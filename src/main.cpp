@@ -6,6 +6,7 @@
 
 #include "core/log_system.hpp"
 #include "core/mode_detector.hpp"
+#include "ui/mcp_log_dock.hpp"
 #include "ui/mcp_status_bar.hpp"
 
 static godot_self_driving::LogSystem& get_log_system() {
@@ -22,15 +23,17 @@ class GodotSelfDrivingPlugin : public godot::EditorPlugin {
     GDCLASS(GodotSelfDrivingPlugin, godot::EditorPlugin)
 
     godot_self_driving::McpStatusBar* status_bar;
+    godot_self_driving::McpLogDock* log_dock;
 
 protected:
     static void _bind_methods() {}
 
 public:
-    GodotSelfDrivingPlugin() : status_bar(nullptr) {}
+    GodotSelfDrivingPlugin() : status_bar(nullptr), log_dock(nullptr) {}
 
     void _enter_tree() override;
     void _exit_tree() override;
+    void _process(double delta) override;
 };
 
 void GodotSelfDrivingPlugin::_enter_tree() {
@@ -46,10 +49,26 @@ void GodotSelfDrivingPlugin::_enter_tree() {
     add_control_to_container(godot::EditorPlugin::CONTAINER_TOOLBAR, status_bar);
     get_log_system().log(LogLevel::Debug, LogCategory::System, "Toolbar status bar attached");
 
+    log_dock = memnew(godot_self_driving::McpLogDock);
+    log_dock->set_title("MCP Log");
+    add_dock(log_dock);
+    get_log_system().log(LogLevel::Debug, LogCategory::System, "Bottom log dock registered");
+
     get_log_system().log(LogLevel::Info, LogCategory::System, "Plugin ready");
 }
 
+void GodotSelfDrivingPlugin::_process(double) {
+    if (log_dock) {
+        log_dock->poll_new_entries();
+    }
+}
+
 void GodotSelfDrivingPlugin::_exit_tree() {
+    if (log_dock) {
+        remove_dock(log_dock);
+        memdelete(log_dock);
+        log_dock = nullptr;
+    }
     if (status_bar) {
         remove_control_from_container(godot::EditorPlugin::CONTAINER_TOOLBAR, status_bar);
         memdelete(status_bar);
@@ -74,6 +93,7 @@ GSD_EXPORT GDExtensionBool GDExtensionEntryPoint(
         if (p_level == godot::MODULE_INITIALIZATION_LEVEL_EDITOR) {
             get_log_system().log(godot_self_driving::LogLevel::Info, godot_self_driving::LogCategory::System, "Editor level initialized");
 
+            godot::ClassDB::register_class<godot_self_driving::McpLogDock>();
             godot::ClassDB::register_class<GodotSelfDrivingPlugin>();
             godot::EditorPlugins::add_by_type<GodotSelfDrivingPlugin>();
         }
