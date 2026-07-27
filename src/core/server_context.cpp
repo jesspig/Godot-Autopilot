@@ -14,8 +14,8 @@ int ServerContext::resolve_port() {
     return 9527;
 }
 
-ServerContext::ServerContext()
-    : start_time_(std::chrono::steady_clock::now()) {
+ServerContext::ServerContext(CommandQueue& queue)
+    : queue_(queue), start_time_(std::chrono::steady_clock::now()) {
     port_ = resolve_port();
     LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
         "Server configured on port " + std::to_string(port_));

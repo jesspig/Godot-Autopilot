@@ -6,11 +6,13 @@
 #include <mcp/server/McpServer.hpp>
 #include <mcp/transport/StreamableHttpServerTransport.hpp>
 
+#include "command_queue.hpp"
+
 namespace godot_self_driving {
 
 class ServerContext {
 public:
-    ServerContext();
+    ServerContext(CommandQueue& queue);
     ~ServerContext();
 
     void start();
@@ -19,7 +21,10 @@ public:
     int get_port() const;
     bool is_running() const;
 
+    CommandQueue& get_queue() { return queue_; }
+
 private:
+    CommandQueue& queue_;
     std::shared_ptr<mcp::StreamableHttpServerTransport> transport_;
     std::unique_ptr<mcp::McpServer> server_;
     int port_ = 9527;
