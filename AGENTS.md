@@ -1,0 +1,586 @@
+# Godot-Self-Driving — Agent Guide
+
+## Project Nature
+
+GDExtension plugin (`.dll` / `.so` / `.dylib`) that runs in-process in Godot editor/runtime. Opens an MCP Streamable HTTP server at `http://127.0.0.1:9527/mcp`. No standalone process — starts/stops with the Godot project.
+
+Tech: CMake 3.28+ / C++17 / godot-cpp (FetchContent) / [mcp-cpp-sdk 0.2.1](https://github.com/jesspig/modelcontextprotocol-cpp-sdk) (FetchContent). SDK 0.2.1 uses libhv internally (no asio), and `mcp::JsonValue` replaces `nlohmann::json`.
+
+## Build & Deploy
+
+```bash
+uv run build.py              # Debug build → example/addons/ (no cleanup)
+uv run build.py --release    # Clean .godot/ + addons/, then Release build → example/addons/
+```
+
+Raw CMake:
+
+```bash
+cmake --preset debug
+cmake --build --preset debug
+```
+
+**Do NOT pass `-j`** — Ninja job pools handle parallelism via `cmake/BuildOptimization.cmake`.
+
+Output: `build/debug/godot-self-driving.dll` (Debug, ~9 MB) or `build/release/godot-self-driving.dll` (Release, ~3.5 MB).
+
+`.gdextension` file is **generated** by `build.py` at deploy time, never committed.
+
+If Godot loads a stale plugin after rebuild, use `--release` to clear `.godot/` metadata cache.
+
+## Dependency Fetch Gotchas
+
+All dependencies fetched from GitHub via FetchContent — **never use local paths or local clones**. CMake must clone from the declared GitHub URLs. **Never delete `_deps/`** — forces full re-download. If network unavailable, copy `_deps/` from prior successful build (e.g. from mcp-cpp-sdk's `build/release/_deps/`).
+
+**Release build `_deps`**: When updating SDK version, release build's `build/release/_deps/` may be stale (empty or wrong content). Copy `build/debug/_deps/mcp-cpp-sdk-*` to `build/release/_deps/` to avoid re-fetch.
+
+## Architecture Design
+
+### Thread Model
+
+```
+libhv thread (HTTP + MCP) ──submit()──→ CommandQueue ──drain()──→ Godot main thread (engine APIs)
+                                       ↑ captured args
+```
+
+- **libhv** handles HTTP and MCP protocol on internal threads (replaces asio)
+- **Godot main thread** is the ONLY thread allowed to call engine APIs
+- **CommandQueue** bridges them: tool handlers `submit()`, `EditorPlugin::_process()` calls `drain()` each frame
+- **Do NOT use `GodotNode::_process()`** — in editor mode, only `EditorPlugin::_process()` is called reliably
+
+### GDExtension Initialization (Two Levels)
+
+```
+MODULE_INITIALIZATION_LEVEL_SCENE   → ClassDB::register_class<CustomNode>()
+                                       (McpStatusBar at SCENE)
+MODULE_INITIALIZATION_LEVEL_EDITOR  → ClassDB::register_class<McpLogDock>()
+                                       ClassDB::register_class<EditorPlugin>()
+                                       EditorPlugins::add_by_type<EditorPlugin>()
+                                       new ServerContext() + start()
+```
+
+**Important**: `ClassDB::register_class<T>()` REQUIRED before `EditorPlugins::add_by_type<T>()`. Classes inheriting `EditorDock` must be registered at EDITOR level (EditorDock parent class not available at SCENE). All other Controls at SCENE level.
+
+### EditorPlugin + Dock
+
+- Toolbar: `add_control_to_container(CONTAINER_TOOLBAR, control)`
+- Panels: Use **EditorDock** (inherit, `add_dock()`), NOT `add_control_to_dock()`
+- `DOCK_SLOT_BOTTOM` for log panel
+- Theme: `EditorInterface::get_singleton()->get_base_control()->get_theme()`
+- Editor icon names (from `editor/editor_log.cpp`):
+  - Clear → `"Clear"`, Collapse → `"CombineLines"`
+  - Debug → `"Debug"`, Info → `"Popup"`, Warning → `"StatusWarning"`, Error → `"StatusError"`
+  - All under `"EditorIcons"` theme type
+
+### MCP Server (ServerContext)
+
+Created at EDITOR level. Manages `StreamableHttpServerTransport` + `McpServer`. libhv handles HTTP on internal threads — no background thread needed.
+
+**SDK 0.2.1 event callbacks** (configured via `ServerOptions`):
+
+- `on_method_called` — logs every MCP method call (Debug, Transport)
+- `on_client_connected` — logs client name+version on initialize (Info, Transport)
+- `on_initialized` — logs when notifications/initialized received (Info, Transport)
+- `on_protocol_error` — logs protocol errors (Error, Transport)
+- `on_transport_close` / `on_transport_error` — transport-level events
+
+All callbacks write through `LogSystem::instance().log()` from the libhv thread — no Godot API calls in these paths.
+
+**Must use `stateless=true`** — non-stateless returns 202 with hardcoded `resultType`, actual response goes through SSE.
+
+**MCP requires initialization handshake** before tools work:
+
+```bash
+curl -s -X POST http://127.0.0.1:9527/mcp -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2026-07-28","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}'
+curl -s -X POST http://127.0.0.1:9527/mcp -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"notifications/initialized"}'
+curl -s -X POST http://127.0.0.1:9527/mcp -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+```
+
+Expected response (only 5 meta-tools):
+
+```json
+{"tools":[{"name":"ping","description":"Health check"},{"name":"search_tools","description":"Search available tools by query"},{"name":"list_categories","description":"List all tool categories"},{"name":"get_tool_detail","description":"Get complete schema for one tool"},{"name":"call_tool","description":"Execute any tool by name"}]}
+```
+
+### Log System
+
+Custom `LogSystem` (thread-safe ring buffer, NOT `add_error_handler()`). **Single logging mechanism for the plugin.**
+
+Subsystems: `System/Transport/Tools/Sandbox/Resources/Prompts`. Max 10000 entries (FIFO). Thread-safe via `std::mutex`.
+
+Access via `LogSystem::instance()` (Meyer's singleton) — needed because `ClassDB::register_class<>()` needs default constructors.
+
+### Log Dock (McpLogDock)
+
+`EditorDock` bottom panel (`DOCK_SLOT_BOTTOM`). Shows filtered logs:
+
+- Level toggle buttons with editor icons + counts
+- Category filter dropdown
+- Text search (case-insensitive)
+- Collapse/merge duplicates, Clear button
+- Theme colors, 5000 line FIFO limit
+- **Auto-refresh**: `poll_new_entries()` called each frame from `_process()`. No callbacks, no `call_deferred`.
+- **Collapse mode** (segment-based): build global freq map → lines with `freq == 1` are separators → split log at separators → within each segment, group identical messages and show `(N)message`. See `_rebuild_log()`.
+
+### Port
+
+Default 9527. Override: `GODOT_SELF_DRIVING_PORT` env > default. SDK retries +1 on conflict.
+
+---
+
+## Tool Architecture (Design)
+
+### Server-side Progressive Discovery
+
+```
+tools/list → ping, search_tools, list_categories, get_tool_detail, call_tool (5 tools)
+                    ↓
+              search_tools("create node")
+                    ↓
+              [{name: "scene_node_create", score: 5.22}]
+                    ↓
+              get_tool_detail({name: "scene_node_create"})
+                    ↓
+              {full schema with inputSchema}
+                    ↓
+              call_tool({name: "scene_node_create", arguments: {...}})
+                    ↓
+              Internal handler map → result
+```
+
+Only 5 meta-tools are registered with MCP `RegisterTool`:
+
+1. `ping` — health check
+2. `search_tools` — BM25 keyword search across tool catalog
+3. `list_categories` — list tool categories with counts
+4. `get_tool_detail` — get full `inputSchema` for one tool
+5. `call_tool({name, arguments})` — **execute any non-meta tool**
+
+All other tools live in an internal `unordered_map<string, ToolHandler>` and are routed through `call_tool`. **Do NOT call `server.RegisterTool()` for non-meta tools.**
+
+### Handler Registration Pattern
+
+1. **Populate handler registry**: Add entries to `g_handlers` map — `g_handlers["tool_name"] = handler_fn`. Each handler returns `{"result": ...}` or `{"error": "..."}`.
+2. **Register meta-tools with MCP**: Only `ping`, `search_tools`, `list_categories`, `get_tool_detail`, `call_tool` use `server.RegisterTool()`.
+3. **Add catalog entries**: `catalog.add_tool({name, desc, category, tags, schema})` — makes tool discoverable via `search_tools` / `get_tool_detail`.
+
+### Handler Function Guidelines
+
+- **Signature**: `mcp::JsonValue handler(const mcp::JsonValue& args)` — called on Godot main thread
+- **Returns**: `{"result": value}` on success, `{"error": "message"}` on failure
+- **Args validation**: Check `args.Find("key")` and type with `IsString()`, `IsObject()`, etc.
+- **Error messages**: Descriptive: `"parent node not found: " + path`, not `"not found"`
+- **Logging**: Always log entry + completion via `LogSystem::instance().log()`
+- **Null safety**: Check every Godot API call return for null. `EditorInterface::get_singleton()` can be null outside editor. `get_edited_scene_root()` returns null if no scene open.
+
+### Scene Path Convention
+
+| Node | Path format | Example |
+|------|-------------|---------|
+| Edited scene root | Node name only | `Node2D` |
+| Direct child | Child name only | `Sprite` |
+| Deep child | Slash-separated relative | `Sprite/Mesh` |
+
+`find_node(path_str)` and `resolve_node(path_str)` always:
+
+1. Strip leading `/` if present
+2. If path matches root's name or is empty → return root
+3. Call `root->get_node_or_null(NodePath(clean_path))`
+
+**Critical**: `get_node_or_null()` with a leading `/` (`/Node2D/Sprite`) creates an absolute NodePath that searches from the window root — this traverses the editor UI tree, not the edited scene. Always strip leading `/` first.
+
+### Variant → JSON Mapping
+
+| Godot Type | JSON | Example |
+|-----------|------|---------|
+| VECTOR3 | `{x,y,z}` | `{"x":1,"y":2,"z":3}` |
+| TRANSFORM3D | `{basis,origin}` | `{"basis":[[1,0,0],[0,1,0],[0,0,1]],"origin":[0,0,0]}` |
+| COLOR | `{r,g,b,a}` | `{"r":1.0,"g":0.0,"b":0.0,"a":1.0}` |
+| NODE_PATH | string | `"Node2D/Sprite"` |
+| OBJECT | `{id,class}` | `{"object_id":42,"class":"Node3D"}` |
+
+---
+
+## Key Dependencies
+
+| Dependency | FetchContent URL | Tag |
+|------------|-----------------|-----|
+| godot-cpp | `https://github.com/godotengine/godot-cpp.git` | 10.0.0-rc1 |
+| mcp-cpp-sdk | `https://github.com/jesspig/modelcontextprotocol-cpp-sdk.git` | 0.2.1 |
+| googletest | `https://github.com/google/googletest.git` | v1.15.2 |
+| quickjs | `https://github.com/bellard/quickjs.git` | `04be246001599f5995fa2f2d8c91a0f198d3f34c` |
+
+## Style & Conventions
+
+- No comments unless logic requires explanation
+- **Tool names**: underscore-separated (`scene_node_create`, `physics_3d_ray_cast`). **NOT** dot-notation.
+- **Meta-tools**: `ping`, `search_tools`, `list_categories`, `get_tool_detail`, `call_tool`
+- **Non-meta tools**: stored in `g_handlers` map, called via `call_tool`
+- Each category gets one `*_ops.hpp/cpp` pair in `src/tools/`
+- All tool registration centralized in `src/tools/register_all.cpp`
+- Global singletons: `LogSystem::instance()`, `get_log_system()`, `get_server_ctx()`
+
+---
+
+## Feature Branch DAG — Execution Plan
+
+```mermaid
+flowchart LR
+    subgraph Phase0[Phase 0: Skeleton]
+        sk[feature/skeleton]
+    end
+    subgraph Phase1[Phase 1: Infrastructure]
+        ge[feature/gdextension-entry]
+        lsc[feature/log-system-core]
+    end
+    subgraph Phase2[Phase 2: Core Runtime]
+        ld[feature/log-dock]
+        mec[feature/mcp-engine-core]
+        cb[feature/command-bridge]
+    end
+    subgraph Phase3[Phase 3: Tool Framework]
+        td[feature/tool-discovery]
+        tp[feature/tool-pattern]
+    end
+    subgraph Phase4[Phase 4: Business Tools]
+        tc[feature/tool-core<br/>resource + script]
+        tpbr[feature/tool-pbr<br/>physics + render + nav]
+        ts[feature/tool-script<br/>audio + input + editor]
+        ta[feature/tool-aux<br/>config + debug + doc]
+    end
+    subgraph Phase5[Phase 5: Advanced]
+        qjs[feature/quickjs-sandbox]
+        mres[feature/mcp-resources]
+        mp[feature/mcp-prompts]
+    end
+    sk --> ge & lsc
+    ge --> ld & mec
+    lsc --> ld
+    mec --> cb
+    cb --> td
+    td --> tp
+    tp --> tc & tpbr & ts & ta
+    ta --> qjs
+    tc --> qjs
+    tpbr --> qjs
+    ts --> qjs
+    qjs --> mres
+    mres --> mp
+```
+
+### Serial Execution Order
+
+| # | Branch | Description | Files | Status |
+|:-:|--------|-------------|:-----:|:------:|
+| 1 | `feature/skeleton` | CMake skeleton + empty .dll + build script | 12 | ⬜ IN PROGRESS |
+| 2 | `feature/gdextension-entry` | Two-level init + EditorPlugin + status bar | 5 | ⬜ |
+| 3 | `feature/log-system-core` | Thread-safe log system + Google Test | 5 | ⬜ |
+| 4 | `feature/log-dock` | EditorDock bottom log panel | 2 | ⬜ |
+| 5 | `feature/mcp-engine-core` | libhv + McpServer + Streamable HTTP | 4 | ⬜ |
+| 6 | `feature/command-bridge` | CommandQueue + libhv↔Godot bridge | 1 | ⬜ |
+| 7 | `feature/tool-discovery` | BM25 search + 3 meta-tools | 6 | ⬜ |
+| 8 | `feature/tool-pattern` | VariantJson + scene_ops + property_ops + call_tool | 8 | ⬜ |
+| 9 | `feature/tool-core` | resource + script tools | 4 | ⬜ |
+| 10 | `feature/tool-pbr` | physics + render + nav tools | 6 | ⬜ |
+| 11 | `feature/tool-script` | audio + input + editor tools | 6 | ⬜ |
+| 12 | `feature/tool-aux` | config + debug + doc tools | 6 | ⬜ |
+| 13 | `feature/quickjs-sandbox` | QuickJS programmatic sandbox | 5 | ⬜ |
+| 14 | `feature/mcp-resources` | MCP Resource URI scheme | 1 | ⬜ |
+| 15 | `feature/mcp-prompts` | MCP Prompt templates | 1 | ⬜ |
+
+### Current Status
+
+**Current branch**: `feature/skeleton` (in progress)
+**Next branch**: `feature/gdextension-entry`
+
+---
+
+### Phase 0: Skeleton
+
+#### 1. feature/skeleton
+
+**Goal**: CMake project skeleton, empty GDExtension .dll that loads in Godot without crash.
+
+**Files**:
+
+- `CMakeLists.txt` — Top-level CMake 3.28+, C++17, FetchContent for godot-cpp + mcp-cpp-sdk
+- `cmake/Platform.cmake` — Architecture/CI detection (GSD_ARCH, GSD_IS_CI)
+- `cmake/BuildOptimization.cmake` — Ninja job pools, Unity Build (CPU+memory aware)
+- `cmake/CompilerOptions.cmake` — Clang-first compiler flags (clang-cl on Windows)
+- `cmake/Cache.cmake` — sccache/ccache auto-detection
+- `cmake/Lto.cmake` — ThinLTO (Clang) / LTCG (MSVC) / IPO (GCC), Release only
+- `cmake/FetchDependencies.cmake` — godot-cpp + mcp-cpp-sdk via FetchContent
+- `CMakePresets.json` — debug + release presets, Ninja generator
+- `src/main.cpp` — Minimal GDExtension entry point with `__declspec(dllexport)`
+- `godot-self-driving.gdextension` — **Generated** by build.py, never committed
+- `build.py` — `uv run build.py [--release]` builds + deploys to `example/addons/`
+- `.gitignore`, `LICENSE`, `README.md`, `README_zh.md`
+
+**Verification**: `cmake --preset debug && cmake --build --preset debug` produces a .dll that loads in Godot without errors.
+
+---
+
+### Phase 1: Infrastructure
+
+#### 2. feature/gdextension-entry
+
+**Goal**: Two-level GDExtension initialization, EditorPlugin registration, toolbar status bar.
+
+**Files**:
+
+- `src/main.cpp` — `GDExtensionEntryPoint` with two-level init:
+  - SCENE level: `ClassDB::register_class<McpStatusBar>()`
+  - EDITOR level: `ClassDB::register_class<McpLogDock>()`, `ClassDB::register_class<EditorPlugin>()`, `EditorPlugins::add_by_type<>()`
+- `src/core/mode_detector.hpp/cpp` — `RuntimeMode` enum (`Editor`/`Game`/`Unknown`), `ModeDetector::is_editor()`, `is_runtime()`, `detect()`
+- `src/ui/mcp_status_bar.hpp/cpp` — `McpStatusBar` (HBoxContainer), editor theme icon + "GSD: initializing..." label, `set_status_text()`, `set_status_ok()` color switching
+
+**Gotchas**:
+
+- `ClassDB::register_class<T>()` MUST come before `EditorPlugins::add_by_type<T>()`
+- EditorDock subclasses must be registered at EDITOR level (EditorDock not available at SCENE)
+- Status bar uses `EditorPlugin::CONTAINER_TOOLBAR`
+
+---
+
+#### 3. feature/log-system-core
+
+**Goal**: Thread-safe log system with filtering + Google Test integration.
+
+**Files**:
+
+- `src/core/log_system.hpp/cpp` — `LogEntry` (timestamp, level, category, message), `LogSystem` class
+  - `log(LogLevel, LogCategory, string_view)` — thread-safe, FIFO ring buffer (10k limit)
+  - `query({min_level, filter_text, category})` — filtered query returns const pointers
+  - `set_on_new_entry(callback)` — subscribe for UI updates (callback invoked outside lock)
+  - `LogSystem::instance()` — Meyer's singleton (required for ClassDB default constructors)
+- `CMakeLists.txt` — Added `GSD_BUILD_TESTS` option with Google Test v1.15.2 FetchContent
+- `tests/CMakeLists.txt` — test_log_system target
+- `tests/test_log_system.cpp` — 8 test cases
+
+**Log Levels**: Debug, Info, Warning, Error
+**Log Categories**: System, Transport, Tools, Sandbox, Resources, Prompts
+
+**Tests** (8 total): EmptyQuery, BasicLogAndQuery, LevelFilter, TextFilter, CategoryFilter, RingBufferLimit, CallbackNotification, ThreadSafety
+
+---
+
+#### 4. feature/log-dock
+
+**Goal**: EditorDock bottom panel showing filtered MCP logs.
+
+**Files**:
+
+- `src/ui/mcp_log_dock.hpp/cpp` — `McpLogDock` extending `godot::EditorDock`
+  - UI: toolbar (Clear/Collapse buttons + search box + category dropdown) → filter bar (4 level toggle buttons) → RichTextLabel
+  - Editor icons: Clear→"Clear", Collapse→"CombineLines", Debug→"Debug", Info→"Popup", Warning→"StatusWarning", Error→"StatusError"
+  - Theme colors: `EditorInterface::get_singleton()->get_base_control()->get_theme()`
+  - Thread safety: callback pushes to pending queue under mutex → `poll_new_entries()` in `_process()`
+- `src/main.cpp` — `register_class<McpLogDock>()` at EDITOR level, `add_dock(log_dock)` in EditorPlugin
+
+---
+
+### Phase 2: Core Runtime
+
+#### 5. feature/mcp-engine-core
+
+**Goal**: McpServer + StreamableHttpServerTransport (libhv replaces asio).
+
+**Files**:
+
+- `src/core/server_context.hpp/cpp` — `ServerContext` class managing lifecycle:
+  - `start()`: StreamableHttpServerTransport(port 9527, stateless=true) → McpServer → register_tools → Start() (non-blocking, libhv handles threading internally)
+  - `stop()`: Close server → close transport
+  - `get_port()`: returns actual port (handles auto-increment)
+  - Port resolution: `GODOT_SELF_DRIVING_PORT` env > 9527 default
+- Tools registered at startup:
+  - `ping` — health check, returns "pong" (meta-tool, directly registered)
+  - `system_status` — returns JSON with version/port/uptime
+
+**Critical**: `stateless=true` is required. Without it, POST returns 202 with hardcoded `{"resultType":"complete"}` and actual response goes through SSE stream.
+
+---
+
+#### 6. feature/command-bridge
+
+**Goal**: Thread-safe command queue bridging libhv thread to Godot main thread via `EditorPlugin::_process()`.
+
+**Files**:
+
+- `src/core/command_queue.hpp` — Header-only template class:
+  - `submit(Fn&& fn) → std::future<ResultType>` — enqueue from any thread, returns future
+  - `drain()` — dequeue all pending tasks, execute on calling thread, set promises
+- `src/main.cpp` — `GodotSelfDrivingPlugin` holds static `CommandQueue`, overrides `_process()` to call `drain()` each frame
+
+**Critical**: `Node::_process()` is NOT called in editor mode. Only `EditorPlugin::_process()` is reliable.
+
+**Exception safety**: `Task::execute()` wraps `fn()` in try-catch. On exception, `promise.set_exception()` is called instead of silently leaving the promise unresolved (which would hang `result.get()` on the libhv thread forever).
+
+---
+
+### Phase 3: Tool Framework
+
+#### 7. feature/tool-discovery
+
+**Goal**: Three-tier progressive tool discovery with BM25 keyword search.
+
+**Files**:
+
+- `src/util/bm25_index.hpp/cpp` — BM25 inverted index over tool names + descriptions + tags
+- `src/tools/register_all.hpp` — `register_all_tools(McpServer&, CommandQueue&, ToolCatalog&, Bm25Index&, int port)` declaration
+- `src/tools/tool_catalog.hpp/cpp` — `ToolInfo` struct + `ToolCatalog` singleton with `populate_default_tools()`
+- `src/core/server_context.cpp` — Register meta-tools, populate catalog + BM25 index
+
+**Meta-Tools**:
+
+| Tool | Input | Output | Description |
+|------|-------|--------|-------------|
+| `search_tools` | `{query, category?, tags?}` | `[{name, score}]` | BM25 search across tool catalog |
+| `list_categories` | `{}` | `[{id, name, tool_count}]` | List all tool categories |
+| `get_tool_detail` | `{name}` | full ToolInfo JSON | Complete schema for one tool |
+
+**Dependency**: feature/command-bridge
+
+---
+
+#### 8. feature/tool-pattern
+
+**Goal**: Variant↔JSON conversion, first real engine tools, server-side progressive discovery via `call_tool`.
+
+**Files**:
+
+- `src/util/variant_json.hpp/cpp` — `VariantJson::serialize(Variant) → mcp::JsonValue`, `VariantJson::deserialize(mcp::JsonValue, type_hint) → Variant`
+- `src/tools/scene_ops.hpp/cpp` — `scene_node_create`, `scene_node_delete`, `scene_tree_get`
+- `src/tools/property_ops.hpp/cpp` — `property_get`, `property_set`, `property_get_list`, `signal_connect`
+- `src/tools/register_all.cpp` — Register 4 meta-tools + `call_tool` proxy. All non-meta tools stored in internal handler map and routed through `call_tool`.
+- `src/core/server_context.cpp` — Removed inline `_ping`/`system.status` registration
+- `src/tools/tool_catalog.cpp` — Updated tool metadata
+- `tests/test_tool_catalog.cpp` — 6 ToolCatalog tests
+
+**Dependency**: feature/tool-discovery
+
+---
+
+### Phase 4: Business Tools
+
+#### 9. feature/tool-core
+
+**Goal**: Resource management + script execution tools.
+
+**Files**:
+
+- `src/tools/resource_ops.hpp/cpp` — 20 tools (load, save, create, rename, delete, import, etc.)
+- `src/tools/script_ops.hpp/cpp` — 10 tools (execute, load, create, attach, detach, etc.)
+- `src/tools/register_all.cpp` — 30 handler registrations + 30 catalog entries
+
+**Dependency**: feature/tool-pattern
+
+---
+
+#### 10. feature/tool-pbr
+
+**Goal**: Physics + rendering + navigation direct server control.
+
+**Files**:
+
+- `src/tools/physics_ops.hpp/cpp` — 40 tools (2D + 3D physics queries, body/joint/area creation)
+- `src/tools/render_ops.hpp/cpp` — 30 tools (canvas, mesh, material, camera, light, particle, viewport)
+- `src/tools/nav_ops.hpp/cpp` — 15 tools (2D + 3D navigation, maps, regions, agents)
+
+**Dependency**: feature/tool-pattern
+
+---
+
+#### 11. feature/tool-script
+
+**Goal**: Audio + input simulation + editor integration tools.
+
+**Files**:
+
+- `src/tools/audio_ops.hpp/cpp` — 15 tools (bus, effect, stream playback)
+- `src/tools/input_ops.hpp/cpp` — 10 tools (action/key/mouse/gamepad simulation)
+- `src/tools/editor_ops.hpp/cpp` — 20 tools (selection, scene, undo redo, file system, plugins)
+
+**Dependency**: feature/tool-pattern
+
+---
+
+#### 12. feature/tool-aux
+
+**Goal**: Configuration, debug, and documentation query tools.
+
+**Files**:
+
+- `src/tools/config_ops.hpp/cpp` — 13 tools (project settings, engine, editor settings)
+- `src/tools/debug_ops.hpp/cpp` — 15 tools (performance, profiling, debug visualization)
+- `src/tools/doc_ops.hpp/cpp` — 4 tools (class reference via `ClassDBSingleton` runtime reflection)
+
+**Dependency**: feature/tool-pattern
+
+---
+
+### Phase 5: Advanced
+
+#### 13. feature/quickjs-sandbox
+
+**Goal**: QuickJS sandbox for programmatic tool composition (async/await support).
+
+**Files**:
+
+- `src/sandbox/script_sandbox.hpp/cpp` — `ScriptSandbox` class:
+  - `initialize()`: create JSRuntime + JSContext, set memory/stack/GC limits
+  - `execute(script, timeout_ms) → ScriptResult{result_json, console_output, error, execution_time_ms}`
+  - Async event loop: `JS_Eval(JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_ASYNC)` → `JS_ExecutePendingJob()` loop → `JS_PromiseState()`/`JS_PromiseResult()`
+  - `inject_builtins()`: exposes `console.log/warn/error` (captures output) + `_mcpCall(name, args_json)` (bridges to `g_handlers`)
+  - Interrupt handler for timeout enforcement
+- `src/sandbox/tool_stubs_generator.hpp/cpp` — `generate_stubs(catalog)`: iterates `get_all_tools()`, generates async tool stubs
+- `CMakeLists.txt` — FetchContent for QuickJS (commit `04be2460`), LANGUAGES C CXX, 5 source files, compiler-rt for 128-bit division
+- `src/tools/register_all.hpp/cpp` — Added `ScriptSandbox&` param, sandbox tool integration
+- `src/core/server_context.hpp/cpp` — Added `ScriptSandbox sandbox_` member, sandbox init + stub injection
+
+**Windows compat**: `sys/time.h` stub for `gettimeofday`/`clock_gettime`, `pthread.h` stub for mutex/condvar (atomics disabled via `-UCONFIG_ATOMICS`), `alloca` via `-Dalloca=__builtin_alloca`, `CONFIG_VERSION` read from VERSION file.
+
+**Dependency**: feature/tool-aux + feature/tool-discovery
+
+---
+
+#### 14. feature/mcp-resources
+
+**Goal**: Expose Godot engine state as MCP Resource URI scheme.
+
+**Modified Files**:
+
+- `src/tools/register_all.cpp` — Register Resource URIs
+
+**Resource URI Scheme**:
+
+| URI | Registration | Description |
+|-----|------------|-------------|
+| `godot://engine/version` | `RegisterResource` | Engine version info as JSON |
+| `godot://scene/tree` | `RegisterResource` | Current scene node tree (JSON) |
+| `godot://scene/{path}` | `RegisterResourceTemplate` | Get node properties by path |
+| `godot://filesystem/tree` | `RegisterResource` | Project file system structure |
+| `godot://filesystem/{path}` | `RegisterResourceTemplate` | File content or directory listing |
+| `godot://editor/selection` | `RegisterResource` | Currently selected nodes/resources |
+| `godot://editor/settings/{key}` | `RegisterResourceTemplate` | Editor setting value |
+| `godot://log/recent` | `RegisterResource` | Last N log entries |
+
+**Dependency**: feature/quickjs-sandbox
+
+---
+
+#### 15. feature/mcp-prompts
+
+**Goal**: MCP Prompt templates for common engine tasks.
+
+**Modified Files**:
+
+- `src/tools/register_all.cpp` — Register Prompts
+
+**Prompts**: `create-3d-scene`, `setup-character`, `debug-physics`, `setup-input-map`, `setup-gui`
+
+Each prompt returns `PromptMessage[]` with pre-written instructions and tool call examples guiding the LLM through the task step by step.
+
+**Dependency**: feature/mcp-resources
