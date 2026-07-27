@@ -1,0 +1,48 @@
+# Build
+build/
+out/
+cmake-build-*/
+
+# IDE
+.idea/
+.vs/
+.vscode/
+*.swp
+*.swo
+*~
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+CTestTestfile.cmake
+compile_commands.json
+
+# Godot
+.godot/
+import/
+*.translation
+*.uid
+
+# GDExtension
+*.dll
+*.so
+*.dylib
+*.pdb
+*.exp
+*.lib
+
+# Dependencies (FetchContent)
+_build_/
+_deps/
+_download/
+
+# Tests
+tests/*.xml
+test-results/
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
