@@ -56,19 +56,15 @@ include(Lto)
 # ====================================================================
 # godot-self-driving — SHARED (GDExtension)
 # ====================================================================
-add_library(godot-self-driving SHARED src/main.cpp)
+add_library(godot-self-driving SHARED
+    src/main.cpp
+    src/core/mode_detector.cpp
+    src/ui/mcp_status_bar.cpp)
 
 target_include_directories(godot-self-driving PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
-target_link_libraries(godot-self-driving PRIVATE
-    -Wl,/WHOLEARCHIVE:godot-cpp)
+target_link_libraries(godot-self-driving PRIVATE godot-cpp)
+if(MSVC)
+    target_link_options(godot-self-driving PRIVATE "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>")
+endif()
 
-# ====================================================================
-# 构建摘要
-# ====================================================================
-file(WRITE "${CMAKE_BINARY_DIR}/build_config.txt"
-    "version=${PROJECT_VERSION}\n"
-    "build_type=${CMAKE_BUILD_TYPE}\n"
-    "generator=${CMAKE_GENERATOR}\n"
-    "compiler_id=${CMAKE_CXX_COMPILER_ID}\n"
-    "lto=${GSD_LTO}\n")
