@@ -54,15 +54,6 @@ include(FetchDependencies)
 include(Lto)
 
 # ====================================================================
-# Option: 测试
-# ====================================================================
-option(GSD_BUILD_TESTS "Build tests" ON)
-if(GSD_BUILD_TESTS)
-    enable_testing()
-    add_subdirectory(tests)
-endif()
-
-# ====================================================================
 # godot-self-driving — SHARED (GDExtension)
 # ====================================================================
 add_library(godot-self-driving SHARED
