@@ -22,6 +22,10 @@
 
 libhv 在内部线程处理 HTTP/MCP。`Node::_process()` 在编辑器模式下不会被调用——只有 `EditorPlugin::_process()` 是可靠的。`CommandQueue::drain()` 必须放在 `EditorPlugin::_process()` 里每帧调用。
 
+### R6: CommandQueue — Exception Safety
+
+`Task::execute()` 必须用 `try-catch` 包裹 `fn()`。异常时调 `promise.set_exception()`，否则 `future.get()` 在 libhv 线程上永远挂起。
+
 ---
 
 ## Project Nature
@@ -304,7 +308,7 @@ flowchart LR
 | 3 | `feature/log-system-core` | Thread-safe log system | 2 | ✅ |
 | 4 | `feature/log-dock` | EditorDock bottom log panel | 2 | ✅ |
 | 5 | `feature/mcp-engine-core` | libhv + McpServer + Streamable HTTP | 4 | ✅ |
-| 6 | `feature/command-bridge` | CommandQueue + libhv↔Godot bridge | 1 | ⬜ |
+| 6 | `feature/command-bridge` | CommandQueue + libhv↔Godot bridge | 1 | ✅ |
 | 7 | `feature/tool-discovery` | BM25 search + 3 meta-tools | 6 | ⬜ |
 | 8 | `feature/tool-pattern` | VariantJson + scene_ops + property_ops + call_tool | 8 | ⬜ |
 | 9 | `feature/tool-core` | resource + script tools | 4 | ⬜ |
@@ -317,8 +321,8 @@ flowchart LR
 
 ### Current Status
 
-**Current branch**: `feature/gdextension-entry` (completed)
-**Next branch**: `feature/log-system-core`
+**Current branch**: `feature/command-bridge` (completed)
+**Next branch**: `feature/tool-discovery`
 
 ---
 
@@ -438,9 +442,9 @@ flowchart LR
   - `drain()` — dequeue all pending tasks, execute on calling thread, set promises
 - `src/main.cpp` — `GodotSelfDrivingPlugin` holds static `CommandQueue`, overrides `_process()` to call `drain()` each frame
 
-**Critical**: `Node::_process()` is NOT called in editor mode. Only `EditorPlugin::_process()` is reliable.
+**Critical**: `Node::_process()` is NOT called in editor mode. Only `EditorPlugin::_process()` is reliable. (R5)
 
-**Exception safety**: `Task::execute()` wraps `fn()` in try-catch. On exception, `promise.set_exception()` is called instead of silently leaving the promise unresolved (which would hang `result.get()` on the libhv thread forever).
+**Exception safety**: `Task::execute()` wraps `fn()` in try-catch. On exception, `promise.set_exception()` is called instead of silently leaving the promise unresolved, which would hang `future.get()` on the libhv thread forever. (R6)
 
 ---
 

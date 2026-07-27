@@ -4,6 +4,7 @@
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/engine.hpp>
 
+#include "core/command_queue.hpp"
 #include "core/log_system.hpp"
 #include "core/mode_detector.hpp"
 #include "core/server_context.hpp"
@@ -31,6 +32,7 @@ class GodotSelfDrivingPlugin : public godot::EditorPlugin {
 
     godot_self_driving::McpStatusBar* status_bar;
     godot_self_driving::McpLogDock* log_dock;
+    static godot_self_driving::CommandQueue s_queue;
 
 protected:
     static void _bind_methods() {}
@@ -41,7 +43,11 @@ public:
     void _enter_tree() override;
     void _exit_tree() override;
     void _process(double delta) override;
+
+    static godot_self_driving::CommandQueue& queue() { return s_queue; }
 };
+
+godot_self_driving::CommandQueue GodotSelfDrivingPlugin::s_queue;
 
 void GodotSelfDrivingPlugin::_enter_tree() {
     using godot_self_driving::LogLevel;
@@ -70,6 +76,7 @@ void GodotSelfDrivingPlugin::_enter_tree() {
 }
 
 void GodotSelfDrivingPlugin::_process(double) {
+    s_queue.drain();
     if (log_dock) {
         log_dock->poll_new_entries();
     }
@@ -105,7 +112,7 @@ GSD_EXPORT GDExtensionBool GDExtensionEntryPoint(
         if (p_level == godot::MODULE_INITIALIZATION_LEVEL_EDITOR) {
             get_log_system().log(godot_self_driving::LogLevel::Info, godot_self_driving::LogCategory::System, "Editor level initialized");
 
-            g_server_ctx = new (std::nothrow) godot_self_driving::ServerContext();
+            g_server_ctx = new (std::nothrow) godot_self_driving::ServerContext(GodotSelfDrivingPlugin::queue());
             if (g_server_ctx) {
                 g_server_ctx->start();
                 auto port = g_server_ctx->get_port();
