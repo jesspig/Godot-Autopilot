@@ -54,11 +54,21 @@ include(FetchDependencies)
 include(Lto)
 
 # ====================================================================
+# Option: 测试
+# ====================================================================
+option(GSD_BUILD_TESTS "Build tests" ON)
+if(GSD_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
+
+# ====================================================================
 # godot-self-driving — SHARED (GDExtension)
 # ====================================================================
 add_library(godot-self-driving SHARED
     src/main.cpp
     src/core/mode_detector.cpp
+    src/core/log_system.cpp
     src/ui/mcp_status_bar.cpp)
 
 target_include_directories(godot-self-driving PRIVATE ${CMAKE_SOURCE_DIR}/src)
