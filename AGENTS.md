@@ -277,8 +277,8 @@ flowchart LR
 |:-:|--------|-------------|:-----:|:------:|
 | 1 | `feature/skeleton` | CMake skeleton + empty .dll + build script | 12 | ✅ |
 | 2 | `feature/gdextension-entry` | Two-level init + EditorPlugin + status bar | 5 | ✅ |
-| 3 | `feature/log-system-core` | Thread-safe log system + Google Test | 5 | ✅ |
-| 4 | `feature/log-dock` | EditorDock bottom log panel | 2 | ⬜ |
+| 3 | `feature/log-system-core` | Thread-safe log system | 2 | ✅ |
+| 4 | `feature/log-dock` | EditorDock bottom log panel | 2 | ✅ |
 | 5 | `feature/mcp-engine-core` | libhv + McpServer + Streamable HTTP | 4 | ⬜ |
 | 6 | `feature/command-bridge` | CommandQueue + libhv↔Godot bridge | 1 | ⬜ |
 | 7 | `feature/tool-discovery` | BM25 search + 3 meta-tools | 6 | ⬜ |

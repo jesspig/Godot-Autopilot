@@ -60,7 +60,8 @@ add_library(godot-self-driving SHARED
     src/main.cpp
     src/core/mode_detector.cpp
     src/core/log_system.cpp
-    src/ui/mcp_status_bar.cpp)
+    src/ui/mcp_status_bar.cpp
+    src/ui/mcp_log_dock.cpp)
 
 target_include_directories(godot-self-driving PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
