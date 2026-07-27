@@ -1,5 +1,6 @@
 #include "server_context.hpp"
 #include "log_system.hpp"
+#include "tools/register_all.hpp"
 #include <mcp/server/ServerOptions.hpp>
 #include <mcp/Content.hpp>
 #include <hv/hlog.h>
@@ -96,37 +97,7 @@ bool ServerContext::is_running() const {
 }
 
 void ServerContext::register_tools() {
-    // ping — health check
-    {
-        mcp::ToolOptions opts;
-        opts.Description("Health check");
-        server_->RegisterTool("ping", opts,
-            [](const mcp::RequestContext<mcp::CallToolRequestParams>&) -> mcp::CallToolResult {
-                mcp::CallToolResult result;
-                result.content.push_back(mcp::TextContent{"text", "pong"});
-                return result;
-            });
-    }
-
-    // system_status — version/uptime
-    {
-        auto start = start_time_;
-        mcp::ToolOptions opts;
-        opts.Description("Get engine and server status");
-        server_->RegisterTool("system_status", opts,
-            [start](const mcp::RequestContext<mcp::CallToolRequestParams>&) -> mcp::CallToolResult {
-                auto now = std::chrono::steady_clock::now();
-                auto uptime_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count();
-
-                mcp::CallToolResult result;
-                result.content.push_back(mcp::TextContent{"text",
-                    "Version: 0.1.0, uptime: " + std::to_string(uptime_ms) + "ms"});
-                return result;
-            });
-    }
-
-    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-        "ping and system_status tools registered");
+    register_all_tools(*server_, queue_, catalog_, bm25_index_, port_);
 }
 
 } // namespace godot_self_driving

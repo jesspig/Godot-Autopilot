@@ -61,6 +61,9 @@ add_library(godot-self-driving SHARED
     src/core/mode_detector.cpp
     src/core/log_system.cpp
     src/core/server_context.cpp
+    src/tools/register_all.cpp
+    src/tools/tool_catalog.cpp
+    src/util/bm25_index.cpp
     src/ui/mcp_status_bar.cpp
     src/ui/mcp_log_dock.cpp)
 
