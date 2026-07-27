@@ -60,12 +60,13 @@ add_library(godot-self-driving SHARED
     src/main.cpp
     src/core/mode_detector.cpp
     src/core/log_system.cpp
+    src/core/server_context.cpp
     src/ui/mcp_status_bar.cpp
     src/ui/mcp_log_dock.cpp)
 
 target_include_directories(godot-self-driving PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
-target_link_libraries(godot-self-driving PRIVATE godot-cpp)
+target_link_libraries(godot-self-driving PRIVATE godot-cpp mcp-server mcp-http)
 if(MSVC)
     target_link_options(godot-self-driving PRIVATE "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>")
 endif()

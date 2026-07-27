@@ -1,5 +1,29 @@
 # Godot-Self-Driving — Agent Guide
 
+## ⚠️ Rules — Verified from Implementation
+
+### R1: WHOLEARCHIVE Required for godot-cpp
+
+`target_link_libraries(godot-self-driving PRIVATE godot-cpp)` 传播 include 路径，但链接器会丢弃未被引用的静态初始化代码（`ClassDB::register_class` 等）。必须额外加 `target_link_options(godot-self-driving PRIVATE "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>")`。`-Wl,/WHOLEARCHIVE:godot-cpp` 的写法不传播 include 路径——永远用上面这种拆分写法。
+
+### R2: GDExtension Init — SCENE Before EDITOR
+
+`ClassDB::register_class<T>()` 必须在 `EditorPlugins::add_by_type<T>()` 之前调用。继承 `EditorDock` 的类必须在 `MODULE_INITIALIZATION_LEVEL_EDITOR` 阶段注册（EditorDock 父类在 SCENE 阶段不可用）。普通 Control 在 SCENE 阶段注册。
+
+### R3: Logging — Single Mechanism
+
+全程使用 `LogSystem::instance().log()`。`UtilityFunctions::print`、`godot::print_line`、`std::cout` 的日志不会出现在 MCP Log Dock 中。
+
+### R4: MCP Server — stateless=true Required
+
+`StreamableHttpServerOptions.stateless` 必须设为 `true`。为 `false` 时 POST 响应走 SSE 流（返回 202 + 异步推送），不走直接 HTTP 返回，MCP 客户端收不到同步响应。
+
+### R5: Thread Model — libhv Internal Threads + EditorPlugin::_process()
+
+libhv 在内部线程处理 HTTP/MCP。`Node::_process()` 在编辑器模式下不会被调用——只有 `EditorPlugin::_process()` 是可靠的。`CommandQueue::drain()` 必须放在 `EditorPlugin::_process()` 里每帧调用。
+
+---
+
 ## Project Nature
 
 GDExtension plugin (`.dll` / `.so` / `.dylib`) that runs in-process in Godot editor/runtime. Opens an MCP Streamable HTTP server at `http://127.0.0.1:9527/mcp`. No standalone process — starts/stops with the Godot project.
@@ -279,7 +303,7 @@ flowchart LR
 | 2 | `feature/gdextension-entry` | Two-level init + EditorPlugin + status bar | 5 | ✅ |
 | 3 | `feature/log-system-core` | Thread-safe log system | 2 | ✅ |
 | 4 | `feature/log-dock` | EditorDock bottom log panel | 2 | ✅ |
-| 5 | `feature/mcp-engine-core` | libhv + McpServer + Streamable HTTP | 4 | ⬜ |
+| 5 | `feature/mcp-engine-core` | libhv + McpServer + Streamable HTTP | 4 | ✅ |
 | 6 | `feature/command-bridge` | CommandQueue + libhv↔Godot bridge | 1 | ⬜ |
 | 7 | `feature/tool-discovery` | BM25 search + 3 meta-tools | 6 | ⬜ |
 | 8 | `feature/tool-pattern` | VariantJson + scene_ops + property_ops + call_tool | 8 | ⬜ |

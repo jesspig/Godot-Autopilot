@@ -6,11 +6,18 @@
 
 #include "core/log_system.hpp"
 #include "core/mode_detector.hpp"
+#include "core/server_context.hpp"
 #include "ui/mcp_log_dock.hpp"
 #include "ui/mcp_status_bar.hpp"
 
 static godot_self_driving::LogSystem& get_log_system() {
     return godot_self_driving::LogSystem::instance();
+}
+
+static godot_self_driving::ServerContext* g_server_ctx = nullptr;
+
+static godot_self_driving::ServerContext* get_server_ctx() {
+    return g_server_ctx;
 }
 
 #ifdef _WIN32
@@ -45,7 +52,12 @@ void GodotSelfDrivingPlugin::_enter_tree() {
         std::string("Runtime mode: ") + (godot_self_driving::ModeDetector::is_editor() ? "Editor" : "Runtime"));
 
     status_bar = memnew(godot_self_driving::McpStatusBar);
-    status_bar->set_status_text("GSD: offline");
+    if (get_server_ctx() && get_server_ctx()->is_running()) {
+        auto port = get_server_ctx()->get_port();
+        status_bar->set_status_text("GSD: 127.0.0.1:" + godot::String::num_int64(port));
+    } else {
+        status_bar->set_status_text("GSD: offline");
+    }
     add_control_to_container(godot::EditorPlugin::CONTAINER_TOOLBAR, status_bar);
     get_log_system().log(LogLevel::Debug, LogCategory::System, "Toolbar status bar attached");
 
@@ -93,6 +105,14 @@ GSD_EXPORT GDExtensionBool GDExtensionEntryPoint(
         if (p_level == godot::MODULE_INITIALIZATION_LEVEL_EDITOR) {
             get_log_system().log(godot_self_driving::LogLevel::Info, godot_self_driving::LogCategory::System, "Editor level initialized");
 
+            g_server_ctx = new (std::nothrow) godot_self_driving::ServerContext();
+            if (g_server_ctx) {
+                g_server_ctx->start();
+                auto port = g_server_ctx->get_port();
+                get_log_system().log(godot_self_driving::LogLevel::Info, godot_self_driving::LogCategory::Transport,
+                    "MCP server listening on 127.0.0.1:" + std::to_string(port));
+            }
+
             godot::ClassDB::register_class<godot_self_driving::McpLogDock>();
             godot::ClassDB::register_class<GodotSelfDrivingPlugin>();
             godot::EditorPlugins::add_by_type<GodotSelfDrivingPlugin>();
@@ -101,6 +121,8 @@ GSD_EXPORT GDExtensionBool GDExtensionEntryPoint(
 
     init.register_terminator([](godot::ModuleInitializationLevel p_level) {
         if (p_level == godot::MODULE_INITIALIZATION_LEVEL_EDITOR) {
+            delete g_server_ctx;
+            g_server_ctx = nullptr;
             get_log_system().log(godot_self_driving::LogLevel::Info, godot_self_driving::LogCategory::System, "Editor level terminated");
         }
         if (p_level == godot::MODULE_INITIALIZATION_LEVEL_SCENE) {
