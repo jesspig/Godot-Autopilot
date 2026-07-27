@@ -7,6 +7,8 @@
 #include <mcp/transport/StreamableHttpServerTransport.hpp>
 
 #include "command_queue.hpp"
+#include "tools/tool_catalog.hpp"
+#include "util/bm25_index.hpp"
 
 namespace godot_self_driving {
 
@@ -25,6 +27,8 @@ public:
 
 private:
     CommandQueue& queue_;
+    ToolCatalog catalog_;
+    Bm25Index bm25_index_;
     std::shared_ptr<mcp::StreamableHttpServerTransport> transport_;
     std::unique_ptr<mcp::McpServer> server_;
     int port_ = 9527;

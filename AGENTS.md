@@ -309,7 +309,7 @@ flowchart LR
 | 4 | `feature/log-dock` | EditorDock bottom log panel | 2 | ✅ |
 | 5 | `feature/mcp-engine-core` | libhv + McpServer + Streamable HTTP | 4 | ✅ |
 | 6 | `feature/command-bridge` | CommandQueue + libhv↔Godot bridge | 1 | ✅ |
-| 7 | `feature/tool-discovery` | BM25 search + 3 meta-tools | 6 | ⬜ |
+| 7 | `feature/tool-discovery` | BM25 search + 3 meta-tools | 6 | ✅ |
 | 8 | `feature/tool-pattern` | VariantJson + scene_ops + property_ops + call_tool | 8 | ⬜ |
 | 9 | `feature/tool-core` | resource + script tools | 4 | ⬜ |
 | 10 | `feature/tool-pbr` | physics + render + nav tools | 6 | ⬜ |
@@ -321,8 +321,8 @@ flowchart LR
 
 ### Current Status
 
-**Current branch**: `feature/command-bridge` (completed)
-**Next branch**: `feature/tool-discovery`
+**Current branch**: `feature/tool-discovery` (completed)
+**Next branch**: `feature/tool-pattern`
 
 ---
 
