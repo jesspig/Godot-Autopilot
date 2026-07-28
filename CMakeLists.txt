@@ -63,7 +63,9 @@ add_library(godot-self-driving SHARED
     src/core/server_context.cpp
     src/tools/property_ops.cpp
     src/tools/register_all.cpp
+    src/tools/resource_ops.cpp
     src/tools/scene_ops.cpp
+    src/tools/script_ops.cpp
     src/tools/tool_catalog.cpp
     src/util/bm25_index.cpp
     src/util/variant_json.cpp

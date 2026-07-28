@@ -1,6 +1,8 @@
 #include "register_all.hpp"
 #include "core/log_system.hpp"
 #include "tools/property_ops.hpp"
+#include "tools/resource_ops.hpp"
+#include "tools/script_ops.hpp"
 #include "tools/scene_ops.hpp"
 #include <mcp/Content.hpp>
 #include <mcp/JsonValue.hpp>
@@ -42,6 +44,36 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
     g_handlers["property_set"] = property_ops::handle_set;
     g_handlers["property_get_list"] = property_ops::handle_get_list;
     g_handlers["signal_connect"] = property_ops::handle_signal_connect;
+    g_handlers["resource_load"] = resource_ops::handle_load;
+    g_handlers["resource_load_threaded"] = resource_ops::handle_load_threaded;
+    g_handlers["resource_load_threaded_get_status"] = resource_ops::handle_load_threaded_get_status;
+    g_handlers["resource_load_threaded_wait"] = resource_ops::handle_load_threaded_wait;
+    g_handlers["resource_save"] = resource_ops::handle_save;
+    g_handlers["resource_create"] = resource_ops::handle_create;
+    g_handlers["resource_duplicate"] = resource_ops::handle_duplicate;
+    g_handlers["resource_get_type"] = resource_ops::handle_get_type;
+    g_handlers["resource_exists"] = resource_ops::handle_exists;
+    g_handlers["resource_list_types"] = resource_ops::handle_list_types;
+    g_handlers["resource_get_extensions"] = resource_ops::handle_get_extensions;
+    g_handlers["resource_list_dir"] = resource_ops::handle_list_dir;
+    g_handlers["resource_get_uid"] = resource_ops::handle_get_uid;
+    g_handlers["resource_set_uid"] = resource_ops::handle_set_uid;
+    g_handlers["resource_remove"] = resource_ops::handle_remove;
+    g_handlers["resource_rename"] = resource_ops::handle_rename;
+    g_handlers["resource_get_dependencies"] = resource_ops::handle_get_dependencies;
+    g_handlers["resource_has_dependency"] = resource_ops::handle_has_dependency;
+    g_handlers["resource_import"] = resource_ops::handle_import;
+    g_handlers["resource_reimport"] = resource_ops::handle_reimport;
+    g_handlers["script_execute_gdscript"] = script_ops::handle_execute_gdscript;
+    g_handlers["script_load"] = script_ops::handle_load;
+    g_handlers["script_create"] = script_ops::handle_create;
+    g_handlers["script_attach_to_node"] = script_ops::handle_attach_to_node;
+    g_handlers["script_detach_from_node"] = script_ops::handle_detach_from_node;
+    g_handlers["script_get_property"] = script_ops::handle_get_property;
+    g_handlers["script_set_property"] = script_ops::handle_set_property;
+    g_handlers["script_call_function"] = script_ops::handle_call_function;
+    g_handlers["script_reload"] = script_ops::handle_reload;
+    g_handlers["script_get_variable_list"] = script_ops::handle_get_variable_list;
 
     // ── 2. Populate catalog ──
     catalog.populate_default_tools();
