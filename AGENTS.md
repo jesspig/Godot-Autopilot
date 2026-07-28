@@ -26,6 +26,14 @@ libhv 在内部线程处理 HTTP/MCP。`Node::_process()` 在编辑器模式下�
 
 `Task::execute()` 必须用 `try-catch` 包裹 `fn()`。异常时调 `promise.set_exception()`，否则 `future.get()` 在 libhv 线程上永远挂起。
 
+### R7: Tool Architecture — Two-Tier (Direct vs Proxy)
+
+Meta-tools（ping、search_tools、list_categories、get_tool_detail）直接通过 `server_->RegisterTool()` 注册到 MCP server。所有业务工具（scene_*、property_*、resource_*、script_* 等）注册在 `g_handlers` 内部映射中，通过 `call_tool` 代理调用。`ToolHandler` 签名是 `mcp::JsonValue(const mcp::JsonValue&)`——handler 返回原始 JSON，`call_tool` 负责包装成 `CallToolResult`。这样业务 handler 无需感知 MCP 协议。
+
+### R8: UndoRedo for State-Changing Operations
+
+修改 Godot 编辑器状态的操作（property_set、script_attach_to_node、script_detach_from_node 等）必须通过 `EditorInterface::get_editor_undo_redo()` 创建 UndoRedo action。用 `add_do_method` / `add_undo_method` / `commit_action()` 包裹，不要直接调用 `node->set()` 或 `node->set_script()`。
+
 ---
 
 ## Project Nature
@@ -311,7 +319,7 @@ flowchart LR
 | 6 | `feature/command-bridge` | CommandQueue + libhv↔Godot bridge | 1 | ✅ |
 | 7 | `feature/tool-discovery` | BM25 search + 3 meta-tools | 6 | ✅ |
 | 8 | `feature/tool-pattern` | VariantJson + scene_ops + property_ops + call_tool | 8 | ✅ |
-| 9 | `feature/tool-core` | resource + script tools | 4 | ⬜ |
+| 9 | `feature/tool-core` | resource + script tools | 4 | ✅ |
 | 10 | `feature/tool-pbr` | physics + render + nav tools | 6 | ⬜ |
 | 11 | `feature/tool-script` | audio + input + editor tools | 6 | ⬜ |
 | 12 | `feature/tool-aux` | config + debug + doc tools | 6 | ⬜ |
@@ -321,8 +329,8 @@ flowchart LR
 
 ### Current Status
 
-**Current branch**: `feature/tool-pattern` (completed)
-**Next branch**: `feature/tool-core`
+**Current branch**: `feature/tool-core` (completed)
+**Next branch**: `feature/tool-pbr`
 
 ---
 

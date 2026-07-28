@@ -268,6 +268,558 @@ void ToolCatalog::populate_default_tools() {
         s["required"] = std::move(rq);
         add_tool({"signal_connect", "Connect a signal from one node to another", "Properties", {"signal", "connect"}, std::move(s)});
     }
+
+    // resource_ops
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        pp["description"] = mcp::JsonValue("Resource file path");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        mcp::JsonValue thp(mcp::JsonValue::object_tag);
+        thp["type"] = mcp::JsonValue("string");
+        thp["description"] = mcp::JsonValue("Optional type hint for loading");
+        props["type_hint"] = std::move(thp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"resource_load", "Load a resource from file path", "Resources", {"resource", "load"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        pp["description"] = mcp::JsonValue("Resource file path");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        mcp::JsonValue thp(mcp::JsonValue::object_tag);
+        thp["type"] = mcp::JsonValue("string");
+        thp["description"] = mcp::JsonValue("Optional type hint");
+        props["type_hint"] = std::move(thp);
+        mcp::JsonValue usp(mcp::JsonValue::object_tag);
+        usp["type"] = mcp::JsonValue("boolean");
+        usp["description"] = mcp::JsonValue("Use sub-threads for loading");
+        props["use_sub_threads"] = std::move(usp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"resource_load_threaded", "Start threaded resource load", "Resources", {"resource", "load", "threaded"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        pp["description"] = mcp::JsonValue("Resource file path");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"resource_load_threaded_get_status", "Get status of threaded resource load", "Resources", {"resource", "load", "status"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        pp["description"] = mcp::JsonValue("Resource file path");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"resource_load_threaded_wait", "Wait for threaded resource load to complete", "Resources", {"resource", "load", "wait"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        pp["description"] = mcp::JsonValue("Source resource file path");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        mcp::JsonValue dp(mcp::JsonValue::object_tag);
+        dp["type"] = mcp::JsonValue("string");
+        dp["description"] = mcp::JsonValue("Destination file path (defaults to same as path)");
+        props["dest_path"] = std::move(dp);
+        mcp::JsonValue fp(mcp::JsonValue::object_tag);
+        fp["type"] = mcp::JsonValue("integer");
+        fp["description"] = mcp::JsonValue("Saver flags bitfield");
+        props["flags"] = std::move(fp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"resource_save", "Save a resource to file", "Resources", {"resource", "save"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue tp(mcp::JsonValue::object_tag);
+        tp["type"] = mcp::JsonValue("string");
+        tp["description"] = mcp::JsonValue("Resource class type (e.g. PackedScene, Material)");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["type"] = std::move(tp);
+        mcp::JsonValue np(mcp::JsonValue::object_tag);
+        np["type"] = mcp::JsonValue("string");
+        np["description"] = mcp::JsonValue("Optional resource name");
+        props["name"] = std::move(np);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("type"));
+        s["required"] = std::move(rq);
+        add_tool({"resource_create", "Create a new resource instance by class type", "Resources", {"resource", "create"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        pp["description"] = mcp::JsonValue("Resource file path to duplicate");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        mcp::JsonValue dp(mcp::JsonValue::object_tag);
+        dp["type"] = mcp::JsonValue("boolean");
+        dp["description"] = mcp::JsonValue("Deep copy (default: false)");
+        props["deep"] = std::move(dp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"resource_duplicate", "Duplicate/instance a loaded resource", "Resources", {"resource", "duplicate"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        pp["description"] = mcp::JsonValue("Resource file path");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"resource_get_type", "Get the class type of a resource", "Resources", {"resource", "type"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        pp["description"] = mcp::JsonValue("Resource file path");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"resource_exists", "Check if a resource exists at path", "Resources", {"resource", "exists"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"resource_list_types", "List all instantiable Resource subclass types", "Resources", {"resource", "types", "list"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue tp(mcp::JsonValue::object_tag);
+        tp["type"] = mcp::JsonValue("string");
+        tp["description"] = mcp::JsonValue("Resource type to get extensions for");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["type"] = std::move(tp);
+        s["properties"] = std::move(props);
+        add_tool({"resource_get_extensions", "Get recognized file extensions for a resource type", "Resources", {"resource", "extensions"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        pp["description"] = mcp::JsonValue("Directory path to list");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"resource_list_dir", "List resource files in a directory", "Resources", {"resource", "directory", "list"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        pp["description"] = mcp::JsonValue("Resource file path");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"resource_get_uid", "Get the UID of a resource file", "Resources", {"resource", "uid", "get"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        pp["description"] = mcp::JsonValue("Resource file path");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        mcp::JsonValue up(mcp::JsonValue::object_tag);
+        up["type"] = mcp::JsonValue("integer");
+        up["description"] = mcp::JsonValue("UID value (auto-generated if omitted)");
+        props["uid"] = std::move(up);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"resource_set_uid", "Set or assign a UID to a resource file", "Resources", {"resource", "uid", "set"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        pp["description"] = mcp::JsonValue("Resource file path to remove");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"resource_remove", "Delete a resource file from disk", "Resources", {"resource", "remove", "delete"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue fp(mcp::JsonValue::object_tag);
+        fp["type"] = mcp::JsonValue("string");
+        fp["description"] = mcp::JsonValue("Current file path");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["from"] = std::move(fp);
+        mcp::JsonValue tp(mcp::JsonValue::object_tag);
+        tp["type"] = mcp::JsonValue("string");
+        tp["description"] = mcp::JsonValue("New file path");
+        props["to"] = std::move(tp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("from"));
+        rq.PushBack(mcp::JsonValue("to"));
+        s["required"] = std::move(rq);
+        add_tool({"resource_rename", "Rename/move a resource file", "Resources", {"resource", "rename", "move"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        pp["description"] = mcp::JsonValue("Resource file path");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"resource_get_dependencies", "List all dependencies of a resource", "Resources", {"resource", "dependencies", "list"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        pp["description"] = mcp::JsonValue("Resource file path");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        mcp::JsonValue dp(mcp::JsonValue::object_tag);
+        dp["type"] = mcp::JsonValue("string");
+        dp["description"] = mcp::JsonValue("Dependency path to check");
+        props["dependency"] = std::move(dp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        rq.PushBack(mcp::JsonValue("dependency"));
+        s["required"] = std::move(rq);
+        add_tool({"resource_has_dependency", "Check if a resource depends on another file", "Resources", {"resource", "dependency", "check"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        pp["description"] = mcp::JsonValue("Resource file path to import");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"resource_import", "Import a single resource file (editor only)", "Resources", {"resource", "import"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        pp["description"] = mcp::JsonValue("Single file path to reimport");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        mcp::JsonValue ap(mcp::JsonValue::object_tag);
+        ap["type"] = mcp::JsonValue("array");
+        ap["description"] = mcp::JsonValue("Array of file paths to reimport");
+        mcp::JsonValue ai(mcp::JsonValue::object_tag);
+        ai["type"] = mcp::JsonValue("string");
+        ap["items"] = std::move(ai);
+        props["files"] = std::move(ap);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("files"));
+        s["required"] = std::move(rq);
+        add_tool({"resource_reimport", "Reimport one or more resource files (editor only)", "Resources", {"resource", "reimport"}, std::move(s)});
+    }
+
+    // script_ops
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue ep(mcp::JsonValue::object_tag);
+        ep["type"] = mcp::JsonValue("string");
+        ep["description"] = mcp::JsonValue("GDScript expression to evaluate");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["expression"] = std::move(ep);
+        mcp::JsonValue inp(mcp::JsonValue::object_tag);
+        inp["type"] = mcp::JsonValue("array");
+        inp["description"] = mcp::JsonValue("Variable names for the expression context");
+        mcp::JsonValue ini(mcp::JsonValue::object_tag);
+        ini["type"] = mcp::JsonValue("string");
+        inp["items"] = std::move(ini);
+        props["input_names"] = std::move(inp);
+        mcp::JsonValue ivp(mcp::JsonValue::object_tag);
+        ivp["type"] = mcp::JsonValue("array");
+        ivp["description"] = mcp::JsonValue("Input values corresponding to input_names");
+        mcp::JsonValue ivi(mcp::JsonValue::object_tag);
+        ivi["type"] = mcp::JsonValue("object");
+        ivp["items"] = std::move(ivi);
+        props["input_values"] = std::move(ivp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("expression"));
+        s["required"] = std::move(rq);
+        add_tool({"script_execute_gdscript", "Execute an arbitrary GDScript expression", "Scripts", {"script", "execute", "gdscript"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        pp["description"] = mcp::JsonValue("Script file path to load");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"script_load", "Load a script from file path", "Scripts", {"script", "load"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        pp["description"] = mcp::JsonValue("File path to save the new script");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        mcp::JsonValue scp(mcp::JsonValue::object_tag);
+        scp["type"] = mcp::JsonValue("string");
+        scp["description"] = mcp::JsonValue("GDScript source code");
+        props["source_code"] = std::move(scp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        rq.PushBack(mcp::JsonValue("source_code"));
+        s["required"] = std::move(rq);
+        add_tool({"script_create", "Create and save a new GDScript file", "Scripts", {"script", "create"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue np(mcp::JsonValue::object_tag);
+        np["type"] = mcp::JsonValue("string");
+        np["description"] = mcp::JsonValue("Node path to attach script to");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["node_path"] = std::move(np);
+        mcp::JsonValue sp(mcp::JsonValue::object_tag);
+        sp["type"] = mcp::JsonValue("string");
+        sp["description"] = mcp::JsonValue("Script file path to attach");
+        props["script_path"] = std::move(sp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("node_path"));
+        rq.PushBack(mcp::JsonValue("script_path"));
+        s["required"] = std::move(rq);
+        add_tool({"script_attach_to_node", "Attach a script to a scene node", "Scripts", {"script", "attach", "node"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue np(mcp::JsonValue::object_tag);
+        np["type"] = mcp::JsonValue("string");
+        np["description"] = mcp::JsonValue("Node path to detach script from");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["node_path"] = std::move(np);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("node_path"));
+        s["required"] = std::move(rq);
+        add_tool({"script_detach_from_node", "Detach script from a scene node", "Scripts", {"script", "detach", "node"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        pp["description"] = mcp::JsonValue("Property name to read");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["property"] = std::move(pp);
+        mcp::JsonValue ssp(mcp::JsonValue::object_tag);
+        ssp["type"] = mcp::JsonValue("string");
+        ssp["description"] = mcp::JsonValue("Script path (optional, defaults to node if node_path set)");
+        props["script_path"] = std::move(ssp);
+        mcp::JsonValue npp(mcp::JsonValue::object_tag);
+        npp["type"] = mcp::JsonValue("string");
+        npp["description"] = mcp::JsonValue("Node path (optional)");
+        props["node_path"] = std::move(npp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("property"));
+        s["required"] = std::move(rq);
+        add_tool({"script_get_property", "Get a script property's default value or a node's property", "Scripts", {"script", "property", "get"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue npp(mcp::JsonValue::object_tag);
+        npp["type"] = mcp::JsonValue("string");
+        npp["description"] = mcp::JsonValue("Node path");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["node_path"] = std::move(npp);
+        mcp::JsonValue prp(mcp::JsonValue::object_tag);
+        prp["type"] = mcp::JsonValue("string");
+        prp["description"] = mcp::JsonValue("Property name to set");
+        props["property"] = std::move(prp);
+        mcp::JsonValue vl(mcp::JsonValue::object_tag);
+        vl["type"] = mcp::JsonValue("object");
+        vl["description"] = mcp::JsonValue("Value to set");
+        props["value"] = std::move(vl);
+        mcp::JsonValue thp(mcp::JsonValue::object_tag);
+        thp["type"] = mcp::JsonValue("string");
+        thp["description"] = mcp::JsonValue("Optional type hint for deserialization");
+        props["type_hint"] = std::move(thp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("node_path"));
+        rq.PushBack(mcp::JsonValue("property"));
+        rq.PushBack(mcp::JsonValue("value"));
+        s["required"] = std::move(rq);
+        add_tool({"script_set_property", "Set a property on a node via script", "Scripts", {"script", "property", "set"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue npp(mcp::JsonValue::object_tag);
+        npp["type"] = mcp::JsonValue("string");
+        npp["description"] = mcp::JsonValue("Node path");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["node_path"] = std::move(npp);
+        mcp::JsonValue fp(mcp::JsonValue::object_tag);
+        fp["type"] = mcp::JsonValue("string");
+        fp["description"] = mcp::JsonValue("Function/method name to call");
+        props["function"] = std::move(fp);
+        mcp::JsonValue ap(mcp::JsonValue::object_tag);
+        ap["type"] = mcp::JsonValue("array");
+        ap["description"] = mcp::JsonValue("Arguments to pass (optional)");
+        mcp::JsonValue ai(mcp::JsonValue::object_tag);
+        ai["type"] = mcp::JsonValue("object");
+        ap["items"] = std::move(ai);
+        props["arguments"] = std::move(ap);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("node_path"));
+        rq.PushBack(mcp::JsonValue("function"));
+        s["required"] = std::move(rq);
+        add_tool({"script_call_function", "Call a function on a node via its script", "Scripts", {"script", "call", "function"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        pp["description"] = mcp::JsonValue("Script file path to reload");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        mcp::JsonValue ksp(mcp::JsonValue::object_tag);
+        ksp["type"] = mcp::JsonValue("boolean");
+        ksp["description"] = mcp::JsonValue("Keep state on reload (default: false)");
+        props["keep_state"] = std::move(ksp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"script_reload", "Reload a script from disk", "Scripts", {"script", "reload"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        pp["description"] = mcp::JsonValue("Script file path");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"script_get_variable_list", "List all script variables and their types", "Scripts", {"script", "variables", "list"}, std::move(s)});
+    }
 }
 
 } // namespace godot_self_driving
