@@ -820,6 +820,983 @@ void ToolCatalog::populate_default_tools() {
         s["required"] = std::move(rq);
         add_tool({"script_get_variable_list", "List all script variables and their types", "Scripts", {"script", "variables", "list"}, std::move(s)});
     }
+
+    // physics_ops — 2D
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_2d_space_get_direct_state", "Get the direct state of a 2D physics space", "Physics", {"physics", "2d", "space"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_2d_ray_cast", "Cast a ray in 2D physics space", "Physics", {"physics", "2d", "ray"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_2d_shape_cast", "Cast a shape in 2D physics space", "Physics", {"physics", "2d", "shape"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_2d_point_query", "Query a point in 2D physics space", "Physics", {"physics", "2d", "point"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_2d_intersect_shape", "Intersect a shape in 2D physics space", "Physics", {"physics", "2d", "intersect", "shape"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_2d_intersect_point", "Intersect a point in 2D physics space", "Physics", {"physics", "2d", "intersect", "point"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_2d_body_create", "Create a 2D physics body", "Physics", {"physics", "2d", "body", "create"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_2d_body_set_mode", "Set the mode of a 2D physics body", "Physics", {"physics", "2d", "body", "mode"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_2d_body_apply_force", "Apply force to a 2D physics body", "Physics", {"physics", "2d", "body", "force"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_2d_body_apply_impulse", "Apply impulse to a 2D physics body", "Physics", {"physics", "2d", "body", "impulse"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_2d_body_set_state", "Set state of a 2D physics body", "Physics", {"physics", "2d", "body", "state"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_2d_body_get_state", "Get state of a 2D physics body", "Physics", {"physics", "2d", "body", "state"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_2d_joint_create", "Create a 2D physics joint", "Physics", {"physics", "2d", "joint", "create"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_2d_area_create", "Create a 2D physics area", "Physics", {"physics", "2d", "area", "create"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_2d_area_set_monitorable", "Set monitorable flag on a 2D area", "Physics", {"physics", "2d", "area", "monitorable"}, std::move(s)});
+    }
+
+    // physics_ops — 3D
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_3d_space_get_direct_state", "Get the direct state of a 3D physics space", "Physics", {"physics", "3d", "space"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_3d_ray_cast", "Cast a ray in 3D physics space", "Physics", {"physics", "3d", "ray"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_3d_shape_cast", "Cast a shape in 3D physics space", "Physics", {"physics", "3d", "shape"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_3d_point_query", "Query a point in 3D physics space", "Physics", {"physics", "3d", "point"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_3d_intersect_shape", "Intersect a shape in 3D physics space", "Physics", {"physics", "3d", "intersect", "shape"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_3d_intersect_point", "Intersect a point in 3D physics space", "Physics", {"physics", "3d", "intersect", "point"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_3d_body_create", "Create a 3D physics body", "Physics", {"physics", "3d", "body", "create"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_3d_body_set_mode", "Set the mode of a 3D physics body", "Physics", {"physics", "3d", "body", "mode"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_3d_body_apply_force", "Apply force to a 3D physics body", "Physics", {"physics", "3d", "body", "force"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_3d_body_apply_impulse", "Apply impulse to a 3D physics body", "Physics", {"physics", "3d", "body", "impulse"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_3d_body_set_state", "Set state of a 3D physics body", "Physics", {"physics", "3d", "body", "state"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_3d_body_get_state", "Get state of a 3D physics body", "Physics", {"physics", "3d", "body", "state"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_3d_joint_create", "Create a 3D physics joint", "Physics", {"physics", "3d", "joint", "create"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_3d_area_create", "Create a 3D physics area", "Physics", {"physics", "3d", "area", "create"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_3d_area_set_monitorable", "Set monitorable flag on a 3D area", "Physics", {"physics", "3d", "area", "monitorable"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_3d_body_apply_torque", "Apply torque to a 3D physics body", "Physics", {"physics", "3d", "body", "torque"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_3d_body_set_axis_lock", "Set axis lock on a 3D physics body", "Physics", {"physics", "3d", "body", "axis", "lock"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_3d_body_add_collision_exception", "Add collision exception to a 3D body", "Physics", {"physics", "3d", "body", "collision", "exception"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_3d_body_remove_collision_exception", "Remove collision exception from a 3D body", "Physics", {"physics", "3d", "body", "collision", "exception"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_3d_joint_set_param", "Set parameter on a 3D physics joint", "Physics", {"physics", "3d", "joint", "param"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_3d_area_set_space_override", "Set space override on a 3D area", "Physics", {"physics", "3d", "area", "space", "override"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_3d_space_set_gravity", "Set gravity on a 3D physics space", "Physics", {"physics", "3d", "space", "gravity"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_3d_space_set_debug", "Set debug flag on a 3D physics space", "Physics", {"physics", "3d", "space", "debug"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_3d_soft_body_create", "Create a 3D soft body", "Physics", {"physics", "3d", "soft", "body", "create"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"physics_3d_soft_body_set_mesh", "Set mesh on a 3D soft body", "Physics", {"physics", "3d", "soft", "body", "mesh"}, std::move(s)});
+    }
+
+    // render_ops
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"canvas_item_create", "Create a canvas item", "Render", {"render", "canvas", "create"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"canvas_item_draw_rect", "Draw a rectangle on a canvas item", "Render", {"render", "canvas", "draw", "rect"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"canvas_item_draw_circle", "Draw a circle on a canvas item", "Render", {"render", "canvas", "draw", "circle"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"canvas_item_draw_texture", "Draw a texture on a canvas item", "Render", {"render", "canvas", "draw", "texture"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"canvas_item_draw_line", "Draw a line on a canvas item", "Render", {"render", "canvas", "draw", "line"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"canvas_item_set_transform", "Set transform on a canvas item", "Render", {"render", "canvas", "transform"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"canvas_item_set_visible", "Set visibility on a canvas item", "Render", {"render", "canvas", "visible"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"scenario_create", "Create a rendering scenario", "Render", {"render", "scenario", "create"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"scenario_set_environment", "Set environment on a scenario", "Render", {"render", "scenario", "environment"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"camera_create", "Create a camera", "Render", {"render", "camera", "create"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"camera_set_transform", "Set transform on a camera", "Render", {"render", "camera", "transform"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"camera_set_perspective", "Set perspective on a camera", "Render", {"render", "camera", "perspective"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"camera_set_orthogonal", "Set orthogonal on a camera", "Render", {"render", "camera", "orthogonal"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"light_create", "Create a light", "Render", {"render", "light", "create"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"light_set_param", "Set parameter on a light", "Render", {"render", "light", "param"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"light_set_color", "Set color on a light", "Render", {"render", "light", "color"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"mesh_create", "Create a mesh", "Render", {"render", "mesh", "create"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"mesh_add_surface", "Add a surface to a mesh", "Render", {"render", "mesh", "surface"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"mesh_set_material", "Set material on a mesh", "Render", {"render", "mesh", "material"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"material_create", "Create a material", "Render", {"render", "material", "create"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"material_set_param", "Set parameter on a material", "Render", {"render", "material", "param"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"viewport_create", "Create a viewport", "Render", {"render", "viewport", "create"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"viewport_set_size", "Set size on a viewport", "Render", {"render", "viewport", "size"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"viewport_set_clear_mode", "Set clear mode on a viewport", "Render", {"render", "viewport", "clear"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"particle_create", "Create a particle system", "Render", {"render", "particle", "create"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"environment_set_bg_color", "Set background color on an environment", "Render", {"render", "environment", "bg", "color"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"environment_set_ambient", "Set ambient light on an environment", "Render", {"render", "environment", "ambient"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"fog_create", "Create a fog volume", "Render", {"render", "fog", "create"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"shader_create", "Create a shader", "Render", {"render", "shader", "create"}, std::move(s)});
+    }
+
+    // nav_ops
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"nav_2d_map_create", "Create a 2D navigation map", "Nav", {"nav", "2d", "map", "create"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"nav_2d_region_create", "Create a 2D navigation region", "Nav", {"nav", "2d", "region", "create"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"nav_2d_path_query", "Query a 2D navigation path", "Nav", {"nav", "2d", "path", "query"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"nav_2d_agent_create", "Create a 2D navigation agent", "Nav", {"nav", "2d", "agent", "create"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"nav_2d_agent_set_target", "Set target velocity for a 2D navigation agent", "Nav", {"nav", "2d", "agent", "target"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"nav_3d_map_create", "Create a 3D navigation map", "Nav", {"nav", "3d", "map", "create"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"nav_3d_region_create", "Create a 3D navigation region", "Nav", {"nav", "3d", "region", "create"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"nav_3d_path_query", "Query a 3D navigation path", "Nav", {"nav", "3d", "path", "query"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"nav_3d_path_query_segment", "Query the closest point on a segment in 3D navigation space", "Nav", {"nav", "3d", "path", "segment"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"nav_3d_agent_create", "Create a 3D navigation agent", "Nav", {"nav", "3d", "agent", "create"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"nav_3d_agent_set_velocity", "Set velocity for a 3D navigation agent", "Nav", {"nav", "3d", "agent", "velocity"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"nav_3d_agent_get_next_path", "Get next path position for a 3D navigation agent", "Nav", {"nav", "3d", "agent", "path"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"nav_3d_map_set_cell_size", "Set cell size on a 3D navigation map", "Nav", {"nav", "3d", "map", "cell"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"nav_3d_region_set_nav_mesh", "Set navigation mesh on a 3D region", "Nav", {"nav", "3d", "region", "mesh"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"nav_3d_obstacle_create", "Create a 3D navigation obstacle", "Nav", {"nav", "3d", "obstacle", "create"}, std::move(s)});
+    }
 }
 
 } // namespace godot_self_driving

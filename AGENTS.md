@@ -34,6 +34,10 @@ Meta-tools（ping、search_tools、list_categories、get_tool_detail）直接通
 
 修改 Godot 编辑器状态的操作（property_set、script_attach_to_node、script_detach_from_node 等）必须通过 `EditorInterface::get_editor_undo_redo()` 创建 UndoRedo action。用 `add_do_method` / `add_undo_method` / `commit_action()` 包裹，不要直接调用 `node->set()` 或 `node->set_script()`。
 
+### R9: Server API (RID-based) vs Node API (Path-based)
+
+physics_ops、render_ops、nav_ops 使用 Godot 的 Server 级 API（`RenderingServer`、`PhysicsServer2D/3D`、`NavigationServer2D/3D`），参数基于 RID（Resource ID），不依赖 `EditorInterface`。这是 Node 级 API 之外的独立路径——Server API 在无场景打开时也可用，但需要调用方通过 `call_tool` 传入 RID（如 `space_rid`、`body_rid`），而非节点路径。`scene_ops`/`property_ops` 的 Node 路径解析逻辑不适用于 Server API 工具。
+
 ---
 
 ## Project Nature
@@ -246,8 +250,8 @@ All other tools live in an internal `unordered_map<string, ToolHandler>` and are
 |------------|-----------------|-----|
 | godot-cpp | `https://github.com/godotengine/godot-cpp.git` | 10.0.0-rc1 |
 | mcp-cpp-sdk | `https://github.com/jesspig/modelcontextprotocol-cpp-sdk.git` | 0.2.1 |
-| googletest | `https://github.com/google/googletest.git` | v1.15.2 |
-| quickjs | `https://github.com/bellard/quickjs.git` | `04be246001599f5995fa2f2d8c91a0f198d3f34c` |
+
+QuickJS will be added as a dependency in `feature/quickjs-sandbox` (Phase 5).
 
 ## Style & Conventions
 
@@ -320,7 +324,7 @@ flowchart LR
 | 7 | `feature/tool-discovery` | BM25 search + 3 meta-tools | 6 | ✅ |
 | 8 | `feature/tool-pattern` | VariantJson + scene_ops + property_ops + call_tool | 8 | ✅ |
 | 9 | `feature/tool-core` | resource + script tools | 4 | ✅ |
-| 10 | `feature/tool-pbr` | physics + render + nav tools | 6 | ⬜ |
+| 10 | `feature/tool-pbr` | physics + render + nav tools | 6 | ✅ |
 | 11 | `feature/tool-script` | audio + input + editor tools | 6 | ⬜ |
 | 12 | `feature/tool-aux` | config + debug + doc tools | 6 | ⬜ |
 | 13 | `feature/quickjs-sandbox` | QuickJS programmatic sandbox | 5 | ⬜ |
@@ -329,8 +333,8 @@ flowchart LR
 
 ### Current Status
 
-**Current branch**: `feature/tool-core` (completed)
-**Next branch**: `feature/tool-pbr`
+**Current branch**: `feature/tool-pbr` (completed)
+**Next branch**: `feature/tool-script`
 
 ---
 
@@ -392,14 +396,9 @@ flowchart LR
   - `query({min_level, filter_text, category})` — filtered query returns const pointers
   - `set_on_new_entry(callback)` — subscribe for UI updates (callback invoked outside lock)
   - `LogSystem::instance()` — Meyer's singleton (required for ClassDB default constructors)
-- `CMakeLists.txt` — Added `GSD_BUILD_TESTS` option with Google Test v1.15.2 FetchContent
-- `tests/CMakeLists.txt` — test_log_system target
-- `tests/test_log_system.cpp` — 8 test cases
 
 **Log Levels**: Debug, Info, Warning, Error
 **Log Categories**: System, Transport, Tools, Sandbox, Resources, Prompts
-
-**Tests** (8 total): EmptyQuery, BasicLogAndQuery, LevelFilter, TextFilter, CategoryFilter, RingBufferLimit, CallbackNotification, ThreadSafety
 
 ---
 
