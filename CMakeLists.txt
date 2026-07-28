@@ -62,6 +62,9 @@ add_library(godot-self-driving SHARED
     src/core/log_system.cpp
     src/core/server_context.cpp
     src/tools/audio_ops.cpp
+    src/tools/config_ops.cpp
+    src/tools/debug_ops.cpp
+    src/tools/doc_ops.cpp
     src/tools/editor_ops.cpp
     src/tools/input_ops.cpp
     src/tools/nav_ops.cpp

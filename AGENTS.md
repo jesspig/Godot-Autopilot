@@ -326,15 +326,15 @@ flowchart LR
 | 9 | `feature/tool-core` | resource + script tools | 4 | ✅ |
 | 10 | `feature/tool-pbr` | physics + render + nav tools | 6 | ✅ |
 | 11 | `feature/tool-script` | audio + input + editor tools | 6 | ✅ |
-| 12 | `feature/tool-aux` | config + debug + doc tools | 6 | ⬜ |
+| 12 | `feature/tool-aux` | config + debug + doc tools | 6 | ✅ |
 | 13 | `feature/quickjs-sandbox` | QuickJS programmatic sandbox | 5 | ⬜ |
 | 14 | `feature/mcp-resources` | MCP Resource URI scheme | 1 | ⬜ |
 | 15 | `feature/mcp-prompts` | MCP Prompt templates | 1 | ⬜ |
 
 ### Current Status
 
-**Current branch**: `feature/tool-script` (completed)
-**Next branch**: `feature/tool-aux`
+**Current branch**: `feature/tool-aux` (completed)
+**Next branch**: `feature/quickjs-sandbox`
 
 ---
 
