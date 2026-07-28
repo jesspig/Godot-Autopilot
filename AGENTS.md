@@ -62,7 +62,7 @@ cmake --build --preset debug
 
 **Do NOT pass `-j`** — Ninja job pools handle parallelism via `cmake/BuildOptimization.cmake`.
 
-Output: `build/debug/godot-self-driving.dll` (Debug, ~9 MB) or `build/release/godot-self-driving.dll` (Release, ~3.5 MB).
+Output: `build/debug/godot-self-driving.dll` (Debug, ~9 MB) or `build/release/godot-self-driving.dll` (Release, ~4.5 MB).
 
 `.gdextension` file is **generated** by `build.py` at deploy time, never committed.
 
@@ -325,7 +325,7 @@ flowchart LR
 | 8 | `feature/tool-pattern` | VariantJson + scene_ops + property_ops + call_tool | 8 | ✅ |
 | 9 | `feature/tool-core` | resource + script tools | 4 | ✅ |
 | 10 | `feature/tool-pbr` | physics + render + nav tools | 6 | ✅ |
-| 11 | `feature/tool-script` | audio + input + editor tools | 6 | ⬜ |
+| 11 | `feature/tool-script` | audio + input + editor tools | 6 | ✅ |
 | 12 | `feature/tool-aux` | config + debug + doc tools | 6 | ⬜ |
 | 13 | `feature/quickjs-sandbox` | QuickJS programmatic sandbox | 5 | ⬜ |
 | 14 | `feature/mcp-resources` | MCP Resource URI scheme | 1 | ⬜ |
@@ -333,8 +333,8 @@ flowchart LR
 
 ### Current Status
 
-**Current branch**: `feature/tool-pbr` (completed)
-**Next branch**: `feature/tool-script`
+**Current branch**: `feature/tool-script` (completed)
+**Next branch**: `feature/tool-aux`
 
 ---
 
@@ -387,7 +387,7 @@ flowchart LR
 
 #### 3. feature/log-system-core
 
-**Goal**: Thread-safe log system with filtering + Google Test integration.
+**Goal**: Thread-safe log system with filtering.
 
 **Files**:
 
@@ -492,7 +492,6 @@ flowchart LR
 - `src/tools/register_all.cpp` — Register 4 meta-tools + `call_tool` proxy. All non-meta tools stored in internal handler map and routed through `call_tool`.
 - `src/core/server_context.cpp` — Removed inline `_ping`/`system.status` registration
 - `src/tools/tool_catalog.cpp` — Updated tool metadata
-- `tests/test_tool_catalog.cpp` — 6 ToolCatalog tests
 
 **Dependency**: feature/tool-discovery
 

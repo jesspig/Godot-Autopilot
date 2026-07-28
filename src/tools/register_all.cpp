@@ -9,6 +9,9 @@
 #include "tools/physics_ops.hpp"
 #include "tools/render_ops.hpp"
 #include "tools/nav_ops.hpp"
+#include "tools/audio_ops.hpp"
+#include "tools/input_ops.hpp"
+#include "tools/editor_ops.hpp"
 
 namespace godot_self_driving {
 
@@ -131,6 +134,51 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
     g_handlers["nav_3d_map_set_cell_size"] = nav_ops::handle_3d_map_set_cell_size;
     g_handlers["nav_3d_region_set_nav_mesh"] = nav_ops::handle_3d_region_set_nav_mesh;
     g_handlers["nav_3d_obstacle_create"] = nav_ops::handle_3d_obstacle_create;
+    g_handlers["audio_bus_get_layout"] = audio_ops::handle_bus_get_layout;
+    g_handlers["audio_bus_set_layout"] = audio_ops::handle_bus_set_layout;
+    g_handlers["audio_bus_get_count"] = audio_ops::handle_bus_get_count;
+    g_handlers["audio_bus_get_name"] = audio_ops::handle_bus_get_name;
+    g_handlers["audio_bus_set_volume"] = audio_ops::handle_bus_set_volume;
+    g_handlers["audio_bus_set_mute"] = audio_ops::handle_bus_set_mute;
+    g_handlers["audio_bus_set_bypass"] = audio_ops::handle_bus_set_bypass;
+    g_handlers["audio_effect_add"] = audio_ops::handle_effect_add;
+    g_handlers["audio_effect_remove"] = audio_ops::handle_effect_remove;
+    g_handlers["audio_stream_play"] = audio_ops::handle_stream_play;
+    g_handlers["audio_stream_stop"] = audio_ops::handle_stream_stop;
+    g_handlers["audio_stream_set_volume"] = audio_ops::handle_stream_set_volume;
+    g_handlers["audio_stream_set_pitch"] = audio_ops::handle_stream_set_pitch;
+    g_handlers["audio_stream_get_playback_position"] = audio_ops::handle_stream_get_playback_position;
+    g_handlers["audio_stream_seek"] = audio_ops::handle_stream_seek;
+    g_handlers["input_action_press"] = input_ops::handle_action_press;
+    g_handlers["input_action_release"] = input_ops::handle_action_release;
+    g_handlers["input_is_action_pressed"] = input_ops::handle_is_action_pressed;
+    g_handlers["input_is_action_just_pressed"] = input_ops::handle_is_action_just_pressed;
+    g_handlers["input_key_press"] = input_ops::handle_key_press;
+    g_handlers["input_key_release"] = input_ops::handle_key_release;
+    g_handlers["input_mouse_move"] = input_ops::handle_mouse_move;
+    g_handlers["input_mouse_button_press"] = input_ops::handle_mouse_button_press;
+    g_handlers["input_mouse_button_release"] = input_ops::handle_mouse_button_release;
+    g_handlers["input_gamepad_simulate"] = input_ops::handle_gamepad_simulate;
+    g_handlers["editor_get_selection"] = editor_ops::handle_get_selection;
+    g_handlers["editor_set_selection"] = editor_ops::handle_set_selection;
+    g_handlers["editor_get_edited_scene_root"] = editor_ops::handle_get_edited_scene_root;
+    g_handlers["editor_save_scene"] = editor_ops::handle_save_scene;
+    g_handlers["editor_save_all_scenes"] = editor_ops::handle_save_all_scenes;
+    g_handlers["editor_reload_scene"] = editor_ops::handle_reload_scene;
+    g_handlers["editor_inspect_object"] = editor_ops::handle_inspect_object;
+    g_handlers["editor_undo_redo_start"] = editor_ops::handle_undo_redo_start;
+    g_handlers["editor_undo_redo_commit"] = editor_ops::handle_undo_redo_commit;
+    g_handlers["editor_undo_redo_add_do"] = editor_ops::handle_undo_redo_add_do;
+    g_handlers["editor_undo_redo_add_undo"] = editor_ops::handle_undo_redo_add_undo;
+    g_handlers["editor_file_system_get_resources"] = editor_ops::handle_file_system_get_resources;
+    g_handlers["editor_file_system_scan"] = editor_ops::handle_file_system_scan;
+    g_handlers["editor_import_resource"] = editor_ops::handle_import_resource;
+    g_handlers["editor_set_main_scene"] = editor_ops::handle_set_main_scene;
+    g_handlers["editor_play_current_scene"] = editor_ops::handle_play_current_scene;
+    g_handlers["editor_stop_playing"] = editor_ops::handle_stop_playing;
+    g_handlers["editor_get_resource_filesystem"] = editor_ops::handle_get_resource_filesystem;
+    g_handlers["editor_get_plugin_list"] = editor_ops::handle_get_plugin_list;
+    g_handlers["editor_set_plugin_enabled"] = editor_ops::handle_set_plugin_enabled;
     g_handlers["resource_load"] = resource_ops::handle_load;
     g_handlers["resource_load_threaded"] = resource_ops::handle_load_threaded;
     g_handlers["resource_load_threaded_get_status"] = resource_ops::handle_load_threaded_get_status;
