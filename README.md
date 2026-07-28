@@ -16,12 +16,11 @@ MCP Host (Claude Desktop, Cursor, etc.)
   ▼
 Godot Editor / Runtime
   └── Godot-Self-Driving (GDExtension)
-      ├── asio io_context (background thread)
+      ├── libhv (internal HTTP threads)
       ├── mcp-cpp-sdk: McpServer + Streamable HTTP
-      ├── Command Queue (async → Godot main thread bridge)
-      ├── ~244 MCP Tools across 13 categories
+      ├── Command Queue (libhv → Godot main thread bridge)
+      ├── ~239 MCP Tools across 13 categories
       ├── Inline Documentation (offline engine docs)
-      ├── QuickJS Sandbox (scriptable tool composition)
       └── Custom Log Dock (dedicated plugin output panel)
 ```
 
@@ -155,9 +154,8 @@ Open your Godot project — the server starts automatically. The port displays i
 | **Engine** | Godot 4.x (GDExtension) |
 | **Bindings** | godot-cpp (FetchContent) |
 | **MCP Protocol** | [modelcontextprotocol-cpp-sdk](https://github.com/jesspig/modelcontextprotocol-cpp-sdk) |
-| **HTTP / Async** | asio 1-30-2 (standalone) |
-| **JSON** | nlohmann/json v3.11.3 |
-| **Sandbox** | QuickJS (ES2023, async/await) |
+| **HTTP / Async** | libhv (internal) |
+| **JSON** | mcp::JsonValue (SDK built-in) |
 | **Build** | CMake 3.28+ / C++17 |
 | **Optimization** | Clang-first, ThinLTO, Ninja, sccache, Unity Build |
 

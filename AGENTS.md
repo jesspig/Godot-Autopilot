@@ -28,7 +28,7 @@ libhv 在内部线程处理 HTTP/MCP。`Node::_process()` 在编辑器模式下�
 
 ### R7: Tool Architecture — Two-Tier (Direct vs Proxy)
 
-Meta-tools（ping、search_tools、list_categories、get_tool_detail）直接通过 `server_->RegisterTool()` 注册到 MCP server。所有业务工具（scene_*、property_*、resource_*、script_* 等）注册在 `g_handlers` 内部映射中，通过 `call_tool` 代理调用。`ToolHandler` 签名是 `mcp::JsonValue(const mcp::JsonValue&)`——handler 返回原始 JSON，`call_tool` 负责包装成 `CallToolResult`。这样业务 handler 无需感知 MCP 协议。
+Meta-tools（ping、search_tools、list_categories、get_tool_detail、call_tool）直接通过 `server_->RegisterTool()` 注册到 MCP server。所有业务工具（scene_*、property_*、resource_*、script_* 等）注册在 `g_handlers` 内部映射中，通过 `call_tool` 代理调用。`ToolHandler` 签名是 `mcp::JsonValue(const mcp::JsonValue&)`——handler 返回原始 JSON，`call_tool` 负责包装成 `CallToolResult`。这样业务 handler 无需感知 MCP 协议。
 
 ### R8: UndoRedo for State-Changing Operations
 
@@ -38,13 +38,52 @@ Meta-tools（ping、search_tools、list_categories、get_tool_detail）直接通
 
 physics_ops、render_ops、nav_ops 使用 Godot 的 Server 级 API（`RenderingServer`、`PhysicsServer2D/3D`、`NavigationServer2D/3D`），参数基于 RID（Resource ID），不依赖 `EditorInterface`。这是 Node 级 API 之外的独立路径——Server API 在无场景打开时也可用，但需要调用方通过 `call_tool` 传入 RID（如 `space_rid`、`body_rid`），而非节点路径。`scene_ops`/`property_ops` 的 Node 路径解析逻辑不适用于 Server API 工具。
 
+### R10: ctx Capture — NEVER Capture By Reference
+
+`ctx` (RequestContext) is destroyed after the handler lambda returns. Capturing `ctx` by reference into the `queue.submit()` lambda causes use-after-free in `drain()`. **Always copy needed params as `mcp::JsonValue` before submitting.** Inside the submit lambda, use the copy — never `ctx`.
+
+### R11: BM25 Index Population — Must Be After All Tools
+
+`index.add_entry()` must be called **after** both `catalog.populate_default_tools()` AND all `catalog.add_tool()` calls from `register_all_tools()`. If called before, `search_tools` won't find the newly registered tools. (Done via `for (auto* tool : catalog.get_all_tools())` loop in `register_all.cpp`.)
+
+### R12: Ref\<T\> Requires Complete Type — Include Class Headers
+
+Any `.cpp` using `Ref<SomeGodotClass>` (e.g. `Ref<AudioBusLayout>`, `Ref<AudioEffect>`, `Ref<AudioStream>`, `Ref<Resource>`) **must** `#include` the corresponding class header from `godot_cpp/classes/`. Forward declarations are insufficient — `Ref<T>` destructor calls `unref()` which requires the complete type for `memdelete`. When in doubt, include the header for any `Ref<T>` you construct, receive from a singleton, or return.
+
+### R13: Editor Alignment — Tool Behavior Must Match Godot Editor
+
+Every tool that modifies resources or scene state must replicate what the Godot editor does for the equivalent human operation. Key rules derived from Godot engine source analysis:
+
+**Resource rename**: After `DirAccess::rename_absolute()`, must also:
+
+- Update `ResourceCache` via `ResourceLoader::get_cached_ref()` → `set_path(new_path)`
+- If renamed file is the edited scene → `root->set_scene_file_path(new_path)`
+- Update `EditorFileSystem::update_file()` for both old and new paths
+
+**Resource delete**: After file removal, must:
+
+- Unregister from `ResourceCache` by loading cached ref and calling `set_path("")`
+- Update `EditorFileSystem::update_file()` with removed path
+
+**Resource save to new path**: After `ResourceSaver::save()`, if `dest_path != path`:
+
+- Check if saved file is the edited scene → `root->set_scene_file_path(new_path)`
+- Update `EditorFileSystem::update_file()` for both paths
+
+**Script attach/detach**: Must go through `EditorUndoRedoManager` to mark scene as modified:
+
+- `undo_redo->create_action("Attach/Detach Script")`
+- `add_do_method(node, "set_script", new_script)` / `add_undo_method(node, "set_script", old_script)`
+- `commit_action()`
+- Without this, the scene tab won't show the unsaved indicator (asterisk) and undo won't work
+
 ---
 
 ## Project Nature
 
 GDExtension plugin (`.dll` / `.so` / `.dylib`) that runs in-process in Godot editor/runtime. Opens an MCP Streamable HTTP server at `http://127.0.0.1:9527/mcp`. No standalone process — starts/stops with the Godot project.
 
-Tech: CMake 3.28+ / C++17 / godot-cpp (FetchContent) / [mcp-cpp-sdk 0.2.1](https://github.com/jesspig/modelcontextprotocol-cpp-sdk) (FetchContent). SDK 0.2.1 uses libhv internally (no asio), and `mcp::JsonValue` replaces `nlohmann::json`.
+Tech: CMake 3.28+ / C++17 / godot-cpp (FetchContent) / [mcp-cpp-sdk 0.2.1](https://github.com/jesspig/modelcontextprotocol-cpp-sdk) (FetchContent). SDK 0.2.1 uses libhv internally, and `mcp::JsonValue` is the native JSON type.
 
 ## Build & Deploy
 
@@ -80,13 +119,13 @@ All dependencies fetched from GitHub via FetchContent — **never use local path
 
 ```
 libhv thread (HTTP + MCP) ──submit()──→ CommandQueue ──drain()──→ Godot main thread (engine APIs)
-                                       ↑ captured args
+                                       ↑ captured args (R10)
 ```
 
-- **libhv** handles HTTP and MCP protocol on internal threads (replaces asio)
+- **libhv** handles HTTP and MCP protocol on internal threads
 - **Godot main thread** is the ONLY thread allowed to call engine APIs
 - **CommandQueue** bridges them: tool handlers `submit()`, `EditorPlugin::_process()` calls `drain()` each frame
-- **Do NOT use `GodotNode::_process()`** — in editor mode, only `EditorPlugin::_process()` is called reliably
+- **Do NOT use `GodotNode::_process()`** — in editor mode, only `EditorPlugin::_process()` is called reliably (R5)
 
 ### GDExtension Initialization (Two Levels)
 
@@ -99,7 +138,7 @@ MODULE_INITIALIZATION_LEVEL_EDITOR  → ClassDB::register_class<McpLogDock>()
                                        new ServerContext() + start()
 ```
 
-**Important**: `ClassDB::register_class<T>()` REQUIRED before `EditorPlugins::add_by_type<T>()`. Classes inheriting `EditorDock` must be registered at EDITOR level (EditorDock parent class not available at SCENE). All other Controls at SCENE level.
+**Important**: `ClassDB::register_class<T>()` REQUIRED before `EditorPlugins::add_by_type<T>()`. Classes inheriting `EditorDock` must be registered at EDITOR level (EditorDock parent class not available at SCENE). All other Controls at SCENE level. (R2)
 
 ### EditorPlugin + Dock
 
@@ -124,9 +163,9 @@ Created at EDITOR level. Manages `StreamableHttpServerTransport` + `McpServer`. 
 - `on_protocol_error` — logs protocol errors (Error, Transport)
 - `on_transport_close` / `on_transport_error` — transport-level events
 
-All callbacks write through `LogSystem::instance().log()` from the libhv thread — no Godot API calls in these paths.
+All callbacks write through `LogSystem::instance().log()` from the libhv thread — no Godot API calls in these paths (R3, R5).
 
-**Must use `stateless=true`** — non-stateless returns 202 with hardcoded `resultType`, actual response goes through SSE.
+**Must use `stateless=true`** — non-stateless returns 202 with hardcoded `resultType`, actual response goes through SSE. (R4)
 
 **MCP requires initialization handshake** before tools work:
 
@@ -139,19 +178,21 @@ curl -s -X POST http://127.0.0.1:9527/mcp -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
 ```
 
-Expected response (only 5 meta-tools):
+Expected response (only 5 meta-tools, per R7):
 
 ```json
 {"tools":[{"name":"ping","description":"Health check"},{"name":"search_tools","description":"Search available tools by query"},{"name":"list_categories","description":"List all tool categories"},{"name":"get_tool_detail","description":"Get complete schema for one tool"},{"name":"call_tool","description":"Execute any tool by name"}]}
 ```
 
-### Log System
+### Log System (R3)
 
 Custom `LogSystem` (thread-safe ring buffer, NOT `add_error_handler()`). **Single logging mechanism for the plugin.**
 
 Subsystems: `System/Transport/Tools/Resources/Prompts`. Max 10000 entries (FIFO). Thread-safe via `std::mutex`.
 
 Access via `LogSystem::instance()` (Meyer's singleton) — needed because `ClassDB::register_class<>()` needs default constructors.
+
+**Data race fix**: `log()` copies `on_new_entry_` callback under the lock before invoking it outside — never read the callback without holding `mutex_`.
 
 ### Log Dock (McpLogDock)
 
@@ -171,9 +212,9 @@ Default 9527. Override: `GODOT_SELF_DRIVING_PORT` env > default. SDK retries +1 
 
 ---
 
-## Tool Architecture (Design)
+## Tool Architecture
 
-### Server-side Progressive Discovery
+### Server-side Progressive Discovery (R7)
 
 ```
 tools/list → ping, search_tools, list_categories, get_tool_detail, call_tool (5 tools)
@@ -199,21 +240,21 @@ Only 5 meta-tools are registered with MCP `RegisterTool`:
 4. `get_tool_detail` — get full `inputSchema` for one tool
 5. `call_tool({name, arguments})` — **execute any non-meta tool**
 
-All other tools live in an internal `unordered_map<string, ToolHandler>` and are routed through `call_tool`. **Do NOT call `server.RegisterTool()` for non-meta tools.**
+All other tools live in an internal `unordered_map<string, ToolHandler>` in `register_all.cpp` and are routed through `call_tool`. **Do NOT call `server.RegisterTool()` for non-meta tools.** (R7)
 
 ### Handler Registration Pattern
 
-1. **Populate handler registry**: Add entries to `g_handlers` map — `g_handlers["tool_name"] = handler_fn`. Each handler returns `{"result": ...}` or `{"error": "..."}`.
+1. **Populate handler registry** (R7): Add entries to `g_handlers` map — `g_handlers["tool_name"] = handler_fn`. Each handler returns `{"result": ...}` or `{"error": "..."}`.
 2. **Register meta-tools with MCP**: Only `ping`, `search_tools`, `list_categories`, `get_tool_detail`, `call_tool` use `server.RegisterTool()`.
 3. **Add catalog entries**: `catalog.add_tool({name, desc, category, tags, schema})` — makes tool discoverable via `search_tools` / `get_tool_detail`.
 
 ### Handler Function Guidelines
 
-- **Signature**: `mcp::JsonValue handler(const mcp::JsonValue& args)` — called on Godot main thread
+- **Signature**: `mcp::JsonValue handler(const mcp::JsonValue& args)` — called on Godot main thread (R5)
 - **Returns**: `{"result": value}` on success, `{"error": "message"}` on failure
 - **Args validation**: Check `args.Find("key")` and type with `IsString()`, `IsObject()`, etc.
 - **Error messages**: Descriptive: `"parent node not found: " + path`, not `"not found"`
-- **Logging**: Always log entry + completion via `LogSystem::instance().log()`
+- **Logging**: Always log entry + completion via `LogSystem::instance().log()` (R3)
 - **Null safety**: Check every Godot API call return for null. `EditorInterface::get_singleton()` can be null outside editor. `get_edited_scene_root()` returns null if no scene open.
 
 ### Scene Path Convention
@@ -242,6 +283,20 @@ All other tools live in an internal `unordered_map<string, ToolHandler>` and are
 | NODE_PATH | string | `"Node2D/Sprite"` |
 | OBJECT | `{id,class}` | `{"object_id":42,"class":"Node3D"}` |
 
+### Common Pitfalls Checklist
+
+- [ ] `ctx` captured by reference in `queue.submit()` lambda? → **Must** copy to `mcp::JsonValue` first (R10)
+- [ ] `Node::_process()` used for draining? → **Must** use `EditorPlugin::_process()` (R5)
+- [ ] UtilityFunctions::print or std::cout used? → **Must** use `LogSystem::instance().log()` (R3)
+- [ ] `server.RegisterTool()` called for scene_*/property_* tool? → **Must** only call for meta-tools (R7)
+- [ ] BM25 index populated before all tools registered? → **Must** after all catalog entries are added (R11)
+- [ ] Path has leading `/`? → Strip before `get_node_or_null()`
+- [ ] `get_edited_scene_root()` not checked for null? → Can return null if no scene open
+- [ ] EditorInterface::get_singleton() not checked for null? → Can be null in runtime mode
+- [ ] File rename/delete without ResourceCache cleanup? → **Must** update cache + notify EditorFileSystem (R13)
+- [ ] Script attach/detach without EditorUndoRedoManager? → **Must** use undo_redo to mark scene modified (R13)
+- [ ] `Ref<T>` used without complete type header? → **Must** `#include` the class header (R12)
+
 ---
 
 ## Key Dependencies
@@ -256,7 +311,7 @@ All other tools live in an internal `unordered_map<string, ToolHandler>` and are
 - No comments unless logic requires explanation
 - **Tool names**: underscore-separated (`scene_node_create`, `physics_3d_ray_cast`). **NOT** dot-notation.
 - **Meta-tools**: `ping`, `search_tools`, `list_categories`, `get_tool_detail`, `call_tool`
-- **Non-meta tools**: stored in `g_handlers` map, called via `call_tool`
+- **Non-meta tools**: stored in `g_handlers` map, called via `call_tool` (R7)
 - Each category gets one `*_ops.hpp/cpp` pair in `src/tools/`
 - All tool registration centralized in `src/tools/register_all.cpp`
 - Global singletons: `LogSystem::instance()`, `get_log_system()`, `get_server_ctx()`
@@ -371,7 +426,7 @@ flowchart LR
 
 **Gotchas**:
 
-- `ClassDB::register_class<T>()` MUST come before `EditorPlugins::add_by_type<T>()`
+- `ClassDB::register_class<T>()` MUST come before `EditorPlugins::add_by_type<T>()` (R2)
 - EditorDock subclasses must be registered at EDITOR level (EditorDock not available at SCENE)
 - Status bar uses `EditorPlugin::CONTAINER_TOOLBAR`
 
@@ -404,7 +459,7 @@ flowchart LR
   - UI: toolbar (Clear/Collapse buttons + search box + category dropdown) → filter bar (4 level toggle buttons) → RichTextLabel
   - Editor icons: Clear→"Clear", Collapse→"CombineLines", Debug→"Debug", Info→"Popup", Warning→"StatusWarning", Error→"StatusError"
   - Theme colors: `EditorInterface::get_singleton()->get_base_control()->get_theme()`
-  - Thread safety: callback pushes to pending queue under mutex → `poll_new_entries()` in `_process()`
+  - Thread safety: callback pushes to pending queue under mutex → `poll_new_entries()` in `_process()` (R5)
 - `src/main.cpp` — `register_class<McpLogDock>()` at EDITOR level, `add_dock(log_dock)` in EditorPlugin
 
 ---
@@ -413,7 +468,7 @@ flowchart LR
 
 #### 5. feature/mcp-engine-core
 
-**Goal**: McpServer + StreamableHttpServerTransport (libhv replaces asio).
+**Goal**: McpServer + StreamableHttpServerTransport (libhv).
 
 **Files**:
 
@@ -422,11 +477,11 @@ flowchart LR
   - `stop()`: Close server → close transport
   - `get_port()`: returns actual port (handles auto-increment)
   - Port resolution: `GODOT_SELF_DRIVING_PORT` env > 9527 default
-- Tools registered at startup:
+- Tools registered at startup (all tools callable via `call_tool` proxy, per R7):
   - `ping` — health check, returns "pong" (meta-tool, directly registered)
   - `system_status` — returns JSON with version/port/uptime
 
-**Critical**: `stateless=true` is required. Without it, POST returns 202 with hardcoded `{"resultType":"complete"}` and actual response goes through SSE stream.
+**Critical**: `stateless=true` is required. Without it, POST returns 202 with hardcoded `{"resultType":"complete"}` and actual response goes through SSE stream. (R4)
 
 ---
 
@@ -458,7 +513,7 @@ flowchart LR
 - `src/util/bm25_index.hpp/cpp` — BM25 inverted index over tool names + descriptions + tags
 - `src/tools/register_all.hpp` — `register_all_tools(McpServer&, CommandQueue&, ToolCatalog&, Bm25Index&, int port)` declaration
 - `src/tools/tool_catalog.hpp/cpp` — `ToolInfo` struct + `ToolCatalog` singleton with `populate_default_tools()`
-- `src/core/server_context.cpp` — Register meta-tools, populate catalog + BM25 index
+- `src/core/server_context.cpp` — Register meta-tools, populate catalog + BM25 index (R11)
 
 **Meta-Tools**:
 
@@ -481,7 +536,7 @@ flowchart LR
 - `src/util/variant_json.hpp/cpp` — `VariantJson::serialize(Variant) → mcp::JsonValue`, `VariantJson::deserialize(mcp::JsonValue, type_hint) → Variant`
 - `src/tools/scene_ops.hpp/cpp` — `scene_node_create`, `scene_node_delete`, `scene_tree_get`
 - `src/tools/property_ops.hpp/cpp` — `property_get`, `property_set`, `property_get_list`, `signal_connect`
-- `src/tools/register_all.cpp` — Register 4 meta-tools + `call_tool` proxy. All non-meta tools stored in internal handler map and routed through `call_tool`.
+- `src/tools/register_all.cpp` — Register 4 meta-tools + `call_tool` proxy. All non-meta tools stored in internal handler map and routed through `call_tool`. (R7)
 - `src/core/server_context.cpp` — Removed inline `_ping`/`system.status` registration
 - `src/tools/tool_catalog.cpp` — Updated tool metadata
 
@@ -501,6 +556,13 @@ flowchart LR
 - `src/tools/script_ops.hpp/cpp` — 10 tools (execute, load, create, attach, detach, etc.)
 - `src/tools/register_all.cpp` — 30 handler registrations + 30 catalog entries
 
+**Editor alignment fixes** (R13):
+
+- `resource_rename` — updates `ResourceCache` + `scene_file_path` + `EditorFileSystem`
+- `resource_remove` — unregisters from `ResourceCache` + refreshes `EditorFileSystem`
+- `resource_save` to new path — updates `scene_file_path` + refreshes `EditorFileSystem`
+- `script_attach_to_node` / `script_detach_from_node` — uses `EditorUndoRedoManager` to mark scene modified
+
 **Dependency**: feature/tool-pattern
 
 ---
@@ -514,6 +576,21 @@ flowchart LR
 - `src/tools/physics_ops.hpp/cpp` — 40 tools (2D + 3D physics queries, body/joint/area creation)
 - `src/tools/render_ops.hpp/cpp` — 30 tools (canvas, mesh, material, camera, light, particle, viewport)
 - `src/tools/nav_ops.hpp/cpp` — 15 tools (2D + 3D navigation, maps, regions, agents)
+
+**physics_2d_* tools** (15):
+`physics_2d_space_get_direct_state`, `physics_2d_ray_cast`, `physics_2d_shape_cast`, `physics_2d_point_query`, `physics_2d_intersect_shape`, `physics_2d_intersect_point`, `physics_2d_body_create`, `physics_2d_body_set_mode`, `physics_2d_body_apply_force`, `physics_2d_body_apply_impulse`, `physics_2d_body_set_state`, `physics_2d_body_get_state`, `physics_2d_joint_create`, `physics_2d_area_create`, `physics_2d_area_set_monitorable`
+
+**physics_3d_* tools** (25):
+Same as 2D plus `physics_3d_body_apply_torque`, `physics_3d_body_set_axis_lock`, `physics_3d_body_add_collision_exception`, `physics_3d_body_remove_collision_exception`, `physics_3d_joint_set_param`, `physics_3d_area_set_space_override`, `physics_3d_space_set_gravity`, `physics_3d_space_set_debug`, `physics_3d_soft_body_create`, `physics_3d_soft_body_set_mesh`
+
+**render_* tools** (30):
+`canvas_item_create`, `canvas_item_draw_rect`, `canvas_item_draw_circle`, `canvas_item_draw_texture`, `canvas_item_draw_line`, `canvas_item_set_transform`, `canvas_item_set_visible`, `scenario_create`, `scenario_set_environment`, `camera_create`, `camera_set_transform`, `camera_set_perspective`, `camera_set_orthogonal`, `light_create`, `light_set_param`, `light_set_color`, `mesh_create`, `mesh_add_surface`, `mesh_set_material`, `material_create`, `material_set_param`, `viewport_create`, `viewport_set_size`, `viewport_set_clear_mode`, `particle_create`, `environment_set_bg_color`, `environment_set_ambient`, `fog_create`, `shader_create`
+
+**nav_2d_* tools** (5):
+`nav_2d_map_create`, `nav_2d_region_create`, `nav_2d_path_query`, `nav_2d_agent_create`, `nav_2d_agent_set_target`
+
+**nav_3d_* tools** (10):
+`nav_3d_map_create`, `nav_3d_map_set_cell_size`, `nav_3d_region_create`, `nav_3d_region_set_nav_mesh`, `nav_3d_path_query`, `nav_3d_path_query_segment`, `nav_3d_agent_create`, `nav_3d_agent_set_velocity`, `nav_3d_agent_get_next_path`, `nav_3d_obstacle_create`
 
 **Dependency**: feature/tool-pattern
 
@@ -529,6 +606,15 @@ flowchart LR
 - `src/tools/input_ops.hpp/cpp` — 10 tools (action/key/mouse/gamepad simulation)
 - `src/tools/editor_ops.hpp/cpp` — 20 tools (selection, scene, undo redo, file system, plugins)
 
+**audio_* tools** (15):
+`audio_bus_get_layout`, `audio_bus_set_layout`, `audio_bus_get_count`, `audio_bus_get_name`, `audio_bus_set_volume`, `audio_bus_set_mute`, `audio_bus_set_bypass`, `audio_effect_add`, `audio_effect_remove`, `audio_stream_play`, `audio_stream_stop`, `audio_stream_set_volume`, `audio_stream_set_pitch`, `audio_stream_get_playback_position`, `audio_stream_seek`
+
+**input_* tools** (10):
+`input_action_press`, `input_action_release`, `input_is_action_pressed`, `input_is_action_just_pressed`, `input_key_press`, `input_key_release`, `input_mouse_move`, `input_mouse_button_press`, `input_mouse_button_release`, `input_gamepad_simulate`
+
+**editor_* tools** (20):
+`editor_get_selection`, `editor_set_selection`, `editor_get_edited_scene_root`, `editor_save_scene`, `editor_save_all_scenes`, `editor_reload_scene`, `editor_inspect_object`, `editor_undo_redo_start`, `editor_undo_redo_commit`, `editor_undo_redo_add_do`, `editor_undo_redo_add_undo`, `editor_file_system_get_resources`, `editor_file_system_scan`, `editor_import_resource`, `editor_set_main_scene`, `editor_play_current_scene`, `editor_stop_playing`, `editor_get_resource_filesystem`, `editor_get_plugin_list`, `editor_set_plugin_enabled`
+
 **Dependency**: feature/tool-pattern
 
 ---
@@ -542,6 +628,24 @@ flowchart LR
 - `src/tools/config_ops.hpp/cpp` — 13 tools (project settings, engine, editor settings)
 - `src/tools/debug_ops.hpp/cpp` — 15 tools (performance, profiling, debug visualization)
 - `src/tools/doc_ops.hpp/cpp` — 4 tools (class reference via `ClassDBSingleton` runtime reflection)
+
+**config_* tools** (13):
+`project_settings_get/set/has/save`, `engine_get_version/get_fps/get_frames_drawn`, `engine_set/get_time_scale`, `engine_set_max_fps`, `editor_settings_get/set/has`
+
+**debug_* tools** (15):
+`debug_print`, `debug_print_stack`, `debug_get_performance_monitor`, `debug_list_performance_monitors`, `debug_get_object_count`, `debug_get_object_count_by_class` (not available), `debug_get_memory_usage`, `debug_profile_start/stop/get_data` (not available), `debug_set_fps_limit`, `debug_set_physics_fps`, `debug_collision_debug`, `debug_navigation_debug`, `debug_performance_debug`
+
+**doc_* tools** (4):
+`doc_get_class({class: "Node3D"})` → full class reference via runtime reflection (methods/properties/signals/enums/constants, no docstrings)
+`doc_search({query: "ray_cast"})` → search registered classes by name
+`doc_get_method({class: "Node3D", method: "set_position"})` → method signature
+`doc_get_property({class: "Node3D", property: "position"})` → property metadata
+
+**Notes**:
+- `EditorSettings` accessed via `EditorInterface::get_singleton()->get_editor_settings()` (no `get_singleton()` in godot-cpp)
+- `ScriptBacktrace` API verified matching `script_backtrace.hpp` (get_language_name, get_frame_count/function/file/line, *variable_count/name/value)
+- 4 "not available" handlers (`debug_get_object_count_by_class`, `debug_profile_*`) return proper `{"error": "..."}` messages (not stubs)
+- `doc_*` tools use `ClassDBSingleton` runtime reflection — no docstrings, all handlers include `"note"` field
 
 **Dependency**: feature/tool-pattern
 
