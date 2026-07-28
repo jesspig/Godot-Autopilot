@@ -320,13 +320,13 @@ flowchart LR
 | 10 | `feature/tool-pbr` | physics + render + nav tools | 6 | ✅ |
 | 11 | `feature/tool-script` | audio + input + editor tools | 6 | ✅ |
 | 12 | `feature/tool-aux` | config + debug + doc tools | 6 | ✅ |
-| 13 | `feature/mcp-resources` | MCP Resource URI scheme | 1 | ⬜ |
+| 13 | `feature/mcp-resources` | MCP Resource URI scheme | 1 | ✅ |
 | 14 | `feature/mcp-prompts` | MCP Prompt templates | 1 | ⬜ |
 
 ### Current Status
 
-**Current branch**: `feature/tool-aux` (completed)
-**Next branch**: `feature/mcp-resources`
+**Current branch**: `feature/mcp-resources` (completed)
+**Next branch**: `feature/mcp-prompts`
 
 ---
 
@@ -553,9 +553,9 @@ flowchart LR
 
 **Goal**: Expose Godot engine state as MCP Resource URI scheme.
 
-**Modified Files**:
+**Files**:
 
-- `src/tools/register_all.cpp` — Register Resource URIs
+- `src/resources/resource_handlers.hpp/cpp` — 8 resource handlers (engine-version, scene-tree, scene-node, filesystem-tree, filesystem-path, editor-selection, editor-setting, log-recent)
 
 **Resource URI Scheme**:
 

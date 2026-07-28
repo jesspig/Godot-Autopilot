@@ -1,5 +1,6 @@
 #include "server_context.hpp"
 #include "log_system.hpp"
+#include "resources/resource_handlers.hpp"
 #include "tools/register_all.hpp"
 #include <mcp/server/ServerOptions.hpp>
 #include <mcp/Content.hpp>
@@ -98,6 +99,7 @@ bool ServerContext::is_running() const {
 
 void ServerContext::register_tools() {
     register_all_tools(*server_, queue_, catalog_, bm25_index_, port_);
+    register_all_resources(*server_, queue_);
 }
 
 } // namespace godot_self_driving
