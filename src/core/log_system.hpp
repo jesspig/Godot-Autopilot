@@ -11,7 +11,7 @@
 namespace godot_self_driving {
 
 enum class LogLevel { Debug, Info, Warning, Error };
-enum class LogCategory { System, Transport, Tools, Sandbox, Resources, Prompts };
+enum class LogCategory { System, Transport, Tools, Resources, Prompts };
 
 struct LogEntry {
     std::chrono::system_clock::time_point timestamp;
