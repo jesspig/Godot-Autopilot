@@ -119,6 +119,155 @@ void ToolCatalog::populate_default_tools() {
 
         add_tool({"get_tool_detail", "Get complete schema for one tool", "Meta", {"detail", "schema"}, std::move(s)});
     }
+
+    // system_status (already in g_handlers but needs catalog entry)
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"system_status", "Get server status info", "System", {"status", "info"}, std::move(s)});
+    }
+
+    // call_tool — proxy
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue np(mcp::JsonValue::object_tag);
+        np["type"] = mcp::JsonValue("string");
+        props["name"] = std::move(np);
+        mcp::JsonValue ap(mcp::JsonValue::object_tag);
+        ap["type"] = mcp::JsonValue("object");
+        props["arguments"] = std::move(ap);
+        s["properties"] = std::move(props);
+        mcp::JsonValue req(mcp::JsonValue::array_tag);
+        req.PushBack(mcp::JsonValue("name"));
+        s["required"] = std::move(req);
+        add_tool({"call_tool", "Execute any tool by name", "Meta", {"proxy", "execute"}, std::move(s)});
+    }
+
+    // scene_ops
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["parent_path"] = std::move(pp);
+        mcp::JsonValue np(mcp::JsonValue::object_tag);
+        np["type"] = mcp::JsonValue("string");
+        props["name"] = std::move(np);
+        mcp::JsonValue tp(mcp::JsonValue::object_tag);
+        tp["type"] = mcp::JsonValue("string");
+        props["type"] = std::move(tp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("parent_path"));
+        s["required"] = std::move(rq);
+        add_tool({"scene_node_create", "Create a new scene node as child of a parent", "Scene", {"node", "create"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"scene_node_delete", "Delete a scene node by path", "Scene", {"node", "delete"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"scene_tree_get", "Get the full scene tree", "Scene", {"tree", "structure"}, std::move(s)});
+    }
+
+    // property_ops
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        props["path"] = std::move(pp);
+        mcp::JsonValue prp(mcp::JsonValue::object_tag);
+        prp["type"] = mcp::JsonValue("string");
+        props["property"] = std::move(prp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        rq.PushBack(mcp::JsonValue("property"));
+        s["required"] = std::move(rq);
+        add_tool({"property_get", "Get a property value from a scene node", "Properties", {"property", "get"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        props["path"] = std::move(pp);
+        mcp::JsonValue prp(mcp::JsonValue::object_tag);
+        prp["type"] = mcp::JsonValue("string");
+        props["property"] = std::move(prp);
+        mcp::JsonValue vl(mcp::JsonValue::object_tag);
+        vl["type"] = mcp::JsonValue("object");
+        props["value"] = std::move(vl);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        rq.PushBack(mcp::JsonValue("property"));
+        rq.PushBack(mcp::JsonValue("value"));
+        s["required"] = std::move(rq);
+        add_tool({"property_set", "Set a property value on a scene node", "Properties", {"property", "set"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"property_get_list", "List all properties of a scene node", "Properties", {"property", "list"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue sp(mcp::JsonValue::object_tag);
+        sp["type"] = mcp::JsonValue("string");
+        props["source_path"] = std::move(sp);
+        mcp::JsonValue sg(mcp::JsonValue::object_tag);
+        sg["type"] = mcp::JsonValue("string");
+        props["signal"] = std::move(sg);
+        mcp::JsonValue tp(mcp::JsonValue::object_tag);
+        tp["type"] = mcp::JsonValue("string");
+        props["target_path"] = std::move(tp);
+        mcp::JsonValue mt(mcp::JsonValue::object_tag);
+        mt["type"] = mcp::JsonValue("string");
+        props["method"] = std::move(mt);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("source_path"));
+        rq.PushBack(mcp::JsonValue("signal"));
+        rq.PushBack(mcp::JsonValue("target_path"));
+        rq.PushBack(mcp::JsonValue("method"));
+        s["required"] = std::move(rq);
+        add_tool({"signal_connect", "Connect a signal from one node to another", "Properties", {"signal", "connect"}, std::move(s)});
+    }
 }
 
 } // namespace godot_self_driving
