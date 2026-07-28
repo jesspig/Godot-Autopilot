@@ -310,7 +310,7 @@ flowchart LR
 | 5 | `feature/mcp-engine-core` | libhv + McpServer + Streamable HTTP | 4 | ✅ |
 | 6 | `feature/command-bridge` | CommandQueue + libhv↔Godot bridge | 1 | ✅ |
 | 7 | `feature/tool-discovery` | BM25 search + 3 meta-tools | 6 | ✅ |
-| 8 | `feature/tool-pattern` | VariantJson + scene_ops + property_ops + call_tool | 8 | ⬜ |
+| 8 | `feature/tool-pattern` | VariantJson + scene_ops + property_ops + call_tool | 8 | ✅ |
 | 9 | `feature/tool-core` | resource + script tools | 4 | ⬜ |
 | 10 | `feature/tool-pbr` | physics + render + nav tools | 6 | ⬜ |
 | 11 | `feature/tool-script` | audio + input + editor tools | 6 | ⬜ |
@@ -321,8 +321,8 @@ flowchart LR
 
 ### Current Status
 
-**Current branch**: `feature/tool-discovery` (completed)
-**Next branch**: `feature/tool-pattern`
+**Current branch**: `feature/tool-pattern` (completed)
+**Next branch**: `feature/tool-core`
 
 ---
 
