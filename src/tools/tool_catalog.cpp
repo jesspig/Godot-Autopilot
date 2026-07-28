@@ -1797,6 +1797,692 @@ void ToolCatalog::populate_default_tools() {
         s["required"] = std::move(rq);
         add_tool({"nav_3d_obstacle_create", "Create a 3D navigation obstacle", "Nav", {"nav", "3d", "obstacle", "create"}, std::move(s)});
     }
+
+    // audio_ops
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"audio_bus_get_layout", "Get the audio bus layout", "Audio", {"audio", "bus"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue lp(mcp::JsonValue::object_tag);
+        lp["type"] = mcp::JsonValue("object");
+        lp["description"] = mcp::JsonValue("AudioBusLayout resource data");
+        props["layout"] = std::move(lp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("layout"));
+        s["required"] = std::move(rq);
+        add_tool({"audio_bus_set_layout", "Set the audio bus layout", "Audio", {"audio", "bus"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"audio_bus_get_count", "Get the number of audio buses", "Audio", {"audio", "bus", "count"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue bip(mcp::JsonValue::object_tag);
+        bip["type"] = mcp::JsonValue("integer");
+        bip["description"] = mcp::JsonValue("Bus index");
+        props["bus_index"] = std::move(bip);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("bus_index"));
+        s["required"] = std::move(rq);
+        add_tool({"audio_bus_get_name", "Get the name of an audio bus", "Audio", {"audio", "bus", "name"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue bip(mcp::JsonValue::object_tag);
+        bip["type"] = mcp::JsonValue("integer");
+        bip["description"] = mcp::JsonValue("Bus index");
+        props["bus_index"] = std::move(bip);
+        mcp::JsonValue vp(mcp::JsonValue::object_tag);
+        vp["type"] = mcp::JsonValue("number");
+        vp["description"] = mcp::JsonValue("Volume in dB");
+        props["volume_db"] = std::move(vp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("bus_index"));
+        rq.PushBack(mcp::JsonValue("volume_db"));
+        s["required"] = std::move(rq);
+        add_tool({"audio_bus_set_volume", "Set volume of an audio bus", "Audio", {"audio", "bus", "volume"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue bip(mcp::JsonValue::object_tag);
+        bip["type"] = mcp::JsonValue("integer");
+        bip["description"] = mcp::JsonValue("Bus index");
+        props["bus_index"] = std::move(bip);
+        mcp::JsonValue mp(mcp::JsonValue::object_tag);
+        mp["type"] = mcp::JsonValue("boolean");
+        mp["description"] = mcp::JsonValue("Whether the bus is muted");
+        props["muted"] = std::move(mp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("bus_index"));
+        rq.PushBack(mcp::JsonValue("muted"));
+        s["required"] = std::move(rq);
+        add_tool({"audio_bus_set_mute", "Mute or unmute an audio bus", "Audio", {"audio", "bus", "mute"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue bip(mcp::JsonValue::object_tag);
+        bip["type"] = mcp::JsonValue("integer");
+        bip["description"] = mcp::JsonValue("Bus index");
+        props["bus_index"] = std::move(bip);
+        mcp::JsonValue bp(mcp::JsonValue::object_tag);
+        bp["type"] = mcp::JsonValue("boolean");
+        bp["description"] = mcp::JsonValue("Whether to bypass effects");
+        props["bypass"] = std::move(bp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("bus_index"));
+        rq.PushBack(mcp::JsonValue("bypass"));
+        s["required"] = std::move(rq);
+        add_tool({"audio_bus_set_bypass", "Bypass or enable effects on an audio bus", "Audio", {"audio", "bus", "bypass"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue bip(mcp::JsonValue::object_tag);
+        bip["type"] = mcp::JsonValue("integer");
+        bip["description"] = mcp::JsonValue("Bus index");
+        props["bus_index"] = std::move(bip);
+        mcp::JsonValue etp(mcp::JsonValue::object_tag);
+        etp["type"] = mcp::JsonValue("string");
+        etp["description"] = mcp::JsonValue("Effect type name (e.g. AudioEffectReverb)");
+        props["effect_type"] = std::move(etp);
+        mcp::JsonValue app(mcp::JsonValue::object_tag);
+        app["type"] = mcp::JsonValue("integer");
+        app["description"] = mcp::JsonValue("Optional position to insert the effect");
+        props["at_position"] = std::move(app);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("bus_index"));
+        rq.PushBack(mcp::JsonValue("effect_type"));
+        s["required"] = std::move(rq);
+        add_tool({"audio_effect_add", "Add an audio effect to a bus", "Audio", {"audio", "effect", "add"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue bip(mcp::JsonValue::object_tag);
+        bip["type"] = mcp::JsonValue("integer");
+        bip["description"] = mcp::JsonValue("Bus index");
+        props["bus_index"] = std::move(bip);
+        mcp::JsonValue eip(mcp::JsonValue::object_tag);
+        eip["type"] = mcp::JsonValue("integer");
+        eip["description"] = mcp::JsonValue("Effect index to remove");
+        props["effect_index"] = std::move(eip);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("bus_index"));
+        rq.PushBack(mcp::JsonValue("effect_index"));
+        s["required"] = std::move(rq);
+        add_tool({"audio_effect_remove", "Remove an audio effect from a bus", "Audio", {"audio", "effect", "remove"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue npp(mcp::JsonValue::object_tag);
+        npp["type"] = mcp::JsonValue("string");
+        npp["description"] = mcp::JsonValue("Path to AudioStreamPlayer node");
+        props["node_path"] = std::move(npp);
+        mcp::JsonValue spp(mcp::JsonValue::object_tag);
+        spp["type"] = mcp::JsonValue("string");
+        spp["description"] = mcp::JsonValue("Optional path to audio stream resource");
+        props["stream_path"] = std::move(spp);
+        mcp::JsonValue fpp(mcp::JsonValue::object_tag);
+        fpp["type"] = mcp::JsonValue("number");
+        fpp["description"] = mcp::JsonValue("Optional playback start position in seconds");
+        props["from_position"] = std::move(fpp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("node_path"));
+        s["required"] = std::move(rq);
+        add_tool({"audio_stream_play", "Play an audio stream on a player node", "Audio", {"audio", "stream", "play"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue npp(mcp::JsonValue::object_tag);
+        npp["type"] = mcp::JsonValue("string");
+        npp["description"] = mcp::JsonValue("Path to AudioStreamPlayer node");
+        props["node_path"] = std::move(npp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("node_path"));
+        s["required"] = std::move(rq);
+        add_tool({"audio_stream_stop", "Stop an audio stream on a player node", "Audio", {"audio", "stream", "stop"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue npp(mcp::JsonValue::object_tag);
+        npp["type"] = mcp::JsonValue("string");
+        npp["description"] = mcp::JsonValue("Path to AudioStreamPlayer node");
+        props["node_path"] = std::move(npp);
+        mcp::JsonValue vp(mcp::JsonValue::object_tag);
+        vp["type"] = mcp::JsonValue("number");
+        vp["description"] = mcp::JsonValue("Volume in dB");
+        props["volume_db"] = std::move(vp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("node_path"));
+        rq.PushBack(mcp::JsonValue("volume_db"));
+        s["required"] = std::move(rq);
+        add_tool({"audio_stream_set_volume", "Set volume of an audio stream player", "Audio", {"audio", "stream", "volume"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue npp(mcp::JsonValue::object_tag);
+        npp["type"] = mcp::JsonValue("string");
+        npp["description"] = mcp::JsonValue("Path to AudioStreamPlayer node");
+        props["node_path"] = std::move(npp);
+        mcp::JsonValue psp(mcp::JsonValue::object_tag);
+        psp["type"] = mcp::JsonValue("number");
+        psp["description"] = mcp::JsonValue("Pitch scale factor");
+        props["pitch_scale"] = std::move(psp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("node_path"));
+        rq.PushBack(mcp::JsonValue("pitch_scale"));
+        s["required"] = std::move(rq);
+        add_tool({"audio_stream_set_pitch", "Set pitch scale of an audio stream player", "Audio", {"audio", "stream", "pitch"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue npp(mcp::JsonValue::object_tag);
+        npp["type"] = mcp::JsonValue("string");
+        npp["description"] = mcp::JsonValue("Path to AudioStreamPlayer node");
+        props["node_path"] = std::move(npp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("node_path"));
+        s["required"] = std::move(rq);
+        add_tool({"audio_stream_get_playback_position", "Get current playback position of an audio stream", "Audio", {"audio", "stream", "position"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue npp(mcp::JsonValue::object_tag);
+        npp["type"] = mcp::JsonValue("string");
+        npp["description"] = mcp::JsonValue("Path to AudioStreamPlayer node");
+        props["node_path"] = std::move(npp);
+        mcp::JsonValue tp(mcp::JsonValue::object_tag);
+        tp["type"] = mcp::JsonValue("number");
+        tp["description"] = mcp::JsonValue("Position to seek to in seconds");
+        props["to_position"] = std::move(tp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("node_path"));
+        rq.PushBack(mcp::JsonValue("to_position"));
+        s["required"] = std::move(rq);
+        add_tool({"audio_stream_seek", "Seek an audio stream to a position", "Audio", {"audio", "stream", "seek"}, std::move(s)});
+    }
+
+    // input_ops
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue ap(mcp::JsonValue::object_tag);
+        ap["type"] = mcp::JsonValue("string");
+        ap["description"] = mcp::JsonValue("Input action name");
+        props["action"] = std::move(ap);
+        mcp::JsonValue sp(mcp::JsonValue::object_tag);
+        sp["type"] = mcp::JsonValue("number");
+        sp["description"] = mcp::JsonValue("Optional action strength (0.0-1.0)");
+        props["strength"] = std::move(sp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("action"));
+        s["required"] = std::move(rq);
+        add_tool({"input_action_press", "Press an input action", "Input", {"input", "action", "press"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue ap(mcp::JsonValue::object_tag);
+        ap["type"] = mcp::JsonValue("string");
+        ap["description"] = mcp::JsonValue("Input action name");
+        props["action"] = std::move(ap);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("action"));
+        s["required"] = std::move(rq);
+        add_tool({"input_action_release", "Release an input action", "Input", {"input", "action", "release"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue ap(mcp::JsonValue::object_tag);
+        ap["type"] = mcp::JsonValue("string");
+        ap["description"] = mcp::JsonValue("Input action name");
+        props["action"] = std::move(ap);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("action"));
+        s["required"] = std::move(rq);
+        add_tool({"input_is_action_pressed", "Check if an input action is pressed", "Input", {"input", "action", "pressed"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue ap(mcp::JsonValue::object_tag);
+        ap["type"] = mcp::JsonValue("string");
+        ap["description"] = mcp::JsonValue("Input action name");
+        props["action"] = std::move(ap);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("action"));
+        s["required"] = std::move(rq);
+        add_tool({"input_is_action_just_pressed", "Check if an input action was just pressed", "Input", {"input", "action", "just_pressed"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue kp(mcp::JsonValue::object_tag);
+        kp["type"] = mcp::JsonValue("string");
+        kp["description"] = mcp::JsonValue("Key name (e.g. SPACE, ENTER, A)");
+        props["key"] = std::move(kp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("key"));
+        s["required"] = std::move(rq);
+        add_tool({"input_key_press", "Simulate a key press", "Input", {"input", "key", "press"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue kp(mcp::JsonValue::object_tag);
+        kp["type"] = mcp::JsonValue("string");
+        kp["description"] = mcp::JsonValue("Key name (e.g. SPACE, ENTER, A)");
+        props["key"] = std::move(kp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("key"));
+        s["required"] = std::move(rq);
+        add_tool({"input_key_release", "Simulate a key release", "Input", {"input", "key", "release"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("object");
+        pp["description"] = mcp::JsonValue("Mouse position {x, y}");
+        props["position"] = std::move(pp);
+        mcp::JsonValue rp(mcp::JsonValue::object_tag);
+        rp["type"] = mcp::JsonValue("object");
+        rp["description"] = mcp::JsonValue("Optional relative movement {x, y}");
+        props["relative"] = std::move(rp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("position"));
+        s["required"] = std::move(rq);
+        add_tool({"input_mouse_move", "Move the mouse cursor", "Input", {"input", "mouse", "move"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue bp(mcp::JsonValue::object_tag);
+        bp["type"] = mcp::JsonValue("string");
+        bp["description"] = mcp::JsonValue("Mouse button (LEFT, RIGHT, MIDDLE)");
+        props["button"] = std::move(bp);
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("object");
+        pp["description"] = mcp::JsonValue("Optional mouse position {x, y}");
+        props["position"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("button"));
+        s["required"] = std::move(rq);
+        add_tool({"input_mouse_button_press", "Press a mouse button", "Input", {"input", "mouse", "button", "press"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue bp(mcp::JsonValue::object_tag);
+        bp["type"] = mcp::JsonValue("string");
+        bp["description"] = mcp::JsonValue("Mouse button (LEFT, RIGHT, MIDDLE)");
+        props["button"] = std::move(bp);
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("object");
+        pp["description"] = mcp::JsonValue("Optional mouse position {x, y}");
+        props["position"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("button"));
+        s["required"] = std::move(rq);
+        add_tool({"input_mouse_button_release", "Release a mouse button", "Input", {"input", "mouse", "button", "release"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue ap(mcp::JsonValue::object_tag);
+        ap["type"] = mcp::JsonValue("string");
+        ap["description"] = mcp::JsonValue("Gamepad action (STOP, VIBRATE)");
+        props["action"] = std::move(ap);
+        mcp::JsonValue dp(mcp::JsonValue::object_tag);
+        dp["type"] = mcp::JsonValue("integer");
+        dp["description"] = mcp::JsonValue("Optional device id");
+        props["device"] = std::move(dp);
+        mcp::JsonValue wmp(mcp::JsonValue::object_tag);
+        wmp["type"] = mcp::JsonValue("number");
+        wmp["description"] = mcp::JsonValue("Optional weak motor magnitude");
+        props["weak_magnitude"] = std::move(wmp);
+        mcp::JsonValue smp(mcp::JsonValue::object_tag);
+        smp["type"] = mcp::JsonValue("number");
+        smp["description"] = mcp::JsonValue("Optional strong motor magnitude");
+        props["strong_magnitude"] = std::move(smp);
+        mcp::JsonValue durp(mcp::JsonValue::object_tag);
+        durp["type"] = mcp::JsonValue("number");
+        durp["description"] = mcp::JsonValue("Optional vibration duration in seconds");
+        props["duration"] = std::move(durp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("action"));
+        s["required"] = std::move(rq);
+        add_tool({"input_gamepad_simulate", "Simulate gamepad actions (stop/vibrate)", "Input", {"input", "gamepad", "simulate"}, std::move(s)});
+    }
+
+    // editor_ops
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"editor_get_selection", "Get currently selected nodes in the editor", "Editor", {"editor", "selection", "get"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("array");
+        mcp::JsonValue pi(mcp::JsonValue::object_tag);
+        pi["type"] = mcp::JsonValue("string");
+        pp["items"] = std::move(pi);
+        pp["description"] = mcp::JsonValue("Array of node paths to select");
+        props["paths"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("paths"));
+        s["required"] = std::move(rq);
+        add_tool({"editor_set_selection", "Set editor selection to specified nodes", "Editor", {"editor", "selection", "set"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"editor_get_edited_scene_root", "Get the root node of the currently edited scene", "Editor", {"editor", "scene", "root"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"editor_save_scene", "Save the currently edited scene", "Editor", {"editor", "scene", "save"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"editor_save_all_scenes", "Save all open scenes in the editor", "Editor", {"editor", "scene", "save_all"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue spp(mcp::JsonValue::object_tag);
+        spp["type"] = mcp::JsonValue("string");
+        spp["description"] = mcp::JsonValue("Optional scene file path to reload");
+        props["scene_path"] = std::move(spp);
+        s["properties"] = std::move(props);
+        add_tool({"editor_reload_scene", "Reload a scene from disk", "Editor", {"editor", "scene", "reload"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue rpp(mcp::JsonValue::object_tag);
+        rpp["type"] = mcp::JsonValue("string");
+        rpp["description"] = mcp::JsonValue("Path to the resource to inspect");
+        props["resource_path"] = std::move(rpp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("resource_path"));
+        s["required"] = std::move(rq);
+        add_tool({"editor_inspect_object", "Open the inspector for a resource", "Editor", {"editor", "inspect", "object"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue anp(mcp::JsonValue::object_tag);
+        anp["type"] = mcp::JsonValue("string");
+        anp["description"] = mcp::JsonValue("Name for the undo/redo action");
+        props["action_name"] = std::move(anp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("action_name"));
+        s["required"] = std::move(rq);
+        add_tool({"editor_undo_redo_start", "Start an undo/redo action", "Editor", {"editor", "undo", "redo"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"editor_undo_redo_commit", "Commit the current undo/redo action", "Editor", {"editor", "undo", "redo"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue npp(mcp::JsonValue::object_tag);
+        npp["type"] = mcp::JsonValue("string");
+        npp["description"] = mcp::JsonValue("Node path to call method on");
+        props["node_path"] = std::move(npp);
+        mcp::JsonValue mp(mcp::JsonValue::object_tag);
+        mp["type"] = mcp::JsonValue("string");
+        mp["description"] = mcp::JsonValue("Method name to call");
+        props["method"] = std::move(mp);
+        mcp::JsonValue vp(mcp::JsonValue::object_tag);
+        vp["type"] = mcp::JsonValue("object");
+        vp["description"] = mcp::JsonValue("Optional value argument");
+        props["value"] = std::move(vp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("node_path"));
+        rq.PushBack(mcp::JsonValue("method"));
+        s["required"] = std::move(rq);
+        add_tool({"editor_undo_redo_add_do", "Add a do-method to the current undo/redo action", "Editor", {"editor", "undo", "redo"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue npp(mcp::JsonValue::object_tag);
+        npp["type"] = mcp::JsonValue("string");
+        npp["description"] = mcp::JsonValue("Node path to call method on");
+        props["node_path"] = std::move(npp);
+        mcp::JsonValue mp(mcp::JsonValue::object_tag);
+        mp["type"] = mcp::JsonValue("string");
+        mp["description"] = mcp::JsonValue("Method name to call");
+        props["method"] = std::move(mp);
+        mcp::JsonValue vp(mcp::JsonValue::object_tag);
+        vp["type"] = mcp::JsonValue("object");
+        vp["description"] = mcp::JsonValue("Optional value argument");
+        props["value"] = std::move(vp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("node_path"));
+        rq.PushBack(mcp::JsonValue("method"));
+        s["required"] = std::move(rq);
+        add_tool({"editor_undo_redo_add_undo", "Add an undo-method to the current undo/redo action", "Editor", {"editor", "undo", "redo"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        pp["description"] = mcp::JsonValue("Optional filesystem path to browse");
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        add_tool({"editor_file_system_get_resources", "Browse the editor resource filesystem", "Editor", {"editor", "filesystem", "browse"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"editor_file_system_scan", "Rescan the editor filesystem for changes", "Editor", {"editor", "filesystem", "scan"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        pp["description"] = mcp::JsonValue("Path to the resource to import");
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"editor_import_resource", "Import a resource (load and return its type)", "Editor", {"editor", "import", "resource"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        pp["description"] = mcp::JsonValue("Path to the scene file");
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        add_tool({"editor_set_main_scene", "Set the main scene for the project", "Editor", {"editor", "main_scene", "set"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"editor_play_current_scene", "Play the currently edited scene", "Editor", {"editor", "play", "scene"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"editor_stop_playing", "Stop the currently running scene", "Editor", {"editor", "stop", "play"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"editor_get_resource_filesystem", "Get the editor resource filesystem state", "Editor", {"editor", "filesystem", "status"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"editor_get_plugin_list", "List editor plugins (limited info)", "Editor", {"editor", "plugin", "list"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        pp["description"] = mcp::JsonValue("Plugin name");
+        props["plugin"] = std::move(pp);
+        mcp::JsonValue ep(mcp::JsonValue::object_tag);
+        ep["type"] = mcp::JsonValue("boolean");
+        ep["description"] = mcp::JsonValue("Whether to enable the plugin");
+        props["enabled"] = std::move(ep);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("plugin"));
+        rq.PushBack(mcp::JsonValue("enabled"));
+        s["required"] = std::move(rq);
+        add_tool({"editor_set_plugin_enabled", "Enable or disable an editor plugin", "Editor", {"editor", "plugin", "enable"}, std::move(s)});
+    }
 }
 
 } // namespace godot_self_driving
