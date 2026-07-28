@@ -149,7 +149,7 @@ Expected response (only 5 meta-tools):
 
 Custom `LogSystem` (thread-safe ring buffer, NOT `add_error_handler()`). **Single logging mechanism for the plugin.**
 
-Subsystems: `System/Transport/Tools/Sandbox/Resources/Prompts`. Max 10000 entries (FIFO). Thread-safe via `std::mutex`.
+Subsystems: `System/Transport/Tools/Resources/Prompts`. Max 10000 entries (FIFO). Thread-safe via `std::mutex`.
 
 Access via `LogSystem::instance()` (Meyer's singleton) — needed because `ClassDB::register_class<>()` needs default constructors.
 
@@ -251,8 +251,6 @@ All other tools live in an internal `unordered_map<string, ToolHandler>` and are
 | godot-cpp | `https://github.com/godotengine/godot-cpp.git` | 10.0.0-rc1 |
 | mcp-cpp-sdk | `https://github.com/jesspig/modelcontextprotocol-cpp-sdk.git` | 0.2.1 |
 
-QuickJS will be added as a dependency in `feature/quickjs-sandbox` (Phase 5).
-
 ## Style & Conventions
 
 - No comments unless logic requires explanation
@@ -291,8 +289,7 @@ flowchart LR
         ts[feature/tool-script<br/>audio + input + editor]
         ta[feature/tool-aux<br/>config + debug + doc]
     end
-    subgraph Phase5[Phase 5: Advanced]
-        qjs[feature/quickjs-sandbox]
+    subgraph Phase5[Phase 5: MCP Extensions]
         mres[feature/mcp-resources]
         mp[feature/mcp-prompts]
     end
@@ -303,11 +300,7 @@ flowchart LR
     cb --> td
     td --> tp
     tp --> tc & tpbr & ts & ta
-    ta --> qjs
-    tc --> qjs
-    tpbr --> qjs
-    ts --> qjs
-    qjs --> mres
+    ta --> mres
     mres --> mp
 ```
 
@@ -327,14 +320,13 @@ flowchart LR
 | 10 | `feature/tool-pbr` | physics + render + nav tools | 6 | ✅ |
 | 11 | `feature/tool-script` | audio + input + editor tools | 6 | ✅ |
 | 12 | `feature/tool-aux` | config + debug + doc tools | 6 | ✅ |
-| 13 | `feature/quickjs-sandbox` | QuickJS programmatic sandbox | 5 | ⬜ |
-| 14 | `feature/mcp-resources` | MCP Resource URI scheme | 1 | ⬜ |
-| 15 | `feature/mcp-prompts` | MCP Prompt templates | 1 | ⬜ |
+| 13 | `feature/mcp-resources` | MCP Resource URI scheme | 1 | ⬜ |
+| 14 | `feature/mcp-prompts` | MCP Prompt templates | 1 | ⬜ |
 
 ### Current Status
 
 **Current branch**: `feature/tool-aux` (completed)
-**Next branch**: `feature/quickjs-sandbox`
+**Next branch**: `feature/mcp-resources`
 
 ---
 
@@ -398,7 +390,7 @@ flowchart LR
   - `LogSystem::instance()` — Meyer's singleton (required for ClassDB default constructors)
 
 **Log Levels**: Debug, Info, Warning, Error
-**Log Categories**: System, Transport, Tools, Sandbox, Resources, Prompts
+**Log Categories**: System, Transport, Tools, Resources, Prompts
 
 ---
 
@@ -555,32 +547,9 @@ flowchart LR
 
 ---
 
-### Phase 5: Advanced
+### Phase 5: MCP Extensions
 
-#### 13. feature/quickjs-sandbox
-
-**Goal**: QuickJS sandbox for programmatic tool composition (async/await support).
-
-**Files**:
-
-- `src/sandbox/script_sandbox.hpp/cpp` — `ScriptSandbox` class:
-  - `initialize()`: create JSRuntime + JSContext, set memory/stack/GC limits
-  - `execute(script, timeout_ms) → ScriptResult{result_json, console_output, error, execution_time_ms}`
-  - Async event loop: `JS_Eval(JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_ASYNC)` → `JS_ExecutePendingJob()` loop → `JS_PromiseState()`/`JS_PromiseResult()`
-  - `inject_builtins()`: exposes `console.log/warn/error` (captures output) + `_mcpCall(name, args_json)` (bridges to `g_handlers`)
-  - Interrupt handler for timeout enforcement
-- `src/sandbox/tool_stubs_generator.hpp/cpp` — `generate_stubs(catalog)`: iterates `get_all_tools()`, generates async tool stubs
-- `CMakeLists.txt` — FetchContent for QuickJS (commit `04be2460`), LANGUAGES C CXX, 5 source files, compiler-rt for 128-bit division
-- `src/tools/register_all.hpp/cpp` — Added `ScriptSandbox&` param, sandbox tool integration
-- `src/core/server_context.hpp/cpp` — Added `ScriptSandbox sandbox_` member, sandbox init + stub injection
-
-**Windows compat**: `sys/time.h` stub for `gettimeofday`/`clock_gettime`, `pthread.h` stub for mutex/condvar (atomics disabled via `-UCONFIG_ATOMICS`), `alloca` via `-Dalloca=__builtin_alloca`, `CONFIG_VERSION` read from VERSION file.
-
-**Dependency**: feature/tool-aux + feature/tool-discovery
-
----
-
-#### 14. feature/mcp-resources
+#### 13. feature/mcp-resources
 
 **Goal**: Expose Godot engine state as MCP Resource URI scheme.
 
@@ -601,11 +570,11 @@ flowchart LR
 | `godot://editor/settings/{key}` | `RegisterResourceTemplate` | Editor setting value |
 | `godot://log/recent` | `RegisterResource` | Last N log entries |
 
-**Dependency**: feature/quickjs-sandbox
+**Dependency**: feature/tool-aux
 
 ---
 
-#### 15. feature/mcp-prompts
+#### 14. feature/mcp-prompts
 
 **Goal**: MCP Prompt templates for common engine tasks.
 
