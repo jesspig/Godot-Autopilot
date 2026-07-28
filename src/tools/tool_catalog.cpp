@@ -2483,6 +2483,414 @@ void ToolCatalog::populate_default_tools() {
         s["required"] = std::move(rq);
         add_tool({"editor_set_plugin_enabled", "Enable or disable an editor plugin", "Editor", {"editor", "plugin", "enable"}, std::move(s)});
     }
+
+    // config_ops
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue np(mcp::JsonValue::object_tag);
+        np["type"] = mcp::JsonValue("string");
+        np["description"] = mcp::JsonValue("Setting name");
+        props["name"] = std::move(np);
+        mcp::JsonValue dp(mcp::JsonValue::object_tag);
+        dp["type"] = mcp::JsonValue("object");
+        dp["description"] = mcp::JsonValue("Optional default value if not set");
+        props["default"] = std::move(dp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("name"));
+        s["required"] = std::move(rq);
+        add_tool({"project_settings_get", "Get a project setting by name", "Config", {"config", "project", "settings", "get"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue np(mcp::JsonValue::object_tag);
+        np["type"] = mcp::JsonValue("string");
+        np["description"] = mcp::JsonValue("Setting name");
+        props["name"] = std::move(np);
+        mcp::JsonValue vp(mcp::JsonValue::object_tag);
+        vp["type"] = mcp::JsonValue("object");
+        vp["description"] = mcp::JsonValue("Value to set");
+        props["value"] = std::move(vp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("name"));
+        rq.PushBack(mcp::JsonValue("value"));
+        s["required"] = std::move(rq);
+        add_tool({"project_settings_set", "Set a project setting by name", "Config", {"config", "project", "settings", "set"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue np(mcp::JsonValue::object_tag);
+        np["type"] = mcp::JsonValue("string");
+        np["description"] = mcp::JsonValue("Setting name");
+        props["name"] = std::move(np);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("name"));
+        s["required"] = std::move(rq);
+        add_tool({"project_settings_has", "Check if a project setting exists", "Config", {"config", "project", "settings", "has"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"project_settings_save", "Save project settings to disk", "Config", {"config", "project", "settings", "save"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"engine_get_version", "Get the Godot engine version info", "Config", {"config", "engine", "version"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"engine_get_fps", "Get the current FPS", "Config", {"config", "engine", "fps"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"engine_get_frames_drawn", "Get total frames drawn since engine start", "Config", {"config", "engine", "frames"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue sp(mcp::JsonValue::object_tag);
+        sp["type"] = mcp::JsonValue("number");
+        sp["description"] = mcp::JsonValue("Time scale factor");
+        props["scale"] = std::move(sp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("scale"));
+        s["required"] = std::move(rq);
+        add_tool({"engine_set_time_scale", "Set the engine time scale", "Config", {"config", "engine", "time_scale", "set"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"engine_get_time_scale", "Get the current engine time scale", "Config", {"config", "engine", "time_scale", "get"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue fp(mcp::JsonValue::object_tag);
+        fp["type"] = mcp::JsonValue("integer");
+        fp["description"] = mcp::JsonValue("Max FPS value");
+        props["fps"] = std::move(fp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("fps"));
+        s["required"] = std::move(rq);
+        add_tool({"engine_set_max_fps", "Set the engine max FPS cap", "Config", {"config", "engine", "max_fps", "set"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue np(mcp::JsonValue::object_tag);
+        np["type"] = mcp::JsonValue("string");
+        np["description"] = mcp::JsonValue("Editor setting name");
+        props["name"] = std::move(np);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("name"));
+        s["required"] = std::move(rq);
+        add_tool({"editor_settings_get", "Get an editor setting by name", "Config", {"config", "editor", "settings", "get"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue np(mcp::JsonValue::object_tag);
+        np["type"] = mcp::JsonValue("string");
+        np["description"] = mcp::JsonValue("Editor setting name");
+        props["name"] = std::move(np);
+        mcp::JsonValue vp(mcp::JsonValue::object_tag);
+        vp["type"] = mcp::JsonValue("object");
+        vp["description"] = mcp::JsonValue("Value to set");
+        props["value"] = std::move(vp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("name"));
+        rq.PushBack(mcp::JsonValue("value"));
+        s["required"] = std::move(rq);
+        add_tool({"editor_settings_set", "Set an editor setting by name", "Config", {"config", "editor", "settings", "set"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue np(mcp::JsonValue::object_tag);
+        np["type"] = mcp::JsonValue("string");
+        np["description"] = mcp::JsonValue("Editor setting name");
+        props["name"] = std::move(np);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("name"));
+        s["required"] = std::move(rq);
+        add_tool({"editor_settings_has", "Check if an editor setting exists", "Config", {"config", "editor", "settings", "has"}, std::move(s)});
+    }
+
+    // debug_ops
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue mp(mcp::JsonValue::object_tag);
+        mp["type"] = mcp::JsonValue("string");
+        mp["description"] = mcp::JsonValue("Message to print");
+        props["message"] = std::move(mp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("message"));
+        s["required"] = std::move(rq);
+        add_tool({"debug_print", "Print a debug log message", "Debug", {"debug", "print", "log"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue ivp(mcp::JsonValue::object_tag);
+        ivp["type"] = mcp::JsonValue("boolean");
+        ivp["description"] = mcp::JsonValue("Include variable values in stack trace");
+        props["include_variables"] = std::move(ivp);
+        s["properties"] = std::move(props);
+        add_tool({"debug_print_stack", "Print the current script call stack", "Debug", {"debug", "stack", "trace"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue mp(mcp::JsonValue::object_tag);
+        mp["type"] = mcp::JsonValue("integer");
+        mp["description"] = mcp::JsonValue("Performance monitor ID (0-58)");
+        props["monitor"] = std::move(mp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("monitor"));
+        s["required"] = std::move(rq);
+        add_tool({"debug_get_performance_monitor", "Get a specific performance monitor value by ID", "Debug", {"debug", "performance", "monitor", "get"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"debug_list_performance_monitors", "List all available performance monitors", "Debug", {"debug", "performance", "monitor", "list"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"debug_get_object_count", "Get total live object count", "Debug", {"debug", "objects", "count"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"debug_get_object_count_by_class", "Get object count by class (limited availability)", "Debug", {"debug", "objects", "class"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"debug_get_memory_usage", "Get current static memory usage in bytes", "Debug", {"debug", "memory", "usage"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"debug_profile_start", "Start profiling (not available via godot-cpp)", "Debug", {"debug", "profile", "start"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"debug_profile_stop", "Stop profiling (not available via godot-cpp)", "Debug", {"debug", "profile", "stop"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        add_tool({"debug_profile_get_data", "Get profiling data (not available via godot-cpp)", "Debug", {"debug", "profile", "data"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue fp(mcp::JsonValue::object_tag);
+        fp["type"] = mcp::JsonValue("integer");
+        fp["description"] = mcp::JsonValue("FPS limit value");
+        props["fps"] = std::move(fp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("fps"));
+        s["required"] = std::move(rq);
+        add_tool({"debug_set_fps_limit", "Set a dynamic FPS limit for the engine", "Debug", {"debug", "fps", "limit", "set"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue fp(mcp::JsonValue::object_tag);
+        fp["type"] = mcp::JsonValue("integer");
+        fp["description"] = mcp::JsonValue("Physics FPS value");
+        props["fps"] = std::move(fp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("fps"));
+        s["required"] = std::move(rq);
+        add_tool({"debug_set_physics_fps", "Set the physics FPS (ticks per second)", "Debug", {"debug", "physics", "fps", "set"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue ep(mcp::JsonValue::object_tag);
+        ep["type"] = mcp::JsonValue("boolean");
+        ep["description"] = mcp::JsonValue("Enable or disable collision debug visualization");
+        props["enabled"] = std::move(ep);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("enabled"));
+        s["required"] = std::move(rq);
+        add_tool({"debug_collision_debug", "Toggle collision debug visualization", "Debug", {"debug", "collision", "visualize"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue ep(mcp::JsonValue::object_tag);
+        ep["type"] = mcp::JsonValue("boolean");
+        ep["description"] = mcp::JsonValue("Enable or disable navigation debug visualization");
+        props["enabled"] = std::move(ep);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("enabled"));
+        s["required"] = std::move(rq);
+        add_tool({"debug_navigation_debug", "Toggle navigation debug visualization", "Debug", {"debug", "navigation", "visualize"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue ep(mcp::JsonValue::object_tag);
+        ep["type"] = mcp::JsonValue("boolean");
+        ep["description"] = mcp::JsonValue("Enable or disable performance debug overlay");
+        props["enabled"] = std::move(ep);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("enabled"));
+        s["required"] = std::move(rq);
+        add_tool({"debug_performance_debug", "Toggle performance debug overlay in editor", "Debug", {"debug", "performance", "overlay"}, std::move(s)});
+    }
+
+    // doc_ops
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue cp(mcp::JsonValue::object_tag);
+        cp["type"] = mcp::JsonValue("string");
+        cp["description"] = mcp::JsonValue("Class name to get documentation for");
+        props["class"] = std::move(cp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("class"));
+        s["required"] = std::move(rq);
+        add_tool({"doc_get_class", "Get detailed documentation for a Godot class", "Docs", {"docs", "class", "get"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue qp(mcp::JsonValue::object_tag);
+        qp["type"] = mcp::JsonValue("string");
+        qp["description"] = mcp::JsonValue("Search query");
+        props["query"] = std::move(qp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("query"));
+        s["required"] = std::move(rq);
+        add_tool({"doc_search", "Search Godot classes by name", "Docs", {"docs", "search", "class"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue cp(mcp::JsonValue::object_tag);
+        cp["type"] = mcp::JsonValue("string");
+        cp["description"] = mcp::JsonValue("Class name");
+        props["class"] = std::move(cp);
+        mcp::JsonValue mp(mcp::JsonValue::object_tag);
+        mp["type"] = mcp::JsonValue("string");
+        mp["description"] = mcp::JsonValue("Method name");
+        props["method"] = std::move(mp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("class"));
+        rq.PushBack(mcp::JsonValue("method"));
+        s["required"] = std::move(rq);
+        add_tool({"doc_get_method", "Get signature info for a specific method on a class", "Docs", {"docs", "method", "get"}, std::move(s)});
+    }
+
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue cp(mcp::JsonValue::object_tag);
+        cp["type"] = mcp::JsonValue("string");
+        cp["description"] = mcp::JsonValue("Class name");
+        props["class"] = std::move(cp);
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        pp["description"] = mcp::JsonValue("Property name");
+        props["property"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("class"));
+        rq.PushBack(mcp::JsonValue("property"));
+        s["required"] = std::move(rq);
+        add_tool({"doc_get_property", "Get property info for a specific property on a class", "Docs", {"docs", "property", "get"}, std::move(s)});
+    }
 }
 
 } // namespace godot_self_driving

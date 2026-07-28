@@ -12,6 +12,9 @@
 #include "tools/audio_ops.hpp"
 #include "tools/input_ops.hpp"
 #include "tools/editor_ops.hpp"
+#include "tools/config_ops.hpp"
+#include "tools/debug_ops.hpp"
+#include "tools/doc_ops.hpp"
 
 namespace godot_self_driving {
 
@@ -179,6 +182,38 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
     g_handlers["editor_get_resource_filesystem"] = editor_ops::handle_get_resource_filesystem;
     g_handlers["editor_get_plugin_list"] = editor_ops::handle_get_plugin_list;
     g_handlers["editor_set_plugin_enabled"] = editor_ops::handle_set_plugin_enabled;
+    g_handlers["project_settings_get"] = config_ops::handle_project_settings_get;
+    g_handlers["project_settings_set"] = config_ops::handle_project_settings_set;
+    g_handlers["project_settings_has"] = config_ops::handle_project_settings_has;
+    g_handlers["project_settings_save"] = config_ops::handle_project_settings_save;
+    g_handlers["engine_get_version"] = config_ops::handle_engine_get_version;
+    g_handlers["engine_get_fps"] = config_ops::handle_engine_get_fps;
+    g_handlers["engine_get_frames_drawn"] = config_ops::handle_engine_get_frames_drawn;
+    g_handlers["engine_set_time_scale"] = config_ops::handle_engine_set_time_scale;
+    g_handlers["engine_get_time_scale"] = config_ops::handle_engine_get_time_scale;
+    g_handlers["engine_set_max_fps"] = config_ops::handle_engine_set_max_fps;
+    g_handlers["editor_settings_get"] = config_ops::handle_editor_settings_get;
+    g_handlers["editor_settings_set"] = config_ops::handle_editor_settings_set;
+    g_handlers["editor_settings_has"] = config_ops::handle_editor_settings_has;
+    g_handlers["debug_print"] = debug_ops::handle_print;
+    g_handlers["debug_print_stack"] = debug_ops::handle_print_stack;
+    g_handlers["debug_get_performance_monitor"] = debug_ops::handle_get_performance_monitor;
+    g_handlers["debug_list_performance_monitors"] = debug_ops::handle_list_performance_monitors;
+    g_handlers["debug_get_object_count"] = debug_ops::handle_get_object_count;
+    g_handlers["debug_get_object_count_by_class"] = debug_ops::handle_get_object_count_by_class;
+    g_handlers["debug_get_memory_usage"] = debug_ops::handle_get_memory_usage;
+    g_handlers["debug_profile_start"] = debug_ops::handle_profile_start;
+    g_handlers["debug_profile_stop"] = debug_ops::handle_profile_stop;
+    g_handlers["debug_profile_get_data"] = debug_ops::handle_profile_get_data;
+    g_handlers["debug_set_fps_limit"] = debug_ops::handle_set_fps_limit;
+    g_handlers["debug_set_physics_fps"] = debug_ops::handle_set_physics_fps;
+    g_handlers["debug_collision_debug"] = debug_ops::handle_collision_debug;
+    g_handlers["debug_navigation_debug"] = debug_ops::handle_navigation_debug;
+    g_handlers["debug_performance_debug"] = debug_ops::handle_performance_debug;
+    g_handlers["doc_get_class"] = doc_ops::handle_get_class;
+    g_handlers["doc_search"] = doc_ops::handle_search;
+    g_handlers["doc_get_method"] = doc_ops::handle_get_method;
+    g_handlers["doc_get_property"] = doc_ops::handle_get_property;
     g_handlers["resource_load"] = resource_ops::handle_load;
     g_handlers["resource_load_threaded"] = resource_ops::handle_load_threaded;
     g_handlers["resource_load_threaded_get_status"] = resource_ops::handle_load_threaded_get_status;
