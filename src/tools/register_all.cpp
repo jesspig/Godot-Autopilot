@@ -509,7 +509,344 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
             });
     }
 
-    // ── 4. Populate BM25 index ──
+    // ── 4. Catalog entries (full schemas) ──
+    // Meta-tools (overwrite basic entries from populate_default_tools)
+    {
+        catalog.add_tool({"call_tool", "Execute any tool by name", "Meta", {"proxy", "execute"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    }
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["parent_path"] = std::move(pp);
+        mcp::JsonValue np(mcp::JsonValue::object_tag);
+        np["type"] = mcp::JsonValue("string");
+        props["name"] = std::move(np);
+        mcp::JsonValue tp(mcp::JsonValue::object_tag);
+        tp["type"] = mcp::JsonValue("string");
+        props["type"] = std::move(tp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("parent_path"));
+        s["required"] = std::move(rq);
+        catalog.add_tool({"scene_node_create", "Create a new scene node as child of a parent", "Scene", {"node", "create"}, std::move(s)});
+    }
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        catalog.add_tool({"scene_node_delete", "Delete a scene node by path", "Scene", {"node", "delete"}, std::move(s)});
+    }
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+        catalog.add_tool({"scene_tree_get", "Get the full scene tree", "Scene", {"tree", "structure"}, std::move(s)});
+    }
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        props["path"] = std::move(pp);
+        mcp::JsonValue prp(mcp::JsonValue::object_tag);
+        prp["type"] = mcp::JsonValue("string");
+        props["property"] = std::move(prp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        rq.PushBack(mcp::JsonValue("property"));
+        s["required"] = std::move(rq);
+        catalog.add_tool({"property_get", "Get a property value from a scene node", "Properties", {"property", "get"}, std::move(s)});
+    }
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        props["path"] = std::move(pp);
+        mcp::JsonValue prp(mcp::JsonValue::object_tag);
+        prp["type"] = mcp::JsonValue("string");
+        props["property"] = std::move(prp);
+        mcp::JsonValue vl(mcp::JsonValue::object_tag);
+        vl["type"] = mcp::JsonValue("object");
+        props["value"] = std::move(vl);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        rq.PushBack(mcp::JsonValue("property"));
+        rq.PushBack(mcp::JsonValue("value"));
+        s["required"] = std::move(rq);
+        catalog.add_tool({"property_set", "Set a property value on a scene node", "Properties", {"property", "set"}, std::move(s)});
+    }
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue pp(mcp::JsonValue::object_tag);
+        pp["type"] = mcp::JsonValue("string");
+        props["path"] = std::move(pp);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("path"));
+        s["required"] = std::move(rq);
+        catalog.add_tool({"property_get_list", "List all properties of a scene node", "Properties", {"property", "list"}, std::move(s)});
+    }
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue sp(mcp::JsonValue::object_tag);
+        sp["type"] = mcp::JsonValue("string");
+        props["source_path"] = std::move(sp);
+        mcp::JsonValue sg(mcp::JsonValue::object_tag);
+        sg["type"] = mcp::JsonValue("string");
+        props["signal"] = std::move(sg);
+        mcp::JsonValue tp(mcp::JsonValue::object_tag);
+        tp["type"] = mcp::JsonValue("string");
+        props["target_path"] = std::move(tp);
+        mcp::JsonValue mt(mcp::JsonValue::object_tag);
+        mt["type"] = mcp::JsonValue("string");
+        props["method"] = std::move(mt);
+        s["properties"] = std::move(props);
+        mcp::JsonValue rq(mcp::JsonValue::array_tag);
+        rq.PushBack(mcp::JsonValue("source_path"));
+        rq.PushBack(mcp::JsonValue("signal"));
+        rq.PushBack(mcp::JsonValue("target_path"));
+        rq.PushBack(mcp::JsonValue("method"));
+        s["required"] = std::move(rq);
+        catalog.add_tool({"signal_connect", "Connect a signal from one node to another", "Properties", {"signal", "connect"}, std::move(s)});
+    }
+
+    // resource_ops
+    catalog.add_tool({"resource_load", "Load a resource from file path", "Resources", {"resource", "load"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"resource_load_threaded", "Start threaded resource load", "Resources", {"resource", "load", "threaded"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"resource_load_threaded_get_status", "Get status of threaded resource load", "Resources", {"resource", "load", "status"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"resource_load_threaded_wait", "Wait for threaded resource load to complete", "Resources", {"resource", "load", "wait"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"resource_save", "Save a resource to file", "Resources", {"resource", "save"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"resource_create", "Create a new resource instance by class type", "Resources", {"resource", "create"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"resource_duplicate", "Duplicate/instance a loaded resource", "Resources", {"resource", "duplicate"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"resource_get_type", "Get the class type of a resource", "Resources", {"resource", "type"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"resource_exists", "Check if a resource exists at path", "Resources", {"resource", "exists"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"resource_list_types", "List all instantiable Resource subclass types", "Resources", {"resource", "types", "list"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"resource_get_extensions", "Get recognized file extensions for a resource type", "Resources", {"resource", "extensions"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"resource_list_dir", "List resource files in a directory", "Resources", {"resource", "directory", "list"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"resource_get_uid", "Get the UID of a resource file", "Resources", {"resource", "uid", "get"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"resource_set_uid", "Set or assign a UID to a resource file", "Resources", {"resource", "uid", "set"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"resource_remove", "Delete a resource file from disk", "Resources", {"resource", "remove", "delete"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"resource_rename", "Rename/move a resource file", "Resources", {"resource", "rename", "move"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"resource_get_dependencies", "List all dependencies of a resource", "Resources", {"resource", "dependencies", "list"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"resource_has_dependency", "Check if a resource depends on another file", "Resources", {"resource", "dependency", "check"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"resource_import", "Import a single resource file (editor only)", "Resources", {"resource", "import"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"resource_reimport", "Reimport one or more resource files (editor only)", "Resources", {"resource", "reimport"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+
+    // script_ops
+    catalog.add_tool({"script_execute_gdscript", "Execute an arbitrary GDScript expression", "Scripts", {"script", "execute", "gdscript"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"script_load", "Load a script from file path", "Scripts", {"script", "load"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"script_create", "Create and save a new GDScript file", "Scripts", {"script", "create"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"script_attach_to_node", "Attach a script to a scene node", "Scripts", {"script", "attach", "node"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"script_detach_from_node", "Detach script from a scene node", "Scripts", {"script", "detach", "node"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"script_get_property", "Get a script property's default value or a node's property", "Scripts", {"script", "property", "get"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"script_set_property", "Set a property on a node via script", "Scripts", {"script", "property", "set"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"script_call_function", "Call a function on a node via its script", "Scripts", {"script", "call", "function"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"script_reload", "Reload a script from disk", "Scripts", {"script", "reload"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"script_get_variable_list", "List all script variables and their types", "Scripts", {"script", "variables", "list"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+
+    // physics_ops — 2D
+    catalog.add_tool({"physics_2d_space_get_direct_state", "Get the direct state of a 2D physics space", "Physics", {"physics", "2d", "space"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_2d_ray_cast", "Cast a ray in 2D physics space", "Physics", {"physics", "2d", "ray"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_2d_shape_cast", "Cast a shape in 2D physics space", "Physics", {"physics", "2d", "shape"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_2d_point_query", "Query a point in 2D physics space", "Physics", {"physics", "2d", "point"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_2d_intersect_shape", "Intersect a shape in 2D physics space", "Physics", {"physics", "2d", "intersect", "shape"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_2d_intersect_point", "Intersect a point in 2D physics space", "Physics", {"physics", "2d", "intersect", "point"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_2d_body_create", "Create a 2D physics body", "Physics", {"physics", "2d", "body", "create"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_2d_body_set_mode", "Set the mode of a 2D physics body", "Physics", {"physics", "2d", "body", "mode"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_2d_body_apply_force", "Apply force to a 2D physics body", "Physics", {"physics", "2d", "body", "force"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_2d_body_apply_impulse", "Apply impulse to a 2D physics body", "Physics", {"physics", "2d", "body", "impulse"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_2d_body_set_state", "Set state of a 2D physics body", "Physics", {"physics", "2d", "body", "state"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_2d_body_get_state", "Get state of a 2D physics body", "Physics", {"physics", "2d", "body", "state"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_2d_joint_create", "Create a 2D physics joint", "Physics", {"physics", "2d", "joint", "create"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_2d_area_create", "Create a 2D physics area", "Physics", {"physics", "2d", "area", "create"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_2d_area_set_monitorable", "Set monitorable flag on a 2D area", "Physics", {"physics", "2d", "area", "monitorable"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+
+    // physics_ops — 3D
+    catalog.add_tool({"physics_3d_space_get_direct_state", "Get the direct state of a 3D physics space", "Physics", {"physics", "3d", "space"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_ray_cast", "Cast a ray in 3D physics space", "Physics", {"physics", "3d", "ray"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_shape_cast", "Cast a shape in 3D physics space", "Physics", {"physics", "3d", "shape"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_point_query", "Query a point in 3D physics space", "Physics", {"physics", "3d", "point"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_intersect_shape", "Intersect a shape in 3D physics space", "Physics", {"physics", "3d", "intersect", "shape"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_intersect_point", "Intersect a point in 3D physics space", "Physics", {"physics", "3d", "intersect", "point"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_body_create", "Create a 3D physics body", "Physics", {"physics", "3d", "body", "create"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_body_set_mode", "Set the mode of a 3D physics body", "Physics", {"physics", "3d", "body", "mode"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_body_apply_force", "Apply force to a 3D physics body", "Physics", {"physics", "3d", "body", "force"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_body_apply_impulse", "Apply impulse to a 3D physics body", "Physics", {"physics", "3d", "body", "impulse"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_body_apply_torque", "Apply torque to a 3D physics body", "Physics", {"physics", "3d", "body", "torque"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_body_set_axis_lock", "Set axis lock on a 3D physics body", "Physics", {"physics", "3d", "body", "axis_lock"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_body_set_state", "Set state of a 3D physics body", "Physics", {"physics", "3d", "body", "state"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_body_get_state", "Get state of a 3D physics body", "Physics", {"physics", "3d", "body", "state"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_body_add_collision_exception", "Add collision exception to a 3D body", "Physics", {"physics", "3d", "collision", "exception"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_body_remove_collision_exception", "Remove collision exception from a 3D body", "Physics", {"physics", "3d", "collision", "exception"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_joint_create", "Create a 3D physics joint", "Physics", {"physics", "3d", "joint", "create"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_joint_set_param", "Set parameter on a 3D physics joint", "Physics", {"physics", "3d", "joint", "param"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_area_create", "Create a 3D physics area", "Physics", {"physics", "3d", "area", "create"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_area_set_monitorable", "Set monitorable flag on a 3D area", "Physics", {"physics", "3d", "area", "monitorable"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_area_set_space_override", "Set space override mode on a 3D area", "Physics", {"physics", "3d", "area", "space_override"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_space_set_gravity", "Set gravity on a 3D physics space", "Physics", {"physics", "3d", "space", "gravity"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_space_set_debug", "Toggle debug visualization on a 3D space", "Physics", {"physics", "3d", "space", "debug"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_soft_body_create", "Create a 3D soft body", "Physics", {"physics", "3d", "soft_body", "create"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_soft_body_set_mesh", "Set soft body mesh", "Physics", {"physics", "3d", "soft_body", "mesh"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+
+    // render_ops
+    catalog.add_tool({"canvas_item_create", "Create a canvas item", "Render", {"render", "canvas", "create"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"canvas_item_draw_rect", "Draw a rectangle on a canvas item", "Render", {"render", "canvas", "draw", "rect"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"canvas_item_draw_circle", "Draw a circle on a canvas item", "Render", {"render", "canvas", "draw", "circle"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"canvas_item_draw_texture", "Draw a texture on a canvas item", "Render", {"render", "canvas", "draw", "texture"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"canvas_item_draw_line", "Draw a line on a canvas item", "Render", {"render", "canvas", "draw", "line"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"canvas_item_set_transform", "Set transform on a canvas item", "Render", {"render", "canvas", "transform"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"canvas_item_set_visible", "Set visibility on a canvas item", "Render", {"render", "canvas", "visible"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"scenario_create", "Create a render scenario", "Render", {"render", "scenario", "create"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"scenario_set_environment", "Set environment on a render scenario", "Render", {"render", "scenario", "environment"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"camera_create", "Create a render camera", "Render", {"render", "camera", "create"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"camera_set_transform", "Set transform on a render camera", "Render", {"render", "camera", "transform"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"camera_set_perspective", "Set perspective projection on camera", "Render", {"render", "camera", "perspective"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"camera_set_orthogonal", "Set orthogonal projection on camera", "Render", {"render", "camera", "orthogonal"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"light_create", "Create a render light", "Render", {"render", "light", "create"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"light_set_param", "Set a parameter on a render light", "Render", {"render", "light", "param"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"light_set_color", "Set color on a render light", "Render", {"render", "light", "color"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"mesh_create", "Create a render mesh", "Render", {"render", "mesh", "create"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"mesh_add_surface", "Add a surface to a render mesh", "Render", {"render", "mesh", "surface"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"mesh_set_material", "Set material on a render mesh", "Render", {"render", "mesh", "material"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"material_create", "Create a render material", "Render", {"render", "material", "create"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"material_set_param", "Set a parameter on a render material", "Render", {"render", "material", "param"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"viewport_create", "Create a render viewport", "Render", {"render", "viewport", "create"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"viewport_set_size", "Set size on a render viewport", "Render", {"render", "viewport", "size"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"viewport_set_clear_mode", "Set clear mode on a render viewport", "Render", {"render", "viewport", "clear"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"particle_create", "Create a particle system", "Render", {"render", "particle", "create"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"environment_set_bg_color", "Set background color on environment", "Render", {"render", "environment", "bg"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"environment_set_ambient", "Set ambient light on environment", "Render", {"render", "environment", "ambient"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"fog_create", "Create a fog volume", "Render", {"render", "fog", "create"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"shader_create", "Create a shader", "Render", {"render", "shader", "create"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+
+    // nav_ops — 2D
+    catalog.add_tool({"nav_2d_map_create", "Create a 2D navigation map", "Navigation", {"nav", "2d", "map", "create"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"nav_2d_region_create", "Create a 2D navigation region", "Navigation", {"nav", "2d", "region", "create"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"nav_2d_path_query", "Query a path in 2D navigation", "Navigation", {"nav", "2d", "path", "query"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"nav_2d_agent_create", "Create a 2D navigation agent", "Navigation", {"nav", "2d", "agent", "create"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"nav_2d_agent_set_target", "Set target for a 2D navigation agent", "Navigation", {"nav", "2d", "agent", "target"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+
+    // nav_ops — 3D
+    catalog.add_tool({"nav_3d_map_create", "Create a 3D navigation map", "Navigation", {"nav", "3d", "map", "create"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"nav_3d_map_set_cell_size", "Set cell size on a 3D nav map", "Navigation", {"nav", "3d", "map", "cell"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"nav_3d_region_create", "Create a 3D navigation region", "Navigation", {"nav", "3d", "region", "create"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"nav_3d_region_set_nav_mesh", "Set nav mesh on a 3D region", "Navigation", {"nav", "3d", "region", "navmesh"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"nav_3d_path_query", "Query a path in 3D navigation", "Navigation", {"nav", "3d", "path", "query"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"nav_3d_path_query_segment", "Query a path segment in 3D navigation", "Navigation", {"nav", "3d", "path", "segment"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"nav_3d_agent_create", "Create a 3D navigation agent", "Navigation", {"nav", "3d", "agent", "create"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"nav_3d_agent_set_velocity", "Set velocity on a 3D nav agent", "Navigation", {"nav", "3d", "agent", "velocity"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"nav_3d_agent_get_next_path", "Get next path position for a 3D nav agent", "Navigation", {"nav", "3d", "agent", "next_path"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"nav_3d_obstacle_create", "Create a 3D navigation obstacle", "Navigation", {"nav", "3d", "obstacle", "create"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+
+    // audio_ops
+    catalog.add_tool({"audio_bus_get_layout", "Get the current audio bus layout", "Audio", {"audio", "bus", "layout", "get"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"audio_bus_set_layout", "Set the audio bus layout", "Audio", {"audio", "bus", "layout", "set"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"audio_bus_get_count", "Get the number of audio buses", "Audio", {"audio", "bus", "count"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"audio_bus_get_name", "Get the name of an audio bus by index", "Audio", {"audio", "bus", "name"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"audio_bus_set_volume", "Set volume on an audio bus", "Audio", {"audio", "bus", "volume"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"audio_bus_set_mute", "Set mute on an audio bus", "Audio", {"audio", "bus", "mute"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"audio_bus_set_bypass", "Set bypass effects on an audio bus", "Audio", {"audio", "bus", "bypass"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"audio_effect_add", "Add an audio effect to a bus", "Audio", {"audio", "effect", "add"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"audio_effect_remove", "Remove an audio effect from a bus", "Audio", {"audio", "effect", "remove"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"audio_stream_play", "Play an audio stream", "Audio", {"audio", "stream", "play"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"audio_stream_stop", "Stop the currently playing audio stream", "Audio", {"audio", "stream", "stop"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"audio_stream_set_volume", "Set volume on the audio stream", "Audio", {"audio", "stream", "volume"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"audio_stream_set_pitch", "Set pitch on the audio stream", "Audio", {"audio", "stream", "pitch"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"audio_stream_get_playback_position", "Get the current playback position", "Audio", {"audio", "stream", "position"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"audio_stream_seek", "Seek the audio stream to a position", "Audio", {"audio", "stream", "seek"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+
+    // input_ops
+    catalog.add_tool({"input_action_press", "Press an input action", "Input", {"input", "action", "press"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"input_action_release", "Release an input action", "Input", {"input", "action", "release"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"input_is_action_pressed", "Check if an input action is pressed", "Input", {"input", "action", "pressed"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"input_is_action_just_pressed", "Check if an input action was just pressed", "Input", {"input", "action", "just_pressed"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"input_key_press", "Simulate a key press", "Input", {"input", "key", "press"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"input_key_release", "Simulate a key release", "Input", {"input", "key", "release"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"input_mouse_move", "Simulate mouse movement", "Input", {"input", "mouse", "move"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"input_mouse_button_press", "Simulate mouse button press", "Input", {"input", "mouse", "press"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"input_mouse_button_release", "Simulate mouse button release", "Input", {"input", "mouse", "release"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"input_gamepad_simulate", "Simulate gamepad input", "Input", {"input", "gamepad", "simulate"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+
+    // editor_ops
+    catalog.add_tool({"editor_get_selection", "Get currently selected nodes", "Editor", {"editor", "selection", "get"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"editor_set_selection", "Set selected nodes by path", "Editor", {"editor", "selection", "set"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"editor_get_edited_scene_root", "Get the edited scene root node", "Editor", {"editor", "scene", "root"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"editor_save_scene", "Save the current scene", "Editor", {"editor", "scene", "save"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"editor_save_all_scenes", "Save all open scenes", "Editor", {"editor", "scene", "save_all"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"editor_reload_scene", "Reload the current scene from disk", "Editor", {"editor", "scene", "reload"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"editor_inspect_object", "Inspect an object in the editor", "Editor", {"editor", "inspect"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"editor_undo_redo_start", "Start an undo/redo action", "Editor", {"editor", "undo", "start"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"editor_undo_redo_commit", "Commit the current undo/redo action", "Editor", {"editor", "undo", "commit"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"editor_undo_redo_add_do", "Add a do method to the undo/redo action", "Editor", {"editor", "undo", "do"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"editor_undo_redo_add_undo", "Add an undo method to the undo/redo action", "Editor", {"editor", "undo", "undo"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"editor_file_system_get_resources", "Get resources from the file system", "Editor", {"editor", "filesystem", "resources"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"editor_file_system_scan", "Scan the file system for changes", "Editor", {"editor", "filesystem", "scan"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"editor_import_resource", "Import a resource into the project", "Editor", {"editor", "import", "resource"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"editor_set_main_scene", "Set the main scene", "Editor", {"editor", "scene", "main"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"editor_play_current_scene", "Play the current scene", "Editor", {"editor", "play", "scene"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"editor_stop_playing", "Stop the running scene", "Editor", {"editor", "stop", "playing"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"editor_get_resource_filesystem", "Get the editor file system", "Editor", {"editor", "filesystem", "get"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"editor_get_plugin_list", "List all plugins", "Editor", {"editor", "plugin", "list"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"editor_set_plugin_enabled", "Enable or disable a plugin", "Editor", {"editor", "plugin", "enable"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+
+    // config_ops
+    catalog.add_tool({"project_settings_get", "Get a project setting by name", "Config", {"config", "project", "settings", "get"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"project_settings_set", "Set a project setting by name", "Config", {"config", "project", "settings", "set"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"project_settings_has", "Check if a project setting exists", "Config", {"config", "project", "settings", "has"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"project_settings_save", "Save all project settings to disk", "Config", {"config", "project", "settings", "save"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"engine_get_version", "Get engine version info", "Config", {"config", "engine", "version"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"engine_get_fps", "Get current FPS", "Config", {"config", "engine", "fps", "get"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"engine_get_frames_drawn", "Get total frames drawn", "Config", {"config", "engine", "frames"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"engine_set_time_scale", "Set the engine time scale", "Config", {"config", "engine", "time", "scale", "set"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"engine_get_time_scale", "Get the engine time scale", "Config", {"config", "engine", "time", "scale", "get"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"engine_set_max_fps", "Set the maximum FPS", "Config", {"config", "engine", "fps", "max"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"editor_settings_get", "Get an editor setting by name", "Config", {"config", "editor", "settings", "get"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"editor_settings_set", "Set an editor setting by name", "Config", {"config", "editor", "settings", "set"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"editor_settings_has", "Check if an editor setting exists", "Config", {"config", "editor", "settings", "has"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+
+    // debug_ops
+    catalog.add_tool({"debug_print", "Print a debug log message", "Debug", {"debug", "print", "log"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"debug_print_stack", "Print the current script call stack", "Debug", {"debug", "stack", "trace"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"debug_get_performance_monitor", "Get a specific performance monitor value by ID", "Debug", {"debug", "performance", "monitor", "get"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"debug_list_performance_monitors", "List all available performance monitors", "Debug", {"debug", "performance", "monitor", "list"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"debug_get_object_count", "Get total live object count", "Debug", {"debug", "objects", "count"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"debug_get_object_count_by_class", "Get object count by class (limited availability)", "Debug", {"debug", "objects", "class"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"debug_get_memory_usage", "Get current static memory usage in bytes", "Debug", {"debug", "memory", "usage"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"debug_profile_start", "Start profiling (not available via godot-cpp)", "Debug", {"debug", "profile", "start"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"debug_profile_stop", "Stop profiling (not available via godot-cpp)", "Debug", {"debug", "profile", "stop"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"debug_profile_get_data", "Get profiling data (not available via godot-cpp)", "Debug", {"debug", "profile", "data"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"debug_set_fps_limit", "Set a dynamic FPS limit for the engine", "Debug", {"debug", "fps", "limit", "set"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"debug_set_physics_fps", "Set the physics FPS (ticks per second)", "Debug", {"debug", "physics", "fps", "set"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"debug_collision_debug", "Toggle collision debug visualization", "Debug", {"debug", "collision", "visualize"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"debug_navigation_debug", "Toggle navigation debug visualization", "Debug", {"debug", "navigation", "visualize"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"debug_performance_debug", "Toggle performance debug overlay in editor", "Debug", {"debug", "performance", "overlay"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+
+    // doc_ops
+    catalog.add_tool({"doc_get_class", "Get detailed documentation for a Godot class", "Docs", {"docs", "class", "get"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"doc_search", "Search Godot classes by name", "Docs", {"docs", "search", "class"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"doc_get_method", "Get signature info for a specific method on a class", "Docs", {"docs", "method", "get"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"doc_get_property", "Get property info for a specific property on a class", "Docs", {"docs", "property", "get"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+
+    // ── 5. Populate BM25 index ──
     for (auto* tool : catalog.get_all_tools()) {
         index.add_entry(tool->name, tool->description, tool->category, tool->tags);
     }
