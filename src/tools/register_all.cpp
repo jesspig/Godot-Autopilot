@@ -6,6 +6,9 @@
 #include "tools/scene_ops.hpp"
 #include <mcp/Content.hpp>
 #include <mcp/JsonValue.hpp>
+#include "tools/physics_ops.hpp"
+#include "tools/render_ops.hpp"
+#include "tools/nav_ops.hpp"
 
 namespace godot_self_driving {
 
@@ -44,6 +47,90 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
     g_handlers["property_set"] = property_ops::handle_set;
     g_handlers["property_get_list"] = property_ops::handle_get_list;
     g_handlers["signal_connect"] = property_ops::handle_signal_connect;
+    g_handlers["physics_2d_space_get_direct_state"] = physics_ops::handle_2d_space_get_direct_state;
+    g_handlers["physics_2d_ray_cast"] = physics_ops::handle_2d_ray_cast;
+    g_handlers["physics_2d_shape_cast"] = physics_ops::handle_2d_shape_cast;
+    g_handlers["physics_2d_point_query"] = physics_ops::handle_2d_point_query;
+    g_handlers["physics_2d_intersect_shape"] = physics_ops::handle_2d_intersect_shape;
+    g_handlers["physics_2d_intersect_point"] = physics_ops::handle_2d_intersect_point;
+    g_handlers["physics_2d_body_create"] = physics_ops::handle_2d_body_create;
+    g_handlers["physics_2d_body_set_mode"] = physics_ops::handle_2d_body_set_mode;
+    g_handlers["physics_2d_body_apply_force"] = physics_ops::handle_2d_body_apply_force;
+    g_handlers["physics_2d_body_apply_impulse"] = physics_ops::handle_2d_body_apply_impulse;
+    g_handlers["physics_2d_body_set_state"] = physics_ops::handle_2d_body_set_state;
+    g_handlers["physics_2d_body_get_state"] = physics_ops::handle_2d_body_get_state;
+    g_handlers["physics_2d_joint_create"] = physics_ops::handle_2d_joint_create;
+    g_handlers["physics_2d_area_create"] = physics_ops::handle_2d_area_create;
+    g_handlers["physics_2d_area_set_monitorable"] = physics_ops::handle_2d_area_set_monitorable;
+    g_handlers["physics_3d_space_get_direct_state"] = physics_ops::handle_3d_space_get_direct_state;
+    g_handlers["physics_3d_ray_cast"] = physics_ops::handle_3d_ray_cast;
+    g_handlers["physics_3d_shape_cast"] = physics_ops::handle_3d_shape_cast;
+    g_handlers["physics_3d_point_query"] = physics_ops::handle_3d_point_query;
+    g_handlers["physics_3d_intersect_shape"] = physics_ops::handle_3d_intersect_shape;
+    g_handlers["physics_3d_intersect_point"] = physics_ops::handle_3d_intersect_point;
+    g_handlers["physics_3d_body_create"] = physics_ops::handle_3d_body_create;
+    g_handlers["physics_3d_body_set_mode"] = physics_ops::handle_3d_body_set_mode;
+    g_handlers["physics_3d_body_apply_force"] = physics_ops::handle_3d_body_apply_force;
+    g_handlers["physics_3d_body_apply_impulse"] = physics_ops::handle_3d_body_apply_impulse;
+    g_handlers["physics_3d_body_set_state"] = physics_ops::handle_3d_body_set_state;
+    g_handlers["physics_3d_body_get_state"] = physics_ops::handle_3d_body_get_state;
+    g_handlers["physics_3d_joint_create"] = physics_ops::handle_3d_joint_create;
+    g_handlers["physics_3d_area_create"] = physics_ops::handle_3d_area_create;
+    g_handlers["physics_3d_area_set_monitorable"] = physics_ops::handle_3d_area_set_monitorable;
+    g_handlers["physics_3d_body_apply_torque"] = physics_ops::handle_3d_body_apply_torque;
+    g_handlers["physics_3d_body_set_axis_lock"] = physics_ops::handle_3d_body_set_axis_lock;
+    g_handlers["physics_3d_body_add_collision_exception"] = physics_ops::handle_3d_body_add_collision_exception;
+    g_handlers["physics_3d_body_remove_collision_exception"] = physics_ops::handle_3d_body_remove_collision_exception;
+    g_handlers["physics_3d_joint_set_param"] = physics_ops::handle_3d_joint_set_param;
+    g_handlers["physics_3d_area_set_space_override"] = physics_ops::handle_3d_area_set_space_override;
+    g_handlers["physics_3d_space_set_gravity"] = physics_ops::handle_3d_space_set_gravity;
+    g_handlers["physics_3d_space_set_debug"] = physics_ops::handle_3d_space_set_debug;
+    g_handlers["physics_3d_soft_body_create"] = physics_ops::handle_3d_soft_body_create;
+    g_handlers["physics_3d_soft_body_set_mesh"] = physics_ops::handle_3d_soft_body_set_mesh;
+    g_handlers["canvas_item_create"] = render_ops::handle_canvas_item_create;
+    g_handlers["canvas_item_draw_rect"] = render_ops::handle_canvas_item_draw_rect;
+    g_handlers["canvas_item_draw_circle"] = render_ops::handle_canvas_item_draw_circle;
+    g_handlers["canvas_item_draw_texture"] = render_ops::handle_canvas_item_draw_texture;
+    g_handlers["canvas_item_draw_line"] = render_ops::handle_canvas_item_draw_line;
+    g_handlers["canvas_item_set_transform"] = render_ops::handle_canvas_item_set_transform;
+    g_handlers["canvas_item_set_visible"] = render_ops::handle_canvas_item_set_visible;
+    g_handlers["scenario_create"] = render_ops::handle_scenario_create;
+    g_handlers["scenario_set_environment"] = render_ops::handle_scenario_set_environment;
+    g_handlers["camera_create"] = render_ops::handle_camera_create;
+    g_handlers["camera_set_transform"] = render_ops::handle_camera_set_transform;
+    g_handlers["camera_set_perspective"] = render_ops::handle_camera_set_perspective;
+    g_handlers["camera_set_orthogonal"] = render_ops::handle_camera_set_orthogonal;
+    g_handlers["light_create"] = render_ops::handle_light_create;
+    g_handlers["light_set_param"] = render_ops::handle_light_set_param;
+    g_handlers["light_set_color"] = render_ops::handle_light_set_color;
+    g_handlers["mesh_create"] = render_ops::handle_mesh_create;
+    g_handlers["mesh_add_surface"] = render_ops::handle_mesh_add_surface;
+    g_handlers["mesh_set_material"] = render_ops::handle_mesh_set_material;
+    g_handlers["material_create"] = render_ops::handle_material_create;
+    g_handlers["material_set_param"] = render_ops::handle_material_set_param;
+    g_handlers["viewport_create"] = render_ops::handle_viewport_create;
+    g_handlers["viewport_set_size"] = render_ops::handle_viewport_set_size;
+    g_handlers["viewport_set_clear_mode"] = render_ops::handle_viewport_set_clear_mode;
+    g_handlers["particle_create"] = render_ops::handle_particle_create;
+    g_handlers["environment_set_bg_color"] = render_ops::handle_environment_set_bg_color;
+    g_handlers["environment_set_ambient"] = render_ops::handle_environment_set_ambient;
+    g_handlers["fog_create"] = render_ops::handle_fog_create;
+    g_handlers["shader_create"] = render_ops::handle_shader_create;
+    g_handlers["nav_2d_map_create"] = nav_ops::handle_2d_map_create;
+    g_handlers["nav_2d_region_create"] = nav_ops::handle_2d_region_create;
+    g_handlers["nav_2d_path_query"] = nav_ops::handle_2d_path_query;
+    g_handlers["nav_2d_agent_create"] = nav_ops::handle_2d_agent_create;
+    g_handlers["nav_2d_agent_set_target"] = nav_ops::handle_2d_agent_set_target;
+    g_handlers["nav_3d_map_create"] = nav_ops::handle_3d_map_create;
+    g_handlers["nav_3d_region_create"] = nav_ops::handle_3d_region_create;
+    g_handlers["nav_3d_path_query"] = nav_ops::handle_3d_path_query;
+    g_handlers["nav_3d_path_query_segment"] = nav_ops::handle_3d_path_query_segment;
+    g_handlers["nav_3d_agent_create"] = nav_ops::handle_3d_agent_create;
+    g_handlers["nav_3d_agent_set_velocity"] = nav_ops::handle_3d_agent_set_velocity;
+    g_handlers["nav_3d_agent_get_next_path"] = nav_ops::handle_3d_agent_get_next_path;
+    g_handlers["nav_3d_map_set_cell_size"] = nav_ops::handle_3d_map_set_cell_size;
+    g_handlers["nav_3d_region_set_nav_mesh"] = nav_ops::handle_3d_region_set_nav_mesh;
+    g_handlers["nav_3d_obstacle_create"] = nav_ops::handle_3d_obstacle_create;
     g_handlers["resource_load"] = resource_ops::handle_load;
     g_handlers["resource_load_threaded"] = resource_ops::handle_load_threaded;
     g_handlers["resource_load_threaded_get_status"] = resource_ops::handle_load_threaded_get_status;
