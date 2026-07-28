@@ -76,7 +76,6 @@ McpLogDock::McpLogDock()
     category_filter->add_item("System");
     category_filter->add_item("Transport");
     category_filter->add_item("Tools");
-    category_filter->add_item("Sandbox");
     category_filter->add_item("Resources");
     category_filter->add_item("Prompts");
     category_filter->select(0);

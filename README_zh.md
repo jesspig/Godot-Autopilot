@@ -16,12 +16,11 @@ MCP 主机 (Claude Desktop, Cursor 等)
   ▼
 Godot 编辑器 / 运行时
   └── Godot-Self-Driving (GDExtension)
-      ├── asio io_context (后台线程)
+      ├── libhv (内部 HTTP 线程)
       ├── mcp-cpp-sdk: McpServer + Streamable HTTP
-      ├── 命令队列 (asio → Godot 主线程桥接)
-      ├── ~244 个 MCP 工具，覆盖 13 个类别
+      ├── 命令队列 (libhv → Godot 主线程桥接)
+      ├── ~239 个 MCP 工具，覆盖 13 个类别
       ├── 内置文档 (离线引擎 API 文档)
-      ├── QuickJS 沙盒 (可编程工具编排)
       └── 自定义日志面板 (专属插件输出面板)
 ```
 
@@ -155,9 +154,8 @@ your-project/
 | **引擎** | Godot 4.x (GDExtension) |
 | **绑定层** | godot-cpp (FetchContent) |
 | **MCP 协议** | [modelcontextprotocol-cpp-sdk](https://github.com/jesspig/modelcontextprotocol-cpp-sdk) |
-| **HTTP / 异步** | asio 1-30-2 (standalone) |
-| **JSON** | nlohmann/json v3.11.3 |
-| **沙盒** | QuickJS (ES2023, async/await) |
+| **HTTP / 异步** | libhv (内部) |
+| **JSON** | mcp::JsonValue (SDK 内置) |
 | **构建** | CMake 3.28+ / C++17 |
 | **优化** | Clang 优先, ThinLTO, Ninja, sccache, Unity Build |
 
