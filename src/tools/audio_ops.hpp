@@ -21,6 +21,11 @@ mcp::JsonValue handle_stream_set_volume(const mcp::JsonValue& args);
 mcp::JsonValue handle_stream_set_pitch(const mcp::JsonValue& args);
 mcp::JsonValue handle_stream_get_playback_position(const mcp::JsonValue& args);
 mcp::JsonValue handle_stream_seek(const mcp::JsonValue& args);
+mcp::JsonValue handle_bus_set_solo(const mcp::JsonValue& args);
+mcp::JsonValue handle_get_output_device_list(const mcp::JsonValue& args);
+mcp::JsonValue handle_set_output_device(const mcp::JsonValue& args);
+mcp::JsonValue handle_get_input_device_list(const mcp::JsonValue& args);
+mcp::JsonValue handle_set_input_device(const mcp::JsonValue& args);
 
 } // namespace audio_ops
 } // namespace godot_self_driving

@@ -757,5 +757,402 @@ JV handle_shader_create(const JV& args) {
     JV r(JV::object_tag); r["result"] = rid_to_json(rid); return r;
 }
 
+JV handle_texture_create_2d(const JV& args) {
+    auto* it_path = args.Find("image_path");
+    if (!it_path || !it_path->IsString()) {
+        JV r(JV::object_tag); r["error"] = JV("missing required parameter: image_path"); return r;
+    }
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "render_texture_create_2d called");
+    auto* rs = godot::RenderingServer::get_singleton();
+    if (!rs) { JV r(JV::object_tag); r["error"] = JV("RenderingServer not available"); return r; }
+    auto img = godot::Image::load_from_file(godot::String(it_path->GetString().c_str()));
+    if (img.is_null()) { JV r(JV::object_tag); r["error"] = JV("failed to load image"); return r; }
+    godot::RID rid = rs->texture_2d_create(img);
+    JV r(JV::object_tag); r["result"] = rid_to_json(rid); return r;
+}
+
+JV handle_shader_set_code(const JV& args) {
+    auto* it_sh = args.Find("shader_rid");
+    auto* it_code = args.Find("code");
+    if (!it_sh || !it_sh->IsNumber()) {
+        JV r(JV::object_tag); r["error"] = JV("missing required parameter: shader_rid"); return r;
+    }
+    if (!it_code || !it_code->IsString()) {
+        JV r(JV::object_tag); r["error"] = JV("missing required parameter: code"); return r;
+    }
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "render_shader_set_code called");
+    auto* rs = godot::RenderingServer::get_singleton();
+    if (!rs) { JV r(JV::object_tag); r["error"] = JV("RenderingServer not available"); return r; }
+    godot::RID sh = rid_from_json(*it_sh);
+    rs->shader_set_code(sh, godot::String(it_code->GetString().c_str()));
+    JV r(JV::object_tag); r["result"] = JV("ok"); return r;
+}
+
+JV handle_shader_get_parameter_list(const JV&) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "render_shader_get_parameter_list called");
+    JV r(JV::object_tag);
+    r["error"] = JV("shader_get_parameter_list not available via godot-cpp; use property_get on the Shader resource");
+    return r;
+}
+
+JV handle_environment_set_glow(const JV& args) {
+    auto* it_env = args.Find("environment_rid");
+    if (!it_env || !it_env->IsNumber()) {
+        JV r(JV::object_tag); r["error"] = JV("missing required parameter: environment_rid"); return r;
+    }
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "render_environment_set_glow called");
+    auto* rs = godot::RenderingServer::get_singleton();
+    if (!rs) { JV r(JV::object_tag); r["error"] = JV("RenderingServer not available"); return r; }
+    godot::RID env = rid_from_json(*it_env);
+    bool enabled = true;
+    auto* en = args.Find("enabled");
+    if (en && en->IsBool()) enabled = en->GetBool();
+    godot::PackedFloat32Array levels;
+    levels.append(0.85f);
+    auto* lv = args.Find("level");
+    if (lv && lv->IsDouble()) levels[0] = static_cast<float>(lv->GetDouble());
+    float intensity = 0.8f;
+    auto* it = args.Find("intensity");
+    if (it) intensity = static_cast<float>(it->GetDouble());
+    float strength = 1.0f;
+    auto* st = args.Find("strength");
+    if (st) strength = static_cast<float>(st->GetDouble());
+    float mix = 0.05f;
+    auto* mx = args.Find("mix");
+    if (mx) mix = static_cast<float>(mx->GetDouble());
+    float bloom_threshold = 0.0f;
+    auto* bt = args.Find("bloom_threshold");
+    if (bt) bloom_threshold = static_cast<float>(bt->GetDouble());
+    int blend_mode = 0;
+    auto* bm = args.Find("blend_mode");
+    if (bm && bm->IsInt()) blend_mode = static_cast<int>(bm->GetInt());
+    float hdr_bleed_threshold = 0.5f;
+    auto* hbt = args.Find("hdr_bleed_threshold");
+    if (hbt) hdr_bleed_threshold = static_cast<float>(hbt->GetDouble());
+    float hdr_bleed_scale = 2.0f;
+    auto* hbs = args.Find("hdr_bleed_scale");
+    if (hbs) hdr_bleed_scale = static_cast<float>(hbs->GetDouble());
+    float hdr_luminance_cap = 2.0f;
+    auto* hlc = args.Find("hdr_luminance_cap");
+    if (hlc) hdr_luminance_cap = static_cast<float>(hlc->GetDouble());
+    float glow_map_strength = 1.0f;
+    auto* gms = args.Find("glow_map_strength");
+    if (gms) glow_map_strength = static_cast<float>(gms->GetDouble());
+    rs->environment_set_glow(env, enabled, levels, intensity, strength, mix,
+        bloom_threshold, static_cast<godot::RenderingServer::EnvironmentGlowBlendMode>(blend_mode),
+        hdr_bleed_threshold, hdr_bleed_scale, hdr_luminance_cap, glow_map_strength, godot::RID());
+    JV r(JV::object_tag); r["result"] = JV("ok"); return r;
+}
+
+JV handle_environment_set_ssr(const JV& args) {
+    auto* it_env = args.Find("environment_rid");
+    if (!it_env || !it_env->IsNumber()) {
+        JV r(JV::object_tag); r["error"] = JV("missing required parameter: environment_rid"); return r;
+    }
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "render_environment_set_ssr called");
+    auto* rs = godot::RenderingServer::get_singleton();
+    if (!rs) { JV r(JV::object_tag); r["error"] = JV("RenderingServer not available"); return r; }
+    godot::RID env = rid_from_json(*it_env);
+    bool enabled = true;
+    auto* en = args.Find("enabled");
+    if (en && en->IsBool()) enabled = en->GetBool();
+    int max_steps = 64;
+    auto* ms = args.Find("max_steps");
+    if (ms && ms->IsInt()) max_steps = static_cast<int>(ms->GetInt());
+    float fade_in = 0.1f;
+    auto* fi = args.Find("fade_in");
+    if (fi) fade_in = static_cast<float>(fi->GetDouble());
+    float fade_out = 0.1f;
+    auto* fo = args.Find("fade_out");
+    if (fo) fade_out = static_cast<float>(fo->GetDouble());
+    float depth_tolerance = 0.1f;
+    auto* dt = args.Find("depth_tolerance");
+    if (dt) depth_tolerance = static_cast<float>(dt->GetDouble());
+    rs->environment_set_ssr(env, enabled, max_steps, fade_in, fade_out, depth_tolerance);
+    JV r(JV::object_tag); r["result"] = JV("ok"); return r;
+}
+
+JV handle_environment_set_tonemap(const JV& args) {
+    auto* it_env = args.Find("environment_rid");
+    if (!it_env || !it_env->IsNumber()) {
+        JV r(JV::object_tag); r["error"] = JV("missing required parameter: environment_rid"); return r;
+    }
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "render_environment_set_tonemap called");
+    auto* rs = godot::RenderingServer::get_singleton();
+    if (!rs) { JV r(JV::object_tag); r["error"] = JV("RenderingServer not available"); return r; }
+    godot::RID env = rid_from_json(*it_env);
+    int tone_mapper = 0;
+    auto* tm = args.Find("tone_mapper");
+    if (tm && tm->IsInt()) tone_mapper = static_cast<int>(tm->GetInt());
+    float exposure = 1.0f;
+    auto* ex = args.Find("exposure");
+    if (ex) exposure = static_cast<float>(ex->GetDouble());
+    float white = 1.0f;
+    auto* wh = args.Find("white");
+    if (wh) white = static_cast<float>(wh->GetDouble());
+    rs->environment_set_tonemap(env, static_cast<godot::RenderingServer::EnvironmentToneMapper>(tone_mapper), exposure, white);
+    JV r(JV::object_tag); r["result"] = JV("ok"); return r;
+}
+
+JV handle_environment_set_sdfgi(const JV& args) {
+    auto* it_env = args.Find("environment_rid");
+    if (!it_env || !it_env->IsNumber()) {
+        JV r(JV::object_tag); r["error"] = JV("missing required parameter: environment_rid"); return r;
+    }
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "render_environment_set_sdfgi called");
+    auto* rs = godot::RenderingServer::get_singleton();
+    if (!rs) { JV r(JV::object_tag); r["error"] = JV("RenderingServer not available"); return r; }
+    godot::RID env = rid_from_json(*it_env);
+    bool enabled = true;
+    auto* en = args.Find("enabled");
+    if (en && en->IsBool()) enabled = en->GetBool();
+    int cascades = 4;
+    auto* ca = args.Find("cascades");
+    if (ca && ca->IsInt()) cascades = static_cast<int>(ca->GetInt());
+    float min_cell_size = 0.1f;
+    auto* mcs = args.Find("min_cell_size");
+    if (mcs) min_cell_size = static_cast<float>(mcs->GetDouble());
+    int y_scale = 0;
+    auto* ys = args.Find("y_scale");
+    if (ys && ys->IsInt()) y_scale = static_cast<int>(ys->GetInt());
+    bool use_occlusion = true;
+    auto* uo = args.Find("use_occlusion");
+    if (uo && uo->IsBool()) use_occlusion = uo->GetBool();
+    float bounce_feedback = 0.5f;
+    auto* bf = args.Find("bounce_feedback");
+    if (bf) bounce_feedback = static_cast<float>(bf->GetDouble());
+    bool read_sky = true;
+    auto* rs_ = args.Find("read_sky");
+    if (rs_ && rs_->IsBool()) read_sky = rs_->GetBool();
+    float energy = 1.0f;
+    auto* eg = args.Find("energy");
+    if (eg) energy = static_cast<float>(eg->GetDouble());
+    float normal_bias = 1.0f;
+    auto* nb = args.Find("normal_bias");
+    if (nb) normal_bias = static_cast<float>(nb->GetDouble());
+    float probe_bias = 1.0f;
+    auto* pb = args.Find("probe_bias");
+    if (pb) probe_bias = static_cast<float>(pb->GetDouble());
+    rs->environment_set_sdfgi(env, enabled, cascades, min_cell_size,
+        static_cast<godot::RenderingServer::EnvironmentSDFGIYScale>(y_scale),
+        use_occlusion, bounce_feedback, read_sky, energy, normal_bias, probe_bias);
+    JV r(JV::object_tag); r["result"] = JV("ok"); return r;
+}
+
+JV handle_environment_set_volumetric_fog(const JV& args) {
+    auto* it_env = args.Find("environment_rid");
+    if (!it_env || !it_env->IsNumber()) {
+        JV r(JV::object_tag); r["error"] = JV("missing required parameter: environment_rid"); return r;
+    }
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "render_environment_set_volumetric_fog called");
+    auto* rs = godot::RenderingServer::get_singleton();
+    if (!rs) { JV r(JV::object_tag); r["error"] = JV("RenderingServer not available"); return r; }
+    godot::RID env = rid_from_json(*it_env);
+    bool enabled = true;
+    auto* en = args.Find("enabled");
+    if (en && en->IsBool()) enabled = en->GetBool();
+    float density = 0.05f;
+    auto* de = args.Find("density");
+    if (de) density = static_cast<float>(de->GetDouble());
+    JV albedo_col = JV::FromObject({{"r", JV(1.0)}, {"g", JV(1.0)}, {"b", JV(1.0)}});
+    auto* al = args.Find("albedo");
+    if (al && al->IsObject()) albedo_col = *al;
+    godot::Color albedo = parse_color(albedo_col);
+    JV emission_col = JV::FromObject({{"r", JV(0.0)}, {"g", JV(0.0)}, {"b", JV(0.0)}});
+    auto* em = args.Find("emission");
+    if (em && em->IsObject()) emission_col = *em;
+    godot::Color emission = parse_color(emission_col);
+    float emission_energy = 1.0f;
+    auto* ee = args.Find("emission_energy");
+    if (ee) emission_energy = static_cast<float>(ee->GetDouble());
+    float anisotropy = 0.0f;
+    auto* an = args.Find("anisotropy");
+    if (an) anisotropy = static_cast<float>(an->GetDouble());
+    float length = 0.0f;
+    auto* le = args.Find("length");
+    if (le) length = static_cast<float>(le->GetDouble());
+    float detail_spread = 0.0f;
+    auto* ds = args.Find("detail_spread");
+    if (ds) detail_spread = static_cast<float>(ds->GetDouble());
+    float gi_inject = 0.0f;
+    auto* gi = args.Find("gi_inject");
+    if (gi) gi_inject = static_cast<float>(gi->GetDouble());
+    bool temporal_reprojection = false;
+    auto* tr = args.Find("temporal_reprojection");
+    if (tr && tr->IsBool()) temporal_reprojection = tr->GetBool();
+    float temporal_reprojection_amount = 0.5f;
+    auto* tra = args.Find("temporal_reprojection_amount");
+    if (tra) temporal_reprojection_amount = static_cast<float>(tra->GetDouble());
+    float ambient_inject = 0.0f;
+    auto* ai = args.Find("ambient_inject");
+    if (ai) ambient_inject = static_cast<float>(ai->GetDouble());
+    float sky_affect = 0.0f;
+    auto* sa = args.Find("sky_affect");
+    if (sa) sky_affect = static_cast<float>(sa->GetDouble());
+    rs->environment_set_volumetric_fog(env, enabled, density, albedo, emission, emission_energy,
+        anisotropy, length, detail_spread, gi_inject, temporal_reprojection,
+        temporal_reprojection_amount, ambient_inject, sky_affect);
+    JV r(JV::object_tag); r["result"] = JV("ok"); return r;
+}
+
+JV handle_sky_create(const JV& args) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "render_sky_create called");
+    auto* rs = godot::RenderingServer::get_singleton();
+    if (!rs) { JV r(JV::object_tag); r["error"] = JV("RenderingServer not available"); return r; }
+    godot::RID rid = rs->sky_create();
+    JV r(JV::object_tag); r["result"] = rid_to_json(rid); return r;
+}
+
+JV handle_sky_set_material(const JV& args) {
+    auto* it_sky = args.Find("sky_rid");
+    auto* it_mat = args.Find("material_rid");
+    if (!it_sky || !it_sky->IsNumber()) {
+        JV r(JV::object_tag); r["error"] = JV("missing required parameter: sky_rid"); return r;
+    }
+    if (!it_mat || !it_mat->IsNumber()) {
+        JV r(JV::object_tag); r["error"] = JV("missing required parameter: material_rid"); return r;
+    }
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "render_sky_set_material called");
+    auto* rs = godot::RenderingServer::get_singleton();
+    if (!rs) { JV r(JV::object_tag); r["error"] = JV("RenderingServer not available"); return r; }
+    godot::RID sky = rid_from_json(*it_sky);
+    godot::RID mat = rid_from_json(*it_mat);
+    rs->sky_set_material(sky, mat);
+    JV r(JV::object_tag); r["result"] = JV("ok"); return r;
+}
+
+JV handle_particles_set_emitting(const JV& args) {
+    auto* it_p = args.Find("particles_rid");
+    if (!it_p || !it_p->IsNumber()) {
+        JV r(JV::object_tag); r["error"] = JV("missing required parameter: particles_rid"); return r;
+    }
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "render_particles_set_emitting called");
+    auto* rs = godot::RenderingServer::get_singleton();
+    if (!rs) { JV r(JV::object_tag); r["error"] = JV("RenderingServer not available"); return r; }
+    godot::RID p = rid_from_json(*it_p);
+    bool emitting = true;
+    auto* em = args.Find("emitting");
+    if (em && em->IsBool()) emitting = em->GetBool();
+    rs->particles_set_emitting(p, emitting);
+    JV r(JV::object_tag); r["result"] = JV("ok"); return r;
+}
+
+JV handle_particles_restart(const JV& args) {
+    auto* it_p = args.Find("particles_rid");
+    if (!it_p || !it_p->IsNumber()) {
+        JV r(JV::object_tag); r["error"] = JV("missing required parameter: particles_rid"); return r;
+    }
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "render_particles_restart called");
+    auto* rs = godot::RenderingServer::get_singleton();
+    if (!rs) { JV r(JV::object_tag); r["error"] = JV("RenderingServer not available"); return r; }
+    godot::RID p = rid_from_json(*it_p);
+    rs->particles_restart(p);
+    JV r(JV::object_tag); r["result"] = JV("ok"); return r;
+}
+
+JV handle_particles_set_lifetime(const JV& args) {
+    auto* it_p = args.Find("particles_rid");
+    if (!it_p || !it_p->IsNumber()) {
+        JV r(JV::object_tag); r["error"] = JV("missing required parameter: particles_rid"); return r;
+    }
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "render_particles_set_lifetime called");
+    auto* rs = godot::RenderingServer::get_singleton();
+    if (!rs) { JV r(JV::object_tag); r["error"] = JV("RenderingServer not available"); return r; }
+    godot::RID p = rid_from_json(*it_p);
+    float lifetime = 1.0f;
+    auto* lt = args.Find("lifetime");
+    if (lt) lifetime = static_cast<float>(lt->GetDouble());
+    rs->particles_set_lifetime(p, lifetime);
+    JV r(JV::object_tag); r["result"] = JV("ok"); return r;
+}
+
+JV handle_reflection_probe_create(const JV& args) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "render_reflection_probe_create called");
+    auto* rs = godot::RenderingServer::get_singleton();
+    if (!rs) { JV r(JV::object_tag); r["error"] = JV("RenderingServer not available"); return r; }
+    godot::RID rid = rs->reflection_probe_create();
+    JV r(JV::object_tag); r["result"] = rid_to_json(rid); return r;
+}
+
+JV handle_decal_create(const JV& args) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "render_decal_create called");
+    auto* rs = godot::RenderingServer::get_singleton();
+    if (!rs) { JV r(JV::object_tag); r["error"] = JV("RenderingServer not available"); return r; }
+    godot::RID rid = rs->decal_create();
+    JV r(JV::object_tag); r["result"] = rid_to_json(rid); return r;
+}
+
+JV handle_fog_volume_set_shape(const JV& args) {
+    auto* it_fog = args.Find("fog_rid");
+    auto* it_shape = args.Find("shape");
+    if (!it_fog || !it_fog->IsNumber()) {
+        JV r(JV::object_tag); r["error"] = JV("missing required parameter: fog_rid"); return r;
+    }
+    if (!it_shape || !it_shape->IsInt()) {
+        JV r(JV::object_tag); r["error"] = JV("missing required parameter: shape"); return r;
+    }
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "render_fog_volume_set_shape called");
+    auto* rs = godot::RenderingServer::get_singleton();
+    if (!rs) { JV r(JV::object_tag); r["error"] = JV("RenderingServer not available"); return r; }
+    godot::RID fog = rid_from_json(*it_fog);
+    int shape = static_cast<int>(it_shape->GetInt());
+    rs->fog_volume_set_shape(fog, static_cast<godot::RenderingServer::FogVolumeShape>(shape));
+    JV r(JV::object_tag); r["result"] = JV("ok"); return r;
+}
+
+JV handle_instance_set_visible(const JV& args) {
+    auto* it_inst = args.Find("instance_rid");
+    if (!it_inst || !it_inst->IsNumber()) {
+        JV r(JV::object_tag); r["error"] = JV("missing required parameter: instance_rid"); return r;
+    }
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "render_instance_set_visible called");
+    auto* rs = godot::RenderingServer::get_singleton();
+    if (!rs) { JV r(JV::object_tag); r["error"] = JV("RenderingServer not available"); return r; }
+    godot::RID inst = rid_from_json(*it_inst);
+    bool visible = true;
+    auto* vs = args.Find("visible");
+    if (vs && vs->IsBool()) visible = vs->GetBool();
+    rs->instance_set_visible(inst, visible);
+    JV r(JV::object_tag); r["result"] = JV("ok"); return r;
+}
+
+JV handle_instance_set_layer_mask(const JV& args) {
+    auto* it_inst = args.Find("instance_rid");
+    auto* it_mask = args.Find("mask");
+    if (!it_inst || !it_inst->IsNumber()) {
+        JV r(JV::object_tag); r["error"] = JV("missing required parameter: instance_rid"); return r;
+    }
+    if (!it_mask || !it_mask->IsInt()) {
+        JV r(JV::object_tag); r["error"] = JV("missing required parameter: mask"); return r;
+    }
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "render_instance_set_layer_mask called");
+    auto* rs = godot::RenderingServer::get_singleton();
+    if (!rs) { JV r(JV::object_tag); r["error"] = JV("RenderingServer not available"); return r; }
+    godot::RID inst = rid_from_json(*it_inst);
+    uint32_t mask = static_cast<uint32_t>(it_mask->GetInt());
+    rs->instance_set_layer_mask(inst, mask);
+    JV r(JV::object_tag); r["result"] = JV("ok"); return r;
+}
+
+JV handle_global_shader_parameter_set(const JV& args) {
+    auto* it_name = args.Find("name");
+    auto* it_val = args.Find("value");
+    if (!it_name || !it_name->IsString()) {
+        JV r(JV::object_tag); r["error"] = JV("missing required parameter: name"); return r;
+    }
+    if (!it_val) {
+        JV r(JV::object_tag); r["error"] = JV("missing required parameter: value"); return r;
+    }
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "render_global_shader_parameter_set called");
+    auto* rs = godot::RenderingServer::get_singleton();
+    if (!rs) { JV r(JV::object_tag); r["error"] = JV("RenderingServer not available"); return r; }
+    godot::StringName name(it_name->GetString().c_str());
+    auto* th = args.Find("type_hint");
+    std::string type_hint = th ? th->GetString() : "";
+    godot::Variant val = VariantJson::deserialize(*it_val, type_hint);
+    rs->global_shader_parameter_set(name, val);
+    JV r(JV::object_tag); r["result"] = JV("ok"); return r;
+}
+
 } // namespace render_ops
 } // namespace godot_self_driving

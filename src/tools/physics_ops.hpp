@@ -47,6 +47,16 @@ mcp::JsonValue handle_3d_space_set_gravity(const mcp::JsonValue& args);
 mcp::JsonValue handle_3d_space_set_debug(const mcp::JsonValue& args);
 mcp::JsonValue handle_3d_soft_body_create(const mcp::JsonValue& args);
 mcp::JsonValue handle_3d_soft_body_set_mesh(const mcp::JsonValue& args);
+mcp::JsonValue handle_3d_shape_create(const mcp::JsonValue& args);
+mcp::JsonValue handle_3d_shape_set_data(const mcp::JsonValue& args);
+mcp::JsonValue handle_3d_body_add_shape(const mcp::JsonValue& args);
+mcp::JsonValue handle_3d_body_set_param(const mcp::JsonValue& args);
+mcp::JsonValue handle_3d_area_set_param(const mcp::JsonValue& args);
+mcp::JsonValue handle_3d_space_set_param(const mcp::JsonValue& args);
+mcp::JsonValue handle_3d_area_set_transform(const mcp::JsonValue& args);
+mcp::JsonValue handle_3d_body_set_transform(const mcp::JsonValue& args);
+mcp::JsonValue handle_2d_shape_create(const mcp::JsonValue& args);
+mcp::JsonValue handle_2d_shape_set_data(const mcp::JsonValue& args);
 
 } // namespace physics_ops
 } // namespace godot_self_driving
