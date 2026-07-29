@@ -12,6 +12,7 @@
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
@@ -87,6 +88,12 @@ void dir_to_json(godot::EditorFileSystemDirectory* dir, mcp::JsonValue& j, int d
         }
     }
     j["children"] = std::move(children_arr);
+}
+
+mcp::JsonValue error_json(const std::string& msg) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue(msg);
+    return e;
 }
 
 } // namespace
@@ -629,6 +636,52 @@ mcp::JsonValue handle_set_plugin_enabled(const mcp::JsonValue& args) {
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue("ok");
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "editor_set_plugin_enabled completed");
+    return r;
+}
+
+mcp::JsonValue handle_new_scene(const mcp::JsonValue& args) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "editor_new_scene called");
+    auto* editor = godot::EditorInterface::get_singleton();
+    if (!editor) {
+        return error_json("EditorInterface not available");
+    }
+
+    std::string type = "Node";
+    auto* tp = args.Find("type");
+    if (tp && tp->IsString()) type = tp->GetString();
+
+    std::string name = "NewRoot";
+    auto* np = args.Find("name");
+    if (np && np->IsString()) name = np->GetString();
+
+    auto* cdbs = godot::ClassDBSingleton::get_singleton();
+    if (!cdbs) {
+        return error_json("ClassDB singleton not available");
+    }
+
+    if (!cdbs->is_parent_class(godot::StringName(type.c_str()), godot::StringName("Node"))) {
+        return error_json(type + " is not a Node subclass");
+    }
+
+    godot::Variant obj_var = cdbs->instantiate(godot::StringName(type.c_str()));
+    if (obj_var.get_type() == godot::Variant::NIL) {
+        return error_json("failed to instantiate node type: " + type);
+    }
+
+    auto* node = godot::Object::cast_to<godot::Node>(obj_var);
+    if (!node) {
+        return error_json("instantiated object is not a Node: " + type);
+    }
+
+    node->set_name(godot::StringName(name.c_str()));
+    editor->add_root_node(node);
+
+    mcp::JsonValue inner(mcp::JsonValue::object_tag);
+    inner["path"] = mcp::JsonValue(name);
+    inner["type"] = mcp::JsonValue(type);
+    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    r["result"] = std::move(inner);
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "editor_new_scene completed");
     return r;
 }
 

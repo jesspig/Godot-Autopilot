@@ -188,6 +188,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
     g_handlers["editor_get_resource_filesystem"] = editor_ops::handle_get_resource_filesystem;
     g_handlers["editor_get_plugin_list"] = editor_ops::handle_get_plugin_list;
     g_handlers["editor_set_plugin_enabled"] = editor_ops::handle_set_plugin_enabled;
+    g_handlers["editor_new_scene"] = editor_ops::handle_new_scene;
     g_handlers["project_settings_get"] = config_ops::handle_project_settings_get;
     g_handlers["project_settings_set"] = config_ops::handle_project_settings_set;
     g_handlers["project_settings_has"] = config_ops::handle_project_settings_has;
@@ -1078,6 +1079,21 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
     catalog.add_tool({"editor_get_resource_filesystem", "Get the editor file system", "Editor", {"editor", "filesystem", "get"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
     catalog.add_tool({"editor_get_plugin_list", "List all plugins", "Editor", {"editor", "plugin", "list"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
     catalog.add_tool({"editor_set_plugin_enabled", "Enable or disable a plugin", "Editor", {"editor", "plugin", "enable"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue t_j(mcp::JsonValue::object_tag);
+        t_j["type"] = mcp::JsonValue("string");
+        t_j["description"] = mcp::JsonValue("Node class type (default: Node)");
+        props["type"] = std::move(t_j);
+        mcp::JsonValue n_j(mcp::JsonValue::object_tag);
+        n_j["type"] = mcp::JsonValue("string");
+        n_j["description"] = mcp::JsonValue("Node name (default: NewRoot)");
+        props["name"] = std::move(n_j);
+        s["properties"] = std::move(props);
+        catalog.add_tool({"editor_new_scene", "Create a new scene with a root node", "Editor", {"editor", "scene", "new"}, std::move(s)});
+    }
 
     // config_ops
     catalog.add_tool({"project_settings_get", "Get a project setting by name", "Config", {"config", "project", "settings", "get"}, mcp::JsonValue(mcp::JsonValue::object_tag)});

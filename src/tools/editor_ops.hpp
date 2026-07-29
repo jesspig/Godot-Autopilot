@@ -26,6 +26,7 @@ mcp::JsonValue handle_stop_playing(const mcp::JsonValue& args);
 mcp::JsonValue handle_get_resource_filesystem(const mcp::JsonValue& args);
 mcp::JsonValue handle_get_plugin_list(const mcp::JsonValue& args);
 mcp::JsonValue handle_set_plugin_enabled(const mcp::JsonValue& args);
+mcp::JsonValue handle_new_scene(const mcp::JsonValue& args);
 
 } // namespace editor_ops
 } // namespace godot_self_driving
