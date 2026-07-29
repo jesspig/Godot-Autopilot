@@ -71,6 +71,7 @@ add_library(godot-self-driving SHARED
     src/tools/os_ops.cpp
     src/tools/scene_tree_ops.cpp
     src/tools/text_ops.cpp
+    src/tools/tilemap_ops.cpp
     src/tools/debug_ops.cpp
     src/tools/doc_ops.cpp
     src/tools/editor_ops.cpp
