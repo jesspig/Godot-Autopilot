@@ -33,7 +33,7 @@ static std::string prompt_create_3d_scene() {
 {
   "name": "scene_node_create",
   "arguments": {
-    "parent": "",
+    "parent_path": "",
     "name": "MyScene",
     "type": "Node3D"
   }
@@ -45,7 +45,7 @@ static std::string prompt_create_3d_scene() {
 {
   "name": "scene_node_create",
   "arguments": {
-    "parent": "MyScene",
+    "parent_path": "MyScene",
     "name": "Camera3D",
     "type": "Camera3D"
   }
@@ -68,7 +68,7 @@ static std::string prompt_create_3d_scene() {
 {
   "name": "scene_node_create",
   "arguments": {
-    "parent": "MyScene",
+    "parent_path": "MyScene",
     "name": "DirectionalLight3D",
     "type": "DirectionalLight3D"
   }
@@ -91,7 +91,7 @@ static std::string prompt_create_3d_scene() {
 {
   "name": "scene_node_create",
   "arguments": {
-    "parent": "MyScene",
+    "parent_path": "MyScene",
     "name": "WorldEnvironment",
     "type": "WorldEnvironment"
   }
@@ -114,7 +114,7 @@ static std::string prompt_create_3d_scene() {
 {
   "name": "scene_node_create",
   "arguments": {
-    "parent": "MyScene",
+    "parent_path": "MyScene",
     "name": "TestMesh",
     "type": "MeshInstance3D"
   }
@@ -158,7 +158,7 @@ static std::string prompt_setup_character() {
 {
   "name": "scene_node_create",
   "arguments": {
-    "parent": "",
+    "parent_path": "",
     "name": "Player",
     "type": "CharacterBody3D"
   }
@@ -170,7 +170,7 @@ static std::string prompt_setup_character() {
 {
   "name": "scene_node_create",
   "arguments": {
-    "parent": "Player",
+    "parent_path": "Player",
     "name": "CollisionShape3D",
     "type": "CollisionShape3D"
   }
@@ -199,7 +199,7 @@ static std::string prompt_setup_character() {
   "name": "script_create",
   "arguments": {
     "path": "res://player.gd",
-    "content": "extends CharacterBody3D\n\n@export var speed: float = 5.0\n@export var jump_velocity: float = 4.5\n\nfunc _physics_process(delta: float) -> void:\n    # 获取输入方向\n    var input_dir: Vector2 = Input.get_vector(\"move_left\", \"move_right\", \"move_forward\", \"move_back\")\n    var direction: Vector3 = (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()\n    \n    # 水平移动\n    if direction:\n        velocity.x = direction.x * speed\n        velocity.z = direction.z * speed\n    else:\n        velocity.x = move_toward(velocity.x, 0, speed)\n        velocity.z = move_toward(velocity.z, 0, speed)\n    \n    # 重力\n    if not is_on_floor():\n        velocity.y += get_gravity().y * delta\n    \n    # 跳跃\n    if Input.is_action_just_pressed(\"ui_accept\") and is_on_floor():\n        velocity.y = jump_velocity\n    \n    move_and_slide()"
+    "source_code": "extends CharacterBody3D\n\n@export var speed: float = 5.0\n@export var jump_velocity: float = 4.5\n\nfunc _physics_process(delta: float) -> void:\n    # 获取输入方向\n    var input_dir: Vector2 = Input.get_vector(\"move_left\", \"move_right\", \"move_forward\", \"move_back\")\n    var direction: Vector3 = (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()\n    \n    # 水平移动\n    if direction:\n        velocity.x = direction.x * speed\n        velocity.z = direction.z * speed\n    else:\n        velocity.x = move_toward(velocity.x, 0, speed)\n        velocity.z = move_toward(velocity.z, 0, speed)\n    \n    # 重力\n    if not is_on_floor():\n        velocity.y += get_gravity().y * delta\n    \n    # 跳跃\n    if Input.is_action_just_pressed(\"ui_accept\") and is_on_floor():\n        velocity.y = jump_velocity\n    \n    move_and_slide()"
   }
 }
 ```
@@ -495,7 +495,7 @@ CanvasLayer 确保 UI 不受游戏世界缩放影响：
   "arguments": {
     "name": "scene_node_create",
     "arguments": {
-      "parent": "",
+      "parent_path": "",
       "name": "UI",
       "type": "CanvasLayer"
     }
@@ -511,7 +511,7 @@ CanvasLayer 确保 UI 不受游戏世界缩放影响：
   "arguments": {
     "name": "scene_node_create",
     "arguments": {
-      "parent": "UI",
+      "parent_path": "UI",
       "name": "MainContainer",
       "type": "VBoxContainer"
     }
@@ -553,7 +553,7 @@ CanvasLayer 确保 UI 不受游戏世界缩放影响：
   "arguments": {
     "name": "scene_node_create",
     "arguments": {
-      "parent": "UI/MainContainer",
+      "parent_path": "UI/MainContainer",
       "name": "Title",
       "type": "Label"
     }
@@ -594,7 +594,7 @@ CanvasLayer 确保 UI 不受游戏世界缩放影响：
   "arguments": {
     "name": "scene_node_create",
     "arguments": {
-      "parent": "UI/MainContainer",
+      "parent_path": "UI/MainContainer",
       "name": "StartButton",
       "type": "Button"
     }
@@ -622,7 +622,7 @@ CanvasLayer 确保 UI 不受游戏世界缩放影响：
   "arguments": {
     "name": "scene_node_create",
     "arguments": {
-      "parent": "UI/MainContainer",
+      "parent_path": "UI/MainContainer",
       "name": "QuitButton",
       "type": "Button"
     }
