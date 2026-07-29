@@ -8,6 +8,7 @@
 #include <godot_cpp/classes/editor_file_system_directory.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/resource_saver.hpp>
+#include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/node.hpp>
@@ -44,7 +45,15 @@ godot::Node* find_node(const std::string& path_str) {
         return root;
     }
     godot::NodePath np(godot::String(clean.c_str()));
-    return root->get_node_or_null(np);
+    auto* node = root->get_node_or_null(np);
+    if (!node) return nullptr;
+    if (node == root) return node;
+    auto* p = node->get_parent();
+    while (p) {
+        if (p == root) return node;
+        p = p->get_parent();
+    }
+    return nullptr;
 }
 
 std::string relative_path(godot::Node* node, godot::Node* root) {
@@ -674,6 +683,12 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue& args) {
     }
 
     node->set_name(godot::StringName(name.c_str()));
+
+    auto* existing_root = editor->get_edited_scene_root();
+    if (existing_root) {
+        return error_json("scene already has a root node — close current scene first or delete the root node before calling editor_new_scene");
+    }
+
     editor->add_root_node(node);
 
     mcp::JsonValue inner(mcp::JsonValue::object_tag);
@@ -682,6 +697,75 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue& args) {
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = std::move(inner);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "editor_new_scene completed");
+    return r;
+}
+
+mcp::JsonValue handle_open_scene(const mcp::JsonValue& args) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "editor_open_scene called");
+    auto* pp = args.Find("path");
+    if (!pp || !pp->IsString()) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("missing required parameter: path");
+        return e;
+    }
+    std::string path = pp->GetString();
+    auto* editor = godot::EditorInterface::get_singleton();
+    if (!editor) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("EditorInterface not available");
+        return e;
+    }
+    editor->open_scene_from_path(godot::String(path.c_str()));
+    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    r["result"] = mcp::JsonValue("ok");
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "editor_open_scene completed");
+    return r;
+}
+
+mcp::JsonValue handle_save_scene_as(const mcp::JsonValue& args) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "editor_save_scene_as called");
+    auto* pp = args.Find("path");
+    if (!pp || !pp->IsString()) {
+        return error_json("missing required parameter: path");
+    }
+    std::string path = pp->GetString();
+    auto* editor = godot::EditorInterface::get_singleton();
+    if (!editor) {
+        return error_json("EditorInterface not available");
+    }
+    auto* root = editor->get_edited_scene_root();
+    if (!root) {
+        return error_json("no scene open");
+    }
+    editor->save_scene_as(godot::String(path.c_str()));
+    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    r["result"] = mcp::JsonValue("saved");
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "editor_save_scene_as completed");
+    return r;
+}
+
+mcp::JsonValue handle_new_text_resource(const mcp::JsonValue& args) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "editor_new_text_resource called");
+    auto* pp = args.Find("path");
+    if (!pp || !pp->IsString()) {
+        return error_json("missing required parameter: path");
+    }
+    auto* sp = args.Find("source_code");
+    if (!sp || !sp->IsString()) {
+        return error_json("missing required parameter: source_code");
+    }
+    std::string path = pp->GetString();
+    auto file = godot::FileAccess::open(godot::String(path.c_str()), godot::FileAccess::WRITE);
+    if (file.is_null()) {
+        return error_json("failed to open file for writing: " + path);
+    }
+    file->store_string(godot::String(sp->GetString().c_str()));
+    file->close();
+    mcp::JsonValue inner(mcp::JsonValue::object_tag);
+    inner["path"] = mcp::JsonValue(path);
+    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    r["result"] = std::move(inner);
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "editor_new_text_resource completed");
     return r;
 }
 

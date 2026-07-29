@@ -239,5 +239,25 @@ JV handle_shaped_text_get_size(const JV& args) {
     return r;
 }
 
+JV handle_file_write(const JV& args) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "file_write called");
+    auto* pp = args.Find("path");
+    if (!pp || !pp->IsString()) return error_json("missing required parameter: path");
+    auto* cp = args.Find("content");
+    if (!cp || !cp->IsString()) return error_json("missing required parameter: content");
+    std::string mode = "WRITE";
+    auto* mp = args.Find("mode");
+    if (mp && mp->IsString()) mode = mp->GetString();
+    godot::FileAccess::ModeFlags flag = godot::FileAccess::WRITE;
+    if (mode == "APPEND") flag = godot::FileAccess::READ_WRITE;
+    auto file = godot::FileAccess::open(godot::String(pp->GetString().c_str()), flag);
+    if (file.is_null()) return error_json("failed to open file: " + pp->GetString());
+    if (mode == "APPEND") file->seek_end();
+    file->store_string(godot::String(cp->GetString().c_str()));
+    file->close();
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "file_write completed");
+    return ok_json();
+}
+
 } // namespace text_ops
 } // namespace godot_self_driving
