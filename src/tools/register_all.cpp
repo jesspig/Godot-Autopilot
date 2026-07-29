@@ -10,11 +10,17 @@
 #include "tools/render_ops.hpp"
 #include "tools/nav_ops.hpp"
 #include "tools/audio_ops.hpp"
+#include "tools/code_exec_ops.hpp"
 #include "tools/input_ops.hpp"
 #include "tools/editor_ops.hpp"
 #include "tools/config_ops.hpp"
 #include "tools/debug_ops.hpp"
+#include "tools/display_ops.hpp"
 #include "tools/doc_ops.hpp"
+#include "tools/input_map_ops.hpp"
+#include "tools/os_ops.hpp"
+#include "tools/scene_tree_ops.hpp"
+#include "tools/text_ops.hpp"
 
 namespace godot_self_driving {
 
@@ -244,6 +250,130 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
     g_handlers["script_call_function"] = script_ops::handle_call_function;
     g_handlers["script_reload"] = script_ops::handle_reload;
     g_handlers["script_get_variable_list"] = script_ops::handle_get_variable_list;
+
+    // display_ops
+    g_handlers["display_clipboard_get"] = display_ops::handle_clipboard_get;
+    g_handlers["display_clipboard_set"] = display_ops::handle_clipboard_set;
+    g_handlers["display_dialog_show"] = display_ops::handle_dialog_show;
+    g_handlers["display_mouse_get_position"] = display_ops::handle_mouse_get_position;
+    g_handlers["display_mouse_set_mode"] = display_ops::handle_mouse_set_mode;
+    g_handlers["display_mouse_warp"] = display_ops::handle_mouse_warp;
+    g_handlers["display_screen_capture"] = display_ops::handle_screen_capture;
+    g_handlers["display_screen_get_count"] = display_ops::handle_screen_get_count;
+    g_handlers["display_screen_get_dpi"] = display_ops::handle_screen_get_dpi;
+    g_handlers["display_screen_get_position"] = display_ops::handle_screen_get_position;
+    g_handlers["display_screen_get_refresh_rate"] = display_ops::handle_screen_get_refresh_rate;
+    g_handlers["display_screen_get_size"] = display_ops::handle_screen_get_size;
+    g_handlers["display_tts_get_voices"] = display_ops::handle_tts_get_voices;
+    g_handlers["display_tts_speak"] = display_ops::handle_tts_speak;
+    g_handlers["display_tts_stop"] = display_ops::handle_tts_stop;
+    g_handlers["display_window_create"] = display_ops::handle_window_create;
+    g_handlers["display_window_delete"] = display_ops::handle_window_delete;
+    g_handlers["display_window_move_to_foreground"] = display_ops::handle_window_move_to_foreground;
+    g_handlers["display_window_request_attention"] = display_ops::handle_window_request_attention;
+    g_handlers["display_window_set_flag"] = display_ops::handle_window_set_flag;
+    g_handlers["display_window_set_mode"] = display_ops::handle_window_set_mode;
+    g_handlers["display_window_set_position"] = display_ops::handle_window_set_position;
+    g_handlers["display_window_set_size"] = display_ops::handle_window_set_size;
+    g_handlers["display_window_set_title"] = display_ops::handle_window_set_title;
+
+    // os_ops
+    g_handlers["os_alert"] = os_ops::handle_os_alert;
+    g_handlers["os_create_process"] = os_ops::handle_os_create_process;
+    g_handlers["os_execute"] = os_ops::handle_os_execute;
+    g_handlers["os_get_datetime"] = os_ops::handle_os_get_datetime;
+    g_handlers["os_get_environment"] = os_ops::handle_os_get_environment;
+    g_handlers["os_get_locale"] = os_ops::handle_os_get_locale;
+    g_handlers["os_get_system_fonts"] = os_ops::handle_os_get_system_fonts;
+    g_handlers["os_get_system_info"] = os_ops::handle_os_get_system_info;
+    g_handlers["os_get_unique_id"] = os_ops::handle_os_get_unique_id;
+    g_handlers["os_get_unix_time"] = os_ops::handle_os_get_unix_time;
+    g_handlers["os_get_user_data_dir"] = os_ops::handle_os_get_user_data_dir;
+    g_handlers["os_kill"] = os_ops::handle_os_kill;
+    g_handlers["os_move_to_trash"] = os_ops::handle_os_move_to_trash;
+    g_handlers["os_set_environment"] = os_ops::handle_os_set_environment;
+    g_handlers["os_shell_open"] = os_ops::handle_os_shell_open;
+
+    // render_ops — new
+    g_handlers["render_texture_create_2d"] = render_ops::handle_texture_create_2d;
+    g_handlers["render_shader_set_code"] = render_ops::handle_shader_set_code;
+    g_handlers["render_shader_get_parameter_list"] = render_ops::handle_shader_get_parameter_list;
+    g_handlers["render_environment_set_glow"] = render_ops::handle_environment_set_glow;
+    g_handlers["render_environment_set_ssr"] = render_ops::handle_environment_set_ssr;
+    g_handlers["render_environment_set_tonemap"] = render_ops::handle_environment_set_tonemap;
+    g_handlers["render_environment_set_sdfgi"] = render_ops::handle_environment_set_sdfgi;
+    g_handlers["render_environment_set_volumetric_fog"] = render_ops::handle_environment_set_volumetric_fog;
+    g_handlers["render_sky_create"] = render_ops::handle_sky_create;
+    g_handlers["render_sky_set_material"] = render_ops::handle_sky_set_material;
+    g_handlers["render_particles_set_emitting"] = render_ops::handle_particles_set_emitting;
+    g_handlers["render_particles_restart"] = render_ops::handle_particles_restart;
+    g_handlers["render_particles_set_lifetime"] = render_ops::handle_particles_set_lifetime;
+    g_handlers["render_reflection_probe_create"] = render_ops::handle_reflection_probe_create;
+    g_handlers["render_decal_create"] = render_ops::handle_decal_create;
+    g_handlers["render_fog_volume_set_shape"] = render_ops::handle_fog_volume_set_shape;
+    g_handlers["render_instance_set_visible"] = render_ops::handle_instance_set_visible;
+    g_handlers["render_instance_set_layer_mask"] = render_ops::handle_instance_set_layer_mask;
+    g_handlers["render_global_shader_parameter_set"] = render_ops::handle_global_shader_parameter_set;
+
+    // scene_tree_ops
+    g_handlers["scene_tree_call_group"] = scene_tree_ops::handle_call_group;
+    g_handlers["scene_tree_create_timer"] = scene_tree_ops::handle_create_timer;
+    g_handlers["scene_tree_get_nodes_in_group"] = scene_tree_ops::handle_get_nodes_in_group;
+    g_handlers["scene_tree_is_paused"] = scene_tree_ops::handle_is_paused;
+    g_handlers["scene_tree_notify_group"] = scene_tree_ops::handle_notify_group;
+    g_handlers["scene_tree_reload_current_scene"] = scene_tree_ops::handle_reload_current_scene;
+    g_handlers["scene_tree_set_debug_collisions"] = scene_tree_ops::handle_set_debug_collisions;
+    g_handlers["scene_tree_set_pause"] = scene_tree_ops::handle_set_pause;
+
+    // input_map_ops
+    g_handlers["input_map_action_add_event"] = input_map_ops::handle_action_add_event;
+    g_handlers["input_map_action_erase_event"] = input_map_ops::handle_action_erase_event;
+    g_handlers["input_map_action_set_deadzone"] = input_map_ops::handle_action_set_deadzone;
+    g_handlers["input_map_add_action"] = input_map_ops::handle_add_action;
+    g_handlers["input_map_erase_action"] = input_map_ops::handle_erase_action;
+    g_handlers["input_map_get_actions"] = input_map_ops::handle_get_actions;
+    g_handlers["input_map_has_action"] = input_map_ops::handle_has_action;
+
+    // text_ops
+    g_handlers["text_create_font"] = text_ops::handle_create_font;
+    g_handlers["text_create_shaped_text"] = text_ops::handle_create_shaped_text;
+    g_handlers["text_font_set_antialiasing"] = text_ops::handle_font_set_antialiasing;
+    g_handlers["text_font_set_data"] = text_ops::handle_font_set_data;
+    g_handlers["text_font_set_hinting"] = text_ops::handle_font_set_hinting;
+    g_handlers["text_get_system_font_path"] = text_ops::handle_get_system_font_path;
+    g_handlers["text_has_feature"] = text_ops::handle_has_feature;
+    g_handlers["text_is_locale_right_to_left"] = text_ops::handle_is_locale_right_to_left;
+    g_handlers["text_shaped_text_add_string"] = text_ops::handle_shaped_text_add_string;
+    g_handlers["text_shaped_text_get_size"] = text_ops::handle_shaped_text_get_size;
+
+    // audio_ops — new
+    g_handlers["audio_bus_set_solo"] = audio_ops::handle_bus_set_solo;
+    g_handlers["audio_get_output_device_list"] = audio_ops::handle_get_output_device_list;
+    g_handlers["audio_set_output_device"] = audio_ops::handle_set_output_device;
+    g_handlers["audio_get_input_device_list"] = audio_ops::handle_get_input_device_list;
+    g_handlers["audio_set_input_device"] = audio_ops::handle_set_input_device;
+
+    // debug_ops — new
+    g_handlers["debug_get_all_monitors"] = debug_ops::handle_get_all_monitors;
+    g_handlers["debug_add_custom_monitor"] = debug_ops::handle_add_custom_monitor;
+    g_handlers["debug_remove_custom_monitor"] = debug_ops::handle_remove_custom_monitor;
+    g_handlers["debug_get_custom_monitor"] = debug_ops::handle_get_custom_monitor;
+    g_handlers["debug_list_custom_monitors"] = debug_ops::handle_list_custom_monitors;
+    g_handlers["debug_query_object_count"] = debug_ops::handle_query_object_count;
+    g_handlers["debug_query_memory_usage"] = debug_ops::handle_query_memory_usage;
+    g_handlers["debug_query_node_count"] = debug_ops::handle_query_node_count;
+
+    // physics_ops — new
+    g_handlers["physics_3d_shape_create"] = physics_ops::handle_3d_shape_create;
+    g_handlers["physics_3d_shape_set_data"] = physics_ops::handle_3d_shape_set_data;
+    g_handlers["physics_3d_body_add_shape"] = physics_ops::handle_3d_body_add_shape;
+    g_handlers["physics_3d_body_set_param"] = physics_ops::handle_3d_body_set_param;
+    g_handlers["physics_3d_area_set_param"] = physics_ops::handle_3d_area_set_param;
+    g_handlers["physics_3d_space_set_param"] = physics_ops::handle_3d_space_set_param;
+    g_handlers["physics_3d_area_set_transform"] = physics_ops::handle_3d_area_set_transform;
+    g_handlers["physics_3d_body_set_transform"] = physics_ops::handle_3d_body_set_transform;
+    g_handlers["physics_2d_shape_create"] = physics_ops::handle_2d_shape_create;
+    g_handlers["physics_2d_shape_set_data"] = physics_ops::handle_2d_shape_set_data;
 
     // ── 2. Populate catalog ──
     catalog.populate_default_tools();
@@ -509,10 +639,151 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
             });
     }
 
+    // batch_execute
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+
+        mcp::JsonValue item(mcp::JsonValue::object_tag);
+        item["type"] = mcp::JsonValue("object");
+        mcp::JsonValue iprops(mcp::JsonValue::object_tag);
+        mcp::JsonValue tp(mcp::JsonValue::object_tag);
+        tp["type"] = mcp::JsonValue("string");
+        tp["description"] = mcp::JsonValue("Tool name to execute");
+        iprops["tool"] = std::move(tp);
+        mcp::JsonValue ap(mcp::JsonValue::object_tag);
+        ap["type"] = mcp::JsonValue("object");
+        ap["description"] = mcp::JsonValue("Tool arguments");
+        iprops["args"] = std::move(ap);
+        item["properties"] = std::move(iprops);
+        mcp::JsonValue ireq(mcp::JsonValue::array_tag);
+        ireq.PushBack(mcp::JsonValue("tool"));
+        item["required"] = std::move(ireq);
+
+        mcp::JsonValue ops_prop(mcp::JsonValue::object_tag);
+        ops_prop["type"] = mcp::JsonValue("array");
+        ops_prop["items"] = std::move(item);
+        ops_prop["description"] = mcp::JsonValue("Ordered list of operations to execute");
+        props["operations"] = std::move(ops_prop);
+
+        mcp::JsonValue stop_prop(mcp::JsonValue::object_tag);
+        stop_prop["type"] = mcp::JsonValue("boolean");
+        stop_prop["description"] = mcp::JsonValue("Stop on first error");
+        stop_prop["default"] = mcp::JsonValue(true);
+        props["stop_on_error"] = std::move(stop_prop);
+
+        s["properties"] = std::move(props);
+        mcp::JsonValue req(mcp::JsonValue::array_tag);
+        req.PushBack(mcp::JsonValue("operations"));
+        s["required"] = std::move(req);
+
+        mcp::ToolOptions b_opts;
+        b_opts.Description("Execute multiple tools in batch. Each operation runs in sequence; if stop_on_error is true and any operation fails, remaining operations are skipped.").InputSchema(std::move(s));
+        server.RegisterTool("batch_execute", b_opts,
+            [&queue](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
+                mcp::JsonValue args = ctx.Params().arguments
+                    ? *ctx.Params().arguments : mcp::JsonValue(mcp::JsonValue::object_tag);
+                auto body = queue.submit([args = std::move(args)]() -> std::string {
+                    return code_exec_ops::handle_batch_execute(args).Dump();
+                }).get();
+                mcp::CallToolResult mcp_result;
+                mcp_result.content.push_back(mcp::TextContent{"text", body});
+                return mcp_result;
+            });
+    }
+
+    // code_execute
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+
+        mcp::JsonValue sc(mcp::JsonValue::object_tag);
+        sc["type"] = mcp::JsonValue("string");
+        sc["description"] = mcp::JsonValue("GDScript source code");
+        props["source_code"] = std::move(sc);
+
+        mcp::JsonValue fn(mcp::JsonValue::object_tag);
+        fn["type"] = mcp::JsonValue("string");
+        fn["description"] = mcp::JsonValue("Function name to call (default: _run)");
+        props["function_name"] = std::move(fn);
+
+        mcp::JsonValue tm(mcp::JsonValue::object_tag);
+        tm["type"] = mcp::JsonValue("integer");
+        tm["description"] = mcp::JsonValue("Execution timeout in milliseconds (max 30000)");
+        tm["default"] = mcp::JsonValue(static_cast<int64_t>(5000));
+        tm["maximum"] = mcp::JsonValue(static_cast<int64_t>(30000));
+        props["timeout_ms"] = std::move(tm);
+
+        s["properties"] = std::move(props);
+        mcp::JsonValue req(mcp::JsonValue::array_tag);
+        req.PushBack(mcp::JsonValue("source_code"));
+        s["required"] = std::move(req);
+
+        mcp::ToolOptions c_opts;
+        c_opts.Description("Execute arbitrary GDScript code. The source code is wrapped in a script that extends Node, compiled, attached to a temporary node, and executed. Returns the function result serialized as JSON.").InputSchema(std::move(s));
+        server.RegisterTool("code_execute", c_opts,
+            [&queue](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
+                mcp::JsonValue args = ctx.Params().arguments
+                    ? *ctx.Params().arguments : mcp::JsonValue(mcp::JsonValue::object_tag);
+                auto body = queue.submit([args = std::move(args)]() -> std::string {
+                    return code_exec_ops::handle_code_execute(args).Dump();
+                }).get();
+                mcp::CallToolResult mcp_result;
+                mcp::JsonValue j = mcp::JsonValue::Parse(body);
+                if (j.Find("error") != nullptr) mcp_result.is_error = true;
+                mcp_result.content.push_back(mcp::TextContent{"text", body});
+                return mcp_result;
+            });
+    }
+
     // ── 4. Catalog entries (full schemas) ──
     // Meta-tools (overwrite basic entries from populate_default_tools)
     {
         catalog.add_tool({"call_tool", "Execute any tool by name", "Meta", {"proxy", "execute"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    }
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+
+        mcp::JsonValue item(mcp::JsonValue::object_tag);
+        item["type"] = mcp::JsonValue("object");
+        mcp::JsonValue iprops(mcp::JsonValue::object_tag);
+        mcp::JsonValue tp(mcp::JsonValue::object_tag);
+        tp["type"] = mcp::JsonValue("string");
+        iprops["tool"] = std::move(tp);
+        mcp::JsonValue ap(mcp::JsonValue::object_tag);
+        ap["type"] = mcp::JsonValue("object");
+        iprops["args"] = std::move(ap);
+        item["properties"] = std::move(iprops);
+        mcp::JsonValue ireq(mcp::JsonValue::array_tag);
+        ireq.PushBack(mcp::JsonValue("tool"));
+        item["required"] = std::move(ireq);
+
+        mcp::JsonValue ops_prop(mcp::JsonValue::object_tag);
+        ops_prop["type"] = mcp::JsonValue("array");
+        ops_prop["items"] = std::move(item);
+        props["operations"] = std::move(ops_prop);
+        s["properties"] = std::move(props);
+        mcp::JsonValue req(mcp::JsonValue::array_tag);
+        req.PushBack(mcp::JsonValue("operations"));
+        s["required"] = std::move(req);
+        catalog.add_tool({"batch_execute", "Execute multiple tools in batch", "Meta", {"batch", "execute"}, std::move(s)});
+    }
+    {
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue sc(mcp::JsonValue::object_tag);
+        sc["type"] = mcp::JsonValue("string");
+        props["source_code"] = std::move(sc);
+        s["properties"] = std::move(props);
+        mcp::JsonValue req(mcp::JsonValue::array_tag);
+        req.PushBack(mcp::JsonValue("source_code"));
+        s["required"] = std::move(req);
+        catalog.add_tool({"code_execute", "Execute arbitrary GDScript code", "Meta", {"code", "execute"}, std::move(s)});
     }
     {
         mcp::JsonValue s(mcp::JsonValue::object_tag);
@@ -845,6 +1116,130 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
     catalog.add_tool({"doc_search", "Search Godot classes by name", "Docs", {"docs", "search", "class"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
     catalog.add_tool({"doc_get_method", "Get signature info for a specific method on a class", "Docs", {"docs", "method", "get"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
     catalog.add_tool({"doc_get_property", "Get property info for a specific property on a class", "Docs", {"docs", "property", "get"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+
+    // display_ops
+    catalog.add_tool({"display_clipboard_get", "Get clipboard text", "Display", {"display", "clipboard"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"display_clipboard_set", "Set clipboard text", "Display", {"display", "clipboard"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"display_dialog_show", "Show a native dialog", "Display", {"display", "dialog"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"display_mouse_get_position", "Get mouse cursor position", "Display", {"display", "mouse"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"display_mouse_set_mode", "Set mouse cursor mode", "Display", {"display", "mouse"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"display_mouse_warp", "Warp mouse cursor to position", "Display", {"display", "mouse"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"display_screen_capture", "Capture screen image", "Display", {"display", "screen"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"display_screen_get_count", "Get number of screens", "Display", {"display", "screen"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"display_screen_get_dpi", "Get screen DPI", "Display", {"display", "screen"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"display_screen_get_position", "Get screen position", "Display", {"display", "screen"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"display_screen_get_refresh_rate", "Get screen refresh rate", "Display", {"display", "screen"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"display_screen_get_size", "Get screen resolution", "Display", {"display", "screen"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"display_tts_get_voices", "Get available TTS voices", "Display", {"display", "tts"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"display_tts_speak", "Speak text via TTS", "Display", {"display", "tts"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"display_tts_stop", "Stop TTS playback", "Display", {"display", "tts"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"display_window_create", "Create a sub-window", "Display", {"display", "window"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"display_window_delete", "Delete a sub-window", "Display", {"display", "window"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"display_window_move_to_foreground", "Move window to foreground", "Display", {"display", "window"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"display_window_request_attention", "Flash window taskbar", "Display", {"display", "window"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"display_window_set_flag", "Set a window flag", "Display", {"display", "window"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"display_window_set_mode", "Set window mode", "Display", {"display", "window"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"display_window_set_position", "Set window position", "Display", {"display", "window"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"display_window_set_size", "Set window size", "Display", {"display", "window"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"display_window_set_title", "Set window title", "Display", {"display", "window"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+
+    // os_ops
+    catalog.add_tool({"os_alert", "Show a modal alert dialog", "OS", {"os", "alert"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"os_create_process", "Start a process asynchronously", "OS", {"os", "process"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"os_execute", "Execute a command and wait for output", "OS", {"os", "execute"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"os_get_datetime", "Get current system date and time", "OS", {"os", "datetime"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"os_get_environment", "Get an environment variable", "OS", {"os", "environment"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"os_get_locale", "Get system locale", "OS", {"os", "locale"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"os_get_system_fonts", "Get list of system fonts", "OS", {"os", "fonts"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"os_get_system_info", "Get system information", "OS", {"os", "system"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"os_get_unique_id", "Get machine unique ID", "OS", {"os", "unique_id"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"os_get_unix_time", "Get current Unix timestamp", "OS", {"os", "time"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"os_get_user_data_dir", "Get user data directory", "OS", {"os", "data_dir"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"os_kill", "Kill a process by PID", "OS", {"os", "kill"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"os_move_to_trash", "Move file or folder to trash", "OS", {"os", "trash"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"os_set_environment", "Set an environment variable", "OS", {"os", "environment"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"os_shell_open", "Open URL or file in default application", "OS", {"os", "shell"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+
+    // render_ops — new
+    catalog.add_tool({"render_texture_create_2d", "Create a 2D texture from an image", "Render", {"render", "texture"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"render_shader_set_code", "Set shader source code", "Render", {"render", "shader"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"render_shader_get_parameter_list", "Get shader parameter list", "Render", {"render", "shader"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"render_environment_set_glow", "Set glow effect on environment", "Render", {"render", "environment"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"render_environment_set_ssr", "Set screen-space reflections", "Render", {"render", "environment"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"render_environment_set_tonemap", "Set tone mapping on environment", "Render", {"render", "environment"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"render_environment_set_sdfgi", "Set SDFGI global illumination", "Render", {"render", "environment"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"render_environment_set_volumetric_fog", "Set volumetric fog on environment", "Render", {"render", "environment"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"render_sky_create", "Create a sky", "Render", {"render", "sky"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"render_sky_set_material", "Set material on sky", "Render", {"render", "sky"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"render_particles_set_emitting", "Set particle emitting state", "Render", {"render", "particles"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"render_particles_restart", "Restart particle system", "Render", {"render", "particles"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"render_particles_set_lifetime", "Set particle lifetime", "Render", {"render", "particles"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"render_reflection_probe_create", "Create a reflection probe", "Render", {"render", "reflection_probe"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"render_decal_create", "Create a decal", "Render", {"render", "decal"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"render_fog_volume_set_shape", "Set fog volume shape", "Render", {"render", "fog"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"render_instance_set_visible", "Set instance visibility", "Render", {"render", "instance"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"render_instance_set_layer_mask", "Set instance layer mask", "Render", {"render", "instance"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"render_global_shader_parameter_set", "Set global shader parameter", "Render", {"render", "shader"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+
+    // scene_tree_ops
+    catalog.add_tool({"scene_tree_call_group", "Call a method on all nodes in a group", "Scene", {"scene", "group"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"scene_tree_create_timer", "Create a scene tree timer", "Scene", {"scene", "timer"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"scene_tree_get_nodes_in_group", "Get all nodes in a group", "Scene", {"scene", "group"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"scene_tree_is_paused", "Check if scene tree is paused", "Scene", {"scene", "pause"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"scene_tree_notify_group", "Send a notification to a group", "Scene", {"scene", "group"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"scene_tree_reload_current_scene", "Reload the current scene", "Scene", {"scene", "reload"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"scene_tree_set_debug_collisions", "Toggle collision debug visualization", "Scene", {"scene", "debug"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"scene_tree_set_pause", "Pause or unpause the scene tree", "Scene", {"scene", "pause"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+
+    // input_map_ops
+    catalog.add_tool({"input_map_action_add_event", "Bind an input event to an action", "Input", {"input", "map"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"input_map_action_erase_event", "Remove an input event from an action", "Input", {"input", "map"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"input_map_action_set_deadzone", "Set deadzone for an action", "Input", {"input", "map"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"input_map_add_action", "Add a new input action", "Input", {"input", "map"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"input_map_erase_action", "Remove an input action", "Input", {"input", "map"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"input_map_get_actions", "Get all input actions", "Input", {"input", "map"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"input_map_has_action", "Check if an input action exists", "Input", {"input", "map"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+
+    // text_ops
+    catalog.add_tool({"text_create_font", "Create a font object", "Text", {"text", "font"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"text_create_shaped_text", "Create a shaped text object", "Text", {"text", "shaped"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"text_font_set_antialiasing", "Set font antialiasing mode", "Text", {"text", "font"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"text_font_set_data", "Set font data from file", "Text", {"text", "font"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"text_font_set_hinting", "Set font hinting mode", "Text", {"text", "font"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"text_get_system_font_path", "Get system font file path", "Text", {"text", "font"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"text_has_feature", "Check if a text feature is supported", "Text", {"text", "feature"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"text_is_locale_right_to_left", "Check if locale is RTL", "Text", {"text", "locale"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"text_shaped_text_add_string", "Add a string to shaped text", "Text", {"text", "shaped"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"text_shaped_text_get_size", "Get shaped text size", "Text", {"text", "shaped"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+
+    // audio_ops — new
+    catalog.add_tool({"audio_bus_set_solo", "Set solo on an audio bus", "Audio", {"audio", "bus"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"audio_get_output_device_list", "List audio output devices", "Audio", {"audio", "device"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"audio_set_output_device", "Set audio output device", "Audio", {"audio", "device"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"audio_get_input_device_list", "List audio input devices", "Audio", {"audio", "device"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"audio_set_input_device", "Set audio input device", "Audio", {"audio", "device"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+
+    // debug_ops — new
+    catalog.add_tool({"debug_get_all_monitors", "Get all performance monitor values", "Debug", {"debug", "performance"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"debug_add_custom_monitor", "Add a custom performance monitor", "Debug", {"debug", "performance"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"debug_remove_custom_monitor", "Remove a custom performance monitor", "Debug", {"debug", "performance"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"debug_get_custom_monitor", "Get custom performance monitor value", "Debug", {"debug", "performance"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"debug_list_custom_monitors", "List all custom performance monitors", "Debug", {"debug", "performance"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"debug_query_object_count", "Get total object count", "Debug", {"debug", "objects"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"debug_query_memory_usage", "Get static memory usage", "Debug", {"debug", "memory"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"debug_query_node_count", "Get current node count", "Debug", {"debug", "objects"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+
+    // physics_ops — new
+    catalog.add_tool({"physics_3d_shape_create", "Create a 3D physics shape", "Physics", {"physics", "3d", "shape"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_shape_set_data", "Set data on a 3D physics shape", "Physics", {"physics", "3d", "shape"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_body_add_shape", "Add a shape to a 3D physics body", "Physics", {"physics", "3d", "body"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_body_set_param", "Set a parameter on a 3D physics body", "Physics", {"physics", "3d", "body"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_area_set_param", "Set a parameter on a 3D physics area", "Physics", {"physics", "3d", "area"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_space_set_param", "Set a parameter on a 3D physics space", "Physics", {"physics", "3d", "space"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_area_set_transform", "Set transform on a 3D physics area", "Physics", {"physics", "3d", "area"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_3d_body_set_transform", "Set transform on a 3D physics body", "Physics", {"physics", "3d", "body"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_2d_shape_create", "Create a 2D physics shape", "Physics", {"physics", "2d", "shape"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
+    catalog.add_tool({"physics_2d_shape_set_data", "Set data on a 2D physics shape", "Physics", {"physics", "2d", "shape"}, mcp::JsonValue(mcp::JsonValue::object_tag)});
 
     // ── 5. Populate BM25 index ──
     for (auto* tool : catalog.get_all_tools()) {
