@@ -63,14 +63,6 @@ void node_to_json(godot::Node* node, const std::string& root_prefix, mcp::JsonVa
 } // namespace
 
 mcp::JsonValue handle_create(const mcp::JsonValue& args) {
-    auto* pp = args.Find("parent_path");
-    if (!pp || !pp->IsString()) {
-        mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("missing required parameter: parent_path");
-        return e;
-    }
-    std::string parent_path = pp->GetString();
-
     std::string name = "NewNode";
     auto* n = args.Find("name");
     if (n && n->IsString()) name = n->GetString();
@@ -92,13 +84,6 @@ mcp::JsonValue handle_create(const mcp::JsonValue& args) {
         return e;
     }
 
-    auto* parent = find_node(parent_path);
-    if (!parent) {
-        mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("parent node not found: " + parent_path);
-        return e;
-    }
-
     godot::Variant obj_var = cdbs->instantiate(godot::StringName(type.c_str()));
     if (obj_var.get_type() == godot::Variant::NIL) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -114,24 +99,59 @@ mcp::JsonValue handle_create(const mcp::JsonValue& args) {
     }
 
     obj->set_name(godot::StringName(name.c_str()));
-    parent->add_child(obj);
+
+    auto* pp = args.Find("parent_path");
+    bool has_parent = pp && pp->IsString() && !pp->GetString().empty();
 
     auto* editor = godot::EditorInterface::get_singleton();
-    std::string abs_path = to_std(obj->get_path());
+
+    if (has_parent) {
+        std::string parent_path = pp->GetString();
+        auto* parent = find_node(parent_path);
+        if (!parent) {
+            mcp::JsonValue e(mcp::JsonValue::object_tag);
+            e["error"] = mcp::JsonValue("parent node not found: " + parent_path);
+            return e;
+        }
+        parent->add_child(obj);
+    } else {
+        if (!editor) {
+            mcp::JsonValue e(mcp::JsonValue::object_tag);
+            e["error"] = mcp::JsonValue("EditorInterface not available");
+            return e;
+        }
+        auto* existing_root = editor->get_edited_scene_root();
+        if (existing_root) {
+            mcp::JsonValue e(mcp::JsonValue::object_tag);
+            e["error"] = mcp::JsonValue("scene already has a root, use parent_path to add children");
+            return e;
+        }
+        editor->add_root_node(obj);
+    }
+
+    std::string result_path = name;
     if (editor) {
         auto* scene_root = editor->get_edited_scene_root();
         if (scene_root) {
+            std::string abs_path = to_std(obj->get_path());
             std::string root_pref = to_std(scene_root->get_path());
             if (abs_path == root_pref) {
-                abs_path = name;
+                result_path = name;
             } else if (abs_path.find(root_pref + "/") == 0) {
-                abs_path = abs_path.substr(root_pref.size() + 1);
+                result_path = abs_path.substr(root_pref.size() + 1);
+            } else {
+                result_path = abs_path;
             }
+        } else {
+            result_path = name;
         }
+    } else {
+        result_path = name;
     }
+
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     mcp::JsonValue inner(mcp::JsonValue::object_tag);
-    inner["path"] = mcp::JsonValue(abs_path);
+    inner["path"] = mcp::JsonValue(result_path);
     r["result"] = std::move(inner);
     return r;
 }

@@ -10,6 +10,7 @@
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/resource_saver.hpp>
 #include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
@@ -180,6 +181,16 @@ mcp::JsonValue handle_create(const mcp::JsonValue& args) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
         e["error"] = mcp::JsonValue("ResourceSaver not available");
         return e;
+    }
+
+    std::string dir_path = path;
+    size_t last_slash = dir_path.find_last_of('/');
+    if (last_slash != std::string::npos) {
+        dir_path = dir_path.substr(0, last_slash);
+        auto dir = godot::DirAccess::open(godot::String("res://"));
+        if (dir.is_valid()) {
+            dir->make_dir_recursive(godot::String(dir_path.c_str()));
+        }
     }
 
     godot::Error err = saver->save(script, godot::String(path.c_str()));

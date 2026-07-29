@@ -44,7 +44,12 @@ JV handle_action_add_event(const JV& args) {
         return e;
     }
     std::string action = ap->GetString();
-    godot::Variant event_var = VariantJson::deserialize(*ep, "InputEvent");
+    std::string event_class = "InputEvent";
+    auto* class_field = ep->Find("class");
+    if (class_field && class_field->IsString()) {
+        event_class = class_field->GetString();
+    }
+    godot::Variant event_var = VariantJson::deserialize(*ep, event_class);
     auto event = godot::Ref<godot::InputEvent>(event_var);
     if (event.is_null()) {
         JV e(JV::object_tag);

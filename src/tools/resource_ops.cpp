@@ -176,14 +176,30 @@ mcp::JsonValue handle_save(const mcp::JsonValue& args) {
     auto* fl = args.Find("flags");
     if (fl && fl->IsInt()) flags = static_cast<int>(fl->GetInt());
 
+    godot::Ref<godot::Resource> res;
+
     auto* loader = godot::ResourceLoader::get_singleton();
-    if (!loader) {
-        mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("ResourceLoader not available");
-        return e;
+    if (loader) {
+        res = loader->load(godot::String(path.c_str()));
     }
 
-    godot::Ref<godot::Resource> res = loader->load(godot::String(path.c_str()));
+    if (res.is_null()) {
+        auto* ct = args.Find("class_type");
+        if (ct && ct->IsString()) {
+            std::string class_type = ct->GetString();
+            auto* cdbs = godot::ClassDBSingleton::get_singleton();
+            if (cdbs) {
+                godot::Variant obj_var = cdbs->instantiate(godot::StringName(class_type.c_str()));
+                if (obj_var.get_type() != godot::Variant::NIL) {
+                    auto* obj = godot::Object::cast_to<godot::Resource>(obj_var);
+                    if (obj) {
+                        res = godot::Ref<godot::Resource>(obj);
+                    }
+                }
+            }
+        }
+    }
+
     if (res.is_null()) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
         e["error"] = mcp::JsonValue("failed to load resource: " + path);
@@ -195,6 +211,16 @@ mcp::JsonValue handle_save(const mcp::JsonValue& args) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
         e["error"] = mcp::JsonValue("ResourceSaver not available");
         return e;
+    }
+
+    std::string save_dir = dest_path;
+    size_t last_slash = save_dir.find_last_of('/');
+    if (last_slash != std::string::npos) {
+        save_dir = save_dir.substr(0, last_slash);
+        auto dir = godot::DirAccess::open(godot::String("res://"));
+        if (dir.is_valid()) {
+            dir->make_dir_recursive(godot::String(save_dir.c_str()));
+        }
     }
 
     godot::Error err = saver->save(

@@ -7,6 +7,7 @@
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 #include <chrono>
+#include <sstream>
 #include <string>
 
 namespace godot_self_driving {
@@ -111,15 +112,85 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
 
     auto start_time = std::chrono::steady_clock::now();
 
-    std::string wrapped = "extends Node\n\nfunc " + func_name + "():\n\t";
-    for (char c : source_code) {
-        if (c == '\n') {
-            wrapped += "\n\t";
-        } else {
-            wrapped += c;
+    // Detect if source_code contains func definitions on non-commented lines
+    bool has_func_def = false;
+    {
+        std::istringstream stream(source_code);
+        std::string line;
+        while (std::getline(stream, line)) {
+            size_t pos = line.find_first_not_of(" \t");
+            if (pos == std::string::npos || line[pos] == '#') continue;
+            if (line.compare(pos, 5, "func ") == 0) {
+                has_func_def = true;
+                break;
+            }
         }
     }
-    wrapped += "\n";
+
+    // Clean extends lines from user code to prevent conflicts with wrapper
+    auto clean_extends = [](const std::string& code) -> std::string {
+        std::string result;
+        std::istringstream stream(code);
+        std::string line;
+        bool first = true;
+        while (std::getline(stream, line)) {
+            if (!first) result += "\n";
+            first = false;
+            size_t pos = line.find_first_not_of(" \t");
+            if (pos != std::string::npos && line.compare(pos, 8, "extends ") == 0) {
+                result += "# " + line;
+            } else {
+                result += line;
+            }
+        }
+        return result;
+    };
+
+    std::string wrapped;
+    if (has_func_def) {
+        // Multi-function mode: prepend @tool + extends Node, do NOT wrap in a function
+        std::string cleaned = clean_extends(source_code);
+        wrapped = "@tool\nextends Node\n\n" + cleaned + "\n";
+
+        // Ensure func_name exists in user code; if not, append a stub
+        bool has_named_func = false;
+        {
+            std::istringstream stream(cleaned);
+            std::string line;
+            while (std::getline(stream, line)) {
+                size_t pos = line.find_first_not_of(" \t");
+                if (pos == std::string::npos || line[pos] == '#') continue;
+                if (line.compare(pos, 5, "func ") == 0) {
+                    size_t name_start = line.find_first_not_of(" \t", pos + 5);
+                    if (name_start == std::string::npos) continue;
+                    size_t name_end = line.find('(', name_start);
+                    if (name_end == std::string::npos) continue;
+                    std::string fname = line.substr(name_start, name_end - name_start);
+                    size_t last = fname.find_last_not_of(" \t");
+                    if (last != std::string::npos) fname = fname.substr(0, last + 1);
+                    if (fname == func_name) {
+                        has_named_func = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if (!has_named_func) {
+            wrapped += "func " + func_name + "():\n    pass\n";
+        }
+    } else {
+        // Single expression mode: wrap in a function with 4-space indentation
+        std::string cleaned = clean_extends(source_code);
+        wrapped = "@tool\nextends Node\n\nfunc " + func_name + "():\n    ";
+        for (char c : cleaned) {
+            if (c == '\n') {
+                wrapped += "\n    ";
+            } else {
+                wrapped += c;
+            }
+        }
+        wrapped += "\n";
+    }
 
     godot::Ref<godot::GDScript> script;
     script.instantiate();
