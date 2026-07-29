@@ -29,6 +29,7 @@ mcp::JsonValue serialize_ref(const godot::Ref<godot::Resource>& res) {
     j["class"] = mcp::JsonValue(to_std(res->get_class()));
     j["path"] = mcp::JsonValue(to_std(res->get_path()));
     j["object_id"] = mcp::JsonValue(static_cast<int64_t>(res->get_instance_id()));
+    j["name"] = mcp::JsonValue(to_std(res->get_name()));
     return j;
 }
 
@@ -61,6 +62,9 @@ mcp::JsonValue handle_load(const mcp::JsonValue& args) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
         e["error"] = mcp::JsonValue("failed to load resource: " + path);
         return e;
+    }
+    if (to_std(res->get_path()).empty()) {
+        res->set_path(godot::String(path.c_str()));
     }
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = serialize_ref(res);
@@ -178,9 +182,21 @@ mcp::JsonValue handle_save(const mcp::JsonValue& args) {
 
     godot::Ref<godot::Resource> res;
 
-    auto* loader = godot::ResourceLoader::get_singleton();
-    if (loader) {
-        res = loader->load(godot::String(path.c_str()));
+    auto* oid = args.Find("object_id");
+    if (oid && oid->IsInt()) {
+        int64_t obj_id = oid->GetInt();
+        auto* obj = godot::ObjectDB::get_instance(static_cast<uint64_t>(obj_id));
+        if (obj) {
+            auto* res_obj = godot::Object::cast_to<godot::Resource>(obj);
+            if (res_obj) {
+                res = godot::Ref<godot::Resource>(res_obj);
+            }
+        }
+    } else {
+        auto* loader = godot::ResourceLoader::get_singleton();
+        if (loader) {
+            res = loader->load(godot::String(path.c_str()));
+        }
     }
 
     if (res.is_null()) {
@@ -293,8 +309,13 @@ mcp::JsonValue handle_create(const mcp::JsonValue& args) {
         res->set_name(godot::String(name.c_str()));
     }
 
+    auto result = serialize_ref(res);
+    std::string res_path = to_std(res->get_path());
+    if (res_path.empty() && !name.empty()) {
+        result["path"] = mcp::JsonValue("memory://" + name);
+    }
     mcp::JsonValue r(mcp::JsonValue::object_tag);
-    r["result"] = serialize_ref(res);
+    r["result"] = std::move(result);
     return r;
 }
 

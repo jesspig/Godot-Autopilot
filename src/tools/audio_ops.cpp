@@ -6,6 +6,8 @@
 #include <godot_cpp/classes/audio_effect.hpp>
 #include <godot_cpp/classes/audio_stream.hpp>
 #include <godot_cpp/classes/audio_stream_player.hpp>
+#include <godot_cpp/classes/audio_stream_player2d.hpp>
+#include <godot_cpp/classes/audio_stream_player3d.hpp>
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
@@ -50,6 +52,72 @@ mcp::JsonValue error_json(const std::string& msg) {
 mcp::JsonValue ok_json() {
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue("ok");
+    return r;
+}
+
+struct AudioPlayerVariant {
+    godot::AudioStreamPlayer* p1 = nullptr;
+    godot::AudioStreamPlayer2D* p2 = nullptr;
+    godot::AudioStreamPlayer3D* p3 = nullptr;
+
+    bool is_valid() const { return p1 || p2 || p3; }
+
+    std::string type_name() const {
+        if (p1) return "AudioStreamPlayer";
+        if (p2) return "AudioStreamPlayer2D";
+        if (p3) return "AudioStreamPlayer3D";
+        return "unknown";
+    }
+
+    void play(float from_pos = 0.0f) {
+        if (p1) p1->play(from_pos);
+        else if (p2) p2->play(from_pos);
+        else if (p3) p3->play(from_pos);
+    }
+
+    void stop() {
+        if (p1) p1->stop();
+        else if (p2) p2->stop();
+        else if (p3) p3->stop();
+    }
+
+    void seek(float to_position) {
+        if (p1) p1->seek(to_position);
+        else if (p2) p2->seek(to_position);
+        else if (p3) p3->seek(to_position);
+    }
+
+    void set_volume_db(float volume_db) {
+        if (p1) p1->set_volume_db(volume_db);
+        else if (p2) p2->set_volume_db(volume_db);
+        else if (p3) p3->set_volume_db(volume_db);
+    }
+
+    void set_pitch_scale(float pitch_scale) {
+        if (p1) p1->set_pitch_scale(pitch_scale);
+        else if (p2) p2->set_pitch_scale(pitch_scale);
+        else if (p3) p3->set_pitch_scale(pitch_scale);
+    }
+
+    float get_playback_position() {
+        if (p1) return p1->get_playback_position();
+        if (p2) return p2->get_playback_position();
+        if (p3) return p3->get_playback_position();
+        return 0.0f;
+    }
+
+    void set_stream(const godot::Ref<godot::AudioStream>& stream) {
+        if (p1) p1->set_stream(stream);
+        else if (p2) p2->set_stream(stream);
+        else if (p3) p3->set_stream(stream);
+    }
+};
+
+AudioPlayerVariant resolve_audio_player(godot::Node* node) {
+    AudioPlayerVariant r;
+    r.p1 = godot::Object::cast_to<godot::AudioStreamPlayer>(node);
+    if (!r.p1) r.p2 = godot::Object::cast_to<godot::AudioStreamPlayer2D>(node);
+    if (!r.p1 && !r.p2) r.p3 = godot::Object::cast_to<godot::AudioStreamPlayer3D>(node);
     return r;
 }
 
@@ -276,9 +344,9 @@ mcp::JsonValue handle_stream_play(const mcp::JsonValue& args) {
     if (!node) {
         return error_json("AudioStreamPlayer node not found: " + path);
     }
-    auto* player = godot::Object::cast_to<godot::AudioStreamPlayer>(node);
-    if (!player) {
-        return error_json("node is not an AudioStreamPlayer: " + path);
+    auto ap = resolve_audio_player(node);
+    if (!ap.is_valid()) {
+        return error_json("node is not an AudioStreamPlayer/AudioStreamPlayer2D/AudioStreamPlayer3D: " + path + " (actual class: " + to_std(node->get_class()) + ")");
     }
     auto* sp = args.Find("stream_path");
     if (sp && sp->IsString()) {
@@ -294,14 +362,14 @@ mcp::JsonValue handle_stream_play(const mcp::JsonValue& args) {
         if (audio_stream.is_null()) {
             return error_json("loaded resource is not an AudioStream: " + sp->GetString());
         }
-        player->set_stream(audio_stream);
+        ap.set_stream(audio_stream);
     }
     float from_pos = 0.0f;
     auto* fp = args.Find("from_position");
     if (fp && fp->IsNumber()) {
         from_pos = static_cast<float>(fp->IsDouble() ? fp->GetDouble() : static_cast<double>(fp->GetInt()));
     }
-    player->play(from_pos);
+    ap.play(from_pos);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "audio_stream_play completed");
     return ok_json();
 }
@@ -317,11 +385,11 @@ mcp::JsonValue handle_stream_stop(const mcp::JsonValue& args) {
     if (!node) {
         return error_json("AudioStreamPlayer node not found: " + path);
     }
-    auto* player = godot::Object::cast_to<godot::AudioStreamPlayer>(node);
-    if (!player) {
-        return error_json("node is not an AudioStreamPlayer: " + path);
+    auto ap = resolve_audio_player(node);
+    if (!ap.is_valid()) {
+        return error_json("node is not an AudioStreamPlayer/AudioStreamPlayer2D/AudioStreamPlayer3D: " + path + " (actual class: " + to_std(node->get_class()) + ")");
     }
-    player->stop();
+    ap.stop();
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "audio_stream_stop completed");
     return ok_json();
 }
@@ -341,12 +409,12 @@ mcp::JsonValue handle_stream_set_volume(const mcp::JsonValue& args) {
     if (!node) {
         return error_json("AudioStreamPlayer node not found: " + path);
     }
-    auto* player = godot::Object::cast_to<godot::AudioStreamPlayer>(node);
-    if (!player) {
-        return error_json("node is not an AudioStreamPlayer: " + path);
+    auto ap = resolve_audio_player(node);
+    if (!ap.is_valid()) {
+        return error_json("node is not an AudioStreamPlayer/AudioStreamPlayer2D/AudioStreamPlayer3D: " + path + " (actual class: " + to_std(node->get_class()) + ")");
     }
     float vol = static_cast<float>(vd->IsDouble() ? vd->GetDouble() : static_cast<double>(vd->GetInt()));
-    player->set_volume_db(vol);
+    ap.set_volume_db(vol);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "audio_stream_set_volume completed");
     return ok_json();
 }
@@ -366,12 +434,12 @@ mcp::JsonValue handle_stream_set_pitch(const mcp::JsonValue& args) {
     if (!node) {
         return error_json("AudioStreamPlayer node not found: " + path);
     }
-    auto* player = godot::Object::cast_to<godot::AudioStreamPlayer>(node);
-    if (!player) {
-        return error_json("node is not an AudioStreamPlayer: " + path);
+    auto ap = resolve_audio_player(node);
+    if (!ap.is_valid()) {
+        return error_json("node is not an AudioStreamPlayer/AudioStreamPlayer2D/AudioStreamPlayer3D: " + path + " (actual class: " + to_std(node->get_class()) + ")");
     }
     float pitch = static_cast<float>(ps->IsDouble() ? ps->GetDouble() : static_cast<double>(ps->GetInt()));
-    player->set_pitch_scale(pitch);
+    ap.set_pitch_scale(pitch);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "audio_stream_set_pitch completed");
     return ok_json();
 }
@@ -387,11 +455,11 @@ mcp::JsonValue handle_stream_get_playback_position(const mcp::JsonValue& args) {
     if (!node) {
         return error_json("AudioStreamPlayer node not found: " + path);
     }
-    auto* player = godot::Object::cast_to<godot::AudioStreamPlayer>(node);
-    if (!player) {
-        return error_json("node is not an AudioStreamPlayer: " + path);
+    auto ap = resolve_audio_player(node);
+    if (!ap.is_valid()) {
+        return error_json("node is not an AudioStreamPlayer/AudioStreamPlayer2D/AudioStreamPlayer3D: " + path + " (actual class: " + to_std(node->get_class()) + ")");
     }
-    float pos = player->get_playback_position();
+    float pos = ap.get_playback_position();
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue(static_cast<double>(pos));
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "audio_stream_get_playback_position completed");
@@ -413,12 +481,12 @@ mcp::JsonValue handle_stream_seek(const mcp::JsonValue& args) {
     if (!node) {
         return error_json("AudioStreamPlayer node not found: " + path);
     }
-    auto* player = godot::Object::cast_to<godot::AudioStreamPlayer>(node);
-    if (!player) {
-        return error_json("node is not an AudioStreamPlayer: " + path);
+    auto ap = resolve_audio_player(node);
+    if (!ap.is_valid()) {
+        return error_json("node is not an AudioStreamPlayer/AudioStreamPlayer2D/AudioStreamPlayer3D: " + path + " (actual class: " + to_std(node->get_class()) + ")");
     }
     float to_pos = static_cast<float>(tp->IsDouble() ? tp->GetDouble() : static_cast<double>(tp->GetInt()));
-    player->seek(to_pos);
+    ap.seek(to_pos);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "audio_stream_seek completed");
     return ok_json();
 }

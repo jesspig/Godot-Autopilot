@@ -102,7 +102,9 @@ mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue& args) {
         }
     }
 
-    godot::Variant result = expr->execute(inputs, nullptr, true);
+    godot::Node* base_instance = memnew(godot::Node);
+    godot::Variant result = expr->execute(inputs, base_instance, true);
+    memdelete(base_instance);
     if (expr->has_execute_failed()) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
         e["error"] = mcp::JsonValue("execution failed: " + to_std(expr->get_error_text()));

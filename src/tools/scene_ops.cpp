@@ -33,7 +33,15 @@ godot::Node* find_node(const std::string& path_str) {
         return root;
     }
     godot::NodePath np(godot::String(clean.c_str()));
-    return root->get_node_or_null(np);
+    auto* node = root->get_node_or_null(np);
+    if (!node) return nullptr;
+    if (node == root) return node;
+    auto* p = node->get_parent();
+    while (p) {
+        if (p == root) return node;
+        p = p->get_parent();
+    }
+    return nullptr;
 }
 
 void node_to_json(godot::Node* node, const std::string& root_prefix, mcp::JsonValue& j) {
@@ -114,6 +122,8 @@ mcp::JsonValue handle_create(const mcp::JsonValue& args) {
             return e;
         }
         parent->add_child(obj);
+        auto* scene_root = editor->get_edited_scene_root();
+        if (scene_root) obj->set_owner(scene_root);
     } else {
         if (!editor) {
             mcp::JsonValue e(mcp::JsonValue::object_tag);

@@ -271,6 +271,7 @@ mcp::JsonValue handle_signal_connect(const mcp::JsonValue& args) {
 
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue("connected");
+    r["warning"] = mcp::JsonValue("connection is runtime-only and will not be serialized to scene file (.tscn). It will be lost after scene reload.");
     return r;
 }
 

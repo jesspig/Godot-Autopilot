@@ -68,7 +68,18 @@ mcp::JsonValue handle_project_settings_set(const mcp::JsonValue& args) {
         return e;
     }
     std::string name = np->GetString();
-    godot::Variant value = VariantJson::deserialize(*vp);
+    godot::Variant value;
+    if (vp->IsObject()) {
+        auto* type_field = vp->Find("type");
+        auto* value_field = vp->Find("value");
+        if (type_field && type_field->IsString() && value_field) {
+            value = VariantJson::deserialize(*value_field, type_field->GetString());
+        } else {
+            value = VariantJson::deserialize(*vp);
+        }
+    } else {
+        value = VariantJson::deserialize(*vp);
+    }
     ps->set_setting(godot::String(name.c_str()), value);
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue("ok");

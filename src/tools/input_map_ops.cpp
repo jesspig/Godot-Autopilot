@@ -53,7 +53,7 @@ JV handle_action_add_event(const JV& args) {
     auto event = godot::Ref<godot::InputEvent>(event_var);
     if (event.is_null()) {
         JV e(JV::object_tag);
-        e["error"] = JV("failed to deserialize InputEvent");
+        e["error"] = JV("failed to deserialize InputEvent — specify a concrete class e.g. \"InputEventKey\" with field \"class\" (common: InputEventKey, InputEventMouseButton, InputEventJoypadButton, InputEventAction, InputEventShortcut)");
         return e;
     }
     im->action_add_event(godot::StringName(action.c_str()), event);

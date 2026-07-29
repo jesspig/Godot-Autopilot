@@ -179,12 +179,30 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
             wrapped += "func " + func_name + "():\n    pass\n";
         }
     } else {
-        // Single expression mode: wrap in a function with 4-space indentation
         std::string cleaned = clean_extends(source_code);
-        wrapped = "@tool\nextends Node\n\nfunc " + func_name + "():\n    ";
+
+        bool uses_tabs = false;
+        bool uses_spaces = false;
+        {
+            std::istringstream stream(cleaned);
+            std::string line;
+            while (std::getline(stream, line)) {
+                size_t pos = line.find_first_not_of(" \t");
+                if (pos == std::string::npos || pos == 0) continue;
+                std::string indent = line.substr(0, pos);
+                if (indent.find('\t') != std::string::npos) uses_tabs = true;
+                if (indent.find("    ") != std::string::npos) uses_spaces = true;
+            }
+        }
+
+        bool use_tab_style = uses_tabs && !uses_spaces;
+        std::string prefix = use_tab_style ? "\t" : "    ";
+        std::string nl_prefix = use_tab_style ? "\n\t" : "\n    ";
+
+        wrapped = "@tool\nextends Node\n\nfunc " + func_name + "():\n" + prefix;
         for (char c : cleaned) {
             if (c == '\n') {
-                wrapped += "\n    ";
+                wrapped += nl_prefix;
             } else {
                 wrapped += c;
             }
