@@ -3,6 +3,10 @@
 #include "util/variant_json.hpp"
 #include <mcp/JsonValue.hpp>
 #include <godot_cpp/classes/physics_server2d.hpp>
+#include <godot_cpp/classes/collision_object2d.hpp>
+#include <godot_cpp/classes/collision_object3d.hpp>
+#include <godot_cpp/classes/editor_interface.hpp>
+#include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/physics_server3d.hpp>
 #include <godot_cpp/classes/physics_direct_space_state2d.hpp>
 #include <godot_cpp/classes/physics_direct_space_state3d.hpp>
@@ -16,6 +20,7 @@
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
 #include <godot_cpp/variant/vector2.hpp>
+#include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 #include <godot_cpp/variant/transform2d.hpp>
 #include <godot_cpp/variant/transform3d.hpp>
@@ -996,6 +1001,31 @@ JV handle_2d_shape_set_data(const JV& args) {
     godot::PhysicsServer2D::get_singleton()->shape_set_data(shape, VariantJson::deserialize(*dp));
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_2d_shape_set_data completed");
     JV r(JV::object_tag); r["result"] = JV("ok"); return r;
+}
+
+JV handle_physics_node_get_rid(const JV& args) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_node_get_rid called");
+    auto* pp = args.Find("path");
+    if (!pp || !pp->IsString()) { JV r(JV::object_tag); r["error"] = JV("missing required parameter: path"); return r; }
+    std::string path = pp->GetString();
+    auto* editor = godot::EditorInterface::get_singleton();
+    if (!editor) { JV r(JV::object_tag); r["error"] = JV("EditorInterface not available"); return r; }
+    auto* root = editor->get_edited_scene_root();
+    if (!root) { JV r(JV::object_tag); r["error"] = JV("no edited scene root"); return r; }
+    std::string clean = path;
+    if (!clean.empty() && clean[0] == '/') clean = clean.substr(1);
+    godot::Node* node = nullptr;
+    if (clean.empty() || clean == to_std(root->get_name())) {
+        node = root;
+    } else {
+        node = root->get_node_or_null(godot::NodePath(godot::String(clean.c_str())));
+    }
+    if (!node) { JV r(JV::object_tag); r["error"] = JV("node not found: " + path); return r; }
+    auto* co2d = godot::Object::cast_to<godot::CollisionObject2D>(node);
+    if (co2d) { LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_node_get_rid completed"); JV r(JV::object_tag); r["result"] = rid_result(co2d->get_rid()); return r; }
+    auto* co3d = godot::Object::cast_to<godot::CollisionObject3D>(node);
+    if (co3d) { LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_node_get_rid completed"); JV r(JV::object_tag); r["result"] = rid_result(co3d->get_rid()); return r; }
+    JV r(JV::object_tag); r["error"] = JV("node is not a CollisionObject2D or CollisionObject3D: " + path); return r;
 }
 
 } // namespace physics_ops

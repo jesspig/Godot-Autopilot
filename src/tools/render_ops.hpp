@@ -54,6 +54,7 @@ mcp::JsonValue handle_fog_volume_set_shape(const mcp::JsonValue& args);
 mcp::JsonValue handle_instance_set_visible(const mcp::JsonValue& args);
 mcp::JsonValue handle_instance_set_layer_mask(const mcp::JsonValue& args);
 mcp::JsonValue handle_global_shader_parameter_set(const mcp::JsonValue& args);
+mcp::JsonValue handle_canvas_item_get_rid(const mcp::JsonValue& args);
 
 } // namespace render_ops
 } // namespace godot_self_driving

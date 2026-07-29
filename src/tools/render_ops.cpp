@@ -2,6 +2,9 @@
 #include "core/log_system.hpp"
 #include "util/variant_json.hpp"
 #include <mcp/JsonValue.hpp>
+#include <godot_cpp/classes/canvas_item.hpp>
+#include <godot_cpp/classes/editor_interface.hpp>
+#include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/variant/color.hpp>
 #include <godot_cpp/variant/vector2.hpp>
@@ -15,6 +18,7 @@
 #include <godot_cpp/variant/packed_int32_array.hpp>
 #include <godot_cpp/variant/packed_color_array.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
+#include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
@@ -1152,6 +1156,30 @@ JV handle_global_shader_parameter_set(const JV& args) {
     godot::Variant val = VariantJson::deserialize(*it_val, type_hint);
     rs->global_shader_parameter_set(name, val);
     JV r(JV::object_tag); r["result"] = JV("ok"); return r;
+}
+
+JV handle_canvas_item_get_rid(const JV& args) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "canvas_item_get_rid called");
+    auto* pp = args.Find("path");
+    if (!pp || !pp->IsString()) { JV r(JV::object_tag); r["error"] = JV("missing required parameter: path"); return r; }
+    std::string path = pp->GetString();
+    auto* editor = godot::EditorInterface::get_singleton();
+    if (!editor) { JV r(JV::object_tag); r["error"] = JV("EditorInterface not available"); return r; }
+    auto* root = editor->get_edited_scene_root();
+    if (!root) { JV r(JV::object_tag); r["error"] = JV("no edited scene root"); return r; }
+    std::string clean = path;
+    if (!clean.empty() && clean[0] == '/') clean = clean.substr(1);
+    godot::Node* node = nullptr;
+    if (clean.empty() || clean == to_std(root->get_name())) {
+        node = root;
+    } else {
+        node = root->get_node_or_null(godot::NodePath(godot::String(clean.c_str())));
+    }
+    if (!node) { JV r(JV::object_tag); r["error"] = JV("node not found: " + path); return r; }
+    auto* ci = godot::Object::cast_to<godot::CanvasItem>(node);
+    if (!ci) { JV r(JV::object_tag); r["error"] = JV("node is not a CanvasItem: " + path); return r; }
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "canvas_item_get_rid completed");
+    JV r(JV::object_tag); r["result"] = rid_to_json(ci->get_canvas_item()); return r;
 }
 
 } // namespace render_ops
