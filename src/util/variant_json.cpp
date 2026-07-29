@@ -3,6 +3,8 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
+#include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/core/object.hpp>
 
 namespace godot_self_driving {
@@ -489,6 +491,44 @@ godot::Variant deserialize_typed(const mcp::JsonValue& j, godot::Variant::Type t
     }
 }
 
+godot::Variant deserialize_as_object(const mcp::JsonValue& j, const std::string& class_name) {
+    if (!j.IsObject()) return godot::Variant();
+
+    auto* cdbs = godot::ClassDBSingleton::get_singleton();
+    if (!cdbs) return godot::Variant();
+
+    std::string resolved_class = class_name;
+    auto* class_field = j.Find("class");
+    if (class_field && class_field->IsString()) {
+        resolved_class = class_field->GetString();
+    }
+
+    godot::StringName sn(resolved_class.c_str());
+    godot::Variant obj_var = cdbs->instantiate(sn);
+    if (obj_var.get_type() == godot::Variant::NIL) return obj_var;
+
+    godot::Object* obj = obj_var.operator godot::Object*();
+    if (!obj) return godot::Variant();
+
+    godot::TypedArray<godot::Dictionary> props = obj->get_property_list();
+    std::unordered_set<std::string> valid_props;
+    for (int64_t i = 0; i < props.size(); i++) {
+        godot::Dictionary prop = props[i];
+        std::string pname = to_std_string(godot::String(prop["name"]));
+        valid_props.insert(std::move(pname));
+    }
+
+    for (const auto& [key, val] : j.GetObject()) {
+        if (key == "class") continue;
+        if (valid_props.count(key) == 0) continue;
+        godot::StringName prop_name(key.c_str());
+        godot::Variant prop_val = deserialize_inferred(val);
+        obj->set(prop_name, prop_val);
+    }
+
+    return obj_var;
+}
+
 } // anonymous namespace
 
 mcp::JsonValue VariantJson::serialize(const godot::Variant& v) {
@@ -731,8 +771,24 @@ mcp::JsonValue VariantJson::serialize(const godot::Variant& v) {
         godot::Object* obj = v.operator godot::Object*();
         if (obj) {
             mcp::JsonValue j(mcp::JsonValue::object_tag);
-            j["object_id"] = mcp::JsonValue(static_cast<int64_t>(obj->get_instance_id()));
             j["class"] = mcp::JsonValue(to_std_string(obj->get_class()));
+
+            auto props = obj->get_property_list();
+            for (int64_t i = 0; i < props.size(); i++) {
+                godot::Dictionary prop = props[i];
+                godot::String prop_name = prop["name"];
+                std::string name_std = to_std_string(prop_name);
+
+                if (name_std.empty() || name_std[0] == '_' || name_std == "script") continue;
+
+                int64_t usage = static_cast<int64_t>(prop["usage"]);
+                if (!(usage & PROPERTY_USAGE_STORAGE)) continue;
+                if (usage & (PROPERTY_USAGE_GROUP | PROPERTY_USAGE_SUBGROUP | PROPERTY_USAGE_CATEGORY)) continue;
+
+                godot::Variant val = obj->get(prop_name);
+                j[name_std] = serialize(val);
+            }
+
             return j;
         }
         return mcp::JsonValue();
@@ -903,6 +959,13 @@ godot::Variant VariantJson::deserialize(const mcp::JsonValue& j, const std::stri
         auto type = parse_type_hint(type_hint);
         if (type.has_value()) {
             return deserialize_typed(j, type.value());
+        }
+        // Not a known Variant type — try as Godot class name (e.g., "InputEventKey")
+        if (j.IsObject()) {
+            godot::Variant obj = deserialize_as_object(j, type_hint);
+            if (obj.get_type() != godot::Variant::NIL) {
+                return obj;
+            }
         }
     }
     return deserialize_inferred(j);
