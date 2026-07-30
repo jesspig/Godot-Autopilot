@@ -7,6 +7,7 @@
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
+#include <godot_cpp/classes/project_settings.hpp>
 #include <string>
 
 namespace godot_self_driving {
@@ -45,12 +46,19 @@ JV handle_action_add_event(const JV& args) {
     }
     std::string action = ap->GetString();
     std::string event_class = "InputEvent";
+    bool class_explicitly_provided = false;
     auto* class_field = ep->Find("class");
     if (class_field && class_field->IsString()) {
         event_class = class_field->GetString();
+        class_explicitly_provided = true;
     }
     godot::Variant event_var = VariantJson::deserialize(*ep, event_class);
     auto event = godot::Ref<godot::InputEvent>(event_var);
+    if (!class_explicitly_provided) {
+        JV e(JV::object_tag);
+        e["error"] = JV("missing required field 'class': must specify a concrete InputEvent subclass, e.g. {\"class\":\"InputEventKey\", \"keycode\":65} — use search_tools to find InputEvent* subclasses");
+        return e;
+    }
     if (event.is_null()) {
         JV e(JV::object_tag);
         e["error"] = JV("failed to deserialize InputEvent — specify a concrete class e.g. \"InputEventKey\" with field \"class\" (common: InputEventKey, InputEventMouseButton, InputEventJoypadButton, InputEventAction, InputEventShortcut)");
@@ -220,6 +228,42 @@ JV handle_has_action(const JV& args) {
     JV r(JV::object_tag);
     r["result"] = JV(has);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "input_map_has_action completed");
+    return r;
+}
+
+JV handle_persist(const JV&) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "input_map_persist called");
+    auto* im = godot::InputMap::get_singleton();
+    if (!im) {
+        JV e(JV::object_tag);
+        e["error"] = JV("InputMap not available");
+        return e;
+    }
+    auto* ps = godot::ProjectSettings::get_singleton();
+    if (!ps) {
+        JV e(JV::object_tag);
+        e["error"] = JV("ProjectSettings not available");
+        return e;
+    }
+    auto actions = im->get_actions();
+    int persisted = 0;
+    for (int i = 0; i < actions.size(); i++) {
+        godot::StringName action_name = actions[i];
+        std::string name_std = to_std(godot::String(action_name));
+        if (name_std.substr(0, 3) == "ui_") continue;
+        std::string prefix = "input/" + name_std;
+        float deadzone = im->action_get_deadzone(action_name);
+        ps->set_setting(godot::String((prefix + "/deadzone").c_str()), deadzone);
+        auto events = im->action_get_events(action_name);
+        ps->set_setting(godot::String((prefix + "/events").c_str()), events);
+        persisted++;
+    }
+    godot::Error err = ps->save();
+    JV r(JV::object_tag);
+    r["result"] = JV("persisted");
+    r["actions_persisted"] = JV(persisted);
+    r["save_error"] = JV(static_cast<int>(err));
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "input_map_persist completed: " + std::to_string(persisted) + " actions persisted");
     return r;
 }
 

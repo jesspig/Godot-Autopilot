@@ -73,9 +73,28 @@ mcp::JsonValue handle_project_settings_set(const mcp::JsonValue& args) {
         auto* type_field = vp->Find("type");
         auto* value_field = vp->Find("value");
         if (type_field && type_field->IsString() && value_field) {
+            // Format: {"type": "String", "value": "hello"}
             value = VariantJson::deserialize(*value_field, type_field->GetString());
         } else {
+            // Format: bare object or alternative format — let deserialize infer
             value = VariantJson::deserialize(*vp);
+        }
+    } else if (vp->IsInt()) {
+        // Bare int: deserialize with "int" type hint for proper int storage
+        value = VariantJson::deserialize(*vp, "int");
+    } else if (vp->IsDouble()) {
+        // Bare float: deserialize with "float" type hint
+        value = VariantJson::deserialize(*vp, "float");
+    } else if (vp->IsBool()) {
+        // Bare bool: deserialize with "bool" type hint
+        value = VariantJson::deserialize(*vp, "bool");
+    } else if (vp->IsString()) {
+        // Bare string: infer type from existing setting value
+        auto existing = godot::ProjectSettings::get_singleton()->get_setting(godot::String(name.c_str()));
+        if (existing.get_type() != godot::Variant::NIL) {
+            value = VariantJson::deserialize(*vp, to_std(godot::Variant::get_type_name(existing.get_type())));
+        } else {
+            value = VariantJson::deserialize(*vp, "String");
         }
     } else {
         value = VariantJson::deserialize(*vp);

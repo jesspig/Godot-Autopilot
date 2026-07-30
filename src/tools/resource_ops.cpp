@@ -180,11 +180,32 @@ mcp::JsonValue handle_save(const mcp::JsonValue& args) {
     auto* fl = args.Find("flags");
     if (fl && fl->IsInt()) flags = static_cast<int>(fl->GetInt());
 
+    std::string name;
+    auto* nm = args.Find("name");
+    if (nm && nm->IsString()) name = nm->GetString();
+
     godot::Ref<godot::Resource> res;
 
-    auto* oid = args.Find("object_id");
-    if (oid && oid->IsInt()) {
-        int64_t obj_id = oid->GetInt();
+    auto* oid_str = args.Find("object_id_str");
+    int64_t obj_id = 0;
+    bool has_oid = false;
+    if (oid_str && oid_str->IsString()) {
+        try {
+            obj_id = std::stoll(oid_str->GetString());
+            has_oid = true;
+        } catch (...) {
+            mcp::JsonValue e(mcp::JsonValue::object_tag);
+            e["error"] = mcp::JsonValue("invalid object_id_str: not a valid 64-bit integer");
+            return e;
+        }
+    } else {
+        auto* oid = args.Find("object_id");
+        if (oid && oid->IsInt()) {
+            obj_id = oid->GetInt();
+            has_oid = true;
+        }
+    }
+    if (has_oid) {
         auto* obj = godot::ObjectDB::get_instance(static_cast<uint64_t>(obj_id));
         if (obj) {
             auto* res_obj = godot::Object::cast_to<godot::Resource>(obj);
@@ -216,9 +237,13 @@ mcp::JsonValue handle_save(const mcp::JsonValue& args) {
         }
     }
 
+    if (!res.is_null() && res->get_path().is_empty() && !name.empty()) {
+        res->set_path(godot::String(("memory://" + name).c_str()));
+    }
+
     if (res.is_null()) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("failed to load resource: " + path);
+        e["error"] = mcp::JsonValue("failed to resolve resource: provide object_id (from resource_create) or class_type + name to create a new resource in memory");
         return e;
     }
 
@@ -307,13 +332,10 @@ mcp::JsonValue handle_create(const mcp::JsonValue& args) {
 
     if (!name.empty()) {
         res->set_name(godot::String(name.c_str()));
+        res->set_path(godot::String(("memory://" + name).c_str()));
     }
 
     auto result = serialize_ref(res);
-    std::string res_path = to_std(res->get_path());
-    if (res_path.empty() && !name.empty()) {
-        result["path"] = mcp::JsonValue("memory://" + name);
-    }
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = std::move(result);
     return r;

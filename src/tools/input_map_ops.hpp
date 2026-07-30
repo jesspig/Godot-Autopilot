@@ -13,6 +13,7 @@ mcp::JsonValue handle_add_action(const mcp::JsonValue& args);
 mcp::JsonValue handle_erase_action(const mcp::JsonValue& args);
 mcp::JsonValue handle_get_actions(const mcp::JsonValue& args);
 mcp::JsonValue handle_has_action(const mcp::JsonValue& args);
+mcp::JsonValue handle_persist(const mcp::JsonValue& args);
 
 } // namespace input_map_ops
 } // namespace godot_self_driving

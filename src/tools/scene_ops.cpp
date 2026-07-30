@@ -41,21 +41,31 @@ godot::Node* find_node(const std::string& path_str) {
         if (p == root) return node;
         p = p->get_parent();
     }
-    return nullptr;
+    return root;
 }
 
 void node_to_json(godot::Node* node, const std::string& root_prefix, mcp::JsonValue& j) {
     if (!node) return;
     j["name"] = mcp::JsonValue(to_std(node->get_name()));
     j["type"] = mcp::JsonValue(to_std(node->get_class()));
-    std::string abs_path = to_std(node->get_path());
-    if (abs_path == root_prefix) {
-        j["path"] = mcp::JsonValue(to_std(node->get_name()));
-    } else if (abs_path.size() > root_prefix.size() && abs_path[root_prefix.size()] == '/' && abs_path.find(root_prefix) == 0) {
-        j["path"] = mcp::JsonValue(abs_path.substr(root_prefix.size() + 1));
-    } else {
-        j["path"] = mcp::JsonValue(abs_path);
+    // 从 scene root 到 node 的完整路径
+    godot::Node* root = godot::EditorInterface::get_singleton()
+                            ? godot::EditorInterface::get_singleton()->get_edited_scene_root()
+                            : nullptr;
+    godot::Node* n = node;
+    std::vector<std::string> parts;
+    while (n && n != root) {
+        parts.push_back(to_std(n->get_name()));
+        n = n->get_parent();
     }
+    std::reverse(parts.begin(), parts.end());
+    std::string path;
+    for (size_t i = 0; i < parts.size(); i++) {
+        if (i > 0) path += "/";
+        path += parts[i];
+    }
+    if (path.empty()) path = to_std(node->get_name());
+    j["path"] = mcp::JsonValue(path);
     j["children"] = mcp::JsonValue(mcp::JsonValue::array_tag);
     auto children = node->get_children();
     for (int i = 0; i < children.size(); i++) {
@@ -139,6 +149,19 @@ mcp::JsonValue handle_create(const mcp::JsonValue& args) {
         editor->add_root_node(obj);
     }
 
+    // 根据节点类型自动切换视口
+    if (editor) {
+        auto* scene_root = editor->get_edited_scene_root();
+        if (scene_root) {
+            godot::StringName type_sn(type.c_str());
+            if (cdbs->is_parent_class(type_sn, godot::StringName("Node2D"))) {
+                editor->set_main_screen_editor(godot::String("2D"));
+            } else if (cdbs->is_parent_class(type_sn, godot::StringName("Node3D"))) {
+                editor->set_main_screen_editor(godot::String("3D"));
+            }
+        }
+    }
+
     std::string result_path = name;
     if (editor) {
         auto* scene_root = editor->get_edited_scene_root();
@@ -159,9 +182,22 @@ mcp::JsonValue handle_create(const mcp::JsonValue& args) {
         result_path = name;
     }
 
+    std::string parent_path_str;
+    if (has_parent) {
+        parent_path_str = pp->GetString();
+    } else if (editor) {
+        auto* scene_root = editor->get_edited_scene_root();
+        parent_path_str = scene_root ? to_std(scene_root->get_name()) : "";
+    }
+
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     mcp::JsonValue inner(mcp::JsonValue::object_tag);
     inner["path"] = mcp::JsonValue(result_path);
+    inner["undo"] = mcp::JsonValue(
+        "use editor_undo_redo tools: editor_undo_redo_start, "
+        "editor_undo_redo_add_do_method(scene_node_delete, " + result_path + "), "
+        "editor_undo_redo_add_undo_method(scene_node_create, " + name + ", " + type + ", " + parent_path_str + "), "
+        "editor_undo_redo_commit");
     r["result"] = std::move(inner);
     return r;
 }
@@ -180,9 +216,43 @@ mcp::JsonValue handle_delete(const mcp::JsonValue& args) {
         e["error"] = mcp::JsonValue("node not found: " + path);
         return e;
     }
+
+    std::string node_name = to_std(node->get_name());
+    std::string node_type = to_std(node->get_class());
+    std::string parent_path;
+    auto* parent = node->get_parent();
+    if (parent) {
+        auto* editor = godot::EditorInterface::get_singleton();
+        auto* scene_root = editor ? editor->get_edited_scene_root() : nullptr;
+        std::string abs_parent = to_std(parent->get_path());
+        if (scene_root) {
+            std::string root_pref = to_std(scene_root->get_path());
+            if (abs_parent == root_pref) {
+                parent_path = to_std(parent->get_name());
+            } else if (abs_parent.find(root_pref + "/") == 0) {
+                parent_path = abs_parent.substr(root_pref.size() + 1);
+            } else {
+                parent_path = abs_parent;
+            }
+        } else {
+            parent_path = abs_parent;
+        }
+    }
+
     node->queue_free();
+
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue("deleted");
+    mcp::JsonValue undo_info(mcp::JsonValue::object_tag);
+    undo_info["name"] = mcp::JsonValue(node_name);
+    undo_info["type"] = mcp::JsonValue(node_type);
+    undo_info["parent_path"] = mcp::JsonValue(parent_path);
+    undo_info["hint"] = mcp::JsonValue(
+        "use editor_undo_redo tools: editor_undo_redo_start, "
+        "editor_undo_redo_add_do_method(property_set, " + path + ", enabled, false) (no-op if already deleted), "
+        "editor_undo_redo_add_undo_method(scene_node_create, " + node_name + ", " + node_type + ", " + parent_path + "), "
+        "editor_undo_redo_commit");
+    r["undo"] = std::move(undo_info);
     return r;
 }
 

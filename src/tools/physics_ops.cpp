@@ -22,6 +22,7 @@
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/variant/vector3.hpp>
+#include <godot_cpp/core/object.hpp>
 #include <godot_cpp/variant/transform2d.hpp>
 #include <godot_cpp/variant/transform3d.hpp>
 #include <unordered_map>
@@ -1026,6 +1027,36 @@ JV handle_physics_node_get_rid(const JV& args) {
     auto* co3d = godot::Object::cast_to<godot::CollisionObject3D>(node);
     if (co3d) { LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_node_get_rid completed"); JV r(JV::object_tag); r["result"] = rid_result(co3d->get_rid()); return r; }
     JV r(JV::object_tag); r["error"] = JV("node is not a CollisionObject2D or CollisionObject3D: " + path); return r;
+}
+
+JV handle_resolve_object(const JV& args) {
+    auto* idp = args.Find("object_id");
+    if (!idp || !idp->IsInt()) {
+        JV r(JV::object_tag); r["error"] = JV("missing required parameter: object_id (integer)"); return r;
+    }
+    uint64_t object_id = static_cast<uint64_t>(idp->GetInt());
+    godot::Object* obj = godot::ObjectDB::get_instance(object_id);
+    if (!obj) {
+        JV r(JV::object_tag); r["error"] = JV("no object found for object_id: " + std::to_string(object_id)); return r;
+    }
+    JV r(JV::object_tag);
+    r["result"] = JV("ok");
+    r["class"] = JV(to_std(obj->get_class()));
+    godot::Node* node = godot::Object::cast_to<godot::Node>(obj);
+    if (node) {
+        if (node->is_inside_tree()) {
+            r["node_path"] = JV(to_std(node->get_path()));
+        }
+        r["name"] = JV(to_std(node->get_name()));
+    }
+    auto res = godot::Ref<godot::Resource>(obj);
+    if (res.is_valid()) {
+        std::string res_path = to_std(res->get_path());
+        if (!res_path.empty()) {
+            r["resource_path"] = JV(res_path);
+        }
+    }
+    return r;
 }
 
 } // namespace physics_ops

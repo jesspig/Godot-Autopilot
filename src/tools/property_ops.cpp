@@ -2,6 +2,7 @@
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
+#include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
@@ -145,12 +146,45 @@ mcp::JsonValue handle_set(const mcp::JsonValue& args) {
         type_hint = it_hint->GetString();
     }
 
+    if (type_hint.empty()) {
+        godot::TypedArray<godot::Dictionary> props = node->get_property_list();
+        for (int64_t i = 0; i < props.size(); i++) {
+            godot::Dictionary dict = props[i];
+            if (dict.has("name") && to_std_string(dict["name"].operator godot::String()) == prop_str) {
+                if (dict.has("type")) {
+                    int type_id = static_cast<int>(dict["type"]);
+                    type_hint = to_std_string(godot::Variant::get_type_name(static_cast<godot::Variant::Type>(type_id)));
+                }
+                break;
+            }
+        }
+    }
+
     godot::StringName prop_name(prop_str.c_str());
     godot::Variant value = VariantJson::deserialize(*it_val, type_hint);
+
+    godot::Variant old_val = node->get(prop_name);
     node->set(prop_name, value);
 
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue("ok");
+
+    bool is_camera2d = false;
+    auto* cdbs = godot::ClassDBSingleton::get_singleton();
+    if (cdbs) {
+        is_camera2d = cdbs->is_parent_class(node->get_class(), godot::StringName("Camera2D"));
+    }
+    if (is_camera2d && (prop_str == "enabled" || prop_str == "current")) {
+        r["serialization_note"] = mcp::JsonValue(
+            "Camera2D " + prop_str + " is runtime-only and won't appear in .tscn. "
+            "Use code_execute to call set_" + prop_str + "() after _ready() for initial state.");
+    }
+
+    mcp::JsonValue undo_info(mcp::JsonValue::object_tag);
+    undo_info["path"] = mcp::JsonValue(path_str);
+    undo_info["property"] = mcp::JsonValue(prop_str);
+    undo_info["old_value"] = VariantJson::serialize(old_val);
+    r["undo"] = std::move(undo_info);
     return r;
 }
 
@@ -262,7 +296,7 @@ mcp::JsonValue handle_signal_connect(const mcp::JsonValue& args) {
     }
 
     godot::Callable callable(target, godot::StringName(method_name.c_str()));
-    godot::Error err = source->connect(sig_name, callable);
+    godot::Error err = source->connect(sig_name, callable, godot::Object::CONNECT_PERSIST);
     if (err != godot::OK) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
         e["error"] = mcp::JsonValue("failed to connect signal: error code " + std::to_string(static_cast<int>(err)));
@@ -271,7 +305,7 @@ mcp::JsonValue handle_signal_connect(const mcp::JsonValue& args) {
 
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue("connected");
-    r["warning"] = mcp::JsonValue("connection is runtime-only and will not be serialized to scene file (.tscn). It will be lost after scene reload.");
+    r["info"] = mcp::JsonValue("signal connection created with CONNECT_PERSIST flag");
     return r;
 }
 

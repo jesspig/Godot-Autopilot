@@ -2,6 +2,7 @@
 #include "core/log_system.hpp"
 #include "register_all.hpp"
 #include "util/variant_json.hpp"
+#include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/gd_script.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/variant/string.hpp>
@@ -197,14 +198,30 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
 
         bool use_tab_style = uses_tabs && !uses_spaces;
         std::string prefix = use_tab_style ? "\t" : "    ";
-        std::string nl_prefix = use_tab_style ? "\n\t" : "\n    ";
 
-        wrapped = "@tool\nextends Node\n\nfunc " + func_name + "():\n" + prefix;
-        for (char c : cleaned) {
-            if (c == '\n') {
-                wrapped += nl_prefix;
+        // Detect if user code already has indentation on continuation lines
+        bool has_indent = false;
+        for (size_t i = 0; i < cleaned.size(); i++) {
+            if (cleaned[i] == '\n' && i + 1 < cleaned.size() && (cleaned[i+1] == ' ' || cleaned[i+1] == '\t')) {
+                has_indent = true;
+                break;
+            }
+        }
+
+        wrapped = "@tool\nextends Node\n\nfunc " + func_name + "():\n";
+        if (!cleaned.empty()) {
+            if (has_indent) {
+                wrapped += cleaned;
             } else {
-                wrapped += c;
+                wrapped += prefix;
+                for (size_t i = 0; i < cleaned.size(); i++) {
+                    if (cleaned[i] == '\n') {
+                        wrapped += '\n';
+                        wrapped += prefix;
+                    } else {
+                        wrapped += cleaned[i];
+                    }
+                }
             }
         }
         wrapped += "\n";
@@ -231,8 +248,20 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
     godot::Node* temp_node = memnew(godot::Node);
     temp_node->set_script(godot::Variant(script));
 
+    // Temporarily add to scene tree so get_tree() is available
+    godot::EditorInterface* editor_4 = godot::EditorInterface::get_singleton();
+    godot::Node* scene_root_4 = editor_4 ? editor_4->get_edited_scene_root() : nullptr;
+    bool temp_added_4 = false;
+    if (scene_root_4) {
+        scene_root_4->add_child(temp_node);
+        temp_added_4 = true;
+    }
+
     godot::StringName fn_name(func_name.c_str());
     if (!temp_node->has_method(fn_name)) {
+        if (temp_added_4 && temp_node->get_parent()) {
+            temp_node->get_parent()->remove_child(temp_node);
+        }
         memdelete(temp_node);
         mcp::JsonValue e(mcp::JsonValue::object_tag);
         e["error"] = mcp::JsonValue("function not found in compiled script: " + func_name);
@@ -249,6 +278,9 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
 
     check_time();
     if (timeout_hit) {
+        if (temp_added_4 && temp_node->get_parent()) {
+            temp_node->get_parent()->remove_child(temp_node);
+        }
         memdelete(temp_node);
         mcp::JsonValue e(mcp::JsonValue::object_tag);
         e["error"] = mcp::JsonValue("Execution timed out after " + std::to_string(timeout_ms) + " ms");
@@ -257,6 +289,9 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
 
     result = temp_node->call(fn_name);
 
+    if (temp_added_4 && temp_node->get_parent()) {
+        temp_node->get_parent()->remove_child(temp_node);
+    }
     memdelete(temp_node);
 
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(

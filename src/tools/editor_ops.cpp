@@ -215,7 +215,25 @@ mcp::JsonValue handle_save_scene(const mcp::JsonValue&) {
     }
     godot::Error err = editor->save_scene();
     mcp::JsonValue r(mcp::JsonValue::object_tag);
-    r["result"] = mcp::JsonValue(static_cast<int64_t>(err));
+    if (err != godot::Error::OK) {
+        godot::String existing_path = root->get_scene_file_path();
+        if (existing_path.is_empty()) {
+            std::string root_name = to_std(root->get_name());
+            std::string generated_path = "res://" + root_name + ".tscn";
+            LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "scene has no file path, saving as " + generated_path);
+            editor->save_scene_as(godot::String(generated_path.c_str()));
+            r["path"] = mcp::JsonValue(generated_path);
+            r["result"] = mcp::JsonValue("saved");
+            LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "editor_save_scene completed (saved as new scene)");
+            return r;
+        }
+        r["path"] = mcp::JsonValue(to_std(existing_path));
+        r["result"] = mcp::JsonValue(static_cast<int64_t>(err));
+    } else {
+        godot::String file_path = root->get_scene_file_path();
+        r["path"] = mcp::JsonValue(to_std(file_path));
+        r["result"] = mcp::JsonValue("saved");
+    }
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "editor_save_scene completed");
     return r;
 }
@@ -686,10 +704,20 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue& args) {
 
     auto* existing_root = editor->get_edited_scene_root();
     if (existing_root) {
-        return error_json("scene already has a root node — close current scene first or delete the root node before calling editor_new_scene");
+        return error_json("scene already has a root node — save and close current scene first (use editor_save_scene if needed), or delete the root node before calling editor_new_scene");
     }
 
     editor->add_root_node(node);
+
+    // 自动切换到对应工作区
+    {
+        godot::StringName type_sn(type.c_str());
+        if (cdbs->is_parent_class(type_sn, godot::StringName("Node2D"))) {
+            editor->set_main_screen_editor(godot::String("2D"));
+        } else if (cdbs->is_parent_class(type_sn, godot::StringName("Node3D"))) {
+            editor->set_main_screen_editor(godot::String("3D"));
+        }
+    }
 
     mcp::JsonValue inner(mcp::JsonValue::object_tag);
     inner["path"] = mcp::JsonValue(name);
@@ -716,6 +744,21 @@ mcp::JsonValue handle_open_scene(const mcp::JsonValue& args) {
         return e;
     }
     editor->open_scene_from_path(godot::String(path.c_str()));
+
+    // 打开场景后根据根节点类型自动切换工作区
+    {
+        auto* root = editor->get_edited_scene_root();
+        if (root) {
+            godot::StringName root_class = root->get_class();
+            auto* cdbs = godot::ClassDBSingleton::get_singleton();
+            if (cdbs && cdbs->is_parent_class(root_class, godot::StringName("Node2D"))) {
+                editor->set_main_screen_editor(godot::String("2D"));
+            } else if (cdbs && cdbs->is_parent_class(root_class, godot::StringName("Node3D"))) {
+                editor->set_main_screen_editor(godot::String("3D"));
+            }
+        }
+    }
+
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue("ok");
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "editor_open_scene completed");

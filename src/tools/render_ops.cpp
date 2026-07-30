@@ -1182,5 +1182,44 @@ JV handle_canvas_item_get_rid(const JV& args) {
     JV r(JV::object_tag); r["result"] = rid_to_json(ci->get_canvas_item()); return r;
 }
 
+JV handle_resolve_rid(const JV& args) {
+    auto* idp = args.Find("rid");
+    if (!idp || !idp->IsInt()) {
+        JV r(JV::object_tag); r["error"] = JV("missing required parameter: rid (integer)"); return r;
+    }
+    godot::RID rid = rid_from_json(*idp);
+    JV r(JV::object_tag);
+    r["rid"] = JV(static_cast<int64_t>(rid.get_id()));
+    r["is_valid"] = JV(rid.is_valid());
+    if (!rid.is_valid()) {
+        r["result"] = JV("ok");
+        return r;
+    }
+    auto* editor = godot::EditorInterface::get_singleton();
+    if (editor) {
+        auto* root = editor->get_edited_scene_root();
+        if (root) {
+            JV nodes_arr(JV::array_tag);
+            godot::TypedArray<godot::Node> all_nodes = root->get_children(true);
+            for (int64_t i = 0; i < all_nodes.size(); i++) {
+                auto* node = godot::Object::cast_to<godot::Node>(all_nodes[i]);
+                if (!node) continue;
+                auto* ci = godot::Object::cast_to<godot::CanvasItem>(node);
+                if (ci && ci->get_canvas_item() == rid) {
+                    JV nj(JV::object_tag);
+                    nj["node_path"] = JV(to_std(node->get_path()));
+                    nj["type"] = JV("canvas_item");
+                    nodes_arr.PushBack(std::move(nj));
+                }
+            }
+            if (nodes_arr.Size() > 0) {
+                r["nodes"] = std::move(nodes_arr);
+            }
+        }
+    }
+    r["result"] = JV("ok");
+    return r;
+}
+
 } // namespace render_ops
 } // namespace godot_self_driving
