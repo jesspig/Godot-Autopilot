@@ -1,4 +1,6 @@
 #include "prompts/prompt_handlers.hpp"
+#include "prompts/prompt_tool_usage.hpp"
+#include "prompts/prompt_keycode_reference.hpp"
 #include "core/log_system.hpp"
 #include <mcp/Content.hpp>
 #include <string>
@@ -725,8 +727,28 @@ void register_all_prompts(mcp::McpServer& server, CommandQueue& queue) {
             return make_result(content);
         });
 
+    server.RegisterPrompt("tool-usage",
+        mcp::PromptOptions{}.Description("Usage examples for the 17 most commonly used MCP tools with JSON input/output and gotchas"),
+        [&queue](const std::string&, const std::optional<mcp::JsonValue>&) -> mcp::GetPromptResult {
+            std::string content;
+            queue.submit([&content]() {
+                content = prompt_tool_usage();
+            }).get();
+            return make_result(content);
+        });
+
+    server.RegisterPrompt("keycode-reference",
+        mcp::PromptOptions{}.Description("Godot keycode reference for InputEventKey and Variant type JSON mapping for property operations"),
+        [&queue](const std::string&, const std::optional<mcp::JsonValue>&) -> mcp::GetPromptResult {
+            std::string content;
+            queue.submit([&content]() {
+                content = prompt_keycode_reference();
+            }).get();
+            return make_result(content);
+        });
+
     LogSystem::instance().log(LogLevel::Info, LogCategory::Prompts,
-        "5 prompt templates registered");
+        "7 prompt templates registered");
 }
 
 } // namespace godot_self_driving
