@@ -63,7 +63,10 @@ add_library(godot-self-driving SHARED
     src/core/server_context.cpp
     src/resources/resource_handlers.cpp
     src/prompts/prompt_handlers.cpp
+    src/prompts/prompt_tool_usage.cpp
+    src/prompts/prompt_keycode_reference.cpp
     src/tools/audio_ops.cpp
+    src/tools/capture_ops.cpp
     src/tools/code_exec_ops.cpp
     src/tools/config_ops.cpp
     src/tools/display_ops.cpp
@@ -75,11 +78,13 @@ add_library(godot-self-driving SHARED
     src/tools/debug_ops.cpp
     src/tools/doc_ops.cpp
     src/tools/editor_ops.cpp
+    src/tools/group_ops.cpp
     src/tools/input_ops.cpp
     src/tools/nav_ops.cpp
     src/tools/physics_ops.cpp
     src/tools/property_ops.cpp
     src/tools/register_all.cpp
+    src/tools/schema_builder.cpp
     src/tools/render_ops.cpp
     src/tools/resource_ops.cpp
     src/tools/scene_ops.cpp
