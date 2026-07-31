@@ -9,6 +9,7 @@
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/resource_saver.hpp>
 #include <godot_cpp/classes/file_access.hpp>
+#include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/node.hpp>
@@ -103,6 +104,23 @@ mcp::JsonValue error_json(const std::string& msg) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
     e["error"] = mcp::JsonValue(msg);
     return e;
+}
+
+godot::PackedStringArray editor_unsaved_scenes(godot::EditorInterface* editor) {
+    godot::Variant v = editor->call(godot::StringName("get_unsaved_scenes"));
+    if (v.get_type() != godot::Variant::PACKED_STRING_ARRAY) {
+        return {};
+    }
+    return v;
+}
+
+std::string unsaved_list_str(const godot::PackedStringArray& scenes) {
+    std::string list;
+    for (int i = 0; i < scenes.size(); i++) {
+        if (i > 0) list += ", ";
+        list += to_std(scenes[i]);
+    }
+    return list;
 }
 
 } // namespace
@@ -716,7 +734,7 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue& args) {
 
     auto* existing_root = editor->get_edited_scene_root();
     if (existing_root) {
-        return error_json("scene already has a root node — save and close current scene first (use editor_save_scene if needed), or delete the root node before calling editor_new_scene");
+        return error_json("scene already has a root node — use editor_close_scene to close it, then call editor_new_scene again");
     }
 
     editor->add_root_node(node);
@@ -755,11 +773,24 @@ mcp::JsonValue handle_open_scene(const mcp::JsonValue& args) {
         e["error"] = mcp::JsonValue("EditorInterface not available");
         return e;
     }
+    godot::PackedStringArray unsaved = editor_unsaved_scenes(editor);
+    if (!unsaved.is_empty()) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("current scene has unsaved changes: " + unsaved_list_str(unsaved) + " — save first (editor_save_scene)");
+        return e;
+    }
+    auto* old_root = editor->get_edited_scene_root();
     editor->open_scene_from_path(godot::String(path.c_str()));
+    auto* new_root = editor->get_edited_scene_root();
+    if (new_root == old_root) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("failed to open scene at " + path + " — edited scene did not change (check editor output log)");
+        return e;
+    }
 
     // 打开场景后根据根节点类型自动切换工作区
     {
-        auto* root = editor->get_edited_scene_root();
+        auto* root = new_root;
         if (root) {
             godot::StringName root_class = root->get_class();
             auto* cdbs = godot::ClassDBSingleton::get_singleton();
@@ -774,6 +805,26 @@ mcp::JsonValue handle_open_scene(const mcp::JsonValue& args) {
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue("ok");
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "editor_open_scene completed");
+    return r;
+}
+
+mcp::JsonValue handle_close_scene(const mcp::JsonValue&) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "editor_close_scene called");
+    auto* editor = godot::EditorInterface::get_singleton();
+    if (!editor) {
+        return error_json("EditorInterface not available");
+    }
+    godot::PackedStringArray unsaved = editor_unsaved_scenes(editor);
+    if (!unsaved.is_empty()) {
+        return error_json("scene has unsaved changes: " + unsaved_list_str(unsaved) + " — save first (editor_save_scene)");
+    }
+    godot::Error err = editor->close_scene();
+    if (err != godot::Error::OK) {
+        return error_json("failed to close scene (error " + std::to_string(static_cast<int>(err)) + ")");
+    }
+    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    r["result"] = mcp::JsonValue("closed");
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "editor_close_scene completed");
     return r;
 }
 
@@ -792,7 +843,20 @@ mcp::JsonValue handle_save_scene_as(const mcp::JsonValue& args) {
     if (!root) {
         return error_json("no scene open");
     }
-    editor->save_scene_as(godot::String(path.c_str()));
+    godot::String path_gs(path.c_str());
+    if (path_gs.begins_with("res://")) {
+        godot::String dir = path_gs.get_base_dir();
+        if (!godot::DirAccess::dir_exists_absolute(dir)) {
+            godot::Error err = godot::DirAccess::make_dir_recursive_absolute(dir);
+            if (err != godot::Error::OK) {
+                return error_json("failed to create parent directory: " + to_std(dir) + " (error " + std::to_string(static_cast<int>(err)) + ")");
+            }
+        }
+    }
+    editor->save_scene_as(path_gs);
+    if (!godot::FileAccess::file_exists(path_gs)) {
+        return error_json("save failed — file not created at " + path + " (check editor output log)");
+    }
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue("saved");
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "editor_save_scene_as completed");

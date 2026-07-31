@@ -6,6 +6,7 @@
 TOOL_ENTRY(scene_node_create, "scene_node_create", "Create a new scene node as child of a parent", "Scene", "node,create", scene_ops::handle_create, SCHEMA_BASIC)
 TOOL_ENTRY(scene_node_delete, "scene_node_delete", "Delete a scene node by path", "Scene", "node,delete", scene_ops::handle_delete, SCHEMA_BASIC)
 TOOL_ENTRY(scene_tree_get, "scene_tree_get", "Get the full scene tree", "Scene", "tree,structure", scene_ops::handle_get_tree, SCHEMA_BASIC)
+TOOL_ENTRY(scene_instance, "scene_instance", "Instantiate a PackedScene into the edited scene", "Scene", "scene,instance", scene_ops::handle_instance, SCHEMA_BASIC)
 
 // ── Properties ──
 TOOL_ENTRY(property_get, "property_get", "Get a property value from a scene node", "Properties", "property,get", property_ops::handle_get, SCHEMA_BASIC)
@@ -254,6 +255,7 @@ TOOL_ENTRY(editor_new_scene, "editor_new_scene", "Create a new scene with a root
 TOOL_ENTRY(editor_open_scene, "editor_open_scene", "Open a scene file in the editor by path", "Editor", "scene,open", editor_ops::handle_open_scene, SCHEMA_BASIC)
 TOOL_ENTRY(editor_save_scene_as, "editor_save_scene_as", "Save the current scene to a specific file path", "Editor", "editor,scene,save", editor_ops::handle_save_scene_as, SCHEMA_BASIC)
 TOOL_ENTRY(editor_new_text_resource, "editor_new_text_resource", "Create a new text resource file with the given content", "Editor", "editor,resource,text,create", editor_ops::handle_new_text_resource, SCHEMA_BASIC)
+TOOL_ENTRY(editor_close_scene, "editor_close_scene", "Close the current edited scene (refuses to close if it has unsaved changes)", "Editor", "editor,close,scene", editor_ops::handle_close_scene, SCHEMA_BASIC)
 
 // ── Config ──
 TOOL_ENTRY(project_settings_get, "project_settings_get", "Get a project setting by name", "Config", "config,project,settings,get", config_ops::handle_project_settings_get, SCHEMA_BASIC)
@@ -346,6 +348,9 @@ TOOL_ENTRY(os_move_to_trash, "os_move_to_trash", "Move file or folder to trash",
 TOOL_ENTRY(os_set_environment, "os_set_environment", "Set an environment variable", "OS", "os,environment", os_ops::handle_os_set_environment, SCHEMA_NONE)
 TOOL_ENTRY(os_shell_open, "os_shell_open", "Open URL or file in default application", "OS", "os,shell", os_ops::handle_os_shell_open, SCHEMA_NONE)
 
+// ── System ──
+TOOL_ENTRY(log_get_game_entries, "log_get_game_entries", "Read the tail of the game process log file (user://logs/godot.log)", "System", "log,game,read", log_ops::handle_log_get_game_entries, SCHEMA_BASIC)
+
 // ── SceneTree ──
 TOOL_ENTRY(scene_tree_call_group, "scene_tree_call_group", "Call a method on all nodes in a group", "Scene", "scene,group", scene_tree_ops::handle_call_group, SCHEMA_BASIC)
 TOOL_ENTRY(scene_tree_create_timer, "scene_tree_create_timer", "Create a scene tree timer", "Scene", "scene,timer", scene_tree_ops::handle_create_timer, SCHEMA_BASIC)
@@ -373,7 +378,15 @@ TOOL_ENTRY(text_shaped_text_get_size, "text_shaped_text_get_size", "Get shaped t
 TOOL_ENTRY(tilemap_create, "tilemap_create", "Create a TileMap node", "TileMap", "tilemap,create", tilemap_ops::handle_create, SCHEMA_BASIC)
 TOOL_ENTRY(tilemap_set_cell, "tilemap_set_cell", "Set a cell on a TileMap node", "TileMap", "tilemap,cell,set", tilemap_ops::handle_set_cell, SCHEMA_BASIC)
 TOOL_ENTRY(tilemap_set_cells, "tilemap_set_cells", "Set multiple cells on a TileMap node", "TileMap", "tilemap,cell,set,batch", tilemap_ops::handle_set_cells, SCHEMA_BASIC)
-TOOL_ENTRY(tileset_create, "tileset_create", "Create a TileSet resource", "TileMap", "tileset,create", tilemap_ops::handle_tileset_create, SCHEMA_NONE)
+TOOL_ENTRY(tileset_create, "tileset_create", "Create a TileSet resource", "TileMap", "tileset,create", tilemap_ops::handle_tileset_create, SCHEMA_BASIC)
+TOOL_ENTRY(tileset_add_atlas_source, "tileset_add_atlas_source", "Add an atlas source with a texture to a TileSet", "TileMap", "tileset,atlas,texture", tileset_ops::handle_add_atlas_source, SCHEMA_BASIC)
+TOOL_ENTRY(tileset_add_physics_layer, "tileset_add_physics_layer", "Add a physics layer to a TileSet", "TileMap", "tileset,physics,layer", tileset_ops::handle_add_physics_layer, SCHEMA_BASIC)
+TOOL_ENTRY(tileset_set_tile_collision, "tileset_set_tile_collision", "Set collision polygons for a tile in a TileSet", "TileMap", "tileset,collision,polygon", tileset_ops::handle_set_tile_collision, SCHEMA_BASIC)
+
+// ── SpriteFrames ──
+TOOL_ENTRY(spriteframes_create, "spriteframes_create", "Create a SpriteFrames resource in memory", "SpriteFrames", "spriteframes,create", spriteframes_ops::handle_create, SCHEMA_BASIC)
+TOOL_ENTRY(spriteframes_add_animation, "spriteframes_add_animation", "Add an animation to a SpriteFrames resource", "SpriteFrames", "spriteframes,animation,add", spriteframes_ops::handle_add_animation, SCHEMA_BASIC)
+TOOL_ENTRY(spriteframes_add_frame, "spriteframes_add_frame", "Add a texture frame to a SpriteFrames animation", "SpriteFrames", "spriteframes,frame,add", spriteframes_ops::handle_add_frame, SCHEMA_BASIC)
 
 // ── Group ──
 TOOL_ENTRY(group_add_node_to_group, "group_add_node_to_group", "Add a scene node to a group", "Group", "group,add", group_ops::handle_add_node_to_group, SCHEMA_BASIC)

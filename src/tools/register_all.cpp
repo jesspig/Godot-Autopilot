@@ -19,10 +19,13 @@
 #include "tools/display_ops.hpp"
 #include "tools/doc_ops.hpp"
 #include "tools/input_map_ops.hpp"
+#include "tools/log_ops.hpp"
 #include "tools/os_ops.hpp"
 #include "tools/scene_tree_ops.hpp"
+#include "tools/spriteframes_ops.hpp"
 #include "tools/text_ops.hpp"
 #include "tools/tilemap_ops.hpp"
+#include "tools/tileset_ops.hpp"
 #include "tools/group_ops.hpp"
 #include "tools/capture_ops.hpp"
 #include "tools/debugger_ops.hpp"
@@ -175,6 +178,12 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"path", "string", "Node path to delete", true},
         });
         m["scene_tree_get"] = schema::build_schema({});
+        m["scene_instance"] = schema::build_schema({
+            {"path", "string", "Path to the .tscn scene file to instantiate", true},
+            {"parent_path", "string", "Parent node path (default: edited scene root)", false},
+            {"name", "string", "Node name (default: scene root name)", false},
+            {"owner", "boolean", "Set owner so nodes are saved with the scene (default: true)", false},
+        });
 
         // ── SceneTree ──
         m["scene_tree_call_group"] = schema::build_schema({
@@ -414,6 +423,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"path", "string", "File path to save the resource", true},
             {"source_code", "string", "Text content to write", true},
         });
+        m["editor_close_scene"] = schema::build_schema({});
 
         // ── Config ──
         m["project_settings_get"] = schema::build_schema({
@@ -487,7 +497,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
         });
         m["input_map_action_add_event"] = schema::build_schema({
             {"action", "string", "Action name identifier to bind event to (e.g. \"mario_jump\")", true},
-            {"event", "object", "Input event object (must include \"class\":\"InputEventKey\" etc.)", true},
+            {"event", "object", "Input event object (must include \"class\":\"InputEventKey\" etc.) — physical_keycode/keycode accept numeric key codes or KEY_* name strings (e.g. \"KEY_A\" or 65)", true},
         });
         m["input_map_action_erase_event"] = schema::build_schema({
             {"action", "string", "Action name identifier whose event to remove (e.g. \"mario_jump\")", true},
@@ -543,6 +553,11 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
         });
         m["debugger_get_session_info"] = schema::build_schema({});
 
+        // ── System ──
+        m["log_get_game_entries"] = schema::build_schema({
+            {"limit", "integer", "Maximum number of log entries to return (default: 50)", false},
+        });
+
         // ── Debug (explicit schema overrides for tools with custom params) ──
         m["debug_print"] = schema::build_schema({
             {"message", "string", "Debug log message to print", true},
@@ -580,6 +595,48 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"node_path", "string", "Path to the TileMap node", true},
             {"cells", "array", "Array of cells, each {\"x\":int,\"y\":int,\"source_id\":int,\"atlas_coords\":{\"x\":int,\"y\":int}}", true},
             {"layer", "integer", "Tile layer index (default: 0)", false},
+        });
+        m["tileset_create"] = schema::build_schema({
+            {"name", "string", "Resource name used as memory:// reference", false},
+            {"tile_size", "integer", "Base tile size in pixels (default 16)", false},
+        });
+        m["tileset_add_atlas_source"] = schema::build_schema({
+            {"name", "string", "TileSet resource name (memory:// reference)", true},
+            {"source_id", "integer", "Source ID to assign (0-255)", true},
+            {"texture", "string", "Texture file path (e.g. res://tiles.png)", true},
+            {"tile_size", "object", "Tile size in pixels (e.g. {\"x\":16,\"y\":16})", true},
+            {"margin", "integer", "Margin in pixels around the atlas texture (default: 0)", false},
+            {"spacing", "integer", "Spacing between tiles in pixels (default: 0)", false},
+        });
+        m["tileset_add_physics_layer"] = schema::build_schema({
+            {"name", "string", "TileSet resource name (memory:// reference)", true},
+            {"layer_id", "integer", "Physics layer index to add", true},
+            {"collision_layer", "integer", "Collision layer bitmask (default: 1)", false},
+            {"collision_mask", "integer", "Collision mask bitmask (default: 1)", false},
+        });
+        m["tileset_set_tile_collision"] = schema::build_schema({
+            {"name", "string", "TileSet resource name (memory:// reference)", true},
+            {"source_id", "integer", "Source ID of the atlas source", true},
+            {"atlas_coords", "object", "Atlas coordinates of the tile (e.g. {\"x\":0,\"y\":0})", true},
+            {"physics_layer", "integer", "Physics layer index to set collision on", true},
+            {"polygon", "array", "Collision polygon points, each {\"x\":float,\"y\":float}", true},
+        });
+
+        // ── SpriteFrames ──
+        m["spriteframes_create"] = schema::build_schema({
+            {"name", "string", "Resource name used as memory:// reference", true},
+        });
+        m["spriteframes_add_animation"] = schema::build_schema({
+            {"name", "string", "SpriteFrames resource name (memory:// reference)", true},
+            {"animation", "string", "Animation name to add", true},
+            {"fps", "number", "Animation playback speed in frames per second (default: 5)", false},
+            {"loop", "boolean", "Loop the animation (default: true)", false},
+        });
+        m["spriteframes_add_frame"] = schema::build_schema({
+            {"name", "string", "SpriteFrames resource name (memory:// reference)", true},
+            {"animation", "string", "Animation name to add the frame to", true},
+            {"texture", "string", "Texture file path (e.g. res://frame.png)", true},
+            {"duration", "number", "Frame duration in seconds (default: 1.0)", false},
         });
 
         // ── Batch (for catalog discoverability) ──
@@ -976,6 +1033,11 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         tm["default"] = mcp::JsonValue(static_cast<int64_t>(5000));
         tm["maximum"] = mcp::JsonValue(static_cast<int64_t>(30000));
         props["timeout_ms"] = std::move(tm);
+
+        mcp::JsonValue ao(mcp::JsonValue::object_tag);
+        ao["type"] = mcp::JsonValue("boolean");
+        ao["description"] = mcp::JsonValue("Automatically set owner on nodes created during execution so they are saved with the scene (default true)");
+        props["auto_owner"] = std::move(ao);
 
         s["properties"] = std::move(props);
         mcp::JsonValue req(mcp::JsonValue::array_tag);

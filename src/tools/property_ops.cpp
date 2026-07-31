@@ -1,4 +1,5 @@
 #include "property_ops.hpp"
+#include "resource_ops.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
@@ -49,7 +50,19 @@ godot::Node* resolve_node(const std::string& path_str) {
     if (clean.empty() || clean == to_std_string(root->get_name())) {
         return root;
     }
-    return root->get_node_or_null(godot::NodePath(clean.c_str()));
+    godot::Node* node = root->get_node_or_null(godot::NodePath(clean.c_str()));
+    if (!node) {
+        std::string root_name = to_std_string(root->get_name());
+        if (clean.size() > root_name.size() + 1 &&
+            clean.compare(0, root_name.size(), root_name) == 0 &&
+            clean[root_name.size()] == '/') {
+            std::string sub = clean.substr(root_name.size() + 1);
+            if (!sub.empty()) {
+                node = root->get_node_or_null(godot::NodePath(sub.c_str()));
+            }
+        }
+    }
+    return node;
 }
 
 std::string hint_name(int hint) {
@@ -189,7 +202,19 @@ mcp::JsonValue handle_set(const mcp::JsonValue& args) {
     }
 
     godot::StringName prop_name(prop_str.c_str());
-    godot::Variant value = VariantJson::deserialize(*it_val, type_hint);
+    godot::Variant value;
+    std::string resource_error;
+    bool resource_attached = false;
+    if (resource_ops::try_resolve_resource_value(*it_val, value, resource_error)) {
+        if (!resource_error.empty()) {
+            mcp::JsonValue e(mcp::JsonValue::object_tag);
+            e["error"] = mcp::JsonValue(resource_error);
+            return e;
+        }
+        resource_attached = true;
+    } else {
+        value = VariantJson::deserialize(*it_val, type_hint);
+    }
 
     godot::Variant old_val = node->get(prop_name);
     node->set(prop_name, value);
@@ -200,6 +225,9 @@ mcp::JsonValue handle_set(const mcp::JsonValue& args) {
 
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue("ok");
+    if (resource_attached) {
+        r["resource_attached"] = mcp::JsonValue(true);
+    }
 
     if (expected_dump != actual_dump) {
         r["warning"] = mcp::JsonValue(

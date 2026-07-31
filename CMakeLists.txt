@@ -73,10 +73,12 @@ add_library(godot-self-driving SHARED
     src/tools/config_ops.cpp
     src/tools/display_ops.cpp
     src/tools/input_map_ops.cpp
+    src/tools/log_ops.cpp
     src/tools/os_ops.cpp
     src/tools/scene_tree_ops.cpp
     src/tools/text_ops.cpp
     src/tools/tilemap_ops.cpp
+    src/tools/tileset_ops.cpp
     src/tools/debug_ops.cpp
     src/tools/debugger_ops.cpp
     src/tools/doc_ops.cpp
@@ -92,6 +94,7 @@ add_library(godot-self-driving SHARED
     src/tools/resource_ops.cpp
     src/tools/scene_ops.cpp
     src/tools/script_ops.cpp
+    src/tools/spriteframes_ops.cpp
     src/tools/tool_catalog.cpp
     src/util/bm25_index.cpp
     src/util/variant_json.cpp

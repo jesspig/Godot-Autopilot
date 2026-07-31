@@ -115,6 +115,11 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
         if (tm->IsInt()) timeout_ms = static_cast<int>(tm->GetInt());
     }
 
+    bool auto_owner = true;
+    if (auto* ao = args.Find("auto_owner")) {
+        if (ao->IsBool()) auto_owner = ao->GetBool();
+    }
+
     auto start_time = std::chrono::steady_clock::now();
 
     // Detect if source_code contains func definitions on non-commented lines
@@ -129,6 +134,23 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
             if (line.compare(pos, 5, "func ") == 0) {
                 has_func_def = true;
                 break;
+            }
+        }
+    }
+
+    // Block unsafe close_scene calls that would destroy the executing node
+    {
+        std::istringstream stream(source_code);
+        std::string line;
+        while (std::getline(stream, line)) {
+            size_t pos = line.find_first_not_of(" \t");
+            if (pos == std::string::npos || line[pos] == '#') continue;
+            if (pos + 1 < line.size() && line[pos] == '/' && line[pos + 1] == '/') continue;
+            if (line.find("close_scene(") != std::string::npos ||
+                line.find("close_scene (") != std::string::npos) {
+                mcp::JsonValue e(mcp::JsonValue::object_tag);
+                e["error"] = mcp::JsonValue("calling EditorInterface.close_scene() from code_execute is unsafe (it destroys the executing node and crashes the editor) — use the editor_close_scene MCP tool instead");
+                return e;
             }
         }
     }
@@ -325,7 +347,8 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
     }
     memdelete(temp_node);
 
-    // ── Leak cleanup: remove any nodes users added directly to scene_root (without owner) ──
+    // ── Leak cleanup: remove or retain nodes users added directly to scene_root (without owner) ──
+    int auto_owner_set = 0;
     if (scene_root_for_leak) {
         int child_count_after = scene_root_for_leak->get_child_count();
         if (child_count_after > child_count_before) {
@@ -333,8 +356,13 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
             for (int i = children.size() - 1; i >= 0; i--) {
                 auto* child = godot::Object::cast_to<godot::Node>(children[i]);
                 if (child && child->get_owner() == nullptr) {
-                    scene_root_for_leak->remove_child(child);
-                    memdelete(child);
+                    if (auto_owner) {
+                        child->set_owner(scene_root_for_leak);
+                        ++auto_owner_set;
+                    } else {
+                        scene_root_for_leak->remove_child(child);
+                        memdelete(child);
+                    }
                 }
             }
         }
@@ -346,9 +374,15 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = VariantJson::serialize(result);
     r["execution_time_ms"] = mcp::JsonValue(static_cast<int64_t>(elapsed));
+    r["auto_owner_set"] = mcp::JsonValue(static_cast<int64_t>(auto_owner_set));
     if (!new_error_text.empty()) {
         r["runtime_error"] = mcp::JsonValue(true);
-        r["error_details"] = mcp::JsonValue(new_error_text);
+        if (new_error_text.size() > 8192) {
+            r["error_details"] = mcp::JsonValue(new_error_text.substr(0, 8192)
+                + "\n...(truncated, total " + std::to_string(new_error_text.size()) + " bytes)");
+        } else {
+            r["error_details"] = mcp::JsonValue(new_error_text);
+        }
     }
     if (!temp_added_4) {
         r["note"] = mcp::JsonValue("temporary node was not added to any scene tree — get_tree() will be null");
