@@ -62,7 +62,9 @@ add_library(godot-self-driving SHARED
     src/core/log_system.cpp
     src/core/server_context.cpp
     src/resources/resource_handlers.cpp
+    src/resources/debugger_resources.cpp
     src/prompts/prompt_handlers.cpp
+    src/prompts/debugger_prompts.cpp
     src/prompts/prompt_tool_usage.cpp
     src/prompts/prompt_keycode_reference.cpp
     src/tools/audio_ops.cpp
@@ -76,6 +78,7 @@ add_library(godot-self-driving SHARED
     src/tools/text_ops.cpp
     src/tools/tilemap_ops.cpp
     src/tools/debug_ops.cpp
+    src/tools/debugger_ops.cpp
     src/tools/doc_ops.cpp
     src/tools/editor_ops.cpp
     src/tools/group_ops.cpp

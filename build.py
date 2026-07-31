@@ -78,6 +78,9 @@ def _generate_gdextension() -> None:
 def _deploy(preset: str) -> None:
     binary_dir = BUILD_DIR / preset
     EXAMPLE_ADDON_DIR.mkdir(parents=True, exist_ok=True)
+    # Remove any Godot hot-reload backup DLLs from previous runs to avoid loading errors
+    for f in EXAMPLE_ADDON_DIR.glob("~*"):
+        f.unlink(missing_ok=True)
     _generate_gdextension()
     system = platform.system().lower()
     lib_name = PLATFORM_LIBS.get(system)
