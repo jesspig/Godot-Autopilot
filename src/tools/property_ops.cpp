@@ -174,6 +174,8 @@ mcp::JsonValue handle_set(const mcp::JsonValue& args) {
         return e;
     }
 
+    godot::Dictionary dict = find_property_info(node, prop_str);
+
     std::string type_hint;
     auto* it_hint = args.Find("type_hint");
     if (it_hint && it_hint->IsString()) {
@@ -181,7 +183,6 @@ mcp::JsonValue handle_set(const mcp::JsonValue& args) {
     }
 
     if (type_hint.empty()) {
-        godot::Dictionary dict = find_property_info(node, prop_str);
         if (!dict.is_empty() && dict.has("type")) {
             int type_id = static_cast<int>(dict["type"]);
             int hint_val = 0;
@@ -249,10 +250,14 @@ mcp::JsonValue handle_set(const mcp::JsonValue& args) {
     }
 
     if (expected_dump != actual_dump) {
-        r["warning"] = mcp::JsonValue(
+        std::string warning_text =
             "set applied but readback mismatch: expected " + expected_dump +
             ", got " + actual_dump +
-            " — property may have been rejected (type mismatch) or converted");
+            " — property may have been rejected (type mismatch) or converted";
+        if (dict.is_empty()) {
+            warning_text += " — 属性名 \"" + prop_str + "\" 不在 get_property_list 中（可能不存在或是方法名）；方法名需改为对应属性（例如 add_theme_font_size_override → theme_override_font_sizes/font_size）";
+        }
+        r["warning"] = mcp::JsonValue(warning_text);
     }
 
     bool is_camera2d = false;

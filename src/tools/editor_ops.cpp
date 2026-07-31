@@ -246,8 +246,15 @@ mcp::JsonValue handle_save_scene(const mcp::JsonValue&) {
             std::string generated_path = "res://" + root_name + ".tscn";
             LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "scene has no file path, saving as " + generated_path);
             editor->save_scene_as(godot::String(generated_path.c_str()));
+            if (!godot::FileAccess::file_exists(godot::String(generated_path.c_str()))) {
+                mcp::JsonValue e(mcp::JsonValue::object_tag);
+                e["error"] = mcp::JsonValue("failed to save scene to \"" + generated_path + "\": no file was created after save_scene_as — use editor_save_scene_as with an explicit path");
+                LogSystem::instance().log(LogLevel::Error, LogCategory::Tools, "editor_save_scene failed to save as " + generated_path);
+                return e;
+            }
             r["path"] = mcp::JsonValue(generated_path);
             r["result"] = mcp::JsonValue("saved");
+            r["note"] = mcp::JsonValue("scene had no file path — saved to " + generated_path + "; use editor_save_scene_as to choose a directory");
             LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "editor_save_scene completed (saved as new scene)");
             return r;
         }

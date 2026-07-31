@@ -88,7 +88,18 @@ mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue& args) {
         }
     }
 
-    if (is_single_expr && expression.find('\n') == std::string::npos) {
+    bool has_assignment = false;
+    for (size_t i = 0; i < expression.size() && !has_assignment; ++i) {
+        if (expression[i] != '=') continue;
+        char before = i > 0 ? expression[i - 1] : '\0';
+        char after = i + 1 < expression.size() ? expression[i + 1] : '\0';
+        if (before != '=' && before != '!' && before != '<' && before != '>' &&
+            after != '=' && after != '!' && after != '<' && after != '>') {
+            has_assignment = true;
+        }
+    }
+
+    if (is_single_expr && expression.find('\n') == std::string::npos && !has_assignment) {
         // Single expression mode: use godot::Expression (fast path)
         godot::Ref<godot::Expression> expr;
         expr.instantiate();
@@ -124,9 +135,14 @@ mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue& args) {
             }
         }
 
-        godot::Node* base_instance = memnew(godot::Node);
+        auto* editor = godot::EditorInterface::get_singleton();
+        godot::Node* scene_root = editor ? editor->get_edited_scene_root() : nullptr;
+        godot::Node* base_instance = scene_root ? scene_root : memnew(godot::Node);
         godot::Variant result = expr->execute(inputs, base_instance, true);
-        memdelete(base_instance);
+        if (!scene_root) {
+            if (base_instance->get_parent()) base_instance->get_parent()->remove_child(base_instance);
+            memdelete(base_instance);
+        }
         if (expr->has_execute_failed()) {
             mcp::JsonValue e(mcp::JsonValue::object_tag);
             e["error"] = mcp::JsonValue("execution failed: " + to_std(expr->get_error_text()));

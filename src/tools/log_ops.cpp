@@ -79,8 +79,12 @@ JV handle_log_get_game_entries(const JV& args) {
     }
     auto file = godot::FileAccess::open(path, godot::FileAccess::READ);
     if (file.is_null()) {
-        return error_json("failed to open game log file: \"" + to_std(path) + "\" — " +
-            logs_dir_diagnostic(logs_dir) + " — " + RUN_HINT);
+        os->delay_usec(100000);
+        file = godot::FileAccess::open(path, godot::FileAccess::READ);
+        if (file.is_null()) {
+            return error_json("failed to open game log file (retried once after delay): \"" + to_std(path) + "\" — open error code " + std::to_string(static_cast<int>(godot::FileAccess::get_open_error())) + " — " +
+                logs_dir_diagnostic(logs_dir) + " — " + RUN_HINT);
+        }
     }
     std::vector<std::string> tail;
     int64_t total_lines = 0;

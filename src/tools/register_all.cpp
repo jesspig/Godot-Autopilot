@@ -1434,6 +1434,8 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"animation", "string", "Animation name to add the frame to", true},
             {"texture", "string", "Texture file path (e.g. res://frame.png)", true},
             {"duration", "number", "Frame duration in seconds (default: 1.0)", false},
+            {"hframes", "integer", "Horizontal frame count for spritesheet splitting (default: 1)", false},
+            {"vframes", "integer", "Vertical frame count for spritesheet splitting (default: 1)", false},
         });
 
         // ── Batch (for catalog discoverability) ──

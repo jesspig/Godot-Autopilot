@@ -167,6 +167,14 @@ bool try_resolve_resource_value(const mcp::JsonValue& val, godot::Variant& out, 
     if (!val.IsObject()) {
         return false;
     }
+    for (auto it = val.begin(); it != val.end(); ++it) {
+        const std::string& key = it->first;
+        if (!key.empty() && key[0] == '$') {
+            out_error = "unsupported resource reference format: 使用了 \"" + key +
+                "\" 包装 — 支持格式: {\"path\": \"res://...\"}（磁盘资源）或 {\"resource\": \"memory://名称\"}（内存资源）或字符串路径 + type_hint";
+            return true;
+        }
+    }
     auto* it_resource = val.Find("resource");
     if (it_resource && it_resource->IsString()) {
         std::string name = it_resource->GetString();
@@ -369,6 +377,9 @@ mcp::JsonValue handle_save(const mcp::JsonValue& args) {
                     auto* obj = godot::Object::cast_to<godot::Resource>(obj_var);
                     if (obj) {
                         res = godot::Ref<godot::Resource>(obj);
+                        if (resolve_memory_resource(name).is_null()) {
+                            register_memory_resource(res, name);
+                        }
                     }
                 }
             }
@@ -394,9 +405,45 @@ mcp::JsonValue handle_save(const mcp::JsonValue& args) {
 
     std::string save_dir = dest_path;
     bool dirs_created = false;
+    std::string case_conflict;
     size_t last_slash = save_dir.find_last_of('/');
     if (last_slash != std::string::npos) {
         save_dir = save_dir.substr(0, last_slash);
+        std::string target;
+        std::string parent;
+        size_t slash2 = save_dir.find_last_of('/');
+        if (slash2 == std::string::npos) {
+            target = save_dir;
+            parent = "res://";
+        } else if (slash2 + 1 < save_dir.size()) {
+            target = save_dir.substr(slash2 + 1);
+            parent = save_dir.substr(0, slash2);
+            if (parent == "res:" || parent == "res:/") {
+                parent = "res://";
+            } else if (parent == "user:" || parent == "user:/") {
+                parent = "user://";
+            }
+        }
+        if (!target.empty()) {
+            godot::String target_lower = godot::String(target.c_str()).to_lower();
+            auto parent_dir = godot::DirAccess::open(godot::String(parent.c_str()));
+            if (parent_dir.is_valid()) {
+                parent_dir->list_dir_begin();
+                godot::String entry = parent_dir->get_next();
+                while (!entry.is_empty()) {
+                    if (parent_dir->current_is_dir() &&
+                        entry != godot::String(target.c_str()) &&
+                        entry.to_lower() == target_lower) {
+                        case_conflict = "directory case mismatch: 保存目录 \"" + target +
+                            "\" 与已有目录 \"" + to_std(entry) +
+                            "\" 仅大小写不同（Windows 大小写不敏感，可能引发资源加载警告）— 建议统一目录名大小写";
+                        break;
+                    }
+                    entry = parent_dir->get_next();
+                }
+                parent_dir->list_dir_end();
+            }
+        }
         auto dir = godot::DirAccess::open(godot::String("res://"));
         if (dir.is_valid()) {
             if (!dir->dir_exists(godot::String(save_dir.c_str()))) {
@@ -415,19 +462,23 @@ mcp::JsonValue handle_save(const mcp::JsonValue& args) {
         res,
         godot::String(dest_path.c_str()),
         static_cast<godot::BitField<godot::ResourceSaver::SaverFlags>>(flags));
-    if (err == godot::OK && dest_path != path) {
+    if (err == godot::OK) {
         auto* editor = godot::EditorInterface::get_singleton();
         if (editor) {
-            auto* root = editor->get_edited_scene_root();
             godot::String src_gs(path.c_str());
             godot::String dst_gs(dest_path.c_str());
-            if (root && root->get_scene_file_path() == src_gs) {
-                root->set_scene_file_path(dst_gs);
-            }
             auto* efs = editor->get_resource_filesystem();
             if (efs) {
-                efs->update_file(src_gs);
                 efs->update_file(dst_gs);
+            }
+            if (dest_path != path) {
+                auto* root = editor->get_edited_scene_root();
+                if (root && root->get_scene_file_path() == src_gs) {
+                    root->set_scene_file_path(dst_gs);
+                }
+                if (efs) {
+                    efs->update_file(src_gs);
+                }
             }
         }
     }
@@ -441,6 +492,9 @@ mcp::JsonValue handle_save(const mcp::JsonValue& args) {
     r["result"] = mcp::JsonValue(static_cast<int64_t>(err));
     if (dirs_created) {
         r["directories_created"] = mcp::JsonValue(true);
+    }
+    if (!case_conflict.empty()) {
+        r["warning"] = mcp::JsonValue(case_conflict);
     }
     return r;
 }
@@ -754,16 +808,22 @@ mcp::JsonValue handle_remove(const mcp::JsonValue& args) {
 }
 
 mcp::JsonValue handle_rename(const mcp::JsonValue& args) {
-    auto* it_from = args.Find("from");
-    auto* it_to = args.Find("to");
+    auto* it_from = args.Find("path");
+    if ((!it_from || !it_from->IsString()) && args.Contains("from")) {
+        it_from = args.Find("from");
+    }
+    auto* it_to = args.Find("new_path");
+    if ((!it_to || !it_to->IsString()) && args.Contains("to")) {
+        it_to = args.Find("to");
+    }
     if (!it_from || !it_from->IsString()) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("missing required parameter: from");
+        e["error"] = mcp::JsonValue("missing required parameter: path");
         return e;
     }
     if (!it_to || !it_to->IsString()) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("missing required parameter: to");
+        e["error"] = mcp::JsonValue("missing required parameter: new_path");
         return e;
     }
     std::string from = it_from->GetString();
@@ -983,6 +1043,41 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue& args) {
         return e;
     }
 
+    bool found = false;
+    godot::TypedArray<godot::Dictionary> props = res->get_property_list();
+    for (int64_t i = 0; i < props.size(); i++) {
+        godot::Dictionary dict = props[i];
+        if (dict.has("name") && to_std(dict["name"].operator godot::String()) == prop) {
+            found = true;
+            if (type_hint.empty() && dict.has("type")) {
+                int type_id = static_cast<int>(dict["type"]);
+                int hint_val = 0;
+                if (dict.has("hint")) {
+                    hint_val = static_cast<int>(dict["hint"]);
+                }
+                bool is_object_type = static_cast<godot::Variant::Type>(type_id) == godot::Variant::OBJECT;
+                bool is_resource_hint = hint_val == godot::PROPERTY_HINT_RESOURCE_TYPE;
+                if ((is_object_type || is_resource_hint) && dict.has("hint_string")) {
+                    std::string hint_str = to_std(dict["hint_string"].operator godot::String());
+                    if (!hint_str.empty()) {
+                        type_hint = hint_str;
+                    }
+                }
+                if (type_hint.empty()) {
+                    type_hint = to_std(godot::Variant::get_type_name(static_cast<godot::Variant::Type>(type_id)));
+                }
+            }
+            break;
+        }
+    }
+    if (!found) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("property not found: " + prop + " on " +
+            to_std(res->get_class()) +
+            " — use resource_get_property_list or check the property name");
+        return e;
+    }
+
     godot::Variant value;
     std::string resource_error;
     bool resource_attached = false;
@@ -997,24 +1092,11 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue& args) {
         value = VariantJson::deserialize(*args.Find("value"), type_hint);
     }
 
-    bool found = false;
-    godot::TypedArray<godot::Dictionary> props = res->get_property_list();
-    for (int64_t i = 0; i < props.size(); i++) {
-        godot::Dictionary dict = props[i];
-        if (dict.has("name") && to_std(dict["name"].operator godot::String()) == prop) {
-            found = true;
-            break;
-        }
-    }
-    if (!found) {
-        mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("property not found: " + prop + " on " +
-            to_std(res->get_class()) +
-            " — use resource_get_property_list or check the property name");
-        return e;
-    }
-
     res->set(godot::StringName(prop.c_str()), value);
+
+    godot::Variant new_val = res->get(godot::StringName(prop.c_str()));
+    std::string expected_dump = VariantJson::serialize(value).Dump();
+    std::string actual_dump = VariantJson::serialize(new_val).Dump();
 
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
         "resource_set_property: set " + prop + " on " + to_std(res->get_class()) +
@@ -1026,6 +1108,12 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue& args) {
     j["path"] = mcp::JsonValue(to_std(res->get_path()));
     j["object_id"] = mcp::JsonValue(static_cast<int64_t>(res->get_instance_id()));
     j["resource_attached"] = mcp::JsonValue(resource_attached);
+    if (expected_dump != actual_dump) {
+        j["warning"] = mcp::JsonValue(
+            "set applied but readback mismatch: expected " + expected_dump +
+            ", got " + actual_dump +
+            " — property may have been rejected (type mismatch) or converted");
+    }
     return j;
 }
 

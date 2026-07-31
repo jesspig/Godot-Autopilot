@@ -450,7 +450,9 @@ mcp::JsonValue handle_debugger_get_errors(const mcp::JsonValue& args) {
     size_t limit = 20;
     if (auto* l = args.Find("limit")) { if (l->IsInt()) limit = static_cast<size_t>(l->GetInt()); }
     mcp::JsonValue r(mcp::JsonValue::object_tag);
-    r["result"] = mcp::JsonValue(DebuggerCapture::instance().get_errors_text(limit));
+    std::string errors_text = DebuggerCapture::instance().get_errors_text(limit);
+    r["result"] = mcp::JsonValue(errors_text);
+    if (errors_text.empty()) r["note"] = capture_note_for_empty_result();
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "debugger_get_errors completed");
     return r;
 }
