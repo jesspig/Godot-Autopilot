@@ -3,3 +3,6 @@
 !.gitignore
 !icon.svg
 !project.godot
+!assets/
+!assets/**/
+!assets/**/*.png
