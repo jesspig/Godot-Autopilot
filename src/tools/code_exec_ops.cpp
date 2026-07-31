@@ -12,6 +12,7 @@
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 #include <chrono>
+#include <functional>
 #include <sstream>
 #include <string>
 
@@ -35,6 +36,8 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue& args) {
     mcp::JsonValue results(mcp::JsonValue::array_tag);
     int succeeded = 0;
     int failed = 0;
+    bool stopped = false;
+    size_t stopped_after = 0;
 
     const auto& arr = ops->GetArray();
     for (size_t i = 0; i < arr.size(); ++i) {
@@ -47,7 +50,11 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue& args) {
             result_item["error"] = mcp::JsonValue("operation is not an object");
             results.PushBack(std::move(result_item));
             ++failed;
-            if (stop_on_error) break;
+            if (stop_on_error) {
+                stopped = true;
+                stopped_after = i + 1;
+                break;
+            }
             continue;
         }
 
@@ -57,7 +64,11 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue& args) {
             result_item["error"] = mcp::JsonValue("missing required field: tool");
             results.PushBack(std::move(result_item));
             ++failed;
-            if (stop_on_error) break;
+            if (stop_on_error) {
+                stopped = true;
+                stopped_after = i + 1;
+                break;
+            }
             continue;
         }
 
@@ -76,7 +87,11 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue& args) {
             result_item["error"] = *err;
             results.PushBack(std::move(result_item));
             ++failed;
-            if (stop_on_error) break;
+            if (stop_on_error) {
+                stopped = true;
+                stopped_after = i + 1;
+                break;
+            }
         } else {
             result_item["status"] = mcp::JsonValue("ok");
             result_item["data"] = std::move(handler_result);
@@ -87,9 +102,18 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue& args) {
 
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["results"] = std::move(results);
-    r["total"] = mcp::JsonValue(static_cast<int64_t>(succeeded + failed));
+    int64_t executed = succeeded + failed;
+    int64_t skipped = static_cast<int64_t>(arr.size()) - executed;
+    r["total"] = mcp::JsonValue(executed);
     r["succeeded"] = mcp::JsonValue(static_cast<int64_t>(succeeded));
     r["failed"] = mcp::JsonValue(static_cast<int64_t>(failed));
+    r["skipped"] = mcp::JsonValue(skipped);
+    if (stopped) {
+        r["note"] = mcp::JsonValue("stopped at operation " + std::to_string(stopped_after)
+            + "/" + std::to_string(arr.size()) + " (stop_on_error=true); "
+            + std::to_string(skipped)
+            + " remaining operations were not executed. Set stop_on_error=false to run all operations.");
+    }
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "batch_execute completed");
     return r;
 }
@@ -259,14 +283,25 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
 
     script->set_source_code(godot::String(wrapped.c_str()));
 
+    size_t compile_log_before = debugger_ops::capture_log_count();
     godot::Error parse_err = script->reload();
     if (parse_err != godot::OK) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
         int code = static_cast<int>(parse_err);
         std::string err_name = "ERR_UNKNOWN";
         if (code == 43) err_name = "ERR_PARSE_ERROR";
-        e["error"] = mcp::JsonValue("GDScript compilation failed: "
-            + err_name + " (code " + std::to_string(code) + ")");
+        std::string message = "GDScript compilation failed: "
+            + err_name + " (code " + std::to_string(code) + ")";
+        std::string compile_err = debugger_ops::capture_new_error_text(compile_log_before);
+        if (!compile_err.empty()) {
+            if (compile_err.size() > 8192) {
+                message += "\n" + compile_err.substr(0, 8192)
+                    + "\n...(truncated, total " + std::to_string(compile_err.size()) + " bytes)";
+            } else {
+                message += "\n" + compile_err;
+            }
+        }
+        e["error"] = mcp::JsonValue(message);
         return e;
     }
 
@@ -352,14 +387,25 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
     if (scene_root_for_leak) {
         int child_count_after = scene_root_for_leak->get_child_count();
         if (child_count_after > child_count_before) {
-            auto children = scene_root_for_leak->get_children();
-            for (int i = children.size() - 1; i >= 0; i--) {
-                auto* child = godot::Object::cast_to<godot::Node>(children[i]);
-                if (child && child->get_owner() == nullptr) {
-                    if (auto_owner) {
-                        child->set_owner(scene_root_for_leak);
-                        ++auto_owner_set;
-                    } else {
+            if (auto_owner) {
+                std::function<void(godot::Node*)> set_owner_recursive = [&](godot::Node* parent) {
+                    for (int i = 0; i < parent->get_child_count(); ++i) {
+                        godot::Node* child = parent->get_child(i);
+                        if (child->get_owner() == nullptr) {
+                            child->set_owner(scene_root_for_leak);
+                            ++auto_owner_set;
+                        }
+                        set_owner_recursive(child);
+                    }
+                };
+                for (int i = 0; i < scene_root_for_leak->get_child_count(); ++i) {
+                    set_owner_recursive(scene_root_for_leak->get_child(i));
+                }
+            } else {
+                auto children = scene_root_for_leak->get_children();
+                for (int i = children.size() - 1; i >= 0; i--) {
+                    auto* child = godot::Object::cast_to<godot::Node>(children[i]);
+                    if (child && child->get_owner() == nullptr) {
                         scene_root_for_leak->remove_child(child);
                         memdelete(child);
                     }

@@ -428,8 +428,8 @@ namespace {
 
 mcp::JsonValue capture_note_for_empty_result() {
     return mcp::JsonValue(capture_session_active()
-        ? "session active but no data captured — the editor's built-in debug handlers consume debug messages before editor plugins can see them (engine limitation); use log_get_game_entries to read the game process log file instead"
-        : "no active debug session — start the game with editor_play_current_scene");
+        ? "session active but no data captured — debugger data is only available while a game is running through the editor debugger; the editor's built-in debug handlers consume debug messages before editor plugins can see them (engine limitation); use log_get_game_entries to read the game process log file instead"
+        : "no active debug session — debugger data is only available while a game is running through the editor debugger; start the game with editor_play_current_scene");
 }
 
 } // namespace
