@@ -47,8 +47,22 @@ void Bm25Index::add_entry(const std::string& name, const std::string& descriptio
 std::vector<Bm25Result> Bm25Index::search(const SearchQuery& query) const {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    if (query.text.empty() || docs_.empty()) {
+    if (docs_.empty()) {
         return {};
+    }
+
+    if (query.text.empty()) {
+        if (!query.category) {
+            return {};
+        }
+        std::vector<Bm25Result> results;
+        for (const auto& doc : docs_) {
+            if (doc.category != *query.category) {
+                continue;
+            }
+            results.push_back({doc.name, 0.0});
+        }
+        return results;
     }
 
     auto query_tokens = tokenize(query.text);

@@ -3,9 +3,9 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
+#include <godot_cpp/classes/global_constants.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/core/object.hpp>
 #include <godot_cpp/classes/resource.hpp>
@@ -590,6 +590,60 @@ godot::Variant deserialize_typed(const mcp::JsonValue& j, godot::Variant::Type t
     }
 }
 
+struct PropertyMeta {
+    godot::Variant::Type type = godot::Variant::NIL;
+    int hint = 0;
+    std::string hint_string;
+};
+
+bool is_typed_value_type(godot::Variant::Type t) {
+    switch (t) {
+    case godot::Variant::BOOL:
+    case godot::Variant::INT:
+    case godot::Variant::FLOAT:
+    case godot::Variant::STRING:
+    case godot::Variant::VECTOR2:
+    case godot::Variant::VECTOR2I:
+    case godot::Variant::RECT2:
+    case godot::Variant::RECT2I:
+    case godot::Variant::VECTOR3:
+    case godot::Variant::VECTOR3I:
+    case godot::Variant::TRANSFORM2D:
+    case godot::Variant::VECTOR4:
+    case godot::Variant::VECTOR4I:
+    case godot::Variant::PLANE:
+    case godot::Variant::QUATERNION:
+    case godot::Variant::AABB:
+    case godot::Variant::BASIS:
+    case godot::Variant::TRANSFORM3D:
+    case godot::Variant::PROJECTION:
+    case godot::Variant::COLOR:
+    case godot::Variant::STRING_NAME:
+    case godot::Variant::NODE_PATH:
+    case godot::Variant::DICTIONARY:
+    case godot::Variant::ARRAY:
+    case godot::Variant::PACKED_BYTE_ARRAY:
+    case godot::Variant::PACKED_INT32_ARRAY:
+    case godot::Variant::PACKED_INT64_ARRAY:
+    case godot::Variant::PACKED_FLOAT32_ARRAY:
+    case godot::Variant::PACKED_FLOAT64_ARRAY:
+    case godot::Variant::PACKED_STRING_ARRAY:
+    case godot::Variant::PACKED_VECTOR2_ARRAY:
+    case godot::Variant::PACKED_VECTOR3_ARRAY:
+    case godot::Variant::PACKED_COLOR_ARRAY:
+    case godot::Variant::PACKED_VECTOR4_ARRAY:
+        return true;
+    default:
+        return false;
+    }
+}
+
+std::string clean_class_name(const std::string& hint_string) {
+    size_t sep = hint_string.find_first_of("/:,");
+    if (sep == std::string::npos) return hint_string;
+    return hint_string.substr(0, sep);
+}
+
 godot::Variant deserialize_as_object(const mcp::JsonValue& j, const std::string& class_name) {
     if (!j.IsObject()) return godot::Variant();
 
@@ -610,22 +664,39 @@ godot::Variant deserialize_as_object(const mcp::JsonValue& j, const std::string&
     if (!obj) return godot::Variant();
 
     godot::TypedArray<godot::Dictionary> props = obj->get_property_list();
-    std::unordered_set<std::string> valid_props;
+    std::unordered_map<std::string, PropertyMeta> prop_meta;
     for (int64_t i = 0; i < props.size(); i++) {
         godot::Dictionary prop = props[i];
         std::string pname = to_std_string(godot::String(prop["name"]));
-        valid_props.insert(std::move(pname));
+        PropertyMeta meta;
+        if (prop.has("type")) {
+            meta.type = static_cast<godot::Variant::Type>(static_cast<int>(prop["type"]));
+        }
+        if (prop.has("hint")) {
+            meta.hint = static_cast<int>(prop["hint"]);
+        }
+        if (prop.has("hint_string")) {
+            meta.hint_string = to_std_string(prop["hint_string"].operator godot::String());
+        }
+        prop_meta.emplace(std::move(pname), std::move(meta));
     }
 
     for (const auto& [key, val] : j.GetObject()) {
         if (key == "class") continue;
-        if (valid_props.count(key) == 0) continue;
+        auto meta_it = prop_meta.find(key);
+        if (meta_it == prop_meta.end()) continue;
         godot::StringName prop_name(key.c_str());
         godot::Variant prop_val;
         if (val.IsObject()) {
             auto nested_class_it = val.GetObject().find("class");
             if (nested_class_it != val.GetObject().end() && nested_class_it->second.IsString()) {
                 prop_val = deserialize_as_object(val, nested_class_it->second.GetString());
+            } else if (is_typed_value_type(meta_it->second.type)) {
+                prop_val = deserialize_typed(val, meta_it->second.type);
+            } else if ((meta_it->second.type == godot::Variant::OBJECT ||
+                        meta_it->second.hint == godot::PROPERTY_HINT_RESOURCE_TYPE) &&
+                       !meta_it->second.hint_string.empty()) {
+                prop_val = deserialize_as_object(val, clean_class_name(meta_it->second.hint_string));
             } else {
                 prop_val = deserialize_inferred(val);
             }
