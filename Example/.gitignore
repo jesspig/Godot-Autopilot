@@ -6,3 +6,5 @@
 !assets/
 !assets/**/
 !assets/**/*.png
+!docs/
+!docs/**/*.md
