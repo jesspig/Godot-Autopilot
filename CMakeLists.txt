@@ -67,6 +67,7 @@ add_library(godot-self-driving SHARED
     src/prompts/debugger_prompts.cpp
     src/prompts/prompt_tool_usage.cpp
     src/prompts/prompt_keycode_reference.cpp
+    src/runtime/game_bridge.cpp
     src/tools/audio_ops.cpp
     src/tools/capture_ops.cpp
     src/tools/code_exec_ops.cpp
@@ -92,12 +93,15 @@ add_library(godot-self-driving SHARED
     src/tools/schema_builder.cpp
     src/tools/render_ops.cpp
     src/tools/resource_ops.cpp
+    src/tools/runtime_ops.cpp
     src/tools/scene_ops.cpp
     src/tools/script_ops.cpp
     src/tools/spriteframes_ops.cpp
     src/tools/tool_catalog.cpp
     src/util/bm25_index.cpp
     src/util/variant_json.cpp
+    src/util/error_util.cpp
+    src/util/readback_util.cpp
     src/ui/mcp_status_bar.cpp
     src/ui/mcp_log_dock.cpp)
 
