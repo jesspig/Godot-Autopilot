@@ -1,6 +1,8 @@
 #include "property_ops.hpp"
 #include "resource_ops.hpp"
 #include "util/variant_json.hpp"
+#include "util/readback_util.hpp"
+#include "util/error_util.hpp"
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
@@ -13,8 +15,10 @@
 #include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/variant/variant.hpp>
 #include <godot_cpp/core/error_macros.hpp>
+#include <algorithm>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace godot_self_driving {
 namespace property_ops {
@@ -35,6 +39,46 @@ godot::Dictionary find_property_info(godot::Node* node, const std::string& prop_
         }
     }
     return godot::Dictionary();
+}
+
+int levenshtein_distance(const std::string& a, const std::string& b) {
+    std::vector<size_t> prev(b.size() + 1), curr(b.size() + 1);
+    for (size_t j = 0; j <= b.size(); j++) prev[j] = j;
+    for (size_t i = 1; i <= a.size(); i++) {
+        curr[0] = i;
+        for (size_t j = 1; j <= b.size(); j++) {
+            size_t cost = (a[i - 1] == b[j - 1]) ? 0 : 1;
+            curr[j] = std::min({prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost});
+        }
+        prev.swap(curr);
+    }
+    return static_cast<int>(prev[b.size()]);
+}
+
+std::string find_property_candidates(godot::Node* node, const std::string& prop_name) {
+    struct Candidate {
+        int distance;
+        std::string name;
+    };
+    godot::TypedArray<godot::Dictionary> props = node->get_property_list();
+    std::vector<Candidate> candidates;
+    for (int64_t i = 0; i < props.size(); i++) {
+        godot::Dictionary dict = props[i];
+        if (!dict.has("name")) continue;
+        std::string name = to_std_string(dict["name"].operator godot::String());
+        candidates.push_back({levenshtein_distance(prop_name, name), name});
+    }
+    std::sort(candidates.begin(), candidates.end(),
+              [](const Candidate& x, const Candidate& y) {
+                  if (x.distance != y.distance) return x.distance < y.distance;
+                  return x.name < y.name;
+              });
+    std::string result;
+    for (size_t k = 0; k < candidates.size() && k < 3; k++) {
+        if (!result.empty()) result += ", ";
+        result += candidates[k].name;
+    }
+    return result;
 }
 
 godot::Node* resolve_node(const std::string& path_str) {
@@ -175,6 +219,14 @@ mcp::JsonValue handle_set(const mcp::JsonValue& args) {
     }
 
     godot::Dictionary dict = find_property_info(node, prop_str);
+    if (dict.is_empty()) {
+        return util::error_detail(
+            "property '" + prop_str + "' does not exist on " + path_str,
+            path_str,
+            "a valid property name from get_property_list",
+            "use property_get_list to see available properties; candidate: " +
+                find_property_candidates(node, prop_str));
+    }
 
     std::string type_hint;
     auto* it_hint = args.Find("type_hint");
@@ -240,8 +292,6 @@ mcp::JsonValue handle_set(const mcp::JsonValue& args) {
     node->set(prop_name, value);
 
     godot::Variant new_val = node->get(prop_name);
-    std::string expected_dump = VariantJson::serialize(value).Dump();
-    std::string actual_dump = VariantJson::serialize(new_val).Dump();
 
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue("ok");
@@ -249,15 +299,18 @@ mcp::JsonValue handle_set(const mcp::JsonValue& args) {
         r["resource_attached"] = mcp::JsonValue(true);
     }
 
-    if (expected_dump != actual_dump) {
-        std::string warning_text =
-            "set applied but readback mismatch: expected " + expected_dump +
-            ", got " + actual_dump +
-            " — property may have been rejected (type mismatch) or converted";
-        if (dict.is_empty()) {
-            warning_text += " — 属性名 \"" + prop_str + "\" 不在 get_property_list 中（可能不存在或是方法名）；方法名需改为对应属性（例如 add_theme_font_size_override → theme_override_font_sizes/font_size）";
-        }
-        r["warning"] = mcp::JsonValue(warning_text);
+    std::string readback_detail;
+    util::ReadbackStatus readback =
+        util::check_readback(value, old_val, new_val, readback_detail);
+    if (readback == util::ReadbackStatus::REJECTED) {
+        return util::error_detail(
+            "property rejected: '" + prop_str + "' on " + path_str,
+            path_str,
+            "readback equals set value",
+            "property may not exist, be read-only, or require a type hint; use property_get_list");
+    }
+    if (readback == util::ReadbackStatus::CONVERTED) {
+        r["warning"] = mcp::JsonValue("set applied; " + readback_detail);
     }
 
     bool is_camera2d = false;

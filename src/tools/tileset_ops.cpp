@@ -1,8 +1,10 @@
 #include "tileset_ops.hpp"
+#include "../util/error_util.hpp"
 #include "core/log_system.hpp"
 #include "resource_ops.hpp"
 #include <mcp/JsonValue.hpp>
 #include <godot_cpp/classes/class_db_singleton.hpp>
+#include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/texture2d.hpp>
 #include <godot_cpp/classes/tile_data.hpp>
@@ -118,9 +120,16 @@ JV handle_add_atlas_source(const JV& args) {
     if (tileset->has_source(source_id))
         return error("source_id already exists: " + std::to_string(source_id));
 
+    godot::String tex_path = godot::String(tex->GetString().c_str());
+    if (!godot::FileAccess::file_exists(tex_path)) {
+        return util::error_detail("failed to load texture: file does not exist: " + tex->GetString(),
+                                  "source_id " + std::to_string(source_id),
+                                  "the texture file to exist on disk",
+                                  "provide a valid texture path and retry");
+    }
     auto* loader = godot::ResourceLoader::get_singleton();
     if (!loader) return error("ResourceLoader not available");
-    godot::Ref<godot::Resource> tex_res = loader->load(godot::String(tex->GetString().c_str()));
+    godot::Ref<godot::Resource> tex_res = loader->load(tex_path);
     if (tex_res.is_null()) return error("failed to load texture: " + tex->GetString());
     godot::Ref<godot::Texture2D> texture = tex_res;
     if (texture.is_null()) return error("resource is not a Texture2D: " + tex->GetString());
@@ -235,6 +244,15 @@ JV handle_set_tile_collision(const JV& args) {
     }
 
     int physics_layer = static_cast<int>(pl->GetInt());
+    if (physics_layer >= tileset->get_physics_layers_count()) {
+        std::string atlas_pos = "atlas_coords " + std::to_string(coords.x) + "," + std::to_string(coords.y) +
+                                " (source " + std::to_string(source_id) + ")";
+        return util::error_detail("TileSet '" + n->GetString() + "' has no physics layer " +
+                                      std::to_string(physics_layer),
+                                  atlas_pos,
+                                  "a physics layer must exist before setting collision polygons",
+                                  "call tileset_add_physics_layer first, then retry");
+    }
     const auto& poly_arr = poly->GetArray();
 
     std::vector<godot::PackedVector2Array> polygons;
@@ -263,10 +281,19 @@ JV handle_set_tile_collision(const JV& args) {
             data->remove_collision_polygon(physics_layer, 0);
         }
     } else {
+        std::string atlas_pos = "atlas_coords " + std::to_string(coords.x) + "," + std::to_string(coords.y) +
+                                " (source " + std::to_string(source_id) + ")";
         for (const auto& points : polygons) {
             int32_t poly_idx = data->get_collision_polygons_count(physics_layer);
             data->add_collision_polygon(physics_layer);
             data->set_collision_polygon_points(physics_layer, poly_idx, points);
+            godot::PackedVector2Array rb = data->get_collision_polygon_points(physics_layer, poly_idx);
+            if (rb.size() == 0) {
+                return util::error_detail("collision polygon write failed (engine rejected it)",
+                                          atlas_pos,
+                                          "polygon points to be written",
+                                          "check physics layer exists and polygon is valid; engine logs show root cause");
+            }
             point_count += static_cast<int>(points.size());
         }
     }

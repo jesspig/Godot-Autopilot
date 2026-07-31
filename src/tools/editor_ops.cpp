@@ -1,5 +1,6 @@
 #include "editor_ops.hpp"
 #include "core/log_system.hpp"
+#include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/editor_selection.hpp>
@@ -727,6 +728,10 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue& args) {
     auto* np = args.Find("name");
     if (np && np->IsString()) name = np->GetString();
 
+    bool close_current = false;
+    auto* cp = args.Find("close_current");
+    if (cp && cp->IsBool()) close_current = cp->GetBool();
+
     auto* cdbs = godot::ClassDBSingleton::get_singleton();
     if (!cdbs) {
         return error_json("ClassDB singleton not available");
@@ -748,9 +753,26 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue& args) {
 
     node->set_name(godot::StringName(name.c_str()));
 
+    bool closed_previous = false;
     auto* existing_root = editor->get_edited_scene_root();
     if (existing_root) {
-        return error_json("scene already has a root node — use editor_close_scene to close it, then call editor_new_scene again");
+        if (!close_current) {
+            return error_json("scene already has a root node — use editor_close_scene to close it, then call editor_new_scene again");
+        }
+        if (existing_root->get_scene_file_path().is_empty()) {
+            return util::error_detail("current scene is unsaved", to_std(existing_root->get_name()),
+                                      "scene saved before close",
+                                      "call editor_save_scene first, then editor_new_scene with close_current=true");
+        }
+        godot::PackedStringArray unsaved = editor_unsaved_scenes(editor);
+        if (!unsaved.is_empty()) {
+            return error_json("scene has unsaved changes: " + unsaved_list_str(unsaved) + " — save first (editor_save_scene)");
+        }
+        godot::Error err = editor->close_scene();
+        if (err != godot::Error::OK) {
+            return error_json("failed to close scene (error " + std::to_string(static_cast<int>(err)) + ")");
+        }
+        closed_previous = true;
     }
 
     editor->add_root_node(node);
@@ -768,6 +790,7 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue& args) {
     mcp::JsonValue inner(mcp::JsonValue::object_tag);
     inner["path"] = mcp::JsonValue(name);
     inner["type"] = mcp::JsonValue(type);
+    inner["closed_previous"] = mcp::JsonValue(closed_previous);
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = std::move(inner);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "editor_new_scene completed");

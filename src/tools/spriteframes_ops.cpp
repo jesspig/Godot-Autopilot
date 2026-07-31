@@ -1,8 +1,10 @@
 #include "spriteframes_ops.hpp"
 #include "resource_ops.hpp"
 #include "core/log_system.hpp"
+#include "util/error_util.hpp"
 #include <godot_cpp/classes/atlas_texture.hpp>
 #include <godot_cpp/classes/class_db_singleton.hpp>
+#include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/sprite_frames.hpp>
 #include <godot_cpp/classes/texture2d.hpp>
@@ -146,10 +148,16 @@ JV handle_add_frame(const JV& args) {
     godot::Ref<godot::SpriteFrames> sf = resolve_spriteframes(name, resolve_err);
     if (sf.is_null()) return error(resolve_err);
 
+    godot::String tex_path(texture.c_str());
+    if (!godot::FileAccess::file_exists(tex_path))
+        return util::error_detail("file does not exist", texture, "an existing file path",
+                                  "check the disk directory structure; docs paths may be relative to the wrong folder");
     auto* loader = godot::ResourceLoader::get_singleton();
     if (!loader) return error("ResourceLoader not available");
-    godot::Ref<godot::Resource> tex_res = loader->load(godot::String(texture.c_str()));
-    if (tex_res.is_null()) return error("failed to load texture: " + texture);
+    godot::Ref<godot::Resource> tex_res = loader->load(tex_path);
+    if (tex_res.is_null())
+        return util::error_detail("file exists but failed to load (not imported or wrong type)", texture,
+                                  "an importable resource of type Texture2D", "reimport the file or check the file format");
     godot::Ref<godot::Texture2D> tex = tex_res;
     if (tex.is_null()) return error("loaded resource is not a Texture2D: " + texture);
 

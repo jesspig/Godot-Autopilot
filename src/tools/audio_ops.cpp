@@ -1,5 +1,6 @@
 #include "audio_ops.hpp"
 #include "core/log_system.hpp"
+#include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/audio_server.hpp>
 #include <godot_cpp/classes/audio_bus_layout.hpp>
@@ -8,6 +9,7 @@
 #include <godot_cpp/classes/audio_stream_player.hpp>
 #include <godot_cpp/classes/audio_stream_player2d.hpp>
 #include <godot_cpp/classes/audio_stream_player3d.hpp>
+#include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
@@ -359,13 +361,18 @@ mcp::JsonValue handle_stream_play(const mcp::JsonValue& args) {
     }
     auto* sp = args.Find("stream_path");
     if (sp && sp->IsString()) {
+        godot::String stream_path(sp->GetString().c_str());
+        if (!godot::FileAccess::file_exists(stream_path))
+            return util::error_detail("file does not exist", sp->GetString(), "an existing file path",
+                                      "check the disk directory structure; docs paths may be relative to the wrong folder");
         auto* loader = godot::ResourceLoader::get_singleton();
         if (!loader) {
             return error_json("ResourceLoader not available");
         }
-        auto stream = loader->load(godot::String(sp->GetString().c_str()));
+        auto stream = loader->load(stream_path);
         if (stream.is_null()) {
-            return error_json("failed to load audio stream: " + sp->GetString());
+            return util::error_detail("file exists but failed to load (not imported or wrong type)", sp->GetString(),
+                                      "an importable resource of type AudioStream", "reimport the file or check the file format");
         }
         auto audio_stream = godot::Ref<godot::AudioStream>(stream);
         if (audio_stream.is_null()) {

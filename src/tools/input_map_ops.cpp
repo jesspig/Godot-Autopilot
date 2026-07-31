@@ -8,6 +8,7 @@
 #include <godot_cpp/variant/string_name.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
+#include <algorithm>
 #include <string>
 #include <unordered_map>
 
@@ -467,7 +468,7 @@ JV handle_has_action(const JV& args) {
     return r;
 }
 
-JV handle_persist(const JV&) {
+JV handle_persist(const JV& args) {
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "input_map_persist called");
     auto* im = godot::InputMap::get_singleton();
     if (!im) {
@@ -481,24 +482,71 @@ JV handle_persist(const JV&) {
         e["error"] = JV("ProjectSettings not available");
         return e;
     }
+    std::vector<std::string> allowlist;
+    bool has_allowlist = false;
+    auto* ap = args.Find("actions");
+    if (ap && !ap->IsArray()) {
+        JV e(JV::object_tag);
+        e["error"] = JV("invalid parameter: actions must be a JSON array of action name strings");
+        return e;
+    }
+    if (ap) {
+        has_allowlist = true;
+        const auto& arr = ap->GetArray();
+        for (const auto& item : arr) {
+            if (item.IsString()) {
+                allowlist.push_back(item.GetString());
+            }
+        }
+    }
     auto actions = im->get_actions();
     int persisted = 0;
+    std::vector<std::string> skipped;
+    std::vector<std::string> skipped_missing;
     for (int i = 0; i < actions.size(); i++) {
+        std::string name_std = to_std(godot::String(actions[i]));
+        if (has_allowlist) {
+            if (std::find(allowlist.begin(), allowlist.end(), name_std) == allowlist.end()) {
+                skipped.push_back(name_std);
+                continue;
+            }
+        } else {
+            if (name_std.substr(0, 3) == "ui_" || name_std.find('/') != std::string::npos) {
+                skipped.push_back(name_std);
+                continue;
+            }
+        }
         godot::StringName action_name = actions[i];
-        std::string name_std = to_std(godot::String(action_name));
-        if (name_std.substr(0, 3) == "ui_") continue;
         godot::Dictionary dict;
         dict["deadzone"] = im->action_get_deadzone(action_name);
         dict["events"] = im->action_get_events(action_name);
         ps->set_setting(godot::String(("input/" + name_std).c_str()), dict);
         persisted++;
     }
+    if (has_allowlist) {
+        for (const auto& name : allowlist) {
+            if (!im->has_action(godot::StringName(name.c_str()))) {
+                skipped_missing.push_back(name);
+            }
+        }
+    }
     godot::Error err = ps->save();
     JV r(JV::object_tag);
     r["result"] = JV("persisted");
     r["actions_persisted"] = JV(persisted);
+    r["skipped_count"] = JV(static_cast<int64_t>(skipped.size()));
+    JV skipped_arr(JV::array_tag);
+    for (const auto& name : skipped) {
+        skipped_arr.PushBack(JV(name));
+    }
+    r["skipped"] = std::move(skipped_arr);
+    JV missing_arr(JV::array_tag);
+    for (const auto& name : skipped_missing) {
+        missing_arr.PushBack(JV(name));
+    }
+    r["skipped_missing"] = std::move(missing_arr);
     r["save_error"] = JV(static_cast<int>(err));
-    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "input_map_persist completed: " + std::to_string(persisted) + " actions persisted");
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "input_map_persist completed: " + std::to_string(persisted) + " actions persisted, " + std::to_string(skipped.size()) + " skipped");
     return r;
 }
 

@@ -1,5 +1,6 @@
 #include "log_ops.hpp"
 #include "core/log_system.hpp"
+#include "../util/error_util.hpp"
 #include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/dir_access.hpp>
@@ -57,6 +58,52 @@ std::string logs_dir_diagnostic(const godot::String& logs_dir) {
     return joined;
 }
 
+struct TailResult {
+    bool opened = false;
+    std::vector<std::string> lines;
+    int64_t total_lines = 0;
+};
+
+TailResult read_tail(const godot::String& path, int64_t limit) {
+    TailResult result;
+    auto file = godot::FileAccess::open(path, godot::FileAccess::READ);
+    if (file.is_null()) return result;
+    result.opened = true;
+    while (!file->eof_reached()) {
+        std::string line = to_std(file->get_line());
+        result.total_lines++;
+        if (limit == 0) continue;
+        if (static_cast<int64_t>(result.lines.size()) < limit) {
+            result.lines.push_back(std::move(line));
+        } else {
+            result.lines.erase(result.lines.begin());
+            result.lines.push_back(std::move(line));
+        }
+    }
+    file->close();
+    return result;
+}
+
+constexpr char ARCHIVE_WARNING[] = "primary log locked by game process; returned archive godot.log.1";
+
+JV build_result(const godot::String& path, const TailResult& tail, bool from_archive) {
+    JV entries(JV::array_tag);
+    for (const std::string& line : tail.lines) {
+        entries.PushBack(JV(line));
+    }
+    JV result(JV::object_tag);
+    result["path"] = JV(to_std(path));
+    result["entries"] = std::move(entries);
+    result["total_lines"] = JV(tail.total_lines);
+    if (from_archive) {
+        result["from_archive"] = JV(true);
+        result["warning"] = JV(ARCHIVE_WARNING);
+    }
+    JV r(JV::object_tag);
+    r["result"] = std::move(result);
+    return r;
+}
+
 } // namespace
 
 JV handle_log_get_game_entries(const JV& args) {
@@ -77,41 +124,29 @@ JV handle_log_get_game_entries(const JV& args) {
         return error_json("game log file not found: \"" + to_std(path) + "\" — " +
             logs_dir_diagnostic(logs_dir) + " — " + RUN_HINT);
     }
-    auto file = godot::FileAccess::open(path, godot::FileAccess::READ);
-    if (file.is_null()) {
+    TailResult tail = read_tail(path, limit);
+    if (!tail.opened) {
         os->delay_usec(100000);
-        file = godot::FileAccess::open(path, godot::FileAccess::READ);
-        if (file.is_null()) {
-            return error_json("failed to open game log file (retried once after delay): \"" + to_std(path) + "\" — open error code " + std::to_string(static_cast<int>(godot::FileAccess::get_open_error())) + " — " +
-                logs_dir_diagnostic(logs_dir) + " — " + RUN_HINT);
+        tail = read_tail(path, limit);
+    }
+    if (tail.opened) {
+        LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "log_get_game_entries completed");
+        return build_result(path, tail, false);
+    }
+    godot::String archive = logs_dir + "/godot.log.1";
+    if (godot::FileAccess::file_exists(archive)) {
+        TailResult archived = read_tail(archive, limit);
+        if (archived.opened) {
+            LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "log_get_game_entries completed (from archive)");
+            return build_result(archive, archived, true);
         }
     }
-    std::vector<std::string> tail;
-    int64_t total_lines = 0;
-    while (!file->eof_reached()) {
-        std::string line = to_std(file->get_line());
-        total_lines++;
-        if (limit == 0) continue;
-        if (static_cast<int64_t>(tail.size()) < limit) {
-            tail.push_back(std::move(line));
-        } else {
-            tail.erase(tail.begin());
-            tail.push_back(std::move(line));
-        }
-    }
-    file->close();
-    JV entries(JV::array_tag);
-    for (const std::string& line : tail) {
-        entries.PushBack(JV(line));
-    }
-    JV result(JV::object_tag);
-    result["path"] = JV(to_std(path));
-    result["entries"] = std::move(entries);
-    result["total_lines"] = JV(total_lines);
-    JV r(JV::object_tag);
-    r["result"] = std::move(result);
-    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "log_get_game_entries completed");
-    return r;
+    return util::error_detail(
+        "open error code " + std::to_string(static_cast<int>(godot::FileAccess::get_open_error())) +
+            " (game process holds the log file)",
+        to_std(path) + " — " + logs_dir_diagnostic(logs_dir),
+        "read the game process log",
+        "stop the game first (editor_stop_playing), or use debugger_get_output / debugger_get_errors for in-memory capture — " + std::string(RUN_HINT));
 }
 
 } // namespace log_ops

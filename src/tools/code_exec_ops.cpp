@@ -2,6 +2,7 @@
 #include "core/log_system.hpp"
 #include "register_all.hpp"
 #include "tools/debugger_ops.hpp"
+#include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/engine.hpp>
@@ -12,9 +13,72 @@
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 #include <chrono>
+#include <cctype>
 #include <functional>
 #include <sstream>
 #include <string>
+
+namespace {
+
+// 包装脚本头部行数：wrapped 中用户源码第 1 行对应包装第 offset+1 行，
+// 引擎错误行号减去 offset 即得用户源码行号。
+constexpr int WRAP_HEADER_LINES_SINGLE = 4; // "@tool\nextends Node\n\nfunc <name>():\n"
+constexpr int WRAP_HEADER_LINES_MULTI = 3;  // "@tool\nextends Node\n\n"
+
+// 将引擎错误文本中 "gdscript://<name>.gd:<line>" 的行号换算为用户源码行号
+// （<line> 减去 offset），换算结果 >0 时替换并附注，≤0 时保留原值（指向包装头）。
+// tag 非空时仅换算资源名与 tag 匹配的引用；传空串换算所有引用。
+std::string map_line_numbers(const std::string& err_text, int offset, const std::string& tag) {
+    std::string mapped;
+    mapped.reserve(err_text.size());
+    const std::string marker = "gdscript://";
+    size_t pos = 0;
+    while (true) {
+        size_t mark = err_text.find(marker, pos);
+        if (mark == std::string::npos) {
+            mapped.append(err_text, pos, std::string::npos);
+            break;
+        }
+        mapped.append(err_text, pos, mark - pos);
+        size_t name_start = mark + marker.size();
+        size_t name_end = err_text.find('.', name_start);
+        bool is_gd_colon = name_end != std::string::npos
+            && err_text.compare(name_end, 4, ".gd:") == 0;
+        bool name_matches = tag.empty()
+            || err_text.compare(name_start, tag.size(), tag) == 0;
+        if (!is_gd_colon || !name_matches) {
+            mapped.append(marker);
+            pos = name_start;
+            continue;
+        }
+        size_t num_start = name_end + 4;
+        size_t num_end = num_start;
+        while (num_end < err_text.size()
+               && std::isdigit(static_cast<unsigned char>(err_text[num_end]))) {
+            ++num_end;
+        }
+        if (num_end == num_start) {
+            mapped.append(marker);
+            pos = name_start;
+            continue;
+        }
+        std::string name = err_text.substr(name_start, name_end - name_start);
+        int original = std::stoi(err_text.substr(num_start, num_end - num_start));
+        std::string replacement;
+        if (original - offset > 0) {
+            replacement = "gdscript://" + name + ".gd:"
+                + std::to_string(original - offset)
+                + " (mapped to user source line " + std::to_string(original - offset) + ")";
+        } else {
+            replacement = "gdscript://" + name + ".gd:" + std::to_string(original);
+        }
+        mapped += replacement;
+        pos = num_end;
+    }
+    return mapped;
+}
+
+} // namespace
 
 namespace godot_self_driving {
 namespace code_exec_ops {
@@ -233,6 +297,28 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
     } else {
         std::string cleaned = clean_extends(source_code);
 
+        // 单函数模式不允许出现 func 定义。has_func_def 已忽略缩进覆盖 "func " 前缀，
+        // 此处兜底其漏掉的非标准写法（如 "func" 后跟 tab 或左括号），使失败显式可归因。
+        {
+            std::istringstream stream(cleaned);
+            std::string line;
+            while (std::getline(stream, line)) {
+                size_t pos = line.find_first_not_of(" \t");
+                if (pos == std::string::npos || line[pos] == '#') continue;
+                if (pos + 1 < line.size() && line[pos] == '/' && line[pos + 1] == '/') continue;
+                if (line.compare(pos, 5, "func ") == 0
+                    || line.compare(pos, 5, "func\t") == 0
+                    || (line.compare(pos, 4, "func") == 0
+                        && pos + 4 < line.size() && line[pos + 4] == '(')) {
+                    return util::error_detail(
+                        "func definition detected in single-function mode",
+                        "source_code",
+                        "no func definitions while in single-function mode",
+                        "top-level func definitions require multi-function mode; use editor script_create or wrap in a lambda");
+                }
+            }
+        }
+
         bool uses_tabs = false;
         bool uses_spaces = false;
         {
@@ -245,6 +331,14 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
                 if (indent.find('\t') != std::string::npos) uses_tabs = true;
                 if (indent.find("    ") != std::string::npos) uses_spaces = true;
             }
+        }
+
+        if (uses_tabs && uses_spaces) {
+            return util::error_detail(
+                "mixed tab/space indentation detected in source",
+                "source_code",
+                "consistent indentation",
+                "reindent source with only tabs or only spaces; note the wrapper requires the same indentation style throughout");
         }
 
         bool use_tab_style = uses_tabs && !uses_spaces;
@@ -294,13 +388,17 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
             + err_name + " (code " + std::to_string(code) + ")";
         std::string compile_err = debugger_ops::capture_new_error_text(compile_log_before);
         if (!compile_err.empty()) {
-            if (compile_err.size() > 8192) {
-                message += "\n" + compile_err.substr(0, 8192)
-                    + "\n...(truncated, total " + std::to_string(compile_err.size()) + " bytes)";
+            int map_offset = has_func_def ? WRAP_HEADER_LINES_MULTI : WRAP_HEADER_LINES_SINGLE;
+            std::string mapped_err = map_line_numbers(compile_err, map_offset, "");
+            if (mapped_err.size() > 8192) {
+                message += "\n" + mapped_err.substr(0, 8192)
+                    + "\n...(truncated, total " + std::to_string(mapped_err.size()) + " bytes)";
             } else {
-                message += "\n" + compile_err;
+                message += "\n" + mapped_err;
             }
+            message += "\nerror lines above were mapped from the generated wrapper script";
         }
+        message += "\nwrapped source:\n" + wrapped;
         e["error"] = mcp::JsonValue(message);
         return e;
     }
@@ -421,6 +519,7 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
     r["result"] = VariantJson::serialize(result);
     r["execution_time_ms"] = mcp::JsonValue(static_cast<int64_t>(elapsed));
     r["auto_owner_set"] = mcp::JsonValue(static_cast<int64_t>(auto_owner_set));
+    r["wrapped_source"] = mcp::JsonValue(wrapped);
     if (!new_error_text.empty()) {
         r["runtime_error"] = mcp::JsonValue(true);
         if (new_error_text.size() > 8192) {

@@ -1,5 +1,6 @@
 #include "scene_ops.hpp"
 #include "core/log_system.hpp"
+#include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
@@ -20,6 +21,10 @@ namespace scene_ops {
 namespace {
 
 constexpr const char* NODE_PATH_HINT = " — expected scene-relative path like 'Level1/Player' or absolute '/root/Level1/Player'";
+
+constexpr int DEFAULT_MAX_DEPTH = 8;
+constexpr int UNLIMITED_TREE_DEPTH = 100000;
+constexpr int MAX_PROPERTY_COUNT = 20;
 
 std::string to_std(const godot::String& s) {
     godot::CharString utf8 = s.utf8();
@@ -62,7 +67,24 @@ godot::Node* find_node(const std::string& path_str) {
     return root;
 }
 
-void node_to_json(godot::Node* node, const std::string& root_prefix, mcp::JsonValue& j) {
+void collect_property_summary(godot::Node* node, mcp::JsonValue& j) {
+    godot::TypedArray<godot::Dictionary> props = node->get_property_list();
+    int count = 0;
+    for (int i = 0; i < props.size() && count < MAX_PROPERTY_COUNT; i++) {
+        godot::Dictionary prop = props[i];
+        godot::Variant name_v = prop["name"];
+        if (name_v.get_type() != godot::Variant::STRING_NAME) continue;
+        godot::StringName prop_name = name_v;
+        std::string name_str = to_std(godot::String(prop_name));
+        if (name_str.rfind("metadata/", 0) == 0) continue;
+        if (!name_str.empty() && name_str[0] == '_') continue;
+        if (static_cast<godot::Variant::Type>(static_cast<int>(prop["type"])) == godot::Variant::OBJECT) continue;
+        j[name_str] = VariantJson::serialize(node->get(prop_name));
+        count++;
+    }
+}
+
+void node_to_json(godot::Node* node, int remaining_depth, bool include_properties, mcp::JsonValue& j) {
     if (!node) return;
     j["name"] = mcp::JsonValue(to_std(node->get_name()));
     j["type"] = mcp::JsonValue(to_std(node->get_class()));
@@ -84,13 +106,19 @@ void node_to_json(godot::Node* node, const std::string& root_prefix, mcp::JsonVa
     }
     if (path.empty()) path = to_std(node->get_name());
     j["path"] = mcp::JsonValue(path);
+    if (include_properties) {
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        collect_property_summary(node, props);
+        j["properties"] = std::move(props);
+    }
+    if (remaining_depth <= 0) return;
     j["children"] = mcp::JsonValue(mcp::JsonValue::array_tag);
     auto children = node->get_children();
     for (int i = 0; i < children.size(); i++) {
         auto* child = godot::Object::cast_to<godot::Node>(children[i]);
         if (child) {
             mcp::JsonValue child_j(mcp::JsonValue::object_tag);
-            node_to_json(child, root_prefix, child_j);
+            node_to_json(child, remaining_depth - 1, include_properties, child_j);
             j["children"].PushBack(std::move(child_j));
         }
     }
@@ -369,13 +397,38 @@ mcp::JsonValue handle_get_tree(const mcp::JsonValue&) {
         root = editor->get_edited_scene_root();
     }
     if (!root) {
-        mcp::JsonValue r(mcp::JsonValue::object_tag);
-        r["result"] = mcp::JsonValue(nullptr);
-        return r;
+        return util::error_detail("no scene currently open in the editor", "scene_tree_get",
+                                  "an edited scene", "open or create a scene first (editor_new_scene)");
     }
-    std::string root_prefix = to_std(root->get_path());
     mcp::JsonValue result(mcp::JsonValue::object_tag);
-    node_to_json(root, root_prefix, result);
+    node_to_json(root, UNLIMITED_TREE_DEPTH, false, result);
+    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    r["result"] = std::move(result);
+    return r;
+}
+
+mcp::JsonValue handle_get_editor_scene_tree(const mcp::JsonValue& args) {
+    auto* editor = godot::EditorInterface::get_singleton();
+    godot::Node* root = nullptr;
+    if (editor) {
+        root = editor->get_edited_scene_root();
+    }
+    if (!root) {
+        return util::error_detail("no scene currently open in the editor", "scene_get_tree",
+                                  "an edited scene", "open or create a scene first (editor_new_scene)");
+    }
+    int max_depth = DEFAULT_MAX_DEPTH;
+    auto* dp = args.Find("max_depth");
+    if (dp && dp->IsInt()) {
+        max_depth = static_cast<int>(dp->GetInt());
+        if (max_depth < 1) max_depth = 1;
+    }
+    bool include_properties = false;
+    auto* ip = args.Find("include_properties");
+    if (ip && ip->IsBool()) include_properties = ip->GetBool();
+
+    mcp::JsonValue result(mcp::JsonValue::object_tag);
+    node_to_json(root, max_depth, include_properties, result);
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = std::move(result);
     return r;

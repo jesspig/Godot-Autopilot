@@ -1,6 +1,8 @@
 #include "resource_ops.hpp"
 #include "core/log_system.hpp"
 #include "util/variant_json.hpp"
+#include "util/error_util.hpp"
+#include "util/readback_util.hpp"
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/resource_saver.hpp>
@@ -10,6 +12,7 @@
 #include <godot_cpp/classes/editor_file_system.hpp>
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/engine.hpp>
+#include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <string>
@@ -193,10 +196,15 @@ bool try_resolve_resource_value(const mcp::JsonValue& val, godot::Variant& out, 
     auto* it_path = val.Find("path");
     if (it_path && it_path->IsString()) {
         std::string path = it_path->GetString();
+        if (!godot::FileAccess::file_exists(godot::String(path.c_str()))) {
+            out_error = "file does not exist: " + path;
+            return true;
+        }
         auto* loader = godot::ResourceLoader::get_singleton();
         godot::Ref<godot::Resource> res = loader ? loader->load(godot::String(path.c_str())) : godot::Ref<godot::Resource>();
         if (res.is_null()) {
-            out_error = "failed to load resource: " + path;
+            out_error = "failed to load resource: " + path +
+                " (file exists but failed to load — not imported or wrong type)";
             return true;
         }
         out = godot::Variant(res.ptr());
@@ -225,12 +233,20 @@ mcp::JsonValue handle_load(const mcp::JsonValue& args) {
         return e;
     }
 
+    godot::String path_gs(path.c_str());
+    if (!godot::FileAccess::file_exists(path_gs)) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("file does not exist: " + path);
+        return e;
+    }
+
     godot::Ref<godot::Resource> res = loader->load(
-        godot::String(path.c_str()),
+        path_gs,
         godot::String(type_hint.c_str()));
     if (res.is_null()) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("failed to load resource: " + path);
+        e["error"] = mcp::JsonValue("failed to load resource: " + path +
+            " (file exists but failed to load — not imported or wrong type)");
         return e;
     }
     if (to_std(res->get_path()).empty()) {
@@ -481,6 +497,16 @@ mcp::JsonValue handle_save(const mcp::JsonValue& args) {
                 }
             }
         }
+        auto* ruid = godot::ResourceUID::get_singleton();
+        if (ruid) {
+            auto* loader = godot::ResourceLoader::get_singleton();
+            int64_t uid_val = loader
+                ? loader->get_resource_uid(godot::String(dest_path.c_str()))
+                : godot::ResourceUID::INVALID_ID;
+            if (uid_val != godot::ResourceUID::INVALID_ID) {
+                ruid->add_id(uid_val, godot::String(dest_path.c_str()));
+            }
+        }
     }
     if (err == godot::OK && has_oid) {
         std::lock_guard<std::mutex> lock(g_resource_cache_mutex);
@@ -581,10 +607,18 @@ mcp::JsonValue handle_duplicate(const mcp::JsonValue& args) {
         return e;
     }
 
-    godot::Ref<godot::Resource> res = loader->load(godot::String(path.c_str()));
+    godot::String path_gs(path.c_str());
+    if (!godot::FileAccess::file_exists(path_gs)) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("file does not exist: " + path);
+        return e;
+    }
+
+    godot::Ref<godot::Resource> res = loader->load(path_gs);
     if (res.is_null()) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("failed to load resource: " + path);
+        e["error"] = mcp::JsonValue("failed to load resource: " + path +
+            " (file exists but failed to load — not imported or wrong type)");
         return e;
     }
 
@@ -616,10 +650,18 @@ mcp::JsonValue handle_get_type(const mcp::JsonValue& args) {
         return e;
     }
 
-    godot::Ref<godot::Resource> res = loader->load(godot::String(path.c_str()));
+    godot::String path_gs(path.c_str());
+    if (!godot::FileAccess::file_exists(path_gs)) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("file does not exist: " + path);
+        return e;
+    }
+
+    godot::Ref<godot::Resource> res = loader->load(path_gs);
     if (res.is_null()) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("failed to load resource: " + path);
+        e["error"] = mcp::JsonValue("failed to load resource: " + path +
+            " (file exists but failed to load — not imported or wrong type)");
         return e;
     }
 
@@ -940,6 +982,12 @@ mcp::JsonValue handle_import(const mcp::JsonValue& args) {
     }
     std::string path = it_path->GetString();
 
+    if (!godot::FileAccess::file_exists(godot::String(path.c_str()))) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("file does not exist: " + path);
+        return e;
+    }
+
     auto* editor = godot::EditorInterface::get_singleton();
     if (!editor) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -1092,15 +1140,18 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue& args) {
         value = VariantJson::deserialize(*args.Find("value"), type_hint);
     }
 
+    godot::Variant old_val = res->get(godot::StringName(prop.c_str()));
     res->set(godot::StringName(prop.c_str()), value);
 
     godot::Variant new_val = res->get(godot::StringName(prop.c_str()));
-    std::string expected_dump = VariantJson::serialize(value).Dump();
-    std::string actual_dump = VariantJson::serialize(new_val).Dump();
 
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
         "resource_set_property: set " + prop + " on " + to_std(res->get_class()) +
         " (object_id=" + std::to_string(static_cast<int64_t>(res->get_instance_id())) + ")");
+
+    std::string readback_detail;
+    util::ReadbackStatus readback =
+        util::check_readback(value, old_val, new_val, readback_detail);
 
     mcp::JsonValue j(mcp::JsonValue::object_tag);
     j["result"] = mcp::JsonValue("ok");
@@ -1108,11 +1159,15 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue& args) {
     j["path"] = mcp::JsonValue(to_std(res->get_path()));
     j["object_id"] = mcp::JsonValue(static_cast<int64_t>(res->get_instance_id()));
     j["resource_attached"] = mcp::JsonValue(resource_attached);
-    if (expected_dump != actual_dump) {
-        j["warning"] = mcp::JsonValue(
-            "set applied but readback mismatch: expected " + expected_dump +
-            ", got " + actual_dump +
-            " — property may have been rejected (type mismatch) or converted");
+    if (readback == util::ReadbackStatus::REJECTED) {
+        return util::error_detail(
+            "property rejected: '" + prop + "' on " + to_std(res->get_path()),
+            to_std(res->get_path()),
+            "readback equals set value",
+            "property may not exist, be read-only, or require a type hint; use resource_get_property_list");
+    }
+    if (readback == util::ReadbackStatus::CONVERTED) {
+        j["warning"] = mcp::JsonValue("set applied; " + readback_detail);
     }
     return j;
 }
