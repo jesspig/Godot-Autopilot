@@ -6,6 +6,7 @@
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/tile_map.hpp>
+#include <godot_cpp/classes/tile_map_layer.hpp>
 #include <godot_cpp/classes/tile_set.hpp>
 #include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/variant/string.hpp>
@@ -143,7 +144,10 @@ JV handle_set_cell(const JV& args) {
     if (!node) return error("node not found: " + p->GetString());
 
     auto* tile_map = godot::Object::cast_to<godot::TileMap>(node);
-    if (!tile_map) return error("node is not a TileMap: " + p->GetString());
+    auto* tile_map_layer = tile_map ? nullptr : godot::Object::cast_to<godot::TileMapLayer>(node);
+    if (!tile_map && !tile_map_layer)
+        return error("node is not a TileMap or TileMapLayer: " + p->GetString()
+            + " — create one with tilemap_create (TileMap) or scene_node_create + property_set (TileMapLayer), or fix the path");
 
     auto* x = args.Find("x");
     auto* y = args.Find("y");
@@ -167,9 +171,11 @@ JV handle_set_cell(const JV& args) {
             atlas_coords = godot::Vector2i(static_cast<int>(acx->GetInt()), static_cast<int>(acy->GetInt()));
     }
 
-    tile_map->set_cell(layer,
-        godot::Vector2i(static_cast<int>(x->GetInt()), static_cast<int>(y->GetInt())),
-        source_id, atlas_coords);
+    godot::Vector2i coords(static_cast<int>(x->GetInt()), static_cast<int>(y->GetInt()));
+    if (tile_map)
+        tile_map->set_cell(layer, coords, source_id, atlas_coords);
+    else
+        tile_map_layer->set_cell(coords, source_id, atlas_coords);
 
     JV r(JV::object_tag);
     r["result"] = JV("ok");
@@ -180,14 +186,18 @@ JV handle_set_cell(const JV& args) {
 JV handle_set_cells(const JV& args) {
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "tilemap_set_cells called");
 
-    auto* p = args.Find("node_path");
+    auto* p = args.Find("path");
+    if (!p || !p->IsString()) p = args.Find("node_path");
     if (!p || !p->IsString()) return error("missing required parameter: node_path");
 
     auto* node = find_node(p->GetString());
     if (!node) return error("node not found: " + p->GetString());
 
     auto* tile_map = godot::Object::cast_to<godot::TileMap>(node);
-    if (!tile_map) return error("node is not a TileMap: " + p->GetString());
+    auto* tile_map_layer = tile_map ? nullptr : godot::Object::cast_to<godot::TileMapLayer>(node);
+    if (!tile_map && !tile_map_layer)
+        return error("node is not a TileMap or TileMapLayer: " + p->GetString()
+            + " — create one with tilemap_create (TileMap) or scene_node_create + property_set (TileMapLayer), or fix the path");
 
     auto* cells = args.Find("cells");
     if (!cells || !cells->IsArray()) return error("missing required parameter: cells");
@@ -231,9 +241,11 @@ JV handle_set_cells(const JV& args) {
                 atlas_coords = godot::Vector2i(static_cast<int>(acx->GetInt()), static_cast<int>(acy->GetInt()));
         }
 
-        tile_map->set_cell(layer,
-            godot::Vector2i(static_cast<int>(cx->GetInt()), static_cast<int>(cy->GetInt())),
-            static_cast<int>(si->GetInt()), atlas_coords);
+        godot::Vector2i coords(static_cast<int>(cx->GetInt()), static_cast<int>(cy->GetInt()));
+        if (tile_map)
+            tile_map->set_cell(layer, coords, static_cast<int>(si->GetInt()), atlas_coords);
+        else
+            tile_map_layer->set_cell(coords, static_cast<int>(si->GetInt()), atlas_coords);
         ++set_count;
     }
 

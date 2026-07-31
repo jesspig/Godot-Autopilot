@@ -23,6 +23,8 @@ mcp::JsonValue error_response(const std::string& msg) {
 static const char b64_chars[] =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
+} // namespace
+
 std::string base64_encode(const uint8_t* data, size_t len) {
     std::string result;
     result.reserve(((len + 2) / 3) * 4);
@@ -40,8 +42,6 @@ std::string base64_encode(const uint8_t* data, size_t len) {
     }
     return result;
 }
-
-} // namespace
 
 mcp::JsonValue handle_capture_viewport(const mcp::JsonValue&) {
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "capture_viewport called");

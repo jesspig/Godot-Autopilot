@@ -1,4 +1,5 @@
 #include "display_ops.hpp"
+#include "capture_ops.hpp"
 #include "core/log_system.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/display_server.hpp>
@@ -6,6 +7,7 @@
 #include <godot_cpp/classes/window.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
+#include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
 #include <godot_cpp/variant/rect2i.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
@@ -185,9 +187,22 @@ JV handle_screen_capture(const JV& args) {
     if (image.is_null()) {
         return error_json("failed to capture screen image");
     }
-    auto serialized = VariantJson::serialize(godot::Variant(image));
+    godot::PackedByteArray png_buffer = image->save_png_to_buffer();
+    if (png_buffer.size() == 0) {
+        auto serialized = VariantJson::serialize(godot::Variant(image));
+        JV r(JV::object_tag);
+        r["result"] = std::move(serialized);
+        r["warning"] = JV("PNG encoding failed; returned raw serialized image data");
+        LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "display_screen_capture completed (png fallback)");
+        return r;
+    }
+    std::string b64 = capture_ops::base64_encode(png_buffer.ptr(), static_cast<size_t>(png_buffer.size()));
+    JV inner(JV::object_tag);
+    inner["mime"] = JV("image/png");
+    inner["format"] = JV("png");
+    inner["data"] = JV(b64);
     JV r(JV::object_tag);
-    r["result"] = std::move(serialized);
+    r["result"] = std::move(inner);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "display_screen_capture completed");
     return r;
 }

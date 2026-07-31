@@ -13,6 +13,7 @@
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 #include <string>
+#include <vector>
 
 namespace godot_self_driving {
 namespace tileset_ops {
@@ -50,6 +51,38 @@ bool parse_vec2i(const JV& obj, const char* x_key, const char* y_key, godot::Vec
     auto* vy = obj.Find(y_key);
     if (!vx || !vx->IsInt() || !vy || !vy->IsInt()) return false;
     out = godot::Vector2i(static_cast<int>(vx->GetInt()), static_cast<int>(vy->GetInt()));
+    return true;
+}
+
+double as_double(const JV& j) {
+    if (j.IsInt()) return static_cast<double>(j.GetInt());
+    return j.GetDouble();
+}
+
+int compute_grid(int tex_dim, int tile_dim, int margin, int spacing) {
+    int valid = tex_dim - margin;
+    if (valid < tile_dim || tile_dim + spacing <= 0) return 0;
+    return 1 + (valid - tile_dim) / (tile_dim + spacing);
+}
+
+bool parse_point(const JV& item, godot::Vector2& out) {
+    auto* px = item.Find("x");
+    auto* py = item.Find("y");
+    if (!item.IsObject() || !px || !px->IsNumber() || !py || !py->IsNumber()) return false;
+    out = godot::Vector2(static_cast<float>(as_double(*px)), static_cast<float>(as_double(*py)));
+    return true;
+}
+
+bool parse_polygon(const JV& points_arr, godot::PackedVector2Array& out, std::string& out_error) {
+    const auto& arr = points_arr.GetArray();
+    for (size_t i = 0; i < arr.size(); ++i) {
+        godot::Vector2 pt;
+        if (!parse_point(arr[i], pt)) {
+            out_error = "invalid polygon point at index " + std::to_string(i) + ": expected {x: number, y: number}";
+            return false;
+        }
+        out.append(pt);
+    }
     return true;
 }
 
@@ -106,10 +139,26 @@ JV handle_add_atlas_source(const JV& args) {
 
     int32_t actual_id = tileset->add_source(src, source_id);
 
+    int grid_x = compute_grid(texture->get_width(), tile_size.x, margin, spacing);
+    int grid_y = compute_grid(texture->get_height(), tile_size.y, margin, spacing);
+    int created_tiles = 0;
+    for (int y = 0; y < grid_y; ++y) {
+        for (int x = 0; x < grid_x; ++x) {
+            src->create_tile(godot::Vector2i(x, y));
+            ++created_tiles;
+        }
+    }
+
     JV r(JV::object_tag);
     r["result"] = JV("ok");
     r["source_id"] = JV(static_cast<int64_t>(actual_id));
-    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "tileset_add_atlas_source completed");
+    r["created_tiles"] = JV(static_cast<int64_t>(created_tiles));
+    JV grid_size(JV::object_tag);
+    grid_size["x"] = JV(static_cast<int64_t>(grid_x));
+    grid_size["y"] = JV(static_cast<int64_t>(grid_y));
+    r["grid_size"] = std::move(grid_size);
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+        "tileset_add_atlas_source completed: " + std::to_string(created_tiles) + " tiles created");
     return r;
 }
 
@@ -187,27 +236,39 @@ JV handle_set_tile_collision(const JV& args) {
 
     int physics_layer = static_cast<int>(pl->GetInt());
     const auto& poly_arr = poly->GetArray();
-    int point_count = 0;
 
-    if (poly_arr.empty()) {
+    std::vector<godot::PackedVector2Array> polygons;
+    if (!poly_arr.empty()) {
+        if (poly_arr[0].IsArray()) {
+            for (size_t i = 0; i < poly_arr.size(); ++i) {
+                if (!poly_arr[i].IsArray())
+                    return error("invalid polygon at index " + std::to_string(i) + ": expected array of {x: number, y: number}");
+                godot::PackedVector2Array points;
+                std::string parse_err;
+                if (!parse_polygon(poly_arr[i], points, parse_err)) return error(parse_err);
+                polygons.push_back(std::move(points));
+            }
+        } else {
+            godot::PackedVector2Array points;
+            std::string parse_err;
+            if (!parse_polygon(*poly, points, parse_err)) return error(parse_err);
+            polygons.push_back(std::move(points));
+        }
+    }
+
+    int point_count = 0;
+    if (polygons.empty()) {
         int32_t count = data->get_collision_polygons_count(physics_layer);
         for (int32_t i = 0; i < count; ++i) {
             data->remove_collision_polygon(physics_layer, 0);
         }
     } else {
-        godot::PackedVector2Array points;
-        for (size_t i = 0; i < poly_arr.size(); ++i) {
-            const auto& item = poly_arr[i];
-            auto* px = item.Find("x");
-            auto* py = item.Find("y");
-            if (!item.IsObject() || !px || !px->IsNumber() || !py || !py->IsNumber())
-                return error("invalid polygon point at index " + std::to_string(i) + ": expected {x: number, y: number}");
-            points.append(godot::Vector2(static_cast<float>(px->GetDouble()), static_cast<float>(py->GetDouble())));
+        for (const auto& points : polygons) {
+            int32_t poly_idx = data->get_collision_polygons_count(physics_layer);
+            data->add_collision_polygon(physics_layer);
+            data->set_collision_polygon_points(physics_layer, poly_idx, points);
+            point_count += static_cast<int>(points.size());
         }
-        int32_t poly_idx = data->get_collision_polygons_count(physics_layer);
-        data->add_collision_polygon(physics_layer);
-        data->set_collision_polygon_points(physics_layer, poly_idx, points);
-        point_count = static_cast<int>(points.size());
     }
 
     JV r(JV::object_tag);

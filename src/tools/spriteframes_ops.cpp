@@ -1,6 +1,7 @@
 #include "spriteframes_ops.hpp"
 #include "resource_ops.hpp"
 #include "core/log_system.hpp"
+#include <godot_cpp/classes/atlas_texture.hpp>
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/sprite_frames.hpp>
@@ -84,7 +85,8 @@ JV handle_add_animation(const JV& args) {
 
     double fps = 5.0;
     auto* f = args.Find("fps");
-    if (f && f->IsNumber()) fps = f->GetDouble();
+    if (f && f->IsInt()) fps = static_cast<double>(f->GetInt());
+    else if (f && f->IsDouble()) fps = f->GetDouble();
 
     bool loop = true;
     auto* l = args.Find("loop");
@@ -125,7 +127,20 @@ JV handle_add_frame(const JV& args) {
 
     float duration = 1.0f;
     auto* d = args.Find("duration");
-    if (d && d->IsNumber()) duration = static_cast<float>(d->GetDouble());
+    if (d && d->IsInt()) duration = static_cast<float>(d->GetInt());
+    else if (d && d->IsDouble()) duration = static_cast<float>(d->GetDouble());
+
+    int hframes = 1;
+    auto* hf = args.Find("hframes");
+    if (hf && hf->IsInt()) hframes = static_cast<int>(hf->GetInt());
+    else if (hf) return error("invalid parameter: hframes must be a positive integer");
+    if (hframes < 1) return error("invalid parameter: hframes must be a positive integer");
+
+    int vframes = 1;
+    auto* vf = args.Find("vframes");
+    if (vf && vf->IsInt()) vframes = static_cast<int>(vf->GetInt());
+    else if (vf) return error("invalid parameter: vframes must be a positive integer");
+    if (vframes < 1) return error("invalid parameter: vframes must be a positive integer");
 
     std::string resolve_err;
     godot::Ref<godot::SpriteFrames> sf = resolve_spriteframes(name, resolve_err);
@@ -142,11 +157,29 @@ JV handle_add_frame(const JV& args) {
     if (!sf->has_animation(anim))
         return error("animation not found: " + animation + " (add it with spriteframes_add_animation first)");
 
-    sf->add_frame(anim, tex, duration);
+    int added_frames = 0;
+    if (hframes * vframes > 1) {
+        int fr_w = tex->get_width() / hframes;
+        int fr_h = tex->get_height() / vframes;
+        for (int y = 0; y < vframes; ++y) {
+            for (int x = 0; x < hframes; ++x) {
+                godot::Ref<godot::AtlasTexture> atlas;
+                atlas.instantiate();
+                atlas->set_atlas(tex);
+                atlas->set_region(godot::Rect2(x * fr_w, y * fr_h, fr_w, fr_h));
+                sf->add_frame(anim, atlas, duration);
+                ++added_frames;
+            }
+        }
+    } else {
+        sf->add_frame(anim, tex, duration);
+        added_frames = 1;
+    }
 
     JV r(JV::object_tag);
     r["result"] = JV("ok");
     r["frames"] = JV(static_cast<int64_t>(sf->get_frame_count(anim)));
+    r["added_frames"] = JV(static_cast<int64_t>(added_frames));
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "spriteframes_add_frame completed");
     return r;
 }
