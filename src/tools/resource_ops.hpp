@@ -2,9 +2,16 @@
 #define GODOT_SELF_DRIVING_RESOURCE_OPS_HPP
 
 #include <mcp/JsonValue.hpp>
+#include <godot_cpp/classes/resource.hpp>
+#include <godot_cpp/variant/variant.hpp>
+#include <string>
 
 namespace godot_self_driving {
 namespace resource_ops {
+
+godot::Ref<godot::Resource> resolve_memory_resource(const std::string& name);
+void register_memory_resource(const godot::Ref<godot::Resource>& res, const std::string& name);
+bool try_resolve_resource_value(const mcp::JsonValue& val, godot::Variant& out, std::string& out_error);
 
 mcp::JsonValue handle_load(const mcp::JsonValue& args);
 mcp::JsonValue handle_load_threaded(const mcp::JsonValue& args);

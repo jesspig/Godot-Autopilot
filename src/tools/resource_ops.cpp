@@ -144,6 +144,59 @@ std::string describe_target(const mcp::JsonValue& args) {
 
 } // namespace
 
+godot::Ref<godot::Resource> resolve_memory_resource(const std::string& name) {
+    std::lock_guard<std::mutex> lock(g_resource_cache_mutex);
+    auto it = g_resource_cache.find("name:" + name);
+    if (it != g_resource_cache.end()) {
+        return it->second;
+    }
+    return godot::Ref<godot::Resource>();
+}
+
+void register_memory_resource(const godot::Ref<godot::Resource>& res, const std::string& name) {
+    std::lock_guard<std::mutex> lock(g_resource_cache_mutex);
+    std::string oid_str = std::to_string(static_cast<int64_t>(res->get_instance_id()));
+    g_resource_cache[oid_str] = res;
+    if (!name.empty()) {
+        g_resource_cache["name:" + name] = res;
+    }
+}
+
+bool try_resolve_resource_value(const mcp::JsonValue& val, godot::Variant& out, std::string& out_error) {
+    out_error.clear();
+    if (!val.IsObject()) {
+        return false;
+    }
+    auto* it_resource = val.Find("resource");
+    if (it_resource && it_resource->IsString()) {
+        std::string name = it_resource->GetString();
+        const std::string prefix = "memory://";
+        if (name.compare(0, prefix.size(), prefix) == 0) {
+            name = name.substr(prefix.size());
+        }
+        godot::Ref<godot::Resource> res = resolve_memory_resource(name);
+        if (res.is_null()) {
+            out_error = "memory resource not found: " + name + " (create it with resource_create first)";
+            return true;
+        }
+        out = godot::Variant(res.ptr());
+        return true;
+    }
+    auto* it_path = val.Find("path");
+    if (it_path && it_path->IsString()) {
+        std::string path = it_path->GetString();
+        auto* loader = godot::ResourceLoader::get_singleton();
+        godot::Ref<godot::Resource> res = loader ? loader->load(godot::String(path.c_str())) : godot::Ref<godot::Resource>();
+        if (res.is_null()) {
+            out_error = "failed to load resource: " + path;
+            return true;
+        }
+        out = godot::Variant(res.ptr());
+        return true;
+    }
+    return false;
+}
+
 mcp::JsonValue handle_load(const mcp::JsonValue& args) {
     auto* it_path = args.Find("path");
     if (!it_path || !it_path->IsString()) {
@@ -918,7 +971,19 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue& args) {
         return e;
     }
 
-    godot::Variant value = VariantJson::deserialize(*args.Find("value"), type_hint);
+    godot::Variant value;
+    std::string resource_error;
+    bool resource_attached = false;
+    if (try_resolve_resource_value(*args.Find("value"), value, resource_error)) {
+        if (!resource_error.empty()) {
+            mcp::JsonValue e(mcp::JsonValue::object_tag);
+            e["error"] = mcp::JsonValue(resource_error);
+            return e;
+        }
+        resource_attached = true;
+    } else {
+        value = VariantJson::deserialize(*args.Find("value"), type_hint);
+    }
 
     bool found = false;
     godot::TypedArray<godot::Dictionary> props = res->get_property_list();
@@ -948,6 +1013,7 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue& args) {
     j["class"] = mcp::JsonValue(to_std(res->get_class()));
     j["path"] = mcp::JsonValue(to_std(res->get_path()));
     j["object_id"] = mcp::JsonValue(static_cast<int64_t>(res->get_instance_id()));
+    j["resource_attached"] = mcp::JsonValue(resource_attached);
     return j;
 }
 
