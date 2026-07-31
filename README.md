@@ -151,6 +151,10 @@ Open your Godot project — the server starts automatically. The port displays i
 | **Build** | CMake 3.28+ / C++17 |
 | **Optimization** | Clang-first, ThinLTO, Ninja, sccache, Unity Build |
 
+## Asset Attribution
+
+The `Example/` test project uses pixel art assets from [Pixel Adventure 1](https://pixelfrog-assets.itch.io/pixel-adventure-1) by Pixel Frog.
+
 ## License
 
 MIT

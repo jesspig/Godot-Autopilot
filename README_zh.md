@@ -151,6 +151,10 @@ your-project/
 | **构建** | CMake 3.28+ / C++17 |
 | **优化** | Clang 优先, ThinLTO, Ninja, sccache, Unity Build |
 
+## 素材声明
+
+`Example/` 测试项目使用了 [Pixel Adventure 1](https://pixelfrog-assets.itch.io/pixel-adventure-1) 的像素艺术素材，版权归 Pixel Frog 所有。
+
 ## 许可证
 
 MIT
