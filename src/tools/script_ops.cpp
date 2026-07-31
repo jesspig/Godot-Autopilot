@@ -11,18 +11,23 @@
 #include <godot_cpp/classes/resource_saver.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/dir_access.hpp>
+#include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
+#include <sstream>
 #include <string>
 
 namespace godot_self_driving {
 namespace script_ops {
 
 namespace {
+
+constexpr int PROPERTY_USAGE_CATEGORY = 0x80;
+constexpr int PROPERTY_USAGE_INTERNAL = 0x08;
 
 std::string to_std(const godot::String& s) {
     godot::CharString utf8 = s.utf8();
@@ -52,6 +57,7 @@ mcp::JsonValue serialize_resource(const godot::Ref<godot::Resource>& res) {
     j["class"] = mcp::JsonValue(to_std(res->get_class()));
     j["path"] = mcp::JsonValue(to_std(res->get_path()));
     j["object_id"] = mcp::JsonValue(static_cast<int64_t>(res->get_instance_id()));
+    j["object_id_str"] = mcp::JsonValue(std::to_string(static_cast<int64_t>(res->get_instance_id())));
     return j;
 }
 
@@ -66,50 +72,148 @@ mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue& args) {
     }
     std::string expression = it_expr->GetString();
 
-    godot::Ref<godot::Expression> expr;
-    expr.instantiate();
-    if (expr.is_null()) {
-        mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("failed to create Expression");
-        return e;
-    }
-
-    godot::PackedStringArray input_names;
-    auto* it_inputs = args.Find("input_names");
-    if (it_inputs && it_inputs->IsArray()) {
-        const auto& arr = it_inputs->GetArray();
-        for (const auto& n : arr) {
-            if (n.IsString()) {
-                input_names.append(godot::String(n.GetString().c_str()));
+    bool is_single_expr = true;
+    {
+        std::istringstream stream(expression);
+        std::string line;
+        int line_count = 0;
+        while (std::getline(stream, line)) {
+            size_t pos = line.find_first_not_of(" \t");
+            if (pos != std::string::npos && line[pos] != '#') {
+                line_count++;
+                if (line_count > 1) { is_single_expr = false; break; }
             }
         }
     }
 
-    godot::Error parse_err = expr->parse(godot::String(expression.c_str()), input_names);
-    if (parse_err != godot::OK) {
-        std::string err_text = to_std(expr->get_error_text());
-        mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("parse error: " + err_text);
-        return e;
+    if (is_single_expr && expression.find('\n') == std::string::npos) {
+        // Single expression mode: use godot::Expression (fast path)
+        godot::Ref<godot::Expression> expr;
+        expr.instantiate();
+        if (expr.is_null()) {
+            mcp::JsonValue e(mcp::JsonValue::object_tag);
+            e["error"] = mcp::JsonValue("failed to create Expression instance");
+            return e;
+        }
+
+        godot::PackedStringArray input_names;
+        auto* it_inputs = args.Find("input_names");
+        if (it_inputs && it_inputs->IsArray()) {
+            const auto& arr = it_inputs->GetArray();
+            for (const auto& n : arr) {
+                if (n.IsString()) input_names.append(godot::String(n.GetString().c_str()));
+            }
+        }
+
+        godot::Error parse_err = expr->parse(godot::String(expression.c_str()), input_names);
+        if (parse_err != godot::OK) {
+            std::string err_text = to_std(expr->get_error_text());
+            mcp::JsonValue e(mcp::JsonValue::object_tag);
+            e["error"] = mcp::JsonValue("parse error: " + err_text);
+            return e;
+        }
+
+        godot::Array inputs;
+        auto* it_vals = args.Find("input_values");
+        if (it_vals && it_vals->IsArray()) {
+            const auto& arr = it_vals->GetArray();
+            for (const auto& v : arr) {
+                inputs.append(VariantJson::deserialize(v));
+            }
+        }
+
+        godot::Node* base_instance = memnew(godot::Node);
+        godot::Variant result = expr->execute(inputs, base_instance, true);
+        memdelete(base_instance);
+        if (expr->has_execute_failed()) {
+            mcp::JsonValue e(mcp::JsonValue::object_tag);
+            e["error"] = mcp::JsonValue("execution failed: " + to_std(expr->get_error_text()));
+            return e;
+        }
+
+        mcp::JsonValue r(mcp::JsonValue::object_tag);
+        r["result"] = VariantJson::serialize(result);
+        return r;
     }
 
-    godot::Array inputs;
-    auto* it_vals = args.Find("input_values");
-    if (it_vals && it_vals->IsArray()) {
-        const auto& arr = it_vals->GetArray();
-        for (const auto& v : arr) {
-            inputs.append(VariantJson::deserialize(v));
+    // Multi-line / statement mode: use GDScript wrapping
+    auto* editor = godot::EditorInterface::get_singleton();
+    godot::Node* scene_root = editor ? editor->get_edited_scene_root() : nullptr;
+
+    std::string cleaned;
+    {
+        std::istringstream stream(expression);
+        std::string line;
+        bool first = true;
+        while (std::getline(stream, line)) {
+            if (!first) cleaned += "\n";
+            first = false;
+            size_t pos = line.find_first_not_of(" \t");
+            if (pos != std::string::npos && line.compare(pos, 8, "extends ") == 0) {
+                cleaned += "# " + line;
+            } else {
+                cleaned += line;
+            }
         }
     }
 
-    godot::Node* base_instance = memnew(godot::Node);
-    godot::Variant result = expr->execute(inputs, base_instance, true);
-    memdelete(base_instance);
-    if (expr->has_execute_failed()) {
+    std::string wrapped;
+    wrapped = "@tool\nextends Node\n\nfunc _run():\n";
+    if (!cleaned.empty()) {
+        std::istringstream stream(cleaned);
+        std::string line;
+        bool first_line = true;
+        while (std::getline(stream, line)) {
+            if (!first_line) wrapped += "\n";
+            first_line = false;
+            size_t content_start = line.find_first_not_of(" \t");
+            if (content_start == std::string::npos) {
+                wrapped += "    ";
+            } else {
+                wrapped += "    " + line;
+            }
+        }
+    }
+    wrapped += "\n";
+
+    godot::Ref<godot::GDScript> script;
+    script.instantiate();
+    if (script.is_null()) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("execution failed: " + to_std(expr->get_error_text()));
+        e["error"] = mcp::JsonValue("failed to create GDScript instance");
         return e;
     }
+
+    script->set_source_code(godot::String(wrapped.c_str()));
+    godot::Error parse_err2 = script->reload();
+    if (parse_err2 != godot::OK) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("GDScript compilation failed: ERR_PARSE_ERROR (code " + std::to_string(static_cast<int>(parse_err2)) + ")");
+        return e;
+    }
+
+    godot::Node* temp_node = memnew(godot::Node);
+    temp_node->set_script(godot::Variant(script));
+
+    bool temp_added = false;
+    if (scene_root) {
+        scene_root->add_child(temp_node);
+        temp_added = true;
+    }
+
+    godot::StringName fn_name("_run");
+    if (!temp_node->has_method(fn_name)) {
+        if (temp_added && temp_node->get_parent()) temp_node->get_parent()->remove_child(temp_node);
+        memdelete(temp_node);
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("unexpected error: compiled script missing _run method");
+        return e;
+    }
+
+    godot::Variant result = temp_node->call(fn_name);
+
+    if (temp_added && temp_node->get_parent()) temp_node->get_parent()->remove_child(temp_node);
+    memdelete(temp_node);
 
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = VariantJson::serialize(result);
@@ -167,6 +271,16 @@ mcp::JsonValue handle_create(const mcp::JsonValue& args) {
     std::string path = it_path->GetString();
     std::string source_code = it_code->GetString();
 
+    bool overwrite = false;
+    auto* it_overwrite = args.Find("overwrite");
+    if (it_overwrite && it_overwrite->IsBool()) overwrite = it_overwrite->GetBool();
+
+    if (!overwrite && godot::FileAccess::file_exists(godot::String(path.c_str()))) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("file already exists: " + path + " — pass overwrite=true to replace it");
+        return e;
+    }
+
     godot::Ref<godot::GDScript> script;
     script.instantiate();
     if (script.is_null()) {
@@ -176,7 +290,12 @@ mcp::JsonValue handle_create(const mcp::JsonValue& args) {
     }
 
     script->set_source_code(godot::String(source_code.c_str()));
-    script->reload();
+    godot::Error reload_err = script->reload();
+    if (reload_err != godot::OK) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("script compilation failed: ERR_PARSE_ERROR (code " + std::to_string(static_cast<int>(reload_err)) + ")");
+        return e;
+    }
 
     auto* saver = godot::ResourceSaver::get_singleton();
     if (!saver) {
@@ -266,6 +385,11 @@ mcp::JsonValue handle_attach_to_node(const mcp::JsonValue& args) {
     }
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue("script attached to " + node_path);
+    bool instantiable = script->can_instantiate();
+    r["instantiated"] = mcp::JsonValue(instantiable);
+    if (!instantiable) {
+        r["note"] = mcp::JsonValue("script is not instantiable in the editor: method calls will fail until the game is run — mark the script with @tool to run in the editor");
+    }
     return r;
 }
 
@@ -427,6 +551,14 @@ mcp::JsonValue handle_call_function(const mcp::JsonValue& args) {
         return e;
     }
 
+    godot::Ref<godot::Script> script = node->get_script();
+    if (script.is_valid() && !script->can_instantiate()) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("script is not instantiable in the editor: " + to_std(script->get_path()) +
+            " — scripts must be marked @tool to run in the editor, or run the game to execute non-tool scripts");
+        return e;
+    }
+
     godot::StringName func_name(function.c_str());
     if (!node->has_method(func_name)) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -435,7 +567,10 @@ mcp::JsonValue handle_call_function(const mcp::JsonValue& args) {
     }
 
     godot::Array args_arr;
-    auto* it_arr = args.Find("arguments");
+    auto* it_arr = args.Find("args");
+    if (!it_arr || !it_arr->IsArray()) {
+        it_arr = args.Find("arguments");
+    }
     if (it_arr && it_arr->IsArray()) {
         const auto& arr = it_arr->GetArray();
         for (const auto& a : arr) {
@@ -444,6 +579,13 @@ mcp::JsonValue handle_call_function(const mcp::JsonValue& args) {
     }
 
     godot::Variant result = node->callv(func_name, args_arr);
+    if (result.get_type() == godot::Variant::NIL && script.is_valid() && !script->can_instantiate()) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("method call failed on node " + node_path +
+            ": script instance unavailable in the editor — scripts must be marked @tool to run in the editor, or run the game to execute non-tool scripts");
+        return e;
+    }
+
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = VariantJson::serialize(result);
     return r;
@@ -523,7 +665,15 @@ mcp::JsonValue handle_get_variable_list(const mcp::JsonValue& args) {
     mcp::JsonValue result(mcp::JsonValue::array_tag);
     for (int64_t i = 0; i < props.size(); i++) {
         godot::Dictionary dict = props[i];
+        int usage = 0;
+        if (dict.has("usage")) {
+            usage = static_cast<int>(dict["usage"]);
+        }
+        if ((usage & PROPERTY_USAGE_CATEGORY) != 0 || (usage & PROPERTY_USAGE_INTERNAL) != 0) {
+            continue;
+        }
         mcp::JsonValue item(mcp::JsonValue::object_tag);
+        item["usage"] = mcp::JsonValue(static_cast<int64_t>(usage));
         if (dict.has("name")) {
             item["name"] = mcp::JsonValue(to_std(dict["name"].operator godot::String()));
         }

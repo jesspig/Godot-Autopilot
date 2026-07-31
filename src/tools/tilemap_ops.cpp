@@ -126,6 +126,7 @@ JV handle_create(const JV& args) {
     info["name"] = JV(name);
     info["path"] = JV(result_path);
     info["object_id"] = JV(static_cast<int64_t>(tile_map->get_instance_id()));
+    info["object_id_str"] = JV(std::to_string(static_cast<int64_t>(tile_map->get_instance_id())));
     r["result"] = std::move(info);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "tilemap_create completed");
     return r;
@@ -175,6 +176,82 @@ JV handle_set_cell(const JV& args) {
     return r;
 }
 
+JV handle_set_cells(const JV& args) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "tilemap_set_cells called");
+
+    auto* p = args.Find("node_path");
+    if (!p || !p->IsString()) return error("missing required parameter: node_path");
+
+    auto* node = find_node(p->GetString());
+    if (!node) return error("node not found: " + p->GetString());
+
+    auto* tile_map = godot::Object::cast_to<godot::TileMap>(node);
+    if (!tile_map) return error("node is not a TileMap: " + p->GetString());
+
+    auto* cells = args.Find("cells");
+    if (!cells || !cells->IsArray()) return error("missing required parameter: cells");
+
+    int layer = 0;
+    auto* la = args.Find("layer");
+    if (la && la->IsInt()) layer = static_cast<int>(la->GetInt());
+
+    const auto& arr = cells->GetArray();
+    int set_count = 0;
+    int failed_count = 0;
+    std::string failure_detail;
+    for (size_t i = 0; i < arr.size(); ++i) {
+        const auto& cell = arr[i];
+        auto* cx = cell.Find("x");
+        auto* cy = cell.Find("y");
+        auto* si = cell.Find("source_id");
+        std::string failure;
+        if (!cell.IsObject()) {
+            failure = "expected an object";
+        } else if (!cx || !cx->IsInt()) {
+            failure = "missing required parameter: x";
+        } else if (!cy || !cy->IsInt()) {
+            failure = "missing required parameter: y";
+        } else if (!si || !si->IsInt()) {
+            failure = "missing required parameter: source_id";
+        }
+        if (!failure.empty()) {
+            if (failed_count > 0) failure_detail += "; ";
+            failure_detail += "cells[" + std::to_string(i) + "]: " + failure;
+            ++failed_count;
+            continue;
+        }
+
+        godot::Vector2i atlas_coords(0, 0);
+        auto* ac = cell.Find("atlas_coords");
+        if (ac && ac->IsObject()) {
+            auto* acx = ac->Find("x");
+            auto* acy = ac->Find("y");
+            if (acx && acx->IsInt() && acy && acy->IsInt())
+                atlas_coords = godot::Vector2i(static_cast<int>(acx->GetInt()), static_cast<int>(acy->GetInt()));
+        }
+
+        tile_map->set_cell(layer,
+            godot::Vector2i(static_cast<int>(cx->GetInt()), static_cast<int>(cy->GetInt())),
+            static_cast<int>(si->GetInt()), atlas_coords);
+        ++set_count;
+    }
+
+    if (failed_count > 0) {
+        JV e(JV::object_tag);
+        e["error"] = JV("invalid cells entries: " + failure_detail);
+        e["warnings"] = JV(std::to_string(failed_count) + " cells skipped");
+        return e;
+    }
+
+    JV r(JV::object_tag);
+    JV info(JV::object_tag);
+    info["set_count"] = JV(set_count);
+    info["layer"] = JV(layer);
+    r["result"] = std::move(info);
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "tilemap_set_cells completed");
+    return r;
+}
+
 JV handle_tileset_create(const JV& args) {
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "tileset_create called");
 
@@ -204,6 +281,7 @@ JV handle_tileset_create(const JV& args) {
     info["class"] = JV("TileSet");
     info["name"] = JV(name);
     info["object_id"] = JV(static_cast<int64_t>(tile_set->get_instance_id()));
+    info["object_id_str"] = JV(std::to_string(static_cast<int64_t>(tile_set->get_instance_id())));
     r["result"] = std::move(info);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "tileset_create completed");
     return r;

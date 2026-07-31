@@ -12,6 +12,8 @@ mcp::JsonValue handle_load_threaded_get_status(const mcp::JsonValue& args);
 mcp::JsonValue handle_load_threaded_wait(const mcp::JsonValue& args);
 mcp::JsonValue handle_save(const mcp::JsonValue& args);
 mcp::JsonValue handle_create(const mcp::JsonValue& args);
+mcp::JsonValue handle_set_property(const mcp::JsonValue& args);
+mcp::JsonValue handle_get_property(const mcp::JsonValue& args);
 mcp::JsonValue handle_duplicate(const mcp::JsonValue& args);
 mcp::JsonValue handle_get_type(const mcp::JsonValue& args);
 mcp::JsonValue handle_exists(const mcp::JsonValue& args);

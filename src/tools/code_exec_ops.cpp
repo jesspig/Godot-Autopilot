@@ -1,10 +1,14 @@
 #include "code_exec_ops.hpp"
 #include "core/log_system.hpp"
 #include "register_all.hpp"
+#include "tools/debugger_ops.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/editor_interface.hpp>
+#include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/gd_script.hpp>
 #include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/classes/scene_tree.hpp>
+#include <godot_cpp/classes/window.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 #include <chrono>
@@ -121,6 +125,7 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
         while (std::getline(stream, line)) {
             size_t pos = line.find_first_not_of(" \t");
             if (pos == std::string::npos || line[pos] == '#') continue;
+            if (pos + 1 < line.size() && line[pos] == '/' && line[pos + 1] == '/') continue;
             if (line.compare(pos, 5, "func ") == 0) {
                 has_func_def = true;
                 break;
@@ -199,28 +204,23 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
         bool use_tab_style = uses_tabs && !uses_spaces;
         std::string prefix = use_tab_style ? "\t" : "    ";
 
-        // Detect if user code already has indentation on continuation lines
-        bool has_indent = false;
-        for (size_t i = 0; i < cleaned.size(); i++) {
-            if (cleaned[i] == '\n' && i + 1 < cleaned.size() && (cleaned[i+1] == ' ' || cleaned[i+1] == '\t')) {
-                has_indent = true;
-                break;
-            }
-        }
-
         wrapped = "@tool\nextends Node\n\nfunc " + func_name + "():\n";
         if (!cleaned.empty()) {
-            if (has_indent) {
-                wrapped += cleaned;
-            } else {
-                wrapped += prefix;
-                for (size_t i = 0; i < cleaned.size(); i++) {
-                    if (cleaned[i] == '\n') {
-                        wrapped += '\n';
-                        wrapped += prefix;
-                    } else {
-                        wrapped += cleaned[i];
-                    }
+            std::istringstream stream(cleaned);
+            std::string line;
+            bool first_line = true;
+            while (std::getline(stream, line)) {
+                if (!first_line) wrapped += "\n";
+                first_line = false;
+
+                // Find original indentation
+                size_t content_start = line.find_first_not_of(" \t");
+                if (content_start == std::string::npos) {
+                    // Empty/whitespace-only line → just the base prefix
+                    wrapped += prefix;
+                } else {
+                    // Line with content: base prefix + original content (preserving relative indent)
+                    wrapped += prefix + line;
                 }
             }
         }
@@ -240,9 +240,27 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
     godot::Error parse_err = script->reload();
     if (parse_err != godot::OK) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("GDScript compilation failed with error code: "
-            + std::to_string(static_cast<int>(parse_err)));
+        int code = static_cast<int>(parse_err);
+        std::string err_name = "ERR_UNKNOWN";
+        if (code == 43) err_name = "ERR_PARSE_ERROR";
+        e["error"] = mcp::JsonValue("GDScript compilation failed: "
+            + err_name + " (code " + std::to_string(code) + ")");
         return e;
+    }
+
+    size_t log_before = debugger_ops::capture_log_count();
+
+    // Record child count before execution for leak detection
+    int child_count_before = 0;
+    godot::Node* scene_root_for_leak = nullptr;
+    {
+        auto* editor_for_leak = godot::EditorInterface::get_singleton();
+        if (editor_for_leak) {
+            scene_root_for_leak = editor_for_leak->get_edited_scene_root();
+        }
+    }
+    if (scene_root_for_leak) {
+        child_count_before = scene_root_for_leak->get_child_count();
     }
 
     godot::Node* temp_node = memnew(godot::Node);
@@ -250,10 +268,21 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
 
     // Temporarily add to scene tree so get_tree() is available
     godot::EditorInterface* editor_4 = godot::EditorInterface::get_singleton();
+    godot::Node* parent_node = nullptr;
     godot::Node* scene_root_4 = editor_4 ? editor_4->get_edited_scene_root() : nullptr;
-    bool temp_added_4 = false;
     if (scene_root_4) {
-        scene_root_4->add_child(temp_node);
+        parent_node = scene_root_4;
+    } else {
+        auto* engine = godot::Engine::get_singleton();
+        auto* main_loop = engine ? engine->get_main_loop() : nullptr;
+        auto* tree = godot::Object::cast_to<godot::SceneTree>(main_loop);
+        if (tree) {
+            parent_node = godot::Object::cast_to<godot::Node>(tree->get_root());
+        }
+    }
+    bool temp_added_4 = false;
+    if (parent_node) {
+        parent_node->add_child(temp_node);
         temp_added_4 = true;
     }
 
@@ -289,10 +318,27 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
 
     result = temp_node->call(fn_name);
 
+    std::string new_error_text = debugger_ops::capture_new_error_text(log_before);
+
     if (temp_added_4 && temp_node->get_parent()) {
         temp_node->get_parent()->remove_child(temp_node);
     }
     memdelete(temp_node);
+
+    // ── Leak cleanup: remove any nodes users added directly to scene_root (without owner) ──
+    if (scene_root_for_leak) {
+        int child_count_after = scene_root_for_leak->get_child_count();
+        if (child_count_after > child_count_before) {
+            auto children = scene_root_for_leak->get_children();
+            for (int i = children.size() - 1; i >= 0; i--) {
+                auto* child = godot::Object::cast_to<godot::Node>(children[i]);
+                if (child && child->get_owner() == nullptr) {
+                    scene_root_for_leak->remove_child(child);
+                    memdelete(child);
+                }
+            }
+        }
+    }
 
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() - start_time).count();
@@ -300,6 +346,13 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = VariantJson::serialize(result);
     r["execution_time_ms"] = mcp::JsonValue(static_cast<int64_t>(elapsed));
+    if (!new_error_text.empty()) {
+        r["runtime_error"] = mcp::JsonValue(true);
+        r["error_details"] = mcp::JsonValue(new_error_text);
+    }
+    if (!temp_added_4) {
+        r["note"] = mcp::JsonValue("temporary node was not added to any scene tree — get_tree() will be null");
+    }
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "code_execute completed");
     return r;
 }
