@@ -34,6 +34,18 @@ godot::Node* find_node(const std::string& path_str) {
     }
     godot::NodePath np(godot::String(clean.c_str()));
     auto* node = root->get_node_or_null(np);
+    if (!node) {
+        // Strip root name prefix if present (e.g. "Game/Player" → "Player" when root is "Game")
+        std::string root_name = to_std(root->get_name());
+        if (clean.size() > root_name.size() + 1 &&
+            clean.compare(0, root_name.size(), root_name) == 0 &&
+            clean[root_name.size()] == '/') {
+            std::string sub = clean.substr(root_name.size() + 1);
+            if (!sub.empty()) {
+                node = root->get_node_or_null(godot::NodePath(godot::String(sub.c_str())));
+            }
+        }
+    }
     if (!node) return nullptr;
     if (node == root) return node;
     auto* p = node->get_parent();

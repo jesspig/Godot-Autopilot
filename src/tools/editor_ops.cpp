@@ -322,10 +322,10 @@ mcp::JsonValue handle_inspect_object(const mcp::JsonValue& args) {
 
 mcp::JsonValue handle_undo_redo_start(const mcp::JsonValue& args) {
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "editor_undo_redo_start called");
-    auto* an = args.Find("action_name");
+    auto* an = args.Find("name");
     if (!an || !an->IsString()) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("missing required parameter: action_name");
+        e["error"] = mcp::JsonValue("missing required parameter: name");
         return e;
     }
     std::string action_name = an->GetString();
@@ -581,9 +581,21 @@ mcp::JsonValue handle_play_current_scene(const mcp::JsonValue&) {
         e["error"] = mcp::JsonValue("EditorInterface not available");
         return e;
     }
+    if (editor->is_playing_scene()) {
+        mcp::JsonValue a(mcp::JsonValue::object_tag);
+        a["result"] = mcp::JsonValue("already_playing");
+        a["is_playing"] = mcp::JsonValue(true);
+        return a;
+    }
     editor->play_current_scene();
+    if (!editor->is_playing_scene()) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("failed to start scene playback: no game process started — ensure the current scene is saved and runnable");
+        return e;
+    }
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue("ok");
+    r["is_playing"] = mcp::JsonValue(true);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "editor_play_current_scene completed");
     return r;
 }

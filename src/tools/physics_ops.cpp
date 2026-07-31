@@ -7,6 +7,8 @@
 #include <godot_cpp/classes/collision_object3d.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/classes/viewport.hpp>
+#include <godot_cpp/classes/world2d.hpp>
 #include <godot_cpp/classes/physics_server3d.hpp>
 #include <godot_cpp/classes/physics_direct_space_state2d.hpp>
 #include <godot_cpp/classes/physics_direct_space_state3d.hpp>
@@ -186,12 +188,31 @@ JV handle_2d_space_get_direct_state(const JV& args) {
     JV ret(JV::object_tag); ret["result"] = std::move(r); return ret;
 }
 
+static godot::RID auto_detect_2d_space() {
+    auto* editor = godot::EditorInterface::get_singleton();
+    if (!editor) return godot::RID();
+    auto* root = editor->get_edited_scene_root();
+    if (!root) return godot::RID();
+    auto* viewport = root->get_viewport();
+    if (!viewport) return godot::RID();
+    auto world = viewport->find_world_2d();
+    if (!world.is_valid()) return godot::RID();
+    return world->get_space();
+}
+
 JV handle_2d_ray_cast(const JV& args) {
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_2d_ray_cast called");
-    godot::RID space = resolve(args, "space_rid");
+    auto* it_rid = args.Find("space_rid");
+    godot::RID space;
+    if (it_rid && it_rid->IsNumber()) {
+        space = resolve(args, "space_rid");
+    }
+    if (!space.is_valid()) {
+        space = auto_detect_2d_space();
+    }
     auto* it_from = args.Find("from");
     auto* it_to = args.Find("to");
-    if (!space.is_valid()) { JV r(JV::object_tag); r["error"] = JV("missing or invalid required parameter: space_rid"); return r; }
+    if (!space.is_valid()) { JV r(JV::object_tag); r["error"] = JV("could not resolve 2D physics space: provide space_rid or ensure a scene with a 2D viewport is open"); return r; }
     if (!it_from || !it_from->IsObject()) { JV r(JV::object_tag); r["error"] = JV("missing required parameter: from"); return r; }
     if (!it_to || !it_to->IsObject()) { JV r(JV::object_tag); r["error"] = JV("missing required parameter: to"); return r; }
     auto* ps = godot::PhysicsServer2D::get_singleton();

@@ -111,6 +111,13 @@ struct AudioPlayerVariant {
         else if (p2) p2->set_stream(stream);
         else if (p3) p3->set_stream(stream);
     }
+
+    godot::Ref<godot::AudioStream> get_stream() {
+        if (p1) return p1->get_stream();
+        if (p2) return p2->get_stream();
+        if (p3) return p3->get_stream();
+        return {};
+    }
 };
 
 AudioPlayerVariant resolve_audio_player(godot::Node* node) {
@@ -368,6 +375,9 @@ mcp::JsonValue handle_stream_play(const mcp::JsonValue& args) {
     auto* fp = args.Find("from_position");
     if (fp && fp->IsNumber()) {
         from_pos = static_cast<float>(fp->IsDouble() ? fp->GetDouble() : static_cast<double>(fp->GetInt()));
+    }
+    if (ap.get_stream().is_null()) {
+        return error_json("node has no audio stream set: " + path + " — set the stream first (e.g. resource_set_property with a loaded AudioStream resource)");
     }
     ap.play(from_pos);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "audio_stream_play completed");

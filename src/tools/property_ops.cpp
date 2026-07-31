@@ -3,6 +3,7 @@
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/class_db_singleton.hpp>
+#include <godot_cpp/classes/global_constants.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
@@ -21,6 +22,17 @@ namespace {
 std::string to_std_string(const godot::String& s) {
     godot::CharString utf8 = s.utf8();
     return std::string(utf8.ptr());
+}
+
+godot::Dictionary find_property_info(godot::Node* node, const std::string& prop_name) {
+    godot::TypedArray<godot::Dictionary> props = node->get_property_list();
+    for (int64_t i = 0; i < props.size(); i++) {
+        godot::Dictionary dict = props[i];
+        if (dict.has("name") && to_std_string(dict["name"].operator godot::String()) == prop_name) {
+            return dict;
+        }
+    }
+    return godot::Dictionary();
 }
 
 godot::Node* resolve_node(const std::string& path_str) {
@@ -103,6 +115,14 @@ mcp::JsonValue handle_get(const mcp::JsonValue& args) {
     }
 
     godot::StringName prop_name(prop_str.c_str());
+
+    godot::Dictionary prop_info = find_property_info(node, prop_str);
+    if (prop_info.is_empty()) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("property not found: " + prop_str + " on node " + path_str + " — use property_get_list to see available properties");
+        return e;
+    }
+
     godot::Variant value = node->get(prop_name);
 
     mcp::JsonValue r(mcp::JsonValue::object_tag);
@@ -147,15 +167,23 @@ mcp::JsonValue handle_set(const mcp::JsonValue& args) {
     }
 
     if (type_hint.empty()) {
-        godot::TypedArray<godot::Dictionary> props = node->get_property_list();
-        for (int64_t i = 0; i < props.size(); i++) {
-            godot::Dictionary dict = props[i];
-            if (dict.has("name") && to_std_string(dict["name"].operator godot::String()) == prop_str) {
-                if (dict.has("type")) {
-                    int type_id = static_cast<int>(dict["type"]);
-                    type_hint = to_std_string(godot::Variant::get_type_name(static_cast<godot::Variant::Type>(type_id)));
+        godot::Dictionary dict = find_property_info(node, prop_str);
+        if (!dict.is_empty() && dict.has("type")) {
+            int type_id = static_cast<int>(dict["type"]);
+            int hint_val = 0;
+            if (dict.has("hint")) {
+                hint_val = static_cast<int>(dict["hint"]);
+            }
+            bool is_object_type = static_cast<godot::Variant::Type>(type_id) == godot::Variant::OBJECT;
+            bool is_resource_hint = hint_val == godot::PROPERTY_HINT_RESOURCE_TYPE;
+            if ((is_object_type || is_resource_hint) && dict.has("hint_string")) {
+                std::string hint_str = to_std_string(dict["hint_string"].operator godot::String());
+                if (!hint_str.empty()) {
+                    type_hint = hint_str;
                 }
-                break;
+            }
+            if (type_hint.empty()) {
+                type_hint = to_std_string(godot::Variant::get_type_name(static_cast<godot::Variant::Type>(type_id)));
             }
         }
     }
@@ -166,18 +194,38 @@ mcp::JsonValue handle_set(const mcp::JsonValue& args) {
     godot::Variant old_val = node->get(prop_name);
     node->set(prop_name, value);
 
+    godot::Variant new_val = node->get(prop_name);
+    std::string expected_dump = VariantJson::serialize(value).Dump();
+    std::string actual_dump = VariantJson::serialize(new_val).Dump();
+
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue("ok");
+
+    if (expected_dump != actual_dump) {
+        r["warning"] = mcp::JsonValue(
+            "set applied but readback mismatch: expected " + expected_dump +
+            ", got " + actual_dump +
+            " — property may have been rejected (type mismatch) or converted");
+    }
 
     bool is_camera2d = false;
     auto* cdbs = godot::ClassDBSingleton::get_singleton();
     if (cdbs) {
         is_camera2d = cdbs->is_parent_class(node->get_class(), godot::StringName("Camera2D"));
     }
-    if (is_camera2d && (prop_str == "enabled" || prop_str == "current")) {
-        r["serialization_note"] = mcp::JsonValue(
-            "Camera2D " + prop_str + " is runtime-only and won't appear in .tscn. "
-            "Use code_execute to call set_" + prop_str + "() after _ready() for initial state.");
+    if (is_camera2d) {
+        if (prop_str == "enabled") {
+            r["serialization_note"] = mcp::JsonValue(
+                "Camera2D enabled defaults to true. If setting to true (the default), it won't appear in .tscn. "
+                "If setting to false, it will serialize correctly. "
+                "To ensure initial enabled state, use code_execute: "
+                "get_node(\"Path/To/Camera2D\").set_enabled(true/false) in _ready().");
+        } else if (prop_str == "current") {
+            r["serialization_note"] = mcp::JsonValue(
+                "Camera2D current is not a registered property (no setter/getter). "
+                "Cannot be set via property_set. "
+                "Use code_execute: get_node(\"Path/To/Camera2D\").make_current()");
+        }
     }
 
     mcp::JsonValue undo_info(mcp::JsonValue::object_tag);

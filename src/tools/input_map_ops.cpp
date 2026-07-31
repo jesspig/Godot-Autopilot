@@ -65,6 +65,21 @@ JV handle_action_add_event(const JV& args) {
         return e;
     }
     im->action_add_event(godot::StringName(action.c_str()), event);
+    {
+        auto* ps = godot::ProjectSettings::get_singleton();
+        if (ps) {
+            auto* im = godot::InputMap::get_singleton();
+            if (im && im->has_action(godot::StringName(action.c_str()))) {
+                godot::TypedArray<godot::InputEvent> events = im->action_get_events(godot::StringName(action.c_str()));
+                godot::Array arr;
+                for (int i = 0; i < events.size(); i++) {
+                    arr.append(events[i]);
+                }
+                ps->set_setting("input/" + godot::String(action.c_str()) + "/events", arr);
+                ps->save();
+            }
+        }
+    }
     JV r(JV::object_tag);
     r["result"] = JV("ok");
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "input_map_action_add_event completed");
@@ -162,6 +177,18 @@ JV handle_add_action(const JV& args) {
         deadzone = static_cast<float>(dz->IsDouble() ? dz->GetDouble() : static_cast<double>(dz->GetInt()));
     }
     im->add_action(godot::StringName(action.c_str()), deadzone);
+    {
+        auto* ps = godot::ProjectSettings::get_singleton();
+        if (ps) {
+            godot::String setting_path = "input/" + godot::String(action.c_str()) + "/deadzone";
+            godot::Variant existing = ps->get_setting(setting_path);
+            if (existing.get_type() == godot::Variant::NIL) {
+                ps->set_setting(setting_path, deadzone);
+                ps->set_setting("input/" + godot::String(action.c_str()) + "/events", godot::Array());
+                ps->save();
+            }
+        }
+    }
     JV r(JV::object_tag);
     r["result"] = JV("ok");
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "input_map_add_action completed");

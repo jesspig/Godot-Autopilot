@@ -1,6 +1,7 @@
 #include "group_ops.hpp"
 #include "core/log_system.hpp"
 #include <godot_cpp/classes/editor_interface.hpp>
+#include <godot_cpp/classes/editor_undo_redo_manager.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/variant/node_path.hpp>
@@ -70,12 +71,29 @@ mcp::JsonValue handle_add_node_to_group(const mcp::JsonValue& args) {
         return e;
     }
 
-    node->add_to_group(godot::StringName(group_name.c_str()));
+    godot::StringName group(group_name.c_str());
+    auto* editor = godot::EditorInterface::get_singleton();
+    auto* undo_redo = editor ? editor->get_editor_undo_redo() : nullptr;
+    if (undo_redo) {
+        undo_redo->create_action("Add Node to Group");
+        undo_redo->add_do_method(node, godot::StringName("add_to_group"), group, true);
+        undo_redo->add_undo_method(node, godot::StringName("remove_from_group"), group);
+        undo_redo->commit_action();
+    } else {
+        node->add_to_group(group, true);
+    }
+
+    if (!node->is_in_group(group)) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("add_to_group failed: node is not in group after operation: " + node_path + " group=" + group_name);
+        return e;
+    }
 
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue("added");
     r["node_path"] = mcp::JsonValue(node_path);
     r["group"] = mcp::JsonValue(group_name);
+    r["persistent"] = mcp::JsonValue(true);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
         "group_add_node_to_group: " + node_path + " -> " + group_name);
     return r;
@@ -106,7 +124,23 @@ mcp::JsonValue handle_remove_node_from_group(const mcp::JsonValue& args) {
         return e;
     }
 
-    node->remove_from_group(godot::StringName(group_name.c_str()));
+    godot::StringName group(group_name.c_str());
+    auto* editor = godot::EditorInterface::get_singleton();
+    auto* undo_redo = editor ? editor->get_editor_undo_redo() : nullptr;
+    if (undo_redo) {
+        undo_redo->create_action("Remove Node from Group");
+        undo_redo->add_do_method(node, godot::StringName("remove_from_group"), group);
+        undo_redo->add_undo_method(node, godot::StringName("add_to_group"), group, true);
+        undo_redo->commit_action();
+    } else {
+        node->remove_from_group(group);
+    }
+
+    if (node->is_in_group(group)) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("remove_from_group failed: node is still in group after operation: " + node_path + " group=" + group_name);
+        return e;
+    }
 
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue("removed");
