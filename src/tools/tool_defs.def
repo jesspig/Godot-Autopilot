@@ -34,6 +34,8 @@ TOOL_ENTRY(resource_get_dependencies, "resource_get_dependencies", "List all dep
 TOOL_ENTRY(resource_has_dependency, "resource_has_dependency", "Check if a resource depends on another file", "Resources", "resource,dependency,check", resource_ops::handle_has_dependency, SCHEMA_BASIC)
 TOOL_ENTRY(resource_import, "resource_import", "Import a single resource file (editor only)", "Resources", "resource,import", resource_ops::handle_import, SCHEMA_BASIC)
 TOOL_ENTRY(resource_reimport, "resource_reimport", "Reimport one or more resource files (editor only)", "Resources", "resource,reimport", resource_ops::handle_reimport, SCHEMA_BASIC)
+TOOL_ENTRY(resource_set_property, "resource_set_property", "Set a property on a resource", "Resources", "resource,property,set", resource_ops::handle_set_property, SCHEMA_BASIC)
+TOOL_ENTRY(resource_get_property, "resource_get_property", "Get a property value from a resource", "Resources", "resource,property,get", resource_ops::handle_get_property, SCHEMA_BASIC)
 
 // ── Scripts ──
 TOOL_ENTRY(script_execute_gdscript, "script_execute_gdscript", "Execute an arbitrary GDScript expression", "Scripts", "script,execute,gdscript", script_ops::handle_execute_gdscript, SCHEMA_BASIC)
@@ -49,7 +51,7 @@ TOOL_ENTRY(script_get_variable_list, "script_get_variable_list", "List all scrip
 
 // ── Physics 2D ──
 TOOL_ENTRY(physics_2d_space_get_direct_state, "physics_2d_space_get_direct_state", "Get the direct state of a 2D physics space", "Physics", "physics,2d,space", physics_ops::handle_2d_space_get_direct_state, SCHEMA_NONE)
-TOOL_ENTRY(physics_2d_ray_cast, "physics_2d_ray_cast", "Cast a ray in 2D physics space", "Physics", "physics,2d,ray", physics_ops::handle_2d_ray_cast, SCHEMA_NONE)
+TOOL_ENTRY(physics_2d_ray_cast, "physics_2d_ray_cast", "Cast a ray in 2D physics space", "Physics", "physics,2d,ray", physics_ops::handle_2d_ray_cast, SCHEMA_BASIC)
 TOOL_ENTRY(physics_2d_shape_cast, "physics_2d_shape_cast", "Cast a shape in 2D physics space", "Physics", "physics,2d,shape", physics_ops::handle_2d_shape_cast, SCHEMA_NONE)
 TOOL_ENTRY(physics_2d_point_query, "physics_2d_point_query", "Query a point in 2D physics space", "Physics", "physics,2d,point", physics_ops::handle_2d_point_query, SCHEMA_NONE)
 TOOL_ENTRY(physics_2d_intersect_shape, "physics_2d_intersect_shape", "Intersect a shape in 2D physics space", "Physics", "physics,2d,intersect,shape", physics_ops::handle_2d_intersect_shape, SCHEMA_NONE)
@@ -192,7 +194,7 @@ TOOL_ENTRY(audio_bus_set_mute, "audio_bus_set_mute", "Set mute on an audio bus",
 TOOL_ENTRY(audio_bus_set_bypass, "audio_bus_set_bypass", "Set bypass effects on an audio bus", "Audio", "audio,bus,bypass", audio_ops::handle_bus_set_bypass, SCHEMA_NONE)
 TOOL_ENTRY(audio_effect_add, "audio_effect_add", "Add an audio effect to a bus", "Audio", "audio,effect,add", audio_ops::handle_effect_add, SCHEMA_NONE)
 TOOL_ENTRY(audio_effect_remove, "audio_effect_remove", "Remove an audio effect from a bus", "Audio", "audio,effect,remove", audio_ops::handle_effect_remove, SCHEMA_NONE)
-TOOL_ENTRY(audio_stream_play, "audio_stream_play", "Play an audio stream", "Audio", "audio,stream,play", audio_ops::handle_stream_play, SCHEMA_NONE)
+TOOL_ENTRY(audio_stream_play, "audio_stream_play", "Play an audio stream", "Audio", "audio,stream,play", audio_ops::handle_stream_play, SCHEMA_BASIC)
 TOOL_ENTRY(audio_stream_stop, "audio_stream_stop", "Stop the currently playing audio stream", "Audio", "audio,stream,stop", audio_ops::handle_stream_stop, SCHEMA_NONE)
 TOOL_ENTRY(audio_stream_set_volume, "audio_stream_set_volume", "Set volume on the audio stream", "Audio", "audio,stream,volume", audio_ops::handle_stream_set_volume, SCHEMA_NONE)
 TOOL_ENTRY(audio_stream_set_pitch, "audio_stream_set_pitch", "Set pitch on the audio stream", "Audio", "audio,stream,pitch", audio_ops::handle_stream_set_pitch, SCHEMA_NONE)
@@ -207,25 +209,25 @@ TOOL_ENTRY(audio_get_input_device_list, "audio_get_input_device_list", "List aud
 TOOL_ENTRY(audio_set_input_device, "audio_set_input_device", "Set audio input device", "Audio", "audio,device", audio_ops::handle_set_input_device, SCHEMA_NONE)
 
 // ── Input ──
-TOOL_ENTRY(input_action_press, "input_action_press", "Press an input action", "Input", "input,action,press", input_ops::handle_action_press, SCHEMA_NONE)
-TOOL_ENTRY(input_action_release, "input_action_release", "Release an input action", "Input", "input,action,release", input_ops::handle_action_release, SCHEMA_NONE)
-TOOL_ENTRY(input_is_action_pressed, "input_is_action_pressed", "Check if an input action is pressed", "Input", "input,action,pressed", input_ops::handle_is_action_pressed, SCHEMA_NONE)
-TOOL_ENTRY(input_is_action_just_pressed, "input_is_action_just_pressed", "Check if an input action was just pressed", "Input", "input,action,just_pressed", input_ops::handle_is_action_just_pressed, SCHEMA_NONE)
-TOOL_ENTRY(input_key_press, "input_key_press", "Simulate a key press", "Input", "input,key,press", input_ops::handle_key_press, SCHEMA_NONE)
-TOOL_ENTRY(input_key_release, "input_key_release", "Simulate a key release", "Input", "input,key,release", input_ops::handle_key_release, SCHEMA_NONE)
-TOOL_ENTRY(input_mouse_move, "input_mouse_move", "Simulate mouse movement", "Input", "input,mouse,move", input_ops::handle_mouse_move, SCHEMA_NONE)
-TOOL_ENTRY(input_mouse_button_press, "input_mouse_button_press", "Simulate mouse button press", "Input", "input,mouse,press", input_ops::handle_mouse_button_press, SCHEMA_NONE)
-TOOL_ENTRY(input_mouse_button_release, "input_mouse_button_release", "Simulate mouse button release", "Input", "input,mouse,release", input_ops::handle_mouse_button_release, SCHEMA_NONE)
-TOOL_ENTRY(input_gamepad_simulate, "input_gamepad_simulate", "Simulate gamepad input", "Input", "input,gamepad,simulate", input_ops::handle_gamepad_simulate, SCHEMA_NONE)
+TOOL_ENTRY(input_action_press, "input_action_press", "Press an input action (editor process only — a running game is a separate process and will not receive these events)", "Input", "input,action,press", input_ops::handle_action_press, SCHEMA_NONE)
+TOOL_ENTRY(input_action_release, "input_action_release", "Release an input action (editor process only — a running game is a separate process and will not receive these events)", "Input", "input,action,release", input_ops::handle_action_release, SCHEMA_NONE)
+TOOL_ENTRY(input_is_action_pressed, "input_is_action_pressed", "Check if an input action is pressed (editor process only — a running game is a separate process and will not receive these events)", "Input", "input,action,pressed", input_ops::handle_is_action_pressed, SCHEMA_NONE)
+TOOL_ENTRY(input_is_action_just_pressed, "input_is_action_just_pressed", "Check if an input action was just pressed (editor process only — a running game is a separate process and will not receive these events)", "Input", "input,action,just_pressed", input_ops::handle_is_action_just_pressed, SCHEMA_NONE)
+TOOL_ENTRY(input_key_press, "input_key_press", "Simulate a key press (editor process only — a running game is a separate process and will not receive these events)", "Input", "input,key,press", input_ops::handle_key_press, SCHEMA_BASIC)
+TOOL_ENTRY(input_key_release, "input_key_release", "Simulate a key release (editor process only — a running game is a separate process and will not receive these events)", "Input", "input,key,release", input_ops::handle_key_release, SCHEMA_BASIC)
+TOOL_ENTRY(input_mouse_move, "input_mouse_move", "Simulate mouse movement (editor process only — a running game is a separate process and will not receive these events)", "Input", "input,mouse,move", input_ops::handle_mouse_move, SCHEMA_NONE)
+TOOL_ENTRY(input_mouse_button_press, "input_mouse_button_press", "Simulate mouse button press (editor process only — a running game is a separate process and will not receive these events)", "Input", "input,mouse,press", input_ops::handle_mouse_button_press, SCHEMA_NONE)
+TOOL_ENTRY(input_mouse_button_release, "input_mouse_button_release", "Simulate mouse button release (editor process only — a running game is a separate process and will not receive these events)", "Input", "input,mouse,release", input_ops::handle_mouse_button_release, SCHEMA_NONE)
+TOOL_ENTRY(input_gamepad_simulate, "input_gamepad_simulate", "Simulate gamepad input (editor process only — a running game is a separate process and will not receive these events)", "Input", "input,gamepad,simulate", input_ops::handle_gamepad_simulate, SCHEMA_NONE)
 
 // ── InputMap ──
-TOOL_ENTRY(input_map_action_add_event, "input_map_action_add_event", "Bind an input event to an action", "Input", "input,map", input_map_ops::handle_action_add_event, SCHEMA_BASIC)
-TOOL_ENTRY(input_map_action_erase_event, "input_map_action_erase_event", "Remove an input event from an action", "Input", "input,map", input_map_ops::handle_action_erase_event, SCHEMA_BASIC)
-TOOL_ENTRY(input_map_action_set_deadzone, "input_map_action_set_deadzone", "Set deadzone for an action", "Input", "input,map", input_map_ops::handle_action_set_deadzone, SCHEMA_BASIC)
-TOOL_ENTRY(input_map_add_action, "input_map_add_action", "Add a new input action", "Input", "input,map", input_map_ops::handle_add_action, SCHEMA_BASIC)
-TOOL_ENTRY(input_map_erase_action, "input_map_erase_action", "Remove an input action", "Input", "input,map", input_map_ops::handle_erase_action, SCHEMA_BASIC)
-TOOL_ENTRY(input_map_get_actions, "input_map_get_actions", "Get all input actions", "Input", "input,map", input_map_ops::handle_get_actions, SCHEMA_BASIC)
-TOOL_ENTRY(input_map_has_action, "input_map_has_action", "Check if an input action exists", "Input", "input,map", input_map_ops::handle_has_action, SCHEMA_BASIC)
+TOOL_ENTRY(input_map_action_add_event, "input_map_action_add_event", "Bind an input event to an action (modifies editor project InputMap — a running game process will not see the change)", "Input", "input,map", input_map_ops::handle_action_add_event, SCHEMA_BASIC)
+TOOL_ENTRY(input_map_action_erase_event, "input_map_action_erase_event", "Remove an input event from an action (modifies editor project InputMap — a running game process will not see the change)", "Input", "input,map", input_map_ops::handle_action_erase_event, SCHEMA_BASIC)
+TOOL_ENTRY(input_map_action_set_deadzone, "input_map_action_set_deadzone", "Set deadzone for an action (modifies editor project InputMap — a running game process will not see the change)", "Input", "input,map", input_map_ops::handle_action_set_deadzone, SCHEMA_BASIC)
+TOOL_ENTRY(input_map_add_action, "input_map_add_action", "Add a new input action (modifies editor project InputMap — a running game process will not see the change)", "Input", "input,map", input_map_ops::handle_add_action, SCHEMA_BASIC)
+TOOL_ENTRY(input_map_erase_action, "input_map_erase_action", "Remove an input action (modifies editor project InputMap — a running game process will not see the change)", "Input", "input,map", input_map_ops::handle_erase_action, SCHEMA_BASIC)
+TOOL_ENTRY(input_map_get_actions, "input_map_get_actions", "Get all input actions (reads editor project InputMap — a running game process has its own InputMap)", "Input", "input,map", input_map_ops::handle_get_actions, SCHEMA_BASIC)
+TOOL_ENTRY(input_map_has_action, "input_map_has_action", "Check if an input action exists (reads editor project InputMap — a running game process has its own InputMap)", "Input", "input,map", input_map_ops::handle_has_action, SCHEMA_BASIC)
 
 // ── Editor ──
 TOOL_ENTRY(editor_get_selection, "editor_get_selection", "Get currently selected nodes", "Editor", "editor,selection,get", editor_ops::handle_get_selection, SCHEMA_BASIC)
@@ -269,7 +271,7 @@ TOOL_ENTRY(editor_settings_set, "editor_settings_set", "Set an editor setting by
 TOOL_ENTRY(editor_settings_has, "editor_settings_has", "Check if an editor setting exists", "Config", "config,editor,settings,has", config_ops::handle_editor_settings_has, SCHEMA_BASIC)
 
 // ── Debug ──
-TOOL_ENTRY(debug_print, "debug_print", "Print a debug log message", "Debug", "debug,print,log", debug_ops::handle_print, SCHEMA_NONE)
+TOOL_ENTRY(debug_print, "debug_print", "Print a debug log message", "Debug", "debug,print,log", debug_ops::handle_print, SCHEMA_BASIC)
 TOOL_ENTRY(debug_print_stack, "debug_print_stack", "Print the current script call stack", "Debug", "debug,stack,trace", debug_ops::handle_print_stack, SCHEMA_NONE)
 TOOL_ENTRY(debug_get_performance_monitor, "debug_get_performance_monitor", "Get a specific performance monitor value by ID", "Debug", "debug,performance,monitor,get", debug_ops::handle_get_performance_monitor, SCHEMA_NONE)
 TOOL_ENTRY(debug_list_performance_monitors, "debug_list_performance_monitors", "List all available performance monitors", "Debug", "debug,performance,monitor,list", debug_ops::handle_list_performance_monitors, SCHEMA_NONE)
@@ -281,7 +283,7 @@ TOOL_ENTRY(debug_profile_stop, "debug_profile_stop", "Stop profiling (not availa
 TOOL_ENTRY(debug_profile_get_data, "debug_profile_get_data", "Get profiling data (not available via godot-cpp)", "Debug", "debug,profile,data", debug_ops::handle_profile_get_data, SCHEMA_NONE)
 TOOL_ENTRY(debug_set_fps_limit, "debug_set_fps_limit", "Set a dynamic FPS limit for the engine", "Debug", "debug,fps,limit,set", debug_ops::handle_set_fps_limit, SCHEMA_NONE)
 TOOL_ENTRY(debug_set_physics_fps, "debug_set_physics_fps", "Set the physics FPS (ticks per second)", "Debug", "debug,physics,fps,set", debug_ops::handle_set_physics_fps, SCHEMA_NONE)
-TOOL_ENTRY(debug_collision_debug, "debug_collision_debug", "Toggle collision debug visualization", "Debug", "debug,collision,visualize", debug_ops::handle_collision_debug, SCHEMA_NONE)
+TOOL_ENTRY(debug_collision_debug, "debug_collision_debug", "Toggle collision debug visualization", "Debug", "debug,collision,visualize", debug_ops::handle_collision_debug, SCHEMA_BASIC)
 TOOL_ENTRY(debug_navigation_debug, "debug_navigation_debug", "Toggle navigation debug visualization", "Debug", "debug,navigation,visualize", debug_ops::handle_navigation_debug, SCHEMA_NONE)
 TOOL_ENTRY(debug_performance_debug, "debug_performance_debug", "Toggle performance debug overlay in editor", "Debug", "debug,performance,overlay", debug_ops::handle_performance_debug, SCHEMA_NONE)
 
@@ -298,8 +300,8 @@ TOOL_ENTRY(debug_query_node_count, "debug_query_node_count", "Get current node c
 // ── Docs ──
 TOOL_ENTRY(doc_get_class, "doc_get_class", "Get detailed documentation for a Godot class", "Docs", "docs,class,get", doc_ops::handle_get_class, SCHEMA_NONE)
 TOOL_ENTRY(doc_search, "doc_search", "Search Godot classes by name", "Docs", "docs,search,class", doc_ops::handle_search, SCHEMA_NONE)
-TOOL_ENTRY(doc_get_method, "doc_get_method", "Get signature info for a specific method on a class", "Docs", "docs,method,get", doc_ops::handle_get_method, SCHEMA_NONE)
-TOOL_ENTRY(doc_get_property, "doc_get_property", "Get property info for a specific property on a class", "Docs", "docs,property,get", doc_ops::handle_get_property, SCHEMA_NONE)
+TOOL_ENTRY(doc_get_method, "doc_get_method", "Get signature info for a specific method on a class", "Docs", "docs,method,get", doc_ops::handle_get_method, SCHEMA_BASIC)
+TOOL_ENTRY(doc_get_property, "doc_get_property", "Get property info for a specific property on a class", "Docs", "docs,property,get", doc_ops::handle_get_property, SCHEMA_BASIC)
 
 // ── Display ──
 TOOL_ENTRY(display_clipboard_get, "display_clipboard_get", "Get clipboard text", "Display", "display,clipboard", display_ops::handle_clipboard_get, SCHEMA_NONE)
@@ -345,14 +347,14 @@ TOOL_ENTRY(os_set_environment, "os_set_environment", "Set an environment variabl
 TOOL_ENTRY(os_shell_open, "os_shell_open", "Open URL or file in default application", "OS", "os,shell", os_ops::handle_os_shell_open, SCHEMA_NONE)
 
 // ── SceneTree ──
-TOOL_ENTRY(scene_tree_call_group, "scene_tree_call_group", "Call a method on all nodes in a group", "Scene", "scene,group", scene_tree_ops::handle_call_group, SCHEMA_NONE)
-TOOL_ENTRY(scene_tree_create_timer, "scene_tree_create_timer", "Create a scene tree timer", "Scene", "scene,timer", scene_tree_ops::handle_create_timer, SCHEMA_NONE)
-TOOL_ENTRY(scene_tree_get_nodes_in_group, "scene_tree_get_nodes_in_group", "Get all nodes in a group", "Scene", "scene,group", scene_tree_ops::handle_get_nodes_in_group, SCHEMA_NONE)
-TOOL_ENTRY(scene_tree_is_paused, "scene_tree_is_paused", "Check if scene tree is paused", "Scene", "scene,pause", scene_tree_ops::handle_is_paused, SCHEMA_NONE)
-TOOL_ENTRY(scene_tree_notify_group, "scene_tree_notify_group", "Send a notification to a group", "Scene", "scene,group", scene_tree_ops::handle_notify_group, SCHEMA_NONE)
-TOOL_ENTRY(scene_tree_reload_current_scene, "scene_tree_reload_current_scene", "Reload the current scene", "Scene", "scene,reload", scene_tree_ops::handle_reload_current_scene, SCHEMA_NONE)
-TOOL_ENTRY(scene_tree_set_debug_collisions, "scene_tree_set_debug_collisions", "Toggle collision debug visualization", "Scene", "scene,debug", scene_tree_ops::handle_set_debug_collisions, SCHEMA_NONE)
-TOOL_ENTRY(scene_tree_set_pause, "scene_tree_set_pause", "Pause or unpause the scene tree", "Scene", "scene,pause", scene_tree_ops::handle_set_pause, SCHEMA_NONE)
+TOOL_ENTRY(scene_tree_call_group, "scene_tree_call_group", "Call a method on all nodes in a group", "Scene", "scene,group", scene_tree_ops::handle_call_group, SCHEMA_BASIC)
+TOOL_ENTRY(scene_tree_create_timer, "scene_tree_create_timer", "Create a scene tree timer", "Scene", "scene,timer", scene_tree_ops::handle_create_timer, SCHEMA_BASIC)
+TOOL_ENTRY(scene_tree_get_nodes_in_group, "scene_tree_get_nodes_in_group", "Get all nodes in a group", "Scene", "scene,group", scene_tree_ops::handle_get_nodes_in_group, SCHEMA_BASIC)
+TOOL_ENTRY(scene_tree_is_paused, "scene_tree_is_paused", "Check if scene tree is paused", "Scene", "scene,pause", scene_tree_ops::handle_is_paused, SCHEMA_BASIC)
+TOOL_ENTRY(scene_tree_notify_group, "scene_tree_notify_group", "Send a notification to a group", "Scene", "scene,group", scene_tree_ops::handle_notify_group, SCHEMA_BASIC)
+TOOL_ENTRY(scene_tree_reload_current_scene, "scene_tree_reload_current_scene", "Reload the current scene", "Scene", "scene,reload", scene_tree_ops::handle_reload_current_scene, SCHEMA_BASIC)
+TOOL_ENTRY(scene_tree_set_debug_collisions, "scene_tree_set_debug_collisions", "Toggle collision debug visualization", "Scene", "scene,debug", scene_tree_ops::handle_set_debug_collisions, SCHEMA_BASIC)
+TOOL_ENTRY(scene_tree_set_pause, "scene_tree_set_pause", "Pause or unpause the scene tree", "Scene", "scene,pause", scene_tree_ops::handle_set_pause, SCHEMA_BASIC)
 
 // ── Text ──
 TOOL_ENTRY(file_write, "file_write", "Write or append text content to a file", "Text", "file,write", text_ops::handle_file_write, SCHEMA_BASIC)
@@ -368,8 +370,9 @@ TOOL_ENTRY(text_shaped_text_add_string, "text_shaped_text_add_string", "Add a st
 TOOL_ENTRY(text_shaped_text_get_size, "text_shaped_text_get_size", "Get shaped text size", "Text", "text,shaped", text_ops::handle_shaped_text_get_size, SCHEMA_NONE)
 
 // ── TileMap ──
-TOOL_ENTRY(tilemap_create, "tilemap_create", "Create a TileMap node", "TileMap", "tilemap,create", tilemap_ops::handle_create, SCHEMA_NONE)
-TOOL_ENTRY(tilemap_set_cell, "tilemap_set_cell", "Set a cell on a TileMap node", "TileMap", "tilemap,cell,set", tilemap_ops::handle_set_cell, SCHEMA_NONE)
+TOOL_ENTRY(tilemap_create, "tilemap_create", "Create a TileMap node", "TileMap", "tilemap,create", tilemap_ops::handle_create, SCHEMA_BASIC)
+TOOL_ENTRY(tilemap_set_cell, "tilemap_set_cell", "Set a cell on a TileMap node", "TileMap", "tilemap,cell,set", tilemap_ops::handle_set_cell, SCHEMA_BASIC)
+TOOL_ENTRY(tilemap_set_cells, "tilemap_set_cells", "Set multiple cells on a TileMap node", "TileMap", "tilemap,cell,set,batch", tilemap_ops::handle_set_cells, SCHEMA_BASIC)
 TOOL_ENTRY(tileset_create, "tileset_create", "Create a TileSet resource", "TileMap", "tileset,create", tilemap_ops::handle_tileset_create, SCHEMA_NONE)
 
 // ── Group ──
@@ -379,6 +382,15 @@ TOOL_ENTRY(group_has_node_in_group, "group_has_node_in_group", "Check if a scene
 
 // ── Capture ──
 TOOL_ENTRY(editor_capture_viewport, "editor_capture_viewport", "Capture the editor viewport as a PNG image, returned as base64-encoded string", "Capture", "capture,screenshot,viewport", capture_ops::handle_capture_viewport, SCHEMA_BASIC)
+
+// ── Debugger ──
+TOOL_ENTRY(output_get_log, "output_get_log", "Get captured engine log entries (errors and messages)", "Debugger", "debugger,log,output", debugger_ops::handle_output_get_log, SCHEMA_NONE)
+TOOL_ENTRY(debugger_get_errors, "debugger_get_errors", "Get captured debugger errors with stack traces", "Debugger", "debugger,errors,stack", debugger_ops::handle_debugger_get_errors, SCHEMA_NONE)
+TOOL_ENTRY(debugger_get_output, "debugger_get_output", "Get captured game output (stdout/stderr)", "Debugger", "debugger,output,stdout", debugger_ops::handle_debugger_get_output, SCHEMA_NONE)
+TOOL_ENTRY(debugger_get_stack_dump, "debugger_get_stack_dump", "Get the most recent stack dump from the debugger", "Debugger", "debugger,stack,dump", debugger_ops::handle_debugger_get_stack_dump, SCHEMA_NONE)
+TOOL_ENTRY(debugger_get_scene_tree, "debugger_get_scene_tree", "Get the remote scene tree from a running game session", "Debugger", "debugger,scene,tree", debugger_ops::handle_debugger_get_scene_tree, SCHEMA_NONE)
+TOOL_ENTRY(debugger_get_monitors, "debugger_get_monitors", "Get performance monitor frames from the debugger", "Debugger", "debugger,monitors,performance", debugger_ops::handle_debugger_get_monitors, SCHEMA_NONE)
+TOOL_ENTRY(debugger_get_session_info, "debugger_get_session_info", "Get current debug session state (active, breaked, running)", "Debugger", "debugger,session,status", debugger_ops::handle_debugger_get_session_info, SCHEMA_NONE)
 
 // ── InputMap ──
 TOOL_ENTRY(input_map_persist, "input_map_persist", "Persist all runtime InputMap actions to ProjectSettings and save to disk", "InputMap", "input,map,persist,save", input_map_ops::handle_persist, SCHEMA_BASIC)

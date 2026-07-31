@@ -25,6 +25,7 @@
 #include "tools/tilemap_ops.hpp"
 #include "tools/group_ops.hpp"
 #include "tools/capture_ops.hpp"
+#include "tools/debugger_ops.hpp"
 #include "tools/schema_builder.hpp"
 
 namespace godot_self_driving {
@@ -103,11 +104,11 @@ mcp::JsonValue build_schema_for_none_by_name(const std::string& name) {
 
     if (name.rfind("input_", 0) == 0) {
         return schema::build_schema({
-            {"action", "string", "Input action name. Use input_map_get_actions to list available actions.", false},
+            {"action", "string", "Input action name — a programmatic identifier, not a display name. Use input_map_get_actions to list available actions.", false},
         });
     }
 
-    if (name.rfind("debug_", 0) == 0) {
+    if (name.rfind("debug_", 0) == 0 || name.rfind("debugger_", 0) == 0 || name.rfind("output_", 0) == 0) {
         mcp::JsonValue s(mcp::JsonValue::object_tag);
         s["type"] = mcp::JsonValue("object");
         s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
@@ -166,14 +167,41 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
 
         // ── Scene ──
         m["scene_node_create"] = schema::build_schema({
-            {"parent_path", "string", "Parent node path", true},
-            {"name", "string", "Node name", true},
-            {"type", "string", "Node class type (e.g. Node2D, Sprite2D)", true},
+            {"parent_path", "string", "Parent node path (omit to create root node)", false},
+            {"name", "string", "Node name (default: NewNode)", true},
+            {"type", "string", "Node class type (e.g. Node2D, Sprite2D, default: Node)", true},
         });
         m["scene_node_delete"] = schema::build_schema({
             {"path", "string", "Node path to delete", true},
         });
         m["scene_tree_get"] = schema::build_schema({});
+
+        // ── SceneTree ──
+        m["scene_tree_call_group"] = schema::build_schema({
+            {"group_name", "string", "Scene group name", true},
+            {"method", "string", "Method name to call on group nodes", true},
+            {"arguments", "array", "Optional arguments to pass to the method", false},
+        });
+        m["scene_tree_create_timer"] = schema::build_schema({
+            {"delay_sec", "number", "Timer delay in seconds", true},
+            {"process_always", "boolean", "Process when paused (default: true)", false},
+            {"process_in_physics", "boolean", "Process in physics step (default: false)", false},
+        });
+        m["scene_tree_get_nodes_in_group"] = schema::build_schema({
+            {"group_name", "string", "Scene group name", true},
+        });
+        m["scene_tree_is_paused"] = schema::build_schema({});
+        m["scene_tree_notify_group"] = schema::build_schema({
+            {"group_name", "string", "Scene group name", true},
+            {"notification", "integer", "Notification constant (e.g. NOTIFICATION_READY=13, NOTIFICATION_PROCESS=3)", true},
+        });
+        m["scene_tree_reload_current_scene"] = schema::build_schema({});
+        m["scene_tree_set_debug_collisions"] = schema::build_schema({
+            {"enabled", "boolean", "Enable collision debug visualization", true},
+        });
+        m["scene_tree_set_pause"] = schema::build_schema({
+            {"paused", "boolean", "Pause state", true},
+        });
 
         // ── Properties ──
         m["property_get"] = schema::build_schema({
@@ -199,9 +227,12 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
         // ── Resources ──
         m["resource_load"] = schema::build_schema({
             {"path", "string", "Resource file path", true},
+            {"type_hint", "string", "Resource type hint (e.g. PackedScene, Texture2D)", false},
         });
         m["resource_load_threaded"] = schema::build_schema({
             {"path", "string", "Resource file path", true},
+            {"type_hint", "string", "Resource type hint", false},
+            {"use_sub_threads", "boolean", "Use sub-threads for background loading", false},
         });
         m["resource_load_threaded_get_status"] = schema::build_schema({
             {"path", "string", "Resource file path", true},
@@ -210,17 +241,21 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"path", "string", "Resource file path", true},
         });
         m["resource_save"] = schema::build_schema({
-            {"path", "string", "Path to load from (if no object_id) or destination path", true},
-            {"dest_path", "string", "Optional destination path (defaults to path)", false},
-            {"class_type", "string", "Class type to instantiate if loading fails", false},
+            {"path", "string", "Source path to load from, or destination path if object_id provided", true},
+            {"dest_path", "string", "Destination path (defaults to path)", false},
+            {"name", "string", "Resource name for in-memory resources", false},
+            {"class_type", "string", "Class type to instantiate if resource not found", false},
             {"object_id", "integer", "Object ID of an in-memory resource to save", false},
-            {"flags", "integer", "Saver flags as bitfield", false},
+            {"object_id_str", "string", "Object ID as string (alternative to object_id)", false},
+            {"flags", "integer", "Saver flags as bitfield (see ResourceSaver.SaverFlags)", false},
         });
         m["resource_create"] = schema::build_schema({
             {"type", "string", "Resource class type (e.g. Resource, PackedScene)", true},
+            {"name", "string", "Optional resource name for identification", false},
         });
         m["resource_duplicate"] = schema::build_schema({
-            {"path", "string", "Resource path", true},
+            {"path", "string", "Resource path to load and duplicate", true},
+            {"deep", "boolean", "Deep duplicate (true) or shallow (false, default)", false},
         });
         m["resource_get_type"] = schema::build_schema({
             {"path", "string", "Resource path", true},
@@ -262,17 +297,35 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
         m["resource_reimport"] = schema::build_schema({
             {"path", "string", "Resource file path to reimport", true},
         });
+        m["resource_set_property"] = schema::build_schema({
+            {"object_id_str", "string", "Object ID as string (alternative to object_id)", false},
+            {"object_id", "integer", "Object ID of an in-memory resource", false},
+            {"name", "string", "Resource name for in-memory resources", false},
+            {"path", "string", "Resource path to load and modify", false},
+            {"property", "string", "Property name to set", true},
+            {"value", "object", "Property value to set", true},
+            {"type_hint", "string", "Type hint (e.g. Vector2, Color, int, float)", false},
+        });
+        m["resource_get_property"] = schema::build_schema({
+            {"object_id_str", "string", "Object ID as string (alternative to object_id)", false},
+            {"object_id", "integer", "Object ID of an in-memory resource", false},
+            {"name", "string", "Resource name for in-memory resources", false},
+            {"path", "string", "Resource path to load and read", false},
+            {"property", "string", "Property name to read", true},
+            {"type_hint", "string", "Type hint (e.g. Vector2, Color, int, float)", false},
+        });
 
         // ── Scripts ──
         m["script_execute_gdscript"] = schema::build_schema({
-            {"code", "string", "GDScript code to execute", true},
+            {"expression", "string", "GDScript expression or code to execute", true},
         });
         m["script_load"] = schema::build_schema({
             {"path", "string", "Script file path", true},
         });
         m["script_create"] = schema::build_schema({
             {"path", "string", "Script file path to create", true},
-            {"content", "string", "Script content", false},
+            {"source_code", "string", "Script content", false},
+            {"overwrite", "boolean", "Overwrite existing file (default: false)", false},
         });
         m["script_attach_to_node"] = schema::build_schema({
             {"node_path", "string", "Node path to attach script to", true},
@@ -282,7 +335,8 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"node_path", "string", "Node path to detach script from", true},
         });
         m["script_get_property"] = schema::build_schema({
-            {"node_path", "string", "Node path", true},
+            {"script_path", "string", "Resource path of the script (.gd file) to read a default property from", false},
+            {"node_path", "string", "Node path", false},
             {"property", "string", "Property name", true},
         });
         m["script_set_property"] = schema::build_schema({
@@ -364,6 +418,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
         // ── Config ──
         m["project_settings_get"] = schema::build_schema({
             {"name", "string", "Project setting name", true},
+            {"default", "object", "Default value if setting does not exist", false},
         });
         m["project_settings_set"] = schema::build_schema({
             {"name", "string", "Project setting name", true},
@@ -420,29 +475,118 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
 
         // ── InputMap ──
         m["input_map_add_action"] = schema::build_schema({
-            {"action", "string", "Action name (e.g. mario_jump, move_left)", true},
+            {"action", "string", "Action name identifier (e.g. \"mario_jump\", \"move_left\", \"ui_accept\") — this is a programmatic identifier, not a display name", true},
             {"deadzone", "number", "Deadzone value (default: 0.5)", false},
         });
         m["input_map_erase_action"] = schema::build_schema({
-            {"action", "string", "Action name to remove", true},
+            {"action", "string", "Action name identifier to remove (e.g. \"mario_jump\")", true},
         });
         m["input_map_get_actions"] = schema::build_schema({});
         m["input_map_has_action"] = schema::build_schema({
-            {"action", "string", "Action name to check", true},
+            {"action", "string", "Action name identifier to check for existence (e.g. \"ui_accept\")", true},
         });
         m["input_map_action_add_event"] = schema::build_schema({
-            {"action", "string", "Action name to bind event to", true},
+            {"action", "string", "Action name identifier to bind event to (e.g. \"mario_jump\")", true},
             {"event", "object", "Input event object (must include \"class\":\"InputEventKey\" etc.)", true},
         });
         m["input_map_action_erase_event"] = schema::build_schema({
-            {"action", "string", "Action name", true},
+            {"action", "string", "Action name identifier whose event to remove (e.g. \"mario_jump\")", true},
             {"event_index", "integer", "Index of event to remove", true},
         });
         m["input_map_action_set_deadzone"] = schema::build_schema({
-            {"action", "string", "Action name", true},
+            {"action", "string", "Action name identifier to set deadzone for (e.g. \"mario_jump\")", true},
             {"deadzone", "number", "Deadzone value (0.0 to 1.0)", true},
         });
         m["input_map_persist"] = schema::build_schema({});
+
+        // ── Input (explicit schemas) ──
+        m["input_key_press"] = schema::build_schema({
+            {"key", "string", "Key name to press (e.g. \"space\", \"A\", \"Shift\")", true},
+        });
+        m["input_key_release"] = schema::build_schema({
+            {"key", "string", "Key name to release (e.g. \"space\", \"A\", \"Shift\")", true},
+        });
+
+        // ── Physics (explicit) ──
+        m["physics_2d_ray_cast"] = schema::build_schema({
+            {"space_rid", "integer", "RID of the 2D physics space (omit to auto-detect from editor scene)", false},
+            {"from", "object", "Ray origin (Vector2 with x and y fields)", true},
+            {"to", "object", "Ray destination (Vector2 with x and y fields)", true},
+            {"collision_mask", "integer", "Collision layer mask", false},
+            {"exclude", "array", "Array of RIDs to exclude from collision", false},
+            {"collide_with_bodies", "boolean", "Should collide with physics bodies (default: true)", false},
+            {"collide_with_areas", "boolean", "Should collide with areas (default: false)", false},
+            {"hit_from_inside", "boolean", "Should hit shapes the ray starts inside of (default: false)", false},
+        });
+
+        // ── Audio (explicit) ──
+        m["audio_stream_play"] = schema::build_schema({
+            {"node_path", "string", "Path to the AudioStreamPlayer node", true},
+            {"stream_path", "string", "Path to an audio resource file (.ogg, .mp3, .wav) to load and play", false},
+            {"from_position", "number", "Start playback position in seconds", false},
+        });
+
+        // ── Debugger / Output ──
+        m["output_get_log"] = schema::build_schema({
+            {"limit", "integer", "Maximum number of log entries to return (default: 50)", false},
+        });
+        m["debugger_get_errors"] = schema::build_schema({
+            {"limit", "integer", "Maximum number of errors to return (default: 20)", false},
+        });
+        m["debugger_get_output"] = schema::build_schema({
+            {"limit", "integer", "Maximum number of output entries to return (default: 50)", false},
+        });
+        m["debugger_get_stack_dump"] = schema::build_schema({});
+        m["debugger_get_scene_tree"] = schema::build_schema({});
+        m["debugger_get_monitors"] = schema::build_schema({
+            {"count", "integer", "Number of recent monitor frames to return (default: 1)", false},
+        });
+        m["debugger_get_session_info"] = schema::build_schema({});
+
+        // ── Debug (explicit schema overrides for tools with custom params) ──
+        m["debug_print"] = schema::build_schema({
+            {"message", "string", "Debug log message to print", true},
+        });
+        m["debug_collision_debug"] = schema::build_schema({
+            {"enabled", "boolean", "Enable collision debug visualization", true},
+        });
+
+        // ── Docs (explicit schema overrides for tools needing more than just "class") ──
+        m["doc_get_method"] = schema::build_schema({
+            {"class", "string", "Godot class name", true},
+            {"method", "string", "Method name to look up documentation for", true},
+        });
+        m["doc_get_property"] = schema::build_schema({
+            {"class", "string", "Godot class name", true},
+            {"property", "string", "Property name to look up documentation for", true},
+        });
+
+        // ── TileMap (explicit schemas) ──
+        m["tilemap_create"] = schema::build_schema({
+            {"name", "string", "TileMap node name (default: TileMap)", false},
+            {"tile_size", "integer", "Tile size in pixels (default: 16)", false},
+            {"format", "integer", "Tile map cell format (0=square, 1=isometric, default: 0)", false},
+            {"parent_path", "string", "Parent node path (omit to add to root)", false},
+        });
+        m["tilemap_set_cell"] = schema::build_schema({
+            {"path", "string", "Path to the TileMap node", true},
+            {"x", "integer", "Cell X coordinate", true},
+            {"y", "integer", "Cell Y coordinate", true},
+            {"layer", "integer", "Tile layer index (default: 0)", false},
+            {"source_id", "integer", "TileSet source ID (default: 0)", false},
+            {"atlas_coords", "object", "Atlas coordinates Vector2i (e.g. {\"x\":0,\"y\":0})", false},
+        });
+        m["tilemap_set_cells"] = schema::build_schema({
+            {"node_path", "string", "Path to the TileMap node", true},
+            {"cells", "array", "Array of cells, each {\"x\":int,\"y\":int,\"source_id\":int,\"atlas_coords\":{\"x\":int,\"y\":int}}", true},
+            {"layer", "integer", "Tile layer index (default: 0)", false},
+        });
+
+        // ── Batch (for catalog discoverability) ──
+        m["batch_execute"] = schema::build_schema({
+            {"operations", "array", "Ordered list of operations to execute", true},
+            {"stop_on_error", "boolean", "Stop on first error (default: true)", false},
+        });
 
         return m;
     }();
@@ -961,7 +1105,16 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         return code_exec_ops::handle_code_execute(args);
     };
 
-    // ── 7. Populate BM25 index ──
+    // ── 7. Register meta-tools in catalog for discoverability ──
+    if (catalog.get_tool("batch_execute") == nullptr) {
+        catalog.add_tool({"batch_execute",
+            "Execute multiple tools in batch. Each operation runs in sequence; if stop_on_error is true and any operation fails, remaining operations are skipped.",
+            "System", {"batch", "execute", "multi"},
+            build_schema_for(SCHEMA_BASIC, "batch_execute")
+        });
+    }
+
+    // ── 8. Populate BM25 index ──
     for (auto* tool : catalog.get_all_tools()) {
         index.add_entry(tool->name, tool->description, tool->category, tool->tags);
     }
@@ -970,7 +1123,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
         std::to_string(count) + " tools registered via catalog");
 
-    // ── 8. Sync check: g_handlers vs catalog ──
+    // ── 9. Sync check: g_handlers vs catalog ──
     int missing_from_catalog = 0;
     for (auto& [name, _] : g_handlers) {
         if (catalog.get_tool(name) == nullptr) {
@@ -988,8 +1141,8 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
     // Reverse sync check: catalog → g_handlers
     for (auto* ctool : catalog.get_all_tools()) {
         if (g_handlers.find(ctool->name) == g_handlers.end() && meta_tool_names.find(ctool->name) == meta_tool_names.end()) {
-            LogSystem::instance().log(LogLevel::Warning, LogCategory::Tools,
-                "WARNING: tool '" + ctool->name + "' exists in catalog but has no handler in g_handlers");
+            LogSystem::instance().log(LogLevel::Error, LogCategory::Tools,
+                "tool '" + ctool->name + "' exists in catalog but has no handler in g_handlers");
         }
     }
 }
