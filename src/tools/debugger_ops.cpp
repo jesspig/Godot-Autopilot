@@ -428,7 +428,7 @@ namespace {
 
 mcp::JsonValue capture_note_for_empty_result() {
     return mcp::JsonValue(capture_session_active()
-        ? "session active but no data captured — the editor's built-in debug handlers consume these messages before plugins can see them (engine limitation)"
+        ? "session active but no data captured — the editor's built-in debug handlers consume debug messages before editor plugins can see them (engine limitation); use log_get_game_entries to read the game process log file instead"
         : "no active debug session — start the game with editor_play_current_scene");
 }
 

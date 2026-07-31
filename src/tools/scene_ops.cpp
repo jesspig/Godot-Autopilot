@@ -1,14 +1,18 @@
 #include "scene_ops.hpp"
+#include "core/log_system.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
 #include <godot_cpp/classes/class_db_singleton.hpp>
+#include <godot_cpp/classes/packed_scene.hpp>
+#include <godot_cpp/classes/resource_loader.hpp>
 
 namespace godot_self_driving {
 namespace scene_ops {
@@ -194,22 +198,10 @@ mcp::JsonValue handle_create(const mcp::JsonValue& args) {
         result_path = name;
     }
 
-    std::string parent_path_str;
-    if (has_parent) {
-        parent_path_str = pp->GetString();
-    } else if (editor) {
-        auto* scene_root = editor->get_edited_scene_root();
-        parent_path_str = scene_root ? to_std(scene_root->get_name()) : "";
-    }
-
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     mcp::JsonValue inner(mcp::JsonValue::object_tag);
     inner["path"] = mcp::JsonValue(result_path);
-    inner["undo"] = mcp::JsonValue(
-        "use editor_undo_redo tools: editor_undo_redo_start, "
-        "editor_undo_redo_add_do_method(scene_node_delete, " + result_path + "), "
-        "editor_undo_redo_add_undo_method(scene_node_create, " + name + ", " + type + ", " + parent_path_str + "), "
-        "editor_undo_redo_commit");
+    inner["undo"] = mcp::JsonValue("delete node " + result_path + " (scene_node_delete)");
     r["result"] = std::move(inner);
     return r;
 }
@@ -229,13 +221,20 @@ mcp::JsonValue handle_delete(const mcp::JsonValue& args) {
         return e;
     }
 
+    auto* editor = godot::EditorInterface::get_singleton();
+    auto* scene_root = editor ? editor->get_edited_scene_root() : nullptr;
+    if (node == scene_root) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue(
+            "cannot delete the scene root node — use editor_close_scene to close the scene, then editor_new_scene");
+        return e;
+    }
+
     std::string node_name = to_std(node->get_name());
     std::string node_type = to_std(node->get_class());
     std::string parent_path;
     auto* parent = node->get_parent();
     if (parent) {
-        auto* editor = godot::EditorInterface::get_singleton();
-        auto* scene_root = editor ? editor->get_edited_scene_root() : nullptr;
         std::string abs_parent = to_std(parent->get_path());
         if (scene_root) {
             std::string root_pref = to_std(scene_root->get_path());
@@ -260,11 +259,104 @@ mcp::JsonValue handle_delete(const mcp::JsonValue& args) {
     undo_info["type"] = mcp::JsonValue(node_type);
     undo_info["parent_path"] = mcp::JsonValue(parent_path);
     undo_info["hint"] = mcp::JsonValue(
-        "use editor_undo_redo tools: editor_undo_redo_start, "
-        "editor_undo_redo_add_do_method(property_set, " + path + ", enabled, false) (no-op if already deleted), "
-        "editor_undo_redo_add_undo_method(scene_node_create, " + node_name + ", " + node_type + ", " + parent_path + "), "
-        "editor_undo_redo_commit");
+        "recreate node " + node_name + " (" + node_type + ") under " + parent_path + " (scene_node_create)");
     r["undo"] = std::move(undo_info);
+    return r;
+}
+
+mcp::JsonValue handle_instance(const mcp::JsonValue& args) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "scene_instance called");
+
+    auto* p = args.Find("path");
+    if (!p || !p->IsString()) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("missing required parameter: path");
+        return e;
+    }
+    std::string path = p->GetString();
+
+    auto* loader = godot::ResourceLoader::get_singleton();
+    if (!loader) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("ResourceLoader not available");
+        return e;
+    }
+
+    godot::Ref<godot::Resource> res = loader->load(godot::String(path.c_str()));
+    auto* packed_scene = godot::Object::cast_to<godot::PackedScene>(res.ptr());
+    if (!packed_scene) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("failed to load packed scene: " + path);
+        return e;
+    }
+
+    godot::Node* instance = packed_scene->instantiate();
+    if (!instance) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("failed to instantiate scene: " + path);
+        return e;
+    }
+
+    auto* editor = godot::EditorInterface::get_singleton();
+    auto* scene_root = editor ? editor->get_edited_scene_root() : nullptr;
+
+    auto* pp = args.Find("parent_path");
+    godot::Node* parent = nullptr;
+    if (pp && pp->IsString() && !pp->GetString().empty()) {
+        parent = find_node(pp->GetString());
+        if (!parent) {
+            memdelete(instance);
+            mcp::JsonValue e(mcp::JsonValue::object_tag);
+            e["error"] = mcp::JsonValue("parent node not found: " + pp->GetString());
+            return e;
+        }
+    } else if (!scene_root) {
+        memdelete(instance);
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("no scene open");
+        return e;
+    } else {
+        parent = scene_root;
+    }
+
+    auto* n = args.Find("name");
+    if (n && n->IsString() && !n->GetString().empty()) {
+        instance->set_name(godot::StringName(n->GetString().c_str()));
+    }
+
+    parent->add_child(instance);
+
+    bool set_owner = true;
+    auto* o = args.Find("owner");
+    if (o && o->IsBool()) set_owner = o->GetBool();
+    if (set_owner && scene_root) {
+        instance->set_owner(scene_root);
+    }
+
+    std::string instance_name = to_std(instance->get_name());
+    std::string instance_type = to_std(instance->get_class());
+    std::string result_path = instance_name;
+    if (scene_root) {
+        std::string abs_path = to_std(instance->get_path());
+        std::string root_pref = to_std(scene_root->get_path());
+        if (abs_path == root_pref) {
+            result_path = instance_name;
+        } else if (abs_path.find(root_pref + "/") == 0) {
+            result_path = abs_path.substr(root_pref.size() + 1);
+        } else {
+            result_path = abs_path;
+        }
+    }
+
+    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    mcp::JsonValue inner(mcp::JsonValue::object_tag);
+    inner["path"] = mcp::JsonValue(result_path);
+    inner["name"] = mcp::JsonValue(instance_name);
+    inner["type"] = mcp::JsonValue(instance_type);
+    inner["undo"] = mcp::JsonValue("delete node " + result_path + " (scene_node_delete)");
+    r["result"] = std::move(inner);
+
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "scene_instance completed");
     return r;
 }
 

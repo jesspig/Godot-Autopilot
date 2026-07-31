@@ -1,4 +1,5 @@
 #include "tilemap_ops.hpp"
+#include "resource_ops.hpp"
 #include "core/log_system.hpp"
 #include <mcp/JsonValue.hpp>
 #include <godot_cpp/classes/class_db_singleton.hpp>
@@ -276,10 +277,13 @@ JV handle_tileset_create(const JV& args) {
     tile_set->set("resource_name", godot::String(name.c_str()));
     tile_set->set("tile_size", godot::Vector2i(tile_size, tile_size));
 
+    resource_ops::register_memory_resource(tile_set, name);
+
     JV r(JV::object_tag);
     JV info(JV::object_tag);
     info["class"] = JV("TileSet");
     info["name"] = JV(name);
+    info["path"] = JV("memory://" + name);
     info["object_id"] = JV(static_cast<int64_t>(tile_set->get_instance_id()));
     info["object_id_str"] = JV(std::to_string(static_cast<int64_t>(tile_set->get_instance_id())));
     r["result"] = std::move(info);
