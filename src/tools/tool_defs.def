@@ -5,8 +5,9 @@
 // ── Scene ──
 TOOL_ENTRY(scene_node_create, "scene_node_create", "Create a new scene node as child of a parent", "Scene", "node,create", scene_ops::handle_create, SCHEMA_BASIC)
 TOOL_ENTRY(scene_node_delete, "scene_node_delete", "Delete a scene node by path", "Scene", "node,delete", scene_ops::handle_delete, SCHEMA_BASIC)
-TOOL_ENTRY(scene_tree_get, "scene_tree_get", "Get the full scene tree", "Scene", "tree,structure", scene_ops::handle_get_tree, SCHEMA_BASIC)
+TOOL_ENTRY(scene_tree_get, "scene_tree_get", "Get the full scene tree (returns an error if no scene is currently open in the editor)", "Scene", "tree,structure", scene_ops::handle_get_tree, SCHEMA_BASIC)
 TOOL_ENTRY(scene_instance, "scene_instance", "Instantiate a PackedScene into the edited scene", "Scene", "scene,instance", scene_ops::handle_instance, SCHEMA_BASIC)
+TOOL_ENTRY(scene_get_tree, "scene_get_tree", "Get the current edited scene's node tree (name/type/path/children, optional properties summary)", "Scene", "scene,tree,inspect,read", scene_ops::handle_get_editor_scene_tree, SCHEMA_BASIC)
 
 // ── Properties ──
 TOOL_ENTRY(property_get, "property_get", "Get a property value from a scene node", "Properties", "property,get", property_ops::handle_get, SCHEMA_BASIC)
@@ -251,7 +252,7 @@ TOOL_ENTRY(editor_stop_playing, "editor_stop_playing", "Stop the running scene",
 TOOL_ENTRY(editor_get_resource_filesystem, "editor_get_resource_filesystem", "Get the editor file system", "Editor", "editor,filesystem,get", editor_ops::handle_get_resource_filesystem, SCHEMA_BASIC)
 TOOL_ENTRY(editor_get_plugin_list, "editor_get_plugin_list", "List all plugins (godot-cpp API cannot enumerate editor plugins — an empty array is expected; use editor_file_system_get_resources to read the addons directory instead)", "Editor", "editor,plugin,list", editor_ops::handle_get_plugin_list, SCHEMA_BASIC)
 TOOL_ENTRY(editor_set_plugin_enabled, "editor_set_plugin_enabled", "Enable or disable a plugin", "Editor", "editor,plugin,enable", editor_ops::handle_set_plugin_enabled, SCHEMA_BASIC)
-TOOL_ENTRY(editor_new_scene, "editor_new_scene", "Create a new scene with a root node", "Editor", "editor,scene,new", editor_ops::handle_new_scene, SCHEMA_BASIC)
+TOOL_ENTRY(editor_new_scene, "editor_new_scene", "Create a new scene with a root node (set close_current=true to automatically close the current scene first; this errors if the current scene has unsaved changes)", "Editor", "editor,scene,new", editor_ops::handle_new_scene, SCHEMA_BASIC)
 TOOL_ENTRY(editor_open_scene, "editor_open_scene", "Open a scene file in the editor by path", "Editor", "scene,open", editor_ops::handle_open_scene, SCHEMA_BASIC)
 TOOL_ENTRY(editor_save_scene_as, "editor_save_scene_as", "Save the current scene to a specific file path", "Editor", "editor,scene,save", editor_ops::handle_save_scene_as, SCHEMA_BASIC)
 TOOL_ENTRY(editor_new_text_resource, "editor_new_text_resource", "Create a new text resource file with the given content", "Editor", "editor,resource,text,create", editor_ops::handle_new_text_resource, SCHEMA_BASIC)
@@ -394,7 +395,7 @@ TOOL_ENTRY(group_remove_node_from_group, "group_remove_node_from_group", "Remove
 TOOL_ENTRY(group_has_node_in_group, "group_has_node_in_group", "Check if a scene node belongs to a group", "Group", "group,check", group_ops::handle_has_node_in_group, SCHEMA_BASIC)
 
 // ── Capture ──
-TOOL_ENTRY(editor_capture_viewport, "editor_capture_viewport", "Capture the editor viewport as a PNG image, returned as base64-encoded string", "Capture", "capture,screenshot,viewport", capture_ops::handle_capture_viewport, SCHEMA_BASIC)
+TOOL_ENTRY(editor_capture_viewport, "editor_capture_viewport", "Capture the editor viewport as a PNG image, returned as base64-encoded string (target parameter: \"editor\" default; \"game\" not supported yet)", "Capture", "capture,screenshot,viewport", capture_ops::handle_capture_viewport, SCHEMA_BASIC)
 
 // ── Debugger ──
 TOOL_ENTRY(output_get_log, "output_get_log", "Get captured engine log entries (errors and messages)", "Debugger", "debugger,log,output", debugger_ops::handle_output_get_log, SCHEMA_NONE)
@@ -405,5 +406,11 @@ TOOL_ENTRY(debugger_get_scene_tree, "debugger_get_scene_tree", "Get the remote s
 TOOL_ENTRY(debugger_get_monitors, "debugger_get_monitors", "Get performance monitor frames from the debugger", "Debugger", "debugger,monitors,performance", debugger_ops::handle_debugger_get_monitors, SCHEMA_NONE)
 TOOL_ENTRY(debugger_get_session_info, "debugger_get_session_info", "Get current debug session state (active, breaked, running)", "Debugger", "debugger,session,status", debugger_ops::handle_debugger_get_session_info, SCHEMA_NONE)
 
+// ── Game (runtime debug channel) ──
+TOOL_ENTRY(game_status, "game_status", "Query a running game process (engine version, current scene, node count, FPS) over the runtime debug channel — requires a game running from the editor (editor_play_current_scene) whose project loads the godot-self-driving extension", "Game", "game,runtime,status,debug", runtime_ops::handle_game_status, SCHEMA_BASIC)
+TOOL_ENTRY(game_eval, "game_eval", "Run code or inspect/modify state inside the running game process: action=\"script\" executes arbitrary GDScript (must extend Node and define func _run()); action=\"get_property\"/\"set_property\"/\"call_method\" operate on a node by path — requires a game running from the editor (editor_play_current_scene) whose project loads the godot-self-driving extension", "Game", "game,runtime,eval,script,debug", runtime_ops::handle_game_eval, SCHEMA_BASIC)
+TOOL_ENTRY(game_input, "game_input", "Simulate input inside the running game process (key / mouse_button / action events injected via Input.parse_input_event) — unlike the editor-process input_* tools, the running game receives these events; requires a game running from the editor (editor_play_current_scene) whose project loads the godot-self-driving extension", "Game", "game,runtime,input,simulate,debug", runtime_ops::handle_game_input, SCHEMA_BASIC)
+TOOL_ENTRY(game_capture, "game_capture", "Capture the running game's viewport as a PNG image, returned as base64-encoded string — requires a game running from the editor (editor_play_current_scene) whose project loads the godot-self-driving extension", "Game", "game,runtime,capture,screenshot,debug", runtime_ops::handle_game_capture, SCHEMA_BASIC)
+
 // ── InputMap ──
-TOOL_ENTRY(input_map_persist, "input_map_persist", "Persist all runtime InputMap actions to ProjectSettings and save to disk", "InputMap", "input,map,persist,save", input_map_ops::handle_persist, SCHEMA_BASIC)
+TOOL_ENTRY(input_map_persist, "input_map_persist", "Persist runtime InputMap actions to ProjectSettings and save to disk (optional actions whitelist; when omitted, actions prefixed with \"ui_\" or containing \"/\" are filtered out)", "InputMap", "input,map,persist,save", input_map_ops::handle_persist, SCHEMA_BASIC)

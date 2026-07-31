@@ -29,6 +29,7 @@
 #include "tools/group_ops.hpp"
 #include "tools/capture_ops.hpp"
 #include "tools/debugger_ops.hpp"
+#include "tools/runtime_ops.hpp"
 #include "tools/schema_builder.hpp"
 
 namespace godot_self_driving {
@@ -105,6 +106,10 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"path", "string", "Node path to delete", true},
         });
         m["scene_tree_get"] = schema::build_schema({});
+        m["scene_get_tree"] = schema::build_schema({
+            {"max_depth", "integer", "Maximum tree depth to include (default: 8)", false},
+            {"include_properties", "boolean", "Include a summary of node properties (default: false)", false},
+        });
         m["scene_instance"] = schema::build_schema({
             {"path", "string", "Path to the .tscn scene file to instantiate", true},
             {"parent_path", "string", "Parent node path (default: edited scene root)", false},
@@ -339,6 +344,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
         m["editor_new_scene"] = schema::build_schema({
             {"type", "string", "Node class type (default: Node)", false},
             {"name", "string", "Node name (default: NewRoot)", false},
+            {"close_current", "boolean", "Close the current scene first if it has no unsaved changes (default: false; errors if the current scene is unsaved)", false},
         });
         m["editor_open_scene"] = schema::build_schema({
             {"path", "string", "Path to the scene file to open (e.g., res://game.tscn)", true},
@@ -449,7 +455,9 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
         });
 
         // ── Capture ──
-        m["editor_capture_viewport"] = schema::build_schema({});
+        m["editor_capture_viewport"] = schema::build_schema({
+            {"target", "string", "Target to capture: \"editor\" (default); \"game\" is not supported yet", false},
+        });
 
         // ── InputMap ──
         m["input_map_add_action"] = schema::build_schema({
@@ -475,7 +483,9 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"action", "string", "Action name identifier to set deadzone for (e.g. \"mario_jump\")", true},
             {"deadzone", "number", "Deadzone value (0.0 to 1.0)", true},
         });
-        m["input_map_persist"] = schema::build_schema({});
+        m["input_map_persist"] = schema::build_schema({
+            {"actions", "array", "Action whitelist (array of action name strings); when omitted, actions prefixed with \"ui_\" or containing \"/\" are filtered out", false},
+        });
 
         // ── Input (explicit schemas) ──
         m["input_action_press"] = schema::build_schema({
@@ -1186,6 +1196,33 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"count", "integer", "Number of recent monitor frames to return (default: 1)", false},
         });
         m["debugger_get_session_info"] = schema::build_schema({});
+
+        // ── Game (runtime debug channel) ──
+        m["game_status"] = schema::build_schema({
+            {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 30000)", false},
+        });
+        m["game_eval"] = schema::build_schema({
+            {"action", "string", "Action to run in the game process: \"script\" (execute arbitrary GDScript), \"get_property\", \"set_property\", \"call_method\"", true},
+            {"node_path", "string", "Node path for get_property/set_property/call_method (omit to use the current scene root)", false},
+            {"property", "string", "Property name for get_property/set_property", false},
+            {"value", "object", "Value to set for set_property", false},
+            {"method", "string", "Method name for call_method", false},
+            {"args", "array", "Arguments for call_method", false},
+            {"source_code", "string", "GDScript source for action=\"script\" — must extend Node and define func _run()", false},
+            {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 30000)", false},
+        });
+        m["game_input"] = schema::build_schema({
+            {"type", "string", "Input event type: \"key\", \"mouse_button\" or \"action\"", true},
+            {"keycode", "string", "Key for type=\"key\": numeric key code (e.g. 65) or key name (e.g. \"A\", \"space\", \"KEY_LEFT\")", false},
+            {"pressed", "boolean", "Pressed state (default: true)", false},
+            {"button_index", "integer", "Mouse button index for type=\"mouse_button\" (e.g. 1=left, 2=right, 3=middle)", false},
+            {"position", "object", "Mouse position {x, y} for type=\"mouse_button\"", false},
+            {"action", "string", "Action name for type=\"action\"", false},
+            {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 30000)", false},
+        });
+        m["game_capture"] = schema::build_schema({
+            {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 30000)", false},
+        });
 
         // ── System ──
         m["log_get_game_entries"] = schema::build_schema({
