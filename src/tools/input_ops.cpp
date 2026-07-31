@@ -71,8 +71,8 @@ bool extract_vec2(const mcp::JsonValue& obj, double& x, double& y) {
     auto* yp = obj.Find("y");
     if (!xp || !xp->IsNumber()) return false;
     if (!yp || !yp->IsNumber()) return false;
-    x = xp->GetDouble();
-    y = yp->GetDouble();
+    x = xp->IsInt() ? static_cast<double>(xp->GetInt()) : xp->GetDouble();
+    y = yp->IsInt() ? static_cast<double>(yp->GetInt()) : yp->GetDouble();
     return true;
 }
 
@@ -92,7 +92,7 @@ mcp::JsonValue handle_action_press(const mcp::JsonValue& args) {
     float strength = 1.0f;
     auto* strength_p = args.Find("strength");
     if (strength_p && strength_p->IsNumber()) {
-        strength = static_cast<float>(strength_p->GetDouble());
+        strength = static_cast<float>(strength_p->IsInt() ? static_cast<double>(strength_p->GetInt()) : strength_p->GetDouble());
     }
 
     auto* input = godot::Input::get_singleton();
@@ -443,15 +443,15 @@ mcp::JsonValue handle_gamepad_simulate(const mcp::JsonValue& args) {
 
         float weak = 0.5f;
         auto* weak_p = args.Find("weak_magnitude");
-        if (weak_p && weak_p->IsNumber()) weak = static_cast<float>(weak_p->GetDouble());
+        if (weak_p && weak_p->IsNumber()) weak = static_cast<float>(weak_p->IsInt() ? static_cast<double>(weak_p->GetInt()) : weak_p->GetDouble());
 
         float strong = 0.5f;
         auto* strong_p = args.Find("strong_magnitude");
-        if (strong_p && strong_p->IsNumber()) strong = static_cast<float>(strong_p->GetDouble());
+        if (strong_p && strong_p->IsNumber()) strong = static_cast<float>(strong_p->IsInt() ? static_cast<double>(strong_p->GetInt()) : strong_p->GetDouble());
 
         float duration = 0.0f;
         auto* dur_p = args.Find("duration");
-        if (dur_p && dur_p->IsNumber()) duration = static_cast<float>(dur_p->GetDouble());
+        if (dur_p && dur_p->IsNumber()) duration = static_cast<float>(dur_p->IsInt() ? static_cast<double>(dur_p->GetInt()) : dur_p->GetDouble());
 
         input->start_joy_vibration(device, weak, strong, duration);
 

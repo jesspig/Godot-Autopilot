@@ -19,6 +19,8 @@ namespace scene_ops {
 
 namespace {
 
+constexpr const char* NODE_PATH_HINT = " — expected scene-relative path like 'Level1/Player' or absolute '/root/Level1/Player'";
+
 std::string to_std(const godot::String& s) {
     godot::CharString utf8 = s.utf8();
     return std::string(utf8.ptr());
@@ -144,7 +146,7 @@ mcp::JsonValue handle_create(const mcp::JsonValue& args) {
         auto* parent = find_node(parent_path);
         if (!parent) {
             mcp::JsonValue e(mcp::JsonValue::object_tag);
-            e["error"] = mcp::JsonValue("parent node not found: " + parent_path);
+            e["error"] = mcp::JsonValue("parent node not found: " + parent_path + NODE_PATH_HINT);
             return e;
         }
         parent->add_child(obj);
@@ -217,7 +219,7 @@ mcp::JsonValue handle_delete(const mcp::JsonValue& args) {
     auto* node = find_node(path);
     if (!node) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("node not found: " + path);
+        e["error"] = mcp::JsonValue("node not found: " + path + NODE_PATH_HINT);
         return e;
     }
 
@@ -307,7 +309,7 @@ mcp::JsonValue handle_instance(const mcp::JsonValue& args) {
         if (!parent) {
             memdelete(instance);
             mcp::JsonValue e(mcp::JsonValue::object_tag);
-            e["error"] = mcp::JsonValue("parent node not found: " + pp->GetString());
+            e["error"] = mcp::JsonValue("parent node not found: " + pp->GetString() + NODE_PATH_HINT);
             return e;
         }
     } else if (!scene_root) {

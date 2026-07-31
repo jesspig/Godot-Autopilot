@@ -2,7 +2,9 @@
 #include "core/log_system.hpp"
 #include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/classes/file_access.hpp>
+#include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/variant/string.hpp>
+#include <godot_cpp/variant/packed_string_array.hpp>
 #include <string>
 #include <vector>
 
@@ -12,6 +14,8 @@ namespace log_ops {
 using JV = mcp::JsonValue;
 
 namespace {
+
+constexpr char RUN_HINT[] = "game logs are written by the running game process (start it with editor_play_current_scene)";
 
 std::string to_std(const godot::String& s) {
     godot::CharString utf8 = s.utf8();
@@ -27,6 +31,32 @@ JV error_json(const std::string& msg) {
 constexpr int64_t DEFAULT_LIMIT = 50;
 constexpr int64_t MAX_LIMIT = 500;
 
+std::string logs_dir_diagnostic(const godot::String& logs_dir) {
+    auto dir = godot::DirAccess::open(logs_dir);
+    if (!dir.is_valid()) {
+        return "logs directory does not exist: \"" + to_std(logs_dir) + "\"";
+    }
+    godot::PackedStringArray names;
+    dir->list_dir_begin();
+    godot::String name = dir->get_next();
+    while (!name.is_empty()) {
+        if (name != "." && name != "..") {
+            names.push_back(name);
+        }
+        name = dir->get_next();
+    }
+    dir->list_dir_end();
+    if (names.size() == 0) {
+        return "logs directory is empty: \"" + to_std(logs_dir) + "\"";
+    }
+    std::string joined = "directory contains: ";
+    for (int i = 0; i < names.size(); i++) {
+        if (i > 0) joined += ", ";
+        joined += to_std(names[i]);
+    }
+    return joined;
+}
+
 } // namespace
 
 JV handle_log_get_game_entries(const JV& args) {
@@ -41,12 +71,17 @@ JV handle_log_get_game_entries(const JV& args) {
     }
     auto* os = godot::OS::get_singleton();
     if (!os) return error_json("OS singleton not available");
-    godot::String path = os->get_user_data_dir() + "/logs/godot.log";
+    godot::String logs_dir = os->get_user_data_dir() + "/logs";
+    godot::String path = logs_dir + "/godot.log";
     if (!godot::FileAccess::file_exists(path)) {
-        return error_json("game log file not found at " + to_std(path) + " — run the game first (editor_play_current_scene)");
+        return error_json("game log file not found: \"" + to_std(path) + "\" — " +
+            logs_dir_diagnostic(logs_dir) + " — " + RUN_HINT);
     }
     auto file = godot::FileAccess::open(path, godot::FileAccess::READ);
-    if (file.is_null()) return error_json("failed to open game log file at " + to_std(path));
+    if (file.is_null()) {
+        return error_json("failed to open game log file: \"" + to_std(path) + "\" — " +
+            logs_dir_diagnostic(logs_dir) + " — " + RUN_HINT);
+    }
     std::vector<std::string> tail;
     int64_t total_lines = 0;
     while (!file->eof_reached()) {

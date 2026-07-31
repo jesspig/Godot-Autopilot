@@ -28,6 +28,8 @@ namespace editor_ops {
 
 namespace {
 
+constexpr int MAX_TREE_DEPTH = 12;
+
 std::string to_std(const godot::String& s) {
     godot::CharString utf8 = s.utf8();
     return std::string(utf8.ptr());
@@ -72,18 +74,19 @@ std::string relative_path(godot::Node* node, godot::Node* root) {
     return abs_path;
 }
 
-void dir_to_json(godot::EditorFileSystemDirectory* dir, mcp::JsonValue& j, int depth) {
-    if (!dir) return;
+bool dir_to_json(godot::EditorFileSystemDirectory* dir, mcp::JsonValue& j, int depth) {
+    if (!dir) return false;
     j["name"] = mcp::JsonValue(to_std(dir->get_name()));
     j["path"] = mcp::JsonValue(to_std(dir->get_path()));
     j["type"] = mcp::JsonValue("directory");
     mcp::JsonValue children_arr(mcp::JsonValue::array_tag);
-    if (depth < 3) {
+    bool truncated = false;
+    if (depth < MAX_TREE_DEPTH) {
         for (int i = 0; i < dir->get_subdir_count(); i++) {
             auto* sub = dir->get_subdir(i);
             if (sub) {
                 mcp::JsonValue child(mcp::JsonValue::object_tag);
-                dir_to_json(sub, child, depth + 1);
+                if (dir_to_json(sub, child, depth + 1)) truncated = true;
                 children_arr.PushBack(std::move(child));
             }
         }
@@ -96,8 +99,11 @@ void dir_to_json(godot::EditorFileSystemDirectory* dir, mcp::JsonValue& j, int d
             file["children"] = mcp::JsonValue(mcp::JsonValue::array_tag);
             children_arr.PushBack(std::move(file));
         }
+    } else if (dir->get_subdir_count() > 0 || dir->get_file_count() > 0) {
+        truncated = true;
     }
     j["children"] = std::move(children_arr);
+    return truncated;
 }
 
 mcp::JsonValue error_json(const std::string& msg) {
@@ -509,9 +515,12 @@ mcp::JsonValue handle_file_system_get_resources(const mcp::JsonValue& args) {
         return r;
     }
     mcp::JsonValue result(mcp::JsonValue::object_tag);
-    dir_to_json(dir, result, 0);
+    bool truncated = dir_to_json(dir, result, 0);
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = std::move(result);
+    if (truncated) {
+        r["max_depth"] = mcp::JsonValue(static_cast<int64_t>(MAX_TREE_DEPTH));
+    }
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "editor_file_system_get_resources completed");
     return r;
 }

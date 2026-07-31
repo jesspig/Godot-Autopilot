@@ -393,12 +393,21 @@ mcp::JsonValue handle_save(const mcp::JsonValue& args) {
     }
 
     std::string save_dir = dest_path;
+    bool dirs_created = false;
     size_t last_slash = save_dir.find_last_of('/');
     if (last_slash != std::string::npos) {
         save_dir = save_dir.substr(0, last_slash);
         auto dir = godot::DirAccess::open(godot::String("res://"));
         if (dir.is_valid()) {
-            dir->make_dir_recursive(godot::String(save_dir.c_str()));
+            if (!dir->dir_exists(godot::String(save_dir.c_str()))) {
+                godot::Error mk_err = dir->make_dir_recursive(godot::String(save_dir.c_str()));
+                if (mk_err != godot::Error::OK) {
+                    mcp::JsonValue e(mcp::JsonValue::object_tag);
+                    e["error"] = mcp::JsonValue("failed to create directory: " + save_dir + " (error " + std::to_string(static_cast<int>(mk_err)) + ") — expected the directory to be creatable before saving the resource");
+                    return e;
+                }
+                dirs_created = true;
+            }
         }
     }
 
@@ -430,6 +439,9 @@ mcp::JsonValue handle_save(const mcp::JsonValue& args) {
 
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue(static_cast<int64_t>(err));
+    if (dirs_created) {
+        r["directories_created"] = mcp::JsonValue(true);
+    }
     return r;
 }
 

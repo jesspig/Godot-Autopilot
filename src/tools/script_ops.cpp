@@ -26,6 +26,8 @@ namespace script_ops {
 
 namespace {
 
+constexpr const char* NODE_PATH_HINT = " — expected scene-relative path like 'Level1/Player' or absolute '/root/Level1/Player'";
+
 constexpr int PROPERTY_USAGE_CATEGORY = 0x80;
 constexpr int PROPERTY_USAGE_INTERNAL = 0x08;
 
@@ -348,7 +350,7 @@ mcp::JsonValue handle_attach_to_node(const mcp::JsonValue& args) {
     godot::Node* node = resolve_node(node_path);
     if (!node) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("node not found: " + node_path);
+        e["error"] = mcp::JsonValue("node not found: " + node_path + NODE_PATH_HINT);
         return e;
     }
 
@@ -405,7 +407,7 @@ mcp::JsonValue handle_detach_from_node(const mcp::JsonValue& args) {
     godot::Node* node = resolve_node(node_path);
     if (!node) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("node not found: " + node_path);
+        e["error"] = mcp::JsonValue("node not found: " + node_path + NODE_PATH_HINT);
         return e;
     }
 
@@ -469,7 +471,7 @@ mcp::JsonValue handle_get_property(const mcp::JsonValue& args) {
         godot::Node* node = resolve_node(node_path);
         if (!node) {
             mcp::JsonValue e(mcp::JsonValue::object_tag);
-            e["error"] = mcp::JsonValue("node not found: " + node_path);
+            e["error"] = mcp::JsonValue("node not found: " + node_path + NODE_PATH_HINT);
             return e;
         }
         godot::StringName prop_name(property.c_str());
@@ -509,7 +511,7 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue& args) {
     godot::Node* node = resolve_node(node_path);
     if (!node) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("node not found: " + node_path);
+        e["error"] = mcp::JsonValue("node not found: " + node_path + NODE_PATH_HINT);
         return e;
     }
 
@@ -547,7 +549,7 @@ mcp::JsonValue handle_call_function(const mcp::JsonValue& args) {
     godot::Node* node = resolve_node(node_path);
     if (!node) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("node not found: " + node_path);
+        e["error"] = mcp::JsonValue("node not found: " + node_path + NODE_PATH_HINT);
         return e;
     }
 

@@ -2,6 +2,7 @@
 #include "resource_ops.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/global_constants.hpp>
@@ -123,7 +124,7 @@ mcp::JsonValue handle_get(const mcp::JsonValue& args) {
     godot::Node* node = resolve_node(path_str);
     if (!node) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("node not found: " + path_str);
+        e["error"] = mcp::JsonValue("node not found: " + path_str + " — expected scene-relative path like 'Level1/Player' or absolute '/root/Level1/Player'");
         return e;
     }
 
@@ -169,7 +170,7 @@ mcp::JsonValue handle_set(const mcp::JsonValue& args) {
     godot::Node* node = resolve_node(path_str);
     if (!node) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("node not found: " + path_str);
+        e["error"] = mcp::JsonValue("node not found: " + path_str + " — expected scene-relative path like 'Level1/Player' or absolute '/root/Level1/Player'");
         return e;
     }
 
@@ -214,6 +215,24 @@ mcp::JsonValue handle_set(const mcp::JsonValue& args) {
         resource_attached = true;
     } else {
         value = VariantJson::deserialize(*it_val, type_hint);
+    }
+
+    if (resource_attached && value.get_type() == godot::Variant::OBJECT) {
+        godot::Ref<godot::Resource> res = value;
+        if (res.is_valid()) {
+            std::string res_path = to_std_string(res->get_path());
+            const std::string memory_prefix = "memory://";
+            if (res_path.compare(0, memory_prefix.size(), memory_prefix) == 0) {
+                std::string res_name = res_path.substr(memory_prefix.size());
+                mcp::JsonValue e(mcp::JsonValue::object_tag);
+                e["error"] = mcp::JsonValue(
+                    "cannot assign memory resource '" + res_name + "' to node property '" +
+                    prop_str + "' on " + path_str +
+                    " — memory:// resources are not persistent and will corrupt the scene file if saved. "
+                    "Use resource_save to save it to disk first, then pass {\"path\": \"res://...\"}");
+                return e;
+            }
+        }
     }
 
     godot::Variant old_val = node->get(prop_name);
@@ -277,7 +296,7 @@ mcp::JsonValue handle_get_list(const mcp::JsonValue& args) {
     godot::Node* node = resolve_node(path_str);
     if (!node) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("node not found: " + path_str);
+        e["error"] = mcp::JsonValue("node not found: " + path_str + " — expected scene-relative path like 'Level1/Player' or absolute '/root/Level1/Player'");
         return e;
     }
 

@@ -73,8 +73,8 @@ godot::Vector2 parse_vec2(const JV& j) {
     auto* x = j.Find("x");
     auto* y = j.Find("y");
     return godot::Vector2(
-        static_cast<float>(x ? x->GetDouble() : 0.0),
-        static_cast<float>(y ? y->GetDouble() : 0.0));
+        static_cast<float>(x && x->IsNumber() ? (x->IsInt() ? static_cast<double>(x->GetInt()) : x->GetDouble()) : 0.0),
+        static_cast<float>(y && y->IsNumber() ? (y->IsInt() ? static_cast<double>(y->GetInt()) : y->GetDouble()) : 0.0));
 }
 
 godot::Vector3 parse_vec3(const JV& j) {
@@ -82,15 +82,15 @@ godot::Vector3 parse_vec3(const JV& j) {
     auto* y = j.Find("y");
     auto* z = j.Find("z");
     return godot::Vector3(
-        static_cast<float>(x ? x->GetDouble() : 0.0),
-        static_cast<float>(y ? y->GetDouble() : 0.0),
-        static_cast<float>(z ? z->GetDouble() : 0.0));
+        static_cast<float>(x && x->IsNumber() ? (x->IsInt() ? static_cast<double>(x->GetInt()) : x->GetDouble()) : 0.0),
+        static_cast<float>(y && y->IsNumber() ? (y->IsInt() ? static_cast<double>(y->GetInt()) : y->GetDouble()) : 0.0),
+        static_cast<float>(z && z->IsNumber() ? (z->IsInt() ? static_cast<double>(z->GetInt()) : z->GetDouble()) : 0.0));
 }
 
 godot::Transform2D parse_t2d(const JV& j) {
     godot::Transform2D t;
     if (j.Contains("origin")) t.set_origin(parse_vec2(j["origin"]));
-    if (j.Contains("rotation")) t.set_rotation(static_cast<float>(j["rotation"].GetDouble()));
+    if (j.Contains("rotation")) t.set_rotation(static_cast<float>(j["rotation"].IsNumber() ? (j["rotation"].IsInt() ? static_cast<double>(j["rotation"].GetInt()) : j["rotation"].GetDouble()) : 0.0));
     if (j.Contains("scale")) t.set_scale(parse_vec2(j["scale"]));
     return t;
 }
@@ -104,9 +104,9 @@ godot::Basis parse_basis(const JV& j) {
             if (r.IsArray()) {
                 size_t rsz = r.Size();
                 b.rows[i] = godot::Vector3(
-                    static_cast<float>(rsz > 0 ? r[0].GetDouble() : 0.0),
-                    static_cast<float>(rsz > 1 ? r[1].GetDouble() : 0.0),
-                    static_cast<float>(rsz > 2 ? r[2].GetDouble() : 0.0));
+                    static_cast<float>(rsz > 0 ? (r[0].IsNumber() ? (r[0].IsInt() ? static_cast<double>(r[0].GetInt()) : r[0].GetDouble()) : 0.0) : 0.0),
+                    static_cast<float>(rsz > 1 ? (r[1].IsNumber() ? (r[1].IsInt() ? static_cast<double>(r[1].GetInt()) : r[1].GetDouble()) : 0.0) : 0.0),
+                    static_cast<float>(rsz > 2 ? (r[2].IsNumber() ? (r[2].IsInt() ? static_cast<double>(r[2].GetInt()) : r[2].GetDouble()) : 0.0) : 0.0));
             }
         }
     }
@@ -882,7 +882,7 @@ JV handle_3d_space_set_debug(const JV& args) {
     if (args.Contains("solver_iterations"))
         ps->space_set_param(space, godot::PhysicsServer3D::SPACE_PARAM_SOLVER_ITERATIONS, static_cast<float>(args["solver_iterations"].GetInt()));
     if (args.Contains("contact_max_allowed_penetration"))
-        ps->space_set_param(space, godot::PhysicsServer3D::SPACE_PARAM_CONTACT_MAX_ALLOWED_PENETRATION, static_cast<float>(args["contact_max_allowed_penetration"].GetDouble()));
+        ps->space_set_param(space, godot::PhysicsServer3D::SPACE_PARAM_CONTACT_MAX_ALLOWED_PENETRATION, static_cast<float>(args["contact_max_allowed_penetration"].IsNumber() ? (args["contact_max_allowed_penetration"].IsInt() ? static_cast<double>(args["contact_max_allowed_penetration"].GetInt()) : args["contact_max_allowed_penetration"].GetDouble()) : 0.0));
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_3d_space_set_debug completed");
     JV r(JV::object_tag); r["result"] = JV("ok"); return r;
 }

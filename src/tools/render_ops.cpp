@@ -43,25 +43,25 @@ godot::RID rid_from_json(const JV& j) {
 godot::Color parse_color(const JV& j) {
     auto* r = j.Find("r"); auto* g = j.Find("g"); auto* b = j.Find("b"); auto* a = j.Find("a");
     return godot::Color(
-        static_cast<float>(r ? r->GetDouble() : 0.0),
-        static_cast<float>(g ? g->GetDouble() : 0.0),
-        static_cast<float>(b ? b->GetDouble() : 0.0),
-        static_cast<float>(a ? a->GetDouble() : 1.0));
+        static_cast<float>(r && r->IsNumber() ? (r->IsInt() ? static_cast<double>(r->GetInt()) : r->GetDouble()) : 0.0),
+        static_cast<float>(g && g->IsNumber() ? (g->IsInt() ? static_cast<double>(g->GetInt()) : g->GetDouble()) : 0.0),
+        static_cast<float>(b && b->IsNumber() ? (b->IsInt() ? static_cast<double>(b->GetInt()) : b->GetDouble()) : 0.0),
+        static_cast<float>(a && a->IsNumber() ? (a->IsInt() ? static_cast<double>(a->GetInt()) : a->GetDouble()) : 1.0));
 }
 
 godot::Vector2 parse_vector2(const JV& j) {
     auto* x = j.Find("x"); auto* y = j.Find("y");
     return godot::Vector2(
-        x ? x->GetDouble() : 0.0,
-        y ? y->GetDouble() : 0.0);
+        x && x->IsNumber() ? (x->IsInt() ? static_cast<double>(x->GetInt()) : x->GetDouble()) : 0.0,
+        y && y->IsNumber() ? (y->IsInt() ? static_cast<double>(y->GetInt()) : y->GetDouble()) : 0.0);
 }
 
 godot::Vector3 parse_vector3(const JV& j) {
     auto* x = j.Find("x"); auto* y = j.Find("y"); auto* z = j.Find("z");
     return godot::Vector3(
-        x ? x->GetDouble() : 0.0,
-        y ? y->GetDouble() : 0.0,
-        z ? z->GetDouble() : 0.0);
+        x && x->IsNumber() ? (x->IsInt() ? static_cast<double>(x->GetInt()) : x->GetDouble()) : 0.0,
+        y && y->IsNumber() ? (y->IsInt() ? static_cast<double>(y->GetInt()) : y->GetDouble()) : 0.0,
+        z && z->IsNumber() ? (z->IsInt() ? static_cast<double>(z->GetInt()) : z->GetDouble()) : 0.0);
 }
 
 godot::Rect2 parse_rect2(const JV& j) {
@@ -135,7 +135,7 @@ JV handle_canvas_item_draw_circle(const JV& args) {
     godot::RID ci = rid_from_json(*it_ci);
     godot::Vector2 pos = parse_vector2(*it_pos);
     auto* rad = args.Find("radius");
-    float radius = static_cast<float>(rad ? rad->GetDouble() : 1.0);
+    float radius = static_cast<float>(rad && rad->IsNumber() ? (rad->IsInt() ? static_cast<double>(rad->GetInt()) : rad->GetDouble()) : 1.0);
     godot::Color c = parse_color(*it_color);
     auto* aa = args.Find("antialiased");
     bool antialiased = aa ? aa->GetBool() : false;
@@ -208,7 +208,7 @@ JV handle_canvas_item_draw_line(const JV& args) {
     godot::Vector2 to = parse_vector2(*it_to);
     godot::Color c = parse_color(*it_color);
     auto* w = args.Find("width");
-    float width = static_cast<float>(w ? w->GetDouble() : -1.0);
+    float width = static_cast<float>(w && w->IsNumber() ? (w->IsInt() ? static_cast<double>(w->GetInt()) : w->GetDouble()) : -1.0);
     auto* aa = args.Find("antialiased");
     bool antialiased = aa ? aa->GetBool() : false;
 
@@ -233,9 +233,9 @@ JV handle_canvas_item_set_transform(const JV& args) {
     auto* ya = args.Find("y");
     auto* ox = args.Find("origin_x");
     auto* oy = args.Find("origin_y");
-    xform.columns[0] = godot::Vector2(xa ? xa->GetDouble() : 1.0, 0.0);
-    xform.columns[1] = godot::Vector2(0.0, ya ? ya->GetDouble() : 1.0);
-    xform.columns[2] = godot::Vector2(ox ? ox->GetDouble() : 0.0, oy ? oy->GetDouble() : 0.0);
+    xform.columns[0] = godot::Vector2(xa && xa->IsNumber() ? (xa->IsInt() ? static_cast<double>(xa->GetInt()) : xa->GetDouble()) : 1.0, 0.0);
+    xform.columns[1] = godot::Vector2(0.0, ya && ya->IsNumber() ? (ya->IsInt() ? static_cast<double>(ya->GetInt()) : ya->GetDouble()) : 1.0);
+    xform.columns[2] = godot::Vector2(ox && ox->IsNumber() ? (ox->IsInt() ? static_cast<double>(ox->GetInt()) : ox->GetDouble()) : 0.0, oy && oy->IsNumber() ? (oy->IsInt() ? static_cast<double>(oy->GetInt()) : oy->GetDouble()) : 0.0);
 
     rs->canvas_item_set_transform(ci, xform);
     LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools, "render_canvas_item_set_transform completed");
@@ -319,9 +319,9 @@ JV handle_camera_set_transform(const JV& args) {
     auto* oy = args.Find("origin_y");
     auto* oz = args.Find("origin_z");
     xform.origin = godot::Vector3(
-        ox ? ox->GetDouble() : 0.0,
-        oy ? oy->GetDouble() : 0.0,
-        oz ? oz->GetDouble() : 0.0);
+        ox && ox->IsNumber() ? (ox->IsInt() ? static_cast<double>(ox->GetInt()) : ox->GetDouble()) : 0.0,
+        oy && oy->IsNumber() ? (oy->IsInt() ? static_cast<double>(oy->GetInt()) : oy->GetDouble()) : 0.0,
+        oz && oz->IsNumber() ? (oz->IsInt() ? static_cast<double>(oz->GetInt()) : oz->GetDouble()) : 0.0);
 
     rs->camera_set_transform(cam, xform);
     LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools, "render_camera_set_transform completed");
@@ -342,9 +342,9 @@ JV handle_camera_set_perspective(const JV& args) {
     auto* fovy_a = args.Find("fovy_degrees");
     auto* znear_a = args.Find("z_near");
     auto* zfar_a = args.Find("z_far");
-    float fovy = static_cast<float>(fovy_a ? fovy_a->GetDouble() : 75.0);
-    float znear = static_cast<float>(znear_a ? znear_a->GetDouble() : 0.01);
-    float zfar = static_cast<float>(zfar_a ? zfar_a->GetDouble() : 4000.0);
+    float fovy = static_cast<float>(fovy_a && fovy_a->IsNumber() ? (fovy_a->IsInt() ? static_cast<double>(fovy_a->GetInt()) : fovy_a->GetDouble()) : 75.0);
+    float znear = static_cast<float>(znear_a && znear_a->IsNumber() ? (znear_a->IsInt() ? static_cast<double>(znear_a->GetInt()) : znear_a->GetDouble()) : 0.01);
+    float zfar = static_cast<float>(zfar_a && zfar_a->IsNumber() ? (zfar_a->IsInt() ? static_cast<double>(zfar_a->GetInt()) : zfar_a->GetDouble()) : 4000.0);
 
     rs->camera_set_perspective(cam, fovy, znear, zfar);
     LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools, "render_camera_set_perspective completed");
@@ -365,9 +365,9 @@ JV handle_camera_set_orthogonal(const JV& args) {
     auto* size_a = args.Find("size");
     auto* znear_a = args.Find("z_near");
     auto* zfar_a = args.Find("z_far");
-    float size = static_cast<float>(size_a ? size_a->GetDouble() : 10.0);
-    float znear = static_cast<float>(znear_a ? znear_a->GetDouble() : 0.01);
-    float zfar = static_cast<float>(zfar_a ? zfar_a->GetDouble() : 4000.0);
+    float size = static_cast<float>(size_a && size_a->IsNumber() ? (size_a->IsInt() ? static_cast<double>(size_a->GetInt()) : size_a->GetDouble()) : 10.0);
+    float znear = static_cast<float>(znear_a && znear_a->IsNumber() ? (znear_a->IsInt() ? static_cast<double>(znear_a->GetInt()) : znear_a->GetDouble()) : 0.01);
+    float zfar = static_cast<float>(zfar_a && zfar_a->IsNumber() ? (zfar_a->IsInt() ? static_cast<double>(zfar_a->GetInt()) : zfar_a->GetDouble()) : 4000.0);
 
     rs->camera_set_orthogonal(cam, size, znear, zfar);
     LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools, "render_camera_set_orthogonal completed");
@@ -716,7 +716,7 @@ JV handle_environment_set_ambient(const JV& args) {
     auto source = static_cast<godot::RenderingServer::EnvironmentAmbientSource>(
         src ? static_cast<int>(src->GetInt()) : 0);
     auto* en = args.Find("energy");
-    float energy = static_cast<float>(en ? en->GetDouble() : 1.0);
+    float energy = static_cast<float>(en && en->IsNumber() ? (en->IsInt() ? static_cast<double>(en->GetInt()) : en->GetDouble()) : 1.0);
 
     rs->environment_set_ambient_light(env, c, source, energy);
     LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools, "render_environment_set_ambient completed");
@@ -817,31 +817,31 @@ JV handle_environment_set_glow(const JV& args) {
     if (lv && lv->IsDouble()) levels[0] = static_cast<float>(lv->GetDouble());
     float intensity = 0.8f;
     auto* it = args.Find("intensity");
-    if (it) intensity = static_cast<float>(it->GetDouble());
+    if (it && it->IsNumber()) intensity = static_cast<float>(it->IsInt() ? static_cast<double>(it->GetInt()) : it->GetDouble());
     float strength = 1.0f;
     auto* st = args.Find("strength");
-    if (st) strength = static_cast<float>(st->GetDouble());
+    if (st && st->IsNumber()) strength = static_cast<float>(st->IsInt() ? static_cast<double>(st->GetInt()) : st->GetDouble());
     float mix = 0.05f;
     auto* mx = args.Find("mix");
-    if (mx) mix = static_cast<float>(mx->GetDouble());
+    if (mx && mx->IsNumber()) mix = static_cast<float>(mx->IsInt() ? static_cast<double>(mx->GetInt()) : mx->GetDouble());
     float bloom_threshold = 0.0f;
     auto* bt = args.Find("bloom_threshold");
-    if (bt) bloom_threshold = static_cast<float>(bt->GetDouble());
+    if (bt && bt->IsNumber()) bloom_threshold = static_cast<float>(bt->IsInt() ? static_cast<double>(bt->GetInt()) : bt->GetDouble());
     int blend_mode = 0;
     auto* bm = args.Find("blend_mode");
     if (bm && bm->IsInt()) blend_mode = static_cast<int>(bm->GetInt());
     float hdr_bleed_threshold = 0.5f;
     auto* hbt = args.Find("hdr_bleed_threshold");
-    if (hbt) hdr_bleed_threshold = static_cast<float>(hbt->GetDouble());
+    if (hbt && hbt->IsNumber()) hdr_bleed_threshold = static_cast<float>(hbt->IsInt() ? static_cast<double>(hbt->GetInt()) : hbt->GetDouble());
     float hdr_bleed_scale = 2.0f;
     auto* hbs = args.Find("hdr_bleed_scale");
-    if (hbs) hdr_bleed_scale = static_cast<float>(hbs->GetDouble());
+    if (hbs && hbs->IsNumber()) hdr_bleed_scale = static_cast<float>(hbs->IsInt() ? static_cast<double>(hbs->GetInt()) : hbs->GetDouble());
     float hdr_luminance_cap = 2.0f;
     auto* hlc = args.Find("hdr_luminance_cap");
-    if (hlc) hdr_luminance_cap = static_cast<float>(hlc->GetDouble());
+    if (hlc && hlc->IsNumber()) hdr_luminance_cap = static_cast<float>(hlc->IsInt() ? static_cast<double>(hlc->GetInt()) : hlc->GetDouble());
     float glow_map_strength = 1.0f;
     auto* gms = args.Find("glow_map_strength");
-    if (gms) glow_map_strength = static_cast<float>(gms->GetDouble());
+    if (gms && gms->IsNumber()) glow_map_strength = static_cast<float>(gms->IsInt() ? static_cast<double>(gms->GetInt()) : gms->GetDouble());
     rs->environment_set_glow(env, enabled, levels, intensity, strength, mix,
         bloom_threshold, static_cast<godot::RenderingServer::EnvironmentGlowBlendMode>(blend_mode),
         hdr_bleed_threshold, hdr_bleed_scale, hdr_luminance_cap, glow_map_strength, godot::RID());
@@ -865,13 +865,13 @@ JV handle_environment_set_ssr(const JV& args) {
     if (ms && ms->IsInt()) max_steps = static_cast<int>(ms->GetInt());
     float fade_in = 0.1f;
     auto* fi = args.Find("fade_in");
-    if (fi) fade_in = static_cast<float>(fi->GetDouble());
+    if (fi && fi->IsNumber()) fade_in = static_cast<float>(fi->IsInt() ? static_cast<double>(fi->GetInt()) : fi->GetDouble());
     float fade_out = 0.1f;
     auto* fo = args.Find("fade_out");
-    if (fo) fade_out = static_cast<float>(fo->GetDouble());
+    if (fo && fo->IsNumber()) fade_out = static_cast<float>(fo->IsInt() ? static_cast<double>(fo->GetInt()) : fo->GetDouble());
     float depth_tolerance = 0.1f;
     auto* dt = args.Find("depth_tolerance");
-    if (dt) depth_tolerance = static_cast<float>(dt->GetDouble());
+    if (dt && dt->IsNumber()) depth_tolerance = static_cast<float>(dt->IsInt() ? static_cast<double>(dt->GetInt()) : dt->GetDouble());
     rs->environment_set_ssr(env, enabled, max_steps, fade_in, fade_out, depth_tolerance);
     JV r(JV::object_tag); r["result"] = JV("ok"); return r;
 }
@@ -890,10 +890,10 @@ JV handle_environment_set_tonemap(const JV& args) {
     if (tm && tm->IsInt()) tone_mapper = static_cast<int>(tm->GetInt());
     float exposure = 1.0f;
     auto* ex = args.Find("exposure");
-    if (ex) exposure = static_cast<float>(ex->GetDouble());
+    if (ex && ex->IsNumber()) exposure = static_cast<float>(ex->IsInt() ? static_cast<double>(ex->GetInt()) : ex->GetDouble());
     float white = 1.0f;
     auto* wh = args.Find("white");
-    if (wh) white = static_cast<float>(wh->GetDouble());
+    if (wh && wh->IsNumber()) white = static_cast<float>(wh->IsInt() ? static_cast<double>(wh->GetInt()) : wh->GetDouble());
     rs->environment_set_tonemap(env, static_cast<godot::RenderingServer::EnvironmentToneMapper>(tone_mapper), exposure, white);
     JV r(JV::object_tag); r["result"] = JV("ok"); return r;
 }
@@ -915,7 +915,7 @@ JV handle_environment_set_sdfgi(const JV& args) {
     if (ca && ca->IsInt()) cascades = static_cast<int>(ca->GetInt());
     float min_cell_size = 0.1f;
     auto* mcs = args.Find("min_cell_size");
-    if (mcs) min_cell_size = static_cast<float>(mcs->GetDouble());
+    if (mcs && mcs->IsNumber()) min_cell_size = static_cast<float>(mcs->IsInt() ? static_cast<double>(mcs->GetInt()) : mcs->GetDouble());
     int y_scale = 0;
     auto* ys = args.Find("y_scale");
     if (ys && ys->IsInt()) y_scale = static_cast<int>(ys->GetInt());
@@ -924,19 +924,19 @@ JV handle_environment_set_sdfgi(const JV& args) {
     if (uo && uo->IsBool()) use_occlusion = uo->GetBool();
     float bounce_feedback = 0.5f;
     auto* bf = args.Find("bounce_feedback");
-    if (bf) bounce_feedback = static_cast<float>(bf->GetDouble());
+    if (bf && bf->IsNumber()) bounce_feedback = static_cast<float>(bf->IsInt() ? static_cast<double>(bf->GetInt()) : bf->GetDouble());
     bool read_sky = true;
     auto* rs_ = args.Find("read_sky");
     if (rs_ && rs_->IsBool()) read_sky = rs_->GetBool();
     float energy = 1.0f;
     auto* eg = args.Find("energy");
-    if (eg) energy = static_cast<float>(eg->GetDouble());
+    if (eg && eg->IsNumber()) energy = static_cast<float>(eg->IsInt() ? static_cast<double>(eg->GetInt()) : eg->GetDouble());
     float normal_bias = 1.0f;
     auto* nb = args.Find("normal_bias");
-    if (nb) normal_bias = static_cast<float>(nb->GetDouble());
+    if (nb && nb->IsNumber()) normal_bias = static_cast<float>(nb->IsInt() ? static_cast<double>(nb->GetInt()) : nb->GetDouble());
     float probe_bias = 1.0f;
     auto* pb = args.Find("probe_bias");
-    if (pb) probe_bias = static_cast<float>(pb->GetDouble());
+    if (pb && pb->IsNumber()) probe_bias = static_cast<float>(pb->IsInt() ? static_cast<double>(pb->GetInt()) : pb->GetDouble());
     rs->environment_set_sdfgi(env, enabled, cascades, min_cell_size,
         static_cast<godot::RenderingServer::EnvironmentSDFGIYScale>(y_scale),
         use_occlusion, bounce_feedback, read_sky, energy, normal_bias, probe_bias);
@@ -957,7 +957,7 @@ JV handle_environment_set_volumetric_fog(const JV& args) {
     if (en && en->IsBool()) enabled = en->GetBool();
     float density = 0.05f;
     auto* de = args.Find("density");
-    if (de) density = static_cast<float>(de->GetDouble());
+    if (de && de->IsNumber()) density = static_cast<float>(de->IsInt() ? static_cast<double>(de->GetInt()) : de->GetDouble());
     JV albedo_col = JV::FromObject({{"r", JV(1.0)}, {"g", JV(1.0)}, {"b", JV(1.0)}});
     auto* al = args.Find("albedo");
     if (al && al->IsObject()) albedo_col = *al;
@@ -968,31 +968,31 @@ JV handle_environment_set_volumetric_fog(const JV& args) {
     godot::Color emission = parse_color(emission_col);
     float emission_energy = 1.0f;
     auto* ee = args.Find("emission_energy");
-    if (ee) emission_energy = static_cast<float>(ee->GetDouble());
+    if (ee && ee->IsNumber()) emission_energy = static_cast<float>(ee->IsInt() ? static_cast<double>(ee->GetInt()) : ee->GetDouble());
     float anisotropy = 0.0f;
     auto* an = args.Find("anisotropy");
-    if (an) anisotropy = static_cast<float>(an->GetDouble());
+    if (an && an->IsNumber()) anisotropy = static_cast<float>(an->IsInt() ? static_cast<double>(an->GetInt()) : an->GetDouble());
     float length = 0.0f;
     auto* le = args.Find("length");
-    if (le) length = static_cast<float>(le->GetDouble());
+    if (le && le->IsNumber()) length = static_cast<float>(le->IsInt() ? static_cast<double>(le->GetInt()) : le->GetDouble());
     float detail_spread = 0.0f;
     auto* ds = args.Find("detail_spread");
-    if (ds) detail_spread = static_cast<float>(ds->GetDouble());
+    if (ds && ds->IsNumber()) detail_spread = static_cast<float>(ds->IsInt() ? static_cast<double>(ds->GetInt()) : ds->GetDouble());
     float gi_inject = 0.0f;
     auto* gi = args.Find("gi_inject");
-    if (gi) gi_inject = static_cast<float>(gi->GetDouble());
+    if (gi && gi->IsNumber()) gi_inject = static_cast<float>(gi->IsInt() ? static_cast<double>(gi->GetInt()) : gi->GetDouble());
     bool temporal_reprojection = false;
     auto* tr = args.Find("temporal_reprojection");
     if (tr && tr->IsBool()) temporal_reprojection = tr->GetBool();
     float temporal_reprojection_amount = 0.5f;
     auto* tra = args.Find("temporal_reprojection_amount");
-    if (tra) temporal_reprojection_amount = static_cast<float>(tra->GetDouble());
+    if (tra && tra->IsNumber()) temporal_reprojection_amount = static_cast<float>(tra->IsInt() ? static_cast<double>(tra->GetInt()) : tra->GetDouble());
     float ambient_inject = 0.0f;
     auto* ai = args.Find("ambient_inject");
-    if (ai) ambient_inject = static_cast<float>(ai->GetDouble());
+    if (ai && ai->IsNumber()) ambient_inject = static_cast<float>(ai->IsInt() ? static_cast<double>(ai->GetInt()) : ai->GetDouble());
     float sky_affect = 0.0f;
     auto* sa = args.Find("sky_affect");
-    if (sa) sky_affect = static_cast<float>(sa->GetDouble());
+    if (sa && sa->IsNumber()) sky_affect = static_cast<float>(sa->IsInt() ? static_cast<double>(sa->GetInt()) : sa->GetDouble());
     rs->environment_set_volumetric_fog(env, enabled, density, albedo, emission, emission_energy,
         anisotropy, length, detail_spread, gi_inject, temporal_reprojection,
         temporal_reprojection_amount, ambient_inject, sky_affect);
@@ -1065,7 +1065,7 @@ JV handle_particles_set_lifetime(const JV& args) {
     godot::RID p = rid_from_json(*it_p);
     float lifetime = 1.0f;
     auto* lt = args.Find("lifetime");
-    if (lt) lifetime = static_cast<float>(lt->GetDouble());
+    if (lt && lt->IsNumber()) lifetime = static_cast<float>(lt->IsInt() ? static_cast<double>(lt->GetInt()) : lt->GetDouble());
     rs->particles_set_lifetime(p, lifetime);
     JV r(JV::object_tag); r["result"] = JV("ok"); return r;
 }

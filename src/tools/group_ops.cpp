@@ -76,10 +76,14 @@ mcp::JsonValue handle_add_node_to_group(const mcp::JsonValue& args) {
     auto* undo_redo = editor ? editor->get_editor_undo_redo() : nullptr;
     if (undo_redo) {
         undo_redo->create_action("Add Node to Group");
+        undo_redo->add_do_method(node, godot::StringName("remove_from_group"), group);
         undo_redo->add_do_method(node, godot::StringName("add_to_group"), group, true);
         undo_redo->add_undo_method(node, godot::StringName("remove_from_group"), group);
         undo_redo->commit_action();
     } else {
+        if (node->is_in_group(group)) {
+            node->remove_from_group(group);
+        }
         node->add_to_group(group, true);
     }
 

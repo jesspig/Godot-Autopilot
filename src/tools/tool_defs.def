@@ -222,7 +222,7 @@ TOOL_ENTRY(input_mouse_button_release, "input_mouse_button_release", "Simulate m
 TOOL_ENTRY(input_gamepad_simulate, "input_gamepad_simulate", "Simulate gamepad input (editor process only — a running game is a separate process and will not receive these events)", "Input", "input,gamepad,simulate", input_ops::handle_gamepad_simulate, SCHEMA_NONE)
 
 // ── InputMap ──
-TOOL_ENTRY(input_map_action_add_event, "input_map_action_add_event", "Bind an input event to an action (modifies editor project InputMap — a running game process will not see the change)", "Input", "input,map", input_map_ops::handle_action_add_event, SCHEMA_BASIC)
+TOOL_ENTRY(input_map_action_add_event, "input_map_action_add_event", "Bind an input event to an action (modifies editor project InputMap — a running game process will not see the change). InputEventKey.device defaults to 16 (DEVICE_ID_KEYBOARD; IDs 0-15 are reserved for joypads) — this is normal; pass an explicit device in the event object to override", "Input", "input,map", input_map_ops::handle_action_add_event, SCHEMA_BASIC)
 TOOL_ENTRY(input_map_action_erase_event, "input_map_action_erase_event", "Remove an input event from an action (modifies editor project InputMap — a running game process will not see the change)", "Input", "input,map", input_map_ops::handle_action_erase_event, SCHEMA_BASIC)
 TOOL_ENTRY(input_map_action_set_deadzone, "input_map_action_set_deadzone", "Set deadzone for an action (modifies editor project InputMap — a running game process will not see the change)", "Input", "input,map", input_map_ops::handle_action_set_deadzone, SCHEMA_BASIC)
 TOOL_ENTRY(input_map_add_action, "input_map_add_action", "Add a new input action (modifies editor project InputMap — a running game process will not see the change)", "Input", "input,map", input_map_ops::handle_add_action, SCHEMA_BASIC)
@@ -249,7 +249,7 @@ TOOL_ENTRY(editor_set_main_scene, "editor_set_main_scene", "Set the main scene",
 TOOL_ENTRY(editor_play_current_scene, "editor_play_current_scene", "Play the current scene", "Editor", "editor,play,scene", editor_ops::handle_play_current_scene, SCHEMA_BASIC)
 TOOL_ENTRY(editor_stop_playing, "editor_stop_playing", "Stop the running scene", "Editor", "editor,stop,playing", editor_ops::handle_stop_playing, SCHEMA_BASIC)
 TOOL_ENTRY(editor_get_resource_filesystem, "editor_get_resource_filesystem", "Get the editor file system", "Editor", "editor,filesystem,get", editor_ops::handle_get_resource_filesystem, SCHEMA_BASIC)
-TOOL_ENTRY(editor_get_plugin_list, "editor_get_plugin_list", "List all plugins", "Editor", "editor,plugin,list", editor_ops::handle_get_plugin_list, SCHEMA_BASIC)
+TOOL_ENTRY(editor_get_plugin_list, "editor_get_plugin_list", "List all plugins (godot-cpp API cannot enumerate editor plugins — an empty array is expected; use editor_file_system_get_resources to read the addons directory instead)", "Editor", "editor,plugin,list", editor_ops::handle_get_plugin_list, SCHEMA_BASIC)
 TOOL_ENTRY(editor_set_plugin_enabled, "editor_set_plugin_enabled", "Enable or disable a plugin", "Editor", "editor,plugin,enable", editor_ops::handle_set_plugin_enabled, SCHEMA_BASIC)
 TOOL_ENTRY(editor_new_scene, "editor_new_scene", "Create a new scene with a root node", "Editor", "editor,scene,new", editor_ops::handle_new_scene, SCHEMA_BASIC)
 TOOL_ENTRY(editor_open_scene, "editor_open_scene", "Open a scene file in the editor by path", "Editor", "scene,open", editor_ops::handle_open_scene, SCHEMA_BASIC)
@@ -399,9 +399,9 @@ TOOL_ENTRY(editor_capture_viewport, "editor_capture_viewport", "Capture the edit
 // ── Debugger ──
 TOOL_ENTRY(output_get_log, "output_get_log", "Get captured engine log entries (errors and messages)", "Debugger", "debugger,log,output", debugger_ops::handle_output_get_log, SCHEMA_NONE)
 TOOL_ENTRY(debugger_get_errors, "debugger_get_errors", "Get captured debugger errors with stack traces", "Debugger", "debugger,errors,stack", debugger_ops::handle_debugger_get_errors, SCHEMA_NONE)
-TOOL_ENTRY(debugger_get_output, "debugger_get_output", "Get captured game output (stdout/stderr)", "Debugger", "debugger,output,stdout", debugger_ops::handle_debugger_get_output, SCHEMA_NONE)
+TOOL_ENTRY(debugger_get_output, "debugger_get_output", "Get captured game output (stdout/stderr) — returns data only while a game is running through the editor debugger (editor_play_current_scene)", "Debugger", "debugger,output,stdout", debugger_ops::handle_debugger_get_output, SCHEMA_NONE)
 TOOL_ENTRY(debugger_get_stack_dump, "debugger_get_stack_dump", "Get the most recent stack dump from the debugger", "Debugger", "debugger,stack,dump", debugger_ops::handle_debugger_get_stack_dump, SCHEMA_NONE)
-TOOL_ENTRY(debugger_get_scene_tree, "debugger_get_scene_tree", "Get the remote scene tree from a running game session", "Debugger", "debugger,scene,tree", debugger_ops::handle_debugger_get_scene_tree, SCHEMA_NONE)
+TOOL_ENTRY(debugger_get_scene_tree, "debugger_get_scene_tree", "Get the remote scene tree from a running game session — returns data only while a game is running through the editor debugger (editor_play_current_scene); the editor's own scene tree is not available via this channel", "Debugger", "debugger,scene,tree", debugger_ops::handle_debugger_get_scene_tree, SCHEMA_NONE)
 TOOL_ENTRY(debugger_get_monitors, "debugger_get_monitors", "Get performance monitor frames from the debugger", "Debugger", "debugger,monitors,performance", debugger_ops::handle_debugger_get_monitors, SCHEMA_NONE)
 TOOL_ENTRY(debugger_get_session_info, "debugger_get_session_info", "Get current debug session state (active, breaked, running)", "Debugger", "debugger,session,status", debugger_ops::handle_debugger_get_session_info, SCHEMA_NONE)
 

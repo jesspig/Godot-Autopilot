@@ -22,6 +22,8 @@ namespace audio_ops {
 
 namespace {
 
+constexpr const char* NODE_PATH_HINT = " — expected scene-relative path like 'Level1/Player' or absolute '/root/Level1/Player'";
+
 std::string to_std(const godot::String& s) {
     godot::CharString utf8 = s.utf8();
     return std::string(utf8.ptr());
@@ -349,7 +351,7 @@ mcp::JsonValue handle_stream_play(const mcp::JsonValue& args) {
     std::string path = np->GetString();
     auto* node = find_node(path);
     if (!node) {
-        return error_json("AudioStreamPlayer node not found: " + path);
+        return error_json("AudioStreamPlayer node not found: " + path + NODE_PATH_HINT);
     }
     auto ap = resolve_audio_player(node);
     if (!ap.is_valid()) {
@@ -393,7 +395,7 @@ mcp::JsonValue handle_stream_stop(const mcp::JsonValue& args) {
     std::string path = np->GetString();
     auto* node = find_node(path);
     if (!node) {
-        return error_json("AudioStreamPlayer node not found: " + path);
+        return error_json("AudioStreamPlayer node not found: " + path + NODE_PATH_HINT);
     }
     auto ap = resolve_audio_player(node);
     if (!ap.is_valid()) {
@@ -417,7 +419,7 @@ mcp::JsonValue handle_stream_set_volume(const mcp::JsonValue& args) {
     std::string path = np->GetString();
     auto* node = find_node(path);
     if (!node) {
-        return error_json("AudioStreamPlayer node not found: " + path);
+        return error_json("AudioStreamPlayer node not found: " + path + NODE_PATH_HINT);
     }
     auto ap = resolve_audio_player(node);
     if (!ap.is_valid()) {
@@ -442,7 +444,7 @@ mcp::JsonValue handle_stream_set_pitch(const mcp::JsonValue& args) {
     std::string path = np->GetString();
     auto* node = find_node(path);
     if (!node) {
-        return error_json("AudioStreamPlayer node not found: " + path);
+        return error_json("AudioStreamPlayer node not found: " + path + NODE_PATH_HINT);
     }
     auto ap = resolve_audio_player(node);
     if (!ap.is_valid()) {
@@ -463,7 +465,7 @@ mcp::JsonValue handle_stream_get_playback_position(const mcp::JsonValue& args) {
     std::string path = np->GetString();
     auto* node = find_node(path);
     if (!node) {
-        return error_json("AudioStreamPlayer node not found: " + path);
+        return error_json("AudioStreamPlayer node not found: " + path + NODE_PATH_HINT);
     }
     auto ap = resolve_audio_player(node);
     if (!ap.is_valid()) {
@@ -489,7 +491,7 @@ mcp::JsonValue handle_stream_seek(const mcp::JsonValue& args) {
     std::string path = np->GetString();
     auto* node = find_node(path);
     if (!node) {
-        return error_json("AudioStreamPlayer node not found: " + path);
+        return error_json("AudioStreamPlayer node not found: " + path + NODE_PATH_HINT);
     }
     auto ap = resolve_audio_player(node);
     if (!ap.is_valid()) {
