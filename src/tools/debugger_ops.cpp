@@ -1,5 +1,6 @@
 #include "debugger_ops.hpp"
 #include "core/log_system.hpp"
+#include "runtime_ops.hpp"
 #include <godot_cpp/classes/editor_debugger_plugin.hpp>
 #include <godot_cpp/classes/editor_debugger_session.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
@@ -337,7 +338,7 @@ void OutputCaptureLogger::_log_message(const String& p_message, bool p_error) {
 bool DebugCapturePlugin::_has_capture(const String& p_name) const {
     std::string n = p_name.utf8().ptr();
     return n == "scene" || n == "performance" || n == "visual"
-        || n == "servers" || n == "window" || n == "filesystem";
+        || n == "servers" || n == "window" || n == "filesystem" || n == "gsd";
 }
 
 void DebugCapturePlugin::_setup_session(int32_t p_session_id) {
@@ -414,6 +415,10 @@ bool DebugCapturePlugin::_capture(const String& p_message, const Array& p_data, 
         for (int i = 0; i < static_cast<int>(p_data.size()); i++)
             values.push_back(static_cast<double>(p_data[i]));
         dc::instance().add_monitor_frame(values);
+    }
+    else if (msg == "gsd:response" && p_data.size() >= 1) {
+        String payload = p_data[0];
+        godot_self_driving::runtime_ops::handle_game_response(std::string(payload.utf8().ptr()));
     }
 
     return false;

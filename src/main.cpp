@@ -10,6 +10,7 @@
 #include "core/log_system.hpp"
 #include "core/mode_detector.hpp"
 #include "core/server_context.hpp"
+#include "runtime/game_bridge.hpp"
 #include "tools/debugger_ops.hpp"
 #include "ui/mcp_log_dock.hpp"
 #include "ui/mcp_status_bar.hpp"
@@ -53,6 +54,16 @@ public:
 };
 
 godot_self_driving::CommandQueue GodotSelfDrivingPlugin::s_queue;
+
+namespace godot_self_driving {
+
+// Forward-declared in tools/runtime_ops.hpp; lets the runtime tools dispatch
+// their send_request work onto the editor main thread.
+CommandQueue& get_editor_queue() {
+    return GodotSelfDrivingPlugin::queue();
+}
+
+} // namespace godot_self_driving
 
 void GodotSelfDrivingPlugin::_enter_tree() {
     using godot_self_driving::LogLevel;
@@ -144,6 +155,9 @@ GSD_EXPORT GDExtensionBool GDExtensionEntryPoint(
     init.register_initializer([](godot::ModuleInitializationLevel p_level) {
         if (p_level == godot::MODULE_INITIALIZATION_LEVEL_SCENE) {
             godot::ClassDB::register_class<godot_self_driving::McpStatusBar>();
+            if (!godot::Engine::get_singleton()->is_editor_hint()) {
+                godot_self_driving::runtime::game_bridge::register_listener();
+            }
             get_log_system().log(godot_self_driving::LogLevel::Info, godot_self_driving::LogCategory::System, "Scene level initialized");
         }
         if (p_level == godot::MODULE_INITIALIZATION_LEVEL_EDITOR) {
@@ -172,6 +186,7 @@ GSD_EXPORT GDExtensionBool GDExtensionEntryPoint(
             get_log_system().log(godot_self_driving::LogLevel::Info, godot_self_driving::LogCategory::System, "Editor level terminated");
         }
         if (p_level == godot::MODULE_INITIALIZATION_LEVEL_SCENE) {
+            godot_self_driving::runtime::game_bridge::unregister_listener();
             get_log_system().log(godot_self_driving::LogLevel::Info, godot_self_driving::LogCategory::System, "Scene level terminated");
         }
     });
