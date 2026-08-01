@@ -1558,12 +1558,10 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         mcp::ToolOptions opts;
         opts.Description("Health check ping");
         server.RegisterTool("ping", opts,
-            [&queue](const mcp::RequestContext<mcp::CallToolRequestParams>&) -> mcp::CallToolResult {
-                auto body = queue.submit([]() -> std::string {
-                    mcp::JsonValue r(mcp::JsonValue::object_tag);
-                    r["result"] = mcp::JsonValue("pong");
-                    return r.Dump();
-                }).get();
+            [](const mcp::RequestContext<mcp::CallToolRequestParams>&) -> mcp::CallToolResult {
+                mcp::JsonValue r(mcp::JsonValue::object_tag);
+                r["result"] = mcp::JsonValue("pong");
+                auto body = r.Dump();
 
                 mcp::CallToolResult mcp_result;
                 mcp_result.content.push_back(mcp::TextContent{"text", body});
@@ -1798,6 +1796,22 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
 
                 std::string body = result.get();
                 mcp::JsonValue j = mcp::JsonValue::Parse(body);
+                if (j.IsObject()) {
+                    auto* pending_p = j.Find("__gsd_pending");
+                    if (pending_p && pending_p->IsInt()) {
+                        int64_t rid = pending_p->GetInt();
+                        int64_t timeout = 5000;
+                        if (auto* t = j.Find("timeout_ms")) {
+                            if (t->IsInt() && t->GetInt() > 0) timeout = t->GetInt();
+                        }
+                        mcp::JsonValue final = runtime_ops::wait_pending_response(rid, timeout);
+                        if (name == "game_capture" || (final.IsObject() && final.Contains("path"))) {
+                            final = runtime_ops::finalize_capture_response(final);
+                        }
+                        j = std::move(final);
+                        body = j.Dump();
+                    }
+                }
 
                 mcp::CallToolResult mcp_result;
                 if (j.Find("error") != nullptr) mcp_result.is_error = true;

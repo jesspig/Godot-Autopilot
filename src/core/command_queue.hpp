@@ -6,6 +6,7 @@
 #include <memory>
 #include <mutex>
 #include <queue>
+#include <thread>
 #include <type_traits>
 
 namespace godot_self_driving {
@@ -38,10 +39,13 @@ class CommandQueue {
 
     std::queue<std::unique_ptr<TaskBase>> tasks_;
     std::mutex mutex_;
+    std::thread::id main_thread_id_;
 
 public:
     CommandQueue() = default;
     ~CommandQueue() = default;
+
+    bool is_main_thread() const { return main_thread_id_ == std::this_thread::get_id(); }
 
     template <typename Fn>
     auto submit(Fn&& fn) -> std::future<std::invoke_result_t<Fn>> {
@@ -55,6 +59,9 @@ public:
     }
 
     void drain() {
+        if (main_thread_id_ == std::thread::id()) {
+            main_thread_id_ = std::this_thread::get_id();
+        }
         std::queue<std::unique_ptr<TaskBase>> batch;
         {
             std::lock_guard<std::mutex> lock(mutex_);

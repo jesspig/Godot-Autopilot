@@ -130,18 +130,69 @@ JV wait_for_response(int64_t request_id, int64_t timeout_ms) {
     return error_json("unexpected game response (missing result)");
 }
 
-JV send_and_wait(const std::string& op, const JV& params, int64_t timeout_ms) {
+} // namespace
+
+mcp::JsonValue handle_gsd_send(const std::string& op, const mcp::JsonValue& params, int64_t timeout_ms) {
     int64_t request_id = g_next_request_id.fetch_add(1);
-    JV placeholder;
+    JV result;
     try {
-        placeholder = get_editor_queue().submit(
-            [&]() { return send_request(request_id, op, params); }).get();
+        if (get_editor_queue().is_main_thread()) {
+            result = send_request(request_id, op, params);
+        } else {
+            result = get_editor_queue().submit(
+                [&]() { return send_request(request_id, op, params); }).get();
+        }
     } catch (const std::exception& ex) {
         return error_json(std::string("failed to submit request to main thread: ") + ex.what());
     }
-    if (placeholder.Contains("error")) return placeholder;
+    if (result.Contains("error")) return result;
+    JV r(JV::object_tag);
+    r["__gsd_pending"] = JV(request_id);
+    r["timeout_ms"] = JV(timeout_ms);
+    return r;
+}
+
+mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms) {
     return wait_for_response(request_id, timeout_ms);
 }
+
+mcp::JsonValue finalize_capture_response(const mcp::JsonValue& pending_result) {
+    if (pending_result.Contains("error")) return pending_result;
+    if (!pending_result.IsObject()) return error_json("unexpected capture response");
+    auto* path_p = pending_result.Find("path");
+    if (!path_p || !path_p->IsString()) return error_json("capture response missing path");
+
+    try {
+        return get_editor_queue().submit([pending_result]() -> JV {
+            std::string path = pending_result["path"].GetString();
+            godot::Ref<godot::FileAccess> file =
+                godot::FileAccess::open(godot::String(path.c_str()), godot::FileAccess::READ);
+            if (file.is_null() || !file->is_open()) {
+                return error_json("failed to read captured file: " + path);
+            }
+            uint64_t length = file->get_length();
+            godot::PackedByteArray bytes = file->get_buffer(static_cast<int64_t>(length));
+            file->close();
+            if (bytes.size() <= 0) {
+                return error_json("captured file is empty: " + path);
+            }
+            std::string b64 = capture_ops::base64_encode(bytes.ptrw(), static_cast<size_t>(bytes.size()));
+
+            JV r(JV::object_tag);
+            r["data"] = JV(b64);
+            r["format"] = JV("png");
+            if (auto* w = pending_result.Find("width")) r["width"] = *w;
+            if (auto* h = pending_result.Find("height")) r["height"] = *h;
+            r["path"] = JV(path);
+            LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "game_capture completed");
+            return r;
+        }).get();
+    } catch (const std::exception& ex) {
+        return error_json(std::string("failed to read captured file on main thread: ") + ex.what());
+    }
+}
+
+namespace {
 
 void copy_optional(const JV& from, JV& to, const char* key) {
     if (auto* v = from.Find(key)) to[key] = *v;
@@ -176,9 +227,7 @@ void handle_game_response(const std::string& json_str) {
 mcp::JsonValue handle_game_status(const mcp::JsonValue& args) {
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "game_status called");
     JV params(JV::object_tag);
-    JV result = send_and_wait("status", params, extract_timeout(args));
-    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "game_status completed");
-    return result;
+    return handle_gsd_send("status", params, extract_timeout(args));
 }
 
 mcp::JsonValue handle_game_eval(const mcp::JsonValue& args) {
@@ -195,9 +244,7 @@ mcp::JsonValue handle_game_eval(const mcp::JsonValue& args) {
     copy_optional(args, params, "method");
     copy_optional(args, params, "args");
     copy_optional(args, params, "source_code");
-    JV result = send_and_wait("eval", params, extract_timeout(args));
-    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "game_eval completed");
-    return result;
+    return handle_gsd_send("eval", params, extract_timeout(args));
 }
 
 mcp::JsonValue handle_game_input(const mcp::JsonValue& args) {
@@ -213,43 +260,13 @@ mcp::JsonValue handle_game_input(const mcp::JsonValue& args) {
     copy_optional(args, params, "button_index");
     copy_optional(args, params, "position");
     copy_optional(args, params, "action");
-    JV result = send_and_wait("input", params, extract_timeout(args));
-    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "game_input completed");
-    return result;
+    return handle_gsd_send("input", params, extract_timeout(args));
 }
 
 mcp::JsonValue handle_game_capture(const mcp::JsonValue& args) {
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "game_capture called");
     JV params(JV::object_tag);
-    JV resp = send_and_wait("capture", params, extract_timeout(args));
-    if (resp.Contains("error")) return resp;
-    if (!resp.IsObject()) return error_json("unexpected capture response");
-
-    auto* path_p = resp.Find("path");
-    if (!path_p || !path_p->IsString()) return error_json("capture response missing path");
-    std::string path = path_p->GetString();
-
-    godot::Ref<godot::FileAccess> file =
-        godot::FileAccess::open(godot::String(path.c_str()), godot::FileAccess::READ);
-    if (file.is_null() || !file->is_open()) {
-        return error_json("failed to read captured file: " + path);
-    }
-    uint64_t length = file->get_length();
-    godot::PackedByteArray bytes = file->get_buffer(static_cast<int64_t>(length));
-    file->close();
-    if (bytes.size() <= 0) {
-        return error_json("captured file is empty: " + path);
-    }
-    std::string b64 = capture_ops::base64_encode(bytes.ptrw(), static_cast<size_t>(bytes.size()));
-
-    JV r(JV::object_tag);
-    r["data"] = JV(b64);
-    r["format"] = JV("png");
-    if (auto* w = resp.Find("width")) r["width"] = *w;
-    if (auto* h = resp.Find("height")) r["height"] = *h;
-    r["path"] = JV(path);
-    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "game_capture completed");
-    return r;
+    return handle_gsd_send("capture", params, extract_timeout(args));
 }
 
 } // namespace runtime_ops
