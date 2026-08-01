@@ -757,7 +757,7 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue& args) {
     auto* existing_root = editor->get_edited_scene_root();
     if (existing_root) {
         if (!close_current) {
-            return error_json("scene already has a root node — use editor_close_scene to close it, then call editor_new_scene again");
+            return error_json("scene already has a root node — call editor_new_scene with close_current=true, or call editor_close_scene first");
         }
         if (existing_root->get_scene_file_path().is_empty()) {
             return util::error_detail("current scene is unsaved", to_std(existing_root->get_name()),

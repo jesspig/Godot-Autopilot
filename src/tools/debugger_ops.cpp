@@ -273,6 +273,58 @@ private:
     static constexpr size_t MAX_MONITORS = 500;
 };
 
+// ── Godot 3 → 4 renamed property hints ──
+// 依据 Godot 官方迁移表 renames_map_3_to_4.cpp，且旧名在 Godot 4
+// 引擎 ADD_PROPERTY 全局核查中已无同名属性（frames 为任务指定项）。
+struct RenameHint {
+    const char* old_name;
+    const char* new_name;
+};
+
+const RenameHint RENAME_HINTS[] = {
+    { "frames", "sprite_frames" },                  // AnimatedSprite2D/3D
+    { "cast_to", "target_position" },               // RayCast2D/3D, ShapeCast2D/3D
+    { "rect_position", "position" },                // Control
+    { "rect_global_position", "global_position" },  // Control
+    { "rect_size", "size" },                        // Control
+    { "rect_min_size", "custom_minimum_size" },     // Control
+    { "rect_rotation", "rotation" },                // Control
+    { "rect_scale", "scale" },                      // Control
+    { "rect_pivot_offset", "pivot_offset" },        // Control
+    { "translation", "position" },                  // Node3D
+};
+
+constexpr const char INVALID_ACCESS_MARKER[] = "Invalid access to property or key '";
+
+std::string append_rename_hint(const std::string& error_text) {
+    size_t marker_pos = error_text.find(INVALID_ACCESS_MARKER);
+    if (marker_pos == std::string::npos) {
+        return error_text;
+    }
+    size_t key_start = marker_pos + sizeof(INVALID_ACCESS_MARKER) - 1;
+    size_t key_end = error_text.find('\'', key_start);
+    if (key_end == std::string::npos) {
+        return error_text;
+    }
+    std::string key = error_text.substr(key_start, key_end - key_start);
+    for (const RenameHint& hint : RENAME_HINTS) {
+        if (key != hint.old_name) {
+            continue;
+        }
+        std::string hinted = error_text;
+        if (!hinted.empty() && hinted.back() != '\n') {
+            hinted += '\n';
+        }
+        hinted += "Hint: did you mean '";
+        hinted += hint.new_name;
+        hinted += "'? The old Godot 3 name '";
+        hinted += hint.old_name;
+        hinted += "' was renamed in Godot 4.";
+        return hinted;
+    }
+    return error_text;
+}
+
 } // namespace
 
 // ── DebuggerCapture delegation functions ──
@@ -304,7 +356,7 @@ bool capture_session_breaked() {
 }
 size_t capture_log_count() { return DebuggerCapture::instance().log_count(); }
 std::string capture_new_error_text(size_t since_count) {
-    return DebuggerCapture::instance().get_log_text_since(since_count, true);
+    return append_rename_hint(DebuggerCapture::instance().get_log_text_since(since_count, true));
 }
 
 } // namespace debugger_ops

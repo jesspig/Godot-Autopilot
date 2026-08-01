@@ -501,6 +501,7 @@ JV handle_persist(const JV& args) {
     }
     auto actions = im->get_actions();
     int persisted = 0;
+    std::vector<std::string> persisted_names;
     std::vector<std::string> skipped;
     std::vector<std::string> skipped_missing;
     for (int i = 0; i < actions.size(); i++) {
@@ -521,6 +522,7 @@ JV handle_persist(const JV& args) {
         dict["deadzone"] = im->action_get_deadzone(action_name);
         dict["events"] = im->action_get_events(action_name);
         ps->set_setting(godot::String(("input/" + name_std).c_str()), dict);
+        persisted_names.push_back(name_std);
         persisted++;
     }
     if (has_allowlist) {
@@ -531,9 +533,38 @@ JV handle_persist(const JV& args) {
         }
     }
     godot::Error err = ps->save();
+    bool readback_verified = true;
+    std::vector<std::string> readback_failed;
+    for (const auto& name : persisted_names) {
+        godot::String setting_path = godot::String(("input/" + name).c_str());
+        bool ok = ps->has_setting(setting_path);
+        if (ok) {
+            godot::Variant stored = ps->get_setting(setting_path);
+            if (stored.get_type() == godot::Variant::DICTIONARY) {
+                godot::Dictionary stored_dict = stored;
+                ok = stored_dict.has("deadzone") && stored_dict.has("events");
+            } else {
+                ok = false;
+            }
+        }
+        if (!ok) {
+            readback_verified = false;
+            readback_failed.push_back(name);
+            LogSystem::instance().log(LogLevel::Warning, LogCategory::Tools, "input_map_persist readback failed for action '" + name + "': setting missing or malformed at input/" + name);
+        }
+    }
     JV r(JV::object_tag);
     r["result"] = JV("persisted");
     r["actions_persisted"] = JV(persisted);
+    r["readback_verified"] = JV(readback_verified);
+    if (!readback_failed.empty()) {
+        JV failed_arr(JV::array_tag);
+        for (const auto& name : readback_failed) {
+            failed_arr.PushBack(JV(name));
+        }
+        r["readback_failed"] = std::move(failed_arr);
+    }
+    r["note"] = JV("persisted actions are loaded by the game process at startup (InputMap.load_from_project_settings); the editor process InputMap does not reload project input/ settings until restart. Verify with ProjectSettings.get_setting('input/<action>'), not get_setting('input').");
     r["skipped_count"] = JV(static_cast<int64_t>(skipped.size()));
     JV skipped_arr(JV::array_tag);
     for (const auto& name : skipped) {

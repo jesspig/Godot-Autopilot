@@ -59,6 +59,9 @@ JV handle_create(const JV& args) {
     godot::Ref<godot::SpriteFrames> sf = obj_var;
     if (sf.is_null()) return error("instantiated object is not a SpriteFrames");
 
+    // 引擎构造 SpriteFrames 时自带空 default 动画，导出 .tres 会残留无用 default:0 条目，此处删除。
+    sf->remove_animation(godot::StringName("default"));
+
     resource_ops::register_memory_resource(sf, name);
 
     JV r(JV::object_tag);
@@ -67,8 +70,9 @@ JV handle_create(const JV& args) {
     info["name"] = JV(name);
     info["path"] = JV("memory://" + name);
     info["object_id"] = JV(static_cast<int64_t>(sf->get_instance_id()));
+    info["default_animation_removed"] = JV(true);
     r["result"] = std::move(info);
-    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "spriteframes_create completed");
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "spriteframes_create completed (default animation removed)");
     return r;
 }
 

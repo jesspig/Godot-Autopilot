@@ -5,7 +5,6 @@
 #include "tools/scene_ops.hpp"
 #include <godot_cpp/classes/editor_undo_redo_manager.hpp>
 #include <godot_cpp/classes/engine.hpp>
-#include <godot_cpp/classes/expression.hpp>
 #include <godot_cpp/classes/gd_script.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/resource_saver.hpp>
@@ -74,87 +73,7 @@ mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue& args) {
     }
     std::string expression = it_expr->GetString();
 
-    bool is_single_expr = true;
-    {
-        std::istringstream stream(expression);
-        std::string line;
-        int line_count = 0;
-        while (std::getline(stream, line)) {
-            size_t pos = line.find_first_not_of(" \t");
-            if (pos != std::string::npos && line[pos] != '#') {
-                line_count++;
-                if (line_count > 1) { is_single_expr = false; break; }
-            }
-        }
-    }
-
-    bool has_assignment = false;
-    for (size_t i = 0; i < expression.size() && !has_assignment; ++i) {
-        if (expression[i] != '=') continue;
-        char before = i > 0 ? expression[i - 1] : '\0';
-        char after = i + 1 < expression.size() ? expression[i + 1] : '\0';
-        if (before != '=' && before != '!' && before != '<' && before != '>' &&
-            after != '=' && after != '!' && after != '<' && after != '>') {
-            has_assignment = true;
-        }
-    }
-
-    if (is_single_expr && expression.find('\n') == std::string::npos && !has_assignment) {
-        // Single expression mode: use godot::Expression (fast path)
-        godot::Ref<godot::Expression> expr;
-        expr.instantiate();
-        if (expr.is_null()) {
-            mcp::JsonValue e(mcp::JsonValue::object_tag);
-            e["error"] = mcp::JsonValue("failed to create Expression instance");
-            return e;
-        }
-
-        godot::PackedStringArray input_names;
-        auto* it_inputs = args.Find("input_names");
-        if (it_inputs && it_inputs->IsArray()) {
-            const auto& arr = it_inputs->GetArray();
-            for (const auto& n : arr) {
-                if (n.IsString()) input_names.append(godot::String(n.GetString().c_str()));
-            }
-        }
-
-        godot::Error parse_err = expr->parse(godot::String(expression.c_str()), input_names);
-        if (parse_err != godot::OK) {
-            std::string err_text = to_std(expr->get_error_text());
-            mcp::JsonValue e(mcp::JsonValue::object_tag);
-            e["error"] = mcp::JsonValue("parse error: " + err_text);
-            return e;
-        }
-
-        godot::Array inputs;
-        auto* it_vals = args.Find("input_values");
-        if (it_vals && it_vals->IsArray()) {
-            const auto& arr = it_vals->GetArray();
-            for (const auto& v : arr) {
-                inputs.append(VariantJson::deserialize(v));
-            }
-        }
-
-        auto* editor = godot::EditorInterface::get_singleton();
-        godot::Node* scene_root = editor ? editor->get_edited_scene_root() : nullptr;
-        godot::Node* base_instance = scene_root ? scene_root : memnew(godot::Node);
-        godot::Variant result = expr->execute(inputs, base_instance, true);
-        if (!scene_root) {
-            if (base_instance->get_parent()) base_instance->get_parent()->remove_child(base_instance);
-            memdelete(base_instance);
-        }
-        if (expr->has_execute_failed()) {
-            mcp::JsonValue e(mcp::JsonValue::object_tag);
-            e["error"] = mcp::JsonValue("execution failed: " + to_std(expr->get_error_text()));
-            return e;
-        }
-
-        mcp::JsonValue r(mcp::JsonValue::object_tag);
-        r["result"] = VariantJson::serialize(result);
-        return r;
-    }
-
-    // Multi-line / statement mode: use GDScript wrapping
+    // GDScript wrapping (single execution path)
     auto* editor = godot::EditorInterface::get_singleton();
     godot::Node* scene_root = editor ? editor->get_edited_scene_root() : nullptr;
 

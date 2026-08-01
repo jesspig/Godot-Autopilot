@@ -40,7 +40,7 @@ TOOL_ENTRY(resource_set_property, "resource_set_property", "Set a property on a 
 TOOL_ENTRY(resource_get_property, "resource_get_property", "Get a property value from a resource", "Resources", "resource,property,get", resource_ops::handle_get_property, SCHEMA_BASIC)
 
 // ── Scripts ──
-TOOL_ENTRY(script_execute_gdscript, "script_execute_gdscript", "Execute an arbitrary GDScript expression", "Scripts", "script,execute,gdscript", script_ops::handle_execute_gdscript, SCHEMA_BASIC)
+TOOL_ENTRY(script_execute_gdscript, "script_execute_gdscript", "Execute arbitrary GDScript statements; the source is wrapped in a script and executed via a run function, supporting full GDScript including global classes (e.g. Engine, EditorInterface)", "Scripts", "script,execute,gdscript", script_ops::handle_execute_gdscript, SCHEMA_BASIC)
 TOOL_ENTRY(script_load, "script_load", "Load a script from file path", "Scripts", "script,load", script_ops::handle_load, SCHEMA_BASIC)
 TOOL_ENTRY(script_create, "script_create", "Create and save a new GDScript file", "Scripts", "script,create", script_ops::handle_create, SCHEMA_BASIC)
 TOOL_ENTRY(script_attach_to_node, "script_attach_to_node", "Attach a script to a scene node", "Scripts", "script,attach,node", script_ops::handle_attach_to_node, SCHEMA_BASIC)
@@ -378,7 +378,7 @@ TOOL_ENTRY(text_shaped_text_get_size, "text_shaped_text_get_size", "Get shaped t
 // ── TileMap ──
 TOOL_ENTRY(tilemap_create, "tilemap_create", "Create a TileMap node", "TileMap", "tilemap,create", tilemap_ops::handle_create, SCHEMA_BASIC)
 TOOL_ENTRY(tilemap_set_cell, "tilemap_set_cell", "Set a cell on a TileMap node", "TileMap", "tilemap,cell,set", tilemap_ops::handle_set_cell, SCHEMA_BASIC)
-TOOL_ENTRY(tilemap_set_cells, "tilemap_set_cells", "Set multiple cells on a TileMap node", "TileMap", "tilemap,cell,set,batch", tilemap_ops::handle_set_cells, SCHEMA_BASIC)
+TOOL_ENTRY(tilemap_set_cells, "tilemap_set_cells", "Set multiple cells on a TileMap node. For large batches, consider generating the cells array programmatically (e.g. via code_execute) to avoid manual JSON errors.", "TileMap", "tilemap,cell,set,batch", tilemap_ops::handle_set_cells, SCHEMA_BASIC)
 TOOL_ENTRY(tileset_create, "tileset_create", "Create a TileSet resource", "TileMap", "tileset,create", tilemap_ops::handle_tileset_create, SCHEMA_BASIC)
 TOOL_ENTRY(tileset_add_atlas_source, "tileset_add_atlas_source", "Add an atlas source with a texture to a TileSet", "TileMap", "tileset,atlas,texture", tileset_ops::handle_add_atlas_source, SCHEMA_BASIC)
 TOOL_ENTRY(tileset_add_physics_layer, "tileset_add_physics_layer", "Add a physics layer to a TileSet", "TileMap", "tileset,physics,layer", tileset_ops::handle_add_physics_layer, SCHEMA_BASIC)
@@ -413,4 +413,4 @@ TOOL_ENTRY(game_input, "game_input", "Simulate input inside the running game pro
 TOOL_ENTRY(game_capture, "game_capture", "Capture the running game's viewport as a PNG image, returned as base64-encoded string — requires a game running from the editor (editor_play_current_scene) whose project loads the godot-self-driving extension", "Game", "game,runtime,capture,screenshot,debug", runtime_ops::handle_game_capture, SCHEMA_BASIC)
 
 // ── InputMap ──
-TOOL_ENTRY(input_map_persist, "input_map_persist", "Persist runtime InputMap actions to ProjectSettings and save to disk (optional actions whitelist; when omitted, actions prefixed with \"ui_\" or containing \"/\" are filtered out)", "InputMap", "input,map,persist,save", input_map_ops::handle_persist, SCHEMA_BASIC)
+TOOL_ENTRY(input_map_persist, "input_map_persist", "Persist runtime InputMap actions to ProjectSettings and save to disk (optional actions whitelist; when omitted, actions prefixed with \"ui_\" or containing \"/\" are filtered out); Note: persisted actions are loaded by the game process at startup; the editor process does not reload project input settings until restart. Verify with ProjectSettings.get_setting('input/<action>').", "InputMap", "input,map,persist,save", input_map_ops::handle_persist, SCHEMA_BASIC)
