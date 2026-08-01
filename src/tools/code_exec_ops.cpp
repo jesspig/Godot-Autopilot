@@ -78,6 +78,72 @@ std::string map_line_numbers(const std::string& err_text, int offset, const std:
     return mapped;
 }
 
+// 临时节点 RAII 守卫：析构时从父节点移除并释放，并将外部指针置空防止双重释放。
+// 持有指针引用（而非值拷贝），构造/析构后外部指针自动归空。
+struct TempNodeGuard {
+    godot::Node*& node;
+
+    explicit TempNodeGuard(godot::Node*& n) : node(n) {}
+
+    ~TempNodeGuard() {
+        cleanup();
+    }
+
+    void cleanup() {
+        if (node == nullptr) return;
+        if (node->get_parent()) {
+            node->get_parent()->remove_child(node);
+        }
+        memdelete(node);
+        node = nullptr;
+    }
+};
+
+// 从引擎错误文本首行解析结构化字段（file/line/message）。
+// 支持形如 "SCRIPT ERROR at gdscript://<name>.gd:<n> - <msg>"
+// 与 "[HH:MM:SS] [ERROR] <file>:<line> - <message>" 的引擎文本。
+// 无法可靠解析的字段省略；全部无法解析时返回空对象（调用方据此省略）。
+mcp::JsonValue extract_structured_error(const std::string& err_text) {
+    mcp::JsonValue out(mcp::JsonValue::object_tag);
+
+    std::string line = err_text.substr(0, err_text.find('\n'));
+    if (line.empty()) return out;
+
+    size_t sep = line.find(" - ");
+    std::string head = (sep == std::string::npos) ? line : line.substr(0, sep);
+    std::string message = (sep == std::string::npos) ? "" : line.substr(sep + 3);
+
+    // 从右向左找 "<file>:<digits>"：冒号前字符非数字（排除 [HH:MM:SS] 时间戳），
+    // 冒号后紧跟数字。
+    for (size_t i = head.size(); i > 0; --i) {
+        size_t colon = i - 1;
+        if (head[colon] != ':' || colon == 0) continue;
+        char before = head[colon - 1];
+        if (std::isdigit(static_cast<unsigned char>(before))) continue;
+        if (i >= head.size() || !std::isdigit(static_cast<unsigned char>(head[i]))) continue;
+        size_t num_end = i;
+        while (num_end < head.size()
+               && std::isdigit(static_cast<unsigned char>(head[num_end]))) {
+            ++num_end;
+        }
+        size_t file_start = colon;
+        while (file_start > 0
+               && head[file_start - 1] != ' ' && head[file_start - 1] != '\t'
+               && head[file_start - 1] != '[' && head[file_start - 1] != ']') {
+            --file_start;
+        }
+        out["file"] = mcp::JsonValue(head.substr(file_start, colon - file_start));
+        out["line"] = mcp::JsonValue(static_cast<int64_t>(
+            std::stoi(head.substr(i, num_end - i))));
+        break;
+    }
+
+    if (!message.empty()) {
+        out["message"] = mcp::JsonValue(message);
+    }
+    return out;
+}
+
 } // namespace
 
 namespace godot_self_driving {
@@ -418,67 +484,61 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
         child_count_before = scene_root_for_leak->get_child_count();
     }
 
-    godot::Node* temp_node = memnew(godot::Node);
-    temp_node->set_script(godot::Variant(script));
-
-    // Temporarily add to scene tree so get_tree() is available
-    godot::EditorInterface* editor_4 = godot::EditorInterface::get_singleton();
-    godot::Node* parent_node = nullptr;
-    godot::Node* scene_root_4 = editor_4 ? editor_4->get_edited_scene_root() : nullptr;
-    if (scene_root_4) {
-        parent_node = scene_root_4;
-    } else {
-        auto* engine = godot::Engine::get_singleton();
-        auto* main_loop = engine ? engine->get_main_loop() : nullptr;
-        auto* tree = godot::Object::cast_to<godot::SceneTree>(main_loop);
-        if (tree) {
-            parent_node = godot::Object::cast_to<godot::Node>(tree->get_root());
-        }
-    }
-    bool temp_added_4 = false;
-    if (parent_node) {
-        parent_node->add_child(temp_node);
-        temp_added_4 = true;
-    }
-
-    godot::StringName fn_name(func_name.c_str());
-    if (!temp_node->has_method(fn_name)) {
-        if (temp_added_4 && temp_node->get_parent()) {
-            temp_node->get_parent()->remove_child(temp_node);
-        }
-        memdelete(temp_node);
-        mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("function not found in compiled script: " + func_name);
-        return e;
-    }
-
-    bool timeout_hit = false;
+    // ── 临时节点生命周期：块作用域 + RAII 守卫，正常/异常/提前返回路径必清理 ──
     godot::Variant result;
-    auto check_time = [&]() {
-        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now() - start_time).count();
-        if (elapsed >= timeout_ms) timeout_hit = true;
-    };
+    std::string new_error_text;
+    bool temp_added = false;
+    {
+        godot::Node* temp_node = nullptr;
+        TempNodeGuard temp_guard(temp_node);
 
-    check_time();
-    if (timeout_hit) {
-        if (temp_added_4 && temp_node->get_parent()) {
-            temp_node->get_parent()->remove_child(temp_node);
+        temp_node = memnew(godot::Node);
+        temp_node->set_script(godot::Variant(script));
+
+        // 挂到 SceneTree root 下的隔离位置使 get_tree() 可用（不再污染编辑场景根）；
+        // root 不可用（理论不存在）时仅作防御回退到编辑场景根。
+        godot::Node* parent_node = nullptr;
+        {
+            auto* engine = godot::Engine::get_singleton();
+            auto* main_loop = engine ? engine->get_main_loop() : nullptr;
+            auto* tree = godot::Object::cast_to<godot::SceneTree>(main_loop);
+            if (tree) {
+                parent_node = godot::Object::cast_to<godot::Node>(tree->get_root());
+            }
         }
-        memdelete(temp_node);
-        mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("Execution timed out after " + std::to_string(timeout_ms) + " ms");
-        return e;
-    }
+        if (!parent_node) {
+            auto* editor = godot::EditorInterface::get_singleton();
+            parent_node = editor ? editor->get_edited_scene_root() : nullptr;
+        }
+        if (parent_node) {
+            parent_node->add_child(temp_node);
+            temp_added = true;
+        }
 
-    result = temp_node->call(fn_name);
+        godot::StringName fn_name(func_name.c_str());
+        if (!temp_node->has_method(fn_name)) {
+            mcp::JsonValue e(mcp::JsonValue::object_tag);
+            e["error"] = mcp::JsonValue("function not found in compiled script: " + func_name);
+            return e;
+        }
 
-    std::string new_error_text = debugger_ops::capture_new_error_text(log_before);
+        bool timeout_hit = false;
+        auto check_time = [&]() {
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - start_time).count();
+            if (elapsed >= timeout_ms) timeout_hit = true;
+        };
 
-    if (temp_added_4 && temp_node->get_parent()) {
-        temp_node->get_parent()->remove_child(temp_node);
-    }
-    memdelete(temp_node);
+        check_time();
+        if (timeout_hit) {
+            mcp::JsonValue e(mcp::JsonValue::object_tag);
+            e["error"] = mcp::JsonValue("Execution timed out after " + std::to_string(timeout_ms) + " ms");
+            return e;
+        }
+
+        result = temp_node->call(fn_name);
+        new_error_text = debugger_ops::capture_new_error_text(log_before);
+    } // 块结束：temp_guard 析构，移除并释放临时节点
 
     // ── Leak cleanup: remove or retain nodes users added directly to scene_root (without owner) ──
     int auto_owner_set = 0;
@@ -528,8 +588,12 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
         } else {
             r["error_details"] = mcp::JsonValue(new_error_text);
         }
+        mcp::JsonValue structured = extract_structured_error(new_error_text);
+        if (structured.IsObject() && !structured.Empty()) {
+            r["structured_error"] = std::move(structured);
+        }
     }
-    if (!temp_added_4) {
+    if (!temp_added) {
         r["note"] = mcp::JsonValue("temporary node was not added to any scene tree — get_tree() will be null");
     }
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "code_execute completed");
