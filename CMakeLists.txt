@@ -60,6 +60,7 @@ add_library(godot-self-driving SHARED
     src/main.cpp
     src/core/mode_detector.cpp
     src/core/log_system.cpp
+    src/core/resource_registry.cpp
     src/core/server_context.cpp
     src/resources/resource_handlers.cpp
     src/resources/debugger_resources.cpp
