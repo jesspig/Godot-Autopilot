@@ -8,6 +8,9 @@
 #include <godot_cpp/variant/packed_string_array.hpp>
 #include <string>
 #include <vector>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 namespace godot_self_driving {
 namespace log_ops {
@@ -64,7 +67,67 @@ struct TailResult {
     int64_t total_lines = 0;
 };
 
+#ifdef _WIN32
+static TailResult shared_read_tail(const godot::String& path, int64_t limit) {
+    // Windows: open with FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE so the
+    // running game's log writer does not block reading.
+    TailResult result;
+    HANDLE handle = CreateFileW((LPCWSTR)path.utf16().get_data(), GENERIC_READ,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (handle == INVALID_HANDLE_VALUE) return result;
+    LARGE_INTEGER size;
+    if (!GetFileSizeEx(handle, &size)) {
+        CloseHandle(handle);
+        return result;
+    }
+    constexpr int64_t TAIL_WINDOW = 256 * 1024;
+    LARGE_INTEGER offset;
+    offset.QuadPart = (size.QuadPart > TAIL_WINDOW) ? size.QuadPart - TAIL_WINDOW : 0;
+    if (!SetFilePointerEx(handle, offset, nullptr, FILE_BEGIN)) {
+        CloseHandle(handle);
+        return result;
+    }
+    std::string raw;
+    std::vector<char> buffer(64 * 1024);
+    DWORD read = 0;
+    while (ReadFile(handle, buffer.data(), static_cast<DWORD>(buffer.size()), &read, nullptr) && read > 0) {
+        raw.append(buffer.data(), read);
+    }
+    CloseHandle(handle);
+    result.opened = true;
+    size_t start = 0;
+    while (start < raw.size()) {
+        size_t end = raw.find('\n', start);
+        if (end == std::string::npos) {
+            result.total_lines++;
+            if (limit != 0 && static_cast<int64_t>(result.lines.size()) < limit) {
+                result.lines.push_back(raw.substr(start));
+            }
+            break;
+        }
+        std::string line = raw.substr(start, end - start);
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        result.total_lines++;
+        if (limit != 0) {
+            if (static_cast<int64_t>(result.lines.size()) < limit) {
+                result.lines.push_back(std::move(line));
+            } else {
+                result.lines.erase(result.lines.begin());
+                result.lines.push_back(std::move(line));
+            }
+        }
+        start = end + 1;
+    }
+    return result;
+}
+#endif
+
 TailResult read_tail(const godot::String& path, int64_t limit) {
+#ifdef _WIN32
+    TailResult shared = shared_read_tail(path, limit);
+    if (shared.opened) return shared;
+#endif
     TailResult result;
     auto file = godot::FileAccess::open(path, godot::FileAccess::READ);
     if (file.is_null()) return result;

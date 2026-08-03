@@ -28,6 +28,7 @@ using JV = mcp::JsonValue;
 
 constexpr int64_t DEFAULT_TIMEOUT_MS = 5000;
 constexpr int64_t MAX_TIMEOUT_MS = 30000;
+constexpr int64_t RESPONSE_GRACE_MS = 2000;
 
 JV error_json(const std::string& message) {
     JV e(JV::object_tag);
@@ -51,6 +52,7 @@ struct PendingRequest {
     std::condition_variable cv;
     bool done = false;
     JV response;
+    std::string op;
 };
 
 std::mutex g_pending_mtx;
@@ -74,6 +76,7 @@ JV send_request(int64_t request_id, const std::string& op, const JV& params) {
     }
 
     auto pending = std::make_shared<PendingRequest>();
+    pending->op = op;
     {
         std::lock_guard<std::mutex> lock(g_pending_mtx);
         g_pending[request_id] = pending;
@@ -111,9 +114,10 @@ JV wait_for_response(int64_t request_id, int64_t timeout_ms) {
     bool completed = pending->cv.wait_for(lock, std::chrono::milliseconds(timeout_ms),
         [&]() { return pending->done; });
     if (!completed) {
+        std::string op_name = pending->op.empty() ? "?" : pending->op;
         std::lock_guard<std::mutex> gl(g_pending_mtx);
         g_pending.erase(request_id);
-        return error_json("game timed out — no gsd listener (the game project must load the godot-self-driving extension; run the game from the editor at least once)");
+        return error_json("game op \"" + op_name + "\" timed out after " + std::to_string(timeout_ms) + " ms (request_id " + std::to_string(request_id) + ") — the request was sent to the active debug session(s) but no response arrived; the game process may be paused or physics-frozen (query game_status), or the game project may not load the godot-self-driving extension");
     }
     {
         std::lock_guard<std::mutex> gl(g_pending_mtx);
@@ -148,7 +152,7 @@ mcp::JsonValue handle_gsd_send(const std::string& op, const mcp::JsonValue& para
     if (result.Contains("error")) return result;
     JV r(JV::object_tag);
     r["__gsd_pending"] = JV(request_id);
-    r["timeout_ms"] = JV(timeout_ms);
+    r["timeout_ms"] = JV(timeout_ms + RESPONSE_GRACE_MS);
     return r;
 }
 
@@ -198,6 +202,18 @@ void copy_optional(const JV& from, JV& to, const char* key) {
     if (auto* v = from.Find(key)) to[key] = *v;
 }
 
+constexpr const char* INPUT_PARAM_WHITELIST[] = {
+    "type", "keycode", "pressed", "button_index", "position",
+    "action", "duration_ms", "mode", "timeout_ms",
+};
+
+bool is_input_param_allowed(const std::string& key) {
+    for (const char* allowed : INPUT_PARAM_WHITELIST) {
+        if (key == allowed) return true;
+    }
+    return false;
+}
+
 } // namespace
 
 void handle_game_response(const std::string& json_str) {
@@ -213,7 +229,11 @@ void handle_game_response(const std::string& json_str) {
         auto it = g_pending.find(request_id);
         if (it != g_pending.end()) pending = it->second;
     }
-    if (!pending) return;
+    if (!pending) {
+        LogSystem::instance().log(LogLevel::Warning, LogCategory::Tools,
+            "late game response discarded (request_id " + std::to_string(request_id) + ", editor wait already timed out)");
+        return;
+    }
 
     {
         std::lock_guard<std::mutex> lock(pending->mtx);
@@ -244,6 +264,9 @@ mcp::JsonValue handle_game_eval(const mcp::JsonValue& args) {
     copy_optional(args, params, "method");
     copy_optional(args, params, "args");
     copy_optional(args, params, "source_code");
+    copy_optional(args, params, "persist");
+    copy_optional(args, params, "persist_name");
+    copy_optional(args, params, "timeout_ms");
     return handle_gsd_send("eval", params, extract_timeout(args));
 }
 
@@ -260,7 +283,62 @@ mcp::JsonValue handle_game_input(const mcp::JsonValue& args) {
     copy_optional(args, params, "button_index");
     copy_optional(args, params, "position");
     copy_optional(args, params, "action");
-    return handle_gsd_send("input", params, extract_timeout(args));
+    copy_optional(args, params, "duration_ms");
+    copy_optional(args, params, "mode");
+
+    std::vector<std::string> ignored;
+    if (args.IsObject()) {
+        for (const auto& entry : args.GetObject()) {
+            if (!is_input_param_allowed(entry.first)) {
+                ignored.push_back(entry.first);
+            }
+        }
+    }
+
+    JV result = handle_gsd_send("input", params, extract_timeout(args));
+    if (!result.Contains("error") && !ignored.empty()) {
+        JV ignored_arr(JV::array_tag);
+        for (const auto& key : ignored) ignored_arr.PushBack(JV(key));
+        result["ignored_params"] = std::move(ignored_arr);
+        std::string warning = "ignored unknown parameters: ";
+        for (size_t i = 0; i < ignored.size(); i++) {
+            if (i > 0) warning += ", ";
+            warning += ignored[i];
+        }
+        result["warning"] = JV(warning);
+    }
+    return result;
+}
+
+mcp::JsonValue handle_game_input_wait(const mcp::JsonValue& args) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "game_input_wait called");
+    auto* action_p = args.Find("action");
+    if (!action_p || !action_p->IsString()) {
+        return error_json("missing required parameter: action");
+    }
+    JV params(JV::object_tag);
+    params["action"] = *action_p;
+    copy_optional(args, params, "state");
+    copy_optional(args, params, "timeout_ms");
+    return handle_gsd_send("input_wait", params, extract_timeout(args));
+}
+
+mcp::JsonValue handle_game_input_status(const mcp::JsonValue& args) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "game_input_status called");
+    auto* action_p = args.Find("action");
+    if (!action_p || !action_p->IsString()) {
+        return error_json("missing required parameter: action");
+    }
+    JV params(JV::object_tag);
+    params["action"] = *action_p;
+    JV result = handle_gsd_send("input_status", params, extract_timeout(args));
+    if (!result.Contains("error")) {
+        std::string recent_errors = debugger_ops::capture_get_errors_text(5);
+        if (!recent_errors.empty()) {
+            result["recent_engine_errors"] = JV(recent_errors);
+        }
+    }
+    return result;
 }
 
 mcp::JsonValue handle_game_capture(const mcp::JsonValue& args) {

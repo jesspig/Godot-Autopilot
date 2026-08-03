@@ -1,5 +1,6 @@
 #include "code_exec_ops.hpp"
 #include "core/log_system.hpp"
+#include "core/resource_registry.hpp"
 #include "register_all.hpp"
 #include "tools/debugger_ops.hpp"
 #include "util/error_util.hpp"
@@ -19,6 +20,12 @@
 #include <string>
 
 namespace {
+
+// godot::String → std::string（UTF-8），供资源类名/路径序列化使用。
+std::string to_std_string(const godot::String& s) {
+    godot::CharString utf8 = s.utf8();
+    return std::string(utf8.ptr());
+}
 
 // 包装脚本头部行数：wrapped 中用户源码第 1 行对应包装第 offset+1 行，
 // 引擎错误行号减去 offset 即得用户源码行号。
@@ -576,6 +583,26 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
         std::chrono::steady_clock::now() - start_time).count();
 
     mcp::JsonValue r(mcp::JsonValue::object_tag);
+
+    // 返回值本身是资源对象时注册到资源注册表保活（空 name 仅以 oid 键存储）：
+    // 临时节点已随 541 行块结束销毁，脚本实例引用归零，若不保活该资源实例也会
+    // 随之销毁，此后 resource_save 按 path 只能从磁盘重载旧文件，修改即丢失。
+    // 附带 registered_resource 字段供后续以 object_id 定位这个"修改过的活实例"。
+    if (result.get_type() == godot::Variant::OBJECT) {
+        godot::Object* obj = result.operator godot::Object*();
+        godot::Resource* res_obj = godot::Object::cast_to<godot::Resource>(obj);
+        if (res_obj) {
+            godot::Ref<godot::Resource> res(res_obj);
+            resource_registry::register_resource(res, "");
+            mcp::JsonValue reg(mcp::JsonValue::object_tag);
+            reg["object_id"] = mcp::JsonValue(static_cast<int64_t>(res->get_instance_id()));
+            reg["object_id_str"] = mcp::JsonValue(std::to_string(static_cast<int64_t>(res->get_instance_id())));
+            reg["class"] = mcp::JsonValue(to_std_string(res->get_class()));
+            reg["path"] = mcp::JsonValue(to_std_string(res->get_path()));
+            r["registered_resource"] = std::move(reg);
+        }
+    }
+
     r["result"] = VariantJson::serialize(result);
     r["execution_time_ms"] = mcp::JsonValue(static_cast<int64_t>(elapsed));
     r["auto_owner_set"] = mcp::JsonValue(static_cast<int64_t>(auto_owner_set));

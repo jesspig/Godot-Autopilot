@@ -63,6 +63,7 @@ JV handle_create(const JV& args) {
     sf->remove_animation(godot::StringName("default"));
 
     resource_ops::register_memory_resource(sf, name);
+    sf->set_path(godot::String(("memory://" + name).c_str()));
 
     JV r(JV::object_tag);
     JV info(JV::object_tag);

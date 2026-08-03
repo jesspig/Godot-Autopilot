@@ -40,11 +40,32 @@ godot::Node* find_node(const std::string& path_str) {
     if (!clean.empty() && clean[0] == '/') {
         clean = clean.substr(1);
     }
+    if (clean.size() > 5 && clean.compare(0, 5, "root/") == 0) {
+        clean = clean.substr(5);
+    }
     if (clean.empty() || clean == to_std(root->get_name())) {
         return root;
     }
     godot::NodePath np(godot::String(clean.c_str()));
-    return root->get_node_or_null(np);
+    auto* node = root->get_node_or_null(np);
+    if (!node) {
+        std::string root_name = to_std(root->get_name());
+        if (clean.size() > root_name.size() + 1 &&
+            clean.compare(0, root_name.size(), root_name) == 0 &&
+            clean[root_name.size()] == '/') {
+            std::string sub = clean.substr(root_name.size() + 1);
+            if (!sub.empty()) {
+                node = root->get_node_or_null(godot::NodePath(godot::String(sub.c_str())));
+            }
+        }
+    }
+    if (!node) return nullptr;
+    auto* p = node->get_parent();
+    while (p) {
+        if (p == root) return node;
+        p = p->get_parent();
+    }
+    return nullptr;
 }
 
 mcp::JsonValue error_json(const std::string& msg) {

@@ -40,6 +40,9 @@ godot::Node* find_node(const std::string& path_str) {
     if (!clean.empty() && clean[0] == '/') {
         clean = clean.substr(1);
     }
+    if (clean.size() > 5 && clean.compare(0, 5, "root/") == 0) {
+        clean = clean.substr(5);
+    }
     if (clean.empty() || clean == to_std(root->get_name())) {
         return root;
     }
@@ -64,7 +67,7 @@ godot::Node* find_node(const std::string& path_str) {
         if (p == root) return node;
         p = p->get_parent();
     }
-    return root;
+    return nullptr;
 }
 
 void collect_property_summary(godot::Node* node, mcp::JsonValue& j) {

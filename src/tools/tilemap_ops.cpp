@@ -302,6 +302,7 @@ JV handle_tileset_create(const JV& args) {
     tile_set->set("tile_size", godot::Vector2i(tile_size, tile_size));
 
     resource_ops::register_memory_resource(tile_set, name);
+    tile_set->set_path(godot::String(("memory://" + name).c_str()));
 
     JV r(JV::object_tag);
     JV info(JV::object_tag);

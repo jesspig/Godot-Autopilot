@@ -307,6 +307,20 @@ std::string append_rename_hint(const std::string& error_text) {
         return error_text;
     }
     std::string key = error_text.substr(key_start, key_end - key_start);
+    constexpr const char* BASE_TYPE_SUFFIX = " on a base object of type '";
+    size_t suffix_pos = error_text.find(BASE_TYPE_SUFFIX, key_end);
+    if (suffix_pos != std::string::npos) {
+        size_t type_start = suffix_pos + sizeof(BASE_TYPE_SUFFIX) - 1;
+        size_t type_end = error_text.find('\'', type_start);
+        if (type_end != std::string::npos) {
+            std::string base_type = error_text.substr(type_start, type_end - type_start);
+            bool is_packed_array = base_type.compare(0, 6, "Packed") == 0 &&
+                base_type.size() >= 11 && base_type.compare(base_type.size() - 5, 5, "Array") == 0;
+            if (base_type == "Dictionary" || base_type == "Array" || is_packed_array) {
+                return error_text;
+            }
+        }
+    }
     for (const RenameHint& hint : RENAME_HINTS) {
         if (key != hint.old_name) {
             continue;

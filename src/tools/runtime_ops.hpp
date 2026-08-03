@@ -16,6 +16,8 @@ namespace runtime_ops {
 mcp::JsonValue handle_game_status(const mcp::JsonValue& args);
 mcp::JsonValue handle_game_eval(const mcp::JsonValue& args);
 mcp::JsonValue handle_game_input(const mcp::JsonValue& args);
+mcp::JsonValue handle_game_input_wait(const mcp::JsonValue& args);
+mcp::JsonValue handle_game_input_status(const mcp::JsonValue& args);
 mcp::JsonValue handle_game_capture(const mcp::JsonValue& args);
 
 // Executes send_request safely from the current thread (direct call on the

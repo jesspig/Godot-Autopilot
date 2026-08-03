@@ -305,7 +305,9 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
         m["editor_get_edited_scene_root"] = schema::build_schema({});
         m["editor_save_scene"] = schema::build_schema({});
         m["editor_save_all_scenes"] = schema::build_schema({});
-        m["editor_reload_scene"] = schema::build_schema({});
+        m["editor_reload_scene"] = schema::build_schema({
+            {"scene_path", "string", "Scene file path to reload (default: current edited scene)", false},
+        });
         m["editor_inspect_object"] = schema::build_schema({
             {"object_id", "integer", "Object instance ID to inspect", true},
         });
@@ -1188,7 +1190,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"limit", "integer", "Maximum number of errors to return (default: 20)", false},
         });
         m["debugger_get_output"] = schema::build_schema({
-            {"limit", "integer", "Maximum number of output entries to return (default: 50)", false},
+            {"limit", "integer", "Maximum number of output entries to return (default: 50). KNOWN LIMITATION: editor's built-in debug handlers consume game output before plugins; usually empty — use log_get_game_entries instead", false},
         });
         m["debugger_get_stack_dump"] = schema::build_schema({});
         m["debugger_get_scene_tree"] = schema::build_schema({});
@@ -1199,7 +1201,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
 
         // ── Game (runtime debug channel) ──
         m["game_status"] = schema::build_schema({
-            {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 30000)", false},
+            {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 30000), 返回字段含 paused（SceneTree 暂停状态）与 physics_frame（物理帧计数），用于区分假运行", false},
         });
         m["game_eval"] = schema::build_schema({
             {"action", "string", "Action to run in the game process: \"script\" (execute arbitrary GDScript), \"get_property\", \"set_property\", \"call_method\"", true},
@@ -1209,6 +1211,8 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"method", "string", "Method name for call_method", false},
             {"args", "array", "Arguments for call_method", false},
             {"source_code", "string", "GDScript source for action=\"script\" — must extend Node and define func _run()", false},
+            {"persist", "boolean", "Keep the script's temporary node alive after the call (default: false); the node is stored under /root/__gsd_runtime and its path is returned in node_path for later get_property/call_method use", false},
+            {"persist_name", "string", "Node name under /root/__gsd_runtime when persist=true (default: auto-generated)", false},
             {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 30000)", false},
         });
         m["game_input"] = schema::build_schema({
@@ -1217,7 +1221,18 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"pressed", "boolean", "Pressed state (default: true)", false},
             {"button_index", "integer", "Mouse button index for type=\"mouse_button\" (e.g. 1=left, 2=right, 3=middle)", false},
             {"position", "object", "Mouse position {x, y} for type=\"mouse_button\"", false},
-            {"action", "string", "Action name for type=\"action\"", false},
+            {"action", "string", "Action name; transient states (is_action_just_pressed) are only visible in the next physics frame — use game_input wait/status ops or auto-release (duration_ms) to observe effects", false},
+            {"duration_ms", "integer", "Hold duration: auto-release the input after this many ms (0/absent = no auto-release); only meaningful when pressed=true", false},
+            {"mode", "string", "Injection mode for type=action: \"event\" (default, via Input.parse_input_event) or \"api\" (via Input.action_press/action_release, immediate)", false},
+            {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 30000)", false},
+        });
+        m["game_input_wait"] = schema::build_schema({
+            {"action", "string", "Action name to wait on", true},
+            {"state", "string", "Transient state to wait for: \"just_pressed\" (default), \"just_released\" or \"pressed\"", false},
+            {"timeout_ms", "integer", "Wait timeout in milliseconds (default: 2000, max: 30000)", false},
+        });
+        m["game_input_status"] = schema::build_schema({
+            {"action", "string", "Action name to query, 返回字段含 paused 与 physics_frame，用于判断瞬态输入是否因暂停而无法被消费", true},
             {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 30000)", false},
         });
         m["game_capture"] = schema::build_schema({
@@ -1453,7 +1468,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"source_id", "integer", "Source ID of the atlas source", true},
             {"atlas_coords", "object", "Atlas coordinates of the tile (e.g. {\"x\":0,\"y\":0})", true},
             {"physics_layer", "integer", "Physics layer index to set collision on", true},
-            {"polygon", "array", "Collision polygon points, each {\"x\":float,\"y\":float}", true},
+            {"polygon", "array", "Collision polygon points (Array of {x,y}), each point is relative to the TILE CENTER (e.g. for tile_size=16 use (-8,-8)-(8,8) for full-tile collision; (0,0)-(16,16) starts at the center and overhangs)", true},
         });
 
         // ── SpriteFrames ──
@@ -1909,7 +1924,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         s["required"] = std::move(req);
 
         mcp::ToolOptions c_opts;
-        c_opts.Description("Execute arbitrary GDScript code. The source code is wrapped in a script that extends Node, compiled, attached to a temporary node, and executed. Returns the function result serialized as JSON.").InputSchema(std::move(s));
+        c_opts.Description("Execute arbitrary GDScript code. The source code is wrapped in a script that extends Node, compiled, attached to a temporary node, and executed. Returns the function result serialized as JSON. By default the source is inlined inside the _run() function body: top-level func definitions are not supported — inline all code as expressions/statements, or define named functions and call one via function_name (multi-function mode).").InputSchema(std::move(s));
         server.RegisterTool("code_execute", c_opts,
             [&queue](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
                 mcp::JsonValue args = ctx.Params().arguments

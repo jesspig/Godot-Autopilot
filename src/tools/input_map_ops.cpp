@@ -533,7 +533,7 @@ JV handle_persist(const JV& args) {
         }
     }
     godot::Error err = ps->save();
-    bool readback_verified = true;
+    bool readback_verified = (err == godot::OK);
     std::vector<std::string> readback_failed;
     for (const auto& name : persisted_names) {
         godot::String setting_path = godot::String(("input/" + name).c_str());

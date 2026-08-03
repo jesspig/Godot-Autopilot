@@ -3,6 +3,7 @@
 #include "util/variant_json.hpp"
 #include "tools/property_ops.hpp"
 #include "tools/scene_ops.hpp"
+#include "tools/debugger_ops.hpp"
 #include <godot_cpp/classes/editor_undo_redo_manager.hpp>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/gd_script.hpp>
@@ -29,6 +30,42 @@ constexpr const char* NODE_PATH_HINT = " — expected scene-relative path like '
 
 constexpr int PROPERTY_USAGE_CATEGORY = 0x80;
 constexpr int PROPERTY_USAGE_INTERNAL = 0x08;
+
+constexpr const char* SINGLE_EXPR_BLOCKING_KEYWORDS[] = {
+    "if", "for", "while", "match", "func", "return", "var", "const",
+    "class", "static", "break", "continue", "pass", "await", "try",
+    "assert", "super", "self",
+};
+
+bool is_plain_assignment(const std::string& text) {
+    for (size_t i = 0; i < text.size(); ++i) {
+        if (text[i] != '=') continue;
+        char prev = i > 0 ? text[i - 1] : '\0';
+        char next = i + 1 < text.size() ? text[i + 1] : '\0';
+        bool prev_is_op = prev == '=' || prev == '!' || prev == '<' || prev == '>';
+        bool next_is_op = next == '=' || next == '!' || next == '<' || next == '>';
+        if (!prev_is_op && !next_is_op) return true;
+    }
+    return false;
+}
+
+bool is_single_expression(const std::string& text) {
+    if (text.find('\n') != std::string::npos) return false;
+    size_t start = text.find_first_not_of(" \t");
+    if (start == std::string::npos || text[start] == '#') return false;
+    if (is_plain_assignment(text)) return false;
+    size_t word_end = start;
+    while (word_end < text.size()) {
+        char c = text[word_end];
+        if (c == ' ' || c == '\t' || c == '(' || c == ':') break;
+        ++word_end;
+    }
+    std::string first_word = text.substr(start, word_end - start);
+    for (const char* keyword : SINGLE_EXPR_BLOCKING_KEYWORDS) {
+        if (first_word == keyword) return false;
+    }
+    return true;
+}
 
 std::string to_std(const godot::String& s) {
     godot::CharString utf8 = s.utf8();
@@ -96,7 +133,9 @@ mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue& args) {
 
     std::string wrapped;
     wrapped = "@tool\nextends Node\n\nfunc _run():\n";
-    if (!cleaned.empty()) {
+    if (is_single_expression(expression)) {
+        wrapped += "    return " + cleaned + "\n";
+    } else if (!cleaned.empty()) {
         std::istringstream stream(cleaned);
         std::string line;
         bool first_line = true;
@@ -227,10 +266,22 @@ mcp::JsonValue handle_create(const mcp::JsonValue& args) {
     }
 
     script->set_source_code(godot::String(source_code.c_str()));
+    script->set_path_cache(godot::String(path.c_str()));
+    size_t compile_log_before = debugger_ops::capture_log_count();
     godot::Error reload_err = script->reload();
     if (reload_err != godot::OK) {
+        std::string message = "script compilation failed: ERR_PARSE_ERROR (code " + std::to_string(static_cast<int>(reload_err)) + ")";
+        std::string compile_err = debugger_ops::capture_new_error_text(compile_log_before);
+        if (!compile_err.empty()) {
+            if (compile_err.size() > 8192) {
+                message += "\n" + compile_err.substr(0, 8192)
+                    + "\n...(truncated, total " + std::to_string(compile_err.size()) + " bytes)";
+            } else {
+                message += "\n" + compile_err;
+            }
+        }
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("script compilation failed: ERR_PARSE_ERROR (code " + std::to_string(static_cast<int>(reload_err)) + ")");
+        e["error"] = mcp::JsonValue(message);
         return e;
     }
 

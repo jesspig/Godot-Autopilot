@@ -1,5 +1,6 @@
 #include "resource_ops.hpp"
 #include "core/log_system.hpp"
+#include "core/resource_registry.hpp"
 #include "util/variant_json.hpp"
 #include "util/error_util.hpp"
 #include "util/readback_util.hpp"
@@ -16,8 +17,6 @@
 #include <godot_cpp/variant/packed_string_array.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <string>
-#include <unordered_map>
-#include <mutex>
 
 namespace godot_self_driving {
 namespace resource_ops {
@@ -43,9 +42,6 @@ mcp::JsonValue serialize_ref(const godot::Ref<godot::Resource>& res) {
 } // namespace
 
 namespace {
-
-std::unordered_map<std::string, godot::Ref<godot::Resource>> g_resource_cache;
-std::mutex g_resource_cache_mutex;
 
 godot::Ref<godot::Resource> resolve_resource(
     const mcp::JsonValue& args,
@@ -94,23 +90,13 @@ godot::Ref<godot::Resource> resolve_resource(
         }
         if (res.is_null()) {
             std::string oid_key = std::to_string(obj_id);
-            std::lock_guard<std::mutex> lock(g_resource_cache_mutex);
-            auto it = g_resource_cache.find(oid_key);
-            if (it != g_resource_cache.end()) {
-                res = it->second;
-            } else if (!name.empty()) {
-                auto it2 = g_resource_cache.find("name:" + name);
-                if (it2 != g_resource_cache.end()) {
-                    res = it2->second;
-                }
+            res = resource_registry::lookup_memory(oid_key);
+            if (res.is_null() && !name.empty()) {
+                res = resource_registry::lookup_memory(name);
             }
         }
     } else if (!name.empty()) {
-        std::lock_guard<std::mutex> lock(g_resource_cache_mutex);
-        auto it = g_resource_cache.find("name:" + name);
-        if (it != g_resource_cache.end()) {
-            res = it->second;
-        }
+        res = resource_registry::lookup_memory(name);
     }
 
     if (res.is_null() && !path.empty()) {
@@ -148,25 +134,45 @@ std::string describe_target(const mcp::JsonValue& args) {
 } // namespace
 
 godot::Ref<godot::Resource> resolve_memory_resource(const std::string& name) {
-    std::lock_guard<std::mutex> lock(g_resource_cache_mutex);
-    auto it = g_resource_cache.find("name:" + name);
-    if (it != g_resource_cache.end()) {
-        return it->second;
-    }
-    return godot::Ref<godot::Resource>();
+    return resource_registry::lookup_memory(name);
 }
 
 void register_memory_resource(const godot::Ref<godot::Resource>& res, const std::string& name) {
-    std::lock_guard<std::mutex> lock(g_resource_cache_mutex);
-    std::string oid_str = std::to_string(static_cast<int64_t>(res->get_instance_id()));
-    g_resource_cache[oid_str] = res;
-    if (!name.empty()) {
-        g_resource_cache["name:" + name] = res;
-    }
+    resource_registry::register_resource(res, name);
 }
 
 bool try_resolve_resource_value(const mcp::JsonValue& val, godot::Variant& out, std::string& out_error) {
     out_error.clear();
+    if (val.IsString()) {
+        const std::string str = val.GetString();
+        const std::string mem_prefix = "memory://";
+        if (str.compare(0, mem_prefix.size(), mem_prefix) == 0) {
+            std::string name = str.substr(mem_prefix.size());
+            godot::Ref<godot::Resource> res = resource_registry::lookup_memory(name);
+            if (res.is_null()) {
+                out_error = "memory resource not found: " + name + " (create it with resource_create/spriteframes_create first)";
+                return true;
+            }
+            out = godot::Variant(res.ptr());
+            return true;
+        }
+        const std::string res_prefix = "res://";
+        if (str.compare(0, res_prefix.size(), res_prefix) == 0) {
+            if (!godot::FileAccess::file_exists(godot::String(str.c_str()))) {
+                out_error = "file does not exist: " + str;
+                return true;
+            }
+            auto* loader = godot::ResourceLoader::get_singleton();
+            godot::Ref<godot::Resource> res = loader ? loader->load(godot::String(str.c_str())) : godot::Ref<godot::Resource>();
+            if (res.is_null()) {
+                out_error = "failed to load resource: " + str;
+                return true;
+            }
+            out = godot::Variant(res.ptr());
+            return true;
+        }
+        return false;
+    }
     if (!val.IsObject()) {
         return false;
     }
@@ -505,17 +511,25 @@ mcp::JsonValue handle_save(const mcp::JsonValue& args) {
                 : godot::ResourceUID::INVALID_ID;
             if (uid_val != godot::ResourceUID::INVALID_ID) {
                 ruid->add_id(uid_val, godot::String(dest_path.c_str()));
+                if (editor) {
+                    auto* efs = editor->get_resource_filesystem();
+                    if (efs) {
+                        efs->reimport_files(godot::PackedStringArray());
+                    }
+                }
             }
         }
     }
     if (err == godot::OK && has_oid) {
-        std::lock_guard<std::mutex> lock(g_resource_cache_mutex);
-        std::string oid_str = std::to_string(obj_id);
-        g_resource_cache.erase(oid_str);
+        resource_registry::erase_oid(obj_id);
+        resource_registry::register_resource(res, name);
     }
 
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue(static_cast<int64_t>(err));
+    if (err == godot::OK && has_oid) {
+        r["cache"] = mcp::JsonValue("kept");
+    }
     if (dirs_created) {
         r["directories_created"] = mcp::JsonValue(true);
     }
@@ -573,14 +587,7 @@ mcp::JsonValue handle_create(const mcp::JsonValue& args) {
 
     auto result = serialize_ref(res);
 
-    {
-        std::lock_guard<std::mutex> lock(g_resource_cache_mutex);
-        std::string oid_str = std::to_string(static_cast<int64_t>(res->get_instance_id()));
-        g_resource_cache[oid_str] = res;
-        if (!name.empty()) {
-            g_resource_cache["name:" + name] = res;
-        }
-    }
+    resource_registry::register_resource(res, name);
 
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = std::move(result);
@@ -812,6 +819,13 @@ mcp::JsonValue handle_set_uid(const mcp::JsonValue& args) {
         uid = uid_svc->create_id();
     }
     uid_svc->set_id(uid, godot::String(path.c_str()));
+    auto* editor = godot::EditorInterface::get_singleton();
+    if (editor) {
+        auto* efs = editor->get_resource_filesystem();
+        if (efs) {
+            efs->reimport_files(godot::PackedStringArray());
+        }
+    }
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue(static_cast<int64_t>(uid));
     return r;

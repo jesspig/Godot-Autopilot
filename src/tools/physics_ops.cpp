@@ -1036,11 +1036,23 @@ JV handle_physics_node_get_rid(const JV& args) {
     if (!root) { JV r(JV::object_tag); r["error"] = JV("no edited scene root"); return r; }
     std::string clean = path;
     if (!clean.empty() && clean[0] == '/') clean = clean.substr(1);
+    if (clean.size() > 5 && clean.compare(0, 5, "root/") == 0) clean = clean.substr(5);
     godot::Node* node = nullptr;
     if (clean.empty() || clean == to_std(root->get_name())) {
         node = root;
     } else {
         node = root->get_node_or_null(godot::NodePath(godot::String(clean.c_str())));
+        if (!node) {
+            std::string root_name = to_std(root->get_name());
+            if (clean.size() > root_name.size() + 1 &&
+                clean.compare(0, root_name.size(), root_name) == 0 &&
+                clean[root_name.size()] == '/') {
+                std::string sub = clean.substr(root_name.size() + 1);
+                if (!sub.empty()) {
+                    node = root->get_node_or_null(godot::NodePath(godot::String(sub.c_str())));
+                }
+            }
+        }
     }
     if (!node) { JV r(JV::object_tag); r["error"] = JV("node not found: " + path); return r; }
     auto* co2d = godot::Object::cast_to<godot::CollisionObject2D>(node);

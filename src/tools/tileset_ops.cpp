@@ -283,10 +283,11 @@ JV handle_set_tile_collision(const JV& args) {
     } else {
         std::string atlas_pos = "atlas_coords " + std::to_string(coords.x) + "," + std::to_string(coords.y) +
                                 " (source " + std::to_string(source_id) + ")";
-        for (const auto& points : polygons) {
-            int32_t poly_idx = data->get_collision_polygons_count(physics_layer);
-            data->add_collision_polygon(physics_layer);
-            data->set_collision_polygon_points(physics_layer, poly_idx, points);
+        // 声明式替换：以传入多边形数量为最终数量（截断或扩张），再逐索引覆写
+        data->set_collision_polygons_count(physics_layer, static_cast<int32_t>(polygons.size()));
+        for (size_t i = 0; i < polygons.size(); ++i) {
+            int32_t poly_idx = static_cast<int32_t>(i);
+            data->set_collision_polygon_points(physics_layer, poly_idx, polygons[i]);
             godot::PackedVector2Array rb = data->get_collision_polygon_points(physics_layer, poly_idx);
             if (rb.size() == 0) {
                 return util::error_detail("collision polygon write failed (engine rejected it)",
@@ -294,7 +295,7 @@ JV handle_set_tile_collision(const JV& args) {
                                           "polygon points to be written",
                                           "check physics layer exists and polygon is valid; engine logs show root cause");
             }
-            point_count += static_cast<int>(points.size());
+            point_count += static_cast<int>(polygons[i].size());
         }
     }
 
