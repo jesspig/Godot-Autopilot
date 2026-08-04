@@ -13,9 +13,11 @@
 #include <godot_cpp/classes/input_event_action.hpp>
 #include <godot_cpp/classes/input_event_key.hpp>
 #include <godot_cpp/classes/input_event_mouse_button.hpp>
+#include <godot_cpp/classes/logger.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/classes/ref.hpp>
+#include <godot_cpp/classes/script_backtrace.hpp>
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/classes/scene_tree_timer.hpp>
@@ -29,10 +31,14 @@
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
+#include <godot_cpp/variant/typed_array.hpp>
 #include <godot_cpp/variant/variant.hpp>
 #include <mcp/JsonValue.hpp>
+#include <cstdio>
+#include <mutex>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace godot_self_driving {
 namespace runtime {
@@ -107,6 +113,7 @@ public:
     }
 
     void _physics_process(double delta) override {
+        (void)delta;
         if (finished_) return;
         elapsed_ = static_cast<double>(godot::Time::get_singleton()->get_ticks_msec() - start_ticks_) / 1000.0;
         auto* input = godot::Input::get_singleton();
@@ -133,7 +140,7 @@ public:
     }
 };
 
-// duration_ms 定时释放注入器：timer 到点后按原参数补发 pressed=false 的事件，然后自毁
+// 物理帧计数定时释放注入器：帧数到点后按原参数补发 pressed=false 的事件，然后自毁
 class GameBridgeDelayedRelease : public godot::Node {
     GDCLASS(GameBridgeDelayedRelease, godot::Node)
 
@@ -144,13 +151,11 @@ class GameBridgeDelayedRelease : public godot::Node {
     bool has_position_ = false;
     godot::StringName action_;
     bool mode_api_ = false;
-    godot::Ref<godot::SceneTreeTimer> timer_;
+    uint64_t start_physics_frame_ = 0;
+    int64_t duration_frames_ = 0;
 
 protected:
-    static void _bind_methods() {
-        godot::ClassDB::bind_method(godot::D_METHOD("_on_release_timer_timeout"),
-            &GameBridgeDelayedRelease::_on_release_timer_timeout);
-    }
+    static void _bind_methods() {}
 
 public:
     void setup(int type, const godot::Key& key, int64_t button_index,
@@ -169,15 +174,22 @@ public:
             return;
         }
         tree->get_root()->add_child(this);
-        timer_ = tree->create_timer(delay_sec);
-        if (timer_.is_null()) {
-            queue_free();
-            return;
-        }
-        timer_->connect("timeout", godot::Callable(this, godot::StringName("_on_release_timer_timeout")));
+        start_physics_frame_ = godot::Engine::get_singleton()->get_physics_frames();
+        duration_frames_ = static_cast<int64_t>(delay_sec * godot::Engine::get_singleton()->get_physics_ticks_per_second());
+        set_physics_process(true);
     }
 
-    void _on_release_timer_timeout() {
+    void _physics_process(double delta) override {
+        (void)delta;
+        if (godot::Engine::get_singleton()->get_physics_frames() - start_physics_frame_
+                >= static_cast<uint64_t>(duration_frames_)) {
+            do_release();
+            queue_free();
+        }
+    }
+
+private:
+    void do_release() {
         auto* input = godot::Input::get_singleton();
         if (input) {
             if (type_ == 0) {
@@ -207,8 +219,6 @@ public:
                 input->parse_input_event(ev);
             }
         }
-        timer_.unref();
-        queue_free();
     }
 };
 
@@ -334,6 +344,88 @@ void schedule_release(const std::string& type, const godot::Key& key, int64_t bu
     release->setup(type_code, key, button_index, position, has_position, action, mode_api,
                    duration_ms / 1000.0);
 }
+
+// ── 游戏侧错误/输出环形缓冲 ──
+// 引擎调试器通道（EngineDebugger::captures 表）仅在接收端分发命令，
+// 发送路径（send_message/send_error/flush_output）不经过捕获回调，
+// 因此注册 "error"/"output" 前缀捕获无法拦截引擎级错误/输出；
+// 缓冲由 GameBridgeLogger（OS::add_logger 挂载，捕获游戏进程 print()/错误日志，
+// 见下方 GameBridgeLogger 定义）与通道级错误（gsd 请求解析失败、未知 op、
+// op 执行失败）共同填充，供编辑器经 gsd 通道拉取。
+struct GameErrorEntry {
+    int hr, min, sec, msec;
+    std::string file, func;
+    int line;
+    std::string error, descr;
+    bool is_warning;
+    std::vector<std::string> stack;
+};
+
+struct GameOutputEntry {
+    std::string text;
+    int type;
+};
+
+constexpr size_t MAX_ERROR_BUFFER = 200;
+constexpr size_t MAX_OUTPUT_BUFFER = 500;
+
+std::mutex g_buffer_mtx;
+std::vector<GameErrorEntry> g_error_buffer;
+std::vector<GameOutputEntry> g_output_buffer;
+
+void push_game_error(const std::string& file, const std::string& func, int line,
+                     const std::string& error, const std::string& descr, bool is_warning,
+                     std::vector<std::string> stack) {
+    uint64_t time = godot::Time::get_singleton() ? godot::Time::get_singleton()->get_ticks_msec() : 0;
+    std::lock_guard<std::mutex> lock(g_buffer_mtx);
+    g_error_buffer.push_back({static_cast<int>(time / 3600000),
+        static_cast<int>((time / 60000) % 60), static_cast<int>((time / 1000) % 60),
+        static_cast<int>(time % 1000), file, func, line, error, descr, is_warning,
+        std::move(stack)});
+    if (g_error_buffer.size() > MAX_ERROR_BUFFER) {
+        g_error_buffer.erase(g_error_buffer.begin());
+    }
+}
+
+void push_game_output(const std::string& text, int type) {
+    std::lock_guard<std::mutex> lock(g_buffer_mtx);
+    g_output_buffer.push_back({text, type});
+    if (g_output_buffer.size() > MAX_OUTPUT_BUFFER) {
+        g_output_buffer.erase(g_output_buffer.begin());
+    }
+}
+
+// 引擎 ErrorType 枚举（core/error/error_macros.h）：0=ERR_SCRIPT, 1=ERR_SHADER,
+// 2=ERR_SYSTEM, 3=ERR_WARNING
+constexpr int32_t ENGINE_ERROR_TYPE_ERR_WARNING = 3;
+
+// 挂载到 OS::add_logger 的游戏进程日志捕获器：print()/错误日志写入缓冲
+class GameBridgeLogger : public godot::Logger {
+    GDCLASS(GameBridgeLogger, godot::Logger)
+
+protected:
+    static void _bind_methods() {}
+
+public:
+    void _log_error(const godot::String& p_function, const godot::String& p_file,
+        int32_t p_line, const godot::String& p_code, const godot::String& p_rationale,
+        bool p_editor_notify, int32_t p_error_type,
+        const godot::TypedArray<godot::Ref<godot::ScriptBacktrace>>& p_script_backtraces) override {
+        (void)p_editor_notify;
+        (void)p_script_backtraces;
+        push_game_error(to_std(p_file), to_std(p_function), p_line,
+            to_std(p_code), to_std(p_rationale),
+            p_error_type == ENGINE_ERROR_TYPE_ERR_WARNING, {});
+    }
+
+    void _log_message(const godot::String& p_message, bool p_error) override {
+        if (p_error) {
+            push_game_error("", "", 0, to_std(p_message), "", false, {});
+        } else {
+            push_game_output(to_std(p_message), 0);
+        }
+    }
+};
 
 // ── op: status ──
 JV op_status() {
@@ -699,12 +791,22 @@ JV op_input(const JV& params) {
         if (key == godot::KEY_NONE) {
             return error_result("invalid keycode: " + (kc->IsString() ? kc->GetString() : std::to_string(kc->GetInt())));
         }
+        if (pressed) {
+            godot::Ref<godot::InputEventKey> release_ev;
+            release_ev.instantiate();
+            release_ev->set_pressed(false);
+            release_ev->set_keycode(key);
+            release_ev->set_physical_keycode(key);
+            input->parse_input_event(release_ev);
+            input->flush_buffered_events();
+        }
         godot::Ref<godot::InputEventKey> ev;
         ev.instantiate();
         ev->set_pressed(pressed);
         ev->set_keycode(key);
         ev->set_physical_keycode(key);
         input->parse_input_event(ev);
+        input->flush_buffered_events();
         release_type = "key";
     } else if (type == "mouse_button") {
         auto* bi = params.Find("button_index");
@@ -713,6 +815,18 @@ JV op_input(const JV& params) {
         }
         button_index = bi->GetInt();
         if (extract_position(params, pos)) has_pos = true;
+        if (pressed) {
+            godot::Ref<godot::InputEventMouseButton> release_ev;
+            release_ev.instantiate();
+            release_ev->set_pressed(false);
+            release_ev->set_button_index(static_cast<godot::MouseButton>(button_index));
+            if (has_pos) {
+                release_ev->set_position(pos);
+                release_ev->set_global_position(pos);
+            }
+            input->parse_input_event(release_ev);
+            input->flush_buffered_events();
+        }
         godot::Ref<godot::InputEventMouseButton> ev;
         ev.instantiate();
         ev->set_pressed(pressed);
@@ -722,6 +836,7 @@ JV op_input(const JV& params) {
             ev->set_global_position(pos);
         }
         input->parse_input_event(ev);
+        input->flush_buffered_events();
         release_type = "mouse_button";
     } else if (type == "action") {
         auto* act = params.Find("action");
@@ -729,6 +844,10 @@ JV op_input(const JV& params) {
             return error_result("input action requires action (string)");
         }
         action = godot::StringName(act->GetString().c_str());
+        if (pressed) {
+            // 先强制 release 清掉残留按下状态，保证本次注入产生新的 false→true 沿
+            input->action_release(action);
+        }
         if (mode_api) {
             if (pressed) input->action_press(action);
             else input->action_release(action);
@@ -738,6 +857,7 @@ JV op_input(const JV& params) {
             ev->set_action(action);
             ev->set_pressed(pressed);
             input->parse_input_event(ev);
+            if (pressed) input->flush_buffered_events();
         }
         release_type = "action";
     } else {
@@ -750,6 +870,18 @@ JV op_input(const JV& params) {
 
     JV r(JV::object_tag);
     r["result"] = JV("ok");
+    if (pressed) {
+        auto* engine = godot::Engine::get_singleton();
+        if (engine) {
+            r["injected_at_physics_frame"] = JV(static_cast<int64_t>(engine->get_physics_frames()));
+            r["expected_visible_frame"] = JV(static_cast<int64_t>(engine->get_physics_frames() + 1));
+        }
+        if (auto* tree = get_scene_tree()) {
+            if (tree->is_paused()) {
+                r["warning"] = JV("game paused: transient input edge will not be consumed by physics callbacks while paused");
+            }
+        }
+    }
     return r;
 }
 
@@ -779,6 +911,13 @@ JV op_input_wait(const JV& params, int64_t request_id) {
     if (!tree) return error_result("no scene tree");
     godot::Node* root = tree->get_root();
     if (!root) return error_result("no root node");
+
+    if (auto* inject_p = params.Find("inject")) {
+        if (inject_p->IsObject()) {
+            JV inj_result = op_input(*inject_p);
+            if (inj_result.Contains("error")) return inj_result;
+        }
+    }
 
     GameBridgeInputWatcher* watcher = memnew(GameBridgeInputWatcher);
     watcher->setup(request_id, godot::StringName(act->GetString().c_str()), state_kind,
@@ -831,6 +970,104 @@ JV op_capture(int64_t request_id) {
     return ok_result(std::move(r));
 }
 
+// ── op: get_errors（读取游戏侧错误缓冲） ──
+JV op_get_errors(const JV& params) {
+    int64_t limit = 50;
+    if (auto* l = params.Find("limit")) {
+        if (l->IsInt() && l->GetInt() > 0) limit = l->GetInt();
+    }
+    JV arr(JV::array_tag);
+    {
+        std::lock_guard<std::mutex> lock(g_buffer_mtx);
+        size_t start = (static_cast<size_t>(limit) >= g_error_buffer.size())
+            ? 0 : g_error_buffer.size() - static_cast<size_t>(limit);
+        for (size_t i = start; i < g_error_buffer.size(); i++) {
+            const GameErrorEntry& e = g_error_buffer[i];
+            JV item(JV::object_tag);
+            char time_buf[16];
+            snprintf(time_buf, sizeof(time_buf), "%02d:%02d:%02d.%03d",
+                e.hr, e.min, e.sec, e.msec);
+            item["time"] = JV(std::string(time_buf));
+            item["file"] = JV(e.file);
+            item["func"] = JV(e.func);
+            item["line"] = JV(static_cast<int64_t>(e.line));
+            item["error"] = JV(e.error);
+            item["descr"] = JV(e.descr);
+            item["is_warning"] = JV(e.is_warning);
+            JV stack(JV::array_tag);
+            for (const std::string& f : e.stack) stack.PushBack(JV(f));
+            item["stack"] = std::move(stack);
+            arr.PushBack(std::move(item));
+        }
+    }
+    return ok_result(std::move(arr));
+}
+
+// ── op: get_output（读取游戏侧输出缓冲） ──
+JV op_get_output(const JV& params) {
+    int64_t limit = 200;
+    if (auto* l = params.Find("limit")) {
+        if (l->IsInt() && l->GetInt() > 0) limit = l->GetInt();
+    }
+    JV arr(JV::array_tag);
+    {
+        std::lock_guard<std::mutex> lock(g_buffer_mtx);
+        size_t start = (static_cast<size_t>(limit) >= g_output_buffer.size())
+            ? 0 : g_output_buffer.size() - static_cast<size_t>(limit);
+        for (size_t i = start; i < g_output_buffer.size(); i++) {
+            JV item(JV::object_tag);
+            item["type"] = JV(static_cast<int64_t>(g_output_buffer[i].type));
+            item["text"] = JV(g_output_buffer[i].text);
+            arr.PushBack(std::move(item));
+        }
+    }
+    return ok_result(std::move(arr));
+}
+
+// ── op: get_tree（遍历 SceneTree root，文本化） ──
+constexpr int MAX_TREE_DEPTH = 64;
+constexpr int64_t MAX_TREE_NODES = 2000;
+
+struct TreeWalkState {
+    std::string out;
+    int64_t count = 0;
+    bool truncated = false;
+};
+
+void walk_tree(godot::Node* node, int depth, TreeWalkState& state) {
+    if (state.truncated) return;
+    if (depth > MAX_TREE_DEPTH) {
+        state.out += std::string(static_cast<size_t>(depth) * 2, ' ')
+            + "(max depth " + std::to_string(MAX_TREE_DEPTH) + ")\n";
+        return;
+    }
+    if (state.count >= MAX_TREE_NODES) {
+        state.truncated = true;
+        return;
+    }
+    state.out += std::string(static_cast<size_t>(depth) * 2, ' ')
+        + to_std(godot::String(node->get_name()))
+        + " (" + to_std(godot::String(node->get_class())) + ")\n";
+    state.count++;
+    int64_t child_count = node->get_child_count();
+    for (int64_t i = 0; i < child_count; i++) {
+        walk_tree(node->get_child(i), depth + 1, state);
+    }
+}
+
+JV op_get_tree() {
+    godot::SceneTree* tree = get_scene_tree();
+    if (!tree) return error_result("no scene tree");
+    godot::Node* root = tree->get_root();
+    if (!root) return error_result("no root node");
+    TreeWalkState state;
+    walk_tree(root, 0, state);
+    if (state.truncated) {
+        state.out += "(tree truncated at " + std::to_string(MAX_TREE_NODES) + " nodes)\n";
+    }
+    return ok_result(JV(state.out));
+}
+
 // ── dispatch & response ──
 void send_response(int64_t request_id, JV body) {
     body["request_id"] = JV(request_id);
@@ -851,10 +1088,16 @@ protected:
 
 public:
     bool on_gsd_message(const godot::String& p_message, const godot::Array& p_data) {
+        (void)p_message;
         if (p_data.size() < 1) return true;
         std::string req_str = to_std(godot::String(p_data[0]));
         JV request = JV::Parse(req_str);
-        if (!request.IsObject()) return true;
+        if (!request.IsObject()) {
+            push_game_error("game_bridge.cpp", "on_gsd_message", 0,
+                "malformed gsd request", req_str.substr(0, 200), false, {});
+            push_game_output("malformed gsd request: " + req_str.substr(0, 200), 1);
+            return true;
+        }
 
         int64_t request_id = 0;
         if (auto* rid = request.Find("request_id")) {
@@ -876,7 +1119,18 @@ public:
         else if (op == "input_wait") body = op_input_wait(params, request_id);
         else if (op == "input_status") body = op_input_status(params);
         else if (op == "capture") body = op_capture(request_id);
+        else if (op == "get_errors") body = op_get_errors(params);
+        else if (op == "get_output") body = op_get_output(params);
+        else if (op == "get_tree") body = op_get_tree();
         else body = error_result("unknown op: " + op);
+
+        // 通道级错误主动写入缓冲（引擎发送端不经过捕获回调，见缓冲说明）
+        if (body.Contains("error")) {
+            std::string err_text = body["error"].GetString();
+            push_game_error("game_bridge.cpp", "on_gsd_message", 0,
+                "op '" + op + "' failed: " + err_text, "", false, {});
+            push_game_output("op " + op + " error: " + err_text, 1);
+        }
 
         // 异步 op（input_wait / eval await）返回 null，由 watcher / awaiter 自行响应
         if (!body.IsNull()) {
@@ -888,6 +1142,7 @@ public:
 };
 
 godot::Ref<GameBridgeListener> g_listener;
+godot::Ref<GameBridgeLogger> g_logger;
 bool g_registered = false;
 
 } // namespace
@@ -900,17 +1155,24 @@ void register_listener() {
         godot::ClassDB::register_class<GameBridgeInputWatcher>();
         godot::ClassDB::register_class<GameBridgeDelayedRelease>();
         godot::ClassDB::register_class<GameBridgeEvalAwaiter>();
+        godot::ClassDB::register_class<GameBridgeLogger>();
         class_registered = true;
     }
     if (g_listener.is_null()) {
         g_listener.instantiate();
     }
+    if (g_logger.is_null()) {
+        g_logger.instantiate();
+    }
     if (auto* dbg = godot::EngineDebugger::get_singleton()) {
         dbg->register_message_capture(godot::StringName("gsd"),
             godot::Callable(g_listener.ptr(), godot::StringName("on_gsd_message")));
+        if (auto* os = godot::OS::get_singleton()) {
+            os->add_logger(g_logger);
+        }
         g_registered = true;
         LogSystem::instance().log(LogLevel::Info, LogCategory::System,
-            "Game bridge listener registered (gsd message capture)");
+            "Game bridge listener registered (gsd message capture + game logger)");
     }
 }
 
@@ -919,6 +1181,10 @@ void unregister_listener() {
     if (auto* dbg = godot::EngineDebugger::get_singleton()) {
         dbg->unregister_message_capture(godot::StringName("gsd"));
     }
+    if (auto* os = godot::OS::get_singleton()) {
+        os->remove_logger(g_logger);
+    }
+    g_logger.unref();
     g_listener.unref();
     g_registered = false;
     LogSystem::instance().log(LogLevel::Info, LogCategory::System,

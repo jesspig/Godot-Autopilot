@@ -59,6 +59,7 @@ bool capture_session_active();
 bool capture_session_breaked();
 size_t capture_log_count();
 std::string capture_new_error_text(size_t since_count);
+std::string capture_new_output_text(size_t since_count);
 
 ::godot::Ref<::godot::OutputCaptureLogger> create_output_logger();
 ::godot::Ref<::godot::DebugCapturePlugin> create_debug_plugin();

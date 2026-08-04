@@ -9,8 +9,6 @@
 #include <godot_cpp/classes/logger.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/array.hpp>
-#include <godot_cpp/variant/packed_string_array.hpp>
-#include <godot_cpp/variant/packed_int32_array.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
 #include <godot_cpp/classes/script_backtrace.hpp>
@@ -110,10 +108,9 @@ public:
         if (monitors_.size() > MAX_MONITORS) monitors_.erase(monitors_.begin());
     }
 
-    void set_session_state(bool active, bool breaked) {
+    size_t stack_size() {
         std::lock_guard<std::mutex> lock(mtx_);
-        session_active_ = active;
-        session_breaked_ = breaked;
+        return stack_.size();
     }
 
     std::string get_log_text(size_t limit) {
@@ -144,6 +141,19 @@ public:
             oss << "[" << ms_to_time(e.timestamp_ms) << "] "
                 << (e.is_error ? "[ERROR] " : "[INFO] ")
                 << e.text << "\n";
+        }
+        return oss.str();
+    }
+
+    std::string get_log_text_since_success(size_t since_count) {
+        std::lock_guard<std::mutex> lock(mtx_);
+        std::ostringstream oss;
+        size_t start = (since_count >= log_buffer_.size()) ? log_buffer_.size() : since_count;
+        for (size_t i = start; i < log_buffer_.size(); i++) {
+            auto& e = log_buffer_[i];
+            if (e.is_error) continue;
+            oss << "[" << ms_to_time(e.timestamp_ms) << "] "
+                << "[INFO] " << e.text << "\n";
         }
         return oss.str();
     }
@@ -264,8 +274,6 @@ private:
     std::vector<StackFrame> stack_;
     std::vector<std::string> scene_tree_lines_;
     std::vector<MonitorFrame> monitors_;
-    bool session_active_ = false;
-    bool session_breaked_ = false;
     std::mutex mtx_;
     static constexpr size_t MAX_LOG = 2000;
     static constexpr size_t MAX_ERRORS = 500;
@@ -347,6 +355,7 @@ std::string capture_get_log_text(size_t limit) { return DebuggerCapture::instanc
 std::string capture_get_errors_text(size_t limit) { return DebuggerCapture::instance().get_errors_text(limit); }
 std::string capture_get_game_output_text(size_t limit) { return DebuggerCapture::instance().get_game_output_text(limit); }
 std::string capture_get_stack_dump_text() { return DebuggerCapture::instance().get_stack_dump_text(); }
+size_t capture_stack_size() { return DebuggerCapture::instance().stack_size(); }
 std::string capture_get_scene_tree_text() { return DebuggerCapture::instance().get_scene_tree_text(); }
 std::string capture_get_monitors_text(size_t count) { return DebuggerCapture::instance().get_monitors_text(count); }
 std::string capture_get_session_info_text() { return DebuggerCapture::instance().get_session_info_text(); }
@@ -371,6 +380,9 @@ bool capture_session_breaked() {
 size_t capture_log_count() { return DebuggerCapture::instance().log_count(); }
 std::string capture_new_error_text(size_t since_count) {
     return append_rename_hint(DebuggerCapture::instance().get_log_text_since(since_count, true));
+}
+std::string capture_new_output_text(size_t since_count) {
+    return DebuggerCapture::instance().get_log_text_since_success(since_count);
 }
 
 } // namespace debugger_ops
@@ -403,8 +415,7 @@ void OutputCaptureLogger::_log_message(const String& p_message, bool p_error) {
 
 bool DebugCapturePlugin::_has_capture(const String& p_name) const {
     std::string n = p_name.utf8().ptr();
-    return n == "scene" || n == "performance" || n == "visual"
-        || n == "servers" || n == "window" || n == "filesystem" || n == "gsd";
+    return n == "gsd";
 }
 
 void DebugCapturePlugin::_setup_session(int32_t p_session_id) {
@@ -417,72 +428,11 @@ void DebugCapturePlugin::_setup_session(int32_t p_session_id) {
 
 bool DebugCapturePlugin::_capture(const String& p_message, const Array& p_data, int32_t) {
     std::string msg = p_message.utf8().ptr();
-    using dc = godot_self_driving::debugger_ops::DebuggerCapture;
 
-    if (msg == "error" && p_data.size() >= 11) {
-        int hr = static_cast<int>(p_data[0]), min = static_cast<int>(p_data[1]);
-        int sec = static_cast<int>(p_data[2]), msec = static_cast<int>(p_data[3]);
-        String src_file = p_data[4], src_func = p_data[5];
-        int src_line = static_cast<int>(p_data[6]);
-        String err = p_data[7], err_descr = p_data[8];
-        bool is_warning = p_data[9];
-        int stack_size = static_cast<int>(p_data[10]);
-        std::vector<std::string> s_files, s_funcs;
-        std::vector<int> s_lines;
-        for (int i = 0; i < stack_size; i++) {
-            int base = 11 + i * 3;
-            if (base + 2 < static_cast<int>(p_data.size())) {
-                s_files.push_back(String(p_data[base]).utf8().ptr());
-                s_funcs.push_back(String(p_data[base + 1]).utf8().ptr());
-                s_lines.push_back(static_cast<int>(p_data[base + 2]));
-            }
-        }
-        dc::instance().add_error(hr, min, sec, msec,
-            src_file.utf8().ptr(), src_func.utf8().ptr(), src_line,
-            err.utf8().ptr(), err_descr.utf8().ptr(), is_warning,
-            s_files, s_funcs, s_lines);
-    }
-    else if (msg == "output" && p_data.size() >= 2) {
-        PackedStringArray strings = p_data[0];
-        PackedInt32Array types = p_data[1];
-        for (int i = 0; i < strings.size() && i < types.size(); i++)
-            dc::instance().add_game_output(std::string(strings[i].utf8().ptr()), static_cast<int>(types[i]));
-    }
-    else if (msg == "stack_dump") {
-        std::vector<godot_self_driving::debugger_ops::StackFrame> frames;
-        for (int i = 0; i + 2 < static_cast<int>(p_data.size()); i += 3) {
-            godot_self_driving::debugger_ops::StackFrame f;
-            f.file = String(p_data[i]).utf8().ptr();
-            f.line = static_cast<int>(p_data[i + 1]);
-            f.func = String(p_data[i + 2]).utf8().ptr();
-            frames.push_back(std::move(f));
-        }
-        dc::instance().set_stack_dump(frames);
-    }
-    else if (msg == "debug_enter") {
-        dc::instance().set_session_state(true, true);
-    }
-    else if (msg == "debug_exit") {
-        dc::instance().set_session_state(true, false);
-    }
-    else if (msg == "scene:scene_tree") {
-        std::vector<std::string> lines;
-        int idx = 0;
-        while (idx + 5 < static_cast<int>(p_data.size())) {
-            String name = p_data[idx + 1];
-            String type_name = p_data[idx + 2];
-            idx += 6;
-            lines.push_back(std::string(name.utf8().ptr()) + " (" + type_name.utf8().ptr() + ")");
-        }
-        dc::instance().set_scene_tree_raw(lines);
-    }
-    else if (msg == "performance:profile_frame") {
-        std::vector<double> values;
-        for (int i = 0; i < static_cast<int>(p_data.size()); i++)
-            values.push_back(static_cast<double>(p_data[i]));
-        dc::instance().add_monitor_frame(values);
-    }
-    else if (msg == "gsd:response" && p_data.size() >= 1) {
+    // 内置 handler 已消费 error/output/stack_dump/debug_enter/debug_exit/
+    // scene:scene_tree/performance:profile_frame，插件只能收到未命中的消息；
+    // 游戏侧错误/输出/场景树现经 gsd 运行时通道拉取（game_bridge 缓冲 + op）。
+    if (msg == "gsd:response" && p_data.size() >= 1) {
         String payload = p_data[0];
         godot_self_driving::runtime_ops::handle_game_response(std::string(payload.utf8().ptr()));
     }
@@ -499,8 +449,8 @@ namespace {
 
 mcp::JsonValue capture_note_for_empty_result() {
     return mcp::JsonValue(capture_session_active()
-        ? "session active but no data captured — debugger data is only available while a game is running through the editor debugger; the editor's built-in debug handlers consume debug messages before editor plugins can see them (engine limitation); use log_get_game_entries to read the game process log file instead"
-        : "no active debug session — debugger data is only available while a game is running through the editor debugger; start the game with editor_play_current_scene");
+        ? "session active but the game reported no data — verify the game project loads the godot-self-driving extension; fall back to log_get_game_entries for the game process log"
+        : "no active debug session — start the game with editor_play_current_scene; game errors/output/scene-tree are now fetched over the runtime channel (game must load the godot-self-driving extension)");
 }
 
 } // namespace
@@ -520,6 +470,11 @@ mcp::JsonValue handle_debugger_get_errors(const mcp::JsonValue& args) {
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "debugger_get_errors called");
     size_t limit = 20;
     if (auto* l = args.Find("limit")) { if (l->IsInt()) limit = static_cast<size_t>(l->GetInt()); }
+    if (capture_session_active()) {
+        mcp::JsonValue params(mcp::JsonValue::object_tag);
+        params["limit"] = mcp::JsonValue(static_cast<int64_t>(limit));
+        return runtime_ops::handle_gsd_send("get_errors", params, 5000);
+    }
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     std::string errors_text = DebuggerCapture::instance().get_errors_text(limit);
     r["result"] = mcp::JsonValue(errors_text);
@@ -532,6 +487,11 @@ mcp::JsonValue handle_debugger_get_output(const mcp::JsonValue& args) {
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "debugger_get_output called");
     size_t limit = 50;
     if (auto* l = args.Find("limit")) { if (l->IsInt()) limit = static_cast<size_t>(l->GetInt()); }
+    if (capture_session_active()) {
+        mcp::JsonValue params(mcp::JsonValue::object_tag);
+        params["limit"] = mcp::JsonValue(static_cast<int64_t>(limit));
+        return runtime_ops::handle_gsd_send("get_output", params, 5000);
+    }
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     std::string output_text = DebuggerCapture::instance().get_game_output_text(limit);
     r["result"] = mcp::JsonValue(output_text);
@@ -544,12 +504,19 @@ mcp::JsonValue handle_debugger_get_stack_dump(const mcp::JsonValue&) {
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "debugger_get_stack_dump called");
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue(DebuggerCapture::instance().get_stack_dump_text());
+    if (capture_stack_size() == 0) {
+        r["note"] = mcp::JsonValue("stack data is only available in a debugger breakpoint session; this version cannot fetch it over the gsd runtime channel — use log_get_game_entries or game_eval to diagnose");
+    }
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "debugger_get_stack_dump completed");
     return r;
 }
 
 mcp::JsonValue handle_debugger_get_scene_tree(const mcp::JsonValue&) {
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "debugger_get_scene_tree called");
+    if (capture_session_active()) {
+        mcp::JsonValue params(mcp::JsonValue::object_tag);
+        return runtime_ops::handle_gsd_send("get_tree", params, 5000);
+    }
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     std::string scene_tree_text = DebuggerCapture::instance().get_scene_tree_text();
     r["result"] = mcp::JsonValue(scene_tree_text);

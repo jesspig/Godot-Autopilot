@@ -319,6 +319,7 @@ mcp::JsonValue handle_game_input_wait(const mcp::JsonValue& args) {
     JV params(JV::object_tag);
     params["action"] = *action_p;
     copy_optional(args, params, "state");
+    copy_optional(args, params, "inject");
     copy_optional(args, params, "timeout_ms");
     return handle_gsd_send("input_wait", params, extract_timeout(args));
 }
