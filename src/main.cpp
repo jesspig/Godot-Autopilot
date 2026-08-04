@@ -9,6 +9,7 @@
 #include "core/command_queue.hpp"
 #include "core/log_system.hpp"
 #include "core/mode_detector.hpp"
+#include "core/scene_dirty_tracker.hpp"
 #include "core/server_context.hpp"
 #include "runtime/game_bridge.hpp"
 #include "tools/debugger_ops.hpp"
@@ -49,11 +50,19 @@ public:
     void _enter_tree() override;
     void _exit_tree() override;
     void _process(double delta) override;
+    godot::String _get_unsaved_status(const godot::String& p_for_scene) const override;
 
     static godot_self_driving::CommandQueue& queue() { return s_queue; }
 };
 
 godot_self_driving::CommandQueue GodotSelfDrivingPlugin::s_queue;
+
+godot::String GodotSelfDrivingPlugin::_get_unsaved_status(const godot::String& p_for_scene) const {
+    if (godot_self_driving::scene_dirty_tracker::is_current_scene_dirty()) {
+        return p_for_scene;
+    }
+    return godot::String();
+}
 
 namespace godot_self_driving {
 

@@ -1,5 +1,6 @@
 #include "scene_ops.hpp"
 #include "core/log_system.hpp"
+#include "core/scene_dirty_tracker.hpp"
 #include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/node.hpp>
@@ -236,6 +237,7 @@ mcp::JsonValue handle_create(const mcp::JsonValue& args) {
     inner["path"] = mcp::JsonValue(result_path);
     inner["undo"] = mcp::JsonValue("delete node " + result_path + " (scene_node_delete)");
     r["result"] = std::move(inner);
+    scene_dirty_tracker::mark_scene_modified();
     return r;
 }
 
@@ -294,6 +296,7 @@ mcp::JsonValue handle_delete(const mcp::JsonValue& args) {
     undo_info["hint"] = mcp::JsonValue(
         "recreate node " + node_name + " (" + node_type + ") under " + parent_path + " (scene_node_create)");
     r["undo"] = std::move(undo_info);
+    scene_dirty_tracker::mark_scene_modified();
     return r;
 }
 
@@ -389,6 +392,7 @@ mcp::JsonValue handle_instance(const mcp::JsonValue& args) {
     inner["undo"] = mcp::JsonValue("delete node " + result_path + " (scene_node_delete)");
     r["result"] = std::move(inner);
 
+    scene_dirty_tracker::mark_scene_modified();
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "scene_instance completed");
     return r;
 }

@@ -1,5 +1,6 @@
 #include "property_ops.hpp"
 #include "resource_ops.hpp"
+#include "core/scene_dirty_tracker.hpp"
 #include "util/variant_json.hpp"
 #include "util/readback_util.hpp"
 #include "util/error_util.hpp"
@@ -213,8 +214,14 @@ mcp::JsonValue handle_set(const mcp::JsonValue& args) {
 
     godot::Node* node = resolve_node(path_str);
     if (!node) {
+        std::string err = "node not found: " + path_str +
+                          " — expected scene-relative path like 'Level1/Player' or absolute '/root/Level1/Player'";
+        const std::string memory_prefix = "memory://";
+        if (path_str.compare(0, memory_prefix.size(), memory_prefix) == 0) {
+            err += " memory:// is a resource namespace, not a node path; to reference a memory resource pass it as the value (e.g. {\"resource\": \"memory://name\"}) or create the resource inline with code_execute";
+        }
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("node not found: " + path_str + " — expected scene-relative path like 'Level1/Player' or absolute '/root/Level1/Player'");
+        e["error"] = mcp::JsonValue(err);
         return e;
     }
 
@@ -282,7 +289,8 @@ mcp::JsonValue handle_set(const mcp::JsonValue& args) {
                     "cannot assign memory resource '" + res_name + "' to node property '" +
                     prop_str + "' on " + path_str +
                     " — memory:// resources are not persistent and will corrupt the scene file if saved. "
-                    "Use resource_save to save it to disk first, then pass {\"path\": \"res://...\"}");
+                    "Use resource_save to save it to disk first, then pass {\"path\": \"res://...\"}"
+                    " Alternatively create the resource inline via code_execute (e.g. node.shape = RectangleShape2D.new()) or use resource_set_property to edit the memory resource itself.");
                 return e;
             }
         }
@@ -338,6 +346,7 @@ mcp::JsonValue handle_set(const mcp::JsonValue& args) {
     undo_info["property"] = mcp::JsonValue(prop_str);
     undo_info["old_value"] = VariantJson::serialize(old_val);
     r["undo"] = std::move(undo_info);
+    scene_dirty_tracker::mark_scene_modified();
     return r;
 }
 

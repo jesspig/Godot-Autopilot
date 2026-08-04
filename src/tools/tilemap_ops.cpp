@@ -1,6 +1,7 @@
 #include "tilemap_ops.hpp"
 #include "resource_ops.hpp"
 #include "core/log_system.hpp"
+#include "core/scene_dirty_tracker.hpp"
 #include <mcp/JsonValue.hpp>
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
@@ -142,6 +143,7 @@ JV handle_create(const JV& args) {
     info["object_id"] = JV(static_cast<int64_t>(tile_map->get_instance_id()));
     info["object_id_str"] = JV(std::to_string(static_cast<int64_t>(tile_map->get_instance_id())));
     r["result"] = std::move(info);
+    scene_dirty_tracker::mark_scene_modified();
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "tilemap_create completed");
     return r;
 }
@@ -191,6 +193,7 @@ JV handle_set_cell(const JV& args) {
 
     JV r(JV::object_tag);
     r["result"] = JV("ok");
+    scene_dirty_tracker::mark_scene_modified();
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "tilemap_set_cell completed");
     return r;
 }
@@ -273,6 +276,9 @@ JV handle_set_cells(const JV& args) {
     info["set_count"] = JV(set_count);
     info["layer"] = JV(layer);
     r["result"] = std::move(info);
+    if (set_count > 0) {
+        scene_dirty_tracker::mark_scene_modified();
+    }
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "tilemap_set_cells completed");
     return r;
 }

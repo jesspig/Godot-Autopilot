@@ -1,5 +1,6 @@
 #include "group_ops.hpp"
 #include "core/log_system.hpp"
+#include "core/scene_dirty_tracker.hpp"
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/editor_undo_redo_manager.hpp>
 #include <godot_cpp/classes/node.hpp>
@@ -112,6 +113,7 @@ mcp::JsonValue handle_add_node_to_group(const mcp::JsonValue& args) {
     r["node_path"] = mcp::JsonValue(node_path);
     r["group"] = mcp::JsonValue(group_name);
     r["persistent"] = mcp::JsonValue(true);
+    scene_dirty_tracker::mark_scene_modified();
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
         "group_add_node_to_group: " + node_path + " -> " + group_name);
     return r;
@@ -164,6 +166,7 @@ mcp::JsonValue handle_remove_node_from_group(const mcp::JsonValue& args) {
     r["result"] = mcp::JsonValue("removed");
     r["node_path"] = mcp::JsonValue(node_path);
     r["group"] = mcp::JsonValue(group_name);
+    scene_dirty_tracker::mark_scene_modified();
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
         "group_remove_node_from_group: " + node_path + " -> " + group_name);
     return r;

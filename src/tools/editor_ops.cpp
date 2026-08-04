@@ -1,5 +1,6 @@
 #include "editor_ops.hpp"
 #include "core/log_system.hpp"
+#include "core/scene_dirty_tracker.hpp"
 #include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/editor_interface.hpp>
@@ -270,6 +271,7 @@ mcp::JsonValue handle_save_scene(const mcp::JsonValue&) {
             r["path"] = mcp::JsonValue(generated_path);
             r["result"] = mcp::JsonValue("saved");
             r["note"] = mcp::JsonValue("scene had no file path — saved to " + generated_path + "; use editor_save_scene_as to choose a directory");
+            scene_dirty_tracker::clear_scene_modified();
             LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "editor_save_scene completed (saved as new scene)");
             return r;
         }
@@ -279,6 +281,7 @@ mcp::JsonValue handle_save_scene(const mcp::JsonValue&) {
         godot::String file_path = root->get_scene_file_path();
         r["path"] = mcp::JsonValue(to_std(file_path));
         r["result"] = mcp::JsonValue("saved");
+        scene_dirty_tracker::clear_scene_modified();
     }
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "editor_save_scene completed");
     return r;
@@ -787,9 +790,11 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue& args) {
             return error_json("failed to close scene (error " + std::to_string(static_cast<int>(err)) + ")");
         }
         closed_previous = true;
+        scene_dirty_tracker::clear_scene_modified();
     }
 
     editor->add_root_node(node);
+    scene_dirty_tracker::clear_scene_modified();
 
     // 自动切换到对应工作区
     {
@@ -855,6 +860,7 @@ mcp::JsonValue handle_open_scene(const mcp::JsonValue& args) {
         }
     }
 
+    scene_dirty_tracker::clear_scene_modified();
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue("ok");
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "editor_open_scene completed");
@@ -912,6 +918,7 @@ mcp::JsonValue handle_save_scene_as(const mcp::JsonValue& args) {
     }
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue("saved");
+    scene_dirty_tracker::clear_scene_modified();
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "editor_save_scene_as completed");
     return r;
 }
