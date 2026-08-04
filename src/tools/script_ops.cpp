@@ -10,6 +10,8 @@
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/resource_saver.hpp>
 #include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/classes/scene_tree.hpp>
+#include <godot_cpp/classes/window.hpp>
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
@@ -27,6 +29,11 @@ namespace script_ops {
 namespace {
 
 constexpr const char* NODE_PATH_HINT = " — expected scene-relative path like 'Level1/Player' or absolute '/root/Level1/Player'";
+
+// "Node not found" 运行时错误追加的用法指引：执行节点在 /root 下，不在编辑场景内；
+// 必须通过 SceneRoot（编辑场景根节点）以无根名前缀的相对路径访问场景节点。
+// 与 code_exec_ops.cpp 中同名常量逐字一致（DRY 第三次重复时才提取）。
+constexpr const char* NODE_NOT_FOUND_HINT = "\n[hint] Node path resolution: the execution node lives under /root, NOT inside the edited scene. Use SceneRoot.get_node(\"Child\") to reach edited-scene nodes (SceneRoot is the scene root node itself — no root-name prefix, e.g. SceneRoot.get_node(\"Player\") or SceneRoot.get_node(\"Player/CollisionShape2D\")).";
 
 constexpr int PROPERTY_USAGE_CATEGORY = 0x80;
 constexpr int PROPERTY_USAGE_INTERNAL = 0x08;
@@ -99,6 +106,15 @@ mcp::JsonValue serialize_resource(const godot::Ref<godot::Resource>& res) {
     return j;
 }
 
+std::string truncate_capture_text(const std::string& text) {
+    constexpr size_t MAX_CAPTURE_BYTES = 8192;
+    if (text.size() > MAX_CAPTURE_BYTES) {
+        return text.substr(0, MAX_CAPTURE_BYTES)
+            + "\n...(truncated, total " + std::to_string(text.size()) + " bytes)";
+    }
+    return text;
+}
+
 } // namespace
 
 mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue& args) {
@@ -109,10 +125,6 @@ mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue& args) {
         return e;
     }
     std::string expression = it_expr->GetString();
-
-    // GDScript wrapping (single execution path)
-    auto* editor = godot::EditorInterface::get_singleton();
-    godot::Node* scene_root = editor ? editor->get_edited_scene_root() : nullptr;
 
     std::string cleaned;
     {
@@ -133,6 +145,8 @@ mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue& args) {
 
     std::string wrapped;
     wrapped = "@tool\nextends Node\n\nfunc _run():\n";
+    // 注入 SceneRoot 便捷变量（编辑场景根节点）：执行节点在 /root 下，get_node() 找不到编辑场景节点
+    wrapped += "    var SceneRoot := EditorInterface.get_edited_scene_root()\n";
     if (is_single_expression(expression)) {
         wrapped += "    return " + cleaned + "\n";
     } else if (!cleaned.empty()) {
@@ -161,10 +175,18 @@ mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue& args) {
     }
 
     script->set_source_code(godot::String(wrapped.c_str()));
+    size_t compile_log_before = debugger_ops::capture_log_count();
     godot::Error parse_err2 = script->reload();
     if (parse_err2 != godot::OK) {
+        std::string message = "GDScript compilation failed: ERR_PARSE_ERROR (code "
+            + std::to_string(static_cast<int>(parse_err2)) + ")";
+        std::string compile_err = debugger_ops::capture_new_error_text(compile_log_before);
+        if (!compile_err.empty()) {
+            message += "\n" + truncate_capture_text(compile_err);
+        }
+        message += "\nwrapped source:\n" + wrapped;
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("GDScript compilation failed: ERR_PARSE_ERROR (code " + std::to_string(static_cast<int>(parse_err2)) + ")");
+        e["error"] = mcp::JsonValue(message);
         return e;
     }
 
@@ -172,8 +194,21 @@ mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue& args) {
     temp_node->set_script(godot::Variant(script));
 
     bool temp_added = false;
-    if (scene_root) {
-        scene_root->add_child(temp_node);
+    godot::Node* parent_node = nullptr;
+    {
+        auto* engine = godot::Engine::get_singleton();
+        auto* main_loop = engine ? engine->get_main_loop() : nullptr;
+        auto* tree = godot::Object::cast_to<godot::SceneTree>(main_loop);
+        if (tree) {
+            parent_node = godot::Object::cast_to<godot::Node>(tree->get_root());
+        }
+    }
+    if (!parent_node) {
+        auto* editor = godot::EditorInterface::get_singleton();
+        parent_node = editor ? editor->get_edited_scene_root() : nullptr;
+    }
+    if (parent_node) {
+        parent_node->add_child(temp_node);
         temp_added = true;
     }
 
@@ -186,13 +221,26 @@ mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue& args) {
         return e;
     }
 
+    size_t log_before = debugger_ops::capture_log_count();
     godot::Variant result = temp_node->call(fn_name);
+    std::string new_output_text = debugger_ops::capture_new_output_text(log_before);
+    std::string new_error_text = debugger_ops::capture_new_error_text(log_before);
 
     if (temp_added && temp_node->get_parent()) temp_node->get_parent()->remove_child(temp_node);
     memdelete(temp_node);
 
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = VariantJson::serialize(result);
+    if (!new_output_text.empty()) {
+        r["output"] = mcp::JsonValue(truncate_capture_text(new_output_text));
+    }
+    if (!new_error_text.empty()) {
+        std::string errors = truncate_capture_text(new_error_text);
+        if (new_error_text.find("Node not found") != std::string::npos) {
+            errors += NODE_NOT_FOUND_HINT;
+        }
+        r["errors"] = mcp::JsonValue(errors);
+    }
     return r;
 }
 

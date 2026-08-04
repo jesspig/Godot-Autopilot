@@ -29,8 +29,12 @@ std::string to_std_string(const godot::String& s) {
 
 // 包装脚本头部行数：wrapped 中用户源码第 1 行对应包装第 offset+1 行，
 // 引擎错误行号减去 offset 即得用户源码行号。
-constexpr int WRAP_HEADER_LINES_SINGLE = 4; // "@tool\nextends Node\n\nfunc <name>():\n"
-constexpr int WRAP_HEADER_LINES_MULTI = 3;  // "@tool\nextends Node\n\n"
+constexpr int WRAP_HEADER_LINES_SINGLE = 5; // "@tool\nextends Node\n\nfunc <name>():\n" + SceneRoot 注入行
+constexpr int WRAP_HEADER_LINES_MULTI = 5;  // "@tool\nextends Node\n\n" + SceneRoot 注入两行
+
+// "Node not found" 运行时错误追加的用法指引：执行节点在 /root 下，不在编辑场景内；
+// 必须通过 SceneRoot（编辑场景根节点）以无根名前缀的相对路径访问场景节点。
+constexpr const char* NODE_NOT_FOUND_HINT = "\n[hint] Node path resolution: the execution node lives under /root, NOT inside the edited scene. Use SceneRoot.get_node(\"Child\") to reach edited-scene nodes (SceneRoot is the scene root node itself — no root-name prefix, e.g. SceneRoot.get_node(\"Player\") or SceneRoot.get_node(\"Player/CollisionShape2D\")).";
 
 // 将引擎错误文本中 "gdscript://<name>.gd:<line>" 的行号换算为用户源码行号
 // （<line> 减去 offset），换算结果 >0 时替换并附注，≤0 时保留原值（指向包装头）。
@@ -339,7 +343,7 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
     if (has_func_def) {
         // Multi-function mode: prepend @tool + extends Node, do NOT wrap in a function
         std::string cleaned = clean_extends(source_code);
-        wrapped = "@tool\nextends Node\n\n" + cleaned + "\n";
+        wrapped = "@tool\nextends Node\n\nvar SceneRoot := EditorInterface.get_edited_scene_root()\n\n" + cleaned + "\n";
 
         // Ensure func_name exists in user code; if not, append a stub
         bool has_named_func = false;
@@ -418,6 +422,8 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
         std::string prefix = use_tab_style ? "\t" : "    ";
 
         wrapped = "@tool\nextends Node\n\nfunc " + func_name + "():\n";
+        // 注入 SceneRoot 便捷变量（编辑场景根节点）：执行节点在 /root 下，get_node() 找不到编辑场景节点
+        wrapped += prefix + "var SceneRoot := EditorInterface.get_edited_scene_root()\n";
         if (!cleaned.empty()) {
             std::istringstream stream(cleaned);
             std::string line;
@@ -494,6 +500,7 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
     // ── 临时节点生命周期：块作用域 + RAII 守卫，正常/异常/提前返回路径必清理 ──
     godot::Variant result;
     std::string new_error_text;
+    std::string new_output_text;
     bool temp_added = false;
     {
         godot::Node* temp_node = nullptr;
@@ -545,6 +552,7 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
 
         result = temp_node->call(fn_name);
         new_error_text = debugger_ops::capture_new_error_text(log_before);
+        new_output_text = debugger_ops::capture_new_output_text(log_before);
     } // 块结束：temp_guard 析构，移除并释放临时节点
 
     // ── Leak cleanup: remove or retain nodes users added directly to scene_root (without owner) ──
@@ -607,14 +615,25 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue& args) {
     r["execution_time_ms"] = mcp::JsonValue(static_cast<int64_t>(elapsed));
     r["auto_owner_set"] = mcp::JsonValue(static_cast<int64_t>(auto_owner_set));
     r["wrapped_source"] = mcp::JsonValue(wrapped);
+    if (!new_output_text.empty()) {
+        if (new_output_text.size() > 8192) {
+            r["output"] = mcp::JsonValue(new_output_text.substr(0, 8192)
+                + "\n...(truncated, total " + std::to_string(new_output_text.size()) + " bytes)");
+        } else {
+            r["output"] = mcp::JsonValue(new_output_text);
+        }
+    }
     if (!new_error_text.empty()) {
         r["runtime_error"] = mcp::JsonValue(true);
-        if (new_error_text.size() > 8192) {
-            r["error_details"] = mcp::JsonValue(new_error_text.substr(0, 8192)
-                + "\n...(truncated, total " + std::to_string(new_error_text.size()) + " bytes)");
-        } else {
-            r["error_details"] = mcp::JsonValue(new_error_text);
+        std::string error_details = new_error_text;
+        if (error_details.size() > 8192) {
+            error_details = error_details.substr(0, 8192)
+                + "\n...(truncated, total " + std::to_string(new_error_text.size()) + " bytes)";
         }
+        if (new_error_text.find("Node not found") != std::string::npos) {
+            error_details += NODE_NOT_FOUND_HINT;
+        }
+        r["error_details"] = mcp::JsonValue(error_details);
         mcp::JsonValue structured = extract_structured_error(new_error_text);
         if (structured.IsObject() && !structured.Empty()) {
             r["structured_error"] = std::move(structured);
