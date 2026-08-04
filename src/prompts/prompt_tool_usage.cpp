@@ -5,7 +5,7 @@ namespace godot_self_driving {
 std::string prompt_tool_usage() {
     return R"gsd(# 常用工具使用示例
 
-本文档提供了 17 个最常用 MCP 工具的详细使用示例，包含输入输出格式和注意事项。
+本文档提供了 19 个最常用 MCP 工具的详细使用示例，包含输入输出格式和注意事项。
 
 ---
 
@@ -480,8 +480,22 @@ std::string prompt_tool_usage() {
 }
 ```
 
+**SceneRoot 便捷变量（访问编辑场景节点）：**
+```json
+{
+  "name": "code_execute",
+  "arguments": {
+    "source_code": "return SceneRoot.get_node(\"Player\").name",
+    "function_name": "_run",
+    "timeout_ms": 5000
+  }
+}
+```
+
 **注意：**
 - 代码自动包装在 `@tool extends Node` 脚本中
+- 便捷变量 `SceneRoot` 即编辑场景根节点，等价于 `EditorInterface.get_edited_scene_root()`
+- 访问编辑场景节点请用 `SceneRoot.get_node("Child")`，不要带根节点名前缀（如 `SceneRoot.get_node("Player")`、`SceneRoot.get_node("Player/CollisionShape2D")`）；执行节点挂在 `/root` 下，`/root` 路径下没有编辑场景
 - 使用 `EditorInterface.get_edited_scene_root()` 获取当前场景根节点（不是 `get_tree()`）
 - 代码中的 `extends` 行会被自动注释掉
 - 默认超时 5000ms，最大 30000ms
@@ -603,6 +617,60 @@ std::string prompt_tool_usage() {
 - `data` 字段是 Base64 编码的 PNG 图片数据
 - 截取的是编辑器基类控件的视口（包含工具栏、视口等）
 - 截图是实时编辑器的当前状态
+
+---
+
+## 18. tilemap_set_cells — 批量铺 TileMap（大批量推荐用 code_execute）
+
+**功能：** 一次设置多个 TileMap cell。
+
+**输入（小型批次，建议 ≤64 项）：**
+```json
+{
+  "name": "tilemap_set_cells",
+  "arguments": {
+    "node_path": "TileMap",
+    "cells": [
+      {"x": 0, "y": 5, "source_id": 0, "atlas_coords": {"x": 0, "y": 0}},
+      {"x": 1, "y": 5, "source_id": 0, "atlas_coords": {"x": 0, "y": 0}}
+    ],
+    "layer": 0
+  }
+}
+```
+
+**替代路径（大批量推荐）— code_execute 循环铺 TileMap：**
+```json
+{
+  "name": "code_execute",
+  "arguments": {
+    "source_code": "var tilemap = EditorInterface.get_edited_scene_root().get_node(\"TileMap\")\nvar source_id = 0\nvar atlas_coords = Vector2i(0, 0)\nfor x in range(32):\n    tilemap.set_cell(0, Vector2i(x, 5), source_id, atlas_coords)\nreturn \"placed 32 cells\""
+  }
+}
+```
+
+**注意：**
+- `cells` 数组每请求建议保持 ~64 项以下——客户端侧参数构造可能截断更大载荷，导致 JSON 解析失败（报 parse error）
+- 大批量铺 TileMap（如整行、整面）改用 `code_execute`（或 `game_eval`）程序化循环生成，避免手工构造大型 JSON 出错
+- `code_execute` 单函数模式下代码内联在 `_run()` 中执行，循环结束后用 `return` 返回结果
+
+---
+
+## 19. scene_tree_get — 获取场景树
+
+**功能：** 获取当前打开场景的完整场景树结构。
+
+**输入：**
+```json
+{
+  "name": "scene_tree_get",
+  "arguments": {}
+}
+```
+
+**注意：**
+- 没有打开的场景时返回错误
+- After editor_new_scene / editor_open_scene, the scene tree listing may reflect the previous scene; call again or wait briefly for the editor to refresh.
 
 ---
 

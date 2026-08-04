@@ -150,7 +150,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"property", "string", "Property name", true},
         });
         m["property_set"] = schema::build_schema({
-            {"path", "string", "Node path", true},
+            {"path", "string", "Node path (scene-relative or absolute). memory:// is a resource namespace and is NOT valid here — memory resources go in the value parameter (e.g. {\"resource\": \"memory://name\"})", true},
             {"property", "string", "Property name", true},
             {"value", "object", "Property value to set", true},
             {"type_hint", "string", "Type hint (e.g. Vector2, Color, int, float)", false},
@@ -258,7 +258,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
 
         // ── Scripts ──
         m["script_execute_gdscript"] = schema::build_schema({
-            {"expression", "string", "GDScript expression or code to execute", true},
+            {"expression", "string", "GDScript expression or code to execute. Single expression auto-returns its value; multi-line code needs an explicit return. print() output appears in the output field, errors in the errors field", true},
         });
         m["script_load"] = schema::build_schema({
             {"path", "string", "Script file path", true},
@@ -1190,7 +1190,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"limit", "integer", "Maximum number of errors to return (default: 20)", false},
         });
         m["debugger_get_output"] = schema::build_schema({
-            {"limit", "integer", "Maximum number of output entries to return (default: 50). KNOWN LIMITATION: editor's built-in debug handlers consume game output before plugins; usually empty — use log_get_game_entries instead", false},
+            {"limit", "integer", "Maximum number of output entries to return (default: 50); fetched from the running game over the runtime channel when a debug session is active", false},
         });
         m["debugger_get_stack_dump"] = schema::build_schema({});
         m["debugger_get_scene_tree"] = schema::build_schema({});
@@ -1229,6 +1229,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
         m["game_input_wait"] = schema::build_schema({
             {"action", "string", "Action name to wait on", true},
             {"state", "string", "Transient state to wait for: \"just_pressed\" (default), \"just_released\" or \"pressed\"", false},
+            {"inject", "object", "Inject an input before waiting, in the same call (fields mirror game_input: type/action/keycode/pressed/mode/duration_ms/button_index/position) — eliminates the inject-then-observe cross-roundtrip frame gap; required for state=just_pressed/just_released, without inject the transient window (1 physics frame) has already expired and the wait will always time out", false},
             {"timeout_ms", "integer", "Wait timeout in milliseconds (default: 2000, max: 30000)", false},
         });
         m["game_input_status"] = schema::build_schema({
@@ -1924,7 +1925,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         s["required"] = std::move(req);
 
         mcp::ToolOptions c_opts;
-        c_opts.Description("Execute arbitrary GDScript code. The source code is wrapped in a script that extends Node, compiled, attached to a temporary node, and executed. Returns the function result serialized as JSON. By default the source is inlined inside the _run() function body: top-level func definitions are not supported — inline all code as expressions/statements, or define named functions and call one via function_name (multi-function mode).").InputSchema(std::move(s));
+        c_opts.Description("Execute arbitrary GDScript code. The source code is wrapped in a script that extends Node, compiled, attached to a temporary node, and executed. Returns the function result serialized as JSON. By default the source is inlined inside the _run() function body: top-level func definitions are not supported — inline all code as expressions/statements, or define named functions and call one via function_name (multi-function mode). Execution environment exposes SceneRoot (the edited scene root node) for node access; see SceneRoot.get_node(\"Child\").").InputSchema(std::move(s));
         server.RegisterTool("code_execute", c_opts,
             [&queue](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
                 mcp::JsonValue args = ctx.Params().arguments

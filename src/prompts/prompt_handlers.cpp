@@ -468,6 +468,21 @@ static std::string prompt_setup_input_map() {
   }
 }
 ```
+**注意：** `input_*` 工具仅作用于编辑器进程（MCP 服务器只在编辑器进程加载），运行中的游戏是独立进程，不会收到这些事件。要注入运行中的游戏进程，请使用 `game_input` 工具（Game 类别）：
+```json
+{
+  "name": "call_tool",
+  "arguments": {
+    "name": "game_input",
+    "arguments": {
+      "type": "action",
+      "action": "move_right",
+      "mode": "api",
+      "duration_ms": 1000
+    }
+  }
+}
+```
 
 ## 注意事项
 - 键位 Keycode 对应 Godot 的 `Key` 枚举值
