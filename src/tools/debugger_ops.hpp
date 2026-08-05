@@ -34,6 +34,7 @@ protected:
     Ref<EditorDebuggerSession> session_;
 public:
     std::vector<int32_t> session_ids_;
+    std::vector<int32_t> ready_session_ids_;
     static DebugCapturePlugin* s_instance;
     bool _has_capture(const String& p_name) const override;
     bool _capture(const String& p_message, const Array& p_data, int32_t p_session_id) override;

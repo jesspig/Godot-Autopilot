@@ -1,5 +1,6 @@
 #include "debugger_ops.hpp"
 #include "core/log_system.hpp"
+#include "runtime/gsd_protocol.hpp"
 #include "runtime_ops.hpp"
 #include <godot_cpp/classes/editor_debugger_plugin.hpp>
 #include <godot_cpp/classes/editor_debugger_session.hpp>
@@ -420,19 +421,30 @@ bool DebugCapturePlugin::_has_capture(const String& p_name) const {
 
 void DebugCapturePlugin::_setup_session(int32_t p_session_id) {
     session_ids_.push_back(p_session_id);
+    ready_session_ids_.erase(
+        std::remove(ready_session_ids_.begin(), ready_session_ids_.end(), p_session_id),
+        ready_session_ids_.end());
     session_ = get_session(p_session_id);
     if (session_.is_valid()) {
         godot_self_driving::debugger_ops::capture_add_log_entry("Debug session started", false);
     }
 }
 
-bool DebugCapturePlugin::_capture(const String& p_message, const Array& p_data, int32_t) {
+bool DebugCapturePlugin::_capture(const String& p_message, const Array& p_data, int32_t p_session_id) {
     std::string msg = p_message.utf8().ptr();
+
+    if (msg == std::string(godot_self_driving::GSD_MSG_READY)) {
+        if (std::find(ready_session_ids_.begin(), ready_session_ids_.end(), p_session_id) ==
+            ready_session_ids_.end()) {
+            ready_session_ids_.push_back(p_session_id);
+        }
+        return true;
+    }
 
     // 内置 handler 已消费 error/output/stack_dump/debug_enter/debug_exit/
     // scene:scene_tree/performance:profile_frame，插件只能收到未命中的消息；
     // 游戏侧错误/输出/场景树现经 gsd 运行时通道拉取（game_bridge 缓冲 + op）。
-    if (msg == "gsd:response" && p_data.size() >= 1) {
+    if (msg == std::string(godot_self_driving::GSD_MSG_RESPONSE) && p_data.size() >= 1) {
         String payload = p_data[0];
         godot_self_driving::runtime_ops::handle_game_response(std::string(payload.utf8().ptr()));
     }

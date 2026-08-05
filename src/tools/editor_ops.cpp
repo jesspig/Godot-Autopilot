@@ -1,4 +1,5 @@
 #include "editor_ops.hpp"
+#include "../runtime/gsd_protocol.hpp"
 #include "../util/scene_path.hpp"
 #include "core/log_system.hpp"
 #include "core/scene_dirty_tracker.hpp"
@@ -16,6 +17,7 @@
 #include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/variant/string.hpp>
@@ -761,6 +763,21 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue& args) {
     }
 
     editor->add_root_node(node);
+
+    // 轮询等待场景切换生效（引擎 UndoRedo 提交可能延迟一个 idle 帧）
+    int64_t waited_ms = 0;
+    bool switched = false;
+    while (waited_ms < GSD_NEW_SCENE_SWITCH_WAIT_MS) {
+        if (editor->get_edited_scene_root() == node) { switched = true; break; }
+        godot::OS::get_singleton()->delay_usec(GSD_NEW_SCENE_POLL_MS * 1000);
+        waited_ms += GSD_NEW_SCENE_POLL_MS;
+    }
+    if (!switched) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("scene switch did not take effect within 2000 ms (editor_new_scene) — the new scene root was not observed after add_root_node");
+        return e;
+    }
+
     scene_dirty_tracker::clear_scene_modified();
 
     // 自动切换到对应工作区

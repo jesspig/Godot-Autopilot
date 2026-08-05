@@ -1,5 +1,6 @@
 #include "game_bridge.hpp"
 
+#include "gsd_protocol.hpp"
 #include "core/log_system.hpp"
 #include "util/error_util.hpp"
 #include "util/readback_util.hpp"
@@ -35,6 +36,7 @@
 #include <godot_cpp/variant/variant.hpp>
 #include <mcp/JsonValue.hpp>
 #include <cstdio>
+#include <functional>
 #include <mutex>
 #include <string>
 #include <unordered_map>
@@ -86,6 +88,26 @@ godot::Node* resolve_node(const std::string& node_path) {
 // send_response 前向声明（定义在 dispatch 段），供 watcher / awaiter 回调使用
 void send_response(int64_t request_id, JV body);
 
+// 协议常量（std::string_view）转 godot::String，用于消息名等字符串参数
+godot::String gsd_string(const std::string_view& sv) {
+    return godot::String(std::string(sv).c_str());
+}
+
+// ── 活动时间戳与挂起操作取消注册表 ──
+// 每次收到 gsd 请求刷新，供 ping / status 报告游戏进程活跃度
+uint64_t g_last_activity_ms = 0;
+// 异步 op（input_wait / eval await）按 request_id 注册取消回调，
+// cancel op 在主线程查找并调用。全部在主线程上下文操作，无需锁。
+std::unordered_map<int64_t, std::function<void()>> g_cancel_handlers;
+
+void register_cancel_handler(int64_t request_id, std::function<void()> handler) {
+    g_cancel_handlers[request_id] = std::move(handler);
+}
+
+void unregister_cancel_handler(int64_t request_id) {
+    g_cancel_handlers.erase(request_id);
+}
+
 // input_wait 观测器：挂到 root，在 _physics_process 中轮询输入状态，命中或超时即响应并自毁
 class GameBridgeInputWatcher : public godot::Node {
     GDCLASS(GameBridgeInputWatcher, godot::Node)
@@ -112,6 +134,14 @@ public:
         start_ticks_ = godot::Time::get_singleton()->get_ticks_msec();
     }
 
+    // cancel op 触发的取消：不自行响应，由 cancel op 返回结果
+    void cancel() {
+        if (finished_) return;
+        finished_ = true;
+        unregister_cancel_handler(request_id_);
+        queue_free();
+    }
+
     void _physics_process(double delta) override {
         (void)delta;
         if (finished_) return;
@@ -125,12 +155,16 @@ public:
         }
         if (hit) {
             finished_ = true;
+            unregister_cancel_handler(request_id_);
             JV body(JV::object_tag);
             body["result"] = JV("matched");
+            body[GSD_FIELD_MATCHED_AT_PHYSICS_FRAME]
+                = JV(static_cast<int64_t>(godot::Engine::get_singleton()->get_physics_frames()));
             send_response(request_id_, std::move(body));
             queue_free();
         } else if (elapsed_ >= timeout_sec_) {
             finished_ = true;
+            unregister_cancel_handler(request_id_);
             const char* state_name = state_kind_ == 0 ? "just_pressed"
                 : (state_kind_ == 1 ? "just_released" : "pressed");
             send_response(request_id_, error_result("timeout waiting for "
@@ -140,7 +174,8 @@ public:
     }
 };
 
-// 物理帧计数定时释放注入器：帧数到点后按原参数补发 pressed=false 的事件，然后自毁
+// 物理帧计数定时释放注入器：帧数到点后按原参数补发 pressed=false 的事件，然后自毁。
+// 保持模式（keep_pressed）：到期前每物理帧重发 pressed=true 并 flush，维持按下状态
 class GameBridgeDelayedRelease : public godot::Node {
     GDCLASS(GameBridgeDelayedRelease, godot::Node)
 
@@ -151,6 +186,7 @@ class GameBridgeDelayedRelease : public godot::Node {
     bool has_position_ = false;
     godot::StringName action_;
     bool mode_api_ = false;
+    bool keep_pressed_ = false;
     uint64_t start_physics_frame_ = 0;
     int64_t duration_frames_ = 0;
 
@@ -160,7 +196,8 @@ protected:
 public:
     void setup(int type, const godot::Key& key, int64_t button_index,
                const godot::Vector2& position, bool has_position,
-               const godot::StringName& action, bool mode_api, double delay_sec) {
+               const godot::StringName& action, bool mode_api, double delay_sec,
+               bool keep_pressed) {
         type_ = type;
         key_ = key;
         button_index_ = button_index;
@@ -168,6 +205,7 @@ public:
         has_position_ = has_position;
         action_ = action;
         mode_api_ = mode_api;
+        keep_pressed_ = keep_pressed;
         godot::SceneTree* tree = get_scene_tree();
         if (!tree) {
             memdelete(this);
@@ -185,10 +223,45 @@ public:
                 >= static_cast<uint64_t>(duration_frames_)) {
             do_release();
             queue_free();
+        } else if (keep_pressed_) {
+            do_press();
         }
     }
 
 private:
+    void do_press() {
+        auto* input = godot::Input::get_singleton();
+        if (input) {
+            if (type_ == 0) {
+                godot::Ref<godot::InputEventKey> ev;
+                ev.instantiate();
+                ev->set_pressed(true);
+                ev->set_keycode(key_);
+                ev->set_physical_keycode(key_);
+                input->parse_input_event(ev);
+            } else if (type_ == 1) {
+                godot::Ref<godot::InputEventMouseButton> ev;
+                ev.instantiate();
+                ev->set_pressed(true);
+                ev->set_button_index(static_cast<godot::MouseButton>(button_index_));
+                if (has_position_) {
+                    ev->set_position(position_);
+                    ev->set_global_position(position_);
+                }
+                input->parse_input_event(ev);
+            } else if (mode_api_) {
+                input->action_press(action_);
+            } else {
+                godot::Ref<godot::InputEventAction> ev;
+                ev.instantiate();
+                ev->set_action(action_);
+                ev->set_pressed(true);
+                input->parse_input_event(ev);
+            }
+            input->flush_buffered_events();
+        }
+    }
+
     void do_release() {
         auto* input = godot::Input::get_singleton();
         if (input) {
@@ -265,12 +338,15 @@ public:
             return;
         }
         tree->get_root()->add_child(this);
+        register_cancel_handler(request_id_, [this] { cancel(); });
         if (state_ref_.is_valid()) {
             godot::Callable completed_cb(this, godot::StringName("_on_await_completed"));
             godot::Error err = state_ref_->connect("completed", completed_cb);
             if (err == godot::OK) connected_ = true;
         }
-        timer_ = tree->create_timer(timeout_ms / 1000.0);
+        // process_always=true, process_in_physics=false, ignore_time_scale=true：
+        // 兜底超时不受 time_scale / 暂停影响，保证假冻结时也能按时失败
+        timer_ = tree->create_timer(timeout_ms / 1000.0, true, false, true);
         if (timer_.is_valid()) {
             godot::Error err = timer_->connect("timeout",
                 godot::Callable(this, godot::StringName("_on_await_timeout")));
@@ -316,8 +392,16 @@ public:
         cleanup();
     }
 
+    // cancel op 触发的取消：不自行响应，由 cancel op 返回结果
+    void cancel() {
+        if (done_) return;
+        done_ = true;
+        cleanup();
+    }
+
 private:
     void cleanup() {
+        unregister_cancel_handler(request_id_);
         timer_.unref();
         if (connected_ && state_ref_.is_valid()) {
             state_ref_->disconnect("completed",
@@ -335,14 +419,15 @@ private:
     }
 };
 
-// 定时补发释放事件（pressed=false）
+// 定时补发释放事件（pressed=false）；keep_pressed=true 时到期前保持持续按压
 void schedule_release(const std::string& type, const godot::Key& key, int64_t button_index,
                       const godot::Vector2& position, bool has_position,
-                      const godot::StringName& action, bool mode_api, int64_t duration_ms) {
+                      const godot::StringName& action, bool mode_api, int64_t duration_ms,
+                      bool keep_pressed) {
     GameBridgeDelayedRelease* release = memnew(GameBridgeDelayedRelease);
     int type_code = (type == "key") ? 0 : (type == "mouse_button") ? 1 : 2;
     release->setup(type_code, key, button_index, position, has_position, action, mode_api,
-                   duration_ms / 1000.0);
+                   duration_ms / 1000.0, keep_pressed);
 }
 
 // ── 游戏侧错误/输出环形缓冲 ──
@@ -439,6 +524,7 @@ JV op_status() {
         r["fps"] = JV(engine->get_frames_per_second());
         r["physics_frame"] = JV(static_cast<int64_t>(engine->get_physics_frames()));
     }
+    r[GSD_FIELD_LAST_ACTIVITY_MS] = JV(static_cast<int64_t>(g_last_activity_ms));
     if (auto* tree = get_scene_tree()) {
         r["paused"] = JV(tree->is_paused());
         r["node_count"] = JV(static_cast<int64_t>(tree->get_node_count()));
@@ -754,7 +840,8 @@ bool param_pressed(const JV& params, bool default_value) {
     return default_value;
 }
 
-JV op_input(const JV& params) {
+JV op_input(const JV& params, int64_t request_id) {
+    (void)request_id; // 预留：hold 注入可经 cancel op 中断
     auto* type_p = params.Find("type");
     if (!type_p || !type_p->IsString()) {
         return error_result("input requires type (key|mouse_button|action)");
@@ -768,7 +855,9 @@ JV op_input(const JV& params) {
     if (auto* mode_p = params.Find("mode")) {
         if (mode_p->IsString()) mode = mode_p->GetString();
     }
+    // hold 与 event 都走事件注入（api 走 Input API）；hold 在 duration 内保持持续按压
     bool mode_api = (mode == "api");
+    bool keep_pressed = (mode == "hold");
     int64_t duration_ms = 0;
     if (auto* dur_p = params.Find("duration_ms")) {
         if (dur_p->IsInt() && dur_p->GetInt() > 0) duration_ms = dur_p->GetInt();
@@ -865,7 +954,8 @@ JV op_input(const JV& params) {
     }
 
     if (pressed && duration_ms > 0 && !release_type.empty()) {
-        schedule_release(release_type, key, button_index, pos, has_pos, action, mode_api, duration_ms);
+        schedule_release(release_type, key, button_index, pos, has_pos, action, mode_api,
+                         duration_ms, keep_pressed);
     }
 
     JV r(JV::object_tag);
@@ -875,6 +965,9 @@ JV op_input(const JV& params) {
         if (engine) {
             r["injected_at_physics_frame"] = JV(static_cast<int64_t>(engine->get_physics_frames()));
             r["expected_visible_frame"] = JV(static_cast<int64_t>(engine->get_physics_frames() + 1));
+            // flush 后的当前帧，供编辑器回读校验注入边沿是否已被消费
+            r[GSD_FIELD_PARSED_PHYSICS_FRAME] = JV(static_cast<int64_t>(engine->get_physics_frames()));
+            r[GSD_FIELD_PARSED_PROCESS_FRAME] = JV(static_cast<int64_t>(engine->get_process_frames()));
         }
         if (auto* tree = get_scene_tree()) {
             if (tree->is_paused()) {
@@ -882,6 +975,40 @@ JV op_input(const JV& params) {
             }
         }
     }
+    return r;
+}
+
+// ── op: ping（进程健康检测） ──
+JV op_ping() {
+    JV r(JV::object_tag);
+    auto* engine = godot::Engine::get_singleton();
+    if (engine) {
+        r["physics_frame"] = JV(static_cast<int64_t>(engine->get_physics_frames()));
+        r["process_frame"] = JV(static_cast<int64_t>(engine->get_process_frames()));
+    }
+    r[GSD_FIELD_LAST_ACTIVITY_MS] = JV(static_cast<int64_t>(g_last_activity_ms));
+    return r;
+}
+
+// ── op: cancel（取消挂起的异步 op） ──
+JV op_cancel(const JV& params) {
+    auto* rid_p = params.Find(GSD_FIELD_REQUEST_ID);
+    if (!rid_p || !rid_p->IsInt()) {
+        return error_result("cancel requires request_id (integer)");
+    }
+    int64_t target = rid_p->GetInt();
+    JV r(JV::object_tag);
+    auto it = g_cancel_handlers.find(target);
+    if (it == g_cancel_handlers.end()) {
+        r[GSD_FIELD_CANCELLED] = JV(false);
+        r["reason"] = JV("no pending operation for request_id " + std::to_string(target));
+        return r;
+    }
+    // 先取出回调并注销，再调用；回调内部 cleanup 的注销为幂等操作
+    std::function<void()> handler = std::move(it->second);
+    g_cancel_handlers.erase(it);
+    handler();
+    r[GSD_FIELD_CANCELLED] = JV(true);
     return r;
 }
 
@@ -914,7 +1041,7 @@ JV op_input_wait(const JV& params, int64_t request_id) {
 
     if (auto* inject_p = params.Find("inject")) {
         if (inject_p->IsObject()) {
-            JV inj_result = op_input(*inject_p);
+            JV inj_result = op_input(*inject_p, request_id);
             if (inj_result.Contains("error")) return inj_result;
         }
     }
@@ -923,6 +1050,7 @@ JV op_input_wait(const JV& params, int64_t request_id) {
     watcher->setup(request_id, godot::StringName(act->GetString().c_str()), state_kind,
                    timeout_ms / 1000.0);
     root->add_child(watcher);
+    register_cancel_handler(request_id, [watcher] { watcher->cancel(); });
     return JV(); // 异步：不立即响应，由 watcher 在命中 / 超时 send_response
 }
 
@@ -1074,7 +1202,7 @@ void send_response(int64_t request_id, JV body) {
     godot::Array payload;
     payload.push_back(godot::String(body.Dump().c_str()));
     if (auto* dbg = godot::EngineDebugger::get_singleton()) {
-        dbg->send_message(godot::String("gsd:response"), payload);
+        dbg->send_message(gsd_string(GSD_MSG_RESPONSE), payload);
     }
 }
 
@@ -1089,6 +1217,7 @@ protected:
 public:
     bool on_gsd_message(const godot::String& p_message, const godot::Array& p_data) {
         (void)p_message;
+        g_last_activity_ms = godot::Time::get_singleton() ? godot::Time::get_singleton()->get_ticks_msec() : 0;
         if (p_data.size() < 1) return true;
         std::string req_str = to_std(godot::String(p_data[0]));
         JV request = JV::Parse(req_str);
@@ -1100,28 +1229,30 @@ public:
         }
 
         int64_t request_id = 0;
-        if (auto* rid = request.Find("request_id")) {
+        if (auto* rid = request.Find(GSD_FIELD_REQUEST_ID)) {
             if (rid->IsInt()) request_id = rid->GetInt();
         }
         std::string op;
-        if (auto* op_p = request.Find("op")) {
+        if (auto* op_p = request.Find(GSD_FIELD_OP)) {
             if (op_p->IsString()) op = op_p->GetString();
         }
         JV params(JV::object_tag);
-        if (auto* params_p = request.Find("params")) {
+        if (auto* params_p = request.Find(GSD_FIELD_PARAMS)) {
             if (params_p->IsObject()) params = *params_p;
         }
 
         JV body;
-        if (op == "status") body = op_status();
-        else if (op == "eval") body = op_eval(params, request_id);
-        else if (op == "input") body = op_input(params);
-        else if (op == "input_wait") body = op_input_wait(params, request_id);
-        else if (op == "input_status") body = op_input_status(params);
-        else if (op == "capture") body = op_capture(request_id);
-        else if (op == "get_errors") body = op_get_errors(params);
-        else if (op == "get_output") body = op_get_output(params);
-        else if (op == "get_tree") body = op_get_tree();
+        if (op == GSD_OP_STATUS) body = op_status();
+        else if (op == GSD_OP_PING) body = op_ping();
+        else if (op == GSD_OP_CANCEL) body = op_cancel(params);
+        else if (op == GSD_OP_EVAL) body = op_eval(params, request_id);
+        else if (op == GSD_OP_INPUT) body = op_input(params, request_id);
+        else if (op == GSD_OP_INPUT_WAIT) body = op_input_wait(params, request_id);
+        else if (op == GSD_OP_INPUT_STATUS) body = op_input_status(params);
+        else if (op == GSD_OP_CAPTURE) body = op_capture(request_id);
+        else if (op == GSD_OP_GET_ERRORS) body = op_get_errors(params);
+        else if (op == GSD_OP_GET_OUTPUT) body = op_get_output(params);
+        else if (op == GSD_OP_GET_TREE) body = op_get_tree();
         else body = error_result("unknown op: " + op);
 
         // 通道级错误主动写入缓冲（引擎发送端不经过捕获回调，见缓冲说明）
@@ -1165,12 +1296,21 @@ void register_listener() {
         g_logger.instantiate();
     }
     if (auto* dbg = godot::EngineDebugger::get_singleton()) {
-        dbg->register_message_capture(godot::StringName("gsd"),
+        dbg->register_message_capture(godot::StringName(gsd_string(GSD_PREFIX)),
             godot::Callable(g_listener.ptr(), godot::StringName("on_gsd_message")));
         if (auto* os = godot::OS::get_singleton()) {
             os->add_logger(g_logger);
         }
         g_registered = true;
+        // 就绪握手：告知编辑器本进程已注册 gsd 通道、可接收请求
+        {
+            JV body(JV::object_tag);
+            body[GSD_FIELD_READY] = JV(true);
+            body[GSD_FIELD_LAST_ACTIVITY_MS] = JV(static_cast<int64_t>(g_last_activity_ms));
+            godot::Array payload;
+            payload.push_back(godot::String(body.Dump().c_str()));
+            dbg->send_message(gsd_string(GSD_MSG_READY), payload);
+        }
         LogSystem::instance().log(LogLevel::Info, LogCategory::System,
             "Game bridge listener registered (gsd message capture + game logger)");
     }
@@ -1179,7 +1319,7 @@ void register_listener() {
 void unregister_listener() {
     if (!g_registered) return;
     if (auto* dbg = godot::EngineDebugger::get_singleton()) {
-        dbg->unregister_message_capture(godot::StringName("gsd"));
+        dbg->unregister_message_capture(godot::StringName(gsd_string(GSD_PREFIX)));
     }
     if (auto* os = godot::OS::get_singleton()) {
         os->remove_logger(g_logger);
