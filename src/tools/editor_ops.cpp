@@ -1,4 +1,5 @@
 #include "editor_ops.hpp"
+#include "../util/scene_path.hpp"
 #include "core/log_system.hpp"
 #include "core/scene_dirty_tracker.hpp"
 #include "util/error_util.hpp"
@@ -35,44 +36,6 @@ constexpr int MAX_TREE_DEPTH = 12;
 std::string to_std(const godot::String& s) {
     godot::CharString utf8 = s.utf8();
     return std::string(utf8.ptr());
-}
-
-godot::Node* find_node(const std::string& path_str) {
-    auto* editor = godot::EditorInterface::get_singleton();
-    if (!editor) return nullptr;
-    auto* root = editor->get_edited_scene_root();
-    if (!root) return nullptr;
-    std::string clean = path_str;
-    if (!clean.empty() && clean[0] == '/') {
-        clean = clean.substr(1);
-    }
-    if (clean.size() > 5 && clean.compare(0, 5, "root/") == 0) {
-        clean = clean.substr(5);
-    }
-    if (clean.empty() || clean == to_std(root->get_name())) {
-        return root;
-    }
-    godot::NodePath np(godot::String(clean.c_str()));
-    auto* node = root->get_node_or_null(np);
-    if (!node) {
-        std::string root_name = to_std(root->get_name());
-        if (clean.size() > root_name.size() + 1 &&
-            clean.compare(0, root_name.size(), root_name) == 0 &&
-            clean[root_name.size()] == '/') {
-            std::string sub = clean.substr(root_name.size() + 1);
-            if (!sub.empty()) {
-                node = root->get_node_or_null(godot::NodePath(godot::String(sub.c_str())));
-            }
-        }
-    }
-    if (!node) return nullptr;
-    if (node == root) return node;
-    auto* p = node->get_parent();
-    while (p) {
-        if (p == root) return node;
-        p = p->get_parent();
-    }
-    return nullptr;
 }
 
 std::string relative_path(godot::Node* node, godot::Node* root) {
@@ -200,10 +163,12 @@ mcp::JsonValue handle_set_selection(const mcp::JsonValue& args) {
         return e;
     }
     sel->clear();
+    auto* root = editor->get_edited_scene_root();
     const auto& paths_arr = paths_p->GetArray();
     for (const auto& p : paths_arr) {
         if (p.IsString()) {
-            auto* node = find_node(p.GetString());
+            std::string hint;
+            auto* node = godot_self_driving::util::resolve_scene_node(p.GetString(), root, &hint);
             if (node) {
                 sel->add_node(node);
             }
@@ -434,13 +399,14 @@ mcp::JsonValue handle_undo_redo_add_do(const mcp::JsonValue& args) {
     }
     std::string node_path = np->GetString();
     std::string method = mt->GetString();
-    auto* node = find_node(node_path);
+    auto* editor = godot::EditorInterface::get_singleton();
+    std::string hint;
+    auto* node = godot_self_driving::util::resolve_scene_node(node_path, editor ? editor->get_edited_scene_root() : nullptr, &hint);
     if (!node) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("node not found: " + node_path);
+        e["error"] = mcp::JsonValue("node not found: " + node_path + " — " + hint);
         return e;
     }
-    auto* editor = godot::EditorInterface::get_singleton();
     if (!editor) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
         e["error"] = mcp::JsonValue("EditorInterface not available");
@@ -481,13 +447,14 @@ mcp::JsonValue handle_undo_redo_add_undo(const mcp::JsonValue& args) {
     }
     std::string node_path = np->GetString();
     std::string method = mt->GetString();
-    auto* node = find_node(node_path);
+    auto* editor = godot::EditorInterface::get_singleton();
+    std::string hint;
+    auto* node = godot_self_driving::util::resolve_scene_node(node_path, editor ? editor->get_edited_scene_root() : nullptr, &hint);
     if (!node) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("node not found: " + node_path);
+        e["error"] = mcp::JsonValue("node not found: " + node_path + " — " + hint);
         return e;
     }
-    auto* editor = godot::EditorInterface::get_singleton();
     if (!editor) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
         e["error"] = mcp::JsonValue("EditorInterface not available");

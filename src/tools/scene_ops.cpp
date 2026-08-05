@@ -1,4 +1,5 @@
 #include "scene_ops.hpp"
+#include "../util/scene_path.hpp"
 #include "core/log_system.hpp"
 #include "core/scene_dirty_tracker.hpp"
 #include "util/error_util.hpp"
@@ -21,8 +22,6 @@ namespace scene_ops {
 
 namespace {
 
-constexpr const char* NODE_PATH_HINT = " — expected scene-relative path like 'Level1/Player' or absolute '/root/Level1/Player'";
-
 constexpr int DEFAULT_MAX_DEPTH = 8;
 constexpr int UNLIMITED_TREE_DEPTH = 100000;
 constexpr int MAX_PROPERTY_COUNT = 20;
@@ -30,45 +29,6 @@ constexpr int MAX_PROPERTY_COUNT = 20;
 std::string to_std(const godot::String& s) {
     godot::CharString utf8 = s.utf8();
     return std::string(utf8.ptr());
-}
-
-godot::Node* find_node(const std::string& path_str) {
-    auto* editor = godot::EditorInterface::get_singleton();
-    if (!editor) return nullptr;
-    auto* root = editor->get_edited_scene_root();
-    if (!root) return nullptr;
-    std::string clean = path_str;
-    if (!clean.empty() && clean[0] == '/') {
-        clean = clean.substr(1);
-    }
-    if (clean.size() > 5 && clean.compare(0, 5, "root/") == 0) {
-        clean = clean.substr(5);
-    }
-    if (clean.empty() || clean == to_std(root->get_name())) {
-        return root;
-    }
-    godot::NodePath np(godot::String(clean.c_str()));
-    auto* node = root->get_node_or_null(np);
-    if (!node) {
-        // Strip root name prefix if present (e.g. "Game/Player" → "Player" when root is "Game")
-        std::string root_name = to_std(root->get_name());
-        if (clean.size() > root_name.size() + 1 &&
-            clean.compare(0, root_name.size(), root_name) == 0 &&
-            clean[root_name.size()] == '/') {
-            std::string sub = clean.substr(root_name.size() + 1);
-            if (!sub.empty()) {
-                node = root->get_node_or_null(godot::NodePath(godot::String(sub.c_str())));
-            }
-        }
-    }
-    if (!node) return nullptr;
-    if (node == root) return node;
-    auto* p = node->get_parent();
-    while (p) {
-        if (p == root) return node;
-        p = p->get_parent();
-    }
-    return nullptr;
 }
 
 void collect_property_summary(godot::Node* node, mcp::JsonValue& j) {
@@ -175,10 +135,12 @@ mcp::JsonValue handle_create(const mcp::JsonValue& args) {
 
     if (has_parent) {
         std::string parent_path = pp->GetString();
-        auto* parent = find_node(parent_path);
+        std::string hint;
+        auto* root = editor ? editor->get_edited_scene_root() : nullptr;
+        auto* parent = godot_self_driving::util::resolve_scene_node(parent_path, root, &hint);
         if (!parent) {
             mcp::JsonValue e(mcp::JsonValue::object_tag);
-            e["error"] = mcp::JsonValue("parent node not found: " + parent_path + NODE_PATH_HINT);
+            e["error"] = mcp::JsonValue("parent node not found: " + parent_path + " — " + hint);
             return e;
         }
         parent->add_child(obj);
@@ -249,15 +211,16 @@ mcp::JsonValue handle_delete(const mcp::JsonValue& args) {
         return e;
     }
     std::string path = p->GetString();
-    auto* node = find_node(path);
+    auto* editor = godot::EditorInterface::get_singleton();
+    auto* scene_root = editor ? editor->get_edited_scene_root() : nullptr;
+    std::string hint;
+    auto* node = godot_self_driving::util::resolve_scene_node(path, scene_root, &hint);
     if (!node) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("node not found: " + path + NODE_PATH_HINT);
+        e["error"] = mcp::JsonValue("node not found: " + path + " — " + hint);
         return e;
     }
 
-    auto* editor = godot::EditorInterface::get_singleton();
-    auto* scene_root = editor ? editor->get_edited_scene_root() : nullptr;
     if (node == scene_root) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
         e["error"] = mcp::JsonValue(
@@ -339,11 +302,12 @@ mcp::JsonValue handle_instance(const mcp::JsonValue& args) {
     auto* pp = args.Find("parent_path");
     godot::Node* parent = nullptr;
     if (pp && pp->IsString() && !pp->GetString().empty()) {
-        parent = find_node(pp->GetString());
+        std::string hint;
+        parent = godot_self_driving::util::resolve_scene_node(pp->GetString(), scene_root, &hint);
         if (!parent) {
             memdelete(instance);
             mcp::JsonValue e(mcp::JsonValue::object_tag);
-            e["error"] = mcp::JsonValue("parent node not found: " + pp->GetString() + NODE_PATH_HINT);
+            e["error"] = mcp::JsonValue("parent node not found: " + pp->GetString() + " — " + hint);
             return e;
         }
     } else if (!scene_root) {
