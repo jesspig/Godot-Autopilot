@@ -163,6 +163,13 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"signal", "string", "Signal name", true},
             {"target_path", "string", "Target node path", true},
             {"method", "string", "Method to call on target", true},
+            {"persist", "boolean", "Persist the connection with CONNECT_PERSIST so it is saved with the scene (default: true); false creates a runtime-only connection that is not saved", false},
+        });
+        m["signal_disconnect"] = schema::build_schema({
+            {"source_path", "string", "Source node path", true},
+            {"signal", "string", "Signal name", true},
+            {"target_path", "string", "Target node path", true},
+            {"method", "string", "Method to call on target", true},
         });
 
         // ── Resources ──
@@ -1497,6 +1504,18 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"stop_on_error", "boolean", "Stop on first error (default: true)", false},
         });
 
+        // ── Meta-tools (for catalog discoverability) ──
+        m["call_tool"] = schema::build_schema({
+            {"name", "string", "Tool name to execute", true},
+            {"arguments", "object", "Tool arguments as JSON object", false},
+        });
+        m["code_execute"] = schema::build_schema({
+            {"source_code", "string", "GDScript source code", true},
+            {"function_name", "string", "Function name to call (default: _run)", false},
+            {"timeout_ms", "integer", "Execution timeout in milliseconds (max 30000)", false},
+            {"auto_owner", "boolean", "Automatically set owner on nodes created during execution so they are saved with the scene (default true)", false},
+        });
+
         return m;
     }();
 
@@ -2053,6 +2072,20 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
             "Execute multiple tools in batch. Each operation runs in sequence; if stop_on_error is true and any operation fails, remaining operations are skipped.",
             "System", {"batch", "execute", "multi"},
             build_schema_for(SCHEMA_BASIC, "batch_execute")
+        });
+    }
+    if (catalog.get_tool("call_tool") == nullptr) {
+        catalog.add_tool({"call_tool",
+            "Execute any tool by name. Use this to call all non-meta tools (scene_*, property_*, signal_*, system_status).",
+            "System", {"call", "dispatch", "proxy"},
+            build_schema_for(SCHEMA_BASIC, "call_tool")
+        });
+    }
+    if (catalog.get_tool("code_execute") == nullptr) {
+        catalog.add_tool({"code_execute",
+            "Execute arbitrary GDScript code. The source code is wrapped in a script that extends Node, compiled, attached to a temporary node, and executed. Returns the function result serialized as JSON. By default the source is inlined inside the _run() function body: top-level func definitions are not supported — inline all code as expressions/statements, or define named functions and call one via function_name (multi-function mode). Execution environment exposes SceneRoot (the edited scene root node) for node access; see SceneRoot.get_node(\"Child\").",
+            "System", {"code", "execute", "script", "gdscript"},
+            build_schema_for(SCHEMA_BASIC, "code_execute")
         });
     }
 

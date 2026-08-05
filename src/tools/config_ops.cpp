@@ -137,8 +137,14 @@ mcp::JsonValue handle_project_settings_save(const mcp::JsonValue&) {
         return e;
     }
     godot::Error err = ps->save();
+    if (err != godot::Error::OK) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("project settings save failed (error code " +
+                                    std::to_string(static_cast<int64_t>(err)) + ")");
+        return e;
+    }
     mcp::JsonValue r(mcp::JsonValue::object_tag);
-    r["result"] = mcp::JsonValue(static_cast<int64_t>(err));
+    r["result"] = mcp::JsonValue("ok");
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "project_settings_save completed");
     return r;
 }

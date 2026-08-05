@@ -355,6 +355,7 @@ mcp::JsonValue handle_instance(const mcp::JsonValue& args) {
     inner["type"] = mcp::JsonValue(instance_type);
     inner["undo"] = mcp::JsonValue("delete node " + result_path + " (scene_node_delete)");
     r["result"] = std::move(inner);
+    r["note"] = mcp::JsonValue("instance inherits CONNECT_PERSIST connections saved in its source scene; do not reconnect the same signal+callable pairs on instances to avoid duplicate-connection errors");
 
     scene_dirty_tracker::mark_scene_modified();
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "scene_instance completed");

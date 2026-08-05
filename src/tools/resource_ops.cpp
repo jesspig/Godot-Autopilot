@@ -47,10 +47,12 @@ godot::Ref<godot::Resource> resolve_resource(
     const mcp::JsonValue& args,
     bool& out_has_oid,
     int64_t& out_obj_id,
-    std::string& out_error) {
+    std::string& out_error,
+    std::string* out_warning = nullptr) {
     out_has_oid = false;
     out_obj_id = 0;
     out_error.clear();
+    if (out_warning) out_warning->clear();
 
     std::string name;
     auto* it_name = args.Find("name");
@@ -103,6 +105,10 @@ godot::Ref<godot::Resource> resolve_resource(
         auto* loader = godot::ResourceLoader::get_singleton();
         if (loader) {
             res = loader->load(godot::String(path.c_str()));
+        }
+        if (res.is_valid() && out_warning) {
+            *out_warning = "loaded existing file from disk (" + path +
+                "); in-memory modifications to this resource (if any) are NOT included — pass name or object_id to save the live instance";
         }
     }
 
@@ -379,8 +385,9 @@ mcp::JsonValue handle_save(const mcp::JsonValue& args) {
     bool has_oid = false;
     int64_t obj_id = 0;
     std::string resolve_err;
+    std::string resolve_warning;
     godot::Ref<godot::Resource> res =
-        resolve_resource(args, has_oid, obj_id, resolve_err);
+        resolve_resource(args, has_oid, obj_id, resolve_err, &resolve_warning);
 
     if (res.is_null() && !resolve_err.empty()) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -414,7 +421,11 @@ mcp::JsonValue handle_save(const mcp::JsonValue& args) {
 
     if (res.is_null()) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("failed to resolve resource: provide object_id (from resource_create) or class_type + name to create a new resource in memory");
+        if (!path.empty()) {
+            e["error"] = mcp::JsonValue("failed to resolve resource: resource at path '" + path + "' could not be loaded from disk — provide object_id (from resource_create) or class_type + name to create a new resource in memory");
+        } else {
+            e["error"] = mcp::JsonValue("failed to resolve resource: provide object_id (from resource_create) or class_type + name to create a new resource in memory");
+        }
         return e;
     }
 
@@ -520,6 +531,14 @@ mcp::JsonValue handle_save(const mcp::JsonValue& args) {
             }
         }
     }
+    bool verified = false;
+    if (err == godot::OK) {
+        auto* loader = godot::ResourceLoader::get_singleton();
+        if (loader) {
+            godot::Ref<godot::Resource> verify = loader->load(godot::String(dest_path.c_str()));
+            verified = verify.is_valid();
+        }
+    }
     if (err == godot::OK && has_oid) {
         resource_registry::erase_oid(obj_id);
         resource_registry::register_resource(res, name);
@@ -530,11 +549,16 @@ mcp::JsonValue handle_save(const mcp::JsonValue& args) {
     if (err == godot::OK && has_oid) {
         r["cache"] = mcp::JsonValue("kept");
     }
+    if (err == godot::OK) {
+        r["verified"] = mcp::JsonValue(verified);
+    }
     if (dirs_created) {
         r["directories_created"] = mcp::JsonValue(true);
     }
     if (!case_conflict.empty()) {
         r["warning"] = mcp::JsonValue(case_conflict);
+    } else if (!resolve_warning.empty()) {
+        r["warning"] = mcp::JsonValue(resolve_warning);
     }
     return r;
 }

@@ -4,6 +4,7 @@
 #include "util/variant_json.hpp"
 #include "util/readback_util.hpp"
 #include "util/error_util.hpp"
+#include "util/scene_path.hpp"
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
@@ -82,33 +83,12 @@ std::string find_property_candidates(godot::Node* node, const std::string& prop_
     return result;
 }
 
-godot::Node* resolve_node(const std::string& path_str) {
+godot::Node* find_edited_scene_root() {
     auto editor = godot::EditorInterface::get_singleton();
-    godot::Node* root = nullptr;
     if (editor) {
-        root = editor->get_edited_scene_root();
+        return editor->get_edited_scene_root();
     }
-    if (!root) return nullptr;
-    std::string clean = path_str;
-    if (!clean.empty() && clean[0] == '/') {
-        clean = clean.substr(1);
-    }
-    if (clean.empty() || clean == to_std_string(root->get_name())) {
-        return root;
-    }
-    godot::Node* node = root->get_node_or_null(godot::NodePath(clean.c_str()));
-    if (!node) {
-        std::string root_name = to_std_string(root->get_name());
-        if (clean.size() > root_name.size() + 1 &&
-            clean.compare(0, root_name.size(), root_name) == 0 &&
-            clean[root_name.size()] == '/') {
-            std::string sub = clean.substr(root_name.size() + 1);
-            if (!sub.empty()) {
-                node = root->get_node_or_null(godot::NodePath(sub.c_str()));
-            }
-        }
-    }
-    return node;
+    return nullptr;
 }
 
 std::string hint_name(int hint) {
@@ -166,10 +146,11 @@ mcp::JsonValue handle_get(const mcp::JsonValue& args) {
     std::string path_str = it_path->GetString();
     std::string prop_str = it_prop->GetString();
 
-    godot::Node* node = resolve_node(path_str);
+    std::string hint;
+    godot::Node* node = util::resolve_scene_node(path_str, find_edited_scene_root(), &hint);
     if (!node) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("node not found: " + path_str + " — expected scene-relative path like 'Level1/Player' or absolute '/root/Level1/Player'");
+        e["error"] = mcp::JsonValue("node not found: " + path_str + " — " + hint);
         return e;
     }
 
@@ -212,10 +193,10 @@ mcp::JsonValue handle_set(const mcp::JsonValue& args) {
     std::string path_str = it_path->GetString();
     std::string prop_str = it_prop->GetString();
 
-    godot::Node* node = resolve_node(path_str);
+    std::string hint;
+    godot::Node* node = util::resolve_scene_node(path_str, find_edited_scene_root(), &hint);
     if (!node) {
-        std::string err = "node not found: " + path_str +
-                          " — expected scene-relative path like 'Level1/Player' or absolute '/root/Level1/Player'";
+        std::string err = "node not found: " + path_str + " — " + hint;
         const std::string memory_prefix = "memory://";
         if (path_str.compare(0, memory_prefix.size(), memory_prefix) == 0) {
             err += " memory:// is a resource namespace, not a node path; to reference a memory resource pass it as the value (e.g. {\"resource\": \"memory://name\"}) or create the resource inline with code_execute";
@@ -360,10 +341,11 @@ mcp::JsonValue handle_get_list(const mcp::JsonValue& args) {
 
     std::string path_str = it_path->GetString();
 
-    godot::Node* node = resolve_node(path_str);
+    std::string hint;
+    godot::Node* node = util::resolve_scene_node(path_str, find_edited_scene_root(), &hint);
     if (!node) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("node not found: " + path_str + " — expected scene-relative path like 'Level1/Player' or absolute '/root/Level1/Player'");
+        e["error"] = mcp::JsonValue("node not found: " + path_str + " — " + hint);
         return e;
     }
 
@@ -410,6 +392,90 @@ mcp::JsonValue handle_signal_connect(const mcp::JsonValue& args) {
     auto* it_signal = args.Find("signal");
     auto* it_target = args.Find("target_path");
     auto* it_method = args.Find("method");
+    auto* it_persist = args.Find("persist");
+    if (!it_source || !it_source->IsString()) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("missing required parameter: source_path");
+        return e;
+    }
+    if (!it_signal || !it_signal->IsString()) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("missing required parameter: signal");
+        return e;
+    }
+    if (!it_target || !it_target->IsString()) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("missing required parameter: target_path");
+        return e;
+    }
+    if (!it_method || !it_method->IsString()) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("missing required parameter: method");
+        return e;
+    }
+
+    bool persist = true;
+    if (it_persist && it_persist->IsBool()) {
+        persist = it_persist->GetBool();
+    }
+
+    std::string source_path = it_source->GetString();
+    std::string signal_name = it_signal->GetString();
+    std::string target_path = it_target->GetString();
+    std::string method_name = it_method->GetString();
+
+    std::string hint;
+    godot::Node* source = util::resolve_scene_node(source_path, find_edited_scene_root(), &hint);
+    if (!source) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("source node not found: " + source_path + " — " + hint);
+        return e;
+    }
+
+    godot::Node* target = util::resolve_scene_node(target_path, find_edited_scene_root(), &hint);
+    if (!target) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("target node not found: " + target_path + " — " + hint);
+        return e;
+    }
+
+    godot::StringName sig_name(signal_name.c_str());
+    if (!source->has_signal(sig_name)) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("signal not found: " + signal_name);
+        return e;
+    }
+
+    godot::Callable callable(target, godot::StringName(method_name.c_str()));
+    if (source->is_connected(sig_name, callable)) {
+        mcp::JsonValue r(mcp::JsonValue::object_tag);
+        r["result"] = mcp::JsonValue("already_connected");
+        r["info"] = mcp::JsonValue("signal is already connected to this callable on the node; scene instances inherit persistent connections — use signal_disconnect to remove it");
+        return r;
+    }
+    godot::Error err = source->connect(sig_name, callable, persist ? godot::Object::CONNECT_PERSIST : 0);
+    if (err != godot::OK) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("failed to connect signal: error code " + std::to_string(static_cast<int>(err)));
+        return e;
+    }
+
+    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    r["result"] = mcp::JsonValue("connected");
+    r["persisted"] = mcp::JsonValue(persist);
+    if (persist) {
+        r["note"] = mcp::JsonValue("connection created with CONNECT_PERSIST — it is saved with the scene and inherited by every instantiation; avoid connecting the same signal+callable again");
+    } else {
+        r["note"] = mcp::JsonValue("connection created without CONNECT_PERSIST — it is not saved with the scene");
+    }
+    return r;
+}
+
+mcp::JsonValue handle_signal_disconnect(const mcp::JsonValue& args) {
+    auto* it_source = args.Find("source_path");
+    auto* it_signal = args.Find("signal");
+    auto* it_target = args.Find("target_path");
+    auto* it_method = args.Find("method");
     if (!it_source || !it_source->IsString()) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
         e["error"] = mcp::JsonValue("missing required parameter: source_path");
@@ -436,38 +502,31 @@ mcp::JsonValue handle_signal_connect(const mcp::JsonValue& args) {
     std::string target_path = it_target->GetString();
     std::string method_name = it_method->GetString();
 
-    godot::Node* source = resolve_node(source_path);
+    std::string hint;
+    godot::Node* source = util::resolve_scene_node(source_path, find_edited_scene_root(), &hint);
     if (!source) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("source node not found: " + source_path);
+        e["error"] = mcp::JsonValue("source node not found: " + source_path + " — " + hint);
         return e;
     }
 
-    godot::Node* target = resolve_node(target_path);
+    godot::Node* target = util::resolve_scene_node(target_path, find_edited_scene_root(), &hint);
     if (!target) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("target node not found: " + target_path);
+        e["error"] = mcp::JsonValue("target node not found: " + target_path + " — " + hint);
         return e;
     }
 
     godot::StringName sig_name(signal_name.c_str());
-    if (!source->has_signal(sig_name)) {
-        mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("signal not found: " + signal_name);
-        return e;
-    }
-
     godot::Callable callable(target, godot::StringName(method_name.c_str()));
-    godot::Error err = source->connect(sig_name, callable, godot::Object::CONNECT_PERSIST);
-    if (err != godot::OK) {
-        mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("failed to connect signal: error code " + std::to_string(static_cast<int>(err)));
-        return e;
+    if (!source->is_connected(sig_name, callable)) {
+        mcp::JsonValue r(mcp::JsonValue::object_tag);
+        r["result"] = mcp::JsonValue("not_connected");
+        return r;
     }
-
+    source->disconnect(sig_name, callable);
     mcp::JsonValue r(mcp::JsonValue::object_tag);
-    r["result"] = mcp::JsonValue("connected");
-    r["info"] = mcp::JsonValue("signal connection created with CONNECT_PERSIST flag");
+    r["result"] = mcp::JsonValue("disconnected");
     return r;
 }
 
