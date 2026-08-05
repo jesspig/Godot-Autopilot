@@ -16,6 +16,7 @@
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
+#include <godot_cpp/classes/editor_file_system.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
 #include <godot_cpp/variant/string.hpp>
@@ -94,6 +95,53 @@ std::string truncate_capture_text(const std::string& text) {
     return text;
 }
 
+// 缓存失效先例与 resource_ops.cpp:869-874 逐字一致（ResourceCache 条目随 Resource 析构移除，
+// 失效对象可能因 path_cache 驻留，set_path("") 使缓存条目移除）。返回是否实际清除了缓存条目。
+bool invalidate_cached_resource(const std::string& path) {
+    auto* loader = godot::ResourceLoader::get_singleton();
+    if (!loader || !loader->has_cached(godot::String(path.c_str()))) {
+        return false;
+    }
+    auto cached = loader->get_cached_ref(godot::String(path.c_str()));
+    if (cached.is_valid()) {
+        cached->set_path("");
+    }
+    return true;
+}
+
+// 顶层 func 定义检测，移植自 code_exec_ops.cpp:291-304（跳过注释行）
+bool has_top_level_func_def(const std::string& code) {
+    std::istringstream stream(code);
+    std::string line;
+    while (std::getline(stream, line)) {
+        size_t pos = line.find_first_not_of(" \t");
+        if (pos == std::string::npos || line[pos] == '#') continue;
+        if (pos + 1 < line.size() && line[pos] == '/' && line[pos + 1] == '/') continue;
+        if (line.compare(pos, 5, "func ") == 0) return true;
+    }
+    return false;
+}
+
+// 函数名解析移植自 code_exec_ops.cpp:349-370：检测用户代码是否定义了指定顶层函数
+bool defines_function_named(const std::string& code, const std::string& target) {
+    std::istringstream stream(code);
+    std::string line;
+    while (std::getline(stream, line)) {
+        size_t pos = line.find_first_not_of(" \t");
+        if (pos == std::string::npos || line[pos] == '#') continue;
+        if (line.compare(pos, 5, "func ") != 0) continue;
+        size_t name_start = line.find_first_not_of(" \t", pos + 5);
+        if (name_start == std::string::npos) continue;
+        size_t name_end = line.find('(', name_start);
+        if (name_end == std::string::npos) continue;
+        std::string fname = line.substr(name_start, name_end - name_start);
+        size_t last = fname.find_last_not_of(" \t");
+        if (last != std::string::npos) fname = fname.substr(0, last + 1);
+        if (fname == target) return true;
+    }
+    return false;
+}
+
 } // namespace
 
 mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue& args) {
@@ -123,27 +171,62 @@ mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue& args) {
     }
 
     std::string wrapped;
-    wrapped = "@tool\nextends Node\n\nfunc _run():\n";
-    // 注入 SceneRoot 便捷变量（编辑场景根节点）：执行节点在 /root 下，get_node() 找不到编辑场景节点
-    wrapped += "    var SceneRoot := EditorInterface.get_edited_scene_root()\n";
-    if (is_single_expression(expression)) {
+    if (has_top_level_func_def(cleaned)) {
+        // 多函数模式（移植自 code_exec_ops.cpp:342-373）：顶层放置用户代码，不包进 _run。
+        // 本工具无 function_name 参数，入口固定为 _run；未定义 _run 时显式报错。
+        if (!defines_function_named(cleaned, "_run")) {
+            mcp::JsonValue e(mcp::JsonValue::object_tag);
+            e["error"] = mcp::JsonValue("multi-function mode requires a func _run() entry point（或将函数改为 lambda 变量）");
+            return e;
+        }
+        wrapped = "@tool\nextends Node\n\nvar SceneRoot := EditorInterface.get_edited_scene_root()\n\n" + cleaned + "\n";
+    } else if (is_single_expression(expression)) {
+        wrapped = "@tool\nextends Node\n\nfunc _run():\n";
+        // 注入 SceneRoot 便捷变量（编辑场景根节点）：执行节点在 /root 下，get_node() 找不到编辑场景节点
+        wrapped += "    var SceneRoot := EditorInterface.get_edited_scene_root()\n";
         wrapped += "    return " + cleaned + "\n";
-    } else if (!cleaned.empty()) {
-        std::istringstream stream(cleaned);
-        std::string line;
-        bool first_line = true;
-        while (std::getline(stream, line)) {
-            if (!first_line) wrapped += "\n";
-            first_line = false;
-            size_t content_start = line.find_first_not_of(" \t");
-            if (content_start == std::string::npos) {
-                wrapped += "    ";
-            } else {
-                wrapped += "    " + line;
+        wrapped += "\n";
+    } else {
+        // 缩进风格检测（移植自 code_exec_ops.cpp:399-422）：按用户风格选择包装前缀
+        bool uses_tabs = false;
+        bool uses_spaces = false;
+        {
+            std::istringstream stream(cleaned);
+            std::string line;
+            while (std::getline(stream, line)) {
+                size_t pos = line.find_first_not_of(" \t");
+                if (pos == std::string::npos || pos == 0) continue;
+                std::string indent = line.substr(0, pos);
+                if (indent.find('\t') != std::string::npos) uses_tabs = true;
+                if (indent.find("    ") != std::string::npos) uses_spaces = true;
             }
         }
+        if (uses_tabs && uses_spaces) {
+            mcp::JsonValue e(mcp::JsonValue::object_tag);
+            e["error"] = mcp::JsonValue("mixed tab/space indentation detected in source — reindent source with only tabs or only spaces; note the wrapper requires the same indentation style throughout");
+            return e;
+        }
+        std::string prefix = (uses_tabs && !uses_spaces) ? "\t" : "    ";
+        wrapped = "@tool\nextends Node\n\nfunc _run():\n";
+        // 注入 SceneRoot 便捷变量（编辑场景根节点）：执行节点在 /root 下，get_node() 找不到编辑场景节点
+        wrapped += prefix + "var SceneRoot := EditorInterface.get_edited_scene_root()\n";
+        if (!cleaned.empty()) {
+            std::istringstream stream(cleaned);
+            std::string line;
+            bool first_line = true;
+            while (std::getline(stream, line)) {
+                if (!first_line) wrapped += "\n";
+                first_line = false;
+                size_t content_start = line.find_first_not_of(" \t");
+                if (content_start == std::string::npos) {
+                    wrapped += prefix;
+                } else {
+                    wrapped += prefix + line;
+                }
+            }
+        }
+        wrapped += "\n";
     }
-    wrapped += "\n";
 
     godot::Ref<godot::GDScript> script;
     script.instantiate();
@@ -278,7 +361,8 @@ mcp::JsonValue handle_create(const mcp::JsonValue& args) {
     auto* it_overwrite = args.Find("overwrite");
     if (it_overwrite && it_overwrite->IsBool()) overwrite = it_overwrite->GetBool();
 
-    if (!overwrite && godot::FileAccess::file_exists(godot::String(path.c_str()))) {
+    bool file_exists_on_disk = godot::FileAccess::file_exists(godot::String(path.c_str()));
+    if (!overwrite && file_exists_on_disk) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
         e["error"] = mcp::JsonValue("file already exists: " + path + " — pass overwrite=true to replace it");
         return e;
@@ -297,6 +381,8 @@ mcp::JsonValue handle_create(const mcp::JsonValue& args) {
     size_t compile_log_before = debugger_ops::capture_log_count();
     godot::Error reload_err = script->reload();
     if (reload_err != godot::OK) {
+        // 编译失败对象不应因 path_cache 驻留缓存：清理后下次 load() 才能读到磁盘真实内容
+        invalidate_cached_resource(path);
         std::string message = "script compilation failed: ERR_PARSE_ERROR (code " + std::to_string(static_cast<int>(reload_err)) + ")";
         std::string compile_err = debugger_ops::capture_new_error_text(compile_log_before);
         if (!compile_err.empty()) {
@@ -336,9 +422,31 @@ mcp::JsonValue handle_create(const mcp::JsonValue& args) {
         return e;
     }
 
+    // 覆盖重写后旧版脚本对象可能仍在 ResourceCache：set_path("") 使缓存条目随析构移除
+    bool cache_invalidated = invalidate_cached_resource(path);
+    auto* editor = godot::EditorInterface::get_singleton();
+    if (editor) {
+        auto* efs = editor->get_resource_filesystem();
+        if (efs) {
+            // 先例：resource_ops.cpp:503-505；仅刷新文件系统记录，全局类注册由引擎异步排队
+            efs->update_file(godot::String(path.c_str()));
+        }
+    }
+
     mcp::JsonValue j(mcp::JsonValue::object_tag);
     j["path"] = mcp::JsonValue(path);
     j["class"] = mcp::JsonValue("GDScript");
+    j["overwritten"] = mcp::JsonValue(file_exists_on_disk);
+    if (cache_invalidated) {
+        j["cache_invalidated"] = mcp::JsonValue(true);
+    }
+    godot::StringName global_name = script->get_global_name();
+    if (global_name != godot::StringName()) {
+        j["global_class_name"] = mcp::JsonValue(util::to_std(godot::String(global_name)));
+        // update_file 仅排队全局类注册（引擎 editor_file_system.cpp:2519-2521 异步执行），
+        // 故提示延迟而非全量 scan()（scan 异步且有副作用）
+        j["global_class_hint"] = mcp::JsonValue("global class registration may be delayed — cross-script references may need preload() or a filesystem rescan");
+    }
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = std::move(j);
     return r;
