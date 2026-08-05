@@ -35,6 +35,27 @@ mcp::JsonValue handle_environment_set_bg_color(const mcp::JsonValue& args);
 mcp::JsonValue handle_environment_set_ambient(const mcp::JsonValue& args);
 mcp::JsonValue handle_fog_create(const mcp::JsonValue& args);
 mcp::JsonValue handle_shader_create(const mcp::JsonValue& args);
+mcp::JsonValue handle_texture_create_2d(const mcp::JsonValue& args);
+mcp::JsonValue handle_shader_set_code(const mcp::JsonValue& args);
+mcp::JsonValue handle_shader_get_parameter_list(const mcp::JsonValue& args);
+mcp::JsonValue handle_environment_set_glow(const mcp::JsonValue& args);
+mcp::JsonValue handle_environment_set_ssr(const mcp::JsonValue& args);
+mcp::JsonValue handle_environment_set_tonemap(const mcp::JsonValue& args);
+mcp::JsonValue handle_environment_set_sdfgi(const mcp::JsonValue& args);
+mcp::JsonValue handle_environment_set_volumetric_fog(const mcp::JsonValue& args);
+mcp::JsonValue handle_sky_create(const mcp::JsonValue& args);
+mcp::JsonValue handle_sky_set_material(const mcp::JsonValue& args);
+mcp::JsonValue handle_particles_set_emitting(const mcp::JsonValue& args);
+mcp::JsonValue handle_particles_restart(const mcp::JsonValue& args);
+mcp::JsonValue handle_particles_set_lifetime(const mcp::JsonValue& args);
+mcp::JsonValue handle_reflection_probe_create(const mcp::JsonValue& args);
+mcp::JsonValue handle_decal_create(const mcp::JsonValue& args);
+mcp::JsonValue handle_fog_volume_set_shape(const mcp::JsonValue& args);
+mcp::JsonValue handle_instance_set_visible(const mcp::JsonValue& args);
+mcp::JsonValue handle_instance_set_layer_mask(const mcp::JsonValue& args);
+mcp::JsonValue handle_global_shader_parameter_set(const mcp::JsonValue& args);
+mcp::JsonValue handle_canvas_item_get_rid(const mcp::JsonValue& args);
+mcp::JsonValue handle_resolve_rid(const mcp::JsonValue& args);
 
 } // namespace render_ops
 } // namespace godot_self_driving

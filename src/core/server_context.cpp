@@ -1,7 +1,9 @@
 #include "server_context.hpp"
 #include "log_system.hpp"
 #include "resources/resource_handlers.hpp"
+#include "resources/debugger_resources.hpp"
 #include "prompts/prompt_handlers.hpp"
+#include "prompts/debugger_prompts.hpp"
 #include "tools/register_all.hpp"
 #include <mcp/server/ServerOptions.hpp>
 #include <mcp/Content.hpp>
@@ -102,6 +104,8 @@ void ServerContext::register_tools() {
     register_all_tools(*server_, queue_, catalog_, bm25_index_, port_);
     register_all_resources(*server_, queue_);
     register_all_prompts(*server_, queue_);
+    register_debugger_resources(*server_);
+    register_debugger_prompts(*server_);
 }
 
 } // namespace godot_self_driving

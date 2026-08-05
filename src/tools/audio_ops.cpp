@@ -1,11 +1,15 @@
 #include "audio_ops.hpp"
 #include "core/log_system.hpp"
+#include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/audio_server.hpp>
 #include <godot_cpp/classes/audio_bus_layout.hpp>
 #include <godot_cpp/classes/audio_effect.hpp>
 #include <godot_cpp/classes/audio_stream.hpp>
 #include <godot_cpp/classes/audio_stream_player.hpp>
+#include <godot_cpp/classes/audio_stream_player2d.hpp>
+#include <godot_cpp/classes/audio_stream_player3d.hpp>
+#include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
@@ -19,6 +23,8 @@ namespace godot_self_driving {
 namespace audio_ops {
 
 namespace {
+
+constexpr const char* NODE_PATH_HINT = " — expected scene-relative path like 'Level1/Player' or absolute '/root/Level1/Player'";
 
 std::string to_std(const godot::String& s) {
     godot::CharString utf8 = s.utf8();
@@ -34,11 +40,32 @@ godot::Node* find_node(const std::string& path_str) {
     if (!clean.empty() && clean[0] == '/') {
         clean = clean.substr(1);
     }
+    if (clean.size() > 5 && clean.compare(0, 5, "root/") == 0) {
+        clean = clean.substr(5);
+    }
     if (clean.empty() || clean == to_std(root->get_name())) {
         return root;
     }
     godot::NodePath np(godot::String(clean.c_str()));
-    return root->get_node_or_null(np);
+    auto* node = root->get_node_or_null(np);
+    if (!node) {
+        std::string root_name = to_std(root->get_name());
+        if (clean.size() > root_name.size() + 1 &&
+            clean.compare(0, root_name.size(), root_name) == 0 &&
+            clean[root_name.size()] == '/') {
+            std::string sub = clean.substr(root_name.size() + 1);
+            if (!sub.empty()) {
+                node = root->get_node_or_null(godot::NodePath(godot::String(sub.c_str())));
+            }
+        }
+    }
+    if (!node) return nullptr;
+    auto* p = node->get_parent();
+    while (p) {
+        if (p == root) return node;
+        p = p->get_parent();
+    }
+    return nullptr;
 }
 
 mcp::JsonValue error_json(const std::string& msg) {
@@ -50,6 +77,79 @@ mcp::JsonValue error_json(const std::string& msg) {
 mcp::JsonValue ok_json() {
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue("ok");
+    return r;
+}
+
+struct AudioPlayerVariant {
+    godot::AudioStreamPlayer* p1 = nullptr;
+    godot::AudioStreamPlayer2D* p2 = nullptr;
+    godot::AudioStreamPlayer3D* p3 = nullptr;
+
+    bool is_valid() const { return p1 || p2 || p3; }
+
+    std::string type_name() const {
+        if (p1) return "AudioStreamPlayer";
+        if (p2) return "AudioStreamPlayer2D";
+        if (p3) return "AudioStreamPlayer3D";
+        return "unknown";
+    }
+
+    void play(float from_pos = 0.0f) {
+        if (p1) p1->play(from_pos);
+        else if (p2) p2->play(from_pos);
+        else if (p3) p3->play(from_pos);
+    }
+
+    void stop() {
+        if (p1) p1->stop();
+        else if (p2) p2->stop();
+        else if (p3) p3->stop();
+    }
+
+    void seek(float to_position) {
+        if (p1) p1->seek(to_position);
+        else if (p2) p2->seek(to_position);
+        else if (p3) p3->seek(to_position);
+    }
+
+    void set_volume_db(float volume_db) {
+        if (p1) p1->set_volume_db(volume_db);
+        else if (p2) p2->set_volume_db(volume_db);
+        else if (p3) p3->set_volume_db(volume_db);
+    }
+
+    void set_pitch_scale(float pitch_scale) {
+        if (p1) p1->set_pitch_scale(pitch_scale);
+        else if (p2) p2->set_pitch_scale(pitch_scale);
+        else if (p3) p3->set_pitch_scale(pitch_scale);
+    }
+
+    float get_playback_position() {
+        if (p1) return p1->get_playback_position();
+        if (p2) return p2->get_playback_position();
+        if (p3) return p3->get_playback_position();
+        return 0.0f;
+    }
+
+    void set_stream(const godot::Ref<godot::AudioStream>& stream) {
+        if (p1) p1->set_stream(stream);
+        else if (p2) p2->set_stream(stream);
+        else if (p3) p3->set_stream(stream);
+    }
+
+    godot::Ref<godot::AudioStream> get_stream() {
+        if (p1) return p1->get_stream();
+        if (p2) return p2->get_stream();
+        if (p3) return p3->get_stream();
+        return {};
+    }
+};
+
+AudioPlayerVariant resolve_audio_player(godot::Node* node) {
+    AudioPlayerVariant r;
+    r.p1 = godot::Object::cast_to<godot::AudioStreamPlayer>(node);
+    if (!r.p1) r.p2 = godot::Object::cast_to<godot::AudioStreamPlayer2D>(node);
+    if (!r.p1 && !r.p2) r.p3 = godot::Object::cast_to<godot::AudioStreamPlayer3D>(node);
     return r;
 }
 
@@ -274,34 +374,42 @@ mcp::JsonValue handle_stream_play(const mcp::JsonValue& args) {
     std::string path = np->GetString();
     auto* node = find_node(path);
     if (!node) {
-        return error_json("AudioStreamPlayer node not found: " + path);
+        return error_json("AudioStreamPlayer node not found: " + path + NODE_PATH_HINT);
     }
-    auto* player = godot::Object::cast_to<godot::AudioStreamPlayer>(node);
-    if (!player) {
-        return error_json("node is not an AudioStreamPlayer: " + path);
+    auto ap = resolve_audio_player(node);
+    if (!ap.is_valid()) {
+        return error_json("node is not an AudioStreamPlayer/AudioStreamPlayer2D/AudioStreamPlayer3D: " + path + " (actual class: " + to_std(node->get_class()) + ")");
     }
     auto* sp = args.Find("stream_path");
     if (sp && sp->IsString()) {
+        godot::String stream_path(sp->GetString().c_str());
+        if (!godot::FileAccess::file_exists(stream_path))
+            return util::error_detail("file does not exist", sp->GetString(), "an existing file path",
+                                      "check the disk directory structure; docs paths may be relative to the wrong folder");
         auto* loader = godot::ResourceLoader::get_singleton();
         if (!loader) {
             return error_json("ResourceLoader not available");
         }
-        auto stream = loader->load(godot::String(sp->GetString().c_str()));
+        auto stream = loader->load(stream_path);
         if (stream.is_null()) {
-            return error_json("failed to load audio stream: " + sp->GetString());
+            return util::error_detail("file exists but failed to load (not imported or wrong type)", sp->GetString(),
+                                      "an importable resource of type AudioStream", "reimport the file or check the file format");
         }
         auto audio_stream = godot::Ref<godot::AudioStream>(stream);
         if (audio_stream.is_null()) {
             return error_json("loaded resource is not an AudioStream: " + sp->GetString());
         }
-        player->set_stream(audio_stream);
+        ap.set_stream(audio_stream);
     }
     float from_pos = 0.0f;
     auto* fp = args.Find("from_position");
     if (fp && fp->IsNumber()) {
         from_pos = static_cast<float>(fp->IsDouble() ? fp->GetDouble() : static_cast<double>(fp->GetInt()));
     }
-    player->play(from_pos);
+    if (ap.get_stream().is_null()) {
+        return error_json("node has no audio stream set: " + path + " — set the stream first (e.g. resource_set_property with a loaded AudioStream resource)");
+    }
+    ap.play(from_pos);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "audio_stream_play completed");
     return ok_json();
 }
@@ -315,13 +423,13 @@ mcp::JsonValue handle_stream_stop(const mcp::JsonValue& args) {
     std::string path = np->GetString();
     auto* node = find_node(path);
     if (!node) {
-        return error_json("AudioStreamPlayer node not found: " + path);
+        return error_json("AudioStreamPlayer node not found: " + path + NODE_PATH_HINT);
     }
-    auto* player = godot::Object::cast_to<godot::AudioStreamPlayer>(node);
-    if (!player) {
-        return error_json("node is not an AudioStreamPlayer: " + path);
+    auto ap = resolve_audio_player(node);
+    if (!ap.is_valid()) {
+        return error_json("node is not an AudioStreamPlayer/AudioStreamPlayer2D/AudioStreamPlayer3D: " + path + " (actual class: " + to_std(node->get_class()) + ")");
     }
-    player->stop();
+    ap.stop();
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "audio_stream_stop completed");
     return ok_json();
 }
@@ -339,14 +447,14 @@ mcp::JsonValue handle_stream_set_volume(const mcp::JsonValue& args) {
     std::string path = np->GetString();
     auto* node = find_node(path);
     if (!node) {
-        return error_json("AudioStreamPlayer node not found: " + path);
+        return error_json("AudioStreamPlayer node not found: " + path + NODE_PATH_HINT);
     }
-    auto* player = godot::Object::cast_to<godot::AudioStreamPlayer>(node);
-    if (!player) {
-        return error_json("node is not an AudioStreamPlayer: " + path);
+    auto ap = resolve_audio_player(node);
+    if (!ap.is_valid()) {
+        return error_json("node is not an AudioStreamPlayer/AudioStreamPlayer2D/AudioStreamPlayer3D: " + path + " (actual class: " + to_std(node->get_class()) + ")");
     }
     float vol = static_cast<float>(vd->IsDouble() ? vd->GetDouble() : static_cast<double>(vd->GetInt()));
-    player->set_volume_db(vol);
+    ap.set_volume_db(vol);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "audio_stream_set_volume completed");
     return ok_json();
 }
@@ -364,14 +472,14 @@ mcp::JsonValue handle_stream_set_pitch(const mcp::JsonValue& args) {
     std::string path = np->GetString();
     auto* node = find_node(path);
     if (!node) {
-        return error_json("AudioStreamPlayer node not found: " + path);
+        return error_json("AudioStreamPlayer node not found: " + path + NODE_PATH_HINT);
     }
-    auto* player = godot::Object::cast_to<godot::AudioStreamPlayer>(node);
-    if (!player) {
-        return error_json("node is not an AudioStreamPlayer: " + path);
+    auto ap = resolve_audio_player(node);
+    if (!ap.is_valid()) {
+        return error_json("node is not an AudioStreamPlayer/AudioStreamPlayer2D/AudioStreamPlayer3D: " + path + " (actual class: " + to_std(node->get_class()) + ")");
     }
     float pitch = static_cast<float>(ps->IsDouble() ? ps->GetDouble() : static_cast<double>(ps->GetInt()));
-    player->set_pitch_scale(pitch);
+    ap.set_pitch_scale(pitch);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "audio_stream_set_pitch completed");
     return ok_json();
 }
@@ -385,13 +493,13 @@ mcp::JsonValue handle_stream_get_playback_position(const mcp::JsonValue& args) {
     std::string path = np->GetString();
     auto* node = find_node(path);
     if (!node) {
-        return error_json("AudioStreamPlayer node not found: " + path);
+        return error_json("AudioStreamPlayer node not found: " + path + NODE_PATH_HINT);
     }
-    auto* player = godot::Object::cast_to<godot::AudioStreamPlayer>(node);
-    if (!player) {
-        return error_json("node is not an AudioStreamPlayer: " + path);
+    auto ap = resolve_audio_player(node);
+    if (!ap.is_valid()) {
+        return error_json("node is not an AudioStreamPlayer/AudioStreamPlayer2D/AudioStreamPlayer3D: " + path + " (actual class: " + to_std(node->get_class()) + ")");
     }
-    float pos = player->get_playback_position();
+    float pos = ap.get_playback_position();
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue(static_cast<double>(pos));
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "audio_stream_get_playback_position completed");
@@ -411,15 +519,103 @@ mcp::JsonValue handle_stream_seek(const mcp::JsonValue& args) {
     std::string path = np->GetString();
     auto* node = find_node(path);
     if (!node) {
-        return error_json("AudioStreamPlayer node not found: " + path);
+        return error_json("AudioStreamPlayer node not found: " + path + NODE_PATH_HINT);
     }
-    auto* player = godot::Object::cast_to<godot::AudioStreamPlayer>(node);
-    if (!player) {
-        return error_json("node is not an AudioStreamPlayer: " + path);
+    auto ap = resolve_audio_player(node);
+    if (!ap.is_valid()) {
+        return error_json("node is not an AudioStreamPlayer/AudioStreamPlayer2D/AudioStreamPlayer3D: " + path + " (actual class: " + to_std(node->get_class()) + ")");
     }
     float to_pos = static_cast<float>(tp->IsDouble() ? tp->GetDouble() : static_cast<double>(tp->GetInt()));
-    player->seek(to_pos);
+    ap.seek(to_pos);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "audio_stream_seek completed");
+    return ok_json();
+}
+
+mcp::JsonValue handle_bus_set_solo(const mcp::JsonValue& args) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "audio_bus_set_solo called");
+    auto* server = godot::AudioServer::get_singleton();
+    if (!server) {
+        return error_json("AudioServer not available");
+    }
+    auto* bi = args.Find("bus_index");
+    if (!bi || !bi->IsInt()) {
+        return error_json("missing required parameter: bus_index");
+    }
+    auto* sl = args.Find("solo");
+    if (!sl || !sl->IsBool()) {
+        return error_json("missing required parameter: solo");
+    }
+    int idx = bi->GetInt();
+    int count = server->get_bus_count();
+    if (idx < 0 || idx >= count) {
+        return error_json("audio bus not found at index: " + std::to_string(idx));
+    }
+    server->set_bus_solo(idx, sl->GetBool());
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "audio_bus_set_solo completed");
+    return ok_json();
+}
+
+mcp::JsonValue handle_get_output_device_list(const mcp::JsonValue&) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "audio_get_output_device_list called");
+    auto* server = godot::AudioServer::get_singleton();
+    if (!server) {
+        return error_json("AudioServer not available");
+    }
+    auto devices = server->get_output_device_list();
+    mcp::JsonValue arr(mcp::JsonValue::array_tag);
+    for (int i = 0; i < devices.size(); i++) {
+        arr.PushBack(mcp::JsonValue(to_std(devices[i])));
+    }
+    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    r["result"] = std::move(arr);
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "audio_get_output_device_list completed");
+    return r;
+}
+
+mcp::JsonValue handle_set_output_device(const mcp::JsonValue& args) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "audio_set_output_device called");
+    auto* server = godot::AudioServer::get_singleton();
+    if (!server) {
+        return error_json("AudioServer not available");
+    }
+    auto* dv = args.Find("device");
+    if (!dv || !dv->IsString()) {
+        return error_json("missing required parameter: device");
+    }
+    server->set_output_device(godot::String(dv->GetString().c_str()));
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "audio_set_output_device completed");
+    return ok_json();
+}
+
+mcp::JsonValue handle_get_input_device_list(const mcp::JsonValue&) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "audio_get_input_device_list called");
+    auto* server = godot::AudioServer::get_singleton();
+    if (!server) {
+        return error_json("AudioServer not available");
+    }
+    auto devices = server->get_input_device_list();
+    mcp::JsonValue arr(mcp::JsonValue::array_tag);
+    for (int i = 0; i < devices.size(); i++) {
+        arr.PushBack(mcp::JsonValue(to_std(devices[i])));
+    }
+    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    r["result"] = std::move(arr);
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "audio_get_input_device_list completed");
+    return r;
+}
+
+mcp::JsonValue handle_set_input_device(const mcp::JsonValue& args) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "audio_set_input_device called");
+    auto* server = godot::AudioServer::get_singleton();
+    if (!server) {
+        return error_json("AudioServer not available");
+    }
+    auto* dv = args.Find("device");
+    if (!dv || !dv->IsString()) {
+        return error_json("missing required parameter: device");
+    }
+    server->set_input_device(godot::String(dv->GetString().c_str()));
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "audio_set_input_device completed");
     return ok_json();
 }
 

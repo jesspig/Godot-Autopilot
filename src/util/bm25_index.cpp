@@ -4,6 +4,10 @@
 #include <cctype>
 #include <cmath>
 
+// P2-11：查询词是工具名连续子串的场景（如用户查 "sprite frames"，分词为
+// ["sprite","frames"]，而 "frames" 不单独出现在索引词中）可能被 BM25 低分过滤。
+// 在 search() 中对名称子串命中额外加分（+2.0），保证工具名子串匹配不会漏掉。
+
 namespace godot_self_driving {
 
 std::vector<std::string> Bm25Index::tokenize(const std::string& text) const {
@@ -47,8 +51,22 @@ void Bm25Index::add_entry(const std::string& name, const std::string& descriptio
 std::vector<Bm25Result> Bm25Index::search(const SearchQuery& query) const {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    if (query.text.empty() || docs_.empty()) {
+    if (docs_.empty()) {
         return {};
+    }
+
+    if (query.text.empty()) {
+        if (!query.category) {
+            return {};
+        }
+        std::vector<Bm25Result> results;
+        for (const auto& doc : docs_) {
+            if (doc.category != *query.category) {
+                continue;
+            }
+            results.push_back({doc.name, 0.0});
+        }
+        return results;
     }
 
     auto query_tokens = tokenize(query.text);
@@ -95,10 +113,29 @@ std::vector<Bm25Result> Bm25Index::search(const SearchQuery& query) const {
 
     size_t N = candidates.size();
 
+    // P2-11：去非字母数字 + 小写的紧凑串，用于名称子串匹配。
+    auto compact = [](const std::string& text) {
+        std::string out;
+        for (unsigned char c : text) {
+            if (std::isalnum(c)) {
+                out.push_back(static_cast<char>(std::tolower(c)));
+            }
+        }
+        return out;
+    };
+    const std::string query_compact = compact(query.text);
+
     std::vector<Bm25Result> results;
     results.reserve(candidates.size());
     for (size_t idx : candidates) {
         double score = compute_bm25(query_tokens, docs_[idx], N, df);
+        // P2-11：查询紧凑串是 name 紧凑串的子串时加分，避免名称子串匹配被低分过滤。
+        if (!query_compact.empty()) {
+            const std::string name_compact = compact(docs_[idx].name);
+            if (!name_compact.empty() && name_compact.find(query_compact) != std::string::npos) {
+                score += 2.0;
+            }
+        }
         if (score > 0.0) {
             results.push_back({docs_[idx].name, score});
         }

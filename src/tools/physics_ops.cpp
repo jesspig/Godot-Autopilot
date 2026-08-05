@@ -3,6 +3,12 @@
 #include "util/variant_json.hpp"
 #include <mcp/JsonValue.hpp>
 #include <godot_cpp/classes/physics_server2d.hpp>
+#include <godot_cpp/classes/collision_object2d.hpp>
+#include <godot_cpp/classes/collision_object3d.hpp>
+#include <godot_cpp/classes/editor_interface.hpp>
+#include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/classes/viewport.hpp>
+#include <godot_cpp/classes/world2d.hpp>
 #include <godot_cpp/classes/physics_server3d.hpp>
 #include <godot_cpp/classes/physics_direct_space_state2d.hpp>
 #include <godot_cpp/classes/physics_direct_space_state3d.hpp>
@@ -16,7 +22,9 @@
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
 #include <godot_cpp/variant/vector2.hpp>
+#include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/variant/vector3.hpp>
+#include <godot_cpp/core/object.hpp>
 #include <godot_cpp/variant/transform2d.hpp>
 #include <godot_cpp/variant/transform3d.hpp>
 #include <unordered_map>
@@ -65,8 +73,8 @@ godot::Vector2 parse_vec2(const JV& j) {
     auto* x = j.Find("x");
     auto* y = j.Find("y");
     return godot::Vector2(
-        static_cast<float>(x ? x->GetDouble() : 0.0),
-        static_cast<float>(y ? y->GetDouble() : 0.0));
+        static_cast<float>(x && x->IsNumber() ? (x->IsInt() ? static_cast<double>(x->GetInt()) : x->GetDouble()) : 0.0),
+        static_cast<float>(y && y->IsNumber() ? (y->IsInt() ? static_cast<double>(y->GetInt()) : y->GetDouble()) : 0.0));
 }
 
 godot::Vector3 parse_vec3(const JV& j) {
@@ -74,15 +82,15 @@ godot::Vector3 parse_vec3(const JV& j) {
     auto* y = j.Find("y");
     auto* z = j.Find("z");
     return godot::Vector3(
-        static_cast<float>(x ? x->GetDouble() : 0.0),
-        static_cast<float>(y ? y->GetDouble() : 0.0),
-        static_cast<float>(z ? z->GetDouble() : 0.0));
+        static_cast<float>(x && x->IsNumber() ? (x->IsInt() ? static_cast<double>(x->GetInt()) : x->GetDouble()) : 0.0),
+        static_cast<float>(y && y->IsNumber() ? (y->IsInt() ? static_cast<double>(y->GetInt()) : y->GetDouble()) : 0.0),
+        static_cast<float>(z && z->IsNumber() ? (z->IsInt() ? static_cast<double>(z->GetInt()) : z->GetDouble()) : 0.0));
 }
 
 godot::Transform2D parse_t2d(const JV& j) {
     godot::Transform2D t;
     if (j.Contains("origin")) t.set_origin(parse_vec2(j["origin"]));
-    if (j.Contains("rotation")) t.set_rotation(static_cast<float>(j["rotation"].GetDouble()));
+    if (j.Contains("rotation")) t.set_rotation(static_cast<float>(j["rotation"].IsNumber() ? (j["rotation"].IsInt() ? static_cast<double>(j["rotation"].GetInt()) : j["rotation"].GetDouble()) : 0.0));
     if (j.Contains("scale")) t.set_scale(parse_vec2(j["scale"]));
     return t;
 }
@@ -96,9 +104,9 @@ godot::Basis parse_basis(const JV& j) {
             if (r.IsArray()) {
                 size_t rsz = r.Size();
                 b.rows[i] = godot::Vector3(
-                    static_cast<float>(rsz > 0 ? r[0].GetDouble() : 0.0),
-                    static_cast<float>(rsz > 1 ? r[1].GetDouble() : 0.0),
-                    static_cast<float>(rsz > 2 ? r[2].GetDouble() : 0.0));
+                    static_cast<float>(rsz > 0 ? (r[0].IsNumber() ? (r[0].IsInt() ? static_cast<double>(r[0].GetInt()) : r[0].GetDouble()) : 0.0) : 0.0),
+                    static_cast<float>(rsz > 1 ? (r[1].IsNumber() ? (r[1].IsInt() ? static_cast<double>(r[1].GetInt()) : r[1].GetDouble()) : 0.0) : 0.0),
+                    static_cast<float>(rsz > 2 ? (r[2].IsNumber() ? (r[2].IsInt() ? static_cast<double>(r[2].GetInt()) : r[2].GetDouble()) : 0.0) : 0.0));
             }
         }
     }
@@ -180,12 +188,31 @@ JV handle_2d_space_get_direct_state(const JV& args) {
     JV ret(JV::object_tag); ret["result"] = std::move(r); return ret;
 }
 
+static godot::RID auto_detect_2d_space() {
+    auto* editor = godot::EditorInterface::get_singleton();
+    if (!editor) return godot::RID();
+    auto* root = editor->get_edited_scene_root();
+    if (!root) return godot::RID();
+    auto* viewport = root->get_viewport();
+    if (!viewport) return godot::RID();
+    auto world = viewport->find_world_2d();
+    if (!world.is_valid()) return godot::RID();
+    return world->get_space();
+}
+
 JV handle_2d_ray_cast(const JV& args) {
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_2d_ray_cast called");
-    godot::RID space = resolve(args, "space_rid");
+    auto* it_rid = args.Find("space_rid");
+    godot::RID space;
+    if (it_rid && it_rid->IsNumber()) {
+        space = resolve(args, "space_rid");
+    }
+    if (!space.is_valid()) {
+        space = auto_detect_2d_space();
+    }
     auto* it_from = args.Find("from");
     auto* it_to = args.Find("to");
-    if (!space.is_valid()) { JV r(JV::object_tag); r["error"] = JV("missing or invalid required parameter: space_rid"); return r; }
+    if (!space.is_valid()) { JV r(JV::object_tag); r["error"] = JV("could not resolve 2D physics space: provide space_rid or ensure a scene with a 2D viewport is open"); return r; }
     if (!it_from || !it_from->IsObject()) { JV r(JV::object_tag); r["error"] = JV("missing required parameter: from"); return r; }
     if (!it_to || !it_to->IsObject()) { JV r(JV::object_tag); r["error"] = JV("missing required parameter: to"); return r; }
     auto* ps = godot::PhysicsServer2D::get_singleton();
@@ -855,7 +882,7 @@ JV handle_3d_space_set_debug(const JV& args) {
     if (args.Contains("solver_iterations"))
         ps->space_set_param(space, godot::PhysicsServer3D::SPACE_PARAM_SOLVER_ITERATIONS, static_cast<float>(args["solver_iterations"].GetInt()));
     if (args.Contains("contact_max_allowed_penetration"))
-        ps->space_set_param(space, godot::PhysicsServer3D::SPACE_PARAM_CONTACT_MAX_ALLOWED_PENETRATION, static_cast<float>(args["contact_max_allowed_penetration"].GetDouble()));
+        ps->space_set_param(space, godot::PhysicsServer3D::SPACE_PARAM_CONTACT_MAX_ALLOWED_PENETRATION, static_cast<float>(args["contact_max_allowed_penetration"].IsNumber() ? (args["contact_max_allowed_penetration"].IsInt() ? static_cast<double>(args["contact_max_allowed_penetration"].GetInt()) : args["contact_max_allowed_penetration"].GetDouble()) : 0.0));
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_3d_space_set_debug completed");
     JV r(JV::object_tag); r["result"] = JV("ok"); return r;
 }
@@ -877,6 +904,192 @@ JV handle_3d_soft_body_set_mesh(const JV& args) {
     godot::PhysicsServer3D::get_singleton()->soft_body_set_mesh(soft, mesh);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_3d_soft_body_set_mesh completed");
     JV r(JV::object_tag); r["result"] = JV("ok"); return r;
+}
+
+JV handle_3d_shape_create(const JV&) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_3d_shape_create called");
+    auto* ps = godot::PhysicsServer3D::get_singleton();
+    if (!ps) { JV r(JV::object_tag); r["error"] = JV("PhysicsServer3D not available"); return r; }
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_3d_shape_create completed");
+    JV r(JV::object_tag); r["result"] = rid_result(ps->sphere_shape_create()); return r;
+}
+
+JV handle_3d_shape_set_data(const JV& args) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_3d_shape_set_data called");
+    godot::RID shape = resolve(args, "rid");
+    if (!shape.is_valid()) { JV r(JV::object_tag); r["error"] = JV("missing or invalid required parameter: rid"); return r; }
+    auto* dp = args.Find("data");
+    if (!dp) { JV r(JV::object_tag); r["error"] = JV("missing required parameter: data"); return r; }
+    godot::PhysicsServer3D::get_singleton()->shape_set_data(shape, VariantJson::deserialize(*dp));
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_3d_shape_set_data completed");
+    JV r(JV::object_tag); r["result"] = JV("ok"); return r;
+}
+
+JV handle_3d_body_add_shape(const JV& args) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_3d_body_add_shape called");
+    godot::RID body = resolve(args, "rid");
+    godot::RID shape = resolve(args, "shape_rid");
+    if (!body.is_valid()) { JV r(JV::object_tag); r["error"] = JV("missing or invalid required parameter: rid"); return r; }
+    if (!shape.is_valid()) { JV r(JV::object_tag); r["error"] = JV("missing or invalid required parameter: shape_rid"); return r; }
+    godot::Transform3D t;
+    if (args.Contains("transform")) t = parse_t3d(args["transform"]);
+    bool disabled = false;
+    if (args.Contains("disabled")) disabled = args["disabled"].GetBool();
+    godot::PhysicsServer3D::get_singleton()->body_add_shape(body, shape, t, disabled);
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_3d_body_add_shape completed");
+    JV r(JV::object_tag); r["result"] = JV("ok"); return r;
+}
+
+JV handle_3d_body_set_param(const JV& args) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_3d_body_set_param called");
+    godot::RID body = resolve(args, "rid");
+    if (!body.is_valid()) { JV r(JV::object_tag); r["error"] = JV("missing or invalid required parameter: rid"); return r; }
+    auto* pp = args.Find("param");
+    auto* vp = args.Find("value");
+    if (!pp || !pp->IsNumber()) { JV r(JV::object_tag); r["error"] = JV("missing required parameter: param"); return r; }
+    if (!vp || !vp->IsNumber()) { JV r(JV::object_tag); r["error"] = JV("missing required parameter: value"); return r; }
+    int param = static_cast<int>(pp->IsInt() ? pp->GetInt() : static_cast<int64_t>(pp->GetDouble()));
+    float val = static_cast<float>(vp->IsDouble() ? vp->GetDouble() : static_cast<double>(vp->GetInt()));
+    godot::PhysicsServer3D::get_singleton()->body_set_param(body, static_cast<godot::PhysicsServer3D::BodyParameter>(param), val);
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_3d_body_set_param completed");
+    JV r(JV::object_tag); r["result"] = JV("ok"); return r;
+}
+
+JV handle_3d_area_set_param(const JV& args) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_3d_area_set_param called");
+    godot::RID area = resolve(args, "rid");
+    if (!area.is_valid()) { JV r(JV::object_tag); r["error"] = JV("missing or invalid required parameter: rid"); return r; }
+    auto* pp = args.Find("param");
+    auto* vp = args.Find("value");
+    if (!pp || !pp->IsNumber()) { JV r(JV::object_tag); r["error"] = JV("missing required parameter: param"); return r; }
+    if (!vp) { JV r(JV::object_tag); r["error"] = JV("missing required parameter: value"); return r; }
+    int param = static_cast<int>(pp->IsInt() ? pp->GetInt() : static_cast<int64_t>(pp->GetDouble()));
+    godot::PhysicsServer3D::get_singleton()->area_set_param(area, static_cast<godot::PhysicsServer3D::AreaParameter>(param), VariantJson::deserialize(*vp));
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_3d_area_set_param completed");
+    JV r(JV::object_tag); r["result"] = JV("ok"); return r;
+}
+
+JV handle_3d_space_set_param(const JV& args) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_3d_space_set_param called");
+    godot::RID space = resolve(args, "space_rid");
+    if (!space.is_valid()) { JV r(JV::object_tag); r["error"] = JV("missing or invalid required parameter: space_rid"); return r; }
+    auto* pp = args.Find("param");
+    auto* vp = args.Find("value");
+    if (!pp || !pp->IsNumber()) { JV r(JV::object_tag); r["error"] = JV("missing required parameter: param"); return r; }
+    if (!vp || !vp->IsNumber()) { JV r(JV::object_tag); r["error"] = JV("missing required parameter: value"); return r; }
+    int param = static_cast<int>(pp->IsInt() ? pp->GetInt() : static_cast<int64_t>(pp->GetDouble()));
+    float val = static_cast<float>(vp->IsDouble() ? vp->GetDouble() : static_cast<double>(vp->GetInt()));
+    godot::PhysicsServer3D::get_singleton()->space_set_param(space, static_cast<godot::PhysicsServer3D::SpaceParameter>(param), val);
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_3d_space_set_param completed");
+    JV r(JV::object_tag); r["result"] = JV("ok"); return r;
+}
+
+JV handle_3d_area_set_transform(const JV& args) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_3d_area_set_transform called");
+    godot::RID area = resolve(args, "rid");
+    auto* tp = args.Find("transform");
+    if (!area.is_valid()) { JV r(JV::object_tag); r["error"] = JV("missing or invalid required parameter: rid"); return r; }
+    if (!tp || !tp->IsObject()) { JV r(JV::object_tag); r["error"] = JV("missing required parameter: transform"); return r; }
+    godot::PhysicsServer3D::get_singleton()->area_set_transform(area, parse_t3d(*tp));
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_3d_area_set_transform completed");
+    JV r(JV::object_tag); r["result"] = JV("ok"); return r;
+}
+
+JV handle_3d_body_set_transform(const JV& args) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_3d_body_set_transform called");
+    godot::RID body = resolve(args, "rid");
+    auto* tp = args.Find("transform");
+    if (!body.is_valid()) { JV r(JV::object_tag); r["error"] = JV("missing or invalid required parameter: rid"); return r; }
+    if (!tp || !tp->IsObject()) { JV r(JV::object_tag); r["error"] = JV("missing required parameter: transform"); return r; }
+    godot::PhysicsServer3D::get_singleton()->body_set_state(body, godot::PhysicsServer3D::BODY_STATE_TRANSFORM, parse_t3d(*tp));
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_3d_body_set_transform completed");
+    JV r(JV::object_tag); r["result"] = JV("ok"); return r;
+}
+
+JV handle_2d_shape_create(const JV&) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_2d_shape_create called");
+    auto* ps = godot::PhysicsServer2D::get_singleton();
+    if (!ps) { JV r(JV::object_tag); r["error"] = JV("PhysicsServer2D not available"); return r; }
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_2d_shape_create completed");
+    JV r(JV::object_tag); r["result"] = rid_result(ps->circle_shape_create()); return r;
+}
+
+JV handle_2d_shape_set_data(const JV& args) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_2d_shape_set_data called");
+    godot::RID shape = resolve(args, "rid");
+    if (!shape.is_valid()) { JV r(JV::object_tag); r["error"] = JV("missing or invalid required parameter: rid"); return r; }
+    auto* dp = args.Find("data");
+    if (!dp) { JV r(JV::object_tag); r["error"] = JV("missing required parameter: data"); return r; }
+    godot::PhysicsServer2D::get_singleton()->shape_set_data(shape, VariantJson::deserialize(*dp));
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_2d_shape_set_data completed");
+    JV r(JV::object_tag); r["result"] = JV("ok"); return r;
+}
+
+JV handle_physics_node_get_rid(const JV& args) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_node_get_rid called");
+    auto* pp = args.Find("path");
+    if (!pp || !pp->IsString()) { JV r(JV::object_tag); r["error"] = JV("missing required parameter: path"); return r; }
+    std::string path = pp->GetString();
+    auto* editor = godot::EditorInterface::get_singleton();
+    if (!editor) { JV r(JV::object_tag); r["error"] = JV("EditorInterface not available"); return r; }
+    auto* root = editor->get_edited_scene_root();
+    if (!root) { JV r(JV::object_tag); r["error"] = JV("no edited scene root"); return r; }
+    std::string clean = path;
+    if (!clean.empty() && clean[0] == '/') clean = clean.substr(1);
+    if (clean.size() > 5 && clean.compare(0, 5, "root/") == 0) clean = clean.substr(5);
+    godot::Node* node = nullptr;
+    if (clean.empty() || clean == to_std(root->get_name())) {
+        node = root;
+    } else {
+        node = root->get_node_or_null(godot::NodePath(godot::String(clean.c_str())));
+        if (!node) {
+            std::string root_name = to_std(root->get_name());
+            if (clean.size() > root_name.size() + 1 &&
+                clean.compare(0, root_name.size(), root_name) == 0 &&
+                clean[root_name.size()] == '/') {
+                std::string sub = clean.substr(root_name.size() + 1);
+                if (!sub.empty()) {
+                    node = root->get_node_or_null(godot::NodePath(godot::String(sub.c_str())));
+                }
+            }
+        }
+    }
+    if (!node) { JV r(JV::object_tag); r["error"] = JV("node not found: " + path); return r; }
+    auto* co2d = godot::Object::cast_to<godot::CollisionObject2D>(node);
+    if (co2d) { LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_node_get_rid completed"); JV r(JV::object_tag); r["result"] = rid_result(co2d->get_rid()); return r; }
+    auto* co3d = godot::Object::cast_to<godot::CollisionObject3D>(node);
+    if (co3d) { LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "physics_node_get_rid completed"); JV r(JV::object_tag); r["result"] = rid_result(co3d->get_rid()); return r; }
+    JV r(JV::object_tag); r["error"] = JV("node is not a CollisionObject2D or CollisionObject3D: " + path); return r;
+}
+
+JV handle_resolve_object(const JV& args) {
+    auto* idp = args.Find("object_id");
+    if (!idp || !idp->IsInt()) {
+        JV r(JV::object_tag); r["error"] = JV("missing required parameter: object_id (integer)"); return r;
+    }
+    uint64_t object_id = static_cast<uint64_t>(idp->GetInt());
+    godot::Object* obj = godot::ObjectDB::get_instance(object_id);
+    if (!obj) {
+        JV r(JV::object_tag); r["error"] = JV("no object found for object_id: " + std::to_string(object_id)); return r;
+    }
+    JV r(JV::object_tag);
+    r["result"] = JV("ok");
+    r["class"] = JV(to_std(obj->get_class()));
+    godot::Node* node = godot::Object::cast_to<godot::Node>(obj);
+    if (node) {
+        if (node->is_inside_tree()) {
+            r["node_path"] = JV(to_std(node->get_path()));
+        }
+        r["name"] = JV(to_std(node->get_name()));
+    }
+    auto res = godot::Ref<godot::Resource>(obj);
+    if (res.is_valid()) {
+        std::string res_path = to_std(res->get_path());
+        if (!res_path.empty()) {
+            r["resource_path"] = JV(res_path);
+        }
+    }
+    return r;
 }
 
 } // namespace physics_ops

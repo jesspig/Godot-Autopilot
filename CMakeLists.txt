@@ -60,26 +60,50 @@ add_library(godot-self-driving SHARED
     src/main.cpp
     src/core/mode_detector.cpp
     src/core/log_system.cpp
+    src/core/resource_registry.cpp
+    src/core/scene_dirty_tracker.cpp
     src/core/server_context.cpp
     src/resources/resource_handlers.cpp
+    src/resources/debugger_resources.cpp
     src/prompts/prompt_handlers.cpp
+    src/prompts/debugger_prompts.cpp
+    src/prompts/prompt_tool_usage.cpp
+    src/prompts/prompt_keycode_reference.cpp
+    src/runtime/game_bridge.cpp
     src/tools/audio_ops.cpp
+    src/tools/capture_ops.cpp
+    src/tools/code_exec_ops.cpp
     src/tools/config_ops.cpp
+    src/tools/display_ops.cpp
+    src/tools/input_map_ops.cpp
+    src/tools/log_ops.cpp
+    src/tools/os_ops.cpp
+    src/tools/scene_tree_ops.cpp
+    src/tools/text_ops.cpp
+    src/tools/tilemap_ops.cpp
+    src/tools/tileset_ops.cpp
     src/tools/debug_ops.cpp
+    src/tools/debugger_ops.cpp
     src/tools/doc_ops.cpp
     src/tools/editor_ops.cpp
+    src/tools/group_ops.cpp
     src/tools/input_ops.cpp
     src/tools/nav_ops.cpp
     src/tools/physics_ops.cpp
     src/tools/property_ops.cpp
     src/tools/register_all.cpp
+    src/tools/schema_builder.cpp
     src/tools/render_ops.cpp
     src/tools/resource_ops.cpp
+    src/tools/runtime_ops.cpp
     src/tools/scene_ops.cpp
     src/tools/script_ops.cpp
+    src/tools/spriteframes_ops.cpp
     src/tools/tool_catalog.cpp
     src/util/bm25_index.cpp
     src/util/variant_json.cpp
+    src/util/error_util.cpp
+    src/util/readback_util.cpp
     src/ui/mcp_status_bar.cpp
     src/ui/mcp_log_dock.cpp)
 

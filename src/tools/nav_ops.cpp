@@ -44,8 +44,8 @@ JV vec2_to_json(const godot::Vector2& v) {
 godot::Vector2 json_to_vec2(const JV& j) {
     auto* x = j.Find("x"); auto* y = j.Find("y");
     return godot::Vector2(
-        static_cast<float>(x ? x->GetDouble() : 0.0),
-        static_cast<float>(y ? y->GetDouble() : 0.0));
+        static_cast<float>(x && x->IsNumber() ? (x->IsInt() ? static_cast<double>(x->GetInt()) : x->GetDouble()) : 0.0),
+        static_cast<float>(y && y->IsNumber() ? (y->IsInt() ? static_cast<double>(y->GetInt()) : y->GetDouble()) : 0.0));
 }
 
 JV vec3_to_json(const godot::Vector3& v) {
@@ -55,9 +55,9 @@ JV vec3_to_json(const godot::Vector3& v) {
 godot::Vector3 json_to_vec3(const JV& j) {
     auto* x = j.Find("x"); auto* y = j.Find("y"); auto* z = j.Find("z");
     return godot::Vector3(
-        static_cast<float>(x ? x->GetDouble() : 0.0),
-        static_cast<float>(y ? y->GetDouble() : 0.0),
-        static_cast<float>(z ? z->GetDouble() : 0.0));
+        static_cast<float>(x && x->IsNumber() ? (x->IsInt() ? static_cast<double>(x->GetInt()) : x->GetDouble()) : 0.0),
+        static_cast<float>(y && y->IsNumber() ? (y->IsInt() ? static_cast<double>(y->GetInt()) : y->GetDouble()) : 0.0),
+        static_cast<float>(z && z->IsNumber() ? (z->IsInt() ? static_cast<double>(z->GetInt()) : z->GetDouble()) : 0.0));
 }
 
 } // namespace
@@ -156,8 +156,8 @@ JV handle_2d_agent_create(const JV& args) {
     ns->agent_set_map(agent, map);
     ns->agent_set_position(agent, json_to_vec2(*it_pos));
 
-    if (args.Contains("radius")) ns->agent_set_radius(agent, static_cast<float>(args["radius"].GetDouble()));
-    if (args.Contains("max_speed")) ns->agent_set_max_speed(agent, static_cast<float>(args["max_speed"].GetDouble()));
+    if (args.Contains("radius")) ns->agent_set_radius(agent, static_cast<float>(args["radius"].IsNumber() ? (args["radius"].IsInt() ? static_cast<double>(args["radius"].GetInt()) : args["radius"].GetDouble()) : 0.0));
+    if (args.Contains("max_speed")) ns->agent_set_max_speed(agent, static_cast<float>(args["max_speed"].IsNumber() ? (args["max_speed"].IsInt() ? static_cast<double>(args["max_speed"].GetInt()) : args["max_speed"].GetDouble()) : 0.0));
     if (args.Contains("avoidance_enabled")) ns->agent_set_avoidance_enabled(agent, args["avoidance_enabled"].GetBool());
 
     LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools, "navigation_2d_agent_create completed");
@@ -194,8 +194,8 @@ JV handle_3d_map_create(const JV& args) {
     bool active = act ? act->GetBool() : false;
     ns->map_set_active(map, active);
 
-    if (args.Contains("cell_size")) ns->map_set_cell_size(map, static_cast<float>(args["cell_size"].GetDouble()));
-    if (args.Contains("cell_height")) ns->map_set_cell_height(map, static_cast<float>(args["cell_height"].GetDouble()));
+    if (args.Contains("cell_size")) ns->map_set_cell_size(map, static_cast<float>(args["cell_size"].IsNumber() ? (args["cell_size"].IsInt() ? static_cast<double>(args["cell_size"].GetInt()) : args["cell_size"].GetDouble()) : 0.0));
+    if (args.Contains("cell_height")) ns->map_set_cell_height(map, static_cast<float>(args["cell_height"].IsNumber() ? (args["cell_height"].IsInt() ? static_cast<double>(args["cell_height"].GetInt()) : args["cell_height"].GetDouble()) : 0.0));
     if (args.Contains("up")) ns->map_set_up(map, json_to_vec3(args["up"]));
 
     LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools, "navigation_3d_map_create completed");
@@ -300,9 +300,9 @@ JV handle_3d_agent_create(const JV& args) {
     ns->agent_set_map(agent, map);
     ns->agent_set_position(agent, json_to_vec3(*it_pos));
 
-    if (args.Contains("radius")) ns->agent_set_radius(agent, static_cast<float>(args["radius"].GetDouble()));
-    if (args.Contains("height")) ns->agent_set_height(agent, static_cast<float>(args["height"].GetDouble()));
-    if (args.Contains("max_speed")) ns->agent_set_max_speed(agent, static_cast<float>(args["max_speed"].GetDouble()));
+    if (args.Contains("radius")) ns->agent_set_radius(agent, static_cast<float>(args["radius"].IsNumber() ? (args["radius"].IsInt() ? static_cast<double>(args["radius"].GetInt()) : args["radius"].GetDouble()) : 0.0));
+    if (args.Contains("height")) ns->agent_set_height(agent, static_cast<float>(args["height"].IsNumber() ? (args["height"].IsInt() ? static_cast<double>(args["height"].GetInt()) : args["height"].GetDouble()) : 0.0));
+    if (args.Contains("max_speed")) ns->agent_set_max_speed(agent, static_cast<float>(args["max_speed"].IsNumber() ? (args["max_speed"].IsInt() ? static_cast<double>(args["max_speed"].GetInt()) : args["max_speed"].GetDouble()) : 0.0));
     if (args.Contains("use_3d_avoidance")) ns->agent_set_use_3d_avoidance(agent, args["use_3d_avoidance"].GetBool());
 
     LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools, "navigation_3d_agent_create completed");
@@ -361,7 +361,7 @@ JV handle_3d_map_set_cell_size(const JV& args) {
     auto* ns = godot::NavigationServer3D::get_singleton();
     if (!ns) { JV r(JV::object_tag); r["error"] = JV("NavigationServer3D not available"); return r; }
 
-    ns->map_set_cell_size(rid_from_int(it_map->GetInt()), static_cast<float>(it_cell->GetDouble()));
+    ns->map_set_cell_size(rid_from_int(it_map->GetInt()), static_cast<float>(it_cell->IsInt() ? static_cast<double>(it_cell->GetInt()) : it_cell->GetDouble()));
 
     LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools, "navigation_3d_map_set_cell_size completed");
     JV r(JV::object_tag); r["result"] = JV(true); return r;
@@ -410,8 +410,8 @@ JV handle_3d_obstacle_create(const JV& args) {
     ns->obstacle_set_map(obstacle, map);
     ns->obstacle_set_position(obstacle, json_to_vec3(*it_pos));
 
-    if (args.Contains("radius")) ns->obstacle_set_radius(obstacle, static_cast<float>(args["radius"].GetDouble()));
-    if (args.Contains("height")) ns->obstacle_set_height(obstacle, static_cast<float>(args["height"].GetDouble()));
+    if (args.Contains("radius")) ns->obstacle_set_radius(obstacle, static_cast<float>(args["radius"].IsNumber() ? (args["radius"].IsInt() ? static_cast<double>(args["radius"].GetInt()) : args["radius"].GetDouble()) : 0.0));
+    if (args.Contains("height")) ns->obstacle_set_height(obstacle, static_cast<float>(args["height"].IsNumber() ? (args["height"].IsInt() ? static_cast<double>(args["height"].GetInt()) : args["height"].GetDouble()) : 0.0));
 
     LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools, "navigation_3d_obstacle_create completed");
     JV r(JV::object_tag);

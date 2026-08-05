@@ -6,6 +6,9 @@
 
 namespace godot_self_driving {
 
+std::string prompt_tool_usage();
+std::string prompt_keycode_reference();
+
 void register_all_prompts(mcp::McpServer& server, CommandQueue& queue);
 
 } // namespace godot_self_driving

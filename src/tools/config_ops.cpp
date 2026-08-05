@@ -68,7 +68,37 @@ mcp::JsonValue handle_project_settings_set(const mcp::JsonValue& args) {
         return e;
     }
     std::string name = np->GetString();
-    godot::Variant value = VariantJson::deserialize(*vp);
+    godot::Variant value;
+    if (vp->IsObject()) {
+        auto* type_field = vp->Find("type");
+        auto* value_field = vp->Find("value");
+        if (type_field && type_field->IsString() && value_field) {
+            // Format: {"type": "String", "value": "hello"}
+            value = VariantJson::deserialize(*value_field, type_field->GetString());
+        } else {
+            // Format: bare object or alternative format — let deserialize infer
+            value = VariantJson::deserialize(*vp);
+        }
+    } else if (vp->IsInt()) {
+        // Bare int: deserialize with "int" type hint for proper int storage
+        value = VariantJson::deserialize(*vp, "int");
+    } else if (vp->IsDouble()) {
+        // Bare float: deserialize with "float" type hint
+        value = VariantJson::deserialize(*vp, "float");
+    } else if (vp->IsBool()) {
+        // Bare bool: deserialize with "bool" type hint
+        value = VariantJson::deserialize(*vp, "bool");
+    } else if (vp->IsString()) {
+        // Bare string: infer type from existing setting value
+        auto existing = godot::ProjectSettings::get_singleton()->get_setting(godot::String(name.c_str()));
+        if (existing.get_type() != godot::Variant::NIL) {
+            value = VariantJson::deserialize(*vp, to_std(godot::Variant::get_type_name(existing.get_type())));
+        } else {
+            value = VariantJson::deserialize(*vp, "String");
+        }
+    } else {
+        value = VariantJson::deserialize(*vp);
+    }
     ps->set_setting(godot::String(name.c_str()), value);
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = mcp::JsonValue("ok");
@@ -107,8 +137,14 @@ mcp::JsonValue handle_project_settings_save(const mcp::JsonValue&) {
         return e;
     }
     godot::Error err = ps->save();
+    if (err != godot::Error::OK) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("project settings save failed (error code " +
+                                    std::to_string(static_cast<int64_t>(err)) + ")");
+        return e;
+    }
     mcp::JsonValue r(mcp::JsonValue::object_tag);
-    r["result"] = mcp::JsonValue(static_cast<int64_t>(err));
+    r["result"] = mcp::JsonValue("ok");
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "project_settings_save completed");
     return r;
 }

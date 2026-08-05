@@ -3,7 +3,13 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <godot_cpp/classes/class_db_singleton.hpp>
+#include <godot_cpp/classes/editor_interface.hpp>
+#include <godot_cpp/classes/global_constants.hpp>
+#include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/core/object.hpp>
+#include <godot_cpp/classes/resource.hpp>
+#include <godot_cpp/classes/resource_loader.hpp>
 
 namespace godot_self_driving {
 
@@ -144,14 +150,49 @@ godot::Variant deserialize_inferred(const mcp::JsonValue& j) {
         return godot::Variant(arr);
     }
     if (j.IsObject()) {
+        auto& obj = j.GetObject();
+        auto ref_it = obj.find("__node_ref__");
+        if (ref_it != obj.end()) {
+            godot::String node_path_str(ref_it->second.GetString().c_str());
+            auto* editor = godot::EditorInterface::get_singleton();
+            if (editor) {
+                auto* scene_root = editor->get_edited_scene_root();
+                if (scene_root) {
+                    godot::Node* top = scene_root;
+                    while (top->get_parent()) {
+                        top = top->get_parent();
+                    }
+                    godot::Node* found = top->get_node_or_null(godot::NodePath(node_path_str));
+                    if (found) {
+                        return godot::Variant(static_cast<godot::Object*>(found));
+                    }
+                }
+            }
+            return godot::Variant();
+        }
+        auto oid_s_it = obj.find("object_id_str");
+        if (oid_s_it != obj.end() && oid_s_it->second.IsString()) {
+            try {
+                int64_t id = std::stoll(oid_s_it->second.GetString());
+                auto* op = godot::ObjectDB::get_instance(static_cast<uint64_t>(id));
+                if (op) return godot::Variant(op);
+            } catch (...) {}
+        }
+        auto oid_i_it = obj.find("object_id");
+        if (oid_i_it != obj.end() && oid_i_it->second.IsInt()) {
+            auto* op = godot::ObjectDB::get_instance(static_cast<uint64_t>(oid_i_it->second.GetInt()));
+            if (op) return godot::Variant(op);
+        }
         godot::Dictionary d;
-        for (const auto& [key, val] : j.GetObject()) {
+        for (const auto& [key, val] : obj) {
             d[godot::String(key.c_str())] = deserialize_inferred(val);
         }
         return godot::Variant(d);
     }
     return godot::Variant();
 }
+
+godot::Variant deserialize_as_object(const mcp::JsonValue& j, const std::string& class_name);
 
 godot::Variant deserialize_typed(const mcp::JsonValue& j, godot::Variant::Type type) {
     using namespace godot;
@@ -484,9 +525,188 @@ godot::Variant deserialize_typed(const mcp::JsonValue& j, godot::Variant::Type t
         return Variant(a);
     }
 
+    case Variant::OBJECT: {
+        if (j.IsObject()) {
+            auto ref_it = j.GetObject().find("__node_ref__");
+            if (ref_it != j.GetObject().end()) {
+                godot::String node_path_str(ref_it->second.GetString().c_str());
+                auto* editor = godot::EditorInterface::get_singleton();
+                if (editor) {
+                    auto* scene_root = editor->get_edited_scene_root();
+                    if (scene_root) {
+                        godot::Node* top = scene_root;
+                        while (top->get_parent()) {
+                            top = top->get_parent();
+                        }
+                        godot::Node* found = top->get_node_or_null(godot::NodePath(node_path_str));
+                        if (found) {
+                            return godot::Variant(static_cast<godot::Object*>(found));
+                        }
+                    }
+                }
+            }
+            auto oid_s_it = j.GetObject().find("object_id_str");
+            if (oid_s_it != j.GetObject().end() && oid_s_it->second.IsString()) {
+                try {
+                    int64_t id = std::stoll(oid_s_it->second.GetString());
+                    auto* op = godot::ObjectDB::get_instance(static_cast<uint64_t>(id));
+                    if (op) return godot::Variant(op);
+                } catch (...) {}
+            }
+            auto oid_i_it = j.GetObject().find("object_id");
+            if (oid_i_it != j.GetObject().end() && oid_i_it->second.IsInt()) {
+                auto* op = godot::ObjectDB::get_instance(static_cast<uint64_t>(oid_i_it->second.GetInt()));
+                if (op) return godot::Variant(op);
+            }
+            auto class_it = j.GetObject().find("class");
+            if (class_it != j.GetObject().end() && class_it->second.IsString()) {
+                godot::Variant obj = deserialize_as_object(j, class_it->second.GetString());
+                if (obj.get_type() != godot::Variant::NIL) {
+                    return obj;
+                }
+            }
+            return deserialize_inferred(j);
+        }
+        if (j.IsString()) {
+            auto* loader = godot::ResourceLoader::get_singleton();
+            if (loader) {
+                godot::String path(j.GetString().c_str());
+                if (loader->exists(path)) {
+                    godot::Ref<godot::Resource> res = loader->load(path);
+                    if (res.is_valid()) {
+                        return godot::Variant(res.ptr());
+                    }
+                }
+            }
+        }
+        return godot::Variant();
+    }
+
+    case Variant::RID:
+        return godot::Variant();
+
     default:
         return Variant();
     }
+}
+
+struct PropertyMeta {
+    godot::Variant::Type type = godot::Variant::NIL;
+    int hint = 0;
+    std::string hint_string;
+};
+
+bool is_typed_value_type(godot::Variant::Type t) {
+    switch (t) {
+    case godot::Variant::BOOL:
+    case godot::Variant::INT:
+    case godot::Variant::FLOAT:
+    case godot::Variant::STRING:
+    case godot::Variant::VECTOR2:
+    case godot::Variant::VECTOR2I:
+    case godot::Variant::RECT2:
+    case godot::Variant::RECT2I:
+    case godot::Variant::VECTOR3:
+    case godot::Variant::VECTOR3I:
+    case godot::Variant::TRANSFORM2D:
+    case godot::Variant::VECTOR4:
+    case godot::Variant::VECTOR4I:
+    case godot::Variant::PLANE:
+    case godot::Variant::QUATERNION:
+    case godot::Variant::AABB:
+    case godot::Variant::BASIS:
+    case godot::Variant::TRANSFORM3D:
+    case godot::Variant::PROJECTION:
+    case godot::Variant::COLOR:
+    case godot::Variant::STRING_NAME:
+    case godot::Variant::NODE_PATH:
+    case godot::Variant::DICTIONARY:
+    case godot::Variant::ARRAY:
+    case godot::Variant::PACKED_BYTE_ARRAY:
+    case godot::Variant::PACKED_INT32_ARRAY:
+    case godot::Variant::PACKED_INT64_ARRAY:
+    case godot::Variant::PACKED_FLOAT32_ARRAY:
+    case godot::Variant::PACKED_FLOAT64_ARRAY:
+    case godot::Variant::PACKED_STRING_ARRAY:
+    case godot::Variant::PACKED_VECTOR2_ARRAY:
+    case godot::Variant::PACKED_VECTOR3_ARRAY:
+    case godot::Variant::PACKED_COLOR_ARRAY:
+    case godot::Variant::PACKED_VECTOR4_ARRAY:
+        return true;
+    default:
+        return false;
+    }
+}
+
+std::string clean_class_name(const std::string& hint_string) {
+    size_t sep = hint_string.find_first_of("/:,");
+    if (sep == std::string::npos) return hint_string;
+    return hint_string.substr(0, sep);
+}
+
+godot::Variant deserialize_as_object(const mcp::JsonValue& j, const std::string& class_name) {
+    if (!j.IsObject()) return godot::Variant();
+
+    auto* cdbs = godot::ClassDBSingleton::get_singleton();
+    if (!cdbs) return godot::Variant();
+
+    std::string resolved_class = class_name;
+    auto* class_field = j.Find("class");
+    if (class_field && class_field->IsString()) {
+        resolved_class = class_field->GetString();
+    }
+
+    godot::StringName sn(resolved_class.c_str());
+    godot::Variant obj_var = cdbs->instantiate(sn);
+    if (obj_var.get_type() == godot::Variant::NIL) return obj_var;
+
+    godot::Object* obj = obj_var.operator godot::Object*();
+    if (!obj) return godot::Variant();
+
+    godot::TypedArray<godot::Dictionary> props = obj->get_property_list();
+    std::unordered_map<std::string, PropertyMeta> prop_meta;
+    for (int64_t i = 0; i < props.size(); i++) {
+        godot::Dictionary prop = props[i];
+        std::string pname = to_std_string(godot::String(prop["name"]));
+        PropertyMeta meta;
+        if (prop.has("type")) {
+            meta.type = static_cast<godot::Variant::Type>(static_cast<int>(prop["type"]));
+        }
+        if (prop.has("hint")) {
+            meta.hint = static_cast<int>(prop["hint"]);
+        }
+        if (prop.has("hint_string")) {
+            meta.hint_string = to_std_string(prop["hint_string"].operator godot::String());
+        }
+        prop_meta.emplace(std::move(pname), std::move(meta));
+    }
+
+    for (const auto& [key, val] : j.GetObject()) {
+        if (key == "class") continue;
+        auto meta_it = prop_meta.find(key);
+        if (meta_it == prop_meta.end()) continue;
+        godot::StringName prop_name(key.c_str());
+        godot::Variant prop_val;
+        if (val.IsObject()) {
+            auto nested_class_it = val.GetObject().find("class");
+            if (nested_class_it != val.GetObject().end() && nested_class_it->second.IsString()) {
+                prop_val = deserialize_as_object(val, nested_class_it->second.GetString());
+            } else if (is_typed_value_type(meta_it->second.type)) {
+                prop_val = deserialize_typed(val, meta_it->second.type);
+            } else if ((meta_it->second.type == godot::Variant::OBJECT ||
+                        meta_it->second.hint == godot::PROPERTY_HINT_RESOURCE_TYPE) &&
+                       !meta_it->second.hint_string.empty()) {
+                prop_val = deserialize_as_object(val, clean_class_name(meta_it->second.hint_string));
+            } else {
+                prop_val = deserialize_inferred(val);
+            }
+        } else {
+            prop_val = deserialize_inferred(val);
+        }
+        obj->set(prop_name, prop_val);
+    }
+
+    return obj_var;
 }
 
 } // anonymous namespace
@@ -731,8 +951,24 @@ mcp::JsonValue VariantJson::serialize(const godot::Variant& v) {
         godot::Object* obj = v.operator godot::Object*();
         if (obj) {
             mcp::JsonValue j(mcp::JsonValue::object_tag);
-            j["object_id"] = mcp::JsonValue(static_cast<int64_t>(obj->get_instance_id()));
             j["class"] = mcp::JsonValue(to_std_string(obj->get_class()));
+
+            auto props = obj->get_property_list();
+            for (int64_t i = 0; i < props.size(); i++) {
+                godot::Dictionary prop = props[i];
+                godot::String prop_name = prop["name"];
+                std::string name_std = to_std_string(prop_name);
+
+                if (name_std.empty() || name_std[0] == '_' || name_std == "script") continue;
+
+                int64_t usage = static_cast<int64_t>(prop["usage"]);
+                if (!(usage & PROPERTY_USAGE_STORAGE)) continue;
+                if (usage & (PROPERTY_USAGE_GROUP | PROPERTY_USAGE_SUBGROUP | PROPERTY_USAGE_CATEGORY)) continue;
+
+                godot::Variant val = obj->get(prop_name);
+                j[name_std] = serialize(val);
+            }
+
             return j;
         }
         return mcp::JsonValue();
@@ -744,6 +980,7 @@ mcp::JsonValue VariantJson::serialize(const godot::Variant& v) {
         if (obj) {
             mcp::JsonValue j(mcp::JsonValue::object_tag);
             j["object_id"] = mcp::JsonValue(static_cast<int64_t>(obj->get_instance_id()));
+            j["object_id_str"] = mcp::JsonValue(std::to_string(static_cast<int64_t>(obj->get_instance_id())));
             j["method"] = mcp::JsonValue(to_std_string(godot::String(c.get_method())));
             return j;
         }
@@ -756,6 +993,7 @@ mcp::JsonValue VariantJson::serialize(const godot::Variant& v) {
         if (obj) {
             mcp::JsonValue j(mcp::JsonValue::object_tag);
             j["object_id"] = mcp::JsonValue(static_cast<int64_t>(obj->get_instance_id()));
+            j["object_id_str"] = mcp::JsonValue(std::to_string(static_cast<int64_t>(obj->get_instance_id())));
             j["signal"] = mcp::JsonValue(to_std_string(godot::String(sig.get_name())));
             return j;
         }
@@ -903,6 +1141,23 @@ godot::Variant VariantJson::deserialize(const mcp::JsonValue& j, const std::stri
         auto type = parse_type_hint(type_hint);
         if (type.has_value()) {
             return deserialize_typed(j, type.value());
+        }
+        if (j.IsString()) {
+            auto* loader = godot::ResourceLoader::get_singleton();
+            if (loader) {
+                godot::Ref<godot::Resource> res = loader->load(
+                    godot::String(j.GetString().c_str()),
+                    godot::String(type_hint.c_str()));
+                if (res.is_valid()) {
+                    return godot::Variant(res.ptr());
+                }
+            }
+        }
+        if (j.IsObject()) {
+            godot::Variant obj = deserialize_as_object(j, type_hint);
+            if (obj.get_type() != godot::Variant::NIL) {
+                return obj;
+            }
         }
     }
     return deserialize_inferred(j);
