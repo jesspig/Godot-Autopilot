@@ -193,13 +193,32 @@ bool try_resolve_resource_value(const mcp::JsonValue& val, godot::Variant& out, 
     auto* it_resource = val.Find("resource");
     if (it_resource && it_resource->IsString()) {
         std::string name = it_resource->GetString();
-        const std::string prefix = "memory://";
-        if (name.compare(0, prefix.size(), prefix) == 0) {
-            name = name.substr(prefix.size());
+        const std::string mem_prefix = "memory://";
+        const bool is_mem = name.compare(0, mem_prefix.size(), mem_prefix) == 0;
+        if (is_mem) {
+            name = name.substr(mem_prefix.size());
+        }
+        const std::string res_prefix = "res://";
+        if (!is_mem && name.compare(0, res_prefix.size(), res_prefix) == 0) {
+            if (!godot::FileAccess::file_exists(godot::String(name.c_str()))) {
+                out_error = "file does not exist: " + name;
+                return true;
+            }
+            auto* loader = godot::ResourceLoader::get_singleton();
+            godot::Ref<godot::Resource> res = loader ? loader->load(godot::String(name.c_str())) : godot::Ref<godot::Resource>();
+            if (res.is_null()) {
+                out_error = "failed to load resource: " + name +
+                    " (file exists but failed to load — not imported or wrong type)";
+                return true;
+            }
+            out = godot::Variant(res.ptr());
+            return true;
         }
         godot::Ref<godot::Resource> res = resolve_memory_resource(name);
         if (res.is_null()) {
-            out_error = "memory resource not found: " + name + " (create it with resource_create first)";
+            out_error = "memory resource not found: " + name +
+                (is_mem ? " (create it with resource_create first)"
+                        : " — 建议使用 {\"path\": \"res://...\"}（磁盘资源）或 {\"resource\": \"memory://名称\"}（内存资源）");
             return true;
         }
         out = godot::Variant(res.ptr());

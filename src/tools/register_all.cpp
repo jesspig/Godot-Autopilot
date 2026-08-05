@@ -152,7 +152,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
         m["property_set"] = schema::build_schema({
             {"path", "string", "Node path (scene-relative or absolute). memory:// is a resource namespace and is NOT valid here — memory resources go in the value parameter (e.g. {\"resource\": \"memory://name\"})", true},
             {"property", "string", "Property name", true},
-            {"value", "object", "Property value to set", true},
+            {"value", "object", "Property value to set — 资源引用支持两种格式: {\"path\": \"res://xxx.tres\"}（磁盘资源，赋节点属性用）或 {\"resource\": \"memory://名称\"}（内存资源，仅资源编辑场景）", true},
             {"type_hint", "string", "Type hint (e.g. Vector2, Color, int, float)", false},
         });
         m["property_get_list"] = schema::build_schema({
@@ -1450,7 +1450,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
         });
         m["tilemap_set_cells"] = schema::build_schema({
             {"node_path", "string", "Path to the TileMap node", true},
-            {"cells", "array", "Array of cells, each {\"x\":int,\"y\":int,\"source_id\":int,\"atlas_coords\":{\"x\":int,\"y\":int}}", true},
+            {"cells", "array", "Array of cells, each {\"x\":int,\"y\":int,\"source_id\":int,\"atlas_coords\":{\"x\":int,\"y\":int}} — 单次调用 ≤64 条目（大 payload 可能被客户端截断）；331 格级别的大批量请用 script_execute_gdscript 编程铺设（TileMap.set_cell 循环）", true},
             {"layer", "integer", "Tile layer index (default: 0)", false},
         });
         m["tileset_create"] = schema::build_schema({

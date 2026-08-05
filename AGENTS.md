@@ -46,4 +46,5 @@
 - **无 CI**（`.github/` 不存在）
 - **无测试套件或 lint 配置**（googletest 在 `_deps/` 中但从未使用）
 - **~299/313 工具 schema 为** `mcp::JsonValue(object_tag)`（空对象），仅 ~14 个工具拥有完整 JSON Schema。这是已知缺口
+- **目标引擎版本**：Godot 4.7；常见 API 迁移事实：`TileSet.get_tile_data` 属 `TileSetAtlasSource.get_tile_data(source_id→atlas_coords, alternative)`；`AnimatedSprite2D` 属性名为 `sprite_frames`（`frames` 自 4.0 起更名）；`motion_mode` 枚举 GROUNDED=0/FLOATING=1
 - **详细架构规划**见 `docs/plan/`，但那是计划而非当前实现

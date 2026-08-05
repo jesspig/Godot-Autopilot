@@ -57,6 +57,26 @@ int levenshtein_distance(const std::string& a, const std::string& b) {
     return static_cast<int>(prev[b.size()]);
 }
 
+// 与 debugger_ops.cpp 的 RENAME_HINTS 同源（Godot 3→4 迁移表 renames_map_3_to_4.cpp）；
+// 该表位于 debugger_ops.cpp 匿名命名空间无法跨文件复用，此处定义同构副本。
+struct PropertyRenameHint {
+    const char* old_name;
+    const char* new_name;
+};
+
+const PropertyRenameHint PROPERTY_RENAME_HINTS[] = {
+    { "frames", "sprite_frames" },                  // AnimatedSprite2D/3D
+    { "cast_to", "target_position" },               // RayCast2D/3D, ShapeCast2D/3D
+    { "rect_position", "position" },                // Control
+    { "rect_global_position", "global_position" },  // Control
+    { "rect_size", "size" },                        // Control
+    { "rect_min_size", "custom_minimum_size" },     // Control
+    { "rect_rotation", "rotation" },                // Control
+    { "rect_scale", "scale" },                      // Control
+    { "rect_pivot_offset", "pivot_offset" },        // Control
+    { "translation", "position" },                  // Node3D
+};
+
 std::string find_property_candidates(godot::Node* node, const std::string& prop_name) {
     struct Candidate {
         int distance;
@@ -70,13 +90,26 @@ std::string find_property_candidates(godot::Node* node, const std::string& prop_
         std::string name = to_std_string(dict["name"].operator godot::String());
         candidates.push_back({levenshtein_distance(prop_name, name), name});
     }
+    // 重命名映射候选（distance=-1 排序后恒居首位，优先级高于所有编辑距离候选）
+    for (const PropertyRenameHint& hint : PROPERTY_RENAME_HINTS) {
+        if (prop_name == hint.old_name) {
+            candidates.push_back({-1, hint.new_name});
+            break;
+        }
+    }
     std::sort(candidates.begin(), candidates.end(),
               [](const Candidate& x, const Candidate& y) {
                   if (x.distance != y.distance) return x.distance < y.distance;
                   return x.name < y.name;
               });
+    size_t unique_count = 0;
+    for (size_t k = 0; k < candidates.size(); k++) {
+        if (unique_count > 0 && candidates[unique_count - 1].name == candidates[k].name) continue;
+        candidates[unique_count++] = candidates[k];
+    }
+    candidates.resize(unique_count);
     std::string result;
-    for (size_t k = 0; k < candidates.size() && k < 3; k++) {
+    for (size_t k = 0; k < candidates.size() && k < 4; k++) {
         if (!result.empty()) result += ", ";
         result += candidates[k].name;
     }
