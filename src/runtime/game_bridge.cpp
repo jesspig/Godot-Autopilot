@@ -87,6 +87,8 @@ godot::Node* resolve_node(const std::string& node_path) {
 // ── 异步辅助对象 ──
 // send_response 前向声明（定义在 dispatch 段），供 watcher / awaiter 回调使用
 void send_response(int64_t request_id, JV body);
+// eval 错误附加前向声明（定义于错误缓冲辅助段），供 await 完成回调使用
+void append_eval_runtime_errors(JV& body, uint64_t since_seq);
 
 // 协议常量（std::string_view）转 godot::String，用于消息名等字符串参数
 godot::String gsd_string(const std::string_view& sv) {
@@ -96,6 +98,8 @@ godot::String gsd_string(const std::string_view& sv) {
 // ── 活动时间戳与挂起操作取消注册表 ──
 // 每次收到 gsd 请求刷新，供 ping / status 报告游戏进程活跃度
 uint64_t g_last_activity_ms = 0;
+// 游戏侧 healthy 判定阈值：距离最近一次 gsd 请求超过该间隔视为不活跃
+constexpr int64_t GAME_HEALTHY_ACTIVITY_THRESHOLD_MS = 3000;
 // 异步 op（input_wait / eval await）按 request_id 注册取消回调，
 // cancel op 在主线程查找并调用。全部在主线程上下文操作，无需锁。
 std::unordered_map<int64_t, std::function<void()>> g_cancel_handlers;
@@ -310,6 +314,7 @@ class GameBridgeEvalAwaiter : public godot::Node {
     std::string persist_path_;
     godot::Ref<godot::SceneTreeTimer> timer_;
     bool done_ = false;
+    uint64_t errors_since_seq_ = 0;
 
 protected:
     static void _bind_methods() {
@@ -322,7 +327,7 @@ protected:
 public:
     void setup(int64_t request_id, const godot::Ref<godot::RefCounted>& state_ref,
                godot::Node* target, godot::Node* parent, bool persist,
-               const std::string& persist_path, int64_t timeout_ms) {
+               const std::string& persist_path, int64_t timeout_ms, uint64_t errors_since_seq) {
         request_id_ = request_id;
         timeout_ms_ = timeout_ms;
         state_ref_ = state_ref;
@@ -330,6 +335,7 @@ public:
         parent_ = parent;
         persist_ = persist;
         persist_path_ = persist_path;
+        errors_since_seq_ = errors_since_seq;
         godot::SceneTree* tree = get_scene_tree();
         if (!tree) {
             JV body = error_result("no scene tree for eval await");
@@ -372,6 +378,7 @@ public:
                 body = ok_result(std::move(inner));
             }
         }
+        append_eval_runtime_errors(body, errors_since_seq_);
         send_response(request_id_, std::move(body));
         cleanup();
     }
@@ -430,6 +437,87 @@ void schedule_release(const std::string& type, const godot::Key& key, int64_t bu
                    duration_ms / 1000.0, keep_pressed);
 }
 
+// ── 输入序列注入器 ──
+// 前向声明：单步注入实现位于 op_input 段
+std::string inject_step(const JV& step);
+void push_game_error(const std::string& file, const std::string& func, int line,
+                     const std::string& error, const std::string& descr, bool is_warning,
+                     std::vector<std::string> stack);
+
+// 输入序列注入器：挂 root，按每步 duration_ms 时间线后台推进单步注入，完成后自毁。
+// SceneTreeTimer 链式调度（ignore_time_scale，暂停时不挂死）；单步复用 inject_step
+// （press 前强制 release / duration 后自动 release），瞬态边沿与单次注入一致。
+class GameBridgeInputSequence : public godot::Node {
+    GDCLASS(GameBridgeInputSequence, godot::Node)
+
+    std::vector<JV> steps_;
+    size_t index_ = 0;
+    godot::Ref<godot::SceneTreeTimer> timer_;
+
+protected:
+    static void _bind_methods() {
+        godot::ClassDB::bind_method(godot::D_METHOD("_on_step_timeout"),
+            &GameBridgeInputSequence::_on_step_timeout);
+    }
+
+public:
+    void setup(std::vector<JV> steps) {
+        steps_ = std::move(steps);
+        godot::SceneTree* tree = get_scene_tree();
+        if (!tree) {
+            memdelete(this);
+            return;
+        }
+        tree->get_root()->add_child(this);
+        run_step();
+    }
+
+    void _on_step_timeout() {
+        timer_.unref();
+        run_step();
+    }
+
+private:
+    void run_step() {
+        if (index_ >= steps_.size()) {
+            queue_free();
+            return;
+        }
+        const JV& step = steps_[index_];
+        int64_t delay_ms = 0;
+        if (auto* d = step.Find("duration_ms")) {
+            if (d->IsInt() && d->GetInt() > 0) delay_ms = d->GetInt();
+        }
+        std::string step_err = inject_step(step);
+        if (!step_err.empty()) {
+            // 单步失败不中断序列：写入错误缓冲供编辑器经 get_errors 拉取
+            push_game_error("game_bridge.cpp", "op_input sequence", 0,
+                "sequence step " + std::to_string(index_ + 1) + " failed: " + step_err,
+                "", false, {});
+        }
+        index_++;
+        if (index_ >= steps_.size()) {
+            queue_free();
+            return;
+        }
+        godot::SceneTree* tree = get_scene_tree();
+        if (!tree) {
+            queue_free();
+            return;
+        }
+        // 步骤间延时 = 该步骤 duration_ms（press 的 release 由 inject_step 的
+        // schedule_release 在该时长后触发，与单次注入 press+release 语义一致）
+        timer_ = tree->create_timer(static_cast<double>(delay_ms) / 1000.0, true, false, true);
+        if (timer_.is_valid()) {
+            godot::Error err = timer_->connect("timeout",
+                godot::Callable(this, godot::StringName("_on_step_timeout")));
+            if (err != godot::OK) queue_free();
+        } else {
+            queue_free();
+        }
+    }
+};
+
 // ── 游戏侧错误/输出环形缓冲 ──
 // 引擎调试器通道（EngineDebugger::captures 表）仅在接收端分发命令，
 // 发送路径（send_message/send_error/flush_output）不经过捕获回调，
@@ -444,6 +532,7 @@ struct GameErrorEntry {
     std::string error, descr;
     bool is_warning;
     std::vector<std::string> stack;
+    uint64_t seq;
 };
 
 struct GameOutputEntry {
@@ -457,6 +546,8 @@ constexpr size_t MAX_OUTPUT_BUFFER = 500;
 std::mutex g_buffer_mtx;
 std::vector<GameErrorEntry> g_error_buffer;
 std::vector<GameOutputEntry> g_output_buffer;
+// 单调递增错误序号：配合环形缓冲（erase begin）定位"自某点以来的新增错误"
+uint64_t g_error_seq = 0;
 
 void push_game_error(const std::string& file, const std::string& func, int line,
                      const std::string& error, const std::string& descr, bool is_warning,
@@ -466,7 +557,7 @@ void push_game_error(const std::string& file, const std::string& func, int line,
     g_error_buffer.push_back({static_cast<int>(time / 3600000),
         static_cast<int>((time / 60000) % 60), static_cast<int>((time / 1000) % 60),
         static_cast<int>(time % 1000), file, func, line, error, descr, is_warning,
-        std::move(stack)});
+        std::move(stack), ++g_error_seq});
     if (g_error_buffer.size() > MAX_ERROR_BUFFER) {
         g_error_buffer.erase(g_error_buffer.begin());
     }
@@ -512,6 +603,80 @@ public:
     }
 };
 
+// ── 活跃度与错误增量辅助 ──
+// 附加活跃度字段：last_activity_ms（绝对单调毫秒）+ healthy（按间隔比较）。
+// g_last_activity_ms==0 表示刚启动尚未收到请求，视为 healthy。
+void append_activity_fields(JV& r) {
+    r[GSD_FIELD_LAST_ACTIVITY_MS] = JV(static_cast<int64_t>(g_last_activity_ms));
+    bool healthy = true;
+    if (g_last_activity_ms != 0 && godot::Time::get_singleton()) {
+        uint64_t now_ms = godot::Time::get_singleton()->get_ticks_msec();
+        healthy = (now_ms - g_last_activity_ms)
+            < static_cast<uint64_t>(GAME_HEALTHY_ACTIVITY_THRESHOLD_MS);
+    }
+    r[GSD_FIELD_HEALTHY] = JV(healthy);
+}
+
+uint64_t current_error_seq() {
+    std::lock_guard<std::mutex> lock(g_buffer_mtx);
+    return g_error_seq;
+}
+
+// 序列化缓冲中 seq > since_seq 的新增错误：返回文本摘要与首条结构化字段
+// （file/line/message，与编辑器侧 extract_structured_error 输出结构一致）
+struct EvalErrorDelta {
+    std::string text;
+    JV structured;
+};
+
+EvalErrorDelta eval_error_delta(uint64_t since_seq) {
+    EvalErrorDelta delta;
+    delta.structured = JV(JV::object_tag);
+    {
+        std::lock_guard<std::mutex> lock(g_buffer_mtx);
+        for (const GameErrorEntry& e : g_error_buffer) {
+            if (e.seq <= since_seq) continue;
+            std::string line;
+            if (!e.file.empty()) {
+                line = e.file;
+                if (e.line > 0) line += ":" + std::to_string(e.line);
+                line += " - ";
+            }
+            line += e.error;
+            if (!e.descr.empty()) line += ": " + e.descr;
+            if (!delta.text.empty()) delta.text += "\n";
+            delta.text += line;
+            if (delta.structured.Empty()) {
+                if (!e.file.empty()) delta.structured["file"] = JV(e.file);
+                if (e.line > 0) delta.structured["line"] = JV(static_cast<int64_t>(e.line));
+                if (!e.error.empty()) delta.structured["message"] = JV(e.error);
+            }
+        }
+    }
+    return delta;
+}
+
+// 参考 script_ops 的 8192 字节截断模式，限制 eval 错误文本体积
+std::string truncate_error_text(const std::string& text) {
+    constexpr size_t MAX_EVAL_ERROR_BYTES = 8192;
+    if (text.size() > MAX_EVAL_ERROR_BYTES) {
+        return text.substr(0, MAX_EVAL_ERROR_BYTES)
+            + "\n...(truncated, total " + std::to_string(text.size()) + " bytes)";
+    }
+    return text;
+}
+
+// 在响应中附加 call 后的新增错误字段（runtime_error/error_details/structured_error）
+void append_eval_runtime_errors(JV& body, uint64_t since_seq) {
+    EvalErrorDelta delta = eval_error_delta(since_seq);
+    if (delta.text.empty()) return;
+    body["runtime_error"] = JV(true);
+    body["error_details"] = JV(truncate_error_text(delta.text));
+    if (!delta.structured.Empty()) {
+        body["structured_error"] = std::move(delta.structured);
+    }
+}
+
 // ── op: status ──
 JV op_status() {
     JV r(JV::object_tag);
@@ -524,7 +689,7 @@ JV op_status() {
         r["fps"] = JV(engine->get_frames_per_second());
         r["physics_frame"] = JV(static_cast<int64_t>(engine->get_physics_frames()));
     }
-    r[GSD_FIELD_LAST_ACTIVITY_MS] = JV(static_cast<int64_t>(g_last_activity_ms));
+    append_activity_fields(r);
     if (auto* tree = get_scene_tree()) {
         r["paused"] = JV(tree->is_paused());
         r["node_count"] = JV(static_cast<int64_t>(tree->get_node_count()));
@@ -553,10 +718,16 @@ JV op_eval_script(const JV& params, int64_t request_id) {
     if (script.is_null()) return error_result("failed to create GDScript instance");
 
     script->set_source_code(godot::String(source.c_str()));
+    uint64_t compile_seq_before = current_error_seq();
     godot::Error parse_err = script->reload();
     if (parse_err != godot::OK) {
-        return error_result("GDScript compilation failed (ERR code "
-            + std::to_string(static_cast<int>(parse_err)) + ")");
+        std::string message = "GDScript compilation failed (ERR code "
+            + std::to_string(static_cast<int>(parse_err)) + ")";
+        EvalErrorDelta compile_delta = eval_error_delta(compile_seq_before);
+        if (!compile_delta.text.empty()) {
+            message += "\n" + truncate_error_text(compile_delta.text);
+        }
+        return error_result(message);
     }
 
     bool persist = false;
@@ -606,6 +777,7 @@ JV op_eval_script(const JV& params, int64_t request_id) {
         return error_result("function _run not found in compiled script — script must extend Node and define func _run()");
     }
 
+    uint64_t run_seq_before = current_error_seq();
     godot::Variant result = temp_node->call(run_fn);
 
     godot::Object* state_obj = nullptr;
@@ -619,7 +791,7 @@ JV op_eval_script(const JV& params, int64_t request_id) {
         if (persist) persist_path = "/root/__gsd_runtime/" + persist_name;
         GameBridgeEvalAwaiter* awaiter = memnew(GameBridgeEvalAwaiter);
         awaiter->setup(request_id, godot::Ref<godot::RefCounted>(result),
-            temp_node, parent, persist, persist_path, await_timeout_ms);
+            temp_node, parent, persist, persist_path, await_timeout_ms, run_seq_before);
         return JV(); // 异步：不立即响应，由 awaiter 在 completed / timeout 时 send_response
     }
 
@@ -629,6 +801,7 @@ JV op_eval_script(const JV& params, int64_t request_id) {
     }
 
     JV body = ok_result(VariantJson::serialize(result));
+    append_eval_runtime_errors(body, run_seq_before);
     if (persist) {
         if (body["result"].IsObject()) {
             body["result"]["node_path"] = JV("/root/__gsd_runtime/" + persist_name);
@@ -840,29 +1013,31 @@ bool param_pressed(const JV& params, bool default_value) {
     return default_value;
 }
 
-JV op_input(const JV& params, int64_t request_id) {
-    (void)request_id; // 预留：hold 注入可经 cancel op 中断
-    auto* type_p = params.Find("type");
+// 单步注入（type=key|mouse_button|action）：参数解析、press 前强制 release、
+// 事件注入 + flush、按 duration_ms 调度自动释放（hold 模式持续重发按下）。
+// 返回空串表示成功，否则为错误消息。
+std::string inject_step(const JV& step) {
+    auto* type_p = step.Find("type");
     if (!type_p || !type_p->IsString()) {
-        return error_result("input requires type (key|mouse_button|action)");
+        return "input requires type (key|mouse_button|action)";
     }
     std::string type = type_p->GetString();
 
     auto* input = godot::Input::get_singleton();
-    if (!input) return error_result("Input singleton not available");
+    if (!input) return "Input singleton not available";
 
     std::string mode = "event";
-    if (auto* mode_p = params.Find("mode")) {
+    if (auto* mode_p = step.Find("mode")) {
         if (mode_p->IsString()) mode = mode_p->GetString();
     }
     // hold 与 event 都走事件注入（api 走 Input API）；hold 在 duration 内保持持续按压
     bool mode_api = (mode == "api");
     bool keep_pressed = (mode == "hold");
     int64_t duration_ms = 0;
-    if (auto* dur_p = params.Find("duration_ms")) {
+    if (auto* dur_p = step.Find("duration_ms")) {
         if (dur_p->IsInt() && dur_p->GetInt() > 0) duration_ms = dur_p->GetInt();
     }
-    bool pressed = param_pressed(params, true);
+    bool pressed = param_pressed(step, true);
 
     std::string release_type;
     godot::Key key = godot::KEY_NONE;
@@ -872,13 +1047,13 @@ JV op_input(const JV& params, int64_t request_id) {
     godot::StringName action;
 
     if (type == "key") {
-        auto* kc = params.Find("keycode");
+        auto* kc = step.Find("keycode");
         if (!kc || !(kc->IsInt() || kc->IsString())) {
-            return error_result("input key requires keycode (numeric key code or key name)");
+            return "input key requires keycode (numeric key code or key name)";
         }
         key = parse_keycode(*kc);
         if (key == godot::KEY_NONE) {
-            return error_result("invalid keycode: " + (kc->IsString() ? kc->GetString() : std::to_string(kc->GetInt())));
+            return "invalid keycode: " + (kc->IsString() ? kc->GetString() : std::to_string(kc->GetInt()));
         }
         if (pressed) {
             godot::Ref<godot::InputEventKey> release_ev;
@@ -898,12 +1073,12 @@ JV op_input(const JV& params, int64_t request_id) {
         input->flush_buffered_events();
         release_type = "key";
     } else if (type == "mouse_button") {
-        auto* bi = params.Find("button_index");
+        auto* bi = step.Find("button_index");
         if (!bi || !bi->IsInt()) {
-            return error_result("input mouse_button requires button_index (integer)");
+            return "input mouse_button requires button_index (integer)";
         }
         button_index = bi->GetInt();
-        if (extract_position(params, pos)) has_pos = true;
+        if (extract_position(step, pos)) has_pos = true;
         if (pressed) {
             godot::Ref<godot::InputEventMouseButton> release_ev;
             release_ev.instantiate();
@@ -928,9 +1103,9 @@ JV op_input(const JV& params, int64_t request_id) {
         input->flush_buffered_events();
         release_type = "mouse_button";
     } else if (type == "action") {
-        auto* act = params.Find("action");
+        auto* act = step.Find("action");
         if (!act || !act->IsString()) {
-            return error_result("input action requires action (string)");
+            return "input action requires action (string)";
         }
         action = godot::StringName(act->GetString().c_str());
         if (pressed) {
@@ -950,14 +1125,59 @@ JV op_input(const JV& params, int64_t request_id) {
         }
         release_type = "action";
     } else {
-        return error_result("unknown input type: " + type);
+        return "unknown input type: " + type;
     }
 
     if (pressed && duration_ms > 0 && !release_type.empty()) {
         schedule_release(release_type, key, button_index, pos, has_pos, action, mode_api,
                          duration_ms, keep_pressed);
     }
+    return "";
+}
 
+// op: input 序列路径：校验并后台调度注入序列，立即返回（不等序列完成）。
+// 每步语义与单次注入一致（type/keycode|button_index|action + pressed + duration_ms，
+// press 的 release 由 duration_ms 控制）；有 sequence 时忽略单次注入参数。
+// 序列后台推进，不提供 injected_at_physics_frame 等帧级回读字段
+// （需要帧级回读校验边沿请改用单次注入）。
+JV op_input_sequence(const JV& seq_value) {
+    if (!seq_value.IsArray()) {
+        return error_result("input sequence must be an array");
+    }
+    const auto& items = seq_value.GetArray();
+    if (items.empty()) {
+        return error_result("input sequence must not be empty");
+    }
+    std::vector<JV> steps;
+    steps.reserve(items.size());
+    for (const JV& item : items) {
+        if (!item.IsObject()) {
+            return error_result("input sequence item must be an object with type/keycode or type/action fields");
+        }
+        steps.push_back(item);
+    }
+    GameBridgeInputSequence* seq = memnew(GameBridgeInputSequence);
+    seq->setup(std::move(steps));
+    JV inner(JV::object_tag);
+    inner["sequence"] = JV("scheduled");
+    inner["steps"] = JV(static_cast<int64_t>(items.size()));
+    return ok_result(std::move(inner));
+}
+
+JV op_input(const JV& params, int64_t request_id) {
+    (void)request_id; // 预留：hold 注入可经 cancel op 中断
+    if (auto* seq_p = params.Find("sequence")) {
+        // 有 sequence 时忽略单次注入参数
+        return op_input_sequence(*seq_p);
+    }
+    auto* type_p = params.Find("type");
+    if (!type_p || !type_p->IsString()) {
+        return error_result("input requires type (key|mouse_button|action)");
+    }
+    std::string step_err = inject_step(params);
+    if (!step_err.empty()) return error_result(step_err);
+
+    bool pressed = param_pressed(params, true);
     JV r(JV::object_tag);
     r["result"] = JV("ok");
     if (pressed) {
@@ -986,7 +1206,7 @@ JV op_ping() {
         r["physics_frame"] = JV(static_cast<int64_t>(engine->get_physics_frames()));
         r["process_frame"] = JV(static_cast<int64_t>(engine->get_process_frames()));
     }
-    r[GSD_FIELD_LAST_ACTIVITY_MS] = JV(static_cast<int64_t>(g_last_activity_ms));
+    append_activity_fields(r);
     return r;
 }
 
@@ -1286,6 +1506,7 @@ void register_listener() {
         godot::ClassDB::register_class<GameBridgeInputWatcher>();
         godot::ClassDB::register_class<GameBridgeDelayedRelease>();
         godot::ClassDB::register_class<GameBridgeEvalAwaiter>();
+        godot::ClassDB::register_class<GameBridgeInputSequence>();
         godot::ClassDB::register_class<GameBridgeLogger>();
         class_registered = true;
     }
@@ -1306,7 +1527,7 @@ void register_listener() {
         {
             JV body(JV::object_tag);
             body[GSD_FIELD_READY] = JV(true);
-            body[GSD_FIELD_LAST_ACTIVITY_MS] = JV(static_cast<int64_t>(g_last_activity_ms));
+            append_activity_fields(body);
             godot::Array payload;
             payload.push_back(godot::String(body.Dump().c_str()));
             dbg->send_message(gsd_string(GSD_MSG_READY), payload);

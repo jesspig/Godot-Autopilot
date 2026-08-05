@@ -34,6 +34,14 @@ constexpr int64_t DEFAULT_TIMEOUT_MS = 5000;
 constexpr int64_t MAX_TIMEOUT_MS = 30000;
 constexpr int64_t RESPONSE_GRACE_MS = 2000;
 constexpr int64_t HEALTHY_ACTIVITY_THRESHOLD_MS = 3000;
+constexpr int64_t PHYSICS_STALL_DETECT_MS = 1000;
+
+// 跨请求状态：status 响应中的 physics_frame 与其到达时刻，用于检测物理帧停滞。
+// 仅 wait_for_response（HTTP 线程）访问，无需加锁；
+// 若未来多个 HTTP 线程并发轮询 status，需加锁保护。
+int64_t g_last_status_physics_frame = -1;
+std::chrono::steady_clock::time_point g_last_status_time;
+bool g_last_status_time_valid = false;
 
 bool env_flag_disabled(const std::string& value) {
     return value == "0" || value == "false";
@@ -167,11 +175,38 @@ JV wait_for_response(int64_t request_id, int64_t timeout_ms) {
     if (auto* result_p = response.Find(GSD_FIELD_RESULT)) {
         JV result = *result_p;
         if (pending->op == std::string(GSD_OP_STATUS) && result.IsObject()) {
-            if (auto* la = result.Find(GSD_FIELD_LAST_ACTIVITY_MS)) {
-                if (la->IsInt()) {
-                    result[GSD_FIELD_HEALTHY] = JV(la->GetInt() < HEALTHY_ACTIVITY_THRESHOLD_MS);
+            // 游戏侧已回传 healthy（间隔比较）则透传；否则回退编辑器侧旧逻辑
+            if (!result.Contains(GSD_FIELD_HEALTHY)) {
+                if (auto* la = result.Find(GSD_FIELD_LAST_ACTIVITY_MS)) {
+                    if (la->IsInt()) {
+                        result[GSD_FIELD_HEALTHY] = JV(la->GetInt() < HEALTHY_ACTIVITY_THRESHOLD_MS);
+                    }
                 }
             }
+            // 物理帧停滞检测：帧数不增长、fps>0、距上次 status 响应 >= 1s → 标记
+            bool physics_stalled = false;
+            if (auto* pf = result.Find("physics_frame")) {
+                if (pf->IsInt()) {
+                    auto now = std::chrono::steady_clock::now();
+                    if (g_last_status_time_valid) {
+                        int64_t elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            now - g_last_status_time).count();
+                        bool fps_positive = false;
+                        if (auto* fps = result.Find("fps")) {
+                            if (fps->IsInt()) fps_positive = fps->GetInt() > 0;
+                            else if (fps->IsDouble()) fps_positive = fps->GetDouble() > 0.0;
+                        }
+                        if (pf->GetInt() == g_last_status_physics_frame
+                                && elapsed_ms >= PHYSICS_STALL_DETECT_MS && fps_positive) {
+                            physics_stalled = true;
+                        }
+                    }
+                    g_last_status_physics_frame = pf->GetInt();
+                    g_last_status_time = now;
+                    g_last_status_time_valid = true;
+                }
+            }
+            result["physics_stalled"] = JV(physics_stalled);
         }
         return result;
     }
