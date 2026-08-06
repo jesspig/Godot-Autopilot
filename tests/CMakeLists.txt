@@ -73,28 +73,40 @@ if(GSD_UNIT_SOURCES)
 endif()
 
 # ====================================================================
-# gsd_engine_tests — L2 引擎内集成测试 (经 PROJECT_ROOT 定位 .env 与 Example)
+# gsd_test_runner — L2 引擎驱动测试执行器 (自管 Godot 进程, 不做 gtest 发现)
 # ====================================================================
-file(GLOB_RECURSE GSD_ENGINE_SOURCES CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/integration/*.cpp")
+add_executable(gsd_test_runner
+    runner/main.cpp
+    runner/godot_process.cpp
+    runner/config_loader.cpp
+    runner/assert_engine.cpp
+    runner/pipeline_executor.cpp
+    runner/traversal.cpp
+    runner/runner_report.cpp
+    integration/mcp_test_client.cpp)
 
-if(GSD_ENGINE_SOURCES)
-    add_executable(gsd_engine_tests ${GSD_ENGINE_SOURCES})
-
-    target_include_directories(gsd_engine_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
-    target_compile_definitions(gsd_engine_tests PRIVATE PROJECT_ROOT="${CMAKE_SOURCE_DIR}")
-    target_link_libraries(gsd_engine_tests PRIVATE
-        godot-cpp mcp-server mcp-http mcp-client hv_static GTest::gtest_main)
-    if(MSVC)
-        target_link_options(gsd_engine_tests PRIVATE "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>")
-    endif()
-
-    set_target_properties(gsd_engine_tests PROPERTIES
-        CXX_STANDARD ${GSD_TESTS_CXX_STANDARD}
-        CXX_STANDARD_REQUIRED ${GSD_TESTS_CXX_STANDARD_REQUIRED}
-        LINK_SEARCH_START_STATIC ${GSD_TESTS_LINK_SEARCH_STATIC}
-        LINK_SEARCH_END_STATIC ${GSD_TESTS_LINK_SEARCH_STATIC})
-
-    # L2 需启动 Godot 进程, 提高测试发现超时 (默认 5s 不够)
-    gtest_discover_tests(gsd_engine_tests DISCOVERY_TIMEOUT 30)
+target_include_directories(gsd_test_runner PRIVATE
+    ${CMAKE_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(gsd_test_runner PRIVATE PROJECT_ROOT="${CMAKE_SOURCE_DIR}")
+target_link_libraries(gsd_test_runner PRIVATE
+    godot-cpp mcp-server mcp-http mcp-client hv_static)
+set_target_properties(gsd_test_runner PROPERTIES
+    CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON
+    LINK_SEARCH_START_STATIC ON LINK_SEARCH_END_STATIC ON)
+if(MSVC)
+    target_link_options(gsd_test_runner PRIVATE "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>")
 endif()
+
+# ── ctest 注册: 每份 config/*.json 一条 gsd_runner_<name> 用例 ──
+# config/ 由后续阶段创建, 目录尚不存在时 GLOB 为空, foreach 自然跳过。
+file(GLOB GSD_TEST_CONFIGS CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/config/*.json")
+
+foreach(cfg ${GSD_TEST_CONFIGS})
+    get_filename_component(TEST_NAME "${cfg}" NAME_WE)
+    add_test(NAME gsd_runner_${TEST_NAME}
+        COMMAND gsd_test_runner --file ${TEST_NAME}
+                --report-dir ${CMAKE_CURRENT_BINARY_DIR}/output)
+    # 单文件含遍历约 2-4 分钟, 超时防挂死
+    set_tests_properties(gsd_runner_${TEST_NAME} PROPERTIES TIMEOUT 600)
+endforeach()
