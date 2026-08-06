@@ -19,7 +19,7 @@ Godot Editor
       ├── libhv (internal HTTP threads)
       ├── mcp-cpp-sdk: McpServer + Streamable HTTP
       ├── Command Queue (libhv → Godot main thread bridge)
-      ├── ~200 MCP Tools across 13 categories
+      ├── ~355 MCP Tools across 22 categories
       ├── Inline Documentation (offline engine docs)
       └── Custom Log Dock (dedicated plugin output panel)
 ```
@@ -31,38 +31,47 @@ Godot Editor
 | **Transport** | Streamable HTTP (POST /mcp) | Standard MCP protocol, no bridge process |
 | **Thread Model** | Command queue + frame sync | Safe Godot main-thread-only API access |
 | **Port** | 9527 | Configurable via `GODOT_SELF_DRIVING_PORT` env var |
-| **Discovery** | 3-Tier Progressive (Catalog→Inspect→Execute) | Keeps context small with ~200 tools |
+| **Discovery** | 3-Tier Progressive (Catalog→Inspect→Execute) | Keeps context small with ~355 tools |
 | **Search** | BM25 keyword | Tools organized by namespace + descriptions |
 | **Build** | CMake 3.28+ / C++17 | Cross-platform, auto-optimized builds |
 
 ## Features
 
-### 🎮 Full Engine Control (~200 Tools)
+### 🎮 Full Engine Control (~355 Tools)
 
 | Category | Tools | Description |
 |----------|:-----:|-------------|
-| **scene** | 3 | Node creation, deletion, scene tree inspection |
-| **property** | 4 | Get/set properties, list properties, signal connect |
-| **resource** | 20 | Load, save, create, list resources |
-| **physics** | 40 | 2D/3D ray casts, body creation, force application, joints |
-| **render** | 29 | Canvas items, cameras, lights, meshes, viewports, materials |
-| **navigation** | 15 | Nav mesh, path queries, agents |
-| **audio** | 15 | Bus management, stream playback, effects |
-| **input** | 10 | Key/mouse/gamepad simulation, action queries |
-| **script** | 10 | Execute GDScript and C#, call methods on any node |
-| **editor** | 20 | Selection, undo/redo, scene save, plugin management |
-| **config** | 13 | Project settings, engine properties |
-| **debug** | 15 | Performance monitors, profiling, diagnostics |
-| **documentation** | 4 | Query offline Godot API docs |
+| **Physics** | 51 | 2D/3D ray casts, body creation, force application, joints |
+| **Render** | 50 | Canvas items, cameras, lights, meshes, viewports, materials |
+| **Editor** | 25 | Selection, undo/redo, scene save, plugin management |
+| **Display** | 24 | Window, viewport and screen properties |
+| **Debug** | 23 | Performance monitors, profiling, diagnostics |
+| **Resources** | 22 | Load, save, create, list resources |
+| **Audio** | 20 | Bus management, stream playback, effects |
+| **Input** | 17 | Key/mouse/gamepad simulation, action queries |
+| **OS** | 15 | Operating system, environment and clipboard access |
+| **Navigation** | 15 | Nav mesh, path queries, agents |
+| **Config** | 13 | Project settings, engine properties |
+| **Scene** | 13 | Node creation, deletion, scene tree inspection (e.g. `scene_node_create`) |
+| **Text** | 11 | String manipulation, parsing and formatting |
+| **Scripts** | 9 | Execute GDScript and C#, call methods on any node |
+| **Debugger** | 7 | Debugger session control and inspection |
+| **TileMap** | 7 | Tile map creation, cell manipulation and queries |
+| **Properties** | 5 | Get/set properties, list properties, signal connect (e.g. `property_set`) |
+| **Docs** | 4 | Query offline Godot API docs |
+| **Game** | 3 | Game loop control and engine-wide state |
+| **Group** | 3 | Node group management and membership queries |
+| **SpriteFrames** | 3 | Sprite frame set creation and animation management |
+| **System** | 1 | Plugin-level system information |
 
 ### 📖 Inline API Documentation
 
 Query Godot's built-in offline documentation directly through MCP tools. No web searches needed — every class, method, property, and signal is documented from the engine's own `DocTools` cache:
 
-- `documentation.get_class` — Full class docs (description, methods, properties, signals)
-- `documentation.search` — Search classes by name or keyword
-- `documentation.get_method` — Method signature and description
-- `documentation.get_property` — Property type and description
+- `doc_get_class` — Full class docs (description, methods, properties, signals)
+- `doc_search` — Search classes by name or keyword
+- `doc_get_method` — Method signature and description
+- `doc_get_property` — Property type and description
 
 ### 📋 MCP Resources
 
@@ -76,6 +85,7 @@ godot://filesystem/tree             — Project file system structure
 godot://filesystem/{path}           — File/directory content
 godot://editor/selection            — Current selection
 godot://editor/settings/{key}       — Editor settings
+godot://log/recent                  — Recent plugin log entries
 ```
 
 ### 📝 Dedicated Log Panel

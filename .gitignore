@@ -40,6 +40,8 @@ _download/
 
 # Tests
 tests/*.xml
+tests/output/
+report-*.json
 test-results/
 .env
 
