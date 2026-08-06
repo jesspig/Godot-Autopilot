@@ -1,0 +1,100 @@
+# ====================================================================
+# GSD 测试基础设施 (由根 CMakeLists.txt 在 GSD_ENABLE_TESTS=ON 时引入)
+# 编译器探测/编译选项/C++17 已在根 CMakeLists.txt 完成, 测试目标继承。
+# ====================================================================
+
+# ── googletest (GIT_TAG 与 mcp-cpp-sdk 使用的 v1.15.2 一致) ──
+# 若 SDK 侧已开启 MCP_BUILD_TESTS 并先声明了 googletest, 此处跳过避免重复声明。
+include(FetchContent)
+if(NOT TARGET GTest::gtest_main)
+    FetchContent_Declare(googletest
+        GIT_REPOSITORY https://github.com/google/googletest.git
+        GIT_TAG        v1.15.2
+        GIT_SHALLOW    TRUE)
+    set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(googletest)
+endif()
+
+include(GoogleTest)
+
+# 业务子集源码 (从仓库根引用; register_all.cpp 引用全部 handle_xxx 符号, 链接必需)
+# resource_registry.cpp 被 code_exec_ops.cpp / resource_ops.cpp 引用 (grep 确认)
+file(GLOB GSD_TOOLS_OPS_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_SOURCE_DIR}/src/tools/*_ops.cpp")
+
+# 链接依赖 (grep 确认)：
+#   variant_json.cpp      — ops 大量调用 VariantJson::serialize/deserialize
+#   scene_dirty_tracker.cpp — editor/group/property/scene/tilemap ops 调用
+#   readback_util.cpp     — property/resource ops 调用 util::check_readback
+set(GSD_UNIT_BUSINESS_SOURCES
+    ${CMAKE_SOURCE_DIR}/src/core/log_system.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/resource_registry.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/scene_dirty_tracker.cpp
+    ${CMAKE_SOURCE_DIR}/src/util/bm25_index.cpp
+    ${CMAKE_SOURCE_DIR}/src/util/error_util.cpp
+    ${CMAKE_SOURCE_DIR}/src/util/readback_util.cpp
+    ${CMAKE_SOURCE_DIR}/src/util/variant_json.cpp
+    ${CMAKE_SOURCE_DIR}/src/tools/tool_catalog.cpp
+    ${CMAKE_SOURCE_DIR}/src/tools/schema_builder.cpp
+    ${CMAKE_SOURCE_DIR}/src/tools/register_all.cpp
+    ${GSD_TOOLS_OPS_SOURCES})
+
+set(GSD_TESTS_CXX_STANDARD 17)
+set(GSD_TESTS_CXX_STANDARD_REQUIRED ON)
+set(GSD_TESTS_LINK_SEARCH_STATIC ON)
+
+# ====================================================================
+# gsd_unit_tests — L1 纯单元测试 (不启动引擎, 不触碰 Godot API)
+# ====================================================================
+file(GLOB_RECURSE GSD_UNIT_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/unit/*.cpp")
+
+if(GSD_UNIT_SOURCES)
+    add_executable(gsd_unit_tests ${GSD_UNIT_SOURCES} ${GSD_UNIT_BUSINESS_SOURCES})
+
+    target_include_directories(gsd_unit_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    # mcp-client: register_all_test.cpp 使用 McpClient::Create/ListTools/Close
+    # 做 ListTools 往返断言 (SDK 测试链接组合为 mcp-client + mcp-server)
+    target_link_libraries(gsd_unit_tests PRIVATE
+        godot-cpp mcp-server mcp-client GTest::gtest_main)
+    if(MSVC)
+        target_link_options(gsd_unit_tests PRIVATE "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>")
+    endif()
+
+    set_target_properties(gsd_unit_tests PROPERTIES
+        CXX_STANDARD ${GSD_TESTS_CXX_STANDARD}
+        CXX_STANDARD_REQUIRED ${GSD_TESTS_CXX_STANDARD_REQUIRED}
+        LINK_SEARCH_START_STATIC ${GSD_TESTS_LINK_SEARCH_STATIC}
+        LINK_SEARCH_END_STATIC ${GSD_TESTS_LINK_SEARCH_STATIC})
+
+    gtest_discover_tests(gsd_unit_tests)
+endif()
+
+# ====================================================================
+# gsd_engine_tests — L2 引擎内集成测试 (经 PROJECT_ROOT 定位 .env 与 Example)
+# ====================================================================
+file(GLOB_RECURSE GSD_ENGINE_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/integration/*.cpp")
+
+if(GSD_ENGINE_SOURCES)
+    add_executable(gsd_engine_tests ${GSD_ENGINE_SOURCES})
+
+    target_include_directories(gsd_engine_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    target_compile_definitions(gsd_engine_tests PRIVATE PROJECT_ROOT="${CMAKE_SOURCE_DIR}")
+    target_link_libraries(gsd_engine_tests PRIVATE
+        godot-cpp mcp-server mcp-http mcp-client hv_static GTest::gtest_main)
+    if(MSVC)
+        target_link_options(gsd_engine_tests PRIVATE "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>")
+    endif()
+
+    set_target_properties(gsd_engine_tests PROPERTIES
+        CXX_STANDARD ${GSD_TESTS_CXX_STANDARD}
+        CXX_STANDARD_REQUIRED ${GSD_TESTS_CXX_STANDARD_REQUIRED}
+        LINK_SEARCH_START_STATIC ${GSD_TESTS_LINK_SEARCH_STATIC}
+        LINK_SEARCH_END_STATIC ${GSD_TESTS_LINK_SEARCH_STATIC})
+
+    # L2 需启动 Godot 进程, 提高测试发现超时 (默认 5s 不够)
+    gtest_discover_tests(gsd_engine_tests DISCOVERY_TIMEOUT 30)
+endif()
