@@ -41,6 +41,7 @@ _download/
 # Tests
 tests/*.xml
 test-results/
+.env
 
 # OS
 .DS_Store
