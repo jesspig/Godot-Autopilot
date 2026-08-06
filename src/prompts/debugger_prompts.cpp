@@ -6,25 +6,28 @@ namespace godot_self_driving {
 
 namespace {
 
-mcp::GetPromptResult make_result(const std::string& content) {
-    mcp::GetPromptResult r;
-    mcp::PromptMessage pm;
-    pm.role = "assistant";
-    pm.content = mcp::TextContent{"text", content};
-    r.messages = {std::move(pm)};
-    return r;
+mcp::GetPromptResult make_result(const std::string &content) {
+  mcp::GetPromptResult r;
+  mcp::PromptMessage pm;
+  pm.role = "assistant";
+  pm.content = mcp::TextContent{"text", content};
+  r.messages = {std::move(pm)};
+  return r;
 }
 
-} // anonymous namespace
+} // namespace
 
-void register_debugger_prompts(mcp::McpServer& server) {
-    using mcp::PromptOptions;
+void register_debugger_prompts(mcp::McpServer &server) {
+  using mcp::PromptOptions;
 
-    // 1. debug-analyze-error
-    server.RegisterPrompt("debug-analyze-error",
-        PromptOptions{}.Description("Analyze a runtime error with full context. Use output_get_log and debugger_get_errors first to gather data."),
-        [](const std::string& name, const std::optional<mcp::JsonValue>& args) {
-            std::string text = R"TEMPLATE(You have encountered a runtime error in the Godot game. Follow these steps to diagnose:
+  server.RegisterPrompt(
+      "debug-analyze-error",
+      PromptOptions{}.Description(
+          "Analyze a runtime error with full context. Use output_get_log and "
+          "debugger_get_errors first to gather data."),
+      [](const std::string &name, const std::optional<mcp::JsonValue> &args) {
+        std::string text =
+            R"TEMPLATE(You have encountered a runtime error in the Godot game. Follow these steps to diagnose:
 
 1. **Read error data**: Use `debugger_get_errors` to retrieve structured errors from the running game, or
    use `output_get_log` to check editor output for compilation/script errors.
@@ -48,21 +51,25 @@ void register_debugger_prompts(mcp::McpServer& server) {
    - Validate node paths before access
    - Ensure resources are loaded before use
 )TEMPLATE";
-            // 如果传入了 error_text 参数，附加到模板后
-            if (args && args->IsObject()) {
-                auto* err = args->Find("error_text");
-                if (err && err->IsString()) {
-                    text += "\n## Error to analyze:\n" + err->GetString() + "\n";
-                }
-            }
-            return make_result(text);
-        });
 
-    // 2. debug-analyze-breakpoint
-    server.RegisterPrompt("debug-analyze-breakpoint",
-        PromptOptions{}.Description("Analyze the current breakpoint context: stack trace, scene tree, and variable state."),
-        [](const std::string& name, const std::optional<mcp::JsonValue>& args) -> mcp::GetPromptResult {
-            std::string text = R"TEMPLATE(The debugger has paused at a breakpoint. Follow these steps:
+        if (args && args->IsObject()) {
+          auto *err = args->Find("error_text");
+          if (err && err->IsString()) {
+            text += "\n## Error to analyze:\n" + err->GetString() + "\n";
+          }
+        }
+        return make_result(text);
+      });
+
+  server.RegisterPrompt(
+      "debug-analyze-breakpoint",
+      PromptOptions{}.Description(
+          "Analyze the current breakpoint context: stack trace, scene tree, "
+          "and variable state."),
+      [](const std::string &name,
+         const std::optional<mcp::JsonValue> &args) -> mcp::GetPromptResult {
+        std::string text =
+            R"TEMPLATE(The debugger has paused at a breakpoint. Follow these steps:
 
 1. **Read the stack**: Use `debugger_get_stack_dump` to see the call stack.
 2. **Read the scene**: Use `debugger_get_scene_tree` to see the remote scene tree.
@@ -77,14 +84,17 @@ void register_debugger_prompts(mcp::McpServer& server) {
    - If investigating a bug: compare expected vs actual values
    - If inspecting flow: check if the call hierarchy is as expected
 )TEMPLATE";
-            return make_result(text);
-        });
+        return make_result(text);
+      });
 
-    // 3. debug-review-output
-    server.RegisterPrompt("debug-review-output",
-        PromptOptions{}.Description("Review the game's output log for issues, errors, and unexpected behavior."),
-        [](const std::string& name, const std::optional<mcp::JsonValue>& args) -> mcp::GetPromptResult {
-            std::string text = R"TEMPLATE(Review the game output to understand the current state:
+  server.RegisterPrompt(
+      "debug-review-output",
+      PromptOptions{}.Description("Review the game's output log for issues, "
+                                  "errors, and unexpected behavior."),
+      [](const std::string &name,
+         const std::optional<mcp::JsonValue> &args) -> mcp::GetPromptResult {
+        std::string text =
+            R"TEMPLATE(Review the game output to understand the current state:
 
 1. **Read outputs**:
    - Use `output_get_log` for editor-side output (script compilation results, tool scripts)
@@ -104,21 +114,24 @@ void register_debugger_prompts(mcp::McpServer& server) {
    - What is the health of the running game?
    - What should be fixed or investigated next?
 )TEMPLATE";
-            // 支持 since 参数
-            if (args && args->IsObject()) {
-                auto* s = args->Find("since");
-                if (s && s->IsString()) {
-                    text += "\n## Context: Reviewing output since \"" + s->GetString() + "\"\n";
-                }
-            }
-            return make_result(text);
-        });
 
-    // 4. debug-review-performance
-    server.RegisterPrompt("debug-review-performance",
-        PromptOptions{}.Description("Review performance monitor data to identify bottlenecks."),
-        [](const std::string& name, const std::optional<mcp::JsonValue>& args) -> mcp::GetPromptResult {
-            std::string text = R"TEMPLATE(Review game performance:
+        if (args && args->IsObject()) {
+          auto *s = args->Find("since");
+          if (s && s->IsString()) {
+            text += "\n## Context: Reviewing output since \"" + s->GetString() +
+                    "\"\n";
+          }
+        }
+        return make_result(text);
+      });
+
+  server.RegisterPrompt(
+      "debug-review-performance",
+      PromptOptions{}.Description(
+          "Review performance monitor data to identify bottlenecks."),
+      [](const std::string &name,
+         const std::optional<mcp::JsonValue> &args) -> mcp::GetPromptResult {
+        std::string text = R"TEMPLATE(Review game performance:
 
 1. **Read monitor data**: Use `debugger_get_monitors` to retrieve the latest performance frame.
 
@@ -140,14 +153,16 @@ void register_debugger_prompts(mcp::McpServer& server) {
    - High draw calls? Check for unnecessary CanvasItem updates
    - High physics time? Simplify collision shapes
 )TEMPLATE";
-            return make_result(text);
-        });
+        return make_result(text);
+      });
 
-    // 5. debug-session-status
-    server.RegisterPrompt("debug-session-status",
-        PromptOptions{}.Description("Quick summary of the current debug session state."),
-        [](const std::string& name, const std::optional<mcp::JsonValue>& args) -> mcp::GetPromptResult {
-            std::string text = R"TEMPLATE(Check the current debug session:
+  server.RegisterPrompt(
+      "debug-session-status",
+      PromptOptions{}.Description(
+          "Quick summary of the current debug session state."),
+      [](const std::string &name,
+         const std::optional<mcp::JsonValue> &args) -> mcp::GetPromptResult {
+        std::string text = R"TEMPLATE(Check the current debug session:
 
 1. Use `debugger_get_session_info` to see if a game is running and if the debugger is paused.
 2. If active and not breaked: the game is running normally. Check `debugger_get_errors` for any runtime errors.
@@ -160,11 +175,11 @@ Based on the state, I will:
 - Running clean → report that the game is running normally
 - No session → report that no game is running
 )TEMPLATE";
-            return make_result(text);
-        });
+        return make_result(text);
+      });
 
-    LogSystem::instance().log(LogLevel::Info, LogCategory::Prompts,
-        "Registered debugger prompts: 5 templates");
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Prompts,
+                            "Registered debugger prompts: 5 templates");
 }
 
 } // namespace godot_self_driving

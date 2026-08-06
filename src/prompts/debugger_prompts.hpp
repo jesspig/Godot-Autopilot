@@ -5,7 +5,7 @@
 
 namespace godot_self_driving {
 
-void register_debugger_prompts(mcp::McpServer& server);
+void register_debugger_prompts(mcp::McpServer &server);
 
-} // namespace godot_self_driving
+}
 #endif

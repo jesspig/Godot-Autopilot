@@ -1,7 +1,7 @@
 #include "prompts/prompt_handlers.hpp"
-#include "prompts/prompt_tool_usage.hpp"
-#include "prompts/prompt_keycode_reference.hpp"
 #include "core/log_system.hpp"
+#include "prompts/prompt_keycode_reference.hpp"
+#include "prompts/prompt_tool_usage.hpp"
 #include <mcp/Content.hpp>
 #include <string>
 
@@ -9,17 +9,17 @@ namespace godot_self_driving {
 
 namespace {
 
-static mcp::GetPromptResult make_result(const std::string& content) {
-    mcp::GetPromptResult r;
-    mcp::PromptMessage pm;
-    pm.role = "assistant";
-    pm.content = mcp::TextContent{"text", content};
-    r.messages = {std::move(pm)};
-    return r;
+static mcp::GetPromptResult make_result(const std::string &content) {
+  mcp::GetPromptResult r;
+  mcp::PromptMessage pm;
+  pm.role = "assistant";
+  pm.content = mcp::TextContent{"text", content};
+  r.messages = {std::move(pm)};
+  return r;
 }
 
 static std::string prompt_create_3d_scene() {
-    return R"gsd(# 创建 3D 场景指南
+  return R"gsd(# 创建 3D 场景指南
 
 ## 背景
 本流程引导你在 Godot 中创建一个完整的 3D 场景，包含摄像机、光照、环境和测试对象。
@@ -144,7 +144,7 @@ static std::string prompt_create_3d_scene() {
 }
 
 static std::string prompt_setup_character() {
-    return R"gsd(# 3D 角色控制器设置指南
+  return R"gsd(# 3D 角色控制器设置指南
 
 ## 背景
 本流程引导你在 Godot 中创建一个 3D 角色控制器，包含 CharacterBody3D、碰撞形状和移动脚本。
@@ -225,7 +225,7 @@ static std::string prompt_setup_character() {
 }
 
 static std::string prompt_debug_physics() {
-    return R"gsd(# 物理调试指南
+  return R"gsd(# 物理调试指南
 
 ## 背景
 本流程引导你使用 Godot 的物理系统和调试工具进行碰撞检测、射线投射和性能分析。
@@ -354,7 +354,7 @@ static std::string prompt_debug_physics() {
 }
 
 static std::string prompt_setup_input_map() {
-    return R"gsd(# 输入动作（Input Map）配置指南
+  return R"gsd(# 输入动作（Input Map）配置指南
 
 ## 背景
 本流程引导你在 Godot 项目设置中创建和配置输入动作，并测试输入响应。
@@ -493,7 +493,7 @@ static std::string prompt_setup_input_map() {
 }
 
 static std::string prompt_setup_gui() {
-    return R"gsd(# GUI 界面创建指南
+  return R"gsd(# GUI 界面创建指南
 
 ## 背景
 本流程引导你在 Godot 中创建一个简单的 GUI 界面，包含容器布局、按钮和标签，以及信号连接。
@@ -689,81 +689,97 @@ CanvasLayer 确保 UI 不受游戏世界缩放影响：
 - 使用 MarginContainer 或设置容器主题的 padding 属性可以添加边距)gsd";
 }
 
-} // anonymous namespace
+} // namespace
 
-void register_all_prompts(mcp::McpServer& server, CommandQueue& queue) {
-    server.RegisterPrompt("create-3d-scene",
-        mcp::PromptOptions{}.Description("Guide to create a basic 3D scene with camera, lighting, and a test object"),
-        [&queue](const std::string&, const std::optional<mcp::JsonValue>&) -> mcp::GetPromptResult {
-            std::string content;
-            queue.submit([&content]() {
-                content = prompt_create_3d_scene();
-            }).get();
-            return make_result(content);
-        });
+void register_all_prompts(mcp::McpServer &server, CommandQueue &queue) {
+  server.RegisterPrompt(
+      "create-3d-scene",
+      mcp::PromptOptions{}.Description("Guide to create a basic 3D scene with "
+                                       "camera, lighting, and a test object"),
+      [&queue](const std::string &,
+               const std::optional<mcp::JsonValue> &) -> mcp::GetPromptResult {
+        std::string content;
+        queue.submit([&content]() { content = prompt_create_3d_scene(); })
+            .get();
+        return make_result(content);
+      });
 
-    server.RegisterPrompt("setup-character",
-        mcp::PromptOptions{}.Description("Guide to set up a 3D character controller with CharacterBody3D, collision, and movement script"),
-        [&queue](const std::string&, const std::optional<mcp::JsonValue>&) -> mcp::GetPromptResult {
-            std::string content;
-            queue.submit([&content]() {
-                content = prompt_setup_character();
-            }).get();
-            return make_result(content);
-        });
+  server.RegisterPrompt(
+      "setup-character",
+      mcp::PromptOptions{}.Description(
+          "Guide to set up a 3D character controller with CharacterBody3D, "
+          "collision, and movement script"),
+      [&queue](const std::string &,
+               const std::optional<mcp::JsonValue> &) -> mcp::GetPromptResult {
+        std::string content;
+        queue.submit([&content]() { content = prompt_setup_character(); })
+            .get();
+        return make_result(content);
+      });
 
-    server.RegisterPrompt("debug-physics",
-        mcp::PromptOptions{}.Description("Guide to use physics debugging tools including ray casts, shape casts, and performance monitors"),
-        [&queue](const std::string&, const std::optional<mcp::JsonValue>&) -> mcp::GetPromptResult {
-            std::string content;
-            queue.submit([&content]() {
-                content = prompt_debug_physics();
-            }).get();
-            return make_result(content);
-        });
+  server.RegisterPrompt(
+      "debug-physics",
+      mcp::PromptOptions{}.Description(
+          "Guide to use physics debugging tools including ray casts, shape "
+          "casts, and performance monitors"),
+      [&queue](const std::string &,
+               const std::optional<mcp::JsonValue> &) -> mcp::GetPromptResult {
+        std::string content;
+        queue.submit([&content]() { content = prompt_debug_physics(); }).get();
+        return make_result(content);
+      });
 
-    server.RegisterPrompt("setup-input-map",
-        mcp::PromptOptions{}.Description("Guide to configure input actions in Project Settings and test them"),
-        [&queue](const std::string&, const std::optional<mcp::JsonValue>&) -> mcp::GetPromptResult {
-            std::string content;
-            queue.submit([&content]() {
-                content = prompt_setup_input_map();
-            }).get();
-            return make_result(content);
-        });
+  server.RegisterPrompt(
+      "setup-input-map",
+      mcp::PromptOptions{}.Description(
+          "Guide to configure input actions in Project Settings and test them"),
+      [&queue](const std::string &,
+               const std::optional<mcp::JsonValue> &) -> mcp::GetPromptResult {
+        std::string content;
+        queue.submit([&content]() { content = prompt_setup_input_map(); })
+            .get();
+        return make_result(content);
+      });
 
-    server.RegisterPrompt("setup-gui",
-        mcp::PromptOptions{}.Description("Guide to create a simple GUI with CanvasLayer, containers, buttons, and labels"),
-        [&queue](const std::string&, const std::optional<mcp::JsonValue>&) -> mcp::GetPromptResult {
-            std::string content;
-            queue.submit([&content]() {
-                content = prompt_setup_gui();
-            }).get();
-            return make_result(content);
-        });
+  server.RegisterPrompt(
+      "setup-gui",
+      mcp::PromptOptions{}.Description(
+          "Guide to create a simple GUI with CanvasLayer, containers, buttons, "
+          "and labels"),
+      [&queue](const std::string &,
+               const std::optional<mcp::JsonValue> &) -> mcp::GetPromptResult {
+        std::string content;
+        queue.submit([&content]() { content = prompt_setup_gui(); }).get();
+        return make_result(content);
+      });
 
-    server.RegisterPrompt("tool-usage",
-        mcp::PromptOptions{}.Description("Usage examples for the 17 most commonly used MCP tools with JSON input/output and gotchas"),
-        [&queue](const std::string&, const std::optional<mcp::JsonValue>&) -> mcp::GetPromptResult {
-            std::string content;
-            queue.submit([&content]() {
-                content = prompt_tool_usage();
-            }).get();
-            return make_result(content);
-        });
+  server.RegisterPrompt(
+      "tool-usage",
+      mcp::PromptOptions{}.Description(
+          "Usage examples for the 17 most commonly used MCP tools with JSON "
+          "input/output and gotchas"),
+      [&queue](const std::string &,
+               const std::optional<mcp::JsonValue> &) -> mcp::GetPromptResult {
+        std::string content;
+        queue.submit([&content]() { content = prompt_tool_usage(); }).get();
+        return make_result(content);
+      });
 
-    server.RegisterPrompt("keycode-reference",
-        mcp::PromptOptions{}.Description("Godot keycode reference for InputEventKey and Variant type JSON mapping for property operations"),
-        [&queue](const std::string&, const std::optional<mcp::JsonValue>&) -> mcp::GetPromptResult {
-            std::string content;
-            queue.submit([&content]() {
-                content = prompt_keycode_reference();
-            }).get();
-            return make_result(content);
-        });
+  server.RegisterPrompt(
+      "keycode-reference",
+      mcp::PromptOptions{}.Description(
+          "Godot keycode reference for InputEventKey and Variant type JSON "
+          "mapping for property operations"),
+      [&queue](const std::string &,
+               const std::optional<mcp::JsonValue> &) -> mcp::GetPromptResult {
+        std::string content;
+        queue.submit([&content]() { content = prompt_keycode_reference(); })
+            .get();
+        return make_result(content);
+      });
 
-    LogSystem::instance().log(LogLevel::Info, LogCategory::Prompts,
-        "7 prompt templates registered");
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Prompts,
+                            "7 prompt templates registered");
 }
 
 } // namespace godot_self_driving

@@ -5,17 +5,13 @@
 
 namespace godot_self_driving {
 
-enum class RuntimeMode {
-    Editor,
-    Game,
-    Unknown
-};
+enum class RuntimeMode { Editor, Game, Unknown };
 
 class ModeDetector {
 public:
-    static RuntimeMode detect();
-    static bool is_editor();
-    static bool is_runtime();
+  static RuntimeMode detect();
+  static bool is_editor();
+  static bool is_runtime();
 };
 
 } // namespace godot_self_driving
