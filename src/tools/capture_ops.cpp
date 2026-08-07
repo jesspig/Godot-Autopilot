@@ -14,12 +14,6 @@ namespace capture_ops {
 
 namespace {
 
-mcp::JsonValue error_response(const std::string &msg) {
-  mcp::JsonValue e(mcp::JsonValue::object_tag);
-  e["error"] = mcp::JsonValue(msg);
-  return e;
-}
-
 godot::Ref<godot::ViewportTexture>
 usable_viewport_texture(godot::SubViewport *viewport) {
   godot::Ref<godot::ViewportTexture> texture;
@@ -92,7 +86,7 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
 
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor)
-    return error_response("EditorInterface not available");
+    return util::error_json("EditorInterface not available");
 
   godot::Ref<godot::ViewportTexture> texture =
       usable_viewport_texture(editor->get_editor_viewport_2d());
@@ -110,7 +104,7 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
 
   godot::PackedByteArray png_buffer = img->save_png_to_buffer();
   if (png_buffer.size() == 0)
-    return error_response("PNG encoding returned empty buffer");
+    return util::error_json("PNG encoding returned empty buffer");
 
   std::string b64 =
       base64_encode(png_buffer.ptr(), static_cast<size_t>(png_buffer.size()));

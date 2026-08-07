@@ -1,5 +1,6 @@
 #include "os_ops.hpp"
 #include "core/log_system.hpp"
+#include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/classes/time.hpp>
@@ -11,11 +12,6 @@ namespace os_ops {
 using JV = mcp::JsonValue;
 
 namespace {
-
-std::string to_std(const godot::String &s) {
-  godot::CharString utf8 = s.utf8();
-  return std::string(utf8.ptr());
-}
 
 godot::String join_psa(const godot::PackedStringArray &psa) {
   godot::String result;
@@ -232,7 +228,7 @@ JV handle_os_get_environment(const JV &args) {
   godot::String value = os->get_environment(godot::String(variable.c_str()));
 
   JV r(JV::object_tag);
-  r["result"] = JV(to_std(value));
+  r["result"] = JV(util::to_std(value));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "os_get_environment completed");
   return r;
@@ -252,7 +248,7 @@ JV handle_os_get_locale(const JV &) {
   godot::String locale = os->get_locale();
 
   JV r(JV::object_tag);
-  r["result"] = JV(to_std(locale));
+  r["result"] = JV(util::to_std(locale));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "os_get_locale completed");
   return r;
@@ -272,7 +268,7 @@ JV handle_os_get_system_fonts(const JV &) {
   godot::PackedStringArray fonts = os->get_system_fonts();
   JV arr(JV::array_tag);
   for (int i = 0; i < fonts.size(); ++i) {
-    arr.PushBack(JV(to_std(fonts[i])));
+    arr.PushBack(JV(util::to_std(fonts[i])));
   }
 
   JV r(JV::object_tag);
@@ -294,10 +290,10 @@ JV handle_os_get_system_info(const JV &) {
   }
 
   JV info(JV::object_tag);
-  info["name"] = JV(to_std(os->get_name()));
-  info["version"] = JV(to_std(os->get_version()));
+  info["name"] = JV(util::to_std(os->get_name()));
+  info["version"] = JV(util::to_std(os->get_version()));
   info["processor_count"] = JV(static_cast<int64_t>(os->get_processor_count()));
-  info["processor_name"] = JV(to_std(os->get_processor_name()));
+  info["processor_name"] = JV(util::to_std(os->get_processor_name()));
 
   JV r(JV::object_tag);
   r["result"] = std::move(info);
@@ -320,7 +316,7 @@ JV handle_os_get_unique_id(const JV &) {
   godot::String uid = os->get_unique_id();
 
   JV r(JV::object_tag);
-  r["result"] = JV(to_std(uid));
+  r["result"] = JV(util::to_std(uid));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "os_get_unique_id completed");
   return r;
@@ -360,7 +356,7 @@ JV handle_os_get_user_data_dir(const JV &) {
   godot::String dir = os->get_user_data_dir();
 
   JV r(JV::object_tag);
-  r["result"] = JV(to_std(dir));
+  r["result"] = JV(util::to_std(dir));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "os_get_user_data_dir completed");
   return r;

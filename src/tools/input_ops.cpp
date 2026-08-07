@@ -1,5 +1,6 @@
 #include "input_ops.hpp"
 #include "core/log_system.hpp"
+#include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/input.hpp>
 #include <godot_cpp/classes/input_event.hpp>
@@ -14,11 +15,6 @@ namespace godot_self_driving {
 namespace input_ops {
 
 namespace {
-
-std::string to_std(const godot::String &s) {
-  godot::CharString utf8 = s.utf8();
-  return std::string(utf8.ptr());
-}
 
 godot::Key parse_key(const std::string &key_str) {
   if (key_str.empty())

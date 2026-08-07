@@ -1,5 +1,6 @@
 #include "physics_ops.hpp"
 #include "core/log_system.hpp"
+#include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/collision_object2d.hpp>
 #include <godot_cpp/classes/collision_object3d.hpp>
@@ -36,11 +37,6 @@ namespace physics_ops {
 using JV = mcp::JsonValue;
 
 namespace {
-
-std::string to_std(const godot::String &s) {
-  godot::CharString utf8 = s.utf8();
-  return std::string(utf8.ptr());
-}
 
 struct RidStore {
   std::unordered_map<int64_t, godot::RID> map;
@@ -2060,13 +2056,13 @@ JV handle_physics_node_get_rid(const JV &args) {
   if (clean.size() > 5 && clean.compare(0, 5, "root/") == 0)
     clean = clean.substr(5);
   godot::Node *node = nullptr;
-  if (clean.empty() || clean == to_std(root->get_name())) {
+  if (clean.empty() || clean == util::to_std(root->get_name())) {
     node = root;
   } else {
     node =
         root->get_node_or_null(godot::NodePath(godot::String(clean.c_str())));
     if (!node) {
-      std::string root_name = to_std(root->get_name());
+      std::string root_name = util::to_std(root->get_name());
       if (clean.size() > root_name.size() + 1 &&
           clean.compare(0, root_name.size(), root_name) == 0 &&
           clean[root_name.size()] == '/') {
@@ -2122,17 +2118,17 @@ JV handle_resolve_object(const JV &args) {
   }
   JV r(JV::object_tag);
   r["result"] = JV("ok");
-  r["class"] = JV(to_std(obj->get_class()));
+  r["class"] = JV(util::to_std(obj->get_class()));
   godot::Node *node = godot::Object::cast_to<godot::Node>(obj);
   if (node) {
     if (node->is_inside_tree()) {
-      r["node_path"] = JV(to_std(node->get_path()));
+      r["node_path"] = JV(util::to_std(node->get_path()));
     }
-    r["name"] = JV(to_std(node->get_name()));
+    r["name"] = JV(util::to_std(node->get_name()));
   }
   auto res = godot::Ref<godot::Resource>(obj);
   if (res.is_valid()) {
-    std::string res_path = to_std(res->get_path());
+    std::string res_path = util::to_std(res->get_path());
     if (!res_path.empty()) {
       r["resource_path"] = JV(res_path);
     }

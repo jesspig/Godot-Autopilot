@@ -1,6 +1,7 @@
 #include "group_ops.hpp"
 #include "core/log_system.hpp"
 #include "core/scene_dirty_tracker.hpp"
+#include "util/error_util.hpp"
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/editor_undo_redo_manager.hpp>
 #include <godot_cpp/classes/node.hpp>
@@ -14,11 +15,6 @@ namespace godot_self_driving {
 namespace group_ops {
 
 namespace {
-
-std::string to_std(const godot::String &s) {
-  godot::CharString utf8 = s.utf8();
-  return std::string(utf8.ptr());
-}
 
 godot::Node *find_node(const std::string &path_str) {
   auto *editor = godot::EditorInterface::get_singleton();
@@ -35,14 +31,14 @@ godot::Node *find_node(const std::string &path_str) {
   if (clean.size() > 5 && clean.compare(0, 5, "root/") == 0) {
     clean = clean.substr(5);
   }
-  if (clean.empty() || clean == to_std(root->get_name())) {
+  if (clean.empty() || clean == util::to_std(root->get_name())) {
     return root;
   }
 
   auto *node =
       root->get_node_or_null(godot::NodePath(godot::String(clean.c_str())));
   if (!node) {
-    std::string root_name = to_std(root->get_name());
+    std::string root_name = util::to_std(root->get_name());
     if (clean.size() > root_name.size() + 1 &&
         clean.compare(0, root_name.size(), root_name) == 0 &&
         clean[root_name.size()] == '/') {

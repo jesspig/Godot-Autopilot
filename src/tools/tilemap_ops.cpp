@@ -2,6 +2,7 @@
 #include "core/log_system.hpp"
 #include "core/scene_dirty_tracker.hpp"
 #include "resource_ops.hpp"
+#include "util/error_util.hpp"
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/node.hpp>
@@ -21,17 +22,6 @@ using JV = mcp::JsonValue;
 
 namespace {
 
-std::string to_std(const godot::String &s) {
-  godot::CharString utf8 = s.utf8();
-  return std::string(utf8.ptr());
-}
-
-JV error(const std::string &msg) {
-  JV e(JV::object_tag);
-  e["error"] = JV(msg);
-  return e;
-}
-
 godot::Node *find_node(const std::string &path_str) {
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor)
@@ -43,13 +33,13 @@ godot::Node *find_node(const std::string &path_str) {
   if (!clean.empty() && clean[0] == '/') {
     clean = clean.substr(1);
   }
-  if (clean.empty() || clean == to_std(root->get_name())) {
+  if (clean.empty() || clean == util::to_std(root->get_name())) {
     return root;
   }
   godot::NodePath np(godot::String(clean.c_str()));
   godot::Node *node = root->get_node_or_null(np);
   if (!node) {
-    std::string root_name = to_std(root->get_name());
+    std::string root_name = util::to_std(root->get_name());
     if (clean.size() > root_name.size() + 1 &&
         clean.compare(0, root_name.size(), root_name) == 0 &&
         clean[root_name.size()] == '/') {
@@ -75,15 +65,15 @@ JV handle_create(const JV &args) {
 
   auto *cdbs = godot::ClassDBSingleton::get_singleton();
   if (!cdbs)
-    return error("ClassDB singleton not available");
+    return util::error_json("ClassDB singleton not available");
 
   godot::Variant obj_var = cdbs->instantiate(godot::StringName("TileMap"));
   if (obj_var.get_type() == godot::Variant::NIL)
-    return error("failed to instantiate TileMap");
+    return util::error_json("failed to instantiate TileMap");
 
   auto *tile_map = godot::Object::cast_to<godot::TileMap>(obj_var);
   if (!tile_map)
-    return error("instantiated object is not a TileMap");
+    return util::error_json("instantiated object is not a TileMap");
 
   tile_map->set_name(godot::StringName(name.c_str()));
 
@@ -116,7 +106,7 @@ JV handle_create(const JV &args) {
   if (has_parent) {
     auto *parent = find_node(pp->GetString());
     if (!parent)
-      return error("parent node not found: " + pp->GetString());
+      return util::error_json("parent node not found: " + pp->GetString());
     parent->add_child(tile_map);
     if (editor) {
       auto *scene_root = editor->get_edited_scene_root();
@@ -137,8 +127,8 @@ JV handle_create(const JV &args) {
   if (editor) {
     auto *scene_root = editor->get_edited_scene_root();
     if (scene_root) {
-      std::string abs = to_std(tile_map->get_path());
-      std::string root_pref = to_std(scene_root->get_path());
+      std::string abs = util::to_std(tile_map->get_path());
+      std::string root_pref = util::to_std(scene_root->get_path());
       if (abs == root_pref)
         result_path = name;
       else if (abs.find(root_pref + "/") == 0)
@@ -169,17 +159,17 @@ JV handle_set_cell(const JV &args) {
 
   auto *p = args.Find("path");
   if (!p || !p->IsString())
-    return error("missing required parameter: path");
+    return util::error_json("missing required parameter: path");
 
   auto *node = find_node(p->GetString());
   if (!node)
-    return error("node not found: " + p->GetString());
+    return util::error_json("node not found: " + p->GetString());
 
   auto *tile_map = godot::Object::cast_to<godot::TileMap>(node);
   auto *tile_map_layer =
       tile_map ? nullptr : godot::Object::cast_to<godot::TileMapLayer>(node);
   if (!tile_map && !tile_map_layer)
-    return error(
+    return util::error_json(
         "node is not a TileMap or TileMapLayer: " + p->GetString() +
         " — create one with tilemap_create (TileMap) or scene_node_create + "
         "property_set (TileMapLayer), or fix the path");
@@ -187,9 +177,9 @@ JV handle_set_cell(const JV &args) {
   auto *x = args.Find("x");
   auto *y = args.Find("y");
   if (!x || !x->IsInt())
-    return error("missing required parameter: x");
+    return util::error_json("missing required parameter: x");
   if (!y || !y->IsInt())
-    return error("missing required parameter: y");
+    return util::error_json("missing required parameter: y");
 
   int layer = 0;
   auto *la = args.Find("layer");
@@ -234,24 +224,24 @@ JV handle_set_cells(const JV &args) {
   if (!p || !p->IsString())
     p = args.Find("node_path");
   if (!p || !p->IsString())
-    return error("missing required parameter: node_path");
+    return util::error_json("missing required parameter: node_path");
 
   auto *node = find_node(p->GetString());
   if (!node)
-    return error("node not found: " + p->GetString());
+    return util::error_json("node not found: " + p->GetString());
 
   auto *tile_map = godot::Object::cast_to<godot::TileMap>(node);
   auto *tile_map_layer =
       tile_map ? nullptr : godot::Object::cast_to<godot::TileMapLayer>(node);
   if (!tile_map && !tile_map_layer)
-    return error(
+    return util::error_json(
         "node is not a TileMap or TileMapLayer: " + p->GetString() +
         " — create one with tilemap_create (TileMap) or scene_node_create + "
         "property_set (TileMapLayer), or fix the path");
 
   auto *cells = args.Find("cells");
   if (!cells || !cells->IsArray())
-    return error("missing required parameter: cells");
+    return util::error_json("missing required parameter: cells");
 
   int layer = 0;
   auto *la = args.Find("layer");
@@ -342,15 +332,15 @@ JV handle_tileset_create(const JV &args) {
 
   auto *cdbs = godot::ClassDBSingleton::get_singleton();
   if (!cdbs)
-    return error("ClassDB singleton not available");
+    return util::error_json("ClassDB singleton not available");
 
   godot::Variant ts_var = cdbs->instantiate(godot::StringName("TileSet"));
   if (ts_var.get_type() == godot::Variant::NIL)
-    return error("failed to instantiate TileSet");
+    return util::error_json("failed to instantiate TileSet");
 
   godot::Ref<godot::TileSet> tile_set = ts_var;
   if (tile_set.is_null())
-    return error("instantiated object is not a TileSet");
+    return util::error_json("instantiated object is not a TileSet");
 
   tile_set->set("resource_name", godot::String(name.c_str()));
   tile_set->set("tile_size", godot::Vector2i(tile_size, tile_size));

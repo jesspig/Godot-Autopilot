@@ -35,18 +35,13 @@ namespace {
 
 constexpr int MAX_TREE_DEPTH = 12;
 
-std::string to_std(const godot::String &s) {
-  godot::CharString utf8 = s.utf8();
-  return std::string(utf8.ptr());
-}
-
 std::string relative_path(godot::Node *node, godot::Node *root) {
   if (!node || !root)
     return "";
-  std::string abs_path = to_std(node->get_path());
-  std::string root_path = to_std(root->get_path());
+  std::string abs_path = util::to_std(node->get_path());
+  std::string root_path = util::to_std(root->get_path());
   if (abs_path == root_path) {
-    return to_std(node->get_name());
+    return util::to_std(node->get_name());
   }
   if (abs_path.size() > root_path.size() + 1 && abs_path.find(root_path) == 0 &&
       abs_path[root_path.size()] == '/') {
@@ -59,8 +54,8 @@ bool dir_to_json(godot::EditorFileSystemDirectory *dir, mcp::JsonValue &j,
                  int depth) {
   if (!dir)
     return false;
-  j["name"] = mcp::JsonValue(to_std(dir->get_name()));
-  j["path"] = mcp::JsonValue(to_std(dir->get_path()));
+  j["name"] = mcp::JsonValue(util::to_std(dir->get_name()));
+  j["path"] = mcp::JsonValue(util::to_std(dir->get_path()));
   j["type"] = mcp::JsonValue("directory");
   mcp::JsonValue children_arr(mcp::JsonValue::array_tag);
   bool truncated = false;
@@ -76,10 +71,10 @@ bool dir_to_json(godot::EditorFileSystemDirectory *dir, mcp::JsonValue &j,
     }
     for (int i = 0; i < dir->get_file_count(); i++) {
       mcp::JsonValue file(mcp::JsonValue::object_tag);
-      file["name"] = mcp::JsonValue(to_std(dir->get_file(i)));
-      file["path"] = mcp::JsonValue(to_std(dir->get_file_path(i)));
+      file["name"] = mcp::JsonValue(util::to_std(dir->get_file(i)));
+      file["path"] = mcp::JsonValue(util::to_std(dir->get_file_path(i)));
       godot::StringName sn = dir->get_file_type(i);
-      file["type"] = mcp::JsonValue(to_std(godot::String(sn)));
+      file["type"] = mcp::JsonValue(util::to_std(godot::String(sn)));
       file["children"] = mcp::JsonValue(mcp::JsonValue::array_tag);
       children_arr.PushBack(std::move(file));
     }
@@ -88,12 +83,6 @@ bool dir_to_json(godot::EditorFileSystemDirectory *dir, mcp::JsonValue &j,
   }
   j["children"] = std::move(children_arr);
   return truncated;
-}
-
-mcp::JsonValue error_json(const std::string &msg) {
-  mcp::JsonValue e(mcp::JsonValue::object_tag);
-  e["error"] = mcp::JsonValue(msg);
-  return e;
 }
 
 godot::PackedStringArray editor_unsaved_scenes(godot::EditorInterface *editor) {
@@ -109,7 +98,7 @@ std::string unsaved_list_str(const godot::PackedStringArray &scenes) {
   for (int i = 0; i < scenes.size(); i++) {
     if (i > 0)
       list += ", ";
-    list += to_std(scenes[i]);
+    list += util::to_std(scenes[i]);
   }
   return list;
 }
@@ -139,10 +128,10 @@ mcp::JsonValue handle_get_selection(const mcp::JsonValue &) {
     if (!node)
       continue;
     mcp::JsonValue item(mcp::JsonValue::object_tag);
-    item["name"] = mcp::JsonValue(to_std(node->get_name()));
-    item["class"] = mcp::JsonValue(to_std(node->get_class()));
+    item["name"] = mcp::JsonValue(util::to_std(node->get_name()));
+    item["class"] = mcp::JsonValue(util::to_std(node->get_class()));
     item["path"] = mcp::JsonValue(root ? relative_path(node, root)
-                                       : to_std(node->get_name()));
+                                       : util::to_std(node->get_name()));
     result_arr.PushBack(std::move(item));
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
@@ -209,9 +198,9 @@ mcp::JsonValue handle_get_edited_scene_root(const mcp::JsonValue &) {
     return r;
   }
   mcp::JsonValue j(mcp::JsonValue::object_tag);
-  j["name"] = mcp::JsonValue(to_std(root->get_name()));
-  j["type"] = mcp::JsonValue(to_std(root->get_class()));
-  j["path"] = mcp::JsonValue(to_std(root->get_name()));
+  j["name"] = mcp::JsonValue(util::to_std(root->get_name()));
+  j["type"] = mcp::JsonValue(util::to_std(root->get_class()));
+  j["path"] = mcp::JsonValue(util::to_std(root->get_name()));
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(j);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -239,7 +228,7 @@ mcp::JsonValue handle_save_scene(const mcp::JsonValue &) {
   if (err != godot::Error::OK) {
     godot::String existing_path = root->get_scene_file_path();
     if (existing_path.is_empty()) {
-      std::string root_name = to_std(root->get_name());
+      std::string root_name = util::to_std(root->get_name());
       std::string generated_path = "res://" + root_name + ".tscn";
       LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                                 "scene has no file path, saving as " +
@@ -268,11 +257,11 @@ mcp::JsonValue handle_save_scene(const mcp::JsonValue &) {
           "editor_save_scene completed (saved as new scene)");
       return r;
     }
-    r["path"] = mcp::JsonValue(to_std(existing_path));
+    r["path"] = mcp::JsonValue(util::to_std(existing_path));
     r["result"] = mcp::JsonValue(static_cast<int64_t>(err));
   } else {
     godot::String file_path = root->get_scene_file_path();
-    r["path"] = mcp::JsonValue(to_std(file_path));
+    r["path"] = mcp::JsonValue(util::to_std(file_path));
     r["result"] = mcp::JsonValue("saved");
     scene_dirty_tracker::clear_scene_modified();
   }
@@ -318,7 +307,7 @@ mcp::JsonValue handle_reload_scene(const mcp::JsonValue &args) {
       e["error"] = mcp::JsonValue("no scene open, provide scene_path");
       return e;
     }
-    scene_path = to_std(root->get_scene_file_path());
+    scene_path = util::to_std(root->get_scene_file_path());
     if (scene_path.empty()) {
       mcp::JsonValue e(mcp::JsonValue::object_tag);
       e["error"] =
@@ -613,7 +602,7 @@ mcp::JsonValue handle_import_resource(const mcp::JsonValue &args) {
     return e;
   }
   mcp::JsonValue j(mcp::JsonValue::object_tag);
-  j["class"] = mcp::JsonValue(to_std(res->get_class()));
+  j["class"] = mcp::JsonValue(util::to_std(res->get_class()));
   j["path"] = mcp::JsonValue(path);
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(j);
@@ -771,7 +760,7 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue &args) {
                             "editor_new_scene called");
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
-    return error_json("EditorInterface not available");
+    return util::error_json("EditorInterface not available");
   }
 
   std::string type = "Node";
@@ -791,22 +780,22 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue &args) {
 
   auto *cdbs = godot::ClassDBSingleton::get_singleton();
   if (!cdbs) {
-    return error_json("ClassDB singleton not available");
+    return util::error_json("ClassDB singleton not available");
   }
 
   if (!cdbs->is_parent_class(godot::StringName(type.c_str()),
                              godot::StringName("Node"))) {
-    return error_json(type + " is not a Node subclass");
+    return util::error_json(type + " is not a Node subclass");
   }
 
   godot::Variant obj_var = cdbs->instantiate(godot::StringName(type.c_str()));
   if (obj_var.get_type() == godot::Variant::NIL) {
-    return error_json("failed to instantiate node type: " + type);
+    return util::error_json("failed to instantiate node type: " + type);
   }
 
   auto *node = godot::Object::cast_to<godot::Node>(obj_var);
   if (!node) {
-    return error_json("instantiated object is not a Node: " + type);
+    return util::error_json("instantiated object is not a Node: " + type);
   }
 
   node->set_name(godot::StringName(name.c_str()));
@@ -815,26 +804,26 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue &args) {
   auto *existing_root = editor->get_edited_scene_root();
   if (existing_root) {
     if (!close_current) {
-      return error_json(
+      return util::error_json(
           "scene already has a root node — call editor_new_scene with "
           "close_current=true, or call editor_close_scene first");
     }
     if (existing_root->get_scene_file_path().is_empty()) {
       return util::error_detail("current scene is unsaved",
-                                to_std(existing_root->get_name()),
+                                util::to_std(existing_root->get_name()),
                                 "scene saved before close",
                                 "call editor_save_scene first, then "
                                 "editor_new_scene with close_current=true");
     }
     godot::PackedStringArray unsaved = editor_unsaved_scenes(editor);
     if (!unsaved.is_empty()) {
-      return error_json(
+      return util::error_json(
           "scene has unsaved changes: " + unsaved_list_str(unsaved) +
           " — save first (editor_save_scene)");
     }
     godot::Error err = editor->close_scene();
     if (err != godot::Error::OK) {
-      return error_json("failed to close scene (error " +
+      return util::error_json("failed to close scene (error " +
                         std::to_string(static_cast<int>(err)) + ")");
     }
     closed_previous = true;
@@ -946,17 +935,17 @@ mcp::JsonValue handle_close_scene(const mcp::JsonValue &) {
                             "editor_close_scene called");
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
-    return error_json("EditorInterface not available");
+    return util::error_json("EditorInterface not available");
   }
   godot::PackedStringArray unsaved = editor_unsaved_scenes(editor);
   if (!unsaved.is_empty()) {
-    return error_json(
+    return util::error_json(
         "scene has unsaved changes: " + unsaved_list_str(unsaved) +
         " — save first (editor_save_scene)");
   }
   godot::Error err = editor->close_scene();
   if (err != godot::Error::OK) {
-    return error_json("failed to close scene (error " +
+    return util::error_json("failed to close scene (error " +
                       std::to_string(static_cast<int>(err)) + ")");
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
@@ -971,16 +960,16 @@ mcp::JsonValue handle_save_scene_as(const mcp::JsonValue &args) {
                             "editor_save_scene_as called");
   auto *pp = args.Find("path");
   if (!pp || !pp->IsString()) {
-    return error_json("missing required parameter: path");
+    return util::error_json("missing required parameter: path");
   }
   std::string path = pp->GetString();
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
-    return error_json("EditorInterface not available");
+    return util::error_json("EditorInterface not available");
   }
   auto *root = editor->get_edited_scene_root();
   if (!root) {
-    return error_json("no scene open");
+    return util::error_json("no scene open");
   }
   godot::String path_gs(path.c_str());
   if (path_gs.begins_with("res://")) {
@@ -988,7 +977,7 @@ mcp::JsonValue handle_save_scene_as(const mcp::JsonValue &args) {
     if (!godot::DirAccess::dir_exists_absolute(dir)) {
       godot::Error err = godot::DirAccess::make_dir_recursive_absolute(dir);
       if (err != godot::Error::OK) {
-        return error_json("failed to create parent directory: " + to_std(dir) +
+        return util::error_json("failed to create parent directory: " + util::to_std(dir) +
                           " (error " + std::to_string(static_cast<int>(err)) +
                           ")");
       }
@@ -996,7 +985,7 @@ mcp::JsonValue handle_save_scene_as(const mcp::JsonValue &args) {
   }
   editor->save_scene_as(path_gs);
   if (!godot::FileAccess::file_exists(path_gs)) {
-    return error_json("save failed — file not created at " + path +
+    return util::error_json("save failed — file not created at " + path +
                       " (check editor output log)");
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
@@ -1012,17 +1001,17 @@ mcp::JsonValue handle_new_text_resource(const mcp::JsonValue &args) {
                             "editor_new_text_resource called");
   auto *pp = args.Find("path");
   if (!pp || !pp->IsString()) {
-    return error_json("missing required parameter: path");
+    return util::error_json("missing required parameter: path");
   }
   auto *sp = args.Find("source_code");
   if (!sp || !sp->IsString()) {
-    return error_json("missing required parameter: source_code");
+    return util::error_json("missing required parameter: source_code");
   }
   std::string path = pp->GetString();
   auto file = godot::FileAccess::open(godot::String(path.c_str()),
                                       godot::FileAccess::WRITE);
   if (file.is_null()) {
-    return error_json("failed to open file for writing: " + path);
+    return util::error_json("failed to open file for writing: " + path);
   }
   file->store_string(godot::String(sp->GetString().c_str()));
   file->close();

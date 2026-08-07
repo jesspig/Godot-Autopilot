@@ -1,5 +1,6 @@
 #include "text_ops.hpp"
 #include "core/log_system.hpp"
+#include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/os.hpp>
@@ -17,17 +18,6 @@ namespace text_ops {
 using JV = mcp::JsonValue;
 
 namespace {
-
-std::string to_std(const godot::String &s) {
-  godot::CharString utf8 = s.utf8();
-  return std::string(utf8.ptr());
-}
-
-JV error_json(const std::string &msg) {
-  JV e(JV::object_tag);
-  e["error"] = JV(msg);
-  return e;
-}
 
 JV ok_json() {
   JV r(JV::object_tag);
@@ -78,7 +68,7 @@ JV handle_create_font(const JV &args) {
                             "text_create_font called");
   auto ts = get_ts();
   if (ts.is_null())
-    return error_json("TextServer not available");
+    return util::error_json("TextServer not available");
   godot::RID rid = ts->create_font();
   int64_t id = rid_store().store(rid);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -93,7 +83,7 @@ JV handle_create_shaped_text(const JV &args) {
                             "text_create_shaped_text called");
   auto ts = get_ts();
   if (ts.is_null())
-    return error_json("TextServer not available");
+    return util::error_json("TextServer not available");
   int direction = 0;
   auto *d = args.Find("direction");
   if (d && d->IsInt())
@@ -118,13 +108,13 @@ JV handle_font_set_antialiasing(const JV &args) {
                             "text_font_set_antialiasing called");
   auto ts = get_ts();
   if (ts.is_null())
-    return error_json("TextServer not available");
+    return util::error_json("TextServer not available");
   godot::RID font_rid = resolve_rid(args, "font_rid");
   if (!font_rid.is_valid())
-    return error_json("missing or invalid parameter: font_rid");
+    return util::error_json("missing or invalid parameter: font_rid");
   auto *a = args.Find("antialiasing");
   if (!a || !a->IsInt())
-    return error_json("missing required parameter: antialiasing");
+    return util::error_json("missing required parameter: antialiasing");
   ts->font_set_antialiasing(
       font_rid, static_cast<godot::TextServer::FontAntialiasing>(a->GetInt()));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -137,13 +127,13 @@ JV handle_font_set_data(const JV &args) {
                             "text_font_set_data called");
   auto ts = get_ts();
   if (ts.is_null())
-    return error_json("TextServer not available");
+    return util::error_json("TextServer not available");
   godot::RID font_rid = resolve_rid(args, "font_rid");
   if (!font_rid.is_valid())
-    return error_json("missing or invalid parameter: font_rid");
+    return util::error_json("missing or invalid parameter: font_rid");
   auto *dp = args.Find("data");
   if (!dp || !dp->IsString())
-    return error_json("missing required parameter: data");
+    return util::error_json("missing required parameter: data");
   std::string data_path = dp->GetString();
   godot::PackedByteArray bytes =
       godot::FileAccess::get_file_as_bytes(godot::String(data_path.c_str()));
@@ -158,13 +148,13 @@ JV handle_font_set_hinting(const JV &args) {
                             "text_font_set_hinting called");
   auto ts = get_ts();
   if (ts.is_null())
-    return error_json("TextServer not available");
+    return util::error_json("TextServer not available");
   godot::RID font_rid = resolve_rid(args, "font_rid");
   if (!font_rid.is_valid())
-    return error_json("missing or invalid parameter: font_rid");
+    return util::error_json("missing or invalid parameter: font_rid");
   auto *h = args.Find("hinting");
   if (!h || !h->IsInt())
-    return error_json("missing required parameter: hinting");
+    return util::error_json("missing required parameter: hinting");
   ts->font_set_hinting(font_rid,
                        static_cast<godot::TextServer::Hinting>(h->GetInt()));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -177,7 +167,7 @@ JV handle_get_system_font_path(const JV &args) {
                             "text_get_system_font_path called");
   auto *fn = args.Find("font_name");
   if (!fn || !fn->IsString())
-    return error_json("missing required parameter: font_name");
+    return util::error_json("missing required parameter: font_name");
   std::string font_name = fn->GetString();
   int weight = 400;
   auto *w = args.Find("weight");
@@ -193,13 +183,13 @@ JV handle_get_system_font_path(const JV &args) {
     italic = it->GetBool();
   auto *os = godot::OS::get_singleton();
   if (!os)
-    return error_json("OS singleton not available");
+    return util::error_json("OS singleton not available");
   godot::String path = os->get_system_font_path(
       godot::String(font_name.c_str()), weight, stretch, italic);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "text_get_system_font_path completed");
   JV r(JV::object_tag);
-  r["result"] = JV(to_std(path));
+  r["result"] = JV(util::to_std(path));
   return r;
 }
 
@@ -208,10 +198,10 @@ JV handle_has_feature(const JV &args) {
                             "text_has_feature called");
   auto ts = get_ts();
   if (ts.is_null())
-    return error_json("TextServer not available");
+    return util::error_json("TextServer not available");
   auto *f = args.Find("feature");
   if (!f || !f->IsInt())
-    return error_json("missing required parameter: feature");
+    return util::error_json("missing required parameter: feature");
   bool result =
       ts->has_feature(static_cast<godot::TextServer::Feature>(f->GetInt()));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -226,10 +216,10 @@ JV handle_is_locale_right_to_left(const JV &args) {
                             "text_is_locale_right_to_left called");
   auto ts = get_ts();
   if (ts.is_null())
-    return error_json("TextServer not available");
+    return util::error_json("TextServer not available");
   auto *l = args.Find("locale");
   if (!l || !l->IsString())
-    return error_json("missing required parameter: locale");
+    return util::error_json("missing required parameter: locale");
   bool result =
       ts->is_locale_right_to_left(godot::String(l->GetString().c_str()));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -244,19 +234,19 @@ JV handle_shaped_text_add_string(const JV &args) {
                             "text_shaped_text_add_string called");
   auto ts = get_ts();
   if (ts.is_null())
-    return error_json("TextServer not available");
+    return util::error_json("TextServer not available");
   godot::RID shaped_rid = resolve_rid(args, "shaped_rid");
   if (!shaped_rid.is_valid())
-    return error_json("missing or invalid parameter: shaped_rid");
+    return util::error_json("missing or invalid parameter: shaped_rid");
   auto *tp = args.Find("text");
   if (!tp || !tp->IsString())
-    return error_json("missing required parameter: text");
+    return util::error_json("missing required parameter: text");
   godot::RID font_rid = resolve_rid(args, "font_rid");
   if (!font_rid.is_valid())
-    return error_json("missing or invalid parameter: font_rid");
+    return util::error_json("missing or invalid parameter: font_rid");
   auto *sp = args.Find("size");
   if (!sp || !sp->IsInt())
-    return error_json("missing required parameter: size");
+    return util::error_json("missing required parameter: size");
   std::string language;
   auto *lp = args.Find("language");
   if (lp && lp->IsString())
@@ -279,10 +269,10 @@ JV handle_shaped_text_get_size(const JV &args) {
                             "text_shaped_text_get_size called");
   auto ts = get_ts();
   if (ts.is_null())
-    return error_json("TextServer not available");
+    return util::error_json("TextServer not available");
   godot::RID shaped_rid = resolve_rid(args, "shaped_rid");
   if (!shaped_rid.is_valid())
-    return error_json("missing or invalid parameter: shaped_rid");
+    return util::error_json("missing or invalid parameter: shaped_rid");
   godot::Vector2 size = ts->shaped_text_get_size(shaped_rid);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "text_shaped_text_get_size completed");
@@ -299,10 +289,10 @@ JV handle_file_write(const JV &args) {
                             "file_write called");
   auto *pp = args.Find("path");
   if (!pp || !pp->IsString())
-    return error_json("missing required parameter: path");
+    return util::error_json("missing required parameter: path");
   auto *cp = args.Find("content");
   if (!cp || !cp->IsString())
-    return error_json("missing required parameter: content");
+    return util::error_json("missing required parameter: content");
   std::string mode = "WRITE";
   auto *mp = args.Find("mode");
   if (mp && mp->IsString())
@@ -313,7 +303,7 @@ JV handle_file_write(const JV &args) {
   auto file =
       godot::FileAccess::open(godot::String(pp->GetString().c_str()), flag);
   if (file.is_null())
-    return error_json("failed to open file: " + pp->GetString());
+    return util::error_json("failed to open file: " + pp->GetString());
   if (mode == "APPEND")
     file->seek_end();
   file->store_string(godot::String(cp->GetString().c_str()));

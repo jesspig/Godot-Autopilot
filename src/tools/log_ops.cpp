@@ -23,24 +23,13 @@ namespace {
 constexpr char RUN_HINT[] = "game logs are written by the running game process "
                             "(start it with editor_play_current_scene)";
 
-std::string to_std(const godot::String &s) {
-  godot::CharString utf8 = s.utf8();
-  return std::string(utf8.ptr());
-}
-
-JV error_json(const std::string &msg) {
-  JV e(JV::object_tag);
-  e["error"] = JV(msg);
-  return e;
-}
-
 constexpr int64_t DEFAULT_LIMIT = 50;
 constexpr int64_t MAX_LIMIT = 500;
 
 std::string logs_dir_diagnostic(const godot::String &logs_dir) {
   auto dir = godot::DirAccess::open(logs_dir);
   if (!dir.is_valid()) {
-    return "logs directory does not exist: \"" + to_std(logs_dir) + "\"";
+    return "logs directory does not exist: \"" + util::to_std(logs_dir) + "\"";
   }
   godot::PackedStringArray names;
   dir->list_dir_begin();
@@ -53,13 +42,13 @@ std::string logs_dir_diagnostic(const godot::String &logs_dir) {
   }
   dir->list_dir_end();
   if (names.size() == 0) {
-    return "logs directory is empty: \"" + to_std(logs_dir) + "\"";
+    return "logs directory is empty: \"" + util::to_std(logs_dir) + "\"";
   }
   std::string joined = "directory contains: ";
   for (int i = 0; i < names.size(); i++) {
     if (i > 0)
       joined += ", ";
-    joined += to_std(names[i]);
+    joined += util::to_std(names[i]);
   }
   return joined;
 }
@@ -143,7 +132,7 @@ TailResult read_tail(const godot::String &path, int64_t limit) {
     return result;
   result.opened = true;
   while (!file->eof_reached()) {
-    std::string line = to_std(file->get_line());
+    std::string line = util::to_std(file->get_line());
     result.total_lines++;
     if (limit == 0)
       continue;
@@ -168,7 +157,7 @@ JV build_result(const godot::String &path, const TailResult &tail,
     entries.PushBack(JV(line));
   }
   JV result(JV::object_tag);
-  result["path"] = JV(to_std(path));
+  result["path"] = JV(util::to_std(path));
   result["entries"] = std::move(entries);
   result["total_lines"] = JV(tail.total_lines);
   if (from_archive) {
@@ -189,7 +178,7 @@ JV handle_log_get_game_entries(const JV &args) {
   auto *lp = args.Find("limit");
   if (lp) {
     if (!lp->IsInt())
-      return error_json("invalid parameter: limit must be an integer");
+      return util::error_json("invalid parameter: limit must be an integer");
     limit = lp->GetInt();
     if (limit > MAX_LIMIT)
       limit = MAX_LIMIT;
@@ -198,11 +187,11 @@ JV handle_log_get_game_entries(const JV &args) {
   }
   auto *os = godot::OS::get_singleton();
   if (!os)
-    return error_json("OS singleton not available");
+    return util::error_json("OS singleton not available");
   godot::String logs_dir = os->get_user_data_dir() + "/logs";
   godot::String path = logs_dir + "/godot.log";
   if (!godot::FileAccess::file_exists(path)) {
-    return error_json("game log file not found: \"" + to_std(path) + "\" — " +
+    return util::error_json("game log file not found: \"" + util::to_std(path) + "\" — " +
                       logs_dir_diagnostic(logs_dir) + " — " + RUN_HINT);
   }
   TailResult tail = read_tail(path, limit);
@@ -230,7 +219,7 @@ JV handle_log_get_game_entries(const JV &args) {
           std::to_string(
               static_cast<int>(godot::FileAccess::get_open_error())) +
           " (game process holds the log file)",
-      to_std(path) + " — " + logs_dir_diagnostic(logs_dir),
+      util::to_std(path) + " — " + logs_dir_diagnostic(logs_dir),
       "read the game process log",
       "stop the game first (editor_stop_playing), or use debugger_get_output / "
       "debugger_get_errors for in-memory capture — " +

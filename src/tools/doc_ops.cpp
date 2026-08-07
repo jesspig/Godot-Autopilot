@@ -1,5 +1,6 @@
 #include "doc_ops.hpp"
 #include "core/log_system.hpp"
+#include "util/error_util.hpp"
 #include <algorithm>
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/variant/array.hpp>
@@ -15,11 +16,6 @@ namespace doc_ops {
 
 namespace {
 
-std::string to_std(const godot::String &s) {
-  godot::CharString utf8 = s.utf8();
-  return std::string(utf8.ptr());
-}
-
 mcp::JsonValue variant_to_json(const godot::Variant &v) {
   switch (v.get_type()) {
   case godot::Variant::NIL:
@@ -32,7 +28,7 @@ mcp::JsonValue variant_to_json(const godot::Variant &v) {
     return mcp::JsonValue(static_cast<double>(v));
   case godot::Variant::STRING: {
     godot::String s = static_cast<godot::String>(v);
-    return mcp::JsonValue(to_std(s));
+    return mcp::JsonValue(util::to_std(s));
   }
   case godot::Variant::DICTIONARY: {
     mcp::JsonValue obj(mcp::JsonValue::object_tag);
@@ -40,7 +36,7 @@ mcp::JsonValue variant_to_json(const godot::Variant &v) {
     godot::Array keys = d.keys();
     for (int i = 0; i < keys.size(); i++) {
       godot::String key = static_cast<godot::String>(keys[i]);
-      obj[to_std(key)] = variant_to_json(d[keys[i]]);
+      obj[util::to_std(key)] = variant_to_json(d[keys[i]]);
     }
     return obj;
   }
@@ -58,7 +54,7 @@ mcp::JsonValue variant_to_json(const godot::Variant &v) {
     return arr;
   }
   default:
-    return mcp::JsonValue(to_std(v.stringify()));
+    return mcp::JsonValue(util::to_std(v.stringify()));
   }
 }
 
@@ -89,7 +85,7 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
   mcp::JsonValue result(mcp::JsonValue::object_tag);
   result["name"] = mcp::JsonValue(class_name);
   result["parent_class"] =
-      mcp::JsonValue(to_std(godot::String(cd->get_parent_class(sn))));
+      mcp::JsonValue(util::to_std(godot::String(cd->get_parent_class(sn))));
   result["api_type"] =
       mcp::JsonValue(static_cast<int64_t>(cd->class_get_api_type(sn)));
   result["can_instantiate"] = mcp::JsonValue(cd->can_instantiate(sn));
@@ -125,14 +121,14 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
     godot::PackedStringArray enum_names = cd->class_get_enum_list(sn, false);
     for (int i = 0; i < enum_names.size(); i++) {
       mcp::JsonValue e(mcp::JsonValue::object_tag);
-      std::string ename = to_std(enum_names[i]);
+      std::string ename = util::to_std(enum_names[i]);
       e["name"] = mcp::JsonValue(ename);
       mcp::JsonValue ec(mcp::JsonValue::array_tag);
       godot::PackedStringArray enum_consts =
           cd->class_get_enum_constants(sn, godot::StringName(ename.c_str()));
       for (int j = 0; j < enum_consts.size(); j++) {
         mcp::JsonValue cv(mcp::JsonValue::object_tag);
-        std::string cname = to_std(enum_consts[j]);
+        std::string cname = util::to_std(enum_consts[j]);
         cv["name"] = mcp::JsonValue(cname);
         cv["value"] =
             mcp::JsonValue(static_cast<int64_t>(cd->class_get_integer_constant(
@@ -150,7 +146,7 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
         cd->class_get_integer_constant_list(sn, false);
     for (int i = 0; i < const_names.size(); i++) {
       mcp::JsonValue cv(mcp::JsonValue::object_tag);
-      std::string cname = to_std(const_names[i]);
+      std::string cname = util::to_std(const_names[i]);
       cv["name"] = mcp::JsonValue(cname);
       cv["value"] =
           mcp::JsonValue(static_cast<int64_t>(cd->class_get_integer_constant(
@@ -190,14 +186,14 @@ mcp::JsonValue handle_search(const mcp::JsonValue &args) {
   mcp::JsonValue results_arr(mcp::JsonValue::array_tag);
   int count = 0;
   for (int i = 0; i < all_classes.size() && count < 50; i++) {
-    std::string name = to_std(all_classes[i]);
+    std::string name = util::to_std(all_classes[i]);
     std::string name_lower = name;
     std::transform(name_lower.begin(), name_lower.end(), name_lower.begin(),
                    ::tolower);
     if (name_lower.find(query_lower) != std::string::npos) {
       mcp::JsonValue item(mcp::JsonValue::object_tag);
       item["name"] = mcp::JsonValue(name);
-      item["parent"] = mcp::JsonValue(to_std(godot::String(
+      item["parent"] = mcp::JsonValue(util::to_std(godot::String(
           cd->get_parent_class(godot::StringName(name.c_str())))));
       item["api_type"] = mcp::JsonValue(static_cast<int64_t>(
           cd->class_get_api_type(godot::StringName(name.c_str()))));
@@ -247,7 +243,7 @@ mcp::JsonValue handle_get_method(const mcp::JsonValue &args) {
     godot::Dictionary d = methods[i];
     if (d.has("name")) {
       godot::String mname = static_cast<godot::String>(d["name"]);
-      if (to_std(mname) == method_name) {
+      if (util::to_std(mname) == method_name) {
         mcp::JsonValue result = variant_to_json(d);
         result["note"] = mcp::JsonValue("method signature without docstrings");
         mcp::JsonValue r(mcp::JsonValue::object_tag);
@@ -299,7 +295,7 @@ mcp::JsonValue handle_get_property(const mcp::JsonValue &args) {
     godot::Dictionary d = props[i];
     if (d.has("name")) {
       godot::String pname = static_cast<godot::String>(d["name"]);
-      if (to_std(pname) == prop_name) {
+      if (util::to_std(pname) == prop_name) {
         mcp::JsonValue result = variant_to_json(d);
         mcp::JsonValue r(mcp::JsonValue::object_tag);
         r["result"] = std::move(result);

@@ -1,5 +1,6 @@
 #include "debug_ops.hpp"
 #include "core/log_system.hpp"
+#include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/editor_settings.hpp>
@@ -13,11 +14,6 @@ namespace godot_self_driving {
 namespace debug_ops {
 
 namespace {
-
-std::string to_std(const godot::String &s) {
-  godot::CharString utf8 = s.utf8();
-  return std::string(utf8.ptr());
-}
 
 struct MonitorInfo {
   const char *name;
@@ -124,14 +120,14 @@ mcp::JsonValue handle_print_stack(const mcp::JsonValue &args) {
     if (!bt)
       continue;
     mcp::JsonValue entry(mcp::JsonValue::object_tag);
-    entry["language"] = mcp::JsonValue(to_std(bt->get_language_name()));
+    entry["language"] = mcp::JsonValue(util::to_std(bt->get_language_name()));
     int frame_count = bt->get_frame_count();
     entry["frame_count"] = mcp::JsonValue(static_cast<int64_t>(frame_count));
     mcp::JsonValue frames(mcp::JsonValue::array_tag);
     for (int f = 0; f < frame_count; f++) {
       mcp::JsonValue frame(mcp::JsonValue::object_tag);
-      frame["function"] = mcp::JsonValue(to_std(bt->get_frame_function(f)));
-      frame["file"] = mcp::JsonValue(to_std(bt->get_frame_file(f)));
+      frame["function"] = mcp::JsonValue(util::to_std(bt->get_frame_function(f)));
+      frame["file"] = mcp::JsonValue(util::to_std(bt->get_frame_file(f)));
       frame["line"] =
           mcp::JsonValue(static_cast<int64_t>(bt->get_frame_line(f)));
       frames.PushBack(std::move(frame));
@@ -142,7 +138,7 @@ mcp::JsonValue handle_print_stack(const mcp::JsonValue &args) {
       mcp::JsonValue globals(mcp::JsonValue::array_tag);
       for (int g = 0; g < gvc; g++) {
         mcp::JsonValue gv(mcp::JsonValue::object_tag);
-        gv["name"] = mcp::JsonValue(to_std(bt->get_global_variable_name(g)));
+        gv["name"] = mcp::JsonValue(util::to_std(bt->get_global_variable_name(g)));
         globals.PushBack(std::move(gv));
       }
       entry["global_variables"] = std::move(globals);
@@ -153,7 +149,7 @@ mcp::JsonValue handle_print_stack(const mcp::JsonValue &args) {
         for (int l = 0; l < lvc; l++) {
           mcp::JsonValue lv(mcp::JsonValue::object_tag);
           lv["name"] =
-              mcp::JsonValue(to_std(bt->get_local_variable_name(f, l)));
+              mcp::JsonValue(util::to_std(bt->get_local_variable_name(f, l)));
           frame_locals.PushBack(std::move(lv));
         }
         locals_arr.PushBack(std::move(frame_locals));
@@ -166,7 +162,7 @@ mcp::JsonValue handle_print_stack(const mcp::JsonValue &args) {
         for (int m = 0; m < mvc; m++) {
           mcp::JsonValue mv(mcp::JsonValue::object_tag);
           mv["name"] =
-              mcp::JsonValue(to_std(bt->get_member_variable_name(f, m)));
+              mcp::JsonValue(util::to_std(bt->get_member_variable_name(f, m)));
           frame_members.PushBack(std::move(mv));
         }
         members_arr.PushBack(std::move(frame_members));
@@ -543,7 +539,7 @@ mcp::JsonValue handle_list_custom_monitors(const mcp::JsonValue &) {
   auto names = perf->get_custom_monitor_names();
   mcp::JsonValue arr(mcp::JsonValue::array_tag);
   for (int i = 0; i < names.size(); i++) {
-    arr.PushBack(mcp::JsonValue(to_std(names[i])));
+    arr.PushBack(mcp::JsonValue(util::to_std(names[i])));
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(arr);

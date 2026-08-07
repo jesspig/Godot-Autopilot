@@ -23,21 +23,16 @@ namespace resource_ops {
 
 namespace {
 
-std::string to_std(const godot::String &s) {
-  godot::CharString utf8 = s.utf8();
-  return std::string(utf8.ptr());
-}
-
 mcp::JsonValue serialize_ref(const godot::Ref<godot::Resource> &res) {
   if (res.is_null())
     return mcp::JsonValue(nullptr);
   mcp::JsonValue j(mcp::JsonValue::object_tag);
-  j["class"] = mcp::JsonValue(to_std(res->get_class()));
-  j["path"] = mcp::JsonValue(to_std(res->get_path()));
+  j["class"] = mcp::JsonValue(util::to_std(res->get_class()));
+  j["path"] = mcp::JsonValue(util::to_std(res->get_path()));
   j["object_id"] = mcp::JsonValue(static_cast<int64_t>(res->get_instance_id()));
   j["object_id_str"] = mcp::JsonValue(
       std::to_string(static_cast<int64_t>(res->get_instance_id())));
-  j["name"] = mcp::JsonValue(to_std(res->get_name()));
+  j["name"] = mcp::JsonValue(util::to_std(res->get_name()));
   return j;
 }
 
@@ -302,7 +297,7 @@ mcp::JsonValue handle_load(const mcp::JsonValue &args) {
         " (file exists but failed to load — not imported or wrong type)");
     return e;
   }
-  if (to_std(res->get_path()).empty()) {
+  if (util::to_std(res->get_path()).empty()) {
     res->set_path(godot::String(path.c_str()));
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
@@ -523,7 +518,7 @@ mcp::JsonValue handle_save(const mcp::JsonValue &args) {
               entry.to_lower() == target_lower) {
             case_conflict =
                 "directory case mismatch: 保存目录 \"" + target +
-                "\" 与已有目录 \"" + to_std(entry) +
+                "\" 与已有目录 \"" + util::to_std(entry) +
                 "\" 仅大小写不同（Windows "
                 "大小写不敏感，可能引发资源加载警告）— 建议统一目录名大小写";
             break;
@@ -764,7 +759,7 @@ mcp::JsonValue handle_get_type(const mcp::JsonValue &args) {
   }
 
   mcp::JsonValue j(mcp::JsonValue::object_tag);
-  j["class"] = mcp::JsonValue(to_std(res->get_class()));
+  j["class"] = mcp::JsonValue(util::to_std(res->get_class()));
   j["path"] = mcp::JsonValue(path);
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(j);
@@ -804,7 +799,7 @@ mcp::JsonValue handle_list_types(const mcp::JsonValue &) {
   godot::PackedStringArray all = cdbs->get_class_list();
   mcp::JsonValue types(mcp::JsonValue::array_tag);
   for (int i = 0; i < all.size(); i++) {
-    std::string cls = to_std(all[i]);
+    std::string cls = util::to_std(all[i]);
     if (cdbs->is_parent_class(godot::StringName(cls.c_str()),
                               godot::StringName("Resource")) &&
         cdbs->can_instantiate(godot::StringName(cls.c_str()))) {
@@ -833,7 +828,7 @@ mcp::JsonValue handle_get_extensions(const mcp::JsonValue &args) {
       loader->get_recognized_extensions_for_type(godot::String(type.c_str()));
   mcp::JsonValue arr(mcp::JsonValue::array_tag);
   for (int i = 0; i < exts.size(); i++) {
-    arr.PushBack(mcp::JsonValue(to_std(exts[i])));
+    arr.PushBack(mcp::JsonValue(util::to_std(exts[i])));
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(arr);
@@ -860,7 +855,7 @@ mcp::JsonValue handle_list_dir(const mcp::JsonValue &args) {
       loader->list_directory(godot::String(path.c_str()));
   mcp::JsonValue arr(mcp::JsonValue::array_tag);
   for (int i = 0; i < entries.size(); i++) {
-    arr.PushBack(mcp::JsonValue(to_std(entries[i])));
+    arr.PushBack(mcp::JsonValue(util::to_std(entries[i])));
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(arr);
@@ -1035,7 +1030,7 @@ mcp::JsonValue handle_get_dependencies(const mcp::JsonValue &args) {
       loader->get_dependencies(godot::String(path.c_str()));
   mcp::JsonValue arr(mcp::JsonValue::array_tag);
   for (int i = 0; i < deps.size(); i++) {
-    arr.PushBack(mcp::JsonValue(to_std(deps[i])));
+    arr.PushBack(mcp::JsonValue(util::to_std(deps[i])));
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(arr);
@@ -1214,7 +1209,7 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue &args) {
   for (int64_t i = 0; i < props.size(); i++) {
     godot::Dictionary dict = props[i];
     if (dict.has("name") &&
-        to_std(dict["name"].operator godot::String()) == prop) {
+        util::to_std(dict["name"].operator godot::String()) == prop) {
       found = true;
       if (type_hint.empty() && dict.has("type")) {
         int type_id = static_cast<int>(dict["type"]);
@@ -1227,13 +1222,13 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue &args) {
         bool is_resource_hint = hint_val == godot::PROPERTY_HINT_RESOURCE_TYPE;
         if ((is_object_type || is_resource_hint) && dict.has("hint_string")) {
           std::string hint_str =
-              to_std(dict["hint_string"].operator godot::String());
+              util::to_std(dict["hint_string"].operator godot::String());
           if (!hint_str.empty()) {
             type_hint = hint_str;
           }
         }
         if (type_hint.empty()) {
-          type_hint = to_std(godot::Variant::get_type_name(
+          type_hint = util::to_std(godot::Variant::get_type_name(
               static_cast<godot::Variant::Type>(type_id)));
         }
       }
@@ -1243,7 +1238,7 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue &args) {
   if (!found) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
     e["error"] = mcp::JsonValue(
-        "property not found: " + prop + " on " + to_std(res->get_class()) +
+        "property not found: " + prop + " on " + util::to_std(res->get_class()) +
         " — use resource_get_property_list or check the property name");
     return e;
   }
@@ -1269,7 +1264,7 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue &args) {
 
   LogSystem::instance().log(
       LogLevel::Info, LogCategory::Tools,
-      "resource_set_property: set " + prop + " on " + to_std(res->get_class()) +
+      "resource_set_property: set " + prop + " on " + util::to_std(res->get_class()) +
           " (object_id=" +
           std::to_string(static_cast<int64_t>(res->get_instance_id())) + ")");
 
@@ -1279,14 +1274,14 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue &args) {
 
   mcp::JsonValue j(mcp::JsonValue::object_tag);
   j["result"] = mcp::JsonValue("ok");
-  j["class"] = mcp::JsonValue(to_std(res->get_class()));
-  j["path"] = mcp::JsonValue(to_std(res->get_path()));
+  j["class"] = mcp::JsonValue(util::to_std(res->get_class()));
+  j["path"] = mcp::JsonValue(util::to_std(res->get_path()));
   j["object_id"] = mcp::JsonValue(static_cast<int64_t>(res->get_instance_id()));
   j["resource_attached"] = mcp::JsonValue(resource_attached);
   if (readback == util::ReadbackStatus::REJECTED) {
     return util::error_detail(
-        "property rejected: '" + prop + "' on " + to_std(res->get_path()),
-        to_std(res->get_path()), "readback equals set value",
+        "property rejected: '" + prop + "' on " + util::to_std(res->get_path()),
+        util::to_std(res->get_path()), "readback equals set value",
         "property may not exist, be read-only, or require a type hint; use "
         "resource_get_property_list");
   }
@@ -1321,7 +1316,7 @@ mcp::JsonValue handle_get_property(const mcp::JsonValue &args) {
   godot::Variant value = res->get(godot::StringName(prop.c_str()));
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "resource_get_property: read " + prop + " on " +
-                                to_std(res->get_class()));
+                                util::to_std(res->get_class()));
 
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = VariantJson::serialize(value);

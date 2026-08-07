@@ -1,6 +1,8 @@
 #ifndef GODOT_SELF_DRIVING_SCENE_PATH_HPP
 #define GODOT_SELF_DRIVING_SCENE_PATH_HPP
 
+#include "error_util.hpp"
+
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/variant/string.hpp>
@@ -8,11 +10,6 @@
 
 namespace godot_self_driving {
 namespace util {
-
-inline std::string to_std(const godot::String &s) {
-  godot::CharString utf8 = s.utf8();
-  return std::string(utf8.ptr());
-}
 
 inline std::string scene_path_hint(godot::Node *scene_root) {
   if (!scene_root) {

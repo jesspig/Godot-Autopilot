@@ -1,5 +1,6 @@
 #include "resources/resource_handlers.hpp"
 #include "core/log_system.hpp"
+#include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #include <ctime>
 #include <godot_cpp/classes/editor_file_system.hpp>
@@ -40,11 +41,6 @@ static void set_error(std::string &json_str, const std::string &msg) {
   json_str = err.Dump(-1);
 }
 
-static std::string to_std(const godot::String &s) {
-  godot::CharString utf8 = s.utf8();
-  return std::string(utf8.ptr());
-}
-
 static const char *level_to_string(LogLevel level) {
   switch (level) {
   case LogLevel::Debug:
@@ -79,9 +75,9 @@ static const char *category_to_string(LogCategory cat) {
 
 static std::string compute_relative_path(godot::Node *node,
                                          const std::string &root_prefix) {
-  std::string abs_path = to_std(node->get_path());
+  std::string abs_path = util::to_std(node->get_path());
   if (abs_path == root_prefix) {
-    return to_std(node->get_name());
+    return util::to_std(node->get_name());
   }
   if (!root_prefix.empty() && abs_path.find(root_prefix + "/") == 0) {
     return abs_path.substr(root_prefix.size() + 1);
@@ -91,8 +87,8 @@ static std::string compute_relative_path(godot::Node *node,
 
 static void node_to_json(godot::Node *node, const std::string &root_prefix,
                          mcp::JsonValue &j) {
-  j["name"] = mcp::JsonValue(to_std(node->get_name()));
-  j["class"] = mcp::JsonValue(to_std(node->get_class()));
+  j["name"] = mcp::JsonValue(util::to_std(node->get_name()));
+  j["class"] = mcp::JsonValue(util::to_std(node->get_class()));
   j["path"] = mcp::JsonValue(compute_relative_path(node, root_prefix));
   j["children"] = mcp::JsonValue(mcp::JsonValue::array_tag);
   auto children = node->get_children();
@@ -109,8 +105,8 @@ static void node_to_json(godot::Node *node, const std::string &root_prefix,
 static mcp::JsonValue node_detail_to_json(godot::Node *node,
                                           const std::string &root_prefix) {
   mcp::JsonValue j(mcp::JsonValue::object_tag);
-  j["name"] = mcp::JsonValue(to_std(node->get_name()));
-  j["class"] = mcp::JsonValue(to_std(node->get_class()));
+  j["name"] = mcp::JsonValue(util::to_std(node->get_name()));
+  j["class"] = mcp::JsonValue(util::to_std(node->get_class()));
   j["path"] = mcp::JsonValue(compute_relative_path(node, root_prefix));
 
   mcp::JsonValue props(mcp::JsonValue::object_tag);
@@ -127,7 +123,7 @@ static mcp::JsonValue node_detail_to_json(godot::Node *node,
     if (usage & skip_mask)
       continue;
 
-    std::string name_str = to_std(prop_name);
+    std::string name_str = util::to_std(prop_name);
     if (name_str.empty())
       continue;
 
@@ -142,8 +138,8 @@ static mcp::JsonValue node_detail_to_json(godot::Node *node,
     auto *child = godot::Object::cast_to<godot::Node>(children[i]);
     if (child) {
       mcp::JsonValue child_j(mcp::JsonValue::object_tag);
-      child_j["name"] = mcp::JsonValue(to_std(child->get_name()));
-      child_j["class"] = mcp::JsonValue(to_std(child->get_class()));
+      child_j["name"] = mcp::JsonValue(util::to_std(child->get_name()));
+      child_j["class"] = mcp::JsonValue(util::to_std(child->get_class()));
       j["children"].PushBack(std::move(child_j));
     }
   }
@@ -152,7 +148,7 @@ static mcp::JsonValue node_detail_to_json(godot::Node *node,
   mcp::JsonValue groups_arr(mcp::JsonValue::array_tag);
   for (int i = 0; i < groups.size(); i++) {
     godot::String gs = godot::String(groups[i]);
-    groups_arr.PushBack(mcp::JsonValue(to_std(gs)));
+    groups_arr.PushBack(mcp::JsonValue(util::to_std(gs)));
   }
   j["groups"] = std::move(groups_arr);
 
@@ -161,10 +157,10 @@ static mcp::JsonValue node_detail_to_json(godot::Node *node,
     auto *obj = script_var.operator godot::Object *();
     if (obj) {
       mcp::JsonValue script_j(mcp::JsonValue::object_tag);
-      script_j["class"] = mcp::JsonValue(to_std(obj->get_class()));
+      script_j["class"] = mcp::JsonValue(util::to_std(obj->get_class()));
       auto *res = godot::Object::cast_to<godot::Resource>(obj);
       if (res && !res->get_path().is_empty()) {
-        script_j["path"] = mcp::JsonValue(to_std(res->get_path()));
+        script_j["path"] = mcp::JsonValue(util::to_std(res->get_path()));
       }
       j["script"] = std::move(script_j);
     }
@@ -175,8 +171,8 @@ static mcp::JsonValue node_detail_to_json(godot::Node *node,
 
 static void dir_to_json(godot::EditorFileSystemDirectory *dir,
                         mcp::JsonValue &j) {
-  j["name"] = mcp::JsonValue(to_std(dir->get_name()));
-  j["path"] = mcp::JsonValue(to_std(dir->get_path()));
+  j["name"] = mcp::JsonValue(util::to_std(dir->get_name()));
+  j["path"] = mcp::JsonValue(util::to_std(dir->get_path()));
 
   j["subdirs"] = mcp::JsonValue(mcp::JsonValue::array_tag);
   int subdir_count = dir->get_subdir_count();
@@ -193,10 +189,10 @@ static void dir_to_json(godot::EditorFileSystemDirectory *dir,
   int file_count = dir->get_file_count();
   for (int i = 0; i < file_count; i++) {
     mcp::JsonValue file_j(mcp::JsonValue::object_tag);
-    file_j["name"] = mcp::JsonValue(to_std(dir->get_file(i)));
-    file_j["path"] = mcp::JsonValue(to_std(dir->get_file_path(i)));
+    file_j["name"] = mcp::JsonValue(util::to_std(dir->get_file(i)));
+    file_j["path"] = mcp::JsonValue(util::to_std(dir->get_file_path(i)));
     godot::StringName type = dir->get_file_type(i);
-    file_j["type"] = mcp::JsonValue(to_std(godot::String(type)));
+    file_j["type"] = mcp::JsonValue(util::to_std(godot::String(type)));
     j["files"].PushBack(std::move(file_j));
   }
 }
@@ -252,7 +248,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
                 set_error(json_str, "No scene open");
                 return;
               }
-              std::string root_prefix = to_std(root->get_path());
+              std::string root_prefix = util::to_std(root->get_path());
               mcp::JsonValue result(mcp::JsonValue::object_tag);
               node_to_json(root, root_prefix, result);
               json_str = result.Dump(-1);
@@ -289,7 +285,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
                 clean = clean.substr(1);
 
               godot::Node *node = nullptr;
-              if (clean.empty() || clean == to_std(root->get_name())) {
+              if (clean.empty() || clean == util::to_std(root->get_name())) {
                 node = root;
               } else {
                 godot::NodePath np(godot::String(clean.c_str()));
@@ -301,7 +297,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
                 return;
               }
 
-              std::string root_prefix = to_std(root->get_path());
+              std::string root_prefix = util::to_std(root->get_path());
               auto jv = node_detail_to_json(node, root_prefix);
               json_str = jv.Dump(-1);
             })
@@ -384,7 +380,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
                     (pos != std::string::npos) ? path.substr(pos + 1) : path;
                 result["name"] = mcp::JsonValue(fname);
                 result["path"] = mcp::JsonValue(path);
-                result["type"] = mcp::JsonValue(to_std(file_type));
+                result["type"] = mcp::JsonValue(util::to_std(file_type));
                 json_str = result.Dump(-1);
                 return;
               }
@@ -419,7 +415,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
               auto *root = editor->get_edited_scene_root();
               std::string root_prefix;
               if (root)
-                root_prefix = to_std(root->get_path());
+                root_prefix = util::to_std(root->get_path());
 
               mcp::JsonValue arr(mcp::JsonValue::array_tag);
               for (int i = 0; i < nodes.size(); i++) {
@@ -428,8 +424,8 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
                   continue;
 
                 mcp::JsonValue item(mcp::JsonValue::object_tag);
-                item["name"] = mcp::JsonValue(to_std(node->get_name()));
-                item["class"] = mcp::JsonValue(to_std(node->get_class()));
+                item["name"] = mcp::JsonValue(util::to_std(node->get_name()));
+                item["class"] = mcp::JsonValue(util::to_std(node->get_class()));
                 item["path"] =
                     mcp::JsonValue(compute_relative_path(node, root_prefix));
                 arr.PushBack(std::move(item));

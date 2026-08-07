@@ -28,11 +28,6 @@ constexpr const char *NODE_PATH_HINT =
     " — expected scene-relative path like 'Level1/Player' or absolute "
     "'/root/Level1/Player'";
 
-std::string to_std(const godot::String &s) {
-  godot::CharString utf8 = s.utf8();
-  return std::string(utf8.ptr());
-}
-
 godot::Node *find_node(const std::string &path_str) {
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor)
@@ -47,13 +42,13 @@ godot::Node *find_node(const std::string &path_str) {
   if (clean.size() > 5 && clean.compare(0, 5, "root/") == 0) {
     clean = clean.substr(5);
   }
-  if (clean.empty() || clean == to_std(root->get_name())) {
+  if (clean.empty() || clean == util::to_std(root->get_name())) {
     return root;
   }
   godot::NodePath np(godot::String(clean.c_str()));
   auto *node = root->get_node_or_null(np);
   if (!node) {
-    std::string root_name = to_std(root->get_name());
+    std::string root_name = util::to_std(root->get_name());
     if (clean.size() > root_name.size() + 1 &&
         clean.compare(0, root_name.size(), root_name) == 0 &&
         clean[root_name.size()] == '/') {
@@ -73,12 +68,6 @@ godot::Node *find_node(const std::string &path_str) {
     p = p->get_parent();
   }
   return nullptr;
-}
-
-mcp::JsonValue error_json(const std::string &msg) {
-  mcp::JsonValue e(mcp::JsonValue::object_tag);
-  e["error"] = mcp::JsonValue(msg);
-  return e;
 }
 
 mcp::JsonValue ok_json() {
@@ -196,7 +185,7 @@ mcp::JsonValue handle_bus_get_layout(const mcp::JsonValue &args) {
                             "audio_bus_get_layout called");
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
-    return error_json("AudioServer not available");
+    return util::error_json("AudioServer not available");
   }
   auto layout = server->generate_bus_layout();
   auto serialized = VariantJson::serialize(layout);
@@ -212,16 +201,16 @@ mcp::JsonValue handle_bus_set_layout(const mcp::JsonValue &args) {
                             "audio_bus_set_layout called");
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
-    return error_json("AudioServer not available");
+    return util::error_json("AudioServer not available");
   }
   auto *layout_val = args.Find("layout");
   if (!layout_val || !layout_val->IsObject()) {
-    return error_json("missing required parameter: layout");
+    return util::error_json("missing required parameter: layout");
   }
   auto variant = VariantJson::deserialize(*layout_val, "object");
   auto layout = godot::Ref<godot::AudioBusLayout>(variant);
   if (layout.is_null()) {
-    return error_json("failed to deserialize AudioBusLayout");
+    return util::error_json("failed to deserialize AudioBusLayout");
   }
   server->set_bus_layout(layout);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -234,7 +223,7 @@ mcp::JsonValue handle_bus_get_count(const mcp::JsonValue &args) {
                             "audio_bus_get_count called");
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
-    return error_json("AudioServer not available");
+    return util::error_json("AudioServer not available");
   }
   int count = server->get_bus_count();
   mcp::JsonValue r(mcp::JsonValue::object_tag);
@@ -249,20 +238,20 @@ mcp::JsonValue handle_bus_get_name(const mcp::JsonValue &args) {
                             "audio_bus_get_name called");
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
-    return error_json("AudioServer not available");
+    return util::error_json("AudioServer not available");
   }
   auto *bi = args.Find("bus_index");
   if (!bi || !bi->IsInt()) {
-    return error_json("missing required parameter: bus_index");
+    return util::error_json("missing required parameter: bus_index");
   }
   int idx = bi->GetInt();
   int count = server->get_bus_count();
   if (idx < 0 || idx >= count) {
-    return error_json("audio bus not found at index: " + std::to_string(idx));
+    return util::error_json("audio bus not found at index: " + std::to_string(idx));
   }
   godot::String name = server->get_bus_name(idx);
   mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue(to_std(name));
+  r["result"] = mcp::JsonValue(util::to_std(name));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "audio_bus_get_name completed");
   return r;
@@ -273,20 +262,20 @@ mcp::JsonValue handle_bus_set_volume(const mcp::JsonValue &args) {
                             "audio_bus_set_volume called");
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
-    return error_json("AudioServer not available");
+    return util::error_json("AudioServer not available");
   }
   auto *bi = args.Find("bus_index");
   if (!bi || !bi->IsInt()) {
-    return error_json("missing required parameter: bus_index");
+    return util::error_json("missing required parameter: bus_index");
   }
   auto *vd = args.Find("volume_db");
   if (!vd || !vd->IsNumber()) {
-    return error_json("missing required parameter: volume_db");
+    return util::error_json("missing required parameter: volume_db");
   }
   int idx = bi->GetInt();
   int count = server->get_bus_count();
   if (idx < 0 || idx >= count) {
-    return error_json("audio bus not found at index: " + std::to_string(idx));
+    return util::error_json("audio bus not found at index: " + std::to_string(idx));
   }
   float vol = static_cast<float>(
       vd->IsDouble() ? vd->GetDouble() : static_cast<double>(vd->GetInt()));
@@ -301,20 +290,20 @@ mcp::JsonValue handle_bus_set_mute(const mcp::JsonValue &args) {
                             "audio_bus_set_mute called");
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
-    return error_json("AudioServer not available");
+    return util::error_json("AudioServer not available");
   }
   auto *bi = args.Find("bus_index");
   if (!bi || !bi->IsInt()) {
-    return error_json("missing required parameter: bus_index");
+    return util::error_json("missing required parameter: bus_index");
   }
   auto *mu = args.Find("muted");
   if (!mu || !mu->IsBool()) {
-    return error_json("missing required parameter: muted");
+    return util::error_json("missing required parameter: muted");
   }
   int idx = bi->GetInt();
   int count = server->get_bus_count();
   if (idx < 0 || idx >= count) {
-    return error_json("audio bus not found at index: " + std::to_string(idx));
+    return util::error_json("audio bus not found at index: " + std::to_string(idx));
   }
   server->set_bus_mute(idx, mu->GetBool());
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -327,20 +316,20 @@ mcp::JsonValue handle_bus_set_bypass(const mcp::JsonValue &args) {
                             "audio_bus_set_bypass called");
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
-    return error_json("AudioServer not available");
+    return util::error_json("AudioServer not available");
   }
   auto *bi = args.Find("bus_index");
   if (!bi || !bi->IsInt()) {
-    return error_json("missing required parameter: bus_index");
+    return util::error_json("missing required parameter: bus_index");
   }
   auto *bp = args.Find("bypass");
   if (!bp || !bp->IsBool()) {
-    return error_json("missing required parameter: bypass");
+    return util::error_json("missing required parameter: bypass");
   }
   int idx = bi->GetInt();
   int count = server->get_bus_count();
   if (idx < 0 || idx >= count) {
-    return error_json("audio bus not found at index: " + std::to_string(idx));
+    return util::error_json("audio bus not found at index: " + std::to_string(idx));
   }
   server->set_bus_bypass_effects(idx, bp->GetBool());
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -353,34 +342,34 @@ mcp::JsonValue handle_effect_add(const mcp::JsonValue &args) {
                             "audio_effect_add called");
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
-    return error_json("AudioServer not available");
+    return util::error_json("AudioServer not available");
   }
   auto *bi = args.Find("bus_index");
   if (!bi || !bi->IsInt()) {
-    return error_json("missing required parameter: bus_index");
+    return util::error_json("missing required parameter: bus_index");
   }
   auto *et = args.Find("effect_type");
   if (!et || !et->IsString()) {
-    return error_json("missing required parameter: effect_type");
+    return util::error_json("missing required parameter: effect_type");
   }
   int idx = bi->GetInt();
   int count = server->get_bus_count();
   if (idx < 0 || idx >= count) {
-    return error_json("audio bus not found at index: " + std::to_string(idx));
+    return util::error_json("audio bus not found at index: " + std::to_string(idx));
   }
   std::string effect_type = et->GetString();
   auto *cdbs = godot::ClassDBSingleton::get_singleton();
   if (!cdbs) {
-    return error_json("ClassDB singleton not available");
+    return util::error_json("ClassDB singleton not available");
   }
   godot::StringName sn(effect_type.c_str());
   godot::Variant effect_var = cdbs->instantiate(sn);
   if (effect_var.get_type() == godot::Variant::NIL) {
-    return error_json("failed to instantiate effect type: " + effect_type);
+    return util::error_json("failed to instantiate effect type: " + effect_type);
   }
   auto effect_ref = godot::Ref<godot::AudioEffect>(effect_var);
   if (effect_ref.is_null()) {
-    return error_json("instantiated object is not an AudioEffect: " +
+    return util::error_json("instantiated object is not an AudioEffect: " +
                       effect_type);
   }
   auto *pos_val = args.Find("at_position");
@@ -399,20 +388,20 @@ mcp::JsonValue handle_effect_remove(const mcp::JsonValue &args) {
                             "audio_effect_remove called");
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
-    return error_json("AudioServer not available");
+    return util::error_json("AudioServer not available");
   }
   auto *bi = args.Find("bus_index");
   if (!bi || !bi->IsInt()) {
-    return error_json("missing required parameter: bus_index");
+    return util::error_json("missing required parameter: bus_index");
   }
   auto *ei = args.Find("effect_index");
   if (!ei || !ei->IsInt()) {
-    return error_json("missing required parameter: effect_index");
+    return util::error_json("missing required parameter: effect_index");
   }
   int bus_idx = bi->GetInt();
   int count = server->get_bus_count();
   if (bus_idx < 0 || bus_idx >= count) {
-    return error_json("audio bus not found at index: " +
+    return util::error_json("audio bus not found at index: " +
                       std::to_string(bus_idx));
   }
   int effect_idx = ei->GetInt();
@@ -427,20 +416,20 @@ mcp::JsonValue handle_stream_play(const mcp::JsonValue &args) {
                             "audio_stream_play called");
   auto *np = args.Find("node_path");
   if (!np || !np->IsString()) {
-    return error_json("missing required parameter: node_path");
+    return util::error_json("missing required parameter: node_path");
   }
   std::string path = np->GetString();
   auto *node = find_node(path);
   if (!node) {
-    return error_json("AudioStreamPlayer node not found: " + path +
+    return util::error_json("AudioStreamPlayer node not found: " + path +
                       NODE_PATH_HINT);
   }
   auto ap = resolve_audio_player(node);
   if (!ap.is_valid()) {
-    return error_json(
+    return util::error_json(
         "node is not an "
         "AudioStreamPlayer/AudioStreamPlayer2D/AudioStreamPlayer3D: " +
-        path + " (actual class: " + to_std(node->get_class()) + ")");
+        path + " (actual class: " + util::to_std(node->get_class()) + ")");
   }
   auto *sp = args.Find("stream_path");
   if (sp && sp->IsString()) {
@@ -452,7 +441,7 @@ mcp::JsonValue handle_stream_play(const mcp::JsonValue &args) {
                                 "paths may be relative to the wrong folder");
     auto *loader = godot::ResourceLoader::get_singleton();
     if (!loader) {
-      return error_json("ResourceLoader not available");
+      return util::error_json("ResourceLoader not available");
     }
     auto stream = loader->load(stream_path);
     if (stream.is_null()) {
@@ -463,7 +452,7 @@ mcp::JsonValue handle_stream_play(const mcp::JsonValue &args) {
     }
     auto audio_stream = godot::Ref<godot::AudioStream>(stream);
     if (audio_stream.is_null()) {
-      return error_json("loaded resource is not an AudioStream: " +
+      return util::error_json("loaded resource is not an AudioStream: " +
                         sp->GetString());
     }
     ap.set_stream(audio_stream);
@@ -475,7 +464,7 @@ mcp::JsonValue handle_stream_play(const mcp::JsonValue &args) {
         fp->IsDouble() ? fp->GetDouble() : static_cast<double>(fp->GetInt()));
   }
   if (ap.get_stream().is_null()) {
-    return error_json("node has no audio stream set: " + path +
+    return util::error_json("node has no audio stream set: " + path +
                       " — set the stream first (e.g. resource_set_property "
                       "with a loaded AudioStream resource)");
   }
@@ -490,20 +479,20 @@ mcp::JsonValue handle_stream_stop(const mcp::JsonValue &args) {
                             "audio_stream_stop called");
   auto *np = args.Find("node_path");
   if (!np || !np->IsString()) {
-    return error_json("missing required parameter: node_path");
+    return util::error_json("missing required parameter: node_path");
   }
   std::string path = np->GetString();
   auto *node = find_node(path);
   if (!node) {
-    return error_json("AudioStreamPlayer node not found: " + path +
+    return util::error_json("AudioStreamPlayer node not found: " + path +
                       NODE_PATH_HINT);
   }
   auto ap = resolve_audio_player(node);
   if (!ap.is_valid()) {
-    return error_json(
+    return util::error_json(
         "node is not an "
         "AudioStreamPlayer/AudioStreamPlayer2D/AudioStreamPlayer3D: " +
-        path + " (actual class: " + to_std(node->get_class()) + ")");
+        path + " (actual class: " + util::to_std(node->get_class()) + ")");
   }
   ap.stop();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -516,24 +505,24 @@ mcp::JsonValue handle_stream_set_volume(const mcp::JsonValue &args) {
                             "audio_stream_set_volume called");
   auto *np = args.Find("node_path");
   if (!np || !np->IsString()) {
-    return error_json("missing required parameter: node_path");
+    return util::error_json("missing required parameter: node_path");
   }
   auto *vd = args.Find("volume_db");
   if (!vd || !vd->IsNumber()) {
-    return error_json("missing required parameter: volume_db");
+    return util::error_json("missing required parameter: volume_db");
   }
   std::string path = np->GetString();
   auto *node = find_node(path);
   if (!node) {
-    return error_json("AudioStreamPlayer node not found: " + path +
+    return util::error_json("AudioStreamPlayer node not found: " + path +
                       NODE_PATH_HINT);
   }
   auto ap = resolve_audio_player(node);
   if (!ap.is_valid()) {
-    return error_json(
+    return util::error_json(
         "node is not an "
         "AudioStreamPlayer/AudioStreamPlayer2D/AudioStreamPlayer3D: " +
-        path + " (actual class: " + to_std(node->get_class()) + ")");
+        path + " (actual class: " + util::to_std(node->get_class()) + ")");
   }
   float vol = static_cast<float>(
       vd->IsDouble() ? vd->GetDouble() : static_cast<double>(vd->GetInt()));
@@ -548,24 +537,24 @@ mcp::JsonValue handle_stream_set_pitch(const mcp::JsonValue &args) {
                             "audio_stream_set_pitch called");
   auto *np = args.Find("node_path");
   if (!np || !np->IsString()) {
-    return error_json("missing required parameter: node_path");
+    return util::error_json("missing required parameter: node_path");
   }
   auto *ps = args.Find("pitch_scale");
   if (!ps || !ps->IsNumber()) {
-    return error_json("missing required parameter: pitch_scale");
+    return util::error_json("missing required parameter: pitch_scale");
   }
   std::string path = np->GetString();
   auto *node = find_node(path);
   if (!node) {
-    return error_json("AudioStreamPlayer node not found: " + path +
+    return util::error_json("AudioStreamPlayer node not found: " + path +
                       NODE_PATH_HINT);
   }
   auto ap = resolve_audio_player(node);
   if (!ap.is_valid()) {
-    return error_json(
+    return util::error_json(
         "node is not an "
         "AudioStreamPlayer/AudioStreamPlayer2D/AudioStreamPlayer3D: " +
-        path + " (actual class: " + to_std(node->get_class()) + ")");
+        path + " (actual class: " + util::to_std(node->get_class()) + ")");
   }
   float pitch = static_cast<float>(
       ps->IsDouble() ? ps->GetDouble() : static_cast<double>(ps->GetInt()));
@@ -580,20 +569,20 @@ mcp::JsonValue handle_stream_get_playback_position(const mcp::JsonValue &args) {
                             "audio_stream_get_playback_position called");
   auto *np = args.Find("node_path");
   if (!np || !np->IsString()) {
-    return error_json("missing required parameter: node_path");
+    return util::error_json("missing required parameter: node_path");
   }
   std::string path = np->GetString();
   auto *node = find_node(path);
   if (!node) {
-    return error_json("AudioStreamPlayer node not found: " + path +
+    return util::error_json("AudioStreamPlayer node not found: " + path +
                       NODE_PATH_HINT);
   }
   auto ap = resolve_audio_player(node);
   if (!ap.is_valid()) {
-    return error_json(
+    return util::error_json(
         "node is not an "
         "AudioStreamPlayer/AudioStreamPlayer2D/AudioStreamPlayer3D: " +
-        path + " (actual class: " + to_std(node->get_class()) + ")");
+        path + " (actual class: " + util::to_std(node->get_class()) + ")");
   }
   float pos = ap.get_playback_position();
   mcp::JsonValue r(mcp::JsonValue::object_tag);
@@ -608,24 +597,24 @@ mcp::JsonValue handle_stream_seek(const mcp::JsonValue &args) {
                             "audio_stream_seek called");
   auto *np = args.Find("node_path");
   if (!np || !np->IsString()) {
-    return error_json("missing required parameter: node_path");
+    return util::error_json("missing required parameter: node_path");
   }
   auto *tp = args.Find("to_position");
   if (!tp || !tp->IsNumber()) {
-    return error_json("missing required parameter: to_position");
+    return util::error_json("missing required parameter: to_position");
   }
   std::string path = np->GetString();
   auto *node = find_node(path);
   if (!node) {
-    return error_json("AudioStreamPlayer node not found: " + path +
+    return util::error_json("AudioStreamPlayer node not found: " + path +
                       NODE_PATH_HINT);
   }
   auto ap = resolve_audio_player(node);
   if (!ap.is_valid()) {
-    return error_json(
+    return util::error_json(
         "node is not an "
         "AudioStreamPlayer/AudioStreamPlayer2D/AudioStreamPlayer3D: " +
-        path + " (actual class: " + to_std(node->get_class()) + ")");
+        path + " (actual class: " + util::to_std(node->get_class()) + ")");
   }
   float to_pos = static_cast<float>(
       tp->IsDouble() ? tp->GetDouble() : static_cast<double>(tp->GetInt()));
@@ -640,20 +629,20 @@ mcp::JsonValue handle_bus_set_solo(const mcp::JsonValue &args) {
                             "audio_bus_set_solo called");
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
-    return error_json("AudioServer not available");
+    return util::error_json("AudioServer not available");
   }
   auto *bi = args.Find("bus_index");
   if (!bi || !bi->IsInt()) {
-    return error_json("missing required parameter: bus_index");
+    return util::error_json("missing required parameter: bus_index");
   }
   auto *sl = args.Find("solo");
   if (!sl || !sl->IsBool()) {
-    return error_json("missing required parameter: solo");
+    return util::error_json("missing required parameter: solo");
   }
   int idx = bi->GetInt();
   int count = server->get_bus_count();
   if (idx < 0 || idx >= count) {
-    return error_json("audio bus not found at index: " + std::to_string(idx));
+    return util::error_json("audio bus not found at index: " + std::to_string(idx));
   }
   server->set_bus_solo(idx, sl->GetBool());
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -666,12 +655,12 @@ mcp::JsonValue handle_get_output_device_list(const mcp::JsonValue &) {
                             "audio_get_output_device_list called");
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
-    return error_json("AudioServer not available");
+    return util::error_json("AudioServer not available");
   }
   auto devices = server->get_output_device_list();
   mcp::JsonValue arr(mcp::JsonValue::array_tag);
   for (int i = 0; i < devices.size(); i++) {
-    arr.PushBack(mcp::JsonValue(to_std(devices[i])));
+    arr.PushBack(mcp::JsonValue(util::to_std(devices[i])));
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(arr);
@@ -685,11 +674,11 @@ mcp::JsonValue handle_set_output_device(const mcp::JsonValue &args) {
                             "audio_set_output_device called");
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
-    return error_json("AudioServer not available");
+    return util::error_json("AudioServer not available");
   }
   auto *dv = args.Find("device");
   if (!dv || !dv->IsString()) {
-    return error_json("missing required parameter: device");
+    return util::error_json("missing required parameter: device");
   }
   server->set_output_device(godot::String(dv->GetString().c_str()));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -702,12 +691,12 @@ mcp::JsonValue handle_get_input_device_list(const mcp::JsonValue &) {
                             "audio_get_input_device_list called");
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
-    return error_json("AudioServer not available");
+    return util::error_json("AudioServer not available");
   }
   auto devices = server->get_input_device_list();
   mcp::JsonValue arr(mcp::JsonValue::array_tag);
   for (int i = 0; i < devices.size(); i++) {
-    arr.PushBack(mcp::JsonValue(to_std(devices[i])));
+    arr.PushBack(mcp::JsonValue(util::to_std(devices[i])));
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(arr);
@@ -721,11 +710,11 @@ mcp::JsonValue handle_set_input_device(const mcp::JsonValue &args) {
                             "audio_set_input_device called");
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
-    return error_json("AudioServer not available");
+    return util::error_json("AudioServer not available");
   }
   auto *dv = args.Find("device");
   if (!dv || !dv->IsString()) {
-    return error_json("missing required parameter: device");
+    return util::error_json("missing required parameter: device");
   }
   server->set_input_device(godot::String(dv->GetString().c_str()));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,

@@ -1,5 +1,6 @@
 #include "nav_ops.hpp"
 #include "core/log_system.hpp"
+#include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/navigation_mesh.hpp>
 #include <godot_cpp/classes/navigation_polygon.hpp>
@@ -23,11 +24,6 @@ namespace nav_ops {
 using JV = mcp::JsonValue;
 
 namespace {
-
-std::string to_std(const godot::String &s) {
-  godot::CharString utf8 = s.utf8();
-  return std::string(utf8.ptr());
-}
 
 int64_t rid_to_int(const godot::RID &rid) { return rid.get_id(); }
 

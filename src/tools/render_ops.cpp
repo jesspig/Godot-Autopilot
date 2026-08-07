@@ -1,5 +1,6 @@
 #include "render_ops.hpp"
 #include "core/log_system.hpp"
+#include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/canvas_item.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
@@ -30,11 +31,6 @@ namespace render_ops {
 using JV = mcp::JsonValue;
 
 namespace {
-
-std::string to_std(const godot::String &s) {
-  godot::CharString utf8 = s.utf8();
-  return std::string(utf8.ptr());
-}
 
 godot::RID rid_from_json(const JV &j) {
   return godot::UtilityFunctions::rid_from_int64(j.GetInt());
@@ -1843,13 +1839,13 @@ JV handle_canvas_item_get_rid(const JV &args) {
   if (clean.size() > 5 && clean.compare(0, 5, "root/") == 0)
     clean = clean.substr(5);
   godot::Node *node = nullptr;
-  if (clean.empty() || clean == to_std(root->get_name())) {
+  if (clean.empty() || clean == util::to_std(root->get_name())) {
     node = root;
   } else {
     node =
         root->get_node_or_null(godot::NodePath(godot::String(clean.c_str())));
     if (!node) {
-      std::string root_name = to_std(root->get_name());
+      std::string root_name = util::to_std(root->get_name());
       if (clean.size() > root_name.size() + 1 &&
           clean.compare(0, root_name.size(), root_name) == 0 &&
           clean[root_name.size()] == '/') {
@@ -1907,7 +1903,7 @@ JV handle_resolve_rid(const JV &args) {
         auto *ci = godot::Object::cast_to<godot::CanvasItem>(node);
         if (ci && ci->get_canvas_item() == rid) {
           JV nj(JV::object_tag);
-          nj["node_path"] = JV(to_std(node->get_path()));
+          nj["node_path"] = JV(util::to_std(node->get_path()));
           nj["type"] = JV("canvas_item");
           nodes_arr.PushBack(std::move(nj));
         }

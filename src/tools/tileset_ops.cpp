@@ -24,28 +24,17 @@ using JV = mcp::JsonValue;
 
 namespace {
 
-std::string to_std(const godot::String &s) {
-  godot::CharString utf8 = s.utf8();
-  return std::string(utf8.ptr());
-}
-
-JV error(const std::string &msg) {
-  JV e(JV::object_tag);
-  e["error"] = JV(msg);
-  return e;
-}
-
 godot::Ref<godot::TileSet> resolve_tileset(const std::string &name,
                                            JV &out_error) {
   godot::Ref<godot::Resource> res = resource_ops::resolve_memory_resource(name);
   if (res.is_null()) {
-    out_error = error("memory resource not found: " + name +
+    out_error = util::error_json("memory resource not found: " + name +
                       " (create it with tileset_create first)");
     return godot::Ref<godot::TileSet>();
   }
   godot::Ref<godot::TileSet> tileset = res;
   if (tileset.is_null()) {
-    out_error = error("resource " + name + " is not a TileSet");
+    out_error = util::error_json("resource " + name + " is not a TileSet");
   }
   return tileset;
 }
@@ -107,19 +96,19 @@ JV handle_add_atlas_source(const JV &args) {
 
   auto *n = args.Find("name");
   if (!n || !n->IsString())
-    return error("missing required parameter: name");
+    return util::error_json("missing required parameter: name");
   auto *sid = args.Find("source_id");
   if (!sid || !sid->IsInt())
-    return error("missing required parameter: source_id");
+    return util::error_json("missing required parameter: source_id");
   auto *tex = args.Find("texture");
   if (!tex || !tex->IsString())
-    return error("missing required parameter: texture");
+    return util::error_json("missing required parameter: texture");
   auto *tsz = args.Find("tile_size");
   if (!tsz || !tsz->IsObject())
-    return error("missing required parameter: tile_size");
+    return util::error_json("missing required parameter: tile_size");
   godot::Vector2i tile_size;
   if (!parse_vec2i(*tsz, "x", "y", tile_size))
-    return error("missing required parameter: tile_size.x");
+    return util::error_json("missing required parameter: tile_size.x");
 
   int margin = 0;
   auto *mg = args.Find("margin");
@@ -139,7 +128,7 @@ JV handle_add_atlas_source(const JV &args) {
 
   int source_id = static_cast<int>(sid->GetInt());
   if (tileset->has_source(source_id))
-    return error("source_id already exists: " + std::to_string(source_id));
+    return util::error_json("source_id already exists: " + std::to_string(source_id));
 
   godot::String tex_path = godot::String(tex->GetString().c_str());
   if (!godot::FileAccess::file_exists(tex_path)) {
@@ -151,24 +140,24 @@ JV handle_add_atlas_source(const JV &args) {
   }
   auto *loader = godot::ResourceLoader::get_singleton();
   if (!loader)
-    return error("ResourceLoader not available");
+    return util::error_json("ResourceLoader not available");
   godot::Ref<godot::Resource> tex_res = loader->load(tex_path);
   if (tex_res.is_null())
-    return error("failed to load texture: " + tex->GetString());
+    return util::error_json("failed to load texture: " + tex->GetString());
   godot::Ref<godot::Texture2D> texture = tex_res;
   if (texture.is_null())
-    return error("resource is not a Texture2D: " + tex->GetString());
+    return util::error_json("resource is not a Texture2D: " + tex->GetString());
 
   auto *cdbs = godot::ClassDBSingleton::get_singleton();
   if (!cdbs)
-    return error("ClassDB singleton not available");
+    return util::error_json("ClassDB singleton not available");
   godot::Variant var =
       cdbs->instantiate(godot::StringName("TileSetAtlasSource"));
   if (var.get_type() == godot::Variant::NIL)
-    return error("failed to instantiate TileSetAtlasSource");
+    return util::error_json("failed to instantiate TileSetAtlasSource");
   godot::Ref<godot::TileSetAtlasSource> src = var;
   if (src.is_null())
-    return error("instantiated object is not a TileSetAtlasSource");
+    return util::error_json("instantiated object is not a TileSetAtlasSource");
 
   src->set_texture(texture);
   src->set_texture_region_size(tile_size);
@@ -209,10 +198,10 @@ JV handle_add_physics_layer(const JV &args) {
 
   auto *n = args.Find("name");
   if (!n || !n->IsString())
-    return error("missing required parameter: name");
+    return util::error_json("missing required parameter: name");
   auto *lid = args.Find("layer_id");
   if (!lid || !lid->IsInt())
-    return error("missing required parameter: layer_id");
+    return util::error_json("missing required parameter: layer_id");
 
   int collision_layer = 1;
   auto *cl = args.Find("collision_layer");
@@ -251,22 +240,22 @@ JV handle_set_tile_collision(const JV &args) {
 
   auto *n = args.Find("name");
   if (!n || !n->IsString())
-    return error("missing required parameter: name");
+    return util::error_json("missing required parameter: name");
   auto *sid = args.Find("source_id");
   if (!sid || !sid->IsInt())
-    return error("missing required parameter: source_id");
+    return util::error_json("missing required parameter: source_id");
   auto *ac = args.Find("atlas_coords");
   if (!ac || !ac->IsObject())
-    return error("missing required parameter: atlas_coords");
+    return util::error_json("missing required parameter: atlas_coords");
   godot::Vector2i coords;
   if (!parse_vec2i(*ac, "x", "y", coords))
-    return error("missing required parameter: atlas_coords.x");
+    return util::error_json("missing required parameter: atlas_coords.x");
   auto *pl = args.Find("physics_layer");
   if (!pl || !pl->IsInt())
-    return error("missing required parameter: physics_layer");
+    return util::error_json("missing required parameter: physics_layer");
   auto *poly = args.Find("polygon");
   if (!poly || !poly->IsArray())
-    return error("missing required parameter: polygon");
+    return util::error_json("missing required parameter: polygon");
 
   JV resolve_err;
   godot::Ref<godot::TileSet> tileset =
@@ -277,10 +266,10 @@ JV handle_set_tile_collision(const JV &args) {
   int source_id = static_cast<int>(sid->GetInt());
   godot::Ref<godot::TileSetSource> src_res = tileset->get_source(source_id);
   if (src_res.is_null())
-    return error("source not found: " + std::to_string(source_id));
+    return util::error_json("source not found: " + std::to_string(source_id));
   godot::Ref<godot::TileSetAtlasSource> src = src_res;
   if (src.is_null())
-    return error("source " + std::to_string(source_id) +
+    return util::error_json("source " + std::to_string(source_id) +
                  " is not a TileSetAtlasSource");
 
   if (!src->has_tile(coords)) {
@@ -288,13 +277,13 @@ JV handle_set_tile_collision(const JV &args) {
   }
   if (!src->has_tile(coords)) {
     std::string pos = std::to_string(coords.x) + "," + std::to_string(coords.y);
-    return error("failed to create tile at " + pos);
+    return util::error_json("failed to create tile at " + pos);
   }
 
   godot::TileData *data = src->get_tile_data(coords, 0);
   if (!data) {
     std::string pos = std::to_string(coords.x) + "," + std::to_string(coords.y);
-    return error("failed to get tile data at " + pos);
+    return util::error_json("failed to get tile data at " + pos);
   }
 
   int physics_layer = static_cast<int>(pl->GetInt());
@@ -316,19 +305,19 @@ JV handle_set_tile_collision(const JV &args) {
     if (poly_arr[0].IsArray()) {
       for (size_t i = 0; i < poly_arr.size(); ++i) {
         if (!poly_arr[i].IsArray())
-          return error("invalid polygon at index " + std::to_string(i) +
+          return util::error_json("invalid polygon at index " + std::to_string(i) +
                        ": expected array of {x: number, y: number}");
         godot::PackedVector2Array points;
         std::string parse_err;
         if (!parse_polygon(poly_arr[i], points, parse_err))
-          return error(parse_err);
+          return util::error_json(parse_err);
         polygons.push_back(std::move(points));
       }
     } else {
       godot::PackedVector2Array points;
       std::string parse_err;
       if (!parse_polygon(*poly, points, parse_err))
-        return error(parse_err);
+        return util::error_json(parse_err);
       polygons.push_back(std::move(points));
     }
   }

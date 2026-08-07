@@ -18,12 +18,6 @@ using JV = mcp::JsonValue;
 
 namespace {
 
-JV error(const std::string &msg) {
-  JV e(JV::object_tag);
-  e["error"] = JV(msg);
-  return e;
-}
-
 godot::Ref<godot::SpriteFrames> resolve_spriteframes(const std::string &name,
                                                      std::string &out_error) {
   out_error.clear();
@@ -49,20 +43,20 @@ JV handle_create(const JV &args) {
 
   auto *n = args.Find("name");
   if (!n || !n->IsString() || n->GetString().empty())
-    return error("missing required parameter: name");
+    return util::error_json("missing required parameter: name");
   std::string name = n->GetString();
 
   auto *cdbs = godot::ClassDBSingleton::get_singleton();
   if (!cdbs)
-    return error("ClassDB singleton not available");
+    return util::error_json("ClassDB singleton not available");
 
   godot::Variant obj_var = cdbs->instantiate(godot::StringName("SpriteFrames"));
   if (obj_var.get_type() == godot::Variant::NIL)
-    return error("failed to instantiate SpriteFrames");
+    return util::error_json("failed to instantiate SpriteFrames");
 
   godot::Ref<godot::SpriteFrames> sf = obj_var;
   if (sf.is_null())
-    return error("instantiated object is not a SpriteFrames");
+    return util::error_json("instantiated object is not a SpriteFrames");
 
   sf->remove_animation(godot::StringName("default"));
 
@@ -89,12 +83,12 @@ JV handle_add_animation(const JV &args) {
 
   auto *n = args.Find("name");
   if (!n || !n->IsString() || n->GetString().empty())
-    return error("missing required parameter: name");
+    return util::error_json("missing required parameter: name");
   std::string name = n->GetString();
 
   auto *a = args.Find("animation");
   if (!a || !a->IsString() || a->GetString().empty())
-    return error("missing required parameter: animation");
+    return util::error_json("missing required parameter: animation");
   std::string animation = a->GetString();
 
   double fps = 5.0;
@@ -112,7 +106,7 @@ JV handle_add_animation(const JV &args) {
   std::string resolve_err;
   godot::Ref<godot::SpriteFrames> sf = resolve_spriteframes(name, resolve_err);
   if (sf.is_null())
-    return error(resolve_err);
+    return util::error_json(resolve_err);
 
   godot::StringName anim(animation.c_str());
   sf->add_animation(anim);
@@ -132,17 +126,17 @@ JV handle_add_frame(const JV &args) {
 
   auto *n = args.Find("name");
   if (!n || !n->IsString() || n->GetString().empty())
-    return error("missing required parameter: name");
+    return util::error_json("missing required parameter: name");
   std::string name = n->GetString();
 
   auto *a = args.Find("animation");
   if (!a || !a->IsString() || a->GetString().empty())
-    return error("missing required parameter: animation");
+    return util::error_json("missing required parameter: animation");
   std::string animation = a->GetString();
 
   auto *t = args.Find("texture");
   if (!t || !t->IsString() || t->GetString().empty())
-    return error("missing required parameter: texture");
+    return util::error_json("missing required parameter: texture");
   std::string texture = t->GetString();
 
   float duration = 1.0f;
@@ -157,23 +151,23 @@ JV handle_add_frame(const JV &args) {
   if (hf && hf->IsInt())
     hframes = static_cast<int>(hf->GetInt());
   else if (hf)
-    return error("invalid parameter: hframes must be a positive integer");
+    return util::error_json("invalid parameter: hframes must be a positive integer");
   if (hframes < 1)
-    return error("invalid parameter: hframes must be a positive integer");
+    return util::error_json("invalid parameter: hframes must be a positive integer");
 
   int vframes = 1;
   auto *vf = args.Find("vframes");
   if (vf && vf->IsInt())
     vframes = static_cast<int>(vf->GetInt());
   else if (vf)
-    return error("invalid parameter: vframes must be a positive integer");
+    return util::error_json("invalid parameter: vframes must be a positive integer");
   if (vframes < 1)
-    return error("invalid parameter: vframes must be a positive integer");
+    return util::error_json("invalid parameter: vframes must be a positive integer");
 
   std::string resolve_err;
   godot::Ref<godot::SpriteFrames> sf = resolve_spriteframes(name, resolve_err);
   if (sf.is_null())
-    return error(resolve_err);
+    return util::error_json(resolve_err);
 
   godot::String tex_path(texture.c_str());
   if (!godot::FileAccess::file_exists(tex_path))
@@ -183,7 +177,7 @@ JV handle_add_frame(const JV &args) {
                               "may be relative to the wrong folder");
   auto *loader = godot::ResourceLoader::get_singleton();
   if (!loader)
-    return error("ResourceLoader not available");
+    return util::error_json("ResourceLoader not available");
   godot::Ref<godot::Resource> tex_res = loader->load(tex_path);
   if (tex_res.is_null())
     return util::error_detail(
@@ -192,11 +186,11 @@ JV handle_add_frame(const JV &args) {
         "reimport the file or check the file format");
   godot::Ref<godot::Texture2D> tex = tex_res;
   if (tex.is_null())
-    return error("loaded resource is not a Texture2D: " + texture);
+    return util::error_json("loaded resource is not a Texture2D: " + texture);
 
   godot::StringName anim(animation.c_str());
   if (!sf->has_animation(anim))
-    return error("animation not found: " + animation +
+    return util::error_json("animation not found: " + animation +
                  " (add it with spriteframes_add_animation first)");
 
   int added_frames = 0;

@@ -1,5 +1,6 @@
 #include "config_ops.hpp"
 #include "core/log_system.hpp"
+#include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/editor_settings.hpp>
@@ -10,15 +11,6 @@
 
 namespace godot_self_driving {
 namespace config_ops {
-
-namespace {
-
-std::string to_std(const godot::String &s) {
-  godot::CharString utf8 = s.utf8();
-  return std::string(utf8.ptr());
-}
-
-} // namespace
 
 mcp::JsonValue handle_project_settings_get(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -98,7 +90,7 @@ mcp::JsonValue handle_project_settings_set(const mcp::JsonValue &args) {
         godot::String(name.c_str()));
     if (existing.get_type() != godot::Variant::NIL) {
       value = VariantJson::deserialize(
-          *vp, to_std(godot::Variant::get_type_name(existing.get_type())));
+          *vp, util::to_std(godot::Variant::get_type_name(existing.get_type())));
     } else {
       value = VariantJson::deserialize(*vp, "String");
     }
@@ -186,7 +178,7 @@ mcp::JsonValue handle_engine_get_version(const mcp::JsonValue &) {
   }
   if (info.has("string")) {
     godot::String s = info["string"];
-    j["string"] = mcp::JsonValue(to_std(s));
+    j["string"] = mcp::JsonValue(util::to_std(s));
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(j);

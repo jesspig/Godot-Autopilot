@@ -6,6 +6,7 @@
 
 using godot_self_driving::util::error_detail;
 using godot_self_driving::util::error_json;
+using godot_self_driving::util::ok_result;
 
 TEST(ErrorUtilTest, ErrorJsonShape) {
     auto value = error_json("something failed");
@@ -28,3 +29,14 @@ TEST(ErrorUtilTest, ErrorDetailHasAllFourFields) {
                            " \xe2\x80\x94 action: action here";
     EXPECT_EQ(err->GetString(), expected);
 }
+
+TEST(ErrorUtilTest, OkResultShape) {
+    auto value = ok_result(mcp::JsonValue("v"));
+    ASSERT_TRUE(value.IsObject());
+    EXPECT_EQ(value.Size(), 1u);
+    const mcp::JsonValue* result = value.Find("result");
+    ASSERT_NE(result, nullptr);
+    EXPECT_TRUE(result->IsString());
+    EXPECT_EQ(result->GetString(), "v");
+}
+

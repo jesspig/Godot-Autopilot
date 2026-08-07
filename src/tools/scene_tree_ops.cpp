@@ -1,5 +1,6 @@
 #include "scene_tree_ops.hpp"
 #include "core/log_system.hpp"
+#include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/engine.hpp>
@@ -18,11 +19,6 @@ namespace scene_tree_ops {
 using JV = mcp::JsonValue;
 
 namespace {
-
-std::string to_std(const godot::String &s) {
-  godot::CharString utf8 = s.utf8();
-  return std::string(utf8.ptr());
-}
 
 godot::SceneTree *get_tree() {
   auto *editor = godot::EditorInterface::get_singleton();
@@ -151,7 +147,7 @@ JV handle_get_nodes_in_group(const JV &args) {
     auto *node = godot::Object::cast_to<godot::Node>(nodes[i]);
     if (!node)
       continue;
-    result_arr.PushBack(JV(to_std(node->get_path())));
+    result_arr.PushBack(JV(util::to_std(node->get_path())));
   }
   JV r(JV::object_tag);
   r["result"] = std::move(result_arr);

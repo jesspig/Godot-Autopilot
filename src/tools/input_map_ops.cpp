@@ -1,5 +1,6 @@
 #include "input_map_ops.hpp"
 #include "core/log_system.hpp"
+#include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #include <algorithm>
 #include <godot_cpp/classes/input_event.hpp>
@@ -18,11 +19,6 @@ namespace input_map_ops {
 using JV = mcp::JsonValue;
 
 namespace {
-
-std::string to_std(const godot::String &s) {
-  godot::CharString utf8 = s.utf8();
-  return std::string(utf8.ptr());
-}
 
 const std::unordered_map<std::string, int64_t> KEY_NAME_TO_CODE = {
     {"KEY_SPACE", 32},
@@ -462,7 +458,7 @@ JV handle_get_actions(const JV &) {
   auto names = im->get_actions();
   JV result_arr(JV::array_tag);
   for (int i = 0; i < names.size(); i++) {
-    result_arr.PushBack(JV(to_std(godot::String(names[i]))));
+    result_arr.PushBack(JV(util::to_std(godot::String(names[i]))));
   }
   JV r(JV::object_tag);
   r["result"] = std::move(result_arr);
@@ -534,7 +530,7 @@ JV handle_persist(const JV &args) {
   std::vector<std::string> skipped;
   std::vector<std::string> skipped_missing;
   for (int i = 0; i < actions.size(); i++) {
-    std::string name_std = to_std(godot::String(actions[i]));
+    std::string name_std = util::to_std(godot::String(actions[i]));
     if (has_allowlist) {
       if (std::find(allowlist.begin(), allowlist.end(), name_std) ==
           allowlist.end()) {

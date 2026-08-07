@@ -26,11 +26,6 @@ constexpr int DEFAULT_MAX_DEPTH = 8;
 constexpr int UNLIMITED_TREE_DEPTH = 100000;
 constexpr int MAX_PROPERTY_COUNT = 20;
 
-std::string to_std(const godot::String &s) {
-  godot::CharString utf8 = s.utf8();
-  return std::string(utf8.ptr());
-}
-
 void collect_property_summary(godot::Node *node, mcp::JsonValue &j) {
   godot::TypedArray<godot::Dictionary> props = node->get_property_list();
   int count = 0;
@@ -40,7 +35,7 @@ void collect_property_summary(godot::Node *node, mcp::JsonValue &j) {
     if (name_v.get_type() != godot::Variant::STRING_NAME)
       continue;
     godot::StringName prop_name = name_v;
-    std::string name_str = to_std(godot::String(prop_name));
+    std::string name_str = util::to_std(godot::String(prop_name));
     if (name_str.rfind("metadata/", 0) == 0)
       continue;
     if (!name_str.empty() && name_str[0] == '_')
@@ -57,8 +52,8 @@ void node_to_json(godot::Node *node, int remaining_depth,
                   bool include_properties, mcp::JsonValue &j) {
   if (!node)
     return;
-  j["name"] = mcp::JsonValue(to_std(node->get_name()));
-  j["type"] = mcp::JsonValue(to_std(node->get_class()));
+  j["name"] = mcp::JsonValue(util::to_std(node->get_name()));
+  j["type"] = mcp::JsonValue(util::to_std(node->get_class()));
 
   godot::Node *root =
       godot::EditorInterface::get_singleton()
@@ -67,7 +62,7 @@ void node_to_json(godot::Node *node, int remaining_depth,
   godot::Node *n = node;
   std::vector<std::string> parts;
   while (n && n != root) {
-    parts.push_back(to_std(n->get_name()));
+    parts.push_back(util::to_std(n->get_name()));
     n = n->get_parent();
   }
   std::reverse(parts.begin(), parts.end());
@@ -78,7 +73,7 @@ void node_to_json(godot::Node *node, int remaining_depth,
     path += parts[i];
   }
   if (path.empty())
-    path = to_std(node->get_name());
+    path = util::to_std(node->get_name());
   j["path"] = mcp::JsonValue(path);
   if (include_properties) {
     mcp::JsonValue props(mcp::JsonValue::object_tag);
@@ -195,8 +190,8 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
   if (editor) {
     auto *scene_root = editor->get_edited_scene_root();
     if (scene_root) {
-      std::string abs_path = to_std(obj->get_path());
-      std::string root_pref = to_std(scene_root->get_path());
+      std::string abs_path = util::to_std(obj->get_path());
+      std::string root_pref = util::to_std(scene_root->get_path());
       if (abs_path == root_pref) {
         result_path = name;
       } else if (abs_path.find(root_pref + "/") == 0) {
@@ -248,16 +243,16 @@ mcp::JsonValue handle_delete(const mcp::JsonValue &args) {
     return e;
   }
 
-  std::string node_name = to_std(node->get_name());
-  std::string node_type = to_std(node->get_class());
+  std::string node_name = util::to_std(node->get_name());
+  std::string node_type = util::to_std(node->get_class());
   std::string parent_path;
   auto *parent = node->get_parent();
   if (parent) {
-    std::string abs_parent = to_std(parent->get_path());
+    std::string abs_parent = util::to_std(parent->get_path());
     if (scene_root) {
-      std::string root_pref = to_std(scene_root->get_path());
+      std::string root_pref = util::to_std(scene_root->get_path());
       if (abs_parent == root_pref) {
-        parent_path = to_std(parent->get_name());
+        parent_path = util::to_std(parent->get_name());
       } else if (abs_parent.find(root_pref + "/") == 0) {
         parent_path = abs_parent.substr(root_pref.size() + 1);
       } else {
@@ -358,12 +353,12 @@ mcp::JsonValue handle_instance(const mcp::JsonValue &args) {
     instance->set_owner(scene_root);
   }
 
-  std::string instance_name = to_std(instance->get_name());
-  std::string instance_type = to_std(instance->get_class());
+  std::string instance_name = util::to_std(instance->get_name());
+  std::string instance_type = util::to_std(instance->get_class());
   std::string result_path = instance_name;
   if (scene_root) {
-    std::string abs_path = to_std(instance->get_path());
-    std::string root_pref = to_std(scene_root->get_path());
+    std::string abs_path = util::to_std(instance->get_path());
+    std::string root_pref = util::to_std(scene_root->get_path());
     if (abs_path == root_pref) {
       result_path = instance_name;
     } else if (abs_path.find(root_pref + "/") == 0) {
