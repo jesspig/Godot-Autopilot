@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <string>
+#include <typeinfo>
 
 #include <godot_cpp/classes/display_server.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
@@ -109,7 +110,7 @@ void GodotSelfDrivingPlugin::_enter_tree() {
     status_bar = memnew(godot_self_driving::McpStatusBar);
     if (get_server_ctx() && get_server_ctx()->is_running()) {
       auto port = get_server_ctx()->get_port();
-      status_bar->set_status_text("GSD: 127.0.0.1:" +
+      status_bar->set_status_text("GSD: 0.0.0.0:" +
                                   godot::String::num_int64(port));
     } else {
       status_bar->set_status_text("GSD: offline");
@@ -118,9 +119,15 @@ void GodotSelfDrivingPlugin::_enter_tree() {
                              status_bar);
     get_log_system().log(LogLevel::Debug, LogCategory::System,
                          "Toolbar status bar attached");
+  } catch (const std::exception &e) {
+    get_log_system().log(
+        LogLevel::Error, LogCategory::System,
+        "plugin setup step failed (status bar): " + std::string(e.what()) +
+            " (type=" + typeid(e).name() + ")");
   } catch (...) {
     get_log_system().log(LogLevel::Error, LogCategory::System,
-                         "plugin setup step failed");
+                         "plugin setup step failed (status bar): "
+                         "unknown exception");
   }
 
   try {
@@ -129,9 +136,15 @@ void GodotSelfDrivingPlugin::_enter_tree() {
     add_dock(log_dock);
     get_log_system().log(LogLevel::Debug, LogCategory::System,
                          "Bottom log dock registered");
+  } catch (const std::exception &e) {
+    get_log_system().log(
+        LogLevel::Error, LogCategory::System,
+        "plugin setup step failed (log dock): " + std::string(e.what()) +
+            " (type=" + typeid(e).name() + ")");
   } catch (...) {
     get_log_system().log(LogLevel::Error, LogCategory::System,
-                         "plugin setup step failed");
+                         "plugin setup step failed (log dock): "
+                         "unknown exception");
   }
 
   try {
@@ -144,9 +157,15 @@ void GodotSelfDrivingPlugin::_enter_tree() {
                              "Output capture logger registered");
       }
     }
+  } catch (const std::exception &e) {
+    get_log_system().log(
+        LogLevel::Error, LogCategory::System,
+        "plugin setup step failed (output logger): " +
+            std::string(e.what()) + " (type=" + typeid(e).name() + ")");
   } catch (...) {
     get_log_system().log(LogLevel::Error, LogCategory::System,
-                         "plugin setup step failed");
+                         "plugin setup step failed (output logger): "
+                         "unknown exception");
   }
 
   try {
@@ -156,9 +175,15 @@ void GodotSelfDrivingPlugin::_enter_tree() {
       get_log_system().log(LogLevel::Info, LogCategory::System,
                            "Debugger capture plugin registered");
     }
+  } catch (const std::exception &e) {
+    get_log_system().log(
+        LogLevel::Error, LogCategory::System,
+        "plugin setup step failed (debugger plugin): " +
+            std::string(e.what()) + " (type=" + typeid(e).name() + ")");
   } catch (...) {
     get_log_system().log(LogLevel::Error, LogCategory::System,
-                         "plugin setup step failed");
+                         "plugin setup step failed (debugger plugin): "
+                         "unknown exception");
   }
 
   g_server_ctx = new (std::nothrow)
@@ -168,7 +193,7 @@ void GodotSelfDrivingPlugin::_enter_tree() {
     if (started) {
       auto port = g_server_ctx->get_port();
       get_log_system().log(LogLevel::Info, LogCategory::Transport,
-                           "MCP server listening on 127.0.0.1:" +
+                           "MCP server listening on 0.0.0.0:" +
                                std::to_string(port));
     } else {
       get_log_system().log(LogLevel::Error, LogCategory::Transport,
@@ -230,10 +255,15 @@ void GodotSelfDrivingPlugin::_exit_tree() {
     get_log_system().log(godot_self_driving::LogLevel::Info,
                          godot_self_driving::LogCategory::System,
                          "Editor plugin exited");
+  } catch (const std::exception &e) {
+    get_log_system().log(godot_self_driving::LogLevel::Error,
+                         godot_self_driving::LogCategory::System,
+                         "exit tree exception: " + std::string(e.what()) +
+                             " (type=" + typeid(e).name() + ")");
   } catch (...) {
     get_log_system().log(godot_self_driving::LogLevel::Error,
                          godot_self_driving::LogCategory::System,
-                         "exit tree exception");
+                         "exit tree exception: unknown exception");
   }
 }
 

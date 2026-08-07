@@ -33,7 +33,7 @@ class McpLogDock : public godot::EditorDock {
   bool collapse = false;
   static constexpr int LINE_LIMIT = 5000;
   static constexpr float DEFAULT_DOCK_HEIGHT = 200.0f;
-  size_t last_shown_count_ = 0;
+  size_t last_index_ = 0;
 
 protected:
   static void _bind_methods();

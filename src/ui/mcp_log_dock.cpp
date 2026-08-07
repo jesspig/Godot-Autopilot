@@ -186,20 +186,20 @@ void McpLogDock::_update_theme() {
 void McpLogDock::refresh() { _rebuild_log(); }
 
 void McpLogDock::poll_new_entries() {
-  auto entries = log_system->query({});
-  if (entries.size() <= last_shown_count_)
+  size_t next = last_index_;
+  auto entries = log_system->query_from(last_index_, &next);
+  if (entries.empty())
     return;
 
+  last_index_ = next;
   if (!collapse) {
-    for (size_t i = last_shown_count_; i < entries.size(); i++) {
-      _add_log_line(*entries[i]);
+    for (auto *e : entries) {
+      _add_log_line(*e);
     }
-    last_shown_count_ = entries.size();
     _update_filter_counts();
     return;
   }
 
-  last_shown_count_ = entries.size();
   _rebuild_log();
 }
 
@@ -275,10 +275,10 @@ bool McpLogDock::_check_display(const LogEntry &entry) const {
 
 void McpLogDock::_rebuild_log() {
   log_display->clear();
-  last_shown_count_ = 0;
 
-  auto entries = log_system->query({});
-  last_shown_count_ = entries.size();
+  size_t next = 0;
+  auto entries = log_system->query_from(0, &next);
+  last_index_ = next;
 
   if (!collapse) {
     for (const auto *e : entries) {
@@ -350,7 +350,7 @@ void McpLogDock::_on_category_changed(int index) { _rebuild_log(); }
 
 void McpLogDock::_on_clear() {
   log_display->clear();
-  last_shown_count_ = log_system->query({}).size();
+  last_index_ = log_system->next_index();
 }
 
 void McpLogDock::_on_collapse_toggled(bool enabled) {

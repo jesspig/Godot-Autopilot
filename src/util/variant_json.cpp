@@ -1,4 +1,5 @@
 #include "variant_json.hpp"
+#include "core/log_system.hpp"
 #include <cctype>
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
@@ -10,6 +11,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace godot_self_driving {
 
@@ -191,12 +193,17 @@ godot::Variant deserialize_inferred(const mcp::JsonValue &j) {
     }
     auto oid_s_it = obj.find("object_id_str");
     if (oid_s_it != obj.end() && oid_s_it->second.IsString()) {
+      std::string oid_str = oid_s_it->second.GetString();
       try {
-        int64_t id = std::stoll(oid_s_it->second.GetString());
+        int64_t id = std::stoll(oid_str);
         auto *op = godot::ObjectDB::get_instance(static_cast<uint64_t>(id));
         if (op)
           return godot::Variant(op);
       } catch (...) {
+        LogSystem::instance().log(
+            LogLevel::Warning, LogCategory::System,
+            "variant_json: stoll parse failed for object_id (value=" +
+                oid_str + ")");
       }
     }
     auto oid_i_it = obj.find("object_id");
@@ -539,12 +546,17 @@ godot::Variant deserialize_typed(const mcp::JsonValue &j,
       }
       auto oid_s_it = j.GetObject().find("object_id_str");
       if (oid_s_it != j.GetObject().end() && oid_s_it->second.IsString()) {
+        std::string oid_str = oid_s_it->second.GetString();
         try {
-          int64_t id = std::stoll(oid_s_it->second.GetString());
+          int64_t id = std::stoll(oid_str);
           auto *op = godot::ObjectDB::get_instance(static_cast<uint64_t>(id));
           if (op)
             return godot::Variant(op);
         } catch (...) {
+          LogSystem::instance().log(
+              LogLevel::Warning, LogCategory::System,
+              "variant_json: stoll parse failed for object_id (value=" +
+                  oid_str + ")");
         }
       }
       auto oid_i_it = j.GetObject().find("object_id");
@@ -659,8 +671,13 @@ godot::Variant deserialize_as_object(const mcp::JsonValue &j,
 
   godot::StringName sn(resolved_class.c_str());
   godot::Variant obj_var = cdbs->instantiate(sn);
-  if (obj_var.get_type() == godot::Variant::NIL)
+  if (obj_var.get_type() == godot::Variant::NIL) {
+    LogSystem::instance().log(
+        LogLevel::Warning, LogCategory::System,
+        "variant_json: class instantiate failed (class=" + resolved_class +
+            ")");
     return obj_var;
+  }
 
   godot::Object *obj = obj_var.operator godot::Object *();
   if (!obj)
@@ -719,10 +736,17 @@ godot::Variant deserialize_as_object(const mcp::JsonValue &j,
   return obj_var;
 }
 
-} // namespace
+// 递归序列化的深度上限；超过时输出字符串占位而非继续递归（防止栈溢出）
+constexpr int MAX_SERIALIZE_DEPTH = 32;
+// 占位形态：深度超限输出 "[depth exceeded]"、检测到环输出 "[<circular ref>"
+const char *const DEPTH_EXCEEDED_PLACEHOLDER = "[depth exceeded]";
+const char *const CIRCULAR_REF_PLACEHOLDER = "[<circular ref>";
 
-mcp::JsonValue VariantJson::serialize(const godot::Variant &v) {
+mcp::JsonValue serialize_impl(const godot::Variant &v, int depth,
+                              std::unordered_set<uint64_t> &visited) {
   using namespace godot;
+  if (depth >= MAX_SERIALIZE_DEPTH)
+    return mcp::JsonValue(DEPTH_EXCEEDED_PLACEHOLDER);
   switch (v.get_type()) {
   case Variant::NIL:
     return mcp::JsonValue();
@@ -960,6 +984,13 @@ mcp::JsonValue VariantJson::serialize(const godot::Variant &v) {
   case Variant::OBJECT: {
     godot::Object *obj = v.operator godot::Object *();
     if (obj) {
+      // 路径环检测：递归进入前插入 instance_id，退出后移除（允许 DAG 共享子对象）
+      uint64_t oid = obj->get_instance_id();
+      if (visited.count(oid) > 0) {
+        return mcp::JsonValue(CIRCULAR_REF_PLACEHOLDER);
+      }
+      visited.insert(oid);
+
       mcp::JsonValue j(mcp::JsonValue::object_tag);
       j["class"] = mcp::JsonValue(to_std_string(obj->get_class()));
 
@@ -980,9 +1011,10 @@ mcp::JsonValue VariantJson::serialize(const godot::Variant &v) {
           continue;
 
         godot::Variant val = obj->get(prop_name);
-        j[name_std] = serialize(val);
+        j[name_std] = serialize_impl(val, depth + 1, visited);
       }
 
+      visited.erase(oid);
       return j;
     }
     return mcp::JsonValue();
@@ -1026,7 +1058,8 @@ mcp::JsonValue VariantJson::serialize(const godot::Variant &v) {
     mcp::JsonValue j(mcp::JsonValue::object_tag);
     for (int i = 0; i < keys.size(); i++) {
       auto key = keys[i];
-      j[to_std_string(key.operator godot::String())] = serialize(d[key]);
+      j[to_std_string(key.operator godot::String())] =
+          serialize_impl(d[key], depth + 1, visited);
     }
     return j;
   }
@@ -1035,7 +1068,7 @@ mcp::JsonValue VariantJson::serialize(const godot::Variant &v) {
     godot::Array a = v.operator godot::Array();
     mcp::JsonValue j(mcp::JsonValue::array_tag);
     for (int i = 0; i < a.size(); i++) {
-      j.PushBack(serialize(a[i]));
+      j.PushBack(serialize_impl(a[i], depth + 1, visited));
     }
     return j;
   }
@@ -1156,6 +1189,13 @@ mcp::JsonValue VariantJson::serialize(const godot::Variant &v) {
   }
 }
 
+} // namespace
+
+mcp::JsonValue VariantJson::serialize(const godot::Variant &v) {
+  std::unordered_set<uint64_t> visited;
+  return serialize_impl(v, 0, visited);
+}
+
 godot::Variant VariantJson::deserialize(const mcp::JsonValue &j,
                                         const std::string &type_hint) {
   if (!type_hint.empty()) {
@@ -1166,12 +1206,16 @@ godot::Variant VariantJson::deserialize(const mcp::JsonValue &j,
     if (j.IsString()) {
       auto *loader = godot::ResourceLoader::get_singleton();
       if (loader) {
+        godot::String res_path(j.GetString().c_str());
         godot::Ref<godot::Resource> res =
-            loader->load(godot::String(j.GetString().c_str()),
-                         godot::String(type_hint.c_str()));
+            loader->load(res_path, godot::String(type_hint.c_str()));
         if (res.is_valid()) {
           return godot::Variant(res.ptr());
         }
+        LogSystem::instance().log(
+            LogLevel::Warning, LogCategory::Resources,
+            "variant_json: resource load failed (path=" +
+                to_std_string(res_path) + ", type_hint=" + type_hint + ")");
       }
     }
     if (j.IsObject()) {

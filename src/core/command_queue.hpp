@@ -1,6 +1,7 @@
 #ifndef GODOT_SELF_DRIVING_COMMAND_QUEUE_HPP
 #define GODOT_SELF_DRIVING_COMMAND_QUEUE_HPP
 
+#include <atomic>
 #include <functional>
 #include <future>
 #include <memory>
@@ -38,14 +39,15 @@ class CommandQueue {
 
   std::queue<std::unique_ptr<TaskBase>> tasks_;
   std::mutex mutex_;
-  std::thread::id main_thread_id_;
+  std::atomic<std::thread::id> main_thread_id_{};
 
 public:
   CommandQueue() = default;
   ~CommandQueue() = default;
 
   bool is_main_thread() const {
-    return main_thread_id_ == std::this_thread::get_id();
+    return main_thread_id_.load(std::memory_order_relaxed) ==
+           std::this_thread::get_id();
   }
 
   template <typename Fn>
@@ -60,8 +62,10 @@ public:
   }
 
   void drain() {
-    if (main_thread_id_ == std::thread::id()) {
-      main_thread_id_ = std::this_thread::get_id();
+    if (main_thread_id_.load(std::memory_order_relaxed) ==
+        std::thread::id()) {
+      main_thread_id_.store(std::this_thread::get_id(),
+                            std::memory_order_relaxed);
     }
     std::queue<std::unique_ptr<TaskBase>> batch;
     {

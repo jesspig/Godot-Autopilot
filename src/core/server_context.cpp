@@ -95,7 +95,7 @@ bool ServerContext::start() {
     running_ = true;
 
     LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
-                              "MCP server started on 127.0.0.1:" +
+                              "MCP server started on 0.0.0.0:" +
                                   std::to_string(port_));
     return true;
   } catch (const std::exception &e) {

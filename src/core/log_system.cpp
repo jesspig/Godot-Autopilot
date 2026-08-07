@@ -18,11 +18,14 @@ void LogSystem::log(LogLevel level, LogCategory category,
   {
     std::lock_guard<std::mutex> lock(mutex_);
     if (entries_.size() >= MAX_ENTRIES) {
-      entries_.erase(entries_.begin());
+      entries_.pop_front();
     }
+    entry.serial = next_serial_++;
     entries_.push_back(std::move(entry));
-    saved = entries_.back();
     cb = on_new_entry_;
+    if (cb) {
+      saved = entries_.back();
+    }
   }
 
   if (cb) {
@@ -58,6 +61,27 @@ std::vector<const LogEntry *> LogSystem::query(const Query &q) const {
   }
 
   return result;
+}
+
+std::vector<const LogEntry *> LogSystem::query_from(size_t start_index,
+                                                    size_t *next_index) const {
+  std::lock_guard<std::mutex> lock(mutex_);
+
+  std::vector<const LogEntry *> result;
+  for (const auto &e : entries_) {
+    if (e.serial >= start_index) {
+      result.push_back(&e);
+    }
+  }
+  if (next_index) {
+    *next_index = next_serial_;
+  }
+  return result;
+}
+
+size_t LogSystem::next_index() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return next_serial_;
 }
 
 LogSystem &LogSystem::instance() {

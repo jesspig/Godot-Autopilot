@@ -2,6 +2,7 @@
 #define GODOT_SELF_DRIVING_LOG_SYSTEM_HPP
 
 #include <chrono>
+#include <deque>
 #include <functional>
 #include <mutex>
 #include <optional>
@@ -18,6 +19,7 @@ struct LogEntry {
   LogLevel level;
   LogCategory category;
   std::string message;
+  size_t serial = 0;
 };
 
 class LogSystem {
@@ -33,14 +35,19 @@ public:
   };
   std::vector<const LogEntry *> query(const Query &q) const;
 
+  std::vector<const LogEntry *> query_from(size_t start_index,
+                                           size_t *next_index) const;
+  size_t next_index() const;
+
   static LogSystem &instance();
 
   using OnNewEntryCallback = std::function<void(const LogEntry &)>;
   void set_on_new_entry(OnNewEntryCallback callback);
 
 private:
-  std::vector<LogEntry> entries_;
+  std::deque<LogEntry> entries_;
   mutable std::mutex mutex_;
+  size_t next_serial_ = 0;
   OnNewEntryCallback on_new_entry_;
 };
 
