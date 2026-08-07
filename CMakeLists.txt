@@ -63,6 +63,7 @@ add_library(godot-self-driving SHARED
     src/core/resource_registry.cpp
     src/core/scene_dirty_tracker.cpp
     src/core/server_context.cpp
+    src/core/export_guard.cpp
     src/resources/resource_handlers.cpp
     src/resources/debugger_resources.cpp
     src/prompts/prompt_handlers.cpp
@@ -70,6 +71,8 @@ add_library(godot-self-driving SHARED
     src/prompts/prompt_tool_usage.cpp
     src/prompts/prompt_keycode_reference.cpp
     src/runtime/game_bridge.cpp
+    src/runtime/game_bridge_input.cpp
+    src/runtime/game_bridge_eval.cpp
     src/tools/audio_ops.cpp
     src/tools/capture_ops.cpp
     src/tools/code_exec_ops.cpp

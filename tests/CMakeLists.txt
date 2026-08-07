@@ -32,6 +32,7 @@ set(GSD_UNIT_BUSINESS_SOURCES
     ${CMAKE_SOURCE_DIR}/src/core/log_system.cpp
     ${CMAKE_SOURCE_DIR}/src/core/resource_registry.cpp
     ${CMAKE_SOURCE_DIR}/src/core/scene_dirty_tracker.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/export_guard.cpp
     ${CMAKE_SOURCE_DIR}/src/util/bm25_index.cpp
     ${CMAKE_SOURCE_DIR}/src/util/error_util.cpp
     ${CMAKE_SOURCE_DIR}/src/util/readback_util.cpp
