@@ -29,8 +29,6 @@ public:
 
   void populate_default_tools();
 
-  static ToolCatalog &instance();
-
   ToolCatalog() = default;
 
 private:

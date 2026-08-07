@@ -12,6 +12,9 @@ CommandQueue &get_editor_queue();
 
 namespace runtime_ops {
 
+void set_editor_queue(godot_self_driving::CommandQueue *q);
+bool has_editor_queue();
+
 mcp::JsonValue handle_game_status(const mcp::JsonValue &args);
 mcp::JsonValue handle_game_eval(const mcp::JsonValue &args);
 mcp::JsonValue handle_game_input(const mcp::JsonValue &args);

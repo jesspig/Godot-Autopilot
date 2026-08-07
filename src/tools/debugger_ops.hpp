@@ -9,48 +9,51 @@
 #include <godot_cpp/variant/packed_int32_array.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
+#include <atomic>
 #include <mcp/JsonValue.hpp>
 #include <string>
 #include <vector>
 
-namespace godot {
+namespace godot_self_driving {
+namespace debugger_ops {
 
-class OutputCaptureLogger : public Logger {
+class OutputCaptureLogger : public godot::Logger {
   GDCLASS(OutputCaptureLogger, Logger)
 protected:
   static void _bind_methods() {}
 
 public:
   void _log_error(
-      const String &p_function, const String &p_file, int32_t p_line,
-      const String &p_code, const String &p_rationale, bool p_editor_notify,
+      const godot::String &p_function, const godot::String &p_file,
+      int32_t p_line, const godot::String &p_code,
+      const godot::String &p_rationale, bool p_editor_notify,
       int32_t p_error_type,
-      const TypedArray<Ref<ScriptBacktrace>> &p_script_backtraces) override;
-  void _log_message(const String &p_message, bool p_error) override;
+      const godot::TypedArray<godot::Ref<godot::ScriptBacktrace>>
+          &p_script_backtraces) override;
+  void _log_message(const godot::String &p_message, bool p_error) override;
 };
 
-class DebugCapturePlugin : public EditorDebuggerPlugin {
+class DebugCapturePlugin : public godot::EditorDebuggerPlugin {
   GDCLASS(DebugCapturePlugin, EditorDebuggerPlugin)
 protected:
   static void _bind_methods() {}
-  Ref<EditorDebuggerSession> session_;
+  godot::Ref<godot::EditorDebuggerSession> session_;
 
 public:
   std::vector<int32_t> session_ids_;
   std::vector<int32_t> ready_session_ids_;
-  static DebugCapturePlugin *s_instance;
-  bool _has_capture(const String &p_name) const override;
-  bool _capture(const String &p_message, const Array &p_data,
+  static std::atomic<DebugCapturePlugin *> s_instance;
+  bool _has_capture(const godot::String &p_name) const override;
+  bool _capture(const godot::String &p_message, const godot::Array &p_data,
                 int32_t p_session_id) override;
   void _setup_session(int32_t p_session_id) override;
-  Ref<EditorDebuggerSession> get_session_ref() const { return session_; }
-  static DebugCapturePlugin *get_instance() { return s_instance; }
+  godot::Ref<godot::EditorDebuggerSession> get_session_ref() const {
+    return session_;
+  }
+  static DebugCapturePlugin *get_instance() {
+    return s_instance.load(std::memory_order_relaxed);
+  }
 };
-
-} // namespace godot
-
-namespace godot_self_driving {
-namespace debugger_ops {
 
 void capture_add_log_entry(const std::string &text, bool is_error);
 std::string capture_get_log_text(size_t limit);
@@ -66,8 +69,8 @@ size_t capture_log_count();
 std::string capture_new_error_text(size_t since_count);
 std::string capture_new_output_text(size_t since_count);
 
-::godot::Ref<::godot::OutputCaptureLogger> create_output_logger();
-::godot::Ref<::godot::DebugCapturePlugin> create_debug_plugin();
+::godot::Ref<OutputCaptureLogger> create_output_logger();
+::godot::Ref<DebugCapturePlugin> create_debug_plugin();
 
 mcp::JsonValue handle_output_get_log(const mcp::JsonValue &args);
 mcp::JsonValue handle_debugger_get_errors(const mcp::JsonValue &args);

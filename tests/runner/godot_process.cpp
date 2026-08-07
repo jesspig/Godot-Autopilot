@@ -397,18 +397,35 @@ bool GodotProcess::start(std::chrono::seconds ready_timeout) {
   PROCESS_INFORMATION pi{};
 
   // 首次 --import：幂等同步执行，失败/超时不致命，记日志继续
-  if (launch_process(build_godot_cmdline(impl_->godot_path,
-                                         impl_->project_path,
-                                         headless_flag + "--editor --import"),
-                     pi, impl_->stdout_read, impl_->stderr_read)) {
-    attach_process(*impl_, pi);
-    if (WaitForSingleObject(impl_->process, kImportTimeoutMs) != WAIT_OBJECT_0) {
-      append_log(*impl_, "[gsd] 警告：--import 未在 120s 内退出，继续尝试\n");
+  {
+    const char *force_key = "GSD_FORCE_HEADLESS";
+    char force_buf[64] = {0};
+    const DWORD force_len =
+        GetEnvironmentVariableA(force_key, force_buf, sizeof(force_buf));
+    const bool had_force = force_len > 0 && force_len < sizeof(force_buf);
+    const std::string force_value = had_force ? std::string(force_buf) : "";
+    const auto restore_force_env = [&] {
+      SetEnvironmentVariableA(force_key,
+                              had_force ? force_value.c_str() : nullptr);
+    };
+    SetEnvironmentVariableA(force_key, "1");
+
+    if (launch_process(build_godot_cmdline(impl_->godot_path,
+                                           impl_->project_path,
+                                           headless_flag + "--editor --import"),
+                       pi, impl_->stdout_read, impl_->stderr_read)) {
+      attach_process(*impl_, pi);
+      if (WaitForSingleObject(impl_->process, kImportTimeoutMs) !=
+          WAIT_OBJECT_0) {
+        append_log(*impl_, "[gsd] 警告：--import 未在 120s 内退出，继续尝试\n");
+      }
+      close_process(*impl_);
+    } else {
+      append_log(*impl_, "[gsd] 警告：启动 --import 进程失败（错误码 " +
+                             std::to_string(GetLastError()) +
+                             "），继续尝试\n");
     }
-    close_process(*impl_);
-  } else {
-    append_log(*impl_, "[gsd] 警告：启动 --import 进程失败（错误码 " +
-                           std::to_string(GetLastError()) + "），继续尝试\n");
+    restore_force_env();
   }
 
   // 常驻启动：临时注入端口环境变量，CreateProcess 继承后恢复
@@ -423,17 +440,31 @@ bool GodotProcess::start(std::chrono::seconds ready_timeout) {
   };
   SetEnvironmentVariableA(port_key, std::to_string(impl_->port).c_str());
 
+  const char *force_key = "GSD_FORCE_HEADLESS";
+  char force_buf[64] = {0};
+  const DWORD force_len =
+      GetEnvironmentVariableA(force_key, force_buf, sizeof(force_buf));
+  const bool had_force = force_len > 0 && force_len < sizeof(force_buf);
+  const std::string force_value = had_force ? std::string(force_buf) : "";
+  const auto restore_force_env = [&] {
+    SetEnvironmentVariableA(force_key,
+                            had_force ? force_value.c_str() : nullptr);
+  };
+  SetEnvironmentVariableA(force_key, "1");
+
   if (!launch_process(build_godot_cmdline(impl_->godot_path,
                                           impl_->project_path,
                                           headless_flag + "--editor"),
                       pi, impl_->stdout_read, impl_->stderr_read)) {
     restore_port_env();
+    restore_force_env();
     impl_->last_error =
         "启动编辑器进程失败（错误码 " + std::to_string(GetLastError()) + "）";
     return false;
   }
   attach_process(*impl_, pi);
   restore_port_env();
+  restore_force_env();
 
   // 就绪轮询：TCP 探测成功后再做 MCP initialize 握手确认
   const auto deadline = std::chrono::steady_clock::now() + ready_timeout;

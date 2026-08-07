@@ -4,11 +4,6 @@
 
 namespace godot_self_driving {
 
-ToolCatalog &ToolCatalog::instance() {
-  static ToolCatalog inst;
-  return inst;
-}
-
 void ToolCatalog::add_tool(const ToolInfo &info) {
   std::lock_guard<std::mutex> lock(mutex_);
   tools_[info.name] = info;

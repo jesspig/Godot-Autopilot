@@ -276,7 +276,7 @@ public:
     bool active = capture_session_active();
     bool breaked = capture_session_breaked();
     size_t session_count = 0;
-    auto *plugin = ::godot::DebugCapturePlugin::get_instance();
+    auto *plugin = DebugCapturePlugin::get_instance();
     if (plugin)
       session_count = plugin->session_ids_.size();
     std::ostringstream oss;
@@ -415,7 +415,7 @@ std::string capture_get_session_info_text() {
   return DebuggerCapture::instance().get_session_info_text();
 }
 bool capture_session_active() {
-  auto *plugin = ::godot::DebugCapturePlugin::get_instance();
+  auto *plugin = DebugCapturePlugin::get_instance();
   if (!plugin)
     return false;
   for (int32_t id : plugin->session_ids_) {
@@ -426,7 +426,7 @@ bool capture_session_active() {
   return false;
 }
 bool capture_session_breaked() {
-  auto *plugin = ::godot::DebugCapturePlugin::get_instance();
+  auto *plugin = DebugCapturePlugin::get_instance();
   if (!plugin)
     return false;
   for (int32_t id : plugin->session_ids_) {
@@ -445,18 +445,16 @@ std::string capture_new_output_text(size_t since_count) {
   return DebuggerCapture::instance().get_log_text_since_success(since_count);
 }
 
-} // namespace debugger_ops
-} // namespace godot_self_driving
+std::atomic<DebugCapturePlugin *> DebugCapturePlugin::s_instance{nullptr};
 
-namespace godot {
-
-DebugCapturePlugin *DebugCapturePlugin::s_instance = nullptr;
-
-void OutputCaptureLogger::_log_error(const String &p_function,
-                                     const String &p_file, int32_t p_line,
-                                     const String &p_code,
-                                     const String &p_rationale, bool, int32_t,
-                                     const TypedArray<Ref<ScriptBacktrace>> &) {
+void OutputCaptureLogger::_log_error(const godot::String &p_function,
+                                     const godot::String &p_file,
+                                     int32_t p_line,
+                                     const godot::String &p_code,
+                                     const godot::String &p_rationale, bool,
+                                     int32_t,
+                                     const godot::TypedArray<
+                                         godot::Ref<godot::ScriptBacktrace>> &) {
   std::string text(p_file.utf8().ptr());
   text += ":";
   text += std::to_string(p_line);
@@ -470,12 +468,13 @@ void OutputCaptureLogger::_log_error(const String &p_function,
   godot_self_driving::debugger_ops::capture_add_log_entry(text, true);
 }
 
-void OutputCaptureLogger::_log_message(const String &p_message, bool p_error) {
+void OutputCaptureLogger::_log_message(const godot::String &p_message,
+                                       bool p_error) {
   godot_self_driving::debugger_ops::capture_add_log_entry(
       p_message.utf8().ptr(), p_error);
 }
 
-bool DebugCapturePlugin::_has_capture(const String &p_name) const {
+bool DebugCapturePlugin::_has_capture(const godot::String &p_name) const {
   std::string n = p_name.utf8().ptr();
   return n == "gsd";
 }
@@ -492,7 +491,8 @@ void DebugCapturePlugin::_setup_session(int32_t p_session_id) {
   }
 }
 
-bool DebugCapturePlugin::_capture(const String &p_message, const Array &p_data,
+bool DebugCapturePlugin::_capture(const godot::String &p_message,
+                                  const godot::Array &p_data,
                                   int32_t p_session_id) {
   std::string msg = p_message.utf8().ptr();
 
@@ -506,18 +506,13 @@ bool DebugCapturePlugin::_capture(const String &p_message, const Array &p_data,
 
   if (msg == std::string(godot_self_driving::GSD_MSG_RESPONSE) &&
       p_data.size() >= 1) {
-    String payload = p_data[0];
+    godot::String payload = p_data[0];
     godot_self_driving::runtime_ops::handle_game_response(
         std::string(payload.utf8().ptr()));
   }
 
   return false;
 }
-
-} // namespace godot
-
-namespace godot_self_driving {
-namespace debugger_ops {
 
 namespace {
 
@@ -663,20 +658,20 @@ mcp::JsonValue handle_debugger_get_session_info(const mcp::JsonValue &) {
 }
 
 void register_classes() {
-  godot::ClassDB::register_class<::godot::OutputCaptureLogger>();
-  godot::ClassDB::register_class<::godot::DebugCapturePlugin>();
+  godot::ClassDB::register_class<OutputCaptureLogger>();
+  godot::ClassDB::register_class<DebugCapturePlugin>();
 }
 
-::godot::Ref<::godot::OutputCaptureLogger> create_output_logger() {
-  ::godot::Ref<::godot::OutputCaptureLogger> logger;
+::godot::Ref<OutputCaptureLogger> create_output_logger() {
+  ::godot::Ref<OutputCaptureLogger> logger;
   logger.instantiate();
   return logger;
 }
 
-::godot::Ref<::godot::DebugCapturePlugin> create_debug_plugin() {
-  ::godot::Ref<::godot::DebugCapturePlugin> plugin;
+::godot::Ref<DebugCapturePlugin> create_debug_plugin() {
+  ::godot::Ref<DebugCapturePlugin> plugin;
   plugin.instantiate();
-  ::godot::DebugCapturePlugin::s_instance = plugin.ptr();
+  DebugCapturePlugin::s_instance.store(plugin.ptr(), std::memory_order_relaxed);
   return plugin;
 }
 

@@ -1,6 +1,7 @@
 #include "runtime_ops.hpp"
 
 #include "core/command_queue.hpp"
+#include "core/config.hpp"
 #include "core/log_system.hpp"
 #include "runtime/gsd_protocol.hpp"
 #include "tools/capture_ops.hpp"
@@ -30,10 +31,9 @@ namespace {
 
 using JV = mcp::JsonValue;
 
-constexpr int64_t DEFAULT_TIMEOUT_MS = 5000;
-constexpr int64_t MAX_TIMEOUT_MS = 30000;
+CommandQueue *g_editor_queue = nullptr;
+
 constexpr int64_t RESPONSE_GRACE_MS = 2000;
-constexpr int64_t HEALTHY_ACTIVITY_THRESHOLD_MS = 3000;
 constexpr int64_t PHYSICS_STALL_DETECT_MS = 1000;
 
 int64_t g_last_status_physics_frame = -1;
@@ -51,13 +51,13 @@ JV error_json(const std::string &message) {
 }
 
 int64_t extract_timeout(const JV &args) {
-  int64_t timeout = DEFAULT_TIMEOUT_MS;
+  int64_t timeout = GSD_DEFAULT_TIMEOUT_MS;
   if (auto *tp = args.Find("timeout_ms")) {
     if (tp->IsInt() && tp->GetInt() > 0)
       timeout = tp->GetInt();
   }
-  if (timeout > MAX_TIMEOUT_MS)
-    timeout = MAX_TIMEOUT_MS;
+  if (timeout > GSD_MAX_TIMEOUT_MS)
+    timeout = GSD_MAX_TIMEOUT_MS;
   return timeout;
 }
 
@@ -75,14 +75,17 @@ struct PendingRequest {
 std::mutex g_pending_mtx;
 std::map<int64_t, std::shared_ptr<PendingRequest>> g_pending;
 
-bool is_session_ready(godot::DebugCapturePlugin *plugin, int32_t session_id) {
+bool is_session_ready(
+    godot_self_driving::debugger_ops::DebugCapturePlugin *plugin,
+    int32_t session_id) {
   return std::find(plugin->ready_session_ids_.begin(),
                    plugin->ready_session_ids_.end(),
                    session_id) != plugin->ready_session_ids_.end();
 }
 
 JV send_request(int64_t request_id, const std::string &op, const JV &params) {
-  auto *plugin = ::godot::DebugCapturePlugin::get_instance();
+  auto *plugin =
+      godot_self_driving::debugger_ops::DebugCapturePlugin::get_instance();
   if (!plugin)
     return error_json("debugger capture plugin not initialized");
 
@@ -155,7 +158,8 @@ JV wait_for_response(int64_t request_id, int64_t timeout_ms) {
     }
     if (session_id >= 0) {
       get_editor_queue().submit([session_id, request_id]() {
-        auto *plugin = ::godot::DebugCapturePlugin::get_instance();
+        auto *plugin =
+            godot_self_driving::debugger_ops::DebugCapturePlugin::get_instance();
         if (!plugin)
           return;
         auto session = plugin->get_session(session_id);
@@ -196,35 +200,38 @@ JV wait_for_response(int64_t request_id, int64_t timeout_ms) {
         if (auto *la = result.Find(GSD_FIELD_LAST_ACTIVITY_MS)) {
           if (la->IsInt()) {
             result[GSD_FIELD_HEALTHY] =
-                JV(la->GetInt() < HEALTHY_ACTIVITY_THRESHOLD_MS);
+                JV(la->GetInt() < GSD_HEALTHY_ACTIVITY_THRESHOLD_MS);
           }
         }
       }
 
       bool physics_stalled = false;
-      if (auto *pf = result.Find("physics_frame")) {
-        if (pf->IsInt()) {
-          auto now = std::chrono::steady_clock::now();
-          if (g_last_status_time_valid) {
-            int64_t elapsed_ms =
-                std::chrono::duration_cast<std::chrono::milliseconds>(
-                    now - g_last_status_time)
-                    .count();
-            bool fps_positive = false;
-            if (auto *fps = result.Find("fps")) {
-              if (fps->IsInt())
-                fps_positive = fps->GetInt() > 0;
-              else if (fps->IsDouble())
-                fps_positive = fps->GetDouble() > 0.0;
+      {
+        std::lock_guard<std::mutex> lock(g_pending_mtx);
+        if (auto *pf = result.Find("physics_frame")) {
+          if (pf->IsInt()) {
+            auto now = std::chrono::steady_clock::now();
+            if (g_last_status_time_valid) {
+              int64_t elapsed_ms =
+                  std::chrono::duration_cast<std::chrono::milliseconds>(
+                      now - g_last_status_time)
+                      .count();
+              bool fps_positive = false;
+              if (auto *fps = result.Find("fps")) {
+                if (fps->IsInt())
+                  fps_positive = fps->GetInt() > 0;
+                else if (fps->IsDouble())
+                  fps_positive = fps->GetDouble() > 0.0;
+              }
+              if (pf->GetInt() == g_last_status_physics_frame &&
+                  elapsed_ms >= PHYSICS_STALL_DETECT_MS && fps_positive) {
+                physics_stalled = true;
+              }
             }
-            if (pf->GetInt() == g_last_status_physics_frame &&
-                elapsed_ms >= PHYSICS_STALL_DETECT_MS && fps_positive) {
-              physics_stalled = true;
-            }
+            g_last_status_physics_frame = pf->GetInt();
+            g_last_status_time = now;
+            g_last_status_time_valid = true;
           }
-          g_last_status_physics_frame = pf->GetInt();
-          g_last_status_time = now;
-          g_last_status_time_valid = true;
         }
       }
       result["physics_stalled"] = JV(physics_stalled);
@@ -236,9 +243,16 @@ JV wait_for_response(int64_t request_id, int64_t timeout_ms) {
 
 } // namespace
 
+void set_editor_queue(godot_self_driving::CommandQueue *q) {
+  g_editor_queue = q;
+}
+
+bool has_editor_queue() { return g_editor_queue != nullptr; }
+
 void maybe_recover_break() {
   static std::unordered_map<int32_t, int> g_auto_continue_counts;
-  auto *plugin = ::godot::DebugCapturePlugin::get_instance();
+  auto *plugin =
+      godot_self_driving::debugger_ops::DebugCapturePlugin::get_instance();
   if (!plugin)
     return;
 
@@ -524,4 +538,7 @@ mcp::JsonValue handle_game_capture(const mcp::JsonValue &args) {
 }
 
 } // namespace runtime_ops
+
+CommandQueue &get_editor_queue() { return *runtime_ops::g_editor_queue; }
+
 } // namespace godot_self_driving

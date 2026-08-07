@@ -1,4 +1,5 @@
 #include "register_all.hpp"
+#include "core/export_guard.hpp"
 #include "core/log_system.hpp"
 #include "tools/audio_ops.hpp"
 #include "tools/capture_ops.hpp"
@@ -1535,7 +1536,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string &name) {
 
 }
 
-mcp::JsonValue call_handler(const std::string& name, const mcp::JsonValue& args) {
+static mcp::JsonValue call_handler_impl(const std::string& name, const mcp::JsonValue& args) {
     auto it = g_handlers.find(name);
     if (it != g_handlers.end()) {
         try {
@@ -1562,6 +1563,172 @@ mcp::JsonValue call_handler(const std::string& name, const mcp::JsonValue& args)
     mcp::JsonValue e(mcp::JsonValue::object_tag);
     e["error"] = mcp::JsonValue("domain tool '" + name + "' not found — use search_tools to discover available tools");
     return e;
+}
+
+mcp::JsonValue call_handler(const std::string& name, const mcp::JsonValue& args) {
+    if (!godot_self_driving::runtime_ops::has_editor_queue() ||
+        get_editor_queue().is_main_thread()) {
+        return call_handler_impl(name, args);
+    }
+    return get_editor_queue().submit([name, args] { return call_handler_impl(name, args); }).get();
+}
+
+static mcp::CallToolResult export_blocked_result() {
+    mcp::CallToolResult err;
+    err.is_error = true;
+    err.content.push_back(mcp::TextContent{"text", R"({"error":"editor is exporting; retry after export completes"})"});
+    return err;
+}
+
+static mcp::JsonValue meta_ping_impl() {
+    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    r["result"] = mcp::JsonValue("pong");
+    return r;
+}
+
+static mcp::JsonValue meta_search_tools_impl(const mcp::JsonValue& args, Bm25Index& index) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "search_tools called");
+    if (args.Find("query") == nullptr) {
+        mcp::JsonValue err(mcp::JsonValue::object_tag);
+        err["error"] = mcp::JsonValue("missing required parameter: query");
+        return err;
+    }
+
+    Bm25Index::SearchQuery query;
+    query.text = args["query"].GetString();
+
+    if (auto* cat = args.Find("category")) {
+        if (!cat->IsNull()) {
+            query.category = cat->GetString();
+        }
+    }
+
+    if (auto* tags_val = args.Find("tags")) {
+        if (!tags_val->IsNull() && tags_val->IsArray()) {
+            std::vector<std::string> tags;
+            for (auto& t : tags_val->GetArray()) {
+                tags.push_back(t.GetString());
+            }
+            query.tags = std::move(tags);
+        }
+    }
+
+    auto results = index.search(query);
+
+    mcp::JsonValue j(mcp::JsonValue::object_tag);
+    mcp::JsonValue arr(mcp::JsonValue::array_tag);
+    for (auto& r : results) {
+        mcp::JsonValue item(mcp::JsonValue::object_tag);
+        item["name"] = mcp::JsonValue(r.name);
+        item["score"] = mcp::JsonValue(r.score);
+        arr.PushBack(std::move(item));
+    }
+    j["results"] = std::move(arr);
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "search_tools completed");
+    return j;
+}
+
+static mcp::JsonValue meta_list_categories_impl(ToolCatalog& catalog) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "list_categories called");
+    auto cats = catalog.get_categories();
+    mcp::JsonValue j(mcp::JsonValue::object_tag);
+    mcp::JsonValue arr(mcp::JsonValue::array_tag);
+    for (auto& c : cats) {
+        mcp::JsonValue item(mcp::JsonValue::object_tag);
+        item["id"] = mcp::JsonValue(c);
+        item["name"] = mcp::JsonValue(c);
+        int count = 0;
+        for (auto* t : catalog.get_all_tools()) {
+            if (t->category == c) {
+                ++count;
+            }
+        }
+        item["tool_count"] = mcp::JsonValue(static_cast<int64_t>(count));
+        arr.PushBack(std::move(item));
+    }
+    j["categories"] = std::move(arr);
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "list_categories completed");
+    return j;
+}
+
+static mcp::JsonValue meta_get_tool_detail_impl(const mcp::JsonValue& args, ToolCatalog& catalog) {
+    if (args.Find("name") == nullptr) {
+        mcp::JsonValue err(mcp::JsonValue::object_tag);
+        err["error"] = mcp::JsonValue("missing required parameter: name");
+        return err;
+    }
+
+    std::string name = args["name"].GetString();
+    auto* info = catalog.get_tool(name);
+    if (!info) {
+        mcp::JsonValue err(mcp::JsonValue::object_tag);
+        err["error"] = mcp::JsonValue("tool not found: " + name);
+        return err;
+    }
+
+    mcp::JsonValue j(mcp::JsonValue::object_tag);
+    mcp::JsonValue t(mcp::JsonValue::object_tag);
+    t["name"] = mcp::JsonValue(info->name);
+    t["description"] = mcp::JsonValue(info->description);
+    t["category"] = mcp::JsonValue(info->category);
+    mcp::JsonValue tags(mcp::JsonValue::array_tag);
+    for (auto& tg : info->tags) {
+        tags.PushBack(mcp::JsonValue(tg));
+    }
+    t["tags"] = std::move(tags);
+    t["input_schema"] = info->input_schema;
+    j["tool"] = std::move(t);
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "get_tool_detail completed");
+    return j;
+}
+
+static mcp::JsonValue meta_call_tool_impl(const mcp::JsonValue& args) {
+    if (args.Find("name") == nullptr) {
+        LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "call_tool failed: missing name");
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("missing required parameter: name");
+        return e;
+    }
+
+    std::string name = args["name"].GetString();
+    mcp::JsonValue tool_args = [&]{
+        if (auto* a = args.Find("arguments")) return *a;
+        return mcp::JsonValue(mcp::JsonValue::object_tag);
+    }();
+
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, name + " called via call_tool");
+    if (!godot_self_driving::runtime_ops::has_editor_queue() ||
+        get_editor_queue().is_main_thread()) {
+        return call_handler(name, tool_args);
+    }
+    return get_editor_queue().submit([name, tool_args = std::move(tool_args)]() {
+        return call_handler(name, tool_args);
+    }).get();
+}
+
+static mcp::JsonValue meta_call_tool_wait(const std::string& name, mcp::JsonValue result) {
+    auto* pending_p = result.Find("__gsd_pending");
+    if (pending_p && pending_p->IsInt()) {
+        int64_t rid = pending_p->GetInt();
+        int64_t timeout = 5000;
+        if (auto* t = result.Find("timeout_ms")) {
+            if (t->IsInt() && t->GetInt() > 0) timeout = t->GetInt();
+        }
+        mcp::JsonValue final = runtime_ops::wait_pending_response(rid, timeout);
+        if (name == "game_capture" || (final.IsObject() && final.Contains("path"))) {
+            final = runtime_ops::finalize_capture_response(final);
+        }
+        result = std::move(final);
+    }
+    return result;
+}
+
+static mcp::JsonValue meta_batch_execute_impl(const mcp::JsonValue& args) {
+    return code_exec_ops::handle_batch_execute(args);
+}
+
+static mcp::JsonValue meta_code_execute_impl(const mcp::JsonValue& args) {
+    return code_exec_ops::handle_code_execute(args);
 }
 
 void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog& catalog, Bm25Index& index, int port) {
@@ -1594,8 +1761,10 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         opts.Description("Health check ping");
         server.RegisterTool("ping", opts,
             [](const mcp::RequestContext<mcp::CallToolRequestParams>&) -> mcp::CallToolResult {
-                mcp::JsonValue r(mcp::JsonValue::object_tag);
-                r["result"] = mcp::JsonValue("pong");
+                if (godot_self_driving::ExportGuard::is_exporting()) {
+                    return export_blocked_result();
+                }
+                mcp::JsonValue r = meta_ping_impl();
                 auto body = r.Dump();
 
                 mcp::CallToolResult mcp_result;
@@ -1638,48 +1807,13 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         s_opts.Description("Search available tools by query").InputSchema(std::move(s));
         server.RegisterTool("search_tools", s_opts,
             [&queue, &index](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
+                if (godot_self_driving::ExportGuard::is_exporting()) {
+                    return export_blocked_result();
+                }
                 mcp::JsonValue args_copy = ctx.Params().arguments
                     ? *ctx.Params().arguments : mcp::JsonValue(mcp::JsonValue::object_tag);
                 auto body = queue.submit([args = std::move(args_copy), &index]() -> std::string {
-                    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "search_tools called");
-                    if (args.Find("query") == nullptr) {
-                        mcp::JsonValue err(mcp::JsonValue::object_tag);
-                        err["error"] = mcp::JsonValue("missing required parameter: query");
-                        return err.Dump();
-                    }
-
-                    Bm25Index::SearchQuery query;
-                    query.text = args["query"].GetString();
-
-                    if (auto* cat = args.Find("category")) {
-                        if (!cat->IsNull()) {
-                            query.category = cat->GetString();
-                        }
-                    }
-
-                    if (auto* tags_val = args.Find("tags")) {
-                        if (!tags_val->IsNull() && tags_val->IsArray()) {
-                            std::vector<std::string> tags;
-                            for (auto& t : tags_val->GetArray()) {
-                                tags.push_back(t.GetString());
-                            }
-                            query.tags = std::move(tags);
-                        }
-                    }
-
-                    auto results = index.search(query);
-
-                    mcp::JsonValue j(mcp::JsonValue::object_tag);
-                    mcp::JsonValue arr(mcp::JsonValue::array_tag);
-                    for (auto& r : results) {
-                        mcp::JsonValue item(mcp::JsonValue::object_tag);
-                        item["name"] = mcp::JsonValue(r.name);
-                        item["score"] = mcp::JsonValue(r.score);
-                        arr.PushBack(std::move(item));
-                    }
-                    j["results"] = std::move(arr);
-                    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "search_tools completed");
-                    return j.Dump();
+                    return meta_search_tools_impl(args, index).Dump();
                 }).get();
 
                 mcp::CallToolResult mcp_result;
@@ -1698,27 +1832,11 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         l_opts.Description("List all tool categories").InputSchema(std::move(s));
         server.RegisterTool("list_categories", l_opts,
             [&queue, &catalog](const mcp::RequestContext<mcp::CallToolRequestParams>&) -> mcp::CallToolResult {
+                if (godot_self_driving::ExportGuard::is_exporting()) {
+                    return export_blocked_result();
+                }
                 auto body = queue.submit([&catalog]() -> std::string {
-                    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "list_categories called");
-                    auto cats = catalog.get_categories();
-                    mcp::JsonValue j(mcp::JsonValue::object_tag);
-                    mcp::JsonValue arr(mcp::JsonValue::array_tag);
-                    for (auto& c : cats) {
-                        mcp::JsonValue item(mcp::JsonValue::object_tag);
-                        item["id"] = mcp::JsonValue(c);
-                        item["name"] = mcp::JsonValue(c);
-                        int count = 0;
-                        for (auto* t : catalog.get_all_tools()) {
-                            if (t->category == c) {
-                                ++count;
-                            }
-                        }
-                        item["tool_count"] = mcp::JsonValue(static_cast<int64_t>(count));
-                        arr.PushBack(std::move(item));
-                    }
-                    j["categories"] = std::move(arr);
-                    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "list_categories completed");
-                    return j.Dump();
+                    return meta_list_categories_impl(catalog).Dump();
                 }).get();
 
                 mcp::CallToolResult mcp_result;
@@ -1745,37 +1863,13 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         g_opts.Description("Get complete schema for one tool").InputSchema(std::move(s));
         server.RegisterTool("get_tool_detail", g_opts,
             [&queue, &catalog](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
+                if (godot_self_driving::ExportGuard::is_exporting()) {
+                    return export_blocked_result();
+                }
                 mcp::JsonValue args_copy = ctx.Params().arguments
                     ? *ctx.Params().arguments : mcp::JsonValue(mcp::JsonValue::object_tag);
                 auto body = queue.submit([args = std::move(args_copy), &catalog]() -> std::string {
-                    if (args.Find("name") == nullptr) {
-                        mcp::JsonValue err(mcp::JsonValue::object_tag);
-                        err["error"] = mcp::JsonValue("missing required parameter: name");
-                        return err.Dump();
-                    }
-
-                    std::string name = args["name"].GetString();
-                    auto* info = catalog.get_tool(name);
-                    if (!info) {
-                        mcp::JsonValue err(mcp::JsonValue::object_tag);
-                        err["error"] = mcp::JsonValue("tool not found: " + name);
-                        return err.Dump();
-                    }
-
-                    mcp::JsonValue j(mcp::JsonValue::object_tag);
-                    mcp::JsonValue t(mcp::JsonValue::object_tag);
-                    t["name"] = mcp::JsonValue(info->name);
-                    t["description"] = mcp::JsonValue(info->description);
-                    t["category"] = mcp::JsonValue(info->category);
-                    mcp::JsonValue tags(mcp::JsonValue::array_tag);
-                    for (auto& tg : info->tags) {
-                        tags.PushBack(mcp::JsonValue(tg));
-                    }
-                    t["tags"] = std::move(tags);
-                    t["input_schema"] = info->input_schema;
-                    j["tool"] = std::move(t);
-                    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "get_tool_detail completed");
-                    return j.Dump();
+                    return meta_get_tool_detail_impl(args, catalog).Dump();
                 }).get();
 
                 mcp::CallToolResult mcp_result;
@@ -1806,52 +1900,21 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         c_opts.Description("Execute any tool by name. Use this to call all non-meta tools (scene_*, property_*, signal_*, system_status).").InputSchema(std::move(s));
         server.RegisterTool("call_tool", c_opts,
             [&queue](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
+                if (godot_self_driving::ExportGuard::is_exporting()) {
+                    return export_blocked_result();
+                }
                 mcp::JsonValue args = ctx.Params().arguments
                     ? *ctx.Params().arguments : mcp::JsonValue(mcp::JsonValue::object_tag);
-                if (args.Find("name") == nullptr) {
-                    mcp::CallToolResult err;
-                    err.is_error = true;
-                    err.content.push_back(mcp::TextContent{"text", R"({"error":"missing required parameter: name"})"});
-                    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "call_tool failed: missing name");
-                    return err;
-                }
-
-                std::string name = args["name"].GetString();
-                mcp::JsonValue tool_args = [&]{
-                    if (auto* a = args.Find("arguments")) return *a;
-                    return mcp::JsonValue(mcp::JsonValue::object_tag);
-                }();
-
-                auto result = queue.submit([name, tool_args = std::move(tool_args)]() -> std::string {
-                    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, name + " called via call_tool");
-
-                    mcp::JsonValue handler_result = call_handler(name, tool_args);
-                    return handler_result.Dump();
-                });
-
-                std::string body = result.get();
-                mcp::JsonValue j = mcp::JsonValue::Parse(body);
-                if (j.IsObject()) {
-                    auto* pending_p = j.Find("__gsd_pending");
-                    if (pending_p && pending_p->IsInt()) {
-                        int64_t rid = pending_p->GetInt();
-                        int64_t timeout = 5000;
-                        if (auto* t = j.Find("timeout_ms")) {
-                            if (t->IsInt() && t->GetInt() > 0) timeout = t->GetInt();
-                        }
-                        mcp::JsonValue final = runtime_ops::wait_pending_response(rid, timeout);
-                        if (name == "game_capture" || (final.IsObject() && final.Contains("path"))) {
-                            final = runtime_ops::finalize_capture_response(final);
-                        }
-                        j = std::move(final);
-                        body = j.Dump();
-                    }
-                }
+                std::string name = args.Find("name") != nullptr ? args["name"].GetString() : "";
+                mcp::JsonValue j = meta_call_tool_wait(name, meta_call_tool_impl(args));
+                std::string body = j.Dump();
 
                 mcp::CallToolResult mcp_result;
                 if (j.Find("error") != nullptr) mcp_result.is_error = true;
                 mcp_result.content.push_back(mcp::TextContent{"text", body});
-                LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, name + " completed");
+                if (!name.empty()) {
+                    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, name + " completed");
+                }
                 return mcp_result;
             });
     }
@@ -1899,10 +1962,13 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         b_opts.Description("Execute multiple tools in batch. Each operation runs in sequence; if stop_on_error is true and any operation fails, remaining operations are skipped.").InputSchema(std::move(s));
         server.RegisterTool("batch_execute", b_opts,
             [&queue](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
+                if (godot_self_driving::ExportGuard::is_exporting()) {
+                    return export_blocked_result();
+                }
                 mcp::JsonValue args = ctx.Params().arguments
                     ? *ctx.Params().arguments : mcp::JsonValue(mcp::JsonValue::object_tag);
                 auto body = queue.submit([args = std::move(args)]() -> std::string {
-                    return code_exec_ops::handle_batch_execute(args).Dump();
+                    return meta_batch_execute_impl(args).Dump();
                 }).get();
                 mcp::CallToolResult mcp_result;
                 mcp_result.content.push_back(mcp::TextContent{"text", body});
@@ -1947,10 +2013,13 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         c_opts.Description("Execute arbitrary GDScript code. The source code is wrapped in a script that extends Node, compiled, attached to a temporary node, and executed. Returns the function result serialized as JSON. By default the source is inlined inside the _run() function body: top-level func definitions are not supported — inline all code as expressions/statements, or define named functions and call one via function_name (multi-function mode). Execution environment exposes SceneRoot (the edited scene root node) for node access; see SceneRoot.get_node(\"Child\").").InputSchema(std::move(s));
         server.RegisterTool("code_execute", c_opts,
             [&queue](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
+                if (godot_self_driving::ExportGuard::is_exporting()) {
+                    return export_blocked_result();
+                }
                 mcp::JsonValue args = ctx.Params().arguments
                     ? *ctx.Params().arguments : mcp::JsonValue(mcp::JsonValue::object_tag);
                 auto body = queue.submit([args = std::move(args)]() -> std::string {
-                    return code_exec_ops::handle_code_execute(args).Dump();
+                    return meta_code_execute_impl(args).Dump();
                 }).get();
                 mcp::CallToolResult mcp_result;
                 mcp::JsonValue j = mcp::JsonValue::Parse(body);
@@ -1968,102 +2037,30 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
 
 
     g_meta_handlers["ping"] = [](const mcp::JsonValue&) -> mcp::JsonValue {
-        mcp::JsonValue r(mcp::JsonValue::object_tag);
-        r["result"] = mcp::JsonValue("pong");
-        return r;
+        return meta_ping_impl();
     };
     g_meta_handlers["search_tools"] = [&index](const mcp::JsonValue& args) -> mcp::JsonValue {
-        LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "search_tools called via meta handler");
-        if (args.Find("query") == nullptr) {
-            mcp::JsonValue err(mcp::JsonValue::object_tag);
-            err["error"] = mcp::JsonValue("missing required parameter: query");
-            return err;
-        }
-        Bm25Index::SearchQuery query;
-        query.text = args["query"].GetString();
-        if (auto* cat = args.Find("category")) {
-            if (!cat->IsNull()) query.category = cat->GetString();
-        }
-        if (auto* tags_val = args.Find("tags")) {
-            if (!tags_val->IsNull() && tags_val->IsArray()) {
-                std::vector<std::string> tags;
-                for (auto& t : tags_val->GetArray()) tags.push_back(t.GetString());
-                query.tags = std::move(tags);
-            }
-        }
-        auto results = index.search(query);
-        mcp::JsonValue j(mcp::JsonValue::object_tag);
-        mcp::JsonValue arr(mcp::JsonValue::array_tag);
-        for (auto& r : results) {
-            mcp::JsonValue item(mcp::JsonValue::object_tag);
-            item["name"] = mcp::JsonValue(r.name);
-            item["score"] = mcp::JsonValue(r.score);
-            arr.PushBack(std::move(item));
-        }
-        j["results"] = std::move(arr);
-        return j;
+        return meta_search_tools_impl(args, index);
     };
     g_meta_handlers["list_categories"] = [&catalog](const mcp::JsonValue&) -> mcp::JsonValue {
-        auto cats = catalog.get_categories();
-        mcp::JsonValue j(mcp::JsonValue::object_tag);
-        mcp::JsonValue arr(mcp::JsonValue::array_tag);
-        for (auto& c : cats) {
-            mcp::JsonValue item(mcp::JsonValue::object_tag);
-            item["id"] = mcp::JsonValue(c);
-            item["name"] = mcp::JsonValue(c);
-            int count = 0;
-            for (auto* t : catalog.get_all_tools()) {
-                if (t->category == c) ++count;
-            }
-            item["tool_count"] = mcp::JsonValue(static_cast<int64_t>(count));
-            arr.PushBack(std::move(item));
-        }
-        j["categories"] = std::move(arr);
-        return j;
+        return meta_list_categories_impl(catalog);
     };
     g_meta_handlers["get_tool_detail"] = [&catalog](const mcp::JsonValue& args) -> mcp::JsonValue {
-        if (args.Find("name") == nullptr) {
-            mcp::JsonValue err(mcp::JsonValue::object_tag);
-            err["error"] = mcp::JsonValue("missing required parameter: name");
-            return err;
-        }
-        std::string name = args["name"].GetString();
-        auto* info = catalog.get_tool(name);
-        if (!info) {
-            mcp::JsonValue err(mcp::JsonValue::object_tag);
-            err["error"] = mcp::JsonValue("tool not found: " + name);
-            return err;
-        }
-        mcp::JsonValue j(mcp::JsonValue::object_tag);
-        mcp::JsonValue t(mcp::JsonValue::object_tag);
-        t["name"] = mcp::JsonValue(info->name);
-        t["description"] = mcp::JsonValue(info->description);
-        t["category"] = mcp::JsonValue(info->category);
-        mcp::JsonValue tags(mcp::JsonValue::array_tag);
-        for (auto& tg : info->tags) tags.PushBack(mcp::JsonValue(tg));
-        t["tags"] = std::move(tags);
-        t["input_schema"] = info->input_schema;
-        j["tool"] = std::move(t);
-        return j;
+        return meta_get_tool_detail_impl(args, catalog);
     };
     g_meta_handlers["call_tool"] = [](const mcp::JsonValue& args) -> mcp::JsonValue {
-        if (args.Find("name") == nullptr) {
-            mcp::JsonValue e(mcp::JsonValue::object_tag);
-            e["error"] = mcp::JsonValue("missing required parameter: name");
-            return e;
+        std::string name = args.Find("name") != nullptr ? args["name"].GetString() : "";
+        mcp::JsonValue j = meta_call_tool_wait(name, meta_call_tool_impl(args));
+        if (!name.empty()) {
+            LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, name + " completed");
         }
-        std::string name = args["name"].GetString();
-        mcp::JsonValue tool_args = [&]{
-            if (auto* a = args.Find("arguments")) return *a;
-            return mcp::JsonValue(mcp::JsonValue::object_tag);
-        }();
-        return call_handler(name, tool_args);
+        return j;
     };
     g_meta_handlers["batch_execute"] = [](const mcp::JsonValue& args) -> mcp::JsonValue {
-        return code_exec_ops::handle_batch_execute(args);
+        return meta_batch_execute_impl(args);
     };
     g_meta_handlers["code_execute"] = [](const mcp::JsonValue& args) -> mcp::JsonValue {
-        return code_exec_ops::handle_code_execute(args);
+        return meta_code_execute_impl(args);
     };
 
 
@@ -2103,7 +2100,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
     for (auto& [name, _] : g_handlers) {
         if (catalog.get_tool(name) == nullptr) {
             LogSystem::instance().log(LogLevel::Warning, LogCategory::Tools,
-                "handler '" + name + "' missing from catalog — adding");
+                "handler missing catalog entry, using Auto: " + name);
             catalog.add_tool({name, name, "Auto", {"auto"}, make_schema()});
             ++missing_from_catalog;
         }

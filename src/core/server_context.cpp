@@ -1,10 +1,13 @@
 #include "server_context.hpp"
+#include "config.hpp"
 #include "log_system.hpp"
 #include "prompts/debugger_prompts.hpp"
 #include "prompts/prompt_handlers.hpp"
 #include "resources/debugger_resources.hpp"
 #include "resources/resource_handlers.hpp"
 #include "tools/register_all.hpp"
+#include "tools/tool_catalog.hpp"
+#include "util/bm25_index.hpp"
 #include <cstdlib>
 #include <hv/hlog.h>
 #include <mcp/Content.hpp>
@@ -16,11 +19,14 @@ int ServerContext::resolve_port() {
   if (const char *env_port = std::getenv("GODOT_SELF_DRIVING_PORT")) {
     return std::atoi(env_port);
   }
-  return 9527;
+  return GSD_DEFAULT_PORT;
 }
 
 ServerContext::ServerContext(CommandQueue &queue)
-    : queue_(queue), start_time_(std::chrono::steady_clock::now()) {
+    : queue_(queue),
+      catalog_(std::make_unique<ToolCatalog>()),
+      bm25_index_(std::make_unique<Bm25Index>()),
+      start_time_(std::chrono::steady_clock::now()) {
   port_ = resolve_port();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
                             "Server configured on port " +
@@ -33,56 +39,76 @@ ServerContext::~ServerContext() {
   }
 }
 
-void ServerContext::start() {
-  hlog_disable();
+bool ServerContext::start() {
+  try {
+    hlog_disable();
 
-  mcp::StreamableHttpServerOptions http_opts;
-  http_opts.port = static_cast<uint16_t>(port_);
-  http_opts.endpoint = "/mcp";
-  http_opts.stateless = true;
-  http_opts.enable_legacy_sse = false;
+    mcp::StreamableHttpServerOptions http_opts;
+    http_opts.port = static_cast<uint16_t>(port_);
+    http_opts.endpoint = "/mcp";
+    http_opts.stateless = true;
+    http_opts.enable_legacy_sse = false;
 
-  transport_ = std::make_shared<mcp::StreamableHttpServerTransport>(http_opts);
+    transport_ =
+        std::make_shared<mcp::StreamableHttpServerTransport>(http_opts);
 
-  mcp::ServerOptions opts;
-  opts.server_info = mcp::Implementation{"godot-self-driving", "0.1.0"};
-  opts.on_method_called = [this](std::string_view method) {
-    LogSystem::instance().log(LogLevel::Debug, LogCategory::Transport,
-                              "MCP request: " + std::string(method));
-  };
-  opts.on_client_connected = [](const mcp::Implementation &info) {
+    mcp::ServerOptions opts;
+    opts.server_info = mcp::Implementation{"godot-self-driving", "0.1.0"};
+    opts.on_method_called = [this](std::string_view method) {
+      LogSystem::instance().log(LogLevel::Debug, LogCategory::Transport,
+                                "MCP request: " + std::string(method));
+    };
+    opts.on_client_connected = [](const mcp::Implementation &info) {
+      LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
+                                "Client connected: " + info.name + " " +
+                                    info.version);
+    };
+    opts.on_initialized = [] {
+      LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
+                                "Client initialization complete");
+    };
+    opts.on_protocol_error = [](std::string_view error) {
+      LogSystem::instance().log(LogLevel::Error, LogCategory::Transport,
+                                "Protocol error: " + std::string(error));
+    };
+    opts.on_transport_close = [] {
+      LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
+                                "Client disconnected");
+    };
+    opts.on_transport_error = [](std::string_view msg) {
+      LogSystem::instance().log(LogLevel::Error, LogCategory::Transport,
+                                "Transport error: " + std::string(msg));
+    };
+    server_ = mcp::McpServer::Create(transport_, opts);
+    if (!server_) {
+      last_error_ = "McpServer::Create returned null";
+      LogSystem::instance().log(LogLevel::Error, LogCategory::Transport,
+                                "MCP server start failed: " + last_error_);
+      return false;
+    }
+
+    register_tools();
+
+    transport_->Start();
+
+    port_ = http_opts.port;
+    running_ = true;
+
     LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
-                              "Client connected: " + info.name + " " +
-                                  info.version);
-  };
-  opts.on_initialized = [] {
-    LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
-                              "Client initialization complete");
-  };
-  opts.on_protocol_error = [](std::string_view error) {
+                              "MCP server started on 127.0.0.1:" +
+                                  std::to_string(port_));
+    return true;
+  } catch (const std::exception &e) {
+    last_error_ = "transport start failed: " + std::string(e.what());
     LogSystem::instance().log(LogLevel::Error, LogCategory::Transport,
-                              "Protocol error: " + std::string(error));
-  };
-  opts.on_transport_close = [] {
-    LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
-                              "Client disconnected");
-  };
-  opts.on_transport_error = [](std::string_view msg) {
+                              "MCP server start failed: " + last_error_);
+    return false;
+  } catch (...) {
+    last_error_ = "transport start failed: unknown exception";
     LogSystem::instance().log(LogLevel::Error, LogCategory::Transport,
-                              "Transport error: " + std::string(msg));
-  };
-  server_ = mcp::McpServer::Create(transport_, opts);
-
-  register_tools();
-
-  transport_->Start();
-
-  port_ = http_opts.port;
-  running_ = true;
-
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
-                            "MCP server started on 127.0.0.1:" +
-                                std::to_string(port_));
+                              "MCP server start failed: " + last_error_);
+    return false;
+  }
 }
 
 void ServerContext::stop() {
@@ -102,7 +128,7 @@ int ServerContext::get_port() const { return port_; }
 bool ServerContext::is_running() const { return running_; }
 
 void ServerContext::register_tools() {
-  register_all_tools(*server_, queue_, catalog_, bm25_index_, port_);
+  register_all_tools(*server_, queue_, *catalog_, *bm25_index_, port_);
   register_all_resources(*server_, queue_);
   register_all_prompts(*server_, queue_);
   register_debugger_resources(*server_);
