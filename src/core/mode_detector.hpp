@@ -11,7 +11,6 @@ class ModeDetector {
 public:
   static RuntimeMode detect();
   static bool is_editor();
-  static bool is_runtime();
 };
 
 } // namespace godot_self_driving

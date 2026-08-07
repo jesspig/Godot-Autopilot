@@ -14,6 +14,4 @@ RuntimeMode ModeDetector::detect() {
 
 bool ModeDetector::is_editor() { return detect() == RuntimeMode::Editor; }
 
-bool ModeDetector::is_runtime() { return detect() == RuntimeMode::Game; }
-
 } // namespace godot_self_driving

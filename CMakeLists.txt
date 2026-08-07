@@ -67,6 +67,11 @@ add_library(godot-self-driving SHARED
     src/resources/resource_handlers.cpp
     src/resources/debugger_resources.cpp
     src/prompts/prompt_handlers.cpp
+    src/prompts/prompt_create_3d_scene.cpp
+    src/prompts/prompt_setup_character.cpp
+    src/prompts/prompt_debug_physics.cpp
+    src/prompts/prompt_setup_input_map.cpp
+    src/prompts/prompt_setup_gui.cpp
     src/prompts/debugger_prompts.cpp
     src/prompts/prompt_tool_usage.cpp
     src/prompts/prompt_keycode_reference.cpp
@@ -87,7 +92,9 @@ add_library(godot-self-driving SHARED
     src/tools/tileset_ops.cpp
     src/tools/debug_ops.cpp
     src/tools/debugger_ops.cpp
+    src/tools/debugger_access.cpp
     src/tools/doc_ops.cpp
+    src/tools/display_window_ops.cpp
     src/tools/editor_ops.cpp
     src/tools/group_ops.cpp
     src/tools/input_ops.cpp
@@ -95,10 +102,19 @@ add_library(godot-self-driving SHARED
     src/tools/physics_ops.cpp
     src/tools/property_ops.cpp
     src/tools/register_all.cpp
+    src/tools/dispatch.cpp
     src/tools/schema_builder.cpp
+    src/tools/schema_scene_ops.cpp
+    src/tools/schema_editor_config_ops.cpp
+    src/tools/schema_physics_ops.cpp
+    src/tools/schema_render_audio_ops.cpp
+    src/tools/schema_debug_sys_ops.cpp
+    src/tools/schema_content_ops.cpp
     src/tools/render_ops.cpp
+    src/tools/environment_ops.cpp
     src/tools/resource_ops.cpp
     src/tools/runtime_ops.cpp
+    src/tools/runtime_game_ops.cpp
     src/tools/scene_ops.cpp
     src/tools/script_ops.cpp
     src/tools/spriteframes_ops.cpp

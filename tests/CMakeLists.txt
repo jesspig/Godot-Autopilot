@@ -40,6 +40,8 @@ set(GSD_UNIT_BUSINESS_SOURCES
     ${CMAKE_SOURCE_DIR}/src/tools/tool_catalog.cpp
     ${CMAKE_SOURCE_DIR}/src/tools/schema_builder.cpp
     ${CMAKE_SOURCE_DIR}/src/tools/register_all.cpp
+    ${CMAKE_SOURCE_DIR}/src/tools/dispatch.cpp
+    ${CMAKE_SOURCE_DIR}/src/tools/debugger_access.cpp
     ${GSD_TOOLS_OPS_SOURCES})
 
 set(GSD_TESTS_CXX_STANDARD 17)

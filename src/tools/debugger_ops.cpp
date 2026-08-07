@@ -1,5 +1,6 @@
 #include "debugger_ops.hpp"
 #include "core/log_system.hpp"
+#include "debugger_access.hpp"
 #include "runtime/gsd_protocol.hpp"
 #include "runtime_ops.hpp"
 #include <algorithm>
@@ -278,7 +279,7 @@ public:
     size_t session_count = 0;
     auto *plugin = DebugCapturePlugin::get_instance();
     if (plugin)
-      session_count = plugin->session_ids_.size();
+      session_count = plugin->get_session_ids().size();
     std::ostringstream oss;
     oss << "Debug Session:\n";
     oss << "  Active: " << (active ? "true" : "false") << "\n";
@@ -418,7 +419,7 @@ bool capture_session_active() {
   auto *plugin = DebugCapturePlugin::get_instance();
   if (!plugin)
     return false;
-  for (int32_t id : plugin->session_ids_) {
+  for (int32_t id : plugin->get_session_ids()) {
     auto s = plugin->get_session(id);
     if (s.is_valid() && s->is_active())
       return true;
@@ -429,7 +430,7 @@ bool capture_session_breaked() {
   auto *plugin = DebugCapturePlugin::get_instance();
   if (!plugin)
     return false;
-  for (int32_t id : plugin->session_ids_) {
+  for (int32_t id : plugin->get_session_ids()) {
     auto s = plugin->get_session(id);
     if (s.is_valid() && s->is_breaked())
       return true;
@@ -480,10 +481,14 @@ bool DebugCapturePlugin::_has_capture(const godot::String &p_name) const {
 }
 
 void DebugCapturePlugin::_setup_session(int32_t p_session_id) {
-  session_ids_.push_back(p_session_id);
-  ready_session_ids_.erase(std::remove(ready_session_ids_.begin(),
-                                       ready_session_ids_.end(), p_session_id),
-                           ready_session_ids_.end());
+  {
+    std::lock_guard<std::mutex> lock(session_mtx_);
+    session_ids_.push_back(p_session_id);
+    ready_session_ids_.erase(std::remove(ready_session_ids_.begin(),
+                                         ready_session_ids_.end(),
+                                         p_session_id),
+                             ready_session_ids_.end());
+  }
   session_ = get_session(p_session_id);
   if (session_.is_valid()) {
     godot_self_driving::debugger_ops::capture_add_log_entry(
@@ -497,6 +502,7 @@ bool DebugCapturePlugin::_capture(const godot::String &p_message,
   std::string msg = p_message.utf8().ptr();
 
   if (msg == std::string(godot_self_driving::GSD_MSG_READY)) {
+    std::lock_guard<std::mutex> lock(session_mtx_);
     if (std::find(ready_session_ids_.begin(), ready_session_ids_.end(),
                   p_session_id) == ready_session_ids_.end()) {
       ready_session_ids_.push_back(p_session_id);
@@ -676,4 +682,5 @@ void register_classes() {
 }
 
 } // namespace debugger_ops
+
 } // namespace godot_self_driving

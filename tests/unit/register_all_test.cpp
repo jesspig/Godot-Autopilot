@@ -10,6 +10,7 @@
 #include <mcp/transport/InMemoryTransport.hpp>
 
 #include "core/command_queue.hpp"
+#include "tools/dispatch.hpp"
 #include "tools/register_all.hpp"
 #include "tools/tool_catalog.hpp"
 #include "util/bm25_index.hpp"
@@ -176,7 +177,7 @@ TEST_F(RegisteredServerFixture, CatalogCoversServerTools) {
 
 TEST_F(RegisteredServerFixture, CallHandlerUnknownToolReturnsError) {
   mcp::JsonValue args(mcp::JsonValue::object_tag);
-  auto result = godot_self_driving::call_handler("no_such_tool_xyz", args);
+  auto result = godot_self_driving::dispatch::call_handler("no_such_tool_xyz", args);
   const auto *err = result.Find("error");
   ASSERT_NE(err, nullptr);
   ASSERT_TRUE(err->IsString());
@@ -190,7 +191,7 @@ TEST_F(RegisteredServerFixture, CallHandlerOversizedArgsKeepsFixedError) {
   mcp::JsonValue args(mcp::JsonValue::object_tag);
   args["payload"] = mcp::JsonValue(big);
 
-  auto result = godot_self_driving::call_handler("no_such_tool_xyz", args);
+  auto result = godot_self_driving::dispatch::call_handler("no_such_tool_xyz", args);
   const auto *err = result.Find("error");
   ASSERT_NE(err, nullptr);
   ASSERT_TRUE(err->IsString());

@@ -1,8 +1,8 @@
 #include "code_exec_ops.hpp"
 #include "core/log_system.hpp"
 #include "core/resource_registry.hpp"
-#include "register_all.hpp"
 #include "tools/debugger_ops.hpp"
+#include "tools/dispatch.hpp"
 #include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #include <cctype>
@@ -149,6 +149,415 @@ mcp::JsonValue extract_structured_error(const std::string &err_text) {
   return out;
 }
 
+struct ExecContext {
+  std::string source_code;
+  std::string func_name;
+  int timeout_ms = 5000;
+  bool auto_owner = true;
+  std::chrono::steady_clock::time_point start_time;
+  bool has_func_def = false;
+  std::string wrapped;
+  godot::Ref<godot::GDScript> script;
+  godot::Node *scene_root_for_leak = nullptr;
+  int child_count_before = 0;
+  godot::Variant result;
+  std::string new_error_text;
+  std::string new_output_text;
+  bool temp_added = false;
+  int auto_owner_set = 0;
+};
+
+bool check_source_safety(ExecContext &ctx, std::string &error_out) {
+  ctx.has_func_def = false;
+  {
+    std::istringstream stream(ctx.source_code);
+    std::string line;
+    while (std::getline(stream, line)) {
+      size_t pos = line.find_first_not_of(" \t");
+      if (pos == std::string::npos || line[pos] == '#')
+        continue;
+      if (pos + 1 < line.size() && line[pos] == '/' && line[pos + 1] == '/')
+        continue;
+      if (line.compare(pos, 5, "func ") == 0) {
+        ctx.has_func_def = true;
+        break;
+      }
+    }
+  }
+
+  {
+    std::istringstream stream(ctx.source_code);
+    std::string line;
+    while (std::getline(stream, line)) {
+      size_t pos = line.find_first_not_of(" \t");
+      if (pos == std::string::npos || line[pos] == '#')
+        continue;
+      if (pos + 1 < line.size() && line[pos] == '/' && line[pos + 1] == '/')
+        continue;
+      if (line.find("close_scene(") != std::string::npos ||
+          line.find("close_scene (") != std::string::npos) {
+        error_out =
+            "calling EditorInterface.close_scene() from code_execute is unsafe "
+            "(it destroys the executing node and crashes the editor) — use the "
+            "editor_close_scene MCP tool instead";
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+bool build_wrapped_source(ExecContext &ctx, std::string &error_out) {
+  auto clean_extends = [](const std::string &code) -> std::string {
+    std::string result;
+    std::istringstream stream(code);
+    std::string line;
+    bool first = true;
+    while (std::getline(stream, line)) {
+      if (!first)
+        result += "\n";
+      first = false;
+      size_t pos = line.find_first_not_of(" \t");
+      if (pos != std::string::npos && line.compare(pos, 8, "extends ") == 0) {
+        result += "# " + line;
+      } else {
+        result += line;
+      }
+    }
+    return result;
+  };
+
+  if (ctx.has_func_def) {
+
+    std::string cleaned = clean_extends(ctx.source_code);
+    ctx.wrapped = "@tool\nextends Node\n\nvar SceneRoot := "
+                  "EditorInterface.get_edited_scene_root()\n\n" +
+                  cleaned + "\n";
+
+    bool has_named_func = false;
+    {
+      std::istringstream stream(cleaned);
+      std::string line;
+      while (std::getline(stream, line)) {
+        size_t pos = line.find_first_not_of(" \t");
+        if (pos == std::string::npos || line[pos] == '#')
+          continue;
+        if (line.compare(pos, 5, "func ") == 0) {
+          size_t name_start = line.find_first_not_of(" \t", pos + 5);
+          if (name_start == std::string::npos)
+            continue;
+          size_t name_end = line.find('(', name_start);
+          if (name_end == std::string::npos)
+            continue;
+          std::string fname = line.substr(name_start, name_end - name_start);
+          size_t last = fname.find_last_not_of(" \t");
+          if (last != std::string::npos)
+            fname = fname.substr(0, last + 1);
+          if (fname == ctx.func_name) {
+            has_named_func = true;
+            break;
+          }
+        }
+      }
+    }
+    if (!has_named_func) {
+      ctx.wrapped += "func " + ctx.func_name + "():\n    pass\n";
+    }
+  } else {
+    std::string cleaned = clean_extends(ctx.source_code);
+
+    {
+      std::istringstream stream(cleaned);
+      std::string line;
+      while (std::getline(stream, line)) {
+        size_t pos = line.find_first_not_of(" \t");
+        if (pos == std::string::npos || line[pos] == '#')
+          continue;
+        if (pos + 1 < line.size() && line[pos] == '/' && line[pos + 1] == '/')
+          continue;
+        if (line.compare(pos, 5, "func ") == 0 ||
+            line.compare(pos, 5, "func\t") == 0 ||
+            (line.compare(pos, 4, "func") == 0 && pos + 4 < line.size() &&
+             line[pos + 4] == '(')) {
+          mcp::JsonValue detail = godot_self_driving::util::error_detail(
+              "func definition detected in single-function mode", "source_code",
+              "no func definitions while in single-function mode",
+              "top-level func definitions require multi-function mode; use "
+              "editor script_create or wrap in a lambda");
+          error_out = detail.Find("error")->GetString();
+          return false;
+        }
+      }
+    }
+
+    bool uses_tabs = false;
+    bool uses_spaces = false;
+    {
+      std::istringstream stream(cleaned);
+      std::string line;
+      while (std::getline(stream, line)) {
+        size_t pos = line.find_first_not_of(" \t");
+        if (pos == std::string::npos || pos == 0)
+          continue;
+        std::string indent = line.substr(0, pos);
+        if (indent.find('\t') != std::string::npos)
+          uses_tabs = true;
+        if (indent.find("    ") != std::string::npos)
+          uses_spaces = true;
+      }
+    }
+
+    if (uses_tabs && uses_spaces) {
+      mcp::JsonValue detail = godot_self_driving::util::error_detail(
+          "mixed tab/space indentation detected in source", "source_code",
+          "consistent indentation",
+          "reindent source with only tabs or only spaces; note the wrapper "
+          "requires the same indentation style throughout");
+      error_out = detail.Find("error")->GetString();
+      return false;
+    }
+
+    bool use_tab_style = uses_tabs && !uses_spaces;
+    std::string prefix = use_tab_style ? "\t" : "    ";
+
+    ctx.wrapped = "@tool\nextends Node\n\nfunc " + ctx.func_name + "():\n";
+
+    ctx.wrapped +=
+        prefix + "var SceneRoot := EditorInterface.get_edited_scene_root()\n";
+    if (!cleaned.empty()) {
+      std::istringstream stream(cleaned);
+      std::string line;
+      bool first_line = true;
+      while (std::getline(stream, line)) {
+        if (!first_line)
+          ctx.wrapped += "\n";
+        first_line = false;
+
+        size_t content_start = line.find_first_not_of(" \t");
+        if (content_start == std::string::npos) {
+
+          ctx.wrapped += prefix;
+        } else {
+
+          ctx.wrapped += prefix + line;
+        }
+      }
+    }
+    ctx.wrapped += "\n";
+  }
+  return true;
+}
+
+bool compile_and_map_errors(ExecContext &ctx, std::string &error_out) {
+  ctx.script.instantiate();
+  if (ctx.script.is_null()) {
+    error_out = "failed to create GDScript instance";
+    return false;
+  }
+
+  ctx.script->set_source_code(godot::String(ctx.wrapped.c_str()));
+
+  size_t compile_log_before = godot_self_driving::debugger_ops::capture_log_count();
+  godot::Error parse_err = ctx.script->reload();
+  if (parse_err != godot::OK) {
+    int code = static_cast<int>(parse_err);
+    std::string err_name = "ERR_UNKNOWN";
+    if (code == 43)
+      err_name = "ERR_PARSE_ERROR";
+    std::string message = "GDScript compilation failed: " + err_name +
+                          " (code " + std::to_string(code) + ")";
+    std::string compile_err =
+        godot_self_driving::debugger_ops::capture_new_error_text(
+            compile_log_before);
+    if (!compile_err.empty()) {
+      int map_offset =
+          ctx.has_func_def ? WRAP_HEADER_LINES_MULTI : WRAP_HEADER_LINES_SINGLE;
+      std::string mapped_err = map_line_numbers(compile_err, map_offset, "");
+      if (mapped_err.size() > 8192) {
+        message += "\n" + mapped_err.substr(0, 8192) +
+                   "\n...(truncated, total " +
+                   std::to_string(mapped_err.size()) + " bytes)";
+      } else {
+        message += "\n" + mapped_err;
+      }
+      message +=
+          "\nerror lines above were mapped from the generated wrapper script";
+    }
+    message += "\nwrapped source:\n" + ctx.wrapped;
+    error_out = message;
+    return false;
+  }
+  return true;
+}
+
+bool run_with_timeout(ExecContext &ctx, std::string &error_out) {
+  size_t log_before = godot_self_driving::debugger_ops::capture_log_count();
+
+  ctx.child_count_before = 0;
+  ctx.scene_root_for_leak = nullptr;
+  {
+    auto *editor_for_leak = godot::EditorInterface::get_singleton();
+    if (editor_for_leak) {
+      ctx.scene_root_for_leak = editor_for_leak->get_edited_scene_root();
+    }
+  }
+  if (ctx.scene_root_for_leak) {
+    ctx.child_count_before = ctx.scene_root_for_leak->get_child_count();
+  }
+
+  {
+    godot::Node *temp_node = nullptr;
+    TempNodeGuard temp_guard(temp_node);
+
+    temp_node = memnew(godot::Node);
+    temp_node->set_script(godot::Variant(ctx.script));
+
+    godot::Node *parent_node = nullptr;
+    {
+      auto *engine = godot::Engine::get_singleton();
+      auto *main_loop = engine ? engine->get_main_loop() : nullptr;
+      auto *tree = godot::Object::cast_to<godot::SceneTree>(main_loop);
+      if (tree) {
+        parent_node = godot::Object::cast_to<godot::Node>(tree->get_root());
+      }
+    }
+    if (!parent_node) {
+      auto *editor = godot::EditorInterface::get_singleton();
+      parent_node = editor ? editor->get_edited_scene_root() : nullptr;
+    }
+    if (parent_node) {
+      parent_node->add_child(temp_node);
+      ctx.temp_added = true;
+    }
+
+    godot::StringName fn_name(ctx.func_name.c_str());
+    if (!temp_node->has_method(fn_name)) {
+      error_out =
+          "function not found in compiled script: " + ctx.func_name;
+      return false;
+    }
+
+    bool timeout_hit = false;
+    auto check_time = [&]() {
+      auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                         std::chrono::steady_clock::now() - ctx.start_time)
+                         .count();
+      if (elapsed >= ctx.timeout_ms)
+        timeout_hit = true;
+    };
+
+    check_time();
+    if (timeout_hit) {
+      error_out = "Execution timed out after " +
+                  std::to_string(ctx.timeout_ms) + " ms";
+      return false;
+    }
+
+    ctx.result = temp_node->call(fn_name);
+    ctx.new_error_text =
+        godot_self_driving::debugger_ops::capture_new_error_text(log_before);
+    ctx.new_output_text =
+        godot_self_driving::debugger_ops::capture_new_output_text(log_before);
+  }
+  return true;
+}
+
+void reconcile_leaked_children(ExecContext &ctx) {
+  ctx.auto_owner_set = 0;
+  if (ctx.scene_root_for_leak) {
+    int child_count_after = ctx.scene_root_for_leak->get_child_count();
+    if (child_count_after > ctx.child_count_before) {
+      if (ctx.auto_owner) {
+        std::function<void(godot::Node *)> set_owner_recursive =
+            [&](godot::Node *parent) {
+              for (int i = 0; i < parent->get_child_count(); ++i) {
+                godot::Node *child = parent->get_child(i);
+                if (child->get_owner() == nullptr) {
+                  child->set_owner(ctx.scene_root_for_leak);
+                  ++ctx.auto_owner_set;
+                }
+                set_owner_recursive(child);
+              }
+            };
+        for (int i = 0; i < ctx.scene_root_for_leak->get_child_count(); ++i) {
+          set_owner_recursive(ctx.scene_root_for_leak->get_child(i));
+        }
+      } else {
+        auto children = ctx.scene_root_for_leak->get_children();
+        for (int i = children.size() - 1; i >= 0; i--) {
+          auto *child = godot::Object::cast_to<godot::Node>(children[i]);
+          if (child && child->get_owner() == nullptr) {
+            ctx.scene_root_for_leak->remove_child(child);
+            memdelete(child);
+          }
+        }
+      }
+    }
+  }
+}
+
+mcp::JsonValue build_exec_result(ExecContext &ctx) {
+  auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                     std::chrono::steady_clock::now() - ctx.start_time)
+                     .count();
+
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+
+  if (ctx.result.get_type() == godot::Variant::OBJECT) {
+    godot::Object *obj = ctx.result.operator godot::Object *();
+    godot::Resource *res_obj = godot::Object::cast_to<godot::Resource>(obj);
+    if (res_obj) {
+      godot::Ref<godot::Resource> res(res_obj);
+      godot_self_driving::resource_registry::register_resource(res, "");
+      mcp::JsonValue reg(mcp::JsonValue::object_tag);
+      reg["object_id"] =
+          mcp::JsonValue(static_cast<int64_t>(res->get_instance_id()));
+      reg["object_id_str"] = mcp::JsonValue(
+          std::to_string(static_cast<int64_t>(res->get_instance_id())));
+      reg["class"] = mcp::JsonValue(to_std_string(res->get_class()));
+      reg["path"] = mcp::JsonValue(to_std_string(res->get_path()));
+      r["registered_resource"] = std::move(reg);
+    }
+  }
+
+  r["result"] = godot_self_driving::VariantJson::serialize(ctx.result);
+  r["execution_time_ms"] = mcp::JsonValue(static_cast<int64_t>(elapsed));
+  r["auto_owner_set"] =
+      mcp::JsonValue(static_cast<int64_t>(ctx.auto_owner_set));
+  r["wrapped_source"] = mcp::JsonValue(ctx.wrapped);
+  if (!ctx.new_output_text.empty()) {
+    if (ctx.new_output_text.size() > 8192) {
+      r["output"] = mcp::JsonValue(
+          ctx.new_output_text.substr(0, 8192) + "\n...(truncated, total " +
+          std::to_string(ctx.new_output_text.size()) + " bytes)");
+    } else {
+      r["output"] = mcp::JsonValue(ctx.new_output_text);
+    }
+  }
+  if (!ctx.new_error_text.empty()) {
+    r["runtime_error"] = mcp::JsonValue(true);
+    std::string error_details = ctx.new_error_text;
+    if (error_details.size() > 8192) {
+      error_details = error_details.substr(0, 8192) +
+                      "\n...(truncated, total " +
+                      std::to_string(ctx.new_error_text.size()) + " bytes)";
+    }
+    if (ctx.new_error_text.find("Node not found") != std::string::npos) {
+      error_details += NODE_NOT_FOUND_HINT;
+    }
+    r["error_details"] = mcp::JsonValue(error_details);
+    mcp::JsonValue structured = extract_structured_error(ctx.new_error_text);
+    if (structured.IsObject() && !structured.Empty()) {
+      r["structured_error"] = std::move(structured);
+    }
+  }
+  if (!ctx.temp_added) {
+    r["note"] = mcp::JsonValue("temporary node was not added to any scene tree "
+                               "— get_tree() will be null");
+  }
+  return r;
+}
+
 } // namespace
 
 namespace godot_self_driving {
@@ -218,7 +627,7 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
       tool_args = *a;
     }
 
-    mcp::JsonValue handler_result = call_handler(tool_name, tool_args);
+    mcp::JsonValue handler_result = dispatch::call_handler(tool_name, tool_args);
 
     if (auto *err = handler_result.Find("error")) {
       result_item["status"] = mcp::JsonValue("error");
@@ -263,6 +672,7 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "code_execute called");
 
+  ExecContext ctx;
   auto *src = args.Find("source_code");
   if (!src || !src->IsString()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -270,403 +680,39 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue &args) {
     return e;
   }
 
-  std::string source_code = src->GetString();
-  std::string func_name = "_run";
+  ctx.source_code = src->GetString();
+  ctx.func_name = "_run";
   if (auto *fn = args.Find("function_name")) {
     if (fn->IsString())
-      func_name = fn->GetString();
+      ctx.func_name = fn->GetString();
   }
 
-  int timeout_ms = 5000;
+  ctx.timeout_ms = 5000;
   if (auto *tm = args.Find("timeout_ms")) {
     if (tm->IsInt())
-      timeout_ms = static_cast<int>(tm->GetInt());
+      ctx.timeout_ms = static_cast<int>(tm->GetInt());
   }
 
-  bool auto_owner = true;
+  ctx.auto_owner = true;
   if (auto *ao = args.Find("auto_owner")) {
     if (ao->IsBool())
-      auto_owner = ao->GetBool();
+      ctx.auto_owner = ao->GetBool();
   }
 
-  auto start_time = std::chrono::steady_clock::now();
+  ctx.start_time = std::chrono::steady_clock::now();
 
-  bool has_func_def = false;
-  {
-    std::istringstream stream(source_code);
-    std::string line;
-    while (std::getline(stream, line)) {
-      size_t pos = line.find_first_not_of(" \t");
-      if (pos == std::string::npos || line[pos] == '#')
-        continue;
-      if (pos + 1 < line.size() && line[pos] == '/' && line[pos + 1] == '/')
-        continue;
-      if (line.compare(pos, 5, "func ") == 0) {
-        has_func_def = true;
-        break;
-      }
-    }
-  }
+  std::string error_out;
+  if (!check_source_safety(ctx, error_out))
+    return util::error_json(error_out);
+  if (!build_wrapped_source(ctx, error_out))
+    return util::error_json(error_out);
+  if (!compile_and_map_errors(ctx, error_out))
+    return util::error_json(error_out);
+  if (!run_with_timeout(ctx, error_out))
+    return util::error_json(error_out);
+  reconcile_leaked_children(ctx);
 
-  {
-    std::istringstream stream(source_code);
-    std::string line;
-    while (std::getline(stream, line)) {
-      size_t pos = line.find_first_not_of(" \t");
-      if (pos == std::string::npos || line[pos] == '#')
-        continue;
-      if (pos + 1 < line.size() && line[pos] == '/' && line[pos + 1] == '/')
-        continue;
-      if (line.find("close_scene(") != std::string::npos ||
-          line.find("close_scene (") != std::string::npos) {
-        mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue(
-            "calling EditorInterface.close_scene() from code_execute is unsafe "
-            "(it destroys the executing node and crashes the editor) — use the "
-            "editor_close_scene MCP tool instead");
-        return e;
-      }
-    }
-  }
-
-  auto clean_extends = [](const std::string &code) -> std::string {
-    std::string result;
-    std::istringstream stream(code);
-    std::string line;
-    bool first = true;
-    while (std::getline(stream, line)) {
-      if (!first)
-        result += "\n";
-      first = false;
-      size_t pos = line.find_first_not_of(" \t");
-      if (pos != std::string::npos && line.compare(pos, 8, "extends ") == 0) {
-        result += "# " + line;
-      } else {
-        result += line;
-      }
-    }
-    return result;
-  };
-
-  std::string wrapped;
-  if (has_func_def) {
-
-    std::string cleaned = clean_extends(source_code);
-    wrapped = "@tool\nextends Node\n\nvar SceneRoot := "
-              "EditorInterface.get_edited_scene_root()\n\n" +
-              cleaned + "\n";
-
-    bool has_named_func = false;
-    {
-      std::istringstream stream(cleaned);
-      std::string line;
-      while (std::getline(stream, line)) {
-        size_t pos = line.find_first_not_of(" \t");
-        if (pos == std::string::npos || line[pos] == '#')
-          continue;
-        if (line.compare(pos, 5, "func ") == 0) {
-          size_t name_start = line.find_first_not_of(" \t", pos + 5);
-          if (name_start == std::string::npos)
-            continue;
-          size_t name_end = line.find('(', name_start);
-          if (name_end == std::string::npos)
-            continue;
-          std::string fname = line.substr(name_start, name_end - name_start);
-          size_t last = fname.find_last_not_of(" \t");
-          if (last != std::string::npos)
-            fname = fname.substr(0, last + 1);
-          if (fname == func_name) {
-            has_named_func = true;
-            break;
-          }
-        }
-      }
-    }
-    if (!has_named_func) {
-      wrapped += "func " + func_name + "():\n    pass\n";
-    }
-  } else {
-    std::string cleaned = clean_extends(source_code);
-
-    {
-      std::istringstream stream(cleaned);
-      std::string line;
-      while (std::getline(stream, line)) {
-        size_t pos = line.find_first_not_of(" \t");
-        if (pos == std::string::npos || line[pos] == '#')
-          continue;
-        if (pos + 1 < line.size() && line[pos] == '/' && line[pos + 1] == '/')
-          continue;
-        if (line.compare(pos, 5, "func ") == 0 ||
-            line.compare(pos, 5, "func\t") == 0 ||
-            (line.compare(pos, 4, "func") == 0 && pos + 4 < line.size() &&
-             line[pos + 4] == '(')) {
-          return util::error_detail(
-              "func definition detected in single-function mode", "source_code",
-              "no func definitions while in single-function mode",
-              "top-level func definitions require multi-function mode; use "
-              "editor script_create or wrap in a lambda");
-        }
-      }
-    }
-
-    bool uses_tabs = false;
-    bool uses_spaces = false;
-    {
-      std::istringstream stream(cleaned);
-      std::string line;
-      while (std::getline(stream, line)) {
-        size_t pos = line.find_first_not_of(" \t");
-        if (pos == std::string::npos || pos == 0)
-          continue;
-        std::string indent = line.substr(0, pos);
-        if (indent.find('\t') != std::string::npos)
-          uses_tabs = true;
-        if (indent.find("    ") != std::string::npos)
-          uses_spaces = true;
-      }
-    }
-
-    if (uses_tabs && uses_spaces) {
-      return util::error_detail(
-          "mixed tab/space indentation detected in source", "source_code",
-          "consistent indentation",
-          "reindent source with only tabs or only spaces; note the wrapper "
-          "requires the same indentation style throughout");
-    }
-
-    bool use_tab_style = uses_tabs && !uses_spaces;
-    std::string prefix = use_tab_style ? "\t" : "    ";
-
-    wrapped = "@tool\nextends Node\n\nfunc " + func_name + "():\n";
-
-    wrapped +=
-        prefix + "var SceneRoot := EditorInterface.get_edited_scene_root()\n";
-    if (!cleaned.empty()) {
-      std::istringstream stream(cleaned);
-      std::string line;
-      bool first_line = true;
-      while (std::getline(stream, line)) {
-        if (!first_line)
-          wrapped += "\n";
-        first_line = false;
-
-        size_t content_start = line.find_first_not_of(" \t");
-        if (content_start == std::string::npos) {
-
-          wrapped += prefix;
-        } else {
-
-          wrapped += prefix + line;
-        }
-      }
-    }
-    wrapped += "\n";
-  }
-
-  godot::Ref<godot::GDScript> script;
-  script.instantiate();
-  if (script.is_null()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("failed to create GDScript instance");
-    return e;
-  }
-
-  script->set_source_code(godot::String(wrapped.c_str()));
-
-  size_t compile_log_before = debugger_ops::capture_log_count();
-  godot::Error parse_err = script->reload();
-  if (parse_err != godot::OK) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    int code = static_cast<int>(parse_err);
-    std::string err_name = "ERR_UNKNOWN";
-    if (code == 43)
-      err_name = "ERR_PARSE_ERROR";
-    std::string message = "GDScript compilation failed: " + err_name +
-                          " (code " + std::to_string(code) + ")";
-    std::string compile_err =
-        debugger_ops::capture_new_error_text(compile_log_before);
-    if (!compile_err.empty()) {
-      int map_offset =
-          has_func_def ? WRAP_HEADER_LINES_MULTI : WRAP_HEADER_LINES_SINGLE;
-      std::string mapped_err = map_line_numbers(compile_err, map_offset, "");
-      if (mapped_err.size() > 8192) {
-        message += "\n" + mapped_err.substr(0, 8192) +
-                   "\n...(truncated, total " +
-                   std::to_string(mapped_err.size()) + " bytes)";
-      } else {
-        message += "\n" + mapped_err;
-      }
-      message +=
-          "\nerror lines above were mapped from the generated wrapper script";
-    }
-    message += "\nwrapped source:\n" + wrapped;
-    e["error"] = mcp::JsonValue(message);
-    return e;
-  }
-
-  size_t log_before = debugger_ops::capture_log_count();
-
-  int child_count_before = 0;
-  godot::Node *scene_root_for_leak = nullptr;
-  {
-    auto *editor_for_leak = godot::EditorInterface::get_singleton();
-    if (editor_for_leak) {
-      scene_root_for_leak = editor_for_leak->get_edited_scene_root();
-    }
-  }
-  if (scene_root_for_leak) {
-    child_count_before = scene_root_for_leak->get_child_count();
-  }
-
-  godot::Variant result;
-  std::string new_error_text;
-  std::string new_output_text;
-  bool temp_added = false;
-  {
-    godot::Node *temp_node = nullptr;
-    TempNodeGuard temp_guard(temp_node);
-
-    temp_node = memnew(godot::Node);
-    temp_node->set_script(godot::Variant(script));
-
-    godot::Node *parent_node = nullptr;
-    {
-      auto *engine = godot::Engine::get_singleton();
-      auto *main_loop = engine ? engine->get_main_loop() : nullptr;
-      auto *tree = godot::Object::cast_to<godot::SceneTree>(main_loop);
-      if (tree) {
-        parent_node = godot::Object::cast_to<godot::Node>(tree->get_root());
-      }
-    }
-    if (!parent_node) {
-      auto *editor = godot::EditorInterface::get_singleton();
-      parent_node = editor ? editor->get_edited_scene_root() : nullptr;
-    }
-    if (parent_node) {
-      parent_node->add_child(temp_node);
-      temp_added = true;
-    }
-
-    godot::StringName fn_name(func_name.c_str());
-    if (!temp_node->has_method(fn_name)) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] =
-          mcp::JsonValue("function not found in compiled script: " + func_name);
-      return e;
-    }
-
-    bool timeout_hit = false;
-    auto check_time = [&]() {
-      auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-                         std::chrono::steady_clock::now() - start_time)
-                         .count();
-      if (elapsed >= timeout_ms)
-        timeout_hit = true;
-    };
-
-    check_time();
-    if (timeout_hit) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue("Execution timed out after " +
-                                  std::to_string(timeout_ms) + " ms");
-      return e;
-    }
-
-    result = temp_node->call(fn_name);
-    new_error_text = debugger_ops::capture_new_error_text(log_before);
-    new_output_text = debugger_ops::capture_new_output_text(log_before);
-  }
-
-  int auto_owner_set = 0;
-  if (scene_root_for_leak) {
-    int child_count_after = scene_root_for_leak->get_child_count();
-    if (child_count_after > child_count_before) {
-      if (auto_owner) {
-        std::function<void(godot::Node *)> set_owner_recursive =
-            [&](godot::Node *parent) {
-              for (int i = 0; i < parent->get_child_count(); ++i) {
-                godot::Node *child = parent->get_child(i);
-                if (child->get_owner() == nullptr) {
-                  child->set_owner(scene_root_for_leak);
-                  ++auto_owner_set;
-                }
-                set_owner_recursive(child);
-              }
-            };
-        for (int i = 0; i < scene_root_for_leak->get_child_count(); ++i) {
-          set_owner_recursive(scene_root_for_leak->get_child(i));
-        }
-      } else {
-        auto children = scene_root_for_leak->get_children();
-        for (int i = children.size() - 1; i >= 0; i--) {
-          auto *child = godot::Object::cast_to<godot::Node>(children[i]);
-          if (child && child->get_owner() == nullptr) {
-            scene_root_for_leak->remove_child(child);
-            memdelete(child);
-          }
-        }
-      }
-    }
-  }
-
-  auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-                     std::chrono::steady_clock::now() - start_time)
-                     .count();
-
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-
-  if (result.get_type() == godot::Variant::OBJECT) {
-    godot::Object *obj = result.operator godot::Object *();
-    godot::Resource *res_obj = godot::Object::cast_to<godot::Resource>(obj);
-    if (res_obj) {
-      godot::Ref<godot::Resource> res(res_obj);
-      resource_registry::register_resource(res, "");
-      mcp::JsonValue reg(mcp::JsonValue::object_tag);
-      reg["object_id"] =
-          mcp::JsonValue(static_cast<int64_t>(res->get_instance_id()));
-      reg["object_id_str"] = mcp::JsonValue(
-          std::to_string(static_cast<int64_t>(res->get_instance_id())));
-      reg["class"] = mcp::JsonValue(to_std_string(res->get_class()));
-      reg["path"] = mcp::JsonValue(to_std_string(res->get_path()));
-      r["registered_resource"] = std::move(reg);
-    }
-  }
-
-  r["result"] = VariantJson::serialize(result);
-  r["execution_time_ms"] = mcp::JsonValue(static_cast<int64_t>(elapsed));
-  r["auto_owner_set"] = mcp::JsonValue(static_cast<int64_t>(auto_owner_set));
-  r["wrapped_source"] = mcp::JsonValue(wrapped);
-  if (!new_output_text.empty()) {
-    if (new_output_text.size() > 8192) {
-      r["output"] = mcp::JsonValue(
-          new_output_text.substr(0, 8192) + "\n...(truncated, total " +
-          std::to_string(new_output_text.size()) + " bytes)");
-    } else {
-      r["output"] = mcp::JsonValue(new_output_text);
-    }
-  }
-  if (!new_error_text.empty()) {
-    r["runtime_error"] = mcp::JsonValue(true);
-    std::string error_details = new_error_text;
-    if (error_details.size() > 8192) {
-      error_details = error_details.substr(0, 8192) +
-                      "\n...(truncated, total " +
-                      std::to_string(new_error_text.size()) + " bytes)";
-    }
-    if (new_error_text.find("Node not found") != std::string::npos) {
-      error_details += NODE_NOT_FOUND_HINT;
-    }
-    r["error_details"] = mcp::JsonValue(error_details);
-    mcp::JsonValue structured = extract_structured_error(new_error_text);
-    if (structured.IsObject() && !structured.Empty()) {
-      r["structured_error"] = std::move(structured);
-    }
-  }
-  if (!temp_added) {
-    r["note"] = mcp::JsonValue("temporary node was not added to any scene tree "
-                               "— get_tree() will be null");
-  }
+  mcp::JsonValue r = build_exec_result(ctx);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "code_execute completed");
   return r;

@@ -9,8 +9,10 @@
 #include <godot_cpp/variant/packed_int32_array.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
+#include <algorithm>
 #include <atomic>
 #include <mcp/JsonValue.hpp>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -40,8 +42,6 @@ protected:
   godot::Ref<godot::EditorDebuggerSession> session_;
 
 public:
-  std::vector<int32_t> session_ids_;
-  std::vector<int32_t> ready_session_ids_;
   static std::atomic<DebugCapturePlugin *> s_instance;
   bool _has_capture(const godot::String &p_name) const override;
   bool _capture(const godot::String &p_message, const godot::Array &p_data,
@@ -53,6 +53,25 @@ public:
   static DebugCapturePlugin *get_instance() {
     return s_instance.load(std::memory_order_relaxed);
   }
+  std::vector<int32_t> get_session_ids() const {
+    std::lock_guard<std::mutex> lock(session_mtx_);
+    return session_ids_;
+  }
+  bool has_session(int32_t id) const {
+    std::lock_guard<std::mutex> lock(session_mtx_);
+    return std::find(session_ids_.begin(), session_ids_.end(), id) !=
+           session_ids_.end();
+  }
+  bool is_session_ready(int32_t id) const {
+    std::lock_guard<std::mutex> lock(session_mtx_);
+    return std::find(ready_session_ids_.begin(), ready_session_ids_.end(),
+                     id) != ready_session_ids_.end();
+  }
+
+private:
+  std::vector<int32_t> session_ids_;
+  std::vector<int32_t> ready_session_ids_;
+  mutable std::mutex session_mtx_;
 };
 
 void capture_add_log_entry(const std::string &text, bool is_error);
