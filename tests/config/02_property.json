@@ -1,0 +1,178 @@
+{
+  "name": "property_tools",
+  "description": "T3.3 迁移自 tests/integration/property_tools_test.cpp 的 11 个 TEST_F（PropertyToolsTest）：property_get/set/get_list 的返回结构、错误措辞、readback MATCHED、int 字符串静默转 0、缺参报错。节点选型 Label（Control 子类），规避 set_main_screen_editor 调用",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "before_all": [
+      {
+        "id": "new_scene",
+        "tool": "editor_new_scene",
+        "args": { "name": "Root" }
+      },
+      {
+        "id": "create_label_node",
+        "tool": "scene_node_create",
+        "args": { "name": "LabelNode", "type": "Label", "parent_path": "Root" }
+      }
+    ],
+    "stages": [
+      {
+        "id": "main",
+        "steps": [
+          {
+            "id": "property_get_int",
+            "tool": "property_set",
+            "args": { "path": "LabelNode", "property": "z_index", "value": 5 },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          },
+          {
+            "id": "property_get_int_read",
+            "tool": "property_get",
+            "args": { "path": "LabelNode", "property": "z_index" },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": 5 } ]
+            }
+          },
+          {
+            "id": "property_set_get_string",
+            "tool": "property_set",
+            "args": { "path": "LabelNode", "property": "text", "value": "Hello GSD" },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          },
+          {
+            "id": "property_get_string_read",
+            "tool": "property_get",
+            "args": { "path": "LabelNode", "property": "text" },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "Hello GSD" } ]
+            }
+          },
+          {
+            "id": "property_set_vector2",
+            "tool": "property_set",
+            "args": { "path": "LabelNode", "property": "position", "value": { "x": 12.5, "y": -3.25 } },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          },
+          {
+            "id": "property_get_vector2_read",
+            "tool": "property_get",
+            "args": { "path": "LabelNode", "property": "position" },
+            "expect": {
+              "field_checks": [
+                { "key": "result.x", "value": 12.5 },
+                { "key": "result.y", "value": -3.25 }
+              ]
+            }
+          },
+          {
+            "id": "property_set_color",
+            "tool": "property_set",
+            "args": { "path": "LabelNode", "property": "modulate", "value": { "r": 1, "g": 0.5, "b": 0.25, "a": 1 } },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          },
+          {
+            "id": "property_get_color_read",
+            "tool": "property_get",
+            "args": { "path": "LabelNode", "property": "modulate" },
+            "expect": {
+              "field_checks": [
+                { "key": "result.r", "value": 1 },
+                { "key": "result.g", "value": 0.5 },
+                { "key": "result.b", "value": 0.25 },
+                { "key": "result.a", "value": 1 }
+              ]
+            }
+          },
+          {
+            "id": "property_get_missing_property",
+            "tool": "property_get",
+            "args": { "path": "LabelNode", "property": "no_such_prop" },
+            "expect": {
+              "field_checks": [
+                { "key": "error", "value": "property not found: no_such_prop on node LabelNode — use property_get_list to see available properties" }
+              ]
+            }
+          },
+          {
+            "id": "property_set_nonexistent_property",
+            "tool": "property_set",
+            "args": { "path": "LabelNode", "property": "no_such_prop", "value": 1 },
+            "expect": {
+              "field_checks": [ { "key": "error", "not_empty": true } ]
+            }
+          },
+          {
+            "id": "property_get_missing_node",
+            "tool": "property_get",
+            "args": { "path": "NoSuchNode", "property": "z_index" },
+            "expect": {
+              "field_checks": [
+                { "key": "error", "value": "node not found: NoSuchNode — 当前场景根为 \"Root\"；合法路径写法：Root/子路径、/root/Root/子路径、子路径" }
+              ]
+            }
+          },
+          {
+            "id": "property_set_missing_node",
+            "tool": "property_set",
+            "args": { "path": "NoSuchNode", "property": "z_index", "value": 5 },
+            "expect": {
+              "field_checks": [
+                { "key": "error", "value": "node not found: NoSuchNode — 当前场景根为 \"Root\"；合法路径写法：Root/子路径、/root/Root/子路径、子路径" }
+              ]
+            }
+          },
+          {
+            "id": "readback_matched_set",
+            "tool": "property_set",
+            "args": { "path": "Root", "property": "name", "value": "My Root" },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          },
+          {
+            "id": "readback_matched_get",
+            "tool": "property_get",
+            "args": { "path": "My Root", "property": "name" },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "My Root" } ]
+            }
+          },
+          {
+            "id": "property_set_int_as_string",
+            "tool": "property_set",
+            "args": { "path": "LabelNode", "property": "z_index", "value": "abc" },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          },
+          {
+            "id": "property_get_list",
+            "tool": "property_get_list",
+            "args": { "path": "LabelNode" },
+            "expect": {
+              "has_keys": [ "result" ],
+              "field_checks": [ { "key": "result", "not_empty": true } ]
+            }
+          },
+          {
+            "id": "property_set_missing_value_param",
+            "tool": "property_set",
+            "args": { "path": "LabelNode", "property": "z_index" },
+            "expect": {
+              "field_checks": [ { "key": "error", "value": "missing required parameter: value" } ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

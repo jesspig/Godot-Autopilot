@@ -1,0 +1,97 @@
+{
+  "name": "resources_scripts",
+  "description": "资源/脚本类工具代表性配置驱动用例：script_execute_gdscript 四种行为（单表达式自动 return、多行显式 return、语法错误、缺参报错）+ 资源只读查询（get_extensions、exists）+ search_tools 检索验证脚本工具可发现。全部为无副作用工具。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "fail_fast",
+    "stages": [
+      {
+        "id": "scripts",
+        "steps": [
+          {
+            "id": "script_execute_single_expression",
+            "tool": "script_execute_gdscript",
+            "args": { "expression": "1 + 1" },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": 2 }
+              ]
+            }
+          },
+          {
+            "id": "script_execute_multiline_return",
+            "tool": "script_execute_gdscript",
+            "args": { "expression": "var x = 40\nreturn x + 2" },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": 42 }
+              ]
+            }
+          },
+          {
+            "id": "script_execute_syntax_error",
+            "tool": "script_execute_gdscript",
+            "args": { "expression": "1 +" },
+            "expect": {
+              "field_checks": [
+                { "key": "error", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "script_execute_missing_expression",
+            "tool": "script_execute_gdscript",
+            "args": {},
+            "expect": {
+              "field_checks": [
+                { "key": "error", "value": "missing required parameter: expression" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "resources",
+        "steps": [
+          {
+            "id": "resource_get_extensions_gdscript",
+            "tool": "resource_get_extensions",
+            "args": { "type": "GDScript" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "resource_exists_nonexistent",
+            "tool": "resource_exists",
+            "args": { "path": "res://__gsd_config_probe_nonexistent__.gd" },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "discovery",
+        "steps": [
+          {
+            "id": "search_tools_script_execute",
+            "tool": "search_tools",
+            "args": { "query": "script_execute_gdscript" },
+            "expect": {
+              "has_keys": ["results"],
+              "field_checks": [
+                { "key": "results", "not_empty": true }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

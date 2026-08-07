@@ -1,36 +1,37 @@
 #include "register_all.hpp"
 #include "core/log_system.hpp"
-#include "tools/property_ops.hpp"
-#include "tools/resource_ops.hpp"
-#include "tools/script_ops.hpp"
-#include "tools/scene_ops.hpp"
-#include <mcp/Content.hpp>
-#include <mcp/JsonValue.hpp>
-#include <unordered_set>
-#include "tools/physics_ops.hpp"
-#include "tools/render_ops.hpp"
-#include "tools/nav_ops.hpp"
 #include "tools/audio_ops.hpp"
+#include "tools/capture_ops.hpp"
 #include "tools/code_exec_ops.hpp"
-#include "tools/input_ops.hpp"
-#include "tools/editor_ops.hpp"
 #include "tools/config_ops.hpp"
 #include "tools/debug_ops.hpp"
+#include "tools/debugger_ops.hpp"
 #include "tools/display_ops.hpp"
 #include "tools/doc_ops.hpp"
+#include "tools/editor_ops.hpp"
+#include "tools/group_ops.hpp"
 #include "tools/input_map_ops.hpp"
+#include "tools/input_ops.hpp"
 #include "tools/log_ops.hpp"
+#include "tools/nav_ops.hpp"
 #include "tools/os_ops.hpp"
+#include "tools/physics_ops.hpp"
+#include "tools/property_ops.hpp"
+#include "tools/render_ops.hpp"
+#include "tools/resource_ops.hpp"
+#include "tools/runtime_ops.hpp"
+#include "tools/scene_ops.hpp"
 #include "tools/scene_tree_ops.hpp"
+#include "tools/schema_builder.hpp"
+#include "tools/script_ops.hpp"
 #include "tools/spriteframes_ops.hpp"
 #include "tools/text_ops.hpp"
 #include "tools/tilemap_ops.hpp"
 #include "tools/tileset_ops.hpp"
-#include "tools/group_ops.hpp"
-#include "tools/capture_ops.hpp"
-#include "tools/debugger_ops.hpp"
-#include "tools/runtime_ops.hpp"
-#include "tools/schema_builder.hpp"
+#include <mcp/Content.hpp>
+#include <mcp/JsonValue.hpp>
+#include <unordered_set>
+
 
 namespace godot_self_driving {
 
@@ -38,65 +39,65 @@ namespace {
 std::unordered_map<std::string, ToolHandler> g_handlers;
 std::unordered_map<std::string, ToolHandler> g_meta_handlers;
 const std::unordered_set<std::string> meta_tool_names = {
-    "ping", "search_tools", "list_categories", "get_tool_detail",
-    "call_tool", "batch_execute", "code_execute"
-};
+    "ping",      "search_tools",  "list_categories", "get_tool_detail",
+    "call_tool", "batch_execute", "code_execute"};
 
 mcp::JsonValue make_schema() {
-    mcp::JsonValue s(mcp::JsonValue::object_tag);
-    s["type"] = mcp::JsonValue("object");
-    mcp::JsonValue props(mcp::JsonValue::object_tag);
-    s["properties"] = std::move(props);
-    mcp::JsonValue req(mcp::JsonValue::array_tag);
-    s["required"] = std::move(req);
-    return s;
+  mcp::JsonValue s(mcp::JsonValue::object_tag);
+  s["type"] = mcp::JsonValue("object");
+  mcp::JsonValue props(mcp::JsonValue::object_tag);
+  s["properties"] = std::move(props);
+  mcp::JsonValue req(mcp::JsonValue::array_tag);
+  s["required"] = std::move(req);
+  return s;
 }
 
-void add_required(mcp::JsonValue& schema, const std::string& name) {
-    auto* req = schema.Find("required");
-    if (req && req->IsArray()) {
-        req->PushBack(mcp::JsonValue(name));
-    }
+void add_required(mcp::JsonValue &schema, const std::string &name) {
+  auto *req = schema.Find("required");
+  if (req && req->IsArray()) {
+    req->PushBack(mcp::JsonValue(name));
+  }
 }
 
-std::vector<std::string> split_tags(const std::string& csv) {
-    if (csv.empty()) return {};
-    std::vector<std::string> result;
-    size_t start = 0, end;
-    while ((end = csv.find(',', start)) != std::string::npos) {
-        result.push_back(csv.substr(start, end - start));
-        start = end + 1;
-    }
-    result.push_back(csv.substr(start));
-    return result;
+std::vector<std::string> split_tags(const std::string &csv) {
+  if (csv.empty())
+    return {};
+  std::vector<std::string> result;
+  size_t start = 0, end;
+  while ((end = csv.find(',', start)) != std::string::npos) {
+    result.push_back(csv.substr(start, end - start));
+    start = end + 1;
+  }
+  result.push_back(csv.substr(start));
+  return result;
 }
 
 enum SchemaType { SCHEMA_NONE, SCHEMA_BASIC };
 
-mcp::JsonValue build_schema_for_none_by_name(const std::string& name) {
-    if (name.rfind("scene_tree_", 0) == 0) {
-        return schema::build_schema({
-            {"group", "string", "Scene group name.", false},
-        });
-    }
+mcp::JsonValue build_schema_for_none_by_name(const std::string &name) {
+  if (name.rfind("scene_tree_", 0) == 0) {
+    return schema::build_schema({
+        {"group", "string", "Scene group name.", false},
+    });
+  }
 
-    if (name.rfind("tilemap_", 0) == 0) {
-        return schema::build_schema({
-            {"node_path", "string", "Path to the TileMap node in the scene.", true},
-        });
-    }
+  if (name.rfind("tilemap_", 0) == 0) {
+    return schema::build_schema({
+        {"node_path", "string", "Path to the TileMap node in the scene.", true},
+    });
+  }
 
-    mcp::JsonValue s(mcp::JsonValue::object_tag);
-    s["type"] = mcp::JsonValue("object");
-    s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
-    return s;
+  mcp::JsonValue s(mcp::JsonValue::object_tag);
+  s["type"] = mcp::JsonValue("object");
+  s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
+  return s;
 }
 
-mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
-    static const std::unordered_map<std::string, mcp::JsonValue> schemas = []{
+mcp::JsonValue build_schema_for(SchemaType type, const std::string &name) {
+  static const std::unordered_map<std::string, mcp::JsonValue> schemas = [] {
         std::unordered_map<std::string, mcp::JsonValue> m;
 
-        // ── Scene ──
+
         m["scene_node_create"] = schema::build_schema({
             {"parent_path", "string", "Parent node path (omit to create root node)", false},
             {"name", "string", "Node name (default: NewNode)", true},
@@ -117,7 +118,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"owner", "boolean", "Set owner so nodes are saved with the scene (default: true)", false},
         });
 
-        // ── SceneTree ──
+
         m["scene_tree_call_group"] = schema::build_schema({
             {"group_name", "string", "Scene group name", true},
             {"method", "string", "Method name to call on group nodes", true},
@@ -144,7 +145,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"paused", "boolean", "Pause state", true},
         });
 
-        // ── Properties ──
+
         m["property_get"] = schema::build_schema({
             {"path", "string", "Node path", true},
             {"property", "string", "Property name", true},
@@ -172,7 +173,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"method", "string", "Method to call on target", true},
         });
 
-        // ── Resources ──
+
         m["resource_load"] = schema::build_schema({
             {"path", "string", "Resource file path", true},
             {"type_hint", "string", "Resource type hint (e.g. PackedScene, Texture2D)", false},
@@ -263,7 +264,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"type_hint", "string", "Type hint (e.g. Vector2, Color, int, float)", false},
         });
 
-        // ── Scripts ──
+
         m["script_execute_gdscript"] = schema::build_schema({
             {"expression", "string", "GDScript expression or code to execute. Single expression auto-returns its value; multi-line code needs an explicit return. print() output appears in the output field, errors in the errors field", true},
         });
@@ -304,7 +305,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"path", "string", "Script file path", true},
         });
 
-        // ── Editor ──
+
         m["editor_get_selection"] = schema::build_schema({});
         m["editor_set_selection"] = schema::build_schema({
             {"paths", "array", "List of node paths to select", true},
@@ -367,7 +368,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
         });
         m["editor_close_scene"] = schema::build_schema({});
 
-        // ── Config ──
+
         m["project_settings_get"] = schema::build_schema({
             {"name", "string", "Project setting name", true},
             {"default", "object", "Default value if setting does not exist", false},
@@ -401,14 +402,14 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"name", "string", "Editor setting name", true},
         });
 
-        // ── Text (file_write) ──
+
         m["file_write"] = schema::build_schema({
             {"path", "string", "File path to write", true},
             {"content", "string", "Content to write", true},
             {"mode", "string", "Write mode: WRITE or APPEND (default: WRITE)", false},
         });
 
-        // ── Text (explicit) ──
+
         m["text_create_font"] = schema::build_schema({});
         m["text_create_shaped_text"] = schema::build_schema({
             {"direction", "integer", "Text direction: 0=auto, 1=ltr, 2=rtl (default: 0)", false},
@@ -449,7 +450,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"shaped_rid", "integer", "RID of the shaped text (from text_create_shaped_text)", true},
         });
 
-        // ── Group ──
+
         m["group_add_node_to_group"] = schema::build_schema({
             {"node_path", "string", "Path to the scene node", true},
             {"group_name", "string", "Group name to add the node to", true},
@@ -463,12 +464,12 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"group_name", "string", "Group name to check", true},
         });
 
-        // ── Capture ──
+
         m["editor_capture_viewport"] = schema::build_schema({
             {"target", "string", "Target to capture: \"editor\" (default); \"game\" is not supported yet", false},
         });
 
-        // ── InputMap ──
+
         m["input_map_add_action"] = schema::build_schema({
             {"action", "string", "Action name identifier (e.g. \"mario_jump\", \"move_left\", \"ui_accept\") — this is a programmatic identifier, not a display name", true},
             {"deadzone", "number", "Deadzone value (default: 0.5)", false},
@@ -496,7 +497,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"actions", "array", "Action whitelist (array of action name strings); when omitted, actions prefixed with \"ui_\" or containing \"/\" are filtered out", false},
         });
 
-        // ── Input (explicit schemas) ──
+
         m["input_action_press"] = schema::build_schema({
             {"action", "string", "Input action name to press", true},
             {"strength", "number", "Action strength (default: 1.0)", false},
@@ -536,7 +537,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"duration", "number", "Vibration duration in seconds", false},
         });
 
-        // ── Physics (explicit) ──
+
         m["physics_2d_ray_cast"] = schema::build_schema({
             {"space_rid", "integer", "RID of the 2D physics space (omit to auto-detect from editor scene)", false},
             {"from", "object", "Ray origin (Vector2 with x and y fields)", true},
@@ -634,7 +635,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"data", "object", "Shape data (e.g. {\"radius\": 10})", true},
         });
 
-        // ── Physics 3D (explicit) ──
+
         m["physics_3d_space_get_direct_state"] = schema::build_schema({
             {"space_rid", "integer", "RID of the 3D physics space", true},
         });
@@ -809,7 +810,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"object_id", "integer", "Object instance ID (ObjectID) to resolve", true},
         });
 
-        // ── Navigation (explicit) ──
+
         m["nav_2d_map_create"] = schema::build_schema({
             {"active", "boolean", "Set the map active (default: false)", false},
         });
@@ -890,7 +891,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"height", "number", "Obstacle height", false},
         });
 
-        // ── Render (explicit) ──
+
         m["canvas_item_create"] = schema::build_schema({});
         m["canvas_item_draw_rect"] = schema::build_schema({
             {"canvas_item_rid", "integer", "RID of the canvas item", true},
@@ -1123,7 +1124,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"rid", "integer", "RID to resolve", true},
         });
 
-        // ── Audio (explicit) ──
+
         m["audio_stream_play"] = schema::build_schema({
             {"node_path", "string", "Path to the AudioStreamPlayer node", true},
             {"stream_path", "string", "Path to an audio resource file (.ogg, .mp3, .wav) to load and play", false},
@@ -1189,7 +1190,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"device", "string", "Audio input device name", true},
         });
 
-        // ── Debugger / Output ──
+
         m["output_get_log"] = schema::build_schema({
             {"limit", "integer", "Maximum number of log entries to return (default: 50)", false},
         });
@@ -1206,7 +1207,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
         });
         m["debugger_get_session_info"] = schema::build_schema({});
 
-        // ── Game (runtime debug channel) ──
+
         m["game_status"] = schema::build_schema({
             {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 30000), 返回字段含 paused（SceneTree 暂停状态）与 physics_frame（物理帧计数），用于区分假运行", false},
         });
@@ -1247,12 +1248,12 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 30000)", false},
         });
 
-        // ── System ──
+
         m["log_get_game_entries"] = schema::build_schema({
             {"limit", "integer", "Maximum number of log entries to return (default: 50)", false},
         });
 
-        // ── Debug (explicit) ──
+
         m["debug_print"] = schema::build_schema({
             {"message", "string", "Debug log message to print", true},
         });
@@ -1297,7 +1298,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
         m["debug_query_memory_usage"] = schema::build_schema({});
         m["debug_query_node_count"] = schema::build_schema({});
 
-        // ── Display (explicit) ──
+
         m["display_clipboard_get"] = schema::build_schema({});
         m["display_clipboard_set"] = schema::build_schema({
             {"text", "string", "Text to copy to the clipboard", true},
@@ -1377,7 +1378,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"window_id", "integer", "Window ID (default: main window)", false},
         });
 
-        // ── OS (explicit) ──
+
         m["os_alert"] = schema::build_schema({
             {"text", "string", "Alert message text", true},
             {"title", "string", "Alert dialog title (default: Alert!)", false},
@@ -1417,7 +1418,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"uri", "string", "URL or file path to open with the default application", true},
         });
 
-        // ── Docs (explicit) ──
+
         m["doc_get_class"] = schema::build_schema({
             {"class", "string", "Godot class name", true},
         });
@@ -1433,7 +1434,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"property", "string", "Property name to look up documentation for", true},
         });
 
-        // ── TileMap (explicit schemas) ──
+
         m["tilemap_create"] = schema::build_schema({
             {"name", "string", "TileMap node name (default: TileMap)", false},
             {"tile_size", "integer", "Tile size in pixels (default: 16)", false},
@@ -1479,7 +1480,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"polygon", "array", "Collision polygon points (Array of {x,y}), each point is relative to the TILE CENTER (e.g. for tile_size=16 use (-8,-8)-(8,8) for full-tile collision; (0,0)-(16,16) starts at the center and overhangs)", true},
         });
 
-        // ── SpriteFrames ──
+
         m["spriteframes_create"] = schema::build_schema({
             {"name", "string", "Resource name used as memory:// reference", true},
         });
@@ -1498,13 +1499,13 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
             {"vframes", "integer", "Vertical frame count for spritesheet splitting (default: 1)", false},
         });
 
-        // ── Batch (for catalog discoverability) ──
+
         m["batch_execute"] = schema::build_schema({
             {"operations", "array", "Ordered list of operations to execute", true},
             {"stop_on_error", "boolean", "Stop on first error (default: true)", false},
         });
 
-        // ── Meta-tools (for catalog discoverability) ──
+
         m["call_tool"] = schema::build_schema({
             {"name", "string", "Tool name to execute", true},
             {"arguments", "object", "Tool arguments as JSON object", false},
@@ -1532,7 +1533,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string& name) {
     return s;
 }
 
-} // namespace
+}
 
 mcp::JsonValue call_handler(const std::string& name, const mcp::JsonValue& args) {
     auto it = g_handlers.find(name);
@@ -1564,7 +1565,7 @@ mcp::JsonValue call_handler(const std::string& name, const mcp::JsonValue& args)
 }
 
 void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog& catalog, Bm25Index& index, int port) {
-    // ── 1. system_status handler (inline — unique lambda captures port/start) ──
+
     g_handlers["system_status"] = [port, start = std::chrono::steady_clock::now()](const mcp::JsonValue&) -> mcp::JsonValue {
         auto uptime = std::chrono::duration_cast<std::chrono::seconds>(
             std::chrono::steady_clock::now() - start).count();
@@ -1578,17 +1579,16 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         return r;
     };
 
-    // ── 2. Populate handler registry via X-macro ──
-    #define TOOL_ENTRY(id, name_str, desc, cat, tags_csv, handler_fn, schema_type) \
-        g_handlers[name_str] = handler_fn;
-    #include "tool_defs.def"
-    #undef TOOL_ENTRY
+#define TOOL_ENTRY(id, name_str, desc, cat, tags_csv, handler_fn, schema_type) \
+  g_handlers[name_str] = handler_fn;
+#include "tool_defs.def"
+#undef TOOL_ENTRY
 
-    // ── 3. Populate catalog defaults ──
+
     catalog.populate_default_tools();
 
-    // ── 4. Register directly-called meta-tools ──
-    // ping
+
+
     {
         mcp::ToolOptions opts;
         opts.Description("Health check ping");
@@ -1604,7 +1604,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
             });
     }
 
-    // search_tools
+
     {
         mcp::JsonValue s(mcp::JsonValue::object_tag);
         s["type"] = mcp::JsonValue("object");
@@ -1688,7 +1688,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
             });
     }
 
-    // list_categories
+
     {
         mcp::JsonValue s(mcp::JsonValue::object_tag);
         s["type"] = mcp::JsonValue("object");
@@ -1727,7 +1727,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
             });
     }
 
-    // get_tool_detail
+
     {
         mcp::JsonValue s(mcp::JsonValue::object_tag);
         s["type"] = mcp::JsonValue("object");
@@ -1784,7 +1784,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
             });
     }
 
-    // call_tool — single entry point for all non-meta tools
+
     {
         mcp::JsonValue s(mcp::JsonValue::object_tag);
         s["type"] = mcp::JsonValue("object");
@@ -1856,7 +1856,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
             });
     }
 
-    // batch_execute
+
     {
         mcp::JsonValue s(mcp::JsonValue::object_tag);
         s["type"] = mcp::JsonValue("object");
@@ -1910,7 +1910,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
             });
     }
 
-    // code_execute
+
     {
         mcp::JsonValue s(mcp::JsonValue::object_tag);
         s["type"] = mcp::JsonValue("object");
@@ -1960,13 +1960,13 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
             });
     }
 
-    // ── 5. Catalog entries via X-macro ──
-    #define TOOL_ENTRY(id, name_str, desc, cat, tags_csv, handler_fn, schema_type) \
-        catalog.add_tool({name_str, desc, cat, split_tags(tags_csv), build_schema_for(schema_type, name_str)});
-    #include "tool_defs.def"
-    #undef TOOL_ENTRY
+#define TOOL_ENTRY(id, name_str, desc, cat, tags_csv, handler_fn, schema_type) \
+  catalog.add_tool({name_str, desc, cat, split_tags(tags_csv),                 \
+                    build_schema_for(schema_type, name_str)});
+#include "tool_defs.def"
+#undef TOOL_ENTRY
 
-    // ── 6. Populate meta handlers (for call_handler fallback) ──
+
     g_meta_handlers["ping"] = [](const mcp::JsonValue&) -> mcp::JsonValue {
         mcp::JsonValue r(mcp::JsonValue::object_tag);
         r["result"] = mcp::JsonValue("pong");
@@ -2066,7 +2066,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         return code_exec_ops::handle_code_execute(args);
     };
 
-    // ── 7. Register meta-tools in catalog for discoverability ──
+
     if (catalog.get_tool("batch_execute") == nullptr) {
         catalog.add_tool({"batch_execute",
             "Execute multiple tools in batch. Each operation runs in sequence; if stop_on_error is true and any operation fails, remaining operations are skipped.",
@@ -2089,7 +2089,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         });
     }
 
-    // ── 8. Populate BM25 index ──
+
     for (auto* tool : catalog.get_all_tools()) {
         index.add_entry(tool->name, tool->description, tool->category, tool->tags);
     }
@@ -2098,7 +2098,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
         std::to_string(count) + " tools registered via catalog");
 
-    // ── 9. Sync check: g_handlers vs catalog ──
+
     int missing_from_catalog = 0;
     for (auto& [name, _] : g_handlers) {
         if (catalog.get_tool(name) == nullptr) {
@@ -2113,7 +2113,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
             std::to_string(missing_from_catalog) + " handlers auto-added to catalog");
     }
 
-    // Reverse sync check: catalog → g_handlers
+
     for (auto* ctool : catalog.get_all_tools()) {
         if (g_handlers.find(ctool->name) == g_handlers.end() && meta_tool_names.find(ctool->name) == meta_tool_names.end()) {
             LogSystem::instance().log(LogLevel::Error, LogCategory::Tools,
@@ -2122,4 +2122,4 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
     }
 }
 
-} // namespace godot_self_driving
+}

@@ -6,9 +6,9 @@
 namespace godot_self_driving {
 namespace log_ops {
 
-mcp::JsonValue handle_log_get_game_entries(const mcp::JsonValue& args);
+mcp::JsonValue handle_log_get_game_entries(const mcp::JsonValue &args);
 
-} // namespace log_ops
+}
 } // namespace godot_self_driving
 
 #endif

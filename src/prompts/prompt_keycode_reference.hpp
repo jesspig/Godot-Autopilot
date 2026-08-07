@@ -7,6 +7,6 @@ namespace godot_self_driving {
 
 std::string prompt_keycode_reference();
 
-} // namespace godot_self_driving
+}
 
 #endif

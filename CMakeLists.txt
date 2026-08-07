@@ -114,3 +114,12 @@ if(MSVC)
     target_link_options(godot-self-driving PRIVATE "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>")
 endif()
 
+# ====================================================================
+# 测试基础设施 (默认关闭, 显式 -DGSD_ENABLE_TESTS=ON 启用)
+# ====================================================================
+option(GSD_ENABLE_TESTS "Enable tests" OFF)
+if(GSD_ENABLE_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
+

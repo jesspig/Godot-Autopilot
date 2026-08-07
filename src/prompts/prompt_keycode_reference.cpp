@@ -3,7 +3,7 @@
 namespace godot_self_driving {
 
 std::string prompt_keycode_reference() {
-    return R"gsd(# Godot 按键码与 Variant 类型参考
+  return R"gsd(# Godot 按键码与 Variant 类型参考
 
 本文档提供 `input_map_action_add_event` 所需的按键码（keycode）和 Godot Variant 类型在 JSON 中的表示方式。
 

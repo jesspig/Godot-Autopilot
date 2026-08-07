@@ -3,7 +3,7 @@
 namespace godot_self_driving {
 
 std::string prompt_tool_usage() {
-    return R"gsd(# 常用工具使用示例
+  return R"gsd(# 常用工具使用示例
 
 本文档提供了 19 个最常用 MCP 工具的详细使用示例，包含输入输出格式和注意事项。
 

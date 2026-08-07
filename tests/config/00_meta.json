@@ -1,0 +1,188 @@
+{
+  "name": "meta_tools",
+  "description": "迁移自 tests/integration/meta_tools_test.cpp 的 15 个用例：ping/search_tools/list_categories/get_tool_detail/call_tool/batch_execute/code_execute 元工具语义验证（全部无持久副作用）",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "stages": [
+      {
+        "id": "main",
+        "steps": [
+          {
+            "id": "ping_ok",
+            "tool": "ping",
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "pong" }
+              ]
+            }
+          },
+          {
+            "id": "search_keyword",
+            "tool": "search_tools",
+            "args": { "query": "scene_node_create" },
+            "expect": {
+              "has_keys": ["results"],
+              "field_checks": [
+                { "key": "results", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "search_category",
+            "tool": "search_tools",
+            "args": { "query": "scene_node_create", "category": "Scene" },
+            "expect": {
+              "has_keys": ["results"],
+              "field_checks": [
+                { "key": "results", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "search_tags",
+            "tool": "search_tools",
+            "args": { "query": "scene_node_create", "tags": ["node"] },
+            "expect": {
+              "has_keys": ["results"],
+              "field_checks": [
+                { "key": "results", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "list_categories",
+            "tool": "list_categories",
+            "expect": {
+              "has_keys": ["categories"],
+              "field_checks": [
+                { "key": "categories", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "detail_existing",
+            "tool": "get_tool_detail",
+            "args": { "name": "scene_node_create" },
+            "expect": {
+              "field_checks": [
+                { "key": "tool.name", "value": "scene_node_create" },
+                { "key": "tool.description", "not_empty": true },
+                { "key": "tool.category", "not_empty": true },
+                { "key": "tool.tags", "not_empty": true },
+                { "key": "tool.input_schema", "not_empty": true },
+                { "key": "tool.input_schema.type", "value": "object" }
+              ]
+            }
+          },
+          {
+            "id": "detail_missing",
+            "tool": "get_tool_detail",
+            "args": { "name": "no_such_tool_xyz" },
+            "expect": {
+              "field_checks": [
+                { "key": "error", "value": "tool not found: no_such_tool_xyz" }
+              ]
+            }
+          },
+          {
+            "id": "detail_missing_param",
+            "tool": "get_tool_detail",
+            "args": {},
+            "expect": {
+              "field_checks": [
+                { "key": "error", "value": "missing required parameter: name" }
+              ]
+            }
+          },
+          {
+            "id": "call_unknown_tool",
+            "tool": "call_tool",
+            "args": { "name": "no_such_tool_xyz", "arguments": {} },
+            "expect": {
+              "field_checks": [
+                { "key": "error", "value": "domain tool 'no_such_tool_xyz' not found — use search_tools to discover available tools" }
+              ]
+            }
+          },
+          {
+            "id": "call_missing_name",
+            "tool": "call_tool",
+            "args": {},
+            "expect": {
+              "field_checks": [
+                { "key": "error", "value": "missing required parameter: name" }
+              ]
+            }
+          },
+          {
+            "id": "batch_sequential",
+            "tool": "batch_execute",
+            "args": {
+              "operations": [
+                { "tool": "ping", "args": {} },
+                { "tool": "list_categories", "args": {} }
+              ]
+            },
+            "expect": {
+              "has_keys": ["results", "succeeded", "failed"],
+              "field_checks": [
+                { "key": "results", "not_empty": true },
+                { "key": "succeeded", "value": 2 },
+                { "key": "failed", "value": 0 }
+              ]
+            }
+          },
+          {
+            "id": "batch_unknown_tool",
+            "tool": "batch_execute",
+            "args": {
+              "operations": [
+                { "tool": "no_such_tool_xyz", "args": {} }
+              ]
+            },
+            "expect": {
+              "has_keys": ["results", "succeeded", "failed"],
+              "field_checks": [
+                { "key": "results", "not_empty": true },
+                { "key": "succeeded", "value": 0 },
+                { "key": "failed", "value": 1 }
+              ]
+            }
+          },
+          {
+            "id": "code_return_value",
+            "tool": "code_execute",
+            "args": { "source_code": "return 21 * 2" },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": 42 },
+                { "key": "execution_time_ms", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "code_syntax_error",
+            "tool": "code_execute",
+            "args": { "source_code": "var x =" },
+            "expect": {
+              "field_checks": [
+                { "key": "error", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "code_missing_source",
+            "tool": "code_execute",
+            "args": {},
+            "expect": {
+              "field_checks": [
+                { "key": "error", "value": "missing required parameter: source_code" }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
