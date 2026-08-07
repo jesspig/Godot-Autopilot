@@ -6,6 +6,8 @@
 Usage:
     uv run build.py                    # Debug 构建并部署
     uv run build.py --release          # 清理 + Release 构建并部署
+    uv run build.py --release --package  # Release 构建并打包 dist/
+    uv run build.py --package          # 打包已部署的 addons
 """
 
 import argparse
@@ -28,6 +30,8 @@ PLATFORM_LIBS: dict[str, str] = {
 }
 
 PLATFORM_PDB = "godot-self-driving.pdb"
+
+ADDON_VERSION = "0.1.0"
 
 
 def _run(cmd: list[str], cwd: Path | None = None) -> bool:
@@ -101,6 +105,53 @@ def _deploy(preset: str) -> None:
             size_kb = pdb_src.stat().st_size / 1024
             print(f"  {PLATFORM_PDB}  ({size_kb:.0f} KB)", flush=True)
     print(f"  -> {EXAMPLE_ADDON_DIR}", flush=True)
+    _validate_addon_integrity()
+
+
+def _validate_addon_integrity() -> None:
+    system = platform.system().lower()
+    platform_key = {"windows": "windows", "linux": "linux", "darwin": "macos"}.get(system)
+    if not platform_key:
+        print(f"[ERROR] Unsupported platform: {system}", flush=True)
+        sys.exit(1)
+    gdextension_path = EXAMPLE_ADDON_DIR / "godot-self-driving.gdextension"
+    content = gdextension_path.read_text(encoding="utf-8")
+    in_libraries = False
+    missing = []
+    for line in content.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("["):
+            in_libraries = stripped == "[libraries]"
+        elif in_libraries and "=" in stripped:
+            key, _, value = stripped.partition("=")
+            if key.split(".", 1)[0] == platform_key:
+                res_path = value.strip().strip('"')
+                disk_path = EXAMPLE_DIR / res_path.removeprefix("res://")
+                if not disk_path.exists():
+                    missing.append(res_path)
+    if missing:
+        for res_path in missing:
+            print(
+                f"[ERROR] Incomplete addon: {res_path} missing; export will fail in host projects",
+                flush=True,
+            )
+        sys.exit(1)
+
+
+def _package_addon() -> None:
+    if not EXAMPLE_ADDON_DIR.exists():
+        print("[ERROR] Addons not deployed; run a build first (e.g. uv run build.py)", flush=True)
+        sys.exit(1)
+    dist_dir = PROJECT_ROOT / "dist"
+    dist_dir.mkdir(exist_ok=True)
+    zip_path = shutil.make_archive(
+        str(dist_dir / f"godot-self-driving-{ADDON_VERSION}"),
+        "zip",
+        root_dir=EXAMPLE_DIR,
+        base_dir="addons/godot-self-driving",
+    )
+    size_kb = Path(zip_path).stat().st_size / 1024
+    print(f"[PACKAGE] {zip_path} ({size_kb:.0f} KB)", flush=True)
 
 
 def _clean() -> None:
@@ -117,11 +168,17 @@ def main():
     parser = argparse.ArgumentParser(description="Godot-Self-Driving build & deploy")
     parser.add_argument("--release", action="store_true", help="Release build (default: Debug)")
     parser.add_argument("--debug", action="store_true", help="Debug build (default)")
+    parser.add_argument("--package", action="store_true", help="Package addons as dist/godot-self-driving-<version>.zip")
     args = parser.parse_args()
 
     if args.release and args.debug:
         print("[ERROR] Cannot specify both --release and --debug", flush=True)
         sys.exit(1)
+
+    if args.package and not args.release and not args.debug:
+        print("[PACKAGE] Packaging existing addons...", flush=True)
+        _package_addon()
+        return
 
     config = "Release" if args.release else "Debug"
     preset = "release" if args.release else "debug"
@@ -137,6 +194,9 @@ def main():
 
     print(f"\n[DEPLOY] Copying artifacts to example/addons/...", flush=True)
     _deploy(preset)
+
+    if args.package:
+        _package_addon()
 
     print(f"\n[DONE] Build + deploy complete.", flush=True)
 
