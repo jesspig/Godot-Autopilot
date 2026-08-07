@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <unordered_set>
 
 namespace godot_self_driving {
 
@@ -100,17 +101,31 @@ std::vector<Bm25Result> Bm25Index::search(const SearchQuery &query) const {
 
   std::unordered_map<std::string, size_t> df;
   for (const auto &qt : query_tokens) {
-    size_t count = 0;
-    for (size_t idx : candidates) {
-      const auto &tokens = docs_[idx].tokens;
-      if (std::find(tokens.begin(), tokens.end(), qt) != tokens.end()) {
-        ++count;
+    df[qt] = 0;
+  }
+  std::unordered_set<std::string> unique_query_tokens(query_tokens.begin(),
+                                                      query_tokens.end());
+  for (size_t idx : candidates) {
+    const auto &tokens = docs_[idx].tokens;
+    std::unordered_set<std::string> unique_doc_tokens(tokens.begin(),
+                                                      tokens.end());
+    for (const auto &qt : unique_query_tokens) {
+      if (unique_doc_tokens.find(qt) != unique_doc_tokens.end()) {
+        ++df[qt];
       }
     }
-    df[qt] = count;
   }
 
   size_t N = candidates.size();
+
+  double avg_dl = 0.0;
+  for (const auto &d : docs_) {
+    avg_dl += static_cast<double>(d.tokens.size());
+  }
+  avg_dl = docs_.empty() ? 1.0 : avg_dl / static_cast<double>(docs_.size());
+  if (avg_dl == 0.0) {
+    avg_dl = 1.0;
+  }
 
   auto compact = [](const std::string &text) {
     std::string out;
@@ -126,7 +141,7 @@ std::vector<Bm25Result> Bm25Index::search(const SearchQuery &query) const {
   std::vector<Bm25Result> results;
   results.reserve(candidates.size());
   for (size_t idx : candidates) {
-    double score = compute_bm25(query_tokens, docs_[idx], N, df);
+    double score = compute_bm25(query_tokens, docs_[idx], N, df, avg_dl);
 
     if (!query_compact.empty()) {
       const std::string name_compact = compact(docs_[idx].name);
@@ -173,18 +188,10 @@ size_t Bm25Index::size() const {
 double Bm25Index::compute_bm25(
     const std::vector<std::string> &query_tokens, const Document &doc,
     size_t total_docs,
-    const std::unordered_map<std::string, size_t> &df) const {
+    const std::unordered_map<std::string, size_t> &df,
+    double avg_dl) const {
   if (total_docs == 0) {
     return 0.0;
-  }
-
-  double avg_dl = 0.0;
-  for (const auto &d : docs_) {
-    avg_dl += static_cast<double>(d.tokens.size());
-  }
-  avg_dl = docs_.empty() ? 1.0 : avg_dl / static_cast<double>(docs_.size());
-  if (avg_dl == 0.0) {
-    avg_dl = 1.0;
   }
 
   double doc_len = static_cast<double>(doc.tokens.size());

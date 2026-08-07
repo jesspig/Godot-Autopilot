@@ -46,7 +46,8 @@ private:
   std::vector<std::string> tokenize(const std::string &text) const;
   double compute_bm25(const std::vector<std::string> &query_tokens,
                       const Document &doc, size_t total_docs,
-                      const std::unordered_map<std::string, size_t> &df) const;
+                      const std::unordered_map<std::string, size_t> &df,
+                      double avg_dl) const;
 
   std::vector<Document> docs_;
   mutable std::mutex mutex_;
