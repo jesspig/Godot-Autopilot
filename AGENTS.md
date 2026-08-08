@@ -40,7 +40,7 @@
 - **日志类别**（仅此几个）：`System`、`Transport`、`Tools`、`Resources`、`Prompts`
 - **编译器**：优先 Clang/clang-cl，自动检测；MSVC/GCC 回退
 - **优化**：自动 sccache/ccache、LTO（Release 使用 ThinLTO/LTCG/IPO）、Unity 构建、Ninja 作业池 — 均根据硬件自适应，可通过 `GSD_COMPILE_JOBS` / `GSD_LINK_JOBS` 等环境变量覆盖
-- **依赖**：godot-cpp 10.0.0-rc1、mcp-cpp-sdk 0.2.1 — 使用 FetchContent，不依赖子模块
+- **依赖**：godot-cpp 10.0.0-rc1、mcp-cpp-sdk 0.2.2 — 使用 FetchContent，不依赖子模块
 
 ## 测试
 

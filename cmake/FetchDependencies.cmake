@@ -21,7 +21,7 @@ FetchContent_MakeAvailable(godot-cpp)
 # ====================================================================
 FetchContent_Declare(mcp-cpp-sdk
     GIT_REPOSITORY https://github.com/jesspig/modelcontextprotocol-cpp-sdk.git
-    GIT_TAG        0.2.1
+    GIT_TAG        0.2.2
     GIT_SHALLOW    TRUE)
 FetchContent_MakeAvailable(mcp-cpp-sdk)
 
