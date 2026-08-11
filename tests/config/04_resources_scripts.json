@@ -67,7 +67,7 @@
           {
             "id": "resource_exists_nonexistent",
             "tool": "resource_exists",
-            "args": { "path": "res://__gsd_config_probe_nonexistent__.gd" },
+            "args": { "path": "res://__gda_config_probe_nonexistent__.gd" },
             "expect": {
               "field_checks": [
                 { "key": "result", "value": false }

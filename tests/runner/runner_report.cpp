@@ -13,7 +13,7 @@
 #include <utility>
 #include <vector>
 
-namespace gsd_test {
+namespace gda_test {
 
 namespace {
 
@@ -172,4 +172,4 @@ std::string save_json_report(const std::vector<FileResult>& results, const std::
     return file_path;
 }
 
-}  // namespace gsd_test
+}  // namespace gda_test

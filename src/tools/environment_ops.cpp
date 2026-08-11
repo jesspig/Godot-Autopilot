@@ -8,7 +8,7 @@
 #include <mcp/JsonValue.hpp>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace render_ops {
 
 using JV = mcp::JsonValue;
@@ -448,4 +448,4 @@ JV handle_environment_set_volumetric_fog(const JV &args) {
 }
 
 } // namespace render_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

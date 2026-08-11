@@ -2,7 +2,7 @@
 
 #include "core/config.hpp"
 #include "core/log_system.hpp"
-#include "gsd_protocol.hpp"
+#include "gda_protocol.hpp"
 #include "util/error_util.hpp"
 #include <cstdio>
 #include <functional>
@@ -34,7 +34,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace runtime {
 namespace game_bridge {
 
@@ -73,7 +73,7 @@ godot::Node *resolve_node(const std::string &node_path) {
 
 namespace {
 
-godot::String gsd_string(const std::string_view &sv) {
+godot::String gda_string(const std::string_view &sv) {
   return godot::String(std::string(sv).c_str());
 }
 
@@ -103,7 +103,7 @@ uint64_t g_error_seq = 0;
 void push_game_output(const std::string &text, int type) {
   std::lock_guard<std::mutex> lock(g_buffer_mtx);
   g_output_buffer.push_back({text, type});
-  if (g_output_buffer.size() > GSD_OUTPUT_BUFFER_MAX) {
+  if (g_output_buffer.size() > GDA_OUTPUT_BUFFER_MAX) {
     g_output_buffer.erase(g_output_buffer.begin());
   }
 }
@@ -122,7 +122,7 @@ void push_game_error(const std::string &file, const std::string &func, int line,
        static_cast<int>((time / 1000) % 60), static_cast<int>(time % 1000),
        file, func, line, error, descr, is_warning, std::move(stack),
        ++g_error_seq});
-  if (g_error_buffer.size() > GSD_ERROR_BUFFER_MAX) {
+  if (g_error_buffer.size() > GDA_ERROR_BUFFER_MAX) {
     g_error_buffer.erase(g_error_buffer.begin());
   }
 }
@@ -167,8 +167,8 @@ EvalErrorDelta eval_error_delta(uint64_t since_seq) {
 }
 
 std::string truncate_error_text(const std::string &text) {
-  if (text.size() > GSD_EVAL_TRUNCATE_BYTES) {
-    return text.substr(0, GSD_EVAL_TRUNCATE_BYTES) + "\n...(truncated, total " +
+  if (text.size() > GDA_EVAL_TRUNCATE_BYTES) {
+    return text.substr(0, GDA_EVAL_TRUNCATE_BYTES) + "\n...(truncated, total " +
            std::to_string(text.size()) + " bytes)";
   }
   return text;
@@ -219,14 +219,14 @@ public:
 };
 
 void append_activity_fields(JV &r) {
-  r[GSD_FIELD_LAST_ACTIVITY_MS] = JV(static_cast<int64_t>(g_last_activity_ms));
+  r[GDA_FIELD_LAST_ACTIVITY_MS] = JV(static_cast<int64_t>(g_last_activity_ms));
   bool healthy = true;
   if (g_last_activity_ms != 0 && godot::Time::get_singleton()) {
     uint64_t now_ms = godot::Time::get_singleton()->get_ticks_msec();
     healthy = (now_ms - g_last_activity_ms) <
-              static_cast<uint64_t>(GSD_HEALTHY_ACTIVITY_THRESHOLD_MS);
+              static_cast<uint64_t>(GDA_HEALTHY_ACTIVITY_THRESHOLD_MS);
   }
-  r[GSD_FIELD_HEALTHY] = JV(healthy);
+  r[GDA_FIELD_HEALTHY] = JV(healthy);
 }
 
 JV op_status() {
@@ -269,7 +269,7 @@ JV op_ping() {
 }
 
 JV op_cancel(const JV &params) {
-  auto *rid_p = params.Find(GSD_FIELD_REQUEST_ID);
+  auto *rid_p = params.Find(GDA_FIELD_REQUEST_ID);
   if (!rid_p || !rid_p->IsInt()) {
     return error_result("cancel requires request_id (integer)");
   }
@@ -277,7 +277,7 @@ JV op_cancel(const JV &params) {
   JV r(JV::object_tag);
   auto it = g_cancel_handlers.find(target);
   if (it == g_cancel_handlers.end()) {
-    r[GSD_FIELD_CANCELLED] = JV(false);
+    r[GDA_FIELD_CANCELLED] = JV(false);
     r["reason"] =
         JV("no pending operation for request_id " + std::to_string(target));
     return r;
@@ -286,7 +286,7 @@ JV op_cancel(const JV &params) {
   std::function<void()> handler = std::move(it->second);
   g_cancel_handlers.erase(it);
   handler();
-  r[GSD_FIELD_CANCELLED] = JV(true);
+  r[GDA_FIELD_CANCELLED] = JV(true);
   return r;
 }
 
@@ -302,7 +302,7 @@ JV op_capture(int64_t request_id) {
     return error_result("failed to read viewport texture");
   }
   std::string path = util::to_std(godot::OS::get_singleton()->get_cache_dir()) +
-                     "/gsd_capture_" + std::to_string(request_id) + ".png";
+                     "/gda_capture_" + std::to_string(request_id) + ".png";
   godot::Error save_err = image->save_png(godot::String(path.c_str()));
   if (save_err != godot::OK) {
     return error_result("save_png failed (ERR code " +
@@ -425,12 +425,12 @@ class GameBridgeListener : public godot::RefCounted {
 
 protected:
   static void _bind_methods() {
-    godot::ClassDB::bind_method(godot::D_METHOD("on_gsd_message"),
-                                &GameBridgeListener::on_gsd_message);
+    godot::ClassDB::bind_method(godot::D_METHOD("on_gda_message"),
+                                &GameBridgeListener::on_gda_message);
   }
 
 public:
-  bool on_gsd_message(const godot::String &p_message,
+  bool on_gda_message(const godot::String &p_message,
                       const godot::Array &p_data) {
     (void)p_message;
     g_last_activity_ms = godot::Time::get_singleton()
@@ -441,58 +441,58 @@ public:
     std::string req_str = util::to_std(godot::String(p_data[0]));
     JV request = JV::Parse(req_str);
     if (!request.IsObject()) {
-      push_game_error("game_bridge.cpp", "on_gsd_message", 0,
-                      "malformed gsd request", req_str.substr(0, 200), false,
+      push_game_error("game_bridge.cpp", "on_gda_message", 0,
+                      "malformed gda request", req_str.substr(0, 200), false,
                       {});
-      push_game_output("malformed gsd request: " + req_str.substr(0, 200), 1);
+      push_game_output("malformed gda request: " + req_str.substr(0, 200), 1);
       return true;
     }
 
     int64_t request_id = 0;
-    if (auto *rid = request.Find(GSD_FIELD_REQUEST_ID)) {
+    if (auto *rid = request.Find(GDA_FIELD_REQUEST_ID)) {
       if (rid->IsInt())
         request_id = rid->GetInt();
     }
     std::string op;
-    if (auto *op_p = request.Find(GSD_FIELD_OP)) {
+    if (auto *op_p = request.Find(GDA_FIELD_OP)) {
       if (op_p->IsString())
         op = op_p->GetString();
     }
     JV params(JV::object_tag);
-    if (auto *params_p = request.Find(GSD_FIELD_PARAMS)) {
+    if (auto *params_p = request.Find(GDA_FIELD_PARAMS)) {
       if (params_p->IsObject())
         params = *params_p;
     }
 
     JV body;
-    if (op == GSD_OP_STATUS)
+    if (op == GDA_OP_STATUS)
       body = op_status();
-    else if (op == GSD_OP_PING)
+    else if (op == GDA_OP_PING)
       body = op_ping();
-    else if (op == GSD_OP_CANCEL)
+    else if (op == GDA_OP_CANCEL)
       body = op_cancel(params);
-    else if (op == GSD_OP_EVAL)
+    else if (op == GDA_OP_EVAL)
       body = op_eval(params, request_id);
-    else if (op == GSD_OP_INPUT)
+    else if (op == GDA_OP_INPUT)
       body = op_input(params, request_id);
-    else if (op == GSD_OP_INPUT_WAIT)
+    else if (op == GDA_OP_INPUT_WAIT)
       body = op_input_wait(params, request_id);
-    else if (op == GSD_OP_INPUT_STATUS)
+    else if (op == GDA_OP_INPUT_STATUS)
       body = op_input_status(params);
-    else if (op == GSD_OP_CAPTURE)
+    else if (op == GDA_OP_CAPTURE)
       body = op_capture(request_id);
-    else if (op == GSD_OP_GET_ERRORS)
+    else if (op == GDA_OP_GET_ERRORS)
       body = op_get_errors(params);
-    else if (op == GSD_OP_GET_OUTPUT)
+    else if (op == GDA_OP_GET_OUTPUT)
       body = op_get_output(params);
-    else if (op == GSD_OP_GET_TREE)
+    else if (op == GDA_OP_GET_TREE)
       body = op_get_tree();
     else
       body = error_result("unknown op: " + op);
 
     if (body.Contains("error")) {
       std::string err_text = body["error"].GetString();
-      push_game_error("game_bridge.cpp", "on_gsd_message", 0,
+      push_game_error("game_bridge.cpp", "on_gda_message", 0,
                       "op '" + op + "' failed: " + err_text, "", false, {});
       push_game_output("op " + op + " error: " + err_text, 1);
     }
@@ -516,7 +516,7 @@ void send_response(int64_t request_id, JV body) {
   godot::Array payload;
   payload.push_back(godot::String(body.Dump().c_str()));
   if (auto *dbg = godot::EngineDebugger::get_singleton()) {
-    dbg->send_message(gsd_string(GSD_MSG_RESPONSE), payload);
+    dbg->send_message(gda_string(GDA_MSG_RESPONSE), payload);
   }
 }
 
@@ -539,8 +539,8 @@ void register_listener() {
   }
   if (auto *dbg = godot::EngineDebugger::get_singleton()) {
     dbg->register_message_capture(
-        godot::StringName(gsd_string(GSD_PREFIX)),
-        godot::Callable(g_listener.ptr(), godot::StringName("on_gsd_message")));
+        godot::StringName(gda_string(GDA_PREFIX)),
+        godot::Callable(g_listener.ptr(), godot::StringName("on_gda_message")));
     if (auto *os = godot::OS::get_singleton()) {
       os->add_logger(g_logger);
     }
@@ -548,15 +548,15 @@ void register_listener() {
 
     {
       JV body(JV::object_tag);
-      body[GSD_FIELD_READY] = JV(true);
+      body[GDA_FIELD_READY] = JV(true);
       append_activity_fields(body);
       godot::Array payload;
       payload.push_back(godot::String(body.Dump().c_str()));
-      dbg->send_message(gsd_string(GSD_MSG_READY), payload);
+      dbg->send_message(gda_string(GDA_MSG_READY), payload);
     }
     LogSystem::instance().log(
         LogLevel::Info, LogCategory::System,
-        "Game bridge listener registered (gsd message capture + game logger)");
+        "Game bridge listener registered (gda message capture + game logger)");
   }
 }
 
@@ -564,7 +564,7 @@ void unregister_listener() {
   if (!g_registered)
     return;
   if (auto *dbg = godot::EngineDebugger::get_singleton()) {
-    dbg->unregister_message_capture(godot::StringName(gsd_string(GSD_PREFIX)));
+    dbg->unregister_message_capture(godot::StringName(gda_string(GDA_PREFIX)));
   }
   if (auto *os = godot::OS::get_singleton()) {
     os->remove_logger(g_logger);
@@ -578,4 +578,4 @@ void unregister_listener() {
 
 } // namespace game_bridge
 } // namespace runtime
-} // namespace godot_self_driving
+} // namespace godot_autopilot

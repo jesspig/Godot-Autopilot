@@ -15,7 +15,7 @@
 #include <mcp/JsonValue.hpp>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace tilemap_ops {
 
 using JV = mcp::JsonValue;
@@ -363,4 +363,4 @@ JV handle_tileset_create(const JV &args) {
 }
 
 } // namespace tilemap_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

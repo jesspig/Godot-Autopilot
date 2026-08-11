@@ -54,14 +54,14 @@ struct RegisteredServerFixture : ::testing::Test {
   std::unique_ptr<mcp::McpServer> server;
   std::unique_ptr<mcp::McpClient> client;
   std::thread server_thread;
-  godot_self_driving::CommandQueue queue;
-  godot_self_driving::ToolCatalog catalog;
-  godot_self_driving::Bm25Index index;
+  godot_autopilot::CommandQueue queue;
+  godot_autopilot::ToolCatalog catalog;
+  godot_autopilot::Bm25Index index;
 
   void SetUp() override {
     auto pair = mcp::InMemoryTransport::CreatePair();
     server = mcp::McpServer::Create(pair.server);
-    godot_self_driving::register_all_tools(*server, queue, catalog, index,
+    godot_autopilot::register_all_tools(*server, queue, catalog, index,
                                            9527);
     server_thread = std::thread([this] { server->Run(); });
 
@@ -177,7 +177,7 @@ TEST_F(RegisteredServerFixture, CatalogCoversServerTools) {
 
 TEST_F(RegisteredServerFixture, CallHandlerUnknownToolReturnsError) {
   mcp::JsonValue args(mcp::JsonValue::object_tag);
-  auto result = godot_self_driving::dispatch::call_handler("no_such_tool_xyz", args);
+  auto result = godot_autopilot::dispatch::call_handler("no_such_tool_xyz", args);
   const auto *err = result.Find("error");
   ASSERT_NE(err, nullptr);
   ASSERT_TRUE(err->IsString());
@@ -191,7 +191,7 @@ TEST_F(RegisteredServerFixture, CallHandlerOversizedArgsKeepsFixedError) {
   mcp::JsonValue args(mcp::JsonValue::object_tag);
   args["payload"] = mcp::JsonValue(big);
 
-  auto result = godot_self_driving::dispatch::call_handler("no_such_tool_xyz", args);
+  auto result = godot_autopilot::dispatch::call_handler("no_such_tool_xyz", args);
   const auto *err = result.Find("error");
   ASSERT_NE(err, nullptr);
   ASSERT_TRUE(err->IsString());
@@ -203,7 +203,7 @@ TEST_F(RegisteredServerFixture, CallHandlerOversizedArgsKeepsFixedError) {
 }
 
 TEST_F(RegisteredServerFixture, ReRegisterIsIdempotentForServerAndCatalog) {
-  godot_self_driving::register_all_tools(*server, queue, catalog, index, 9527);
+  godot_autopilot::register_all_tools(*server, queue, catalog, index, 9527);
 
   auto result = client->ListTools();
   EXPECT_EQ(result.tools.size(), kMetaToolCount);
@@ -214,10 +214,10 @@ TEST_F(RegisteredServerFixture, TwoIndependentServersRegisterIdentically) {
   auto pair2 = mcp::InMemoryTransport::CreatePair();
   auto server2 = mcp::McpServer::Create(pair2.server);
 
-  godot_self_driving::CommandQueue queue2;
-  godot_self_driving::ToolCatalog catalog2;
-  godot_self_driving::Bm25Index index2;
-  godot_self_driving::register_all_tools(*server2, queue2, catalog2, index2,
+  godot_autopilot::CommandQueue queue2;
+  godot_autopilot::ToolCatalog catalog2;
+  godot_autopilot::Bm25Index index2;
+  godot_autopilot::register_all_tools(*server2, queue2, catalog2, index2,
                                          9528);
 
   std::thread thread2([&server2] { server2->Run(); });

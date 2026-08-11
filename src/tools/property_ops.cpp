@@ -22,7 +22,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace property_ops {
 
 namespace {
@@ -646,4 +646,4 @@ mcp::JsonValue handle_signal_disconnect(const mcp::JsonValue &args) {
 }
 
 } // namespace property_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

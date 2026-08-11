@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-namespace gsd_test {
+namespace gda_test {
 
 struct StepExpect {
     std::vector<std::string> has_keys;

@@ -1,5 +1,5 @@
 #include "editor_ops.hpp"
-#include "../runtime/gsd_protocol.hpp"
+#include "../runtime/gda_protocol.hpp"
 #include "../util/scene_path.hpp"
 #include "core/log_system.hpp"
 #include "core/scene_dirty_tracker.hpp"
@@ -28,7 +28,7 @@
 #include <godot_cpp/variant/typed_array.hpp>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace editor_ops {
 
 namespace {
@@ -168,7 +168,7 @@ mcp::JsonValue handle_set_selection(const mcp::JsonValue &args) {
   for (const auto &p : paths_arr) {
     if (p.IsString()) {
       std::string hint;
-      auto *node = godot_self_driving::util::resolve_scene_node(p.GetString(),
+      auto *node = godot_autopilot::util::resolve_scene_node(p.GetString(),
                                                                 root, &hint);
       if (node) {
         sel->add_node(node);
@@ -431,7 +431,7 @@ mcp::JsonValue handle_undo_redo_add_do(const mcp::JsonValue &args) {
   std::string method = mt->GetString();
   auto *editor = godot::EditorInterface::get_singleton();
   std::string hint;
-  auto *node = godot_self_driving::util::resolve_scene_node(
+  auto *node = godot_autopilot::util::resolve_scene_node(
       node_path, editor ? editor->get_edited_scene_root() : nullptr, &hint);
   if (!node) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -482,7 +482,7 @@ mcp::JsonValue handle_undo_redo_add_undo(const mcp::JsonValue &args) {
   std::string method = mt->GetString();
   auto *editor = godot::EditorInterface::get_singleton();
   std::string hint;
-  auto *node = godot_self_driving::util::resolve_scene_node(
+  auto *node = godot_autopilot::util::resolve_scene_node(
       node_path, editor ? editor->get_edited_scene_root() : nullptr, &hint);
   if (!node) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -834,13 +834,13 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue &args) {
 
   int64_t waited_ms = 0;
   bool switched = false;
-  while (waited_ms < GSD_NEW_SCENE_SWITCH_WAIT_MS) {
+  while (waited_ms < GDA_NEW_SCENE_SWITCH_WAIT_MS) {
     if (editor->get_edited_scene_root() == node) {
       switched = true;
       break;
     }
-    godot::OS::get_singleton()->delay_usec(GSD_NEW_SCENE_POLL_MS * 1000);
-    waited_ms += GSD_NEW_SCENE_POLL_MS;
+    godot::OS::get_singleton()->delay_usec(GDA_NEW_SCENE_POLL_MS * 1000);
+    waited_ms += GDA_NEW_SCENE_POLL_MS;
   }
   if (!switched) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -1025,4 +1025,4 @@ mcp::JsonValue handle_new_text_resource(const mcp::JsonValue &args) {
 }
 
 } // namespace editor_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

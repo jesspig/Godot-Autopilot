@@ -9,7 +9,7 @@
 #include <godot_cpp/variant/dictionary.hpp>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace config_ops {
 
 mcp::JsonValue handle_project_settings_get(const mcp::JsonValue &args) {
@@ -385,4 +385,4 @@ mcp::JsonValue handle_editor_settings_has(const mcp::JsonValue &args) {
 }
 
 } // namespace config_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

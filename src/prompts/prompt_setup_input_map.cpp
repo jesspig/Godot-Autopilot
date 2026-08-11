@@ -1,9 +1,9 @@
 #include "prompts/prompt_setup_input_map.hpp"
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 std::string prompt_setup_input_map() {
-  return R"gsd(# 输入动作（Input Map）配置指南
+  return R"gda(# 输入动作（Input Map）配置指南
 
 ## 背景
 本流程引导你在 Godot 项目设置中创建和配置输入动作，并测试输入响应。
@@ -138,7 +138,7 @@ std::string prompt_setup_input_map() {
 - 创建动作后不会自动绑定按键——需要手动添加 events 数组
 - `project_settings_save` 将设置持久化到 project.godot 文件
 - 为同一个动作绑定多个按键（如键盘 A 键和手柄左摇杆）可以提高可用性
-- 输入动作名称应与脚本中使用的名称一致)gsd";
+- 输入动作名称应与脚本中使用的名称一致)gda";
 }
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot

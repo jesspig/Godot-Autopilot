@@ -1,12 +1,12 @@
-#ifndef GODOT_SELF_DRIVING_RESOURCE_OPS_HPP
-#define GODOT_SELF_DRIVING_RESOURCE_OPS_HPP
+#ifndef GODOT_AUTOPILOT_RESOURCE_OPS_HPP
+#define GODOT_AUTOPILOT_RESOURCE_OPS_HPP
 
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/variant/variant.hpp>
 #include <mcp/JsonValue.hpp>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace resource_ops {
 
 godot::Ref<godot::Resource> resolve_memory_resource(const std::string &name);
@@ -39,6 +39,6 @@ mcp::JsonValue handle_import(const mcp::JsonValue &args);
 mcp::JsonValue handle_reimport(const mcp::JsonValue &args);
 
 } // namespace resource_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 
 #endif

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Godot-Self-Driving 构建脚本。
+"""Godot-Autopilot 构建脚本。
 
 构建 GDExtension 并部署到 example/addons/。
 
@@ -21,15 +21,15 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent
 BUILD_DIR = PROJECT_ROOT / "build"
 EXAMPLE_DIR = PROJECT_ROOT / "example"
-EXAMPLE_ADDON_DIR = EXAMPLE_DIR / "addons" / "godot-self-driving"
+EXAMPLE_ADDON_DIR = EXAMPLE_DIR / "addons" / "godot-autopilot"
 
 PLATFORM_LIBS: dict[str, str] = {
-    "windows": "godot-self-driving.dll",
-    "linux": "libgodot-self-driving.so",
-    "darwin": "libgodot-self-driving.dylib",
+    "windows": "godot-autopilot.dll",
+    "linux": "libgodot-autopilot.so",
+    "darwin": "libgodot-autopilot.dylib",
 }
 
-PLATFORM_PDB = "godot-self-driving.pdb"
+PLATFORM_PDB = "godot-autopilot.pdb"
 
 ADDON_VERSION = "0.1.0"
 
@@ -62,21 +62,21 @@ def _build(preset: str) -> bool:
 
 def _generate_gdextension() -> None:
     EXAMPLE_ADDON_DIR.mkdir(parents=True, exist_ok=True)
-    (EXAMPLE_ADDON_DIR / "godot-self-driving.gdextension").write_text(
+    (EXAMPLE_ADDON_DIR / "godot-autopilot.gdextension").write_text(
         "[configuration]\n"
         'entry_symbol = "GDExtensionEntryPoint"\n'
         'compatibility_minimum = "4.3"\n'
         "\n"
         "[libraries]\n"
-        'windows.debug.x86_64 = "res://addons/godot-self-driving/godot-self-driving.dll"\n'
-        'windows.release.x86_64 = "res://addons/godot-self-driving/godot-self-driving.dll"\n'
-        'linux.debug.x86_64 = "res://addons/godot-self-driving/godot-self-driving.so"\n'
-        'linux.release.x86_64 = "res://addons/godot-self-driving/godot-self-driving.so"\n'
-        'macos.debug.x86_64 = "res://addons/godot-self-driving/godot-self-driving.dylib"\n'
-        'macos.release.x86_64 = "res://addons/godot-self-driving/godot-self-driving.dylib"\n',
+        'windows.debug.x86_64 = "res://addons/godot-autopilot/godot-autopilot.dll"\n'
+        'windows.release.x86_64 = "res://addons/godot-autopilot/godot-autopilot.dll"\n'
+        'linux.debug.x86_64 = "res://addons/godot-autopilot/godot-autopilot.so"\n'
+        'linux.release.x86_64 = "res://addons/godot-autopilot/godot-autopilot.so"\n'
+        'macos.debug.x86_64 = "res://addons/godot-autopilot/godot-autopilot.dylib"\n'
+        'macos.release.x86_64 = "res://addons/godot-autopilot/godot-autopilot.dylib"\n',
         encoding="utf-8",
     )
-    print(f"  godot-self-driving.gdextension  (generated)", flush=True)
+    print(f"  godot-autopilot.gdextension  (generated)", flush=True)
 
 
 def _deploy(preset: str) -> None:
@@ -114,7 +114,7 @@ def _validate_addon_integrity() -> None:
     if not platform_key:
         print(f"[ERROR] Unsupported platform: {system}", flush=True)
         sys.exit(1)
-    gdextension_path = EXAMPLE_ADDON_DIR / "godot-self-driving.gdextension"
+    gdextension_path = EXAMPLE_ADDON_DIR / "godot-autopilot.gdextension"
     content = gdextension_path.read_text(encoding="utf-8")
     in_libraries = False
     missing = []
@@ -145,10 +145,10 @@ def _package_addon() -> None:
     dist_dir = PROJECT_ROOT / "dist"
     dist_dir.mkdir(exist_ok=True)
     zip_path = shutil.make_archive(
-        str(dist_dir / f"godot-self-driving-{ADDON_VERSION}"),
+        str(dist_dir / f"godot-autopilot-{ADDON_VERSION}"),
         "zip",
         root_dir=EXAMPLE_DIR,
-        base_dir="addons/godot-self-driving",
+        base_dir="addons/godot-autopilot",
     )
     size_kb = Path(zip_path).stat().st_size / 1024
     print(f"[PACKAGE] {zip_path} ({size_kb:.0f} KB)", flush=True)
@@ -165,10 +165,10 @@ def _clean() -> None:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Godot-Self-Driving build & deploy")
+    parser = argparse.ArgumentParser(description="Godot-Autopilot build & deploy")
     parser.add_argument("--release", action="store_true", help="Release build (default: Debug)")
     parser.add_argument("--debug", action="store_true", help="Debug build (default)")
-    parser.add_argument("--package", action="store_true", help="Package addons as dist/godot-self-driving-<version>.zip")
+    parser.add_argument("--package", action="store_true", help="Package addons as dist/godot-autopilot-<version>.zip")
     args = parser.parse_args()
 
     if args.release and args.debug:

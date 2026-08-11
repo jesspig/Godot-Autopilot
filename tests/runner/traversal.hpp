@@ -5,7 +5,7 @@
 
 #include "pipeline_executor.hpp"
 
-namespace gsd_test {
+namespace gda_test {
 
 struct TraversalStats {
     size_t total = 0;        // 工具总数（def 解析）
@@ -39,4 +39,4 @@ bool is_excluded_tool(const std::string& name);
 TraversalStats run_traversal(McpTestClient& client, const std::string& mode,
                              std::vector<StepResult>& out_steps);
 
-} // namespace gsd_test
+} // namespace gda_test

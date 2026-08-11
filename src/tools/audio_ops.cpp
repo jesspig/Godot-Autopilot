@@ -19,7 +19,7 @@
 #include <godot_cpp/variant/string_name.hpp>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace audio_ops {
 
 namespace {
@@ -723,4 +723,4 @@ mcp::JsonValue handle_set_input_device(const mcp::JsonValue &args) {
 }
 
 } // namespace audio_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

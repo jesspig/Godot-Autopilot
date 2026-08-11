@@ -7,23 +7,23 @@
 #include <string>
 #include <vector>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace runtime_ops {
 
-using godot_self_driving::util::error_json;
+using godot_autopilot::util::error_json;
 
 namespace {
 
 using JV = mcp::JsonValue;
 
 int64_t extract_timeout(const JV &args) {
-  int64_t timeout = GSD_DEFAULT_TIMEOUT_MS;
+  int64_t timeout = GDA_DEFAULT_TIMEOUT_MS;
   if (auto *tp = args.Find("timeout_ms")) {
     if (tp->IsInt() && tp->GetInt() > 0)
       timeout = tp->GetInt();
   }
-  if (timeout > GSD_MAX_TIMEOUT_MS)
-    timeout = GSD_MAX_TIMEOUT_MS;
+  if (timeout > GDA_MAX_TIMEOUT_MS)
+    timeout = GDA_MAX_TIMEOUT_MS;
   return timeout;
 }
 
@@ -51,7 +51,7 @@ mcp::JsonValue handle_game_status(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "game_status called");
   JV params(JV::object_tag);
-  return handle_gsd_send("status", params, extract_timeout(args));
+  return handle_gda_send("status", params, extract_timeout(args));
 }
 
 mcp::JsonValue handle_game_eval(const mcp::JsonValue &args) {
@@ -73,7 +73,7 @@ mcp::JsonValue handle_game_eval(const mcp::JsonValue &args) {
   copy_optional(args, params, "persist");
   copy_optional(args, params, "persist_name");
   copy_optional(args, params, "timeout_ms");
-  return handle_gsd_send("eval", params, extract_timeout(args));
+  return handle_gda_send("eval", params, extract_timeout(args));
 }
 
 mcp::JsonValue handle_game_input(const mcp::JsonValue &args) {
@@ -103,7 +103,7 @@ mcp::JsonValue handle_game_input(const mcp::JsonValue &args) {
     }
   }
 
-  JV result = handle_gsd_send("input", params, extract_timeout(args));
+  JV result = handle_gda_send("input", params, extract_timeout(args));
   if (!result.Contains("error") && !ignored.empty()) {
     JV ignored_arr(JV::array_tag);
     for (const auto &key : ignored)
@@ -132,7 +132,7 @@ mcp::JsonValue handle_game_input_wait(const mcp::JsonValue &args) {
   copy_optional(args, params, "state");
   copy_optional(args, params, "inject");
   copy_optional(args, params, "timeout_ms");
-  return handle_gsd_send("input_wait", params, extract_timeout(args));
+  return handle_gda_send("input_wait", params, extract_timeout(args));
 }
 
 mcp::JsonValue handle_game_input_status(const mcp::JsonValue &args) {
@@ -144,7 +144,7 @@ mcp::JsonValue handle_game_input_status(const mcp::JsonValue &args) {
   }
   JV params(JV::object_tag);
   params["action"] = *action_p;
-  JV result = handle_gsd_send("input_status", params, extract_timeout(args));
+  JV result = handle_gda_send("input_status", params, extract_timeout(args));
   if (!result.Contains("error")) {
     std::string recent_errors = debugger_ops::capture_get_errors_text(5);
     if (!recent_errors.empty()) {
@@ -158,8 +158,8 @@ mcp::JsonValue handle_game_capture(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "game_capture called");
   JV params(JV::object_tag);
-  return handle_gsd_send("capture", params, extract_timeout(args));
+  return handle_gda_send("capture", params, extract_timeout(args));
 }
 
 } // namespace runtime_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

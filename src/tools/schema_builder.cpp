@@ -1,6 +1,6 @@
 #include "tools/schema_builder.hpp"
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace schema {
 
 mcp::JsonValue make_object_schema() {
@@ -136,4 +136,4 @@ mcp::JsonValue build_schema(std::initializer_list<ParamDef> params) {
 }
 
 } // namespace schema
-} // namespace godot_self_driving
+} // namespace godot_autopilot

@@ -2,7 +2,7 @@
 #include "core/log_system.hpp"
 #include <mcp/Content.hpp>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 namespace {
 
@@ -182,4 +182,4 @@ Based on the state, I will:
                             "Registered debugger prompts: 5 templates");
 }
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot

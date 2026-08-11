@@ -279,7 +279,7 @@ bool build_wrapped_source(ExecContext &ctx, std::string &error_out) {
             line.compare(pos, 5, "func\t") == 0 ||
             (line.compare(pos, 4, "func") == 0 && pos + 4 < line.size() &&
              line[pos + 4] == '(')) {
-          mcp::JsonValue detail = godot_self_driving::util::error_detail(
+          mcp::JsonValue detail = godot_autopilot::util::error_detail(
               "func definition detected in single-function mode", "source_code",
               "no func definitions while in single-function mode",
               "top-level func definitions require multi-function mode; use "
@@ -308,7 +308,7 @@ bool build_wrapped_source(ExecContext &ctx, std::string &error_out) {
     }
 
     if (uses_tabs && uses_spaces) {
-      mcp::JsonValue detail = godot_self_driving::util::error_detail(
+      mcp::JsonValue detail = godot_autopilot::util::error_detail(
           "mixed tab/space indentation detected in source", "source_code",
           "consistent indentation",
           "reindent source with only tabs or only spaces; note the wrapper "
@@ -357,7 +357,7 @@ bool compile_and_map_errors(ExecContext &ctx, std::string &error_out) {
 
   ctx.script->set_source_code(godot::String(ctx.wrapped.c_str()));
 
-  size_t compile_log_before = godot_self_driving::debugger_ops::capture_log_count();
+  size_t compile_log_before = godot_autopilot::debugger_ops::capture_log_count();
   godot::Error parse_err = ctx.script->reload();
   if (parse_err != godot::OK) {
     int code = static_cast<int>(parse_err);
@@ -367,7 +367,7 @@ bool compile_and_map_errors(ExecContext &ctx, std::string &error_out) {
     std::string message = "GDScript compilation failed: " + err_name +
                           " (code " + std::to_string(code) + ")";
     std::string compile_err =
-        godot_self_driving::debugger_ops::capture_new_error_text(
+        godot_autopilot::debugger_ops::capture_new_error_text(
             compile_log_before);
     if (!compile_err.empty()) {
       int map_offset =
@@ -391,7 +391,7 @@ bool compile_and_map_errors(ExecContext &ctx, std::string &error_out) {
 }
 
 bool run_with_timeout(ExecContext &ctx, std::string &error_out) {
-  size_t log_before = godot_self_driving::debugger_ops::capture_log_count();
+  size_t log_before = godot_autopilot::debugger_ops::capture_log_count();
 
   ctx.child_count_before = 0;
   ctx.scene_root_for_leak = nullptr;
@@ -455,9 +455,9 @@ bool run_with_timeout(ExecContext &ctx, std::string &error_out) {
 
     ctx.result = temp_node->call(fn_name);
     ctx.new_error_text =
-        godot_self_driving::debugger_ops::capture_new_error_text(log_before);
+        godot_autopilot::debugger_ops::capture_new_error_text(log_before);
     ctx.new_output_text =
-        godot_self_driving::debugger_ops::capture_new_output_text(log_before);
+        godot_autopilot::debugger_ops::capture_new_output_text(log_before);
   }
   return true;
 }
@@ -508,7 +508,7 @@ mcp::JsonValue build_exec_result(ExecContext &ctx) {
     godot::Resource *res_obj = godot::Object::cast_to<godot::Resource>(obj);
     if (res_obj) {
       godot::Ref<godot::Resource> res(res_obj);
-      godot_self_driving::resource_registry::register_resource(res, "");
+      godot_autopilot::resource_registry::register_resource(res, "");
       mcp::JsonValue reg(mcp::JsonValue::object_tag);
       reg["object_id"] =
           mcp::JsonValue(static_cast<int64_t>(res->get_instance_id()));
@@ -520,7 +520,7 @@ mcp::JsonValue build_exec_result(ExecContext &ctx) {
     }
   }
 
-  r["result"] = godot_self_driving::VariantJson::serialize(ctx.result);
+  r["result"] = godot_autopilot::VariantJson::serialize(ctx.result);
   r["execution_time_ms"] = mcp::JsonValue(static_cast<int64_t>(elapsed));
   r["auto_owner_set"] =
       mcp::JsonValue(static_cast<int64_t>(ctx.auto_owner_set));
@@ -560,7 +560,7 @@ mcp::JsonValue build_exec_result(ExecContext &ctx) {
 
 } // namespace
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace code_exec_ops {
 
 mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
@@ -719,4 +719,4 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue &args) {
 }
 
 } // namespace code_exec_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

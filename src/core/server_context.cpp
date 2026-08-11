@@ -13,13 +13,13 @@
 #include <mcp/Content.hpp>
 #include <mcp/server/ServerOptions.hpp>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 int ServerContext::resolve_port() {
-  if (const char *env_port = std::getenv("GODOT_SELF_DRIVING_PORT")) {
+  if (const char *env_port = std::getenv("GODOT_AUTOPILOT_PORT")) {
     return std::atoi(env_port);
   }
-  return GSD_DEFAULT_PORT;
+  return GDA_DEFAULT_PORT;
 }
 
 ServerContext::ServerContext(CommandQueue &queue)
@@ -53,7 +53,7 @@ bool ServerContext::start() {
         std::make_shared<mcp::StreamableHttpServerTransport>(http_opts);
 
     mcp::ServerOptions opts;
-    opts.server_info = mcp::Implementation{"godot-self-driving", "0.1.0"};
+    opts.server_info = mcp::Implementation{"godot-autopilot", "0.1.0"};
     opts.on_method_called = [this](std::string_view method) {
       LogSystem::instance().log(LogLevel::Debug, LogCategory::Transport,
                                 "MCP request: " + std::string(method));
@@ -135,4 +135,4 @@ void ServerContext::register_tools() {
   register_debugger_prompts(*server_);
 }
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot

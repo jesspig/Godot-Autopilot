@@ -4,8 +4,8 @@
 
 测试体系分两层：
 
-- **L1 纯单测**（`gsd_unit_tests`，59 个 gtest 用例）：不启动引擎，不触碰 Godot API，验证核心逻辑与工具注册管线。
-- **L2 配置驱动引擎内测试**（`gsd_test_runner` + `tests/config/*.json` 用例）：由 C++ 执行器自管 Godot headless 编辑器进程，经真实 MCP HTTP 全链路驱动领域工具，并按 JSON 用例中的断言语义（C++ 执行器侧）校验响应。**每份 config/*.json = 一次独立的编辑器生命周期最小闭环**（启动 → MCP 就绪 → 执行步骤 → 停止进程），文件间互不共享状态。
+- **L1 纯单测**（`gda_unit_tests`，59 个 gtest 用例）：不启动引擎，不触碰 Godot API，验证核心逻辑与工具注册管线。
+- **L2 配置驱动引擎内测试**（`gda_test_runner` + `tests/config/*.json` 用例）：由 C++ 执行器自管 Godot headless 编辑器进程，经真实 MCP HTTP 全链路驱动领域工具，并按 JSON 用例中的断言语义（C++ 执行器侧）校验响应。**每份 config/*.json = 一次独立的编辑器生命周期最小闭环**（启动 → MCP 就绪 → 执行步骤 → 停止进程），文件间互不共享状态。
 
 架构一句话：进程内 GDExtension（EditorPlugin），领域工具经 `call_tool` 元工具代理，由 `register_all.cpp` 的 `g_handlers` 映射分发。
 
@@ -13,7 +13,7 @@
 
 | 依赖 | 说明 |
 | ---- | ---- |
-| CMake 3.28+ | 测试目标经根 `CMakeLists.txt` 的 `GSD_ENABLE_TESTS` 选项（默认 OFF，`CMakeLists.txt:120`）引入 |
+| CMake 3.28+ | 测试目标经根 `CMakeLists.txt` 的 `GDA_ENABLE_TESTS` 选项（默认 OFF，`CMakeLists.txt:120`）引入 |
 | Ninja | 构建生成器（预设 `debug` / `release` 均为 Ninja） |
 | clang-cl | 编译器（MSVC/GCC 自动回退，测试继承根配置） |
 | Godot 可执行文件 | 仅 L2 需要，见第 3 节 |
@@ -30,22 +30,22 @@
 $env:GODOT_PATH="C:\path\to\Godot.exe"
 ```
 
-若二者皆无，`gsd_test_runner` 退出码 2（"未找到 Godot 可执行文件"）。L1 不受影响。
+若二者皆无，`gda_test_runner` 退出码 2（"未找到 Godot 可执行文件"）。L1 不受影响。
 
 ## 4. 构建
 
 ```powershell
 # 1. 配置（启用测试；可追加 --preset debug）
-cmake --preset debug -DGSD_ENABLE_TESTS=ON
+cmake --preset debug -DGDA_ENABLE_TESTS=ON
 
 # 2. 构建测试目标
-cmake --build --preset debug --target gsd_unit_tests gsd_test_runner
+cmake --build --preset debug --target gda_unit_tests gda_test_runner
 ```
 
 产物位于 `build/debug/tests/`：
 
-- `gsd_unit_tests.exe` — L1，gtest 可执行文件
-- `gsd_test_runner.exe` — L2，自驱动用例跑批器（CLI 入口 `tests/runner/main.cpp`）
+- `gda_unit_tests.exe` — L1，gtest 可执行文件
+- `gda_test_runner.exe` — L2，自驱动用例跑批器（CLI 入口 `tests/runner/main.cpp`）
 
 ## 5. 运行
 
@@ -55,17 +55,17 @@ cmake --build --preset debug --target gsd_unit_tests gsd_test_runner
 ctest --preset debug
 ```
 
-注册方式（`tests/CMakeLists.txt:100-111`）：**每份 `config/*.json` 一条 `gsd_runner_<文件名去后缀>` 用例**，命令为 `gsd_test_runner --file <name> --report-dir <build>/tests/output`，`TIMEOUT 600`（单文件含遍历约 2-4 分钟，超时防挂死）。当前 5 个 config 文件 → 5 条 ctest 用例：`gsd_runner_00_meta`、`gsd_runner_01_scene`、`gsd_runner_02_property`、`gsd_runner_03_tools_contract`、`gsd_runner_04_resources_scripts`。
+注册方式（`tests/CMakeLists.txt:100-111`）：**每份 `config/*.json` 一条 `gda_runner_<文件名去后缀>` 用例**，命令为 `gda_test_runner --file <name> --report-dir <build>/tests/output`，`TIMEOUT 600`（单文件含遍历约 2-4 分钟，超时防挂死）。当前 5 个 config 文件 → 5 条 ctest 用例：`gda_runner_00_meta`、`gda_runner_01_scene`、`gda_runner_02_property`、`gda_runner_03_tools_contract`、`gda_runner_04_resources_scripts`。
 
 - L1 经 `gtest_discover_tests` 注册，每用例一条（如 `CommandQueueTest.*`）。
 - **耗时**：普通用例约 15s/文件（一次编辑器生命周期）；`03_tools_contract` 含两次全量遍历（348 工具 ×2），约 2-3 分钟。全量 ctest 约 3-4 分钟。
-- 单跑一条：`ctest --preset debug -R gsd_runner_00_meta` 或 `ctest --preset debug -R CommandQueueTest`。
+- 单跑一条：`ctest --preset debug -R gda_runner_00_meta` 或 `ctest --preset debug -R CommandQueueTest`。
 
 ### 5.2 单文件（直跑执行器）
 
 ```powershell
 # --file 只跑指定用例文件，name 可含或不含 .json 后缀
-build\debug\tests\gsd_test_runner.exe --file 01_scene
+build\debug\tests\gda_test_runner.exe --file 01_scene
 ```
 
 ### 5.3 CLI 参数全表（`tests/runner/main.cpp`）
@@ -76,7 +76,7 @@ build\debug\tests\gsd_test_runner.exe --file 01_scene
 | `--file <name>` | 只跑指定用例文件，name 可含或不含 `.json` 后缀（默认跑目录下全部 `*.json`，按文件名排序；无匹配则退出码 2） |
 | `--headless` | Godot 以 headless 模式启动（默认） |
 | `--gui` | Godot 以窗口模式启动。`--headless` 与 `--gui` 互斥（同用报错退出码 2）；**用例 JSON 的 `headless` 字段优先于 CLI**，冲突时以用例为准并在 stderr 提示 |
-| `--no-auto` | 不启动 Godot 进程；端口取自环境变量 `GODOT_SELF_DRIVING_PORT`，TCP + MCP initialize 就绪后直连外部 MCP 服务跑用例（端口未设置或未就绪 → 退出码 2） |
+| `--no-auto` | 不启动 Godot 进程；端口取自环境变量 `GODOT_AUTOPILOT_PORT`，TCP + MCP initialize 就绪后直连外部 MCP 服务跑用例（端口未设置或未就绪 → 退出码 2） |
 | `--keep-open` | 全部文件跑完后不停止 Godot 进程（最后一个文件保留进程，便于人工排查） |
 | `--report-dir <dir>` | 报告目录（默认 `PROJECT_ROOT/tests/output`，自动创建） |
 | `--help` | 打印本说明并退出（退出码 0） |
@@ -91,7 +91,7 @@ build\debug\tests\gsd_test_runner.exe --file 01_scene
 
 ### 5.4 执行闭环与报告
 
-每个文件的生命周期（`godot_process.cpp`）：随机空闲端口 → 首次 `--editor --import` 幂等同步执行（120s 超时，失败/超时不致命）→ 注入 `GODOT_SELF_DRIVING_PORT` 后常驻启动 `--editor`（`--headless` 由用例决定）→ 就绪轮询（TCP 端口探测 + MCP initialize 握手）→ `before_all` → stages 步骤 → `after_all` → 停止（taskkill 软杀 → 5s 宽限 → TerminateProcess 兜底）。stdout/stderr 各接管道读线程持续消费（防 64KB 缓冲写满阻塞子进程），崩溃时截取最近 2000 字符日志。
+每个文件的生命周期（`godot_process.cpp`）：随机空闲端口 → 首次 `--editor --import` 幂等同步执行（120s 超时，失败/超时不致命）→ 注入 `GODOT_AUTOPILOT_PORT` 后常驻启动 `--editor`（`--headless` 由用例决定）→ 就绪轮询（TCP 端口探测 + MCP initialize 握手）→ `before_all` → stages 步骤 → `after_all` → 停止（taskkill 软杀 → 5s 宽限 → TerminateProcess 兜底）。stdout/stderr 各接管道读线程持续消费（防 64KB 缓冲写满阻塞子进程），崩溃时截取最近 2000 字符日志。
 
 输出：控制台表格（文件名称 / 通过步骤数 / 耗时（<10s 显毫秒，否则显秒）/ 状态 PASS|FAIL|ERROR）+ JSON 报告 `report-YYYYmmdd_HHMMSS.json`（字段：`generated_at` / `total_files` / `passed_files` / `files[].{name,passed,duration_ms,fatal_error,steps[]}`）。
 
@@ -270,7 +270,7 @@ Remove-Item Example/default_bus_layout.tres
 
 本体系为 GodotMind-Archive 测试方案（Python 编排 + `tests/yaml_tests/*.yaml` + 引擎内 `/run-tests` 端点）的 C++ 重实现，主要差异：
 
-| 维度 | GodotMind-Archive | 本体系（GSD） |
+| 维度 | GodotMind-Archive | 本体系（GDA） |
 | ---- | ---- | ---- |
 | 用例格式 | YAML（`yaml_tests/*.yaml`） | JSON（`tests/config/*.json`） |
 | 断言位置 | 引擎内 C++ `/run-tests` 端点执行断言 | **C++ 执行器侧**（`assert_engine.cpp`）解析响应校验 |

@@ -4,18 +4,18 @@
 
 #include <string>
 
-using godot_self_driving::schema::add_param;
-using godot_self_driving::schema::add_required_flag;
-using godot_self_driving::schema::arr_param;
-using godot_self_driving::schema::bool_param;
-using godot_self_driving::schema::build_schema;
-using godot_self_driving::schema::int_param;
-using godot_self_driving::schema::make_empty_schema;
-using godot_self_driving::schema::make_object_schema;
-using godot_self_driving::schema::num_param;
-using godot_self_driving::schema::obj_param;
-using godot_self_driving::schema::ParamDef;
-using godot_self_driving::schema::string_param;
+using godot_autopilot::schema::add_param;
+using godot_autopilot::schema::add_required_flag;
+using godot_autopilot::schema::arr_param;
+using godot_autopilot::schema::bool_param;
+using godot_autopilot::schema::build_schema;
+using godot_autopilot::schema::int_param;
+using godot_autopilot::schema::make_empty_schema;
+using godot_autopilot::schema::make_object_schema;
+using godot_autopilot::schema::num_param;
+using godot_autopilot::schema::obj_param;
+using godot_autopilot::schema::ParamDef;
+using godot_autopilot::schema::string_param;
 
 namespace {
 

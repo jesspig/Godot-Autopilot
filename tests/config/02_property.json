@@ -39,7 +39,7 @@
           {
             "id": "property_set_get_string",
             "tool": "property_set",
-            "args": { "path": "LabelNode", "property": "text", "value": "Hello GSD" },
+            "args": { "path": "LabelNode", "property": "text", "value": "Hello GDA" },
             "expect": {
               "field_checks": [ { "key": "result", "value": "ok" } ]
             }
@@ -49,7 +49,7 @@
             "tool": "property_get",
             "args": { "path": "LabelNode", "property": "text" },
             "expect": {
-              "field_checks": [ { "key": "result", "value": "Hello GSD" } ]
+              "field_checks": [ { "key": "result", "value": "Hello GDA" } ]
             }
           },
           {

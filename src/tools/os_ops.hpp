@@ -1,9 +1,9 @@
-#ifndef GODOT_SELF_DRIVING_OS_OPS_HPP
-#define GODOT_SELF_DRIVING_OS_OPS_HPP
+#ifndef GODOT_AUTOPILOT_OS_OPS_HPP
+#define GODOT_AUTOPILOT_OS_OPS_HPP
 
 #include <mcp/JsonValue.hpp>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace os_ops {
 
 mcp::JsonValue handle_os_alert(const mcp::JsonValue &args);
@@ -23,5 +23,5 @@ mcp::JsonValue handle_os_set_environment(const mcp::JsonValue &args);
 mcp::JsonValue handle_os_shell_open(const mcp::JsonValue &args);
 
 } // namespace os_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 #endif

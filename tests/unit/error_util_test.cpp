@@ -4,9 +4,9 @@
 
 #include <string>
 
-using godot_self_driving::util::error_detail;
-using godot_self_driving::util::error_json;
-using godot_self_driving::util::ok_result;
+using godot_autopilot::util::error_detail;
+using godot_autopilot::util::error_json;
+using godot_autopilot::util::ok_result;
 
 TEST(ErrorUtilTest, ErrorJsonShape) {
     auto value = error_json("something failed");

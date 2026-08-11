@@ -10,7 +10,7 @@
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 static const char *LEVEL_ICON_NAMES[4] = {"Debug", "Popup", "StatusWarning",
                                           "StatusError"};
@@ -358,4 +358,4 @@ void McpLogDock::_on_collapse_toggled(bool enabled) {
   _rebuild_log();
 }
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot

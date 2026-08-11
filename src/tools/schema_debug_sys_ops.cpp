@@ -1,7 +1,7 @@
 #include "tools/schema_fills.hpp"
 #include "tools/schema_builder.hpp"
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 void fill_schema_debug_sys(std::unordered_map<std::string, mcp::JsonValue>& m) {
 
@@ -32,8 +32,8 @@ void fill_schema_debug_sys(std::unordered_map<std::string, mcp::JsonValue>& m) {
             {"method", "string", "Method name for call_method", false},
             {"args", "array", "Arguments for call_method", false},
             {"source_code", "string", "GDScript source for action=\"script\" — must extend Node and define func _run()", false},
-            {"persist", "boolean", "Keep the script's temporary node alive after the call (default: false); the node is stored under /root/__gsd_runtime and its path is returned in node_path for later get_property/call_method use", false},
-            {"persist_name", "string", "Node name under /root/__gsd_runtime when persist=true (default: auto-generated)", false},
+            {"persist", "boolean", "Keep the script's temporary node alive after the call (default: false); the node is stored under /root/__gda_runtime and its path is returned in node_path for later get_property/call_method use", false},
+            {"persist_name", "string", "Node name under /root/__gda_runtime when persist=true (default: auto-generated)", false},
             {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 30000)", false},
         });
         m["game_input"] = schema::build_schema({
@@ -181,4 +181,4 @@ void fill_schema_debug_sys(std::unordered_map<std::string, mcp::JsonValue>& m) {
         });
 }
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot

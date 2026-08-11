@@ -13,7 +13,7 @@
 #include <godot_cpp/variant/vector2i.hpp>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace display_ops {
 
 namespace {
@@ -358,4 +358,4 @@ JV handle_tts_stop(const JV &args) {
 }
 
 } // namespace display_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

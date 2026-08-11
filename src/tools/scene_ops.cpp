@@ -17,7 +17,7 @@
 #include <godot_cpp/variant/string_name.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace scene_ops {
 
 namespace {
@@ -147,7 +147,7 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
     std::string hint;
     auto *root = editor ? editor->get_edited_scene_root() : nullptr;
     auto *parent =
-        godot_self_driving::util::resolve_scene_node(parent_path, root, &hint);
+        godot_autopilot::util::resolve_scene_node(parent_path, root, &hint);
     if (!parent) {
       mcp::JsonValue e(mcp::JsonValue::object_tag);
       e["error"] = mcp::JsonValue("parent node not found: " + parent_path +
@@ -228,7 +228,7 @@ mcp::JsonValue handle_delete(const mcp::JsonValue &args) {
   auto *scene_root = editor ? editor->get_edited_scene_root() : nullptr;
   std::string hint;
   auto *node =
-      godot_self_driving::util::resolve_scene_node(path, scene_root, &hint);
+      godot_autopilot::util::resolve_scene_node(path, scene_root, &hint);
   if (!node) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
     e["error"] = mcp::JsonValue("node not found: " + path + " — " + hint);
@@ -320,7 +320,7 @@ mcp::JsonValue handle_instance(const mcp::JsonValue &args) {
   godot::Node *parent = nullptr;
   if (pp && pp->IsString() && !pp->GetString().empty()) {
     std::string hint;
-    parent = godot_self_driving::util::resolve_scene_node(pp->GetString(),
+    parent = godot_autopilot::util::resolve_scene_node(pp->GetString(),
                                                           scene_root, &hint);
     if (!parent) {
       memdelete(instance);
@@ -436,4 +436,4 @@ mcp::JsonValue handle_get_editor_scene_tree(const mcp::JsonValue &args) {
 }
 
 } // namespace scene_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

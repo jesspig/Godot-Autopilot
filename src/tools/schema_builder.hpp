@@ -1,11 +1,11 @@
-#ifndef GODOT_SELF_DRIVING_SCHEMA_BUILDER_HPP
-#define GODOT_SELF_DRIVING_SCHEMA_BUILDER_HPP
+#ifndef GODOT_AUTOPILOT_SCHEMA_BUILDER_HPP
+#define GODOT_AUTOPILOT_SCHEMA_BUILDER_HPP
 
 #include <initializer_list>
 #include <mcp/JsonValue.hpp>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace schema {
 
 struct ParamDef {
@@ -30,6 +30,6 @@ mcp::JsonValue arr_param(const std::string &desc, bool required);
 mcp::JsonValue build_schema(std::initializer_list<ParamDef> params);
 
 } // namespace schema
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 
 #endif

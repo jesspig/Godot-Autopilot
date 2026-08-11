@@ -1,9 +1,9 @@
 #include "prompts/prompt_create_3d_scene.hpp"
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 std::string prompt_create_3d_scene() {
-  return R"gsd(# 创建 3D 场景指南
+  return R"gda(# 创建 3D 场景指南
 
 ## 背景
 本流程引导你在 Godot 中创建一个完整的 3D 场景，包含摄像机、光照、环境和测试对象。
@@ -124,7 +124,7 @@ std::string prompt_create_3d_scene() {
 - WorldEnvironment 的 environment 属性需要先创建 Environment 资源再赋值
 - Camera3D 默认位置在原点，需要调整位置才能看到场景
 - 使用 `property_get_list` 查看节点的所有可用属性
-- 使用 `editor_save_scene` 保存当前场景)gsd";
+- 使用 `editor_save_scene` 保存当前场景)gda";
 }
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot

@@ -1,9 +1,9 @@
-#ifndef GODOT_SELF_DRIVING_SCRIPT_OPS_HPP
-#define GODOT_SELF_DRIVING_SCRIPT_OPS_HPP
+#ifndef GODOT_AUTOPILOT_SCRIPT_OPS_HPP
+#define GODOT_AUTOPILOT_SCRIPT_OPS_HPP
 
 #include <mcp/JsonValue.hpp>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace script_ops {
 
 mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue &args);
@@ -18,6 +18,6 @@ mcp::JsonValue handle_reload(const mcp::JsonValue &args);
 mcp::JsonValue handle_get_variable_list(const mcp::JsonValue &args);
 
 } // namespace script_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 
 #endif

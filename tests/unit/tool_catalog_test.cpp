@@ -7,8 +7,8 @@
 #include <thread>
 #include <vector>
 
-using godot_self_driving::ToolCatalog;
-using godot_self_driving::ToolInfo;
+using godot_autopilot::ToolCatalog;
+using godot_autopilot::ToolInfo;
 
 namespace {
 

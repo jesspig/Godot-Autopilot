@@ -1,9 +1,9 @@
-#ifndef GODOT_SELF_DRIVING_EXPORT_GUARD_HPP
-#define GODOT_SELF_DRIVING_EXPORT_GUARD_HPP
+#ifndef GODOT_AUTOPILOT_EXPORT_GUARD_HPP
+#define GODOT_AUTOPILOT_EXPORT_GUARD_HPP
 
 #include <godot_cpp/classes/editor_export_plugin.hpp>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 class ExportGuard : public godot::EditorExportPlugin {
   GDCLASS(ExportGuard, godot::EditorExportPlugin)
@@ -19,6 +19,6 @@ protected:
   static void _bind_methods() {}
 };
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 
 #endif

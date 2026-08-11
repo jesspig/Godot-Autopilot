@@ -20,7 +20,7 @@
 #include <map>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 namespace {
 
@@ -128,7 +128,7 @@ static mcp::JsonValue node_detail_to_json(godot::Node *node,
       continue;
 
     godot::Variant val = node->get(prop_name);
-    props[name_str] = godot_self_driving::VariantJson::serialize(val);
+    props[name_str] = godot_autopilot::VariantJson::serialize(val);
   }
   j["properties"] = std::move(props);
 
@@ -516,4 +516,4 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
                             "8 resource handlers registered");
 }
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot

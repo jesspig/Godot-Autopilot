@@ -6,7 +6,7 @@
 #include <godot_cpp/classes/time.hpp>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace os_ops {
 
 using JV = mcp::JsonValue;
@@ -484,4 +484,4 @@ JV handle_os_shell_open(const JV &args) {
 }
 
 } // namespace os_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

@@ -1,10 +1,10 @@
-# Godot-Self-Driving
+# Godot-Autopilot
 
 > **Godot 引擎的 MCP 服务端 — 在原生 API 层面实现 AI 对引擎的全面控制**
 
 [English Version](README.md)
 
-Godot-Self-Driving 是一个基于 [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) 协议的服务端，它在 **原生引擎 API 层面** 将 AI Agent 与 Godot 引擎连接。与传统工具从"用户 UI 视角"出发（模拟点击或编辑器操作）不同，本项目赋予 AI Agent 对 Godot 整个引擎表面的直接、程序化访问能力 —— 场景树操作、物理服务器、渲染服务器、音频、导航、输入模拟、脚本执行等。
+Godot-Autopilot 是一个基于 [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) 协议的服务端，它在 **原生引擎 API 层面** 将 AI Agent 与 Godot 引擎连接。与传统工具从"用户 UI 视角"出发（模拟点击或编辑器操作）不同，本项目赋予 AI Agent 对 Godot 整个引擎表面的直接、程序化访问能力 —— 场景树操作、物理服务器、渲染服务器、音频、导航、输入模拟、脚本执行等。
 
 这是一个**进程内 GDExtension 插件**，直接加载到 Godot 编辑器中。无需独立的桥接进程 —— MCP 服务端随项目打开而启动，随项目关闭而停止。
 
@@ -15,7 +15,7 @@ MCP 主机 (Claude Desktop, Cursor 等)
   │ POST http://127.0.0.1:9527/mcp
   ▼
 Godot 编辑器
-  └── Godot-Self-Driving (GDExtension)
+  └── Godot-Autopilot (GDExtension)
       ├── libhv (内部 HTTP 线程)
       ├── mcp-cpp-sdk: McpServer + Streamable HTTP
       ├── 命令队列 (libhv → Godot 主线程桥接)
@@ -30,7 +30,7 @@ Godot 编辑器
 |--------|------|------|
 | **传输协议** | Streamable HTTP (POST /mcp) | MCP 标准协议，无桥接进程 |
 | **线程模型** | 命令队列 + 帧同步回调 | 安全访问 Godot 主线程独占 API |
-| **端口** | 9527 | 可通过 `GODOT_SELF_DRIVING_PORT` 环境变量配置 |
+| **端口** | 9527 | 可通过 `GODOT_AUTOPILOT_PORT` 环境变量配置 |
 | **发现机制** | 三层渐进式 (目录→检视→执行) | ~200 个工具场景下节省上下文窗口（数量随插件版本变化） |
 | **搜索** | BM25 关键词 | 工具按命名空间 + 描述组织 |
 | **构建** | CMake 3.28+ / C++17 | 跨平台，自动优化构建 |
@@ -99,8 +99,8 @@ godot://editor/settings/{key}       — 编辑器设置
 ### 构建
 
 ```bash
-git clone https://github.com/jesspig/Godot-Self-Driving.git
-cd Godot-Self-Driving
+git clone https://github.com/jesspig/Godot-Autopilot.git
+cd Godot-Autopilot
 
 # 推荐：一步完成构建 + 部署到 Example/addons/
 uv run build.py             # Debug
@@ -110,7 +110,7 @@ uv run build.py --release   # Release（先清理）
 cmake --preset release && cmake --build --preset release
 ```
 
-编译产物 `.dll` / `.so` / `.dylib` 位于 `build/release/`。`build.py` 同时生成 `.gdextension` 文件并将产物复制到 `Example/addons/godot-self-driving/`。
+编译产物 `.dll` / `.so` / `.dylib` 位于 `build/release/`。`build.py` 同时生成 `.gdextension` 文件并将产物复制到 `Example/addons/godot-autopilot/`。
 
 ### 安装
 
@@ -119,9 +119,9 @@ cmake --preset release && cmake --build --preset release
 ```
 your-project/
 └── addons/
-    └── godot-self-driving/
-        ├── godot-self-driving.dll      (或 .so / .dylib)
-        └── godot-self-driving.gdextension
+    └── godot-autopilot/
+        ├── godot-autopilot.dll      (或 .so / .dylib)
+        └── godot-autopilot.gdextension
 ```
 
 ### 配置 MCP 主机

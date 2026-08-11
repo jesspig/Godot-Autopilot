@@ -10,7 +10,7 @@
 #include <godot_cpp/variant/typed_array.hpp>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace debug_ops {
 
 namespace {
@@ -600,4 +600,4 @@ mcp::JsonValue handle_query_node_count(const mcp::JsonValue &) {
 }
 
 } // namespace debug_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

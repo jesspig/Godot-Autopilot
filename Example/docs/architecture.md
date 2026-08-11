@@ -13,7 +13,7 @@
 
 - `Example/project.godot` 是 Godot 4.7、Forward Plus 项目。
 - 当前没有主场景、输入动作、GDScript、场景资源或音频。
-- 插件构建命令是 `uv run build.py`，部署目录是 `Example/addons/godot-self-driving/`。
+- 插件构建命令是 `uv run build.py`，部署目录是 `Example/addons/godot-autopilot/`。
 - MCP 默认端口是 `9527`；Godot API 只能由 Godot 主线程调用。
 - HTTP 线程提交的操作必须经过 `CommandQueue::submit()`，由主线程 `_process()` 排空。
 
@@ -289,7 +289,7 @@ flowchart TD
 ```mermaid
 flowchart LR
     Dev[开发者或 MCP Client] --> HTTP[HTTP 请求 9527]
-    HTTP --> Plugin[Godot Self Driving 插件]
+    HTTP --> Plugin[Godot Autopilot 插件]
     Plugin --> Worker[libhv HTTP 线程]
     Worker --> Queue[CommandQueue submit]
     Queue --> Main[Godot 主线程 process]
@@ -297,7 +297,7 @@ flowchart LR
     Godot --> Game[单关卡运行时]
     Build[uv run build.py] --> Deploy[部署插件到 Example addons]
     Deploy --> Plugin
-    Env[GODOT_SELF_DRIVING_PORT] --> HTTP
+    Env[GODOT_AUTOPILOT_PORT] --> HTTP
 ```
 
 关键判读: HTTP 线程不得直接调用 Godot API；`uv run build.py` 只负责插件构建部署。游戏是否能运行要由 Godot 主场景和输入配置单独验证。

@@ -1,9 +1,9 @@
 #include "prompts/prompt_tool_usage.hpp"
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 std::string prompt_tool_usage() {
-  return R"gsd(# 常用工具使用示例
+  return R"gda(# 常用工具使用示例
 
 本文档提供了 19 个最常用 MCP 工具的详细使用示例，包含输入输出格式和注意事项。
 
@@ -679,7 +679,7 @@ std::string prompt_tool_usage() {
 1. **所有节点路径**相对于当前场景根节点（如 `Player`、`UI/MainContainer/StartButton`）
 2. **属性值类型**：Vector2→`{x,y}`、Vector3→`{x,y,z}`、Color→`{r,g,b,a}`、Rect2→`{position:{x,y},size:{w,h}}`
 3. **错误处理**：所有工具返回 `{"error": "消息"}` 表示失败
-4. **线程安全**：所有 Godot API 调用通过 CommandQueue 在主线程执行)gsd";
+4. **线程安全**：所有 Godot API 调用通过 CommandQueue 在主线程执行)gda";
 }
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot

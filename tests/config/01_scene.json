@@ -187,7 +187,7 @@
           {
             "id": "group_add",
             "tool": "group_add_node_to_group",
-            "args": { "node_path": "Lbl", "group_name": "gsd_test_group" },
+            "args": { "node_path": "Lbl", "group_name": "gda_test_group" },
             "expect": {
               "field_checks": [
                 { "key": "result", "value": "added" }
@@ -197,7 +197,7 @@
           {
             "id": "group_has_true",
             "tool": "group_has_node_in_group",
-            "args": { "node_path": "Lbl", "group_name": "gsd_test_group" },
+            "args": { "node_path": "Lbl", "group_name": "gda_test_group" },
             "expect": {
               "field_checks": [
                 { "key": "result", "value": true }
@@ -207,7 +207,7 @@
           {
             "id": "group_remove",
             "tool": "group_remove_node_from_group",
-            "args": { "node_path": "Lbl", "group_name": "gsd_test_group" },
+            "args": { "node_path": "Lbl", "group_name": "gda_test_group" },
             "expect": {
               "field_checks": [
                 { "key": "result", "value": "removed" }
@@ -217,7 +217,7 @@
           {
             "id": "group_has_false",
             "tool": "group_has_node_in_group",
-            "args": { "node_path": "Lbl", "group_name": "gsd_test_group" },
+            "args": { "node_path": "Lbl", "group_name": "gda_test_group" },
             "expect": {
               "field_checks": [
                 { "key": "result", "value": false }

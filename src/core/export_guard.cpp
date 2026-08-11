@@ -2,7 +2,7 @@
 
 #include <atomic>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 namespace {
 std::atomic<bool> g_exporting{false};
@@ -21,4 +21,4 @@ void ExportGuard::_export_end() {
   g_exporting.store(false, std::memory_order_relaxed);
 }
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot

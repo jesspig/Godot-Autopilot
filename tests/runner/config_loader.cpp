@@ -18,7 +18,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace gsd_test {
+namespace gda_test {
 
 namespace {
 
@@ -248,4 +248,4 @@ TestCase load_test_case(const std::string& json_path) {
     return tc;
 }
 
-} // namespace gsd_test
+} // namespace gda_test

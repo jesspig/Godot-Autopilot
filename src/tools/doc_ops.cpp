@@ -11,7 +11,7 @@
 #include <godot_cpp/variant/typed_array.hpp>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace doc_ops {
 
 namespace {
@@ -312,4 +312,4 @@ mcp::JsonValue handle_get_property(const mcp::JsonValue &args) {
 }
 
 } // namespace doc_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

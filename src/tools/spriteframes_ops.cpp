@@ -11,7 +11,7 @@
 #include <godot_cpp/variant/string_name.hpp>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace spriteframes_ops {
 
 using JV = mcp::JsonValue;
@@ -222,4 +222,4 @@ JV handle_add_frame(const JV &args) {
 }
 
 } // namespace spriteframes_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

@@ -1,11 +1,11 @@
-#ifndef GODOT_SELF_DRIVING_RESOURCE_REGISTRY_HPP
-#define GODOT_SELF_DRIVING_RESOURCE_REGISTRY_HPP
+#ifndef GODOT_AUTOPILOT_RESOURCE_REGISTRY_HPP
+#define GODOT_AUTOPILOT_RESOURCE_REGISTRY_HPP
 
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/core/object.hpp>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace resource_registry {
 
 void register_resource(const godot::Ref<godot::Resource> &res,
@@ -15,6 +15,6 @@ void erase_oid(int64_t object_id);
 bool is_registered(const std::string &name);
 
 } // namespace resource_registry
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 
 #endif

@@ -1,5 +1,5 @@
-#ifndef GODOT_SELF_DRIVING_TOOL_CATALOG_HPP
-#define GODOT_SELF_DRIVING_TOOL_CATALOG_HPP
+#ifndef GODOT_AUTOPILOT_TOOL_CATALOG_HPP
+#define GODOT_AUTOPILOT_TOOL_CATALOG_HPP
 
 #include <mutex>
 #include <optional>
@@ -9,7 +9,7 @@
 
 #include <mcp/JsonValue.hpp>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 struct ToolInfo {
   std::string name;
@@ -36,6 +36,6 @@ private:
   std::unordered_map<std::string, ToolInfo> tools_;
 };
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 
 #endif

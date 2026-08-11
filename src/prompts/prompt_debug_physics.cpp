@@ -1,9 +1,9 @@
 #include "prompts/prompt_debug_physics.hpp"
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 std::string prompt_debug_physics() {
-  return R"gsd(# 物理调试指南
+  return R"gda(# 物理调试指南
 
 ## 背景
 本流程引导你使用 Godot 的物理系统和调试工具进行碰撞检测、射线投射和性能分析。
@@ -128,7 +128,7 @@ std::string prompt_debug_physics() {
 - 射线投射的 `from` 和 `to` 是世界坐标
 - 碰撞掩码（collision_mask）基于层的 2^N 位运算
 - 调试可视化在编辑器场景运行时才生效
-- 使用 `debug_list_performance_monitors` 查看所有可用的性能监控项)gsd";
+- 使用 `debug_list_performance_monitors` 查看所有可用的性能监控项)gda";
 }
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot

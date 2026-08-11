@@ -1,9 +1,9 @@
-#ifndef GODOT_SELF_DRIVING_DISPLAY_OPS_HPP
-#define GODOT_SELF_DRIVING_DISPLAY_OPS_HPP
+#ifndef GODOT_AUTOPILOT_DISPLAY_OPS_HPP
+#define GODOT_AUTOPILOT_DISPLAY_OPS_HPP
 
 #include <mcp/JsonValue.hpp>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace display_ops {
 
 mcp::JsonValue handle_clipboard_get(const mcp::JsonValue &args);
@@ -32,6 +32,6 @@ mcp::JsonValue handle_window_set_size(const mcp::JsonValue &args);
 mcp::JsonValue handle_window_set_title(const mcp::JsonValue &args);
 
 } // namespace display_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 
 #endif

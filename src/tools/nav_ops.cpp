@@ -18,7 +18,7 @@
 #include <mcp/JsonValue.hpp>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace nav_ops {
 
 using JV = mcp::JsonValue;
@@ -723,4 +723,4 @@ JV handle_3d_obstacle_create(const JV &args) {
 }
 
 } // namespace nav_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

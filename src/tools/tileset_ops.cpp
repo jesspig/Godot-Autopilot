@@ -17,7 +17,7 @@
 #include <string>
 #include <vector>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace tileset_ops {
 
 using JV = mcp::JsonValue;
@@ -364,4 +364,4 @@ JV handle_set_tile_collision(const JV &args) {
 }
 
 } // namespace tileset_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

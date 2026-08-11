@@ -1,11 +1,11 @@
-#ifndef GODOT_SELF_DRIVING_MCP_STATUS_BAR_HPP
-#define GODOT_SELF_DRIVING_MCP_STATUS_BAR_HPP
+#ifndef GODOT_AUTOPILOT_MCP_STATUS_BAR_HPP
+#define GODOT_AUTOPILOT_MCP_STATUS_BAR_HPP
 
 #include <godot_cpp/classes/h_box_container.hpp>
 #include <godot_cpp/classes/label.hpp>
 #include <godot_cpp/classes/texture_rect.hpp>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 class McpStatusBar : public godot::HBoxContainer {
   GDCLASS(McpStatusBar, godot::HBoxContainer)
@@ -24,6 +24,6 @@ public:
   void set_status_ok(bool ok);
 };
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 
 #endif

@@ -31,7 +31,7 @@
 #include <string>
 #include <unordered_map>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace physics_ops {
 
 using JV = mcp::JsonValue;
@@ -2137,4 +2137,4 @@ JV handle_resolve_object(const JV &args) {
 }
 
 } // namespace physics_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

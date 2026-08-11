@@ -1,9 +1,9 @@
-#ifndef GODOT_SELF_DRIVING_DEBUG_OPS_HPP
-#define GODOT_SELF_DRIVING_DEBUG_OPS_HPP
+#ifndef GODOT_AUTOPILOT_DEBUG_OPS_HPP
+#define GODOT_AUTOPILOT_DEBUG_OPS_HPP
 
 #include <mcp/JsonValue.hpp>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace debug_ops {
 
 mcp::JsonValue handle_print(const mcp::JsonValue &args);
@@ -31,5 +31,5 @@ mcp::JsonValue handle_query_memory_usage(const mcp::JsonValue &args);
 mcp::JsonValue handle_query_node_count(const mcp::JsonValue &args);
 
 } // namespace debug_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 #endif

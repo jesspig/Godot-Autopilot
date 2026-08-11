@@ -35,7 +35,7 @@
 #include <mcp/JsonValue.hpp>
 
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 namespace {
 mcp::JsonValue make_schema() {
@@ -241,7 +241,7 @@ static mcp::JsonValue meta_call_tool_impl(mcp::JsonValue args) {
 }
 
 static mcp::JsonValue meta_call_tool_wait(const std::string& name, mcp::JsonValue result) {
-    auto* pending_p = result.Find("__gsd_pending");
+    auto* pending_p = result.Find("__gda_pending");
     if (pending_p && pending_p->IsInt()) {
         int64_t rid = pending_p->GetInt();
         int64_t timeout = 5000;
@@ -295,7 +295,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         opts.Description("Health check ping");
         server.RegisterTool("ping", opts,
             [](const mcp::RequestContext<mcp::CallToolRequestParams>&) -> mcp::CallToolResult {
-                if (godot_self_driving::ExportGuard::is_exporting()) {
+                if (godot_autopilot::ExportGuard::is_exporting()) {
                     return dispatch::export_blocked_result();
                 }
                 mcp::JsonValue r = meta_ping_impl();
@@ -341,7 +341,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         s_opts.Description("Search available tools by query").InputSchema(std::move(s));
         server.RegisterTool("search_tools", s_opts,
             [&queue, &index](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
-                if (godot_self_driving::ExportGuard::is_exporting()) {
+                if (godot_autopilot::ExportGuard::is_exporting()) {
                     return dispatch::export_blocked_result();
                 }
                 mcp::JsonValue args_copy = ctx.Params().arguments
@@ -366,7 +366,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         l_opts.Description("List all tool categories").InputSchema(std::move(s));
         server.RegisterTool("list_categories", l_opts,
             [&queue, &catalog](const mcp::RequestContext<mcp::CallToolRequestParams>&) -> mcp::CallToolResult {
-                if (godot_self_driving::ExportGuard::is_exporting()) {
+                if (godot_autopilot::ExportGuard::is_exporting()) {
                     return dispatch::export_blocked_result();
                 }
                 auto body = queue.submit([&catalog]() -> std::string {
@@ -397,7 +397,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         g_opts.Description("Get complete schema for one tool").InputSchema(std::move(s));
         server.RegisterTool("get_tool_detail", g_opts,
             [&queue, &catalog](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
-                if (godot_self_driving::ExportGuard::is_exporting()) {
+                if (godot_autopilot::ExportGuard::is_exporting()) {
                     return dispatch::export_blocked_result();
                 }
                 mcp::JsonValue args_copy = ctx.Params().arguments
@@ -434,7 +434,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         c_opts.Description("Execute any tool by name. Use this to call all non-meta tools (scene_*, property_*, signal_*, system_status).").InputSchema(std::move(s));
         server.RegisterTool("call_tool", c_opts,
             [](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
-                if (godot_self_driving::ExportGuard::is_exporting()) {
+                if (godot_autopilot::ExportGuard::is_exporting()) {
                     return dispatch::export_blocked_result();
                 }
                 mcp::JsonValue args = ctx.Params().arguments
@@ -496,7 +496,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         b_opts.Description("Execute multiple tools in batch. Each operation runs in sequence; if stop_on_error is true and any operation fails, remaining operations are skipped.").InputSchema(std::move(s));
         server.RegisterTool("batch_execute", b_opts,
             [&queue](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
-                if (godot_self_driving::ExportGuard::is_exporting()) {
+                if (godot_autopilot::ExportGuard::is_exporting()) {
                     return dispatch::export_blocked_result();
                 }
                 mcp::JsonValue args = ctx.Params().arguments
@@ -547,7 +547,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         c_opts.Description("Execute arbitrary GDScript code. The source code is wrapped in a script that extends Node, compiled, attached to a temporary node, and executed. Returns the function result serialized as JSON. By default the source is inlined inside the _run() function body: top-level func definitions are not supported — inline all code as expressions/statements, or define named functions and call one via function_name (multi-function mode). Execution environment exposes SceneRoot (the edited scene root node) for node access; see SceneRoot.get_node(\"Child\").").InputSchema(std::move(s));
         server.RegisterTool("code_execute", c_opts,
             [&queue](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
-                if (godot_self_driving::ExportGuard::is_exporting()) {
+                if (godot_autopilot::ExportGuard::is_exporting()) {
                     return dispatch::export_blocked_result();
                 }
                 mcp::JsonValue args = ctx.Params().arguments

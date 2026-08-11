@@ -1,9 +1,9 @@
-#ifndef GODOT_SELF_DRIVING_AUDIO_OPS_HPP
-#define GODOT_SELF_DRIVING_AUDIO_OPS_HPP
+#ifndef GODOT_AUTOPILOT_AUDIO_OPS_HPP
+#define GODOT_AUTOPILOT_AUDIO_OPS_HPP
 
 #include <mcp/JsonValue.hpp>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace audio_ops {
 
 mcp::JsonValue handle_bus_get_layout(const mcp::JsonValue &args);
@@ -28,6 +28,6 @@ mcp::JsonValue handle_get_input_device_list(const mcp::JsonValue &args);
 mcp::JsonValue handle_set_input_device(const mcp::JsonValue &args);
 
 } // namespace audio_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 
 #endif

@@ -13,7 +13,7 @@
 #include <string>
 #include <unordered_map>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace input_map_ops {
 
 using JV = mcp::JsonValue;
@@ -620,4 +620,4 @@ JV handle_persist(const JV &args) {
 }
 
 } // namespace input_map_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

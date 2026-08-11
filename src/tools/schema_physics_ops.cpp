@@ -1,7 +1,7 @@
 #include "tools/schema_fills.hpp"
 #include "tools/schema_builder.hpp"
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 void fill_schema_physics(std::unordered_map<std::string, mcp::JsonValue>& m) {
 
@@ -357,4 +357,4 @@ void fill_schema_physics(std::unordered_map<std::string, mcp::JsonValue>& m) {
         });
 }
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot

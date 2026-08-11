@@ -6,7 +6,7 @@
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 McpStatusBar::McpStatusBar() {
   set_custom_minimum_size(godot::Vector2(0, 24));
@@ -32,7 +32,7 @@ McpStatusBar::McpStatusBar() {
   }
 
   status_label = memnew(godot::Label);
-  status_label->set_text("GSD: initializing");
+  status_label->set_text("GDA: initializing");
   add_child(status_label);
 }
 
@@ -50,4 +50,4 @@ void McpStatusBar::set_status_ok(bool ok) {
 
 void McpStatusBar::_bind_methods() {}
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot

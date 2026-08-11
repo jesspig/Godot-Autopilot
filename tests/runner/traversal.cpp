@@ -10,7 +10,7 @@
 #include <utility>
 
 #ifndef PROJECT_ROOT
-#error "PROJECT_ROOT 编译宏未定义（tests/CMakeLists.txt 已为 gsd_test_runner 配置）"
+#error "PROJECT_ROOT 编译宏未定义（tests/CMakeLists.txt 已为 gda_test_runner 配置）"
 #endif
 
 namespace {
@@ -127,7 +127,7 @@ mcp::JsonValue heuristic_value(const std::string& type) {
 }
 
 // 经 call_tool 元工具代理调用领域工具；崩溃后响应文本可能为空/非 JSON。
-mcp::JsonValue call_domain_tool(gsd_test::McpTestClient& client,
+mcp::JsonValue call_domain_tool(gda_test::McpTestClient& client,
                                 const std::string& name,
                                 const mcp::JsonValue& args,
                                 std::string* raw_out) {
@@ -140,7 +140,7 @@ mcp::JsonValue call_domain_tool(gsd_test::McpTestClient& client,
     return mcp::JsonValue::Parse(text);
 }
 
-void print_stats(const std::string& mode, const gsd_test::TraversalStats& s,
+void print_stats(const std::string& mode, const gda_test::TraversalStats& s,
                  size_t results, size_t errors, size_t missing_req,
                  size_t skipped,
                  const std::vector<std::string>& non_object_names) {
@@ -164,7 +164,7 @@ void print_stats(const std::string& mode, const gsd_test::TraversalStats& s,
 
 } // namespace
 
-namespace gsd_test {
+namespace gda_test {
 
 std::vector<std::string> parse_domain_tool_names() {
     const std::string path =
@@ -353,4 +353,4 @@ TraversalStats run_traversal(McpTestClient& client, const std::string& mode,
     return stats;
 }
 
-} // namespace gsd_test
+} // namespace gda_test

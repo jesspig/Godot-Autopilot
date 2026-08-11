@@ -11,7 +11,7 @@
 #include <godot_cpp/variant/string_name.hpp>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace input_ops {
 
 namespace {
@@ -499,4 +499,4 @@ mcp::JsonValue handle_gamepad_simulate(const mcp::JsonValue &args) {
 }
 
 } // namespace input_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

@@ -18,7 +18,7 @@
 #include <godot_cpp/variant/packed_string_array.hpp>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace resource_ops {
 
 namespace {
@@ -1324,4 +1324,4 @@ mcp::JsonValue handle_get_property(const mcp::JsonValue &args) {
 }
 
 } // namespace resource_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

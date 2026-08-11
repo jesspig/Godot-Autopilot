@@ -1,10 +1,10 @@
-# Godot-Self-Driving
+# Godot-Autopilot
 
 > **An MCP Server for Godot Engine — AI-native engine control at the API level**
 
 [中文版说明](README_zh.md)
 
-Godot-Self-Driving is an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that bridges AI agents with the Godot game engine at the **native engine API level**. Unlike conventional tools that operate from a user-UI perspective (simulating clicks or editor operations), this project gives AI agents direct, programmatic access to Godot's entire engine surface — scene tree manipulation, physics servers, rendering servers, audio, navigation, input simulation, script execution, and more.
+Godot-Autopilot is an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that bridges AI agents with the Godot game engine at the **native engine API level**. Unlike conventional tools that operate from a user-UI perspective (simulating clicks or editor operations), this project gives AI agents direct, programmatic access to Godot's entire engine surface — scene tree manipulation, physics servers, rendering servers, audio, navigation, input simulation, script execution, and more.
 
 This is an **in-process GDExtension plugin** that loads directly into the Godot editor. No standalone bridge process needed — the MCP server starts when your project opens, and stops when it closes.
 
@@ -15,7 +15,7 @@ MCP Host (Claude Desktop, Cursor, etc.)
   │ POST http://127.0.0.1:9527/mcp
   ▼
 Godot Editor
-  └── Godot-Self-Driving (GDExtension)
+  └── Godot-Autopilot (GDExtension)
       ├── libhv (internal HTTP threads)
       ├── mcp-cpp-sdk: McpServer + Streamable HTTP
       ├── Command Queue (libhv → Godot main thread bridge)
@@ -30,7 +30,7 @@ Godot Editor
 |----------|--------|-----------|
 | **Transport** | Streamable HTTP (POST /mcp) | Standard MCP protocol, no bridge process |
 | **Thread Model** | Command queue + frame sync | Safe Godot main-thread-only API access |
-| **Port** | 9527 | Configurable via `GODOT_SELF_DRIVING_PORT` env var |
+| **Port** | 9527 | Configurable via `GODOT_AUTOPILOT_PORT` env var |
 | **Discovery** | 3-Tier Progressive (Catalog→Inspect→Execute) | Keeps context small with ~355 tools (count varies by plugin version) |
 | **Search** | BM25 keyword | Tools organized by namespace + descriptions |
 | **Build** | CMake 3.28+ / C++17 | Cross-platform, auto-optimized builds |
@@ -109,8 +109,8 @@ A custom `EditorDock` bottom panel displays plugin-only logs (system, tools, tra
 ### Build
 
 ```bash
-git clone https://github.com/jesspig/Godot-Self-Driving.git
-cd Godot-Self-Driving
+git clone https://github.com/jesspig/Godot-Autopilot.git
+cd Godot-Autopilot
 
 # Recommended: build + deploy to Example/addons/ in one step
 uv run build.py             # Debug
@@ -120,7 +120,7 @@ uv run build.py --release   # Release (cleans first)
 cmake --preset release && cmake --build --preset release
 ```
 
-The built `.dll` / `.so` / `.dylib` will be in `build/release/`. `build.py` also generates the `.gdextension` file and copies artifacts to `Example/addons/godot-self-driving/`.
+The built `.dll` / `.so` / `.dylib` will be in `build/release/`. `build.py` also generates the `.gdextension` file and copies artifacts to `Example/addons/godot-autopilot/`.
 
 ### Install
 
@@ -129,9 +129,9 @@ Copy to your Godot project:
 ```
 your-project/
 └── addons/
-    └── godot-self-driving/
-        ├── godot-self-driving.dll      (or .so / .dylib)
-        └── godot-self-driving.gdextension
+    └── godot-autopilot/
+        ├── godot-autopilot.dll      (or .so / .dylib)
+        └── godot-autopilot.gdextension
 ```
 
 ### Configure MCP Host

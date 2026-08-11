@@ -25,7 +25,7 @@
 #include <mcp/JsonValue.hpp>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace runtime {
 namespace game_bridge {
 
@@ -222,15 +222,15 @@ JV op_eval_script(const JV &params, int64_t request_id) {
   godot::Node *parent = root;
   if (persist) {
     godot::Node *container =
-        root->get_node_or_null(godot::NodePath("/root/__gsd_runtime"));
+        root->get_node_or_null(godot::NodePath("/root/__gda_runtime"));
     if (!container) {
       container = memnew(godot::Node);
-      container->set_name("__gsd_runtime");
+      container->set_name("__gda_runtime");
       root->add_child(container);
     }
     if (container->get_node_or_null(
             godot::NodePath(godot::String(persist_name.c_str())))) {
-      return error_result("persist node already exists: /root/__gsd_runtime/" +
+      return error_result("persist node already exists: /root/__gda_runtime/" +
                           persist_name);
     }
     parent = container;
@@ -263,7 +263,7 @@ JV op_eval_script(const JV &params, int64_t request_id) {
   if (is_await) {
     std::string persist_path;
     if (persist)
-      persist_path = "/root/__gsd_runtime/" + persist_name;
+      persist_path = "/root/__gda_runtime/" + persist_name;
     GameBridgeEvalAwaiter *awaiter = memnew(GameBridgeEvalAwaiter);
     awaiter->setup(request_id, godot::Ref<godot::RefCounted>(result), temp_node,
                    parent, persist, persist_path, await_timeout_ms,
@@ -280,11 +280,11 @@ JV op_eval_script(const JV &params, int64_t request_id) {
   append_eval_runtime_errors(body, run_seq_before);
   if (persist) {
     if (body["result"].IsObject()) {
-      body["result"]["node_path"] = JV("/root/__gsd_runtime/" + persist_name);
+      body["result"]["node_path"] = JV("/root/__gda_runtime/" + persist_name);
     } else {
       JV inner(JV::object_tag);
       inner["value"] = std::move(body["result"]);
-      inner["node_path"] = JV("/root/__gsd_runtime/" + persist_name);
+      inner["node_path"] = JV("/root/__gda_runtime/" + persist_name);
       body = ok_result(std::move(inner));
     }
   }
@@ -442,4 +442,4 @@ void register_eval_bridge_classes() {
 
 } // namespace game_bridge
 } // namespace runtime
-} // namespace godot_self_driving
+} // namespace godot_autopilot

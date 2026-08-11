@@ -13,7 +13,7 @@
 #include <windows.h>
 #endif
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace log_ops {
 
 using JV = mcp::JsonValue;
@@ -227,4 +227,4 @@ JV handle_log_get_game_entries(const JV &args) {
 }
 
 } // namespace log_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

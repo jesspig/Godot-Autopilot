@@ -3,7 +3,7 @@
 #include <mutex>
 #include <unordered_map>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace resource_registry {
 
 namespace {
@@ -60,4 +60,4 @@ bool is_registered(const std::string &name) {
 }
 
 } // namespace resource_registry
-} // namespace godot_self_driving
+} // namespace godot_autopilot

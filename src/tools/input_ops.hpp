@@ -1,9 +1,9 @@
-#ifndef GODOT_SELF_DRIVING_INPUT_OPS_HPP
-#define GODOT_SELF_DRIVING_INPUT_OPS_HPP
+#ifndef GODOT_AUTOPILOT_INPUT_OPS_HPP
+#define GODOT_AUTOPILOT_INPUT_OPS_HPP
 
 #include <mcp/JsonValue.hpp>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace input_ops {
 
 mcp::JsonValue handle_action_press(const mcp::JsonValue &args);
@@ -18,5 +18,5 @@ mcp::JsonValue handle_mouse_button_release(const mcp::JsonValue &args);
 mcp::JsonValue handle_gamepad_simulate(const mcp::JsonValue &args);
 
 } // namespace input_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 #endif

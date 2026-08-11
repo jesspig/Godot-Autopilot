@@ -1,9 +1,9 @@
 #include "prompts/prompt_setup_character.hpp"
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 std::string prompt_setup_character() {
-  return R"gsd(# 3D 角色控制器设置指南
+  return R"gda(# 3D 角色控制器设置指南
 
 ## 背景
 本流程引导你在 Godot 中创建一个 3D 角色控制器，包含 CharacterBody3D、碰撞形状和移动脚本。
@@ -80,7 +80,7 @@ std::string prompt_setup_character() {
 - 脚本中的输入动作（move_left/move_right/move_forward/move_back）需要先在 Input Map 中配置（参考 setup-input-map）
 - 碰撞形状的尺寸需要与视觉模型匹配
 - 使用 `property_set` 可以调整角色的其他物理属性（重力倍率、最大滑动角度等）
-- CharacterBody3D 默认没有视觉表现——可以添加 MeshInstance3D 作为子节点)gsd";
+- CharacterBody3D 默认没有视觉表现——可以添加 MeshInstance3D 作为子节点)gda";
 }
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot

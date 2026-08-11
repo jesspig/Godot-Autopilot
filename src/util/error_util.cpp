@@ -1,6 +1,6 @@
 #include "error_util.hpp"
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace util {
 
 mcp::JsonValue error_json(const std::string &msg) {
@@ -30,4 +30,4 @@ mcp::JsonValue error_detail(const std::string &fact,
 }
 
 } // namespace util
-} // namespace godot_self_driving
+} // namespace godot_autopilot

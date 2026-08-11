@@ -1,7 +1,7 @@
 #include "debugger_ops.hpp"
 #include "core/log_system.hpp"
 #include "debugger_access.hpp"
-#include "runtime/gsd_protocol.hpp"
+#include "runtime/gda_protocol.hpp"
 #include "runtime_ops.hpp"
 #include <algorithm>
 #include <ctime>
@@ -22,7 +22,7 @@
 #include <string>
 #include <vector>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace debugger_ops {
 
 namespace {
@@ -466,18 +466,18 @@ void OutputCaptureLogger::_log_error(const godot::String &p_function,
     text += p_code.utf8().ptr();
     text += ")";
   }
-  godot_self_driving::debugger_ops::capture_add_log_entry(text, true);
+  godot_autopilot::debugger_ops::capture_add_log_entry(text, true);
 }
 
 void OutputCaptureLogger::_log_message(const godot::String &p_message,
                                        bool p_error) {
-  godot_self_driving::debugger_ops::capture_add_log_entry(
+  godot_autopilot::debugger_ops::capture_add_log_entry(
       p_message.utf8().ptr(), p_error);
 }
 
 bool DebugCapturePlugin::_has_capture(const godot::String &p_name) const {
   std::string n = p_name.utf8().ptr();
-  return n == "gsd";
+  return n == "gda";
 }
 
 void DebugCapturePlugin::_setup_session(int32_t p_session_id) {
@@ -491,7 +491,7 @@ void DebugCapturePlugin::_setup_session(int32_t p_session_id) {
   }
   session_ = get_session(p_session_id);
   if (session_.is_valid()) {
-    godot_self_driving::debugger_ops::capture_add_log_entry(
+    godot_autopilot::debugger_ops::capture_add_log_entry(
         "Debug session started", false);
   }
 }
@@ -501,7 +501,7 @@ bool DebugCapturePlugin::_capture(const godot::String &p_message,
                                   int32_t p_session_id) {
   std::string msg = p_message.utf8().ptr();
 
-  if (msg == std::string(godot_self_driving::GSD_MSG_READY)) {
+  if (msg == std::string(godot_autopilot::GDA_MSG_READY)) {
     std::lock_guard<std::mutex> lock(session_mtx_);
     if (std::find(ready_session_ids_.begin(), ready_session_ids_.end(),
                   p_session_id) == ready_session_ids_.end()) {
@@ -510,10 +510,10 @@ bool DebugCapturePlugin::_capture(const godot::String &p_message,
     return true;
   }
 
-  if (msg == std::string(godot_self_driving::GSD_MSG_RESPONSE) &&
+  if (msg == std::string(godot_autopilot::GDA_MSG_RESPONSE) &&
       p_data.size() >= 1) {
     godot::String payload = p_data[0];
-    godot_self_driving::runtime_ops::handle_game_response(
+    godot_autopilot::runtime_ops::handle_game_response(
         std::string(payload.utf8().ptr()));
   }
 
@@ -526,12 +526,12 @@ mcp::JsonValue capture_note_for_empty_result() {
   return mcp::JsonValue(
       capture_session_active()
           ? "session active but the game reported no data — verify the game "
-            "project loads the godot-self-driving extension; fall back to "
+            "project loads the godot-autopilot extension; fall back to "
             "log_get_game_entries for the game process log"
           : "no active debug session — start the game with "
             "editor_play_current_scene; game errors/output/scene-tree are now "
             "fetched over the runtime channel (game must load the "
-            "godot-self-driving extension)");
+            "godot-autopilot extension)");
 }
 
 } // namespace
@@ -562,7 +562,7 @@ mcp::JsonValue handle_debugger_get_errors(const mcp::JsonValue &args) {
   if (capture_session_active()) {
     mcp::JsonValue params(mcp::JsonValue::object_tag);
     params["limit"] = mcp::JsonValue(static_cast<int64_t>(limit));
-    return runtime_ops::handle_gsd_send("get_errors", params, 5000);
+    return runtime_ops::handle_gda_send("get_errors", params, 5000);
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   std::string errors_text = DebuggerCapture::instance().get_errors_text(limit);
@@ -585,7 +585,7 @@ mcp::JsonValue handle_debugger_get_output(const mcp::JsonValue &args) {
   if (capture_session_active()) {
     mcp::JsonValue params(mcp::JsonValue::object_tag);
     params["limit"] = mcp::JsonValue(static_cast<int64_t>(limit));
-    return runtime_ops::handle_gsd_send("get_output", params, 5000);
+    return runtime_ops::handle_gda_send("get_output", params, 5000);
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   std::string output_text =
@@ -607,7 +607,7 @@ mcp::JsonValue handle_debugger_get_stack_dump(const mcp::JsonValue &) {
   if (capture_stack_size() == 0) {
     r["note"] = mcp::JsonValue(
         "stack data is only available in a debugger breakpoint session; this "
-        "version cannot fetch it over the gsd runtime channel — use "
+        "version cannot fetch it over the gda runtime channel — use "
         "log_get_game_entries or game_eval to diagnose");
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -620,7 +620,7 @@ mcp::JsonValue handle_debugger_get_scene_tree(const mcp::JsonValue &) {
                             "debugger_get_scene_tree called");
   if (capture_session_active()) {
     mcp::JsonValue params(mcp::JsonValue::object_tag);
-    return runtime_ops::handle_gsd_send("get_tree", params, 5000);
+    return runtime_ops::handle_gda_send("get_tree", params, 5000);
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   std::string scene_tree_text =
@@ -683,4 +683,4 @@ void register_classes() {
 
 } // namespace debugger_ops
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot

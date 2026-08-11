@@ -1,9 +1,9 @@
-#ifndef GODOT_SELF_DRIVING_EDITOR_OPS_HPP
-#define GODOT_SELF_DRIVING_EDITOR_OPS_HPP
+#ifndef GODOT_AUTOPILOT_EDITOR_OPS_HPP
+#define GODOT_AUTOPILOT_EDITOR_OPS_HPP
 
 #include <mcp/JsonValue.hpp>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace editor_ops {
 
 mcp::JsonValue handle_get_selection(const mcp::JsonValue &args);
@@ -33,5 +33,5 @@ mcp::JsonValue handle_save_scene_as(const mcp::JsonValue &args);
 mcp::JsonValue handle_new_text_resource(const mcp::JsonValue &args);
 
 } // namespace editor_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 #endif
