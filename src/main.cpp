@@ -108,13 +108,7 @@ void GodotSelfDrivingPlugin::_enter_tree() {
 
   try {
     status_bar = memnew(godot_self_driving::McpStatusBar);
-    if (get_server_ctx() && get_server_ctx()->is_running()) {
-      auto port = get_server_ctx()->get_port();
-      status_bar->set_status_text("GSD: 0.0.0.0:" +
-                                  godot::String::num_int64(port));
-    } else {
-      status_bar->set_status_text("GSD: offline");
-    }
+    status_bar->set_status_text("GSD: starting...");
     add_control_to_container(godot::EditorPlugin::CONTAINER_TOOLBAR,
                              status_bar);
     get_log_system().log(LogLevel::Debug, LogCategory::System,
@@ -192,13 +186,24 @@ void GodotSelfDrivingPlugin::_enter_tree() {
     bool started = g_server_ctx->start();
     if (started) {
       auto port = g_server_ctx->get_port();
+      if (status_bar) {
+        status_bar->set_status_text("GSD: 0.0.0.0:" +
+                                    godot::String::num_int64(port));
+      }
       get_log_system().log(LogLevel::Info, LogCategory::Transport,
                            "MCP server listening on 0.0.0.0:" +
                                std::to_string(port));
     } else {
+      if (status_bar) {
+        status_bar->set_status_text("GSD: offline");
+      }
       get_log_system().log(LogLevel::Error, LogCategory::Transport,
                            "MCP server start failed: " +
                                g_server_ctx->last_error());
+    }
+  } else {
+    if (status_bar) {
+      status_bar->set_status_text("GSD: offline");
     }
   }
 
@@ -294,6 +299,7 @@ GDExtensionEntryPoint(GDExtensionInterfaceGetProcAddress p_get_proc_address,
 
         godot::ClassDB::register_class<godot_self_driving::McpLogDock>();
         godot::ClassDB::register_class<godot_self_driving::McpStatusBar>();
+        godot::ClassDB::register_class<godot_self_driving::ExportGuard>();
         godot::ClassDB::register_class<GodotSelfDrivingPlugin>();
         godot::EditorPlugins::add_by_type<GodotSelfDrivingPlugin>();
       }
