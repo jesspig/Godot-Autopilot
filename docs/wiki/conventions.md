@@ -7,7 +7,7 @@
 - **命名空间**：`godot_autopilot`（工具子命名空间 `<模块>_ops`，如 `godot_autopilot::scene_ops`）
 - **前缀**：核心常量 `GDA_*`（如 `GDA_DEFAULT_PORT`）；运行时协议 `gda:*`；导出宏 `GDA_EXPORT`
 - **产物与目录**：CMake 目标 `godot-autopilot`，部署到 `Example/addons/godot-autopilot/`
-- **工具命名**：约定 `<category>_<action>_<subaction>`（snake_case），实际覆盖率约 30%（严格三段式 103/348）；已知例外：`resolve_object`/`resolve_rid`（无类别前缀）、`signal_connect`/`signal_disconnect`（无 property 前缀）、`output_get_log`、`editor_capture_viewport`（editor_ 前缀）
+- **工具命名**：约定 `<动词>_<类别>_<维度>_<对象>_<修饰>`（snake_case，**动词置首**），如 `create_scene_node`、`intersect_physics_2d_ray`、`set_input_map_action_deadzone`；331 个工具名全部动词置首，段数随粒度自然变化（2-6 段），`signal_connect`/`property_set` 等短名属规范内省略类别段
 - **头文件 include guard**：`GODOT_AUTOPILOT_<MODULE>_HPP`
 
 ## 日志

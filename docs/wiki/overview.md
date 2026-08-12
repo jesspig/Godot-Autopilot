@@ -13,9 +13,9 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 
 ## 核心能力
 
-### MCP 工具：355 个 = 7 元工具 + 348 领域工具
+### MCP 工具：338 个 = 7 元工具 + 331 领域工具
 
-数值以 `src/tools/tool_defs.def`（348 条 `TOOL_ENTRY`）与 `src/tools/dispatch.cpp`（`meta_tool_names` 7 个）为准；数量随插件版本变化，运行时可经 `search_tools` 确认。
+数值以 `src/tools/tool_defs.def`（331 条 `TOOL_ENTRY`）与 `src/tools/dispatch.cpp`（`meta_tool_names` 7 个）为准；数量随插件版本变化，运行时可经 `search_tools` 确认。工具名遵循 `<动词>_<类别>_<维度>_<对象>_<修饰>`（动词置首，snake_case）。
 
 **7 个元工具**（直接 `server.RegisterTool()` 注册，见 `register_all.cpp`）：
 
@@ -29,24 +29,24 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 | `batch_execute` | 顺序批量执行多工具 |
 | `code_execute` | 执行任意 GDScript（临时 Node + `_run()`，可选 `function_name` 多函数模式） |
 
-**348 个领域工具**（经 `call_tool` 代理，`g_handlers` 映射分发），按 24 个类别组织，各类别数量以 `tool_defs.def` 统计为准：
+**331 个领域工具**（经 `call_tool` 代理，`g_handlers` 映射分发），按 23 个类别组织（InputMap 并入 Input），各类别数量以 `tool_defs.def` 统计为准：
 
 | 类别 | 数量 | 类别 | 数量 |
 |---|---:|---|---:|
-| Physics | 52 | Render | 50 |
-| Editor | 25 | Display | 24 |
-| Debug | 23 | Resources | 22 |
-| Audio | 20 | Input | 17 |
-| Navigation | 15 | OS | 15 |
-| Scene | 13 | Config | 13 |
-| Text | 11 | Scripts | 10 |
-| Debugger | 7 | TileMap | 7 |
-| Game | 6 | Properties | 5 |
-| Docs | 4 | SpriteFrames | 3 |
-| Group | 3 | InputMap | 1 |
-| Capture | 1 | System | 1 |
+| Render | 49 | Scene | 12 |
+| Physics | 47 | Scripts | 10 |
+| Display | 24 | Text | 10 |
+| Editor | 22 | TileMap | 7 |
+| Resources | 21 | Debugger | 7 |
+| Audio | 20 | Game | 6 |
+| Input | 19 | Properties | 5 |
+| OS | 16 | Docs | 4 |
+| Debug | 16 | Group | 3 |
+| Navigation | 15 | SpriteFrames | 3 |
+| Config | 13 | System | 1 |
+| | | Capture | 1 |
 
-另有 `system_status`（端口/版本/运行时长）注册于 `g_handlers`，经 `call_tool` 调用，不直接注册为 MCP 工具；`ToolCatalog` 合计 356 条目（348 领域 + `system_status` + 5 个默认条目 + 3 个 meta 快照）。
+另有 `system_status`（端口/版本/运行时长）注册于 `g_handlers`，经 `call_tool` 调用，不直接注册为 MCP 工具；`ToolCatalog` 合计 342 条目（331 领域 + 7 元工具 + `system_status` + 3 个 meta 快照）。
 
 ### 提示词模板：7 个
 
@@ -60,7 +60,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 
 ### 运行时桥接（game_* 工具）
 
-编辑器进程的 MCP 服务器与游戏运行时进程经 EngineDebugger 消息通道（`gda:request` / `gda:response` / `gda:ready`）双向通信，`src/runtime/`（`game_bridge.cpp` / `game_bridge_input.cpp` / `game_bridge_eval.cpp` + `gda_protocol.hpp`）实现输入模拟、GDScript 求值、截图捕获、日志/错误回传、场景树查询等 op。工具侧封装见 `game_*` / `log_get_game_entries` 等。详见 [modules/entry_runtime.md](./modules/entry_runtime.md)。
+编辑器进程的 MCP 服务器与游戏运行时进程经 EngineDebugger 消息通道（`gda:request` / `gda:response` / `gda:ready`）双向通信，`src/runtime/`（`game_bridge.cpp` / `game_bridge_input.cpp` / `game_bridge_eval.cpp` + `gda_protocol.hpp`）实现输入模拟、GDScript 求值、截图捕获、日志/错误回传、场景树查询等 op。工具侧封装见 `game_*` / `get_game_log_entries` 等。详见 [modules/entry_runtime.md](./modules/entry_runtime.md)。
 
 ### 编辑器 UI
 
@@ -96,7 +96,7 @@ godot-self-driving/
 │   ├── core/                   # 基础设施：CommandQueue(header-only)、config、LogSystem、ModeDetector、
 │   │                           #   ResourceRegistry、SceneDirtyTracker、ExportGuard、ServerContext
 │   ├── tools/                  # 领域工具：36 个 *_ops.cpp、register_all、dispatch、tool_catalog、
-│   │                           #   tool_defs.def（348 条工具定义）、schema_* 生成器
+│   │                           #   tool_defs.def（331 条工具定义）、schema_* 生成器
 │   ├── resources/              # MCP Resources：resource_handlers + debugger_resources
 │   ├── prompts/                # 提示词模板：7 个主题 + debugger_prompts
 │   ├── runtime/                # 游戏运行时桥接：game_bridge(±input/eval) + gda_protocol.hpp
@@ -131,7 +131,7 @@ flowchart LR
 | 项 | 约定 |
 |---|---|
 | 命名空间 | `godot_autopilot`（部分子模块用子命名空间，如 `dispatch`、`resource_registry`、`scene_dirty_tracker`、`runtime::game_bridge`） |
-| 工具命名 | `<category>_<action>_<subaction>`（snake_case，如 `physics_2d_ray_cast`、`scene_node_create`） |
+| 工具命名 | `<动词>_<类别>_<维度>_<对象>_<修饰>`（动词置首，snake_case，如 `intersect_physics_2d_ray`、`create_scene_node`、`set_input_map_action_deadzone`） |
 | 代码前缀 | 常量 `GDA_`（如 `GDA_DEFAULT_PORT`）；运行时环境变量 `GODOT_AUTOPILOT_PORT`、`GDA_FORCE_HEADLESS` |
 | 产物 | `godot-autopilot`（库名/插件目录/`.gdextension` 名） |
 | 端口 | 9527（`GDA_DEFAULT_PORT`，`config.hpp`），`GODOT_AUTOPILOT_PORT` 环境变量覆盖，端点 `/mcp`（`server_context.cpp`） |
@@ -141,7 +141,7 @@ flowchart LR
 | 项 | 值 |
 |---|---|
 | MCP 端口 / 端点 | 9527 / `/mcp`（环境变量 `GODOT_AUTOPILOT_PORT` 覆盖） |
-| 工具总数 | 355 = 7 元 + 348 领域（领域 24 类别）；ToolCatalog 356 条目 |
+| 工具总数 | 338 = 7 元 + 331 领域（领域 23 类别）；ToolCatalog 342 条目 |
 | 提示词 / 资源 | 7 模板 / 15 资源 |
 | 日志类别 | 5（System / Transport / Tools / Resources / Prompts） |
 | 引擎目标 | Godot 4.7（`Example/project.godot` features） |
@@ -149,8 +149,8 @@ flowchart LR
 ## 文档一致性核查（速览）
 
 - 端口 9527、`/mcp`、`GODOT_AUTOPILOT_PORT`：README（英/中）、AGENTS.md、代码三方一致 ✓
-- 工具总数 355：README.md（英文）"~355" 与 `tool_defs.def` + meta 数量一致 ✓；**README_zh.md 的"~200 个工具、13 个类别"已过时** ✗
-- README.md 类别数量表与 def 有偏差（Physics 51→52、Input 17→7、Game 3→1、Properties 5→2、Scene 13→11、TileMap 7→6、Debugger 7→5 等）✗
+- 工具总数 338：README.md（英文）"~338" 与 `tool_defs.def` + meta 数量一致 ✓；README_zh.md 已同步更新（原"~200 个工具、13 个类别"过时，已修正）
+- README.md 类别数量表与 def 一致（23 类，以 `tool_defs.def` 实测为准）✓
 - 无 CI：`.github/` 不存在，AGENTS.md 声称属实 ✓
 - 目标引擎 4.7：与 `Example/project.godot` 一致 ✓；README 前提"Godot 4.3+"为宽松下界
 - 详细对照见 [example.md](./example.md) 与 [modules/core.md](./modules/core.md) 的"不一致点"章节

@@ -20,9 +20,10 @@
 
 ## 关键数值速查（以运行时统计为准）
 
-- 工具总数 **355** = 7 元工具 + 348 领域工具；`ToolCatalog` 356 条目；领域工具分 **24 类**
-- schema：283 非空 / 73 空；**3 个契约缺口**（scene_node_create、resource_get_extensions、resource_reimport）
-- 遍历排除 **35 个副作用工具**；L1 单元测试 **61 个 gtest**；L2 用例 **5 个文件**
+- 工具总数 **338** = 7 元工具 + 331 领域工具；`ToolCatalog` 342 条目；领域工具分 **23 类**（InputMap 并入 Input）
+- schema：非空/空数以运行时统计为准（def 静态：SCHEMA_NONE=208 / SCHEMA_BASIC=123）；**3 个契约缺口**（create_scene_node、get_resource_extensions、reimport_resource_files）
+- 遍历排除 **34 个副作用工具**；L1 单元测试 **61 个 gtest**；L2 用例 **5 个文件**
+- 工具命名规范：`<动词>_<类别>_<维度>_<对象>_<修饰>`（动词置首，如 create_scene_node、intersect_physics_2d_ray）
 - MCP 端口 **9527**（`/mcp`），`GODOT_AUTOPILOT_PORT` 可覆盖；产物名 `godot-autopilot`
 
 ## 维护入口

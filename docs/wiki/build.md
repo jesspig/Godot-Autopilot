@@ -119,7 +119,7 @@ version 8；`debug`/`release` 两个 configure 预设：Ninja 生成器、`build
 - 依赖版本 `godot-cpp 10.0.0-rc1` / `mcp-cpp-sdk 0.2.2`、FetchContent 非子模块 ✓（`FetchDependencies.cmake:15,24`）；
 - 编译器优先 Clang/clang-cl、MSVC/GCC 回退 ✓（根 CMakeLists 自动探测 + `CompilerOptions.cmake` 分发）；
 - 优化自适应（sccache/ccache、LTO、Unity、Ninja 作业池）✓；**精度差异**：AGENTS.md 写"可通过 `GDA_COMPILE_JOBS` / `GDA_LINK_JOBS` 等环境变量覆盖"——实际仅这两个支持环境变量，`GDA_UNITY_BATCH_SIZE` 等内存参数只接受 `-D` CACHE；
-- **文档不一致点**：`README_zh.md` 仍写"~200 个 MCP 工具、13 个类别"，与 `README.md`（~355/22）及 [overview.md](./overview.md) 审计（355 = 7 元 + 348 领域）不符，中文 README 已过时；另 `--package` / `--debug` 两个 build.py 参数在 README 构建章节未提及。
+- **文档一致性**：`README_zh.md` 与 `README.md`（~338/23 类）及 [overview.md](./overview.md) 审计（338 = 7 元 + 331 领域）一致；`--package` / `--debug` 两个 build.py 参数在 README 构建章节未提及。
 
 ## 关联页面
 

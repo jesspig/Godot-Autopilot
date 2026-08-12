@@ -156,7 +156,7 @@
 - AGENTS.md "在 MODULE_INITIALIZATION_LEVEL_EDITOR 阶段加载到 Godot 编辑器"：编辑器侧类确在 EDITOR 级别注册；但运行时桥接 `register_listener` 注册在 **SCENE 级别**且仅非编辑器进程，属补充事实而非矛盾。
 - AGENTS.md 线程模型 "HTTP 线程 → CommandQueue::submit() → 主线程 _process() 排空"：与 `_process()` 中 `s_queue.drain()` 一致。
 - AGENTS.md 错误模式 `{"error": "..."}`：桥接层 `error_result` 同构；差异是桥接响应额外带布尔 `ok` 字段。
-- Example/docs/architecture.md 的 HTTP→libhv→CommandQueue→主线程流程图与本文件 `_process` 实现一致；该文档的 `game_*` 工具（game_status/game_input/game_capture 等）正是本页桥接 op 在 MCP 工具侧的封装。
+- Example/docs/architecture.md 的 HTTP→libhv→CommandQueue→主线程流程图与本文件 `_process` 实现一致；该文档的 `game_*` 工具（get_game_status/queue_game_input/capture_game_viewport 等）正是本页桥接 op 在 MCP 工具侧的封装。
 
 不一致点汇总：
 

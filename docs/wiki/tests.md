@@ -88,7 +88,7 @@ stdout/stderr 各接独立管道读线程持续消费，防 64KB 缓冲写满阻
 | `gda_runner_01_scene` | `01_scene.json` | 01_scene | before_all 1 + 19 | 场景节点：创建（显式根路径/默认值/子节点/非法类型/双根）、删除（成功/缺失/根禁删）、树查询、未保存拒绝切换、group 四步、缺参报错 |
 | `gda_runner_02_property` | `02_property.json` | property_tools | before_all 2 + 17 | 属性读写：int/string/Vector2/Color 写读回、缺属性/缺节点报错、readback MATCHED、int 字符串静默转 0、property_get_list、缺 value 报错 |
 | `gda_runner_03_tools_contract` | `03_tools_contract.json` | tools_contract | 2 个 traverse 步骤 | 全量遍历：empty_args + heuristic_smoke（详见下节） |
-| `gda_runner_04_resources_scripts` | `04_resources_scripts.json` | resources_scripts | 7 | script_execute_gdscript 四行为（单表达式自返/多行显式 return/语法错/缺参）+ resource_get_extensions / resource_exists + search_tools 发现性 |
+| `gda_runner_04_resources_scripts` | `04_resources_scripts.json` | resources_scripts | 7 | execute_script 四行为（单表达式自返/多行显式 return/语法错/缺参）+ get_resource_extensions / has_resource + search_tools 发现性 |
 
 **JSON schema 冻结规则**（`config_loader.cpp` 强制校验，违规抛 `runtime_error` 且错误消息含字段路径）：顶层必填 `name`/`pipeline`；`headless` 默认 true；`on_failure` 仅 `fail_fast`（默认）| `continue`；`before_all`/`after_all` 仅 tool+args+id（不支持 traverse/expect）；`stages[].steps` 平铺保留顺序；步骤 `tool` 与 `traverse` 二选一；`traverse.mode` 仅 `empty_args`（默认）| `heuristic_smoke`。
 
@@ -96,44 +96,44 @@ stdout/stderr 各接独立管道读线程持续消费，防 64KB 缓冲写满阻
 
 ## 全量遍历（`traversal.cpp`）
 
-- **工具来源**：运行时解析 `src/tools/tool_defs.def` 的 `TOOL_ENTRY(` 条目，**实测 348 个**；解析失败（缺逗号/引号未闭合）抛异常
+- **工具来源**：运行时解析 `src/tools/tool_defs.def` 的 `TOOL_ENTRY(` 条目，**实测 331 个**；解析失败（缺逗号/引号未闭合）抛异常
 - **内置前置校验**：每工具先 `get_tool_detail` 校验存在性与工具名一致性（响应非对象或名字不匹配 → FAIL）
 - **`empty_args`**：空对象调用；响应非 JSON 对象 → FAIL；含 `error` 字段算"有错误响应"（统计 error 数，不 FAIL）；schema `required` 非空但空参未报错 → 记 **warnings**（不 FAIL）
 - **`heuristic_smoke`**：按 schema properties 类型生成启发值（integer→0、number→0.0、boolean→false、array→`[]`、object→`{}`、其余→`"test"`）；无 properties 的工具跳过（不产生步骤）
 - **崩溃检测**：每步调用后查编辑器进程存活，进程死亡 → `fatal_error`（附 2000 字符日志）
 - 统计输出：调用总数 / 通过 / 失败 / result / error / "missing required" / 跳过（无 properties）/ 排除（副作用）
 
-### 步数核算（vs AGENTS.md 的 "560 步"）
+### 步数核算（vs AGENTS.md 的 "约 408 步"）
 
-- 每次遍历候选 = 348 − 35 排除 = **313 个非排除工具**
-- empty_args：313 个调用、每个产生 1 个步骤
-- heuristic_smoke：313 个候选 − 无 properties 的工具跳过数；按运行时观测 ~66 个跳过推算 ≈ 247 个步骤
-- 两次遍历合计 ≈ **560 个步骤**（无静态来源，精确值取决于运行时空 schema 数，AGENTS.md 的 "560" 即此口径）
-- 耗时：AGENTS.md 称 "约 15s"，`tests/README.md` 称 "约 2-3 分钟"（626 次 HTTP 往返 + 两次全量 get_tool_detail）。两者矛盾，**以 README 的分钟级为准**（15s 仅是单次编辑器生命周期本身的量级）。
+- 每次遍历候选 = 331 − 34 排除 = **297 个非排除工具**
+- empty_args：297 个调用、每个产生 1 个步骤
+- heuristic_smoke：297 个候选 − 无 properties 的工具跳过数；按 def 静态推算（SCHEMA_NONE=208，其中 22 个被排除）≈ 111 个步骤
+- 两次遍历合计 ≈ **408 个步骤**（精确值取决于运行时空 schema 数，以运行时统计为准）
+- 耗时：`tests/README.md` 称 "约 2-3 分钟"（两次全量遍历 + 两次全量 get_tool_detail 的 HTTP 往返量级）。
 
-### 35 工具排除清单（`traversal.cpp:24-63`，实测 35 = 13 + 22，名单与 README/AGENTS.md 逐项一致）
+### 34 工具排除清单（`traversal.cpp:24-63`，实测 34 = 12 + 22，名单与 README/AGENTS.md 逐项一致）
 
-**持久磁盘副作用（13）**——写 project.godot / editor_settings / .tscn / 文件：
+**持久磁盘副作用（12）**——写 project.godot / editor_settings / .tscn / 文件：
 
 ```
-editor_set_main_scene  editor_set_plugin_enabled  project_settings_save
-input_map_action_add_event  input_map_persist  editor_settings_set
-editor_save_scene  editor_save_all_scenes  editor_save_scene_as
-editor_new_text_resource  file_write  script_create  resource_save
+set_editor_main_scene  set_editor_plugin_enabled  save_project_settings
+add_input_map_action_event  save_input_map  set_editor_settings
+save_editor_scene  save_editor_scenes  save_editor_scene_as
+write_file  create_script  save_resource
 ```
 
 **用户可见副作用（22）**——弹窗/进程/环境变量/音频/剪贴板/鼠标/窗口：
 
 | 类别 | 数量 | 工具 |
 |---|---|---|
-| 弹窗与对话框 | 2 | `os_alert`、`display_dialog_show` |
-| 进程与系统执行 | 5 | `os_create_process`、`os_execute`、`os_kill`、`os_shell_open`、`os_move_to_trash` |
-| 环境变量 | 1 | `os_set_environment` |
-| 音频/语音 | 2 | `display_tts_speak`、`display_tts_stop` |
-| 剪贴板/鼠标 | 3 | `display_clipboard_set`、`display_mouse_set_mode`、`display_mouse_warp` |
-| 窗口操作 | 9 | `display_window_set_title`、`display_window_set_position`、`display_window_set_size`、`display_window_set_mode`、`display_window_set_flag`、`display_window_move_to_foreground`、`display_window_request_attention`、`display_window_create`、`display_window_delete` |
+| 弹窗与对话框 | 2 | `show_os_alert`、`show_display_dialog` |
+| 进程与系统执行 | 5 | `create_os_process`、`execute_os_process`、`kill_os_process`、`open_os_path`、`move_os_file_to_trash` |
+| 环境变量 | 1 | `set_os_environment` |
+| 音频/语音 | 2 | `speak_display_tts`、`stop_display_tts` |
+| 剪贴板/鼠标 | 3 | `set_display_clipboard`、`set_display_mouse_mode`、`warp_display_mouse` |
+| 窗口操作 | 9 | `set_display_window_title`、`set_display_window_position`、`set_display_window_size`、`set_display_window_mode`、`set_display_window_flag`、`move_display_window_to_foreground`、`request_display_window_attention`、`create_display_window`、`delete_display_window` |
 
-历史事故（README 记载）：`editor_set_main_scene` 曾把 `application/run/main_scene` 写成 `"test"` 写入 `Example/project.godot`；`editor_save_scene` 空参生成 `Example/NewNode.tscn`。**新增工具若写配置/文件/弹窗/改窗口，必须同步加入此清单**，否则遍历会污染 Example 项目或干扰桌面。
+历史事故（README 记载）：`set_editor_main_scene` 曾把 `application/run/main_scene` 写成 `"test"` 写入 `Example/project.godot`；`save_editor_scene` 空参生成 `Example/NewNode.tscn`。**新增工具若写配置/文件/弹窗/改窗口，必须同步加入此清单**，否则遍历会污染 Example 项目或干扰桌面。
 
 ### warnings 语义（3 个已知契约缺口）
 
@@ -141,24 +141,24 @@ editor_new_text_resource  file_write  script_create  resource_save
 
 | 工具 | 缺口 |
 |---|---|
-| `scene_node_create` | name / type 有默认值，不校验必填 |
-| `resource_get_extensions` | 缺 type 时返回全类型列表 |
-| `resource_reimport` | 空参时 count=0 静默成功 |
+| `create_scene_node` | name / type 有默认值，不校验必填 |
+| `get_resource_extensions` | 缺 type 时返回全类型列表 |
+| `reimport_resource_files` | 空参时 count=0 静默成功 |
 
 ## 数值核算总表（vs AGENTS.md / README）
 
 | 条目 | AGENTS.md 声称 | 源码核算 | 结论 |
 |---|---|---|---|
-| L1 gtest 数量 | 59 | 61（8 文件逐文件统计：14+13+10+7+7+6+3+1） | **不一致，实际 61**（`tests/README.md` 第 7 行同称 59，同样过时） |
+| L1 gtest 数量 | 61 | 61（8 文件逐文件统计：14+13+10+7+7+6+3+1） | 一致 |
 | L2 用例文件数 | 5 | 5（00_meta / 01_scene / 02_property / 03_tools_contract / 04_resources_scripts） | 一致 |
 | ctest L2 用例 | gda_runner_<name> | 一致（`tests/CMakeLists.txt:108-114`，TIMEOUT 600） | 一致 |
-| 遍历工具数 | 348 | 348（`tool_defs.def` TOOL_ENTRY 计数） | 一致 |
-| 排除工具数 | 35 | 35（13 磁盘 + 22 用户可见，名单逐项核对） | 一致 |
-| 03 遍历步数 | 560 步 | ≈560（313 空参 + ≈247 冒烟，后者取决于运行时空 schema 数） | 无静态来源，运行时统计口径 |
-| 03 耗时 | 约 15s | README：约 2-3 分钟 | **不一致**（15s 与 626 次 HTTP 往返量级矛盾） |
-| schema 283 非空 / 73 空 | 运行时观测 | `SchemaStatisticsBaseline` 仅断言非空>空>0；静态可数 SCHEMA_NONE=222、`build_schema({})` 字面量 70（283+73=356 与 catalog 总数自洽） | 无法静态精确核算，属运行时观测值 |
-| 工具总数 355 = 7 元 + 348 领域 | 结构一致 | 7 元工具注册（`register_all.cpp` RegisterTool）+ 348 领域经 `call_tool` 代理；`g_handlers` = 348 领域 + system_status = 349 | 结构一致 |
-| ToolCatalog 356 条目 | 348 领域 + system_status + 8 特殊 | `tool_catalog.cpp` 5 个 add_tool（ping/system_status/search_tools/list_categories/get_tool_detail）+ `register_all.cpp` 5 个（batch_execute/call_tool/code_execute 等） | 356 = 348 + 8 自洽 |
+| 遍历工具数 | 331 | 331（`tool_defs.def` TOOL_ENTRY 计数） | 一致 |
+| 排除工具数 | 34 | 34（12 磁盘 + 22 用户可见，名单逐项核对） | 一致 |
+| 03 遍历步数 | 约 408 步 | ≈408（297 空参 + ≈111 冒烟，后者取决于运行时空 schema 数） | 运行时统计口径 |
+| 03 耗时 | 约 2-3 分钟 | README：约 2-3 分钟 | 一致 |
+| schema 非空/空数 | 运行时观测 | `SchemaStatisticsBaseline` 仅断言非空>空>0；def 静态可数 SCHEMA_NONE=208 / SCHEMA_BASIC=123（旧 222/126） | 无法静态精确核算，属运行时观测值 |
+| 工具总数 338 = 7 元 + 331 领域 | 结构一致 | 7 元工具注册（`register_all.cpp` RegisterTool）+ 331 领域经 `call_tool` 代理；`g_handlers` = 331 领域 + system_status = 332 | 结构一致 |
+| ToolCatalog 342 条目 | 331 领域 + 7 元 + system_status + 3 快照 | `tool_catalog.cpp` 5 个 add_tool（ping/system_status/search_tools/list_categories/get_tool_detail）+ `register_all.cpp` 3 个（batch_execute/call_tool/code_execute） | 342 自洽 |
 
 ## 已知引擎副作用
 
@@ -166,11 +166,9 @@ editor_new_text_resource  file_write  script_create  resource_save
 
 ## 审计发现的不一致点清单
 
-1. **L1 数量**：AGENTS.md 与 `tests/README.md` 均称 "59 个 gtest"，实际源码统计 **61 个**（8 文件 14+13+10+7+7+6+3+1）。
-2. **03 遍历耗时**：AGENTS.md 称 "560 步，约 15s"，`tests/README.md` 称 "约 2-3 分钟"，二者矛盾；按 626 次 HTTP 往返的体量，15s 不可信。
-3. **03 步数**：AGENTS.md 称 "560 步"，推导 ≈560（313 空参 + ≈247 冒烟），无静态来源（精确值随运行时空 schema 数变化），属运行时统计口径。
-4. **schema 空/非空数**：283/73 为运行时观测值，`SchemaStatisticsBaseline` 不硬编码；静态只能数出 SCHEMA_NONE=222、`build_schema({})`=70，无法精确复现 73。
-5. **引擎副作用**（非数值）：README 的 `[audio]` 段 / `default_bus_layout.tres` 声称无执行器代码佐证，属引擎行为，待验证。
+1. **03 遍历步数**：旧 AGENTS.md 称 "560 步"（348 工具口径），全量重命名后为 ≈408（297 空参 + ≈111 冒烟），精确值随运行时空 schema 数变化，属运行时统计口径。
+2. **schema 空/非空数**：旧 283/73 为运行时观测值，`SchemaStatisticsBaseline` 不硬编码；重命名后 def 静态可数 SCHEMA_NONE=208 / SCHEMA_BASIC=123，catalog 级非空/空数以运行时观测为准。
+3. **引擎副作用**（非数值）：README 的 `[audio]` 段 / `default_bus_layout.tres` 声称无执行器代码佐证，属引擎行为，待验证。
 
 ## 相关页面
 

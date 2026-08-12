@@ -108,7 +108,7 @@ flowchart LR
 | 常量 | 值 | 类型 | 主要用途 |
 |---|---|---|---|
 | `GDA_DEFAULT_PORT` | `9527` | `int` | MCP HTTP 默认端口 |
-| `GDA_HEALTHY_ACTIVITY_THRESHOLD_MS` | `3000` | `int64_t` | `game_status` 健康判定阈值（`game_bridge.cpp`） |
+| `GDA_HEALTHY_ACTIVITY_THRESHOLD_MS` | `3000` | `int64_t` | `get_game_status` 健康判定阈值（`game_bridge.cpp`） |
 | `GDA_DEFAULT_TIMEOUT_MS` | `5000` | `int64_t` | 默认操作超时 |
 | `GDA_MAX_TIMEOUT_MS` | `30000` | `int64_t` | 超时上限（与 `code_execute` 工具 30s 上限呼应） |
 | `GDA_ERROR_BUFFER_MAX` | `200` | `size_t` | 错误缓冲上限（`game_bridge.cpp`） |

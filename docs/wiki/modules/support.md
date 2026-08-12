@@ -27,23 +27,23 @@
 
 | 注册名 | 描述（注册时） | 内容来源函数 | 正文要点 |
 |---|---|---|---|
-| `create-3d-scene` | Guide to create a basic 3D scene with camera, lighting, and a test object | `prompt_create_3d_scene()`（130 行） | 分步：Node3D 根 → Camera3D → DirectionalLight3D → 环境/测试对象，各步附 `scene_node_create`/`property_set` JSON 示例 |
-| `setup-character` | Guide to set up a 3D character controller with CharacterBody3D, collision, and movement script | `prompt_setup_character()`（86 行） | CharacterBody3D + CollisionShape3D + CapsuleShape3D + `script_create`/`script_attach_to_node`，附完整 player.gd 模板 |
-| `debug-physics` | Guide to use physics debugging tools including ray casts, shape casts, and performance monitors | `prompt_debug_physics()`（134 行） | `physics_3d_ray_cast`/`physics_3d_shape_cast`/点查询/监视器示例 |
-| `setup-input-map` | Guide to configure input actions in Project Settings and test them | `prompt_setup_input_map()`（144 行） | 经 `call_tool` 调 `project_settings_set`/`project_settings_save` 配置 `input/move_*` 等动作与按键事件 |
+| `create-3d-scene` | Guide to create a basic 3D scene with camera, lighting, and a test object | `prompt_create_3d_scene()`（130 行） | 分步：Node3D 根 → Camera3D → DirectionalLight3D → 环境/测试对象，各步附 `create_scene_node`/`property_set` JSON 示例 |
+| `setup-character` | Guide to set up a 3D character controller with CharacterBody3D, collision, and movement script | `prompt_setup_character()`（86 行） | CharacterBody3D + CollisionShape3D + CapsuleShape3D + `create_script`/`attach_script_to_node`，附完整 player.gd 模板 |
+| `debug-physics` | Guide to use physics debugging tools including ray casts, shape casts, and performance monitors | `prompt_debug_physics()`（134 行） | `intersect_physics_3d_ray`/点查询/监视器示例（shape_cast 工具已随重命名删除） |
+| `setup-input-map` | Guide to configure input actions in Project Settings and test them | `prompt_setup_input_map()`（144 行） | 经 `call_tool` 调 `set_project_settings`/`save_project_settings` 配置 `input/move_*` 等动作与按键事件 |
 | `setup-gui` | Guide to create a simple GUI with CanvasLayer, containers, buttons, and labels | `prompt_setup_gui()`（202 行） | CanvasLayer → VBoxContainer → 标签/按钮 + 信号连接示例 |
 | `tool-usage` | Usage examples for the 17 most commonly used MCP tools with JSON input/output and gotchas | `prompt_tool_usage()`（685 行） | 实际含 **19 个**工具章节（见"不一致点"） |
-| `keycode-reference` | Godot keycode reference for InputEventKey and Variant type JSON mapping for property operations | `prompt_keycode_reference()`（213 行） | ASCII 键码表、Godot 特殊键码（`KEY_SPECIAL=4194304` 基值）、`input_map_action_add_event` 的 event JSON、Variant→JSON 映射表 |
+| `keycode-reference` | Godot keycode reference for InputEventKey and Variant type JSON mapping for property operations | `prompt_keycode_reference()`（213 行） | ASCII 键码表、Godot 特殊键码（`KEY_SPECIAL=4194304` 基值）、`add_input_map_action_event` 的 event JSON、Variant→JSON 映射表 |
 
 ### 调试 prompt 名单（register_debugger_prompts，可带可选参数）
 
 | 注册名 | 描述 | 支持参数 | 正文引导使用的工具 |
 |---|---|---|---|
-| `debug-analyze-error` | Analyze a runtime error with full context | `error_text`（追加到文末） | `debugger_get_errors`、`output_get_log` |
-| `debug-analyze-breakpoint` | Analyze the current breakpoint context: stack trace, scene tree, and variable state | 无 | `debugger_get_stack_dump`、`debugger_get_scene_tree`、`debugger_get_session_info` |
-| `debug-review-output` | Review the game's output log for issues | `since`（追加到文末） | `output_get_log`、`debugger_get_output` |
-| `debug-review-performance` | Review performance monitor data to identify bottlenecks | 无 | `debugger_get_monitors` |
-| `debug-session-status` | Quick summary of the current debug session state | 无 | `debugger_get_session_info` 等 |
+| `debug-analyze-error` | Analyze a runtime error with full context | `error_text`（追加到文末） | `get_debugger_errors`、`get_debugger_log` |
+| `debug-analyze-breakpoint` | Analyze the current breakpoint context: stack trace, scene tree, and variable state | 无 | `get_debugger_stack_dump`、`get_debugger_scene_tree`、`get_debugger_session_info` |
+| `debug-review-output` | Review the game's output log for issues | `since`（追加到文末） | `get_debugger_log`、`get_debugger_output` |
+| `debug-review-performance` | Review performance monitor data to identify bottlenecks | 无 | `get_debugger_monitors` |
+| `debug-session-status` | Quick summary of the current debug session state | 无 | `get_debugger_session_info` 等 |
 
 ## Resources（15 个 URI，均经 RegisterResource/RegisterResourceTemplate 注册）
 
