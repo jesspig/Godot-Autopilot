@@ -30,12 +30,11 @@ const char *const kMetaToolNames[kMetaToolCount] = {
     "call_tool", "batch_execute", "code_execute"};
 
 const char *const kValidCategories[] = {
-    "Audio",        "Capture",  "Config",     "Debug",   "Debugger",
-    "Display",      "Docs",     "Editor",     "Game",    "Group",
-    "Input",        "InputMap", "Navigation", "OS",      "Physics",
-    "Properties",   "Render",   "Resources",  "Scene",   "Scripts",
-    "SpriteFrames", "System",   "Text",       "TileMap", "Meta",
-    "Auto"};
+    "Audio",      "Capture",  "Config",      "Debug",   "Debugger",
+    "Display",    "Docs",     "Editor",      "Game",    "Group",
+    "Input",      "Navigation", "OS",        "Physics", "Properties",
+    "Render",     "Resources", "Scene",      "Scripts", "SpriteFrames",
+    "System",     "Text",     "TileMap",     "Meta",    "Auto"};
 
 bool has_schema_params(const mcp::JsonValue &schema) {
   const auto *props = schema.Find("properties");
@@ -148,13 +147,15 @@ TEST_F(RegisteredServerFixture, SchemaStatisticsBaseline) {
 
 TEST_F(RegisteredServerFixture, SchemaSampledTools) {
   const char *const kNonEmpty[] = {
-      "property_get",          "physics_2d_ray_cast", "script_execute_gdscript",
-      "scene_tree_call_group", "tilemap_set_cell",    "game_input",
-      "batch_execute",         "call_tool",           "code_execute",
+      "property_get",          "intersect_physics_2d_ray",
+      "execute_script",        "call_scene_tree_group",
+      "set_tilemap_cell",      "queue_game_input",
+      "get_scene_tree",        "batch_execute",
+      "call_tool",             "code_execute",
       "search_tools",          "get_tool_detail"};
-  const char *const kEmpty[] = {"scene_tree_get",         "engine_get_version",
-                                "physics_2d_body_create", "ping",
-                                "system_status",          "list_categories"};
+  const char *const kEmpty[] = {"get_engine_version",   "create_physics_2d_body",
+                                "ping",                 "system_status",
+                                "list_categories"};
   for (const char *name : kNonEmpty) {
     const auto *info = catalog.get_tool(name);
     ASSERT_NE(info, nullptr) << name;

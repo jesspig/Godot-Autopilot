@@ -1,13 +1,13 @@
 {
   "name": "01_scene",
-  "description": "迁移自 tests/integration/scene_tools_test.cpp（SceneToolsTest，12 用例）。before_all 用 editor_new_scene 建干净根 Root。无法完全覆盖的语义：1) 用例1 '省略 parent_path 建根'：before_all 已建根，省略 parent_path 属双根错误（由步骤 create_second_root_fails 覆盖），本用例改用明确根路径 parent_path=Root 验证建节点与相对 path 断言；2) 用例4 '删除后树中消失'：scene_node_delete 为 queue_free 异步释放，JSON 框架无 sleep 机制（gtest 靠 sleep 500ms），改为断言返回 deleted 与 undo 存在；3) 用例8 children 数组内容精确断言：field_checks 不支持数组索引，退化为 children 非空 + 根字段精确断言；4) 用例10 的 '拒绝后场景仍在' 断言拆为独立步骤 scene_unchanged_after_refuse。",
+  "description": "迁移自 tests/integration/scene_tools_test.cpp（SceneToolsTest，12 用例）。before_all 用 create_editor_scene 建干净根 Root。无法完全覆盖的语义：1) 用例1 '省略 parent_path 建根'：before_all 已建根，省略 parent_path 属双根错误（由步骤 create_second_root_fails 覆盖），本用例改用明确根路径 parent_path=Root 验证建节点与相对 path 断言；2) 用例4 '删除后树中消失'：delete_scene_node 为 queue_free 异步释放，JSON 框架无 sleep 机制（gtest 靠 sleep 500ms），改为断言返回 deleted 与 undo 存在；3) 用例8 children 数组内容精确断言：field_checks 不支持数组索引，退化为 children 非空 + 根字段精确断言；4) 用例10 的 '拒绝后场景仍在' 断言拆为独立步骤 scene_unchanged_after_refuse。",
   "headless": true,
   "pipeline": {
     "on_failure": "fail_fast",
     "before_all": [
       {
         "id": "before_new_scene",
-        "tool": "editor_new_scene",
+        "tool": "create_editor_scene",
         "args": { "name": "Root" }
       }
     ],
@@ -17,7 +17,7 @@
         "steps": [
           {
             "id": "create_node_via_explicit_root_path",
-            "tool": "scene_node_create",
+            "tool": "create_scene_node",
             "args": { "name": "NodeA", "type": "Node", "parent_path": "Root" },
             "expect": {
               "has_keys": ["result"],
@@ -29,7 +29,7 @@
           },
           {
             "id": "create_with_defaults",
-            "tool": "scene_node_create",
+            "tool": "create_scene_node",
             "args": { "parent_path": "Root" },
             "expect": {
               "field_checks": [
@@ -39,7 +39,7 @@
           },
           {
             "id": "create_label_child",
-            "tool": "scene_node_create",
+            "tool": "create_scene_node",
             "args": { "name": "Lbl", "type": "Label", "parent_path": "Root" },
             "expect": {
               "field_checks": [
@@ -49,7 +49,7 @@
           },
           {
             "id": "create_sprite2d_child",
-            "tool": "scene_node_create",
+            "tool": "create_scene_node",
             "args": { "name": "Spr", "type": "Sprite2D", "parent_path": "Root" },
             "expect": {
               "field_checks": [
@@ -59,7 +59,7 @@
           },
           {
             "id": "create_invalid_type",
-            "tool": "scene_node_create",
+            "tool": "create_scene_node",
             "args": { "name": "Bad", "type": "NoSuchNodeType123" },
             "expect": {
               "field_checks": [
@@ -69,7 +69,7 @@
           },
           {
             "id": "create_second_root_fails",
-            "tool": "scene_node_create",
+            "tool": "create_scene_node",
             "args": { "name": "SecondRoot" },
             "expect": {
               "field_checks": [
@@ -84,7 +84,7 @@
         "steps": [
           {
             "id": "create_doomed_node",
-            "tool": "scene_node_create",
+            "tool": "create_scene_node",
             "args": { "name": "Doomed", "type": "Node", "parent_path": "Root" },
             "expect": {
               "field_checks": [
@@ -94,7 +94,7 @@
           },
           {
             "id": "delete_child_ok",
-            "tool": "scene_node_delete",
+            "tool": "delete_scene_node",
             "args": { "path": "Doomed" },
             "expect": {
               "has_keys": ["undo"],
@@ -105,7 +105,7 @@
           },
           {
             "id": "delete_missing_node",
-            "tool": "scene_node_delete",
+            "tool": "delete_scene_node",
             "args": { "path": "NoSuchNode" },
             "expect": {
               "field_checks": [
@@ -115,11 +115,11 @@
           },
           {
             "id": "delete_root_forbidden",
-            "tool": "scene_node_delete",
+            "tool": "delete_scene_node",
             "args": { "path": "Root" },
             "expect": {
               "field_checks": [
-                { "key": "error", "value": "cannot delete the scene root node — use editor_close_scene to close the scene, then editor_new_scene" }
+                { "key": "error", "value": "cannot delete the scene root node — use close_editor_scene to close the scene, then create_editor_scene" }
               ]
             }
           }
@@ -130,7 +130,7 @@
         "steps": [
           {
             "id": "get_tree_with_properties",
-            "tool": "scene_get_tree",
+            "tool": "get_scene_tree",
             "args": { "include_properties": true },
             "expect": {
               "has_keys": ["result"],
@@ -144,7 +144,7 @@
           },
           {
             "id": "tree_get_full",
-            "tool": "scene_tree_get",
+            "tool": "get_scene_tree",
             "expect": {
               "has_keys": ["result"],
               "field_checks": [
@@ -162,17 +162,17 @@
         "steps": [
           {
             "id": "new_scene_unsaved_refused",
-            "tool": "editor_new_scene",
+            "tool": "create_editor_scene",
             "args": { "name": "Second", "close_current": true },
             "expect": {
               "field_checks": [
-                { "key": "error", "value": "current scene is unsaved — position: Root — expected: scene saved before close — action: call editor_save_scene first, then editor_new_scene with close_current=true" }
+                { "key": "error", "value": "current scene is unsaved — position: Root — expected: scene saved before close — action: call save_editor_scene first, then create_editor_scene with close_current=true" }
               ]
             }
           },
           {
             "id": "scene_unchanged_after_refuse",
-            "tool": "scene_get_tree",
+            "tool": "get_scene_tree",
             "expect": {
               "field_checks": [
                 { "key": "result.name", "value": "Root" }
@@ -186,7 +186,7 @@
         "steps": [
           {
             "id": "group_add",
-            "tool": "group_add_node_to_group",
+            "tool": "add_group_node",
             "args": { "node_path": "Lbl", "group_name": "gda_test_group" },
             "expect": {
               "field_checks": [
@@ -196,7 +196,7 @@
           },
           {
             "id": "group_has_true",
-            "tool": "group_has_node_in_group",
+            "tool": "has_group_node",
             "args": { "node_path": "Lbl", "group_name": "gda_test_group" },
             "expect": {
               "field_checks": [
@@ -206,7 +206,7 @@
           },
           {
             "id": "group_remove",
-            "tool": "group_remove_node_from_group",
+            "tool": "remove_group_node",
             "args": { "node_path": "Lbl", "group_name": "gda_test_group" },
             "expect": {
               "field_checks": [
@@ -216,7 +216,7 @@
           },
           {
             "id": "group_has_false",
-            "tool": "group_has_node_in_group",
+            "tool": "has_group_node",
             "args": { "node_path": "Lbl", "group_name": "gda_test_group" },
             "expect": {
               "field_checks": [
@@ -231,7 +231,7 @@
         "steps": [
           {
             "id": "delete_missing_path_param",
-            "tool": "scene_node_delete",
+            "tool": "delete_scene_node",
             "args": {},
             "expect": {
               "field_checks": [

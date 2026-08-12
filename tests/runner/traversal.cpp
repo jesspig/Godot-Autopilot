@@ -15,51 +15,50 @@
 
 namespace {
 
-// ── 35 工具排除清单 ──
+// ── 34 工具排除清单 ──
 // 迁移自 tool_schema_contract_test.cpp 的 kPersistentSideEffectTools。
-// 历史事故：editor_set_main_scene 曾把 application/run/main_scene 写成 "test"
-// 写入 Example/project.godot；editor_save_scene 空参生成 Example/NewNode.tscn；
-// os_alert 弹系统模态对话框；display_clipboard_set 覆盖系统剪贴板；
-// display_tts_speak 系统朗读。两类工具在空参与冒烟两个遍历中一律跳过。
+// 历史事故：set_editor_main_scene 曾把 application/run/main_scene 写成 "test"
+// 写入 Example/project.godot；save_editor_scene 空参生成 Example/NewNode.tscn；
+// show_os_alert 弹系统模态对话框；set_display_clipboard 覆盖系统剪贴板；
+// speak_display_tts 系统朗读。两类工具在空参与冒烟两个遍历中一律跳过。
 const char* const kExcludedSideEffectTools[] = {
     // ── 持久磁盘副作用（写 project.godot / editor_settings / .tscn / 文件） ──
-    "editor_set_main_scene",
-    "editor_set_plugin_enabled",
-    "project_settings_save",
-    "input_map_action_add_event",
-    "input_map_persist",
-    "editor_settings_set",
-    "editor_save_scene",
-    "editor_save_all_scenes",
-    "editor_save_scene_as",
-    "editor_new_text_resource",
-    "file_write",
-    "script_create",
-    "resource_save",
+    "set_editor_main_scene",
+    "set_editor_plugin_enabled",
+    "save_project_settings",
+    "add_input_map_action_event",
+    "save_input_map",
+    "set_editor_settings",
+    "save_editor_scene",
+    "save_editor_scenes",
+    "save_editor_scene_as",
+    "write_file",
+    "create_script",
+    "save_resource",
 
     // ── 用户可见副作用（弹窗/进程/环境变量/音频/剪贴板/鼠标/窗口） ──
-    "os_alert",
-    "display_dialog_show",
-    "os_create_process",
-    "os_execute",
-    "os_kill",
-    "os_shell_open",
-    "os_move_to_trash",
-    "os_set_environment",
-    "display_tts_speak",
-    "display_tts_stop",
-    "display_clipboard_set",
-    "display_mouse_set_mode",
-    "display_mouse_warp",
-    "display_window_set_title",
-    "display_window_set_position",
-    "display_window_set_size",
-    "display_window_set_mode",
-    "display_window_set_flag",
-    "display_window_move_to_foreground",
-    "display_window_request_attention",
-    "display_window_create",
-    "display_window_delete",
+    "show_os_alert",
+    "show_display_dialog",
+    "create_os_process",
+    "execute_os_process",
+    "kill_os_process",
+    "open_os_path",
+    "move_os_file_to_trash",
+    "set_os_environment",
+    "speak_display_tts",
+    "stop_display_tts",
+    "set_display_clipboard",
+    "set_display_mouse_mode",
+    "warp_display_mouse",
+    "set_display_window_title",
+    "set_display_window_position",
+    "set_display_window_size",
+    "set_display_window_mode",
+    "set_display_window_flag",
+    "move_display_window_to_foreground",
+    "request_display_window_attention",
+    "create_display_window",
+    "delete_display_window",
 };
 
 const char* kModeEmptyArgs = "empty_args";
@@ -297,8 +296,9 @@ TraversalStats run_traversal(McpTestClient& client, const std::string& mode,
             } else {
                 ++results;
             }
-            // 历史教训：scene_node_create/resource_get_extensions/resource_reimport
-            // 带默认值的必填参数不校验 → 仅记 warnings，不 FAIL。
+            // 历史教训：create_scene_node/get_resource_extensions/
+            // reimport_resource_files 带默认值的必填参数不校验 → 仅记 warnings，
+            // 不 FAIL。
             if (!required.empty() && !errored) {
                 stats.warnings.push_back("schema 必填但空参未报错: " + name);
             }

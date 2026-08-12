@@ -20,7 +20,7 @@
           {
             "id": "search_keyword",
             "tool": "search_tools",
-            "args": { "query": "scene_node_create" },
+            "args": { "query": "create_scene_node" },
             "expect": {
               "has_keys": ["results"],
               "field_checks": [
@@ -31,7 +31,7 @@
           {
             "id": "search_category",
             "tool": "search_tools",
-            "args": { "query": "scene_node_create", "category": "Scene" },
+            "args": { "query": "create_scene_node", "category": "Scene" },
             "expect": {
               "has_keys": ["results"],
               "field_checks": [
@@ -42,7 +42,7 @@
           {
             "id": "search_tags",
             "tool": "search_tools",
-            "args": { "query": "scene_node_create", "tags": ["node"] },
+            "args": { "query": "create_scene_node", "tags": ["node"] },
             "expect": {
               "has_keys": ["results"],
               "field_checks": [
@@ -63,10 +63,10 @@
           {
             "id": "detail_existing",
             "tool": "get_tool_detail",
-            "args": { "name": "scene_node_create" },
+            "args": { "name": "create_scene_node" },
             "expect": {
               "field_checks": [
-                { "key": "tool.name", "value": "scene_node_create" },
+                { "key": "tool.name", "value": "create_scene_node" },
                 { "key": "tool.description", "not_empty": true },
                 { "key": "tool.category", "not_empty": true },
                 { "key": "tool.tags", "not_empty": true },
