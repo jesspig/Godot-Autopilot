@@ -34,7 +34,7 @@ int window_id_from_args(const JV &args) {
 
 JV handle_window_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_window_create called");
+                            "create_display_window called");
   auto *ds = godot::DisplayServer::get_singleton();
   if (!ds) {
     return util::error_json("DisplayServer not available");
@@ -72,13 +72,13 @@ JV handle_window_create(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = JV(window_id);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_window_create completed");
+                            "create_display_window completed");
   return r;
 }
 
 JV handle_window_delete(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_window_delete called");
+                            "delete_display_window called");
   auto *wp = args.Find("window_id");
   if (!wp || !wp->IsInt()) {
     return util::error_json("missing required parameter: window_id");
@@ -100,13 +100,13 @@ JV handle_window_delete(const JV &args) {
   }
   window->queue_free();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_window_delete completed");
+                            "delete_display_window completed");
   return ok_json();
 }
 
 JV handle_window_move_to_foreground(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_window_move_to_foreground called");
+                            "move_display_window_to_foreground called");
   auto *ds = godot::DisplayServer::get_singleton();
   if (!ds) {
     return util::error_json("DisplayServer not available");
@@ -114,13 +114,13 @@ JV handle_window_move_to_foreground(const JV &args) {
   int wid = window_id_from_args(args);
   ds->window_move_to_foreground(wid);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_window_move_to_foreground completed");
+                            "move_display_window_to_foreground completed");
   return ok_json();
 }
 
 JV handle_window_request_attention(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_window_request_attention called");
+                            "request_display_window_attention called");
   auto *ds = godot::DisplayServer::get_singleton();
   if (!ds) {
     return util::error_json("DisplayServer not available");
@@ -128,13 +128,13 @@ JV handle_window_request_attention(const JV &args) {
   int wid = window_id_from_args(args);
   ds->window_request_attention(wid);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_window_request_attention completed");
+                            "request_display_window_attention completed");
   return ok_json();
 }
 
 JV handle_window_set_flag(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_window_set_flag called");
+                            "set_display_window_flag called");
   auto *fp = args.Find("flag");
   if (!fp || !fp->IsInt()) {
     return util::error_json("missing required parameter: flag");
@@ -152,13 +152,13 @@ JV handle_window_set_flag(const JV &args) {
       static_cast<godot::DisplayServer::WindowFlags>(fp->GetInt()),
       ep->GetBool(), wid);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_window_set_flag completed");
+                            "set_display_window_flag completed");
   return ok_json();
 }
 
 JV handle_window_set_mode(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_window_set_mode called");
+                            "set_display_window_mode called");
   auto *mp = args.Find("mode");
   if (!mp || !mp->IsInt()) {
     return util::error_json("missing required parameter: mode");
@@ -171,13 +171,13 @@ JV handle_window_set_mode(const JV &args) {
   ds->window_set_mode(
       static_cast<godot::DisplayServer::WindowMode>(mp->GetInt()), wid);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_window_set_mode completed");
+                            "set_display_window_mode completed");
   return ok_json();
 }
 
 JV handle_window_set_position(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_window_set_position called");
+                            "set_display_window_position called");
   auto *xp = args.Find("x");
   if (!xp || !xp->IsInt()) {
     return util::error_json("missing required parameter: x");
@@ -193,13 +193,13 @@ JV handle_window_set_position(const JV &args) {
   int wid = window_id_from_args(args);
   ds->window_set_position(godot::Vector2i(xp->GetInt(), yp->GetInt()), wid);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_window_set_position completed");
+                            "set_display_window_position completed");
   return ok_json();
 }
 
 JV handle_window_set_size(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_window_set_size called");
+                            "set_display_window_size called");
   auto *wp = args.Find("width");
   if (!wp || !wp->IsInt()) {
     return util::error_json("missing required parameter: width");
@@ -215,13 +215,13 @@ JV handle_window_set_size(const JV &args) {
   int wid = window_id_from_args(args);
   ds->window_set_size(godot::Vector2i(wp->GetInt(), hp->GetInt()), wid);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_window_set_size completed");
+                            "set_display_window_size completed");
   return ok_json();
 }
 
 JV handle_window_set_title(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_window_set_title called");
+                            "set_display_window_title called");
   auto *tp = args.Find("title");
   if (!tp || !tp->IsString()) {
     return util::error_json("missing required parameter: title");
@@ -233,7 +233,7 @@ JV handle_window_set_title(const JV &args) {
   int wid = window_id_from_args(args);
   ds->window_set_title(godot::String(tp->GetString().c_str()), wid);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_window_set_title completed");
+                            "set_display_window_title completed");
   return ok_json();
 }
 

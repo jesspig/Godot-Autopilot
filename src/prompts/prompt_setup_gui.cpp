@@ -20,7 +20,7 @@ CanvasLayer 确保 UI 不受游戏世界缩放影响：
 {
   "name": "call_tool",
   "arguments": {
-    "name": "scene_node_create",
+    "name": "create_scene_node",
     "arguments": {
       "parent_path": "",
       "name": "UI",
@@ -36,7 +36,7 @@ CanvasLayer 确保 UI 不受游戏世界缩放影响：
 {
   "name": "call_tool",
   "arguments": {
-    "name": "scene_node_create",
+    "name": "create_scene_node",
     "arguments": {
       "parent_path": "UI",
       "name": "MainContainer",
@@ -78,7 +78,7 @@ CanvasLayer 确保 UI 不受游戏世界缩放影响：
 {
   "name": "call_tool",
   "arguments": {
-    "name": "scene_node_create",
+    "name": "create_scene_node",
     "arguments": {
       "parent_path": "UI/MainContainer",
       "name": "Title",
@@ -119,7 +119,7 @@ CanvasLayer 确保 UI 不受游戏世界缩放影响：
 {
   "name": "call_tool",
   "arguments": {
-    "name": "scene_node_create",
+    "name": "create_scene_node",
     "arguments": {
       "parent_path": "UI/MainContainer",
       "name": "StartButton",
@@ -147,7 +147,7 @@ CanvasLayer 确保 UI 不受游戏世界缩放影响：
 {
   "name": "call_tool",
   "arguments": {
-    "name": "scene_node_create",
+    "name": "create_scene_node",
     "arguments": {
       "parent_path": "UI/MainContainer",
       "name": "QuitButton",

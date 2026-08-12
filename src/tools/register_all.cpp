@@ -71,13 +71,16 @@ std::vector<std::string> split_tags(const std::string &csv) {
 enum SchemaType { SCHEMA_NONE, SCHEMA_BASIC };
 
 mcp::JsonValue build_schema_for_none_by_name(const std::string &name) {
-  if (name.rfind("scene_tree_", 0) == 0) {
+  if (name == "call_scene_tree_group" || name == "get_scene_tree_nodes_in_group" ||
+      name == "notify_scene_tree_group" || name == "is_scene_tree_paused" ||
+      name == "set_scene_tree_pause") {
     return schema::build_schema({
         {"group", "string", "Scene group name.", false},
     });
   }
 
-  if (name.rfind("tilemap_", 0) == 0) {
+  if (name == "create_tilemap" || name == "set_tilemap_cell" ||
+      name == "set_tilemap_cells") {
     return schema::build_schema({
         {"node_path", "string", "Path to the TileMap node in the scene.", true},
     });
@@ -249,7 +252,7 @@ static mcp::JsonValue meta_call_tool_wait(const std::string& name, mcp::JsonValu
             if (t->IsInt() && t->GetInt() > 0) timeout = t->GetInt();
         }
         mcp::JsonValue final = runtime_ops::wait_pending_response(rid, timeout);
-        if (name == "game_capture" || (final.IsObject() && final.Contains("path"))) {
+        if (name == "capture_game_viewport" || (final.IsObject() && final.Contains("path"))) {
             final = runtime_ops::finalize_capture_response(final);
         }
         result = std::move(final);

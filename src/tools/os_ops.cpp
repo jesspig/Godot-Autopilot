@@ -27,7 +27,7 @@ godot::String join_psa(const godot::PackedStringArray &psa) {
 
 JV handle_os_alert(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_alert called");
+                            "show_os_alert called");
 
   auto *text_p = args.Find("text");
   if (!text_p || !text_p->IsString()) {
@@ -55,13 +55,13 @@ JV handle_os_alert(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_alert completed");
+                            "show_os_alert completed");
   return r;
 }
 
 JV handle_os_create_process(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_create_process called");
+                            "create_os_process called");
 
   auto *path_p = args.Find("path");
   if (!path_p || !path_p->IsString()) {
@@ -98,13 +98,13 @@ JV handle_os_create_process(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = JV(static_cast<int64_t>(pid));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_create_process completed");
+                            "create_os_process completed");
   return r;
 }
 
 JV handle_os_execute(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_execute called");
+                            "execute_os_process called");
 
   auto *path_p = args.Find("path");
   if (!path_p || !path_p->IsString()) {
@@ -176,13 +176,13 @@ JV handle_os_execute(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = VariantJson::serialize(d);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_execute completed");
+                            "execute_os_process completed");
   return r;
 }
 
 JV handle_os_get_datetime(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_get_datetime called");
+                            "get_os_datetime called");
 
   auto *time = godot::Time::get_singleton();
   if (!time) {
@@ -202,13 +202,13 @@ JV handle_os_get_datetime(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = VariantJson::serialize(dt);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_get_datetime completed");
+                            "get_os_datetime completed");
   return r;
 }
 
 JV handle_os_get_environment(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_get_environment called");
+                            "get_os_environment called");
 
   auto *var_p = args.Find("variable");
   if (!var_p || !var_p->IsString()) {
@@ -230,13 +230,13 @@ JV handle_os_get_environment(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = JV(util::to_std(value));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_get_environment completed");
+                            "get_os_environment completed");
   return r;
 }
 
 JV handle_os_get_locale(const JV &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_get_locale called");
+                            "get_os_locale called");
 
   auto *os = godot::OS::get_singleton();
   if (!os) {
@@ -250,13 +250,13 @@ JV handle_os_get_locale(const JV &) {
   JV r(JV::object_tag);
   r["result"] = JV(util::to_std(locale));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_get_locale completed");
+                            "get_os_locale completed");
   return r;
 }
 
 JV handle_os_get_system_fonts(const JV &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_get_system_fonts called");
+                            "get_os_system_fonts called");
 
   auto *os = godot::OS::get_singleton();
   if (!os) {
@@ -274,13 +274,13 @@ JV handle_os_get_system_fonts(const JV &) {
   JV r(JV::object_tag);
   r["result"] = std::move(arr);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_get_system_fonts completed");
+                            "get_os_system_fonts completed");
   return r;
 }
 
 JV handle_os_get_system_info(const JV &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_get_system_info called");
+                            "get_os_system_info called");
 
   auto *os = godot::OS::get_singleton();
   if (!os) {
@@ -298,13 +298,13 @@ JV handle_os_get_system_info(const JV &) {
   JV r(JV::object_tag);
   r["result"] = std::move(info);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_get_system_info completed");
+                            "get_os_system_info completed");
   return r;
 }
 
 JV handle_os_get_unique_id(const JV &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_get_unique_id called");
+                            "get_os_unique_id called");
 
   auto *os = godot::OS::get_singleton();
   if (!os) {
@@ -318,13 +318,13 @@ JV handle_os_get_unique_id(const JV &) {
   JV r(JV::object_tag);
   r["result"] = JV(util::to_std(uid));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_get_unique_id completed");
+                            "get_os_unique_id completed");
   return r;
 }
 
 JV handle_os_get_unix_time(const JV &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_get_unix_time called");
+                            "get_os_unix_time called");
 
   auto *time = godot::Time::get_singleton();
   if (!time) {
@@ -338,13 +338,13 @@ JV handle_os_get_unix_time(const JV &) {
   JV r(JV::object_tag);
   r["result"] = JV(unix_time);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_get_unix_time completed");
+                            "get_os_unix_time completed");
   return r;
 }
 
 JV handle_os_get_user_data_dir(const JV &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_get_user_data_dir called");
+                            "get_os_user_data_dir called");
 
   auto *os = godot::OS::get_singleton();
   if (!os) {
@@ -358,13 +358,13 @@ JV handle_os_get_user_data_dir(const JV &) {
   JV r(JV::object_tag);
   r["result"] = JV(util::to_std(dir));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_get_user_data_dir completed");
+                            "get_os_user_data_dir completed");
   return r;
 }
 
 JV handle_os_kill(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_kill called");
+                            "kill_os_process called");
 
   auto *pid_p = args.Find("pid");
   if (!pid_p || !pid_p->IsInt()) {
@@ -386,13 +386,13 @@ JV handle_os_kill(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = JV(static_cast<int64_t>(err));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_kill completed");
+                            "kill_os_process completed");
   return r;
 }
 
 JV handle_os_move_to_trash(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_move_to_trash called");
+                            "move_os_file_to_trash called");
 
   auto *path_p = args.Find("path");
   if (!path_p || !path_p->IsString()) {
@@ -414,13 +414,13 @@ JV handle_os_move_to_trash(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = JV(static_cast<int64_t>(err));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_move_to_trash completed");
+                            "move_os_file_to_trash completed");
   return r;
 }
 
 JV handle_os_set_environment(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_set_environment called");
+                            "set_os_environment called");
 
   auto *var_p = args.Find("variable");
   if (!var_p || !var_p->IsString()) {
@@ -451,13 +451,13 @@ JV handle_os_set_environment(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_set_environment completed");
+                            "set_os_environment completed");
   return r;
 }
 
 JV handle_os_shell_open(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_shell_open called");
+                            "open_os_path called");
 
   auto *uri_p = args.Find("uri");
   if (!uri_p || !uri_p->IsString()) {
@@ -479,7 +479,7 @@ JV handle_os_shell_open(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = JV(static_cast<int64_t>(err));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "os_shell_open completed");
+                            "open_os_path completed");
   return r;
 }
 

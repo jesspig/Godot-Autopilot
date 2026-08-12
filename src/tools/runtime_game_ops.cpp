@@ -49,14 +49,14 @@ bool is_input_param_allowed(const std::string &key) {
 
 mcp::JsonValue handle_game_status(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "game_status called");
+                            "get_game_status called");
   JV params(JV::object_tag);
   return handle_gda_send("status", params, extract_timeout(args));
 }
 
 mcp::JsonValue handle_game_eval(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "game_eval called");
+                            "execute_game_script called");
   auto *action_p = args.Find("action");
   if (!action_p || !action_p->IsString()) {
     return error_json("missing required parameter: action "
@@ -78,7 +78,7 @@ mcp::JsonValue handle_game_eval(const mcp::JsonValue &args) {
 
 mcp::JsonValue handle_game_input(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "game_input called");
+                            "queue_game_input called");
   auto *type_p = args.Find("type");
   if (!type_p || !type_p->IsString()) {
     return error_json(
@@ -122,7 +122,7 @@ mcp::JsonValue handle_game_input(const mcp::JsonValue &args) {
 
 mcp::JsonValue handle_game_input_wait(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "game_input_wait called");
+                            "wait_game_input called");
   auto *action_p = args.Find("action");
   if (!action_p || !action_p->IsString()) {
     return error_json("missing required parameter: action");
@@ -137,7 +137,7 @@ mcp::JsonValue handle_game_input_wait(const mcp::JsonValue &args) {
 
 mcp::JsonValue handle_game_input_status(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "game_input_status called");
+                            "get_game_input_status called");
   auto *action_p = args.Find("action");
   if (!action_p || !action_p->IsString()) {
     return error_json("missing required parameter: action");
@@ -156,7 +156,7 @@ mcp::JsonValue handle_game_input_status(const mcp::JsonValue &args) {
 
 mcp::JsonValue handle_game_capture(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "game_capture called");
+                            "capture_game_viewport called");
   JV params(JV::object_tag);
   return handle_gda_send("capture", params, extract_timeout(args));
 }

@@ -527,9 +527,9 @@ mcp::JsonValue capture_note_for_empty_result() {
       capture_session_active()
           ? "session active but the game reported no data — verify the game "
             "project loads the godot-autopilot extension; fall back to "
-            "log_get_game_entries for the game process log"
+            "get_game_log_entries for the game process log"
           : "no active debug session — start the game with "
-            "editor_play_current_scene; game errors/output/scene-tree are now "
+            "play_editor_current_scene; game errors/output/scene-tree are now "
             "fetched over the runtime channel (game must load the "
             "godot-autopilot extension)");
 }
@@ -538,7 +538,7 @@ mcp::JsonValue capture_note_for_empty_result() {
 
 mcp::JsonValue handle_output_get_log(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "output_get_log called");
+                            "get_debugger_log called");
   size_t limit = 50;
   if (auto *l = args.Find("limit")) {
     if (l->IsInt())
@@ -547,13 +547,13 @@ mcp::JsonValue handle_output_get_log(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue(DebuggerCapture::instance().get_log_text(limit));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "output_get_log completed");
+                            "get_debugger_log completed");
   return r;
 }
 
 mcp::JsonValue handle_debugger_get_errors(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debugger_get_errors called");
+                            "get_debugger_errors called");
   size_t limit = 20;
   if (auto *l = args.Find("limit")) {
     if (l->IsInt())
@@ -570,13 +570,13 @@ mcp::JsonValue handle_debugger_get_errors(const mcp::JsonValue &args) {
   if (errors_text.empty())
     r["note"] = capture_note_for_empty_result();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debugger_get_errors completed");
+                            "get_debugger_errors completed");
   return r;
 }
 
 mcp::JsonValue handle_debugger_get_output(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debugger_get_output called");
+                            "get_debugger_output called");
   size_t limit = 50;
   if (auto *l = args.Find("limit")) {
     if (l->IsInt())
@@ -594,13 +594,13 @@ mcp::JsonValue handle_debugger_get_output(const mcp::JsonValue &args) {
   if (output_text.empty())
     r["note"] = capture_note_for_empty_result();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debugger_get_output completed");
+                            "get_debugger_output completed");
   return r;
 }
 
 mcp::JsonValue handle_debugger_get_stack_dump(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debugger_get_stack_dump called");
+                            "get_debugger_stack_dump called");
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] =
       mcp::JsonValue(DebuggerCapture::instance().get_stack_dump_text());
@@ -608,16 +608,16 @@ mcp::JsonValue handle_debugger_get_stack_dump(const mcp::JsonValue &) {
     r["note"] = mcp::JsonValue(
         "stack data is only available in a debugger breakpoint session; this "
         "version cannot fetch it over the gda runtime channel — use "
-        "log_get_game_entries or game_eval to diagnose");
+        "get_game_log_entries or execute_game_script to diagnose");
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debugger_get_stack_dump completed");
+                            "get_debugger_stack_dump completed");
   return r;
 }
 
 mcp::JsonValue handle_debugger_get_scene_tree(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debugger_get_scene_tree called");
+                            "get_debugger_scene_tree called");
   if (capture_session_active()) {
     mcp::JsonValue params(mcp::JsonValue::object_tag);
     return runtime_ops::handle_gda_send("get_tree", params, 5000);
@@ -629,13 +629,13 @@ mcp::JsonValue handle_debugger_get_scene_tree(const mcp::JsonValue &) {
   if (scene_tree_text.empty())
     r["note"] = capture_note_for_empty_result();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debugger_get_scene_tree completed");
+                            "get_debugger_scene_tree completed");
   return r;
 }
 
 mcp::JsonValue handle_debugger_get_monitors(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debugger_get_monitors called");
+                            "get_debugger_monitors called");
   size_t count = 1;
   if (auto *c = args.Find("count")) {
     if (c->IsInt())
@@ -648,18 +648,18 @@ mcp::JsonValue handle_debugger_get_monitors(const mcp::JsonValue &args) {
   if (monitors_text.empty())
     r["note"] = capture_note_for_empty_result();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debugger_get_monitors completed");
+                            "get_debugger_monitors completed");
   return r;
 }
 
 mcp::JsonValue handle_debugger_get_session_info(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debugger_get_session_info called");
+                            "get_debugger_session_info called");
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] =
       mcp::JsonValue(DebuggerCapture::instance().get_session_info_text());
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debugger_get_session_info completed");
+                            "get_debugger_session_info completed");
   return r;
 }
 

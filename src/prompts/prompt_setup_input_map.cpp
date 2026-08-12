@@ -15,12 +15,12 @@ std::string prompt_setup_input_map() {
 ## 分步引导
 
 ### 步骤 1：创建输入动作
-通过 project_settings_set 创建新的输入动作映射：
+通过 set_project_settings 创建新的输入动作映射：
 ```json
 {
   "name": "call_tool",
   "arguments": {
-    "name": "project_settings_set",
+    "name": "set_project_settings",
     "arguments": {
       "key": "input/move_left",
       "value": {
@@ -40,12 +40,12 @@ std::string prompt_setup_input_map() {
 - `input/interact`
 
 ### 步骤 2：为动作绑定按键
-使用 `project_settings_set` 添加按键事件到动作。每个事件使用 Dictionary 格式：
+使用 `set_project_settings` 添加按键事件到动作。每个事件使用 Dictionary 格式：
 ```json
 {
   "name": "call_tool",
   "arguments": {
-    "name": "project_settings_set",
+    "name": "set_project_settings",
     "arguments": {
       "key": "input/move_left",
       "value": {
@@ -73,19 +73,19 @@ std::string prompt_setup_input_map() {
 {
   "name": "call_tool",
   "arguments": {
-    "name": "project_settings_save",
+    "name": "save_project_settings",
     "arguments": {}
   }
 }
 ```
 
 ### 步骤 4：测试输入动作
-在场景中运行后，可以通过 `input_is_action_pressed` 检查动作状态：
+在场景中运行后，可以通过 `is_input_action_pressed` 检查动作状态：
 ```json
 {
   "name": "call_tool",
   "arguments": {
-    "name": "input_is_action_pressed",
+    "name": "is_input_action_pressed",
     "arguments": {
       "action": "move_left"
     }
@@ -99,7 +99,7 @@ std::string prompt_setup_input_map() {
 {
   "name": "call_tool",
   "arguments": {
-    "name": "input_action_press",
+    "name": "press_input_action",
     "arguments": {
       "action": "jump"
     }
@@ -110,19 +110,19 @@ std::string prompt_setup_input_map() {
 {
   "name": "call_tool",
   "arguments": {
-    "name": "input_action_release",
+    "name": "release_input_action",
     "arguments": {
       "action": "jump"
     }
   }
 }
 ```
-**注意：** `input_*` 工具仅作用于编辑器进程（MCP 服务器只在编辑器进程加载），运行中的游戏是独立进程，不会收到这些事件。要注入运行中的游戏进程，请使用 `game_input` 工具（Game 类别）：
+**注意：** `input_*` 工具仅作用于编辑器进程（MCP 服务器只在编辑器进程加载），运行中的游戏是独立进程，不会收到这些事件。要注入运行中的游戏进程，请使用 `queue_game_input` 工具（Game 类别）：
 ```json
 {
   "name": "call_tool",
   "arguments": {
-    "name": "game_input",
+    "name": "queue_game_input",
     "arguments": {
       "type": "action",
       "action": "move_right",
@@ -136,7 +136,7 @@ std::string prompt_setup_input_map() {
 ## 注意事项
 - 键位 Keycode 对应 Godot 的 `Key` 枚举值
 - 创建动作后不会自动绑定按键——需要手动添加 events 数组
-- `project_settings_save` 将设置持久化到 project.godot 文件
+- `save_project_settings` 将设置持久化到 project.godot 文件
 - 为同一个动作绑定多个按键（如键盘 A 键和手柄左摇杆）可以提高可用性
 - 输入动作名称应与脚本中使用的名称一致)gda";
 }

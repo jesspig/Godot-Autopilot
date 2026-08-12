@@ -44,7 +44,7 @@ godot::SceneTree *get_tree() {
 
 JV handle_call_group(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "scene_tree_call_group called");
+                            "call_scene_tree_group called");
   auto *gn = args.Find("group_name");
   if (!gn || !gn->IsString()) {
     JV e(JV::object_tag);
@@ -81,13 +81,13 @@ JV handle_call_group(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "scene_tree_call_group completed");
+                            "call_scene_tree_group completed");
   return r;
 }
 
 JV handle_create_timer(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "scene_tree_create_timer called");
+                            "create_scene_tree_timer called");
   auto *dp = args.Find("delay_sec");
   if (!dp || !dp->IsNumber()) {
     JV e(JV::object_tag);
@@ -121,13 +121,13 @@ JV handle_create_timer(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = VariantJson::serialize(godot::Variant(timer));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "scene_tree_create_timer completed");
+                            "create_scene_tree_timer completed");
   return r;
 }
 
 JV handle_get_nodes_in_group(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "scene_tree_get_nodes_in_group called");
+                            "get_scene_tree_nodes_in_group called");
   auto *gn = args.Find("group_name");
   if (!gn || !gn->IsString()) {
     JV e(JV::object_tag);
@@ -152,13 +152,13 @@ JV handle_get_nodes_in_group(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = std::move(result_arr);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "scene_tree_get_nodes_in_group completed");
+                            "get_scene_tree_nodes_in_group completed");
   return r;
 }
 
 JV handle_is_paused(const JV &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "scene_tree_is_paused called");
+                            "is_scene_tree_paused called");
   auto *tree = get_tree();
   if (!tree) {
     JV e(JV::object_tag);
@@ -169,13 +169,13 @@ JV handle_is_paused(const JV &) {
   JV r(JV::object_tag);
   r["result"] = JV(paused);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "scene_tree_is_paused completed");
+                            "is_scene_tree_paused completed");
   return r;
 }
 
 JV handle_notify_group(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "scene_tree_notify_group called");
+                            "notify_scene_tree_group called");
   auto *gn = args.Find("group_name");
   if (!gn || !gn->IsString()) {
     JV e(JV::object_tag);
@@ -200,13 +200,13 @@ JV handle_notify_group(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "scene_tree_notify_group completed");
+                            "notify_scene_tree_group completed");
   return r;
 }
 
 JV handle_reload_current_scene(const JV &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "scene_tree_reload_current_scene called");
+                            "reload_scene_tree_current_scene called");
   auto *tree = get_tree();
   if (!tree) {
     JV e(JV::object_tag);
@@ -217,13 +217,13 @@ JV handle_reload_current_scene(const JV &) {
   JV r(JV::object_tag);
   r["result"] = JV(static_cast<int64_t>(err));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "scene_tree_reload_current_scene completed");
+                            "reload_scene_tree_current_scene completed");
   return r;
 }
 
 JV handle_set_debug_collisions(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "scene_tree_set_debug_collisions called");
+                            "set_scene_tree_debug_collisions_hint called");
   auto *ep = args.Find("enabled");
   if (!ep || !ep->IsBool()) {
     JV e(JV::object_tag);
@@ -240,13 +240,13 @@ JV handle_set_debug_collisions(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "scene_tree_set_debug_collisions completed");
+                            "set_scene_tree_debug_collisions_hint completed");
   return r;
 }
 
 JV handle_set_pause(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "scene_tree_set_pause called");
+                            "set_scene_tree_pause called");
   auto *pp = args.Find("paused");
   if (!pp || !pp->IsBool()) {
     JV e(JV::object_tag);
@@ -263,7 +263,7 @@ JV handle_set_pause(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "scene_tree_set_pause completed");
+                            "set_scene_tree_pause completed");
   return r;
 }
 

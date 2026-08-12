@@ -208,7 +208,7 @@ void persist_action(const std::string &action_name, godot::InputMap *im,
 
 JV handle_action_add_event(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "input_map_action_add_event called");
+                            "add_input_map_action_event called");
   auto *ap = args.Find("action");
   if (!ap || !ap->IsString()) {
     JV e(JV::object_tag);
@@ -281,13 +281,13 @@ JV handle_action_add_event(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "input_map_action_add_event completed");
+                            "add_input_map_action_event completed");
   return r;
 }
 
 JV handle_action_erase_event(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "input_map_action_erase_event called");
+                            "erase_input_map_action_event called");
   auto *ap = args.Find("action");
   if (!ap || !ap->IsString()) {
     JV e(JV::object_tag);
@@ -330,13 +330,13 @@ JV handle_action_erase_event(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "input_map_action_erase_event completed");
+                            "erase_input_map_action_event completed");
   return r;
 }
 
 JV handle_action_set_deadzone(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "input_map_action_set_deadzone called");
+                            "set_input_map_action_deadzone called");
   auto *ap = args.Find("action");
   if (!ap || !ap->IsString()) {
     JV e(JV::object_tag);
@@ -368,13 +368,13 @@ JV handle_action_set_deadzone(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "input_map_action_set_deadzone completed");
+                            "set_input_map_action_deadzone completed");
   return r;
 }
 
 JV handle_add_action(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "input_map_add_action called");
+                            "add_input_map_action called");
   auto *ap = args.Find("action");
   if (!ap || !ap->IsString()) {
     JV e(JV::object_tag);
@@ -408,13 +408,13 @@ JV handle_add_action(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "input_map_add_action completed");
+                            "add_input_map_action completed");
   return r;
 }
 
 JV handle_erase_action(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "input_map_erase_action called");
+                            "erase_input_map_action called");
   auto *ap = args.Find("action");
   if (!ap || !ap->IsString()) {
     JV e(JV::object_tag);
@@ -442,13 +442,13 @@ JV handle_erase_action(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "input_map_erase_action completed");
+                            "erase_input_map_action completed");
   return r;
 }
 
 JV handle_get_actions(const JV &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "input_map_get_actions called");
+                            "get_input_map_actions called");
   auto *im = godot::InputMap::get_singleton();
   if (!im) {
     JV e(JV::object_tag);
@@ -463,13 +463,13 @@ JV handle_get_actions(const JV &) {
   JV r(JV::object_tag);
   r["result"] = std::move(result_arr);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "input_map_get_actions completed");
+                            "get_input_map_actions completed");
   return r;
 }
 
 JV handle_has_action(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "input_map_has_action called");
+                            "has_input_map_action called");
   auto *ap = args.Find("action");
   if (!ap || !ap->IsString()) {
     JV e(JV::object_tag);
@@ -487,13 +487,13 @@ JV handle_has_action(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = JV(has);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "input_map_has_action completed");
+                            "has_input_map_action completed");
   return r;
 }
 
 JV handle_persist(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "input_map_persist called");
+                            "save_input_map called");
   auto *im = godot::InputMap::get_singleton();
   if (!im) {
     JV e(JV::object_tag);
@@ -579,7 +579,7 @@ JV handle_persist(const JV &args) {
       readback_failed.push_back(name);
       LogSystem::instance().log(
           LogLevel::Warning, LogCategory::Tools,
-          "input_map_persist readback failed for action '" + name +
+          "save_input_map readback failed for action '" + name +
               "': setting missing or malformed at input/" + name);
     }
   }
@@ -614,7 +614,7 @@ JV handle_persist(const JV &args) {
   r["save_error"] = JV(static_cast<int>(err));
   LogSystem::instance().log(
       LogLevel::Info, LogCategory::Tools,
-      "input_map_persist completed: " + std::to_string(persisted) +
+      "save_input_map completed: " + std::to_string(persisted) +
           " actions persisted, " + std::to_string(skipped.size()) + " skipped");
   return r;
 }

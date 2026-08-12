@@ -248,7 +248,7 @@ JV hit_3d(const godot::Dictionary &d) {
 
 JV handle_2d_space_get_direct_state(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_space_get_direct_state called");
+                            "get_physics_2d_space_direct_state called");
   godot::RID space = resolve(args, "space_rid");
   if (!space.is_valid()) {
     JV r(JV::object_tag);
@@ -279,7 +279,7 @@ JV handle_2d_space_get_direct_state(const JV &args) {
   queries.PushBack(JV("get_rest_info"));
   r["available_queries"] = std::move(queries);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_space_get_direct_state completed");
+                            "get_physics_2d_space_direct_state completed");
   JV ret(JV::object_tag);
   ret["result"] = std::move(r);
   return ret;
@@ -303,7 +303,7 @@ static godot::RID auto_detect_2d_space() {
 
 JV handle_2d_ray_cast(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_ray_cast called");
+                            "intersect_physics_2d_ray called");
   auto *it_rid = args.Find("space_rid");
   godot::RID space;
   if (it_rid && it_rid->IsNumber()) {
@@ -362,15 +362,15 @@ JV handle_2d_ray_cast(const JV &args) {
     return r;
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_ray_cast completed");
+                            "intersect_physics_2d_ray completed");
   JV r(JV::object_tag);
   r["result"] = hit_2d(result);
   return r;
 }
 
-JV handle_2d_shape_cast(const JV &args) {
+JV handle_2d_intersect_shape(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_shape_cast called");
+                            "intersect_physics_2d_shape called");
   godot::RID space = resolve(args, "space_rid");
   godot::RID shape = resolve(args, "shape_rid");
   if (!space.is_valid()) {
@@ -418,113 +418,7 @@ JV handle_2d_shape_cast(const JV &args) {
   for (int64_t i = 0; i < hits.size(); i++)
     arr.PushBack(hit_2d(hits[i]));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_shape_cast completed");
-  JV r(JV::object_tag);
-  r["result"] = std::move(arr);
-  return r;
-}
-
-JV handle_2d_point_query(const JV &args) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_point_query called");
-  godot::RID space = resolve(args, "space_rid");
-  auto *it_pos = args.Find("position");
-  if (!space.is_valid()) {
-    JV r(JV::object_tag);
-    r["error"] = JV("missing or invalid required parameter: space_rid");
-    return r;
-  }
-  if (!it_pos || !it_pos->IsObject()) {
-    JV r(JV::object_tag);
-    r["error"] = JV("missing required parameter: position");
-    return r;
-  }
-  auto *ps = godot::PhysicsServer2D::get_singleton();
-  if (!ps) {
-    JV r(JV::object_tag);
-    r["error"] = JV("PhysicsServer2D not available");
-    return r;
-  }
-  auto *state = ps->space_get_direct_state(space);
-  if (!state) {
-    JV r(JV::object_tag);
-    r["error"] = JV("space_get_direct_state returned null");
-    return r;
-  }
-  godot::Ref<godot::PhysicsPointQueryParameters2D> p;
-  p.instantiate();
-  p->set_position(parse_vec2(*it_pos));
-  if (args.Contains("collision_mask"))
-    p->set_collision_mask(
-        static_cast<uint32_t>(args["collision_mask"].GetInt()));
-  if (args.Contains("exclude"))
-    p->set_exclude(parse_rids(args["exclude"]));
-  if (args.Contains("collide_with_bodies"))
-    p->set_collide_with_bodies(args["collide_with_bodies"].GetBool());
-  if (args.Contains("collide_with_areas"))
-    p->set_collide_with_areas(args["collide_with_areas"].GetBool());
-  auto *mr = args.Find("max_results");
-  int64_t mrv = mr ? mr->GetInt() : 32;
-  auto hits = state->intersect_point(p, mrv);
-  JV arr(JV::array_tag);
-  for (int64_t i = 0; i < hits.size(); i++)
-    arr.PushBack(hit_2d(hits[i]));
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_point_query completed");
-  JV r(JV::object_tag);
-  r["result"] = std::move(arr);
-  return r;
-}
-
-JV handle_2d_intersect_shape(const JV &args) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_intersect_shape called");
-  godot::RID space = resolve(args, "space_rid");
-  godot::RID shape = resolve(args, "shape_rid");
-  if (!space.is_valid()) {
-    JV r(JV::object_tag);
-    r["error"] = JV("missing or invalid required parameter: space_rid");
-    return r;
-  }
-  if (!shape.is_valid()) {
-    JV r(JV::object_tag);
-    r["error"] = JV("missing or invalid required parameter: shape_rid");
-    return r;
-  }
-  auto *ps = godot::PhysicsServer2D::get_singleton();
-  if (!ps) {
-    JV r(JV::object_tag);
-    r["error"] = JV("PhysicsServer2D not available");
-    return r;
-  }
-  auto *state = ps->space_get_direct_state(space);
-  if (!state) {
-    JV r(JV::object_tag);
-    r["error"] = JV("space_get_direct_state returned null");
-    return r;
-  }
-  godot::Ref<godot::PhysicsShapeQueryParameters2D> p;
-  p.instantiate();
-  p->set_shape_rid(shape);
-  if (args.Contains("transform"))
-    p->set_transform(parse_t2d(args["transform"]));
-  if (args.Contains("collision_mask"))
-    p->set_collision_mask(
-        static_cast<uint32_t>(args["collision_mask"].GetInt()));
-  if (args.Contains("exclude"))
-    p->set_exclude(parse_rids(args["exclude"]));
-  if (args.Contains("collide_with_bodies"))
-    p->set_collide_with_bodies(args["collide_with_bodies"].GetBool());
-  if (args.Contains("collide_with_areas"))
-    p->set_collide_with_areas(args["collide_with_areas"].GetBool());
-  auto *mr = args.Find("max_results");
-  int64_t mrv = mr ? mr->GetInt() : 32;
-  auto hits = state->intersect_shape(p, mrv);
-  JV arr(JV::array_tag);
-  for (int64_t i = 0; i < hits.size(); i++)
-    arr.PushBack(hit_2d(hits[i]));
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_intersect_shape completed");
+                            "intersect_physics_2d_shape completed");
   JV r(JV::object_tag);
   r["result"] = std::move(arr);
   return r;
@@ -532,7 +426,7 @@ JV handle_2d_intersect_shape(const JV &args) {
 
 JV handle_2d_intersect_point(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_intersect_point called");
+                            "intersect_physics_2d_point called");
   godot::RID space = resolve(args, "space_rid");
   auto *it_pos = args.Find("position");
   if (!space.is_valid()) {
@@ -576,7 +470,7 @@ JV handle_2d_intersect_point(const JV &args) {
   for (int64_t i = 0; i < hits.size(); i++)
     arr.PushBack(hit_2d(hits[i]));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_intersect_point completed");
+                            "intersect_physics_2d_point completed");
   JV r(JV::object_tag);
   r["result"] = std::move(arr);
   return r;
@@ -584,7 +478,7 @@ JV handle_2d_intersect_point(const JV &args) {
 
 JV handle_2d_body_create(const JV &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_body_create called");
+                            "create_physics_2d_body called");
   auto *ps = godot::PhysicsServer2D::get_singleton();
   if (!ps) {
     JV r(JV::object_tag);
@@ -592,7 +486,7 @@ JV handle_2d_body_create(const JV &) {
     return r;
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_body_create completed");
+                            "create_physics_2d_body completed");
   JV r(JV::object_tag);
   r["result"] = rid_result(ps->body_create());
   return r;
@@ -600,7 +494,7 @@ JV handle_2d_body_create(const JV &) {
 
 JV handle_2d_body_set_mode(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_body_set_mode called");
+                            "set_physics_2d_body_mode called");
   godot::RID body = resolve(args, "rid");
   auto *it_mode = args.Find("mode");
   if (!body.is_valid()) {
@@ -625,7 +519,7 @@ JV handle_2d_body_set_mode(const JV &args) {
   godot::PhysicsServer2D::get_singleton()->body_set_mode(
       body, static_cast<godot::PhysicsServer2D::BodyMode>(m));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_body_set_mode completed");
+                            "set_physics_2d_body_mode completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -633,7 +527,7 @@ JV handle_2d_body_set_mode(const JV &args) {
 
 JV handle_2d_body_apply_force(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_body_apply_force called");
+                            "apply_physics_2d_body_force called");
   godot::RID body = resolve(args, "rid");
   auto *it_force = args.Find("force");
   if (!body.is_valid()) {
@@ -653,7 +547,7 @@ JV handle_2d_body_apply_force(const JV &args) {
   else
     ps->body_apply_central_force(body, f);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_body_apply_force completed");
+                            "apply_physics_2d_body_force completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -661,7 +555,7 @@ JV handle_2d_body_apply_force(const JV &args) {
 
 JV handle_2d_body_apply_impulse(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_body_apply_impulse called");
+                            "apply_physics_2d_body_impulse called");
   godot::RID body = resolve(args, "rid");
   auto *it_imp = args.Find("impulse");
   if (!body.is_valid()) {
@@ -681,7 +575,7 @@ JV handle_2d_body_apply_impulse(const JV &args) {
   else
     ps->body_apply_central_impulse(body, imp);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_body_apply_impulse completed");
+                            "apply_physics_2d_body_impulse completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -689,7 +583,7 @@ JV handle_2d_body_apply_impulse(const JV &args) {
 
 JV handle_2d_body_set_state(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_body_set_state called");
+                            "set_physics_2d_body_state called");
   godot::RID body = resolve(args, "rid");
   auto *it_state = args.Find("state");
   if (!body.is_valid()) {
@@ -722,7 +616,7 @@ JV handle_2d_body_set_state(const JV &args) {
       body, static_cast<godot::PhysicsServer2D::BodyState>(s),
       VariantJson::deserialize(*it_val));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_body_set_state completed");
+                            "set_physics_2d_body_state completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -730,7 +624,7 @@ JV handle_2d_body_set_state(const JV &args) {
 
 JV handle_2d_body_get_state(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_body_get_state called");
+                            "get_physics_2d_body_state called");
   godot::RID body = resolve(args, "rid");
   auto *it_state = args.Find("state");
   if (!body.is_valid()) {
@@ -756,7 +650,7 @@ JV handle_2d_body_get_state(const JV &args) {
   auto val = godot::PhysicsServer2D::get_singleton()->body_get_state(
       body, static_cast<godot::PhysicsServer2D::BodyState>(s));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_body_get_state completed");
+                            "get_physics_2d_body_state completed");
   JV r(JV::object_tag);
   r["result"] = VariantJson::serialize(val);
   return r;
@@ -764,7 +658,7 @@ JV handle_2d_body_get_state(const JV &args) {
 
 JV handle_2d_joint_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_joint_create called");
+                            "create_physics_2d_joint called");
   auto *it_type = args.Find("type");
   if (!it_type || !it_type->IsString()) {
     JV r(JV::object_tag);
@@ -817,7 +711,7 @@ JV handle_2d_joint_create(const JV &args) {
     return r;
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_joint_create completed");
+                            "create_physics_2d_joint completed");
   JV r(JV::object_tag);
   r["result"] = rid_result(j);
   return r;
@@ -825,7 +719,7 @@ JV handle_2d_joint_create(const JV &args) {
 
 JV handle_2d_area_create(const JV &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_area_create called");
+                            "create_physics_2d_area called");
   auto *ps = godot::PhysicsServer2D::get_singleton();
   if (!ps) {
     JV r(JV::object_tag);
@@ -833,7 +727,7 @@ JV handle_2d_area_create(const JV &) {
     return r;
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_area_create completed");
+                            "create_physics_2d_area completed");
   JV r(JV::object_tag);
   r["result"] = rid_result(ps->area_create());
   return r;
@@ -841,7 +735,7 @@ JV handle_2d_area_create(const JV &) {
 
 JV handle_2d_area_set_monitorable(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_area_set_monitorable called");
+                            "set_physics_2d_area_monitorable called");
   godot::RID area = resolve(args, "rid");
   auto *it_mon = args.Find("monitorable");
   if (!area.is_valid()) {
@@ -857,7 +751,7 @@ JV handle_2d_area_set_monitorable(const JV &args) {
   godot::PhysicsServer2D::get_singleton()->area_set_monitorable(
       area, it_mon->GetBool());
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_area_set_monitorable completed");
+                            "set_physics_2d_area_monitorable completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -865,7 +759,7 @@ JV handle_2d_area_set_monitorable(const JV &args) {
 
 JV handle_3d_space_get_direct_state(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_space_get_direct_state called");
+                            "get_physics_3d_space_direct_state called");
   godot::RID space = resolve(args, "space_rid");
   if (!space.is_valid()) {
     JV r(JV::object_tag);
@@ -896,7 +790,7 @@ JV handle_3d_space_get_direct_state(const JV &args) {
   queries.PushBack(JV("get_rest_info"));
   r["available_queries"] = std::move(queries);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_space_get_direct_state completed");
+                            "get_physics_3d_space_direct_state completed");
   JV ret(JV::object_tag);
   ret["result"] = std::move(r);
   return ret;
@@ -904,7 +798,7 @@ JV handle_3d_space_get_direct_state(const JV &args) {
 
 JV handle_3d_ray_cast(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_ray_cast called");
+                            "intersect_physics_3d_ray called");
   godot::RID space = resolve(args, "space_rid");
   auto *it_from = args.Find("from");
   auto *it_to = args.Find("to");
@@ -957,15 +851,15 @@ JV handle_3d_ray_cast(const JV &args) {
     return r;
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_ray_cast completed");
+                            "intersect_physics_3d_ray completed");
   JV r(JV::object_tag);
   r["result"] = hit_3d(result);
   return r;
 }
 
-JV handle_3d_shape_cast(const JV &args) {
+JV handle_3d_intersect_shape(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_shape_cast called");
+                            "intersect_physics_3d_shape called");
   godot::RID space = resolve(args, "space_rid");
   godot::RID shape = resolve(args, "shape_rid");
   if (!space.is_valid()) {
@@ -1013,113 +907,7 @@ JV handle_3d_shape_cast(const JV &args) {
   for (int64_t i = 0; i < hits.size(); i++)
     arr.PushBack(hit_3d(hits[i]));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_shape_cast completed");
-  JV r(JV::object_tag);
-  r["result"] = std::move(arr);
-  return r;
-}
-
-JV handle_3d_point_query(const JV &args) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_point_query called");
-  godot::RID space = resolve(args, "space_rid");
-  auto *it_pos = args.Find("position");
-  if (!space.is_valid()) {
-    JV r(JV::object_tag);
-    r["error"] = JV("missing or invalid required parameter: space_rid");
-    return r;
-  }
-  if (!it_pos || !it_pos->IsObject()) {
-    JV r(JV::object_tag);
-    r["error"] = JV("missing required parameter: position");
-    return r;
-  }
-  auto *ps = godot::PhysicsServer3D::get_singleton();
-  if (!ps) {
-    JV r(JV::object_tag);
-    r["error"] = JV("PhysicsServer3D not available");
-    return r;
-  }
-  auto *state = ps->space_get_direct_state(space);
-  if (!state) {
-    JV r(JV::object_tag);
-    r["error"] = JV("space_get_direct_state returned null");
-    return r;
-  }
-  godot::Ref<godot::PhysicsPointQueryParameters3D> p;
-  p.instantiate();
-  p->set_position(parse_vec3(*it_pos));
-  if (args.Contains("collision_mask"))
-    p->set_collision_mask(
-        static_cast<uint32_t>(args["collision_mask"].GetInt()));
-  if (args.Contains("exclude"))
-    p->set_exclude(parse_rids(args["exclude"]));
-  if (args.Contains("collide_with_bodies"))
-    p->set_collide_with_bodies(args["collide_with_bodies"].GetBool());
-  if (args.Contains("collide_with_areas"))
-    p->set_collide_with_areas(args["collide_with_areas"].GetBool());
-  auto *mr = args.Find("max_results");
-  int64_t mrv = mr ? mr->GetInt() : 32;
-  auto hits = state->intersect_point(p, mrv);
-  JV arr(JV::array_tag);
-  for (int64_t i = 0; i < hits.size(); i++)
-    arr.PushBack(hit_3d(hits[i]));
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_point_query completed");
-  JV r(JV::object_tag);
-  r["result"] = std::move(arr);
-  return r;
-}
-
-JV handle_3d_intersect_shape(const JV &args) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_intersect_shape called");
-  godot::RID space = resolve(args, "space_rid");
-  godot::RID shape = resolve(args, "shape_rid");
-  if (!space.is_valid()) {
-    JV r(JV::object_tag);
-    r["error"] = JV("missing or invalid required parameter: space_rid");
-    return r;
-  }
-  if (!shape.is_valid()) {
-    JV r(JV::object_tag);
-    r["error"] = JV("missing or invalid required parameter: shape_rid");
-    return r;
-  }
-  auto *ps = godot::PhysicsServer3D::get_singleton();
-  if (!ps) {
-    JV r(JV::object_tag);
-    r["error"] = JV("PhysicsServer3D not available");
-    return r;
-  }
-  auto *state = ps->space_get_direct_state(space);
-  if (!state) {
-    JV r(JV::object_tag);
-    r["error"] = JV("space_get_direct_state returned null");
-    return r;
-  }
-  godot::Ref<godot::PhysicsShapeQueryParameters3D> p;
-  p.instantiate();
-  p->set_shape_rid(shape);
-  if (args.Contains("transform"))
-    p->set_transform(parse_t3d(args["transform"]));
-  if (args.Contains("collision_mask"))
-    p->set_collision_mask(
-        static_cast<uint32_t>(args["collision_mask"].GetInt()));
-  if (args.Contains("exclude"))
-    p->set_exclude(parse_rids(args["exclude"]));
-  if (args.Contains("collide_with_bodies"))
-    p->set_collide_with_bodies(args["collide_with_bodies"].GetBool());
-  if (args.Contains("collide_with_areas"))
-    p->set_collide_with_areas(args["collide_with_areas"].GetBool());
-  auto *mr = args.Find("max_results");
-  int64_t mrv = mr ? mr->GetInt() : 32;
-  auto hits = state->intersect_shape(p, mrv);
-  JV arr(JV::array_tag);
-  for (int64_t i = 0; i < hits.size(); i++)
-    arr.PushBack(hit_3d(hits[i]));
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_intersect_shape completed");
+                            "intersect_physics_3d_shape completed");
   JV r(JV::object_tag);
   r["result"] = std::move(arr);
   return r;
@@ -1127,7 +915,7 @@ JV handle_3d_intersect_shape(const JV &args) {
 
 JV handle_3d_intersect_point(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_intersect_point called");
+                            "intersect_physics_3d_point called");
   godot::RID space = resolve(args, "space_rid");
   auto *it_pos = args.Find("position");
   if (!space.is_valid()) {
@@ -1171,7 +959,7 @@ JV handle_3d_intersect_point(const JV &args) {
   for (int64_t i = 0; i < hits.size(); i++)
     arr.PushBack(hit_3d(hits[i]));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_intersect_point completed");
+                            "intersect_physics_3d_point completed");
   JV r(JV::object_tag);
   r["result"] = std::move(arr);
   return r;
@@ -1179,7 +967,7 @@ JV handle_3d_intersect_point(const JV &args) {
 
 JV handle_3d_body_create(const JV &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_body_create called");
+                            "create_physics_3d_body called");
   auto *ps = godot::PhysicsServer3D::get_singleton();
   if (!ps) {
     JV r(JV::object_tag);
@@ -1187,7 +975,7 @@ JV handle_3d_body_create(const JV &) {
     return r;
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_body_create completed");
+                            "create_physics_3d_body completed");
   JV r(JV::object_tag);
   r["result"] = rid_result(ps->body_create());
   return r;
@@ -1195,7 +983,7 @@ JV handle_3d_body_create(const JV &) {
 
 JV handle_3d_body_set_mode(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_body_set_mode called");
+                            "set_physics_3d_body_mode called");
   godot::RID body = resolve(args, "rid");
   auto *it_mode = args.Find("mode");
   if (!body.is_valid()) {
@@ -1220,7 +1008,7 @@ JV handle_3d_body_set_mode(const JV &args) {
   godot::PhysicsServer3D::get_singleton()->body_set_mode(
       body, static_cast<godot::PhysicsServer3D::BodyMode>(m));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_body_set_mode completed");
+                            "set_physics_3d_body_mode completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -1228,7 +1016,7 @@ JV handle_3d_body_set_mode(const JV &args) {
 
 JV handle_3d_body_apply_force(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_body_apply_force called");
+                            "apply_physics_3d_body_force called");
   godot::RID body = resolve(args, "rid");
   auto *it_force = args.Find("force");
   if (!body.is_valid()) {
@@ -1248,7 +1036,7 @@ JV handle_3d_body_apply_force(const JV &args) {
   else
     ps->body_apply_central_force(body, f);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_body_apply_force completed");
+                            "apply_physics_3d_body_force completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -1256,7 +1044,7 @@ JV handle_3d_body_apply_force(const JV &args) {
 
 JV handle_3d_body_apply_impulse(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_body_apply_impulse called");
+                            "apply_physics_3d_body_impulse called");
   godot::RID body = resolve(args, "rid");
   auto *it_imp = args.Find("impulse");
   if (!body.is_valid()) {
@@ -1276,7 +1064,7 @@ JV handle_3d_body_apply_impulse(const JV &args) {
   else
     ps->body_apply_central_impulse(body, imp);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_body_apply_impulse completed");
+                            "apply_physics_3d_body_impulse completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -1284,7 +1072,7 @@ JV handle_3d_body_apply_impulse(const JV &args) {
 
 JV handle_3d_body_set_state(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_body_set_state called");
+                            "set_physics_3d_body_state called");
   godot::RID body = resolve(args, "rid");
   auto *it_state = args.Find("state");
   if (!body.is_valid()) {
@@ -1317,7 +1105,7 @@ JV handle_3d_body_set_state(const JV &args) {
       body, static_cast<godot::PhysicsServer3D::BodyState>(s),
       VariantJson::deserialize(*it_val));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_body_set_state completed");
+                            "set_physics_3d_body_state completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -1325,7 +1113,7 @@ JV handle_3d_body_set_state(const JV &args) {
 
 JV handle_3d_body_get_state(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_body_get_state called");
+                            "get_physics_3d_body_state called");
   godot::RID body = resolve(args, "rid");
   auto *it_state = args.Find("state");
   if (!body.is_valid()) {
@@ -1351,7 +1139,7 @@ JV handle_3d_body_get_state(const JV &args) {
   auto val = godot::PhysicsServer3D::get_singleton()->body_get_state(
       body, static_cast<godot::PhysicsServer3D::BodyState>(s));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_body_get_state completed");
+                            "get_physics_3d_body_state completed");
   JV r(JV::object_tag);
   r["result"] = VariantJson::serialize(val);
   return r;
@@ -1359,7 +1147,7 @@ JV handle_3d_body_get_state(const JV &args) {
 
 JV handle_3d_joint_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_joint_create called");
+                            "create_physics_3d_joint called");
   auto *it_type = args.Find("type");
   if (!it_type || !it_type->IsString()) {
     JV r(JV::object_tag);
@@ -1460,7 +1248,7 @@ JV handle_3d_joint_create(const JV &args) {
     return r;
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_joint_create completed");
+                            "create_physics_3d_joint completed");
   JV r(JV::object_tag);
   r["result"] = rid_result(j);
   return r;
@@ -1468,7 +1256,7 @@ JV handle_3d_joint_create(const JV &args) {
 
 JV handle_3d_area_create(const JV &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_area_create called");
+                            "create_physics_3d_area called");
   auto *ps = godot::PhysicsServer3D::get_singleton();
   if (!ps) {
     JV r(JV::object_tag);
@@ -1476,7 +1264,7 @@ JV handle_3d_area_create(const JV &) {
     return r;
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_area_create completed");
+                            "create_physics_3d_area completed");
   JV r(JV::object_tag);
   r["result"] = rid_result(ps->area_create());
   return r;
@@ -1484,7 +1272,7 @@ JV handle_3d_area_create(const JV &) {
 
 JV handle_3d_area_set_monitorable(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_area_set_monitorable called");
+                            "set_physics_3d_area_monitorable called");
   godot::RID area = resolve(args, "rid");
   auto *it_mon = args.Find("monitorable");
   if (!area.is_valid()) {
@@ -1500,7 +1288,7 @@ JV handle_3d_area_set_monitorable(const JV &args) {
   godot::PhysicsServer3D::get_singleton()->area_set_monitorable(
       area, it_mon->GetBool());
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_area_set_monitorable completed");
+                            "set_physics_3d_area_monitorable completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -1508,7 +1296,7 @@ JV handle_3d_area_set_monitorable(const JV &args) {
 
 JV handle_3d_body_apply_torque(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_body_apply_torque called");
+                            "apply_physics_3d_body_torque called");
   godot::RID body = resolve(args, "rid");
   auto *it_t = args.Find("torque");
   if (!body.is_valid()) {
@@ -1524,7 +1312,7 @@ JV handle_3d_body_apply_torque(const JV &args) {
   godot::PhysicsServer3D::get_singleton()->body_apply_torque(body,
                                                              parse_vec3(*it_t));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_body_apply_torque completed");
+                            "apply_physics_3d_body_torque completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -1532,7 +1320,7 @@ JV handle_3d_body_apply_torque(const JV &args) {
 
 JV handle_3d_body_set_axis_lock(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_body_set_axis_lock called");
+                            "set_physics_3d_body_axis_lock called");
   godot::RID body = resolve(args, "rid");
   auto *it_axis = args.Find("axis");
   auto *it_lock = args.Find("lock");
@@ -1573,7 +1361,7 @@ JV handle_3d_body_set_axis_lock(const JV &args) {
       body, static_cast<godot::PhysicsServer3D::BodyAxis>(axis),
       it_lock->GetBool());
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_body_set_axis_lock completed");
+                            "set_physics_3d_body_axis_lock completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -1581,7 +1369,7 @@ JV handle_3d_body_set_axis_lock(const JV &args) {
 
 JV handle_3d_body_add_collision_exception(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_body_add_collision_exception called");
+                            "add_physics_3d_body_collision_exception called");
   godot::RID body = resolve(args, "rid");
   godot::RID ex = resolve(args, "excepted_body_rid");
   if (!body.is_valid()) {
@@ -1598,7 +1386,7 @@ JV handle_3d_body_add_collision_exception(const JV &args) {
                                                                         ex);
   LogSystem::instance().log(
       LogLevel::Info, LogCategory::Tools,
-      "physics_3d_body_add_collision_exception completed");
+      "add_physics_3d_body_collision_exception completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -1607,7 +1395,7 @@ JV handle_3d_body_add_collision_exception(const JV &args) {
 JV handle_3d_body_remove_collision_exception(const JV &args) {
   LogSystem::instance().log(
       LogLevel::Info, LogCategory::Tools,
-      "physics_3d_body_remove_collision_exception called");
+      "remove_physics_3d_body_collision_exception called");
   godot::RID body = resolve(args, "rid");
   godot::RID ex = resolve(args, "excepted_body_rid");
   if (!body.is_valid()) {
@@ -1624,7 +1412,7 @@ JV handle_3d_body_remove_collision_exception(const JV &args) {
                                                                            ex);
   LogSystem::instance().log(
       LogLevel::Info, LogCategory::Tools,
-      "physics_3d_body_remove_collision_exception completed");
+      "remove_physics_3d_body_collision_exception completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -1632,7 +1420,7 @@ JV handle_3d_body_remove_collision_exception(const JV &args) {
 
 JV handle_3d_joint_set_param(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_joint_set_param called");
+                            "set_physics_3d_joint_param called");
   godot::RID joint = resolve(args, "rid");
   if (!joint.is_valid()) {
     JV r(JV::object_tag);
@@ -1647,7 +1435,7 @@ JV handle_3d_joint_set_param(const JV &args) {
     ps->joint_disable_collisions_between_bodies(
         joint, args["disable_collision"].GetBool());
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_joint_set_param completed");
+                            "set_physics_3d_joint_param completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -1655,7 +1443,7 @@ JV handle_3d_joint_set_param(const JV &args) {
 
 JV handle_3d_area_set_space_override(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_area_set_space_override called");
+                            "set_physics_3d_area_space called");
   godot::RID area = resolve(args, "rid");
   godot::RID space = resolve(args, "space_rid");
   if (!area.is_valid()) {
@@ -1670,7 +1458,7 @@ JV handle_3d_area_set_space_override(const JV &args) {
   }
   godot::PhysicsServer3D::get_singleton()->area_set_space(area, space);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_area_set_space_override completed");
+                            "set_physics_3d_area_space completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -1678,7 +1466,7 @@ JV handle_3d_area_set_space_override(const JV &args) {
 
 JV handle_3d_space_set_gravity(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_space_set_gravity called");
+                            "set_physics_3d_space_solver_iterations called");
   godot::RID space = resolve(args, "rid");
   if (!space.is_valid()) {
     JV r(JV::object_tag);
@@ -1691,7 +1479,7 @@ JV handle_3d_space_set_gravity(const JV &args) {
                         godot::PhysicsServer3D::SPACE_PARAM_SOLVER_ITERATIONS,
                         static_cast<float>(args["solver_iterations"].GetInt()));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_space_set_gravity completed");
+                            "set_physics_3d_space_solver_iterations completed");
   JV r(JV::object_tag);
   r["result"] = JV("gravity-related space params updated (actual gravity set "
                    "via AreaParameter or ProjectSettings)");
@@ -1700,7 +1488,7 @@ JV handle_3d_space_set_gravity(const JV &args) {
 
 JV handle_3d_space_set_debug(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_space_set_debug called");
+                            "set_physics_3d_space_solver_params called");
   godot::RID space = resolve(args, "rid");
   if (!space.is_valid()) {
     JV r(JV::object_tag);
@@ -1724,7 +1512,7 @@ JV handle_3d_space_set_debug(const JV &args) {
                        : args["contact_max_allowed_penetration"].GetDouble())
                 : 0.0));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_space_set_debug completed");
+                            "set_physics_3d_space_solver_params completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -1732,7 +1520,7 @@ JV handle_3d_space_set_debug(const JV &args) {
 
 JV handle_3d_soft_body_create(const JV &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_soft_body_create called");
+                            "create_physics_3d_soft_body called");
   auto *ps = godot::PhysicsServer3D::get_singleton();
   if (!ps) {
     JV r(JV::object_tag);
@@ -1740,7 +1528,7 @@ JV handle_3d_soft_body_create(const JV &) {
     return r;
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_soft_body_create completed");
+                            "create_physics_3d_soft_body completed");
   JV r(JV::object_tag);
   r["result"] = rid_result(ps->soft_body_create());
   return r;
@@ -1748,7 +1536,7 @@ JV handle_3d_soft_body_create(const JV &) {
 
 JV handle_3d_soft_body_set_mesh(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_soft_body_set_mesh called");
+                            "set_physics_3d_soft_body_mesh called");
   godot::RID soft = resolve(args, "rid");
   godot::RID mesh = resolve(args, "mesh_rid");
   if (!soft.is_valid()) {
@@ -1763,7 +1551,7 @@ JV handle_3d_soft_body_set_mesh(const JV &args) {
   }
   godot::PhysicsServer3D::get_singleton()->soft_body_set_mesh(soft, mesh);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_soft_body_set_mesh completed");
+                            "set_physics_3d_soft_body_mesh completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -1771,7 +1559,7 @@ JV handle_3d_soft_body_set_mesh(const JV &args) {
 
 JV handle_3d_shape_create(const JV &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_shape_create called");
+                            "create_physics_3d_sphere_shape called");
   auto *ps = godot::PhysicsServer3D::get_singleton();
   if (!ps) {
     JV r(JV::object_tag);
@@ -1779,7 +1567,7 @@ JV handle_3d_shape_create(const JV &) {
     return r;
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_shape_create completed");
+                            "create_physics_3d_sphere_shape completed");
   JV r(JV::object_tag);
   r["result"] = rid_result(ps->sphere_shape_create());
   return r;
@@ -1787,7 +1575,7 @@ JV handle_3d_shape_create(const JV &) {
 
 JV handle_3d_shape_set_data(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_shape_set_data called");
+                            "set_physics_3d_shape_data called");
   godot::RID shape = resolve(args, "rid");
   if (!shape.is_valid()) {
     JV r(JV::object_tag);
@@ -1803,7 +1591,7 @@ JV handle_3d_shape_set_data(const JV &args) {
   godot::PhysicsServer3D::get_singleton()->shape_set_data(
       shape, VariantJson::deserialize(*dp));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_shape_set_data completed");
+                            "set_physics_3d_shape_data completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -1811,7 +1599,7 @@ JV handle_3d_shape_set_data(const JV &args) {
 
 JV handle_3d_body_add_shape(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_body_add_shape called");
+                            "add_physics_3d_body_shape called");
   godot::RID body = resolve(args, "rid");
   godot::RID shape = resolve(args, "shape_rid");
   if (!body.is_valid()) {
@@ -1833,7 +1621,7 @@ JV handle_3d_body_add_shape(const JV &args) {
   godot::PhysicsServer3D::get_singleton()->body_add_shape(body, shape, t,
                                                           disabled);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_body_add_shape completed");
+                            "add_physics_3d_body_shape completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -1841,7 +1629,7 @@ JV handle_3d_body_add_shape(const JV &args) {
 
 JV handle_3d_body_set_param(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_body_set_param called");
+                            "set_physics_3d_body_param called");
   godot::RID body = resolve(args, "rid");
   if (!body.is_valid()) {
     JV r(JV::object_tag);
@@ -1867,7 +1655,7 @@ JV handle_3d_body_set_param(const JV &args) {
   godot::PhysicsServer3D::get_singleton()->body_set_param(
       body, static_cast<godot::PhysicsServer3D::BodyParameter>(param), val);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_body_set_param completed");
+                            "set_physics_3d_body_param completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -1875,7 +1663,7 @@ JV handle_3d_body_set_param(const JV &args) {
 
 JV handle_3d_area_set_param(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_area_set_param called");
+                            "set_physics_3d_area_param called");
   godot::RID area = resolve(args, "rid");
   if (!area.is_valid()) {
     JV r(JV::object_tag);
@@ -1900,7 +1688,7 @@ JV handle_3d_area_set_param(const JV &args) {
       area, static_cast<godot::PhysicsServer3D::AreaParameter>(param),
       VariantJson::deserialize(*vp));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_area_set_param completed");
+                            "set_physics_3d_area_param completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -1908,7 +1696,7 @@ JV handle_3d_area_set_param(const JV &args) {
 
 JV handle_3d_space_set_param(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_space_set_param called");
+                            "set_physics_3d_space_param called");
   godot::RID space = resolve(args, "space_rid");
   if (!space.is_valid()) {
     JV r(JV::object_tag);
@@ -1934,7 +1722,7 @@ JV handle_3d_space_set_param(const JV &args) {
   godot::PhysicsServer3D::get_singleton()->space_set_param(
       space, static_cast<godot::PhysicsServer3D::SpaceParameter>(param), val);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_space_set_param completed");
+                            "set_physics_3d_space_param completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -1942,7 +1730,7 @@ JV handle_3d_space_set_param(const JV &args) {
 
 JV handle_3d_area_set_transform(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_area_set_transform called");
+                            "set_physics_3d_area_transform called");
   godot::RID area = resolve(args, "rid");
   auto *tp = args.Find("transform");
   if (!area.is_valid()) {
@@ -1958,7 +1746,7 @@ JV handle_3d_area_set_transform(const JV &args) {
   godot::PhysicsServer3D::get_singleton()->area_set_transform(area,
                                                               parse_t3d(*tp));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_area_set_transform completed");
+                            "set_physics_3d_area_transform completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -1966,7 +1754,7 @@ JV handle_3d_area_set_transform(const JV &args) {
 
 JV handle_3d_body_set_transform(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_body_set_transform called");
+                            "set_physics_3d_body_transform called");
   godot::RID body = resolve(args, "rid");
   auto *tp = args.Find("transform");
   if (!body.is_valid()) {
@@ -1982,7 +1770,7 @@ JV handle_3d_body_set_transform(const JV &args) {
   godot::PhysicsServer3D::get_singleton()->body_set_state(
       body, godot::PhysicsServer3D::BODY_STATE_TRANSFORM, parse_t3d(*tp));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_3d_body_set_transform completed");
+                            "set_physics_3d_body_transform completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -1990,7 +1778,7 @@ JV handle_3d_body_set_transform(const JV &args) {
 
 JV handle_2d_shape_create(const JV &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_shape_create called");
+                            "create_physics_2d_circle_shape called");
   auto *ps = godot::PhysicsServer2D::get_singleton();
   if (!ps) {
     JV r(JV::object_tag);
@@ -1998,7 +1786,7 @@ JV handle_2d_shape_create(const JV &) {
     return r;
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_shape_create completed");
+                            "create_physics_2d_circle_shape completed");
   JV r(JV::object_tag);
   r["result"] = rid_result(ps->circle_shape_create());
   return r;
@@ -2006,7 +1794,7 @@ JV handle_2d_shape_create(const JV &) {
 
 JV handle_2d_shape_set_data(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_shape_set_data called");
+                            "set_physics_2d_shape_data called");
   godot::RID shape = resolve(args, "rid");
   if (!shape.is_valid()) {
     JV r(JV::object_tag);
@@ -2022,7 +1810,7 @@ JV handle_2d_shape_set_data(const JV &args) {
   godot::PhysicsServer2D::get_singleton()->shape_set_data(
       shape, VariantJson::deserialize(*dp));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_2d_shape_set_data completed");
+                            "set_physics_2d_shape_data completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -2030,7 +1818,7 @@ JV handle_2d_shape_set_data(const JV &args) {
 
 JV handle_physics_node_get_rid(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "physics_node_get_rid called");
+                            "get_physics_node_rid called");
   auto *pp = args.Find("path");
   if (!pp || !pp->IsString()) {
     JV r(JV::object_tag);
@@ -2082,7 +1870,7 @@ JV handle_physics_node_get_rid(const JV &args) {
   auto *co2d = godot::Object::cast_to<godot::CollisionObject2D>(node);
   if (co2d) {
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                              "physics_node_get_rid completed");
+                              "get_physics_node_rid completed");
     JV r(JV::object_tag);
     r["result"] = rid_result(co2d->get_rid());
     return r;
@@ -2090,7 +1878,7 @@ JV handle_physics_node_get_rid(const JV &args) {
   auto *co3d = godot::Object::cast_to<godot::CollisionObject3D>(node);
   if (co3d) {
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                              "physics_node_get_rid completed");
+                              "get_physics_node_rid completed");
     JV r(JV::object_tag);
     r["result"] = rid_result(co3d->get_rid());
     return r;

@@ -199,7 +199,7 @@ bool check_source_safety(ExecContext &ctx, std::string &error_out) {
         error_out =
             "calling EditorInterface.close_scene() from code_execute is unsafe "
             "(it destroys the executing node and crashes the editor) — use the "
-            "editor_close_scene MCP tool instead";
+            "close_editor_scene MCP tool instead";
         return false;
       }
     }

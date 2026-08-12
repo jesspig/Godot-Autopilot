@@ -98,7 +98,7 @@ bool extract_vec2(const mcp::JsonValue &obj, double &x, double &y) {
 
 mcp::JsonValue handle_action_press(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "input_action_press called");
+                            "press_input_action called");
 
   auto *action_p = args.Find("action");
   if (!action_p || !action_p->IsString()) {
@@ -132,7 +132,7 @@ mcp::JsonValue handle_action_press(const mcp::JsonValue &args) {
 
 mcp::JsonValue handle_action_release(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "input_action_release called");
+                            "release_input_action called");
 
   auto *action_p = args.Find("action");
   if (!action_p || !action_p->IsString()) {
@@ -158,7 +158,7 @@ mcp::JsonValue handle_action_release(const mcp::JsonValue &args) {
 
 mcp::JsonValue handle_is_action_pressed(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "input_is_action_pressed called");
+                            "is_input_action_pressed called");
 
   auto *action_p = args.Find("action");
   if (!action_p || !action_p->IsString()) {
@@ -184,7 +184,7 @@ mcp::JsonValue handle_is_action_pressed(const mcp::JsonValue &args) {
 
 mcp::JsonValue handle_is_action_just_pressed(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "input_is_action_just_pressed called");
+                            "is_input_action_just_pressed called");
 
   auto *action_p = args.Find("action");
   if (!action_p || !action_p->IsString()) {
@@ -211,7 +211,7 @@ mcp::JsonValue handle_is_action_just_pressed(const mcp::JsonValue &args) {
 
 mcp::JsonValue handle_key_press(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "input_key_press called");
+                            "press_input_key called");
 
   auto *key_p = args.Find("key");
   if (!key_p || !key_p->IsString()) {
@@ -249,7 +249,7 @@ mcp::JsonValue handle_key_press(const mcp::JsonValue &args) {
 
 mcp::JsonValue handle_key_release(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "input_key_release called");
+                            "release_input_key called");
 
   auto *key_p = args.Find("key");
   if (!key_p || !key_p->IsString()) {
@@ -287,7 +287,7 @@ mcp::JsonValue handle_key_release(const mcp::JsonValue &args) {
 
 mcp::JsonValue handle_mouse_move(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "input_mouse_move called");
+                            "move_input_mouse called");
 
   auto *pos_p = args.Find("position");
   if (!pos_p || !pos_p->IsObject()) {
@@ -331,7 +331,7 @@ mcp::JsonValue handle_mouse_move(const mcp::JsonValue &args) {
 
 mcp::JsonValue handle_mouse_button_press(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "input_mouse_button_press called");
+                            "press_input_mouse_button called");
 
   auto *button_p = args.Find("button");
   if (!button_p || !button_p->IsString()) {
@@ -377,7 +377,7 @@ mcp::JsonValue handle_mouse_button_press(const mcp::JsonValue &args) {
 
 mcp::JsonValue handle_mouse_button_release(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "input_mouse_button_release called");
+                            "release_input_mouse_button called");
 
   auto *button_p = args.Find("button");
   if (!button_p || !button_p->IsString()) {
@@ -421,23 +421,9 @@ mcp::JsonValue handle_mouse_button_release(const mcp::JsonValue &args) {
   return r;
 }
 
-mcp::JsonValue handle_gamepad_simulate(const mcp::JsonValue &args) {
+mcp::JsonValue handle_gamepad_vibration_start(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "input_gamepad_simulate called");
-
-  auto *action_p = args.Find("action");
-  if (!action_p || !action_p->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: action");
-    return e;
-  }
-
-  std::string action_str = action_p->GetString();
-  std::string u = action_str;
-  for (auto &c : u) {
-    if (c >= 'a' && c <= 'z')
-      c -= 32;
-  }
+                            "start_input_gamepad_vibration called");
 
   auto *input = godot::Input::get_singleton();
   if (!input) {
@@ -446,56 +432,60 @@ mcp::JsonValue handle_gamepad_simulate(const mcp::JsonValue &args) {
     return e;
   }
 
-  if (u == "STOP") {
-    int device = 0;
-    auto *dev_p = args.Find("device");
-    if (dev_p && dev_p->IsInt())
-      device = dev_p->GetInt();
+  int device = 0;
+  auto *dev_p = args.Find("device");
+  if (dev_p && dev_p->IsInt())
+    device = dev_p->GetInt();
 
-    input->stop_joy_vibration(device);
+  float weak = 0.5f;
+  auto *weak_p = args.Find("weak");
+  if (weak_p && weak_p->IsNumber())
+    weak = static_cast<float>(weak_p->IsInt()
+                                  ? static_cast<double>(weak_p->GetInt())
+                                  : weak_p->GetDouble());
 
-    mcp::JsonValue r(mcp::JsonValue::object_tag);
-    r["result"] = mcp::JsonValue("ok");
-    return r;
+  float strong = 0.5f;
+  auto *strong_p = args.Find("strong");
+  if (strong_p && strong_p->IsNumber())
+    strong = static_cast<float>(strong_p->IsInt()
+                                    ? static_cast<double>(strong_p->GetInt())
+                                    : strong_p->GetDouble());
+
+  float duration = 0.0f;
+  auto *dur_p = args.Find("duration");
+  if (dur_p && dur_p->IsNumber())
+    duration = static_cast<float>(dur_p->IsInt()
+                                      ? static_cast<double>(dur_p->GetInt())
+                                      : dur_p->GetDouble());
+
+  input->start_joy_vibration(device, weak, strong, duration);
+
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["result"] = mcp::JsonValue("ok");
+  return r;
+}
+
+mcp::JsonValue handle_gamepad_vibration_stop(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
+                            "stop_input_gamepad_vibration called");
+
+  auto *input = godot::Input::get_singleton();
+  if (!input) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue("Input singleton not available");
+    return e;
   }
 
-  if (u == "VIBRATE") {
-    int device = 0;
-    auto *dev_p = args.Find("device");
-    if (dev_p && dev_p->IsInt())
-      device = dev_p->GetInt();
+  int device = 0;
+  auto *dev_p = args.Find("device");
+  if (dev_p && dev_p->IsInt())
+    device = dev_p->GetInt();
 
-    float weak = 0.5f;
-    auto *weak_p = args.Find("weak_magnitude");
-    if (weak_p && weak_p->IsNumber())
-      weak = static_cast<float>(weak_p->IsInt()
-                                    ? static_cast<double>(weak_p->GetInt())
-                                    : weak_p->GetDouble());
+  input->stop_joy_vibration(device);
 
-    float strong = 0.5f;
-    auto *strong_p = args.Find("strong_magnitude");
-    if (strong_p && strong_p->IsNumber())
-      strong = static_cast<float>(strong_p->IsInt()
-                                      ? static_cast<double>(strong_p->GetInt())
-                                      : strong_p->GetDouble());
-
-    float duration = 0.0f;
-    auto *dur_p = args.Find("duration");
-    if (dur_p && dur_p->IsNumber())
-      duration = static_cast<float>(dur_p->IsInt()
-                                        ? static_cast<double>(dur_p->GetInt())
-                                        : dur_p->GetDouble());
-
-    input->start_joy_vibration(device, weak, strong, duration);
-
-    mcp::JsonValue r(mcp::JsonValue::object_tag);
-    r["result"] = mcp::JsonValue("ok");
-    return r;
-  }
-
-  mcp::JsonValue e(mcp::JsonValue::object_tag);
-  e["error"] = mcp::JsonValue("unknown gamepad action: " + action_str);
-  return e;
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["result"] = mcp::JsonValue("ok");
+  return r;
 }
 
 } // namespace input_ops

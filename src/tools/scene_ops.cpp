@@ -210,7 +210,7 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
   mcp::JsonValue inner(mcp::JsonValue::object_tag);
   inner["path"] = mcp::JsonValue(result_path);
   inner["undo"] =
-      mcp::JsonValue("delete node " + result_path + " (scene_node_delete)");
+      mcp::JsonValue("delete node " + result_path + " (delete_scene_node)");
   r["result"] = std::move(inner);
   scene_dirty_tracker::mark_scene_modified();
   return r;
@@ -238,8 +238,8 @@ mcp::JsonValue handle_delete(const mcp::JsonValue &args) {
   if (node == scene_root) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
     e["error"] = mcp::JsonValue(
-        "cannot delete the scene root node — use editor_close_scene to close "
-        "the scene, then editor_new_scene");
+        "cannot delete the scene root node — use close_editor_scene to close "
+        "the scene, then create_editor_scene");
     return e;
   }
 
@@ -273,7 +273,7 @@ mcp::JsonValue handle_delete(const mcp::JsonValue &args) {
   undo_info["parent_path"] = mcp::JsonValue(parent_path);
   undo_info["hint"] =
       mcp::JsonValue("recreate node " + node_name + " (" + node_type +
-                     ") under " + parent_path + " (scene_node_create)");
+                     ") under " + parent_path + " (create_scene_node)");
   r["undo"] = std::move(undo_info);
   scene_dirty_tracker::mark_scene_modified();
   return r;
@@ -281,7 +281,7 @@ mcp::JsonValue handle_delete(const mcp::JsonValue &args) {
 
 mcp::JsonValue handle_instance(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "scene_instance called");
+                            "instantiate_scene called");
 
   auto *p = args.Find("path");
   if (!p || !p->IsString()) {
@@ -374,7 +374,7 @@ mcp::JsonValue handle_instance(const mcp::JsonValue &args) {
   inner["name"] = mcp::JsonValue(instance_name);
   inner["type"] = mcp::JsonValue(instance_type);
   inner["undo"] =
-      mcp::JsonValue("delete node " + result_path + " (scene_node_delete)");
+      mcp::JsonValue("delete node " + result_path + " (delete_scene_node)");
   r["result"] = std::move(inner);
   r["note"] = mcp::JsonValue(
       "instance inherits CONNECT_PERSIST connections saved in its source "
@@ -383,11 +383,11 @@ mcp::JsonValue handle_instance(const mcp::JsonValue &args) {
 
   scene_dirty_tracker::mark_scene_modified();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "scene_instance completed");
+                            "instantiate_scene completed");
   return r;
 }
 
-mcp::JsonValue handle_get_tree(const mcp::JsonValue &) {
+mcp::JsonValue handle_get_tree(const mcp::JsonValue &args) {
   auto *editor = godot::EditorInterface::get_singleton();
   godot::Node *root = nullptr;
   if (editor) {
@@ -395,33 +395,18 @@ mcp::JsonValue handle_get_tree(const mcp::JsonValue &) {
   }
   if (!root) {
     return util::error_detail(
-        "no scene currently open in the editor", "scene_tree_get",
-        "an edited scene", "open or create a scene first (editor_new_scene)");
-  }
-  mcp::JsonValue result(mcp::JsonValue::object_tag);
-  node_to_json(root, UNLIMITED_TREE_DEPTH, false, result);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = std::move(result);
-  return r;
-}
-
-mcp::JsonValue handle_get_editor_scene_tree(const mcp::JsonValue &args) {
-  auto *editor = godot::EditorInterface::get_singleton();
-  godot::Node *root = nullptr;
-  if (editor) {
-    root = editor->get_edited_scene_root();
-  }
-  if (!root) {
-    return util::error_detail(
-        "no scene currently open in the editor", "scene_get_tree",
-        "an edited scene", "open or create a scene first (editor_new_scene)");
+        "no scene currently open in the editor", "get_scene_tree",
+        "an edited scene", "open or create a scene first (create_editor_scene)");
   }
   int max_depth = DEFAULT_MAX_DEPTH;
   auto *dp = args.Find("max_depth");
   if (dp && dp->IsInt()) {
     max_depth = static_cast<int>(dp->GetInt());
-    if (max_depth < 1)
+    if (max_depth == -1) {
+      max_depth = UNLIMITED_TREE_DEPTH;
+    } else if (max_depth < 1) {
       max_depth = 1;
+    }
   }
   bool include_properties = false;
   auto *ip = args.Find("include_properties");

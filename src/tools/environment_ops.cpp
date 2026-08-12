@@ -61,7 +61,7 @@ JV handle_environment_set_bg_color(const JV &args) {
   }
 
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_environment_set_bg_color called");
+                            "set_render_environment_bg_color called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -74,7 +74,7 @@ JV handle_environment_set_bg_color(const JV &args) {
 
   rs->environment_set_bg_color(env, c);
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_environment_set_bg_color completed");
+                            "set_render_environment_bg_color completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -95,7 +95,7 @@ JV handle_environment_set_ambient(const JV &args) {
   }
 
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_environment_set_ambient called");
+                            "set_render_environment_ambient_light called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -116,7 +116,7 @@ JV handle_environment_set_ambient(const JV &args) {
 
   rs->environment_set_ambient_light(env, c, source, energy);
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_environment_set_ambient completed");
+                            "set_render_environment_ambient_light completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -130,7 +130,7 @@ JV handle_environment_set_glow(const JV &args) {
     return r;
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_environment_set_glow called");
+                            "set_render_environment_glow called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -209,7 +209,7 @@ JV handle_environment_set_ssr(const JV &args) {
     return r;
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_environment_set_ssr called");
+                            "set_render_environment_ssr called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -255,7 +255,7 @@ JV handle_environment_set_tonemap(const JV &args) {
     return r;
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_environment_set_tonemap called");
+                            "set_render_environment_tonemap called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -294,7 +294,7 @@ JV handle_environment_set_sdfgi(const JV &args) {
     return r;
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_environment_set_sdfgi called");
+                            "set_render_environment_sdfgi called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -365,7 +365,7 @@ JV handle_environment_set_volumetric_fog(const JV &args) {
     return r;
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_environment_set_volumetric_fog called");
+                            "set_render_environment_volumetric_fog called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);

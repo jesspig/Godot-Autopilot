@@ -14,7 +14,7 @@ namespace config_ops {
 
 mcp::JsonValue handle_project_settings_get(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "project_settings_get called");
+                            "get_project_settings called");
   auto *np = args.Find("name");
   if (!np || !np->IsString()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -38,13 +38,13 @@ mcp::JsonValue handle_project_settings_get(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = VariantJson::serialize(result);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "project_settings_get completed");
+                            "get_project_settings completed");
   return r;
 }
 
 mcp::JsonValue handle_project_settings_set(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "project_settings_set called");
+                            "set_project_settings called");
   auto *np = args.Find("name");
   if (!np || !np->IsString()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -101,13 +101,13 @@ mcp::JsonValue handle_project_settings_set(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "project_settings_set completed");
+                            "set_project_settings completed");
   return r;
 }
 
 mcp::JsonValue handle_project_settings_has(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "project_settings_has called");
+                            "has_project_settings called");
   auto *np = args.Find("name");
   if (!np || !np->IsString()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -125,13 +125,13 @@ mcp::JsonValue handle_project_settings_has(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue(has);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "project_settings_has completed");
+                            "has_project_settings completed");
   return r;
 }
 
 mcp::JsonValue handle_project_settings_save(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "project_settings_save called");
+                            "save_project_settings called");
   auto *ps = godot::ProjectSettings::get_singleton();
   if (!ps) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -149,13 +149,13 @@ mcp::JsonValue handle_project_settings_save(const mcp::JsonValue &) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "project_settings_save completed");
+                            "save_project_settings completed");
   return r;
 }
 
 mcp::JsonValue handle_engine_get_version(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "engine_get_version called");
+                            "get_engine_version called");
   auto *engine = godot::Engine::get_singleton();
   if (!engine) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -183,13 +183,13 @@ mcp::JsonValue handle_engine_get_version(const mcp::JsonValue &) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(j);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "engine_get_version completed");
+                            "get_engine_version completed");
   return r;
 }
 
 mcp::JsonValue handle_engine_get_fps(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "engine_get_fps called");
+                            "get_engine_fps called");
   auto *engine = godot::Engine::get_singleton();
   if (!engine) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -200,13 +200,13 @@ mcp::JsonValue handle_engine_get_fps(const mcp::JsonValue &) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue(fps);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "engine_get_fps completed");
+                            "get_engine_fps completed");
   return r;
 }
 
 mcp::JsonValue handle_engine_get_frames_drawn(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "engine_get_frames_drawn called");
+                            "get_engine_frames_drawn called");
   auto *engine = godot::Engine::get_singleton();
   if (!engine) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -217,13 +217,13 @@ mcp::JsonValue handle_engine_get_frames_drawn(const mcp::JsonValue &) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue(static_cast<int64_t>(count));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "engine_get_frames_drawn completed");
+                            "get_engine_frames_drawn completed");
   return r;
 }
 
 mcp::JsonValue handle_engine_set_time_scale(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "engine_set_time_scale called");
+                            "set_engine_time_scale called");
   auto *sp = args.Find("scale");
   if (!sp || !sp->IsNumber()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -242,13 +242,13 @@ mcp::JsonValue handle_engine_set_time_scale(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "engine_set_time_scale completed");
+                            "set_engine_time_scale completed");
   return r;
 }
 
 mcp::JsonValue handle_engine_get_time_scale(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "engine_get_time_scale called");
+                            "get_engine_time_scale called");
   auto *engine = godot::Engine::get_singleton();
   if (!engine) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -259,13 +259,13 @@ mcp::JsonValue handle_engine_get_time_scale(const mcp::JsonValue &) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue(scale);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "engine_get_time_scale completed");
+                            "get_engine_time_scale completed");
   return r;
 }
 
 mcp::JsonValue handle_engine_set_max_fps(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "engine_set_max_fps called");
+                            "set_engine_max_fps called");
   auto *fp = args.Find("fps");
   if (!fp || !fp->IsInt()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -283,13 +283,13 @@ mcp::JsonValue handle_engine_set_max_fps(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "engine_set_max_fps completed");
+                            "set_engine_max_fps completed");
   return r;
 }
 
 mcp::JsonValue handle_editor_settings_get(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_settings_get called");
+                            "get_editor_settings called");
   auto *np = args.Find("name");
   if (!np || !np->IsString()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -313,13 +313,13 @@ mcp::JsonValue handle_editor_settings_get(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = VariantJson::serialize(result);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_settings_get completed");
+                            "get_editor_settings completed");
   return r;
 }
 
 mcp::JsonValue handle_editor_settings_set(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_settings_set called");
+                            "set_editor_settings called");
   auto *np = args.Find("name");
   if (!np || !np->IsString()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -350,13 +350,13 @@ mcp::JsonValue handle_editor_settings_set(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_settings_set completed");
+                            "set_editor_settings completed");
   return r;
 }
 
 mcp::JsonValue handle_editor_settings_has(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_settings_has called");
+                            "has_editor_settings called");
   auto *np = args.Find("name");
   if (!np || !np->IsString()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -380,7 +380,7 @@ mcp::JsonValue handle_editor_settings_has(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue(has);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_settings_has completed");
+                            "has_editor_settings completed");
   return r;
 }
 

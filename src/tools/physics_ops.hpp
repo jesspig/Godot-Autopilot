@@ -8,8 +8,6 @@ namespace physics_ops {
 
 mcp::JsonValue handle_2d_space_get_direct_state(const mcp::JsonValue &args);
 mcp::JsonValue handle_2d_ray_cast(const mcp::JsonValue &args);
-mcp::JsonValue handle_2d_shape_cast(const mcp::JsonValue &args);
-mcp::JsonValue handle_2d_point_query(const mcp::JsonValue &args);
 mcp::JsonValue handle_2d_intersect_shape(const mcp::JsonValue &args);
 mcp::JsonValue handle_2d_intersect_point(const mcp::JsonValue &args);
 mcp::JsonValue handle_2d_body_create(const mcp::JsonValue &args);
@@ -24,8 +22,6 @@ mcp::JsonValue handle_2d_area_set_monitorable(const mcp::JsonValue &args);
 
 mcp::JsonValue handle_3d_space_get_direct_state(const mcp::JsonValue &args);
 mcp::JsonValue handle_3d_ray_cast(const mcp::JsonValue &args);
-mcp::JsonValue handle_3d_shape_cast(const mcp::JsonValue &args);
-mcp::JsonValue handle_3d_point_query(const mcp::JsonValue &args);
 mcp::JsonValue handle_3d_intersect_shape(const mcp::JsonValue &args);
 mcp::JsonValue handle_3d_intersect_point(const mcp::JsonValue &args);
 mcp::JsonValue handle_3d_body_create(const mcp::JsonValue &args);

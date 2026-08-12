@@ -182,7 +182,7 @@ AudioPlayerVariant resolve_audio_player(godot::Node *node) {
 
 mcp::JsonValue handle_bus_get_layout(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_bus_get_layout called");
+                            "get_audio_bus_layout called");
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
     return util::error_json("AudioServer not available");
@@ -192,13 +192,13 @@ mcp::JsonValue handle_bus_get_layout(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(serialized);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_bus_get_layout completed");
+                            "get_audio_bus_layout completed");
   return r;
 }
 
 mcp::JsonValue handle_bus_set_layout(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_bus_set_layout called");
+                            "set_audio_bus_layout called");
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
     return util::error_json("AudioServer not available");
@@ -214,13 +214,13 @@ mcp::JsonValue handle_bus_set_layout(const mcp::JsonValue &args) {
   }
   server->set_bus_layout(layout);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_bus_set_layout completed");
+                            "set_audio_bus_layout completed");
   return ok_json();
 }
 
 mcp::JsonValue handle_bus_get_count(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_bus_get_count called");
+                            "get_audio_bus_count called");
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
     return util::error_json("AudioServer not available");
@@ -229,13 +229,13 @@ mcp::JsonValue handle_bus_get_count(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue(static_cast<int64_t>(count));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_bus_get_count completed");
+                            "get_audio_bus_count completed");
   return r;
 }
 
 mcp::JsonValue handle_bus_get_name(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_bus_get_name called");
+                            "get_audio_bus_name called");
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
     return util::error_json("AudioServer not available");
@@ -253,13 +253,13 @@ mcp::JsonValue handle_bus_get_name(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue(util::to_std(name));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_bus_get_name completed");
+                            "get_audio_bus_name completed");
   return r;
 }
 
 mcp::JsonValue handle_bus_set_volume(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_bus_set_volume called");
+                            "set_audio_bus_volume_db called");
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
     return util::error_json("AudioServer not available");
@@ -281,13 +281,13 @@ mcp::JsonValue handle_bus_set_volume(const mcp::JsonValue &args) {
       vd->IsDouble() ? vd->GetDouble() : static_cast<double>(vd->GetInt()));
   server->set_bus_volume_db(idx, vol);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_bus_set_volume completed");
+                            "set_audio_bus_volume_db completed");
   return ok_json();
 }
 
 mcp::JsonValue handle_bus_set_mute(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_bus_set_mute called");
+                            "set_audio_bus_mute called");
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
     return util::error_json("AudioServer not available");
@@ -307,13 +307,13 @@ mcp::JsonValue handle_bus_set_mute(const mcp::JsonValue &args) {
   }
   server->set_bus_mute(idx, mu->GetBool());
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_bus_set_mute completed");
+                            "set_audio_bus_mute completed");
   return ok_json();
 }
 
 mcp::JsonValue handle_bus_set_bypass(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_bus_set_bypass called");
+                            "set_audio_bus_bypass_effects called");
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
     return util::error_json("AudioServer not available");
@@ -333,13 +333,13 @@ mcp::JsonValue handle_bus_set_bypass(const mcp::JsonValue &args) {
   }
   server->set_bus_bypass_effects(idx, bp->GetBool());
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_bus_set_bypass completed");
+                            "set_audio_bus_bypass_effects completed");
   return ok_json();
 }
 
 mcp::JsonValue handle_effect_add(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_effect_add called");
+                            "add_audio_bus_effect called");
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
     return util::error_json("AudioServer not available");
@@ -379,13 +379,13 @@ mcp::JsonValue handle_effect_add(const mcp::JsonValue &args) {
   }
   server->add_bus_effect(idx, effect_ref, position);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_effect_add completed");
+                            "add_audio_bus_effect completed");
   return ok_json();
 }
 
 mcp::JsonValue handle_effect_remove(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_effect_remove called");
+                            "remove_audio_bus_effect called");
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
     return util::error_json("AudioServer not available");
@@ -407,13 +407,13 @@ mcp::JsonValue handle_effect_remove(const mcp::JsonValue &args) {
   int effect_idx = ei->GetInt();
   server->remove_bus_effect(bus_idx, effect_idx);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_effect_remove completed");
+                            "remove_audio_bus_effect completed");
   return ok_json();
 }
 
 mcp::JsonValue handle_stream_play(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_stream_play called");
+                            "play_audio_player called");
   auto *np = args.Find("node_path");
   if (!np || !np->IsString()) {
     return util::error_json("missing required parameter: node_path");
@@ -470,13 +470,13 @@ mcp::JsonValue handle_stream_play(const mcp::JsonValue &args) {
   }
   ap.play(from_pos);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_stream_play completed");
+                            "play_audio_player completed");
   return ok_json();
 }
 
 mcp::JsonValue handle_stream_stop(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_stream_stop called");
+                            "stop_audio_player called");
   auto *np = args.Find("node_path");
   if (!np || !np->IsString()) {
     return util::error_json("missing required parameter: node_path");
@@ -496,13 +496,13 @@ mcp::JsonValue handle_stream_stop(const mcp::JsonValue &args) {
   }
   ap.stop();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_stream_stop completed");
+                            "stop_audio_player completed");
   return ok_json();
 }
 
 mcp::JsonValue handle_stream_set_volume(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_stream_set_volume called");
+                            "set_audio_player_volume_db called");
   auto *np = args.Find("node_path");
   if (!np || !np->IsString()) {
     return util::error_json("missing required parameter: node_path");
@@ -528,13 +528,13 @@ mcp::JsonValue handle_stream_set_volume(const mcp::JsonValue &args) {
       vd->IsDouble() ? vd->GetDouble() : static_cast<double>(vd->GetInt()));
   ap.set_volume_db(vol);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_stream_set_volume completed");
+                            "set_audio_player_volume_db completed");
   return ok_json();
 }
 
 mcp::JsonValue handle_stream_set_pitch(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_stream_set_pitch called");
+                            "set_audio_player_pitch_scale called");
   auto *np = args.Find("node_path");
   if (!np || !np->IsString()) {
     return util::error_json("missing required parameter: node_path");
@@ -560,13 +560,13 @@ mcp::JsonValue handle_stream_set_pitch(const mcp::JsonValue &args) {
       ps->IsDouble() ? ps->GetDouble() : static_cast<double>(ps->GetInt()));
   ap.set_pitch_scale(pitch);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_stream_set_pitch completed");
+                            "set_audio_player_pitch_scale completed");
   return ok_json();
 }
 
 mcp::JsonValue handle_stream_get_playback_position(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_stream_get_playback_position called");
+                            "get_audio_player_playback_position called");
   auto *np = args.Find("node_path");
   if (!np || !np->IsString()) {
     return util::error_json("missing required parameter: node_path");
@@ -588,13 +588,13 @@ mcp::JsonValue handle_stream_get_playback_position(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue(static_cast<double>(pos));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_stream_get_playback_position completed");
+                            "get_audio_player_playback_position completed");
   return r;
 }
 
 mcp::JsonValue handle_stream_seek(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_stream_seek called");
+                            "seek_audio_player called");
   auto *np = args.Find("node_path");
   if (!np || !np->IsString()) {
     return util::error_json("missing required parameter: node_path");
@@ -620,13 +620,13 @@ mcp::JsonValue handle_stream_seek(const mcp::JsonValue &args) {
       tp->IsDouble() ? tp->GetDouble() : static_cast<double>(tp->GetInt()));
   ap.seek(to_pos);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_stream_seek completed");
+                            "seek_audio_player completed");
   return ok_json();
 }
 
 mcp::JsonValue handle_bus_set_solo(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_bus_set_solo called");
+                            "set_audio_bus_solo called");
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
     return util::error_json("AudioServer not available");
@@ -646,13 +646,13 @@ mcp::JsonValue handle_bus_set_solo(const mcp::JsonValue &args) {
   }
   server->set_bus_solo(idx, sl->GetBool());
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_bus_set_solo completed");
+                            "set_audio_bus_solo completed");
   return ok_json();
 }
 
 mcp::JsonValue handle_get_output_device_list(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_get_output_device_list called");
+                            "get_audio_device_outputs called");
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
     return util::error_json("AudioServer not available");
@@ -665,13 +665,13 @@ mcp::JsonValue handle_get_output_device_list(const mcp::JsonValue &) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(arr);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_get_output_device_list completed");
+                            "get_audio_device_outputs completed");
   return r;
 }
 
 mcp::JsonValue handle_set_output_device(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_set_output_device called");
+                            "set_audio_device_output called");
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
     return util::error_json("AudioServer not available");
@@ -682,13 +682,13 @@ mcp::JsonValue handle_set_output_device(const mcp::JsonValue &args) {
   }
   server->set_output_device(godot::String(dv->GetString().c_str()));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_set_output_device completed");
+                            "set_audio_device_output completed");
   return ok_json();
 }
 
 mcp::JsonValue handle_get_input_device_list(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_get_input_device_list called");
+                            "get_audio_device_inputs called");
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
     return util::error_json("AudioServer not available");
@@ -701,13 +701,13 @@ mcp::JsonValue handle_get_input_device_list(const mcp::JsonValue &) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(arr);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_get_input_device_list completed");
+                            "get_audio_device_inputs completed");
   return r;
 }
 
 mcp::JsonValue handle_set_input_device(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_set_input_device called");
+                            "set_audio_device_input called");
   auto *server = godot::AudioServer::get_singleton();
   if (!server) {
     return util::error_json("AudioServer not available");
@@ -718,7 +718,7 @@ mcp::JsonValue handle_set_input_device(const mcp::JsonValue &args) {
   }
   server->set_input_device(godot::String(dv->GetString().c_str()));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "audio_set_input_device completed");
+                            "set_audio_device_input completed");
   return ok_json();
 }
 

@@ -65,14 +65,14 @@ godot::Ref<godot::TextServer> get_ts() {
 
 JV handle_create_font(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "text_create_font called");
+                            "create_text_font called");
   auto ts = get_ts();
   if (ts.is_null())
     return util::error_json("TextServer not available");
   godot::RID rid = ts->create_font();
   int64_t id = rid_store().store(rid);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "text_create_font completed");
+                            "create_text_font completed");
   JV r(JV::object_tag);
   r["result"] = JV(id);
   return r;
@@ -80,7 +80,7 @@ JV handle_create_font(const JV &args) {
 
 JV handle_create_shaped_text(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "text_create_shaped_text called");
+                            "create_shaped_text called");
   auto ts = get_ts();
   if (ts.is_null())
     return util::error_json("TextServer not available");
@@ -97,7 +97,7 @@ JV handle_create_shaped_text(const JV &args) {
       static_cast<godot::TextServer::Orientation>(orientation));
   int64_t id = rid_store().store(rid);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "text_create_shaped_text completed");
+                            "create_shaped_text completed");
   JV r(JV::object_tag);
   r["result"] = JV(id);
   return r;
@@ -105,7 +105,7 @@ JV handle_create_shaped_text(const JV &args) {
 
 JV handle_font_set_antialiasing(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "text_font_set_antialiasing called");
+                            "set_text_font_antialiasing called");
   auto ts = get_ts();
   if (ts.is_null())
     return util::error_json("TextServer not available");
@@ -118,13 +118,13 @@ JV handle_font_set_antialiasing(const JV &args) {
   ts->font_set_antialiasing(
       font_rid, static_cast<godot::TextServer::FontAntialiasing>(a->GetInt()));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "text_font_set_antialiasing completed");
+                            "set_text_font_antialiasing completed");
   return ok_json();
 }
 
 JV handle_font_set_data(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "text_font_set_data called");
+                            "set_text_font_data called");
   auto ts = get_ts();
   if (ts.is_null())
     return util::error_json("TextServer not available");
@@ -139,13 +139,13 @@ JV handle_font_set_data(const JV &args) {
       godot::FileAccess::get_file_as_bytes(godot::String(data_path.c_str()));
   ts->font_set_data(font_rid, bytes);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "text_font_set_data completed");
+                            "set_text_font_data completed");
   return ok_json();
 }
 
 JV handle_font_set_hinting(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "text_font_set_hinting called");
+                            "set_text_font_hinting called");
   auto ts = get_ts();
   if (ts.is_null())
     return util::error_json("TextServer not available");
@@ -158,13 +158,13 @@ JV handle_font_set_hinting(const JV &args) {
   ts->font_set_hinting(font_rid,
                        static_cast<godot::TextServer::Hinting>(h->GetInt()));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "text_font_set_hinting completed");
+                            "set_text_font_hinting completed");
   return ok_json();
 }
 
 JV handle_get_system_font_path(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "text_get_system_font_path called");
+                            "get_text_font_system_path called");
   auto *fn = args.Find("font_name");
   if (!fn || !fn->IsString())
     return util::error_json("missing required parameter: font_name");
@@ -187,7 +187,7 @@ JV handle_get_system_font_path(const JV &args) {
   godot::String path = os->get_system_font_path(
       godot::String(font_name.c_str()), weight, stretch, italic);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "text_get_system_font_path completed");
+                            "get_text_font_system_path completed");
   JV r(JV::object_tag);
   r["result"] = JV(util::to_std(path));
   return r;
@@ -195,7 +195,7 @@ JV handle_get_system_font_path(const JV &args) {
 
 JV handle_has_feature(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "text_has_feature called");
+                            "has_text_feature called");
   auto ts = get_ts();
   if (ts.is_null())
     return util::error_json("TextServer not available");
@@ -205,7 +205,7 @@ JV handle_has_feature(const JV &args) {
   bool result =
       ts->has_feature(static_cast<godot::TextServer::Feature>(f->GetInt()));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "text_has_feature completed");
+                            "has_text_feature completed");
   JV r(JV::object_tag);
   r["result"] = JV(result);
   return r;
@@ -213,7 +213,7 @@ JV handle_has_feature(const JV &args) {
 
 JV handle_is_locale_right_to_left(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "text_is_locale_right_to_left called");
+                            "is_text_locale_right_to_left called");
   auto ts = get_ts();
   if (ts.is_null())
     return util::error_json("TextServer not available");
@@ -223,7 +223,7 @@ JV handle_is_locale_right_to_left(const JV &args) {
   bool result =
       ts->is_locale_right_to_left(godot::String(l->GetString().c_str()));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "text_is_locale_right_to_left completed");
+                            "is_text_locale_right_to_left completed");
   JV r(JV::object_tag);
   r["result"] = JV(result);
   return r;
@@ -231,7 +231,7 @@ JV handle_is_locale_right_to_left(const JV &args) {
 
 JV handle_shaped_text_add_string(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "text_shaped_text_add_string called");
+                            "add_shaped_text_string called");
   auto ts = get_ts();
   if (ts.is_null())
     return util::error_json("TextServer not available");
@@ -258,7 +258,7 @@ JV handle_shaped_text_add_string(const JV &args) {
       static_cast<int64_t>(sp->GetInt()), godot::Dictionary(),
       godot::String(language.c_str()));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "text_shaped_text_add_string completed");
+                            "add_shaped_text_string completed");
   JV r(JV::object_tag);
   r["result"] = JV(result);
   return r;
@@ -266,7 +266,7 @@ JV handle_shaped_text_add_string(const JV &args) {
 
 JV handle_shaped_text_get_size(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "text_shaped_text_get_size called");
+                            "get_shaped_text_size called");
   auto ts = get_ts();
   if (ts.is_null())
     return util::error_json("TextServer not available");
@@ -275,7 +275,7 @@ JV handle_shaped_text_get_size(const JV &args) {
     return util::error_json("missing or invalid parameter: shaped_rid");
   godot::Vector2 size = ts->shaped_text_get_size(shaped_rid);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "text_shaped_text_get_size completed");
+                            "get_shaped_text_size completed");
   JV r(JV::object_tag);
   JV inner(JV::object_tag);
   inner["x"] = JV(static_cast<double>(size.x));
@@ -286,7 +286,7 @@ JV handle_shaped_text_get_size(const JV &args) {
 
 JV handle_file_write(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "file_write called");
+                            "write_file called");
   auto *pp = args.Find("path");
   if (!pp || !pp->IsString())
     return util::error_json("missing required parameter: path");
@@ -309,7 +309,7 @@ JV handle_file_write(const JV &args) {
   file->store_string(godot::String(cp->GetString().c_str()));
   file->close();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "file_write completed");
+                            "write_file completed");
   return ok_json();
 }
 

@@ -9,14 +9,14 @@ std::string prompt_tool_usage() {
 
 ---
 
-## 1. scene_node_create — 创建子节点
+## 1. create_scene_node — 创建子节点
 
 **功能：** 在场景中创建新节点。可指定父节点路径、节点名称和类型。
 
 **输入：**
 ```json
 {
-  "name": "scene_node_create",
+  "name": "create_scene_node",
   "arguments": {
     "parent_path": "",
     "name": "Player",
@@ -155,14 +155,14 @@ std::string prompt_tool_usage() {
 
 ---
 
-## 5. script_create — 创建 GDScript 文件
+## 5. create_script — 创建 GDScript 文件
 
 **功能：** 在指定路径创建 GDScript 文件并写入源码。
 
 **输入：**
 ```json
 {
-  "name": "script_create",
+  "name": "create_script",
   "arguments": {
     "path": "res://player.gd",
     "source_code": "extends CharacterBody2D\n\n@export var speed: float = 200.0\n\nfunc _physics_process(delta: float) -> void:\n    var input_dir := Input.get_vector(\"move_left\", \"move_right\", \"move_up\", \"move_down\")\n    velocity = input_dir * speed\n    move_and_slide()"
@@ -187,14 +187,14 @@ std::string prompt_tool_usage() {
 
 ---
 
-## 6. script_attach_to_node — 附加脚本到节点
+## 6. attach_script_to_node — 附加脚本到节点
 
 **功能：** 将已存在的 GDScript 文件附加到场景中的节点上。
 
 **输入：**
 ```json
 {
-  "name": "script_attach_to_node",
+  "name": "attach_script_to_node",
   "arguments": {
     "node_path": "Player",
     "script_path": "res://player.gd"
@@ -217,14 +217,14 @@ std::string prompt_tool_usage() {
 
 ---
 
-## 7. resource_create — 创建资源
+## 7. create_resource — 创建资源
 
 **功能：** 在内存中创建指定类型的资源实例。
 
 **输入：**
 ```json
 {
-  "name": "resource_create",
+  "name": "create_resource",
   "arguments": {
     "type": "Environment",
     "name": "MyEnvironment"
@@ -245,21 +245,21 @@ std::string prompt_tool_usage() {
 ```
 
 **注意：**
-- 资源在内存中创建，需通过 `resource_save` 持久化到文件
+- 资源在内存中创建，需通过 `save_resource` 持久化到文件
 - `name` 可选，用于设置内存路径标识
-- 返回的 `object_id` 可用于 `resource_save` 的 `object_id` 参数
+- 返回的 `object_id` 可用于 `save_resource` 的 `object_id` 参数
 - 类型必须是 Resource 子类
 
 ---
 
-## 8. resource_save — 保存资源
+## 8. save_resource — 保存资源
 
 **功能：** 将资源保存到文件。支持保存内存中创建的资源（使用 object_id 或 class_type+name 变通方案）。
 
 **输入（使用 class_type + name 创建新资源并保存）：**
 ```json
 {
-  "name": "resource_save",
+  "name": "save_resource",
   "arguments": {
     "path": "res://environment.tres",
     "class_type": "Environment",
@@ -271,7 +271,7 @@ std::string prompt_tool_usage() {
 **输入（保存对象 ID 指定的资源）：**
 ```json
 {
-  "name": "resource_save",
+  "name": "save_resource",
   "arguments": {
     "path": "res://environment.tres",
     "object_id": 1234567890
@@ -291,19 +291,19 @@ std::string prompt_tool_usage() {
 - `path` 是源路径（用于加载已有资源）或目标路径
 - `dest_path` 可选，用于保存到不同路径
 - 当资源无法加载时，如果提供了 `class_type` + `name` 会自动创建新资源
-- `object_id` 来自 `resource_create` 的返回结果
+- `object_id` 来自 `create_resource` 的返回结果
 - 自动创建中间目录
 
 ---
 
-## 9. editor_new_scene — 创建新场景
+## 9. create_editor_scene — 创建新场景
 
 **功能：** 创建新场景并设置根节点。
 
 **输入：**
 ```json
 {
-  "name": "editor_new_scene",
+  "name": "create_editor_scene",
   "arguments": {
     "type": "Node2D",
     "name": "Game"
@@ -328,14 +328,14 @@ std::string prompt_tool_usage() {
 
 ---
 
-## 10. editor_open_scene — 打开场景
+## 10. open_editor_scene — 打开场景
 
 **功能：** 从文件系统打开一个 .tscn 场景文件。
 
 **输入：**
 ```json
 {
-  "name": "editor_open_scene",
+  "name": "open_editor_scene",
   "arguments": {
     "path": "res://game.tscn"
   }
@@ -355,14 +355,14 @@ std::string prompt_tool_usage() {
 
 ---
 
-## 11. editor_save_scene_as — 保存场景
+## 11. save_editor_scene_as — 保存场景
 
 **功能：** 将当前场景保存到指定路径。
 
 **输入：**
 ```json
 {
-  "name": "editor_save_scene_as",
+  "name": "save_editor_scene_as",
   "arguments": {
     "path": "res://game.tscn"
   }
@@ -382,14 +382,14 @@ std::string prompt_tool_usage() {
 
 ---
 
-## 12. input_map_add_action + input_map_action_add_event — 输入映射
+## 12. add_input_map_action + add_input_map_action_event — 输入映射
 
 **功能：** 创建输入动作并绑定按键事件。
 
 **步骤 1：创建动作**
 ```json
 {
-  "name": "input_map_add_action",
+  "name": "add_input_map_action",
   "arguments": {
     "action": "move_left",
     "deadzone": 0.5
@@ -400,7 +400,7 @@ std::string prompt_tool_usage() {
 **步骤 2：绑定按键事件**
 ```json
 {
-  "name": "input_map_action_add_event",
+  "name": "add_input_map_action_event",
   "arguments": {
     "action": "move_left",
     "event": {
@@ -424,18 +424,18 @@ std::string prompt_tool_usage() {
 - 参数名是 `action`（不是 `name`）
 - `event` 参数必须包含 `"class"` 字段指定具体 InputEvent 子类
 - 常用 event 类：`InputEventKey`、`InputEventMouseButton`、`InputEventJoypadButton`
-- 必须先用 `input_map_add_action` 创建动作，再绑定事件
+- 必须先用 `add_input_map_action` 创建动作，再绑定事件
 
 ---
 
-## 13. input_map_persist — 持久化输入映射
+## 13. save_input_map — 持久化输入映射
 
 **功能：** 将当前运行时 InputMap 中的所有自定义动作保存到 ProjectSettings 并写入 project.godot 文件。
 
 **输入：**
 ```json
 {
-  "name": "input_map_persist",
+  "name": "save_input_map",
   "arguments": {}
 }
 ```
@@ -517,7 +517,7 @@ std::string prompt_tool_usage() {
     "stop_on_error": true,
     "operations": [
       {
-        "tool": "scene_node_create",
+        "tool": "create_scene_node",
         "args": {
           "parent_path": "",
           "name": "Game",
@@ -525,7 +525,7 @@ std::string prompt_tool_usage() {
         }
       },
       {
-        "tool": "scene_node_create",
+        "tool": "create_scene_node",
         "args": {
           "parent_path": "Game",
           "name": "Player",
@@ -541,8 +541,8 @@ std::string prompt_tool_usage() {
 ```json
 {
   "results": [
-    {"index": 0, "tool": "scene_node_create", "status": "ok", "data": {"result": {"path": "Game", ...}}},
-    {"index": 1, "tool": "scene_node_create", "status": "ok", "data": {"result": {"path": "Game/Player", ...}}}
+    {"index": 0, "tool": "create_scene_node", "status": "ok", "data": {"result": {"path": "Game", ...}}},
+    {"index": 1, "tool": "create_scene_node", "status": "ok", "data": {"result": {"path": "Game/Player", ...}}}
   ],
   "total": 2,
   "succeeded": 2,
@@ -558,14 +558,14 @@ std::string prompt_tool_usage() {
 
 ---
 
-## 16. group_add_node_to_group — 组管理
+## 16. add_group_node — 组管理
 
 **功能：** 将节点添加到指定组，便于批量操作和查找。
 
 **输入：**
 ```json
 {
-  "name": "group_add_node_to_group",
+  "name": "add_group_node",
   "arguments": {
     "node_path": "Player",
     "group_name": "players"
@@ -589,14 +589,14 @@ std::string prompt_tool_usage() {
 
 ---
 
-## 17. editor_capture_viewport — 视口截图
+## 17. capture_editor_viewport — 视口截图
 
 **功能：** 捕获编辑器当前视口的 PNG 截图。
 
 **输入：**
 ```json
 {
-  "name": "editor_capture_viewport",
+  "name": "capture_editor_viewport",
   "arguments": {}
 }
 ```
@@ -620,14 +620,14 @@ std::string prompt_tool_usage() {
 
 ---
 
-## 18. tilemap_set_cells — 批量铺 TileMap（大批量推荐用 code_execute）
+## 18. set_tilemap_cells — 批量铺 TileMap（大批量推荐用 code_execute）
 
 **功能：** 一次设置多个 TileMap cell。
 
 **输入（小型批次，建议 ≤64 项）：**
 ```json
 {
-  "name": "tilemap_set_cells",
+  "name": "set_tilemap_cells",
   "arguments": {
     "node_path": "TileMap",
     "cells": [
@@ -651,26 +651,26 @@ std::string prompt_tool_usage() {
 
 **注意：**
 - `cells` 数组每请求建议保持 ~64 项以下——客户端侧参数构造可能截断更大载荷，导致 JSON 解析失败（报 parse error）
-- 大批量铺 TileMap（如整行、整面）改用 `code_execute`（或 `game_eval`）程序化循环生成，避免手工构造大型 JSON 出错
+- 大批量铺 TileMap（如整行、整面）改用 `code_execute`（或 `execute_game_script`）程序化循环生成，避免手工构造大型 JSON 出错
 - `code_execute` 单函数模式下代码内联在 `_run()` 中执行，循环结束后用 `return` 返回结果
 
 ---
 
-## 19. scene_tree_get — 获取场景树
+## 19. get_scene_tree — 获取场景树
 
 **功能：** 获取当前打开场景的完整场景树结构。
 
 **输入：**
 ```json
 {
-  "name": "scene_tree_get",
+  "name": "get_scene_tree",
   "arguments": {}
 }
 ```
 
 **注意：**
 - 没有打开的场景时返回错误
-- After editor_new_scene / editor_open_scene, the scene tree listing may reflect the previous scene; call again or wait briefly for the editor to refresh.
+- After create_editor_scene / open_editor_scene, the scene tree listing may reflect the previous scene; call again or wait briefly for the editor to refresh.
 
 ---
 

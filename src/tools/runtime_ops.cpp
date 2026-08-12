@@ -125,7 +125,7 @@ JV wait_for_response(int64_t request_id, int64_t timeout_ms) {
                       std::to_string(request_id) +
                       ") — the request was sent to the active debug session(s) "
                       "but no response arrived; the game process may be paused "
-                      "or physics-frozen (query game_status), or the game "
+                      "or physics-frozen (query get_game_status), or the game "
                       "project may not load the godot-autopilot extension");
   }
   {
@@ -297,7 +297,7 @@ mcp::JsonValue finalize_capture_response(const mcp::JsonValue &pending_result) {
             r["height"] = *h;
           r["path"] = JV(path);
           LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                                    "game_capture completed");
+                                    "capture_game_viewport completed");
           return r;
         })
         .get();

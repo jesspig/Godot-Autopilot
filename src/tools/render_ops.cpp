@@ -101,7 +101,7 @@ JV rid_to_json(const godot::RID &rid) {
 
 JV handle_canvas_item_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_canvas_item_create called");
+                            "create_render_canvas_item called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -110,7 +110,7 @@ JV handle_canvas_item_create(const JV &args) {
   }
   godot::RID rid = rs->canvas_item_create();
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_canvas_item_create completed");
+                            "create_render_canvas_item completed");
   JV r(JV::object_tag);
   r["result"] = rid_to_json(rid);
   return r;
@@ -137,7 +137,7 @@ JV handle_canvas_item_draw_rect(const JV &args) {
   }
 
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_canvas_item_draw_rect called");
+                            "add_render_canvas_item_rect called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -153,7 +153,7 @@ JV handle_canvas_item_draw_rect(const JV &args) {
 
   rs->canvas_item_add_rect(ci, r, c, antialiased);
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_canvas_item_draw_rect completed");
+                            "add_render_canvas_item_rect completed");
   JV ret(JV::object_tag);
   ret["result"] = JV("ok");
   return ret;
@@ -180,7 +180,7 @@ JV handle_canvas_item_draw_circle(const JV &args) {
   }
 
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_canvas_item_draw_circle called");
+                            "add_render_canvas_item_circle called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -202,7 +202,7 @@ JV handle_canvas_item_draw_circle(const JV &args) {
 
   rs->canvas_item_add_circle(ci, pos, radius, c, antialiased);
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_canvas_item_draw_circle completed");
+                            "add_render_canvas_item_circle completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -229,7 +229,7 @@ JV handle_canvas_item_draw_texture(const JV &args) {
   }
 
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_canvas_item_draw_texture called");
+                            "add_render_canvas_item_texture_rect called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -252,7 +252,7 @@ JV handle_canvas_item_draw_texture(const JV &args) {
 
   rs->canvas_item_add_texture_rect(ci, r, tex, tile, modulate, transpose);
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_canvas_item_draw_texture completed");
+                            "add_render_canvas_item_texture_rect completed");
   JV ret(JV::object_tag);
   ret["result"] = JV("ok");
   return ret;
@@ -285,7 +285,7 @@ JV handle_canvas_item_draw_line(const JV &args) {
   }
 
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_canvas_item_draw_line called");
+                            "add_render_canvas_item_line called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -307,7 +307,7 @@ JV handle_canvas_item_draw_line(const JV &args) {
 
   rs->canvas_item_add_line(ci, from, to, c, width, antialiased);
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_canvas_item_draw_line completed");
+                            "add_render_canvas_item_line completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -322,7 +322,7 @@ JV handle_canvas_item_set_transform(const JV &args) {
   }
 
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_canvas_item_set_transform called");
+                            "set_render_canvas_item_transform called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -356,7 +356,7 @@ JV handle_canvas_item_set_transform(const JV &args) {
 
   rs->canvas_item_set_transform(ci, xform);
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_canvas_item_set_transform completed");
+                            "set_render_canvas_item_transform completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -371,7 +371,7 @@ JV handle_canvas_item_set_visible(const JV &args) {
   }
 
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_canvas_item_set_visible called");
+                            "set_render_canvas_item_visible called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -385,7 +385,7 @@ JV handle_canvas_item_set_visible(const JV &args) {
 
   rs->canvas_item_set_visible(ci, visible);
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_canvas_item_set_visible completed");
+                            "set_render_canvas_item_visible completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -393,7 +393,7 @@ JV handle_canvas_item_set_visible(const JV &args) {
 
 JV handle_scenario_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_scenario_create called");
+                            "create_render_scenario called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -403,7 +403,7 @@ JV handle_scenario_create(const JV &args) {
 
   godot::RID rid = rs->scenario_create();
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_scenario_create completed");
+                            "create_render_scenario completed");
   JV r(JV::object_tag);
   r["result"] = rid_to_json(rid);
   return r;
@@ -424,7 +424,7 @@ JV handle_scenario_set_environment(const JV &args) {
   }
 
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_scenario_set_environment called");
+                            "set_render_scenario_environment called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -437,7 +437,7 @@ JV handle_scenario_set_environment(const JV &args) {
 
   rs->scenario_set_environment(sc, env);
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_scenario_set_environment completed");
+                            "set_render_scenario_environment completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -445,7 +445,7 @@ JV handle_scenario_set_environment(const JV &args) {
 
 JV handle_camera_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_camera_create called");
+                            "create_render_camera called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -455,7 +455,7 @@ JV handle_camera_create(const JV &args) {
 
   godot::RID rid = rs->camera_create();
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_camera_create completed");
+                            "create_render_camera completed");
   JV r(JV::object_tag);
   r["result"] = rid_to_json(rid);
   return r;
@@ -470,7 +470,7 @@ JV handle_camera_set_transform(const JV &args) {
   }
 
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_camera_set_transform called");
+                            "set_render_camera_transform called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -496,7 +496,7 @@ JV handle_camera_set_transform(const JV &args) {
 
   rs->camera_set_transform(cam, xform);
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_camera_set_transform completed");
+                            "set_render_camera_transform completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -511,7 +511,7 @@ JV handle_camera_set_perspective(const JV &args) {
   }
 
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_camera_set_perspective called");
+                            "set_render_camera_perspective called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -541,7 +541,7 @@ JV handle_camera_set_perspective(const JV &args) {
 
   rs->camera_set_perspective(cam, fovy, znear, zfar);
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_camera_set_perspective completed");
+                            "set_render_camera_perspective completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -556,7 +556,7 @@ JV handle_camera_set_orthogonal(const JV &args) {
   }
 
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_camera_set_orthogonal called");
+                            "set_render_camera_orthogonal called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -586,7 +586,7 @@ JV handle_camera_set_orthogonal(const JV &args) {
 
   rs->camera_set_orthogonal(cam, size, znear, zfar);
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_camera_set_orthogonal completed");
+                            "set_render_camera_orthogonal completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -594,7 +594,7 @@ JV handle_camera_set_orthogonal(const JV &args) {
 
 JV handle_light_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_light_create called");
+                            "create_render_light called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -619,7 +619,7 @@ JV handle_light_create(const JV &args) {
   }
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_light_create completed");
+                            "create_render_light completed");
   JV r(JV::object_tag);
   r["result"] = rid_to_json(rid);
   return r;
@@ -646,7 +646,7 @@ JV handle_light_set_param(const JV &args) {
   }
 
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_light_set_param called");
+                            "set_render_light_param called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -663,7 +663,7 @@ JV handle_light_set_param(const JV &args) {
 
   rs->light_set_param(light, param, val);
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_light_set_param completed");
+                            "set_render_light_param completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -684,7 +684,7 @@ JV handle_light_set_color(const JV &args) {
   }
 
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_light_set_color called");
+                            "set_render_light_color called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -697,7 +697,7 @@ JV handle_light_set_color(const JV &args) {
 
   rs->light_set_color(light, c);
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_light_set_color completed");
+                            "set_render_light_color completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -705,7 +705,7 @@ JV handle_light_set_color(const JV &args) {
 
 JV handle_mesh_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_mesh_create called");
+                            "create_render_mesh called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -715,7 +715,7 @@ JV handle_mesh_create(const JV &args) {
 
   godot::RID rid = rs->mesh_create();
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_mesh_create completed");
+                            "create_render_mesh completed");
   JV r(JV::object_tag);
   r["result"] = rid_to_json(rid);
   return r;
@@ -730,7 +730,7 @@ JV handle_mesh_add_surface(const JV &args) {
   }
 
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_mesh_add_surface called");
+                            "add_render_mesh_surface called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -815,7 +815,7 @@ JV handle_mesh_add_surface(const JV &args) {
 
   rs->mesh_add_surface_from_arrays(mesh, primitive, arrays);
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_mesh_add_surface completed");
+                            "add_render_mesh_surface completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -842,7 +842,7 @@ JV handle_mesh_set_material(const JV &args) {
   }
 
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_mesh_set_material called");
+                            "set_render_mesh_surface_material called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -856,7 +856,7 @@ JV handle_mesh_set_material(const JV &args) {
 
   rs->mesh_surface_set_material(mesh, surface, material);
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_mesh_set_material completed");
+                            "set_render_mesh_surface_material completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -864,7 +864,7 @@ JV handle_mesh_set_material(const JV &args) {
 
 JV handle_material_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_material_create called");
+                            "create_render_material called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -874,7 +874,7 @@ JV handle_material_create(const JV &args) {
 
   godot::RID rid = rs->material_create();
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_material_create completed");
+                            "create_render_material completed");
   JV r(JV::object_tag);
   r["result"] = rid_to_json(rid);
   return r;
@@ -901,7 +901,7 @@ JV handle_material_set_param(const JV &args) {
   }
 
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_material_set_param called");
+                            "set_render_material_param called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -917,7 +917,7 @@ JV handle_material_set_param(const JV &args) {
 
   rs->material_set_param(material, param_name, val);
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_material_set_param completed");
+                            "set_render_material_param completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -925,7 +925,7 @@ JV handle_material_set_param(const JV &args) {
 
 JV handle_viewport_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_viewport_create called");
+                            "create_render_viewport called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -935,7 +935,7 @@ JV handle_viewport_create(const JV &args) {
 
   godot::RID rid = rs->viewport_create();
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_viewport_create completed");
+                            "create_render_viewport completed");
   JV r(JV::object_tag);
   r["result"] = rid_to_json(rid);
   return r;
@@ -950,7 +950,7 @@ JV handle_viewport_set_size(const JV &args) {
   }
 
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_viewport_set_size called");
+                            "set_render_viewport_size called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -966,7 +966,7 @@ JV handle_viewport_set_size(const JV &args) {
 
   rs->viewport_set_size(vp, width, height);
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_viewport_set_size completed");
+                            "set_render_viewport_size completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -981,7 +981,7 @@ JV handle_viewport_set_clear_mode(const JV &args) {
   }
 
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_viewport_set_clear_mode called");
+                            "set_render_viewport_clear_mode called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -996,7 +996,7 @@ JV handle_viewport_set_clear_mode(const JV &args) {
 
   rs->viewport_set_clear_mode(vp, clear_mode);
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_viewport_set_clear_mode completed");
+                            "set_render_viewport_clear_mode completed");
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   return r;
@@ -1004,7 +1004,7 @@ JV handle_viewport_set_clear_mode(const JV &args) {
 
 JV handle_particle_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_particle_create called");
+                            "create_render_particles called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -1019,7 +1019,7 @@ JV handle_particle_create(const JV &args) {
       rid, static_cast<godot::RenderingServer::ParticlesMode>(mode));
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_particle_create completed");
+                            "create_render_particles completed");
   JV r(JV::object_tag);
   r["result"] = rid_to_json(rid);
   return r;
@@ -1027,7 +1027,7 @@ JV handle_particle_create(const JV &args) {
 
 JV handle_fog_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_fog_create called");
+                            "create_render_fog_volume called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -1050,7 +1050,7 @@ JV handle_fog_create(const JV &args) {
   }
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_fog_create completed");
+                            "create_render_fog_volume completed");
   JV r(JV::object_tag);
   r["result"] = rid_to_json(rid);
   return r;
@@ -1058,7 +1058,7 @@ JV handle_fog_create(const JV &args) {
 
 JV handle_shader_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_shader_create called");
+                            "create_render_shader called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -1074,7 +1074,7 @@ JV handle_shader_create(const JV &args) {
   }
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "render_shader_create completed");
+                            "create_render_shader completed");
   JV r(JV::object_tag);
   r["result"] = rid_to_json(rid);
   return r;
@@ -1088,7 +1088,7 @@ JV handle_texture_create_2d(const JV &args) {
     return r;
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_texture_create_2d called");
+                            "create_render_texture_from_image called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -1122,7 +1122,7 @@ JV handle_shader_set_code(const JV &args) {
     return r;
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_shader_set_code called");
+                            "set_render_shader_code called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -1136,18 +1136,9 @@ JV handle_shader_set_code(const JV &args) {
   return r;
 }
 
-JV handle_shader_get_parameter_list(const JV &) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_shader_get_parameter_list called");
-  JV r(JV::object_tag);
-  r["error"] = JV("shader_get_parameter_list not available via godot-cpp; use "
-                  "property_get on the Shader resource");
-  return r;
-}
-
 JV handle_sky_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_sky_create called");
+                            "create_render_sky called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -1174,7 +1165,7 @@ JV handle_sky_set_material(const JV &args) {
     return r;
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_sky_set_material called");
+                            "set_render_sky_material called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -1197,7 +1188,7 @@ JV handle_particles_set_emitting(const JV &args) {
     return r;
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_particles_set_emitting called");
+                            "set_render_particles_emitting called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -1223,7 +1214,7 @@ JV handle_particles_restart(const JV &args) {
     return r;
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_particles_restart called");
+                            "restart_render_particles called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -1245,7 +1236,7 @@ JV handle_particles_set_lifetime(const JV &args) {
     return r;
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_particles_set_lifetime called");
+                            "set_render_particles_lifetime called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -1266,7 +1257,7 @@ JV handle_particles_set_lifetime(const JV &args) {
 
 JV handle_reflection_probe_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_reflection_probe_create called");
+                            "create_render_reflection_probe called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -1281,7 +1272,7 @@ JV handle_reflection_probe_create(const JV &args) {
 
 JV handle_decal_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_decal_create called");
+                            "create_render_decal called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -1308,7 +1299,7 @@ JV handle_fog_volume_set_shape(const JV &args) {
     return r;
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_fog_volume_set_shape called");
+                            "set_render_fog_volume_shape called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -1332,7 +1323,7 @@ JV handle_instance_set_visible(const JV &args) {
     return r;
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_instance_set_visible called");
+                            "set_render_instance_visible called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -1364,7 +1355,7 @@ JV handle_instance_set_layer_mask(const JV &args) {
     return r;
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_instance_set_layer_mask called");
+                            "set_render_instance_layer_mask called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -1393,7 +1384,7 @@ JV handle_global_shader_parameter_set(const JV &args) {
     return r;
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "render_global_shader_parameter_set called");
+                            "set_render_shader_parameter_global called");
   auto *rs = godot::RenderingServer::get_singleton();
   if (!rs) {
     JV r(JV::object_tag);
@@ -1412,7 +1403,7 @@ JV handle_global_shader_parameter_set(const JV &args) {
 
 JV handle_canvas_item_get_rid(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "canvas_item_get_rid called");
+                            "get_render_canvas_item_rid called");
   auto *pp = args.Find("path");
   if (!pp || !pp->IsString()) {
     JV r(JV::object_tag);
@@ -1468,7 +1459,7 @@ JV handle_canvas_item_get_rid(const JV &args) {
     return r;
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "canvas_item_get_rid completed");
+                            "get_render_canvas_item_rid completed");
   JV r(JV::object_tag);
   r["result"] = rid_to_json(ci->get_canvas_item());
   return r;

@@ -15,7 +15,8 @@ mcp::JsonValue handle_key_release(const mcp::JsonValue &args);
 mcp::JsonValue handle_mouse_move(const mcp::JsonValue &args);
 mcp::JsonValue handle_mouse_button_press(const mcp::JsonValue &args);
 mcp::JsonValue handle_mouse_button_release(const mcp::JsonValue &args);
-mcp::JsonValue handle_gamepad_simulate(const mcp::JsonValue &args);
+mcp::JsonValue handle_gamepad_vibration_start(const mcp::JsonValue &args);
+mcp::JsonValue handle_gamepad_vibration_stop(const mcp::JsonValue &args);
 
 } // namespace input_ops
 } // namespace godot_autopilot

@@ -37,7 +37,6 @@ mcp::JsonValue handle_fog_create(const mcp::JsonValue &args);
 mcp::JsonValue handle_shader_create(const mcp::JsonValue &args);
 mcp::JsonValue handle_texture_create_2d(const mcp::JsonValue &args);
 mcp::JsonValue handle_shader_set_code(const mcp::JsonValue &args);
-mcp::JsonValue handle_shader_get_parameter_list(const mcp::JsonValue &args);
 mcp::JsonValue handle_environment_set_glow(const mcp::JsonValue &args);
 mcp::JsonValue handle_environment_set_ssr(const mcp::JsonValue &args);
 mcp::JsonValue handle_environment_set_tonemap(const mcp::JsonValue &args);

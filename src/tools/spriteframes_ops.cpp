@@ -24,7 +24,7 @@ godot::Ref<godot::SpriteFrames> resolve_spriteframes(const std::string &name,
   godot::Ref<godot::Resource> res = resource_ops::resolve_memory_resource(name);
   if (res.is_null()) {
     out_error = "memory resource not found: " + name +
-                " (create it with spriteframes_create first)";
+                " (create it with create_spriteframes first)";
     return godot::Ref<godot::SpriteFrames>();
   }
   godot::Ref<godot::SpriteFrames> sf(res);
@@ -39,7 +39,7 @@ godot::Ref<godot::SpriteFrames> resolve_spriteframes(const std::string &name,
 
 JV handle_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "spriteframes_create called");
+                            "create_spriteframes called");
 
   auto *n = args.Find("name");
   if (!n || !n->IsString() || n->GetString().empty())
@@ -73,13 +73,13 @@ JV handle_create(const JV &args) {
   r["result"] = std::move(info);
   LogSystem::instance().log(
       LogLevel::Info, LogCategory::Tools,
-      "spriteframes_create completed (default animation removed)");
+      "create_spriteframes completed (default animation removed)");
   return r;
 }
 
 JV handle_add_animation(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "spriteframes_add_animation called");
+                            "add_spriteframes_animation called");
 
   auto *n = args.Find("name");
   if (!n || !n->IsString() || n->GetString().empty())
@@ -116,13 +116,13 @@ JV handle_add_animation(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = JV("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "spriteframes_add_animation completed");
+                            "add_spriteframes_animation completed");
   return r;
 }
 
 JV handle_add_frame(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "spriteframes_add_frame called");
+                            "add_spriteframes_frame called");
 
   auto *n = args.Find("name");
   if (!n || !n->IsString() || n->GetString().empty())
@@ -191,7 +191,7 @@ JV handle_add_frame(const JV &args) {
   godot::StringName anim(animation.c_str());
   if (!sf->has_animation(anim))
     return util::error_json("animation not found: " + animation +
-                 " (add it with spriteframes_add_animation first)");
+                 " (add it with add_spriteframes_animation first)");
 
   int added_frames = 0;
   if (hframes * vframes > 1) {
@@ -217,7 +217,7 @@ JV handle_add_frame(const JV &args) {
   r["frames"] = JV(static_cast<int64_t>(sf->get_frame_count(anim)));
   r["added_frames"] = JV(static_cast<int64_t>(added_frames));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "spriteframes_add_frame completed");
+                            "add_spriteframes_frame completed");
   return r;
 }
 

@@ -107,7 +107,7 @@ std::string unsaved_list_str(const godot::PackedStringArray &scenes) {
 
 mcp::JsonValue handle_get_selection(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_get_selection called");
+                            "get_editor_selection called");
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -137,13 +137,13 @@ mcp::JsonValue handle_get_selection(const mcp::JsonValue &) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(result_arr);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_get_selection completed");
+                            "get_editor_selection completed");
   return r;
 }
 
 mcp::JsonValue handle_set_selection(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_set_selection called");
+                            "set_editor_selection called");
   auto *paths_p = args.Find("paths");
   if (!paths_p || !paths_p->IsArray()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -178,13 +178,13 @@ mcp::JsonValue handle_set_selection(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_set_selection completed");
+                            "set_editor_selection completed");
   return r;
 }
 
 mcp::JsonValue handle_get_edited_scene_root(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_get_edited_scene_root called");
+                            "get_editor_edited_scene_root called");
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -204,13 +204,13 @@ mcp::JsonValue handle_get_edited_scene_root(const mcp::JsonValue &) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(j);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_get_edited_scene_root completed");
+                            "get_editor_edited_scene_root completed");
   return r;
 }
 
 mcp::JsonValue handle_save_scene(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_save_scene called");
+                            "save_editor_scene called");
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -240,9 +240,9 @@ mcp::JsonValue handle_save_scene(const mcp::JsonValue &) {
         e["error"] =
             mcp::JsonValue("failed to save scene to \"" + generated_path +
                            "\": no file was created after save_scene_as — use "
-                           "editor_save_scene_as with an explicit path");
+                           "save_editor_scene_as with an explicit path");
         LogSystem::instance().log(LogLevel::Error, LogCategory::Tools,
-                                  "editor_save_scene failed to save as " +
+                                  "save_editor_scene failed to save as " +
                                       generated_path);
         return e;
       }
@@ -250,11 +250,11 @@ mcp::JsonValue handle_save_scene(const mcp::JsonValue &) {
       r["result"] = mcp::JsonValue("saved");
       r["note"] =
           mcp::JsonValue("scene had no file path — saved to " + generated_path +
-                         "; use editor_save_scene_as to choose a directory");
+                         "; use save_editor_scene_as to choose a directory");
       scene_dirty_tracker::clear_scene_modified();
       LogSystem::instance().log(
           LogLevel::Info, LogCategory::Tools,
-          "editor_save_scene completed (saved as new scene)");
+          "save_editor_scene completed (saved as new scene)");
       return r;
     }
     r["path"] = mcp::JsonValue(util::to_std(existing_path));
@@ -266,13 +266,13 @@ mcp::JsonValue handle_save_scene(const mcp::JsonValue &) {
     scene_dirty_tracker::clear_scene_modified();
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_save_scene completed");
+                            "save_editor_scene completed");
   return r;
 }
 
 mcp::JsonValue handle_save_all_scenes(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_save_all_scenes called");
+                            "save_editor_scenes called");
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -283,13 +283,13 @@ mcp::JsonValue handle_save_all_scenes(const mcp::JsonValue &) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_save_all_scenes completed");
+                            "save_editor_scenes completed");
   return r;
 }
 
 mcp::JsonValue handle_reload_scene(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_reload_scene called");
+                            "reload_editor_scene called");
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -319,13 +319,13 @@ mcp::JsonValue handle_reload_scene(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_reload_scene completed");
+                            "reload_editor_scene completed");
   return r;
 }
 
 mcp::JsonValue handle_inspect_object(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_inspect_object called");
+                            "inspect_editor_resource called");
   auto *rp = args.Find("resource_path");
   if (!rp || !rp->IsString()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -355,13 +355,13 @@ mcp::JsonValue handle_inspect_object(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_inspect_object completed");
+                            "inspect_editor_resource completed");
   return r;
 }
 
 mcp::JsonValue handle_undo_redo_start(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_undo_redo_start called");
+                            "create_editor_undo_redo_action called");
   auto *an = args.Find("name");
   if (!an || !an->IsString()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -385,13 +385,13 @@ mcp::JsonValue handle_undo_redo_start(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_undo_redo_start completed");
+                            "create_editor_undo_redo_action completed");
   return r;
 }
 
 mcp::JsonValue handle_undo_redo_commit(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_undo_redo_commit called");
+                            "commit_editor_undo_redo called");
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -408,13 +408,13 @@ mcp::JsonValue handle_undo_redo_commit(const mcp::JsonValue &) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_undo_redo_commit completed");
+                            "commit_editor_undo_redo completed");
   return r;
 }
 
 mcp::JsonValue handle_undo_redo_add_do(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_undo_redo_add_do called");
+                            "add_editor_undo_redo_do called");
   auto *np = args.Find("node_path");
   auto *mt = args.Find("method");
   if (!np || !np->IsString()) {
@@ -459,13 +459,13 @@ mcp::JsonValue handle_undo_redo_add_do(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_undo_redo_add_do completed");
+                            "add_editor_undo_redo_do completed");
   return r;
 }
 
 mcp::JsonValue handle_undo_redo_add_undo(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_undo_redo_add_undo called");
+                            "add_editor_undo_redo_undo called");
   auto *np = args.Find("node_path");
   auto *mt = args.Find("method");
   if (!np || !np->IsString()) {
@@ -510,13 +510,13 @@ mcp::JsonValue handle_undo_redo_add_undo(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_undo_redo_add_undo completed");
+                            "add_editor_undo_redo_undo completed");
   return r;
 }
 
 mcp::JsonValue handle_file_system_get_resources(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_file_system_get_resources called");
+                            "get_editor_file_system_tree called");
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -550,13 +550,13 @@ mcp::JsonValue handle_file_system_get_resources(const mcp::JsonValue &args) {
     r["max_depth"] = mcp::JsonValue(static_cast<int64_t>(MAX_TREE_DEPTH));
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_file_system_get_resources completed");
+                            "get_editor_file_system_tree completed");
   return r;
 }
 
 mcp::JsonValue handle_file_system_scan(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_file_system_scan called");
+                            "scan_editor_file_system called");
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -573,47 +573,13 @@ mcp::JsonValue handle_file_system_scan(const mcp::JsonValue &) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_file_system_scan completed");
-  return r;
-}
-
-mcp::JsonValue handle_import_resource(const mcp::JsonValue &args) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_import_resource called");
-  auto *pp = args.Find("path");
-  if (!pp || !pp->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: path");
-    return e;
-  }
-  std::string path = pp->GetString();
-  godot::String path_gs(path.c_str());
-  auto *loader = godot::ResourceLoader::get_singleton();
-  if (!loader) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("ResourceLoader not available");
-    return e;
-  }
-  auto res = loader->load(path_gs);
-  if (res.is_null()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("failed to load resource: " + path +
-                                " (may need manual import)");
-    return e;
-  }
-  mcp::JsonValue j(mcp::JsonValue::object_tag);
-  j["class"] = mcp::JsonValue(util::to_std(res->get_class()));
-  j["path"] = mcp::JsonValue(path);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = std::move(j);
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_import_resource completed");
+                            "scan_editor_file_system completed");
   return r;
 }
 
 mcp::JsonValue handle_set_main_scene(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_set_main_scene called");
+                            "set_editor_main_scene called");
   auto *pp = args.Find("path");
   if (!pp || !pp->IsString()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -633,13 +599,13 @@ mcp::JsonValue handle_set_main_scene(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_set_main_scene completed");
+                            "set_editor_main_scene completed");
   return r;
 }
 
 mcp::JsonValue handle_play_current_scene(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_play_current_scene called");
+                            "play_editor_current_scene called");
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -664,13 +630,13 @@ mcp::JsonValue handle_play_current_scene(const mcp::JsonValue &) {
   r["result"] = mcp::JsonValue("ok");
   r["is_playing"] = mcp::JsonValue(true);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_play_current_scene completed");
+                            "play_editor_current_scene completed");
   return r;
 }
 
 mcp::JsonValue handle_stop_playing(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_stop_playing called");
+                            "stop_editor_playing called");
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -681,13 +647,13 @@ mcp::JsonValue handle_stop_playing(const mcp::JsonValue &) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_stop_playing completed");
+                            "stop_editor_playing completed");
   return r;
 }
 
 mcp::JsonValue handle_get_resource_filesystem(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_get_resource_filesystem called");
+                            "get_editor_file_system_status called");
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -706,27 +672,13 @@ mcp::JsonValue handle_get_resource_filesystem(const mcp::JsonValue &) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(j);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_get_resource_filesystem completed");
-  return r;
-}
-
-mcp::JsonValue handle_get_plugin_list(const mcp::JsonValue &) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_get_plugin_list called");
-  mcp::JsonValue j(mcp::JsonValue::object_tag);
-  j["plugins"] = mcp::JsonValue(mcp::JsonValue::array_tag);
-  j["note"] = mcp::JsonValue("Plugin enumeration not available via godot-cpp "
-                             "API; use editor_set_plugin_enabled directly");
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = std::move(j);
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_get_plugin_list completed");
+                            "get_editor_file_system_status completed");
   return r;
 }
 
 mcp::JsonValue handle_set_plugin_enabled(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_set_plugin_enabled called");
+                            "set_editor_plugin_enabled called");
   auto *pp = args.Find("plugin");
   auto *ep = args.Find("enabled");
   if (!pp || !pp->IsString()) {
@@ -751,13 +703,13 @@ mcp::JsonValue handle_set_plugin_enabled(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_set_plugin_enabled completed");
+                            "set_editor_plugin_enabled completed");
   return r;
 }
 
 mcp::JsonValue handle_new_scene(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_new_scene called");
+                            "create_editor_scene called");
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
     return util::error_json("EditorInterface not available");
@@ -805,21 +757,21 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue &args) {
   if (existing_root) {
     if (!close_current) {
       return util::error_json(
-          "scene already has a root node — call editor_new_scene with "
-          "close_current=true, or call editor_close_scene first");
+          "scene already has a root node — call create_editor_scene with "
+          "close_current=true, or call close_editor_scene first");
     }
     if (existing_root->get_scene_file_path().is_empty()) {
       return util::error_detail("current scene is unsaved",
                                 util::to_std(existing_root->get_name()),
                                 "scene saved before close",
-                                "call editor_save_scene first, then "
-                                "editor_new_scene with close_current=true");
+                                "call save_editor_scene first, then "
+                                "create_editor_scene with close_current=true");
     }
     godot::PackedStringArray unsaved = editor_unsaved_scenes(editor);
     if (!unsaved.is_empty()) {
       return util::error_json(
           "scene has unsaved changes: " + unsaved_list_str(unsaved) +
-          " — save first (editor_save_scene)");
+          " — save first (save_editor_scene)");
     }
     godot::Error err = editor->close_scene();
     if (err != godot::Error::OK) {
@@ -845,7 +797,7 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue &args) {
   if (!switched) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
     e["error"] = mcp::JsonValue(
-        "scene switch did not take effect within 2000 ms (editor_new_scene) — "
+        "scene switch did not take effect within 2000 ms (create_editor_scene) — "
         "the new scene root was not observed after add_root_node");
     return e;
   }
@@ -868,13 +820,13 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(inner);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_new_scene completed");
+                            "create_editor_scene completed");
   return r;
 }
 
 mcp::JsonValue handle_open_scene(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_open_scene called");
+                            "open_editor_scene called");
   auto *pp = args.Find("path");
   if (!pp || !pp->IsString()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -893,7 +845,7 @@ mcp::JsonValue handle_open_scene(const mcp::JsonValue &args) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
     e["error"] = mcp::JsonValue(
         "current scene has unsaved changes: " + unsaved_list_str(unsaved) +
-        " — save first (editor_save_scene)");
+        " — save first (save_editor_scene)");
     return e;
   }
   auto *old_root = editor->get_edited_scene_root();
@@ -926,13 +878,13 @@ mcp::JsonValue handle_open_scene(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_open_scene completed");
+                            "open_editor_scene completed");
   return r;
 }
 
 mcp::JsonValue handle_close_scene(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_close_scene called");
+                            "close_editor_scene called");
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
     return util::error_json("EditorInterface not available");
@@ -941,7 +893,7 @@ mcp::JsonValue handle_close_scene(const mcp::JsonValue &) {
   if (!unsaved.is_empty()) {
     return util::error_json(
         "scene has unsaved changes: " + unsaved_list_str(unsaved) +
-        " — save first (editor_save_scene)");
+        " — save first (save_editor_scene)");
   }
   godot::Error err = editor->close_scene();
   if (err != godot::Error::OK) {
@@ -951,13 +903,13 @@ mcp::JsonValue handle_close_scene(const mcp::JsonValue &) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("closed");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_close_scene completed");
+                            "close_editor_scene completed");
   return r;
 }
 
 mcp::JsonValue handle_save_scene_as(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_save_scene_as called");
+                            "save_editor_scene_as called");
   auto *pp = args.Find("path");
   if (!pp || !pp->IsString()) {
     return util::error_json("missing required parameter: path");
@@ -992,35 +944,7 @@ mcp::JsonValue handle_save_scene_as(const mcp::JsonValue &args) {
   r["result"] = mcp::JsonValue("saved");
   scene_dirty_tracker::clear_scene_modified();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_save_scene_as completed");
-  return r;
-}
-
-mcp::JsonValue handle_new_text_resource(const mcp::JsonValue &args) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_new_text_resource called");
-  auto *pp = args.Find("path");
-  if (!pp || !pp->IsString()) {
-    return util::error_json("missing required parameter: path");
-  }
-  auto *sp = args.Find("source_code");
-  if (!sp || !sp->IsString()) {
-    return util::error_json("missing required parameter: source_code");
-  }
-  std::string path = pp->GetString();
-  auto file = godot::FileAccess::open(godot::String(path.c_str()),
-                                      godot::FileAccess::WRITE);
-  if (file.is_null()) {
-    return util::error_json("failed to open file for writing: " + path);
-  }
-  file->store_string(godot::String(sp->GetString().c_str()));
-  file->close();
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["path"] = mcp::JsonValue(path);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = std::move(inner);
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "editor_new_text_resource completed");
+                            "save_editor_scene_as completed");
   return r;
 }
 
