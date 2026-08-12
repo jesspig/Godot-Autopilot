@@ -3,9 +3,9 @@
 
 #include <gtest/gtest.h>
 
-using godot_self_driving::CommandQueue;
-using godot_self_driving::runtime_ops::has_editor_queue;
-using godot_self_driving::runtime_ops::set_editor_queue;
+using godot_autopilot::CommandQueue;
+using godot_autopilot::runtime_ops::has_editor_queue;
+using godot_autopilot::runtime_ops::set_editor_queue;
 
 TEST(RuntimeOpsTest, EditorQueueInjectionRoundTrip) {
     CommandQueue q;

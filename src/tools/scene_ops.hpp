@@ -1,18 +1,17 @@
-#ifndef GODOT_SELF_DRIVING_SCENE_OPS_HPP
-#define GODOT_SELF_DRIVING_SCENE_OPS_HPP
+#ifndef GODOT_AUTOPILOT_SCENE_OPS_HPP
+#define GODOT_AUTOPILOT_SCENE_OPS_HPP
 
 #include <mcp/JsonValue.hpp>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace scene_ops {
 
 mcp::JsonValue handle_create(const mcp::JsonValue &args);
 mcp::JsonValue handle_delete(const mcp::JsonValue &args);
 mcp::JsonValue handle_instance(const mcp::JsonValue &args);
 mcp::JsonValue handle_get_tree(const mcp::JsonValue &args);
-mcp::JsonValue handle_get_editor_scene_tree(const mcp::JsonValue &args);
 
 } // namespace scene_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 
 #endif

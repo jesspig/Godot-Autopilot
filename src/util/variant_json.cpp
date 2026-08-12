@@ -13,7 +13,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 namespace {
 
@@ -1228,4 +1228,4 @@ godot::Variant VariantJson::deserialize(const mcp::JsonValue &j,
   return deserialize_inferred(j);
 }
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot

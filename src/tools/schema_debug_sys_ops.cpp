@@ -1,30 +1,30 @@
 #include "tools/schema_fills.hpp"
 #include "tools/schema_builder.hpp"
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 void fill_schema_debug_sys(std::unordered_map<std::string, mcp::JsonValue>& m) {
 
-        m["output_get_log"] = schema::build_schema({
+        m["get_debugger_log"] = schema::build_schema({
             {"limit", "integer", "Maximum number of log entries to return (default: 50)", false},
         });
-        m["debugger_get_errors"] = schema::build_schema({
+        m["get_debugger_errors"] = schema::build_schema({
             {"limit", "integer", "Maximum number of errors to return (default: 20)", false},
         });
-        m["debugger_get_output"] = schema::build_schema({
+        m["get_debugger_output"] = schema::build_schema({
             {"limit", "integer", "Maximum number of output entries to return (default: 50); fetched from the running game over the runtime channel when a debug session is active", false},
         });
-        m["debugger_get_stack_dump"] = schema::build_schema({});
-        m["debugger_get_scene_tree"] = schema::build_schema({});
-        m["debugger_get_monitors"] = schema::build_schema({
+        m["get_debugger_stack_dump"] = schema::build_schema({});
+        m["get_debugger_scene_tree"] = schema::build_schema({});
+        m["get_debugger_monitors"] = schema::build_schema({
             {"count", "integer", "Number of recent monitor frames to return (default: 1)", false},
         });
-        m["debugger_get_session_info"] = schema::build_schema({});
+        m["get_debugger_session_info"] = schema::build_schema({});
 
-        m["game_status"] = schema::build_schema({
+        m["get_game_status"] = schema::build_schema({
             {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 30000), 返回字段含 paused（SceneTree 暂停状态）与 physics_frame（物理帧计数），用于区分假运行", false},
         });
-        m["game_eval"] = schema::build_schema({
+        m["execute_game_script"] = schema::build_schema({
             {"action", "string", "Action to run in the game process: \"script\" (execute arbitrary GDScript), \"get_property\", \"set_property\", \"call_method\"", true},
             {"node_path", "string", "Node path for get_property/set_property/call_method (omit to use the current scene root)", false},
             {"property", "string", "Property name for get_property/set_property", false},
@@ -32,11 +32,11 @@ void fill_schema_debug_sys(std::unordered_map<std::string, mcp::JsonValue>& m) {
             {"method", "string", "Method name for call_method", false},
             {"args", "array", "Arguments for call_method", false},
             {"source_code", "string", "GDScript source for action=\"script\" — must extend Node and define func _run()", false},
-            {"persist", "boolean", "Keep the script's temporary node alive after the call (default: false); the node is stored under /root/__gsd_runtime and its path is returned in node_path for later get_property/call_method use", false},
-            {"persist_name", "string", "Node name under /root/__gsd_runtime when persist=true (default: auto-generated)", false},
+            {"persist", "boolean", "Keep the script's temporary node alive after the call (default: false); the node is stored under /root/__gda_runtime and its path is returned in node_path for later get_property/call_method use", false},
+            {"persist_name", "string", "Node name under /root/__gda_runtime when persist=true (default: auto-generated)", false},
             {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 30000)", false},
         });
-        m["game_input"] = schema::build_schema({
+        m["queue_game_input"] = schema::build_schema({
             {"type", "string", "Input event type: \"key\", \"mouse_button\" or \"action\"", true},
             {"keycode", "string", "Key for type=\"key\": numeric key code (e.g. 65) or key name (e.g. \"A\", \"space\", \"KEY_LEFT\")", false},
             {"pressed", "boolean", "Pressed state (default: true)", false},
@@ -47,118 +47,108 @@ void fill_schema_debug_sys(std::unordered_map<std::string, mcp::JsonValue>& m) {
             {"mode", "string", "Injection mode for type=action: \"event\" (default, via Input.parse_input_event) or \"api\" (via Input.action_press/action_release, immediate)", false},
             {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 30000)", false},
         });
-        m["game_input_wait"] = schema::build_schema({
+        m["wait_game_input"] = schema::build_schema({
             {"action", "string", "Action name to wait on", true},
             {"state", "string", "Transient state to wait for: \"just_pressed\" (default), \"just_released\" or \"pressed\"", false},
             {"inject", "object", "Inject an input before waiting, in the same call (fields mirror game_input: type/action/keycode/pressed/mode/duration_ms/button_index/position) — eliminates the inject-then-observe cross-roundtrip frame gap; required for state=just_pressed/just_released, without inject the transient window (1 physics frame) has already expired and the wait will always time out", false},
             {"timeout_ms", "integer", "Wait timeout in milliseconds (default: 2000, max: 30000)", false},
         });
-        m["game_input_status"] = schema::build_schema({
+        m["get_game_input_status"] = schema::build_schema({
             {"action", "string", "Action name to query, 返回字段含 paused 与 physics_frame，用于判断瞬态输入是否因暂停而无法被消费", true},
             {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 30000)", false},
         });
-        m["game_capture"] = schema::build_schema({
+        m["capture_game_viewport"] = schema::build_schema({
             {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 30000)", false},
         });
 
-        m["log_get_game_entries"] = schema::build_schema({
+        m["get_game_log_entries"] = schema::build_schema({
             {"limit", "integer", "Maximum number of log entries to return (default: 50)", false},
         });
 
-        m["debug_print"] = schema::build_schema({
+        m["print_debug_log"] = schema::build_schema({
             {"message", "string", "Debug log message to print", true},
         });
-        m["debug_print_stack"] = schema::build_schema({
+        m["get_debug_stack"] = schema::build_schema({
             {"include_variables", "boolean", "Include script local/member variables (default: false)", false},
         });
-        m["debug_get_performance_monitor"] = schema::build_schema({
+        m["get_debug_monitor"] = schema::build_schema({
             {"monitor", "number", "Performance monitor ID (integer 0-58, see debug_list_performance_monitors)", true},
         });
-        m["debug_list_performance_monitors"] = schema::build_schema({});
-        m["debug_get_object_count"] = schema::build_schema({});
-        m["debug_get_object_count_by_class"] = schema::build_schema({});
-        m["debug_get_memory_usage"] = schema::build_schema({});
-        m["debug_profile_start"] = schema::build_schema({});
-        m["debug_profile_stop"] = schema::build_schema({});
-        m["debug_profile_get_data"] = schema::build_schema({});
-        m["debug_set_fps_limit"] = schema::build_schema({
-            {"fps", "number", "Maximum FPS limit to set", true},
-        });
-        m["debug_set_physics_fps"] = schema::build_schema({
+        m["get_debug_monitor_catalog"] = schema::build_schema({});
+        m["get_debug_object_count"] = schema::build_schema({});
+        m["get_debug_memory_usage"] = schema::build_schema({});
+        m["set_debug_physics_fps"] = schema::build_schema({
             {"fps", "number", "Physics ticks per second to set", true},
         });
-        m["debug_collision_debug"] = schema::build_schema({
+        m["set_debug_collision_visual"] = schema::build_schema({
             {"enabled", "boolean", "Enable collision debug visualization", true},
         });
-        m["debug_navigation_debug"] = schema::build_schema({
+        m["set_debug_navigation_visual"] = schema::build_schema({
             {"enabled", "boolean", "Enable navigation debug visualization", true},
         });
-        m["debug_performance_debug"] = schema::build_schema({
+        m["set_debug_performance_visual"] = schema::build_schema({
             {"enabled", "boolean", "Enable performance debug overlay", true},
         });
-        m["debug_get_all_monitors"] = schema::build_schema({});
-        m["debug_add_custom_monitor"] = schema::build_schema({});
-        m["debug_remove_custom_monitor"] = schema::build_schema({
+        m["get_debug_monitors"] = schema::build_schema({});
+        m["remove_debug_custom_monitor"] = schema::build_schema({
             {"id", "string", "Custom monitor name to remove", true},
         });
-        m["debug_get_custom_monitor"] = schema::build_schema({
+        m["get_debug_custom_monitor"] = schema::build_schema({
             {"id", "string", "Custom monitor name to read", true},
         });
-        m["debug_list_custom_monitors"] = schema::build_schema({});
-        m["debug_query_object_count"] = schema::build_schema({});
-        m["debug_query_memory_usage"] = schema::build_schema({});
-        m["debug_query_node_count"] = schema::build_schema({});
+        m["get_debug_custom_monitor_names"] = schema::build_schema({});
+        m["get_debug_node_count"] = schema::build_schema({});
 
-        m["os_alert"] = schema::build_schema({
+        m["show_os_alert"] = schema::build_schema({
             {"text", "string", "Alert message text", true},
             {"title", "string", "Alert dialog title (default: Alert!)", false},
         });
-        m["os_create_process"] = schema::build_schema({
+        m["create_os_process"] = schema::build_schema({
             {"path", "string", "Executable path to start", true},
             {"arguments", "array", "Array of command line argument strings", true},
         });
-        m["os_execute"] = schema::build_schema({
+        m["execute_os_process"] = schema::build_schema({
             {"path", "string", "Executable path to run", true},
             {"arguments", "array", "Array of command line argument strings", true},
             {"output", "boolean", "Capture stdout/stderr (default: false)", false},
         });
-        m["os_get_datetime"] = schema::build_schema({
+        m["get_os_datetime"] = schema::build_schema({
             {"utc", "boolean", "Return UTC time instead of local (default: false)", false},
         });
-        m["os_get_environment"] = schema::build_schema({
+        m["get_os_environment"] = schema::build_schema({
             {"variable", "string", "Environment variable name", true},
         });
-        m["os_get_locale"] = schema::build_schema({});
-        m["os_get_system_fonts"] = schema::build_schema({});
-        m["os_get_system_info"] = schema::build_schema({});
-        m["os_get_unique_id"] = schema::build_schema({});
-        m["os_get_unix_time"] = schema::build_schema({});
-        m["os_get_user_data_dir"] = schema::build_schema({});
-        m["os_kill"] = schema::build_schema({
+        m["get_os_locale"] = schema::build_schema({});
+        m["get_os_system_fonts"] = schema::build_schema({});
+        m["get_os_system_info"] = schema::build_schema({});
+        m["get_os_unique_id"] = schema::build_schema({});
+        m["get_os_unix_time"] = schema::build_schema({});
+        m["get_os_user_data_dir"] = schema::build_schema({});
+        m["kill_os_process"] = schema::build_schema({
             {"pid", "integer", "Process ID to kill", true},
         });
-        m["os_move_to_trash"] = schema::build_schema({
+        m["move_os_file_to_trash"] = schema::build_schema({
             {"path", "string", "File or folder path to move to trash", true},
         });
-        m["os_set_environment"] = schema::build_schema({
+        m["set_os_environment"] = schema::build_schema({
             {"variable", "string", "Environment variable name", true},
             {"value", "string", "Environment variable value", true},
         });
-        m["os_shell_open"] = schema::build_schema({
+        m["open_os_path"] = schema::build_schema({
             {"uri", "string", "URL or file path to open with the default application", true},
         });
 
-        m["doc_get_class"] = schema::build_schema({
+        m["get_docs_class"] = schema::build_schema({
             {"class", "string", "Godot class name", true},
         });
-        m["doc_search"] = schema::build_schema({
+        m["find_docs_class"] = schema::build_schema({
             {"query", "string", "Search text to match against class names", true},
         });
-        m["doc_get_method"] = schema::build_schema({
+        m["get_docs_method"] = schema::build_schema({
             {"class", "string", "Godot class name", true},
             {"method", "string", "Method name to look up documentation for", true},
         });
-        m["doc_get_property"] = schema::build_schema({
+        m["get_docs_property"] = schema::build_schema({
             {"class", "string", "Godot class name", true},
             {"property", "string", "Property name to look up documentation for", true},
         });
@@ -181,4 +171,4 @@ void fill_schema_debug_sys(std::unordered_map<std::string, mcp::JsonValue>& m) {
         });
 }
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot

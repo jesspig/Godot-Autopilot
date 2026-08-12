@@ -1,9 +1,9 @@
 #include "prompts/prompt_setup_gui.hpp"
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 std::string prompt_setup_gui() {
-  return R"gsd(# GUI 界面创建指南
+  return R"gda(# GUI 界面创建指南
 
 ## 背景
 本流程引导你在 Godot 中创建一个简单的 GUI 界面，包含容器布局、按钮和标签，以及信号连接。
@@ -20,7 +20,7 @@ CanvasLayer 确保 UI 不受游戏世界缩放影响：
 {
   "name": "call_tool",
   "arguments": {
-    "name": "scene_node_create",
+    "name": "create_scene_node",
     "arguments": {
       "parent_path": "",
       "name": "UI",
@@ -36,7 +36,7 @@ CanvasLayer 确保 UI 不受游戏世界缩放影响：
 {
   "name": "call_tool",
   "arguments": {
-    "name": "scene_node_create",
+    "name": "create_scene_node",
     "arguments": {
       "parent_path": "UI",
       "name": "MainContainer",
@@ -78,7 +78,7 @@ CanvasLayer 确保 UI 不受游戏世界缩放影响：
 {
   "name": "call_tool",
   "arguments": {
-    "name": "scene_node_create",
+    "name": "create_scene_node",
     "arguments": {
       "parent_path": "UI/MainContainer",
       "name": "Title",
@@ -119,7 +119,7 @@ CanvasLayer 确保 UI 不受游戏世界缩放影响：
 {
   "name": "call_tool",
   "arguments": {
-    "name": "scene_node_create",
+    "name": "create_scene_node",
     "arguments": {
       "parent_path": "UI/MainContainer",
       "name": "StartButton",
@@ -147,7 +147,7 @@ CanvasLayer 确保 UI 不受游戏世界缩放影响：
 {
   "name": "call_tool",
   "arguments": {
-    "name": "scene_node_create",
+    "name": "create_scene_node",
     "arguments": {
       "parent_path": "UI/MainContainer",
       "name": "QuitButton",
@@ -196,7 +196,7 @@ CanvasLayer 确保 UI 不受游戏世界缩放影响：
 - 如果按钮需要间距，可以在容器中添加控制节点（Control）作为间隔
 - `horizontal_alignment` 值：0=左对齐，1=居中对齐，2=右对齐
 - 信号连接需要对应的脚本中存在目标方法
-- 使用 MarginContainer 或设置容器主题的 padding 属性可以添加边距)gsd";
+- 使用 MarginContainer 或设置容器主题的 padding 属性可以添加边距)gda";
 }
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot

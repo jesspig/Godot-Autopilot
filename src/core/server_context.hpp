@@ -1,5 +1,5 @@
-#ifndef GODOT_SELF_DRIVING_SERVER_CONTEXT_HPP
-#define GODOT_SELF_DRIVING_SERVER_CONTEXT_HPP
+#ifndef GODOT_AUTOPILOT_SERVER_CONTEXT_HPP
+#define GODOT_AUTOPILOT_SERVER_CONTEXT_HPP
 
 #include <chrono>
 #include <string>
@@ -11,7 +11,7 @@
 #include "command_queue.hpp"
 #include "config.hpp"
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 class ToolCatalog;
 class Bm25Index;
@@ -37,7 +37,7 @@ private:
   std::unique_ptr<Bm25Index> bm25_index_;
   std::shared_ptr<mcp::StreamableHttpServerTransport> transport_;
   std::unique_ptr<mcp::McpServer> server_;
-  int port_ = GSD_DEFAULT_PORT;
+  int port_ = GDA_DEFAULT_PORT;
   bool running_ = false;
   std::string last_error_;
   std::chrono::steady_clock::time_point start_time_;
@@ -46,6 +46,6 @@ private:
   int resolve_port();
 };
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 
 #endif

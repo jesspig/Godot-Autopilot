@@ -5,7 +5,7 @@
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/node.hpp>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace scene_dirty_tracker {
 
 namespace {
@@ -44,4 +44,4 @@ bool is_current_scene_dirty() {
 }
 
 } // namespace scene_dirty_tracker
-} // namespace godot_self_driving
+} // namespace godot_autopilot

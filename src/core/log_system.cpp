@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cctype>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 void LogSystem::log(LogLevel level, LogCategory category,
                     const std::string &message) {
@@ -94,4 +94,4 @@ void LogSystem::set_on_new_entry(OnNewEntryCallback callback) {
   on_new_entry_ = std::move(callback);
 }
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot

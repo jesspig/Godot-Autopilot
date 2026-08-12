@@ -13,7 +13,7 @@
 
 - `Example/project.godot` 是 Godot 4.7、Forward Plus 项目。
 - 当前没有主场景、输入动作、GDScript、场景资源或音频。
-- 插件构建命令是 `uv run build.py`，部署目录是 `Example/addons/godot-self-driving/`。
+- 插件构建命令是 `uv run build.py`，部署目录是 `Example/addons/godot-autopilot/`。
 - MCP 默认端口是 `9527`；Godot API 只能由 Godot 主线程调用。
 - HTTP 线程提交的操作必须经过 `CommandQueue::submit()`，由主线程 `_process()` 排空。
 
@@ -252,24 +252,24 @@ graph TD
 flowchart TD
     A[打开 Example 项目] --> B[ping]
     B --> C[search_tools 与 get_tool_detail]
-    C --> D[editor_new_scene]
-    D --> E[scene_node_create 主节点]
-    E --> F[scene_node_create 世界节点]
-    F --> G[resource_create TileSet]
-    G --> H[resource_save 与 atlas 配置]
-    H --> I[tilemap_create 与 tilemap_set_cells]
-    I --> J[scene_instance 玩家与交互节点]
-    J --> K[script_create 与 script_attach_to_node]
-    K --> L[input_map_add_action 与持久化]
+    C --> D[create_editor_scene]
+    D --> E[create_scene_node 主节点]
+    E --> F[create_scene_node 世界节点]
+    F --> G[create_resource TileSet]
+    G --> H[save_resource 与 atlas 配置]
+    H --> I[create_tilemap 与 set_tilemap_cells]
+    I --> J[instantiate_scene 玩家与交互节点]
+    J --> K[create_script 与 attach_script_to_node]
+    K --> L[add_input_map_action 与持久化]
     L --> M[signal_connect]
     M --> N[property_set 相机与碰撞属性]
-    N --> O[editor_save_scene_as]
-    O --> P[editor_set_main_scene]
-    P --> Q[editor_play_current_scene]
-    Q --> R[game_status 与 game_capture]
-    R --> S[game_input 与 game_input_wait]
+    N --> O[save_editor_scene_as]
+    O --> P[set_editor_main_scene]
+    P --> Q[play_editor_current_scene]
+    Q --> R[get_game_status 与 capture_game_viewport]
+    R --> S[queue_game_input 与 wait_game_input]
     S --> T[按 level spec 验收]
-    T --> U[editor_stop_playing 与 log_get_game_entries]
+    T --> U[stop_editor_playing 与 get_game_log_entries]
 ```
 
 关键判读: 该顺序先验证工具和编辑器状态，再创建资源、场景、脚本和输入，最后才运行；图中的每一步都是 TODO，不代表已经执行。
@@ -277,10 +277,10 @@ flowchart TD
 推荐元工具和领域工具范围:
 
 - 元工具: `ping`、`search_tools`、`list_categories`、`get_tool_detail`、`call_tool`、`batch_execute`、`code_execute`。
-- 场景与属性: `editor_new_scene`、`scene_node_create`、`scene_instance`、`property_set`、`signal_connect`、`editor_save_scene_as`、`editor_save_scene`。
-- 脚本与资源: `script_create`、`script_attach_to_node`、`script_execute_gdscript`、`resource_create`、`resource_save`、`resource_load`、`spriteframes_create`、`spriteframes_add_animation`、`spriteframes_add_frame`。
-- TileMap: `tileset_create`、`tileset_add_atlas_source`、`tileset_add_physics_layer`、`tileset_set_tile_collision`、`tilemap_create`、`tilemap_set_cell`、`tilemap_set_cells`。
-- 输入与运行: `input_map_add_action`、`input_map_action_add_event`、`input_map_action_set_deadzone`、`input_map_persist`、`input_map_get_actions`、`input_map_has_action`、`editor_set_main_scene`、`editor_open_scene`、`editor_play_current_scene`、`editor_stop_playing`、`game_status`、`game_eval`、`game_input`、`game_input_wait`、`game_input_status`、`game_capture`、`log_get_game_entries`。
+- 场景与属性: `create_editor_scene`、`create_scene_node`、`instantiate_scene`、`property_set`、`signal_connect`、`save_editor_scene_as`、`save_editor_scene`。
+- 脚本与资源: `create_script`、`attach_script_to_node`、`execute_script`、`create_resource`、`save_resource`、`load_resource`、`create_spriteframes`、`add_spriteframes_animation`、`add_spriteframes_frame`。
+- TileMap: `create_tilemap_tileset`、`add_tilemap_atlas_source`、`add_tilemap_physics_layer`、`set_tilemap_tile_collision`、`create_tilemap`、`set_tilemap_cell`、`set_tilemap_cells`。
+- 输入与运行: `add_input_map_action`、`add_input_map_action_event`、`set_input_map_action_deadzone`、`save_input_map`、`get_input_map_actions`、`has_input_map_action`、`set_editor_main_scene`、`open_editor_scene`、`play_editor_current_scene`、`stop_editor_playing`、`get_game_status`、`execute_game_script`、`queue_game_input`、`wait_game_input`、`get_game_input_status`、`capture_game_viewport`、`get_game_log_entries`。
 
 ## 部署与运行边界
 
@@ -289,7 +289,7 @@ flowchart TD
 ```mermaid
 flowchart LR
     Dev[开发者或 MCP Client] --> HTTP[HTTP 请求 9527]
-    HTTP --> Plugin[Godot Self Driving 插件]
+    HTTP --> Plugin[Godot Autopilot 插件]
     Plugin --> Worker[libhv HTTP 线程]
     Worker --> Queue[CommandQueue submit]
     Queue --> Main[Godot 主线程 process]
@@ -297,7 +297,7 @@ flowchart LR
     Godot --> Game[单关卡运行时]
     Build[uv run build.py] --> Deploy[部署插件到 Example addons]
     Deploy --> Plugin
-    Env[GODOT_SELF_DRIVING_PORT] --> HTTP
+    Env[GODOT_AUTOPILOT_PORT] --> HTTP
 ```
 
 关键判读: HTTP 线程不得直接调用 Godot API；`uv run build.py` 只负责插件构建部署。游戏是否能运行要由 Godot 主场景和输入配置单独验证。
@@ -309,5 +309,5 @@ flowchart LR
 - [ ] 碰撞层和掩码与本文件一致。
 - [ ] 信号连接唯一，重复运行初始化不会重复连接。
 - [ ] MCP 调用遵循从空项目到运行验证的顺序。
-- [ ] `editor_set_main_scene` 后可以从项目运行入口进入单关卡。
+- [ ] `set_editor_main_scene` 后可以从项目运行入口进入单关卡。
 - [ ] 日志中没有缺失资源、无效节点路径或跨线程 Godot API 错误。

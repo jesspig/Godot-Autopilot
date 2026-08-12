@@ -4,10 +4,10 @@
 
 #include <string>
 
-using godot_self_driving::LogCategory;
-using godot_self_driving::LogEntry;
-using godot_self_driving::LogLevel;
-using godot_self_driving::LogSystem;
+using godot_autopilot::LogCategory;
+using godot_autopilot::LogEntry;
+using godot_autopilot::LogLevel;
+using godot_autopilot::LogSystem;
 
 TEST(LogSystemTest, InstanceIsSingleton) {
     EXPECT_EQ(&LogSystem::instance(), &LogSystem::instance());

@@ -1,23 +1,23 @@
 #include "prompts/prompt_create_3d_scene.hpp"
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 std::string prompt_create_3d_scene() {
-  return R"gsd(# 创建 3D 场景指南
+  return R"gda(# 创建 3D 场景指南
 
 ## 背景
 本流程引导你在 Godot 中创建一个完整的 3D 场景，包含摄像机、光照、环境和测试对象。
 
 ## 前置条件
 - 编辑器处于打开状态
-- 已有一个空白场景（可通过 `scene_node_create` 创建 Node3D 根节点）
+- 已有一个空白场景（可通过 `create_scene_node` 创建 Node3D 根节点）
 
 ## 分步引导
 
 ### 步骤 1：创建根节点
 ```json
 {
-  "name": "scene_node_create",
+  "name": "create_scene_node",
   "arguments": {
     "parent_path": "",
     "name": "MyScene",
@@ -29,7 +29,7 @@ std::string prompt_create_3d_scene() {
 ### 步骤 2：添加摄像机
 ```json
 {
-  "name": "scene_node_create",
+  "name": "create_scene_node",
   "arguments": {
     "parent_path": "MyScene",
     "name": "Camera3D",
@@ -52,7 +52,7 @@ std::string prompt_create_3d_scene() {
 ### 步骤 3：添加方向光
 ```json
 {
-  "name": "scene_node_create",
+  "name": "create_scene_node",
   "arguments": {
     "parent_path": "MyScene",
     "name": "DirectionalLight3D",
@@ -75,7 +75,7 @@ std::string prompt_create_3d_scene() {
 ### 步骤 4：添加环境
 ```json
 {
-  "name": "scene_node_create",
+  "name": "create_scene_node",
   "arguments": {
     "parent_path": "MyScene",
     "name": "WorldEnvironment",
@@ -98,7 +98,7 @@ std::string prompt_create_3d_scene() {
 ### 步骤 5：添加测试对象
 ```json
 {
-  "name": "scene_node_create",
+  "name": "create_scene_node",
   "arguments": {
     "parent_path": "MyScene",
     "name": "TestMesh",
@@ -124,7 +124,7 @@ std::string prompt_create_3d_scene() {
 - WorldEnvironment 的 environment 属性需要先创建 Environment 资源再赋值
 - Camera3D 默认位置在原点，需要调整位置才能看到场景
 - 使用 `property_get_list` 查看节点的所有可用属性
-- 使用 `editor_save_scene` 保存当前场景)gsd";
+- 使用 `save_editor_scene` 保存当前场景)gda";
 }
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot

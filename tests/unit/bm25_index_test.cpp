@@ -4,7 +4,7 @@
 
 #include <string>
 
-using godot_self_driving::Bm25Index;
+using godot_autopilot::Bm25Index;
 
 namespace {
 

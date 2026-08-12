@@ -25,7 +25,7 @@
 #include <sstream>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace script_ops {
 
 namespace {
@@ -913,4 +913,4 @@ mcp::JsonValue handle_get_variable_list(const mcp::JsonValue &args) {
 }
 
 } // namespace script_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

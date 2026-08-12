@@ -4,33 +4,33 @@ cmake_minimum_required(VERSION 3.28...4.2)
 # 优先级: Clang/clang-cl > 系统默认
 if(NOT DEFINED CACHE{CMAKE_CXX_COMPILER})
     if(WIN32)
-        find_program(GSD_CLANG_CL NAMES clang-cl)
-        if(GSD_CLANG_CL)
-            set(CMAKE_C_COMPILER "${GSD_CLANG_CL}")
-            set(CMAKE_CXX_COMPILER "${GSD_CLANG_CL}")
+        find_program(GDA_CLANG_CL NAMES clang-cl)
+        if(GDA_CLANG_CL)
+            set(CMAKE_C_COMPILER "${GDA_CLANG_CL}")
+            set(CMAKE_CXX_COMPILER "${GDA_CLANG_CL}")
             set(CMAKE_C_FLAGS "--target=x86_64-pc-windows-msvc" CACHE STRING "")
             set(CMAKE_CXX_FLAGS "--target=x86_64-pc-windows-msvc" CACHE STRING "")
-            message(STATUS "[gsd] Auto-detected: clang-cl (${GSD_CLANG_CL})")
+            message(STATUS "[gda] Auto-detected: clang-cl (${GDA_CLANG_CL})")
         endif()
     else()
-        find_program(GSD_CLANGXX NAMES clang++-19 clang++-18 clang++-17 clang++-16 clang++)
-        if(GSD_CLANGXX)
-            set(CMAKE_CXX_COMPILER "${GSD_CLANGXX}")
-            get_filename_component(_cxx_name "${GSD_CLANGXX}" NAME)
+        find_program(GDA_CLANGXX NAMES clang++-19 clang++-18 clang++-17 clang++-16 clang++)
+        if(GDA_CLANGXX)
+            set(CMAKE_CXX_COMPILER "${GDA_CLANGXX}")
+            get_filename_component(_cxx_name "${GDA_CLANGXX}" NAME)
             if(_cxx_name MATCHES "^clang\\+\\+-(.+)$")
                 set(_ver "${CMAKE_MATCH_1}")
-                find_program(GSD_CLANG NAMES "clang-${_ver}" "clang")
+                find_program(GDA_CLANG NAMES "clang-${_ver}" "clang")
             else()
-                find_program(GSD_CLANG NAMES "clang")
+                find_program(GDA_CLANG NAMES "clang")
             endif()
-            if(GSD_CLANG)
-                set(CMAKE_C_COMPILER "${GSD_CLANG}")
+            if(GDA_CLANG)
+                set(CMAKE_C_COMPILER "${GDA_CLANG}")
             endif()
         endif()
     endif()
 endif()
 
-project(Godot-Self-Driving VERSION 0.1.0 LANGUAGES C CXX)
+project(Godot-Autopilot VERSION 0.1.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_AUTOMOC OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -39,11 +39,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 # ── Ninja 探测 ──
-find_program(GSD_NINJA NAMES ninja)
-if(GSD_NINJA AND CMAKE_GENERATOR MATCHES "Ninja")
-    message(STATUS "[gsd] Ninja: ${GSD_NINJA}")
-elseif(GSD_NINJA AND NOT CMAKE_GENERATOR MATCHES "Ninja")
-    message(WARNING "[gsd] Ninja available (${GSD_NINJA}) but generator is '${CMAKE_GENERATOR}'. Use -G Ninja for faster builds.")
+find_program(GDA_NINJA NAMES ninja)
+if(GDA_NINJA AND CMAKE_GENERATOR MATCHES "Ninja")
+    message(STATUS "[gda] Ninja: ${GDA_NINJA}")
+elseif(GDA_NINJA AND NOT CMAKE_GENERATOR MATCHES "Ninja")
+    message(WARNING "[gda] Ninja available (${GDA_NINJA}) but generator is '${CMAKE_GENERATOR}'. Use -G Ninja for faster builds.")
 endif()
 
 include(Platform)
@@ -54,9 +54,9 @@ include(FetchDependencies)
 include(Lto)
 
 # ====================================================================
-# godot-self-driving — SHARED (GDExtension)
+# godot-autopilot — SHARED (GDExtension)
 # ====================================================================
-add_library(godot-self-driving SHARED
+add_library(godot-autopilot SHARED
     src/main.cpp
     src/core/mode_detector.cpp
     src/core/log_system.cpp
@@ -126,18 +126,18 @@ add_library(godot-self-driving SHARED
     src/ui/mcp_status_bar.cpp
     src/ui/mcp_log_dock.cpp)
 
-target_include_directories(godot-self-driving PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_include_directories(godot-autopilot PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
-target_link_libraries(godot-self-driving PRIVATE godot-cpp mcp-server mcp-http)
+target_link_libraries(godot-autopilot PRIVATE godot-cpp mcp-server mcp-http)
 if(MSVC)
-    target_link_options(godot-self-driving PRIVATE "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>")
+    target_link_options(godot-autopilot PRIVATE "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>")
 endif()
 
 # ====================================================================
-# 测试基础设施 (默认关闭, 显式 -DGSD_ENABLE_TESTS=ON 启用)
+# 测试基础设施 (默认关闭, 显式 -DGDA_ENABLE_TESTS=ON 启用)
 # ====================================================================
-option(GSD_ENABLE_TESTS "Enable tests" OFF)
-if(GSD_ENABLE_TESTS)
+option(GDA_ENABLE_TESTS "Enable tests" OFF)
+if(GDA_ENABLE_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()

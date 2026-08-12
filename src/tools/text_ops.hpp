@@ -1,9 +1,9 @@
-#ifndef GODOT_SELF_DRIVING_TEXT_OPS_HPP
-#define GODOT_SELF_DRIVING_TEXT_OPS_HPP
+#ifndef GODOT_AUTOPILOT_TEXT_OPS_HPP
+#define GODOT_AUTOPILOT_TEXT_OPS_HPP
 
 #include <mcp/JsonValue.hpp>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace text_ops {
 
 mcp::JsonValue handle_create_font(const mcp::JsonValue &args);
@@ -19,6 +19,6 @@ mcp::JsonValue handle_shaped_text_get_size(const mcp::JsonValue &args);
 mcp::JsonValue handle_file_write(const mcp::JsonValue &args);
 
 } // namespace text_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 
 #endif

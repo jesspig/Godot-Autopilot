@@ -11,7 +11,7 @@
 #include <godot_cpp/variant/string_name.hpp>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace group_ops {
 
 namespace {
@@ -218,4 +218,4 @@ mcp::JsonValue handle_has_node_in_group(const mcp::JsonValue &args) {
 }
 
 } // namespace group_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

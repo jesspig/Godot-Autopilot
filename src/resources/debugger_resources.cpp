@@ -2,7 +2,7 @@
 #include "core/log_system.hpp"
 #include "tools/debugger_ops.hpp"
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 void register_debugger_resources(mcp::McpServer &server) {
   using namespace debugger_ops;
@@ -77,4 +77,4 @@ void register_debugger_resources(mcp::McpServer &server) {
                             "Registered debugger resources: 7 URIs");
 }
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot

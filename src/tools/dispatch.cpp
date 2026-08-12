@@ -3,7 +3,7 @@
 #include "tools/runtime_ops.hpp"
 #include <mcp/Content.hpp>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace dispatch {
 
 std::unordered_map<std::string, HandlerFn> g_handlers;
@@ -56,7 +56,7 @@ mcp::JsonValue call_handler_impl(const std::string &name,
 
 mcp::JsonValue call_handler(const std::string &name,
                             const mcp::JsonValue &args) {
-  if (!godot_self_driving::runtime_ops::has_editor_queue() ||
+  if (!godot_autopilot::runtime_ops::has_editor_queue() ||
       get_editor_queue().is_main_thread()) {
     return call_handler_impl(name, args);
   }
@@ -74,4 +74,4 @@ mcp::CallToolResult export_blocked_result() {
 }
 
 } // namespace dispatch
-} // namespace godot_self_driving
+} // namespace godot_autopilot

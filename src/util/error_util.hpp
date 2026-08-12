@@ -1,11 +1,11 @@
-#ifndef GODOT_SELF_DRIVING_ERROR_UTIL_HPP
-#define GODOT_SELF_DRIVING_ERROR_UTIL_HPP
+#ifndef GODOT_AUTOPILOT_ERROR_UTIL_HPP
+#define GODOT_AUTOPILOT_ERROR_UTIL_HPP
 
 #include <godot_cpp/variant/string.hpp>
 #include <mcp/JsonValue.hpp>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace util {
 
 mcp::JsonValue error_json(const std::string &msg);
@@ -20,6 +20,6 @@ mcp::JsonValue error_detail(const std::string &fact,
                             const std::string &action);
 
 } // namespace util
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 
 #endif

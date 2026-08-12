@@ -30,12 +30,11 @@ const char *const kMetaToolNames[kMetaToolCount] = {
     "call_tool", "batch_execute", "code_execute"};
 
 const char *const kValidCategories[] = {
-    "Audio",        "Capture",  "Config",     "Debug",   "Debugger",
-    "Display",      "Docs",     "Editor",     "Game",    "Group",
-    "Input",        "InputMap", "Navigation", "OS",      "Physics",
-    "Properties",   "Render",   "Resources",  "Scene",   "Scripts",
-    "SpriteFrames", "System",   "Text",       "TileMap", "Meta",
-    "Auto"};
+    "Audio",      "Capture",  "Config",      "Debug",   "Debugger",
+    "Display",    "Docs",     "Editor",      "Game",    "Group",
+    "Input",      "Navigation", "OS",        "Physics", "Properties",
+    "Render",     "Resources", "Scene",      "Scripts", "SpriteFrames",
+    "System",     "Text",     "TileMap",     "Meta",    "Auto"};
 
 bool has_schema_params(const mcp::JsonValue &schema) {
   const auto *props = schema.Find("properties");
@@ -54,14 +53,14 @@ struct RegisteredServerFixture : ::testing::Test {
   std::unique_ptr<mcp::McpServer> server;
   std::unique_ptr<mcp::McpClient> client;
   std::thread server_thread;
-  godot_self_driving::CommandQueue queue;
-  godot_self_driving::ToolCatalog catalog;
-  godot_self_driving::Bm25Index index;
+  godot_autopilot::CommandQueue queue;
+  godot_autopilot::ToolCatalog catalog;
+  godot_autopilot::Bm25Index index;
 
   void SetUp() override {
     auto pair = mcp::InMemoryTransport::CreatePair();
     server = mcp::McpServer::Create(pair.server);
-    godot_self_driving::register_all_tools(*server, queue, catalog, index,
+    godot_autopilot::register_all_tools(*server, queue, catalog, index,
                                            9527);
     server_thread = std::thread([this] { server->Run(); });
 
@@ -148,13 +147,15 @@ TEST_F(RegisteredServerFixture, SchemaStatisticsBaseline) {
 
 TEST_F(RegisteredServerFixture, SchemaSampledTools) {
   const char *const kNonEmpty[] = {
-      "property_get",          "physics_2d_ray_cast", "script_execute_gdscript",
-      "scene_tree_call_group", "tilemap_set_cell",    "game_input",
-      "batch_execute",         "call_tool",           "code_execute",
+      "property_get",          "intersect_physics_2d_ray",
+      "execute_script",        "call_scene_tree_group",
+      "set_tilemap_cell",      "queue_game_input",
+      "get_scene_tree",        "batch_execute",
+      "call_tool",             "code_execute",
       "search_tools",          "get_tool_detail"};
-  const char *const kEmpty[] = {"scene_tree_get",         "engine_get_version",
-                                "physics_2d_body_create", "ping",
-                                "system_status",          "list_categories"};
+  const char *const kEmpty[] = {"get_engine_version",   "create_physics_2d_body",
+                                "ping",                 "system_status",
+                                "list_categories"};
   for (const char *name : kNonEmpty) {
     const auto *info = catalog.get_tool(name);
     ASSERT_NE(info, nullptr) << name;
@@ -177,7 +178,7 @@ TEST_F(RegisteredServerFixture, CatalogCoversServerTools) {
 
 TEST_F(RegisteredServerFixture, CallHandlerUnknownToolReturnsError) {
   mcp::JsonValue args(mcp::JsonValue::object_tag);
-  auto result = godot_self_driving::dispatch::call_handler("no_such_tool_xyz", args);
+  auto result = godot_autopilot::dispatch::call_handler("no_such_tool_xyz", args);
   const auto *err = result.Find("error");
   ASSERT_NE(err, nullptr);
   ASSERT_TRUE(err->IsString());
@@ -191,7 +192,7 @@ TEST_F(RegisteredServerFixture, CallHandlerOversizedArgsKeepsFixedError) {
   mcp::JsonValue args(mcp::JsonValue::object_tag);
   args["payload"] = mcp::JsonValue(big);
 
-  auto result = godot_self_driving::dispatch::call_handler("no_such_tool_xyz", args);
+  auto result = godot_autopilot::dispatch::call_handler("no_such_tool_xyz", args);
   const auto *err = result.Find("error");
   ASSERT_NE(err, nullptr);
   ASSERT_TRUE(err->IsString());
@@ -203,7 +204,7 @@ TEST_F(RegisteredServerFixture, CallHandlerOversizedArgsKeepsFixedError) {
 }
 
 TEST_F(RegisteredServerFixture, ReRegisterIsIdempotentForServerAndCatalog) {
-  godot_self_driving::register_all_tools(*server, queue, catalog, index, 9527);
+  godot_autopilot::register_all_tools(*server, queue, catalog, index, 9527);
 
   auto result = client->ListTools();
   EXPECT_EQ(result.tools.size(), kMetaToolCount);
@@ -214,10 +215,10 @@ TEST_F(RegisteredServerFixture, TwoIndependentServersRegisterIdentically) {
   auto pair2 = mcp::InMemoryTransport::CreatePair();
   auto server2 = mcp::McpServer::Create(pair2.server);
 
-  godot_self_driving::CommandQueue queue2;
-  godot_self_driving::ToolCatalog catalog2;
-  godot_self_driving::Bm25Index index2;
-  godot_self_driving::register_all_tools(*server2, queue2, catalog2, index2,
+  godot_autopilot::CommandQueue queue2;
+  godot_autopilot::ToolCatalog catalog2;
+  godot_autopilot::Bm25Index index2;
+  godot_autopilot::register_all_tools(*server2, queue2, catalog2, index2,
                                          9528);
 
   std::thread thread2([&server2] { server2->Run(); });

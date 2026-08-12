@@ -1,9 +1,9 @@
 #include "prompts/prompt_debug_physics.hpp"
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 std::string prompt_debug_physics() {
-  return R"gsd(# 物理调试指南
+  return R"gda(# 物理调试指南
 
 ## 背景
 本流程引导你使用 Godot 的物理系统和调试工具进行碰撞检测、射线投射和性能分析。
@@ -20,7 +20,7 @@ std::string prompt_debug_physics() {
 {
   "name": "call_tool",
   "arguments": {
-    "name": "physics_3d_ray_cast",
+    "name": "intersect_physics_3d_ray",
     "arguments": {
       "space_rid": 0,
       "from": {"x": 0, "y": 1, "z": 0},
@@ -38,7 +38,7 @@ std::string prompt_debug_physics() {
 {
   "name": "call_tool",
   "arguments": {
-    "name": "physics_3d_shape_cast",
+    "name": "intersect_physics_3d_shape",
     "arguments": {
       "space_rid": 0,
       "shape_type": "CapsuleShape3D",
@@ -57,7 +57,7 @@ std::string prompt_debug_physics() {
 {
   "name": "call_tool",
   "arguments": {
-    "name": "physics_3d_point_query",
+    "name": "intersect_physics_3d_point",
     "arguments": {
       "space_rid": 0,
       "position": {"x": 0, "y": 1, "z": 0},
@@ -73,7 +73,7 @@ std::string prompt_debug_physics() {
 {
   "name": "call_tool",
   "arguments": {
-    "name": "physics_2d_ray_cast",
+    "name": "intersect_physics_2d_ray",
     "arguments": {
       "space_rid": 0,
       "from": {"x": 0, "y": 0},
@@ -90,7 +90,7 @@ std::string prompt_debug_physics() {
 {
   "name": "call_tool",
   "arguments": {
-    "name": "debug_collision_debug",
+    "name": "set_debug_collision_visual",
     "arguments": {
       "enabled": true
     }
@@ -101,7 +101,7 @@ std::string prompt_debug_physics() {
 {
   "name": "call_tool",
   "arguments": {
-    "name": "debug_navigation_debug",
+    "name": "set_debug_navigation_visual",
     "arguments": {
       "enabled": true
     }
@@ -115,7 +115,7 @@ std::string prompt_debug_physics() {
 {
   "name": "call_tool",
   "arguments": {
-    "name": "debug_get_performance_monitor",
+    "name": "get_debug_monitor",
     "arguments": {
       "monitor": "physics_3d_active_objects"
     }
@@ -124,11 +124,11 @@ std::string prompt_debug_physics() {
 ```
 
 ## 注意事项
-- `space_rid` 需要先通过 `physics_3d_space_get_direct_state` 获取
+- `space_rid` 需要先通过 `get_physics_3d_space_direct_state` 获取
 - 射线投射的 `from` 和 `to` 是世界坐标
 - 碰撞掩码（collision_mask）基于层的 2^N 位运算
 - 调试可视化在编辑器场景运行时才生效
-- 使用 `debug_list_performance_monitors` 查看所有可用的性能监控项)gsd";
+- 使用 `get_debug_monitor_catalog` 查看所有可用的性能监控项)gda";
 }
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot

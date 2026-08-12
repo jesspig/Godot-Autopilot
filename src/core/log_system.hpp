@@ -1,5 +1,5 @@
-#ifndef GODOT_SELF_DRIVING_LOG_SYSTEM_HPP
-#define GODOT_SELF_DRIVING_LOG_SYSTEM_HPP
+#ifndef GODOT_AUTOPILOT_LOG_SYSTEM_HPP
+#define GODOT_AUTOPILOT_LOG_SYSTEM_HPP
 
 #include <chrono>
 #include <deque>
@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 enum class LogLevel { Debug, Info, Warning, Error };
 enum class LogCategory { System, Transport, Tools, Resources, Prompts };
@@ -51,6 +51,6 @@ private:
   OnNewEntryCallback on_new_entry_;
 };
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 
 #endif

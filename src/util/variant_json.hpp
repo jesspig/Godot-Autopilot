@@ -1,10 +1,10 @@
-#ifndef GODOT_SELF_DRIVING_VARIANT_JSON_HPP
-#define GODOT_SELF_DRIVING_VARIANT_JSON_HPP
+#ifndef GODOT_AUTOPILOT_VARIANT_JSON_HPP
+#define GODOT_AUTOPILOT_VARIANT_JSON_HPP
 
 #include <godot_cpp/variant/variant.hpp>
 #include <mcp/JsonValue.hpp>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 struct VariantJson {
   static mcp::JsonValue serialize(const godot::Variant &v);
@@ -12,6 +12,6 @@ struct VariantJson {
                                     const std::string &type_hint = "");
 };
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 
 #endif

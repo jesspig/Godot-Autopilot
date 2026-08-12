@@ -19,16 +19,16 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
         add_compile_definitions(_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS)
         add_compile_definitions(_WIN32_WINNT=0x0A00)
-        message(STATUS "[gsd] clang-cl flags applied")
+        message(STATUS "[gda] clang-cl flags applied")
     else()
         add_compile_options(
             -Wall -Wextra -Wpedantic
             -Wno-unused-parameter
         )
-        if(NOT GSD_IS_CI)
+        if(NOT GDA_IS_CI)
             add_compile_options(-march=native)
         endif()
-        message(STATUS "[gsd] Clang flags applied")
+        message(STATUS "[gda] Clang flags applied")
     endif()
 
 # ── MSVC (cl.exe only) ──
@@ -48,7 +48,7 @@ elseif(MSVC)
         _WIN32_WINNT=0x0A00
     )
     set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT Embedded CACHE INTERNAL "")
-    message(STATUS "[gsd] MSVC flags applied")
+    message(STATUS "[gda] MSVC flags applied")
 
 # ── GNU GCC ──
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
@@ -56,13 +56,13 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         -Wall -Wextra -Wpedantic
         -Wno-unused-parameter
     )
-    if(NOT GSD_IS_CI)
+    if(NOT GDA_IS_CI)
         add_compile_options(-march=native)
     endif()
-    message(STATUS "[gsd] GCC flags applied")
+    message(STATUS "[gda] GCC flags applied")
 
 else()
-    message(WARNING "[gsd] Unknown compiler: ${CMAKE_CXX_COMPILER_ID}")
+    message(WARNING "[gda] Unknown compiler: ${CMAKE_CXX_COMPILER_ID}")
 endif()
 
 # ── Threads — required for std::thread on macOS/Clang (Unity builds) ──

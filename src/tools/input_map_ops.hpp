@@ -1,9 +1,9 @@
-#ifndef GODOT_SELF_DRIVING_INPUT_MAP_OPS_HPP
-#define GODOT_SELF_DRIVING_INPUT_MAP_OPS_HPP
+#ifndef GODOT_AUTOPILOT_INPUT_MAP_OPS_HPP
+#define GODOT_AUTOPILOT_INPUT_MAP_OPS_HPP
 
 #include <mcp/JsonValue.hpp>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace input_map_ops {
 
 mcp::JsonValue handle_action_add_event(const mcp::JsonValue &args);
@@ -16,6 +16,6 @@ mcp::JsonValue handle_has_action(const mcp::JsonValue &args);
 mcp::JsonValue handle_persist(const mcp::JsonValue &args);
 
 } // namespace input_map_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 
 #endif

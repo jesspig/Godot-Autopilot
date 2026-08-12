@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-namespace gsd_test {
+namespace gda_test {
 
 struct ToolSummary {
   std::string name;
@@ -31,4 +31,4 @@ private:
   std::unique_ptr<Impl> impl_;
 };
 
-} // namespace gsd_test
+} // namespace gda_test

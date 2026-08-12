@@ -1,5 +1,5 @@
-#ifndef GODOT_SELF_DRIVING_DEBUGGER_OPS_HPP
-#define GODOT_SELF_DRIVING_DEBUGGER_OPS_HPP
+#ifndef GODOT_AUTOPILOT_DEBUGGER_OPS_HPP
+#define GODOT_AUTOPILOT_DEBUGGER_OPS_HPP
 
 #include <godot_cpp/classes/editor_debugger_plugin.hpp>
 #include <godot_cpp/classes/editor_debugger_session.hpp>
@@ -16,7 +16,7 @@
 #include <string>
 #include <vector>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace debugger_ops {
 
 class OutputCaptureLogger : public godot::Logger {
@@ -102,5 +102,5 @@ mcp::JsonValue handle_debugger_get_session_info(const mcp::JsonValue &args);
 void register_classes();
 
 } // namespace debugger_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 #endif

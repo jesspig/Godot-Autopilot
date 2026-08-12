@@ -15,7 +15,7 @@
 #include <mcp/JsonValue.hpp>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace tilemap_ops {
 
 using JV = mcp::JsonValue;
@@ -56,7 +56,7 @@ godot::Node *find_node(const std::string &path_str) {
 
 JV handle_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "tilemap_create called");
+                            "create_tilemap called");
 
   std::string name = "TileMap";
   auto *n = args.Find("name");
@@ -149,13 +149,13 @@ JV handle_create(const JV &args) {
   r["result"] = std::move(info);
   scene_dirty_tracker::mark_scene_modified();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "tilemap_create completed");
+                            "create_tilemap completed");
   return r;
 }
 
 JV handle_set_cell(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "tilemap_set_cell called");
+                            "set_tilemap_cell called");
 
   auto *p = args.Find("path");
   if (!p || !p->IsString())
@@ -171,7 +171,7 @@ JV handle_set_cell(const JV &args) {
   if (!tile_map && !tile_map_layer)
     return util::error_json(
         "node is not a TileMap or TileMapLayer: " + p->GetString() +
-        " — create one with tilemap_create (TileMap) or scene_node_create + "
+        " — create one with create_tilemap (TileMap) or create_scene_node + "
         "property_set (TileMapLayer), or fix the path");
 
   auto *x = args.Find("x");
@@ -212,13 +212,13 @@ JV handle_set_cell(const JV &args) {
   r["result"] = JV("ok");
   scene_dirty_tracker::mark_scene_modified();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "tilemap_set_cell completed");
+                            "set_tilemap_cell completed");
   return r;
 }
 
 JV handle_set_cells(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "tilemap_set_cells called");
+                            "set_tilemap_cells called");
 
   auto *p = args.Find("path");
   if (!p || !p->IsString())
@@ -236,7 +236,7 @@ JV handle_set_cells(const JV &args) {
   if (!tile_map && !tile_map_layer)
     return util::error_json(
         "node is not a TileMap or TileMapLayer: " + p->GetString() +
-        " — create one with tilemap_create (TileMap) or scene_node_create + "
+        " — create one with create_tilemap (TileMap) or create_scene_node + "
         "property_set (TileMapLayer), or fix the path");
 
   auto *cells = args.Find("cells");
@@ -312,13 +312,13 @@ JV handle_set_cells(const JV &args) {
     scene_dirty_tracker::mark_scene_modified();
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "tilemap_set_cells completed");
+                            "set_tilemap_cells completed");
   return r;
 }
 
 JV handle_tileset_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "tileset_create called");
+                            "create_tilemap_tileset called");
 
   std::string name = "TileSet";
   auto *n = args.Find("name");
@@ -358,9 +358,9 @@ JV handle_tileset_create(const JV &args) {
       JV(std::to_string(static_cast<int64_t>(tile_set->get_instance_id())));
   r["result"] = std::move(info);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "tileset_create completed");
+                            "create_tilemap_tileset completed");
   return r;
 }
 
 } // namespace tilemap_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

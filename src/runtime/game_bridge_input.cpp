@@ -1,6 +1,6 @@
 #include "game_bridge.hpp"
 
-#include "gsd_protocol.hpp"
+#include "gda_protocol.hpp"
 #include "util/error_util.hpp"
 #include <functional>
 #include <godot_cpp/classes/engine.hpp>
@@ -25,7 +25,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace runtime {
 namespace game_bridge {
 
@@ -103,7 +103,7 @@ public:
       unregister_cancel_handler(request_id_);
       JV body(JV::object_tag);
       body["result"] = JV("matched");
-      body[GSD_FIELD_MATCHED_AT_PHYSICS_FRAME] = JV(static_cast<int64_t>(
+      body[GDA_FIELD_MATCHED_AT_PHYSICS_FRAME] = JV(static_cast<int64_t>(
           godot::Engine::get_singleton()->get_physics_frames()));
       send_response(request_id_, std::move(body));
       queue_free();
@@ -639,9 +639,9 @@ JV op_input(const JV &params, int64_t request_id) {
       r["expected_visible_frame"] =
           JV(static_cast<int64_t>(engine->get_physics_frames() + 1));
 
-      r[GSD_FIELD_PARSED_PHYSICS_FRAME] =
+      r[GDA_FIELD_PARSED_PHYSICS_FRAME] =
           JV(static_cast<int64_t>(engine->get_physics_frames()));
-      r[GSD_FIELD_PARSED_PROCESS_FRAME] =
+      r[GDA_FIELD_PARSED_PROCESS_FRAME] =
           JV(static_cast<int64_t>(engine->get_process_frames()));
     }
     if (auto *tree = get_scene_tree()) {
@@ -735,4 +735,4 @@ void register_input_bridge_classes() {
 
 } // namespace game_bridge
 } // namespace runtime
-} // namespace godot_self_driving
+} // namespace godot_autopilot

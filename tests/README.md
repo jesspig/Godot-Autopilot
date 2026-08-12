@@ -4,8 +4,8 @@
 
 测试体系分两层：
 
-- **L1 纯单测**（`gsd_unit_tests`，59 个 gtest 用例）：不启动引擎，不触碰 Godot API，验证核心逻辑与工具注册管线。
-- **L2 配置驱动引擎内测试**（`gsd_test_runner` + `tests/config/*.json` 用例）：由 C++ 执行器自管 Godot headless 编辑器进程，经真实 MCP HTTP 全链路驱动领域工具，并按 JSON 用例中的断言语义（C++ 执行器侧）校验响应。**每份 config/*.json = 一次独立的编辑器生命周期最小闭环**（启动 → MCP 就绪 → 执行步骤 → 停止进程），文件间互不共享状态。
+- **L1 纯单测**（`gda_unit_tests`，61 个 gtest 用例）：不启动引擎，不触碰 Godot API，验证核心逻辑与工具注册管线。
+- **L2 配置驱动引擎内测试**（`gda_test_runner` + `tests/config/*.json` 用例）：由 C++ 执行器自管 Godot headless 编辑器进程，经真实 MCP HTTP 全链路驱动领域工具，并按 JSON 用例中的断言语义（C++ 执行器侧）校验响应。**每份 config/*.json = 一次独立的编辑器生命周期最小闭环**（启动 → MCP 就绪 → 执行步骤 → 停止进程），文件间互不共享状态。
 
 架构一句话：进程内 GDExtension（EditorPlugin），领域工具经 `call_tool` 元工具代理，由 `register_all.cpp` 的 `g_handlers` 映射分发。
 
@@ -13,7 +13,7 @@
 
 | 依赖 | 说明 |
 | ---- | ---- |
-| CMake 3.28+ | 测试目标经根 `CMakeLists.txt` 的 `GSD_ENABLE_TESTS` 选项（默认 OFF，`CMakeLists.txt:120`）引入 |
+| CMake 3.28+ | 测试目标经根 `CMakeLists.txt` 的 `GDA_ENABLE_TESTS` 选项（默认 OFF，`CMakeLists.txt:120`）引入 |
 | Ninja | 构建生成器（预设 `debug` / `release` 均为 Ninja） |
 | clang-cl | 编译器（MSVC/GCC 自动回退，测试继承根配置） |
 | Godot 可执行文件 | 仅 L2 需要，见第 3 节 |
@@ -30,22 +30,22 @@
 $env:GODOT_PATH="C:\path\to\Godot.exe"
 ```
 
-若二者皆无，`gsd_test_runner` 退出码 2（"未找到 Godot 可执行文件"）。L1 不受影响。
+若二者皆无，`gda_test_runner` 退出码 2（"未找到 Godot 可执行文件"）。L1 不受影响。
 
 ## 4. 构建
 
 ```powershell
 # 1. 配置（启用测试；可追加 --preset debug）
-cmake --preset debug -DGSD_ENABLE_TESTS=ON
+cmake --preset debug -DGDA_ENABLE_TESTS=ON
 
 # 2. 构建测试目标
-cmake --build --preset debug --target gsd_unit_tests gsd_test_runner
+cmake --build --preset debug --target gda_unit_tests gda_test_runner
 ```
 
 产物位于 `build/debug/tests/`：
 
-- `gsd_unit_tests.exe` — L1，gtest 可执行文件
-- `gsd_test_runner.exe` — L2，自驱动用例跑批器（CLI 入口 `tests/runner/main.cpp`）
+- `gda_unit_tests.exe` — L1，gtest 可执行文件
+- `gda_test_runner.exe` — L2，自驱动用例跑批器（CLI 入口 `tests/runner/main.cpp`）
 
 ## 5. 运行
 
@@ -55,17 +55,17 @@ cmake --build --preset debug --target gsd_unit_tests gsd_test_runner
 ctest --preset debug
 ```
 
-注册方式（`tests/CMakeLists.txt:100-111`）：**每份 `config/*.json` 一条 `gsd_runner_<文件名去后缀>` 用例**，命令为 `gsd_test_runner --file <name> --report-dir <build>/tests/output`，`TIMEOUT 600`（单文件含遍历约 2-4 分钟，超时防挂死）。当前 5 个 config 文件 → 5 条 ctest 用例：`gsd_runner_00_meta`、`gsd_runner_01_scene`、`gsd_runner_02_property`、`gsd_runner_03_tools_contract`、`gsd_runner_04_resources_scripts`。
+注册方式（`tests/CMakeLists.txt:100-111`）：**每份 `config/*.json` 一条 `gda_runner_<文件名去后缀>` 用例**，命令为 `gda_test_runner --file <name> --report-dir <build>/tests/output`，`TIMEOUT 600`（单文件含遍历约 2-4 分钟，超时防挂死）。当前 5 个 config 文件 → 5 条 ctest 用例：`gda_runner_00_meta`、`gda_runner_01_scene`、`gda_runner_02_property`、`gda_runner_03_tools_contract`、`gda_runner_04_resources_scripts`。
 
 - L1 经 `gtest_discover_tests` 注册，每用例一条（如 `CommandQueueTest.*`）。
-- **耗时**：普通用例约 15s/文件（一次编辑器生命周期）；`03_tools_contract` 含两次全量遍历（348 工具 ×2），约 2-3 分钟。全量 ctest 约 3-4 分钟。
-- 单跑一条：`ctest --preset debug -R gsd_runner_00_meta` 或 `ctest --preset debug -R CommandQueueTest`。
+- **耗时**：普通用例约 15s/文件（一次编辑器生命周期）；`03_tools_contract` 含两次全量遍历（331 工具 ×2），约 2-3 分钟。全量 ctest 约 3-4 分钟。
+- 单跑一条：`ctest --preset debug -R gda_runner_00_meta` 或 `ctest --preset debug -R CommandQueueTest`。
 
 ### 5.2 单文件（直跑执行器）
 
 ```powershell
 # --file 只跑指定用例文件，name 可含或不含 .json 后缀
-build\debug\tests\gsd_test_runner.exe --file 01_scene
+build\debug\tests\gda_test_runner.exe --file 01_scene
 ```
 
 ### 5.3 CLI 参数全表（`tests/runner/main.cpp`）
@@ -76,7 +76,7 @@ build\debug\tests\gsd_test_runner.exe --file 01_scene
 | `--file <name>` | 只跑指定用例文件，name 可含或不含 `.json` 后缀（默认跑目录下全部 `*.json`，按文件名排序；无匹配则退出码 2） |
 | `--headless` | Godot 以 headless 模式启动（默认） |
 | `--gui` | Godot 以窗口模式启动。`--headless` 与 `--gui` 互斥（同用报错退出码 2）；**用例 JSON 的 `headless` 字段优先于 CLI**，冲突时以用例为准并在 stderr 提示 |
-| `--no-auto` | 不启动 Godot 进程；端口取自环境变量 `GODOT_SELF_DRIVING_PORT`，TCP + MCP initialize 就绪后直连外部 MCP 服务跑用例（端口未设置或未就绪 → 退出码 2） |
+| `--no-auto` | 不启动 Godot 进程；端口取自环境变量 `GODOT_AUTOPILOT_PORT`，TCP + MCP initialize 就绪后直连外部 MCP 服务跑用例（端口未设置或未就绪 → 退出码 2） |
 | `--keep-open` | 全部文件跑完后不停止 Godot 进程（最后一个文件保留进程，便于人工排查） |
 | `--report-dir <dir>` | 报告目录（默认 `PROJECT_ROOT/tests/output`，自动创建） |
 | `--help` | 打印本说明并退出（退出码 0） |
@@ -91,7 +91,7 @@ build\debug\tests\gsd_test_runner.exe --file 01_scene
 
 ### 5.4 执行闭环与报告
 
-每个文件的生命周期（`godot_process.cpp`）：随机空闲端口 → 首次 `--editor --import` 幂等同步执行（120s 超时，失败/超时不致命）→ 注入 `GODOT_SELF_DRIVING_PORT` 后常驻启动 `--editor`（`--headless` 由用例决定）→ 就绪轮询（TCP 端口探测 + MCP initialize 握手）→ `before_all` → stages 步骤 → `after_all` → 停止（taskkill 软杀 → 5s 宽限 → TerminateProcess 兜底）。stdout/stderr 各接管道读线程持续消费（防 64KB 缓冲写满阻塞子进程），崩溃时截取最近 2000 字符日志。
+每个文件的生命周期（`godot_process.cpp`）：随机空闲端口 → 首次 `--editor --import` 幂等同步执行（120s 超时，失败/超时不致命）→ 注入 `GODOT_AUTOPILOT_PORT` 后常驻启动 `--editor`（`--headless` 由用例决定）→ 就绪轮询（TCP 端口探测 + MCP initialize 握手）→ `before_all` → stages 步骤 → `after_all` → 停止（taskkill 软杀 → 5s 宽限 → TerminateProcess 兜底）。stdout/stderr 各接管道读线程持续消费（防 64KB 缓冲写满阻塞子进程），崩溃时截取最近 2000 字符日志。
 
 输出：控制台表格（文件名称 / 通过步骤数 / 耗时（<10s 显毫秒，否则显秒）/ 状态 PASS|FAIL|ERROR）+ JSON 报告 `report-YYYYmmdd_HHMMSS.json`（字段：`generated_at` / `total_files` / `passed_files` / `files[].{name,passed,duration_ms,fatal_error,steps[]}`）。
 
@@ -131,7 +131,7 @@ build\debug\tests\gsd_test_runner.exe --file 01_scene
           {
             "id": "search_keyword",
             "tool": "search_tools",
-            "args": { "query": "scene_node_create" },
+            "args": { "query": "create_scene_node" },
             "expect": {
               "has_keys": ["results"],
               "field_checks": [ { "key": "results", "not_empty": true } ]
@@ -140,10 +140,10 @@ build\debug\tests\gsd_test_runner.exe --file 01_scene
           {
             "id": "detail_existing",
             "tool": "get_tool_detail",
-            "args": { "name": "scene_node_create" },
+            "args": { "name": "create_scene_node" },
             "expect": {
               "field_checks": [
-                { "key": "tool.name", "value": "scene_node_create" },
+                { "key": "tool.name", "value": "create_scene_node" },
                 { "key": "tool.input_schema.type", "value": "object" }
               ]
             }
@@ -198,54 +198,53 @@ build\debug\tests\gsd_test_runner.exe --file 01_scene
 | 文件 | name | 内容 |
 | ---- | ---- | ---- |
 | `00_meta.json` | meta_tools | 15 步元工具语义（ping / search_tools / list_categories / get_tool_detail / call_tool / batch_execute / code_execute），全部无持久副作用 |
-| `01_scene.json` | 01_scene | 场景节点创建/查询/删除/撤销，`before_all` 用 `editor_new_scene` 建干净根 Root |
+| `01_scene.json` | 01_scene | 场景节点创建/查询/删除/撤销，`before_all` 用 `create_editor_scene` 建干净根 Root |
 | `02_property.json` | property_tools | 属性读写 11 用例，含 readback MATCHED、int 字符串静默转 0、缺参报错 |
-| `03_tools_contract.json` | tools_contract | 两个遍历步骤（empty_args + heuristic_smoke），全量 348 领域工具契约与冒烟 |
-| `04_resources_scripts.json` | resources_scripts | script_execute_gdscript 四种行为（单表达式自返 / 多行显式 return / 语法错误 / 缺参报错）+ 资源只读查询 |
+| `03_tools_contract.json` | tools_contract | 两个遍历步骤（empty_args + heuristic_smoke），全量 331 领域工具契约与冒烟 |
+| `04_resources_scripts.json` | resources_scripts | execute_script 四种行为（单表达式自返 / 多行显式 return / 语法错误 / 缺参报错）+ 资源只读查询 |
 
 ## 7. 遍历与排除清单（`tests/runner/traversal.cpp`）
 
 遍历模式：
 
-- **工具来源**：运行时解析 `src/tools/tool_defs.def` 的 `TOOL_ENTRY(` 条目，共 **348 个领域工具**；解析失败（缺逗号/引号未闭合等）抛异常
+- **工具来源**：运行时解析 `src/tools/tool_defs.def` 的 `TOOL_ENTRY(` 条目，共 **331 个领域工具**；解析失败（缺逗号/引号未闭合等）抛异常
 - **内置前置校验**：每个工具先经 `get_tool_detail` 校验存在性与工具名一致性（响应非 JSON 对象或工具名不匹配 → FAIL）
 - **`empty_args`**（空参契约）：空对象调用。响应非 JSON 对象 → FAIL；返回 `error` 字段算"有错误响应"（统计 error 数，不 FAIL）；schema 声明必填但空参未报错 → 记 **warnings**（不 FAIL）
 - **`heuristic_smoke`**（启发式冒烟）：按 schema properties 类型生成启发式参数（`integer`→0、`number`→0.0、`boolean`→false、`array`→`[]`、`object`→`{}`、其余→`"test"`）；无 properties 的工具（SCHEMA_NONE）跳过
 - **崩溃检测**：遍历中每步调用后检查编辑器进程存活，进程死亡即 fatal_error（附 stdout/stderr 日志截断 2000 字符）
 - 统计输出：调用总数 / 通过 / 失败 / result 数 / error 数 / "missing required" 数 / 跳过 / 排除
 
-### 35 工具排除清单（13 持久磁盘副作用 + 22 用户可见副作用）
+### 34 工具排除清单（12 持久磁盘副作用 + 22 用户可见副作用）
 
-两类工具在 empty_args 与 heuristic_smoke 两个遍历中一律跳过（历史事故：`editor_set_main_scene` 曾把 `application/run/main_scene` 写成 `"test"` 写入 `Example/project.godot`；`editor_save_scene` 空参生成 `Example/NewNode.tscn`；`os_alert` 弹系统模态对话框；`display_clipboard_set` 覆盖系统剪贴板；`display_tts_speak` 系统朗读）。
+两类工具在 empty_args 与 heuristic_smoke 两个遍历中一律跳过（历史事故：`set_editor_main_scene` 曾把 `application/run/main_scene` 写成 `"test"` 写入 `Example/project.godot`；`save_editor_scene` 空参生成 `Example/NewNode.tscn`；`show_os_alert` 弹系统模态对话框；`set_display_clipboard` 覆盖系统剪贴板；`speak_display_tts` 系统朗读）。
 
-**持久磁盘副作用（13）**——写 project.godot / editor_settings / .tscn / 文件：
+**持久磁盘副作用（12）**——写 project.godot / editor_settings / .tscn / 文件：
 
 ```
-editor_set_main_scene
-editor_set_plugin_enabled
-project_settings_save
-input_map_action_add_event
-input_map_persist
-editor_settings_set
-editor_save_scene
-editor_save_all_scenes
-editor_save_scene_as
-editor_new_text_resource
-file_write
-script_create
-resource_save
+set_editor_main_scene
+set_editor_plugin_enabled
+save_project_settings
+add_input_map_action_event
+save_input_map
+set_editor_settings
+save_editor_scene
+save_editor_scenes
+save_editor_scene_as
+write_file
+create_script
+save_resource
 ```
 
 **用户可见副作用（22）**——弹窗/进程/环境变量/音频/剪贴板/鼠标/窗口，会干扰用户桌面：
 
 | 类别 | 数量 | 工具 |
 | ---- | ---- | ---- |
-| 弹窗与对话框 | 2 | `os_alert`、`display_dialog_show` |
-| 进程与系统执行 | 5 | `os_create_process`、`os_execute`、`os_kill`、`os_shell_open`、`os_move_to_trash` |
-| 环境变量 | 1 | `os_set_environment` |
-| 音频/语音 | 2 | `display_tts_speak`、`display_tts_stop` |
-| 剪贴板/鼠标 | 3 | `display_clipboard_set`、`display_mouse_set_mode`、`display_mouse_warp` |
-| 窗口操作 | 9 | `display_window_set_title`、`display_window_set_position`、`display_window_set_size`、`display_window_set_mode`、`display_window_set_flag`、`display_window_move_to_foreground`、`display_window_request_attention`、`display_window_create`、`display_window_delete` |
+| 弹窗与对话框 | 2 | `show_os_alert`、`show_display_dialog` |
+| 进程与系统执行 | 5 | `create_os_process`、`execute_os_process`、`kill_os_process`、`open_os_path`、`move_os_file_to_trash` |
+| 环境变量 | 1 | `set_os_environment` |
+| 音频/语音 | 2 | `speak_display_tts`、`stop_display_tts` |
+| 剪贴板/鼠标 | 3 | `set_display_clipboard`、`set_display_mouse_mode`、`warp_display_mouse` |
+| 窗口操作 | 9 | `set_display_window_title`、`set_display_window_position`、`set_display_window_size`、`set_display_window_mode`、`set_display_window_flag`、`move_display_window_to_foreground`、`request_display_window_attention`、`create_display_window`、`delete_display_window` |
 
 ### warnings 语义（3 个已知契约缺口，测试发现并验证，业务代码未改）
 
@@ -253,9 +252,9 @@ resource_save
 
 | 工具 | 缺口 |
 | ---- | ---- |
-| `scene_node_create` | name / type 有默认值，不校验必填 |
-| `resource_get_extensions` | 缺 type 时返回全类型列表 |
-| `resource_reimport` | 空参时 count=0 静默成功 |
+| `create_scene_node` | name / type 有默认值，不校验必填 |
+| `get_resource_extensions` | 缺 type 时返回全类型列表 |
+| `reimport_resource_files` | 空参时 count=0 静默成功 |
 
 ## 8. 已知引擎副作用
 
@@ -270,7 +269,7 @@ Remove-Item Example/default_bus_layout.tres
 
 本体系为 GodotMind-Archive 测试方案（Python 编排 + `tests/yaml_tests/*.yaml` + 引擎内 `/run-tests` 端点）的 C++ 重实现，主要差异：
 
-| 维度 | GodotMind-Archive | 本体系（GSD） |
+| 维度 | GodotMind-Archive | 本体系（GDA） |
 | ---- | ---- | ---- |
 | 用例格式 | YAML（`yaml_tests/*.yaml`） | JSON（`tests/config/*.json`） |
 | 断言位置 | 引擎内 C++ `/run-tests` 端点执行断言 | **C++ 执行器侧**（`assert_engine.cpp`）解析响应校验 |

@@ -1,9 +1,9 @@
-#ifndef GODOT_SELF_DRIVING_NAV_OPS_HPP
-#define GODOT_SELF_DRIVING_NAV_OPS_HPP
+#ifndef GODOT_AUTOPILOT_NAV_OPS_HPP
+#define GODOT_AUTOPILOT_NAV_OPS_HPP
 
 #include <mcp/JsonValue.hpp>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace nav_ops {
 
 mcp::JsonValue handle_2d_map_create(const mcp::JsonValue &args);
@@ -24,6 +24,6 @@ mcp::JsonValue handle_3d_region_set_nav_mesh(const mcp::JsonValue &args);
 mcp::JsonValue handle_3d_obstacle_create(const mcp::JsonValue &args);
 
 } // namespace nav_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 
 #endif

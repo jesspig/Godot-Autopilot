@@ -5,7 +5,7 @@
 #include <stdexcept>
 #include <thread>
 
-using godot_self_driving::CommandQueue;
+using godot_autopilot::CommandQueue;
 
 TEST(CommandQueueTest, SubmitDrainReturnsValuesInOrder) {
     CommandQueue q;

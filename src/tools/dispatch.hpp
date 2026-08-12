@@ -1,5 +1,5 @@
-#ifndef GODOT_SELF_DRIVING_DISPATCH_HPP
-#define GODOT_SELF_DRIVING_DISPATCH_HPP
+#ifndef GODOT_AUTOPILOT_DISPATCH_HPP
+#define GODOT_AUTOPILOT_DISPATCH_HPP
 
 #include <functional>
 #include <string>
@@ -8,7 +8,7 @@
 #include <mcp/JsonValue.hpp>
 #include <mcp/McpTypes.hpp>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace dispatch {
 
 using HandlerFn = std::function<mcp::JsonValue(const mcp::JsonValue &)>;
@@ -23,6 +23,6 @@ mcp::JsonValue call_handler(const std::string &name,
 mcp::CallToolResult export_blocked_result();
 
 } // namespace dispatch
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 
 #endif

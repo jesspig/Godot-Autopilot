@@ -3,7 +3,7 @@
 #include "core/command_queue.hpp"
 #include "core/config.hpp"
 #include "core/log_system.hpp"
-#include "runtime/gsd_protocol.hpp"
+#include "runtime/gda_protocol.hpp"
 #include "tools/capture_ops.hpp"
 #include "tools/debugger_access.hpp"
 #include "util/error_util.hpp"
@@ -25,10 +25,10 @@
 #include <unordered_map>
 #include <vector>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace runtime_ops {
 
-using godot_self_driving::util::error_json;
+using godot_autopilot::util::error_json;
 
 namespace {
 
@@ -66,15 +66,15 @@ JV send_request(int64_t request_id, const std::string &op, const JV &params) {
     return error_json("debugger capture plugin not initialized");
 
   JV payload(JV::object_tag);
-  payload[GSD_FIELD_REQUEST_ID] = JV(request_id);
-  payload[GSD_FIELD_OP] = JV(op);
-  payload[GSD_FIELD_PARAMS] = params;
+  payload[GDA_FIELD_REQUEST_ID] = JV(request_id);
+  payload[GDA_FIELD_OP] = JV(op);
+  payload[GDA_FIELD_PARAMS] = params;
 
   int32_t used_session_id = -1;
   if (!debugger_broadcast_request(payload.Dump(), &used_session_id)) {
-    return error_json("game not ready: the game process has not reported gsd "
+    return error_json("game not ready: the game process has not reported gda "
                       "ready yet — wait a moment after play, or verify the "
-                      "game project loads the godot-self-driving extension");
+                      "game project loads the godot-autopilot extension");
   }
 
   auto pending = std::make_shared<PendingRequest>();
@@ -125,8 +125,8 @@ JV wait_for_response(int64_t request_id, int64_t timeout_ms) {
                       std::to_string(request_id) +
                       ") — the request was sent to the active debug session(s) "
                       "but no response arrived; the game process may be paused "
-                      "or physics-frozen (query game_status), or the game "
-                      "project may not load the godot-self-driving extension");
+                      "or physics-frozen (query get_game_status), or the game "
+                      "project may not load the godot-autopilot extension");
   }
   {
     std::lock_guard<std::mutex> gl(g_pending_mtx);
@@ -137,15 +137,15 @@ JV wait_for_response(int64_t request_id, int64_t timeout_ms) {
   if (response.Contains("error")) {
     return error_json(response["error"].GetString());
   }
-  if (auto *result_p = response.Find(GSD_FIELD_RESULT)) {
+  if (auto *result_p = response.Find(GDA_FIELD_RESULT)) {
     JV result = *result_p;
-    if (pending->op == std::string(GSD_OP_STATUS) && result.IsObject()) {
+    if (pending->op == std::string(GDA_OP_STATUS) && result.IsObject()) {
 
-      if (!result.Contains(GSD_FIELD_HEALTHY)) {
-        if (auto *la = result.Find(GSD_FIELD_LAST_ACTIVITY_MS)) {
+      if (!result.Contains(GDA_FIELD_HEALTHY)) {
+        if (auto *la = result.Find(GDA_FIELD_LAST_ACTIVITY_MS)) {
           if (la->IsInt()) {
-            result[GSD_FIELD_HEALTHY] =
-                JV(la->GetInt() < GSD_HEALTHY_ACTIVITY_THRESHOLD_MS);
+            result[GDA_FIELD_HEALTHY] =
+                JV(la->GetInt() < GDA_HEALTHY_ACTIVITY_THRESHOLD_MS);
           }
         }
       }
@@ -188,7 +188,7 @@ JV wait_for_response(int64_t request_id, int64_t timeout_ms) {
 
 } // namespace
 
-void set_editor_queue(godot_self_driving::CommandQueue *q) {
+void set_editor_queue(godot_autopilot::CommandQueue *q) {
   g_editor_queue = q;
 }
 
@@ -198,7 +198,7 @@ void maybe_recover_break() {
   static std::unordered_map<int32_t, int> g_auto_continue_counts;
 
   godot::String env = godot::OS::get_singleton()->get_environment(
-      godot::String(GSD_AUTO_CONTINUE_ENV.data()));
+      godot::String(GDA_AUTO_CONTINUE_ENV.data()));
   std::string env_value = env.utf8().ptr();
 
   for (int32_t id : debugger_breaked_session_ids()) {
@@ -206,14 +206,14 @@ void maybe_recover_break() {
       continue;
 
     int &count = g_auto_continue_counts[id];
-    if (count >= GSD_AUTO_CONTINUE_MAX) {
-      if (count == GSD_AUTO_CONTINUE_MAX) {
+    if (count >= GDA_AUTO_CONTINUE_MAX) {
+      if (count == GDA_AUTO_CONTINUE_MAX) {
         LogSystem::instance().log(
             LogLevel::Warning, LogCategory::System,
             "auto continue suppressed for debugger break (session " +
                 std::to_string(id) + "): reached limit " +
-                std::to_string(GSD_AUTO_CONTINUE_MAX) +
-                " — set GSD_AUTO_CONTINUE to a larger value to allow more");
+                std::to_string(GDA_AUTO_CONTINUE_MAX) +
+                " — set GDA_AUTO_CONTINUE to a larger value to allow more");
       }
       continue;
     }
@@ -226,7 +226,7 @@ void maybe_recover_break() {
   }
 }
 
-mcp::JsonValue handle_gsd_send(const std::string &op,
+mcp::JsonValue handle_gda_send(const std::string &op,
                                const mcp::JsonValue &params,
                                int64_t timeout_ms) {
   int64_t request_id = g_next_request_id.fetch_add(1);
@@ -249,7 +249,7 @@ mcp::JsonValue handle_gsd_send(const std::string &op,
   if (result.Contains("error"))
     return result;
   JV r(JV::object_tag);
-  r["__gsd_pending"] = JV(request_id);
+  r["__gda_pending"] = JV(request_id);
   r["timeout_ms"] = JV(timeout_ms + RESPONSE_GRACE_MS);
   return r;
 }
@@ -297,7 +297,7 @@ mcp::JsonValue finalize_capture_response(const mcp::JsonValue &pending_result) {
             r["height"] = *h;
           r["path"] = JV(path);
           LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                                    "game_capture completed");
+                                    "capture_game_viewport completed");
           return r;
         })
         .get();
@@ -347,4 +347,4 @@ void handle_game_response(const std::string &json_str) {
 
 CommandQueue &get_editor_queue() { return *runtime_ops::g_editor_queue; }
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot

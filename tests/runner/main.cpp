@@ -1,7 +1,7 @@
-// gsd_test_runner — 自驱动用例跑批器（CLI 入口）
+// gda_test_runner — 自驱动用例跑批器（CLI 入口）
 //
 // 用法:
-//   gsd_test_runner [--config-dir <dir>] [--file <name>] [--headless|--gui]
+//   gda_test_runner [--config-dir <dir>] [--file <name>] [--headless|--gui]
 //                   [--no-auto] [--keep-open] [--report-dir <dir>] [--help]
 //
 // 参数:
@@ -13,7 +13,7 @@
 //                        用例 JSON 的 headless 字段优先于 CLI；冲突时以用例
 //                        为准，并在 stderr 提示
 //   --no-auto            不启动 Godot 进程；端口取自环境变量
-//                        GODOT_SELF_DRIVING_PORT，TCP+initialize 就绪后
+//                        GODOT_AUTOPILOT_PORT，TCP+initialize 就绪后
 //                        直连外部 MCP 服务跑用例
 //   --keep-open          全部文件跑完后不停止 Godot 进程（进程保留）
 //   --report-dir <dir>   报告目录（默认 PROJECT_ROOT/tests/output，自动创建）
@@ -44,10 +44,10 @@
 
 #ifndef PROJECT_ROOT
 #error                                                                         \
-    "PROJECT_ROOT 编译宏未定义（参见 tests/CMakeLists.txt 中 gsd_engine_tests 的配置）"
+    "PROJECT_ROOT 编译宏未定义（参见 tests/CMakeLists.txt 中 gda_engine_tests 的配置）"
 #endif
 
-namespace gsd_test {
+namespace gda_test {
 
 namespace {
 
@@ -60,7 +60,7 @@ constexpr int kExitError = 2;
 const std::string kDefaultConfigDir = std::string(PROJECT_ROOT) + "/tests/config";
 const std::string kDefaultReportDir = std::string(PROJECT_ROOT) + "/tests/output";
 const std::string kProjectPath = std::string(PROJECT_ROOT) + "/Example";
-const char *kPortEnvKey = "GODOT_SELF_DRIVING_PORT";
+const char *kPortEnvKey = "GODOT_AUTOPILOT_PORT";
 
 constexpr auto kPostStopSleep = std::chrono::seconds(2);
 constexpr auto kExternalProbeTimeout = std::chrono::seconds(5);
@@ -79,7 +79,7 @@ enum class ParseResult { kOk, kHelp, kError };
 
 void print_usage(std::ostream &out) {
   out << "用法:\n"
-      << "  gsd_test_runner [--config-dir <dir>] [--file <name>]"
+      << "  gda_test_runner [--config-dir <dir>] [--file <name>]"
          " [--headless|--gui]\n"
       << "                  [--no-auto] [--keep-open] [--report-dir <dir>]"
          " [--help]\n\n"
@@ -93,7 +93,7 @@ void print_usage(std::ostream &out) {
       << "                      用例 JSON 的 headless 字段优先于 CLI；冲突时\n"
       << "                      以用例为准，并在 stderr 提示\n"
       << "  --no-auto           不启动 Godot 进程；端口取自环境变量\n"
-      << "                      GODOT_SELF_DRIVING_PORT，TCP+initialize 就绪\n"
+      << "                      GODOT_AUTOPILOT_PORT，TCP+initialize 就绪\n"
       << "                      后直连外部 MCP 服务跑用例\n"
       << "  --keep-open         全部文件跑完后不停止 Godot 进程（进程保留）\n"
       << "  --report-dir <dir>  报告目录（默认 " << kDefaultReportDir
@@ -338,11 +338,11 @@ int run_main(int argc, char **argv) {
 
 } // namespace
 
-} // namespace gsd_test
+} // namespace gda_test
 
 int main(int argc, char **argv) {
   try {
-    return gsd_test::run_main(argc, argv);
+    return gda_test::run_main(argc, argv);
   } catch (const std::exception &e) {
     std::cerr << "错误: 未捕获异常: " << e.what() << std::endl;
     return 2;

@@ -68,8 +68,8 @@ graph TD
 - 已安装并可打开 Godot 4.7。
 - 当前项目目录是 `Example/`，项目名为 `Example`。
 - 已确认 `Example/assets/` 中的路径大小写、空格、括号和拼写保持原样。
-- 已知插件构建命令是 `uv run build.py`。该命令构建并部署插件到 `Example/addons/godot-self-driving/`，不是游戏运行命令。
-- MCP 默认端口是 `9527`，可由环境变量 `GODOT_SELF_DRIVING_PORT` 覆盖。
+- 已知插件构建命令是 `uv run build.py`。该命令构建并部署插件到 `Example/addons/godot-autopilot/`，不是游戏运行命令。
+- MCP 默认端口是 `9527`，可由环境变量 `GODOT_AUTOPILOT_PORT` 覆盖。
 - 第一次搭建前不要把不存在的脚本、场景或音频当作现状；它们只能按 `TARGET` 和 `TODO` 创建。
 
 ## 验证入口

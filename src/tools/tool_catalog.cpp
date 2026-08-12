@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 void ToolCatalog::add_tool(const ToolInfo &info) {
   std::lock_guard<std::mutex> lock(mutex_);
@@ -138,4 +138,4 @@ void ToolCatalog::populate_default_tools() {
   }
 }
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot

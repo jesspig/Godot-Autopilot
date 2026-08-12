@@ -17,7 +17,7 @@
 #include <string>
 #include <vector>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace tileset_ops {
 
 using JV = mcp::JsonValue;
@@ -29,7 +29,7 @@ godot::Ref<godot::TileSet> resolve_tileset(const std::string &name,
   godot::Ref<godot::Resource> res = resource_ops::resolve_memory_resource(name);
   if (res.is_null()) {
     out_error = util::error_json("memory resource not found: " + name +
-                      " (create it with tileset_create first)");
+                      " (create it with create_tilemap_tileset first)");
     return godot::Ref<godot::TileSet>();
   }
   godot::Ref<godot::TileSet> tileset = res;
@@ -92,7 +92,7 @@ bool parse_polygon(const JV &points_arr, godot::PackedVector2Array &out,
 
 JV handle_add_atlas_source(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "tileset_add_atlas_source called");
+                            "add_tilemap_atlas_source called");
 
   auto *n = args.Find("name");
   if (!n || !n->IsString())
@@ -187,14 +187,14 @@ JV handle_add_atlas_source(const JV &args) {
   r["grid_size"] = std::move(grid_size);
   LogSystem::instance().log(
       LogLevel::Info, LogCategory::Tools,
-      "tileset_add_atlas_source completed: " + std::to_string(created_tiles) +
+      "add_tilemap_atlas_source completed: " + std::to_string(created_tiles) +
           " tiles created");
   return r;
 }
 
 JV handle_add_physics_layer(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "tileset_add_physics_layer called");
+                            "add_tilemap_physics_layer called");
 
   auto *n = args.Find("name");
   if (!n || !n->IsString())
@@ -230,13 +230,13 @@ JV handle_add_physics_layer(const JV &args) {
   r["result"] = JV("ok");
   r["layer_id"] = JV(static_cast<int64_t>(actual_id));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "tileset_add_physics_layer completed");
+                            "add_tilemap_physics_layer completed");
   return r;
 }
 
 JV handle_set_tile_collision(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "tileset_set_tile_collision called");
+                            "set_tilemap_tile_collision called");
 
   auto *n = args.Find("name");
   if (!n || !n->IsString())
@@ -296,7 +296,7 @@ JV handle_set_tile_collision(const JV &args) {
             std::to_string(physics_layer),
         atlas_pos,
         "a physics layer must exist before setting collision polygons",
-        "call tileset_add_physics_layer first, then retry");
+        "call add_tilemap_physics_layer first, then retry");
   }
   const auto &poly_arr = poly->GetArray();
 
@@ -359,9 +359,9 @@ JV handle_set_tile_collision(const JV &args) {
   r["atlas_coords"] = std::move(coords_json);
   r["polygon_points"] = JV(point_count);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "tileset_set_tile_collision completed");
+                            "set_tilemap_tile_collision completed");
   return r;
 }
 
 } // namespace tileset_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

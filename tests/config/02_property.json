@@ -7,12 +7,12 @@
     "before_all": [
       {
         "id": "new_scene",
-        "tool": "editor_new_scene",
+        "tool": "create_editor_scene",
         "args": { "name": "Root" }
       },
       {
         "id": "create_label_node",
-        "tool": "scene_node_create",
+        "tool": "create_scene_node",
         "args": { "name": "LabelNode", "type": "Label", "parent_path": "Root" }
       }
     ],
@@ -39,7 +39,7 @@
           {
             "id": "property_set_get_string",
             "tool": "property_set",
-            "args": { "path": "LabelNode", "property": "text", "value": "Hello GSD" },
+            "args": { "path": "LabelNode", "property": "text", "value": "Hello GDA" },
             "expect": {
               "field_checks": [ { "key": "result", "value": "ok" } ]
             }
@@ -49,7 +49,7 @@
             "tool": "property_get",
             "args": { "path": "LabelNode", "property": "text" },
             "expect": {
-              "field_checks": [ { "key": "result", "value": "Hello GSD" } ]
+              "field_checks": [ { "key": "result", "value": "Hello GDA" } ]
             }
           },
           {

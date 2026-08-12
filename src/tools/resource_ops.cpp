@@ -18,7 +18,7 @@
 #include <godot_cpp/variant/packed_string_array.hpp>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace resource_ops {
 
 namespace {
@@ -160,7 +160,7 @@ bool try_resolve_resource_value(const mcp::JsonValue &val, godot::Variant &out,
       if (res.is_null()) {
         out_error =
             "memory resource not found: " + name +
-            " (create it with resource_create/spriteframes_create first)";
+            " (create it with create_resource/create_spriteframes first)";
         return true;
       }
       out = godot::Variant(res.ptr());
@@ -229,7 +229,7 @@ bool try_resolve_resource_value(const mcp::JsonValue &val, godot::Variant &out,
     if (res.is_null()) {
       out_error =
           "memory resource not found: " + name +
-          (is_mem ? " (create it with resource_create first)"
+          (is_mem ? " (create it with create_resource first)"
                   : " — 建议使用 {\"path\": \"res://...\"}（磁盘资源）或 "
                     "{\"resource\": \"memory://名称\"}（内存资源）");
       return true;
@@ -467,12 +467,12 @@ mcp::JsonValue handle_save(const mcp::JsonValue &args) {
       e["error"] = mcp::JsonValue(
           "failed to resolve resource: resource at path '" + path +
           "' could not be loaded from disk — provide object_id (from "
-          "resource_create) or class_type + name to create a new resource in "
+          "create_resource) or class_type + name to create a new resource in "
           "memory");
     } else {
       e["error"] =
           mcp::JsonValue("failed to resolve resource: provide object_id (from "
-                         "resource_create) or class_type + name to create a "
+                         "create_resource) or class_type + name to create a "
                          "new resource in memory");
     }
     return e;
@@ -1075,50 +1075,6 @@ mcp::JsonValue handle_has_dependency(const mcp::JsonValue &args) {
   return r;
 }
 
-mcp::JsonValue handle_import(const mcp::JsonValue &args) {
-  auto *engine = godot::Engine::get_singleton();
-  if (engine && engine->is_editor_hint() == false) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] =
-        mcp::JsonValue("resource_import is only available in editor mode");
-    return e;
-  }
-  auto *it_path = args.Find("path");
-  if (!it_path || !it_path->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: path");
-    return e;
-  }
-  std::string path = it_path->GetString();
-
-  if (!godot::FileAccess::file_exists(godot::String(path.c_str()))) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("file does not exist: " + path);
-    return e;
-  }
-
-  auto *editor = godot::EditorInterface::get_singleton();
-  if (!editor) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorInterface not available");
-    return e;
-  }
-
-  auto *efs = editor->get_resource_filesystem();
-  if (!efs) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorFileSystem not available");
-    return e;
-  }
-
-  godot::PackedStringArray files;
-  files.append(godot::String(path.c_str()));
-  efs->reimport_files(files);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("import queued for: " + path);
-  return r;
-}
-
 mcp::JsonValue handle_reimport(const mcp::JsonValue &args) {
   auto *engine = godot::Engine::get_singleton();
   if (engine && engine->is_editor_hint() == false) {
@@ -1324,4 +1280,4 @@ mcp::JsonValue handle_get_property(const mcp::JsonValue &args) {
 }
 
 } // namespace resource_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

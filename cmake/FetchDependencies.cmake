@@ -1,5 +1,5 @@
 # ====================================================================
-# Godot-Self-Driving 依赖管理 (FetchContent)
+# Godot-Autopilot 依赖管理 (FetchContent)
 # 仅使用公开 GitHub 仓库，确保其他用户可直接构建。
 # 第一次需要网络，之后缓存到 build/<preset>/_deps/。
 # 禁止删除 _deps/，否则需要重新下载。
@@ -25,4 +25,4 @@ FetchContent_Declare(mcp-cpp-sdk
     GIT_SHALLOW    TRUE)
 FetchContent_MakeAvailable(mcp-cpp-sdk)
 
-message(STATUS "[gsd] Dependencies: godot-cpp + mcp-cpp-sdk")
+message(STATUS "[gda] Dependencies: godot-cpp + mcp-cpp-sdk")

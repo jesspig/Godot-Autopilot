@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-namespace gsd_test {
+namespace gda_test {
 
 class GodotProcess {
 public:
@@ -23,7 +23,7 @@ public:
     ~GodotProcess();
 
     // 启动：含首次 --headless --editor --import 幂等同步执行（失败不致命，记录日志继续）
-    // + 常驻 --headless --editor --path <project> 启动（注入 GODOT_SELF_DRIVING_PORT）
+    // + 常驻 --headless --editor --path <project> 启动（注入 GODOT_AUTOPILOT_PORT）
     // + 就绪轮询（TCP 探测 + MCP initialize 握手，200ms 间隔，ready_timeout 上限）
     // 返回 true=就绪；false=失败（last_error() 含捕获的编辑器日志摘要）
     bool start(std::chrono::seconds ready_timeout = std::chrono::seconds(90));

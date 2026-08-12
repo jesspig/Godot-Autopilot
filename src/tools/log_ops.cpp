@@ -13,7 +13,7 @@
 #include <windows.h>
 #endif
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace log_ops {
 
 using JV = mcp::JsonValue;
@@ -21,7 +21,7 @@ using JV = mcp::JsonValue;
 namespace {
 
 constexpr char RUN_HINT[] = "game logs are written by the running game process "
-                            "(start it with editor_play_current_scene)";
+                            "(start it with play_editor_current_scene)";
 
 constexpr int64_t DEFAULT_LIMIT = 50;
 constexpr int64_t MAX_LIMIT = 500;
@@ -173,7 +173,7 @@ JV build_result(const godot::String &path, const TailResult &tail,
 
 JV handle_log_get_game_entries(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "log_get_game_entries called");
+                            "get_game_log_entries called");
   int64_t limit = DEFAULT_LIMIT;
   auto *lp = args.Find("limit");
   if (lp) {
@@ -201,7 +201,7 @@ JV handle_log_get_game_entries(const JV &args) {
   }
   if (tail.opened) {
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                              "log_get_game_entries completed");
+                              "get_game_log_entries completed");
     return build_result(path, tail, false);
   }
   godot::String archive = logs_dir + "/godot.log.1";
@@ -210,7 +210,7 @@ JV handle_log_get_game_entries(const JV &args) {
     if (archived.opened) {
       LogSystem::instance().log(
           LogLevel::Info, LogCategory::Tools,
-          "log_get_game_entries completed (from archive)");
+          "get_game_log_entries completed (from archive)");
       return build_result(archive, archived, true);
     }
   }
@@ -221,10 +221,10 @@ JV handle_log_get_game_entries(const JV &args) {
           " (game process holds the log file)",
       util::to_std(path) + " — " + logs_dir_diagnostic(logs_dir),
       "read the game process log",
-      "stop the game first (editor_stop_playing), or use debugger_get_output / "
+      "stop the game first (stop_editor_playing), or use debugger_get_output / "
       "debugger_get_errors for in-memory capture — " +
           std::string(RUN_HINT));
 }
 
 } // namespace log_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

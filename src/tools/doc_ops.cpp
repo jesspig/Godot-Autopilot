@@ -11,7 +11,7 @@
 #include <godot_cpp/variant/typed_array.hpp>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace doc_ops {
 
 namespace {
@@ -62,7 +62,7 @@ mcp::JsonValue variant_to_json(const godot::Variant &v) {
 
 mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "documentation_get_class called");
+                            "get_docs_class called");
   auto *np = args.Find("class");
   if (!np || !np->IsString()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -159,13 +159,13 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(result);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "documentation_get_class completed");
+                            "get_docs_class completed");
   return r;
 }
 
 mcp::JsonValue handle_search(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "documentation_search called");
+                            "find_docs_class called");
   auto *qp = args.Find("query");
   if (!qp || !qp->IsString()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -204,13 +204,13 @@ mcp::JsonValue handle_search(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(results_arr);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "documentation_search completed");
+                            "find_docs_class completed");
   return r;
 }
 
 mcp::JsonValue handle_get_method(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "documentation_get_method called");
+                            "get_docs_method called");
   auto *cp = args.Find("class");
   auto *mp = args.Find("method");
   if (!cp || !cp->IsString()) {
@@ -249,7 +249,7 @@ mcp::JsonValue handle_get_method(const mcp::JsonValue &args) {
         mcp::JsonValue r(mcp::JsonValue::object_tag);
         r["result"] = std::move(result);
         LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                                  "documentation_get_method completed");
+                                  "get_docs_method completed");
         return r;
       }
     }
@@ -262,7 +262,7 @@ mcp::JsonValue handle_get_method(const mcp::JsonValue &args) {
 
 mcp::JsonValue handle_get_property(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "documentation_get_property called");
+                            "get_docs_property called");
   auto *cp = args.Find("class");
   auto *pp = args.Find("property");
   if (!cp || !cp->IsString()) {
@@ -300,7 +300,7 @@ mcp::JsonValue handle_get_property(const mcp::JsonValue &args) {
         mcp::JsonValue r(mcp::JsonValue::object_tag);
         r["result"] = std::move(result);
         LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                                  "documentation_get_property completed");
+                                  "get_docs_property completed");
         return r;
       }
     }
@@ -312,4 +312,4 @@ mcp::JsonValue handle_get_property(const mcp::JsonValue &args) {
 }
 
 } // namespace doc_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

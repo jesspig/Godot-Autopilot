@@ -10,7 +10,7 @@
 #include <mcp/Content.hpp>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 namespace {
 
@@ -116,4 +116,4 @@ void register_all_prompts(mcp::McpServer &server, CommandQueue &queue) {
                             "7 prompt templates registered");
 }
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot

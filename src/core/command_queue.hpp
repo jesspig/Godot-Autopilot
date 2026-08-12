@@ -1,5 +1,5 @@
-#ifndef GODOT_SELF_DRIVING_COMMAND_QUEUE_HPP
-#define GODOT_SELF_DRIVING_COMMAND_QUEUE_HPP
+#ifndef GODOT_AUTOPILOT_COMMAND_QUEUE_HPP
+#define GODOT_AUTOPILOT_COMMAND_QUEUE_HPP
 
 #include <atomic>
 #include <functional>
@@ -10,7 +10,7 @@
 #include <thread>
 #include <type_traits>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 class CommandQueue {
   struct TaskBase {
@@ -79,6 +79,6 @@ public:
   }
 };
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 
 #endif

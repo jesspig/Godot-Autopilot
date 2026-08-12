@@ -5,7 +5,7 @@
 #include <cmath>
 #include <unordered_set>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 std::vector<std::string> Bm25Index::tokenize(const std::string &text) const {
   std::vector<std::string> tokens;
@@ -230,4 +230,4 @@ double Bm25Index::compute_bm25(
   return score;
 }
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot

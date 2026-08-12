@@ -18,10 +18,10 @@
 
 #ifndef PROJECT_ROOT
 #error                                                                         \
-    "PROJECT_ROOT 编译宏未定义（tests/CMakeLists.txt 已为 gsd_test_runner 配置）"
+    "PROJECT_ROOT 编译宏未定义（tests/CMakeLists.txt 已为 gda_test_runner 配置）"
 #endif
 
-namespace gsd_test {
+namespace gda_test {
 
 #ifdef _WIN32
 namespace {
@@ -155,7 +155,7 @@ bool mcp_initialize_handshake(int port) {
   ioctlsocket(s, FIONBIO, &block);
 
   const std::string body =
-      R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"gsd-test-runner","version":"0.1.0"}}})";
+      R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"gda-test-runner","version":"0.1.0"}}})";
   const std::string req =
       "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1:" + std::to_string(port) +
       "\r\nContent-Type: application/json\r\n"
@@ -398,7 +398,7 @@ bool GodotProcess::start(std::chrono::seconds ready_timeout) {
 
   // 首次 --import：幂等同步执行，失败/超时不致命，记日志继续
   {
-    const char *force_key = "GSD_FORCE_HEADLESS";
+    const char *force_key = "GDA_FORCE_HEADLESS";
     char force_buf[64] = {0};
     const DWORD force_len =
         GetEnvironmentVariableA(force_key, force_buf, sizeof(force_buf));
@@ -417,11 +417,11 @@ bool GodotProcess::start(std::chrono::seconds ready_timeout) {
       attach_process(*impl_, pi);
       if (WaitForSingleObject(impl_->process, kImportTimeoutMs) !=
           WAIT_OBJECT_0) {
-        append_log(*impl_, "[gsd] 警告：--import 未在 120s 内退出，继续尝试\n");
+        append_log(*impl_, "[gda] 警告：--import 未在 120s 内退出，继续尝试\n");
       }
       close_process(*impl_);
     } else {
-      append_log(*impl_, "[gsd] 警告：启动 --import 进程失败（错误码 " +
+      append_log(*impl_, "[gda] 警告：启动 --import 进程失败（错误码 " +
                              std::to_string(GetLastError()) +
                              "），继续尝试\n");
     }
@@ -429,7 +429,7 @@ bool GodotProcess::start(std::chrono::seconds ready_timeout) {
   }
 
   // 常驻启动：临时注入端口环境变量，CreateProcess 继承后恢复
-  const char *port_key = "GODOT_SELF_DRIVING_PORT";
+  const char *port_key = "GODOT_AUTOPILOT_PORT";
   char old_buf[64] = {0};
   const DWORD old_len =
       GetEnvironmentVariableA(port_key, old_buf, sizeof(old_buf));
@@ -440,7 +440,7 @@ bool GodotProcess::start(std::chrono::seconds ready_timeout) {
   };
   SetEnvironmentVariableA(port_key, std::to_string(impl_->port).c_str());
 
-  const char *force_key = "GSD_FORCE_HEADLESS";
+  const char *force_key = "GDA_FORCE_HEADLESS";
   char force_buf[64] = {0};
   const DWORD force_len =
       GetEnvironmentVariableA(force_key, force_buf, sizeof(force_buf));
@@ -497,12 +497,12 @@ void GodotProcess::stop() {
       TerminateProcess(impl_->process, 1);
       WaitForSingleObject(impl_->process, 5000);
       append_log(*impl_,
-                 "[gsd] 编辑器未正常退出，已强杀（TerminateProcess）\n");
+                 "[gda] 编辑器未正常退出，已强杀（TerminateProcess）\n");
     }
   }
   DWORD exit_code = 0;
   GetExitCodeProcess(impl_->process, &exit_code);
-  append_log(*impl_, "[gsd] 编辑器退出码: " + std::to_string(exit_code) + "\n");
+  append_log(*impl_, "[gda] 编辑器退出码: " + std::to_string(exit_code) + "\n");
   close_process(*impl_);
 }
 
@@ -553,4 +553,4 @@ std::string GodotProcess::last_error() const { return impl_->last_error; }
 std::string GodotProcess::resolve_godot_path() { return ""; }
 #endif
 
-} // namespace gsd_test
+} // namespace gda_test

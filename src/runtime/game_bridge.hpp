@@ -1,5 +1,5 @@
-#ifndef GODOT_SELF_DRIVING_RUNTIME_GAME_BRIDGE_HPP
-#define GODOT_SELF_DRIVING_RUNTIME_GAME_BRIDGE_HPP
+#ifndef GODOT_AUTOPILOT_RUNTIME_GAME_BRIDGE_HPP
+#define GODOT_AUTOPILOT_RUNTIME_GAME_BRIDGE_HPP
 
 #include <cstdint>
 #include <functional>
@@ -12,7 +12,7 @@
 #include <godot_cpp/variant/string.hpp>
 #include <mcp/JsonValue.hpp>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace runtime {
 namespace game_bridge {
 
@@ -70,6 +70,6 @@ JV op_input_status(const JV &params);
 
 } // namespace game_bridge
 } // namespace runtime
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 
 #endif

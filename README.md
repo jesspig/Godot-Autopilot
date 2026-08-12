@@ -1,10 +1,10 @@
-# Godot-Self-Driving
+# Godot-Autopilot
 
 > **An MCP Server for Godot Engine — AI-native engine control at the API level**
 
 [中文版说明](README_zh.md)
 
-Godot-Self-Driving is an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that bridges AI agents with the Godot game engine at the **native engine API level**. Unlike conventional tools that operate from a user-UI perspective (simulating clicks or editor operations), this project gives AI agents direct, programmatic access to Godot's entire engine surface — scene tree manipulation, physics servers, rendering servers, audio, navigation, input simulation, script execution, and more.
+Godot-Autopilot is an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that bridges AI agents with the Godot game engine at the **native engine API level**. Unlike conventional tools that operate from a user-UI perspective (simulating clicks or editor operations), this project gives AI agents direct, programmatic access to Godot's entire engine surface — scene tree manipulation, physics servers, rendering servers, audio, navigation, input simulation, script execution, and more.
 
 This is an **in-process GDExtension plugin** that loads directly into the Godot editor. No standalone bridge process needed — the MCP server starts when your project opens, and stops when it closes.
 
@@ -15,11 +15,11 @@ MCP Host (Claude Desktop, Cursor, etc.)
   │ POST http://127.0.0.1:9527/mcp
   ▼
 Godot Editor
-  └── Godot-Self-Driving (GDExtension)
+  └── Godot-Autopilot (GDExtension)
       ├── libhv (internal HTTP threads)
       ├── mcp-cpp-sdk: McpServer + Streamable HTTP
       ├── Command Queue (libhv → Godot main thread bridge)
-      ├── ~355 MCP Tools across 22 categories (count varies by plugin version; see MCP search_tools)
+      ├── ~338 MCP Tools across 23 categories (count varies by plugin version; see MCP search_tools)
       ├── Inline Documentation (offline engine docs)
       └── Custom Log Dock (dedicated plugin output panel)
 ```
@@ -30,48 +30,49 @@ Godot Editor
 |----------|--------|-----------|
 | **Transport** | Streamable HTTP (POST /mcp) | Standard MCP protocol, no bridge process |
 | **Thread Model** | Command queue + frame sync | Safe Godot main-thread-only API access |
-| **Port** | 9527 | Configurable via `GODOT_SELF_DRIVING_PORT` env var |
-| **Discovery** | 3-Tier Progressive (Catalog→Inspect→Execute) | Keeps context small with ~355 tools (count varies by plugin version) |
+| **Port** | 9527 | Configurable via `GODOT_AUTOPILOT_PORT` env var |
+| **Discovery** | 3-Tier Progressive (Catalog→Inspect→Execute) | Keeps context small with ~338 tools (count varies by plugin version) |
 | **Search** | BM25 keyword | Tools organized by namespace + descriptions |
 | **Build** | CMake 3.28+ / C++17 | Cross-platform, auto-optimized builds |
 
 ## Features
 
-### 🎮 Full Engine Control (~355 Tools, count varies by plugin version; see MCP search_tools)
+### 🎮 Full Engine Control (~338 Tools, count varies by plugin version; see MCP search_tools)
 
 | Category | Tools | Description |
 |----------|:-----:|-------------|
-| **Physics** | 51 | 2D/3D ray casts, body creation, force application, joints |
-| **Render** | 50 | Canvas items, cameras, lights, meshes, viewports, materials |
-| **Editor** | 25 | Selection, undo/redo, scene save, plugin management |
+| **Render** | 49 | Canvas items, cameras, lights, meshes, viewports, materials |
+| **Physics** | 47 | 2D/3D ray casts, body creation, force application, joints |
 | **Display** | 24 | Window, viewport and screen properties |
-| **Debug** | 23 | Performance monitors, profiling, diagnostics |
-| **Resources** | 22 | Load, save, create, list resources |
+| **Editor** | 22 | Selection, undo/redo, scene save, plugin management |
+| **Resources** | 21 | Load, save, create, list resources |
 | **Audio** | 20 | Bus management, stream playback, effects |
-| **Input** | 17 | Key/mouse/gamepad simulation, action queries |
-| **OS** | 15 | Operating system, environment and clipboard access |
+| **Input** | 19 | Key/mouse/gamepad simulation, action queries (includes InputMap) |
+| **OS** | 16 | Operating system, environment and clipboard access |
+| **Debug** | 16 | Performance monitors, profiling, diagnostics |
 | **Navigation** | 15 | Nav mesh, path queries, agents |
 | **Config** | 13 | Project settings, engine properties |
-| **Scene** | 13 | Node creation, deletion, scene tree inspection (e.g. `scene_node_create`) |
-| **Text** | 11 | String manipulation, parsing and formatting |
-| **Scripts** | 9 | Execute GDScript and C#, call methods on any node |
-| **Debugger** | 7 | Debugger session control and inspection |
+| **Scene** | 12 | Node creation, deletion, scene tree inspection (e.g. `create_scene_node`) |
+| **Scripts** | 10 | Execute GDScript and C#, call methods on any node |
+| **Text** | 10 | String manipulation, parsing and formatting |
 | **TileMap** | 7 | Tile map creation, cell manipulation and queries |
+| **Debugger** | 7 | Debugger session control and inspection |
+| **Game** | 6 | Game loop control and engine-wide state |
 | **Properties** | 5 | Get/set properties, list properties, signal connect (e.g. `property_set`) |
 | **Docs** | 4 | Query offline Godot API docs |
-| **Game** | 3 | Game loop control and engine-wide state |
 | **Group** | 3 | Node group management and membership queries |
 | **SpriteFrames** | 3 | Sprite frame set creation and animation management |
 | **System** | 1 | Plugin-level system information |
+| **Capture** | 1 | Editor viewport screenshot |
 
 ### 📖 Inline API Documentation
 
 Query Godot's built-in offline documentation directly through MCP tools. No web searches needed — every class, method, property, and signal is documented from the engine's own `DocTools` cache:
 
-- `doc_get_class` — Full class docs (description, methods, properties, signals)
-- `doc_search` — Search classes by name or keyword
-- `doc_get_method` — Method signature and description
-- `doc_get_property` — Property type and description
+- `get_docs_class` — Full class docs (description, methods, properties, signals)
+- `find_docs_class` — Search classes by name or keyword
+- `get_docs_method` — Method signature and description
+- `get_docs_property` — Property type and description
 
 ### 📋 MCP Resources
 
@@ -109,8 +110,8 @@ A custom `EditorDock` bottom panel displays plugin-only logs (system, tools, tra
 ### Build
 
 ```bash
-git clone https://github.com/jesspig/Godot-Self-Driving.git
-cd Godot-Self-Driving
+git clone https://github.com/jesspig/Godot-Autopilot.git
+cd Godot-Autopilot
 
 # Recommended: build + deploy to Example/addons/ in one step
 uv run build.py             # Debug
@@ -120,7 +121,7 @@ uv run build.py --release   # Release (cleans first)
 cmake --preset release && cmake --build --preset release
 ```
 
-The built `.dll` / `.so` / `.dylib` will be in `build/release/`. `build.py` also generates the `.gdextension` file and copies artifacts to `Example/addons/godot-self-driving/`.
+The built `.dll` / `.so` / `.dylib` will be in `build/release/`. `build.py` also generates the `.gdextension` file and copies artifacts to `Example/addons/godot-autopilot/`.
 
 ### Install
 
@@ -129,9 +130,9 @@ Copy to your Godot project:
 ```
 your-project/
 └── addons/
-    └── godot-self-driving/
-        ├── godot-self-driving.dll      (or .so / .dylib)
-        └── godot-self-driving.gdextension
+    └── godot-autopilot/
+        ├── godot-autopilot.dll      (or .so / .dylib)
+        └── godot-autopilot.gdextension
 ```
 
 ### Configure MCP Host

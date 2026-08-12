@@ -9,7 +9,7 @@
 #include <godot_cpp/variant/packed_byte_array.hpp>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace capture_ops {
 
 namespace {
@@ -57,7 +57,7 @@ std::string base64_encode(const uint8_t *data, size_t len) {
 
 mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "capture_viewport called");
+                            "capture_editor_viewport called");
 
   std::string target = "editor";
   if (auto *target_p = args.Find("target")) {
@@ -119,10 +119,10 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
 
   LogSystem::instance().log(
       LogLevel::Info, LogCategory::Tools,
-      "capture_viewport completed: " + std::to_string(img->get_width()) + "x" +
+      "capture_editor_viewport completed: " + std::to_string(img->get_width()) + "x" +
           std::to_string(img->get_height()));
   return r;
 }
 
 } // namespace capture_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

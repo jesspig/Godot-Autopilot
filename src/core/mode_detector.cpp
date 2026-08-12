@@ -2,7 +2,7 @@
 
 #include <godot_cpp/classes/engine.hpp>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 RuntimeMode ModeDetector::detect() {
   auto *engine = godot::Engine::get_singleton();
@@ -14,4 +14,4 @@ RuntimeMode ModeDetector::detect() {
 
 bool ModeDetector::is_editor() { return detect() == RuntimeMode::Editor; }
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot

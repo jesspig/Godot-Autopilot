@@ -1,5 +1,5 @@
-#ifndef GODOT_SELF_DRIVING_BM25_INDEX_HPP
-#define GODOT_SELF_DRIVING_BM25_INDEX_HPP
+#ifndef GODOT_AUTOPILOT_BM25_INDEX_HPP
+#define GODOT_AUTOPILOT_BM25_INDEX_HPP
 
 #include <cmath>
 #include <mutex>
@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 struct Bm25Result {
   std::string name;
@@ -56,6 +56,6 @@ private:
   static constexpr double B = 0.75;
 };
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 
 #endif

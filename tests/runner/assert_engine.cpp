@@ -2,7 +2,7 @@
 
 #include <vector>
 
-namespace gsd_test {
+namespace gda_test {
 namespace {
 
 std::string join_keys(const std::vector<std::string>& keys) {
@@ -94,4 +94,4 @@ bool check_expectations(const mcp::JsonValue& response, const StepExpect& expect
     return true;
 }
 
-}  // namespace gsd_test
+}  // namespace gda_test

@@ -13,7 +13,7 @@
 #include <godot_cpp/variant/vector2i.hpp>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace display_ops {
 
 namespace {
@@ -38,7 +38,7 @@ int screen_from_args(const JV &args) {
 
 JV handle_clipboard_get(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_clipboard_get called");
+                            "get_display_clipboard called");
   auto *ds = godot::DisplayServer::get_singleton();
   if (!ds) {
     return util::error_json("DisplayServer not available");
@@ -47,13 +47,13 @@ JV handle_clipboard_get(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = JV(util::to_std(text));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_clipboard_get completed");
+                            "get_display_clipboard completed");
   return r;
 }
 
 JV handle_clipboard_set(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_clipboard_set called");
+                            "set_display_clipboard called");
   auto *tp = args.Find("text");
   if (!tp || !tp->IsString()) {
     return util::error_json("missing required parameter: text");
@@ -64,13 +64,13 @@ JV handle_clipboard_set(const JV &args) {
   }
   ds->clipboard_set(godot::String(tp->GetString().c_str()));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_clipboard_set completed");
+                            "set_display_clipboard completed");
   return ok_json();
 }
 
 JV handle_dialog_show(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_dialog_show called");
+                            "show_display_dialog called");
   auto *tp = args.Find("title");
   if (!tp || !tp->IsString()) {
     return util::error_json("missing required parameter: title");
@@ -101,13 +101,13 @@ JV handle_dialog_show(const JV &args) {
                       std::to_string(static_cast<int>(err)));
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_dialog_show completed");
+                            "show_display_dialog completed");
   return ok_json();
 }
 
 JV handle_mouse_get_position(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_mouse_get_position called");
+                            "get_display_mouse_position called");
   auto *ds = godot::DisplayServer::get_singleton();
   if (!ds) {
     return util::error_json("DisplayServer not available");
@@ -119,13 +119,13 @@ JV handle_mouse_get_position(const JV &args) {
   pos_obj["y"] = JV(static_cast<int64_t>(pos.y));
   r["result"] = std::move(pos_obj);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_mouse_get_position completed");
+                            "get_display_mouse_position completed");
   return r;
 }
 
 JV handle_mouse_set_mode(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_mouse_set_mode called");
+                            "set_display_mouse_mode called");
   auto *mp = args.Find("mode");
   if (!mp || !mp->IsInt()) {
     return util::error_json("missing required parameter: mode");
@@ -140,13 +140,13 @@ JV handle_mouse_set_mode(const JV &args) {
   }
   ds->mouse_set_mode(static_cast<godot::DisplayServer::MouseMode>(mode));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_mouse_set_mode completed");
+                            "set_display_mouse_mode completed");
   return ok_json();
 }
 
 JV handle_mouse_warp(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_mouse_warp called");
+                            "warp_display_mouse called");
   auto *xp = args.Find("x");
   if (!xp || !xp->IsInt()) {
     return util::error_json("missing required parameter: x");
@@ -161,13 +161,13 @@ JV handle_mouse_warp(const JV &args) {
   }
   ds->warp_mouse(godot::Vector2i(xp->GetInt(), yp->GetInt()));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_mouse_warp completed");
+                            "warp_display_mouse completed");
   return ok_json();
 }
 
 JV handle_screen_capture(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_screen_capture called");
+                            "capture_display_screen called");
   auto *ds = godot::DisplayServer::get_singleton();
   if (!ds) {
     return util::error_json("DisplayServer not available");
@@ -186,7 +186,7 @@ JV handle_screen_capture(const JV &args) {
         JV("PNG encoding failed; returned raw serialized image data");
     LogSystem::instance().log(
         LogLevel::Info, LogCategory::Tools,
-        "display_screen_capture completed (png fallback)");
+        "capture_display_screen completed (png fallback)");
     return r;
   }
   std::string b64 = capture_ops::base64_encode(
@@ -198,13 +198,13 @@ JV handle_screen_capture(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = std::move(inner);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_screen_capture completed");
+                            "capture_display_screen completed");
   return r;
 }
 
 JV handle_screen_get_count(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_screen_get_count called");
+                            "get_display_screen_count called");
   auto *ds = godot::DisplayServer::get_singleton();
   if (!ds) {
     return util::error_json("DisplayServer not available");
@@ -213,13 +213,13 @@ JV handle_screen_get_count(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = JV(static_cast<int64_t>(count));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_screen_get_count completed");
+                            "get_display_screen_count completed");
   return r;
 }
 
 JV handle_screen_get_dpi(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_screen_get_dpi called");
+                            "get_display_screen_dpi called");
   auto *ds = godot::DisplayServer::get_singleton();
   if (!ds) {
     return util::error_json("DisplayServer not available");
@@ -229,13 +229,13 @@ JV handle_screen_get_dpi(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = JV(static_cast<int64_t>(dpi));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_screen_get_dpi completed");
+                            "get_display_screen_dpi completed");
   return r;
 }
 
 JV handle_screen_get_position(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_screen_get_position called");
+                            "get_display_screen_position called");
   auto *ds = godot::DisplayServer::get_singleton();
   if (!ds) {
     return util::error_json("DisplayServer not available");
@@ -248,13 +248,13 @@ JV handle_screen_get_position(const JV &args) {
   pos_obj["y"] = JV(static_cast<int64_t>(pos.y));
   r["result"] = std::move(pos_obj);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_screen_get_position completed");
+                            "get_display_screen_position completed");
   return r;
 }
 
 JV handle_screen_get_refresh_rate(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_screen_get_refresh_rate called");
+                            "get_display_screen_refresh_rate called");
   auto *ds = godot::DisplayServer::get_singleton();
   if (!ds) {
     return util::error_json("DisplayServer not available");
@@ -264,13 +264,13 @@ JV handle_screen_get_refresh_rate(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = JV(static_cast<double>(rate));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_screen_get_refresh_rate completed");
+                            "get_display_screen_refresh_rate completed");
   return r;
 }
 
 JV handle_screen_get_size(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_screen_get_size called");
+                            "get_display_screen_size called");
   auto *ds = godot::DisplayServer::get_singleton();
   if (!ds) {
     return util::error_json("DisplayServer not available");
@@ -283,13 +283,13 @@ JV handle_screen_get_size(const JV &args) {
   size_obj["y"] = JV(static_cast<int64_t>(size.y));
   r["result"] = std::move(size_obj);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_screen_get_size completed");
+                            "get_display_screen_size completed");
   return r;
 }
 
 JV handle_tts_get_voices(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_tts_get_voices called");
+                            "get_display_tts_voices called");
   auto *ds = godot::DisplayServer::get_singleton();
   if (!ds) {
     return util::error_json("DisplayServer not available");
@@ -299,13 +299,13 @@ JV handle_tts_get_voices(const JV &args) {
   JV r(JV::object_tag);
   r["result"] = std::move(serialized);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_tts_get_voices completed");
+                            "get_display_tts_voices completed");
   return r;
 }
 
 JV handle_tts_speak(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_tts_speak called");
+                            "speak_display_tts called");
   auto *tp = args.Find("text");
   if (!tp || !tp->IsString()) {
     return util::error_json("missing required parameter: text");
@@ -340,22 +340,22 @@ JV handle_tts_speak(const JV &args) {
   ds->tts_speak(godot::String(text.c_str()), godot::String(voice.c_str()),
                 volume, pitch, rate);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_tts_speak completed");
+                            "speak_display_tts completed");
   return ok_json();
 }
 
 JV handle_tts_stop(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_tts_stop called");
+                            "stop_display_tts called");
   auto *ds = godot::DisplayServer::get_singleton();
   if (!ds) {
     return util::error_json("DisplayServer not available");
   }
   ds->tts_stop();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "display_tts_stop completed");
+                            "stop_display_tts completed");
   return ok_json();
 }
 
 } // namespace display_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

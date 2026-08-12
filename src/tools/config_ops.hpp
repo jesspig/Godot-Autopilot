@@ -1,9 +1,9 @@
-#ifndef GODOT_SELF_DRIVING_CONFIG_OPS_HPP
-#define GODOT_SELF_DRIVING_CONFIG_OPS_HPP
+#ifndef GODOT_AUTOPILOT_CONFIG_OPS_HPP
+#define GODOT_AUTOPILOT_CONFIG_OPS_HPP
 
 #include <mcp/JsonValue.hpp>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace config_ops {
 
 mcp::JsonValue handle_project_settings_get(const mcp::JsonValue &args);
@@ -21,5 +21,5 @@ mcp::JsonValue handle_editor_settings_set(const mcp::JsonValue &args);
 mcp::JsonValue handle_editor_settings_has(const mcp::JsonValue &args);
 
 } // namespace config_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 #endif

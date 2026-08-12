@@ -1,9 +1,9 @@
-#ifndef GODOT_SELF_DRIVING_RENDER_OPS_HPP
-#define GODOT_SELF_DRIVING_RENDER_OPS_HPP
+#ifndef GODOT_AUTOPILOT_RENDER_OPS_HPP
+#define GODOT_AUTOPILOT_RENDER_OPS_HPP
 
 #include <mcp/JsonValue.hpp>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace render_ops {
 
 mcp::JsonValue handle_canvas_item_create(const mcp::JsonValue &args);
@@ -37,7 +37,6 @@ mcp::JsonValue handle_fog_create(const mcp::JsonValue &args);
 mcp::JsonValue handle_shader_create(const mcp::JsonValue &args);
 mcp::JsonValue handle_texture_create_2d(const mcp::JsonValue &args);
 mcp::JsonValue handle_shader_set_code(const mcp::JsonValue &args);
-mcp::JsonValue handle_shader_get_parameter_list(const mcp::JsonValue &args);
 mcp::JsonValue handle_environment_set_glow(const mcp::JsonValue &args);
 mcp::JsonValue handle_environment_set_ssr(const mcp::JsonValue &args);
 mcp::JsonValue handle_environment_set_tonemap(const mcp::JsonValue &args);
@@ -59,6 +58,6 @@ mcp::JsonValue handle_canvas_item_get_rid(const mcp::JsonValue &args);
 mcp::JsonValue handle_resolve_rid(const mcp::JsonValue &args);
 
 } // namespace render_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 
 #endif

@@ -1,5 +1,5 @@
-#ifndef GODOT_SELF_DRIVING_SCENE_PATH_HPP
-#define GODOT_SELF_DRIVING_SCENE_PATH_HPP
+#ifndef GODOT_AUTOPILOT_SCENE_PATH_HPP
+#define GODOT_AUTOPILOT_SCENE_PATH_HPP
 
 #include "error_util.hpp"
 
@@ -8,7 +8,7 @@
 #include <godot_cpp/variant/string.hpp>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace util {
 
 inline std::string scene_path_hint(godot::Node *scene_root) {
@@ -72,6 +72,6 @@ inline godot::Node *resolve_scene_node(const std::string &path_str,
 }
 
 } // namespace util
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 
 #endif

@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-namespace gsd_test {
+namespace gda_test {
 
 // stdout 汇总：每文件一行（name | steps 通过/总数 | 耗时 | 状态 PASS/FAIL/ERROR），
 // 失败文件后跟失败步骤明细（step_id/tool/detail）；末尾总统计（文件数/通过/失败/总耗时）

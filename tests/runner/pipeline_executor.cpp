@@ -12,7 +12,7 @@
 #include <string>
 #include <utility>
 
-namespace gsd_test {
+namespace gda_test {
 namespace {
 
 constexpr size_t CRASH_LOG_LIMIT = 2000;
@@ -260,4 +260,4 @@ FileResult run_pipeline(const TestCase& tc, GodotProcess* proc,
     return result;
 }
 
-} // namespace gsd_test
+} // namespace gda_test

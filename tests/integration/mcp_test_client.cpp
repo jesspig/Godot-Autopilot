@@ -25,7 +25,7 @@
 #pragma comment(lib, "ws2_32.lib")
 #endif
 
-namespace gsd_test {
+namespace gda_test {
 
 #ifdef _WIN32
 namespace {
@@ -89,7 +89,7 @@ bool McpTestClient::connect(std::chrono::seconds timeout) {
       mcp::HttpClientTransportOptions transport_opts;
       transport_opts.endpoint =
           "http://127.0.0.1:" + std::to_string(impl_->port) + "/mcp";
-      transport_opts.name = "gsd-test-client";
+      transport_opts.name = "gda-test-client";
 
       auto factory =
           std::make_shared<mcp::StreamableHttpClientTransport>(transport_opts);
@@ -191,4 +191,4 @@ std::string McpTestClient::call_tool(const std::string &) {
 bool McpTestClient::last_call_was_error() const { return true; }
 #endif
 
-} // namespace gsd_test
+} // namespace gda_test

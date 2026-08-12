@@ -1,11 +1,11 @@
-#ifndef GODOT_SELF_DRIVING_DEBUGGER_ACCESS_HPP
-#define GODOT_SELF_DRIVING_DEBUGGER_ACCESS_HPP
+#ifndef GODOT_AUTOPILOT_DEBUGGER_ACCESS_HPP
+#define GODOT_AUTOPILOT_DEBUGGER_ACCESS_HPP
 
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 // runtime_ops 对 debugger 能力的自由函数接口，实现于 debugger_access.cpp。
 // 依赖方向：runtime_ops.cpp -> debugger_access.hpp（实现于 debugger_access.cpp）；
@@ -14,7 +14,7 @@ namespace godot_self_driving {
 // 捕获插件是否已初始化（等价 DebugCapturePlugin::get_instance() != nullptr）。
 bool debugger_capture_initialized();
 
-// 将 payload 作为 gsd:request 发给全部 active 且 ready 的会话。
+// 将 payload 作为 gda:request 发给全部 active 且 ready 的会话。
 // 返回是否至少发出一个会话；out_first_session_id 接收第一个会话 id（可为空）。
 bool debugger_broadcast_request(const std::string &payload,
                                 int32_t *out_first_session_id);
@@ -34,6 +34,6 @@ namespace debugger_ops {
 std::string capture_get_errors_text(size_t limit);
 
 } // namespace debugger_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 
 #endif

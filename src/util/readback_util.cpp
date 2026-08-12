@@ -1,7 +1,7 @@
 #include "readback_util.hpp"
 #include "variant_json.hpp"
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace util {
 
 ReadbackStatus check_readback(const godot::Variant &expected_value,
@@ -33,4 +33,4 @@ ReadbackStatus check_readback(const godot::Variant &expected_value,
 }
 
 } // namespace util
-} // namespace godot_self_driving
+} // namespace godot_autopilot

@@ -1,9 +1,9 @@
-#ifndef GODOT_SELF_DRIVING_PROMPT_SETUP_INPUT_MAP_HPP
-#define GODOT_SELF_DRIVING_PROMPT_SETUP_INPUT_MAP_HPP
+#ifndef GODOT_AUTOPILOT_PROMPT_SETUP_INPUT_MAP_HPP
+#define GODOT_AUTOPILOT_PROMPT_SETUP_INPUT_MAP_HPP
 
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 std::string prompt_setup_input_map();
 

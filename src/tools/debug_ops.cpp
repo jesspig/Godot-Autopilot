@@ -10,7 +10,7 @@
 #include <godot_cpp/variant/typed_array.hpp>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace debug_ops {
 
 namespace {
@@ -86,7 +86,7 @@ static const MonitorInfo s_monitors[] = {
 
 mcp::JsonValue handle_print(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_print called");
+                            "print_debug_log called");
   auto *mp = args.Find("message");
   if (!mp || !mp->IsString()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -98,13 +98,13 @@ mcp::JsonValue handle_print(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_print completed");
+                            "print_debug_log completed");
   return r;
 }
 
 mcp::JsonValue handle_print_stack(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_print_stack called");
+                            "get_debug_stack called");
   auto *ivp = args.Find("include_variables");
   bool include_vars = ivp && ivp->IsBool() ? ivp->GetBool() : false;
   auto *engine = godot::Engine::get_singleton();
@@ -174,13 +174,13 @@ mcp::JsonValue handle_print_stack(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(result_arr);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_print_stack completed");
+                            "get_debug_stack completed");
   return r;
 }
 
 mcp::JsonValue handle_get_performance_monitor(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_get_performance_monitor called");
+                            "get_debug_monitor called");
   auto *mp = args.Find("monitor");
   if (!mp || !mp->IsNumber()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -208,13 +208,13 @@ mcp::JsonValue handle_get_performance_monitor(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue(value);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_get_performance_monitor completed");
+                            "get_debug_monitor completed");
   return r;
 }
 
 mcp::JsonValue handle_list_performance_monitors(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_list_performance_monitors called");
+                            "get_debug_monitor_catalog called");
   mcp::JsonValue arr(mcp::JsonValue::array_tag);
   int count = sizeof(s_monitors) / sizeof(s_monitors[0]);
   for (int i = 0; i < count; i++) {
@@ -227,13 +227,13 @@ mcp::JsonValue handle_list_performance_monitors(const mcp::JsonValue &) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(arr);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_list_performance_monitors completed");
+                            "get_debug_monitor_catalog completed");
   return r;
 }
 
 mcp::JsonValue handle_get_object_count(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_get_object_count called");
+                            "get_debug_object_count called");
   auto *perf = godot::Performance::get_singleton();
   if (!perf) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -244,23 +244,13 @@ mcp::JsonValue handle_get_object_count(const mcp::JsonValue &) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue(count);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_get_object_count completed");
+                            "get_debug_object_count completed");
   return r;
-}
-
-mcp::JsonValue handle_get_object_count_by_class(const mcp::JsonValue &) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_get_object_count_by_class called");
-  mcp::JsonValue e(mcp::JsonValue::object_tag);
-  e["error"] =
-      mcp::JsonValue("object count by class not available via godot-cpp; use "
-                     "Performance::get_monitor(OBJECT_COUNT) for total count");
-  return e;
 }
 
 mcp::JsonValue handle_get_memory_usage(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_get_memory_usage called");
+                            "get_debug_memory_usage called");
   auto *perf = godot::Performance::get_singleton();
   if (!perf) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -271,63 +261,13 @@ mcp::JsonValue handle_get_memory_usage(const mcp::JsonValue &) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue(bytes);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_get_memory_usage completed");
-  return r;
-}
-
-mcp::JsonValue handle_profile_start(const mcp::JsonValue &) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_profile_start called");
-  mcp::JsonValue e(mcp::JsonValue::object_tag);
-  e["error"] = mcp::JsonValue("profiling not available via godot-cpp; use "
-                              "EditorInterface debug settings instead");
-  return e;
-}
-
-mcp::JsonValue handle_profile_stop(const mcp::JsonValue &) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_profile_stop called");
-  mcp::JsonValue e(mcp::JsonValue::object_tag);
-  e["error"] = mcp::JsonValue("profiling not available via godot-cpp");
-  return e;
-}
-
-mcp::JsonValue handle_profile_get_data(const mcp::JsonValue &) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_profile_get_data called");
-  mcp::JsonValue e(mcp::JsonValue::object_tag);
-  e["error"] = mcp::JsonValue("profiling not available via godot-cpp");
-  return e;
-}
-
-mcp::JsonValue handle_set_fps_limit(const mcp::JsonValue &args) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_set_fps_limit called");
-  auto *fp = args.Find("fps");
-  if (!fp || !fp->IsNumber()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: fps (integer)");
-    return e;
-  }
-  int64_t fps =
-      fp->IsDouble() ? static_cast<int64_t>(fp->GetDouble()) : fp->GetInt();
-  auto *engine = godot::Engine::get_singleton();
-  if (!engine) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("Engine not available");
-    return e;
-  }
-  engine->set_max_fps(static_cast<int32_t>(fps));
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_set_fps_limit completed");
+                            "get_debug_memory_usage completed");
   return r;
 }
 
 mcp::JsonValue handle_set_physics_fps(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_set_physics_fps called");
+                            "set_debug_physics_fps called");
   auto *fp = args.Find("fps");
   if (!fp || !fp->IsNumber()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -346,13 +286,13 @@ mcp::JsonValue handle_set_physics_fps(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_set_physics_fps completed");
+                            "set_debug_physics_fps completed");
   return r;
 }
 
 mcp::JsonValue handle_collision_debug(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_collision_debug called");
+                            "set_debug_collision_visual called");
   auto *ep = args.Find("enabled");
   if (!ep || !ep->IsBool()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -377,13 +317,13 @@ mcp::JsonValue handle_collision_debug(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_collision_debug completed");
+                            "set_debug_collision_visual completed");
   return r;
 }
 
 mcp::JsonValue handle_navigation_debug(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_navigation_debug called");
+                            "set_debug_navigation_visual called");
   auto *ep = args.Find("enabled");
   if (!ep || !ep->IsBool()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -408,13 +348,13 @@ mcp::JsonValue handle_navigation_debug(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_navigation_debug completed");
+                            "set_debug_navigation_visual completed");
   return r;
 }
 
 mcp::JsonValue handle_performance_debug(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_performance_debug called");
+                            "set_debug_performance_visual called");
   auto *ep = args.Find("enabled");
   if (!ep || !ep->IsBool()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -439,13 +379,13 @@ mcp::JsonValue handle_performance_debug(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_performance_debug completed");
+                            "set_debug_performance_visual completed");
   return r;
 }
 
 mcp::JsonValue handle_get_all_monitors(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_get_all_monitors called");
+                            "get_debug_monitors called");
   auto *perf = godot::Performance::get_singleton();
   if (!perf) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -466,23 +406,13 @@ mcp::JsonValue handle_get_all_monitors(const mcp::JsonValue &) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(arr);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_get_all_monitors completed");
+                            "get_debug_monitors completed");
   return r;
-}
-
-mcp::JsonValue handle_add_custom_monitor(const mcp::JsonValue &) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_add_custom_monitor called");
-  mcp::JsonValue e(mcp::JsonValue::object_tag);
-  e["error"] =
-      mcp::JsonValue("custom monitor creation from JSON not supported via "
-                     "godot-cpp; use script_execute_gdscript instead");
-  return e;
 }
 
 mcp::JsonValue handle_remove_custom_monitor(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_remove_custom_monitor called");
+                            "remove_debug_custom_monitor called");
   auto *id_p = args.Find("id");
   if (!id_p || !id_p->IsString()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -499,13 +429,13 @@ mcp::JsonValue handle_remove_custom_monitor(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_remove_custom_monitor completed");
+                            "remove_debug_custom_monitor completed");
   return r;
 }
 
 mcp::JsonValue handle_get_custom_monitor(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_get_custom_monitor called");
+                            "get_debug_custom_monitor called");
   auto *id_p = args.Find("id");
   if (!id_p || !id_p->IsString()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -523,13 +453,13 @@ mcp::JsonValue handle_get_custom_monitor(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = VariantJson::serialize(val);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_get_custom_monitor completed");
+                            "get_debug_custom_monitor completed");
   return r;
 }
 
 mcp::JsonValue handle_list_custom_monitors(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_list_custom_monitors called");
+                            "get_debug_custom_monitor_names called");
   auto *perf = godot::Performance::get_singleton();
   if (!perf) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -544,47 +474,13 @@ mcp::JsonValue handle_list_custom_monitors(const mcp::JsonValue &) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(arr);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_list_custom_monitors completed");
-  return r;
-}
-
-mcp::JsonValue handle_query_object_count(const mcp::JsonValue &) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_query_object_count called");
-  auto *perf = godot::Performance::get_singleton();
-  if (!perf) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("Performance singleton not available");
-    return e;
-  }
-  double count = perf->get_monitor(godot::Performance::OBJECT_COUNT);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue(count);
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_query_object_count completed");
-  return r;
-}
-
-mcp::JsonValue handle_query_memory_usage(const mcp::JsonValue &) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_query_memory_usage called");
-  auto *perf = godot::Performance::get_singleton();
-  if (!perf) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("Performance singleton not available");
-    return e;
-  }
-  double bytes = perf->get_monitor(godot::Performance::MEMORY_STATIC);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue(bytes);
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_query_memory_usage completed");
+                            "get_debug_custom_monitor_names completed");
   return r;
 }
 
 mcp::JsonValue handle_query_node_count(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_query_node_count called");
+                            "get_debug_node_count called");
   auto *perf = godot::Performance::get_singleton();
   if (!perf) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -595,9 +491,9 @@ mcp::JsonValue handle_query_node_count(const mcp::JsonValue &) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue(count);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "debug_query_node_count completed");
+                            "get_debug_node_count completed");
   return r;
 }
 
 } // namespace debug_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot

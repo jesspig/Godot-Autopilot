@@ -3,7 +3,7 @@
 #include <mcp/JsonValue.hpp>
 #include <string>
 
-namespace gsd_test {
+namespace gda_test {
 
 // 点路径取值："result.position.x"；不支持数组下标（仅对象点路径）
 // 路径任一段不存在返回 nullptr

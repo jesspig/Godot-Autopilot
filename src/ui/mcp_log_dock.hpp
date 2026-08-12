@@ -1,5 +1,5 @@
-#ifndef GODOT_SELF_DRIVING_MCP_LOG_DOCK_HPP
-#define GODOT_SELF_DRIVING_MCP_LOG_DOCK_HPP
+#ifndef GODOT_AUTOPILOT_MCP_LOG_DOCK_HPP
+#define GODOT_AUTOPILOT_MCP_LOG_DOCK_HPP
 
 #include <godot_cpp/classes/button.hpp>
 #include <godot_cpp/classes/editor_dock.hpp>
@@ -9,7 +9,7 @@
 
 #include "../core/log_system.hpp"
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 
 class McpLogDock : public godot::EditorDock {
   GDCLASS(McpLogDock, godot::EditorDock)
@@ -61,6 +61,6 @@ private:
   void _on_collapse_toggled(bool enabled);
 };
 
-} // namespace godot_self_driving
+} // namespace godot_autopilot
 
 #endif

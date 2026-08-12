@@ -18,7 +18,7 @@
 #include <mcp/JsonValue.hpp>
 #include <string>
 
-namespace godot_self_driving {
+namespace godot_autopilot {
 namespace nav_ops {
 
 using JV = mcp::JsonValue;
@@ -76,7 +76,7 @@ godot::Vector3 json_to_vec3(const JV &j) {
 
 JV handle_2d_map_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_2d_map_create called");
+                            "create_nav_2d_map called");
 
   auto *ns = godot::NavigationServer2D::get_singleton();
   if (!ns) {
@@ -91,7 +91,7 @@ JV handle_2d_map_create(const JV &args) {
   ns->map_set_active(map, active);
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_2d_map_create completed");
+                            "create_nav_2d_map completed");
   JV r(JV::object_tag);
   r["result"] = JV::FromObject({{"rid", JV(rid_to_int(map))}});
   return r;
@@ -99,7 +99,7 @@ JV handle_2d_map_create(const JV &args) {
 
 JV handle_2d_region_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_2d_region_create called");
+                            "create_nav_2d_region called");
 
   auto *it_map = args.Find("map_rid");
   if (!it_map || !it_map->IsNumber()) {
@@ -128,7 +128,7 @@ JV handle_2d_region_create(const JV &args) {
   }
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_2d_region_create completed");
+                            "create_nav_2d_region completed");
   JV r(JV::object_tag);
   r["result"] = JV::FromObject({{"rid", JV(rid_to_int(region))}});
   return r;
@@ -136,7 +136,7 @@ JV handle_2d_region_create(const JV &args) {
 
 JV handle_2d_path_query(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_2d_path_query called");
+                            "get_nav_2d_map_path called");
 
   auto *it_map = args.Find("map_rid");
   auto *it_origin = args.Find("origin");
@@ -180,7 +180,7 @@ JV handle_2d_path_query(const JV &args) {
   }
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_2d_path_query completed");
+                            "get_nav_2d_map_path completed");
   JV r(JV::object_tag);
   r["result"] = JV::FromObject({{"path", std::move(arr)}});
   return r;
@@ -188,7 +188,7 @@ JV handle_2d_path_query(const JV &args) {
 
 JV handle_2d_agent_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_2d_agent_create called");
+                            "create_nav_2d_agent called");
 
   auto *it_map = args.Find("map_rid");
   auto *it_pos = args.Find("position");
@@ -235,7 +235,7 @@ JV handle_2d_agent_create(const JV &args) {
     ns->agent_set_avoidance_enabled(agent, args["avoidance_enabled"].GetBool());
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_2d_agent_create completed");
+                            "create_nav_2d_agent completed");
   JV r(JV::object_tag);
   r["result"] = JV::FromObject({{"rid", JV(rid_to_int(agent))}});
   return r;
@@ -243,7 +243,7 @@ JV handle_2d_agent_create(const JV &args) {
 
 JV handle_2d_agent_set_target(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_2d_agent_set_target called");
+                            "set_nav_2d_agent_velocity called");
 
   auto *it_agent = args.Find("agent_rid");
   auto *it_vel = args.Find("velocity");
@@ -269,7 +269,7 @@ JV handle_2d_agent_set_target(const JV &args) {
                          json_to_vec2(*it_vel));
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_2d_agent_set_target completed");
+                            "set_nav_2d_agent_velocity completed");
   JV r(JV::object_tag);
   r["result"] = JV(true);
   return r;
@@ -277,7 +277,7 @@ JV handle_2d_agent_set_target(const JV &args) {
 
 JV handle_3d_map_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_3d_map_create called");
+                            "create_nav_3d_map called");
 
   auto *ns = godot::NavigationServer3D::get_singleton();
   if (!ns) {
@@ -311,7 +311,7 @@ JV handle_3d_map_create(const JV &args) {
     ns->map_set_up(map, json_to_vec3(args["up"]));
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_3d_map_create completed");
+                            "create_nav_3d_map completed");
   JV r(JV::object_tag);
   r["result"] = JV::FromObject({{"rid", JV(rid_to_int(map))}});
   return r;
@@ -319,7 +319,7 @@ JV handle_3d_map_create(const JV &args) {
 
 JV handle_3d_region_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_3d_region_create called");
+                            "create_nav_3d_region called");
 
   auto *it_map = args.Find("map_rid");
   if (!it_map || !it_map->IsNumber()) {
@@ -346,7 +346,7 @@ JV handle_3d_region_create(const JV &args) {
         region, static_cast<uint32_t>(args["navigation_layers"].GetInt()));
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_3d_region_create completed");
+                            "create_nav_3d_region completed");
   JV r(JV::object_tag);
   r["result"] = JV::FromObject({{"rid", JV(rid_to_int(region))}});
   return r;
@@ -354,7 +354,7 @@ JV handle_3d_region_create(const JV &args) {
 
 JV handle_3d_path_query(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_3d_path_query called");
+                            "get_nav_3d_map_path called");
 
   auto *it_map = args.Find("map_rid");
   auto *it_origin = args.Find("origin");
@@ -398,7 +398,7 @@ JV handle_3d_path_query(const JV &args) {
   }
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_3d_path_query completed");
+                            "get_nav_3d_map_path completed");
   JV r(JV::object_tag);
   r["result"] = JV::FromObject({{"path", std::move(arr)}});
   return r;
@@ -406,7 +406,7 @@ JV handle_3d_path_query(const JV &args) {
 
 JV handle_3d_path_query_segment(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_3d_path_query_segment called");
+                            "get_nav_3d_map_closest_point_to_segment called");
 
   auto *it_map = args.Find("map_rid");
   auto *it_start = args.Find("start");
@@ -441,7 +441,7 @@ JV handle_3d_path_query_segment(const JV &args) {
       map, json_to_vec3(*it_start), json_to_vec3(*it_end), use_collision);
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_3d_path_query_segment completed");
+                            "get_nav_3d_map_closest_point_to_segment completed");
   JV r(JV::object_tag);
   r["result"] = JV::FromObject({{"point", vec3_to_json(point)}});
   return r;
@@ -449,7 +449,7 @@ JV handle_3d_path_query_segment(const JV &args) {
 
 JV handle_3d_agent_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_3d_agent_create called");
+                            "create_nav_3d_agent called");
 
   auto *it_map = args.Find("map_rid");
   auto *it_pos = args.Find("position");
@@ -504,7 +504,7 @@ JV handle_3d_agent_create(const JV &args) {
     ns->agent_set_use_3d_avoidance(agent, args["use_3d_avoidance"].GetBool());
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_3d_agent_create completed");
+                            "create_nav_3d_agent completed");
   JV r(JV::object_tag);
   r["result"] = JV::FromObject({{"rid", JV(rid_to_int(agent))}});
   return r;
@@ -512,7 +512,7 @@ JV handle_3d_agent_create(const JV &args) {
 
 JV handle_3d_agent_set_velocity(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_3d_agent_set_velocity called");
+                            "set_nav_3d_agent_velocity called");
 
   auto *it_agent = args.Find("agent_rid");
   auto *it_vel = args.Find("velocity");
@@ -538,7 +538,7 @@ JV handle_3d_agent_set_velocity(const JV &args) {
                          json_to_vec3(*it_vel));
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_3d_agent_set_velocity completed");
+                            "set_nav_3d_agent_velocity completed");
   JV r(JV::object_tag);
   r["result"] = JV(true);
   return r;
@@ -546,7 +546,7 @@ JV handle_3d_agent_set_velocity(const JV &args) {
 
 JV handle_3d_agent_get_next_path(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_3d_agent_get_next_path called");
+                            "get_nav_3d_agent_state called");
 
   auto *it_agent = args.Find("agent_rid");
   if (!it_agent || !it_agent->IsNumber()) {
@@ -567,7 +567,7 @@ JV handle_3d_agent_get_next_path(const JV &args) {
   godot::Vector3 vel = ns->agent_get_velocity(agent);
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_3d_agent_get_next_path completed");
+                            "get_nav_3d_agent_state completed");
   JV r(JV::object_tag);
   JV result(JV::object_tag);
   result["position"] = vec3_to_json(pos);
@@ -578,7 +578,7 @@ JV handle_3d_agent_get_next_path(const JV &args) {
 
 JV handle_3d_map_set_cell_size(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_3d_map_set_cell_size called");
+                            "set_nav_3d_map_cell_size called");
 
   auto *it_map = args.Find("map_rid");
   auto *it_cell = args.Find("cell_size");
@@ -607,7 +607,7 @@ JV handle_3d_map_set_cell_size(const JV &args) {
                              : it_cell->GetDouble()));
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_3d_map_set_cell_size completed");
+                            "set_nav_3d_map_cell_size completed");
   JV r(JV::object_tag);
   r["result"] = JV(true);
   return r;
@@ -615,7 +615,7 @@ JV handle_3d_map_set_cell_size(const JV &args) {
 
 JV handle_3d_region_set_nav_mesh(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_3d_region_set_nav_mesh called");
+                            "set_nav_3d_region_navigation_mesh called");
 
   auto *it_region = args.Find("region_rid");
   auto *it_mesh = args.Find("mesh_path");
@@ -663,7 +663,7 @@ JV handle_3d_region_set_nav_mesh(const JV &args) {
   ns->region_set_navigation_mesh(rid_from_int(it_region->GetInt()), mesh);
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_3d_region_set_nav_mesh completed");
+                            "set_nav_3d_region_navigation_mesh completed");
   JV r(JV::object_tag);
   r["result"] = JV(true);
   return r;
@@ -671,7 +671,7 @@ JV handle_3d_region_set_nav_mesh(const JV &args) {
 
 JV handle_3d_obstacle_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_3d_obstacle_create called");
+                            "create_nav_3d_obstacle called");
 
   auto *it_map = args.Find("map_rid");
   auto *it_pos = args.Find("position");
@@ -716,11 +716,11 @@ JV handle_3d_obstacle_create(const JV &args) {
                           : 0.0));
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
-                            "navigation_3d_obstacle_create completed");
+                            "create_nav_3d_obstacle completed");
   JV r(JV::object_tag);
   r["result"] = JV::FromObject({{"rid", JV(rid_to_int(obstacle))}});
   return r;
 }
 
 } // namespace nav_ops
-} // namespace godot_self_driving
+} // namespace godot_autopilot
