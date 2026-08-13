@@ -8,7 +8,7 @@
 
 这 13 个模块是领域工具的前半部分：覆盖场景节点操作、属性/信号、分组、输入模拟与 InputMap、物理（2D/3D 双份）、导航、资源生命周期、脚本与 GDScript 执行、项目/引擎/编辑器配置、引擎类文档查询、编辑器会话管理。全部位于命名空间 `godot_autopilot::<模块>_ops`，与 AGENTS.md 约定一致。
 
-`tool_defs.def` 共 331 个 `TOOL_ENTRY`（即 AGENTS.md 所述 331 个领域工具），本页 13 模块占其中 **172 个（52.0%）**。工具经 `register_all.cpp` 的 `TOOL_ENTRY` 宏同时写入 `dispatch::g_handlers` 与 `ToolCatalog`；领域工具不直接注册到 MCP 服务器，统一经元工具 `call_tool` 分发（见 [../modules/tools_registry.md](../modules/tools_registry.md)）。
+`tool_defs.def` 共 332 个 `TOOL_ENTRY`（即 AGENTS.md 所述 332 个领域工具），本页 13 模块占其中 **172 个（51.8%）**。工具经 `register_all.cpp` 的 `TOOL_ENTRY` 宏同时写入 `dispatch::g_handlers` 与 `ToolCatalog`；领域工具不直接注册到 MCP 服务器，统一经元工具 `call_tool` 分发（见 [../modules/tools_registry.md](../modules/tools_registry.md)）。
 
 ## 模块总览
 
@@ -285,7 +285,7 @@
 | 文档 | 声称 | 代码事实 | 判定 |
 |---|---|---|---|
 | AGENTS.md（命名约定） | 工具命名 `<动词>_<类别>_<维度>_<对象>_<修饰>`，动词置首，如 `intersect_physics_2d_ray` | 本组符合；`signal_connect`/`signal_disconnect`（动词置首，无类别段）、config_ops 的 `get_project_settings`/`set_engine_*`/`get_editor_settings`（类别段为 project/engine/editor，与文件名 `config_` 不一致）属规范内的长短变化 | 一致 ✓（动词置首） |
-| AGENTS.md（工具总数） | 331 领域工具 | `tool_defs.def` 恰好 331 条 `TOOL_ENTRY`；本页 13 模块 172 条 | 一致 ✓ |
+| AGENTS.md（工具总数） | 332 领域工具 | `tool_defs.def` 恰好 332 条 `TOOL_ENTRY`；本页 13 模块 172 条 | 一致 ✓ |
 | AGENTS.md（错误模式） | 领域工具返回 `{"error": "消息"}` | 一致；另有 `error_detail` 扩展格式与 dispatch `catch(...)` 兜底、导出期固定错误 | 一致 ✓（有扩展） |
 | AGENTS.md（契约缺口 3 项） | `create_scene_node` 不校验必填；`get_resource_extensions` 缺 type 返回全类型；`reimport_resource_files` 空参静默成功 | 三项均在代码中逐一确认（默认 "NewNode"/"Node"；空 type 传 `""`；count=0 返回 queued） | 一致 ✓ |
 | AGENTS.md（遍历排除） | 34 个副作用工具排除 | `kExcludedSideEffectTools` 含 `save_input_map`、`add_input_map_action_event`、`save_project_settings`、`set_editor_settings`、`set_editor_main_scene`、`set_editor_plugin_enabled`、`save_editor_scene` 等本组持久化工具 | 一致 ✓ |

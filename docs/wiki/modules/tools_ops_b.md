@@ -2,7 +2,7 @@
 
 > 覆盖 `src/tools/` 下 18 个模块：debug_ops、debugger_ops、debugger_access、display_ops、display_window_ops、os_ops、runtime_ops、runtime_game_ops、audio_ops、render_ops、environment_ops、text_ops、tilemap_ops、tileset_ops、spriteframes_ops、code_exec_ops、log_ops、capture_ops。
 >
-> 工具总数：**161** = 159 个领域工具 + 2 个元工具（`batch_execute`、`code_execute`，经 `server.RegisterTool()` 直连，不经 `call_tool`）。数量以 `src/tools/tool_defs.def` 的 `TOOL_ENTRY` 与 `register_all.cpp` 为准。
+> 工具总数：**162** = 160 个领域工具 + 2 个元工具（`batch_execute`、`code_execute`，经 `server.RegisterTool()` 直连，不经 `call_tool`）。数量以 `src/tools/tool_defs.def` 的 `TOOL_ENTRY` 与 `register_all.cpp` 为准。
 >
 > 相关页面：[工具注册表](../modules/tools_registry.md) · [运行时通道](../modules/entry_runtime.md)
 
@@ -17,7 +17,7 @@
 | `display_window_ops.cpp` | `godot_autopilot::display_ops` | `display_ops.hpp`（无独立 hpp） | 9 |
 | `os_ops.cpp` | `godot_autopilot::os_ops` | `os_ops.hpp` | 15 |
 | `runtime_ops.cpp` | `godot_autopilot::runtime_ops` | `runtime_ops.hpp` | 0（基础设施） |
-| `runtime_game_ops.cpp` | `godot_autopilot::runtime_ops` | `runtime_ops.hpp`（无独立 hpp） | 6 |
+| `runtime_game_ops.cpp` | `godot_autopilot::runtime_ops` | `runtime_ops.hpp`（无独立 hpp） | 7 |
 | `audio_ops.cpp` | `godot_autopilot::audio_ops` | `audio_ops.hpp` | 20 |
 | `render_ops.cpp` | `godot_autopilot::render_ops` | `render_ops.hpp` | 42 |
 | `environment_ops.cpp` | `godot_autopilot::render_ops` | `render_ops.hpp`（无独立 hpp） | 7 |
@@ -85,10 +85,10 @@
 - **错误模式**：必填参数缺失 → error_json；单例缺失 → error_json；`kill_os_process`/`move_os_file_to_trash`/`open_os_path` 返回 Error 枚举数值。
 - 出站链接：[工具注册表](../modules/tools_registry.md) · [运行时通道](../modules/entry_runtime.md)
 
-## runtime_ops + runtime_game_ops — 游戏运行时通道（6 工具 + 基础设施）
+## runtime_ops + runtime_game_ops — 游戏运行时通道（7 工具 + 基础设施）
 
 - **职责**：`game_*` 工具把请求经编辑器调试会话发送到运行中的游戏进程（gda 协议），等待响应；`runtime_ops.cpp` 提供队列注入、请求生命周期、超时取消、断点自动恢复、捕获文件回读。
-- **代表工具**：`get_game_status`、`execute_game_script`、`queue_game_input`、`wait_game_input`、`get_game_input_status`、`capture_game_viewport`。
+- **代表工具**：`get_game_status`、`execute_game_script`、`queue_game_input`、`wait_game_input`、`get_game_input_status`、`capture_game_viewport`、`reload_game_scripts`。
 - **关键事实**：
   - **`set_editor_queue(CommandQueue*)`**：`main.cpp` 注入 Godot 主线程队列（`get_editor_queue()` 全局访问）。`handle_gda_send` 非主线程时经 `queue.submit(...).get()` 投递；游戏响应 `handle_game_response` 由 `DebugCapturePlugin::_capture` 喂入，以 request_id 匹配 `PendingRequest`（mutex + condition_variable）并唤醒等待线程。
   - 请求 ID 原子自增；`extract_timeout` 钳制到 `GDA_MAX_TIMEOUT_MS=30000`（默认 `GDA_DEFAULT_TIMEOUT_MS=5000`，`src/core/config.hpp`）；`handle_gda_send` 返回中间态 `{"__gda_pending": id, "timeout_ms": ...}`，由 `register_all.cpp::meta_call_tool_wait` 转 `wait_pending_response` 轮询合并；`capture_game_viewport` 额外走 `finalize_capture_response`（主线程读文件 → base64）。
