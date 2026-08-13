@@ -14,10 +14,6 @@ config/name="Example"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
 
-[audio]
-
-buses/default_bus_layout="uid://c6hb2nshs2igl"
-
 [display]
 
 window/stretch/mode="canvas_items"
@@ -25,7 +21,7 @@ window/stretch/aspect="expand"
 
 [dotnet]
 
-project/assembly_name="新建游戏项目"
+project/assembly_name="Example"
 
 [physics]
 
