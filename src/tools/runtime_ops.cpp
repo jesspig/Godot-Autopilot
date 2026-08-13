@@ -126,7 +126,10 @@ JV wait_for_response(int64_t request_id, int64_t timeout_ms) {
                       ") — the request was sent to the active debug session(s) "
                       "but no response arrived; the game process may be paused "
                       "or physics-frozen (query get_game_status), or the game "
-                      "project may not load the godot-autopilot extension");
+                      "project may not load the godot-autopilot extension. "
+                      "If the in-game script errored, a pending await may " 
+                      "never complete — run get_game_log_entries to inspect "
+                      "the game log.");
   }
   {
     std::lock_guard<std::mutex> gl(g_pending_mtx);
@@ -135,7 +138,14 @@ JV wait_for_response(int64_t request_id, int64_t timeout_ms) {
 
   JV response = pending->response;
   if (response.Contains("error")) {
-    return error_json(response["error"].GetString());
+    std::string error_text = response["error"].GetString();
+    if (auto *ed = response.Find("error_details")) {
+      if (ed->IsString()) {
+        error_text +=
+            "\n(game-side error details)\n" + ed->GetString();
+      }
+    }
+    return error_json(error_text);
   }
   if (auto *result_p = response.Find(GDA_FIELD_RESULT)) {
     JV result = *result_p;
@@ -180,6 +190,21 @@ JV wait_for_response(int64_t request_id, int64_t timeout_ms) {
         }
       }
       result["physics_stalled"] = JV(physics_stalled);
+    }
+    if (response.Find("runtime_error")) {
+      JV merged = result;
+      if (!merged.IsObject()) {
+        JV wrapped(JV::object_tag);
+        wrapped["value"] = std::move(merged);
+        merged = std::move(wrapped);
+      }
+      if (auto *re = response.Find("runtime_error"))
+        merged["runtime_error"] = *re;
+      if (auto *ed = response.Find("error_details"))
+        merged["error_details"] = *ed;
+      if (auto *se = response.Find("structured_error"))
+        merged["structured_error"] = *se;
+      return merged;
     }
     return result;
   }
