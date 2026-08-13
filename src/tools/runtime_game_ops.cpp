@@ -161,5 +161,39 @@ mcp::JsonValue handle_game_capture(const mcp::JsonValue &args) {
   return handle_gda_send("capture", params, extract_timeout(args));
 }
 
+mcp::JsonValue handle_game_reload_scripts(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "reload_game_scripts called");
+  auto *paths_p = args.Find("paths");
+  if (!paths_p || !paths_p->IsArray() || paths_p->GetArray().empty()) {
+    return error_json(
+        "reload_game_scripts requires paths: non-empty array of res:// script paths");
+  }
+  std::vector<std::string> paths_vec;
+  for (const auto &item : paths_p->GetArray()) {
+    if (!item.IsString() || item.GetString().empty()) {
+      return error_json(
+          "reload_game_scripts requires paths: non-empty array of res:// script paths");
+    }
+    paths_vec.push_back(item.GetString());
+  }
+  int32_t sent = debugger_broadcast_reload_scripts(paths_vec);
+  if (sent <= 0) {
+    return error_json(
+        "game not ready: no active debug session — start the game from the editor first");
+  }
+  JV paths_arr(JV::array_tag);
+  for (const auto &path : paths_vec)
+    paths_arr.PushBack(JV(path));
+  JV inner(JV::object_tag);
+  inner["sent_sessions"] = JV(static_cast<int64_t>(sent));
+  inner["paths"] = std::move(paths_arr);
+  JV result(JV::object_tag);
+  result["result"] = std::move(inner);
+  result["note"] = JV(
+      "soft reload is applied by the game on its next idle poll; no confirmation is returned — verify with get_game_log_entries");
+  return result;
+}
+
 } // namespace runtime_ops
 } // namespace godot_autopilot

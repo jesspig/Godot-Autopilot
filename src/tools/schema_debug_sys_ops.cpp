@@ -29,12 +29,15 @@ void fill_schema_debug_sys(std::unordered_map<std::string, mcp::JsonValue>& m) {
             {"node_path", "string", "Node path for get_property/set_property/call_method (omit to use the current scene root)", false},
             {"property", "string", "Property name for get_property/set_property", false},
             {"value", "object", "Value to set for set_property", false},
-            {"method", "string", "Method name for call_method", false},
+            {"method", "string", "Method name for call_method; await methods are awaited to completion (bounded by timeout_ms) and return their final result", false},
             {"args", "array", "Arguments for call_method", false},
             {"source_code", "string", "GDScript source for action='script' — must extend Node and define func _run()", false},
             {"persist", "boolean", "Keep the script's temporary node alive after the call (default: false); the node is stored under /root/__gda_runtime and its path is returned in node_path for later get_property/call_method use", false},
             {"persist_name", "string", "Node name under /root/__gda_runtime when persist=true (default: auto-generated)", false},
             {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 30000); on expiry an idempotent cancel interrupts the pending in-game await", false},
+        });
+        m["reload_game_scripts"] = schema::build_schema({
+            {"paths", "array", "Non-empty array of res:// GDScript file paths to reload in the running game", true},
         });
         m["queue_game_input"] = schema::build_schema({
             {"type", "string", "Input event type: 'key' (keyboard), 'mouse_button' (mouse click) or 'action' (named InputMap action)", true},
@@ -42,7 +45,7 @@ void fill_schema_debug_sys(std::unordered_map<std::string, mcp::JsonValue>& m) {
             {"pressed", "boolean", "Pressed state (default: true)", false},
             {"button_index", "integer", "Mouse button index for type='mouse_button' (e.g. 1=left, 2=right, 3=middle)", false},
             {"position", "object", "Mouse position {x, y} for type='mouse_button'", false},
-            {"action", "string", "Action name for type='action' (e.g. 'ui_accept'); transient states (is_action_just_pressed) are only visible in the next physics frame — use wait_game_input or get_game_input_status to observe effects", false},
+            {"action", "string", "Action name for type='action' (e.g. 'ui_accept'); transient states (is_action_just_pressed) are only visible in the next physics frame — use wait_game_input or get_game_input_status to observe effects. Transient states are not visible in _process (render frame)", false},
             {"duration_ms", "integer", "Hold duration: auto-release the input after this many ms (0/absent = no auto-release); only meaningful when pressed=true", false},
             {"mode", "string", "Injection mode: 'event' (default, via Input.parse_input_event), 'api' (via Input.action_press/action_release, immediate) or 'hold' (event-style injection that stays pressed for duration_ms)", false},
             {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 30000)", false},
@@ -50,7 +53,7 @@ void fill_schema_debug_sys(std::unordered_map<std::string, mcp::JsonValue>& m) {
         m["wait_game_input"] = schema::build_schema({
             {"action", "string", "Action name to wait on", true},
             {"state", "string", "Transient state to wait for: 'just_pressed' (default), 'just_released' or 'pressed'", false},
-            {"inject", "object", "Inject an input before waiting, in the same call (fields mirror queue_game_input: type/action/keycode/pressed/mode/duration_ms/button_index/position) — eliminates the inject-then-observe cross-roundtrip frame gap; required for state=just_pressed/just_released, without inject the transient window (1 physics frame) has already expired and the wait will always time out", false},
+            {"inject", "object", "Inject an input before waiting, in the same call (fields mirror queue_game_input: type/action/keycode/pressed/mode/duration_ms/button_index/position) — eliminates the inject-then-observe cross-roundtrip frame gap; required for state=just_pressed/just_released, without inject the transient window (1 physics frame) has already expired and the wait will always time out. Transient states are not visible in _process (render frame)", false},
             {"timeout_ms", "integer", "Wait timeout in milliseconds (default: 2000, max: 30000)", false},
         });
         m["get_game_input_status"] = schema::build_schema({

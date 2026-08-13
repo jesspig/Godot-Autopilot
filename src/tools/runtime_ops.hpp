@@ -21,6 +21,7 @@ mcp::JsonValue handle_game_input(const mcp::JsonValue &args);
 mcp::JsonValue handle_game_input_wait(const mcp::JsonValue &args);
 mcp::JsonValue handle_game_input_status(const mcp::JsonValue &args);
 mcp::JsonValue handle_game_capture(const mcp::JsonValue &args);
+mcp::JsonValue handle_game_reload_scripts(const mcp::JsonValue &args);
 
 mcp::JsonValue handle_gda_send(const std::string &op,
                                const mcp::JsonValue &params,
