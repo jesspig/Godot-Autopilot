@@ -466,6 +466,32 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
     return e;
   }
 
+  bool verified = false;
+  bool readback = false;
+  std::string write_issue;
+  std::string write_warning;
+  auto readback_file = godot::FileAccess::open(
+      godot::String(path.c_str()), godot::FileAccess::READ);
+  if (readback_file.is_valid() && readback_file->is_open()) {
+    readback = true;
+    std::string read_back = util::to_std(readback_file->get_as_text());
+    godot::Error read_err = readback_file->get_error();
+    if (read_err != godot::OK && read_err != godot::ERR_FILE_EOF) {
+      write_issue = "readback read error";
+    } else if (read_back == source_code) {
+      verified = true;
+    } else {
+      write_issue = "readback mismatch (written " +
+                    std::to_string(source_code.size()) + " bytes, read back " +
+                    std::to_string(read_back.size()) + " bytes)";
+      write_warning =
+          "file may not have been updated on disk; retry or check file locks "
+          "(e.g. the running game or antivirus)";
+    }
+  } else {
+    write_issue = "readback open failed";
+  }
+
   bool cache_invalidated = invalidate_cached_resource(path);
   auto *editor = godot::EditorInterface::get_singleton();
   if (editor) {
@@ -480,6 +506,14 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
   j["path"] = mcp::JsonValue(path);
   j["class"] = mcp::JsonValue("GDScript");
   j["overwritten"] = mcp::JsonValue(file_exists_on_disk);
+  j["verified"] = mcp::JsonValue(verified);
+  j["readback"] = mcp::JsonValue(readback);
+  if (!write_issue.empty()) {
+    j["write_issue"] = mcp::JsonValue(write_issue);
+  }
+  if (!write_warning.empty()) {
+    j["warning"] = mcp::JsonValue(write_warning);
+  }
   if (cache_invalidated) {
     j["cache_invalidated"] = mcp::JsonValue(true);
   }
