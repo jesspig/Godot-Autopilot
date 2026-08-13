@@ -13,9 +13,9 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 
 ## 核心能力
 
-### MCP 工具：338 个 = 7 元工具 + 331 领域工具
+### MCP 工具：339 个 = 7 元工具 + 332 领域工具
 
-数值以 `src/tools/tool_defs.def`（331 条 `TOOL_ENTRY`）与 `src/tools/dispatch.cpp`（`meta_tool_names` 7 个）为准；数量随插件版本变化，运行时可经 `search_tools` 确认。工具名遵循 `<动词>_<类别>_<维度>_<对象>_<修饰>`（动词置首，snake_case）。
+数值以 `src/tools/tool_defs.def`（332 条 `TOOL_ENTRY`）与 `src/tools/dispatch.cpp`（`meta_tool_names` 7 个）为准；数量随插件版本变化，运行时可经 `search_tools` 确认。工具名遵循 `<动词>_<类别>_<维度>_<对象>_<修饰>`（动词置首，snake_case）。
 
 **7 个元工具**（直接 `server.RegisterTool()` 注册，见 `register_all.cpp`）：
 
@@ -29,7 +29,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 | `batch_execute` | 顺序批量执行多工具 |
 | `code_execute` | 执行任意 GDScript（临时 Node + `_run()`，可选 `function_name` 多函数模式） |
 
-**331 个领域工具**（经 `call_tool` 代理，`g_handlers` 映射分发），按 23 个类别组织（InputMap 并入 Input），各类别数量以 `tool_defs.def` 统计为准：
+**332 个领域工具**（经 `call_tool` 代理，`g_handlers` 映射分发），按 23 个类别组织（InputMap 并入 Input），各类别数量以 `tool_defs.def` 统计为准：
 
 | 类别 | 数量 | 类别 | 数量 |
 |---|---:|---|---:|
@@ -38,7 +38,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 | Display | 24 | Text | 10 |
 | Editor | 22 | TileMap | 7 |
 | Resources | 21 | Debugger | 7 |
-| Audio | 20 | Game | 6 |
+| Audio | 20 | Game | 7 |
 | Input | 19 | Properties | 5 |
 | OS | 16 | Docs | 4 |
 | Debug | 16 | Group | 3 |
@@ -46,7 +46,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 | Config | 13 | System | 1 |
 | | | Capture | 1 |
 
-另有 `system_status`（端口/版本/运行时长）注册于 `g_handlers`，经 `call_tool` 调用，不直接注册为 MCP 工具；`ToolCatalog` 合计 342 条目（331 领域 + 7 元工具 + `system_status` + 3 个 meta 快照）。
+另有 `system_status`（端口/版本/运行时长）注册于 `g_handlers`，经 `call_tool` 调用，不直接注册为 MCP 工具；`ToolCatalog` 合计 343 条目（332 领域 + 7 元工具 + `system_status` + 3 个 meta 快照）。
 
 ### 提示词模板：7 个
 
@@ -96,7 +96,7 @@ godot-self-driving/
 │   ├── core/                   # 基础设施：CommandQueue(header-only)、config、LogSystem、ModeDetector、
 │   │                           #   ResourceRegistry、SceneDirtyTracker、ExportGuard、ServerContext
 │   ├── tools/                  # 领域工具：36 个 *_ops.cpp、register_all、dispatch、tool_catalog、
-│   │                           #   tool_defs.def（331 条工具定义）、schema_* 生成器
+│   │                           #   tool_defs.def（332 条工具定义）、schema_* 生成器
 │   ├── resources/              # MCP Resources：resource_handlers + debugger_resources
 │   ├── prompts/                # 提示词模板：7 个主题 + debugger_prompts
 │   ├── runtime/                # 游戏运行时桥接：game_bridge(±input/eval) + gda_protocol.hpp
@@ -141,7 +141,7 @@ flowchart LR
 | 项 | 值 |
 |---|---|
 | MCP 端口 / 端点 | 9527 / `/mcp`（环境变量 `GODOT_AUTOPILOT_PORT` 覆盖） |
-| 工具总数 | 338 = 7 元 + 331 领域（领域 23 类别）；ToolCatalog 342 条目 |
+| 工具总数 | 339 = 7 元 + 332 领域（领域 23 类别）；ToolCatalog 343 条目 |
 | 提示词 / 资源 | 7 模板 / 15 资源 |
 | 日志类别 | 5（System / Transport / Tools / Resources / Prompts） |
 | 引擎目标 | Godot 4.7（`Example/project.godot` features） |
@@ -149,7 +149,7 @@ flowchart LR
 ## 文档一致性核查（速览）
 
 - 端口 9527、`/mcp`、`GODOT_AUTOPILOT_PORT`：README（英/中）、AGENTS.md、代码三方一致 ✓
-- 工具总数 338：README.md（英文）"~338" 与 `tool_defs.def` + meta 数量一致 ✓；README_zh.md 已同步更新（原"~200 个工具、13 个类别"过时，已修正）
+- 工具总数 339：README.md（英文）"~339" 与 `tool_defs.def` + meta 数量一致 ✓；README_zh.md 已同步更新（原"~200 个工具、13 个类别"过时，已修正）
 - README.md 类别数量表与 def 一致（23 类，以 `tool_defs.def` 实测为准）✓
 - 无 CI：`.github/` 不存在，AGENTS.md 声称属实 ✓
 - 目标引擎 4.7：与 `Example/project.godot` 一致 ✓；README 前提"Godot 4.3+"为宽松下界

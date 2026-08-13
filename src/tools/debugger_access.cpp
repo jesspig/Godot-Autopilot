@@ -85,4 +85,35 @@ void debugger_continue_session(int32_t session_id) {
   session->send_message(godot::String("continue"), godot::Array());
 }
 
+int32_t debugger_broadcast_reload_scripts(const std::vector<std::string> &script_paths) {
+  auto *plugin = debugger_ops::DebugCapturePlugin::get_instance();
+  if (!plugin)
+    return 0;
+  std::vector<godot::Ref<godot::EditorDebuggerSession>> sessions;
+  for (int32_t id : plugin->get_session_ids()) {
+    auto session = plugin->get_session(id);
+    if (!(session.is_valid() && session->is_active()))
+      continue;
+    if (!plugin->is_session_ready(id))
+      continue;
+    sessions.push_back(session);
+  }
+  if (sessions.empty())
+    return 0;
+  godot::Array arr;
+  if (script_paths.empty()) {
+    for (auto &session : sessions) {
+      session->send_message(godot::String("reload_all_scripts"), godot::Array());
+    }
+    return static_cast<int32_t>(sessions.size());
+  }
+  for (const auto &path : script_paths) {
+    arr.push_back(godot::String(path.c_str()));
+  }
+  for (auto &session : sessions) {
+    session->send_message(godot::String("reload_scripts"), arr);
+  }
+  return static_cast<int32_t>(sessions.size());
+}
+
 } // namespace godot_autopilot

@@ -28,6 +28,10 @@ std::vector<int32_t> debugger_breaked_session_ids();
 // 若会话存在且 active 且 breaked，向其发送 continue。
 void debugger_continue_session(int32_t session_id);
 
+// 向全部 active 且 ready 的会话广播引擎原生 reload 消息；返回已发送的会话数（0=无会话）。
+// script_paths 为空时发送 reload_all_scripts（重载全部脚本），否则发送 reload_scripts（指定路径）。
+int32_t debugger_broadcast_reload_scripts(const std::vector<std::string> &script_paths);
+
 namespace debugger_ops {
 
 // runtime_ops 仅需该 capture 自由函数；与 debugger_ops.hpp 声明一致，实现同源。

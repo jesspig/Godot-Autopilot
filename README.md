@@ -19,7 +19,7 @@ Godot Editor
       ├── libhv (internal HTTP threads)
       ├── mcp-cpp-sdk: McpServer + Streamable HTTP
       ├── Command Queue (libhv → Godot main thread bridge)
-      ├── ~338 MCP Tools across 23 categories (count varies by plugin version; see MCP search_tools)
+      ├── ~339 MCP Tools across 23 categories (count varies by plugin version; see MCP search_tools)
       ├── Inline Documentation (offline engine docs)
       └── Custom Log Dock (dedicated plugin output panel)
 ```
@@ -31,13 +31,13 @@ Godot Editor
 | **Transport** | Streamable HTTP (POST /mcp) | Standard MCP protocol, no bridge process |
 | **Thread Model** | Command queue + frame sync | Safe Godot main-thread-only API access |
 | **Port** | 9527 | Configurable via `GODOT_AUTOPILOT_PORT` env var |
-| **Discovery** | 3-Tier Progressive (Catalog→Inspect→Execute) | Keeps context small with ~338 tools (count varies by plugin version) |
+| **Discovery** | 3-Tier Progressive (Catalog→Inspect→Execute) | Keeps context small with ~339 tools (count varies by plugin version) |
 | **Search** | BM25 keyword | Tools organized by namespace + descriptions |
 | **Build** | CMake 3.28+ / C++17 | Cross-platform, auto-optimized builds |
 
 ## Features
 
-### 🎮 Full Engine Control (~338 Tools, count varies by plugin version; see MCP search_tools)
+### 🎮 Full Engine Control (~339 Tools, count varies by plugin version; see MCP search_tools)
 
 | Category | Tools | Description |
 |----------|:-----:|-------------|
@@ -57,7 +57,7 @@ Godot Editor
 | **Text** | 10 | String manipulation, parsing and formatting |
 | **TileMap** | 7 | Tile map creation, cell manipulation and queries |
 | **Debugger** | 7 | Debugger session control and inspection |
-| **Game** | 6 | Game loop control and engine-wide state |
+| **Game** | 7 | Game loop control and engine-wide state |
 | **Properties** | 5 | Get/set properties, list properties, signal connect (e.g. `property_set`) |
 | **Docs** | 4 | Query offline Godot API docs |
 | **Group** | 3 | Node group management and membership queries |

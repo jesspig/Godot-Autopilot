@@ -5,7 +5,7 @@
 
 ## 架构总览
 
-测试分两层，由根 `CMakeLists.txt` 的 `GDA_ENABLE_TESTS`（默认 OFF，`CMakeLists.txt:139`）引入：
+测试分两层，由根 `CMakeLists.txt` 的 `GDA_ENABLE_TESTS` 引入。该开关已固化在 `CMakePresets.json` 的 debug/release 预设（cacheVariables 默认 `ON`），**清理/重建 `build/` 后重新配置（`uv run build.py` 或 `cmake --preset debug`）自动恢复测试目标，无需手动传参**；直接以裸 `cmake`（不带 preset）配置时仍为默认 OFF（`CMakeLists.txt:139`）：
 
 | 层 | 目标 | 可执行文件 | 启动引擎 | 判定方式 |
 |---|---|---|---|---|
@@ -17,8 +17,8 @@ L2 的链路：执行器自管 Godot headless 编辑器进程 → 注入 `GODOT_
 ## 构建与运行
 
 ```powershell
-# 配置（启用测试）
-cmake --preset debug -DGDA_ENABLE_TESTS=ON
+# 配置（测试开关已固化在预设，无需传参；下述命令为显式写法）
+cmake --preset debug
 
 # 构建
 cmake --build --preset debug --target gda_unit_tests gda_test_runner
@@ -96,7 +96,7 @@ stdout/stderr 各接独立管道读线程持续消费，防 64KB 缓冲写满阻
 
 ## 全量遍历（`traversal.cpp`）
 
-- **工具来源**：运行时解析 `src/tools/tool_defs.def` 的 `TOOL_ENTRY(` 条目，**实测 331 个**；解析失败（缺逗号/引号未闭合）抛异常
+- **工具来源**：运行时解析 `src/tools/tool_defs.def` 的 `TOOL_ENTRY(` 条目，**实测 332 个**；解析失败（缺逗号/引号未闭合）抛异常
 - **内置前置校验**：每工具先 `get_tool_detail` 校验存在性与工具名一致性（响应非对象或名字不匹配 → FAIL）
 - **`empty_args`**：空对象调用；响应非 JSON 对象 → FAIL；含 `error` 字段算"有错误响应"（统计 error 数，不 FAIL）；schema `required` 非空但空参未报错 → 记 **warnings**（不 FAIL）
 - **`heuristic_smoke`**：按 schema properties 类型生成启发值（integer→0、number→0.0、boolean→false、array→`[]`、object→`{}`、其余→`"test"`）；无 properties 的工具跳过（不产生步骤）
@@ -105,10 +105,10 @@ stdout/stderr 各接独立管道读线程持续消费，防 64KB 缓冲写满阻
 
 ### 步数核算（vs AGENTS.md 的 "约 408 步"）
 
-- 每次遍历候选 = 331 − 34 排除 = **297 个非排除工具**
-- empty_args：297 个调用、每个产生 1 个步骤
-- heuristic_smoke：297 个候选 − 无 properties 的工具跳过数；按 def 静态推算（SCHEMA_NONE=208，其中 22 个被排除）≈ 111 个步骤
-- 两次遍历合计 ≈ **408 个步骤**（精确值取决于运行时空 schema 数，以运行时统计为准）
+- 每次遍历候选 = 332 − 34 排除 = **298 个非排除工具**
+- empty_args：298 个调用、每个产生 1 个步骤
+- heuristic_smoke：298 个候选 − 无 properties 的工具跳过数；按 def 静态推算（SCHEMA_NONE=208，其中 22 个被排除）≈ 112 个步骤
+- 两次遍历合计 ≈ **410 个步骤**（精确值取决于运行时空 schema 数，以运行时统计为准）
 - 耗时：`tests/README.md` 称 "约 2-3 分钟"（两次全量遍历 + 两次全量 get_tool_detail 的 HTTP 往返量级）。
 
 ### 34 工具排除清单（`traversal.cpp:24-63`，实测 34 = 12 + 22，名单与 README/AGENTS.md 逐项一致）
@@ -152,22 +152,28 @@ write_file  create_script  save_resource
 | L1 gtest 数量 | 61 | 61（8 文件逐文件统计：14+13+10+7+7+6+3+1） | 一致 |
 | L2 用例文件数 | 5 | 5（00_meta / 01_scene / 02_property / 03_tools_contract / 04_resources_scripts） | 一致 |
 | ctest L2 用例 | gda_runner_<name> | 一致（`tests/CMakeLists.txt:108-114`，TIMEOUT 600） | 一致 |
-| 遍历工具数 | 331 | 331（`tool_defs.def` TOOL_ENTRY 计数） | 一致 |
+| 遍历工具数 | 332 | 332（`tool_defs.def` TOOL_ENTRY 计数） | 一致 |
 | 排除工具数 | 34 | 34（12 磁盘 + 22 用户可见，名单逐项核对） | 一致 |
-| 03 遍历步数 | 约 408 步 | ≈408（297 空参 + ≈111 冒烟，后者取决于运行时空 schema 数） | 运行时统计口径 |
+| 03 遍历步数 | 约 410 步 | ≈410（298 空参 + ≈112 冒烟，后者取决于运行时空 schema 数） | 运行时统计口径 |
 | 03 耗时 | 约 2-3 分钟 | README：约 2-3 分钟 | 一致 |
-| schema 非空/空数 | 运行时观测 | `SchemaStatisticsBaseline` 仅断言非空>空>0；def 静态可数 SCHEMA_NONE=208 / SCHEMA_BASIC=123（旧 222/126） | 无法静态精确核算，属运行时观测值 |
-| 工具总数 338 = 7 元 + 331 领域 | 结构一致 | 7 元工具注册（`register_all.cpp` RegisterTool）+ 331 领域经 `call_tool` 代理；`g_handlers` = 331 领域 + system_status = 332 | 结构一致 |
-| ToolCatalog 342 条目 | 331 领域 + 7 元 + system_status + 3 快照 | `tool_catalog.cpp` 5 个 add_tool（ping/system_status/search_tools/list_categories/get_tool_detail）+ `register_all.cpp` 3 个（batch_execute/call_tool/code_execute） | 342 自洽 |
+| schema 非空/空数 | 运行时观测 | `SchemaStatisticsBaseline` 仅断言非空>空>0；def 静态可数 SCHEMA_NONE=208 / SCHEMA_BASIC=124（旧 222/126） | 无法静态精确核算，属运行时观测值 |
+| 工具总数 339 = 7 元 + 332 领域 | 结构一致 | 7 元工具注册（`register_all.cpp` RegisterTool）+ 332 领域经 `call_tool` 代理；`g_handlers` = 332 领域 + system_status = 333 | 结构一致 |
+| ToolCatalog 343 条目 | 332 领域 + 7 元 + system_status + 3 快照 | `tool_catalog.cpp` 5 个 add_tool（ping/system_status/search_tools/list_categories/get_tool_detail）+ `register_all.cpp` 3 个（batch_execute/call_tool/code_execute） | 343 自洽 |
 
 ## 已知引擎副作用
 
 `tests/README.md` 第 8 节声称：L2 每次运行后 `Example/project.godot` 可能被引擎自动追加 `[audio]` 段（`buses/default_bus_layout="uid://c6hb2nshs2igl"`），并生成 `Example/default_bus_layout.tres`。**审计结论：执行器代码无写库逻辑**（`godot_process.cpp` 仅管理进程与管道），此行为属 Godot headless 编辑器自身自动保存，仓库代码无法直接佐证，标注**待现场验证**。清理方式（README 记载）：`git checkout -- Example/project.godot` + `Remove-Item Example/default_bus_layout.tres`。
 
+## L2 环境漂移（编辑器场景恢复）
+
+当 `Example/project.godot` 含 `run/main_scene`（如报告测试产物或手动配置）且 `Example/.godot/editor` 缓存记录最近场景时，headless 编辑器启动后会**异步恢复主场景**，覆盖用例 `before_all` 创建的 Root 场景，导致 `01_scene`/`02_property` 用例失败。已确证与插件代码无关（基线项目状态下一次通过）。
+
+运行 L2 前确保 `Example/project.godot` 不含 `run/main_scene`，或删除 `Example/.godot/editor` 缓存；用 `git status` 检查 `Example/project.godot` 是否被测试/编辑器改动过。
+
 ## 审计发现的不一致点清单
 
-1. **03 遍历步数**：旧 AGENTS.md 称 "560 步"（348 工具口径），全量重命名后为 ≈408（297 空参 + ≈111 冒烟），精确值随运行时空 schema 数变化，属运行时统计口径。
-2. **schema 空/非空数**：旧 283/73 为运行时观测值，`SchemaStatisticsBaseline` 不硬编码；重命名后 def 静态可数 SCHEMA_NONE=208 / SCHEMA_BASIC=123，catalog 级非空/空数以运行时观测为准。
+1. **03 遍历步数**：旧 AGENTS.md 称 "560 步"（348 工具口径），全量重命名后为 ≈408（297 空参 + ≈111 冒烟），新增 `reload_game_scripts` 后 ≈410（298 空参 + ≈112 冒烟），精确值随运行时空 schema 数变化，属运行时统计口径。
+2. **schema 空/非空数**：旧 283/73 为运行时观测值，`SchemaStatisticsBaseline` 不硬编码；重命名后 def 静态可数 SCHEMA_NONE=208 / SCHEMA_BASIC=124，catalog 级非空/空数以运行时观测为准。
 3. **引擎副作用**（非数值）：README 的 `[audio]` 段 / `default_bus_layout.tres` 声称无执行器代码佐证，属引擎行为，待验证。
 
 ## 相关页面

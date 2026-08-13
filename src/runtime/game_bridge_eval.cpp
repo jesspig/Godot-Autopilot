@@ -134,9 +134,10 @@ public:
                         : std::string("?");
       context += ")";
     }
-    send_response(request_id_,
-                  error_result("await timed out after " +
-                               std::to_string(timeout_ms_) + " ms" + context));
+    JV body = error_result("await timed out after " +
+                           std::to_string(timeout_ms_) + " ms" + context);
+    append_eval_runtime_errors(body, errors_since_seq_);
+    send_response(request_id_, std::move(body));
     cleanup();
   }
 
@@ -386,7 +387,7 @@ JV op_eval_set_property(const JV &params) {
   return r;
 }
 
-JV op_eval_call_method(const JV &params) {
+JV op_eval_call_method(const JV &params, int64_t request_id) {
   auto *path_p = params.Find("node_path");
   auto *method_p = params.Find("method");
   if (!path_p || !path_p->IsString())
@@ -412,7 +413,29 @@ JV op_eval_call_method(const JV &params) {
         " — expected a built-in or script method of that node; use "
         "get_property_list or the node's script to list available methods");
   }
+  uint64_t call_seq_before = current_error_seq();
   godot::Variant result = node->callv(method_sn, call_args);
+
+  godot::Object *state_obj = nullptr;
+  if (result.get_type() == godot::Variant::OBJECT) {
+    state_obj = godot::Object::cast_to<godot::Object>(result);
+  }
+  bool is_await =
+      state_obj && state_obj->get_class() == "GDScriptFunctionState";
+
+  if (is_await) {
+    int64_t await_timeout_ms = 5000;
+    if (auto *tp = params.Find("timeout_ms")) {
+      if (tp->IsInt() && tp->GetInt() > 0)
+        await_timeout_ms = tp->GetInt();
+    }
+    GameBridgeEvalAwaiter *awaiter = memnew(GameBridgeEvalAwaiter);
+    awaiter->setup(request_id, godot::Ref<godot::RefCounted>(result),
+                   /*target=*/nullptr, /*parent=*/nullptr, /*persist=*/false,
+                   /*persist_path=*/"", await_timeout_ms, call_seq_before);
+    return JV();
+  }
+
   return ok_result(VariantJson::serialize(result));
 }
 
@@ -432,7 +455,7 @@ JV op_eval(const JV &params, int64_t request_id) {
   if (action == "set_property")
     return op_eval_set_property(params);
   if (action == "call_method")
-    return op_eval_call_method(params);
+    return op_eval_call_method(params, request_id);
   return error_result("unknown eval action: " + action);
 }
 
