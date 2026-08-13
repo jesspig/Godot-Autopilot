@@ -13,7 +13,7 @@
 
 | 依赖 | 说明 |
 | ---- | ---- |
-| CMake 3.28+ | 测试目标经根 `CMakeLists.txt` 的 `GDA_ENABLE_TESTS` 选项（默认 OFF，`CMakeLists.txt:120`）引入 |
+| CMake 3.28+ | 测试目标经根 `CMakeLists.txt` 的 `GDA_ENABLE_TESTS` 选项引入；该开关已固化在 `CMakePresets.json` debug/release 预设（默认 ON），清理 `build/` 后重新配置自动恢复（裸 `cmake` 不带 preset 时默认 OFF，`CMakeLists.txt:120`） |
 | Ninja | 构建生成器（预设 `debug` / `release` 均为 Ninja） |
 | clang-cl | 编译器（MSVC/GCC 自动回退，测试继承根配置） |
 | Godot 可执行文件 | 仅 L2 需要，见第 3 节 |
@@ -35,8 +35,8 @@ $env:GODOT_PATH="C:\path\to\Godot.exe"
 ## 4. 构建
 
 ```powershell
-# 1. 配置（启用测试；可追加 --preset debug）
-cmake --preset debug -DGDA_ENABLE_TESTS=ON
+# 1. 配置（测试开关已固化在预设，无需传参）
+cmake --preset debug
 
 # 2. 构建测试目标
 cmake --build --preset debug --target gda_unit_tests gda_test_runner
@@ -58,7 +58,7 @@ ctest --preset debug
 注册方式（`tests/CMakeLists.txt:100-111`）：**每份 `config/*.json` 一条 `gda_runner_<文件名去后缀>` 用例**，命令为 `gda_test_runner --file <name> --report-dir <build>/tests/output`，`TIMEOUT 600`（单文件含遍历约 2-4 分钟，超时防挂死）。当前 5 个 config 文件 → 5 条 ctest 用例：`gda_runner_00_meta`、`gda_runner_01_scene`、`gda_runner_02_property`、`gda_runner_03_tools_contract`、`gda_runner_04_resources_scripts`。
 
 - L1 经 `gtest_discover_tests` 注册，每用例一条（如 `CommandQueueTest.*`）。
-- **耗时**：普通用例约 15s/文件（一次编辑器生命周期）；`03_tools_contract` 含两次全量遍历（331 工具 ×2），约 2-3 分钟。全量 ctest 约 3-4 分钟。
+- **耗时**：普通用例约 15s/文件（一次编辑器生命周期）；`03_tools_contract` 含两次全量遍历（332 工具 ×2），约 2-3 分钟。全量 ctest 约 3-4 分钟。
 - 单跑一条：`ctest --preset debug -R gda_runner_00_meta` 或 `ctest --preset debug -R CommandQueueTest`。
 
 ### 5.2 单文件（直跑执行器）
@@ -200,14 +200,14 @@ build\debug\tests\gda_test_runner.exe --file 01_scene
 | `00_meta.json` | meta_tools | 15 步元工具语义（ping / search_tools / list_categories / get_tool_detail / call_tool / batch_execute / code_execute），全部无持久副作用 |
 | `01_scene.json` | 01_scene | 场景节点创建/查询/删除/撤销，`before_all` 用 `create_editor_scene` 建干净根 Root |
 | `02_property.json` | property_tools | 属性读写 11 用例，含 readback MATCHED、int 字符串静默转 0、缺参报错 |
-| `03_tools_contract.json` | tools_contract | 两个遍历步骤（empty_args + heuristic_smoke），全量 331 领域工具契约与冒烟 |
+| `03_tools_contract.json` | tools_contract | 两个遍历步骤（empty_args + heuristic_smoke），全量 332 领域工具契约与冒烟 |
 | `04_resources_scripts.json` | resources_scripts | execute_script 四种行为（单表达式自返 / 多行显式 return / 语法错误 / 缺参报错）+ 资源只读查询 |
 
 ## 7. 遍历与排除清单（`tests/runner/traversal.cpp`）
 
 遍历模式：
 
-- **工具来源**：运行时解析 `src/tools/tool_defs.def` 的 `TOOL_ENTRY(` 条目，共 **331 个领域工具**；解析失败（缺逗号/引号未闭合等）抛异常
+- **工具来源**：运行时解析 `src/tools/tool_defs.def` 的 `TOOL_ENTRY(` 条目，共 **332 个领域工具**；解析失败（缺逗号/引号未闭合等）抛异常
 - **内置前置校验**：每个工具先经 `get_tool_detail` 校验存在性与工具名一致性（响应非 JSON 对象或工具名不匹配 → FAIL）
 - **`empty_args`**（空参契约）：空对象调用。响应非 JSON 对象 → FAIL；返回 `error` 字段算"有错误响应"（统计 error 数，不 FAIL）；schema 声明必填但空参未报错 → 记 **warnings**（不 FAIL）
 - **`heuristic_smoke`**（启发式冒烟）：按 schema properties 类型生成启发式参数（`integer`→0、`number`→0.0、`boolean`→false、`array`→`[]`、`object`→`{}`、其余→`"test"`）；无 properties 的工具（SCHEMA_NONE）跳过
