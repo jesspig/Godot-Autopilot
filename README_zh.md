@@ -16,9 +16,9 @@ MCP 主机 (Claude Desktop, Cursor 等)
   ▼
 Godot 编辑器
   └── Godot-Autopilot (GDExtension)
-      ├── libhv (内部 HTTP 线程)
+      ├── mcp-cpp-sdk: HTTP 服务器 (内部线程)
       ├── mcp-cpp-sdk: McpServer + Streamable HTTP
-      ├── 命令队列 (libhv → Godot 主线程桥接)
+      ├── 命令队列 (HTTP 线程 → Godot 主线程桥接)
       ├── ~339 个 MCP 工具，覆盖 23 个类别（数量随插件版本变化，以 MCP search_tools 返回为准）
       ├── 内置文档 (离线引擎 API 文档)
       └── 自定义日志面板 (专属插件输出面板)
@@ -156,7 +156,7 @@ your-project/
 | **引擎** | Godot 4.x (GDExtension) |
 | **绑定层** | godot-cpp (FetchContent) |
 | **MCP 协议** | [modelcontextprotocol-cpp-sdk](https://github.com/jesspig/modelcontextprotocol-cpp-sdk) |
-| **HTTP / 异步** | libhv (内部) |
+| **HTTP / 异步** | mcp-cpp-sdk (内部, 自研) |
 | **JSON** | mcp::JsonValue (SDK 内置) |
 | **构建** | CMake 3.28+ / C++17 |
 | **优化** | Clang 优先, ThinLTO, Ninja, sccache, Unity Build |

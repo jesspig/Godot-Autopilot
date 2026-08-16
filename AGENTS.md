@@ -7,13 +7,13 @@
 - **`uv run build.py --package`** — 打包已部署的 addons 为 `dist/godot-autopilot-<version>.zip`
 - 手动: `cmake --preset debug && cmake --build --preset debug`
 - 预设 (`CMakePresets.json`): `debug`, `release`（均为 Ninja）
-- **切勿删除 `build/<preset>/_deps/`** — 缓存已获取的依赖项（godot-cpp、mcp-cpp-sdk、libhv、simdjson、googletest）
+- **切勿删除 `build/<preset>/_deps/`** — 缓存已获取的依赖项（godot-cpp、mcp-cpp-sdk、googletest）
 - **添加新 .cpp 时必须在 `CMakeLists.txt` 的 `add_library()` 中加入**，否则 Unity 构建也不会包含
 
 ## 架构
 
 - **进程内 GDExtension**，在 `MODULE_INITIALIZATION_LEVEL_EDITOR` 阶段加载到 Godot 编辑器
-- **线程模型**：HTTP 线程（libhv）→ `CommandQueue::submit()` → Godot 主线程（在 `_process()` 中排空）
+- **线程模型**：HTTP 线程（mcp-cpp-sdk 0.3.x 自研网络栈）→ `CommandQueue::submit()` → Godot 主线程（在 `_process()` 中排空）
 - **所有 Godot API 调用必须通过 `queue.submit()`** — 从 HTTP 线程直接调用会崩溃
 - **MCP 端口**：9527，端点 `/mcp`。通过 `GODOT_AUTOPILOT_PORT` 环境变量覆盖
 - **元工具（7 个）**：直接在 `server.RegisterTool()` 注册，不经过 `call_tool`：
@@ -41,18 +41,18 @@
 - **日志类别**（仅此几个）：`System`、`Transport`、`Tools`、`Resources`、`Prompts`
 - **编译器**：优先 Clang/clang-cl，自动检测；MSVC/GCC 回退
 - **优化**：自动 sccache/ccache、LTO（Release 使用 ThinLTO/LTCG/IPO）、Unity 构建、Ninja 作业池 — 均根据硬件自适应，可通过 `GDA_COMPILE_JOBS` / `GDA_LINK_JOBS` 等环境变量覆盖
-- **依赖**：godot-cpp 10.0.0-rc1、mcp-cpp-sdk 0.2.2 — 使用 FetchContent，不依赖子模块
+- **依赖**：godot-cpp 10.0.0-rc1、mcp-cpp-sdk 0.3.1（0.3.x 起移除 libhv 与 simdjson，改为 SDK 自研网络栈/JSON 解析器） — 使用 FetchContent，不依赖子模块
 
 ## 测试
 
 - **启用**：`GDA_ENABLE_TESTS` 已固化在 `CMakePresets.json` 的 debug/release 预设（默认 ON）——清理或重建 `build/` 后 `uv run build.py` / `cmake --preset debug` 自动恢复测试，无需手动传参（裸 `cmake` 不带 preset 时默认 OFF）
-- **运行**：`ctest --preset debug`（L1 秒级；L2 全量约 3-4 分钟，需 Godot 路径）；单文件：`build/debug/tests/gda_test_runner.exe --file 01_scene`
+- **运行**：`ctest --preset debug`（L1 秒级；L2 全量约 2 分钟，需 Godot 路径）；单文件：`build/debug/tests/gda_test_runner.exe --file 01_scene`
 - **结构**：L1 = `gda_unit_tests`（61 个 gtest，不启动引擎，含 339 工具注册管线断言，数量随插件版本变化）；L2 = `gda_test_runner` + `tests/config/*.json`（5 个用例文件，每文件一次 headless 编辑器生命周期最小闭环，经真实 MCP HTTP）
 - **新增 JSON 用例 = 新增 `tests/config/*.json`，零 C++ 改动**；schema / CLI / 排除清单全量文档在 `tests/README.md`
 - **Godot 路径**：环境变量 `GODOT_PATH` 或仓库根 `.env`（复制 `.env.template`）；缺失时 L2 全部失败/跳过
 - **全工具遍历**：`03_tools_contract.json` 对 332 领域工具做空参契约 + 启发式冒烟（数量随插件版本变化，以 MCP search_tools 返回为准；约 410 步为静态推算，以运行时统计为准，约 2-3 分钟）
 - **34 个副作用工具被遍历排除**（`show_os_alert` / `write_file` / `save_editor_scene` / `display_*` 等，清单在 `tests/runner/traversal.cpp`）——新增工具若写配置/文件/弹窗/改窗口，必须同步加入排除清单，否则遍历会污染 Example 项目或干扰桌面
-- **引擎副作用**：L2 运行后 `Example/project.godot` 会被追加 `[audio]` 段并生成 `default_bus_layout.tres`（headless 编辑器自动保存，无害；`git checkout -- Example/project.godot` 清理）
+- **引擎副作用**：L2 运行后 `Example/project.godot` 会被 headless 编辑器自动追加 `[audio]` 段（并生成 `default_bus_layout.tres`）或 `[input]` 段（输入映射）等自动保存内容，无害但弄脏工作区；`git checkout -- Example/project.godot` 清理（`default_bus_layout.tres` 如生成需手动删除）
 
 ## 知识局限
 
@@ -62,10 +62,12 @@
 - **领域工具分 23 类**（`tool_defs.def` 实测：Render 49、Physics 47、Display 24、Editor 22、Resources 21、Audio 20、Input 19、OS 16、Debug 16、Navigation 15、Config 13、Scene 12、Scripts 10、Text 10、Debugger 7、TileMap 7、Game 7、Properties 5、Docs 4、Group 3、SpriteFrames 3、System 1、Capture 1；InputMap 并入 Input）——README.md 的类别表已同步
 - **3 个模块无独立 .hpp**：`environment_ops.cpp`、`display_window_ops.cpp`、`runtime_game_ops.cpp` 分别复用 `render_ops.hpp`/`display_ops.hpp`/`runtime_ops.hpp`
 - **`code_execute.timeout_ms` 无上限钳制**：schema 声称 max 30000，实现仅 `static_cast<int>`；对比 `runtime_game_ops` 有 `GDA_MAX_TIMEOUT_MS` 钳制
+- **DNS rebinding 保护**（mcp-cpp-sdk 0.3.1 起）：HttpServer 默认只允许 Host 为 `localhost`/`127.0.0.1`/`::1` 的请求，其余返回 403（`StreamableHttpServerTransport` 未开放 `allowed_hosts` 配置）——MCP 客户端必须连 `127.0.0.1:9527`，局域网 IP 直连会被拒
 - **详细架构规划**见 `docs/wiki/`（当前实现的权威文档，与源码同步维护）
 
 ## 协作约定
 
+- **提交信息**：`<type>(<scope>): <中文描述>`，沿用仓库历史风格（如 `fix(运行时调试): eval 脚本错误回传`、`docs(知识库): 全量数字同步`）
 - **多代理迭代时：子代理只写代码不编译，主代理统一 configure + build 再分批运行测试**（并行编译会锁）
 - 新增 `src/*.cpp` 时同步更新三处：业务 `add_library()`（根 `CMakeLists.txt`）、`tests/CMakeLists.txt` 的 `GDA_UNIT_BUSINESS_SOURCES`（L1 链接需要，漏了会 undefined symbol）
 - **L1 测试禁止调用任何已注册工具 handler**（无引擎时 godot-cpp 接口指针为 nullptr 会崩溃）；`register_all_test` 只能测注册/分发/未知工具错误路径
@@ -86,4 +88,6 @@
 - **维护日志**：`docs/wiki/changelog/` 按天分文件（`<YYYY-MM-DD>-log.md`），每条记录 `<YYYY-MM-DD-HH>` 精确到小时；`log.md` 为摘要，仅留最近 7 条
 - **页面结构**：`overview.md`（总览/架构/技术栈）、`build.md`（构建/部署/打包）、`tests.md`（L1/L2 测试体系与数值）、`conventions.md`（工程约定）、`modules/`（core、entry_runtime、tools_registry、tools_ops_a/b、support）、`example.md`（Example 项目）
 - **维护规则**：修改代码后只更新受影响页面；删除过时描述而非留废弃标记；每页至少 1 条出站/入站相对路径链接；数值（工具数、gtest 数等）以运行时统计为准，改动后需重新核算
+- **审计日期同步**：带页头"审计日期"行的页面（overview / build / tests / example / modules/tools_registry / tools_ops_a / support / core），内容修改后必须同步更新该日期为当天并标注变更原因（格式：`2026-08-16（2026-08-12 初稿；08-16 随 <变更> 同步）`）；无审计日期头的页面（conventions / entry_runtime / index 等）不新增该行
+- **日志联动**：修改 wiki 页面或代码后，须在当天 `changelog/<YYYY-MM-DD>-log.md` 追加记录（含变更内容与验证结果）；漏记会在下次 `log.md` 摘要整理时发现
 - **配对审计**：页面与代码的对应关系——core.md↔`src/core/`、entry_runtime.md↔`src/main.cpp`+`src/runtime/`、tools_registry.md↔`src/tools/`（register_all/dispatch/tool_catalog/schema_*）、tools_ops_a/b↔`src/tools/*_ops.cpp`、support.md↔`src/prompts/`+`src/resources/`+`src/ui/`+`src/util/`、build.md↔`CMakeLists.txt`+`cmake/`+`build.py`、tests.md↔`tests/`、example.md↔`Example/`

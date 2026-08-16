@@ -1,6 +1,6 @@
 # 项目总览（Overview）
 
-> 审计日期：2026-08-12，基于当前工作树文件与代码逐项核对（不依赖 git 历史）。
+> 审计日期：2026-08-16（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步），基于当前工作树文件与代码逐项核对（不依赖 git 历史）。
 > 事实来源：根 `README.md` / `README_zh.md` / `AGENTS.md`、`CMakeLists.txt`、`cmake/FetchDependencies.cmake`、`src/main.cpp`、`src/core/server_context.cpp`、`src/tools/tool_defs.def`、`src/tools/dispatch.cpp`、`src/prompts/prompt_handlers.cpp`、`src/resources/resource_handlers.cpp`、`Example/project.godot`、`Example/docs/`。
 
 ## 项目定位
@@ -74,9 +74,9 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 |---|---|---|
 | 引擎 | Godot 4.x GDExtension（目标 4.7，见 `Example/project.godot` features） | — |
 | 绑定层 | godot-cpp，GIT_TAG `10.0.0-rc1` | `cmake/FetchDependencies.cmake` |
-| MCP 协议 | mcp-cpp-sdk（modelcontextprotocol-cpp-sdk），GIT_TAG `0.2.2`，仓库 `jesspig/modelcontextprotocol-cpp-sdk` | 同上 |
-| HTTP / 异步 | libhv（内部 HTTP 线程） | mcp-cpp-sdk 传递依赖（`build/<preset>/_deps/libhv-*`） |
-| JSON | mcp::JsonValue（SDK 内置）；simdjson 以传递依赖形式随 mcp-cpp-sdk 拉取 | `_deps/simdjson-*` |
+| MCP 协议 | mcp-cpp-sdk（modelcontextprotocol-cpp-sdk），GIT_TAG `0.3.1`，仓库 `jesspig/modelcontextprotocol-cpp-sdk` | 同上 |
+| HTTP / 异步 | mcp-cpp-sdk 自研网络栈（内部 HTTP 线程） | mcp-cpp-sdk 内置（0.3.x 起移除 libhv） |
+| JSON | mcp::JsonValue（SDK 内置，自研解析器） | mcp-cpp-sdk 内置（0.3.x 起移除 simdjson） |
 | 构建 | CMake 3.28+（`cmake_minimum_required(3.28...4.2)`）、C++17、Ninja 预设（`debug`/`release`） | 根 `CMakeLists.txt`、`CMakePresets.json` |
 | 编译 | 优先 Clang/clang-cl 自动探测，MSVC/GCC 回退；sccache/ccache、LTO（ThinLTO/LTCG/IPO）、Unity 构建、作业池 | `cmake/BuildOptimization.cmake` 等 |
 | 测试 | googletest（FetchContent 拉取，L1）；自研 `gda_test_runner` + `tests/config/*.json`（L2） | `tests/` |
@@ -113,7 +113,7 @@ godot-self-driving/
 
 ```mermaid
 flowchart LR
-    Host[MCP 主机: Claude Desktop / Cursor / opencode 等] -->|POST http://127.0.0.1:9527/mcp| HTTP[libhv HTTP 线程<br/>StreamableHttpServerTransport]
+    Host[MCP 主机: Claude Desktop / Cursor / opencode 等] -->|POST http://127.0.0.1:9527/mcp| HTTP[SDK HTTP 线程<br/>StreamableHttpServerTransport]
     HTTP -->|queue.submit() 返回 future| Q[CommandQueue 互斥队列]
     Q -->|_process 每帧 drain()| Main[Godot 主线程]
     Main --> API[Godot API / 场景 / 引擎]

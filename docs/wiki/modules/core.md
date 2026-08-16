@@ -1,11 +1,11 @@
 # 核心模块（src/core/）
 
-> 审计日期：2026-08-12，基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 审计日期：2026-08-16（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步），基于当前工作树代码逐行核对（不依赖 git 历史）。
 > 覆盖范围：`src/core/` 下 8 组文件。注意：`CommandQueue` 为 header-only（仅 `command_queue.hpp`，无对应 `.cpp`），实际为 14 个文件。
 
 ## 模块简介
 
-`src/core/` 是插件的基础设施层：负责把 HTTP 线程（libhv）的请求安全地桥接到 Godot 主线程、提供进程内日志、配置常量、运行时模式检测、资源缓存、场景脏状态跟踪，以及 MCP 服务器的生命周期管理。所有模块位于命名空间 `godot_autopilot`（`ResourceRegistry`/`SceneDirtyTracker` 使用 `godot_autopilot::resource_registry` / `godot_autopilot::scene_dirty_tracker` 子命名空间）。
+`src/core/` 是插件的基础设施层：负责把 HTTP 线程（mcp-cpp-sdk 自研网络栈）的请求安全地桥接到 Godot 主线程、提供进程内日志、配置常量、运行时模式检测、资源缓存、场景脏状态跟踪，以及 MCP 服务器的生命周期管理。所有模块位于命名空间 `godot_autopilot`（`ResourceRegistry`/`SceneDirtyTracker` 使用 `godot_autopilot::resource_registry` / `godot_autopilot::scene_dirty_tracker` 子命名空间）。
 
 ## 职责表
 
@@ -69,7 +69,7 @@
 ### ServerContext
 
 - 构造：持有 `CommandQueue&`，创建 `ToolCatalog` 与 `Bm25Index`，`resolve_port()` 解析端口并写 Transport 日志
-- `bool start()` — 依次：`hlog_disable()`（**显式禁用 libhv 日志**）→ `StreamableHttpServerTransport`（port、`endpoint = "/mcp"`、`stateless = true`、`enable_legacy_sse = false`）→ `mcp::McpServer::Create` → `register_tools()` → `transport_->Start()`；成功后回写 `port_ = http_opts.port`
+- `bool start()` — 依次：`StreamableHttpServerTransport`（port、`endpoint = "/mcp"`、`stateless = true`、`enable_legacy_sse = false`）→ `mcp::McpServer::Create` → `register_tools()` → `transport_->Start()`；成功后回写 `port_ = http_opts.port`；SDK 自身日志默认关闭（`MCP_LOG_LEVEL` 未设置时为 Off）
 - `void stop()` — `server_->Close()` + `transport_->Close()`；析构函数对 running 状态兜底调用
 - `int get_port()` / `bool is_running()` / `const std::string& last_error()`
 - MCP 服务器标识：`mcp::Implementation{"godot-autopilot", "0.1.0"}`
@@ -80,7 +80,7 @@
 
 ```mermaid
 flowchart LR
-    Client[MCP Client] -->|POST /mcp 端口 9527| HTTP[libhv HTTP 线程]
+    Client[MCP Client] -->|POST /mcp 端口 9527| HTTP[SDK HTTP 线程]
     HTTP -->|queue.submit() 返回 future| Q[CommandQueue 互斥队列]
     Q -->|_process 每帧 drain| Main[Godot 主线程]
     Main --> API[Godot API / 场景 / 引擎]

@@ -28,4 +28,4 @@
 
 ## 维护入口
 
-代码改动后：更新受影响页面 → 重核数值 → 追加 [changelog/](../../changelog/log.md)（按天分文件，每条记录精确到小时）→ 同步 [AGENTS.md](../../AGENTS.md)。
+代码改动后：更新受影响页面 → 同步页头"审计日期"（带日期行的页面：overview / build / tests / example / modules/tools_registry / tools_ops_a / support / core；无日期头的页面不新增）→ 重核数值 → 追加 [changelog/](../../changelog/log.md)（按天分文件，每条记录精确到小时）→ 同步 [AGENTS.md](../../AGENTS.md)。
