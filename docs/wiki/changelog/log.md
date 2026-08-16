@@ -2,6 +2,10 @@
 
 > 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 条。
 
+## 2026-08-17
+
+- **新增右侧栏 MCP 配置面板**（`McpConfigDock`）：端口 SpinBox + Apply 运行时重启（`ServerContext::restart`）+ 持久化到 `user://godot_autopilot/config.json`（`PluginConfig`，解析优先级 环境变量 > 持久化 > 默认 9527）；一键生成 8 个客户端（opencode / Claude Code / Codex / Cursor / Copilot / Trae / Qoder / WorkBuddy）项目级配置文件，JSON 智能合并、Codex TOML 已配置跳过；L1 新增 11 用例（77/77 全过）；详见 `changelog/2026-08-17-log.md`
+
 ## 2026-08-16
 
 - **mcp-cpp-sdk 升级 0.2.2 → 0.3.1**（破坏性重构）：去 libhv/simdjson 换 SDK 自研网络栈与 JSON 解析器；项目仅改 3 处（FetchDependencies GIT_TAG、server_context.cpp 删 hlog_disable、tests/CMakeLists.txt 删 hv_static），API 面兼容已逐一验证；构建 + ctest 66/66 通过（含真实 MCP HTTP L2 闭环）；文档 18 处 libhv/simdjson 引用全量同步

@@ -65,7 +65,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 ### 编辑器 UI
 
 - 自定义底部日志面板 `McpLogDock`（"MCP Log"，按 LogLevel/LogCategory 过滤、文本搜索、折叠重复）。
-- 工具栏状态栏 `McpStatusBar`（显示 `GDA: 0.0.0.0:<port>`）。
+- 右侧配置面板 `McpConfigDock`（"MCP Config"：端口运行时重启 + 持久化、一键生成 8 个客户端 MCP 配置）。
 - `ExportGuard`：导出期间拒绝领域工具调用（返回 `{"error":"editor is exporting; ..."}`）。
 
 ## 技术栈
@@ -100,7 +100,7 @@ godot-self-driving/
 │   ├── resources/              # MCP Resources：resource_handlers + debugger_resources
 │   ├── prompts/                # 提示词模板：7 个主题 + debugger_prompts
 │   ├── runtime/                # 游戏运行时桥接：game_bridge(±input/eval) + gda_protocol.hpp
-│   ├── ui/                     # 编辑器 UI：mcp_status_bar、mcp_log_dock
+│   ├── ui/                     # 编辑器 UI：mcp_config_dock、mcp_log_dock
 │   └── util/                   # 通用：variant_json、bm25_index、error_util、readback_util、scene_path
 ├── tests/                      # L1 gda_unit_tests（61 个 gtest）+ L2 gda_test_runner + config/*.json（5 份）
 ├── docs/                       # 规划文档（docs/plan/）与本知识库（docs/wiki/）
