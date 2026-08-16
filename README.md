@@ -16,9 +16,9 @@ MCP Host (Claude Desktop, Cursor, etc.)
   ▼
 Godot Editor
   └── Godot-Autopilot (GDExtension)
-      ├── libhv (internal HTTP threads)
+      ├── mcp-cpp-sdk: HTTP server (internal threads)
       ├── mcp-cpp-sdk: McpServer + Streamable HTTP
-      ├── Command Queue (libhv → Godot main thread bridge)
+      ├── Command Queue (HTTP thread → Godot main thread bridge)
       ├── ~339 MCP Tools across 23 categories (count varies by plugin version; see MCP search_tools)
       ├── Inline Documentation (offline engine docs)
       └── Custom Log Dock (dedicated plugin output panel)
@@ -157,7 +157,7 @@ Open your Godot project — the server starts automatically. The port displays i
 | **Engine** | Godot 4.x (GDExtension) |
 | **Bindings** | godot-cpp (FetchContent) |
 | **MCP Protocol** | [modelcontextprotocol-cpp-sdk](https://github.com/jesspig/modelcontextprotocol-cpp-sdk) |
-| **HTTP / Async** | libhv (internal) |
+| **HTTP / Async** | mcp-cpp-sdk (internal, self-hosted) |
 | **JSON** | mcp::JsonValue (SDK built-in) |
 | **Build** | CMake 3.28+ / C++17 |
 | **Optimization** | Clang-first, ThinLTO, Ninja, sccache, Unity Build |

@@ -1,6 +1,6 @@
 # 构建体系（build）
 
-> 审计日期：2026-08-12，基于当前工作树文件逐项核对（不依赖 git 历史）。
+> 审计日期：2026-08-16（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步），基于当前工作树文件逐项核对（不依赖 git 历史）。
 > 事实来源：`build.py`（205 行）、`CMakeLists.txt`（144 行）、`CMakePresets.json`、`cmake/` 全部 6 个模块、`.env.template`、根 `README.md` / `README_zh.md` / `AGENTS.md` 构建段。
 
 ## 命令速查表
@@ -29,7 +29,7 @@
 
 1. 先尝试 `cmake --preset <debug|release>`；
 2. 失败且 `build/<preset>/` 存在 → **AUTO-CLEAN**：删除该目录内除 `_deps/` 外的全部文件与目录（目录递归删除、文件 unlink），然后重试一次；
-3. `_deps/` 是 FetchContent 依赖缓存（godot-cpp、mcp-cpp-sdk、libhv、simdjson、googletest），刻意保留 —— 删除会导致全部重新下载。
+3. `_deps/` 是 FetchContent 依赖缓存（godot-cpp、mcp-cpp-sdk、googletest），刻意保留 —— 删除会导致全部重新下载。
 
 ### 3. 构建 `_build(preset)`
 
@@ -85,7 +85,7 @@
 | `BuildOptimization.cmake` | 硬件感知并行度（核心规则） | `GDA_COMPILE_JOBS`、`GDA_LINK_JOBS`（CACHE 优先、其次 ENV）、`GDA_UNITY_BUILD`（ON 且核数 >1 时启用）、`GDA_UNITY_BATCH_SIZE`（0=auto）、`GDA_MAX_COMPILE_MEM_MB`（默认 1500）、`GDA_MAX_LINK_MEM_MB`（默认 4000）、`GDA_UNITY_MEM_MB`（默认 500） |
 | `CompilerOptions.cmake` | 按编译器分发 flags | Clang/clang-cl 与 MSVC：`/utf-8 /bigobj /W4 /EHsc` + `_CRT_SECURE_NO_WARNINGS`、`_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS`、`_WIN32_WINNT=0x0A00`；MSVC 调试信息 `Embedded`；GCC/Clang 非 Windows 非 CI 追加 `-march=native`；`find_package(Threads REQUIRED)`；`CMAKE_POSITION_INDEPENDENT_CODE ON` |
 | `Cache.cmake` | 编译缓存自动探测 | 优先 sccache（支持 MSVC），回退 ccache（仅 GCC/Clang）；命中则设 `CMAKE_C/CXX_COMPILER_LAUNCHER` |
-| `FetchDependencies.cmake` | FetchContent 依赖 | `godot-cpp` @ `10.0.0-rc1`（godotengine/godot-cpp，GIT_SHALLOW）、`mcp-cpp-sdk` @ `0.2.2`（jesspig/modelcontextprotocol-cpp-sdk，GIT_SHALLOW）；`FETCHCONTENT_QUIET OFF`；文件头部注释明确"禁止删除 _deps/" |
+| `FetchDependencies.cmake` | FetchContent 依赖 | `godot-cpp` @ `10.0.0-rc1`（godotengine/godot-cpp，GIT_SHALLOW）、`mcp-cpp-sdk` @ `0.3.1`（jesspig/modelcontextprotocol-cpp-sdk，GIT_SHALLOW）；`FETCHCONTENT_QUIET OFF`；文件头部注释明确"禁止删除 _deps/" |
 | `Lto.cmake` | 仅 Release 的链接优化 | `GDA_LTO` 记录；优先级 Clang ThinLTO（`-flto=thin`）> MSVC LTCG（`CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE`）> GCC IPO（`CheckIPOSupported`）；非 Release 直接跳过 |
 
 ### 并行度计算规则（`BuildOptimization.cmake`）
@@ -116,7 +116,7 @@ version 8；`debug`/`release` 两个 configure 预设：Ninja 生成器、`build
 - `uv run build.py` / `--release` 语义、手动 `cmake --preset` 命令 ✓；
 - "切勿删除 `build/<preset>/_deps/`" ✓（`build.py` AUTO-CLEAN 保留 + `FetchDependencies.cmake` 头注释）；
 - "添加新 .cpp 时必须在 `add_library()` 中加入" ✓（Unity 构建只编译列出的文件）；
-- 依赖版本 `godot-cpp 10.0.0-rc1` / `mcp-cpp-sdk 0.2.2`、FetchContent 非子模块 ✓（`FetchDependencies.cmake:15,24`）；
+- 依赖版本 `godot-cpp 10.0.0-rc1` / `mcp-cpp-sdk 0.3.1`、FetchContent 非子模块 ✓（`FetchDependencies.cmake:15,24`）；
 - 编译器优先 Clang/clang-cl、MSVC/GCC 回退 ✓（根 CMakeLists 自动探测 + `CompilerOptions.cmake` 分发）；
 - 优化自适应（sccache/ccache、LTO、Unity、Ninja 作业池）✓；**精度差异**：AGENTS.md 写"可通过 `GDA_COMPILE_JOBS` / `GDA_LINK_JOBS` 等环境变量覆盖"——实际仅这两个支持环境变量，`GDA_UNITY_BATCH_SIZE` 等内存参数只接受 `-D` CACHE；
 - **文档一致性**：`README_zh.md` 与 `README.md`（~339/23 类）及 [overview.md](./overview.md) 审计（339 = 7 元 + 332 领域）一致；`--package` / `--debug` 两个 build.py 参数在 README 构建章节未提及。

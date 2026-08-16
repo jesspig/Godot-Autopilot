@@ -2,6 +2,11 @@
 
 > 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 条。
 
+## 2026-08-16
+
+- **mcp-cpp-sdk 升级 0.2.2 → 0.3.1**（破坏性重构）：去 libhv/simdjson 换 SDK 自研网络栈与 JSON 解析器；项目仅改 3 处（FetchDependencies GIT_TAG、server_context.cpp 删 hlog_disable、tests/CMakeLists.txt 删 hv_static），API 面兼容已逐一验证；构建 + ctest 66/66 通过（含真实 MCP HTTP L2 闭环）；文档 18 处 libhv/simdjson 引用全量同步
+- 知识库更新规则完善（AGENTS.md 新增审计日期同步/日志联动，index.md 维护入口同步）
+
 ## 2026-08-13
 
 - 测试开关持久化：`GDA_ENABLE_TESTS` 固化进 `CMakePresets.json` debug/release 预设（清理 build/ 后自动恢复，不再丢测试注册）；debug 与 release 各 66/66 全量测试复验通过

@@ -290,7 +290,7 @@ flowchart TD
 flowchart LR
     Dev[开发者或 MCP Client] --> HTTP[HTTP 请求 9527]
     HTTP --> Plugin[Godot Autopilot 插件]
-    Plugin --> Worker[libhv HTTP 线程]
+    Plugin --> Worker[SDK HTTP 线程]
     Worker --> Queue[CommandQueue submit]
     Queue --> Main[Godot 主线程 process]
     Main --> Godot[Godot 场景与 API]

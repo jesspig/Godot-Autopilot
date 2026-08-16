@@ -44,4 +44,4 @@
 ## 其他
 
 - 无 CI（`.github/` 不存在）；构建、测试均本地执行
-- 依赖版本固定：godot-cpp 10.0.0-rc1、mcp-cpp-sdk 0.2.2（FetchContent，无子模块）
+- 依赖版本固定：godot-cpp 10.0.0-rc1、mcp-cpp-sdk 0.3.1（FetchContent，无子模块）
