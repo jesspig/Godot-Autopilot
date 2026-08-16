@@ -63,6 +63,7 @@ add_library(godot-autopilot SHARED
     src/core/resource_registry.cpp
     src/core/scene_dirty_tracker.cpp
     src/core/server_context.cpp
+    src/core/plugin_config.cpp
     src/core/export_guard.cpp
     src/resources/resource_handlers.cpp
     src/resources/debugger_resources.cpp
@@ -121,10 +122,11 @@ add_library(godot-autopilot SHARED
     src/tools/tool_catalog.cpp
     src/util/bm25_index.cpp
     src/util/variant_json.cpp
+    src/util/client_config_gen.cpp
     src/util/error_util.cpp
     src/util/readback_util.cpp
-    src/ui/mcp_status_bar.cpp
-    src/ui/mcp_log_dock.cpp)
+    src/ui/mcp_log_dock.cpp
+    src/ui/mcp_config_dock.cpp)
 
 target_include_directories(godot-autopilot PRIVATE ${CMAKE_SOURCE_DIR}/src)
 

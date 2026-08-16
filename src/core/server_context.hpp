@@ -2,6 +2,7 @@
 #define GODOT_AUTOPILOT_SERVER_CONTEXT_HPP
 
 #include <chrono>
+#include <cstdint>
 #include <string>
 
 #include <mcp/server/McpServer.hpp>
@@ -23,6 +24,7 @@ public:
 
   bool start();
   void stop();
+  bool restart(uint16_t port);
 
   int get_port() const;
   bool is_running() const;

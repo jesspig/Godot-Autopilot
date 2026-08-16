@@ -1,6 +1,7 @@
 #include "server_context.hpp"
 #include "config.hpp"
 #include "log_system.hpp"
+#include "plugin_config.hpp"
 #include "prompts/debugger_prompts.hpp"
 #include "prompts/prompt_handlers.hpp"
 #include "resources/debugger_resources.hpp"
@@ -17,6 +18,10 @@ namespace godot_autopilot {
 int ServerContext::resolve_port() {
   if (const char *env_port = std::getenv("GODOT_AUTOPILOT_PORT")) {
     return std::atoi(env_port);
+  }
+  int saved_port = PluginConfig::load_port();
+  if (saved_port > 0) {
+    return saved_port;
   }
   return GDA_DEFAULT_PORT;
 }
@@ -118,6 +123,12 @@ void ServerContext::stop() {
 
   LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
                             "MCP server stopped");
+}
+
+bool ServerContext::restart(uint16_t port) {
+  stop();
+  port_ = port;
+  return start();
 }
 
 int ServerContext::get_port() const { return port_; }
