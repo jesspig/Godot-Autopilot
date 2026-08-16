@@ -92,7 +92,7 @@ target_include_directories(gda_test_runner PRIVATE
     ${CMAKE_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(gda_test_runner PRIVATE PROJECT_ROOT="${CMAKE_SOURCE_DIR}")
 target_link_libraries(gda_test_runner PRIVATE
-    godot-cpp mcp-server mcp-http mcp-client hv_static)
+    godot-cpp mcp-server mcp-http mcp-client)
 set_target_properties(gda_test_runner PROPERTIES
     CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON
     LINK_SEARCH_START_STATIC ON LINK_SEARCH_END_STATIC ON)

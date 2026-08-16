@@ -9,7 +9,6 @@
 #include "tools/tool_catalog.hpp"
 #include "util/bm25_index.hpp"
 #include <cstdlib>
-#include <hv/hlog.h>
 #include <mcp/Content.hpp>
 #include <mcp/server/ServerOptions.hpp>
 
@@ -41,8 +40,6 @@ ServerContext::~ServerContext() {
 
 bool ServerContext::start() {
   try {
-    hlog_disable();
-
     mcp::StreamableHttpServerOptions http_opts;
     http_opts.port = static_cast<uint16_t>(port_);
     http_opts.endpoint = "/mcp";
