@@ -15,7 +15,7 @@
 - **进程内 GDExtension**，在 `MODULE_INITIALIZATION_LEVEL_EDITOR` 阶段加载到 Godot 编辑器
 - **线程模型**：HTTP 线程（mcp-cpp-sdk 0.3.x 自研网络栈）→ `CommandQueue::submit()` → Godot 主线程（在 `_process()` 中排空）
 - **所有 Godot API 调用必须通过 `queue.submit()`** — 从 HTTP 线程直接调用会崩溃
-- **MCP 端口**：9527，端点 `/mcp`。通过 `GODOT_AUTOPILOT_PORT` 环境变量覆盖
+- **MCP 端口**：9527，端点 `/mcp`。解析优先级：环境变量 `GODOT_AUTOPILOT_PORT` > `user://godot_autopilot/config.json`（`PluginConfig`，配置面板 Apply 后持久化）> 默认 9527——环境变量优先保证测试/CI 不受面板配置影响
 - **元工具（7 个）**：直接在 `server.RegisterTool()` 注册，不经过 `call_tool`：
   `ping`、`search_tools`、`list_categories`、`get_tool_detail`、`call_tool`、`batch_execute`、`code_execute`
 - **领域工具（332 个，数量随插件版本变化，以 MCP search_tools 返回为准）**：通过 `call_tool` 代理，由 `register_all.cpp` 中的 `g_handlers` 映射分发。完整 schema 在 `ToolCatalog` 中
@@ -30,8 +30,10 @@
 
 1. 在 `src/tools/<category>_ops.hpp` 声明：`mcp::JsonValue handle_xxx(const mcp::JsonValue& args);`，命名空间 `godot_autopilot::<category>_ops`
 2. 在 `src/tools/<category>_ops.cpp` 实现处理函数
-3. 在 `register_all.cpp` 中注册：`g_handlers["tool_name"] = <category>_ops::handle_func;` + `catalog.add_tool({"name", "desc", "Category", {"tags..."}, schema});`
+3. 在 `src/tools/tool_defs.def` 加一行 `TOOL_ENTRY(id, "tool_name", "desc", "Category", "tags", <category>_ops::handle_xxx, SCHEMA_BASIC|SCHEMA_NONE)`——`register_all.cpp` 把 def include 两次，宏自动写入 `g_handlers` 与 `ToolCatalog`，**register_all.cpp 无需手改**；SCHEMA_BASIC 时还需在 `src/tools/schema_*_ops.cpp` 的 fill 表加 `schema::build_schema({ParamDef...})` 条目（SCHEMA_NONE 走回退：scene_tree_* 自动补 `group`、tilemap_* 补 `node_path`，否则空表）
 4. 在 `CMakeLists.txt` 的 `add_library()` 中添加新的 `.cpp`
+
+元工具（`ping`/`search_tools`/`list_categories`/`get_tool_detail`/`call_tool`/`batch_execute`/`code_execute`）例外：直接 `server.RegisterTool()` 注册，不进 def。
 
 **命名约定**：`<动词>_<类别>_<维度>_<对象>_<修饰>`（snake_case，动词置首，如 `create_scene_node`、`intersect_physics_2d_ray`、`set_input_map_action_deadzone`；动词 get/set/create/add/remove/apply/play/stop 等置首，段数随粒度变化）
 
@@ -67,6 +69,7 @@
 
 ## 协作约定
 
+- **CRLF 伪变更**：`git status` 常显示大量 `M`（LF→CRLF 行尾规范化差异），但 `git diff HEAD` 为空——改动前务必用 `git diff` 确认真实变更，不要凭 status 判断工作区状态
 - **提交信息**：`<type>(<scope>): <中文描述>`，沿用仓库历史风格（如 `fix(运行时调试): eval 脚本错误回传`、`docs(知识库): 全量数字同步`）
 - **多代理迭代时：子代理只写代码不编译，主代理统一 configure + build 再分批运行测试**（并行编译会锁）
 - 新增 `src/*.cpp` 时同步更新三处：业务 `add_library()`（根 `CMakeLists.txt`）、`tests/CMakeLists.txt` 的 `GDA_UNIT_BUSINESS_SOURCES`（L1 链接需要，漏了会 undefined symbol）
@@ -75,10 +78,8 @@
 
 ## 工程原则
 
-- 所有操作遵循 **KISS / DRY / YAGNI**：最小改动，不预埋无调用者的功能，重复三次才提取。
-- **先搜索后动手**：以实际代码/文档为事实，禁止臆测不存在的 API、节点、资源路径。
 - **不写注释、代码即文档**：意图靠清晰命名与结构表达。
-- 整洁可读：代码与文档保持整洁，命名自解释，结构简单直接。
+- **先搜索后动手**：以实际代码/文档为事实，禁止臆测不存在的 API、节点、资源路径。
 
 ## 项目知识库
 
@@ -87,6 +88,7 @@
 - **基于事实更新**：更新前用 `git status` / `git diff HEAD` 核查工作区全部实际变更（含用户在编辑器中手动修改的代码、配置等），以实际文件为准，禁止仅凭对话记忆撰写；无法核实的标注 `> [!todo] 待补充`
 - **维护日志**：`docs/wiki/changelog/` 按天分文件（`<YYYY-MM-DD>-log.md`），每条记录 `<YYYY-MM-DD-HH>` 精确到小时；`log.md` 为摘要，仅留最近 7 条
 - **页面结构**：`overview.md`（总览/架构/技术栈）、`build.md`（构建/部署/打包）、`tests.md`（L1/L2 测试体系与数值）、`conventions.md`（工程约定）、`modules/`（core、entry_runtime、tools_registry、tools_ops_a/b、support）、`example.md`（Example 项目）
+- **frontmatter 规范**：概念页面必须含 YAML frontmatter——`type`（必填，自解释描述性短语，同类概念 type 值一致，如 modules/ 下统一"模块文档"）、`title`、`description`（一句话）、`tags`（列表）、`timestamp`（最后显著更新时刻，ISO 8601，必须取真实系统时间）、`resource`（对应具体源码资产时填相对路径 URI，抽象概念不填）；`index.md` / `log.md` / `changelog/*` 为保留文件，不加 frontmatter
 - **维护规则**：修改代码后只更新受影响页面；删除过时描述而非留废弃标记；每页至少 1 条出站/入站相对路径链接；数值（工具数、gtest 数等）以运行时统计为准，改动后需重新核算
 - **审计日期同步**：带页头"审计日期"行的页面（overview / build / tests / example / modules/tools_registry / tools_ops_a / support / core），内容修改后必须同步更新该日期为当天并标注变更原因（格式：`2026-08-16（2026-08-12 初稿；08-16 随 <变更> 同步）`）；无审计日期头的页面（conventions / entry_runtime / index 等）不新增该行
 - **日志联动**：修改 wiki 页面或代码后，须在当天 `changelog/<YYYY-MM-DD>-log.md` 追加记录（含变更内容与验证结果）；漏记会在下次 `log.md` 摘要整理时发现

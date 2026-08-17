@@ -1,6 +1,18 @@
+---
+type: 测试体系指南
+title: 测试体系
+description: L1/L2 双层测试体系、遍历排除清单、数值统计与已知引擎副作用
+tags:
+  - 测试
+  - L1
+  - L2
+timestamp: "2026-08-17T01:03:27+08:00"
+resource: tests/
+---
+
 # 测试体系（tests/）
 
-> 审计日期：2026-08-17（2026-08-12 初稿；08-17 随客户端配置生成器测试同步），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 审计日期：2026-08-17（2026-08-12 初稿；08-17 随客户端配置生成器测试同步并补 YAML frontmatter），基于当前工作树代码逐行核对（不依赖 git 历史）。
 > 覆盖范围：`tests/` 全部（unit 9 文件、runner 7 实现 + 6 头文件、integration、config 5 JSON、`tests/CMakeLists.txt`），对照 `tests/README.md` 与仓库根 `AGENTS.md` 测试段逐条核算。未运行任何测试，所有数值均来自源码静态统计。
 
 ## 架构总览

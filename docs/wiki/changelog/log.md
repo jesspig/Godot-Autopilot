@@ -5,6 +5,7 @@
 ## 2026-08-17
 
 - **新增右侧栏 MCP 配置面板**（`McpConfigDock`）：端口 SpinBox + Apply 运行时重启（`ServerContext::restart`）+ 持久化到 `user://godot_autopilot/config.json`（`PluginConfig`，解析优先级 环境变量 > 持久化 > 默认 9527）；一键生成 8 个客户端（opencode / Claude Code / Codex / Cursor / Copilot / Trae / Qoder / WorkBuddy）项目级配置文件，JSON 智能合并、Codex TOML 已配置跳过；L1 新增 11 用例（77/77 全过）；详见 `changelog/2026-08-17-log.md`
+- **知识库全量复核**：11 个概念页面新增 YAML frontmatter（type/title/description/tags/timestamp/resource）；数值修正——build.md 源 .cpp 68→70、index.md gtest 61→72 与 A 组 180→172、tools_registry.md 步数统一 410、core.md 16 文件、support.md util 6 组与行数修正、entry_runtime.md 行数修正、conventions.md 332 工具、example.md project.godot 32 行
 
 ## 2026-08-16
 

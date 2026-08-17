@@ -1,7 +1,19 @@
+---
+type: 模块文档
+title: 核心模块
+description: 命令队列、配置常量、日志、模式检测、资源缓存、脏状态跟踪、服务器生命周期与插件配置
+tags:
+  - 模块
+  - 核心层
+  - 线程模型
+timestamp: "2026-08-17T01:03:27+08:00"
+resource: src/core/
+---
+
 # 核心模块（src/core/）
 
-> 审计日期：2026-08-17（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 随配置面板端口持久化同步），基于当前工作树代码逐行核对（不依赖 git 历史）。
-> 覆盖范围：`src/core/` 下 9 组文件。注意：`CommandQueue` 为 header-only（仅 `command_queue.hpp`，无对应 `.cpp`），实际为 15 个文件。
+> 审计日期：2026-08-17（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 随配置面板端口持久化同步并补 YAML frontmatter），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 覆盖范围：`src/core/` 下 9 组文件。注意：`CommandQueue` 为 header-only（仅 `command_queue.hpp`，无对应 `.cpp`），实际为 16 个文件。
 
 ## 模块简介
 

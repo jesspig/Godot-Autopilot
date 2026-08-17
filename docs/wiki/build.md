@@ -1,6 +1,22 @@
+---
+type: 构建部署指南
+title: 构建体系
+description: 构建/部署/打包流程、CMake 模块职责、产物清单与环境变量
+tags:
+  - 构建
+  - CMake
+  - 部署
+timestamp: "2026-08-17T01:03:27+08:00"
+resource:
+  - CMakeLists.txt
+  - CMakePresets.json
+  - build.py
+  - cmake/
+---
+
 # 构建体系（build）
 
-> 审计日期：2026-08-16（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步），基于当前工作树文件逐项核对（不依赖 git 历史）。
+> 审计日期：2026-08-17（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 补 YAML frontmatter 并复核 add_library 源数量），基于当前工作树文件逐项核对（不依赖 git 历史）。
 > 事实来源：`build.py`（205 行）、`CMakeLists.txt`（144 行）、`CMakePresets.json`、`cmake/` 全部 6 个模块、`.env.template`、根 `README.md` / `README_zh.md` / `AGENTS.md` 构建段。
 
 ## 命令速查表
@@ -61,12 +77,12 @@
 
 ## CMake 目标
 
-`add_library(godot-autopilot SHARED ...)`（`CMakeLists.txt:59-127`）共 **68 个 .cpp**：
+`add_library(godot-autopilot SHARED ...)`（`CMakeLists.txt:59-129`）共 **70 个 .cpp**：
 
 | 目录 | 数量 | 目录 | 数量 |
 |---|---:|---|---:|
 | `src/main.cpp` | 1 | `src/tools/` | 41 |
-| `src/core/` | 6 | `src/util/` | 4 |
+| `src/core/` | 7 | `src/util/` | 5 |
 | `src/resources/` | 2 | `src/ui/` | 2 |
 | `src/prompts/` | 9 | `src/runtime/` | 3 |
 

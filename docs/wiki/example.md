@@ -1,6 +1,17 @@
-﻿# 示例工程（Example/）
+﻿---
+type: 示例工程指南
+title: 示例工程
+description: Example 文档/示例工程定位、project.godot 事实、文档索引与素材清单
+tags:
+  - 示例工程
+  - Example
+timestamp: "2026-08-17T01:03:27+08:00"
+resource: Example/
+---
 
-> 审计日期：2026-08-12，基于当前工作树 `Example/` 目录与文档核对。
+# 示例工程（Example/）
+
+> 审计日期：2026-08-17（2026-08-12 初稿；08-17 补 YAML frontmatter 并核对 project.godot），基于当前工作树 `Example/` 目录与文档核对。
 > 事实来源：`Example/project.godot`、`Example/docs/`（6 篇）、`Example/assets/` 目录枚举。
 
 ## 定位
@@ -15,7 +26,7 @@
 
 ## project.godot 关键事实
 
-文件路径 `Example/project.godot`（36 行，`config_version=5`）：
+文件路径 `Example/project.godot`（32 行，`config_version=5`）：
 
 | 配置段 | 键 | 值 | 说明 |
 |---|---|---|---|
@@ -25,7 +36,7 @@
 | `[audio]` | `buses/default_bus_layout` | `uid://c6hb2nshs2igl` | 音频总线布局引用（L2 测试运行后由 headless 编辑器追加） |
 | `[display]` | `window/stretch/mode` | `canvas_items` | 窗口伸缩模式 |
 | `[display]` | `window/stretch/aspect` | `expand` | 伸缩纵横比 |
-| `[dotnet]` | `project/assembly_name` | `新建游戏项目` | .NET 程序集名（默认占位值） |
+| `[dotnet]` | `project/assembly_name` | `Example` | .NET 程序集名 |
 | `[physics]` | `3d/physics_engine` | `Jolt Physics` | 3D 物理引擎：Jolt |
 | `[rendering]` | `rendering_device/driver.windows` | `d3d12` | Windows 渲染设备驱动：Direct3D 12 |
 | — | `run/main_scene` | （无） | **未配置主场景** |

@@ -1,6 +1,18 @@
+---
+type: 模块文档
+title: 工具注册表
+description: 工具注册管线、三层结构、schema 统计口径、契约缺口与遍历排除清单
+tags:
+  - 模块
+  - 工具注册
+  - schema
+timestamp: "2026-08-17T01:03:27+08:00"
+resource: src/tools/
+---
+
 # 工具注册表（src/tools/ 注册管线）
 
-> 审计日期：2026-08-12，基于当前工作树源码逐行核算（未运行测试、未引用 git 历史）。
+> 审计日期：2026-08-17（2026-08-12 初稿；08-17 补 YAML frontmatter 并统一遍历步数为 410），基于当前工作树源码逐行核算（未运行测试、未引用 git 历史）。
 > 覆盖范围：`register_all.cpp/hpp`、`dispatch.cpp/hpp`、`tool_catalog.cpp/hpp`、`schema_builder.cpp/hpp`、`schema_fills.hpp`、6 个 `schema_*_ops.cpp`、`tool_defs.def`，对照 `tests/runner/traversal.cpp`、`tests/unit/register_all_test.cpp`、`tests/config/03_tools_contract.json` 与仓库根 `AGENTS.md` 工具段。
 > 相关页面：[测试体系](../tests.md) · [工具实现 B 组](../modules/tools_ops_b.md) · [工具实现 A 组](../modules/tools_ops_a.md) · [入口与运行时](../modules/entry_runtime.md) · [架构总览](../overview.md)
 
@@ -78,7 +90,7 @@ flowchart TD
 - 清单定义在 `traversal.cpp:24-63`；其中 22 个（SCHEMA_NONE=22）同时属于空 schema 集合，冒烟阶段跳过。
 - 遍历新增工具时必须同步维护此清单，否则会污染 `Example/` 项目或干扰桌面（注释见 `traversal.cpp:18-23`）。
 
-## 遍历步数推导（约 408 步）
+## 遍历步数推导（约 410 步）
 
 遍历经 `call_tool` 元工具代理，每个非排除工具产生一次调用 = 一个 StepResult；步数全部由 def 与排除/空表集合决定，可精确复现：
 
@@ -122,7 +134,7 @@ flowchart TD
 
 ## 与 AGENTS.md 不一致点清单
 
-1. **耗时声称不符（旧）**：AGENTS.md 旧写"560 步，约 15s"——560 步已随重命名更新为 ≈408（297 + 111）；"约 15s"与 `03_tools_contract.json` 描述"共耗时约 2-3 分钟"矛盾（且 L2 需启动 headless 编辑器，秒级耗时不现实），以分钟级为准。
+1. **耗时声称不符（旧）**：AGENTS.md 旧写"560 步，约 15s"——560 步已随重命名更新为 ≈408（297 + 111），新增 `reload_game_scripts` 后为 410（298 + 112）；"约 15s"与 `03_tools_contract.json` 描述"共耗时约 2-3 分钟"矛盾（且 L2 需启动 headless 编辑器，秒级耗时不现实），以分钟级为准。
 2. **ToolCatalog 构成口径**：343 = 332 领域 + 7 元工具 + `system_status` + 3 个 meta 快照；默认表 5 项（ping/system_status/search_tools/list_categories/get_tool_detail）与快照 3 项（batch_execute/call_tool/code_execute）中，7 个元工具均有目录条目。
 3. **g_handlers 口径**：实际 333（332 def + system_status，`register_all.cpp:270`），AGENTS.md 未提及 system_status 属于 g_handlers。
 4. **3 个契约缺口补充**：`reimport_resource_files` 的 schema 字段名（path）与 handler 实际读取字段（files）不一致，AGENTS.md 未记载。

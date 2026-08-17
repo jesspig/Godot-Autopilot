@@ -1,6 +1,18 @@
+---
+type: 模块文档
+title: 领域工具模块（A 组）
+description: 13 个领域工具模块（场景/属性/输入/物理/导航/资源/脚本/配置/文档/编辑器）实现细节
+tags:
+  - 模块
+  - 领域工具
+  - A组
+timestamp: "2026-08-17T01:03:27+08:00"
+resource: src/tools/
+---
+
 # 领域工具模块（src/tools/，A 组 13 模块）
 
-> 审计日期：2026-08-12，基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 审计日期：2026-08-17（2026-08-12 初稿；08-17 补 YAML frontmatter），基于当前工作树代码逐行核对（不依赖 git 历史）。
 > 覆盖范围：`src/tools/` 下 13 对 `.cpp/.hpp`：scene_ops、scene_tree_ops、property_ops、group_ops、input_ops、input_map_ops、physics_ops、nav_ops、resource_ops、script_ops、config_ops、doc_ops、editor_ops。
 > 统计口径：`handle_` 函数数取自 `.cpp` 定义；注册工具数取自 `tool_defs.def` 的 `TOOL_ENTRY` 行（以 handler 所属模块分组），两口径全部一致。
 
