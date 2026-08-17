@@ -1,7 +1,19 @@
+---
+type: 模块文档
+title: 核心模块
+description: 命令队列、配置常量、日志、模式检测、资源缓存、脏状态跟踪、服务器生命周期与插件配置
+tags:
+  - 模块
+  - 核心层
+  - 线程模型
+timestamp: "2026-08-17T01:03:27+08:00"
+resource: src/core/
+---
+
 # 核心模块（src/core/）
 
-> 审计日期：2026-08-16（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步），基于当前工作树代码逐行核对（不依赖 git 历史）。
-> 覆盖范围：`src/core/` 下 8 组文件。注意：`CommandQueue` 为 header-only（仅 `command_queue.hpp`，无对应 `.cpp`），实际为 14 个文件。
+> 审计日期：2026-08-17（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 随配置面板端口持久化同步并补 YAML frontmatter），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 覆盖范围：`src/core/` 下 9 组文件。注意：`CommandQueue` 为 header-only（仅 `command_queue.hpp`，无对应 `.cpp`），实际为 16 个文件。
 
 ## 模块简介
 
@@ -18,7 +30,8 @@
 | `ModeDetector` | `mode_detector.cpp/hpp` | 运行时模式检测（编辑器/游戏/未知） | `_enter_tree` 启动日志 |
 | `ResourceRegistry` | `resource_registry.cpp/hpp` | 内存资源缓存（oid 键 + `name:` 前缀键），全局 mutex 保护 | 资源类工具 |
 | `SceneDirtyTracker` | `scene_dirty_tracker.cpp/hpp` | 记录"当前编辑场景是否被修改"及根节点实例 ID | `GodotAutopilotPlugin::_get_unsaved_status` |
-| `ServerContext` | `server_context.cpp/hpp` | MCP 服务器组装、端口解析、启动/停止、工具/资源/prompt 注册 | `main.cpp` 入口 |
+| `ServerContext` | `server_context.cpp/hpp` | MCP 服务器组装、端口解析、启动/停止/重启、工具/资源/prompt 注册 | `main.cpp` 入口 |
+| `PluginConfig` | `plugin_config.cpp/hpp` | 插件自身配置持久化（`user://godot_autopilot/config.json`，当前仅端口） | `ServerContext` 端口解析、`McpConfigDock` Apply |
 
 ## 关键接口清单
 
@@ -71,10 +84,17 @@
 - 构造：持有 `CommandQueue&`，创建 `ToolCatalog` 与 `Bm25Index`，`resolve_port()` 解析端口并写 Transport 日志
 - `bool start()` — 依次：`StreamableHttpServerTransport`（port、`endpoint = "/mcp"`、`stateless = true`、`enable_legacy_sse = false`）→ `mcp::McpServer::Create` → `register_tools()` → `transport_->Start()`；成功后回写 `port_ = http_opts.port`；SDK 自身日志默认关闭（`MCP_LOG_LEVEL` 未设置时为 Off）
 - `void stop()` — `server_->Close()` + `transport_->Close()`；析构函数对 running 状态兜底调用
+- `bool restart(uint16_t port)` — `stop()` → 更新 `port_` → `start()`；供配置面板运行时改端口（配置面板 Apply 后立即生效，无需重启编辑器）
 - `int get_port()` / `bool is_running()` / `const std::string& last_error()`
 - MCP 服务器标识：`mcp::Implementation{"godot-autopilot", "0.1.0"}`
 - 生命周期回调（全部写 Transport 类别日志）：`on_method_called`（Debug）、`on_client_connected` / `on_initialized` / `on_transport_close`（Info）、`on_protocol_error` / `on_transport_error`（Error）
 - `register_tools()` 注册四类：工具、资源、prompt、调试器专用资源/prompt
+
+### PluginConfig（命名空间静态方法，非类实例）
+
+- `int load_port()` — 读 `user://godot_autopilot/config.json` 的 `port` 键；文件不存在/解析失败/非整数时返回 `-1`（表示未配置）
+- `bool save_port(int port)` — 写回 `{"port": N}`（先 `DirAccess::make_dir_recursive_absolute` 建目录）；失败记 System 类别错误日志并返回 false
+- 消费方：`ServerContext::resolve_port()`（启动时读取）、`McpConfigDock::_on_apply_port()`（Apply 成功后写入）
 
 ## 线程模型
 
@@ -100,7 +120,9 @@ flowchart LR
 
 ## 环境变量与端口
 
-- `GODOT_AUTOPILOT_PORT`：`resolve_port()` 用 `std::getenv` 读取、`std::atoi` 转换（**无格式校验**），缺省 `GDA_DEFAULT_PORT`（9527）
+- `GODOT_AUTOPILOT_PORT`：`resolve_port()` 用 `std::getenv` 读取、`std::atoi` 转换（**无格式校验**）
+- 端口解析优先级：**环境变量 > `PluginConfig::load_port()`（user:// 持久化值，需 > 0）> `GDA_DEFAULT_PORT`（9527）**——环境变量优先保证测试/CI 场景不受面板配置影响
+- 运行时改端口：`ServerContext::restart(uint16_t)`（配置面板 Apply 触发，成功后经 `PluginConfig::save_port` 持久化）
 - `GDA_FORCE_HEADLESS`：强制 headless 相关路径（`main.cpp` 读取）
 
 ## config.hpp 常量全表

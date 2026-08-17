@@ -1,3 +1,15 @@
+---
+type: 模块文档
+title: 工具实现模块（B 组）
+description: 18 个领域工具模块（调试/显示/OS/运行时/渲染/音频/瓦片/文本/执行）实现细节
+tags:
+  - 模块
+  - 领域工具
+  - B组
+timestamp: "2026-08-17T01:03:27+08:00"
+resource: src/tools/
+---
+
 # 工具实现模块 B（调试/显示/OS/运行时/渲染/资源/执行）
 
 > 覆盖 `src/tools/` 下 18 个模块：debug_ops、debugger_ops、debugger_access、display_ops、display_window_ops、os_ops、runtime_ops、runtime_game_ops、audio_ops、render_ops、environment_ops、text_ops、tilemap_ops、tileset_ops、spriteframes_ops、code_exec_ops、log_ops、capture_ops。

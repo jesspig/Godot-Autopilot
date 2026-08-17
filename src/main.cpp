@@ -20,8 +20,8 @@
 #include "runtime/game_bridge.hpp"
 #include "tools/debugger_ops.hpp"
 #include "tools/runtime_ops.hpp"
+#include "ui/mcp_config_dock.hpp"
 #include "ui/mcp_log_dock.hpp"
-#include "ui/mcp_status_bar.hpp"
 
 static godot_autopilot::LogSystem &get_log_system() {
   return godot_autopilot::LogSystem::instance();
@@ -52,8 +52,8 @@ static bool gda_cmdline_mode() {
 class GodotAutopilotPlugin : public godot::EditorPlugin {
   GDCLASS(GodotAutopilotPlugin, godot::EditorPlugin)
 
-  godot_autopilot::McpStatusBar *status_bar;
   godot_autopilot::McpLogDock *log_dock;
+  godot_autopilot::McpConfigDock *config_dock;
   godot::Ref<godot_autopilot::debugger_ops::OutputCaptureLogger>
       output_logger_;
   godot::Ref<godot_autopilot::debugger_ops::DebugCapturePlugin>
@@ -65,7 +65,8 @@ protected:
   static void _bind_methods() {}
 
 public:
-  GodotAutopilotPlugin() : status_bar(nullptr), log_dock(nullptr) {}
+  GodotAutopilotPlugin()
+      : log_dock(nullptr), config_dock(nullptr) {}
 
   void _enter_tree() override;
   void _exit_tree() override;
@@ -104,24 +105,6 @@ void GodotAutopilotPlugin::_enter_tree() {
     get_log_system().log(LogLevel::Info, LogCategory::System,
                          "cmdline mode: plugin UI/server disabled");
     return;
-  }
-
-  try {
-    status_bar = memnew(godot_autopilot::McpStatusBar);
-    status_bar->set_status_text("GDA: starting...");
-    add_control_to_container(godot::EditorPlugin::CONTAINER_TOOLBAR,
-                             status_bar);
-    get_log_system().log(LogLevel::Debug, LogCategory::System,
-                         "Toolbar status bar attached");
-  } catch (const std::exception &e) {
-    get_log_system().log(
-        LogLevel::Error, LogCategory::System,
-        "plugin setup step failed (status bar): " + std::string(e.what()) +
-            " (type=" + typeid(e).name() + ")");
-  } catch (...) {
-    get_log_system().log(LogLevel::Error, LogCategory::System,
-                         "plugin setup step failed (status bar): "
-                         "unknown exception");
   }
 
   try {
@@ -186,25 +169,31 @@ void GodotAutopilotPlugin::_enter_tree() {
     bool started = g_server_ctx->start();
     if (started) {
       auto port = g_server_ctx->get_port();
-      if (status_bar) {
-        status_bar->set_status_text("GDA: 0.0.0.0:" +
-                                    godot::String::num_int64(port));
-      }
       get_log_system().log(LogLevel::Info, LogCategory::Transport,
                            "MCP server listening on 0.0.0.0:" +
                                std::to_string(port));
     } else {
-      if (status_bar) {
-        status_bar->set_status_text("GDA: offline");
-      }
       get_log_system().log(LogLevel::Error, LogCategory::Transport,
                            "MCP server start failed: " +
                                g_server_ctx->last_error());
     }
-  } else {
-    if (status_bar) {
-      status_bar->set_status_text("GDA: offline");
-    }
+  }
+
+  try {
+    config_dock = memnew(godot_autopilot::McpConfigDock);
+    config_dock->set_server_context(g_server_ctx);
+    add_dock(config_dock);
+    get_log_system().log(LogLevel::Debug, LogCategory::System,
+                         "Right config dock registered");
+  } catch (const std::exception &e) {
+    get_log_system().log(
+        LogLevel::Error, LogCategory::System,
+        "plugin setup step failed (config dock): " + std::string(e.what()) +
+            " (type=" + typeid(e).name() + ")");
+  } catch (...) {
+    get_log_system().log(LogLevel::Error, LogCategory::System,
+                         "plugin setup step failed (config dock): "
+                         "unknown exception");
   }
 
   export_guard_.instantiate();
@@ -251,11 +240,10 @@ void GodotAutopilotPlugin::_exit_tree() {
       memdelete(log_dock);
       log_dock = nullptr;
     }
-    if (status_bar) {
-      remove_control_from_container(godot::EditorPlugin::CONTAINER_TOOLBAR,
-                                    status_bar);
-      memdelete(status_bar);
-      status_bar = nullptr;
+    if (config_dock) {
+      remove_dock(config_dock);
+      memdelete(config_dock);
+      config_dock = nullptr;
     }
     get_log_system().log(godot_autopilot::LogLevel::Info,
                          godot_autopilot::LogCategory::System,
@@ -298,7 +286,7 @@ GDExtensionEntryPoint(GDExtensionInterfaceGetProcAddress p_get_proc_address,
         godot_autopilot::debugger_ops::register_classes();
 
         godot::ClassDB::register_class<godot_autopilot::McpLogDock>();
-        godot::ClassDB::register_class<godot_autopilot::McpStatusBar>();
+        godot::ClassDB::register_class<godot_autopilot::McpConfigDock>();
         godot::ClassDB::register_class<godot_autopilot::ExportGuard>();
         godot::ClassDB::register_class<GodotAutopilotPlugin>();
         godot::EditorPlugins::add_by_type<GodotAutopilotPlugin>();

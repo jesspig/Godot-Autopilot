@@ -1,6 +1,20 @@
+---
+type: 项目总览
+title: 项目总览
+description: 项目定位、整体架构、技术栈与目录结构的权威总览
+tags:
+  - 总览
+  - 架构
+  - 技术栈
+timestamp: "2026-08-17T01:03:27+08:00"
+resource:
+  - README.md
+  - src/
+---
+
 # 项目总览（Overview）
 
-> 审计日期：2026-08-16（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步），基于当前工作树文件与代码逐项核对（不依赖 git 历史）。
+> 审计日期：2026-08-17（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 补 YAML frontmatter 并复核数值），基于当前工作树文件与代码逐项核对（不依赖 git 历史）。
 > 事实来源：根 `README.md` / `README_zh.md` / `AGENTS.md`、`CMakeLists.txt`、`cmake/FetchDependencies.cmake`、`src/main.cpp`、`src/core/server_context.cpp`、`src/tools/tool_defs.def`、`src/tools/dispatch.cpp`、`src/prompts/prompt_handlers.cpp`、`src/resources/resource_handlers.cpp`、`Example/project.godot`、`Example/docs/`。
 
 ## 项目定位
@@ -65,7 +79,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 ### 编辑器 UI
 
 - 自定义底部日志面板 `McpLogDock`（"MCP Log"，按 LogLevel/LogCategory 过滤、文本搜索、折叠重复）。
-- 工具栏状态栏 `McpStatusBar`（显示 `GDA: 0.0.0.0:<port>`）。
+- 右侧配置面板 `McpConfigDock`（"MCP Config"：端口运行时重启 + 持久化、一键生成 8 个客户端 MCP 配置）。
 - `ExportGuard`：导出期间拒绝领域工具调用（返回 `{"error":"editor is exporting; ..."}`）。
 
 ## 技术栈
@@ -94,15 +108,16 @@ godot-self-driving/
 ├── src/
 │   ├── main.cpp                # GDExtension 入口 + GodotAutopilotPlugin(EditorPlugin) 生命周期
 │   ├── core/                   # 基础设施：CommandQueue(header-only)、config、LogSystem、ModeDetector、
-│   │                           #   ResourceRegistry、SceneDirtyTracker、ExportGuard、ServerContext
-│   ├── tools/                  # 领域工具：36 个 *_ops.cpp、register_all、dispatch、tool_catalog、
-│   │                           #   tool_defs.def（332 条工具定义）、schema_* 生成器
+│   │                           #   ResourceRegistry、SceneDirtyTracker、ExportGuard、ServerContext、PluginConfig
+│   ├── tools/                  # 领域工具：41 个 .cpp（30 个 *_ops + 6 个 schema_* 生成器 +
+│   │                           #   register_all/dispatch/tool_catalog/schema_builder/debugger_access）、
+│   │                           #   tool_defs.def（332 条工具定义）
 │   ├── resources/              # MCP Resources：resource_handlers + debugger_resources
 │   ├── prompts/                # 提示词模板：7 个主题 + debugger_prompts
 │   ├── runtime/                # 游戏运行时桥接：game_bridge(±input/eval) + gda_protocol.hpp
-│   ├── ui/                     # 编辑器 UI：mcp_status_bar、mcp_log_dock
-│   └── util/                   # 通用：variant_json、bm25_index、error_util、readback_util、scene_path
-├── tests/                      # L1 gda_unit_tests（61 个 gtest）+ L2 gda_test_runner + config/*.json（5 份）
+│   ├── ui/                     # 编辑器 UI：mcp_config_dock、mcp_log_dock
+│   └── util/                   # 通用：variant_json、bm25_index、error_util、readback_util、scene_path、client_config_gen
+├── tests/                      # L1 gda_unit_tests（72 个 gtest）+ L2 gda_test_runner + config/*.json（5 份）
 ├── docs/                       # 规划文档（docs/plan/）与本知识库（docs/wiki/）
 └── Example/                    # 文档/示例工程（详见 example.md）
 ```

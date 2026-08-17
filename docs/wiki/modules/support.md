@@ -1,7 +1,25 @@
+---
+type: 模块文档
+title: 支撑模块
+description: 提示词、MCP 资源、编辑器 UI 与通用工具库实现细节
+tags:
+  - 模块
+  - 提示词
+  - 资源
+  - UI
+  - 工具库
+timestamp: "2026-08-17T01:03:27+08:00"
+resource:
+  - src/prompts/
+  - src/resources/
+  - src/ui/
+  - src/util/
+---
+
 # 支撑模块（src/prompts/、src/resources/、src/ui/、src/util/）
 
-> 审计日期：2026-08-12，基于当前工作树代码逐行核对（不依赖 git 历史）。
-> 覆盖范围：`src/prompts/` 9 组文件（18 个）、`src/resources/` 2 组、`src/ui/` 2 组、`src/util/` 6 组（其中 `scene_path.hpp` 为 header-only）。注册入口在 `src/core/server_context.cpp:133-135`。
+> 审计日期：2026-08-17（2026-08-12 初稿；08-17 随配置面板新增、状态栏移除同步并补 YAML frontmatter），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 覆盖范围：`src/prompts/` 9 组文件（18 个）、`src/resources/` 2 组、`src/ui/` 2 组、`src/util/` 6 组（11 个，其中 `scene_path.hpp` 为 header-only）。注册入口在 `src/core/server_context.cpp:133-135`。
 
 ## 模块简介
 
@@ -9,8 +27,8 @@
 
 - **Prompts**：向 MCP 客户端暴露 12 个 prompt 模板（7 通用 + 5 调试），全部经 `server.RegisterPrompt` 注册。
 - **Resources**：暴露 15 个 MCP resource URI（8 引擎侧 + 7 调试捕获侧），全部为 `godot://` 前缀。
-- **UI**：编辑器内状态栏（`McpStatusBar`）与底部日志面板（`McpLogDock`），消费 `LogSystem` 与服务器生命周期。
-- **Util**：与工具层共享的纯工具件——Variant↔JSON 互转、BM25 检索、错误 JSON 构造、写后读回校验、场景路径解析。
+- **UI**：底部日志面板（`McpLogDock`）、右侧配置面板（`McpConfigDock`），消费 `LogSystem` 与服务器生命周期。
+- **Util**：与工具层共享的纯工具件——Variant↔JSON 互转、BM25 检索、错误 JSON 构造、写后读回校验、场景路径解析、客户端 MCP 配置生成。
 
 ## Prompts（12 个，均经 RegisterPrompt 注册）
 
@@ -32,7 +50,7 @@
 | `debug-physics` | Guide to use physics debugging tools including ray casts, shape casts, and performance monitors | `prompt_debug_physics()`（134 行） | `intersect_physics_3d_ray`/点查询/监视器示例（shape_cast 工具已随重命名删除） |
 | `setup-input-map` | Guide to configure input actions in Project Settings and test them | `prompt_setup_input_map()`（144 行） | 经 `call_tool` 调 `set_project_settings`/`save_project_settings` 配置 `input/move_*` 等动作与按键事件 |
 | `setup-gui` | Guide to create a simple GUI with CanvasLayer, containers, buttons, and labels | `prompt_setup_gui()`（202 行） | CanvasLayer → VBoxContainer → 标签/按钮 + 信号连接示例 |
-| `tool-usage` | Usage examples for the 17 most commonly used MCP tools with JSON input/output and gotchas | `prompt_tool_usage()`（685 行） | 实际含 **19 个**工具章节（见"不一致点"） |
+| `tool-usage` | Usage examples for the 17 most commonly used MCP tools with JSON input/output and gotchas | `prompt_tool_usage()`（625 行） | 实际含 **19 个**工具章节（见"不一致点"） |
 | `keycode-reference` | Godot keycode reference for InputEventKey and Variant type JSON mapping for property operations | `prompt_keycode_reference()`（213 行） | ASCII 键码表、Godot 特殊键码（`KEY_SPECIAL=4194304` 基值）、`add_input_map_action_event` 的 event JSON、Variant→JSON 映射表 |
 
 ### 调试 prompt 名单（register_debugger_prompts，可带可选参数）
@@ -85,15 +103,6 @@
 
 ## UI
 
-### McpStatusBar（`mcp_status_bar.cpp/hpp`）
-
-`HBoxContainer` 子类（GDCLASS），高 24px：
-
-- 成员：`icon`（TextureRect，16x16，编辑器下取主题 `EditorIcons` 的 `"Node"` 图标）+ `status_label`（Label）
-- 默认文本：`"GDA: initializing"`（构造函数）
-- 接口：`set_status_text(String)`；`set_status_ok(bool)`——图标着色 绿 `(0.3, 0.9, 0.3)` / 红 `(0.9, 0.3, 0.3)`
-- 状态流转在 `main.cpp`：`"GDA: starting..."` → 启动成功后 `"GDA: 0.0.0.0:<port>"` → 失败/停止 `"GDA: offline"`
-
 ### McpLogDock（`mcp_log_dock.cpp/hpp`）
 
 `EditorDock` 子类，标题 "MCP Log"，默认停靠底部槽（`DOCK_SLOT_BOTTOM`），可关闭，最小高度 `DEFAULT_DOCK_HEIGHT = 200`：
@@ -103,6 +112,36 @@
 - **折叠**：`collapse` 开关，按消息聚合相同文本并显示 `(N)` 次数前缀；折叠模式改动触发全量重建
 - **主题**：`_update_theme()` 从编辑器主题取 `error_color`/`warning_color`/`font_color`（无则回退硬编码色）、`output_source*` 字体族、各按钮图标；`NOTIFICATION_ENTER_TREE`/`NOTIFICATION_THEME_CHANGED` 时刷新
 - **日志来源**：构造时取 `LogSystem::instance()` 指针；`poll_new_entries()` 用 `query_from(last_index_)` 增量拉取（`main.cpp:_process` 每帧调用）；`refresh()`/`_rebuild_log()` 全量重建；`_on_clear()` 清显示并把 `last_index_` 推进到 `log_system->next_index()`（只清界面，不删 LogSystem 缓冲）
+
+### McpConfigDock（`mcp_config_dock.cpp/hpp`）
+
+`EditorDock` 子类，标题 "MCP Config"，默认停靠右侧槽（`DOCK_SLOT_RIGHT_UR`），可关闭：
+
+- **布局**：VBoxContainer = 端口区（Label + SpinBox 1–65535 + Apply 按钮 + 运行状态 Label）→ 分隔线 → 客户端配置区（`OptionButton` 下拉选择 8 个客户端，label 含配置文件路径）+ Generate 按钮 + 结果 Label + 生效条件提示 Label
+- **端口管理**：`set_server_context(ServerContext*)` 注入服务器（null 时禁用 Apply）；Apply → `ServerContext::restart(port)` → 成功后 `PluginConfig::save_port(port)` 持久化，并刷新面板内运行状态 Label（"Running on port N" / "Server offline"，主题色标注）
+- **配置生成**：`_on_generate()` 只处理下拉选中的单个客户端——目标目录 `ProjectSettings::globalize_path("res://")`；文件不存在 → `render_config` 新建；JSON 已存在 → `merge_json_config` 合并（**先解析现有配置，保留其他键，仅更新 `mcp`/`mcpServers` 下的 `godot-autopilot` 条目**，不覆盖用户的其他 agent 配置）；Codex TOML 已含 `mcp_servers` → 跳过并提示；JSON 无法解析 → 跳过不写（防覆盖）；结果单文件报告「创建/更新/跳过」原因
+- **主题**：颜色经 `theme_color()` 从编辑器主题取 `success_color`/`error_color`/`warning_color`/`font_disabled_color`（无则回退硬编码色）
+
+### client_config_gen（`client_config_gen.cpp/hpp`，命名空间 `godot_autopilot::client_config_gen`）
+
+纯函数生成器（**仅依赖 std + `mcp::JsonValue`，无 Godot API**，L1 可测）：
+
+| 客户端 | 文件路径 | 顶层键 | 条目字段 |
+|---|---|---|---|
+| OpenCode | `opencode.json` | `mcp` | `type=remote`、`url`、`enabled=true` |
+| Claude Code | `.mcp.json` | `mcpServers` | `type=http`、`url` |
+| Codex | `.codex/config.toml` | `[mcp_servers.godot-autopilot]`（TOML） | `url` |
+| Cursor | `.cursor/mcp.json` | `mcpServers` | `url`（无 type） |
+| GitHub Copilot | `.github/mcp.json` | `mcpServers` | `type=http`、`url` |
+| Trae | `.trae/mcp.json` | `mcpServers` | `url`（无 type） |
+| Qoder | `.qoder/settings.json` | `mcpServers` | `type=http`、`url` |
+| WorkBuddy | `.workbuddy/mcp.json` | `mcpServers` | `type=http`、`url` |
+
+- 服务器名常量 `kServerName = "godot-autopilot"`；URL 统一 `http://127.0.0.1:<port>/mcp`（DNS rebinding 保护要求 127.0.0.1）
+- `render_config(ClientId, port)` — 全新文件内容（JSON `Dump(2)` 缩进 / TOML 字符串）
+- `merge_json_config(ClientId, port, existing)` — 空串 → 视为新建；Parse 失败或非对象 → `Unparsable`；否则更新顶层键下同名条目并保留其余内容
+- `merge_toml_config(port, existing)` — 已含 `[mcp_servers` 段 → `AlreadyConfigured`；否则追加段（保留原文）
+- `display_name` / `file_path` / `description` — UI label 与报告用
 
 ## Util
 

@@ -1,7 +1,19 @@
+---
+type: 测试体系指南
+title: 测试体系
+description: L1/L2 双层测试体系、遍历排除清单、数值统计与已知引擎副作用
+tags:
+  - 测试
+  - L1
+  - L2
+timestamp: "2026-08-17T01:03:27+08:00"
+resource: tests/
+---
+
 # 测试体系（tests/）
 
-> 审计日期：2026-08-12，基于当前工作树代码逐行核对（不依赖 git 历史）。
-> 覆盖范围：`tests/` 全部（unit 8 文件、runner 7 实现 + 6 头文件、integration、config 5 JSON、`tests/CMakeLists.txt`），对照 `tests/README.md` 与仓库根 `AGENTS.md` 测试段逐条核算。未运行任何测试，所有数值均来自源码静态统计。
+> 审计日期：2026-08-17（2026-08-12 初稿；08-17 随客户端配置生成器测试同步并补 YAML frontmatter），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 覆盖范围：`tests/` 全部（unit 9 文件、runner 7 实现 + 6 头文件、integration、config 5 JSON、`tests/CMakeLists.txt`），对照 `tests/README.md` 与仓库根 `AGENTS.md` 测试段逐条核算。未运行任何测试，所有数值均来自源码静态统计。
 
 ## 架构总览
 
@@ -60,7 +72,7 @@ stdout/stderr 各接独立管道读线程持续消费，防 64KB 缓冲写满阻
 
 ## L1 单元测试
 
-**8 个测试文件，实际 61 个 TEST/TEST_F**（`TEST`/`TEST_F` 宏逐行统计）：
+**9 个测试文件，实际 72 个 TEST/TEST_F**（`TEST`/`TEST_F` 宏逐行统计）：
 
 | 文件 | 数量 | 主题 |
 |---|---|---|
@@ -70,13 +82,14 @@ stdout/stderr 各接独立管道读线程持续消费，防 64KB 缓冲写满阻
 | `command_queue_test.cpp` | 7 | 跨线程 submit/drain、异常经 future 传播、主线程记录 |
 | `tool_catalog_test.cpp` | 7 | add/get、重复覆盖、并发安全、默认工具填充一次 |
 | `log_system_test.cpp` | 6 | 单例、级别/分类/文本过滤、环形缓冲覆盖 |
+| `client_config_gen_test.cpp` | 11 | 8 客户端配置文件渲染快照（URL/type/enabled）、JSON 合并三态（新建/保留其他键/非法）、TOML 追加与跳过 |
 | `error_util_test.cpp` | 3 | 错误 JSON 形状、四字段详情 |
 | `runtime_ops_test.cpp` | 1 | 编辑器队列注入往返 |
-| **合计** | **61** | |
+| **合计** | **72** | |
 
-**链接来源**（`tests/CMakeLists.txt:31-45` 的 `GDA_UNIT_BUSINESS_SOURCES`，共 13 个显式 + 1 组 glob）：`src/core/` 的 `log_system`、`resource_registry`、`scene_dirty_tracker`、`export_guard`；`src/util/` 的 `bm25_index`、`error_util`、`readback_util`、`variant_json`；`src/tools/` 的 `tool_catalog`、`schema_builder`、`register_all`、`dispatch`、`debugger_access`；`src/tools/*_ops.cpp`（`GDA_TOOLS_OPS_SOURCES` glob，`register_all.cpp` 引用全部 `handle_xxx` 符号故必须链接）。
+**链接来源**（`tests/CMakeLists.txt:31-46` 的 `GDA_UNIT_BUSINESS_SOURCES`，共 14 个显式 + 1 组 glob）：`src/core/` 的 `log_system`、`resource_registry`、`scene_dirty_tracker`、`export_guard`；`src/util/` 的 `bm25_index`、`error_util`、`readback_util`、`variant_json`、`client_config_gen`；`src/tools/` 的 `tool_catalog`、`schema_builder`、`register_all`、`dispatch`、`debugger_access`；`src/tools/*_ops.cpp`（`GDA_TOOLS_OPS_SOURCES` glob，`register_all.cpp` 引用全部 `handle_xxx` 符号故必须链接）。
 
-**约束**：L1 禁止调用任何已注册工具 handler（无引擎时 godot-cpp 接口指针为 nullptr 会崩溃）；`register_all_test` 仅测注册/分发/未知工具错误路径。`SchemaStatisticsBaseline`（`register_all_test.cpp:133-147`）为运行时统计：断言 schema 非空数 > 空数 > 0，**不硬编码具体数值**（AGENTS.md 声称的 "283 非空 / 73 空" 是运行时观测值而非断言常量）。
+**约束**：L1 禁止调用任何已注册工具 handler（无引擎时 godot-cpp 接口指针为 nullptr 会崩溃）；`register_all_test` 仅测注册/分发/未知工具错误路径。`SchemaStatisticsBaseline`（`register_all_test.cpp:133-147`）为运行时统计：断言 schema 非空数 > 空数 > 0，**不硬编码具体数值**（AGENTS.md 声称的 "283 非空 / 73 空" 是运行时观测值而非断言常量）。`client_config_gen` 为纯 C++（仅 std + `mcp::JsonValue`），不触碰 Godot API，可安全纳入 L1。
 
 ## L2 配置驱动用例
 
@@ -149,7 +162,7 @@ write_file  create_script  save_resource
 
 | 条目 | AGENTS.md 声称 | 源码核算 | 结论 |
 |---|---|---|---|
-| L1 gtest 数量 | 61 | 61（8 文件逐文件统计：14+13+10+7+7+6+3+1） | 一致 |
+| L1 gtest 数量 | 61 | 72（9 文件逐文件统计：14+13+10+7+7+6+11+3+1） | 随配置面板新增 11 个 |
 | L2 用例文件数 | 5 | 5（00_meta / 01_scene / 02_property / 03_tools_contract / 04_resources_scripts） | 一致 |
 | ctest L2 用例 | gda_runner_<name> | 一致（`tests/CMakeLists.txt:108-114`，TIMEOUT 600） | 一致 |
 | 遍历工具数 | 332 | 332（`tool_defs.def` TOOL_ENTRY 计数） | 一致 |

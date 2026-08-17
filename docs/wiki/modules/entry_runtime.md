@@ -1,6 +1,20 @@
+---
+type: 模块文档
+title: 入口与运行时桥接
+description: GDExtension 入口与插件生命周期、GDA 协议常量、游戏运行时桥接三文件职责
+tags:
+  - 模块
+  - 入口
+  - 运行时桥接
+timestamp: "2026-08-17T01:03:27+08:00"
+resource:
+  - src/main.cpp
+  - src/runtime/
+---
+
 # 模块：入口与运行时桥接（entry_runtime）
 
-覆盖代码：`src/main.cpp`（343 行）与 `src/runtime/`（`gda_protocol.hpp` 65 行、`game_bridge.hpp` 75 行、`game_bridge.cpp` 581 行、`game_bridge_input.cpp` 738 行、`game_bridge_eval.cpp` 445 行）。
+覆盖代码：`src/main.cpp`（331 行）与 `src/runtime/`（`gda_protocol.hpp` 65 行、`game_bridge.hpp` 75 行、`game_bridge.cpp` 581 行、`game_bridge_input.cpp` 738 行、`game_bridge_eval.cpp` 468 行）。
 
 职责全景：`main.cpp` 是 GDExtension 的导出入口与编辑器插件本体；`src/runtime/` 是在**游戏运行时进程**内与编辑器进程通信的桥接层，通过 EngineDebugger 消息通道承载 GDA 协议。编辑器内的 MCP 服务器（`ServerContext`）与运行时桥接是两条相互独立的消息通路，本页只覆盖入口生命周期与运行时桥接，MCP 工具侧见相关模块页。
 
@@ -18,7 +32,7 @@
 按模块级别分派：
 
 - **SCENE 级别**：仅当 `!Engine::is_editor_hint()`（即运行游戏的非编辑器进程）时调用 `runtime::game_bridge::register_listener()`。编辑器进程在此级别不注册桥接监听。
-- **EDITOR 级别**：先 `debugger_ops::register_classes()`，然后依次 `ClassDB::register_class` 注册 4 个类：`McpLogDock`、`McpStatusBar`、`ExportGuard`、`GodotAutopilotPlugin`，最后 `EditorPlugins::add_by_type<GodotAutopilotPlugin>()` 把插件类型注册进编辑器。
+- **EDITOR 级别**：先 `debugger_ops::register_classes()`，然后依次 `ClassDB::register_class` 注册 4 个类：`McpLogDock`、`McpConfigDock`、`ExportGuard`、`GodotAutopilotPlugin`，最后 `EditorPlugins::add_by_type<GodotAutopilotPlugin>()` 把插件类型注册进编辑器。
 
 ### 1.3 模块终止（register_terminator）
 
@@ -30,19 +44,20 @@
 `GDCLASS(GodotAutopilotPlugin, godot::EditorPlugin)`，`_bind_methods()` 为空。成员：
 
 - 静态 `CommandQueue s_queue`，经 `queue()` 静态访问器暴露；`_process` 中 `s_queue.drain()` 即 AGENTS.md 所述"主线程排空"的实现点。
-- UI 成员：`McpStatusBar *status_bar`、`McpLogDock *log_dock`；`Ref<OutputCaptureLogger>`、`Ref<DebugCapturePlugin>`、`Ref<ExportGuard>`。
+- UI 成员：`McpLogDock *log_dock`、`McpConfigDock *config_dock`；`Ref<OutputCaptureLogger>`、`Ref<DebugCapturePlugin>`、`Ref<ExportGuard>`。
 - 覆写方法：`_enter_tree` / `_exit_tree` / `_process` / `_get_unsaved_status`。
 
 `_enter_tree()` 顺序（每个步骤独立 try/catch，失败不中断后续）：
 
 1. 日志"plugin starting"，`runtime_ops::set_editor_queue(&queue())` 注入队列，`ModeDetector` 判定 Editor/Runtime 模式写日志。
 2. `gda_cmdline_mode()` 为真则直接 return——不建 UI、不启服务器（队列已在步骤 1 注入）。
-3. 创建 `McpStatusBar`（`set_status_text("GDA: starting...")`）挂到 `CONTAINER_TOOLBAR`；创建 `McpLogDock`（标题 "MCP Log"）`add_dock`。
+3. 创建 `McpLogDock`（标题 "MCP Log"）`add_dock`。
 4. `debugger_ops::create_output_logger()` 经 `OS::add_logger` 注册；`debugger_ops::create_debug_plugin()` 经 `add_debugger_plugin` 注册。
-5. `new (std::nothrow) ServerContext(queue())` 并 `start()`；成功则状态栏显示 `GDA: 0.0.0.0:<port>` 并记 Transport 日志，失败显示 `GDA: offline` 并记 `last_error()`。
-6. `export_guard_.instantiate()` + `add_export_plugin`，日志 "Plugin ready"。
+5. `new (std::nothrow) ServerContext(queue())` 并 `start()`；成功则记 Transport 日志（含端口），失败记 `last_error()`。
+6. 创建 `McpConfigDock` 并 `set_server_context`（面板内显示运行端口/离线状态）`add_dock`。
+7. `export_guard_.instantiate()` + `add_export_plugin`，日志 "Plugin ready"。
 
-`_exit_tree()` 逆序清理：停并删 `g_server_ctx` → 移除 ExportGuard → 移除 debugger plugin → `OS::remove_logger` → 移除并 memdelete 停靠面板与状态栏，整体包 try/catch。
+`_exit_tree()` 逆序清理：停并删 `g_server_ctx` → 移除 ExportGuard → 移除 debugger plugin → `OS::remove_logger` → 移除并 memdelete 停靠面板，整体包 try/catch。
 
 `_process()`：`s_queue.drain()` + `log_dock->poll_new_entries()`。
 
