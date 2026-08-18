@@ -1,0 +1,27 @@
+#ifndef GODOT_AUTOPILOT_DEBUG_OPS_HPP
+#define GODOT_AUTOPILOT_DEBUG_OPS_HPP
+
+#include <mcp/JsonValue.hpp>
+
+namespace godot_autopilot {
+namespace debug_ops {
+
+mcp::JsonValue handle_print(const mcp::JsonValue &args);
+mcp::JsonValue handle_print_stack(const mcp::JsonValue &args);
+mcp::JsonValue handle_get_performance_monitor(const mcp::JsonValue &args);
+mcp::JsonValue handle_list_performance_monitors(const mcp::JsonValue &args);
+mcp::JsonValue handle_get_object_count(const mcp::JsonValue &args);
+mcp::JsonValue handle_get_memory_usage(const mcp::JsonValue &args);
+mcp::JsonValue handle_set_physics_fps(const mcp::JsonValue &args);
+mcp::JsonValue handle_collision_debug(const mcp::JsonValue &args);
+mcp::JsonValue handle_navigation_debug(const mcp::JsonValue &args);
+mcp::JsonValue handle_performance_debug(const mcp::JsonValue &args);
+mcp::JsonValue handle_get_all_monitors(const mcp::JsonValue &args);
+mcp::JsonValue handle_remove_custom_monitor(const mcp::JsonValue &args);
+mcp::JsonValue handle_get_custom_monitor(const mcp::JsonValue &args);
+mcp::JsonValue handle_list_custom_monitors(const mcp::JsonValue &args);
+mcp::JsonValue handle_query_node_count(const mcp::JsonValue &args);
+
+} // namespace debug_ops
+} // namespace godot_autopilot
+#endif
