@@ -6,7 +6,7 @@ tags:
   - 模块
   - 领域工具
   - B组
-timestamp: "2026-08-17T01:03:27+08:00"
+timestamp: "2026-08-20T16:59:13+08:00"
 resource: src/tools/
 ---
 
@@ -14,7 +14,7 @@ resource: src/tools/
 
 > 覆盖 `src/tools/` 下 18 个模块：debug_ops、debugger_ops、debugger_access、display_ops、display_window_ops、os_ops、runtime_ops、runtime_game_ops、audio_ops、render_ops、environment_ops、text_ops、tilemap_ops、tileset_ops、spriteframes_ops、code_exec_ops、log_ops、capture_ops。
 >
-> 工具总数：**162** = 160 个领域工具 + 2 个元工具（`batch_execute`、`code_execute`，经 `server.RegisterTool()` 直连，不经 `call_tool`）。数量以 `src/tools/tool_defs.def` 的 `TOOL_ENTRY` 与 `register_all.cpp` 为准。
+> 工具总数：**164** = 162 个领域工具 + 2 个元工具（`batch_execute`、`code_execute`，经 `server.RegisterTool()` 直连，不经 `call_tool`）。数量以 `src/tools/tool_defs.def` 的 `TOOL_ENTRY` 与 `register_all.cpp` 为准。
 >
 > 相关页面：[工具注册表](../modules/tools_registry.md) · [运行时通道](../modules/entry_runtime.md)
 
@@ -33,7 +33,7 @@ resource: src/tools/
 | `audio_ops.cpp` | `godot_autopilot::audio_ops` | `audio_ops.hpp` | 20 |
 | `render_ops.cpp` | `godot_autopilot::render_ops` | `render_ops.hpp` | 42 |
 | `environment_ops.cpp` | `godot_autopilot::render_ops` | `render_ops.hpp`（无独立 hpp） | 7 |
-| `text_ops.cpp` | `godot_autopilot::text_ops` | `text_ops.hpp` | 11 |
+| `text_ops.cpp` | `godot_autopilot::text_ops` | `text_ops.hpp` | 13 |
 | `tilemap_ops.cpp` | `godot_autopilot::tilemap_ops` | `tilemap_ops.hpp` | 4 |
 | `tileset_ops.cpp` | `godot_autopilot::tileset_ops` | `tileset_ops.hpp` | 3 |
 | `spriteframes_ops.cpp` | `godot_autopilot::spriteframes_ops` | `spriteframes_ops.hpp` | 3 |
@@ -136,14 +136,15 @@ resource: src/tools/
 - **错误模式**：必填 `environment_rid`/RID 参数缺失 → error_json；`RenderingServer not available` → error_json；无 `result` 之外的扩展字段。
 - 出站链接：[工具注册表](../modules/tools_registry.md) · [运行时通道](../modules/entry_runtime.md)
 
-## text_ops — 文本服务与字形（11 工具，含 write_file，归 OS 类）
+## text_ops — 文本服务与字形（13 工具，含 write_file/read_file/find_in_files，归 OS 类）
 
-- **职责**：`TextServer` 直通：字体资源、shaped text、系统字体路径、RTL 检测；另含一个通用文件写入工具。
-- **代表工具**：`create_text_font`、`create_shaped_text`、`set_text_font_antialiasing`、`set_text_font_data`、`set_text_font_hinting`、`get_text_font_system_path`、`has_text_feature`、`is_text_locale_right_to_left`、`add_shaped_text_string`、`get_shaped_text_size`、`write_file`。
+- **职责**：`TextServer` 直通：字体资源、shaped text、系统字体路径、RTL 检测；另含通用文件读写与项目内文本搜索工具。
+- **代表工具**：`create_text_font`、`create_shaped_text`、`set_text_font_antialiasing`、`set_text_font_data`、`set_text_font_hinting`、`get_text_font_system_path`、`has_text_feature`、`is_text_locale_right_to_left`、`add_shaped_text_string`、`get_shaped_text_size`、`write_file`、`read_file`、`find_in_files`。
 - **关键事实**：
-  - `set_text_font_data` 用 `FileAccess::get_file_as_bytes` 读字体文件；`write_file`（原 `file_write`，随全量重命名迁移至 OS 类）用 `FileAccess` WRITE/READ_WRITE 直写磁盘，**属于测试 34 排除清单**（写文件副作用，历史事故源之一）。
+  - `set_text_font_data` 用 `FileAccess::get_file_as_bytes` 读字体文件；`write_file`（原 `file_write`，随全量重命名迁移至 OS 类）用 `FileAccess` WRITE/READ_WRITE 直写磁盘，**属于测试排除清单**（写文件副作用，历史事故源之一）。
+  - **`read_file` / `find_in_files`（08-20 新增）**：`read_file` 与 `write_file` 对称，读任意文本文件返回 `{path, content}`；`find_in_files` 递归搜索目录下文本（`query` 必填，可选 `dir` 默认 `res://`、`extensions` 默认 gd/tscn/tres/cs/md/json/h/cpp、`case_sensitive`、`max_results` 默认 500，达到即截断返回 `truncated:true`），按扩展名过滤并统计每文件命中次数，**归 OS 类但 handler 在 text_ops**。路径拼接用 `join_search_path`（`res://` 根免三重斜杠）。
   - 本模块是 `get_os_system_fonts`（os_ops）之外的字体获取路径补充。
-- **错误模式**：`TextServer not available` / `missing or invalid parameter: font_rid` / `shaped_rid`；`write_file` 打开失败 → error_json。
+- **错误模式**：`TextServer not available` / `missing or invalid parameter: font_rid` / `shaped_rid`；`write_file`/`read_file` 打开失败 → error_json；`find_in_files` 缺 query → missing required parameter。
 - 出站链接：[工具注册表](../modules/tools_registry.md) · [运行时通道](../modules/entry_runtime.md)
 
 ## tilemap_ops — 瓦片地图（4 工具）
@@ -220,7 +221,7 @@ resource: src/tools/
 
 ## 与 AGENTS.md 对照结果
 
-- **34 工具排除清单归属**（`tests/runner/traversal.cpp` 的 `kExcludedSideEffectTools`，共 34 项）：本批模块占 **23 项**——os_ops 7（`show_os_alert`、`create_os_process`、`execute_os_process`、`kill_os_process`、`open_os_path`、`move_os_file_to_trash`、`set_os_environment`）、display_ops 6（`show_display_dialog`、`speak_display_tts`、`stop_display_tts`、`set_display_clipboard`、`set_display_mouse_mode`、`warp_display_mouse`）、display_window_ops 9（`display_window_*` 全部）、text_ops 1（`write_file`，磁盘类）；其余 11 项属 A 组 editor_ops/input_map/config/script/resource。**注意 `display_` 前缀并非全排除**：只读的 `get_display_clipboard`、`get_display_mouse_position`、`get_display_screen_*`（5 个）、`get_display_tts_voices`、`capture_display_screen` 共 10 个不排除。
+- **35 工具排除清单归属**（`tests/runner/traversal.cpp` 的 `kExcludedSideEffectTools`，共 35 项）：本批模块占 **23 项**——os_ops 7（`show_os_alert`、`create_os_process`、`execute_os_process`、`kill_os_process`、`open_os_path`、`move_os_file_to_trash`、`set_os_environment`）、display_ops 6（`show_display_dialog`、`speak_display_tts`、`stop_display_tts`、`set_display_clipboard`、`set_display_mouse_mode`、`warp_display_mouse`）、display_window_ops 9（`display_window_*` 全部）、text_ops 1（`write_file`，磁盘类）；其余 12 项属 A 组 editor_ops/input_map/config/script/resource，其中 08-20 新增的 `build_csharp_assembly`（editor_ops，进程副作用）也列入。**注意 `display_` 前缀并非全排除**：只读的 `get_display_clipboard`、`get_display_mouse_position`、`get_display_screen_*`（5 个）、`get_display_tts_voices`、`capture_display_screen` 共 10 个不排除。
 - **不一致点**：
   1. `code_execute` 的 `timeout_ms`：schema 与 prompt 文档声称 "max 30000"，但 `code_exec_ops.cpp` 读取后未钳制（仅 `static_cast<int>`）；`runtime_game_ops` 则有 `GDA_MAX_TIMEOUT_MS=30000` 钳制。超大值会按原值等待（同步调用期间无法中断）。
   2. AGENTS.md「添加工具需在 `<category>_ops.hpp` 声明」与实现不符：`environment_ops.cpp`（7 工具）、`display_window_ops.cpp`（9 工具）、`runtime_game_ops.cpp`（6 工具）无独立 hpp，声明分别复用 `render_ops.hpp`、`display_ops.hpp`、`runtime_ops.hpp`。
