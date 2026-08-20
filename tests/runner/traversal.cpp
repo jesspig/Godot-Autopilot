@@ -32,6 +32,7 @@ const char* const kExcludedSideEffectTools[] = {
     "save_editor_scene",
     "save_editor_scenes",
     "save_editor_scene_as",
+    "build_csharp_assembly",
     "write_file",
     "create_script",
     "save_resource",

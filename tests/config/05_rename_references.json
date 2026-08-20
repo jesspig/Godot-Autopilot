@@ -1,0 +1,149 @@
+{
+  "name": "05_rename_references",
+  "description": "验证 P0 修复：rename_resource_file 事务化（uid 保活 + 磁盘引用回写 + 结构化影响报告），以及引用反查 get_resource_references、read_file、find_in_files。在 res://gda_tmp_rename/ 临时创建资源 src.tres 与手工依赖文件 dep.tres（仅按 path 引用 src），rename 后断言：find_in_files 证明旧路径引用消失、新路径引用存在、rename 返回含 updated_files/stale_references/uid_preserved。验证后遗留 gda_tmp_rename 临时目录，需测试后清理。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "fail_fast",
+    "stages": [
+      {
+        "id": "setup_src",
+        "steps": [
+          {
+            "id": "create_src_resource",
+            "tool": "create_resource",
+            "args": { "type": "Resource", "name": "around_src" },
+            "expect": { "has_keys": ["result"] }
+          },
+          {
+            "id": "save_src_resource",
+            "tool": "save_resource",
+            "args": { "name": "around_src", "path": "res://gda_tmp_rename/around_src.tres" },
+            "expect": {
+              "has_keys": ["result", "verified"],
+              "field_checks": [
+                { "key": "result", "value": 0 },
+                { "key": "verified", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "src_uid_present",
+            "tool": "get_resource_uid",
+            "args": { "path": "res://gda_tmp_rename/around_src.tres" },
+            "expect": { "has_keys": ["result"] }
+          }
+        ]
+      },
+      {
+        "id": "write_dep",
+        "steps": [
+          {
+            "id": "write_dep_file",
+            "tool": "write_file",
+            "args": {
+              "path": "res://gda_tmp_rename/around_dep.tres",
+              "content": "[gd_scene load_steps=2 format=3]\n\nGDA_UNIQUE_MARKER_7f3a\n\n[ext_resource type=\"Resource\" path=\"res://gda_tmp_rename/around_src.tres\" id=\"1_abc\"]\n"
+            },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "ok" }
+              ]
+            }
+          },
+          {
+            "id": "reverse_lookup_before_rename",
+            "tool": "get_resource_references",
+            "args": { "path": "res://gda_tmp_rename/around_src.tres" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "not_empty": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "rename_transaction",
+        "steps": [
+          {
+            "id": "rename_src_to_dst",
+            "tool": "rename_resource_file",
+            "args": { "path": "res://gda_tmp_rename/around_src.tres", "new_path": "res://gda_tmp_rename/around_dst.tres" },
+            "expect": {
+              "has_keys": ["result", "updated_files", "stale_references", "uid_preserved"],
+              "field_checks": [
+                { "key": "result", "value": 0 },
+                { "key": "updated_files", "not_empty": true },
+                { "key": "uid_preserved", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "dst_uid_still_present",
+            "tool": "get_resource_uid",
+            "args": { "path": "res://gda_tmp_rename/around_dst.tres" },
+            "expect": { "has_keys": ["result"] }
+          }
+        ]
+      },
+      {
+        "id": "verify_rewrites",
+        "steps": [
+          {
+            "id": "marker_still_findable",
+            "tool": "find_in_files",
+            "args": { "query": "GDA_UNIQUE_MARKER_7f3a", "dir": "res://gda_tmp_rename" },
+            "expect": {
+              "field_checks": [
+                { "key": "result.files", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "new_path_referenced",
+            "tool": "find_in_files",
+            "args": { "query": "around_dst.tres", "dir": "res://gda_tmp_rename" },
+            "expect": {
+              "field_checks": [
+                { "key": "result.files", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "old_path_no_longer_referenced",
+            "tool": "find_in_files",
+            "args": { "query": "around_src.tres", "dir": "res://gda_tmp_rename" },
+            "expect": {
+              "field_checks": [
+                { "key": "result.files", "value": [] }
+              ]
+            }
+          },
+          {
+            "id": "reverse_lookup_dst",
+            "tool": "get_resource_references",
+            "args": { "path": "res://gda_tmp_rename/around_dst.tres" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "reverse_lookup_src_empty",
+            "tool": "get_resource_references",
+            "args": { "path": "res://gda_tmp_rename/around_src.tres" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": [] }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
