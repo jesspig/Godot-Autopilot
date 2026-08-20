@@ -2,6 +2,10 @@
 
 > 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 条。
 
+## 2026-08-20
+
+- **rename 事务化 + 覆盖度补齐**：`rename_resource_file` 改事务化——搬运 `.uid` 保 uid 不重生成（P0-2）、rename 前扫描 res:// 依赖并回写 `path` 引用（P0-1）、返回 `updated_files`/`stale_references`/`uid_preserved` 影响报告（P2-1）、`script_class` 不再经 `ResourceLoader.load` 确认（防重入崩溃）；`property_set` 对 Node 类型属性 + NodePath 自动转节点引用（P1-1，落 `node_paths`）；新增 4 个域工具（总数 339→343、领域 332→336）：`get_resource_references`/`read_file`/`find_in_files`/`build_csharp_assembly`（进程副作用入剔除 34→35）；全量 ctest 78/78 通过；详见 `changelog/2026-08-20-log.md`
+
 ## 2026-08-17
 
 - **新增右侧栏 MCP 配置面板**（`McpConfigDock`）：端口 SpinBox + Apply 运行时重启（`ServerContext::restart`）+ 持久化到 `user://godot_autopilot/config.json`（`PluginConfig`，解析优先级 环境变量 > 持久化 > 默认 9527）；一键生成 8 个客户端（opencode / Claude Code / Codex / Cursor / Copilot / Trae / Qoder / WorkBuddy）项目级配置文件，JSON 智能合并、Codex TOML 已配置跳过；L1 新增 11 用例（77/77 全过）；详见 `changelog/2026-08-17-log.md`

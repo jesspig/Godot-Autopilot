@@ -6,13 +6,13 @@ tags:
   - 模块
   - 领域工具
   - A组
-timestamp: "2026-08-17T01:03:27+08:00"
+timestamp: "2026-08-20T16:59:13+08:00"
 resource: src/tools/
 ---
 
 # 领域工具模块（src/tools/，A 组 13 模块）
 
-> 审计日期：2026-08-17（2026-08-12 初稿；08-17 补 YAML frontmatter），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 审计日期：2026-08-20（2026-08-12 初稿；08-17 补 YAML frontmatter；08-20 随 rename 事务化 + 新工具同步），基于当前工作树代码逐行核对（不依赖 git 历史）。
 > 覆盖范围：`src/tools/` 下 13 对 `.cpp/.hpp`：scene_ops、scene_tree_ops、property_ops、group_ops、input_ops、input_map_ops、physics_ops、nav_ops、resource_ops、script_ops、config_ops、doc_ops、editor_ops。
 > 统计口径：`handle_` 函数数取自 `.cpp` 定义；注册工具数取自 `tool_defs.def` 的 `TOOL_ENTRY` 行（以 handler 所属模块分组），两口径全部一致。
 
@@ -20,7 +20,7 @@ resource: src/tools/
 
 这 13 个模块是领域工具的前半部分：覆盖场景节点操作、属性/信号、分组、输入模拟与 InputMap、物理（2D/3D 双份）、导航、资源生命周期、脚本与 GDScript 执行、项目/引擎/编辑器配置、引擎类文档查询、编辑器会话管理。全部位于命名空间 `godot_autopilot::<模块>_ops`，与 AGENTS.md 约定一致。
 
-`tool_defs.def` 共 332 个 `TOOL_ENTRY`（即 AGENTS.md 所述 332 个领域工具），本页 13 模块占其中 **172 个（51.8%）**。工具经 `register_all.cpp` 的 `TOOL_ENTRY` 宏同时写入 `dispatch::g_handlers` 与 `ToolCatalog`；领域工具不直接注册到 MCP 服务器，统一经元工具 `call_tool` 分发（见 [../modules/tools_registry.md](../modules/tools_registry.md)）。
+`tool_defs.def` 共 336 个 `TOOL_ENTRY`（即 AGENTS.md 所述 336 个领域工具），本页 13 模块占其中 **174 个（51.8%）**。工具经 `register_all.cpp` 的 `TOOL_ENTRY` 宏同时写入 `dispatch::g_handlers` 与 `ToolCatalog`；领域工具不直接注册到 MCP 服务器，统一经元工具 `call_tool` 分发（见 [../modules/tools_registry.md](../modules/tools_registry.md)）。
 
 ## 模块总览
 
@@ -34,12 +34,12 @@ resource: src/tools/
 | `input_map_ops` | 8 | 8 | InputMap 运行期动作增删改查与持久化 |
 | `physics_ops` | 48 | 48 | PhysicsServer 2D/3D 对象与空间查询（含挂靠 Debug 类的 `get_debug_object_info`） |
 | `nav_ops` | 15 | 15 | NavigationServer 2D/3D 地图/区域/代理 |
-| `resource_ops` | 21 | 21 | 资源加载/保存/创建/UID/导入/依赖 |
+| `resource_ops` | 22 | 22 | 资源加载/保存/创建/UID/导入/依赖/反查 |
 | `script_ops` | 10 | 10 | GDScript 执行、脚本附加/属性/调用 |
 | `config_ops` | 13 | 13 | ProjectSettings/Engine/EditorSettings |
 | `doc_ops` | 4 | 4 | ClassDB 类/方法/属性文档查询 |
-| `editor_ops` | 22 | 22 | 编辑器会话：选择/场景/撤销/播放/文件系统 |
-| **合计** | **172** | **172** | |
+| `editor_ops` | 23 | 23 | 编辑器会话：选择/场景/撤销/播放/文件系统/C# 构建 |
+| **合计** | **174** | **174** | |
 
 ## 公共模式
 
@@ -100,6 +100,7 @@ resource: src/tools/
 
 - `handle_set` 类型推导：`type_hint` 未指定时从属性字典自动推导——OBJECT 类型或 `PROPERTY_HINT_RESOURCE_TYPE` 用 `hint_string` 作为类名，否则用 Variant 类型名。
 - 资源赋值接 `resource_ops::try_resolve_resource_value`；**拒绝把 `memory://` 内存资源赋给节点属性**（返回错误，说明会损坏场景文件，要求先 `save_resource` 落盘）。
+- **Node 类型属性 + NodePath 自动转节点引用（08-20 起，P1-1 修复）**：`handle_set` 检测到目标属性 `type==OBJECT` 且 `hint==PROPERTY_HINT_RESOURCE_TYPE` 且 `hint_string` 指向 Node 子类时，若 `value` 为字符串（节点路径），以编辑场景根 `get_node()` 解析后赋**节点对象引用**（而非 NodePath Variant），使其在保存场景时正确落入 `node_paths` 数组、实例化后还原为节点引用。解析失败返回 `error_detail` 说明正确用法（传场景内有效路径，或改用 `code_execute` 直接赋节点引用）；成功结果带 `converted_node_path` 字段标注。判断辅助 `parse_hint_class`/`is_node_class`（容错 `Type:` 前缀、逗号 token）。
 - 写后 readback 校验：`util::check_readback` 返回 REJECTED 时 `error_detail` 报错（可能只读/不存在/需 type_hint），CONVERTED 时返回 `warning`。
 - Camera2D 特例：`enabled`（默认值 true 不序列化）与 `current`（无 setter，需 `code_execute` 调 `make_current()`）返回 `serialization_note` 指导。
 - 属性名纠错提示：Levenshtein 距离候选 + `PROPERTY_RENAME_HINTS` 重命名映射表（9 条，如 `frames→sprite_frames`、`cast_to→target_position`、`translation→position`，与 AGENTS.md 中 Godot 4.x 迁移事实一致）。
@@ -197,9 +198,9 @@ resource: src/tools/
 - 地图创建默认不激活（`map_set_active` 需显式传 `active: true`）；区域创建支持 `enabled`/`navigation_layers` 初始参数。
 - `set_nav_3d_region_navigation_mesh` 接受 `NavigationMesh` 资源（可经 `ResourceLoader` 加载路径传入）；路径返回点为 Vector2/Vector3 数组序列化（`{x,y[,z]}`）。
 
-## resource_ops（21 工具）
+## resource_ops（22 工具）
 
-职责：资源生命周期管理——加载/保存/创建/复制/UID/文件操作/依赖/导入，是资源类工具（Resources 类别）的完整实现。注册工具：
+职责：资源生命周期管理——加载/保存/创建/复制/UID/文件操作/依赖/反查/导入，是资源类工具（Resources 类别）的完整实现。注册工具：
 
 | 工具名 | 说明 |
 |---|---|
@@ -207,7 +208,7 @@ resource: src/tools/
 | `load_resource_threaded` / `get_resource_load_threaded_status` / `get_resource_load_threaded` | 线程化加载三件套 |
 | `get_resource_type` / `has_resource` / `get_resource_types` / `get_resource_extensions` | 类型与存在性 |
 | `get_resource_dir_files` / `get_resource_uid` / `set_resource_uid` / `remove_resource_file` / `rename_resource_file` | 文件系统操作 |
-| `get_resource_dependencies` / `has_resource_dependency` | 依赖查询 |
+| `get_resource_dependencies` / `has_resource_dependency` / `get_resource_references` | 依赖正向查询 / 反查（谁引用了某资源） |
 | `reimport_resource_files` | 编辑器导入（原 `resource_import` 已删除） |
 | `get_resource_property` / `set_resource_property` | 内存资源属性 |
 
@@ -217,7 +218,9 @@ resource: src/tools/
 - 序列化统一返回 `class/path/object_id/object_id_str/name` 五字段（`serialize_ref`）。
 - `handle_reimport` 仅编辑器模式可用（`is_editor_hint` 校验）；空参时 `count=0` 返回 `reimport queued for 0 file(s)` 静默成功（AGENTS.md 契约缺口，确认属实）。
 - `handle_get_extensions`：缺 `type` 时调 `get_recognized_extensions_for_type("")` 返回全类型（AGENTS.md 契约缺口，确认属实）。
-- `remove_resource_file`/`rename_resource_file` 有磁盘副作用；`set_resource_uid` 修改 `.uid` 文件。
+- `remove_resource_file` 有磁盘副作用；`set_resource_uid` 修改 `.uid` 文件。
+- **`rename_resource_file` 事务化（08-20 起）**：改名不再只是 Move+索引重建——① 先搬运伴生 `.uid` 文件（保 uid 不重生成，P0-2 修复）；② rename 前扫描 res:// 全部 `.tscn/.tres` 收集依赖，rename 后对命中 `path="<旧>"` 的依赖做文本回写（P0-1 修复），写前关闭读句柄、写后 flush/close 并回读验证，验证不过入 `stale_references` 而非乐观上报；③ 返回结构化影响报告 `{result, updated_files:[{file,changes}], stale_references:[{file,reason}], uid_preserved}`（P2-1）；④ `script_class` 因无法可靠确认全局类名（曾依赖 `ResourceLoader.load` 重入编辑器文件系统，有崩溃风险）一律列入 `stale_references` 由调用方人工确认。`get_resource_references` 复用同一扫描器反查引用（path/uid/class_name 三选一）。
+- 工程约束：`collect_text_file_paths` 用 `join_path` 拼接（`res://` 根免产生 `res:///` 三重斜杠，否则 WRITE 提交会失败并残留 `.tmp`）。
 
 ## script_ops（10 工具）
 
@@ -283,6 +286,7 @@ resource: src/tools/
 | `get_editor_file_system_tree` / `scan_editor_file_system` / `get_editor_file_system_status` | 文件系统（原 `editor_import_resource` 已删除） |
 | `play_editor_current_scene` / `stop_editor_playing` | 播放 |
 | `set_editor_main_scene` / `inspect_editor_resource` / `set_editor_plugin_enabled` | 杂项（原 `editor_get_plugin_list` 已删除） |
+| `build_csharp_assembly` | C# 工程编译（`dotnet build` 子进程，见下） |
 
 关键实现事实：
 
@@ -291,16 +295,17 @@ resource: src/tools/
 - 文件系统树导出 `dir_to_json` 递归上限 `MAX_TREE_DEPTH=12`，截断时返回 `truncated: true`。
 - `set_editor_main_scene` 写 `application/run/main_scene` 并 `ProjectSettings::save()`；`set_editor_plugin_enabled`、`save_editor_scene` 等均在遍历测试排除清单中。
 - `create_editor_undo_redo_action` 支持动作分组名称，`add_do`/`add_undo` 以 node_path + 方法 + 参数形式入栈。
+- **`build_csharp_assembly`（08-20 新增）**：在 res:// 根定位 `.csproj/.sln`（无则报非 C# 工程），经 `OS::create_process` 异步启动 `dotnet build --nologo <project>`（非阻塞，沿用 os_ops 模式，避免冻结编辑器），返回 `{project_file, command, started, pid, note}`；`started` 为假时附 `error` 说明 SDK 缺失。`note` 明示能力边界：GDExtension(C++) 无公共 API 触发编辑器内 C# 程序集热重载（该能力在引擎 `modules/mono` 内部），仅能在 CI/命令行式编译验证；编辑器内类/签名变更后的验证仍须用户在编辑器点 Build 或重启。已加入遍历测试副作用排除清单。
 
 ## 与现有文档的不一致点
 
 | 文档 | 声称 | 代码事实 | 判定 |
 |---|---|---|---|
 | AGENTS.md（命名约定） | 工具命名 `<动词>_<类别>_<维度>_<对象>_<修饰>`，动词置首，如 `intersect_physics_2d_ray` | 本组符合；`signal_connect`/`signal_disconnect`（动词置首，无类别段）、config_ops 的 `get_project_settings`/`set_engine_*`/`get_editor_settings`（类别段为 project/engine/editor，与文件名 `config_` 不一致）属规范内的长短变化 | 一致 ✓（动词置首） |
-| AGENTS.md（工具总数） | 332 领域工具 | `tool_defs.def` 恰好 332 条 `TOOL_ENTRY`；本页 13 模块 172 条 | 一致 ✓ |
+| AGENTS.md（工具总数） | 336 领域工具 | `tool_defs.def` 恰好 336 条 `TOOL_ENTRY`；本页 13 模块 174 条 | 一致 ✓ |
 | AGENTS.md（错误模式） | 领域工具返回 `{"error": "消息"}` | 一致；另有 `error_detail` 扩展格式与 dispatch `catch(...)` 兜底、导出期固定错误 | 一致 ✓（有扩展） |
 | AGENTS.md（契约缺口 3 项） | `create_scene_node` 不校验必填；`get_resource_extensions` 缺 type 返回全类型；`reimport_resource_files` 空参静默成功 | 三项均在代码中逐一确认（默认 "NewNode"/"Node"；空 type 传 `""`；count=0 返回 queued） | 一致 ✓ |
-| AGENTS.md（遍历排除） | 34 个副作用工具排除 | `kExcludedSideEffectTools` 含 `save_input_map`、`add_input_map_action_event`、`save_project_settings`、`set_editor_settings`、`set_editor_main_scene`、`set_editor_plugin_enabled`、`save_editor_scene` 等本组持久化工具 | 一致 ✓ |
+| AGENTS.md（遍历排除） | 35 个副作用工具排除 | `kExcludedSideEffectTools` 含 `save_input_map`、`add_input_map_action_event`、`save_project_settings`、`set_editor_settings`、`set_editor_main_scene`、`set_editor_plugin_enabled`、`save_editor_scene`、`build_csharp_assembly` 等本组/跨组持久化或进程副作用工具 | 一致 ✓ |
 | 命名归属 | 类别前缀应反映模块 | `get_scene_tree` 注册在 scene_ops（非 scene_tree_ops）——旧 `scene_tree_get`/`scene_get_tree` 双名已合并，不再语义重叠 | 已消解 ✓ |
 | AGENTS.md（架构） | 工具经 `call_tool` 代理、`register_all.cpp` 的 `g_handlers` 映射分发 | `TOOL_ENTRY` 宏同时填 `g_handlers` 与 catalog；`dispatch.cpp` 非主线程走 `queue.submit()` | 一致 ✓ |
 | `input_ops` | （无文档声明） | `parse_key`/`parse_mouse_button` 对未识别名称返回 `KEY_NONE`/`MOUSE_BUTTON_NONE` 而非报错 | 文档空缺，建议补充 |

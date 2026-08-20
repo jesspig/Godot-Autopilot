@@ -2,6 +2,7 @@
 #include "core/log_system.hpp"
 #include "util/error_util.hpp"
 #include "util/variant_json.hpp"
+#include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/classes/text_server.hpp>
@@ -11,6 +12,7 @@
 #include <godot_cpp/variant/vector2.hpp>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace godot_autopilot {
 namespace text_ops {
@@ -311,6 +313,191 @@ JV handle_file_write(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "write_file completed");
   return ok_json();
+}
+
+namespace {
+
+std::string ascii_lower(const std::string &s) {
+  std::string out = s;
+  for (char &c : out) {
+    if (c >= 'A' && c <= 'Z')
+      c = static_cast<char>(c + ('a' - 'A'));
+  }
+  return out;
+}
+
+bool matches_extension(const std::string &name,
+                       const std::vector<std::string> &exts,
+                       bool case_sensitive) {
+  size_t dot = name.rfind('.');
+  if (dot == std::string::npos)
+    return false;
+  std::string ext = name.substr(dot + 1);
+  for (const auto &e : exts) {
+    if (case_sensitive) {
+      if (ext == e)
+        return true;
+    } else if (ascii_lower(ext) == ascii_lower(e)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+int count_occurrences(const std::string &text, const std::string &query,
+                      bool case_sensitive) {
+  if (query.empty())
+    return 0;
+  if (case_sensitive) {
+    int n = 0;
+    size_t pos = 0;
+    while ((pos = text.find(query, pos)) != std::string::npos) {
+      ++n;
+      pos += query.size();
+    }
+    return n;
+  }
+  const std::string lower_text = ascii_lower(text);
+  const std::string lower_query = ascii_lower(query);
+  int n = 0;
+  size_t pos = 0;
+  while ((pos = lower_text.find(lower_query, pos)) != std::string::npos) {
+    ++n;
+    pos += lower_query.size();
+  }
+  return n;
+}
+
+std::string join_search_path(const std::string &dir,
+                             const std::string &name) {
+  return dir + (dir.empty() || dir.back() == '/' ? std::string() : "/") + name;
+}
+
+void find_in_files_recursive(const std::string &dir,
+                             const std::vector<std::string> &exts,
+                             const std::string &query,
+                             bool case_sensitive, int max_results,
+                             std::vector<std::pair<std::string, int>> &hits,
+                             bool &truncated) {
+  if (truncated || static_cast<int>(hits.size()) >= max_results)
+    return;
+  godot::Ref<godot::DirAccess> da =
+      godot::DirAccess::open(godot::String(dir.c_str()));
+  if (da.is_null()) {
+    return;
+  }
+  da->list_dir_begin();
+  godot::String entry = da->get_next();
+  while (entry != godot::String()) {
+    if (truncated || static_cast<int>(hits.size()) >= max_results)
+      break;
+    if (entry != "." && entry != "..") {
+      std::string name = util::to_std(entry);
+      std::string fpath = join_search_path(dir, name);
+      if (da->current_is_dir()) {
+        find_in_files_recursive(fpath, exts, query, case_sensitive, max_results,
+                                hits, truncated);
+      } else if (matches_extension(name, exts, case_sensitive)) {
+        auto file = godot::FileAccess::open(godot::String(fpath.c_str()),
+                                            godot::FileAccess::READ);
+        if (file.is_null())
+          continue;
+        std::string text = util::to_std(file->get_as_text());
+        file->close();
+        int n = count_occurrences(text, query, case_sensitive);
+        if (n > 0) {
+          hits.emplace_back(fpath, n);
+          if (static_cast<int>(hits.size()) >= max_results)
+            truncated = true;
+        }
+      }
+    }
+    entry = da->get_next();
+  }
+  da->list_dir_end();
+}
+
+} // namespace
+
+JV handle_file_read(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "read_file called");
+  auto *pp = args.Find("path");
+  if (!pp || !pp->IsString())
+    return util::error_json("missing required parameter: path");
+  auto file = godot::FileAccess::open(godot::String(pp->GetString().c_str()),
+                                      godot::FileAccess::READ);
+  if (file.is_null())
+    return util::error_json("failed to open file: " + pp->GetString());
+  std::string content = util::to_std(file->get_as_text());
+  file->close();
+  JV inner(JV::object_tag);
+  inner["path"] = JV(pp->GetString());
+  inner["content"] = JV(content);
+  JV r(JV::object_tag);
+  r["result"] = std::move(inner);
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "read_file completed");
+  return r;
+}
+
+JV handle_find_in_files(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "find_in_files called");
+  auto *qp = args.Find("query");
+  if (!qp || !qp->IsString() || qp->GetString().empty())
+    return util::error_json("missing required parameter: query");
+  std::string query = qp->GetString();
+
+  std::string dir = "res://";
+  auto *dp = args.Find("dir");
+  if (dp && dp->IsString())
+    dir = dp->GetString();
+
+  std::vector<std::string> exts = {"gd", "tscn", "tres", "cs",
+                                   "md", "json", "h",  "cpp"};
+  auto *ep = args.Find("extensions");
+  if (ep && ep->IsArray() && !ep->GetArray().empty()) {
+    exts.clear();
+    for (const auto &e : ep->GetArray()) {
+      if (e.IsString())
+        exts.push_back(e.GetString());
+    }
+  }
+
+  bool case_sensitive = false;
+  auto *cp = args.Find("case_sensitive");
+  if (cp && cp->IsBool())
+    case_sensitive = cp->GetBool();
+
+  int max_results = 500;
+  auto *mp = args.Find("max_results");
+  if (mp && mp->IsInt())
+    max_results = static_cast<int>(mp->GetInt());
+  if (max_results < 1)
+    max_results = 1;
+
+  std::vector<std::pair<std::string, int>> hits;
+  bool truncated = false;
+  find_in_files_recursive(dir, exts, query, case_sensitive, max_results, hits,
+                          truncated);
+
+  JV files(JV::array_tag);
+  for (const auto &h : hits) {
+    JV item(JV::object_tag);
+    item["file"] = JV(h.first);
+    item["matches"] = JV(static_cast<int64_t>(h.second));
+    files.PushBack(std::move(item));
+  }
+  JV inner(JV::object_tag);
+  inner["files"] = std::move(files);
+  inner["truncated"] = JV(truncated);
+  inner["total"] = JV(static_cast<int64_t>(hits.size()));
+  JV r(JV::object_tag);
+  r["result"] = std::move(inner);
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "find_in_files completed");
+  return r;
 }
 
 } // namespace text_ops

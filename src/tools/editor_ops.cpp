@@ -948,5 +948,61 @@ mcp::JsonValue handle_save_scene_as(const mcp::JsonValue &args) {
   return r;
 }
 
+mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "build_csharp_assembly called");
+  static const char *kNote =
+      "本工具仅等效触发 C# 项目编译，不等同于在编辑器中点击 Build 后的程序集热重载。"
+      "GDExtension(C++) 无公共 API 触发编辑器内的 C# 程序集重载——该能力位于引擎 "
+      "modules/mono 内部，非 GDExtension 可调用。适合 CI / 命令行式编译验证；若需编辑器内"
+      "类或签名变更后校验渲染，仍须用户在编辑器中点 Build 或重启编辑器。";
+
+  std::string project_file;
+  godot::Ref<godot::DirAccess> da = godot::DirAccess::open("res://");
+  if (!da.is_null()) {
+    da->list_dir_begin();
+    godot::String entry = da->get_next();
+    while (entry != godot::String()) {
+      if (entry != "." && entry != ".." && !da->current_is_dir() &&
+          (entry.ends_with(".csproj") || entry.ends_with(".sln"))) {
+        project_file = "res://" + util::to_std(entry);
+        break;
+      }
+      entry = da->get_next();
+    }
+    da->list_dir_end();
+  }
+  if (project_file.empty())
+    return util::error_json("当前项目不是 C# 工程，未发现 .csproj/.sln");
+
+  auto *os = godot::OS::get_singleton();
+  if (!os)
+    return util::error_json("OS singleton not available");
+
+  godot::PackedStringArray argv;
+  argv.append("build");
+  argv.append("--nologo");
+  argv.append(godot::String(project_file.c_str()));
+  int32_t pid = os->create_process("dotnet", argv);
+
+  std::string command = "dotnet build --nologo " + project_file;
+  mcp::JsonValue inner(mcp::JsonValue::object_tag);
+  inner["project_file"] = mcp::JsonValue(project_file);
+  inner["command"] = mcp::JsonValue(command);
+  inner["pid"] = mcp::JsonValue(static_cast<int64_t>(pid));
+  inner["note"] = mcp::JsonValue(kNote);
+  inner["started"] = mcp::JsonValue(pid > 0);
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["result"] = std::move(inner);
+  if (pid <= 0) {
+    r["error"] = mcp::JsonValue(
+        "启动 dotnet 失败（SDK 缺失或不在 PATH？），请确认已安装 .NET SDK 且 "
+        "dotnet 命令可用");
+  }
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "build_csharp_assembly completed");
+  return r;
+}
+
 } // namespace editor_ops
 } // namespace godot_autopilot
