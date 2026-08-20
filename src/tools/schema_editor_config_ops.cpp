@@ -59,6 +59,8 @@ void fill_schema_editor_config(std::unordered_map<std::string, mcp::JsonValue>& 
         });
         m["close_editor_scene"] = schema::build_schema({});
 
+        m["build_csharp_assembly"] = schema::build_schema({});
+
         m["get_project_settings"] = schema::build_schema({
             {"name", "string", "Project setting name, e.g. display/window/size/viewport_width; settings come from project.godot", true},
             {"default", "object", "Serialized JSON value returned when the setting does not exist; otherwise a null value is returned", false},
