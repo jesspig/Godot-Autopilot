@@ -2,6 +2,10 @@
 
 > 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 条。
 
+## 2026-08-22
+
+- **版本号单一来源化**：新增根 `VERSION` 文件为唯一真源；CMake `file(READ)` 喂 `project()`、`configure_file` 生成 `GDA_VERSION` 宏供 `server_info`/`system_status` 引用、`build.py` 运行时读取；版本升至 **0.2.0**；文档产物名泛化 `<version>` 占位；L1 78/78。详见 `changelog/2026-08-22-log.md`
+
 ## 2026-08-21
 
 - **遍历副作用排除 `side_effects()` 驱动**：`SideEffect` 扩 6 值（+Process）；`GDA_TOOL_CLASS_SIDE` 变体宏标记 35 个副作用工具；`get_tool_detail` 补 `side_effect` 字段；runner 读该字段排除、删除硬编码 `kExcludedSideEffectTools`；L1 78/78 + L2 6/6。详见 `changelog/2026-08-21-log.md`

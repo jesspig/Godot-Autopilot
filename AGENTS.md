@@ -9,6 +9,7 @@
 - 预设 (`CMakePresets.json`): `debug`, `release`（均为 Ninja）
 - **切勿删除 `build/<preset>/_deps/`** — 缓存已获取的依赖项（godot-cpp、mcp-cpp-sdk、googletest）
 - **添加新 .cpp 时必须在 `CMakeLists.txt` 的 `add_library()` 中加入**，否则 Unity 构建也不会包含
+- **版本号单一来源**：根 `VERSION` 文件——CMake `project()` 经 `file(READ)` 读取、`configure_file` 生成 `GDA_VERSION` 宏（`server_info`/`system_status.version` 引用）、`build.py` 运行时读取；升版只改该文件并重新 configure
 
 ## 架构
 
