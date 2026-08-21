@@ -56,7 +56,7 @@ flowchart TD
 | # | 声称（AGENTS.md） | 核算结果 | 结论 |
 |---|---|---|---|
 | 1 | 元工具 7 个：ping/search_tools/list_categories/get_tool_detail/call_tool/batch_execute/code_execute，均作为顶层工具提供 | 7 个经 registry `add_meta`（`register_all.cpp:304-465`），统一在 `register_all.cpp:471-490` 循环 `server.RegisterTool`（描述/schema 取自 registry 工具）；名单与 `dispatch.hpp` 的 `meta_tool_names`、`register_all_test.cpp` 的 `kMetaToolNames` 完全一致；L1 断言 `ListTools` 恰好 7 个 | **一致** |
-| 2 | 领域工具 336 个 | `tool_defs.def` 中 `TOOL_ENTRY(` 336 条（无重复名）；registry `all()`=**337** = 336 + system_status | **一致**（system_status 是唯一非 def 来源） |
+| 2 | 领域工具 336 个 | 26 个 `*_tools.hpp` 的 `GDA_TOOL_CLASS`/`GDA_TOOL_CLASS_SIDE` 共 336 个（无重复名）；registry `all()`=**337** = 336 + system_status | **一致**（system_status 是唯一非真类来源） |
 | 3 | 工具总体 = 7 元 + 336 域 | registry `all_any()`=**344**（337 域/系统 + 7 元）；MCP 顶层 7 元工具 | **一致** |
 | 4 | ToolCatalog 344 条 | 由 registry `all_any()` 逐一 `make_tool_info` 派生 344 = 336 域 + system_status + 7 元；原 `populate_default_tools`/meta 快照/`Auto` 补录链路整体废弃 | **一致**（单一来源派生，无独立填表） |
 | 5 | schema 283 非空 / 73 空（旧值，已随重命名变化） | def 层面静态可数：SCHEMA_NONE=208、SCHEMA_BASIC=124（旧 222/126）；catalog 级非空/空数随 6 个 fill 函数与默认表变化，**以运行时 `SchemaStatisticsBaseline` 观测为准**，不硬编码 | **运行时统计口径** |
@@ -114,24 +114,24 @@ flowchart TD
 
 ## def 分类分布（336 领域工具，23 个类别）
 
-> [!todo] 细分表随 332→336（+read_file/find_in_files→OS、build_csharp_assembly→Editor、get_resource_references→Resources）变化；下表为迁移前 332 的分布，逐类别重算待补。权威总数以 `tool_defs.def` grep (=336) 与 registry `all()`(=337) 为准。
+> 权威总数由 26 个 `*_tools.hpp` 的 `GDA_TOOL_CLASS`/`GDA_TOOL_CLASS_SIDE` 枚举为准（=336），registry `all()`=337（+system_status）；下表为按分类的细分。
 
 | 类别 | 数量 | 类别 | 数量 |
 |---|---|---|---|
 | Render | 49 | Scene | 12 |
 | Physics | 47 | Scripts | 10 |
 | Display | 24 | Text | 10 |
-| Editor | 22 | TileMap | 7 |
-| Resources | 21 | Debugger | 7 |
+| Editor | 23 | TileMap | 7 |
+| Resources | 22 | Debugger | 7 |
 | Audio | 20 | Game | 7 |
 | Input | 19 | Properties | 5 |
-| OS | 16 | Docs | 4 |
+| OS | 18 | Docs | 4 |
 | Debug | 16 | Group | 3 |
 | Navigation | 15 | SpriteFrames | 3 |
 | Config | 13 | System | 1 |
 | | | Capture | 1 |
 
-注：InputMap 类别已并入 Input（原 `input_map_persist` → `save_input_map` 归 Input）；`get_debug_object_info` 挂 physics_ops 模块但归 Debug 类；`write_file` 归 OS 类；`capture_editor_viewport` 归 Capture。
+注：InputMap 类别已并入 Input（原 `input_map_persist` → `save_input_map` 归 Input）；`get_debug_object_info` 挂 physics_ops 模块但归 **Debug** 类（`physics_tools.hpp` 生成、Category "Debug"）；`write_file` 归 OS 类；`capture_editor_viewport` 归 Capture。
 
 ## 与 AGENTS.md 不一致点清单
 

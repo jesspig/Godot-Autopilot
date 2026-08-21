@@ -7,6 +7,7 @@
 - **遍历副作用排除 `side_effects()` 驱动**：`SideEffect` 扩 6 值（+Process）；`GDA_TOOL_CLASS_SIDE` 变体宏标记 35 个副作用工具；`get_tool_detail` 补 `side_effect` 字段；runner 读该字段排除、删除硬编码 `kExcludedSideEffectTools`；L1 78/78 + L2 6/6。详见 `changelog/2026-08-21-log.md`
 - **元工具接口+组合化**：新增 `IMetaTool` 标记接口 + `MetaTool`（ToolBase+IMetaTool，依赖组合注入）；`ToolRegistry::add()` 按 `dynamic_cast<IMetaTool>` 自动归类（实现接口即元工具）；7 个元工具改以 `MetaTool` 注册；新增 L1 路由断言；L1 78/78 + L2 6/6。详见 `changelog/2026-08-21-log.md`
 - **ToolBase 工具统一标准化全量落地**：新增 `tool_decl.hpp`（真类宏）+ 26 个 `<域>_tools.hpp`，**336 域工具悉数迁移为独立 `ToolBase` 子类**；`tool_defs.def` 删除，`register_all` 改为注册各域 `make_tools()` + system_status + 7 元工具，catalog(344)/index/分发/RegisterTool 全从 registry 派生；遍历 runner 改从 `*_tools.hpp` 枚举（修正 compare 偏移 11→10 bug）；L1 77/77 + L2 6/6（03 全遍历 546 步）；side_effects 遍历驱动未落地。详见 `changelog/2026-08-21-log.md`
+- **重构收尾文档同步**：清除 `AGENTS.md`/overview/conventions/tools_ops_a/b/tests-README/tools_registry 对已删 `tool_defs.def` 的遗留引用与旧计数，统一为 336 域/344 catalog/35 副作用驱动排除；`get_debug_object_info` 归 Debug（Physics 47/Debug 16）；改动仅文档、未动代码。详见 `changelog/2026-08-21-log.md`
 
 ## 2026-08-20
 
