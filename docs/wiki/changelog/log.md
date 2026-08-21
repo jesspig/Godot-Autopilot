@@ -2,8 +2,16 @@
 
 > 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 条。
 
+## 2026-08-21
+
+- **遍历副作用排除 `side_effects()` 驱动**：`SideEffect` 扩 6 值（+Process）；`GDA_TOOL_CLASS_SIDE` 变体宏标记 35 个副作用工具；`get_tool_detail` 补 `side_effect` 字段；runner 读该字段排除、删除硬编码 `kExcludedSideEffectTools`；L1 78/78 + L2 6/6。详见 `changelog/2026-08-21-log.md`
+- **元工具接口+组合化**：新增 `IMetaTool` 标记接口 + `MetaTool`（ToolBase+IMetaTool，依赖组合注入）；`ToolRegistry::add()` 按 `dynamic_cast<IMetaTool>` 自动归类（实现接口即元工具）；7 个元工具改以 `MetaTool` 注册；新增 L1 路由断言；L1 78/78 + L2 6/6。详见 `changelog/2026-08-21-log.md`
+- **ToolBase 工具统一标准化全量落地**：新增 `tool_decl.hpp`（真类宏）+ 26 个 `<域>_tools.hpp`，**336 域工具悉数迁移为独立 `ToolBase` 子类**；`tool_defs.def` 删除，`register_all` 改为注册各域 `make_tools()` + system_status + 7 元工具，catalog(344)/index/分发/RegisterTool 全从 registry 派生；遍历 runner 改从 `*_tools.hpp` 枚举（修正 compare 偏移 11→10 bug）；L1 77/77 + L2 6/6（03 全遍历 546 步）；side_effects 遍历驱动未落地。详见 `changelog/2026-08-21-log.md`
+
 ## 2026-08-20
 
+- **ToolBase 工具统一标准化落地（ToolRegistry 单一来源）**：新增 `tool_base.hpp`/`tool_registry.hpp`/`fn_tool.hpp`；`register_all` 重构为 registry 单一来源，336 域 + system_status + 7 元全入静态 `ToolRegistry`，派生 catalog(344)/index/g_handlers/RegisterTool；修复函数局部对象悬垂（`g_active_registry` 升为文件级静态）；L1 77/77 + L2 6/6（含 03_tools_contract 336 工具全遍历）通过；逐域真类迁移 M1–M8 与 `side_effects()` 遍历驱动未落地。详见 `changelog/2026-08-20-log.md`
+- **ToolBase 工具统一标准化设计定稿**（未实现，仅立项）：接口 + 组合取向，`ToolBase` 纯虚根 + 角色接口切片 + 域助手注入；明确"自动注册推导而非自动发现"（C++ 无反射）；`ToolRegistry` 取代三容器、`GD_TOOL_LIST` 类名清单、元工具最后注册、`side_effects()` 替排除清单。新增设计提案页 `tool_base_design.md` 并补录 index；未动任何代码。详见 `changelog/2026-08-20-log.md`
 - **rename 事务化 + 覆盖度补齐**：`rename_resource_file` 改事务化——搬运 `.uid` 保 uid 不重生成（P0-2）、rename 前扫描 res:// 依赖并回写 `path` 引用（P0-1）、返回 `updated_files`/`stale_references`/`uid_preserved` 影响报告（P2-1）、`script_class` 不再经 `ResourceLoader.load` 确认（防重入崩溃）；`property_set` 对 Node 类型属性 + NodePath 自动转节点引用（P1-1，落 `node_paths`）；新增 4 个域工具（总数 339→343、领域 332→336）：`get_resource_references`/`read_file`/`find_in_files`/`build_csharp_assembly`（进程副作用入剔除 34→35）；全量 ctest 78/78 通过；详见 `changelog/2026-08-20-log.md`
 
 ## 2026-08-17
