@@ -41,10 +41,12 @@ timestamp: "2026-08-20T16:59:13+08:00"
 
 ## 添加工具流程
 
+`ToolRegistry` 单一来源（无 `tool_defs.def`）：
+
 1. `<category>_ops.hpp` 声明 `mcp::JsonValue handle_xxx(const mcp::JsonValue& args);`
 2. `<category>_ops.cpp` 实现（返回 `{"error": ...}` 或结果对象）
-3. `tool_defs.def` 加 `TOOL_ENTRY` 行（宏被 `register_all.cpp` include 两次，自动写入 `g_handlers` 与 `ToolCatalog`，**register_all.cpp 无需手改**）；SCHEMA_BASIC 时同步在 `schema_*_ops.cpp` fill 表加 `schema::build_schema({ParamDef...})` 条目
-4. `CMakeLists.txt` `add_library()` 添加 `.cpp`；新工具若有副作用需同步加入 `tests/runner/traversal.cpp` 排除清单
+3. 该域 `<category>_tools.hpp` 用 `GDA_TOOL_CLASS`（有副作用用 `GDA_TOOL_CLASS_SIDE`）声明独立 ToolBase 子类并入 `make_tools()`——`register_all.cpp` 自动注册，无需手改；schema 由 `tool_input_schema(name, basic)` 单一源（转发 `build_schema_for`，SCHEMA_NONE/basic 沿用）
+4. `CMakeLists.txt` `add_library()` 添加 `.cpp`（header-only 则无需）；带副作用（枚举 `SideEffect` 选值）用 `GDA_TOOL_CLASS_SIDE` 标记即自动进入遍历排除，无需手改 `tests/runner/traversal.cpp`
 
 ## 测试纪律
 

@@ -6,14 +6,14 @@ tags:
   - 测试
   - L1
   - L2
-timestamp: "2026-08-20T16:59:13+08:00"
+timestamp: "2026-08-21T12:15:38+08:00"
 resource: tests/
 ---
 
 # 测试体系（tests/）
 
-> 审计日期：2026-08-20（2026-08-12 初稿；08-17 随客户端配置生成器测试同步并补 YAML frontmatter；08-20 随 +4 工具与新 L2 用例 `05_rename_references` 同步），基于当前工作树代码逐行核对（不依赖 git 历史）。
-> 覆盖范围：`tests/` 全部（unit 9 文件、runner 7 实现 + 6 头文件、integration、config 6 JSON、`tests/CMakeLists.txt`），对照 `tests/README.md` 与仓库根 `AGENTS.md` 测试段逐条核算。未运行任何测试，所有数值均来自源码静态统计。
+> 审计日期：2026-08-20（2026-08-12 初稿；08-17 随客户端配置生成器测试同步并补 YAML frontmatter；08-20 随 +4 工具与新 L2 用例 `05_rename_references` 同步；**同日 23:30 随 ToolRegistry 单测 +4（L1 72→77）复核**），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 覆盖范围：`tests/` 全部（unit 10 文件、runner 7 实现 + 6 头文件、integration、config 6 JSON、`tests/CMakeLists.txt`），对照 `tests/README.md` 与仓库根 `AGENTS.md` 测试段逐条核算。未运行任何测试，所有数值均来自源码静态统计。
 
 ## 架构总览
 
@@ -72,7 +72,7 @@ stdout/stderr 各接独立管道读线程持续消费，防 64KB 缓冲写满阻
 
 ## L1 单元测试
 
-**9 个测试文件，实际 72 个 TEST/TEST_F**（`TEST`/`TEST_F` 宏逐行统计）：
+**10 个测试文件，实际 77 个 TEST/TEST_F**（`TEST`/`TEST_F` 宏逐行统计）：
 
 | 文件 | 数量 | 主题 |
 |---|---|---|
@@ -85,7 +85,8 @@ stdout/stderr 各接独立管道读线程持续消费，防 64KB 缓冲写满阻
 | `client_config_gen_test.cpp` | 11 | 8 客户端配置文件渲染快照（URL/type/enabled）、JSON 合并三态（新建/保留其他键/非法）、TOML 追加与跳过 |
 | `error_util_test.cpp` | 3 | 错误 JSON 形状、四字段详情 |
 | `runtime_ops_test.cpp` | 1 | 编辑器队列注入往返 |
-| **合计** | **72** | |
+| `tool_registry_test.cpp` | 4 | ToolBase/FnTool/ToolRegistry：add/find/categories、execute echo、角色接口助手、meta 注册 |
+| **合计** | **77** | |
 
 **链接来源**（`tests/CMakeLists.txt:31-46` 的 `GDA_UNIT_BUSINESS_SOURCES`，共 14 个显式 + 1 组 glob）：`src/core/` 的 `log_system`、`resource_registry`、`scene_dirty_tracker`、`export_guard`；`src/util/` 的 `bm25_index`、`error_util`、`readback_util`、`variant_json`、`client_config_gen`；`src/tools/` 的 `tool_catalog`、`schema_builder`、`register_all`、`dispatch`、`debugger_access`；`src/tools/*_ops.cpp`（`GDA_TOOLS_OPS_SOURCES` glob，`register_all.cpp` 引用全部 `handle_xxx` 符号故必须链接）。
 
@@ -110,8 +111,8 @@ stdout/stderr 各接独立管道读线程持续消费，防 64KB 缓冲写满阻
 
 ## 全量遍历（`traversal.cpp`）
 
-- **工具来源**：运行时解析 `src/tools/tool_defs.def` 的 `TOOL_ENTRY(` 条目，**实测 336 个**；解析失败（缺逗号/引号未闭合）抛异常
-- **内置前置校验**：每工具先 `get_tool_detail` 校验存在性与工具名一致性（响应非对象或名字不匹配 → FAIL）
+- **工具来源**：运行时遍历 `src/tools/*_tools.hpp` 解析 `GDA_TOOL_CLASS(` 第 2 参，**实测 336 个**；解析失败（缺逗号/引号未闭合）抛异常
+- **副作用排除**：每工具先 `get_tool_detail`（响应含 `side_effect` 字段）；字段非空即视为副作用工具，记录 excluded 并跳过（不再硬编码名单）；再校验存在性与工具名一致性（响应非对象或名字不匹配 → FAIL）
 - **`empty_args`**：空对象调用；响应非 JSON 对象 → FAIL；含 `error` 字段算"有错误响应"（统计 error 数，不 FAIL）；schema `required` 非空但空参未报错 → 记 **warnings**（不 FAIL）
 - **`heuristic_smoke`**：按 schema properties 类型生成启发值（integer→0、number→0.0、boolean→false、array→`[]`、object→`{}`、其余→`"test"`）；无 properties 的工具跳过（不产生步骤）
 - **崩溃检测**：每步调用后查编辑器进程存活，进程死亡 → `fatal_error`（附 2000 字符日志）
@@ -163,16 +164,16 @@ build_csharp_assembly  write_file  create_script  save_resource
 
 | 条目 | AGENTS.md 声称 | 源码核算 | 结论 |
 |---|---|---|---|
-| L1 gtest 数量 | 61 | 72（9 文件逐文件统计：14+13+10+7+7+6+11+3+1） | 随配置面板新增 11 个 |
+| L1 gtest 数量 | 61 | 78（10 文件统计：ToolRegistry 5，其余同前） | 配置面板 +11；ToolRegistry 单测 +5 |
 | L2 用例文件数 | 5 | 6（00_meta / 01_scene / 02_property / 03_tools_contract / 04_resources_scripts / 05_rename_references） | 08-20 新增 05 |
 | ctest L2 用例 | gda_runner_<name> | 一致（`tests/CMakeLists.txt:108-114`，TIMEOUT 600；05 由 GLOB 自动发现） | 一致 |
-| 遍历工具数 | 332 | 336（`tool_defs.def` TOOL_ENTRY 计数） | 08-20 随 +4 上浮 |
-| 排除工具数 | 34 | 35（13 磁盘含 build_csharp_assembly + 22 用户可见，名单逐项核对） | 08-20 新增 1 |
-| 03 遍历步数 | 约 408 步 | ≈413（301 空参 + ≈112 冒烟，后者取决于运行时空 schema 数） | 运行时统计口径 |
+| 遍历工具数 | 332 | 336（`*_tools.hpp` 的 `GDA_TOOL_CLASS(` 计数） | 08-21 真类化后改由头文件枚举 |
+| 排除工具数 | 34 | 35（`get_tool_detail` 的 `side_effect` 字段非空即排除，08-21 起由工具 `side_effects()`/`GDA_TOOL_CLASS_SIDE` 驱动，不再硬编码） | 08-21 副作用驱动 |
+| 03 遍历步数 | 约 408 步 | **实测 546**（08-21 全量真类化后 run，336 工具含冒烟） | 运行时统计口径 |
 | 03 耗时 | 约 2-3 分钟 | README：约 2-3 分钟 | 一致 |
 | schema 非空/空数 | 运行时观测 | `SchemaStatisticsBaseline` 仅断言非空>空>0；def 静态可数 SCHEMA_NONE=208 / SCHEMA_BASIC=128（旧 222/126，08-20 随 +4 SCHEMA_BASIC） | 无法静态精确核算，属运行时观测值 |
-| 工具总数 343 = 7 元 + 336 领域 | 结构一致 | 7 元工具注册（`register_all.cpp` RegisterTool）+ 336 领域经 `call_tool` 代理；`g_handlers` = 336 领域 + system_status = 337 | 结构一致 |
-| ToolCatalog 347 条目 | 336 领域 + 7 元 + system_status + 3 快照 | `tool_catalog.cpp` 5 个 add_tool（ping/system_status/search_tools/list_categories/get_tool_detail）+ `register_all.cpp` 3 个（batch_execute/call_tool/code_execute） | 347 自洽 |
+| 工具总结构 | 7 元 + 336 领域 | 7 元工具经 `add_meta`+RegisterTool；336 领域/系统经 26 域 `make_tools()`；`g_handlers` 派生=337（336+system_status） | 单一来源 |
+| ToolCatalog 344 条目 | 336 领域 + system_status + 7 元 | 全部由 registry `all_any()` 逐一 `make_tool_info` 派生，无独立填表 | 344 自洽 |
 
 ## 已知引擎副作用
 

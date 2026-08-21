@@ -6,21 +6,21 @@ tags:
   - 模块
   - 领域工具
   - A组
-timestamp: "2026-08-20T16:59:13+08:00"
+timestamp: "2026-08-21T10:00:00+08:00"
 resource: src/tools/
 ---
 
 # 领域工具模块（src/tools/，A 组 13 模块）
 
-> 审计日期：2026-08-20（2026-08-12 初稿；08-17 补 YAML frontmatter；08-20 随 rename 事务化 + 新工具同步），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 审计日期：2026-08-21（2026-08-12 初稿；08-17 补 YAML frontmatter；08-20 随 rename 事务化 + 新工具同步；08-21 随 ToolBase 类重构同步——`tool_defs.def`/`TOOL_ENTRY` 移除，注册与计数口径改为 `<域>_tools.hpp`/`ToolRegistry`），基于当前工作树代码逐行核对（不依赖 git 历史）。
 > 覆盖范围：`src/tools/` 下 13 对 `.cpp/.hpp`：scene_ops、scene_tree_ops、property_ops、group_ops、input_ops、input_map_ops、physics_ops、nav_ops、resource_ops、script_ops、config_ops、doc_ops、editor_ops。
-> 统计口径：`handle_` 函数数取自 `.cpp` 定义；注册工具数取自 `tool_defs.def` 的 `TOOL_ENTRY` 行（以 handler 所属模块分组），两口径全部一致。
+> 统计口径：工具数以 `src/tools/*_tools.hpp` 的 `GDA_TOOL_CLASS(`/`GDA_TOOL_CLASS_SIDE(` 声明计数为准（一个工具 = 一个 `ToolBase` 真类，`handle_` 函数与之逐一对应，两口径一致）；注册经 `register_all.cpp` 调用 26 组 `<域>_tools::make_tools()` 汇入单一 `ToolRegistry`。
 
 ## 模块简介
 
 这 13 个模块是领域工具的前半部分：覆盖场景节点操作、属性/信号、分组、输入模拟与 InputMap、物理（2D/3D 双份）、导航、资源生命周期、脚本与 GDScript 执行、项目/引擎/编辑器配置、引擎类文档查询、编辑器会话管理。全部位于命名空间 `godot_autopilot::<模块>_ops`，与 AGENTS.md 约定一致。
 
-`tool_defs.def` 共 336 个 `TOOL_ENTRY`（即 AGENTS.md 所述 336 个领域工具），本页 13 模块占其中 **174 个（51.8%）**。工具经 `register_all.cpp` 的 `TOOL_ENTRY` 宏同时写入 `dispatch::g_handlers` 与 `ToolCatalog`；领域工具不直接注册到 MCP 服务器，统一经元工具 `call_tool` 分发（见 [../modules/tools_registry.md](../modules/tools_registry.md)）。
+26 个 `<域>_tools.hpp` 共声明 **336 个领域工具**（含 35 个以 `GDA_TOOL_CLASS_SIDE(` 标记的副作用工具），本页 13 域占其中 **174 个（51.8%）**。`register_all.cpp` 注册 26 组 `<域>_tools::make_tools()`（另加 `system_status` 1 与 7 个元工具，catalog/index 共 344）汇入单一 `ToolRegistry`，catalog/index/`dispatch::g_handlers`/`server.RegisterTool()` 全部由其派生；领域工具不直接注册到 MCP 服务器，统一经元工具 `call_tool` 分发（见 [../modules/tools_registry.md](../modules/tools_registry.md)）。
 
 ## 模块总览
 
@@ -155,7 +155,7 @@ resource: src/tools/
 
 - 内置约 150+ 条 `KEY_NAME_TO_CODE` 常量表（`"KEY_A"→65` 等 Unicode/功能键码）用于把键名转成 `Key` 码。
 - 事件构造基于 `InputEvent`（键盘/鼠标/手柄事件）；`action_set_deadzone` 调 `InputMap::action_set_deadzone`。
-- `save_input_map` 是**持久化副作用**：把动作写入 `ProjectSettings` 的 `input/<action>` 并 `save()`；`add_input_map_action_event` 同理。二者均在 `tests/runner/traversal.cpp` 的 `kExcludedSideEffectTools` 排除清单中（与 AGENTS.md 遍历排除约定一致）。
+- `save_input_map` 是**持久化副作用**：把动作写入 `ProjectSettings` 的 `input/<action>` 并 `save()`；`add_input_map_action_event` 同理。二者均以 `GDA_TOOL_CLASS_SIDE(` 声明为副作用工具（`side_effect` 非空），遍历经 `get_tool_detail` 的 `side_effect` 字段自动排除，不再硬编码清单（与 AGENTS.md 遍历排除约定一致）。
 
 ## physics_ops（48 工具）
 
@@ -255,7 +255,7 @@ resource: src/tools/
 
 - `set_project_settings` 的值类型推断：显式 `{"type": ..., "value": ...}` 包裹优先；int/float/bool 原生类型直转；字符串时先查已有设置的 Variant 类型再按该类型反序列化（`VariantJson::deserialize(vp, type_name)`），避免设置被存成错误类型。
 - `get_engine_version` 返回 Engine 版本字符串（`{major, minor, patch}` 结构）；`set_time_scale`/`set_max_fps` 直接写 `Engine` 单例。
-- `save_project_settings` 与 `set_editor_settings` 均写磁盘（持久化副作用），在遍历测试排除清单中。
+- `save_project_settings` 与 `set_editor_settings` 均写磁盘（持久化副作用），以 `GDA_TOOL_CLASS_SIDE(` 声明（`side_effect` 非空），遍历自动排除。
 - 命名前缀三套并存（`project_settings_*`、`engine_*`、`editor_settings_*`），与文件名 `config_` 不一致（见下节）。
 
 ## doc_ops（4 工具）
@@ -293,21 +293,21 @@ resource: src/tools/
 - `handle_save_all_scenes` 经 `editor->call("get_unsaved_scenes")` 拿未保存场景列表（godot-cpp 无直接 API）。
 - `handle_play_current_scene`：`is_playing_scene()` 防重（返回 `already_playing`），play 后再次校验，失败报 `failed to start scene playback: no game process started`；与 `entry_runtime`（game bridge）配合（见 [../modules/entry_runtime.md](../modules/entry_runtime.md)）。
 - 文件系统树导出 `dir_to_json` 递归上限 `MAX_TREE_DEPTH=12`，截断时返回 `truncated: true`。
-- `set_editor_main_scene` 写 `application/run/main_scene` 并 `ProjectSettings::save()`；`set_editor_plugin_enabled`、`save_editor_scene` 等均在遍历测试排除清单中。
+- `set_editor_main_scene` 写 `application/run/main_scene` 并 `ProjectSettings::save()`；`set_editor_plugin_enabled`、`save_editor_scene` 等均以 `GDA_TOOL_CLASS_SIDE(` 声明（`side_effect` 非空），遍历自动排除。
 - `create_editor_undo_redo_action` 支持动作分组名称，`add_do`/`add_undo` 以 node_path + 方法 + 参数形式入栈。
-- **`build_csharp_assembly`（08-20 新增）**：在 res:// 根定位 `.csproj/.sln`（无则报非 C# 工程），经 `OS::create_process` 异步启动 `dotnet build --nologo <project>`（非阻塞，沿用 os_ops 模式，避免冻结编辑器），返回 `{project_file, command, started, pid, note}`；`started` 为假时附 `error` 说明 SDK 缺失。`note` 明示能力边界：GDExtension(C++) 无公共 API 触发编辑器内 C# 程序集热重载（该能力在引擎 `modules/mono` 内部），仅能在 CI/命令行式编译验证；编辑器内类/签名变更后的验证仍须用户在编辑器点 Build 或重启。已加入遍历测试副作用排除清单。
+- **`build_csharp_assembly`（08-20 新增）**：在 res:// 根定位 `.csproj/.sln`（无则报非 C# 工程），经 `OS::create_process` 异步启动 `dotnet build --nologo <project>`（非阻塞，沿用 os_ops 模式，避免冻结编辑器），返回 `{project_file, command, started, pid, note}`；`started` 为假时附 `error` 说明 SDK 缺失。`note` 明示能力边界：GDExtension(C++) 无公共 API 触发编辑器内 C# 程序集热重载（该能力在引擎 `modules/mono` 内部），仅能在 CI/命令行式编译验证；编辑器内类/签名变更后的验证仍须用户在编辑器点 Build 或重启。以 `GDA_TOOL_CLASS_SIDE(` 声明（`side_effect` 非空），遍历自动排除。
 
 ## 与现有文档的不一致点
 
 | 文档 | 声称 | 代码事实 | 判定 |
 |---|---|---|---|
 | AGENTS.md（命名约定） | 工具命名 `<动词>_<类别>_<维度>_<对象>_<修饰>`，动词置首，如 `intersect_physics_2d_ray` | 本组符合；`signal_connect`/`signal_disconnect`（动词置首，无类别段）、config_ops 的 `get_project_settings`/`set_engine_*`/`get_editor_settings`（类别段为 project/engine/editor，与文件名 `config_` 不一致）属规范内的长短变化 | 一致 ✓（动词置首） |
-| AGENTS.md（工具总数） | 336 领域工具 | `tool_defs.def` 恰好 336 条 `TOOL_ENTRY`；本页 13 模块 174 条 | 一致 ✓ |
+| AGENTS.md（工具总数） | 336 领域工具 | 26 个 `*_tools.hpp` 恰为 336 个 `GDA_TOOL_CLASS(`/`GDA_TOOL_CLASS_SIDE(`；本页 13 域 174 个 | 一致 ✓ |
 | AGENTS.md（错误模式） | 领域工具返回 `{"error": "消息"}` | 一致；另有 `error_detail` 扩展格式与 dispatch `catch(...)` 兜底、导出期固定错误 | 一致 ✓（有扩展） |
 | AGENTS.md（契约缺口 3 项） | `create_scene_node` 不校验必填；`get_resource_extensions` 缺 type 返回全类型；`reimport_resource_files` 空参静默成功 | 三项均在代码中逐一确认（默认 "NewNode"/"Node"；空 type 传 `""`；count=0 返回 queued） | 一致 ✓ |
-| AGENTS.md（遍历排除） | 35 个副作用工具排除 | `kExcludedSideEffectTools` 含 `save_input_map`、`add_input_map_action_event`、`save_project_settings`、`set_editor_settings`、`set_editor_main_scene`、`set_editor_plugin_enabled`、`save_editor_scene`、`build_csharp_assembly` 等本组/跨组持久化或进程副作用工具 | 一致 ✓ |
+| AGENTS.md（遍历排除） | 35 个副作用工具排除 | 35 个副作用工具以 `GDA_TOOL_CLASS_SIDE(` 声明并经 `ISideEffect` 暴露 `side_effect`；遍历经 `get_tool_detail` 返回的 `tool.side_effect` 非空即排除，不再硬编码清单 | 一致 ✓ |
 | 命名归属 | 类别前缀应反映模块 | `get_scene_tree` 注册在 scene_ops（非 scene_tree_ops）——旧 `scene_tree_get`/`scene_get_tree` 双名已合并，不再语义重叠 | 已消解 ✓ |
-| AGENTS.md（架构） | 工具经 `call_tool` 代理、`register_all.cpp` 的 `g_handlers` 映射分发 | `TOOL_ENTRY` 宏同时填 `g_handlers` 与 catalog；`dispatch.cpp` 非主线程走 `queue.submit()` | 一致 ✓ |
+| AGENTS.md（架构） | 工具经 `call_tool` 代理、`register_all.cpp` 的 `g_handlers` 映射分发 | 工具由 `<域>_tools::make_tools()` 汇入 `ToolRegistry`，`register_all.cpp` 由 registry 派生填充 `g_handlers` 与 catalog；`dispatch.cpp` 非主线程走 `queue.submit()` | 一致 ✓ |
 | `input_ops` | （无文档声明） | `parse_key`/`parse_mouse_button` 对未识别名称返回 `KEY_NONE`/`MOUSE_BUTTON_NONE` 而非报错 | 文档空缺，建议补充 |
 
 ## 相关页面

@@ -11,6 +11,7 @@
 | [tests.md](tests.md) | L1/L2 测试体系、遍历排除清单、数值统计 | `tests/` |
 | [conventions.md](conventions.md) | 工程约定：命名、日志、错误模式、添加工具流程 | 全仓库 |
 | [example.md](example.md) | Example 示例项目与文档 | `Example/` |
+| [tool_base_design.md](tool_base_design.md) | ToolBase 工具统一标准化（接口 + 组合 + 真类化）：336 域工具全为独立 ToolBase 子类、ToolRegistry 唯一来源、tool_defs.def 删除 | `tool_base.hpp`、`tool_registry.hpp`、`fn_tool.hpp`、`tool_decl.hpp`、26 个 `*_tools.hpp`、`register_all.cpp` |
 | [modules/core.md](modules/core.md) | 核心层：线程模型、端口、日志、配置常量 | `src/core/` |
 | [modules/entry_runtime.md](modules/entry_runtime.md) | 插件入口与运行时桥接、gda 协议 | `src/main.cpp`、`src/runtime/` |
 | [modules/tools_registry.md](modules/tools_registry.md) | 工具注册管线、元工具、schema 统计、契约缺口 | `src/tools/`（register_all/dispatch/tool_catalog/schema_*） |
@@ -20,9 +21,9 @@
 
 ## 关键数值速查（以运行时统计为准）
 
-- 工具总数 **339** = 7 元工具 + 332 领域工具；`ToolCatalog` 343 条目；领域工具分 **23 类**（InputMap 并入 Input）
+- 工具注册总入口 `ToolRegistry`（单一来源）：**344 条目** = 336 域工具 + `system_status` + 7 元工具；域工具分 **23 类**（InputMap 并入 Input）
 - schema：非空/空数以运行时统计为准（def 静态：SCHEMA_NONE=208 / SCHEMA_BASIC=124）；**3 个契约缺口**（create_scene_node、get_resource_extensions、reimport_resource_files）
-- 遍历排除 **34 个副作用工具**；L1 单元测试 **72 个 gtest**；L2 用例 **5 个文件**
+- 遍历排除 **35 个副作用工具**；L1 单元测试 **77 个 gtest**；L2 引擎用例 **6 个文件**（00_meta/01_scene/02_property/03_tools_contract/04_resources_scripts/05_rename_references）
 - 工具命名规范：`<动词>_<类别>_<维度>_<对象>_<修饰>`（动词置首，如 create_scene_node、intersect_physics_2d_ray）
 - MCP 端口 **9527**（`/mcp`），`GODOT_AUTOPILOT_PORT` 可覆盖；产物名 `godot-autopilot`
 
