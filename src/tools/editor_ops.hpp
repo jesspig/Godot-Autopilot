@@ -28,6 +28,7 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue &args);
 mcp::JsonValue handle_open_scene(const mcp::JsonValue &args);
 mcp::JsonValue handle_close_scene(const mcp::JsonValue &args);
 mcp::JsonValue handle_save_scene_as(const mcp::JsonValue &args);
+mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args);
 
 } // namespace editor_ops
 } // namespace godot_autopilot

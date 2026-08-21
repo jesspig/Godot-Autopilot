@@ -131,6 +131,39 @@ godot::Node *find_edited_scene_root() {
   return nullptr;
 }
 
+std::string parse_hint_class(const std::string &hint_string) {
+  const std::string prefix = "Type:";
+  std::string s = hint_string;
+  if (s.compare(0, prefix.size(), prefix) == 0) {
+    s = s.substr(prefix.size());
+  }
+  size_t comma = s.find(',');
+  if (comma != std::string::npos) {
+    s = s.substr(0, comma);
+  }
+  size_t start = s.find_first_not_of(" \t");
+  if (start == std::string::npos) {
+    return "";
+  }
+  size_t end = s.find_last_not_of(" \t");
+  return s.substr(start, end - start + 1);
+}
+
+bool is_node_class(const std::string &class_name) {
+  if (class_name.empty()) {
+    return false;
+  }
+  auto *cdbs = godot::ClassDBSingleton::get_singleton();
+  if (!cdbs) {
+    return false;
+  }
+  godot::StringName cls(class_name.c_str());
+  if (cls == godot::StringName("Node")) {
+    return true;
+  }
+  return cdbs->is_parent_class(cls, godot::StringName("Node"));
+}
+
 std::string hint_name(int hint) {
   static const std::unordered_map<int, std::string> names = {
       {0, "None"},
@@ -330,19 +363,60 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
   }
 
   godot::StringName prop_name(prop_str.c_str());
+  std::string value_node_path;
   godot::Variant value;
-  std::string resource_error;
-  bool resource_attached = false;
-  if (resource_ops::try_resolve_resource_value(*it_val, value,
-                                               resource_error)) {
-    if (!resource_error.empty()) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue(resource_error);
-      return e;
+  bool converted_node_path = false;
+  bool node_typed_prop = false;
+  if (!dict.is_empty() && dict.has("type") && dict.has("hint") &&
+      dict.has("hint_string")) {
+    int type_id = static_cast<int>(dict["type"]);
+    int hint_val = static_cast<int>(dict["hint"]);
+    if (static_cast<godot::Variant::Type>(type_id) == godot::Variant::OBJECT &&
+        hint_val == godot::PROPERTY_HINT_RESOURCE_TYPE) {
+      std::string hint_str =
+          to_std_string(dict["hint_string"].operator godot::String());
+      node_typed_prop = is_node_class(parse_hint_class(hint_str));
     }
-    resource_attached = true;
-  } else {
-    value = VariantJson::deserialize(*it_val, type_hint);
+  }
+  if (node_typed_prop && it_val->IsString()) {
+    std::string np_str = it_val->GetString();
+    godot::Node *scene_root = find_edited_scene_root();
+    godot::Node *target_node = nullptr;
+    if (scene_root) {
+      target_node = scene_root->get_node_or_null(
+          godot::NodePath(godot::String(np_str.c_str())));
+    }
+    if (!target_node) {
+      return util::error_detail(
+          "cannot assign node path '" + np_str + "' to node-typed property '" +
+              prop_str + "' on " + path_str,
+          path_str,
+          "a valid path to a node inside the currently edited scene" +
+              (scene_root ? " (root \"" +
+                                to_std_string(scene_root->get_name()) + "\")"
+                          : " (no edited scene root)"),
+          "pass a scene-resolvable node path such as \"Player/Camera2D\" or "
+          "\"..\", or use code_execute to assign a node reference directly "
+          "(e.g. get_node(\"Path/To/Node\"))");
+    }
+    value = godot::Variant(static_cast<godot::Object *>(target_node));
+    converted_node_path = true;
+    value_node_path = np_str;
+  }
+  bool resource_attached = false;
+  if (!converted_node_path) {
+    std::string resource_error;
+    if (resource_ops::try_resolve_resource_value(*it_val, value,
+                                                 resource_error)) {
+      if (!resource_error.empty()) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue(resource_error);
+        return e;
+      }
+      resource_attached = true;
+    } else {
+      value = VariantJson::deserialize(*it_val, type_hint);
+    }
   }
 
   if (resource_attached && value.get_type() == godot::Variant::OBJECT) {
@@ -376,6 +450,9 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
   r["result"] = mcp::JsonValue("ok");
   if (resource_attached) {
     r["resource_attached"] = mcp::JsonValue(true);
+  }
+  if (converted_node_path) {
+    r["converted_node_path"] = mcp::JsonValue(value_node_path);
   }
 
   std::string readback_detail;

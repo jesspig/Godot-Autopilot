@@ -35,6 +35,7 @@ mcp::JsonValue handle_remove(const mcp::JsonValue &args);
 mcp::JsonValue handle_rename(const mcp::JsonValue &args);
 mcp::JsonValue handle_get_dependencies(const mcp::JsonValue &args);
 mcp::JsonValue handle_has_dependency(const mcp::JsonValue &args);
+mcp::JsonValue handle_get_references(const mcp::JsonValue &args);
 mcp::JsonValue handle_reimport(const mcp::JsonValue &args);
 
 } // namespace resource_ops

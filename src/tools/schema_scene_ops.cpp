@@ -144,6 +144,11 @@ void fill_schema_scene(std::unordered_map<std::string, mcp::JsonValue>& m) {
             {"path", "string", "Resource file path to inspect, e.g. res://scene.tscn", true},
             {"dependency", "string", "Dependency file path to search for in the resource's dependency list, e.g. res://icon.svg", true},
         });
+        m["get_resource_references"] = schema::build_schema({
+            {"path", "string", "Resource path to search for as a target reference, e.g. res://assets/icon.png; ignore uid and class_name", false},
+            {"uid", "string", "Resource UID to search for in uid:// references, e.g. uid://abc123", false},
+            {"class_name", "string", "Script class name to search for in script references, e.g. Player", false},
+        });
         m["reimport_resource_files"] = schema::build_schema({
             {"path", "string", "Single resource file path to reimport; alternative to files", true},
             {"files", "array", "Array of resource file paths to reimport; alternative to a single path", false},
@@ -210,6 +215,16 @@ void fill_schema_scene(std::unordered_map<std::string, mcp::JsonValue>& m) {
             {"path", "string", "File path to write (absolute path, or user://-relative); plain file I/O with no editor resource tracking", true},
             {"content", "string", "Text content to store in the file", true},
             {"mode", "string", "Write mode: 'WRITE' overwrites existing content (default), 'APPEND' appends to the end of the file", false},
+        });
+        m["read_file"] = schema::build_schema({
+            {"path", "string", "File path to read (absolute path, or res:// / user://-relative); plain file I/O with no editor resource tracking", true},
+        });
+        m["find_in_files"] = schema::build_schema({
+            {"query", "string", "Text to search for within each file; files that contain no occurrence are skipped", true},
+            {"dir", "string", "Directory to search recursively (string, default: res://)", false},
+            {"extensions", "array", "File extensions to include, without leading dot (array, e.g. ['gd','tscn','cs']); default: ['gd','tscn','tres','cs','md','json','h','cpp']", false},
+            {"case_sensitive", "boolean", "Match the query with case sensitivity (boolean, default: false)", false},
+            {"max_results", "integer", "Maximum number of matching files to return (integer, default: 500); stops searching early and sets truncated: true when exceeded", false},
         });
 
         m["add_group_node"] = schema::build_schema({

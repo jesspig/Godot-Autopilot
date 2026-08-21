@@ -1,6 +1,7 @@
 #include "register_all.hpp"
 #include "core/export_guard.hpp"
 #include "core/log_system.hpp"
+#include <version.hpp>
 #include "tools/audio_ops.hpp"
 #include "tools/capture_ops.hpp"
 #include "tools/code_exec_ops.hpp"
@@ -11,10 +12,38 @@
 #include "tools/display_ops.hpp"
 #include "tools/doc_ops.hpp"
 #include "tools/editor_ops.hpp"
+#include "tools/fn_tool.hpp"
 #include "tools/group_ops.hpp"
+#include "tools/group_tools.hpp"
+#include "tools/capture_tools.hpp"
+#include "tools/spriteframes_tools.hpp"
+#include "tools/config_tools.hpp"
+#include "tools/debug_tools.hpp"
+#include "tools/audio_tools.hpp"
+#include "tools/render_tools.hpp"
+#include "tools/display_tools.hpp"
+#include "tools/editor_tools.hpp"
+#include "tools/input_tools.hpp"
+#include "tools/os_tools.hpp"
+#include "tools/physics_tools.hpp"
+#include "tools/scene_tools.hpp"
+#include "tools/scene_tree_tools.hpp"
+#include "tools/resource_tools.hpp"
+#include "tools/script_tools.hpp"
+#include "tools/nav_tools.hpp"
+#include "tools/text_tools.hpp"
+#include "tools/tilemap_tools.hpp"
+#include "tools/tileset_tools.hpp"
+#include "tools/input_map_tools.hpp"
+#include "tools/debugger_tools.hpp"
+#include "tools/doc_tools.hpp"
+#include "tools/game_tools.hpp"
+#include "tools/property_tools.hpp"
+#include "tools/system_tools.hpp"
 #include "tools/input_map_ops.hpp"
 #include "tools/input_ops.hpp"
 #include "tools/log_ops.hpp"
+#include "tools/meta_tools.hpp"
 #include "tools/nav_ops.hpp"
 #include "tools/os_ops.hpp"
 #include "tools/physics_ops.hpp"
@@ -31,8 +60,12 @@
 #include "tools/text_ops.hpp"
 #include "tools/tilemap_ops.hpp"
 #include "tools/tileset_ops.hpp"
+#include "tools/tool_base.hpp"
+#include "tools/tool_registry.hpp"
 #include <mcp/Content.hpp>
 #include <mcp/JsonValue.hpp>
+#include <memory>
+#include <utility>
 
 
 namespace godot_autopilot {
@@ -46,26 +79,6 @@ mcp::JsonValue make_schema() {
   mcp::JsonValue req(mcp::JsonValue::array_tag);
   s["required"] = std::move(req);
   return s;
-}
-
-void add_required(mcp::JsonValue &schema, const std::string &name) {
-  auto *req = schema.Find("required");
-  if (req && req->IsArray()) {
-    req->PushBack(mcp::JsonValue(name));
-  }
-}
-
-std::vector<std::string> split_tags(const std::string &csv) {
-  if (csv.empty())
-    return {};
-  std::vector<std::string> result;
-  size_t start = 0, end;
-  while ((end = csv.find(',', start)) != std::string::npos) {
-    result.push_back(csv.substr(start, end - start));
-    start = end + 1;
-  }
-  result.push_back(csv.substr(start));
-  return result;
 }
 
 enum SchemaType { SCHEMA_NONE, SCHEMA_BASIC };
@@ -122,6 +135,10 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string &name) {
 }
 
 }
+
+mcp::JsonValue tool_input_schema(const std::string& name, bool basic) { return build_schema_for(basic ? SCHEMA_BASIC : SCHEMA_NONE, name); }
+
+static std::unique_ptr<ToolRegistry> g_active_registry = std::make_unique<ToolRegistry>();
 
 static mcp::JsonValue meta_ping_impl() {
     mcp::JsonValue r(mcp::JsonValue::object_tag);
@@ -220,6 +237,12 @@ static mcp::JsonValue meta_get_tool_detail_impl(const mcp::JsonValue& args, Tool
     }
     t["tags"] = std::move(tags);
     t["input_schema"] = info->input_schema;
+    const char* se = "";
+    if (auto* tool = g_active_registry->find_any(name)) {
+        se = ::godot_autopilot::side_effect_name(
+            ::godot_autopilot::side_effect_of(*tool));
+    }
+    t["side_effect"] = mcp::JsonValue(se);
     j["tool"] = std::move(t);
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "get_tool_detail completed");
     return j;
@@ -270,63 +293,75 @@ static mcp::JsonValue meta_code_execute_impl(const mcp::JsonValue& args) {
 
 void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog& catalog, Bm25Index& index, int port) {
 
-    dispatch::g_handlers["system_status"] = [port, start = std::chrono::steady_clock::now()](const mcp::JsonValue&) -> mcp::JsonValue {
-        auto uptime = std::chrono::duration_cast<std::chrono::seconds>(
-            std::chrono::steady_clock::now() - start).count();
-        mcp::JsonValue status(mcp::JsonValue::object_tag);
-        status["version"] = mcp::JsonValue("0.1.0");
-        status["port"] = mcp::JsonValue(static_cast<int64_t>(port));
-        status["uptime_seconds"] = mcp::JsonValue(static_cast<int64_t>(uptime));
-        status["running"] = mcp::JsonValue(true);
-        mcp::JsonValue r(mcp::JsonValue::object_tag);
-        r["result"] = std::move(status);
-        return r;
+    (void)queue;
+    g_active_registry = std::make_unique<ToolRegistry>();
+
+    g_active_registry->add(make_fn_tool(
+        ToolMeta{"system_status", "Get server status info", "System", {"status", "info"}, true},
+        [port, start = std::chrono::steady_clock::now()](const mcp::JsonValue&) -> mcp::JsonValue {
+            auto uptime = std::chrono::duration_cast<std::chrono::seconds>(
+                std::chrono::steady_clock::now() - start).count();
+            mcp::JsonValue status(mcp::JsonValue::object_tag);
+            status["version"] = mcp::JsonValue(GDA_VERSION);
+            status["port"] = mcp::JsonValue(static_cast<int64_t>(port));
+            status["uptime_seconds"] = mcp::JsonValue(static_cast<int64_t>(uptime));
+            status["running"] = mcp::JsonValue(true);
+            mcp::JsonValue r(mcp::JsonValue::object_tag);
+            r["result"] = std::move(status);
+            return r;
+        },
+        make_schema()));
+
+auto add_domain_tools = [](auto& make_fn) {
+        for (auto& t : make_fn()) {
+            g_active_registry->add(std::move(t));
+        }
     };
 
-#define TOOL_ENTRY(id, name_str, desc, cat, tags_csv, handler_fn, schema_type) \
-  dispatch::g_handlers[name_str] = handler_fn;
-#include "tool_defs.def"
-#undef TOOL_ENTRY
+    add_domain_tools(group_tools::make_tools);
+    add_domain_tools(capture_tools::make_tools);
+    add_domain_tools(spriteframes_tools::make_tools);
+    add_domain_tools(config_tools::make_tools);
+    add_domain_tools(debug_tools::make_tools);
+    add_domain_tools(audio_tools::make_tools);
+    add_domain_tools(render_tools::make_tools);
+    add_domain_tools(display_tools::make_tools);
+    add_domain_tools(editor_tools::make_tools);
+    add_domain_tools(input_tools::make_tools);
+    add_domain_tools(os_tools::make_tools);
+    add_domain_tools(physics_tools::make_tools);
+    add_domain_tools(scene_tools::make_tools);
+    add_domain_tools(scene_tree_tools::make_tools);
+    add_domain_tools(resource_tools::make_tools);
+    add_domain_tools(script_tools::make_tools);
+    add_domain_tools(nav_tools::make_tools);
+    add_domain_tools(text_tools::make_tools);
+    add_domain_tools(tilemap_tools::make_tools);
+    add_domain_tools(tileset_tools::make_tools);
+    add_domain_tools(input_map_tools::make_tools);
+    add_domain_tools(debugger_tools::make_tools);
+    add_domain_tools(doc_tools::make_tools);
+    add_domain_tools(game_tools::make_tools);
+    add_domain_tools(property_tools::make_tools);
+    add_domain_tools(system_tools::make_tools);
 
-
-    catalog.populate_default_tools();
-
-
-
-    {
-        mcp::ToolOptions opts;
-        opts.Description("Health check ping");
-        server.RegisterTool("ping", opts,
-            [](const mcp::RequestContext<mcp::CallToolRequestParams>&) -> mcp::CallToolResult {
-                if (godot_autopilot::ExportGuard::is_exporting()) {
-                    return dispatch::export_blocked_result();
-                }
-                mcp::JsonValue r = meta_ping_impl();
-                auto body = r.Dump();
-
-                mcp::CallToolResult mcp_result;
-                mcp_result.content.push_back(mcp::TextContent{"text", body});
-                return mcp_result;
-            });
-    }
-
+    g_active_registry->add(std::make_unique<::godot_autopilot::MetaTool>(
+        ToolMeta{"ping", "Health check ping", "Meta", {"health", "ping"}, true},
+        [](const mcp::JsonValue&) { return meta_ping_impl(); },
+        make_schema()));
 
     {
         mcp::JsonValue s(mcp::JsonValue::object_tag);
         s["type"] = mcp::JsonValue("object");
-
         mcp::JsonValue props(mcp::JsonValue::object_tag);
-
         mcp::JsonValue q_prop(mcp::JsonValue::object_tag);
         q_prop["type"] = mcp::JsonValue("string");
         q_prop["description"] = mcp::JsonValue("Search query");
         props["query"] = std::move(q_prop);
-
         mcp::JsonValue c_prop(mcp::JsonValue::object_tag);
         c_prop["type"] = mcp::JsonValue("string");
         c_prop["description"] = mcp::JsonValue("Filter by category");
         props["category"] = std::move(c_prop);
-
         mcp::JsonValue t_prop(mcp::JsonValue::object_tag);
         t_prop["type"] = mcp::JsonValue("array");
         mcp::JsonValue ti(mcp::JsonValue::object_tag);
@@ -334,54 +369,20 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         t_prop["items"] = std::move(ti);
         t_prop["description"] = mcp::JsonValue("Filter by tags");
         props["tags"] = std::move(t_prop);
-
         s["properties"] = std::move(props);
         mcp::JsonValue req(mcp::JsonValue::array_tag);
         req.PushBack(mcp::JsonValue("query"));
         s["required"] = std::move(req);
-
-        mcp::ToolOptions s_opts;
-        s_opts.Description("Search available tools by query").InputSchema(std::move(s));
-        server.RegisterTool("search_tools", s_opts,
-            [&queue, &index](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
-                if (godot_autopilot::ExportGuard::is_exporting()) {
-                    return dispatch::export_blocked_result();
-                }
-                mcp::JsonValue args_copy = ctx.Params().arguments
-                    ? *ctx.Params().arguments : mcp::JsonValue(mcp::JsonValue::object_tag);
-                auto body = queue.submit([args = std::move(args_copy), &index]() -> std::string {
-                    return meta_search_tools_impl(args, index).Dump();
-                }).get();
-
-                mcp::CallToolResult mcp_result;
-                mcp_result.content.push_back(mcp::TextContent{"text", body});
-                return mcp_result;
-            });
+        g_active_registry->add(std::make_unique<::godot_autopilot::MetaTool>(
+            ToolMeta{"search_tools", "Search available tools by query", "Meta", {"search", "discovery"}, true},
+            [&index](const mcp::JsonValue& args) { return meta_search_tools_impl(args, index); },
+            std::move(s)));
     }
 
-
-    {
-        mcp::JsonValue s(mcp::JsonValue::object_tag);
-        s["type"] = mcp::JsonValue("object");
-        s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
-
-        mcp::ToolOptions l_opts;
-        l_opts.Description("List all tool categories").InputSchema(std::move(s));
-        server.RegisterTool("list_categories", l_opts,
-            [&queue, &catalog](const mcp::RequestContext<mcp::CallToolRequestParams>&) -> mcp::CallToolResult {
-                if (godot_autopilot::ExportGuard::is_exporting()) {
-                    return dispatch::export_blocked_result();
-                }
-                auto body = queue.submit([&catalog]() -> std::string {
-                    return meta_list_categories_impl(catalog).Dump();
-                }).get();
-
-                mcp::CallToolResult mcp_result;
-                mcp_result.content.push_back(mcp::TextContent{"text", body});
-                return mcp_result;
-            });
-    }
-
+    g_active_registry->add(std::make_unique<::godot_autopilot::MetaTool>(
+        ToolMeta{"list_categories", "List all tool categories", "Meta", {"categories", "discovery"}, true},
+        [&catalog](const mcp::JsonValue&) { return meta_list_categories_impl(catalog); },
+        make_schema()));
 
     {
         mcp::JsonValue s(mcp::JsonValue::object_tag);
@@ -395,26 +396,11 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         mcp::JsonValue req(mcp::JsonValue::array_tag);
         req.PushBack(mcp::JsonValue("name"));
         s["required"] = std::move(req);
-
-        mcp::ToolOptions g_opts;
-        g_opts.Description("Get complete schema for one tool").InputSchema(std::move(s));
-        server.RegisterTool("get_tool_detail", g_opts,
-            [&queue, &catalog](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
-                if (godot_autopilot::ExportGuard::is_exporting()) {
-                    return dispatch::export_blocked_result();
-                }
-                mcp::JsonValue args_copy = ctx.Params().arguments
-                    ? *ctx.Params().arguments : mcp::JsonValue(mcp::JsonValue::object_tag);
-                auto body = queue.submit([args = std::move(args_copy), &catalog]() -> std::string {
-                    return meta_get_tool_detail_impl(args, catalog).Dump();
-                }).get();
-
-                mcp::CallToolResult mcp_result;
-                mcp_result.content.push_back(mcp::TextContent{"text", body});
-                return mcp_result;
-            });
+        g_active_registry->add(std::make_unique<::godot_autopilot::MetaTool>(
+            ToolMeta{"get_tool_detail", "Get complete schema for one tool", "Meta", {"detail", "schema"}, true},
+            [&catalog](const mcp::JsonValue& args) { return meta_get_tool_detail_impl(args, catalog); },
+            std::move(s)));
     }
-
 
     {
         mcp::JsonValue s(mcp::JsonValue::object_tag);
@@ -432,36 +418,25 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         mcp::JsonValue creq(mcp::JsonValue::array_tag);
         creq.PushBack(mcp::JsonValue("name"));
         s["required"] = std::move(creq);
-
-        mcp::ToolOptions c_opts;
-        c_opts.Description("Execute any tool by name. Use this to call all non-meta tools (scene_*, property_*, signal_*, system_status).").InputSchema(std::move(s));
-        server.RegisterTool("call_tool", c_opts,
-            [](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
-                if (godot_autopilot::ExportGuard::is_exporting()) {
-                    return dispatch::export_blocked_result();
-                }
-                mcp::JsonValue args = ctx.Params().arguments
-                    ? *ctx.Params().arguments : mcp::JsonValue(mcp::JsonValue::object_tag);
-                std::string name = args.Find("name") != nullptr ? args["name"].GetString() : "";
-                mcp::JsonValue j = meta_call_tool_wait(name, meta_call_tool_impl(std::move(args)));
-                std::string body = j.Dump();
-
-                mcp::CallToolResult mcp_result;
-                if (j.Find("error") != nullptr) mcp_result.is_error = true;
-                mcp_result.content.push_back(mcp::TextContent{"text", body});
+        g_active_registry->add(std::make_unique<::godot_autopilot::MetaTool>(
+            ToolMeta{"call_tool",
+                     "Execute any tool by name. Use this to call all non-meta tools (scene_*, property_*, signal_*, system_status).",
+                     "System", {"call", "dispatch", "proxy"}, true},
+            [](const mcp::JsonValue& args) -> mcp::JsonValue {
+                std::string name = args.Find("name") != nullptr && args["name"].IsString() ? args["name"].GetString() : std::string();
+                mcp::JsonValue j = meta_call_tool_wait(name, meta_call_tool_impl(args));
                 if (!name.empty()) {
                     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, name + " completed");
                 }
-                return mcp_result;
-            });
+                return j;
+            },
+            std::move(s)));
     }
-
 
     {
         mcp::JsonValue s(mcp::JsonValue::object_tag);
         s["type"] = mcp::JsonValue("object");
         mcp::JsonValue props(mcp::JsonValue::object_tag);
-
         mcp::JsonValue item(mcp::JsonValue::object_tag);
         item["type"] = mcp::JsonValue("object");
         mcp::JsonValue iprops(mcp::JsonValue::object_tag);
@@ -477,183 +452,109 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         mcp::JsonValue ireq(mcp::JsonValue::array_tag);
         ireq.PushBack(mcp::JsonValue("tool"));
         item["required"] = std::move(ireq);
-
         mcp::JsonValue ops_prop(mcp::JsonValue::object_tag);
         ops_prop["type"] = mcp::JsonValue("array");
         ops_prop["items"] = std::move(item);
         ops_prop["description"] = mcp::JsonValue("Ordered list of operations to execute");
         props["operations"] = std::move(ops_prop);
-
         mcp::JsonValue stop_prop(mcp::JsonValue::object_tag);
         stop_prop["type"] = mcp::JsonValue("boolean");
         stop_prop["description"] = mcp::JsonValue("Stop on first error");
         stop_prop["default"] = mcp::JsonValue(true);
         props["stop_on_error"] = std::move(stop_prop);
-
         s["properties"] = std::move(props);
         mcp::JsonValue req(mcp::JsonValue::array_tag);
         req.PushBack(mcp::JsonValue("operations"));
         s["required"] = std::move(req);
-
-        mcp::ToolOptions b_opts;
-        b_opts.Description("Execute multiple tools in batch. Each operation runs in sequence; if stop_on_error is true and any operation fails, remaining operations are skipped.").InputSchema(std::move(s));
-        server.RegisterTool("batch_execute", b_opts,
-            [&queue](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
-                if (godot_autopilot::ExportGuard::is_exporting()) {
-                    return dispatch::export_blocked_result();
-                }
-                mcp::JsonValue args = ctx.Params().arguments
-                    ? *ctx.Params().arguments : mcp::JsonValue(mcp::JsonValue::object_tag);
-                auto body = queue.submit([args = std::move(args)]() -> std::string {
-                    return meta_batch_execute_impl(args).Dump();
-                }).get();
-                mcp::CallToolResult mcp_result;
-                mcp_result.content.push_back(mcp::TextContent{"text", body});
-                return mcp_result;
-            });
+        g_active_registry->add(std::make_unique<::godot_autopilot::MetaTool>(
+            ToolMeta{"batch_execute",
+                     "Execute multiple tools in batch. Each operation runs in sequence; if stop_on_error is true and any operation fails, remaining operations are skipped.",
+                     "System", {"batch", "execute", "multi"}, true},
+            [](const mcp::JsonValue& a) { return meta_batch_execute_impl(a); },
+            std::move(s)));
     }
-
 
     {
         mcp::JsonValue s(mcp::JsonValue::object_tag);
         s["type"] = mcp::JsonValue("object");
         mcp::JsonValue props(mcp::JsonValue::object_tag);
-
         mcp::JsonValue sc(mcp::JsonValue::object_tag);
         sc["type"] = mcp::JsonValue("string");
         sc["description"] = mcp::JsonValue("GDScript source code");
         props["source_code"] = std::move(sc);
-
         mcp::JsonValue fn(mcp::JsonValue::object_tag);
         fn["type"] = mcp::JsonValue("string");
         fn["description"] = mcp::JsonValue("Function name to call (default: _run)");
         props["function_name"] = std::move(fn);
-
         mcp::JsonValue tm(mcp::JsonValue::object_tag);
         tm["type"] = mcp::JsonValue("integer");
         tm["description"] = mcp::JsonValue("Execution timeout in milliseconds (max 30000)");
         tm["default"] = mcp::JsonValue(static_cast<int64_t>(5000));
         tm["maximum"] = mcp::JsonValue(static_cast<int64_t>(30000));
         props["timeout_ms"] = std::move(tm);
-
         mcp::JsonValue ao(mcp::JsonValue::object_tag);
         ao["type"] = mcp::JsonValue("boolean");
         ao["description"] = mcp::JsonValue("Automatically set owner on nodes created during execution so they are saved with the scene (default true)");
         props["auto_owner"] = std::move(ao);
-
         s["properties"] = std::move(props);
         mcp::JsonValue req(mcp::JsonValue::array_tag);
         req.PushBack(mcp::JsonValue("source_code"));
         s["required"] = std::move(req);
+        g_active_registry->add(std::make_unique<::godot_autopilot::MetaTool>(
+            ToolMeta{"code_execute",
+                     "Execute arbitrary GDScript code. The source code is wrapped in a script that extends Node, compiled, attached to a temporary node, and executed. Returns the function result serialized as JSON. By default the source is inlined inside the _run() function body: top-level func definitions are not supported — inline all code as expressions/statements, or define named functions and call one via function_name (multi-function mode). Execution environment exposes SceneRoot (the edited scene root node) for node access; see SceneRoot.get_node(\"Child\").",
+                     "System", {"code", "execute", "script", "gdscript"}, true},
+            [](const mcp::JsonValue& a) { return meta_code_execute_impl(a); },
+            std::move(s)));
+    }
 
-        mcp::ToolOptions c_opts;
-        c_opts.Description("Execute arbitrary GDScript code. The source code is wrapped in a script that extends Node, compiled, attached to a temporary node, and executed. Returns the function result serialized as JSON. By default the source is inlined inside the _run() function body: top-level func definitions are not supported — inline all code as expressions/statements, or define named functions and call one via function_name (multi-function mode). Execution environment exposes SceneRoot (the edited scene root node) for node access; see SceneRoot.get_node(\"Child\").").InputSchema(std::move(s));
-        server.RegisterTool("code_execute", c_opts,
-            [&queue](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
+    for (auto* t : g_active_registry->all_any()) {
+        catalog.add_tool(make_tool_info(*t));
+    }
+
+    for (auto* meta_tool : g_active_registry->all_meta()) {
+        const std::string meta_name = meta_tool->meta().name;
+        mcp::ToolOptions opts;
+        opts.Description(meta_tool->meta().description).InputSchema(meta_tool->input_schema());
+        server.RegisterTool(meta_name, opts,
+            [meta_name](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
                 if (godot_autopilot::ExportGuard::is_exporting()) {
                     return dispatch::export_blocked_result();
                 }
                 mcp::JsonValue args = ctx.Params().arguments
                     ? *ctx.Params().arguments : mcp::JsonValue(mcp::JsonValue::object_tag);
-                auto body = queue.submit([args = std::move(args)]() -> std::string {
-                    return meta_code_execute_impl(args).Dump();
-                }).get();
+                mcp::JsonValue res = g_active_registry->find_meta(meta_name)->execute(args);
                 mcp::CallToolResult mcp_result;
-                mcp::JsonValue j = mcp::JsonValue::Parse(body);
-                if (j.Find("error") != nullptr) mcp_result.is_error = true;
-                mcp_result.content.push_back(mcp::TextContent{"text", body});
+                if ((meta_name == "call_tool" || meta_name == "code_execute") && res.Find("error") != nullptr) {
+                    mcp_result.is_error = true;
+                }
+                mcp_result.content.push_back(mcp::TextContent{"text", res.Dump()});
                 return mcp_result;
             });
     }
 
-#define TOOL_ENTRY(id, name_str, desc, cat, tags_csv, handler_fn, schema_type) \
-  catalog.add_tool({name_str, desc, cat, split_tags(tags_csv),                 \
-                    build_schema_for(schema_type, name_str)});
-#include "tool_defs.def"
-#undef TOOL_ENTRY
-
-
-    dispatch::g_meta_handlers["ping"] = [](const mcp::JsonValue&) -> mcp::JsonValue {
-        return meta_ping_impl();
-    };
-    dispatch::g_meta_handlers["search_tools"] = [&index](const mcp::JsonValue& args) -> mcp::JsonValue {
-        return meta_search_tools_impl(args, index);
-    };
-    dispatch::g_meta_handlers["list_categories"] = [&catalog](const mcp::JsonValue&) -> mcp::JsonValue {
-        return meta_list_categories_impl(catalog);
-    };
-    dispatch::g_meta_handlers["get_tool_detail"] = [&catalog](const mcp::JsonValue& args) -> mcp::JsonValue {
-        return meta_get_tool_detail_impl(args, catalog);
-    };
-    dispatch::g_meta_handlers["call_tool"] = [](const mcp::JsonValue& args) -> mcp::JsonValue {
-        std::string name = args.Find("name") != nullptr ? args["name"].GetString() : "";
-        mcp::JsonValue j = meta_call_tool_wait(name, meta_call_tool_impl(args));
-        if (!name.empty()) {
-            LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, name + " completed");
-        }
-        return j;
-    };
-    dispatch::g_meta_handlers["batch_execute"] = [](const mcp::JsonValue& args) -> mcp::JsonValue {
-        return meta_batch_execute_impl(args);
-    };
-    dispatch::g_meta_handlers["code_execute"] = [](const mcp::JsonValue& args) -> mcp::JsonValue {
-        return meta_code_execute_impl(args);
-    };
-
-
-    if (catalog.get_tool("batch_execute") == nullptr) {
-        catalog.add_tool({"batch_execute",
-            "Execute multiple tools in batch. Each operation runs in sequence; if stop_on_error is true and any operation fails, remaining operations are skipped.",
-            "System", {"batch", "execute", "multi"},
-            build_schema_for(SCHEMA_BASIC, "batch_execute")
-        });
-    }
-    if (catalog.get_tool("call_tool") == nullptr) {
-        catalog.add_tool({"call_tool",
-            "Execute any tool by name. Use this to call all non-meta tools (scene_*, property_*, signal_*, system_status).",
-            "System", {"call", "dispatch", "proxy"},
-            build_schema_for(SCHEMA_BASIC, "call_tool")
-        });
-    }
-    if (catalog.get_tool("code_execute") == nullptr) {
-        catalog.add_tool({"code_execute",
-            "Execute arbitrary GDScript code. The source code is wrapped in a script that extends Node, compiled, attached to a temporary node, and executed. Returns the function result serialized as JSON. By default the source is inlined inside the _run() function body: top-level func definitions are not supported — inline all code as expressions/statements, or define named functions and call one via function_name (multi-function mode). Execution environment exposes SceneRoot (the edited scene root node) for node access; see SceneRoot.get_node(\"Child\").",
-            "System", {"code", "execute", "script", "gdscript"},
-            build_schema_for(SCHEMA_BASIC, "code_execute")
-        });
+    for (auto* t : g_active_registry->all_any()) {
+        index.add_entry(t->meta().name, t->meta().description, t->meta().category, t->meta().tags);
     }
 
-
-    for (auto* tool : catalog.get_all_tools()) {
-        index.add_entry(tool->name, tool->description, tool->category, tool->tags);
+    for (auto* t : g_active_registry->all()) {
+        std::string name = t->meta().name;
+        dispatch::g_handlers[name] = [name](const mcp::JsonValue& a) -> mcp::JsonValue {
+            return g_active_registry->find(name)->execute(a);
+        };
+    }
+    for (auto* t : g_active_registry->all_meta()) {
+        std::string name = t->meta().name;
+        dispatch::g_meta_handlers[name] = [name](const mcp::JsonValue& a) -> mcp::JsonValue {
+            return g_active_registry->find_meta(name)->execute(a);
+        };
     }
 
     auto count = catalog.size();
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-        std::to_string(count) + " tools registered via catalog");
-
-
-    int missing_from_catalog = 0;
-    for (auto& [name, _] : dispatch::g_handlers) {
-        if (catalog.get_tool(name) == nullptr) {
-            LogSystem::instance().log(LogLevel::Warning, LogCategory::Tools,
-                "handler missing catalog entry, using Auto: " + name);
-            catalog.add_tool({name, name, "Auto", {"auto"}, make_schema()});
-            ++missing_from_catalog;
-        }
-    }
-    if (missing_from_catalog > 0) {
-        LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-            std::to_string(missing_from_catalog) + " handlers auto-added to catalog");
-    }
-
-
-    for (auto* ctool : catalog.get_all_tools()) {
-        if (dispatch::g_handlers.find(ctool->name) == dispatch::g_handlers.end() && dispatch::meta_tool_names.find(ctool->name) == dispatch::meta_tool_names.end()) {
-            LogSystem::instance().log(LogLevel::Error, LogCategory::Tools,
-                "tool '" + ctool->name + "' exists in catalog but has no handler in g_handlers");
-        }
-    }
+        std::to_string(count) + " tools registered via registry");
 }
+
+ToolRegistry& get_active_registry() { return *g_active_registry; }
 
 }

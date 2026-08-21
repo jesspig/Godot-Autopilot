@@ -6,7 +6,7 @@ tags:
   - 构建
   - CMake
   - 部署
-timestamp: "2026-08-17T01:03:27+08:00"
+timestamp: "2026-08-22T01:38:08+08:00"
 resource:
   - CMakeLists.txt
   - CMakePresets.json
@@ -16,7 +16,7 @@ resource:
 
 # 构建体系（build）
 
-> 审计日期：2026-08-17（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 补 YAML frontmatter 并复核 add_library 源数量），基于当前工作树文件逐项核对（不依赖 git 历史）。
+> 审计日期：2026-08-22（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 补 YAML frontmatter 并复核 add_library 源数量；08-22 随版本号收敛为根 `VERSION` 单一来源同步），基于当前工作树文件逐项核对（不依赖 git 历史）。
 > 事实来源：`build.py`（205 行）、`CMakeLists.txt`（144 行）、`CMakePresets.json`、`cmake/` 全部 6 个模块、`.env.template`、根 `README.md` / `README_zh.md` / `AGENTS.md` 构建段。
 
 ## 命令速查表
@@ -25,12 +25,24 @@ resource:
 |---|---|
 | `uv run build.py` | Debug：配置 + 构建 + 部署到 `Example/addons/godot-autopilot/` |
 | `uv run build.py --release` | 先清理，再 Release 配置 + 构建 + 部署 |
-| `uv run build.py --release --package` | Release 构建部署后，再打包 `dist/godot-autopilot-0.1.0.zip` |
+| `uv run build.py --release --package` | Release 构建部署后，再打包 `dist/godot-autopilot-<version>.zip` |
 | `uv run build.py --package` | 仅打包已部署的 addons（不触发构建，未部署则报错退出） |
 | `uv run build.py --debug` | 显式 Debug（默认即为 Debug） |
 | `cmake --preset debug && cmake --build --preset debug` | 手动构建（不部署） |
 
 约束：`--release` 与 `--debug` 互斥，同时指定报错退出（`build.py:174`）。
+
+## 版本号单一来源（根 `VERSION` 文件）
+
+版本号只在根目录 `VERSION` 文件维护一处，其余全部派生：
+
+| 消费方 | 方式 |
+|---|---|
+| `CMakeLists.txt` | `project()` 前 `file(READ ...)` 读入并 `string(STRIP)`，作为 `project(... VERSION ...)` 实参 |
+| C++（MCP `server_info`、`system_status.version`） | `configure_file(src/core/version.hpp.in → <build>/generated/version.hpp @ONLY)` 生成 `GDA_VERSION` 字符串宏；`server_context.cpp` / `register_all.cpp` 包含 `<version.hpp>` 引用 |
+| `build.py` | `ADDON_VERSION = (PROJECT_ROOT / "VERSION").read_text().strip()`，用于打包产物名 |
+
+升版流程：只改 `VERSION` 文件内容即可（重新 configure 后生效）。
 
 ## 构建流水线（build.py）
 
@@ -60,7 +72,7 @@ resource:
 
 ### 5. 打包 `_package_addon()`（`build.py:141-155`)
 
-将 `Example/addons/godot-autopilot/` 打包为 `dist/godot-autopilot-0.1.0.zip`（`ADDON_VERSION = "0.1.0"`，与 `project()` 版本一致）。
+将 `Example/addons/godot-autopilot/` 打包为 `dist/godot-autopilot-<version>.zip`（`ADDON_VERSION` 读自根目录 `VERSION` 文件——版本号单一来源，与 `project()` 版本一致）。
 
 ## 产物清单
 
@@ -71,7 +83,7 @@ resource:
 | `libgodot-autopilot.dylib` | 同上 | macOS |
 | `godot-autopilot.pdb` | 同上（Windows，存在时复制） | 调试符号 |
 | `godot-autopilot.gdextension` | 部署目录（每次部署重新生成） | 入口 `entry_symbol = "GDExtensionEntryPoint"`、`compatibility_minimum = "4.3"`、`[libraries]` 6 条平台路径（windows/linux/macos × debug/release，均为 `x86_64`） |
-| `dist/godot-autopilot-0.1.0.zip` | `dist/` | `--package` 产物 |
+| `dist/godot-autopilot-<version>.zip` | `dist/` | `--package` 产物（版本号取自根 `VERSION` 文件） |
 
 部署目录：`Example/addons/godot-autopilot/`（README 的 `Example/` 与 build.py 内部路径 `example/` 在 Windows 大小写不敏感文件系统下为同一目录）。
 

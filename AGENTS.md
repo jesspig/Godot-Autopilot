@@ -9,6 +9,7 @@
 - 预设 (`CMakePresets.json`): `debug`, `release`（均为 Ninja）
 - **切勿删除 `build/<preset>/_deps/`** — 缓存已获取的依赖项（godot-cpp、mcp-cpp-sdk、googletest）
 - **添加新 .cpp 时必须在 `CMakeLists.txt` 的 `add_library()` 中加入**，否则 Unity 构建也不会包含
+- **版本号单一来源**：根 `VERSION` 文件——CMake `project()` 经 `file(READ)` 读取、`configure_file` 生成 `GDA_VERSION` 宏（`server_info`/`system_status.version` 引用）、`build.py` 运行时读取；升版只改该文件并重新 configure
 
 ## 架构
 
@@ -16,24 +17,25 @@
 - **线程模型**：HTTP 线程（mcp-cpp-sdk 0.3.x 自研网络栈）→ `CommandQueue::submit()` → Godot 主线程（在 `_process()` 中排空）
 - **所有 Godot API 调用必须通过 `queue.submit()`** — 从 HTTP 线程直接调用会崩溃
 - **MCP 端口**：9527，端点 `/mcp`。解析优先级：环境变量 `GODOT_AUTOPILOT_PORT` > `user://godot_autopilot/config.json`（`PluginConfig`，配置面板 Apply 后持久化）> 默认 9527——环境变量优先保证测试/CI 不受面板配置影响
-- **元工具（7 个）**：直接在 `server.RegisterTool()` 注册，不经过 `call_tool`：
+- **工具注册**：`ToolRegistry` 单一来源。全部工具为 `ToolBase` 对象——336 域工具（26 个 `src/tools/<域>_tools.hpp`，用宏 `GDA_TOOL_CLASS` / `GDA_TOOL_CLASS_SIDE` 生成独立 ToolBase 子类，`make_tools()` 提供）+ `system_status`（FnTool）+ 7 元工具（`MetaTool`，实现 `IMetaTool` 标记接口即元工具）。`register_all.cpp` 注册 26 域 `make_tools()` + `system_status`，并 `ToolRegistry::add()` 7 元（依 `dynamic_cast<IMetaTool*>` 自动归类，另有 `add_meta` 兼容）。catalog/index、BM25 index、`g_handlers`、`g_meta_handlers`、`RegisterTool` 全从 registry 派生，`get_active_registry()` 暴露活跃 registry
+- **元工具（7 个，顶层 MCP 工具，不经过 `call_tool`）**：
   `ping`、`search_tools`、`list_categories`、`get_tool_detail`、`call_tool`、`batch_execute`、`code_execute`
-- **领域工具（332 个，数量随插件版本变化，以 MCP search_tools 返回为准）**：通过 `call_tool` 代理，由 `register_all.cpp` 中的 `g_handlers` 映射分发。完整 schema 在 `ToolCatalog` 中
-- **工具总数**：339 = 7 元 + 332 领域（数量随插件版本变化，以 MCP search_tools 返回为准）；`ToolCatalog` 条目 343（另含 `system_status` 与 3 个 meta 快照）
+- **领域工具（336 个，经 `call_tool` 代理分发）**：为 `ToolBase` 子类，完整 schema 在 `ToolCatalog` 中
+- **工具总数**：343 = 7 元 + 336 领域（`system_status` 为 FnTool，非顶层工具）；`ToolCatalog`/BM25 index 条目 344（= 336 域 + `system_status` + 7 元）
 - **入口点**：`src/main.cpp` → `GDExtensionEntryPoint` 注册类与 `GodotAutopilotPlugin(EditorPlugin)`；`ServerContext` 由插件 `_enter_tree()` 启动、`_exit_tree()` 停止
 - **关键工具函数**：`VariantJson::serialize/deserialize` (`util/variant_json.hpp`) 用于 `godot::Variant` ↔ `mcp::JsonValue` 互转
 - **错误模式**：领域工具返回 `{"error": "消息"}` JSON；`call_tool` 元工具检查 `error` 字段并设 `is_error = true`
 
 ## 添加工具
 
-需要四处修改：
+流程（`ToolRegistry` 单一来源，无 def）：
 
-1. 在 `src/tools/<category>_ops.hpp` 声明：`mcp::JsonValue handle_xxx(const mcp::JsonValue& args);`，命名空间 `godot_autopilot::<category>_ops`
-2. 在 `src/tools/<category>_ops.cpp` 实现处理函数
-3. 在 `src/tools/tool_defs.def` 加一行 `TOOL_ENTRY(id, "tool_name", "desc", "Category", "tags", <category>_ops::handle_xxx, SCHEMA_BASIC|SCHEMA_NONE)`——`register_all.cpp` 把 def include 两次，宏自动写入 `g_handlers` 与 `ToolCatalog`，**register_all.cpp 无需手改**；SCHEMA_BASIC 时还需在 `src/tools/schema_*_ops.cpp` 的 fill 表加 `schema::build_schema({ParamDef...})` 条目（SCHEMA_NONE 走回退：scene_tree_* 自动补 `group`、tilemap_* 补 `node_path`，否则空表）
-4. 在 `CMakeLists.txt` 的 `add_library()` 中添加新的 `.cpp`
+1. 在 `src/tools/<category>_ops.hpp` 声明 `mcp::JsonValue handle_xxx(const mcp::JsonValue& args);`（命名空间 `godot_autopilot::<category>_ops`），并在 `<category>_ops.cpp` 实现处理函数
+2. 在该域 `src/tools/<category>_tools.hpp` 用宏 `GDA_TOOL_CLASS`（有副作用用 `GDA_TOOL_CLASS_SIDE`）声明独立 ToolBase 子类并入该域 `make_tools()`——`register_all.cpp` 自动注册，无需手改
+3. 新增 `.cpp` 时加入根 `CMakeLists.txt` 的 `add_library()`，并同步加入 `tests/CMakeLists.txt` 的 `GDA_UNIT_BUSINESS_SOURCES`（header-only 则无需）
+4. 带副作用时：在枚举 `SideEffect`（None/WritesFile/WritesConfig/ShowsAlert/ModifiesWindow/Process）中选定值并用 `GDA_TOOL_CLASS_SIDE` 标记——自动被遍历排除，无需手改排除清单
 
-元工具（`ping`/`search_tools`/`list_categories`/`get_tool_detail`/`call_tool`/`batch_execute`/`code_execute`）例外：直接 `server.RegisterTool()` 注册，不进 def。
+schema 由 `tool_input_schema(name, basic)` 单一源提供（转发 `build_schema_for`，SCHEMA_NONE/basic 沿用）。元工具（7 个 `MetaTool`）不在此流程内：实现 `IMetaTool` 标记接口即可，`ToolRegistry::add()` 依 `dynamic_cast<IMetaTool*>` 自动归类；`get_tool_detail` 响应含 `side_effect` 字段。
 
 **命名约定**：`<动词>_<类别>_<维度>_<对象>_<修饰>`（snake_case，动词置首，如 `create_scene_node`、`intersect_physics_2d_ray`、`set_input_map_action_deadzone`；动词 get/set/create/add/remove/apply/play/stop 等置首，段数随粒度变化）
 
@@ -49,19 +51,19 @@
 
 - **启用**：`GDA_ENABLE_TESTS` 已固化在 `CMakePresets.json` 的 debug/release 预设（默认 ON）——清理或重建 `build/` 后 `uv run build.py` / `cmake --preset debug` 自动恢复测试，无需手动传参（裸 `cmake` 不带 preset 时默认 OFF）
 - **运行**：`ctest --preset debug`（L1 秒级；L2 全量约 2 分钟，需 Godot 路径）；单文件：`build/debug/tests/gda_test_runner.exe --file 01_scene`
-- **结构**：L1 = `gda_unit_tests`（72 个 gtest，不启动引擎，含 339 工具注册管线断言，数量随插件版本变化）；L2 = `gda_test_runner` + `tests/config/*.json`（5 个用例文件，每文件一次 headless 编辑器生命周期最小闭环，经真实 MCP HTTP）
+- **结构**：L1 = `gda_unit_tests`（78 个 gtest，不启动引擎，含 344 工具注册管线断言，数量随插件版本变化）；L2 = `gda_test_runner` + `tests/config/*.json`（5 个用例文件，每文件一次 headless 编辑器生命周期最小闭环，经真实 MCP HTTP）
 - **新增 JSON 用例 = 新增 `tests/config/*.json`，零 C++ 改动**；schema / CLI / 排除清单全量文档在 `tests/README.md`
 - **Godot 路径**：环境变量 `GODOT_PATH` 或仓库根 `.env`（复制 `.env.template`）；缺失时 L2 全部失败/跳过
-- **全工具遍历**：`03_tools_contract.json` 对 332 领域工具做空参契约 + 启发式冒烟（数量随插件版本变化，以 MCP search_tools 返回为准；约 410 步为静态推算，以运行时统计为准，约 2-3 分钟）
-- **34 个副作用工具被遍历排除**（`show_os_alert` / `write_file` / `save_editor_scene` / `display_*` 等，清单在 `tests/runner/traversal.cpp`）——新增工具若写配置/文件/弹窗/改窗口，必须同步加入排除清单，否则遍历会污染 Example 项目或干扰桌面
+- **全工具遍历**：`03_tools_contract.json` 对 336 领域工具做空参契约 + 启发式冒烟（数量随插件版本变化，以 `*_tools.hpp` 枚举为准；实测约 546 步，以运行时统计为准，约 2-3 分钟）
+- **35 个副作用工具被遍历排除**：`SideEffect` 枚举（None/WritesFile/WritesConfig/ShowsAlert/ModifiesWindow/Process）标记工具，用 `GDA_TOOL_CLASS_SIDE` 隐式携带——`get_tool_detail` 响应含 `side_effect` 字段，`tests/runner/traversal.cpp` 依该字段自动排除（不再硬编码名单）并从 `*_tools.hpp` 枚举 336 工具名——新增工具带副作用时用 `GDA_TOOL_CLASS_SIDE` 标记即自动进入排除
 - **引擎副作用**：L2 运行后 `Example/project.godot` 会被 headless 编辑器自动追加 `[audio]` 段（并生成 `default_bus_layout.tres`）或 `[input]` 段（输入映射）等自动保存内容，无害但弄脏工作区；`git checkout -- Example/project.godot` 清理（`default_bus_layout.tres` 如生成需手动删除）
 
 ## 知识局限
 
 - **无 CI**（`.github/` 不存在）
-- **schema 覆盖**：非空/空数以运行时统计为准（由 `tests/unit/register_all_test.cpp` 的 `SchemaStatisticsBaseline` 运行时统计断言，不硬编码数量；def 层面静态：SCHEMA_NONE=208 / SCHEMA_BASIC=124）；**3 个契约缺口**：`create_scene_node`（name/type 有默认值不校验必填）、`get_resource_extensions`（缺 type 返回全类型）、`reimport_resource_files`（空参 count=0 静默成功）——遍历测试记 warnings 不 FAIL
+- **schema 覆盖**：非空/空数以运行时统计为准（由 `tests/unit/register_all_test.cpp` 的 `SchemaStatisticsBaseline` 运行时统计断言，不硬编码数量；schema 由 `tool_input_schema(name, basic)` 单一源经 `build_schema_for` 生成，SCHEMA_NONE/basic 沿用）；**3 个契约缺口**：`create_scene_node`（name/type 有默认值不校验必填）、`get_resource_extensions`（缺 type 返回全类型）、`reimport_resource_files`（空参 count=0 静默成功）——遍历测试记 warnings 不 FAIL
 - **目标引擎版本**：Godot 4.7；常见 API 迁移事实：`TileSet.get_tile_data` 属 `TileSetAtlasSource.get_tile_data(source_id→atlas_coords, alternative)`；`AnimatedSprite2D` 属性名为 `sprite_frames`（`frames` 自 4.0 起更名）；`motion_mode` 枚举 GROUNDED=0/FLOATING=1
-- **领域工具分 23 类**（`tool_defs.def` 实测：Render 49、Physics 47、Display 24、Editor 22、Resources 21、Audio 20、Input 19、OS 16、Debug 16、Navigation 15、Config 13、Scene 12、Scripts 10、Text 10、Debugger 7、TileMap 7、Game 7、Properties 5、Docs 4、Group 3、SpriteFrames 3、System 1、Capture 1；InputMap 并入 Input）——README.md 的类别表已同步
+- **领域工具分 23 类**（以 catalog/registry 运行统计为准，`*_tools.hpp` 实测：Render 49、Physics 47、Display 24、Editor 23、Resources 22、Audio 20、Input 19、OS 18、Debug 16、Navigation 15、Config 13、Scene 12、Scripts 10、Text 10、Debugger 7、TileMap 7、Game 7、Properties 5、Docs 4、Group 3、SpriteFrames 3、System 1、Capture 1；合计 336，InputMap 并入 Input；`get_debug_object_info` 归 Debug 类）——README.md 的类别表已同步
 - **3 个模块无独立 .hpp**：`environment_ops.cpp`、`display_window_ops.cpp`、`runtime_game_ops.cpp` 分别复用 `render_ops.hpp`/`display_ops.hpp`/`runtime_ops.hpp`
 - **`code_execute.timeout_ms` 无上限钳制**：schema 声称 max 30000，实现仅 `static_cast<int>`；对比 `runtime_game_ops` 有 `GDA_MAX_TIMEOUT_MS` 钳制
 - **DNS rebinding 保护**（mcp-cpp-sdk 0.3.1 起）：HttpServer 默认只允许 Host 为 `localhost`/`127.0.0.1`/`::1` 的请求，其余返回 403（`StreamableHttpServerTransport` 未开放 `allowed_hosts` 配置）——MCP 客户端必须连 `127.0.0.1:9527`，局域网 IP 直连会被拒

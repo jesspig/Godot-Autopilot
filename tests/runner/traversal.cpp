@@ -4,9 +4,11 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
+#include <string>
 #include <utility>
 
 #ifndef PROJECT_ROOT
@@ -14,52 +16,6 @@
 #endif
 
 namespace {
-
-// ── 34 工具排除清单 ──
-// 迁移自 tool_schema_contract_test.cpp 的 kPersistentSideEffectTools。
-// 历史事故：set_editor_main_scene 曾把 application/run/main_scene 写成 "test"
-// 写入 Example/project.godot；save_editor_scene 空参生成 Example/NewNode.tscn；
-// show_os_alert 弹系统模态对话框；set_display_clipboard 覆盖系统剪贴板；
-// speak_display_tts 系统朗读。两类工具在空参与冒烟两个遍历中一律跳过。
-const char* const kExcludedSideEffectTools[] = {
-    // ── 持久磁盘副作用（写 project.godot / editor_settings / .tscn / 文件） ──
-    "set_editor_main_scene",
-    "set_editor_plugin_enabled",
-    "save_project_settings",
-    "add_input_map_action_event",
-    "save_input_map",
-    "set_editor_settings",
-    "save_editor_scene",
-    "save_editor_scenes",
-    "save_editor_scene_as",
-    "write_file",
-    "create_script",
-    "save_resource",
-
-    // ── 用户可见副作用（弹窗/进程/环境变量/音频/剪贴板/鼠标/窗口） ──
-    "show_os_alert",
-    "show_display_dialog",
-    "create_os_process",
-    "execute_os_process",
-    "kill_os_process",
-    "open_os_path",
-    "move_os_file_to_trash",
-    "set_os_environment",
-    "speak_display_tts",
-    "stop_display_tts",
-    "set_display_clipboard",
-    "set_display_mouse_mode",
-    "warp_display_mouse",
-    "set_display_window_title",
-    "set_display_window_position",
-    "set_display_window_size",
-    "set_display_window_mode",
-    "set_display_window_flag",
-    "move_display_window_to_foreground",
-    "request_display_window_attention",
-    "create_display_window",
-    "delete_display_window",
-};
 
 const char* kModeEmptyArgs = "empty_args";
 const char* kModeHeuristicSmoke = "heuristic_smoke";
@@ -166,49 +122,59 @@ void print_stats(const std::string& mode, const gda_test::TraversalStats& s,
 namespace gda_test {
 
 std::vector<std::string> parse_domain_tool_names() {
-    const std::string path =
-        std::string(PROJECT_ROOT) + "/src/tools/tool_defs.def";
-    std::ifstream in(path);
-    if (!in.is_open()) {
-        throw std::runtime_error("无法打开 " + path);
+    const std::filesystem::path dir =
+        std::filesystem::path(std::string(PROJECT_ROOT)) / "src" / "tools";
+    if (!std::filesystem::exists(dir) ||
+        !std::filesystem::is_directory(dir)) {
+        throw std::runtime_error("工具源目录不存在或非目录: " + dir.string());
     }
     std::vector<std::string> names;
-    std::string line;
-    size_t line_no = 0;
-    while (std::getline(in, line)) {
-        ++line_no;
-        const size_t p = line.find("TOOL_ENTRY(");
-        if (p == std::string::npos)
+    for (const auto& entry : std::filesystem::directory_iterator(dir)) {
+        const std::string fname = entry.path().filename().string();
+        if (!entry.is_regular_file() ||
+            entry.path().extension() != ".hpp" ||
+            !(fname.size() >= 10 &&
+              fname.compare(fname.size() - 10, 10, "_tools.hpp") == 0)) {
             continue;
-        const size_t comma = line.find(',', p);
-        if (comma == std::string::npos) {
-            throw std::runtime_error(path + ":" + std::to_string(line_no) +
-                                     " 含 TOOL_ENTRY( 但缺逗号，无法解析工具名");
         }
-        const size_t q1 = line.find('"', comma);
-        if (q1 == std::string::npos) {
-            throw std::runtime_error(path + ":" + std::to_string(line_no) +
-                                     " 缺工具名引号字段，无法解析工具名");
+        const std::string file_path = entry.path().string();
+        std::ifstream in(file_path);
+        if (!in.is_open()) {
+            throw std::runtime_error("无法打开 " + file_path);
         }
-        const size_t q2 = line.find('"', q1 + 1);
-        if (q2 == std::string::npos) {
-            throw std::runtime_error(path + ":" + std::to_string(line_no) +
-                                     " 工具名引号字段未闭合，无法解析工具名");
+        std::string line;
+        size_t line_no = 0;
+        while (std::getline(in, line)) {
+            ++line_no;
+            const size_t p = line.find("GDA_TOOL_CLASS(");
+            if (p == std::string::npos)
+                continue;
+            const size_t comma = line.find(',', p);
+            if (comma == std::string::npos) {
+                throw std::runtime_error(file_path + ":" +
+                                         std::to_string(line_no) +
+                                         " 含 GDA_TOOL_CLASS( 但缺逗号，无法解析工具名");
+            }
+            const size_t q1 = line.find('"', comma);
+            if (q1 == std::string::npos) {
+                throw std::runtime_error(file_path + ":" +
+                                         std::to_string(line_no) +
+                                         " 缺工具名引号字段，无法解析工具名");
+            }
+            const size_t q2 = line.find('"', q1 + 1);
+            if (q2 == std::string::npos) {
+                throw std::runtime_error(file_path + ":" +
+                                         std::to_string(line_no) +
+                                         " 工具名引号字段未闭合，无法解析工具名");
+            }
+            names.push_back(line.substr(q1 + 1, q2 - q1 - 1));
         }
-        names.push_back(line.substr(q1 + 1, q2 - q1 - 1));
     }
     if (names.empty()) {
-        throw std::runtime_error(path + " 未解析出任何工具名");
+        throw std::runtime_error(
+            dir.string() + " 下未解析出任何工具名（未匹配 *_tools.hpp 或 GDA_TOOL_CLASS(）");
     }
     return names;
-}
-
-bool is_excluded_tool(const std::string& name) {
-    for (const char* excluded : kExcludedSideEffectTools) {
-        if (name == excluded)
-            return true;
-    }
-    return false;
 }
 
 TraversalStats run_traversal(McpTestClient& client, const std::string& mode,
@@ -232,18 +198,26 @@ TraversalStats run_traversal(McpTestClient& client, const std::string& mode,
     std::vector<std::string> non_object_names;
 
     for (const std::string& name : names) {
-        if (is_excluded_tool(name)) {
-            stats.excluded_names.push_back(name);
-            ++stats.excluded;
-            continue;
-        }
-
         mcp::JsonValue detail_args(mcp::JsonValue::object_tag);
         detail_args["name"] = mcp::JsonValue(name);
         const std::string detail_text =
             client.call_tool("get_tool_detail", detail_args.Dump());
         const mcp::JsonValue detail = mcp::JsonValue::Parse(detail_text);
         const auto* tool = detail.IsObject() ? detail.Find("tool") : nullptr;
+
+        // 副作用判定：读取 get_tool_detail 返回的 tool.side_effect，非空即排除
+        std::string side_effect;
+        if (detail.IsObject() && tool && tool->IsObject()) {
+            const auto* se = tool->Find("side_effect");
+            if (se && se->IsString())
+                side_effect = se->GetString();
+        }
+        if (!side_effect.empty()) {
+            stats.excluded_names.push_back(name);
+            ++stats.excluded;
+            continue;
+        }
+
         if (!detail.IsObject() || !tool || !tool->IsObject()) {
             StepResult sr;
             sr.passed = false;

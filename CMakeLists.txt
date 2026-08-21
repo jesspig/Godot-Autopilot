@@ -30,7 +30,10 @@ if(NOT DEFINED CACHE{CMAKE_CXX_COMPILER})
     endif()
 endif()
 
-project(Godot-Autopilot VERSION 0.1.0 LANGUAGES C CXX)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" GDA_VERSION)
+string(STRIP "${GDA_VERSION}" GDA_VERSION)
+
+project(Godot-Autopilot VERSION ${GDA_VERSION} LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_AUTOMOC OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -56,6 +59,8 @@ include(Lto)
 # ====================================================================
 # godot-autopilot — SHARED (GDExtension)
 # ====================================================================
+configure_file(src/core/version.hpp.in "${CMAKE_BINARY_DIR}/generated/version.hpp" @ONLY)
+
 add_library(godot-autopilot SHARED
     src/main.cpp
     src/core/mode_detector.cpp
@@ -128,7 +133,9 @@ add_library(godot-autopilot SHARED
     src/ui/mcp_log_dock.cpp
     src/ui/mcp_config_dock.cpp)
 
-target_include_directories(godot-autopilot PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_include_directories(godot-autopilot PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_BINARY_DIR}/generated)
 
 target_link_libraries(godot-autopilot PRIVATE godot-cpp mcp-server mcp-http)
 if(MSVC)

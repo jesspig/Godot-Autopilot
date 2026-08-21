@@ -14,9 +14,11 @@
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/resource_saver.hpp>
 #include <godot_cpp/classes/resource_uid.hpp>
+#include <godot_cpp/classes/script.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
 #include <string>
+#include <vector>
 
 namespace godot_autopilot {
 namespace resource_ops {
@@ -862,6 +864,69 @@ mcp::JsonValue handle_list_dir(const mcp::JsonValue &args) {
   return r;
 }
 
+namespace {
+
+struct RefHit {
+  bool path;
+  bool uid;
+  bool klass;
+};
+
+godot::String make_token(const char *prefix, const std::string &value) {
+  return godot::String(prefix) + godot::String(value.c_str()) + "\"";
+}
+
+std::string join_path(const std::string &dir, const std::string &name) {
+  return dir + (dir.empty() || dir.back() == '/' ? std::string() : "/") + name;
+}
+
+void collect_text_file_paths(const std::string &dir,
+                             std::vector<std::string> &out) {
+  godot::Ref<godot::DirAccess> da =
+      godot::DirAccess::open(godot::String(dir.c_str()));
+  if (da.is_null()) {
+    return;
+  }
+  da->list_dir_begin();
+  godot::String entry = da->get_next();
+  while (entry != godot::String()) {
+    if (entry != "." && entry != "..") {
+      if (da->current_is_dir()) {
+        collect_text_file_paths(join_path(dir, util::to_std(entry)), out);
+      } else if (entry.ends_with(".tscn") || entry.ends_with(".tres")) {
+        out.push_back(join_path(dir, util::to_std(entry)));
+      }
+    }
+    entry = da->get_next();
+  }
+  da->list_dir_end();
+}
+
+RefHit scan_reference_tokens(const godot::String &content,
+                             const std::string &target_path,
+                             const std::string &target_uid,
+                             const std::string &target_class) {
+  RefHit hit;
+  hit.path = false;
+  hit.uid = false;
+  hit.klass = false;
+  if (!target_path.empty()) {
+    const godot::String tok = make_token("path=\"", target_path);
+    hit.path = content.contains(tok);
+  }
+  if (!target_uid.empty()) {
+    const godot::String tok = make_token("uid=\"", target_uid);
+    hit.uid = content.contains(tok);
+  }
+  if (!target_class.empty()) {
+    const godot::String tok = make_token("script_class=\"", target_class);
+    hit.klass = content.contains(tok);
+  }
+  return hit;
+}
+
+} // namespace
+
 mcp::JsonValue handle_get_uid(const mcp::JsonValue &args) {
   auto *it_path = args.Find("path");
   if (!it_path || !it_path->IsString()) {
@@ -973,6 +1038,45 @@ mcp::JsonValue handle_rename(const mcp::JsonValue &args) {
   }
   std::string from = it_from->GetString();
   std::string to = it_to->GetString();
+  const std::string from_uid_path = from + ".uid";
+  const std::string to_uid_path = to + ".uid";
+
+  auto *loader = godot::ResourceLoader::get_singleton();
+
+  int64_t old_uid = -1;
+  std::string old_uid_str;
+  if (loader) {
+    old_uid = loader->get_resource_uid(godot::String(from.c_str()));
+    if (old_uid >= 0) {
+      old_uid_str = std::to_string(old_uid);
+    }
+  }
+
+  const bool uid_sidecar_absent =
+      !godot::FileAccess::file_exists(godot::String(from_uid_path.c_str()));
+  godot::Error uid_err = godot::OK;
+  if (!uid_sidecar_absent) {
+    uid_err = godot::DirAccess::rename_absolute(
+        godot::String(from_uid_path.c_str()),
+        godot::String(to_uid_path.c_str()));
+  }
+
+  std::vector<std::string> text_files;
+  collect_text_file_paths("res://", text_files);
+  std::vector<std::pair<std::string, RefHit>> deps;
+  for (const std::string &fp : text_files) {
+    godot::Ref<godot::FileAccess> fa = godot::FileAccess::open(
+        godot::String(fp.c_str()), godot::FileAccess::READ);
+    if (fa.is_null()) {
+      continue;
+    }
+    const godot::String content = fa->get_as_text();
+    const RefHit hit =
+        scan_reference_tokens(content, from, old_uid_str, std::string());
+    if (hit.path || hit.uid || hit.klass) {
+      deps.emplace_back(fp, hit);
+    }
+  }
 
   godot::Error err = godot::DirAccess::rename_absolute(
       godot::String(from.c_str()), godot::String(to.c_str()));
@@ -982,10 +1086,118 @@ mcp::JsonValue handle_rename(const mcp::JsonValue &args) {
     return r;
   }
 
+  int64_t new_uid = -1;
+  std::string new_uid_str;
+  if (loader) {
+    new_uid = loader->get_resource_uid(godot::String(to.c_str()));
+    if (new_uid >= 0) {
+      new_uid_str = std::to_string(new_uid);
+    }
+  }
+  const bool uid_changed =
+      new_uid >= 0 && old_uid >= 0 && new_uid != old_uid;
+
+  struct UpdatedFileRec {
+    std::string file;
+    std::vector<std::string> changes;
+  };
+  struct StaleRefRec {
+    std::string file;
+    std::string reason;
+  };
+  std::vector<UpdatedFileRec> updated;
+  std::vector<StaleRefRec> stale;
+
+  for (const auto &dep : deps) {
+    const std::string &fp = dep.first;
+    const RefHit &hit = dep.second;
+    godot::String content;
+    {
+      godot::Ref<godot::FileAccess> fa = godot::FileAccess::open(
+          godot::String(fp.c_str()), godot::FileAccess::READ);
+      if (fa.is_null()) {
+        stale.push_back({fp, "无法读取文件"});
+        continue;
+      }
+      content = fa->get_as_text();
+    }
+    std::vector<std::string> changes;
+    bool needs_write = false;
+
+    if (hit.path) {
+      const godot::String old_tok = make_token("path=\"", from);
+      const godot::String new_tok = make_token("path=\"", to);
+      if (content.contains(old_tok)) {
+        content = content.replace(old_tok, new_tok);
+        needs_write = true;
+        changes.emplace_back("path");
+      }
+    }
+
+    if (hit.uid && uid_changed && !new_uid_str.empty()) {
+      const godot::String old_tok = make_token("uid=\"", old_uid_str);
+      const godot::String new_tok = make_token("uid=\"", new_uid_str);
+      if (content.contains(old_tok)) {
+        content = content.replace(old_tok, new_tok);
+        needs_write = true;
+        changes.emplace_back("uid");
+      }
+    }
+
+    if (hit.klass) {
+      stale.push_back({fp, "未改写 script_class，需人工确认全局类名"});
+    }
+
+    if (!needs_write) {
+      continue;
+    }
+    godot::Ref<godot::FileAccess> writer = godot::FileAccess::open(
+        godot::String(fp.c_str()), godot::FileAccess::WRITE);
+    if (writer.is_null() || !writer->store_string(content)) {
+      stale.push_back({fp, "写入失败"});
+      continue;
+    }
+    writer->flush();
+    writer->close();
+    godot::Ref<godot::FileAccess> checker = godot::FileAccess::open(
+        godot::String(fp.c_str()), godot::FileAccess::READ);
+    if (checker.is_null() ||
+        !checker->get_as_text().contains(make_token("path=\"", to))) {
+      stale.push_back({fp, "写入未提交（原文件未更新）"});
+      continue;
+    }
+    updated.push_back({fp, std::move(changes)});
+  }
+
+  const bool uid_preserved = uid_sidecar_absent || uid_err == godot::OK;
+
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["result"] = mcp::JsonValue(static_cast<int64_t>(err));
+  mcp::JsonValue updated_arr(mcp::JsonValue::array_tag);
+  for (auto &u : updated) {
+    mcp::JsonValue item(mcp::JsonValue::object_tag);
+    item["file"] = mcp::JsonValue(u.file);
+    mcp::JsonValue cs(mcp::JsonValue::array_tag);
+    for (const std::string &c : u.changes) {
+      cs.PushBack(mcp::JsonValue(c));
+    }
+    item["changes"] = std::move(cs);
+    updated_arr.PushBack(std::move(item));
+  }
+  r["updated_files"] = std::move(updated_arr);
+  mcp::JsonValue stale_arr(mcp::JsonValue::array_tag);
+  for (const auto &s : stale) {
+    mcp::JsonValue item(mcp::JsonValue::object_tag);
+    item["file"] = mcp::JsonValue(s.file);
+    item["reason"] = mcp::JsonValue(s.reason);
+    stale_arr.PushBack(std::move(item));
+  }
+  r["stale_references"] = std::move(stale_arr);
+  r["uid_preserved"] = mcp::JsonValue(uid_preserved);
+
   godot::String from_gs(from.c_str());
   godot::String to_gs(to.c_str());
 
-  auto *loader = godot::ResourceLoader::get_singleton();
   if (loader && loader->has_cached(from_gs)) {
     auto cached = loader->get_cached_ref(from_gs);
     if (cached.is_valid()) {
@@ -1005,9 +1217,64 @@ mcp::JsonValue handle_rename(const mcp::JsonValue &args) {
       efs->update_file(to_gs);
     }
   }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue(static_cast<int64_t>(err));
   return r;
+}
+
+mcp::JsonValue handle_get_references(const mcp::JsonValue &args) {
+  std::string target_path;
+  auto *it_path = args.Find("path");
+  if (it_path && it_path->IsString()) {
+    target_path = it_path->GetString();
+  }
+  std::string target_uid;
+  auto *it_uid = args.Find("uid");
+  if (it_uid && it_uid->IsString()) {
+    target_uid = it_uid->GetString();
+  }
+  std::string target_class;
+  auto *it_class = args.Find("class_name");
+  if (it_class && it_class->IsString()) {
+    target_class = it_class->GetString();
+  }
+  if (target_path.empty() && target_uid.empty() && target_class.empty()) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue(
+        "missing target: provide one of path, uid or class_name");
+    return e;
+  }
+
+  std::vector<std::string> text_files;
+  collect_text_file_paths("res://", text_files);
+  mcp::JsonValue result(mcp::JsonValue::array_tag);
+  for (const std::string &fp : text_files) {
+    godot::Ref<godot::FileAccess> fa = godot::FileAccess::open(
+        godot::String(fp.c_str()), godot::FileAccess::READ);
+    if (fa.is_null()) {
+      continue;
+    }
+    const godot::String content = fa->get_as_text();
+    const RefHit hit = scan_reference_tokens(
+        content, target_path, target_uid, target_class);
+    if (hit.path || hit.uid || hit.klass) {
+      mcp::JsonValue item(mcp::JsonValue::object_tag);
+      item["file"] = mcp::JsonValue(fp);
+      mcp::JsonValue matched(mcp::JsonValue::array_tag);
+      if (hit.path) {
+        matched.PushBack(mcp::JsonValue("path"));
+      }
+      if (hit.uid) {
+        matched.PushBack(mcp::JsonValue("uid"));
+      }
+      if (hit.klass) {
+        matched.PushBack(mcp::JsonValue("script_class"));
+      }
+      item["matched"] = std::move(matched);
+      result.PushBack(std::move(item));
+    }
+  }
+  mcp::JsonValue ret(mcp::JsonValue::object_tag);
+  ret["result"] = std::move(result);
+  return ret;
 }
 
 mcp::JsonValue handle_get_dependencies(const mcp::JsonValue &args) {
