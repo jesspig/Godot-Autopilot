@@ -58,7 +58,8 @@ file(GLOB_RECURSE GDA_UNIT_SOURCES CONFIGURE_DEPENDS
 if(GDA_UNIT_SOURCES)
     add_executable(gda_unit_tests ${GDA_UNIT_SOURCES} ${GDA_UNIT_BUSINESS_SOURCES})
 
-    target_include_directories(gda_unit_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    target_include_directories(gda_unit_tests PRIVATE
+        ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
     # mcp-client: register_all_test.cpp 使用 McpClient::Create/ListTools/Close
     # 做 ListTools 往返断言 (SDK 测试链接组合为 mcp-client + mcp-server)
     target_link_libraries(gda_unit_tests PRIVATE

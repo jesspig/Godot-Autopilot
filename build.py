@@ -31,7 +31,7 @@ PLATFORM_LIBS: dict[str, str] = {
 
 PLATFORM_PDB = "godot-autopilot.pdb"
 
-ADDON_VERSION = "0.1.0"
+ADDON_VERSION = (PROJECT_ROOT / "VERSION").read_text(encoding="utf-8").strip()
 
 
 def _run(cmd: list[str], cwd: Path | None = None) -> bool:
