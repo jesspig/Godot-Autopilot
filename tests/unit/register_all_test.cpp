@@ -13,6 +13,7 @@
 #include "tools/dispatch.hpp"
 #include "tools/register_all.hpp"
 #include "tools/tool_catalog.hpp"
+#include "tools/tool_registry.hpp"
 #include "util/bm25_index.hpp"
 
 #include <string>
@@ -242,4 +243,28 @@ TEST_F(RegisteredServerFixture, TwoIndependentServersRegisterIdentically) {
 
 TEST_F(RegisteredServerFixture, Bm25IndexPopulatedAfterRegistration) {
   EXPECT_EQ(index.size(), catalog.size());
+}
+
+TEST_F(RegisteredServerFixture, RegistryIsSingleSourceOfTools) {
+  auto& reg = godot_autopilot::get_active_registry();
+
+  EXPECT_EQ(reg.meta_size(), kMetaToolCount);
+
+  EXPECT_EQ(reg.all_any().size(), catalog.size());
+
+  for (const char* name : kMetaToolNames) {
+    EXPECT_NE(reg.find_meta(name), nullptr) << "missing meta tool: " << name;
+  }
+
+  EXPECT_NE(reg.find("system_status"), nullptr);
+
+  for (auto* t : reg.all_any()) {
+    EXPECT_NE(catalog.get_tool(t->meta().name), nullptr)
+        << "registry tool missing from catalog: " << t->meta().name;
+  }
+
+  for (const auto* tool : catalog.get_all_tools()) {
+    EXPECT_NE(reg.find_any(tool->name), nullptr)
+        << "catalog entry missing from registry: " << tool->name;
+  }
 }

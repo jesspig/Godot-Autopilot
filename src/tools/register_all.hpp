@@ -3,15 +3,21 @@
 
 #include "core/command_queue.hpp"
 #include "tools/tool_catalog.hpp"
+#include "tools/tool_registry.hpp"
 #include "util/bm25_index.hpp"
 #include <chrono>
 #include <mcp/JsonValue.hpp>
 #include <mcp/server/McpServer.hpp>
+#include <string>
 
 namespace godot_autopilot {
 
 void register_all_tools(mcp::McpServer &server, CommandQueue &queue,
                         ToolCatalog &catalog, Bm25Index &index, int port);
+
+ToolRegistry& get_active_registry();
+
+mcp::JsonValue tool_input_schema(const std::string& name, bool basic);
 
 } // namespace godot_autopilot
 
