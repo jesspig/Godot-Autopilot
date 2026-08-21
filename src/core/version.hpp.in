@@ -1,0 +1,3 @@
+#pragma once
+
+#define GDA_VERSION "@PROJECT_VERSION@"

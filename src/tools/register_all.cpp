@@ -1,6 +1,7 @@
 #include "register_all.hpp"
 #include "core/export_guard.hpp"
 #include "core/log_system.hpp"
+#include <version.hpp>
 #include "tools/audio_ops.hpp"
 #include "tools/capture_ops.hpp"
 #include "tools/code_exec_ops.hpp"
@@ -301,7 +302,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
             auto uptime = std::chrono::duration_cast<std::chrono::seconds>(
                 std::chrono::steady_clock::now() - start).count();
             mcp::JsonValue status(mcp::JsonValue::object_tag);
-            status["version"] = mcp::JsonValue("0.1.0");
+            status["version"] = mcp::JsonValue(GDA_VERSION);
             status["port"] = mcp::JsonValue(static_cast<int64_t>(port));
             status["uptime_seconds"] = mcp::JsonValue(static_cast<int64_t>(uptime));
             status["running"] = mcp::JsonValue(true);

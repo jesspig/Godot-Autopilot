@@ -2,6 +2,7 @@
 #include "config.hpp"
 #include "log_system.hpp"
 #include "plugin_config.hpp"
+#include <version.hpp>
 #include "prompts/debugger_prompts.hpp"
 #include "prompts/prompt_handlers.hpp"
 #include "resources/debugger_resources.hpp"
@@ -55,7 +56,7 @@ bool ServerContext::start() {
         std::make_shared<mcp::StreamableHttpServerTransport>(http_opts);
 
     mcp::ServerOptions opts;
-    opts.server_info = mcp::Implementation{"godot-autopilot", "0.1.0"};
+    opts.server_info = mcp::Implementation{"godot-autopilot", GDA_VERSION};
     opts.on_method_called = [this](std::string_view method) {
       LogSystem::instance().log(LogLevel::Debug, LogCategory::Transport,
                                 "MCP request: " + std::string(method));
