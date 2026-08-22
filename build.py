@@ -72,8 +72,8 @@ def _generate_gdextension() -> None:
         'windows.release.x86_64 = "res://addons/godot-autopilot/godot-autopilot.dll"\n'
         'linux.debug.x86_64 = "res://addons/godot-autopilot/godot-autopilot.so"\n'
         'linux.release.x86_64 = "res://addons/godot-autopilot/godot-autopilot.so"\n'
-        'macos.debug.x86_64 = "res://addons/godot-autopilot/godot-autopilot.dylib"\n'
-        'macos.release.x86_64 = "res://addons/godot-autopilot/godot-autopilot.dylib"\n',
+        'macos.debug.universal = "res://addons/godot-autopilot/libgodot-autopilot.dylib"\n'
+        'macos.release.universal = "res://addons/godot-autopilot/libgodot-autopilot.dylib"\n',
         encoding="utf-8",
     )
     print(f"  godot-autopilot.gdextension  (generated)", flush=True)
@@ -138,8 +138,32 @@ def _validate_addon_integrity() -> None:
         sys.exit(1)
 
 
-def _package_addon() -> None:
-    if not EXAMPLE_ADDON_DIR.exists():
+def _collect_platform_libs(libs_dir: Path) -> int:
+    collected = 0
+    for lib_name in PLATFORM_LIBS.values():
+        matches = list(libs_dir.rglob(lib_name))
+        if not matches:
+            continue
+        shutil.copy2(matches[0], EXAMPLE_ADDON_DIR / lib_name)
+        print(f"  {lib_name}  <- {matches[0].relative_to(libs_dir)}", flush=True)
+        collected += 1
+    return collected
+
+
+def _package_addon(libs_dir: Path | None = None) -> None:
+    if libs_dir is not None:
+        EXAMPLE_ADDON_DIR.mkdir(parents=True, exist_ok=True)
+        for f in EXAMPLE_ADDON_DIR.glob("~*"):
+            f.unlink(missing_ok=True)
+        count = _collect_platform_libs(libs_dir)
+        if count != len(PLATFORM_LIBS):
+            print(
+                f"[ERROR] Expected {len(PLATFORM_LIBS)} platform libraries under {libs_dir}, found {count}",
+                flush=True,
+            )
+            sys.exit(1)
+        _generate_gdextension()
+    elif not EXAMPLE_ADDON_DIR.exists():
         print("[ERROR] Addons not deployed; run a build first (e.g. uv run build.py)", flush=True)
         sys.exit(1)
     dist_dir = PROJECT_ROOT / "dist"
@@ -169,15 +193,25 @@ def main():
     parser.add_argument("--release", action="store_true", help="Release build (default: Debug)")
     parser.add_argument("--debug", action="store_true", help="Debug build (default)")
     parser.add_argument("--package", action="store_true", help="Package addons as dist/godot-autopilot-<version>.zip")
+    parser.add_argument(
+        "--libs-dir",
+        type=Path,
+        default=None,
+        help="Collect cross-platform libraries from this directory before packaging (requires --package)",
+    )
     args = parser.parse_args()
 
     if args.release and args.debug:
         print("[ERROR] Cannot specify both --release and --debug", flush=True)
         sys.exit(1)
 
+    if args.libs_dir is not None and not args.package:
+        print("[ERROR] --libs-dir requires --package", flush=True)
+        sys.exit(1)
+
     if args.package and not args.release and not args.debug:
         print("[PACKAGE] Packaging existing addons...", flush=True)
-        _package_addon()
+        _package_addon(args.libs_dir)
         return
 
     config = "Release" if args.release else "Debug"
@@ -196,7 +230,7 @@ def main():
     _deploy(preset)
 
     if args.package:
-        _package_addon()
+        _package_addon(args.libs_dir)
 
     print(f"\n[DONE] Build + deploy complete.", flush=True)
 
