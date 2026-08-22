@@ -17,7 +17,7 @@
 - **线程模型**：HTTP 线程（mcp-cpp-sdk 0.3.x 自研网络栈）→ `CommandQueue::submit()` → Godot 主线程（在 `_process()` 中排空）
 - **所有 Godot API 调用必须通过 `queue.submit()`** — 从 HTTP 线程直接调用会崩溃
 - **MCP 端口**：9527，端点 `/mcp`。解析优先级：环境变量 `GODOT_AUTOPILOT_PORT` > `user://godot_autopilot/config.json`（`PluginConfig`，配置面板 Apply 后持久化）> 默认 9527——环境变量优先保证测试/CI 不受面板配置影响
-- **工具注册**：`ToolRegistry` 单一来源。全部工具为 `ToolBase` 对象——336 域工具（26 个 `src/tools/<域>_tools.hpp`，用宏 `GDA_TOOL_CLASS` / `GDA_TOOL_CLASS_SIDE` 生成独立 ToolBase 子类，`make_tools()` 提供）+ `system_status`（FnTool）+ 7 元工具（`MetaTool`，实现 `IMetaTool` 标记接口即元工具）。`register_all.cpp` 注册 26 域 `make_tools()` + `system_status`，并 `ToolRegistry::add()` 7 元（依 `dynamic_cast<IMetaTool*>` 自动归类，另有 `add_meta` 兼容）。catalog/index、BM25 index、`g_handlers`、`g_meta_handlers`、`RegisterTool` 全从 registry 派生，`get_active_registry()` 暴露活跃 registry
+- **工具注册**：`ToolRegistry` 单一来源。全部工具为 `ToolBase` 对象——336 域工具（26 个 `src/tools/<域>_tools.hpp`，用宏 `GDA_TOOL_CLASS` / `GDA_TOOL_CLASS_SIDE` 生成独立 ToolBase 子类，`make_tools()` 提供）+ `system_status`（FnTool）+ 7 元工具（`MetaTool`，实现 `IMetaTool` 标记接口即元工具）。`register_all.cpp` 注册 26 域 `make_tools()` + `system_status`，并 `ToolRegistry::add()` 7 元（依 `dynamic_cast<IMetaTool*>` 自动归类）。catalog/index、BM25 index、`g_handlers`、`g_meta_handlers`、`RegisterTool` 全从 registry 派生，`get_active_registry()` 暴露活跃 registry
 - **元工具（7 个，顶层 MCP 工具，不经过 `call_tool`）**：
   `ping`、`search_tools`、`list_categories`、`get_tool_detail`、`call_tool`、`batch_execute`、`code_execute`
 - **领域工具（336 个，经 `call_tool` 代理分发）**：为 `ToolBase` 子类，完整 schema 在 `ToolCatalog` 中
@@ -51,7 +51,7 @@ schema 由 `tool_input_schema(name, basic)` 单一源提供（转发 `build_sche
 
 - **启用**：`GDA_ENABLE_TESTS` 已固化在 `CMakePresets.json` 的 debug/release 预设（默认 ON）——清理或重建 `build/` 后 `uv run build.py` / `cmake --preset debug` 自动恢复测试，无需手动传参（裸 `cmake` 不带 preset 时默认 OFF）
 - **运行**：`ctest --preset debug`（L1 秒级；L2 全量约 2 分钟，需 Godot 路径）；单文件：`build/debug/tests/gda_test_runner.exe --file 01_scene`
-- **结构**：L1 = `gda_unit_tests`（78 个 gtest，不启动引擎，含 344 工具注册管线断言，数量随插件版本变化）；L2 = `gda_test_runner` + `tests/config/*.json`（5 个用例文件，每文件一次 headless 编辑器生命周期最小闭环，经真实 MCP HTTP）
+- **结构**：L1 = `gda_unit_tests`（71 个 gtest，不启动引擎，含 344 工具注册管线断言，数量随插件版本变化）；L2 = `gda_test_runner` + `tests/config/*.json`（5 个用例文件，每文件一次 headless 编辑器生命周期最小闭环，经真实 MCP HTTP）
 - **新增 JSON 用例 = 新增 `tests/config/*.json`，零 C++ 改动**；schema / CLI / 排除清单全量文档在 `tests/README.md`
 - **Godot 路径**：环境变量 `GODOT_PATH` 或仓库根 `.env`（复制 `.env.template`）；缺失时 L2 全部失败/跳过
 - **全工具遍历**：`03_tools_contract.json` 对 336 领域工具做空参契约 + 启发式冒烟（数量随插件版本变化，以 `*_tools.hpp` 枚举为准；实测约 546 步，以运行时统计为准，约 2-3 分钟）
