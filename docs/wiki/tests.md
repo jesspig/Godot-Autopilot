@@ -6,13 +6,13 @@ tags:
   - 测试
   - L1
   - L2
-timestamp: "2026-08-22T06:57:00+08:00"
+timestamp: "2026-08-22T15:10:00+08:00"
 resource: tests/
 ---
 
 # 测试体系（tests/）
 
-> 审计日期：2026-08-22（2026-08-12 初稿；08-17 随客户端配置生成器测试同步并补 YAML frontmatter；08-20 随 +4 工具与新 L2 用例 `05_rename_references` 同步；08-21 随 ToolRegistry 单测复核；08-22 随测试瘦身同步——L1 78→71、SCHEMA 静态口径失效），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 审计日期：2026-08-22（2026-08-12 初稿；08-17 随客户端配置生成器测试同步并补 YAML frontmatter；08-20 随 +4 工具与新 L2 用例 `05_rename_references` 同步；08-21 随 ToolRegistry 单测复核；08-22 随测试瘦身同步——L1 78→71、SCHEMA 静态口径失效；08-22 15 时全量一致性审计——L1 分文件计数修正、L2 用例数 6、排除清单分组 12+22+1、步数对齐实测 546），基于当前工作树代码逐行核对（不依赖 git 历史）。
 > 覆盖范围：`tests/` 全部（unit 10 文件、runner 7 实现 + 6 头文件、integration、config 6 JSON、`tests/CMakeLists.txt`），对照 `tests/README.md` 与仓库根 `AGENTS.md` 测试段逐条核算。未运行任何测试，所有数值均来自源码静态统计。
 
 ## 架构总览
@@ -72,29 +72,29 @@ stdout/stderr 各接独立管道读线程持续消费，防 64KB 缓冲写满阻
 
 ## L1 单元测试
 
-**10 个测试文件，实际 77 个 TEST/TEST_F**（`TEST`/`TEST_F` 宏逐行统计）：
+**10 个测试文件，实际 71 个 TEST/TEST_F**（`TEST`/`TEST_F` 宏逐行统计，2026-08-22 复核）：
 
 | 文件 | 数量 | 主题 |
 |---|---|---|
 | `bm25_index_test.cpp` | 14 | BM25 检索：命中排序、分类/标签过滤、空查询、上限截断 |
-| `register_all_test.cpp` | 13 | 注册管线：7 元工具 ListTools 往返、catalog 覆盖、schema 基线、未知工具错误、幂等重注册、双服务器一致性 |
-| `schema_builder_test.cpp` | 10 | schema 构造形状、required 位置、未知类型不崩溃 |
+| `register_all_test.cpp` | 14 | 注册管线：7 元工具 ListTools 往返、catalog 覆盖、schema 基线、未知工具错误、幂等重注册、双服务器一致性 |
+| `client_config_gen_test.cpp` | 11 | 8 客户端配置文件渲染快照（URL/type/enabled）、JSON 合并三态（新建/保留其他键/非法）、TOML 追加与跳过 |
 | `command_queue_test.cpp` | 7 | 跨线程 submit/drain、异常经 future 传播、主线程记录 |
 | `tool_catalog_test.cpp` | 7 | add/get、重复覆盖、并发安全、默认工具填充一次 |
-| `log_system_test.cpp` | 6 | 单例、级别/分类/文本过滤、环形缓冲覆盖 |
-| `client_config_gen_test.cpp` | 11 | 8 客户端配置文件渲染快照（URL/type/enabled）、JSON 合并三态（新建/保留其他键/非法）、TOML 追加与跳过 |
+| `log_system_test.cpp` | 5 | 单例、级别/分类/文本过滤、环形缓冲覆盖（08-22 清理删回调用例） |
+| `tool_registry_test.cpp` | 5 | ToolBase/FnTool/ToolRegistry：add/find/categories、execute echo、角色接口助手、meta 注册与路由断言 |
+| `schema_builder_test.cpp` | 4 | schema 构造形状、required 位置、未知类型不崩溃（08-22 清理后 API 收敛为三件，用例收缩） |
 | `error_util_test.cpp` | 3 | 错误 JSON 形状、四字段详情 |
 | `runtime_ops_test.cpp` | 1 | 编辑器队列注入往返 |
-| `tool_registry_test.cpp` | 4 | ToolBase/FnTool/ToolRegistry：add/find/categories、execute echo、角色接口助手、meta 注册 |
-| **合计** | **77** | |
+| **合计** | **71** | |
 
 **链接来源**（`tests/CMakeLists.txt:31-46` 的 `GDA_UNIT_BUSINESS_SOURCES`，共 14 个显式 + 1 组 glob）：`src/core/` 的 `log_system`、`resource_registry`、`scene_dirty_tracker`、`export_guard`；`src/util/` 的 `bm25_index`、`error_util`、`readback_util`、`variant_json`、`client_config_gen`；`src/tools/` 的 `tool_catalog`、`schema_builder`、`register_all`、`dispatch`、`debugger_access`；`src/tools/*_ops.cpp`（`GDA_TOOLS_OPS_SOURCES` glob，`register_all.cpp` 引用全部 `handle_xxx` 符号故必须链接）。
 
-**约束**：L1 禁止调用任何已注册工具 handler（无引擎时 godot-cpp 接口指针为 nullptr 会崩溃）；`register_all_test` 仅测注册/分发/未知工具错误路径。`SchemaStatisticsBaseline`（`register_all_test.cpp:133-147`）为运行时统计：断言 schema 非空数 > 空数 > 0，**不硬编码具体数值**（AGENTS.md 声称的 "283 非空 / 73 空" 是运行时观测值而非断言常量）。`client_config_gen` 为纯 C++（仅 std + `mcp::JsonValue`），不触碰 Godot API，可安全纳入 L1。
+**约束**：L1 禁止调用任何已注册工具 handler（无引擎时 godot-cpp 接口指针为 nullptr 会崩溃）；`register_all_test` 仅测注册/分发/未知工具错误路径。`SchemaStatisticsBaseline`（`register_all_test.cpp:133-147`）为运行时统计：断言 schema 非空数 > 空数 > 0，**不硬编码具体数值**（历史观测值如 "283 非空 / 73 空" 仅为某次运行的快照，非断言常量）。`client_config_gen` 为纯 C++（仅 std + `mcp::JsonValue`），不触碰 Godot API，可安全纳入 L1。
 
 ## L2 配置驱动用例
 
-**5 个用例文件 → 5 条 ctest 用例**（`tests/CMakeLists.txt:105-114`：`gda_runner_<文件名去后缀>`，`TIMEOUT 600`）：
+**6 个用例文件 → 6 条 ctest 用例**（`tests/CMakeLists.txt:105-114`：`gda_runner_<文件名去后缀>`，`TIMEOUT 600`）：
 
 | ctest 用例 | 文件 | name | 步骤数 | 内容 |
 |---|---|---|---|---|
@@ -118,23 +118,23 @@ stdout/stderr 各接独立管道读线程持续消费，防 64KB 缓冲写满阻
 - **崩溃检测**：每步调用后查编辑器进程存活，进程死亡 → `fatal_error`（附 2000 字符日志）
 - 统计输出：调用总数 / 通过 / 失败 / result / error / "missing required" / 跳过（无 properties）/ 排除（副作用）
 
-### 步数核算（vs AGENTS.md 的 "约 408 步"）
+### 步数核算（与 AGENTS.md "约 546 步" 对齐）
 
 - 每次遍历候选 = 336 − 35 排除 = **301 个非排除工具**
 - empty_args：301 个调用、每个产生 1 个步骤
-- heuristic_smoke：301 个候选 − 无 properties 的工具跳过数；按 def 静态推算（SCHEMA_NONE=208，其中被排除 22 个）≈ 112 个步骤
-- 两次遍历合计 ≈ **413 个步骤**（精确值取决于运行时空 schema 数，以运行时统计为准，08-20 随 +4 工具上浮）
+- heuristic_smoke：301 个候选中跳过无 properties 的工具，步骤数取决于运行时空 schema 数
+- **08-21 全量真类化后实测 ≈546 步**（AGENTS.md/README 同口径）；精确值随运行时统计浮动，以 `03_tools_contract` 运行输出为准
 - 耗时：`tests/README.md` 称 "约 2-3 分钟"（两次全量遍历 + 两次全量 get_tool_detail 的 HTTP 往返量级）。
 
-### 35 工具排除清单（`traversal.cpp:24-63`，实测 35 = 13 + 22，名单与 README/AGENTS.md 逐项一致；08-20 新增 `build_csharp_assembly`）
+### 35 工具排除清单（`GDA_TOOL_CLASS_SIDE` 标记驱动，实测 35 = 12 + 22 + 1；08-21 起由 `side_effects()` 自动排除，不再硬编码名单）
 
-**持久磁盘副作用（13）**——写 project.godot / editor_settings / .tscn / 文件（08-20 起含进程副作用的 `build_csharp_assembly`）：
+**持久磁盘副作用（12）**——写 project.godot / editor_settings / .tscn / 文件：
 
 ```
 set_editor_main_scene  set_editor_plugin_enabled  save_project_settings
 add_input_map_action_event  save_input_map  set_editor_settings
 save_editor_scene  save_editor_scenes  save_editor_scene_as
-build_csharp_assembly  write_file  create_script  save_resource
+write_file  create_script  save_resource
 ```
 
 **用户可见副作用（22）**——弹窗/进程/环境变量/音频/剪贴板/鼠标/窗口：
@@ -147,6 +147,8 @@ build_csharp_assembly  write_file  create_script  save_resource
 | 音频/语音 | 2 | `speak_display_tts`、`stop_display_tts` |
 | 剪贴板/鼠标 | 3 | `set_display_clipboard`、`set_display_mouse_mode`、`warp_display_mouse` |
 | 窗口操作 | 9 | `set_display_window_title`、`set_display_window_position`、`set_display_window_size`、`set_display_window_mode`、`set_display_window_flag`、`move_display_window_to_foreground`、`request_display_window_attention`、`create_display_window`、`delete_display_window` |
+
+**进程副作用（1）**：`build_csharp_assembly`（08-20 新增）。
 
 历史事故（README 记载）：`set_editor_main_scene` 曾把 `application/run/main_scene` 写成 `"test"` 写入 `Example/project.godot`；`save_editor_scene` 空参生成 `Example/NewNode.tscn`。**新增工具若写配置/文件/弹窗/改窗口，必须同步加入此清单**，否则遍历会污染 Example 项目或干扰桌面。
 
@@ -164,12 +166,12 @@ build_csharp_assembly  write_file  create_script  save_resource
 
 | 条目 | AGENTS.md 声称 | 源码核算 | 结论 |
 |---|---|---|---|
-| L1 gtest 数量 | 61 | 71（08-22 清理后：log_system 回调用例删除、schema_builder/bm25_index 用例收缩） | 配置面板 +11；ToolRegistry 单测 +5；清理 -7 |
-| L2 用例文件数 | 5 | 6（00_meta / 01_scene / 02_property / 03_tools_contract / 04_resources_scripts / 05_rename_references） | 08-20 新增 05 |
+| L1 gtest 数量 | 71（历史：61→78→71，08-22 清理删 log_system 回调用例、schema_builder 用例收缩） | 71（逐文件宏统计见上表） | 一致 |
+| L2 用例文件数 | 6（00_meta / 01_scene / 02_property / 03_tools_contract / 04_resources_scripts / 05_rename_references；08-20 新增 05） | 6 | 一致 |
 | ctest L2 用例 | gda_runner_<name> | 一致（`tests/CMakeLists.txt:108-114`，TIMEOUT 600；05 由 GLOB 自动发现） | 一致 |
-| 遍历工具数 | 332 | 336（`*_tools.hpp` 的 `GDA_TOOL_CLASS(` 计数） | 08-21 真类化后改由头文件枚举 |
-| 排除工具数 | 34 | 35（`get_tool_detail` 的 `side_effect` 字段非空即排除，08-21 起由工具 `side_effects()`/`GDA_TOOL_CLASS_SIDE` 驱动，不再硬编码） | 08-21 副作用驱动 |
-| 03 遍历步数 | 约 408 步 | **实测 546**（08-21 全量真类化后 run，336 工具含冒烟） | 运行时统计口径 |
+| 遍历工具数 | 336 | 336（26 个 `*_tools.hpp` 的 `GDA_TOOL_CLASS(_SIDE)` 计数） | 一致 |
+| 排除工具数 | 35 | 35（`get_tool_detail` 的 `side_effect` 字段非空即排除，由 `GDA_TOOL_CLASS_SIDE` 驱动，不硬编码） | 一致 |
+| 03 遍历步数 | 约 546 步 | **实测 546**（08-21 全量真类化后 run，336 工具含冒烟） | 运行时统计口径 |
 | 03 耗时 | 约 2-3 分钟 | README：约 2-3 分钟 | 一致 |
 | schema 非空/空数 | 运行时观测 | `SchemaStatisticsBaseline` 仅断言非空>空>0（08-22 起 SCHEMA_NONE/BASIC 静态枚举已删，`tool_input_schema` 的 basic 参数为 no-op） | 无法静态精确核算，属运行时观测值 |
 | 工具总结构 | 7 元 + 336 领域 | 7 元工具经 `ToolRegistry::add()`（IMetaTool 自动归类）+RegisterTool；336 领域/系统经 26 域 `make_tools()`；`g_handlers` 派生=337（336+system_status） | 单一来源 |
@@ -187,8 +189,8 @@ build_csharp_assembly  write_file  create_script  save_resource
 
 ## 审计发现的不一致点清单
 
-1. **03 遍历步数**：旧 AGENTS.md 称 "560 步"（348 工具口径），全量重命名后为 ≈408（297 空参 + ≈111 冒烟），新增 `reload_game_scripts` 后 ≈410（298 空参 + ≈112 冒烟），精确值随运行时空 schema 数变化，属运行时统计口径。
-2. **schema 空/非空数**：旧 283/73 为运行时观测值，`SchemaStatisticsBaseline` 不硬编码；重命名后 def 静态可数 SCHEMA_NONE=208 / SCHEMA_BASIC=124，catalog 级非空/空数以运行时观测为准。
+1. **03 遍历步数**：历史值 560（348 工具口径）→ ≈408 → ≈410 → **当前实测 ≈546**（336 工具含冒烟，08-21 全量真类化后 run）；精确值随运行时空 schema 数变化，属运行时统计口径。
+2. **schema 空/非空数**：旧 283/73 为运行时观测值，`SchemaStatisticsBaseline` 不硬编码；08-21 真类化 + 08-22 清理后 def/SCHEMA_NONE 静态口径整体废除（fill 表直出），catalog 级非空/空数以运行时观测为准。
 3. **引擎副作用**（非数值）：README 的 `[audio]` 段 / `default_bus_layout.tres` 声称无执行器代码佐证，属引擎行为，待验证。
 
 ## 相关页面

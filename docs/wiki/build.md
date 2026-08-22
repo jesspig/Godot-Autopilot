@@ -6,7 +6,7 @@ tags:
   - 构建
   - CMake
   - 部署
-timestamp: "2026-08-22T06:57:00+08:00"
+timestamp: "2026-08-22T15:10:00+08:00"
 resource:
   - CMakeLists.txt
   - CMakePresets.json
@@ -16,8 +16,8 @@ resource:
 
 # 构建体系（build）
 
-> 审计日期：2026-08-22（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 补 YAML frontmatter 并复核 add_library 源数量；08-22 随版本号收敛为根 `VERSION` 单一来源同步；08-22 随代码清理同步——Unity 构建接线生效、Lto.cmake 删 `GDA_LTO` 死变量），基于当前工作树文件逐项核对（不依赖 git 历史）。
-> 事实来源：`build.py`（205 行）、`CMakeLists.txt`（144 行）、`CMakePresets.json`、`cmake/` 全部 6 个模块、`.env.template`、根 `README.md` / `README_zh.md` / `AGENTS.md` 构建段。
+> 审计日期：2026-08-22（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 补 YAML frontmatter 并复核 add_library 源数量；08-22 随版本号收敛为根 `VERSION` 单一来源同步；08-22 随代码清理同步——Unity 构建接线生效、Lto.cmake 删 `GDA_LTO` 死变量；08-22 15 时全量一致性审计——CMakeLists 行数 157、端口覆盖行号、README ~343 口径对齐），基于当前工作树文件逐项核对（不依赖 git 历史）。
+> 事实来源：`build.py`（205 行）、`CMakeLists.txt`（157 行）、`CMakePresets.json`、`cmake/` 全部 6 个模块、`.env.template`、根 `README.md` / `README_zh.md` / `AGENTS.md` 构建段。
 
 ## 命令速查表
 
@@ -133,7 +133,7 @@ version 8；`debug`/`release` 两个 configure 预设：Ninja 生成器、`build
 | 变量 | 作用 | 生效方式 |
 |---|---|---|
 | `GODOT_PATH` | 定位 Godot 可执行文件（L2 引擎内测试） | 进程环境变量优先，为空才回退仓库根 `.env`（复制 `.env.template`，不入库）；二者皆缺 → L2 失败/跳过 |
-| `GODOT_AUTOPILOT_PORT` | 覆盖默认 MCP 端口 9527 | 运行时 `std::getenv`（`src/core/server_context.cpp:19`） |
+| `GODOT_AUTOPILOT_PORT` | 覆盖默认 MCP 端口 9527 | 运行时 `std::getenv`（`src/core/server_context.cpp:20`） |
 | `GDA_COMPILE_JOBS` / `GDA_LINK_JOBS` | 强制编译/链接并行度 | CACHE（`-D`）优先，其次进程环境变量 |
 | `CI` | 存在即 `GDA_IS_CI=ON` | 隐式；关闭 `-march=native` 以保证可复现 |
 | `GDA_UNITY_BUILD` / `GDA_UNITY_BATCH_SIZE` / `GDA_MAX_COMPILE_MEM_MB` / `GDA_MAX_LINK_MEM_MB` / `GDA_UNITY_MEM_MB` | Unity 与内存估算 | 仅 CMake 缓存参数（`-D`），**不支持环境变量** |
@@ -148,7 +148,7 @@ version 8；`debug`/`release` 两个 configure 预设：Ninja 生成器、`build
 - 依赖版本 `godot-cpp 10.0.0-rc1` / `mcp-cpp-sdk 0.3.1`、FetchContent 非子模块 ✓（`FetchDependencies.cmake:15,24`）；
 - 编译器优先 Clang/clang-cl、MSVC/GCC 回退 ✓（根 CMakeLists 自动探测 + `CompilerOptions.cmake` 分发）；
 - 优化自适应（sccache/ccache、LTO、Unity、Ninja 作业池）✓；**精度差异**：AGENTS.md 写"可通过 `GDA_COMPILE_JOBS` / `GDA_LINK_JOBS` 等环境变量覆盖"——实际仅这两个支持环境变量，`GDA_UNITY_BATCH_SIZE` 等内存参数只接受 `-D` CACHE；
-- **文档一致性**：`README_zh.md` 与 `README.md`（~339/23 类）及 [overview.md](./overview.md) 审计（339 = 7 元 + 332 领域）一致；`--package` / `--debug` 两个 build.py 参数在 README 构建章节未提及。
+- **文档一致性**：`README.md` / `README_zh.md` 工具数口径 "~343 / 23 类"（08-22 审计时由 "~339" 修正）及 [overview.md](./overview.md) 审计（343 = 7 元 + 336 领域；registry/catalog 344 含 `system_status`）一致；`--package` / `--debug` 两个 build.py 参数在 README 构建章节未提及。
 
 ## 关联页面
 

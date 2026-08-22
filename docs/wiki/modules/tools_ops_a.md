@@ -6,13 +6,13 @@ tags:
   - 模块
   - 领域工具
   - A组
-timestamp: "2026-08-21T10:00:00+08:00"
+timestamp: "2026-08-22T15:10:00+08:00"
 resource: src/tools/
 ---
 
 # 领域工具模块（src/tools/，A 组 13 模块）
 
-> 审计日期：2026-08-21（2026-08-12 初稿；08-17 补 YAML frontmatter；08-20 随 rename 事务化 + 新工具同步；08-21 随 ToolBase 类重构同步——`tool_defs.def`/`TOOL_ENTRY` 移除，注册与计数口径改为 `<域>_tools.hpp`/`ToolRegistry`），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 审计日期：2026-08-22（2026-08-12 初稿；08-17 补 YAML frontmatter；08-20 随 rename 事务化 + 新工具同步；08-21 随 ToolBase 类重构同步——`tool_defs.def`/`TOOL_ENTRY` 移除，注册与计数口径改为 `<域>_tools.hpp`/`ToolRegistry`；08-22 15 时全量一致性审计——editor 计数 23、RENAME_HINTS 10 条、resolve_scene_node/RidStore/rid_from_json/NODE_NOT_FOUND_HINT 归一至 util 共享头、get_docs_class 补 enums/constants），基于当前工作树代码逐行核对（不依赖 git 历史）。
 > 覆盖范围：`src/tools/` 下 13 对 `.cpp/.hpp`：scene_ops、scene_tree_ops、property_ops、group_ops、input_ops、input_map_ops、physics_ops、nav_ops、resource_ops、script_ops、config_ops、doc_ops、editor_ops。
 > 统计口径：工具数以 `src/tools/*_tools.hpp` 的 `GDA_TOOL_CLASS(`/`GDA_TOOL_CLASS_SIDE(` 声明计数为准（一个工具 = 一个 `ToolBase` 真类，`handle_` 函数与之逐一对应，两口径一致）；注册经 `register_all.cpp` 调用 26 组 `<域>_tools::make_tools()` 汇入单一 `ToolRegistry`。
 
@@ -103,7 +103,7 @@ resource: src/tools/
 - **Node 类型属性 + NodePath 自动转节点引用（08-20 起，P1-1 修复）**：`handle_set` 检测到目标属性 `type==OBJECT` 且 `hint==PROPERTY_HINT_RESOURCE_TYPE` 且 `hint_string` 指向 Node 子类时，若 `value` 为字符串（节点路径），以编辑场景根 `get_node()` 解析后赋**节点对象引用**（而非 NodePath Variant），使其在保存场景时正确落入 `node_paths` 数组、实例化后还原为节点引用。解析失败返回 `error_detail` 说明正确用法（传场景内有效路径，或改用 `code_execute` 直接赋节点引用）；成功结果带 `converted_node_path` 字段标注。判断辅助 `parse_hint_class`/`is_node_class`（容错 `Type:` 前缀、逗号 token）。
 - 写后 readback 校验：`util::check_readback` 返回 REJECTED 时 `error_detail` 报错（可能只读/不存在/需 type_hint），CONVERTED 时返回 `warning`。
 - Camera2D 特例：`enabled`（默认值 true 不序列化）与 `current`（无 setter，需 `code_execute` 调 `make_current()`）返回 `serialization_note` 指导。
-- 属性名纠错提示：Levenshtein 距离候选 + `PROPERTY_RENAME_HINTS` 重命名映射表（9 条，如 `frames→sprite_frames`、`cast_to→target_position`、`translation→position`，与 AGENTS.md 中 Godot 4.x 迁移事实一致）。
+- 属性名纠错提示：Levenshtein 距离候选 + `PROPERTY_RENAME_HINTS` 重命名映射表（10 条，如 `frames→sprite_frames`、`cast_to→target_position`、`rect_position→position`、`translation→position` 等，与 AGENTS.md 中 Godot 4.x 迁移事实一致；表定义在 `property_ops.cpp:64-75`）。
 - 信号连接默认 `persist=true`（CONNECT_PERSIST，随场景保存）；`signal_disconnect` 幂等（`not_connected` 不算错误）。
 
 ## group_ops（3 工具）
@@ -117,7 +117,7 @@ resource: src/tools/
 
 关键实现事实：
 
-- 路径解析 `find_node`：剥除前导 `/` 与 `root/` 前缀，`get_node_or_null` 解析，并沿父链校验节点确实挂在编辑场景根之下（防跨场景误操作）。
+- 路径解析 `find_node`：本地薄包装，转发 `util::resolve_scene_node`（`util/scene_path.hpp`，全仓 7 处 `find_node` 的归一实现）——依次剥除前导 `/`、`root`、场景根名三段，`get_node_or_null` 解析，并沿父链校验节点确实挂在编辑场景根之下（防跨场景误操作）。
 - 增删均走 `EditorUndoRedoManager`（`create_action` / `add_do_method` / `add_undo_method` / `commit_action`），无 undo manager 时直接操作。
 - `add_to_group(group, true)` 第二参持久化；操作后 `is_in_group` 反向校验，失败返回 `add_to_group failed: node is not in group after operation`。
 - 成功响应含 `persistent: true` 与 `node_path`/`group` 回显。
@@ -175,7 +175,7 @@ resource: src/tools/
 
 关键实现事实：
 
-- **RID 生命周期**：静态 `RidStore`（`std::unordered_map<int64_t, godot::RID>`）把 int64 句柄↔RID 双向映射并保活；跨请求传参一律用整数 id。注意 `create_physics_2d_circle_shape` 的工具描述明确提示：返回的是 `PhysicsServer2D` RID 句柄，**不可直接赋给 `CollisionShape2D.shape`**（其类型为 `Shape2D` 资源），需要挂载时用资源类工具或 `code_execute`。
+- **RID 生命周期**：`RidStore`（`std::unordered_map<int64_t, godot::RID>`，定义于 `util/rid_registry.hpp` 的 `rid_store<Physics>()` 模板标签实例——08-22 起跨域共享，text_ops 亦复用）把 int64 句柄↔RID 双向映射并保活；跨请求传参一律用整数 id。注意 `create_physics_2d_circle_shape` 的工具描述明确提示：返回的是 `PhysicsServer2D` RID 句柄，**不可直接赋给 `CollisionShape2D.shape`**（其类型为 `Shape2D` 资源），需要挂载时用资源类工具或 `code_execute`。
 - 2D/3D 成对命名（`*_physics_2d_*` / `*_physics_3d_*`）覆盖 20 对 + 空间查询，是命名最整齐的模块；`get_debug_object_info` 自 `resolve_object` 迁移而来（不再无前缀）。
 - 3D 空间查询参数类：`PhysicsRayQueryParameters3D` / `PhysicsShapeQueryParameters3D` / `PhysicsPointQueryParameters3D`（2D 同构）。
 - 变换参数解析：`parse_vec2/vec3`（`{x,y[,z]}` 对象）、`parse_t2d`（origin/rotation/scale）、`parse_basis`（3×3 数组），数值缺省为 0。
@@ -194,7 +194,7 @@ resource: src/tools/
 
 关键实现事实：
 
-- RID 经 `rid.get_id()` / `UtilityFunctions::rid_from_int64(id)` 跨 JSON 传递（int64），与 physics_ops 的字符串/整数风格不同（后者用进程内 RidStore）。
+- RID 跨 JSON 传递经 `util/json_godot.hpp` 的 `rid_to_json`/`rid_from_json` 封装（序列化形态为 `{"rid": <int64>}`，底层仍是 `UtilityFunctions::rid_from_int64`），与 physics_ops 的进程内 RidStore 风格不同。
 - 地图创建默认不激活（`map_set_active` 需显式传 `active: true`）；区域创建支持 `enabled`/`navigation_layers` 初始参数。
 - `set_nav_3d_region_navigation_mesh` 接受 `NavigationMesh` 资源（可经 `ResourceLoader` 加载路径传入）；路径返回点为 Vector2/Vector3 数组序列化（`{x,y[,z]}`）。
 
@@ -236,8 +236,8 @@ resource: src/tools/
 
 关键实现事实：
 
-- `handle_execute_gdscript`：`is_single_expression` 判定（无换行、非纯赋值、首词不在 18 个关键字黑名单如 if/for/func/return/var/await…）时自动把表达式值作为返回值；多行代码需显式 `return`；输出经 `truncate_capture_text` 截断至 8192 字节。
-- 节点路径提示常量：执行节点挂在 `/root` 下而非编辑场景内，`NODE_NOT_FOUND_HINT` 指导用 `SceneRoot.get_node(...)` 访问编辑场景节点。
+- `handle_execute_gdscript`：`is_single_expression` 判定（无换行、非纯赋值、首词不在 18 个关键字黑名单如 if/for/func/return/var/await…）时自动把表达式值作为返回值；多行代码需显式 `return`；输出经 `truncate_capture_text` 截断至 `MAX_CAPTURE_BYTES = 8192` 字节（两常量均定义于共享头 `util/gdscript_wrap.hpp`，与 code_exec_ops 共用）。
+- 节点路径提示常量：执行节点挂在 `/root` 下而非编辑场景内，`NODE_NOT_FOUND_HINT`（`util/gdscript_wrap.hpp`）指导用 `SceneRoot.get_node(...)` 访问编辑场景节点。
 - `handle_reload` 先 `invalidate_cached_resource`（`ResourceLoader` 缓存引用置空路径）再重载，避免旧资源残留。
 - 资源序列化 `serialize_resource` 返回 `class/path/object_id/object_id_str`（无 name）。
 
@@ -272,9 +272,9 @@ resource: src/tools/
 
 - 全部基于 `ClassDBSingleton`：`class_exists` / `get_parent_class` / `class_get_api_type` / `can_instantiate` / `class_get_method_list` / `class_get_property_list` / `class_get_signal_list`。
 - 自带 `variant_to_json` 序列化（BOOL/INT/FLOAT/STRING/字典/数组/打包数组，其余 `stringify()` 兜底），未复用 `VariantJson`。
-- `get_docs_class` 返回 `name/parent_class/api_type/can_instantiate/methods/properties/signals` 结构。
+- `get_docs_class` 返回 `name/parent_class/api_type/can_instantiate/methods/properties/signals` 结构，另含 `enums`/`constants` 两数组与 `note`（无 docstring 时提示）。
 
-## editor_ops（22 工具）
+## editor_ops（23 工具）
 
 职责：Godot 编辑器会话操作（EditorInterface/EditorSelection/EditorUndoRedoManager/EditorFileSystem）。注册工具：
 

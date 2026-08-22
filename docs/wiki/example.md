@@ -5,13 +5,13 @@ description: Example 文档/示例工程定位、project.godot 事实、文档�
 tags:
   - 示例工程
   - Example
-timestamp: "2026-08-17T01:03:27+08:00"
+timestamp: "2026-08-22T15:10:00+08:00"
 resource: Example/
 ---
 
 # 示例工程（Example/）
 
-> 审计日期：2026-08-17（2026-08-12 初稿；08-17 补 YAML frontmatter 并核对 project.godot），基于当前工作树 `Example/` 目录与文档核对。
+> 审计日期：2026-08-22（2026-08-12 初稿；08-17 补 YAML frontmatter 并核对 project.godot；08-22 15 时全量一致性审计——`[audio]` 段与 `default_bus_layout.tres` 已随清理消失，改注为"L2 运行后可能追加"；PNG 173 与 docs 6 篇复核），基于当前工作树 `Example/` 目录与文档核对。
 > 事实来源：`Example/project.godot`、`Example/docs/`（6 篇）、`Example/assets/` 目录枚举。
 
 ## 定位
@@ -33,16 +33,15 @@ resource: Example/
 | `[application]` | `config/name` | `Example` | 项目名 |
 | `[application]` | `config/features` | `PackedStringArray("4.7", "Forward Plus")` | 引擎版本 4.7、渲染方法 Forward Plus |
 | `[application]` | `config/icon` | `res://icon.svg` | 图标 |
-| `[audio]` | `buses/default_bus_layout` | `uid://c6hb2nshs2igl` | 音频总线布局引用（L2 测试运行后由 headless 编辑器追加） |
 | `[display]` | `window/stretch/mode` | `canvas_items` | 窗口伸缩模式 |
 | `[display]` | `window/stretch/aspect` | `expand` | 伸缩纵横比 |
 | `[dotnet]` | `project/assembly_name` | `Example` | .NET 程序集名 |
 | `[physics]` | `3d/physics_engine` | `Jolt Physics` | 3D 物理引擎：Jolt |
 | `[rendering]` | `rendering_device/driver.windows` | `d3d12` | Windows 渲染设备驱动：Direct3D 12 |
 | — | `run/main_scene` | （无） | **未配置主场景** |
-| — | `[input]` | （无） | **未配置输入动作** |
+| — | `[input]` / `[audio]` | （无） | **未配置**输入动作与音频总线（L2 运行后 headless 编辑器可能自动追加，`git checkout -- Example/project.godot` 可清理） |
 
-注：`[audio]` 段与 `default_bus_layout.tres` 是 L2 测试运行后 headless 编辑器自动保存的副作用（见 AGENTS.md 测试段），`git checkout -- Example/project.godot` 可清理。
+注：当前工作树 `project.godot` 无 `[audio]` 段、无 `default_bus_layout.tres`（上次 L2 副作用已被清理）；L2 再次运行后 headless 编辑器可能自动追加 `[audio]` 段并生成 `default_bus_layout.tres`（见 AGENTS.md 测试段），`git checkout -- Example/project.godot` + 手动删除 tres 可清理。
 
 ## 文档索引表（Example/docs/ 共 6 篇）
 

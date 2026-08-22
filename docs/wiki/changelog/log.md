@@ -4,6 +4,7 @@
 
 ## 2026-08-22
 
+- **全量代码-文档一致性审计**：零代码变更前提下逐页核对 24 个 wiki 页与 AGENTS/README/测试资产；修正 README ~339→~343、L1 分文件计数 77→71、L2 用例 5→6、监控项表 83→59、RENAME_HINTS 9→10、editor 计数 22→23、register_listener 注册类 4→6、排除清单分组 12+22+1、步数对齐实测 546；support.md 补四个 util 共享头小节；core/entry_runtime/build/overview 行号与语义残留清除。详见 `changelog/2026-08-22-log.md`
 - **大规模死代码清理与跨域去重**：删 ArgReader/IExportGuard/IAsync/make_ok·error/add_meta/to_tool_info_all/is_registered/get_queue/start_time_/GDA_*_READY_WAIT_MS 等死代码；新建 util/json_godot、rid_registry、type_hint、gdscript_wrap 四个 header-only 头；7 份 find_node 归一 resolve_scene_node（tilemap 获 root/ 剥离修复）、RidStore 归一、json_number 约 80 处收敛；register_all 删 25 冗余 include 与 build_schema_for_none_by_name，dispatch 元名单派生化；修复 restart 后 BM25 索引翻倍（index.clear()）；Unity 构建接线生效 batch=8；L1 71/71 + L2 77/77，净删约 1400 行/56 文件。详见 `changelog/2026-08-22-log.md`
 - **版本号单一来源化**：新增根 `VERSION` 文件为唯一真源；CMake `file(READ)` 喂 `project()`、`configure_file` 生成 `GDA_VERSION` 宏供 `server_info`/`system_status` 引用、`build.py` 运行时读取；版本升至 **0.2.0**；文档产物名泛化 `<version>` 占位。详见 `changelog/2026-08-22-log.md`
 

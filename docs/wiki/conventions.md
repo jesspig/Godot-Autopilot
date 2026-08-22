@@ -6,7 +6,7 @@ tags:
   - 约定
   - 命名
   - 规范
-timestamp: "2026-08-22T06:57:00+08:00"
+timestamp: "2026-08-22T15:10:00+08:00"
 ---
 
 # 工程约定
@@ -45,7 +45,7 @@ timestamp: "2026-08-22T06:57:00+08:00"
 
 1. `<category>_ops.hpp` 声明 `mcp::JsonValue handle_xxx(const mcp::JsonValue& args);`
 2. `<category>_ops.cpp` 实现（返回 `{"error": ...}` 或结果对象）
-3. 该域 `<category>_tools.hpp` 用 `GDA_TOOL_CLASS`（有副作用用 `GDA_TOOL_CLASS_SIDE`）声明独立 ToolBase 子类并入 `make_tools()`——`register_all.cpp` 自动注册，无需手改；schema 由 `tool_input_schema(name, basic)` 单一源（转发 `build_schema_for`，SCHEMA_NONE/basic 沿用）
+3. 该域 `<category>_tools.hpp` 用 `GDA_TOOL_CLASS`（有副作用用 `GDA_TOOL_CLASS_SIDE`）声明独立 ToolBase 子类并入 `make_tools()`——`register_all.cpp` 自动注册，无需手改；schema 由 `tool_input_schema(name, basic)` 单一源（转发 `build_schema_for`，`basic` 参数保留签名但已为 no-op）
 4. `CMakeLists.txt` `add_library()` 添加 `.cpp`（header-only 则无需）；带副作用（枚举 `SideEffect` 选值）用 `GDA_TOOL_CLASS_SIDE` 标记即自动进入遍历排除，无需手改 `tests/runner/traversal.cpp`
 
 ## 测试纪律
