@@ -8,6 +8,7 @@
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/editor_selection.hpp>
 #include <godot_cpp/classes/editor_settings.hpp>
+#include <godot_cpp/classes/global_constants.hpp>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/resource.hpp>
@@ -24,7 +25,7 @@ namespace godot_autopilot {
 
 namespace {
 
-static mcp::ReadResourceResult make_json_result(const std::string &uri,
+mcp::ReadResourceResult make_json_result(const std::string &uri,
                                                 const std::string &json) {
   mcp::TextResourceContents trc;
   trc.uri = uri;
@@ -35,13 +36,13 @@ static mcp::ReadResourceResult make_json_result(const std::string &uri,
   return rr;
 }
 
-static void set_error(std::string &json_str, const std::string &msg) {
+void set_error(std::string &json_str, const std::string &msg) {
   mcp::JsonValue err(mcp::JsonValue::object_tag);
   err["error"] = mcp::JsonValue(msg);
   json_str = err.Dump(-1);
 }
 
-static const char *level_to_string(LogLevel level) {
+const char *level_to_string(LogLevel level) {
   switch (level) {
   case LogLevel::Debug:
     return "debug";
@@ -56,7 +57,7 @@ static const char *level_to_string(LogLevel level) {
   }
 }
 
-static const char *category_to_string(LogCategory cat) {
+const char *category_to_string(LogCategory cat) {
   switch (cat) {
   case LogCategory::System:
     return "system";
@@ -73,7 +74,7 @@ static const char *category_to_string(LogCategory cat) {
   }
 }
 
-static std::string compute_relative_path(godot::Node *node,
+std::string compute_relative_path(godot::Node *node,
                                          const std::string &root_prefix) {
   std::string abs_path = util::to_std(node->get_path());
   if (abs_path == root_prefix) {
@@ -85,7 +86,7 @@ static std::string compute_relative_path(godot::Node *node,
   return abs_path;
 }
 
-static void node_to_json(godot::Node *node, const std::string &root_prefix,
+void node_to_json(godot::Node *node, const std::string &root_prefix,
                          mcp::JsonValue &j) {
   j["name"] = mcp::JsonValue(util::to_std(node->get_name()));
   j["class"] = mcp::JsonValue(util::to_std(node->get_class()));
@@ -102,7 +103,7 @@ static void node_to_json(godot::Node *node, const std::string &root_prefix,
   }
 }
 
-static mcp::JsonValue node_detail_to_json(godot::Node *node,
+mcp::JsonValue node_detail_to_json(godot::Node *node,
                                           const std::string &root_prefix) {
   mcp::JsonValue j(mcp::JsonValue::object_tag);
   j["name"] = mcp::JsonValue(util::to_std(node->get_name()));
@@ -116,10 +117,8 @@ static mcp::JsonValue node_detail_to_json(godot::Node *node,
     godot::String prop_name = prop["name"];
     int usage = static_cast<int>(prop["usage"]);
 
-    int skip_mask = 8     /* PROPERTY_USAGE_INTERNAL */
-                    | 64  /* PROPERTY_USAGE_GROUP */
-                    | 128 /* PROPERTY_USAGE_CATEGORY */
-                    | 256 /* PROPERTY_USAGE_SUBGROUP */;
+    int skip_mask = godot::PROPERTY_USAGE_INTERNAL | godot::PROPERTY_USAGE_GROUP |
+                    godot::PROPERTY_USAGE_CATEGORY | godot::PROPERTY_USAGE_SUBGROUP;
     if (usage & skip_mask)
       continue;
 
@@ -169,7 +168,7 @@ static mcp::JsonValue node_detail_to_json(godot::Node *node,
   return j;
 }
 
-static void dir_to_json(godot::EditorFileSystemDirectory *dir,
+void dir_to_json(godot::EditorFileSystemDirectory *dir,
                         mcp::JsonValue &j) {
   j["name"] = mcp::JsonValue(util::to_std(dir->get_name()));
   j["path"] = mcp::JsonValue(util::to_std(dir->get_path()));
@@ -197,7 +196,7 @@ static void dir_to_json(godot::EditorFileSystemDirectory *dir,
   }
 }
 
-static godot::String to_godot_path(const std::string &path) {
+godot::String to_godot_path(const std::string &path) {
   if (path.find("res://") == 0) {
     return godot::String(path.c_str());
   }

@@ -15,13 +15,6 @@ namespace {
 
 using JV = mcp::JsonValue;
 
-// 与 display_ops.cpp 中 ok_json() 相同（跨文件重复小工具，保持两文件自包含）
-JV ok_json() {
-  JV r(JV::object_tag);
-  r["result"] = JV("ok");
-  return r;
-}
-
 int window_id_from_args(const JV &args) {
   auto *wp = args.Find("window_id");
   if (wp && wp->IsInt()) {
@@ -101,7 +94,7 @@ JV handle_window_delete(const JV &args) {
   window->queue_free();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "delete_display_window completed");
-  return ok_json();
+  return util::ok_result(JV("ok"));
 }
 
 JV handle_window_move_to_foreground(const JV &args) {
@@ -115,7 +108,7 @@ JV handle_window_move_to_foreground(const JV &args) {
   ds->window_move_to_foreground(wid);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "move_display_window_to_foreground completed");
-  return ok_json();
+  return util::ok_result(JV("ok"));
 }
 
 JV handle_window_request_attention(const JV &args) {
@@ -129,7 +122,7 @@ JV handle_window_request_attention(const JV &args) {
   ds->window_request_attention(wid);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "request_display_window_attention completed");
-  return ok_json();
+  return util::ok_result(JV("ok"));
 }
 
 JV handle_window_set_flag(const JV &args) {
@@ -153,7 +146,7 @@ JV handle_window_set_flag(const JV &args) {
       ep->GetBool(), wid);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_display_window_flag completed");
-  return ok_json();
+  return util::ok_result(JV("ok"));
 }
 
 JV handle_window_set_mode(const JV &args) {
@@ -172,7 +165,7 @@ JV handle_window_set_mode(const JV &args) {
       static_cast<godot::DisplayServer::WindowMode>(mp->GetInt()), wid);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_display_window_mode completed");
-  return ok_json();
+  return util::ok_result(JV("ok"));
 }
 
 JV handle_window_set_position(const JV &args) {
@@ -194,7 +187,7 @@ JV handle_window_set_position(const JV &args) {
   ds->window_set_position(godot::Vector2i(xp->GetInt(), yp->GetInt()), wid);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_display_window_position completed");
-  return ok_json();
+  return util::ok_result(JV("ok"));
 }
 
 JV handle_window_set_size(const JV &args) {
@@ -216,7 +209,7 @@ JV handle_window_set_size(const JV &args) {
   ds->window_set_size(godot::Vector2i(wp->GetInt(), hp->GetInt()), wid);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_display_window_size completed");
-  return ok_json();
+  return util::ok_result(JV("ok"));
 }
 
 JV handle_window_set_title(const JV &args) {
@@ -234,7 +227,7 @@ JV handle_window_set_title(const JV &args) {
   ds->window_set_title(godot::String(tp->GetString().c_str()), wid);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_display_window_title completed");
-  return ok_json();
+  return util::ok_result(JV("ok"));
 }
 
 } // namespace display_ops

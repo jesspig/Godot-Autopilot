@@ -3,6 +3,7 @@
 #include "core/resource_registry.hpp"
 #include "util/error_util.hpp"
 #include "util/readback_util.hpp"
+#include "util/type_hint.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/dir_access.hpp>
@@ -139,6 +140,135 @@ std::string describe_target(const mcp::JsonValue &args) {
   return "no identifier provided";
 }
 
+const char kLoadFailSuffix[] =
+    " (file exists but failed to load — not imported or wrong type)";
+
+bool load_resource_or_error(const std::string &path,
+                            godot::Ref<godot::Resource> &out_res,
+                            std::string &out_error,
+                            const std::string &type_hint = {},
+                            const char *load_fail_suffix = kLoadFailSuffix) {
+  if (!godot::FileAccess::file_exists(godot::String(path.c_str()))) {
+    out_error = "file does not exist: " + path;
+    return false;
+  }
+  auto *loader = godot::ResourceLoader::get_singleton();
+  out_res = loader ? loader->load(godot::String(path.c_str()),
+                                  godot::String(type_hint.c_str()))
+                   : godot::Ref<godot::Resource>();
+  if (out_res.is_null()) {
+    out_error =
+        "failed to load resource: " + path +
+        (load_fail_suffix != nullptr ? load_fail_suffix : "");
+    return false;
+  }
+  return true;
+}
+
+std::string scan_directory_case_conflict(const std::string &save_dir) {
+  std::string target;
+  std::string parent;
+  size_t slash2 = save_dir.find_last_of('/');
+  if (slash2 == std::string::npos) {
+    target = save_dir;
+    parent = "res://";
+  } else if (slash2 + 1 < save_dir.size()) {
+    target = save_dir.substr(slash2 + 1);
+    parent = save_dir.substr(0, slash2);
+    if (parent == "res:" || parent == "res:/") {
+      parent = "res://";
+    } else if (parent == "user:" || parent == "user:/") {
+      parent = "user://";
+    }
+  }
+  if (target.empty()) {
+    return {};
+  }
+  godot::String target_lower = godot::String(target.c_str()).to_lower();
+  auto parent_dir = godot::DirAccess::open(godot::String(parent.c_str()));
+  if (parent_dir.is_valid()) {
+    parent_dir->list_dir_begin();
+    godot::String entry = parent_dir->get_next();
+    while (!entry.is_empty()) {
+      if (parent_dir->current_is_dir() &&
+          entry != godot::String(target.c_str()) &&
+          entry.to_lower() == target_lower) {
+        std::string conflict =
+            "directory case mismatch: 保存目录 \"" + target +
+            "\" 与已有目录 \"" + util::to_std(entry) +
+            "\" 仅大小写不同（Windows "
+            "大小写不敏感，可能引发资源加载警告）— 建议统一目录名大小写";
+        parent_dir->list_dir_end();
+        return conflict;
+      }
+      entry = parent_dir->get_next();
+    }
+    parent_dir->list_dir_end();
+  }
+  return {};
+}
+
+bool ensure_save_directory(const std::string &save_dir, bool &dirs_created,
+                           std::string &out_error) {
+  auto dir = godot::DirAccess::open(godot::String("res://"));
+  if (!dir.is_valid()) {
+    return true;
+  }
+  if (dir->dir_exists(godot::String(save_dir.c_str()))) {
+    return true;
+  }
+  godot::Error mk_err =
+      dir->make_dir_recursive(godot::String(save_dir.c_str()));
+  if (mk_err != godot::Error::OK) {
+    out_error =
+        "failed to create directory: " + save_dir + " (error " +
+        std::to_string(static_cast<int>(mk_err)) +
+        ") — expected the directory to be creatable before saving the "
+        "resource";
+    return false;
+  }
+  dirs_created = true;
+  return true;
+}
+
+void sync_editor_and_uid_after_save(const std::string &src_path,
+                                    const std::string &dest_path) {
+  auto *editor = godot::EditorInterface::get_singleton();
+  if (editor) {
+    godot::String src_gs(src_path.c_str());
+    godot::String dst_gs(dest_path.c_str());
+    auto *efs = editor->get_resource_filesystem();
+    if (efs) {
+      efs->update_file(dst_gs);
+    }
+    if (dest_path != src_path) {
+      auto *root = editor->get_edited_scene_root();
+      if (root && root->get_scene_file_path() == src_gs) {
+        root->set_scene_file_path(dst_gs);
+      }
+      if (efs) {
+        efs->update_file(src_gs);
+      }
+    }
+  }
+  auto *ruid = godot::ResourceUID::get_singleton();
+  if (ruid) {
+    auto *loader = godot::ResourceLoader::get_singleton();
+    int64_t uid_val =
+        loader ? loader->get_resource_uid(godot::String(dest_path.c_str()))
+               : godot::ResourceUID::INVALID_ID;
+    if (uid_val != godot::ResourceUID::INVALID_ID) {
+      ruid->add_id(uid_val, godot::String(dest_path.c_str()));
+      if (editor) {
+        auto *efs = editor->get_resource_filesystem();
+        if (efs) {
+          efs->reimport_files(godot::PackedStringArray());
+        }
+      }
+    }
+  }
+}
+
 } // namespace
 
 godot::Ref<godot::Resource> resolve_memory_resource(const std::string &name) {
@@ -170,16 +300,8 @@ bool try_resolve_resource_value(const mcp::JsonValue &val, godot::Variant &out,
     }
     const std::string res_prefix = "res://";
     if (str.compare(0, res_prefix.size(), res_prefix) == 0) {
-      if (!godot::FileAccess::file_exists(godot::String(str.c_str()))) {
-        out_error = "file does not exist: " + str;
-        return true;
-      }
-      auto *loader = godot::ResourceLoader::get_singleton();
-      godot::Ref<godot::Resource> res =
-          loader ? loader->load(godot::String(str.c_str()))
-                 : godot::Ref<godot::Resource>();
-      if (res.is_null()) {
-        out_error = "failed to load resource: " + str;
+      godot::Ref<godot::Resource> res;
+      if (!load_resource_or_error(str, res, out_error, {}, "")) {
         return true;
       }
       out = godot::Variant(res.ptr());
@@ -210,18 +332,8 @@ bool try_resolve_resource_value(const mcp::JsonValue &val, godot::Variant &out,
     }
     const std::string res_prefix = "res://";
     if (!is_mem && name.compare(0, res_prefix.size(), res_prefix) == 0) {
-      if (!godot::FileAccess::file_exists(godot::String(name.c_str()))) {
-        out_error = "file does not exist: " + name;
-        return true;
-      }
-      auto *loader = godot::ResourceLoader::get_singleton();
-      godot::Ref<godot::Resource> res =
-          loader ? loader->load(godot::String(name.c_str()))
-                 : godot::Ref<godot::Resource>();
-      if (res.is_null()) {
-        out_error =
-            "failed to load resource: " + name +
-            " (file exists but failed to load — not imported or wrong type)";
+      godot::Ref<godot::Resource> res;
+      if (!load_resource_or_error(name, res, out_error)) {
         return true;
       }
       out = godot::Variant(res.ptr());
@@ -242,18 +354,8 @@ bool try_resolve_resource_value(const mcp::JsonValue &val, godot::Variant &out,
   auto *it_path = val.Find("path");
   if (it_path && it_path->IsString()) {
     std::string path = it_path->GetString();
-    if (!godot::FileAccess::file_exists(godot::String(path.c_str()))) {
-      out_error = "file does not exist: " + path;
-      return true;
-    }
-    auto *loader = godot::ResourceLoader::get_singleton();
-    godot::Ref<godot::Resource> res =
-        loader ? loader->load(godot::String(path.c_str()))
-               : godot::Ref<godot::Resource>();
-    if (res.is_null()) {
-      out_error =
-          "failed to load resource: " + path +
-          " (file exists but failed to load — not imported or wrong type)";
+    godot::Ref<godot::Resource> res;
+    if (!load_resource_or_error(path, res, out_error)) {
       return true;
     }
     out = godot::Variant(res.ptr());
@@ -283,20 +385,11 @@ mcp::JsonValue handle_load(const mcp::JsonValue &args) {
     return e;
   }
 
-  godot::String path_gs(path.c_str());
-  if (!godot::FileAccess::file_exists(path_gs)) {
+  godot::Ref<godot::Resource> res;
+  std::string load_err;
+  if (!load_resource_or_error(path, res, load_err, type_hint)) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("file does not exist: " + path);
-    return e;
-  }
-
-  godot::Ref<godot::Resource> res =
-      loader->load(path_gs, godot::String(type_hint.c_str()));
-  if (res.is_null()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(
-        "failed to load resource: " + path +
-        " (file exists but failed to load — not imported or wrong type)");
+    e["error"] = mcp::JsonValue(load_err);
     return e;
   }
   if (util::to_std(res->get_path()).empty()) {
@@ -493,59 +586,12 @@ mcp::JsonValue handle_save(const mcp::JsonValue &args) {
   size_t last_slash = save_dir.find_last_of('/');
   if (last_slash != std::string::npos) {
     save_dir = save_dir.substr(0, last_slash);
-    std::string target;
-    std::string parent;
-    size_t slash2 = save_dir.find_last_of('/');
-    if (slash2 == std::string::npos) {
-      target = save_dir;
-      parent = "res://";
-    } else if (slash2 + 1 < save_dir.size()) {
-      target = save_dir.substr(slash2 + 1);
-      parent = save_dir.substr(0, slash2);
-      if (parent == "res:" || parent == "res:/") {
-        parent = "res://";
-      } else if (parent == "user:" || parent == "user:/") {
-        parent = "user://";
-      }
-    }
-    if (!target.empty()) {
-      godot::String target_lower = godot::String(target.c_str()).to_lower();
-      auto parent_dir = godot::DirAccess::open(godot::String(parent.c_str()));
-      if (parent_dir.is_valid()) {
-        parent_dir->list_dir_begin();
-        godot::String entry = parent_dir->get_next();
-        while (!entry.is_empty()) {
-          if (parent_dir->current_is_dir() &&
-              entry != godot::String(target.c_str()) &&
-              entry.to_lower() == target_lower) {
-            case_conflict =
-                "directory case mismatch: 保存目录 \"" + target +
-                "\" 与已有目录 \"" + util::to_std(entry) +
-                "\" 仅大小写不同（Windows "
-                "大小写不敏感，可能引发资源加载警告）— 建议统一目录名大小写";
-            break;
-          }
-          entry = parent_dir->get_next();
-        }
-        parent_dir->list_dir_end();
-      }
-    }
-    auto dir = godot::DirAccess::open(godot::String("res://"));
-    if (dir.is_valid()) {
-      if (!dir->dir_exists(godot::String(save_dir.c_str()))) {
-        godot::Error mk_err =
-            dir->make_dir_recursive(godot::String(save_dir.c_str()));
-        if (mk_err != godot::Error::OK) {
-          mcp::JsonValue e(mcp::JsonValue::object_tag);
-          e["error"] = mcp::JsonValue(
-              "failed to create directory: " + save_dir + " (error " +
-              std::to_string(static_cast<int>(mk_err)) +
-              ") — expected the directory to be creatable before saving the "
-              "resource");
-          return e;
-        }
-        dirs_created = true;
-      }
+    case_conflict = scan_directory_case_conflict(save_dir);
+    std::string dir_error;
+    if (!ensure_save_directory(save_dir, dirs_created, dir_error)) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue(dir_error);
+      return e;
     }
   }
 
@@ -553,40 +599,7 @@ mcp::JsonValue handle_save(const mcp::JsonValue &args) {
       res, godot::String(dest_path.c_str()),
       static_cast<godot::BitField<godot::ResourceSaver::SaverFlags>>(flags));
   if (err == godot::OK) {
-    auto *editor = godot::EditorInterface::get_singleton();
-    if (editor) {
-      godot::String src_gs(path.c_str());
-      godot::String dst_gs(dest_path.c_str());
-      auto *efs = editor->get_resource_filesystem();
-      if (efs) {
-        efs->update_file(dst_gs);
-      }
-      if (dest_path != path) {
-        auto *root = editor->get_edited_scene_root();
-        if (root && root->get_scene_file_path() == src_gs) {
-          root->set_scene_file_path(dst_gs);
-        }
-        if (efs) {
-          efs->update_file(src_gs);
-        }
-      }
-    }
-    auto *ruid = godot::ResourceUID::get_singleton();
-    if (ruid) {
-      auto *loader = godot::ResourceLoader::get_singleton();
-      int64_t uid_val =
-          loader ? loader->get_resource_uid(godot::String(dest_path.c_str()))
-                 : godot::ResourceUID::INVALID_ID;
-      if (uid_val != godot::ResourceUID::INVALID_ID) {
-        ruid->add_id(uid_val, godot::String(dest_path.c_str()));
-        if (editor) {
-          auto *efs = editor->get_resource_filesystem();
-          if (efs) {
-            efs->reimport_files(godot::PackedStringArray());
-          }
-        }
-      }
-    }
+    sync_editor_and_uid_after_save(path, dest_path);
   }
   bool verified = false;
   if (err == godot::OK) {
@@ -700,19 +713,11 @@ mcp::JsonValue handle_duplicate(const mcp::JsonValue &args) {
     return e;
   }
 
-  godot::String path_gs(path.c_str());
-  if (!godot::FileAccess::file_exists(path_gs)) {
+  godot::Ref<godot::Resource> res;
+  std::string load_err;
+  if (!load_resource_or_error(path, res, load_err)) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("file does not exist: " + path);
-    return e;
-  }
-
-  godot::Ref<godot::Resource> res = loader->load(path_gs);
-  if (res.is_null()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(
-        "failed to load resource: " + path +
-        " (file exists but failed to load — not imported or wrong type)");
+    e["error"] = mcp::JsonValue(load_err);
     return e;
   }
 
@@ -744,19 +749,11 @@ mcp::JsonValue handle_get_type(const mcp::JsonValue &args) {
     return e;
   }
 
-  godot::String path_gs(path.c_str());
-  if (!godot::FileAccess::file_exists(path_gs)) {
+  godot::Ref<godot::Resource> res;
+  std::string load_err;
+  if (!load_resource_or_error(path, res, load_err)) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("file does not exist: " + path);
-    return e;
-  }
-
-  godot::Ref<godot::Resource> res = loader->load(path_gs);
-  if (res.is_null()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(
-        "failed to load resource: " + path +
-        " (file exists but failed to load — not imported or wrong type)");
+    e["error"] = mcp::JsonValue(load_err);
     return e;
   }
 
@@ -1434,27 +1431,7 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue &args) {
     if (dict.has("name") &&
         util::to_std(dict["name"].operator godot::String()) == prop) {
       found = true;
-      if (type_hint.empty() && dict.has("type")) {
-        int type_id = static_cast<int>(dict["type"]);
-        int hint_val = 0;
-        if (dict.has("hint")) {
-          hint_val = static_cast<int>(dict["hint"]);
-        }
-        bool is_object_type = static_cast<godot::Variant::Type>(type_id) ==
-                              godot::Variant::OBJECT;
-        bool is_resource_hint = hint_val == godot::PROPERTY_HINT_RESOURCE_TYPE;
-        if ((is_object_type || is_resource_hint) && dict.has("hint_string")) {
-          std::string hint_str =
-              util::to_std(dict["hint_string"].operator godot::String());
-          if (!hint_str.empty()) {
-            type_hint = hint_str;
-          }
-        }
-        if (type_hint.empty()) {
-          type_hint = util::to_std(godot::Variant::get_type_name(
-              static_cast<godot::Variant::Type>(type_id)));
-        }
-      }
+      type_hint = util::infer_type_hint(dict, std::move(type_hint));
       break;
     }
   }

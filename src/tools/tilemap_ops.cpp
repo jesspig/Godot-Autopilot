@@ -3,13 +3,13 @@
 #include "core/scene_dirty_tracker.hpp"
 #include "resource_ops.hpp"
 #include "util/error_util.hpp"
+#include "util/scene_path.hpp"
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/tile_map.hpp>
 #include <godot_cpp/classes/tile_map_layer.hpp>
 #include <godot_cpp/classes/tile_set.hpp>
-#include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 #include <mcp/JsonValue.hpp>
@@ -26,30 +26,7 @@ godot::Node *find_node(const std::string &path_str) {
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor)
     return nullptr;
-  auto *root = editor->get_edited_scene_root();
-  if (!root)
-    return nullptr;
-  std::string clean = path_str;
-  if (!clean.empty() && clean[0] == '/') {
-    clean = clean.substr(1);
-  }
-  if (clean.empty() || clean == util::to_std(root->get_name())) {
-    return root;
-  }
-  godot::NodePath np(godot::String(clean.c_str()));
-  godot::Node *node = root->get_node_or_null(np);
-  if (!node) {
-    std::string root_name = util::to_std(root->get_name());
-    if (clean.size() > root_name.size() + 1 &&
-        clean.compare(0, root_name.size(), root_name) == 0 &&
-        clean[root_name.size()] == '/') {
-      std::string sub = clean.substr(root_name.size() + 1);
-      if (!sub.empty()) {
-        node = root->get_node_or_null(godot::NodePath(sub.c_str()));
-      }
-    }
-  }
-  return node;
+  return util::resolve_scene_node(path_str, editor->get_edited_scene_root());
 }
 
 } // namespace

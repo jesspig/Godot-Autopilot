@@ -6,13 +6,13 @@ tags:
   - 模块
   - 核心层
   - 线程模型
-timestamp: "2026-08-22T01:38:08+08:00"
+timestamp: "2026-08-22T06:57:00+08:00"
 resource: src/core/
 ---
 
 # 核心模块（src/core/）
 
-> 审计日期：2026-08-22（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 随配置面板端口持久化同步并补 YAML frontmatter；08-22 随版本号收敛为根 `VERSION` 单一来源同步 MCP 标识引用），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 审计日期：2026-08-22（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 随配置面板端口持久化同步并补 YAML frontmatter；08-22 随版本号收敛为根 `VERSION` 单一来源同步 MCP 标识引用；08-22 随死代码清理同步——`set_on_new_entry` 回调与 `is_registered` 删除），基于当前工作树代码逐行核对（不依赖 git 历史）。
 > 覆盖范围：`src/core/` 下 9 组文件。注意：`CommandQueue` 为 header-only（仅 `command_queue.hpp`，无对应 `.cpp`），实际为 16 个文件。
 
 ## 模块简介
@@ -26,7 +26,7 @@ resource: src/core/
 | `CommandQueue` | `command_queue.hpp`（header-only） | 跨线程任务队列：`submit()` 入队并返回 `std::future`，主线程 `drain()` 批量执行 | 所有工具/resource/prompt handler、`main.cpp` |
 | 配置常量 | `config.hpp` | 端口、超时、缓冲区上限等编译期常量（GDA_ 前缀） | `server_context.cpp`、`runtime/game_bridge.cpp` 等 |
 | `ExportGuard` | `export_guard.cpp/hpp` | 导出期间置位全局原子标志，供工具分发判定"导出中" | `dispatch::export_blocked_result`、`_enter_tree` 注册 |
-| `LogSystem` | `log_system.cpp/hpp` | 进程内环形日志（内存 + 回调，无文件输出），单例 | 全部模块、`McpLogDock`、log 类资源 |
+| `LogSystem` | `log_system.cpp/hpp` | 进程内环形日志（仅内存，无文件输出），单例 | 全部模块、`McpLogDock`、log 类资源 |
 | `ModeDetector` | `mode_detector.cpp/hpp` | 运行时模式检测（编辑器/游戏/未知） | `_enter_tree` 启动日志 |
 | `ResourceRegistry` | `resource_registry.cpp/hpp` | 内存资源缓存（oid 键 + `name:` 前缀键），全局 mutex 保护 | 资源类工具 |
 | `SceneDirtyTracker` | `scene_dirty_tracker.cpp/hpp` | 记录"当前编辑场景是否被修改"及根节点实例 ID | `GodotAutopilotPlugin::_get_unsaved_status` |
@@ -58,8 +58,7 @@ resource: src/core/
 - `query(const Query&)` — 支持 `min_level` / `filter_text`（大小写不敏感） / `category` 过滤
 - `query_from(size_t start_index, size_t* next_index)` + `size_t next_index()` — 增量查询（用于 `godot://log/recent` 类资源）
 - `static LogSystem& instance()` — 局部静态单例
-- `set_on_new_entry(OnNewEntryCallback)` — 新条目回调（锁外调用），`McpLogDock` 消费
-- **写入目标：仅内存 + 回调；无文件、无 Godot 控制台直接输出**
+- **写入目标：仅内存；无文件、无回调、无 Godot 控制台直接输出**（`McpLogDock` 经 `poll_new_entries`/`query_from` 轮询消费）
 
 ### ModeDetector
 
@@ -70,7 +69,7 @@ resource: src/core/
 
 - `register_resource(res, name)` — 以 `instance_id` 为键，另加 `"name:" + name` 键
 - `lookup_memory(name)` — 先查 `name:` 键；若参数为纯数字再回退查 oid 键；未命中返回空 `Ref`
-- `erase_oid(object_id)`、`is_registered(name)`
+- `erase_oid(object_id)`
 - 线程安全：`std::unordered_map<std::string, godot::Ref<godot::Resource>>` + 全局 `std::mutex`
 
 ### SceneDirtyTracker（命名空间函数，非类）

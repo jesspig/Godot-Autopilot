@@ -6,7 +6,7 @@ tags:
   - 模块
   - 入口
   - 运行时桥接
-timestamp: "2026-08-17T01:03:27+08:00"
+timestamp: "2026-08-22T06:57:00+08:00"
 resource:
   - src/main.cpp
   - src/runtime/
@@ -14,7 +14,7 @@ resource:
 
 # 模块：入口与运行时桥接（entry_runtime）
 
-覆盖代码：`src/main.cpp`（331 行）与 `src/runtime/`（`gda_protocol.hpp` 65 行、`game_bridge.hpp` 75 行、`game_bridge.cpp` 581 行、`game_bridge_input.cpp` 738 行、`game_bridge_eval.cpp` 468 行）。
+覆盖代码：`src/main.cpp`（283 行）与 `src/runtime/`（`gda_protocol.hpp` 40 行、`game_bridge.hpp` 47 行、`game_bridge.cpp` 529 行、`game_bridge_input.cpp` 633 行、`game_bridge_eval.cpp` 427 行）。
 
 职责全景：`main.cpp` 是 GDExtension 的导出入口与编辑器插件本体；`src/runtime/` 是在**游戏运行时进程**内与编辑器进程通信的桥接层，通过 EngineDebugger 消息通道承载 GDA 协议。编辑器内的 MCP 服务器（`ServerContext`）与运行时桥接是两条相互独立的消息通路，本页只覆盖入口生命周期与运行时桥接，MCP 工具侧见相关模块页。
 
@@ -25,7 +25,7 @@ resource:
 - 以 `extern "C"` 导出，签名 `GDExtensionEntryPoint(GDExtensionInterfaceGetProcAddress, GDExtensionClassLibraryPtr, GDExtensionInitialization*)`。
 - 修饰宏 `GDA_EXPORT`：Windows（`_WIN32`）为 `__declspec(dllexport)`，其余平台为空。
 - 函数体：构造 `godot::GDExtensionBinding::InitObject`，注册 initializer 与 terminator 回调，最后返回 `init.init()`。
-- 两个回调内部均包 try/catch，异常只记录日志不中断。
+- 两个回调内部均包 try/catch，异常只记录日志不中断（catch 分支统一委托 `log_setup_failure` 助手写 System 错误日志）。
 
 ### 1.2 模块初始化（register_initializer）
 
@@ -123,8 +123,6 @@ resource:
 
 | 常量 | 值 | 使用方 |
 |---|---|---|
-| `GDA_READY_WAIT_MS` | `5000` | 仅定义，当前无使用方 |
-| `GDA_PLAY_READY_WAIT_MS` | `2000` | 仅定义，当前无使用方 |
 | `GDA_NEW_SCENE_SWITCH_WAIT_MS` | `2000` | `src/tools/editor_ops.cpp`（换场景等待上限） |
 | `GDA_NEW_SCENE_POLL_MS` | `50` | `src/tools/editor_ops.cpp`（轮询步长） |
 | `GDA_AUTO_CONTINUE_ENV` | `GDA_AUTO_CONTINUE` | `src/tools/runtime_ops.cpp`（自动继续次数环境变量） |
@@ -139,7 +137,7 @@ resource:
 - `register_listener()`（幂等，`g_registered` 守卫）：首次调用时注册 4 个类（`GameBridgeListener`、`GameBridgeLogger`，及 eval/input 两组桥接类）；实例化监听器与日志器；`EngineDebugger::register_message_capture("gda", on_gda_message)` 捕获前缀 `gda` 的消息；`OS::add_logger` 挂游戏日志器；随后立即发出 `gda:ready`（body 含 `ready:true` 与活动字段）。
 - `unregister_listener()`：反注册消息捕获与日志器，unref 两个实例。
 - `GameBridgeListener`（RefCounted 子类）：绑定方法 `on_gda_message(p_message: String, p_data: Array) -> bool`。解析 `data[0]` 为 JSON 请求，取 `request_id`/`op`/`params` 分发；每收到一条消息即刷新 `g_last_activity_ms`；响应统一附加 `ok` 字段后经 `send_response` 发出。请求畸形或 op 执行失败会同时记入错误与输出缓冲。
-- `send_response(request_id, body)`：补 `request_id` 字段（此处用字面量而非常量，见第 4 节），`EngineDebugger::send_message("gda:response", [json])`。
+- `send_response(request_id, body)`：补 `request_id` 字段（`GDA_FIELD_REQUEST_ID` 常量），`EngineDebugger::send_message("gda:response", [json])`。
 - `GameBridgeLogger`（godot::Logger 子类）：`_log_error` 按错误类型（warning 判定码 3）经 `push_game_error` 入错误缓冲；`_log_message` 错误入错误缓冲、普通消息入输出缓冲。
 - 缓冲：`g_error_buffer`（环形，上限 200，每条带递增 `seq`，`g_error_seq` 单调）+ `g_output_buffer`（上限 500），互斥锁保护；`current_error_seq()` / `eval_error_delta(since_seq)` / `append_eval_runtime_errors` 供 eval 附加运行期错误增量（文本增量 + 仅首条的 `structured_error`）；`truncate_error_text` 超 8192 字节截断。
 - 状态与工具 op：`status`（版本/fps/physics_frame、paused/node_count/scene、活动字段）、`ping`（physics/process 帧 + 活动字段）、`cancel`（查 `g_cancel_handlers` 并调用 handler）、`capture`（根窗口纹理存 PNG 到缓存目录 `gda_capture_<request_id>.png`，返回 path/width/height）、`get_errors`（limit 默认 50）、`get_output`（limit 默认 200）、`get_tree`（DFS，深度上限 64、节点上限 2000）。
@@ -177,10 +175,9 @@ resource:
 
 1. `gsd_cmdline_mode` 不存在，实际函数名 `gda_cmdline_mode()`（main.cpp:36）。
 2. `GDA_FORCE_HEADLESS=1` 的语义与变量名相反：它是**禁用** cmdline 模式（强制 `false`），而非强制无头。
-3. `send_response` 中 `ok` 与 `request_id` 用字面量写入（game_bridge.cpp:501/515），未复用 `GDA_FIELD_OK` / `GDA_FIELD_REQUEST_ID` 常量（值一致）。
-4. terminator 的 SCENE 级别**无条件** `unregister_listener()`，与 initializer 的 `!is_editor_hint()` 条件注册不对称。
-5. `GDA_READY_WAIT_MS` / `GDA_PLAY_READY_WAIT_MS` 仅定义、全仓库无使用方；`GDA_MSG_REQUEST` 不被桥接侧使用（由工具侧 `debugger_access.cpp` 发出）。
-6. 请求消息虽从 `GDA_PREFIX` 取名，但桥接捕获只按 `"gda"` 前缀匹配，`GDA_MSG_*` 常量仅用于发送方向。
+3. terminator 的 SCENE 级别**无条件** `unregister_listener()`，与 initializer 的 `!is_editor_hint()` 条件注册不对称。
+4. `GDA_MSG_REQUEST` 不被桥接侧使用（由工具侧 `debugger_access.cpp` 发出）。
+5. 请求消息虽从 `GDA_PREFIX` 取名，但桥接捕获只按 `"gda"` 前缀匹配，`GDA_MSG_*` 常量仅用于发送方向。
 
 ## 出站链接
 

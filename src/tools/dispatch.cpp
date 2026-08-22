@@ -8,9 +8,6 @@ namespace dispatch {
 
 std::unordered_map<std::string, HandlerFn> g_handlers;
 std::unordered_map<std::string, HandlerFn> g_meta_handlers;
-const std::unordered_set<std::string> meta_tool_names = {
-    "ping",      "search_tools",  "list_categories", "get_tool_detail",
-    "call_tool", "batch_execute", "code_execute"};
 
 namespace {
 
@@ -32,17 +29,8 @@ mcp::JsonValue call_handler_impl(const std::string &name,
       return e;
     }
   }
-  if (meta_tool_names.count(name)) {
-    auto meta_it = g_meta_handlers.find(name);
-    if (meta_it != g_meta_handlers.end()) {
-      return meta_it->second(args);
-    }
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] =
-        mcp::JsonValue("meta tool '" + name +
-                       "' cannot be invoked via this path — try calling it "
-                       "directly as a top-level tool instead");
-    return e;
+  if (auto meta_it = g_meta_handlers.find(name); meta_it != g_meta_handlers.end()) {
+    return meta_it->second(args);
   }
   mcp::JsonValue e(mcp::JsonValue::object_tag);
   e["error"] =

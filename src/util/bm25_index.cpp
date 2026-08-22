@@ -100,9 +100,6 @@ std::vector<Bm25Result> Bm25Index::search(const SearchQuery &query) const {
   }
 
   std::unordered_map<std::string, size_t> df;
-  for (const auto &qt : query_tokens) {
-    df[qt] = 0;
-  }
   std::unordered_set<std::string> unique_query_tokens(query_tokens.begin(),
                                                       query_tokens.end());
   for (size_t idx : candidates) {
@@ -122,7 +119,7 @@ std::vector<Bm25Result> Bm25Index::search(const SearchQuery &query) const {
   for (const auto &d : docs_) {
     avg_dl += static_cast<double>(d.tokens.size());
   }
-  avg_dl = docs_.empty() ? 1.0 : avg_dl / static_cast<double>(docs_.size());
+  avg_dl /= static_cast<double>(docs_.size());
   if (avg_dl == 0.0) {
     avg_dl = 1.0;
   }
@@ -165,14 +162,6 @@ std::vector<Bm25Result> Bm25Index::search(const SearchQuery &query) const {
   }
 
   return results;
-}
-
-std::vector<Bm25Result> Bm25Index::search(const std::string &query,
-                                          int max_results) const {
-  SearchQuery q;
-  q.text = query;
-  q.max_results = max_results;
-  return search(q);
 }
 
 void Bm25Index::clear() {

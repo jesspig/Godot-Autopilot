@@ -6,7 +6,7 @@ tags:
   - 约定
   - 命名
   - 规范
-timestamp: "2026-08-20T16:59:13+08:00"
+timestamp: "2026-08-22T06:57:00+08:00"
 ---
 
 # 工程约定
@@ -25,7 +25,7 @@ timestamp: "2026-08-20T16:59:13+08:00"
 
 - 类别（仅 5 个）：`System`、`Transport`、`Tools`、`Resources`、`Prompts`（`LogCategory` 枚举）
 - 级别：`Debug`、`Info`、`Warning`、`Error`（`LogLevel` 枚举）
-- `LogSystem` 单例：环形缓冲上限 10000 条，仅内存 + 回调（`set_on_new_entry` 供 `McpLogDock` 消费），**无文件输出**
+- `LogSystem` 单例：环形缓冲上限 10000 条，仅内存写入（`McpLogDock` 轮询消费），**无文件输出**
 - 禁止记录密钥与 PII
 
 ## 错误模式

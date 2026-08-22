@@ -30,11 +30,6 @@ public:
     }
   }
 
-  void add_meta(std::unique_ptr<ToolBase> tool) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    meta_[tool->meta().name] = std::move(tool);
-  }
-
   ToolBase* find(const std::string& name) {
     std::lock_guard<std::mutex> lock(mutex_);
     auto it = tools_.find(name);
@@ -93,17 +88,6 @@ public:
       if (std::find(result.begin(), result.end(), cat) == result.end())
         result.push_back(cat);
     }
-    return result;
-  }
-
-  std::vector<ToolInfo> to_tool_info_all() const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    std::vector<ToolInfo> result;
-    result.reserve(tools_.size() + meta_.size());
-    for (const auto& entry : tools_)
-      result.push_back(make_tool_info(*entry.second));
-    for (const auto& entry : meta_)
-      result.push_back(make_tool_info(*entry.second));
     return result;
   }
 

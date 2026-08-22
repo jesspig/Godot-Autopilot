@@ -1,5 +1,9 @@
 #include "mcp_log_dock.hpp"
 
+#include <cstddef>
+#include <string>
+#include <unordered_map>
+
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/font.hpp>
@@ -108,8 +112,6 @@ McpLogDock::McpLogDock() : log_system(&LogSystem::instance()) {
   _update_theme();
   _rebuild_log();
 }
-
-McpLogDock::~McpLogDock() {}
 
 void McpLogDock::_bind_methods() {}
 

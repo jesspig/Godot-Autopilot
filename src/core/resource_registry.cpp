@@ -55,9 +55,5 @@ void erase_oid(int64_t object_id) {
   g_cache.erase(oid_key(object_id));
 }
 
-bool is_registered(const std::string &name) {
-  return !lookup_memory(name).is_null();
-}
-
 } // namespace resource_registry
 } // namespace godot_autopilot

@@ -1,6 +1,8 @@
 #include "audio_ops.hpp"
 #include "core/log_system.hpp"
 #include "util/error_util.hpp"
+#include "util/json_godot.hpp"
+#include "util/scene_path.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/audio_bus_layout.hpp>
 #include <godot_cpp/classes/audio_effect.hpp>
@@ -32,48 +34,7 @@ godot::Node *find_node(const std::string &path_str) {
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor)
     return nullptr;
-  auto *root = editor->get_edited_scene_root();
-  if (!root)
-    return nullptr;
-  std::string clean = path_str;
-  if (!clean.empty() && clean[0] == '/') {
-    clean = clean.substr(1);
-  }
-  if (clean.size() > 5 && clean.compare(0, 5, "root/") == 0) {
-    clean = clean.substr(5);
-  }
-  if (clean.empty() || clean == util::to_std(root->get_name())) {
-    return root;
-  }
-  godot::NodePath np(godot::String(clean.c_str()));
-  auto *node = root->get_node_or_null(np);
-  if (!node) {
-    std::string root_name = util::to_std(root->get_name());
-    if (clean.size() > root_name.size() + 1 &&
-        clean.compare(0, root_name.size(), root_name) == 0 &&
-        clean[root_name.size()] == '/') {
-      std::string sub = clean.substr(root_name.size() + 1);
-      if (!sub.empty()) {
-        node =
-            root->get_node_or_null(godot::NodePath(godot::String(sub.c_str())));
-      }
-    }
-  }
-  if (!node)
-    return nullptr;
-  auto *p = node->get_parent();
-  while (p) {
-    if (p == root)
-      return node;
-    p = p->get_parent();
-  }
-  return nullptr;
-}
-
-mcp::JsonValue ok_json() {
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
-  return r;
+  return util::resolve_scene_node(path_str, editor->get_edited_scene_root());
 }
 
 struct AudioPlayerVariant {
@@ -215,7 +176,7 @@ mcp::JsonValue handle_bus_set_layout(const mcp::JsonValue &args) {
   server->set_bus_layout(layout);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_bus_layout completed");
-  return ok_json();
+  return util::ok_result(mcp::JsonValue("ok"));
 }
 
 mcp::JsonValue handle_bus_get_count(const mcp::JsonValue &args) {
@@ -277,12 +238,11 @@ mcp::JsonValue handle_bus_set_volume(const mcp::JsonValue &args) {
   if (idx < 0 || idx >= count) {
     return util::error_json("audio bus not found at index: " + std::to_string(idx));
   }
-  float vol = static_cast<float>(
-      vd->IsDouble() ? vd->GetDouble() : static_cast<double>(vd->GetInt()));
+  float vol = static_cast<float>(util::json_number(vd, 0.0));
   server->set_bus_volume_db(idx, vol);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_bus_volume_db completed");
-  return ok_json();
+  return util::ok_result(mcp::JsonValue("ok"));
 }
 
 mcp::JsonValue handle_bus_set_mute(const mcp::JsonValue &args) {
@@ -308,7 +268,7 @@ mcp::JsonValue handle_bus_set_mute(const mcp::JsonValue &args) {
   server->set_bus_mute(idx, mu->GetBool());
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_bus_mute completed");
-  return ok_json();
+  return util::ok_result(mcp::JsonValue("ok"));
 }
 
 mcp::JsonValue handle_bus_set_bypass(const mcp::JsonValue &args) {
@@ -334,7 +294,7 @@ mcp::JsonValue handle_bus_set_bypass(const mcp::JsonValue &args) {
   server->set_bus_bypass_effects(idx, bp->GetBool());
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_bus_bypass_effects completed");
-  return ok_json();
+  return util::ok_result(mcp::JsonValue("ok"));
 }
 
 mcp::JsonValue handle_effect_add(const mcp::JsonValue &args) {
@@ -380,7 +340,7 @@ mcp::JsonValue handle_effect_add(const mcp::JsonValue &args) {
   server->add_bus_effect(idx, effect_ref, position);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "add_audio_bus_effect completed");
-  return ok_json();
+  return util::ok_result(mcp::JsonValue("ok"));
 }
 
 mcp::JsonValue handle_effect_remove(const mcp::JsonValue &args) {
@@ -408,7 +368,7 @@ mcp::JsonValue handle_effect_remove(const mcp::JsonValue &args) {
   server->remove_bus_effect(bus_idx, effect_idx);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "remove_audio_bus_effect completed");
-  return ok_json();
+  return util::ok_result(mcp::JsonValue("ok"));
 }
 
 mcp::JsonValue handle_stream_play(const mcp::JsonValue &args) {
@@ -457,12 +417,8 @@ mcp::JsonValue handle_stream_play(const mcp::JsonValue &args) {
     }
     ap.set_stream(audio_stream);
   }
-  float from_pos = 0.0f;
-  auto *fp = args.Find("from_position");
-  if (fp && fp->IsNumber()) {
-    from_pos = static_cast<float>(
-        fp->IsDouble() ? fp->GetDouble() : static_cast<double>(fp->GetInt()));
-  }
+  float from_pos =
+      static_cast<float>(util::json_number(args.Find("from_position"), 0.0));
   if (ap.get_stream().is_null()) {
     return util::error_json("node has no audio stream set: " + path +
                       " — set the stream first (e.g. resource_set_property "
@@ -471,7 +427,7 @@ mcp::JsonValue handle_stream_play(const mcp::JsonValue &args) {
   ap.play(from_pos);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "play_audio_player completed");
-  return ok_json();
+  return util::ok_result(mcp::JsonValue("ok"));
 }
 
 mcp::JsonValue handle_stream_stop(const mcp::JsonValue &args) {
@@ -497,7 +453,7 @@ mcp::JsonValue handle_stream_stop(const mcp::JsonValue &args) {
   ap.stop();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "stop_audio_player completed");
-  return ok_json();
+  return util::ok_result(mcp::JsonValue("ok"));
 }
 
 mcp::JsonValue handle_stream_set_volume(const mcp::JsonValue &args) {
@@ -524,12 +480,11 @@ mcp::JsonValue handle_stream_set_volume(const mcp::JsonValue &args) {
         "AudioStreamPlayer/AudioStreamPlayer2D/AudioStreamPlayer3D: " +
         path + " (actual class: " + util::to_std(node->get_class()) + ")");
   }
-  float vol = static_cast<float>(
-      vd->IsDouble() ? vd->GetDouble() : static_cast<double>(vd->GetInt()));
+  float vol = static_cast<float>(util::json_number(vd, 0.0));
   ap.set_volume_db(vol);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_player_volume_db completed");
-  return ok_json();
+  return util::ok_result(mcp::JsonValue("ok"));
 }
 
 mcp::JsonValue handle_stream_set_pitch(const mcp::JsonValue &args) {
@@ -556,12 +511,11 @@ mcp::JsonValue handle_stream_set_pitch(const mcp::JsonValue &args) {
         "AudioStreamPlayer/AudioStreamPlayer2D/AudioStreamPlayer3D: " +
         path + " (actual class: " + util::to_std(node->get_class()) + ")");
   }
-  float pitch = static_cast<float>(
-      ps->IsDouble() ? ps->GetDouble() : static_cast<double>(ps->GetInt()));
+  float pitch = static_cast<float>(util::json_number(ps, 0.0));
   ap.set_pitch_scale(pitch);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_player_pitch_scale completed");
-  return ok_json();
+  return util::ok_result(mcp::JsonValue("ok"));
 }
 
 mcp::JsonValue handle_stream_get_playback_position(const mcp::JsonValue &args) {
@@ -616,12 +570,11 @@ mcp::JsonValue handle_stream_seek(const mcp::JsonValue &args) {
         "AudioStreamPlayer/AudioStreamPlayer2D/AudioStreamPlayer3D: " +
         path + " (actual class: " + util::to_std(node->get_class()) + ")");
   }
-  float to_pos = static_cast<float>(
-      tp->IsDouble() ? tp->GetDouble() : static_cast<double>(tp->GetInt()));
+  float to_pos = static_cast<float>(util::json_number(tp, 0.0));
   ap.seek(to_pos);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "seek_audio_player completed");
-  return ok_json();
+  return util::ok_result(mcp::JsonValue("ok"));
 }
 
 mcp::JsonValue handle_bus_set_solo(const mcp::JsonValue &args) {
@@ -647,7 +600,7 @@ mcp::JsonValue handle_bus_set_solo(const mcp::JsonValue &args) {
   server->set_bus_solo(idx, sl->GetBool());
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_bus_solo completed");
-  return ok_json();
+  return util::ok_result(mcp::JsonValue("ok"));
 }
 
 mcp::JsonValue handle_get_output_device_list(const mcp::JsonValue &) {
@@ -683,7 +636,7 @@ mcp::JsonValue handle_set_output_device(const mcp::JsonValue &args) {
   server->set_output_device(godot::String(dv->GetString().c_str()));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_device_output completed");
-  return ok_json();
+  return util::ok_result(mcp::JsonValue("ok"));
 }
 
 mcp::JsonValue handle_get_input_device_list(const mcp::JsonValue &) {
@@ -719,7 +672,7 @@ mcp::JsonValue handle_set_input_device(const mcp::JsonValue &args) {
   server->set_input_device(godot::String(dv->GetString().c_str()));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_device_input completed");
-  return ok_json();
+  return util::ok_result(mcp::JsonValue("ok"));
 }
 
 } // namespace audio_ops

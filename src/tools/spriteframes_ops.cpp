@@ -2,6 +2,7 @@
 #include "core/log_system.hpp"
 #include "resource_ops.hpp"
 #include "util/error_util.hpp"
+#include "util/json_godot.hpp"
 #include <godot_cpp/classes/atlas_texture.hpp>
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/file_access.hpp>
@@ -91,12 +92,7 @@ JV handle_add_animation(const JV &args) {
     return util::error_json("missing required parameter: animation");
   std::string animation = a->GetString();
 
-  double fps = 5.0;
-  auto *f = args.Find("fps");
-  if (f && f->IsInt())
-    fps = static_cast<double>(f->GetInt());
-  else if (f && f->IsDouble())
-    fps = f->GetDouble();
+  double fps = util::json_number(args.Find("fps"), 5.0);
 
   bool loop = true;
   auto *l = args.Find("loop");
@@ -139,12 +135,8 @@ JV handle_add_frame(const JV &args) {
     return util::error_json("missing required parameter: texture");
   std::string texture = t->GetString();
 
-  float duration = 1.0f;
-  auto *d = args.Find("duration");
-  if (d && d->IsInt())
-    duration = static_cast<float>(d->GetInt());
-  else if (d && d->IsDouble())
-    duration = static_cast<float>(d->GetDouble());
+  float duration =
+      static_cast<float>(util::json_number(args.Find("duration"), 1.0));
 
   int hframes = 1;
   auto *hf = args.Find("hframes");

@@ -6,7 +6,7 @@ tags:
   - 总览
   - 架构
   - 技术栈
-timestamp: "2026-08-20T16:59:13+08:00"
+timestamp: "2026-08-22T06:57:00+08:00"
 resource:
   - README.md
   - src/
@@ -14,7 +14,7 @@ resource:
 
 # 项目总览（Overview）
 
-> 审计日期：2026-08-21（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 补 YAML frontmatter 并复核数值；08-20 随 rename 事务化 + 4 个新工具同步；08-21 随 ToolBase 重构同步），基于当前工作树文件与代码逐项核对（不依赖 git 历史）。
+> 审计日期：2026-08-22（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 补 YAML frontmatter 并复核数值；08-20 随 rename 事务化 + 4 个新工具同步；08-21 随 ToolBase 重构同步；08-22 随代码清理同步——`GDA_LTO` 环境变量移除、gtest 数复核），基于当前工作树文件与代码逐项核对（不依赖 git 历史）。
 > 事实来源：根 `README.md` / `README_zh.md` / `AGENTS.md`、`CMakeLists.txt`、`cmake/FetchDependencies.cmake`、`src/main.cpp`、`src/core/server_context.cpp`、`src/tools/tool_registry.hpp`、`src/tools/*_tools.hpp`、`src/tools/dispatch.cpp`、`src/prompts/prompt_handlers.cpp`、`src/resources/resource_handlers.cpp`、`Example/project.godot`、`Example/docs/`。
 
 ## 项目定位
@@ -55,7 +55,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 | Audio | 20 | Game | 7 |
 | Input | 19 | Properties | 5 |
 | OS | 18 | Docs | 4 |
-| Debug | 15 | Group | 3 |
+| Debug | 16 | Group | 3 |
 | Navigation | 15 | SpriteFrames | 3 |
 | Config | 13 | System | 1 |
 | | | Capture | 1 |
@@ -95,7 +95,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 | 编译 | 优先 Clang/clang-cl 自动探测，MSVC/GCC 回退；sccache/ccache、LTO（ThinLTO/LTCG/IPO）、Unity 构建、作业池 | `cmake/BuildOptimization.cmake` 等 |
 | 测试 | googletest（FetchContent 拉取，L1）；自研 `gda_test_runner` + `tests/config/*.json`（L2） | `tests/` |
 
-构建优化可通过环境变量覆盖：`GDA_COMPILE_JOBS`、`GDA_LINK_JOBS`、`GDA_CCACHE`、`GDA_SCCACHE`、`GDA_LTO`、`GDA_UNITY_ENABLED`、`GDA_UNITY_BATCH`、`GDA_MAX_COMPILE_MEM_MB`、`GDA_MAX_LINK_MEM_MB`、`GDA_ARCH`、`GDA_IS_CI` 等。详见 [build.md](./build.md)。
+构建优化可通过环境变量覆盖：`GDA_COMPILE_JOBS`、`GDA_LINK_JOBS`、`GDA_CCACHE`、`GDA_SCCACHE`、`GDA_UNITY_ENABLED`、`GDA_UNITY_BATCH`、`GDA_MAX_COMPILE_MEM_MB`、`GDA_MAX_LINK_MEM_MB`、`GDA_ARCH`、`GDA_IS_CI` 等。详见 [build.md](./build.md)。
 
 ## 目录结构
 
@@ -116,8 +116,9 @@ godot-self-driving/
 │   ├── prompts/                # 提示词模板：7 个主题 + debugger_prompts
 │   ├── runtime/                # 游戏运行时桥接：game_bridge(±input/eval) + gda_protocol.hpp
 │   ├── ui/                     # 编辑器 UI：mcp_config_dock、mcp_log_dock
-│   └── util/                   # 通用：variant_json、bm25_index、error_util、readback_util、scene_path、client_config_gen
-├── tests/                      # L1 gda_unit_tests（72 个 gtest）+ L2 gda_test_runner + config/*.json（5 份）
+│   └── util/                   # 通用：variant_json、bm25_index、error_util、readback_util、scene_path、client_config_gen、
+│   │                           #   json_godot、rid_registry、type_hint、gdscript_wrap（后四个 header-only）
+├── tests/                      # L1 gda_unit_tests（71 个 gtest）+ L2 gda_test_runner + config/*.json（5 份）
 ├── docs/                       # 规划文档（docs/plan/）与本知识库（docs/wiki/）
 └── Example/                    # 文档/示例工程（详见 example.md）
 ```

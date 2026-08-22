@@ -6,13 +6,13 @@ tags:
   - 测试
   - L1
   - L2
-timestamp: "2026-08-21T12:15:38+08:00"
+timestamp: "2026-08-22T06:57:00+08:00"
 resource: tests/
 ---
 
 # 测试体系（tests/）
 
-> 审计日期：2026-08-20（2026-08-12 初稿；08-17 随客户端配置生成器测试同步并补 YAML frontmatter；08-20 随 +4 工具与新 L2 用例 `05_rename_references` 同步；**同日 23:30 随 ToolRegistry 单测 +4（L1 72→77）复核**），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 审计日期：2026-08-22（2026-08-12 初稿；08-17 随客户端配置生成器测试同步并补 YAML frontmatter；08-20 随 +4 工具与新 L2 用例 `05_rename_references` 同步；08-21 随 ToolRegistry 单测复核；08-22 随测试瘦身同步——L1 78→71、SCHEMA 静态口径失效），基于当前工作树代码逐行核对（不依赖 git 历史）。
 > 覆盖范围：`tests/` 全部（unit 10 文件、runner 7 实现 + 6 头文件、integration、config 6 JSON、`tests/CMakeLists.txt`），对照 `tests/README.md` 与仓库根 `AGENTS.md` 测试段逐条核算。未运行任何测试，所有数值均来自源码静态统计。
 
 ## 架构总览
@@ -164,15 +164,15 @@ build_csharp_assembly  write_file  create_script  save_resource
 
 | 条目 | AGENTS.md 声称 | 源码核算 | 结论 |
 |---|---|---|---|
-| L1 gtest 数量 | 61 | 78（10 文件统计：ToolRegistry 5，其余同前） | 配置面板 +11；ToolRegistry 单测 +5 |
+| L1 gtest 数量 | 61 | 71（08-22 清理后：log_system 回调用例删除、schema_builder/bm25_index 用例收缩） | 配置面板 +11；ToolRegistry 单测 +5；清理 -7 |
 | L2 用例文件数 | 5 | 6（00_meta / 01_scene / 02_property / 03_tools_contract / 04_resources_scripts / 05_rename_references） | 08-20 新增 05 |
 | ctest L2 用例 | gda_runner_<name> | 一致（`tests/CMakeLists.txt:108-114`，TIMEOUT 600；05 由 GLOB 自动发现） | 一致 |
 | 遍历工具数 | 332 | 336（`*_tools.hpp` 的 `GDA_TOOL_CLASS(` 计数） | 08-21 真类化后改由头文件枚举 |
 | 排除工具数 | 34 | 35（`get_tool_detail` 的 `side_effect` 字段非空即排除，08-21 起由工具 `side_effects()`/`GDA_TOOL_CLASS_SIDE` 驱动，不再硬编码） | 08-21 副作用驱动 |
 | 03 遍历步数 | 约 408 步 | **实测 546**（08-21 全量真类化后 run，336 工具含冒烟） | 运行时统计口径 |
 | 03 耗时 | 约 2-3 分钟 | README：约 2-3 分钟 | 一致 |
-| schema 非空/空数 | 运行时观测 | `SchemaStatisticsBaseline` 仅断言非空>空>0；def 静态可数 SCHEMA_NONE=208 / SCHEMA_BASIC=128（旧 222/126，08-20 随 +4 SCHEMA_BASIC） | 无法静态精确核算，属运行时观测值 |
-| 工具总结构 | 7 元 + 336 领域 | 7 元工具经 `add_meta`+RegisterTool；336 领域/系统经 26 域 `make_tools()`；`g_handlers` 派生=337（336+system_status） | 单一来源 |
+| schema 非空/空数 | 运行时观测 | `SchemaStatisticsBaseline` 仅断言非空>空>0（08-22 起 SCHEMA_NONE/BASIC 静态枚举已删，`tool_input_schema` 的 basic 参数为 no-op） | 无法静态精确核算，属运行时观测值 |
+| 工具总结构 | 7 元 + 336 领域 | 7 元工具经 `ToolRegistry::add()`（IMetaTool 自动归类）+RegisterTool；336 领域/系统经 26 域 `make_tools()`；`g_handlers` 派生=337（336+system_status） | 单一来源 |
 | ToolCatalog 344 条目 | 336 领域 + system_status + 7 元 | 全部由 registry `all_any()` 逐一 `make_tool_info` 派生，无独立填表 | 344 自洽 |
 
 ## 已知引擎副作用
