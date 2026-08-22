@@ -133,6 +133,10 @@ add_library(godot-autopilot SHARED
     src/ui/mcp_log_dock.cpp
     src/ui/mcp_config_dock.cpp)
 
+set_target_properties(godot-autopilot PROPERTIES
+    UNITY_BUILD ${GDA_UNITY_ENABLED}
+    UNITY_BUILD_BATCH_SIZE ${GDA_UNITY_BATCH})
+
 target_include_directories(godot-autopilot PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_BINARY_DIR}/generated)
