@@ -14,7 +14,7 @@ namespace godot_autopilot {
 
 namespace {
 
-static mcp::GetPromptResult make_result(const std::string &content) {
+mcp::GetPromptResult make_result(const std::string &content) {
   mcp::GetPromptResult r;
   mcp::PromptMessage pm;
   pm.role = "assistant";

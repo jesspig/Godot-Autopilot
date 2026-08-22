@@ -1,5 +1,6 @@
 #include "tileset_ops.hpp"
 #include "../util/error_util.hpp"
+#include "../util/json_godot.hpp"
 #include "core/log_system.hpp"
 #include "resource_ops.hpp"
 #include <godot_cpp/classes/class_db_singleton.hpp>
@@ -51,9 +52,7 @@ bool parse_vec2i(const JV &obj, const char *x_key, const char *y_key,
 }
 
 double as_double(const JV &j) {
-  if (j.IsInt())
-    return static_cast<double>(j.GetInt());
-  return j.GetDouble();
+  return util::json_number(&j, 0.0);
 }
 
 int compute_grid(int tex_dim, int tile_dim, int margin, int spacing) {

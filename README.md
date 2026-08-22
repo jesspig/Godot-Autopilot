@@ -19,7 +19,7 @@ Godot Editor
       ├── mcp-cpp-sdk: HTTP server (internal threads)
       ├── mcp-cpp-sdk: McpServer + Streamable HTTP
       ├── Command Queue (HTTP thread → Godot main thread bridge)
-      ├── ~339 MCP Tools across 23 categories (count varies by plugin version; see MCP search_tools)
+      ├── ~343 MCP Tools across 23 categories (count varies by plugin version; see MCP search_tools)
       ├── Inline Documentation (offline engine docs)
       └── Custom Log Dock (dedicated plugin output panel)
 ```
@@ -31,13 +31,13 @@ Godot Editor
 | **Transport** | Streamable HTTP (POST /mcp) | Standard MCP protocol, no bridge process |
 | **Thread Model** | Command queue + frame sync | Safe Godot main-thread-only API access |
 | **Port** | 9527 | Configurable via `GODOT_AUTOPILOT_PORT` env var |
-| **Discovery** | 3-Tier Progressive (Catalog→Inspect→Execute) | Keeps context small with ~339 tools (count varies by plugin version) |
+| **Discovery** | 3-Tier Progressive (Catalog→Inspect→Execute) | Keeps context small with ~343 tools (count varies by plugin version) |
 | **Search** | BM25 keyword | Tools organized by namespace + descriptions |
 | **Build** | CMake 3.28+ / C++17 | Cross-platform, auto-optimized builds |
 
 ## Features
 
-### 🎮 Full Engine Control (~339 Tools, count varies by plugin version; see MCP search_tools)
+### 🎮 Full Engine Control (~343 Tools, count varies by plugin version; see MCP search_tools)
 
 | Category | Tools | Description |
 |----------|:-----:|-------------|

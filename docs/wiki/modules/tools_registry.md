@@ -6,26 +6,26 @@ tags:
   - 模块
   - 工具注册
   - schema
-timestamp: "2026-08-21T12:15:38+08:00"
+timestamp: "2026-08-22T15:10:00+08:00"
 resource: src/tools/
 ---
 
 # 工具注册表（src/tools/ 注册管线）
 
-> 审计日期：2026-08-21（2026-08-12 初稿；08-17 补 frontmatter；08-20 registry 单一来源重构；**08-21 00:48 真类化 + def 删除；**11:57 元工具接口化；**12:15 副作用驱动遍历排除（L1 78/78 + L2 6/6）**）。
+> 审计日期：2026-08-22（2026-08-12 初稿；08-17 补 frontmatter；08-20 registry 单一来源重构；08-21 00:48 真类化 + def 删除；11:57 元工具接口化；12:15 副作用驱动遍历排除；08-22 随死代码清理同步——`add_meta`/`to_tool_info_all`/`build_schema_for_none_by_name` 删除、dispatch 元名单派生化、BM25 索引重建修复；08-22 15 时全量一致性审计——schema 静态口径残留清除（SCHEMA_NONE/BASIC 已废）、遍历步数对齐实测 546）。
 > 覆盖范围：`register_all.cpp/hpp`、`dispatch.cpp/hpp`、`tool_catalog.cpp/hpp`、`schema_builder.cpp/hpp`、`schema_fills.hpp`、6 个 `schema_*_ops.cpp`、`tool_base.hpp`、`tool_registry.hpp`、`fn_tool.hpp`、`tool_decl.hpp`、`meta_tools.hpp`、26 个 `*_tools.hpp`，对照 `tests/runner/traversal.cpp`、`tests/unit/register_all_test.cpp`、`tests/config/03_tools_contract.json` 与仓库根 `AGENTS.md` 工具段。
 > 相关页面：[测试体系](../tests.md) · [工具实现 B 组](../modules/tools_ops_b.md) · [工具实现 A 组](../modules/tools_ops_a.md) · [入口与运行时](../modules/entry_runtime.md) · [架构总览](../overview.md)
 
 ## 注册管线流程（ToolRegistry 单一来源 + 全量真类，自 2026-08-21）
 
-工具注册发生在 `register_all_tools()`（`src/tools/register_all.cpp`），现为 **ToolRegistry 单一来源**且 **336 域工具全部为独立 `ToolBase` 子类**。`tool_defs.def` 已删除；域工具定义在 `src/tools/<域>_tools.hpp`（26 个），每个用宏 `GDA_TOOL_CLASS(ClassName, "tool_name", desc, "Category", std::vector<std::string>({tags}), handler, basic)`（宏在 `tool_decl.hpp`）生成 `public ToolBase` 真类，`make_tools()` 返回 `vector<unique_ptr<ToolBase>>`。`register_all` 先 add `system_status`（FnTool），再逐一注册 26 个域的 `make_tools()`，再 `add_meta` 7 个元工具；catalog/index/g_handlers/g_meta_handlers/RegisterTool 均从 registry 派生。
+工具注册发生在 `register_all_tools()`（`src/tools/register_all.cpp`），现为 **ToolRegistry 单一来源**且 **336 域工具全部为独立 `ToolBase` 子类**。`tool_defs.def` 已删除；域工具定义在 `src/tools/<域>_tools.hpp`（26 个），每个用宏 `GDA_TOOL_CLASS(ClassName, "tool_name", desc, "Category", std::vector<std::string>({tags}), handler, basic)`（宏在 `tool_decl.hpp`）生成 `public ToolBase` 真类，`make_tools()` 返回 `vector<unique_ptr<ToolBase>>`。`register_all` 先 add `system_status`（FnTool），再逐一注册 26 个域的 `make_tools()`，再 `add()` 7 个元工具（`dynamic_cast<IMetaTool*>` 自动归类）；catalog/index/g_handlers/g_meta_handlers/RegisterTool 均从 registry 派生。
 
 ```mermaid
 flowchart TD
     A[register_all_tools] --> B[g_active_registry = 新建 ToolRegistry]
     B --> C[add FnTool: system_status]
     B --> D[add 26 域 make_tools(): 336 个真类]
-    B --> E[add_meta FnTool: 7 个元工具]
+    B --> E[add MetaTool: 7 个元工具]
     E --> F[派生 catalog.add_tool(all_any)]
     E --> G[派生 server.RegisterTool(all_meta)]
     E --> H[派生 BM25 index.add_entry(all_any)]
@@ -33,10 +33,10 @@ flowchart TD
 ```
 
 - **真类（非 FnTool）**：`src/tools/*_tools.hpp` 共 26 个文件，命名空间 `godot_autopilot::<域>_tools`，提供 `make_tools()`。类内 `execute` 委托既有 domain handler（`scene_ops::handle_*` 等），`input_schema` 调 `::godot_autopilot::tool_input_schema(ToolName, basic)`（复用 `build_schema_for`，与旧 def 路径**零漂移**）。
-- **schema 单一源**：`tool_input_schema(name, basic)` 在 `register_all.hpp/cpp` 暴露，转发匿名命名空间 `build_schema_for`；SCHEMA_NONE→`false`/SCHEMA_BASIC→`true`。
+- **schema 单一源**：`tool_input_schema(name, basic)` 在 `register_all.hpp/cpp` 暴露，转发匿名命名空间 `build_schema_for`；`basic` 参数保留签名但已为 no-op（fill 表直接给出最终 schema）。
 - **宏要点**：`GDA_TOOL_CLASS` 的 TagsList 实参必须用圆括号 `std::vector<std::string>({...})`（花括号逗号会被预处理器拆散）；`make_tools()` 必须用 `push_back(std::make_unique<Class>())`（vector 花括号 initializer_list 触发 unique_ptr 拷贝-已删除）。
-- **元工具 = 接口 + 组合**：`IMetaTool` 标记接口（`tool_base.hpp`）；元工具类 `MetaTool : ToolBase, IMetaTool`（`meta_tools.hpp`），依赖（index/catalog/schema/处理逻辑）经构造函数组合注入；`ToolRegistry::add()` 用 `dynamic_cast<const IMetaTool*>` 自动归类——**实现 `IMetaTool` 接口即元工具**（Java 心智）。7 个元工具以 `MetaTool` 注册（`blocked_export` 默认 false），在域工具之后，由派生循环统一 `RegisterTool`。`add_meta()` 保留直写 meta_（兼容测试）。
-- **生命周期**：`g_active_registry` 为文件级 `static unique_ptr<ToolRegistry>`（程序存活期），`register_all_tools` 每次调用重建内容，避免悬垂。
+- **元工具 = 接口 + 组合**：`IMetaTool` 标记接口（`tool_base.hpp`）；元工具类 `MetaTool : ToolBase, IMetaTool`（`meta_tools.hpp`），依赖（index/catalog/schema/处理逻辑）经构造函数组合注入；`ToolRegistry::add()` 用 `dynamic_cast<const IMetaTool*>` 自动归类——**实现 `IMetaTool` 接口即元工具**（Java 心智）。7 个元工具以 `MetaTool` 注册，在域工具之后，由派生循环统一 `RegisterTool`；导出保护在 RegisterTool 回调统一前置 `ExportGuard::is_exporting()` 检查。
+- **生命周期**：`g_active_registry` 为文件级 `static unique_ptr<ToolRegistry>`（程序存活期），`register_all_tools` 每次调用重建内容并 `index.clear()` 重置 BM25 索引，避免悬垂与重复注册。
 - **副作用驱动遍历排除**：`SideEffect` 枚举含 6 值（`None/WritesFile/WritesConfig/ShowsAlert/ModifiesWindow/Process`）；35 个副作用工具用 `GDA_TOOL_CLASS_SIDE` 宏（实现 `ISideEffect` 返回对应值）；`meta_get_tool_detail_impl` 经 `g_active_registry->find_any(name)` + `side_effect_of` + `side_effect_name` 在 `get_tool_detail` 响应补 `side_effect` 字段；遍历 runner 读该字段排除（删除硬编码清单）。
 - **分类边界**：`get_debug_object_info`（def 标 Debug、handler `physics_ops::handle_resolve_object`）归 `physics_tools`；`read_file/find_in_files/write_file`（def 归 OS、handler `text_ops`）归 `os_tools`；Scene Tree 类工具 Category 均为 "Scene"、按 handler 分 `scene_tools`/`scene_tree_tools`；InputMap 工具 Category "Input"、归 `input_map_tools`。
 
@@ -55,28 +55,28 @@ flowchart TD
 
 | # | 声称（AGENTS.md） | 核算结果 | 结论 |
 |---|---|---|---|
-| 1 | 元工具 7 个：ping/search_tools/list_categories/get_tool_detail/call_tool/batch_execute/code_execute，均作为顶层工具提供 | 7 个经 registry `add_meta`（`register_all.cpp:304-465`），统一在 `register_all.cpp:471-490` 循环 `server.RegisterTool`（描述/schema 取自 registry 工具）；名单与 `dispatch.hpp` 的 `meta_tool_names`、`register_all_test.cpp` 的 `kMetaToolNames` 完全一致；L1 断言 `ListTools` 恰好 7 个 | **一致** |
+| 1 | 元工具 7 个：ping/search_tools/list_categories/get_tool_detail/call_tool/batch_execute/code_execute，均作为顶层工具提供 | 7 个经 registry `add()`（`dynamic_cast<IMetaTool*>` 自动入 meta_），统一在 `register_all.cpp` 循环 `server.RegisterTool`（描述/schema 取自 registry 工具）；名单由 `g_active_registry->all_meta()` 派生，与 `register_all_test.cpp` 的 `kMetaToolNames` 一致；L1 断言 `ListTools` 恰好 7 个 | **一致** |
 | 2 | 领域工具 336 个 | 26 个 `*_tools.hpp` 的 `GDA_TOOL_CLASS`/`GDA_TOOL_CLASS_SIDE` 共 336 个（无重复名）；registry `all()`=**337** = 336 + system_status | **一致**（system_status 是唯一非真类来源） |
 | 3 | 工具总体 = 7 元 + 336 域 | registry `all_any()`=**344**（337 域/系统 + 7 元）；MCP 顶层 7 元工具 | **一致** |
 | 4 | ToolCatalog 344 条 | 由 registry `all_any()` 逐一 `make_tool_info` 派生 344 = 336 域 + system_status + 7 元；原 `populate_default_tools`/meta 快照/`Auto` 补录链路整体废弃 | **一致**（单一来源派生，无独立填表） |
-| 5 | schema 283 非空 / 73 空（旧值，已随重命名变化） | def 层面静态可数：SCHEMA_NONE=208、SCHEMA_BASIC=124（旧 222/126）；catalog 级非空/空数随 6 个 fill 函数与默认表变化，**以运行时 `SchemaStatisticsBaseline` 观测为准**，不硬编码 | **运行时统计口径** |
+| 5 | schema 283 非空 / 73 空（旧值，已随重命名变化） | def/SCHEMA_NONE 静态口径已随 08-21 真类化与 08-22 清理整体废除（fill 表直接给出最终 schema，`tool_input_schema` 的 basic 参数为 no-op）；catalog 级非空/空数**以运行时 `SchemaStatisticsBaseline` 观测为准**，不硬编码 | **运行时统计口径** |
 | 6 | SchemaStatisticsBaseline 运行时统计断言，不硬编码 | `register_all_test.cpp:133-147` 只断言 `non_empty > empty`、`empty > 0`、总和 = `catalog.size()`；旧 283/73 为运行时实测值 | **一致** |
 | 7 | 3 个契约缺口 | 见下表 | **一致** |
-| 8 | 35 个副作用工具遍历排除 | `traversal.cpp:24-63` 前端数组 35 项（12 持久磁盘 + 22 用户可见 + `build_csharp_assembly` 进程副作用），全部存在于 def | **一致** |
-| 9 | 遍历步数与工具数联动 | 步数随 def/exclusion 变（336 − 35 = 301 空参 + 冒烟）；**以运行时 `03_tools_contract` 统计为准**，本页旧推导 410（332−34）已过期 | **运行时统计口径** |
+| 8 | 35 个副作用工具遍历排除 | 26 个 `*_tools.hpp` 中 35 个工具用 `GDA_TOOL_CLASS_SIDE` 标记（12 持久磁盘 + 22 用户可见 + `build_csharp_assembly` 进程副作用）；runner 读 `side_effect` 字段自动排除 | **一致** |
+| 9 | 遍历步数与工具数联动 | 步数随工具数/排除集变化（336 − 35 = 301 空参 + 冒烟）；**以运行时 `03_tools_contract` 统计为准**，本页旧推导 410 已过期 | **运行时统计口径** |
 | 10 | 命名约定 `<动词>_<类别>_<维度>_<对象>_<修饰>`（动词置首） | 336 个名字全部小写 snake_case；首段均为动词（create/get/set/add/remove/apply/intersect/play/stop/save/…），符合规范 | **一致** |
 
 ## 元工具与 g_meta_handlers
 
-- 7 个元工具经 registry `add_meta` 注册、由 `register_all.cpp:471-490` 循环 `RegisterTool`，不经 `call_tool`；`g_meta_handlers`（`register_all.cpp:502-507` 派生）保留同一组实现供分发层复用——即 `call_handler` 收到元工具名时走 `g_meta_handlers` 分支（`dispatch.cpp:35-39`）。
-- `call_tool` 元工具检查结果 JSON 的 `error` 字段并置 `is_error = true`（`register_all.cpp:484`），与领域工具 `{"error": ...}` 错误模式衔接。
-- `call_tool` 对带 `__gda_pending` 的异步结果做等待与 `capture_game_viewport` 结果定型（`register_all.cpp:251-266`）。
+- 7 个元工具经 registry `add()` 注册（`IMetaTool` 接口自动归类）、由 `register_all.cpp` 派生循环 `RegisterTool`，不经 `call_tool`；`g_meta_handlers`（`register_all.cpp` 从 `all_meta()` 派生）保留同一组实现供分发层复用——即 `call_handler` 未命中 `g_handlers` 时直接查 `g_meta_handlers`（`dispatch.cpp`）。
+- `call_tool`/`code_execute` 的错误翻转在 RegisterTool 回调统一处理：结果 JSON 含 `error` 字段时置 `is_error = true`，与领域工具 `{"error": ...}` 错误模式衔接。
+- `call_tool` 对带 `__gda_pending` 的异步结果做等待与 `capture_game_viewport` 结果定型；等待实现为 `runtime_ops::wait_pending_response`。
 
 ## Schema 统计口径
 
-- `has_schema_params` 判定：`input_schema.properties` 存在且为非空对象（`register_all_test.cpp:40-43`）；空 schema 仍保留空 `properties` 对象。
-- 330 余条 schema 全部由 `schema::build_schema({ParamDef...})` 生成（`schema_builder.cpp:116-136`）；无 schema 条目的工具走 `build_schema_for_none_by_name`（`register_all.cpp:73-90`）——`scene_tree_*` 补 `group` 参数、`tilemap_*` 补 `node_path`，其余返回空表。当前 332 个 def 工具全部在 fill 表中有条目，该回退路径未实际命中。
-- 3 个 meta 快照（batch_execute/call_tool/code_execute）在 `schema_debug_sys_ops.cpp:166-181` 中有非空 schema 条目，因此 `SchemaSampledTools` 将其断言为非空（`register_all_test.cpp:149-168`）。
+- `has_schema_params` 判定：`input_schema.properties` 存在且为非空对象（`register_all_test.cpp`）；空 schema 仍保留空 `properties` 对象。
+- 330 余条 schema 全部由 `schema::build_schema({ParamDef...})` 生成（6 个 `schema_*_ops.cpp` fill 表 + register_all 内联的元工具 schema）；未命中 fill 表的名字返回空表。schema_builder API 面收敛为三件：`ParamDef`、`build_schema(initializer_list<ParamDef>)`、`add_required_flag`（原 `make_object_schema`/`make_empty_schema`/`add_param` 等辅助函数已删除）。
+- 元工具 schema：ping/list_categories/get_tool_detail/call_tool 五个转换 `build_schema`；search_tools/batch_execute/code_execute 保留手写 JSON（嵌套结构 ParamDef 不可表达）。batch_execute/code_execute 处理逻辑内联于 `code_exec_ops::handle_batch_execute`/`handle_code_execute`，由 `SchemaSampledTools` 断言非空（`register_all_test.cpp`）。
 
 ## 契约缺口表（遍历记 warnings，不 FAIL）
 
@@ -88,31 +88,32 @@ flowchart TD
 
 历史背景注释见 `traversal.cpp:300-301`。
 
-## 遍历排除清单摘要（34 个）
+## 遍历排除清单摘要（35 个）
 
 - **12 个持久磁盘副作用**：set_editor_main_scene、set_editor_plugin_enabled、save_project_settings、add_input_map_action_event、save_input_map、set_editor_settings、save_editor_scene、save_editor_scenes、save_editor_scene_as、write_file、create_script、save_resource。
 - **22 个用户可见副作用**：show_os_alert、show_display_dialog、create_os_process、execute_os_process、kill_os_process、open_os_path、move_os_file_to_trash、set_os_environment、speak_display_tts、stop_display_tts、set_display_clipboard、set_display_mouse_mode、warp_display_mouse、set_display_window_title、set_display_window_position、set_display_window_size、set_display_window_mode、set_display_window_flag、move_display_window_to_foreground、request_display_window_attention、create_display_window、delete_display_window。
-- 清单定义在 `traversal.cpp:24-63`；其中 22 个（SCHEMA_NONE=22）同时属于空 schema 集合，冒烟阶段跳过。
-- 遍历新增工具时必须同步维护此清单，否则会污染 `Example/` 项目或干扰桌面（注释见 `traversal.cpp:18-23`）。
+- **1 个进程副作用**：build_csharp_assembly。
+- 清单不硬编码：35 个工具用 `GDA_TOOL_CLASS_SIDE` 标记，`get_tool_detail` 响应携带 `side_effect` 字段，`tests/runner/traversal.cpp` 依该字段自动排除并从 `*_tools.hpp` 枚举全部工具名；其中空 schema 的副作用工具在冒烟阶段同样跳过。
 
 ## 遍历步数推导
 
-> [!todo] 步数随工具数变化：域工具 332→336（+read_file/find_in_files/build_csharp_assembly/get_resource_references）、排除 34→35，空参 336−35=301，冒烟步数以运行时 `03_tools_contract.json` 统计为准；本段旧推导 410（=332−34 空参 + 冒烟）已过期待重算。
+> 步数随工具数变化：域工具 336、排除 35，空参 336−35=301，冒烟步数以运行时 `03_tools_contract.json` 统计为准；**08-21 全量真类化后实测 ≈546 步**（与 AGENTS.md/tests.md 口径一致）。
 
-遍历经 `call_tool` 元工具代理，每个非排除工具产生一次调用 = 一个 StepResult；步数全部由 def 与排除/空表集合决定（当前运行实测量见 `03_tools_contract` 报告）。
+遍历经 `call_tool` 元工具代理，每个非排除工具产生一次调用 = 一个 StepResult；步数随工具集与空 schema 数浮动（当前运行实测量见 `03_tools_contract` 报告）。
 
 ## 分发与错误路径（dispatch.cpp）
 
-- `call_handler`（`dispatch.cpp:57-66`）：编辑器队列存在且不在主线程时，先 `queue.submit` 排到主线程执行，保证 Godot API 线程安全。
-- `call_handler_impl`（`dispatch.cpp:17-53`）查找顺序：`g_handlers` → 命中即执行，异常捕获后返回 `internal error in tool 'X': unexpected C++ exception`（参数 dump 截断 256 字节）；未命中但属 `meta_tool_names` → `g_meta_handlers`；否则返回 `domain tool 'X' not found — use search_tools to discover available tools`。
-- 导出保护：全部 7 个元工具回调前置 `ExportGuard::is_exporting()` 检查，命中返回 `export_blocked_result()`（`dispatch.cpp:68-74`）。
+- `call_handler`：编辑器队列存在且不在主线程时，先 `queue.submit` 排到主线程执行，保证 Godot API 线程安全。
+- `call_handler_impl` 查找顺序：`g_handlers` → 命中即执行，异常捕获后返回 `internal error in tool 'X': unexpected C++ exception`（参数 dump 截断 256 字节）；未命中再查 `g_meta_handlers`（元名单不再硬编码，由 registry `all_meta()` 派生）；否则返回 `domain tool 'X' not found — use search_tools to discover available tools`。
+- 导出保护：全部 7 个元工具回调前置 `ExportGuard::is_exporting()` 检查，命中返回 `export_blocked_result()`。
+- `debugger_access.hpp` 为 runtime_ops 提供的自由函数接口（capture/broadcast/cancel/continue/breaked/reload_scripts），实现于 `debugger_access.cpp`；依赖方向 runtime_ops.cpp → debugger_access.hpp、debugger_ops.cpp → runtime_ops.hpp，无环。
 
 ## 命名约定抽查
 
 - 336 个工具名全部匹配 `^[a-z0-9_]+$`（小写 snake_case，无大写、无连字符），且**首段均为动词**（create/get/set/add/remove/apply/intersect/play/stop/save/seek/move/warp/…）——符合 `<动词>_<类别>_<维度>_<对象>_<修饰>` 动词置首规范。
 - 段数随粒度自然变化：2 段（`instantiate_scene`、`property_get`、`signal_connect`…）、3-4 段（`create_physics_2d_body`、`intersect_physics_2d_ray`…）、5 段+（`get_scene_tree_nodes_in_group`、`set_input_map_action_deadzone`、`get_nav_3d_map_closest_point_to_segment`…）。规范约束动词置首与 snake_case，段数与类别段选取以表达清晰为准。
 
-## def 分类分布（336 领域工具，23 个类别）
+## 类别分布（336 领域工具，23 个类别）
 
 > 权威总数由 26 个 `*_tools.hpp` 的 `GDA_TOOL_CLASS`/`GDA_TOOL_CLASS_SIDE` 枚举为准（=336），registry `all()`=337（+system_status）；下表为按分类的细分。
 

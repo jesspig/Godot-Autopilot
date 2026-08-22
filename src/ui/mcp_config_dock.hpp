@@ -29,7 +29,6 @@ protected:
 
 public:
   McpConfigDock();
-  ~McpConfigDock() = default;
 
   void set_server_context(ServerContext *ctx);
 

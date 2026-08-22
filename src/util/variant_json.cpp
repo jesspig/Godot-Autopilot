@@ -736,9 +736,7 @@ godot::Variant deserialize_as_object(const mcp::JsonValue &j,
   return obj_var;
 }
 
-// 递归序列化的深度上限；超过时输出字符串占位而非继续递归（防止栈溢出）
 constexpr int MAX_SERIALIZE_DEPTH = 32;
-// 占位形态：深度超限输出 "[depth exceeded]"、检测到环输出 "[<circular ref>"
 const char *const DEPTH_EXCEEDED_PLACEHOLDER = "[depth exceeded]";
 const char *const CIRCULAR_REF_PLACEHOLDER = "[<circular ref>";
 
@@ -984,7 +982,6 @@ mcp::JsonValue serialize_impl(const godot::Variant &v, int depth,
   case Variant::OBJECT: {
     godot::Object *obj = v.operator godot::Object *();
     if (obj) {
-      // 路径环检测：递归进入前插入 instance_id，退出后移除（允许 DAG 共享子对象）
       uint64_t oid = obj->get_instance_id();
       if (visited.count(oid) > 0) {
         return mcp::JsonValue(CIRCULAR_REF_PLACEHOLDER);

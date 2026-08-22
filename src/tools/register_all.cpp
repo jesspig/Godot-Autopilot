@@ -2,18 +2,9 @@
 #include "core/export_guard.hpp"
 #include "core/log_system.hpp"
 #include <version.hpp>
-#include "tools/audio_ops.hpp"
-#include "tools/capture_ops.hpp"
 #include "tools/code_exec_ops.hpp"
-#include "tools/config_ops.hpp"
-#include "tools/debug_ops.hpp"
-#include "tools/debugger_ops.hpp"
 #include "tools/dispatch.hpp"
-#include "tools/display_ops.hpp"
-#include "tools/doc_ops.hpp"
-#include "tools/editor_ops.hpp"
 #include "tools/fn_tool.hpp"
-#include "tools/group_ops.hpp"
 #include "tools/group_tools.hpp"
 #include "tools/capture_tools.hpp"
 #include "tools/spriteframes_tools.hpp"
@@ -40,26 +31,10 @@
 #include "tools/game_tools.hpp"
 #include "tools/property_tools.hpp"
 #include "tools/system_tools.hpp"
-#include "tools/input_map_ops.hpp"
-#include "tools/input_ops.hpp"
-#include "tools/log_ops.hpp"
 #include "tools/meta_tools.hpp"
-#include "tools/nav_ops.hpp"
-#include "tools/os_ops.hpp"
-#include "tools/physics_ops.hpp"
-#include "tools/property_ops.hpp"
-#include "tools/render_ops.hpp"
-#include "tools/resource_ops.hpp"
 #include "tools/runtime_ops.hpp"
-#include "tools/scene_ops.hpp"
-#include "tools/scene_tree_ops.hpp"
 #include "tools/schema_builder.hpp"
 #include "tools/schema_fills.hpp"
-#include "tools/script_ops.hpp"
-#include "tools/spriteframes_ops.hpp"
-#include "tools/text_ops.hpp"
-#include "tools/tilemap_ops.hpp"
-#include "tools/tileset_ops.hpp"
 #include "tools/tool_base.hpp"
 #include "tools/tool_registry.hpp"
 #include <mcp/Content.hpp>
@@ -71,42 +46,9 @@
 namespace godot_autopilot {
 
 namespace {
-mcp::JsonValue make_schema() {
-  mcp::JsonValue s(mcp::JsonValue::object_tag);
-  s["type"] = mcp::JsonValue("object");
-  mcp::JsonValue props(mcp::JsonValue::object_tag);
-  s["properties"] = std::move(props);
-  mcp::JsonValue req(mcp::JsonValue::array_tag);
-  s["required"] = std::move(req);
-  return s;
-}
 
-enum SchemaType { SCHEMA_NONE, SCHEMA_BASIC };
-
-mcp::JsonValue build_schema_for_none_by_name(const std::string &name) {
-  if (name == "call_scene_tree_group" || name == "get_scene_tree_nodes_in_group" ||
-      name == "notify_scene_tree_group" || name == "is_scene_tree_paused" ||
-      name == "set_scene_tree_pause") {
-    return schema::build_schema({
-        {"group", "string", "Scene group name.", false},
-    });
-  }
-
-  if (name == "create_tilemap" || name == "set_tilemap_cell" ||
-      name == "set_tilemap_cells") {
-    return schema::build_schema({
-        {"node_path", "string", "Path to the TileMap node in the scene.", true},
-    });
-  }
-
-  mcp::JsonValue s(mcp::JsonValue::object_tag);
-  s["type"] = mcp::JsonValue("object");
-  s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
-  return s;
-}
-
-mcp::JsonValue build_schema_for(SchemaType type, const std::string &name) {
-  static const std::unordered_map<std::string, mcp::JsonValue> schemas = [] {
+mcp::JsonValue build_schema_for(const std::string &name) {
+    static const std::unordered_map<std::string, mcp::JsonValue> schemas = [] {
         std::unordered_map<std::string, mcp::JsonValue> m;
 
 
@@ -124,10 +66,6 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string &name) {
     auto it = schemas.find(name);
     if (it != schemas.end()) return it->second;
 
-    if (type == SCHEMA_NONE) {
-        return build_schema_for_none_by_name(name);
-    }
-
     mcp::JsonValue s(mcp::JsonValue::object_tag);
     s["type"] = mcp::JsonValue("object");
     s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
@@ -136,7 +74,7 @@ mcp::JsonValue build_schema_for(SchemaType type, const std::string &name) {
 
 }
 
-mcp::JsonValue tool_input_schema(const std::string& name, bool basic) { return build_schema_for(basic ? SCHEMA_BASIC : SCHEMA_NONE, name); }
+mcp::JsonValue tool_input_schema(const std::string& name, bool basic) { (void)basic; return build_schema_for(name); }
 
 static std::unique_ptr<ToolRegistry> g_active_registry = std::make_unique<ToolRegistry>();
 
@@ -283,18 +221,11 @@ static mcp::JsonValue meta_call_tool_wait(const std::string& name, mcp::JsonValu
     return result;
 }
 
-static mcp::JsonValue meta_batch_execute_impl(const mcp::JsonValue& args) {
-    return code_exec_ops::handle_batch_execute(args);
-}
-
-static mcp::JsonValue meta_code_execute_impl(const mcp::JsonValue& args) {
-    return code_exec_ops::handle_code_execute(args);
-}
-
 void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog& catalog, Bm25Index& index, int port) {
 
     (void)queue;
     g_active_registry = std::make_unique<ToolRegistry>();
+    index.clear();
 
     g_active_registry->add(make_fn_tool(
         ToolMeta{"system_status", "Get server status info", "System", {"status", "info"}, true},
@@ -310,7 +241,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
             r["result"] = std::move(status);
             return r;
         },
-        make_schema()));
+        schema::build_schema({})));
 
 auto add_domain_tools = [](auto& make_fn) {
         for (auto& t : make_fn()) {
@@ -348,7 +279,7 @@ auto add_domain_tools = [](auto& make_fn) {
     g_active_registry->add(std::make_unique<::godot_autopilot::MetaTool>(
         ToolMeta{"ping", "Health check ping", "Meta", {"health", "ping"}, true},
         [](const mcp::JsonValue&) { return meta_ping_impl(); },
-        make_schema()));
+        schema::build_schema({})));
 
     {
         mcp::JsonValue s(mcp::JsonValue::object_tag);
@@ -382,56 +313,31 @@ auto add_domain_tools = [](auto& make_fn) {
     g_active_registry->add(std::make_unique<::godot_autopilot::MetaTool>(
         ToolMeta{"list_categories", "List all tool categories", "Meta", {"categories", "discovery"}, true},
         [&catalog](const mcp::JsonValue&) { return meta_list_categories_impl(catalog); },
-        make_schema()));
+        schema::build_schema({})));
 
-    {
-        mcp::JsonValue s(mcp::JsonValue::object_tag);
-        s["type"] = mcp::JsonValue("object");
-        mcp::JsonValue props(mcp::JsonValue::object_tag);
-        mcp::JsonValue n(mcp::JsonValue::object_tag);
-        n["type"] = mcp::JsonValue("string");
-        n["description"] = mcp::JsonValue("Tool name (e.g. ping, search_tools)");
-        props["name"] = std::move(n);
-        s["properties"] = std::move(props);
-        mcp::JsonValue req(mcp::JsonValue::array_tag);
-        req.PushBack(mcp::JsonValue("name"));
-        s["required"] = std::move(req);
-        g_active_registry->add(std::make_unique<::godot_autopilot::MetaTool>(
-            ToolMeta{"get_tool_detail", "Get complete schema for one tool", "Meta", {"detail", "schema"}, true},
-            [&catalog](const mcp::JsonValue& args) { return meta_get_tool_detail_impl(args, catalog); },
-            std::move(s)));
-    }
+    g_active_registry->add(std::make_unique<::godot_autopilot::MetaTool>(
+        ToolMeta{"get_tool_detail", "Get complete schema for one tool", "Meta", {"detail", "schema"}, true},
+        [&catalog](const mcp::JsonValue& args) { return meta_get_tool_detail_impl(args, catalog); },
+        schema::build_schema({
+            {"name", "string", "Tool name (e.g. ping, search_tools)", true},
+        })));
 
-    {
-        mcp::JsonValue s(mcp::JsonValue::object_tag);
-        s["type"] = mcp::JsonValue("object");
-        mcp::JsonValue props(mcp::JsonValue::object_tag);
-        mcp::JsonValue name_p(mcp::JsonValue::object_tag);
-        name_p["type"] = mcp::JsonValue("string");
-        name_p["description"] = mcp::JsonValue("Tool name to execute");
-        props["name"] = std::move(name_p);
-        mcp::JsonValue a(mcp::JsonValue::object_tag);
-        a["type"] = mcp::JsonValue("object");
-        a["description"] = mcp::JsonValue("Tool arguments as JSON object");
-        props["arguments"] = std::move(a);
-        s["properties"] = std::move(props);
-        mcp::JsonValue creq(mcp::JsonValue::array_tag);
-        creq.PushBack(mcp::JsonValue("name"));
-        s["required"] = std::move(creq);
-        g_active_registry->add(std::make_unique<::godot_autopilot::MetaTool>(
-            ToolMeta{"call_tool",
-                     "Execute any tool by name. Use this to call all non-meta tools (scene_*, property_*, signal_*, system_status).",
-                     "System", {"call", "dispatch", "proxy"}, true},
-            [](const mcp::JsonValue& args) -> mcp::JsonValue {
-                std::string name = args.Find("name") != nullptr && args["name"].IsString() ? args["name"].GetString() : std::string();
-                mcp::JsonValue j = meta_call_tool_wait(name, meta_call_tool_impl(args));
-                if (!name.empty()) {
-                    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, name + " completed");
-                }
-                return j;
-            },
-            std::move(s)));
-    }
+    g_active_registry->add(std::make_unique<::godot_autopilot::MetaTool>(
+        ToolMeta{"call_tool",
+                 "Execute any tool by name. Use this to call all non-meta tools (scene_*, property_*, signal_*, system_status).",
+                 "System", {"call", "dispatch", "proxy"}, true},
+        [](const mcp::JsonValue& args) -> mcp::JsonValue {
+            std::string name = args.Find("name") != nullptr && args["name"].IsString() ? args["name"].GetString() : std::string();
+            mcp::JsonValue j = meta_call_tool_wait(name, meta_call_tool_impl(args));
+            if (!name.empty()) {
+                LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, name + " completed");
+            }
+            return j;
+        },
+        schema::build_schema({
+            {"name", "string", "Tool name to execute", true},
+            {"arguments", "object", "Tool arguments as JSON object", false},
+        })));
 
     {
         mcp::JsonValue s(mcp::JsonValue::object_tag);
@@ -470,7 +376,7 @@ auto add_domain_tools = [](auto& make_fn) {
             ToolMeta{"batch_execute",
                      "Execute multiple tools in batch. Each operation runs in sequence; if stop_on_error is true and any operation fails, remaining operations are skipped.",
                      "System", {"batch", "execute", "multi"}, true},
-            [](const mcp::JsonValue& a) { return meta_batch_execute_impl(a); },
+            [](const mcp::JsonValue& a) { return code_exec_ops::handle_batch_execute(a); },
             std::move(s)));
     }
 
@@ -504,7 +410,7 @@ auto add_domain_tools = [](auto& make_fn) {
             ToolMeta{"code_execute",
                      "Execute arbitrary GDScript code. The source code is wrapped in a script that extends Node, compiled, attached to a temporary node, and executed. Returns the function result serialized as JSON. By default the source is inlined inside the _run() function body: top-level func definitions are not supported — inline all code as expressions/statements, or define named functions and call one via function_name (multi-function mode). Execution environment exposes SceneRoot (the edited scene root node) for node access; see SceneRoot.get_node(\"Child\").",
                      "System", {"code", "execute", "script", "gdscript"}, true},
-            [](const mcp::JsonValue& a) { return meta_code_execute_impl(a); },
+            [](const mcp::JsonValue& a) { return code_exec_ops::handle_code_execute(a); },
             std::move(s)));
     }
 

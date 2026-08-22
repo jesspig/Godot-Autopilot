@@ -30,8 +30,7 @@ int ServerContext::resolve_port() {
 ServerContext::ServerContext(CommandQueue &queue)
     : queue_(queue),
       catalog_(std::make_unique<ToolCatalog>()),
-      bm25_index_(std::make_unique<Bm25Index>()),
-      start_time_(std::chrono::steady_clock::now()) {
+      bm25_index_(std::make_unique<Bm25Index>()) {
   port_ = resolve_port();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
                             "Server configured on port " +

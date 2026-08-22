@@ -498,7 +498,7 @@ public:
     }
 
     if (!body.IsNull()) {
-      body["ok"] = JV(!body.Contains("error"));
+      body[GDA_FIELD_OK] = JV(!body.Contains("error"));
       send_response(request_id, std::move(body));
     }
     return true;
@@ -512,7 +512,7 @@ bool g_registered = false;
 } // namespace
 
 void send_response(int64_t request_id, JV body) {
-  body["request_id"] = JV(request_id);
+  body[GDA_FIELD_REQUEST_ID] = JV(request_id);
   godot::Array payload;
   payload.push_back(godot::String(body.Dump().c_str()));
   if (auto *dbg = godot::EngineDebugger::get_singleton()) {

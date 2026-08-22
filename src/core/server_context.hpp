@@ -1,7 +1,6 @@
 #ifndef GODOT_AUTOPILOT_SERVER_CONTEXT_HPP
 #define GODOT_AUTOPILOT_SERVER_CONTEXT_HPP
 
-#include <chrono>
 #include <cstdint>
 #include <string>
 
@@ -29,8 +28,6 @@ public:
   int get_port() const;
   bool is_running() const;
 
-  CommandQueue &get_queue() { return queue_; }
-
   const std::string &last_error() const { return last_error_; }
 
 private:
@@ -42,7 +39,6 @@ private:
   int port_ = GDA_DEFAULT_PORT;
   bool running_ = false;
   std::string last_error_;
-  std::chrono::steady_clock::time_point start_time_;
 
   void register_tools();
   int resolve_port();

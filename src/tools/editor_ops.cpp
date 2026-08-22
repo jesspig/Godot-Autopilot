@@ -103,6 +103,18 @@ std::string unsaved_list_str(const godot::PackedStringArray &scenes) {
   return list;
 }
 
+void focus_main_screen_for_class(godot::EditorInterface *editor,
+                                 const godot::StringName &class_name) {
+  auto *cdbs = godot::ClassDBSingleton::get_singleton();
+  if (!cdbs)
+    return;
+  if (cdbs->is_parent_class(class_name, godot::StringName("Node2D"))) {
+    editor->set_main_screen_editor(godot::String("2D"));
+  } else if (cdbs->is_parent_class(class_name, godot::StringName("Node3D"))) {
+    editor->set_main_screen_editor(godot::String("3D"));
+  }
+}
+
 } // namespace
 
 mcp::JsonValue handle_get_selection(const mcp::JsonValue &) {
@@ -412,9 +424,19 @@ mcp::JsonValue handle_undo_redo_commit(const mcp::JsonValue &) {
   return r;
 }
 
-mcp::JsonValue handle_undo_redo_add_do(const mcp::JsonValue &args) {
+namespace {
+
+enum class UndoRedoBranch {
+  Do,
+  Undo,
+};
+
+mcp::JsonValue handle_undo_redo_add_method(const mcp::JsonValue &args,
+                                           UndoRedoBranch branch) {
+  const bool is_do = branch == UndoRedoBranch::Do;
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "add_editor_undo_redo_do called");
+                            is_do ? "add_editor_undo_redo_do called"
+                                  : "add_editor_undo_redo_undo called");
   auto *np = args.Find("node_path");
   auto *mt = args.Find("method");
   if (!np || !np->IsString()) {
@@ -450,68 +472,37 @@ mcp::JsonValue handle_undo_redo_add_do(const mcp::JsonValue &args) {
     return e;
   }
   auto *val = args.Find("value");
-  if (val && !val->IsNull()) {
-    godot::Variant var = VariantJson::deserialize(*val);
-    undo_redo->add_do_method(node, godot::StringName(method.c_str()), var);
+  if (is_do) {
+    if (val && !val->IsNull()) {
+      godot::Variant var = VariantJson::deserialize(*val);
+      undo_redo->add_do_method(node, godot::StringName(method.c_str()), var);
+    } else {
+      undo_redo->add_do_method(node, godot::StringName(method.c_str()));
+    }
   } else {
-    undo_redo->add_do_method(node, godot::StringName(method.c_str()));
+    if (val && !val->IsNull()) {
+      godot::Variant var = VariantJson::deserialize(*val);
+      undo_redo->add_undo_method(node, godot::StringName(method.c_str()), var);
+    } else {
+      undo_redo->add_undo_method(node, godot::StringName(method.c_str()));
+    }
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "add_editor_undo_redo_do completed");
+                            is_do ? "add_editor_undo_redo_do completed"
+                                  : "add_editor_undo_redo_undo completed");
   return r;
 }
 
+} // namespace
+
+mcp::JsonValue handle_undo_redo_add_do(const mcp::JsonValue &args) {
+  return handle_undo_redo_add_method(args, UndoRedoBranch::Do);
+}
+
 mcp::JsonValue handle_undo_redo_add_undo(const mcp::JsonValue &args) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "add_editor_undo_redo_undo called");
-  auto *np = args.Find("node_path");
-  auto *mt = args.Find("method");
-  if (!np || !np->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: node_path");
-    return e;
-  }
-  if (!mt || !mt->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: method");
-    return e;
-  }
-  std::string node_path = np->GetString();
-  std::string method = mt->GetString();
-  auto *editor = godot::EditorInterface::get_singleton();
-  std::string hint;
-  auto *node = godot_autopilot::util::resolve_scene_node(
-      node_path, editor ? editor->get_edited_scene_root() : nullptr, &hint);
-  if (!node) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("node not found: " + node_path + " — " + hint);
-    return e;
-  }
-  if (!editor) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorInterface not available");
-    return e;
-  }
-  auto *undo_redo = editor->get_editor_undo_redo();
-  if (!undo_redo) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("EditorUndoRedoManager not available");
-    return e;
-  }
-  auto *val = args.Find("value");
-  if (val && !val->IsNull()) {
-    godot::Variant var = VariantJson::deserialize(*val);
-    undo_redo->add_undo_method(node, godot::StringName(method.c_str()), var);
-  } else {
-    undo_redo->add_undo_method(node, godot::StringName(method.c_str()));
-  }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "add_editor_undo_redo_undo completed");
-  return r;
+  return handle_undo_redo_add_method(args, UndoRedoBranch::Undo);
 }
 
 mcp::JsonValue handle_file_system_get_resources(const mcp::JsonValue &args) {
@@ -804,14 +795,7 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue &args) {
 
   scene_dirty_tracker::clear_scene_modified();
 
-  {
-    godot::StringName type_sn(type.c_str());
-    if (cdbs->is_parent_class(type_sn, godot::StringName("Node2D"))) {
-      editor->set_main_screen_editor(godot::String("2D"));
-    } else if (cdbs->is_parent_class(type_sn, godot::StringName("Node3D"))) {
-      editor->set_main_screen_editor(godot::String("3D"));
-    }
-  }
+  focus_main_screen_for_class(editor, godot::StringName(type.c_str()));
 
   mcp::JsonValue inner(mcp::JsonValue::object_tag);
   inner["path"] = mcp::JsonValue(name);
@@ -859,19 +843,9 @@ mcp::JsonValue handle_open_scene(const mcp::JsonValue &args) {
     return e;
   }
 
-  {
-    auto *root = new_root;
-    if (root) {
-      godot::StringName root_class = root->get_class();
-      auto *cdbs = godot::ClassDBSingleton::get_singleton();
-      if (cdbs &&
-          cdbs->is_parent_class(root_class, godot::StringName("Node2D"))) {
-        editor->set_main_screen_editor(godot::String("2D"));
-      } else if (cdbs && cdbs->is_parent_class(root_class,
-                                               godot::StringName("Node3D"))) {
-        editor->set_main_screen_editor(godot::String("3D"));
-      }
-    }
+  if (new_root) {
+    focus_main_screen_for_class(editor,
+                                godot::StringName(new_root->get_class()));
   }
 
   scene_dirty_tracker::clear_scene_modified();

@@ -1,6 +1,7 @@
 #include "text_ops.hpp"
 #include "core/log_system.hpp"
 #include "util/error_util.hpp"
+#include "util/rid_registry.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/file_access.hpp>
@@ -11,7 +12,6 @@
 #include <godot_cpp/variant/typed_array.hpp>
 #include <godot_cpp/variant/vector2.hpp>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 namespace godot_autopilot {
@@ -27,34 +27,7 @@ JV ok_json() {
   return r;
 }
 
-struct RidStore {
-  std::unordered_map<int64_t, godot::RID> map;
-
-  int64_t store(const godot::RID &rid) {
-    int64_t id = rid.get_id();
-    map[id] = rid;
-    return id;
-  }
-
-  godot::RID get(int64_t id) {
-    auto it = map.find(id);
-    if (it != map.end())
-      return it->second;
-    return godot::RID();
-  }
-};
-
-RidStore &rid_store() {
-  static RidStore s;
-  return s;
-}
-
-godot::RID resolve_rid(const JV &args, const char *key) {
-  auto *it = args.Find(key);
-  if (!it || !it->IsNumber())
-    return godot::RID();
-  return rid_store().get(it->GetInt());
-}
+struct TextRidDomain {};
 
 godot::Ref<godot::TextServer> get_ts() {
   auto *mgr = godot::TextServerManager::get_singleton();
@@ -72,7 +45,7 @@ JV handle_create_font(const JV &args) {
   if (ts.is_null())
     return util::error_json("TextServer not available");
   godot::RID rid = ts->create_font();
-  int64_t id = rid_store().store(rid);
+  int64_t id = util::rid_store<TextRidDomain>().store(rid);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "create_text_font completed");
   JV r(JV::object_tag);
@@ -97,7 +70,7 @@ JV handle_create_shaped_text(const JV &args) {
   godot::RID rid = ts->create_shaped_text(
       static_cast<godot::TextServer::Direction>(direction),
       static_cast<godot::TextServer::Orientation>(orientation));
-  int64_t id = rid_store().store(rid);
+  int64_t id = util::rid_store<TextRidDomain>().store(rid);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "create_shaped_text completed");
   JV r(JV::object_tag);
@@ -111,7 +84,7 @@ JV handle_font_set_antialiasing(const JV &args) {
   auto ts = get_ts();
   if (ts.is_null())
     return util::error_json("TextServer not available");
-  godot::RID font_rid = resolve_rid(args, "font_rid");
+  godot::RID font_rid = util::resolve_rid<TextRidDomain>(args, "font_rid");
   if (!font_rid.is_valid())
     return util::error_json("missing or invalid parameter: font_rid");
   auto *a = args.Find("antialiasing");
@@ -130,7 +103,7 @@ JV handle_font_set_data(const JV &args) {
   auto ts = get_ts();
   if (ts.is_null())
     return util::error_json("TextServer not available");
-  godot::RID font_rid = resolve_rid(args, "font_rid");
+  godot::RID font_rid = util::resolve_rid<TextRidDomain>(args, "font_rid");
   if (!font_rid.is_valid())
     return util::error_json("missing or invalid parameter: font_rid");
   auto *dp = args.Find("data");
@@ -151,7 +124,7 @@ JV handle_font_set_hinting(const JV &args) {
   auto ts = get_ts();
   if (ts.is_null())
     return util::error_json("TextServer not available");
-  godot::RID font_rid = resolve_rid(args, "font_rid");
+  godot::RID font_rid = util::resolve_rid<TextRidDomain>(args, "font_rid");
   if (!font_rid.is_valid())
     return util::error_json("missing or invalid parameter: font_rid");
   auto *h = args.Find("hinting");
@@ -237,13 +210,13 @@ JV handle_shaped_text_add_string(const JV &args) {
   auto ts = get_ts();
   if (ts.is_null())
     return util::error_json("TextServer not available");
-  godot::RID shaped_rid = resolve_rid(args, "shaped_rid");
+  godot::RID shaped_rid = util::resolve_rid<TextRidDomain>(args, "shaped_rid");
   if (!shaped_rid.is_valid())
     return util::error_json("missing or invalid parameter: shaped_rid");
   auto *tp = args.Find("text");
   if (!tp || !tp->IsString())
     return util::error_json("missing required parameter: text");
-  godot::RID font_rid = resolve_rid(args, "font_rid");
+  godot::RID font_rid = util::resolve_rid<TextRidDomain>(args, "font_rid");
   if (!font_rid.is_valid())
     return util::error_json("missing or invalid parameter: font_rid");
   auto *sp = args.Find("size");
@@ -272,7 +245,7 @@ JV handle_shaped_text_get_size(const JV &args) {
   auto ts = get_ts();
   if (ts.is_null())
     return util::error_json("TextServer not available");
-  godot::RID shaped_rid = resolve_rid(args, "shaped_rid");
+  godot::RID shaped_rid = util::resolve_rid<TextRidDomain>(args, "shaped_rid");
   if (!shaped_rid.is_valid())
     return util::error_json("missing or invalid parameter: shaped_rid");
   godot::Vector2 size = ts->shaped_text_get_size(shaped_rid);

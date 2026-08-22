@@ -4,6 +4,7 @@
 #include "util/error_util.hpp"
 #include "util/readback_util.hpp"
 #include "util/scene_path.hpp"
+#include "util/type_hint.hpp"
 #include "util/variant_json.hpp"
 #include <algorithm>
 #include <godot_cpp/classes/class_db_singleton.hpp>
@@ -27,18 +28,13 @@ namespace property_ops {
 
 namespace {
 
-std::string to_std_string(const godot::String &s) {
-  godot::CharString utf8 = s.utf8();
-  return std::string(utf8.ptr());
-}
-
 godot::Dictionary find_property_info(godot::Node *node,
                                      const std::string &prop_name) {
   godot::TypedArray<godot::Dictionary> props = node->get_property_list();
   for (int64_t i = 0; i < props.size(); i++) {
     godot::Dictionary dict = props[i];
     if (dict.has("name") &&
-        to_std_string(dict["name"].operator godot::String()) == prop_name) {
+        util::to_std(dict["name"].operator godot::String()) == prop_name) {
       return dict;
     }
   }
@@ -90,7 +86,7 @@ std::string find_property_candidates(godot::Node *node,
     godot::Dictionary dict = props[i];
     if (!dict.has("name"))
       continue;
-    std::string name = to_std_string(dict["name"].operator godot::String());
+    std::string name = util::to_std(dict["name"].operator godot::String());
     candidates.push_back({levenshtein_distance(prop_name, name), name});
   }
 
@@ -240,6 +236,118 @@ std::string usage_name(int usage) {
   return result;
 }
 
+struct NodePathValueConversion {
+  bool converted = false;
+  bool has_error = false;
+  mcp::JsonValue error;
+  godot::Variant value;
+  std::string node_path;
+};
+
+NodePathValueConversion
+convert_node_path_value(const godot::Dictionary &dict,
+                        const std::string &prop_str,
+                        const std::string &path_str,
+                        const mcp::JsonValue &raw_value) {
+  NodePathValueConversion result;
+  bool node_typed_prop = false;
+  if (!dict.is_empty() && dict.has("type") && dict.has("hint") &&
+      dict.has("hint_string")) {
+    int type_id = static_cast<int>(dict["type"]);
+    int hint_val = static_cast<int>(dict["hint"]);
+    if (static_cast<godot::Variant::Type>(type_id) == godot::Variant::OBJECT &&
+        hint_val == godot::PROPERTY_HINT_RESOURCE_TYPE) {
+      std::string hint_str =
+          util::to_std(dict["hint_string"].operator godot::String());
+      node_typed_prop = is_node_class(parse_hint_class(hint_str));
+    }
+  }
+  if (!node_typed_prop || !raw_value.IsString()) {
+    return result;
+  }
+  std::string np_str = raw_value.GetString();
+  godot::Node *scene_root = find_edited_scene_root();
+  godot::Node *target_node = nullptr;
+  if (scene_root) {
+    target_node = scene_root->get_node_or_null(
+        godot::NodePath(godot::String(np_str.c_str())));
+  }
+  if (!target_node) {
+    result.has_error = true;
+    result.error = util::error_detail(
+        "cannot assign node path '" + np_str + "' to node-typed property '" +
+            prop_str + "' on " + path_str,
+        path_str,
+        "a valid path to a node inside the currently edited scene" +
+            (scene_root ? " (root \"" + util::to_std(scene_root->get_name()) +
+                              "\")"
+                        : " (no edited scene root)"),
+        "pass a scene-resolvable node path such as \"Player/Camera2D\" or "
+        "\"..\", or use code_execute to assign a node reference directly "
+        "(e.g. get_node(\"Path/To/Node\"))");
+    return result;
+  }
+  result.converted = true;
+  result.value = godot::Variant(static_cast<godot::Object *>(target_node));
+  result.node_path = np_str;
+  return result;
+}
+
+bool memory_resource_assignment_blocked(const godot::Variant &value,
+                                        const std::string &prop_str,
+                                        const std::string &path_str,
+                                        mcp::JsonValue &out_error) {
+  if (value.get_type() != godot::Variant::OBJECT) {
+    return false;
+  }
+  godot::Ref<godot::Resource> res = value;
+  if (!res.is_valid()) {
+    return false;
+  }
+  std::string res_path = util::to_std(res->get_path());
+  const std::string memory_prefix = "memory://";
+  if (res_path.compare(0, memory_prefix.size(), memory_prefix) != 0) {
+    return false;
+  }
+  std::string res_name = res_path.substr(memory_prefix.size());
+  mcp::JsonValue e(mcp::JsonValue::object_tag);
+  e["error"] = mcp::JsonValue(
+      "cannot assign memory resource '" + res_name +
+      "' to node property '" + prop_str + "' on " + path_str +
+      " — memory:// resources are not persistent and will corrupt the scene file if saved. "
+      "Use resource_save to save it to disk first, then pass {\"path\": "
+      "\"res://...\"}"
+      " Alternatively create the resource inline via code_execute (e.g. "
+      "node.shape = RectangleShape2D.new()) or use resource_set_property "
+      "to edit the memory resource itself.");
+  out_error = std::move(e);
+  return true;
+}
+
+void add_camera2d_serialization_note(mcp::JsonValue &result,
+                                     const std::string &prop_str,
+                                     godot::Node *node) {
+  auto *cdbs = godot::ClassDBSingleton::get_singleton();
+  if (!cdbs || !cdbs->is_parent_class(node->get_class(),
+                                      godot::StringName("Camera2D"))) {
+    return;
+  }
+  if (prop_str == "enabled") {
+    result["serialization_note"] =
+        mcp::JsonValue("Camera2D enabled defaults to true. If setting to "
+                       "true (the default), it won't appear in .tscn. "
+                       "If setting to false, it will serialize correctly. "
+                       "To ensure initial enabled state, use code_execute: "
+                       "get_node(\"Path/To/Camera2D\").set_enabled(true/"
+                       "false) in _ready().");
+  } else if (prop_str == "current") {
+    result["serialization_note"] = mcp::JsonValue(
+        "Camera2D current is not a registered property (no setter/getter). "
+        "Cannot be set via property_set. "
+        "Use code_execute: get_node(\"Path/To/Camera2D\").make_current()");
+  }
+}
+
 } // namespace
 
 mcp::JsonValue handle_get(const mcp::JsonValue &args) {
@@ -337,71 +445,21 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
   if (it_hint && it_hint->IsString()) {
     type_hint = it_hint->GetString();
   }
-
-  if (type_hint.empty()) {
-    if (!dict.is_empty() && dict.has("type")) {
-      int type_id = static_cast<int>(dict["type"]);
-      int hint_val = 0;
-      if (dict.has("hint")) {
-        hint_val = static_cast<int>(dict["hint"]);
-      }
-      bool is_object_type =
-          static_cast<godot::Variant::Type>(type_id) == godot::Variant::OBJECT;
-      bool is_resource_hint = hint_val == godot::PROPERTY_HINT_RESOURCE_TYPE;
-      if ((is_object_type || is_resource_hint) && dict.has("hint_string")) {
-        std::string hint_str =
-            to_std_string(dict["hint_string"].operator godot::String());
-        if (!hint_str.empty()) {
-          type_hint = hint_str;
-        }
-      }
-      if (type_hint.empty()) {
-        type_hint = to_std_string(godot::Variant::get_type_name(
-            static_cast<godot::Variant::Type>(type_id)));
-      }
-    }
-  }
+  type_hint = util::infer_type_hint(dict, std::move(type_hint));
 
   godot::StringName prop_name(prop_str.c_str());
   std::string value_node_path;
   godot::Variant value;
   bool converted_node_path = false;
-  bool node_typed_prop = false;
-  if (!dict.is_empty() && dict.has("type") && dict.has("hint") &&
-      dict.has("hint_string")) {
-    int type_id = static_cast<int>(dict["type"]);
-    int hint_val = static_cast<int>(dict["hint"]);
-    if (static_cast<godot::Variant::Type>(type_id) == godot::Variant::OBJECT &&
-        hint_val == godot::PROPERTY_HINT_RESOURCE_TYPE) {
-      std::string hint_str =
-          to_std_string(dict["hint_string"].operator godot::String());
-      node_typed_prop = is_node_class(parse_hint_class(hint_str));
-    }
+  NodePathValueConversion node_path_conversion =
+      convert_node_path_value(dict, prop_str, path_str, *it_val);
+  if (node_path_conversion.has_error) {
+    return node_path_conversion.error;
   }
-  if (node_typed_prop && it_val->IsString()) {
-    std::string np_str = it_val->GetString();
-    godot::Node *scene_root = find_edited_scene_root();
-    godot::Node *target_node = nullptr;
-    if (scene_root) {
-      target_node = scene_root->get_node_or_null(
-          godot::NodePath(godot::String(np_str.c_str())));
-    }
-    if (!target_node) {
-      return util::error_detail(
-          "cannot assign node path '" + np_str + "' to node-typed property '" +
-              prop_str + "' on " + path_str,
-          path_str,
-          "a valid path to a node inside the currently edited scene" +
-              (scene_root ? " (root \"" +
-                                to_std_string(scene_root->get_name()) + "\")"
-                          : " (no edited scene root)"),
-          "pass a scene-resolvable node path such as \"Player/Camera2D\" or "
-          "\"..\", or use code_execute to assign a node reference directly "
-          "(e.g. get_node(\"Path/To/Node\"))");
-    }
-    value = godot::Variant(static_cast<godot::Object *>(target_node));
+  if (node_path_conversion.converted) {
+    value = node_path_conversion.value;
     converted_node_path = true;
-    value_node_path = np_str;
+    value_node_path = node_path_conversion.node_path;
   }
   bool resource_attached = false;
   if (!converted_node_path) {
@@ -419,26 +477,10 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
     }
   }
 
-  if (resource_attached && value.get_type() == godot::Variant::OBJECT) {
-    godot::Ref<godot::Resource> res = value;
-    if (res.is_valid()) {
-      std::string res_path = to_std_string(res->get_path());
-      const std::string memory_prefix = "memory://";
-      if (res_path.compare(0, memory_prefix.size(), memory_prefix) == 0) {
-        std::string res_name = res_path.substr(memory_prefix.size());
-        mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue(
-            "cannot assign memory resource '" + res_name +
-            "' to node property '" + prop_str + "' on " + path_str +
-            " — memory:// resources are not persistent and will corrupt the scene file if saved. "
-            "Use resource_save to save it to disk first, then pass {\"path\": "
-            "\"res://...\"}"
-            " Alternatively create the resource inline via code_execute (e.g. "
-            "node.shape = RectangleShape2D.new()) or use resource_set_property "
-            "to edit the memory resource itself.");
-        return e;
-      }
-    }
+  mcp::JsonValue blocked_error;
+  if (resource_attached && memory_resource_assignment_blocked(
+                               value, prop_str, path_str, blocked_error)) {
+    return blocked_error;
   }
 
   godot::Variant old_val = node->get(prop_name);
@@ -469,28 +511,7 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
     r["warning"] = mcp::JsonValue("set applied; " + readback_detail);
   }
 
-  bool is_camera2d = false;
-  auto *cdbs = godot::ClassDBSingleton::get_singleton();
-  if (cdbs) {
-    is_camera2d =
-        cdbs->is_parent_class(node->get_class(), godot::StringName("Camera2D"));
-  }
-  if (is_camera2d) {
-    if (prop_str == "enabled") {
-      r["serialization_note"] =
-          mcp::JsonValue("Camera2D enabled defaults to true. If setting to "
-                         "true (the default), it won't appear in .tscn. "
-                         "If setting to false, it will serialize correctly. "
-                         "To ensure initial enabled state, use code_execute: "
-                         "get_node(\"Path/To/Camera2D\").set_enabled(true/"
-                         "false) in _ready().");
-    } else if (prop_str == "current") {
-      r["serialization_note"] = mcp::JsonValue(
-          "Camera2D current is not a registered property (no setter/getter). "
-          "Cannot be set via property_set. "
-          "Use code_execute: get_node(\"Path/To/Camera2D\").make_current()");
-    }
-  }
+  add_camera2d_serialization_note(r, prop_str, node);
 
   mcp::JsonValue undo_info(mcp::JsonValue::object_tag);
   undo_info["path"] = mcp::JsonValue(path_str);
@@ -529,12 +550,12 @@ mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {
 
     if (dict.has("name")) {
       item["name"] =
-          mcp::JsonValue(to_std_string(dict["name"].operator godot::String()));
+          mcp::JsonValue(util::to_std(dict["name"].operator godot::String()));
     }
     if (dict.has("type")) {
       int type_id = static_cast<int>(dict["type"]);
       item["type_id"] = mcp::JsonValue(static_cast<int64_t>(type_id));
-      item["type"] = mcp::JsonValue(to_std_string(godot::Variant::get_type_name(
+      item["type"] = mcp::JsonValue(util::to_std(godot::Variant::get_type_name(
           static_cast<godot::Variant::Type>(type_id))));
     }
     if (dict.has("hint")) {
@@ -543,7 +564,7 @@ mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {
     }
     if (dict.has("hint_string")) {
       item["hint_string"] = mcp::JsonValue(
-          to_std_string(dict["hint_string"].operator godot::String()));
+          util::to_std(dict["hint_string"].operator godot::String()));
     }
     if (dict.has("usage")) {
       int usage_val = static_cast<int>(dict["usage"]);
@@ -551,7 +572,7 @@ mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {
     }
     if (dict.has("class_name")) {
       item["class_name"] = mcp::JsonValue(
-          to_std_string(dict["class_name"].operator godot::String()));
+          util::to_std(dict["class_name"].operator godot::String()));
     }
 
     result.PushBack(std::move(item));

@@ -4,6 +4,7 @@
 #include "tools/debugger_ops.hpp"
 #include "tools/dispatch.hpp"
 #include "util/error_util.hpp"
+#include "util/gdscript_wrap.hpp"
 #include "util/variant_json.hpp"
 #include <cctype>
 #include <chrono>
@@ -19,22 +20,12 @@
 #include <sstream>
 #include <string>
 
-namespace {
+using namespace godot_autopilot;
 
-std::string to_std_string(const godot::String &s) {
-  godot::CharString utf8 = s.utf8();
-  return std::string(utf8.ptr());
-}
+namespace {
 
 constexpr int WRAP_HEADER_LINES_SINGLE = 5;
 constexpr int WRAP_HEADER_LINES_MULTI = 5;
-
-constexpr const char *NODE_NOT_FOUND_HINT =
-    "\n[hint] Node path resolution: the execution node lives under /root, NOT "
-    "inside the edited scene. Use SceneRoot.get_node(\"Child\") to reach "
-    "edited-scene nodes (SceneRoot is the scene root node itself — no "
-    "root-name prefix, e.g. SceneRoot.get_node(\"Player\") or "
-    "SceneRoot.get_node(\"Player/CollisionShape2D\")).";
 
 std::string map_line_numbers(const std::string &err_text, int offset,
                              const std::string &tag) {
@@ -168,22 +159,8 @@ struct ExecContext {
 };
 
 bool check_source_safety(ExecContext &ctx, std::string &error_out) {
-  ctx.has_func_def = false;
-  {
-    std::istringstream stream(ctx.source_code);
-    std::string line;
-    while (std::getline(stream, line)) {
-      size_t pos = line.find_first_not_of(" \t");
-      if (pos == std::string::npos || line[pos] == '#')
-        continue;
-      if (pos + 1 < line.size() && line[pos] == '/' && line[pos + 1] == '/')
-        continue;
-      if (line.compare(pos, 5, "func ") == 0) {
-        ctx.has_func_def = true;
-        break;
-      }
-    }
-  }
+  ctx.has_func_def =
+      gdscript_wrap::has_top_level_func_def(ctx.source_code);
 
   {
     std::istringstream stream(ctx.source_code);
@@ -208,63 +185,18 @@ bool check_source_safety(ExecContext &ctx, std::string &error_out) {
 }
 
 bool build_wrapped_source(ExecContext &ctx, std::string &error_out) {
-  auto clean_extends = [](const std::string &code) -> std::string {
-    std::string result;
-    std::istringstream stream(code);
-    std::string line;
-    bool first = true;
-    while (std::getline(stream, line)) {
-      if (!first)
-        result += "\n";
-      first = false;
-      size_t pos = line.find_first_not_of(" \t");
-      if (pos != std::string::npos && line.compare(pos, 8, "extends ") == 0) {
-        result += "# " + line;
-      } else {
-        result += line;
-      }
-    }
-    return result;
-  };
-
   if (ctx.has_func_def) {
 
-    std::string cleaned = clean_extends(ctx.source_code);
+    std::string cleaned = gdscript_wrap::strip_extends_lines(ctx.source_code);
     ctx.wrapped = "@tool\nextends Node\n\nvar SceneRoot := "
                   "EditorInterface.get_edited_scene_root()\n\n" +
                   cleaned + "\n";
 
-    bool has_named_func = false;
-    {
-      std::istringstream stream(cleaned);
-      std::string line;
-      while (std::getline(stream, line)) {
-        size_t pos = line.find_first_not_of(" \t");
-        if (pos == std::string::npos || line[pos] == '#')
-          continue;
-        if (line.compare(pos, 5, "func ") == 0) {
-          size_t name_start = line.find_first_not_of(" \t", pos + 5);
-          if (name_start == std::string::npos)
-            continue;
-          size_t name_end = line.find('(', name_start);
-          if (name_end == std::string::npos)
-            continue;
-          std::string fname = line.substr(name_start, name_end - name_start);
-          size_t last = fname.find_last_not_of(" \t");
-          if (last != std::string::npos)
-            fname = fname.substr(0, last + 1);
-          if (fname == ctx.func_name) {
-            has_named_func = true;
-            break;
-          }
-        }
-      }
-    }
-    if (!has_named_func) {
+    if (!gdscript_wrap::defines_function_named(cleaned, ctx.func_name)) {
       ctx.wrapped += "func " + ctx.func_name + "():\n    pass\n";
     }
   } else {
-    std::string cleaned = clean_extends(ctx.source_code);
+    std::string cleaned = gdscript_wrap::strip_extends_lines(ctx.source_code);
 
     {
       std::istringstream stream(cleaned);
@@ -290,24 +222,10 @@ bool build_wrapped_source(ExecContext &ctx, std::string &error_out) {
       }
     }
 
-    bool uses_tabs = false;
-    bool uses_spaces = false;
-    {
-      std::istringstream stream(cleaned);
-      std::string line;
-      while (std::getline(stream, line)) {
-        size_t pos = line.find_first_not_of(" \t");
-        if (pos == std::string::npos || pos == 0)
-          continue;
-        std::string indent = line.substr(0, pos);
-        if (indent.find('\t') != std::string::npos)
-          uses_tabs = true;
-        if (indent.find("    ") != std::string::npos)
-          uses_spaces = true;
-      }
-    }
+    gdscript_wrap::IndentStyle indent =
+        gdscript_wrap::scan_indent_style(cleaned);
 
-    if (uses_tabs && uses_spaces) {
+    if (indent.uses_tabs && indent.uses_spaces) {
       mcp::JsonValue detail = godot_autopilot::util::error_detail(
           "mixed tab/space indentation detected in source", "source_code",
           "consistent indentation",
@@ -317,32 +235,13 @@ bool build_wrapped_source(ExecContext &ctx, std::string &error_out) {
       return false;
     }
 
-    bool use_tab_style = uses_tabs && !uses_spaces;
-    std::string prefix = use_tab_style ? "\t" : "    ";
+    std::string prefix = gdscript_wrap::indent_prefix(indent);
 
     ctx.wrapped = "@tool\nextends Node\n\nfunc " + ctx.func_name + "():\n";
 
     ctx.wrapped +=
         prefix + "var SceneRoot := EditorInterface.get_edited_scene_root()\n";
-    if (!cleaned.empty()) {
-      std::istringstream stream(cleaned);
-      std::string line;
-      bool first_line = true;
-      while (std::getline(stream, line)) {
-        if (!first_line)
-          ctx.wrapped += "\n";
-        first_line = false;
-
-        size_t content_start = line.find_first_not_of(" \t");
-        if (content_start == std::string::npos) {
-
-          ctx.wrapped += prefix;
-        } else {
-
-          ctx.wrapped += prefix + line;
-        }
-      }
-    }
+    ctx.wrapped += gdscript_wrap::reindent_lines(cleaned, prefix);
     ctx.wrapped += "\n";
   }
   return true;
@@ -364,26 +263,20 @@ bool compile_and_map_errors(ExecContext &ctx, std::string &error_out) {
     std::string err_name = "ERR_UNKNOWN";
     if (code == 43)
       err_name = "ERR_PARSE_ERROR";
-    std::string message = "GDScript compilation failed: " + err_name +
-                          " (code " + std::to_string(code) + ")";
-    std::string compile_err =
+    int map_offset =
+        ctx.has_func_def ? WRAP_HEADER_LINES_MULTI : WRAP_HEADER_LINES_SINGLE;
+    std::string message = gdscript_wrap::compose_compile_failure_message(
+        "GDScript compilation failed: " + err_name +
+            " (code " + std::to_string(code) + ")",
         godot_autopilot::debugger_ops::capture_new_error_text(
-            compile_log_before);
-    if (!compile_err.empty()) {
-      int map_offset =
-          ctx.has_func_def ? WRAP_HEADER_LINES_MULTI : WRAP_HEADER_LINES_SINGLE;
-      std::string mapped_err = map_line_numbers(compile_err, map_offset, "");
-      if (mapped_err.size() > 8192) {
-        message += "\n" + mapped_err.substr(0, 8192) +
-                   "\n...(truncated, total " +
-                   std::to_string(mapped_err.size()) + " bytes)";
-      } else {
-        message += "\n" + mapped_err;
-      }
-      message +=
-          "\nerror lines above were mapped from the generated wrapper script";
-    }
-    message += "\nwrapped source:\n" + ctx.wrapped;
+            compile_log_before),
+        ctx.wrapped,
+        [&](const std::string &captured) {
+          return gdscript_wrap::truncate_capture_text(
+                     map_line_numbers(captured, map_offset, "")) +
+                 "\nerror lines above were mapped from the generated wrapper "
+                 "script";
+        });
     error_out = message;
     return false;
   }
@@ -514,8 +407,8 @@ mcp::JsonValue build_exec_result(ExecContext &ctx) {
           mcp::JsonValue(static_cast<int64_t>(res->get_instance_id()));
       reg["object_id_str"] = mcp::JsonValue(
           std::to_string(static_cast<int64_t>(res->get_instance_id())));
-      reg["class"] = mcp::JsonValue(to_std_string(res->get_class()));
-      reg["path"] = mcp::JsonValue(to_std_string(res->get_path()));
+      reg["class"] = mcp::JsonValue(util::to_std(res->get_class()));
+      reg["path"] = mcp::JsonValue(util::to_std(res->get_path()));
       r["registered_resource"] = std::move(reg);
     }
   }
@@ -526,24 +419,15 @@ mcp::JsonValue build_exec_result(ExecContext &ctx) {
       mcp::JsonValue(static_cast<int64_t>(ctx.auto_owner_set));
   r["wrapped_source"] = mcp::JsonValue(ctx.wrapped);
   if (!ctx.new_output_text.empty()) {
-    if (ctx.new_output_text.size() > 8192) {
-      r["output"] = mcp::JsonValue(
-          ctx.new_output_text.substr(0, 8192) + "\n...(truncated, total " +
-          std::to_string(ctx.new_output_text.size()) + " bytes)");
-    } else {
-      r["output"] = mcp::JsonValue(ctx.new_output_text);
-    }
+    r["output"] = mcp::JsonValue(
+        gdscript_wrap::truncate_capture_text(ctx.new_output_text));
   }
   if (!ctx.new_error_text.empty()) {
     r["runtime_error"] = mcp::JsonValue(true);
-    std::string error_details = ctx.new_error_text;
-    if (error_details.size() > 8192) {
-      error_details = error_details.substr(0, 8192) +
-                      "\n...(truncated, total " +
-                      std::to_string(ctx.new_error_text.size()) + " bytes)";
-    }
+    std::string error_details =
+        gdscript_wrap::truncate_capture_text(ctx.new_error_text);
     if (ctx.new_error_text.find("Node not found") != std::string::npos) {
-      error_details += NODE_NOT_FOUND_HINT;
+      error_details += gdscript_wrap::NODE_NOT_FOUND_HINT;
     }
     r["error_details"] = mcp::JsonValue(error_details);
     mcp::JsonValue structured = extract_structured_error(ctx.new_error_text);

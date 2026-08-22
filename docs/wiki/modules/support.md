@@ -8,7 +8,7 @@ tags:
   - 资源
   - UI
   - 工具库
-timestamp: "2026-08-17T01:03:27+08:00"
+timestamp: "2026-08-22T15:10:00+08:00"
 resource:
   - src/prompts/
   - src/resources/
@@ -18,8 +18,8 @@ resource:
 
 # 支撑模块（src/prompts/、src/resources/、src/ui/、src/util/）
 
-> 审计日期：2026-08-17（2026-08-12 初稿；08-17 随配置面板新增、状态栏移除同步并补 YAML frontmatter），基于当前工作树代码逐行核对（不依赖 git 历史）。
-> 覆盖范围：`src/prompts/` 9 组文件（18 个）、`src/resources/` 2 组、`src/ui/` 2 组、`src/util/` 6 组（11 个，其中 `scene_path.hpp` 为 header-only）。注册入口在 `src/core/server_context.cpp:133-135`。
+> 审计日期：2026-08-22（2026-08-12 初稿；08-17 随配置面板新增、状态栏移除同步并补 YAML frontmatter；08-22 15 时全量一致性审计——新增 json_godot/rid_registry/type_hint/gdscript_wrap 四个 header-only util 小节、覆盖范围计数 10 组/15 文件、注册入口行号校准），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 覆盖范围：`src/prompts/` 9 组文件（18 个）、`src/resources/` 2 组、`src/ui/` 2 组、`src/util/` 10 组（15 个文件，其中 `scene_path.hpp`/`json_godot.hpp`/`rid_registry.hpp`/`type_hint.hpp`/`gdscript_wrap.hpp` 为 header-only）。注册入口在 `src/core/server_context.cpp:140-143`。
 
 ## 模块简介
 
@@ -28,7 +28,7 @@ resource:
 - **Prompts**：向 MCP 客户端暴露 12 个 prompt 模板（7 通用 + 5 调试），全部经 `server.RegisterPrompt` 注册。
 - **Resources**：暴露 15 个 MCP resource URI（8 引擎侧 + 7 调试捕获侧），全部为 `godot://` 前缀。
 - **UI**：底部日志面板（`McpLogDock`）、右侧配置面板（`McpConfigDock`），消费 `LogSystem` 与服务器生命周期。
-- **Util**：与工具层共享的纯工具件——Variant↔JSON 互转、BM25 检索、错误 JSON 构造、写后读回校验、场景路径解析、客户端 MCP 配置生成。
+- **Util**：与工具层共享的纯工具件——Variant↔JSON 互转、BM25 检索、错误 JSON 构造、写后读回校验、场景路径解析、JSON 数值/几何/RID 辅助、进程内 RID 注册表、类型提示推断、GDScript 包装流水线、客户端 MCP 配置生成。
 
 ## Prompts（12 个，均经 RegisterPrompt 注册）
 
@@ -222,6 +222,43 @@ resource:
 | `resolve_scene_node(path_str, scene_root, out_hint)` | 依次剥前导 `/`、`root`、根节点名三段后 `get_node_or_null`；且校验结果在 `scene_root` 子树内（parent 链上溯）；失败经 `out_hint` 输出提示并返回 nullptr |
 
 消费方：`scene_ops`/`property_ops`/`script_ops`/`editor_ops` 共 15+ 处调用（节点路径参数解析的统一入口）。
+
+### json_godot.hpp（header-only，命名空间 `godot_autopilot::util`，08-22 新增）
+
+| 函数 | 行为 |
+|---|---|
+| `json_number(value, fallback)` | `JsonValue*` 宽容取数（int/double 统一转 double，缺失/非数字回 fallback）——约 80 处数值三元式的收敛点 |
+| `json_to_vec2/vec3/rect2/color(j)` | JSON 对象 → Godot 几何类型（缺字段默认 0，color 的 a 缺省 1.0 由调用方处理） |
+| `vec2_to_json/vec3_to_json(v)` | Godot 向量 → `{x,y[,z]}` 对象 |
+| `rid_from_json/rid_to_json(…)` | RID ↔ `{"rid": <int64>}`（底层 `UtilityFunctions::rid_from_int64`） |
+
+消费方：audio/environment/nav/physics/render/spriteframes 等 ops（数值读取与几何参数解析、RID 互转的共享实现）。
+
+### rid_registry.hpp（header-only，命名空间 `godot_autopilot::util`，08-22 新增）
+
+- `class RidStore`：`std::unordered_map<int64_t, godot::RID>` 句柄↔RID 双向映射并保活。
+- `template <typename Domain> RidStore &rid_store()`：按域标签取独立实例（physics 与 text 各自命名空间互不串号）。
+- `template <typename Domain> RID resolve_rid(args, key)`：从工具参数解析整数 id 并查表，未命中报错。
+
+消费方：physics_ops、text_ops。
+
+### type_hint.hpp（header-only，命名空间 `godot_autopilot::util`，08-22 新增）
+
+- `infer_type_hint(dict, …)`：从参数字典推断 Variant 反序列化所需的 type_hint 字符串（供 `VariantJson::deserialize` 第二参）。
+
+消费方：property_ops、resource_ops。
+
+### gdscript_wrap.hpp（header-only，命名空间 `godot_autopilot::util`，08-22 新增）
+
+GDScript 包装流水线共享件（script_ops 与 code_exec_ops 共用）：
+
+| 符号 | 说明 |
+|---|---|
+| `MAX_CAPTURE_BYTES = 8192` | 输出截断上限常量 |
+| `NODE_NOT_FOUND_HINT` | 节点路径错误提示常量（指导用 `SceneRoot.get_node(...)`） |
+| `truncate_capture_text(text)` | 超 8192 字节截断 |
+| `strip_extends_lines / has_top_level_func_def / defines_function_named` | 单表达式判定与 extends 剥离 |
+| `IndentStyle / scan_indent_style / indent_prefix / reindent_lines` | 包装时缩进风格探测与重排 |
 
 ## 与现有文档的不一致点
 

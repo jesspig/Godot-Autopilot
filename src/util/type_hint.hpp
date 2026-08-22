@@ -1,0 +1,44 @@
+#ifndef GODOT_AUTOPILOT_TYPE_HINT_HPP
+#define GODOT_AUTOPILOT_TYPE_HINT_HPP
+
+#include "error_util.hpp"
+
+#include <godot_cpp/classes/global_constants.hpp>
+#include <godot_cpp/variant/dictionary.hpp>
+#include <godot_cpp/variant/string.hpp>
+#include <godot_cpp/variant/variant.hpp>
+#include <string>
+
+namespace godot_autopilot {
+namespace util {
+
+inline std::string infer_type_hint(const godot::Dictionary &dict,
+                                   std::string type_hint) {
+  if (!type_hint.empty() || !dict.has("type")) {
+    return type_hint;
+  }
+  int type_id = static_cast<int>(dict["type"]);
+  int hint_val = 0;
+  if (dict.has("hint")) {
+    hint_val = static_cast<int>(dict["hint"]);
+  }
+  bool is_object_type =
+      static_cast<godot::Variant::Type>(type_id) == godot::Variant::OBJECT;
+  bool is_resource_hint = hint_val == godot::PROPERTY_HINT_RESOURCE_TYPE;
+  if ((is_object_type || is_resource_hint) && dict.has("hint_string")) {
+    std::string hint_str = to_std(dict["hint_string"].operator godot::String());
+    if (!hint_str.empty()) {
+      type_hint = hint_str;
+    }
+  }
+  if (type_hint.empty()) {
+    type_hint = to_std(godot::Variant::get_type_name(
+        static_cast<godot::Variant::Type>(type_id)));
+  }
+  return type_hint;
+}
+
+} // namespace util
+} // namespace godot_autopilot
+
+#endif

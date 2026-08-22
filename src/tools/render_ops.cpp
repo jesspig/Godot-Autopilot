@@ -1,6 +1,8 @@
 #include "render_ops.hpp"
 #include "core/log_system.hpp"
 #include "util/error_util.hpp"
+#include "util/json_godot.hpp"
+#include "util/scene_path.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/canvas_item.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
@@ -8,7 +10,6 @@
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/color.hpp>
-#include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/variant/packed_color_array.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
 #include <godot_cpp/variant/packed_int32_array.hpp>
@@ -19,7 +20,6 @@
 #include <godot_cpp/variant/string_name.hpp>
 #include <godot_cpp/variant/transform2d.hpp>
 #include <godot_cpp/variant/transform3d.hpp>
-#include <godot_cpp/variant/utility_functions.hpp>
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 #include <mcp/JsonValue.hpp>
@@ -29,75 +29,6 @@ namespace godot_autopilot {
 namespace render_ops {
 
 using JV = mcp::JsonValue;
-
-namespace {
-
-godot::RID rid_from_json(const JV &j) {
-  return godot::UtilityFunctions::rid_from_int64(j.GetInt());
-}
-
-godot::Color parse_color(const JV &j) {
-  auto *r = j.Find("r");
-  auto *g = j.Find("g");
-  auto *b = j.Find("b");
-  auto *a = j.Find("a");
-  return godot::Color(
-      static_cast<float>(
-          r && r->IsNumber()
-              ? (r->IsInt() ? static_cast<double>(r->GetInt()) : r->GetDouble())
-              : 0.0),
-      static_cast<float>(
-          g && g->IsNumber()
-              ? (g->IsInt() ? static_cast<double>(g->GetInt()) : g->GetDouble())
-              : 0.0),
-      static_cast<float>(
-          b && b->IsNumber()
-              ? (b->IsInt() ? static_cast<double>(b->GetInt()) : b->GetDouble())
-              : 0.0),
-      static_cast<float>(
-          a && a->IsNumber()
-              ? (a->IsInt() ? static_cast<double>(a->GetInt()) : a->GetDouble())
-              : 1.0));
-}
-
-godot::Vector2 parse_vector2(const JV &j) {
-  auto *x = j.Find("x");
-  auto *y = j.Find("y");
-  return godot::Vector2(
-      x && x->IsNumber()
-          ? (x->IsInt() ? static_cast<double>(x->GetInt()) : x->GetDouble())
-          : 0.0,
-      y && y->IsNumber()
-          ? (y->IsInt() ? static_cast<double>(y->GetInt()) : y->GetDouble())
-          : 0.0);
-}
-
-godot::Vector3 parse_vector3(const JV &j) {
-  auto *x = j.Find("x");
-  auto *y = j.Find("y");
-  auto *z = j.Find("z");
-  return godot::Vector3(
-      x && x->IsNumber()
-          ? (x->IsInt() ? static_cast<double>(x->GetInt()) : x->GetDouble())
-          : 0.0,
-      y && y->IsNumber()
-          ? (y->IsInt() ? static_cast<double>(y->GetInt()) : y->GetDouble())
-          : 0.0,
-      z && z->IsNumber()
-          ? (z->IsInt() ? static_cast<double>(z->GetInt()) : z->GetDouble())
-          : 0.0);
-}
-
-godot::Rect2 parse_rect2(const JV &j) {
-  return godot::Rect2(parse_vector2(j.At("position")),
-                      parse_vector2(j.At("size")));
-}
-
-JV rid_to_json(const godot::RID &rid) {
-  return JV::FromObject({{"rid", JV(static_cast<int64_t>(rid.get_id()))}});
-}
-
-} // namespace
 
 JV handle_canvas_item_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -112,7 +43,7 @@ JV handle_canvas_item_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "create_render_canvas_item completed");
   JV r(JV::object_tag);
-  r["result"] = rid_to_json(rid);
+  r["result"] = util::rid_to_json(rid);
   return r;
 }
 
@@ -145,9 +76,9 @@ JV handle_canvas_item_draw_rect(const JV &args) {
     return r;
   }
 
-  godot::RID ci = rid_from_json(*it_ci);
-  godot::Rect2 r = parse_rect2(*it_rect);
-  godot::Color c = parse_color(*it_color);
+  godot::RID ci = util::rid_from_json(*it_ci);
+  godot::Rect2 r = util::json_to_rect2(*it_rect);
+  godot::Color c = util::json_to_color(*it_color);
   auto *aa = args.Find("antialiased");
   bool antialiased = aa ? aa->GetBool() : false;
 
@@ -188,15 +119,11 @@ JV handle_canvas_item_draw_circle(const JV &args) {
     return r;
   }
 
-  godot::RID ci = rid_from_json(*it_ci);
-  godot::Vector2 pos = parse_vector2(*it_pos);
+  godot::RID ci = util::rid_from_json(*it_ci);
+  godot::Vector2 pos = util::json_to_vec2(*it_pos);
   auto *rad = args.Find("radius");
-  float radius = static_cast<float>(
-      rad && rad->IsNumber()
-          ? (rad->IsInt() ? static_cast<double>(rad->GetInt())
-                          : rad->GetDouble())
-          : 1.0);
-  godot::Color c = parse_color(*it_color);
+  float radius = static_cast<float>(util::json_number(rad, 1.0));
+  godot::Color c = util::json_to_color(*it_color);
   auto *aa = args.Find("antialiased");
   bool antialiased = aa ? aa->GetBool() : false;
 
@@ -237,15 +164,15 @@ JV handle_canvas_item_draw_texture(const JV &args) {
     return r;
   }
 
-  godot::RID ci = rid_from_json(*it_ci);
-  godot::RID tex = rid_from_json(*it_tex);
-  godot::Rect2 r = parse_rect2(*it_rect);
+  godot::RID ci = util::rid_from_json(*it_ci);
+  godot::RID tex = util::rid_from_json(*it_tex);
+  godot::Rect2 r = util::json_to_rect2(*it_rect);
   auto *tile_a = args.Find("tile");
   bool tile = tile_a ? tile_a->GetBool() : false;
   godot::Color modulate(1, 1, 1, 1);
   auto *it_mod = args.Find("modulate");
   if (it_mod && it_mod->IsObject()) {
-    modulate = parse_color(*it_mod);
+    modulate = util::json_to_color(*it_mod);
   }
   auto *transp = args.Find("transpose");
   bool transpose = transp ? transp->GetBool() : false;
@@ -293,15 +220,12 @@ JV handle_canvas_item_draw_line(const JV &args) {
     return r;
   }
 
-  godot::RID ci = rid_from_json(*it_ci);
-  godot::Vector2 from = parse_vector2(*it_from);
-  godot::Vector2 to = parse_vector2(*it_to);
-  godot::Color c = parse_color(*it_color);
+  godot::RID ci = util::rid_from_json(*it_ci);
+  godot::Vector2 from = util::json_to_vec2(*it_from);
+  godot::Vector2 to = util::json_to_vec2(*it_to);
+  godot::Color c = util::json_to_color(*it_color);
   auto *w = args.Find("width");
-  float width = static_cast<float>(
-      w && w->IsNumber()
-          ? (w->IsInt() ? static_cast<double>(w->GetInt()) : w->GetDouble())
-          : -1.0);
+  float width = static_cast<float>(util::json_number(w, -1.0));
   auto *aa = args.Find("antialiased");
   bool antialiased = aa ? aa->GetBool() : false;
 
@@ -330,29 +254,18 @@ JV handle_canvas_item_set_transform(const JV &args) {
     return r;
   }
 
-  godot::RID ci = rid_from_json(*it_ci);
+  godot::RID ci = util::rid_from_json(*it_ci);
   godot::Transform2D xform;
   auto *xa = args.Find("x");
   auto *ya = args.Find("y");
   auto *ox = args.Find("origin_x");
   auto *oy = args.Find("origin_y");
-  xform.columns[0] = godot::Vector2(
-      xa && xa->IsNumber()
-          ? (xa->IsInt() ? static_cast<double>(xa->GetInt()) : xa->GetDouble())
-          : 1.0,
-      0.0);
+  xform.columns[0] =
+      godot::Vector2(util::json_number(xa, 1.0), 0.0);
   xform.columns[1] =
-      godot::Vector2(0.0, ya && ya->IsNumber()
-                              ? (ya->IsInt() ? static_cast<double>(ya->GetInt())
-                                             : ya->GetDouble())
-                              : 1.0);
-  xform.columns[2] = godot::Vector2(
-      ox && ox->IsNumber()
-          ? (ox->IsInt() ? static_cast<double>(ox->GetInt()) : ox->GetDouble())
-          : 0.0,
-      oy && oy->IsNumber()
-          ? (oy->IsInt() ? static_cast<double>(oy->GetInt()) : oy->GetDouble())
-          : 0.0);
+      godot::Vector2(0.0, util::json_number(ya, 1.0));
+  xform.columns[2] = godot::Vector2(util::json_number(ox, 0.0),
+                                    util::json_number(oy, 0.0));
 
   rs->canvas_item_set_transform(ci, xform);
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
@@ -379,7 +292,7 @@ JV handle_canvas_item_set_visible(const JV &args) {
     return r;
   }
 
-  godot::RID ci = rid_from_json(*it_ci);
+  godot::RID ci = util::rid_from_json(*it_ci);
   auto *vis = args.Find("visible");
   bool visible = vis ? vis->GetBool() : true;
 
@@ -405,7 +318,7 @@ JV handle_scenario_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "create_render_scenario completed");
   JV r(JV::object_tag);
-  r["result"] = rid_to_json(rid);
+  r["result"] = util::rid_to_json(rid);
   return r;
 }
 
@@ -432,8 +345,8 @@ JV handle_scenario_set_environment(const JV &args) {
     return r;
   }
 
-  godot::RID sc = rid_from_json(*it_sc);
-  godot::RID env = rid_from_json(*it_env);
+  godot::RID sc = util::rid_from_json(*it_sc);
+  godot::RID env = util::rid_from_json(*it_env);
 
   rs->scenario_set_environment(sc, env);
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
@@ -457,7 +370,7 @@ JV handle_camera_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "create_render_camera completed");
   JV r(JV::object_tag);
-  r["result"] = rid_to_json(rid);
+  r["result"] = util::rid_to_json(rid);
   return r;
 }
 
@@ -478,21 +391,14 @@ JV handle_camera_set_transform(const JV &args) {
     return r;
   }
 
-  godot::RID cam = rid_from_json(*it_cam);
+  godot::RID cam = util::rid_from_json(*it_cam);
   godot::Transform3D xform;
   auto *ox = args.Find("origin_x");
   auto *oy = args.Find("origin_y");
   auto *oz = args.Find("origin_z");
-  xform.origin = godot::Vector3(
-      ox && ox->IsNumber()
-          ? (ox->IsInt() ? static_cast<double>(ox->GetInt()) : ox->GetDouble())
-          : 0.0,
-      oy && oy->IsNumber()
-          ? (oy->IsInt() ? static_cast<double>(oy->GetInt()) : oy->GetDouble())
-          : 0.0,
-      oz && oz->IsNumber()
-          ? (oz->IsInt() ? static_cast<double>(oz->GetInt()) : oz->GetDouble())
-          : 0.0);
+  xform.origin = godot::Vector3(util::json_number(ox, 0.0),
+                                util::json_number(oy, 0.0),
+                                util::json_number(oz, 0.0));
 
   rs->camera_set_transform(cam, xform);
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
@@ -519,25 +425,13 @@ JV handle_camera_set_perspective(const JV &args) {
     return r;
   }
 
-  godot::RID cam = rid_from_json(*it_cam);
+  godot::RID cam = util::rid_from_json(*it_cam);
   auto *fovy_a = args.Find("fovy_degrees");
   auto *znear_a = args.Find("z_near");
   auto *zfar_a = args.Find("z_far");
-  float fovy = static_cast<float>(
-      fovy_a && fovy_a->IsNumber()
-          ? (fovy_a->IsInt() ? static_cast<double>(fovy_a->GetInt())
-                             : fovy_a->GetDouble())
-          : 75.0);
-  float znear = static_cast<float>(
-      znear_a && znear_a->IsNumber()
-          ? (znear_a->IsInt() ? static_cast<double>(znear_a->GetInt())
-                              : znear_a->GetDouble())
-          : 0.01);
-  float zfar = static_cast<float>(
-      zfar_a && zfar_a->IsNumber()
-          ? (zfar_a->IsInt() ? static_cast<double>(zfar_a->GetInt())
-                             : zfar_a->GetDouble())
-          : 4000.0);
+  float fovy = static_cast<float>(util::json_number(fovy_a, 75.0));
+  float znear = static_cast<float>(util::json_number(znear_a, 0.01));
+  float zfar = static_cast<float>(util::json_number(zfar_a, 4000.0));
 
   rs->camera_set_perspective(cam, fovy, znear, zfar);
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
@@ -564,25 +458,13 @@ JV handle_camera_set_orthogonal(const JV &args) {
     return r;
   }
 
-  godot::RID cam = rid_from_json(*it_cam);
+  godot::RID cam = util::rid_from_json(*it_cam);
   auto *size_a = args.Find("size");
   auto *znear_a = args.Find("z_near");
   auto *zfar_a = args.Find("z_far");
-  float size = static_cast<float>(
-      size_a && size_a->IsNumber()
-          ? (size_a->IsInt() ? static_cast<double>(size_a->GetInt())
-                             : size_a->GetDouble())
-          : 10.0);
-  float znear = static_cast<float>(
-      znear_a && znear_a->IsNumber()
-          ? (znear_a->IsInt() ? static_cast<double>(znear_a->GetInt())
-                              : znear_a->GetDouble())
-          : 0.01);
-  float zfar = static_cast<float>(
-      zfar_a && zfar_a->IsNumber()
-          ? (zfar_a->IsInt() ? static_cast<double>(zfar_a->GetInt())
-                             : zfar_a->GetDouble())
-          : 4000.0);
+  float size = static_cast<float>(util::json_number(size_a, 10.0));
+  float znear = static_cast<float>(util::json_number(znear_a, 0.01));
+  float zfar = static_cast<float>(util::json_number(zfar_a, 4000.0));
 
   rs->camera_set_orthogonal(cam, size, znear, zfar);
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
@@ -621,7 +503,7 @@ JV handle_light_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "create_render_light completed");
   JV r(JV::object_tag);
-  r["result"] = rid_to_json(rid);
+  r["result"] = util::rid_to_json(rid);
   return r;
 }
 
@@ -654,7 +536,7 @@ JV handle_light_set_param(const JV &args) {
     return r;
   }
 
-  godot::RID light = rid_from_json(*it_light);
+  godot::RID light = util::rid_from_json(*it_light);
   auto param = static_cast<godot::RenderingServer::LightParam>(
       static_cast<int>(it_param->GetInt()));
   float val =
@@ -692,8 +574,8 @@ JV handle_light_set_color(const JV &args) {
     return r;
   }
 
-  godot::RID light = rid_from_json(*it_light);
-  godot::Color c = parse_color(*it_color);
+  godot::RID light = util::rid_from_json(*it_light);
+  godot::Color c = util::json_to_color(*it_color);
 
   rs->light_set_color(light, c);
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
@@ -717,7 +599,7 @@ JV handle_mesh_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "create_render_mesh completed");
   JV r(JV::object_tag);
-  r["result"] = rid_to_json(rid);
+  r["result"] = util::rid_to_json(rid);
   return r;
 }
 
@@ -738,7 +620,7 @@ JV handle_mesh_add_surface(const JV &args) {
     return r;
   }
 
-  godot::RID mesh = rid_from_json(*it_mesh);
+  godot::RID mesh = util::rid_from_json(*it_mesh);
   auto *prim_a = args.Find("primitive");
   auto primitive = static_cast<godot::RenderingServer::PrimitiveType>(
       prim_a ? static_cast<int>(prim_a->GetInt())
@@ -756,7 +638,7 @@ JV handle_mesh_add_surface(const JV &args) {
       godot::PackedVector3Array verts;
       const JV::Array &vert_list = it_verts->GetArray();
       for (const auto &v : vert_list) {
-        verts.append(parse_vector3(v));
+        verts.append(util::json_to_vec3(v));
       }
       arrays[godot::RenderingServer::ARRAY_VERTEX] = verts;
     }
@@ -766,7 +648,7 @@ JV handle_mesh_add_surface(const JV &args) {
       godot::PackedVector3Array norms;
       const JV::Array &norm_list = it_norms->GetArray();
       for (const auto &n : norm_list) {
-        norms.append(parse_vector3(n));
+        norms.append(util::json_to_vec3(n));
       }
       arrays[godot::RenderingServer::ARRAY_NORMAL] = norms;
     }
@@ -787,7 +669,7 @@ JV handle_mesh_add_surface(const JV &args) {
       godot::PackedColorArray cols;
       const JV::Array &color_list = it_colors->GetArray();
       for (const auto &c : color_list) {
-        cols.append(parse_color(c));
+        cols.append(util::json_to_color(c));
       }
       arrays[godot::RenderingServer::ARRAY_COLOR] = cols;
     }
@@ -797,7 +679,7 @@ JV handle_mesh_add_surface(const JV &args) {
       godot::PackedVector2Array uvs;
       const JV::Array &uv_list = it_uvs->GetArray();
       for (const auto &uv : uv_list) {
-        uvs.append(parse_vector2(uv));
+        uvs.append(util::json_to_vec2(uv));
       }
       arrays[godot::RenderingServer::ARRAY_TEX_UV] = uvs;
     }
@@ -850,9 +732,9 @@ JV handle_mesh_set_material(const JV &args) {
     return r;
   }
 
-  godot::RID mesh = rid_from_json(*it_mesh);
+  godot::RID mesh = util::rid_from_json(*it_mesh);
   int surface = static_cast<int>(it_surf->GetInt());
-  godot::RID material = rid_from_json(*it_mat);
+  godot::RID material = util::rid_from_json(*it_mat);
 
   rs->mesh_surface_set_material(mesh, surface, material);
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
@@ -876,7 +758,7 @@ JV handle_material_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "create_render_material completed");
   JV r(JV::object_tag);
-  r["result"] = rid_to_json(rid);
+  r["result"] = util::rid_to_json(rid);
   return r;
 }
 
@@ -909,7 +791,7 @@ JV handle_material_set_param(const JV &args) {
     return r;
   }
 
-  godot::RID material = rid_from_json(*it_mat);
+  godot::RID material = util::rid_from_json(*it_mat);
   godot::StringName param_name(it_param->GetString().c_str());
   auto *th = args.Find("type_hint");
   std::string type_hint = th ? th->GetString() : "";
@@ -937,7 +819,7 @@ JV handle_viewport_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "create_render_viewport completed");
   JV r(JV::object_tag);
-  r["result"] = rid_to_json(rid);
+  r["result"] = util::rid_to_json(rid);
   return r;
 }
 
@@ -958,7 +840,7 @@ JV handle_viewport_set_size(const JV &args) {
     return r;
   }
 
-  godot::RID vp = rid_from_json(*it_vp);
+  godot::RID vp = util::rid_from_json(*it_vp);
   auto *w = args.Find("width");
   auto *h = args.Find("height");
   int32_t width = static_cast<int32_t>(w ? w->GetInt() : 640);
@@ -989,7 +871,7 @@ JV handle_viewport_set_clear_mode(const JV &args) {
     return r;
   }
 
-  godot::RID vp = rid_from_json(*it_vp);
+  godot::RID vp = util::rid_from_json(*it_vp);
   auto *cm = args.Find("clear_mode");
   auto clear_mode = static_cast<godot::RenderingServer::ViewportClearMode>(
       cm ? static_cast<int>(cm->GetInt()) : 0);
@@ -1021,7 +903,7 @@ JV handle_particle_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "create_render_particles completed");
   JV r(JV::object_tag);
-  r["result"] = rid_to_json(rid);
+  r["result"] = util::rid_to_json(rid);
   return r;
 }
 
@@ -1046,13 +928,13 @@ JV handle_fog_create(const JV &args) {
 
   auto *it_size = args.Find("size");
   if (it_size && it_size->IsObject()) {
-    rs->fog_volume_set_size(rid, parse_vector3(*it_size));
+    rs->fog_volume_set_size(rid, util::json_to_vec3(*it_size));
   }
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "create_render_fog_volume completed");
   JV r(JV::object_tag);
-  r["result"] = rid_to_json(rid);
+  r["result"] = util::rid_to_json(rid);
   return r;
 }
 
@@ -1076,7 +958,7 @@ JV handle_shader_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "create_render_shader completed");
   JV r(JV::object_tag);
-  r["result"] = rid_to_json(rid);
+  r["result"] = util::rid_to_json(rid);
   return r;
 }
 
@@ -1104,7 +986,7 @@ JV handle_texture_create_2d(const JV &args) {
   }
   godot::RID rid = rs->texture_2d_create(img);
   JV r(JV::object_tag);
-  r["result"] = rid_to_json(rid);
+  r["result"] = util::rid_to_json(rid);
   return r;
 }
 
@@ -1129,7 +1011,7 @@ JV handle_shader_set_code(const JV &args) {
     r["error"] = JV("RenderingServer not available");
     return r;
   }
-  godot::RID sh = rid_from_json(*it_sh);
+  godot::RID sh = util::rid_from_json(*it_sh);
   rs->shader_set_code(sh, godot::String(it_code->GetString().c_str()));
   JV r(JV::object_tag);
   r["result"] = JV("ok");
@@ -1147,7 +1029,7 @@ JV handle_sky_create(const JV &args) {
   }
   godot::RID rid = rs->sky_create();
   JV r(JV::object_tag);
-  r["result"] = rid_to_json(rid);
+  r["result"] = util::rid_to_json(rid);
   return r;
 }
 
@@ -1172,8 +1054,8 @@ JV handle_sky_set_material(const JV &args) {
     r["error"] = JV("RenderingServer not available");
     return r;
   }
-  godot::RID sky = rid_from_json(*it_sky);
-  godot::RID mat = rid_from_json(*it_mat);
+  godot::RID sky = util::rid_from_json(*it_sky);
+  godot::RID mat = util::rid_from_json(*it_mat);
   rs->sky_set_material(sky, mat);
   JV r(JV::object_tag);
   r["result"] = JV("ok");
@@ -1195,7 +1077,7 @@ JV handle_particles_set_emitting(const JV &args) {
     r["error"] = JV("RenderingServer not available");
     return r;
   }
-  godot::RID p = rid_from_json(*it_p);
+  godot::RID p = util::rid_from_json(*it_p);
   bool emitting = true;
   auto *em = args.Find("emitting");
   if (em && em->IsBool())
@@ -1221,7 +1103,7 @@ JV handle_particles_restart(const JV &args) {
     r["error"] = JV("RenderingServer not available");
     return r;
   }
-  godot::RID p = rid_from_json(*it_p);
+  godot::RID p = util::rid_from_json(*it_p);
   rs->particles_restart(p);
   JV r(JV::object_tag);
   r["result"] = JV("ok");
@@ -1243,12 +1125,9 @@ JV handle_particles_set_lifetime(const JV &args) {
     r["error"] = JV("RenderingServer not available");
     return r;
   }
-  godot::RID p = rid_from_json(*it_p);
-  float lifetime = 1.0f;
+  godot::RID p = util::rid_from_json(*it_p);
   auto *lt = args.Find("lifetime");
-  if (lt && lt->IsNumber())
-    lifetime = static_cast<float>(
-        lt->IsInt() ? static_cast<double>(lt->GetInt()) : lt->GetDouble());
+  float lifetime = static_cast<float>(util::json_number(lt, 1.0));
   rs->particles_set_lifetime(p, lifetime);
   JV r(JV::object_tag);
   r["result"] = JV("ok");
@@ -1266,7 +1145,7 @@ JV handle_reflection_probe_create(const JV &args) {
   }
   godot::RID rid = rs->reflection_probe_create();
   JV r(JV::object_tag);
-  r["result"] = rid_to_json(rid);
+  r["result"] = util::rid_to_json(rid);
   return r;
 }
 
@@ -1281,7 +1160,7 @@ JV handle_decal_create(const JV &args) {
   }
   godot::RID rid = rs->decal_create();
   JV r(JV::object_tag);
-  r["result"] = rid_to_json(rid);
+  r["result"] = util::rid_to_json(rid);
   return r;
 }
 
@@ -1306,7 +1185,7 @@ JV handle_fog_volume_set_shape(const JV &args) {
     r["error"] = JV("RenderingServer not available");
     return r;
   }
-  godot::RID fog = rid_from_json(*it_fog);
+  godot::RID fog = util::rid_from_json(*it_fog);
   int shape = static_cast<int>(it_shape->GetInt());
   rs->fog_volume_set_shape(
       fog, static_cast<godot::RenderingServer::FogVolumeShape>(shape));
@@ -1330,7 +1209,7 @@ JV handle_instance_set_visible(const JV &args) {
     r["error"] = JV("RenderingServer not available");
     return r;
   }
-  godot::RID inst = rid_from_json(*it_inst);
+  godot::RID inst = util::rid_from_json(*it_inst);
   bool visible = true;
   auto *vs = args.Find("visible");
   if (vs && vs->IsBool())
@@ -1362,7 +1241,7 @@ JV handle_instance_set_layer_mask(const JV &args) {
     r["error"] = JV("RenderingServer not available");
     return r;
   }
-  godot::RID inst = rid_from_json(*it_inst);
+  godot::RID inst = util::rid_from_json(*it_inst);
   uint32_t mask = static_cast<uint32_t>(it_mask->GetInt());
   rs->instance_set_layer_mask(inst, mask);
   JV r(JV::object_tag);
@@ -1423,30 +1302,7 @@ JV handle_canvas_item_get_rid(const JV &args) {
     r["error"] = JV("no edited scene root");
     return r;
   }
-  std::string clean = path;
-  if (!clean.empty() && clean[0] == '/')
-    clean = clean.substr(1);
-  if (clean.size() > 5 && clean.compare(0, 5, "root/") == 0)
-    clean = clean.substr(5);
-  godot::Node *node = nullptr;
-  if (clean.empty() || clean == util::to_std(root->get_name())) {
-    node = root;
-  } else {
-    node =
-        root->get_node_or_null(godot::NodePath(godot::String(clean.c_str())));
-    if (!node) {
-      std::string root_name = util::to_std(root->get_name());
-      if (clean.size() > root_name.size() + 1 &&
-          clean.compare(0, root_name.size(), root_name) == 0 &&
-          clean[root_name.size()] == '/') {
-        std::string sub = clean.substr(root_name.size() + 1);
-        if (!sub.empty()) {
-          node = root->get_node_or_null(
-              godot::NodePath(godot::String(sub.c_str())));
-        }
-      }
-    }
-  }
+  godot::Node *node = util::resolve_scene_node(path, root);
   if (!node) {
     JV r(JV::object_tag);
     r["error"] = JV("node not found: " + path);
@@ -1461,7 +1317,7 @@ JV handle_canvas_item_get_rid(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_render_canvas_item_rid completed");
   JV r(JV::object_tag);
-  r["result"] = rid_to_json(ci->get_canvas_item());
+  r["result"] = util::rid_to_json(ci->get_canvas_item());
   return r;
 }
 
@@ -1472,7 +1328,7 @@ JV handle_resolve_rid(const JV &args) {
     r["error"] = JV("missing required parameter: rid (integer)");
     return r;
   }
-  godot::RID rid = rid_from_json(*idp);
+  godot::RID rid = util::rid_from_json(*idp);
   JV r(JV::object_tag);
   r["rid"] = JV(static_cast<int64_t>(rid.get_id()));
   r["is_valid"] = JV(rid.is_valid());

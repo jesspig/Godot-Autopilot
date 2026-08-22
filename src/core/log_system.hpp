@@ -3,7 +3,6 @@
 
 #include <chrono>
 #include <deque>
-#include <functional>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -41,14 +40,10 @@ public:
 
   static LogSystem &instance();
 
-  using OnNewEntryCallback = std::function<void(const LogEntry &)>;
-  void set_on_new_entry(OnNewEntryCallback callback);
-
 private:
   std::deque<LogEntry> entries_;
   mutable std::mutex mutex_;
   size_t next_serial_ = 0;
-  OnNewEntryCallback on_new_entry_;
 };
 
 } // namespace godot_autopilot

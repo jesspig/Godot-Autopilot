@@ -13,8 +13,6 @@ void LogSystem::log(LogLevel level, LogCategory category,
   entry.category = category;
   entry.message = message;
 
-  OnNewEntryCallback cb;
-  LogEntry saved;
   {
     std::lock_guard<std::mutex> lock(mutex_);
     if (entries_.size() >= MAX_ENTRIES) {
@@ -22,14 +20,6 @@ void LogSystem::log(LogLevel level, LogCategory category,
     }
     entry.serial = next_serial_++;
     entries_.push_back(std::move(entry));
-    cb = on_new_entry_;
-    if (cb) {
-      saved = entries_.back();
-    }
-  }
-
-  if (cb) {
-    cb(saved);
   }
 }
 
@@ -87,11 +77,6 @@ size_t LogSystem::next_index() const {
 LogSystem &LogSystem::instance() {
   static LogSystem inst;
   return inst;
-}
-
-void LogSystem::set_on_new_entry(OnNewEntryCallback callback) {
-  std::lock_guard<std::mutex> lock(mutex_);
-  on_new_entry_ = std::move(callback);
 }
 
 } // namespace godot_autopilot

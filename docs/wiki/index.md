@@ -1,6 +1,6 @@
 # GDA (Godot Autopilot) 项目知识库
 
-本知识库与源码同步维护，所有事实以当前代码为准；数值以运行时统计为准。维护记录见 [changelog/](../../changelog/log.md)。
+本知识库与源码同步维护，所有事实以当前代码为准；数值以运行时统计为准。维护记录见 [changelog/log.md](changelog/log.md)。
 
 ## 页面索引
 
@@ -22,11 +22,11 @@
 ## 关键数值速查（以运行时统计为准）
 
 - 工具注册总入口 `ToolRegistry`（单一来源）：**344 条目** = 336 域工具 + `system_status` + 7 元工具；域工具分 **23 类**（InputMap 并入 Input）
-- schema：非空/空数以运行时统计为准（def 静态：SCHEMA_NONE=208 / SCHEMA_BASIC=124）；**3 个契约缺口**（create_scene_node、get_resource_extensions、reimport_resource_files）
-- 遍历排除 **35 个副作用工具**；L1 单元测试 **77 个 gtest**；L2 引擎用例 **6 个文件**（00_meta/01_scene/02_property/03_tools_contract/04_resources_scripts/05_rename_references）
+- schema：非空/空数以运行时统计为准；**3 个契约缺口**（create_scene_node、get_resource_extensions、reimport_resource_files）
+- 遍历排除 **35 个副作用工具**；L1 单元测试 **71 个 gtest**；L2 引擎用例 **6 个文件**（00_meta/01_scene/02_property/03_tools_contract/04_resources_scripts/05_rename_references）
 - 工具命名规范：`<动词>_<类别>_<维度>_<对象>_<修饰>`（动词置首，如 create_scene_node、intersect_physics_2d_ray）
 - MCP 端口 **9527**（`/mcp`），`GODOT_AUTOPILOT_PORT` 可覆盖；产物名 `godot-autopilot`
 
 ## 维护入口
 
-代码改动后：更新受影响页面 → 同步页头"审计日期"（带日期行的页面：overview / build / tests / example / modules/tools_registry / tools_ops_a / support / core；无日期头的页面不新增）→ 更新 frontmatter 的 `timestamp`（真实系统时间，ISO 8601）→ 重核数值 → 追加 [changelog/](../../changelog/log.md)（按天分文件，每条记录精确到小时）→ 同步 [AGENTS.md](../../AGENTS.md)。
+代码改动后：更新受影响页面 → 同步页头"审计日期"（带日期行的页面：overview / build / tests / example / modules/tools_registry / tools_ops_a / support / core；无日期头的页面不新增）→ 更新 frontmatter 的 `timestamp`（真实系统时间，ISO 8601）→ 重核数值 → 追加 [changelog/log.md](changelog/log.md)（按天分文件，每条记录精确到小时）→ 同步 [AGENTS.md](../../AGENTS.md)。

@@ -8,6 +8,14 @@ using godot_autopilot::Bm25Index;
 
 namespace {
 
+godot_autopilot::Bm25Index::SearchQuery make_text_query(
+    const std::string &text, int max_results = 10) {
+  godot_autopilot::Bm25Index::SearchQuery q;
+  q.text = text;
+  q.max_results = max_results;
+  return q;
+}
+
 void add_sprite_entries(Bm25Index &idx) {
   idx.add_entry("sprite_frames", "Create sprite frames for animation", "Sprite",
                 {"animation", "frames"});
@@ -19,7 +27,7 @@ void add_sprite_entries(Bm25Index &idx) {
 TEST(Bm25IndexTest, HitReturnsMatchingToolFirst) {
   Bm25Index idx;
   add_sprite_entries(idx);
-  auto results = idx.search("sprite frames");
+  auto results = idx.search(make_text_query("sprite frames"));
   ASSERT_FALSE(results.empty());
   EXPECT_EQ(results[0].name, "sprite_frames");
 }
@@ -27,14 +35,14 @@ TEST(Bm25IndexTest, HitReturnsMatchingToolFirst) {
 TEST(Bm25IndexTest, MissReturnsEmpty) {
   Bm25Index idx;
   add_sprite_entries(idx);
-  EXPECT_TRUE(idx.search("zebra unicorn").empty());
+  EXPECT_TRUE(idx.search(make_text_query("zebra unicorn")).empty());
 }
 
 TEST(Bm25IndexTest, MoreMatchingTokensRankHigher) {
   Bm25Index idx;
   idx.add_entry("banana_doc", "banana apple smoothie", "Food", {});
   idx.add_entry("plain_doc", "banana", "Food", {});
-  auto results = idx.search("apple banana");
+  auto results = idx.search(make_text_query("apple banana"));
   ASSERT_EQ(results.size(), 2u);
   EXPECT_EQ(results[0].name, "banana_doc");
   EXPECT_GT(results[0].score, results[1].score);
@@ -43,7 +51,7 @@ TEST(Bm25IndexTest, MoreMatchingTokensRankHigher) {
 TEST(Bm25IndexTest, NameSubstringBonusLiftsZeroBm25Hit) {
   Bm25Index idx;
   idx.add_entry("spriteframes", "unrelated text", "Misc", {});
-  auto results = idx.search("sprite frames");
+  auto results = idx.search(make_text_query("sprite frames"));
   ASSERT_EQ(results.size(), 1u);
   EXPECT_DOUBLE_EQ(results[0].score, 2.0);
 }
@@ -51,7 +59,7 @@ TEST(Bm25IndexTest, NameSubstringBonusLiftsZeroBm25Hit) {
 TEST(Bm25IndexTest, CaseInsensitiveMatching) {
   Bm25Index idx;
   add_sprite_entries(idx);
-  auto results = idx.search("SPRITE FRAMES");
+  auto results = idx.search(make_text_query("SPRITE FRAMES"));
   ASSERT_FALSE(results.empty());
   EXPECT_EQ(results[0].name, "sprite_frames");
 }
@@ -91,13 +99,13 @@ TEST(Bm25IndexTest, EmptyQueryWithCategoryListsCategoryDocs) {
 TEST(Bm25IndexTest, EmptyQueryWithoutCategoryReturnsEmpty) {
   Bm25Index idx;
   add_sprite_entries(idx);
-  EXPECT_TRUE(idx.search("").empty());
+  EXPECT_TRUE(idx.search(make_text_query("")).empty());
 }
 
 TEST(Bm25IndexTest, SymbolOnlyQueryReturnsEmpty) {
   Bm25Index idx;
   add_sprite_entries(idx);
-  EXPECT_TRUE(idx.search("!!!").empty());
+  EXPECT_TRUE(idx.search(make_text_query("!!!")).empty());
 }
 
 TEST(Bm25IndexTest, TagsFilterRequiresAllTags) {
@@ -119,7 +127,7 @@ TEST(Bm25IndexTest, MaxResultsTruncates) {
   for (int i = 0; i < 5; ++i) {
     idx.add_entry("t" + std::to_string(i), "common stuff", "Cat", {});
   }
-  auto results = idx.search("common", 2);
+  auto results = idx.search(make_text_query("common", 2));
   ASSERT_EQ(results.size(), 2u);
 }
 
@@ -129,7 +137,7 @@ TEST(Bm25IndexTest, ClearEmptiesIndex) {
   EXPECT_EQ(idx.size(), 2u);
   idx.clear();
   EXPECT_EQ(idx.size(), 0u);
-  EXPECT_TRUE(idx.search("sprite").empty());
+  EXPECT_TRUE(idx.search(make_text_query("sprite")).empty());
 }
 
 TEST(Bm25IndexTest, SizeCountsEntries) {

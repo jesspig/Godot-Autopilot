@@ -19,7 +19,7 @@ endif()
 
 include(GoogleTest)
 
-# 业务子集源码 (从仓库根引用; register_all.cpp 引用全部 handle_xxx 符号, 链接必需)
+# 业务子集源码 (从仓库根引用; ops 实现文件经 make_tools() 被 register_all.cpp 引用, 链接必需)
 # resource_registry.cpp 被 code_exec_ops.cpp / resource_ops.cpp 引用 (grep 确认)
 file(GLOB GDA_TOOLS_OPS_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_SOURCE_DIR}/src/tools/*_ops.cpp")
@@ -45,10 +45,6 @@ set(GDA_UNIT_BUSINESS_SOURCES
     ${CMAKE_SOURCE_DIR}/src/tools/debugger_access.cpp
     ${GDA_TOOLS_OPS_SOURCES})
 
-set(GDA_TESTS_CXX_STANDARD 17)
-set(GDA_TESTS_CXX_STANDARD_REQUIRED ON)
-set(GDA_TESTS_LINK_SEARCH_STATIC ON)
-
 # ====================================================================
 # gda_unit_tests — L1 纯单元测试 (不启动引擎, 不触碰 Godot API)
 # ====================================================================
@@ -69,10 +65,10 @@ if(GDA_UNIT_SOURCES)
     endif()
 
     set_target_properties(gda_unit_tests PROPERTIES
-        CXX_STANDARD ${GDA_TESTS_CXX_STANDARD}
-        CXX_STANDARD_REQUIRED ${GDA_TESTS_CXX_STANDARD_REQUIRED}
-        LINK_SEARCH_START_STATIC ${GDA_TESTS_LINK_SEARCH_STATIC}
-        LINK_SEARCH_END_STATIC ${GDA_TESTS_LINK_SEARCH_STATIC})
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED ON
+        LINK_SEARCH_START_STATIC ON
+        LINK_SEARCH_END_STATIC ON)
 
     gtest_discover_tests(gda_unit_tests)
 endif()

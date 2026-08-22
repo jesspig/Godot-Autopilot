@@ -50,75 +50,54 @@ std::string render_toml(int port) {
          server_url(port) + "\"\n";
 }
 
+struct ClientInfo {
+  ClientId id;
+  const char *display_name;
+  const char *file_path;
+  const char *description;
+};
+
+constexpr ClientInfo kClients[] = {
+    {ClientId::OpenCode, "OpenCode", "opencode.json", "opencode.json (mcp key)"},
+    {ClientId::ClaudeCode, "Claude Code", ".mcp.json",
+     ".mcp.json (mcpServers)"},
+    {ClientId::Codex, "Codex", ".codex/config.toml",
+     ".codex/config.toml (mcp_servers)"},
+    {ClientId::Cursor, "Cursor", ".cursor/mcp.json",
+     ".cursor/mcp.json (mcpServers)"},
+    {ClientId::Copilot, "GitHub Copilot", ".github/mcp.json",
+     ".github/mcp.json (mcpServers)"},
+    {ClientId::Trae, "Trae", ".trae/mcp.json", ".trae/mcp.json (mcpServers)"},
+    {ClientId::Qoder, "Qoder", ".qoder/settings.json",
+     ".qoder/settings.json (mcpServers)"},
+    {ClientId::WorkBuddy, "WorkBuddy", ".workbuddy/mcp.json",
+     ".workbuddy/mcp.json (mcpServers)"},
+};
+
+const ClientInfo *find_client(ClientId id) {
+  for (const ClientInfo &info : kClients) {
+    if (info.id == id) {
+      return &info;
+    }
+  }
+  return nullptr;
+}
+
 } // namespace
 
 const char *display_name(ClientId id) {
-  switch (id) {
-  case ClientId::OpenCode:
-    return "OpenCode";
-  case ClientId::ClaudeCode:
-    return "Claude Code";
-  case ClientId::Codex:
-    return "Codex";
-  case ClientId::Cursor:
-    return "Cursor";
-  case ClientId::Copilot:
-    return "GitHub Copilot";
-  case ClientId::Trae:
-    return "Trae";
-  case ClientId::Qoder:
-    return "Qoder";
-  case ClientId::WorkBuddy:
-    return "WorkBuddy";
-  default:
-    return "";
-  }
+  const ClientInfo *info = find_client(id);
+  return info != nullptr ? info->display_name : "";
 }
 
 const char *file_path(ClientId id) {
-  switch (id) {
-  case ClientId::OpenCode:
-    return "opencode.json";
-  case ClientId::ClaudeCode:
-    return ".mcp.json";
-  case ClientId::Codex:
-    return ".codex/config.toml";
-  case ClientId::Cursor:
-    return ".cursor/mcp.json";
-  case ClientId::Copilot:
-    return ".github/mcp.json";
-  case ClientId::Trae:
-    return ".trae/mcp.json";
-  case ClientId::Qoder:
-    return ".qoder/settings.json";
-  case ClientId::WorkBuddy:
-    return ".workbuddy/mcp.json";
-  default:
-    return "";
-  }
+  const ClientInfo *info = find_client(id);
+  return info != nullptr ? info->file_path : "";
 }
 
 const char *description(ClientId id) {
-  switch (id) {
-  case ClientId::OpenCode:
-    return "opencode.json (mcp key)";
-  case ClientId::ClaudeCode:
-    return ".mcp.json (mcpServers)";
-  case ClientId::Codex:
-    return ".codex/config.toml (mcp_servers)";
-  case ClientId::Cursor:
-    return ".cursor/mcp.json (mcpServers)";
-  case ClientId::Copilot:
-    return ".github/mcp.json (mcpServers)";
-  case ClientId::Trae:
-    return ".trae/mcp.json (mcpServers)";
-  case ClientId::Qoder:
-    return ".qoder/settings.json (mcpServers)";
-  case ClientId::WorkBuddy:
-    return ".workbuddy/mcp.json (mcpServers)";
-  default:
-    return "";
-  }
+  const ClientInfo *info = find_client(id);
+  return info != nullptr ? info->description : "";
 }
 
 std::string render_config(ClientId id, int port) {

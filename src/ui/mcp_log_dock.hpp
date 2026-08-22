@@ -1,6 +1,8 @@
 #ifndef GODOT_AUTOPILOT_MCP_LOG_DOCK_HPP
 #define GODOT_AUTOPILOT_MCP_LOG_DOCK_HPP
 
+#include <cstddef>
+
 #include <godot_cpp/classes/button.hpp>
 #include <godot_cpp/classes/editor_dock.hpp>
 #include <godot_cpp/classes/line_edit.hpp>
@@ -40,7 +42,6 @@ protected:
 
 public:
   McpLogDock();
-  ~McpLogDock();
 
   void refresh();
   void poll_new_entries();

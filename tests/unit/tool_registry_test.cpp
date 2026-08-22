@@ -10,9 +10,9 @@
 #include <utility>
 
 using godot_autopilot::FnTool;
+using godot_autopilot::SideEffect;
 using godot_autopilot::ToolMeta;
 using godot_autopilot::ToolRegistry;
-using godot_autopilot::blocks_export;
 using godot_autopilot::make_fn_tool;
 using godot_autopilot::side_effect_of;
 
@@ -72,28 +72,25 @@ TEST(ToolRegistryTest, ExecuteEchoArgs) {
 }
 
 TEST(ToolRegistryTest, RoleInterfaceHelpers) {
-  auto blocked = std::make_unique<FnTool>(
+  auto plain = std::make_unique<FnTool>(
       make_meta("tool_a", "desc a", "Scene", true), echo_handler,
       mcp::JsonValue(mcp::JsonValue::object_tag));
-  EXPECT_TRUE(blocks_export(*blocked));
-  EXPECT_EQ(side_effect_of(*blocked), godot_autopilot::SideEffect::None);
-
-  auto unblocked = std::make_unique<FnTool>(
-      make_meta("tool_b", "desc b", "Resources", false), echo_handler,
-      mcp::JsonValue(mcp::JsonValue::object_tag), /*blocked_export=*/false);
-  EXPECT_FALSE(blocks_export(*unblocked));
+  EXPECT_EQ(side_effect_of(*plain), SideEffect::None);
 
   auto factory = make_fn_tool(make_meta("tool_f", "desc f", "Scene", true),
                               echo_handler,
                               mcp::JsonValue(mcp::JsonValue::object_tag));
   ASSERT_NE(factory, nullptr);
-  EXPECT_TRUE(blocks_export(*factory));
+  EXPECT_EQ(side_effect_of(*factory), SideEffect::None);
 }
 
 TEST(ToolRegistryTest, MetaRegistration) {
   ToolRegistry registry;
-  registry.add_meta(std::make_unique<FnTool>(
-      make_meta("tool_m", "desc m", "Scene", true), echo_handler,
+  registry.add(std::make_unique<::godot_autopilot::MetaTool>(
+      make_meta("tool_m", "desc m", "Scene", true),
+      [](const mcp::JsonValue&) -> mcp::JsonValue {
+        return mcp::JsonValue(mcp::JsonValue::object_tag);
+      },
       mcp::JsonValue(mcp::JsonValue::object_tag)));
 
   EXPECT_NE(registry.find_meta("tool_m"), nullptr);
