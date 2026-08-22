@@ -6,7 +6,7 @@ tags:
   - 模块
   - 领域工具
   - B组
-timestamp: "2026-08-21T10:00:00+08:00"
+timestamp: "2026-08-22T15:10:00+08:00"
 resource: src/tools/
 ---
 
@@ -35,7 +35,7 @@ resource: src/tools/
 | `tilemap_ops.cpp` | `godot_autopilot::tilemap_ops` | `tilemap_tools.hpp` | 4 |
 | `tileset_ops.cpp` | `godot_autopilot::tileset_ops` | `tileset_tools.hpp` | 3 |
 | `spriteframes_ops.cpp` | `godot_autopilot::spriteframes_ops` | `spriteframes_tools.hpp` | 3 |
-| `code_exec_ops.cpp` | `godot_autopilot::code_exec_ops` | —（元工具，不经 `*_tools.hpp`） | 2 |
+| `code_exec_ops.cpp` | `godot_autopilot::code_exec_ops` | —（元工具，不经 `*_tools.hpp`，不计入合计） | 2 |
 | `log_ops.cpp` | `godot_autopilot::log_ops` | `system_tools.hpp` | 1 |
 | `capture_ops.cpp` | `godot_autopilot::capture_ops` | `capture_tools.hpp` | 1 |
 | **合计（领域工具）** | | | **162** |
@@ -47,7 +47,7 @@ resource: src/tools/
 - **职责**：编辑器侧引擎诊断：日志打印、脚本调用栈回溯、`Performance` 单例监控、FPS/物理帧率调节、编辑器调试可视化开关。
 - **代表工具**：`print_debug_log`、`get_debug_stack`、`get_debug_monitor`、`get_debug_monitor_catalog`、`get_debug_monitors`、`set_debug_physics_fps`、`set_debug_collision_visual`、`set_debug_navigation_visual`、`set_debug_performance_visual`、`remove_debug_custom_monitor`、`get_debug_custom_monitor`、`get_debug_custom_monitor_names`、`get_debug_object_count`、`get_debug_memory_usage`、`get_debug_node_count`；Debug 类另含 `get_debug_object_info`（对象 ID → 类名/节点路径，handler 在 physics_ops，自 `resolve_object` 迁移）。
 - **关键事实**：
-  - 内置 83 个性能监控项静态表（`s_monitors`：time/memory/quantity 三类），`get_debug_monitors` 按表序取 `Performance::get_monitor` 值。
+  - 内置 59 个性能监控项静态表（`s_monitors`：time/memory/quantity 三类，id 0-58），`get_debug_monitors` 按表序取 `Performance::get_monitor` 值。
   - `get_debug_stack` 用 `Engine::capture_script_backtraces(include_vars)` 取 `ScriptBacktrace`，可展开帧、全局/局部/成员变量名。
   - 占位工具（`debug_get_object_count_by_class`、`debug_profile_*`、`debug_set_fps_limit`、`debug_add_custom_monitor`、`debug_query_object_count`/`debug_query_memory_usage`，godot-cpp 不可用）与 `resolve_object` 旧名已随全量重命名删除。
   - `set_debug_collision_visual` 等 3 个写 `EditorSettings::set_project_metadata("debug_options", ...)`。
@@ -62,7 +62,7 @@ resource: src/tools/
   - 注册两个 Godot 类（`debugger_ops::register_classes()` 经 `ClassDB::register_class`，由 `main.cpp` 调用）：`OutputCaptureLogger`（继承 `godot::Logger`，`_log_error`/`_log_message` 写入捕获缓冲）与 `DebugCapturePlugin`（继承 `EditorDebuggerPlugin`，单例存于静态 `s_instance`；`_setup_session` 登记会话、`_capture` 处理 `gda` 协议消息——`GDA_MSG_READY` 标记就绪、`GDA_MSG_RESPONSE` 转发给 `runtime_ops::handle_game_response`）。
   - 内存捕获环形缓冲（`DebuggerCapture` 单例，mutex 保护）：日志 2000 条、错误 500 条、运行输出 2000 条、监视帧 500 条。
   - 会话激活时 `get_debugger_errors`/`get_output`/`get_scene_tree` **切换为经 `runtime_ops::handle_gda_send` 走运行时通道**（get_errors/get_output/get_tree，超时 5000ms）；`get_stack_dump` 仅断点会话本地数据（附 note 说明无法经通道获取）。
-  - `get_debugger_log` 命中 `Invalid access to property or key` 错误时追加 Godot 3→4 重命名提示（`RENAME_HINTS`：frames→sprite_frames、translation→position 等 9 条）。
+  - `get_debugger_log` 命中 `Invalid access to property or key` 错误时追加 Godot 3→4 重命名提示（`RENAME_HINTS`：frames→sprite_frames、cast_to→target_position、translation→position 等 10 条，`debugger_ops.cpp:329-340`）。
   - 空结果附加 `capture_note_for_empty_result()`：提示启动 `play_editor_current_scene` 或改用 `get_game_log_entries`。
 - **错误模式**：无会话场景返回 `result` 空串 + `note` 字段；会话内错误经通道原样返回 `{"error": ...}`。
 - 出站链接：[运行时通道](../modules/entry_runtime.md) · [工具注册表](../modules/tools_registry.md)
@@ -129,7 +129,7 @@ resource: src/tools/
 - **代表工具**：`create_render_canvas_item`、`add_render_canvas_item_rect`、`create_render_camera`、`create_render_light`、`create_render_mesh`、`create_render_material`、`create_render_viewport`、`create_render_particles`、`set_render_environment_bg_color`、`set_render_environment_ambient_light`、`set_render_environment_glow`、`set_render_environment_ssr`、`set_render_environment_tonemap`、`set_render_environment_sdfgi`、`set_render_environment_volumetric_fog`、`create_render_sky`、`set_render_shader_code`、`set_render_shader_parameter_global`、`find_render_node_from_rid`。
 - **关键事实**：
   - 全程 RID 数值句柄（`rid_from_json`/`rid_to_json`，经 `UtilityFunctions::rid_from_int64` 互转），不绑定场景节点。
-  - **`environment_ops.cpp` 无独立 hpp**：7 个环境后处理工具与 `render_ops.cpp` 共享 `render_ops` 命名空间，声明在 `render_ops.hpp`；辅助函数 `rid_from_json`/`parse_color` 两文件各持一份（注释明示"保持两处同步"）。
+  - **`environment_ops.cpp` 无独立 hpp**：7 个环境后处理工具与 `render_ops.cpp` 共享 `render_ops` 命名空间，声明在 `render_ops.hpp`；RID 辅助已归一至共享头 `util/json_godot.hpp`（`rid_from_json`/`rid_to_json`、`json_to_color` 等），08-22 清理时删除两文件本地副本。
   - `set_render_environment_*` 参数繁多带默认值（glow 13 参、sdfgi 11 参、volumetric_fog 13 参）；环境工具用 `LogLevel::Debug` 记完成日志，其余为 Info。
   - `find_render_node_from_rid` 与 `get_render_canvas_item_rid` 桥接场景节点与 RID（`EditorInterface` 参与）。
 - **错误模式**：必填 `environment_rid`/RID 参数缺失 → error_json；`RenderingServer not available` → error_json；无 `result` 之外的扩展字段。

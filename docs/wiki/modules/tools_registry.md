@@ -6,13 +6,13 @@ tags:
   - 模块
   - 工具注册
   - schema
-timestamp: "2026-08-22T06:57:00+08:00"
+timestamp: "2026-08-22T15:10:00+08:00"
 resource: src/tools/
 ---
 
 # 工具注册表（src/tools/ 注册管线）
 
-> 审计日期：2026-08-22（2026-08-12 初稿；08-17 补 frontmatter；08-20 registry 单一来源重构；08-21 00:48 真类化 + def 删除；11:57 元工具接口化；12:15 副作用驱动遍历排除；08-22 随死代码清理同步——`add_meta`/`to_tool_info_all`/`build_schema_for_none_by_name` 删除、dispatch 元名单派生化、BM25 索引重建修复）。
+> 审计日期：2026-08-22（2026-08-12 初稿；08-17 补 frontmatter；08-20 registry 单一来源重构；08-21 00:48 真类化 + def 删除；11:57 元工具接口化；12:15 副作用驱动遍历排除；08-22 随死代码清理同步——`add_meta`/`to_tool_info_all`/`build_schema_for_none_by_name` 删除、dispatch 元名单派生化、BM25 索引重建修复；08-22 15 时全量一致性审计——schema 静态口径残留清除（SCHEMA_NONE/BASIC 已废）、遍历步数对齐实测 546）。
 > 覆盖范围：`register_all.cpp/hpp`、`dispatch.cpp/hpp`、`tool_catalog.cpp/hpp`、`schema_builder.cpp/hpp`、`schema_fills.hpp`、6 个 `schema_*_ops.cpp`、`tool_base.hpp`、`tool_registry.hpp`、`fn_tool.hpp`、`tool_decl.hpp`、`meta_tools.hpp`、26 个 `*_tools.hpp`，对照 `tests/runner/traversal.cpp`、`tests/unit/register_all_test.cpp`、`tests/config/03_tools_contract.json` 与仓库根 `AGENTS.md` 工具段。
 > 相关页面：[测试体系](../tests.md) · [工具实现 B 组](../modules/tools_ops_b.md) · [工具实现 A 组](../modules/tools_ops_a.md) · [入口与运行时](../modules/entry_runtime.md) · [架构总览](../overview.md)
 
@@ -59,7 +59,7 @@ flowchart TD
 | 2 | 领域工具 336 个 | 26 个 `*_tools.hpp` 的 `GDA_TOOL_CLASS`/`GDA_TOOL_CLASS_SIDE` 共 336 个（无重复名）；registry `all()`=**337** = 336 + system_status | **一致**（system_status 是唯一非真类来源） |
 | 3 | 工具总体 = 7 元 + 336 域 | registry `all_any()`=**344**（337 域/系统 + 7 元）；MCP 顶层 7 元工具 | **一致** |
 | 4 | ToolCatalog 344 条 | 由 registry `all_any()` 逐一 `make_tool_info` 派生 344 = 336 域 + system_status + 7 元；原 `populate_default_tools`/meta 快照/`Auto` 补录链路整体废弃 | **一致**（单一来源派生，无独立填表） |
-| 5 | schema 283 非空 / 73 空（旧值，已随重命名变化） | def 层面静态可数：SCHEMA_NONE=208、SCHEMA_BASIC=124（旧 222/126）；catalog 级非空/空数随 6 个 fill 函数与默认表变化，**以运行时 `SchemaStatisticsBaseline` 观测为准**，不硬编码 | **运行时统计口径** |
+| 5 | schema 283 非空 / 73 空（旧值，已随重命名变化） | def/SCHEMA_NONE 静态口径已随 08-21 真类化与 08-22 清理整体废除（fill 表直接给出最终 schema，`tool_input_schema` 的 basic 参数为 no-op）；catalog 级非空/空数**以运行时 `SchemaStatisticsBaseline` 观测为准**，不硬编码 | **运行时统计口径** |
 | 6 | SchemaStatisticsBaseline 运行时统计断言，不硬编码 | `register_all_test.cpp:133-147` 只断言 `non_empty > empty`、`empty > 0`、总和 = `catalog.size()`；旧 283/73 为运行时实测值 | **一致** |
 | 7 | 3 个契约缺口 | 见下表 | **一致** |
 | 8 | 35 个副作用工具遍历排除 | 26 个 `*_tools.hpp` 中 35 个工具用 `GDA_TOOL_CLASS_SIDE` 标记（12 持久磁盘 + 22 用户可见 + `build_csharp_assembly` 进程副作用）；runner 读 `side_effect` 字段自动排除 | **一致** |
@@ -97,9 +97,9 @@ flowchart TD
 
 ## 遍历步数推导
 
-> 步数随工具数变化：域工具 336、排除 35，空参 336−35=301，冒烟步数以运行时 `03_tools_contract.json` 统计为准；本段旧推导 410 已过期待重算。
+> 步数随工具数变化：域工具 336、排除 35，空参 336−35=301，冒烟步数以运行时 `03_tools_contract.json` 统计为准；**08-21 全量真类化后实测 ≈546 步**（与 AGENTS.md/tests.md 口径一致）。
 
-遍历经 `call_tool` 元工具代理，每个非排除工具产生一次调用 = 一个 StepResult；步数全部由 def 与排除/空表集合决定（当前运行实测量见 `03_tools_contract` 报告）。
+遍历经 `call_tool` 元工具代理，每个非排除工具产生一次调用 = 一个 StepResult；步数随工具集与空 schema 数浮动（当前运行实测量见 `03_tools_contract` 报告）。
 
 ## 分发与错误路径（dispatch.cpp）
 

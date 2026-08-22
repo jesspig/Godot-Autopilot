@@ -1,6 +1,6 @@
 {
   "name": "tools_contract",
-  "description": "全工具遍历的配置驱动声明：步骤1 empty_args 对全部 332 个领域工具空参调用校验响应契约（34 个副作用工具自动跳过）；步骤2 heuristic_smoke 对全部工具按 schema 属性类型生成启发式参数冒烟调用。两步骤中每个工具均先经 get_tool_detail 校验存在性与工具名一致性（内置），warnings 不视为失败。执行器对 traverse 步骤不做分段，两次遍历均一次跑完 332 工具，共耗时约 2-3 分钟。",
+  "description": "全工具遍历的配置驱动声明：步骤1 empty_args 对全部 336 个领域工具空参调用校验响应契约（35 个副作用工具自动跳过）；步骤2 heuristic_smoke 对全部工具按 schema 属性类型生成启发式参数冒烟调用。两步骤中每个工具均先经 get_tool_detail 校验存在性与工具名一致性（内置），warnings 不视为失败。执行器对 traverse 步骤不做分段，两次遍历均一次跑完 336 工具，共耗时约 2-3 分钟。",
   "headless": true,
   "pipeline": {
     "on_failure": "continue",

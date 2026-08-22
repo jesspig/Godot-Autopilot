@@ -6,13 +6,13 @@ tags:
   - 模块
   - 核心层
   - 线程模型
-timestamp: "2026-08-22T06:57:00+08:00"
+timestamp: "2026-08-22T15:10:00+08:00"
 resource: src/core/
 ---
 
 # 核心模块（src/core/）
 
-> 审计日期：2026-08-22（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 随配置面板端口持久化同步并补 YAML frontmatter；08-22 随版本号收敛为根 `VERSION` 单一来源同步 MCP 标识引用；08-22 随死代码清理同步——`set_on_new_entry` 回调与 `is_registered` 删除），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 审计日期：2026-08-22（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 随配置面板端口持久化同步并补 YAML frontmatter；08-22 随版本号收敛为根 `VERSION` 单一来源同步 MCP 标识引用；08-22 随死代码清理同步——`set_on_new_entry` 回调与 `is_registered` 删除；08-22 15 时全量一致性审计——职责表补 `version.hpp.in`、生命周期步骤修正状态栏残留与 `GDA_FORCE_HEADLESS` 语义），基于当前工作树代码逐行核对（不依赖 git 历史）。
 > 覆盖范围：`src/core/` 下 9 组文件。注意：`CommandQueue` 为 header-only（仅 `command_queue.hpp`，无对应 `.cpp`），实际为 16 个文件。
 
 ## 模块简介
@@ -32,6 +32,7 @@ resource: src/core/
 | `SceneDirtyTracker` | `scene_dirty_tracker.cpp/hpp` | 记录"当前编辑场景是否被修改"及根节点实例 ID | `GodotAutopilotPlugin::_get_unsaved_status` |
 | `ServerContext` | `server_context.cpp/hpp` | MCP 服务器组装、端口解析、启动/停止/重启、工具/资源/prompt 注册 | `main.cpp` 入口 |
 | `PluginConfig` | `plugin_config.cpp/hpp` | 插件自身配置持久化（`user://godot_autopilot/config.json`，当前仅端口） | `ServerContext` 端口解析、`McpConfigDock` Apply |
+| 版本宏 | `version.hpp.in`（configure_file 模板，生成 `<build>/generated/version.hpp`） | 定义 `GDA_VERSION` 字符串宏，取自根 `VERSION` 文件单一来源 | `server_context.cpp`（MCP `server_info`）、`register_all.cpp`（`system_status.version`） |
 
 ## 关键接口清单
 
@@ -113,7 +114,7 @@ flowchart LR
 ## 生命周期（插件 ↔ ServerContext）
 
 1. `GDExtensionEntryPoint`：`MODULE_INITIALIZATION_LEVEL_SCENE` 注册类，`MODULE_INITIALIZATION_LEVEL_EDITOR` 时 `EditorPlugins::add_by_type<GodotAutopilotPlugin>()`
-2. `_enter_tree`：设置 editor queue → 状态栏/Log Dock/输出捕获/调试器插件 → `new ServerContext(queue)` 并 `start()` → `add_export_plugin(ExportGuard)`；`GDA_FORCE_HEADLESS` 或 `gda_cmdline_mode()` 时跳过 UI/服务器
+2. `_enter_tree`：设置 editor queue → Log Dock/输出捕获/调试器插件 → `new ServerContext(queue)` 并 `start()` → Config Dock → `add_export_plugin(ExportGuard)`；`gda_cmdline_mode()` 为真时跳过 UI/服务器（`GDA_FORCE_HEADLESS=1` 反向禁用 cmdline 模式，语义与变量名相反）
 3. `_process`：每帧 `drain()` + Dock 轮询
 4. `_exit_tree`：`ServerContext::stop()` + delete → 注销各组件
 

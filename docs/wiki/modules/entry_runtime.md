@@ -6,7 +6,7 @@ tags:
   - 模块
   - 入口
   - 运行时桥接
-timestamp: "2026-08-22T06:57:00+08:00"
+timestamp: "2026-08-22T15:10:00+08:00"
 resource:
   - src/main.cpp
   - src/runtime/
@@ -25,7 +25,7 @@ resource:
 - 以 `extern "C"` 导出，签名 `GDExtensionEntryPoint(GDExtensionInterfaceGetProcAddress, GDExtensionClassLibraryPtr, GDExtensionInitialization*)`。
 - 修饰宏 `GDA_EXPORT`：Windows（`_WIN32`）为 `__declspec(dllexport)`，其余平台为空。
 - 函数体：构造 `godot::GDExtensionBinding::InitObject`，注册 initializer 与 terminator 回调，最后返回 `init.init()`。
-- 两个回调内部均包 try/catch，异常只记录日志不中断（catch 分支统一委托 `log_setup_failure` 助手写 System 错误日志）。
+- 两个回调内部均包 try/catch，异常只记录日志不中断；`_enter_tree` 内另有四组步骤级 try/catch（log dock / output logger / debugger plugin / config dock），catch 分支统一委托 `log_setup_failure` 助手（`main.cpp:30-40`）写 System 错误日志。
 
 ### 1.2 模块初始化（register_initializer）
 
@@ -63,7 +63,7 @@ resource:
 
 `_get_unsaved_status()`：`scene_dirty_tracker::is_current_scene_dirty()` 为真时返回场景名，否则返回空串。
 
-### 1.5 cmdline 模式检测（gda_cmdline_mode，main.cpp:36）
+### 1.5 cmdline 模式检测（gda_cmdline_mode，main.cpp:46）
 
 实际函数名是 `gda_cmdline_mode()`（**不存在** `gsd_cmdline_mode`）。语义：
 
@@ -134,7 +134,7 @@ resource:
 
 ### 3.1 game_bridge.cpp — 消息通道与缓冲
 
-- `register_listener()`（幂等，`g_registered` 守卫）：首次调用时注册 4 个类（`GameBridgeListener`、`GameBridgeLogger`，及 eval/input 两组桥接类）；实例化监听器与日志器；`EngineDebugger::register_message_capture("gda", on_gda_message)` 捕获前缀 `gda` 的消息；`OS::add_logger` 挂游戏日志器；随后立即发出 `gda:ready`（body 含 `ready:true` 与活动字段）。
+- `register_listener()`（幂等，`g_registered` 守卫）：首次调用时注册 6 个类（`GameBridgeListener`、`GameBridgeLogger`，及 eval 组 `GameBridgeEvalAwaiter`、input 组 Watcher/DelayedRelease/Sequence 共 3 个桥接类；注册顺序 Listener→eval→input→Logger）；实例化监听器与日志器；`EngineDebugger::register_message_capture("gda", on_gda_message)` 捕获前缀 `gda` 的消息；`OS::add_logger` 挂游戏日志器；随后立即发出 `gda:ready`（body 含 `ready:true` 与活动字段）。
 - `unregister_listener()`：反注册消息捕获与日志器，unref 两个实例。
 - `GameBridgeListener`（RefCounted 子类）：绑定方法 `on_gda_message(p_message: String, p_data: Array) -> bool`。解析 `data[0]` 为 JSON 请求，取 `request_id`/`op`/`params` 分发；每收到一条消息即刷新 `g_last_activity_ms`；响应统一附加 `ok` 字段后经 `send_response` 发出。请求畸形或 op 执行失败会同时记入错误与输出缓冲。
 - `send_response(request_id, body)`：补 `request_id` 字段（`GDA_FIELD_REQUEST_ID` 常量），`EngineDebugger::send_message("gda:response", [json])`。
@@ -165,7 +165,7 @@ resource:
 
 ## 4. 与现有文档对照
 
-- AGENTS.md "入口点：src/main.cpp → GDExtensionEntryPoint → 注册 GodotAutopilotPlugin 并启动 ServerContext"：方向正确，但**严格说 ServerContext 不是入口点启动的**——`GDExtensionEntryPoint` 只做类注册与 `add_by_type`，插件实例由 Godot 创建后在其 `_enter_tree()` 中才 `new ServerContext` 并 `start()`（main.cpp:183-186）。实际链为：入口点 → 注册插件类型 → Godot 实例化 → `_enter_tree` → ServerContext 启动。
+- AGENTS.md "入口点：src/main.cpp → GDExtensionEntryPoint → 注册 GodotAutopilotPlugin 并启动 ServerContext"：方向正确，但**严格说 ServerContext 不是入口点启动的**——`GDExtensionEntryPoint` 只做类注册与 `add_by_type`，插件实例由 Godot 创建后在其 `_enter_tree()` 中才 `new ServerContext` 并 `start()`（main.cpp:161-175）。实际链为：入口点 → 注册插件类型 → Godot 实例化 → `_enter_tree` → ServerContext 启动。
 - AGENTS.md "在 MODULE_INITIALIZATION_LEVEL_EDITOR 阶段加载到 Godot 编辑器"：编辑器侧类确在 EDITOR 级别注册；但运行时桥接 `register_listener` 注册在 **SCENE 级别**且仅非编辑器进程，属补充事实而非矛盾。
 - AGENTS.md 线程模型 "HTTP 线程 → CommandQueue::submit() → 主线程 _process() 排空"：与 `_process()` 中 `s_queue.drain()` 一致。
 - AGENTS.md 错误模式 `{"error": "..."}`：桥接层 `error_result` 同构；差异是桥接响应额外带布尔 `ok` 字段。
@@ -173,7 +173,7 @@ resource:
 
 不一致点汇总：
 
-1. `gsd_cmdline_mode` 不存在，实际函数名 `gda_cmdline_mode()`（main.cpp:36）。
+1. `gsd_cmdline_mode` 不存在，实际函数名 `gda_cmdline_mode()`（main.cpp:46）。
 2. `GDA_FORCE_HEADLESS=1` 的语义与变量名相反：它是**禁用** cmdline 模式（强制 `false`），而非强制无头。
 3. terminator 的 SCENE 级别**无条件** `unregister_listener()`，与 initializer 的 `!is_editor_hint()` 条件注册不对称。
 4. `GDA_MSG_REQUEST` 不被桥接侧使用（由工具侧 `debugger_access.cpp` 发出）。

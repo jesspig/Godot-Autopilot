@@ -1,6 +1,6 @@
 # GDA (Godot Autopilot) 项目知识库
 
-本知识库与源码同步维护，所有事实以当前代码为准；数值以运行时统计为准。维护记录见 [changelog/](../../changelog/log.md)。
+本知识库与源码同步维护，所有事实以当前代码为准；数值以运行时统计为准。维护记录见 [changelog/log.md](changelog/log.md)。
 
 ## 页面索引
 
@@ -29,4 +29,4 @@
 
 ## 维护入口
 
-代码改动后：更新受影响页面 → 同步页头"审计日期"（带日期行的页面：overview / build / tests / example / modules/tools_registry / tools_ops_a / support / core；无日期头的页面不新增）→ 更新 frontmatter 的 `timestamp`（真实系统时间，ISO 8601）→ 重核数值 → 追加 [changelog/](../../changelog/log.md)（按天分文件，每条记录精确到小时）→ 同步 [AGENTS.md](../../AGENTS.md)。
+代码改动后：更新受影响页面 → 同步页头"审计日期"（带日期行的页面：overview / build / tests / example / modules/tools_registry / tools_ops_a / support / core；无日期头的页面不新增）→ 更新 frontmatter 的 `timestamp`（真实系统时间，ISO 8601）→ 重核数值 → 追加 [changelog/log.md](changelog/log.md)（按天分文件，每条记录精确到小时）→ 同步 [AGENTS.md](../../AGENTS.md)。
