@@ -6,7 +6,7 @@ tags:
   - 约定
   - 命名
   - 规范
-timestamp: "2026-08-22T15:10:00+08:00"
+timestamp: "2026-08-23T01:09:00+08:00"
 ---
 
 # 工程约定
@@ -68,5 +68,5 @@ gda 聚焦「编辑器内的引擎操作」，以下能力**明确不做**，避
 
 ## 其他
 
-- 无 CI（`.github/` 不存在）；构建、测试均本地执行
+- CI/Release 工作流见 [build.md](./build.md)「CI 与 Release」；CI 仅跑 L1，L2 引擎用例仍仅本地执行（需 `GODOT_PATH`）
 - 依赖版本固定：godot-cpp 10.0.0-rc1、mcp-cpp-sdk 0.3.1（FetchContent，无子模块）

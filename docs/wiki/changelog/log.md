@@ -2,6 +2,10 @@
 
 > 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 条。
 
+## 2026-08-23
+
+- **CI/Release 工作流落地**：新增 `.github/workflows/ci.yml`（develop 触发，三平台 Debug + L1）与 `release.yml`（tag `v*` 触发：tag↔VERSION 校验 → 三平台 Release → 合并 `addons.zip` 发布）；build.py 增 `--package --libs-dir` 跨平台合并打包、gdextension macOS 条目改 universal；preset 设 `CMAKE_OSX_ARCHITECTURES` 双架构；版本升至 **0.2.1**；L1 71/71 验证通过。详见 `changelog/2026-08-23-log.md`
+
 ## 2026-08-22
 
 - **全量代码-文档一致性审计**：零代码变更前提下逐页核对 24 个 wiki 页与 AGENTS/README/测试资产；修正 README ~339→~343、L1 分文件计数 77→71、L2 用例 5→6、监控项表 83→59、RENAME_HINTS 9→10、editor 计数 22→23、register_listener 注册类 4→6、排除清单分组 12+22+1、步数对齐实测 546；support.md 补四个 util 共享头小节；core/entry_runtime/build/overview 行号与语义残留清除。详见 `changelog/2026-08-22-log.md`
@@ -13,8 +17,3 @@
 - **遍历副作用排除 `side_effects()` 驱动**：`SideEffect` 扩 6 值（+Process）；`GDA_TOOL_CLASS_SIDE` 变体宏标记 35 个副作用工具；`get_tool_detail` 补 `side_effect` 字段；runner 读该字段排除、删除硬编码 `kExcludedSideEffectTools`。详见 `changelog/2026-08-21-log.md`
 - **元工具接口+组合化**：新增 `IMetaTool` 标记接口 + `MetaTool`（ToolBase+IMetaTool，依赖组合注入）；`ToolRegistry::add()` 按 `dynamic_cast<IMetaTool>` 自动归类（实现接口即元工具）；7 个元工具改以 `MetaTool` 注册；新增 L1 路由断言。详见 `changelog/2026-08-21-log.md`
 - **ToolBase 工具统一标准化全量落地**：新增 `tool_decl.hpp`（真类宏）+ 26 个 `<域>_tools.hpp`，**336 域工具悉数迁移为独立 `ToolBase` 子类**；`tool_defs.def` 删除，catalog(344)/index/分发/RegisterTool 全从 registry 派生。详见 `changelog/2026-08-21-log.md`
-- **重构收尾文档同步**：清除 AGENTS/wiki 对已删 `tool_defs.def` 的遗留引用与旧计数，统一为 336 域/344 catalog/35 副作用驱动排除。详见 `changelog/2026-08-21-log.md`
-
-## 2026-08-20
-
-- **ToolBase 工具统一标准化落地（ToolRegistry 单一来源）**：新增 `tool_base.hpp`/`tool_registry.hpp`/`fn_tool.hpp`；修复函数局部对象悬垂（`g_active_registry` 升为文件级静态）。详见 `changelog/2026-08-20-log.md`

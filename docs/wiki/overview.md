@@ -6,7 +6,7 @@ tags:
   - 总览
   - 架构
   - 技术栈
-timestamp: "2026-08-22T15:10:00+08:00"
+timestamp: "2026-08-23T01:09:00+08:00"
 resource:
   - README.md
   - src/
@@ -14,7 +14,7 @@ resource:
 
 # 项目总览（Overview）
 
-> 审计日期：2026-08-22（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 补 YAML frontmatter 并复核数值；08-20 随 rename 事务化 + 4 个新工具同步；08-21 随 ToolBase 重构同步；08-22 随代码清理同步——`GDA_LTO` 环境变量移除、gtest 数复核；08-22 15 时全量一致性审计——构建参数双通道澄清、L2 用例 6 份、README ~343 口径对齐），基于当前工作树文件与代码逐项核对（不依赖 git 历史）。
+> 审计日期：2026-08-23（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 补 YAML frontmatter 并复核数值；08-20 随 rename 事务化 + 4 个新工具同步；08-21 随 ToolBase 重构同步；08-22 随代码清理同步——`GDA_LTO` 环境变量移除、gtest 数复核；08-22 15 时全量一致性审计——构建参数双通道澄清、L2 用例 6 份、README ~343 口径对齐；08-23 随 CI/Release 工作流落地同步），基于当前工作树文件与代码逐项核对（不依赖 git 历史）。
 > 事实来源：根 `README.md` / `README_zh.md` / `AGENTS.md`、`CMakeLists.txt`、`cmake/FetchDependencies.cmake`、`src/main.cpp`、`src/core/server_context.cpp`、`src/tools/tool_registry.hpp`、`src/tools/*_tools.hpp`、`src/tools/dispatch.cpp`、`src/prompts/prompt_handlers.cpp`、`src/resources/resource_handlers.cpp`、`Example/project.godot`、`Example/docs/`。
 
 ## 项目定位
@@ -167,7 +167,7 @@ flowchart LR
 - 端口 9527、`/mcp`、`GODOT_AUTOPILOT_PORT`：README（英/中）、AGENTS.md、代码三方一致 ✓
 - 工具总数 343：README.md / README_zh.md "~343"（08-22 审计时由过时的 "~339" 修正，均注明 count varies by plugin version）与 `ToolRegistry`/catalog（registry 条目 344 = 343 工具 + system_status）口径自洽 ✓
 - README.md 类别数量表与 `*_tools.hpp`/catalog 一致（23 类，以各族 `make_tools()` 实测为准）✓
-- 无 CI：`.github/` 不存在，AGENTS.md 声称属实 ✓
+- CI：`.github/workflows/{ci,release}.yml`（develop 触发 CI、tag `v*` 触发 Release），AGENTS.md 声称属实 ✓
 - 目标引擎 4.7：与 `Example/project.godot` 一致 ✓；README 前提"Godot 4.3+"为宽松下界
 - 详细对照见 [example.md](./example.md) 与 [modules/core.md](./modules/core.md) 的"不一致点"章节
 

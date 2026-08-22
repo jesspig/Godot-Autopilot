@@ -5,6 +5,10 @@
 - **`uv run build.py`** — Debug: 配置 + 构建 + 部署到 `Example/addons/godot-autopilot/`
 - **`uv run build.py --release`** — Release: 先清理，再配置 + 构建 + 部署
 - **`uv run build.py --package`** — 打包已部署的 addons 为 `dist/godot-autopilot-<version>.zip`
+- **`uv run build.py --package --libs-dir <dir>`** — 从目录递归收集三平台库（dll/so/dylib）合并部署后打包（CI Release 用，须与 `--package` 同用）
+- **CI**：`.github/workflows/ci.yml` — develop push/PR 触发，三平台 Debug 编译 + L1 测试（`ctest --preset debug -E "^gda_runner_"` 排除需引擎的 L2）
+- **Release**：`.github/workflows/release.yml` — tag `v*` 触发；validate job 校验 tag 与 VERSION 一致 → 三平台 Release 构建上传 artifact → package job 合并三库为 `addons.zip` 发布 GitHub Release
+- **macOS 产物为 universal 双架构**：preset 设 `CMAKE_OSX_ARCHITECTURES=x86_64;arm64`（仅 Apple 平台生效），gdextension 用 `macos.{debug,release}.universal` 条目（Godot 4.4+ 支持显式 universal 标签加载）
 - 手动: `cmake --preset debug && cmake --build --preset debug`
 - 预设 (`CMakePresets.json`): `debug`, `release`（均为 Ninja）
 - **切勿删除 `build/<preset>/_deps/`** — 缓存已获取的依赖项（godot-cpp、mcp-cpp-sdk、googletest）
@@ -57,7 +61,7 @@ schema 由 `tool_input_schema(name, basic)` 单一源提供（转发 `build_sche
 
 ## 知识局限
 
-- **无 CI**（`.github/` 不存在）
+- **CI 不跑 L2**：L2 需 Godot 可执行文件（`GODOT_PATH`），CI 仅编译 + L1；Release workflow 亦不重复跑测试（tag 应打在已过 CI 的 commit 上）
 - **schema 覆盖**：非空/空数以运行时统计为准（由 `tests/unit/register_all_test.cpp` 的 `SchemaStatisticsBaseline` 运行时统计断言，不硬编码数量；schema 由 `tool_input_schema(name, basic)` 单一源经 `build_schema_for` 生成）；**3 个契约缺口**：`create_scene_node`（name/type 有默认值不校验必填）、`get_resource_extensions`（缺 type 返回全类型）、`reimport_resource_files`（空参 count=0 静默成功）——遍历测试记 warnings 不 FAIL
 - **目标引擎版本**：Godot 4.7；常见 API 迁移事实：`TileSet.get_tile_data` 属 `TileSetAtlasSource.get_tile_data(source_id→atlas_coords, alternative)`；`AnimatedSprite2D` 属性名为 `sprite_frames`（`frames` 自 4.0 起更名）；`motion_mode` 枚举 GROUNDED=0/FLOATING=1
 - **领域工具分 23 类**（InputMap 并入 Input；`get_debug_object_info` 归 Debug 类）——各类计数以 `docs/wiki/modules/tools_registry.md` 类别分布表为准，改动后需重新核算并同步 README
