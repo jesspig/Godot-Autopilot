@@ -29,10 +29,9 @@ namespace godot_autopilot {
 namespace runtime_ops {
 
 using godot_autopilot::util::error_json;
+using JV = mcp::JsonValue;
 
 namespace {
-
-using JV = mcp::JsonValue;
 
 CommandQueue *g_editor_queue = nullptr;
 
@@ -91,7 +90,9 @@ JV send_request(int64_t request_id, const std::string &op, const JV &params) {
   return r;
 }
 
-JV wait_for_response(int64_t request_id, int64_t timeout_ms) {
+} // namespace
+
+mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms) {
   std::shared_ptr<PendingRequest> pending;
   {
     std::lock_guard<std::mutex> lock(g_pending_mtx);
@@ -211,8 +212,6 @@ JV wait_for_response(int64_t request_id, int64_t timeout_ms) {
   return error_json("unexpected game response (missing result)");
 }
 
-} // namespace
-
 void set_editor_queue(godot_autopilot::CommandQueue *q) {
   g_editor_queue = q;
 }
@@ -277,10 +276,6 @@ mcp::JsonValue handle_gda_send(const std::string &op,
   r["__gda_pending"] = JV(request_id);
   r["timeout_ms"] = JV(timeout_ms + RESPONSE_GRACE_MS);
   return r;
-}
-
-mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms) {
-  return wait_for_response(request_id, timeout_ms);
 }
 
 mcp::JsonValue finalize_capture_response(const mcp::JsonValue &pending_result) {

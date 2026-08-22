@@ -210,6 +210,7 @@ TEST_F(RegisteredServerFixture, ReRegisterIsIdempotentForServerAndCatalog) {
   auto result = client->ListTools();
   EXPECT_EQ(result.tools.size(), kMetaToolCount);
   EXPECT_EQ(catalog.size(), catalog.get_all_tools().size());
+  EXPECT_EQ(index.size(), catalog.size());
 }
 
 TEST_F(RegisteredServerFixture, TwoIndependentServersRegisterIdentically) {
