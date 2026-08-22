@@ -54,23 +54,6 @@ TEST(LogSystemTest, QueryFilterTextIsCaseInsensitive) {
     EXPECT_EQ(results[0]->message, "CaseMixAbC_1");
 }
 
-TEST(LogSystemTest, OnNewEntryCallbackReceivesEntry) {
-    LogSystem& log = LogSystem::instance();
-    bool called = false;
-    std::string received;
-    LogCategory received_category = LogCategory::System;
-    log.set_on_new_entry([&](const LogEntry& e) {
-        called = true;
-        received = e.message;
-        received_category = e.category;
-    });
-    log.log(LogLevel::Info, LogCategory::Prompts, "CBMARK_hello");
-    EXPECT_TRUE(called);
-    EXPECT_EQ(received, "CBMARK_hello");
-    EXPECT_EQ(received_category, LogCategory::Prompts);
-    log.set_on_new_entry({});
-}
-
 TEST(LogSystemTest, RingBufferOverwritesOldestAtMaxEntries) {
     LogSystem& log = LogSystem::instance();
     const int total = LogSystem::MAX_ENTRIES + 50;

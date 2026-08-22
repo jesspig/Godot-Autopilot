@@ -1,15 +1,5 @@
 #pragma once
 
-//
-
-//
-
-//
-
-//
-
-//
-
 #include <string_view>
 
 namespace godot_autopilot {
@@ -51,10 +41,6 @@ inline constexpr std::string_view GDA_FIELD_LAST_ACTIVITY_MS =
     "last_activity_ms";
 inline constexpr std::string_view GDA_FIELD_READY = "ready";
 inline constexpr std::string_view GDA_FIELD_HEALTHY = "healthy";
-
-inline constexpr int GDA_READY_WAIT_MS = 5000;
-
-inline constexpr int GDA_PLAY_READY_WAIT_MS = 2000;
 
 inline constexpr std::string_view GDA_AUTO_CONTINUE_ENV = "GDA_AUTO_CONTINUE";
 inline constexpr int GDA_AUTO_CONTINUE_MAX = 3;
