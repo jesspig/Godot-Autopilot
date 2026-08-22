@@ -1,7 +1,9 @@
 #include "game_bridge.hpp"
 
+#include "core/config.hpp"
 #include "gda_protocol.hpp"
 #include "util/error_util.hpp"
+#include <cctype>
 #include <functional>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/global_constants.hpp>
@@ -122,6 +124,44 @@ public:
   }
 };
 
+void dispatch_input_event(godot::Input *input, int type_code,
+                          const godot::Key &key, int64_t button_index,
+                          const godot::Vector2 &position, bool has_position,
+                          bool pressed, const godot::StringName &action,
+                          bool mode_api, bool flush) {
+  if (type_code == 0) {
+    godot::Ref<godot::InputEventKey> ev;
+    ev.instantiate();
+    ev->set_pressed(pressed);
+    ev->set_keycode(key);
+    ev->set_physical_keycode(key);
+    input->parse_input_event(ev);
+  } else if (type_code == 1) {
+    godot::Ref<godot::InputEventMouseButton> ev;
+    ev.instantiate();
+    ev->set_pressed(pressed);
+    ev->set_button_index(static_cast<godot::MouseButton>(button_index));
+    if (has_position) {
+      ev->set_position(position);
+      ev->set_global_position(position);
+    }
+    input->parse_input_event(ev);
+  } else if (mode_api) {
+    if (pressed)
+      input->action_press(action);
+    else
+      input->action_release(action);
+  } else {
+    godot::Ref<godot::InputEventAction> ev;
+    ev.instantiate();
+    ev->set_action(action);
+    ev->set_pressed(pressed);
+    input->parse_input_event(ev);
+  }
+  if (flush)
+    input->flush_buffered_events();
+}
+
 class GameBridgeDelayedRelease : public godot::Node {
   GDCLASS(GameBridgeDelayedRelease, godot::Node)
 
@@ -181,65 +221,16 @@ private:
   void do_press() {
     auto *input = godot::Input::get_singleton();
     if (input) {
-      if (type_ == 0) {
-        godot::Ref<godot::InputEventKey> ev;
-        ev.instantiate();
-        ev->set_pressed(true);
-        ev->set_keycode(key_);
-        ev->set_physical_keycode(key_);
-        input->parse_input_event(ev);
-      } else if (type_ == 1) {
-        godot::Ref<godot::InputEventMouseButton> ev;
-        ev.instantiate();
-        ev->set_pressed(true);
-        ev->set_button_index(static_cast<godot::MouseButton>(button_index_));
-        if (has_position_) {
-          ev->set_position(position_);
-          ev->set_global_position(position_);
-        }
-        input->parse_input_event(ev);
-      } else if (mode_api_) {
-        input->action_press(action_);
-      } else {
-        godot::Ref<godot::InputEventAction> ev;
-        ev.instantiate();
-        ev->set_action(action_);
-        ev->set_pressed(true);
-        input->parse_input_event(ev);
-      }
-      input->flush_buffered_events();
+      dispatch_input_event(input, type_, key_, button_index_, position_,
+                           has_position_, true, action_, mode_api_, true);
     }
   }
 
   void do_release() {
     auto *input = godot::Input::get_singleton();
     if (input) {
-      if (type_ == 0) {
-        godot::Ref<godot::InputEventKey> ev;
-        ev.instantiate();
-        ev->set_pressed(false);
-        ev->set_keycode(key_);
-        ev->set_physical_keycode(key_);
-        input->parse_input_event(ev);
-      } else if (type_ == 1) {
-        godot::Ref<godot::InputEventMouseButton> ev;
-        ev.instantiate();
-        ev->set_pressed(false);
-        ev->set_button_index(static_cast<godot::MouseButton>(button_index_));
-        if (has_position_) {
-          ev->set_position(position_);
-          ev->set_global_position(position_);
-        }
-        input->parse_input_event(ev);
-      } else if (mode_api_) {
-        input->action_release(action_);
-      } else {
-        godot::Ref<godot::InputEventAction> ev;
-        ev.instantiate();
-        ev->set_action(action_);
-        ev->set_pressed(false);
-        input->parse_input_event(ev);
-      }
+      dispatch_input_event(input, type_, key_, button_index_, position_,
+                           has_position_, false, action_, mode_api_, false);
     }
   }
 };
@@ -329,6 +320,75 @@ private:
   }
 };
 
+struct KeyCodeEntry {
+  const char *name;
+  godot::Key key;
+};
+
+constexpr KeyCodeEntry kKeyCodeNameTable[] = {
+    {"SPACE", godot::KEY_SPACE},
+    {"ENTER", godot::KEY_ENTER},
+    {"RETURN", godot::KEY_ENTER},
+    {"ESCAPE", godot::KEY_ESCAPE},
+    {"TAB", godot::KEY_TAB},
+    {"BACKSPACE", godot::KEY_BACKSPACE},
+    {"INSERT", godot::KEY_INSERT},
+    {"DELETE", godot::KEY_DELETE},
+    {"PAUSE", godot::KEY_PAUSE},
+    {"PRINT", godot::KEY_PRINT},
+    {"CLEAR", godot::KEY_CLEAR},
+    {"SHIFT", godot::KEY_SHIFT},
+    {"CTRL", godot::KEY_CTRL},
+    {"CONTROL", godot::KEY_CTRL},
+    {"META", godot::KEY_META},
+    {"ALT", godot::KEY_ALT},
+    {"CAPSLOCK", godot::KEY_CAPSLOCK},
+    {"NUMLOCK", godot::KEY_NUMLOCK},
+    {"SCROLLLOCK", godot::KEY_SCROLLLOCK},
+    {"MENU", godot::KEY_MENU},
+    {"HOME", godot::KEY_HOME},
+    {"END", godot::KEY_END},
+    {"LEFT", godot::KEY_LEFT},
+    {"RIGHT", godot::KEY_RIGHT},
+    {"UP", godot::KEY_UP},
+    {"DOWN", godot::KEY_DOWN},
+    {"PAGEUP", godot::KEY_PAGEUP},
+    {"PAGEDOWN", godot::KEY_PAGEDOWN},
+    {"F1", godot::KEY_F1},
+    {"F2", godot::KEY_F2},
+    {"F3", godot::KEY_F3},
+    {"F4", godot::KEY_F4},
+    {"F5", godot::KEY_F5},
+    {"F6", godot::KEY_F6},
+    {"F7", godot::KEY_F7},
+    {"F8", godot::KEY_F8},
+    {"F9", godot::KEY_F9},
+    {"F10", godot::KEY_F10},
+    {"F11", godot::KEY_F11},
+    {"F12", godot::KEY_F12},
+    {"MINUS", godot::KEY_MINUS},
+    {"EQUAL", godot::KEY_EQUAL},
+    {"BRACKETLEFT", godot::KEY_BRACKETLEFT},
+    {"BRACKETRIGHT", godot::KEY_BRACKETRIGHT},
+    {"BACKSLASH", godot::KEY_BACKSLASH},
+    {"SEMICOLON", godot::KEY_SEMICOLON},
+    {"APOSTROPHE", godot::KEY_APOSTROPHE},
+    {"COMMA", godot::KEY_COMMA},
+    {"PERIOD", godot::KEY_PERIOD},
+    {"SLASH", godot::KEY_SLASH},
+    {"QUOTELEFT", godot::KEY_QUOTELEFT},
+    {"KP_ENTER", godot::KEY_KP_ENTER},
+    {"KP_ADD", godot::KEY_KP_ADD},
+    {"KP_SUBTRACT", godot::KEY_KP_SUBTRACT},
+    {"KP_MULTIPLY", godot::KEY_KP_MULTIPLY},
+    {"KP_DIVIDE", godot::KEY_KP_DIVIDE},
+    {"KP_PERIOD", godot::KEY_KP_PERIOD},
+};
+
+char ascii_upper(char c) {
+  return static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+}
+
 godot::Key parse_keycode(const JV &keycode) {
   auto parse_int_key = [](int64_t value) -> godot::Key {
     if (value > 0 && value <= 0xFFFFFF)
@@ -355,9 +415,7 @@ godot::Key parse_keycode(const JV &keycode) {
     return parse_int_key(std::stoll(s));
 
   if (s.size() == 1) {
-    char c = s[0];
-    if (c >= 'a' && c <= 'z')
-      c -= 32;
+    char c = ascii_upper(s[0]);
     if ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
       return static_cast<godot::Key>(c);
     }
@@ -365,76 +423,16 @@ godot::Key parse_keycode(const JV &keycode) {
   }
 
   std::string u = s;
-  for (auto &c : u) {
-    if (c >= 'a' && c <= 'z')
-      c -= 32;
-  }
+  for (auto &c : u)
+    c = ascii_upper(c);
   if (u.rfind("KEY_", 0) == 0)
     u = u.substr(4);
 
-  static const std::unordered_map<std::string, godot::Key> name_map = {
-      {"SPACE", godot::KEY_SPACE},
-      {"ENTER", godot::KEY_ENTER},
-      {"RETURN", godot::KEY_ENTER},
-      {"ESCAPE", godot::KEY_ESCAPE},
-      {"TAB", godot::KEY_TAB},
-      {"BACKSPACE", godot::KEY_BACKSPACE},
-      {"INSERT", godot::KEY_INSERT},
-      {"DELETE", godot::KEY_DELETE},
-      {"PAUSE", godot::KEY_PAUSE},
-      {"PRINT", godot::KEY_PRINT},
-      {"CLEAR", godot::KEY_CLEAR},
-      {"SHIFT", godot::KEY_SHIFT},
-      {"CTRL", godot::KEY_CTRL},
-      {"CONTROL", godot::KEY_CTRL},
-      {"META", godot::KEY_META},
-      {"ALT", godot::KEY_ALT},
-      {"CAPSLOCK", godot::KEY_CAPSLOCK},
-      {"NUMLOCK", godot::KEY_NUMLOCK},
-      {"SCROLLLOCK", godot::KEY_SCROLLLOCK},
-      {"MENU", godot::KEY_MENU},
-      {"HOME", godot::KEY_HOME},
-      {"END", godot::KEY_END},
-      {"LEFT", godot::KEY_LEFT},
-      {"RIGHT", godot::KEY_RIGHT},
-      {"UP", godot::KEY_UP},
-      {"DOWN", godot::KEY_DOWN},
-      {"PAGEUP", godot::KEY_PAGEUP},
-      {"PAGEDOWN", godot::KEY_PAGEDOWN},
-      {"F1", godot::KEY_F1},
-      {"F2", godot::KEY_F2},
-      {"F3", godot::KEY_F3},
-      {"F4", godot::KEY_F4},
-      {"F5", godot::KEY_F5},
-      {"F6", godot::KEY_F6},
-      {"F7", godot::KEY_F7},
-      {"F8", godot::KEY_F8},
-      {"F9", godot::KEY_F9},
-      {"F10", godot::KEY_F10},
-      {"F11", godot::KEY_F11},
-      {"F12", godot::KEY_F12},
-      {"MINUS", godot::KEY_MINUS},
-      {"EQUAL", godot::KEY_EQUAL},
-      {"BRACKETLEFT", godot::KEY_BRACKETLEFT},
-      {"BRACKETRIGHT", godot::KEY_BRACKETRIGHT},
-      {"BACKSLASH", godot::KEY_BACKSLASH},
-      {"SEMICOLON", godot::KEY_SEMICOLON},
-      {"APOSTROPHE", godot::KEY_APOSTROPHE},
-      {"COMMA", godot::KEY_COMMA},
-      {"PERIOD", godot::KEY_PERIOD},
-      {"SLASH", godot::KEY_SLASH},
-      {"QUOTELEFT", godot::KEY_QUOTELEFT},
-      {"KP_ENTER", godot::KEY_KP_ENTER},
-      {"KP_ADD", godot::KEY_KP_ADD},
-      {"KP_SUBTRACT", godot::KEY_KP_SUBTRACT},
-      {"KP_MULTIPLY", godot::KEY_KP_MULTIPLY},
-      {"KP_DIVIDE", godot::KEY_KP_DIVIDE},
-      {"KP_PERIOD", godot::KEY_KP_PERIOD},
-  };
-  auto it = name_map.find(u);
-  if (it == name_map.end())
-    return godot::KEY_NONE;
-  return it->second;
+  for (const auto &entry : kKeyCodeNameTable) {
+    if (u == entry.name)
+      return entry.key;
+  }
+  return godot::KEY_NONE;
 }
 
 bool extract_position(const JV &params, godot::Vector2 &out) {
@@ -503,21 +501,11 @@ std::string inject_step(const JV &step) {
              (kc->IsString() ? kc->GetString() : std::to_string(kc->GetInt()));
     }
     if (pressed) {
-      godot::Ref<godot::InputEventKey> release_ev;
-      release_ev.instantiate();
-      release_ev->set_pressed(false);
-      release_ev->set_keycode(key);
-      release_ev->set_physical_keycode(key);
-      input->parse_input_event(release_ev);
-      input->flush_buffered_events();
+      dispatch_input_event(input, 0, key, 0, pos, has_pos, false,
+                           godot::StringName(), false, true);
     }
-    godot::Ref<godot::InputEventKey> ev;
-    ev.instantiate();
-    ev->set_pressed(pressed);
-    ev->set_keycode(key);
-    ev->set_physical_keycode(key);
-    input->parse_input_event(ev);
-    input->flush_buffered_events();
+    dispatch_input_event(input, 0, key, 0, pos, has_pos, pressed,
+                         godot::StringName(), false, true);
     release_type = "key";
   } else if (type == "mouse_button") {
     auto *bi = step.Find("button_index");
@@ -528,28 +516,11 @@ std::string inject_step(const JV &step) {
     if (extract_position(step, pos))
       has_pos = true;
     if (pressed) {
-      godot::Ref<godot::InputEventMouseButton> release_ev;
-      release_ev.instantiate();
-      release_ev->set_pressed(false);
-      release_ev->set_button_index(
-          static_cast<godot::MouseButton>(button_index));
-      if (has_pos) {
-        release_ev->set_position(pos);
-        release_ev->set_global_position(pos);
-      }
-      input->parse_input_event(release_ev);
-      input->flush_buffered_events();
+      dispatch_input_event(input, 1, key, button_index, pos, has_pos, false,
+                           godot::StringName(), false, true);
     }
-    godot::Ref<godot::InputEventMouseButton> ev;
-    ev.instantiate();
-    ev->set_pressed(pressed);
-    ev->set_button_index(static_cast<godot::MouseButton>(button_index));
-    if (has_pos) {
-      ev->set_position(pos);
-      ev->set_global_position(pos);
-    }
-    input->parse_input_event(ev);
-    input->flush_buffered_events();
+    dispatch_input_event(input, 1, key, button_index, pos, has_pos, pressed,
+                         godot::StringName(), false, true);
     release_type = "mouse_button";
   } else if (type == "action") {
     auto *act = step.Find("action");
@@ -561,20 +532,8 @@ std::string inject_step(const JV &step) {
 
       input->action_release(action);
     }
-    if (mode_api) {
-      if (pressed)
-        input->action_press(action);
-      else
-        input->action_release(action);
-    } else {
-      godot::Ref<godot::InputEventAction> ev;
-      ev.instantiate();
-      ev->set_action(action);
-      ev->set_pressed(pressed);
-      input->parse_input_event(ev);
-      if (pressed)
-        input->flush_buffered_events();
-    }
+    dispatch_input_event(input, 2, key, button_index, pos, has_pos, pressed,
+                         action, mode_api, mode_api ? false : pressed);
     release_type = "action";
   } else {
     return "unknown input type: " + type;
@@ -680,8 +639,8 @@ JV op_input_wait(const JV &params, int64_t request_id) {
     if (tp->IsInt() && tp->GetInt() > 0)
       timeout_ms = tp->GetInt();
   }
-  if (timeout_ms > 30000)
-    timeout_ms = 30000;
+  if (timeout_ms > GDA_MAX_TIMEOUT_MS)
+    timeout_ms = GDA_MAX_TIMEOUT_MS;
 
   godot::SceneTree *tree = get_scene_tree();
   if (!tree)

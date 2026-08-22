@@ -27,15 +27,25 @@ static godot_autopilot::LogSystem &get_log_system() {
   return godot_autopilot::LogSystem::instance();
 }
 
-static godot_autopilot::ServerContext *g_server_ctx = nullptr;
-
-static godot_autopilot::ServerContext *get_server_ctx() {
-  return g_server_ctx;
+static void log_setup_failure(const char *step, const std::exception &e) {
+  get_log_system().log(
+      godot_autopilot::LogLevel::Error, godot_autopilot::LogCategory::System,
+      std::string("plugin setup step failed (") + step + "): " +
+          std::string(e.what()) + " (type=" + typeid(e).name() + ")");
 }
 
+static void log_setup_failure(const char *step) {
+  get_log_system().log(godot_autopilot::LogLevel::Error,
+                       godot_autopilot::LogCategory::System,
+                       std::string("plugin setup step failed (") + step +
+                           "): unknown exception");
+}
+
+static godot_autopilot::ServerContext *g_server_ctx = nullptr;
+
 static bool gda_cmdline_mode() {
-  if (const char *f = std::getenv("GDA_FORCE_HEADLESS")) {
-    if (std::string(f) == "1") return false;
+  if (const char *force_headless_env = std::getenv("GDA_FORCE_HEADLESS")) {
+    if (std::string(force_headless_env) == "1") return false;
   }
   auto *engine = godot::Engine::get_singleton();
   auto *ds = godot::DisplayServer::get_singleton();
@@ -114,14 +124,9 @@ void GodotAutopilotPlugin::_enter_tree() {
     get_log_system().log(LogLevel::Debug, LogCategory::System,
                          "Bottom log dock registered");
   } catch (const std::exception &e) {
-    get_log_system().log(
-        LogLevel::Error, LogCategory::System,
-        "plugin setup step failed (log dock): " + std::string(e.what()) +
-            " (type=" + typeid(e).name() + ")");
+    log_setup_failure("log dock", e);
   } catch (...) {
-    get_log_system().log(LogLevel::Error, LogCategory::System,
-                         "plugin setup step failed (log dock): "
-                         "unknown exception");
+    log_setup_failure("log dock");
   }
 
   try {
@@ -135,14 +140,9 @@ void GodotAutopilotPlugin::_enter_tree() {
       }
     }
   } catch (const std::exception &e) {
-    get_log_system().log(
-        LogLevel::Error, LogCategory::System,
-        "plugin setup step failed (output logger): " +
-            std::string(e.what()) + " (type=" + typeid(e).name() + ")");
+    log_setup_failure("output logger", e);
   } catch (...) {
-    get_log_system().log(LogLevel::Error, LogCategory::System,
-                         "plugin setup step failed (output logger): "
-                         "unknown exception");
+    log_setup_failure("output logger");
   }
 
   try {
@@ -153,14 +153,9 @@ void GodotAutopilotPlugin::_enter_tree() {
                            "Debugger capture plugin registered");
     }
   } catch (const std::exception &e) {
-    get_log_system().log(
-        LogLevel::Error, LogCategory::System,
-        "plugin setup step failed (debugger plugin): " +
-            std::string(e.what()) + " (type=" + typeid(e).name() + ")");
+    log_setup_failure("debugger plugin", e);
   } catch (...) {
-    get_log_system().log(LogLevel::Error, LogCategory::System,
-                         "plugin setup step failed (debugger plugin): "
-                         "unknown exception");
+    log_setup_failure("debugger plugin");
   }
 
   g_server_ctx = new (std::nothrow)
@@ -186,14 +181,9 @@ void GodotAutopilotPlugin::_enter_tree() {
     get_log_system().log(LogLevel::Debug, LogCategory::System,
                          "Right config dock registered");
   } catch (const std::exception &e) {
-    get_log_system().log(
-        LogLevel::Error, LogCategory::System,
-        "plugin setup step failed (config dock): " + std::string(e.what()) +
-            " (type=" + typeid(e).name() + ")");
+    log_setup_failure("config dock", e);
   } catch (...) {
-    get_log_system().log(LogLevel::Error, LogCategory::System,
-                         "plugin setup step failed (config dock): "
-                         "unknown exception");
+    log_setup_failure("config dock");
   }
 
   export_guard_.instantiate();
