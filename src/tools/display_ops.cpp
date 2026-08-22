@@ -20,12 +20,6 @@ namespace {
 
 using JV = mcp::JsonValue;
 
-JV ok_json() {
-  JV r(JV::object_tag);
-  r["result"] = JV("ok");
-  return r;
-}
-
 int screen_from_args(const JV &args) {
   auto *sp = args.Find("screen");
   if (sp && sp->IsInt()) {
@@ -65,7 +59,7 @@ JV handle_clipboard_set(const JV &args) {
   ds->clipboard_set(godot::String(tp->GetString().c_str()));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_display_clipboard completed");
-  return ok_json();
+  return util::ok_result(JV("ok"));
 }
 
 JV handle_dialog_show(const JV &args) {
@@ -102,7 +96,7 @@ JV handle_dialog_show(const JV &args) {
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "show_display_dialog completed");
-  return ok_json();
+  return util::ok_result(JV("ok"));
 }
 
 JV handle_mouse_get_position(const JV &args) {
@@ -141,7 +135,7 @@ JV handle_mouse_set_mode(const JV &args) {
   ds->mouse_set_mode(static_cast<godot::DisplayServer::MouseMode>(mode));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_display_mouse_mode completed");
-  return ok_json();
+  return util::ok_result(JV("ok"));
 }
 
 JV handle_mouse_warp(const JV &args) {
@@ -162,7 +156,7 @@ JV handle_mouse_warp(const JV &args) {
   ds->warp_mouse(godot::Vector2i(xp->GetInt(), yp->GetInt()));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "warp_display_mouse completed");
-  return ok_json();
+  return util::ok_result(JV("ok"));
 }
 
 JV handle_screen_capture(const JV &args) {
@@ -341,7 +335,7 @@ JV handle_tts_speak(const JV &args) {
                 volume, pitch, rate);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "speak_display_tts completed");
-  return ok_json();
+  return util::ok_result(JV("ok"));
 }
 
 JV handle_tts_stop(const JV &args) {
@@ -354,7 +348,7 @@ JV handle_tts_stop(const JV &args) {
   ds->tts_stop();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "stop_display_tts completed");
-  return ok_json();
+  return util::ok_result(JV("ok"));
 }
 
 } // namespace display_ops

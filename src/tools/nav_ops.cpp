@@ -1,6 +1,7 @@
 #include "nav_ops.hpp"
 #include "core/log_system.hpp"
 #include "util/error_util.hpp"
+#include "util/json_godot.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/navigation_mesh.hpp>
 #include <godot_cpp/classes/navigation_polygon.hpp>
@@ -12,7 +13,6 @@
 #include <godot_cpp/variant/rid.hpp>
 #include <godot_cpp/variant/transform2d.hpp>
 #include <godot_cpp/variant/transform3d.hpp>
-#include <godot_cpp/variant/utility_functions.hpp>
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 #include <mcp/JsonValue.hpp>
@@ -25,51 +25,12 @@ using JV = mcp::JsonValue;
 
 namespace {
 
-int64_t rid_to_int(const godot::RID &rid) { return rid.get_id(); }
-
-godot::RID rid_from_int(int64_t id) {
-  return godot::UtilityFunctions::rid_from_int64(id);
-}
-
 JV vec2_to_json(const godot::Vector2 &v) {
   return JV::FromObject({{"x", JV(v.x)}, {"y", JV(v.y)}});
 }
 
-godot::Vector2 json_to_vec2(const JV &j) {
-  auto *x = j.Find("x");
-  auto *y = j.Find("y");
-  return godot::Vector2(
-      static_cast<float>(
-          x && x->IsNumber()
-              ? (x->IsInt() ? static_cast<double>(x->GetInt()) : x->GetDouble())
-              : 0.0),
-      static_cast<float>(
-          y && y->IsNumber()
-              ? (y->IsInt() ? static_cast<double>(y->GetInt()) : y->GetDouble())
-              : 0.0));
-}
-
 JV vec3_to_json(const godot::Vector3 &v) {
   return JV::FromObject({{"x", JV(v.x)}, {"y", JV(v.y)}, {"z", JV(v.z)}});
-}
-
-godot::Vector3 json_to_vec3(const JV &j) {
-  auto *x = j.Find("x");
-  auto *y = j.Find("y");
-  auto *z = j.Find("z");
-  return godot::Vector3(
-      static_cast<float>(
-          x && x->IsNumber()
-              ? (x->IsInt() ? static_cast<double>(x->GetInt()) : x->GetDouble())
-              : 0.0),
-      static_cast<float>(
-          y && y->IsNumber()
-              ? (y->IsInt() ? static_cast<double>(y->GetInt()) : y->GetDouble())
-              : 0.0),
-      static_cast<float>(
-          z && z->IsNumber()
-              ? (z->IsInt() ? static_cast<double>(z->GetInt()) : z->GetDouble())
-              : 0.0));
 }
 
 } // namespace
@@ -93,7 +54,7 @@ JV handle_2d_map_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "create_nav_2d_map completed");
   JV r(JV::object_tag);
-  r["result"] = JV::FromObject({{"rid", JV(rid_to_int(map))}});
+  r["result"] = util::rid_to_json(map);
   return r;
 }
 
@@ -115,7 +76,7 @@ JV handle_2d_region_create(const JV &args) {
     return r;
   }
 
-  godot::RID map = rid_from_int(it_map->GetInt());
+  godot::RID map = util::rid_from_json(*it_map);
   godot::RID region = ns->region_create();
   ns->region_set_map(region, map);
 
@@ -130,7 +91,7 @@ JV handle_2d_region_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "create_nav_2d_region completed");
   JV r(JV::object_tag);
-  r["result"] = JV::FromObject({{"rid", JV(rid_to_int(region))}});
+  r["result"] = util::rid_to_json(region);
   return r;
 }
 
@@ -164,9 +125,9 @@ JV handle_2d_path_query(const JV &args) {
     return r;
   }
 
-  godot::RID map = rid_from_int(it_map->GetInt());
-  godot::Vector2 origin = json_to_vec2(*it_origin);
-  godot::Vector2 dest = json_to_vec2(*it_dest);
+  godot::RID map = util::rid_from_json(*it_map);
+  godot::Vector2 origin = util::json_to_vec2(*it_origin);
+  godot::Vector2 dest = util::json_to_vec2(*it_dest);
   auto *opt = args.Find("optimize");
   bool optimize = opt ? opt->GetBool() : true;
   auto *nl = args.Find("navigation_layers");
@@ -210,34 +171,26 @@ JV handle_2d_agent_create(const JV &args) {
     return r;
   }
 
-  godot::RID map = rid_from_int(it_map->GetInt());
+  godot::RID map = util::rid_from_json(*it_map);
   godot::RID agent = ns->agent_create();
   ns->agent_set_map(agent, map);
-  ns->agent_set_position(agent, json_to_vec2(*it_pos));
+  ns->agent_set_position(agent, util::json_to_vec2(*it_pos));
 
   if (args.Contains("radius"))
     ns->agent_set_radius(
-        agent, static_cast<float>(
-                   args["radius"].IsNumber()
-                       ? (args["radius"].IsInt()
-                              ? static_cast<double>(args["radius"].GetInt())
-                              : args["radius"].GetDouble())
-                       : 0.0));
+        agent,
+        static_cast<float>(util::json_number(args.Find("radius"), 0.0)));
   if (args.Contains("max_speed"))
     ns->agent_set_max_speed(
-        agent, static_cast<float>(
-                   args["max_speed"].IsNumber()
-                       ? (args["max_speed"].IsInt()
-                              ? static_cast<double>(args["max_speed"].GetInt())
-                              : args["max_speed"].GetDouble())
-                       : 0.0));
+        agent,
+        static_cast<float>(util::json_number(args.Find("max_speed"), 0.0)));
   if (args.Contains("avoidance_enabled"))
     ns->agent_set_avoidance_enabled(agent, args["avoidance_enabled"].GetBool());
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "create_nav_2d_agent completed");
   JV r(JV::object_tag);
-  r["result"] = JV::FromObject({{"rid", JV(rid_to_int(agent))}});
+  r["result"] = util::rid_to_json(agent);
   return r;
 }
 
@@ -265,8 +218,8 @@ JV handle_2d_agent_set_target(const JV &args) {
     return r;
   }
 
-  ns->agent_set_velocity(rid_from_int(it_agent->GetInt()),
-                         json_to_vec2(*it_vel));
+  ns->agent_set_velocity(util::rid_from_json(*it_agent),
+                         util::json_to_vec2(*it_vel));
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "set_nav_2d_agent_velocity completed");
@@ -293,27 +246,19 @@ JV handle_3d_map_create(const JV &args) {
 
   if (args.Contains("cell_size"))
     ns->map_set_cell_size(
-        map, static_cast<float>(
-                 args["cell_size"].IsNumber()
-                     ? (args["cell_size"].IsInt()
-                            ? static_cast<double>(args["cell_size"].GetInt())
-                            : args["cell_size"].GetDouble())
-                     : 0.0));
+        map, static_cast<float>(util::json_number(args.Find("cell_size"),
+                                                  0.0)));
   if (args.Contains("cell_height"))
     ns->map_set_cell_height(
-        map, static_cast<float>(
-                 args["cell_height"].IsNumber()
-                     ? (args["cell_height"].IsInt()
-                            ? static_cast<double>(args["cell_height"].GetInt())
-                            : args["cell_height"].GetDouble())
-                     : 0.0));
+        map, static_cast<float>(util::json_number(args.Find("cell_height"),
+                                                  0.0)));
   if (args.Contains("up"))
-    ns->map_set_up(map, json_to_vec3(args["up"]));
+    ns->map_set_up(map, util::json_to_vec3(args["up"]));
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "create_nav_3d_map completed");
   JV r(JV::object_tag);
-  r["result"] = JV::FromObject({{"rid", JV(rid_to_int(map))}});
+  r["result"] = util::rid_to_json(map);
   return r;
 }
 
@@ -335,7 +280,7 @@ JV handle_3d_region_create(const JV &args) {
     return r;
   }
 
-  godot::RID map = rid_from_int(it_map->GetInt());
+  godot::RID map = util::rid_from_json(*it_map);
   godot::RID region = ns->region_create();
   ns->region_set_map(region, map);
 
@@ -348,7 +293,7 @@ JV handle_3d_region_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "create_nav_3d_region completed");
   JV r(JV::object_tag);
-  r["result"] = JV::FromObject({{"rid", JV(rid_to_int(region))}});
+  r["result"] = util::rid_to_json(region);
   return r;
 }
 
@@ -382,9 +327,9 @@ JV handle_3d_path_query(const JV &args) {
     return r;
   }
 
-  godot::RID map = rid_from_int(it_map->GetInt());
-  godot::Vector3 origin = json_to_vec3(*it_origin);
-  godot::Vector3 dest = json_to_vec3(*it_dest);
+  godot::RID map = util::rid_from_json(*it_map);
+  godot::Vector3 origin = util::json_to_vec3(*it_origin);
+  godot::Vector3 dest = util::json_to_vec3(*it_dest);
   auto *opt = args.Find("optimize");
   bool optimize = opt ? opt->GetBool() : true;
   auto *nl = args.Find("navigation_layers");
@@ -434,11 +379,11 @@ JV handle_3d_path_query_segment(const JV &args) {
     return r;
   }
 
-  godot::RID map = rid_from_int(it_map->GetInt());
+  godot::RID map = util::rid_from_json(*it_map);
   auto *uc = args.Find("use_collision");
   bool use_collision = uc ? uc->GetBool() : false;
   godot::Vector3 point = ns->map_get_closest_point_to_segment(
-      map, json_to_vec3(*it_start), json_to_vec3(*it_end), use_collision);
+      map, util::json_to_vec3(*it_start), util::json_to_vec3(*it_end), use_collision);
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "get_nav_3d_map_closest_point_to_segment completed");
@@ -471,42 +416,30 @@ JV handle_3d_agent_create(const JV &args) {
     return r;
   }
 
-  godot::RID map = rid_from_int(it_map->GetInt());
+  godot::RID map = util::rid_from_json(*it_map);
   godot::RID agent = ns->agent_create();
   ns->agent_set_map(agent, map);
-  ns->agent_set_position(agent, json_to_vec3(*it_pos));
+  ns->agent_set_position(agent, util::json_to_vec3(*it_pos));
 
   if (args.Contains("radius"))
     ns->agent_set_radius(
-        agent, static_cast<float>(
-                   args["radius"].IsNumber()
-                       ? (args["radius"].IsInt()
-                              ? static_cast<double>(args["radius"].GetInt())
-                              : args["radius"].GetDouble())
-                       : 0.0));
+        agent,
+        static_cast<float>(util::json_number(args.Find("radius"), 0.0)));
   if (args.Contains("height"))
     ns->agent_set_height(
-        agent, static_cast<float>(
-                   args["height"].IsNumber()
-                       ? (args["height"].IsInt()
-                              ? static_cast<double>(args["height"].GetInt())
-                              : args["height"].GetDouble())
-                       : 0.0));
+        agent,
+        static_cast<float>(util::json_number(args.Find("height"), 0.0)));
   if (args.Contains("max_speed"))
     ns->agent_set_max_speed(
-        agent, static_cast<float>(
-                   args["max_speed"].IsNumber()
-                       ? (args["max_speed"].IsInt()
-                              ? static_cast<double>(args["max_speed"].GetInt())
-                              : args["max_speed"].GetDouble())
-                       : 0.0));
+        agent,
+        static_cast<float>(util::json_number(args.Find("max_speed"), 0.0)));
   if (args.Contains("use_3d_avoidance"))
     ns->agent_set_use_3d_avoidance(agent, args["use_3d_avoidance"].GetBool());
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "create_nav_3d_agent completed");
   JV r(JV::object_tag);
-  r["result"] = JV::FromObject({{"rid", JV(rid_to_int(agent))}});
+  r["result"] = util::rid_to_json(agent);
   return r;
 }
 
@@ -534,8 +467,8 @@ JV handle_3d_agent_set_velocity(const JV &args) {
     return r;
   }
 
-  ns->agent_set_velocity(rid_from_int(it_agent->GetInt()),
-                         json_to_vec3(*it_vel));
+  ns->agent_set_velocity(util::rid_from_json(*it_agent),
+                         util::json_to_vec3(*it_vel));
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "set_nav_3d_agent_velocity completed");
@@ -562,7 +495,7 @@ JV handle_3d_agent_get_next_path(const JV &args) {
     return r;
   }
 
-  godot::RID agent = rid_from_int(it_agent->GetInt());
+  godot::RID agent = util::rid_from_json(*it_agent);
   godot::Vector3 pos = ns->agent_get_position(agent);
   godot::Vector3 vel = ns->agent_get_velocity(agent);
 
@@ -600,11 +533,8 @@ JV handle_3d_map_set_cell_size(const JV &args) {
     return r;
   }
 
-  ns->map_set_cell_size(
-      rid_from_int(it_map->GetInt()),
-      static_cast<float>(it_cell->IsInt()
-                             ? static_cast<double>(it_cell->GetInt())
-                             : it_cell->GetDouble()));
+  ns->map_set_cell_size(util::rid_from_json(*it_map),
+                        static_cast<float>(util::json_number(it_cell, 0.0)));
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "set_nav_3d_map_cell_size completed");
@@ -660,7 +590,7 @@ JV handle_3d_region_set_nav_mesh(const JV &args) {
     return r;
   }
 
-  ns->region_set_navigation_mesh(rid_from_int(it_region->GetInt()), mesh);
+  ns->region_set_navigation_mesh(util::rid_from_json(*it_region), mesh);
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "set_nav_3d_region_navigation_mesh completed");
@@ -693,32 +623,24 @@ JV handle_3d_obstacle_create(const JV &args) {
     return r;
   }
 
-  godot::RID map = rid_from_int(it_map->GetInt());
+  godot::RID map = util::rid_from_json(*it_map);
   godot::RID obstacle = ns->obstacle_create();
   ns->obstacle_set_map(obstacle, map);
-  ns->obstacle_set_position(obstacle, json_to_vec3(*it_pos));
+  ns->obstacle_set_position(obstacle, util::json_to_vec3(*it_pos));
 
   if (args.Contains("radius"))
     ns->obstacle_set_radius(
-        obstacle, static_cast<float>(
-                      args["radius"].IsNumber()
-                          ? (args["radius"].IsInt()
-                                 ? static_cast<double>(args["radius"].GetInt())
-                                 : args["radius"].GetDouble())
-                          : 0.0));
+        obstacle,
+        static_cast<float>(util::json_number(args.Find("radius"), 0.0)));
   if (args.Contains("height"))
     ns->obstacle_set_height(
-        obstacle, static_cast<float>(
-                      args["height"].IsNumber()
-                          ? (args["height"].IsInt()
-                                 ? static_cast<double>(args["height"].GetInt())
-                                 : args["height"].GetDouble())
-                          : 0.0));
+        obstacle,
+        static_cast<float>(util::json_number(args.Find("height"), 0.0)));
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "create_nav_3d_obstacle completed");
   JV r(JV::object_tag);
-  r["result"] = JV::FromObject({{"rid", JV(rid_to_int(obstacle))}});
+  r["result"] = util::rid_to_json(obstacle);
   return r;
 }
 

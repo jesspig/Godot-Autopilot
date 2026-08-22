@@ -2,8 +2,8 @@
 #include "../util/scene_path.hpp"
 #include "core/log_system.hpp"
 #include "tools/debugger_ops.hpp"
-#include "tools/property_ops.hpp"
 #include "tools/scene_ops.hpp"
+#include "util/gdscript_wrap.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/editor_file_system.hpp>
@@ -22,7 +22,6 @@
 #include <godot_cpp/variant/packed_string_array.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
-#include <sstream>
 #include <string>
 
 namespace godot_autopilot {
@@ -34,13 +33,6 @@ constexpr const char *NODE_PATH_HINT =
     " — valid path forms: with scene root name (e.g. 'GameManager/HUD'), "
     "without root name (e.g. 'HUD'), with 'root/' prefix (e.g. "
     "'root/GameManager/HUD'), or absolute (e.g. '/root/GameManager/HUD')";
-
-constexpr const char *NODE_NOT_FOUND_HINT =
-    "\n[hint] Node path resolution: the execution node lives under /root, NOT "
-    "inside the edited scene. Use SceneRoot.get_node(\"Child\") to reach "
-    "edited-scene nodes (SceneRoot is the scene root node itself — no "
-    "root-name prefix, e.g. SceneRoot.get_node(\"Player\") or "
-    "SceneRoot.get_node(\"Player/CollisionShape2D\")).";
 
 constexpr int PROPERTY_USAGE_CATEGORY = 0x80;
 constexpr int PROPERTY_USAGE_INTERNAL = 0x08;
@@ -100,15 +92,6 @@ mcp::JsonValue serialize_resource(const godot::Ref<godot::Resource> &res) {
   return j;
 }
 
-std::string truncate_capture_text(const std::string &text) {
-  constexpr size_t MAX_CAPTURE_BYTES = 8192;
-  if (text.size() > MAX_CAPTURE_BYTES) {
-    return text.substr(0, MAX_CAPTURE_BYTES) + "\n...(truncated, total " +
-           std::to_string(text.size()) + " bytes)";
-  }
-  return text;
-}
-
 bool invalidate_cached_resource(const std::string &path) {
   auto *loader = godot::ResourceLoader::get_singleton();
   if (!loader || !loader->has_cached(godot::String(path.c_str()))) {
@@ -121,45 +104,34 @@ bool invalidate_cached_resource(const std::string &path) {
   return true;
 }
 
-bool has_top_level_func_def(const std::string &code) {
-  std::istringstream stream(code);
-  std::string line;
-  while (std::getline(stream, line)) {
-    size_t pos = line.find_first_not_of(" \t");
-    if (pos == std::string::npos || line[pos] == '#')
-      continue;
-    if (pos + 1 < line.size() && line[pos] == '/' && line[pos + 1] == '/')
-      continue;
-    if (line.compare(pos, 5, "func ") == 0)
-      return true;
+bool load_script_or_error(const std::string &path,
+                          godot::Ref<godot::Script> &out_script,
+                          mcp::JsonValue &err_out) {
+  auto *loader = godot::ResourceLoader::get_singleton();
+  if (!loader) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue("ResourceLoader not available");
+    err_out = std::move(e);
+    return false;
   }
-  return false;
-}
 
-bool defines_function_named(const std::string &code,
-                            const std::string &target) {
-  std::istringstream stream(code);
-  std::string line;
-  while (std::getline(stream, line)) {
-    size_t pos = line.find_first_not_of(" \t");
-    if (pos == std::string::npos || line[pos] == '#')
-      continue;
-    if (line.compare(pos, 5, "func ") != 0)
-      continue;
-    size_t name_start = line.find_first_not_of(" \t", pos + 5);
-    if (name_start == std::string::npos)
-      continue;
-    size_t name_end = line.find('(', name_start);
-    if (name_end == std::string::npos)
-      continue;
-    std::string fname = line.substr(name_start, name_end - name_start);
-    size_t last = fname.find_last_not_of(" \t");
-    if (last != std::string::npos)
-      fname = fname.substr(0, last + 1);
-    if (fname == target)
-      return true;
+  godot::Ref<godot::Resource> res = loader->load(godot::String(path.c_str()));
+  if (res.is_null()) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue("failed to load script: " + path);
+    err_out = std::move(e);
+    return false;
   }
-  return false;
+
+  godot::Ref<godot::Script> script = res;
+  if (script.is_null()) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue("loaded resource is not a Script: " + path);
+    err_out = std::move(e);
+    return false;
+  }
+  out_script = script;
+  return true;
 }
 
 } // namespace
@@ -173,28 +145,12 @@ mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue &args) {
   }
   std::string expression = it_expr->GetString();
 
-  std::string cleaned;
-  {
-    std::istringstream stream(expression);
-    std::string line;
-    bool first = true;
-    while (std::getline(stream, line)) {
-      if (!first)
-        cleaned += "\n";
-      first = false;
-      size_t pos = line.find_first_not_of(" \t");
-      if (pos != std::string::npos && line.compare(pos, 8, "extends ") == 0) {
-        cleaned += "# " + line;
-      } else {
-        cleaned += line;
-      }
-    }
-  }
+  std::string cleaned = gdscript_wrap::strip_extends_lines(expression);
 
   std::string wrapped;
-  if (has_top_level_func_def(cleaned)) {
+  if (gdscript_wrap::has_top_level_func_def(cleaned)) {
 
-    if (!defines_function_named(cleaned, "_run")) {
+    if (!gdscript_wrap::defines_function_named(cleaned, "_run")) {
       mcp::JsonValue e(mcp::JsonValue::object_tag);
       e["error"] = mcp::JsonValue("multi-function mode requires a func _run() "
                                   "entry point（或将函数改为 lambda 变量）");
@@ -211,23 +167,9 @@ mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue &args) {
     wrapped += "\n";
   } else {
 
-    bool uses_tabs = false;
-    bool uses_spaces = false;
-    {
-      std::istringstream stream(cleaned);
-      std::string line;
-      while (std::getline(stream, line)) {
-        size_t pos = line.find_first_not_of(" \t");
-        if (pos == std::string::npos || pos == 0)
-          continue;
-        std::string indent = line.substr(0, pos);
-        if (indent.find('\t') != std::string::npos)
-          uses_tabs = true;
-        if (indent.find("    ") != std::string::npos)
-          uses_spaces = true;
-      }
-    }
-    if (uses_tabs && uses_spaces) {
+    gdscript_wrap::IndentStyle indent =
+        gdscript_wrap::scan_indent_style(cleaned);
+    if (indent.uses_tabs && indent.uses_spaces) {
       mcp::JsonValue e(mcp::JsonValue::object_tag);
       e["error"] = mcp::JsonValue(
           "mixed tab/space indentation detected in source — reindent source "
@@ -235,27 +177,12 @@ mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue &args) {
           "indentation style throughout");
       return e;
     }
-    std::string prefix = (uses_tabs && !uses_spaces) ? "\t" : "    ";
+    std::string prefix = gdscript_wrap::indent_prefix(indent);
     wrapped = "@tool\nextends Node\n\nfunc _run():\n";
 
     wrapped +=
         prefix + "var SceneRoot := EditorInterface.get_edited_scene_root()\n";
-    if (!cleaned.empty()) {
-      std::istringstream stream(cleaned);
-      std::string line;
-      bool first_line = true;
-      while (std::getline(stream, line)) {
-        if (!first_line)
-          wrapped += "\n";
-        first_line = false;
-        size_t content_start = line.find_first_not_of(" \t");
-        if (content_start == std::string::npos) {
-          wrapped += prefix;
-        } else {
-          wrapped += prefix + line;
-        }
-      }
-    }
+    wrapped += gdscript_wrap::reindent_lines(cleaned, prefix);
     wrapped += "\n";
   }
 
@@ -271,15 +198,11 @@ mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue &args) {
   size_t compile_log_before = debugger_ops::capture_log_count();
   godot::Error parse_err2 = script->reload();
   if (parse_err2 != godot::OK) {
-    std::string message =
+    std::string message = gdscript_wrap::compose_compile_failure_message(
         "GDScript compilation failed: ERR_PARSE_ERROR (code " +
-        std::to_string(static_cast<int>(parse_err2)) + ")";
-    std::string compile_err =
-        debugger_ops::capture_new_error_text(compile_log_before);
-    if (!compile_err.empty()) {
-      message += "\n" + truncate_capture_text(compile_err);
-    }
-    message += "\nwrapped source:\n" + wrapped;
+            std::to_string(static_cast<int>(parse_err2)) + ")",
+        debugger_ops::capture_new_error_text(compile_log_before), wrapped,
+        gdscript_wrap::truncate_capture_text);
     mcp::JsonValue e(mcp::JsonValue::object_tag);
     e["error"] = mcp::JsonValue(message);
     return e;
@@ -331,12 +254,13 @@ mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = VariantJson::serialize(result);
   if (!new_output_text.empty()) {
-    r["output"] = mcp::JsonValue(truncate_capture_text(new_output_text));
+    r["output"] =
+        mcp::JsonValue(gdscript_wrap::truncate_capture_text(new_output_text));
   }
   if (!new_error_text.empty()) {
-    std::string errors = truncate_capture_text(new_error_text);
+    std::string errors = gdscript_wrap::truncate_capture_text(new_error_text);
     if (new_error_text.find("Node not found") != std::string::npos) {
-      errors += NODE_NOT_FOUND_HINT;
+      errors += gdscript_wrap::NODE_NOT_FOUND_HINT;
     }
     r["errors"] = mcp::JsonValue(errors);
   }
@@ -352,29 +276,13 @@ mcp::JsonValue handle_load(const mcp::JsonValue &args) {
   }
   std::string path = it_path->GetString();
 
-  auto *loader = godot::ResourceLoader::get_singleton();
-  if (!loader) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("ResourceLoader not available");
-    return e;
-  }
-
-  godot::Ref<godot::Resource> res = loader->load(godot::String(path.c_str()));
-  if (res.is_null()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("failed to load script: " + path);
-    return e;
-  }
-
-  godot::Ref<godot::Script> script = res;
-  if (script.is_null()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("loaded resource is not a Script: " + path);
-    return e;
-  }
+  godot::Ref<godot::Script> script;
+  mcp::JsonValue load_err;
+  if (!load_script_or_error(path, script, load_err))
+    return load_err;
 
   mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = serialize_resource(res);
+  r["result"] = serialize_resource(script);
   return r;
 }
 
@@ -428,13 +336,7 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
     std::string compile_err =
         debugger_ops::capture_new_error_text(compile_log_before);
     if (!compile_err.empty()) {
-      if (compile_err.size() > 8192) {
-        message += "\n" + compile_err.substr(0, 8192) +
-                   "\n...(truncated, total " +
-                   std::to_string(compile_err.size()) + " bytes)";
-      } else {
-        message += "\n" + compile_err;
-      }
+      message += "\n" + gdscript_wrap::truncate_capture_text(compile_err);
     }
     mcp::JsonValue e(mcp::JsonValue::object_tag);
     e["error"] = mcp::JsonValue(message);
@@ -560,28 +462,10 @@ mcp::JsonValue handle_attach_to_node(const mcp::JsonValue &args) {
     return e;
   }
 
-  auto *loader = godot::ResourceLoader::get_singleton();
-  if (!loader) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("ResourceLoader not available");
-    return e;
-  }
-
-  godot::Ref<godot::Resource> res =
-      loader->load(godot::String(script_path.c_str()));
-  if (res.is_null()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("failed to load script: " + script_path);
-    return e;
-  }
-
-  godot::Ref<godot::Script> script = res;
-  if (script.is_null()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] =
-        mcp::JsonValue("loaded resource is not a Script: " + script_path);
-    return e;
-  }
+  godot::Ref<godot::Script> script;
+  mcp::JsonValue load_err;
+  if (!load_script_or_error(script_path, script, load_err))
+    return load_err;
 
   auto *editor = godot::EditorInterface::get_singleton();
   auto *undo_redo = editor ? editor->get_editor_undo_redo() : nullptr;
@@ -659,27 +543,10 @@ mcp::JsonValue handle_get_property(const mcp::JsonValue &args) {
   auto *it_path = args.Find("script_path");
   if (it_path && it_path->IsString()) {
     std::string script_path = it_path->GetString();
-    auto *loader = godot::ResourceLoader::get_singleton();
-    if (!loader) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue("ResourceLoader not available");
-      return e;
-    }
-
-    godot::Ref<godot::Resource> res =
-        loader->load(godot::String(script_path.c_str()));
-    if (res.is_null()) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue("failed to load script: " + script_path);
-      return e;
-    }
-    godot::Ref<godot::Script> script = res;
-    if (script.is_null()) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] =
-          mcp::JsonValue("loaded resource is not a Script: " + script_path);
-      return e;
-    }
+    godot::Ref<godot::Script> script;
+    mcp::JsonValue load_err;
+    if (!load_script_or_error(script_path, script, load_err))
+      return load_err;
 
     godot::StringName prop_name(property.c_str());
     godot::Variant val = script->get_property_default_value(prop_name);
@@ -856,30 +723,14 @@ mcp::JsonValue handle_reload(const mcp::JsonValue &args) {
   if (ks && ks->IsBool())
     keep_state = ks->GetBool();
 
-  auto *loader = godot::ResourceLoader::get_singleton();
-  if (!loader) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("ResourceLoader not available");
-    return e;
-  }
+  godot::Ref<godot::Script> script;
+  mcp::JsonValue load_err;
+  if (!load_script_or_error(path, script, load_err))
+    return load_err;
 
-  godot::Ref<godot::Resource> res = loader->load(godot::String(path.c_str()));
-  if (res.is_null()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("failed to load script: " + path);
-    return e;
-  }
-
-  godot::Ref<godot::Script> script = res;
-  if (script.is_null()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("loaded resource is not a Script: " + path);
-    return e;
-  }
-
-  godot::Error err = script->reload(keep_state);
+  godot::Error reload_result = script->reload(keep_state);
   mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue(static_cast<int64_t>(err));
+  r["result"] = mcp::JsonValue(static_cast<int64_t>(reload_result));
   return r;
 }
 
@@ -892,29 +743,12 @@ mcp::JsonValue handle_get_variable_list(const mcp::JsonValue &args) {
   }
   std::string path = it_path->GetString();
 
-  auto *loader = godot::ResourceLoader::get_singleton();
-  if (!loader) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("ResourceLoader not available");
-    return e;
-  }
+  godot::Ref<godot::Script> script;
+  mcp::JsonValue load_err;
+  if (!load_script_or_error(path, script, load_err))
+    return load_err;
 
-  godot::Ref<godot::Resource> res = loader->load(godot::String(path.c_str()));
-  if (res.is_null()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("failed to load script: " + path);
-    return e;
-  }
-
-  godot::Ref<godot::Script> script = res;
-  if (script.is_null()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("loaded resource is not a Script: " + path);
-    return e;
-  }
-
-  godot::TypedArray<godot::Dictionary> props =
-      script->get_script_property_list();
+  godot::TypedArray<godot::Dictionary> props = script->get_script_property_list();
   mcp::JsonValue result(mcp::JsonValue::array_tag);
   for (int64_t i = 0; i < props.size(); i++) {
     godot::Dictionary dict = props[i];

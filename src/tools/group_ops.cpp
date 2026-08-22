@@ -2,12 +2,11 @@
 #include "core/log_system.hpp"
 #include "core/scene_dirty_tracker.hpp"
 #include "util/error_util.hpp"
+#include "util/scene_path.hpp"
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/editor_undo_redo_manager.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
-#include <godot_cpp/variant/node_path.hpp>
-#include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 #include <string>
 
@@ -20,45 +19,7 @@ godot::Node *find_node(const std::string &path_str) {
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor)
     return nullptr;
-  auto *root = editor->get_edited_scene_root();
-  if (!root)
-    return nullptr;
-
-  std::string clean = path_str;
-  if (!clean.empty() && clean[0] == '/') {
-    clean = clean.substr(1);
-  }
-  if (clean.size() > 5 && clean.compare(0, 5, "root/") == 0) {
-    clean = clean.substr(5);
-  }
-  if (clean.empty() || clean == util::to_std(root->get_name())) {
-    return root;
-  }
-
-  auto *node =
-      root->get_node_or_null(godot::NodePath(godot::String(clean.c_str())));
-  if (!node) {
-    std::string root_name = util::to_std(root->get_name());
-    if (clean.size() > root_name.size() + 1 &&
-        clean.compare(0, root_name.size(), root_name) == 0 &&
-        clean[root_name.size()] == '/') {
-      std::string sub = clean.substr(root_name.size() + 1);
-      if (!sub.empty()) {
-        node =
-            root->get_node_or_null(godot::NodePath(godot::String(sub.c_str())));
-      }
-    }
-  }
-  if (!node)
-    return nullptr;
-
-  auto *p = node->get_parent();
-  while (p) {
-    if (p == root)
-      return node;
-    p = p->get_parent();
-  }
-  return nullptr;
+  return util::resolve_scene_node(path_str, editor->get_edited_scene_root());
 }
 
 } // namespace

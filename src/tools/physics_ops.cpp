@@ -1,6 +1,9 @@
 #include "physics_ops.hpp"
 #include "core/log_system.hpp"
 #include "util/error_util.hpp"
+#include "util/json_godot.hpp"
+#include "util/rid_registry.hpp"
+#include "util/scene_path.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/collision_object2d.hpp>
 #include <godot_cpp/classes/collision_object3d.hpp>
@@ -20,7 +23,6 @@
 #include <godot_cpp/classes/world2d.hpp>
 #include <godot_cpp/core/object.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
-#include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/variant/rid.hpp>
 #include <godot_cpp/variant/transform2d.hpp>
 #include <godot_cpp/variant/transform3d.hpp>
@@ -29,7 +31,6 @@
 #include <godot_cpp/variant/vector3.hpp>
 #include <mcp/JsonValue.hpp>
 #include <string>
-#include <unordered_map>
 
 namespace godot_autopilot {
 namespace physics_ops {
@@ -38,81 +39,17 @@ using JV = mcp::JsonValue;
 
 namespace {
 
-struct RidStore {
-  std::unordered_map<int64_t, godot::RID> map;
-
-  int64_t store(const godot::RID &rid) {
-    int64_t id = rid.get_id();
-    map[id] = rid;
-    return id;
-  }
-
-  godot::RID get(int64_t id) {
-    auto it = map.find(id);
-    if (it != map.end())
-      return it->second;
-    return godot::RID();
-  }
-};
-
-RidStore &rid_store() {
-  static RidStore s;
-  return s;
-}
-
-godot::RID resolve(const JV &args, const char *key) {
-  auto *it = args.Find(key);
-  if (!it || !it->IsNumber())
-    return godot::RID();
-  return rid_store().get(it->GetInt());
-}
-
-godot::Vector2 parse_vec2(const JV &j) {
-  auto *x = j.Find("x");
-  auto *y = j.Find("y");
-  return godot::Vector2(
-      static_cast<float>(
-          x && x->IsNumber()
-              ? (x->IsInt() ? static_cast<double>(x->GetInt()) : x->GetDouble())
-              : 0.0),
-      static_cast<float>(
-          y && y->IsNumber()
-              ? (y->IsInt() ? static_cast<double>(y->GetInt()) : y->GetDouble())
-              : 0.0));
-}
-
-godot::Vector3 parse_vec3(const JV &j) {
-  auto *x = j.Find("x");
-  auto *y = j.Find("y");
-  auto *z = j.Find("z");
-  return godot::Vector3(
-      static_cast<float>(
-          x && x->IsNumber()
-              ? (x->IsInt() ? static_cast<double>(x->GetInt()) : x->GetDouble())
-              : 0.0),
-      static_cast<float>(
-          y && y->IsNumber()
-              ? (y->IsInt() ? static_cast<double>(y->GetInt()) : y->GetDouble())
-              : 0.0),
-      static_cast<float>(
-          z && z->IsNumber()
-              ? (z->IsInt() ? static_cast<double>(z->GetInt()) : z->GetDouble())
-              : 0.0));
-}
+struct PhysicsRidDomain {};
 
 godot::Transform2D parse_t2d(const JV &j) {
   godot::Transform2D t;
   if (j.Contains("origin"))
-    t.set_origin(parse_vec2(j["origin"]));
+    t.set_origin(util::json_to_vec2(j["origin"]));
   if (j.Contains("rotation"))
-    t.set_rotation(static_cast<float>(
-        j["rotation"].IsNumber()
-            ? (j["rotation"].IsInt()
-                   ? static_cast<double>(j["rotation"].GetInt())
-                   : j["rotation"].GetDouble())
-            : 0.0));
+    t.set_rotation(
+        static_cast<float>(util::json_number(j.Find("rotation"), 0.0)));
   if (j.Contains("scale"))
-    t.set_scale(parse_vec2(j["scale"]));
+    t.set_scale(util::json_to_vec2(j["scale"]));
   return t;
 }
 
@@ -158,7 +95,7 @@ godot::Transform3D parse_t3d(const JV &j) {
     basis = parse_basis(j["basis"]);
   godot::Vector3 origin;
   if (j.Contains("origin"))
-    origin = parse_vec3(j["origin"]);
+    origin = util::json_to_vec3(j["origin"]);
   return godot::Transform3D(basis, origin);
 }
 
@@ -166,7 +103,7 @@ godot::TypedArray<godot::RID> parse_rids(const JV &j) {
   godot::TypedArray<godot::RID> arr;
   if (j.IsArray()) {
     for (size_t i = 0; i < j.Size(); i++) {
-      godot::RID r = rid_store().get(j[i].GetInt());
+      godot::RID r = util::rid_store<PhysicsRidDomain>().get(j[i].GetInt());
       if (r.is_valid())
         arr.append(r);
     }
@@ -177,7 +114,7 @@ godot::TypedArray<godot::RID> parse_rids(const JV &j) {
 JV rid_result(const godot::RID &rid) {
   if (!rid.is_valid())
     return JV(nullptr);
-  int64_t id = rid_store().store(rid);
+  int64_t id = util::rid_store<PhysicsRidDomain>().store(rid);
   JV j(JV::object_tag);
   j["id"] = JV(id);
   j["is_valid"] = JV(true);
@@ -204,7 +141,7 @@ JV hit_2d(const godot::Dictionary &d) {
     h["collider_id"] = JV(static_cast<int64_t>(d["collider_id"]));
   if (d.has("rid")) {
     godot::RID r = d["rid"];
-    h["rid"] = JV(rid_store().store(r));
+    h["rid"] = JV(util::rid_store<PhysicsRidDomain>().store(r));
   }
   if (d.has("shape"))
     h["shape"] = JV(static_cast<int>(d["shape"]));
@@ -235,7 +172,7 @@ JV hit_3d(const godot::Dictionary &d) {
     h["collider_id"] = JV(static_cast<int64_t>(d["collider_id"]));
   if (d.has("rid")) {
     godot::RID r = d["rid"];
-    h["rid"] = JV(rid_store().store(r));
+    h["rid"] = JV(util::rid_store<PhysicsRidDomain>().store(r));
   }
   if (d.has("shape"))
     h["shape"] = JV(static_cast<int>(d["shape"]));
@@ -249,7 +186,7 @@ JV hit_3d(const godot::Dictionary &d) {
 JV handle_2d_space_get_direct_state(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_physics_2d_space_direct_state called");
-  godot::RID space = resolve(args, "space_rid");
+  godot::RID space = util::resolve_rid<PhysicsRidDomain>(args, "space_rid");
   if (!space.is_valid()) {
     JV r(JV::object_tag);
     r["error"] = JV("missing or invalid required parameter: space_rid");
@@ -268,7 +205,7 @@ JV handle_2d_space_get_direct_state(const JV &args) {
     return r;
   }
   JV r(JV::object_tag);
-  r["space_rid"] = JV(rid_store().store(space));
+  r["space_rid"] = JV(util::rid_store<PhysicsRidDomain>().store(space));
   r["valid"] = JV(true);
   JV queries(JV::array_tag);
   queries.PushBack(JV("intersect_ray"));
@@ -304,11 +241,7 @@ static godot::RID auto_detect_2d_space() {
 JV handle_2d_ray_cast(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "intersect_physics_2d_ray called");
-  auto *it_rid = args.Find("space_rid");
-  godot::RID space;
-  if (it_rid && it_rid->IsNumber()) {
-    space = resolve(args, "space_rid");
-  }
+  godot::RID space = util::resolve_rid<PhysicsRidDomain>(args, "space_rid");
   if (!space.is_valid()) {
     space = auto_detect_2d_space();
   }
@@ -347,7 +280,7 @@ JV handle_2d_ray_cast(const JV &args) {
   auto *excl = args.Find("exclude");
   JV empty_arr(JV::array_tag);
   auto params = godot::PhysicsRayQueryParameters2D::create(
-      parse_vec2(*it_from), parse_vec2(*it_to), cmv,
+      util::json_to_vec2(*it_from), util::json_to_vec2(*it_to), cmv,
       parse_rids(excl ? *excl : empty_arr));
   if (args.Contains("collide_with_bodies"))
     params->set_collide_with_bodies(args["collide_with_bodies"].GetBool());
@@ -371,8 +304,8 @@ JV handle_2d_ray_cast(const JV &args) {
 JV handle_2d_intersect_shape(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "intersect_physics_2d_shape called");
-  godot::RID space = resolve(args, "space_rid");
-  godot::RID shape = resolve(args, "shape_rid");
+  godot::RID space = util::resolve_rid<PhysicsRidDomain>(args, "space_rid");
+  godot::RID shape = util::resolve_rid<PhysicsRidDomain>(args, "shape_rid");
   if (!space.is_valid()) {
     JV r(JV::object_tag);
     r["error"] = JV("missing or invalid required parameter: space_rid");
@@ -401,7 +334,7 @@ JV handle_2d_intersect_shape(const JV &args) {
   if (args.Contains("transform"))
     p->set_transform(parse_t2d(args["transform"]));
   if (args.Contains("motion"))
-    p->set_motion(parse_vec2(args["motion"]));
+    p->set_motion(util::json_to_vec2(args["motion"]));
   if (args.Contains("collision_mask"))
     p->set_collision_mask(
         static_cast<uint32_t>(args["collision_mask"].GetInt()));
@@ -427,7 +360,7 @@ JV handle_2d_intersect_shape(const JV &args) {
 JV handle_2d_intersect_point(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "intersect_physics_2d_point called");
-  godot::RID space = resolve(args, "space_rid");
+  godot::RID space = util::resolve_rid<PhysicsRidDomain>(args, "space_rid");
   auto *it_pos = args.Find("position");
   if (!space.is_valid()) {
     JV r(JV::object_tag);
@@ -453,7 +386,7 @@ JV handle_2d_intersect_point(const JV &args) {
   }
   godot::Ref<godot::PhysicsPointQueryParameters2D> p;
   p.instantiate();
-  p->set_position(parse_vec2(*it_pos));
+  p->set_position(util::json_to_vec2(*it_pos));
   if (args.Contains("collision_mask"))
     p->set_collision_mask(
         static_cast<uint32_t>(args["collision_mask"].GetInt()));
@@ -495,7 +428,7 @@ JV handle_2d_body_create(const JV &) {
 JV handle_2d_body_set_mode(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_physics_2d_body_mode called");
-  godot::RID body = resolve(args, "rid");
+  godot::RID body = util::resolve_rid<PhysicsRidDomain>(args, "rid");
   auto *it_mode = args.Find("mode");
   if (!body.is_valid()) {
     JV r(JV::object_tag);
@@ -528,7 +461,7 @@ JV handle_2d_body_set_mode(const JV &args) {
 JV handle_2d_body_apply_force(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "apply_physics_2d_body_force called");
-  godot::RID body = resolve(args, "rid");
+  godot::RID body = util::resolve_rid<PhysicsRidDomain>(args, "rid");
   auto *it_force = args.Find("force");
   if (!body.is_valid()) {
     JV r(JV::object_tag);
@@ -541,9 +474,9 @@ JV handle_2d_body_apply_force(const JV &args) {
     return r;
   }
   auto *ps = godot::PhysicsServer2D::get_singleton();
-  godot::Vector2 f = parse_vec2(*it_force);
+  godot::Vector2 f = util::json_to_vec2(*it_force);
   if (args.Contains("position") && args["position"].IsObject())
-    ps->body_apply_force(body, f, parse_vec2(args["position"]));
+    ps->body_apply_force(body, f, util::json_to_vec2(args["position"]));
   else
     ps->body_apply_central_force(body, f);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -556,7 +489,7 @@ JV handle_2d_body_apply_force(const JV &args) {
 JV handle_2d_body_apply_impulse(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "apply_physics_2d_body_impulse called");
-  godot::RID body = resolve(args, "rid");
+  godot::RID body = util::resolve_rid<PhysicsRidDomain>(args, "rid");
   auto *it_imp = args.Find("impulse");
   if (!body.is_valid()) {
     JV r(JV::object_tag);
@@ -569,9 +502,9 @@ JV handle_2d_body_apply_impulse(const JV &args) {
     return r;
   }
   auto *ps = godot::PhysicsServer2D::get_singleton();
-  godot::Vector2 imp = parse_vec2(*it_imp);
+  godot::Vector2 imp = util::json_to_vec2(*it_imp);
   if (args.Contains("position") && args["position"].IsObject())
-    ps->body_apply_impulse(body, imp, parse_vec2(args["position"]));
+    ps->body_apply_impulse(body, imp, util::json_to_vec2(args["position"]));
   else
     ps->body_apply_central_impulse(body, imp);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -584,7 +517,7 @@ JV handle_2d_body_apply_impulse(const JV &args) {
 JV handle_2d_body_set_state(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_physics_2d_body_state called");
-  godot::RID body = resolve(args, "rid");
+  godot::RID body = util::resolve_rid<PhysicsRidDomain>(args, "rid");
   auto *it_state = args.Find("state");
   if (!body.is_valid()) {
     JV r(JV::object_tag);
@@ -625,7 +558,7 @@ JV handle_2d_body_set_state(const JV &args) {
 JV handle_2d_body_get_state(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_physics_2d_body_state called");
-  godot::RID body = resolve(args, "rid");
+  godot::RID body = util::resolve_rid<PhysicsRidDomain>(args, "rid");
   auto *it_state = args.Find("state");
   if (!body.is_valid()) {
     JV r(JV::object_tag);
@@ -675,11 +608,13 @@ JV handle_2d_joint_create(const JV &args) {
   std::string t = it_type->GetString();
   auto rid = [&](const std::string &k) -> godot::RID {
     auto *v = args.Find(k);
-    return v && v->IsNumber() ? rid_store().get(v->GetInt()) : godot::RID();
+    return v && v->IsNumber()
+               ? util::rid_store<PhysicsRidDomain>().get(v->GetInt())
+               : godot::RID();
   };
   if (t == "pin") {
     godot::Vector2 a =
-        args.Contains("anchor") ? parse_vec2(args["anchor"]) : godot::Vector2();
+        args.Contains("anchor") ? util::json_to_vec2(args["anchor"]) : godot::Vector2();
     ps->joint_make_pin(j, a, rid("body_a"), rid("body_b"));
   } else if (t == "groove") {
     if (!args.Contains("groove1_a") || !args.Contains("groove2_a") ||
@@ -690,8 +625,8 @@ JV handle_2d_joint_create(const JV &args) {
       return r;
     }
     ps->joint_make_groove(
-        j, parse_vec2(args["groove1_a"]), parse_vec2(args["groove2_a"]),
-        parse_vec2(args["anchor_b"]), rid("body_a"), rid("body_b"));
+        j, util::json_to_vec2(args["groove1_a"]), util::json_to_vec2(args["groove2_a"]),
+        util::json_to_vec2(args["anchor_b"]), rid("body_a"), rid("body_b"));
   } else if (t == "damped_spring") {
     if (!args.Contains("anchor_a") || !args.Contains("anchor_b") ||
         !args.Contains("body_a")) {
@@ -700,8 +635,8 @@ JV handle_2d_joint_create(const JV &args) {
       r["error"] = JV("damped_spring requires anchor_a, anchor_b, body_a");
       return r;
     }
-    ps->joint_make_damped_spring(j, parse_vec2(args["anchor_a"]),
-                                 parse_vec2(args["anchor_b"]), rid("body_a"),
+    ps->joint_make_damped_spring(j, util::json_to_vec2(args["anchor_a"]),
+                                 util::json_to_vec2(args["anchor_b"]), rid("body_a"),
                                  rid("body_b"));
   } else {
     ps->free_rid(j);
@@ -736,7 +671,7 @@ JV handle_2d_area_create(const JV &) {
 JV handle_2d_area_set_monitorable(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_physics_2d_area_monitorable called");
-  godot::RID area = resolve(args, "rid");
+  godot::RID area = util::resolve_rid<PhysicsRidDomain>(args, "rid");
   auto *it_mon = args.Find("monitorable");
   if (!area.is_valid()) {
     JV r(JV::object_tag);
@@ -760,7 +695,7 @@ JV handle_2d_area_set_monitorable(const JV &args) {
 JV handle_3d_space_get_direct_state(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_physics_3d_space_direct_state called");
-  godot::RID space = resolve(args, "space_rid");
+  godot::RID space = util::resolve_rid<PhysicsRidDomain>(args, "space_rid");
   if (!space.is_valid()) {
     JV r(JV::object_tag);
     r["error"] = JV("missing or invalid required parameter: space_rid");
@@ -779,7 +714,7 @@ JV handle_3d_space_get_direct_state(const JV &args) {
     return r;
   }
   JV r(JV::object_tag);
-  r["space_rid"] = JV(rid_store().store(space));
+  r["space_rid"] = JV(util::rid_store<PhysicsRidDomain>().store(space));
   r["valid"] = JV(true);
   JV queries(JV::array_tag);
   queries.PushBack(JV("intersect_ray"));
@@ -799,7 +734,7 @@ JV handle_3d_space_get_direct_state(const JV &args) {
 JV handle_3d_ray_cast(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "intersect_physics_3d_ray called");
-  godot::RID space = resolve(args, "space_rid");
+  godot::RID space = util::resolve_rid<PhysicsRidDomain>(args, "space_rid");
   auto *it_from = args.Find("from");
   auto *it_to = args.Find("to");
   if (!space.is_valid()) {
@@ -834,7 +769,7 @@ JV handle_3d_ray_cast(const JV &args) {
   auto *excl = args.Find("exclude");
   JV empty_arr(JV::array_tag);
   auto params = godot::PhysicsRayQueryParameters3D::create(
-      parse_vec3(*it_from), parse_vec3(*it_to), cmv,
+      util::json_to_vec3(*it_from), util::json_to_vec3(*it_to), cmv,
       parse_rids(excl ? *excl : empty_arr));
   if (args.Contains("collide_with_bodies"))
     params->set_collide_with_bodies(args["collide_with_bodies"].GetBool());
@@ -860,8 +795,8 @@ JV handle_3d_ray_cast(const JV &args) {
 JV handle_3d_intersect_shape(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "intersect_physics_3d_shape called");
-  godot::RID space = resolve(args, "space_rid");
-  godot::RID shape = resolve(args, "shape_rid");
+  godot::RID space = util::resolve_rid<PhysicsRidDomain>(args, "space_rid");
+  godot::RID shape = util::resolve_rid<PhysicsRidDomain>(args, "shape_rid");
   if (!space.is_valid()) {
     JV r(JV::object_tag);
     r["error"] = JV("missing or invalid required parameter: space_rid");
@@ -890,7 +825,7 @@ JV handle_3d_intersect_shape(const JV &args) {
   if (args.Contains("transform"))
     p->set_transform(parse_t3d(args["transform"]));
   if (args.Contains("motion"))
-    p->set_motion(parse_vec3(args["motion"]));
+    p->set_motion(util::json_to_vec3(args["motion"]));
   if (args.Contains("collision_mask"))
     p->set_collision_mask(
         static_cast<uint32_t>(args["collision_mask"].GetInt()));
@@ -916,7 +851,7 @@ JV handle_3d_intersect_shape(const JV &args) {
 JV handle_3d_intersect_point(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "intersect_physics_3d_point called");
-  godot::RID space = resolve(args, "space_rid");
+  godot::RID space = util::resolve_rid<PhysicsRidDomain>(args, "space_rid");
   auto *it_pos = args.Find("position");
   if (!space.is_valid()) {
     JV r(JV::object_tag);
@@ -942,7 +877,7 @@ JV handle_3d_intersect_point(const JV &args) {
   }
   godot::Ref<godot::PhysicsPointQueryParameters3D> p;
   p.instantiate();
-  p->set_position(parse_vec3(*it_pos));
+  p->set_position(util::json_to_vec3(*it_pos));
   if (args.Contains("collision_mask"))
     p->set_collision_mask(
         static_cast<uint32_t>(args["collision_mask"].GetInt()));
@@ -984,7 +919,7 @@ JV handle_3d_body_create(const JV &) {
 JV handle_3d_body_set_mode(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_physics_3d_body_mode called");
-  godot::RID body = resolve(args, "rid");
+  godot::RID body = util::resolve_rid<PhysicsRidDomain>(args, "rid");
   auto *it_mode = args.Find("mode");
   if (!body.is_valid()) {
     JV r(JV::object_tag);
@@ -1017,7 +952,7 @@ JV handle_3d_body_set_mode(const JV &args) {
 JV handle_3d_body_apply_force(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "apply_physics_3d_body_force called");
-  godot::RID body = resolve(args, "rid");
+  godot::RID body = util::resolve_rid<PhysicsRidDomain>(args, "rid");
   auto *it_force = args.Find("force");
   if (!body.is_valid()) {
     JV r(JV::object_tag);
@@ -1030,9 +965,9 @@ JV handle_3d_body_apply_force(const JV &args) {
     return r;
   }
   auto *ps = godot::PhysicsServer3D::get_singleton();
-  godot::Vector3 f = parse_vec3(*it_force);
+  godot::Vector3 f = util::json_to_vec3(*it_force);
   if (args.Contains("position") && args["position"].IsObject())
-    ps->body_apply_force(body, f, parse_vec3(args["position"]));
+    ps->body_apply_force(body, f, util::json_to_vec3(args["position"]));
   else
     ps->body_apply_central_force(body, f);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -1045,7 +980,7 @@ JV handle_3d_body_apply_force(const JV &args) {
 JV handle_3d_body_apply_impulse(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "apply_physics_3d_body_impulse called");
-  godot::RID body = resolve(args, "rid");
+  godot::RID body = util::resolve_rid<PhysicsRidDomain>(args, "rid");
   auto *it_imp = args.Find("impulse");
   if (!body.is_valid()) {
     JV r(JV::object_tag);
@@ -1058,9 +993,9 @@ JV handle_3d_body_apply_impulse(const JV &args) {
     return r;
   }
   auto *ps = godot::PhysicsServer3D::get_singleton();
-  godot::Vector3 imp = parse_vec3(*it_imp);
+  godot::Vector3 imp = util::json_to_vec3(*it_imp);
   if (args.Contains("position") && args["position"].IsObject())
-    ps->body_apply_impulse(body, imp, parse_vec3(args["position"]));
+    ps->body_apply_impulse(body, imp, util::json_to_vec3(args["position"]));
   else
     ps->body_apply_central_impulse(body, imp);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -1073,7 +1008,7 @@ JV handle_3d_body_apply_impulse(const JV &args) {
 JV handle_3d_body_set_state(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_physics_3d_body_state called");
-  godot::RID body = resolve(args, "rid");
+  godot::RID body = util::resolve_rid<PhysicsRidDomain>(args, "rid");
   auto *it_state = args.Find("state");
   if (!body.is_valid()) {
     JV r(JV::object_tag);
@@ -1114,7 +1049,7 @@ JV handle_3d_body_set_state(const JV &args) {
 JV handle_3d_body_get_state(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_physics_3d_body_state called");
-  godot::RID body = resolve(args, "rid");
+  godot::RID body = util::resolve_rid<PhysicsRidDomain>(args, "rid");
   auto *it_state = args.Find("state");
   if (!body.is_valid()) {
     JV r(JV::object_tag);
@@ -1164,14 +1099,16 @@ JV handle_3d_joint_create(const JV &args) {
   std::string t = it_type->GetString();
   auto rid = [&](const std::string &k) -> godot::RID {
     auto *v = args.Find(k);
-    return v && v->IsNumber() ? rid_store().get(v->GetInt()) : godot::RID();
+    return v && v->IsNumber()
+               ? util::rid_store<PhysicsRidDomain>().get(v->GetInt())
+               : godot::RID();
   };
   if (t == "pin") {
     godot::RID ba = rid("body_a_rid");
     godot::RID bb = rid("body_b_rid");
-    godot::Vector3 la = args.Contains("local_a") ? parse_vec3(args["local_a"])
+    godot::Vector3 la = args.Contains("local_a") ? util::json_to_vec3(args["local_a"])
                                                  : godot::Vector3();
-    godot::Vector3 lb = args.Contains("local_b") ? parse_vec3(args["local_b"])
+    godot::Vector3 lb = args.Contains("local_b") ? util::json_to_vec3(args["local_b"])
                                                  : godot::Vector3();
     if (!ba.is_valid()) {
       ps->free_rid(j);
@@ -1273,7 +1210,7 @@ JV handle_3d_area_create(const JV &) {
 JV handle_3d_area_set_monitorable(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_physics_3d_area_monitorable called");
-  godot::RID area = resolve(args, "rid");
+  godot::RID area = util::resolve_rid<PhysicsRidDomain>(args, "rid");
   auto *it_mon = args.Find("monitorable");
   if (!area.is_valid()) {
     JV r(JV::object_tag);
@@ -1297,7 +1234,7 @@ JV handle_3d_area_set_monitorable(const JV &args) {
 JV handle_3d_body_apply_torque(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "apply_physics_3d_body_torque called");
-  godot::RID body = resolve(args, "rid");
+  godot::RID body = util::resolve_rid<PhysicsRidDomain>(args, "rid");
   auto *it_t = args.Find("torque");
   if (!body.is_valid()) {
     JV r(JV::object_tag);
@@ -1310,7 +1247,7 @@ JV handle_3d_body_apply_torque(const JV &args) {
     return r;
   }
   godot::PhysicsServer3D::get_singleton()->body_apply_torque(body,
-                                                             parse_vec3(*it_t));
+                                                             util::json_to_vec3(*it_t));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "apply_physics_3d_body_torque completed");
   JV r(JV::object_tag);
@@ -1321,7 +1258,7 @@ JV handle_3d_body_apply_torque(const JV &args) {
 JV handle_3d_body_set_axis_lock(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_physics_3d_body_axis_lock called");
-  godot::RID body = resolve(args, "rid");
+  godot::RID body = util::resolve_rid<PhysicsRidDomain>(args, "rid");
   auto *it_axis = args.Find("axis");
   auto *it_lock = args.Find("lock");
   if (!body.is_valid()) {
@@ -1370,8 +1307,8 @@ JV handle_3d_body_set_axis_lock(const JV &args) {
 JV handle_3d_body_add_collision_exception(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "add_physics_3d_body_collision_exception called");
-  godot::RID body = resolve(args, "rid");
-  godot::RID ex = resolve(args, "excepted_body_rid");
+  godot::RID body = util::resolve_rid<PhysicsRidDomain>(args, "rid");
+  godot::RID ex = util::resolve_rid<PhysicsRidDomain>(args, "excepted_body_rid");
   if (!body.is_valid()) {
     JV r(JV::object_tag);
     r["error"] = JV("missing or invalid required parameter: rid");
@@ -1396,8 +1333,8 @@ JV handle_3d_body_remove_collision_exception(const JV &args) {
   LogSystem::instance().log(
       LogLevel::Info, LogCategory::Tools,
       "remove_physics_3d_body_collision_exception called");
-  godot::RID body = resolve(args, "rid");
-  godot::RID ex = resolve(args, "excepted_body_rid");
+  godot::RID body = util::resolve_rid<PhysicsRidDomain>(args, "rid");
+  godot::RID ex = util::resolve_rid<PhysicsRidDomain>(args, "excepted_body_rid");
   if (!body.is_valid()) {
     JV r(JV::object_tag);
     r["error"] = JV("missing or invalid required parameter: rid");
@@ -1421,7 +1358,7 @@ JV handle_3d_body_remove_collision_exception(const JV &args) {
 JV handle_3d_joint_set_param(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_physics_3d_joint_param called");
-  godot::RID joint = resolve(args, "rid");
+  godot::RID joint = util::resolve_rid<PhysicsRidDomain>(args, "rid");
   if (!joint.is_valid()) {
     JV r(JV::object_tag);
     r["error"] = JV("missing or invalid required parameter: rid");
@@ -1444,8 +1381,8 @@ JV handle_3d_joint_set_param(const JV &args) {
 JV handle_3d_area_set_space_override(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_physics_3d_area_space called");
-  godot::RID area = resolve(args, "rid");
-  godot::RID space = resolve(args, "space_rid");
+  godot::RID area = util::resolve_rid<PhysicsRidDomain>(args, "rid");
+  godot::RID space = util::resolve_rid<PhysicsRidDomain>(args, "space_rid");
   if (!area.is_valid()) {
     JV r(JV::object_tag);
     r["error"] = JV("missing or invalid required parameter: rid");
@@ -1467,7 +1404,7 @@ JV handle_3d_area_set_space_override(const JV &args) {
 JV handle_3d_space_set_gravity(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_physics_3d_space_solver_iterations called");
-  godot::RID space = resolve(args, "rid");
+  godot::RID space = util::resolve_rid<PhysicsRidDomain>(args, "rid");
   if (!space.is_valid()) {
     JV r(JV::object_tag);
     r["error"] = JV("missing or invalid required parameter: rid");
@@ -1489,7 +1426,7 @@ JV handle_3d_space_set_gravity(const JV &args) {
 JV handle_3d_space_set_debug(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_physics_3d_space_solver_params called");
-  godot::RID space = resolve(args, "rid");
+  godot::RID space = util::resolve_rid<PhysicsRidDomain>(args, "rid");
   if (!space.is_valid()) {
     JV r(JV::object_tag);
     r["error"] = JV("missing or invalid required parameter: rid");
@@ -1504,13 +1441,8 @@ JV handle_3d_space_set_debug(const JV &args) {
     ps->space_set_param(
         space,
         godot::PhysicsServer3D::SPACE_PARAM_CONTACT_MAX_ALLOWED_PENETRATION,
-        static_cast<float>(
-            args["contact_max_allowed_penetration"].IsNumber()
-                ? (args["contact_max_allowed_penetration"].IsInt()
-                       ? static_cast<double>(
-                             args["contact_max_allowed_penetration"].GetInt())
-                       : args["contact_max_allowed_penetration"].GetDouble())
-                : 0.0));
+        static_cast<float>(util::json_number(
+            args.Find("contact_max_allowed_penetration"), 0.0)));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_physics_3d_space_solver_params completed");
   JV r(JV::object_tag);
@@ -1537,8 +1469,8 @@ JV handle_3d_soft_body_create(const JV &) {
 JV handle_3d_soft_body_set_mesh(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_physics_3d_soft_body_mesh called");
-  godot::RID soft = resolve(args, "rid");
-  godot::RID mesh = resolve(args, "mesh_rid");
+  godot::RID soft = util::resolve_rid<PhysicsRidDomain>(args, "rid");
+  godot::RID mesh = util::resolve_rid<PhysicsRidDomain>(args, "mesh_rid");
   if (!soft.is_valid()) {
     JV r(JV::object_tag);
     r["error"] = JV("missing or invalid required parameter: rid");
@@ -1576,7 +1508,7 @@ JV handle_3d_shape_create(const JV &) {
 JV handle_3d_shape_set_data(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_physics_3d_shape_data called");
-  godot::RID shape = resolve(args, "rid");
+  godot::RID shape = util::resolve_rid<PhysicsRidDomain>(args, "rid");
   if (!shape.is_valid()) {
     JV r(JV::object_tag);
     r["error"] = JV("missing or invalid required parameter: rid");
@@ -1600,8 +1532,8 @@ JV handle_3d_shape_set_data(const JV &args) {
 JV handle_3d_body_add_shape(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "add_physics_3d_body_shape called");
-  godot::RID body = resolve(args, "rid");
-  godot::RID shape = resolve(args, "shape_rid");
+  godot::RID body = util::resolve_rid<PhysicsRidDomain>(args, "rid");
+  godot::RID shape = util::resolve_rid<PhysicsRidDomain>(args, "shape_rid");
   if (!body.is_valid()) {
     JV r(JV::object_tag);
     r["error"] = JV("missing or invalid required parameter: rid");
@@ -1630,7 +1562,7 @@ JV handle_3d_body_add_shape(const JV &args) {
 JV handle_3d_body_set_param(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_physics_3d_body_param called");
-  godot::RID body = resolve(args, "rid");
+  godot::RID body = util::resolve_rid<PhysicsRidDomain>(args, "rid");
   if (!body.is_valid()) {
     JV r(JV::object_tag);
     r["error"] = JV("missing or invalid required parameter: rid");
@@ -1664,7 +1596,7 @@ JV handle_3d_body_set_param(const JV &args) {
 JV handle_3d_area_set_param(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_physics_3d_area_param called");
-  godot::RID area = resolve(args, "rid");
+  godot::RID area = util::resolve_rid<PhysicsRidDomain>(args, "rid");
   if (!area.is_valid()) {
     JV r(JV::object_tag);
     r["error"] = JV("missing or invalid required parameter: rid");
@@ -1697,7 +1629,7 @@ JV handle_3d_area_set_param(const JV &args) {
 JV handle_3d_space_set_param(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_physics_3d_space_param called");
-  godot::RID space = resolve(args, "space_rid");
+  godot::RID space = util::resolve_rid<PhysicsRidDomain>(args, "space_rid");
   if (!space.is_valid()) {
     JV r(JV::object_tag);
     r["error"] = JV("missing or invalid required parameter: space_rid");
@@ -1731,7 +1663,7 @@ JV handle_3d_space_set_param(const JV &args) {
 JV handle_3d_area_set_transform(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_physics_3d_area_transform called");
-  godot::RID area = resolve(args, "rid");
+  godot::RID area = util::resolve_rid<PhysicsRidDomain>(args, "rid");
   auto *tp = args.Find("transform");
   if (!area.is_valid()) {
     JV r(JV::object_tag);
@@ -1755,7 +1687,7 @@ JV handle_3d_area_set_transform(const JV &args) {
 JV handle_3d_body_set_transform(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_physics_3d_body_transform called");
-  godot::RID body = resolve(args, "rid");
+  godot::RID body = util::resolve_rid<PhysicsRidDomain>(args, "rid");
   auto *tp = args.Find("transform");
   if (!body.is_valid()) {
     JV r(JV::object_tag);
@@ -1795,7 +1727,7 @@ JV handle_2d_shape_create(const JV &) {
 JV handle_2d_shape_set_data(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_physics_2d_shape_data called");
-  godot::RID shape = resolve(args, "rid");
+  godot::RID shape = util::resolve_rid<PhysicsRidDomain>(args, "rid");
   if (!shape.is_valid()) {
     JV r(JV::object_tag);
     r["error"] = JV("missing or invalid required parameter: rid");
@@ -1838,30 +1770,7 @@ JV handle_physics_node_get_rid(const JV &args) {
     r["error"] = JV("no edited scene root");
     return r;
   }
-  std::string clean = path;
-  if (!clean.empty() && clean[0] == '/')
-    clean = clean.substr(1);
-  if (clean.size() > 5 && clean.compare(0, 5, "root/") == 0)
-    clean = clean.substr(5);
-  godot::Node *node = nullptr;
-  if (clean.empty() || clean == util::to_std(root->get_name())) {
-    node = root;
-  } else {
-    node =
-        root->get_node_or_null(godot::NodePath(godot::String(clean.c_str())));
-    if (!node) {
-      std::string root_name = util::to_std(root->get_name());
-      if (clean.size() > root_name.size() + 1 &&
-          clean.compare(0, root_name.size(), root_name) == 0 &&
-          clean[root_name.size()] == '/') {
-        std::string sub = clean.substr(root_name.size() + 1);
-        if (!sub.empty()) {
-          node = root->get_node_or_null(
-              godot::NodePath(godot::String(sub.c_str())));
-        }
-      }
-    }
-  }
+  godot::Node *node = util::resolve_scene_node(path, root);
   if (!node) {
     JV r(JV::object_tag);
     r["error"] = JV("node not found: " + path);
