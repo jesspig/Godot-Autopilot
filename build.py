@@ -70,8 +70,8 @@ def _generate_gdextension() -> None:
         "[libraries]\n"
         'windows.debug.x86_64 = "res://addons/godot-autopilot/godot-autopilot.dll"\n'
         'windows.release.x86_64 = "res://addons/godot-autopilot/godot-autopilot.dll"\n'
-        'linux.debug.x86_64 = "res://addons/godot-autopilot/godot-autopilot.so"\n'
-        'linux.release.x86_64 = "res://addons/godot-autopilot/godot-autopilot.so"\n'
+        'linux.debug.x86_64 = "res://addons/godot-autopilot/libgodot-autopilot.so"\n'
+        'linux.release.x86_64 = "res://addons/godot-autopilot/libgodot-autopilot.so"\n'
         'macos.debug.universal = "res://addons/godot-autopilot/libgodot-autopilot.dylib"\n'
         'macos.release.universal = "res://addons/godot-autopilot/libgodot-autopilot.dylib"\n',
         encoding="utf-8",
