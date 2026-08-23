@@ -56,6 +56,12 @@ jobs:
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
 
+      - name: Ensure libgcc_s link (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          so1="$(find /usr/lib/gcc/x86_64-linux-gnu /usr/lib/x86_64-linux-gnu -name 'libgcc_s.so.1' 2>/dev/null | head -n1)"
+          if [ -n "$so1" ]; then sudo ln -sf "$so1" /usr/lib/x86_64-linux-gnu/libgcc_s.so; fi
+
       - name: Cache FetchContent dependencies
         uses: actions/cache@v4
         with:
