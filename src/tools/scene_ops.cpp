@@ -4,6 +4,7 @@
 #include "core/scene_dirty_tracker.hpp"
 #include "util/error_util.hpp"
 #include "util/variant_json.hpp"
+#include <algorithm>
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/node.hpp>
