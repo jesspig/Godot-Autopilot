@@ -598,23 +598,6 @@ mcp::JsonValue handle_debugger_get_output(const mcp::JsonValue &args) {
   return r;
 }
 
-mcp::JsonValue handle_debugger_get_stack_dump(const mcp::JsonValue &) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "get_debugger_stack_dump called");
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] =
-      mcp::JsonValue(DebuggerCapture::instance().get_stack_dump_text());
-  if (capture_stack_size() == 0) {
-    r["note"] = mcp::JsonValue(
-        "stack data is only available in a debugger breakpoint session; this "
-        "version cannot fetch it over the gda runtime channel — use "
-        "get_game_log_entries or execute_game_script to diagnose");
-  }
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "get_debugger_stack_dump completed");
-  return r;
-}
-
 mcp::JsonValue handle_debugger_get_scene_tree(const mcp::JsonValue &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_debugger_scene_tree called");
@@ -630,25 +613,6 @@ mcp::JsonValue handle_debugger_get_scene_tree(const mcp::JsonValue &) {
     r["note"] = capture_note_for_empty_result();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_debugger_scene_tree completed");
-  return r;
-}
-
-mcp::JsonValue handle_debugger_get_monitors(const mcp::JsonValue &args) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "get_debugger_monitors called");
-  size_t count = 1;
-  if (auto *c = args.Find("count")) {
-    if (c->IsInt())
-      count = static_cast<size_t>(c->GetInt());
-  }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  std::string monitors_text =
-      DebuggerCapture::instance().get_monitors_text(count);
-  r["result"] = mcp::JsonValue(monitors_text);
-  if (monitors_text.empty())
-    r["note"] = capture_note_for_empty_result();
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "get_debugger_monitors completed");
   return r;
 }
 

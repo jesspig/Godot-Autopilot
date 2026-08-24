@@ -17,7 +17,7 @@ GDA_TOOL_CLASS(PrintDebugLogTool, "print_debug_log",
                "Debug", std::vector<std::string>({"debug", "print", "log"}), debug_ops::handle_print, true)
 
 GDA_TOOL_CLASS(GetDebugStackTool, "get_debug_stack",
-               "Capture script backtraces for all currently running scripts in the editor process. Use it when a script error occurs to see where execution was at capture time; unlike get_debugger_stack_dump it needs no debug session. Returns per-backtrace language and frame_count, with frames containing function, file and line; include_variables adds global_variables per backtrace plus local_variables and member_variables per frame.",
+               "Capture script backtraces for all currently running scripts in the editor process. Use it when a script error occurs to see where execution was at capture time; it needs no debug session. Returns per-backtrace language and frame_count, with frames containing function, file and line; include_variables adds global_variables per backtrace plus local_variables and member_variables per frame.",
                "Debug", std::vector<std::string>({"debug", "stack", "trace"}), debug_ops::handle_print_stack, false)
 
 GDA_TOOL_CLASS(GetDebugMonitorTool, "get_debug_monitor",

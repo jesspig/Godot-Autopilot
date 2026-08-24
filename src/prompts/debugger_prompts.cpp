@@ -71,7 +71,7 @@ void register_debugger_prompts(mcp::McpServer &server) {
         std::string text =
             R"TEMPLATE(The debugger has paused at a breakpoint. Follow these steps:
 
-1. **Read the stack**: Use `get_debugger_stack_dump` to see the call stack.
+1. **Read the stack**: Script-level stack capture at a breakpoint is not exposed to extensions; use `execute_game_script` (action='script') inside the running game or `get_game_log_entries` to inspect where execution stopped.
 2. **Read the scene**: Use `get_debugger_scene_tree` to see the remote scene tree.
 3. **Understand the context**:
    - Which function is the execution paused in?
@@ -133,7 +133,7 @@ void register_debugger_prompts(mcp::McpServer &server) {
          const std::optional<mcp::JsonValue> &args) -> mcp::GetPromptResult {
         std::string text = R"TEMPLATE(Review game performance:
 
-1. **Read monitor data**: Use `get_debugger_monitors` to retrieve the latest performance frame.
+1. **Read monitor data**: Use `get_debug_monitors` for live editor-side values and `get_game_status` for the running game's fps and frame counters.
 
 2. **Key metrics to check**:
    - FPS: target 60 (or your project's target)
@@ -166,7 +166,7 @@ void register_debugger_prompts(mcp::McpServer &server) {
 
 1. Use `get_debugger_session_info` to see if a game is running and if the debugger is paused.
 2. If active and not breaked: the game is running normally. Check `get_debugger_errors` for any runtime errors.
-3. If breaked: the debugger is paused at a breakpoint. Use `get_debugger_stack_dump` to see where.
+3. If breaked: the debugger is paused at a breakpoint. Use `execute_game_script` or `get_game_log_entries` to inspect where execution stopped.
 4. If inactive: no game is currently running in the editor.
 
 Based on the state, I will:

@@ -94,9 +94,7 @@ std::string capture_new_output_text(size_t since_count);
 mcp::JsonValue handle_output_get_log(const mcp::JsonValue &args);
 mcp::JsonValue handle_debugger_get_errors(const mcp::JsonValue &args);
 mcp::JsonValue handle_debugger_get_output(const mcp::JsonValue &args);
-mcp::JsonValue handle_debugger_get_stack_dump(const mcp::JsonValue &args);
 mcp::JsonValue handle_debugger_get_scene_tree(const mcp::JsonValue &args);
-mcp::JsonValue handle_debugger_get_monitors(const mcp::JsonValue &args);
 mcp::JsonValue handle_debugger_get_session_info(const mcp::JsonValue &args);
 
 void register_classes();
