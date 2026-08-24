@@ -33,6 +33,10 @@ mcp::JsonValue handle_get_uid(const mcp::JsonValue &args);
 mcp::JsonValue handle_set_uid(const mcp::JsonValue &args);
 mcp::JsonValue handle_remove(const mcp::JsonValue &args);
 mcp::JsonValue handle_rename(const mcp::JsonValue &args);
+mcp::JsonValue apply_path_rewrite_transaction(const std::string &old_path,
+                                              const std::string &new_path);
+mcp::JsonValue handle_move(const mcp::JsonValue &args);
+mcp::JsonValue handle_create_directory(const mcp::JsonValue &args);
 mcp::JsonValue handle_get_dependencies(const mcp::JsonValue &args);
 mcp::JsonValue handle_has_dependency(const mcp::JsonValue &args);
 mcp::JsonValue handle_get_references(const mcp::JsonValue &args);

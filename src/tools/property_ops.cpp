@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
+#include <godot_cpp/classes/editor_undo_redo_manager.hpp>
 #include <godot_cpp/classes/global_constants.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/resource.hpp>
@@ -518,6 +519,34 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
   undo_info["property"] = mcp::JsonValue(prop_str);
   undo_info["old_value"] = VariantJson::serialize(old_val);
   r["undo"] = std::move(undo_info);
+
+  bool object_typed =
+      old_val.get_type() == godot::Variant::OBJECT ||
+      new_val.get_type() == godot::Variant::OBJECT;
+  bool undoable = false;
+  std::string undo_skip_reason;
+  if (object_typed) {
+    undo_skip_reason =
+        "object-typed value: the editor undo stack cannot restore object "
+        "references reliably";
+  } else {
+    auto *editor = godot::EditorInterface::get_singleton();
+    auto *undo_redo = editor ? editor->get_editor_undo_redo() : nullptr;
+    if (!undo_redo) {
+      undo_skip_reason = "EditorUndoRedoManager not available";
+    } else {
+      undo_redo->create_action(godot::String(
+          ("Set Property " + prop_str + " on " + path_str).c_str()));
+      undo_redo->add_do_property(node, prop_name, new_val);
+      undo_redo->add_undo_property(node, prop_name, old_val);
+      undo_redo->commit_action(false);
+      undoable = true;
+    }
+  }
+  r["undoable"] = mcp::JsonValue(undoable);
+  if (!undoable) {
+    r["undo_skip_reason"] = mcp::JsonValue(undo_skip_reason);
+  }
   scene_dirty_tracker::mark_scene_modified();
   return r;
 }

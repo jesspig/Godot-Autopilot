@@ -9,9 +9,19 @@ void fill_schema_scene(std::unordered_map<std::string, mcp::JsonValue>& m) {
             {"parent_path", "string", "Parent node path in the edited scene (e.g. 'Player' or 'Player/Weapon'); omit only while the scene has no root — required once the scene already has a root", false},
             {"name", "string", "Node name (string, default: NewNode)", true},
             {"type", "string", "Node class type (string, default: Node). Must be a Node subclass, e.g. Node2D, Sprite2D — other classes error", true},
+            {"properties", "object", "Optional map of property names to values applied right after creation via the same conversion chain as property_set (object, e.g. {\"visible\": false, \"position\": [10, 20]}); any failing property frees the new node and reports the failing name", false},
         });
         m["delete_scene_node"] = schema::build_schema({
             {"path", "string", "Node path in the edited scene (e.g. 'Enemies/Enemy1'); the scene root cannot be deleted", true},
+        });
+        m["rename_scene_node"] = schema::build_schema({
+            {"path", "string", "Node path in the edited scene (e.g. 'Player/Sprite2D')", true},
+            {"new_name", "string", "New node name; must be unique among siblings and cannot contain '/' or ':' (string, e.g. 'Hero')", true},
+        });
+        m["reparent_node"] = schema::build_schema({
+            {"path", "string", "Node path in the edited scene to reparent (e.g. 'Player/Weapon')", true},
+            {"new_parent_path", "string", "Target parent node path in the edited scene; must not be the node itself or one of its descendants (string, e.g. 'Inventory')", true},
+            {"keep_world_position", "boolean", "Preserve the world transform when the node and the new parent are both Node2D or both Node3D; other type combinations ignore it (boolean, default: false)", false},
         });
         m["get_scene_tree"] = schema::build_schema({
             {"max_depth", "integer", "Maximum tree depth to include (integer, default: 8; -1 means unlimited)", false},
@@ -131,11 +141,19 @@ void fill_schema_scene(std::unordered_map<std::string, mcp::JsonValue>& m) {
             {"uid", "integer", "UID value to assign; when omitted a fresh UID is auto-generated (contract gap: required in schema but optional in the implementation)", true},
         });
         m["remove_resource_file"] = schema::build_schema({
-            {"path", "string", "Resource file path to delete from disk, e.g. res://my_resource.tres; destructive and irreversible", true},
+            {"path", "string", "Resource file path to delete from disk, e.g. res://my_resource.tres; without force the call only runs the impact pre-check and deletes nothing", true},
+            {"force", "boolean", "Two-stage safety switch (default false): false returns would_delete plus dependents from a reverse-reference scan; true performs the deletion — preferentially moving the file to the OS trash (trashed=true) with fallback to permanent removal (permanent=true), also removing the .uid sidecar (sidecars_removed)", false},
         });
         m["rename_resource_file"] = schema::build_schema({
             {"path", "string", "Current resource path, e.g. res://old_name.tres; 'from' is accepted as an alias", true},
             {"new_path", "string", "New resource path, e.g. res://new_name.tres; 'to' is accepted as an alias", true},
+        });
+        m["move_resource_file"] = schema::build_schema({
+            {"path", "string", "Existing res:// file or directory to move, e.g. res://sfx/jump.wav; directories move recursively preserving the sub-folder layout with *.uid sidecars following their owners", true},
+            {"new_directory", "string", "Destination directory inside res:// (absolute like res://assets/sfx or relative like assets/sfx); trailing slashes are trimmed, user:// is rejected", true},
+        });
+        m["create_directory"] = schema::build_schema({
+            {"path", "string", "Directory to create below res:// (absolute like res://assets/audio or relative like assets/audio); missing parents are created recursively; idempotent when the directory already exists", true},
         });
         m["get_resource_dependencies"] = schema::build_schema({
             {"path", "string", "Resource file path whose dependencies to list, e.g. res://scene.tscn", true},
@@ -212,7 +230,7 @@ void fill_schema_scene(std::unordered_map<std::string, mcp::JsonValue>& m) {
         });
 
         m["write_file"] = schema::build_schema({
-            {"path", "string", "File path to write (absolute path, or user://-relative); plain file I/O with no editor resource tracking", true},
+            {"path", "string", "File path to write; res:// paths are engine-managed (automatic reimport/update_file sync and script diagnostics), user:// or absolute paths are plain I/O", true},
             {"content", "string", "Text content to store in the file", true},
             {"mode", "string", "Write mode: 'WRITE' overwrites existing content (default), 'APPEND' appends to the end of the file", false},
         });

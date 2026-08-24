@@ -1,16 +1,23 @@
 #include "text_ops.hpp"
+#include "core/editor_readiness.hpp"
 #include "core/log_system.hpp"
 #include "util/error_util.hpp"
 #include "util/rid_registry.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/dir_access.hpp>
+#include <godot_cpp/classes/editor_file_system.hpp>
+#include <godot_cpp/classes/editor_interface.hpp>
+#include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/os.hpp>
+#include <godot_cpp/classes/resource.hpp>
+#include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/text_server.hpp>
 #include <godot_cpp/classes/text_server_manager.hpp>
 #include <godot_cpp/variant/rid.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
 #include <godot_cpp/variant/vector2.hpp>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -259,6 +266,75 @@ JV handle_shaped_text_get_size(const JV &args) {
   return r;
 }
 
+namespace {
+
+std::string lowercase_extension_of(const std::string &path) {
+  size_t slash = path.find_last_of('/');
+  std::string name =
+      slash == std::string::npos ? path : path.substr(slash + 1);
+  size_t dot = name.rfind('.');
+  if (dot == std::string::npos || dot + 1 >= name.size())
+    return std::string();
+  std::string ext = name.substr(dot + 1);
+  for (char &c : ext) {
+    if (c >= 'A' && c <= 'Z')
+      c = static_cast<char>(c + ('a' - 'A'));
+  }
+  return ext;
+}
+
+bool is_import_type_extension(const std::string &ext) {
+  static const std::set<std::string> kImportExtensions = {
+      "bmp", "cut", "dds", "exr", "hdr", "jpg", "jpeg", "ktx",
+      "png", "pnm", "svg", "svgz", "tga", "webp", "wav", "mp3",
+      "ogg", "ttf", "otf", "woff", "woff2", "pfb", "fnt", "dae",
+      "obj", "glb", "gltf", "escn", "fbx", "blend", "csv", "po"};
+  return kImportExtensions.count(ext) > 0;
+}
+
+bool is_script_extension(const std::string &ext) {
+  static const std::set<std::string> kScriptExtensions = {"gd", "cs",
+                                                          "gdshader",
+                                                          "gdshaderinc"};
+  return kScriptExtensions.count(ext) > 0;
+}
+
+JV build_script_diagnostics(const godot::String &gs_path,
+                            const std::string &ext) {
+  JV diag(JV::object_tag);
+  auto *loader = godot::ResourceLoader::get_singleton();
+  if (!loader) {
+    diag["ok"] = JV(false);
+    diag["hint"] =
+        JV("ResourceLoader not available; open the file in the editor script "
+           "panel to inspect errors");
+    return diag;
+  }
+  if (loader->has_cached(gs_path)) {
+    auto cached = loader->get_cached_ref(gs_path);
+    if (cached.is_valid())
+      cached->set_path(godot::String());
+  }
+  godot::Ref<godot::Resource> loaded = loader->load(gs_path);
+  if (loaded.is_valid()) {
+    diag["ok"] = JV(true);
+    return diag;
+  }
+  diag["ok"] = JV(false);
+  if (ext == "cs") {
+    diag["hint"] =
+        JV("the C# assembly may not be built yet; run a project build before "
+           "expecting this script to load");
+  } else {
+    diag["hint"] =
+        JV("the script failed to load after write (parse or compile error); "
+           "line-level details are only available in the editor script panel");
+  }
+  return diag;
+}
+
+} // namespace
+
 JV handle_file_write(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "write_file called");
@@ -275,17 +351,53 @@ JV handle_file_write(const JV &args) {
   godot::FileAccess::ModeFlags flag = godot::FileAccess::WRITE;
   if (mode == "APPEND")
     flag = godot::FileAccess::READ_WRITE;
-  auto file =
-      godot::FileAccess::open(godot::String(pp->GetString().c_str()), flag);
+  std::string normalized_path = pp->GetString();
+  for (char &c : normalized_path) {
+    if (c == '\\')
+      c = '/';
+  }
+  godot::String gs_path(normalized_path.c_str());
+  auto file = godot::FileAccess::open(gs_path, flag);
   if (file.is_null())
     return util::error_json("failed to open file: " + pp->GetString());
   if (mode == "APPEND")
     file->seek_end();
   file->store_string(godot::String(cp->GetString().c_str()));
   file->close();
+
+  JV r(JV::object_tag);
+  r["result"] = JV("ok");
+  r["engine_managed"] = JV(false);
+  bool in_project = normalized_path.rfind("res://", 0) == 0;
+  auto *engine = godot::Engine::get_singleton();
+  auto *editor =
+      in_project ? godot::EditorInterface::get_singleton() : nullptr;
+  if (editor && engine && engine->is_editor_hint()) {
+    auto *efs = editor->get_resource_filesystem();
+    if (efs) {
+      r["engine_managed"] = JV(true);
+      std::string ext = lowercase_extension_of(normalized_path);
+      bool imported = godot::FileAccess::file_exists(
+                          gs_path + godot::String(".import")) ||
+                      is_import_type_extension(ext);
+      if (imported) {
+        if (is_import_in_progress())
+          return busy_error();
+        godot::PackedStringArray files;
+        files.append(gs_path);
+        efs->reimport_files(files);
+        r["action"] = JV("reimport");
+      } else {
+        efs->update_file(gs_path);
+        r["action"] = JV("update_file");
+      }
+      if (is_script_extension(ext))
+        r["diagnostics"] = build_script_diagnostics(gs_path, ext);
+    }
+  }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "write_file completed");
-  return ok_json();
+  return r;
 }
 
 namespace {
