@@ -1,6 +1,8 @@
 #include "capture_ops.hpp"
 #include "../util/error_util.hpp"
+#include "core/config.hpp"
 #include "core/log_system.hpp"
+#include "tools/runtime_ops.hpp"
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/classes/sub_viewport.hpp>
@@ -70,12 +72,12 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
   }
 
   if (target == "game") {
-    return util::error_detail(
-        "game viewport capture requires the runtime debug channel (not yet "
-        "available)",
-        "capture_ops.cpp handle_capture_viewport",
-        "captured game viewport image",
-        "use target='editor' or wait for the M3 runtime channel");
+    int64_t timeout_ms = GDA_DEFAULT_TIMEOUT_MS;
+    if (auto *tp = args.Find("timeout_ms")) {
+      if (tp->IsInt() && tp->GetInt() > 0)
+        timeout_ms = tp->GetInt();
+    }
+    return runtime_ops::game_capture_blocking(timeout_ms);
   }
   if (target != "editor") {
     return util::error_detail("invalid target '" + target + "'",

@@ -11,6 +11,7 @@
 #include <godot_cpp/classes/input_event_action.hpp>
 #include <godot_cpp/classes/input_event_key.hpp>
 #include <godot_cpp/classes/input_event_mouse_button.hpp>
+#include <godot_cpp/classes/input_event_mouse_motion.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
@@ -457,12 +458,23 @@ bool param_pressed(const JV &params, bool default_value) {
   return default_value;
 }
 
-std::string inject_step(const JV &step) {
-  auto *type_p = step.Find("type");
-  if (!type_p || !type_p->IsString()) {
-    return "input requires type (key|mouse_button|action)";
+std::string step_type(const JV &step) {
+  if (auto *k = step.Find("kind")) {
+    if (k->IsString())
+      return k->GetString();
   }
-  std::string type = type_p->GetString();
+  if (auto *t = step.Find("type")) {
+    if (t->IsString())
+      return t->GetString();
+  }
+  return "";
+}
+
+std::string inject_step(const JV &step) {
+  std::string type = step_type(step);
+  if (type.empty()) {
+    return "input requires kind (key|mouse_button|mouse_motion|action)";
+  }
 
   auto *input = godot::Input::get_singleton();
   if (!input)
@@ -522,6 +534,17 @@ std::string inject_step(const JV &step) {
     dispatch_input_event(input, 1, key, button_index, pos, has_pos, pressed,
                          godot::StringName(), false, true);
     release_type = "mouse_button";
+  } else if (type == "mouse_motion") {
+    if (!extract_position(step, pos))
+      return "input mouse_motion requires position {x, y}";
+    has_pos = true;
+    godot::Ref<godot::InputEventMouseMotion> ev;
+    ev.instantiate();
+    ev->set_position(pos);
+    ev->set_global_position(pos);
+    input->parse_input_event(ev);
+    input->flush_buffered_events();
+    return "";
   } else if (type == "action") {
     auto *act = step.Find("action");
     if (!act || !act->IsString()) {
@@ -546,7 +569,7 @@ std::string inject_step(const JV &step) {
   return "";
 }
 
-JV op_input_sequence(const JV &seq_value) {
+JV inject_duration_sequence(const JV &seq_value) {
   if (!seq_value.IsArray()) {
     return error_result("input sequence must be an array");
   }
@@ -571,13 +594,115 @@ JV op_input_sequence(const JV &seq_value) {
   return ok_result(std::move(inner));
 }
 
+constexpr size_t GDA_SEQUENCE_MAX_ITEMS = 256;
+constexpr int64_t GDA_SEQUENCE_FRAME_BUDGET_MS = 33;
+constexpr int64_t GDA_SEQUENCE_BASE_TIMEOUT_MS = 2000;
+
+struct FrameInputItem {
+  int64_t at_frame = 0;
+  JV payload;
+};
+
+class GameBridgeFrameSequence : public godot::Node {
+  GDCLASS(GameBridgeFrameSequence, godot::Node)
+
+  int64_t request_id_ = 0;
+  std::vector<FrameInputItem> pending_;
+  int64_t executed_ = 0;
+  uint64_t start_physics_frame_ = 0;
+  uint64_t start_ticks_ = 0;
+  int64_t timeout_ms_ = 0;
+  bool finished_ = false;
+
+protected:
+  static void _bind_methods() {}
+
+public:
+  void setup(int64_t request_id, std::vector<FrameInputItem> items,
+             int64_t timeout_ms) {
+    request_id_ = request_id;
+    pending_ = std::move(items);
+    timeout_ms_ = timeout_ms;
+    godot::SceneTree *tree = get_scene_tree();
+    if (!tree) {
+      memdelete(this);
+      return;
+    }
+    set_process_mode(godot::Node::PROCESS_MODE_ALWAYS);
+    set_physics_process(true);
+    tree->get_root()->add_child(this);
+    auto *engine = godot::Engine::get_singleton();
+    start_physics_frame_ = engine ? engine->get_physics_frames() : 0;
+    start_ticks_ = godot::Time::get_singleton()
+                       ? godot::Time::get_singleton()->get_ticks_msec()
+                       : 0;
+  }
+
+  void cancel() {
+    if (finished_)
+      return;
+    finished_ = true;
+    unregister_cancel_handler(request_id_);
+    queue_free();
+  }
+
+  void _physics_process(double delta) override {
+    (void)delta;
+    if (finished_)
+      return;
+    auto *engine = godot::Engine::get_singleton();
+    if (!engine)
+      return;
+    int64_t relative_frame = static_cast<int64_t>(
+        engine->get_physics_frames() - start_physics_frame_);
+    std::vector<FrameInputItem> remaining;
+    remaining.reserve(pending_.size());
+    for (FrameInputItem &item : pending_) {
+      if (item.at_frame <= relative_frame) {
+        std::string err = inject_step(item.payload);
+        if (!err.empty()) {
+          push_game_error("game_bridge_input.cpp", "op_input_sequence", 0,
+                          "input_sequence item at_frame " +
+                              std::to_string(item.at_frame) +
+                              " failed: " + err,
+                          "", false, {});
+        }
+        executed_++;
+      } else {
+        remaining.push_back(std::move(item));
+      }
+    }
+    pending_.swap(remaining);
+    if (pending_.empty()) {
+      finish(true);
+      return;
+    }
+    auto *time = godot::Time::get_singleton();
+    if (time &&
+        time->get_ticks_msec() - start_ticks_ >=
+            static_cast<uint64_t>(timeout_ms_))
+      finish(false);
+  }
+
+private:
+  void finish(bool completed) {
+    finished_ = true;
+    unregister_cancel_handler(request_id_);
+    JV body(JV::object_tag);
+    body["completed"] = JV(completed);
+    body["executed"] = JV(executed_);
+    send_response(request_id_, ok_result(std::move(body)));
+    queue_free();
+  }
+};
+
 } // namespace
 
 JV op_input(const JV &params, int64_t request_id) {
   (void)request_id;
   if (auto *seq_p = params.Find("sequence")) {
 
-    return op_input_sequence(*seq_p);
+    return inject_duration_sequence(*seq_p);
   }
   auto *type_p = params.Find("type");
   if (!type_p || !type_p->IsString()) {
@@ -665,6 +790,58 @@ JV op_input_wait(const JV &params, int64_t request_id) {
   return JV();
 }
 
+JV op_input_sequence(const JV &params, int64_t request_id) {
+  auto *inputs_p = params.Find("inputs");
+  if (!inputs_p || !inputs_p->IsArray())
+    return error_result("input_sequence requires inputs (array)");
+  const auto &items = inputs_p->GetArray();
+  if (items.empty())
+    return error_result("input_sequence inputs must not be empty");
+  if (items.size() > GDA_SEQUENCE_MAX_ITEMS)
+    return error_result("input_sequence inputs exceeds maximum of " +
+                        std::to_string(GDA_SEQUENCE_MAX_ITEMS) + " items");
+
+  std::vector<FrameInputItem> timed;
+  timed.reserve(items.size());
+  int64_t max_at_frame = 0;
+  for (const JV &item : items) {
+    if (!item.IsObject())
+      return error_result(
+          "each input_sequence item must be an object with kind and at_frame");
+    auto *frame_p = item.Find("at_frame");
+    if (!frame_p || !frame_p->IsInt() || frame_p->GetInt() < 0)
+      return error_result("each input_sequence item requires at_frame "
+                          "(non-negative integer physics frame offset)");
+    FrameInputItem entry;
+    entry.at_frame = frame_p->GetInt();
+    entry.payload = item;
+    if (entry.at_frame > max_at_frame)
+      max_at_frame = entry.at_frame;
+    timed.push_back(std::move(entry));
+  }
+
+  godot::SceneTree *tree = get_scene_tree();
+  if (!tree)
+    return error_result("no scene tree");
+  godot::Node *root = tree->get_root();
+  if (!root)
+    return error_result("no root node");
+
+  int64_t timeout_ms =
+      max_at_frame * GDA_SEQUENCE_FRAME_BUDGET_MS + GDA_SEQUENCE_BASE_TIMEOUT_MS;
+  if (auto *tp = params.Find("timeout_ms")) {
+    if (tp->IsInt() && tp->GetInt() > 0)
+      timeout_ms = tp->GetInt();
+  }
+  if (timeout_ms > GDA_MAX_TIMEOUT_MS)
+    timeout_ms = GDA_MAX_TIMEOUT_MS;
+
+  GameBridgeFrameSequence *seq = memnew(GameBridgeFrameSequence);
+  seq->setup(request_id, std::move(timed), timeout_ms);
+  register_cancel_handler(request_id, [seq] { seq->cancel(); });
+  return JV();
+}
+
 JV op_input_status(const JV &params) {
   auto *act = params.Find("action");
   if (!act || !act->IsString()) {
@@ -690,6 +867,7 @@ void register_input_bridge_classes() {
   godot::ClassDB::register_class<GameBridgeInputWatcher>();
   godot::ClassDB::register_class<GameBridgeDelayedRelease>();
   godot::ClassDB::register_class<GameBridgeInputSequence>();
+  godot::ClassDB::register_class<GameBridgeFrameSequence>();
 }
 
 } // namespace game_bridge
