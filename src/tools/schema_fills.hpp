@@ -13,6 +13,9 @@ void fill_schema_physics(std::unordered_map<std::string, mcp::JsonValue>& m);
 void fill_schema_render_audio(std::unordered_map<std::string, mcp::JsonValue>& m);
 void fill_schema_debug_sys(std::unordered_map<std::string, mcp::JsonValue>& m);
 void fill_schema_content(std::unordered_map<std::string, mcp::JsonValue>& m);
+void fill_schema_animation(std::unordered_map<std::string, mcp::JsonValue>& m);
+void fill_schema_theme(std::unordered_map<std::string, mcp::JsonValue>& m);
+void fill_schema_analysis(std::unordered_map<std::string, mcp::JsonValue>& m);
 
 } // namespace godot_autopilot
 
