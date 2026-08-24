@@ -1,19 +1,19 @@
 ---
 type: 模块文档
 title: 核心模块
-description: 命令队列、配置常量、日志、模式检测、资源缓存、脏状态跟踪、服务器生命周期与插件配置
+description: 命令队列、配置常量、日志、模式检测、资源缓存、脏状态跟踪、错误水印、导入就绪门控、服务器生命周期与插件配置
 tags:
   - 模块
   - 核心层
   - 线程模型
-timestamp: "2026-08-22T15:10:00+08:00"
+timestamp: "2026-08-24T05:10:00+08:00"
 resource: src/core/
 ---
 
 # 核心模块（src/core/）
 
-> 审计日期：2026-08-22（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 随配置面板端口持久化同步并补 YAML frontmatter；08-22 随版本号收敛为根 `VERSION` 单一来源同步 MCP 标识引用；08-22 随死代码清理同步——`set_on_new_entry` 回调与 `is_registered` 删除；08-22 15 时全量一致性审计——职责表补 `version.hpp.in`、生命周期步骤修正状态栏残留与 `GDA_FORCE_HEADLESS` 语义），基于当前工作树代码逐行核对（不依赖 git 历史）。
-> 覆盖范围：`src/core/` 下 9 组文件。注意：`CommandQueue` 为 header-only（仅 `command_queue.hpp`，无对应 `.cpp`），实际为 16 个文件。
+> 审计日期：2026-08-24（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 随配置面板端口持久化同步并补 YAML frontmatter；08-22 随版本号收敛为根 `VERSION` 单一来源同步 MCP 标识引用；08-22 随死代码清理同步——`set_on_new_entry` 回调与 `is_registered` 删除；08-22 15 时全量一致性审计——职责表补 `version.hpp.in`、生命周期步骤修正；08-24 随竞品对齐批次新增 `error_watermark.hpp` 与 `editor_readiness.{hpp,cpp}` 两小节），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 覆盖范围：`src/core/` 下 11 组文件。注意：`CommandQueue` 为 header-only（仅 `command_queue.hpp`，无对应 `.cpp`），`error_watermark.hpp` 同为 header-only，实际为 20 个文件。
 
 ## 模块简介
 
@@ -30,6 +30,8 @@ resource: src/core/
 | `ModeDetector` | `mode_detector.cpp/hpp` | 运行时模式检测（编辑器/游戏/未知） | `_enter_tree` 启动日志 |
 | `ResourceRegistry` | `resource_registry.cpp/hpp` | 内存资源缓存（oid 键 + `name:` 前缀键），全局 mutex 保护 | 资源类工具 |
 | `SceneDirtyTracker` | `scene_dirty_tracker.cpp/hpp` | 记录"当前编辑场景是否被修改"及根节点实例 ID | `GodotAutopilotPlugin::_get_unsaved_status` |
+| `error_watermark` | `error_watermark.hpp`（header-only） | 错误水印计数器：累积待消费错误数，供 MCP 响应附 `new_errors_since_last_call` doorbell | `register_all.cpp`（响应后处理）、`runtime_ops.cpp`（游戏 runtime_error 计数） |
+| `editor_readiness` | `editor_readiness.cpp/hpp` | 编辑器导入/扫描进行中检测与 retryable 软错误构造，reimport 类工具的门控 | `resource_ops`（reimport/save 类 handler） |
 | `ServerContext` | `server_context.cpp/hpp` | MCP 服务器组装、端口解析、启动/停止/重启、工具/资源/prompt 注册 | `main.cpp` 入口 |
 | `PluginConfig` | `plugin_config.cpp/hpp` | 插件自身配置持久化（`user://godot_autopilot/config.json`，当前仅端口） | `ServerContext` 端口解析、`McpConfigDock` Apply |
 | 版本宏 | `version.hpp.in`（configure_file 模板，生成 `<build>/generated/version.hpp`） | 定义 `GDA_VERSION` 字符串宏，取自根 `VERSION` 文件单一来源 | `server_context.cpp`（MCP `server_info`）、`register_all.cpp`（`system_status.version`） |
@@ -78,6 +80,23 @@ resource: src/core/
 - `mark_scene_modified()` — 读取 `EditorInterface::get_edited_scene_root()`，无根节点则不置脏；记录根实例 ID
 - `clear_scene_modified()`、`bool is_current_scene_dirty()` — 脏判定要求"有根节点且实例 ID 与记录一致"
 - 消费方：`_get_unsaved_status`（决定编辑器"未保存"标记）
+
+### error_watermark（header-only，命名空间 `godot_autopilot::error_watermark`，08-24 新增）
+
+错误水印 doorbell：AI 客户端无需轮询即可感知"上次调用之后发生了多少个新错误"。
+
+- `record_error(int64_t count = 1)` — 累积待消费错误计数（mutex 保护）
+- `int64_t consume_new_errors()` — 取走并清零累积值（一次性消费语义）
+- `count_response_errors(const mcp::JsonValue&)` — 统计一个响应对象中的错误数：顶层 `error` 字符串计 1；`results` 数组内逐项 `error` 字符串各计 1（覆盖 batch_execute 的子结果）
+- 接线点：编辑器侧在 `register_all.cpp` RegisterTool 回调内对每次工具响应调用 `count_response_errors` 并累入水印，随后把 `consume_new_errors()` 结果作为顶层字段 `new_errors_since_last_call` 附到响应上（含 0 值）；游戏侧 `runtime_ops.cpp` 收到 runtime_error 增量时 `record_error()`
+
+### editor_readiness（命名空间函数，非类，08-24 新增）
+
+导入/扫描就绪门控，避免 reimport 类调用撞上进行中的文件系统扫描：
+
+- `bool is_import_in_progress()` — 经 `EditorInterface::get_resource_filesystem()` 查 `is_scanning()` 与 `is_importing()`（后者以 `has_method` 探测，兼容引擎版本差异）；接口不可用时返回 false
+- `mcp::JsonValue busy_error()` — 构造软错误 `{"error": "editor is currently importing/scanning resources; retry shortly", "retryable": true, "retry_after_ms": 500}`
+- 消费方：`resource_ops` 的 reimport/save 类 handler——导入中且有实际工作量时返回 busy_error，scan 场景幂等跳过
 
 ### ServerContext
 

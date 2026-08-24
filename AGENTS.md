@@ -21,8 +21,9 @@
 - **线程模型**：HTTP 线程（mcp-cpp-sdk 0.3.x 自研网络栈）→ `CommandQueue::submit()` → Godot 主线程（在 `_process()` 中排空）
 - **所有 Godot API 调用必须通过 `queue.submit()`** — 从 HTTP 线程直接调用会崩溃
 - **MCP 端口**：9527，端点 `/mcp`。解析优先级：环境变量 `GODOT_AUTOPILOT_PORT` > `user://godot_autopilot/config.json`（`PluginConfig`，配置面板 Apply 后持久化）> 默认 9527——环境变量优先保证测试/CI 不受面板配置影响
-- **工具注册**：`ToolRegistry` 单一来源。全部工具为 `ToolBase` 对象——336 域工具（26 个 `src/tools/<域>_tools.hpp`，宏 `GDA_TOOL_CLASS` / `GDA_TOOL_CLASS_SIDE` 生成独立子类，`make_tools()` 提供）+ `system_status`（FnTool）+ 7 元工具（`MetaTool`，实现 `IMetaTool` 标记接口即元工具，`ToolRegistry::add()` 经 `dynamic_cast<IMetaTool*>` 自动归类）。catalog/index、BM25 index、`g_handlers`、`g_meta_handlers`、`RegisterTool` 全从 registry 派生
-- **计数口径**：工具总数 343 = 7 元 + 336 领域；`ToolCatalog`/BM25 index 条目 344（= 336 域 + `system_status` + 7 元）。7 元工具 = `ping`/`search_tools`/`list_categories`/`get_tool_detail`/`call_tool`/`batch_execute`/`code_execute`（顶层 MCP 工具）；领域工具经 `call_tool` 代理分发
+- **工具注册**：`ToolRegistry` 单一来源。全部工具为 `ToolBase` 对象——363 域工具（30 个 `src/tools/<域>_tools.hpp`，宏 `GDA_TOOL_CLASS` / `GDA_TOOL_CLASS_SIDE` 生成独立子类，`make_tools()` 提供）+ `system_status`（FnTool）+ 7 元工具（`MetaTool`，实现 `IMetaTool` 标记接口即元工具，`ToolRegistry::add()` 经 `dynamic_cast<IMetaTool*>` 自动归类）。catalog/index、BM25 index、`g_handlers`、`g_meta_handlers`、`RegisterTool` 全从 registry 派生
+- **计数口径**：工具总数 370 = 7 元 + 363 领域；`ToolCatalog`/BM25 index 条目 371（= 363 域 + `system_status` + 7 元）。7 元工具 = `ping`/`search_tools`/`list_categories`/`get_tool_detail`/`call_tool`/`batch_execute`/`code_execute`（顶层 MCP 工具）；领域工具经 `call_tool` 代理分发
+- **错误水印 doorbell**：所有 MCP 响应顶层附 `new_errors_since_last_call`（一次性消费；编辑器侧 error 结果计数 + 游戏侧 runtime_error 计数，`src/core/error_watermark.hpp`）；导入/扫描进行中时 reimport 类调用返回 retryable 软错误（`src/core/editor_readiness.*`）
 - **入口点**：`src/main.cpp` → `GDExtensionEntryPoint` 注册类与 `GodotAutopilotPlugin(EditorPlugin)`；`ServerContext` 由插件 `_enter_tree()` 启动、`_exit_tree()` 停止
 - **关键工具函数**：`VariantJson::serialize/deserialize` (`util/variant_json.hpp`) 用于 `godot::Variant` ↔ `mcp::JsonValue` 互转
 - **错误模式**：领域工具返回 `{"error": "消息"}` JSON；`call_tool` 元工具检查 `error` 字段并设 `is_error = true`
@@ -52,11 +53,11 @@ schema 由 `tool_input_schema(name, basic)` 单一源提供（转发 `build_sche
 
 - **启用**：`GDA_ENABLE_TESTS` 已固化在 `CMakePresets.json` 的 debug/release 预设（默认 ON）——清理或重建 `build/` 后 `uv run build.py` / `cmake --preset debug` 自动恢复测试，无需手动传参（裸 `cmake` 不带 preset 时默认 OFF）
 - **运行**：`ctest --preset debug`（L1 秒级；L2 全量约 2 分钟，需 Godot 路径）；单文件：`build/debug/tests/gda_test_runner.exe --file 01_scene`
-- **结构**：L1 = `gda_unit_tests`（71 个 gtest，不启动引擎，含 344 工具注册管线断言，数量随插件版本变化）；L2 = `gda_test_runner` + `tests/config/*.json`（6 个用例文件，每文件一次 headless 编辑器生命周期最小闭环，经真实 MCP HTTP）
+- **结构**：L1 = `gda_unit_tests`（77 个 gtest，不启动引擎，含 371 工具注册管线断言，数量随插件版本变化）；L2 = `gda_test_runner` + `tests/config/*.json`（6 个用例文件，每文件一次 headless 编辑器生命周期最小闭环，经真实 MCP HTTP）；ctest 测试点共 83 = 77 L1 + 6 L2
 - **新增 JSON 用例 = 新增 `tests/config/*.json`，零 C++ 改动**；schema / CLI / 排除清单全量文档在 `tests/README.md`
 - **Godot 路径**：环境变量 `GODOT_PATH` 或仓库根 `.env`（复制 `.env.template`）；缺失时 L2 全部失败/跳过
-- **全工具遍历**：`03_tools_contract.json` 对 336 领域工具做空参契约 + 启发式冒烟（数量随插件版本变化，以 `*_tools.hpp` 枚举为准；实测约 546 步，以运行时统计为准，约 2-3 分钟）
-- **35 个副作用工具被遍历自动排除**：`GDA_TOOL_CLASS_SIDE` 标记 → `get_tool_detail` 响应携带 `side_effect` 字段 → `tests/runner/traversal.cpp` 依该字段排除并从 `*_tools.hpp` 枚举 336 工具名（无硬编码名单）——新增带副作用的工具标记后即自动进入排除
+- **全工具遍历**：`03_tools_contract.json` 从 30 个域 `*_tools.hpp` 枚举全部 363 领域工具做契约遍历——42 个副作用工具经 `get_tool_detail` 的 `side_effect` 字段排除、**不做空参调用但仍参与枚举**，其余 321 个做空参契约 + 启发式冒烟（数量随插件版本变化，步数以运行时统计为准）
+- **42 个副作用工具被遍历自动排除**：`GDA_TOOL_CLASS_SIDE` 标记 → `get_tool_detail` 响应携带 `side_effect` 字段 → `tests/runner/traversal.cpp` 依该字段排除并从 `*_tools.hpp` 枚举 363 工具名（无硬编码名单）——新增带副作用的工具标记后即自动进入排除
 - **引擎副作用**：L2 运行后 `Example/project.godot` 会被 headless 编辑器自动追加 `[audio]`/`[input]` 等段（可能生成 `default_bus_layout.tres`），无害但弄脏工作区；`git checkout -- Example/project.godot` 清理（生成的 tres 需手动删除）
 
 ## 知识局限
@@ -64,9 +65,8 @@ schema 由 `tool_input_schema(name, basic)` 单一源提供（转发 `build_sche
 - **CI 不跑 L2**：L2 需 Godot 可执行文件（`GODOT_PATH`），CI 仅编译 + L1；Release workflow 亦不重复跑测试（tag 应打在已过 CI 的 commit 上）
 - **schema 覆盖**：非空/空数以运行时统计为准（由 `tests/unit/register_all_test.cpp` 的 `SchemaStatisticsBaseline` 运行时统计断言，不硬编码数量；schema 由 `tool_input_schema(name, basic)` 单一源经 `build_schema_for` 生成）；**3 个契约缺口**：`create_scene_node`（name/type 有默认值不校验必填）、`get_resource_extensions`（缺 type 返回全类型）、`reimport_resource_files`（空参 count=0 静默成功）——遍历测试记 warnings 不 FAIL
 - **目标引擎版本**：Godot 4.7；常见 API 迁移事实：`TileSet.get_tile_data` 属 `TileSetAtlasSource.get_tile_data(source_id→atlas_coords, alternative)`；`AnimatedSprite2D` 属性名为 `sprite_frames`（`frames` 自 4.0 起更名）；`motion_mode` 枚举 GROUNDED=0/FLOATING=1
-- **领域工具分 23 类**（InputMap 并入 Input；`get_debug_object_info` 归 Debug 类）——各类计数以 `docs/wiki/modules/tools_registry.md` 类别分布表为准，改动后需重新核算并同步 README
+- **领域工具分 27 类**（InputMap 并入 Input；`get_debug_object_info` 归 Debug 类）——各类计数以 `docs/wiki/modules/tools_registry.md` 类别分布表为准，改动后需重新核算并同步 README
 - **3 个模块无独立 .hpp**：`environment_ops.cpp`、`display_window_ops.cpp`、`runtime_game_ops.cpp` 分别复用 `render_ops.hpp`/`display_ops.hpp`/`runtime_ops.hpp`
-- **`code_execute.timeout_ms` 无上限钳制**：schema 声称 max 30000，实现仅 `static_cast<int>`；对比 `runtime_game_ops` 有 `GDA_MAX_TIMEOUT_MS` 钳制
 - **DNS rebinding 保护**（mcp-cpp-sdk 0.3.1 起）：HttpServer 默认只允许 Host 为 `localhost`/`127.0.0.1`/`::1` 的请求，其余返回 403（`StreamableHttpServerTransport` 未开放 `allowed_hosts` 配置）——MCP 客户端必须连 `127.0.0.1:9527`，局域网 IP 直连会被拒
 
 ## 协作约定
