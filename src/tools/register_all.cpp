@@ -1,4 +1,5 @@
 #include "register_all.hpp"
+#include "core/error_watermark.hpp"
 #include "core/export_guard.hpp"
 #include "core/log_system.hpp"
 #include <version.hpp>
@@ -31,6 +32,10 @@
 #include "tools/game_tools.hpp"
 #include "tools/property_tools.hpp"
 #include "tools/system_tools.hpp"
+#include "tools/animation_tools.hpp"
+#include "tools/theme_tools.hpp"
+#include "tools/test_tools.hpp"
+#include "tools/analyze_tools.hpp"
 #include "tools/meta_tools.hpp"
 #include "tools/runtime_ops.hpp"
 #include "tools/schema_builder.hpp"
@@ -58,6 +63,9 @@ mcp::JsonValue build_schema_for(const std::string &name) {
         fill_schema_render_audio(m);
         fill_schema_debug_sys(m);
         fill_schema_content(m);
+        fill_schema_animation(m);
+        fill_schema_theme(m);
+        fill_schema_analysis(m);
 
 
         return m;
@@ -275,6 +283,10 @@ auto add_domain_tools = [](auto& make_fn) {
     add_domain_tools(game_tools::make_tools);
     add_domain_tools(property_tools::make_tools);
     add_domain_tools(system_tools::make_tools);
+    add_domain_tools(animation_tools::make_tools);
+    add_domain_tools(theme_tools::make_tools);
+    add_domain_tools(test_tools::make_tools);
+    add_domain_tools(analyze_tools::make_tools);
 
     g_active_registry->add(std::make_unique<::godot_autopilot::MetaTool>(
         ToolMeta{"ping", "Health check ping", "Meta", {"health", "ping"}, true},
@@ -430,9 +442,16 @@ auto add_domain_tools = [](auto& make_fn) {
                 mcp::JsonValue args = ctx.Params().arguments
                     ? *ctx.Params().arguments : mcp::JsonValue(mcp::JsonValue::object_tag);
                 mcp::JsonValue res = g_active_registry->find_meta(meta_name)->execute(args);
+                int64_t new_errors = error_watermark::count_response_errors(res);
+                if (new_errors > 0) {
+                    error_watermark::record_error(new_errors);
+                }
                 mcp::CallToolResult mcp_result;
                 if ((meta_name == "call_tool" || meta_name == "code_execute") && res.Find("error") != nullptr) {
                     mcp_result.is_error = true;
+                }
+                if (res.IsObject()) {
+                    res["new_errors_since_last_call"] = mcp::JsonValue(error_watermark::consume_new_errors());
                 }
                 mcp_result.content.push_back(mcp::TextContent{"text", res.Dump()});
                 return mcp_result;
