@@ -3,6 +3,7 @@
 #include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/os.hpp>
+#include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/classes/time.hpp>
 #include <string>
 
@@ -409,7 +410,13 @@ JV handle_os_move_to_trash(const JV &args) {
   }
 
   std::string path = path_p->GetString();
-  godot::Error err = os->move_to_trash(godot::String(path.c_str()));
+  godot::String os_path(path.c_str());
+  if (auto *ps = godot::ProjectSettings::get_singleton()) {
+    if (os_path.begins_with("res://") || os_path.begins_with("user://")) {
+      os_path = ps->globalize_path(os_path);
+    }
+  }
+  godot::Error err = os->move_to_trash(os_path);
 
   JV r(JV::object_tag);
   r["result"] = JV(static_cast<int64_t>(err));

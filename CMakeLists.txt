@@ -70,6 +70,7 @@ add_library(godot-autopilot SHARED
     src/core/server_context.cpp
     src/core/plugin_config.cpp
     src/core/export_guard.cpp
+    src/core/editor_readiness.cpp
     src/resources/resource_handlers.cpp
     src/resources/debugger_resources.cpp
     src/prompts/prompt_handlers.cpp
@@ -84,6 +85,7 @@ add_library(godot-autopilot SHARED
     src/runtime/game_bridge.cpp
     src/runtime/game_bridge_input.cpp
     src/runtime/game_bridge_eval.cpp
+    src/tools/animation_ops.cpp
     src/tools/audio_ops.cpp
     src/tools/capture_ops.cpp
     src/tools/code_exec_ops.cpp
@@ -93,6 +95,8 @@ add_library(godot-autopilot SHARED
     src/tools/log_ops.cpp
     src/tools/os_ops.cpp
     src/tools/scene_tree_ops.cpp
+    src/tools/theme_ops.cpp
+    src/tools/test_ops.cpp
     src/tools/text_ops.cpp
     src/tools/tilemap_ops.cpp
     src/tools/tileset_ops.cpp
@@ -109,6 +113,8 @@ add_library(godot-autopilot SHARED
     src/tools/property_ops.cpp
     src/tools/register_all.cpp
     src/tools/dispatch.cpp
+    src/tools/analyze_ops.cpp
+    src/tools/schema_animation_ops.cpp
     src/tools/schema_builder.cpp
     src/tools/schema_scene_ops.cpp
     src/tools/schema_editor_config_ops.cpp
@@ -116,6 +122,7 @@ add_library(godot-autopilot SHARED
     src/tools/schema_render_audio_ops.cpp
     src/tools/schema_debug_sys_ops.cpp
     src/tools/schema_content_ops.cpp
+    src/tools/schema_theme_ops.cpp
     src/tools/render_ops.cpp
     src/tools/environment_ops.cpp
     src/tools/resource_ops.cpp

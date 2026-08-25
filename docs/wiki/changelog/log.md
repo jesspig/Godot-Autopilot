@@ -2,6 +2,10 @@
 
 > 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 条。
 
+## 2026-08-24
+
+- **竞品对齐批次 wiki 沉淀**：新建 plans/roadmap.md（竞品定位速记 + P0/P1/P2 交付清单 + P3 遗留）；tools_registry 类别表重算 27 类/363 域、371 条目口径、副作用 42 重分组；core.md 补 error_watermark/editor_readiness 小节；entry_runtime 补 input_sequence/ui_elements op 与 GameBridgeFrameSequence 帧调度；清理被删 debugger 工具死引用；AGENTS.md 数字同步（363/370/371/42/77/83）；reimport 字段名缺口确认已修。详见 `changelog/2026-08-24-log.md`
+
 ## 2026-08-23
 
 - **CI/Release 工作流落地**：新增 `.github/workflows/ci.yml`（develop 触发，三平台 Debug + L1）与 `release.yml`（tag `v*` 触发：tag↔VERSION 校验 → 三平台 Release → 合并 `addons.zip` 发布）；build.py 增 `--package --libs-dir` 跨平台合并打包、gdextension macOS 条目改 universal；preset 设 `CMAKE_OSX_ARCHITECTURES` 双架构；版本升至 **0.2.1**；L1 71/71 验证通过。详见 `changelog/2026-08-23-log.md`

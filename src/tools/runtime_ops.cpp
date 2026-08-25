@@ -2,6 +2,7 @@
 
 #include "core/command_queue.hpp"
 #include "core/config.hpp"
+#include "core/error_watermark.hpp"
 #include "core/log_system.hpp"
 #include "runtime/gda_protocol.hpp"
 #include "tools/capture_ops.hpp"
@@ -328,11 +329,38 @@ mcp::JsonValue finalize_capture_response(const mcp::JsonValue &pending_result) {
   }
 }
 
+mcp::JsonValue game_capture_blocking(int64_t timeout_ms) {
+  if (timeout_ms <= 0)
+    timeout_ms = GDA_DEFAULT_TIMEOUT_MS;
+  if (timeout_ms > GDA_MAX_TIMEOUT_MS)
+    timeout_ms = GDA_MAX_TIMEOUT_MS;
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "capture_editor_viewport delegating to game capture");
+  JV pending = handle_gda_send("capture", JV(JV::object_tag), timeout_ms);
+  if (pending.Contains("error"))
+    return pending;
+  auto *rid_p = pending.Find("__gda_pending");
+  int64_t rid = (rid_p && rid_p->IsInt()) ? rid_p->GetInt() : -1;
+  if (rid < 0)
+    return error_json("unexpected pending state for game capture request");
+  int64_t wait_ms = timeout_ms;
+  if (auto *t = pending.Find("timeout_ms")) {
+    if (t->IsInt() && t->GetInt() > 0)
+      wait_ms = t->GetInt();
+  }
+  JV final_result = wait_pending_response(rid, wait_ms);
+  if (final_result.IsObject() && final_result.Contains("path"))
+    final_result = finalize_capture_response(final_result);
+  return final_result;
+}
+
 void handle_game_response(const std::string &json_str) {
   maybe_recover_break();
   JV parsed = JV::Parse(json_str);
   if (!parsed.IsObject())
     return;
+  if (parsed.Contains("runtime_error"))
+    error_watermark::record_error();
   auto *rid = parsed.Find("request_id");
   if (!rid || !rid->IsInt())
     return;

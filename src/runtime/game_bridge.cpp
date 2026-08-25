@@ -9,6 +9,7 @@
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/engine_debugger.hpp>
 #include <godot_cpp/classes/image.hpp>
+#include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/logger.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/os.hpp>
@@ -420,6 +421,76 @@ JV op_get_tree() {
   return ok_result(JV(state.out));
 }
 
+constexpr int64_t GDA_UI_ELEMENTS_DEFAULT = 100;
+constexpr int64_t GDA_UI_ELEMENTS_MAX = 1000;
+
+struct UiWalkState {
+  JV elements{JV::array_tag};
+  int64_t count = 0;
+  int64_t max_elements = GDA_UI_ELEMENTS_DEFAULT;
+  bool truncated = false;
+};
+
+void walk_ui_elements(godot::Node *node, int depth, UiWalkState &state) {
+  if (state.truncated || depth > MAX_TREE_DEPTH)
+    return;
+  if (auto *ctrl = godot::Object::cast_to<godot::Control>(node)) {
+    if (state.count >= state.max_elements) {
+      state.truncated = true;
+      return;
+    }
+    JV item(JV::object_tag);
+    item["path"] = JV(util::to_std(godot::String(node->get_path())));
+    item["type"] = JV(util::to_std(godot::String(node->get_class())));
+    item["visible"] = JV(ctrl->is_visible_in_tree());
+    godot::Variant text_value = ctrl->get("text");
+    if (text_value.get_type() == godot::Variant::STRING) {
+      item["text"] =
+          JV(util::to_std(static_cast<godot::String>(text_value)));
+    }
+    godot::Rect2 rect = ctrl->get_global_rect();
+    JV position(JV::object_tag);
+    position["x"] = JV(rect.position.x);
+    position["y"] = JV(rect.position.y);
+    JV size(JV::object_tag);
+    size["x"] = JV(rect.size.x);
+    size["y"] = JV(rect.size.y);
+    JV rect_json(JV::object_tag);
+    rect_json["position"] = std::move(position);
+    rect_json["size"] = std::move(size);
+    item["global_rect"] = std::move(rect_json);
+    state.elements.PushBack(std::move(item));
+    state.count++;
+  }
+  int64_t child_count = node->get_child_count();
+  for (int64_t i = 0; i < child_count; i++)
+    walk_ui_elements(node->get_child(i), depth + 1, state);
+}
+
+JV op_ui_elements(const JV &params) {
+  int64_t max_elements = GDA_UI_ELEMENTS_DEFAULT;
+  if (auto *m = params.Find("max_elements")) {
+    if (m->IsInt() && m->GetInt() > 0)
+      max_elements = m->GetInt();
+  }
+  if (max_elements > GDA_UI_ELEMENTS_MAX)
+    max_elements = GDA_UI_ELEMENTS_MAX;
+  godot::SceneTree *tree = get_scene_tree();
+  if (!tree)
+    return error_result("no scene tree");
+  godot::Node *root = tree->get_root();
+  if (!root)
+    return error_result("no root node");
+  UiWalkState state;
+  state.max_elements = max_elements;
+  walk_ui_elements(root, 0, state);
+  JV r(JV::object_tag);
+  r["elements"] = std::move(state.elements);
+  r["count"] = JV(state.count);
+  r["truncated"] = JV(state.truncated);
+  return ok_result(std::move(r));
+}
+
 class GameBridgeListener : public godot::RefCounted {
   GDCLASS(GameBridgeListener, godot::RefCounted)
 
@@ -479,6 +550,10 @@ public:
       body = op_input_wait(params, request_id);
     else if (op == GDA_OP_INPUT_STATUS)
       body = op_input_status(params);
+    else if (op == GDA_OP_INPUT_SEQUENCE)
+      body = op_input_sequence(params, request_id);
+    else if (op == GDA_OP_UI_ELEMENTS)
+      body = op_ui_elements(params);
     else if (op == GDA_OP_CAPTURE)
       body = op_capture(request_id);
     else if (op == GDA_OP_GET_ERRORS)

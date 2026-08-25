@@ -2,6 +2,7 @@
 
 #include "core/config.hpp"
 #include "core/log_system.hpp"
+#include "runtime/gda_protocol.hpp"
 #include "tools/debugger_access.hpp"
 #include "util/error_util.hpp"
 #include <string>
@@ -40,6 +41,22 @@ constexpr const char *INPUT_PARAM_WHITELIST[] = {
 bool is_input_param_allowed(const std::string &key) {
   for (const char *allowed : INPUT_PARAM_WHITELIST) {
     if (key == allowed)
+      return true;
+  }
+  return false;
+}
+
+constexpr size_t SEQUENCE_MAX_ITEMS = 256;
+constexpr int64_t SEQUENCE_FRAME_BUDGET_MS = 33;
+constexpr int64_t SEQUENCE_BASE_TIMEOUT_MS = 2000;
+
+constexpr const char *SEQUENCE_ITEM_KINDS[] = {
+    "key", "mouse_button", "mouse_motion", "action",
+};
+
+bool is_sequence_item_kind(const std::string &kind) {
+  for (const char *allowed : SEQUENCE_ITEM_KINDS) {
+    if (kind == allowed)
       return true;
   }
   return false;
@@ -152,6 +169,68 @@ mcp::JsonValue handle_game_input_status(const mcp::JsonValue &args) {
     }
   }
   return result;
+}
+
+mcp::JsonValue handle_sequence_game_inputs(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "sequence_game_inputs called");
+  auto *inputs_p = args.Find("inputs");
+  if (!inputs_p || !inputs_p->IsArray() || inputs_p->GetArray().empty()) {
+    return error_json(
+        "missing required parameter: inputs (non-empty array of {kind, "
+        "at_frame, ...} input items)");
+  }
+  const auto &items = inputs_p->GetArray();
+  if (items.size() > SEQUENCE_MAX_ITEMS) {
+    return error_json("inputs exceeds maximum of " +
+                      std::to_string(SEQUENCE_MAX_ITEMS) + " items");
+  }
+  int64_t max_at_frame = 0;
+  for (const auto &item : items) {
+    if (!item.IsObject()) {
+      return error_json(
+          "each inputs item must be an object with kind and at_frame");
+    }
+    auto *kind_p = item.Find("kind");
+    if (!kind_p || !kind_p->IsString() ||
+        !is_sequence_item_kind(kind_p->GetString())) {
+      return error_json("each inputs item requires kind "
+                        "(key|mouse_button|mouse_motion|action)");
+    }
+    auto *frame_p = item.Find("at_frame");
+    if (!frame_p || !frame_p->IsInt() || frame_p->GetInt() < 0) {
+      return error_json("each inputs item requires at_frame (non-negative "
+                        "integer physics frame offset)");
+    }
+    if (frame_p->GetInt() > max_at_frame)
+      max_at_frame = frame_p->GetInt();
+  }
+
+  int64_t timeout;
+  if (auto *tp = args.Find("timeout_ms");
+      tp && tp->IsInt() && tp->GetInt() > 0) {
+    timeout = tp->GetInt();
+  } else {
+    timeout =
+        max_at_frame * SEQUENCE_FRAME_BUDGET_MS + SEQUENCE_BASE_TIMEOUT_MS;
+  }
+  if (timeout > GDA_MAX_TIMEOUT_MS)
+    timeout = GDA_MAX_TIMEOUT_MS;
+
+  JV params(JV::object_tag);
+  params["inputs"] = *inputs_p;
+  params["timeout_ms"] = JV(timeout);
+
+  return handle_gda_send(std::string(GDA_OP_INPUT_SEQUENCE), params, timeout);
+}
+
+mcp::JsonValue handle_game_ui_elements(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "get_game_ui_elements called");
+  JV params(JV::object_tag);
+  copy_optional(args, params, "max_elements");
+  return handle_gda_send(std::string(GDA_OP_UI_ELEMENTS), params,
+                         extract_timeout(args));
 }
 
 mcp::JsonValue handle_game_capture(const mcp::JsonValue &args) {

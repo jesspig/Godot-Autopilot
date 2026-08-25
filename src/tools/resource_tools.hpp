@@ -69,12 +69,20 @@ GDA_TOOL_CLASS(SetResourceUidTool, "set_resource_uid",
                "Resources", std::vector<std::string>({"resource", "uid", "set"}), resource_ops::handle_set_uid, true)
 
 GDA_TOOL_CLASS(RemoveResourceFileTool, "remove_resource_file",
-               "Delete a resource file from disk and clear its cached reference so the resource no longer reports a path. This is destructive and irreversible; use rename_resource_file when you want to keep the file. Returns the Godot error code (0 = OK).",
+               "Delete a resource file from disk in a two-stage flow. Without force (default) it is a dry-run impact pre-check: a reverse-reference scan over every .tscn/.tres under res:// (path and uid tokens) returns would_delete plus dependents ({file, matched} objects) and a hint — nothing is deleted, even with zero dependents an explicit force=true is required. With force=true the file is preferentially moved to the OS trash (trashed=true; permanent=true when trash is unavailable or fails), its cached reference path is cleared, the .uid sidecar travels with it (sidecars_removed lists removed sidecar paths) and the editor file system is updated. Use rename_resource_file when you want to keep the file. Returns the Godot error code (0 = OK).",
                "Resources", std::vector<std::string>({"resource", "remove", "delete"}), resource_ops::handle_remove, true)
 
 GDA_TOOL_CLASS(RenameResourceFileTool, "rename_resource_file",
-               "Rename or move a resource file. Accepts path and new_path, with from and to accepted as aliases. The cached resource path, the edited scene file path (when affected) and the editor file system are updated. Returns the Godot error code.",
+               "Rename or move a resource file. Accepts path and new_path, with from and to accepted as aliases. The .uid sidecar travels with the file (the .import sidecar of imported assets migrates alongside it when present), open scenes that equal the file or reference it are automatically saved before the disk rewrite and reloaded afterwards — their undo history resets — path= and uid= tokens in dependent .tscn/.tres files are rewritten, cached resource paths and the edited scene file path migrate, project.godot entries pointing at the old path (application/run/main_scene and autoload/* values, preserving the leading * singleton marker) are remapped and saved, and the editor file system is notified. Returns the Godot error code, updated_files, stale_references as {file, token} objects (token names the literal leftover reference; script_class tokens need scan_editor_file_system after a class_name rename to re-register global classes — see note), uid_preserved, remapped_settings, saved_scenes, reloaded_scenes, unsupported_binary_references ({file, reason} entries for binary resources such as .scn/.res/.csv/.translation that cannot be rewritten in place) and import_sidecar_warning when the .import move fails.",
                "Resources", std::vector<std::string>({"resource", "rename", "move"}), resource_ops::handle_rename, true)
+
+GDA_TOOL_CLASS_SIDE(MoveResourceFileTool, "move_resource_file",
+               "Move a file to another directory inside res:// while keeping its file name, through the same engine-aware transaction pipeline as rename_resource_file: the .uid sidecar travels with the file (.import sidecars migrate too), open scenes that equal the moved file or reference it are automatically saved before the rewrite and reloaded afterwards — their undo history resets — path= and uid= tokens in dependent .tscn/.tres files are rewritten, project.godot entries pointing at the old path (main_scene and autoload/*, preserving the leading * marker) are remapped and saved, cached resource paths and the edited scene file path migrate, and the editor file system is notified per rewritten file. Parameters: path (an existing res:// file or directory) and new_directory (destination directory inside res://, absolute like res://assets/sfx or relative like assets/sfx; trailing slashes are trimmed; user:// is rejected). When path is a directory, every file under it moves recursively preserving the sub-folder layout, *.uid files follow their owners, empty source folders are left behind, and an editor file system scan runs afterwards. Returns moved (array of {from, to, updated_files, uid_preserved}), failed (array of {from, error}), aggregated stale_references as {file, token} objects whose token names the literal leftover reference (script_class tokens require scan_editor_file_system to re-register renamed global classes; see note on each transaction), aggregated unsupported_binary_references ({file, reason} for binary resources such as .scn/.res/.csv/.translation that cannot be rewritten in place), aggregated saved_scenes and reloaded_scenes (scenes saved before each rewrite and reloaded afterwards) and import_sidecar_warnings (array present only when some .import sidecar move failed). Errors when the source does not exist, new_directory targets user://, or a directory move points into its own sub-folder.",
+               "Resources", std::vector<std::string>({"resource", "move", "directory"}), resource_ops::handle_move, true, ::godot_autopilot::SideEffect::WritesFile)
+
+GDA_TOOL_CLASS_SIDE(CreateDirectoryTool, "create_directory",
+               "Create a directory inside the project, including any missing parent directories. path accepts a res:// absolute path (res://assets/audio) or a relative one (assets/audio); user:// is rejected. Idempotent: when the directory already exists the call succeeds and reports already_existed=true instead of failing. A newly created directory triggers an editor file system scan so subsequent resource operations see it immediately. Returns created (the normalized res:// path) and already_existed; errors when the directory cannot be created (invalid path or permission failure).",
+               "Resources", std::vector<std::string>({"resource", "directory", "create"}), resource_ops::handle_create_directory, true, ::godot_autopilot::SideEffect::WritesFile)
 
 GDA_TOOL_CLASS(GetResourceDependenciesTool, "get_resource_dependencies",
                "List the dependencies of a resource file, i.e. the external files it references (textures, scenes, scripts). Use it to audit what a resource needs before moving or deleting files. Returns an array of res:// paths; use has_resource_dependency for a targeted single check.",
@@ -102,7 +110,7 @@ GDA_TOOL_CLASS(GetResourcePropertyTool, "get_resource_property",
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(22);
+  v.reserve(24);
   v.push_back(std::make_unique<LoadResourceTool>());
   v.push_back(std::make_unique<LoadResourceThreadedTool>());
   v.push_back(std::make_unique<GetResourceLoadThreadedStatusTool>());
@@ -119,6 +127,8 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(std::make_unique<SetResourceUidTool>());
   v.push_back(std::make_unique<RemoveResourceFileTool>());
   v.push_back(std::make_unique<RenameResourceFileTool>());
+  v.push_back(std::make_unique<MoveResourceFileTool>());
+  v.push_back(std::make_unique<CreateDirectoryTool>());
   v.push_back(std::make_unique<GetResourceDependenciesTool>());
   v.push_back(std::make_unique<HasResourceDependencyTool>());
   v.push_back(std::make_unique<GetResourceReferencesTool>());

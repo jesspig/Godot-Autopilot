@@ -62,7 +62,7 @@ GDA_TOOL_CLASS_SIDE(KillOsProcessTool, "kill_os_process",
                "OS", std::vector<std::string>({"os", "kill"}), os_ops::handle_os_kill, false, ::godot_autopilot::SideEffect::Process)
 
 GDA_TOOL_CLASS_SIDE(MoveOsFileToTrashTool, "move_os_file_to_trash",
-               "Move a file or folder to the system trash (recycle bin). Use it to delete files safely without permanent removal, leaving a recovery option. Returns a Godot error code (0 means OK); requires 'path' (string). On systems without a trash, deletion may fail.",
+               "Move a file or folder to the system trash (recycle bin). Use it to delete files safely without permanent removal, leaving a recovery option. Supports res:// and user:// project paths (auto-globalized). Returns a Godot error code (0 means OK); requires 'path' (string). On systems without a trash, deletion may fail.",
                "OS", std::vector<std::string>({"os", "trash"}), os_ops::handle_os_move_to_trash, false, ::godot_autopilot::SideEffect::WritesFile)
 
 GDA_TOOL_CLASS_SIDE(SetOsEnvironmentTool, "set_os_environment",
@@ -74,7 +74,7 @@ GDA_TOOL_CLASS_SIDE(OpenOsPathTool, "open_os_path",
                "OS", std::vector<std::string>({"os", "shell"}), os_ops::handle_os_shell_open, false, ::godot_autopilot::SideEffect::Process)
 
 GDA_TOOL_CLASS_SIDE(WriteFileTool, "write_file",
-               "Write or append text content to a file using plain file I/O, bypassing editor resource tracking. Use it for temporary or external files that are not part of the Godot project; project resources should be created through scene or resource tools instead. Requires 'path' and 'content' (strings); optional 'mode' is 'WRITE' (overwrite, default) or 'APPEND'. Returns result 'ok' on success.",
+               "Write or append text content to a file. Paths inside the project (res://) are engine-managed: after writing, the file is synced with the editor file system — imported asset types (images, audio, fonts, 3D models, translations, or any file that already has a .import sidecar) are queued for reimport while plain text files get update_file; script-like files (.gd/.gdshader/.gdshaderinc/.cs) additionally return a diagnostics object reporting whether the written script still loads. External paths (user:// or absolute) are written as plain I/O outside editor tracking and report engine_managed: false. Requires 'path' and 'content' (strings); optional 'mode' is 'WRITE' (overwrite, default) or 'APPEND'. Returns result 'ok', plus engine_managed and action ('reimport' or 'update_file') for managed writes.",
                "OS", std::vector<std::string>({"file", "write"}), text_ops::handle_file_write, true, ::godot_autopilot::SideEffect::WritesFile)
 
 GDA_TOOL_CLASS(ReadFileTool, "read_file",

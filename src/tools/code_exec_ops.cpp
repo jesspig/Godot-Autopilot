@@ -8,12 +8,16 @@
 #include "util/variant_json.hpp"
 #include <cctype>
 #include <chrono>
+#include <algorithm>
+#include <cstdint>
 #include <functional>
 #include <godot_cpp/classes/editor_interface.hpp>
+#include <godot_cpp/classes/editor_undo_redo_manager.hpp>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/gd_script.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
+#include <godot_cpp/classes/undo_redo.hpp>
 #include <godot_cpp/classes/window.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
@@ -26,6 +30,8 @@ namespace {
 
 constexpr int WRAP_HEADER_LINES_SINGLE = 5;
 constexpr int WRAP_HEADER_LINES_MULTI = 5;
+constexpr int CODE_EXEC_DEFAULT_TIMEOUT_MS = 5000;
+constexpr int CODE_EXEC_MAX_TIMEOUT_MS = 30000;
 
 std::string map_line_numbers(const std::string &err_text, int offset,
                              const std::string &tag) {
@@ -143,7 +149,7 @@ mcp::JsonValue extract_structured_error(const std::string &err_text) {
 struct ExecContext {
   std::string source_code;
   std::string func_name;
-  int timeout_ms = 5000;
+  int timeout_ms = CODE_EXEC_DEFAULT_TIMEOUT_MS;
   bool auto_owner = true;
   std::chrono::steady_clock::time_point start_time;
   bool has_func_def = false;
@@ -464,6 +470,25 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
   if (stop && stop->IsBool())
     stop_on_error = stop->GetBool();
 
+  bool rollback_on_error = false;
+  auto *rollback = args.Find("rollback_on_error");
+  if (rollback && rollback->IsBool())
+    rollback_on_error = rollback->GetBool();
+
+  godot::UndoRedo *history = nullptr;
+  uint64_t version_before = 0;
+  if (stop_on_error && rollback_on_error) {
+    auto *editor = godot::EditorInterface::get_singleton();
+    auto *manager = editor ? editor->get_editor_undo_redo() : nullptr;
+    history =
+        manager
+            ? manager->get_history_undo_redo(static_cast<int32_t>(
+                  godot::EditorUndoRedoManager::GLOBAL_HISTORY))
+            : nullptr;
+    if (history)
+      version_before = history->get_version();
+  }
+
   mcp::JsonValue results(mcp::JsonValue::array_tag);
   int succeeded = 0;
   int failed = 0;
@@ -546,6 +571,19 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
                        " (stop_on_error=true); " + std::to_string(skipped) +
                        " remaining operations were not executed. Set "
                        "stop_on_error=false to run all operations.");
+    if (history) {
+      int64_t actions_created =
+          static_cast<int64_t>(history->get_version() - version_before);
+      int64_t rolled_back = 0;
+      for (int64_t i = 0; i < actions_created; ++i) {
+        if (!history->has_undo() || !history->undo())
+          break;
+        ++rolled_back;
+      }
+      r["rolled_back"] = mcp::JsonValue(rolled_back);
+      r["rollback_partial"] =
+          mcp::JsonValue(rolled_back != actions_created);
+    }
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "batch_execute completed");
@@ -571,11 +609,14 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue &args) {
       ctx.func_name = fn->GetString();
   }
 
-  ctx.timeout_ms = 5000;
+  ctx.timeout_ms = CODE_EXEC_DEFAULT_TIMEOUT_MS;
   if (auto *tm = args.Find("timeout_ms")) {
     if (tm->IsInt())
       ctx.timeout_ms = static_cast<int>(tm->GetInt());
   }
+  if (ctx.timeout_ms <= 0)
+    ctx.timeout_ms = CODE_EXEC_DEFAULT_TIMEOUT_MS;
+  ctx.timeout_ms = std::min(ctx.timeout_ms, CODE_EXEC_MAX_TIMEOUT_MS);
 
   ctx.auto_owner = true;
   if (auto *ao = args.Find("auto_owner")) {

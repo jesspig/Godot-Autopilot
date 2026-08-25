@@ -8,7 +8,7 @@ tags:
   - 资源
   - UI
   - 工具库
-timestamp: "2026-08-22T15:10:00+08:00"
+timestamp: "2026-08-24T05:10:00+08:00"
 resource:
   - src/prompts/
   - src/resources/
@@ -18,7 +18,7 @@ resource:
 
 # 支撑模块（src/prompts/、src/resources/、src/ui/、src/util/）
 
-> 审计日期：2026-08-22（2026-08-12 初稿；08-17 随配置面板新增、状态栏移除同步并补 YAML frontmatter；08-22 15 时全量一致性审计——新增 json_godot/rid_registry/type_hint/gdscript_wrap 四个 header-only util 小节、覆盖范围计数 10 组/15 文件、注册入口行号校准），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 审计日期：2026-08-24（2026-08-12 初稿；08-17 随配置面板新增、状态栏移除同步并补 YAML frontmatter；08-22 15 时全量一致性审计——新增 json_godot/rid_registry/type_hint/gdscript_wrap 四个 header-only util 小节、覆盖范围计数 10 组/15 文件、注册入口行号校准；08-24 随竞品对齐批次同步——debugger prompt 引导工具改指 execute_game_script/get_game_log_entries/get_game_status（原 get_debugger_stack_dump/get_debugger_monitors 已删）、BM25 tokenize 补 CJK bigram），基于当前工作树代码逐行核对（不依赖 git 历史）。
 > 覆盖范围：`src/prompts/` 9 组文件（18 个）、`src/resources/` 2 组、`src/ui/` 2 组、`src/util/` 10 组（15 个文件，其中 `scene_path.hpp`/`json_godot.hpp`/`rid_registry.hpp`/`type_hint.hpp`/`gdscript_wrap.hpp` 为 header-only）。注册入口在 `src/core/server_context.cpp:140-143`。
 
 ## 模块简介
@@ -58,9 +58,9 @@ resource:
 | 注册名 | 描述 | 支持参数 | 正文引导使用的工具 |
 |---|---|---|---|
 | `debug-analyze-error` | Analyze a runtime error with full context | `error_text`（追加到文末） | `get_debugger_errors`、`get_debugger_log` |
-| `debug-analyze-breakpoint` | Analyze the current breakpoint context: stack trace, scene tree, and variable state | 无 | `get_debugger_stack_dump`、`get_debugger_scene_tree`、`get_debugger_session_info` |
+| `debug-analyze-breakpoint` | Analyze the current breakpoint context: stack trace, scene tree, and variable state | 无 | `execute_game_script`、`get_game_log_entries`、`get_debugger_scene_tree`、`get_debugger_session_info` |
 | `debug-review-output` | Review the game's output log for issues | `since`（追加到文末） | `get_debugger_log`、`get_debugger_output` |
-| `debug-review-performance` | Review performance monitor data to identify bottlenecks | 无 | `get_debugger_monitors` |
+| `debug-review-performance` | Review performance monitor data to identify bottlenecks | 无 | `get_debug_monitors`、`get_game_status` |
 | `debug-session-status` | Quick summary of the current debug session state | 无 | `get_debugger_session_info` 等 |
 
 ## Resources（15 个 URI，均经 RegisterResource/RegisterResourceTemplate 注册）
@@ -183,7 +183,7 @@ resource:
 | 参数/要点 | 值/行为 |
 |---|---|
 | K1 / B | `1.5` / `0.75`（`static constexpr`） |
-| tokenize | 仅 `isalnum` 字符、转小写、按非字母数字切分；**无词干化、无停用词** |
+| tokenize | ASCII 段按 `isalnum` 切分转小写；**CJK 码点（08-24 起）逐字收集后输出 bigram**（`bm25_index.cpp`，覆盖 0x3400-0x4DBF/0x4E00-0x9FFF/0xF900-0xFAFF 三块），中文查询可用；无词干化、无停用词 |
 | IDF | `ln(1 + (N − df + 0.5) / (df + 0.5))`，df 按候选集内文档去重计数 |
 | 长度归一 | `avg_dl` 为全库平均 token 数（含候选外文档），下限 1.0 |
 | 过滤 | `category` 相等 + `tags` 全包含（原始字符串精确匹配） |

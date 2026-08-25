@@ -31,6 +31,8 @@ mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms);
 
 mcp::JsonValue finalize_capture_response(const mcp::JsonValue &pending_result);
 
+mcp::JsonValue game_capture_blocking(int64_t timeout_ms);
+
 void handle_game_response(const std::string &json_str);
 
 } // namespace runtime_ops

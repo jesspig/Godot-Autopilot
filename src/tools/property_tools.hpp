@@ -17,7 +17,7 @@ GDA_TOOL_CLASS(PropertyGetTool, "property_get",
                "Properties", std::vector<std::string>({"property", "get"}), property_ops::handle_get, true)
 
 GDA_TOOL_CLASS(PropertySetTool, "property_set",
-               "Set a property on a scene node. Requires 'path', 'property' and 'value'. Omit 'type_hint' to infer the Variant type automatically from the property metadata (query property_get_list first for enum ordering). Resource values resolve via {\"path\": \"res://...\"}; memory:// resources are rejected to protect the scene file. Read-only or invalid assignments error; returns 'ok' with an 'undo' entry (old value).",
+               "Set a property on a scene node. Requires 'path', 'property' and 'value'. Omit 'type_hint' to infer the Variant type automatically from the property metadata (query property_get_list first for enum ordering). Resource values resolve via {\"path\": \"res://...\"}; memory:// resources are rejected to protect the scene file. Read-only or invalid assignments error; returns 'ok' with an 'undo' entry (old value) and registers the change with the editor undo stack so Ctrl-Z reverts it (undoable:true), except when the old or new value is an Object reference — then no action is recorded and the response reports undoable:false with undo_skip_reason.",
                "Properties", std::vector<std::string>({"property", "set"}), property_ops::handle_set, true)
 
 GDA_TOOL_CLASS(PropertyGetListTool, "property_get_list",
