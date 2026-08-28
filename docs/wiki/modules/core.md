@@ -6,13 +6,13 @@ tags:
   - 模块
   - 核心层
   - 线程模型
-timestamp: "2026-08-24T05:10:00+08:00"
+timestamp: "2026-08-28"
 resource: src/core/
 ---
 
 # 核心模块（src/core/）
 
-> 审计日期：2026-08-24（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 随配置面板端口持久化同步并补 YAML frontmatter；08-22 随版本号收敛为根 `VERSION` 单一来源同步 MCP 标识引用；08-22 随死代码清理同步——`set_on_new_entry` 回调与 `is_registered` 删除；08-22 15 时全量一致性审计——职责表补 `version.hpp.in`、生命周期步骤修正；08-24 随竞品对齐批次新增 `error_watermark.hpp` 与 `editor_readiness.{hpp,cpp}` 两小节），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 审计日期：2026-08-24（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 随配置面板端口持久化同步并补 YAML frontmatter；08-22 随版本号收敛为根 `VERSION` 单一来源同步 MCP 标识引用；08-22 随死代码清理同步——`set_on_new_entry` 回调与 `is_registered` 删除；08-22 15 时全量一致性审计——职责表补 `version.hpp.in`、生命周期步骤修正；08-24 随竞品对齐批次新增 `error_watermark.hpp` 与 `editor_readiness.{hpp,cpp}` 两小节；08-28 随日志系统增强同步——日志 dock 改名 GDA Log + 配置面板 Show timestamps 开关 + 折叠合并行始终显示最新时间 + ServerContext 诊断日志增强与启动失败真实异常类型透传），基于当前工作树代码逐行核对（不依赖 git 历史）。
 > 覆盖范围：`src/core/` 下 11 组文件。注意：`CommandQueue` 为 header-only（仅 `command_queue.hpp`，无对应 `.cpp`），`error_watermark.hpp` 同为 header-only，实际为 20 个文件。
 
 ## 模块简介
@@ -107,6 +107,7 @@ resource: src/core/
 - `int get_port()` / `bool is_running()` / `const std::string& last_error()`
 - MCP 服务器标识：`mcp::Implementation{"godot-autopilot", GDA_VERSION}`（宏经 `configure_file` 由根 `VERSION` 文件生成，见 `build.md` "版本号单一来源"）
 - 生命周期回调（全部写 Transport 类别日志）：`on_method_called`（Debug）、`on_client_connected` / `on_initialized` / `on_transport_close`（Info）、`on_protocol_error` / `on_transport_error`（Error）
+- 诊断日志增强：初始化 / 注册工具 / 启动传输 / 停止 / 重启等关键流程均补充诊断日志；`start()` 启动失败不再硬编码 "unknown exception"，改为输出捕获到的真实异常类型，便于排查
 - `register_tools()` 注册四类：工具、资源、prompt、调试器专用资源/prompt
 
 ### PluginConfig（命名空间静态方法，非类实例）

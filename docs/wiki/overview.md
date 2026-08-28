@@ -6,7 +6,7 @@ tags:
   - 总览
   - 架构
   - 技术栈
-timestamp: "2026-08-23T01:09:00+08:00"
+timestamp: "2026-08-28"
 resource:
   - README.md
   - src/
@@ -14,7 +14,7 @@ resource:
 
 # 项目总览（Overview）
 
-> 审计日期：2026-08-23（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 补 YAML frontmatter 并复核数值；08-20 随 rename 事务化 + 4 个新工具同步；08-21 随 ToolBase 重构同步；08-22 随代码清理同步——`GDA_LTO` 环境变量移除、gtest 数复核；08-22 15 时全量一致性审计——构建参数双通道澄清、L2 用例 6 份、README ~343 口径对齐；08-23 随 CI/Release 工作流落地同步），基于当前工作树文件与代码逐项核对（不依赖 git 历史）。
+> 审计日期：2026-08-23（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 补 YAML frontmatter 并复核数值；08-20 随 rename 事务化 + 4 个新工具同步；08-21 随 ToolBase 重构同步；08-22 随代码清理同步——`GDA_LTO` 环境变量移除、gtest 数复核；08-22 15 时全量一致性审计——构建参数双通道澄清、L2 用例 6 份、README ~343 口径对齐；08-23 随 CI/Release 工作流落地同步；08-28 随日志系统增强同步——日志 dock 改名 GDA Log + 配置面板 Show timestamps 开关 + 折叠合并行始终显示最新时间 + 启动失败异常类型透传），基于当前工作树文件与代码逐项核对（不依赖 git 历史）。
 > 事实来源：根 `README.md` / `README_zh.md` / `AGENTS.md`、`CMakeLists.txt`、`cmake/FetchDependencies.cmake`、`src/main.cpp`、`src/core/server_context.cpp`、`src/tools/tool_registry.hpp`、`src/tools/*_tools.hpp`、`src/tools/dispatch.cpp`、`src/prompts/prompt_handlers.cpp`、`src/resources/resource_handlers.cpp`、`Example/project.godot`、`Example/docs/`。
 
 ## 项目定位
@@ -78,7 +78,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 
 ### 编辑器 UI
 
-- 自定义底部日志面板 `McpLogDock`（"MCP Log"，按 LogLevel/LogCategory 过滤、文本搜索、折叠重复）。
+- 自定义底部日志面板 `McpLogDock`（"GDA Log"，按 LogLevel/LogCategory 过滤、文本搜索、折叠重复；配置面板 "Show timestamps" 开关控制每条日志时间前缀 `[HH:MM:SS]`（本地时、时分秒），开启时默认生效并经 `user://godot_autopilot/config.json` 的 `show_time` 键持久化；折叠合并重复日志时除条数外始终显示最新一条的 `[HH:MM:SS]`，不受总开关控制）。
 - 右侧配置面板 `McpConfigDock`（"MCP Config"：端口运行时重启 + 持久化、一键生成 8 个客户端 MCP 配置）。
 - `ExportGuard`：导出期间拒绝领域工具调用（返回 `{"error":"editor is exporting; ..."}`）。
 

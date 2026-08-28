@@ -6,7 +6,7 @@ tags:
   - 模块
   - 入口
   - 运行时桥接
-timestamp: "2026-08-24T05:10:00+08:00"
+timestamp: "2026-08-28"
 resource:
   - src/main.cpp
   - src/runtime/
@@ -51,7 +51,7 @@ resource:
 
 1. 日志"plugin starting"，`runtime_ops::set_editor_queue(&queue())` 注入队列，`ModeDetector` 判定 Editor/Runtime 模式写日志。
 2. `gda_cmdline_mode()` 为真则直接 return——不建 UI、不启服务器（队列已在步骤 1 注入）。
-3. 创建 `McpLogDock`（标题 "MCP Log"）`add_dock`。
+3. 创建 `McpLogDock`（标题 "GDA Log"）`add_dock`。
 4. `debugger_ops::create_output_logger()` 经 `OS::add_logger` 注册；`debugger_ops::create_debug_plugin()` 经 `add_debugger_plugin` 注册。
 5. `new (std::nothrow) ServerContext(queue())` 并 `start()`；成功则记 Transport 日志（含端口），失败记 `last_error()`。
 6. 创建 `McpConfigDock` 并 `set_server_context`（面板内显示运行端口/离线状态）`add_dock`。
