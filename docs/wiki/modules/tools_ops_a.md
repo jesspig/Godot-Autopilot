@@ -6,27 +6,27 @@ tags:
   - 模块
   - 领域工具
   - A组
-timestamp: "2026-08-22T15:10:00+08:00"
+timestamp: "2026-08-29T02:35:37+08:00"
 resource: src/tools/
 ---
 
 # 领域工具模块（src/tools/，A 组 13 模块）
 
-> 审计日期：2026-08-22（2026-08-12 初稿；08-17 补 YAML frontmatter；08-20 随 rename 事务化 + 新工具同步；08-21 随 ToolBase 类重构同步——`tool_defs.def`/`TOOL_ENTRY` 移除，注册与计数口径改为 `<域>_tools.hpp`/`ToolRegistry`；08-22 15 时全量一致性审计——editor 计数 23、RENAME_HINTS 10 条、resolve_scene_node/RidStore/rid_from_json/NODE_NOT_FOUND_HINT 归一至 util 共享头、get_docs_class 补 enums/constants），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 审计日期：2026-08-29（2026-08-12 初稿；08-17 补 YAML frontmatter；08-20 随 rename 事务化 + 新工具同步；08-21 随 ToolBase 类重构同步——`tool_defs.def`/`TOOL_ENTRY` 移除，注册与计数口径改为 `<域>_tools.hpp`/`ToolRegistry`；08-22 15 时全量一致性审计——editor 计数 23、RENAME_HINTS 10 条、resolve_scene_node/RidStore/rid_from_json/NODE_NOT_FOUND_HINT 归一至 util 共享头、get_docs_class 补 enums/constants；08-29 随 0.2.2 版本与全量审计同步——336→363、35→42、174→178、26→30 域重核），基于当前工作树代码逐行核对（不依赖 git 历史）。
 > 覆盖范围：`src/tools/` 下 13 对 `.cpp/.hpp`：scene_ops、scene_tree_ops、property_ops、group_ops、input_ops、input_map_ops、physics_ops、nav_ops、resource_ops、script_ops、config_ops、doc_ops、editor_ops。
-> 统计口径：工具数以 `src/tools/*_tools.hpp` 的 `GDA_TOOL_CLASS(`/`GDA_TOOL_CLASS_SIDE(` 声明计数为准（一个工具 = 一个 `ToolBase` 真类，`handle_` 函数与之逐一对应，两口径一致）；注册经 `register_all.cpp` 调用 26 组 `<域>_tools::make_tools()` 汇入单一 `ToolRegistry`。
+> 统计口径：工具数以 `src/tools/*_tools.hpp` 的 `GDA_TOOL_CLASS(`/`GDA_TOOL_CLASS_SIDE(` 声明计数为准（一个工具 = 一个 `ToolBase` 真类，`handle_` 函数与之逐一对应，两口径一致）；注册经 `register_all.cpp` 调用 30 组 `<域>_tools::make_tools()` 汇入单一 `ToolRegistry`。
 
 ## 模块简介
 
 这 13 个模块是领域工具的前半部分：覆盖场景节点操作、属性/信号、分组、输入模拟与 InputMap、物理（2D/3D 双份）、导航、资源生命周期、脚本与 GDScript 执行、项目/引擎/编辑器配置、引擎类文档查询、编辑器会话管理。全部位于命名空间 `godot_autopilot::<模块>_ops`，与 AGENTS.md 约定一致。
 
-26 个 `<域>_tools.hpp` 共声明 **336 个领域工具**（含 35 个以 `GDA_TOOL_CLASS_SIDE(` 标记的副作用工具），本页 13 域占其中 **174 个（51.8%）**。`register_all.cpp` 注册 26 组 `<域>_tools::make_tools()`（另加 `system_status` 1 与 7 个元工具，catalog/index 共 344）汇入单一 `ToolRegistry`，catalog/index/`dispatch::g_handlers`/`server.RegisterTool()` 全部由其派生；领域工具不直接注册到 MCP 服务器，统一经元工具 `call_tool` 分发（见 [../modules/tools_registry.md](../modules/tools_registry.md)）。
+30 个域 `_tools.hpp` 共声明 **363 个领域工具**（含 42 个以 `GDA_TOOL_CLASS_SIDE(` 标记的副作用工具），本页 13 域占其中 **178 个（49.0%）**。`register_all.cpp` 注册 30 组 `<域>_tools::make_tools()`（另加 `system_status` 1 与 7 个元工具，catalog/index 共 371）汇入单一 `ToolRegistry`，catalog/index/`dispatch::g_handlers`/`server.RegisterTool()` 全部由其派生；领域工具不直接注册到 MCP 服务器，统一经元工具 `call_tool` 分发（见 [../modules/tools_registry.md](../modules/tools_registry.md)）。
 
 ## 模块总览
 
 | 模块（命名空间） | handle_ 函数数 | 注册工具数 | 核心职责 |
 |---|---|---|---|
-| `scene_ops` | 4 | 4 | 编辑场景节点创建/删除/实例化/树遍历 |
+| `scene_ops` | 6 | 6 | 编辑场景节点创建/删除/实例化/树遍历 |
 | `scene_tree_ops` | 8 | 8 | SceneTree 层操作：组调用、暂停、定时器 |
 | `property_ops` | 5 | 5 | 节点属性读写、属性列表、信号连接 |
 | `group_ops` | 3 | 3 | 节点分组增删查（可撤销、持久化） |
@@ -34,12 +34,12 @@ resource: src/tools/
 | `input_map_ops` | 8 | 8 | InputMap 运行期动作增删改查与持久化 |
 | `physics_ops` | 48 | 48 | PhysicsServer 2D/3D 对象与空间查询（含挂靠 Debug 类的 `get_debug_object_info`） |
 | `nav_ops` | 15 | 15 | NavigationServer 2D/3D 地图/区域/代理 |
-| `resource_ops` | 22 | 22 | 资源加载/保存/创建/UID/导入/依赖/反查 |
+| `resource_ops` | 24 | 24 | 资源加载/保存/创建/UID/导入/依赖/反查（含 08-24 新增 move_resource_file/create_directory） |
 | `script_ops` | 10 | 10 | GDScript 执行、脚本附加/属性/调用 |
 | `config_ops` | 13 | 13 | ProjectSettings/Engine/EditorSettings |
 | `doc_ops` | 4 | 4 | ClassDB 类/方法/属性文档查询 |
 | `editor_ops` | 23 | 23 | 编辑器会话：选择/场景/撤销/播放/文件系统/C# 构建 |
-| **合计** | **174** | **174** | |
+| **合计** | **178** | **178** | |
 
 ## 公共模式
 
@@ -49,7 +49,7 @@ resource: src/tools/
 - **异常兜底**：`dispatch::call_handler` 对 handler 的 C++ 异常 `catch(...)` 后返回 `{"error": "internal error in tool '<name>'..."}`；导出期间（ExportGuard 置位）所有领域工具返回固定错误 `{"error":"editor is exporting; retry after export completes"}`。
 - **线程**：handler 内部不直接判断线程；`dispatch::call_handler`（`dispatch.cpp`）在非主线程时经 `CommandQueue::submit().get()` 桥接，与 core.md 的线程模型一致。
 
-## scene_ops（4 工具）
+## scene_ops（6 工具）
 
 职责：编辑场景的节点生命周期与树读取。注册工具：
 
@@ -198,7 +198,7 @@ resource: src/tools/
 - 地图创建默认不激活（`map_set_active` 需显式传 `active: true`）；区域创建支持 `enabled`/`navigation_layers` 初始参数。
 - `set_nav_3d_region_navigation_mesh` 接受 `NavigationMesh` 资源（可经 `ResourceLoader` 加载路径传入）；路径返回点为 Vector2/Vector3 数组序列化（`{x,y[,z]}`）。
 
-## resource_ops（22 工具）
+## resource_ops（24 工具）
 
 职责：资源生命周期管理——加载/保存/创建/复制/UID/文件操作/依赖/反查/导入，是资源类工具（Resources 类别）的完整实现。注册工具：
 
@@ -302,10 +302,10 @@ resource: src/tools/
 | 文档 | 声称 | 代码事实 | 判定 |
 |---|---|---|---|
 | AGENTS.md（命名约定） | 工具命名 `<动词>_<类别>_<维度>_<对象>_<修饰>`，动词置首，如 `intersect_physics_2d_ray` | 本组符合；`signal_connect`/`signal_disconnect`（动词置首，无类别段）、config_ops 的 `get_project_settings`/`set_engine_*`/`get_editor_settings`（类别段为 project/engine/editor，与文件名 `config_` 不一致）属规范内的长短变化 | 一致 ✓（动词置首） |
-| AGENTS.md（工具总数） | 336 领域工具 | 26 个 `*_tools.hpp` 恰为 336 个 `GDA_TOOL_CLASS(`/`GDA_TOOL_CLASS_SIDE(`；本页 13 域 174 个 | 一致 ✓ |
+| AGENTS.md（工具总数） | 363 领域工具 | 30 个 `*_tools.hpp` 恰为 363 个 `GDA_TOOL_CLASS(`/`GDA_TOOL_CLASS_SIDE(`；本页 13 域 178 个 | 一致 ✓ |
 | AGENTS.md（错误模式） | 领域工具返回 `{"error": "消息"}` | 一致；另有 `error_detail` 扩展格式与 dispatch `catch(...)` 兜底、导出期固定错误 | 一致 ✓（有扩展） |
 | AGENTS.md（契约缺口 3 项） | `create_scene_node` 不校验必填；`get_resource_extensions` 缺 type 返回全类型；`reimport_resource_files` 空参静默成功 | 三项均在代码中逐一确认（默认 "NewNode"/"Node"；空 type 传 `""`；count=0 返回 queued） | 一致 ✓ |
-| AGENTS.md（遍历排除） | 35 个副作用工具排除 | 35 个副作用工具以 `GDA_TOOL_CLASS_SIDE(` 声明并经 `ISideEffect` 暴露 `side_effect`；遍历经 `get_tool_detail` 返回的 `tool.side_effect` 非空即排除，不再硬编码清单 | 一致 ✓ |
+| AGENTS.md（遍历排除） | 42 个副作用工具排除 | 42 个副作用工具以 `GDA_TOOL_CLASS_SIDE(` 声明并经 `ISideEffect` 暴露 `side_effect`；遍历经 `get_tool_detail` 返回的 `tool.side_effect` 非空即排除，不再硬编码清单 | 一致 ✓ |
 | 命名归属 | 类别前缀应反映模块 | `get_scene_tree` 注册在 scene_ops（非 scene_tree_ops）——旧 `scene_tree_get`/`scene_get_tree` 双名已合并，不再语义重叠 | 已消解 ✓ |
 | AGENTS.md（架构） | 工具经 `call_tool` 代理、`register_all.cpp` 的 `g_handlers` 映射分发 | 工具由 `<域>_tools::make_tools()` 汇入 `ToolRegistry`，`register_all.cpp` 由 registry 派生填充 `g_handlers` 与 catalog；`dispatch.cpp` 非主线程走 `queue.submit()` | 一致 ✓ |
 | `input_ops` | （无文档声明） | `parse_key`/`parse_mouse_button` 对未识别名称返回 `KEY_NONE`/`MOUSE_BUTTON_NONE` 而非报错 | 文档空缺，建议补充 |

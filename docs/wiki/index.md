@@ -15,8 +15,8 @@
 | [modules/core.md](modules/core.md) | 核心层：线程模型、端口、日志、配置常量 | `src/core/` |
 | [modules/entry_runtime.md](modules/entry_runtime.md) | 插件入口与运行时桥接、gda 协议 | `src/main.cpp`、`src/runtime/` |
 | [modules/tools_registry.md](modules/tools_registry.md) | 工具注册管线、元工具、schema 统计、契约缺口 | `src/tools/`（register_all/dispatch/tool_catalog/schema_*） |
-| [modules/tools_ops_a.md](modules/tools_ops_a.md) | 领域工具 A 组（场景/属性/输入/物理/导航/资源/动画/主题/测试/分析等 17 模块，201 工具） | `src/tools/*_ops.cpp` |
-| [modules/tools_ops_b.md](modules/tools_ops_b.md) | 领域工具 B 组（调试/显示/OS/运行时/音频/渲染/瓦片等 18 模块，162 工具） | `src/tools/*_ops.cpp` |
+| [modules/tools_ops_a.md](modules/tools_ops_a.md) | 领域工具 A 组（场景/属性/输入/物理/导航/资源/脚本/配置/文档/编辑器 13 模块，178 工具） | `src/tools/*_ops.cpp` |
+| [modules/tools_ops_b.md](modules/tools_ops_b.md) | 领域工具 B 组（调试/显示/OS/运行时/音频/渲染/瓦片等 18 模块，185 工具；A 178 + B 185 = 363） | `src/tools/*_ops.cpp` |
 | [modules/support.md](modules/support.md) | 提示词、MCP 资源、UI、工具库 | `src/prompts/`、`src/resources/`、`src/ui/`、`src/util/` |
 | [plans/roadmap.md](plans/roadmap.md) | 竞品对齐路线图：竞品定位速览与 P0-P3 批次交付状态 | 全仓库 |
 
@@ -24,7 +24,7 @@
 
 - 工具注册总入口 `ToolRegistry`（单一来源）：**371 条目** = 363 域工具 + `system_status` + 7 元工具；域工具分 **27 类**（InputMap 并入 Input）；MCP 可达工具总数 **370** = 7 元 + 363 域
 - schema：非空/空数以运行时统计为准；**3 个契约缺口**（create_scene_node、get_resource_extensions、reimport_resource_files）
-- 遍历排除 **42 个副作用工具**（枚举 363 / 空参遍历 321）；L1 单元测试 **77 个 gtest**；L2 引擎用例 **6 个文件**（00_meta/01_scene/02_property/03_tools_contract/04_resources_scripts/05_rename_references）；ctest 测试点共 **83**
+- 遍历排除 **42 个副作用工具**（枚举 363 / 空参遍历 321）；L1 单元测试 **77 个 gtest**；L2 引擎用例 **7 个文件**（00_meta/01_scene/02_property/03_tools_contract/04_resources_scripts/05_rename_references/06_move_references）；ctest 测试点共 **84**（77 L1 + 7 L2）
 - 工具命名规范：`<动词>_<类别>_<维度>_<对象>_<修饰>`（动词置首，如 create_scene_node、intersect_physics_2d_ray）
 - MCP 端口 **9527**（`/mcp`），`GODOT_AUTOPILOT_PORT` 可覆盖；产物名 `godot-autopilot`
 

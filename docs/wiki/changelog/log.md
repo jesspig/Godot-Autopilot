@@ -1,6 +1,10 @@
 # 维护日志摘要
 
-> 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 条。
+> 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天。
+
+## 2026-08-29
+
+- **版本 0.2.1 → 0.2.2 与全量知识库审计**：根 `VERSION` 单一来源更新为 `0.2.2`；零代码变更下重核 363 域/42 副作用/371 条目/370 可达/27 类/77 gtest/7 L2/84 ctest/77 .cpp/164 行等全量数值，增量修复 13 个 wiki 页面（overview/build/tests/tools_ops_a/b/tool_base_design/conventions/support/core/entry_runtime/index/example）与 `AGENTS.md`（83→84、6→7 份），frontmatter 与审计日期同步至 2026-08-29；`traversal.cpp` 枚举差异记 `> [!todo]`。详见 `changelog/2026-08-29-log.md`
 
 ## 2026-08-28
 
@@ -26,3 +30,7 @@
 - **遍历副作用排除 `side_effects()` 驱动**：`SideEffect` 扩 6 值（+Process）；`GDA_TOOL_CLASS_SIDE` 变体宏标记 35 个副作用工具；`get_tool_detail` 补 `side_effect` 字段；runner 读该字段排除、删除硬编码 `kExcludedSideEffectTools`。详见 `changelog/2026-08-21-log.md`
 - **元工具接口+组合化**：新增 `IMetaTool` 标记接口 + `MetaTool`（ToolBase+IMetaTool，依赖组合注入）；`ToolRegistry::add()` 按 `dynamic_cast<IMetaTool>` 自动归类（实现接口即元工具）；7 个元工具改以 `MetaTool` 注册；新增 L1 路由断言。详见 `changelog/2026-08-21-log.md`
 - **ToolBase 工具统一标准化全量落地**：新增 `tool_decl.hpp`（真类宏）+ 26 个 `<域>_tools.hpp`，**336 域工具悉数迁移为独立 `ToolBase` 子类**；`tool_defs.def` 删除，catalog(344)/index/分发/RegisterTool 全从 registry 派生。详见 `changelog/2026-08-21-log.md`
+
+## 2026-08-20
+
+- **ToolBase 标准化与 rename 事务化（4 新工具）**：`ToolBase`/`ToolRegistry` 单一来源 + 26 域真类化雏形；`rename_resource_file` 事务化（.uid 伴生、依赖回写、结构化影响报告）、`property_set` NodePath 自动转引用、新增 `get_resource_references`/`read_file`/`find_in_files`/`build_csharp_assembly`（339→343）；`collect_text_file_paths`/`join_path` 规避 `res:///` 三重斜杠；L2 新增 `05_rename_references`，ctest 78/78。详见 `changelog/2026-08-20-log.md`

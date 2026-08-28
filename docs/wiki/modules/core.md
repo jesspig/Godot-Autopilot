@@ -6,14 +6,14 @@ tags:
   - 模块
   - 核心层
   - 线程模型
-timestamp: "2026-08-28"
+timestamp: "2026-08-29T02:35:37+08:00"
 resource: src/core/
 ---
 
 # 核心模块（src/core/）
 
-> 审计日期：2026-08-28（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 随配置面板端口持久化同步并补 YAML frontmatter；08-22 随版本号收敛为根 `VERSION` 单一来源同步 MCP 标识引用；08-22 随死代码清理同步——`set_on_new_entry` 回调与 `is_registered` 删除；08-22 15 时全量一致性审计——职责表补 `version.hpp.in`、生命周期步骤修正；08-24 随竞品对齐批次新增 `error_watermark.hpp` 与 `editor_readiness.{hpp,cpp}` 两小节；08-28 随日志系统增强同步——日志 dock 改名 GDA Log + 配置面板 Show timestamps 开关 + 折叠合并行始终显示最新时间 + ServerContext 诊断日志增强与启动失败真实异常类型透传；08-28 随 SDK 0.3.2 + 默认环回 127.0.0.1 同步），基于当前工作树代码逐行核对（不依赖 git 历史）。
-> 覆盖范围：`src/core/` 下 11 组文件。注意：`CommandQueue` 为 header-only（仅 `command_queue.hpp`，无对应 `.cpp`），`error_watermark.hpp` 同为 header-only，实际为 20 个文件。
+> 审计日期：2026-08-29（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 随配置面板端口持久化同步并补 YAML frontmatter；08-22 随版本号收敛为根 `VERSION` 单一来源同步 MCP 标识引用；08-22 随死代码清理同步——`set_on_new_entry` 回调与 `is_registered` 删除；08-22 15 时全量一致性审计——职责表补 `version.hpp.in`、生命周期步骤修正；08-24 随竞品对齐批次新增 `error_watermark.hpp` 与 `editor_readiness.{hpp,cpp}` 两小节；08-28 随日志系统增强同步——日志 dock 改名 GDA Log + 配置面板 Show timestamps 开关 + 折叠合并行始终显示最新时间 + ServerContext 诊断日志增强与启动失败真实异常类型透传；08-28 随 SDK 0.3.2 + 默认环回 127.0.0.1 同步；08-29 随 0.2.2 版本与全量审计同步（PluginConfig 补 show_time、行号重核）），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 覆盖范围：`src/core/` 下 8 cpp + 12 头共 20 文件（`CommandQueue` 与 `error_watermark` 为 header-only，`version.hpp.in` 为模板，实际 11 业务组 + 版本）。注意：`CommandQueue` 为 header-only（仅 `command_queue.hpp`，无对应 `.cpp`），`error_watermark.hpp` 同为 header-only，`version.hpp.in` 经 `configure_file` 生成 `version.hpp`。
 
 ## 模块简介
 
@@ -33,7 +33,7 @@ resource: src/core/
 | `error_watermark` | `error_watermark.hpp`（header-only） | 错误水印计数器：累积待消费错误数，供 MCP 响应附 `new_errors_since_last_call` doorbell | `register_all.cpp`（响应后处理）、`runtime_ops.cpp`（游戏 runtime_error 计数） |
 | `editor_readiness` | `editor_readiness.cpp/hpp` | 编辑器导入/扫描进行中检测与 retryable 软错误构造，reimport 类工具的门控 | `resource_ops`（reimport/save 类 handler） |
 | `ServerContext` | `server_context.cpp/hpp` | MCP 服务器组装、端口解析、启动/停止/重启、工具/资源/prompt 注册 | `main.cpp` 入口 |
-| `PluginConfig` | `plugin_config.cpp/hpp` | 插件自身配置持久化（`user://godot_autopilot/config.json`，当前仅端口） | `ServerContext` 端口解析、`McpConfigDock` Apply |
+| `PluginConfig` | `plugin_config.cpp/hpp` | 插件自身配置持久化（`user://godot_autopilot/config.json`，当前含 port 与 show_time（Show timestamps 开关持久化，默认 true）） | `ServerContext` 端口解析（`load_port`）、`McpConfigDock` Apply（`save_port`）、`McpLogDock` 时间前缀（`load_show_time`/`save_show_time`） |
 | 版本宏 | `version.hpp.in`（configure_file 模板，生成 `<build>/generated/version.hpp`） | 定义 `GDA_VERSION` 字符串宏，取自根 `VERSION` 文件单一来源 | `server_context.cpp`（MCP `server_info`）、`register_all.cpp`（`system_status.version`） |
 
 ## 关键接口清单
@@ -113,8 +113,10 @@ resource: src/core/
 ### PluginConfig（命名空间静态方法，非类实例）
 
 - `int load_port()` — 读 `user://godot_autopilot/config.json` 的 `port` 键；文件不存在/解析失败/非整数时返回 `-1`（表示未配置）
-- `bool save_port(int port)` — 写回 `{"port": N}`（先 `DirAccess::make_dir_recursive_absolute` 建目录）；失败记 System 类别错误日志并返回 false
-- 消费方：`ServerContext::resolve_port()`（启动时读取）、`McpConfigDock::_on_apply_port()`（Apply 成功后写入）
+- `bool save_port(int port)` — 写回 `{"port": N}`（先 `DirAccess::make_dir_recursive_absolute` 建目录，复用 `save_config_value` 合并写回保留其他键）；失败记 System 类别错误日志并返回 false
+- `bool load_show_time()` — 读 `show_time` 键（`user://godot_autopilot/config.json` 的 `show_time`）；文件不存在/解析失败/非布尔时返回 `true`（默认开启，与配置面板 Show timestamps 开关一致）
+- `bool save_show_time(bool show)` — 写回 `{"show_time": bool}`（同经 `save_config_value` 合并写回）；失败记 System 类别错误日志并返回 false
+- 消费方：`ServerContext::resolve_port()`（启动时 `load_port`）、`McpConfigDock::_on_apply_port()`（Apply 成功后 `save_port`）、`McpLogDock` 时间前缀开关（`load_show_time`/`save_show_time`，配置面板持久化）
 
 ## 线程模型
 

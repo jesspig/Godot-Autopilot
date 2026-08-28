@@ -6,7 +6,7 @@ tags:
   - 构建
   - CMake
   - 部署
-timestamp: "2026-08-28"
+timestamp: "2026-08-29T02:35:37+08:00"
 resource:
   - CMakeLists.txt
   - CMakePresets.json
@@ -16,8 +16,8 @@ resource:
 
 # 构建体系（build）
 
-> 审计日期：2026-08-28（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 补 YAML frontmatter 并复核 add_library 源数量；08-22 随版本号收敛为根 `VERSION` 单一来源同步；08-22 随代码清理同步——Unity 构建接线生效、Lto.cmake 删 `GDA_LTO` 死变量；08-22 15 时全量一致性审计——CMakeLists 行数 157、端口覆盖行号、README ~343 口径对齐；08-23 随 CI/Release 工作流落地同步——新增「CI 与 Release」章节、build.py 行号重核、gdextension macos 条目改 universal；08-28 随 SDK 0.3.2 + 默认环回 127.0.0.1 同步），基于当前工作树文件逐项核对（不依赖 git 历史）。
-> 事实来源：`build.py`（239 行）、`CMakeLists.txt`（157 行）、`CMakePresets.json`、`cmake/` 全部 6 个模块、`.env.template`、根 `README.md` / `README_zh.md` / `AGENTS.md` 构建段、`.github/workflows/{ci,release}.yml`。
+> 审计日期：2026-08-29（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 补 YAML frontmatter 并复核 add_library 源数量；08-22 随版本号收敛为根 `VERSION` 单一来源同步；08-22 随代码清理同步——Unity 构建接线生效、Lto.cmake 删 `GDA_LTO` 死变量；08-22 15 时全量一致性审计——CMakeLists 行数 157、端口覆盖行号、README ~343 口径对齐；08-23 随 CI/Release 工作流落地同步——新增「CI 与 Release」章节、build.py 行号重核、gdextension macos 条目改 universal；08-28 随 SDK 0.3.2 + 默认环回 127.0.0.1 同步；08-29 随 0.2.2 版本发布与全量审计同步（CMakeLists 行数与源数重核 164/77）），基于当前工作树文件逐项核对（不依赖 git 历史）。
+> 事实来源：`build.py`（239 行）、`CMakeLists.txt`（164 行）、`CMakePresets.json`、`cmake/` 全部 6 个模块、`.env.template`、根 `README.md` / `README_zh.md` / `AGENTS.md` 构建段、`.github/workflows/{ci,release}.yml`。
 
 ## 命令速查表
 
@@ -83,7 +83,7 @@ resource:
 
 | job | 内容 |
 |---|---|
-| validate | 校验 tag 与根 `VERSION` 一致（`v0.2.1` ↔ `0.2.1`），不一致 fail |
+| validate | 校验 tag 与根 `VERSION` 一致（`v0.2.2` ↔ `0.2.2`，版本号以根 `VERSION` 为准，当前 0.2.2），不一致 fail |
 | build | 同 CI 环境（Ninja/sccache/msvc-dev-cmd），Release 构建后按精确文件名上传各平台库 artifact（天然排除 pdb） |
 | package | 下载全部 artifact → `python build.py --package --libs-dir dist` 合并 → 重命名为 `addons.zip` → softprops/action-gh-release 发布 |
 
@@ -104,12 +104,12 @@ macOS runner 为 ARM64，preset 设 `CMAKE_OSX_ARCHITECTURES=x86_64;arm64` 编�
 
 ## CMake 目标
 
-`add_library(godot-autopilot SHARED ...)`（`CMakeLists.txt:59-129`）共 **70 个 .cpp**：
+`add_library(godot-autopilot SHARED ...)`（`CMakeLists.txt:64-141`）共 **77 个 .cpp**：
 
 | 目录 | 数量 | 目录 | 数量 |
 |---|---:|---|---:|
-| `src/main.cpp` | 1 | `src/tools/` | 41 |
-| `src/core/` | 7 | `src/util/` | 5 |
+| `src/main.cpp` | 1 | `src/tools/` | 47 |
+| `src/core/` | 8（含 editor_readiness.cpp） | `src/util/` | 5 |
 | `src/resources/` | 2 | `src/ui/` | 2 |
 | `src/prompts/` | 9 | `src/runtime/` | 3 |
 
@@ -164,7 +164,7 @@ version 8；`debug`/`release` 两个 configure 预设：Ninja 生成器、`build
 - 依赖版本 `godot-cpp 10.0.0-rc1` / `mcp-cpp-sdk 0.3.2`、FetchContent 非子模块 ✓（`FetchDependencies.cmake:15,24`）；
 - 编译器优先 Clang/clang-cl、MSVC/GCC 回退 ✓（根 CMakeLists 自动探测 + `CompilerOptions.cmake` 分发）；
 - 优化自适应（sccache/ccache、LTO、Unity、Ninja 作业池）✓；**精度差异**：AGENTS.md 写"可通过 `GDA_COMPILE_JOBS` / `GDA_LINK_JOBS` 等环境变量覆盖"——实际仅这两个支持环境变量，`GDA_UNITY_BATCH_SIZE` 等内存参数只接受 `-D` CACHE；
-- **文档一致性**：`README.md` / `README_zh.md` 工具数口径 "~343 / 23 类"（08-22 审计时由 "~339" 修正）及 [overview.md](./overview.md) 审计（343 = 7 元 + 336 领域；registry/catalog 344 含 `system_status`）一致；`--package` / `--debug` 两个 build.py 参数在 README 构建章节未提及。
+- **文档一致性**：`README.md` / `README_zh.md` 工具数口径 "~370 / 27 类"（08-22 审计时由 "~339" 修正，现随 0.2.2 同步为 370）及 [overview.md](./overview.md) 审计（370 = 7 元 + 363 领域；registry/catalog 371 含 `system_status`）一致；`--package` / `--debug` 两个 build.py 参数在 README 构建章节未提及。
 
 ## 关联页面
 

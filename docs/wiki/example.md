@@ -5,13 +5,13 @@ description: Example 文档/示例工程定位、project.godot 事实、文档�
 tags:
   - 示例工程
   - Example
-timestamp: "2026-08-22T15:10:00+08:00"
+timestamp: "2026-08-29T02:35:37+08:00"
 resource: Example/
 ---
 
 # 示例工程（Example/）
 
-> 审计日期：2026-08-22（2026-08-12 初稿；08-17 补 YAML frontmatter 并核对 project.godot；08-22 15 时全量一致性审计——`[audio]` 段与 `default_bus_layout.tres` 已随清理消失，改注为"L2 运行后可能追加"；PNG 173 与 docs 6 篇复核），基于当前工作树 `Example/` 目录与文档核对。
+> 审计日期：2026-08-29（2026-08-12 初稿；08-17 补 YAML frontmatter 并核对 project.godot；08-22 15 时全量一致性审计——`[audio]` 段与 `default_bus_layout.tres` 已随清理消失，改注为"L2 运行后可能追加"；PNG 173 与 docs 6 篇复核；08-29 随 0.2.2 版本与全量审计同步），基于当前工作树 `Example/` 目录与文档核对。
 > 事实来源：`Example/project.godot`、`Example/docs/`（6 篇）、`Example/assets/` 目录枚举。
 
 ## 定位

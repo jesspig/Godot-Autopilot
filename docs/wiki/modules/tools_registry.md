@@ -6,13 +6,13 @@ tags:
   - 模块
   - 工具注册
   - schema
-timestamp: "2026-08-24T05:10:00+08:00"
+timestamp: "2026-08-29T02:35:37+08:00"
 resource: src/tools/
 ---
 
 # 工具注册表（src/tools/ 注册管线）
 
-> 审计日期：2026-08-24（2026-08-12 初稿；08-17 补 frontmatter；08-20 registry 单一来源重构；08-21 真类化 + def 删除、元工具接口化、副作用驱动遍历排除；08-22 死代码清理与全量一致性审计；08-24 随竞品对齐批次同步——领域工具扩至 363/27 类（+Animation 10、Theme 8、Testing 2、Analysis 3）、副作用 42、删除 get_debugger_stack_dump/get_debugger_monitors、reimport_resource_files 字段名缺口修复、catalog 口径 371）。
+> 审计日期：2026-08-29（2026-08-12 初稿；08-17 补 frontmatter；08-20 registry 单一来源重构；08-21 真类化 + def 删除、元工具接口化、副作用驱动遍历排除；08-22 死代码清理与全量一致性审计；08-24 随竞品对齐批次同步——领域工具扩至 363/27 类（+Animation 10、Theme 8、Testing 2、Analysis 3）、副作用 42、删除 get_debugger_stack_dump/get_debugger_monitors、reimport_resource_files 字段名缺口修复、catalog 口径 371；08-29 随 0.2.2 版本与全量审计同步）。
 > 覆盖范围：`register_all.cpp/hpp`、`dispatch.cpp/hpp`、`tool_catalog.cpp/hpp`、`schema_builder.cpp/hpp`、`schema_fills.hpp`、8 个 `schema_*_ops.cpp`（含 08-24 新增 `schema_animation_ops.cpp`/`schema_theme_ops.cpp`）、`tool_base.hpp`、`tool_registry.hpp`、`fn_tool.hpp`、`tool_decl.hpp`、`meta_tools.hpp`、30 个域 `*_tools.hpp`，对照 `tests/runner/traversal.cpp`、`tests/unit/register_all_test.cpp`、`tests/config/03_tools_contract.json` 与仓库根 `AGENTS.md` 工具段。
 > 相关页面：[测试体系](../tests.md) · [工具实现 B 组](../modules/tools_ops_b.md) · [工具实现 A 组](../modules/tools_ops_a.md) · [入口与运行时](../modules/entry_runtime.md) · [架构总览](../overview.md)
 
