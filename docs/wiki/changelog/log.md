@@ -5,6 +5,7 @@
 ## 2026-08-28
 
 - **日志系统增强（仅日志，未涉及 MCP SDK / 环回绑定）**：日志 dock 标题 "MCP Log" → "GDA Log"；配置面板新增 "Show timestamps" 开关（默认开、show_time 持久化），每条前缀 `[HH:MM:SS]`，折叠合并行始终显示最新时间；ServerContext 关键流程补诊断日志、启动失败透传真实异常类型；call_tool 分发加 Debug 级日志。详见 `changelog/2026-08-28-log.md`
+- **SDK 0.3.1→0.3.2 环回绑定**：支持 `bind_host`/`host`，GDA 默认绑 `127.0.0.1`（`GODOT_AUTOPILOT_HOST` 可覆盖为 `0.0.0.0` 以监听所有接口）。详见 `changelog/2026-08-28-log.md`
 
 ## 2026-08-24
 

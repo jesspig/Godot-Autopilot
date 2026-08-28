@@ -12,7 +12,7 @@ resource: src/core/
 
 # 核心模块（src/core/）
 
-> 审计日期：2026-08-24（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 随配置面板端口持久化同步并补 YAML frontmatter；08-22 随版本号收敛为根 `VERSION` 单一来源同步 MCP 标识引用；08-22 随死代码清理同步——`set_on_new_entry` 回调与 `is_registered` 删除；08-22 15 时全量一致性审计——职责表补 `version.hpp.in`、生命周期步骤修正；08-24 随竞品对齐批次新增 `error_watermark.hpp` 与 `editor_readiness.{hpp,cpp}` 两小节；08-28 随日志系统增强同步——日志 dock 改名 GDA Log + 配置面板 Show timestamps 开关 + 折叠合并行始终显示最新时间 + ServerContext 诊断日志增强与启动失败真实异常类型透传），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 审计日期：2026-08-28（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 随配置面板端口持久化同步并补 YAML frontmatter；08-22 随版本号收敛为根 `VERSION` 单一来源同步 MCP 标识引用；08-22 随死代码清理同步——`set_on_new_entry` 回调与 `is_registered` 删除；08-22 15 时全量一致性审计——职责表补 `version.hpp.in`、生命周期步骤修正；08-24 随竞品对齐批次新增 `error_watermark.hpp` 与 `editor_readiness.{hpp,cpp}` 两小节；08-28 随日志系统增强同步——日志 dock 改名 GDA Log + 配置面板 Show timestamps 开关 + 折叠合并行始终显示最新时间 + ServerContext 诊断日志增强与启动失败真实异常类型透传；08-28 随 SDK 0.3.2 + 默认环回 127.0.0.1 同步），基于当前工作树代码逐行核对（不依赖 git 历史）。
 > 覆盖范围：`src/core/` 下 11 组文件。注意：`CommandQueue` 为 header-only（仅 `command_queue.hpp`，无对应 `.cpp`），`error_watermark.hpp` 同为 header-only，实际为 20 个文件。
 
 ## 模块简介
@@ -100,8 +100,8 @@ resource: src/core/
 
 ### ServerContext
 
-- 构造：持有 `CommandQueue&`，创建 `ToolCatalog` 与 `Bm25Index`，`resolve_port()` 解析端口并写 Transport 日志
-- `bool start()` — 依次：`StreamableHttpServerTransport`（port、`endpoint = "/mcp"`、`stateless = true`、`enable_legacy_sse = false`）→ `mcp::McpServer::Create` → `register_tools()` → `transport_->Start()`；成功后回写 `port_ = http_opts.port`；SDK 自身日志默认关闭（`MCP_LOG_LEVEL` 未设置时为 Off）
+- 构造：持有 `CommandQueue&`，创建 `ToolCatalog` 与 `Bm25Index`，`resolve_port()`/`resolve_host()` 解析端口与主机并写 Transport 日志（默认环回绑定 `127.0.0.1`，env `GODOT_AUTOPILOT_HOST` 可覆盖为 `0.0.0.0` 以监听所有接口）
+- `bool start()` — 依次：`StreamableHttpServerTransport`（`host = resolve_host()` 默认 `127.0.0.1`、`port`、`endpoint = "/mcp"`、`stateless = true`、`enable_legacy_sse = false`）→ `mcp::McpServer::Create` → `register_tools()` → `transport_->Start()`；成功后回写 `port_ = http_opts.port`；SDK 自身日志默认关闭（`MCP_LOG_LEVEL` 未设置时为 Off）
 - `void stop()` — `server_->Close()` + `transport_->Close()`；析构函数对 running 状态兜底调用
 - `bool restart(uint16_t port)` — `stop()` → 更新 `port_` → `start()`；供配置面板运行时改端口（配置面板 Apply 后立即生效，无需重启编辑器）
 - `int get_port()` / `bool is_running()` / `const std::string& last_error()`
@@ -142,6 +142,7 @@ flowchart LR
 
 - `GODOT_AUTOPILOT_PORT`：`resolve_port()` 用 `std::getenv` 读取、`std::atoi` 转换（**无格式校验**）
 - 端口解析优先级：**环境变量 > `PluginConfig::load_port()`（user:// 持久化值，需 > 0）> `GDA_DEFAULT_PORT`（9527）**——环境变量优先保证测试/CI 场景不受面板配置影响
+- `GODOT_AUTOPILOT_HOST`：`resolve_host()` 用 `std::getenv` 读取，非空即生效；默认环回绑定 `127.0.0.1`（SDK 0.3.2 起 `StreamableHttpServerOptions::host`/`bind_host` 支持环回绑定，可覆盖为 `0.0.0.0` 以监听所有接口）
 - 运行时改端口：`ServerContext::restart(uint16_t)`（配置面板 Apply 触发，成功后经 `PluginConfig::save_port` 持久化）
 - `GDA_FORCE_HEADLESS`：强制 headless 相关路径（`main.cpp` 读取）
 
