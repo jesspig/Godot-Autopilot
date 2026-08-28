@@ -29,6 +29,13 @@ int ServerContext::resolve_port() {
   return GDA_DEFAULT_PORT;
 }
 
+std::string ServerContext::resolve_host() {
+  const char *env = std::getenv("GODOT_AUTOPILOT_HOST");
+  if (env && *env)
+    return std::string(env);
+  return "127.0.0.1";
+}
+
 ServerContext::ServerContext(CommandQueue &queue)
     : queue_(queue),
       catalog_(std::make_unique<ToolCatalog>()),
@@ -47,15 +54,17 @@ ServerContext::~ServerContext() {
 
 bool ServerContext::start() {
   try {
-    LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
-                              "MCP server initializing: port=" +
-                                  std::to_string(port_));
-
     mcp::StreamableHttpServerOptions http_opts;
     http_opts.port = static_cast<uint16_t>(port_);
     http_opts.endpoint = "/mcp";
     http_opts.stateless = true;
     http_opts.enable_legacy_sse = false;
+    http_opts.host = resolve_host();
+
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
+                              "MCP server initializing: host=" +
+                                  http_opts.host + " port=" +
+                                  std::to_string(port_));
 
     transport_ =
         std::make_shared<mcp::StreamableHttpServerTransport>(http_opts);
@@ -104,7 +113,8 @@ bool ServerContext::start() {
                               "Tool registration complete");
 
     LogSystem::instance().log(LogLevel::Debug, LogCategory::Transport,
-                              "Starting HTTP transport on port " +
+                              "Starting HTTP transport on " +
+                                  http_opts.host + ":" +
                                   std::to_string(port_));
 
     transport_->Start();
@@ -113,8 +123,8 @@ bool ServerContext::start() {
     running_ = true;
 
     LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
-                              "MCP server started on 0.0.0.0:" +
-                                  std::to_string(port_));
+                              "MCP server started on " + http_opts.host +
+                                  ":" + std::to_string(port_));
     return true;
   } catch (const std::exception &e) {
     last_error_ = "transport start failed: " + std::string(typeid(e).name()) +

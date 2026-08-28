@@ -42,6 +42,7 @@ private:
 
   void register_tools();
   int resolve_port();
+  static std::string resolve_host();
 };
 
 } // namespace godot_autopilot
