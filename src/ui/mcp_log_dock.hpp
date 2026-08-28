@@ -1,6 +1,7 @@
 #ifndef GODOT_AUTOPILOT_MCP_LOG_DOCK_HPP
 #define GODOT_AUTOPILOT_MCP_LOG_DOCK_HPP
 
+#include <chrono>
 #include <cstddef>
 
 #include <godot_cpp/classes/button.hpp>
@@ -33,6 +34,7 @@ class McpLogDock : public godot::EditorDock {
 
   LogSystem *log_system;
   bool collapse = false;
+  bool show_time_ = true;
   static constexpr int LINE_LIMIT = 5000;
   static constexpr float DEFAULT_DOCK_HEIGHT = 200.0f;
   size_t last_index_ = 0;
@@ -45,6 +47,8 @@ public:
 
   void refresh();
   void poll_new_entries();
+  void set_show_time(bool show);
+  static godot::String format_hms(std::chrono::system_clock::time_point tp);
 
   void _notification(int p_what);
 
