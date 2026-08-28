@@ -1,8 +1,13 @@
 #include "mcp_log_dock.hpp"
 
+#include <chrono>
 #include <cstddef>
+#include <cstdio>
+#include <ctime>
 #include <string>
 #include <unordered_map>
+
+#include "core/plugin_config.hpp"
 
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/engine.hpp>
@@ -25,7 +30,8 @@ static const char *LEVEL_TOOLTIPS[4] = {"Toggle visibility of debug messages.",
                                         "Toggle visibility of errors."};
 
 McpLogDock::McpLogDock() : log_system(&LogSystem::instance()) {
-  set_title("MCP Log");
+  set_title("GDA Log");
+  show_time_ = PluginConfig::load_show_time();
   set_icon_name("Node");
   set_default_slot(EditorDock::DOCK_SLOT_BOTTOM);
   set_closable(true);
@@ -114,6 +120,25 @@ McpLogDock::McpLogDock() : log_system(&LogSystem::instance()) {
 }
 
 void McpLogDock::_bind_methods() {}
+
+godot::String McpLogDock::format_hms(std::chrono::system_clock::time_point tp) {
+  std::time_t t = std::chrono::system_clock::to_time_t(tp);
+  std::tm tm{};
+#ifdef _WIN32
+  localtime_s(&tm, &t);
+#else
+  localtime_r(&t, &tm);
+#endif
+  char buf[16];
+  std::snprintf(buf, sizeof(buf), "%02d:%02d:%02d", tm.tm_hour, tm.tm_min,
+                tm.tm_sec);
+  return godot::String(buf);
+}
+
+void McpLogDock::set_show_time(bool show) {
+  show_time_ = show;
+  _rebuild_log();
+}
 
 void McpLogDock::_notification(int p_what) {
   switch (p_what) {
@@ -221,12 +246,16 @@ bool McpLogDock::_add_log_line(const LogEntry &entry, int count) {
     return false;
 
   _apply_entry_style(entry.level);
+  godot::String text;
   if (collapse && count > 1) {
-    log_display->add_text("(" + godot::String::num_int64(count) + ")" +
-                          entry.message.c_str());
+    text = "(" + godot::String::num_int64(count) + ") " + entry.message.c_str() +
+           "  [" + format_hms(entry.timestamp) + "]";
+  } else if (show_time_) {
+    text = "[" + format_hms(entry.timestamp) + "] " + entry.message.c_str();
   } else {
-    log_display->add_text(entry.message.c_str());
+    text = entry.message.c_str();
   }
+  log_display->add_text(text);
   log_display->newline();
   log_display->pop();
 
@@ -307,33 +336,38 @@ void McpLogDock::_rebuild_log() {
       freq[e->message]++;
     }
 
-    std::unordered_map<std::string, int> seg;
+    struct SegInfo {
+      int count = 0;
+      std::chrono::system_clock::time_point last_ts{};
+    };
+    std::unordered_map<std::string, SegInfo> seg;
     for (const auto *e : entries) {
       if (!_check_display(*e))
         continue;
 
       if (freq[e->message] == 1) {
-        for (auto &[msg, cnt] : seg) {
-          if (cnt == 0)
+        for (auto &[msg, info] : seg) {
+          if (info.count == 0)
             continue;
-          auto le = LogEntry{{}, msg_level[msg], msg_cat[msg], msg};
-          _add_log_line(le, cnt);
-          cnt = 0;
+          auto le = LogEntry{info.last_ts, msg_level[msg], msg_cat[msg], msg};
+          _add_log_line(le, info.count);
+          info.count = 0;
         }
-        auto le = LogEntry{
-            {}, msg_level[e->message], msg_cat[e->message], e->message};
+        auto le = LogEntry{e->timestamp, msg_level[e->message],
+                           msg_cat[e->message], e->message};
         _add_log_line(le, 1);
         continue;
       }
 
-      seg[e->message]++;
+      seg[e->message].count++;
+      seg[e->message].last_ts = e->timestamp;
     }
 
-    for (auto &[msg, cnt] : seg) {
-      if (cnt == 0)
+    for (auto &[msg, info] : seg) {
+      if (info.count == 0)
         continue;
-      auto le = LogEntry{{}, msg_level[msg], msg_cat[msg], msg};
-      _add_log_line(le, cnt);
+      auto le = LogEntry{info.last_ts, msg_level[msg], msg_cat[msg], msg};
+      _add_log_line(le, info.count);
     }
   }
 

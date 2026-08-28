@@ -20,7 +20,7 @@
 - **进程内 GDExtension**，在 `MODULE_INITIALIZATION_LEVEL_EDITOR` 阶段加载到 Godot 编辑器
 - **线程模型**：HTTP 线程（mcp-cpp-sdk 0.3.x 自研网络栈）→ `CommandQueue::submit()` → Godot 主线程（在 `_process()` 中排空）
 - **所有 Godot API 调用必须通过 `queue.submit()`** — 从 HTTP 线程直接调用会崩溃
-- **MCP 端口**：9527，端点 `/mcp`。解析优先级：环境变量 `GODOT_AUTOPILOT_PORT` > `user://godot_autopilot/config.json`（`PluginConfig`，配置面板 Apply 后持久化）> 默认 9527——环境变量优先保证测试/CI 不受面板配置影响
+- **MCP 端口**：9527，端点 `/mcp`。解析优先级：环境变量 `GODOT_AUTOPILOT_PORT` > `user://godot_autopilot/config.json`（`PluginConfig`，配置面板 Apply 后持久化）> 默认 9527——环境变量优先保证测试/CI 不受面板配置影响；默认仅绑定 `127.0.0.1`（`GODOT_AUTOPILOT_HOST` 可覆盖为 `0.0.0.0` 以监听所有接口）
 - **工具注册**：`ToolRegistry` 单一来源。全部工具为 `ToolBase` 对象——363 域工具（30 个 `src/tools/<域>_tools.hpp`，宏 `GDA_TOOL_CLASS` / `GDA_TOOL_CLASS_SIDE` 生成独立子类，`make_tools()` 提供）+ `system_status`（FnTool）+ 7 元工具（`MetaTool`，实现 `IMetaTool` 标记接口即元工具，`ToolRegistry::add()` 经 `dynamic_cast<IMetaTool*>` 自动归类）。catalog/index、BM25 index、`g_handlers`、`g_meta_handlers`、`RegisterTool` 全从 registry 派生
 - **计数口径**：工具总数 370 = 7 元 + 363 领域；`ToolCatalog`/BM25 index 条目 371（= 363 域 + `system_status` + 7 元）。7 元工具 = `ping`/`search_tools`/`list_categories`/`get_tool_detail`/`call_tool`/`batch_execute`/`code_execute`（顶层 MCP 工具）；领域工具经 `call_tool` 代理分发
 - **错误水印 doorbell**：所有 MCP 响应顶层附 `new_errors_since_last_call`（一次性消费；编辑器侧 error 结果计数 + 游戏侧 runtime_error 计数，`src/core/error_watermark.hpp`）；导入/扫描进行中时 reimport 类调用返回 retryable 软错误（`src/core/editor_readiness.*`）
@@ -47,7 +47,7 @@ schema 由 `tool_input_schema(name, basic)` 单一源提供（转发 `build_sche
 - **日志类别**（仅此几个）：`System`、`Transport`、`Tools`、`Resources`、`Prompts`
 - **编译器**：优先 Clang/clang-cl，自动检测；MSVC/GCC 回退
 - **优化**：自动 sccache/ccache、LTO（Release 使用 ThinLTO/LTCG/IPO）、Unity 构建、Ninja 作业池 — 均根据硬件自适应，可通过 `GDA_COMPILE_JOBS` / `GDA_LINK_JOBS` 等环境变量覆盖
-- **依赖**：godot-cpp 10.0.0-rc1、mcp-cpp-sdk 0.3.1（0.3.x 起移除 libhv 与 simdjson，改为 SDK 自研网络栈/JSON 解析器） — 使用 FetchContent，不依赖子模块
+- **依赖**：godot-cpp 10.0.0-rc1、mcp-cpp-sdk 0.3.2（0.3.x 起移除 libhv 与 simdjson，改为 SDK 自研网络栈/JSON 解析器） — 使用 FetchContent，不依赖子模块
 
 ## 测试
 
@@ -67,7 +67,7 @@ schema 由 `tool_input_schema(name, basic)` 单一源提供（转发 `build_sche
 - **目标引擎版本**：Godot 4.7；常见 API 迁移事实：`TileSet.get_tile_data` 属 `TileSetAtlasSource.get_tile_data(source_id→atlas_coords, alternative)`；`AnimatedSprite2D` 属性名为 `sprite_frames`（`frames` 自 4.0 起更名）；`motion_mode` 枚举 GROUNDED=0/FLOATING=1
 - **领域工具分 27 类**（InputMap 并入 Input；`get_debug_object_info` 归 Debug 类）——各类计数以 `docs/wiki/modules/tools_registry.md` 类别分布表为准，改动后需重新核算并同步 README
 - **3 个模块无独立 .hpp**：`environment_ops.cpp`、`display_window_ops.cpp`、`runtime_game_ops.cpp` 分别复用 `render_ops.hpp`/`display_ops.hpp`/`runtime_ops.hpp`
-- **DNS rebinding 保护**（mcp-cpp-sdk 0.3.1 起）：HttpServer 默认只允许 Host 为 `localhost`/`127.0.0.1`/`::1` 的请求，其余返回 403（`StreamableHttpServerTransport` 未开放 `allowed_hosts` 配置）——MCP 客户端必须连 `127.0.0.1:9527`，局域网 IP 直连会被拒
+- **DNS rebinding 保护**（mcp-cpp-sdk 0.3.2 起）：HttpServer 默认只允许 Host 为 `localhost`/`127.0.0.1`/`::1` 的请求，其余返回 403（`StreamableHttpServerTransport` 未开放 `allowed_hosts` 配置）——MCP 客户端必须连 `127.0.0.1:9527`，局域网 IP 直连会被拒
 
 ## 协作约定
 

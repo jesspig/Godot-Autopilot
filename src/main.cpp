@@ -119,7 +119,7 @@ void GodotAutopilotPlugin::_enter_tree() {
 
   try {
     log_dock = memnew(godot_autopilot::McpLogDock);
-    log_dock->set_title("MCP Log");
+    log_dock->set_title("GDA Log");
     add_dock(log_dock);
     get_log_system().log(LogLevel::Debug, LogCategory::System,
                          "Bottom log dock registered");
@@ -177,6 +177,7 @@ void GodotAutopilotPlugin::_enter_tree() {
   try {
     config_dock = memnew(godot_autopilot::McpConfigDock);
     config_dock->set_server_context(g_server_ctx);
+    config_dock->set_log_dock(log_dock);
     add_dock(config_dock);
     get_log_system().log(LogLevel::Debug, LogCategory::System,
                          "Right config dock registered");

@@ -6,7 +6,7 @@ tags:
   - 总览
   - 架构
   - 技术栈
-timestamp: "2026-08-23T01:09:00+08:00"
+timestamp: "2026-08-28"
 resource:
   - README.md
   - src/
@@ -14,7 +14,7 @@ resource:
 
 # 项目总览（Overview）
 
-> 审计日期：2026-08-23（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 补 YAML frontmatter 并复核数值；08-20 随 rename 事务化 + 4 个新工具同步；08-21 随 ToolBase 重构同步；08-22 随代码清理同步——`GDA_LTO` 环境变量移除、gtest 数复核；08-22 15 时全量一致性审计——构建参数双通道澄清、L2 用例 6 份、README ~343 口径对齐；08-23 随 CI/Release 工作流落地同步），基于当前工作树文件与代码逐项核对（不依赖 git 历史）。
+> 审计日期：2026-08-28（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 补 YAML frontmatter 并复核数值；08-20 随 rename 事务化 + 4 个新工具同步；08-21 随 ToolBase 重构同步；08-22 随代码清理同步——`GDA_LTO` 环境变量移除、gtest 数复核；08-22 15 时全量一致性审计——构建参数双通道澄清、L2 用例 6 份、README ~343 口径对齐；08-23 随 CI/Release 工作流落地同步；08-28 随日志系统增强同步——日志 dock 改名 GDA Log + 配置面板 Show timestamps 开关 + 折叠合并行始终显示最新时间 + 启动失败异常类型透传；08-28 随 SDK 0.3.2 + 默认环回 127.0.0.1 同步），基于当前工作树文件与代码逐项核对（不依赖 git 历史）。
 > 事实来源：根 `README.md` / `README_zh.md` / `AGENTS.md`、`CMakeLists.txt`、`cmake/FetchDependencies.cmake`、`src/main.cpp`、`src/core/server_context.cpp`、`src/tools/tool_registry.hpp`、`src/tools/*_tools.hpp`、`src/tools/dispatch.cpp`、`src/prompts/prompt_handlers.cpp`、`src/resources/resource_handlers.cpp`、`Example/project.godot`、`Example/docs/`。
 
 ## 项目定位
@@ -78,7 +78,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 
 ### 编辑器 UI
 
-- 自定义底部日志面板 `McpLogDock`（"MCP Log"，按 LogLevel/LogCategory 过滤、文本搜索、折叠重复）。
+- 自定义底部日志面板 `McpLogDock`（"GDA Log"，按 LogLevel/LogCategory 过滤、文本搜索、折叠重复；配置面板 "Show timestamps" 开关控制每条日志时间前缀 `[HH:MM:SS]`（本地时、时分秒），开启时默认生效并经 `user://godot_autopilot/config.json` 的 `show_time` 键持久化；折叠合并重复日志时除条数外始终显示最新一条的 `[HH:MM:SS]`，不受总开关控制）。
 - 右侧配置面板 `McpConfigDock`（"MCP Config"：端口运行时重启 + 持久化、一键生成 8 个客户端 MCP 配置）。
 - `ExportGuard`：导出期间拒绝领域工具调用（返回 `{"error":"editor is exporting; ..."}`）。
 
@@ -88,7 +88,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 |---|---|---|
 | 引擎 | Godot 4.x GDExtension（目标 4.7，见 `Example/project.godot` features） | — |
 | 绑定层 | godot-cpp，GIT_TAG `10.0.0-rc1` | `cmake/FetchDependencies.cmake` |
-| MCP 协议 | mcp-cpp-sdk（modelcontextprotocol-cpp-sdk），GIT_TAG `0.3.1`，仓库 `jesspig/modelcontextprotocol-cpp-sdk` | 同上 |
+| MCP 协议 | mcp-cpp-sdk（modelcontextprotocol-cpp-sdk），GIT_TAG `0.3.2`，仓库 `jesspig/modelcontextprotocol-cpp-sdk` | 同上 |
 | HTTP / 异步 | mcp-cpp-sdk 自研网络栈（内部 HTTP 线程） | mcp-cpp-sdk 内置（0.3.x 起移除 libhv） |
 | JSON | mcp::JsonValue（SDK 内置，自研解析器） | mcp-cpp-sdk 内置（0.3.x 起移除 simdjson） |
 | 构建 | CMake 3.28+（`cmake_minimum_required(3.28...4.2)`）、C++17、Ninja 预设（`debug`/`release`） | 根 `CMakeLists.txt`、`CMakePresets.json` |
@@ -148,15 +148,15 @@ flowchart LR
 |---|---|
 | 命名空间 | `godot_autopilot`（部分子模块用子命名空间，如 `dispatch`、`resource_registry`、`scene_dirty_tracker`、`runtime::game_bridge`） |
 | 工具命名 | `<动词>_<类别>_<维度>_<对象>_<修饰>`（动词置首，snake_case，如 `intersect_physics_2d_ray`、`create_scene_node`、`set_input_map_action_deadzone`） |
-| 代码前缀 | 常量 `GDA_`（如 `GDA_DEFAULT_PORT`）；运行时环境变量 `GODOT_AUTOPILOT_PORT`、`GDA_FORCE_HEADLESS` |
+| 代码前缀 | 常量 `GDA_`（如 `GDA_DEFAULT_PORT`）；运行时环境变量 `GODOT_AUTOPILOT_PORT`/`GODOT_AUTOPILOT_HOST`、`GDA_FORCE_HEADLESS` |
 | 产物 | `godot-autopilot`（库名/插件目录/`.gdextension` 名） |
-| 端口 | 9527（`GDA_DEFAULT_PORT`，`config.hpp`），`GODOT_AUTOPILOT_PORT` 环境变量覆盖，端点 `/mcp`（`server_context.cpp`） |
+| 端口 | 9527（`GDA_DEFAULT_PORT`，`config.hpp`），`GODOT_AUTOPILOT_PORT` 环境变量覆盖，端点 `/mcp`；默认仅绑定 `127.0.0.1`（`GODOT_AUTOPILOT_HOST` 可覆盖为 `0.0.0.0`，`server_context.cpp:resolve_host()`，SDK 0.3.2 `host`/`bind_host`） |
 
 ## 关键数字速查
 
 | 项 | 值 |
 |---|---|
-| MCP 端口 / 端点 | 9527 / `/mcp`（环境变量 `GODOT_AUTOPILOT_PORT` 覆盖） |
+| MCP 端口 / 端点 | 9527 / `/mcp`（环境变量 `GODOT_AUTOPILOT_PORT` 覆盖；默认仅绑定 `127.0.0.1`，`GODOT_AUTOPILOT_HOST` 可覆盖为 `0.0.0.0`） |
 | 工具总数 | 343 = 7 元 + 336 领域（领域 23 类别）；ToolCatalog/index 344 条目 |
 | 提示词 / 资源 | 7 模板 / 15 资源 |
 | 日志类别 | 5（System / Transport / Tools / Resources / Prompts） |

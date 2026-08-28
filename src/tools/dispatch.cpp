@@ -1,4 +1,5 @@
 #include "core/command_queue.hpp"
+#include "core/log_system.hpp"
 #include "tools/dispatch.hpp"
 #include "tools/runtime_ops.hpp"
 #include <mcp/Content.hpp>
@@ -13,31 +14,34 @@ namespace {
 
 mcp::JsonValue call_handler_impl(const std::string &name,
                                  const mcp::JsonValue &args) {
+  mcp::JsonValue result(mcp::JsonValue::object_tag);
   auto it = g_handlers.find(name);
   if (it != g_handlers.end()) {
     try {
-      return it->second(args);
+      result = it->second(args);
     } catch (...) {
       std::string args_dump = args.Dump();
       if (args_dump.size() > 256) {
         args_dump.resize(256);
       }
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue("internal error in tool '" + name +
-                                  "': unexpected C++ exception (args: " +
-                                  args_dump + ")");
-      return e;
+      result = mcp::JsonValue(mcp::JsonValue::object_tag);
+      result["error"] = mcp::JsonValue("internal error in tool '" + name +
+                                       "': unexpected C++ exception (args: " +
+                                       args_dump + ")");
     }
+  } else if (auto meta_it = g_meta_handlers.find(name); meta_it != g_meta_handlers.end()) {
+    result = meta_it->second(args);
+  } else {
+    result = mcp::JsonValue(mcp::JsonValue::object_tag);
+    result["error"] =
+        mcp::JsonValue("domain tool '" + name +
+                       "' not found — use search_tools to discover available "
+                       "tools");
   }
-  if (auto meta_it = g_meta_handlers.find(name); meta_it != g_meta_handlers.end()) {
-    return meta_it->second(args);
-  }
-  mcp::JsonValue e(mcp::JsonValue::object_tag);
-  e["error"] =
-      mcp::JsonValue("domain tool '" + name +
-                     "' not found — use search_tools to discover available "
-                     "tools");
-  return e;
+  bool has_error = result.IsObject() && result.Find("error") != nullptr;
+  LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
+      "call_tool: " + name + " -> " + (has_error ? "error" : "ok"));
+  return result;
 }
 
 } // namespace

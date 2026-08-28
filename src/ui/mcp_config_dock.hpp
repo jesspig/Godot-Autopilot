@@ -5,10 +5,12 @@
 #include <godot_cpp/classes/editor_dock.hpp>
 #include <godot_cpp/classes/label.hpp>
 #include <godot_cpp/classes/option_button.hpp>
+#include <godot_cpp/classes/check_box.hpp>
 #include <godot_cpp/classes/spin_box.hpp>
 
 #include "../core/server_context.hpp"
 #include "../util/client_config_gen.hpp"
+#include "ui/mcp_log_dock.hpp"
 
 namespace godot_autopilot {
 
@@ -22,6 +24,9 @@ class McpConfigDock : public godot::EditorDock {
   godot::Button *generate_button;
   godot::Label *result_label;
 
+  godot::CheckBox *show_time_check = nullptr;
+  McpLogDock *log_dock_ = nullptr;
+
   ServerContext *server_ctx = nullptr;
 
 protected:
@@ -31,12 +36,14 @@ public:
   McpConfigDock();
 
   void set_server_context(ServerContext *ctx);
+  void set_log_dock(McpLogDock *dock);
 
 private:
   void _on_apply_port();
   void _on_generate();
   void _refresh_status();
   void _report(const godot::String &text, const godot::Color &color);
+  void _on_show_time_toggled(bool checked);
 };
 
 } // namespace godot_autopilot
