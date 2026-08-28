@@ -11,6 +11,8 @@
 #include "tools/tool_catalog.hpp"
 #include "util/bm25_index.hpp"
 #include <cstdlib>
+#include <exception>
+#include <typeinfo>
 #include <mcp/Content.hpp>
 #include <mcp/server/ServerOptions.hpp>
 
@@ -45,6 +47,10 @@ ServerContext::~ServerContext() {
 
 bool ServerContext::start() {
   try {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
+                              "MCP server initializing: port=" +
+                                  std::to_string(port_));
+
     mcp::StreamableHttpServerOptions http_opts;
     http_opts.port = static_cast<uint16_t>(port_);
     http_opts.endpoint = "/mcp";
@@ -89,7 +95,17 @@ bool ServerContext::start() {
       return false;
     }
 
+    LogSystem::instance().log(LogLevel::Debug, LogCategory::Transport,
+                              "Registering tools/catalog/resources/prompts...");
+
     register_tools();
+
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
+                              "Tool registration complete");
+
+    LogSystem::instance().log(LogLevel::Debug, LogCategory::Transport,
+                              "Starting HTTP transport on port " +
+                                  std::to_string(port_));
 
     transport_->Start();
 
@@ -101,12 +117,20 @@ bool ServerContext::start() {
                                   std::to_string(port_));
     return true;
   } catch (const std::exception &e) {
-    last_error_ = "transport start failed: " + std::string(e.what());
+    last_error_ = "transport start failed: " + std::string(typeid(e).name()) +
+                  ": " + std::string(e.what());
     LogSystem::instance().log(LogLevel::Error, LogCategory::Transport,
                               "MCP server start failed: " + last_error_);
     return false;
   } catch (...) {
-    last_error_ = "transport start failed: unknown exception";
+    std::string detail = "non-std exception";
+    try {
+      std::rethrow_exception(std::current_exception());
+    } catch (const std::exception &e) {
+      detail = std::string(typeid(e).name()) + ": " + std::string(e.what());
+    } catch (...) {
+    }
+    last_error_ = "transport start failed: " + detail;
     LogSystem::instance().log(LogLevel::Error, LogCategory::Transport,
                               "MCP server start failed: " + last_error_);
     return false;
@@ -118,6 +142,9 @@ void ServerContext::stop() {
     return;
   running_ = false;
 
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
+                            "MCP server stopping");
+
   server_->Close();
   transport_->Close();
 
@@ -126,6 +153,9 @@ void ServerContext::stop() {
 }
 
 bool ServerContext::restart(uint16_t port) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
+                            "MCP server restart requested on port " +
+                                std::to_string(port));
   stop();
   port_ = port;
   return start();
