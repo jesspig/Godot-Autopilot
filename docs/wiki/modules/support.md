@@ -8,7 +8,7 @@ tags:
   - 资源
   - UI
   - 工具库
-timestamp: "2026-08-28"
+timestamp: "2026-08-29T02:35:37+08:00"
 resource:
   - src/prompts/
   - src/resources/
@@ -18,7 +18,7 @@ resource:
 
 # 支撑模块（src/prompts/、src/resources/、src/ui/、src/util/）
 
-> 审计日期：2026-08-24（2026-08-12 初稿；08-17 随配置面板新增、状态栏移除同步并补 YAML frontmatter；08-22 15 时全量一致性审计——新增 json_godot/rid_registry/type_hint/gdscript_wrap 四个 header-only util 小节、覆盖范围计数 10 组/15 文件、注册入口行号校准；08-24 随竞品对齐批次同步——debugger prompt 引导工具改指 execute_game_script/get_game_log_entries/get_game_status（原 get_debugger_stack_dump/get_debugger_monitors 已删）、BM25 tokenize 补 CJK bigram；08-28 随日志系统增强同步——日志 dock 改名 GDA Log + 配置面板 Show timestamps 开关 + 折叠合并行始终显示最新时间 + 启动失败异常类型透传），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 审计日期：2026-08-29（2026-08-12 初稿；08-17 随配置面板新增、状态栏移除同步并补 YAML frontmatter；08-22 15 时全量一致性审计——新增 json_godot/rid_registry/type_hint/gdscript_wrap 四个 header-only util 小节、覆盖范围计数 10 组/15 文件、注册入口行号校准；08-24 随竞品对齐批次同步——debugger prompt 引导工具改指 execute_game_script/get_game_log_entries/get_game_status（原 get_debugger_stack_dump/get_debugger_monitors 已删）、BM25 tokenize 补 CJK bigram；08-28 随日志系统增强同步；08-29 随 0.2.2 版本与全量审计同步），基于当前工作树代码逐行核对（不依赖 git 历史）。
 > 覆盖范围：`src/prompts/` 9 组文件（18 个）、`src/resources/` 2 组、`src/ui/` 2 组、`src/util/` 10 组（15 个文件，其中 `scene_path.hpp`/`json_godot.hpp`/`rid_registry.hpp`/`type_hint.hpp`/`gdscript_wrap.hpp` 为 header-only）。注册入口在 `src/core/server_context.cpp:140-143`。
 
 ## 模块简介

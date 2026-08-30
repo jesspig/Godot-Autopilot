@@ -6,7 +6,7 @@ tags:
   - 模块
   - 领域工具
   - B组
-timestamp: "2026-08-24T05:10:00+08:00"
+timestamp: "2026-08-29T02:35:37+08:00"
 resource: src/tools/
 ---
 
@@ -14,7 +14,7 @@ resource: src/tools/
 
 > 覆盖 `src/tools/` 下 18 个 `.cpp` handler 模块：debug_ops、debugger_ops、debugger_access、display_ops、display_window_ops、os_ops、runtime_ops、runtime_game_ops、audio_ops、render_ops、environment_ops、text_ops、tilemap_ops、tileset_ops、spriteframes_ops、code_exec_ops、log_ops、capture_ops。
 >
-> 工具总数（全系统）：**371**（`ToolRegistry`/catalog/index 口径）= **363 个领域工具**（30 个域 `*_tools.hpp` 以 `GDA_TOOL_CLASS(`/`GDA_TOOL_CLASS_SIDE(` 声明，经 `register_all.cpp` 注册各域 `<域>_tools::make_tools()`）+ `system_status` 1 + **7 个元工具**。本页 B 组占其中 **162 个领域工具**（debugger −2 死工具与 game +2 新工具相抵）；`code_execute`/`batch_execute` 为元工具经 `server.RegisterTool()` 直连、`system_status` 单独注册。数量以 `src/tools/*_tools.hpp` 声明与 `ToolRegistry` 运行时注册为准。
+> 工具总数（全系统）：**371**（`ToolRegistry`/catalog/index 口径）= **363 个领域工具**（30 个域 `*_tools.hpp` 以 `GDA_TOOL_CLASS(`/`GDA_TOOL_CLASS_SIDE(` 声明，经 `register_all.cpp` 注册各域 `<域>_tools::make_tools()`）+ `system_status` 1 + **7 个元工具**。本页 B 组占其中 **185 个领域工具**（A 组 178 + B 组 185 = 363）；`code_execute`/`batch_execute` 为元工具经 `server.RegisterTool()` 直连、`system_status` 单独注册。数量以 `src/tools/*_tools.hpp` 声明与 `ToolRegistry` 运行时注册为准。
 >
 > 相关页面：[工具注册表](../modules/tools_registry.md) · [运行时通道](../modules/entry_runtime.md)
 
@@ -38,7 +38,7 @@ resource: src/tools/
 | `code_exec_ops.cpp` | `godot_autopilot::code_exec_ops` | —（元工具，不经 `*_tools.hpp`，不计入合计） | 2 |
 | `log_ops.cpp` | `godot_autopilot::log_ops` | `system_tools.hpp` | 1 |
 | `capture_ops.cpp` | `godot_autopilot::capture_ops` | `capture_tools.hpp` | 1 |
-| **合计（领域工具）** | | | **162** |
+| **合计（领域工具）** | | | **185** |
 
 注：`environment_ops.cpp`、`display_window_ops.cpp`、`runtime_game_ops.cpp` 没有独立 hpp，handler 函数声明复用 `render_ops.hpp`、`display_ops.hpp`、`runtime_ops.hpp`；工具类声明统一落在对应 `<域>_tools.hpp`（分别为 `render_tools.hpp`/`display_tools.hpp`/`game_tools.hpp`），`make_tools()` 产出 `ToolBase` 实例。显示（24）/渲染（49）两模块的 `_ops.cpp` 与 `_tools.hpp` 归并方式见上表。
 

@@ -6,7 +6,7 @@ tags:
   - 模块
   - 入口
   - 运行时桥接
-timestamp: "2026-08-28"
+timestamp: "2026-08-29T02:35:37+08:00"
 resource:
   - src/main.cpp
   - src/runtime/
@@ -14,7 +14,7 @@ resource:
 
 # 模块：入口与运行时桥接（entry_runtime）
 
-覆盖代码：`src/main.cpp`（321 行）与 `src/runtime/`（`gda_protocol.hpp` 53 行、`game_bridge.hpp` 47 行、`game_bridge.cpp` 656 行、`game_bridge_input.cpp` 875 行、`game_bridge_eval.cpp` 427 行）。
+覆盖代码：`src/main.cpp`（322 行）与 `src/runtime/`（`gda_protocol.hpp` 53 行、`game_bridge.hpp` 47 行、`game_bridge.cpp` 656 行、`game_bridge_input.cpp` 875 行、`game_bridge_eval.cpp` 427 行）。
 
 职责全景：`main.cpp` 是 GDExtension 的导出入口与编辑器插件本体；`src/runtime/` 是在**游戏运行时进程**内与编辑器进程通信的桥接层，通过 EngineDebugger 消息通道承载 GDA 协议。编辑器内的 MCP 服务器（`ServerContext`）与运行时桥接是两条相互独立的消息通路，本页只覆盖入口生命周期与运行时桥接，MCP 工具侧见相关模块页。
 
