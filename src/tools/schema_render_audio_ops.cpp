@@ -6,7 +6,8 @@ namespace godot_autopilot {
 void fill_schema_render_audio(std::unordered_map<std::string, mcp::JsonValue>& m) {
 
         m["capture_editor_viewport"] = schema::build_schema({
-            {"target", "string", "Target to capture; only 'editor' is supported (default), which grabs the 2D viewport with a fallback to the 3D viewport. 'game' is not implemented, use capture_game_viewport for the running game instead", false},
+            {"target", "string", "Target to capture: 'editor' (default) grabs the editor 2D viewport with a fallback to the 3D viewport; 'game' captures the running game's root window over the runtime channel — requires a game launched from the editor whose project loads the godot-autopilot extension", false},
+            {"timeout_ms", "integer", "Response timeout in milliseconds for target='game' (default: 5000, max: 30000); ignored for target='editor'", false},
         });
 
         m["create_render_canvas_item"] = schema::build_schema({});

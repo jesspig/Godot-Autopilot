@@ -147,3 +147,58 @@ TEST(Bm25IndexTest, SizeCountsEntries) {
   idx.add_entry("b", "desc b", "C", {});
   EXPECT_EQ(idx.size(), 3u);
 }
+
+TEST(Bm25IndexTest, ChineseTagQueryMatchesEntryWithPositiveScore) {
+  Bm25Index idx;
+  idx.add_entry("create_animation", "Create animation player node",
+                "Animation", {"动画", "补间"});
+  idx.add_entry("audio_play", "Play audio stream", "Audio", {"声音"});
+  auto results = idx.search(make_text_query("动画"));
+  ASSERT_EQ(results.size(), 1u);
+  EXPECT_EQ(results[0].name, "create_animation");
+  EXPECT_GT(results[0].score, 0.0);
+}
+
+TEST(Bm25IndexTest, ChineseNameQueryRanksExactNameAbovePartialOverlap) {
+  Bm25Index idx;
+  idx.add_entry("创建动画节点", "misc filler text", "Misc", {});
+  idx.add_entry("tween_helper", "创建 misc filler text", "Misc", {});
+  auto results = idx.search(make_text_query("创建动画"));
+  ASSERT_EQ(results.size(), 2u);
+  EXPECT_EQ(results[0].name, "创建动画节点");
+  EXPECT_GT(results[0].score, results[1].score);
+}
+
+TEST(Bm25IndexTest, SingleCjkCharQueryReturnsEmpty) {
+  Bm25Index idx;
+  idx.add_entry("动画工具", "misc filler text", "Misc", {});
+  EXPECT_TRUE(idx.search(make_text_query("动")).empty());
+}
+
+TEST(Bm25IndexTest, MixedAsciiAndCjkQueryHitsAcrossScripts) {
+  Bm25Index idx;
+  idx.add_entry("play_audio", "Play audio stream", "Audio", {"播放"});
+  idx.add_entry("create_sprite", "Create sprite frames", "Sprite", {});
+  auto results = idx.search(make_text_query("play 播放"));
+  ASSERT_FALSE(results.empty());
+  EXPECT_EQ(results[0].name, "play_audio");
+  EXPECT_GT(results[0].score, 0.0);
+}
+
+TEST(Bm25IndexTest, InvalidUtf8QueryBytesAreIgnored) {
+  Bm25Index idx;
+  idx.add_entry("audio_play", "Play audio stream", "Audio", {"声音"});
+  EXPECT_TRUE(idx.search(make_text_query("\xFF\xC3")).empty());
+  auto results = idx.search(make_text_query("\xFF声音"));
+  ASSERT_EQ(results.size(), 1u);
+  EXPECT_EQ(results[0].name, "audio_play");
+}
+
+TEST(Bm25IndexTest, AsciiEnglishRegressionUnchangedByTokenizerRework) {
+  Bm25Index idx;
+  add_sprite_entries(idx);
+  auto results = idx.search(make_text_query("sprite frames"));
+  ASSERT_EQ(results.size(), 1u);
+  EXPECT_EQ(results[0].name, "sprite_frames");
+  EXPECT_GT(results[0].score, 0.0);
+}

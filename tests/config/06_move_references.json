@@ -1,0 +1,203 @@
+{
+  "name": "06_move_references",
+  "description": "验证 move_resource_file 引擎感知事务的完整闭环：被引用资源为 write_file 手写的最小合法 tres（[gd_resource type=\"Resource\"] 空资源，经 write_file 引擎感知 update_file 注册进 EFS），移动目录后，处于打开状态的引用方场景（经 execute_script open_scene_from_path 打开，同一编辑器生命周期内保持打开）先落盘保存、磁盘引用改写、随后自动重载；.uid sidecar 随迁保持 uid 不变；引用方 EFS 依赖图即时刷新。断言组合：moved 非空 + failed/stale_references 为空（result==0 由 failed 为空体现，因 move 响应顶层无 result 字段）；moved[0].to 无法用点路径索引断言（assert_engine json_lookup 仅支持对象键），改用 has_resource_dependency 反查 referrer.tscn → res://gda_tmp_move_refs/dst_dir/asset.tres 命中间接证明移动目的地正确且依赖图已刷新；find_in_files 双向证明磁盘旧路径消失、新路径存在。cleanup 阶段已关闭引用方场景并回收临时目录，避免编辑器布局恢复导致的跨轮污染。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "fail_fast",
+    "stages": [
+      {
+        "id": "setup",
+        "steps": [
+          {
+            "id": "create_tmp_root",
+            "tool": "create_directory",
+            "args": { "path": "res://gda_tmp_move_refs" },
+            "expect": { "has_keys": ["created"] }
+          },
+          {
+            "id": "create_src_dir",
+            "tool": "create_directory",
+            "args": { "path": "res://gda_tmp_move_refs/src_dir" },
+            "expect": { "has_keys": ["created"] }
+          }
+        ]
+      },
+      {
+        "id": "create_asset",
+        "steps": [
+          {
+            "id": "write_src_resource",
+            "tool": "write_file",
+            "args": {
+              "path": "res://gda_tmp_move_refs/src_dir/move_asset.tres",
+              "content": "[gd_resource type=\"Resource\" format=3]\n\n"
+            },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "ok" },
+                { "key": "engine_managed", "value": true },
+                { "key": "action", "value": "update_file" }
+              ]
+            }
+          },
+          {
+            "id": "src_uid_present",
+            "tool": "get_resource_uid",
+            "args": { "path": "res://gda_tmp_move_refs/src_dir/move_asset.tres" },
+            "expect": { "has_keys": ["result"] }
+          }
+        ]
+      },
+      {
+        "id": "write_and_open_referrer",
+        "steps": [
+          {
+            "id": "write_referrer_scene",
+            "tool": "write_file",
+            "args": {
+              "path": "res://gda_tmp_move_refs/referrer.tscn",
+              "content": "[gd_scene load_steps=2 format=3]\n\n[ext_resource type=\"Resource\" path=\"res://gda_tmp_move_refs/src_dir/move_asset.tres\" id=\"1_abc\"]\n\n[node name=\"ReferrerRoot\" type=\"Node\"]\n"
+            },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "ok" }
+              ]
+            }
+          },
+          {
+            "id": "reverse_lookup_before_move",
+            "tool": "get_resource_references",
+            "args": { "path": "res://gda_tmp_move_refs/src_dir/move_asset.tres" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "open_referrer_scene",
+            "tool": "open_editor_scene",
+            "args": { "path": "res://gda_tmp_move_refs/referrer.tscn" },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "ok" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "move_transaction",
+        "steps": [
+          {
+            "id": "move_asset_to_dst_dir",
+            "tool": "move_resource_file",
+            "args": {
+              "path": "res://gda_tmp_move_refs/src_dir/move_asset.tres",
+              "new_directory": "res://gda_tmp_move_refs/dst_dir"
+            },
+            "expect": {
+              "has_keys": ["moved", "failed", "stale_references"],
+              "field_checks": [
+                { "key": "moved", "not_empty": true },
+                { "key": "reloaded_scenes", "not_empty": true },
+                { "key": "failed", "value": [] },
+                { "key": "stale_references", "value": [] }
+              ]
+            }
+          },
+          {
+            "id": "dst_uid_still_present",
+            "tool": "get_resource_uid",
+            "args": { "path": "res://gda_tmp_move_refs/dst_dir/move_asset.tres" },
+            "expect": { "has_keys": ["result"] }
+          }
+        ]
+      },
+      {
+        "id": "verify_rewrites",
+        "steps": [
+          {
+            "id": "new_path_referenced_on_disk",
+            "tool": "find_in_files",
+            "args": { "query": "dst_dir/move_asset.tres", "dir": "res://gda_tmp_move_refs" },
+            "expect": {
+              "field_checks": [
+                { "key": "result.files", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "old_path_gone_from_disk",
+            "tool": "find_in_files",
+            "args": { "query": "src_dir/move_asset.tres", "dir": "res://gda_tmp_move_refs" },
+            "expect": {
+              "field_checks": [
+                { "key": "result.files", "value": [] }
+              ]
+            }
+          },
+          {
+            "id": "efs_dependency_points_to_new_path",
+            "tool": "has_resource_dependency",
+            "args": {
+              "path": "res://gda_tmp_move_refs/referrer.tscn",
+              "dependency": "res://gda_tmp_move_refs/dst_dir/move_asset.tres"
+            },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "reverse_lookup_after_move",
+            "tool": "get_resource_references",
+            "args": { "path": "res://gda_tmp_move_refs/dst_dir/move_asset.tres" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "reverse_lookup_old_path_empty",
+            "tool": "get_resource_references",
+            "args": { "path": "res://gda_tmp_move_refs/src_dir/move_asset.tres" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": [] }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "cleanup",
+        "steps": [
+          {
+            "id": "close_referrer_scene",
+            "tool": "close_editor_scene",
+            "args": {},
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "closed" }
+              ]
+            }
+          },
+          {
+            "id": "trash_tmp_dir",
+            "tool": "move_os_file_to_trash",
+            "args": { "path": "res://gda_tmp_move_refs" },
+            "expect": {
+              "has_keys": ["result"]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -6,7 +6,7 @@ tags:
   - 约定
   - 命名
   - 规范
-timestamp: "2026-08-22T15:10:00+08:00"
+timestamp: "2026-08-29T02:35:37+08:00"
 ---
 
 # 工程约定
@@ -18,7 +18,7 @@ timestamp: "2026-08-22T15:10:00+08:00"
 - **命名空间**：`godot_autopilot`（工具子命名空间 `<模块>_ops`，如 `godot_autopilot::scene_ops`）
 - **前缀**：核心常量 `GDA_*`（如 `GDA_DEFAULT_PORT`）；运行时协议 `gda:*`；导出宏 `GDA_EXPORT`
 - **产物与目录**：CMake 目标 `godot-autopilot`，部署到 `Example/addons/godot-autopilot/`
-- **工具命名**：约定 `<动词>_<类别>_<维度>_<对象>_<修饰>`（snake_case，**动词置首**），如 `create_scene_node`、`intersect_physics_2d_ray`、`set_input_map_action_deadzone`；336 个工具名全部动词置首，段数随粒度自然变化（2-6 段），`signal_connect`/`property_set` 等短名属规范内省略类别段
+- **工具命名**：约定 `<动词>_<类别>_<维度>_<对象>_<修饰>`（snake_case，**动词置首**），如 `create_scene_node`、`intersect_physics_2d_ray`、`set_input_map_action_deadzone`；363 个工具名全部动词置首，段数随粒度自然变化（2-6 段），`signal_connect`/`property_set` 等短名属规范内省略类别段
 - **头文件 include guard**：`GODOT_AUTOPILOT_<MODULE>_HPP`
 
 ## 日志
@@ -68,5 +68,5 @@ gda 聚焦「编辑器内的引擎操作」，以下能力**明确不做**，避
 
 ## 其他
 
-- 无 CI（`.github/` 不存在）；构建、测试均本地执行
-- 依赖版本固定：godot-cpp 10.0.0-rc1、mcp-cpp-sdk 0.3.1（FetchContent，无子模块）
+- CI/Release 工作流见 [build.md](./build.md)「CI 与 Release」；CI 仅跑 L1，L2 引擎用例仍仅本地执行（需 `GODOT_PATH`）
+- 依赖版本固定：godot-cpp 10.0.0-rc1、mcp-cpp-sdk 0.3.2（FetchContent，无子模块）

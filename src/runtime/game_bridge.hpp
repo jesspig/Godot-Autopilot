@@ -66,7 +66,11 @@ JV op_input(const JV &params, int64_t request_id);
 
 JV op_input_wait(const JV &params, int64_t request_id);
 
+JV op_input_sequence(const JV &params, int64_t request_id);
+
 JV op_input_status(const JV &params);
+
+JV op_ui_elements(const JV &params);
 
 } // namespace game_bridge
 } // namespace runtime

@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    branches:
+      - develop
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-2022]
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v5
+
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.8
+
+      - name: Setup MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Ensure libgcc_s link (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          so1="$(find /usr/lib/gcc/x86_64-linux-gnu /usr/lib/x86_64-linux-gnu -name 'libgcc_s.so.1' 2>/dev/null | head -n1)"
+          if [ -n "$so1" ]; then sudo ln -sf "$so1" /usr/lib/x86_64-linux-gnu/libgcc_s.so; fi
+
+      - name: Cache FetchContent dependencies
+        uses: actions/cache@v4
+        with:
+          path: build/debug/_deps
+          key: deps-debug-${{ runner.os }}-${{ hashFiles('cmake/FetchDependencies.cmake') }}
+
+      - name: Build (Debug)
+        run: python build.py
+
+      - name: L1 unit tests
+        run: ctest --preset debug -E "^gda_runner_" --output-on-failure

@@ -1,6 +1,7 @@
 #include "editor_ops.hpp"
 #include "../runtime/gda_protocol.hpp"
 #include "../util/scene_path.hpp"
+#include "core/editor_readiness.hpp"
 #include "core/log_system.hpp"
 #include "core/scene_dirty_tracker.hpp"
 #include "util/error_util.hpp"
@@ -559,6 +560,14 @@ mcp::JsonValue handle_file_system_scan(const mcp::JsonValue &) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
     e["error"] = mcp::JsonValue("EditorFileSystem not available");
     return e;
+  }
+  if (efs->is_scanning()) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                              "scan_editor_file_system skipped: already scanning");
+    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    r["skipped"] = mcp::JsonValue(true);
+    r["reason"] = mcp::JsonValue("already scanning");
+    return r;
   }
   efs->scan();
   mcp::JsonValue r(mcp::JsonValue::object_tag);

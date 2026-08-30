@@ -6,7 +6,7 @@ tags:
   - 模块
   - 入口
   - 运行时桥接
-timestamp: "2026-08-22T15:10:00+08:00"
+timestamp: "2026-08-29T02:35:37+08:00"
 resource:
   - src/main.cpp
   - src/runtime/
@@ -14,7 +14,7 @@ resource:
 
 # 模块：入口与运行时桥接（entry_runtime）
 
-覆盖代码：`src/main.cpp`（283 行）与 `src/runtime/`（`gda_protocol.hpp` 40 行、`game_bridge.hpp` 47 行、`game_bridge.cpp` 529 行、`game_bridge_input.cpp` 633 行、`game_bridge_eval.cpp` 427 行）。
+覆盖代码：`src/main.cpp`（322 行）与 `src/runtime/`（`gda_protocol.hpp` 53 行、`game_bridge.hpp` 47 行、`game_bridge.cpp` 656 行、`game_bridge_input.cpp` 875 行、`game_bridge_eval.cpp` 427 行）。
 
 职责全景：`main.cpp` 是 GDExtension 的导出入口与编辑器插件本体；`src/runtime/` 是在**游戏运行时进程**内与编辑器进程通信的桥接层，通过 EngineDebugger 消息通道承载 GDA 协议。编辑器内的 MCP 服务器（`ServerContext`）与运行时桥接是两条相互独立的消息通路，本页只覆盖入口生命周期与运行时桥接，MCP 工具侧见相关模块页。
 
@@ -51,7 +51,7 @@ resource:
 
 1. 日志"plugin starting"，`runtime_ops::set_editor_queue(&queue())` 注入队列，`ModeDetector` 判定 Editor/Runtime 模式写日志。
 2. `gda_cmdline_mode()` 为真则直接 return——不建 UI、不启服务器（队列已在步骤 1 注入）。
-3. 创建 `McpLogDock`（标题 "MCP Log"）`add_dock`。
+3. 创建 `McpLogDock`（标题 "GDA Log"）`add_dock`。
 4. `debugger_ops::create_output_logger()` 经 `OS::add_logger` 注册；`debugger_ops::create_debug_plugin()` 经 `add_debugger_plugin` 注册。
 5. `new (std::nothrow) ServerContext(queue())` 并 `start()`；成功则记 Transport 日志（含端口），失败记 `last_error()`。
 6. 创建 `McpConfigDock` 并 `set_server_context`（面板内显示运行端口/离线状态）`add_dock`。
@@ -94,6 +94,8 @@ resource:
 | `GDA_OP_INPUT` | `input` | `op_input`（input 文件） |
 | `GDA_OP_INPUT_WAIT` | `input_wait` | `op_input_wait`（input 文件） |
 | `GDA_OP_INPUT_STATUS` | `input_status` | `op_input_status`（input 文件） |
+| `GDA_OP_INPUT_SEQUENCE` | `input_sequence` | `op_input_sequence`（input 文件，08-24 新增） |
+| `GDA_OP_UI_ELEMENTS` | `ui_elements` | `op_ui_elements`（bridge 主文件，08-24 新增） |
 | `GDA_OP_CAPTURE` | `capture` | `op_capture` |
 | `GDA_OP_GET_ERRORS` | `get_errors` | `op_get_errors` |
 | `GDA_OP_GET_OUTPUT` | `get_output` | `op_get_output` |
@@ -134,13 +136,13 @@ resource:
 
 ### 3.1 game_bridge.cpp — 消息通道与缓冲
 
-- `register_listener()`（幂等，`g_registered` 守卫）：首次调用时注册 6 个类（`GameBridgeListener`、`GameBridgeLogger`，及 eval 组 `GameBridgeEvalAwaiter`、input 组 Watcher/DelayedRelease/Sequence 共 3 个桥接类；注册顺序 Listener→eval→input→Logger）；实例化监听器与日志器；`EngineDebugger::register_message_capture("gda", on_gda_message)` 捕获前缀 `gda` 的消息；`OS::add_logger` 挂游戏日志器；随后立即发出 `gda:ready`（body 含 `ready:true` 与活动字段）。
+- `register_listener()`（幂等，`g_registered` 守卫）：首次调用时注册 7 个类（`GameBridgeListener`、`GameBridgeLogger`，及 eval 组 `GameBridgeEvalAwaiter`、input 组 Watcher/DelayedRelease/Sequence/FrameSequence 共 4 个桥接类；注册顺序 Listener→eval→input→Logger）；实例化监听器与日志器；`EngineDebugger::register_message_capture("gda", on_gda_message)` 捕获前缀 `gda` 的消息；`OS::add_logger` 挂游戏日志器；随后立即发出 `gda:ready`（body 含 `ready:true` 与活动字段）。
 - `unregister_listener()`：反注册消息捕获与日志器，unref 两个实例。
 - `GameBridgeListener`（RefCounted 子类）：绑定方法 `on_gda_message(p_message: String, p_data: Array) -> bool`。解析 `data[0]` 为 JSON 请求，取 `request_id`/`op`/`params` 分发；每收到一条消息即刷新 `g_last_activity_ms`；响应统一附加 `ok` 字段后经 `send_response` 发出。请求畸形或 op 执行失败会同时记入错误与输出缓冲。
 - `send_response(request_id, body)`：补 `request_id` 字段（`GDA_FIELD_REQUEST_ID` 常量），`EngineDebugger::send_message("gda:response", [json])`。
 - `GameBridgeLogger`（godot::Logger 子类）：`_log_error` 按错误类型（warning 判定码 3）经 `push_game_error` 入错误缓冲；`_log_message` 错误入错误缓冲、普通消息入输出缓冲。
 - 缓冲：`g_error_buffer`（环形，上限 200，每条带递增 `seq`，`g_error_seq` 单调）+ `g_output_buffer`（上限 500），互斥锁保护；`current_error_seq()` / `eval_error_delta(since_seq)` / `append_eval_runtime_errors` 供 eval 附加运行期错误增量（文本增量 + 仅首条的 `structured_error`）；`truncate_error_text` 超 8192 字节截断。
-- 状态与工具 op：`status`（版本/fps/physics_frame、paused/node_count/scene、活动字段）、`ping`（physics/process 帧 + 活动字段）、`cancel`（查 `g_cancel_handlers` 并调用 handler）、`capture`（根窗口纹理存 PNG 到缓存目录 `gda_capture_<request_id>.png`，返回 path/width/height）、`get_errors`（limit 默认 50）、`get_output`（limit 默认 200）、`get_tree`（DFS，深度上限 64、节点上限 2000）。
+- 状态与工具 op：`status`（版本/fps/physics_frame/paused/node_count/scene、活动字段）、`ping`（physics/process 帧 + 活动字段）、`cancel`（查 `g_cancel_handlers` 并调用 handler）、`capture`（根视口渲染存 PNG 到缓存目录，返回 path/width/height）、`get_errors`（limit 默认 50）、`get_output`（limit 默认 200）、`get_tree`（DFS，深度上限 64、节点上限 2000）、`ui_elements`（08-24 新增，见下）。
 - 辅助函数：`gda_string`（string_view → godot::String）、`error_result`/`ok_result`、`get_scene_tree`、`resolve_node`（空路径取当前场景，先场景内再根节点查询）。
 
 ### 3.2 game_bridge_input.cpp — 输入模拟
@@ -154,6 +156,9 @@ resource:
 - `op_input`：单步或 `sequence` 数组；返回 `injected_at_physics_frame` / `expected_visible_frame` / `parsed_physics_frame` / `parsed_process_frame`，游戏暂停时附 `warning`。注意：单步成功时返回**不带** `result` 包装的裸对象，而 `error_result` 与 sequence 走 `ok_result` 包装。
 - `op_input_wait`：校验 state 三态、可选 `inject` 子对象先注入再等待；挂 watcher 并注册取消 handler，**同步返回空 JSON**（响应由 watcher 在物理帧回调中异步发出）。
 - `op_input_status`：动作三态 + `physics_frame` + `paused`。
+- **`op_input_sequence`（08-24 新增，逐物理帧时间线）**：`inputs[]` 每项必须为对象且含非负整数 `at_frame`（相对首帧的物理帧偏移）与注入字段（复用 `inject_step` 的 type/keycode/action 等），上限 256 项；超时默认按 `max_at_frame × 33ms + 2000ms` 推导、可被 `timeout_ms` 覆盖并钳制 `GDA_MAX_TIMEOUT_MS=30000`。校验通过后同步返回空 JSON，实际注入与响应由 `GameBridgeFrameSequence` 节点异步完成。
+- **`GameBridgeFrameSequence`（Node，PROCESS_MODE_ALWAYS + physics process，08-24 新增）**：`setup()` 记录起始物理帧（`Engine::get_physics_frames()`）与 ticks 后挂到场景根；每物理帧把 `at_frame <= 相对帧数` 的条目经 `inject_step` 注入（失败写入游戏错误缓冲并继续），队列清空即 `finish(true)`；超时未完成则 `finish(false)`。响应体 `{completed, executed}` 经 `ok_result` 包装异步发出，注册 cancel handler 支持中途取消。
+- **`op_ui_elements`（08-24 新增，运行中 Control 树枚举）**：从场景根 DFS 遍历（深度上限同 get_tree 的 64），命中 `Control` 节点即收集 `{path, type, visible, text?, global_rect:{position:{x,y}, size:{x,y}}}`；`max_elements` 默认 100、上限 1000，达到上限标 `truncated:true`。响应为 `ok_result({elements, count, truncated})` 包装。MCP 工具侧对应 `get_game_ui_elements`。
 
 ### 3.3 game_bridge_eval.cpp — 异步求值
 

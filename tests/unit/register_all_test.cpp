@@ -31,11 +31,13 @@ const char *const kMetaToolNames[kMetaToolCount] = {
     "call_tool", "batch_execute", "code_execute"};
 
 const char *const kValidCategories[] = {
-    "Audio",      "Capture",  "Config",      "Debug",   "Debugger",
-    "Display",    "Docs",     "Editor",      "Game",    "Group",
-    "Input",      "Navigation", "OS",        "Physics", "Properties",
-    "Render",     "Resources", "Scene",      "Scripts", "SpriteFrames",
-    "System",     "Text",     "TileMap",     "Meta",    "Auto"};
+    "Analysis",   "Animation",  "Audio",      "Capture",    "Config",     "Debug",
+    "Debugger",   "Display",    "Docs",       "Editor",     "Game",
+    "Group",      "Input",      "Navigation", "OS",         "Physics",
+    "Properties", "Render",     "Resources",  "Scene",      "Scripts",
+    "SpriteFrames", "System",   "Testing",    "Text",       "Theme",
+    "TileMap",
+    "Meta",       "Auto"};
 
 bool has_schema_params(const mcp::JsonValue &schema) {
   const auto *props = schema.Find("properties");

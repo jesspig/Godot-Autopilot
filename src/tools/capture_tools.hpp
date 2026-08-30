@@ -12,7 +12,7 @@
 namespace godot_autopilot {
 namespace capture_tools {
 
-GDA_TOOL_CLASS(CaptureEditorViewportTool, "capture_editor_viewport", "Capture the editor's 2D viewport as a PNG image and return it as base64. Use it to visually verify the scene while editing, e.g. after placing nodes or changing properties. The 2D viewport is preferred and falls back to the 3D viewport when unavailable. target only supports 'editor'; 'game' is not implemented, so use capture_game_viewport for the running game. Returns result with data, format, width and height fields.", "Capture", std::vector<std::string>({"capture","screenshot","viewport"}), ::godot_autopilot::capture_ops::handle_capture_viewport, true)
+GDA_TOOL_CLASS(CaptureEditorViewportTool, "capture_editor_viewport", "Capture a viewport as a PNG image and return it as base64. target='editor' (default) grabs the editor 2D viewport with a fallback to the 3D viewport; use it to visually verify the scene while editing, e.g. after placing nodes or changing properties. target='game' captures the running game's root window over the runtime channel and returns the same result shape (data, format, width, height plus the cache file path); it requires a game launched from the editor (play_editor_current_scene) whose project loads the godot-autopilot extension. Optional 'timeout_ms' applies to target='game' only (default: 5000, max: 30000).", "Capture", std::vector<std::string>({"capture","screenshot","viewport"}), ::godot_autopilot::capture_ops::handle_capture_viewport, true)
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> tools;

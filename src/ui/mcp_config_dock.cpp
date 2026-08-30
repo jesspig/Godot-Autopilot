@@ -83,6 +83,17 @@ McpConfigDock::McpConfigDock() : port_spin(nullptr), apply_button(nullptr) {
                         callable_mp(this, &McpConfigDock::_on_apply_port));
   port_row->add_child(apply_button);
 
+  auto *time_row = memnew(godot::HBoxContainer);
+  root->add_child(time_row);
+  auto *time_label = memnew(godot::Label);
+  time_label->set_text("Show timestamps:");
+  time_row->add_child(time_label);
+  show_time_check = memnew(godot::CheckBox);
+  show_time_check->set_pressed(PluginConfig::load_show_time());
+  show_time_check->set_tooltip_text("Prefix each log line with HH:MM:SS; collapsed (merged) lines always show latest time.");
+  time_row->add_child(show_time_check);
+  show_time_check->connect("toggled", callable_mp(this, &McpConfigDock::_on_show_time_toggled));
+
   status_label = memnew(godot::Label);
   root->add_child(status_label);
 
@@ -135,6 +146,13 @@ McpConfigDock::McpConfigDock() : port_spin(nullptr), apply_button(nullptr) {
 }
 
 void McpConfigDock::_bind_methods() {}
+
+void McpConfigDock::set_log_dock(McpLogDock *dock) { log_dock_ = dock; }
+
+void McpConfigDock::_on_show_time_toggled(bool checked) {
+  PluginConfig::save_show_time(checked);
+  if (log_dock_) log_dock_->set_show_time(checked);
+}
 
 void McpConfigDock::set_server_context(ServerContext *ctx) {
   server_ctx = ctx;

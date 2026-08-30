@@ -14,11 +14,7 @@ void fill_schema_debug_sys(std::unordered_map<std::string, mcp::JsonValue>& m) {
         m["get_debugger_output"] = schema::build_schema({
             {"limit", "integer", "Maximum number of output entries to return (default: 50); fetched from the running game over the runtime channel when a debug session is active, otherwise falls back to editor-captured output. Use get_game_log_entries to read the game process log file", false},
         });
-        m["get_debugger_stack_dump"] = schema::build_schema({});
         m["get_debugger_scene_tree"] = schema::build_schema({});
-        m["get_debugger_monitors"] = schema::build_schema({
-            {"count", "integer", "Number of recent monitor frames to return (default: 1); the capture has no data source, so the result is normally empty — use get_debug_monitors for live editor-side values", false},
-        });
         m["get_debugger_session_info"] = schema::build_schema({});
 
         m["get_game_status"] = schema::build_schema({
@@ -59,6 +55,14 @@ void fill_schema_debug_sys(std::unordered_map<std::string, mcp::JsonValue>& m) {
         m["get_game_input_status"] = schema::build_schema({
             {"action", "string", "Action name to query; the response includes paused and physics_frame so transient input consumption can be diagnosed when the game is paused", true},
             {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 30000); successful responses also include recent_engine_errors (up to 5 recent engine errors) when any exist", false},
+        });
+        m["sequence_game_inputs"] = schema::build_schema({
+            {"inputs", "array", "Timeline items, each an object: kind ('key'|'mouse_button'|'mouse_motion'|'action'), at_frame (integer physics-frame offset from sequence start, 0 = immediately; out-of-order allowed, fires when its frame arrives) plus the queue_game_input fields for that kind — keycode for key, button_index and optional position {x,y} for mouse_button, position {x,y} for mouse_motion, action for action; optional pressed (default true), duration_ms (auto-release), mode ('event'|'api'|'hold'). Max 256 items. Example: [{\"kind\":\"key\",\"keycode\":\"X\",\"at_frame\":0},{\"kind\":\"mouse_button\",\"button_index\":1,\"position\":{\"x\":120,\"y\":80},\"at_frame\":5},{\"kind\":\"action\",\"action\":\"jump\",\"at_frame\":15}]", true},
+            {"timeout_ms", "integer", "Response timeout in milliseconds (default: max(at_frame)*33+2000, max: 30000); the call resolves with {completed:true, executed:n} once every item has fired, or {completed:false, executed:n} on expiry listing how many items fired before the deadline", false},
+        });
+        m["get_game_ui_elements"] = schema::build_schema({
+            {"max_elements", "integer", "Maximum number of Control-derived elements returned in tree order (default: 100, max: 1000); truncated=true signals more remain — raise the cap or narrow via execute_game_script", false},
+            {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 30000)", false},
         });
         m["capture_game_viewport"] = schema::build_schema({
             {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 30000); the capture is returned as a base64-encoded PNG", false},
@@ -159,6 +163,7 @@ void fill_schema_debug_sys(std::unordered_map<std::string, mcp::JsonValue>& m) {
         m["batch_execute"] = schema::build_schema({
             {"operations", "array", "Ordered list of operations to execute", true},
             {"stop_on_error", "boolean", "Stop on first error (default: true)", false},
+            {"rollback_on_error", "boolean", "With stop_on_error=true, after a failure undo every editor action this batch committed (via the global undo history) before returning; response gains rolled_back and rollback_partial (default: false)", false},
         });
 
         m["call_tool"] = schema::build_schema({
@@ -169,8 +174,32 @@ void fill_schema_debug_sys(std::unordered_map<std::string, mcp::JsonValue>& m) {
         m["code_execute"] = schema::build_schema({
             {"source_code", "string", "GDScript source code", true},
             {"function_name", "string", "Function name to call (default: _run)", false},
-            {"timeout_ms", "integer", "Execution timeout in milliseconds (max 30000)", false},
+            {"timeout_ms", "integer", "Execution timeout in milliseconds (integer, default: 5000, max: 30000); values <=0 fall back to the default, larger values are clamped to the max", false},
             {"auto_owner", "boolean", "Automatically set owner on nodes created during execution so they are saved with the scene (default true)", false},
+        });
+
+        m["run_gdscript_tests"] = schema::build_schema({
+            {"tests", "array", "Array of test cases {\"name\": string, \"source\": string}; each source runs as plain sequential statements (top-level func/static/class declarations rejected) with check/check_equal/check_almost_equal/fail/fatal assertions and SceneRoot exposed", true},
+            {"timeout_ms", "integer", "Timeout budget for the whole suite in milliseconds (integer, default: 10000, max: 30000); once exhausted remaining cases are skipped and the running case is flagged running_over_budget", false},
+        });
+        m["run_gdscript_test_files"] = schema::build_schema({
+            {"directory", "string", "Project directory scanned non-recursively for test files (string, default: res://tests); a path without the res:// prefix is normalized automatically", false},
+            {"pattern", "string", "Filename filter supporting * and ? wildcards (string, default: *.gda_test.gd)", false},
+            {"timeout_ms", "integer", "Shared timeout budget for all matched files in milliseconds (integer, default: 10000, max: 30000)", false},
+        });
+}
+
+void fill_schema_analysis(std::unordered_map<std::string, mcp::JsonValue>& m) {
+        m["validate_scene_file"] = schema::build_schema({
+            {"path", "string", "res:// path to a .tscn/.scn scene file on disk to dry-run validate (e.g. \"res://levels/level_01.tscn\"); loaded with CACHE_MODE_IGNORE, dependencies checked and instantiate() attempted without touching the edited scene", true},
+        });
+        m["find_unused_resources"] = schema::build_schema({
+            {"directory", "string", "Project directory whose files are scanned recursively for unreferenced resources (string, default: \"res://\", e.g. \"res://assets\")", false},
+        });
+        m["trace_signal_flow"] = schema::build_schema({
+            {"path", "string", "Scene-relative node path of the node whose signal wiring is traced (e.g. \"Player\")", true},
+            {"direction", "string", "Which connections to report: 'outgoing' (signals the node emits), 'incoming' (connections targeting it) or 'both' (default)", false},
+            {"max_depth", "integer", "How many hops to walk from the start node, >= 1 (default: 3); cycles are cut by a visited set", false},
         });
 }
 

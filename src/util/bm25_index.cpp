@@ -5,24 +5,105 @@
 #include <cmath>
 #include <unordered_set>
 
+namespace {
+
+constexpr char32_t kCjkBlocks[][2] = {{0x3400, 0x4DBF},
+                                      {0x4E00, 0x9FFF},
+                                      {0xF900, 0xFAFF}};
+
+bool is_cjk_codepoint(char32_t cp) {
+  for (const auto &block : kCjkBlocks) {
+    if (cp >= block[0] && cp <= block[1]) {
+      return true;
+    }
+  }
+  return false;
+}
+
+size_t utf8_sequence_length(const std::string &text, size_t pos) {
+  const unsigned char lead = static_cast<unsigned char>(text[pos]);
+  size_t len = 0;
+  if (lead >= 0xC2 && lead <= 0xDF) {
+    len = 2;
+  } else if (lead >= 0xE0 && lead <= 0xEF) {
+    len = 3;
+  } else if (lead >= 0xF0 && lead <= 0xF4) {
+    len = 4;
+  }
+  if (len == 0 || pos + len > text.size()) {
+    return 0;
+  }
+  for (size_t i = 1; i < len; ++i) {
+    if ((static_cast<unsigned char>(text[pos + i]) & 0xC0) != 0x80) {
+      return 0;
+    }
+  }
+  return len;
+}
+
+char32_t decode_utf8_codepoint(const std::string &text, size_t pos,
+                               size_t len) {
+  static constexpr unsigned char kLeadMasks[] = {0x00, 0x7F, 0x1F, 0x0F, 0x07};
+  char32_t cp = static_cast<unsigned char>(text[pos]) & kLeadMasks[len];
+  for (size_t i = 1; i < len; ++i) {
+    cp = (cp << 6) | (static_cast<unsigned char>(text[pos + i]) & 0x3F);
+  }
+  return cp;
+}
+
+} // namespace
+
 namespace godot_autopilot {
 
 std::vector<std::string> Bm25Index::tokenize(const std::string &text) const {
   std::vector<std::string> tokens;
-  std::string current;
-  for (unsigned char c : text) {
-    if (std::isalnum(c)) {
-      current.push_back(static_cast<char>(std::tolower(c)));
-    } else {
-      if (!current.empty()) {
-        tokens.push_back(std::move(current));
-        current.clear();
-      }
+  std::string ascii_word;
+  std::vector<std::string> cjk_chars;
+
+  auto flush_ascii_word = [&]() {
+    if (!ascii_word.empty()) {
+      tokens.push_back(std::move(ascii_word));
+      ascii_word.clear();
     }
+  };
+  auto flush_cjk_bigrams = [&]() {
+    for (size_t i = 0; i + 1 < cjk_chars.size(); ++i) {
+      tokens.push_back(cjk_chars[i] + cjk_chars[i + 1]);
+    }
+    cjk_chars.clear();
+  };
+
+  size_t i = 0;
+  while (i < text.size()) {
+    const unsigned char c = static_cast<unsigned char>(text[i]);
+    if (c < 0x80) {
+      flush_cjk_bigrams();
+      if (std::isalnum(c)) {
+        ascii_word.push_back(static_cast<char>(std::tolower(c)));
+      } else {
+        flush_ascii_word();
+      }
+      ++i;
+      continue;
+    }
+    const size_t len = utf8_sequence_length(text, i);
+    if (len == 0) {
+      flush_ascii_word();
+      flush_cjk_bigrams();
+      ++i;
+      continue;
+    }
+    if (is_cjk_codepoint(decode_utf8_codepoint(text, i, len))) {
+      flush_ascii_word();
+      cjk_chars.emplace_back(text, i, len);
+    } else {
+      flush_ascii_word();
+      flush_cjk_bigrams();
+    }
+    i += len;
   }
-  if (!current.empty()) {
-    tokens.push_back(std::move(current));
-  }
+  flush_ascii_word();
+  flush_cjk_bigrams();
   return tokens;
 }
 
@@ -124,12 +205,24 @@ std::vector<Bm25Result> Bm25Index::search(const SearchQuery &query) const {
     avg_dl = 1.0;
   }
 
-  auto compact = [](const std::string &text) {
+  auto compact = [](const std::string &source) {
     std::string out;
-    for (unsigned char c : text) {
-      if (std::isalnum(c)) {
-        out.push_back(static_cast<char>(std::tolower(c)));
+    size_t i = 0;
+    while (i < source.size()) {
+      const unsigned char c = static_cast<unsigned char>(source[i]);
+      if (c < 0x80) {
+        if (std::isalnum(c)) {
+          out.push_back(static_cast<char>(std::tolower(c)));
+        }
+        ++i;
+        continue;
       }
+      const size_t len = utf8_sequence_length(source, i);
+      if (len > 0 &&
+          is_cjk_codepoint(decode_utf8_codepoint(source, i, len))) {
+        out.append(source, i, len);
+      }
+      i += len > 0 ? len : 1;
     }
     return out;
   };

@@ -1,6 +1,23 @@
 # 维护日志摘要
 
-> 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 条。
+> 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天。
+
+## 2026-08-29
+
+- **版本 0.2.1 → 0.2.2 与全量知识库审计**：根 `VERSION` 单一来源更新为 `0.2.2`；零代码变更下重核 363 域/42 副作用/371 条目/370 可达/27 类/77 gtest/7 L2/84 ctest/77 .cpp/164 行等全量数值，增量修复 13 个 wiki 页面（overview/build/tests/tools_ops_a/b/tool_base_design/conventions/support/core/entry_runtime/index/example）与 `AGENTS.md`（83→84、6→7 份），frontmatter 与审计日期同步至 2026-08-29；`traversal.cpp` 枚举差异记 `> [!todo]`。详见 `changelog/2026-08-29-log.md`
+
+## 2026-08-28
+
+- **日志系统增强（仅日志，未涉及 MCP SDK / 环回绑定）**：日志 dock 标题 "MCP Log" → "GDA Log"；配置面板新增 "Show timestamps" 开关（默认开、show_time 持久化），每条前缀 `[HH:MM:SS]`，折叠合并行始终显示最新时间；ServerContext 关键流程补诊断日志、启动失败透传真实异常类型；call_tool 分发加 Debug 级日志。详见 `changelog/2026-08-28-log.md`
+- **SDK 0.3.1→0.3.2 环回绑定**：支持 `bind_host`/`host`，GDA 默认绑 `127.0.0.1`（`GODOT_AUTOPILOT_HOST` 可覆盖为 `0.0.0.0` 以监听所有接口）。详见 `changelog/2026-08-28-log.md`
+
+## 2026-08-24
+
+- **竞品对齐批次 wiki 沉淀**：新建 plans/roadmap.md（竞品定位速记 + P0/P1/P2 交付清单 + P3 遗留）；tools_registry 类别表重算 27 类/363 域、371 条目口径、副作用 42 重分组；core.md 补 error_watermark/editor_readiness 小节；entry_runtime 补 input_sequence/ui_elements op 与 GameBridgeFrameSequence 帧调度；清理被删 debugger 工具死引用；AGENTS.md 数字同步（363/370/371/42/77/83）；reimport 字段名缺口确认已修。详见 `changelog/2026-08-24-log.md`
+
+## 2026-08-23
+
+- **CI/Release 工作流落地**：新增 `.github/workflows/ci.yml`（develop 触发，三平台 Debug + L1）与 `release.yml`（tag `v*` 触发：tag↔VERSION 校验 → 三平台 Release → 合并 `addons.zip` 发布）；build.py 增 `--package --libs-dir` 跨平台合并打包、gdextension macOS 条目改 universal；preset 设 `CMAKE_OSX_ARCHITECTURES` 双架构；版本升至 **0.2.1**；L1 71/71 验证通过。详见 `changelog/2026-08-23-log.md`
 
 ## 2026-08-22
 
@@ -13,8 +30,7 @@
 - **遍历副作用排除 `side_effects()` 驱动**：`SideEffect` 扩 6 值（+Process）；`GDA_TOOL_CLASS_SIDE` 变体宏标记 35 个副作用工具；`get_tool_detail` 补 `side_effect` 字段；runner 读该字段排除、删除硬编码 `kExcludedSideEffectTools`。详见 `changelog/2026-08-21-log.md`
 - **元工具接口+组合化**：新增 `IMetaTool` 标记接口 + `MetaTool`（ToolBase+IMetaTool，依赖组合注入）；`ToolRegistry::add()` 按 `dynamic_cast<IMetaTool>` 自动归类（实现接口即元工具）；7 个元工具改以 `MetaTool` 注册；新增 L1 路由断言。详见 `changelog/2026-08-21-log.md`
 - **ToolBase 工具统一标准化全量落地**：新增 `tool_decl.hpp`（真类宏）+ 26 个 `<域>_tools.hpp`，**336 域工具悉数迁移为独立 `ToolBase` 子类**；`tool_defs.def` 删除，catalog(344)/index/分发/RegisterTool 全从 registry 派生。详见 `changelog/2026-08-21-log.md`
-- **重构收尾文档同步**：清除 AGENTS/wiki 对已删 `tool_defs.def` 的遗留引用与旧计数，统一为 336 域/344 catalog/35 副作用驱动排除。详见 `changelog/2026-08-21-log.md`
 
 ## 2026-08-20
 
-- **ToolBase 工具统一标准化落地（ToolRegistry 单一来源）**：新增 `tool_base.hpp`/`tool_registry.hpp`/`fn_tool.hpp`；修复函数局部对象悬垂（`g_active_registry` 升为文件级静态）。详见 `changelog/2026-08-20-log.md`
+- **ToolBase 标准化与 rename 事务化（4 新工具）**：`ToolBase`/`ToolRegistry` 单一来源 + 26 域真类化雏形；`rename_resource_file` 事务化（.uid 伴生、依赖回写、结构化影响报告）、`property_set` NodePath 自动转引用、新增 `get_resource_references`/`read_file`/`find_in_files`/`build_csharp_assembly`（339→343）；`collect_text_file_paths`/`join_path` 规避 `res:///` 三重斜杠；L2 新增 `05_rename_references`，ctest 78/78。详见 `changelog/2026-08-20-log.md`
