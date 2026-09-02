@@ -10,6 +10,7 @@
 | [build.md](build.md) | 构建/部署/打包流程、CMake 模块、产物清单、环境变量 | `CMakeLists.txt`、`cmake/`、`build.py` |
 | [tests.md](tests.md) | L1/L2 测试体系、遍历排除清单、数值统计 | `tests/` |
 | [conventions.md](conventions.md) | 工程约定：命名、日志、错误模式、添加工具流程 | 全仓库 |
+| [security_contract.md](security_contract.md) | T0 安全边界与并发契约：可信客户端、监听、风险工具、主线程、生命周期与边界原则 | `src/core/`、`src/tools/`、`src/main.cpp` |
 | [example.md](example.md) | Example 示例项目与文档 | `Example/` |
 | [tool_base_design.md](tool_base_design.md) | ToolBase 工具统一标准化（接口 + 组合 + 真类化）：363 域工具全为独立 ToolBase 子类、ToolRegistry 唯一来源、tool_defs.def 删除 | `tool_base.hpp`、`tool_registry.hpp`、`fn_tool.hpp`、`tool_decl.hpp`、30 个域 `*_tools.hpp`、`register_all.cpp` |
 | [modules/core.md](modules/core.md) | 核心层：线程模型、端口、日志、配置常量 | `src/core/` |

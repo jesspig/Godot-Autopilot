@@ -6,13 +6,13 @@ tags:
   - 模块
   - 工具注册
   - schema
-timestamp: "2026-08-29T02:35:37+08:00"
+timestamp: "2026-09-02T17:10:11+08:00"
 resource: src/tools/
 ---
 
 # 工具注册表（src/tools/ 注册管线）
 
-> 审计日期：2026-08-29（2026-08-12 初稿；08-17 补 frontmatter；08-20 registry 单一来源重构；08-21 真类化 + def 删除、元工具接口化、副作用驱动遍历排除；08-22 死代码清理与全量一致性审计；08-24 随竞品对齐批次同步——领域工具扩至 363/27 类（+Animation 10、Theme 8、Testing 2、Analysis 3）、副作用 42、删除 get_debugger_stack_dump/get_debugger_monitors、reimport_resource_files 字段名缺口修复、catalog 口径 371；08-29 随 0.2.2 版本与全量审计同步）。
+> 审计日期：2026-09-02（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随 T0 安全边界与并发契约同步）。
 > 覆盖范围：`register_all.cpp/hpp`、`dispatch.cpp/hpp`、`tool_catalog.cpp/hpp`、`schema_builder.cpp/hpp`、`schema_fills.hpp`、8 个 `schema_*_ops.cpp`（含 08-24 新增 `schema_animation_ops.cpp`/`schema_theme_ops.cpp`）、`tool_base.hpp`、`tool_registry.hpp`、`fn_tool.hpp`、`tool_decl.hpp`、`meta_tools.hpp`、30 个域 `*_tools.hpp`，对照 `tests/runner/traversal.cpp`、`tests/unit/register_all_test.cpp`、`tests/config/03_tools_contract.json` 与仓库根 `AGENTS.md` 工具段。
 > 相关页面：[测试体系](../tests.md) · [工具实现 B 组](../modules/tools_ops_b.md) · [工具实现 A 组](../modules/tools_ops_a.md) · [入口与运行时](../modules/entry_runtime.md) · [架构总览](../overview.md)
 
@@ -94,6 +94,8 @@ flowchart TD
 - **16 个用户可见副作用**：show_os_alert、show_display_dialog、speak_display_tts、stop_display_tts、set_display_clipboard、set_display_mouse_mode、warp_display_mouse、set_display_window_title、set_display_window_position、set_display_window_size、set_display_window_mode、set_display_window_flag、move_display_window_to_foreground、request_display_window_attention、create_display_window、delete_display_window。
 - **6 个进程副作用**：build_csharp_assembly、create_os_process、execute_os_process、kill_os_process、open_os_path、set_os_environment。
 - 清单不硬编码：42 个工具用 `GDA_TOOL_CLASS_SIDE` 标记，`get_tool_detail` 响应携带 `side_effect` 字段，`tests/runner/traversal.cpp` 依该字段自动排除并从 30 个域 `*_tools.hpp` 枚举全部工具名；其中空 schema 的副作用工具在冒烟阶段同样跳过。
+
+安全分类补充：`code_execute` 和会改变游戏运行时状态的 `game_*`/eval 操作即使没有 `SideEffect` 枚举值，也必须按高风险调用处理。完整分类、路径边界和停止语义见 [T0 安全边界与并发契约](../security_contract.md)。
 
 ## 遍历步数推导
 

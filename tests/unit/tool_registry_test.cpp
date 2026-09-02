@@ -60,7 +60,7 @@ TEST(ToolRegistryTest, ExecuteEchoArgs) {
       make_meta("tool_a", "desc a", "Scene", true), echo_handler,
       mcp::JsonValue(mcp::JsonValue::object_tag)));
 
-  auto* tool = registry.find("tool_a");
+  auto tool = registry.find("tool_a");
   ASSERT_NE(tool, nullptr);
   mcp::JsonValue args(mcp::JsonValue::object_tag);
   args["v"] = 5;

@@ -6,13 +6,13 @@ tags:
   - 模块
   - 核心层
   - 线程模型
-timestamp: "2026-08-29T02:35:37+08:00"
+timestamp: "2026-09-02T17:10:11+08:00"
 resource: src/core/
 ---
 
 # 核心模块（src/core/）
 
-> 审计日期：2026-08-29（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 随配置面板端口持久化同步并补 YAML frontmatter；08-22 随版本号收敛为根 `VERSION` 单一来源同步 MCP 标识引用；08-22 随死代码清理同步——`set_on_new_entry` 回调与 `is_registered` 删除；08-22 15 时全量一致性审计——职责表补 `version.hpp.in`、生命周期步骤修正；08-24 随竞品对齐批次新增 `error_watermark.hpp` 与 `editor_readiness.{hpp,cpp}` 两小节；08-28 随日志系统增强同步——日志 dock 改名 GDA Log + 配置面板 Show timestamps 开关 + 折叠合并行始终显示最新时间 + ServerContext 诊断日志增强与启动失败真实异常类型透传；08-28 随 SDK 0.3.2 + 默认环回 127.0.0.1 同步；08-29 随 0.2.2 版本与全量审计同步（PluginConfig 补 show_time、行号重核）），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 审计日期：2026-09-02（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随 T0 安全边界与并发契约同步），基于当前工作树代码逐行核对（不依赖 git 历史）。
 > 覆盖范围：`src/core/` 下 8 cpp + 12 头共 20 文件（`CommandQueue` 与 `error_watermark` 为 header-only，`version.hpp.in` 为模板，实际 11 业务组 + 版本）。注意：`CommandQueue` 为 header-only（仅 `command_queue.hpp`，无对应 `.cpp`），`error_watermark.hpp` 同为 header-only，`version.hpp.in` 经 `configure_file` 生成 `version.hpp`。
 
 ## 模块简介
@@ -140,6 +140,8 @@ flowchart LR
 3. `_process`：每帧 `drain()` + Dock 轮询
 4. `_exit_tree`：`ServerContext::stop()` + delete → 注销各组件
 
+安全与停止/重载的可执行约束见 [T0 安全边界与并发契约](../security_contract.md)。当前 `CommandQueue` 没有停止或取消状态，不能将 `stop()` 解释为自动取消已入队任务。
+
 ## 环境变量与端口
 
 - `GODOT_AUTOPILOT_PORT`：`resolve_port()` 用 `std::getenv` 读取、`std::atoi` 转换（**无格式校验**）
@@ -147,6 +149,8 @@ flowchart LR
 - `GODOT_AUTOPILOT_HOST`：`resolve_host()` 用 `std::getenv` 读取，非空即生效；默认环回绑定 `127.0.0.1`（SDK 0.3.2 起 `StreamableHttpServerOptions::host`/`bind_host` 支持环回绑定，可覆盖为 `0.0.0.0` 以监听所有接口）
 - 运行时改端口：`ServerContext::restart(uint16_t)`（配置面板 Apply 触发，成功后经 `PluginConfig::save_port` 持久化）
 - `GDA_FORCE_HEADLESS`：强制 headless 相关路径（`main.cpp` 读取）
+
+监听、可信客户端模型、路径和响应大小边界见 [T0 安全边界与并发契约](../security_contract.md)。
 
 ## config.hpp 常量全表
 

@@ -6,14 +6,14 @@ tags:
   - 测试
   - L1
   - L2
-timestamp: "2026-08-29T02:35:37+08:00"
+timestamp: "2026-09-02T17:10:11+08:00"
 resource: tests/
 ---
 
 # 测试体系（tests/）
 
-> 审计日期：2026-08-29（2026-08-12 初稿；08-17 随客户端配置生成器测试同步并补 YAML frontmatter；08-20 随 +4 工具与新 L2 用例 `05_rename_references` 同步；08-21 随 ToolRegistry 单测复核；08-22 随测试瘦身同步——L1 78→71、SCHEMA 静态口径失效；08-22 15 时全量一致性审计——L1 分文件计数修正、L2 用例数 6、排除清单分组 12+22+1、步数对齐实测 546；08-29 随 0.2.2 版本发布与全量审计同步——L1 77（bm25 14→20）、L2 7 份（新增 06_move_references）、363/42/371/84 口径重核、遍历步数重估、排除清单 42 重分组），基于当前工作树代码逐行核对（不依赖 git 历史）。
-> 覆盖范围：`tests/` 全部（unit 10 文件、runner 7 实现 + 6 头文件、integration、config 7 JSON、`tests/CMakeLists.txt`），对照 `tests/README.md` 与仓库根 `AGENTS.md` 测试段逐条核算。未运行任何测试，所有数值均来自源码静态统计。
+> 审计日期：2026-09-02（2026-08-29 0.2.2 发布审计——L1 77、L2 7 份；09-02 安全与并行硬化——L1 77→96（新增 security_parallel_hardening 17 项，覆盖队列/路径/鉴权/限额/日志）、核心路径/扫描/响应边界与构建大小写修复），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 覆盖范围：`tests/` 全部（unit 11 文件、runner 7 实现 + 6 头文件、integration、config 7 JSON、`tests/CMakeLists.txt`），对照 `tests/README.md` 与仓库根 `AGENTS.md` 测试段逐条核算。96 项 L1 已本地验证通过（见 changelog 2026-09-02-17）。
 
 ## 架构总览
 
@@ -72,7 +72,7 @@ stdout/stderr 各接独立管道读线程持续消费，防 64KB 缓冲写满阻
 
 ## L1 单元测试
 
-**10 个测试文件，实际 77 个 TEST/TEST_F**（`TEST`/`TEST_F` 宏逐行统计，2026-08-29 复核；bm25 14→20）：
+**11 个测试文件，实际 96 个 TEST/TEST_F**（`TEST`/`TEST_F` 宏逐行统计，2026-09-02 复核；bm25 14→20，新增 security_parallel_hardening 17 项）：
 
 | 文件 | 数量 | 主题 |
 |---|---|---|
@@ -81,12 +81,13 @@ stdout/stderr 各接独立管道读线程持续消费，防 64KB 缓冲写满阻
 | `client_config_gen_test.cpp` | 11 | 8 客户端配置文件渲染快照（URL/type/enabled）、JSON 合并三态（新建/保留其他键/非法）、TOML 追加与跳过 |
 | `command_queue_test.cpp` | 7 | 跨线程 submit/drain、异常经 future 传播、主线程记录 |
 | `tool_catalog_test.cpp` | 7 | add/get、重复覆盖、并发安全、默认工具填充一次 |
-| `log_system_test.cpp` | 5 | 单例、级别/分类/文本过滤、环形缓冲覆盖（08-22 清理删回调用例） |
+| `log_system_test.cpp` | 7 | 单例、级别/分类/文本过滤、环形缓冲覆盖、值拷贝快照与 recent 上限（09-02 增补） |
 | `tool_registry_test.cpp` | 5 | ToolBase/FnTool/ToolRegistry：add/find/categories、execute echo、角色接口助手、meta 注册与路由断言 |
 | `schema_builder_test.cpp` | 4 | schema 构造形状、required 位置、未知类型不崩溃（08-22 清理后 API 收敛为三件，用例收缩） |
 | `error_util_test.cpp` | 3 | 错误 JSON 形状、四字段详情 |
 | `runtime_ops_test.cpp` | 1 | 编辑器队列注入往返 |
-| **合计** | **77** | |
+| `security_parallel_hardening_test.cpp` | 17 | 安全与并行硬化：队列关闭/满/线程校验、路径/鉴权、配置与截断、日志并发 |
+| **合计** | **96** | |
 
 **链接来源**（`tests/CMakeLists.txt:31-46` 的 `GDA_UNIT_BUSINESS_SOURCES`，共 14 个显式 + 1 组 glob）：`src/core/` 的 `log_system`、`resource_registry`、`scene_dirty_tracker`、`export_guard`；`src/util/` 的 `bm25_index`、`error_util`、`readback_util`、`variant_json`、`client_config_gen`；`src/tools/` 的 `tool_catalog`、`schema_builder`、`register_all`、`dispatch`、`debugger_access`；`src/tools/*_ops.cpp`（`GDA_TOOLS_OPS_SOURCES` glob，`register_all.cpp` 引用全部 `handle_xxx` 符号故必须链接）。
 
