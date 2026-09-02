@@ -8,15 +8,23 @@
 #include "resources/debugger_resources.hpp"
 #include "resources/resource_handlers.hpp"
 #include "tools/register_all.hpp"
+#include "tools/dispatch.hpp"
 #include "tools/tool_catalog.hpp"
 #include "util/bm25_index.hpp"
 #include <cstdlib>
 #include <exception>
+#include <string_view>
 #include <typeinfo>
 #include <mcp/Content.hpp>
 #include <mcp/server/ServerOptions.hpp>
 
 namespace godot_autopilot {
+
+namespace {
+bool is_loopback_host(std::string_view host) {
+  return host == "127.0.0.1" || host == "::1" || host == "[::1]";
+}
+} // namespace
 
 int ServerContext::resolve_port() {
   if (const char *env_port = std::getenv("GODOT_AUTOPILOT_PORT")) {
@@ -41,25 +49,34 @@ ServerContext::ServerContext(CommandQueue &queue)
       catalog_(std::make_unique<ToolCatalog>()),
       bm25_index_(std::make_unique<Bm25Index>()) {
   port_ = resolve_port();
+  host_ = resolve_host();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
-                            "Server configured on port " +
+                            "Server configured on " + host_ + ":" +
                                 std::to_string(port_));
 }
 
 ServerContext::~ServerContext() {
-  if (running_) {
+  if (running_ || server_ || transport_) {
     stop();
   }
 }
 
 bool ServerContext::start() {
   try {
+    if (!is_loopback_host(host_)) {
+      last_error_ = "refusing non-loopback listen address '" + host_ +
+                    "': remote listening requires application authentication";
+      LogSystem::instance().log(LogLevel::Error, LogCategory::Transport,
+                                "MCP server start rejected: " + last_error_);
+      return false;
+    }
+
     mcp::StreamableHttpServerOptions http_opts;
     http_opts.port = static_cast<uint16_t>(port_);
     http_opts.endpoint = "/mcp";
     http_opts.stateless = true;
     http_opts.enable_legacy_sse = false;
-    http_opts.host = resolve_host();
+    http_opts.host = host_;
 
     LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
                               "MCP server initializing: host=" +
@@ -101,6 +118,9 @@ bool ServerContext::start() {
       last_error_ = "McpServer::Create returned null";
       LogSystem::instance().log(LogLevel::Error, LogCategory::Transport,
                                 "MCP server start failed: " + last_error_);
+      transport_.reset();
+      dispatch::clear_handlers();
+      clear_active_registry();
       return false;
     }
 
@@ -131,6 +151,10 @@ bool ServerContext::start() {
                   ": " + std::string(e.what());
     LogSystem::instance().log(LogLevel::Error, LogCategory::Transport,
                               "MCP server start failed: " + last_error_);
+    if (server_) { try { server_->Close(); } catch (...) {} server_.reset(); }
+    if (transport_) { try { transport_->Close(); } catch (...) {} transport_.reset(); }
+    dispatch::clear_handlers();
+    clear_active_registry();
     return false;
   } catch (...) {
     std::string detail = "non-std exception";
@@ -143,20 +167,30 @@ bool ServerContext::start() {
     last_error_ = "transport start failed: " + detail;
     LogSystem::instance().log(LogLevel::Error, LogCategory::Transport,
                               "MCP server start failed: " + last_error_);
+    if (server_) { try { server_->Close(); } catch (...) {} server_.reset(); }
+    if (transport_) { try { transport_->Close(); } catch (...) {} transport_.reset(); }
+    dispatch::clear_handlers();
+    clear_active_registry();
     return false;
   }
 }
 
 void ServerContext::stop() {
-  if (!running_)
+  if (!running_ && !server_ && !transport_)
     return;
   running_ = false;
 
   LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
                             "MCP server stopping");
 
-  server_->Close();
-  transport_->Close();
+  if (server_)
+    server_->Close();
+  if (transport_)
+    transport_->Close();
+  server_.reset();
+  transport_.reset();
+  dispatch::clear_handlers();
+  clear_active_registry();
 
   LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
                             "MCP server stopped");
@@ -173,13 +207,15 @@ bool ServerContext::restart(uint16_t port) {
 
 int ServerContext::get_port() const { return port_; }
 
+const std::string &ServerContext::get_host() const { return host_; }
+
 bool ServerContext::is_running() const { return running_; }
 
 void ServerContext::register_tools() {
   register_all_tools(*server_, queue_, *catalog_, *bm25_index_, port_);
   register_all_resources(*server_, queue_);
   register_all_prompts(*server_, queue_);
-  register_debugger_resources(*server_);
+  register_debugger_resources(*server_, queue_);
   register_debugger_prompts(*server_);
 }
 

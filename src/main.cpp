@@ -101,6 +101,7 @@ void GodotAutopilotPlugin::_enter_tree() {
   using godot_autopilot::LogCategory;
   using godot_autopilot::LogLevel;
 
+  s_queue.open();
   get_log_system().log(LogLevel::Info, LogCategory::System,
                        "==== Godot Self-Driving plugin starting ====");
   godot_autopilot::runtime_ops::set_editor_queue(
@@ -165,8 +166,9 @@ void GodotAutopilotPlugin::_enter_tree() {
     if (started) {
       auto port = g_server_ctx->get_port();
       get_log_system().log(LogLevel::Info, LogCategory::Transport,
-                           "MCP server listening on 0.0.0.0:" +
-                               std::to_string(port));
+                            "MCP server listening on " +
+                                g_server_ctx->get_host() + ":" +
+                                std::to_string(port));
     } else {
       get_log_system().log(LogLevel::Error, LogCategory::Transport,
                            "MCP server start failed: " +
@@ -207,6 +209,8 @@ void GodotAutopilotPlugin::_exit_tree() {
       delete g_server_ctx;
       g_server_ctx = nullptr;
     }
+    s_queue.close();
+    godot_autopilot::runtime_ops::set_editor_queue(nullptr);
 
     if (export_guard_.is_valid()) {
       remove_export_plugin(export_guard_);

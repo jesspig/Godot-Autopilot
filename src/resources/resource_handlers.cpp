@@ -213,8 +213,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           .MimeType("application/json"),
       [&queue](const std::string &uri) -> mcp::ReadResourceResult {
         std::string json_str;
-        queue
-            .submit([&json_str]() {
+         queue.execute_sync([&json_str]() {
               auto *engine = godot::Engine::get_singleton();
               if (!engine) {
                 set_error(json_str, "Engine singleton not available");
@@ -223,8 +222,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
               godot::Dictionary v = engine->get_version_info();
               auto jv = VariantJson::serialize(v);
               json_str = jv.Dump(-1);
-            })
-            .get();
+             });
         return make_json_result(uri, json_str);
       });
 
@@ -235,8 +233,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           .MimeType("application/json"),
       [&queue](const std::string &uri) -> mcp::ReadResourceResult {
         std::string json_str;
-        queue
-            .submit([&json_str]() {
+         queue.execute_sync([&json_str]() {
               auto *editor = godot::EditorInterface::get_singleton();
               if (!editor) {
                 set_error(json_str, "Not in editor mode");
@@ -251,8 +248,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
               mcp::JsonValue result(mcp::JsonValue::object_tag);
               node_to_json(root, root_prefix, result);
               json_str = result.Dump(-1);
-            })
-            .get();
+             });
         return make_json_result(uri, json_str);
       });
 
@@ -266,8 +262,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           -> mcp::ReadResourceResult {
         std::string path = vars.at("path");
         std::string json_str;
-        queue
-            .submit([&json_str, &path]() {
+         queue.execute_sync([&json_str, &path]() {
               auto *editor = godot::EditorInterface::get_singleton();
               if (!editor) {
                 set_error(json_str, "Not in editor mode");
@@ -299,8 +294,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
               std::string root_prefix = util::to_std(root->get_path());
               auto jv = node_detail_to_json(node, root_prefix);
               json_str = jv.Dump(-1);
-            })
-            .get();
+             });
         return make_json_result(uri, json_str);
       });
 
@@ -311,8 +305,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           .MimeType("application/json"),
       [&queue](const std::string &uri) -> mcp::ReadResourceResult {
         std::string json_str;
-        queue
-            .submit([&json_str]() {
+         queue.execute_sync([&json_str]() {
               auto *editor = godot::EditorInterface::get_singleton();
               if (!editor) {
                 set_error(json_str, "Not in editor mode");
@@ -332,8 +325,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
               mcp::JsonValue result(mcp::JsonValue::object_tag);
               dir_to_json(root_dir, result);
               json_str = result.Dump(-1);
-            })
-            .get();
+             });
         return make_json_result(uri, json_str);
       });
 
@@ -347,8 +339,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           -> mcp::ReadResourceResult {
         std::string path = vars.at("path");
         std::string json_str;
-        queue
-            .submit([&json_str, &path]() {
+         queue.execute_sync([&json_str, &path]() {
               auto *editor = godot::EditorInterface::get_singleton();
               if (!editor) {
                 set_error(json_str, "Not in editor mode");
@@ -385,8 +376,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
               }
 
               set_error(json_str, "Path not found in file system: " + path);
-            })
-            .get();
+             });
         return make_json_result(uri, json_str);
       });
 
@@ -397,8 +387,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           .MimeType("application/json"),
       [&queue](const std::string &uri) -> mcp::ReadResourceResult {
         std::string json_str;
-        queue
-            .submit([&json_str]() {
+         queue.execute_sync([&json_str]() {
               auto *editor = godot::EditorInterface::get_singleton();
               if (!editor) {
                 set_error(json_str, "Not in editor mode");
@@ -430,8 +419,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
                 arr.PushBack(std::move(item));
               }
               json_str = arr.Dump(-1);
-            })
-            .get();
+             });
         return make_json_result(uri, json_str);
       });
 
@@ -445,8 +433,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           -> mcp::ReadResourceResult {
         std::string key = vars.at("key");
         std::string json_str;
-        queue
-            .submit([&json_str, &key]() {
+         queue.execute_sync([&json_str, &key]() {
               auto *editor = godot::EditorInterface::get_singleton();
               if (!editor) {
                 set_error(json_str, "Not in editor mode");
@@ -467,8 +454,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
               godot::Variant val = settings->get_setting(gd_key);
               auto jv = VariantJson::serialize(val);
               json_str = jv.Dump(-1);
-            })
-            .get();
+             });
         return make_json_result(uri, json_str);
       });
 
@@ -479,25 +465,23 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           .MimeType("application/json"),
       [&queue](const std::string &uri) -> mcp::ReadResourceResult {
         std::string json_str;
-        queue
-            .submit([&json_str]() {
+         queue.execute_sync([&json_str]() {
               auto &log = LogSystem::instance();
-              auto entries = log.query(LogSystem::Query{});
+              auto entries = log.query_recent(50);
 
               size_t count = entries.size();
-              size_t start = (count > 50) ? count - 50 : 0;
 
               mcp::JsonValue arr(mcp::JsonValue::array_tag);
-              for (size_t i = start; i < count; i++) {
-                auto *entry = entries[i];
+              for (size_t i = 0; i < count; i++) {
+                const auto &entry = entries[i];
                 mcp::JsonValue item(mcp::JsonValue::object_tag);
-                item["level"] = mcp::JsonValue(level_to_string(entry->level));
+                item["level"] = mcp::JsonValue(level_to_string(entry.level));
                 item["category"] =
-                    mcp::JsonValue(category_to_string(entry->category));
-                item["message"] = mcp::JsonValue(entry->message);
+                    mcp::JsonValue(category_to_string(entry.category));
+                item["message"] = mcp::JsonValue(entry.message);
 
                 std::time_t tt =
-                    std::chrono::system_clock::to_time_t(entry->timestamp);
+                    std::chrono::system_clock::to_time_t(entry.timestamp);
                 char buf[32] = {0};
                 std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ",
                               std::gmtime(&tt));
@@ -506,8 +490,7 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
                 arr.PushBack(std::move(item));
               }
               json_str = arr.Dump(-1);
-            })
-            .get();
+             });
         return make_json_result(uri, json_str);
       });
 

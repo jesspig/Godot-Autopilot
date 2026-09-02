@@ -23,12 +23,10 @@ void LogSystem::log(LogLevel level, LogCategory category,
   }
 }
 
-std::vector<const LogEntry *> LogSystem::query(const Query &q) const {
+std::vector<LogEntry> LogSystem::query(const Query &q) const {
   std::lock_guard<std::mutex> lock(mutex_);
 
-  std::vector<const LogEntry *> result;
-  result.reserve(entries_.size());
-
+  std::vector<LogEntry> result;
   for (const auto &e : entries_) {
     if (e.level < q.min_level) {
       continue;
@@ -47,20 +45,32 @@ std::vector<const LogEntry *> LogSystem::query(const Query &q) const {
         continue;
       }
     }
-    result.push_back(&e);
+    result.push_back(e);
   }
 
   return result;
 }
 
-std::vector<const LogEntry *> LogSystem::query_from(size_t start_index,
-                                                    size_t *next_index) const {
+std::vector<LogEntry> LogSystem::query_recent(size_t limit) const {
   std::lock_guard<std::mutex> lock(mutex_);
 
-  std::vector<const LogEntry *> result;
+  const size_t start = entries_.size() > limit ? entries_.size() - limit : 0;
+  std::vector<LogEntry> result;
+  result.reserve(entries_.size() - start);
+  for (size_t i = start; i < entries_.size(); ++i) {
+    result.push_back(entries_[i]);
+  }
+  return result;
+}
+
+std::vector<LogEntry> LogSystem::query_from(size_t start_index,
+                                            size_t *next_index) const {
+  std::lock_guard<std::mutex> lock(mutex_);
+
+  std::vector<LogEntry> result;
   for (const auto &e : entries_) {
     if (e.serial >= start_index) {
-      result.push_back(&e);
+      result.push_back(e);
     }
   }
   if (next_index) {
