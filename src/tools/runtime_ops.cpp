@@ -35,6 +35,7 @@ using JV = mcp::JsonValue;
 namespace {
 
 CommandQueue *g_editor_queue = nullptr;
+std::mutex g_editor_queue_mtx;
 
 constexpr int64_t RESPONSE_GRACE_MS = 2000;
 constexpr int64_t PHYSICS_STALL_DETECT_MS = 1000;
@@ -50,9 +51,11 @@ bool env_flag_disabled(const std::string &value) {
 std::atomic<int64_t> g_next_request_id{1};
 
 struct PendingRequest {
+  enum class State { Waiting, Completed, Cancelled };
+
   std::mutex mtx;
   std::condition_variable cv;
-  bool done = false;
+  State state = State::Waiting;
   JV response;
   std::string op;
   int32_t session_id = -1;
@@ -61,9 +64,48 @@ struct PendingRequest {
 std::mutex g_pending_mtx;
 std::map<int64_t, std::shared_ptr<PendingRequest>> g_pending;
 
+void erase_pending(int64_t request_id,
+                   const std::shared_ptr<PendingRequest> &pending) {
+  std::lock_guard<std::mutex> lock(g_pending_mtx);
+  auto it = g_pending.find(request_id);
+  if (it != g_pending.end() && it->second == pending)
+    g_pending.erase(it);
+}
+
+CommandQueue *current_editor_queue() {
+  std::lock_guard<std::mutex> lock(g_editor_queue_mtx);
+  return g_editor_queue;
+}
+
+void cancel_all_pending(const std::string &reason) {
+  std::vector<std::shared_ptr<PendingRequest>> pending_requests;
+  {
+    std::lock_guard<std::mutex> lock(g_pending_mtx);
+    for (auto &entry : g_pending)
+      pending_requests.push_back(entry.second);
+    g_pending.clear();
+  }
+
+  for (const auto &pending : pending_requests) {
+    std::lock_guard<std::mutex> lock(pending->mtx);
+    if (pending->state != PendingRequest::State::Waiting)
+      continue;
+    pending->state = PendingRequest::State::Cancelled;
+    pending->response = error_json(reason);
+    pending->cv.notify_all();
+  }
+}
+
 JV send_request(int64_t request_id, const std::string &op, const JV &params) {
   if (!debugger_capture_initialized())
     return error_json("debugger capture plugin not initialized");
+
+  auto pending = std::make_shared<PendingRequest>();
+  pending->op = op;
+  {
+    std::lock_guard<std::mutex> lock(g_pending_mtx);
+    g_pending[request_id] = pending;
+  }
 
   JV payload(JV::object_tag);
   payload[GDA_FIELD_REQUEST_ID] = JV(request_id);
@@ -72,18 +114,17 @@ JV send_request(int64_t request_id, const std::string &op, const JV &params) {
 
   int32_t used_session_id = -1;
   if (!debugger_broadcast_request(payload.Dump(), &used_session_id)) {
+    {
+      std::lock_guard<std::mutex> lock(pending->mtx);
+      pending->state = PendingRequest::State::Cancelled;
+    }
+    erase_pending(request_id, pending);
     return error_json("game not ready: the game process has not reported gda "
                       "ready yet — wait a moment after play, or verify the "
                       "game project loads the godot-autopilot extension");
   }
 
-  auto pending = std::make_shared<PendingRequest>();
-  pending->op = op;
   pending->session_id = used_session_id;
-  {
-    std::lock_guard<std::mutex> lock(g_pending_mtx);
-    g_pending[request_id] = pending;
-  }
 
   JV r(JV::object_tag);
   r["request_id"] = JV(request_id);
@@ -109,18 +150,25 @@ mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms) {
   std::unique_lock<std::mutex> lock(pending->mtx);
   bool completed =
       pending->cv.wait_for(lock, std::chrono::milliseconds(timeout_ms),
-                           [&]() { return pending->done; });
+                           [&]() {
+                             return pending->state != PendingRequest::State::Waiting;
+                           });
   if (!completed) {
     std::string op_name = pending->op.empty() ? "?" : pending->op;
     int32_t session_id = pending->session_id;
-    {
-      std::lock_guard<std::mutex> gl(g_pending_mtx);
-      g_pending.erase(request_id);
-    }
-    if (session_id >= 0 && has_editor_queue()) {
-      get_editor_queue().submit([session_id, request_id]() {
-        debugger_send_cancel(session_id, request_id);
-      });
+    pending->state = PendingRequest::State::Cancelled;
+    erase_pending(request_id, pending);
+    lock.unlock();
+    if (session_id >= 0) {
+      if (CommandQueue *queue = current_editor_queue(); queue &&
+          !queue->is_closed()) {
+        try {
+          queue->submit([session_id, request_id]() {
+            debugger_send_cancel(session_id, request_id);
+          });
+        } catch (...) {
+        }
+      }
     }
     return error_json("game op \"" + op_name + "\" timed out after " +
                       std::to_string(timeout_ms) + " ms (request_id " +
@@ -133,10 +181,7 @@ mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms) {
                       "never complete — run get_game_log_entries to inspect "
                       "the game log.");
   }
-  {
-    std::lock_guard<std::mutex> gl(g_pending_mtx);
-    g_pending.erase(request_id);
-  }
+  erase_pending(request_id, pending);
 
   JV response = pending->response;
   if (response.Contains("error")) {
@@ -214,10 +259,15 @@ mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms) {
 }
 
 void set_editor_queue(godot_autopilot::CommandQueue *q) {
-  g_editor_queue = q;
+  {
+    std::lock_guard<std::mutex> lock(g_editor_queue_mtx);
+    g_editor_queue = q;
+  }
+  if (!q)
+    cancel_all_pending("editor command queue closed while waiting for game response");
 }
 
-bool has_editor_queue() { return g_editor_queue != nullptr; }
+bool has_editor_queue() { return current_editor_queue() != nullptr; }
 
 void maybe_recover_break() {
   static std::unordered_map<int32_t, int> g_auto_continue_counts;
@@ -303,21 +353,38 @@ mcp::JsonValue finalize_capture_response(const mcp::JsonValue &pending_result) {
           godot::PackedByteArray bytes =
               file->get_buffer(static_cast<int64_t>(length));
           file->close();
-          if (bytes.size() <= 0) {
-            return error_json("captured file is empty: " + path);
-          }
-          std::string b64 = capture_ops::base64_encode(
-              bytes.ptrw(), static_cast<size_t>(bytes.size()));
-
-          JV r(JV::object_tag);
+           if (bytes.size() <= 0) {
+             return error_json("captured file is empty: " + path);
+           }
+           if (static_cast<size_t>(bytes.size()) > GDA_CAPTURE_MAX_PNG_BYTES) {
+             JV error = error_json(
+                 "captured PNG exceeds the capture limit of " +
+                 std::to_string(GDA_CAPTURE_MAX_PNG_BYTES) + " bytes");
+             JV details(JV::object_tag);
+             details["code"] = JV("capture_bytes_exceeded");
+             error["structured_error"] = std::move(details);
+             return error;
+           }
+           std::string b64 = capture_ops::base64_encode(
+               bytes.ptrw(), static_cast<size_t>(bytes.size()));
+           JV r(JV::object_tag);
           r["data"] = JV(b64);
           r["format"] = JV("png");
           if (auto *w = pending_result.Find("width"))
             r["width"] = *w;
           if (auto *h = pending_result.Find("height"))
             r["height"] = *h;
-          r["path"] = JV(path);
-          LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+           r["path"] = JV(path);
+           if (r.Dump().size() > GDA_MAX_JSON_RESPONSE_BYTES) {
+             JV error = error_json(
+                 "capture response exceeds the JSON response limit of " +
+                 std::to_string(GDA_MAX_JSON_RESPONSE_BYTES) + " bytes");
+             JV details(JV::object_tag);
+             details["code"] = JV("response_too_large");
+             error["structured_error"] = std::move(details);
+             return error;
+           }
+           LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                                     "capture_game_viewport completed");
           return r;
         })
@@ -383,16 +450,23 @@ void handle_game_response(const std::string &json_str) {
 
   {
     std::lock_guard<std::mutex> lock(pending->mtx);
-    if (pending->done)
+    if (pending->state != PendingRequest::State::Waiting) {
+      LogSystem::instance().log(
+          LogLevel::Warning, LogCategory::Tools,
+          "late game response discarded (request_id " +
+              std::to_string(request_id) + ")");
       return;
+    }
     pending->response = std::move(parsed);
-    pending->done = true;
+    pending->state = PendingRequest::State::Completed;
   }
   pending->cv.notify_all();
 }
 
 } // namespace runtime_ops
 
-CommandQueue &get_editor_queue() { return *runtime_ops::g_editor_queue; }
+CommandQueue &get_editor_queue() {
+  return *runtime_ops::current_editor_queue();
+}
 
 } // namespace godot_autopilot
