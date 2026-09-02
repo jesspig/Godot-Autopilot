@@ -3,6 +3,8 @@
 #include "core/config.hpp"
 #include "core/log_system.hpp"
 #include "gda_protocol.hpp"
+#include "tools/authorization.hpp"
+#include "tools/tool_base.hpp"
 #include "util/error_util.hpp"
 #include <cstdio>
 #include <functional>
@@ -302,6 +304,16 @@ JV op_capture(int64_t request_id) {
   if (image.is_null() || image->is_empty()) {
     return error_result("failed to read viewport texture");
   }
+  if (image->get_width() > GDA_CAPTURE_MAX_DIMENSION ||
+      image->get_height() > GDA_CAPTURE_MAX_DIMENSION) {
+    JV error = error_result(
+        "viewport dimensions exceed the capture limit of " +
+        std::to_string(GDA_CAPTURE_MAX_DIMENSION) + " pixels per side");
+    JV details(JV::object_tag);
+    details["code"] = JV("capture_dimensions_exceeded");
+    error["structured_error"] = std::move(details);
+    return error;
+  }
   std::string path = util::to_std(godot::OS::get_singleton()->get_cache_dir()) +
                      "/gda_capture_" + std::to_string(request_id) + ".png";
   godot::Error save_err = image->save_png(godot::String(path.c_str()));
@@ -536,34 +548,41 @@ public:
     }
 
     JV body;
-    if (op == GDA_OP_STATUS)
+    if (op == GDA_OP_STATUS) {
       body = op_status();
-    else if (op == GDA_OP_PING)
+    } else if (op == GDA_OP_PING) {
       body = op_ping();
-    else if (op == GDA_OP_CANCEL)
+    } else if (op == GDA_OP_CANCEL) {
       body = op_cancel(params);
-    else if (op == GDA_OP_EVAL)
-      body = op_eval(params, request_id);
-    else if (op == GDA_OP_INPUT)
-      body = op_input(params, request_id);
-    else if (op == GDA_OP_INPUT_WAIT)
-      body = op_input_wait(params, request_id);
-    else if (op == GDA_OP_INPUT_STATUS)
+    } else if (op == GDA_OP_EVAL || op == GDA_OP_INPUT ||
+               op == GDA_OP_INPUT_WAIT || op == GDA_OP_INPUT_SEQUENCE) {
+      if (!authorization::capability_enabled("game_runtime")) {
+        body = authorization::deny_if_unauthorized(
+            "game_runtime", SideEffect::GameRuntime);
+      } else if (op == GDA_OP_EVAL) {
+        body = op_eval(params, request_id);
+      } else if (op == GDA_OP_INPUT) {
+        body = op_input(params, request_id);
+      } else if (op == GDA_OP_INPUT_WAIT) {
+        body = op_input_wait(params, request_id);
+      } else {
+        body = op_input_sequence(params, request_id);
+      }
+    } else if (op == GDA_OP_INPUT_STATUS) {
       body = op_input_status(params);
-    else if (op == GDA_OP_INPUT_SEQUENCE)
-      body = op_input_sequence(params, request_id);
-    else if (op == GDA_OP_UI_ELEMENTS)
+    } else if (op == GDA_OP_UI_ELEMENTS) {
       body = op_ui_elements(params);
-    else if (op == GDA_OP_CAPTURE)
+    } else if (op == GDA_OP_CAPTURE) {
       body = op_capture(request_id);
-    else if (op == GDA_OP_GET_ERRORS)
+    } else if (op == GDA_OP_GET_ERRORS) {
       body = op_get_errors(params);
-    else if (op == GDA_OP_GET_OUTPUT)
+    } else if (op == GDA_OP_GET_OUTPUT) {
       body = op_get_output(params);
-    else if (op == GDA_OP_GET_TREE)
+    } else if (op == GDA_OP_GET_TREE) {
       body = op_get_tree();
-    else
+    } else {
       body = error_result("unknown op: " + op);
+    }
 
     if (body.Contains("error")) {
       std::string err_text = body["error"].GetString();
@@ -588,8 +607,21 @@ bool g_registered = false;
 
 void send_response(int64_t request_id, JV body) {
   body[GDA_FIELD_REQUEST_ID] = JV(request_id);
+  std::string serialized = body.Dump();
+  if (serialized.size() > GDA_MAX_JSON_RESPONSE_BYTES) {
+    body = error_result("JSON response exceeds the response limit of " +
+                        std::to_string(GDA_MAX_JSON_RESPONSE_BYTES) +
+                        " bytes");
+    JV details(JV::object_tag);
+    details["code"] = JV("response_too_large");
+    details["limit_bytes"] = JV(static_cast<int64_t>(GDA_MAX_JSON_RESPONSE_BYTES));
+    details["actual_bytes"] = JV(static_cast<int64_t>(serialized.size()));
+    body["structured_error"] = std::move(details);
+    body[GDA_FIELD_REQUEST_ID] = JV(request_id);
+    serialized = body.Dump();
+  }
   godot::Array payload;
-  payload.push_back(godot::String(body.Dump().c_str()));
+  payload.push_back(godot::String(serialized.c_str()));
   if (auto *dbg = godot::EngineDebugger::get_singleton()) {
     dbg->send_message(gda_string(GDA_MSG_RESPONSE), payload);
   }

@@ -1,8 +1,12 @@
 #include "display_ops.hpp"
 #include "capture_ops.hpp"
+#include "core/config.hpp"
 #include "core/log_system.hpp"
 #include "util/error_util.hpp"
 #include "util/variant_json.hpp"
+#ifdef GetObject
+#undef GetObject
+#endif
 #include <godot_cpp/classes/display_server.hpp>
 #include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
@@ -19,6 +23,14 @@ namespace display_ops {
 namespace {
 
 using JV = mcp::JsonValue;
+
+JV capture_limit_error(const std::string &code, const std::string &message) {
+  JV error = util::error_json(message);
+  JV details(JV::object_tag);
+  details["code"] = JV(code);
+  error["structured_error"] = std::move(details);
+  return error;
+}
 
 int screen_from_args(const JV &args) {
   auto *sp = args.Find("screen");
@@ -171,6 +183,13 @@ JV handle_screen_capture(const JV &args) {
   if (image.is_null()) {
     return util::error_json("failed to capture screen image");
   }
+  if (image->get_width() > GDA_CAPTURE_MAX_DIMENSION ||
+      image->get_height() > GDA_CAPTURE_MAX_DIMENSION) {
+    return capture_limit_error(
+        "capture_dimensions_exceeded",
+        "screen dimensions exceed the capture limit of " +
+            std::to_string(GDA_CAPTURE_MAX_DIMENSION) + " pixels per side");
+  }
   godot::PackedByteArray png_buffer = image->save_png_to_buffer();
   if (png_buffer.size() == 0) {
     auto serialized = VariantJson::serialize(godot::Variant(image));
@@ -183,6 +202,12 @@ JV handle_screen_capture(const JV &args) {
         "capture_display_screen completed (png fallback)");
     return r;
   }
+  if (static_cast<size_t>(png_buffer.size()) > GDA_CAPTURE_MAX_PNG_BYTES) {
+    return capture_limit_error(
+        "capture_bytes_exceeded",
+        "encoded PNG exceeds the capture limit of " +
+            std::to_string(GDA_CAPTURE_MAX_PNG_BYTES) + " bytes");
+  }
   std::string b64 = capture_ops::base64_encode(
       png_buffer.ptr(), static_cast<size_t>(png_buffer.size()));
   JV inner(JV::object_tag);
@@ -191,6 +216,11 @@ JV handle_screen_capture(const JV &args) {
   inner["data"] = JV(b64);
   JV r(JV::object_tag);
   r["result"] = std::move(inner);
+  if (r.Dump().size() > GDA_MAX_JSON_RESPONSE_BYTES)
+    return capture_limit_error(
+        "response_too_large",
+        "capture response exceeds the JSON response limit of " +
+            std::to_string(GDA_MAX_JSON_RESPONSE_BYTES) + " bytes");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "capture_display_screen completed");
   return r;

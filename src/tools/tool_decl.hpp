@@ -17,7 +17,12 @@
     static const ::godot_autopilot::ToolMeta m = tool_meta_static();                                      \
     return m;                                                                                             \
   }                                                                                                       \
-  mcp::JsonValue execute(const mcp::JsonValue& args) override { return (ExecFn)(args); }                  \
+  mcp::JsonValue execute(const mcp::JsonValue& args) override {                                               \
+    mcp::JsonValue denied = ::godot_autopilot::authorization::deny_if_unauthorized(                         \
+        ToolName, ::godot_autopilot::side_effect_of(*this));                                                 \
+    if (!denied.IsNull()) return denied;                                                                      \
+    return (ExecFn)(args);                                                                                    \
+  }                                                                                                           \
   mcp::JsonValue input_schema() const override {                                                          \
     return ::godot_autopilot::tool_input_schema(ToolName, BasicSchema);                                   \
   }

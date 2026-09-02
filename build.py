@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Godot-Autopilot 构建脚本。
 
-构建 GDExtension 并部署到 example/addons/。
+构建 GDExtension 并部署到 Example/addons/。
 
 Usage:
     uv run build.py                    # Debug 构建并部署
@@ -20,7 +20,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 BUILD_DIR = PROJECT_ROOT / "build"
-EXAMPLE_DIR = PROJECT_ROOT / "example"
+EXAMPLE_DIR = PROJECT_ROOT / "Example"
 EXAMPLE_ADDON_DIR = EXAMPLE_DIR / "addons" / "godot-autopilot"
 
 PLATFORM_LIBS: dict[str, str] = {
@@ -226,7 +226,7 @@ def main():
     if not _build(preset):
         sys.exit(1)
 
-    print(f"\n[DEPLOY] Copying artifacts to example/addons/...", flush=True)
+    print(f"\n[DEPLOY] Copying artifacts to Example/addons/...", flush=True)
     _deploy(preset)
 
     if args.package:

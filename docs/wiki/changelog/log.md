@@ -2,6 +2,12 @@
 
 > 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天。
 
+## 2026-09-02
+
+- **安全与并行硬化全量落地（T1–T11）**：监听拒绝非环回、队列生命周期与背压、注册快照与 handler 原子替换、统一主线程入口、服务启停清理、pending 先登记、路径与能力分级、扫描/截图/变体限额、日志快照、构建大小写修复；同步 wiki timestamp 与安全契约。详见 `changelog/2026-09-02-log.md`
+- **T0 安全边界与并发契约文档化**：新增 `security_contract.md`，明确可信客户端、监听范围、高风险工具、Godot 主线程、队列停止/重载、路径与响应大小边界；同步受影响 wiki 页面 timestamp。详见 `changelog/2026-09-02-log.md`
+- **知识库一致性审计**：依据源码与提交实际变更更新安全、并发、运行时、构建、测试和 `AGENTS.md` 口径，清除过时描述；L1/ctest 非 runner 96/96 已验证。详见 `changelog/2026-09-02-log.md`
+
 ## 2026-08-29
 
 - **版本 0.2.1 → 0.2.2 与全量知识库审计**：根 `VERSION` 单一来源更新为 `0.2.2`；零代码变更下重核 363 域/42 副作用/371 条目/370 可达/27 类/77 gtest/7 L2/84 ctest/77 .cpp/164 行等全量数值，增量修复 13 个 wiki 页面（overview/build/tests/tools_ops_a/b/tool_base_design/conventions/support/core/entry_runtime/index/example）与 `AGENTS.md`（83→84、6→7 份），frontmatter 与审计日期同步至 2026-08-29；`traversal.cpp` 枚举差异记 `> [!todo]`。详见 `changelog/2026-08-29-log.md`

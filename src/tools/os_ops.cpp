@@ -5,7 +5,11 @@
 #include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/classes/time.hpp>
+#include <climits>
 #include <string>
+#ifdef GetObject
+#undef GetObject
+#endif
 
 namespace godot_autopilot {
 namespace os_ops {
@@ -13,6 +17,28 @@ namespace os_ops {
 using JV = mcp::JsonValue;
 
 namespace {
+
+bool has_only_process_parameters(const JV &args, bool execute) {
+  static constexpr const char *create_allowed[] = {"path", "arguments"};
+  static constexpr const char *execute_allowed[] = {"path", "arguments",
+                                                    "output"};
+  const auto *allowed = execute ? execute_allowed : create_allowed;
+  const size_t count = execute ? 3 : 2;
+  if (!args.IsObject())
+    return false;
+  for (const auto &entry : args.GetObject()) {
+    bool found = false;
+    for (size_t i = 0; i < count; ++i) {
+      if (entry.first == allowed[i]) {
+        found = true;
+        break;
+      }
+    }
+    if (!found)
+      return false;
+  }
+  return true;
+}
 
 godot::String join_psa(const godot::PackedStringArray &psa) {
   godot::String result;
@@ -64,6 +90,8 @@ JV handle_os_create_process(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "create_os_process called");
 
+  if (!has_only_process_parameters(args, false))
+    return util::error_json("unknown or invalid parameter for create_os_process");
   auto *path_p = args.Find("path");
   if (!path_p || !path_p->IsString()) {
     JV e(JV::object_tag);
@@ -86,12 +114,14 @@ JV handle_os_create_process(const JV &args) {
   }
 
   std::string path = path_p->GetString();
+  if (path.empty())
+    return util::error_json("path must not be empty");
   const auto &json_args = args_p->GetArray();
   godot::PackedStringArray ps_args;
   for (const auto &a : json_args) {
-    if (a.IsString()) {
-      ps_args.append(godot::String(a.GetString().c_str()));
-    }
+    if (!a.IsString())
+      return util::error_json("arguments must contain only strings");
+    ps_args.append(godot::String(a.GetString().c_str()));
   }
 
   int32_t pid = os->create_process(godot::String(path.c_str()), ps_args);
@@ -107,6 +137,8 @@ JV handle_os_execute(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "execute_os_process called");
 
+  if (!has_only_process_parameters(args, true))
+    return util::error_json("unknown or invalid parameter for execute_os_process");
   auto *path_p = args.Find("path");
   if (!path_p || !path_p->IsString()) {
     JV e(JV::object_tag);
@@ -129,19 +161,22 @@ JV handle_os_execute(const JV &args) {
   }
 
   std::string path = path_p->GetString();
+  if (path.empty())
+    return util::error_json("path must not be empty");
   const auto &json_args = args_p->GetArray();
   godot::PackedStringArray ps_args;
   for (const auto &a : json_args) {
-    if (a.IsString()) {
-      ps_args.append(godot::String(a.GetString().c_str()));
-    }
+    if (!a.IsString())
+      return util::error_json("arguments must contain only strings");
+    ps_args.append(godot::String(a.GetString().c_str()));
   }
 
   bool capture_output = false;
   auto *output_p = args.Find("output");
-  if (output_p && output_p->IsBool()) {
+  if (output_p && !output_p->IsBool())
+    return util::error_json("output must be a boolean");
+  if (output_p)
     capture_output = output_p->GetBool();
-  }
 
   godot::Dictionary d;
   if (capture_output) {
@@ -382,6 +417,8 @@ JV handle_os_kill(const JV &args) {
   }
 
   int32_t pid = static_cast<int32_t>(pid_p->GetInt());
+  if (pid_p->GetInt() <= 0 || pid_p->GetInt() > INT32_MAX)
+    return util::error_json("pid must be a positive 32-bit integer");
   godot::Error err = os->kill(pid);
 
   JV r(JV::object_tag);

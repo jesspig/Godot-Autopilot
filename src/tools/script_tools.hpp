@@ -12,9 +12,9 @@
 namespace godot_autopilot {
 namespace script_tools {
 
-GDA_TOOL_CLASS(ExecuteScriptTool, "execute_script",
+GDA_TOOL_CLASS_SIDE(ExecuteScriptTool, "execute_script",
                "Execute arbitrary GDScript synchronously in the editor process; single-expression input returns its value automatically, multi-line code needs an explicit return statement. print() output appears in the output field, errors in the errors field. Compilation errors include line mapping and the wrapped source. There is no timeout — long code blocks the editor. The environment exposes SceneRoot (edited scene root) for node access; for the running game process use execute_game_script instead.",
-               "Scripts", std::vector<std::string>({"script", "execute", "gdscript"}), script_ops::handle_execute_gdscript, true)
+               "Scripts", std::vector<std::string>({"script", "execute", "gdscript"}), script_ops::handle_execute_gdscript, true, ::godot_autopilot::SideEffect::CodeExecute)
 
 GDA_TOOL_CLASS(LoadScriptTool, "load_script",
                "Load a GDScript resource from a res:// path. Requires path; errors when the file is missing or the loaded resource is not a Script. Returns the script's class, path and object_id. Use it before get_script_property or reload_script to obtain a valid script.",

@@ -6,13 +6,13 @@ tags:
   - 模块
   - 工具注册
   - schema
-timestamp: "2026-08-29T02:35:37+08:00"
+timestamp: "2026-09-02T18:45:30+08:00"
 resource: src/tools/
 ---
 
 # 工具注册表（src/tools/ 注册管线）
 
-> 审计日期：2026-08-29（2026-08-12 初稿；08-17 补 frontmatter；08-20 registry 单一来源重构；08-21 真类化 + def 删除、元工具接口化、副作用驱动遍历排除；08-22 死代码清理与全量一致性审计；08-24 随竞品对齐批次同步——领域工具扩至 363/27 类（+Animation 10、Theme 8、Testing 2、Analysis 3）、副作用 42、删除 get_debugger_stack_dump/get_debugger_monitors、reimport_resource_files 字段名缺口修复、catalog 口径 371；08-29 随 0.2.2 版本与全量审计同步）。
+> 审计日期：2026-09-02（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随 T0 安全边界与并发契约同步）。
 > 覆盖范围：`register_all.cpp/hpp`、`dispatch.cpp/hpp`、`tool_catalog.cpp/hpp`、`schema_builder.cpp/hpp`、`schema_fills.hpp`、8 个 `schema_*_ops.cpp`（含 08-24 新增 `schema_animation_ops.cpp`/`schema_theme_ops.cpp`）、`tool_base.hpp`、`tool_registry.hpp`、`fn_tool.hpp`、`tool_decl.hpp`、`meta_tools.hpp`、30 个域 `*_tools.hpp`，对照 `tests/runner/traversal.cpp`、`tests/unit/register_all_test.cpp`、`tests/config/03_tools_contract.json` 与仓库根 `AGENTS.md` 工具段。
 > 相关页面：[测试体系](../tests.md) · [工具实现 B 组](../modules/tools_ops_b.md) · [工具实现 A 组](../modules/tools_ops_a.md) · [入口与运行时](../modules/entry_runtime.md) · [架构总览](../overview.md)
 
@@ -36,8 +36,8 @@ flowchart TD
 - **schema 单一源**：`tool_input_schema(name, basic)` 在 `register_all.hpp/cpp` 暴露，转发匿名命名空间 `build_schema_for`；`basic` 参数保留签名但已为 no-op（fill 表直接给出最终 schema）。
 - **宏要点**：`GDA_TOOL_CLASS` 的 TagsList 实参必须用圆括号 `std::vector<std::string>({...})`（花括号逗号会被预处理器拆散）；`make_tools()` 必须用 `push_back(std::make_unique<Class>())`（vector 花括号 initializer_list 触发 unique_ptr 拷贝-已删除）。
 - **元工具 = 接口 + 组合**：`IMetaTool` 标记接口（`tool_base.hpp`）；元工具类 `MetaTool : ToolBase, IMetaTool`（`meta_tools.hpp`），依赖（index/catalog/schema/处理逻辑）经构造函数组合注入；`ToolRegistry::add()` 用 `dynamic_cast<const IMetaTool*>` 自动归类——**实现 `IMetaTool` 接口即元工具**（Java 心智）。7 个元工具以 `MetaTool` 注册，在域工具之后，由派生循环统一 `RegisterTool`；导出保护在 RegisterTool 回调统一前置 `ExportGuard::is_exporting()` 检查。
-- **生命周期**：`g_active_registry` 为文件级 `static unique_ptr<ToolRegistry>`（程序存活期），`register_all_tools` 每次调用重建内容并 `index.clear()` 重置 BM25 索引，避免悬垂与重复注册。
-- **副作用驱动遍历排除**：`SideEffect` 枚举含 6 值（`None/WritesFile/WritesConfig/ShowsAlert/ModifiesWindow/Process`）；42 个副作用工具用 `GDA_TOOL_CLASS_SIDE` 宏（实现 `ISideEffect` 返回对应值）；`meta_get_tool_detail_impl` 经 `g_active_registry->find_any(name)` + `side_effect_of` + `side_effect_name` 在 `get_tool_detail` 响应补 `side_effect` 字段；遍历 runner 读该字段排除（删除硬编码清单）。
+- **生命周期**：`g_active_registry` 使用 mutex 保护的 `shared_ptr<ToolRegistry>`；`register_all_tools` 每次先构建局部 registry，再批量替换 catalog/index/dispatch，旧请求持有的 registry 由共享所有权延长生命周期。
+- **副作用驱动遍历排除**：`SideEffect` 枚举含 8 值（`None/WritesFile/WritesConfig/ShowsAlert/ModifiesWindow/Process/CodeExecute/GameRuntime`）；42 个传统副作用工具用 `GDA_TOOL_CLASS_SIDE` 宏标记；`code_execute` 与运行时变更能力通过额外能力分类保护；遍历 runner 读取 `side_effect` 字段排除传统副作用工具。
 - **分类边界**：`get_debug_object_info`（def 标 Debug、handler `physics_ops::handle_resolve_object`）归 `physics_tools`；`read_file/find_in_files/write_file`（def 归 OS、handler `text_ops`）归 `os_tools`；Scene Tree 类工具 Category 均为 "Scene"、按 handler 分 `scene_tools`/`scene_tree_tools`；InputMap 工具 Category "Input"、归 `input_map_tools`。
 
 ## 三层结构
@@ -95,6 +95,8 @@ flowchart TD
 - **6 个进程副作用**：build_csharp_assembly、create_os_process、execute_os_process、kill_os_process、open_os_path、set_os_environment。
 - 清单不硬编码：42 个工具用 `GDA_TOOL_CLASS_SIDE` 标记，`get_tool_detail` 响应携带 `side_effect` 字段，`tests/runner/traversal.cpp` 依该字段自动排除并从 30 个域 `*_tools.hpp` 枚举全部工具名；其中空 schema 的副作用工具在冒烟阶段同样跳过。
 
+安全分类补充：`code_execute` 和会改变游戏运行时状态的 `game_*`/eval 操作即使没有 `SideEffect` 枚举值，也必须按高风险调用处理。完整分类、路径边界和停止语义见 [T0 安全边界与并发契约](../security_contract.md)。
+
 ## 遍历步数推导
 
 > 步数随工具数变化：域工具 363、排除 42，空参 363−42=**321**，冒烟步数以运行时 `03_tools_contract.json` 统计为准。08-24 扩容后枚举与排除集同步扩大，历史实测值（546）已过期，以最近一次运行为准。
@@ -103,7 +105,7 @@ flowchart TD
 
 ## 分发与错误路径（dispatch.cpp）
 
-- `call_handler`：编辑器队列存在且不在主线程时，先 `queue.submit` 排到主线程执行，保证 Godot API 线程安全。
+- `call_handler`：编辑器队列存在且不在主线程时，经 `CommandQueue::execute_sync` 排到主线程执行，保证 Godot API 线程安全；handler map 在锁内替换、复制后锁外执行。
 - `call_handler_impl` 查找顺序：`g_handlers` → 命中即执行，异常捕获后返回 `internal error in tool 'X': unexpected C++ exception`（参数 dump 截断 256 字节）；未命中再查 `g_meta_handlers`（元名单不再硬编码，由 registry `all_meta()` 派生）；否则返回 `domain tool 'X' not found — use search_tools to discover available tools`。
 - 导出保护：全部 7 个元工具回调前置 `ExportGuard::is_exporting()` 检查，命中返回 `export_blocked_result()`。
 - `debugger_access.hpp` 为 runtime_ops 提供的自由函数接口（capture/broadcast/cancel/continue/breaked/reload_scripts），实现于 `debugger_access.cpp`；依赖方向 runtime_ops.cpp → debugger_access.hpp、debugger_ops.cpp → runtime_ops.hpp，无环。

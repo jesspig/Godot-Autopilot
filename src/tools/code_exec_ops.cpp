@@ -23,6 +23,9 @@
 #include <godot_cpp/variant/string_name.hpp>
 #include <sstream>
 #include <string>
+#ifdef GetObject
+#undef GetObject
+#endif
 
 using namespace godot_autopilot;
 
@@ -464,15 +467,22 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
         mcp::JsonValue("missing required parameter: operations (array)");
     return e;
   }
+  constexpr size_t BATCH_MAX_OPERATIONS = 256;
+  if (ops->GetArray().size() > BATCH_MAX_OPERATIONS)
+    return util::error_json("operations exceeds maximum of 256 items");
 
   bool stop_on_error = true;
   auto *stop = args.Find("stop_on_error");
-  if (stop && stop->IsBool())
+  if (stop && !stop->IsBool())
+    return util::error_json("stop_on_error must be a boolean");
+  if (stop)
     stop_on_error = stop->GetBool();
 
   bool rollback_on_error = false;
   auto *rollback = args.Find("rollback_on_error");
-  if (rollback && rollback->IsBool())
+  if (rollback && !rollback->IsBool())
+    return util::error_json("rollback_on_error must be a boolean");
+  if (rollback)
     rollback_on_error = rollback->GetBool();
 
   godot::UndoRedo *history = nullptr;
@@ -533,6 +543,18 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
 
     mcp::JsonValue tool_args(mcp::JsonValue::object_tag);
     if (auto *a = op.Find("args")) {
+      if (!a->IsObject()) {
+        result_item["status"] = mcp::JsonValue("error");
+        result_item["error"] = mcp::JsonValue("operation args must be an object");
+        results.PushBack(std::move(result_item));
+        ++failed;
+        if (stop_on_error) {
+          stopped = true;
+          stopped_after = i + 1;
+          break;
+        }
+        continue;
+      }
       tool_args = *a;
     }
 
@@ -601,18 +623,38 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue &args) {
     e["error"] = mcp::JsonValue("missing required parameter: source_code");
     return e;
   }
+  if (src->GetString().empty())
+    return util::error_json("source_code must not be empty");
+  static constexpr const char *allowed[] = {
+      "source_code", "function_name", "timeout_ms", "auto_owner"};
+  if (args.IsObject()) {
+    for (const auto &entry : args.GetObject()) {
+      bool known = false;
+      for (const char *key : allowed)
+        if (entry.first == key) {
+          known = true;
+          break;
+        }
+      if (!known)
+        return util::error_json("unknown parameter for code_execute: " +
+                                entry.first);
+    }
+  }
 
   ctx.source_code = src->GetString();
   ctx.func_name = "_run";
   if (auto *fn = args.Find("function_name")) {
-    if (fn->IsString())
-      ctx.func_name = fn->GetString();
+    if (!fn->IsString() || fn->GetString().empty())
+      return util::error_json("function_name must be a non-empty string");
+    ctx.func_name = fn->GetString();
   }
 
   ctx.timeout_ms = CODE_EXEC_DEFAULT_TIMEOUT_MS;
   if (auto *tm = args.Find("timeout_ms")) {
-    if (tm->IsInt())
-      ctx.timeout_ms = static_cast<int>(tm->GetInt());
+    if (!tm->IsInt() || tm->GetInt() <= 0 ||
+        tm->GetInt() > CODE_EXEC_MAX_TIMEOUT_MS)
+      return util::error_json("timeout_ms must be an integer between 1 and 30000");
+    ctx.timeout_ms = static_cast<int>(tm->GetInt());
   }
   if (ctx.timeout_ms <= 0)
     ctx.timeout_ms = CODE_EXEC_DEFAULT_TIMEOUT_MS;
@@ -620,8 +662,9 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue &args) {
 
   ctx.auto_owner = true;
   if (auto *ao = args.Find("auto_owner")) {
-    if (ao->IsBool())
-      ctx.auto_owner = ao->GetBool();
+    if (!ao->IsBool())
+      return util::error_json("auto_owner must be a boolean");
+    ctx.auto_owner = ao->GetBool();
   }
 
   ctx.start_time = std::chrono::steady_clock::now();

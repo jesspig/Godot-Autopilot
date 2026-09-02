@@ -13,6 +13,15 @@ constexpr int64_t GDA_MAX_TIMEOUT_MS = 30000;
 constexpr size_t GDA_ERROR_BUFFER_MAX = 200;
 constexpr size_t GDA_OUTPUT_BUFFER_MAX = 500;
 constexpr size_t GDA_EVAL_TRUNCATE_BYTES = 8192;
+constexpr int64_t GDA_CAPTURE_MAX_DIMENSION = 4096;
+constexpr size_t GDA_CAPTURE_MAX_PNG_BYTES = 8 * 1024 * 1024;
+constexpr size_t GDA_VARIANT_MAX_STRING_BYTES = 64 * 1024;
+constexpr size_t GDA_VARIANT_MAX_ARRAY_ELEMENTS = 10000;
+constexpr size_t GDA_MAX_JSON_RESPONSE_BYTES = 4 * 1024 * 1024;
+constexpr size_t GDA_SCAN_MAX_FILES = 10000;
+constexpr size_t GDA_SCAN_MAX_FILE_BYTES = 2 * 1024 * 1024;
+constexpr size_t GDA_SCAN_MAX_TOTAL_BYTES = 32 * 1024 * 1024;
+constexpr size_t GDA_SCAN_MAX_DEPTH = 64;
 
 } // namespace godot_autopilot
 

@@ -27,8 +27,8 @@ ToolInfo make_tool(const std::string &name, const std::string &category) {
 TEST(ToolCatalogTest, AddAndGetTool) {
   ToolCatalog catalog;
   catalog.add_tool(make_tool("alpha", "CatA"));
-  const ToolInfo *info = catalog.get_tool("alpha");
-  ASSERT_NE(info, nullptr);
+  auto info = catalog.get_tool("alpha");
+  ASSERT_TRUE(info.has_value());
   EXPECT_EQ(info->description, "desc of alpha");
   EXPECT_EQ(info->category, "CatA");
   EXPECT_EQ(info->tags.size(), 2u);
@@ -36,7 +36,7 @@ TEST(ToolCatalogTest, AddAndGetTool) {
 
 TEST(ToolCatalogTest, GetMissingToolReturnsNullptr) {
   ToolCatalog catalog;
-  EXPECT_EQ(catalog.get_tool("nope"), nullptr);
+  EXPECT_FALSE(catalog.get_tool("nope").has_value());
 }
 
 TEST(ToolCatalogTest, DuplicateAddOverwrites) {
@@ -48,8 +48,8 @@ TEST(ToolCatalogTest, DuplicateAddOverwrites) {
   second.description = "second";
   catalog.add_tool(second);
   EXPECT_EQ(catalog.size(), 1u);
-  const ToolInfo *info = catalog.get_tool("dup");
-  ASSERT_NE(info, nullptr);
+  auto info = catalog.get_tool("dup");
+  ASSERT_TRUE(info.has_value());
   EXPECT_EQ(info->description, "second");
   EXPECT_EQ(info->category, "CatB");
 }
@@ -62,8 +62,8 @@ TEST(ToolCatalogTest, GetAllToolsReturnsAll) {
   auto all = catalog.get_all_tools();
   ASSERT_EQ(all.size(), 3u);
   std::vector<std::string> names;
-  for (const auto *info : all) {
-    names.push_back(info->name);
+  for (const auto &info : all) {
+    names.push_back(info.name);
   }
   EXPECT_NE(std::find(names.begin(), names.end(), "one"), names.end());
   EXPECT_NE(std::find(names.begin(), names.end(), "two"), names.end());
@@ -102,16 +102,16 @@ TEST(ToolCatalogTest, ConcurrentAddIsSafe) {
   EXPECT_EQ(catalog.size(), static_cast<size_t>(kThreads * kPerThread));
   EXPECT_EQ(catalog.get_all_tools().size(),
             static_cast<size_t>(kThreads * kPerThread));
-  EXPECT_NE(catalog.get_tool("ct_0_0"), nullptr);
-  EXPECT_NE(catalog.get_tool("ct_7_24"), nullptr);
+  EXPECT_TRUE(catalog.get_tool("ct_0_0").has_value());
+  EXPECT_TRUE(catalog.get_tool("ct_7_24").has_value());
 }
 
 TEST(ToolCatalogTest, PopulateDefaultToolsOnce) {
   ToolCatalog catalog;
   catalog.populate_default_tools();
   EXPECT_EQ(catalog.size(), 5u);
-  EXPECT_NE(catalog.get_tool("ping"), nullptr);
-  EXPECT_NE(catalog.get_tool("search_tools"), nullptr);
+  EXPECT_TRUE(catalog.get_tool("ping").has_value());
+  EXPECT_TRUE(catalog.get_tool("search_tools").has_value());
   catalog.populate_default_tools();
   EXPECT_EQ(catalog.size(), 5u);
 }

@@ -1,5 +1,6 @@
 #include "game_bridge.hpp"
 
+#include "core/config.hpp"
 #include "util/error_util.hpp"
 #include "util/readback_util.hpp"
 #include "util/variant_json.hpp"
@@ -448,6 +449,46 @@ JV op_eval(const JV &params, int64_t request_id) {
         "eval requires action (script|get_property|set_property|call_method)");
   }
   std::string action = action_p->GetString();
+  if (action != "script" && action != "get_property" &&
+      action != "set_property" && action != "call_method")
+    return error_result("unknown eval action: " + action);
+  static constexpr const char *allowed[] = {
+      "action", "node_path", "property", "value", "method", "args",
+      "source_code", "persist", "persist_name", "timeout_ms"};
+  if (!params.IsObject())
+    return error_result("eval params must be an object");
+  for (const auto &entry : params.GetObject()) {
+    bool known = false;
+    for (const char *key : allowed)
+      if (entry.first == key) {
+        known = true;
+        break;
+      }
+    if (!known)
+      return error_result("unknown eval parameter: " + entry.first);
+  }
+  if (auto *path = params.Find("node_path"); path && !path->IsString())
+    return error_result("eval node_path must be a string");
+  if (auto *property = params.Find("property"); property &&
+      (!property->IsString() || property->GetString().empty()))
+    return error_result("eval property must be a non-empty string");
+  if (auto *method = params.Find("method"); method &&
+      (!method->IsString() || method->GetString().empty()))
+    return error_result("eval method must be a non-empty string");
+  if (auto *source = params.Find("source_code"); source &&
+      (!source->IsString() || source->GetString().empty()))
+    return error_result("eval source_code must be a non-empty string");
+  if (auto *call_args = params.Find("args"); call_args && !call_args->IsArray())
+    return error_result("eval args must be an array");
+  if (auto *persist = params.Find("persist"); persist && !persist->IsBool())
+    return error_result("eval persist must be a boolean");
+  if (auto *persist_name = params.Find("persist_name"); persist_name &&
+      (!persist_name->IsString() || persist_name->GetString().empty()))
+    return error_result("eval persist_name must be a non-empty string");
+  if (auto *timeout = params.Find("timeout_ms"); timeout &&
+      (!timeout->IsInt() || timeout->GetInt() <= 0 ||
+       timeout->GetInt() > GDA_MAX_TIMEOUT_MS))
+    return error_result("eval timeout_ms must be an integer between 1 and 30000");
   if (action == "script")
     return op_eval_script(params, request_id);
   if (action == "get_property")

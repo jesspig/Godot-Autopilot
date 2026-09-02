@@ -26,8 +26,8 @@ TEST(LogSystemTest, QueryFiltersByMinLevel) {
     q.min_level = LogLevel::Warning;
     auto results = log.query(q);
     ASSERT_EQ(results.size(), 2u);
-    EXPECT_EQ(results[0]->level, LogLevel::Warning);
-    EXPECT_EQ(results[1]->level, LogLevel::Error);
+    EXPECT_EQ(results[0].level, LogLevel::Warning);
+    EXPECT_EQ(results[1].level, LogLevel::Error);
 }
 
 TEST(LogSystemTest, QueryFiltersByCategory) {
@@ -40,8 +40,8 @@ TEST(LogSystemTest, QueryFiltersByCategory) {
     q.category = LogCategory::System;
     auto results = log.query(q);
     ASSERT_EQ(results.size(), 1u);
-    EXPECT_EQ(results[0]->category, LogCategory::System);
-    EXPECT_EQ(results[0]->message, "CATMARK_sys_1");
+    EXPECT_EQ(results[0].category, LogCategory::System);
+    EXPECT_EQ(results[0].message, "CATMARK_sys_1");
 }
 
 TEST(LogSystemTest, QueryFilterTextIsCaseInsensitive) {
@@ -51,7 +51,7 @@ TEST(LogSystemTest, QueryFilterTextIsCaseInsensitive) {
     q.filter_text = "cAsEmIx";
     auto results = log.query(q);
     ASSERT_EQ(results.size(), 1u);
-    EXPECT_EQ(results[0]->message, "CaseMixAbC_1");
+    EXPECT_EQ(results[0].message, "CaseMixAbC_1");
 }
 
 TEST(LogSystemTest, RingBufferOverwritesOldestAtMaxEntries) {
@@ -65,4 +65,26 @@ TEST(LogSystemTest, RingBufferOverwritesOldestAtMaxEntries) {
     EXPECT_TRUE(log.query(q).empty());
     q.filter_text = "RINGMARK_" + std::to_string(total - 1);
     EXPECT_FALSE(log.query(q).empty());
+}
+
+TEST(LogSystemTest, QueryReturnsValueCopyNotDanglingPointer) {
+    LogSystem& log = LogSystem::instance();
+    log.log(LogLevel::Info, LogCategory::System, "SNAPSHOT_test_1");
+    auto snap = log.query_recent(1);
+    ASSERT_EQ(snap.size(), 1u);
+    std::string msg = snap[0].message;
+    // flood to evict oldest
+    for (int i = 0; i < LogSystem::MAX_ENTRIES + 10; ++i) {
+        log.log(LogLevel::Info, LogCategory::System, "FLOOD_" + std::to_string(i));
+    }
+    // snap should still be valid (value copy)
+    EXPECT_EQ(msg, "SNAPSHOT_test_1");
+    EXPECT_EQ(snap[0].message, "SNAPSHOT_test_1");
+}
+
+TEST(LogSystemTest, QueryRecentLimitsResults) {
+    LogSystem& log = LogSystem::instance();
+    for (int i = 0; i < 5; ++i) log.log(LogLevel::Info, LogCategory::System, "RECENT_" + std::to_string(i));
+    auto recent = log.query_recent(2);
+    EXPECT_LE(recent.size(), 2u);
 }

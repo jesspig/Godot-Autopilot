@@ -121,14 +121,14 @@ TEST_F(RegisteredServerFixture, CatalogToolCountMatches) {
 TEST_F(RegisteredServerFixture, CatalogEntriesWellFormed) {
   auto tools = catalog.get_all_tools();
   ASSERT_EQ(tools.size(), catalog.size());
-  for (const auto *tool : tools) {
-    EXPECT_FALSE(tool->name.empty());
-    EXPECT_FALSE(tool->description.empty())
-        << "empty description: " << tool->name;
-    EXPECT_FALSE(tool->category.empty()) << "empty category: " << tool->name;
-    EXPECT_TRUE(is_valid_category(tool->category))
-        << "invalid category '" << tool->category << "' for tool "
-        << tool->name;
+  for (const auto &tool : tools) {
+    EXPECT_FALSE(tool.name.empty());
+    EXPECT_FALSE(tool.description.empty())
+        << "empty description: " << tool.name;
+    EXPECT_FALSE(tool.category.empty()) << "empty category: " << tool.name;
+    EXPECT_TRUE(is_valid_category(tool.category))
+        << "invalid category '" << tool.category << "' for tool "
+        << tool.name;
   }
 }
 
@@ -136,8 +136,8 @@ TEST_F(RegisteredServerFixture, SchemaStatisticsBaseline) {
   size_t non_empty = 0;
   size_t empty = 0;
   const auto tools = catalog.get_all_tools();
-  for (const auto *tool : tools) {
-    if (has_schema_params(tool->input_schema)) {
+  for (const auto &tool : tools) {
+    if (has_schema_params(tool.input_schema)) {
       ++non_empty;
     } else {
       ++empty;
@@ -160,13 +160,13 @@ TEST_F(RegisteredServerFixture, SchemaSampledTools) {
                                 "ping",                 "system_status",
                                 "list_categories"};
   for (const char *name : kNonEmpty) {
-    const auto *info = catalog.get_tool(name);
-    ASSERT_NE(info, nullptr) << name;
+    auto info = catalog.get_tool(name);
+    ASSERT_TRUE(info.has_value()) << name;
     EXPECT_TRUE(has_schema_params(info->input_schema)) << name;
   }
   for (const char *name : kEmpty) {
-    const auto *info = catalog.get_tool(name);
-    ASSERT_NE(info, nullptr) << name;
+    auto info = catalog.get_tool(name);
+    ASSERT_TRUE(info.has_value()) << name;
     EXPECT_FALSE(has_schema_params(info->input_schema)) << name;
   }
 }
@@ -174,7 +174,7 @@ TEST_F(RegisteredServerFixture, SchemaSampledTools) {
 TEST_F(RegisteredServerFixture, CatalogCoversServerTools) {
   auto result = client->ListTools();
   for (const auto &tool : result.tools) {
-    EXPECT_NE(catalog.get_tool(tool.name), nullptr)
+    EXPECT_TRUE(catalog.get_tool(tool.name).has_value())
         << "tool registered on server but missing from catalog: " << tool.name;
   }
 }
@@ -249,25 +249,25 @@ TEST_F(RegisteredServerFixture, Bm25IndexPopulatedAfterRegistration) {
 }
 
 TEST_F(RegisteredServerFixture, RegistryIsSingleSourceOfTools) {
-  auto& reg = godot_autopilot::get_active_registry();
+  auto reg = godot_autopilot::get_active_registry();
 
-  EXPECT_EQ(reg.meta_size(), kMetaToolCount);
+  EXPECT_EQ(reg->meta_size(), kMetaToolCount);
 
-  EXPECT_EQ(reg.all_any().size(), catalog.size());
+  EXPECT_EQ(reg->all_any().size(), catalog.size());
 
   for (const char* name : kMetaToolNames) {
-    EXPECT_NE(reg.find_meta(name), nullptr) << "missing meta tool: " << name;
+    EXPECT_NE(reg->find_meta(name), nullptr) << "missing meta tool: " << name;
   }
 
-  EXPECT_NE(reg.find("system_status"), nullptr);
+  EXPECT_NE(reg->find("system_status"), nullptr);
 
-  for (auto* t : reg.all_any()) {
-    EXPECT_NE(catalog.get_tool(t->meta().name), nullptr)
+  for (auto t : reg->all_any()) {
+    EXPECT_TRUE(catalog.get_tool(t->meta().name).has_value())
         << "registry tool missing from catalog: " << t->meta().name;
   }
 
-  for (const auto* tool : catalog.get_all_tools()) {
-    EXPECT_NE(reg.find_any(tool->name), nullptr)
-        << "catalog entry missing from registry: " << tool->name;
+  for (const auto &tool : catalog.get_all_tools()) {
+    EXPECT_NE(reg->find_any(tool.name), nullptr)
+        << "catalog entry missing from registry: " << tool.name;
   }
 }

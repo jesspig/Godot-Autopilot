@@ -16,6 +16,15 @@ namespace capture_ops {
 
 namespace {
 
+mcp::JsonValue capture_limit_error(const std::string &code,
+                                   const std::string &message) {
+  mcp::JsonValue error = util::error_json(message);
+  mcp::JsonValue details(mcp::JsonValue::object_tag);
+  details["code"] = mcp::JsonValue(code);
+  error["structured_error"] = std::move(details);
+  return error;
+}
+
 godot::Ref<godot::ViewportTexture>
 usable_viewport_texture(godot::SubViewport *viewport) {
   godot::Ref<godot::ViewportTexture> texture;
@@ -104,13 +113,26 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
 
   auto img = texture->get_image();
 
+  if (img->get_width() > GDA_CAPTURE_MAX_DIMENSION ||
+      img->get_height() > GDA_CAPTURE_MAX_DIMENSION) {
+    return capture_limit_error(
+        "capture_dimensions_exceeded",
+        "viewport dimensions exceed the capture limit of " +
+            std::to_string(GDA_CAPTURE_MAX_DIMENSION) + " pixels per side");
+  }
+
   godot::PackedByteArray png_buffer = img->save_png_to_buffer();
   if (png_buffer.size() == 0)
     return util::error_json("PNG encoding returned empty buffer");
+  if (static_cast<size_t>(png_buffer.size()) > GDA_CAPTURE_MAX_PNG_BYTES) {
+    return capture_limit_error(
+        "capture_bytes_exceeded",
+        "encoded PNG exceeds the capture limit of " +
+            std::to_string(GDA_CAPTURE_MAX_PNG_BYTES) + " bytes");
+  }
 
   std::string b64 =
       base64_encode(png_buffer.ptr(), static_cast<size_t>(png_buffer.size()));
-
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   mcp::JsonValue inner(mcp::JsonValue::object_tag);
   inner["data"] = mcp::JsonValue(b64);
@@ -118,6 +140,11 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
   inner["width"] = mcp::JsonValue(img->get_width());
   inner["height"] = mcp::JsonValue(img->get_height());
   r["result"] = std::move(inner);
+  if (r.Dump().size() > GDA_MAX_JSON_RESPONSE_BYTES)
+    return capture_limit_error(
+        "response_too_large",
+        "capture response exceeds the JSON response limit of " +
+            std::to_string(GDA_MAX_JSON_RESPONSE_BYTES) + " bytes");
 
   LogSystem::instance().log(
       LogLevel::Info, LogCategory::Tools,

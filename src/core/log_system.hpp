@@ -19,6 +19,8 @@ struct LogEntry {
   LogCategory category;
   std::string message;
   size_t serial = 0;
+
+  const LogEntry *operator->() const { return this; }
 };
 
 class LogSystem {
@@ -32,10 +34,11 @@ public:
     std::string filter_text;
     std::optional<LogCategory> category;
   };
-  std::vector<const LogEntry *> query(const Query &q) const;
+  std::vector<LogEntry> query(const Query &q) const;
+  std::vector<LogEntry> query_recent(size_t limit) const;
 
-  std::vector<const LogEntry *> query_from(size_t start_index,
-                                           size_t *next_index) const;
+  std::vector<LogEntry> query_from(size_t start_index,
+                                   size_t *next_index) const;
   size_t next_index() const;
 
   static LogSystem &instance();

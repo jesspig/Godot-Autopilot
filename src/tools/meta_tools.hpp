@@ -21,7 +21,13 @@ public:
         schema_(std::move(schema)) {}
 
   const ::godot_autopilot::ToolMeta& meta() const override { return meta_; }
-  mcp::JsonValue execute(const mcp::JsonValue& args) override { return handler_(args); }
+  mcp::JsonValue execute(const mcp::JsonValue& args) override {
+    mcp::JsonValue denied = authorization::deny_if_unauthorized(meta_.name,
+                                                                SideEffect::None);
+    if (!denied.IsNull())
+      return denied;
+    return handler_(args);
+  }
   mcp::JsonValue input_schema() const override { return schema_; }
 
 private:

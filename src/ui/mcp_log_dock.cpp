@@ -220,8 +220,8 @@ void McpLogDock::poll_new_entries() {
 
   last_index_ = next;
   if (!collapse) {
-    for (auto *e : entries) {
-      _add_log_line(*e);
+    for (const auto &e : entries) {
+      _add_log_line(e);
     }
     _update_filter_counts();
     return;
@@ -233,8 +233,8 @@ void McpLogDock::poll_new_entries() {
 void McpLogDock::_update_filter_counts() {
   auto entries = log_system->query({});
   int counts[4] = {0, 0, 0, 0};
-  for (auto *e : entries) {
-    counts[static_cast<int>(e->level)]++;
+  for (const auto &e : entries) {
+    counts[static_cast<int>(e.level)]++;
   }
   for (int i = 0; i < 4; i++) {
     filter_buttons[i]->set_text(godot::String::num_int64(counts[i]));
@@ -312,8 +312,8 @@ void McpLogDock::_rebuild_log() {
   last_index_ = next;
 
   if (!collapse) {
-    for (const auto *e : entries) {
-      _add_log_line(*e);
+    for (const auto &e : entries) {
+      _add_log_line(e);
     }
     _update_filter_counts();
     return;
@@ -321,19 +321,19 @@ void McpLogDock::_rebuild_log() {
 
   std::unordered_map<std::string, LogLevel> msg_level;
   std::unordered_map<std::string, LogCategory> msg_cat;
-  for (const auto *e : entries) {
-    if (!msg_level.count(e->message)) {
-      msg_level[e->message] = e->level;
-      msg_cat[e->message] = e->category;
+  for (const auto &e : entries) {
+    if (!msg_level.count(e.message)) {
+      msg_level[e.message] = e.level;
+      msg_cat[e.message] = e.category;
     }
   }
 
   {
     std::unordered_map<std::string, int> freq;
-    for (const auto *e : entries) {
-      if (!_check_display(*e))
+    for (const auto &e : entries) {
+      if (!_check_display(e))
         continue;
-      freq[e->message]++;
+      freq[e.message]++;
     }
 
     struct SegInfo {
@@ -341,11 +341,11 @@ void McpLogDock::_rebuild_log() {
       std::chrono::system_clock::time_point last_ts{};
     };
     std::unordered_map<std::string, SegInfo> seg;
-    for (const auto *e : entries) {
-      if (!_check_display(*e))
+    for (const auto &e : entries) {
+      if (!_check_display(e))
         continue;
 
-      if (freq[e->message] == 1) {
+      if (freq[e.message] == 1) {
         for (auto &[msg, info] : seg) {
           if (info.count == 0)
             continue;
@@ -353,14 +353,14 @@ void McpLogDock::_rebuild_log() {
           _add_log_line(le, info.count);
           info.count = 0;
         }
-        auto le = LogEntry{e->timestamp, msg_level[e->message],
-                           msg_cat[e->message], e->message};
+        auto le = LogEntry{e.timestamp, msg_level[e.message],
+                           msg_cat[e.message], e.message};
         _add_log_line(le, 1);
         continue;
       }
 
-      seg[e->message].count++;
-      seg[e->message].last_ts = e->timestamp;
+      seg[e.message].count++;
+      seg[e.message].last_ts = e.timestamp;
     }
 
     for (auto &[msg, info] : seg) {

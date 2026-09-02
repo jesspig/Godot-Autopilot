@@ -10,8 +10,8 @@
 ## 架构
 
 - 进程内 GDExtension，`MODULE_INITIALIZATION_LEVEL_EDITOR` 加载；`src/main.cpp:GDExtensionEntryPoint` 注册 `GodotAutopilotPlugin`，`_enter_tree()` 启动 `ServerContext`，`_exit_tree()` 停止
-- 线程：mcp-cpp-sdk HTTP 线程 → `CommandQueue::submit()` → 主线程 `_process():s_queue.drain()`；**所有 Godot API 必须经 `queue.submit()`**，直接调用必崩
-- 端口 9527 `/mcp`，优先级 `GODOT_AUTOPILOT_PORT` env > `user://godot_autopilot/config.json`（`PluginConfig`）> 9527；默认绑 `127.0.0.1`（`GODOT_AUTOPILOT_HOST=0.0.0.0` 可放开）；mcp-cpp-sdk 0.3.2 起 Host 仅允许 `localhost/127.0.0.1/::1`，连局域网 IP 会 403
+- 线程：mcp-cpp-sdk HTTP 线程 → `CommandQueue::submit()`/`execute_sync()` → 主线程 `_process():s_queue.drain()`；**所有 Godot API 必须经队列执行**，直接调用必崩
+- 端口 9527 `/mcp`，优先级 `GODOT_AUTOPILOT_PORT` env > `user://godot_autopilot/config.json`（`PluginConfig`）> 9527；默认绑 `127.0.0.1`，`ServerContext::start()` 拒绝非环回 host；mcp-cpp-sdk 0.3.2 起 Host 仅允许环回主机名/IP
 - 工具注册 `ToolRegistry` 单一来源：363 域工具（30 个 `src/tools/<域>_tools.hpp`，`GDA_TOOL_CLASS`/`GDA_TOOL_CLASS_SIDE` + `make_tools()`）+ `system_status`（FnTool）+ 7 元工具（`MetaTool` 需 `IMetaTool`，`add()` 自动归类）；catalog/BM25/`g_handlers`/`RegisterTool` 全派生
 - 计数：370 = 7 元 + 363 域；371 = 363 域 + `system_status` + 7 元（catalog/index）；7 元 = `ping/search_tools/list_categories/get_tool_detail/call_tool/batch_execute/code_execute`
 - 错误水印：响应顶层 `new_errors_since_last_call` 一次性消费（`error_watermark.hpp`）；`editor_readiness` 导入中返回 `retryable` 软错误
@@ -32,7 +32,7 @@
 
 - 启用：`GDA_ENABLE_TESTS` 已在 `CMakePresets.json` debug/release 置 `ON`（裸 `cmake` 默认 `OFF`）
 - 运行：`ctest --preset debug`（L1 秒级，L2 约 2 分钟需 `GODOT_PATH`）；单跑 `build/debug/tests/gda_test_runner.exe --file 01_scene`；CI 仅 `ctest --preset debug -E "^gda_runner_"`（L1）
-- 结构：L1 `gda_unit_tests` 77 gtest；L2 `gda_test_runner` + `tests/config/*.json` 7 份（`00_meta`/`01_scene`/`02_property`/`03_tools_contract`/`04_resources_scripts`/`05_rename_references`/`06_move_references`）；ctest 共 84
+- 结构：L1 `gda_unit_tests` 96 gtest；L2 `gda_test_runner` + `tests/config/*.json` 7 份（`00_meta`/`01_scene`/`02_property`/`03_tools_contract`/`04_resources_scripts`/`05_rename_references`/`06_move_references`）；当前 ctest 注册点共 103（L2 需 `GODOT_PATH`）
 - 新增用例 = 新建 `tests/config/*.json` 零 C++；Godot 路径 `GODOT_PATH` env > `.env`（`.env.template` 复制），缺失则 L2 跳过
 - 遍历：`03_tools_contract` 枚举 363 域工具，42 个 `GDA_TOOL_CLASS_SIDE` 经 `side_effect` 字段自动排除（仍参与枚举，321 个做空参+冒烟）；3 契约缺口 `create_scene_node`/`get_resource_extensions`/`reimport_resource_files` 记 warnings
 - 副作用：L2 后 `Example/project.godot` 可能追加 `[audio]/[input]` 并生成 `default_bus_layout.tres`，`git checkout -- Example/project.godot` 清理
@@ -50,6 +50,6 @@
 
 ## 知识库
 
-- 位置 `docs/wiki/`，入口 `docs/wiki/index.md`；按需更新（完成功能/交付指南/提交前），只改受影响页，删过时描述不留废弃标记
+- 位置 `docs/wiki/`，入口 `docs/wiki/index.md`；按需更新（完成功能/交付指南/提交前），只改受影响页，删过时描述不留废弃标记；安全与并发约束见 `docs/wiki/security_contract.md`
 - 更新前以 `git diff HEAD` 核查实际变更为准，无法核实标 `> [!todo] 待补充`；数值以运行时统计为准；每页至少 1 条相对链接
 - frontmatter 必含 `type/title/description/tags/timestamp/resource`（`index.md`/`log.md`/`changelog/*` 除外）；带审计日期头的页改后同步日期；改后在 `changelog/<YYYY-MM-DD>-log.md` 按小时追加，`log.md` 仅留最近 7 天

@@ -131,6 +131,10 @@ void Bm25Index::add_entry(const std::string &name,
 std::vector<Bm25Result> Bm25Index::search(const SearchQuery &query) const {
   std::lock_guard<std::mutex> lock(mutex_);
 
+  if (query.max_results <= 0) {
+    return {};
+  }
+
   if (docs_.empty()) {
     return {};
   }
@@ -145,6 +149,13 @@ std::vector<Bm25Result> Bm25Index::search(const SearchQuery &query) const {
         continue;
       }
       results.push_back({doc.name, 0.0});
+    }
+    std::sort(results.begin(), results.end(),
+              [](const Bm25Result &a, const Bm25Result &b) {
+                return a.name < b.name;
+              });
+    if (static_cast<int>(results.size()) > query.max_results) {
+      results.resize(static_cast<size_t>(query.max_results));
     }
     return results;
   }
@@ -247,7 +258,10 @@ std::vector<Bm25Result> Bm25Index::search(const SearchQuery &query) const {
 
   std::sort(results.begin(), results.end(),
             [](const Bm25Result &a, const Bm25Result &b) {
-              return a.score > b.score;
+              if (a.score != b.score) {
+                return a.score > b.score;
+              }
+              return a.name < b.name;
             });
 
   if (static_cast<int>(results.size()) > query.max_results) {
@@ -260,6 +274,26 @@ std::vector<Bm25Result> Bm25Index::search(const SearchQuery &query) const {
 void Bm25Index::clear() {
   std::lock_guard<std::mutex> lock(mutex_);
   docs_.clear();
+}
+
+void Bm25Index::replace_entries(const std::vector<Entry> &entries) {
+  std::vector<Document> replacement;
+  replacement.reserve(entries.size());
+  for (const auto &entry : entries) {
+    std::string combined = entry.name + " " + entry.description + " " + entry.category;
+    for (const auto &tag : entry.tags) {
+      combined += " " + tag;
+    }
+    Document doc;
+    doc.name = entry.name;
+    doc.description = entry.description;
+    doc.category = entry.category;
+    doc.tags = entry.tags;
+    doc.tokens = tokenize(combined);
+    replacement.push_back(std::move(doc));
+  }
+  std::lock_guard<std::mutex> lock(mutex_);
+  docs_ = std::move(replacement);
 }
 
 size_t Bm25Index::size() const {
