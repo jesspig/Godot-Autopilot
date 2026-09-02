@@ -6,7 +6,7 @@ tags:
   - 构建
   - CMake
   - 部署
-timestamp: "2026-09-02T17:10:11+08:00"
+timestamp: "2026-09-02T18:45:30+08:00"
 resource:
   - CMakeLists.txt
   - CMakePresets.json
@@ -16,7 +16,7 @@ resource:
 
 # 构建体系（build）
 
-> 审计日期：2026-08-29（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 补 YAML frontmatter 并复核 add_library 源数量；08-22 随版本号收敛为根 `VERSION` 单一来源同步；08-22 随代码清理同步——Unity 构建接线生效、Lto.cmake 删 `GDA_LTO` 死变量；08-22 15 时全量一致性审计——CMakeLists 行数 157、端口覆盖行号、README ~343 口径对齐；08-23 随 CI/Release 工作流落地同步——新增「CI 与 Release」章节、build.py 行号重核、gdextension macos 条目改 universal；08-28 随 SDK 0.3.2 + 默认环回 127.0.0.1 同步；08-29 随 0.2.2 版本发布与全量审计同步（CMakeLists 行数与源数重核 164/77）），基于当前工作树文件逐项核对（不依赖 git 历史）。
+> 审计日期：2026-09-02（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步），基于当前工作树文件逐项核对（不依赖 git 历史）。
 > 事实来源：`build.py`（239 行）、`CMakeLists.txt`（164 行）、`CMakePresets.json`、`cmake/` 全部 6 个模块、`.env.template`、根 `README.md` / `README_zh.md` / `AGENTS.md` 构建段、`.github/workflows/{ci,release}.yml`。
 
 ## 命令速查表
@@ -100,7 +100,7 @@ macOS runner 为 ARM64，preset 设 `CMAKE_OSX_ARCHITECTURES=x86_64;arm64` 编�
 | `godot-autopilot.gdextension` | 部署目录（每次部署重新生成） | 入口 `entry_symbol = "GDExtensionEntryPoint"`、`compatibility_minimum = "4.3"`、`[libraries]` 6 条平台路径（windows/linux 为 `x86_64`，macos 为 `universal`） |
 | `dist/godot-autopilot-<version>.zip` | `dist/` | `--package` 产物（版本号取自根 `VERSION` 文件） |
 
-部署目录：`Example/addons/godot-autopilot/`（README 的 `Example/` 与 build.py 内部路径 `example/` 在 Windows 大小写不敏感文件系统下为同一目录）。
+部署目录：`Example/addons/godot-autopilot/`；`build.py` 与 CI/Release 均使用仓库实际目录大小写，Linux/macOS 不会产生 `example/` 分叉目录。
 
 ## CMake 目标
 
@@ -149,7 +149,7 @@ version 8；`debug`/`release` 两个 configure 预设：Ninja 生成器、`build
 |---|---|---|
 | `GODOT_PATH` | 定位 Godot 可执行文件（L2 引擎内测试） | 进程环境变量优先，为空才回退仓库根 `.env`（复制 `.env.template`，不入库）；二者皆缺 → L2 失败/跳过 |
 | `GODOT_AUTOPILOT_PORT` | 覆盖默认 MCP 端口 9527 | 运行时 `std::getenv`（`src/core/server_context.cpp:20`） |
-| `GODOT_AUTOPILOT_HOST` | 覆盖默认环回绑定 `127.0.0.1`（可设 `0.0.0.0` 监听所有接口，SDK 0.3.2 `host`/`bind_host`） | 运行时 `std::getenv`（`src/core/server_context.cpp:33`） |
+| `GODOT_AUTOPILOT_HOST` | 读取监听地址；默认 `127.0.0.1`，非环回地址由 `ServerContext::start()` 拒绝 | 运行时 `std::getenv`（`src/core/server_context.cpp:40`） |
 | `GDA_COMPILE_JOBS` / `GDA_LINK_JOBS` | 强制编译/链接并行度 | CACHE（`-D`）优先，其次进程环境变量 |
 | `CI` | 存在即 `GDA_IS_CI=ON` | 隐式；关闭 `-march=native` 以保证可复现 |
 | `GDA_UNITY_BUILD` / `GDA_UNITY_BATCH_SIZE` / `GDA_MAX_COMPILE_MEM_MB` / `GDA_MAX_LINK_MEM_MB` / `GDA_UNITY_MEM_MB` | Unity 与内存估算 | 仅 CMake 缓存参数（`-D`），**不支持环境变量** |

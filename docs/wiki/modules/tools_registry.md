@@ -6,7 +6,7 @@ tags:
   - 模块
   - 工具注册
   - schema
-timestamp: "2026-09-02T17:10:11+08:00"
+timestamp: "2026-09-02T18:45:30+08:00"
 resource: src/tools/
 ---
 
@@ -36,8 +36,8 @@ flowchart TD
 - **schema 单一源**：`tool_input_schema(name, basic)` 在 `register_all.hpp/cpp` 暴露，转发匿名命名空间 `build_schema_for`；`basic` 参数保留签名但已为 no-op（fill 表直接给出最终 schema）。
 - **宏要点**：`GDA_TOOL_CLASS` 的 TagsList 实参必须用圆括号 `std::vector<std::string>({...})`（花括号逗号会被预处理器拆散）；`make_tools()` 必须用 `push_back(std::make_unique<Class>())`（vector 花括号 initializer_list 触发 unique_ptr 拷贝-已删除）。
 - **元工具 = 接口 + 组合**：`IMetaTool` 标记接口（`tool_base.hpp`）；元工具类 `MetaTool : ToolBase, IMetaTool`（`meta_tools.hpp`），依赖（index/catalog/schema/处理逻辑）经构造函数组合注入；`ToolRegistry::add()` 用 `dynamic_cast<const IMetaTool*>` 自动归类——**实现 `IMetaTool` 接口即元工具**（Java 心智）。7 个元工具以 `MetaTool` 注册，在域工具之后，由派生循环统一 `RegisterTool`；导出保护在 RegisterTool 回调统一前置 `ExportGuard::is_exporting()` 检查。
-- **生命周期**：`g_active_registry` 为文件级 `static unique_ptr<ToolRegistry>`（程序存活期），`register_all_tools` 每次调用重建内容并 `index.clear()` 重置 BM25 索引，避免悬垂与重复注册。
-- **副作用驱动遍历排除**：`SideEffect` 枚举含 6 值（`None/WritesFile/WritesConfig/ShowsAlert/ModifiesWindow/Process`）；42 个副作用工具用 `GDA_TOOL_CLASS_SIDE` 宏（实现 `ISideEffect` 返回对应值）；`meta_get_tool_detail_impl` 经 `g_active_registry->find_any(name)` + `side_effect_of` + `side_effect_name` 在 `get_tool_detail` 响应补 `side_effect` 字段；遍历 runner 读该字段排除（删除硬编码清单）。
+- **生命周期**：`g_active_registry` 使用 mutex 保护的 `shared_ptr<ToolRegistry>`；`register_all_tools` 每次先构建局部 registry，再批量替换 catalog/index/dispatch，旧请求持有的 registry 由共享所有权延长生命周期。
+- **副作用驱动遍历排除**：`SideEffect` 枚举含 8 值（`None/WritesFile/WritesConfig/ShowsAlert/ModifiesWindow/Process/CodeExecute/GameRuntime`）；42 个传统副作用工具用 `GDA_TOOL_CLASS_SIDE` 宏标记；`code_execute` 与运行时变更能力通过额外能力分类保护；遍历 runner 读取 `side_effect` 字段排除传统副作用工具。
 - **分类边界**：`get_debug_object_info`（def 标 Debug、handler `physics_ops::handle_resolve_object`）归 `physics_tools`；`read_file/find_in_files/write_file`（def 归 OS、handler `text_ops`）归 `os_tools`；Scene Tree 类工具 Category 均为 "Scene"、按 handler 分 `scene_tools`/`scene_tree_tools`；InputMap 工具 Category "Input"、归 `input_map_tools`。
 
 ## 三层结构
@@ -105,7 +105,7 @@ flowchart TD
 
 ## 分发与错误路径（dispatch.cpp）
 
-- `call_handler`：编辑器队列存在且不在主线程时，先 `queue.submit` 排到主线程执行，保证 Godot API 线程安全。
+- `call_handler`：编辑器队列存在且不在主线程时，经 `CommandQueue::execute_sync` 排到主线程执行，保证 Godot API 线程安全；handler map 在锁内替换、复制后锁外执行。
 - `call_handler_impl` 查找顺序：`g_handlers` → 命中即执行，异常捕获后返回 `internal error in tool 'X': unexpected C++ exception`（参数 dump 截断 256 字节）；未命中再查 `g_meta_handlers`（元名单不再硬编码，由 registry `all_meta()` 派生）；否则返回 `domain tool 'X' not found — use search_tools to discover available tools`。
 - 导出保护：全部 7 个元工具回调前置 `ExportGuard::is_exporting()` 检查，命中返回 `export_blocked_result()`。
 - `debugger_access.hpp` 为 runtime_ops 提供的自由函数接口（capture/broadcast/cancel/continue/breaked/reload_scripts），实现于 `debugger_access.cpp`；依赖方向 runtime_ops.cpp → debugger_access.hpp、debugger_ops.cpp → runtime_ops.hpp，无环。

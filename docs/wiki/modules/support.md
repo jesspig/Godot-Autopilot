@@ -8,7 +8,7 @@ tags:
   - 资源
   - UI
   - 工具库
-timestamp: "2026-09-02T17:10:11+08:00"
+timestamp: "2026-09-02T18:45:30+08:00"
 resource:
   - src/prompts/
   - src/resources/
@@ -18,7 +18,7 @@ resource:
 
 # 支撑模块（src/prompts/、src/resources/、src/ui/、src/util/）
 
-> 审计日期：2026-08-29（2026-08-12 初稿；08-17 随配置面板新增、状态栏移除同步并补 YAML frontmatter；08-22 15 时全量一致性审计——新增 json_godot/rid_registry/type_hint/gdscript_wrap 四个 header-only util 小节、覆盖范围计数 10 组/15 文件、注册入口行号校准；08-24 随竞品对齐批次同步——debugger prompt 引导工具改指 execute_game_script/get_game_log_entries/get_game_status（原 get_debugger_stack_dump/get_debugger_monitors 已删）、BM25 tokenize 补 CJK bigram；08-28 随日志系统增强同步；08-29 随 0.2.2 版本与全量审计同步），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 审计日期：2026-09-02（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步），基于当前工作树代码逐行核对（不依赖 git 历史）。
 > 覆盖范围：`src/prompts/` 9 组文件（18 个）、`src/resources/` 2 组、`src/ui/` 2 组、`src/util/` 10 组（15 个文件，其中 `scene_path.hpp`/`json_godot.hpp`/`rid_registry.hpp`/`type_hint.hpp`/`gdscript_wrap.hpp` 为 header-only）。注册入口在 `src/core/server_context.cpp:140-143`。
 
 ## 模块简介
@@ -69,8 +69,8 @@ resource:
 
 | 组件 | 文件 | 数量 | 注册方式 | MIME | 执行方式 |
 |---|---|---|---|---|---|
-| `register_all_resources(server, queue)` | `resource_handlers.cpp/hpp` | 8（6 静态 + 2 模板） | `godot://` URI，`application/json` | 每个 handler 经 `queue.submit()` 在主线程执行 |
-| `register_debugger_resources(server)` | `debugger_resources.cpp/hpp` | 7（全静态） | `godot://` URI，`text/plain` | 直接同步调用 `tools/debugger_ops` 的 `capture_*` 文本函数（只读 `DebuggerCapture` 捕获缓冲，不触碰引擎 API，故无需 queue） |
+| `register_all_resources(server, queue)` | `resource_handlers.cpp/hpp` | 8（6 静态 + 2 模板） | `godot://` URI，`application/json` | 每个 handler 经 `queue.execute_sync()` 在主线程执行 |
+| `register_debugger_resources(server, queue)` | `debugger_resources.cpp/hpp` | 7（全静态） | `godot://` URI，`text/plain` | 每个 handler 经 `queue.execute_sync()` 执行，`debugger-session` 的 Godot debugger 查询也在主线程执行 |
 
 **注意：`resource_handlers` 不是"扩展名注册表"**——它注册的是 MCP Resource（URI 分发），而非 Godot 资源扩展名映射；扩展名/类型相关逻辑在 `tools/resource_ops` 侧。
 
@@ -269,7 +269,7 @@ GDScript 包装流水线共享件（script_ops 与 code_exec_ops 共用）：
 | `prompt_setup_input_map.cpp:69` | `Enter=4194310（KEY_ENTER）` | `prompt_keycode_reference.cpp:61` 表 `KEY_ENTER=4194312`、`KEY_META=4194310`（87 行） | 文档间冲突 |
 | `prompt_keycode_reference.cpp` 映射表 | `Rid → number`、`PackedByteArray → string (base64)` | `variant_json.cpp` 实现：RID → `{"id": N}` 对象；PackedByteArray → 数字数组 | 提示内容与实现不符 |
 | `prompt_keycode_reference.cpp:85-86` | KEY_SHIFT 表格出现两行 | 重复行（4194307，第二行为"左/右 Shift"） | 文档瑕疵 |
-| AGENTS.md（架构） | "所有 Godot API 调用必须通过 queue.submit()" | `debugger_prompts`/`debugger_resources` 不经 queue 直接同步执行——因 `capture_*` 只读 `DebuggerCapture` 捕获缓冲、不触碰引擎 API | 存在例外，描述不完整 |
+| AGENTS.md（架构） | "所有 Godot API 调用必须通过队列执行" | `debugger_resources` 已统一经 `CommandQueue::execute_sync()` 执行，`debugger-session` 的 Godot debugger 查询也在主线程 | 已与代码一致 |
 | AGENTS.md（日志类别） | 仅 System/Transport/Tools/Resources/Prompts 五类 | `resource_handlers.cpp` 的 `category_to_string` 同五类 + `unknown` 兜底；UI 类别下拉一致 | 一致 ✓ |
 | AGENTS.md（错误模式） | 领域工具返回 `{"error": "消息"}` | `error_util::error_json` 与资源侧 `set_error` 同构 | 一致 ✓ |
 | AGENTS.md | `VariantJson::serialize/deserialize` 用于 Variant ↔ JsonValue 互转 | 完全一致（另含 OBJECT 环检测/深度上限/对象反序列化等扩展） | 一致 ✓ |

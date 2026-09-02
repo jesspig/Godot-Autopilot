@@ -6,7 +6,7 @@ tags:
   - 模块
   - 入口
   - 运行时桥接
-timestamp: "2026-09-02T17:10:11+08:00"
+timestamp: "2026-09-02T18:45:30+08:00"
 resource:
   - src/main.cpp
   - src/runtime/

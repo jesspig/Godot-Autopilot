@@ -6,7 +6,7 @@ tags:
   - 测试
   - L1
   - L2
-timestamp: "2026-09-02T17:10:11+08:00"
+timestamp: "2026-09-02T18:45:30+08:00"
 resource: tests/
 ---
 
@@ -169,7 +169,7 @@ move_os_file_to_trash
 
 | 条目 | AGENTS.md 声称 | 源码核算 | 结论 |
 |---|---|---|---|
-| L1 gtest 数量 | 77（历史：61→78→71→77，08-22 清理删 log_system 回调用例、schema_builder 用例收缩；08-29 bm25 14→20） | 77（逐文件宏统计见上表） | 一致 |
+| L1 gtest 数量 | 96（含 09-02 安全并行硬化专项） | 96（逐文件宏统计见上表，并已运行通过） | 一致 |
 | L2 用例文件数 | 7（00_meta / 01_scene / 02_property / 03_tools_contract / 04_resources_scripts / 05_rename_references / 06_move_references；08-24 新增 06） | 7 | 一致 |
 | ctest L2 用例 | gda_runner_<name> | 一致（`tests/CMakeLists.txt:108-114`，TIMEOUT 600；06 由 GLOB 自动发现） | 一致 |
 | 遍历工具数 | 363 | 363（30 个 `*_tools.hpp` 的 `GDA_TOOL_CLASS(_SIDE)` 计数） | 一致 |
