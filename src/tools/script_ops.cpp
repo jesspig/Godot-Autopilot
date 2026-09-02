@@ -144,6 +144,8 @@ mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue &args) {
     return e;
   }
   std::string expression = it_expr->GetString();
+  if (expression.empty())
+    return util::error_json("expression must not be empty");
 
   std::string cleaned = gdscript_wrap::strip_extends_lines(expression);
 

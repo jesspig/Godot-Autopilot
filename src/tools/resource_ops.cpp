@@ -1,10 +1,12 @@
 #include "resource_ops.hpp"
 #include "editor_ops.hpp"
+#include "core/config.hpp"
 #include "core/editor_readiness.hpp"
 #include "core/log_system.hpp"
 #include "core/resource_registry.hpp"
 #include "util/error_util.hpp"
 #include "util/readback_util.hpp"
+#include "util/project_path.hpp"
 #include "util/type_hint.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/class_db_singleton.hpp>
@@ -31,6 +33,18 @@ namespace godot_autopilot {
 namespace resource_ops {
 
 namespace {
+
+bool normalize_resource_path(const std::string &raw, std::string &out,
+                             std::string &error, bool allow_root = false) {
+  const util::ProjectPath checked =
+      util::normalize_project_path(raw, false, allow_root);
+  if (!checked.valid()) {
+    error = checked.error;
+    return false;
+  }
+  out = checked.value;
+  return true;
+}
 
 mcp::JsonValue serialize_ref(const godot::Ref<godot::Resource> &res) {
   if (res.is_null())
@@ -68,6 +82,12 @@ resolve_resource(const mcp::JsonValue &args, bool &out_has_oid,
   auto *it_path = args.Find("path");
   if (it_path && it_path->IsString())
     path = it_path->GetString();
+  if (!path.empty()) {
+    std::string normalized_path;
+    if (!normalize_resource_path(path, normalized_path, out_error))
+      return godot::Ref<godot::Resource>();
+    path = normalized_path;
+  }
 
   int64_t obj_id = 0;
   bool has_oid = false;
@@ -154,17 +174,21 @@ bool load_resource_or_error(const std::string &path,
                             std::string &out_error,
                             const std::string &type_hint = {},
                             const char *load_fail_suffix = kLoadFailSuffix) {
-  if (!godot::FileAccess::file_exists(godot::String(path.c_str()))) {
-    out_error = "file does not exist: " + path;
+  std::string normalized_path;
+  if (!normalize_resource_path(path, normalized_path, out_error))
+    return false;
+  if (!godot::FileAccess::file_exists(
+          godot::String(normalized_path.c_str()))) {
+    out_error = "file does not exist: " + normalized_path;
     return false;
   }
   auto *loader = godot::ResourceLoader::get_singleton();
-  out_res = loader ? loader->load(godot::String(path.c_str()),
+  out_res = loader ? loader->load(godot::String(normalized_path.c_str()),
                                   godot::String(type_hint.c_str()))
                    : godot::Ref<godot::Resource>();
   if (out_res.is_null()) {
     out_error =
-        "failed to load resource: " + path +
+        "failed to load resource: " + normalized_path +
         (load_fail_suffix != nullptr ? load_fail_suffix : "");
     return false;
   }
@@ -378,6 +402,11 @@ mcp::JsonValue handle_load(const mcp::JsonValue &args) {
     return e;
   }
   std::string path = it_path->GetString();
+  std::string normalized_path;
+  std::string path_error;
+  if (!normalize_resource_path(path, normalized_path, path_error))
+    return util::error_detail("path rejected", "path", path_error,
+                              "use a res:// project resource path");
 
   std::string type_hint;
   auto *th = args.Find("type_hint");
@@ -393,13 +422,13 @@ mcp::JsonValue handle_load(const mcp::JsonValue &args) {
 
   godot::Ref<godot::Resource> res;
   std::string load_err;
-  if (!load_resource_or_error(path, res, load_err, type_hint)) {
+  if (!load_resource_or_error(normalized_path, res, load_err, type_hint)) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
     e["error"] = mcp::JsonValue(load_err);
     return e;
   }
   if (util::to_std(res->get_path()).empty()) {
-    res->set_path(godot::String(path.c_str()));
+    res->set_path(godot::String(normalized_path.c_str()));
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = serialize_ref(res);
@@ -414,6 +443,11 @@ mcp::JsonValue handle_load_threaded(const mcp::JsonValue &args) {
     return e;
   }
   std::string path = it_path->GetString();
+  std::string normalized_path;
+  std::string path_error;
+  if (!normalize_resource_path(path, normalized_path, path_error))
+    return util::error_detail("path rejected", "path", path_error,
+                              "use a res:// project resource path");
 
   std::string type_hint;
   auto *th = args.Find("type_hint");
@@ -433,7 +467,7 @@ mcp::JsonValue handle_load_threaded(const mcp::JsonValue &args) {
   }
 
   godot::Error err = loader->load_threaded_request(
-      godot::String(path.c_str()), godot::String(type_hint.c_str()),
+      godot::String(normalized_path.c_str()), godot::String(type_hint.c_str()),
       use_sub_threads);
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue(static_cast<int64_t>(err));
@@ -448,6 +482,11 @@ mcp::JsonValue handle_load_threaded_get_status(const mcp::JsonValue &args) {
     return e;
   }
   std::string path = it_path->GetString();
+  std::string normalized_path;
+  std::string path_error;
+  if (!normalize_resource_path(path, normalized_path, path_error))
+    return util::error_detail("path rejected", "path", path_error,
+                              "use a res:// project resource path");
 
   auto *loader = godot::ResourceLoader::get_singleton();
   if (!loader) {
@@ -457,7 +496,7 @@ mcp::JsonValue handle_load_threaded_get_status(const mcp::JsonValue &args) {
   }
 
   godot::ResourceLoader::ThreadLoadStatus status =
-      loader->load_threaded_get_status(godot::String(path.c_str()));
+      loader->load_threaded_get_status(godot::String(normalized_path.c_str()));
   static const char *names[] = {"invalid_resource", "in_progress", "failed",
                                 "loaded"};
   int idx = static_cast<int>(status);
@@ -479,6 +518,11 @@ mcp::JsonValue handle_load_threaded_wait(const mcp::JsonValue &args) {
     return e;
   }
   std::string path = it_path->GetString();
+  std::string normalized_path;
+  std::string path_error;
+  if (!normalize_resource_path(path, normalized_path, path_error))
+    return util::error_detail("path rejected", "path", path_error,
+                              "use a res:// project resource path");
 
   auto *loader = godot::ResourceLoader::get_singleton();
   if (!loader) {
@@ -488,7 +532,7 @@ mcp::JsonValue handle_load_threaded_wait(const mcp::JsonValue &args) {
   }
 
   godot::Ref<godot::Resource> res =
-      loader->load_threaded_get(godot::String(path.c_str()));
+      loader->load_threaded_get(godot::String(normalized_path.c_str()));
   if (res.is_null()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
     e["error"] =
@@ -508,11 +552,25 @@ mcp::JsonValue handle_save(const mcp::JsonValue &args) {
     return e;
   }
   std::string path = it_path->GetString();
+  if (!path.empty()) {
+    std::string normalized_path;
+    std::string path_error;
+    if (!normalize_resource_path(path, normalized_path, path_error))
+      return util::error_detail("path rejected", "path", path_error,
+                                "save only inside the res:// project namespace");
+    path = normalized_path;
+  }
 
   std::string dest_path = path;
   auto *dp = args.Find("dest_path");
   if (dp && dp->IsString())
     dest_path = dp->GetString();
+  std::string normalized_dest_path;
+  std::string dest_error;
+  if (!normalize_resource_path(dest_path, normalized_dest_path, dest_error))
+    return util::error_detail("path rejected", "dest_path", dest_error,
+                              "save only inside the res:// project namespace");
+  dest_path = normalized_dest_path;
 
   int flags = 0;
   auto *fl = args.Find("flags");
@@ -747,6 +805,12 @@ mcp::JsonValue handle_get_type(const mcp::JsonValue &args) {
     return e;
   }
   std::string path = it_path->GetString();
+  std::string normalized_path;
+  std::string path_error;
+  if (!normalize_resource_path(path, normalized_path, path_error))
+    return util::error_detail("path rejected", "path", path_error,
+                              "use a res:// project resource path");
+  path = normalized_path;
 
   auto *loader = godot::ResourceLoader::get_singleton();
   if (!loader) {
@@ -779,6 +843,12 @@ mcp::JsonValue handle_exists(const mcp::JsonValue &args) {
     return e;
   }
   std::string path = it_path->GetString();
+  std::string normalized_path;
+  std::string path_error;
+  if (!normalize_resource_path(path, normalized_path, path_error, true))
+    return util::error_detail("path rejected", "path", path_error,
+                              "use a res:// project directory path");
+  path = normalized_path;
 
   auto *loader = godot::ResourceLoader::get_singleton();
   if (!loader) {
@@ -848,6 +918,12 @@ mcp::JsonValue handle_list_dir(const mcp::JsonValue &args) {
     return e;
   }
   std::string path = it_path->GetString();
+  std::string normalized_path;
+  std::string path_error;
+  if (!normalize_resource_path(path, normalized_path, path_error))
+    return util::error_detail("path rejected", "path", path_error,
+                              "use a res:// project resource path");
+  path = normalized_path;
 
   auto *loader = godot::ResourceLoader::get_singleton();
   if (!loader) {
@@ -903,9 +979,44 @@ bool is_binary_candidate_entry(const godot::String &entry) {
   return has_binary_reference_extension(util::to_std(entry));
 }
 
+struct ResourceScanBudget {
+  size_t files_listed = 0;
+  size_t files_scanned = 0;
+  size_t bytes_scanned = 0;
+  std::string limit_reason;
+  bool truncated = false;
+  bool hit_limit(size_t file_bytes, size_t depth) {
+    if (depth > GDA_SCAN_MAX_DEPTH) {
+      limit_reason = "directory_depth";
+      truncated = true;
+      return true;
+    }
+    if (files_listed >= GDA_SCAN_MAX_FILES) {
+      limit_reason = "file_count";
+      truncated = true;
+      return true;
+    }
+    if (file_bytes > GDA_SCAN_MAX_FILE_BYTES) {
+      limit_reason = "single_file_bytes";
+      truncated = true;
+      return true;
+    }
+    if (bytes_scanned > GDA_SCAN_MAX_TOTAL_BYTES - file_bytes) {
+      limit_reason = "total_bytes";
+      truncated = true;
+      return true;
+    }
+    return false;
+  }
+};
+
 void collect_matching_files(const std::string &dir,
                             bool (*match)(const godot::String &),
                             std::vector<std::string> &out) {
+  ResourceScanBudget tmp;
+  bool truncated = false;
+  // delegate to budget-aware version for backwards compatibility (no byte tracking)
+  // simple path without bytes tracking
   godot::Ref<godot::DirAccess> da =
       godot::DirAccess::open(godot::String(dir.c_str()));
   if (da.is_null()) {
@@ -914,11 +1025,60 @@ void collect_matching_files(const std::string &dir,
   da->list_dir_begin();
   godot::String entry = da->get_next();
   while (entry != godot::String()) {
+    if (truncated) break;
     if (entry != "." && entry != "..") {
       if (da->current_is_dir()) {
+        if (tmp.files_listed >= GDA_SCAN_MAX_FILES || tmp.hit_limit(0, 1)) {
+          truncated = true;
+          break;
+        }
         collect_matching_files(join_path(dir, util::to_std(entry)), match, out);
+        if (out.size() >= GDA_SCAN_MAX_FILES) truncated = true;
       } else if (match(entry)) {
+        if (tmp.files_listed >= GDA_SCAN_MAX_FILES) { truncated = true; break; }
+        ++tmp.files_listed;
         out.push_back(join_path(dir, util::to_std(entry)));
+      }
+    }
+    entry = da->get_next();
+  }
+  da->list_dir_end();
+}
+
+void collect_matching_files_budget(const std::string &dir,
+                                   bool (*match)(const godot::String &),
+                                   std::vector<std::string> &out,
+                                   ResourceScanBudget &budget,
+                                   size_t depth,
+                                   bool &truncated) {
+  if (truncated) return;
+  if (depth > GDA_SCAN_MAX_DEPTH) {
+    budget.limit_reason = "directory_depth";
+    budget.truncated = true;
+    truncated = true;
+    return;
+  }
+  godot::Ref<godot::DirAccess> da =
+      godot::DirAccess::open(godot::String(dir.c_str()));
+  if (da.is_null()) return;
+  da->list_dir_begin();
+  godot::String entry = da->get_next();
+  while (entry != godot::String()) {
+    if (truncated) break;
+    if (entry != "." && entry != "..") {
+      std::string name = util::to_std(entry);
+      std::string fpath = join_path(dir, name);
+      if (da->current_is_dir()) {
+        collect_matching_files_budget(fpath, match, out, budget, depth + 1, truncated);
+      } else if (match(entry)) {
+        if (budget.files_listed >= GDA_SCAN_MAX_FILES) {
+          budget.limit_reason = "file_count";
+          budget.truncated = true;
+          truncated = true;
+          break;
+        }
+        ++budget.files_listed;
+        out.push_back(fpath);
       }
     }
     entry = da->get_next();
@@ -973,15 +1133,21 @@ std::vector<std::string> extract_script_class_tokens(const godot::String &conten
 mcp::JsonValue collect_reference_hits(const std::string &target_path,
                                       const std::string &target_uid,
                                       const std::string &target_class) {
+  ResourceScanBudget budget;
+  bool truncated = false;
   std::vector<std::string> text_files;
-  collect_matching_files("res://", is_text_resource_entry, text_files);
+  collect_matching_files_budget("res://", is_text_resource_entry, text_files, budget, 0, truncated);
   mcp::JsonValue result(mcp::JsonValue::array_tag);
   for (const std::string &fp : text_files) {
+    if (truncated) break;
     godot::Ref<godot::FileAccess> fa = godot::FileAccess::open(
         godot::String(fp.c_str()), godot::FileAccess::READ);
-    if (fa.is_null()) {
-      continue;
-    }
+    if (fa.is_null()) continue;
+    int64_t len = fa->get_length();
+    size_t file_bytes = len > 0 ? static_cast<size_t>(len) : 0;
+    if (budget.hit_limit(file_bytes, 0)) { truncated = true; break; }
+    budget.files_scanned++;
+    budget.bytes_scanned += file_bytes;
     const godot::String content = fa->get_as_text();
     const RefHit hit =
         scan_reference_tokens(content, target_path, target_uid, target_class);
@@ -989,15 +1155,46 @@ mcp::JsonValue collect_reference_hits(const std::string &target_path,
       mcp::JsonValue item(mcp::JsonValue::object_tag);
       item["file"] = mcp::JsonValue(fp);
       mcp::JsonValue matched(mcp::JsonValue::array_tag);
-      if (hit.path) {
-        matched.PushBack(mcp::JsonValue("path"));
-      }
-      if (hit.uid) {
-        matched.PushBack(mcp::JsonValue("uid"));
-      }
-      if (hit.klass) {
-        matched.PushBack(mcp::JsonValue("script_class"));
-      }
+      if (hit.path) matched.PushBack(mcp::JsonValue("path"));
+      if (hit.uid) matched.PushBack(mcp::JsonValue("uid"));
+      if (hit.klass) matched.PushBack(mcp::JsonValue("script_class"));
+      item["matched"] = std::move(matched);
+      result.PushBack(std::move(item));
+    }
+  }
+  return result;
+}
+
+mcp::JsonValue collect_reference_hits_budget(const std::string &target_path,
+                                             const std::string &target_uid,
+                                             const std::string &target_class,
+                                             ResourceScanBudget &out_budget,
+                                             bool &out_truncated) {
+  out_budget = ResourceScanBudget();
+  out_truncated = false;
+  std::vector<std::string> text_files;
+  collect_matching_files_budget("res://", is_text_resource_entry, text_files, out_budget, 0, out_truncated);
+  mcp::JsonValue result(mcp::JsonValue::array_tag);
+  for (const std::string &fp : text_files) {
+    if (out_truncated) break;
+    godot::Ref<godot::FileAccess> fa = godot::FileAccess::open(
+        godot::String(fp.c_str()), godot::FileAccess::READ);
+    if (fa.is_null()) continue;
+    int64_t len = fa->get_length();
+    size_t file_bytes = len > 0 ? static_cast<size_t>(len) : 0;
+    if (out_budget.hit_limit(file_bytes, 0)) { out_truncated = true; break; }
+    out_budget.files_scanned++;
+    out_budget.bytes_scanned += file_bytes;
+    const godot::String content = fa->get_as_text();
+    const RefHit hit =
+        scan_reference_tokens(content, target_path, target_uid, target_class);
+    if (hit.path || hit.uid || hit.klass) {
+      mcp::JsonValue item(mcp::JsonValue::object_tag);
+      item["file"] = mcp::JsonValue(fp);
+      mcp::JsonValue matched(mcp::JsonValue::array_tag);
+      if (hit.path) matched.PushBack(mcp::JsonValue("path"));
+      if (hit.uid) matched.PushBack(mcp::JsonValue("uid"));
+      if (hit.klass) matched.PushBack(mcp::JsonValue("script_class"));
       item["matched"] = std::move(matched);
       result.PushBack(std::move(item));
     }
@@ -1015,6 +1212,12 @@ mcp::JsonValue handle_get_uid(const mcp::JsonValue &args) {
     return e;
   }
   std::string path = it_path->GetString();
+  std::string normalized_path;
+  std::string path_error;
+  if (!normalize_resource_path(path, normalized_path, path_error))
+    return util::error_detail("path rejected", "path", path_error,
+                              "use a res:// project resource path");
+  path = normalized_path;
 
   auto *loader = godot::ResourceLoader::get_singleton();
   if (!loader) {
@@ -1037,6 +1240,12 @@ mcp::JsonValue handle_set_uid(const mcp::JsonValue &args) {
     return e;
   }
   std::string path = it_path->GetString();
+  std::string normalized_path;
+  std::string path_error;
+  if (!normalize_resource_path(path, normalized_path, path_error))
+    return util::error_detail("path rejected", "path", path_error,
+                              "use a res:// project resource path");
+  path = normalized_path;
 
   auto *uid_svc = godot::ResourceUID::get_singleton();
   if (!uid_svc) {
@@ -1073,6 +1282,12 @@ mcp::JsonValue handle_remove(const mcp::JsonValue &args) {
     return e;
   }
   std::string path = it_path->GetString();
+  std::string normalized_path;
+  std::string path_error;
+  if (!normalize_resource_path(path, normalized_path, path_error))
+    return util::error_detail("path rejected", "path", path_error,
+                              "use a res:// project resource path");
+  path = normalized_path;
 
   bool force = false;
   auto *it_force = args.Find("force");
@@ -1096,8 +1311,10 @@ mcp::JsonValue handle_remove(const mcp::JsonValue &args) {
         uid_str = util::to_std(ruid->id_to_text(uid));
       }
     }
+    ResourceScanBudget dep_budget;
+    bool dep_truncated = false;
     mcp::JsonValue dependents =
-        collect_reference_hits(path, uid_str, std::string());
+        collect_reference_hits_budget(path, uid_str, std::string(), dep_budget, dep_truncated);
     int64_t dep_count = 0;
     for (const auto &entry : dependents.GetArray()) {
       (void)entry;
@@ -1106,6 +1323,15 @@ mcp::JsonValue handle_remove(const mcp::JsonValue &args) {
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["would_delete"] = mcp::JsonValue(true);
     r["dependents"] = std::move(dependents);
+    if (dep_truncated) {
+      r["scan_truncated"] = mcp::JsonValue(true);
+      mcp::JsonValue lim(mcp::JsonValue::object_tag);
+      lim["files_listed"] = mcp::JsonValue(static_cast<int64_t>(dep_budget.files_listed));
+      lim["files_scanned"] = mcp::JsonValue(static_cast<int64_t>(dep_budget.files_scanned));
+      lim["bytes_scanned"] = mcp::JsonValue(static_cast<int64_t>(dep_budget.bytes_scanned));
+      if (!dep_budget.limit_reason.empty()) lim["reason"] = mcp::JsonValue(dep_budget.limit_reason);
+      r["scan_limit"] = std::move(lim);
+    }
     r["hint"] = mcp::JsonValue(
         "dry-run only: nothing was deleted (" + std::to_string(dep_count) +
         " referencing file(s) found); call again with force=true to move the "
@@ -1170,8 +1396,24 @@ mcp::JsonValue handle_remove(const mcp::JsonValue &args) {
   return r;
 }
 
-mcp::JsonValue apply_path_rewrite_transaction(const std::string &from,
-                                              const std::string &to) {
+mcp::JsonValue apply_path_rewrite_transaction(const std::string &from_raw,
+                                              const std::string &to_raw) {
+  std::string normalized_from;
+  std::string normalized_to;
+  std::string path_error;
+  if (!normalize_resource_path(from_raw, normalized_from, path_error))
+    return util::error_detail("path rejected", "from", path_error,
+                              "rename only inside res://");
+  if (!normalize_resource_path(to_raw, normalized_to, path_error))
+    return util::error_detail("path rejected", "to", path_error,
+                              "rename only inside res://");
+  const std::string &from_path = normalized_from;
+  const std::string &to_path = normalized_to;
+  if (from_path == "res://" || to_path == "res://")
+    return util::error_detail("path rejected", "path", "namespace root is not a file",
+                              "provide resource paths below res://");
+  const std::string &from = from_path;
+  const std::string &to = to_path;
   const std::string from_uid_path = from + ".uid";
   const std::string to_uid_path = to + ".uid";
   const std::string from_import_path = from + ".import";
@@ -1207,15 +1449,21 @@ mcp::JsonValue apply_path_rewrite_transaction(const std::string &from,
         godot::String(to_import_path.c_str()));
   }
 
+  ResourceScanBudget scan_budget;
+  bool scan_truncated = false;
   std::vector<std::string> text_files;
-  collect_matching_files("res://", is_text_resource_entry, text_files);
+  collect_matching_files_budget("res://", is_text_resource_entry, text_files, scan_budget, 0, scan_truncated);
   std::vector<std::pair<std::string, RefHit>> deps;
   for (const std::string &fp : text_files) {
+    if (scan_truncated) break;
     godot::Ref<godot::FileAccess> fa = godot::FileAccess::open(
         godot::String(fp.c_str()), godot::FileAccess::READ);
-    if (fa.is_null()) {
-      continue;
-    }
+    if (fa.is_null()) continue;
+    int64_t len = fa->get_length();
+    size_t file_bytes = len > 0 ? static_cast<size_t>(len) : 0;
+    if (scan_budget.hit_limit(file_bytes, 0)) { scan_truncated = true; break; }
+    scan_budget.files_scanned++;
+    scan_budget.bytes_scanned += file_bytes;
     const godot::String content = fa->get_as_text();
     const RefHit hit =
         scan_reference_tokens(content, from, old_uid_str, std::string());
@@ -1226,14 +1474,18 @@ mcp::JsonValue apply_path_rewrite_transaction(const std::string &from,
 
   std::vector<std::string> unsupported_binary;
   std::vector<std::string> binary_candidates;
-  collect_matching_files("res://", is_binary_candidate_entry,
-                         binary_candidates);
+  collect_matching_files_budget("res://", is_binary_candidate_entry,
+                         binary_candidates, scan_budget, 0, scan_truncated);
   for (const std::string &fp : binary_candidates) {
+    if (scan_truncated) break;
     godot::Ref<godot::FileAccess> fa = godot::FileAccess::open(
         godot::String(fp.c_str()), godot::FileAccess::READ);
-    if (fa.is_null()) {
-      continue;
-    }
+    if (fa.is_null()) continue;
+    int64_t len = fa->get_length();
+    size_t file_bytes = len > 0 ? static_cast<size_t>(len) : 0;
+    if (scan_budget.hit_limit(file_bytes, 0)) { scan_truncated = true; break; }
+    scan_budget.files_scanned++;
+    scan_budget.bytes_scanned += file_bytes;
     const RefHit hit =
         scan_reference_tokens(fa->get_as_text(), from, old_uid_str,
                               std::string());
@@ -1400,6 +1652,19 @@ mcp::JsonValue apply_path_rewrite_transaction(const std::string &from,
       "dock for these; open scenes affected by the move are saved before the "
       "rewrite and reloaded afterwards (their undo history resets)");
   r["uid_preserved"] = mcp::JsonValue(uid_preserved);
+  if (scan_truncated) {
+    r["scan_truncated"] = mcp::JsonValue(true);
+    mcp::JsonValue lim(mcp::JsonValue::object_tag);
+    lim["files_listed"] = mcp::JsonValue(static_cast<int64_t>(scan_budget.files_listed));
+    lim["files_scanned"] = mcp::JsonValue(static_cast<int64_t>(scan_budget.files_scanned));
+    lim["bytes_scanned"] = mcp::JsonValue(static_cast<int64_t>(scan_budget.bytes_scanned));
+    lim["max_files"] = mcp::JsonValue(static_cast<int64_t>(GDA_SCAN_MAX_FILES));
+    lim["max_file_bytes"] = mcp::JsonValue(static_cast<int64_t>(GDA_SCAN_MAX_FILE_BYTES));
+    lim["max_total_bytes"] = mcp::JsonValue(static_cast<int64_t>(GDA_SCAN_MAX_TOTAL_BYTES));
+    lim["max_depth"] = mcp::JsonValue(static_cast<int64_t>(GDA_SCAN_MAX_DEPTH));
+    if (!scan_budget.limit_reason.empty()) lim["reason"] = mcp::JsonValue(scan_budget.limit_reason);
+    r["scan_limit"] = std::move(lim);
+  }
   if (import_sidecar_present && import_err != godot::OK) {
     r["import_sidecar_warning"] = mcp::JsonValue(
         "failed to move .import sidecar " + from_import_path + " -> " +
@@ -1550,27 +1815,6 @@ mcp::JsonValue handle_rename(const mcp::JsonValue &args) {
 
 namespace {
 
-const std::string kResScheme = "res://";
-const std::string kUserScheme = "user://";
-
-std::string normalize_res_path(const std::string &raw) {
-  std::string p = raw;
-  while (p.size() > kResScheme.size() && p.back() == '/') {
-    p.pop_back();
-  }
-  if (p.compare(0, kResScheme.size(), kResScheme) == 0) {
-    return p;
-  }
-  if (!p.empty() && p[0] == '/') {
-    return kResScheme + p.substr(1);
-  }
-  return kResScheme + p;
-}
-
-bool is_user_path(const std::string &p) {
-  return p.compare(0, kUserScheme.size(), kUserScheme) == 0;
-}
-
 bool ends_with_uid_sidecar(const std::string &p) {
   const std::string suffix = ".uid";
   return p.size() > suffix.size() &&
@@ -1600,6 +1844,45 @@ void collect_all_file_paths(const std::string &dir,
   da->list_dir_end();
 }
 
+void collect_all_file_paths_budget(const std::string &dir,
+                                   std::vector<std::string> &out,
+                                   ResourceScanBudget &budget,
+                                   size_t depth,
+                                   bool &truncated) {
+  if (truncated) return;
+  if (depth > GDA_SCAN_MAX_DEPTH) {
+    budget.limit_reason = "directory_depth";
+    budget.truncated = true;
+    truncated = true;
+    return;
+  }
+  godot::Ref<godot::DirAccess> da =
+      godot::DirAccess::open(godot::String(dir.c_str()));
+  if (da.is_null()) return;
+  da->list_dir_begin();
+  godot::String entry = da->get_next();
+  while (entry != godot::String()) {
+    if (truncated) break;
+    if (entry != "." && entry != "..") {
+      const std::string full = join_path(dir, util::to_std(entry));
+      if (da->current_is_dir()) {
+        collect_all_file_paths_budget(full, out, budget, depth + 1, truncated);
+      } else {
+        if (budget.files_listed >= GDA_SCAN_MAX_FILES) {
+          budget.limit_reason = "file_count";
+          budget.truncated = true;
+          truncated = true;
+          break;
+        }
+        ++budget.files_listed;
+        out.push_back(full);
+      }
+    }
+    entry = da->get_next();
+  }
+  da->list_dir_end();
+}
+
 } // namespace
 
 mcp::JsonValue handle_move(const mcp::JsonValue &args) {
@@ -1616,15 +1899,19 @@ mcp::JsonValue handle_move(const mcp::JsonValue &args) {
     return e;
   }
   const std::string raw_dir = it_dir->GetString();
-  if (is_user_path(raw_dir)) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(
-        "new_directory must be inside res://, got: " + raw_dir);
-    return e;
-  }
-  const std::string target_dir = normalize_res_path(raw_dir);
+  std::string target_dir;
+  std::string path_error;
+  if (!normalize_resource_path(raw_dir, target_dir, path_error, true))
+    return util::error_detail("path rejected", "new_directory", path_error,
+                              "move only inside res://");
 
-  const std::string path = it_path->GetString();
+  std::string path;
+  if (!normalize_resource_path(it_path->GetString(), path, path_error, true))
+    return util::error_detail("path rejected", "path", path_error,
+                              "move only res:// files or directories");
+  if (path == "res://")
+    return util::error_detail("path rejected", "path", "namespace root is not movable",
+                              "provide a path below res://");
   godot::String path_gs(path.c_str());
   const bool src_is_dir = godot::DirAccess::dir_exists_absolute(path_gs);
   const bool src_is_file = godot::FileAccess::file_exists(path_gs);
@@ -1634,6 +1921,8 @@ mcp::JsonValue handle_move(const mcp::JsonValue &args) {
     return e;
   }
 
+  ResourceScanBudget move_budget;
+  bool move_truncated = false;
   std::vector<std::string> sources;
   if (src_is_dir) {
     if (target_dir.size() > path.size() &&
@@ -1645,7 +1934,7 @@ mcp::JsonValue handle_move(const mcp::JsonValue &args) {
       return e;
     }
     std::vector<std::string> all;
-    collect_all_file_paths(path, all);
+    collect_all_file_paths_budget(path, all, move_budget, 0, move_truncated);
     for (const std::string &f : all) {
       if (!ends_with_uid_sidecar(f)) {
         sources.push_back(f);
@@ -1773,6 +2062,15 @@ mcp::JsonValue handle_move(const mcp::JsonValue &args) {
   if (scanned) {
     r["filesystem_scanned"] = mcp::JsonValue(true);
   }
+  if (move_truncated) {
+    r["scan_truncated"] = mcp::JsonValue(true);
+    mcp::JsonValue lim(mcp::JsonValue::object_tag);
+    lim["files_listed"] = mcp::JsonValue(static_cast<int64_t>(move_budget.files_listed));
+    lim["reason"] = mcp::JsonValue(move_budget.limit_reason);
+    lim["max_files"] = mcp::JsonValue(static_cast<int64_t>(GDA_SCAN_MAX_FILES));
+    lim["max_depth"] = mcp::JsonValue(static_cast<int64_t>(GDA_SCAN_MAX_DEPTH));
+    r["scan_limit"] = std::move(lim);
+  }
   return r;
 }
 
@@ -1784,18 +2082,11 @@ mcp::JsonValue handle_create_directory(const mcp::JsonValue &args) {
     return e;
   }
   const std::string raw = it_path->GetString();
-  if (is_user_path(raw)) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("path must be inside res://, got: " + raw);
-    return e;
-  }
-  const std::string dir = normalize_res_path(raw);
-  if (dir.size() <= kResScheme.size()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(
-        "path must name a directory below res://, got: " + raw);
-    return e;
-  }
+  std::string dir;
+  std::string path_error;
+  if (!normalize_resource_path(raw, dir, path_error, false))
+    return util::error_detail("path rejected", "path", path_error,
+                              "create directories only below res://");
 
   godot::String dir_gs(dir.c_str());
   const bool already_existed =
@@ -1823,6 +2114,12 @@ mcp::JsonValue handle_get_references(const mcp::JsonValue &args) {
   auto *it_path = args.Find("path");
   if (it_path && it_path->IsString()) {
     target_path = it_path->GetString();
+    std::string normalized_target;
+    std::string path_error;
+    if (!normalize_resource_path(target_path, normalized_target, path_error))
+      return util::error_detail("path rejected", "path", path_error,
+                                "use a res:// project resource path");
+    target_path = normalized_target;
   }
   std::string target_uid;
   auto *it_uid = args.Find("uid");
@@ -1841,9 +2138,20 @@ mcp::JsonValue handle_get_references(const mcp::JsonValue &args) {
     return e;
   }
 
+  ResourceScanBudget ref_budget;
+  bool ref_truncated = false;
+  mcp::JsonValue hits = collect_reference_hits_budget(target_path, target_uid, target_class, ref_budget, ref_truncated);
   mcp::JsonValue ret(mcp::JsonValue::object_tag);
-  ret["result"] =
-      collect_reference_hits(target_path, target_uid, target_class);
+  ret["result"] = std::move(hits);
+  if (ref_truncated) {
+    ret["scan_truncated"] = mcp::JsonValue(true);
+    mcp::JsonValue lim(mcp::JsonValue::object_tag);
+    lim["files_listed"] = mcp::JsonValue(static_cast<int64_t>(ref_budget.files_listed));
+    lim["files_scanned"] = mcp::JsonValue(static_cast<int64_t>(ref_budget.files_scanned));
+    lim["bytes_scanned"] = mcp::JsonValue(static_cast<int64_t>(ref_budget.bytes_scanned));
+    if (!ref_budget.limit_reason.empty()) lim["reason"] = mcp::JsonValue(ref_budget.limit_reason);
+    ret["scan_limit"] = std::move(lim);
+  }
   return ret;
 }
 
@@ -1855,6 +2163,12 @@ mcp::JsonValue handle_get_dependencies(const mcp::JsonValue &args) {
     return e;
   }
   std::string path = it_path->GetString();
+  std::string normalized_path;
+  std::string path_error;
+  if (!normalize_resource_path(path, normalized_path, path_error))
+    return util::error_detail("path rejected", "path", path_error,
+                              "use a res:// project resource path");
+  path = normalized_path;
 
   auto *loader = godot::ResourceLoader::get_singleton();
   if (!loader) {
@@ -1889,6 +2203,17 @@ mcp::JsonValue handle_has_dependency(const mcp::JsonValue &args) {
   }
   std::string path = it_path->GetString();
   std::string dep = it_dep->GetString();
+  std::string normalized_path;
+  std::string normalized_dep;
+  std::string path_error;
+  if (!normalize_resource_path(path, normalized_path, path_error))
+    return util::error_detail("path rejected", "path", path_error,
+                              "use res:// project resource paths");
+  if (!normalize_resource_path(dep, normalized_dep, path_error))
+    return util::error_detail("path rejected", "dependency", path_error,
+                              "use res:// project resource paths");
+  path = normalized_path;
+  dep = normalized_dep;
 
   auto *loader = godot::ResourceLoader::get_singleton();
   if (!loader) {
@@ -1942,7 +2267,13 @@ mcp::JsonValue handle_reimport(const mcp::JsonValue &args) {
     godot::PackedStringArray files;
     for (const auto &f : arr) {
       if (f.IsString()) {
-        files.append(godot::String(f.GetString().c_str()));
+        std::string normalized_file;
+        std::string path_error;
+        if (!normalize_resource_path(f.GetString(), normalized_file,
+                                     path_error))
+          return util::error_detail("path rejected", "files", path_error,
+                                    "reimport only res:// project files");
+        files.append(godot::String(normalized_file.c_str()));
         count++;
       }
     }
@@ -1959,8 +2290,14 @@ mcp::JsonValue handle_reimport(const mcp::JsonValue &args) {
     if (it_path && it_path->IsString()) {
       if (is_import_in_progress())
         return busy_error();
+      std::string normalized_path;
+      std::string path_error;
+      if (!normalize_resource_path(it_path->GetString(), normalized_path,
+                                   path_error))
+        return util::error_detail("path rejected", "path", path_error,
+                                  "reimport only res:// project files");
       godot::PackedStringArray files;
-      files.append(godot::String(it_path->GetString().c_str()));
+      files.append(godot::String(normalized_path.c_str()));
       efs->reimport_files(files);
       count++;
     }

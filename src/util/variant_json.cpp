@@ -1,4 +1,5 @@
 #include "variant_json.hpp"
+#include "core/config.hpp"
 #include "core/log_system.hpp"
 #include <cctype>
 #include <godot_cpp/classes/class_db_singleton.hpp>
@@ -740,6 +741,16 @@ constexpr int MAX_SERIALIZE_DEPTH = 32;
 const char *const DEPTH_EXCEEDED_PLACEHOLDER = "[depth exceeded]";
 const char *const CIRCULAR_REF_PLACEHOLDER = "[<circular ref>";
 
+std::string bounded_variant_string(std::string value) {
+  if (value.size() > GDA_VARIANT_MAX_STRING_BYTES) {
+    constexpr char marker[] = "...(truncated)";
+    constexpr size_t marker_size = sizeof(marker) - 1;
+    value.resize(GDA_VARIANT_MAX_STRING_BYTES - marker_size);
+    value += marker;
+  }
+  return value;
+}
+
 mcp::JsonValue serialize_impl(const godot::Variant &v, int depth,
                               std::unordered_set<uint64_t> &visited) {
   using namespace godot;
@@ -760,7 +771,7 @@ mcp::JsonValue serialize_impl(const godot::Variant &v, int depth,
 
   case Variant::STRING: {
     godot::String s = v.operator godot::String();
-    return mcp::JsonValue(to_std_string(s));
+    return mcp::JsonValue(bounded_variant_string(to_std_string(s)));
   }
 
   case Variant::VECTOR2: {
@@ -1053,94 +1064,132 @@ mcp::JsonValue serialize_impl(const godot::Variant &v, int depth,
     godot::Dictionary d = v.operator godot::Dictionary();
     auto keys = d.keys();
     mcp::JsonValue j(mcp::JsonValue::object_tag);
-    for (int i = 0; i < keys.size(); i++) {
+    for (int i = 0; i < keys.size() &&
+                    static_cast<size_t>(i) < GDA_VARIANT_MAX_ARRAY_ELEMENTS;
+         i++) {
       auto key = keys[i];
       j[to_std_string(key.operator godot::String())] =
           serialize_impl(d[key], depth + 1, visited);
     }
+    if (static_cast<size_t>(keys.size()) > GDA_VARIANT_MAX_ARRAY_ELEMENTS)
+      j["truncated"] = mcp::JsonValue(true);
     return j;
   }
 
   case Variant::ARRAY: {
     godot::Array a = v.operator godot::Array();
     mcp::JsonValue j(mcp::JsonValue::array_tag);
-    for (int i = 0; i < a.size(); i++) {
+    for (int i = 0; i < a.size() &&
+                    static_cast<size_t>(i) < GDA_VARIANT_MAX_ARRAY_ELEMENTS;
+         i++) {
       j.PushBack(serialize_impl(a[i], depth + 1, visited));
     }
+    if (static_cast<size_t>(a.size()) > GDA_VARIANT_MAX_ARRAY_ELEMENTS)
+      j.PushBack(mcp::JsonValue("...(truncated)"));
     return j;
   }
 
   case Variant::PACKED_BYTE_ARRAY: {
     auto a = static_cast<PackedByteArray>(v);
     mcp::JsonValue j(mcp::JsonValue::array_tag);
-    for (int i = 0; i < a.size(); i++) {
+    for (int i = 0; i < a.size() &&
+                    static_cast<size_t>(i) < GDA_VARIANT_MAX_ARRAY_ELEMENTS;
+         i++) {
       j.PushBack(mcp::JsonValue(static_cast<int>(a[i])));
     }
+    if (static_cast<size_t>(a.size()) > GDA_VARIANT_MAX_ARRAY_ELEMENTS)
+      j.PushBack(mcp::JsonValue("...(truncated)"));
     return j;
   }
 
   case Variant::PACKED_INT32_ARRAY: {
     auto a = static_cast<PackedInt32Array>(v);
     mcp::JsonValue j(mcp::JsonValue::array_tag);
-    for (int i = 0; i < a.size(); i++) {
+    for (int i = 0; i < a.size() &&
+                    static_cast<size_t>(i) < GDA_VARIANT_MAX_ARRAY_ELEMENTS;
+         i++) {
       j.PushBack(mcp::JsonValue(a[i]));
     }
+    if (static_cast<size_t>(a.size()) > GDA_VARIANT_MAX_ARRAY_ELEMENTS)
+      j.PushBack(mcp::JsonValue("...(truncated)"));
     return j;
   }
 
   case Variant::PACKED_INT64_ARRAY: {
     auto a = static_cast<PackedInt64Array>(v);
     mcp::JsonValue j(mcp::JsonValue::array_tag);
-    for (int i = 0; i < a.size(); i++) {
+    for (int i = 0; i < a.size() &&
+                    static_cast<size_t>(i) < GDA_VARIANT_MAX_ARRAY_ELEMENTS;
+         i++) {
       j.PushBack(mcp::JsonValue(a[i]));
     }
+    if (static_cast<size_t>(a.size()) > GDA_VARIANT_MAX_ARRAY_ELEMENTS)
+      j.PushBack(mcp::JsonValue("...(truncated)"));
     return j;
   }
 
   case Variant::PACKED_FLOAT32_ARRAY: {
     auto a = static_cast<PackedFloat32Array>(v);
     mcp::JsonValue j(mcp::JsonValue::array_tag);
-    for (int i = 0; i < a.size(); i++) {
+    for (int i = 0; i < a.size() &&
+                    static_cast<size_t>(i) < GDA_VARIANT_MAX_ARRAY_ELEMENTS;
+         i++) {
       j.PushBack(mcp::JsonValue(static_cast<double>(a[i])));
     }
+    if (static_cast<size_t>(a.size()) > GDA_VARIANT_MAX_ARRAY_ELEMENTS)
+      j.PushBack(mcp::JsonValue("...(truncated)"));
     return j;
   }
 
   case Variant::PACKED_FLOAT64_ARRAY: {
     auto a = static_cast<PackedFloat64Array>(v);
     mcp::JsonValue j(mcp::JsonValue::array_tag);
-    for (int i = 0; i < a.size(); i++) {
+    for (int i = 0; i < a.size() &&
+                    static_cast<size_t>(i) < GDA_VARIANT_MAX_ARRAY_ELEMENTS;
+         i++) {
       j.PushBack(mcp::JsonValue(a[i]));
     }
+    if (static_cast<size_t>(a.size()) > GDA_VARIANT_MAX_ARRAY_ELEMENTS)
+      j.PushBack(mcp::JsonValue("...(truncated)"));
     return j;
   }
 
   case Variant::PACKED_STRING_ARRAY: {
     auto a = static_cast<PackedStringArray>(v);
     mcp::JsonValue j(mcp::JsonValue::array_tag);
-    for (int i = 0; i < a.size(); i++) {
-      j.PushBack(mcp::JsonValue(to_std_string(a[i])));
+    for (int i = 0; i < a.size() &&
+                    static_cast<size_t>(i) < GDA_VARIANT_MAX_ARRAY_ELEMENTS;
+         i++) {
+      j.PushBack(mcp::JsonValue(bounded_variant_string(to_std_string(a[i]))));
     }
+    if (static_cast<size_t>(a.size()) > GDA_VARIANT_MAX_ARRAY_ELEMENTS)
+      j.PushBack(mcp::JsonValue("...(truncated)"));
     return j;
   }
 
   case Variant::PACKED_VECTOR2_ARRAY: {
     auto a = static_cast<PackedVector2Array>(v);
     mcp::JsonValue j(mcp::JsonValue::array_tag);
-    for (int i = 0; i < a.size(); i++) {
+    for (int i = 0; i < a.size() &&
+                    static_cast<size_t>(i) < GDA_VARIANT_MAX_ARRAY_ELEMENTS;
+         i++) {
       auto vec = a[i];
       mcp::JsonValue elem(mcp::JsonValue::object_tag);
       elem["x"] = mcp::JsonValue(vec.x);
       elem["y"] = mcp::JsonValue(vec.y);
       j.PushBack(std::move(elem));
     }
+    if (static_cast<size_t>(a.size()) > GDA_VARIANT_MAX_ARRAY_ELEMENTS)
+      j.PushBack(mcp::JsonValue("...(truncated)"));
     return j;
   }
 
   case Variant::PACKED_VECTOR3_ARRAY: {
     auto a = static_cast<PackedVector3Array>(v);
     mcp::JsonValue j(mcp::JsonValue::array_tag);
-    for (int i = 0; i < a.size(); i++) {
+    for (int i = 0; i < a.size() &&
+                    static_cast<size_t>(i) < GDA_VARIANT_MAX_ARRAY_ELEMENTS;
+         i++) {
       auto vec = a[i];
       mcp::JsonValue elem(mcp::JsonValue::object_tag);
       elem["x"] = mcp::JsonValue(vec.x);
@@ -1148,13 +1197,17 @@ mcp::JsonValue serialize_impl(const godot::Variant &v, int depth,
       elem["z"] = mcp::JsonValue(vec.z);
       j.PushBack(std::move(elem));
     }
+    if (static_cast<size_t>(a.size()) > GDA_VARIANT_MAX_ARRAY_ELEMENTS)
+      j.PushBack(mcp::JsonValue("...(truncated)"));
     return j;
   }
 
   case Variant::PACKED_COLOR_ARRAY: {
     auto a = static_cast<PackedColorArray>(v);
     mcp::JsonValue j(mcp::JsonValue::array_tag);
-    for (int i = 0; i < a.size(); i++) {
+    for (int i = 0; i < a.size() &&
+                    static_cast<size_t>(i) < GDA_VARIANT_MAX_ARRAY_ELEMENTS;
+         i++) {
       auto c = a[i];
       mcp::JsonValue elem(mcp::JsonValue::object_tag);
       elem["r"] = mcp::JsonValue(static_cast<double>(c.r));
@@ -1163,13 +1216,17 @@ mcp::JsonValue serialize_impl(const godot::Variant &v, int depth,
       elem["a"] = mcp::JsonValue(static_cast<double>(c.a));
       j.PushBack(std::move(elem));
     }
+    if (static_cast<size_t>(a.size()) > GDA_VARIANT_MAX_ARRAY_ELEMENTS)
+      j.PushBack(mcp::JsonValue("...(truncated)"));
     return j;
   }
 
   case Variant::PACKED_VECTOR4_ARRAY: {
     auto a = static_cast<PackedVector4Array>(v);
     mcp::JsonValue j(mcp::JsonValue::array_tag);
-    for (int i = 0; i < a.size(); i++) {
+    for (int i = 0; i < a.size() &&
+                    static_cast<size_t>(i) < GDA_VARIANT_MAX_ARRAY_ELEMENTS;
+         i++) {
       auto vec = a[i];
       mcp::JsonValue elem(mcp::JsonValue::object_tag);
       elem["x"] = mcp::JsonValue(vec.x);
@@ -1178,6 +1235,8 @@ mcp::JsonValue serialize_impl(const godot::Variant &v, int depth,
       elem["w"] = mcp::JsonValue(vec.w);
       j.PushBack(std::move(elem));
     }
+    if (static_cast<size_t>(a.size()) > GDA_VARIANT_MAX_ARRAY_ELEMENTS)
+      j.PushBack(mcp::JsonValue("...(truncated)"));
     return j;
   }
 
