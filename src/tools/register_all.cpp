@@ -45,7 +45,11 @@
 #include <mcp/Content.hpp>
 #include <mcp/JsonValue.hpp>
 #include <memory>
+#include <mutex>
 #include <utility>
+#ifdef GetObject
+#undef GetObject
+#endif
 
 
 namespace godot_autopilot {
@@ -84,7 +88,8 @@ mcp::JsonValue build_schema_for(const std::string &name) {
 
 mcp::JsonValue tool_input_schema(const std::string& name, bool basic) { (void)basic; return build_schema_for(name); }
 
-static std::unique_ptr<ToolRegistry> g_active_registry = std::make_unique<ToolRegistry>();
+static std::shared_ptr<ToolRegistry> g_active_registry = std::make_shared<ToolRegistry>();
+static std::mutex g_active_registry_mutex;
 
 static mcp::JsonValue meta_ping_impl() {
     mcp::JsonValue r(mcp::JsonValue::object_tag);
@@ -144,8 +149,8 @@ static mcp::JsonValue meta_list_categories_impl(ToolCatalog& catalog) {
         item["id"] = mcp::JsonValue(c);
         item["name"] = mcp::JsonValue(c);
         int count = 0;
-        for (auto* t : catalog.get_all_tools()) {
-            if (t->category == c) {
+        for (const auto& t : catalog.get_all_tools()) {
+            if (t.category == c) {
                 ++count;
             }
         }
@@ -157,15 +162,18 @@ static mcp::JsonValue meta_list_categories_impl(ToolCatalog& catalog) {
     return j;
 }
 
-static mcp::JsonValue meta_get_tool_detail_impl(const mcp::JsonValue& args, ToolCatalog& catalog) {
-    if (args.Find("name") == nullptr) {
+static mcp::JsonValue meta_get_tool_detail_impl(
+    const mcp::JsonValue& args, ToolCatalog& catalog,
+    const std::shared_ptr<ToolRegistry>& registry) {
+    auto *name_p = args.Find("name");
+    if (!name_p || !name_p->IsString() || name_p->GetString().empty()) {
         mcp::JsonValue err(mcp::JsonValue::object_tag);
         err["error"] = mcp::JsonValue("missing required parameter: name");
         return err;
     }
 
-    std::string name = args["name"].GetString();
-    auto* info = catalog.get_tool(name);
+    std::string name = name_p->GetString();
+    auto info = catalog.get_tool(name);
     if (!info) {
         mcp::JsonValue err(mcp::JsonValue::object_tag);
         err["error"] = mcp::JsonValue("tool not found: " + name);
@@ -184,7 +192,7 @@ static mcp::JsonValue meta_get_tool_detail_impl(const mcp::JsonValue& args, Tool
     t["tags"] = std::move(tags);
     t["input_schema"] = info->input_schema;
     const char* se = "";
-    if (auto* tool = g_active_registry->find_any(name)) {
+    if (auto tool = registry->find_any(name)) {
         se = ::godot_autopilot::side_effect_name(
             ::godot_autopilot::side_effect_of(*tool));
     }
@@ -195,18 +203,32 @@ static mcp::JsonValue meta_get_tool_detail_impl(const mcp::JsonValue& args, Tool
 }
 
 static mcp::JsonValue meta_call_tool_impl(mcp::JsonValue args) {
-    if (args.Find("name") == nullptr) {
+    auto *name_p = args.Find("name");
+    if (!name_p || !name_p->IsString() || name_p->GetString().empty()) {
         LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "call_tool failed: missing name");
         mcp::JsonValue e(mcp::JsonValue::object_tag);
         e["error"] = mcp::JsonValue("missing required parameter: name");
         return e;
     }
 
-    std::string name = args["name"].GetString();
+    std::string name = name_p->GetString();
     mcp::JsonValue tool_args = [&]{
         if (auto* a = args.Find("arguments")) return std::move(*a);
         return mcp::JsonValue(mcp::JsonValue::object_tag);
     }();
+
+    if (auto *a = args.Find("arguments"); a && !a->IsObject()) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("arguments must be an object");
+        return e;
+    }
+    for (const auto &entry : args.GetObject()) {
+        if (entry.first != "name" && entry.first != "arguments") {
+            mcp::JsonValue e(mcp::JsonValue::object_tag);
+            e["error"] = mcp::JsonValue("unknown parameter for call_tool: " + entry.first);
+            return e;
+        }
+    }
 
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, name + " called via call_tool");
     return dispatch::call_handler(name, tool_args);
@@ -232,10 +254,9 @@ static mcp::JsonValue meta_call_tool_wait(const std::string& name, mcp::JsonValu
 void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog& catalog, Bm25Index& index, int port) {
 
     (void)queue;
-    g_active_registry = std::make_unique<ToolRegistry>();
-    index.clear();
+    auto registry = std::make_shared<ToolRegistry>();
 
-    g_active_registry->add(make_fn_tool(
+    registry->add(make_fn_tool(
         ToolMeta{"system_status", "Get server status info", "System", {"status", "info"}, true},
         [port, start = std::chrono::steady_clock::now()](const mcp::JsonValue&) -> mcp::JsonValue {
             auto uptime = std::chrono::duration_cast<std::chrono::seconds>(
@@ -251,9 +272,9 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         },
         schema::build_schema({})));
 
-auto add_domain_tools = [](auto& make_fn) {
+    auto add_domain_tools = [&registry](auto& make_fn) {
         for (auto& t : make_fn()) {
-            g_active_registry->add(std::move(t));
+            registry->add(std::move(t));
         }
     };
 
@@ -288,7 +309,7 @@ auto add_domain_tools = [](auto& make_fn) {
     add_domain_tools(test_tools::make_tools);
     add_domain_tools(analyze_tools::make_tools);
 
-    g_active_registry->add(std::make_unique<::godot_autopilot::MetaTool>(
+    registry->add(std::make_unique<::godot_autopilot::MetaTool>(
         ToolMeta{"ping", "Health check ping", "Meta", {"health", "ping"}, true},
         [](const mcp::JsonValue&) { return meta_ping_impl(); },
         schema::build_schema({})));
@@ -316,25 +337,27 @@ auto add_domain_tools = [](auto& make_fn) {
         mcp::JsonValue req(mcp::JsonValue::array_tag);
         req.PushBack(mcp::JsonValue("query"));
         s["required"] = std::move(req);
-        g_active_registry->add(std::make_unique<::godot_autopilot::MetaTool>(
+        registry->add(std::make_unique<::godot_autopilot::MetaTool>(
             ToolMeta{"search_tools", "Search available tools by query", "Meta", {"search", "discovery"}, true},
             [&index](const mcp::JsonValue& args) { return meta_search_tools_impl(args, index); },
             std::move(s)));
     }
 
-    g_active_registry->add(std::make_unique<::godot_autopilot::MetaTool>(
+    registry->add(std::make_unique<::godot_autopilot::MetaTool>(
         ToolMeta{"list_categories", "List all tool categories", "Meta", {"categories", "discovery"}, true},
         [&catalog](const mcp::JsonValue&) { return meta_list_categories_impl(catalog); },
         schema::build_schema({})));
 
-    g_active_registry->add(std::make_unique<::godot_autopilot::MetaTool>(
+    registry->add(std::make_unique<::godot_autopilot::MetaTool>(
         ToolMeta{"get_tool_detail", "Get complete schema for one tool", "Meta", {"detail", "schema"}, true},
-        [&catalog](const mcp::JsonValue& args) { return meta_get_tool_detail_impl(args, catalog); },
+        [&catalog, registry](const mcp::JsonValue& args) {
+            return meta_get_tool_detail_impl(args, catalog, registry);
+        },
         schema::build_schema({
             {"name", "string", "Tool name (e.g. ping, search_tools)", true},
         })));
 
-    g_active_registry->add(std::make_unique<::godot_autopilot::MetaTool>(
+    registry->add(std::make_unique<::godot_autopilot::MetaTool>(
         ToolMeta{"call_tool",
                  "Execute any tool by name. Use this to call all non-meta tools (scene_*, property_*, signal_*, system_status).",
                  "System", {"call", "dispatch", "proxy"}, true},
@@ -384,7 +407,7 @@ auto add_domain_tools = [](auto& make_fn) {
         mcp::JsonValue req(mcp::JsonValue::array_tag);
         req.PushBack(mcp::JsonValue("operations"));
         s["required"] = std::move(req);
-        g_active_registry->add(std::make_unique<::godot_autopilot::MetaTool>(
+        registry->add(std::make_unique<::godot_autopilot::MetaTool>(
             ToolMeta{"batch_execute",
                      "Execute multiple tools in batch. Each operation runs in sequence; if stop_on_error is true and any operation fails, remaining operations are skipped.",
                      "System", {"batch", "execute", "multi"}, true},
@@ -418,7 +441,7 @@ auto add_domain_tools = [](auto& make_fn) {
         mcp::JsonValue req(mcp::JsonValue::array_tag);
         req.PushBack(mcp::JsonValue("source_code"));
         s["required"] = std::move(req);
-        g_active_registry->add(std::make_unique<::godot_autopilot::MetaTool>(
+        registry->add(std::make_unique<::godot_autopilot::MetaTool>(
             ToolMeta{"code_execute",
                      "Execute arbitrary GDScript code. The source code is wrapped in a script that extends Node, compiled, attached to a temporary node, and executed. Returns the function result serialized as JSON. By default the source is inlined inside the _run() function body: top-level func definitions are not supported — inline all code as expressions/statements, or define named functions and call one via function_name (multi-function mode). Execution environment exposes SceneRoot (the edited scene root node) for node access; see SceneRoot.get_node(\"Child\").",
                      "System", {"code", "execute", "script", "gdscript"}, true},
@@ -426,22 +449,30 @@ auto add_domain_tools = [](auto& make_fn) {
             std::move(s)));
     }
 
-    for (auto* t : g_active_registry->all_any()) {
-        catalog.add_tool(make_tool_info(*t));
+    std::vector<ToolInfo> catalog_tools;
+    std::vector<Bm25Index::Entry> index_entries;
+    for (const auto& t : registry->all_any()) {
+        catalog_tools.push_back(make_tool_info(*t));
+        index_entries.push_back({t->meta().name, t->meta().description,
+                                 t->meta().category, t->meta().tags});
     }
+    catalog.replace_tools(std::move(catalog_tools));
+    index.replace_entries(index_entries);
 
-    for (auto* meta_tool : g_active_registry->all_meta()) {
+    for (const auto& meta_tool : registry->all_meta()) {
         const std::string meta_name = meta_tool->meta().name;
         mcp::ToolOptions opts;
         opts.Description(meta_tool->meta().description).InputSchema(meta_tool->input_schema());
         server.RegisterTool(meta_name, opts,
-            [meta_name](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
+            [meta_name, registry, &queue](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
                 if (godot_autopilot::ExportGuard::is_exporting()) {
                     return dispatch::export_blocked_result();
                 }
                 mcp::JsonValue args = ctx.Params().arguments
                     ? *ctx.Params().arguments : mcp::JsonValue(mcp::JsonValue::object_tag);
-                mcp::JsonValue res = g_active_registry->find_meta(meta_name)->execute(args);
+                auto tool = registry->find_meta(meta_name);
+                mcp::JsonValue res = queue.execute_sync(
+                    [tool, args] { return tool->execute(args); });
                 int64_t new_errors = error_watermark::count_response_errors(res);
                 if (new_errors > 0) {
                     error_watermark::record_error(new_errors);
@@ -458,21 +489,24 @@ auto add_domain_tools = [](auto& make_fn) {
             });
     }
 
-    for (auto* t : g_active_registry->all_any()) {
-        index.add_entry(t->meta().name, t->meta().description, t->meta().category, t->meta().tags);
-    }
-
-    for (auto* t : g_active_registry->all()) {
+    dispatch::HandlerMap handlers;
+    dispatch::HandlerMap meta_handlers;
+    for (const auto& t : registry->all()) {
         std::string name = t->meta().name;
-        dispatch::g_handlers[name] = [name](const mcp::JsonValue& a) -> mcp::JsonValue {
-            return g_active_registry->find(name)->execute(a);
+        handlers[name] = [name, registry](const mcp::JsonValue& a) -> mcp::JsonValue {
+            return registry->find(name)->execute(a);
         };
     }
-    for (auto* t : g_active_registry->all_meta()) {
+    for (const auto& t : registry->all_meta()) {
         std::string name = t->meta().name;
-        dispatch::g_meta_handlers[name] = [name](const mcp::JsonValue& a) -> mcp::JsonValue {
-            return g_active_registry->find_meta(name)->execute(a);
+        meta_handlers[name] = [name, registry](const mcp::JsonValue& a) -> mcp::JsonValue {
+            return registry->find_meta(name)->execute(a);
         };
+    }
+    dispatch::replace_handlers(std::move(handlers), std::move(meta_handlers));
+    {
+        std::lock_guard<std::mutex> lock(g_active_registry_mutex);
+        g_active_registry = std::move(registry);
     }
 
     auto count = catalog.size();
@@ -480,6 +514,14 @@ auto add_domain_tools = [](auto& make_fn) {
         std::to_string(count) + " tools registered via registry");
 }
 
-ToolRegistry& get_active_registry() { return *g_active_registry; }
+std::shared_ptr<ToolRegistry> get_active_registry() {
+    std::lock_guard<std::mutex> lock(g_active_registry_mutex);
+    return g_active_registry;
+}
+
+void clear_active_registry() {
+    std::lock_guard<std::mutex> lock(g_active_registry_mutex);
+    g_active_registry = std::make_shared<ToolRegistry>();
+}
 
 }

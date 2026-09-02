@@ -24,43 +24,43 @@ public:
     std::lock_guard<std::mutex> lock(mutex_);
     const std::string name = tool->meta().name;
     if (dynamic_cast<const IMetaTool*>(tool.get())) {
-      meta_[name] = std::move(tool);
+      meta_[name] = std::shared_ptr<ToolBase>(std::move(tool));
     } else {
-      tools_[name] = std::move(tool);
+      tools_[name] = std::shared_ptr<ToolBase>(std::move(tool));
     }
   }
 
-  ToolBase* find(const std::string& name) {
+  std::shared_ptr<ToolBase> find(const std::string& name) const {
     std::lock_guard<std::mutex> lock(mutex_);
     auto it = tools_.find(name);
-    return it != tools_.end() ? it->second.get() : nullptr;
+    return it != tools_.end() ? it->second : nullptr;
   }
 
-  ToolBase* find_meta(const std::string& name) {
+  std::shared_ptr<ToolBase> find_meta(const std::string& name) const {
     std::lock_guard<std::mutex> lock(mutex_);
     auto it = meta_.find(name);
-    return it != meta_.end() ? it->second.get() : nullptr;
+    return it != meta_.end() ? it->second : nullptr;
   }
 
-  ToolBase* find_any(const std::string& name) {
-    ToolBase* tool = find(name);
+  std::shared_ptr<ToolBase> find_any(const std::string& name) const {
+    std::shared_ptr<ToolBase> tool = find(name);
     return tool != nullptr ? tool : find_meta(name);
   }
 
-  std::vector<ToolBase*> all() {
+  std::vector<std::shared_ptr<ToolBase>> all() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return collect(tools_);
   }
 
-  std::vector<ToolBase*> all_meta() {
+  std::vector<std::shared_ptr<ToolBase>> all_meta() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return collect(meta_);
   }
 
-  std::vector<ToolBase*> all_any() {
+  std::vector<std::shared_ptr<ToolBase>> all_any() const {
     std::lock_guard<std::mutex> lock(mutex_);
-    std::vector<ToolBase*> result = collect(tools_);
-    std::vector<ToolBase*> m = collect(meta_);
+    std::vector<std::shared_ptr<ToolBase>> result = collect(tools_);
+    std::vector<std::shared_ptr<ToolBase>> m = collect(meta_);
     result.insert(result.end(), m.begin(), m.end());
     return result;
   }
@@ -92,18 +92,21 @@ public:
   }
 
 private:
-  std::vector<ToolBase*> collect(
-      const std::unordered_map<std::string, std::unique_ptr<ToolBase>>& m) {
-    std::vector<ToolBase*> result;
+  std::vector<std::shared_ptr<ToolBase>> collect(
+      const std::unordered_map<std::string, std::shared_ptr<ToolBase>>& m) const {
+    std::vector<std::shared_ptr<ToolBase>> result;
     result.reserve(m.size());
     for (const auto& entry : m)
-      result.push_back(entry.second.get());
+      result.push_back(entry.second);
+    std::sort(result.begin(), result.end(), [](const auto& lhs, const auto& rhs) {
+      return lhs->meta().name < rhs->meta().name;
+    });
     return result;
   }
 
   mutable std::mutex mutex_;
-  std::unordered_map<std::string, std::unique_ptr<ToolBase>> tools_;
-  std::unordered_map<std::string, std::unique_ptr<ToolBase>> meta_;
+  std::unordered_map<std::string, std::shared_ptr<ToolBase>> tools_;
+  std::unordered_map<std::string, std::shared_ptr<ToolBase>> meta_;
 };
 
 } // namespace godot_autopilot

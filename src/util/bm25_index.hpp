@@ -32,6 +32,13 @@ public:
                                  int max_results = 10) const;
 
   void clear();
+  struct Entry {
+    std::string name;
+    std::string description;
+    std::string category;
+    std::vector<std::string> tags;
+  };
+  void replace_entries(const std::vector<Entry> &entries);
   [[nodiscard]] size_t size() const;
 
 private:
