@@ -23,7 +23,13 @@ public:
         side_(effect) {}
 
   const ToolMeta& meta() const override { return meta_; }
-  mcp::JsonValue execute(const mcp::JsonValue& args) override { return handler_(args); }
+  mcp::JsonValue execute(const mcp::JsonValue& args) override {
+    mcp::JsonValue denied = authorization::deny_if_unauthorized(
+        meta_.name, side_);
+    if (!denied.IsNull())
+      return denied;
+    return handler_(args);
+  }
   mcp::JsonValue input_schema() const override { return schema_; }
   SideEffect side_effects() const override { return side_; }
 

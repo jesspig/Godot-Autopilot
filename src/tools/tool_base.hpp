@@ -10,10 +10,12 @@
 
 #include <tools/schema_builder.hpp>
 #include <util/error_util.hpp>
+#include "tools/authorization.hpp"
 
 namespace godot_autopilot {
 
-enum class SideEffect { None, WritesFile, WritesConfig, ShowsAlert, ModifiesWindow, Process };
+enum class SideEffect { None, WritesFile, WritesConfig, ShowsAlert, ModifiesWindow, Process,
+                        CodeExecute, GameRuntime };
 
 inline const char* side_effect_name(SideEffect e) {
   switch (e) {
@@ -23,6 +25,8 @@ inline const char* side_effect_name(SideEffect e) {
     case SideEffect::ShowsAlert: return "shows_alert";
     case SideEffect::ModifiesWindow: return "modifies_window";
     case SideEffect::Process: return "process";
+    case SideEffect::CodeExecute: return "code_execute";
+    case SideEffect::GameRuntime: return "game_runtime";
   }
   return "";
 }
@@ -58,6 +62,20 @@ inline SideEffect side_effect_of(const ToolBase &t) {
   const auto *side = dynamic_cast<const ISideEffect *>(&t);
   return side ? side->side_effects() : SideEffect::None;
 }
+
+namespace authorization {
+inline const char *capability_for_tool(std::string_view name,
+                                       SideEffect effect) {
+  if (effect == SideEffect::Process)
+    return "process";
+  if (effect == SideEffect::CodeExecute || name == "code_execute" ||
+      name == "execute_script")
+    return "code_execute";
+  if (effect == SideEffect::GameRuntime || name == "execute_game_script")
+    return "game_runtime";
+  return nullptr;
+}
+} // namespace authorization
 
 } // namespace godot_autopilot
 
