@@ -8,7 +8,7 @@ tags:
   - 资源
   - UI
   - 工具库
-timestamp: "2026-09-08T01:57:49+08:00"
+timestamp: "2026-09-08T04:10:12+08:00"
 resource:
   - src/prompts/
   - src/resources/
@@ -18,8 +18,8 @@ resource:
 
 # 支撑模块（src/prompts/、src/resources/、src/ui/、src/util/）
 
-> 审计日期：2026-09-08（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill_gen 一键生成 Agent Skills 同步），基于当前工作树代码逐行核对（不依赖 git 历史）。
-> 覆盖范围：`src/prompts/` 9 组文件（18 个）、`src/resources/` 2 组、`src/ui/` 2 组、`src/util/` 12 组（25 个文件，其中 `scene_path.hpp`/`json_godot.hpp`/`rid_registry.hpp`/`type_hint.hpp`/`gdscript_wrap.hpp`/`project_path.hpp` 为 header-only）。注册入口在 `src/core/server_context.cpp:140-143`。
+> 审计日期：2026-09-08（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill_gen 一键生成 Agent Skills 与 skill 内容外置化同步），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 覆盖范围：`src/prompts/` 9 组文件（18 个）、`src/resources/` 2 组、`src/ui/` 2 组、`src/util/` 12 组（19 个文件，其中 `scene_path.hpp`/`json_godot.hpp`/`rid_registry.hpp`/`type_hint.hpp`/`gdscript_wrap.hpp`/`project_path.hpp` 为 header-only；另含内容目录 `skill_templates/` 24 个文件——23 个 .md + registry.json）。注册入口在 `src/core/server_context.cpp:140-143`。
 
 ## 模块简介
 
@@ -144,17 +144,18 @@ resource:
 - `merge_toml_config(port, existing)` — 已含 `[mcp_servers` 段 → `AlreadyConfigured`；否则追加段（保留原文）
 - `display_name` / `file_path` / `description` — UI label 与报告用
 
-### skill_gen（`skill_gen.cpp/hpp` + 7 个 `skill_content_*.cpp`，命名空间 `godot_autopilot::skill_gen`，09-08 新增）
+### skill_gen（`skill_gen.cpp/hpp` + `skill_content_generated.cpp` + `skill_templates/`，命名空间 `godot_autopilot::skill_gen`，09-08 新增，同日内容外置化）
 
 "一键生成 Agent Skills"：把 19 册英文 Agent Skills（符合 agentskills.io 规范）写入项目根 `.agents/skills/`，供外部编码代理加载。与 `client_config_gen` 同为 UI 面板消费的纯函数生成器（**仅依赖 std，无 Godot API**，L1 可测）：
 
-- **API**：`SkillSpec{name, description, files}`；`all_skills()` 聚合 19 册；`skill_file_path()` 拼生成路径；`render_skill_md()` 渲染 YAML frontmatter——`name`/`description`（值含 ": " 时加引号）/`metadata{author: godot-autopilot, version: "<GDA_VERSION>"}`（version 由 configure_file 注入，与 `server_info` 同源）
+- **内容承载（09-08 外置化）**：19 册正文不再由 7 个 `skill_content_*.cpp`（已删除）手写，外置为 `src/util/skill_templates/`（23 个 .md + `registry.json`；registry 含 19 条 name/description/files 映射，聚合顺序固化于此）+ `tools/embed_skills.py`（纯 stdlib）构建期嵌入——生成头 `skill_content_embedded.h` 入 `build/<preset>/generated/`（gitignore 覆盖），**内容变更不再触碰 C++**。构建期 5 项校验：19 条、name 规则唯一、description ≤1024、files 结构与 source 存在、孤儿 .md 与重复引用（失败非零退出）；定界符 `gda_s` 碰撞自动避让；`cmake/skill_gen.cmake` 中 py launcher 优先（`find_program(NAMES py python python3 REQUIRED)`，本机 python 为 WindowsApps 存根）并 configure 期 `--version` 自检（失败 FATAL_ERROR）
+- **API**：`SkillSpec{name, description, files}`；`skill_gen.hpp` 的 7 个 make_* 声明收敛为 1 个 `make_embedded_skills()`，`all_skills()` 改为其转发（顺序由 registry.json 固化）；`skill_file_path()` 拼生成路径；`render_skill_md()` 渲染 YAML frontmatter——`name`/`description`（值含 ": " 时加引号）/`metadata{author: godot-autopilot, version: "<GDA_VERSION>"}`（version 由 configure_file 注入，与 `server_info` 同源）
 - **生成路径**：`<res://>/.agents/skills/<name>/SKILL.md`；`name` 小写连字符且与目录一致、description ≤1024；4 册另带 `references/` 子文件（physics-navigation、rendering-text、resources-files、tool-map 的 CATEGORY_INDEX/TOOL_REFERENCE 全工具表）
 - **UI 入口**：McpConfigDock 面板 Generate 按钮旁 "Generate Skills" 按钮（tooltip "Write 19 agent skills to .agents/skills/ in the project root"），槽函数 `_on_generate_skills()`：`DirAccess::make_dir_recursive_absolute` 建目录后复用 `write_file` 写入；成功报 "Generated N skills in .agents/skills/ (19 SKILL.md, M reference files)"，失败列相对路径
 - **覆盖写策略**：仅覆盖自有 19 册命名空间内的文件，不触碰 `.agents/skills/` 下其他内容
 - **19 册清单**：usage、direct-http（HTTP 直连兜底：端口四级发现+两步握手+bash/PowerShell 示例）、tool-map、scene-building、properties-signals、resources-files、scripting、running-games、debugging、inspection、tilemap、animation、ui-theming、physics-navigation、rendering-text、audio、os-display、project-config、tips-gotchas
-- **测试**：`tests/unit/skill_gen_test.cpp` 7 用例（SkillGenTest 6 个 TEST + SkillRegistryFixture 1 个 TEST_F）——19 册完整性与名单精确比对、name 规范 `^[a-z0-9]+(-[a-z0-9]+)*$` 且与目录一致、description ≤1024、文件布局无 PLACEHOLDER、frontmatter 渲染、工具名回验（对照运行时 catalog∪schema 参数名∪90 项白名单，注册管线见 [tools_registry.md](tools_registry.md)）、4 册 references 声明
-- **构建接线**：根 `CMakeLists.txt` add_library 与 `tests/CMakeLists.txt` GDA_UNIT_BUSINESS_SOURCES 各追加 8 个 `src/util/skill_*.cpp`
+- **测试**：`tests/unit/skill_gen_test.cpp` 7 用例（SkillGenTest 6 个 TEST + SkillRegistryFixture 1 个 TEST_F）——19 册完整性与名单精确比对、name 规范 `^[a-z0-9]+(-[a-z0-9]+)*$` 且与目录一致、description ≤1024、文件布局无 PLACEHOLDER、frontmatter 渲染、工具名回验（对照运行时 catalog∪schema 参数名∪90 项白名单，注册管线见 [tools_registry.md](tools_registry.md)）、4 册 references 声明；09-08 内容外置化重构后测试零改动全绿
+- **构建接线**：`cmake/skill_gen.cmake` 经 `add_custom_command` 生成嵌入头 + `add_custom_target(gda_skill_embed_header)`；根 `CMakeLists.txt` add_library 与 `tests/CMakeLists.txt` GDA_UNIT_BUSINESS_SOURCES 的 skill 源各为 2 个（`src/util/skill_gen.cpp` + `src/util/skill_content_generated.cpp` 薄胶水：`embedded::all()` → `SkillSpec`），并各 `add_dependencies(... gda_skill_embed_header)`；`skill_templates/*.md` 为数据文件，不进 add_library
 
 ## Util
 

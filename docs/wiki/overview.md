@@ -6,7 +6,7 @@ tags:
   - 总览
   - 架构
   - 技术栈
-timestamp: "2026-09-08T01:56:37+08:00"
+timestamp: "2026-09-08T04:10:12+08:00"
 resource:
   - README.md
   - src/
@@ -14,7 +14,7 @@ resource:
 
 # 项目总览（Overview）
 
-> 审计日期：2026-09-08（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill_gen 与测试数值同步），基于当前工作树文件与代码逐项核对（不依赖 git 历史）。
+> 审计日期：2026-09-08（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill_gen 与测试数值同步，同日随 skill 内容外置化修正 src/util 目录树注释），基于当前工作树文件与代码逐项核对（不依赖 git 历史）。
 > 事实来源：根 `README.md` / `README_zh.md` / `AGENTS.md`、`CMakeLists.txt`、`cmake/FetchDependencies.cmake`、`src/main.cpp`、`src/core/server_context.cpp`、`src/tools/tool_registry.hpp`、`src/tools/*_tools.hpp`、`src/tools/dispatch.cpp`、`src/prompts/prompt_handlers.cpp`、`src/resources/resource_handlers.cpp`、`Example/project.godot`、`Example/docs/`。
 
 ## 项目定位
@@ -118,7 +118,8 @@ godot-self-driving/
 │   ├── runtime/                # 游戏运行时桥接：game_bridge(±input/eval) + gda_protocol.hpp
 │   ├── ui/                     # 编辑器 UI：mcp_config_dock、mcp_log_dock
 │   └── util/                   # 通用编译单元：variant_json、bm25_index、error_util、readback_util、client_config_gen、
-│   │                           #   skill_gen（+7 个 skill_content_* 内容文件）；
+│   │                           #   skill_gen、skill_content_generated（构建期嵌入薄胶水）；内容目录
+│   │                           #   skill_templates/（23 个 .md + registry.json）；
 │   │                           #   header-only：json_godot、rid_registry、scene_path、project_path、type_hint、gdscript_wrap
 ├── tests/                      # L1 gda_unit_tests（103 个 gtest）+ L2 gda_test_runner + config/*.json（7 份）
 ├── docs/                       # 规划文档（docs/plan/）与本知识库（docs/wiki/）

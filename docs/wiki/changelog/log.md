@@ -4,6 +4,7 @@
 
 ## 2026-09-08
 
+- **skill 内容外置化重构（迁移零改写 + 构建期嵌入）**：19 册正文从 7 个 `skill_content_*.cpp` 迁出为 `src/util/skill_templates/`（23 个 .md + registry.json）+ `tools/embed_skills.py` 构建期嵌入（5 项校验，生成头入 `build/generated/`，gitignore 覆盖）；`skill_gen.hpp` 收敛为 `make_embedded_skills()`；ctest L1 103/103 零测试改动。详见 `changelog/2026-09-08-log.md`
 - **知识库审计与修复（三代理配对审计）**：tests.md 7 处数字修正并新增 skill_gen 测试小节、support.md 2 处精确性修正并补 project_path.hpp 小节、AGENTS.md 同步 103 gtest/110 注册点、index/overview/build 修复过时数字与 util 清单、security_contract 补 UI 写盘面、roadmap 补已交付条目。详见 `changelog/2026-09-08-log.md`
 - **一键生成 Agent Skills（19 册 + 生成器 + UI 按钮 + 测试全绿）**：新增 `src/util/skill_gen` 纯函数生成器与 7 个内容单元，聚合 19 册英文 Agent Skills（agentskills.io 规范，4 册带 references/ 全工具表）；McpConfigDock 新增 "Generate Skills" 按钮写入 `.agents/skills/<name>/SKILL.md`（frontmatter version 注入 GDA_VERSION，覆盖写仅限自有 19 册命名空间）；SkillGenTest 7 用例，ctest L1 103/103。详见 `changelog/2026-09-08-log.md`
 

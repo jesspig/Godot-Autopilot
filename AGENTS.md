@@ -4,7 +4,7 @@
 
 - `uv run build.py` — Debug 构建并部署到 `Example/addons/godot-autopilot/`；`--release` 先清理 `.godot`/`addons` 再构建；`--package` 打包 `dist/godot-autopilot-<version>.zip`；`--package --libs-dir <dir>` 从目录递归收集三平台库合并打包（须与 `--package` 同用）
 - 手动：`cmake --preset debug && cmake --build --preset debug`；预设 `debug`/`release`（Ninja，`CMAKE_OSX_ARCHITECTURES=x86_64;arm64` universal，gdextension 用 `macos.{debug,release}.universal`）
-- **勿删 `build/<preset>/_deps/`**（godot-cpp/mcp-cpp-sdk/googletest 缓存）；**新增 `.cpp` 必须加入 `CMakeLists.txt:64` 的 `add_library()`**，业务源码另需同步 `tests/CMakeLists.txt:31` 的 `GDA_UNIT_BUSINESS_SOURCES`（漏了会 undefined symbol，header-only 除外）
+- **勿删 `build/<preset>/_deps/`**（godot-cpp/mcp-cpp-sdk/googletest 缓存）；**新增 `.cpp` 必须加入 `CMakeLists.txt:65` 的 `add_library()`**，业务源码另需同步 `tests/CMakeLists.txt:31` 的 `GDA_UNIT_BUSINESS_SOURCES`（漏了会 undefined symbol，header-only 除外）；`src/util/skill_templates/*.md` 为内容数据文件不进 add_library（经 `cmake/skill_gen.cmake` 构建期嵌入生成头）
 - 版本单一来源：根 `VERSION`（当前 `0.2.2`）→ `CMakeLists.txt:33 file(READ)` 喂 `project()` + `configure_file` 生成 `GDA_VERSION`（`server_info`/`system_status.version`）+ `build.py:34` 打包名；升版只改该文件后重新 configure
 
 ## 架构
@@ -33,7 +33,7 @@
 - 启用：`GDA_ENABLE_TESTS` 已在 `CMakePresets.json` debug/release 置 `ON`（裸 `cmake` 默认 `OFF`）
 - 运行：`ctest --preset debug`（L1 秒级，L2 约 2 分钟需 `GODOT_PATH`）；单跑 `build/debug/tests/gda_test_runner.exe --file 01_scene`；CI 仅 `ctest --preset debug -E "^gda_runner_"`（L1）
 - 结构：L1 `gda_unit_tests` 103 gtest；L2 `gda_test_runner` + `tests/config/*.json` 7 份（`00_meta`/`01_scene`/`02_property`/`03_tools_contract`/`04_resources_scripts`/`05_rename_references`/`06_move_references`）；当前 ctest 注册点共 110（L2 需 `GODOT_PATH`）
-- skill_gen：`src/util/skill_gen.cpp` + `skill_content_*.cpp` 内置 19 册技能（渲染至 `.agents/skills/`），`tests/unit/skill_gen_test.cpp` 7 用例 L1 校验（19 册清单/name/description/文件布局/frontmatter/反引号词回验 catalog∪schema 参数名∪90 项白名单），无需 Godot
+- skill_gen：内容源 `src/util/skill_templates/`（23 个 .md + registry.json，19 册技能）+ `tools/embed_skills.py` 构建期嵌入（5 项校验 name/description/files 结构与孤儿文件，生成头入 `build/<preset>/generated/`，gitignore 覆盖；渲染至 `.agents/skills/`），`tests/unit/skill_gen_test.cpp` 7 用例 L1 校验（19 册清单/name/description/文件布局/frontmatter/反引号词回验 catalog∪schema 参数名∪90 项白名单），无需 Godot
 - 新增用例 = 新建 `tests/config/*.json` 零 C++；Godot 路径 `GODOT_PATH` env > `.env`（`.env.template` 复制），缺失则 L2 跳过
 - 遍历：`03_tools_contract` 枚举 363 域工具，42 个 `GDA_TOOL_CLASS_SIDE` 经 `side_effect` 字段自动排除（仍参与枚举，321 个做空参+冒烟）；3 契约缺口 `create_scene_node`/`get_resource_extensions`/`reimport_resource_files` 记 warnings
 - 副作用：L2 后 `Example/project.godot` 可能追加 `[audio]/[input]` 并生成 `default_bus_layout.tres`，`git checkout -- Example/project.godot` 清理
