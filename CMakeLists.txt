@@ -135,6 +135,14 @@ add_library(godot-autopilot SHARED
     src/util/bm25_index.cpp
     src/util/variant_json.cpp
     src/util/client_config_gen.cpp
+    src/util/skill_gen.cpp
+    src/util/skill_content_entry.cpp
+    src/util/skill_content_scene.cpp
+    src/util/skill_content_resources.cpp
+    src/util/skill_content_runtime.cpp
+    src/util/skill_content_domains.cpp
+    src/util/skill_content_servers.cpp
+    src/util/skill_content_system.cpp
     src/util/error_util.cpp
     src/util/readback_util.cpp
     src/ui/mcp_log_dock.cpp

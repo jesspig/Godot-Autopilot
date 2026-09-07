@@ -10,6 +10,7 @@
 
 #include "../core/server_context.hpp"
 #include "../util/client_config_gen.hpp"
+#include "../util/skill_gen.hpp"
 #include "ui/mcp_log_dock.hpp"
 
 namespace godot_autopilot {
@@ -22,6 +23,7 @@ class McpConfigDock : public godot::EditorDock {
   godot::Label *status_label;
   godot::OptionButton *client_select;
   godot::Button *generate_button;
+  godot::Button *generate_skills_button;
   godot::Label *result_label;
 
   godot::CheckBox *show_time_check = nullptr;
@@ -41,6 +43,7 @@ public:
 private:
   void _on_apply_port();
   void _on_generate();
+  void _on_generate_skills();
   void _refresh_status();
   void _report(const godot::String &text, const godot::Color &color);
   void _on_show_time_toggled(bool checked);

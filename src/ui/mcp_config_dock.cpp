@@ -1,5 +1,6 @@
 #include "mcp_config_dock.hpp"
 
+#include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/h_box_container.hpp>
@@ -127,6 +128,14 @@ McpConfigDock::McpConfigDock() : port_spin(nullptr), apply_button(nullptr) {
   generate_button->connect("pressed",
                            callable_mp(this, &McpConfigDock::_on_generate));
   root->add_child(generate_button);
+
+  generate_skills_button = memnew(godot::Button);
+  generate_skills_button->set_text("Generate Skills");
+  generate_skills_button->set_tooltip_text(
+      "Write 19 agent skills to .agents/skills/ in the project root");
+  generate_skills_button->connect(
+      "pressed", callable_mp(this, &McpConfigDock::_on_generate_skills));
+  root->add_child(generate_skills_button);
 
   result_label = memnew(godot::Label);
   result_label->set_autowrap_mode(godot::TextServer::AUTOWRAP_WORD_SMART);
@@ -258,6 +267,54 @@ void McpConfigDock::_on_generate() {
             theme_color("success_color", godot::Color(0.4f, 0.9f, 0.4f)));
   } else {
     _report("Write failed: " + godot::String(rel_path),
+            theme_color("error_color", godot::Color(0.95f, 0.4f, 0.4f)));
+  }
+}
+
+void McpConfigDock::_on_generate_skills() {
+  godot::String root =
+      godot::ProjectSettings::get_singleton()->globalize_path("res://");
+
+  int generated_skills = 0;
+  int generated_references = 0;
+  std::string failures;
+
+  for (const skill_gen::SkillSpec &spec : skill_gen::all_skills()) {
+    bool all_ok = true;
+    for (const skill_gen::SkillFile &file : spec.files) {
+      const std::string rel_path =
+          skill_gen::skill_file_path(spec.name, file.relative_path);
+      const auto slash = rel_path.rfind('/');
+      if (slash != std::string::npos) {
+        godot::DirAccess::make_dir_recursive_absolute(
+            root.path_join(godot::String(rel_path.substr(0, slash).c_str())));
+      }
+      const std::string content = file.relative_path == "SKILL.md"
+                                      ? skill_gen::render_skill_md(spec)
+                                      : file.body;
+      if (write_file(root.path_join(godot::String(rel_path.c_str())),
+                     content)) {
+        if (file.relative_path != "SKILL.md") {
+          ++generated_references;
+        }
+      } else {
+        all_ok = false;
+        failures += rel_path + "\n";
+      }
+    }
+    if (all_ok) {
+      ++generated_skills;
+    }
+  }
+
+  if (failures.empty()) {
+    _report("Generated " + godot::String::num_int64(generated_skills) +
+                " skills in .agents/skills/ (19 SKILL.md, " +
+                godot::String::num_int64(generated_references) +
+                " reference files)",
+            theme_color("success_color", godot::Color(0.4f, 0.9f, 0.4f)));
+  } else {
+    _report("Skill generation failed for:\n" + godot::String(failures.c_str()),
             theme_color("error_color", godot::Color(0.95f, 0.4f, 0.4f)));
   }
 }
