@@ -40,13 +40,7 @@ set(GDA_UNIT_BUSINESS_SOURCES
     ${CMAKE_SOURCE_DIR}/src/util/variant_json.cpp
     ${CMAKE_SOURCE_DIR}/src/util/client_config_gen.cpp
     ${CMAKE_SOURCE_DIR}/src/util/skill_gen.cpp
-    ${CMAKE_SOURCE_DIR}/src/util/skill_content_entry.cpp
-    ${CMAKE_SOURCE_DIR}/src/util/skill_content_scene.cpp
-    ${CMAKE_SOURCE_DIR}/src/util/skill_content_resources.cpp
-    ${CMAKE_SOURCE_DIR}/src/util/skill_content_runtime.cpp
-    ${CMAKE_SOURCE_DIR}/src/util/skill_content_domains.cpp
-    ${CMAKE_SOURCE_DIR}/src/util/skill_content_servers.cpp
-    ${CMAKE_SOURCE_DIR}/src/util/skill_content_system.cpp
+    ${CMAKE_SOURCE_DIR}/src/util/skill_content_generated.cpp
     ${CMAKE_SOURCE_DIR}/src/tools/tool_catalog.cpp
     ${CMAKE_SOURCE_DIR}/src/tools/schema_builder.cpp
     ${CMAKE_SOURCE_DIR}/src/tools/register_all.cpp
@@ -62,6 +56,9 @@ file(GLOB_RECURSE GDA_UNIT_SOURCES CONFIGURE_DEPENDS
 
 if(GDA_UNIT_SOURCES)
     add_executable(gda_unit_tests ${GDA_UNIT_SOURCES} ${GDA_UNIT_BUSINESS_SOURCES})
+
+    # skill 内容头 skill_content_embedded.h 由 cmake/skill_gen.cmake 构建期生成
+    add_dependencies(gda_unit_tests gda_skill_embed_header)
 
     target_include_directories(gda_unit_tests PRIVATE
         ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)

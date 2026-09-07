@@ -51,19 +51,9 @@ std::string yaml_double_quoted(const std::string &value) {
 
 } // namespace
 
+// 19 册聚合顺序由 skill_templates/registry.json 固化（与原分组聚合顺序一致）
 std::vector<SkillSpec> all_skills() {
-  std::vector<SkillSpec> skills;
-  const auto append = [&skills](std::vector<SkillSpec> group) {
-    skills.insert(skills.end(), group.begin(), group.end());
-  };
-  append(make_entry_skills());
-  append(make_scene_skills());
-  append(make_resource_skills());
-  append(make_runtime_skills());
-  append(make_domain_skills());
-  append(make_server_skills());
-  append(make_system_skills());
-  return skills;
+  return make_embedded_skills();
 }
 
 std::string skill_file_path(const std::string &name,

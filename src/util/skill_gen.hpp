@@ -17,14 +17,7 @@ struct SkillSpec {
   std::vector<SkillFile> files; // files[0] 必须是 SKILL.md
 };
 
-// 内容编译单元（实现位于 skill_content_*.cpp）
-std::vector<SkillSpec> make_entry_skills();    // usage / direct-http / tool-map
-std::vector<SkillSpec> make_scene_skills();    // scene-building / properties-signals
-std::vector<SkillSpec> make_resource_skills(); // resources-files / scripting
-std::vector<SkillSpec> make_runtime_skills();  // running-games / debugging / inspection
-std::vector<SkillSpec> make_domain_skills();   // tilemap / animation / ui-theming
-std::vector<SkillSpec> make_server_skills();   // physics-navigation / rendering-text / audio
-std::vector<SkillSpec> make_system_skills();   // os-display / project-config / tips-gotchas
+std::vector<SkillSpec> make_embedded_skills(); // 实现在 skill_content_generated.cpp；内容由 skill_templates/ 构建期嵌入
 
 std::vector<SkillSpec> all_skills();
 
