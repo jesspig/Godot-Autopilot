@@ -8,7 +8,7 @@ tags:
   - 资源
   - UI
   - 工具库
-timestamp: "2026-09-02T18:45:30+08:00"
+timestamp: "2026-09-08T01:57:49+08:00"
 resource:
   - src/prompts/
   - src/resources/
@@ -18,8 +18,8 @@ resource:
 
 # 支撑模块（src/prompts/、src/resources/、src/ui/、src/util/）
 
-> 审计日期：2026-09-02（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步），基于当前工作树代码逐行核对（不依赖 git 历史）。
-> 覆盖范围：`src/prompts/` 9 组文件（18 个）、`src/resources/` 2 组、`src/ui/` 2 组、`src/util/` 10 组（15 个文件，其中 `scene_path.hpp`/`json_godot.hpp`/`rid_registry.hpp`/`type_hint.hpp`/`gdscript_wrap.hpp` 为 header-only）。注册入口在 `src/core/server_context.cpp:140-143`。
+> 审计日期：2026-09-08（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill_gen 一键生成 Agent Skills 同步），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 覆盖范围：`src/prompts/` 9 组文件（18 个）、`src/resources/` 2 组、`src/ui/` 2 组、`src/util/` 12 组（25 个文件，其中 `scene_path.hpp`/`json_godot.hpp`/`rid_registry.hpp`/`type_hint.hpp`/`gdscript_wrap.hpp`/`project_path.hpp` 为 header-only）。注册入口在 `src/core/server_context.cpp:140-143`。
 
 ## 模块简介
 
@@ -28,7 +28,7 @@ resource:
 - **Prompts**：向 MCP 客户端暴露 12 个 prompt 模板（7 通用 + 5 调试），全部经 `server.RegisterPrompt` 注册。
 - **Resources**：暴露 15 个 MCP resource URI（8 引擎侧 + 7 调试捕获侧），全部为 `godot://` 前缀。
 - **UI**：底部日志面板（`McpLogDock`）、右侧配置面板（`McpConfigDock`），消费 `LogSystem` 与服务器生命周期。
-- **Util**：与工具层共享的纯工具件——Variant↔JSON 互转、BM25 检索、错误 JSON 构造、写后读回校验、场景路径解析、JSON 数值/几何/RID 辅助、进程内 RID 注册表、类型提示推断、GDScript 包装流水线、客户端 MCP 配置生成。
+- **Util**：与工具层共享的纯工具件——Variant↔JSON 互转、BM25 检索、错误 JSON 构造、写后读回校验、场景路径解析、JSON 数值/几何/RID 辅助、进程内 RID 注册表、类型提示推断、GDScript 包装流水线、客户端 MCP 配置生成、Agent Skills 文档生成。
 
 ## Prompts（12 个，均经 RegisterPrompt 注册）
 
@@ -143,6 +143,18 @@ resource:
 - `merge_json_config(ClientId, port, existing)` — 空串 → 视为新建；Parse 失败或非对象 → `Unparsable`；否则更新顶层键下同名条目并保留其余内容
 - `merge_toml_config(port, existing)` — 已含 `[mcp_servers` 段 → `AlreadyConfigured`；否则追加段（保留原文）
 - `display_name` / `file_path` / `description` — UI label 与报告用
+
+### skill_gen（`skill_gen.cpp/hpp` + 7 个 `skill_content_*.cpp`，命名空间 `godot_autopilot::skill_gen`，09-08 新增）
+
+"一键生成 Agent Skills"：把 19 册英文 Agent Skills（符合 agentskills.io 规范）写入项目根 `.agents/skills/`，供外部编码代理加载。与 `client_config_gen` 同为 UI 面板消费的纯函数生成器（**仅依赖 std，无 Godot API**，L1 可测）：
+
+- **API**：`SkillSpec{name, description, files}`；`all_skills()` 聚合 19 册；`skill_file_path()` 拼生成路径；`render_skill_md()` 渲染 YAML frontmatter——`name`/`description`（值含 ": " 时加引号）/`metadata{author: godot-autopilot, version: "<GDA_VERSION>"}`（version 由 configure_file 注入，与 `server_info` 同源）
+- **生成路径**：`<res://>/.agents/skills/<name>/SKILL.md`；`name` 小写连字符且与目录一致、description ≤1024；4 册另带 `references/` 子文件（physics-navigation、rendering-text、resources-files、tool-map 的 CATEGORY_INDEX/TOOL_REFERENCE 全工具表）
+- **UI 入口**：McpConfigDock 面板 Generate 按钮旁 "Generate Skills" 按钮（tooltip "Write 19 agent skills to .agents/skills/ in the project root"），槽函数 `_on_generate_skills()`：`DirAccess::make_dir_recursive_absolute` 建目录后复用 `write_file` 写入；成功报 "Generated N skills in .agents/skills/ (19 SKILL.md, M reference files)"，失败列相对路径
+- **覆盖写策略**：仅覆盖自有 19 册命名空间内的文件，不触碰 `.agents/skills/` 下其他内容
+- **19 册清单**：usage、direct-http（HTTP 直连兜底：端口四级发现+两步握手+bash/PowerShell 示例）、tool-map、scene-building、properties-signals、resources-files、scripting、running-games、debugging、inspection、tilemap、animation、ui-theming、physics-navigation、rendering-text、audio、os-display、project-config、tips-gotchas
+- **测试**：`tests/unit/skill_gen_test.cpp` 7 用例（SkillGenTest 6 个 TEST + SkillRegistryFixture 1 个 TEST_F）——19 册完整性与名单精确比对、name 规范 `^[a-z0-9]+(-[a-z0-9]+)*$` 且与目录一致、description ≤1024、文件布局无 PLACEHOLDER、frontmatter 渲染、工具名回验（对照运行时 catalog∪schema 参数名∪90 项白名单，注册管线见 [tools_registry.md](tools_registry.md)）、4 册 references 声明
+- **构建接线**：根 `CMakeLists.txt` add_library 与 `tests/CMakeLists.txt` GDA_UNIT_BUSINESS_SOURCES 各追加 8 个 `src/util/skill_*.cpp`
 
 ## Util
 
@@ -260,6 +272,10 @@ GDScript 包装流水线共享件（script_ops 与 code_exec_ops 共用）：
 | `truncate_capture_text(text)` | 超 8192 字节截断 |
 | `strip_extends_lines / has_top_level_func_def / defines_function_named` | 单表达式判定与 extends 剥离 |
 | `IndentStyle / scan_indent_style / indent_prefix / reindent_lines` | 包装时缩进风格探测与重排 |
+
+### project_path.hpp（header-only，命名空间 `godot_autopilot::util`，09-02 新增）
+
+工程资源路径规范化与边界校验的单一入口：`normalize_project_path(raw, allow_user, allow_root = true)` 返回 `ProjectPath{value, error}`——反斜杠归一为 `/` 后词法消解，拒绝 `..` 路径穿越；绝对路径经 `ProjectSettings` 定位工程根做大小写不敏感前缀校验，工程外报错；scheme 仅 `res://`/`user://`（`user://` 受 `allow_user` 开关控制），未知 scheme 报错；`allow_root = false` 时拒绝命名空间根本身。失败返回结构化 `error`，不以空路径兜底。消费方：`text_ops`/`resource_ops` 全量入口（边界要求见 [../security_contract.md](../security_contract.md)）。
 
 ## 与现有文档的不一致点
 

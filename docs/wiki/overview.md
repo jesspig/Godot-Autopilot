@@ -6,7 +6,7 @@ tags:
   - 总览
   - 架构
   - 技术栈
-timestamp: "2026-09-02T18:45:30+08:00"
+timestamp: "2026-09-08T01:56:37+08:00"
 resource:
   - README.md
   - src/
@@ -14,7 +14,7 @@ resource:
 
 # 项目总览（Overview）
 
-> 审计日期：2026-09-02（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步），基于当前工作树文件与代码逐项核对（不依赖 git 历史）。
+> 审计日期：2026-09-08（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill_gen 与测试数值同步），基于当前工作树文件与代码逐项核对（不依赖 git 历史）。
 > 事实来源：根 `README.md` / `README_zh.md` / `AGENTS.md`、`CMakeLists.txt`、`cmake/FetchDependencies.cmake`、`src/main.cpp`、`src/core/server_context.cpp`、`src/tools/tool_registry.hpp`、`src/tools/*_tools.hpp`、`src/tools/dispatch.cpp`、`src/prompts/prompt_handlers.cpp`、`src/resources/resource_handlers.cpp`、`Example/project.godot`、`Example/docs/`。
 
 ## 项目定位
@@ -81,7 +81,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 ### 编辑器 UI
 
 - 自定义底部日志面板 `McpLogDock`（"GDA Log"，按 LogLevel/LogCategory 过滤、文本搜索、折叠重复；配置面板 "Show timestamps" 开关控制每条日志时间前缀 `[HH:MM:SS]`（本地时、时分秒），开启时默认生效并经 `user://godot_autopilot/config.json` 的 `show_time` 键持久化；折叠合并重复日志时除条数外始终显示最新一条的 `[HH:MM:SS]`，不受总开关控制）。
-- 右侧配置面板 `McpConfigDock`（"MCP Config"：端口运行时重启 + 持久化、一键生成 8 个客户端 MCP 配置）。
+- 右侧配置面板 `McpConfigDock`（"MCP Config"：端口运行时重启 + 持久化、一键生成 8 个客户端 MCP 配置、一键生成 19 册 Agent Skills 到项目根 .agents/skills/（详见 [modules/support.md](./modules/support.md)））。
 - `ExportGuard`：导出期间拒绝领域工具调用（返回 `{"error":"editor is exporting; ..."}`）。
 
 ## 技术栈
@@ -117,9 +117,10 @@ godot-self-driving/
 │   ├── prompts/                # 提示词模板：7 个主题 + debugger_prompts
 │   ├── runtime/                # 游戏运行时桥接：game_bridge(±input/eval) + gda_protocol.hpp
 │   ├── ui/                     # 编辑器 UI：mcp_config_dock、mcp_log_dock
-│   └── util/                   # 通用：variant_json、bm25_index、error_util、readback_util、scene_path、client_config_gen、
-│   │                           #   json_godot、rid_registry、type_hint、gdscript_wrap（后四个 header-only）
-├── tests/                      # L1 gda_unit_tests（96 个 gtest）+ L2 gda_test_runner + config/*.json（7 份）
+│   └── util/                   # 通用编译单元：variant_json、bm25_index、error_util、readback_util、client_config_gen、
+│   │                           #   skill_gen（+7 个 skill_content_* 内容文件）；
+│   │                           #   header-only：json_godot、rid_registry、scene_path、project_path、type_hint、gdscript_wrap
+├── tests/                      # L1 gda_unit_tests（103 个 gtest）+ L2 gda_test_runner + config/*.json（7 份）
 ├── docs/                       # 规划文档（docs/plan/）与本知识库（docs/wiki/）
 └── Example/                    # 文档/示例工程（详见 example.md）
 ```

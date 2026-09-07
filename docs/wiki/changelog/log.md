@@ -2,6 +2,11 @@
 
 > 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天。
 
+## 2026-09-08
+
+- **知识库审计与修复（三代理配对审计）**：tests.md 7 处数字修正并新增 skill_gen 测试小节、support.md 2 处精确性修正并补 project_path.hpp 小节、AGENTS.md 同步 103 gtest/110 注册点、index/overview/build 修复过时数字与 util 清单、security_contract 补 UI 写盘面、roadmap 补已交付条目。详见 `changelog/2026-09-08-log.md`
+- **一键生成 Agent Skills（19 册 + 生成器 + UI 按钮 + 测试全绿）**：新增 `src/util/skill_gen` 纯函数生成器与 7 个内容单元，聚合 19 册英文 Agent Skills（agentskills.io 规范，4 册带 references/ 全工具表）；McpConfigDock 新增 "Generate Skills" 按钮写入 `.agents/skills/<name>/SKILL.md`（frontmatter version 注入 GDA_VERSION，覆盖写仅限自有 19 册命名空间）；SkillGenTest 7 用例，ctest L1 103/103。详见 `changelog/2026-09-08-log.md`
+
 ## 2026-09-02
 
 - **安全与并行硬化全量落地（T1–T11）**：监听拒绝非环回、队列生命周期与背压、注册快照与 handler 原子替换、统一主线程入口、服务启停清理、pending 先登记、路径与能力分级、扫描/截图/变体限额、日志快照、构建大小写修复；同步 wiki timestamp 与安全契约。详见 `changelog/2026-09-02-log.md`

@@ -6,7 +6,7 @@ tags:
   - 规划
   - 竞品对齐
   - 工具扩展
-timestamp: "2026-08-29T02:35:37+08:00"
+timestamp: "2026-09-08T01:57:22+08:00"
 ---
 
 # 竞品对齐路线图
@@ -54,6 +54,10 @@ timestamp: "2026-08-29T02:35:37+08:00"
 - **Scene 域 +2**：rename_scene_node / reparent_node；`create_scene_node` 支持 `properties` 参数
 - **Game 域 +2**：sequence_game_inputs（逐物理帧时间线注入）/ get_game_ui_elements（运行中 Control 树枚举）
 - **删除 2 死工具**：get_debugger_stack_dump / get_debugger_monitors（ScriptDebugger 未暴露给 GDExtension，数据源不可达）
+
+## 已交付：Agent Skills 生成
+
+- **skill_gen 一键生成 19 册 Agent Skills**（2026-09-08 交付，生成器 + UI 按钮 + 7 用例 L1）：写入项目根 `.agents/skills/`，覆盖写仅限自有 19 册命名空间
 
 ## 遗留：P3 待规划
 

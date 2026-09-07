@@ -6,7 +6,7 @@ tags:
   - 构建
   - CMake
   - 部署
-timestamp: "2026-09-02T18:45:30+08:00"
+timestamp: "2026-09-08T01:56:55+08:00"
 resource:
   - CMakeLists.txt
   - CMakePresets.json
@@ -17,7 +17,7 @@ resource:
 # 构建体系（build）
 
 > 审计日期：2026-09-02（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步），基于当前工作树文件逐项核对（不依赖 git 历史）。
-> 事实来源：`build.py`（239 行）、`CMakeLists.txt`（164 行）、`CMakePresets.json`、`cmake/` 全部 6 个模块、`.env.template`、根 `README.md` / `README_zh.md` / `AGENTS.md` 构建段、`.github/workflows/{ci,release}.yml`。
+> 事实来源：`build.py`（239 行）、`CMakeLists.txt`（172 行）、`CMakePresets.json`、`cmake/` 全部 6 个模块、`.env.template`、根 `README.md` / `README_zh.md` / `AGENTS.md` 构建段、`.github/workflows/{ci,release}.yml`。
 
 ## 命令速查表
 
@@ -104,12 +104,12 @@ macOS runner 为 ARM64，preset 设 `CMAKE_OSX_ARCHITECTURES=x86_64;arm64` 编�
 
 ## CMake 目标
 
-`add_library(godot-autopilot SHARED ...)`（`CMakeLists.txt:64-141`）共 **77 个 .cpp**：
+`add_library(godot-autopilot SHARED ...)`（`CMakeLists.txt:64-141`）共 **85 个 .cpp**：
 
 | 目录 | 数量 | 目录 | 数量 |
 |---|---:|---|---:|
 | `src/main.cpp` | 1 | `src/tools/` | 47 |
-| `src/core/` | 8（含 editor_readiness.cpp） | `src/util/` | 5 |
+| `src/core/` | 8（含 editor_readiness.cpp） | `src/util/` | 13（含 skill_gen 及 7 个 skill_content_* 内容文件） |
 | `src/resources/` | 2 | `src/ui/` | 2 |
 | `src/prompts/` | 9 | `src/runtime/` | 3 |
 
