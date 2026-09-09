@@ -2,6 +2,10 @@
 
 > 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天。
 
+## 2026-09-10
+
+- **skill 体系 19→7 册重构 + Godot 源码研究发现织入**：19 册合并为 `godot-autopilot` 总纲 + 6 册引擎指南（每册带 references/ 渐进披露），84 条 Godot 4.8.0-dev 源码研究发现织入引擎六册（4.7+/4.8 行内简注）；`skill_templates/` 28 个文件、registry 7 条、`SKILL_COUNT` 19→7；McpConfigDock 按钮 Generate/Update 动态化（Update 先清理 `godot-autopilot-` 前缀目录）；skill_gen_test 用例改名 + 白名单 176，ctest L1 103/103 全绿；support/tests/overview/AGENTS.md 知识库同步。详见 `changelog/2026-09-10-log.md`
+
 ## 2026-09-08
 
 - **skill 内容外置化重构（迁移零改写 + 构建期嵌入）**：19 册正文从 7 个 `skill_content_*.cpp` 迁出为 `src/util/skill_templates/`（23 个 .md + registry.json）+ `tools/embed_skills.py` 构建期嵌入（5 项校验，生成头入 `build/generated/`，gitignore 覆盖）；`skill_gen.hpp` 收敛为 `make_embedded_skills()`；ctest L1 103/103 零测试改动。详见 `changelog/2026-09-08-log.md`

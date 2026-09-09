@@ -6,7 +6,7 @@ tags:
   - 构建
   - CMake
   - 部署
-timestamp: "2026-09-08T04:10:12+08:00"
+timestamp: "2026-09-10T01:20:18+08:00"
 resource:
   - CMakeLists.txt
   - CMakePresets.json
@@ -16,7 +16,7 @@ resource:
 
 # 构建体系（build）
 
-> 审计日期：2026-09-08（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill 内容外置化同步），基于当前工作树文件逐项核对（不依赖 git 历史）。
+> 审计日期：2026-09-10（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill 内容外置化同步；09-10 随 7 册重构同步），基于当前工作树文件逐项核对（不依赖 git 历史）。
 > 事实来源：`build.py`（239 行）、`CMakeLists.txt`（169 行）、`CMakePresets.json`、`cmake/` 全部 7 个模块、`tools/embed_skills.py`、`.env.template`、根 `README.md` / `README_zh.md` / `AGENTS.md` 构建段、`.github/workflows/{ci,release}.yml`。
 
 ## 命令速查表
@@ -113,7 +113,7 @@ macOS runner 为 ARM64，preset 设 `CMAKE_OSX_ARCHITECTURES=x86_64;arm64` 编�
 | `src/resources/` | 2 | `src/ui/` | 2 |
 | `src/prompts/` | 9 | `src/runtime/` | 3 |
 
-- **skill 内容嵌入头**：19 册技能正文外置为 `src/util/skill_templates/`（23 个 .md + registry.json，**不进 add_library**），`cmake/skill_gen.cmake` 在构建期经 `tools/embed_skills.py` 生成 `build/<preset>/generated/skill_content_embedded.h`（gitignore 覆盖）；`add_dependencies(godot-autopilot gda_skill_embed_header)`（`CMakeLists.txt:146`）保证生成先于编译；
+- **skill 内容嵌入头**：7 册技能正文外置为 `src/util/skill_templates/`（27 个 .md + registry.json，**不进 add_library**），`cmake/skill_gen.cmake` 在构建期经 `tools/embed_skills.py` 生成 `build/<preset>/generated/skill_content_embedded.h`（gitignore 覆盖）；`add_dependencies(godot-autopilot gda_skill_embed_header)`（`CMakeLists.txt:146`）保证生成先于编译；
 - 私有头文件目录：`${CMAKE_SOURCE_DIR}/src`；
 - 链接库（PRIVATE）：`godot-cpp`、`mcp-server`、`mcp-http`（后两者来自 mcp-cpp-sdk）；
 - MSVC（含 clang-cl）额外 `target_link_options "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>"`（`CMakeLists.txt:158`）—— 强制导出 godot-cpp 全部符号，防止 GDExtension 入口符号被链接器裁剪；
