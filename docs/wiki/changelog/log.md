@@ -5,6 +5,7 @@
 ## 2026-09-10
 
 - **skill 体系 19→7 册重构 + Godot 源码研究发现织入**：19 册合并为 `godot-autopilot` 总纲 + 6 册引擎指南（每册带 references/ 渐进披露），84 条 Godot 4.8.0-dev 源码研究发现织入引擎六册（4.7+/4.8 行内简注）；`skill_templates/` 28 个文件、registry 7 条、`SKILL_COUNT` 19→7；McpConfigDock 按钮 Generate/Update 动态化（Update 先清理 `godot-autopilot-` 前缀目录）；skill_gen_test 用例改名 + 白名单 176，ctest L1 103/103 全绿；support/tests/overview/AGENTS.md 知识库同步。详见 `changelog/2026-09-10-log.md`
+- **版本号 0.2.2 → 0.2.3**：根 `VERSION` 单一来源变更（CRLF 保留），AGENTS.md/build.md 示例同步，GDA_VERSION 注入验证通过，ctest L1 103/103。详见 `changelog/2026-09-10-log.md`
 
 ## 2026-09-08
 
