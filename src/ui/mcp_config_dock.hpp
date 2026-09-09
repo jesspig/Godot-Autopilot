@@ -44,7 +44,10 @@ private:
   void _on_apply_port();
   void _on_generate();
   void _on_generate_skills();
+  bool has_existing_skills();
+  void remove_legacy_skill_dirs();
   void _refresh_status();
+  void _refresh_generate_skills_button();
   void _report(const godot::String &text, const godot::Color &color);
   void _on_show_time_toggled(bool checked);
 };

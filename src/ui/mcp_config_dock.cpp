@@ -18,6 +18,8 @@ namespace godot_autopilot {
 namespace {
 
 constexpr const char *kDockTitle = "MCP Config";
+constexpr const char *kSkillsDir = "res://.agents/skills";
+constexpr const char *kSkillDirPrefix = "godot-autopilot-";
 
 godot::Color theme_color(const char *name, const godot::Color &fallback) {
   godot::Ref<godot::Theme> theme =
@@ -48,6 +50,28 @@ godot::String read_file(const godot::String &path) {
   godot::String content = file->get_as_text();
   file->close();
   return content;
+}
+
+void remove_dir_recursive(const godot::String &path) {
+  godot::Ref<godot::DirAccess> dir = godot::DirAccess::open(path);
+  if (dir.is_null()) {
+    return;
+  }
+  dir->list_dir_begin();
+  godot::String entry = dir->get_next();
+  while (entry != godot::String()) {
+    if (entry != "." && entry != "..") {
+      const godot::String child = path.path_join(entry);
+      if (dir->current_is_dir()) {
+        remove_dir_recursive(child);
+      } else {
+        dir->remove(child);
+      }
+    }
+    entry = dir->get_next();
+  }
+  dir->list_dir_end();
+  godot::DirAccess::remove_absolute(path);
 }
 
 } // namespace
@@ -130,9 +154,6 @@ McpConfigDock::McpConfigDock() : port_spin(nullptr), apply_button(nullptr) {
   root->add_child(generate_button);
 
   generate_skills_button = memnew(godot::Button);
-  generate_skills_button->set_text("Generate Skills");
-  generate_skills_button->set_tooltip_text(
-      "Write 19 agent skills to .agents/skills/ in the project root");
   generate_skills_button->connect(
       "pressed", callable_mp(this, &McpConfigDock::_on_generate_skills));
   root->add_child(generate_skills_button);
@@ -186,6 +207,15 @@ void McpConfigDock::_refresh_status() {
     status_label->set_modulate(
         theme_color("error_color", godot::Color(0.95f, 0.4f, 0.4f)));
   }
+  _refresh_generate_skills_button();
+}
+
+void McpConfigDock::_refresh_generate_skills_button() {
+  generate_skills_button->set_text(has_existing_skills() ? "Update Skills"
+                                                         : "Generate Skills");
+  generate_skills_button->set_tooltip_text(
+      "Write the 7 godot-autopilot skills to .agents/skills/ "
+      "(updates existing entries)");
 }
 
 void McpConfigDock::_report(const godot::String &text,
@@ -271,7 +301,48 @@ void McpConfigDock::_on_generate() {
   }
 }
 
+bool McpConfigDock::has_existing_skills() {
+  godot::Ref<godot::DirAccess> dir = godot::DirAccess::open(kSkillsDir);
+  if (dir.is_null()) {
+    return false;
+  }
+  dir->list_dir_begin();
+  godot::String entry = dir->get_next();
+  while (entry != godot::String()) {
+    if (entry != "." && entry != ".." && dir->current_is_dir() &&
+        entry.begins_with(kSkillDirPrefix)) {
+      dir->list_dir_end();
+      return true;
+    }
+    entry = dir->get_next();
+  }
+  dir->list_dir_end();
+  return false;
+}
+
+void McpConfigDock::remove_legacy_skill_dirs() {
+  godot::Ref<godot::DirAccess> dir = godot::DirAccess::open(kSkillsDir);
+  if (dir.is_null()) {
+    return;
+  }
+  dir->list_dir_begin();
+  godot::String entry = dir->get_next();
+  while (entry != godot::String()) {
+    if (entry != "." && entry != ".." && dir->current_is_dir() &&
+        entry.begins_with(kSkillDirPrefix)) {
+      remove_dir_recursive(godot::String(kSkillsDir).path_join(entry));
+    }
+    entry = dir->get_next();
+  }
+  dir->list_dir_end();
+}
+
 void McpConfigDock::_on_generate_skills() {
+  const bool updating = has_existing_skills();
+  if (updating) {
+    remove_legacy_skill_dirs();
+  }
+
   godot::String root =
       godot::ProjectSettings::get_singleton()->globalize_path("res://");
 
@@ -308,15 +379,25 @@ void McpConfigDock::_on_generate_skills() {
   }
 
   if (failures.empty()) {
-    _report("Generated " + godot::String::num_int64(generated_skills) +
-                " skills in .agents/skills/ (19 SKILL.md, " +
-                godot::String::num_int64(generated_references) +
-                " reference files)",
-            theme_color("success_color", godot::Color(0.4f, 0.9f, 0.4f)));
+    if (updating) {
+      _report("Updated " + godot::String::num_int64(generated_skills) +
+                  " skills in .agents/skills/ (" +
+                  godot::String::num_int64(generated_references) +
+                  " reference files)",
+              theme_color("success_color", godot::Color(0.4f, 0.9f, 0.4f)));
+    } else {
+      _report("Generated " + godot::String::num_int64(generated_skills) +
+                  " skills in .agents/skills/ (" +
+                  godot::String::num_int64(generated_references) +
+                  " reference files)",
+              theme_color("success_color", godot::Color(0.4f, 0.9f, 0.4f)));
+    }
   } else {
     _report("Skill generation failed for:\n" + godot::String(failures.c_str()),
             theme_color("error_color", godot::Color(0.95f, 0.4f, 0.4f)));
   }
+
+  _refresh_generate_skills_button();
 }
 
 } // namespace godot_autopilot
