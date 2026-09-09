@@ -1,0 +1,154 @@
+{
+  "skills": [
+    {
+      "name": "godot-autopilot",
+      "description": "Complete usage guide for the godot-autopilot MCP server: connection prerequisites, tool discovery protocol (search first, never guess names), the error protocol (new_errors_since_last_call watermark, retryable soft errors), direct HTTP fallback, task-to-tool routing and tool gotchas. Use for anything godot-autopilot related in a Godot project.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "source": "autopilot.md"
+        },
+        {
+          "path": "references/http-fallback.md",
+          "source": "autopilot--http-fallback.md"
+        },
+        {
+          "path": "references/tool-catalog.md",
+          "source": "autopilot--tool-catalog.md"
+        },
+        {
+          "path": "references/tool-gotchas.md",
+          "source": "autopilot--tool-gotchas.md"
+        }
+      ]
+    },
+    {
+      "name": "godot-autopilot-scene-system",
+      "description": "Godot scene system operations guide: scene lifecycle, node create/delete/rename/reparent, property read/write with JSON value shapes, signal wiring, the editor undo history model and .tscn serialization details. Use when building or restructuring scenes, setting properties or connecting signals.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "source": "scene-system.md"
+        },
+        {
+          "path": "references/property-json-shapes.md",
+          "source": "scene-system--property-json-shapes.md"
+        },
+        {
+          "path": "references/undo-history.md",
+          "source": "scene-system--undo-history.md"
+        },
+        {
+          "path": "references/scene-format-tokens.md",
+          "source": "scene-system--scene-format-tokens.md"
+        }
+      ]
+    },
+    {
+      "name": "godot-autopilot-resources",
+      "description": "Godot resource and file operations guide: load, save, create and duplicate resources; transactional rename and move with reference rewriting; UID and dependency management; the import pipeline and path rules. Use when working with .tres/.tscn/.import files or the project layout.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "source": "resources.md"
+        },
+        {
+          "path": "references/tool-reference.md",
+          "source": "resources--tool-reference.md"
+        },
+        {
+          "path": "references/import-and-sidecars.md",
+          "source": "resources--import-and-sidecars.md"
+        },
+        {
+          "path": "references/os-and-display.md",
+          "source": "resources--os-and-display.md"
+        }
+      ]
+    },
+    {
+      "name": "godot-autopilot-scripting",
+      "description": "Godot GDScript guide: script lifecycle, the four execution channels (execute_script, call_script_node, execute_game_script, code_execute), @tool semantics, static initializers and the editor-vs-game process boundary. Use when writing, attaching or running GDScript.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "source": "scripting.md"
+        },
+        {
+          "path": "references/execution-gotchas.md",
+          "source": "scripting--execution-gotchas.md"
+        }
+      ]
+    },
+    {
+      "name": "godot-autopilot-runtime",
+      "description": "Godot runtime and debugging guide: launch and stop the game, input injection with frame-accurate timing, pause semantics, three log and error paths, the error watermark confirmation loop and runtime inspection. Use when running the game, simulating input or diagnosing problems.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "source": "runtime.md"
+        },
+        {
+          "path": "references/input-injection.md",
+          "source": "runtime--input-injection.md"
+        },
+        {
+          "path": "references/debug-paths.md",
+          "source": "runtime--debug-paths.md"
+        },
+        {
+          "path": "references/runtime-inspection.md",
+          "source": "runtime--runtime-inspection.md"
+        },
+        {
+          "path": "references/project-config.md",
+          "source": "runtime--project-config.md"
+        }
+      ]
+    },
+    {
+      "name": "godot-autopilot-servers",
+      "description": "Godot server-layer RID tools guide: RenderingServer, PhysicsServer and NavigationServer semantics - RID lifecycles and silent failures, physics tick ordering, navigation sync slots and the editor single-thread assumption. Use for server-side drawing, physics simulation or pathfinding.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "source": "servers.md"
+        },
+        {
+          "path": "references/tool-reference-physics-nav.md",
+          "source": "servers--tool-reference-physics-nav.md"
+        },
+        {
+          "path": "references/tool-reference-rendering.md",
+          "source": "servers--tool-reference-rendering.md"
+        }
+      ]
+    },
+    {
+      "name": "godot-autopilot-content",
+      "description": "Godot content pipeline guide: TileMap and TileSet, AnimationPlayer and AnimationTree, audio buses and playback, and Control theming and layout - with the silent-failure gotchas of each domain. Use when building tile levels, animating, configuring sound or styling UI.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "source": "content.md"
+        },
+        {
+          "path": "references/tilemap-details.md",
+          "source": "content--tilemap-details.md"
+        },
+        {
+          "path": "references/animation-details.md",
+          "source": "content--animation-details.md"
+        },
+        {
+          "path": "references/audio-details.md",
+          "source": "content--audio-details.md"
+        },
+        {
+          "path": "references/ui-theme-details.md",
+          "source": "content--ui-theme-details.md"
+        }
+      ]
+    }
+  ]
+}

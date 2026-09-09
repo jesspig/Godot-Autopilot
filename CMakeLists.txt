@@ -55,6 +55,7 @@ include(CompilerOptions)
 include(Cache)
 include(FetchDependencies)
 include(Lto)
+include(skill_gen)
 
 # ====================================================================
 # godot-autopilot — SHARED (GDExtension)
@@ -135,10 +136,14 @@ add_library(godot-autopilot SHARED
     src/util/bm25_index.cpp
     src/util/variant_json.cpp
     src/util/client_config_gen.cpp
+    src/util/skill_gen.cpp
+    src/util/skill_content_generated.cpp
     src/util/error_util.cpp
     src/util/readback_util.cpp
     src/ui/mcp_log_dock.cpp
     src/ui/mcp_config_dock.cpp)
+
+add_dependencies(godot-autopilot gda_skill_embed_header)
 
 set_target_properties(godot-autopilot PROPERTIES
     UNITY_BUILD ${GDA_UNITY_ENABLED}
