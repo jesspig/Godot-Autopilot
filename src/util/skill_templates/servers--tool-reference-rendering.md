@@ -137,3 +137,10 @@ All take an `environment_rid` from an external source (no create tool).
 
 Rendering and text RIDs are process-local: they are never persisted to scene
 files and become invalid when the editor closes.
+
+## See also
+
+- `godot-autopilot-servers` (`SKILL.md`) - RID mental model, lifecycle and timing semantics.
+- `references/tool-reference-physics-nav.md` - the full physics + navigation tool tables.
+- `godot-autopilot-scene-system` - the scene nodes that own canvas items these tools draw to.
+- `godot-autopilot-content` - content-domain workflows (tilemaps, animation, audio, UI).

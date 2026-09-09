@@ -23,35 +23,16 @@ namespace {
 
 using namespace godot_autopilot::skill_gen;
 
-// 契约 §4 的 19 册 name 定稿清单（逐字采用，顺序不限但必须精确匹配）。
-constexpr size_t kSkillCount = 19;
+// 契约 §1 的 7 册 name 定稿清单（逐字采用，顺序不限但必须精确匹配）。
+constexpr size_t kSkillCount = 7;
 const char *const kExpectedSkillNames[kSkillCount] = {
-    "godot-autopilot-usage",
-    "godot-autopilot-direct-http",
-    "godot-autopilot-tool-map",
-    "godot-autopilot-scene-building",
-    "godot-autopilot-properties-signals",
-    "godot-autopilot-resources-files",
+    "godot-autopilot",
+    "godot-autopilot-scene-system",
+    "godot-autopilot-resources",
     "godot-autopilot-scripting",
-    "godot-autopilot-running-games",
-    "godot-autopilot-debugging",
-    "godot-autopilot-inspection",
-    "godot-autopilot-tilemap",
-    "godot-autopilot-animation",
-    "godot-autopilot-ui-theming",
-    "godot-autopilot-physics-navigation",
-    "godot-autopilot-rendering-text",
-    "godot-autopilot-audio",
-    "godot-autopilot-os-display",
-    "godot-autopilot-project-config",
-    "godot-autopilot-tips-gotchas"};
-
-// 契约 §6 第 7 条：必须声明 references 文件的四册。
-const char *const kReferenceSkillNames[] = {
-    "godot-autopilot-physics-navigation",
-    "godot-autopilot-rendering-text",
-    "godot-autopilot-resources-files",
-    "godot-autopilot-tool-map"};
+    "godot-autopilot-runtime",
+    "godot-autopilot-servers",
+    "godot-autopilot-content"};
 
 // 契约 §6 第 6 条手动白名单。初始清单来自契约；微调新增的均为明确非工具名/
 // 参数名的词（Godot API 方法、Godot 属性名、内部机制/返回字段、枚举值、
@@ -88,7 +69,31 @@ const char *const kManualWhitelist[] = {
     "keep_state", "last_activity_ms", "load_failed", "missing_dependencies",
     "missing_dependency", "mouse_button", "mouse_motion", "parent_class",
     "physics_frame", "recent_engine_errors", "running_over_budget",
-    "set_property", "total_lines", "unresolved_uids"};
+    "set_property", "total_lines", "unresolved_uids",
+    // 内容外置化与 7 册重构实测补充
+    "action_press", "action_release", "alternative_tile", "anchor_",
+    "anchors_preset", "call_deferred", "can_process", "create_tile",
+    "create_timer", "current_physics_frame", "dest_files", "dest_md5",
+    "exact_match", "ext_resource", "find_track", "from_uid_path",
+    "full_rect", "game_runtime", "gd_resource", "gd_scene",
+    "generator_parameters", "get_bus_index", "group_file", "grow_",
+    "import_sidecar_warning", "import_sidecar_warnings", "importer_defaults",
+    "importer_name", "importer_version", "instance_placeholder",
+    "is_action_just_pressed", "is_action_just_pressed_by_event",
+    "is_action_pressed", "is_editor_hint", "is_input_action_",
+    "is_instance_valid", "key_label", "layout_mode", "live_", "load_steps",
+    "map_get_iteration_id", "mark_unsaved", "max_errors_per_second",
+    "max_polyphony", "max_queued_messages", "max_warnings_per_second",
+    "modifies_window", "node_paths", "offset_", "owner_uid_path",
+    "parent_id_path", "parse_input_event", "physical_keycode", "press_input_",
+    "pressed_event_id", "process_events", "process_frame", "process_owner",
+    "queue_free", "release_input_", "runtime_node_select_", "scanning_changes",
+    "scripting_enabled", "send_error", "send_message", "set_active",
+    "set_anchors_and_offsets_preset", "set_anchors_preset", "set_cell",
+    "set_custom_mouse_cursor", "shows_alert", "side_effect", "source_file",
+    "source_md5", "sub_resource", "tile_map_data", "tile_set", "to_uid_path",
+    "track_insert_key", "tree_exited", "uid_cache", "unique_id",
+    "use_multiple_threads", "writes_config", "z_index", "set_suspend"};
 
 bool is_word_char(char c) {
   return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
@@ -222,7 +227,7 @@ protected:
   }
 };
 
-TEST(SkillGenTest, AllNineteenSkillsPresent) {
+TEST(SkillGenTest, AllSevenSkillsPresent) {
   const std::vector<SkillSpec> skills = all_skills();
   ASSERT_EQ(skills.size(), kSkillCount);
 
@@ -355,23 +360,17 @@ TEST_F(SkillRegistryFixture, ToolNamesExistInRegistry) {
   }
 }
 
-TEST(SkillGenTest, ReferencesDeclaredForComplexSkills) {
-  const std::set<std::string> need_refs(
-      kReferenceSkillNames,
-      kReferenceSkillNames + sizeof(kReferenceSkillNames) / sizeof(char *));
+TEST(SkillGenTest, EverySkillDeclaresReferences) {
+  // 契约 §1 的新结构：每册都带 references/ 文件，files[0] 固定为 SKILL.md。
   for (const SkillSpec &spec : all_skills()) {
-    size_t ref_count = 0;
-    for (const SkillFile &file : spec.files) {
-      if (starts_with(file.relative_path, "references/")) {
-        ++ref_count;
-      }
-    }
-    if (need_refs.count(spec.name) > 0) {
-      EXPECT_GE(ref_count, size_t{1})
-          << spec.name << " must declare at least one references/ file";
-    } else {
-      EXPECT_EQ(spec.files.size(), size_t{1})
-          << spec.name << " must contain only SKILL.md";
+    ASSERT_GE(spec.files.size(), size_t{2})
+        << spec.name << " must declare at least one references/ file";
+    EXPECT_EQ(spec.files[0].relative_path, "SKILL.md")
+        << "files[0] must be SKILL.md: " << spec.name;
+    for (size_t i = 1; i < spec.files.size(); ++i) {
+      EXPECT_TRUE(starts_with(spec.files[i].relative_path, "references/"))
+          << spec.name << ": reference path must start with 'references/': "
+          << spec.files[i].relative_path;
     }
   }
 }

@@ -51,7 +51,7 @@ std::string yaml_double_quoted(const std::string &value) {
 
 } // namespace
 
-// 19 册聚合顺序由 skill_templates/registry.json 固化（与原分组聚合顺序一致）
+// 册集合与聚合顺序由 skill_templates/registry.json 固化
 std::vector<SkillSpec> all_skills() {
   return make_embedded_skills();
 }

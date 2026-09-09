@@ -1,11 +1,18 @@
 # OS and Display Integration
 
-Tools in this skill talk to the operating system and the desktop around the
+OS and display integration - an extension of the godot-autopilot-resources
+skill. These tools talk to the operating system and the desktop around the
 editor: processes, environment, files, dialogs, clipboard, mouse, screens,
-text-to-speech and editor sub-windows. These are registered domain tools; call
+text-to-speech and editor sub-windows. All are registered domain tools; call
 them through `call_tool` unless your MCP client exposes them directly.
 
-## Side-effect warning - read before calling anything
+Four file tools - `write_file`, `read_file`, `find_in_files` and
+`move_os_file_to_trash` - echo the resource and file operations documented in
+the godot-autopilot-resources skill (imports, rename with reference
+rewriting, path rules). This page covers their OS-facing behavior; everything
+else here is a standalone OS integration surface.
+
+## Side-effect classes
 
 Most of these tools change state outside the editor. The risk class of every
 tool is machine-readable: the `get_tool_detail` response carries a side_effect
@@ -31,9 +38,10 @@ Read-only queries (`get_os_datetime`, `get_os_system_info`, `read_file`,
 
 ## Processes: create, execute, kill
 
-- `create_os_process` starts an executable as a detached background process and
-  returns immediately with the PID. Use it for long-running or fire-and-forget
-  programs. Keep the PID to stop it later with `kill_os_process`.
+- `create_os_process` starts an executable as a detached background process
+  and returns immediately with the PID. Use it for long-running or
+  fire-and-forget programs. Keep the PID to stop it later with
+  `kill_os_process`.
 - `execute_os_process` runs a command synchronously and blocks until it exits.
   Pass `output` as true to capture stdout and stderr into the response (both
   are empty strings when `output` is false or omitted, which is the default).
@@ -47,7 +55,7 @@ Read-only queries (`get_os_datetime`, `get_os_system_info`, `read_file`,
 
 The response carries the exit code plus the captured output streams. Output is
 not truncated per stream, but the whole tool response is bounded by the
-server-wide JSON response size limit (see godot-autopilot-tips-gotchas).
+server-wide JSON response size limit (see the godot-autopilot skill).
 
 Related process-class tools: `open_os_path` opens a URL or file path with the
 default application (browser, file manager); `set_os_environment` sets an
@@ -153,18 +161,16 @@ All window tools default to the main window when `window_id` is omitted.
 
 ## Boundary: editor desktop vs the running game
 
-Every tool in this skill acts on the editor process and the desktop around it.
+Every tool on this page acts on the editor process and the desktop around it.
 None of it reaches a game launched with `play_editor_current_scene`: the game
 is a separate process with its own display server. To run shell-like logic
 inside the game or touch its OS integration, use `execute_game_script` (see
-godot-autopilot-scripting) or the game channel tools (see
-godot-autopilot-running-games).
+the godot-autopilot-scripting skill) or the game channel tools (see the
+godot-autopilot-runtime skill).
 
 ## See also
 
-- godot-autopilot-project-config - project.godot settings, editor settings,
-  InputMap and C# builds
-- godot-autopilot-tips-gotchas - size limits, silent failures and
-  prompt-vs-implementation conflicts
-- godot-autopilot-usage - connection prerequisites, tool discovery and the
-  error protocol
+- godot-autopilot-resources - resource load/save/rename, imports and path
+  rules; shares the four file tools described above
+- godot-autopilot-runtime - launching the game, input injection and runtime
+  debugging

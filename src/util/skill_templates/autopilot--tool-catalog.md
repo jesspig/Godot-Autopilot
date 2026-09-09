@@ -454,3 +454,7 @@ All 363 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `add_tilemap_atlas_source` - add an atlas source with a texture to an in-memory TileSet
 - `add_tilemap_physics_layer` - add a physics layer to an in-memory TileSet
 - `set_tilemap_tile_collision` - set collision polygons for one tile of a TileSet
+
+## See also
+
+- godot-autopilot - usage overview, discovery protocol and the error watermark

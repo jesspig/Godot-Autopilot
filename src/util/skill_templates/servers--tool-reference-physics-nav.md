@@ -119,3 +119,10 @@ See `SKILL.md` in the parent folder for workflows and the RID mental model.
 
 Navigation RIDs are process-local: they are never persisted to scene files and
 become invalid when the editor closes.
+
+## See also
+
+- `godot-autopilot-servers` (`SKILL.md`) - RID mental model, lifecycle and timing semantics.
+- `references/tool-reference-rendering.md` - the full render + text tool tables.
+- `godot-autopilot-scene-system` - the scene nodes and `CollisionShape` properties these tools bridge to.
+- `godot-autopilot-content` - content-domain workflows (tilemaps, animation, audio, UI).

@@ -1,208 +1,152 @@
 {
   "skills": [
     {
-      "name": "godot-autopilot-usage",
-      "description": "Entry point for using the godot-autopilot MCP server in a Godot project: connection prerequisites, tool discovery protocol (search first, never guess tool names), and the error protocol (new_errors_since_last_call watermark, retryable soft errors, export lockout). Use whenever working on a Godot project through the godot-autopilot MCP tools.",
+      "name": "godot-autopilot",
+      "description": "Complete usage guide for the godot-autopilot MCP server: connection prerequisites, tool discovery protocol (search first, never guess names), the error protocol (new_errors_since_last_call watermark, retryable soft errors), direct HTTP fallback, task-to-tool routing and tool gotchas. Use for anything godot-autopilot related in a Godot project.",
       "files": [
         {
           "path": "SKILL.md",
-          "source": "usage.md"
-        }
-      ]
-    },
-    {
-      "name": "godot-autopilot-direct-http",
-      "description": "Direct HTTP fallback for the godot-autopilot MCP server: when the MCP client lost its tools after an editor restart (empty tool list, failed calls, reconnect failed), send JSON-RPC tools/call straight to http://127.0.0.1:<port>/mcp using curl (bash) or PowerShell. Always discover the actual port first from MCP config files - never assume the default 9527.",
-      "files": [
-        {
-          "path": "SKILL.md",
-          "source": "direct-http.md"
-        }
-      ]
-    },
-    {
-      "name": "godot-autopilot-tool-map",
-      "description": "Task-to-tool routing table for the godot-autopilot MCP server: which domain tools fit reading, building, modifying, running or debugging a Godot project, and when to prefer batch_execute vs code_execute. Use when you know the task but not which of the 363 tools to call.",
-      "files": [
-        {
-          "path": "SKILL.md",
-          "source": "tool-map.md"
+          "source": "autopilot.md"
         },
         {
-          "path": "references/CATEGORY_INDEX.md",
-          "source": "tool-map--CATEGORY_INDEX.md"
-        }
-      ]
-    },
-    {
-      "name": "godot-autopilot-scene-building",
-      "description": "Building and editing Godot scenes through godot-autopilot: create, delete, rename and reparent nodes, instantiate packed scenes, group nodes, editor undo/redo grouping, and saving scenes. Use when creating or restructuring scenes or nodes in the editor.",
-      "files": [
-        {
-          "path": "SKILL.md",
-          "source": "scene-building.md"
-        }
-      ]
-    },
-    {
-      "name": "godot-autopilot-properties-signals",
-      "description": "Reading and writing node properties and connecting signals in the edited scene via godot-autopilot: JSON value shapes for Vector2/Vector3/Color/Rect2, the Godot 3 to 4 renamed-properties table, undo behavior, and signal connect/disconnect. Use when setting or inspecting properties or wiring signals.",
-      "files": [
-        {
-          "path": "SKILL.md",
-          "source": "properties-signals.md"
-        }
-      ]
-    },
-    {
-      "name": "godot-autopilot-resources-files",
-      "description": "Resource and file operations via godot-autopilot: load, save, create, duplicate and delete resources; rename and move files with automatic reference rewriting; dependency queries; imports; and directory management under res://. Use when working with .tres/.tscn/.import files or the project file layout.",
-      "files": [
-        {
-          "path": "SKILL.md",
-          "source": "resources-files.md"
+          "path": "references/http-fallback.md",
+          "source": "autopilot--http-fallback.md"
         },
         {
-          "path": "references/TOOL_REFERENCE.md",
-          "source": "resources-files--TOOL_REFERENCE.md"
+          "path": "references/tool-catalog.md",
+          "source": "autopilot--tool-catalog.md"
+        },
+        {
+          "path": "references/tool-gotchas.md",
+          "source": "autopilot--tool-gotchas.md"
+        }
+      ]
+    },
+    {
+      "name": "godot-autopilot-scene-system",
+      "description": "Godot scene system operations guide: scene lifecycle, node create/delete/rename/reparent, property read/write with JSON value shapes, signal wiring, the editor undo history model and .tscn serialization details. Use when building or restructuring scenes, setting properties or connecting signals.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "source": "scene-system.md"
+        },
+        {
+          "path": "references/property-json-shapes.md",
+          "source": "scene-system--property-json-shapes.md"
+        },
+        {
+          "path": "references/undo-history.md",
+          "source": "scene-system--undo-history.md"
+        },
+        {
+          "path": "references/scene-format-tokens.md",
+          "source": "scene-system--scene-format-tokens.md"
+        }
+      ]
+    },
+    {
+      "name": "godot-autopilot-resources",
+      "description": "Godot resource and file operations guide: load, save, create and duplicate resources; transactional rename and move with reference rewriting; UID and dependency management; the import pipeline and path rules. Use when working with .tres/.tscn/.import files or the project layout.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "source": "resources.md"
+        },
+        {
+          "path": "references/tool-reference.md",
+          "source": "resources--tool-reference.md"
+        },
+        {
+          "path": "references/import-and-sidecars.md",
+          "source": "resources--import-and-sidecars.md"
+        },
+        {
+          "path": "references/os-and-display.md",
+          "source": "resources--os-and-display.md"
         }
       ]
     },
     {
       "name": "godot-autopilot-scripting",
-      "description": "GDScript workflows via godot-autopilot: create, attach, edit and reload scripts; the three execution channels (execute_script in the editor, call_script_node on nodes, execute_game_script in the running game) and the code_execute meta tool, with their safety differences. Use when writing or running GDScript.",
+      "description": "Godot GDScript guide: script lifecycle, the four execution channels (execute_script, call_script_node, execute_game_script, code_execute), @tool semantics, static initializers and the editor-vs-game process boundary. Use when writing, attaching or running GDScript.",
       "files": [
         {
           "path": "SKILL.md",
           "source": "scripting.md"
-        }
-      ]
-    },
-    {
-      "name": "godot-autopilot-running-games",
-      "description": "Running the game and simulating input via godot-autopilot: play and stop the current scene, the game_* runtime channel status, input injection into the running game (queue/wait/sequence), and viewport capture. Use when launching the project, simulating gameplay or taking game screenshots. Editor-side input tools do NOT reach the game.",
-      "files": [
-        {
-          "path": "SKILL.md",
-          "source": "running-games.md"
-        }
-      ]
-    },
-    {
-      "name": "godot-autopilot-debugging",
-      "description": "Debugging Godot projects via godot-autopilot: three complementary log and error paths (debugger capture, in-game buffers, on-disk log), performance monitors, memory and object counters, call stacks, pause and reload, and inline GDScript tests. Use when the game misbehaves, prints errors, or you need runtime diagnostics.",
-      "files": [
-        {
-          "path": "SKILL.md",
-          "source": "debugging.md"
-        }
-      ]
-    },
-    {
-      "name": "godot-autopilot-inspection",
-      "description": "Reading scene, node, engine and project information via godot-autopilot: editor scene tree and properties, the running game's scene tree and UI elements, engine stats and performance, ClassDB reflection queries, and project health analysis. Use when you need to know what exists or what state something is in.",
-      "files": [
-        {
-          "path": "SKILL.md",
-          "source": "inspection.md"
-        }
-      ]
-    },
-    {
-      "name": "godot-autopilot-tilemap",
-      "description": "TileMap and TileSet workflows via godot-autopilot: create tilemap nodes with a default TileSet, add atlas sources and physics layers, set single or bulk cells, and Godot 4.7 API notes. Use when building tile-based levels.",
-      "files": [
-        {
-          "path": "SKILL.md",
-          "source": "tilemap.md"
-        }
-      ]
-    },
-    {
-      "name": "godot-autopilot-animation",
-      "description": "Animation workflows via godot-autopilot: AnimationPlayer and AnimationTree state machines, value and method tracks, keyframes, and SpriteFrames resources for AnimatedSprite2D. Use when animating characters, objects or UI.",
-      "files": [
-        {
-          "path": "SKILL.md",
-          "source": "animation.md"
-        }
-      ]
-    },
-    {
-      "name": "godot-autopilot-ui-theming",
-      "description": "UI theming and layout via godot-autopilot: create .tres theme files, set color/constant/font-size/stylebox entries, apply themes to Control nodes, anchor presets, and enumerating the running game's Control tree. Use when styling controls or inspecting game UI.",
-      "files": [
-        {
-          "path": "SKILL.md",
-          "source": "ui-theming.md"
-        }
-      ]
-    },
-    {
-      "name": "godot-autopilot-physics-navigation",
-      "description": "PhysicsServer and NavigationServer RID-based tools via godot-autopilot: ray, shape and point queries, server-side bodies, joints, areas and soft bodies, and nav maps, regions and agents. RID handles are server objects, not scene resources. Use for physics queries, simulation or pathfinding.",
-      "files": [
-        {
-          "path": "SKILL.md",
-          "source": "physics-navigation.md"
         },
         {
-          "path": "references/TOOL_REFERENCE.md",
-          "source": "physics-navigation--TOOL_REFERENCE.md"
+          "path": "references/execution-gotchas.md",
+          "source": "scripting--execution-gotchas.md"
         }
       ]
     },
     {
-      "name": "godot-autopilot-rendering-text",
-      "description": "RenderingServer and TextServer RID-based tools via godot-autopilot: canvas items, meshes, materials, shaders, cameras, lights, viewports, environment post-effects, particles, and font/text shaping measurement. Use for low-level drawing or rendering setup without scene nodes.",
+      "name": "godot-autopilot-runtime",
+      "description": "Godot runtime and debugging guide: launch and stop the game, input injection with frame-accurate timing, pause semantics, three log and error paths, the error watermark confirmation loop and runtime inspection. Use when running the game, simulating input or diagnosing problems.",
       "files": [
         {
           "path": "SKILL.md",
-          "source": "rendering-text.md"
+          "source": "runtime.md"
         },
         {
-          "path": "references/TOOL_REFERENCE.md",
-          "source": "rendering-text--TOOL_REFERENCE.md"
+          "path": "references/input-injection.md",
+          "source": "runtime--input-injection.md"
+        },
+        {
+          "path": "references/debug-paths.md",
+          "source": "runtime--debug-paths.md"
+        },
+        {
+          "path": "references/runtime-inspection.md",
+          "source": "runtime--runtime-inspection.md"
+        },
+        {
+          "path": "references/project-config.md",
+          "source": "runtime--project-config.md"
         }
       ]
     },
     {
-      "name": "godot-autopilot-audio",
-      "description": "Audio bus layout and playback control via godot-autopilot: inspect and replace the bus layout, add or bypass effects, control players (play, stop, volume, pitch, seek) and switch audio devices. Use when configuring sound or triggering playback in the editor.",
+      "name": "godot-autopilot-servers",
+      "description": "Godot server-layer RID tools guide: RenderingServer, PhysicsServer and NavigationServer semantics - RID lifecycles and silent failures, physics tick ordering, navigation sync slots and the editor single-thread assumption. Use for server-side drawing, physics simulation or pathfinding.",
       "files": [
         {
           "path": "SKILL.md",
-          "source": "audio.md"
+          "source": "servers.md"
+        },
+        {
+          "path": "references/tool-reference-physics-nav.md",
+          "source": "servers--tool-reference-physics-nav.md"
+        },
+        {
+          "path": "references/tool-reference-rendering.md",
+          "source": "servers--tool-reference-rendering.md"
         }
       ]
     },
     {
-      "name": "godot-autopilot-os-display",
-      "description": "OS and display integration via godot-autopilot: background or synchronous processes, environment variables, system info, dialogs, clipboard, text-to-speech and editor sub-windows. Most of these are side-effect tools - confirm before use. Use when shell commands, OS information or window management is needed.",
+      "name": "godot-autopilot-content",
+      "description": "Godot content pipeline guide: TileMap and TileSet, AnimationPlayer and AnimationTree, audio buses and playback, and Control theming and layout - with the silent-failure gotchas of each domain. Use when building tile levels, animating, configuring sound or styling UI.",
       "files": [
         {
           "path": "SKILL.md",
-          "source": "os-display.md"
-        }
-      ]
-    },
-    {
-      "name": "godot-autopilot-project-config",
-      "description": "Project configuration via godot-autopilot: read and change project.godot settings with the two-step set-then-save flow, editor settings, InputMap action management, and C# assembly builds. Use when changing project settings or input actions.",
-      "files": [
+          "source": "content.md"
+        },
         {
-          "path": "SKILL.md",
-          "source": "project-config.md"
-        }
-      ]
-    },
-    {
-      "name": "godot-autopilot-tips-gotchas",
-      "description": "Cross-domain tips, traps and known pitfalls for godot-autopilot tools: silent failures, JSON value shapes, size limits, prompt-vs-implementation conflicts, and Godot 4.7 API differences. Read when a tool call fails unexpectedly or before complex multi-tool operations.",
-      "files": [
+          "path": "references/tilemap-details.md",
+          "source": "content--tilemap-details.md"
+        },
         {
-          "path": "SKILL.md",
-          "source": "tips-gotchas.md"
+          "path": "references/animation-details.md",
+          "source": "content--animation-details.md"
+        },
+        {
+          "path": "references/audio-details.md",
+          "source": "content--audio-details.md"
+        },
+        {
+          "path": "references/ui-theme-details.md",
+          "source": "content--ui-theme-details.md"
         }
       ]
     }

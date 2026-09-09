@@ -1,9 +1,16 @@
 # Project Configuration
 
-This skill covers project-wide configuration: project.godot settings, editor
-preferences, InputMap actions, the C# build trigger and the main scene. All
-tools are called through `call_tool` unless your MCP client exposes them
-directly.
+Pre-run project configuration - an extension of the godot-autopilot-runtime
+skill. This page covers project-wide configuration: project.godot settings,
+editor preferences, InputMap actions, the C# build trigger and the main
+scene. All tools are called through `call_tool` unless your MCP client
+exposes them directly.
+
+Relation to the runtime skill: a running game loads its InputMap at startup,
+so InputMap edits made here only reach games started afterwards - and
+simulated keys in the running game go through the input-injection tools in
+the godot-autopilot-runtime skill, not through these configuration tools.
+The main scene set here is the scene `play_editor_current_scene` launches.
 
 ## Project settings: the two-step set-then-save flow
 
@@ -14,12 +21,11 @@ Read side:
   setting does not exist.
 - `has_project_settings` distinguishes a missing setting from a stored value.
 
-Write side is a two-step flow - this is the single most important rule in this
-skill:
+Write side is a two-step flow - this is the single most important rule on
+this page:
 
-1. `set_project_settings` changes the setting IN MEMORY ONLY. The tool
-   description says it explicitly: the change is NOT written to
-   project.godot automatically.
+1. `set_project_settings` changes the setting IN MEMORY ONLY. The change is
+   NOT written to project.godot automatically.
 2. `save_project_settings` persists all project settings to project.godot on
    disk. Without this second call the change is lost when the editor closes.
    It is the only config tool that writes project.godot.
@@ -44,7 +50,8 @@ editor restarts. Verify a write with `get_editor_settings`.
 ## InputMap: adding an action end to end
 
 The InputMap tools edit the editor project's InputMap. A running game loads
-its InputMap at startup, so it never sees these changes until it is restarted.
+its InputMap at startup, so it never sees these changes until it is
+restarted.
 
 1. `add_input_map_action` creates an empty action by `action` name; `deadzone`
    defaults to 0.5 (the analog threshold, range 0.0 to 1.0). No events are
@@ -69,12 +76,12 @@ Queries: `get_input_map_actions` lists all action names (including built-in
 ui_* actions), `has_input_map_action` checks one.
 
 Keycodes: trust the implementation, not remembered tables. The plugin's
-built-in keycode prompt has known errors (two built-in prompts disagree on the
-KEY_ENTER value - see godot-autopilot-tips-gotchas), so prefer KEY_* name
+built-in keycode prompt has known errors (two built-in prompts disagree on
+the KEY_ENTER value - see the godot-autopilot skill), so prefer KEY_* name
 strings inside `event` objects; they resolve through the implementation's own
-name-to-code table. Note that the separate input-injection tools use a
-different parser that silently maps unrecognized key names to KEY_NONE instead
-of erroring.
+name-to-code table. Note that the input-injection tools used at runtime use a
+different parser that silently maps unrecognized key names to KEY_NONE
+instead of erroring.
 
 Removal flow: `erase_input_map_action_event` removes one event by zero-based
 `event_index` (out-of-range returns an error); `erase_input_map_action`
@@ -104,13 +111,12 @@ PID; it errors when the project is not a C# project or dotnet is unavailable.
 `set_editor_main_scene` takes a scene `path` such as res://game.tscn and
 persists it to project.godot directly - this tool writes the file itself, no
 save step needed. Typical use right after creating a new level with
-`create_editor_scene` and saving it.
+`create_editor_scene` and saving it; the game then starts from that scene
+when the runtime tools launch it.
 
 ## See also
 
-- godot-autopilot-os-display - OS processes, files, dialogs, clipboard and
-  sub-windows
-- godot-autopilot-tips-gotchas - silent failures, size limits and known
-  prompt-vs-implementation conflicts
-- godot-autopilot-usage - connection prerequisites, tool discovery and the
-  error protocol
+- godot-autopilot-runtime - launching and stopping the game, input injection
+  with frame-accurate timing, and runtime debugging
+- godot-autopilot-scripting - the GDScript execution channels, including
+  `code_execute`

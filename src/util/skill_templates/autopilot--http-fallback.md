@@ -1,6 +1,6 @@
 # Direct HTTP Access to the Godot Autopilot MCP Server
 
-Fallback protocol for talking to the godot-autopilot MCP server with plain HTTP requests (curl or PowerShell) when the normal MCP client channel is broken. The server itself is almost always fine.
+Companion reference of the godot-autopilot skill: how to talk to the server with plain HTTP requests (curl or PowerShell) when the normal MCP client channel is broken. The server itself is almost always fine.
 
 ## When to use this
 
@@ -80,7 +80,7 @@ $line = ($resp.Content -split "`n" | Where-Object { $_ -like 'data:*' } | Select
 $json = ($line.Substring(5) | ConvertFrom-Json)
 $inner = ($json.result.content[0].text | ConvertFrom-Json)
 $inner.result                        # -> "pong"
-$inner.new_errors_since_last_call    # error watermark, see godot-autopilot-usage
+$inner.new_errors_since_last_call    # error watermark, see the godot-autopilot skill
 ```
 
 PowerShell single-quoted strings need no JSON double-quote escaping. If your PowerShell version renders Invoke-WebRequest output differently, cross-check against the curl example above.
@@ -93,7 +93,7 @@ A successful call returns HTTP 200 with an SSE frame: lines of `event: message` 
 2. Parse the remaining JSON - the JSON-RPC envelope. The tool result lives at result.content[0].text.
 3. That text field is itself a JSON string; parse it again (inner layer).
 4. The business payload is the inner "result" key; an inner "error" key means the tool call failed, and an outer isError of true marks the same thing.
-5. Read the inner top-level `new_errors_since_last_call` - same one-shot semantics as on the MCP channel (see godot-autopilot-usage).
+5. Read the inner top-level `new_errors_since_last_call` - same one-shot semantics as on the MCP channel (see the godot-autopilot skill).
 
 Full shape of a `ping` response (whitespace added for readability):
 
@@ -124,5 +124,4 @@ Tool-level failures (bad arguments, missing nodes) are not HTTP errors - they ar
 
 ## See also
 
-- godot-autopilot-usage
-- godot-autopilot-tool-map
+- godot-autopilot - usage overview, discovery protocol and the error watermark

@@ -1,20 +1,22 @@
-# Tips, Traps and Known Pitfalls
+# Tool Gotchas
 
-Cross-domain catalogue of behaviors that surprise callers: silent failures,
+Catalogue of plugin-side behaviors that surprise callers: silent failures,
 hard size limits, places where the built-in prompt text and the actual
-implementation disagree, JSON value shapes, and Godot 4.7 API differences.
-Each section names the skill that documents the tool family in depth.
+implementation disagree, scene refresh timing, `code_execute` traps, and the
+side-effect classes reported by `get_tool_detail`. Engine-side silent failures
+(dropped node owners, cleared tile cells, audio bus fallbacks and friends)
+live in the domain skills, not here.
 
-## Silent failure 1: non-numeric strings into int properties become 0
+## Silent failure: non-numeric strings into int properties become 0
 
 `property_set` on an int property with a non-numeric string value (e.g. "abc")
 returns ok and stores 0. The call does not error. After any property write
 with a value you are unsure about, read it back with `property_get` and assert
 the expected value.
 
-Details: godot-autopilot-properties-signals.
+Details: godot-autopilot-scene-system.
 
-## Silent failure 2: unrecognized key names become KEY_NONE
+## Silent failure: unrecognized key names become KEY_NONE
 
 The editor-side input injection tools (key pressing) resolve key names through
 a parser that returns KEY_NONE for unrecognized names - without reporting an
@@ -23,10 +25,10 @@ nothing. Prefer single letters and digits (mapped directly) or names from the
 known set (SPACE, ENTER, ESCAPE, SHIFT, CONTROL, ALT, TAB, BACKSPACE, DELETE,
 arrow keys).
 
-Details: godot-autopilot-running-games (editor-side injection does not reach
+Details: godot-autopilot-runtime (editor-side injection does not reach
 the running game; use the game input channel there).
 
-## Silent failure 3: schema-required parameters that have defaults
+## Silent failure: schema-required parameters that have defaults
 
 Three tools declare parameters as required in their schema but fall back to
 defaults instead of erroring when you omit them:
@@ -42,7 +44,7 @@ defaults instead of erroring when you omit them:
 Consequence: an omitted-argument bug can look like a successful call. Verify
 the effect after calls to these three tools.
 
-Details: godot-autopilot-scene-building and godot-autopilot-resources-files.
+Details: godot-autopilot-scene-system and godot-autopilot-resources.
 
 ## Size limits
 
@@ -55,7 +57,7 @@ than silently dropping data.
 | JSON response size | 4 MiB | every tool response |
 | eval output / error text truncation | 8192 bytes | game eval output and captured error text |
 | runtime error / output buffers | 200 / 500 entries | game runtime channel |
-| tilemap cells per call | about 64 | `set_tilemap_cells` (larger payloads may be truncated client-side; use script loops for bulk layouts) |
+| tilemap cells per call | 64 | `set_tilemap_cells` (larger payloads may be truncated client-side; use script loops for bulk layouts) |
 | batch operations / input sequence steps | 256 | `batch_execute` / input sequences |
 | scene tree export | depth 64, 2000 nodes | scene tree reads (max depth reported in the response) |
 | viewport capture | 4096 px per side, 8 MiB PNG | `capture_game_viewport`, `capture_editor_viewport` |
@@ -82,21 +84,6 @@ spots. Where they disagree, trust the implementation and `get_tool_detail`:
   serializes RID as an object like {"id": 42} and PackedByteArray as a plain
   JSON number array.
 
-## JSON value shape quick reference
-
-Property values and method arguments use these shapes:
-
-```json
-{"x": 1.5, "y": -2.0}                                       Vector2
-{"x": 1.0, "y": 2.0, "z": 3.0}                              Vector3
-{"r": 1.0, "g": 0.5, "b": 0.25, "a": 1.0}                   Color
-{"position": {"x": 0, "y": 0}, "size": {"w": 64, "h": 32}}  Rect2
-{"path": "res://icon.svg"}                                  resource reference
-{"id": 42}                                                  RID handle
-```
-
-Details: godot-autopilot-properties-signals.
-
 ## Scene refresh timing
 
 Right after `create_editor_scene` or `open_editor_scene`, an immediately
@@ -105,7 +92,7 @@ editor applies the switch asynchronously relative to tool calls. Retry the
 read (or check `get_editor_edited_scene_root` first) before concluding that
 your change did not apply.
 
-Details: godot-autopilot-scene-building.
+Details: godot-autopilot-scene-system.
 
 ## code_execute traps
 
@@ -135,29 +122,31 @@ as usual. If the server is unexpectedly absent in a headless CI editor, set
 GDA_FORCE_HEADLESS=1; if you intended the lightweight cmdline mode, leave it
 unset.
 
-## Godot 4.7 API differences
+## Side effect classes
 
-Three differences that bite most often in this plugin's workflows:
+`get_tool_detail` reports a `side_effect` marker for every tool that can act
+beyond reading editor state. Read it before calling anything you have not
+used before. The classes, in increasing order of risk:
 
-- TileSetAtlasSource.get_tile_data takes atlas coordinates plus the
-  alternative id (the old source-id-first call order is gone). Relevant when
-  scripting tile data access via `code_execute`; see godot-autopilot-tilemap.
-- AnimatedSprite2D exposes sprite_frames - the Godot 3 name frames does not
-  exist. See godot-autopilot-animation.
-- CharacterBody2D motion_mode: GROUNDED is 0 and FLOATING is 1 when set
-  numerically.
+- `writes_file` - writes files under res:// or user://. Confirm the path
+  stays inside the project before calling.
+- `writes_config` - persists project or editor settings. Treat as a durable
+  change the user will find on disk.
+- `shows_alert` - opens a native dialog that blocks the editor until
+  dismissed. Never fire one in a batch or without an explicit user request.
+- `modifies_window` - moves, resizes, focuses or flashes windows; also
+  clipboard, mouse cursor and screen state.
+- `process` - spawns or kills OS processes, opens paths with the default
+  application and edits the environment. The highest-risk class: commands
+  run outside the project's scope, so double-check every argument before
+  calling.
 
-For the ten most common Godot 3 to 4 renamed properties (frames to
-sprite_frames, cast_to to target_position, rect_position to position,
-translation to position, and friends), see the renamed-properties table in
-godot-autopilot-properties-signals. `property_set` failures automatically
-attach Levenshtein candidates and that rename table.
+Two cases deserve the same caution as `process`: the `code_execute` meta tool
+runs arbitrary GDScript in the editor process, and tools marked `game_runtime`
+change the running game's state. Treat both at the highest risk level.
 
 ## See also
 
-- godot-autopilot-os-display - OS processes, files, dialogs and sub-windows
-  (side-effect classes explained)
-- godot-autopilot-project-config - the set-then-save flow for project.godot,
-  editor settings and InputMap
-- godot-autopilot-usage - connection prerequisites, tool discovery and the
-  error protocol including new_errors_since_last_call
+- godot-autopilot - usage overview, discovery protocol and the error watermark
+- godot-autopilot-scripting - the script execution channels behind the code_execute traps
+- godot-autopilot-scene-system - property JSON value shapes and the memory:// rule

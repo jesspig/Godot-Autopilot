@@ -1,6 +1,6 @@
 # Resource Tool Reference
 
-The 24 resource domain tools plus the three text-file tools from the OS domain. Domain tools are invoked through `call_tool`; see the godot-autopilot-usage skill for the protocol.
+The 24 resource domain tools plus the three text-file tools from the OS domain. Domain tools are invoked through `call_tool`; see the godot-autopilot skill for the protocol.
 
 ## Resource domain (24 tools)
 
@@ -40,3 +40,10 @@ The 24 resource domain tools plus the three text-file tools from the OS domain. 
 | `find_in_files` | Recursively search text files for a query string, with per-file occurrence counts and a truncated flag. |
 
 Property locators: `object_id`/`object_id_str` (from `create_resource` or `load_resource`), in-memory `name`, or file `path`.
+
+## See also
+
+- godot-autopilot - the tool discovery protocol and `call_tool` usage rules
+- references/import-and-sidecars.md - engine behavior behind `reimport_resource_files`, sidecar files and scan gating
+- godot-autopilot-scene-system - the property and signal tools that consume these resource locators
+- godot-autopilot-scripting - script resources and the script diagnostics returned by res:// `write_file`

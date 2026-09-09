@@ -1,12 +1,12 @@
 # Resource and File Operations
 
-Working with .tres/.tscn files, .import sidecars, UIDs and the res:// layout through the resource domain tools plus three text-file tools (`write_file`, `read_file`, `find_in_files`). Every tool is invoked through `call_tool`; see the godot-autopilot-usage skill for the discovery protocol.
+Working with .tres/.tscn files, .import sidecars, UIDs and the res:// layout through the resource domain tools plus three text-file tools (`write_file`, `read_file`, `find_in_files`). Every tool is invoked through `call_tool`; see the godot-autopilot skill for the discovery protocol.
 
 ## Load, create, duplicate and save
 
 - `load_resource` loads a file from disk into memory, with optional `type_hint`, and returns a locator (`class`, `path`, `object_id`, `object_id_str`) that the property tools accept.
 - `create_resource` instantiates a Resource subclass by class name (`type`); pass `name` to register the instance so later calls can reference it as `memory://name`.
-- `duplicate_resource` copies a file-backed resource; `deep` (default false) controls sub-resource copying. In-memory instances must be saved and reloaded before they can be duplicated.
+- `duplicate_resource` duplicates a file-backed resource in memory: `deep` (default false) controls sub-resource copying, and the duplicate is returned as a locator, not written to disk. Save it with `save_resource` to materialize a new file. In-memory instances must be saved and reloaded before they can be duplicated.
 - `save_resource` writes a resource to `dest_path` (defaults to `path`). Locators: `object_id`/`object_id_str` (from `create_resource`), in-memory `name`, or `path`; if none resolves, `class_type` plus `name` creates and registers a new instance. Missing directories are created recursively, the editor file system is refreshed, and the saved file is loaded back for verification.
 
 ```
@@ -59,6 +59,8 @@ Plain-text search:
 4. Remap project.godot entries pointing at the old path - application/run/main_scene and autoload/* values, preserving the leading * singleton marker - and save the file.
 5. Notify the editor file system.
 
+Reload behavior in the engine: the dependency rewrite rewrites each affected file as a whole, and every open scene that references it is placed on a reload queue with the currently edited scene moved to the front. Each queued scene is then reloaded immediately, and a reload clears that scene's undo history. Two consequences: you cannot step back through the pre-transaction edit state with undo after the reload, and any change that was not captured by the save in step 1 is lost - the transaction saves first precisely to narrow that window, but treat unsaved edits in unrelated open scenes as at risk.
+
 `move_resource_file` keeps the file name and takes `new_directory` inside res:// (absolute like res://assets/sfx or relative like assets/sfx; trailing slashes are trimmed; user:// is rejected). When `path` is a directory, every file moves recursively preserving the sub-folder layout, *.uid files follow their owners, empty source folders are left behind, and a file system scan runs afterwards.
 
 Read the structured report instead of assuming success. `rename_resource_file` returns updated_files (per-file change counts), stale_references ({file, token} leftovers that could not be rewritten), uid_preserved, remapped_settings, saved_scenes, reloaded_scenes, unsupported_binary_references (binary resources such as .scn/.res/.csv/.translation cannot be rewritten in place) and import_sidecar_warning when a .import move failed. `move_resource_file` returns moved ({from, to, updated_files, uid_preserved}), failed, plus the aggregated stale_references, unsupported_binary_references, saved_scenes, reloaded_scenes and import_sidecar_warnings.
@@ -92,6 +94,10 @@ To discard a whole directory, `move_os_file_to_trash` (OS domain) trashes a res:
 - `set_resource_uid` triggers a filesystem reimport so the assignment persists.
 - `scan_editor_file_system` rescans the project - run it after a class_name rename that left script_class tokens, or after out-of-band file changes; directory moves trigger one automatically.
 
+Scan gating in brief: the editor file system is a state machine (idle, scanning, processing changes, importing). A scan request issued while a scan or change pass is already running is silently ignored - not queued, not errored. The first scan of an editor session runs on the main thread; later scans run on a low-priority background thread, and their filesystem_changed notification is deferred onto the main loop. The only reliable readiness gates are the engine's is_scanning / is_importing / doing_first_scan states, which `get_editor_file_system_status` exposes. The full state machine, import ordering and sidecar rules are in `references/import-and-sidecars.md`.
+
+## Editor readiness soft errors
+
 While the editor is importing or scanning, resource write operations fail soft with a readiness error instead of corrupting state:
 
 ```
@@ -108,10 +114,17 @@ Wait for retry_after_ms, then retry the same call.
 - All paths are normalized and boundary-checked before use: path traversal, absolute-path escapes, unknown schemes and writes outside the project are rejected with a structured error.
 - `write_file` inside res:// is engine-managed: imported asset types are queued for reimport, plain text files get update_file, and script-like files (.gd/.gdshader/.gdshaderinc/.cs) additionally return a diagnostics object reporting whether the script still loads. Writes to user:// or absolute targets are plain I/O and report engine_managed: false.
 
+## Gotchas
+
+- **Open scenes during rename/move**: for every open scene touched by the transaction, the engine reloads it immediately after rewriting dependencies (the currently edited scene is reloaded first), and the reload wipes that scene's undo history. Save-before-rewrite covers the transaction's own edits; anything else unsaved in those scenes is gone, and undo cannot restore it.
+- **Copying a resource file mints a fresh UID**: when a resource file is duplicated through the engine's file-copy pipeline (editor copy/paste, not the in-memory `duplicate_resource`), the copy always gets a newly minted UID, and the engine first force-saves any edited cached resources back to the source file so the copy cannot drift from what is on disk. Consequence: a file copied next to its original is a different resource as far as uid:// references are concerned - repoint references at the copy explicitly.
+- **Duplicate UIDs are silently re-minted**: if the scan finds a file whose UID already maps to a different existing file, nothing fails - the engine quietly mints a new UID for the newcomer, rewrites it into the file's data, and emits only a WARN. References holding the old UID keep resolving to the old file. If a duplicated scene "does not react to edits", compare `get_resource_uid` of both files.
+- **Scans are not queueable**: a `scan_editor_file_system` call that lands while the editor is mid-scan or mid-import does nothing. Rely on the retryable soft error and the `get_editor_file_system_status` poll loop instead of fire-and-forget scans.
+
 ## See also
 
-- `godot-autopilot-properties-signals` - assigning resources to node properties (memory:// is rejected)
-- `godot-autopilot-scene-building` - scene lifecycle; open scenes are saved and reloaded by rename/move
-- `godot-autopilot-tilemap` - memory:// TileSet that must be saved before it can be assigned
-- `godot-autopilot-tool-map` - task-to-tool routing
-- `godot-autopilot-tips-gotchas` - size limits and silent-failure catalog
+- godot-autopilot - the discovery protocol, task-to-tool routing and the tool gotcha catalog
+- godot-autopilot-scene-system - scene lifecycle (open scenes are saved and reloaded by rename/move) and assigning resources to node properties (memory:// is rejected)
+- godot-autopilot-content - the memory:// TileSet and SpriteFrames that must be saved before they can be assigned
+- references/import-and-sidecars.md - the import pipeline, hand-writing .import files, sidecar rules, duplicate UIDs and the scan state machine
+- references/tool-reference.md - the full resource and text-file tool tables
