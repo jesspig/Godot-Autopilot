@@ -26,6 +26,7 @@ public:
   bool restart(uint16_t port);
 
   int get_port() const;
+  const std::string &get_host() const;
   bool is_running() const;
 
   const std::string &last_error() const { return last_error_; }
@@ -37,6 +38,7 @@ private:
   std::shared_ptr<mcp::StreamableHttpServerTransport> transport_;
   std::unique_ptr<mcp::McpServer> server_;
   int port_ = GDA_DEFAULT_PORT;
+  std::string host_ = "127.0.0.1";
   bool running_ = false;
   std::string last_error_;
 

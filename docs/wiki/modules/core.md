@@ -6,13 +6,13 @@ tags:
   - 模块
   - 核心层
   - 线程模型
-timestamp: "2026-08-29T02:35:37+08:00"
+timestamp: "2026-09-02T18:45:30+08:00"
 resource: src/core/
 ---
 
 # 核心模块（src/core/）
 
-> 审计日期：2026-08-29（2026-08-12 初稿；08-16 随 mcp-cpp-sdk 0.3.1 升级同步；08-17 随配置面板端口持久化同步并补 YAML frontmatter；08-22 随版本号收敛为根 `VERSION` 单一来源同步 MCP 标识引用；08-22 随死代码清理同步——`set_on_new_entry` 回调与 `is_registered` 删除；08-22 15 时全量一致性审计——职责表补 `version.hpp.in`、生命周期步骤修正；08-24 随竞品对齐批次新增 `error_watermark.hpp` 与 `editor_readiness.{hpp,cpp}` 两小节；08-28 随日志系统增强同步——日志 dock 改名 GDA Log + 配置面板 Show timestamps 开关 + 折叠合并行始终显示最新时间 + ServerContext 诊断日志增强与启动失败真实异常类型透传；08-28 随 SDK 0.3.2 + 默认环回 127.0.0.1 同步；08-29 随 0.2.2 版本与全量审计同步（PluginConfig 补 show_time、行号重核）），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 审计日期：2026-09-02（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步），基于当前工作树代码逐行核对（不依赖 git 历史）。
 > 覆盖范围：`src/core/` 下 8 cpp + 12 头共 20 文件（`CommandQueue` 与 `error_watermark` 为 header-only，`version.hpp.in` 为模板，实际 11 业务组 + 版本）。注意：`CommandQueue` 为 header-only（仅 `command_queue.hpp`，无对应 `.cpp`），`error_watermark.hpp` 同为 header-only，`version.hpp.in` 经 `configure_file` 生成 `version.hpp`。
 
 ## 模块简介
@@ -41,9 +41,11 @@ resource: src/core/
 ### CommandQueue（header-only）
 
 - `template <typename Fn> auto submit(Fn&&) -> std::future<std::invoke_result_t<Fn>>` — 入队任务，返回 future；任务异常通过 `promise.set_exception` 传播
-- `void drain()` — 主线程调用；锁定交换批量任务后逐个执行；**首次调用时记录当前线程为"主线程"**
+- `bool drain()` — 主线程调用；关闭或线程不匹配时返回 `false`，否则锁定交换批量任务后逐个执行；首次调用固定当前线程为主线程
+- `void open()` / `void close()` / `bool is_closed()` — 管理队列生命周期；默认容量为 1024，关闭时拒绝并完成未执行任务的 future
+- `execute_sync(Fn&&)` — 主线程直接执行，其他线程提交后等待 future
 - `bool is_main_thread() const` — 与记录的线程 ID 比较
-- 内部结构：`std::queue<std::unique_ptr<TaskBase>>` + `std::mutex` + `std::atomic<std::thread::id>`
+- 内部结构：`std::queue<std::unique_ptr<TaskBase>>` + `std::mutex` + 关闭状态 + 容量限制 + 主线程 ID
 - 实例：`GodotAutopilotPlugin::s_queue`（静态成员），经静态 `queue()` 访问器暴露；`runtime_ops::set_editor_queue` 也持有同一指针
 
 ### config.hpp（全部常量，见文末常量表）
@@ -100,9 +102,9 @@ resource: src/core/
 
 ### ServerContext
 
-- 构造：持有 `CommandQueue&`，创建 `ToolCatalog` 与 `Bm25Index`，`resolve_port()`/`resolve_host()` 解析端口与主机并写 Transport 日志（默认环回绑定 `127.0.0.1`，env `GODOT_AUTOPILOT_HOST` 可覆盖为 `0.0.0.0` 以监听所有接口）
+- 构造：持有 `CommandQueue&`，创建 `ToolCatalog` 与 `Bm25Index`，`resolve_port()`/`resolve_host()` 解析端口与主机并写 Transport 日志；默认环回绑定 `127.0.0.1`，`ServerContext::start()` 拒绝非环回地址
 - `bool start()` — 依次：`StreamableHttpServerTransport`（`host = resolve_host()` 默认 `127.0.0.1`、`port`、`endpoint = "/mcp"`、`stateless = true`、`enable_legacy_sse = false`）→ `mcp::McpServer::Create` → `register_tools()` → `transport_->Start()`；成功后回写 `port_ = http_opts.port`；SDK 自身日志默认关闭（`MCP_LOG_LEVEL` 未设置时为 Off）
-- `void stop()` — `server_->Close()` + `transport_->Close()`；析构函数对 running 状态兜底调用
+- `void stop()` — 幂等关闭 `server_`/`transport_`，清空 dispatch handler 与 active registry；析构函数对非空资源兜底调用
 - `bool restart(uint16_t port)` — `stop()` → 更新 `port_` → `start()`；供配置面板运行时改端口（配置面板 Apply 后立即生效，无需重启编辑器）
 - `int get_port()` / `bool is_running()` / `const std::string& last_error()`
 - MCP 服务器标识：`mcp::Implementation{"godot-autopilot", GDA_VERSION}`（宏经 `configure_file` 由根 `VERSION` 文件生成，见 `build.md` "版本号单一来源"）
@@ -140,13 +142,17 @@ flowchart LR
 3. `_process`：每帧 `drain()` + Dock 轮询
 4. `_exit_tree`：`ServerContext::stop()` + delete → 注销各组件
 
+安全与停止/重载的可执行约束见 [T0 安全边界与并发契约](../security_contract.md)。当前队列关闭会拒绝新任务并为未执行任务完成异常 future；运行时 pending 请求在队列清空时统一取消。
+
 ## 环境变量与端口
 
 - `GODOT_AUTOPILOT_PORT`：`resolve_port()` 用 `std::getenv` 读取、`std::atoi` 转换（**无格式校验**）
 - 端口解析优先级：**环境变量 > `PluginConfig::load_port()`（user:// 持久化值，需 > 0）> `GDA_DEFAULT_PORT`（9527）**——环境变量优先保证测试/CI 场景不受面板配置影响
-- `GODOT_AUTOPILOT_HOST`：`resolve_host()` 用 `std::getenv` 读取，非空即生效；默认环回绑定 `127.0.0.1`（SDK 0.3.2 起 `StreamableHttpServerOptions::host`/`bind_host` 支持环回绑定，可覆盖为 `0.0.0.0` 以监听所有接口）
+- `GODOT_AUTOPILOT_HOST`：`resolve_host()` 用 `std::getenv` 读取，非空即生效；默认环回绑定 `127.0.0.1`，`ServerContext::start()` 拒绝非环回地址
 - 运行时改端口：`ServerContext::restart(uint16_t)`（配置面板 Apply 触发，成功后经 `PluginConfig::save_port` 持久化）
 - `GDA_FORCE_HEADLESS`：强制 headless 相关路径（`main.cpp` 读取）
+
+监听、可信客户端模型、路径和响应大小边界见 [T0 安全边界与并发契约](../security_contract.md)。
 
 ## config.hpp 常量全表
 
@@ -159,6 +165,15 @@ flowchart LR
 | `GDA_ERROR_BUFFER_MAX` | `200` | `size_t` | 错误缓冲上限（`game_bridge.cpp`） |
 | `GDA_OUTPUT_BUFFER_MAX` | `500` | `size_t` | 输出缓冲上限（`game_bridge.cpp`） |
 | `GDA_EVAL_TRUNCATE_BYTES` | `8192` | `size_t` | eval 输出截断字节数（`game_bridge.cpp`） |
+| `GDA_CAPTURE_MAX_DIMENSION` | `4096` | `int64_t` | 截图单边像素上限 |
+| `GDA_CAPTURE_MAX_PNG_BYTES` | `8 MiB` | `size_t` | 截图 PNG 大小上限 |
+| `GDA_VARIANT_MAX_STRING_BYTES` | `64 KiB` | `size_t` | Variant 字符串单项上限 |
+| `GDA_VARIANT_MAX_ARRAY_ELEMENTS` | `10000` | `size_t` | Variant 数组/PackedArray 元素上限 |
+| `GDA_MAX_JSON_RESPONSE_BYTES` | `4 MiB` | `size_t` | JSON 响应大小上限 |
+| `GDA_SCAN_MAX_FILES` | `10000` | `size_t` | 扫描文件数上限 |
+| `GDA_SCAN_MAX_FILE_BYTES` | `2 MiB` | `size_t` | 扫描单文件大小上限 |
+| `GDA_SCAN_MAX_TOTAL_BYTES` | `32 MiB` | `size_t` | 扫描累计字节上限 |
+| `GDA_SCAN_MAX_DEPTH` | `64` | `size_t` | 扫描目录深度上限 |
 
 ## 与现有文档的不一致点
 

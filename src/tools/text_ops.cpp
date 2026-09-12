@@ -1,7 +1,9 @@
 #include "text_ops.hpp"
 #include "core/editor_readiness.hpp"
+#include "core/config.hpp"
 #include "core/log_system.hpp"
 #include "util/error_util.hpp"
+#include "util/project_path.hpp"
 #include "util/rid_registry.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/dir_access.hpp>
@@ -35,6 +37,34 @@ JV ok_json() {
 }
 
 struct TextRidDomain {};
+
+struct ScanBudget {
+  size_t files = 0;
+  size_t total_bytes = 0;
+  std::string reason;
+
+  bool take_file(size_t file_bytes, size_t depth) {
+    if (depth > GDA_SCAN_MAX_DEPTH) {
+      reason = "directory_depth";
+      return false;
+    }
+    if (files >= GDA_SCAN_MAX_FILES) {
+      reason = "file_count";
+      return false;
+    }
+    if (file_bytes > GDA_SCAN_MAX_FILE_BYTES) {
+      reason = "single_file_bytes";
+      return false;
+    }
+    if (total_bytes > GDA_SCAN_MAX_TOTAL_BYTES - file_bytes) {
+      reason = "total_bytes";
+      return false;
+    }
+    ++files;
+    total_bytes += file_bytes;
+    return true;
+  }
+};
 
 godot::Ref<godot::TextServer> get_ts() {
   auto *mgr = godot::TextServerManager::get_singleton();
@@ -116,9 +146,12 @@ JV handle_font_set_data(const JV &args) {
   auto *dp = args.Find("data");
   if (!dp || !dp->IsString())
     return util::error_json("missing required parameter: data");
-  std::string data_path = dp->GetString();
+  const auto checked = util::normalize_project_path(dp->GetString(), true);
+  if (!checked.valid())
+    return util::error_detail("path rejected", "data", checked.error,
+                              "use a res:// or user:// project path");
   godot::PackedByteArray bytes =
-      godot::FileAccess::get_file_as_bytes(godot::String(data_path.c_str()));
+      godot::FileAccess::get_file_as_bytes(godot::String(checked.value.c_str()));
   ts->font_set_data(font_rid, bytes);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_text_font_data completed");
@@ -351,11 +384,12 @@ JV handle_file_write(const JV &args) {
   godot::FileAccess::ModeFlags flag = godot::FileAccess::WRITE;
   if (mode == "APPEND")
     flag = godot::FileAccess::READ_WRITE;
-  std::string normalized_path = pp->GetString();
-  for (char &c : normalized_path) {
-    if (c == '\\')
-      c = '/';
-  }
+  const auto checked = util::normalize_project_path(pp->GetString(), true,
+                                                    false);
+  if (!checked.valid())
+    return util::error_detail("path rejected", "path", checked.error,
+                              "write only inside the project namespaces");
+  const std::string normalized_path = checked.value;
   godot::String gs_path(normalized_path.c_str());
   auto file = godot::FileAccess::open(gs_path, flag);
   if (file.is_null())
@@ -461,9 +495,10 @@ std::string join_search_path(const std::string &dir,
 void find_in_files_recursive(const std::string &dir,
                              const std::vector<std::string> &exts,
                              const std::string &query,
-                             bool case_sensitive, int max_results,
-                             std::vector<std::pair<std::string, int>> &hits,
-                             bool &truncated) {
+                              bool case_sensitive, int max_results,
+                              std::vector<std::pair<std::string, int>> &hits,
+                              bool &truncated, ScanBudget &budget,
+                              size_t depth) {
   if (truncated || static_cast<int>(hits.size()) >= max_results)
     return;
   godot::Ref<godot::DirAccess> da =
@@ -472,6 +507,12 @@ void find_in_files_recursive(const std::string &dir,
     return;
   }
   da->list_dir_begin();
+  if (depth > GDA_SCAN_MAX_DEPTH) {
+    budget.reason = "directory_depth";
+    truncated = true;
+    da->list_dir_end();
+    return;
+  }
   godot::String entry = da->get_next();
   while (entry != godot::String()) {
     if (truncated || static_cast<int>(hits.size()) >= max_results)
@@ -481,12 +522,17 @@ void find_in_files_recursive(const std::string &dir,
       std::string fpath = join_search_path(dir, name);
       if (da->current_is_dir()) {
         find_in_files_recursive(fpath, exts, query, case_sensitive, max_results,
-                                hits, truncated);
+                                hits, truncated, budget, depth + 1);
       } else if (matches_extension(name, exts, case_sensitive)) {
         auto file = godot::FileAccess::open(godot::String(fpath.c_str()),
                                             godot::FileAccess::READ);
         if (file.is_null())
           continue;
+        const int64_t length = file->get_length();
+        if (length < 0 || !budget.take_file(static_cast<size_t>(length), depth)) {
+          truncated = true;
+          break;
+        }
         std::string text = util::to_std(file->get_as_text());
         file->close();
         int n = count_occurrences(text, query, case_sensitive);
@@ -510,14 +556,19 @@ JV handle_file_read(const JV &args) {
   auto *pp = args.Find("path");
   if (!pp || !pp->IsString())
     return util::error_json("missing required parameter: path");
-  auto file = godot::FileAccess::open(godot::String(pp->GetString().c_str()),
+  const auto checked = util::normalize_project_path(pp->GetString(), true,
+                                                    false);
+  if (!checked.valid())
+    return util::error_detail("path rejected", "path", checked.error,
+                              "use a res:// or user:// project path");
+  auto file = godot::FileAccess::open(godot::String(checked.value.c_str()),
                                       godot::FileAccess::READ);
   if (file.is_null())
     return util::error_json("failed to open file: " + pp->GetString());
   std::string content = util::to_std(file->get_as_text());
   file->close();
   JV inner(JV::object_tag);
-  inner["path"] = JV(pp->GetString());
+  inner["path"] = JV(checked.value);
   inner["content"] = JV(content);
   JV r(JV::object_tag);
   r["result"] = std::move(inner);
@@ -538,6 +589,12 @@ JV handle_find_in_files(const JV &args) {
   auto *dp = args.Find("dir");
   if (dp && dp->IsString())
     dir = dp->GetString();
+
+  const auto checked_dir = util::normalize_project_path(dir, true);
+  if (!checked_dir.valid())
+    return util::error_detail("path rejected", "dir", checked_dir.error,
+                              "search only inside the project namespaces");
+  dir = checked_dir.value;
 
   std::vector<std::string> exts = {"gd", "tscn", "tres", "cs",
                                    "md", "json", "h",  "cpp"};
@@ -564,8 +621,9 @@ JV handle_find_in_files(const JV &args) {
 
   std::vector<std::pair<std::string, int>> hits;
   bool truncated = false;
+  ScanBudget budget;
   find_in_files_recursive(dir, exts, query, case_sensitive, max_results, hits,
-                          truncated);
+                          truncated, budget, 0);
 
   JV files(JV::array_tag);
   for (const auto &h : hits) {
@@ -578,6 +636,16 @@ JV handle_find_in_files(const JV &args) {
   inner["files"] = std::move(files);
   inner["truncated"] = JV(truncated);
   inner["total"] = JV(static_cast<int64_t>(hits.size()));
+  JV limit(JV::object_tag);
+  limit["files_scanned"] = JV(static_cast<int64_t>(budget.files));
+  limit["bytes_scanned"] = JV(static_cast<int64_t>(budget.total_bytes));
+  limit["max_files"] = JV(static_cast<int64_t>(GDA_SCAN_MAX_FILES));
+  limit["max_file_bytes"] = JV(static_cast<int64_t>(GDA_SCAN_MAX_FILE_BYTES));
+  limit["max_total_bytes"] = JV(static_cast<int64_t>(GDA_SCAN_MAX_TOTAL_BYTES));
+  limit["max_depth"] = JV(static_cast<int64_t>(GDA_SCAN_MAX_DEPTH));
+  if (!budget.reason.empty())
+    limit["reason"] = JV(budget.reason);
+  inner["limit"] = std::move(limit);
   JV r(JV::object_tag);
   r["result"] = std::move(inner);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,

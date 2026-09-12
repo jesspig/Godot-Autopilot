@@ -6,12 +6,12 @@ tags:
   - 约定
   - 命名
   - 规范
-timestamp: "2026-08-29T02:35:37+08:00"
+timestamp: "2026-09-02T17:10:11+08:00"
 ---
 
 # 工程约定
 
-本文汇总代码中实际体现的工程约定（与 [overview.md](overview.md)、[AGENTS.md](../../AGENTS.md) 互为参照）。
+本文汇总代码中实际体现的工程约定（与 [overview.md](overview.md)、[AGENTS.md](../../AGENTS.md) 互为参照）。安全边界与并发生命周期以 [T0 安全边界与并发契约](security_contract.md) 为准。
 
 ## 命名体系
 

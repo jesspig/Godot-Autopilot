@@ -3,10 +3,15 @@
 #include "core/config.hpp"
 #include "core/log_system.hpp"
 #include "runtime/gda_protocol.hpp"
+#include "tools/authorization.hpp"
 #include "tools/debugger_access.hpp"
+#include "tools/tool_base.hpp"
 #include "util/error_util.hpp"
 #include <string>
 #include <vector>
+#ifdef GetObject
+#undef GetObject
+#endif
 
 namespace godot_autopilot {
 namespace runtime_ops {
@@ -38,11 +43,33 @@ constexpr const char *INPUT_PARAM_WHITELIST[] = {
     "action", "duration_ms", "mode",    "timeout_ms",
 };
 
-bool is_input_param_allowed(const std::string &key) {
-  for (const char *allowed : INPUT_PARAM_WHITELIST) {
-    if (key == allowed)
-      return true;
+bool has_only_fields(const JV &value, const char *const *allowed,
+                     size_t count, std::string &unknown) {
+  if (!value.IsObject())
+    return false;
+  for (const auto &entry : value.GetObject()) {
+    bool found = false;
+    for (size_t i = 0; i < count; ++i) {
+      if (entry.first == allowed[i]) {
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      unknown = entry.first;
+      return false;
+    }
   }
+  return true;
+}
+
+bool is_eval_param_allowed(const std::string &key) {
+  static constexpr const char *allowed[] = {
+      "action", "node_path", "property", "value", "method", "args",
+      "source_code", "persist", "persist_name", "timeout_ms"};
+  for (const char *candidate : allowed)
+    if (key == candidate)
+      return true;
   return false;
 }
 
@@ -65,6 +92,8 @@ bool is_sequence_item_kind(const std::string &kind) {
 } // namespace
 
 mcp::JsonValue handle_game_status(const mcp::JsonValue &args) {
+  if (!args.IsObject() || !args.Empty())
+    return error_json("get_game_status accepts no parameters");
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_game_status called");
   JV params(JV::object_tag);
@@ -72,12 +101,52 @@ mcp::JsonValue handle_game_status(const mcp::JsonValue &args) {
 }
 
 mcp::JsonValue handle_game_eval(const mcp::JsonValue &args) {
+  JV denied = authorization::deny_if_unauthorized(
+      "execute_game_script", SideEffect::GameRuntime);
+  if (!denied.IsNull())
+    return denied;
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "execute_game_script called");
+  if (!args.IsObject())
+    return error_json("execute_game_script parameters must be an object");
   auto *action_p = args.Find("action");
   if (!action_p || !action_p->IsString()) {
     return error_json("missing required parameter: action "
                       "(script|get_property|set_property|call_method)");
+  }
+  const std::string action = action_p->GetString();
+  if (action != "script" && action != "get_property" &&
+      action != "set_property" && action != "call_method")
+    return error_json("invalid action: expected script|get_property|set_property|call_method");
+  if (action == "script") {
+    auto *source = args.Find("source_code");
+    if (!source || !source->IsString() || source->GetString().empty())
+      return error_json("script action requires non-empty source_code (string)");
+  } else if (action == "get_property" || action == "set_property") {
+    auto *property = args.Find("property");
+    if (!property || !property->IsString() || property->GetString().empty())
+      return error_json("property action requires non-empty property (string)");
+  } else {
+    auto *method = args.Find("method");
+    if (!method || !method->IsString() || method->GetString().empty())
+      return error_json("call_method action requires non-empty method (string)");
+  }
+  if (auto *path = args.Find("node_path"); path && !path->IsString())
+    return error_json("node_path must be a string");
+  if (auto *call_args = args.Find("args"); call_args && !call_args->IsArray())
+    return error_json("args must be an array");
+  if (auto *persist = args.Find("persist"); persist && !persist->IsBool())
+    return error_json("persist must be a boolean");
+  if (auto *timeout = args.Find("timeout_ms");
+      timeout && (!timeout->IsInt() || timeout->GetInt() <= 0 ||
+                  timeout->GetInt() > GDA_MAX_TIMEOUT_MS))
+    return error_json("timeout_ms must be an integer between 1 and 30000");
+  if (args.IsObject()) {
+    for (const auto &entry : args.GetObject()) {
+      if (!is_eval_param_allowed(entry.first))
+        return error_json("unknown parameter for execute_game_script: " +
+                          entry.first);
+    }
   }
   JV params(JV::object_tag);
   params["action"] = *action_p;
@@ -94,13 +163,42 @@ mcp::JsonValue handle_game_eval(const mcp::JsonValue &args) {
 }
 
 mcp::JsonValue handle_game_input(const mcp::JsonValue &args) {
+  JV denied = authorization::deny_if_unauthorized(
+      "queue_game_input", SideEffect::GameRuntime);
+  if (!denied.IsNull())
+    return denied;
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "queue_game_input called");
+  if (!args.IsObject())
+    return error_json("queue_game_input parameters must be an object");
+  std::string unknown;
+  if (!has_only_fields(args, INPUT_PARAM_WHITELIST,
+                       sizeof(INPUT_PARAM_WHITELIST) / sizeof(*INPUT_PARAM_WHITELIST),
+                       unknown))
+    return error_json("unknown parameter for queue_game_input: " + unknown);
   auto *type_p = args.Find("type");
   if (!type_p || !type_p->IsString()) {
     return error_json(
         "missing required parameter: type (key|mouse_button|action)");
   }
+  if (type_p->GetString() != "key" && type_p->GetString() != "mouse_button" &&
+      type_p->GetString() != "action")
+    return error_json("type must be key|mouse_button|action");
+  if (auto *pressed = args.Find("pressed"); pressed && !pressed->IsBool())
+    return error_json("pressed must be a boolean");
+  if (auto *duration = args.Find("duration_ms"); duration &&
+      (!duration->IsInt() || duration->GetInt() < 0))
+    return error_json("duration_ms must be a non-negative integer");
+  if (auto *mode = args.Find("mode"); mode &&
+      (!mode->IsString() || (mode->GetString() != "event" &&
+                             mode->GetString() != "api" && mode->GetString() != "hold")))
+    return error_json("mode must be event|api|hold");
+  if (auto *position = args.Find("position"); position && !position->IsObject())
+    return error_json("position must be an object");
+  if (auto *timeout = args.Find("timeout_ms"); timeout &&
+      (!timeout->IsInt() || timeout->GetInt() <= 0 ||
+       timeout->GetInt() > GDA_MAX_TIMEOUT_MS))
+    return error_json("timeout_ms must be an integer between 1 and 30000");
   JV params(JV::object_tag);
   params["type"] = *type_p;
   copy_optional(args, params, "keycode");
@@ -111,39 +209,34 @@ mcp::JsonValue handle_game_input(const mcp::JsonValue &args) {
   copy_optional(args, params, "duration_ms");
   copy_optional(args, params, "mode");
 
-  std::vector<std::string> ignored;
-  if (args.IsObject()) {
-    for (const auto &entry : args.GetObject()) {
-      if (!is_input_param_allowed(entry.first)) {
-        ignored.push_back(entry.first);
-      }
-    }
-  }
-
   JV result = handle_gda_send("input", params, extract_timeout(args));
-  if (!result.Contains("error") && !ignored.empty()) {
-    JV ignored_arr(JV::array_tag);
-    for (const auto &key : ignored)
-      ignored_arr.PushBack(JV(key));
-    result["ignored_params"] = std::move(ignored_arr);
-    std::string warning = "ignored unknown parameters: ";
-    for (size_t i = 0; i < ignored.size(); i++) {
-      if (i > 0)
-        warning += ", ";
-      warning += ignored[i];
-    }
-    result["warning"] = JV(warning);
-  }
   return result;
 }
 
 mcp::JsonValue handle_game_input_wait(const mcp::JsonValue &args) {
+  JV denied = authorization::deny_if_unauthorized(
+      "wait_game_input", SideEffect::GameRuntime);
+  if (!denied.IsNull())
+    return denied;
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "wait_game_input called");
+  static constexpr const char *allowed[] = {"action", "state", "inject",
+                                             "timeout_ms"};
+  std::string unknown;
+  if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed), unknown))
+    return error_json("unknown parameter for wait_game_input: " + unknown);
   auto *action_p = args.Find("action");
   if (!action_p || !action_p->IsString()) {
     return error_json("missing required parameter: action");
   }
+  if (auto *state = args.Find("state"); state && !state->IsString())
+    return error_json("state must be a string");
+  if (auto *inject = args.Find("inject"); inject && !inject->IsObject())
+    return error_json("inject must be an object");
+  if (auto *timeout = args.Find("timeout_ms"); timeout &&
+      (!timeout->IsInt() || timeout->GetInt() <= 0 ||
+       timeout->GetInt() > GDA_MAX_TIMEOUT_MS))
+    return error_json("timeout_ms must be an integer between 1 and 30000");
   JV params(JV::object_tag);
   params["action"] = *action_p;
   copy_optional(args, params, "state");
@@ -155,6 +248,12 @@ mcp::JsonValue handle_game_input_wait(const mcp::JsonValue &args) {
 mcp::JsonValue handle_game_input_status(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_game_input_status called");
+  if (!args.IsObject())
+    return error_json("get_game_input_status parameters must be an object");
+  static constexpr const char *allowed[] = {"action", "timeout_ms"};
+  std::string unknown;
+  if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed), unknown))
+    return error_json("unknown parameter for get_game_input_status: " + unknown);
   auto *action_p = args.Find("action");
   if (!action_p || !action_p->IsString()) {
     return error_json("missing required parameter: action");
@@ -172,8 +271,16 @@ mcp::JsonValue handle_game_input_status(const mcp::JsonValue &args) {
 }
 
 mcp::JsonValue handle_sequence_game_inputs(const mcp::JsonValue &args) {
+  JV denied = authorization::deny_if_unauthorized(
+      "sequence_game_inputs", SideEffect::GameRuntime);
+  if (!denied.IsNull())
+    return denied;
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "sequence_game_inputs called");
+  static constexpr const char *allowed[] = {"inputs", "timeout_ms"};
+  std::string unknown;
+  if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed), unknown))
+    return error_json("unknown parameter for sequence_game_inputs: " + unknown);
   auto *inputs_p = args.Find("inputs");
   if (!inputs_p || !inputs_p->IsArray() || inputs_p->GetArray().empty()) {
     return error_json(
@@ -227,6 +334,13 @@ mcp::JsonValue handle_sequence_game_inputs(const mcp::JsonValue &args) {
 mcp::JsonValue handle_game_ui_elements(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_game_ui_elements called");
+  static constexpr const char *allowed[] = {"max_elements", "timeout_ms"};
+  std::string unknown;
+  if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed), unknown))
+    return error_json("unknown parameter for get_game_ui_elements: " + unknown);
+  if (auto *max = args.Find("max_elements"); max &&
+      (!max->IsInt() || max->GetInt() <= 0))
+    return error_json("max_elements must be a positive integer");
   JV params(JV::object_tag);
   copy_optional(args, params, "max_elements");
   return handle_gda_send(std::string(GDA_OP_UI_ELEMENTS), params,
@@ -236,13 +350,27 @@ mcp::JsonValue handle_game_ui_elements(const mcp::JsonValue &args) {
 mcp::JsonValue handle_game_capture(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "capture_game_viewport called");
+  if (!args.IsObject())
+    return error_json("capture_game_viewport parameters must be an object");
+  static constexpr const char *allowed[] = {"timeout_ms"};
+  std::string unknown;
+  if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed), unknown))
+    return error_json("unknown parameter for capture_game_viewport: " + unknown);
   JV params(JV::object_tag);
   return handle_gda_send("capture", params, extract_timeout(args));
 }
 
 mcp::JsonValue handle_game_reload_scripts(const mcp::JsonValue &args) {
+  JV denied = authorization::deny_if_unauthorized(
+      "reload_game_scripts", SideEffect::GameRuntime);
+  if (!denied.IsNull())
+    return denied;
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "reload_game_scripts called");
+  static constexpr const char *allowed[] = {"paths"};
+  std::string unknown;
+  if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed), unknown))
+    return error_json("unknown parameter for reload_game_scripts: " + unknown);
   auto *paths_p = args.Find("paths");
   if (!paths_p || !paths_p->IsArray() || paths_p->GetArray().empty()) {
     return error_json(

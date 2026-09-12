@@ -22,8 +22,9 @@ struct ToolInfo {
 class ToolCatalog {
 public:
   void add_tool(const ToolInfo &info);
-  const ToolInfo *get_tool(const std::string &name) const;
-  std::vector<const ToolInfo *> get_all_tools() const;
+  std::optional<ToolInfo> get_tool(const std::string &name) const;
+  std::vector<ToolInfo> get_all_tools() const;
+  void replace_tools(std::vector<ToolInfo> tools);
   std::vector<std::string> get_categories() const;
   size_t size() const;
 

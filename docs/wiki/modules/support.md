@@ -8,7 +8,7 @@ tags:
   - 资源
   - UI
   - 工具库
-timestamp: "2026-08-29T02:35:37+08:00"
+timestamp: "2026-09-10T01:13:51+08:00"
 resource:
   - src/prompts/
   - src/resources/
@@ -18,8 +18,8 @@ resource:
 
 # 支撑模块（src/prompts/、src/resources/、src/ui/、src/util/）
 
-> 审计日期：2026-08-29（2026-08-12 初稿；08-17 随配置面板新增、状态栏移除同步并补 YAML frontmatter；08-22 15 时全量一致性审计——新增 json_godot/rid_registry/type_hint/gdscript_wrap 四个 header-only util 小节、覆盖范围计数 10 组/15 文件、注册入口行号校准；08-24 随竞品对齐批次同步——debugger prompt 引导工具改指 execute_game_script/get_game_log_entries/get_game_status（原 get_debugger_stack_dump/get_debugger_monitors 已删）、BM25 tokenize 补 CJK bigram；08-28 随日志系统增强同步；08-29 随 0.2.2 版本与全量审计同步），基于当前工作树代码逐行核对（不依赖 git 历史）。
-> 覆盖范围：`src/prompts/` 9 组文件（18 个）、`src/resources/` 2 组、`src/ui/` 2 组、`src/util/` 10 组（15 个文件，其中 `scene_path.hpp`/`json_godot.hpp`/`rid_registry.hpp`/`type_hint.hpp`/`gdscript_wrap.hpp` 为 header-only）。注册入口在 `src/core/server_context.cpp:140-143`。
+> 审计日期：2026-09-10（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill_gen 一键生成 Agent Skills 与 skill 内容外置化同步；09-10 随 skill 体系 19→7 册重构、Godot 源码研究发现织入与 dock 按钮动态化同步），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 覆盖范围：`src/prompts/` 9 组文件（18 个）、`src/resources/` 2 组、`src/ui/` 2 组、`src/util/` 12 组（19 个文件，其中 `scene_path.hpp`/`json_godot.hpp`/`rid_registry.hpp`/`type_hint.hpp`/`gdscript_wrap.hpp`/`project_path.hpp` 为 header-only；另含内容目录 `skill_templates/` 28 个文件——27 个 .md + registry.json）。注册入口在 `src/core/server_context.cpp:140-143`。
 
 ## 模块简介
 
@@ -28,7 +28,7 @@ resource:
 - **Prompts**：向 MCP 客户端暴露 12 个 prompt 模板（7 通用 + 5 调试），全部经 `server.RegisterPrompt` 注册。
 - **Resources**：暴露 15 个 MCP resource URI（8 引擎侧 + 7 调试捕获侧），全部为 `godot://` 前缀。
 - **UI**：底部日志面板（`McpLogDock`）、右侧配置面板（`McpConfigDock`），消费 `LogSystem` 与服务器生命周期。
-- **Util**：与工具层共享的纯工具件——Variant↔JSON 互转、BM25 检索、错误 JSON 构造、写后读回校验、场景路径解析、JSON 数值/几何/RID 辅助、进程内 RID 注册表、类型提示推断、GDScript 包装流水线、客户端 MCP 配置生成。
+- **Util**：与工具层共享的纯工具件——Variant↔JSON 互转、BM25 检索、错误 JSON 构造、写后读回校验、场景路径解析、JSON 数值/几何/RID 辅助、进程内 RID 注册表、类型提示推断、GDScript 包装流水线、客户端 MCP 配置生成、Agent Skills 文档生成。
 
 ## Prompts（12 个，均经 RegisterPrompt 注册）
 
@@ -69,8 +69,8 @@ resource:
 
 | 组件 | 文件 | 数量 | 注册方式 | MIME | 执行方式 |
 |---|---|---|---|---|---|
-| `register_all_resources(server, queue)` | `resource_handlers.cpp/hpp` | 8（6 静态 + 2 模板） | `godot://` URI，`application/json` | 每个 handler 经 `queue.submit()` 在主线程执行 |
-| `register_debugger_resources(server)` | `debugger_resources.cpp/hpp` | 7（全静态） | `godot://` URI，`text/plain` | 直接同步调用 `tools/debugger_ops` 的 `capture_*` 文本函数（只读 `DebuggerCapture` 捕获缓冲，不触碰引擎 API，故无需 queue） |
+| `register_all_resources(server, queue)` | `resource_handlers.cpp/hpp` | 8（6 静态 + 2 模板） | `godot://` URI，`application/json` | 每个 handler 经 `queue.execute_sync()` 在主线程执行 |
+| `register_debugger_resources(server, queue)` | `debugger_resources.cpp/hpp` | 7（全静态） | `godot://` URI，`text/plain` | 每个 handler 经 `queue.execute_sync()` 执行，`debugger-session` 的 Godot debugger 查询也在主线程执行 |
 
 **注意：`resource_handlers` 不是"扩展名注册表"**——它注册的是 MCP Resource（URI 分发），而非 Godot 资源扩展名映射；扩展名/类型相关逻辑在 `tools/resource_ops` 侧。
 
@@ -118,7 +118,8 @@ resource:
 
 `EditorDock` 子类，标题 "MCP Config"，默认停靠右侧槽（`DOCK_SLOT_RIGHT_UR`），可关闭：
 
-- **布局**：VBoxContainer = 端口区（Label + SpinBox 1–65535 + Apply 按钮 + 运行状态 Label）→ 分隔线 → 客户端配置区（`OptionButton` 下拉选择 8 个客户端，label 含配置文件路径）+ Generate 按钮 + 结果 Label + 生效条件提示 Label
+- **布局**：VBoxContainer = 端口区（Label + SpinBox 1–65535 + Apply 按钮 + 运行状态 Label）→ 分隔线 → 客户端配置区（`OptionButton` 下拉选择 8 个客户端，label 含配置文件路径）+ Generate 按钮 + 结果 Label + 生效条件提示 Label → 分隔线 → 技能生成区（Generate Skills / Update Skills 动态按钮）
+- **技能生成（动态按钮）**：按钮文本按 `.agents/skills/` 下是否已存在 `godot-autopilot-` 前缀目录动态切换——无 → "Generate Skills"，有 → "Update Skills"；Update 点击先递归删除全部前缀匹配目录再整体重新生成（语义详见下文 skill_gen 小节）
 - **端口管理**：`set_server_context(ServerContext*)` 注入服务器（null 时禁用 Apply）；Apply → `ServerContext::restart(port)` → 成功后 `PluginConfig::save_port(port)` 持久化，并刷新面板内运行状态 Label（"Running on port N" / "Server offline"，主题色标注）
 - **配置生成**：`_on_generate()` 只处理下拉选中的单个客户端——目标目录 `ProjectSettings::globalize_path("res://")`；文件不存在 → `render_config` 新建；JSON 已存在 → `merge_json_config` 合并（**先解析现有配置，保留其他键，仅更新 `mcp`/`mcpServers` 下的 `godot-autopilot` 条目**，不覆盖用户的其他 agent 配置）；Codex TOML 已含 `mcp_servers` → 跳过并提示；JSON 无法解析 → 跳过不写（防覆盖）；结果单文件报告「创建/更新/跳过」原因
 - **主题**：颜色经 `theme_color()` 从编辑器主题取 `success_color`/`error_color`/`warning_color`/`font_disabled_color`（无则回退硬编码色）
@@ -143,6 +144,27 @@ resource:
 - `merge_json_config(ClientId, port, existing)` — 空串 → 视为新建；Parse 失败或非对象 → `Unparsable`；否则更新顶层键下同名条目并保留其余内容
 - `merge_toml_config(port, existing)` — 已含 `[mcp_servers` 段 → `AlreadyConfigured`；否则追加段（保留原文）
 - `display_name` / `file_path` / `description` — UI label 与报告用
+
+### skill_gen（`skill_gen.cpp/hpp` + `skill_content_generated.cpp` + `skill_templates/`，命名空间 `godot_autopilot::skill_gen`，09-08 新增；09-10 由 19 册重构为 7 册）
+
+"一键生成 Agent Skills"：把 7 册英文 Agent Skills（符合 agentskills.io 规范）写入项目根 `.agents/skills/`，供外部编码代理加载。与 `client_config_gen` 同为 UI 面板消费的纯函数生成器（**仅依赖 std，无 Godot API**，L1 可测）：
+
+- **结构（09-10 七册化）**：原 19 册合并为 7 册——1 册插件总纲 `godot-autopilot` + 6 册引擎指南（`godot-autopilot-{scene-system,resources,scripting,runtime,servers,content}`），每册均带 `references/` 子文档（渐进披露，细节由子文档承载，合计 20 个 references）。**全部 84 条 Godot 4.8.0-dev 源码研究发现织入引擎六册**（撤销三历史、RID 不级联、暂停矩阵、`just_pressed` 双计数器、调试三道闸门、uid 优先于 path、导航双缓冲、`set_cell` 静默清格等），行内以 "4.7+"/"4.8" 简注标注适用版本
+- **内容承载（09-08 外置化，09-10 随册数同步）**：正文不再由 7 个 `skill_content_*.cpp`（已删除）手写，外置为 `src/util/skill_templates/`（28 个文件——27 个 .md + `registry.json`；registry 含 7 条 name/description/files 映射，聚合顺序固化于此）+ `tools/embed_skills.py`（纯 stdlib）构建期嵌入——生成头 `skill_content_embedded.h` 入 `build/<preset>/generated/`（gitignore 覆盖），**内容变更不再触碰 C++**。构建期 5 项校验：恰 `SKILL_COUNT = 7` 条（常量，与 registry 册数保持同步）、name 规则唯一、description ≤1024、files 结构与 source 存在、孤儿 .md 与重复引用（失败非零退出）；定界符 `gda_s` 碰撞自动避让；`cmake/skill_gen.cmake` 中 py launcher 优先（`find_program(NAMES py python python3 REQUIRED)`，本机 python 为 WindowsApps 存根）并 configure 期 `--version` 自检（失败 FATAL_ERROR）
+- **API**：`SkillSpec{name, description, files}`；`skill_gen.hpp` 的 7 个 make_* 声明收敛为 1 个 `make_embedded_skills()`，`all_skills()` 改为其转发（顺序由 registry.json 固化）；`skill_file_path()` 拼生成路径；`render_skill_md()` 渲染 YAML frontmatter——`name`/`description`（值含 ": " 时加引号）/`metadata{author: godot-autopilot, version: "<GDA_VERSION>"}`（version 由 configure_file 注入，与 `server_info` 同源）
+- **生成路径**：`<res://>/.agents/skills/<name>/SKILL.md`；`name` 小写连字符且与目录一致、description ≤1024；7 册全部带 `references/` 子文件
+- **UI 入口（09-10 动态化）**：McpConfigDock 面板按钮文本动态切换（见上文 McpConfigDock 小节），槽函数 `_on_generate_skills()`：先 `has_existing_skills()` 探测——有既有 `godot-autopilot-` 前缀目录则经 `remove_legacy_skill_dirs()`（`remove_dir_recursive` 后序遍历 + `DirAccess::remove`）整体删除后重建，旧 19 册在用户项目中随之自动退役；随后 `DirAccess::make_dir_recursive_absolute` 建目录并复用 `write_file` 写入；成功文案动态计数 "Generated/Updated N skills in .agents/skills/ (M reference files)"，失败列相对路径
+- **覆盖写策略**：写入与清理均限于自有 `godot-autopilot-` 前缀命名空间，不触碰 `.agents/skills/` 下其他内容
+- **7 册清单**（name 与吸收来源）：
+  - `godot-autopilot`——插件总纲：连接前提、工具发现协议（search first, never guess）、错误协议（watermark/retryable），吸收原 usage / direct-http / tool-map / tips-gotchas（references：http-fallback、tool-catalog、tool-gotchas）
+  - `godot-autopilot-scene-system`——场景系统：场景生命周期、节点增删改名换父、属性 JSON 值形状、信号接线、undo 历史与 .tscn 序列化，吸收原 scene-building + properties-signals + inspection 的编辑侧
+  - `godot-autopilot-resources`——资源与文件：load/save/create/duplicate、事务化 rename/move 与引用改写、UID 与依赖管理、导入管线，吸收原 resources-files
+  - `godot-autopilot-scripting`——GDScript：四执行通道、@tool 语义、static 初始化与编辑器/游戏进程边界，原 scripting 就地重写保留
+  - `godot-autopilot-runtime`——运行与调试：启停游戏、帧精确输入注入、暂停语义、日志/错误三通道与 watermark 确认环、运行时检查，吸收原 running-games + debugging + inspection 的运行侧
+  - `godot-autopilot-servers`——服务器层 RID 工具：RenderingServer/PhysicsServer/NavigationServer 语义与静默失败、物理 tick 次序、导航同步槽，吸收原 physics-navigation + rendering-text
+  - `godot-autopilot-content`——内容管线：TileMap/TileSet、AnimationPlayer/Tree、音频总线与播放、Control 主题与布局及各域静默失败，吸收原 tilemap + animation + audio + ui-theming + spriteframes
+- **测试**：`tests/unit/skill_gen_test.cpp` 7 用例（SkillGenTest 6 个 TEST + SkillRegistryFixture 1 个 TEST_F）——7 册完整性与名单精确比对（`AllSevenSkillsPresent`）、name 规范 `^[a-z0-9]+(-[a-z0-9]+)*$` 且与目录一致、description ≤1024、文件布局无 PLACEHOLDER、frontmatter 渲染、工具名回验（对照运行时 catalog∪schema 参数名∪176 项白名单，注册管线见 [tools_registry.md](tools_registry.md)）、每册 ≥1 references 断言（`EverySkillDeclaresReferences`）；09-10 重构后 ctest L1 103/103 全绿
+- **构建接线**：`cmake/skill_gen.cmake` 经 `add_custom_command` 生成嵌入头 + `add_custom_target(gda_skill_embed_header)`；根 `CMakeLists.txt` add_library 与 `tests/CMakeLists.txt` GDA_UNIT_BUSINESS_SOURCES 的 skill 源各为 2 个（`src/util/skill_gen.cpp` + `src/util/skill_content_generated.cpp` 薄胶水：`embedded::all()` → `SkillSpec`），并各 `add_dependencies(... gda_skill_embed_header)`；`skill_templates/*.md` 为数据文件，不进 add_library
 
 ## Util
 
@@ -261,6 +283,10 @@ GDScript 包装流水线共享件（script_ops 与 code_exec_ops 共用）：
 | `strip_extends_lines / has_top_level_func_def / defines_function_named` | 单表达式判定与 extends 剥离 |
 | `IndentStyle / scan_indent_style / indent_prefix / reindent_lines` | 包装时缩进风格探测与重排 |
 
+### project_path.hpp（header-only，命名空间 `godot_autopilot::util`，09-02 新增）
+
+工程资源路径规范化与边界校验的单一入口：`normalize_project_path(raw, allow_user, allow_root = true)` 返回 `ProjectPath{value, error}`——反斜杠归一为 `/` 后词法消解，拒绝 `..` 路径穿越；绝对路径经 `ProjectSettings` 定位工程根做大小写不敏感前缀校验，工程外报错；scheme 仅 `res://`/`user://`（`user://` 受 `allow_user` 开关控制），未知 scheme 报错；`allow_root = false` 时拒绝命名空间根本身。失败返回结构化 `error`，不以空路径兜底。消费方：`text_ops`/`resource_ops` 全量入口（边界要求见 [../security_contract.md](../security_contract.md)）。
+
 ## 与现有文档的不一致点
 
 | 文档 | 声称 | 代码事实 | 判定 |
@@ -269,7 +295,7 @@ GDScript 包装流水线共享件（script_ops 与 code_exec_ops 共用）：
 | `prompt_setup_input_map.cpp:69` | `Enter=4194310（KEY_ENTER）` | `prompt_keycode_reference.cpp:61` 表 `KEY_ENTER=4194312`、`KEY_META=4194310`（87 行） | 文档间冲突 |
 | `prompt_keycode_reference.cpp` 映射表 | `Rid → number`、`PackedByteArray → string (base64)` | `variant_json.cpp` 实现：RID → `{"id": N}` 对象；PackedByteArray → 数字数组 | 提示内容与实现不符 |
 | `prompt_keycode_reference.cpp:85-86` | KEY_SHIFT 表格出现两行 | 重复行（4194307，第二行为"左/右 Shift"） | 文档瑕疵 |
-| AGENTS.md（架构） | "所有 Godot API 调用必须通过 queue.submit()" | `debugger_prompts`/`debugger_resources` 不经 queue 直接同步执行——因 `capture_*` 只读 `DebuggerCapture` 捕获缓冲、不触碰引擎 API | 存在例外，描述不完整 |
+| AGENTS.md（架构） | "所有 Godot API 调用必须通过队列执行" | `debugger_resources` 已统一经 `CommandQueue::execute_sync()` 执行，`debugger-session` 的 Godot debugger 查询也在主线程 | 已与代码一致 |
 | AGENTS.md（日志类别） | 仅 System/Transport/Tools/Resources/Prompts 五类 | `resource_handlers.cpp` 的 `category_to_string` 同五类 + `unknown` 兜底；UI 类别下拉一致 | 一致 ✓ |
 | AGENTS.md（错误模式） | 领域工具返回 `{"error": "消息"}` | `error_util::error_json` 与资源侧 `set_error` 同构 | 一致 ✓ |
 | AGENTS.md | `VariantJson::serialize/deserialize` 用于 Variant ↔ JsonValue 互转 | 完全一致（另含 OBJECT 环检测/深度上限/对象反序列化等扩展） | 一致 ✓ |

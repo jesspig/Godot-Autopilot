@@ -6,18 +6,18 @@ tags:
   - 测试
   - L1
   - L2
-timestamp: "2026-08-29T02:35:37+08:00"
+timestamp: "2026-09-10T01:13:51+08:00"
 resource: tests/
 ---
 
 # 测试体系（tests/）
 
-> 审计日期：2026-08-29（2026-08-12 初稿；08-17 随客户端配置生成器测试同步并补 YAML frontmatter；08-20 随 +4 工具与新 L2 用例 `05_rename_references` 同步；08-21 随 ToolRegistry 单测复核；08-22 随测试瘦身同步——L1 78→71、SCHEMA 静态口径失效；08-22 15 时全量一致性审计——L1 分文件计数修正、L2 用例数 6、排除清单分组 12+22+1、步数对齐实测 546；08-29 随 0.2.2 版本发布与全量审计同步——L1 77（bm25 14→20）、L2 7 份（新增 06_move_references）、363/42/371/84 口径重核、遍历步数重估、排除清单 42 重分组），基于当前工作树代码逐行核对（不依赖 git 历史）。
-> 覆盖范围：`tests/` 全部（unit 10 文件、runner 7 实现 + 6 头文件、integration、config 7 JSON、`tests/CMakeLists.txt`），对照 `tests/README.md` 与仓库根 `AGENTS.md` 测试段逐条核算。未运行任何测试，所有数值均来自源码静态统计。
+> 审计日期：2026-09-10（2026-08-29 0.2.2 发布审计——L1 77、L2 7 份；09-02 安全与并行硬化——L1 77→96（新增 security_parallel_hardening 17 项，覆盖队列/路径/鉴权/限额/日志）、核心路径/扫描/响应边界与构建大小写修复；09-08 技能生成器——L1 96→103（新增 skill_gen 7 项），ctest 注册点 103→110，同日 skill 内容外置化——测试零改动仍 103；09-10 skill 体系 19→7 册重构——用例改名与白名单扩充，仍 103），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 覆盖范围：`tests/` 全部（unit 12 文件、runner 7 实现 + 6 头文件、integration、config 7 JSON、`tests/CMakeLists.txt`），对照 `tests/README.md` 与仓库根 `AGENTS.md` 测试段逐条核算。96 项 L1 已本地验证通过（见 changelog 2026-09-02-17）；09-08 实测 `ctest -N`：L1 103 / 总注册 110（L2 需 `GODOT_PATH`，未计入运行验证）。
 
 ## 架构总览
 
-测试分两层，由根 `CMakeLists.txt` 的 `GDA_ENABLE_TESTS` 引入。该开关已固化在 `CMakePresets.json` 的 debug/release 预设（cacheVariables 默认 `ON`），**清理/重建 `build/` 后重新配置（`uv run build.py` 或 `cmake --preset debug`）自动恢复测试目标，无需手动传参**；直接以裸 `cmake`（不带 preset）配置时仍为默认 OFF（`CMakeLists.txt:139`）：
+测试分两层，由根 `CMakeLists.txt` 的 `GDA_ENABLE_TESTS` 引入。该开关已固化在 `CMakePresets.json` 的 debug/release 预设（cacheVariables 默认 `ON`），**清理/重建 `build/` 后重新配置（`uv run build.py` 或 `cmake --preset debug`）自动恢复测试目标，无需手动传参**；直接以裸 `cmake`（不带 preset）配置时仍为默认 OFF（`CMakeLists.txt:164`）：
 
 | 层 | 目标 | 可执行文件 | 启动引擎 | 判定方式 |
 |---|---|---|---|---|
@@ -46,7 +46,7 @@ build\debug\tests\gda_test_runner.exe --file 01_scene
 - **L1 依赖**：googletest 由 FetchContent 拉取（v1.15.2，GIT_SHALLOW，`tests/CMakeLists.txt:10-13`）；仅 L1 链接。
 - **L2 依赖**：Godot 可执行文件。路径解析 `GodotProcess::resolve_godot_path()`（`godot_process.cpp:528-534`）：进程环境变量 `GODOT_PATH` 优先，为空才回退解析仓库根 `.env`；二者皆无 → 执行器退出码 2。
 - **L2 平台限制**：`godot_process.cpp` / `mcp_test_client.cpp` 的进程管理与 Winsock 实现均为 `#ifdef _WIN32`，非 Windows 平台返回"仅支持 Windows"（失败/不可用）。
-- L2 产物目录：`build/debug/tests/`（ctest 报告输出到 `build/debug/tests/output/`，由 `tests/CMakeLists.txt:112` 指定 `--report-dir`）。
+- L2 产物目录：`build/debug/tests/`（ctest 报告输出到 `build/debug/tests/output/`，由 `tests/CMakeLists.txt:116` 指定 `--report-dir`）。
 
 ### CLI 与退出码（`tests/runner/main.cpp`）
 
@@ -72,7 +72,7 @@ stdout/stderr 各接独立管道读线程持续消费，防 64KB 缓冲写满阻
 
 ## L1 单元测试
 
-**10 个测试文件，实际 77 个 TEST/TEST_F**（`TEST`/`TEST_F` 宏逐行统计，2026-08-29 复核；bm25 14→20）：
+**12 个测试文件，实际 103 个 TEST/TEST_F**（`TEST`/`TEST_F` 宏逐行统计，2026-09-08 复核；09-02 bm25 14→20 + security_parallel_hardening 17 项，09-08 新增 skill_gen 7 项）：
 
 | 文件 | 数量 | 主题 |
 |---|---|---|
@@ -81,20 +81,38 @@ stdout/stderr 各接独立管道读线程持续消费，防 64KB 缓冲写满阻
 | `client_config_gen_test.cpp` | 11 | 8 客户端配置文件渲染快照（URL/type/enabled）、JSON 合并三态（新建/保留其他键/非法）、TOML 追加与跳过 |
 | `command_queue_test.cpp` | 7 | 跨线程 submit/drain、异常经 future 传播、主线程记录 |
 | `tool_catalog_test.cpp` | 7 | add/get、重复覆盖、并发安全、默认工具填充一次 |
-| `log_system_test.cpp` | 5 | 单例、级别/分类/文本过滤、环形缓冲覆盖（08-22 清理删回调用例） |
+| `log_system_test.cpp` | 7 | 单例、级别/分类/文本过滤、环形缓冲覆盖、值拷贝快照与 recent 上限（09-02 增补） |
 | `tool_registry_test.cpp` | 5 | ToolBase/FnTool/ToolRegistry：add/find/categories、execute echo、角色接口助手、meta 注册与路由断言 |
 | `schema_builder_test.cpp` | 4 | schema 构造形状、required 位置、未知类型不崩溃（08-22 清理后 API 收敛为三件，用例收缩） |
 | `error_util_test.cpp` | 3 | 错误 JSON 形状、四字段详情 |
 | `runtime_ops_test.cpp` | 1 | 编辑器队列注入往返 |
-| **合计** | **77** | |
+| `security_parallel_hardening_test.cpp` | 17 | 安全与并行硬化：队列关闭/满/线程校验、路径/鉴权、配置与截断、日志并发 |
+| `skill_gen_test.cpp` | 7 | 技能生成器：7 册清单、name/description 规范、文件布局、frontmatter 渲染、反引号词回验（详见下节） |
+| **合计** | **103** | |
 
-**链接来源**（`tests/CMakeLists.txt:31-46` 的 `GDA_UNIT_BUSINESS_SOURCES`，共 14 个显式 + 1 组 glob）：`src/core/` 的 `log_system`、`resource_registry`、`scene_dirty_tracker`、`export_guard`；`src/util/` 的 `bm25_index`、`error_util`、`readback_util`、`variant_json`、`client_config_gen`；`src/tools/` 的 `tool_catalog`、`schema_builder`、`register_all`、`dispatch`、`debugger_access`；`src/tools/*_ops.cpp`（`GDA_TOOLS_OPS_SOURCES` glob，`register_all.cpp` 引用全部 `handle_xxx` 符号故必须链接）。
+**链接来源**（`tests/CMakeLists.txt:31-49` 的 `GDA_UNIT_BUSINESS_SOURCES`，共 17 个显式 + 1 组 glob）：`src/core/` 的 `log_system`、`resource_registry`、`scene_dirty_tracker`、`export_guard`、`editor_readiness`；`src/util/` 的 `bm25_index`、`error_util`、`readback_util`、`variant_json`、`client_config_gen`、`skill_gen`、`skill_content_generated`（构建期嵌入薄胶水）；`src/tools/` 的 `tool_catalog`、`schema_builder`、`register_all`、`dispatch`、`debugger_access`；`src/tools/*_ops.cpp`（`GDA_TOOLS_OPS_SOURCES` glob，`register_all.cpp` 引用全部 `handle_xxx` 符号故必须链接）。
 
 **约束**：L1 禁止调用任何已注册工具 handler（无引擎时 godot-cpp 接口指针为 nullptr 会崩溃）；`register_all_test` 仅测注册/分发/未知工具错误路径。`SchemaStatisticsBaseline`（`register_all_test.cpp:133-147`）为运行时统计：断言 schema 非空数 > 空数 > 0，**不硬编码具体数值**（历史观测值如 "283 非空 / 73 空" 仅为某次运行的快照，非断言常量）。`client_config_gen` 为纯 C++（仅 std + `mcp::JsonValue`），不触碰 Godot API，可安全纳入 L1。
 
+### skill_gen 技能生成器测试（`skill_gen_test.cpp`，09-08 新增）
+
+生成器 `src/util/skill_gen.cpp`；7 册正文外置为 `src/util/skill_templates/`（28 个文件——27 个 .md + registry.json，registry 7 条映射），经 `tools/embed_skills.py` 构建期嵌入为生成头 `skill_content_embedded.h`（入 `build/<preset>/generated/`，gitignore 覆盖），渲染目标 `.agents/skills/<name>/SKILL.md`。纯 C++ 不触碰 Godot API，L1 可跑无需引擎。09-08 内容外置化重构（7 个 `skill_content_*.cpp` → 模板目录 + 构建期嵌入）测试零改动全绿；**09-10 skill 体系 19→7 册重构（每册带 references/ 渐进披露 + 84 条 Godot 4.8.0-dev 源码研究发现织入引擎六册）后，用例改名与白名单扩充，ctest L1 仍 103/103 全绿**。7 个用例：
+
+| 用例 | 内容 |
+|---|---|
+| `AllSevenSkillsPresent` | 7 册 name 定稿清单逐一核对（数量 = 7，双向集合比对：多出与缺失均 FAIL） |
+| `SkillNamesFollowSpecRules` | name 匹配 `^[a-z0-9]+(-[a-z0-9]+)*$`、≤64 字符、路径 `.agents/skills/<name>/SKILL.md` |
+| `DescriptionsValid` | description 非空、≤1024 字符 |
+| `FilesLayout` | `files[0]` 必为 SKILL.md，其余须 `references/` 前缀；body 非空、无 PLACEHOLDER 残留 |
+| `RenderedFrontmatterWellFormed` | 渲染产物 frontmatter 完整：name/author/`version`（取 `GDA_VERSION`）/description 含 `: ` 必加引号/`metadata:` 与收尾 `---` |
+| `SkillRegistryFixture.ToolNamesExistInRegistry` | 工具名回验（机制见下） |
+| `EverySkillDeclaresReferences` | 每册须至少 1 个 `references/` 文件（files.size() ≥ 2，渐进披露结构契约） |
+
+**工具名回验机制**：`SkillRegistryFixture` 照抄 `register_all_test.cpp` 的服务端构造方式（`register_all_tools` 填充 catalog，仅注册不调用任何 handler），允许集 = 运行时 catalog 全部工具名 ∪ 各工具 `input_schema.properties` 参数名 ∪ 176 项手动白名单（`kManualWhitelist`，实测 176 条，均为明确非工具名的词：Godot API 方法、Godot 属性名、内部机制/返回字段、枚举值等）；随后提取各册正文反引号包裹的全小写含下划线词逐一比对（``` 围栏代码块整体跳过），未命中即 FAIL。保证技能文档中出现的工具名/参数名与运行时注册始终一致。
+
 ## L2 配置驱动用例
 
-**7 个用例文件 → 7 条 ctest 用例**（`tests/CMakeLists.txt:105-114`：`gda_runner_<文件名去后缀>`，`TIMEOUT 600`）：
+**7 个用例文件 → 7 条 ctest 用例**（`tests/CMakeLists.txt:112-119`：`gda_runner_<文件名去后缀>`，`TIMEOUT 600`）：
 
 | ctest 用例 | 文件 | name | 步骤数 | 内容 |
 |---|---|---|---|---|
@@ -168,9 +186,9 @@ move_os_file_to_trash
 
 | 条目 | AGENTS.md 声称 | 源码核算 | 结论 |
 |---|---|---|---|
-| L1 gtest 数量 | 77（历史：61→78→71→77，08-22 清理删 log_system 回调用例、schema_builder 用例收缩；08-29 bm25 14→20） | 77（逐文件宏统计见上表） | 一致 |
+| L1 gtest 数量 | 103（含 09-02 安全并行硬化 17 项 + 09-08 skill_gen 7 项） | 103（逐文件宏统计见上表；`ctest -N -E "^gda_runner_"` 实测 103） | 一致 |
 | L2 用例文件数 | 7（00_meta / 01_scene / 02_property / 03_tools_contract / 04_resources_scripts / 05_rename_references / 06_move_references；08-24 新增 06） | 7 | 一致 |
-| ctest L2 用例 | gda_runner_<name> | 一致（`tests/CMakeLists.txt:108-114`，TIMEOUT 600；06 由 GLOB 自动发现） | 一致 |
+| ctest L2 用例 | gda_runner_<name> | 一致（`tests/CMakeLists.txt:112-119`，TIMEOUT 600；06 由 GLOB 自动发现） | 一致 |
 | 遍历工具数 | 363 | 363（30 个 `*_tools.hpp` 的 `GDA_TOOL_CLASS(_SIDE)` 计数） | 一致 |
 | 排除工具数 | 42 | 42（`get_tool_detail` 的 `side_effect` 字段非空即排除，由 `GDA_TOOL_CLASS_SIDE` 驱动，不硬编码） | 一致 |
 | 03 遍历步数 | 约 640-660 步（321×2 减空 schema 跳过） | **约 642 步**（363−42=321，08-29 重估，以运行时为准；历史 546 已过期） | 运行时统计口径 |

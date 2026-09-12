@@ -12,8 +12,10 @@ namespace dispatch {
 
 using HandlerFn = std::function<mcp::JsonValue(const mcp::JsonValue &)>;
 
-extern std::unordered_map<std::string, HandlerFn> g_handlers;
-extern std::unordered_map<std::string, HandlerFn> g_meta_handlers;
+using HandlerMap = std::unordered_map<std::string, HandlerFn>;
+
+void replace_handlers(HandlerMap handlers, HandlerMap meta_handlers);
+void clear_handlers();
 
 mcp::JsonValue call_handler(const std::string &name,
                             const mcp::JsonValue &args);

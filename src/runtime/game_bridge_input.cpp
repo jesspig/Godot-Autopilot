@@ -47,6 +47,24 @@ namespace {
 
 using JV = mcp::JsonValue;
 
+bool allowed_field(const std::string &name,
+                  std::initializer_list<const char *> fields) {
+  for (const char *field : fields)
+    if (name == field)
+      return true;
+  return false;
+}
+
+std::string unknown_field(const JV &value,
+                          std::initializer_list<const char *> fields) {
+  if (!value.IsObject())
+    return "<not an object>";
+  for (const auto &entry : value.GetObject())
+    if (!allowed_field(entry.first, fields))
+      return entry.first;
+  return {};
+}
+
 std::string inject_step(const JV &step);
 
 class GameBridgeInputWatcher : public godot::Node {
@@ -705,8 +723,33 @@ JV op_input(const JV &params, int64_t request_id) {
     return inject_duration_sequence(*seq_p);
   }
   auto *type_p = params.Find("type");
+  std::string unknown = unknown_field(
+      params, {"type", "keycode", "pressed", "button_index", "position",
+               "action", "duration_ms", "mode", "sequence"});
+  if (!unknown.empty())
+    return error_result("unknown input parameter: " + unknown);
   if (!type_p || !type_p->IsString()) {
     return error_result("input requires type (key|mouse_button|action)");
+  }
+  if (type_p->GetString() != "key" && type_p->GetString() != "mouse_button" &&
+      type_p->GetString() != "action")
+    return error_result("input type must be key|mouse_button|action");
+  if (auto *pressed = params.Find("pressed"); pressed && !pressed->IsBool())
+    return error_result("input pressed must be a boolean");
+  if (auto *duration = params.Find("duration_ms"); duration &&
+      (!duration->IsInt() || duration->GetInt() < 0))
+    return error_result("input duration_ms must be a non-negative integer");
+  if (auto *mode = params.Find("mode"); mode &&
+      (!mode->IsString() || (mode->GetString() != "event" &&
+                             mode->GetString() != "api" && mode->GetString() != "hold")))
+    return error_result("input mode must be event|api|hold");
+  if (auto *position = params.Find("position"); position) {
+    std::string position_unknown = unknown_field(*position, {"x", "y"});
+    if (!position_unknown.empty())
+      return error_result("unknown input position parameter: " + position_unknown);
+    if (!position->IsObject() || !position->Find("x") || !position->Find("y") ||
+        !position->Find("x")->IsNumber() || !position->Find("y")->IsNumber())
+      return error_result("input position must contain numeric x and y");
   }
   std::string step_err = inject_step(params);
   if (!step_err.empty())
@@ -739,14 +782,19 @@ JV op_input(const JV &params, int64_t request_id) {
 }
 
 JV op_input_wait(const JV &params, int64_t request_id) {
+  std::string unknown = unknown_field(params, {"action", "state", "inject",
+                                                "timeout_ms"});
+  if (!unknown.empty())
+    return error_result("unknown input_wait parameter: " + unknown);
   auto *act = params.Find("action");
   if (!act || !act->IsString()) {
     return error_result("input_wait requires action (string)");
   }
   std::string state = "just_pressed";
   if (auto *state_p = params.Find("state")) {
-    if (state_p->IsString())
-      state = state_p->GetString();
+    if (!state_p->IsString())
+      return error_result("input_wait state must be a string");
+    state = state_p->GetString();
   }
   int state_kind;
   if (state == "just_pressed")
@@ -775,11 +823,11 @@ JV op_input_wait(const JV &params, int64_t request_id) {
     return error_result("no root node");
 
   if (auto *inject_p = params.Find("inject")) {
-    if (inject_p->IsObject()) {
-      JV inj_result = op_input(*inject_p, request_id);
-      if (inj_result.Contains("error"))
-        return inj_result;
-    }
+    if (!inject_p->IsObject())
+      return error_result("input_wait inject must be an object");
+    JV inj_result = op_input(*inject_p, request_id);
+    if (inj_result.Contains("error"))
+      return inj_result;
   }
 
   GameBridgeInputWatcher *watcher = memnew(GameBridgeInputWatcher);
@@ -791,6 +839,9 @@ JV op_input_wait(const JV &params, int64_t request_id) {
 }
 
 JV op_input_sequence(const JV &params, int64_t request_id) {
+  std::string unknown = unknown_field(params, {"inputs", "timeout_ms"});
+  if (!unknown.empty())
+    return error_result("unknown input_sequence parameter: " + unknown);
   auto *inputs_p = params.Find("inputs");
   if (!inputs_p || !inputs_p->IsArray())
     return error_result("input_sequence requires inputs (array)");
@@ -812,6 +863,19 @@ JV op_input_sequence(const JV &params, int64_t request_id) {
     if (!frame_p || !frame_p->IsInt() || frame_p->GetInt() < 0)
       return error_result("each input_sequence item requires at_frame "
                           "(non-negative integer physics frame offset)");
+    std::string item_unknown = unknown_field(
+        item, {"kind", "type", "at_frame", "keycode", "pressed",
+               "button_index", "position", "action", "duration_ms", "mode"});
+    if (!item_unknown.empty())
+      return error_result("unknown input_sequence item parameter: " +
+                          item_unknown);
+    auto *kind_p = item.Find("kind");
+    if (kind_p && !kind_p->IsString())
+      return error_result("input_sequence item kind must be a string");
+    if (auto *mode = item.Find("mode"); mode && !mode->IsString())
+      return error_result("input_sequence item mode must be a string");
+    if (auto *pressed = item.Find("pressed"); pressed && !pressed->IsBool())
+      return error_result("input_sequence item pressed must be a boolean");
     FrameInputItem entry;
     entry.at_frame = frame_p->GetInt();
     entry.payload = item;
