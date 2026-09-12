@@ -42,6 +42,7 @@
 #include "tools/schema_fills.hpp"
 #include "tools/tool_base.hpp"
 #include "tools/tool_registry.hpp"
+#include "util/mcp_image_content.hpp"
 #include <mcp/Content.hpp>
 #include <mcp/JsonValue.hpp>
 #include <memory>
@@ -484,7 +485,18 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
                 if (res.IsObject()) {
                     res["new_errors_since_last_call"] = mcp::JsonValue(error_watermark::consume_new_errors());
                 }
+                std::vector<mcp::ContentVariant> image_content;
+                if (meta_name == "call_tool") {
+                    if (auto *tool_name = args.Find("name");
+                        tool_name && tool_name->IsString()) {
+                        util::try_attach_image_content(tool_name->GetString(), res,
+                                                       image_content);
+                    }
+                }
                 mcp_result.content.push_back(mcp::TextContent{"text", res.Dump()});
+                for (auto &block : image_content) {
+                    mcp_result.content.push_back(std::move(block));
+                }
                 return mcp_result;
             });
     }
