@@ -21,6 +21,7 @@
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/resource_saver.hpp>
 #include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
@@ -102,6 +103,52 @@ std::string unsaved_list_str(const godot::PackedStringArray &scenes) {
     list += util::to_std(scenes[i]);
   }
   return list;
+}
+
+constexpr int MIN_NEW_SCENE_TIMEOUT_MS = 50;
+constexpr int MAX_NEW_SCENE_TIMEOUT_MS = 30000;
+
+bool same_scene_path(const godot::String &a, const godot::String &b) {
+  return a.simplify_path() == b.simplify_path();
+}
+
+bool release_unclaimed_node(godot::Node *node, godot::EditorInterface *editor) {
+  if (!node)
+    return false;
+  if (node->get_parent() != nullptr || editor->get_edited_scene_root() == node)
+    return false;
+  godot::memdelete(node);
+  return true;
+}
+
+mcp::JsonValue editor_scene_state_json(godot::EditorInterface *editor) {
+  mcp::JsonValue state(mcp::JsonValue::object_tag);
+  auto *root = editor->get_edited_scene_root();
+  if (root) {
+    mcp::JsonValue root_info(mcp::JsonValue::object_tag);
+    root_info["name"] = mcp::JsonValue(util::to_std(root->get_name()));
+    std::string root_path = util::to_std(root->get_scene_file_path());
+    if (!root_path.empty())
+      root_info["scene_file_path"] = mcp::JsonValue(root_path);
+    state["edited_root"] = std::move(root_info);
+  } else {
+    state["edited_root"] = mcp::JsonValue(nullptr);
+  }
+  godot::PackedStringArray unsaved = editor_unsaved_scenes(editor);
+  mcp::JsonValue unsaved_arr(mcp::JsonValue::array_tag);
+  for (int i = 0; i < unsaved.size(); i++)
+    unsaved_arr.PushBack(mcp::JsonValue(util::to_std(unsaved[i])));
+  state["unsaved_scenes"] = std::move(unsaved_arr);
+  auto *efs = editor->get_resource_filesystem();
+  if (efs) {
+    mcp::JsonValue fs(mcp::JsonValue::object_tag);
+    fs["scanning"] = mcp::JsonValue(efs->is_scanning());
+    fs["progress"] = mcp::JsonValue(efs->get_scanning_progress());
+    state["file_system"] = std::move(fs);
+  } else {
+    state["file_system"] = mcp::JsonValue(nullptr);
+  }
+  return state;
 }
 
 void focus_main_screen_for_class(godot::EditorInterface *editor,
@@ -270,8 +317,16 @@ mcp::JsonValue handle_save_scene(const mcp::JsonValue &) {
           "save_editor_scene completed (saved as new scene)");
       return r;
     }
-    r["path"] = mcp::JsonValue(util::to_std(existing_path));
-    r["result"] = mcp::JsonValue(static_cast<int64_t>(err));
+    std::string failed_path = util::to_std(existing_path);
+    std::string error_code = std::to_string(static_cast<int>(err));
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue("save failed (error code " + error_code +
+                                "): " + failed_path);
+    e["path"] = mcp::JsonValue(failed_path);
+    LogSystem::instance().log(LogLevel::Error, LogCategory::Tools,
+                              "save_editor_scene failed (error code " +
+                                  error_code + "): " + failed_path);
+    return e;
   } else {
     godot::String file_path = root->get_scene_file_path();
     r["path"] = mcp::JsonValue(util::to_std(file_path));
@@ -328,9 +383,33 @@ mcp::JsonValue handle_reload_scene(const mcp::JsonValue &args) {
       return e;
     }
   }
-  editor->reload_scene_from_path(godot::String(scene_path.c_str()));
+  godot::String target_path(scene_path.c_str());
+  godot::PackedStringArray open_scenes = editor->get_open_scenes();
+  bool is_open = false;
+  for (int i = 0; i < open_scenes.size(); i++) {
+    if (same_scene_path(open_scenes[i], target_path)) {
+      is_open = true;
+      break;
+    }
+  }
+  if (!is_open) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] =
+        mcp::JsonValue("scene is not open: " + scene_path + "; reload did not run");
+    LogSystem::instance().log(LogLevel::Warning, LogCategory::Tools,
+                              "reload_editor_scene skipped, scene is not open: " +
+                                  scene_path);
+    return e;
+  }
+  editor->reload_scene_from_path(target_path);
   mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue("ok");
+  r["result"] = mcp::JsonValue("reloaded");
+  r["scene_path"] = mcp::JsonValue(scene_path);
+  auto *reloaded_root = editor->get_edited_scene_root();
+  if (reloaded_root &&
+      same_scene_path(reloaded_root->get_scene_file_path(), target_path)) {
+    r["observed"] = mcp::JsonValue(true);
+  }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "reload_editor_scene completed");
   return r;
@@ -730,6 +809,23 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue &args) {
   if (cp && cp->IsBool())
     close_current = cp->GetBool();
 
+  int timeout_ms = GDA_NEW_SCENE_SWITCH_WAIT_MS;
+  auto *tmp = args.Find("timeout_ms");
+  if (tmp) {
+    if (!tmp->IsInt()) {
+      return util::error_json(
+          "invalid parameter: timeout_ms must be an integer between 50 and 30000");
+    }
+    int64_t requested_ms = tmp->GetInt();
+    if (requested_ms < MIN_NEW_SCENE_TIMEOUT_MS ||
+        requested_ms > MAX_NEW_SCENE_TIMEOUT_MS) {
+      return util::error_json(
+          "invalid parameter: timeout_ms out of range (50-30000): " +
+          std::to_string(requested_ms));
+    }
+    timeout_ms = static_cast<int>(requested_ms);
+  }
+
   auto *cdbs = godot::ClassDBSingleton::get_singleton();
   if (!cdbs) {
     return util::error_json("ClassDB singleton not available");
@@ -756,11 +852,13 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue &args) {
   auto *existing_root = editor->get_edited_scene_root();
   if (existing_root) {
     if (!close_current) {
+      release_unclaimed_node(node, editor);
       return util::error_json(
           "scene already has a root node — call create_editor_scene with "
           "close_current=true, or call close_editor_scene first");
     }
     if (existing_root->get_scene_file_path().is_empty()) {
+      release_unclaimed_node(node, editor);
       return util::error_detail("current scene is unsaved",
                                 util::to_std(existing_root->get_name()),
                                 "scene saved before close",
@@ -769,12 +867,14 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue &args) {
     }
     godot::PackedStringArray unsaved = editor_unsaved_scenes(editor);
     if (!unsaved.is_empty()) {
+      release_unclaimed_node(node, editor);
       return util::error_json(
           "scene has unsaved changes: " + unsaved_list_str(unsaved) +
           " — save first (save_editor_scene)");
     }
     godot::Error err = editor->close_scene();
     if (err != godot::Error::OK) {
+      release_unclaimed_node(node, editor);
       return util::error_json("failed to close scene (error " +
                         std::to_string(static_cast<int>(err)) + ")");
     }
@@ -786,7 +886,7 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue &args) {
 
   int64_t waited_ms = 0;
   bool switched = false;
-  while (waited_ms < GDA_NEW_SCENE_SWITCH_WAIT_MS) {
+  while (waited_ms < timeout_ms) {
     if (editor->get_edited_scene_root() == node) {
       switched = true;
       break;
@@ -795,10 +895,25 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue &args) {
     waited_ms += GDA_NEW_SCENE_POLL_MS;
   }
   if (!switched) {
+    bool released = release_unclaimed_node(node, editor);
+    std::string message =
+        "scene switch did not take effect within " + std::to_string(waited_ms) +
+        " ms (create_editor_scene) — the new scene root was not observed after "
+        "add_root_node";
+    if (released) {
+      message += "; the unclaimed node was released";
+    } else {
+      message += "; the node is still attached to the editor and was not released";
+    }
     mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(
-        "scene switch did not take effect within 2000 ms (create_editor_scene) — "
-        "the new scene root was not observed after add_root_node");
+    e["error"] = mcp::JsonValue(message);
+    e["waited_ms"] = mcp::JsonValue(waited_ms);
+    e["timeout_ms"] = mcp::JsonValue(static_cast<int64_t>(timeout_ms));
+    e["node_released"] = mcp::JsonValue(released);
+    e["editor_state"] = editor_scene_state_json(editor);
+    LogSystem::instance().log(
+        LogLevel::Error, LogCategory::Tools,
+        "create_editor_scene timed out after " + std::to_string(waited_ms) + " ms");
     return e;
   }
 
@@ -838,7 +953,8 @@ mcp::JsonValue handle_open_scene(const mcp::JsonValue &args) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
     e["error"] = mcp::JsonValue(
         "current scene has unsaved changes: " + unsaved_list_str(unsaved) +
-        " — save first (save_editor_scene)");
+        " — save first (save_editor_scene), or discard the changes by calling "
+        "reload_editor_scene with the listed path, then retry open_editor_scene");
     return e;
   }
   auto *old_root = editor->get_edited_scene_root();
@@ -923,8 +1039,35 @@ mcp::JsonValue handle_save_scene_as(const mcp::JsonValue &args) {
     return util::error_json("save failed — file not created at " + path +
                       " (check editor output log)");
   }
+  bool tab_path_registered = false;
+  godot::PackedStringArray open_scenes = editor->get_open_scenes();
+  for (int i = 0; i < open_scenes.size(); i++) {
+    if (same_scene_path(open_scenes[i], path_gs)) {
+      tab_path_registered = true;
+      break;
+    }
+  }
+  bool tab_rebuilt = false;
+  if (!tab_path_registered) {
+    godot::Error close_err = editor->close_scene();
+    if (close_err == godot::Error::OK) {
+      editor->open_scene_from_path(path_gs);
+      auto *reopened_root = editor->get_edited_scene_root();
+      tab_rebuilt = reopened_root != nullptr &&
+                    same_scene_path(reopened_root->get_scene_file_path(), path_gs);
+    }
+  }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("saved");
+  r["tab_path_registered"] = mcp::JsonValue(tab_path_registered);
+  if (!tab_path_registered) {
+    r["tab_rebuilt"] = mcp::JsonValue(tab_rebuilt);
+    if (!tab_rebuilt) {
+      r["warning"] = mcp::JsonValue(
+          "saved, but the editor tab path could not be synchronized; "
+          "get_open_scenes/reload_editor_scene may not see " + path);
+    }
+  }
   scene_dirty_tracker::clear_scene_modified();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "save_editor_scene_as completed");
