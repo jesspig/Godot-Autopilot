@@ -4,7 +4,7 @@
 
 测试体系分两层：
 
-- **L1 纯单测**（`gda_unit_tests`，61 个 gtest 用例）：不启动引擎，不触碰 Godot API，验证核心逻辑与工具注册管线。
+- **L1 纯单测**（`gda_unit_tests`，114 个 gtest 用例）：不启动引擎，不触碰 Godot API，验证核心逻辑与工具注册管线。
 - **L2 配置驱动引擎内测试**（`gda_test_runner` + `tests/config/*.json` 用例）：由 C++ 执行器自管 Godot headless 编辑器进程，经真实 MCP HTTP 全链路驱动领域工具，并按 JSON 用例中的断言语义（C++ 执行器侧）校验响应。**每份 config/*.json = 一次独立的编辑器生命周期最小闭环**（启动 → MCP 就绪 → 执行步骤 → 停止进程），文件间互不共享状态。
 
 架构一句话：进程内 GDExtension（EditorPlugin），领域工具经 `call_tool` 元工具代理，由 `register_all.cpp` 的 `g_handlers` 映射分发。
@@ -55,10 +55,10 @@ cmake --build --preset debug --target gda_unit_tests gda_test_runner
 ctest --preset debug
 ```
 
-注册方式（`tests/CMakeLists.txt:100-111`）：**每份 `config/*.json` 一条 `gda_runner_<文件名去后缀>` 用例**，命令为 `gda_test_runner --file <name> --report-dir <build>/tests/output`，`TIMEOUT 600`（单文件含遍历约 2-4 分钟，超时防挂死）。当前 5 个 config 文件 → 5 条 ctest 用例：`gda_runner_00_meta`、`gda_runner_01_scene`、`gda_runner_02_property`、`gda_runner_03_tools_contract`、`gda_runner_04_resources_scripts`。
+注册方式（`tests/CMakeLists.txt:100-111`）：**每份 `config/*.json` 一条 `gda_runner_<文件名去后缀>` 用例**，命令为 `gda_test_runner --file <name> --report-dir <build>/tests/output`，`TIMEOUT 600`（单文件含遍历约 2-4 分钟，超时防挂死）。当前 8 个 config 文件 → 8 条 ctest 用例：`gda_runner_00_meta`、`gda_runner_01_scene`、`gda_runner_02_property`、`gda_runner_03_tools_contract`、`gda_runner_04_resources_scripts`、`gda_runner_05_rename_references`、`gda_runner_06_move_references`、`gda_runner_07_scene_tabs`。
 
 - L1 经 `gtest_discover_tests` 注册，每用例一条（如 `CommandQueueTest.*`）。
-- **耗时**：普通用例约 15s/文件（一次编辑器生命周期）；`03_tools_contract` 含两次全量遍历（336 领域工具 ×2），约 2-3 分钟。全量 ctest 约 3-4 分钟。
+- **耗时**：普通用例约 15s/文件（一次编辑器生命周期）；`03_tools_contract` 含两次全量遍历（316 领域工具 ×2），约 2-3 分钟。全量 ctest 约 3-4 分钟。
 - 单跑一条：`ctest --preset debug -R gda_runner_00_meta` 或 `ctest --preset debug -R CommandQueueTest`。
 
 ### 5.2 单文件（直跑执行器）
@@ -193,21 +193,24 @@ build\debug\tests\gda_test_runner.exe --file 01_scene
 - **`not_empty`**：string 非空；array/object `Size() > 0`；null 判空失败；其他标量视为非空
 - 断言执行于 C++ 执行器侧，对 `call_tool` 的响应 JSON 校验；无 `expect` 时仅检查工具调用未返回 `error`
 
-### 用例文件（`tests/config/`，5 个）
+### 用例文件（`tests/config/`，8 个）
 
 | 文件 | name | 内容 |
 | ---- | ---- | ---- |
 | `00_meta.json` | meta_tools | 15 步元工具语义（ping / search_tools / list_categories / get_tool_detail / call_tool / batch_execute / code_execute），全部无持久副作用 |
 | `01_scene.json` | 01_scene | 场景节点创建/查询/删除/撤销，`before_all` 用 `create_editor_scene` 建干净根 Root |
-| `02_property.json` | property_tools | 属性读写 11 用例，含 readback MATCHED、int 字符串静默转 0、缺参报错 |
-| `03_tools_contract.json` | tools_contract | 两个遍历步骤（empty_args + heuristic_smoke），全量 336 领域工具契约与冒烟 |
-| `04_resources_scripts.json` | resources_scripts | execute_script 四种行为（单表达式自返 / 多行显式 return / 语法错误 / 缺参报错）+ 资源只读查询 |
+| `02_property.json` | property_tools | 属性读写用例，含 readback MATCHED、int 字符串静默转 0、缺参报错；本轮新增 Node 引用（hint 34）转换、typed 数组元素转换与 fail fast、`property_get_list` 过滤参数 |
+| `03_tools_contract.json` | tools_contract | 两个遍历步骤（empty_args + heuristic_smoke），全量 316 领域工具契约与冒烟；含 reload_resource 空参契约 |
+| `04_resources_scripts.json` | resources_scripts | execute_script 四种行为（单表达式自返 / 多行显式 return / 语法错误 / 缺参报错）+ 资源只读查询；本轮新增 save_resource copy-on-write、reload_resource、duplicate_resource name、copy_resource_file 用例 |
+| `05_rename_references.json` | 05_rename_references | 单文件 rename 引用重写 + 目录 rename fail fast（错误指引 move_resource_file） |
+| `06_move_references.json` | 06_move_references | 单文件与目录级 move 的引用重写验证（find_in_files / get_resource_references 双向） |
+| `07_scene_tabs.json` | 07_scene_tabs | 场景脏状态闭环：dirty 场景阻塞 open、reload 清脏后恢复、reload 未打开报错、create_editor_scene timeout_ms 参数校验 |
 
 ## 7. 遍历与排除清单（`tests/runner/traversal.cpp`）
 
 遍历模式：
 
-- **工具来源**：运行时枚举 `src/tools/*_tools.hpp` 中匹配 `GDA_TOOL_CLASS(` 的行（`parse_domain_tool_names`，按文件名遍历该目录）。共 **336 个领域工具**；其中 35 个副作用工具使用前缀 `GDA_TOOL_CLASS_SIDE(`，解析器（前缀匹配 `GDA_TOOL_CLASS(`）天然不将其纳入枚举，再由 `side_effect` 字段判定排除（见下）。解析失败（缺逗号/引号未闭合等）抛异常
+- **工具来源**：运行时枚举 `src/tools/*_tools.hpp` 中匹配 `GDA_TOOL_CLASS(` 的行（`parse_domain_tool_names`，按文件名遍历该目录）。域工具共 **365 个**；其中 49 个副作用工具使用前缀 `GDA_TOOL_CLASS_SIDE(`，解析器前缀匹配 `GDA_TOOL_CLASS(` 不将其纳入枚举（纳入枚举的工具另经 `side_effect` 字段兜底判定排除，见下）。解析失败（缺逗号/引号未闭合等）抛异常
 - **内置前置校验**：每个工具先经 `get_tool_detail` 校验存在性与工具名一致性（响应非 JSON 对象或工具名不匹配 → FAIL）
 - **`empty_args`**（空参契约）：空对象调用。响应非 JSON 对象 → FAIL；返回 `error` 字段算"有错误响应"（统计 error 数，不 FAIL）；schema 声明必填但空参未报错 → 记 **warnings**（不 FAIL）
 - **`heuristic_smoke`**（启发式冒烟）：按 schema properties 类型生成启发式参数（`integer`→0、`number`→0.0、`boolean`→false、`array`→`[]`、`object`→`{}`、其余→`"test"`）；无 properties 的工具（SCHEMA_NONE）跳过
@@ -216,30 +219,19 @@ build\debug\tests\gda_test_runner.exe --file 01_scene
 
 ### 副作用驱动排除（`get_tool_detail.side_effect`）
 
-副作用工具在 empty_args 与 heuristic_smoke 两个遍历中一律跳过。**判定不再硬编码**：遍历对纳入枚举的每个工具先调 `get_tool_detail`，若返回的 `tool.side_effect` 字段非空即排除（计入 `excluded` 统计，见 `traversal.cpp`）。副作用工具在 `*_tools.hpp` 中用以 `GDA_TOOL_CLASS_SIDE(` 声明并实现 `ISideEffect::side_effects()`，共 **35 个**（历史事故：`set_editor_main_scene` 曾把 `application/run/main_scene` 写成 `"test"` 写入 `Example/project.godot`；`save_editor_scene` 空参生成 `Example/NewNode.tscn`；`show_os_alert` 弹系统模态对话框；`set_display_clipboard` 覆盖系统剪贴板；`speak_display_tts` 系统朗读）。
+副作用工具在 empty_args 与 heuristic_smoke 两个遍历中一律跳过。解析器 `parse_domain_tool_names` 仅匹配前缀 `GDA_TOOL_CLASS(`，以 `GDA_TOOL_CLASS_SIDE(` 声明的副作用工具不进入枚举；对纳入枚举的工具还会先调 `get_tool_detail`，若返回的 `tool.side_effect` 字段非空即排除（计入 `excluded` 统计，见 `traversal.cpp`）。副作用工具在 `*_tools.hpp` 中用以 `GDA_TOOL_CLASS_SIDE(` 声明并实现 `ISideEffect::side_effects()`，共 **49 个**（历史事故：`set_editor_main_scene` 曾把 `application/run/main_scene` 写成 `"test"` 写入 `Example/project.godot`；`save_editor_scene` 空参生成 `Example/NewNode.tscn`；`show_os_alert` 弹系统模态对话框；`set_display_clipboard` 覆盖系统剪贴板；`speak_display_tts` 系统朗读）。
 
-**持久磁盘副作用（12）**——写 project.godot / editor_settings / .tscn / 文件，分布在：
+**副作用分类（49）**——按 `ISideEffect::side_effects()` 返回值分布（`writes_file`/`writes_config`/`process`/`game_runtime`/`code_execute` 为持久或运行时副作用，`shows_alert`/`modifies_window` 会直接干扰用户桌面）：
 
-```
-editor_tools   save_editor_scene / save_editor_scenes / save_editor_scene_as
-               set_editor_main_scene / set_editor_plugin_enabled
-config_tools   save_project_settings / set_editor_settings
-input_map_tools save_input_map / add_input_map_action_event
-resource_tools save_resource
-script_tools   create_script
-os_tools       write_file
-```
-
-**用户可见副作用（23）**——弹窗/进程/环境变量/音频/剪贴板/鼠标/窗口，会干扰用户桌面：
-
-| 类别 | 数量 | 分布（`*_tools.hpp`） | 工具 |
-| ---- | ---- | ---- | ---- |
-| 弹窗与对话框 | 2 | os/display | `show_os_alert`、`show_display_dialog` |
-| 进程与系统执行 | 6 | os（5）+ editor（1） | `create_os_process`、`execute_os_process`、`kill_os_process`、`open_os_path`、`move_os_file_to_trash`、`build_csharp_assembly` |
-| 环境变量 | 1 | os | `set_os_environment` |
-| 音频/语音 | 2 | display | `speak_display_tts`、`stop_display_tts` |
-| 剪贴板/鼠标 | 3 | display | `set_display_clipboard`、`set_display_mouse_mode`、`warp_display_mouse` |
-| 窗口操作 | 9 | display | `set_display_window_title`、`set_display_window_position`、`set_display_window_size`、`set_display_window_mode`、`set_display_window_flag`、`move_display_window_to_foreground`、`request_display_window_attention`、`create_display_window`、`delete_display_window` |
+| side_effect | 数量 | 分布（`*_tools.hpp`）与工具 |
+| ---- | ---- | ---- |
+| `writes_file` | 15 | editor 3（`save_editor_scene` / `save_editor_scenes` / `save_editor_scene_as`）、resource 4（`save_resource` / `copy_resource_file` / `move_resource_file` / `create_directory`）、script 1（`create_script`）、theme 5（`create_theme_resource` / `set_theme_color` / `set_theme_constant` / `set_theme_font_size` / `set_theme_stylebox_flat`）、os 2（`write_file` / `move_os_file_to_trash`） |
+| `writes_config` | 6 | config 2（`save_project_settings` / `set_editor_settings`）、editor 2（`set_editor_main_scene` / `set_editor_plugin_enabled`）、input_map 2（`save_input_map` / `add_input_map_action_event`） |
+| `shows_alert` | 4 | os 1（`show_os_alert`）、display 3（`show_display_dialog` / `speak_display_tts` / `stop_display_tts`） |
+| `modifies_window` | 12 | display 12（`create_display_window` / `delete_display_window` / `move_display_window_to_foreground` / `request_display_window_attention` / `set_display_clipboard` / `set_display_mouse_mode` / `set_display_window_flag` / `set_display_window_mode` / `set_display_window_position` / `set_display_window_size` / `set_display_window_title` / `warp_display_mouse`） |
+| `process` | 6 | os 5（`create_os_process` / `execute_os_process` / `kill_os_process` / `open_os_path` / `set_os_environment`）、editor 1（`build_csharp_assembly`） |
+| `game_runtime` | 5 | game 5（`execute_game_script` / `reload_game_scripts` / `queue_game_input` / `wait_game_input` / `sequence_game_inputs`） |
+| `code_execute` | 1 | script 1（`execute_script`） |
 
 ### warnings 语义（3 个已知契约缺口，测试发现并验证，业务代码未改）
 
