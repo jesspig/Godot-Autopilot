@@ -41,7 +41,7 @@ GDA_TOOL_CLASS_SIDE(WaitGameInputTool, "wait_game_input",
                 "Game", std::vector<std::string>({"game", "runtime", "input", "wait", "debug"}), runtime_ops::handle_game_input_wait, true, ::godot_autopilot::SideEffect::GameRuntime)
 
 GDA_TOOL_CLASS(GetGameInputStatusTool, "get_game_input_status",
-               "Query the current input state of an action in the running game process over the runtime debug channel: pressed, just_pressed, just_released and physics_frame — use it to diagnose input injection. Requires a game launched from the editor whose project loads the godot-autopilot extension. Successful responses also include recent_engine_errors (up to 5 recent engine errors) when any exist.",
+               "Query the current input state of an action in the running game process over the runtime debug channel: pressed, just_pressed, just_released and physics_frame — use it to diagnose input injection. Requires a game launched from the editor whose project loads the godot-autopilot extension. Responses never include recent_engine_errors; for engine errors use get_debugger_errors (running game) or get_debugger_log (editor process).",
                "Game", std::vector<std::string>({"game", "runtime", "input", "status", "debug"}), runtime_ops::handle_game_input_status, true)
 
 GDA_TOOL_CLASS_SIDE(SequenceGameInputsTool, "sequence_game_inputs",

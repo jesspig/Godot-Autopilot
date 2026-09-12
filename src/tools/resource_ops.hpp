@@ -16,6 +16,7 @@ bool try_resolve_resource_value(const mcp::JsonValue &val, godot::Variant &out,
                                 std::string &out_error);
 
 mcp::JsonValue handle_load(const mcp::JsonValue &args);
+mcp::JsonValue handle_reload(const mcp::JsonValue &args);
 mcp::JsonValue handle_load_threaded(const mcp::JsonValue &args);
 mcp::JsonValue handle_load_threaded_get_status(const mcp::JsonValue &args);
 mcp::JsonValue handle_load_threaded_wait(const mcp::JsonValue &args);
@@ -36,6 +37,7 @@ mcp::JsonValue handle_rename(const mcp::JsonValue &args);
 mcp::JsonValue apply_path_rewrite_transaction(const std::string &old_path,
                                               const std::string &new_path);
 mcp::JsonValue handle_move(const mcp::JsonValue &args);
+mcp::JsonValue handle_copy(const mcp::JsonValue &args);
 mcp::JsonValue handle_create_directory(const mcp::JsonValue &args);
 mcp::JsonValue handle_get_dependencies(const mcp::JsonValue &args);
 mcp::JsonValue handle_has_dependency(const mcp::JsonValue &args);

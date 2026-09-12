@@ -1,6 +1,6 @@
 {
   "name": "05_rename_references",
-  "description": "验证 P0 修复：rename_resource_file 事务化（uid 保活 + 磁盘引用回写 + 结构化影响报告），以及引用反查 get_resource_references、read_file、find_in_files。在 res://gda_tmp_rename/ 临时创建资源 src.tres 与手工依赖文件 dep.tres（仅按 path 引用 src），rename 后断言：find_in_files 证明旧路径引用消失、新路径引用存在、rename 返回含 updated_files/stale_references/uid_preserved。验证后遗留 gda_tmp_rename 临时目录，需测试后清理。",
+  "description": "验证 P0 修复：rename_resource_file 事务化（uid 保活 + 磁盘引用回写 + 结构化影响报告），以及引用反查 get_resource_references、read_file、find_in_files。在 res://gda_tmp_rename/ 临时创建资源 src.tres 与手工依赖文件 dep.tres（仅按 path 引用 src），rename 后断言：find_in_files 证明旧路径引用消失、新路径引用存在、rename 返回含 updated_files/stale_references/uid_preserved。另验证目录级 rename 被拒绝（返回 error 并指引 move_resource_file），单文件 rename 用例保留。验证后遗留 gda_tmp_rename 临时目录，需测试后清理。",
   "headless": true,
   "pipeline": {
     "on_failure": "fail_fast",
@@ -31,6 +31,24 @@
             "tool": "get_resource_uid",
             "args": { "path": "res://gda_tmp_rename/around_src.tres" },
             "expect": { "has_keys": ["result"] }
+          }
+        ]
+      },
+      {
+        "id": "directory_rename_rejected",
+        "steps": [
+          {
+            "id": "rename_directory_errors_with_move_hint",
+            "tool": "rename_resource_file",
+            "args": {
+              "path": "res://gda_tmp_rename",
+              "new_path": "res://gda_tmp_rename_as_dir"
+            },
+            "expect": {
+              "field_checks": [
+                { "key": "error", "value": "directory rename not supported — position: res://gda_tmp_rename — expected: res://gda_tmp_rename is a directory — directory-level rename does not rewrite dependency references, so updated_files would be empty and referencing files would be left stale — action: use move_resource_file with path and new_directory instead" }
+              ]
+            }
           }
         ]
       },

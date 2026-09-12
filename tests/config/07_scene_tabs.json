@@ -1,0 +1,182 @@
+{
+  "name": "07_scene_tabs",
+  "description": "场景脏状态闭环用例：create_editor_scene(close_current:true) 建未命名场景 TabA 并 save_editor_scene_as 落盘 tab_a.tscn，property_set 使其变为未保存 → open_editor_scene tab_b.tscn 被拒绝并提示 save_editor_scene 或 reload_editor_scene 丢弃改动 → reload_editor_scene(tab_a) 返回 reloaded/scene_path/observed:true 清脏 → 再次 open tab_b 成功且 get_scene_tree 显示 TabB。用 create+save_as 而非 open 预置场景，避免上一轮残留的编辑器标签布局恢复导致 open 撞上已打开场景。另覆盖 reload_editor_scene 对未打开场景报 'scene is not open'，以及 create_editor_scene timeout_ms 非整数/越界报错且不影响当前场景。fixture 位于 res://gda_tmp_tabs/，cleanup 阶段关闭场景并回收。幽灵标签分支（多标签共存时移动依赖）未覆盖：runner 没有打开第二个标签的步骤，无法制造陈旧标签状态，故放弃该分支。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "stages": [
+      {
+        "id": "setup",
+        "steps": [
+          {
+            "id": "tabs_create_dir",
+            "tool": "create_directory",
+            "args": { "path": "res://gda_tmp_tabs" },
+            "expect": { "has_keys": ["created"] }
+          },
+          {
+            "id": "tabs_write_b",
+            "tool": "write_file",
+            "args": {
+              "path": "res://gda_tmp_tabs/tab_b.tscn",
+              "content": "[gd_scene format=3]\n\n[node name=\"TabB\" type=\"Node2D\"]\n"
+            },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          },
+          {
+            "id": "tabs_write_c",
+            "tool": "write_file",
+            "args": {
+              "path": "res://gda_tmp_tabs/tab_c.tscn",
+              "content": "[gd_scene format=3]\n\n[node name=\"TabC\" type=\"Node2D\"]\n"
+            },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "dirty_flow",
+        "steps": [
+          {
+            "id": "tabs_create_scene_a",
+            "tool": "create_editor_scene",
+            "args": { "name": "TabA", "type": "Node2D", "close_current": true },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.path", "value": "TabA" },
+                { "key": "result.type", "value": "Node2D" }
+              ]
+            }
+          },
+          {
+            "id": "tabs_save_scene_as_a",
+            "tool": "save_editor_scene_as",
+            "args": { "path": "res://gda_tmp_tabs/tab_a.tscn" },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "saved" } ]
+            }
+          },
+          {
+            "id": "tabs_dirty_a",
+            "tool": "property_set",
+            "args": { "path": "TabA", "property": "z_index", "value": 3 },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          },
+          {
+            "id": "tabs_open_b_refused",
+            "tool": "open_editor_scene",
+            "args": { "path": "res://gda_tmp_tabs/tab_b.tscn" },
+            "expect": {
+              "field_checks": [
+                { "key": "error", "value": "current scene has unsaved changes: res://gda_tmp_tabs/tab_a.tscn — save first (save_editor_scene), or discard the changes by calling reload_editor_scene with the listed path, then retry open_editor_scene" }
+              ]
+            }
+          },
+          {
+            "id": "tabs_reload_a",
+            "tool": "reload_editor_scene",
+            "args": { "scene_path": "res://gda_tmp_tabs/tab_a.tscn" },
+            "expect": {
+              "has_keys": ["result", "scene_path"],
+              "field_checks": [
+                { "key": "result", "value": "reloaded" },
+                { "key": "scene_path", "value": "res://gda_tmp_tabs/tab_a.tscn" },
+                { "key": "observed", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "tabs_open_b_after_reload",
+            "tool": "open_editor_scene",
+            "args": { "path": "res://gda_tmp_tabs/tab_b.tscn" },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          },
+          {
+            "id": "tabs_active_is_b",
+            "tool": "get_scene_tree",
+            "expect": {
+              "field_checks": [ { "key": "result.name", "value": "TabB" } ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "reload_not_open",
+        "steps": [
+          {
+            "id": "tabs_reload_c_not_open",
+            "tool": "reload_editor_scene",
+            "args": { "scene_path": "res://gda_tmp_tabs/tab_c.tscn" },
+            "expect": {
+              "field_checks": [
+                { "key": "error", "value": "scene is not open: res://gda_tmp_tabs/tab_c.tscn; reload did not run" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "timeout_validation",
+        "steps": [
+          {
+            "id": "tabs_create_scene_timeout_non_integer",
+            "tool": "create_editor_scene",
+            "args": { "name": "TabTimeout", "timeout_ms": "abc" },
+            "expect": {
+              "field_checks": [
+                { "key": "error", "value": "invalid parameter: timeout_ms must be an integer between 50 and 30000" }
+              ]
+            }
+          },
+          {
+            "id": "tabs_create_scene_timeout_out_of_range",
+            "tool": "create_editor_scene",
+            "args": { "name": "TabTimeout", "timeout_ms": 10 },
+            "expect": {
+              "field_checks": [
+                { "key": "error", "value": "invalid parameter: timeout_ms out of range (50-30000): 10" }
+              ]
+            }
+          },
+          {
+            "id": "tabs_scene_unchanged_after_timeout_errors",
+            "tool": "get_scene_tree",
+            "expect": {
+              "field_checks": [ { "key": "result.name", "value": "TabB" } ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "cleanup",
+        "steps": [
+          {
+            "id": "tabs_close_scene",
+            "tool": "close_editor_scene",
+            "args": {},
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "closed" } ]
+            }
+          },
+          {
+            "id": "tabs_trash_dir",
+            "tool": "move_os_file_to_trash",
+            "args": { "path": "res://gda_tmp_tabs" },
+            "expect": {
+              "has_keys": ["result"]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

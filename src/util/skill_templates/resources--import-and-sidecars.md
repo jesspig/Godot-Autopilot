@@ -6,7 +6,7 @@ How the editor imports assets, how .import and .uid sidecar files are produced a
 
 `reimport_resource_files` maps onto the engine's reimport call. Its semantics:
 
-- **Main thread.** The whole reimport pass runs on the editor's main thread; the editor temporarily disables VSync and low-processor-usage mode while it runs. The tool returns once the files are queued, and the work happens during editor idle processing - poll `get_editor_file_system_status` until the import is idle instead of assuming completion.
+- **Main thread.** The whole reimport pass runs on the editor's main thread; the editor temporarily disables VSync and low-processor-usage mode while it runs. The tool returns once the files are queued, and the work happens during editor idle processing - poll `get_editor_file_system_status` until scanning is false instead of assuming completion.
 - **No recursion.** Requesting a reimport while one is already executing is rejected by the engine, not queued.
 - **`uid://` inputs are accepted.** Each entry is first resolved through the UID cache: a uid:// string that maps to a known file reimports that file.
 - **Import order first.** Files are sorted by each importer's declared import order before anything executes, so low-order importers (on which later importers may depend) run first.
@@ -14,6 +14,7 @@ How the editor imports assets, how .import and .uid sidecar files are produced a
 - **Group files come last.** Imports that bundle several source files (group files) are pulled out of the main pass: their members are skipped and the group file itself is reimported after all regular files.
 - **`keep`/`skip` importers are no-ops.** Files whose .import names the `keep` or `skip` pseudo-importer are not imported at all; the engine only refreshes the cached times and MD5 for the file and marks its import state invalid so it is not treated as imported output.
 - **Failure writes `valid=false`.** When an import fails, the .import file is still (re)written, but instead of a `path=` output entry it carries `valid=false`. The file then looks import-configured but produces no importable resource - check the .import content when a texture/audio asset refuses to load.
+- **Files without a .import have no import effect.** Reimporting a text resource or script (for example .tres or .gd) that carries no .import sidecar does nothing importable: the engine records a BUG-class error, yet the tool still reports "reimport queued" because the queue call itself succeeded. To refresh the editor's cached instance of such a file after it changed on disk, use `reload_resource` instead.
 
 ## Writing .import files by hand
 
@@ -59,12 +60,12 @@ When a scan finds a file whose UID already maps to a different existing file, no
 
 ## Scan state machine and gating
 
-The editor file system runs as a state machine with these observable flags:
+The editor file system runs as a state machine (idle, scanning, processing changes, importing). The autopilot status tool exposes only two fields:
 
-- `scanning` - a full scan is in progress.
-- `scanning_changes` - an incremental change pass is in progress.
-- `importing` - a reimport pass is executing.
-- a first-scan marker for the current editor session.
+- `scanning` - true while a scan or change pass is in progress; this is the readiness gate.
+- `progress` - scanning progress as a float; informational only, not a gate.
+
+The response has no is_importing or doing_first_scan field.
 
 Behaviors that matter for automation:
 
@@ -72,9 +73,9 @@ Behaviors that matter for automation:
 - **Change notifications queue.** File changes detected while the system is busy are held in a pending queue and processed only once the system is no longer scanning; they are not lost, but they are not visible until the pending pass runs.
 - **First scan is main-thread.** The first scan of an editor session must run on the main thread because it registers global classes, plugins and autoloads; subsequent scans run on a low-priority background thread.
 - **Deferred notification.** The filesystem_changed notification raised from a background thread is deferred onto the main loop, so UI and tools observe it one step after the underlying change.
-- **The only reliable gates** are the engine's is_scanning, is_importing and doing_first_scan states - signals and timings are advisory. `get_editor_file_system_status` exposes them; while busy, resource write operations return the retryable soft error documented in the main skill.
+- **The status tool is the gate.** `get_editor_file_system_status` reports only scanning (bool) and progress (float): there is no is_importing or doing_first_scan field, and progress is not a gate. Treat signals and timings as advisory and poll until scanning is false; while busy, resource write operations return the retryable soft error documented in the main skill.
 
-Reliable write workflow: write or reimport - poll `get_editor_file_system_status` until idle - only then verify with `get_resource_dir_files`, `get_resource_type` or `find_in_files`.
+Reliable write workflow: write or reimport - poll `get_editor_file_system_status` until scanning is false - only then verify with `get_resource_dir_files`, `get_resource_type` or `find_in_files`.
 
 ## See also
 

@@ -8,7 +8,7 @@ import sys
 from collections import Counter
 from pathlib import Path, PurePath
 
-SKILL_COUNT = 7
+SKILL_COUNT = 8
 # 与 src/util/skill_templates/registry.json 的册数保持同步
 NAME_PATTERN = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 MAX_NAME_LEN = 64

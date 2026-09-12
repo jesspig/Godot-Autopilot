@@ -1,6 +1,6 @@
 # Godot Autopilot
 
-Entry point for working on a Godot project through the godot-autopilot MCP server. This skill is the plugin usage overview: how to connect, how to discover tools (never guess names), how to route a task to a tool, and how to read the error protocol every response follows. For engine-level operations load the domain skills instead: godot-autopilot-scene-system, godot-autopilot-resources, godot-autopilot-scripting, godot-autopilot-runtime, godot-autopilot-servers and godot-autopilot-content.
+Entry point for working on a Godot project through the godot-autopilot MCP server. This skill is the plugin usage overview: how to connect, how to discover tools (never guess names), how to route a task to a tool, how to read the error protocol every response follows, and the change/observe/verify development loop that keeps edits honest. For engine-level operations load the domain skills instead: godot-autopilot-scene-system, godot-autopilot-resources, godot-autopilot-scripting, godot-autopilot-runtime, godot-autopilot-servers and godot-autopilot-content.
 
 ## Prerequisites
 
@@ -20,7 +20,7 @@ The MCP layer intentionally exposes only seven meta tools:
 - `batch_execute` - run several tool calls in sequence
 - `code_execute` - run GDScript in the editor
 
-The 363 domain tools (scene, property, resource, script, physics, render, audio, and so on) plus `system_status` are not registered as MCP tools directly. Call every domain tool through `call_tool`, passing the domain tool name and its arguments object.
+The 365 domain tools (scene, property, resource, script, physics, render, audio, and so on) plus `system_status` are not registered as MCP tools directly. Call every domain tool through `call_tool`, passing the domain tool name and its arguments object.
 
 ## Discovery protocol - search first, never guess
 
@@ -39,7 +39,7 @@ Example domain call through `call_tool`:
 {"name": "create_scene_node", "arguments": {"type": "Node2D", "name": "Player", "parent_path": "Root/Actors"}}
 ```
 
-If `search_tools` does not surface a tool you suspect exists, browse references/tool-catalog.md: it lists all 363 domain tools grouped by their 30 source modules, one line each.
+If `search_tools` does not surface a tool you suspect exists, browse references/tool-catalog.md: it lists all 365 domain tools grouped by their 30 source modules, one line each.
 
 ## Task routing
 
@@ -93,6 +93,7 @@ If `search_tools` does not surface a tool you suspect exists, browse references/
 | Pause / reload | `set_scene_tree_pause`, `reload_scene_tree_current_scene` |
 | Inline tests | `run_gdscript_tests`, `run_gdscript_test_files` |
 | Project analysis | `validate_scene_file`, `find_unused_resources` |
+| Development loop | `capture_editor_viewport`, `capture_game_viewport`, `get_debugger_log` - the full change/observe/verify cycle is in references/development-workflow.md |
 
 ### Project admin
 
@@ -104,6 +105,16 @@ If `search_tools` does not surface a tool you suspect exists, browse references/
 | Main scene | `set_editor_main_scene` |
 | Scene files | `create_editor_scene`, `open_editor_scene`, `save_editor_scene`, `save_editor_scene_as`, `close_editor_scene` |
 | File system refresh | `scan_editor_file_system` |
+
+## Game development workflow
+
+The routing tables cover single calls; real work is a loop. `ok` means the call went through, not that the effect is what you wanted, so every iteration is change, observe, diagnose, fix, verify - and a fix is confirmed by the error watermark (see "Confirming a fix with the error watermark"), not by assumption:
+
+1. Change the project through tools (`property_set`, `create_script`, `write_file`, and so on), or orchestrate several through `batch_execute` / `code_execute`.
+2. Observe the result with a screenshot (`capture_editor_viewport`, `capture_game_viewport`), a read-back (`property_get`, `get_scene_tree`, `get_resource_property`) or output (`get_debugger_log`; with a running game `get_debugger_errors` and `get_debugger_output`, disk fallback `get_game_log_entries`).
+3. Diagnose from what you observed, fix, and re-observe until the observation shows the intended effect.
+
+references/development-workflow.md expands this into complete loops for UI and scene appearance, script logic, resources and imports, and runtime debugging with input injection - including how screenshots arrive as image content through `call_tool`.
 
 ## batch_execute versus code_execute
 

@@ -1,10 +1,10 @@
 # Runtime and Debugging with godot-autopilot
 
 This book covers the game process life cycle: launching and stopping the
-game, the `game_*` runtime channel, input injection, viewport capture, UI
-reconnaissance, the three log and error paths, the error watermark
-confirmation loop and inline GDScript tests. Deep dives live in
-`references/input-injection.md`, `references/debug-paths.md` and
+game, the `game_*` runtime channel, input injection, viewport capture and the
+visual verification loop, UI reconnaissance, the three log and error paths,
+the error watermark confirmation loop and inline GDScript tests. Deep dives
+live in `references/input-injection.md`, `references/debug-paths.md` and
 `references/runtime-inspection.md`.
 
 ## Start and stop the game
@@ -94,9 +94,10 @@ debug channel into the game process).
   offsets (max 256 items, each with `kind` and `at_frame`) — the tool for
   playtest automation.
 - `get_game_input_status` reports an action's `pressed`, `just_pressed`,
-  `just_released` and the current `physics_frame`; responses also include
-  `recent_engine_errors` (up to 5) when any exist — often the reason input
-  appears ignored.
+  `just_released` and the current `physics_frame`. Engine errors are not
+  attached to this response — when input appears ignored, read
+  `get_debugger_errors` (running game) or `get_debugger_log` (editor
+  process) separately.
 
 Two engine facts govern the timing of everything above:
 
@@ -116,15 +117,40 @@ Full semantics — buffering and flush points, `api` mode forgery versus real
 key events, action matching and per-device state — are in
 `references/input-injection.md`.
 
-## Capture the game viewport
+## Screenshots and visual verification
 
-- `capture_game_viewport` returns the running game's viewport as a
-  base64-encoded PNG (`data`, `format`, `width`, `height`). Optional
-  `timeout_ms` bounds the wait (default 5000, max 30000); captures are
-  limited to 4096 pixels per side and an 8 MiB PNG.
-- `capture_editor_viewport` with `target` set to `game` captures the same
-  running game from the editor side and returns the same result shape; the
-  default `target` `editor` grabs the editor 2D viewport instead.
+Screenshots are the observation step of the change/observe/verify loop: look
+at the rendered result instead of trusting the values you set. Capture after
+UI or scene appearance changes (editor and in-game), at key moments of a
+playtest, and before and after click automation.
+
+Three tools, three targets:
+
+- `capture_game_viewport` — the running game's viewport over the runtime
+  channel (`data`, `format`, `width`, `height`). Optional `timeout_ms` bounds
+  the wait (default 5000, max 30000).
+- `capture_editor_viewport` — the default `target` `editor` grabs the editor
+  2D viewport (falling back to the 3D viewport), so it works while you are
+  still building a scene; `target` `game` captures the running game instead.
+- `capture_display_screen` — a whole physical screen by `screen` index, for
+  desktop-level checks such as window placement; no running game required.
+
+Delivery: through `call_tool` the base64 PNG arrives as an MCP image content
+block, so a multimodal model sees the picture directly. The text JSON keeps
+`format`, `width` and `height`, and its `data` field reads
+`"<attached-as-image-content>"` with image_attached: true. Inside
+`batch_execute` and `code_execute` no image block is attached — the JSON
+keeps the full base64.
+
+Limits: captures are capped at 4096 pixels per side and an 8 MiB PNG, and a
+capture whose base64 payload would exceed the 4 MiB JSON response cap is
+rejected with a response_too_large-style error (base64 inflates by about
+one third), so prefer moderate resolutions.
+
+Pair screenshots with `get_game_ui_elements`: enumerate the controls first
+(`path`, `global_rect`), inject the click with `sequence_game_inputs` or
+`queue_game_input`, then capture again and re-enumerate — screens change
+under fixed coordinates.
 
 ## Enumerate the running game's UI
 
@@ -169,19 +195,23 @@ coordinates, or with `execute_game_script` using `path`.
 | Path | Tools | Source | Needs a running game |
 |---|---|---|---|
 | Editor engine log | `get_debugger_log` | engine log buffer of the editor process: script errors and messages routed through the engine logger | no — always contains data |
-| Debugger session capture | `get_debugger_errors`, `get_debugger_output`, `get_debugger_scene_tree` | with an active debug session: the running game over the runtime channel; without one: editor-process captured errors/output or the last editor-captured tree | live game data needs a session |
+| Debugger session capture | `get_debugger_errors`, `get_debugger_output`, `get_debugger_scene_tree` | with an active debug session: the running game over the runtime channel; without one: an empty result plus a `note` — no editor-side fallback | live game data needs a session |
 | On-disk game log | `get_game_log_entries` | tail window of the game process log file `user://logs/godot.log` | the log file must exist — start the game once with `play_editor_current_scene` |
 
-- `get_debugger_log` (optional `limit`, default 50) never requires a running
-  game — read it first for script errors.
-- `get_debugger_errors` (optional `limit`, default 20) returns a formatted
-  text dump with time, file, line, error text and stack per error.
+- `get_debugger_log` (optional `limit`, default 50) reads the editor engine
+  log — script errors and `print` output from the editor process. It never
+  requires a running game; read it first after editing any `.gd`, `.tscn`,
+  `.tres` or `.cs` file, before changing code again.
+- `get_debugger_errors` (optional `limit`, default 20) returns, with an
+  active session, a structured list under `result` with `time`, `file`,
+  `func`, `line`, `error`, `descr`, is_warning and `stack` per entry.
 - `get_debugger_output` reads stdout/stderr captured from the game process
   (optional `limit`, default 50); `get_debugger_scene_tree` takes no
   parameters and returns the game's tree as formatted text.
-- A capture tool with nothing to return (no session and nothing captured)
-  returns an empty result plus a `note` field suggesting
-  `play_editor_current_scene` or `get_game_log_entries`.
+- Without an active debug session, `get_debugger_errors`,
+  `get_debugger_output` and `get_debugger_scene_tree` return an empty result
+  plus a `note` suggesting `play_editor_current_scene` or
+  `get_game_log_entries` — there is no editor-process fallback.
 - `get_game_log_entries` reads the on-disk log tail (optional `limit`,
   default 50, max 500; returns `path`, `entries`, `total_lines`). It falls
   back to the archived `godot.log.1` (reported as `from_archive`); if the

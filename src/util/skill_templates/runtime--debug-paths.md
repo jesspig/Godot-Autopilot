@@ -10,22 +10,24 @@ behavior. All engine facts here are verified against engine source.
 | Path | Tools | Source | Needs a running game |
 |---|---|---|---|
 | Editor engine log | `get_debugger_log` | engine log buffer of the editor process: script errors and messages routed through the engine logger | no — always contains data |
-| Debugger session capture | `get_debugger_errors`, `get_debugger_output`, `get_debugger_scene_tree` | with an active debug session: the running game over the runtime channel; without one: editor-process captured errors/output or the last editor-captured tree | live game data needs a session |
+| Debugger session capture | `get_debugger_errors`, `get_debugger_output`, `get_debugger_scene_tree` | with an active debug session: the running game over the runtime channel; without one: an empty result plus a `note` — no editor-side fallback | live game data needs a session |
 | On-disk game log | `get_game_log_entries` | tail window of the game process log file `user://logs/godot.log` | the log file must exist — start the game once with `play_editor_current_scene` |
 
 Details that matter:
 
 - `get_debugger_log` takes an optional `limit` (default 50) and never
   requires a running game — read it first for script errors.
-- `get_debugger_errors` (optional `limit`, default 20) returns a formatted
-  text dump with time, file, line, error text and stack per error.
+- `get_debugger_errors` (optional `limit`, default 20) returns, with an
+  active session, a structured list under `result` (`time`, `file`, `func`,
+  `line`, `error`, `descr`, is_warning, `stack` per entry).
 - `get_debugger_output` reads stdout/stderr captured from the game process
   (optional `limit`, default 50).
 - `get_debugger_scene_tree` returns the running game's scene tree as a
-  formatted text tree; it takes no parameters.
-- When a debugger capture tool has nothing to return (no session and
-  nothing captured), it returns an empty result plus a `note` field that
-  suggests starting the game with `play_editor_current_scene` or reading
+  formatted text tree; it takes no parameters. Without a session it returns
+  an empty result plus a `note` like the other session-capture tools.
+- When the session-capture tools have nothing to return (no active
+  session), they return an empty result plus a `note` field that suggests
+  starting the game with `play_editor_current_scene` or reading
   `get_game_log_entries` instead.
 - `get_game_log_entries` reads the on-disk log tail (optional `limit`,
   default 50, max 500) and returns `path`, `entries` and `total_lines`. It
