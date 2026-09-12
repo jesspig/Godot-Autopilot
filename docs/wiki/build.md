@@ -6,7 +6,7 @@ tags:
   - 构建
   - CMake
   - 部署
-timestamp: "2026-09-10T01:20:18+08:00"
+timestamp: "2026-09-10T01:41:10+08:00"
 resource:
   - CMakeLists.txt
   - CMakePresets.json
@@ -83,7 +83,7 @@ resource:
 
 | job | 内容 |
 |---|---|
-| validate | 校验 tag 与根 `VERSION` 一致（`v0.2.2` ↔ `0.2.2`，版本号以根 `VERSION` 为准，当前 0.2.2），不一致 fail |
+| validate | 校验 tag 与根 `VERSION` 一致（`v0.2.3` ↔ `0.2.3`，版本号以根 `VERSION` 为准，当前 0.2.3），不一致 fail |
 | build | 同 CI 环境（Ninja/sccache/msvc-dev-cmd），Release 构建后按精确文件名上传各平台库 artifact（天然排除 pdb） |
 | package | 下载全部 artifact → `python build.py --package --libs-dir dist` 合并 → 重命名为 `addons.zip` → softprops/action-gh-release 发布 |
 
