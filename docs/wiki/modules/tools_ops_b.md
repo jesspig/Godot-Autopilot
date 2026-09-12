@@ -6,7 +6,7 @@ tags:
   - 模块
   - 领域工具
   - B组
-timestamp: "2026-08-29T02:35:37+08:00"
+timestamp: "2026-09-13T03:47:12+08:00"
 resource: src/tools/
 ---
 
@@ -14,7 +14,7 @@ resource: src/tools/
 
 > 覆盖 `src/tools/` 下 18 个 `.cpp` handler 模块：debug_ops、debugger_ops、debugger_access、display_ops、display_window_ops、os_ops、runtime_ops、runtime_game_ops、audio_ops、render_ops、environment_ops、text_ops、tilemap_ops、tileset_ops、spriteframes_ops、code_exec_ops、log_ops、capture_ops。
 >
-> 工具总数（全系统）：**371**（`ToolRegistry`/catalog/index 口径）= **363 个领域工具**（30 个域 `*_tools.hpp` 以 `GDA_TOOL_CLASS(`/`GDA_TOOL_CLASS_SIDE(` 声明，经 `register_all.cpp` 注册各域 `<域>_tools::make_tools()`）+ `system_status` 1 + **7 个元工具**。本页 B 组占其中 **185 个领域工具**（A 组 178 + B 组 185 = 363）；`code_execute`/`batch_execute` 为元工具经 `server.RegisterTool()` 直连、`system_status` 单独注册。数量以 `src/tools/*_tools.hpp` 声明与 `ToolRegistry` 运行时注册为准。
+> 工具总数（全系统）：**373**（`ToolRegistry`/catalog/index 口径）= **365 个领域工具**（30 个域 `*_tools.hpp` 以 `GDA_TOOL_CLASS(`/`GDA_TOOL_CLASS_SIDE(` 声明，经 `register_all.cpp` 注册各域 `<域>_tools::make_tools()`）+ `system_status` 1 + **7 个元工具**。本页 B 组占其中 **185 个领域工具**（A 组 180 + B 组 185 = 365）；`code_execute`/`batch_execute` 为元工具经 `server.RegisterTool()` 直连、`system_status` 单独注册。数量以 `src/tools/*_tools.hpp` 声明与 `ToolRegistry` 运行时注册为准。
 >
 > 相关页面：[工具注册表](../modules/tools_registry.md) · [运行时通道](../modules/entry_runtime.md)
 
@@ -61,9 +61,9 @@ resource: src/tools/
 - **关键事实**：
   - 注册两个 Godot 类（`debugger_ops::register_classes()` 经 `ClassDB::register_class`，由 `main.cpp` 调用）：`OutputCaptureLogger`（继承 `godot::Logger`，`_log_error`/`_log_message` 写入捕获缓冲）与 `DebugCapturePlugin`（继承 `EditorDebuggerPlugin`，单例存于静态 `s_instance`；`_setup_session` 登记会话、`_capture` 处理 `gda` 协议消息——`GDA_MSG_READY` 标记就绪、`GDA_MSG_RESPONSE` 转发给 `runtime_ops::handle_game_response`）。
   - 内存捕获环形缓冲（`DebuggerCapture` 单例，mutex 保护）：日志 2000 条、错误 500 条、运行输出 2000 条、监视帧 500 条。
-  - 会话激活时 `get_debugger_errors`/`get_output`/`get_scene_tree` **切换为经 `runtime_ops::handle_gda_send` 走运行时通道**（get_errors/get_output/get_tree，超时 5000ms）；栈回溯与监视帧仅存本地捕获缓冲（无对应 MCP 工具），经 `godot://debugger/stack-dump`、`godot://debugger/monitors` 资源读取。
+  - 会话激活时 `get_debugger_errors`/`get_output`/`get_scene_tree` **切换为经 `runtime_ops::handle_gda_send` 走运行时通道**（get_errors/get_output/get_tree，超时 5000ms）；**无会话时不再回退编辑器捕获**——返回空 `result` + `note`（说明无活动会话、指导 `play_editor_current_scene` 或改用 `get_game_log_entries`）。编辑器进程自身的脚本错误与输出统一读 `get_debugger_log`；栈回溯与监视帧仅存本地捕获缓冲（无对应 MCP 工具），经 `godot://debugger/stack-dump`、`godot://debugger/monitors` 资源读取。
   - `get_debugger_log` 命中 `Invalid access to property or key` 错误时追加 Godot 3→4 重命名提示（`RENAME_HINTS`：frames→sprite_frames、cast_to→target_position、translation→position 等 10 条，`debugger_ops.cpp:329-340`）。
-  - 空结果附加 `capture_note_for_empty_result()`：提示启动 `play_editor_current_scene` 或改用 `get_game_log_entries`。
+  - 空结果附加 `capture_note_for_empty_result()`：提示启动 `play_editor_current_scene` 或改用 `get_game_log_entries`（辅助函数按会话状态预留两种文案，当前三个 handler 的调用点恒落在无会话分支）；09-13 起工具描述与 schema 同步删除了"编辑器捕获回退/上次场景树"的旧承诺。
 - **错误模式**：无会话场景返回 `result` 空串 + `note` 字段；会话内错误经通道原样返回 `{"error": ...}`。
 - 出站链接：[运行时通道](../modules/entry_runtime.md) · [工具注册表](../modules/tools_registry.md)
 
@@ -78,7 +78,7 @@ resource: src/tools/
 - **职责**：`DisplayServer` 直通封装：剪贴板、对话框、鼠标、屏幕信息与截图、TTS 语音、子窗口创建与管理（`display_window_ops.cpp` 内 9 个窗口工具与 `display_ops.cpp` 共享 `display_ops` 命名空间）。
 - **代表工具**：`get_display_clipboard`/`set`、`show_display_dialog`、`get_display_mouse_position`/`set_mode`/`warp`、`capture_display_screen`、`get_display_screen_count`/`dpi`/`position`/`refresh_rate`/`size`、`get_display_tts_voices`/`speak`/`stop`、`create_display_window`/`delete`/`set_flag`/`set_mode`/`set_position`/`set_size`/`set_title`/`move_to_foreground`/`request_attention`。
 - **关键事实**：
-  - `capture_display_screen` 经 `Image::save_png_to_buffer` → base64（`capture_ops::base64_encode`），PNG 编码失败时降级返回原始序列化 Image + warning。
+  - `capture_display_screen` 经 `Image::save_png_to_buffer` → base64（`capture_ops::base64_encode`），PNG 编码失败时降级返回原始序列化 Image + warning；经 `call_tool` 直调时 PNG 以 MCP image content 交付（09-13 起，见 capture_ops 小节）。
   - `create_display_window` 用 `memnew(godot::Window)` 创建原生子窗口（需 `FEATURE_SUBWINDOWS`），返回 `window->get_window_id()`；`delete_display_window` 经 `instance_from_id` 取 Window 后 `queue_free`。
   - `set_display_mouse_mode` 钳制 mode 0-4；`show_display_dialog` 检查 `DisplayServer::dialog_show` 的返回 Error。
   - 15 个副作用工具以 `GDA_TOOL_CLASS_SIDE(` 声明（`side_effect` 非空），遍历经 `get_tool_detail` 自动排除（见文末对照）。
@@ -102,11 +102,11 @@ resource: src/tools/
 - **代表工具**：`get_game_status`、`execute_game_script`、`queue_game_input`、`wait_game_input`、`get_game_input_status`、`capture_game_viewport`、`reload_game_scripts`，及 08-24 新增 `sequence_game_inputs`（逐物理帧时间线注入）、`get_game_ui_elements`（运行中 Control 树枚举）。
 - **关键事实**：
   - **`set_editor_queue(CommandQueue*)`**：`main.cpp` 注入 Godot 主线程队列（`get_editor_queue()` 全局访问）。`handle_gda_send` 非主线程时经 `queue.submit(...).get()` 投递；游戏响应 `handle_game_response` 由 `DebugCapturePlugin::_capture` 喂入，以 request_id 匹配 `PendingRequest`（mutex + condition_variable）并唤醒等待线程。
-  - 请求 ID 原子自增；`extract_timeout` 钳制到 `GDA_MAX_TIMEOUT_MS=30000`（默认 `GDA_DEFAULT_TIMEOUT_MS=5000`，`src/core/config.hpp`）；`handle_gda_send` 返回中间态 `{"__gda_pending": id, "timeout_ms": ...}`，由 `register_all.cpp::meta_call_tool_wait` 转 `wait_pending_response` 轮询合并；`capture_game_viewport` 额外走 `finalize_capture_response`（主线程读文件 → base64）。
+  - 请求 ID 原子自增；`extract_timeout` 钳制到 `GDA_MAX_TIMEOUT_MS=30000`（默认 `GDA_DEFAULT_TIMEOUT_MS=5000`，`src/core/config.hpp`）；`handle_gda_send` 返回中间态 `{"__gda_pending": id, "timeout_ms": ...}`，由 `register_all.cpp::meta_call_tool_wait` 转 `wait_pending_response` 轮询合并；`capture_game_viewport` 额外走 `finalize_capture_response`（主线程读文件 → base64），经 `call_tool` 直调时 PNG 以 MCP image content 随响应交付（09-13 起，见 capture_ops 小节）。
   - **超时**：超时后经 `queue.submit` 向会话发 `debugger_send_cancel`（GDA_OP_CANCEL），错误信息含 request_id 与诊断提示。
   - `get_game_status` 响应注入派生字段：`healthy`（由 `last_activity_ms` 推导）与 `physics_stalled`（physics_frame 连续不变 ≥1000ms 且 fps>0）。
   - **断点自动恢复** `maybe_recover_break`：对全部 breaked 会话按 `GDA_AUTO_CONTINUE` 环境变量决定是否 `debugger_continue_session`，每会话上限 `GDA_AUTO_CONTINUE_MAX` 次。
-  - `queue_game_input` 参数白名单（type/keycode/pressed/button_index/position/action/duration_ms/mode/timeout_ms），未知参数被忽略并回传 `ignored_params` + warning；`get_game_input_status` 成功时附带最近 5 条引擎错误文本。
+  - `queue_game_input` 参数白名单（type/keycode/pressed/button_index/position/action/duration_ms/mode/timeout_ms），未知参数被忽略并回传 `ignored_params` + warning；`get_game_input_status` **不再附带 `recent_engine_errors`**（09-13 起）——运行中错误改读 `get_debugger_errors`，编辑器错误读 `get_debugger_log`。
   - `sequence_game_inputs`（gda op `input_sequence`）：`inputs[]` 每项含 `at_frame`（物理帧偏移）与注入字段，由游戏侧 `GameBridgeFrameSequence` 节点逐物理帧执行，完成后响应 `{completed, executed}`；上限 256 步，超时默认按 `max_at_frame×33ms+2000ms` 推导并钳制 30000ms，可被 cancel。协议与帧调度细节见[入口与运行时](../modules/entry_runtime.md)。
   - `get_game_ui_elements`（gda op `ui_elements`）：DFS 遍历运行中 Control 树，每项 `{path, type, visible, text?, global_rect:{position,size}}`，`max_elements` 默认 100、上限 1000，超限标 `truncated:true`。
   - `runtime_game_ops.cpp` 无独立 hpp，声明在 `runtime_ops.hpp`。
@@ -216,13 +216,14 @@ resource: src/tools/
 - **关键事实**：
   - `target="game"`（08-24 接通）：委托 `runtime_ops::game_capture_blocking(timeout_ms)` 走运行时通道截图；`timeout_ms` 可选，默认 5000。
   - `target="editor"`（默认）优先 2D 视口（`EditorInterface::get_editor_viewport_2d`）回退 3D；`ViewportTexture::get_image` → `save_png_to_buffer` → `base64_encode`，返回 data/format/width/height。
+  - **MCP image content 交付（09-13 起）**：经元工具 `call_tool` 直调三个截图工具（`capture_editor_viewport`/`capture_game_viewport`/`capture_display_screen`）时，`register_all.cpp` 经 `util::mcp_image_content.hpp` 的 `try_attach_image_content()` 把 PNG base64 转为 MCP image content 块随响应返回（多模态模型可直接看图）；文本 JSON 中该 `data` 替换为 `"<attached-as-image-content>"` 并加 `image_attached:true`，`format`/`width`/`height` 等其余字段保留。`batch_execute`/`code_execute` 内调用不附加 image 块，JSON 中仍是完整 base64；`format` 非 `"png"` 或无 data 时不转换。
   - `base64_encode` 为跨模块工具函数（display_ops 截图、runtime_ops 文件回读共用）。
 - **错误模式**：视口不可用 → error_detail（"open a scene with a visible viewport first"）；PNG 编码空缓冲 → error_json。
 - 出站链接：[工具注册表](../modules/tools_registry.md) · [运行时通道](../modules/entry_runtime.md)
 
 ## 与 AGENTS.md 对照结果
 
-- **副作用工具（42 个）排除机制**：工具以 `GDA_TOOL_CLASS_SIDE(` 声明并经 `ISideEffect` 暴露 `side_effect`；遍历（`tests/runner/traversal.cpp`）不再硬编码清单，而是对每个工具先调 `get_tool_detail`，返回的 `tool.side_effect` 非空即排除。B 组占 **23 个**——os_tools 8（`show_os_alert`、`create_os_process`、`execute_os_process`、`kill_os_process`、`open_os_path`、`move_os_file_to_trash`、`set_os_environment`、`write_file`）、display_tools 15（`show_display_dialog`、`speak_display_tts`、`stop_display_tts`、`set_display_clipboard`、`set_display_mouse_mode`、`warp_display_mouse` 与 `display_window_*` 9 个）；其余 19 个属 A 组与新域 editor（6，含 `build_csharp_assembly`）/input_map（2）/config（2）/resource（3，含 08-24 新增 `move_resource_file`/`create_directory`）/script（1）/theme（5）。**注意 `display_` 前缀并非全排除**：只读的 `get_display_clipboard`、`get_display_mouse_position`、`get_display_screen_*`（5 个）、`get_display_tts_voices`、`capture_display_screen` 等非副作用工具遍历会冒烟。
+- **副作用工具（49 个）排除机制**：工具以 `GDA_TOOL_CLASS_SIDE(` 声明并经 `ISideEffect` 暴露 `side_effect`；L2 遍历解析器（`tests/runner/traversal.cpp`）仅匹配 `GDA_TOOL_CLASS(`，副作用工具天然不入枚举（365 域中 316 个入枚举），入枚举者再经 `get_tool_detail` 的 `tool.side_effect` 非空兜底排除，不再硬编码清单。B 组占 **23 个**——os_tools 8（`show_os_alert`、`create_os_process`、`execute_os_process`、`kill_os_process`、`open_os_path`、`move_os_file_to_trash`、`set_os_environment`、`write_file`）、display_tools 15（`show_display_dialog`、`speak_display_tts`、`stop_display_tts`、`set_display_clipboard`、`set_display_mouse_mode`、`warp_display_mouse` 与 `display_window_*` 9 个）；其余 26 个：editor 6（含 `build_csharp_assembly`）/input_map 2/config 2/resource 4（`save_resource`/`copy_resource_file`/`move_resource_file`/`create_directory`）/script 2（`execute_script`/`create_script`）/theme 5/game 5。按 `side_effects()` 返回值分布：writes_file 15、writes_config 6、shows_alert 4、modifies_window 12、process 6、game_runtime 5、code_execute 1（`tests/README.md` 为准）。**注意 `display_` 前缀并非全排除**：只读的 `get_display_clipboard`、`get_display_mouse_position`、`get_display_screen_*`（5 个）、`get_display_tts_voices`、`capture_display_screen` 等非副作用工具遍历会冒烟。
 - **不一致点**：
   1. AGENTS.md「添加工具需在 `<category>_ops.hpp` 声明」与实现不符：`environment_ops.cpp`（7 工具）、`display_window_ops.cpp`（9 工具）无独立 hpp，handler 声明分别复用 `render_ops.hpp`、`display_ops.hpp`；工具类声明则统一落在对应 `<域>_tools.hpp`（`render_tools.hpp`/`display_tools.hpp`）。另 `runtime_game_ops.cpp`（9 工具）声明在 `runtime_ops.hpp`。
   2. `debugger_ops` 的 `get_debugger_*` 5 工具与 `log_ops` 的 `get_game_log_entries` 职责重叠（内存捕获 vs 磁盘日志），AGENTS.md 未区分两条路径。

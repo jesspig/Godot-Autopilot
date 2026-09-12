@@ -6,7 +6,7 @@ tags:
   - 模块
   - 入口
   - 运行时桥接
-timestamp: "2026-09-02T18:45:30+08:00"
+timestamp: "2026-09-13T03:47:12+08:00"
 resource:
   - src/main.cpp
   - src/runtime/
@@ -125,10 +125,12 @@ resource:
 
 | 常量 | 值 | 使用方 |
 |---|---|---|
-| `GDA_NEW_SCENE_SWITCH_WAIT_MS` | `2000` | `src/tools/editor_ops.cpp`（换场景等待上限） |
+| `GDA_NEW_SCENE_SWITCH_WAIT_MS` | `2000` | `src/tools/editor_ops.cpp`（`create_editor_scene` 的 `timeout_ms` 默认值，可被参数覆盖，范围 50-30000） |
 | `GDA_NEW_SCENE_POLL_MS` | `50` | `src/tools/editor_ops.cpp`（轮询步长） |
 | `GDA_AUTO_CONTINUE_ENV` | `GDA_AUTO_CONTINUE` | `src/tools/runtime_ops.cpp`（自动继续次数环境变量） |
 | `GDA_AUTO_CONTINUE_MAX` | `3` | `src/tools/runtime_ops.cpp`（默认上限） |
+
+`create_editor_scene` 的等待循环以 `timeout_ms` 为上限（默认取 `GDA_NEW_SCENE_SWITCH_WAIT_MS`；非整数或越界直接报错，超时按 `GDA_NEW_SCENE_POLL_MS` 累计等待），失败时返回 `waited_ms`/`timeout_ms`/`node_released`/`editor_state` 诊断并释放未被编辑器接管的临时根节点；实现细节见 [tools_ops_a.md](tools_ops_a.md) 的 editor_ops 小节。
 
 桥接相关常量在 `src/core/config.hpp`：`GDA_HEALTHY_ACTIVITY_THRESHOLD_MS=3000`、`GDA_ERROR_BUFFER_MAX=200`、`GDA_OUTPUT_BUFFER_MAX=500`、`GDA_EVAL_TRUNCATE_BYTES=8192`。
 

@@ -2,6 +2,11 @@
 
 > 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天。
 
+## 2026-09-13
+
+- **mcp-cpp-sdk 0.3.2 → 0.3.3**：`FetchDependencies.cmake` GIT_TAG 升级，重新 configure 拉取 0.3.3 并全量编译通过（无 API 适配），`uv run build.py` 部署通过，ctest L1 114/114 全绿；0.3.3 含 conformance/MRTR、Bearer 鉴权、FileEventStore 会话恢复、传输层死锁修复等（本仓库未启用新特性）。详见 `changelog/2026-09-13-log.md`
+- **反馈修复批次全量交付**：property 数组/NodeType 转换与写失败 fail fast、资源 CoW/`reload_resource`/`copy_resource_file`/标签清理、`create_editor_scene` timeout_ms 诊断、调试器无 session 无回退描述、截图经 call_tool 以 image content 交付、技能 8 册（含 C# 专册与开发闭环）、`resolve_resource` path 注册；L1 114/114、L2 8/8，计数 365 域/49 副作用/316 遍历/373 全量。详见 `changelog/2026-09-13-log.md`
+
 ## 2026-09-10
 
 - **skill 体系 19→7 册重构 + Godot 源码研究发现织入**：19 册合并为 `godot-autopilot` 总纲 + 6 册引擎指南（每册带 references/ 渐进披露），84 条 Godot 4.8.0-dev 源码研究发现织入引擎六册（4.7+/4.8 行内简注）；`skill_templates/` 28 个文件、registry 7 条、`SKILL_COUNT` 19→7；McpConfigDock 按钮 Generate/Update 动态化（Update 先清理 `godot-autopilot-` 前缀目录）；skill_gen_test 用例改名 + 白名单 176，ctest L1 103/103 全绿；support/tests/overview/AGENTS.md 知识库同步。详见 `changelog/2026-09-10-log.md`

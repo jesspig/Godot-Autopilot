@@ -6,13 +6,13 @@ tags:
   - 模块
   - 核心层
   - 线程模型
-timestamp: "2026-09-02T18:45:30+08:00"
+timestamp: "2026-09-13T03:47:12+08:00"
 resource: src/core/
 ---
 
 # 核心模块（src/core/）
 
-> 审计日期：2026-09-02（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 审计日期：2026-09-13（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-13 随资源 path 加载注册进 ResourceRegistry 同步），基于当前工作树代码逐行核对（不依赖 git 历史）。
 > 覆盖范围：`src/core/` 下 8 cpp + 12 头共 20 文件（`CommandQueue` 与 `error_watermark` 为 header-only，`version.hpp.in` 为模板，实际 11 业务组 + 版本）。注意：`CommandQueue` 为 header-only（仅 `command_queue.hpp`，无对应 `.cpp`），`error_watermark.hpp` 同为 header-only，`version.hpp.in` 经 `configure_file` 生成 `version.hpp`。
 
 ## 模块简介
@@ -72,10 +72,11 @@ resource: src/core/
 
 ### ResourceRegistry（命名空间函数，非类）
 
-- `register_resource(res, name)` — 以 `instance_id` 为键，另加 `"name:" + name` 键
+- `register_resource(res, name)` — 以 `instance_id` 为键，另加 `"name:" + name` 键（`name` 为空则只登记 oid 键）
 - `lookup_memory(name)` — 先查 `name:` 键；若参数为纯数字再回退查 oid 键；未命中返回空 `Ref`
 - `erase_oid(object_id)`
 - 线程安全：`std::unordered_map<std::string, godot::Ref<godot::Resource>>` + 全局 `std::mutex`
+- **path 加载自动注册（09-13 起）**：`resource_ops::resolve_resource` 经 `path` 加载磁盘文件的实例在返回前调 `register_resource(res, path)`——该实例被注册表持有，跨调用存活，后续可用 `object_id`/`name:`（含原 `res://` 路径字符串）再次定位；这也是"加载后修改、再保存/查询"能在多次工具调用间保持同一实例的原因。
 
 ### SceneDirtyTracker（命名空间函数，非类）
 
@@ -91,6 +92,7 @@ resource: src/core/
 - `int64_t consume_new_errors()` — 取走并清零累积值（一次性消费语义）
 - `count_response_errors(const mcp::JsonValue&)` — 统计一个响应对象中的错误数：顶层 `error` 字符串计 1；`results` 数组内逐项 `error` 字符串各计 1（覆盖 batch_execute 的子结果）
 - 接线点：编辑器侧在 `register_all.cpp` RegisterTool 回调内对每次工具响应调用 `count_response_errors` 并累入水印，随后把 `consume_new_errors()` 结果作为顶层字段 `new_errors_since_last_call` 附到响应上（含 0 值）；游戏侧 `runtime_ops.cpp` 收到 runtime_error 增量时 `record_error()`
+- 同一 `call_tool` 回调（09-13 起）还承担截图响应后处理：经 `util::try_attach_image_content`（`util/mcp_image_content.hpp`）把 `capture_editor_viewport`/`capture_game_viewport`/`capture_display_screen` 的 PNG base64 转为 MCP image content 块，文本 JSON 的 `data` 替换为 `"<attached-as-image-content>"` 并加 `image_attached:true`；`batch_execute`/`code_execute` 内的调用不附加 image 块
 
 ### editor_readiness（命名空间函数，非类，08-24 新增）
 
