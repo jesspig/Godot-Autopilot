@@ -1,9 +1,16 @@
 {
   "name": "resources_scripts",
-  "description": "资源/脚本类工具代表性配置驱动用例：execute_script 四种行为（单表达式自动 return、多行显式 return、语法错误、缺参报错）+ 资源只读查询（get_resource_extensions、has_resource）+ search_tools 检索验证脚本工具可发现。全部为无副作用工具。",
+  "description": "资源/脚本类工具代表性配置驱动用例：execute_script 四种行为（单表达式自动 return、多行显式 return、语法错误、缺参报错）+ 资源只读查询（get_resource_extensions、has_resource）+ search_tools 检索验证脚本工具可发现。本轮新增：save_resource copy-on-write（按 path 加载→内存修改→存到 dest_path：断言 copy_on_write:true、source_path、源缓存实例 resource_path 不被改写，且 dest 落盘内存值；源文件未被写入内存修改由 reload 后读回磁盘值确认（源内存实例可能被编辑器文件系统扫描异步刷新，不再断言其保留））、reload_resource 重载缓存（replaced:true 后读回磁盘值；缺失文件报错）、duplicate_resource 带 name 注册后跨调用引用与改写、copy_resource_file 复制文件（存在性/类型校验）+ 缺失源与同路径报错。fixture 位于 res://gda_tmp_res_ops/，after_all 回收。",
   "headless": true,
   "pipeline": {
     "on_failure": "fail_fast",
+    "after_all": [
+      {
+        "id": "trash_res_ops_fixture",
+        "tool": "move_os_file_to_trash",
+        "args": { "path": "res://gda_tmp_res_ops" }
+      }
+    ],
     "stages": [
       {
         "id": "scripts",
@@ -87,6 +94,242 @@
               "has_keys": ["results"],
               "field_checks": [
                 { "key": "results", "not_empty": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "res_ops_setup",
+        "steps": [
+          {
+            "id": "res_ops_create_tmp_dir",
+            "tool": "create_directory",
+            "args": { "path": "res://gda_tmp_res_ops" },
+            "expect": { "has_keys": ["created"] }
+          }
+        ]
+      },
+      {
+        "id": "copy_on_write",
+        "steps": [
+          {
+            "id": "cow_create_source",
+            "tool": "create_resource",
+            "args": { "type": "Resource", "name": "gda_cow_source" },
+            "expect": {
+              "field_checks": [
+                { "key": "result.class", "value": "Resource" },
+                { "key": "result.name", "value": "gda_cow_source" }
+              ]
+            }
+          },
+          {
+            "id": "cow_save_source",
+            "tool": "save_resource",
+            "args": { "name": "gda_cow_source", "path": "res://gda_tmp_res_ops/cow_src.tres" },
+            "expect": {
+              "has_keys": ["result", "verified"],
+              "field_checks": [
+                { "key": "result", "value": 0 },
+                { "key": "verified", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "cow_read_source_name",
+            "tool": "get_resource_property",
+            "args": { "path": "res://gda_tmp_res_ops/cow_src.tres", "property": "resource_name" },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "gda_cow_source" } ]
+            }
+          },
+          {
+            "id": "cow_mutate_cached",
+            "tool": "set_resource_property",
+            "args": { "path": "res://gda_tmp_res_ops/cow_src.tres", "property": "resource_name", "value": "gda_cow_mutated" },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          },
+          {
+            "id": "cow_save_to_dest",
+            "tool": "save_resource",
+            "args": {
+              "path": "res://gda_tmp_res_ops/cow_src.tres",
+              "dest_path": "res://gda_tmp_res_ops/cow_copy.tres"
+            },
+            "expect": {
+              "has_keys": ["result", "verified", "copy_on_write", "source_path"],
+              "field_checks": [
+                { "key": "result", "value": 0 },
+                { "key": "verified", "value": true },
+                { "key": "copy_on_write", "value": true },
+                { "key": "source_path", "value": "res://gda_tmp_res_ops/cow_src.tres" }
+              ]
+            }
+          },
+          {
+            "id": "cow_source_cache_path_intact",
+            "tool": "get_resource_property",
+            "args": { "path": "res://gda_tmp_res_ops/cow_src.tres", "property": "resource_path" },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "res://gda_tmp_res_ops/cow_src.tres" } ]
+            }
+          },
+          {
+            "id": "cow_dest_has_written_value",
+            "tool": "get_resource_property",
+            "args": { "path": "res://gda_tmp_res_ops/cow_copy.tres", "property": "resource_name" },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "gda_cow_mutated" } ]
+            }
+          },
+          {
+            "id": "cow_dest_path_is_dest",
+            "tool": "get_resource_property",
+            "args": { "path": "res://gda_tmp_res_ops/cow_copy.tres", "property": "resource_path" },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "res://gda_tmp_res_ops/cow_copy.tres" } ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "reload_cache",
+        "steps": [
+          {
+            "id": "reload_source_replaces_cache",
+            "tool": "reload_resource",
+            "args": { "path": "res://gda_tmp_res_ops/cow_src.tres" },
+            "expect": {
+              "has_keys": ["result", "path", "replaced"],
+              "field_checks": [
+                { "key": "result", "value": "reloaded" },
+                { "key": "path", "value": "res://gda_tmp_res_ops/cow_src.tres" },
+                { "key": "replaced", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "reload_source_reads_disk_value",
+            "tool": "get_resource_property",
+            "args": { "path": "res://gda_tmp_res_ops/cow_src.tres", "property": "resource_name" },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "gda_cow_source" } ]
+            }
+          },
+          {
+            "id": "reload_missing_file_errors",
+            "tool": "reload_resource",
+            "args": { "path": "res://gda_tmp_res_ops/absent_reload.tres" },
+            "expect": {
+              "field_checks": [
+                { "key": "error", "value": "failed to reload resource: res://gda_tmp_res_ops/absent_reload.tres (missing, not imported or failed to load with CACHE_MODE_REPLACE)" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "duplicate_named",
+        "steps": [
+          {
+            "id": "duplicate_with_name",
+            "tool": "duplicate_resource",
+            "args": { "path": "res://gda_tmp_res_ops/cow_src.tres", "name": "gda_dup_probe" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.class", "value": "Resource" },
+                { "key": "result.name", "value": "gda_dup_probe" },
+                { "key": "result.object_id_str", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "duplicate_named_read_across_calls",
+            "tool": "get_resource_property",
+            "args": { "name": "gda_dup_probe", "property": "resource_name" },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "gda_dup_probe" } ]
+            }
+          },
+          {
+            "id": "duplicate_named_write_across_calls",
+            "tool": "set_resource_property",
+            "args": { "name": "gda_dup_probe", "property": "resource_name", "value": "gda_dup_renamed" },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          },
+          {
+            "id": "duplicate_named_reread",
+            "tool": "get_resource_property",
+            "args": { "name": "gda_dup_probe", "property": "resource_name" },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "gda_dup_renamed" } ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "copy_file",
+        "steps": [
+          {
+            "id": "copy_file_ok",
+            "tool": "copy_resource_file",
+            "args": {
+              "path": "res://gda_tmp_res_ops/cow_src.tres",
+              "dest_path": "res://gda_tmp_res_ops/copied/cow_src_copy.tres"
+            },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "copied" },
+                { "key": "from", "value": "res://gda_tmp_res_ops/cow_src.tres" },
+                { "key": "to", "value": "res://gda_tmp_res_ops/copied/cow_src_copy.tres" }
+              ]
+            }
+          },
+          {
+            "id": "copy_file_exists",
+            "tool": "has_resource",
+            "args": { "path": "res://gda_tmp_res_ops/copied/cow_src_copy.tres" },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": true } ]
+            }
+          },
+          {
+            "id": "copy_file_type",
+            "tool": "get_resource_type",
+            "args": { "path": "res://gda_tmp_res_ops/copied/cow_src_copy.tres" },
+            "expect": {
+              "field_checks": [ { "key": "result.class", "value": "Resource" } ]
+            }
+          },
+          {
+            "id": "copy_file_missing_source",
+            "tool": "copy_resource_file",
+            "args": {
+              "path": "res://gda_tmp_res_ops/absent_src.tres",
+              "dest_path": "res://gda_tmp_res_ops/absent_dst.tres"
+            },
+            "expect": {
+              "field_checks": [
+                { "key": "error", "value": "source does not exist: res://gda_tmp_res_ops/absent_src.tres" }
+              ]
+            }
+          },
+          {
+            "id": "copy_file_same_path",
+            "tool": "copy_resource_file",
+            "args": {
+              "path": "res://gda_tmp_res_ops/cow_src.tres",
+              "dest_path": "res://gda_tmp_res_ops/cow_src.tres"
+            },
+            "expect": {
+              "field_checks": [
+                { "key": "error", "value": "source and destination are the same file: res://gda_tmp_res_ops/cow_src.tres" }
               ]
             }
           }
