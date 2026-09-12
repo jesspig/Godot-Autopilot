@@ -152,6 +152,33 @@ std::string get_string_or_dump(const mcp::JsonValue &j) {
   return j.Dump();
 }
 
+bool try_deserialize_node_ref(const mcp::JsonValue &j,
+                              godot::Variant &out_variant) {
+  if (!j.IsObject())
+    return false;
+  const auto &obj = j.GetObject();
+  auto ref_it = obj.find("__node_ref__");
+  if (ref_it == obj.end())
+    return false;
+  out_variant = godot::Variant();
+  godot::String node_path_str(ref_it->second.GetString().c_str());
+  auto *editor = godot::EditorInterface::get_singleton();
+  if (!editor)
+    return true;
+  auto *scene_root = editor->get_edited_scene_root();
+  if (!scene_root)
+    return true;
+  godot::Node *top = scene_root;
+  while (top->get_parent()) {
+    top = top->get_parent();
+  }
+  godot::Node *found = top->get_node_or_null(godot::NodePath(node_path_str));
+  if (found) {
+    out_variant = godot::Variant(static_cast<godot::Object *>(found));
+  }
+  return true;
+}
+
 godot::Variant deserialize_inferred(const mcp::JsonValue &j) {
   if (j.IsNull())
     return godot::Variant();
@@ -171,27 +198,11 @@ godot::Variant deserialize_inferred(const mcp::JsonValue &j) {
     return godot::Variant(arr);
   }
   if (j.IsObject()) {
-    auto &obj = j.GetObject();
-    auto ref_it = obj.find("__node_ref__");
-    if (ref_it != obj.end()) {
-      godot::String node_path_str(ref_it->second.GetString().c_str());
-      auto *editor = godot::EditorInterface::get_singleton();
-      if (editor) {
-        auto *scene_root = editor->get_edited_scene_root();
-        if (scene_root) {
-          godot::Node *top = scene_root;
-          while (top->get_parent()) {
-            top = top->get_parent();
-          }
-          godot::Node *found =
-              top->get_node_or_null(godot::NodePath(node_path_str));
-          if (found) {
-            return godot::Variant(static_cast<godot::Object *>(found));
-          }
-        }
-      }
-      return godot::Variant();
+    godot::Variant node_ref;
+    if (try_deserialize_node_ref(j, node_ref)) {
+      return node_ref;
     }
+    auto &obj = j.GetObject();
     auto oid_s_it = obj.find("object_id_str");
     if (oid_s_it != obj.end() && oid_s_it->second.IsString()) {
       std::string oid_str = oid_s_it->second.GetString();
@@ -526,24 +537,10 @@ godot::Variant deserialize_typed(const mcp::JsonValue &j,
 
   case Variant::OBJECT: {
     if (j.IsObject()) {
-      auto ref_it = j.GetObject().find("__node_ref__");
-      if (ref_it != j.GetObject().end()) {
-        godot::String node_path_str(ref_it->second.GetString().c_str());
-        auto *editor = godot::EditorInterface::get_singleton();
-        if (editor) {
-          auto *scene_root = editor->get_edited_scene_root();
-          if (scene_root) {
-            godot::Node *top = scene_root;
-            while (top->get_parent()) {
-              top = top->get_parent();
-            }
-            godot::Node *found =
-                top->get_node_or_null(godot::NodePath(node_path_str));
-            if (found) {
-              return godot::Variant(static_cast<godot::Object *>(found));
-            }
-          }
-        }
+      godot::Variant node_ref;
+      if (try_deserialize_node_ref(j, node_ref) &&
+          node_ref.get_type() != godot::Variant::NIL) {
+        return node_ref;
       }
       auto oid_s_it = j.GetObject().find("object_id_str");
       if (oid_s_it != j.GetObject().end() && oid_s_it->second.IsString()) {
@@ -659,6 +656,11 @@ godot::Variant deserialize_as_object(const mcp::JsonValue &j,
                                      const std::string &class_name) {
   if (!j.IsObject())
     return godot::Variant();
+
+  godot::Variant node_ref;
+  if (try_deserialize_node_ref(j, node_ref)) {
+    return node_ref;
+  }
 
   auto *cdbs = godot::ClassDBSingleton::get_singleton();
   if (!cdbs)

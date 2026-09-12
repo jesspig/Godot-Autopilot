@@ -1,6 +1,6 @@
 {
   "name": "property_tools",
-  "description": "T3.3 迁移自 tests/integration/property_tools_test.cpp 的 11 个 TEST_F（PropertyToolsTest）：property_get/set/get_list 的返回结构、错误措辞、readback MATCHED、int 字符串静默转 0、缺参报错。节点选型 Label（Control 子类），规避 set_main_screen_editor 调用",
+  "description": "T3.3 迁移自 tests/integration/property_tools_test.cpp 的 11 个 TEST_F（PropertyToolsTest）：property_get/set/get_list 的返回结构、错误措辞、readback MATCHED、int 字符串静默转 0、缺参报错。节点选型 Label（Control 子类），规避 set_main_screen_editor 调用。本轮新增：临时脚本导出的 Node 引用属性（路径字符串转换 + converted_node_path 回执，坏路径报错）、typed 数组元素级转换（Array[Node2D] 接受路径字符串与 {\"__node_ref__\": 路径}，Array[PackedScene] 接受 res:// 路径；坏元素与非数组值报错）、property_get_list 的 only_script_variables / property_filter 过滤行为。fixture 位于 res://gda_tmp_prop_refs/，cleanup 阶段回收。",
   "headless": true,
   "pipeline": {
     "on_failure": "continue",
@@ -169,6 +169,216 @@
             "args": { "path": "LabelNode", "property": "z_index" },
             "expect": {
               "field_checks": [ { "key": "error", "value": "missing required parameter: value" } ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "script_property_refs",
+        "steps": [
+          {
+            "id": "prop_fixture_script_created",
+            "tool": "create_script",
+            "args": {
+              "path": "res://gda_tmp_prop_refs/prop_export_probe.gd",
+              "overwrite": true,
+              "source_code": "@tool\nextends Node\n\n@export var node_link: Node2D\n@export var node_list: Array[Node2D]\n@export var packed_list: Array[PackedScene]\n"
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.path", "value": "res://gda_tmp_prop_refs/prop_export_probe.gd" },
+                { "key": "result.verified", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "prop_fixture_host_created",
+            "tool": "create_scene_node",
+            "args": { "name": "PropHost", "type": "Node", "parent_path": "LabelNode" },
+            "expect": {
+              "field_checks": [ { "key": "result.path", "value": "LabelNode/PropHost" } ]
+            }
+          },
+          {
+            "id": "prop_fixture_target_created",
+            "tool": "create_scene_node",
+            "args": { "name": "PropTarget", "type": "Node2D", "parent_path": "LabelNode" },
+            "expect": {
+              "field_checks": [ { "key": "result.path", "value": "LabelNode/PropTarget" } ]
+            }
+          },
+          {
+            "id": "prop_fixture_script_attached",
+            "tool": "attach_script_to_node",
+            "args": { "node_path": "LabelNode/PropHost", "script_path": "res://gda_tmp_prop_refs/prop_export_probe.gd" },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "script attached to LabelNode/PropHost" },
+                { "key": "instantiated", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "node_ref_set_ok",
+            "tool": "property_set",
+            "args": { "path": "LabelNode/PropHost", "property": "node_link", "value": "LabelNode/PropTarget" },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "ok" },
+                { "key": "converted_node_path", "value": "LabelNode/PropTarget" }
+              ]
+            }
+          },
+          {
+            "id": "node_ref_get",
+            "tool": "property_get",
+            "args": { "path": "LabelNode/PropHost", "property": "node_link" },
+            "expect": {
+              "field_checks": [ { "key": "result.class", "value": "Node2D" } ]
+            }
+          },
+          {
+            "id": "node_ref_set_bad_path",
+            "tool": "property_set",
+            "args": { "path": "LabelNode/PropHost", "property": "node_link", "value": "LabelNode/NoSuchNode" },
+            "expect": {
+              "field_checks": [ { "key": "error", "not_empty": true } ]
+            }
+          },
+          {
+            "id": "node_array_set_ok",
+            "tool": "property_set",
+            "args": { "path": "LabelNode/PropHost", "property": "node_list", "value": ["LabelNode/PropTarget"] },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          },
+          {
+            "id": "node_array_obj_ref_set_ok",
+            "tool": "property_set",
+            "args": { "path": "LabelNode/PropHost", "property": "node_list", "value": [ { "__node_ref__": "LabelNode/PropTarget" } ] },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          },
+          {
+            "id": "node_array_set_bad_element",
+            "tool": "property_set",
+            "args": { "path": "LabelNode/PropHost", "property": "node_list", "value": ["LabelNode/NoSuchNode"] },
+            "expect": {
+              "field_checks": [ { "key": "error", "not_empty": true } ]
+            }
+          },
+          {
+            "id": "node_array_set_unsupported_element",
+            "tool": "property_set",
+            "args": { "path": "LabelNode/PropHost", "property": "node_list", "value": [42] },
+            "expect": {
+              "field_checks": [ { "key": "error", "not_empty": true } ]
+            }
+          },
+          {
+            "id": "node_array_set_non_array_value",
+            "tool": "property_set",
+            "args": { "path": "LabelNode/PropHost", "property": "node_list", "value": "not_an_array" },
+            "expect": {
+              "field_checks": [
+                { "key": "error", "value": "value for array property 'node_list' on LabelNode/PropHost is not a JSON array; refusing to write (a non-array value would silently clear the array) — position: LabelNode/PropHost — expected: a JSON array — action: pass an array, e.g. [] to clear it explicitly, or a list of convertible elements" }
+              ]
+            }
+          },
+          {
+            "id": "packed_fixture_written",
+            "tool": "write_file",
+            "args": {
+              "path": "res://gda_tmp_prop_refs/packed_probe.tscn",
+              "content": "[gd_scene format=3]\n\n[node name=\"PackedProbe\" type=\"Node\"]\n"
+            },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          },
+          {
+            "id": "packed_array_set_ok",
+            "tool": "property_set",
+            "args": { "path": "LabelNode/PropHost", "property": "packed_list", "value": ["res://gda_tmp_prop_refs/packed_probe.tscn"] },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          },
+          {
+            "id": "packed_array_set_bad_path",
+            "tool": "property_set",
+            "args": { "path": "LabelNode/PropHost", "property": "packed_list", "value": ["res://gda_tmp_prop_refs/absent_packed.tscn"] },
+            "expect": {
+              "field_checks": [ { "key": "error", "not_empty": true } ]
+            }
+          },
+          {
+            "id": "packed_array_set_bad_shape",
+            "tool": "property_set",
+            "args": { "path": "LabelNode/PropHost", "property": "packed_list", "value": [ { "bogus": true } ] },
+            "expect": {
+              "field_checks": [ { "key": "error", "not_empty": true } ]
+            }
+          },
+          {
+            "id": "get_list_script_vars_only",
+            "tool": "property_get_list",
+            "args": { "path": "LabelNode/PropHost", "only_script_variables": true },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "not_empty": true } ]
+            }
+          },
+          {
+            "id": "get_list_script_vars_filter_hit",
+            "tool": "property_get_list",
+            "args": { "path": "LabelNode/PropHost", "only_script_variables": true, "property_filter": "node_list" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "not_empty": true } ]
+            }
+          },
+          {
+            "id": "get_list_script_vars_filter_miss",
+            "tool": "property_get_list",
+            "args": { "path": "LabelNode/PropHost", "only_script_variables": true, "property_filter": "z_index" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "value": [] } ]
+            }
+          },
+          {
+            "id": "get_list_filter_engine_prop",
+            "tool": "property_get_list",
+            "args": { "path": "LabelNode", "property_filter": "text" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "not_empty": true } ]
+            }
+          },
+          {
+            "id": "get_list_filter_no_match",
+            "tool": "property_get_list",
+            "args": { "path": "LabelNode", "property_filter": "no_such_filter_zzz" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "value": [] } ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "cleanup",
+        "steps": [
+          {
+            "id": "trash_prop_fixture",
+            "tool": "move_os_file_to_trash",
+            "args": { "path": "res://gda_tmp_prop_refs" },
+            "expect": {
+              "has_keys": ["result"]
             }
           }
         ]
