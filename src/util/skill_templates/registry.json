@@ -19,6 +19,10 @@
         {
           "path": "references/tool-gotchas.md",
           "source": "autopilot--tool-gotchas.md"
+        },
+        {
+          "path": "references/development-workflow.md",
+          "source": "autopilot--development-workflow.md"
         }
       ]
     },
@@ -147,6 +151,20 @@
         {
           "path": "references/ui-theme-details.md",
           "source": "content--ui-theme-details.md"
+        }
+      ]
+    },
+    {
+      "name": "godot-autopilot-csharp",
+      "description": "Godot C#/.NET project guide: the dotnet build loop with build_csharp_assembly, reading compile and parse errors through get_debugger_log, running the game and confirming with get_debugger_errors plus the error watermark, C# [GlobalClass] resources via create_resource, [Export] node and typed-array conversion in property_set, attaching C# scripts, and the no-hot-reload and GDScript-visibility limits of .NET assembly state. Use when working in a C# Godot project.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "source": "csharp.md"
+        },
+        {
+          "path": "references/tool-reference.md",
+          "source": "csharp--tool-reference.md"
         }
       ]
     }

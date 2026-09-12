@@ -13,7 +13,8 @@ serialization rules that decide which property lines end up in the scene file.
 | Color | `{"r": 1, "g": 0.5, "b": 0.25, "a": 1}` |
 | Rect2 | `{"position": {"x": 0, "y": 0}, "size": {"w": 64, "h": 32}}` |
 | Resource | `{"path": "res://icon.svg"}` |
-| Node reference | the node path string, e.g. `Player` |
+| Node reference | the node path string, e.g. `Player`; inside an array, `{"__node_ref__": "Player"}` is also accepted |
+| Typed array | a JSON array whose elements are converted by the array's declared element type — see "Array properties" below |
 
 Example calls:
 
@@ -25,6 +26,27 @@ Example calls:
 
 `property_set` and `create_scene_node` (`properties` object) accept these
 shapes through the same conversion chain.
+
+## Array properties
+
+Typed arrays (`Array[Node]`, `Array[Resource]`, `[Export] Node[]`, ...) convert
+element by element against the declared element type:
+
+- Node elements: a node path string or `{"__node_ref__": "Path/To/Node"}`;
+  the path resolves against the edited scene root like any node reference.
+- Resource elements: a `res://...` or `memory://...` string, `{"path":
+  "res://..."}` or `{"resource": "memory://..."}` (memory resources
+  registered in the current session).
+- `null` passes through and leaves the slot empty.
+
+Failure rules — these return an error instead of a silent write:
+
+- A non-array value assigned to an array property (it used to clear the array
+  silently; pass `[]` to clear explicitly).
+- An element of an array whose element type cannot be determined at all (an
+  untyped `Array` holding object or array elements), or an element shape the
+  tool cannot safely express for the declared element type.
+- A node path that does not resolve in the edited scene.
 
 ## Silent conversions to watch
 
@@ -89,10 +111,14 @@ Camera2D `current` has no setter at all. Make a camera current through
 
 ## C# properties
 
-Read-only or private-setter properties on C# nodes are invisible to GDScript:
-reading a property without a getter returns null. When validating C#-derived
-values through `property_get`, check readable exported fields instead of
-derived values to avoid false failures.
+C# `[Export]` node fields carry the same NodeType hint, so node path strings
+convert to node references through the standard chain. An object-typed
+assignment the engine does not actually apply (C# clears it back to null) is
+now an error ("value not applied") and the tool attempts to restore the old
+value; read-only or private-setter properties error the same way. For
+validation, still prefer readable exported fields over derived values: C#
+properties without a getter are invisible to GDScript, so reading one returns
+null, which is easy to misread as a missing property.
 
 ## memory:// resources must be saved first
 

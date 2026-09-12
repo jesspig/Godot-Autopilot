@@ -121,7 +121,11 @@ persisted and only affects processes started afterwards.
 - `get_display_screen_dpi` / `get_display_screen_refresh_rate` - density and
   refresh rate; some platforms report 0 when the value is unavailable.
 - `capture_display_screen` - capture a whole physical display as a base64
-  PNG (`screen` index, default 0). This is different from
+  PNG (`screen` index, default 0). When this tool is invoked through
+  `call_tool`, the PNG is delivered as an MCP image content block and the
+  text JSON's `data` field is replaced with `<attached-as-image-content>`
+  plus image_attached: true; inside `batch_execute`/`code_execute` the JSON
+  keeps the full base64 string. This is different from
   `capture_editor_viewport` (editor viewport) and `capture_game_viewport`
   (running game).
 

@@ -26,7 +26,18 @@ tabs. A typical lifecycle:
 `create_editor_scene` creates a new empty scene with a root node of the given
 `type` (any Node subclass, default `Node`) and `name` (default `NewRoot`).
 `close_current` (default false) also closes the previous scene, but only when
-it has no unsaved changes.
+it has no unsaved changes. `timeout_ms` (default 2000, range 50-30000) caps how
+long the call waits for the editor to observe the new root after adding it; on
+timeout the call errors with waited_ms, `timeout_ms`, node_released and
+editor_state (edited_root, unsaved_scenes,
+file_system{scanning, progress}) diagnostics, releasing the unclaimed node
+(node_released reports whether the release succeeded).
+
+Only native node roots are supported: `type` names an engine class that is
+instantiated directly, so an inherited scene (a scene whose root derives from
+another scene) cannot be created here. To derive from an existing scene, copy
+the scene file (`copy_resource_file`) or open it and save a copy under a new
+path (`save_editor_scene_as`).
 
 Replacing a scene with unsaved changes is refused:
 
@@ -37,11 +48,11 @@ Save first, then retry. A `type` that is not a Node subclass fails with
 
 ### Opening, saving, closing and reloading
 
-- `open_editor_scene` opens a scene file such as `res://game.tscn` and replaces the edited scene; it errors while the current scene has unsaved changes — call `save_editor_scene` first.
+- `open_editor_scene` opens a scene file such as `res://game.tscn` and replaces the edited scene; it errors while the current scene has unsaved changes. The error lists the unsaved paths and suggests the recovery: save with `save_editor_scene`, or discard the edits by calling `reload_editor_scene` on a listed path, then retry.
 - `save_editor_scene` saves the edited scene. A scene that was never saved is written automatically to `res://<root node name>.tscn` and the response note explains the fallback; use `save_editor_scene_as` to choose an explicit path (missing parent directories are created).
 - `save_editor_scenes` saves every open scene tab at once; scenes without a file path cannot be written to disk.
 - `close_editor_scene` refuses to close a scene with unsaved changes.
-- `reload_editor_scene` restores the scene from disk, dropping all unsaved changes without confirmation (the current scene, or `scene_path` if given). Call `save_editor_scene` first when the changes matter. Reloading also clears the scene's undo history.
+- `reload_editor_scene` restores the scene from disk, dropping all unsaved changes without confirmation (the current scene, or `scene_path` if given). A target scene that is not open now errors with `scene is not open` instead of reporting a fake success; on success the response is `{"result": "reloaded", "scene_path": ...}` (optionally with `observed: true` when the reload was confirmed). Call `save_editor_scene` first when the changes matter. Reloading also clears the scene's undo history.
 - `set_editor_main_scene` takes a `path` such as `res://game.tscn` and persists the main scene setting to project.godot.
 
 ## Creating nodes
@@ -134,7 +145,7 @@ Check what exists and what state the editor is in before modifying it:
 
 - `get_scene_tree` walks the currently edited scene, returning `name`, `type`, `path` and `children` per node. Optional `max_depth` (default 8, `-1` for unlimited) and `include_properties` (true adds up to 20 filtered properties per node). Errors when no scene is open — create or open one first.
 - `get_editor_edited_scene_root` returns the edited scene root's `name`, `type` and `path`; null when no scene is open. Start scene workflows here.
-- `property_get_list` (`path`) — every property of a node with full metadata; see the properties section below.
+- `property_get_list` (`path`, optional `only_script_variables` and `property_filter`) — every property of a node with full metadata; `only_script_variables` (default false) keeps only script-declared variables (usage flag ScriptVariable, bit 4096) and `property_filter` keeps names containing the given case-sensitive substring. See the properties section below.
 - `get_editor_selection` reports which nodes the user has selected (each with `name`, `class` and `path`; an empty array means nothing is selected). `set_editor_selection` focuses subsequent operations on specific nodes.
 - `get_editor_file_system_tree` fetches the project file tree, optionally rooted at the given path; directory entries carry children, file entries carry `name`, `path` and `type`. Trees deeper than 12 levels are truncated and the response carries a `max_depth` field. After creating or modifying files outside the editor, call `scan_editor_file_system`, then poll `get_editor_file_system_status` until `scanning` is false.
 - `capture_editor_viewport` returns a base64 PNG of the editor 2D viewport (3D fallback) — visually verify the scene after placing nodes or changing properties.
@@ -143,17 +154,21 @@ Check what exists and what state the editor is in before modifying it:
 ## Properties — reading and writing
 
 - `property_get` (`path`, `property`) — returns the exact serialized value. Unknown nodes or properties error with candidate suggestions.
-- `property_get_list` (`path`) — every property with its metadata: name, type, hint, hint_string, usage flags and class_name. Query it first to discover valid property names and enum ordering before `property_get` or `property_set`.
+- `property_get_list` (`path`, optional `only_script_variables`, `property_filter`) — every property with its metadata: name, type, hint, hint_string, usage flags and class_name. The optional filters narrow the listing to script variables (`only_script_variables`) or to names containing a case-sensitive substring (`property_filter`). Query it first to discover valid property names and enum ordering before `property_get` or `property_set`.
 - `get_scene_tree` with `include_properties` — a convenience snapshot of up to 20 filtered properties per node (metadata/, underscore-prefixed and Object-typed properties are skipped). Use `property_get` for the exact full value.
 
 `property_set` takes `path`, `property` and `value`. Omit `type_hint` to infer
 the Variant type from the property metadata. After writing, the value is read
 back: a mismatch is reported either as an error (the property may be
 read-only, nonexistent, or need an explicit `type_hint`) or as a warning when
-the engine converted the value.
+the engine converted the value. For Object- and Array-typed properties a value
+the engine does not actually apply (readback null, an emptied array, or a null
+element) is an error prefixed `value not applied`; the tool restores the old
+value when it can and says so in the error.
 
 - Every successful set registers with the editor undo stack so Ctrl-Z reverts it (the response reports undoable:true). Exception: when the old or new value is an Object reference, no action is recorded and the response reports undoable:false with a skip reason.
-- Node-typed properties accept a node path string; it is converted to a node reference automatically and the response notes the conversion.
+- Node-typed properties — engine hint `NodeType` (34), which includes C# `[Export]` node fields — accept a node path string; it is converted to a node reference automatically and the response reports converted_node_path. An unresolvable path is an error, not a silent ok.
+- Array properties convert elements one by one: node elements take a path string or `{"__node_ref__": "..."}`, resource elements take a `res://...` or `memory://...` string, `{"path": "res://..."}` or `{"resource": "memory://..."}`, and `null` leaves a slot empty. Passing a non-array value for an array property is an error instead of silently clearing it, and elements the tool cannot express safely are errors too. See `references/property-json-shapes.md`.
 - Assigning a string to an int property silently converts to 0 and reports ok. After any set with an unusual value shape, read back with `property_get` to confirm what actually landed.
 
 ```json
@@ -203,12 +218,13 @@ undo-loss caveat: `references/undo-history.md`.
 4. Add children with `create_scene_node`, passing `properties` for creation-time values. For many same-shaped nodes, `batch_execute` runs tool calls sequentially (`stop_on_error` defaults to true).
 5. Set remaining properties and wire signals (sections above).
 6. Persist with `save_editor_scene` before playing (`play_editor_current_scene`) or closing.
-7. Read back to verify: `get_scene_tree` (optionally with `include_properties`) and `property_get`.
+7. Read back to verify what landed: `get_scene_tree` (optionally with `include_properties`) and `property_get`.
+8. Observe the result when appearance matters: `capture_editor_viewport` after placing nodes or changing properties, and `validate_scene_file` before committing bulk scene edits.
 
 ## Gotchas
 
 - Three accepted node path forms: `Root/Child` (root-name prefixed), `/root/Root/Child` (absolute), `Child` (relative to the root). An unresolvable path errors as `node not found: NoSuchNode — 当前场景根为 "Root"；合法路径写法：Root/子路径、/root/Root/子路径、子路径` — the message names the current scene root.
-- `create_editor_scene` and `open_editor_scene` refuse to run while the current scene has unsaved changes; save first.
+- `create_editor_scene` and `open_editor_scene` refuse to run while the current scene has unsaved changes; `open_editor_scene` suggests either saving or calling `reload_editor_scene` on the listed path to discard the edits, while `create_editor_scene` requires saving first.
 - Immediately after `create_editor_scene` or `open_editor_scene`, `get_scene_tree` may still reflect the previous scene — call it again or wait briefly for the editor to refresh.
 - The root node cannot be deleted; close the scene with `close_editor_scene` instead.
 - `delete_scene_node` frees the node at the end of the frame, so a tree read right after may still list it.

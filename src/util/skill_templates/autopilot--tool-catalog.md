@@ -1,6 +1,6 @@
 # Category Index
 
-All 363 domain tools of the godot-autopilot MCP server, grouped by their 30 source modules. Call domain tools through `call_tool`; confirm schemas with `get_tool_detail`.
+All 365 domain tools of the godot-autopilot MCP server, grouped by their 30 source modules. Call domain tools through `call_tool`; confirm schemas with `get_tool_detail`.
 
 ## Analysis - analyze_tools (3)
 
@@ -46,7 +46,7 @@ All 363 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 
 ## Capture - capture_tools (1)
 
-- `capture_editor_viewport` - screenshot the editor viewport (or the running game with target=game) as base64 PNG
+- `capture_editor_viewport` - screenshot the editor viewport (or the running game with target=game) as base64 PNG; through `call_tool` the PNG is delivered as image content (`data` becomes `<attached-as-image-content>` with image_attached: true)
 
 ## Config - config_tools (13)
 
@@ -343,9 +343,10 @@ All 363 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `set_render_instance_layer_mask` - set a rendering instance's camera layer mask
 - `find_render_node_from_rid` - validate an RID and find scene nodes using it
 
-## Resources - resource_tools (24)
+## Resources - resource_tools (26)
 
 - `load_resource` - load a resource file from disk into memory
+- `reload_resource` - force-reload a resource file from disk, replacing the editor's cached instance
 - `load_resource_threaded` - start an async background load (step 1 of the threaded chain)
 - `get_resource_load_threaded_status` - poll a threaded load's status (step 2)
 - `get_resource_load_threaded` - fetch a threaded load's result (step 3)
@@ -362,6 +363,7 @@ All 363 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `remove_resource_file` - delete a resource file (dry-run scan first, force to actually delete)
 - `rename_resource_file` - rename or move a file with automatic reference rewriting
 - `move_resource_file` - move a file to another res:// directory through the same transaction pipeline
+- `copy_resource_file` - copy a file to dest_path inside res:// (byte-for-byte; .import/.uid sidecars are not copied)
 - `create_directory` - create directories inside the project (res:// only)
 - `get_resource_dependencies` - list the external files a resource references
 - `has_resource_dependency` - check whether a resource depends on a specific file

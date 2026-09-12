@@ -21,7 +21,10 @@ process — and there is no shared state between them:
 - To drive the game you must cross the debug channel:
   `queue_game_input`, `wait_game_input`, `sequence_game_inputs` or
   `execute_game_script`. To observe the game use `get_game_input_status`,
-  `get_game_status` or `capture_game_viewport`.
+  `get_game_status` or `capture_game_viewport` — through `call_tool` the
+  capture arrives as image content (its `data` field becomes
+  `"<attached-as-image-content>"` with image_attached: true), while inside
+  `batch_execute` / `code_execute` the JSON keeps the full base64.
 
 ## Where an injected event actually lands
 
@@ -209,8 +212,9 @@ Rules verified in engine source:
   `max(at_frame) * 33 + 2000`, capped at 30000. Resolves with `completed`
   and `executed` counts; `completed: false` means timeout.
 - `get_game_input_status` — `pressed`, `just_pressed`, `just_released`,
-  `physics_frame`; includes `recent_engine_errors` (up to 5) when any
-  exist, often the reason input looks ignored.
+  `physics_frame`. Engine errors are never attached to this response; read
+  them with `get_debugger_errors` (running game) or `get_debugger_log`
+  (editor process) instead.
 
 ```json
 {"name": "sequence_game_inputs", "arguments": {"inputs": [

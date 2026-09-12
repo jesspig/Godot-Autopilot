@@ -23,8 +23,8 @@ namespace {
 
 using namespace godot_autopilot::skill_gen;
 
-// 契约 §1 的 7 册 name 定稿清单（逐字采用，顺序不限但必须精确匹配）。
-constexpr size_t kSkillCount = 7;
+// 契约 §1 的 8 册 name 定稿清单（逐字采用，顺序不限但必须精确匹配）。
+constexpr size_t kSkillCount = 8;
 const char *const kExpectedSkillNames[kSkillCount] = {
     "godot-autopilot",
     "godot-autopilot-scene-system",
@@ -32,7 +32,8 @@ const char *const kExpectedSkillNames[kSkillCount] = {
     "godot-autopilot-scripting",
     "godot-autopilot-runtime",
     "godot-autopilot-servers",
-    "godot-autopilot-content"};
+    "godot-autopilot-content",
+    "godot-autopilot-csharp"};
 
 // 契约 §6 第 6 条手动白名单。初始清单来自契约；微调新增的均为明确非工具名/
 // 参数名的词（Godot API 方法、Godot 属性名、内部机制/返回字段、枚举值、
@@ -227,7 +228,7 @@ protected:
   }
 };
 
-TEST(SkillGenTest, AllSevenSkillsPresent) {
+TEST(SkillGenTest, AllEightSkillsPresent) {
   const std::vector<SkillSpec> skills = all_skills();
   ASSERT_EQ(skills.size(), kSkillCount);
 

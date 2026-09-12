@@ -4,8 +4,8 @@ Creating, attaching, editing and reloading GDScript through godot-autopilot, and
 
 ## Script lifecycle
 
-- `create_script` compiles before saving: compilation errors abort the call with parser output, so a success means the file on disk parses. `overwrite` defaults to false. The saved content is read back from disk and verified; a locked file surfaces as verified=false instead of silent success. Never issue parallel `create_script` calls for the same path - serial writes to one file are not synchronized.
-- `attach_script_to_node` and `detach_script_from_node` operate on the edited scene and are registered with the editor undo/redo. A script without `@tool` cannot be instantiated in the editor, so its methods only run once the game runs - `call_script_node` reports the same restriction.
+- `create_script` compiles before saving: compilation errors abort the call with parser output, so a success means the file on disk parses. `overwrite` defaults to false. The saved content is read back from disk and verified; a locked file surfaces as verified=false instead of silent success. Never issue parallel `create_script` calls for the same path - serial writes to one file are not synchronized. A passing compile only proves the file parses, not that the code runs correctly: after any script edit, read `get_debugger_log` to confirm the editor process logged no parser or runtime errors.
+- `attach_script_to_node` and `detach_script_from_node` operate on the edited scene and are registered with the editor undo/redo. `script_path` accepts any resource that `ResourceLoader` resolves as a `Script`, not only .gd files. Replacing an existing script does not migrate or clean up the old script's exported properties: stored references such as `node_paths` may be lost and have to be re-wired by hand. A script without `@tool` cannot be instantiated in the editor, so its methods only run once the game runs - `call_script_node` reports the same restriction.
 - `reload_script` reloads from disk after an external edit; `keep_state` (default false) preserves instance state across the reload. Static variables follow their own rule - see "Static initializers" below.
 - `get_script_property_list` lists a script's declared variables with name, type and usage flags.
 - `get_script_property` reads a value: with `script_path` it returns the declared default; with `node_path` the node's current value. Pass exactly one of the two.
@@ -35,7 +35,7 @@ Details in `references/execution-gotchas.md`.
 All four execute arbitrary GDScript and are treated as highest-risk side effects.
 
 - `execute_script` auto-returns a single expression's value; multi-line code needs an explicit return. print() output lands in the output field, errors in the errors field. The environment exposes `SceneRoot` (the edited scene root); reach scene nodes via SceneRoot.get_node(...).
-- `call_script_node` runs inside the existing node instance, so its state is real, not reconstructed. Non-`@tool` scripts error - run the game instead for those.
+- `call_script_node` runs inside the existing node instance, so its state is real, not reconstructed. Its parameters are `node_path`, `function` (the method name — not `method`) and optional `args`. Non-`@tool` scripts error - run the game instead for those.
 - `execute_game_script` runs inside the running game. Unlike the code_execute sandbox, temporary nodes it creates can persist in the game after the call returns. Game-channel prerequisites are covered by the godot-autopilot-runtime skill.
 
 ## The code_execute meta tool
@@ -96,8 +96,7 @@ The `tree_exited` signal fires once after the whole branch has been cut from the
 
 ## C# limitations
 
-- `build_csharp_assembly` only triggers a `dotnet build` of the .csproj or .sln found at res:// (asynchronous; the response reports started and a pid). There is no public GDExtension API to hot-reload a .NET assembly inside the editor, so after changing C# class signatures someone must click Build in the editor or restart it. The GDScript channels are unaffected.
-- C# properties without a getter are invisible to GDScript: reading one returns null, which is easy to misread as a missing property.
+C#-specific workflows — `build_csharp_assembly`, the lack of in-editor .NET assembly hot-reload, and how C# properties appear to GDScript — live in the `godot-autopilot-csharp` skill; the GDScript channels are unaffected by .NET assembly state.
 
 ## Hot reload in the running game
 

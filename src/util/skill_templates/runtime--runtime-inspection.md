@@ -11,9 +11,9 @@ and types) as a formatted text tree. It takes no parameters.
 
 - With an active debug session it reads the live game over the runtime
   channel.
-- Without a session it returns the **last editor-captured tree** — data may
-  be stale without any error saying so. Check `get_debugger_session_info`
-  first when freshness matters.
+- Without a session it returns an empty result plus a `note` — there is no
+  editor-side fallback, so check `get_debugger_session_info` to tell the two
+  cases apart.
 
 Use it to answer "what is instantiated right now": which scene root is up,
 what spawned at runtime, whether a node you are about to address actually
@@ -99,9 +99,8 @@ sanity checks around a session, not as game probes:
 - `get_debugger_session_info` — `active`, `breaked`, `running` and the
   session count; the gate for every session-capture tool and the reason a
   "live" probe may silently return stale data.
-- `get_debugger_scene_tree` without a session returns the last captured
-  tree, as noted above — the one runtime-inspection tool with a stale-data
-  mode.
+- `get_debugger_scene_tree` without a session returns an empty result plus a
+  `note`, as noted above — a live tree requires an active session.
 
 ## See also
 
