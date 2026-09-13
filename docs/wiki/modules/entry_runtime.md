@@ -6,7 +6,7 @@ tags:
   - 模块
   - 入口
   - 运行时桥接
-timestamp: "2026-09-13T03:47:12+08:00"
+timestamp: "2026-09-13T17:50:28+08:00"
 resource:
   - src/main.cpp
   - src/runtime/
@@ -14,7 +14,7 @@ resource:
 
 # 模块：入口与运行时桥接（entry_runtime）
 
-覆盖代码：`src/main.cpp`（322 行）与 `src/runtime/`（`gda_protocol.hpp` 53 行、`game_bridge.hpp` 47 行、`game_bridge.cpp` 656 行、`game_bridge_input.cpp` 875 行、`game_bridge_eval.cpp` 427 行）。
+覆盖代码：`src/main.cpp`（326 行）与 `src/runtime/`（`gda_protocol.hpp` 53 行、`game_bridge.hpp` 79 行、`game_bridge.cpp` 701 行、`game_bridge_input.cpp` 939 行、`game_bridge_eval.cpp` 509 行）。
 
 职责全景：`main.cpp` 是 GDExtension 的导出入口与编辑器插件本体；`src/runtime/` 是在**游戏运行时进程**内与编辑器进程通信的桥接层，通过 EngineDebugger 消息通道承载 GDA 协议。编辑器内的 MCP 服务器（`ServerContext`）与运行时桥接是两条相互独立的消息通路，本页只覆盖入口生命周期与运行时桥接，MCP 工具侧见相关模块页。
 
@@ -25,7 +25,7 @@ resource:
 - 以 `extern "C"` 导出，签名 `GDExtensionEntryPoint(GDExtensionInterfaceGetProcAddress, GDExtensionClassLibraryPtr, GDExtensionInitialization*)`。
 - 修饰宏 `GDA_EXPORT`：Windows（`_WIN32`）为 `__declspec(dllexport)`，其余平台为空。
 - 函数体：构造 `godot::GDExtensionBinding::InitObject`，注册 initializer 与 terminator 回调，最后返回 `init.init()`。
-- 两个回调内部均包 try/catch，异常只记录日志不中断；`_enter_tree` 内另有四组步骤级 try/catch（log dock / output logger / debugger plugin / config dock），catch 分支统一委托 `log_setup_failure` 助手（`main.cpp:30-40`）写 System 错误日志。
+- 两个回调内部均包 try/catch，异常只记录日志不中断；`_enter_tree` 内另有四组步骤级 try/catch（log dock / output logger / debugger plugin / config dock），catch 分支统一委托 `log_setup_failure` 助手（`main.cpp:30-42`，`std::exception` 与兜底两个重载）写 System 错误日志。
 
 ### 1.2 模块初始化（register_initializer）
 
@@ -72,7 +72,7 @@ resource:
 
 ## 2. GDA 协议常量（gda_protocol.hpp）
 
-协议载体：EngineDebugger 消息通道（`register_message_capture("gda", ...)` / `send_message`）。消息正文为 JSON 字符串。消息方向：`gda:request` 由工具侧（`src/tools/debugger_access.cpp`）发向运行时，`gda:response` / `gda:ready` 由运行时（`game_bridge.cpp`）发出；工具侧接收方在 `src/tools/debugger_ops.cpp`。
+协议载体：EngineDebugger 消息通道（`register_message_capture("gda", ...)` / `send_message`）。消息正文为 JSON 字符串。消息方向：`gda:request` 由工具侧（`src/tools/debugger_access.cpp`）发向运行时，`gda:response` / `gda:ready` 由运行时（`game_bridge.cpp`）发出；工具侧接收方在 `src/tools/debugger_ops.cpp`（09-13 下午起：ready 首次标记会话就绪时触发一次 `runtime_ops::run_channel_self_check` 后台 status 往返自检；ready/response 消息均返回 true 消费，消除编辑器 `Unknown message` 噪声）。
 
 ### 2.1 消息类型（GDA_MSG_*）
 
@@ -138,7 +138,7 @@ resource:
 
 ### 3.1 game_bridge.cpp — 消息通道与缓冲
 
-- `register_listener()`（幂等，`g_registered` 守卫）：首次调用时注册 7 个类（`GameBridgeListener`、`GameBridgeLogger`，及 eval 组 `GameBridgeEvalAwaiter`、input 组 Watcher/DelayedRelease/Sequence/FrameSequence 共 4 个桥接类；注册顺序 Listener→eval→input→Logger）；实例化监听器与日志器；`EngineDebugger::register_message_capture("gda", on_gda_message)` 捕获前缀 `gda` 的消息；`OS::add_logger` 挂游戏日志器；随后立即发出 `gda:ready`（body 含 `ready:true` 与活动字段）。
+- `register_listener()`（幂等，`g_registered` 守卫）：首次调用时注册 7 个类（`GameBridgeListener`、`GameBridgeLogger`，及 eval 组 `GameBridgeEvalAwaiter`、input 组 Watcher/DelayedRelease/Sequence/FrameSequence 共 4 个桥接类；注册顺序 Listener→eval→input→Logger）；实例化监听器与日志器；注册 `gda` 消息捕获**前后各做一次 `has_capture` 检查**（09-13 下午起：已存在或注册后验证失败时记 System 错误日志并 return，不挂日志器、不发 `gda:ready`，避免半途状态被当作就绪）；成功后 `OS::add_logger` 挂游戏日志器，随后立即发出 `gda:ready`（body 含 `ready:true` 与活动字段）。
 - `unregister_listener()`：反注册消息捕获与日志器，unref 两个实例。
 - `GameBridgeListener`（RefCounted 子类）：绑定方法 `on_gda_message(p_message: String, p_data: Array) -> bool`。解析 `data[0]` 为 JSON 请求，取 `request_id`/`op`/`params` 分发；每收到一条消息即刷新 `g_last_activity_ms`；响应统一附加 `ok` 字段后经 `send_response` 发出。请求畸形或 op 执行失败会同时记入错误与输出缓冲。
 - `send_response(request_id, body)`：补 `request_id` 字段（`GDA_FIELD_REQUEST_ID` 常量），`EngineDebugger::send_message("gda:response", [json])`。
@@ -168,15 +168,15 @@ resource:
 - `op_eval_script`：`source_code` → 实例化 `GDScript` 并 `reload()`（编译失败回错误 + 编译期错误增量文本）；构造临时 Node 挂脚本，`persist` 时挂载到 `/root/__gda_runtime/<persist_name>`（缺省 `eval_<request_id>`，重名报错）；要求脚本含 `_run()` 方法；调用 `_run()` 后若返回 `GDScriptFunctionState`（await）则转 `GameBridgeEvalAwaiter` 异步等待，否则同步返回序列化结果（并附运行期错误增量、persist 时补 `node_path`）。
 - `GameBridgeEvalAwaiter`（Node）：连接 state 的 `completed` 信号或超时（默认 5000ms）后响应；完成路径与超时路径都会 `send_response` 并清理（取消 handler、断信号、非 persist 时删除临时节点、queue_free）。
 - `get_property` / `call_method`：经 `resolve_node` 定位节点；call_method 校验 `has_method` 并把 args 按 JSON 反序列化后 `callv`。
-- `set_property`：查 `get_property_list` 取类型与 hint 构造 `type_hint`，`VariantJson::deserialize(value, type_hint)` 后 set，并用 `util::check_readback` 读回校验（REJECTED 报错、CONVERTED 附 warning）。
+- `set_property`：查 `get_property_list` 取类型与 hint 构造 `type_hint`，`VariantJson::deserialize(value, type_hint)` 后 set，并用 `util::check_readback(..., type_sensitive=true)` 读回校验（09-13 下午起：值类型走分量近似比较，设置未生效（回读仍等于旧值）判 REJECTED 报错、引擎调整值附 warning）。
 
 ## 4. 与现有文档对照
 
-- AGENTS.md "入口点：src/main.cpp → GDExtensionEntryPoint → 注册 GodotAutopilotPlugin 并启动 ServerContext"：方向正确，但**严格说 ServerContext 不是入口点启动的**——`GDExtensionEntryPoint` 只做类注册与 `add_by_type`，插件实例由 Godot 创建后在其 `_enter_tree()` 中才 `new ServerContext` 并 `start()`（main.cpp:161-175）。实际链为：入口点 → 注册插件类型 → Godot 实例化 → `_enter_tree` → ServerContext 启动。
+- AGENTS.md "入口点：src/main.cpp → GDExtensionEntryPoint → 注册 GodotAutopilotPlugin 并启动 ServerContext"：方向正确，但**严格说 ServerContext 不是入口点启动的**——`GDExtensionEntryPoint` 只做类注册与 `add_by_type`，插件实例由 Godot 创建后在其 `_enter_tree()` 中才 `new ServerContext` 并 `start()`（main.cpp:162-177）。实际链为：入口点 → 注册插件类型 → Godot 实例化 → `_enter_tree` → ServerContext 启动。
 - AGENTS.md "在 MODULE_INITIALIZATION_LEVEL_EDITOR 阶段加载到 Godot 编辑器"：编辑器侧类确在 EDITOR 级别注册；但运行时桥接 `register_listener` 注册在 **SCENE 级别**且仅非编辑器进程，属补充事实而非矛盾。
 - AGENTS.md 线程模型 "HTTP 线程 → CommandQueue::submit() → 主线程 _process() 排空"：与 `_process()` 中 `s_queue.drain()` 一致。
 - AGENTS.md 错误模式 `{"error": "..."}`：桥接层 `error_result` 同构；差异是桥接响应额外带布尔 `ok` 字段。
-- Example/docs/architecture.md 的 HTTP→SDK 线程→CommandQueue→主线程流程图与本文件 `_process` 实现一致；该文档的 `game_*` 工具（get_game_status/queue_game_input/capture_game_viewport 等）正是本页桥接 op 在 MCP 工具侧的封装。
+- `game_*` 工具（get_game_status/queue_game_input/capture_game_viewport 等）正是本页桥接 op 在 MCP 工具侧的封装（原 Example/docs/architecture.md 已随 2026-09-13 Example 文档重构删除，不再作为对照基线）。
 
 不一致点汇总：
 

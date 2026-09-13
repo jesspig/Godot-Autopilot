@@ -23,6 +23,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -39,6 +40,7 @@ std::mutex g_editor_queue_mtx;
 
 constexpr int64_t RESPONSE_GRACE_MS = 2000;
 constexpr int64_t PHYSICS_STALL_DETECT_MS = 1000;
+constexpr size_t MAX_PAYLOAD_SUMMARY_CHARS = 256;
 
 int64_t g_last_status_physics_frame = -1;
 std::chrono::steady_clock::time_point g_last_status_time;
@@ -48,7 +50,21 @@ bool env_flag_disabled(const std::string &value) {
   return value == "0" || value == "false";
 }
 
+int64_t steady_now_ms() {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(
+             std::chrono::steady_clock::now().time_since_epoch())
+      .count();
+}
+
+std::string summarize_payload(const std::string &payload) {
+  if (payload.size() <= MAX_PAYLOAD_SUMMARY_CHARS)
+    return payload;
+  return payload.substr(0, MAX_PAYLOAD_SUMMARY_CHARS) + "...";
+}
+
 std::atomic<int64_t> g_next_request_id{1};
+std::atomic<int64_t> g_responses_received{0};
+std::atomic<int64_t> g_last_response_steady_ms{-1};
 
 struct PendingRequest {
   enum class State { Waiting, Completed, Cancelled };
@@ -59,6 +75,7 @@ struct PendingRequest {
   JV response;
   std::string op;
   int32_t session_id = -1;
+  int32_t session_count = 0;
 };
 
 std::mutex g_pending_mtx;
@@ -113,7 +130,9 @@ JV send_request(int64_t request_id, const std::string &op, const JV &params) {
   payload[GDA_FIELD_PARAMS] = params;
 
   int32_t used_session_id = -1;
-  if (!debugger_broadcast_request(payload.Dump(), &used_session_id)) {
+  int32_t session_count = 0;
+  if (!debugger_broadcast_request(payload.Dump(), &used_session_id,
+                                  &session_count)) {
     {
       std::lock_guard<std::mutex> lock(pending->mtx);
       pending->state = PendingRequest::State::Cancelled;
@@ -125,6 +144,7 @@ JV send_request(int64_t request_id, const std::string &op, const JV &params) {
   }
 
   pending->session_id = used_session_id;
+  pending->session_count = session_count;
 
   JV r(JV::object_tag);
   r["request_id"] = JV(request_id);
@@ -156,9 +176,28 @@ mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms) {
   if (!completed) {
     std::string op_name = pending->op.empty() ? "?" : pending->op;
     int32_t session_id = pending->session_id;
+    int32_t session_count = pending->session_count;
     pending->state = PendingRequest::State::Cancelled;
     erase_pending(request_id, pending);
     lock.unlock();
+
+    size_t pending_count = 0;
+    {
+      std::lock_guard<std::mutex> pending_lock(g_pending_mtx);
+      pending_count = g_pending.size();
+    }
+    int64_t last_response_ms = g_last_response_steady_ms.load();
+    std::string response_summary;
+    if (last_response_ms >= 0) {
+      response_summary = "responses received: " +
+                         std::to_string(g_responses_received.load()) +
+                         ", last response " +
+                         std::to_string(steady_now_ms() - last_response_ms) +
+                         " ms ago, pending: " + std::to_string(pending_count);
+    } else {
+      response_summary = "no gda:response received yet, pending: " +
+                         std::to_string(pending_count);
+    }
     if (session_id >= 0) {
       if (CommandQueue *queue = current_editor_queue(); queue &&
           !queue->is_closed()) {
@@ -170,16 +209,18 @@ mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms) {
         }
       }
     }
-    return error_json("game op \"" + op_name + "\" timed out after " +
-                      std::to_string(timeout_ms) + " ms (request_id " +
-                      std::to_string(request_id) +
-                      ") — the request was sent to the active debug session(s) "
-                      "but no response arrived; the game process may be paused "
-                      "or physics-frozen (query get_game_status), or the game "
-                      "project may not load the godot-autopilot extension. "
-                      "If the in-game script errored, a pending await may " 
-                      "never complete — run get_game_log_entries to inspect "
-                      "the game log.");
+    return error_json(
+        "game op \"" + op_name + "\" timed out after " +
+        std::to_string(timeout_ms) + " ms (request_id " +
+        std::to_string(request_id) + ") — sent to " +
+        std::to_string(session_count) + " debug session(s); " +
+        response_summary +
+        "; the game process may be paused or physics-frozen (query "
+        "get_game_status), or the game project may not load the "
+        "godot-autopilot extension. "
+        "If the in-game script errored, a pending await may "
+        "never complete — run get_game_log_entries to inspect "
+        "the game log.");
   }
   erase_pending(request_id, pending);
 
@@ -329,6 +370,62 @@ mcp::JsonValue handle_gda_send(const std::string &op,
   return r;
 }
 
+void run_channel_self_check(int32_t p_session_id) {
+  constexpr int64_t SELF_CHECK_TIMEOUT_MS = 1500;
+  constexpr size_t ERROR_PREVIEW_CHARS = 256;
+  auto started = std::chrono::steady_clock::now();
+  JV pending =
+      handle_gda_send("status", JV(JV::object_tag), SELF_CHECK_TIMEOUT_MS);
+  if (pending.Contains("error")) {
+    LogSystem::instance().log(LogLevel::Warning, LogCategory::Tools,
+                              "runtime channel self-check failed to send: " +
+                                  pending["error"].GetString());
+    return;
+  }
+  auto *request_id_p = pending.Find("__gda_pending");
+  if (!request_id_p || !request_id_p->IsInt()) {
+    LogSystem::instance().log(
+        LogLevel::Warning, LogCategory::Tools,
+        "runtime channel self-check failed to send: missing pending request id");
+    return;
+  }
+  int64_t request_id = request_id_p->GetInt();
+  int64_t wait_ms = SELF_CHECK_TIMEOUT_MS + RESPONSE_GRACE_MS;
+  if (auto *timeout_p = pending.Find("timeout_ms")) {
+    if (timeout_p->IsInt() && timeout_p->GetInt() > 0)
+      wait_ms = timeout_p->GetInt();
+  }
+  try {
+    std::thread([p_session_id, request_id, wait_ms, started]() {
+      JV response = wait_pending_response(request_id, wait_ms);
+      int64_t elapsed_ms =
+          std::chrono::duration_cast<std::chrono::milliseconds>(
+              std::chrono::steady_clock::now() - started)
+              .count();
+      if (response.Contains("error")) {
+        std::string error_text = response["error"].GetString();
+        if (error_text.size() > ERROR_PREVIEW_CHARS)
+          error_text.resize(ERROR_PREVIEW_CHARS);
+        LogSystem::instance().log(
+            LogLevel::Warning, LogCategory::Tools,
+            "runtime channel self-check failed (session " +
+                std::to_string(p_session_id) + "): " + error_text);
+        return;
+      }
+      LogSystem::instance().log(
+          LogLevel::Info, LogCategory::Tools,
+          "runtime channel self-check ok (session " +
+              std::to_string(p_session_id) + ", status round-trip " +
+              std::to_string(elapsed_ms) + " ms)");
+    }).detach();
+  } catch (const std::exception &ex) {
+    LogSystem::instance().log(
+        LogLevel::Warning, LogCategory::Tools,
+        std::string("runtime channel self-check failed to start waiter: ") +
+            ex.what());
+  }
+}
+
 mcp::JsonValue finalize_capture_response(const mcp::JsonValue &pending_result) {
   if (pending_result.Contains("error"))
     return pending_result;
@@ -396,41 +493,28 @@ mcp::JsonValue finalize_capture_response(const mcp::JsonValue &pending_result) {
   }
 }
 
-mcp::JsonValue game_capture_blocking(int64_t timeout_ms) {
-  if (timeout_ms <= 0)
-    timeout_ms = GDA_DEFAULT_TIMEOUT_MS;
-  if (timeout_ms > GDA_MAX_TIMEOUT_MS)
-    timeout_ms = GDA_MAX_TIMEOUT_MS;
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "capture_editor_viewport delegating to game capture");
-  JV pending = handle_gda_send("capture", JV(JV::object_tag), timeout_ms);
-  if (pending.Contains("error"))
-    return pending;
-  auto *rid_p = pending.Find("__gda_pending");
-  int64_t rid = (rid_p && rid_p->IsInt()) ? rid_p->GetInt() : -1;
-  if (rid < 0)
-    return error_json("unexpected pending state for game capture request");
-  int64_t wait_ms = timeout_ms;
-  if (auto *t = pending.Find("timeout_ms")) {
-    if (t->IsInt() && t->GetInt() > 0)
-      wait_ms = t->GetInt();
-  }
-  JV final_result = wait_pending_response(rid, wait_ms);
-  if (final_result.IsObject() && final_result.Contains("path"))
-    final_result = finalize_capture_response(final_result);
-  return final_result;
-}
-
 void handle_game_response(const std::string &json_str) {
+  g_responses_received.fetch_add(1);
+  g_last_response_steady_ms.store(steady_now_ms());
   maybe_recover_break();
   JV parsed = JV::Parse(json_str);
-  if (!parsed.IsObject())
+  if (!parsed.IsObject()) {
+    LogSystem::instance().log(
+        LogLevel::Warning, LogCategory::Tools,
+        "game response discarded: payload is not a JSON object (payload: " +
+            summarize_payload(json_str) + ")");
     return;
+  }
   if (parsed.Contains("runtime_error"))
     error_watermark::record_error();
   auto *rid = parsed.Find("request_id");
-  if (!rid || !rid->IsInt())
+  if (!rid || !rid->IsInt()) {
+    LogSystem::instance().log(
+        LogLevel::Warning, LogCategory::Tools,
+        "game response discarded: missing or non-integer request_id (payload: " +
+            summarize_payload(json_str) + ")");
     return;
+  }
   int64_t request_id = rid->GetInt();
 
   std::shared_ptr<PendingRequest> pending;

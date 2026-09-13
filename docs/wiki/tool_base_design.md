@@ -1,26 +1,27 @@
 ---
 type: 模块文档（设计+实现）
 title: ToolBase 工具统一标准化（接口 + 组合 + 真类化）
-description: 以接口 + 组合统一全体工具：ToolBase 接口、角色接口切片、GDA_TOOL_CLASS 真类宏、ToolRegistry 单一来源，365 域工具全部为独立 ToolBase 子类
+description: 以接口 + 组合统一全体工具：ToolBase 接口、角色接口切片、GDA_TOOL_CLASS 真类宏、ToolRegistry 单一来源，366 域工具全部为独立 ToolBase 子类
 tags:
   - 设计
   - 工具架构
   - 接口
   - 组合
-timestamp: "2026-09-13T03:48:49+08:00"
+timestamp: "2026-09-13T17:56:30+08:00"
+resource: src/tools/
 ---
 
 # ToolBase 工具统一标准化（设计定稿 + 全量真类化实现）
 
-> **当前 API 面（2026-08-22 复核；工具数/排除集于 2026-09-13 随反馈修复批次同步）**
+> **当前 API 面（2026-08-22 复核；工具数/排除集于 2026-09-13 随收口批次同步）**
 > `tool_base.hpp`：`SideEffect` 枚举 + `side_effect_name`、`ToolMeta`、`ISideEffect`、`IMetaTool`、`ToolBase`（meta/execute/input_schema 三件套）、`side_effect_of` 自由函数。
 > `tool_decl.hpp`：`GDA_TOOL_CLASS` / `GDA_TOOL_CLASS_SIDE` 真类宏；`fn_tool.hpp`：`FnTool(ToolMeta, HandlerFn, schema, SideEffect=None)`（实现 `ISideEffect`）+ `make_fn_tool`。
 > `tool_registry.hpp`：`make_tool_info` + `ToolRegistry`（`add` 按 `dynamic_cast<IMetaTool*>` 自动归类 / `find` / `find_meta` / `find_any` / `all` / `all_meta` / `all_any`）。
-> - **365 域工具全部为独立 `ToolBase` 子类**，分散于 `src/tools/<域>_tools.hpp`（30 个域文件），`execute` 委托既有 domain handler、`input_schema` 统一经 `tool_input_schema` 取；
+> - **366 域工具全部为独立 `ToolBase` 子类**，分散于 `src/tools/<域>_tools.hpp`（30 个域文件），`execute` 委托既有 domain handler、`input_schema` 统一经 `tool_input_schema` 取；
 > - `tool_defs.def` 已删除；`register_all` 注册 30 个域的 `make_tools()` + `system_status`（FnTool）+ 7 元工具（`MetaTool`，接口 + 组合），catalog / BM25 index / 分发 map 全部从 registry 派生；
 > - **元工具 = 接口 + 组合**：`IMetaTool` 标记接口 + `MetaTool`（`ToolBase`+`IMetaTool`，依赖组合注入），`ToolRegistry::add()` 用 `dynamic_cast<IMetaTool>` 自动归类——实现接口即元工具；
-> - **副作用驱动遍历排除**：`SideEffect` 枚举 8 值（`None/WritesFile/WritesConfig/ShowsAlert/ModifiesWindow/Process/CodeExecute/GameRuntime`）；49 个副作用工具用 `GDA_TOOL_CLASS_SIDE` 宏标记（实现 `ISideEffect`）；`get_tool_detail` 返回 `side_effect` 字段；遍历 runner 仅枚举 `GDA_TOOL_CLASS(` 的 316 个并读该字段兜底排除，删除硬编码 `kExcludedSideEffectTools`。
-> 验证：L1 **114/114**（122 点含 L2） + L2 通过（含 03_tools_contract 遍历：域工具 365，解析器枚举 316 + 49 个 SIDE 不枚举）。权威计数：域工具 365、`system_status` 1、元工具 7、catalog/index 373、MCP 可达 372。
+> - **副作用驱动遍历排除**：`SideEffect` 枚举 8 值（`None/WritesFile/WritesConfig/ShowsAlert/ModifiesWindow/Process/CodeExecute/GameRuntime`）；49 个副作用工具用 `GDA_TOOL_CLASS_SIDE` 宏标记（实现 `ISideEffect`）；`get_tool_detail` 返回 `side_effect` 字段；遍历 runner 仅枚举 `GDA_TOOL_CLASS(` 的 317 个并读该字段兜底排除，删除硬编码 `kExcludedSideEffectTools`。
+> 验证口径：L1 **126** 用例 + L2 9 份配置 = ctest 注册点 **135**（已 `ctest --preset debug -N` 实测确认；L1 为源码 `TEST`/`TEST_F` 宏统计）；`03_tools_contract` 遍历口径：域工具 366，解析器枚举 317 + 49 个 SIDE 不枚举。权威计数：域工具 366、`system_status` 1、元工具 7、catalog/index 374、MCP 可达 373。
 >
 > 相关页面： [工具注册表](modules/tools_registry.md) · [工程约定](conventions.md) · [测试体系](tests.md) · [架构总览](overview.md)
 
@@ -52,7 +53,7 @@ class IMetaTool {};                                         // 纯标记接口
 inline SideEffect side_effect_of(const ToolBase &t);        // dynamic_cast<ISideEffect*>，未实现返回 None
 ```
 
-- **线程契约**：`execute()` 复用现 [dispatch.cpp](../src/tools/dispatch.cpp) 的 `queue.submit` 路由，仅主线程被调；类内部不得另起线程触碰 Godot API。
+- **线程契约**：领域工具 handler 复用现 [dispatch.cpp](../../src/tools/dispatch.cpp) 的 `queue.submit` 路由，仅主线程被调；唯一例外是 `call_tool` 元工具的编排回调（等待运行时响应/截图定型），自 2026-09-13 起在 MCP 线程执行、经 dispatch 把领域工具 handler 路由回主线程，编排逻辑自身不触碰 Godot API。类内部不得另起线程触碰 Godot API。
 - 错误直接返回 `{"error": msg}` JSON 对象（无独立封装助手——早期设计的 `make_ok()/make_error()` 与参数读取助手 `ArgReader` 曾短暂落地，2026-08-22 清理时删除：样板量有限，收敛收益不抵抽象成本）。
 - 导出禁用不做角色接口：RegisterTool 回调统一前置 `ExportGuard::is_exporting()` 检查；异步同样不做接口——`__gda_pending` 约定由 `call_tool` 的等待逻辑统一处理（`runtime_ops::wait_pending_response`）。早期设计的 `IExportGuard`/`IAsync`/`blocks_export`/`tool_is_async` 已随清理删除。
 - 副作用：`side_effects()` 作为 L2 遍历测试排除依据，替代 `tests/runner/traversal.cpp` 的硬编码清单。
@@ -85,4 +86,4 @@ public:
 3. **元工具迁移**：7 个 `MetaTool`（接口 + 组合）。
 4. **收尾清理（2026-08-22）**：删除未兑现或已被更简机制取代的抽象（`ArgReader`/`make_ok`/`make_error`/`IExportGuard`/`IAsync`/`blocks_export`/`tool_is_async`/`add_meta`/`to_tool_info_all`），FnTool 构造收缩为四参，L1 断言与计数同步。
 
-> 行为对等由 L1 断言数字（373 catalog 条目）与 L2 契约用例守住；后续改动需重新核算工具数与文档同步。
+> 行为对等由 L1 断言（catalog 与 registry 全量互覆盖、`SchemaStatisticsBaseline` 动态断言非空>空>0，不硬编码条目数）与 L2 契约用例守住；后续改动需重新核算工具数与文档同步。

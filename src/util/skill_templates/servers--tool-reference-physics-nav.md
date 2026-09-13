@@ -9,9 +9,19 @@ See `SKILL.md` in the parent folder for workflows and the RID mental model.
 | Tool | Purpose |
 |---|---|
 | `get_physics_2d_space_direct_state` | Direct state of a 2D space; confirms it is valid, active and in a scene, and lists the available queries. |
-| `intersect_physics_2d_ray` | Closest-hit ray cast; `space_rid` may be omitted to auto-detect the open editor scene's 2D world. |
+| `intersect_physics_2d_ray` | Closest-hit ray cast; `space_rid` may be omitted to auto-detect the edited scene's 2D world inside the editor process (see the note below). |
 | `intersect_physics_2d_shape` | All colliders overlapping a shape RID; `transform` places it, `motion` sweeps it. |
 | `intersect_physics_2d_point` | All colliders touching a point; `max_results` caps the reply (default 32). |
+
+`intersect_physics_2d_ray` auto-detection resolves the World2D space of the
+edited scene root's SubViewport in the editor process. The editor and a running
+game are separate processes with independent physics worlds, so coordinates from
+the game never hit anything in the editor space. Both the hit and the null reply
+carry the queried `space_rid` and an auto_detected flag; cross-check `space_rid`
+against `get_physics_2d_space_direct_state` to confirm which space was actually
+queried. A null result means the query ran but hit nothing, while a
+space_get_direct_state returned null error means the direct state was unavailable
+(physics thread running or space locked) - a different failure, not a miss.
 
 ## 2D bodies
 

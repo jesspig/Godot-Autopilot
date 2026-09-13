@@ -6,6 +6,7 @@
 #include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #include <algorithm>
+#include <exception>
 #include <vector>
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
@@ -206,6 +207,7 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
   }
 
   std::vector<std::string> applied_properties;
+  std::vector<mcp::JsonValue> property_warnings;
   if (props_it) {
     auto *scene_root_now =
         editor ? editor->get_edited_scene_root() : nullptr;
@@ -215,8 +217,20 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
       prop_args["path"] = mcp::JsonValue(node_rel_path);
       prop_args["property"] = mcp::JsonValue(kv.first);
       prop_args["value"] = kv.second;
-      mcp::JsonValue prop_result =
-          godot_autopilot::property_ops::handle_set(prop_args);
+      mcp::JsonValue prop_result;
+      try {
+        prop_result = godot_autopilot::property_ops::handle_set(prop_args);
+      } catch (const std::exception &) {
+        if (godot::Node *cur_parent = obj->get_parent())
+          cur_parent->remove_child(obj);
+        memdelete(obj);
+        throw;
+      } catch (...) {
+        if (godot::Node *cur_parent = obj->get_parent())
+          cur_parent->remove_child(obj);
+        memdelete(obj);
+        throw;
+      }
       auto *err = prop_result.Find("error");
       if (err) {
         if (godot::Node *cur_parent = obj->get_parent())
@@ -227,6 +241,14 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
             mcp::JsonValue("failed to apply property '" + kv.first +
                            "' on created node: " + err->GetString());
         return e;
+      }
+      auto *warn = prop_result.Find("warning");
+      if (warn && warn->IsString()) {
+        mcp::JsonValue w(mcp::JsonValue::object_tag);
+        w["path"] = mcp::JsonValue(node_rel_path);
+        w["property"] = mcp::JsonValue(kv.first);
+        w["warning"] = mcp::JsonValue(warn->GetString());
+        property_warnings.push_back(std::move(w));
       }
       applied_properties.push_back(kv.first);
     }
@@ -257,6 +279,12 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
   for (const auto &applied_name : applied_properties)
     applied.PushBack(mcp::JsonValue(applied_name));
   inner["applied_properties"] = std::move(applied);
+  if (!property_warnings.empty()) {
+    mcp::JsonValue warnings(mcp::JsonValue::array_tag);
+    for (auto &w : property_warnings)
+      warnings.PushBack(std::move(w));
+    inner["property_warnings"] = std::move(warnings);
+  }
   inner["undo"] =
       mcp::JsonValue("delete node " + result_path + " (delete_scene_node)");
   r["result"] = std::move(inner);

@@ -242,7 +242,8 @@ JV handle_2d_ray_cast(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "intersect_physics_2d_ray called");
   godot::RID space = util::resolve_rid<PhysicsRidDomain>(args, "space_rid");
-  if (!space.is_valid()) {
+  bool auto_detected = !space.is_valid();
+  if (auto_detected) {
     space = auto_detect_2d_space();
   }
   auto *it_from = args.Find("from");
@@ -273,6 +274,8 @@ JV handle_2d_ray_cast(const JV &args) {
   if (!state) {
     JV r(JV::object_tag);
     r["error"] = JV("space_get_direct_state returned null");
+    r["space_rid"] = JV(static_cast<int64_t>(space.get_id()));
+    r["auto_detected"] = JV(auto_detected);
     return r;
   }
   auto *cm = args.Find("collision_mask");
@@ -292,12 +295,16 @@ JV handle_2d_ray_cast(const JV &args) {
   if (result.is_empty()) {
     JV r(JV::object_tag);
     r["result"] = JV(nullptr);
+    r["space_rid"] = JV(static_cast<int64_t>(space.get_id()));
+    r["auto_detected"] = JV(auto_detected);
     return r;
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "intersect_physics_2d_ray completed");
   JV r(JV::object_tag);
   r["result"] = hit_2d(result);
+  r["space_rid"] = JV(static_cast<int64_t>(space.get_id()));
+  r["auto_detected"] = JV(auto_detected);
   return r;
 }
 

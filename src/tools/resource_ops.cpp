@@ -818,7 +818,8 @@ mcp::JsonValue handle_save(const mcp::JsonValue &args) {
     auto *loader = godot::ResourceLoader::get_singleton();
     if (loader) {
       godot::Ref<godot::Resource> verify =
-          loader->load(godot::String(dest_path.c_str()));
+          loader->load(godot::String(dest_path.c_str()), godot::String(),
+                       godot::ResourceLoader::CACHE_MODE_IGNORE);
       verified = verify.is_valid();
       if (copy_on_write && verify.is_valid() &&
           verify.ptr() == cow_source.ptr()) {
@@ -2849,7 +2850,7 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue &args) {
 
   std::string readback_detail;
   util::ReadbackStatus readback =
-      util::check_readback(value, old_val, new_val, readback_detail);
+      util::check_readback(value, old_val, new_val, readback_detail, true);
 
   mcp::JsonValue j(mcp::JsonValue::object_tag);
   j["result"] = mcp::JsonValue("ok");

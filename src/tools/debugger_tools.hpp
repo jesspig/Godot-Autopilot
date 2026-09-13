@@ -16,6 +16,10 @@ GDA_TOOL_CLASS(GetDebuggerLogTool, "get_debugger_log",
                "Read the editor-process engine log buffer, including script errors and print output routed through the engine logger. It always contains data and does not require a running game; for the running game use get_debugger_errors, and for the game process log file on disk use get_game_log_entries. Optional 'limit' (default 50) caps the returned entries.",
                "Debugger", std::vector<std::string>({"debugger", "log", "output"}), debugger_ops::handle_output_get_log, false)
 
+GDA_TOOL_CLASS(GetPluginLogTool, "get_plugin_log",
+               "Read the plugin's own in-process LogSystem buffer — internal diagnostics such as 'late game response discarded', authorization denials and timeout diagnostics — and does not require a running game. This is a different source from get_debugger_log, which reads the editor-process engine log buffer (OS logger). Optional 'limit' (default 100, max 1000), 'level' (debug/info/warning/error, default debug = no filtering), 'category' (system/transport/tools/resources/prompts), 'filter' (case-insensitive substring) and 'since_index' (incremental read from a previous call's next_index; the response includes next_index).",
+               "Debugger", std::vector<std::string>({"debugger", "log", "plugin"}), debugger_ops::handle_plugin_log_get, false)
+
 GDA_TOOL_CLASS(GetDebuggerErrorsTool, "get_debugger_errors",
                "Read script errors from the running game process as a structured list (time, file, func, line, error, descr, is_warning, stack). Requires a game launched from the editor (play_editor_current_scene) whose project loads the godot-autopilot extension; without an active debug session it returns an empty result plus a note — no editor-side fallback. Use get_debugger_log for script errors and output of the editor process instead. Optional 'limit' (default 20) caps the result.",
                "Debugger", std::vector<std::string>({"debugger", "errors", "stack"}), debugger_ops::handle_debugger_get_errors, false)
@@ -34,8 +38,9 @@ GDA_TOOL_CLASS(GetDebuggerSessionInfoTool, "get_debugger_session_info",
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(5);
+  v.reserve(6);
   v.push_back(std::make_unique<GetDebuggerLogTool>());
+  v.push_back(std::make_unique<GetPluginLogTool>());
   v.push_back(std::make_unique<GetDebuggerErrorsTool>());
   v.push_back(std::make_unique<GetDebuggerOutputTool>());
   v.push_back(std::make_unique<GetDebuggerSceneTreeTool>());

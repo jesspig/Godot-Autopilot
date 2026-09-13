@@ -6,7 +6,7 @@ namespace godot_autopilot {
 void fill_schema_physics(std::unordered_map<std::string, mcp::JsonValue>& m) {
 
         m["intersect_physics_2d_ray"] = schema::build_schema({
-            {"space_rid", "integer", "Optional RID of the 2D physics space to query; omit to auto-detect the space from the open editor scene's 2D world", false},
+            {"space_rid", "integer", "Optional RID of the 2D physics space to query; omit to auto-detect the World2D space of the edited scene root's SubViewport in the editor process, which is separate from the running game's physics world", false},
             {"from", "object", "Required. Ray origin as a Vector2 object with x and y fields, e.g. {'x': 0, 'y': 0}", true},
             {"to", "object", "Required. Ray destination as a Vector2 object with x and y fields", true},
             {"collision_mask", "integer", "Optional. Layer mask (bitfield) restricting which layers the ray hits; default is all layers", false},

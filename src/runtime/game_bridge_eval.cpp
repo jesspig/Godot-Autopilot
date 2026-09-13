@@ -373,7 +373,7 @@ JV op_eval_set_property(const JV &params) {
 
   std::string readback_detail;
   util::ReadbackStatus readback =
-      util::check_readback(value, old_val, new_val, readback_detail);
+      util::check_readback(value, old_val, new_val, readback_detail, true);
   if (readback == util::ReadbackStatus::REJECTED) {
     return util::error_detail(
         "property rejected: '" + prop_name + "' on " + path_p->GetString(),

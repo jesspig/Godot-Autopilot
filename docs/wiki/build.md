@@ -6,7 +6,7 @@ tags:
   - 构建
   - CMake
   - 部署
-timestamp: "2026-09-13T02:03:32+08:00"
+timestamp: "2026-09-13T18:13:54+08:00"
 resource:
   - CMakeLists.txt
   - CMakePresets.json
@@ -16,7 +16,7 @@ resource:
 
 # 构建体系（build）
 
-> 审计日期：2026-09-10（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill 内容外置化同步；09-10 随 7 册重构同步），基于当前工作树文件逐项核对（不依赖 git 历史）。
+> 审计日期：2026-09-10（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill 内容外置化同步；09-10 随 7 册重构同步；09-13 晚随 A 组知识库审计修复批次同步——skill_templates 8 册/30 个 .md、server_context/FetchDependencies 行号重核、AGENTS.md/README 对照段更新），基于当前工作树文件逐项核对（不依赖 git 历史）。
 > 事实来源：`build.py`（239 行）、`CMakeLists.txt`（169 行）、`CMakePresets.json`、`cmake/` 全部 7 个模块、`tools/embed_skills.py`、`.env.template`、根 `README.md` / `README_zh.md` / `AGENTS.md` 构建段、`.github/workflows/{ci,release}.yml`。
 
 ## 命令速查表
@@ -113,7 +113,7 @@ macOS runner 为 ARM64，preset 设 `CMAKE_OSX_ARCHITECTURES=x86_64;arm64` 编�
 | `src/resources/` | 2 | `src/ui/` | 2 |
 | `src/prompts/` | 9 | `src/runtime/` | 3 |
 
-- **skill 内容嵌入头**：7 册技能正文外置为 `src/util/skill_templates/`（27 个 .md + registry.json，**不进 add_library**），`cmake/skill_gen.cmake` 在构建期经 `tools/embed_skills.py` 生成 `build/<preset>/generated/skill_content_embedded.h`（gitignore 覆盖）；`add_dependencies(godot-autopilot gda_skill_embed_header)`（`CMakeLists.txt:146`）保证生成先于编译；
+- **skill 内容嵌入头**：8 册技能正文外置为 `src/util/skill_templates/`（30 个 .md + registry.json，**不进 add_library**），`cmake/skill_gen.cmake` 在构建期经 `tools/embed_skills.py` 生成 `build/<preset>/generated/skill_content_embedded.h`（gitignore 覆盖）；`add_dependencies(godot-autopilot gda_skill_embed_header)`（`CMakeLists.txt:146`）保证生成先于编译；
 - 私有头文件目录：`${CMAKE_SOURCE_DIR}/src`；
 - 链接库（PRIVATE）：`godot-cpp`、`mcp-server`、`mcp-http`（后两者来自 mcp-cpp-sdk）；
 - MSVC（含 clang-cl）额外 `target_link_options "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>"`（`CMakeLists.txt:158`）—— 强制导出 godot-cpp 全部符号，防止 GDExtension 入口符号被链接器裁剪；
@@ -150,23 +150,23 @@ version 8；`debug`/`release` 两个 configure 预设：Ninja 生成器、`build
 | 变量 | 作用 | 生效方式 |
 |---|---|---|
 | `GODOT_PATH` | 定位 Godot 可执行文件（L2 引擎内测试） | 进程环境变量优先，为空才回退仓库根 `.env`（复制 `.env.template`，不入库）；二者皆缺 → L2 失败/跳过 |
-| `GODOT_AUTOPILOT_PORT` | 覆盖默认 MCP 端口 9527 | 运行时 `std::getenv`（`src/core/server_context.cpp:20`） |
-| `GODOT_AUTOPILOT_HOST` | 读取监听地址；默认 `127.0.0.1`，非环回地址由 `ServerContext::start()` 拒绝 | 运行时 `std::getenv`（`src/core/server_context.cpp:40`） |
+| `GODOT_AUTOPILOT_PORT` | 覆盖默认 MCP 端口 9527 | 运行时 `std::getenv`（`src/core/server_context.cpp:30`） |
+| `GODOT_AUTOPILOT_HOST` | 读取监听地址；默认 `127.0.0.1`，非环回地址由 `ServerContext::start()` 拒绝 | 运行时 `std::getenv`（`src/core/server_context.cpp:41`） |
 | `GDA_COMPILE_JOBS` / `GDA_LINK_JOBS` | 强制编译/链接并行度 | CACHE（`-D`）优先，其次进程环境变量 |
 | `CI` | 存在即 `GDA_IS_CI=ON` | 隐式；关闭 `-march=native` 以保证可复现 |
 | `GDA_UNITY_BUILD` / `GDA_UNITY_BATCH_SIZE` / `GDA_MAX_COMPILE_MEM_MB` / `GDA_MAX_LINK_MEM_MB` / `GDA_UNITY_MEM_MB` | Unity 与内存估算 | 仅 CMake 缓存参数（`-D`），**不支持环境变量** |
 
 ## 与 AGENTS.md / README 对照
 
-逐条核对结论（全部一致，另有两点精度差异）：
+逐条核对结论（一致，另有一处精度补充）：
 
 - `uv run build.py` / `--release` 语义、手动 `cmake --preset` 命令 ✓；
 - "切勿删除 `build/<preset>/_deps/`" ✓（`build.py` AUTO-CLEAN 保留 + `FetchDependencies.cmake` 头注释）；
 - "添加新 .cpp 时必须在 `add_library()` 中加入" ✓（Unity 构建只编译列出的文件）；**精度补充**：`src/util/skill_templates/*.md` 与 `registry.json` 为内容数据文件，经生成头机制（`skill_gen.cmake` + `tools/embed_skills.py`）进入编译，不进 add_library；
-- 依赖版本 `godot-cpp 10.0.0-rc1` / `mcp-cpp-sdk 0.3.3`、FetchContent 非子模块 ✓（`FetchDependencies.cmake:15,24`）；
+- 依赖版本 `godot-cpp 10.0.0-rc1` / `mcp-cpp-sdk 0.3.3`、FetchContent 非子模块 ✓（`FetchDependencies.cmake:19,28`）；
 - 编译器优先 Clang/clang-cl、MSVC/GCC 回退 ✓（根 CMakeLists 自动探测 + `CompilerOptions.cmake` 分发）；
-- 优化自适应（sccache/ccache、LTO、Unity、Ninja 作业池）✓；**精度差异**：AGENTS.md 写"可通过 `GDA_COMPILE_JOBS` / `GDA_LINK_JOBS` 等环境变量覆盖"——实际仅这两个支持环境变量，`GDA_UNITY_BATCH_SIZE` 等内存参数只接受 `-D` CACHE；
-- **文档一致性**：`README.md` / `README_zh.md` 工具数口径 "~370 / 27 类"（08-22 审计时由 "~339" 修正，现随 0.2.2 同步为 370）及 [overview.md](./overview.md) 审计（370 = 7 元 + 363 领域；registry/catalog 371 含 `system_status`）一致；`--package` / `--debug` 两个 build.py 参数在 README 构建章节未提及。
+- 优化自适应（sccache/ccache、LTO、Unity、Ninja 作业池）✓；AGENTS.md 与实现一致：仅 `GDA_COMPILE_JOBS` / `GDA_LINK_JOBS` 支持 CACHE（`-D`）与进程环境变量双通道，`GDA_UNITY_BUILD`/`GDA_UNITY_BATCH_SIZE` 等内存参数只接受 `-D` CACHE；
+- **文档一致性**：`README.md` / `README_zh.md` 工具数口径 "~366 MCP Tools across 27 categories"（`README.md:22` / `README_zh.md:22`）为域工具口径（27 类合计 366），与 [overview.md](./overview.md) 的"366 域工具"一致；overview 的 **MCP 可达 373 / catalog 374** 是包含 7 元工具与 `system_status` 的另一口径，与 README 域工具口径不矛盾（README 未列这两个数字属口径差异，不再列为待同步项）；`--package` / `--debug` 两个 build.py 参数在 README 构建章节（`README.md:121-122`）未提及。
 
 ## 关联页面
 

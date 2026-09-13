@@ -86,7 +86,10 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
       if (tp->IsInt() && tp->GetInt() > 0)
         timeout_ms = tp->GetInt();
     }
-    return runtime_ops::game_capture_blocking(timeout_ms);
+    if (timeout_ms > GDA_MAX_TIMEOUT_MS)
+      timeout_ms = GDA_MAX_TIMEOUT_MS;
+    return runtime_ops::handle_gda_send(
+        "capture", mcp::JsonValue(mcp::JsonValue::object_tag), timeout_ms);
   }
   if (target != "editor") {
     return util::error_detail("invalid target '" + target + "'",

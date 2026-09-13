@@ -6,13 +6,13 @@ tags:
   - 模块
   - 核心层
   - 线程模型
-timestamp: "2026-09-13T03:47:12+08:00"
+timestamp: "2026-09-13T17:50:28+08:00"
 resource: src/core/
 ---
 
 # 核心模块（src/core/）
 
-> 审计日期：2026-09-13（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-13 随资源 path 加载注册进 ResourceRegistry 同步），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 审计日期：2026-09-13（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-13 上午随资源 path 加载注册进 ResourceRegistry 同步；09-13 下午随收口批次同步 PluginConfig allow 键、授权门与 call_tool MCP 线程例外；09-13 17:50 随 B 组知识库审计同步——补正主线程排空点行号、移除已删除的 architecture.md 对照行），基于当前工作树代码逐行核对（不依赖 git 历史）。
 > 覆盖范围：`src/core/` 下 8 cpp + 12 头共 20 文件（`CommandQueue` 与 `error_watermark` 为 header-only，`version.hpp.in` 为模板，实际 11 业务组 + 版本）。注意：`CommandQueue` 为 header-only（仅 `command_queue.hpp`，无对应 `.cpp`），`error_watermark.hpp` 同为 header-only，`version.hpp.in` 经 `configure_file` 生成 `version.hpp`。
 
 ## 模块简介
@@ -33,7 +33,7 @@ resource: src/core/
 | `error_watermark` | `error_watermark.hpp`（header-only） | 错误水印计数器：累积待消费错误数，供 MCP 响应附 `new_errors_since_last_call` doorbell | `register_all.cpp`（响应后处理）、`runtime_ops.cpp`（游戏 runtime_error 计数） |
 | `editor_readiness` | `editor_readiness.cpp/hpp` | 编辑器导入/扫描进行中检测与 retryable 软错误构造，reimport 类工具的门控 | `resource_ops`（reimport/save 类 handler） |
 | `ServerContext` | `server_context.cpp/hpp` | MCP 服务器组装、端口解析、启动/停止/重启、工具/资源/prompt 注册 | `main.cpp` 入口 |
-| `PluginConfig` | `plugin_config.cpp/hpp` | 插件自身配置持久化（`user://godot_autopilot/config.json`，当前含 port 与 show_time（Show timestamps 开关持久化，默认 true）） | `ServerContext` 端口解析（`load_port`）、`McpConfigDock` Apply（`save_port`）、`McpLogDock` 时间前缀（`load_show_time`/`save_show_time`） |
+| `PluginConfig` | `plugin_config.cpp/hpp` | 插件自身配置持久化（`user://godot_autopilot/config.json`，当前含 port、show_time（Show timestamps 开关持久化，默认 true）与 allow（能力授权列表，默认空=拒绝）） | `ServerContext` 端口解析（`load_port`）、`McpConfigDock` Apply（`save_port`）与 Allow code_execute 复选框（`load_allow`/`save_allow`）、`McpLogDock` 时间前缀（`load_show_time`/`save_show_time`）、`authorization::capability_enabled`（经注册的 AllowProvider 每次调用读取） |
 | 版本宏 | `version.hpp.in`（configure_file 模板，生成 `<build>/generated/version.hpp`） | 定义 `GDA_VERSION` 字符串宏，取自根 `VERSION` 文件单一来源 | `server_context.cpp`（MCP `server_info`）、`register_all.cpp`（`system_status.version`） |
 
 ## 关键接口清单
@@ -64,6 +64,7 @@ resource: src/core/
 - `query_from(size_t start_index, size_t* next_index)` + `size_t next_index()` — 增量查询（用于 `godot://log/recent` 类资源）
 - `static LogSystem& instance()` — 局部静态单例
 - **写入目标：仅内存；无文件、无回调、无 Godot 控制台直接输出**（`McpLogDock` 经 `poll_new_entries`/`query_from` 轮询消费）
+- MCP 侧消费方：`get_plugin_log`（debugger_ops，09-13 下午新增）经 `query`/`query_from` 读取同一缓冲（级别/分类/子串/增量过滤，值拷贝快照），与 `McpLogDock` 并行消费互不影响
 
 ### ModeDetector
 
@@ -120,7 +121,10 @@ resource: src/core/
 - `bool save_port(int port)` — 写回 `{"port": N}`（先 `DirAccess::make_dir_recursive_absolute` 建目录，复用 `save_config_value` 合并写回保留其他键）；失败记 System 类别错误日志并返回 false
 - `bool load_show_time()` — 读 `show_time` 键（`user://godot_autopilot/config.json` 的 `show_time`）；文件不存在/解析失败/非布尔时返回 `true`（默认开启，与配置面板 Show timestamps 开关一致）
 - `bool save_show_time(bool show)` — 写回 `{"show_time": bool}`（同经 `save_config_value` 合并写回）；失败记 System 类别错误日志并返回 false
-- 消费方：`ServerContext::resolve_port()`（启动时 `load_port`）、`McpConfigDock::_on_apply_port()`（Apply 成功后 `save_port`）、`McpLogDock` 时间前缀开关（`load_show_time`/`save_show_time`，配置面板持久化）
+- `std::string load_allow()` — 读 `allow` 键（逗号分隔能力列表）；文件不存在/解析失败/非字符串时返回空串
+- `bool save_allow(const std::string &allow)` — 写回 `{"allow": string}`（同经 `save_config_value` 合并写回）
+- **AllowProvider 桥接（09-13 下午起）**：`plugin_config.cpp` 的静态对象在构造时调用 `authorization::set_allow_provider(&PluginConfig::load_allow)`，使 `capability_enabled` 在无 `GODOT_AUTOPILOT_ALLOW` 环境变量时改读配置——每次调用实时读取，故配置改动下一次工具调用即生效
+- 消费方：`ServerContext::resolve_port()`（启动时 `load_port`）、`McpConfigDock::_on_apply_port()`（Apply 成功后 `save_port`）与 "Allow code_execute" 复选框（`load_allow`/`save_allow`）、`McpLogDock` 时间前缀开关（`load_show_time`/`save_show_time`，配置面板持久化）、`authorization`（能力门的 AllowProvider）
 
 ## 线程模型
 
@@ -134,6 +138,7 @@ flowchart LR
 ```
 
 - HTTP 线程绝不直接触碰 Godot API：领域工具经 `dispatch::call_handler` 判断——非主线程时 `submit(...).get()` 同步等待（`dispatch.cpp`）；资源/prompt 注册同样走 `submit`
+- 唯一编排层例外（09-13 下午起）：`call_tool` 元工具回调在 MCP 线程执行（等待运行时响应/截图定型不再经 `execute_sync` 占用主线程），编排逻辑自身不触碰 Godot API、领域工具 handler 仍由 dispatch 路由回主线程；其余 6 个元工具仍走 `execute_sync`
 - 排空点唯一：`GodotAutopilotPlugin::_process(double)` 调用 `s_queue.drain()`（`main.cpp`），随后轮询 `McpLogDock`
 - `drain()` 首次执行时把当前线程记为"主线程"，此后 `is_main_thread()` 据此判定
 
@@ -184,7 +189,6 @@ flowchart LR
 | AGENTS.md（构建段） | 暗示每个模块有成对的 `.cpp/.hpp` 参与 `add_library()` | `command_queue.hpp` 无对应 `.cpp`，header-only，不进 CMake 源列表 | 文档未明说，审计时需注意 |
 | README.md（前提） | "Godot 4.3+" | Example 项目为 4.7（`Example/project.godot`），AGENTS.md 亦写 4.7 | 文档间冲突 |
 | README.md（安装） | "Open your Godot project — the server starts automatically" | cmdline/`GDA_FORCE_HEADLESS` 模式下 UI 与服务器被禁用（`main.cpp`） | 存在例外，描述不完整 |
-| Example/docs/architecture.md | "HTTP 线程提交必须经 `CommandQueue::submit()`，由主线程 `_process()` 排空" | 与代码完全一致（`main.cpp:217`） | 一致 ✓ |
 | AGENTS.md（架构/端口段） | 端口 9527、`/mcp`、`GODOT_AUTOPILOT_PORT` 覆盖、日志类别五枚举 | 全部与代码一致 | 一致 ✓ |
 | README.md（设计表） | Port 9527、线程模型"Command queue + frame sync" | 一致 ✓ | 一致 ✓ |
 | AGENTS.md | 日志类别 "仅此几个：System、Transport、Tools、Resources、Prompts" | `LogCategory` 枚举完全相同 | 一致 ✓ |

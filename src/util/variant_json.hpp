@@ -10,6 +10,8 @@ struct VariantJson {
   static mcp::JsonValue serialize(const godot::Variant &v);
   static godot::Variant deserialize(const mcp::JsonValue &j,
                                     const std::string &type_hint = "");
+  static godot::Variant deserialize_strict(const mcp::JsonValue &j,
+                                           const std::string &type_hint);
 };
 
 } // namespace godot_autopilot

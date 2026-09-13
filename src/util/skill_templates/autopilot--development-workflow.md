@@ -62,8 +62,10 @@ time: change, observe, diagnose, fix, verify.
 - **Logs and debugger output.** After file edits read `get_debugger_log`
   (editor process, always available). With a running game read
   `get_debugger_errors` / `get_debugger_output`; `get_game_log_entries` is
-  the on-disk fallback that passes none of the debug transport's drop gates.
-  The three paths are documented in `godot-autopilot-runtime`.
+  the on-disk fallback that passes none of the debug transport's drop gates;
+  `get_plugin_log` reads the plugin's own in-process diagnostics
+  (authorization denials, timeout bookkeeping, dropped late game responses).
+  The four paths are documented in `godot-autopilot-runtime`.
 
 ## Loop examples
 

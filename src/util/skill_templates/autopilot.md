@@ -1,6 +1,6 @@
 # Godot Autopilot
 
-Entry point for working on a Godot project through the godot-autopilot MCP server. This skill is the plugin usage overview: how to connect, how to discover tools (never guess names), how to route a task to a tool, how to read the error protocol every response follows, and the change/observe/verify development loop that keeps edits honest. For engine-level operations load the domain skills instead: godot-autopilot-scene-system, godot-autopilot-resources, godot-autopilot-scripting, godot-autopilot-runtime, godot-autopilot-servers and godot-autopilot-content.
+Read this skill before using the godot-autopilot plugin: it is the required entry point for every session on a Godot project through the godot-autopilot MCP server. This skill is the plugin usage overview: how to connect, how to discover tools (never guess names, and how to search for them effectively), when to consult the engine documentation instead of memory, how to watch engine state while working, how to route a task to a tool, how to read the error protocol every response follows, and the change/observe/verify development loop that keeps edits honest. For engine-level operations load the domain skills instead: godot-autopilot-scene-system, godot-autopilot-resources, godot-autopilot-scripting, godot-autopilot-runtime, godot-autopilot-servers and godot-autopilot-content.
 
 ## Prerequisites
 
@@ -20,7 +20,9 @@ The MCP layer intentionally exposes only seven meta tools:
 - `batch_execute` - run several tool calls in sequence
 - `code_execute` - run GDScript in the editor
 
-The 365 domain tools (scene, property, resource, script, physics, render, audio, and so on) plus `system_status` are not registered as MCP tools directly. Call every domain tool through `call_tool`, passing the domain tool name and its arguments object.
+The 366 domain tools (scene, property, resource, script, physics, render, audio, and so on) plus `system_status` are not registered as MCP tools directly. Call every domain tool through `call_tool`, passing the domain tool name and its arguments object.
+
+Two groups are denied by default behind an authorization gate: `code_execute` and `execute_script` (arbitrary GDScript in the editor) need the `code_execute` capability, and the tools that reach the running game (`execute_game_script`, `queue_game_input`, `wait_game_input`, `sequence_game_inputs`, `reload_game_scripts`) need the `game_runtime` capability. The gate is checked on every call; the "batch_execute versus code_execute" section covers the enable paths.
 
 ## Discovery protocol - search first, never guess
 
@@ -39,9 +41,50 @@ Example domain call through `call_tool`:
 {"name": "create_scene_node", "arguments": {"type": "Node2D", "name": "Player", "parent_path": "Root/Actors"}}
 ```
 
-If `search_tools` does not surface a tool you suspect exists, browse references/tool-catalog.md: it lists all 365 domain tools grouped by their 30 source modules, one line each.
+If `search_tools` does not surface a tool you suspect exists, browse references/tool-catalog.md: it lists all 366 domain tools grouped by their 30 source modules, one line each.
+
+### Search techniques
+
+`search_tools` ranks candidates with BM25 over tool names, descriptions, categories and tags, so the words you send shape the order you get back. Practical habits:
+
+- Search by the object first, then by the operation: "tilemap cell" finds the cell tools, "animation track" finds the track tools. Add a verb only when the object query is too broad ("rename scene node").
+- Describe, do not name. While you do not know the real tool name, describe the outcome ("connect a signal from a button") instead of guessing a plausible-looking name; a guessed name fails, a described intent is ranked.
+- Rerun with synonyms before concluding a tool is missing: tile/cell, sprite/texture, log/output, delete/remove/erase, create/add/new. The index has no stemming, so exact wording matters.
+- Narrow with filters: pass `category` for a single domain or `tags` for required tags, and browse `list_categories` when you only know the domain.
+- Read `get_tool_detail` for the candidate's schema and side-effect marker before the first write; the marker says whether the tool writes files or config.
+- When a query still comes back empty, walk references/tool-catalog.md (all 366 domain tools grouped by module) before inventing anything. Never guess a tool name - `call_tool` with a name that does not exist fails by design.
+
+## Consult the engine documentation
+
+Never call engine APIs from memory. Property names, method signatures, enum values, defaults and class members change between Godot versions, and recalled signatures are a common source of silent failures. The server exposes a documentation family - `find_docs_class`, `get_docs_class`, `get_docs_method`, `get_docs_property` - that answers straight from the offline documentation cache bundled with the running editor.
+
+Consult it before:
+
+- Writing or patching a script that calls an engine API you have not read this session.
+- Setting a property whose exact name or accepted values you are not sure of - check the property type and enum names first.
+- Using a class or method that is new to you, or that may have been renamed between Godot versions.
+- Chasing a failure whose message mentions an unknown property, unknown method or parse error.
+
+Because the cache ships inside the editor, the answers follow the engine version the user actually runs: whichever Godot version is open, the documentation matches that exact build. There is no network access and no stale recall involved - read the docs, do not remember them.
 
 ## Task routing
+
+### Choosing the right tool
+
+Reduce the task to its object and intent first; the first matching row is usually the right family:
+
+- Change a property -> `property_set`, then read it back with `property_get` to confirm the value landed.
+- Inspect properties or their metadata -> `property_get`, `property_get_list`.
+- Build or edit tilemaps -> `create_tilemap_tileset` plus `set_tilemap_cell` / `set_tilemap_cells` for cells.
+- Add, rename, move or delete nodes -> the scene tools (`create_scene_node`, `rename_scene_node`, `reparent_node`, `delete_scene_node`).
+- Work with resources in memory or on disk -> the resource tools (`create_resource`, `load_resource`, `save_resource`).
+- Write, attach or call GDScript -> the script tools (`create_script`, `attach_script_to_node`, `call_script_node`).
+- Need an engine API fact -> the documentation tools (`find_docs_class`, `get_docs_class`, `get_docs_method`, `get_docs_property`) - never memory; see "Consult the engine documentation".
+- Run the game and observe it -> the runtime tools (`play_editor_current_scene`, `capture_game_viewport`, `queue_game_input`).
+- Diagnose from logs -> the log tools; see "Watch the engine state".
+- Repeat a fixed sequence of calls -> `batch_execute`; need loops, math or computed values -> `code_execute`; see "batch_execute versus code_execute".
+
+The numbered procedure below applies to every route, and the tables after it list the per-task candidates. When two families could fit, read the candidate's schema with `get_tool_detail` before writing.
 
 1. Find your task category below and pick a candidate tool.
 2. Confirm the exact name with `search_tools` (never guess names).
@@ -74,7 +117,7 @@ If `search_tools` does not surface a tool you suspect exists, browse references/
 | Files | `rename_resource_file`, `move_resource_file` (both rewrite references), `write_file`, `read_file`, `find_in_files` |
 | Scripts | `create_script`, `attach_script_to_node`, `call_script_node`, `reload_script` |
 | Theme | `create_theme_resource`, `set_theme_color`, `set_theme_stylebox_flat`, `apply_theme_to_control`, `set_control_anchor_preset` |
-| Tilemap | `create_tilemap`, `create_tilemap_tileset`, `set_tilemap_cell`, `set_tilemap_cells` (at most 64 cells per call) |
+| Tilemap | `create_tilemap`, `create_tilemap_tileset`, `set_tilemap_cell`, `set_tilemap_cells` (bulk; `source_id` -1 clears a cell) |
 | Animation | `create_scene_animation_player`, `create_animation`, `create_animation_track`, `insert_animation_keyframe`, `create_scene_animation_tree`, `add_animation_machine_state`, `connect_animation_states` |
 | SpriteFrames | `create_spriteframes`, `add_spriteframes_animation`, `add_spriteframes_frame` |
 | Undo grouping | `create_editor_undo_redo_action`, `add_editor_undo_redo_do`, `add_editor_undo_redo_undo`, `commit_editor_undo_redo` |
@@ -88,7 +131,7 @@ If `search_tools` does not surface a tool you suspect exists, browse references/
 | Code in the game | `execute_game_script`, `reload_game_scripts` |
 | Input into the game | `queue_game_input`, `wait_game_input`, `sequence_game_inputs`, `get_game_input_status` - editor-side input tools do not reach the game (see godot-autopilot-runtime) |
 | Game screenshots / UI | `capture_game_viewport`, `get_game_ui_elements` |
-| Logs (three paths) | `get_debugger_log` (editor engine log, works without a game), `get_debugger_errors` and `get_debugger_output` (runtime channel), `get_game_log_entries` (on-disk log, works without a session) |
+| Logs (four sources) | `get_debugger_log` (editor engine log, works without a game), `get_debugger_errors` and `get_debugger_output` (runtime channel), `get_game_log_entries` (on-disk log, works without a session), `get_plugin_log` (plugin-internal diagnostics: authorization denials, timeout bookkeeping, dropped late game responses) |
 | Performance | `get_debug_monitor_catalog`, `get_debug_monitors`, `get_debug_memory_usage`, `get_debug_object_count`, `get_debug_node_count` |
 | Pause / reload | `set_scene_tree_pause`, `reload_scene_tree_current_scene` |
 | Inline tests | `run_gdscript_tests`, `run_gdscript_test_files` |
@@ -106,6 +149,17 @@ If `search_tools` does not surface a tool you suspect exists, browse references/
 | Scene files | `create_editor_scene`, `open_editor_scene`, `save_editor_scene`, `save_editor_scene_as`, `close_editor_scene` |
 | File system refresh | `scan_editor_file_system` |
 
+## Watch the engine state
+
+Never chain write operations blind. Every change lands in a live editor with an import queue, a debugger and an engine log; state you did not observe is state you do not know. Keep observation inside the loop:
+
+- After every write call (any `property_set`, `create_scene_node`, `write_file`, `save_resource`, scene, script or config edit), read the `new_errors_since_last_call` value in the response before issuing the next call. A non-zero value means new errors were recorded - stop, pull the real log lines, fix or explain them, then continue.
+- While a game is running, watch the debugger channel: `get_debugger_errors` and `get_debugger_output` carry the game's errors and prints. Without a running game, the editor output panel and engine log come through `get_debugger_log`, and `get_game_log_entries` reads the on-disk log even after the session ended.
+- When the problem is inside the plugin itself (authorization denials, timeouts, dropped responses), read `get_plugin_log`.
+- Prefer observing real output - a log line, a screenshot, a read-back - over assuming a call did what its name suggests; `ok` only means the call went through.
+
+The watermark mechanics (one-shot consumption, retryable soft errors) are in Error protocol, and the closing check for a fix is "Confirming a fix with the error watermark". This section is about the habit: short write-observe cycles, not long blind sequences.
+
 ## Game development workflow
 
 The routing tables cover single calls; real work is a loop. `ok` means the call went through, not that the effect is what you wanted, so every iteration is change, observe, diagnose, fix, verify - and a fix is confirmed by the error watermark (see "Confirming a fix with the error watermark"), not by assumption:
@@ -122,6 +176,7 @@ references/development-workflow.md expands this into complete loops for UI and s
 - `code_execute` runs GDScript in the editor: the source is wrapped in a script extending Node, and the edited scene root is exposed as SceneRoot. Default mode inlines your code inside a single `_run()` function - top-level func definitions are unsupported (pass `function_name` for multi-function mode). `timeout_ms` defaults to 5000 with a 30000 maximum; timeout is checked before execution, not used to interrupt. `auto_owner` defaults to true so created nodes are saved with the scene.
 - Decision rule: expressible as a handful of existing tool calls - use `batch_execute`. Needs loops, math or conditions (laying out hundreds of tiles, bulk renames, computed values) - use `code_execute`. Very large payloads also favor `code_execute` to avoid huge JSON arguments.
 - Both are meta tools: call them directly at the MCP layer, not through `call_tool`.
+- Authorization: `code_execute` and `execute_script` are denied by default. Enable them either by setting the `GODOT_AUTOPILOT_ALLOW` environment variable to `code_execute` (or `all`) and restarting the engine, or by ticking "Allow code_execute" in the plugin's MCP Config dock, which saves to the plugin config and takes effect on the next tool call - no restart needed. When `GODOT_AUTOPILOT_ALLOW` is set it wins over the config, so do not rely on the dock checkbox while the variable is present. The game runtime tools need the `game_runtime` capability, enabled the same way via the environment variable or the `allow` key in the plugin config (the dock checkbox manages code_execute only).
 
 ## Error protocol
 
@@ -162,7 +217,7 @@ Use the watermark as the closing step of every fix instead of assuming a fix wor
 
 The behaviors below bite most often; the full catalogue lives in references/tool-gotchas.md.
 
-- Tile cells are capped at 64 per call: `set_tilemap_cells` truncates larger payloads. For bulk layouts use a `code_execute` loop instead.
+- `set_tilemap_cells` has no fixed per-call entry cap, but oversized JSON arguments can hit client-side request limits and fail as a parse error before the tool runs. Keep batches reasonably sized and use a `code_execute` loop for bulk layouts. An entry with `source_id` -1 clears the cell at those coordinates.
 - Never assign memory:// resources to node properties: `property_set` rejects them, because writing one into the scene file would corrupt it. Save with `save_resource` first, then assign the `res://` path.
 - Non-numeric strings into int properties become 0: `property_set` returns ok and stores 0. After any property write you are unsure about, read it back with `property_get` and assert the expected value.
 - Where the built-in prompt text and the implementation disagree, the implementation wins: trust `get_tool_detail` over prompt-quoted tool counts, keycodes or serialization claims.

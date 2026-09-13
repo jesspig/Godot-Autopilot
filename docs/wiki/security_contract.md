@@ -6,7 +6,7 @@ tags:
   - 安全
   - 并发
   - 契约
-timestamp: "2026-09-13T03:48:49+08:00"
+timestamp: "2026-09-13T17:34:29+08:00"
 resource:
   - src/core/server_context.cpp
   - src/core/command_queue.hpp
@@ -49,10 +49,20 @@ resource:
 
 近期新增工具的分级（09-13）：`copy_resource_file` 注册为 `GDA_TOOL_CLASS_SIDE` + `SideEffect::WritesFile`（可覆盖已存在的 `dest_path`，属写文件类，须先确认路径在工程范围内）；`reload_resource` 未标记 `SideEffect`（仅以 `ResourceLoader CACHE_MODE_REPLACE` 刷新编辑器资源缓存，不写盘），其余约束仍按只读工具处理。
 
+### 3.1 能力授权门（09-02 引入，09-13 扩展）
+
+高风险能力除 `side_effect` 标记外还受调用级授权门约束，检查发生在**每次工具调用**（无缓存）：
+
+- 解析优先级：`GODOT_AUTOPILOT_ALLOW` 环境变量（逗号分隔，`all` 全放行）> 插件配置 `user://godot_autopilot/config.json` 的 `allow` 键 > **默认拒绝**；环境变量一旦设置即完全覆盖持久化配置。
+- 能力名与工具映射（`tool_base.hpp:capability_for_tool`）：`code_execute`（`code_execute`、`execute_script`）、`game_runtime`（`execute_game_script`、`reload_game_scripts`、`queue_game_input`、`wait_game_input`、`sequence_game_inputs`）、`process`（`SideEffect::Process` 标记的 6 个：`build_csharp_assembly`、`create_os_process`、`execute_os_process`、`kill_os_process`、`open_os_path`、`set_os_environment`）。
+- 拒绝响应含 `error`、`authorization_required`（能力名）与 `enable`（启用指引）三个字段，并写 Warning 日志（Tools 类，可经 `get_plugin_log` 读取）。
+- 启用入口：环境变量（须重启引擎）或配置 `allow` 键；MCP Config 面板的 "Allow code_execute" 复选框只管理 `code_execute` 能力，写入配置后下一次调用生效、无需重启（`process`/`game_runtime` 仍须环境变量或手改配置）。
+
 ## 4. Godot API 与线程
 
 - 所有 Godot API、场景/资源/编辑器对象访问和会触发引擎状态的操作，必须在 Godot 主线程执行。HTTP/SDK 线程不得直接调用。
 - 标准路径是 `CommandQueue::submit()` 入队，由 `GodotAutopilotPlugin::_process()` 的 `drain()` 在主线程排空，再通过 `future` 返回结果。唯一排空点是插件 `_process()`。
+- 明确例外（09-13 起）：`call_tool` 元工具的编排回调在 MCP 线程执行——等待运行时响应（`runtime_ops::wait_pending_response`）与截图定型不再经 `execute_sync` 占用主线程；回调自身不触碰 Godot API（领域工具 handler 经 `dispatch` 路由回主线程、截图读盘经 `queue.submit`），从而保证等待期间调试器消息泵与编辑器主线程不被阻塞。
 - 只有不访问 Godot API 的纯 C++ 逻辑可留在 HTTP 线程；只读缓冲区若由代码明确保证线程安全，才可使用该例外。新增例外必须在代码和文档中同时说明。
 - 主线程判定以队列首次 `drain()` 记录的线程为准；队列必须在插件正常生命周期内先完成主线程初始化，再处理依赖 Godot API 的任务。
 

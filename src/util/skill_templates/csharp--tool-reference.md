@@ -11,6 +11,7 @@ parameters; the other tools accept only the parameters named here.
 | `copy_resource_file` | Byte-for-byte duplicate of a file (`path`, `dest_path`); use it to start a new .cs from one that already compiles. |
 | `build_csharp_assembly` | Trigger an async `dotnet build --nologo <project>` on the res:// root .csproj/.sln; returns the project file, command, started and pid, does not capture compiler output and does not hot-reload the assembly. |
 | `get_debugger_log` | Read the editor-process log buffer (`limit`, default 50); the place where editor-side C# compile and parse errors are recorded. |
+| `get_plugin_log` | Read the plugin's own in-process log (`limit`, default 100, max 1000; optional `level`, `category`, `filter`, `since_index`); authorization denials, timeout diagnostics and dropped late game responses. |
 | `play_editor_current_scene` | Launch the edited scene as a game; save the scene first. |
 | `get_game_status` | Query the running game (`timeout_ms`); a half-dead process is stopped and restarted, not debugged. |
 | `get_debugger_errors` | Read script errors from the running game as a structured list (`limit`, default 20); empty without an active debug session. |

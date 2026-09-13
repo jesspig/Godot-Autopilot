@@ -2,7 +2,7 @@
 
 This book covers the game process life cycle: launching and stopping the
 game, the `game_*` runtime channel, input injection, viewport capture and the
-visual verification loop, UI reconnaissance, the three log and error paths,
+visual verification loop, UI reconnaissance, the four log and error paths,
 the error watermark confirmation loop and inline GDScript tests. Deep dives
 live in `references/input-injection.md`, `references/debug-paths.md` and
 `references/runtime-inspection.md`.
@@ -190,18 +190,25 @@ coordinates, or with `execute_game_script` using `path`.
   is applied during the game's next idle poll and no confirmation is
   returned — verify with `get_game_log_entries` or `get_game_status`.
 
-## Three log and error paths
+## Four log and error paths
 
 | Path | Tools | Source | Needs a running game |
 |---|---|---|---|
 | Editor engine log | `get_debugger_log` | engine log buffer of the editor process: script errors and messages routed through the engine logger | no — always contains data |
 | Debugger session capture | `get_debugger_errors`, `get_debugger_output`, `get_debugger_scene_tree` | with an active debug session: the running game over the runtime channel; without one: an empty result plus a `note` — no editor-side fallback | live game data needs a session |
 | On-disk game log | `get_game_log_entries` | tail window of the game process log file `user://logs/godot.log` | the log file must exist — start the game once with `play_editor_current_scene` |
+| Plugin LogSystem | `get_plugin_log` | the plugin's own in-process diagnostic buffer (authorization denials, timeout bookkeeping, dropped late game responses) — not routed through any engine logger | no — always available |
 
 - `get_debugger_log` (optional `limit`, default 50) reads the editor engine
   log — script errors and `print` output from the editor process. It never
   requires a running game; read it first after editing any `.gd`, `.tscn`,
   `.tres` or `.cs` file, before changing code again.
+- `get_plugin_log` (optional `limit`, default 100, max 1000; `level`,
+  `category`, `filter`, `since_index`) reads the plugin's own in-process
+  diagnostics and returns the entries array with a count and next_index.
+  Unlike `get_debugger_log` it does not read the engine log buffer; this is
+  where authorization denials, timeout bookkeeping and dropped late game
+  responses appear.
 - `get_debugger_errors` (optional `limit`, default 20) returns, with an
   active session, a structured list under `result` with `time`, `file`,
   `func`, `line`, `error`, `descr`, is_warning and `stack` per entry.
@@ -320,7 +327,7 @@ process is in `references/debug-paths.md`.
 
 - `references/input-injection.md` — frame-accurate injection, action
   matching, per-device state and the full pause matrix.
-- `references/debug-paths.md` — the three log paths, protocol drop gates and
+- `references/debug-paths.md` — the four log paths, protocol drop gates and
   breakpoint semantics.
 - `references/runtime-inspection.md` — reading liveness, UI and scene state
   of the running game.

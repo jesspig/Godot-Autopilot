@@ -360,7 +360,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
 
     registry->add(std::make_unique<::godot_autopilot::MetaTool>(
         ToolMeta{"call_tool",
-                 "Execute any tool by name. Use this to call all non-meta tools (scene_*, property_*, signal_*, system_status).",
+                 "Execute any tool by name. Use this to call all 367 non-meta tools (366 domain tools plus system_status).",
                  "System", {"call", "dispatch", "proxy"}, true},
         [](const mcp::JsonValue& args) -> mcp::JsonValue {
             std::string name = args.Find("name") != nullptr && args["name"].IsString() ? args["name"].GetString() : std::string();
@@ -472,8 +472,13 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
                 mcp::JsonValue args = ctx.Params().arguments
                     ? *ctx.Params().arguments : mcp::JsonValue(mcp::JsonValue::object_tag);
                 auto tool = registry->find_meta(meta_name);
-                mcp::JsonValue res = queue.execute_sync(
-                    [tool, args] { return tool->execute(args); });
+                mcp::JsonValue res;
+                if (meta_name == "call_tool") {
+                    res = tool->execute(args);
+                } else {
+                    res = queue.execute_sync(
+                        [tool, args] { return tool->execute(args); });
+                }
                 int64_t new_errors = error_watermark::count_response_errors(res);
                 if (new_errors > 0) {
                     error_watermark::record_error(new_errors);
