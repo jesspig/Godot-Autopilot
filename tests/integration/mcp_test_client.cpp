@@ -18,6 +18,7 @@
 #include <mcp/transport/StreamableHttpClientTransport.hpp>
 
 #include <exception>
+#include <iostream>
 #include <optional>
 #include <thread>
 
@@ -58,6 +59,42 @@ std::string error_json(const std::string &message) {
   mcp::JsonValue obj(mcp::JsonValue::object_tag);
   obj["error"] = message;
   return obj.Dump();
+}
+
+struct CallAttempt {
+  bool success = false;
+  mcp::CallToolResult result;
+  std::string error;
+};
+
+CallAttempt attempt_call_tool(mcp::McpClient &client, const std::string &name,
+                              const std::optional<mcp::JsonValue> &args) {
+  CallAttempt attempt;
+  try {
+    attempt.result = client.CallTool(name, args);
+    attempt.success = true;
+  } catch (const std::exception &e) {
+    attempt.error = e.what();
+  } catch (...) {
+    attempt.error = "未知异常（非 std::exception）";
+  }
+  return attempt;
+}
+
+std::string render_call_result(const mcp::CallToolResult &result) {
+  std::string text;
+  for (const auto &content : result.content) {
+    if (const auto *tc = std::get_if<mcp::TextContent>(&content)) {
+      text += tc->text;
+    }
+  }
+  if (text.empty() && result.structured_content) {
+    text = result.structured_content->Dump();
+  }
+  if (text.empty()) {
+    text = mcp::JsonValue(mcp::JsonValue::object_tag).Dump();
+  }
+  return text;
 }
 
 } // namespace
@@ -137,33 +174,34 @@ std::string McpTestClient::call_tool(const std::string &name,
     impl_->last_was_error = true;
     return error_json("not connected");
   }
-  try {
-    std::optional<mcp::JsonValue> args;
-    if (!args_json.empty())
-      args = mcp::JsonValue::Parse(args_json);
-    const auto result = impl_->client->CallTool(name, args);
-    impl_->last_was_error = result.is_error;
 
-    std::string text;
-    for (const auto &content : result.content) {
-      if (const auto *tc = std::get_if<mcp::TextContent>(&content)) {
-        text += tc->text;
-      }
+  std::optional<mcp::JsonValue> args;
+  if (!args_json.empty()) {
+    try {
+      args = mcp::JsonValue::Parse(args_json);
+    } catch (const std::exception &e) {
+      impl_->last_was_error = true;
+      return error_json(e.what());
+    } catch (...) {
+      impl_->last_was_error = true;
+      return error_json("未知异常（非 std::exception）");
     }
-    if (text.empty() && result.structured_content) {
-      text = result.structured_content->Dump();
-    }
-    if (text.empty()) {
-      text = mcp::JsonValue(mcp::JsonValue::object_tag).Dump();
-    }
-    return text;
-  } catch (const std::exception &e) {
-    impl_->last_was_error = true;
-    return error_json(e.what());
-  } catch (...) {
-    impl_->last_was_error = true;
-    return error_json("未知异常（非 std::exception）");
   }
+
+  auto attempt = attempt_call_tool(*impl_->client, name, args);
+  if (!attempt.success) {
+    std::cout << "[mcp-client] retrying " << name
+              << " after transport error: " << attempt.error << std::endl;
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    attempt = attempt_call_tool(*impl_->client, name, args);
+  }
+  if (!attempt.success) {
+    impl_->last_was_error = true;
+    return error_json(attempt.error);
+  }
+
+  impl_->last_was_error = attempt.result.is_error;
+  return render_call_result(attempt.result);
 }
 
 std::string McpTestClient::call_tool(const std::string &name) {
