@@ -3,6 +3,7 @@
 #include "tools/dispatch.hpp"
 #include "tools/runtime_ops.hpp"
 #include <mcp/Content.hpp>
+#include <exception>
 #include <mutex>
 #include <utility>
 
@@ -34,6 +35,15 @@ mcp::JsonValue call_handler_impl(const std::string &name,
   if (handler) {
     try {
       result = handler(args);
+    } catch (const std::exception &ex) {
+      std::string args_dump = args.Dump();
+      if (args_dump.size() > 256) {
+        args_dump.resize(256);
+      }
+      result = mcp::JsonValue(mcp::JsonValue::object_tag);
+      result["error"] = mcp::JsonValue(
+          "internal error in tool '" + name + "': " + std::string(ex.what()) +
+          " (args: " + args_dump + ")");
     } catch (...) {
       std::string args_dump = args.Dump();
       if (args_dump.size() > 256) {

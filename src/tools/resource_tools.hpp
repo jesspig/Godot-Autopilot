@@ -33,7 +33,7 @@ GDA_TOOL_CLASS(GetResourceLoadThreadedTool, "get_resource_load_threaded",
                "Resources", std::vector<std::string>({"resource", "load", "wait"}), resource_ops::handle_load_threaded_wait, true)
 
 GDA_TOOL_CLASS_SIDE(SaveResourceTool, "save_resource",
-               "Save a resource to disk at dest_path (defaults to path). Locate the resource by object_id/object_id_str (from create_resource), name (in-memory) or path (loaded from disk); if none resolves, class_type plus a name creates and registers a new instance. Missing directories are created recursively and the editor file system is refreshed. Returns the Godot error code, verified (a read-back load check) and directories_created when applicable.",
+               "Save a resource to disk at dest_path (defaults to path). Locate the resource by object_id/object_id_str (from create_resource), name (in-memory) or path (loaded from disk); if none resolves, class_type plus a name creates and registers a new instance. Missing directories are created recursively and the editor file system is refreshed. Returns the Godot error code, verified and directories_created when applicable. verified means the resource was re-read from disk after saving; on Windows, safe-save briefly replaces the file, so a concurrent reader may transiently fail — re-check/retry if that surfaces.",
                "Resources", std::vector<std::string>({"resource", "save"}), resource_ops::handle_save, true, ::godot_autopilot::SideEffect::WritesFile)
 
 GDA_TOOL_CLASS(CreateResourceTool, "create_resource",

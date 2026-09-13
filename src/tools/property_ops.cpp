@@ -550,6 +550,31 @@ void add_camera2d_serialization_note(mcp::JsonValue &result,
   }
 }
 
+// 与 util::check_readback 的值类型近似比较清单保持同步。
+bool is_readback_value_type(godot::Variant::Type type) {
+  switch (type) {
+  case godot::Variant::VECTOR2:
+  case godot::Variant::VECTOR2I:
+  case godot::Variant::RECT2:
+  case godot::Variant::RECT2I:
+  case godot::Variant::VECTOR3:
+  case godot::Variant::VECTOR3I:
+  case godot::Variant::TRANSFORM2D:
+  case godot::Variant::VECTOR4:
+  case godot::Variant::VECTOR4I:
+  case godot::Variant::PLANE:
+  case godot::Variant::QUATERNION:
+  case godot::Variant::AABB:
+  case godot::Variant::BASIS:
+  case godot::Variant::TRANSFORM3D:
+  case godot::Variant::PROJECTION:
+  case godot::Variant::COLOR:
+    return true;
+  default:
+    return false;
+  }
+}
+
 } // namespace
 
 mcp::JsonValue handle_get(const mcp::JsonValue &args) {
@@ -686,7 +711,7 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
       }
       resource_attached = true;
     } else {
-      value = VariantJson::deserialize(*it_val, type_hint);
+      value = VariantJson::deserialize_strict(*it_val, type_hint);
     }
   }
 
@@ -716,7 +741,8 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
     auto prop_type = static_cast<godot::Variant::Type>(
         static_cast<int>(dict["type"]));
     type_sensitive = prop_type == godot::Variant::OBJECT ||
-                     prop_type == godot::Variant::ARRAY;
+                     prop_type == godot::Variant::ARRAY ||
+                     is_readback_value_type(prop_type);
   }
   util::ReadbackStatus readback =
       util::check_readback(value, old_val, new_val, readback_detail,
