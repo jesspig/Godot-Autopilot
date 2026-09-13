@@ -5,13 +5,13 @@ description: Example 文档/示例工程定位、project.godot 事实、docs 文
 tags:
   - 示例工程
   - Example
-timestamp: "2026-09-13T18:09:09+08:00"
+timestamp: "2026-09-13T21:50:35+08:00"
 resource: Example/
 ---
 
 # 示例工程（Example/）
 
-> 审计日期：2026-09-13（2026-08-12 初稿；08-17 补 YAML frontmatter 并核对 project.godot；08-22 15 时全量一致性审计——`[audio]` 段与 `default_bus_layout.tres` 已随清理消失，改注为"L2 运行后可能追加"；08-29 随 0.2.2 版本与全量审计同步；09-13 随文档集重构同步——旧 6 篇结构（game-overview/gameplay-spec/architecture/level-spec/asset-catalog）迁移为 pitch/gdd/art/tech/test 共 11 篇，重核 project.godot 的 `[input]` 残留与 L2 临时目录；09-13 晚随跨组一致性修复更新——`gda_tmp_rename/` 与 `~godot-autopilot_0.pdb` 测试残留已清理，改注为"运行 L2/编辑器热重载可能生成、可安全清理"），基于当前工作树 `Example/` 目录与文档核对。
+> 审计日期：2026-09-13（2026-08-12 初稿；08-17 补 YAML frontmatter 并核对 project.godot；08-22 15 时全量一致性审计——`[audio]` 段与 `default_bus_layout.tres` 已随清理消失，改注为"L2 运行后可能追加"；08-29 随 0.2.2 版本与全量审计同步；09-13 随文档集重构同步——旧 6 篇结构（game-overview/gameplay-spec/architecture/level-spec/asset-catalog）迁移为 pitch/gdd/art/tech/test 共 11 篇，重核 project.godot 的 `[input]` 残留与 L2 临时目录；09-13 晚随跨组一致性修复更新——`gda_tmp_rename/` 与 `~godot-autopilot_0.pdb` 测试残留已清理，改注为"运行 L2/编辑器热重载可能生成、可安全清理"；09-13 晚随 0.2.4 版知识库全量审计同步——素材条目归属修正（`asset-catalog.md` 实为"未把'文件存在'当作'功能已实现'"，补充当前工程无 .tscn/.tres 的事实），其余条目复核一致），基于当前工作树 `Example/` 目录与文档核对。
 > 事实来源：`Example/project.godot`、`Example/docs/`（11 篇）、`Example/assets/` 目录枚举、`Example/.gitignore`。
 
 ## 定位
@@ -66,7 +66,7 @@ resource: Example/
 
 - 总览：Background 7、Main Characters 30、Items 25、Menu 63、Other 4、Terrain 1、Traps 43，合计 173（与 `art/asset-catalog.md` 数量总览表逐项核对一致）。
 - 路径包含空格、括号、大小写差异与个别拼写怪癖（如 `Desappearing`、`Flag Idle)(64x64)`），引用时必须保持原样。
-- 文件名中的 `Idle`/`On`/`Hit`/`Appearing` 只描述视觉状态，不能推断运行行为；资源存在 ≠ 已导入/已切片/已配置 TileSet（`asset-catalog.md` 明示）。
+- 文件名中的 `Idle`/`On`/`Hit`/`Appearing` 只描述视觉状态，不能推断运行行为（`asset-catalog.md` 资源使用检查：未把"文件存在"当作"功能已实现"）；资源存在 ≠ 已导入/已切片/已配置 TileSet——当前工程无 `.tscn`/`.tres`，未配置任何 TileSet。
 
 ## 与根文档/代码的一致性
 

@@ -197,7 +197,7 @@ Rules verified in engine source:
   `action`; `mode`: `event` (default), `api`, `hold` (event-style, held for
   `duration_ms`). Whitelist: `type`, `keycode`, `pressed`, `button_index`,
   `position`, `action`, `duration_ms`, `mode`, `timeout_ms`; anything else
-  is reported in `ignored_params` with a warning.
+  is rejected with an error.
 - `wait_game_input` — wait for `just_pressed` (default), `just_released` or
   `pressed` within a physics frame, `timeout_ms` default 2000 max 30000.
   `just_pressed`/`just_released` require `inject` — the transient window is

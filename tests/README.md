@@ -13,7 +13,7 @@
 
 | 依赖 | 说明 |
 | ---- | ---- |
-| CMake 3.28+ | 测试目标经根 `CMakeLists.txt` 的 `GDA_ENABLE_TESTS` 选项引入；该开关已固化在 `CMakePresets.json` debug/release 预设（默认 ON），清理 `build/` 后重新配置自动恢复（裸 `cmake` 不带 preset 时默认 OFF，`CMakeLists.txt:120`） |
+| CMake 3.28+ | 测试目标经根 `CMakeLists.txt` 的 `GDA_ENABLE_TESTS` 选项引入；该开关已固化在 `CMakePresets.json` debug/release 预设（默认 ON），清理 `build/` 后重新配置自动恢复（裸 `cmake` 不带 preset 时默认 OFF，`CMakeLists.txt:164`） |
 | Ninja | 构建生成器（预设 `debug` / `release` 均为 Ninja） |
 | clang-cl | 编译器（MSVC/GCC 自动回退，测试继承根配置） |
 | Godot 可执行文件 | 仅 L2 需要，见第 3 节 |
@@ -55,7 +55,7 @@ cmake --build --preset debug --target gda_unit_tests gda_test_runner
 ctest --preset debug
 ```
 
-注册方式（`tests/CMakeLists.txt:100-111`）：**每份 `config/*.json` 一条 `gda_runner_<文件名去后缀>` 用例**，命令为 `gda_test_runner --file <name> --report-dir <build>/tests/output`，`TIMEOUT 600`（单文件含遍历约 2-4 分钟，超时防挂死）。当前 9 个 config 文件 → 9 条 ctest 用例：`gda_runner_00_meta`、`gda_runner_01_scene`、`gda_runner_02_property`、`gda_runner_03_tools_contract`、`gda_runner_04_resources_scripts`、`gda_runner_05_rename_references`、`gda_runner_06_move_references`、`gda_runner_07_scene_tabs`、`gda_runner_08_property_readback`。
+注册方式（`tests/CMakeLists.txt:107-119`）：**每份 `config/*.json` 一条 `gda_runner_<文件名去后缀>` 用例**，命令为 `gda_test_runner --file <name> --report-dir <build>/tests/output`，`TIMEOUT 600`（单文件含遍历约 2-4 分钟，超时防挂死）。当前 9 个 config 文件 → 9 条 ctest 用例：`gda_runner_00_meta`、`gda_runner_01_scene`、`gda_runner_02_property`、`gda_runner_03_tools_contract`、`gda_runner_04_resources_scripts`、`gda_runner_05_rename_references`、`gda_runner_06_move_references`、`gda_runner_07_scene_tabs`、`gda_runner_08_property_readback`。
 
 - L1 经 `gtest_discover_tests` 注册，每用例一条（如 `CommandQueueTest.*`）。
 - **耗时**：普通用例约 15s/文件（一次编辑器生命周期）；`03_tools_contract` 含两次全量遍历（317 领域工具 ×2），约 2-3 分钟。全量 ctest 约 3-4 分钟。

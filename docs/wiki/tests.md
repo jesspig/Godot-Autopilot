@@ -6,13 +6,13 @@ tags:
   - 测试
   - L1
   - L2
-timestamp: "2026-09-13T17:56:30+08:00"
+timestamp: "2026-09-13T21:50:35+08:00"
 resource: tests/
 ---
 
 # 测试体系（tests/）
 
-> 审计日期：2026-09-13（2026-08-29 0.2.2 发布审计——L1 77、L2 7 份；09-02 安全与并行硬化——L1 77→96（新增 security_parallel_hardening 17 项，覆盖队列/路径/鉴权/限额/日志）、核心路径/扫描/响应边界与构建大小写修复；09-08 技能生成器——L1 96→103（新增 skill_gen 7 项），ctest 注册点 103→110，同日 skill 内容外置化——测试零改动仍 103；09-10 skill 体系 19→7 册重构——用例改名与白名单扩充，仍 103；09-13 上午随反馈修复批次同步——L1 103→114（新增 mcp_image_content 11 项），L2 7→8 份（新增 07_scene_tabs），ctest 110→122；09-13 下午随收口批次同步——L1 114→126（新增 variant_json_strict 12 项），L2 8→9 份（新增 08_property_readback），ctest 122→135，L2 运行需 `GODOT_AUTOPILOT_ALLOW`；技能体系 8 册；09-13 晚随 A 组知识库审计修复批次同步——02/03/04/05/06 用例步骤与内容重核（02=before_all 2+39、03=1+2、04=after_all 1+28、05=13、06=26）、traversal/register_all_test 行号修正），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 审计日期：2026-09-13（2026-08-29 0.2.2 发布审计——L1 77、L2 7 份；09-02 安全与并行硬化——L1 77→96（新增 security_parallel_hardening 17 项，覆盖队列/路径/鉴权/限额/日志）、核心路径/扫描/响应边界与构建大小写修复；09-08 技能生成器——L1 96→103（新增 skill_gen 7 项），ctest 注册点 103→110，同日 skill 内容外置化——测试零改动仍 103；09-10 skill 体系 19→7 册重构——用例改名与白名单扩充，仍 103；09-13 上午随反馈修复批次同步——L1 103→114（新增 mcp_image_content 11 项），L2 7→8 份（新增 07_scene_tabs），ctest 110→122；09-13 下午随收口批次同步——L1 114→126（新增 variant_json_strict 12 项），L2 8→9 份（新增 08_property_readback），ctest 122→135，L2 运行需 `GODOT_AUTOPILOT_ALLOW`；技能体系 8 册；09-13 晚随 A 组知识库审计修复批次同步——02/03/04/05/06 用例步骤与内容重核（02=before_all 2+39、03=1+2、04=after_all 1+28、05=13、06=26）、traversal/register_all_test 行号修正；09-13 晚随 0.2.4 版知识库全量审计同步——after_all 失败语义修正（工具报错不改变整体判定，仅进程死亡补 fatal_error）、CRASH_LOG_LIMIT 表述改为“截断至 2000 字符”、L2 用例发现机制改为“9 份均由 GLOB 自动发现”、历史事故出处修正并补 todo），基于当前工作树代码逐行核对（不依赖 git 历史）。
 > 覆盖范围：`tests/` 全部（unit 14 文件、runner 7 实现 + 6 头文件、integration、config 9 JSON、`tests/CMakeLists.txt`），对照 `tests/README.md` 与仓库根 `AGENTS.md` 测试段逐条核算。126 项 L1 为 `TEST`/`TEST_F` 宏逐行统计口径（09-13 收口批次新增 variant_json_strict 12 项）；ctest 注册点 135 已由 `ctest --preset debug -N` 实测确认。
 
 ## 架构总览
@@ -61,8 +61,8 @@ build\debug\tests\gda_test_runner.exe --file 01_scene
 2. 首次 `--editor --import` 幂等同步执行（120s 超时，失败/超时不致命，仅记日志）
 3. 临时注入 `GODOT_AUTOPILOT_PORT` 后常驻启动 `--editor`（`--headless` 由用例决定；另注入 `GDA_FORCE_HEADLESS=1`）
 4. 就绪轮询（200ms 间隔）：TCP 端口探测 → MCP `initialize` 握手（裸 `POST /mcp` JSON-RPC，响应含 `serverInfo` 即确认）
-5. 执行 `before_all` → stages → `after_all`（`pipeline_executor.cpp`；`before_all`/`after_all` 失败即整体 `fatal_error` 不判断言；stages 失败按 `on_failure` fail_fast/continue）
-6. 停止：`taskkill /PID` 软杀 → 5s 宽限 → `TerminateProcess` 兜底；崩溃时截取最近 2000 字符日志（`CRASH_LOG_LIMIT`）
+5. 执行 `before_all` → stages → `after_all`（`pipeline_executor.cpp`；`before_all` 失败即整体 `fatal_error`；`before_all`/`after_all` 为 plain 步骤不支持 expect 断言，`after_all` 工具报错不改变整体判定（仅进程死亡导致跳过时补 `fatal_error` 说明）；stages 失败按 `on_failure` fail_fast/continue）
+6. 停止：`taskkill /PID` 软杀 → 5s 宽限 → `TerminateProcess` 兜底；崩溃时附编辑器日志（`pipeline_executor.cpp` 的 `CRASH_LOG_LIMIT` 截断至 2000 字符）
 
 stdout/stderr 各接独立管道读线程持续消费，防 64KB 缓冲写满阻塞子进程。
 
@@ -162,7 +162,9 @@ stdout/stderr 各接独立管道读线程持续消费，防 64KB 缓冲写满阻
 | `game_runtime` | 5 | `execute_game_script`、`reload_game_scripts`、`queue_game_input`、`wait_game_input`、`sequence_game_inputs` |
 | `code_execute` | 1 | `execute_script` |
 
-历史事故（README 记载）：`set_editor_main_scene` 曾把 `application/run/main_scene` 写成 `"test"` 写入 `Example/project.godot`；`save_editor_scene` 空参生成 `Example/NewNode.tscn`。**新增工具若写配置/文件/弹窗/改窗口，必须同步加入此清单**，否则遍历会污染 Example 项目或干扰桌面。
+历史事故（早期文档记载，当前工作树未检索到原始出处）：`set_editor_main_scene` 曾把 `application/run/main_scene` 写成 `"test"` 写入 `Example/project.godot`；`save_editor_scene` 空参生成 `Example/NewNode.tscn`。**新增工具若写配置/文件/弹窗/改窗口，必须同步加入此清单**，否则遍历会污染 Example 项目或干扰桌面。
+
+> [!todo] 待补充：上述两起历史事故的原始出处（当前 `tests/README.md`、根 `README.md`、`AGENTS.md` 均无此段记载）。
 
 ### warnings 语义（3 个已知契约缺口）
 
@@ -180,7 +182,7 @@ stdout/stderr 各接独立管道读线程持续消费，防 64KB 缓冲写满阻
 |---|---|---|---|
 | L1 gtest 数量 | 126（含 09-02 安全并行硬化 17 项 + 09-08 skill_gen 7 项 + 09-13 mcp_image_content 11 项 + variant_json_strict 12 项） | 126（逐文件宏统计见上表） | 一致 |
 | L2 用例文件数 | 9（00_meta / 01_scene / 02_property / 03_tools_contract / 04_resources_scripts / 05_rename_references / 06_move_references / 07_scene_tabs / 08_property_readback；09-13 新增 07 与 08） | 9 | 一致 |
-| ctest L2 用例 | gda_runner_<name> | 一致（`tests/CMakeLists.txt:109-119`，TIMEOUT 600；06/07/08 由 GLOB 自动发现） | 一致 |
+| ctest L2 用例 | gda_runner_<name> | 一致（`tests/CMakeLists.txt:109-119`，TIMEOUT 600；9 份均由 GLOB 自动发现，新增文件零配置） | 一致 |
 | 遍历工具数 | 366 | 366（30 个 `*_tools.hpp` 的 `GDA_TOOL_CLASS(_SIDE)` 计数；解析器仅枚举 `GDA_TOOL_CLASS(` 的 317 个） | 一致 |
 | 排除工具数 | 49 | 49（`GDA_TOOL_CLASS_SIDE` 标记 49 个：writes_file 15 / writes_config 6 / shows_alert 4 / modifies_window 12 / process 6 / game_runtime 5 / code_execute 1；不进入枚举，`side_effect` 字段兜底判定保留） | 一致 |
 | 03 遍历步数 | 上限 634 步（317×2 减空 schema 跳过） | **上限 634 步**（域 366 中解析器枚举 317，49 个 SIDE 不枚举，以运行时为准） | 运行时统计口径 |
