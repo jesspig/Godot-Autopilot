@@ -12,9 +12,35 @@ serialization rules that decide which property lines end up in the scene file.
 | Vector3 | `{"x": 1, "y": 2, "z": 3}` |
 | Color | `{"r": 1, "g": 0.5, "b": 0.25, "a": 1}` |
 | Rect2 | `{"position": {"x": 0, "y": 0}, "size": {"w": 64, "h": 32}}` |
+| Rect2i | `{"position": {"x": 0, "y": 0}, "size": {"w": 64, "h": 32}}` |
+| AABB | `{"position": {"x": 0, "y": 0, "z": 0}, "size": {"w": 64, "h": 32, "d": 16}}` |
+| Transform2D | `{"columns": [[1, 0], [0, 1], [x, y]]}` |
+| Transform3D | `{"basis": {"rows": [[1, 0, 0], [0, 1, 0], [0, 0, 1]]}, "origin": {"x": 0, "y": 0, "z": 0}}` |
+| RID | read back as `{"id": 42}`; JSON does not restore a RID, so RID parameters take the integer handles the tools return |
+| PackedByteArray | `[72, 101, 108, 108, 111]` |
 | Resource | `{"path": "res://icon.svg"}` |
 | Node reference | the node path string, e.g. `Player`; inside an array, `{"__node_ref__": "Player"}` is also accepted |
 | Typed array | a JSON array whose elements are converted by the array's declared element type — see "Array properties" below |
+
+Size and transform key rules:
+
+- Rect2 and Rect2i require `size` with `w` and `h`; `x` and `y` are
+  accepted aliases for the same axes. When both spellings are present with
+  different values the call errors. `position` is optional and defaults to
+  `(0, 0)`.
+- AABB requires `size` with `w`, `h` and `d`; `x`, `y` and `z` are accepted
+  aliases under the same conflict rule. `position` is optional and defaults
+  to `(0, 0, 0)`.
+- Transform2D requires `columns`: at least 3 arrays of at least 2 numbers,
+  in the `[x column, y column, origin column]` order. The `origin`, `x`, `y`
+  spelling is not read.
+- Transform3D requires `basis.rows` (3 arrays of 3 numbers); `origin` is
+  optional and defaults to `(0, 0, 0)`.
+- A RID property reads back as an object with an `id` number, but the
+  conversion chain does not turn JSON back into a RID. RID-typed parameters
+  take the integer handles returned by the tools that create or expose RIDs.
+- PackedByteArray takes and returns a plain JSON number array; it is not a
+  base64 string.
 
 Example calls:
 

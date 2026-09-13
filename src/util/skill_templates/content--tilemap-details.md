@@ -85,7 +85,15 @@ Single cell:
   TileSet, which is why the build order matters.
 - `atlas_coords` - which tile inside the atlas to place.
 
-### Bulk writes and the 64-cell cap
+To clear a cell, pass `source_id` -1; `atlas_coords` is ignored for such an
+entry and may be omitted. The erase semantics come from the engine's
+`set_cell` INVALID handling (see "set_cell INVALID semantics" below):
+
+```json
+{"name": "set_tilemap_cells", "arguments": {"node_path": "Ground", "cells": [{"x": 3, "y": 4, "source_id": -1}]}}
+```
+
+### Bulk writes and request limits
 
 `set_tilemap_cells` writes many cells in one call. Every entry needs `x`, `y`
 and `source_id`; `atlas_coords` is optional per entry.
@@ -94,14 +102,15 @@ and `source_id`; `atlas_coords` is optional per entry.
 {"name": "set_tilemap_cells", "arguments": {"node_path": "Ground", "cells": [{"x": 0, "y": 9, "source_id": 0, "atlas_coords": {"x": 0, "y": 0}}, {"x": 1, "y": 9, "source_id": 0, "atlas_coords": {"x": 1, "y": 0}}]}}
 ```
 
-Keep batches at roughly 64 entries or fewer. Larger payloads can be
-truncated by client-side parameter limits and then fail with a JSON parse
-error before the tool ever runs - the symptom is a parse error, not a tool
-error. For row-, floor- or map-scale fills, generate the layout
-programmatically with `code_execute` (loop over `set_cell` in GDScript)
-instead of hand-building a huge JSON array. Invalid entries are skipped
-rather than failing the whole call; the response reports how many cells were
-set plus a warnings list naming the skipped ones.
+Keep batches reasonably sized: `set_tilemap_cells` imposes no fixed entry cap
+server-side, but oversized JSON arguments can hit client-side or transport
+parameter limits and fail with a JSON parse error before the tool ever runs -
+the symptom is a parse error, not a tool error. For row-, floor- or
+map-scale fills, generate the layout programmatically with `code_execute`
+(loop over `set_cell` in GDScript) or `execute_script` instead of
+hand-building a huge JSON array. Invalid entries are skipped rather than
+failing the whole call; the response reports how many cells were set plus a
+warnings list naming the skipped ones.
 
 ## Per-tile collision
 
@@ -143,7 +152,8 @@ Practical consequences:
 INVALID, the engine treats the call as a reset request and silently clears
 the cell - no error is raised. So a call with a valid source id but an
 INVALID atlas coords (or vice versa) erases the cell you may have meant to
-edit. Always pass all three values together, or clear cells deliberately.
+edit. Always pass all three values together; to clear a cell deliberately,
+pass `source_id` -1 (see the erase example under Place cells above).
 
 ### tile_map_data layout and int16 bounds
 
@@ -192,7 +202,7 @@ passing plain booleans.
 | source not found | `source_id` was never added with `add_tilemap_atlas_source`. |
 | no physics layer N | Call `add_tilemap_physics_layer` before `set_tilemap_tile_collision`. |
 | texture errors | Texture path missing on disk or not imported; check the path. |
-| JSON parse error on a large cells call | Payload exceeded the client limit; split into batches of about 64 or switch to `code_execute`. |
+| JSON parse error on a large cells call | Payload exceeded a client-side parameter limit; split into smaller batches or switch to `code_execute`. |
 
 ## See also
 

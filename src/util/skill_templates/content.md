@@ -43,9 +43,11 @@ Top gotchas (details in the reference):
 
 - `set_cell` with exactly one of source id / atlas coords / alternative
   INVALID silently clears the cell instead of erroring.
-- Keep `set_tilemap_cells` batches at roughly 64 entries; larger payloads can
-  be truncated client-side and fail as a JSON parse error, not a tool error.
-  For map-scale fills, loop over `set_cell` with `code_execute`.
+- `set_tilemap_cells` has no fixed server-side entry cap; oversized JSON
+  arguments can hit client or transport request limits and fail as a parse
+  error before the tool runs. For map-scale fills, loop over `set_cell` with
+  `execute_script` or `code_execute`. An entry with `source_id` -1 clears the
+  cell at those coordinates.
 - Invalid entries in a bulk call are skipped with a warnings list and a set
   count - read both back.
 - A texture that is missing on disk or not yet imported errors at atlas

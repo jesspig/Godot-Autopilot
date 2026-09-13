@@ -231,6 +231,37 @@ The `press_input_*` / `release_input_*` / `move_input_mouse` /
 editor process. They are for editor-UI automation (driving editor
 shortcuts, viewport navigation) — never for driving the game.
 
+### Mouse coordinates and the click paradigm
+
+Mouse positions passed to `move_input_mouse`, `press_input_mouse_button`
+and `release_input_mouse_button` are pixels relative to the **client
+area of the focused window** — the editor main window while it has
+focus, dock areas included — so `(0, 0)` is that window's top-left
+corner. This is not the screen/desktop basis returned by
+`get_display_mouse_position`, and it is not the viewport basis of the
+edited scene. `warp_display_mouse` takes coordinates on the same
+window-client basis (the engine converts them before moving the OS
+cursor), which is why the two families pair up: do not feed raw
+`get_display_mouse_position` values into either.
+
+To click an editor dock, button or tab:
+
+1. Work out the target's client-area pixel coordinates in the focused
+   (main) window — estimate them from the window size or read them off a
+   `capture_editor_viewport` screenshot.
+2. `warp_display_mouse` to those coordinates so the real pointer lands
+   on the control.
+3. `move_input_mouse` to the same coordinates (optional, but it keeps
+   the motion state fresh), then `press_input_mouse_button`.
+4. `release_input_mouse_button` at the same coordinates. Many controls
+   act on the press event itself — the engine's `TabBar`, for example,
+   switches tabs on press rather than release — so the release is often
+   optional, but issuing it keeps press and release paired and avoids
+   stale held state.
+
+These events reach the editor process only; a separately launched game
+never receives them (see "Two processes, one lesson" above).
+
 ## See also
 
 - `../SKILL.md` — game lifecycle, the `game_*` channel and the confirmation
