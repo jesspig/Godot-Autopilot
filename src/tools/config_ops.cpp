@@ -5,12 +5,52 @@
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/editor_settings.hpp>
 #include <godot_cpp/classes/engine.hpp>
+#include <godot_cpp/classes/global_constants.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
+#include <cstdlib>
 #include <string>
+#include <utility>
 
 namespace godot_autopilot {
 namespace config_ops {
+
+namespace {
+
+mcp::JsonValue parse_enum_hint_options(const std::string &hint_string) {
+  mcp::JsonValue options(mcp::JsonValue::array_tag);
+  size_t start = 0;
+  int64_t index = 0;
+  while (start < hint_string.size()) {
+    size_t comma = hint_string.find(',', start);
+    std::string entry =
+        comma == std::string::npos ? hint_string.substr(start)
+                                   : hint_string.substr(start, comma - start);
+    mcp::JsonValue option(mcp::JsonValue::object_tag);
+    size_t colon = entry.find(':');
+    if (colon == std::string::npos) {
+      option["label"] = mcp::JsonValue(entry);
+      option["value"] = mcp::JsonValue(index);
+    } else {
+      option["label"] = mcp::JsonValue(entry.substr(0, colon));
+      std::string value_text = entry.substr(colon + 1);
+      char *end = nullptr;
+      long long parsed = std::strtoll(value_text.c_str(), &end, 10);
+      if (end != value_text.c_str() && *end == '\0') {
+        option["value"] = mcp::JsonValue(static_cast<int64_t>(parsed));
+      }
+    }
+    options.PushBack(std::move(option));
+    ++index;
+    if (comma == std::string::npos) {
+      break;
+    }
+    start = comma + 1;
+  }
+  return options;
+}
+
+} // namespace
 
 mcp::JsonValue handle_project_settings_get(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -312,6 +352,29 @@ mcp::JsonValue handle_editor_settings_get(const mcp::JsonValue &args) {
   godot::Variant result = es->get_setting(godot::String(name.c_str()));
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = VariantJson::serialize(result);
+  godot::TypedArray<godot::Dictionary> props = es->get_property_list();
+  for (int64_t i = 0; i < props.size(); i++) {
+    godot::Dictionary dict = props[i];
+    if (!dict.has("name"))
+      continue;
+    if (util::to_std(dict["name"].operator godot::String()) != name)
+      continue;
+    int hint_value = -1;
+    if (dict.has("hint")) {
+      hint_value = static_cast<int>(dict["hint"]);
+      r["hint"] = mcp::JsonValue(static_cast<int64_t>(hint_value));
+    }
+    std::string hint_string;
+    if (dict.has("hint_string"))
+      hint_string = util::to_std(dict["hint_string"].operator godot::String());
+    if (!hint_string.empty())
+      r["hint_string"] = mcp::JsonValue(hint_string);
+    if (hint_value == static_cast<int>(godot::PROPERTY_HINT_ENUM) &&
+        !hint_string.empty()) {
+      r["enum_options"] = parse_enum_hint_options(hint_string);
+    }
+    break;
+  }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_editor_settings completed");
   return r;

@@ -320,8 +320,8 @@ void fill_schema_render_audio(std::unordered_map<std::string, mcp::JsonValue>& m
             {"mode", "integer", "Cursor behavior: 0=visible, 1=hidden, 2=captured (pointer locked to the window, used for FPS controls), 3=confined, 4=confined_hidden; values outside 0-4 return an error", true},
         });
         m["warp_display_mouse"] = schema::build_schema({
-            {"x", "integer", "Mouse X position in screen coordinates (pixels), e.g. 640", true},
-            {"y", "integer", "Mouse Y position in screen coordinates (pixels), e.g. 360", true},
+            {"x", "integer", "Mouse X position in pixels relative to the client area of the focused window (not screen coordinates), e.g. 640", true},
+            {"y", "integer", "Mouse Y position in pixels relative to the client area of the focused window (not screen coordinates), e.g. 360", true},
         });
         m["capture_display_screen"] = schema::build_schema({
             {"screen", "integer", "Index of the physical screen to capture, default 0; valid range is 0 to count-1 from get_display_screen_count", false},

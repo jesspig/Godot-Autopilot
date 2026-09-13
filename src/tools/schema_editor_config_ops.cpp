@@ -85,7 +85,7 @@ void fill_schema_editor_config(std::unordered_map<std::string, mcp::JsonValue>& 
             {"fps", "integer", "Frame rate cap in frames per second; 0 disables the cap (uncapped)", true},
         });
         m["get_editor_settings"] = schema::build_schema({
-            {"name", "string", "Editor setting name, e.g. interface/theme/base_color; settings come from the editor's own preferences", true},
+            {"name", "string", "Editor setting name, e.g. interface/theme/base_color; settings come from the editor's own preferences. Alongside 'result' (the raw value, unchanged) the response carries the property list metadata: 'hint' (integer PropertyHint) plus 'hint_string' when non-empty; enum settings (hint 2) also include 'enum_options', an array of {'label', 'value'} entries that decodes bare integers such as run/window_placement/game_embed_mode", true},
         });
         m["set_editor_settings"] = schema::build_schema({
             {"name", "string", "Editor setting name to write, e.g. interface/theme/base_color", true},

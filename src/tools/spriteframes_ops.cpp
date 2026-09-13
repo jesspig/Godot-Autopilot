@@ -61,6 +61,17 @@ JV handle_create(const JV &args) {
 
   sf->remove_animation(godot::StringName("default"));
 
+  std::string default_animation;
+  auto *da = args.Find("default_animation");
+  if (da && da->IsString() && !da->GetString().empty())
+    default_animation = da->GetString();
+
+  if (!default_animation.empty()) {
+    godot::StringName anim(default_animation.c_str());
+    if (!sf->has_animation(anim))
+      sf->add_animation(anim);
+  }
+
   resource_ops::register_memory_resource(sf, name);
   sf->set_path(godot::String(("memory://" + name).c_str()));
 
@@ -71,6 +82,8 @@ JV handle_create(const JV &args) {
   info["path"] = JV("memory://" + name);
   info["object_id"] = JV(static_cast<int64_t>(sf->get_instance_id()));
   info["default_animation_removed"] = JV(true);
+  if (!default_animation.empty())
+    info["default_animation"] = JV(default_animation);
   r["result"] = std::move(info);
   LogSystem::instance().log(
       LogLevel::Info, LogCategory::Tools,

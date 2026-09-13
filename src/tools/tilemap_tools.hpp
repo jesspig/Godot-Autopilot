@@ -17,11 +17,11 @@ GDA_TOOL_CLASS(CreateTilemapTool, "create_tilemap",
                "TileMap", std::vector<std::string>({"tilemap", "create"}), tilemap_ops::handle_create, true)
 
 GDA_TOOL_CLASS(SetTilemapCellTool, "set_tilemap_cell",
-               "Set a single cell on a TileMap or TileMapLayer node. Requires path, x, y; optional layer (default 0), source_id (default 0) and atlas_coords {x, y} place the tile. The source must exist in the node's TileSet (build it with create_tilemap_tileset + add_tilemap_atlas_source first). Returns 'ok'; use set_tilemap_cells for batches.",
+               "Set a single cell on a TileMap or TileMapLayer node. Requires path, x, y; optional layer (default 0), source_id (default 0) and atlas_coords {x, y} place the tile. The source must exist in the node's TileSet (build it with create_tilemap_tileset + add_tilemap_atlas_source first). Passing source_id -1 clears the cell at x, y instead (atlas_coords is ignored then). Returns 'ok'; use set_tilemap_cells for batches.",
                "TileMap", std::vector<std::string>({"tilemap", "cell", "set"}), tilemap_ops::handle_set_cell, true)
 
 GDA_TOOL_CLASS(SetTilemapCellsTool, "set_tilemap_cells",
-               "Set multiple cells on a TileMap or TileMapLayer node in one call. Every entry must be an object with x, y and source_id (atlas_coords optional); invalid entries are skipped and reported via error plus warnings. Returns set_count and layer. Keep batches at ~64 entries — client-side parameter limits may truncate larger payloads; generate big layouts programmatically with execute_script instead.",
+               "Set multiple cells on a TileMap or TileMapLayer node in one call. Every entry must be an object with x, y and source_id (atlas_coords optional); an entry with source_id -1 clears the cell at x, y (atlas_coords is ignored for that entry). Invalid entries are skipped and reported via error plus warnings. Returns set_count and layer. There is no fixed entry cap, but keep batches reasonably sized because client-side request limits may apply; generate big layouts programmatically with execute_script or code_execute instead.",
                "TileMap", std::vector<std::string>({"tilemap", "cell", "set", "batch"}), tilemap_ops::handle_set_cells, true)
 
 GDA_TOOL_CLASS(CreateTilemapTilesetTool, "create_tilemap_tileset",
