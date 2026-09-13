@@ -2,7 +2,7 @@
   "skills": [
     {
       "name": "godot-autopilot",
-      "description": "Complete usage guide for the godot-autopilot MCP server: connection prerequisites, tool discovery protocol (search first, never guess names), the error protocol (new_errors_since_last_call watermark, retryable soft errors), direct HTTP fallback, task-to-tool routing and tool gotchas. Use for anything godot-autopilot related in a Godot project.",
+      "description": "Required reading before using the GDA (godot-autopilot) plugin: connection prerequisites, search-first tool discovery (never guess tool names), engine-version-matched documentation lookup, engine state observation (editor log, debugger, plugin log, error watermark), task-to-tool routing and the error watermark protocol. Complete usage guide for the godot-autopilot MCP server. Use for anything godot-autopilot related in a Godot project.",
       "files": [
         {
           "path": "SKILL.md",

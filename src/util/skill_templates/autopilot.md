@@ -1,6 +1,6 @@
 # Godot Autopilot
 
-Entry point for working on a Godot project through the godot-autopilot MCP server. This skill is the plugin usage overview: how to connect, how to discover tools (never guess names), how to route a task to a tool, how to read the error protocol every response follows, and the change/observe/verify development loop that keeps edits honest. For engine-level operations load the domain skills instead: godot-autopilot-scene-system, godot-autopilot-resources, godot-autopilot-scripting, godot-autopilot-runtime, godot-autopilot-servers and godot-autopilot-content.
+Read this skill before using the godot-autopilot plugin: it is the required entry point for every session on a Godot project through the godot-autopilot MCP server. This skill is the plugin usage overview: how to connect, how to discover tools (never guess names, and how to search for them effectively), when to consult the engine documentation instead of memory, how to watch engine state while working, how to route a task to a tool, how to read the error protocol every response follows, and the change/observe/verify development loop that keeps edits honest. For engine-level operations load the domain skills instead: godot-autopilot-scene-system, godot-autopilot-resources, godot-autopilot-scripting, godot-autopilot-runtime, godot-autopilot-servers and godot-autopilot-content.
 
 ## Prerequisites
 
@@ -43,7 +43,48 @@ Example domain call through `call_tool`:
 
 If `search_tools` does not surface a tool you suspect exists, browse references/tool-catalog.md: it lists all 366 domain tools grouped by their 30 source modules, one line each.
 
+### Search techniques
+
+`search_tools` ranks candidates with BM25 over tool names, descriptions, categories and tags, so the words you send shape the order you get back. Practical habits:
+
+- Search by the object first, then by the operation: "tilemap cell" finds the cell tools, "animation track" finds the track tools. Add a verb only when the object query is too broad ("rename scene node").
+- Describe, do not name. While you do not know the real tool name, describe the outcome ("connect a signal from a button") instead of guessing a plausible-looking name; a guessed name fails, a described intent is ranked.
+- Rerun with synonyms before concluding a tool is missing: tile/cell, sprite/texture, log/output, delete/remove/erase, create/add/new. The index has no stemming, so exact wording matters.
+- Narrow with filters: pass `category` for a single domain or `tags` for required tags, and browse `list_categories` when you only know the domain.
+- Read `get_tool_detail` for the candidate's schema and side-effect marker before the first write; the marker says whether the tool writes files or config.
+- When a query still comes back empty, walk references/tool-catalog.md (all 366 domain tools grouped by module) before inventing anything. Never guess a tool name - `call_tool` with a name that does not exist fails by design.
+
+## Consult the engine documentation
+
+Never call engine APIs from memory. Property names, method signatures, enum values, defaults and class members change between Godot versions, and recalled signatures are a common source of silent failures. The server exposes a documentation family - `find_docs_class`, `get_docs_class`, `get_docs_method`, `get_docs_property` - that answers straight from the offline documentation cache bundled with the running editor.
+
+Consult it before:
+
+- Writing or patching a script that calls an engine API you have not read this session.
+- Setting a property whose exact name or accepted values you are not sure of - check the property type and enum names first.
+- Using a class or method that is new to you, or that may have been renamed between Godot versions.
+- Chasing a failure whose message mentions an unknown property, unknown method or parse error.
+
+Because the cache ships inside the editor, the answers follow the engine version the user actually runs: whichever Godot version is open, the documentation matches that exact build. There is no network access and no stale recall involved - read the docs, do not remember them.
+
 ## Task routing
+
+### Choosing the right tool
+
+Reduce the task to its object and intent first; the first matching row is usually the right family:
+
+- Change a property -> `property_set`, then read it back with `property_get` to confirm the value landed.
+- Inspect properties or their metadata -> `property_get`, `property_get_list`.
+- Build or edit tilemaps -> `create_tilemap_tileset` plus `set_tilemap_cell` / `set_tilemap_cells` for cells.
+- Add, rename, move or delete nodes -> the scene tools (`create_scene_node`, `rename_scene_node`, `reparent_node`, `delete_scene_node`).
+- Work with resources in memory or on disk -> the resource tools (`create_resource`, `load_resource`, `save_resource`).
+- Write, attach or call GDScript -> the script tools (`create_script`, `attach_script_to_node`, `call_script_node`).
+- Need an engine API fact -> the documentation tools (`find_docs_class`, `get_docs_class`, `get_docs_method`, `get_docs_property`) - never memory; see "Consult the engine documentation".
+- Run the game and observe it -> the runtime tools (`play_editor_current_scene`, `capture_game_viewport`, `queue_game_input`).
+- Diagnose from logs -> the log tools; see "Watch the engine state".
+- Repeat a fixed sequence of calls -> `batch_execute`; need loops, math or computed values -> `code_execute`; see "batch_execute versus code_execute".
+
+The numbered procedure below applies to every route, and the tables after it list the per-task candidates. When two families could fit, read the candidate's schema with `get_tool_detail` before writing.
 
 1. Find your task category below and pick a candidate tool.
 2. Confirm the exact name with `search_tools` (never guess names).
@@ -107,6 +148,17 @@ If `search_tools` does not surface a tool you suspect exists, browse references/
 | Main scene | `set_editor_main_scene` |
 | Scene files | `create_editor_scene`, `open_editor_scene`, `save_editor_scene`, `save_editor_scene_as`, `close_editor_scene` |
 | File system refresh | `scan_editor_file_system` |
+
+## Watch the engine state
+
+Never chain write operations blind. Every change lands in a live editor with an import queue, a debugger and an engine log; state you did not observe is state you do not know. Keep observation inside the loop:
+
+- After every write call (any `property_set`, `create_scene_node`, `write_file`, `save_resource`, scene, script or config edit), read the `new_errors_since_last_call` value in the response before issuing the next call. A non-zero value means new errors were recorded - stop, pull the real log lines, fix or explain them, then continue.
+- While a game is running, watch the debugger channel: `get_debugger_errors` and `get_debugger_output` carry the game's errors and prints. Without a running game, the editor output panel and engine log come through `get_debugger_log`, and `get_game_log_entries` reads the on-disk log even after the session ended.
+- When the problem is inside the plugin itself (authorization denials, timeouts, dropped responses), read `get_plugin_log`.
+- Prefer observing real output - a log line, a screenshot, a read-back - over assuming a call did what its name suggests; `ok` only means the call went through.
+
+The watermark mechanics (one-shot consumption, retryable soft errors) are in Error protocol, and the closing check for a fix is "Confirming a fix with the error watermark". This section is about the habit: short write-observe cycles, not long blind sequences.
 
 ## Game development workflow
 

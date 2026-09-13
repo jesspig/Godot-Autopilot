@@ -8,7 +8,7 @@ tags:
   - 资源
   - UI
   - 工具库
-timestamp: "2026-09-13T17:50:28+08:00"
+timestamp: "2026-09-13T21:13:00+08:00"
 resource:
   - src/prompts/
   - src/resources/
@@ -18,7 +18,7 @@ resource:
 
 # 支撑模块（src/prompts/、src/resources/、src/ui/、src/util/）
 
-> 审计日期：2026-09-13（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill_gen 一键生成 Agent Skills 与 skill 内容外置化同步；09-10 随 skill 体系 19→7 册重构、Godot 源码研究发现织入与 dock 按钮动态化同步；09-13 上午随 7→8 册（C# 专册与开发闭环）与 util 新增 mcp_image_content.hpp 同步；09-13 下午随收口批次同步——McpConfigDock Allow code_execute 复选框、VariantJson::deserialize_strict、readback_util 值类型近似比较与 16 类清单、技能 runtime 册日志四路来源；09-13 17:50 随 B 组知识库审计同步——修正 prompt_tool_usage 行数、resource_handlers 静态/模板配比、注册入口行号与 keycode 提示词状态），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 审计日期：2026-09-13（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill_gen 一键生成 Agent Skills 与 skill 内容外置化同步；09-10 随 skill 体系 19→7 册重构、Godot 源码研究发现织入与 dock 按钮动态化同步；09-13 上午随 7→8 册（C# 专册与开发闭环）与 util 新增 mcp_image_content.hpp 同步；09-13 下午随收口批次同步——McpConfigDock Allow code_execute 复选框、VariantJson::deserialize_strict、readback_util 值类型近似比较与 16 类清单、技能 runtime 册日志四路来源；09-13 17:50 随 B 组知识库审计同步——修正 prompt_tool_usage 行数、resource_handlers 静态/模板配比、注册入口行号与 keycode 提示词状态；09-13 20 时随主册技能增强同步——description 必读定位与 autopilot.md 新增查文档时机/引擎状态观测/工具选择/搜索技巧四块正文；09-13 21 时统一 skill 为纯英文——scene-system.md 中文错误示例改英文转述、registry description 英文必读定位），基于当前工作树代码逐行核对（不依赖 git 历史）。
 > 覆盖范围：`src/prompts/` 9 组文件（18 个）、`src/resources/` 2 组、`src/ui/` 2 组、`src/util/` 13 组（20 个文件，其中 `scene_path.hpp`/`json_godot.hpp`/`rid_registry.hpp`/`type_hint.hpp`/`gdscript_wrap.hpp`/`project_path.hpp`/`mcp_image_content.hpp` 为 header-only；另含内容目录 `skill_templates/` 31 个文件——30 个 .md + registry.json）。注册入口为 `src/core/server_context.cpp:214-220`（`register_tools()` 内五处注册调用：工具 → 资源 → 通用 prompt → 调试资源 → 调试 prompt）。
 
 ## 模块简介
@@ -157,7 +157,7 @@ resource:
 - **UI 入口（09-10 动态化）**：McpConfigDock 面板按钮文本动态切换（见上文 McpConfigDock 小节），槽函数 `_on_generate_skills()`：先 `has_existing_skills()` 探测——有既有 `godot-autopilot-` 前缀目录则经 `remove_legacy_skill_dirs()`（`remove_dir_recursive` 后序遍历 + `DirAccess::remove`）整体删除后重建，旧 19 册在用户项目中随之自动退役；随后 `DirAccess::make_dir_recursive_absolute` 建目录并复用 `write_file` 写入；成功文案动态计数 "Generated/Updated N skills in .agents/skills/ (M reference files)"，失败列相对路径
 - **覆盖写策略**：写入与清理均限于自有 `godot-autopilot-` 前缀命名空间，不触碰 `.agents/skills/` 下其他内容
 - **8 册清单**（name 与吸收来源）：
-  - `godot-autopilot`——插件总纲：连接前提、工具发现协议（search first, never guess）、错误协议（watermark/retryable）、改→跑→观察→诊断→修→复验的开发闭环，吸收原 usage / direct-http / tool-map / tips-gotchas（references：development-workflow、http-fallback、tool-catalog、tool-gotchas）
+  - `godot-autopilot`——插件总纲，description 以 "Required reading before using the GDA (godot-autopilot) plugin" 开头（全英文）并以此定位本册（09-13 晚增强；09-13 21 时 skills 内容与 description 统一纯英文）：连接前提、工具发现协议（search first, never guess；Discovery protocol 追加 Search techniques——按对象/动词搜索、同义词重试、`category`/`tags` 过滤、BM25 排序受措辞影响、无果查 references/tool-catalog.md）、引擎文档查询时机（新增 Consult the engine documentation——文档工具直读运行中引擎自带的离线文档缓存、随引擎版本匹配，禁止凭记忆调 API）、引擎状态观测（新增 Watch the engine state——写操作后先读 `new_errors_since_last_call`，经编辑器日志/调试器/磁盘日志/插件日志取真实错误行，不连续盲操作）、任务到工具选择清单（Task routing 前置 Choosing the right tool——改属性→`property_set` 并回读、查属性→`property_get`/`property_get_list`、瓦片→`set_tilemap_cell`/`set_tilemap_cells` 与 tileset 工具、节点/资源/脚本/文档/运行时/日志各归其工具、批量→`batch_execute`、循环与数学→`code_execute`）、错误协议（watermark/retryable）、改→跑→观察→诊断→修→复验的开发闭环，吸收原 usage / direct-http / tool-map / tips-gotchas（references：development-workflow、http-fallback、tool-catalog、tool-gotchas）
   - `godot-autopilot-scene-system`——场景系统：场景生命周期、节点增删改名换父、属性 JSON 值形状、信号接线、undo 历史与 .tscn 序列化，吸收原 scene-building + properties-signals + inspection 的编辑侧
   - `godot-autopilot-resources`——资源与文件：load/save/create/duplicate、事务化 rename/move 与引用改写、UID 与依赖管理、导入管线，吸收原 resources-files
   - `godot-autopilot-scripting`——GDScript：四执行通道、@tool 语义、static 初始化与编辑器/游戏进程边界，原 scripting 就地重写保留

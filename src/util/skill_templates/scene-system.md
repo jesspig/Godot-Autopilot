@@ -223,7 +223,7 @@ undo-loss caveat: `references/undo-history.md`.
 
 ## Gotchas
 
-- Three accepted node path forms: `Root/Child` (root-name prefixed), `/root/Root/Child` (absolute), `Child` (relative to the root). An unresolvable path errors as `node not found: NoSuchNode — 当前场景根为 "Root"；合法路径写法：Root/子路径、/root/Root/子路径、子路径` — the message names the current scene root.
+- Three accepted node path forms: `Root/Child` (root-name prefixed), `/root/Root/Child` (absolute), `Child` (relative to the root). An unresolvable path fails with a node not found error whose hint names the current scene root and the legal path spellings; read the hint, fix the path and retry.
 - `create_editor_scene` and `open_editor_scene` refuse to run while the current scene has unsaved changes; `open_editor_scene` suggests either saving or calling `reload_editor_scene` on the listed path to discard the edits, while `create_editor_scene` requires saving first.
 - Immediately after `create_editor_scene` or `open_editor_scene`, `get_scene_tree` may still reflect the previous scene — call it again or wait briefly for the editor to refresh.
 - The root node cannot be deleted; close the scene with `close_editor_scene` instead.
