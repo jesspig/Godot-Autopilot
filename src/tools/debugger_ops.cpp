@@ -3,7 +3,9 @@
 #include "debugger_access.hpp"
 #include "runtime/gda_protocol.hpp"
 #include "runtime_ops.hpp"
+#include "util/error_util.hpp"
 #include <algorithm>
+#include <cctype>
 #include <ctime>
 #include <godot_cpp/classes/editor_debugger_plugin.hpp>
 #include <godot_cpp/classes/editor_debugger_session.hpp>
@@ -502,19 +504,28 @@ bool DebugCapturePlugin::_capture(const godot::String &p_message,
   std::string msg = p_message.utf8().ptr();
 
   if (msg == std::string(godot_autopilot::GDA_MSG_READY)) {
-    std::lock_guard<std::mutex> lock(session_mtx_);
-    if (std::find(ready_session_ids_.begin(), ready_session_ids_.end(),
-                  p_session_id) == ready_session_ids_.end()) {
-      ready_session_ids_.push_back(p_session_id);
+    bool newly_ready = false;
+    {
+      std::lock_guard<std::mutex> lock(session_mtx_);
+      if (std::find(ready_session_ids_.begin(), ready_session_ids_.end(),
+                    p_session_id) == ready_session_ids_.end()) {
+        ready_session_ids_.push_back(p_session_id);
+        newly_ready = true;
+      }
+    }
+    if (newly_ready) {
+      godot_autopilot::runtime_ops::run_channel_self_check(p_session_id);
     }
     return true;
   }
 
-  if (msg == std::string(godot_autopilot::GDA_MSG_RESPONSE) &&
-      p_data.size() >= 1) {
-    godot::String payload = p_data[0];
-    godot_autopilot::runtime_ops::handle_game_response(
-        std::string(payload.utf8().ptr()));
+  if (msg == std::string(godot_autopilot::GDA_MSG_RESPONSE)) {
+    if (p_data.size() >= 1) {
+      godot::String payload = p_data[0];
+      godot_autopilot::runtime_ops::handle_game_response(
+          std::string(payload.utf8().ptr()));
+    }
+    return true;
   }
 
   return false;
@@ -534,6 +545,58 @@ mcp::JsonValue capture_note_for_empty_result() {
             "godot-autopilot extension)");
 }
 
+const char *plugin_log_level_name(LogLevel level) {
+  switch (level) {
+  case LogLevel::Debug:
+    return "debug";
+  case LogLevel::Info:
+    return "info";
+  case LogLevel::Warning:
+    return "warning";
+  case LogLevel::Error:
+    return "error";
+  default:
+    return "unknown";
+  }
+}
+
+const char *plugin_log_category_name(LogCategory category) {
+  switch (category) {
+  case LogCategory::System:
+    return "system";
+  case LogCategory::Transport:
+    return "transport";
+  case LogCategory::Tools:
+    return "tools";
+  case LogCategory::Resources:
+    return "resources";
+  case LogCategory::Prompts:
+    return "prompts";
+  default:
+    return "unknown";
+  }
+}
+
+bool plugin_log_entry_matches(const godot_autopilot::LogEntry &entry,
+                              const LogSystem::Query &query) {
+  if (entry.level < query.min_level)
+    return false;
+  if (query.category.has_value() && entry.category != *query.category)
+    return false;
+  if (!query.filter_text.empty()) {
+    auto it =
+        std::search(entry.message.begin(), entry.message.end(),
+                    query.filter_text.begin(), query.filter_text.end(),
+                    [](char a, char b) {
+                      return std::tolower(static_cast<unsigned char>(a)) ==
+                             std::tolower(static_cast<unsigned char>(b));
+                    });
+    if (it == entry.message.end())
+      return false;
+  }
+  return true;
+}
+
 } // namespace
 
 mcp::JsonValue handle_output_get_log(const mcp::JsonValue &args) {
@@ -548,6 +611,118 @@ mcp::JsonValue handle_output_get_log(const mcp::JsonValue &args) {
   r["result"] = mcp::JsonValue(DebuggerCapture::instance().get_log_text(limit));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_debugger_log completed");
+  return r;
+}
+
+mcp::JsonValue handle_plugin_log_get(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "get_plugin_log called");
+  constexpr int64_t DEFAULT_LIMIT = 100;
+  constexpr int64_t MAX_LIMIT = 1000;
+  int64_t limit = DEFAULT_LIMIT;
+  if (auto *l = args.Find("limit")) {
+    if (!l->IsInt())
+      return util::error_json("invalid parameter: limit must be an integer");
+    limit = l->GetInt();
+    if (limit > MAX_LIMIT)
+      limit = MAX_LIMIT;
+    if (limit < 0)
+      limit = 0;
+  }
+
+  LogSystem::Query query;
+  if (auto *l = args.Find("level")) {
+    if (!l->IsString())
+      return util::error_json("invalid parameter: level must be a string");
+    const std::string level = l->GetString();
+    if (level == "debug")
+      query.min_level = LogLevel::Debug;
+    else if (level == "info")
+      query.min_level = LogLevel::Info;
+    else if (level == "warning")
+      query.min_level = LogLevel::Warning;
+    else if (level == "error")
+      query.min_level = LogLevel::Error;
+    else
+      return util::error_json(
+          "invalid level '" + level +
+          "': expected one of debug, info, warning, error");
+  }
+  if (auto *c = args.Find("category")) {
+    if (!c->IsString())
+      return util::error_json("invalid parameter: category must be a string");
+    const std::string category = c->GetString();
+    if (category == "system")
+      query.category = LogCategory::System;
+    else if (category == "transport")
+      query.category = LogCategory::Transport;
+    else if (category == "tools")
+      query.category = LogCategory::Tools;
+    else if (category == "resources")
+      query.category = LogCategory::Resources;
+    else if (category == "prompts")
+      query.category = LogCategory::Prompts;
+    else
+      return util::error_json(
+          "invalid category '" + category +
+          "': expected one of system, transport, tools, resources, prompts");
+  }
+  if (auto *f = args.Find("filter")) {
+    if (!f->IsString())
+      return util::error_json("invalid parameter: filter must be a string");
+    query.filter_text = f->GetString();
+  }
+
+  LogSystem &log = LogSystem::instance();
+  std::vector<godot_autopilot::LogEntry> entries;
+  size_t next_index = log.next_index();
+  if (auto *s = args.Find("since_index")) {
+    if (!s->IsInt() || s->GetInt() < 0)
+      return util::error_json(
+          "invalid parameter: since_index must be a non-negative integer");
+    entries = log.query_from(static_cast<size_t>(s->GetInt()), &next_index);
+    entries.erase(std::remove_if(entries.begin(), entries.end(),
+                                 [&query](const godot_autopilot::LogEntry &e) {
+                                   return !plugin_log_entry_matches(e, query);
+                                 }),
+                  entries.end());
+    if (static_cast<int64_t>(entries.size()) > limit) {
+      entries.resize(static_cast<size_t>(limit));
+      if (!entries.empty())
+        next_index = entries.back().serial + 1;
+    }
+  } else {
+    entries = log.query(query);
+    if (static_cast<int64_t>(entries.size()) > limit) {
+      entries.erase(entries.begin(),
+                    entries.end() - static_cast<size_t>(limit));
+    }
+    if (!entries.empty())
+      next_index = entries.back().serial + 1;
+  }
+
+  mcp::JsonValue arr(mcp::JsonValue::array_tag);
+  for (const auto &entry : entries) {
+    mcp::JsonValue item(mcp::JsonValue::object_tag);
+    item["serial"] = mcp::JsonValue(static_cast<int64_t>(entry.serial));
+    std::time_t tt = std::chrono::system_clock::to_time_t(entry.timestamp);
+    char buf[32] = {0};
+    std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", std::gmtime(&tt));
+    item["timestamp"] = mcp::JsonValue(buf);
+    item["level"] = mcp::JsonValue(plugin_log_level_name(entry.level));
+    item["category"] = mcp::JsonValue(plugin_log_category_name(entry.category));
+    item["message"] = mcp::JsonValue(entry.message);
+    arr.PushBack(std::move(item));
+  }
+
+  mcp::JsonValue result(mcp::JsonValue::object_tag);
+  result["entries"] = std::move(arr);
+  result["count"] = mcp::JsonValue(static_cast<int64_t>(entries.size()));
+  result["next_index"] = mcp::JsonValue(static_cast<int64_t>(next_index));
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["result"] = std::move(result);
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "get_plugin_log completed");
   return r;
 }
 

@@ -89,6 +89,19 @@ bool is_sequence_item_kind(const std::string &kind) {
   return false;
 }
 
+constexpr const char *RUNTIME_DEGRADATION_HINT =
+    "runtime channel unavailable: the game process did not answer. In the "
+    "meantime you can read the game log from disk (get_game_log_entries), "
+    "capture the whole desktop (capture_display_screen) or the editor "
+    "viewport (capture_editor_viewport); inspect get_plugin_log for the "
+    "plugin-side timeout diagnostics.";
+
+void append_runtime_degradation_hint(JV &result) {
+  if (!result.IsObject() || !result.Contains("error"))
+    return;
+  result["hint"] = JV(RUNTIME_DEGRADATION_HINT);
+}
+
 } // namespace
 
 mcp::JsonValue handle_game_status(const mcp::JsonValue &args) {
@@ -210,6 +223,7 @@ mcp::JsonValue handle_game_input(const mcp::JsonValue &args) {
   copy_optional(args, params, "mode");
 
   JV result = handle_gda_send("input", params, extract_timeout(args));
+  append_runtime_degradation_hint(result);
   return result;
 }
 
@@ -242,7 +256,9 @@ mcp::JsonValue handle_game_input_wait(const mcp::JsonValue &args) {
   copy_optional(args, params, "state");
   copy_optional(args, params, "inject");
   copy_optional(args, params, "timeout_ms");
-  return handle_gda_send("input_wait", params, extract_timeout(args));
+  JV result = handle_gda_send("input_wait", params, extract_timeout(args));
+  append_runtime_degradation_hint(result);
+  return result;
 }
 
 mcp::JsonValue handle_game_input_status(const mcp::JsonValue &args) {
@@ -261,6 +277,7 @@ mcp::JsonValue handle_game_input_status(const mcp::JsonValue &args) {
   JV params(JV::object_tag);
   params["action"] = *action_p;
   JV result = handle_gda_send("input_status", params, extract_timeout(args));
+  append_runtime_degradation_hint(result);
   if (!result.Contains("error")) {
     std::string recent_errors = debugger_ops::capture_get_errors_text(5);
     if (!recent_errors.empty()) {
@@ -328,7 +345,10 @@ mcp::JsonValue handle_sequence_game_inputs(const mcp::JsonValue &args) {
   params["inputs"] = *inputs_p;
   params["timeout_ms"] = JV(timeout);
 
-  return handle_gda_send(std::string(GDA_OP_INPUT_SEQUENCE), params, timeout);
+  JV result =
+      handle_gda_send(std::string(GDA_OP_INPUT_SEQUENCE), params, timeout);
+  append_runtime_degradation_hint(result);
+  return result;
 }
 
 mcp::JsonValue handle_game_ui_elements(const mcp::JsonValue &args) {
@@ -357,7 +377,9 @@ mcp::JsonValue handle_game_capture(const mcp::JsonValue &args) {
   if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed), unknown))
     return error_json("unknown parameter for capture_game_viewport: " + unknown);
   JV params(JV::object_tag);
-  return handle_gda_send("capture", params, extract_timeout(args));
+  JV result = handle_gda_send("capture", params, extract_timeout(args));
+  append_runtime_degradation_hint(result);
+  return result;
 }
 
 mcp::JsonValue handle_game_reload_scripts(const mcp::JsonValue &args) {

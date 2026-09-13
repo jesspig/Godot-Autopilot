@@ -8,6 +8,13 @@ void fill_schema_debug_sys(std::unordered_map<std::string, mcp::JsonValue>& m) {
         m["get_debugger_log"] = schema::build_schema({
             {"limit", "integer", "Maximum number of log entries to return (default: 50); the most recent entries are kept. The buffer always has data from the editor process engine logger, even without a running game", false},
         });
+        m["get_plugin_log"] = schema::build_schema({
+            {"limit", "integer", "Maximum number of plugin log entries to return (default: 100, max: 1000); the most recent entries are kept unless since_index is given (then the oldest unread are kept)", false},
+            {"level", "string", "Minimum log level filter: 'debug' (default, no filtering), 'info', 'warning' or 'error'", false},
+            {"category", "string", "Category filter: 'system', 'transport', 'tools', 'resources' or 'prompts' (omit for all categories)", false},
+            {"filter", "string", "Case-insensitive substring filter on the message text", false},
+            {"since_index", "integer", "Only return entries with serial >= since_index (incremental read); start with 0 and pass the returned next_index on the next call to fetch only new entries", false},
+        });
         m["get_debugger_errors"] = schema::build_schema({
             {"limit", "integer", "Maximum number of errors to return (default: 20); with an active debug session the result is a structured list fetched from the running game (time, file, func, line, error, descr, is_warning, stack), otherwise an empty result plus a note — no editor-side fallback; use get_debugger_log for editor-process script errors and output", false},
         });

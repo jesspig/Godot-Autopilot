@@ -16,7 +16,8 @@ bool debugger_capture_initialized() {
 }
 
 bool debugger_broadcast_request(const std::string &payload,
-                                int32_t *out_first_session_id) {
+                                int32_t *out_first_session_id,
+                                int32_t *out_session_count) {
   auto *plugin = debugger_ops::DebugCapturePlugin::get_instance();
   if (!plugin)
     return false;
@@ -42,6 +43,8 @@ bool debugger_broadcast_request(const std::string &payload,
   }
   if (out_first_session_id)
     *out_first_session_id = first_id;
+  if (out_session_count)
+    *out_session_count = static_cast<int32_t>(sessions.size());
   return true;
 }
 

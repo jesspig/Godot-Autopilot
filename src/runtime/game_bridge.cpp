@@ -645,9 +645,22 @@ void register_listener() {
     g_logger.instantiate();
   }
   if (auto *dbg = godot::EngineDebugger::get_singleton()) {
+    const godot::StringName capture_name(gda_string(GDA_PREFIX));
+    if (dbg->has_capture(capture_name)) {
+      LogSystem::instance().log(
+          LogLevel::Error, LogCategory::System,
+          "game bridge: failed to register 'gda' message capture");
+      return;
+    }
     dbg->register_message_capture(
-        godot::StringName(gda_string(GDA_PREFIX)),
+        capture_name,
         godot::Callable(g_listener.ptr(), godot::StringName("on_gda_message")));
+    if (!dbg->has_capture(capture_name)) {
+      LogSystem::instance().log(
+          LogLevel::Error, LogCategory::System,
+          "game bridge: failed to register 'gda' message capture");
+      return;
+    }
     if (auto *os = godot::OS::get_singleton()) {
       os->add_logger(g_logger);
     }
