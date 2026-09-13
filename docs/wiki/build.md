@@ -6,7 +6,7 @@ tags:
   - 构建
   - CMake
   - 部署
-timestamp: "2026-09-13T18:13:54+08:00"
+timestamp: "2026-09-13T21:29:33+08:00"
 resource:
   - CMakeLists.txt
   - CMakePresets.json
@@ -16,7 +16,7 @@ resource:
 
 # 构建体系（build）
 
-> 审计日期：2026-09-10（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill 内容外置化同步；09-10 随 7 册重构同步；09-13 晚随 A 组知识库审计修复批次同步——skill_templates 8 册/30 个 .md、server_context/FetchDependencies 行号重核、AGENTS.md/README 对照段更新），基于当前工作树文件逐项核对（不依赖 git 历史）。
+> 审计日期：2026-09-10（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill 内容外置化同步；09-10 随 7 册重构同步；09-13 晚随 A 组知识库审计修复批次同步——skill_templates 8 册/30 个 .md、server_context/FetchDependencies 行号重核、AGENTS.md/README 对照段更新；09-13 晚随 0.2.3→0.2.4 升版同步示例版本号），基于当前工作树文件逐项核对（不依赖 git 历史）。
 > 事实来源：`build.py`（239 行）、`CMakeLists.txt`（169 行）、`CMakePresets.json`、`cmake/` 全部 7 个模块、`tools/embed_skills.py`、`.env.template`、根 `README.md` / `README_zh.md` / `AGENTS.md` 构建段、`.github/workflows/{ci,release}.yml`。
 
 ## 命令速查表
@@ -83,7 +83,7 @@ resource:
 
 | job | 内容 |
 |---|---|
-| validate | 校验 tag 与根 `VERSION` 一致（`v0.2.3` ↔ `0.2.3`，版本号以根 `VERSION` 为准，当前 0.2.3），不一致 fail |
+| validate | 校验 tag 与根 `VERSION` 一致（`v0.2.4` ↔ `0.2.4`，版本号以根 `VERSION` 为准，当前 0.2.4），不一致 fail |
 | build | 同 CI 环境（Ninja/sccache/msvc-dev-cmd），Release 构建后按精确文件名上传各平台库 artifact（天然排除 pdb） |
 | package | 下载全部 artifact → `python build.py --package --libs-dir dist` 合并 → 重命名为 `addons.zip` → softprops/action-gh-release 发布 |
 
