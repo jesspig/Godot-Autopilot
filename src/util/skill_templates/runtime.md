@@ -82,9 +82,8 @@ debug channel into the game process).
 - `queue_game_input` simulates one input: `type` is `key`, `mouse_button` or
   `action`; `mode` is `event` (default, parsed input event), `api`
   (immediate `Input.action_press`/`action_release`) or `hold` (event-style,
-  held for `duration_ms`). Parameters outside the whitelist are reported
-  back in `ignored_params` with a warning — a typo does not fail the call,
-  so read the warning.
+  held for `duration_ms`). Parameters outside the whitelist are rejected
+  with an error — a typo fails the call.
 - `wait_game_input` waits until an action reaches a transient state
   (`just_pressed` default, `just_released` or `pressed`) in a physics frame,
   or `timeout_ms` elapses (default 2000, max 30000). Optional `inject` sends
