@@ -6,7 +6,7 @@ tags:
   - 构建
   - CMake
   - 部署
-timestamp: "2026-09-13T21:50:35+08:00"
+timestamp: "2026-09-14T03:26:00+08:00"
 resource:
   - CMakeLists.txt
   - CMakePresets.json
@@ -16,7 +16,7 @@ resource:
 
 # 构建体系（build）
 
-> 审计日期：2026-09-10（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill 内容外置化同步；09-10 随 7 册重构同步；09-13 晚随 A 组知识库审计修复批次同步——skill_templates 8 册/30 个 .md、server_context/FetchDependencies 行号重核、AGENTS.md/README 对照段更新；09-13 晚随 0.2.3→0.2.4 升版同步示例版本号；09-13 晚随 0.2.4 版知识库全量审计同步——GODOT_PATH 缺失行为修正（退出码 2 报错，非“失败/跳过”），全页其余事实复核一致），基于当前工作树文件逐项核对（不依赖 git 历史）。
+> 审计日期：2026-09-10（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill 内容外置化同步；09-10 随 7 册重构同步；09-13 晚随 A 组知识库审计修复批次同步——skill_templates 8 册/30 个 .md、server_context/FetchDependencies 行号重核、AGENTS.md/README 对照段更新；09-13 晚随 0.2.3→0.2.4 升版同步示例版本号；09-13 晚随 0.2.4 版知识库全量审计同步——GODOT_PATH 缺失行为修正（退出码 2 报错，非“失败/跳过”），全页其余事实复核一致；09-14 随 CI Windows Python 编码修复同步——ci/release workflow 增 `PYTHONUTF8`、`embed_skills.py` 强制 UTF-8 输出），基于当前工作树文件逐项核对（不依赖 git 历史）。
 > 事实来源：`build.py`（239 行）、`CMakeLists.txt`（169 行）、`CMakePresets.json`、`cmake/` 全部 7 个模块、`tools/embed_skills.py`、`.env.template`、根 `README.md` / `README_zh.md` / `AGENTS.md` 构建段、`.github/workflows/{ci,release}.yml`。
 
 ## 命令速查表
@@ -77,7 +77,7 @@ resource:
 
 ## CI 与 Release
 
-`.github/workflows/ci.yml` — develop push/PR 触发：三平台 matrix（ubuntu-latest / macos-latest / windows-2022）Debug 编译 + L1 测试 `ctest --preset debug -E "^gda_runner_"`（L2 需 Godot 不在 CI 跑）；sccache + `_deps` 缓存加速。
+`.github/workflows/ci.yml` — develop push/PR 触发：三平台 matrix（ubuntu-latest / macos-latest / windows-2022）Debug 编译 + L1 测试 `ctest --preset debug -E "^gda_runner_"`（L2 需 Godot 不在 CI 跑）；sccache + `_deps` 缓存加速。job 级 env 含 `PYTHONUTF8: "1"`（Windows runner 控制台为 cp1252，保证 `build.py` 及其子进程 `embed_skills.py` 的中文日志不触发 `UnicodeEncodeError`；脚本自身亦对 stdout/stderr 强制 UTF-8，本地 Windows 终端同样受益）。`release.yml` 的 job env 同。
 
 `.github/workflows/release.yml` — tag `v*` 触发：
 

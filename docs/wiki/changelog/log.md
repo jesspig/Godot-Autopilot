@@ -2,6 +2,10 @@
 
 > 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天。
 
+## 2026-09-14
+
+- **CI Windows 构建编码修复**：`embed_skills.py` 中文 print 在 cp1252 控制台 `UnicodeEncodeError`（8/30 起 develop CI 连败根因），脚本 stdout/stderr 强制 UTF-8 + `ci.yml`/`release.yml` 增 `PYTHONUTF8=1`；本地 cp1252 复现环境验证通过，生成头与产物一致。详见 `changelog/2026-09-14-log.md`
+
 ## 2026-09-13
 
 - **mcp-cpp-sdk 0.3.2 → 0.3.3**：`FetchDependencies.cmake` GIT_TAG 升级，重新 configure 拉取 0.3.3 并全量编译通过（无 API 适配），`uv run build.py` 部署通过，ctest L1 114/114 全绿；0.3.3 含 conformance/MRTR、Bearer 鉴权、FileEventStore 会话恢复、传输层死锁修复等（本仓库未启用新特性）。详见 `changelog/2026-09-13-log.md`

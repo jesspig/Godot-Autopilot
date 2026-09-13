@@ -8,6 +8,10 @@ import sys
 from collections import Counter
 from pathlib import Path, PurePath
 
+# Windows 控制台默认 cp1252，中文日志会触发 UnicodeEncodeError；CI 经 PYTHONUTF8 双保险
+sys.stdout.reconfigure(encoding="utf-8")
+sys.stderr.reconfigure(encoding="utf-8")
+
 SKILL_COUNT = 8
 # 与 src/util/skill_templates/registry.json 的册数保持同步
 NAME_PATTERN = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")

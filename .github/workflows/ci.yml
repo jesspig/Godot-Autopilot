@@ -24,6 +24,8 @@ jobs:
 
     env:
       SCCACHE_GHA_ENABLED: "true"
+      # Windows runner 控制台为 cp1252，保证 Python 子进程（含 embed_skills.py）以 UTF-8 输出
+      PYTHONUTF8: "1"
 
     steps:
       - uses: actions/checkout@v4
