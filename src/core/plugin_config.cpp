@@ -6,6 +6,7 @@
 #include <mcp/JsonValue.hpp>
 
 #include "log_system.hpp"
+#include "tools/authorization.hpp"
 
 namespace godot_autopilot {
 
@@ -14,6 +15,7 @@ constexpr const char *kConfigPath = "user://godot_autopilot/config.json";
 constexpr const char *kConfigDir = "user://godot_autopilot";
 constexpr const char *kPortKey = "port";
 constexpr const char *kShowTimeKey = "show_time";
+constexpr const char *kAllowKey = "allow";
 } // namespace
 
 namespace {
@@ -53,6 +55,14 @@ bool save_config_value(const char *key, const mcp::JsonValue &value) {
   file->close();
   return true;
 }
+} // namespace
+
+namespace {
+struct AllowProviderRegistration {
+  AllowProviderRegistration() {
+    authorization::set_allow_provider(&PluginConfig::load_allow);
+  }
+} g_allow_provider_registration;
 } // namespace
 
 int PluginConfig::load_port() {
@@ -112,6 +122,35 @@ bool PluginConfig::load_show_time() {
 
 bool PluginConfig::save_show_time(bool show) {
   return save_config_value(kShowTimeKey, mcp::JsonValue(show));
+}
+
+std::string PluginConfig::load_allow() {
+  godot::Ref<godot::FileAccess> file =
+      godot::FileAccess::open(kConfigPath, godot::FileAccess::READ);
+  if (file.is_null()) {
+    return std::string();
+  }
+  godot::String content = file->get_as_text();
+  file->close();
+
+  mcp::JsonValue doc;
+  try {
+    doc = mcp::JsonValue::Parse(content.utf8().get_data());
+  } catch (...) {
+    LogSystem::instance().log(LogLevel::Error, LogCategory::System,
+                              "Plugin config parse failed: " +
+                                  std::string(kConfigPath));
+    return std::string();
+  }
+  const auto *allow = doc.Find(kAllowKey);
+  if (allow == nullptr || !allow->IsString()) {
+    return std::string();
+  }
+  return allow->GetString();
+}
+
+bool PluginConfig::save_allow(const std::string &allow) {
+  return save_config_value(kAllowKey, mcp::JsonValue(allow));
 }
 
 } // namespace godot_autopilot

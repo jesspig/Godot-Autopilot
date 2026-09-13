@@ -1,5 +1,9 @@
 #include "mcp_config_dock.hpp"
 
+#include <string>
+#include <utility>
+#include <vector>
+
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/file_access.hpp>
@@ -12,6 +16,7 @@
 #include <godot_cpp/core/class_db.hpp>
 
 #include "core/plugin_config.hpp"
+#include "tools/authorization.hpp"
 
 namespace godot_autopilot {
 
@@ -74,6 +79,41 @@ void remove_dir_recursive(const godot::String &path) {
   godot::DirAccess::remove_absolute(path);
 }
 
+std::vector<std::string> split_allow(const std::string &value) {
+  std::vector<std::string> entries;
+  size_t begin = 0;
+  while (begin <= value.size()) {
+    const size_t end = value.find(',', begin);
+    entries.push_back(value.substr(
+        begin, end == std::string::npos ? std::string::npos : end - begin));
+    if (end == std::string::npos) {
+      break;
+    }
+    begin = end + 1;
+  }
+  return entries;
+}
+
+std::string join_allow(const std::vector<std::string> &entries) {
+  std::string out;
+  for (const std::string &entry : entries) {
+    if (entry.empty()) {
+      continue;
+    }
+    if (!out.empty()) {
+      out += ',';
+    }
+    out += entry;
+  }
+  return out;
+}
+
+bool code_execute_allowed() {
+  const std::string allow = PluginConfig::load_allow();
+  return authorization::allow_list_contains(allow, "code_execute") ||
+         authorization::allow_list_contains(allow, "all");
+}
+
 } // namespace
 
 McpConfigDock::McpConfigDock() : port_spin(nullptr), apply_button(nullptr) {
@@ -118,6 +158,22 @@ McpConfigDock::McpConfigDock() : port_spin(nullptr), apply_button(nullptr) {
   show_time_check->set_tooltip_text("Prefix each log line with HH:MM:SS; collapsed (merged) lines always show latest time.");
   time_row->add_child(show_time_check);
   show_time_check->connect("toggled", callable_mp(this, &McpConfigDock::_on_show_time_toggled));
+
+  auto *allow_row = memnew(godot::HBoxContainer);
+  root->add_child(allow_row);
+  auto *allow_label = memnew(godot::Label);
+  allow_label->set_text("Allow code_execute:");
+  allow_row->add_child(allow_label);
+  allow_code_execute_check = memnew(godot::CheckBox);
+  allow_code_execute_check->set_pressed(code_execute_allowed());
+  allow_code_execute_check->set_tooltip_text(
+      "Allow code_execute (and the execute_script tool): read on the next "
+      "tool call, no restart needed. When the GODOT_AUTOPILOT_ALLOW "
+      "environment variable is set it wins over this setting.");
+  allow_row->add_child(allow_code_execute_check);
+  allow_code_execute_check->connect(
+      "toggled",
+      callable_mp(this, &McpConfigDock::_on_allow_code_execute_toggled));
 
   status_label = memnew(godot::Label);
   root->add_child(status_label);
@@ -184,6 +240,25 @@ void McpConfigDock::_on_show_time_toggled(bool checked) {
   if (log_dock_) log_dock_->set_show_time(checked);
 }
 
+void McpConfigDock::_on_allow_code_execute_toggled(bool checked) {
+  std::vector<std::string> entries = split_allow(PluginConfig::load_allow());
+  if (checked) {
+    if (!code_execute_allowed()) {
+      entries.push_back("code_execute");
+    }
+  } else {
+    std::vector<std::string> kept;
+    for (const std::string &entry : entries) {
+      if (entry != "code_execute") {
+        kept.push_back(entry);
+      }
+    }
+    entries = std::move(kept);
+  }
+  PluginConfig::save_allow(join_allow(entries));
+  allow_code_execute_check->set_pressed_no_signal(code_execute_allowed());
+}
+
 void McpConfigDock::set_server_context(ServerContext *ctx) {
   server_ctx = ctx;
   if (port_spin != nullptr) {
@@ -214,7 +289,7 @@ void McpConfigDock::_refresh_generate_skills_button() {
   generate_skills_button->set_text(has_existing_skills() ? "Update Skills"
                                                          : "Generate Skills");
   generate_skills_button->set_tooltip_text(
-      "Write the 7 godot-autopilot skills to .agents/skills/ "
+      "Write the 8 godot-autopilot skills to .agents/skills/ "
       "(updates existing entries)");
 }
 

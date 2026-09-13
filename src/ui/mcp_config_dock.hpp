@@ -27,6 +27,7 @@ class McpConfigDock : public godot::EditorDock {
   godot::Label *result_label;
 
   godot::CheckBox *show_time_check = nullptr;
+  godot::CheckBox *allow_code_execute_check = nullptr;
   McpLogDock *log_dock_ = nullptr;
 
   ServerContext *server_ctx = nullptr;
@@ -50,6 +51,7 @@ private:
   void _refresh_generate_skills_button();
   void _report(const godot::String &text, const godot::Color &color);
   void _on_show_time_toggled(bool checked);
+  void _on_allow_code_execute_toggled(bool checked);
 };
 
 } // namespace godot_autopilot
