@@ -11,4 +11,5 @@
 !assets/**/
 !assets/**/*.png
 !docs/
+!docs/**/
 !docs/**/*.md
