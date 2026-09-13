@@ -19,7 +19,7 @@ Godot Editor
       ├── mcp-cpp-sdk: HTTP server (internal threads)
       ├── mcp-cpp-sdk: McpServer + Streamable HTTP
       ├── Command Queue (HTTP thread → Godot main thread bridge)
-      ├── ~365 MCP Tools across 27 categories (count varies by plugin version; see MCP search_tools)
+      ├── ~366 MCP Tools across 27 categories (count varies by plugin version; see MCP search_tools)
       ├── Inline Documentation (offline engine docs)
       └── Custom Log Dock (dedicated plugin output panel)
 ```
@@ -31,13 +31,13 @@ Godot Editor
 | **Transport** | Streamable HTTP (POST /mcp) | Standard MCP protocol, no bridge process |
 | **Thread Model** | Command queue + frame sync | Safe Godot main-thread-only API access |
 | **Port** | 9527 | Configurable via `GODOT_AUTOPILOT_PORT` env var |
-| **Discovery** | 3-Tier Progressive (Catalog→Inspect→Execute) | Keeps context small with ~365 tools (count varies by plugin version) |
+| **Discovery** | 3-Tier Progressive (Catalog→Inspect→Execute) | Keeps context small with ~366 tools (count varies by plugin version) |
 | **Search** | BM25 keyword | Tools organized by namespace + descriptions |
 | **Build** | CMake 3.28+ / C++17 | Cross-platform, auto-optimized builds |
 
 ## Features
 
-### 🎮 Full Engine Control (~365 Tools, count varies by plugin version; see MCP search_tools)
+### 🎮 Full Engine Control (~366 Tools, count varies by plugin version; see MCP search_tools)
 
 | Category | Tools | Description |
 |----------|:-----:|-------------|
@@ -59,7 +59,7 @@ Godot Editor
 | **Game** | 9 | Game loop control and engine-wide state |
 | **Theme** | 8 | Theme resources, style boxes and font variations |
 | **TileMap** | 7 | Tile map creation, cell manipulation and queries |
-| **Debugger** | 5 | Debugger session control and inspection |
+| **Debugger** | 6 | Debugger session control and inspection |
 | **Properties** | 5 | Get/set properties, list properties, signal connect (e.g. `property_set`) |
 | **Docs** | 4 | Query offline Godot API docs |
 | **Group** | 3 | Node group management and membership queries |
