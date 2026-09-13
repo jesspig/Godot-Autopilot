@@ -6,13 +6,13 @@ tags:
   - 模块
   - 工具注册
   - schema
-timestamp: "2026-09-13T17:50:28+08:00"
+timestamp: "2026-09-13T21:48:42+08:00"
 resource: src/tools/
 ---
 
 # 工具注册表（src/tools/ 注册管线）
 
-> 审计日期：2026-09-13（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随 T0 安全边界与并发契约同步；09-13 上午随反馈修复批次同步工具数 365/372/373、Resources 26、SIDE 排除 49；09-13 下午随收口批次同步工具数 366/373/374 与 get_plugin_log；09-13 17:50 随 B 组知识库审计同步——修正契约缺口行号引用、schema 基线行号与元工具 schema 口径）。
+> 审计日期：2026-09-13（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随 T0 安全边界与并发契约同步；09-13 上午随反馈修复批次同步工具数 365/372/373、Resources 26、SIDE 排除 49；09-13 下午随收口批次同步工具数 366/373/374 与 get_plugin_log；09-13 17:50 随 B 组知识库审计同步——修正契约缺口行号引用、schema 基线行号与元工具 schema 口径；09-13 晚随 0.2.4 版知识库全量审计同步——补正 populate_default_tools 存留状态与命名首段动词的 5 个既有例外）。
 > 覆盖范围：`register_all.cpp/hpp`、`dispatch.cpp/hpp`、`tool_catalog.cpp/hpp`、`schema_builder.cpp/hpp`、`schema_fills.hpp`、8 个 `schema_*_ops.cpp`（含 08-24 新增 `schema_animation_ops.cpp`/`schema_theme_ops.cpp`）、`tool_base.hpp`、`tool_registry.hpp`、`fn_tool.hpp`、`tool_decl.hpp`、`meta_tools.hpp`、30 个域 `*_tools.hpp`，对照 `tests/runner/traversal.cpp`、`tests/unit/register_all_test.cpp`、`tests/config/03_tools_contract.json` 与仓库根 `AGENTS.md` 工具段。
 > 相关页面：[测试体系](../tests.md) · [工具实现 B 组](../modules/tools_ops_b.md) · [工具实现 A 组](../modules/tools_ops_a.md) · [入口与运行时](../modules/entry_runtime.md) · [架构总览](../overview.md)
 
@@ -58,13 +58,13 @@ flowchart TD
 | 1 | 元工具 7 个：ping/search_tools/list_categories/get_tool_detail/call_tool/batch_execute/code_execute，均作为顶层工具提供 | 7 个经 registry `add()`（`dynamic_cast<IMetaTool*>` 自动入 meta_），统一在 `register_all.cpp` 循环 `server.RegisterTool`（描述/schema 取自 registry 工具）；名单由 `g_active_registry->all_meta()` 派生，与 `register_all_test.cpp` 的 `kMetaToolNames` 一致；L1 断言 `ListTools` 恰好 7 个 | **一致** |
 | 2 | 领域工具 366 个 | 30 个 `*_tools.hpp` 的 `GDA_TOOL_CLASS`/`GDA_TOOL_CLASS_SIDE` 共 366 个（317 + 49，无重复名）；registry `all()`=**367** = 366 + system_status | **一致**（system_status 是唯一非真类来源） |
 | 3 | 工具总体 = 7 元 + 366 域 | registry `all_any()`=**374**（367 域/系统 + 7 元）；MCP 顶层 7 元工具，MCP 可达总数 373 | **一致** |
-| 4 | ToolCatalog 374 条 | 由 registry `all_any()` 逐一 `make_tool_info` 派生 374 = 366 域 + system_status + 7 元；原 `populate_default_tools`/meta 快照/`Auto` 补录链路整体废弃 | **一致**（单一来源派生，无独立填表） |
+| 4 | ToolCatalog 374 条 | 由 registry `all_any()` 逐一 `make_tool_info` 派生 374 = 366 域 + system_status + 7 元；原 `populate_default_tools`（函数体尚存于 `tool_catalog.cpp:63` 但已无任何调用者）/meta 快照/`Auto` 补录链路整体废弃 | **一致**（单一来源派生，无独立填表） |
 | 5 | schema 283 非空 / 73 空（旧值，已随重命名变化） | def/SCHEMA_NONE 静态口径已随 08-21 真类化与 08-22 清理整体废除（fill 表直接给出最终 schema，`tool_input_schema` 的 basic 参数为 no-op）；catalog 级非空/空数**以运行时 `SchemaStatisticsBaseline` 观测为准**，不硬编码 | **运行时统计口径** |
 | 6 | SchemaStatisticsBaseline 运行时统计断言，不硬编码 | `register_all_test.cpp:135-149` 只断言 `non_empty > empty`、`empty > 0`、总和 = `catalog.size()`；旧 283/73 为运行时实测值 | **一致** |
 | 7 | 3 个契约缺口 | 见下表（reimport_resource_files 的 schema 字段名不一致已随 08-24 批次修复，空参静默成功仍在） | **一致** |
 | 8 | 49 个副作用工具遍历排除 | 30 个 `*_tools.hpp` 中 49 个工具用 `GDA_TOOL_CLASS_SIDE` 标记（writes_file 15 / writes_config 6 / shows_alert 4 / modifies_window 12 / process 6 / game_runtime 5 / code_execute 1）；解析器仅枚举 `GDA_TOOL_CLASS(` 的 317 个，`side_effect` 字段兜底判定保留 | **一致** |
 | 9 | 遍历步数与工具数联动 | 步数随工具数/排除集变化（域 366 中 317 个参与空参契约遍历，49 个 SIDE 不进入枚举）；**以运行时 `03_tools_contract` 统计为准** | **运行时统计口径** |
-| 10 | 命名约定 `<动词>_<类别>_<维度>_<对象>_<修饰>`（动词置首） | 366 个名字全部小写 snake_case；首段均为动词（create/get/set/add/remove/apply/intersect/play/stop/save/…），符合规范 | **一致** |
+| 10 | 命名约定 `<动词>_<类别>_<维度>_<对象>_<修饰>`（动词置首） | 366 个名字全部小写 snake_case；361 个首段为动词（create/get/set/add/remove/apply/intersect/play/stop/save/…），5 个名词置首的历史例外（property_get/property_set/property_get_list、signal_connect/signal_disconnect） | **一致（含 5 个既有例外）** |
 
 ## 元工具与 g_meta_handlers
 
@@ -115,7 +115,7 @@ flowchart TD
 
 ## 命名约定抽查
 
-- 366 个工具名全部匹配 `^[a-z0-9_]+$`（小写 snake_case，无大写、无连字符），且**首段均为动词**（create/get/set/add/remove/apply/intersect/play/stop/save/seek/move/warp/…）——符合 `<动词>_<类别>_<维度>_<对象>_<修饰>` 动词置首规范。
+- 366 个工具名全部匹配 `^[a-z0-9_]+$`（小写 snake_case，无大写、无连字符）；361 个首段为动词（create/get/set/add/remove/apply/intersect/play/stop/save/seek/move/warp/…），另有 5 个名词置首的既有例外（`property_get`/`property_set`/`property_get_list`、`signal_connect`/`signal_disconnect`）——总体符合 `<动词>_<类别>_<维度>_<对象>_<修饰>` 动词置首规范，例外为历史命名未随重构清理。
 - 段数随粒度自然变化：2 段（`instantiate_scene`、`property_get`、`signal_connect`…）、3-4 段（`create_physics_2d_body`、`intersect_physics_2d_ray`…）、5 段+（`get_scene_tree_nodes_in_group`、`set_input_map_action_deadzone`、`get_nav_3d_map_closest_point_to_segment`…）。规范约束动词置首与 snake_case，段数与类别段选取以表达清晰为准。
 
 ## 类别分布（366 领域工具，27 个类别）

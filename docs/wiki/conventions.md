@@ -6,7 +6,7 @@ tags:
   - 约定
   - 命名
   - 规范
-timestamp: "2026-09-13T17:56:30+08:00"
+timestamp: "2026-09-13T21:47:51+08:00"
 resource: src/
 ---
 
@@ -19,7 +19,7 @@ resource: src/
 - **命名空间**：`godot_autopilot`（工具子命名空间 `<模块>_ops`，如 `godot_autopilot::scene_ops`）
 - **前缀**：核心常量 `GDA_*`（如 `GDA_DEFAULT_PORT`）；运行时协议 `gda:*`；导出宏 `GDA_EXPORT`
 - **产物与目录**：CMake 目标 `godot-autopilot`，部署到 `Example/addons/godot-autopilot/`
-- **工具命名**：约定 `<动词>_<类别>_<维度>_<对象>_<修饰>`（snake_case，**以动词置首为主导**，如 `create_scene_node`、`intersect_physics_2d_ray`、`set_input_map_action_deadzone`）；366 个工具名段数随粒度自然变化（2-6 段），`signal_connect`/`property_set` 等少量短名为规范内保留的名词前置形态
+- **工具命名**：约定 `<动词>_<类别>_<维度>_<对象>_<修饰>`（snake_case，**以动词置首为主导**，如 `create_scene_node`、`intersect_physics_2d_ray`、`set_input_map_action_deadzone`）；366 个工具名段数随粒度自然变化（2-8 段，如 `read_file` / `add_physics_3d_body_collision_exception`），`signal_connect`/`property_set` 等少量短名为规范内保留的名词前置形态
 - **头文件 include guard**：`GODOT_AUTOPILOT_<MODULE>_HPP`
 
 ## 日志
@@ -31,12 +31,12 @@ resource: src/
 
 ## 错误模式
 
-- 领域工具失败返回 `{"error": "消息"}` JSON（可含 `error_detail` 扩展），`call_tool` 元工具检查 `error` 字段并设 `is_error = true`
+- 领域工具失败返回 `{"error": "消息"}` JSON（构造经 `util::error_json`，成功结果经 `util::ok_result` 包 `result`，见 `src/util/error_util.hpp`；个别执行类响应另带 `error_details`/`structured_error` 诊断字段），`call_tool` 元工具检查 `error` 字段并设 `is_error = true`
 - 命名契约：`get/fetch/load` 目标必存在否则抛异常；`find/search/query` 允许为空；`validate/check` 失败即抛；`apply/compute` 为纯函数
 
 ## 线程纪律
 
-- **所有 Godot API 调用必须通过 `queue.submit()`**（HTTP 线程直接调用会崩溃）；例外：`debugger_prompts`/`debugger_resources` 只读捕获缓冲不经队列（安全）；`call_tool` 元工具编排回调在 MCP 线程执行但自身不触碰 Godot API（领域工具经 dispatch 路由回主线程，2026-09-13 起）
+- **所有 Godot API 调用必须通过 `queue.submit()`**（HTTP 线程直接调用会崩溃）；例外：`debugger_prompts` 为纯静态模板文本、不触碰 Godot API 亦不经队列，`debugger_resources` 读取捕获缓冲仍经 `queue.execute_sync()`；`call_tool` 元工具编排回调在 MCP 线程执行但自身不触碰 Godot API（领域工具经 dispatch 路由回主线程，2026-09-13 起）
 - `CommandQueue`：header-only，`submit()` 返回 `std::future`（异常经 `set_exception` 传播），主线程 `_process()` 每帧 `drain()`
 - 导出期间（`ExportGuard` 原子标记）`dispatch` 拒绝工具调用
 

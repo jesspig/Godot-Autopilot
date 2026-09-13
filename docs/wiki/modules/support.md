@@ -8,7 +8,7 @@ tags:
   - 资源
   - UI
   - 工具库
-timestamp: "2026-09-13T21:13:00+08:00"
+timestamp: "2026-09-13T21:48:42+08:00"
 resource:
   - src/prompts/
   - src/resources/
@@ -18,7 +18,7 @@ resource:
 
 # 支撑模块（src/prompts/、src/resources/、src/ui/、src/util/）
 
-> 审计日期：2026-09-13（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill_gen 一键生成 Agent Skills 与 skill 内容外置化同步；09-10 随 skill 体系 19→7 册重构、Godot 源码研究发现织入与 dock 按钮动态化同步；09-13 上午随 7→8 册（C# 专册与开发闭环）与 util 新增 mcp_image_content.hpp 同步；09-13 下午随收口批次同步——McpConfigDock Allow code_execute 复选框、VariantJson::deserialize_strict、readback_util 值类型近似比较与 16 类清单、技能 runtime 册日志四路来源；09-13 17:50 随 B 组知识库审计同步——修正 prompt_tool_usage 行数、resource_handlers 静态/模板配比、注册入口行号与 keycode 提示词状态；09-13 20 时随主册技能增强同步——description 必读定位与 autopilot.md 新增查文档时机/引擎状态观测/工具选择/搜索技巧四块正文；09-13 21 时统一 skill 为纯英文——scene-system.md 中文错误示例改英文转述、registry description 英文必读定位），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 审计日期：2026-09-13（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill_gen 一键生成 Agent Skills 与 skill 内容外置化同步；09-10 随 skill 体系 19→7 册重构、Godot 源码研究发现织入与 dock 按钮动态化同步；09-13 上午随 7→8 册（C# 专册与开发闭环）与 util 新增 mcp_image_content.hpp 同步；09-13 下午随收口批次同步——McpConfigDock Allow code_execute 复选框、VariantJson::deserialize_strict、readback_util 值类型近似比较与 16 类清单、技能 runtime 册日志四路来源；09-13 17:50 随 B 组知识库审计同步——修正 prompt_tool_usage 行数、resource_handlers 静态/模板配比、注册入口行号与 keycode 提示词状态；09-13 20 时随主册技能增强同步——description 必读定位与 autopilot.md 新增查文档时机/引擎状态观测/工具选择/搜索技巧四块正文；09-13 21 时统一 skill 为纯英文——scene-system.md 中文错误示例改英文转述、registry description 英文必读定位；09-13 晚随 0.2.4 版知识库全量审计同步——修正 PACKED_*_ARRAY 为 10 种、scene_path/json_number 消费方计数与 resolve_rid 未命中行为），基于当前工作树代码逐行核对（不依赖 git 历史）。
 > 覆盖范围：`src/prompts/` 9 组文件（18 个）、`src/resources/` 2 组、`src/ui/` 2 组、`src/util/` 13 组（20 个文件，其中 `scene_path.hpp`/`json_godot.hpp`/`rid_registry.hpp`/`type_hint.hpp`/`gdscript_wrap.hpp`/`project_path.hpp`/`mcp_image_content.hpp` 为 header-only；另含内容目录 `skill_templates/` 31 个文件——30 个 .md + registry.json）。注册入口为 `src/core/server_context.cpp:214-220`（`register_tools()` 内五处注册调用：工具 → 资源 → 通用 prompt → 调试资源 → 调试 prompt）。
 
 ## 模块简介
@@ -192,7 +192,7 @@ resource:
 | OBJECT | `{"class": ..., 属性...}`：跳过下划线开头/`script`/非 `PROPERTY_USAGE_STORAGE`/GROUP/SUBGROUP/CATEGORY 属性；实例 ID 环检测（路径环，允许 DAG 共享）→ `"[<circular ref>"`；深度超 32 → `"[depth exceeded]"` |
 | CALLABLE / SIGNAL | `{object_id, object_id_str, method\|signal}` |
 | DICTIONARY / ARRAY | object / array 递归 |
-| PACKED_*_ARRAY（9 种） | 数值数组（byte→int；vector2/3/color/vector4 元素为对象） |
+| PACKED_*_ARRAY（10 种） | 数组（byte→int；string 为字符串数组；vector2/3/color/vector4 元素为对象） |
 | 其余 | `str_from_variant` 兜底 |
 
 **deserialize 两条路径**：
@@ -250,13 +250,13 @@ resource:
 | `strip_leading_segment_if(path, segment)` | 若 path 恰为 segment 则清空；否则去掉 `segment/` 前缀 |
 | `resolve_scene_node(path_str, scene_root, out_hint)` | 依次剥前导 `/`、`root`、根节点名三段后 `get_node_or_null`；且校验结果在 `scene_root` 子树内（parent 链上溯）；失败经 `out_hint` 输出提示并返回 nullptr |
 
-消费方：`scene_ops`/`property_ops`/`script_ops`/`editor_ops` 共 15+ 处调用（节点路径参数解析的统一入口）。
+消费方：12 个模块共 32 处调用（scene_ops 6、property_ops 7、script_ops 5、animation_ops 5 等；节点路径参数解析的统一入口）。
 
 ### json_godot.hpp（header-only，命名空间 `godot_autopilot::util`，08-22 新增）
 
 | 函数 | 行为 |
 |---|---|
-| `json_number(value, fallback)` | `JsonValue*` 宽容取数（int/double 统一转 double，缺失/非数字回 fallback）——约 80 处数值三元式的收敛点 |
+| `json_number(value, fallback)` | `JsonValue*` 宽容取数（int/double 统一转 double，缺失/非数字回 fallback）——64 处外部调用（另 `json_godot.hpp` 内部复用 9 处），数值三元式的收敛点 |
 | `json_to_vec2/vec3/rect2/color(j)` | JSON 对象 → Godot 几何类型（缺字段默认 0，color 的 a 缺省 1.0 由调用方处理） |
 | `vec2_to_json/vec3_to_json(v)` | Godot 向量 → `{x,y[,z]}` 对象 |
 | `rid_from_json/rid_to_json(…)` | RID ↔ `{"rid": <int64>}`（底层 `UtilityFunctions::rid_from_int64`） |
@@ -267,7 +267,7 @@ resource:
 
 - `class RidStore`：`std::unordered_map<int64_t, godot::RID>` 句柄↔RID 双向映射并保活。
 - `template <typename Domain> RidStore &rid_store()`：按域标签取独立实例（physics 与 text 各自命名空间互不串号）。
-- `template <typename Domain> RID resolve_rid(args, key)`：从工具参数解析整数 id 并查表，未命中报错。
+- `template <typename Domain> RID resolve_rid(args, key)`：从工具参数解析整数 id 并查表，未命中返回空 `RID`（由调用方检查 `is_valid()` 后报错，如 `physics_ops.cpp:190`）。
 
 消费方：physics_ops、text_ops。
 

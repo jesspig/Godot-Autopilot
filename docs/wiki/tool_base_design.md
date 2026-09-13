@@ -7,16 +7,16 @@ tags:
   - 工具架构
   - 接口
   - 组合
-timestamp: "2026-09-13T17:56:30+08:00"
+timestamp: "2026-09-13T21:47:51+08:00"
 resource: src/tools/
 ---
 
 # ToolBase 工具统一标准化（设计定稿 + 全量真类化实现）
 
 > **当前 API 面（2026-08-22 复核；工具数/排除集于 2026-09-13 随收口批次同步）**
-> `tool_base.hpp`：`SideEffect` 枚举 + `side_effect_name`、`ToolMeta`、`ISideEffect`、`IMetaTool`、`ToolBase`（meta/execute/input_schema 三件套）、`side_effect_of` 自由函数。
+> `tool_base.hpp`：`SideEffect` 枚举 + `side_effect_name`、`ToolMeta`、`ISideEffect`、`IMetaTool`、`ToolBase`（meta/execute/input_schema 三件套）、`side_effect_of` 自由函数、授权门 `authorization::capability_for_tool` / `deny_if_unauthorized`（`GDA_TOOL_CLASS`/`FnTool`/`MetaTool` 的 `execute()` 统一前置；`GODOT_AUTOPILOT_ALLOW` 优先于面板 `allow` 键）。
 > `tool_decl.hpp`：`GDA_TOOL_CLASS` / `GDA_TOOL_CLASS_SIDE` 真类宏；`fn_tool.hpp`：`FnTool(ToolMeta, HandlerFn, schema, SideEffect=None)`（实现 `ISideEffect`）+ `make_fn_tool`。
-> `tool_registry.hpp`：`make_tool_info` + `ToolRegistry`（`add` 按 `dynamic_cast<IMetaTool*>` 自动归类 / `find` / `find_meta` / `find_any` / `all` / `all_meta` / `all_any`）。
+> `tool_registry.hpp`：`make_tool_info` + `ToolRegistry`（`add` 按 `dynamic_cast<IMetaTool*>` 自动归类 / `find` / `find_meta` / `find_any` / `all` / `all_meta` / `all_any` / `size` / `meta_size` / `categories`，查找与列表返回 `std::shared_ptr<ToolBase>`）。
 > - **366 域工具全部为独立 `ToolBase` 子类**，分散于 `src/tools/<域>_tools.hpp`（30 个域文件），`execute` 委托既有 domain handler、`input_schema` 统一经 `tool_input_schema` 取；
 > - `tool_defs.def` 已删除；`register_all` 注册 30 个域的 `make_tools()` + `system_status`（FnTool）+ 7 元工具（`MetaTool`，接口 + 组合），catalog / BM25 index / 分发 map 全部从 registry 派生；
 > - **元工具 = 接口 + 组合**：`IMetaTool` 标记接口 + `MetaTool`（`ToolBase`+`IMetaTool`，依赖组合注入），`ToolRegistry::add()` 用 `dynamic_cast<IMetaTool>` 自动归类——实现接口即元工具；
@@ -54,7 +54,7 @@ inline SideEffect side_effect_of(const ToolBase &t);        // dynamic_cast<ISid
 ```
 
 - **线程契约**：领域工具 handler 复用现 [dispatch.cpp](../../src/tools/dispatch.cpp) 的 `queue.submit` 路由，仅主线程被调；唯一例外是 `call_tool` 元工具的编排回调（等待运行时响应/截图定型），自 2026-09-13 起在 MCP 线程执行、经 dispatch 把领域工具 handler 路由回主线程，编排逻辑自身不触碰 Godot API。类内部不得另起线程触碰 Godot API。
-- 错误直接返回 `{"error": msg}` JSON 对象（无独立封装助手——早期设计的 `make_ok()/make_error()` 与参数读取助手 `ArgReader` 曾短暂落地，2026-08-22 清理时删除：样板量有限，收敛收益不抵抽象成本）。
+- 错误直接返回 `{"error": msg}` JSON 对象（构造用 `util::error_json`/`util::ok_result` 助手；早期设计的共享 `make_ok()/make_error()` 与参数读取助手 `ArgReader` 已于 2026-08-22 清理删除——`ArgReader` 全仓无残留，`make_error` 仅存于 `analyze_ops.cpp`/`animation_ops.cpp` 两个文件匿名命名空间内的局部小助手）。
 - 导出禁用不做角色接口：RegisterTool 回调统一前置 `ExportGuard::is_exporting()` 检查；异步同样不做接口——`__gda_pending` 约定由 `call_tool` 的等待逻辑统一处理（`runtime_ops::wait_pending_response`）。早期设计的 `IExportGuard`/`IAsync`/`blocks_export`/`tool_is_async` 已随清理删除。
 - 副作用：`side_effects()` 作为 L2 遍历测试排除依据，替代 `tests/runner/traversal.cpp` 的硬编码清单。
 
@@ -67,13 +67,16 @@ inline SideEffect side_effect_of(const ToolBase &t);        // dynamic_cast<ISid
 ```cpp
 class ToolRegistry {
 public:
-  void add(std::unique_ptr<ToolBase>);   // dynamic_cast<IMetaTool*> 自动归类域/元
-  ToolBase *find(name);                  // 仅域
-  ToolBase *find_meta(name);             // 仅元
-  ToolBase *find_any(name);              // 先域后元
-  std::vector<ToolBase*> all();          // 域（供 catalog/index/g_handlers 派生）
-  std::vector<ToolBase*> all_meta();     // 元（供 RegisterTool/g_meta_handlers 派生）
-  std::vector<ToolBase*> all_any();      // 域+元（供 catalog/BM25 index 派生）
+  void add(std::unique_ptr<ToolBase>);                         // dynamic_cast<IMetaTool*> 自动归类域/元
+  std::shared_ptr<ToolBase> find(const std::string &) const;   // 仅域
+  std::shared_ptr<ToolBase> find_meta(const std::string &) const;  // 仅元
+  std::shared_ptr<ToolBase> find_any(const std::string &) const;   // 先域后元
+  std::vector<std::shared_ptr<ToolBase>> all() const;          // 域（供 catalog/index/g_handlers 派生）
+  std::vector<std::shared_ptr<ToolBase>> all_meta() const;     // 元（供 RegisterTool/g_meta_handlers 派生）
+  std::vector<std::shared_ptr<ToolBase>> all_any() const;      // 域+元（供 catalog/BM25 index 派生）
+  size_t size() const;                                         // 域数量
+  size_t meta_size() const;                                    // 元数量
+  std::vector<std::string> categories() const;                 // 域+元去重类别
 };
 ```
 

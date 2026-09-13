@@ -6,7 +6,7 @@ tags:
   - 规划
   - 竞品对齐
   - 工具扩展
-timestamp: "2026-09-13T17:50:28+08:00"
+timestamp: "2026-09-13T21:47:51+08:00"
 resource: src/
 ---
 
@@ -40,7 +40,7 @@ resource: src/
 - **错误水印 doorbell**：所有 MCP 响应顶层附 `new_errors_since_last_call`（一次性消费）；编辑器侧计 error 结果、游戏侧计 runtime_error（`src/core/error_watermark.hpp`）
 - **undo 接入**：create/delete/rename/reparent 场景节点全走 `EditorUndoRedoManager`（响应带 `undoable` 字段）；`property_set` 可撤销（Object 型值降级 `undoable:false`）；`batch_execute` 新增 `rollback_on_error`（按 EditorUndoRedo version 差值整批撤销）
 - **readiness 门控**（`src/core/editor_readiness.{hpp,cpp}`）：导入/扫描进行中时 reimport 类调用返回 `retryable:true` 软错误（retry_after_ms=500），scan 幂等跳过
-- **`code_execute` timeout 钳制 30000ms**（此前 schema 声称上限但实现未钳制）
+- **`code_execute` timeout 上限 30000ms**（越界值直接报错而非静默接受；此前 schema 声称上限但实现未校验）
 - **BM25 中文检索**：分词器支持 CJK bigram（`src/util/bm25_index.cpp`），`search_tools` 中文查询可用
 - **`capture_editor_viewport` target='game' 接通**：08-24 初始接通；09-13 下午改为非阻塞 pending 协议——返回 `{"__gda_pending": id, "timeout_ms": ...}`，由 `call_tool` 等待并经 `finalize_capture_response` 定型（阻塞式 `runtime_ops::game_capture_blocking` 已删除），`timeout_ms` 参数保留（默认 5000、钳制 30000）
 

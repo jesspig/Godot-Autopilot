@@ -6,7 +6,7 @@ tags:
   - 模块
   - 领域工具
   - B组
-timestamp: "2026-09-13T17:50:28+08:00"
+timestamp: "2026-09-13T21:58:26+08:00"
 resource: src/tools/
 ---
 
@@ -85,7 +85,7 @@ resource: src/tools/
 - **关键事实**：
   - `capture_display_screen` 经 `Image::save_png_to_buffer` → base64（`capture_ops::base64_encode`），PNG 编码失败时降级返回原始序列化 Image + warning；经 `call_tool` 直调时 PNG 以 MCP image content 交付（09-13 起，见 capture_ops 小节）。
   - `create_display_window` 用 `memnew(godot::Window)` 创建原生子窗口（需 `FEATURE_SUBWINDOWS`），返回 `window->get_window_id()`；`delete_display_window` 经 `instance_from_id` 取 Window 后 `queue_free`。
-  - `set_display_mouse_mode` 钳制 mode 0-4；`show_display_dialog` 检查 `DisplayServer::dialog_show` 的返回 Error。
+  - `set_display_mouse_mode` 校验 mode 0-4，越界返回 `invalid mouse mode: N`（并非钳制到边界）；`show_display_dialog` 检查 `DisplayServer::dialog_show` 的返回 Error。
   - 鼠标坐标基准（09-13 下午起描述明确）：`get_display_mouse_position` 返回**桌面屏幕**坐标；`warp_display_mouse` 的 x/y 是**聚焦窗口客户区**像素（引擎转换后移动 OS 光标）——两者不可直接互喂，驱动编辑器 dock/UI 时 warp 与输入工具应使用同一客户区坐标（见 tools_ops_a 的 input_ops 小节）。
   - 15 个副作用工具以 `GDA_TOOL_CLASS_SIDE(` 声明（`side_effect` 非空），遍历经 `get_tool_detail` 自动排除（见文末对照）。
 - **错误模式**：`util::error_json`（"missing required parameter" / "DisplayServer not available" / "subwindows not supported on this platform"）。
@@ -114,7 +114,7 @@ resource: src/tools/
   - **通道自检（09-13 下午新增）** `run_channel_self_check`：游戏会话首次 ready 时在后台线程发起一次 `status` 往返（1500ms + 2s 宽限），成功/失败均写入插件日志（成功含往返毫秒数）——启动后即可凭 `get_plugin_log` 判断运行时通道是否健康，不必等首个 7s 超时。
   - `get_game_status` 响应注入派生字段：`healthy`（由 `last_activity_ms` 推导）与 `physics_stalled`（physics_frame 连续不变 ≥1000ms 且 fps>0）。
   - **断点自动恢复** `maybe_recover_break`：对全部 breaked 会话按 `GDA_AUTO_CONTINUE` 环境变量决定是否 `debugger_continue_session`，每会话上限 `GDA_AUTO_CONTINUE_MAX` 次。
-  - `queue_game_input` 参数白名单（type/keycode/pressed/button_index/position/action/duration_ms/mode/timeout_ms），未知参数被忽略并回传 `ignored_params` + warning；`get_game_input_status` **不再附带 `recent_engine_errors`**（09-13 起）——运行中错误改读 `get_debugger_errors`，编辑器错误读 `get_debugger_log`。
+  - `queue_game_input` 参数白名单（type/keycode/pressed/button_index/position/action/duration_ms/mode/timeout_ms），未知参数由 handler 严格校验并返回 `unknown parameter for queue_game_input: <name>` 错误（`runtime_game_ops.cpp:187-191`；`game_tools.hpp:32` 工具描述与 skill 模板中"忽略并回传 `ignored_params`"的旧表述已一并修正）；`get_game_input_status` 响应不附带 `recent_engine_errors`（handler 仍会读取本地错误缓冲，但该缓冲无写入方，字段实际不会出现）——运行中错误改读 `get_debugger_errors`，编辑器错误读 `get_debugger_log`。
   - `sequence_game_inputs`（gda op `input_sequence`）：`inputs[]` 每项含 `at_frame`（物理帧偏移）与注入字段，由游戏侧 `GameBridgeFrameSequence` 节点逐物理帧执行，完成后响应 `{completed, executed}`；上限 256 步，超时默认按 `max_at_frame×33ms+2000ms` 推导并钳制 30000ms，可被 cancel。协议与帧调度细节见[入口与运行时](../modules/entry_runtime.md)。
   - `get_game_ui_elements`（gda op `ui_elements`）：DFS 遍历运行中 Control 树，每项 `{path, type, visible, text?, global_rect:{position,size}}`，`max_elements` 默认 100、上限 1000，超限标 `truncated:true`。
   - **降级指引（09-13 下午起）**：`capture_game_viewport` 与 4 个输入工具在运行时通道不可达的错误响应上附加 `hint` 字段，列出不依赖游戏进程的替代路径（`get_game_log_entries`、`capture_display_screen`、`capture_editor_viewport`、`get_plugin_log`）。
@@ -141,7 +141,7 @@ resource: src/tools/
 - **关键事实**：
   - 全程 RID 数值句柄（`rid_from_json`/`rid_to_json`，经 `UtilityFunctions::rid_from_int64` 互转），不绑定场景节点。
   - **`environment_ops.cpp` 无独立 hpp**：7 个环境后处理工具与 `render_ops.cpp` 共享 `render_ops` 命名空间，声明在 `render_ops.hpp`；RID 辅助已归一至共享头 `util/json_godot.hpp`（`rid_from_json`/`rid_to_json`、`json_to_color` 等），08-22 清理时删除两文件本地副本。
-  - `set_render_environment_*` 参数繁多带默认值（glow 13 参、sdfgi 11 参、volumetric_fog 13 参）；环境工具用 `LogLevel::Debug` 记完成日志，其余为 Info。
+  - `set_render_environment_*` 参数繁多带默认值（含必填 `environment_rid`：glow 12 参、sdfgi 11 参、volumetric_fog 14 参）；渲染工具普遍以 Info 记 `called`、Debug 记 `completed`，环境 7 工具中仅 `set_render_environment_bg_color`/`set_render_environment_ambient_light` 写了 Debug 完成日志，glow/ssr/tonemap/sdfgi/volumetric_fog 只记 Info `called`。
   - `find_render_node_from_rid` 与 `get_render_canvas_item_rid` 桥接场景节点与 RID（`EditorInterface` 参与）。
 - **错误模式**：必填 `environment_rid`/RID 参数缺失 → error_json；`RenderingServer not available` → error_json；无 `result` 之外的扩展字段。
 - 出站链接：[工具注册表](../modules/tools_registry.md) · [运行时通道](../modules/entry_runtime.md)
@@ -190,6 +190,52 @@ resource: src/tools/
   - `add_spriteframes_frame`：单帧直接 `add_frame(anim, tex, duration)`；多帧（hframes*vframes>1）按 `AtlasTexture` 区域切分逐帧添加，返回 frames/added_frames。
   - 纹理路径需磁盘存在且为可加载 Texture2D，否则 `error_detail`（含 reimport 建议）。
 - **错误模式**：hframes/vframes 非正整数 → error_json；动画未加 → error_json（提示先 add_animation）。
+- 出站链接：[工具注册表](../modules/tools_registry.md) · [运行时通道](../modules/entry_runtime.md)
+
+## animation_ops — 动画与状态机（10 工具）
+
+- **职责**：编辑场景内 `AnimationPlayer`/`Animation` 与 `AnimationTree`（`AnimationNodeStateMachine`）的创建与编辑。
+- **代表工具（共 10 个）**：`create_scene_animation_player`、`create_animation`、`remove_animation`、`get_animation_list`、`create_animation_track`、`insert_animation_keyframe`、`remove_animation_track`、`create_scene_animation_tree`、`add_animation_machine_state`、`connect_animation_states`。
+- **关键事实**：
+  - 所有写操作走 `scene_dirty_tracker::mark_scene_modified()`（`animation_ops.cpp` 9 处）；节点解析限定编辑场景（`util::resolve_scene_node`），player/tree 类型不符时报错并列出实际类名。
+  - `create_animation` 在 AnimationPlayer 默认动画库（空 StringName，缺失时自动创建）上 `add_animation`；`length_sec` 默认 1.0 且须 >0，`loop_mode` 0/1/2（none/linear/pingpong），同名动画报错。
+  - `create_animation_track` 支持 `value`（必须给 `property`，轨道路径 `<node_path>:<property>`，更新模式 `UPDATE_CONTINUOUS`）与 `method` 两类；同类型同路径重复报错。`insert_animation_keyframe` 的 value 轨道经 `VariantJson::deserialize` 转 Variant，method 轨道要求 `{"method": "...", "args": [...]}` 对象，返回 key_count，`track_index` 越界报错。
+  - `create_scene_animation_tree` 建 AnimationTree、默认以 `AnimationNodeStateMachine` 为 tree_root，可选 `anim_player` 关联；`add_animation_machine_state` 每状态建一个 `AnimationNodeAnimation`；`connect_animation_states` 带 `condition` 时同时设 `advance_condition` 并强制 `advance_mode=AUTO`，响应 note 提示条件须是 AnimationTree 的 bool 参数（经 code_execute 设置）。
+- **错误模式**：参数缺失、节点不存在、场景未打开、名称或过渡重复、track_index 越界 → `{"error": ...}`。
+- 出站链接：[工具注册表](../modules/tools_registry.md) · [运行时通道](../modules/entry_runtime.md)
+
+## theme_ops — 主题资源与 Control 应用（8 工具，5 个 SIDE）
+
+- **职责**：磁盘 `Theme` 资源（.tres）的创建、写入、检视与对编辑场景 Control 的应用。
+- **代表工具（共 8 个）**：`create_theme_resource`、`set_theme_color`、`set_theme_constant`、`set_theme_font_size`、`set_theme_stylebox_flat`、`get_theme_info`、`apply_theme_to_control`、`set_control_anchor_preset`。
+- **关键事实**：
+  - 5 个写资源工具（create/set_color/set_constant/set_font_size/set_stylebox_flat）以 `GDA_TOOL_CLASS_SIDE(` 声明，每次修改经 `persist_theme` 用 `ResourceSaver` 落盘并 `EditorFileSystem::update_file` 刷新。
+  - `create_theme_resource` 拒绝 `user://` 路径（错误信息要求 res://）且目标文件不能已存在；可选 `base_type` 写入资源 metadata。
+  - 颜色参数支持 `"#rrggbb"`/`"#rrggbbaa"` 或 `{r,g,b,a}`（通道 0-1）；`set_theme_stylebox_flat` 的 `stylebox` 对象支持 bg_color/border_color/border_width/corner_radius/content_margin，其中 width/radius/margin 可传数字（各边/角同值）或对象（left/top/right/bottom、四角键）。
+  - `get_theme_info` 按 type 汇总 colors/constants/font_sizes/styleboxes 名单；`apply_theme_to_control` 与 `set_control_anchor_preset`（preset 0-15、可选 `keep_offsets`）只改内存并 `mark_scene_modified`，响应 note 提示用 `save_editor_scene` 持久化。
+- **错误模式**：路径为 user://、文件已存在、.tres 加载失败/类型不符、颜色或 preset 非法 → error_json。
+- 出站链接：[工具注册表](../modules/tools_registry.md) · [运行时通道](../modules/entry_runtime.md)
+
+## analyze_ops — 场景与依赖分析（3 工具）
+
+- **职责**：只读分析：场景文件可加载性与依赖完整性、项目资源引用图（找未使用资源）、信号连接图。
+- **代表工具**：`validate_scene_file`、`find_unused_resources`、`trace_signal_flow`。
+- **关键事实**：
+  - `validate_scene_file`：以 `CACHE_MODE_IGNORE` 加载 `PackedScene` 并试实例化；逐个检查 `ResourceLoader::get_dependencies`（uid:// 经 `ResourceUID` 解析）是否落盘。返回 `valid`/`problems{kind,message}`/`missing_dependencies`/`dependency_count`，问题码 `load_failed`/`missing_dependency`/`instantiate_failed`。
+  - `find_unused_resources`：经 `EditorFileSystem` 收集文件、用依赖集合求反向引用，豁免 project.godot、主场景、应用图标、autoload 及 `.import`/`icon.svg`；返回 `scanned`/`unused{path,type}`/`unresolved_uids`/`exempted`。
+  - `trace_signal_flow`：从编辑场景节点做 BFS，`direction` outgoing/incoming/both（默认 both）、`max_depth` 默认 3 且 ≥1；边含 `from`/`signal`/`to`/`method`/`persisted`，按对象+信号+目标+方法去重，返回 `root`/`edges`/`edge_count`。
+- **错误模式**：缺 path、direction 非法、max_depth<1、节点/目录不存在、EditorFileSystem 或 ResourceLoader 不可用 → error_json。
+- 出站链接：[工具注册表](../modules/tools_registry.md) · [运行时通道](../modules/entry_runtime.md)
+
+## test_ops — GDScript 测试套件（2 工具）
+
+- **职责**：在编辑器进程内运行带断言框架的 GDScript 测试并汇总结果。
+- **代表工具**：`run_gdscript_tests`（内联 `tests: [{name, source}]` 数组）、`run_gdscript_test_files`（扫描目录，默认 `res://tests`、文件模式 `*.gda_test.gd`，匹配文件名排序后逐个运行）。
+- **关键事实**：
+  - 每个用例包装为 `@tool extends Node` 脚本，注入 `SceneRoot` 与断言函数：`check(condition, msg)`、`check_equal(actual, expected)`、`check_almost_equal(actual, expected, epsilon=0.001)`（非数值回退相等比较）、`fail(msg)`、`fatal(msg)`（置 `__gda_aborted` 中止本用例）；测试体必须是顺序语句，顶层 `func`/`static`/`class`/`class_name` 被拒绝，缩进风格须统一。
+  - `timeout_ms` 默认 10000、上限 30000；GDScript 同步执行不可中断，仅在用例间检查预算，超预算的后续用例跳过并附 note。
+  - 返回 `summary{total,passed,failed,skipped}` + `cases`（含每条 check 与运行时错误）；`run_gdscript_test_files` 额外回传 `files`，无匹配文件时附 note。
+- **错误模式**：`tests` 非数组、目录不存在或打开失败 → error_json；用例编译失败记入 cases。
 - 出站链接：[工具注册表](../modules/tools_registry.md) · [运行时通道](../modules/entry_runtime.md)
 
 ## code_exec_ops — GDScript 动态执行（2 元工具）
