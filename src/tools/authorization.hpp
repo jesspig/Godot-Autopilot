@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include <mcp/JsonValue.hpp>
 
@@ -42,6 +43,53 @@ inline bool allow_list_contains(const std::string &value,
   return false;
 }
 
+inline constexpr const char *kKnownCapabilities[] = {"process", "code_execute",
+                                                     "game_runtime"};
+
+inline bool capability_has_dock_toggle(std::string_view capability) {
+  return capability == "code_execute" || capability == "game_runtime";
+}
+
+inline std::string allow_list_add(std::string allow,
+                                  std::string_view capability) {
+  if (allow_list_contains(allow, capability))
+    return allow;
+  if (allow.empty())
+    return std::string(capability);
+  return allow + "," + std::string(capability);
+}
+
+inline std::string allow_list_remove(std::string allow,
+                                     std::string_view capability) {
+  std::vector<std::string> entries;
+  size_t begin = 0;
+  while (begin <= allow.size()) {
+    const size_t end = allow.find(',', begin);
+    const std::string entry = allow.substr(
+        begin, end == std::string::npos ? std::string::npos : end - begin);
+    if (!entry.empty()) {
+      if (entry == "all") {
+        for (const char *known : kKnownCapabilities)
+          entries.push_back(known);
+      } else {
+        entries.push_back(entry);
+      }
+    }
+    if (end == std::string::npos)
+      break;
+    begin = end + 1;
+  }
+  std::string out;
+  for (const std::string &entry : entries) {
+    if (entry == capability || allow_list_contains(out, entry))
+      continue;
+    if (!out.empty())
+      out += ',';
+    out += entry;
+  }
+  return out;
+}
+
 inline bool capability_enabled(std::string_view capability) {
   const char *raw = std::getenv("GODOT_AUTOPILOT_ALLOW");
   if (raw && *raw != '\0')
@@ -70,10 +118,14 @@ inline mcp::JsonValue deny_if_unauthorized(std::string_view name,
       "'; set GODOT_AUTOPILOT_ALLOW to include '" + capability +
       "' for trusted local development");
   result["authorization_required"] = mcp::JsonValue(capability);
-  result["enable"] = mcp::JsonValue(
+  std::string enable =
       "set GODOT_AUTOPILOT_ALLOW to '" + std::string(capability) +
-      "' (or 'all') and restart the engine, or tick \"Allow " + capability +
-      "\" in the plugin's MCP Config dock (takes effect immediately)");
+      "' (or 'all') and restart the engine";
+  if (capability_has_dock_toggle(capability)) {
+    enable += ", or tick \"Allow " + std::string(capability) +
+              "\" in the plugin's MCP Config dock (takes effect immediately)";
+  }
+  result["enable"] = mcp::JsonValue(enable);
   return result;
 }
 

@@ -1,8 +1,6 @@
 #include "mcp_config_dock.hpp"
 
 #include <string>
-#include <utility>
-#include <vector>
 
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
@@ -79,41 +77,6 @@ void remove_dir_recursive(const godot::String &path) {
   godot::DirAccess::remove_absolute(path);
 }
 
-std::vector<std::string> split_allow(const std::string &value) {
-  std::vector<std::string> entries;
-  size_t begin = 0;
-  while (begin <= value.size()) {
-    const size_t end = value.find(',', begin);
-    entries.push_back(value.substr(
-        begin, end == std::string::npos ? std::string::npos : end - begin));
-    if (end == std::string::npos) {
-      break;
-    }
-    begin = end + 1;
-  }
-  return entries;
-}
-
-std::string join_allow(const std::vector<std::string> &entries) {
-  std::string out;
-  for (const std::string &entry : entries) {
-    if (entry.empty()) {
-      continue;
-    }
-    if (!out.empty()) {
-      out += ',';
-    }
-    out += entry;
-  }
-  return out;
-}
-
-bool code_execute_allowed() {
-  const std::string allow = PluginConfig::load_allow();
-  return authorization::allow_list_contains(allow, "code_execute") ||
-         authorization::allow_list_contains(allow, "all");
-}
-
 } // namespace
 
 McpConfigDock::McpConfigDock() : port_spin(nullptr), apply_button(nullptr) {
@@ -165,7 +128,8 @@ McpConfigDock::McpConfigDock() : port_spin(nullptr), apply_button(nullptr) {
   allow_label->set_text("Allow code_execute:");
   allow_row->add_child(allow_label);
   allow_code_execute_check = memnew(godot::CheckBox);
-  allow_code_execute_check->set_pressed(code_execute_allowed());
+  allow_code_execute_check->set_pressed(authorization::allow_list_contains(
+      PluginConfig::load_allow(), "code_execute"));
   allow_code_execute_check->set_tooltip_text(
       "Allow code_execute (and the execute_script tool): read on the next "
       "tool call, no restart needed. When the GODOT_AUTOPILOT_ALLOW "
@@ -174,6 +138,23 @@ McpConfigDock::McpConfigDock() : port_spin(nullptr), apply_button(nullptr) {
   allow_code_execute_check->connect(
       "toggled",
       callable_mp(this, &McpConfigDock::_on_allow_code_execute_toggled));
+
+  auto *game_runtime_row = memnew(godot::HBoxContainer);
+  root->add_child(game_runtime_row);
+  auto *game_runtime_label = memnew(godot::Label);
+  game_runtime_label->set_text("Allow game_runtime:");
+  game_runtime_row->add_child(game_runtime_label);
+  allow_game_runtime_check = memnew(godot::CheckBox);
+  allow_game_runtime_check->set_pressed(authorization::allow_list_contains(
+      PluginConfig::load_allow(), "game_runtime"));
+  allow_game_runtime_check->set_tooltip_text(
+      "Allow game_runtime (and the game runtime tools): read on the next "
+      "tool call, no restart needed. When the GODOT_AUTOPILOT_ALLOW "
+      "environment variable is set it wins over this setting.");
+  game_runtime_row->add_child(allow_game_runtime_check);
+  allow_game_runtime_check->connect(
+      "toggled",
+      callable_mp(this, &McpConfigDock::_on_allow_game_runtime_toggled));
 
   status_label = memnew(godot::Label);
   root->add_child(status_label);
@@ -241,22 +222,21 @@ void McpConfigDock::_on_show_time_toggled(bool checked) {
 }
 
 void McpConfigDock::_on_allow_code_execute_toggled(bool checked) {
-  std::vector<std::string> entries = split_allow(PluginConfig::load_allow());
-  if (checked) {
-    if (!code_execute_allowed()) {
-      entries.push_back("code_execute");
-    }
-  } else {
-    std::vector<std::string> kept;
-    for (const std::string &entry : entries) {
-      if (entry != "code_execute") {
-        kept.push_back(entry);
-      }
-    }
-    entries = std::move(kept);
-  }
-  PluginConfig::save_allow(join_allow(entries));
-  allow_code_execute_check->set_pressed_no_signal(code_execute_allowed());
+  _on_allow_toggled("code_execute", allow_code_execute_check, checked);
+}
+
+void McpConfigDock::_on_allow_game_runtime_toggled(bool checked) {
+  _on_allow_toggled("game_runtime", allow_game_runtime_check, checked);
+}
+
+void McpConfigDock::_on_allow_toggled(const char *capability,
+                                      godot::CheckBox *box, bool checked) {
+  const std::string allow = PluginConfig::load_allow();
+  PluginConfig::save_allow(
+      checked ? authorization::allow_list_add(allow, capability)
+              : authorization::allow_list_remove(allow, capability));
+  box->set_pressed_no_signal(authorization::allow_list_contains(
+      PluginConfig::load_allow(), capability));
 }
 
 void McpConfigDock::set_server_context(ServerContext *ctx) {
