@@ -6,7 +6,7 @@ tags:
   - 总览
   - 架构
   - 技术栈
-timestamp: "2026-09-13T21:47:51+08:00"
+timestamp: "2026-09-14T21:17:14+08:00"
 resource:
   - README.md
   - src/
@@ -14,7 +14,7 @@ resource:
 
 # 项目总览（Overview）
 
-> 审计日期：2026-09-13（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill_gen 与测试数值同步，同日随 skill 内容外置化修正 src/util 目录树注释；09-10 随 skill 体系 19→7 册重构同步目录树注释与 McpConfigDock 描述；09-13 上午随反馈修复批次同步工具数 365/372/373、Resources 26、L1 114、L2 8 份与技能 8 册；09-13 下午随 T22 收口批次同步工具数 366/373/374、L1 126、L2 9 份、授权门与 get_plugin_log；09-13 晚随 A 组知识库审计修复批次同步 docs 与 cmake 目录树补正、skill_templates 平铺命名澄清；随后跨组复核纠正类别分布口径——以工具 category 字段统计为准（physics_tools.hpp 48 个工具中 get_debug_object_info 归类 Debug，故 Physics 47/Debug 16，27 类合计 366）并同步 README 口径 ~366），基于当前工作树文件与代码逐项核对（不依赖 git 历史）；09-13 晚随 0.2.4 版知识库全量审计同步——补正目录树（core 注释补 EditorReadiness/ErrorWatermark，新增 tools/ 嵌入脚本条目）、EDITOR 级别注册类数 4→6、InputMap 并入 Input 措辞、catalog/index 374 派生来源表述；工具数 366/373/374、27 类、L1 126、L2 9 份、ctest 135 复核无误。
+> 审计日期：2026-09-13（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill_gen 与测试数值同步，同日随 skill 内容外置化修正 src/util 目录树注释；09-10 随 skill 体系 19→7 册重构同步目录树注释与 McpConfigDock 描述；09-13 上午随反馈修复批次同步工具数 365/372/373、Resources 26、L1 114、L2 8 份与技能 8 册；09-13 下午随 T22 收口批次同步工具数 366/373/374、L1 126、L2 9 份、授权门与 get_plugin_log；09-13 晚随 A 组知识库审计修复批次同步 docs 与 cmake 目录树补正、skill_templates 平铺命名澄清；随后跨组复核纠正类别分布口径——以工具 category 字段统计为准（physics_tools.hpp 48 个工具中 get_debug_object_info 归类 Debug，故 Physics 47/Debug 16，27 类合计 366）并同步 README 口径 ~366），基于当前工作树文件与代码逐项核对（不依赖 git 历史）；09-13 晚随 0.2.4 版知识库全量审计同步——补正目录树（core 注释补 EditorReadiness/ErrorWatermark，新增 tools/ 嵌入脚本条目）、EDITOR 级别注册类数 4→6、InputMap 并入 Input 措辞、catalog/index 374 派生来源表述；工具数 366/373/374、27 类、L1 126、L2 9 份、ctest 135 复核无误；09-14 随修复批次同步——McpConfigDock 增列 Allow game_runtime 复选框表述；09-14 修复批次后 L1 140、L2 9、ctest 149。
 > 事实来源：根 `README.md` / `README_zh.md` / `AGENTS.md`、`CMakeLists.txt`、`cmake/FetchDependencies.cmake`、`src/main.cpp`、`src/core/server_context.cpp`、`src/tools/tool_registry.hpp`、`src/tools/*_tools.hpp`、`src/tools/dispatch.cpp`、`src/prompts/prompt_handlers.cpp`、`src/resources/resource_handlers.cpp`、`Example/project.godot`、`Example/docs/`。
 
 ## 项目定位
@@ -81,7 +81,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 ### 编辑器 UI
 
 - 自定义底部日志面板 `McpLogDock`（"GDA Log"，按 LogLevel/LogCategory 过滤、文本搜索、折叠重复；配置面板 "Show timestamps" 开关控制每条日志时间前缀 `[HH:MM:SS]`（本地时、时分秒），开启时默认生效并经 `user://godot_autopilot/config.json` 的 `show_time` 键持久化；折叠合并重复日志时除条数外始终显示最新一条的 `[HH:MM:SS]`，不受总开关控制）。
-- 右侧配置面板 `McpConfigDock`（"MCP Config"：端口运行时重启 + 持久化、一键生成 8 个客户端 MCP 配置、Allow code_execute 授权复选框（写 `allow` 键持久化，下一次工具调用即生效，`GODOT_AUTOPILOT_ALLOW` 环境变量优先）、一键生成 8 册 Agent Skills 到项目根 .agents/skills/——Generate Skills / Update Skills 动态按钮，已有旧版技能目录时先清理再重建（详见 [modules/support.md](./modules/support.md)））。
+- 右侧配置面板 `McpConfigDock`（"MCP Config"：端口运行时重启 + 持久化、一键生成 8 个客户端 MCP 配置、Allow code_execute / Allow game_runtime 授权复选框（写 `allow` 键持久化，下一次工具调用即生效，`GODOT_AUTOPILOT_ALLOW` 环境变量优先）、一键生成 8 册 Agent Skills 到项目根 .agents/skills/——Generate Skills / Update Skills 动态按钮，已有旧版技能目录时先清理再重建（详见 [modules/support.md](./modules/support.md)））。
 - `ExportGuard`：导出期间拒绝领域工具调用（返回 `{"error":"editor is exporting; ..."}`）。
 
 ## 技术栈
@@ -122,7 +122,7 @@ godot-self-driving/
 │   │                           #   skill_gen、skill_content_generated（构建期嵌入薄胶水）；内容目录
 │   │                           #   skill_templates/（8 册模板 = 平铺 30 个 .md：主册 <name>.md + 参考 <name>--<ref>.md，另有 registry.json）；
 │   │                           #   header-only：json_godot、rid_registry、scene_path、project_path、type_hint、gdscript_wrap、mcp_image_content
-├── tests/                      # L1 gda_unit_tests（126 个 gtest）+ L2 gda_test_runner + config/*.json（9 份）
+├── tests/                      # L1 gda_unit_tests（140 个 gtest）+ L2 gda_test_runner + config/*.json（9 份）
 ├── docs/                       # 本知识库（docs/wiki/，含 modules/、plans/、changelog/）
 └── Example/                    # 文档/示例工程（详见 example.md）
 ```

@@ -6,14 +6,14 @@ tags:
   - 测试
   - L1
   - L2
-timestamp: "2026-09-13T21:50:35+08:00"
+timestamp: "2026-09-14T21:17:12+08:00"
 resource: tests/
 ---
 
 # 测试体系（tests/）
 
-> 审计日期：2026-09-13（2026-08-29 0.2.2 发布审计——L1 77、L2 7 份；09-02 安全与并行硬化——L1 77→96（新增 security_parallel_hardening 17 项，覆盖队列/路径/鉴权/限额/日志）、核心路径/扫描/响应边界与构建大小写修复；09-08 技能生成器——L1 96→103（新增 skill_gen 7 项），ctest 注册点 103→110，同日 skill 内容外置化——测试零改动仍 103；09-10 skill 体系 19→7 册重构——用例改名与白名单扩充，仍 103；09-13 上午随反馈修复批次同步——L1 103→114（新增 mcp_image_content 11 项），L2 7→8 份（新增 07_scene_tabs），ctest 110→122；09-13 下午随收口批次同步——L1 114→126（新增 variant_json_strict 12 项），L2 8→9 份（新增 08_property_readback），ctest 122→135，L2 运行需 `GODOT_AUTOPILOT_ALLOW`；技能体系 8 册；09-13 晚随 A 组知识库审计修复批次同步——02/03/04/05/06 用例步骤与内容重核（02=before_all 2+39、03=1+2、04=after_all 1+28、05=13、06=26）、traversal/register_all_test 行号修正；09-13 晚随 0.2.4 版知识库全量审计同步——after_all 失败语义修正（工具报错不改变整体判定，仅进程死亡补 fatal_error）、CRASH_LOG_LIMIT 表述改为“截断至 2000 字符”、L2 用例发现机制改为“9 份均由 GLOB 自动发现”、历史事故出处修正并补 todo），基于当前工作树代码逐行核对（不依赖 git 历史）。
-> 覆盖范围：`tests/` 全部（unit 14 文件、runner 7 实现 + 6 头文件、integration、config 9 JSON、`tests/CMakeLists.txt`），对照 `tests/README.md` 与仓库根 `AGENTS.md` 测试段逐条核算。126 项 L1 为 `TEST`/`TEST_F` 宏逐行统计口径（09-13 收口批次新增 variant_json_strict 12 项）；ctest 注册点 135 已由 `ctest --preset debug -N` 实测确认。
+> 审计日期：2026-09-14（2026-08-29 0.2.2 发布审计——L1 77、L2 7 份；09-02 安全与并行硬化——L1 77→96（新增 security_parallel_hardening 17 项，覆盖队列/路径/鉴权/限额/日志）、核心路径/扫描/响应边界与构建大小写修复；09-08 技能生成器——L1 96→103（新增 skill_gen 7 项），ctest 注册点 103→110，同日 skill 内容外置化——测试零改动仍 103；09-10 skill 体系 19→7 册重构——用例改名与白名单扩充，仍 103；09-13 上午随反馈修复批次同步——L1 103→114（新增 mcp_image_content 11 项），L2 7→8 份（新增 07_scene_tabs），ctest 110→122；09-13 下午随收口批次同步——L1 114→126（新增 variant_json_strict 12 项），L2 8→9 份（新增 08_property_readback），ctest 122→135，L2 运行需 `GODOT_AUTOPILOT_ALLOW`；技能体系 8 册；09-13 晚随 A 组知识库审计修复批次同步——02/03/04/05/06 用例步骤与内容重核（02=before_all 2+39、03=1+2、04=after_all 1+28、05=13、06=26）、traversal/register_all_test 行号修正；09-13 晚随 0.2.4 版知识库全量审计同步——after_all 失败语义修正（工具报错不改变整体判定，仅进程死亡补 fatal_error）、CRASH_LOG_LIMIT 表述改为“截断至 2000 字符”、L2 用例发现机制改为“9 份均由 GLOB 自动发现”、历史事故出处修正并补 todo；09-14 随修复批次同步——L1 126→140（variant_json_strict 12→17、security_parallel_hardening 17→20、runtime_ops 1→3、新增 log_ops_test 4 项），unit 测试文件 14→15，L2 仍 9 份，ctest 注册点 135→149），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 覆盖范围：`tests/` 全部（unit 15 文件、runner 7 实现 + 6 头文件、integration、config 9 JSON、`tests/CMakeLists.txt`），对照 `tests/README.md` 与仓库根 `AGENTS.md` 测试段逐条核算。140 项 L1 为 `TEST`/`TEST_F` 宏逐行统计口径（09-13 收口批次新增 variant_json_strict 12 项）；ctest 注册点 149 已由 `ctest --preset debug -N` 实测确认。
 
 ## 架构总览
 
@@ -73,7 +73,7 @@ stdout/stderr 各接独立管道读线程持续消费，防 64KB 缓冲写满阻
 
 ## L1 单元测试
 
-**14 个测试文件，实际 126 个 TEST/TEST_F**（`TEST`/`TEST_F` 宏逐行统计，2026-09-13 复核；09-02 bm25 14→20 + security_parallel_hardening 17 项，09-08 新增 skill_gen 7 项，09-13 上午新增 mcp_image_content 11 项、下午新增 variant_json_strict 12 项）：
+**15 个测试文件，实际 140 个 TEST/TEST_F**（`TEST`/`TEST_F` 宏逐行统计，2026-09-13 复核；09-02 bm25 14→20 + security_parallel_hardening 17 项，09-08 新增 skill_gen 7 项，09-13 上午新增 mcp_image_content 11 项、下午新增 variant_json_strict 12 项、09-14 修复批次 variant_json_strict +5 / security_parallel_hardening +3 / runtime_ops +2 / log_ops_test +4）：
 
 | 文件 | 数量 | 主题 |
 |---|---|---|
@@ -91,7 +91,7 @@ stdout/stderr 各接独立管道读线程持续消费，防 64KB 缓冲写满阻
 | `skill_gen_test.cpp` | 7 | 技能生成器：8 册清单、name/description 规范、文件布局、frontmatter 渲染、反引号词回验（详见下节） |
 | `mcp_image_content_test.cpp` | 11 | 截图 MCP image content（header-only `src/util/mcp_image_content.hpp`）：3 个 capture_* 白名单、顶层/嵌套 data 提取与优先级、data 替换为 `<attached-as-image-content>`、非白名单/非对象/缺 data/非 png 不注入 |
 | `variant_json_strict_test.cpp` | 12 | `VariantJson::deserialize_strict` 严格形状：Rect2/Rect2i 的 `size` 别名（`w/h` 与 `x/y`）与冲突报错、缺 size、AABB 缺深度、Transform2D 缺 `columns`、Transform3D 缺 `basis.rows`；含完整错误消息文本断言 |
-| **合计** | **126** | |
+| **合计** | **140** | |
 
 **链接来源**（`tests/CMakeLists.txt:31-49` 的 `GDA_UNIT_BUSINESS_SOURCES`，共 17 个显式 + 1 组 glob）：`src/core/` 的 `log_system`、`resource_registry`、`scene_dirty_tracker`、`export_guard`、`editor_readiness`；`src/util/` 的 `bm25_index`、`error_util`、`readback_util`、`variant_json`、`client_config_gen`、`skill_gen`、`skill_content_generated`（构建期嵌入薄胶水）；`src/tools/` 的 `tool_catalog`、`schema_builder`、`register_all`、`dispatch`、`debugger_access`；`src/tools/*_ops.cpp`（`GDA_TOOLS_OPS_SOURCES` glob，`register_all.cpp` 引用全部 `handle_xxx` 符号故必须链接）。
 
@@ -180,7 +180,7 @@ stdout/stderr 各接独立管道读线程持续消费，防 64KB 缓冲写满阻
 
 | 条目 | 权威口径（本轮实测） | 源码核算 | 结论 |
 |---|---|---|---|
-| L1 gtest 数量 | 126（含 09-02 安全并行硬化 17 项 + 09-08 skill_gen 7 项 + 09-13 mcp_image_content 11 项 + variant_json_strict 12 项） | 126（逐文件宏统计见上表） | 一致 |
+| L1 gtest 数量 | 140（含 09-02 安全并行硬化 17 项 + 09-08 skill_gen 7 项 + 09-13 mcp_image_content 11 项 + variant_json_strict 12 项 + 09-14 新增:variant_json_strict 12→17、security_parallel_hardening 17→20、runtime_ops 1→3、log_ops_test 4） | 140（逐文件宏统计见上表） | 一致 |
 | L2 用例文件数 | 9（00_meta / 01_scene / 02_property / 03_tools_contract / 04_resources_scripts / 05_rename_references / 06_move_references / 07_scene_tabs / 08_property_readback；09-13 新增 07 与 08） | 9 | 一致 |
 | ctest L2 用例 | gda_runner_<name> | 一致（`tests/CMakeLists.txt:109-119`，TIMEOUT 600；9 份均由 GLOB 自动发现，新增文件零配置） | 一致 |
 | 遍历工具数 | 366 | 366（30 个 `*_tools.hpp` 的 `GDA_TOOL_CLASS(_SIDE)` 计数；解析器仅枚举 `GDA_TOOL_CLASS(` 的 317 个） | 一致 |

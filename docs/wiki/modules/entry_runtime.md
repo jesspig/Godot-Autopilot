@@ -6,7 +6,7 @@ tags:
   - 模块
   - 入口
   - 运行时桥接
-timestamp: "2026-09-13T17:50:28+08:00"
+timestamp: "2026-09-14T20:49:22+08:00"
 resource:
   - src/main.cpp
   - src/runtime/
@@ -144,7 +144,7 @@ resource:
 - `send_response(request_id, body)`：补 `request_id` 字段（`GDA_FIELD_REQUEST_ID` 常量），`EngineDebugger::send_message("gda:response", [json])`。
 - `GameBridgeLogger`（godot::Logger 子类）：`_log_error` 按错误类型（warning 判定码 3）经 `push_game_error` 入错误缓冲；`_log_message` 错误入错误缓冲、普通消息入输出缓冲。
 - 缓冲：`g_error_buffer`（环形，上限 200，每条带递增 `seq`，`g_error_seq` 单调）+ `g_output_buffer`（上限 500），互斥锁保护；`current_error_seq()` / `eval_error_delta(since_seq)` / `append_eval_runtime_errors` 供 eval 附加运行期错误增量（文本增量 + 仅首条的 `structured_error`）；`truncate_error_text` 超 8192 字节截断。
-- 状态与工具 op：`status`（版本/fps/physics_frame/paused/node_count/scene、活动字段）、`ping`（physics/process 帧 + 活动字段）、`cancel`（查 `g_cancel_handlers` 并调用 handler）、`capture`（根视口渲染存 PNG 到缓存目录，返回 path/width/height）、`get_errors`（limit 默认 50）、`get_output`（limit 默认 200）、`get_tree`（DFS，深度上限 64、节点上限 2000）、`ui_elements`（08-24 新增，见下）。
+- 状态与工具 op：`status`（版本/fps/physics_frame/paused/node_count/scene、活动字段）、`ping`（physics/process 帧 + 活动字段）、`cancel`（查 `g_cancel_handlers` 并调用 handler）、`capture`（根视口渲染存 PNG 到缓存目录，返回 path/width/height；09-14 起渲染后经 `capture_ops::prune_capture_files` 清理缓存目录，仅保留最近 20 张 `gda_capture*`）、`get_errors`（limit 默认 50）、`get_output`（limit 默认 200）、`get_tree`（DFS，深度上限 64、节点上限 2000）、`ui_elements`（08-24 新增，见下）。
 - 辅助函数：`gda_string`（string_view → godot::String）、`error_result`/`ok_result`、`get_scene_tree`、`resolve_node`（空路径取当前场景，先场景内再根节点查询）。
 
 ### 3.2 game_bridge_input.cpp — 输入模拟

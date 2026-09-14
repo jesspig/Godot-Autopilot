@@ -131,6 +131,9 @@ Three tools, three targets:
 - `capture_editor_viewport` — the default `target` `editor` grabs the editor
   2D viewport (falling back to the 3D viewport), so it works while you are
   still building a scene; `target` `game` captures the running game instead.
+  Add save=true on the editor target to also write the PNG under
+  user://godot_autopilot/captures/ and receive its path in the result; both
+  targets keep only the 20 most recent capture files.
 - `capture_display_screen` — a whole physical screen by `screen` index, for
   desktop-level checks such as window placement; no running game required.
 
@@ -219,10 +222,13 @@ coordinates, or with `execute_game_script` using `path`.
   plus a `note` suggesting `play_editor_current_scene` or
   `get_game_log_entries` — there is no editor-process fallback.
 - `get_game_log_entries` reads the on-disk log tail (optional `limit`,
-  default 50, max 500; returns `path`, `entries`, `total_lines`). It falls
-  back to the archived `godot.log.1` (reported as `from_archive`); if the
-  file does not exist the error includes directory diagnostics and a hint
-  to start the game.
+  default 50, max 500; returns `path`, `entries`, `total_lines`). Pass an
+  optional filter to keep only lines containing that case-sensitive
+  substring: the scan then covers the last 2000 lines and the result adds
+  matched_lines with the total matches found (an empty filter means no
+  filtering). It falls back to the archived `godot.log.1` (reported as
+  `from_archive`); if the file does not exist the error includes directory
+  diagnostics and a hint to start the game.
 
 The on-disk log matters more than it looks: the debugger transport silently
 drops messages under load (see below), but the log file does not.

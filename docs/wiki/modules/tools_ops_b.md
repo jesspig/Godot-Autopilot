@@ -6,7 +6,7 @@ tags:
   - 模块
   - 领域工具
   - B组
-timestamp: "2026-09-13T21:58:26+08:00"
+timestamp: "2026-09-14T20:49:22+08:00"
 resource: src/tools/
 ---
 
@@ -252,26 +252,29 @@ resource: src/tools/
   - **timeout_ms**：默认 5000；实现钳制上限 30000（`CODE_EXEC_MAX_TIMEOUT_MS`，非正值回落默认；08-24 前仅 `static_cast<int>` 未钳制，已修复，与 runtime_ops 的 `GDA_MAX_TIMEOUT_MS` 钳制对齐）。
   - 返回字段：result（`VariantJson::serialize`）、execution_time_ms、auto_owner_set、wrapped_source、output（≤8192）、runtime_error/error_details/structured_error（首行解析 file/line/message）。
   - 结果为 Resource 时自动 `resource_registry::register_resource`（registered_resource 字段）。
+  - **异步 game 工具的 pending 语义（09-14 起）**：`operations` 里异步 game 工具返回的中间态 `{"__gda_pending": id}` 经 `runtime_ops::payload_is_pending` 识别后以 `status:"pending"` 记入该条结果（附 note 与 `discard_pending` 明细 `detail`），并主动丢弃 pending 记录——不再假报成功，游戏侧随后到达的响应按迟到响应记 Warning 日志；响应新增 `pending` 计数，`total` = succeeded + failed + pending，`skipped` 为 `stop_on_error` 截断后未执行数。需要异步结果的调用必须改用 `call_tool`（只有它会等待并合并响应）。
 - **错误模式**：`util::error_json(error_out)` 统一出口；编译失败含行号映射与 wrapped source；超时报错不含渲染状态。
 - 出站链接：[运行时通道](../modules/entry_runtime.md) · [工具注册表](../modules/tools_registry.md)
 
 ## log_ops — 游戏日志文件读取（1 工具）
 
 - **职责**：读取游戏进程磁盘日志 `user://logs/godot.log` 尾部。
-- **代表工具**：`get_game_log_entries`（limit 默认 50、上限 500）。
+- **代表工具**：`get_game_log_entries`（limit 默认 50、上限 500；09-14 起可选 `filter`）。
 - **关键事实**：
   - Windows 用 `CreateFileW` 共享读（FILE_SHARE_READ|WRITE|DELETE）+ 256KB 尾窗口；打开失败重试一次（100ms 延迟）后回退归档 `godot.log.1`（返回 `from_archive` + warning）。
   - 文件不存在时错误信息附目录诊断（`logs_dir_diagnostic`：目录不存在/为空/内容列表）与运行提示（"start it with play_editor_current_scene"）。
+  - **`filter` 过滤（09-14 起）**：可选 `filter`（大小写敏感子串）把扫描窗扩大到最近 2000 行（`FILTER_SCAN_LINES`，`filter_log_lines`），命中行再按 `limit` 取尾部返回；结果附 `filter` 与 `matched_lines`（扫描窗内命中总数，不受 limit 截断影响），`filter=""` 等同未过滤。
 - **错误模式**：`error_detail`（open error code + 建议改用 `get_debugger_output`/`get_debugger_errors`）。
 - 出站链接：[运行时通道](../modules/entry_runtime.md) · [工具注册表](../modules/tools_registry.md)
 
 ## capture_ops — 编辑器视口截图（1 工具 + base64 工具函数）
 
-- **职责**：编辑器 2D/3D 视口截图并 base64 返回。
+- **职责**：编辑器 2D/3D 视口截图并 base64 返回，可选落盘保存。
 - **代表工具**：`capture_editor_viewport`（注册名按动词置首规范，hpp 函数名 `handle_capture_viewport`；旧名 `editor_capture_viewport` 的 `editor_` 前缀已随全量重命名消除）。
 - **关键事实**：
   - `target="game"`（08-24 接通；09-13 下午改为非阻塞 pending 协议）：返回中间态 `{"__gda_pending": id, "timeout_ms": ...}`，由 `call_tool` 的 `meta_call_tool_wait` 等待后经 `finalize_capture_response`（主线程读盘 → base64）定型；旧的阻塞式 `runtime_ops::game_capture_blocking` 已删除（它曾在主线程等待，阻塞编辑器消息泵）。`timeout_ms` 可选，默认 5000、钳制 30000。
-  - `target="editor"`（默认）优先 2D 视口（`EditorInterface::get_editor_viewport_2d`）回退 3D；`ViewportTexture::get_image` → `save_png_to_buffer` → `base64_encode`，返回 data/format/width/height。
+  - `target="editor"`（默认）优先 2D 视口（`EditorInterface::get_editor_viewport_2d`）回退 3D；`ViewportTexture::get_image` → `save_png_to_buffer` → `base64_encode`，返回 data/format/width/height；`save:true`（09-14 起，仅 editor 目标）额外把 PNG 写入 `user://godot_autopilot/captures/gda_capture_editor_<ticks>.png` 并在结果附 `path`。
+  - **截图保留上限（09-14 起）**：`prune_capture_files` 按修改时间倒序只保留最近 20 个 `gda_capture*.png`——editor 侧在保存后清理 `user://godot_autopilot/captures/`，游戏侧 `op_capture` 同样清理 OS 缓存目录（`game_bridge.cpp`）。
   - **MCP image content 交付（09-13 起）**：经元工具 `call_tool` 直调三个截图工具（`capture_editor_viewport`/`capture_game_viewport`/`capture_display_screen`）时，`register_all.cpp` 经 `util::mcp_image_content.hpp` 的 `try_attach_image_content()` 把 PNG base64 转为 MCP image content 块随响应返回（多模态模型可直接看图）；文本 JSON 中该 `data` 替换为 `"<attached-as-image-content>"` 并加 `image_attached:true`，`format`/`width`/`height` 等其余字段保留。`batch_execute`/`code_execute` 内调用不附加 image 块，JSON 中仍是完整 base64；`format` 非 `"png"` 或无 data 时不转换。
   - `base64_encode` 为跨模块工具函数（display_ops 截图、runtime_ops 文件回读共用）。
 - **错误模式**：视口不可用 → error_detail（"open a scene with a visible viewport first"）；PNG 编码空缓冲 → error_json。

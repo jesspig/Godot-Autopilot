@@ -92,6 +92,18 @@ text JSON keeps `format`, `width` and `height`, while `data` becomes
 `batch_execute` and `code_execute` no image block is attached - the JSON
 `data` field keeps the full base64 and must be decoded by the caller.
 
+## Async game tools inside batch_execute are not awaited
+
+Several game tools answer asynchronously: their immediate return value is a
+pending marker, and only the single-tool call path (call_tool) waits for the
+game's answer and merges it into the response. Inside batch_execute those
+tools report status pending, and the batch discards the pending record
+instead of faking success - the game-side answer arrives afterwards as a
+late response and is only logged. The response counts stay consistent:
+total = succeeded + failed + pending, and skipped covers operations cut off
+by stop_on_error. If you need a game tool's result, call it with call_tool
+rather than inside a batch.
+
 ## Size limits
 
 These limits are enforced by the server. Truncation is always detectable -
@@ -170,9 +182,11 @@ tools (`execute_game_script`, `queue_game_input`, `wait_game_input`,
 call returns an error carrying authorization_required plus an `enable` field
 (and writes a warning to the plugin log); enable a capability by setting
 `GODOT_AUTOPILOT_ALLOW` to it (or to `all`) and restarting the engine, or -
-for `code_execute` only - by ticking "Allow code_execute" in the plugin's MCP
-Config dock, which takes effect on the next call without a restart. When the
-environment variable is set it wins over the config.
+for `code_execute` and `game_runtime` - by ticking "Allow code_execute" or
+"Allow game_runtime" in the plugin's MCP Config dock, which takes effect on
+the next call without a restart. The process gate keeps no dock toggle: it
+needs the environment variable and a restart. When the environment variable
+is set it wins over the config.
 
 `code_execute` wraps your source in a generated @tool Node script. Four traps:
 

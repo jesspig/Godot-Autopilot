@@ -6,7 +6,7 @@ tags:
   - 安全
   - 并发
   - 契约
-timestamp: "2026-09-13T17:34:29+08:00"
+timestamp: "2026-09-14T20:49:22+08:00"
 resource:
   - src/core/server_context.cpp
   - src/core/command_queue.hpp
@@ -56,7 +56,7 @@ resource:
 - 解析优先级：`GODOT_AUTOPILOT_ALLOW` 环境变量（逗号分隔，`all` 全放行）> 插件配置 `user://godot_autopilot/config.json` 的 `allow` 键 > **默认拒绝**；环境变量一旦设置即完全覆盖持久化配置。
 - 能力名与工具映射（`tool_base.hpp:capability_for_tool`）：`code_execute`（`code_execute`、`execute_script`）、`game_runtime`（`execute_game_script`、`reload_game_scripts`、`queue_game_input`、`wait_game_input`、`sequence_game_inputs`）、`process`（`SideEffect::Process` 标记的 6 个：`build_csharp_assembly`、`create_os_process`、`execute_os_process`、`kill_os_process`、`open_os_path`、`set_os_environment`）。
 - 拒绝响应含 `error`、`authorization_required`（能力名）与 `enable`（启用指引）三个字段，并写 Warning 日志（Tools 类，可经 `get_plugin_log` 读取）。
-- 启用入口：环境变量（须重启引擎）或配置 `allow` 键；MCP Config 面板的 "Allow code_execute" 复选框只管理 `code_execute` 能力，写入配置后下一次调用生效、无需重启（`process`/`game_runtime` 仍须环境变量或手改配置）。
+- 启用入口：环境变量（须重启引擎）或配置 `allow` 键；MCP Config 面板的 "Allow code_execute" 与 "Allow game_runtime" 复选框分别管理对应能力，勾选/取消经 `authorization::allow_list_add`/`allow_list_remove`（`add` 对已生效项含 `all` 保持原样；`remove` 先把 `all` 展开为全部已知能力再逐项删除），写入配置后下一次调用生效、无需重启。`process` 无面板开关，仍须环境变量或手改 `allow` 键。拒绝响应的 `enable` 文案只对 `code_execute`/`game_runtime` 提及 dock（`capability_has_dock_toggle`），`process` 仅给环境变量 + 重启指引。
 
 ## 4. Godot API 与线程
 

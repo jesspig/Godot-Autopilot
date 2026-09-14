@@ -5,6 +5,7 @@
 ## 2026-09-14
 
 - **CI Windows 构建编码修复**：`embed_skills.py` 中文 print 在 cp1252 控制台 `UnicodeEncodeError`（8/30 起 develop CI 连败根因），脚本 stdout/stderr 强制 UTF-8 + `ci.yml`/`release.yml` 增 `PYTHONUTF8=1`；本地 cp1252 复现环境验证通过，生成头与产物一致。详见 `changelog/2026-09-14-log.md`
+- **0.2.5 修复批次（严格形状 / 异步语义 / 工具增强）**：Vector2/Vector2i 严格形状（数组输入明确报错、替代静默写 0）、`get_scene_tree` 属性摘要 String/StringName 判定修复、MCP Config 新增 Allow game_runtime 复选框、`batch_execute` 异步 game 工具返回 `status:"pending"`（不再假成功）、`capture_editor_viewport` 支持 `save`（编辑器/游戏两侧各保留最近 20 张）、`get_game_log_entries` 新增 `filter`/`matched_lines`；L1 126→140、L2 9 份、ctest 135→149。详见 `changelog/2026-09-14-log.md`
 
 ## 2026-09-13
 

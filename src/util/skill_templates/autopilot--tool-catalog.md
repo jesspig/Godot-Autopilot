@@ -46,7 +46,7 @@ All 366 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 
 ## Capture - capture_tools (1)
 
-- `capture_editor_viewport` - screenshot the editor viewport (or the running game with target=game) as base64 PNG; through `call_tool` the PNG is delivered as image content (`data` becomes `<attached-as-image-content>` with image_attached: true)
+- `capture_editor_viewport` - screenshot the editor viewport (or the running game with target=game) as base64 PNG; save=true on the editor target also writes the PNG under user://godot_autopilot/captures/ and returns its path (only the 20 most recent captures are kept); through `call_tool` the PNG is delivered as image content (`data` becomes `<attached-as-image-content>` with image_attached: true)
 
 ## Config - config_tools (13)
 
@@ -414,7 +414,7 @@ All 366 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 
 ## System - system_tools (1)
 
-- `get_game_log_entries` - read the tail of the game's on-disk log file (works without a debug session)
+- `get_game_log_entries` - read the tail of the game's on-disk log file (works without a debug session); an optional case-sensitive substring filter keeps matching lines from the last 2000 and reports the match count
 
 ## Testing - test_tools (2)
 
