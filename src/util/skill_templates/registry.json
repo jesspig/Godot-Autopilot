@@ -2,7 +2,7 @@
   "skills": [
     {
       "name": "godot-autopilot",
-      "description": "Complete usage guide for the godot-autopilot MCP server: connection prerequisites, tool discovery protocol (search first, never guess names), the error protocol (new_errors_since_last_call watermark, retryable soft errors), direct HTTP fallback, task-to-tool routing and tool gotchas. Use for anything godot-autopilot related in a Godot project.",
+      "description": "Required reading before using the GDA (godot-autopilot) plugin: connection prerequisites, search-first tool discovery (never guess tool names), engine-version-matched documentation lookup, engine state observation (editor log, debugger, plugin log, error watermark), task-to-tool routing and the error watermark protocol. Complete usage guide for the godot-autopilot MCP server. Use for anything godot-autopilot related in a Godot project.",
       "files": [
         {
           "path": "SKILL.md",
@@ -19,6 +19,10 @@
         {
           "path": "references/tool-gotchas.md",
           "source": "autopilot--tool-gotchas.md"
+        },
+        {
+          "path": "references/development-workflow.md",
+          "source": "autopilot--development-workflow.md"
         }
       ]
     },
@@ -147,6 +151,20 @@
         {
           "path": "references/ui-theme-details.md",
           "source": "content--ui-theme-details.md"
+        }
+      ]
+    },
+    {
+      "name": "godot-autopilot-csharp",
+      "description": "Godot C#/.NET project guide: the dotnet build loop with build_csharp_assembly, reading compile and parse errors through get_debugger_log, running the game and confirming with get_debugger_errors plus the error watermark, C# [GlobalClass] resources via create_resource, [Export] node and typed-array conversion in property_set, attaching C# scripts, and the no-hot-reload and GDScript-visibility limits of .NET assembly state. Use when working in a C# Godot project.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "source": "csharp.md"
+        },
+        {
+          "path": "references/tool-reference.md",
+          "source": "csharp--tool-reference.md"
         }
       ]
     }

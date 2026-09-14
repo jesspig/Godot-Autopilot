@@ -5,15 +5,15 @@
 - `uv run build.py` — Debug 构建并部署到 `Example/addons/godot-autopilot/`；`--release` 先清理 `.godot`/`addons` 再构建；`--package` 打包 `dist/godot-autopilot-<version>.zip`；`--package --libs-dir <dir>` 从目录递归收集三平台库合并打包（须与 `--package` 同用）
 - 手动：`cmake --preset debug && cmake --build --preset debug`；预设 `debug`/`release`（Ninja，`CMAKE_OSX_ARCHITECTURES=x86_64;arm64` universal，gdextension 用 `macos.{debug,release}.universal`）
 - **勿删 `build/<preset>/_deps/`**（godot-cpp/mcp-cpp-sdk/googletest 缓存）；**新增 `.cpp` 必须加入 `CMakeLists.txt:65` 的 `add_library()`**，业务源码另需同步 `tests/CMakeLists.txt:31` 的 `GDA_UNIT_BUSINESS_SOURCES`（漏了会 undefined symbol，header-only 除外）；`src/util/skill_templates/*.md` 为内容数据文件不进 add_library（经 `cmake/skill_gen.cmake` 构建期嵌入生成头）
-- 版本单一来源：根 `VERSION`（当前 `0.2.3`）→ `CMakeLists.txt:33 file(READ)` 喂 `project()` + `configure_file` 生成 `GDA_VERSION`（`server_info`/`system_status.version`）+ `build.py:34` 打包名；升版只改该文件后重新 configure
+- 版本单一来源：根 `VERSION`（当前 `0.2.4`）→ `CMakeLists.txt:33 file(READ)` 喂 `project()` + `configure_file` 生成 `GDA_VERSION`（`server_info`/`system_status.version`）+ `build.py:34` 打包名；升版只改该文件后重新 configure
 
 ## 架构
 
 - 进程内 GDExtension，`MODULE_INITIALIZATION_LEVEL_EDITOR` 加载；`src/main.cpp:GDExtensionEntryPoint` 注册 `GodotAutopilotPlugin`，`_enter_tree()` 启动 `ServerContext`，`_exit_tree()` 停止
 - 线程：mcp-cpp-sdk HTTP 线程 → `CommandQueue::submit()`/`execute_sync()` → 主线程 `_process():s_queue.drain()`；**所有 Godot API 必须经队列执行**，直接调用必崩
 - 端口 9527 `/mcp`，优先级 `GODOT_AUTOPILOT_PORT` env > `user://godot_autopilot/config.json`（`PluginConfig`）> 9527；默认绑 `127.0.0.1`，`ServerContext::start()` 拒绝非环回 host；mcp-cpp-sdk 0.3.2 起 Host 仅允许环回主机名/IP
-- 工具注册 `ToolRegistry` 单一来源：363 域工具（30 个 `src/tools/<域>_tools.hpp`，`GDA_TOOL_CLASS`/`GDA_TOOL_CLASS_SIDE` + `make_tools()`）+ `system_status`（FnTool）+ 7 元工具（`MetaTool` 需 `IMetaTool`，`add()` 自动归类）；catalog/BM25/`g_handlers`/`RegisterTool` 全派生
-- 计数：370 = 7 元 + 363 域；371 = 363 域 + `system_status` + 7 元（catalog/index）；7 元 = `ping/search_tools/list_categories/get_tool_detail/call_tool/batch_execute/code_execute`
+- 工具注册 `ToolRegistry` 单一来源：366 域工具（30 个 `src/tools/<域>_tools.hpp`，`GDA_TOOL_CLASS`/`GDA_TOOL_CLASS_SIDE` + `make_tools()`）+ `system_status`（FnTool）+ 7 元工具（`MetaTool` 需 `IMetaTool`，`add()` 自动归类）；catalog/BM25/`g_handlers`/`RegisterTool` 全派生
+- 计数：373 = 7 元 + 366 域；374 = 366 域 + `system_status` + 7 元（catalog/index）；7 元 = `ping/search_tools/list_categories/get_tool_detail/call_tool/batch_execute/code_execute`
 - 错误水印：响应顶层 `new_errors_since_last_call` 一次性消费（`error_watermark.hpp`）；`editor_readiness` 导入中返回 `retryable` 软错误
 - 互转：`VariantJson::serialize/deserialize`（`util/variant_json.hpp`）；错误 `{"error": "msg"}`，`call_tool` 置 `is_error=true`
 
@@ -26,16 +26,16 @@
 ## 约定
 
 - 命名空间 `godot_autopilot`；日志仅 `System/Transport/Tools/Resources/Prompts`
-- 编译器优先 Clang/clang-cl，sccache/LTO/Unity/Ninja 池自适应；依赖 godot-cpp 10.0.0-rc1、mcp-cpp-sdk 0.3.2（FetchContent，无子模块）
+- 编译器优先 Clang/clang-cl，sccache/LTO/Unity/Ninja 池自适应；依赖 godot-cpp 10.0.0-rc1、mcp-cpp-sdk 0.3.3（FetchContent，无子模块）
 
 ## 测试
 
 - 启用：`GDA_ENABLE_TESTS` 已在 `CMakePresets.json` debug/release 置 `ON`（裸 `cmake` 默认 `OFF`）
 - 运行：`ctest --preset debug`（L1 秒级，L2 约 2 分钟需 `GODOT_PATH`）；单跑 `build/debug/tests/gda_test_runner.exe --file 01_scene`；CI 仅 `ctest --preset debug -E "^gda_runner_"`（L1）
-- 结构：L1 `gda_unit_tests` 103 gtest；L2 `gda_test_runner` + `tests/config/*.json` 7 份（`00_meta`/`01_scene`/`02_property`/`03_tools_contract`/`04_resources_scripts`/`05_rename_references`/`06_move_references`）；当前 ctest 注册点共 110（L2 需 `GODOT_PATH`）
-- skill_gen：内容源 `src/util/skill_templates/`（27 个 .md + registry.json，7 册技能 = 1 总纲 `godot-autopilot` + 6 引擎指南，每册带 references/；84 条 Godot 4.8.0-dev 源码研究发现织入引擎六册，4.7+/4.8 行内简注）+ `tools/embed_skills.py` 构建期嵌入（`SKILL_COUNT = 7`；5 项校验 name/description/files 结构与孤儿文件，生成头入 `build/<preset>/generated/`，gitignore 覆盖；渲染至 `.agents/skills/`，dock 按钮 Generate Skills/Update Skills 动态切换，Update 先递归清理 `godot-autopilot-` 前缀目录再重建），`tests/unit/skill_gen_test.cpp` 7 用例 L1 校验（7 册清单/name/description/文件布局/frontmatter/反引号词回验 catalog∪schema 参数名∪176 项白名单/每册 references 声明），无需 Godot；ctest L1 103/103 全绿
-- 新增用例 = 新建 `tests/config/*.json` 零 C++；Godot 路径 `GODOT_PATH` env > `.env`（`.env.template` 复制），缺失则 L2 跳过
-- 遍历：`03_tools_contract` 枚举 363 域工具，42 个 `GDA_TOOL_CLASS_SIDE` 经 `side_effect` 字段自动排除（仍参与枚举，321 个做空参+冒烟）；3 契约缺口 `create_scene_node`/`get_resource_extensions`/`reimport_resource_files` 记 warnings
+- 结构：L1 `gda_unit_tests` 126 gtest；L2 `gda_test_runner` + `tests/config/*.json` 9 份（`00_meta`/`01_scene`/`02_property`/`03_tools_contract`/`04_resources_scripts`/`05_rename_references`/`06_move_references`/`07_scene_tabs`/`08_property_readback`）；当前 ctest 注册点共 135（L1 126 + L2 9；L2 需 `GODOT_PATH`）
+- skill_gen：内容源 `src/util/skill_templates/`（30 个 .md + registry.json，8 册技能 = 1 总纲 `godot-autopilot` + 6 引擎指南 + 1 C# 专册 `godot-autopilot-csharp`，每册带 references/；84 条 Godot 4.8.0-dev 源码研究发现织入引擎六册，4.7+/4.8 行内简注）+ `tools/embed_skills.py` 构建期嵌入（`SKILL_COUNT = 8`；5 项校验 name/description/files 结构与孤儿文件，生成头入 `build/<preset>/generated/`，gitignore 覆盖；渲染至 `.agents/skills/`，dock 按钮 Generate Skills/Update Skills 动态切换，Update 先递归清理 `godot-autopilot-` 前缀目录再重建），`tests/unit/skill_gen_test.cpp` 7 用例 L1 校验（8 册清单/name/description/文件布局/frontmatter/反引号词回验 catalog∪schema 参数名∪176 项白名单/每册 references 声明），无需 Godot；ctest L1 126/126 全绿
+- 新增用例 = 新建 `tests/config/*.json` 零 C++；Godot 路径 `GODOT_PATH` env > `.env`（`.env.template` 复制），缺失则执行器以退出码 2 报错（不自动跳过）
+- 遍历：`03_tools_contract` 枚举 366 域工具（解析器仅匹配 `GDA_TOOL_CLASS(`），49 个 `GDA_TOOL_CLASS_SIDE` 不进入枚举（`side_effect` 字段兜底判定保留），317 个做空参+冒烟；3 契约缺口 `create_scene_node`/`get_resource_extensions`/`reimport_resource_files` 记 warnings
 - 副作用：L2 后 `Example/project.godot` 可能追加 `[audio]/[input]` 并生成 `default_bus_layout.tres`，`git checkout -- Example/project.godot` 清理
 
 ## 知识局限
@@ -54,3 +54,4 @@
 - 位置 `docs/wiki/`，入口 `docs/wiki/index.md`；按需更新（完成功能/交付指南/提交前），只改受影响页，删过时描述不留废弃标记；安全与并发约束见 `docs/wiki/security_contract.md`
 - 更新前以 `git diff HEAD` 核查实际变更为准，无法核实标 `> [!todo] 待补充`；数值以运行时统计为准；每页至少 1 条相对链接
 - frontmatter 必含 `type/title/description/tags/timestamp/resource`（`index.md`/`log.md`/`changelog/*` 除外）；带审计日期头的页改后同步日期；改后在 `changelog/<YYYY-MM-DD>-log.md` 按小时追加，`log.md` 仅留最近 7 天
+- 语言简体中文；由本规则触发的自动维护以代码与用户讨论结果为事实，changelog 时间必须真实（禁止猜测）

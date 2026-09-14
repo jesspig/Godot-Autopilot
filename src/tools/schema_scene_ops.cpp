@@ -73,6 +73,8 @@ void fill_schema_scene(std::unordered_map<std::string, mcp::JsonValue>& m) {
         });
         m["property_get_list"] = schema::build_schema({
             {"path", "string", "Node path in the edited scene (string, e.g. 'Player')", true},
+            {"only_script_variables", "boolean", "Only return properties with PROPERTY_USAGE_SCRIPT_VARIABLE (usage bit 4096), i.e. script-declared variables (default: false)", false},
+            {"property_filter", "string", "Case-sensitive substring filter on property names (default: empty = no filter)", false},
         });
         m["signal_connect"] = schema::build_schema({
             {"source_path", "string", "Node path of the signal emitter (string, e.g. 'Player')", true},
@@ -92,6 +94,9 @@ void fill_schema_scene(std::unordered_map<std::string, mcp::JsonValue>& m) {
             {"path", "string", "Resource file path to load, e.g. res://my_resource.tres", true},
             {"type_hint", "string", "Expected resource class to guide loading, e.g. PackedScene, Texture2D; default: none", false},
         });
+        m["reload_resource"] = schema::build_schema({
+            {"path", "string", "Resource file path to force-reload from disk, e.g. res://my_resource.tres", true},
+        });
         m["load_resource_threaded"] = schema::build_schema({
             {"path", "string", "Resource file path to load in the background, e.g. res://my_resource.tres", true},
             {"type_hint", "string", "Expected resource class to guide loading, e.g. PackedScene, Texture2D; default: none", false},
@@ -105,7 +110,7 @@ void fill_schema_scene(std::unordered_map<std::string, mcp::JsonValue>& m) {
         });
         m["save_resource"] = schema::build_schema({
             {"path", "string", "Source path to load from, or destination path if object_id is provided; required to identify the resource", true},
-            {"dest_path", "string", "Destination file path to write, e.g. res://out/my_resource.tres; default: path. Missing parent directories are created recursively", false},
+            {"dest_path", "string", "Destination file path to write, e.g. res://out/my_resource.tres; default: path. Missing parent directories are created recursively; when dest_path differs from path, the resource is duplicated first so the source cached instance is not modified; the response then includes copy_on_write and source_path", false},
             {"name", "string", "Name of an in-memory resource (as passed to create_resource) to save", false},
             {"class_type", "string", "Resource class to instantiate when no resource resolves, e.g. Curve2D; requires name to register the new instance", false},
             {"object_id", "integer", "Object ID of an in-memory resource (from create_resource) to save; mutually exclusive with object_id_str", false},
@@ -113,12 +118,13 @@ void fill_schema_scene(std::unordered_map<std::string, mcp::JsonValue>& m) {
             {"flags", "integer", "ResourceSaver.SaverFlags bitfield, e.g. 1 = RELATIVE_PATHS, 8 = REPLACE_SUBRESOURCE_PATHS; default: 0", false},
         });
         m["create_resource"] = schema::build_schema({
-            {"type", "string", "Resource class to instantiate, e.g. Resource, Curve2D, PackedScene; must be an instantiable Resource subclass", true},
+            {"type", "string", "Resource class to instantiate, e.g. Resource, Curve2D, PackedScene; accepts both engine classes from ClassDB and global script classes (GDScript class_name / C# [GlobalClass]); abstract or invalid scripts are rejected", true},
             {"name", "string", "Registration name so later calls can reference the instance as memory://name and via the returned object_id; optional but recommended", false},
         });
         m["duplicate_resource"] = schema::build_schema({
             {"path", "string", "Disk path of the resource to load and duplicate, e.g. res://my_resource.tres; in-memory resources are not supported", true},
             {"deep", "boolean", "Deep duplicate copies sub-resources (true), shallow keeps shared references (false, default)", false},
+            {"name", "string", "Registration name so later calls can reference the duplicate as memory://name and via the returned object_id; when omitted only the object_id is registered", false},
         });
         m["get_resource_type"] = schema::build_schema({
             {"path", "string", "Resource file path whose class type to report, e.g. res://my_resource.tres", true},
@@ -151,6 +157,10 @@ void fill_schema_scene(std::unordered_map<std::string, mcp::JsonValue>& m) {
         m["move_resource_file"] = schema::build_schema({
             {"path", "string", "Existing res:// file or directory to move, e.g. res://sfx/jump.wav; directories move recursively preserving the sub-folder layout with *.uid sidecars following their owners", true},
             {"new_directory", "string", "Destination directory inside res:// (absolute like res://assets/sfx or relative like assets/sfx); trailing slashes are trimmed, user:// is rejected", true},
+        });
+        m["copy_resource_file"] = schema::build_schema({
+            {"path", "string", "Source file path to copy, e.g. res://assets/icon.png; must exist", true},
+            {"dest_path", "string", "Destination file path to write, e.g. res://assets/icon_copy.png; missing parent directories are created recursively and an existing file is overwritten", true},
         });
         m["create_directory"] = schema::build_schema({
             {"path", "string", "Directory to create below res:// (absolute like res://assets/audio or relative like assets/audio); missing parents are created recursively; idempotent when the directory already exists", true},
@@ -202,7 +212,7 @@ void fill_schema_scene(std::unordered_map<std::string, mcp::JsonValue>& m) {
         });
         m["attach_script_to_node"] = schema::build_schema({
             {"node_path", "string", "Node path in the edited scene to attach the script to", true},
-            {"script_path", "string", "Resource path of the script (.gd file); must be a Script resource", true},
+            {"script_path", "string", "Resource path of a Script resource (e.g. a .gd file or another Script); the resource must be a Script", true},
         });
         m["detach_script_from_node"] = schema::build_schema({
             {"node_path", "string", "Node path in the edited scene to detach the script from", true},

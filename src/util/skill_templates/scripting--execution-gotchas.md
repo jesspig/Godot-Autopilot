@@ -21,7 +21,7 @@ Engine-level facts about how and when GDScript actually executes, each verified 
 - `self` is unavailable inside `_static_init`: it executes in a static context, so touching instance state or assuming a node context fails.
 - Static variables survive a hot reload only when `reload_script` runs with `keep_state=true`. A plain reload re-initializes statics from their field initializers, and `_static_init` runs again on top of that.
 
-For C# there is no equivalent in-editor assembly hot-reload (see the C# limitations section in the main skill), so static-state semantics differences do not arise there.
+For C# there is no equivalent in-editor assembly hot-reload (see the `godot-autopilot-csharp` skill), so static-state semantics differences do not arise there.
 
 ## is_editor_hint and editor-only classes
 

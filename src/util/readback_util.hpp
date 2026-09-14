@@ -12,7 +12,8 @@ enum class ReadbackStatus { MATCHED, REJECTED, CONVERTED, NOOP };
 ReadbackStatus check_readback(const godot::Variant &expected_value,
                               const godot::Variant &old_value,
                               const godot::Variant &actual_value,
-                              std::string &out_detail);
+                              std::string &out_detail,
+                              bool type_sensitive = false);
 
 } // namespace util
 } // namespace godot_autopilot

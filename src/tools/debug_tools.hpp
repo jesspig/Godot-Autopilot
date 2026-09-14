@@ -53,7 +53,7 @@ GDA_TOOL_CLASS(SetDebugPerformanceVisualTool, "set_debug_performance_visual",
                "Debug", std::vector<std::string>({"debug", "performance", "overlay"}), debug_ops::handle_performance_debug, false)
 
 GDA_TOOL_CLASS(GetDebugMonitorsTool, "get_debug_monitors",
-               "Read current values of all built-in performance monitors in one call. Use it for a full performance snapshot without repeated get_debug_monitor calls. Returns an array of {name, type, value} entries covering 58 monitors; takes no parameters. Values are captured at the moment of the call.",
+               "Read current values of all built-in performance monitors in one call. Use it for a full performance snapshot without repeated get_debug_monitor calls. Returns an array of {name, type, value} entries covering 59 monitors; takes no parameters. Values are captured at the moment of the call.",
                "Debug", std::vector<std::string>({"debug", "performance"}), debug_ops::handle_get_all_monitors, false)
 
 GDA_TOOL_CLASS(RemoveDebugCustomMonitorTool, "remove_debug_custom_monitor",

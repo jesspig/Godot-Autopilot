@@ -8,11 +8,18 @@ void fill_schema_debug_sys(std::unordered_map<std::string, mcp::JsonValue>& m) {
         m["get_debugger_log"] = schema::build_schema({
             {"limit", "integer", "Maximum number of log entries to return (default: 50); the most recent entries are kept. The buffer always has data from the editor process engine logger, even without a running game", false},
         });
+        m["get_plugin_log"] = schema::build_schema({
+            {"limit", "integer", "Maximum number of plugin log entries to return (default: 100, max: 1000); the most recent entries are kept unless since_index is given (then the oldest unread are kept)", false},
+            {"level", "string", "Minimum log level filter: 'debug' (default, no filtering), 'info', 'warning' or 'error'", false},
+            {"category", "string", "Category filter: 'system', 'transport', 'tools', 'resources' or 'prompts' (omit for all categories)", false},
+            {"filter", "string", "Case-insensitive substring filter on the message text", false},
+            {"since_index", "integer", "Only return entries with serial >= since_index (incremental read); start with 0 and pass the returned next_index on the next call to fetch only new entries", false},
+        });
         m["get_debugger_errors"] = schema::build_schema({
-            {"limit", "integer", "Maximum number of errors to return (default: 20); the result is a formatted text dump with timestamp, file:line and stack. Fetched from the running game over the runtime channel when a debug session is active, otherwise falls back to editor-process captured errors", false},
+            {"limit", "integer", "Maximum number of errors to return (default: 20); with an active debug session the result is a structured list fetched from the running game (time, file, func, line, error, descr, is_warning, stack), otherwise an empty result plus a note — no editor-side fallback; use get_debugger_log for editor-process script errors and output", false},
         });
         m["get_debugger_output"] = schema::build_schema({
-            {"limit", "integer", "Maximum number of output entries to return (default: 50); fetched from the running game over the runtime channel when a debug session is active, otherwise falls back to editor-captured output. Use get_game_log_entries to read the game process log file", false},
+            {"limit", "integer", "Maximum number of output entries to return (default: 50); fetched from the running game over the runtime channel when a debug session is active, otherwise an empty result plus a note — no editor-side fallback; use get_debugger_log for editor-process output or get_game_log_entries to read the game process log file", false},
         });
         m["get_debugger_scene_tree"] = schema::build_schema({});
         m["get_debugger_session_info"] = schema::build_schema({});
@@ -54,7 +61,7 @@ void fill_schema_debug_sys(std::unordered_map<std::string, mcp::JsonValue>& m) {
         });
         m["get_game_input_status"] = schema::build_schema({
             {"action", "string", "Action name to query; the response includes paused and physics_frame so transient input consumption can be diagnosed when the game is paused", true},
-            {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 30000); successful responses also include recent_engine_errors (up to 5 recent engine errors) when any exist", false},
+            {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 30000); responses never include recent_engine_errors — use get_debugger_errors for running-game errors or get_debugger_log for editor-process errors", false},
         });
         m["sequence_game_inputs"] = schema::build_schema({
             {"inputs", "array", "Timeline items, each an object: kind ('key'|'mouse_button'|'mouse_motion'|'action'), at_frame (integer physics-frame offset from sequence start, 0 = immediately; out-of-order allowed, fires when its frame arrives) plus the queue_game_input fields for that kind — keycode for key, button_index and optional position {x,y} for mouse_button, position {x,y} for mouse_motion, action for action; optional pressed (default true), duration_ms (auto-release), mode ('event'|'api'|'hold'). Max 256 items. Example: [{\"kind\":\"key\",\"keycode\":\"X\",\"at_frame\":0},{\"kind\":\"mouse_button\",\"button_index\":1,\"position\":{\"x\":120,\"y\":80},\"at_frame\":5},{\"kind\":\"action\",\"action\":\"jump\",\"at_frame\":15}]", true},

@@ -25,7 +25,7 @@ GDA_TOOL_CLASS_SIDE(CreateScriptTool, "create_script",
                "Scripts", std::vector<std::string>({"script", "create"}), script_ops::handle_create, true, ::godot_autopilot::SideEffect::WritesFile)
 
 GDA_TOOL_CLASS(AttachScriptToNodeTool, "attach_script_to_node",
-               "Attach a GDScript file to a node in the edited scene, registered with the editor undo/redo. Requires node_path and script_path. Returns 'script attached to <path>' plus instantiated. When the script lacks @tool it cannot be instantiated in the editor, so its methods only run once the game runs — call_script_node reports the same restriction.",
+               "Attach a Script resource (e.g. a .gd file or another Script) to a node in the edited scene, registered with the editor undo/redo. Requires node_path and script_path. Returns 'script attached to <path>' plus instantiated. When the script lacks @tool it cannot be instantiated in the editor, so its methods only run once the game runs — call_script_node reports the same restriction. Replacing an existing script does not migrate exported references (node_paths may be left dangling) — rewire them after attaching.",
                "Scripts", std::vector<std::string>({"script", "attach", "node"}), script_ops::handle_attach_to_node, true)
 
 GDA_TOOL_CLASS(DetachScriptFromNodeTool, "detach_script_from_node",

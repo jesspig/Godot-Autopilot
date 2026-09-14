@@ -46,6 +46,52 @@ the effect after calls to these three tools.
 
 Details: godot-autopilot-scene-system and godot-autopilot-resources.
 
+## Silent failure: property writes are read back, and rejections now error
+
+`property_set` reads each written property back and no longer reports a plain
+ok when the engine drops the value:
+
+- A non-nil value read back as nil, an object-typed property whose readback is
+  not an object, or an array-typed property read back empty when a non-empty
+  array was written (or with an element read back as nil) is now an error:
+  `value not applied: ...`, and the old value is restored. Previously such
+  writes could return ok with no effect.
+- A non-array JSON value for an array property is refused before writing - the
+  error explains that a non-array value would silently clear the array. Pass
+  `[]` to clear it explicitly.
+- An array element that is a JSON object or array is refused when the declared
+  element type cannot be determined. Declare the element type in the script
+  (`Array[T]` / `[Export] T[]`) or build the array with `code_execute`.
+- Values the engine merely adjusts still return ok, with a `warning` field
+  describing the adjustment.
+
+`set_resource_property` performs the same readback and errors when the
+resource rejects the value (it does not restore the old value). Read-back
+remains the authoritative check after every write you are unsure about:
+`property_get` / `get_resource_property` and assert the expected value.
+
+## Debugger reads without a debug session return empty + note
+
+`get_debugger_errors`, `get_debugger_output` and `get_debugger_scene_tree`
+fetch their data from the running game over the runtime channel. Without an
+active debug session they return an empty result plus a `note` - there is no
+editor-process fallback and no stale "last captured" tree. Use
+`get_debugger_log` for editor-process script errors and output,
+`get_game_log_entries` for the game's on-disk log file, and `get_plugin_log`
+for the plugin's own in-process diagnostics (authorization denials, timeout
+bookkeeping and dropped late game responses). The same rule applies
+to `get_game_input_status`: its responses never include
+`recent_engine_errors`, so read errors through the debugger tools instead.
+
+## Screenshots: image content through call_tool, raw base64 inside batch_execute
+
+Through `call_tool`, `capture_editor_viewport`, `capture_game_viewport` and
+`capture_display_screen` deliver the PNG as an MCP image content block: the
+text JSON keeps `format`, `width` and `height`, while `data` becomes
+`"<attached-as-image-content>"` and image_attached is `true`. Inside
+`batch_execute` and `code_execute` no image block is attached - the JSON
+`data` field keeps the full base64 and must be decoded by the caller.
+
 ## Size limits
 
 These limits are enforced by the server. Truncation is always detectable -
@@ -57,10 +103,10 @@ than silently dropping data.
 | JSON response size | 4 MiB | every tool response |
 | eval output / error text truncation | 8192 bytes | game eval output and captured error text |
 | runtime error / output buffers | 200 / 500 entries | game runtime channel |
-| tilemap cells per call | 64 | `set_tilemap_cells` (larger payloads may be truncated client-side; use script loops for bulk layouts) |
+| tilemap cells per call | no fixed server-side cap | `set_tilemap_cells` - oversized JSON arguments can hit client-side request limits and fail as a parse error before the tool runs; use script loops for bulk layouts; `source_id` -1 clears a cell |
 | batch operations / input sequence steps | 256 | `batch_execute` / input sequences |
 | scene tree export | depth 64, 2000 nodes | scene tree reads (max depth reported in the response) |
-| viewport capture | 4096 px per side, 8 MiB PNG | `capture_game_viewport`, `capture_editor_viewport` |
+| viewport capture | 4096 px per side, 8 MiB PNG | `capture_game_viewport`, `capture_editor_viewport`, `capture_display_screen` |
 | Variant single string | 64 KiB | serialized Variant values |
 | Variant array elements | 10000 | arrays and packed arrays |
 | file scan | 10000 files, 2 MiB per file, 32 MiB total, depth 64 | resource/file scans |
@@ -94,7 +140,39 @@ your change did not apply.
 
 Details: godot-autopilot-scene-system.
 
+## Error recovery
+
+Two editor states block otherwise valid calls. Both have a defined recovery:
+
+- **A dirty scene tab blocks open/create.** `open_editor_scene` refuses while
+  any open scene has unsaved changes ("current scene has unsaved changes: ...
+  - save first (save_editor_scene)"), and `create_editor_scene` with
+  `close_current=true` refuses the same way. Recover by saving
+  (`save_editor_scene` for the current scene, `save_editor_scenes` for every
+  tab) or by discarding the edits - call `reload_editor_scene` with the
+  listed path (the scene must be open) to reload it from disk - then retry
+  the original call.
+- **Importing or scanning blocks affected writes.** While the editor scans or
+  imports, affected calls (for example `reimport_resource_files`, or
+  `write_file` landing on an imported asset) fail soft with
+  `retryable: true` and `retry_after_ms` (500) instead of erroring hard. Poll
+  `get_editor_file_system_status` (its `result` carries `scanning` and
+  `progress`) until `scanning` is false, wait at least `retry_after_ms`, then
+  retry the same call. Do not fire-and-forget scans: `scan_editor_file_system`
+  requested while a scan is already running is a no-op.
+
 ## code_execute traps
+
+Before the traps: both `code_execute` and `execute_script` are denied by
+default behind the `code_execute` authorization gate, and the game runtime
+tools (`execute_game_script`, `queue_game_input`, `wait_game_input`,
+`sequence_game_inputs`, `reload_game_scripts`) behind `game_runtime`. A denied
+call returns an error carrying authorization_required plus an `enable` field
+(and writes a warning to the plugin log); enable a capability by setting
+`GODOT_AUTOPILOT_ALLOW` to it (or to `all`) and restarting the engine, or -
+for `code_execute` only - by ticking "Allow code_execute" in the plugin's MCP
+Config dock, which takes effect on the next call without a restart. When the
+environment variable is set it wins over the config.
 
 `code_execute` wraps your source in a generated @tool Node script. Four traps:
 

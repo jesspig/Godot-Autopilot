@@ -61,7 +61,7 @@ void fill_schema_content(std::unordered_map<std::string, mcp::JsonValue>& m) {
         });
         m["set_tilemap_cells"] = schema::build_schema({
             {"node_path", "string", "Path to the TileMap or TileMapLayer node", true},
-            {"cells", "array", "Array of cells, each {\"x\":int,\"y\":int,\"source_id\":int,\"atlas_coords\":{\"x\":int,\"y\":int}} — source_id is required per entry; invalid entries are skipped and reported in the error plus warnings. Keep to ~64 entries per call (client-side parameter limits may truncate larger payloads); generate large layouts programmatically with execute_script (TileMap.set_cell loop)", true},
+            {"cells", "array", "Array of cells, each {\"x\":int,\"y\":int,\"source_id\":int,\"atlas_coords\":{\"x\":int,\"y\":int}} — source_id is required per entry. No fixed server-side entry cap, but keep batches reasonably sized because client or transport layers may limit a single request payload (bigger layouts: loop in execute_script or code_execute). An entry with source_id -1 clears the cell at x, y (atlas_coords is ignored and may be omitted). Invalid entries are skipped and reported in the error plus warnings", true},
             {"layer", "integer", "Tile layer index (default: 0); TileMapLayer nodes ignore it", false},
         });
         m["create_tilemap_tileset"] = schema::build_schema({
@@ -92,6 +92,7 @@ void fill_schema_content(std::unordered_map<std::string, mcp::JsonValue>& m) {
 
         m["create_spriteframes"] = schema::build_schema({
             {"name", "string", "Resource name used as the memory:// reference for later tools (e.g. 'hero_walk')", true},
+            {"default_animation", "string", "Optional animation created immediately as an empty animation (engine-default fps/loop). Use 'default' to match the AnimatedSprite2D default animation property, so a node that never sets animation keeps a deterministic first animation in the editor instead of falling back to an arbitrary list entry; runtime playback still needs an explicit play() call or property_set on the node", false},
         });
         m["add_spriteframes_animation"] = schema::build_schema({
             {"name", "string", "SpriteFrames name from create_spriteframes (memory:// reference)", true},

@@ -16,6 +16,10 @@ GDA_TOOL_CLASS(LoadResourceTool, "load_resource",
                "Load a resource file from disk into memory. Use it to bring a .tres or .tscn file into the editor for inspection or modification, with an optional type_hint to guide loading. Returns the resource reference with class, path, object_id and object_id_str, which set_resource_property and get_resource_property accept as locators. Errors when the file is missing or fails to load.",
                "Resources", std::vector<std::string>({"resource", "load"}), resource_ops::handle_load, true)
 
+GDA_TOOL_CLASS(ReloadResourceTool, "reload_resource",
+               "Force-reload a resource file from disk, replacing the editor's cached instance via ResourceLoader CACHE_MODE_REPLACE. Use it after the file changed on disk outside the editor so later reads observe the on-disk contents instead of a stale cached instance. Returns result (reloaded), path and replaced (true when the cached instance was swapped for a freshly loaded one). Errors when the path is outside res:// or the file cannot be loaded.",
+               "Resources", std::vector<std::string>({"resource", "reload", "cache"}), resource_ops::handle_reload, true)
+
 GDA_TOOL_CLASS(LoadResourceThreadedTool, "load_resource_threaded",
                "Start an asynchronous background load of a resource file and return immediately. It is the first step of the threaded-load chain: after this call, poll get_resource_load_threaded_status, then fetch the result with get_resource_load_threaded. use_sub_threads enables finer-grained parallel loading. Returns the Godot error code (0 = OK).",
                "Resources", std::vector<std::string>({"resource", "load", "threaded"}), resource_ops::handle_load_threaded, true)
@@ -29,15 +33,15 @@ GDA_TOOL_CLASS(GetResourceLoadThreadedTool, "get_resource_load_threaded",
                "Resources", std::vector<std::string>({"resource", "load", "wait"}), resource_ops::handle_load_threaded_wait, true)
 
 GDA_TOOL_CLASS_SIDE(SaveResourceTool, "save_resource",
-               "Save a resource to disk at dest_path (defaults to path). Locate the resource by object_id/object_id_str (from create_resource), name (in-memory) or path (loaded from disk); if none resolves, class_type plus a name creates and registers a new instance. Missing directories are created recursively and the editor file system is refreshed. Returns the Godot error code, verified (a read-back load check) and directories_created when applicable.",
+               "Save a resource to disk at dest_path (defaults to path). Locate the resource by object_id/object_id_str (from create_resource), name (in-memory) or path (loaded from disk); if none resolves, class_type plus a name creates and registers a new instance. Missing directories are created recursively and the editor file system is refreshed. Returns the Godot error code, verified and directories_created when applicable. verified means the resource was re-read from disk after saving; on Windows, safe-save briefly replaces the file, so a concurrent reader may transiently fail — re-check/retry if that surfaces.",
                "Resources", std::vector<std::string>({"resource", "save"}), resource_ops::handle_save, true, ::godot_autopilot::SideEffect::WritesFile)
 
 GDA_TOOL_CLASS(CreateResourceTool, "create_resource",
-               "Instantiate a Resource subclass by class name (type) in memory. Pass name to register the instance so later calls can reference it as memory://name. Returns the reference with object_id and object_id_str, which serve as locators for set_resource_property, get_resource_property and save_resource. Errors when type is not an instantiable Resource subclass.",
+               "Instantiate a Resource subclass by class name (type) in memory. type accepts both engine classes from ClassDB and global script classes (GDScript class_name / C# [GlobalClass]); abstract or invalid scripts are rejected. Pass name to register the instance so later calls can reference it as memory://name. Returns the reference with object_id and object_id_str, which serve as locators for set_resource_property, get_resource_property and save_resource. Errors when type is not a known class or not an instantiable Resource subclass.",
                "Resources", std::vector<std::string>({"resource", "create"}), resource_ops::handle_create, true)
 
 GDA_TOOL_CLASS(DuplicateResourceTool, "duplicate_resource",
-               "Load a resource from a disk path and return a duplicated instance. deep (default false) controls whether sub-resources are deep-copied. Only file-backed resources are supported; in-memory instances from create_resource must be saved and reloaded first. Returns the duplicate's reference with object_id and name.",
+               "Load a resource from a disk path and return a duplicated instance. deep (default false) controls whether sub-resources are deep-copied. Only file-backed resources are supported; in-memory instances from create_resource must be saved and reloaded first. Pass name to also register the duplicate, so later calls can reference it as memory://name or via the returned object_id; the registered reference is what keeps the duplicate in memory across calls. Returns the duplicate's reference with object_id and name.",
                "Resources", std::vector<std::string>({"resource", "duplicate"}), resource_ops::handle_duplicate, true)
 
 GDA_TOOL_CLASS(GetResourceTypeTool, "get_resource_type",
@@ -80,6 +84,10 @@ GDA_TOOL_CLASS_SIDE(MoveResourceFileTool, "move_resource_file",
                "Move a file to another directory inside res:// while keeping its file name, through the same engine-aware transaction pipeline as rename_resource_file: the .uid sidecar travels with the file (.import sidecars migrate too), open scenes that equal the moved file or reference it are automatically saved before the rewrite and reloaded afterwards — their undo history resets — path= and uid= tokens in dependent .tscn/.tres files are rewritten, project.godot entries pointing at the old path (main_scene and autoload/*, preserving the leading * marker) are remapped and saved, cached resource paths and the edited scene file path migrate, and the editor file system is notified per rewritten file. Parameters: path (an existing res:// file or directory) and new_directory (destination directory inside res://, absolute like res://assets/sfx or relative like assets/sfx; trailing slashes are trimmed; user:// is rejected). When path is a directory, every file under it moves recursively preserving the sub-folder layout, *.uid files follow their owners, empty source folders are left behind, and an editor file system scan runs afterwards. Returns moved (array of {from, to, updated_files, uid_preserved}), failed (array of {from, error}), aggregated stale_references as {file, token} objects whose token names the literal leftover reference (script_class tokens require scan_editor_file_system to re-register renamed global classes; see note on each transaction), aggregated unsupported_binary_references ({file, reason} for binary resources such as .scn/.res/.csv/.translation that cannot be rewritten in place), aggregated saved_scenes and reloaded_scenes (scenes saved before each rewrite and reloaded afterwards) and import_sidecar_warnings (array present only when some .import sidecar move failed). Errors when the source does not exist, new_directory targets user://, or a directory move points into its own sub-folder.",
                "Resources", std::vector<std::string>({"resource", "move", "directory"}), resource_ops::handle_move, true, ::godot_autopilot::SideEffect::WritesFile)
 
+GDA_TOOL_CLASS_SIDE(CopyResourceFileTool, "copy_resource_file",
+               "Copy a file to dest_path inside res://. Both path (an existing res:// file) and dest_path are required; missing parent directories of dest_path are created recursively and an existing dest_path is overwritten. The copy is byte-for-byte: .import and .uid sidecars are not copied, imported assets need a reimport and a duplicated uid in the copied text resource may be reassigned by the editor scan. The editor file system is notified for dest_path and a scan runs afterwards. Returns result (copied), from and to. Use rename_resource_file/move_resource_file when you want to keep the file or remap references.",
+               "Resources", std::vector<std::string>({"resource", "copy", "file"}), resource_ops::handle_copy, true, ::godot_autopilot::SideEffect::WritesFile)
+
 GDA_TOOL_CLASS_SIDE(CreateDirectoryTool, "create_directory",
                "Create a directory inside the project, including any missing parent directories. path accepts a res:// absolute path (res://assets/audio) or a relative one (assets/audio); user:// is rejected. Idempotent: when the directory already exists the call succeeds and reports already_existed=true instead of failing. A newly created directory triggers an editor file system scan so subsequent resource operations see it immediately. Returns created (the normalized res:// path) and already_existed; errors when the directory cannot be created (invalid path or permission failure).",
                "Resources", std::vector<std::string>({"resource", "directory", "create"}), resource_ops::handle_create_directory, true, ::godot_autopilot::SideEffect::WritesFile)
@@ -110,8 +118,9 @@ GDA_TOOL_CLASS(GetResourcePropertyTool, "get_resource_property",
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(24);
+  v.reserve(26);
   v.push_back(std::make_unique<LoadResourceTool>());
+  v.push_back(std::make_unique<ReloadResourceTool>());
   v.push_back(std::make_unique<LoadResourceThreadedTool>());
   v.push_back(std::make_unique<GetResourceLoadThreadedStatusTool>());
   v.push_back(std::make_unique<GetResourceLoadThreadedTool>());
@@ -128,6 +137,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(std::make_unique<RemoveResourceFileTool>());
   v.push_back(std::make_unique<RenameResourceFileTool>());
   v.push_back(std::make_unique<MoveResourceFileTool>());
+  v.push_back(std::make_unique<CopyResourceFileTool>());
   v.push_back(std::make_unique<CreateDirectoryTool>());
   v.push_back(std::make_unique<GetResourceDependenciesTool>());
   v.push_back(std::make_unique<HasResourceDependencyTool>());

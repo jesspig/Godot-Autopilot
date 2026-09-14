@@ -148,18 +148,18 @@ Godot 使用 `Key` 枚举，大部分特殊键的码值以 `4194304`（`KEY_SPEC
 | Vector3i | `{x, y, z}` | `{"x":1,"y":2,"z":3}` |
 | Vector4 | `{x, y, z, w}` | `{"x":0,"y":0,"z":0,"w":1}` |
 | Color | `{r, g, b, a}` | `{"r":1.0,"g":0.5,"b":0.5,"a":1.0}` |
-| Rect2 | `{position, size}` | `{"position":{"x":0,"y":0},"size":{"w":100,"h":200}}` |
-| Rect2i | `{position, size}` | `{"position":{"x":0,"y":0},"size":{"w":100,"h":200}}` |
+| Rect2 | `{position, size}`，size 必需 `{w,h}`（或别名 `{x,y}`） | `{"position":{"x":0,"y":0},"size":{"w":100,"h":200}}`（position 可省略） |
+| Rect2i | `{position, size}`，size 必需 `{w,h}`（或别名 `{x,y}`） | `{"position":{"x":0,"y":0},"size":{"w":100,"h":200}}`（position 可省略） |
 | Plane | `{normal, d}` | `{"normal":{"x":0,"y":1,"z":0},"d":0}` |
 | Quaternion | `{x, y, z, w}` | `{"x":0,"y":0,"z":0,"w":1}` |
-| AABB | `{position, size}` | `{"position":{"x":0,"y":0,"z":0},"size":{"w":1,"h":2,"d":3}}` |
-| Transform2D | `{origin, x, y}` | `{"origin":{"x":0,"y":0},"x":{"x":1,"y":0},"y":{"x":0,"y":1}}` |
-| Transform3D | `{origin, basis}` | `{"origin":{"x":0,"y":0,"z":0},"basis":{"x":{"x":1,"y":0,"z":0},"y":...}}` |
+| AABB | `{position, size}`，size 必需 `{w,h,d}`（或别名 `{x,y,z}`） | `{"position":{"x":0,"y":0,"z":0},"size":{"w":1,"h":2,"d":3}}`（position 可省略） |
+| Transform2D | `{columns}` | `{"columns":[[1,0],[0,1],[100,200]]}` |
+| Transform3D | `{basis:{rows}, origin}`，origin 可省略 | `{"basis":{"rows":[[1,0,0],[0,1,0],[0,0,1]]},"origin":{"x":0,"y":0,"z":0}}` |
 | NodePath | string | `"Player/Camera"` |
-| Rid | number | `0` |
+| RID | 只读：读取为 `{"id": number}`；JSON 不能反向还原 RID，RID 参数请传工具返回的整数句柄 | `{"id":42}` |
 | Dictionary | object | `{"key":"value"}` |
 | Array | array | `[1, 2, 3]` |
-| PackedByteArray | string (base64) | `"SGVsbG8="` |
+| PackedByteArray | number array（非 base64 字符串） | `[72,101,108,108,111]` |
 | Color（无 alpha） | `{r, g, b}` | `{"r":1.0,"g":1.0,"b":1.0}` |
 
 ### 使用 type_hint
@@ -182,7 +182,7 @@ Godot 使用 `Key` 枚举，大部分特殊键的码值以 `4194304`（`KEY_SPEC
 - `Vector2`、`Vector3`、`Color`、`Rect2`、`Transform2D`、`Transform3D`
 - `int`、`float`、`bool`、`String`
 - `Dictionary`、`Array`、`PackedStringArray`
-- `NodePath`、`RID`
+- `NodePath`
 - 具体资源类名：`BoxMesh`、`Environment`、`CapsuleShape3D`
 
 ---

@@ -106,8 +106,10 @@ persisted and only affects processes started afterwards.
   button is NOT reported back, so never rely on the user's choice.
 - `get_display_mouse_position` - current pointer position in screen
   coordinates.
-- `warp_display_mouse` - move the pointer instantly to `x` / `y` screen
-  coordinates, e.g. before simulating a click with the input tools.
+- `warp_display_mouse` - move the pointer instantly to `x` / `y` in pixels
+  relative to the client area of the focused window - not the screen
+  coordinates reported by `get_display_mouse_position` - e.g. before
+  simulating a click with the input tools.
 - `set_display_mouse_mode` - cursor behavior: 0=visible, 1=hidden, 2=captured
   (pointer locked to the window, for FPS-style control), 3=confined,
   4=confined_hidden. Values outside 0-4 return an error.
@@ -121,7 +123,11 @@ persisted and only affects processes started afterwards.
 - `get_display_screen_dpi` / `get_display_screen_refresh_rate` - density and
   refresh rate; some platforms report 0 when the value is unavailable.
 - `capture_display_screen` - capture a whole physical display as a base64
-  PNG (`screen` index, default 0). This is different from
+  PNG (`screen` index, default 0). When this tool is invoked through
+  `call_tool`, the PNG is delivered as an MCP image content block and the
+  text JSON's `data` field is replaced with `<attached-as-image-content>`
+  plus image_attached: true; inside `batch_execute`/`code_execute` the JSON
+  keeps the full base64 string. This is different from
   `capture_editor_viewport` (editor viewport) and `capture_game_viewport`
   (running game).
 

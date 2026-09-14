@@ -19,7 +19,7 @@ Godot Editor
       ├── mcp-cpp-sdk: HTTP server (internal threads)
       ├── mcp-cpp-sdk: McpServer + Streamable HTTP
       ├── Command Queue (HTTP thread → Godot main thread bridge)
-      ├── ~343 MCP Tools across 23 categories (count varies by plugin version; see MCP search_tools)
+      ├── ~366 MCP Tools across 27 categories (count varies by plugin version; see MCP search_tools)
       ├── Inline Documentation (offline engine docs)
       └── Custom Log Dock (dedicated plugin output panel)
 ```
@@ -31,37 +31,41 @@ Godot Editor
 | **Transport** | Streamable HTTP (POST /mcp) | Standard MCP protocol, no bridge process |
 | **Thread Model** | Command queue + frame sync | Safe Godot main-thread-only API access |
 | **Port** | 9527 | Configurable via `GODOT_AUTOPILOT_PORT` env var |
-| **Discovery** | 3-Tier Progressive (Catalog→Inspect→Execute) | Keeps context small with ~343 tools (count varies by plugin version) |
+| **Discovery** | 3-Tier Progressive (Catalog→Inspect→Execute) | Keeps context small with ~366 tools (count varies by plugin version) |
 | **Search** | BM25 keyword | Tools organized by namespace + descriptions |
 | **Build** | CMake 3.28+ / C++17 | Cross-platform, auto-optimized builds |
 
 ## Features
 
-### 🎮 Full Engine Control (~343 Tools, count varies by plugin version; see MCP search_tools)
+### 🎮 Full Engine Control (~366 Tools, count varies by plugin version; see MCP search_tools)
 
 | Category | Tools | Description |
 |----------|:-----:|-------------|
 | **Render** | 49 | Canvas items, cameras, lights, meshes, viewports, materials |
 | **Physics** | 47 | 2D/3D ray casts, body creation, force application, joints |
+| **Resources** | 26 | Load, save, create, copy, reload and list resources |
 | **Display** | 24 | Window, viewport and screen properties |
-| **Editor** | 22 | Selection, undo/redo, scene save, plugin management |
-| **Resources** | 21 | Load, save, create, list resources |
+| **Editor** | 23 | Selection, undo/redo, scene save, plugin management |
 | **Audio** | 20 | Bus management, stream playback, effects |
 | **Input** | 19 | Key/mouse/gamepad simulation, action queries (includes InputMap) |
-| **OS** | 16 | Operating system, environment and clipboard access |
+| **OS** | 18 | Operating system, environment and clipboard access |
 | **Debug** | 16 | Performance monitors, profiling, diagnostics |
 | **Navigation** | 15 | Nav mesh, path queries, agents |
+| **Scene** | 14 | Node creation, deletion, scene tree inspection (e.g. `create_scene_node`) |
 | **Config** | 13 | Project settings, engine properties |
-| **Scene** | 12 | Node creation, deletion, scene tree inspection (e.g. `create_scene_node`) |
-| **Scripts** | 10 | Execute GDScript and C#, call methods on any node |
 | **Text** | 10 | String manipulation, parsing and formatting |
+| **Animation** | 10 | Animation players, tracks, mixers and playback |
+| **Scripts** | 10 | Execute GDScript and C#, call methods on any node |
+| **Game** | 9 | Game loop control and engine-wide state |
+| **Theme** | 8 | Theme resources, style boxes and font variations |
 | **TileMap** | 7 | Tile map creation, cell manipulation and queries |
-| **Debugger** | 7 | Debugger session control and inspection |
-| **Game** | 7 | Game loop control and engine-wide state |
+| **Debugger** | 6 | Debugger session control and inspection |
 | **Properties** | 5 | Get/set properties, list properties, signal connect (e.g. `property_set`) |
 | **Docs** | 4 | Query offline Godot API docs |
 | **Group** | 3 | Node group management and membership queries |
 | **SpriteFrames** | 3 | Sprite frame set creation and animation management |
+| **Analysis** | 3 | Scene file validation and project analysis helpers |
+| **Testing** | 2 | In-editor script test helpers |
 | **System** | 1 | Plugin-level system information |
 | **Capture** | 1 | Editor viewport screenshot |
 

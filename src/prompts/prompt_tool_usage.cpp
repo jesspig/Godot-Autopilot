@@ -677,7 +677,7 @@ std::string prompt_tool_usage() {
 ## 通用注意事项
 
 1. **所有节点路径**相对于当前场景根节点（如 `Player`、`UI/MainContainer/StartButton`）
-2. **属性值类型**：Vector2→`{x,y}`、Vector3→`{x,y,z}`、Color→`{r,g,b,a}`、Rect2→`{position:{x,y},size:{w,h}}`
+2. **属性值类型**：Vector2→`{x,y}`、Vector3→`{x,y,z}`、Color→`{r,g,b,a}`、Rect2→`{position:{x,y},size:{w,h}}`（size 也可用 `{x,y}` 别名，position 可省略；同一轴两种拼写并存且值不同会报错）
 3. **错误处理**：所有工具返回 `{"error": "消息"}` 表示失败
 4. **线程安全**：所有 Godot API 调用通过 CommandQueue 在主线程执行)gda";
 }

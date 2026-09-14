@@ -50,6 +50,7 @@ void fill_schema_editor_config(std::unordered_map<std::string, mcp::JsonValue>& 
             {"type", "string", "Godot class name of the root node to create, e.g. 'Node2D' or 'Node3D'; must be a Node subclass, defaults to 'Node'", false},
             {"name", "string", "Name of the new root node, defaults to 'NewRoot'", false},
             {"close_current", "boolean", "Close the current scene first if it has no unsaved changes (default: false; errors if the current scene is unsaved)", false},
+            {"timeout_ms", "integer", "Maximum time in milliseconds to wait for the editor to observe the new scene root after add_root_node (default: 2000, min: 50, max: 30000); on timeout the call errors with waited_ms, timeout_ms, node_released and editor_state diagnostics", false},
         });
         m["open_editor_scene"] = schema::build_schema({
             {"path", "string", "Path to the scene file to open, e.g. 'res://game.tscn'; errors when the current scene has unsaved changes", true},
@@ -84,7 +85,7 @@ void fill_schema_editor_config(std::unordered_map<std::string, mcp::JsonValue>& 
             {"fps", "integer", "Frame rate cap in frames per second; 0 disables the cap (uncapped)", true},
         });
         m["get_editor_settings"] = schema::build_schema({
-            {"name", "string", "Editor setting name, e.g. interface/theme/base_color; settings come from the editor's own preferences", true},
+            {"name", "string", "Editor setting name, e.g. interface/theme/base_color; settings come from the editor's own preferences. Alongside 'result' (the raw value, unchanged) the response carries the property list metadata: 'hint' (integer PropertyHint) plus 'hint_string' when non-empty; enum settings (hint 2) also include 'enum_options', an array of {'label', 'value'} entries that decodes bare integers such as run/window_placement/game_embed_mode", true},
         });
         m["set_editor_settings"] = schema::build_schema({
             {"name", "string", "Editor setting name to write, e.g. interface/theme/base_color", true},

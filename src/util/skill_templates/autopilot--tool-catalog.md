@@ -1,6 +1,6 @@
 # Category Index
 
-All 363 domain tools of the godot-autopilot MCP server, grouped by their 30 source modules. Call domain tools through `call_tool`; confirm schemas with `get_tool_detail`.
+All 366 domain tools of the godot-autopilot MCP server, grouped by their 30 source modules. Call domain tools through `call_tool`; confirm schemas with `get_tool_detail`.
 
 ## Analysis - analyze_tools (3)
 
@@ -46,7 +46,7 @@ All 363 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 
 ## Capture - capture_tools (1)
 
-- `capture_editor_viewport` - screenshot the editor viewport (or the running game with target=game) as base64 PNG
+- `capture_editor_viewport` - screenshot the editor viewport (or the running game with target=game) as base64 PNG; through `call_tool` the PNG is delivered as image content (`data` becomes `<attached-as-image-content>` with image_attached: true)
 
 ## Config - config_tools (13)
 
@@ -82,9 +82,10 @@ All 363 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `set_debug_navigation_visual` - toggle navigation geometry visualization
 - `set_debug_performance_visual` - toggle the performance overlay
 
-## Debugger - debugger_tools (5)
+## Debugger - debugger_tools (6)
 
 - `get_debugger_log` - read the editor engine log buffer (works without a running game)
+- `get_plugin_log` - read the plugin's own in-process log buffer (authorization denials, timeout diagnostics, dropped late game responses; supports `limit`, `level`, `category`, `filter` and `since_index`)
 - `get_debugger_errors` - read script errors captured from the running game
 - `get_debugger_output` - read game stdout/stderr over the runtime channel
 - `get_debugger_scene_tree` - read the running game's scene tree as text
@@ -97,7 +98,7 @@ All 363 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `show_display_dialog` - show a native modal dialog (user-visible side effect)
 - `get_display_mouse_position` - read the mouse cursor position in screen coordinates
 - `set_display_mouse_mode` - set cursor behavior (visible, captured, hidden)
-- `warp_display_mouse` - move the mouse cursor to a screen position
+- `warp_display_mouse` - move the mouse cursor to a position in the focused window's client area (not screen coordinates)
 - `capture_display_screen` - screenshot a physical screen as PNG
 - `get_display_screen_count` - count connected screens
 - `get_display_screen_dpi` - read a screen's DPI
@@ -343,9 +344,10 @@ All 363 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `set_render_instance_layer_mask` - set a rendering instance's camera layer mask
 - `find_render_node_from_rid` - validate an RID and find scene nodes using it
 
-## Resources - resource_tools (24)
+## Resources - resource_tools (26)
 
 - `load_resource` - load a resource file from disk into memory
+- `reload_resource` - force-reload a resource file from disk, replacing the editor's cached instance
 - `load_resource_threaded` - start an async background load (step 1 of the threaded chain)
 - `get_resource_load_threaded_status` - poll a threaded load's status (step 2)
 - `get_resource_load_threaded` - fetch a threaded load's result (step 3)
@@ -362,6 +364,7 @@ All 363 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `remove_resource_file` - delete a resource file (dry-run scan first, force to actually delete)
 - `rename_resource_file` - rename or move a file with automatic reference rewriting
 - `move_resource_file` - move a file to another res:// directory through the same transaction pipeline
+- `copy_resource_file` - copy a file to dest_path inside res:// (byte-for-byte; .import/.uid sidecars are not copied)
 - `create_directory` - create directories inside the project (res:// only)
 - `get_resource_dependencies` - list the external files a resource references
 - `has_resource_dependency` - check whether a resource depends on a specific file
@@ -447,7 +450,7 @@ All 363 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `create_tilemap` - create a TileMap node with a default TileSet of a given tile size
 - `create_tilemap_tileset` - create a TileSet resource in memory and register it as memory://name
 - `set_tilemap_cell` - set a single cell on a TileMap or TileMapLayer node
-- `set_tilemap_cells` - set up to 64 cells in one call (larger batches: use code_execute)
+- `set_tilemap_cells` - set multiple cells in one call; no fixed entry cap (larger batches: use code_execute); source_id -1 clears a cell
 
 ## TileMap - tileset_tools (3)
 

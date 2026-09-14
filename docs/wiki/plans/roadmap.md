@@ -6,12 +6,13 @@ tags:
   - 规划
   - 竞品对齐
   - 工具扩展
-timestamp: "2026-09-10T01:20:18+08:00"
+timestamp: "2026-09-13T21:47:51+08:00"
+resource: src/
 ---
 
 # 竞品对齐路线图
 
-> 记录 2026-08 功能分支 `feature/engine-aware-fs-and-tool-expansion` 的竞品对齐批次（P0/P1/P2 已交付，84 个 ctest 全绿），与后续 P3 方向。工具侧实现细节见 [工具注册表](../modules/tools_registry.md)，运行时协议见 [入口与运行时](../modules/entry_runtime.md)。
+> 记录 2026-08 功能分支 `feature/engine-aware-fs-and-tool-expansion` 的竞品对齐批次（P0/P1/P2 已交付；当前 ctest 共 135 项——L1 126 + L2 9，见 [测试体系](../tests.md)），与后续 P3 方向。工具侧实现细节见 [工具注册表](../modules/tools_registry.md)，运行时协议见 [入口与运行时](../modules/entry_runtime.md)。
 
 ## 竞品全景（一行定位速记）
 
@@ -29,7 +30,7 @@ timestamp: "2026-09-10T01:20:18+08:00"
 
 资源文件 CRUD 从"裸磁盘写"收编为引擎感知事务（`resource_ops.cpp`）：
 
-- **新增** `move_resource_file` / `create_directory`（Resources 类 22→24）：目录级递归移动保布局，`.uid` sidecar 随行
+- **新增** `move_resource_file` / `create_directory`（Resources 类 22→24；后续 09-13 批次增至 26）：目录级递归移动保布局，`.uid` sidecar 随行
 - **`remove_resource_file` 两段式**：默认 dry-run 返回影响预检；`force=true` 才删，优先 OS 回收站（trashed/permanent 标注）
 - **rename/move 补全 remap**：project.godot 的 main_scene/autoload 命中自动改写（保留 `*` 前缀），依赖 `.tscn/.tres` 内 path=/uid= token 重写，残留引用以结构化 `stale_references: {file, token}` 回传
 - **`write_file` 引擎感知化**：res:// 内写入自动判定 reimport/update_file 并附脚本写入诊断（布尔级）；user:// 维持裸写并标 `engine_managed:false`
@@ -39,13 +40,13 @@ timestamp: "2026-09-10T01:20:18+08:00"
 - **错误水印 doorbell**：所有 MCP 响应顶层附 `new_errors_since_last_call`（一次性消费）；编辑器侧计 error 结果、游戏侧计 runtime_error（`src/core/error_watermark.hpp`）
 - **undo 接入**：create/delete/rename/reparent 场景节点全走 `EditorUndoRedoManager`（响应带 `undoable` 字段）；`property_set` 可撤销（Object 型值降级 `undoable:false`）；`batch_execute` 新增 `rollback_on_error`（按 EditorUndoRedo version 差值整批撤销）
 - **readiness 门控**（`src/core/editor_readiness.{hpp,cpp}`）：导入/扫描进行中时 reimport 类调用返回 `retryable:true` 软错误（retry_after_ms=500），scan 幂等跳过
-- **`code_execute` timeout 钳制 30000ms**（此前 schema 声称上限但实现未钳制）
+- **`code_execute` timeout 上限 30000ms**（越界值直接报错而非静默接受；此前 schema 声称上限但实现未校验）
 - **BM25 中文检索**：分词器支持 CJK bigram（`src/util/bm25_index.cpp`），`search_tools` 中文查询可用
-- **`capture_editor_viewport` target='game' 接通**：委托 `runtime_ops::game_capture_blocking`，新增 `timeout_ms` 参数
+- **`capture_editor_viewport` target='game' 接通**：08-24 初始接通；09-13 下午改为非阻塞 pending 协议——返回 `{"__gda_pending": id, "timeout_ms": ...}`，由 `call_tool` 等待并经 `finalize_capture_response` 定型（阻塞式 `runtime_ops::game_capture_blocking` 已删除），`timeout_ms` 参数保留（默认 5000、钳制 30000）
 
 ## 已交付：P2 覆盖扩展
 
-领域工具 336→**363**（净 +27，类别 23→27）：
+领域工具 336→**363**（本批净 +27，类别 23→27；后续 09-13 批次新增至 366，见[工具注册表](../modules/tools_registry.md)）：
 
 - **Animation 域新设 10**：create_scene_animation_player / create_animation / remove_animation / get_animation_list / create_animation_track / insert_animation_keyframe / remove_animation_track / create_scene_animation_tree / add_animation_machine_state / connect_animation_states
 - **Theme 域新设 8**：create_theme_resource / set_theme_color / set_theme_constant / set_theme_font_size / set_theme_stylebox_flat / get_theme_info / apply_theme_to_control / set_control_anchor_preset
@@ -57,7 +58,7 @@ timestamp: "2026-09-10T01:20:18+08:00"
 
 ## 已交付：Agent Skills 生成
 
-- **skill_gen 一键生成 7 册 Agent Skills**（2026-09-08 交付，生成器 + UI 按钮 + 7 用例 L1）：写入项目根 `.agents/skills/`，覆盖写仅限自有 7 册命名空间
+- **skill_gen 一键生成 Agent Skills**（2026-09-08 交付首版 7 册，09-13 扩至 8 册；生成器 + UI 按钮 + 7 用例 L1）：写入项目根 `.agents/skills/`，覆盖写仅限自有命名空间
 
 ## 遗留：P3 待规划
 

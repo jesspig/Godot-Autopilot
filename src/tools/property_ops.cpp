@@ -14,12 +14,14 @@
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/core/error_macros.hpp>
+#include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/callable.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 #include <godot_cpp/variant/variant.hpp>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -245,6 +247,34 @@ struct NodePathValueConversion {
   std::string node_path;
 };
 
+std::string node_reference_expected_text() {
+  godot::Node *scene_root = find_edited_scene_root();
+  return "a valid path to a node inside the currently edited scene" +
+         (scene_root ? " (root \"" + util::to_std(scene_root->get_name()) +
+                           "\")"
+                     : " (no edited scene root)");
+}
+
+const char *const NODE_REFERENCE_ACTION_TEXT =
+    "pass a scene-resolvable node path such as \"Player/Camera2D\" or "
+    "\"..\", or use code_execute to assign a node reference directly "
+    "(e.g. get_node(\"Path/To/Node\"))";
+
+bool resolve_scene_node_reference(const std::string &node_path_str,
+                                  godot::Variant &out_value) {
+  godot::Node *scene_root = find_edited_scene_root();
+  if (!scene_root) {
+    return false;
+  }
+  godot::Node *target_node = scene_root->get_node_or_null(
+      godot::NodePath(godot::String(node_path_str.c_str())));
+  if (!target_node) {
+    return false;
+  }
+  out_value = godot::Variant(static_cast<godot::Object *>(target_node));
+  return true;
+}
+
 NodePathValueConversion
 convert_node_path_value(const godot::Dictionary &dict,
                         const std::string &prop_str,
@@ -252,45 +282,216 @@ convert_node_path_value(const godot::Dictionary &dict,
                         const mcp::JsonValue &raw_value) {
   NodePathValueConversion result;
   bool node_typed_prop = false;
-  if (!dict.is_empty() && dict.has("type") && dict.has("hint") &&
-      dict.has("hint_string")) {
+  if (!dict.is_empty() && dict.has("type") && dict.has("hint")) {
     int type_id = static_cast<int>(dict["type"]);
     int hint_val = static_cast<int>(dict["hint"]);
-    if (static_cast<godot::Variant::Type>(type_id) == godot::Variant::OBJECT &&
-        hint_val == godot::PROPERTY_HINT_RESOURCE_TYPE) {
-      std::string hint_str =
-          util::to_std(dict["hint_string"].operator godot::String());
-      node_typed_prop = is_node_class(parse_hint_class(hint_str));
+    if (static_cast<godot::Variant::Type>(type_id) == godot::Variant::OBJECT) {
+      if (hint_val == godot::PROPERTY_HINT_NODE_TYPE) {
+        node_typed_prop = true;
+      } else if (hint_val == godot::PROPERTY_HINT_RESOURCE_TYPE &&
+                 dict.has("hint_string")) {
+        std::string hint_str =
+            util::to_std(dict["hint_string"].operator godot::String());
+        node_typed_prop = is_node_class(parse_hint_class(hint_str));
+      }
     }
   }
   if (!node_typed_prop || !raw_value.IsString()) {
     return result;
   }
   std::string np_str = raw_value.GetString();
-  godot::Node *scene_root = find_edited_scene_root();
-  godot::Node *target_node = nullptr;
-  if (scene_root) {
-    target_node = scene_root->get_node_or_null(
-        godot::NodePath(godot::String(np_str.c_str())));
-  }
-  if (!target_node) {
+  if (!resolve_scene_node_reference(np_str, result.value)) {
     result.has_error = true;
     result.error = util::error_detail(
         "cannot assign node path '" + np_str + "' to node-typed property '" +
             prop_str + "' on " + path_str,
-        path_str,
-        "a valid path to a node inside the currently edited scene" +
-            (scene_root ? " (root \"" + util::to_std(scene_root->get_name()) +
-                              "\")"
-                        : " (no edited scene root)"),
-        "pass a scene-resolvable node path such as \"Player/Camera2D\" or "
-        "\"..\", or use code_execute to assign a node reference directly "
-        "(e.g. get_node(\"Path/To/Node\"))");
+        path_str, node_reference_expected_text(), NODE_REFERENCE_ACTION_TEXT);
     return result;
   }
   result.converted = true;
-  result.value = godot::Variant(static_cast<godot::Object *>(target_node));
   result.node_path = np_str;
+  return result;
+}
+
+struct ArrayValueConversion {
+  bool handled = false;
+  bool has_error = false;
+  mcp::JsonValue error;
+  godot::Variant value;
+};
+
+bool convert_array_element(const mcp::JsonValue &element,
+                           const util::ArrayElementHint *element_hint,
+                           std::size_t index,
+                           const std::string &prop_str,
+                           const std::string &path_str,
+                           godot::Variant &out_value,
+                           mcp::JsonValue &out_error) {
+  const std::string element_label = "element " + std::to_string(index) +
+                                    " of array property '" + prop_str +
+                                    "' on " + path_str;
+  if (element_hint == nullptr) {
+    if (element.IsArray() || element.IsObject()) {
+      out_error = util::error_detail(
+          "array element type cannot be determined; refusing to write " +
+              element_label,
+          path_str,
+          "an array whose element type is declared (Array[T] / [Export] T[])",
+          "declare the element type in the script or use code_execute to "
+          "build the array manually");
+      return false;
+    }
+    out_value = VariantJson::deserialize(element);
+    return true;
+  }
+
+  std::string element_class = parse_hint_class(element_hint->hint_string);
+  bool node_typed = element_hint->hint == godot::PROPERTY_HINT_NODE_TYPE ||
+                    is_node_class(element_class);
+  bool resource_typed =
+      !node_typed &&
+      (element_hint->hint == godot::PROPERTY_HINT_RESOURCE_TYPE ||
+       (element_hint->type == godot::Variant::OBJECT &&
+        !element_class.empty()));
+
+  if (element.IsNull()) {
+    out_value = godot::Variant();
+    return true;
+  }
+
+  if (node_typed) {
+    std::string np_str;
+    if (element.IsString()) {
+      np_str = element.GetString();
+    } else if (element.IsObject()) {
+      auto *ref = element.Find("__node_ref__");
+      if (ref && ref->IsString()) {
+        np_str = ref->GetString();
+      }
+    }
+    if (np_str.empty()) {
+      out_error = util::error_detail(
+          "cannot resolve node reference for " + element_label, path_str,
+          "a node path string or {\"__node_ref__\": \"...\"}",
+          NODE_REFERENCE_ACTION_TEXT);
+      return false;
+    }
+    if (!resolve_scene_node_reference(np_str, out_value)) {
+      out_error = util::error_detail(
+          "cannot assign node path '" + np_str + "' to " + element_label,
+          path_str, node_reference_expected_text(),
+          NODE_REFERENCE_ACTION_TEXT);
+      return false;
+    }
+    return true;
+  }
+
+  if (resource_typed) {
+    std::string resource_label =
+        element_class.empty() ? std::string("Resource") : element_class;
+    std::string resolve_error;
+    if (resource_ops::try_resolve_resource_value(element, out_value,
+                                                 resolve_error)) {
+      if (resolve_error.empty()) {
+        return true;
+      }
+      out_error = util::error_detail(
+          "cannot convert " + element_label + ": " + resolve_error, path_str,
+          "a " + resource_label + " resource reference",
+          "pass a res:// path string, {\"path\": \"res://...\"} or "
+          "{\"resource\": \"memory://...\"} (or null to clear the slot)");
+      return false;
+    }
+    out_error = util::error_detail(
+        "cannot convert " + element_label + " to a " + resource_label +
+            " resource reference",
+        path_str, "a res:// path string or a resource object",
+        "pass a res:// path string, {\"path\": \"res://...\"} or "
+        "{\"resource\": \"memory://...\"} (or null to clear the slot)");
+    return false;
+  }
+
+  out_value = VariantJson::deserialize(element);
+  return true;
+}
+
+ArrayValueConversion
+convert_array_value(const godot::Dictionary &dict, const std::string &prop_str,
+                    const std::string &path_str,
+                    const mcp::JsonValue &raw_value) {
+  ArrayValueConversion result;
+  if (dict.is_empty() || !dict.has("type")) {
+    return result;
+  }
+  if (static_cast<godot::Variant::Type>(static_cast<int>(dict["type"])) !=
+      godot::Variant::ARRAY) {
+    return result;
+  }
+  result.handled = true;
+  if (!raw_value.IsArray()) {
+    result.has_error = true;
+    result.error = util::error_detail(
+        "value for array property '" + prop_str + "' on " + path_str +
+            " is not a JSON array; refusing to write (a non-array value "
+            "would silently clear the array)",
+        path_str, "a JSON array",
+        "pass an array, e.g. [] to clear it explicitly, or a list of "
+        "convertible elements");
+    return result;
+  }
+
+  std::optional<util::ArrayElementHint> parsed =
+      util::parse_array_element_hint(dict);
+  const util::ArrayElementHint *element_hint =
+      (parsed.has_value() && parsed->known) ? &parsed.value() : nullptr;
+
+  godot::Array out_array;
+  const mcp::JsonValue::Array &elements = raw_value.GetArray();
+  for (std::size_t i = 0; i < elements.size(); i++) {
+    godot::Variant converted;
+    mcp::JsonValue element_error;
+    if (!convert_array_element(elements[i], element_hint, i, prop_str,
+                               path_str, converted, element_error)) {
+      result.has_error = true;
+      result.error = std::move(element_error);
+      return result;
+    }
+    out_array.append(converted);
+  }
+
+  if (element_hint != nullptr) {
+    godot::Variant::Type element_type = element_hint->type;
+    godot::StringName element_class_name;
+    std::string element_class_name_str;
+    if (element_hint->hint == godot::PROPERTY_HINT_RESOURCE_TYPE ||
+        element_hint->hint == godot::PROPERTY_HINT_NODE_TYPE) {
+      element_class_name_str = parse_hint_class(element_hint->hint_string);
+      if (!element_class_name_str.empty()) {
+        element_type = godot::Variant::OBJECT;
+        element_class_name = godot::StringName(element_class_name_str.c_str());
+      }
+    }
+    godot::Variant array_script;
+    godot::Array typed_array(out_array, element_type, element_class_name,
+                             array_script);
+    if (typed_array.size() != out_array.size()) {
+      result.has_error = true;
+      result.error = util::error_detail(
+          "cannot build typed array for property '" + prop_str + "' on " +
+              path_str +
+              ": one or more elements do not match the declared element type" +
+              (element_class_name_str.empty()
+                   ? ""
+                   : " '" + element_class_name_str + "'"),
+          path_str, "elements assignable to the declared array element type",
+          "pass elements matching the declared array element type, or use "
+          "code_execute to build the array manually");
+      return result;
+    }
+    out_array = typed_array;
+  }
+
+  result.value = godot::Variant(out_array);
   return result;
 }
 
@@ -346,6 +547,31 @@ void add_camera2d_serialization_note(mcp::JsonValue &result,
         "Camera2D current is not a registered property (no setter/getter). "
         "Cannot be set via property_set. "
         "Use code_execute: get_node(\"Path/To/Camera2D\").make_current()");
+  }
+}
+
+// 与 util::check_readback 的值类型近似比较清单保持同步。
+bool is_readback_value_type(godot::Variant::Type type) {
+  switch (type) {
+  case godot::Variant::VECTOR2:
+  case godot::Variant::VECTOR2I:
+  case godot::Variant::RECT2:
+  case godot::Variant::RECT2I:
+  case godot::Variant::VECTOR3:
+  case godot::Variant::VECTOR3I:
+  case godot::Variant::TRANSFORM2D:
+  case godot::Variant::VECTOR4:
+  case godot::Variant::VECTOR4I:
+  case godot::Variant::PLANE:
+  case godot::Variant::QUATERNION:
+  case godot::Variant::AABB:
+  case godot::Variant::BASIS:
+  case godot::Variant::TRANSFORM3D:
+  case godot::Variant::PROJECTION:
+  case godot::Variant::COLOR:
+    return true;
+  default:
+    return false;
   }
 }
 
@@ -452,18 +678,29 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
   std::string value_node_path;
   godot::Variant value;
   bool converted_node_path = false;
-  NodePathValueConversion node_path_conversion =
-      convert_node_path_value(dict, prop_str, path_str, *it_val);
-  if (node_path_conversion.has_error) {
-    return node_path_conversion.error;
+  ArrayValueConversion array_conversion =
+      convert_array_value(dict, prop_str, path_str, *it_val);
+  if (array_conversion.has_error) {
+    return array_conversion.error;
   }
-  if (node_path_conversion.converted) {
-    value = node_path_conversion.value;
-    converted_node_path = true;
-    value_node_path = node_path_conversion.node_path;
+  bool array_converted = array_conversion.handled;
+  if (array_converted) {
+    value = array_conversion.value;
+  }
+  if (!array_converted) {
+    NodePathValueConversion node_path_conversion =
+        convert_node_path_value(dict, prop_str, path_str, *it_val);
+    if (node_path_conversion.has_error) {
+      return node_path_conversion.error;
+    }
+    if (node_path_conversion.converted) {
+      value = node_path_conversion.value;
+      converted_node_path = true;
+      value_node_path = node_path_conversion.node_path;
+    }
   }
   bool resource_attached = false;
-  if (!converted_node_path) {
+  if (!array_converted && !converted_node_path) {
     std::string resource_error;
     if (resource_ops::try_resolve_resource_value(*it_val, value,
                                                  resource_error)) {
@@ -474,7 +711,7 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
       }
       resource_attached = true;
     } else {
-      value = VariantJson::deserialize(*it_val, type_hint);
+      value = VariantJson::deserialize_strict(*it_val, type_hint);
     }
   }
 
@@ -499,14 +736,27 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
   }
 
   std::string readback_detail;
+  bool type_sensitive = false;
+  if (dict.has("type")) {
+    auto prop_type = static_cast<godot::Variant::Type>(
+        static_cast<int>(dict["type"]));
+    type_sensitive = prop_type == godot::Variant::OBJECT ||
+                     prop_type == godot::Variant::ARRAY ||
+                     is_readback_value_type(prop_type);
+  }
   util::ReadbackStatus readback =
-      util::check_readback(value, old_val, new_val, readback_detail);
+      util::check_readback(value, old_val, new_val, readback_detail,
+                           type_sensitive);
   if (readback == util::ReadbackStatus::REJECTED) {
-    return util::error_detail("property rejected: '" + prop_str + "' on " +
-                                  path_str,
-                              path_str, "readback equals set value",
-                              "property may not exist, be read-only, or "
-                              "require a type hint; use property_get_list");
+    node->set(prop_name, old_val);
+    bool restored = node->get(prop_name) == old_val;
+    return util::error_detail(
+        "value not applied: '" + prop_str + "' on " + path_str, path_str,
+        "readback equals set value",
+        std::string("property rejected the assigned value (type mismatch or "
+                    "read-only); ") +
+            (restored ? "old value restored"
+                      : "old value could not be restored"));
   }
   if (readback == util::ReadbackStatus::CONVERTED) {
     r["warning"] = mcp::JsonValue("set applied; " + readback_detail);
@@ -561,6 +811,17 @@ mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {
 
   std::string path_str = it_path->GetString();
 
+  bool only_script_variables = false;
+  auto *it_only_script = args.Find("only_script_variables");
+  if (it_only_script && it_only_script->IsBool()) {
+    only_script_variables = it_only_script->GetBool();
+  }
+  std::string property_filter;
+  auto *it_filter = args.Find("property_filter");
+  if (it_filter && it_filter->IsString()) {
+    property_filter = it_filter->GetString();
+  }
+
   std::string hint;
   godot::Node *node =
       util::resolve_scene_node(path_str, find_edited_scene_root(), &hint);
@@ -575,11 +836,29 @@ mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {
 
   for (int64_t i = 0; i < props.size(); i++) {
     godot::Dictionary dict = props[i];
+
+    std::string name;
+    if (dict.has("name")) {
+      name = util::to_std(dict["name"].operator godot::String());
+    }
+    if (!property_filter.empty() &&
+        name.find(property_filter) == std::string::npos) {
+      continue;
+    }
+    if (only_script_variables) {
+      int64_t usage_val = 0;
+      if (dict.has("usage")) {
+        usage_val = static_cast<int64_t>(dict["usage"]);
+      }
+      if (!(usage_val & 4096)) {
+        continue;
+      }
+    }
+
     mcp::JsonValue item(mcp::JsonValue::object_tag);
 
     if (dict.has("name")) {
-      item["name"] =
-          mcp::JsonValue(util::to_std(dict["name"].operator godot::String()));
+      item["name"] = mcp::JsonValue(name);
     }
     if (dict.has("type")) {
       int type_id = static_cast<int>(dict["type"]);

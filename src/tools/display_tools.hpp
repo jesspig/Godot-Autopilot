@@ -25,7 +25,7 @@ GDA_TOOL_CLASS_SIDE(ShowDisplayDialogTool, "show_display_dialog",
                "Display", std::vector<std::string>({"display", "dialog"}), display_ops::handle_dialog_show, false, ::godot_autopilot::SideEffect::ShowsAlert)
 
 GDA_TOOL_CLASS(GetDisplayMousePositionTool, "get_display_mouse_position",
-               "Return the current mouse cursor position in screen coordinates. Use it to track where the pointer is before warping it with warp_display_mouse or simulating clicks with the input tools. Returns result as an object with integer x and y fields.",
+               "Return the current mouse cursor position in screen (desktop) coordinates — a different basis from warp_display_mouse and the mouse input tools, whose positions are relative to the client area of the focused window. Use it to read the pointer's real desktop position, not as a drop-in input to those tools. Returns result as an object with integer x and y fields.",
                "Display", std::vector<std::string>({"display", "mouse"}), display_ops::handle_mouse_get_position, false)
 
 GDA_TOOL_CLASS_SIDE(SetDisplayMouseModeTool, "set_display_mouse_mode",
@@ -33,7 +33,7 @@ GDA_TOOL_CLASS_SIDE(SetDisplayMouseModeTool, "set_display_mouse_mode",
                "Display", std::vector<std::string>({"display", "mouse"}), display_ops::handle_mouse_set_mode, false, ::godot_autopilot::SideEffect::ModifiesWindow)
 
 GDA_TOOL_CLASS_SIDE(WarpDisplayMouseTool, "warp_display_mouse",
-               "Move the mouse cursor instantly to the given position on the current display. Use it to place the pointer before simulating clicks with press_input_mouse_button. Takes integer x and y screen coordinates. Returns result 'ok'; behavior may vary slightly between platforms.",
+               "Move the mouse cursor instantly to the given position, in pixels relative to the client area of the focused window — the engine converts the position onto the desktop — not screen coordinates, and not the basis reported by get_display_mouse_position. Use it to place the pointer before simulating clicks with the input tools, e.g. warp_display_mouse to the target, then move_input_mouse and press_input_mouse_button at the same window-client coordinates. Takes integer x and y. Returns result 'ok'; behavior may vary slightly between platforms.",
                "Display", std::vector<std::string>({"display", "mouse"}), display_ops::handle_mouse_warp, false, ::godot_autopilot::SideEffect::ModifiesWindow)
 
 GDA_TOOL_CLASS(CaptureDisplayScreenTool, "capture_display_screen",

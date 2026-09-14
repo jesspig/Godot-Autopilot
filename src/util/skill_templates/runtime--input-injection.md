@@ -21,7 +21,10 @@ process — and there is no shared state between them:
 - To drive the game you must cross the debug channel:
   `queue_game_input`, `wait_game_input`, `sequence_game_inputs` or
   `execute_game_script`. To observe the game use `get_game_input_status`,
-  `get_game_status` or `capture_game_viewport`.
+  `get_game_status` or `capture_game_viewport` — through `call_tool` the
+  capture arrives as image content (its `data` field becomes
+  `"<attached-as-image-content>"` with image_attached: true), while inside
+  `batch_execute` / `code_execute` the JSON keeps the full base64.
 
 ## Where an injected event actually lands
 
@@ -194,7 +197,7 @@ Rules verified in engine source:
   `action`; `mode`: `event` (default), `api`, `hold` (event-style, held for
   `duration_ms`). Whitelist: `type`, `keycode`, `pressed`, `button_index`,
   `position`, `action`, `duration_ms`, `mode`, `timeout_ms`; anything else
-  is reported in `ignored_params` with a warning.
+  is rejected with an error.
 - `wait_game_input` — wait for `just_pressed` (default), `just_released` or
   `pressed` within a physics frame, `timeout_ms` default 2000 max 30000.
   `just_pressed`/`just_released` require `inject` — the transient window is
@@ -209,8 +212,9 @@ Rules verified in engine source:
   `max(at_frame) * 33 + 2000`, capped at 30000. Resolves with `completed`
   and `executed` counts; `completed: false` means timeout.
 - `get_game_input_status` — `pressed`, `just_pressed`, `just_released`,
-  `physics_frame`; includes `recent_engine_errors` (up to 5) when any
-  exist, often the reason input looks ignored.
+  `physics_frame`. Engine errors are never attached to this response; read
+  them with `get_debugger_errors` (running game) or `get_debugger_log`
+  (editor process) instead.
 
 ```json
 {"name": "sequence_game_inputs", "arguments": {"inputs": [
@@ -226,6 +230,37 @@ The `press_input_*` / `release_input_*` / `move_input_mouse` /
 `is_input_action_*` / `*_input_gamepad_vibration` tools operate on the
 editor process. They are for editor-UI automation (driving editor
 shortcuts, viewport navigation) — never for driving the game.
+
+### Mouse coordinates and the click paradigm
+
+Mouse positions passed to `move_input_mouse`, `press_input_mouse_button`
+and `release_input_mouse_button` are pixels relative to the **client
+area of the focused window** — the editor main window while it has
+focus, dock areas included — so `(0, 0)` is that window's top-left
+corner. This is not the screen/desktop basis returned by
+`get_display_mouse_position`, and it is not the viewport basis of the
+edited scene. `warp_display_mouse` takes coordinates on the same
+window-client basis (the engine converts them before moving the OS
+cursor), which is why the two families pair up: do not feed raw
+`get_display_mouse_position` values into either.
+
+To click an editor dock, button or tab:
+
+1. Work out the target's client-area pixel coordinates in the focused
+   (main) window — estimate them from the window size or read them off a
+   `capture_editor_viewport` screenshot.
+2. `warp_display_mouse` to those coordinates so the real pointer lands
+   on the control.
+3. `move_input_mouse` to the same coordinates (optional, but it keeps
+   the motion state fresh), then `press_input_mouse_button`.
+4. `release_input_mouse_button` at the same coordinates. Many controls
+   act on the press event itself — the engine's `TabBar`, for example,
+   switches tabs on press rather than release — so the release is often
+   optional, but issuing it keeps press and release paired and avoids
+   stale held state.
+
+These events reach the editor process only; a separately launched game
+never receives them (see "Two processes, one lesson" above).
 
 ## See also
 

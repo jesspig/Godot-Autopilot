@@ -1,0 +1,141 @@
+{
+  "name": "property_readback",
+  "description": "T09 补测：L1 无引擎、无法覆盖的成功路径在 L2 回读验证。覆盖 property_set 走 deserialize_strict 后的严格 JSON 形状：Rect2 需 size.w+size.h（或别名 size.x+size.y，同现冲突报错，position 可省略默认 0）；Transform2D 需 columns（>=3 个至少 2 元素的数组）。步骤：Rect2 文档形状成功 + region_rect 读回 size.x/size.y；别名形状成功 + 缺省 position 读回为 0；size 内 x 与 w 冲突报错（invalid Rect2: 'size.x' and 'size.w' conflict）；缺 size 负例由 L1 覆盖（VariantJsonStrictTest.Rect2MissingSizeMessage）；Transform2D 缺 columns 报错；create_scene_node 干净路径（applied_properties 精确为 [\"region_rect\"]，随后读回 position/size 证明属性已应用且无 warning 改写）；create_scene_node 严格错误路径（props 中 size 只给 w，error 报 invalid Rect2，随后 dispatch 包装）。错误断言为完整字符串精确匹配：错误消息经 dispatch 包装为 internal error in tool '<name>': <what> (args: <dump>)，args dump 来自 mcp::JsonValue（std::map 键按字母序、默认紧凑格式，超过 256 字节才截断），assert_engine 仅有 value 全等与 not_empty 语义、无 contains/字段缺席断言，故未显式断言 property_warnings 缺席，改以属性读回值证明干净路径。BadRect 节点残留断言跳过：scene_ops.cpp 的失败清理覆盖异常与 error 返回两条路径，严格校验抛异常时经 catch(std::exception)/catch(...) 执行 remove_child + memdelete 后原样重抛——异常路径会回收已 add_child 的节点；用例未断言节点残留（框架亦无数组包含/字段不存在断言能力）。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "before_all": [
+      {
+        "id": "new_scene",
+        "tool": "create_editor_scene",
+        "args": { "name": "Root" }
+      },
+      {
+        "id": "create_sprite_node",
+        "tool": "create_scene_node",
+        "args": { "name": "SpriteNode", "type": "Sprite2D", "parent_path": "Root" }
+      },
+      {
+        "id": "create_label_node",
+        "tool": "create_scene_node",
+        "args": { "name": "LabelNode", "type": "Label", "parent_path": "Root" }
+      }
+    ],
+    "stages": [
+      {
+        "id": "strict_shapes",
+        "steps": [
+          {
+            "id": "rect2_doc_shape_set",
+            "tool": "property_set",
+            "args": { "path": "SpriteNode", "property": "region_rect", "value": { "position": { "x": 0, "y": 0 }, "size": { "w": 1600, "h": 320 } } },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          },
+          {
+            "id": "rect2_doc_shape_readback",
+            "tool": "property_get",
+            "args": { "path": "SpriteNode", "property": "region_rect" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.size.x", "value": 1600 },
+                { "key": "result.size.y", "value": 320 }
+              ]
+            }
+          },
+          {
+            "id": "rect2_alias_shape_set",
+            "tool": "property_set",
+            "args": { "path": "SpriteNode", "property": "region_rect", "value": { "size": { "x": 64, "y": 32 } } },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          },
+          {
+            "id": "rect2_alias_shape_readback",
+            "tool": "property_get",
+            "args": { "path": "SpriteNode", "property": "region_rect" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.position.x", "value": 0 },
+                { "key": "result.position.y", "value": 0 },
+                { "key": "result.size.x", "value": 64 },
+                { "key": "result.size.y", "value": 32 }
+              ]
+            }
+          },
+          {
+            "id": "rect2_size_axis_conflict_error",
+            "tool": "property_set",
+            "args": { "path": "SpriteNode", "property": "region_rect", "value": { "size": { "w": 10, "h": 4, "x": 99 } } },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "internal error in tool 'property_set': invalid Rect2: 'size.x' and 'size.w' conflict, e.g. {\"position\":{\"x\":0,\"y\":0},\"size\":{\"w\":64,\"h\":32}} (args: {\"path\":\"SpriteNode\",\"property\":\"region_rect\",\"value\":{\"size\":{\"h\":4,\"w\":10,\"x\":99}}})" }
+              ]
+            }
+          },
+          {
+            "id": "transform2d_missing_columns_error",
+            "tool": "property_set",
+            "args": { "path": "SpriteNode", "property": "transform", "value": { "origin": { "x": 1, "y": 2 } } },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "internal error in tool 'property_set': invalid Transform2D: 'columns' must be an array of at least 3 arrays of at least 2 numbers, e.g. {\"columns\":[[1,0],[0,1],[x,y]]} (args: {\"path\":\"SpriteNode\",\"property\":\"transform\",\"value\":{\"origin\":{\"x\":1,\"y\":2}}})" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "create_node_properties",
+        "steps": [
+          {
+            "id": "create_sprite_with_region_rect",
+            "tool": "create_scene_node",
+            "args": { "name": "SpriteWithRect", "type": "Sprite2D", "parent_path": "Root", "properties": { "region_rect": { "position": { "x": 1, "y": 2 }, "size": { "w": 16, "h": 16 } } } },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.path", "value": "SpriteWithRect" },
+                { "key": "result.applied_properties", "value": ["region_rect"] },
+                { "key": "result.undo", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "readback_sprite_with_region_rect",
+            "tool": "property_get",
+            "args": { "path": "SpriteWithRect", "property": "region_rect" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.position.x", "value": 1 },
+                { "key": "result.position.y", "value": 2 },
+                { "key": "result.size.x", "value": 16 },
+                { "key": "result.size.y", "value": 16 }
+              ]
+            }
+          },
+          {
+            "id": "create_sprite_bad_rect_error",
+            "tool": "create_scene_node",
+            "args": { "name": "BadRect", "type": "Sprite2D", "parent_path": "Root", "properties": { "region_rect": { "size": { "w": 1 } } } },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "internal error in tool 'create_scene_node': invalid Rect2: 'size' must provide 'w' and 'h' (or 'x' and 'y'), e.g. {\"position\":{\"x\":0,\"y\":0},\"size\":{\"w\":64,\"h\":32}} (args: {\"name\":\"BadRect\",\"parent_path\":\"Root\",\"properties\":{\"region_rect\":{\"size\":{\"w\":1}}},\"type\":\"Sprite2D\"})" }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -154,6 +154,17 @@ yet) and, as a side effect, removes the built-in default animation - the
 response flags this. Always add named animations explicitly before adding
 frames.
 
+Passing the optional `default_animation` creates that animation immediately
+as an empty animation (engine-default fps and loop) and reports it in the
+response. This exists because an `AnimatedSprite2D` whose `animation`
+property matches no animation falls back to the first entry of the
+animation list - HashMap iteration order, so the editor preview can land on
+an arbitrary animation (e.g. a jump animation). Pass `default_animation`
+with the name the node already expects (the built-in node default is
+`default`) so a node that never sets `animation` has a deterministic first
+animation in the editor. Runtime playback still needs an explicit `play()`
+call or `animation` set on the node.
+
 ```json
 {"name": "add_spriteframes_animation", "arguments": {"name": "hero_frames", "animation": "walk", "fps": 8, "loop": true}}
 ```

@@ -1,31 +1,35 @@
 # Log, Error and Debug Protocol Paths
 
-The three paths the engine talks through — editor log buffer, debugger
-session transport, on-disk game log — and the protocol facts that explain
-the strange cases: missing early errors, silent message loss and breakpoint
-behavior. All engine facts here are verified against engine source.
+The log and error paths available to the autopilot — editor log buffer,
+debugger session transport, on-disk game log and the plugin's own in-process
+LogSystem buffer — and the protocol facts that explain the strange cases:
+missing early errors, silent message loss and breakpoint behavior. All engine
+facts here are verified against engine source.
 
-## Three log and error paths
+## Four log and error paths
 
 | Path | Tools | Source | Needs a running game |
 |---|---|---|---|
 | Editor engine log | `get_debugger_log` | engine log buffer of the editor process: script errors and messages routed through the engine logger | no — always contains data |
-| Debugger session capture | `get_debugger_errors`, `get_debugger_output`, `get_debugger_scene_tree` | with an active debug session: the running game over the runtime channel; without one: editor-process captured errors/output or the last editor-captured tree | live game data needs a session |
+| Debugger session capture | `get_debugger_errors`, `get_debugger_output`, `get_debugger_scene_tree` | with an active debug session: the running game over the runtime channel; without one: an empty result plus a `note` — no editor-side fallback | live game data needs a session |
 | On-disk game log | `get_game_log_entries` | tail window of the game process log file `user://logs/godot.log` | the log file must exist — start the game once with `play_editor_current_scene` |
+| Plugin LogSystem | `get_plugin_log` | the plugin's own in-process diagnostic buffer (authorization denials, timeout bookkeeping, dropped late game responses) — not routed through any engine logger | no — always available |
 
 Details that matter:
 
 - `get_debugger_log` takes an optional `limit` (default 50) and never
   requires a running game — read it first for script errors.
-- `get_debugger_errors` (optional `limit`, default 20) returns a formatted
-  text dump with time, file, line, error text and stack per error.
+- `get_debugger_errors` (optional `limit`, default 20) returns, with an
+  active session, a structured list under `result` (`time`, `file`, `func`,
+  `line`, `error`, `descr`, is_warning, `stack` per entry).
 - `get_debugger_output` reads stdout/stderr captured from the game process
   (optional `limit`, default 50).
 - `get_debugger_scene_tree` returns the running game's scene tree as a
-  formatted text tree; it takes no parameters.
-- When a debugger capture tool has nothing to return (no session and
-  nothing captured), it returns an empty result plus a `note` field that
-  suggests starting the game with `play_editor_current_scene` or reading
+  formatted text tree; it takes no parameters. Without a session it returns
+  an empty result plus a `note` like the other session-capture tools.
+- When the session-capture tools have nothing to return (no active
+  session), they return an empty result plus a `note` field that suggests
+  starting the game with `play_editor_current_scene` or reading
   `get_game_log_entries` instead.
 - `get_game_log_entries` reads the on-disk log tail (optional `limit`,
   default 50, max 500) and returns `path`, `entries` and `total_lines`. It
@@ -33,6 +37,15 @@ Details that matter:
   to the archived `godot.log.1` and reports `from_archive` with a warning;
   if the file does not exist the error includes directory diagnostics and a
   hint to start the game with `play_editor_current_scene`.
+- `get_plugin_log` reads the plugin's own in-process LogSystem buffer
+  (optional `limit`, default 100, max 1000) and needs no running game. Filter
+  with `level` (debug, info, warning or error; the default debug applies no
+  filtering), `category` (system, transport, tools, resources or prompts) and
+  `filter` (case-insensitive substring on the message). For an incremental
+  read pass `since_index` (start with 0, then the returned next_index); the
+  result carries the entries array with a count and next_index. This is a
+  different source from `get_debugger_log`, which reads the editor-process
+  engine log buffer.
 
 Check `get_debugger_session_info` (`active`, `breaked`, `running`, session
 count) before trusting the session-capture path.
@@ -137,6 +150,23 @@ hints (10 in total, e.g. `frames` to `sprite_frames`, `cast_to` to
 `target_position`, `translation` to `position`). Check the hints before
 assuming a real bug — a stale pre-migration property name is a common
 cause.
+
+## Degradation paths when the runtime channel fails
+
+When the game process stops answering, the tools that depend on the
+runtime channel lose their only observation and control path. On a channel
+failure reported directly by the tool (unreachable debug session, send
+failure), `capture_game_viewport` and the input-injection tools add a
+`hint` field to the `error` response with a one-line summary of the
+fallbacks below — prefer these over OS-level screen capture or synthetic
+keyboard input:
+
+| Failing tool(s) | Degradation path |
+|---|---|
+| `capture_game_viewport` | `capture_display_screen` captures a whole physical screen and needs no running game; `capture_editor_viewport` with the default `editor` target grabs the editor viewport. Its `game` target needs the same runtime channel, so it fails the same way. |
+| `get_debugger_errors`, `get_debugger_output` | `get_game_log_entries` reads the on-disk log tail (`user://logs/godot.log`); the log file must exist, so the game must have started at least once. |
+| `queue_game_input`, `wait_game_input`, `get_game_input_status`, `sequence_game_inputs` | No GDA substitute: injected input can only travel over the runtime channel, and the editor process never sees the game's `Input` state. Drive the game from inside instead — an in-game test script created with `create_script` and attached to a node with `attach_script_to_node` simulates input and checks results in the game process itself. |
+| plugin-side timeout details | `get_plugin_log` records the plugin's own timeout bookkeeping for the channel. |
 
 ## Standard error shapes
 

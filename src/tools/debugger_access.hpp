@@ -10,7 +10,8 @@ namespace godot_autopilot {
 bool debugger_capture_initialized();
 
 bool debugger_broadcast_request(const std::string &payload,
-                                int32_t *out_first_session_id);
+                                int32_t *out_first_session_id,
+                                int32_t *out_session_count = nullptr);
 
 void debugger_send_cancel(int32_t session_id, int64_t request_id);
 
