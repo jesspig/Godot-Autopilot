@@ -138,7 +138,9 @@
                 { "key": "result.name", "value": "Root" },
                 { "key": "result.type", "value": "Node" },
                 { "key": "result.path", "value": "Root" },
-                { "key": "result.children", "not_empty": true }
+                { "key": "result.children", "not_empty": true },
+                { "key": "result.properties", "not_empty": true },
+                { "key": "result.properties.name", "value": "Root" }
               ]
             }
           },
