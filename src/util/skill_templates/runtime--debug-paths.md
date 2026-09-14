@@ -32,11 +32,14 @@ Details that matter:
   starting the game with `play_editor_current_scene` or reading
   `get_game_log_entries` instead.
 - `get_game_log_entries` reads the on-disk log tail (optional `limit`,
-  default 50, max 500) and returns `path`, `entries` and `total_lines`. It
-  works without a debug session. If the file cannot be opened it falls back
-  to the archived `godot.log.1` and reports `from_archive` with a warning;
-  if the file does not exist the error includes directory diagnostics and a
-  hint to start the game with `play_editor_current_scene`.
+  default 50, max 500) and returns `path`, `entries` and `total_lines`. An
+  optional case-sensitive substring filter narrows the tail to matching
+  lines: the scan then covers the last 2000 lines and the result adds
+  matched_lines with the total matches found. It works without a debug
+  session. If the file cannot be opened it falls back to the archived
+  `godot.log.1` and reports `from_archive` with a warning; if the file does
+  not exist the error includes directory diagnostics and a hint to start
+  the game with `play_editor_current_scene`.
 - `get_plugin_log` reads the plugin's own in-process LogSystem buffer
   (optional `limit`, default 100, max 1000) and needs no running game. Filter
   with `level` (debug, info, warning or error; the default debug applies no

@@ -16,7 +16,7 @@ parameters; the other tools accept only the parameters named here.
 | `get_game_status` | Query the running game (`timeout_ms`); a half-dead process is stopped and restarted, not debugged. |
 | `get_debugger_errors` | Read script errors from the running game as a structured list (`limit`, default 20); empty without an active debug session. |
 | `get_debugger_output` | Read stdout/stderr captured from the running game over the runtime channel (`limit`, default 50). |
-| `get_game_log_entries` | Read the tail of the on-disk game log (`limit`, default 50, max 500); works without a debug session. |
+| `get_game_log_entries` | Read the tail of the on-disk game log (`limit`, default 50, max 500); works without a debug session. An optional case-sensitive substring filter keeps matching lines from the last 2000 and reports the match count. |
 | `property_get` | Read one node property (`path`, `property`); the read-back check after any property write. |
 | `property_get_list` | List a node's properties with metadata (`path`, plus optional `only_script_variables`, `property_filter`); discover the exact C# `[Export]` field names before reading or writing them. |
 | `property_set` | Set a node property (`path`, `property`, `value`, optional `type_hint`); converts node paths for C# `[Export]` references, errors "value not applied" and attempts to restore the old value when the engine rejects the assignment. |

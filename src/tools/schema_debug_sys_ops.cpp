@@ -77,6 +77,7 @@ void fill_schema_debug_sys(std::unordered_map<std::string, mcp::JsonValue>& m) {
 
         m["get_game_log_entries"] = schema::build_schema({
             {"limit", "integer", "Maximum number of tail log entries to return (default: 50, max: 500); the result also includes path (log file path) and total_lines (full file line count). The log is written by the running game process — start the game first with play_editor_current_scene", false},
+            {"filter", "string", "Optional case-sensitive substring; when set, the scan widens to the last 2000 log lines and only matching lines are returned (newest ones when limit caps them), with matched_lines reporting the total matches in that scan window. Empty string behaves as no filter", false},
         });
 
         m["print_debug_log"] = schema::build_schema({
@@ -168,7 +169,7 @@ void fill_schema_debug_sys(std::unordered_map<std::string, mcp::JsonValue>& m) {
         });
 
         m["batch_execute"] = schema::build_schema({
-            {"operations", "array", "Ordered list of operations to execute", true},
+            {"operations", "array", "Ordered list of operations {'tool': string, 'args': object}; each result carries status 'ok'/'error'/'pending', where 'pending' means an async game tool whose request was sent but is not awaited by batch_execute (call such tools via call_tool to receive the response; batch_execute discards the pending record and the game-side reply is reported as a late response). Response fields: 'total' = executed operations (succeeded+failed+pending), 'pending' = async count, 'skipped' = operations not run due to stop_on_error", true},
             {"stop_on_error", "boolean", "Stop on first error (default: true)", false},
             {"rollback_on_error", "boolean", "With stop_on_error=true, after a failure undo every editor action this batch committed (via the global undo history) before returning; response gains rolled_back and rollback_partial (default: false)", false},
         });
