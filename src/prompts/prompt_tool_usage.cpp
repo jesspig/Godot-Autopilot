@@ -555,6 +555,7 @@ std::string prompt_tool_usage() {
 - `stop_on_error` 默认为 true
 - 操作顺序执行，不是并行
 - 失败的操作用 `args` 字段提供错误信息
+- 异步 game 工具在 batch 中以 `status: "pending"` 返回（请求已发送但 batch 不等待其响应；该记录会被丢弃，游戏侧响应到达时记为 late response），需要结果时请改用 `call_tool` 逐条调用；响应新增 `pending` 计数，`total` = succeeded + failed + pending
 
 ---
 

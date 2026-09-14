@@ -4,6 +4,7 @@
 #include "core/log_system.hpp"
 #include "gda_protocol.hpp"
 #include "tools/authorization.hpp"
+#include "tools/capture_ops.hpp"
 #include "tools/tool_base.hpp"
 #include "util/error_util.hpp"
 #include <cstdio>
@@ -322,6 +323,8 @@ JV op_capture(int64_t request_id) {
                         std::to_string(static_cast<int>(save_err)) + ") at " +
                         path);
   }
+  capture_ops::prune_capture_files(godot::OS::get_singleton()->get_cache_dir(),
+                                   20);
   JV r(JV::object_tag);
   r["path"] = JV(path);
   r["width"] = JV(static_cast<int64_t>(image->get_width()));

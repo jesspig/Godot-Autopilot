@@ -51,7 +51,8 @@ Example calls:
 ```
 
 `property_set` and `create_scene_node` (`properties` object) accept these
-shapes through the same conversion chain.
+shapes through the same conversion chain; set_resource_property uses the same
+strict conversion for resource fields.
 
 ## Array properties
 
@@ -69,6 +70,8 @@ Failure rules — these return an error instead of a silent write:
 
 - A non-array value assigned to an array property (it used to clear the array
   silently; pass `[]` to clear explicitly).
+- A JSON array assigned to a Vector2 or Vector2i property (arrays used to be
+  written as (0, 0) silently; pass the object form {"x": 1, "y": 2} instead).
 - An element of an array whose element type cannot be determined at all (an
   untyped `Array` holding object or array elements), or an element shape the
   tool cannot safely express for the declared element type.

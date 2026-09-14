@@ -8,6 +8,7 @@ void fill_schema_render_audio(std::unordered_map<std::string, mcp::JsonValue>& m
         m["capture_editor_viewport"] = schema::build_schema({
             {"target", "string", "Target to capture: 'editor' (default) grabs the editor 2D viewport with a fallback to the 3D viewport; 'game' captures the running game's root window over the runtime channel — requires a game launched from the editor whose project loads the godot-autopilot extension", false},
             {"timeout_ms", "integer", "Response timeout in milliseconds for target='game' (default: 5000, max: 30000); ignored for target='editor'", false},
+            {"save", "boolean", "Editor target only: when true the PNG is also written to user://godot_autopilot/captures/ and the result gains path; the captures folder keeps the 20 most recent files (default: false)", false},
         });
 
         m["create_render_canvas_item"] = schema::build_schema({});

@@ -12,7 +12,7 @@ resource: src/
 
 # 竞品对齐路线图
 
-> 记录 2026-08 功能分支 `feature/engine-aware-fs-and-tool-expansion` 的竞品对齐批次（P0/P1/P2 已交付；当前 ctest 共 135 项——L1 126 + L2 9，见 [测试体系](../tests.md)），与后续 P3 方向。工具侧实现细节见 [工具注册表](../modules/tools_registry.md)，运行时协议见 [入口与运行时](../modules/entry_runtime.md)。
+> 记录 2026-08 功能分支 `feature/engine-aware-fs-and-tool-expansion` 的竞品对齐批次（P0/P1/P2 已交付；当前 ctest 共 149 项——L1 140 + L2 9，见 [测试体系](../tests.md)），与后续 P3 方向。工具侧实现细节见 [工具注册表](../modules/tools_registry.md)，运行时协议见 [入口与运行时](../modules/entry_runtime.md)。
 
 ## 竞品全景（一行定位速记）
 

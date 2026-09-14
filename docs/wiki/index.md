@@ -25,7 +25,7 @@
 
 - 工具注册总入口 `ToolRegistry`（单一来源）：**374 条目** = 366 域工具 + `system_status` + 7 元工具；域工具分 **27 类**（InputMap 并入 Input）；MCP 可达工具总数 **373** = 7 元 + 366 域
 - schema：非空/空数以运行时统计为准；**3 个契约缺口**（create_scene_node、get_resource_extensions、reimport_resource_files）
-- 遍历排除 **49 个副作用工具**（域 366 个中解析器仅按 `GDA_TOOL_CLASS(` 枚举 317 个，`GDA_TOOL_CLASS_SIDE` 49 个不进入枚举，side_effect 字段兜底判定保留）；L1 单元测试 **126 个 gtest**；L2 引擎用例 **9 个文件**（00_meta/01_scene/02_property/03_tools_contract/04_resources_scripts/05_rename_references/06_move_references/07_scene_tabs/08_property_readback）；当前 ctest 注册点为 **135**（126 L1 + 9 L2，L2 需引擎环境与 `GODOT_AUTOPILOT_ALLOW`）
+- 遍历排除 **49 个副作用工具**（域 366 个中解析器仅按 `GDA_TOOL_CLASS(` 枚举 317 个，`GDA_TOOL_CLASS_SIDE` 49 个不进入枚举，side_effect 字段兜底判定保留）；L1 单元测试 **140 个 gtest**；L2 引擎用例 **9 个文件**（00_meta/01_scene/02_property/03_tools_contract/04_resources_scripts/05_rename_references/06_move_references/07_scene_tabs/08_property_readback）；当前 ctest 注册点为 **149**（140 L1 + 9 L2，L2 需引擎环境与 `GODOT_AUTOPILOT_ALLOW`）
 - 工具命名规范：`<动词>_<类别>_<维度>_<对象>_<修饰>`（动词置首，如 create_scene_node、intersect_physics_2d_ray）
 - MCP 端口 **9527**（`/mcp`），`GODOT_AUTOPILOT_PORT` 可覆盖；产物名 `godot-autopilot`
 

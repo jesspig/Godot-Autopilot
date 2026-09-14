@@ -6,13 +6,13 @@ tags:
   - 模块
   - 核心层
   - 线程模型
-timestamp: "2026-09-13T21:48:42+08:00"
+timestamp: "2026-09-14T20:49:22+08:00"
 resource: src/core/
 ---
 
 # 核心模块（src/core/）
 
-> 审计日期：2026-09-13（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-13 上午随资源 path 加载注册进 ResourceRegistry 同步；09-13 下午随收口批次同步 PluginConfig allow 键、授权门与 call_tool MCP 线程例外；09-13 17:50 随 B 组知识库审计同步——补正主线程排空点行号、移除已删除的 architecture.md 对照行；09-13 晚随 0.2.4 版知识库全量审计同步——补正 query_recent/query_from 消费方注释、SCENE/EDITOR 两级初始化描述、GDA_FORCE_HEADLESS 语义与 editor_readiness 消费方），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 审计日期：2026-09-13（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-13 上午随资源 path 加载注册进 ResourceRegistry 同步；09-13 下午随收口批次同步 PluginConfig allow 键、授权门与 call_tool MCP 线程例外；09-13 17:50 随 B 组知识库审计同步——补正主线程排空点行号、移除已删除的 architecture.md 对照行；09-13 晚随 0.2.4 版知识库全量审计同步——补正 query_recent/query_from 消费方注释、SCENE/EDITOR 两级初始化描述、GDA_FORCE_HEADLESS 语义与 editor_readiness 消费方；09-14 随修复批次同步——PluginConfig 消费方增列 Allow game_runtime 复选框），基于当前工作树代码逐行核对（不依赖 git 历史）。
 > 覆盖范围：`src/core/` 下 8 cpp + 12 头共 20 文件（`CommandQueue` 与 `error_watermark` 为 header-only，`version.hpp.in` 为模板，实际 11 业务组 + 版本）。注意：`CommandQueue` 为 header-only（仅 `command_queue.hpp`，无对应 `.cpp`），`error_watermark.hpp` 同为 header-only，`version.hpp.in` 经 `configure_file` 生成 `version.hpp`。
 
 ## 模块简介
@@ -125,7 +125,7 @@ resource: src/core/
 - `std::string load_allow()` — 读 `allow` 键（逗号分隔能力列表）；文件不存在/解析失败/非字符串时返回空串
 - `bool save_allow(const std::string &allow)` — 写回 `{"allow": string}`（同经 `save_config_value` 合并写回）
 - **AllowProvider 桥接（09-13 下午起）**：`plugin_config.cpp` 的静态对象在构造时调用 `authorization::set_allow_provider(&PluginConfig::load_allow)`，使 `capability_enabled` 在无 `GODOT_AUTOPILOT_ALLOW` 环境变量时改读配置——每次调用实时读取，故配置改动下一次工具调用即生效
-- 消费方：`ServerContext::resolve_port()`（启动时 `load_port`）、`McpConfigDock::_on_apply_port()`（Apply 成功后 `save_port`）与 "Allow code_execute" 复选框（`load_allow`/`save_allow`）、`McpLogDock` 时间前缀开关（`load_show_time`/`save_show_time`，配置面板持久化）、`authorization`（能力门的 AllowProvider）
+- 消费方：`ServerContext::resolve_port()`（启动时 `load_port`）、`McpConfigDock::_on_apply_port()`（Apply 成功后 `save_port`）与 "Allow code_execute" / "Allow game_runtime" 复选框（`load_allow`/`save_allow`）、`McpLogDock` 时间前缀开关（`load_show_time`/`save_show_time`，配置面板持久化）、`authorization`（能力门的 AllowProvider）
 
 ## 线程模型
 

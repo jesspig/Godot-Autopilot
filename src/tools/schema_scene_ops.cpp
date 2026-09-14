@@ -9,7 +9,7 @@ void fill_schema_scene(std::unordered_map<std::string, mcp::JsonValue>& m) {
             {"parent_path", "string", "Parent node path in the edited scene (e.g. 'Player' or 'Player/Weapon'); omit only while the scene has no root — required once the scene already has a root", false},
             {"name", "string", "Node name (string, default: NewNode)", true},
             {"type", "string", "Node class type (string, default: Node). Must be a Node subclass, e.g. Node2D, Sprite2D — other classes error", true},
-            {"properties", "object", "Optional map of property names to values applied right after creation via the same conversion chain as property_set (object, e.g. {\"visible\": false, \"position\": [10, 20]}); any failing property frees the new node and reports the failing name", false},
+            {"properties", "object", "Optional map of property names to values applied right after creation via the same conversion chain as property_set (object, e.g. {\"visible\": false, \"position\": {\"x\": 10, \"y\": 20}}); any failing property frees the new node and reports the failing name", false},
         });
         m["delete_scene_node"] = schema::build_schema({
             {"path", "string", "Node path in the edited scene (e.g. 'Enemies/Enemy1'); the scene root cannot be deleted", true},

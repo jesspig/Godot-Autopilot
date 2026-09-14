@@ -679,6 +679,27 @@ godot::Variant deserialize_rect2_strict(const mcp::JsonValue &j,
       godot::Vector2(as_double(*sx_j), as_double(*sy_j))));
 }
 
+godot::Variant deserialize_vector2_strict(const mcp::JsonValue &j,
+                                          bool int_semantics) {
+  const char *type_name = int_semantics ? "Vector2i" : "Vector2";
+  const char *example = "{\"x\":0,\"y\":0}";
+  if (!j.IsObject())
+    throw std::runtime_error(std::string("invalid ") + type_name +
+                             ": expected a JSON object, e.g. " + example);
+  if (!j.Find("x") || !j.Find("y"))
+    throw std::runtime_error(std::string("invalid ") + type_name +
+                             ": 'x' and 'y' are required numbers, e.g. " +
+                             example);
+  const mcp::JsonValue *x_j =
+      strict_number_field(j, "x", "x", type_name, example);
+  const mcp::JsonValue *y_j =
+      strict_number_field(j, "y", "y", type_name, example);
+  if (int_semantics) {
+    return godot::Variant(godot::Vector2i(as_int64(*x_j), as_int64(*y_j)));
+  }
+  return godot::Variant(godot::Vector2(as_double(*x_j), as_double(*y_j)));
+}
+
 godot::Variant deserialize_aabb_strict(const mcp::JsonValue &j) {
   const char *example =
       "{\"position\":{\"x\":0,\"y\":0,\"z\":0},\"size\":{\"w\":64,\"h\":32,"
@@ -805,6 +826,10 @@ godot::Variant deserialize_transform3d_strict(const mcp::JsonValue &j) {
 godot::Variant deserialize_typed_strict(const mcp::JsonValue &j,
                                         godot::Variant::Type type) {
   switch (type) {
+  case godot::Variant::VECTOR2:
+    return deserialize_vector2_strict(j, false);
+  case godot::Variant::VECTOR2I:
+    return deserialize_vector2_strict(j, true);
   case godot::Variant::RECT2:
     return deserialize_rect2_strict(j, false);
   case godot::Variant::RECT2I:

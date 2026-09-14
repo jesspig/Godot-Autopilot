@@ -1,6 +1,6 @@
 {
   "name": "property_readback",
-  "description": "T09 补测：L1 无引擎、无法覆盖的成功路径在 L2 回读验证。覆盖 property_set 走 deserialize_strict 后的严格 JSON 形状：Rect2 需 size.w+size.h（或别名 size.x+size.y，同现冲突报错，position 可省略默认 0）；Transform2D 需 columns（>=3 个至少 2 元素的数组）。步骤：Rect2 文档形状成功 + region_rect 读回 size.x/size.y；别名形状成功 + 缺省 position 读回为 0；size 内 x 与 w 冲突报错（invalid Rect2: 'size.x' and 'size.w' conflict）；缺 size 负例由 L1 覆盖（VariantJsonStrictTest.Rect2MissingSizeMessage）；Transform2D 缺 columns 报错；create_scene_node 干净路径（applied_properties 精确为 [\"region_rect\"]，随后读回 position/size 证明属性已应用且无 warning 改写）；create_scene_node 严格错误路径（props 中 size 只给 w，error 报 invalid Rect2，随后 dispatch 包装）。错误断言为完整字符串精确匹配：错误消息经 dispatch 包装为 internal error in tool '<name>': <what> (args: <dump>)，args dump 来自 mcp::JsonValue（std::map 键按字母序、默认紧凑格式，超过 256 字节才截断），assert_engine 仅有 value 全等与 not_empty 语义、无 contains/字段缺席断言，故未显式断言 property_warnings 缺席，改以属性读回值证明干净路径。BadRect 节点残留断言跳过：scene_ops.cpp 的失败清理覆盖异常与 error 返回两条路径，严格校验抛异常时经 catch(std::exception)/catch(...) 执行 remove_child + memdelete 后原样重抛——异常路径会回收已 add_child 的节点；用例未断言节点残留（框架亦无数组包含/字段不存在断言能力）。",
+  "description": "T09 补测：L1 无引擎、无法覆盖的成功路径在 L2 回读验证。覆盖 property_set 走 deserialize_strict 后的严格 JSON 形状：Rect2 需 size.w+size.h（或别名 size.x+size.y，同现冲突报错，position 可省略默认 0）；Transform2D 需 columns（>=3 个至少 2 元素的数组）。步骤：Rect2 文档形状成功 + region_rect 读回 size.x/size.y；别名形状成功 + 缺省 position 读回为 0；size 内 x 与 w 冲突报错（invalid Rect2: 'size.x' and 'size.w' conflict）；缺 size 负例由 L1 覆盖（VariantJsonStrictTest.Rect2MissingSizeMessage）；Transform2D 缺 columns 报错；create_scene_node 干净路径（applied_properties 精确为 [\"region_rect\"]，随后读回 position/size 证明属性已应用且无 warning 改写）；create_scene_node 严格错误路径（props 中 size 只给 w，error 报 invalid Rect2，随后 dispatch 包装）。本轮新增 Vector2/Vector2i 覆盖：数组形状 [10,20] 对 Sprite2D.position（property_set）与 create_scene_node properties、以及 RectangleShape2D.size（set_resource_property）一律报 invalid Vector2: expected a JSON object，对象形状 {\"x\":..,\"y\":..} 设置后读回精确分量。错误断言为完整字符串精确匹配：错误消息经 dispatch 包装为 internal error in tool '<name>': <what> (args: <dump>)，args dump 来自 mcp::JsonValue（std::map 键按字母序、默认紧凑格式，超过 256 字节才截断），assert_engine 仅有 value 全等与 not_empty 语义、无 contains/字段缺席断言，故未显式断言 property_warnings 缺席，改以属性读回值证明干净路径。BadRect 节点残留断言跳过：scene_ops.cpp 的失败清理覆盖异常与 error 返回两条路径，严格校验抛异常时经 catch(std::exception)/catch(...) 执行 remove_child + memdelete 后原样重抛——异常路径会回收已 add_child 的节点；用例未断言节点残留（框架亦无数组包含/字段不存在断言能力）。",
   "headless": true,
   "pipeline": {
     "on_failure": "continue",
@@ -88,6 +88,103 @@
               "has_keys": ["error"],
               "field_checks": [
                 { "key": "error", "value": "internal error in tool 'property_set': invalid Transform2D: 'columns' must be an array of at least 3 arrays of at least 2 numbers, e.g. {\"columns\":[[1,0],[0,1],[x,y]]} (args: {\"path\":\"SpriteNode\",\"property\":\"transform\",\"value\":{\"origin\":{\"x\":1,\"y\":2}}})" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "vector2_shapes",
+        "steps": [
+          {
+            "id": "vector2_array_error",
+            "tool": "property_set",
+            "args": { "path": "SpriteNode", "property": "position", "value": [10, 20] },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "internal error in tool 'property_set': invalid Vector2: expected a JSON object, e.g. {\"x\":0,\"y\":0} (args: {\"path\":\"SpriteNode\",\"property\":\"position\",\"value\":[10,20]})" }
+              ]
+            }
+          },
+          {
+            "id": "vector2_object_set",
+            "tool": "property_set",
+            "args": { "path": "SpriteNode", "property": "position", "value": { "x": 12, "y": -3 } },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          },
+          {
+            "id": "vector2_object_readback",
+            "tool": "property_get",
+            "args": { "path": "SpriteNode", "property": "position" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.x", "value": 12 },
+                { "key": "result.y", "value": -3 }
+              ]
+            }
+          },
+          {
+            "id": "create_node_vector2_array_error",
+            "tool": "create_scene_node",
+            "args": { "name": "BadVec", "type": "Sprite2D", "parent_path": "Root", "properties": { "position": [1, 2] } },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "internal error in tool 'create_scene_node': invalid Vector2: expected a JSON object, e.g. {\"x\":0,\"y\":0} (args: {\"name\":\"BadVec\",\"parent_path\":\"Root\",\"properties\":{\"position\":[1,2]},\"type\":\"Sprite2D\"})" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "resource_vector2_shapes",
+        "steps": [
+          {
+            "id": "create_rect_shape_resource",
+            "tool": "create_resource",
+            "args": { "type": "RectangleShape2D", "name": "gda_vec_shape" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.class", "value": "RectangleShape2D" },
+                { "key": "result.name", "value": "gda_vec_shape" }
+              ]
+            }
+          },
+          {
+            "id": "set_resource_property_vector2_array_error",
+            "tool": "set_resource_property",
+            "args": { "name": "gda_vec_shape", "property": "size", "value": [20, 28] },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "internal error in tool 'set_resource_property': invalid Vector2: expected a JSON object, e.g. {\"x\":0,\"y\":0} (args: {\"name\":\"gda_vec_shape\",\"property\":\"size\",\"value\":[20,28]})" }
+              ]
+            }
+          },
+          {
+            "id": "set_resource_property_vector2_object_set",
+            "tool": "set_resource_property",
+            "args": { "name": "gda_vec_shape", "property": "size", "value": { "x": 20, "y": 28 } },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          },
+          {
+            "id": "set_resource_property_vector2_readback",
+            "tool": "get_resource_property",
+            "args": { "name": "gda_vec_shape", "property": "size" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.x", "value": 20 },
+                { "key": "result.y", "value": 28 }
               ]
             }
           }

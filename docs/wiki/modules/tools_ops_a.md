@@ -6,13 +6,13 @@ tags:
   - 模块
   - 领域工具
   - A组
-timestamp: "2026-09-13T21:52:51+08:00"
+timestamp: "2026-09-14T20:49:22+08:00"
 resource: src/tools/
 ---
 
 # 领域工具模块（src/tools/，A 组 13 模块）
 
-> 审计日期：2026-08-29（2026-08-12 初稿；08-17 补 YAML frontmatter；08-20 随 rename 事务化 + 新工具同步；08-21 随 ToolBase 类重构同步——`tool_defs.def`/`TOOL_ENTRY` 移除，注册与计数口径改为 `<域>_tools.hpp`/`ToolRegistry`；08-22 15 时全量一致性审计——editor 计数 23、RENAME_HINTS 10 条、resolve_scene_node/RidStore/rid_from_json/NODE_NOT_FOUND_HINT 归一至 util 共享头、get_docs_class 补 enums/constants；08-29 随 0.2.2 版本与全量审计同步——336→363、35→42、174→178、26→30 域重核；09-13 上午随反馈修复批次同步——363→365、42→49、178→180，property 数组/NodeType 转换与写失败 fail fast、资源 CoW/reload_resource/copy_resource_file/标签清理、create_editor_scene timeout_ms 诊断；09-13 下午随收口批次同步——A 组 180 不变（新增 get_plugin_log 归 B 组，域工具 365→366）、严格 JSON 形状与值类型 readback、save_resource 磁盘重读 verified、ray 空间诊断字段、get_editor_settings enum 元数据；09-13 17:50 随 B 组知识库审计同步——补全 scene_ops 工具表（rename_scene_node/reparent_node）与 rename stale_references 字段口径；09-13 晚随 0.2.4 版知识库全量审计同步——修正 handle_delete 的 undo/redo 口径、input 未识别键/按键实际报错（删除"静默失败点"表述）、physics 配对计数（15 对含空间查询）与 rid_store<PhysicsRidDomain> 标签名、script handle_reload 缓存失效归属、editor save_all_scenes 直接调用与文件树截断 max_depth 字段、config get_engine_version string 字段、property_set undo 注册、group find_node 3 处与响应字段、editor 撤销四件套全名、resource 收集函数实名等代码-文档偏差；A 组 180/366 复核不变），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 审计日期：2026-08-29（2026-08-12 初稿；08-17 补 YAML frontmatter；08-20 随 rename 事务化 + 新工具同步；08-21 随 ToolBase 类重构同步——`tool_defs.def`/`TOOL_ENTRY` 移除，注册与计数口径改为 `<域>_tools.hpp`/`ToolRegistry`；08-22 15 时全量一致性审计——editor 计数 23、RENAME_HINTS 10 条、resolve_scene_node/RidStore/rid_from_json/NODE_NOT_FOUND_HINT 归一至 util 共享头、get_docs_class 补 enums/constants；08-29 随 0.2.2 版本与全量审计同步——336→363、35→42、174→178、26→30 域重核；09-13 上午随反馈修复批次同步——363→365、42→49、178→180，property 数组/NodeType 转换与写失败 fail fast、资源 CoW/reload_resource/copy_resource_file/标签清理、create_editor_scene timeout_ms 诊断；09-13 下午随收口批次同步——A 组 180 不变（新增 get_plugin_log 归 B 组，域工具 365→366）、严格 JSON 形状与值类型 readback、save_resource 磁盘重读 verified、ray 空间诊断字段、get_editor_settings enum 元数据；09-13 17:50 随 B 组知识库审计同步——补全 scene_ops 工具表（rename_scene_node/reparent_node）与 rename stale_references 字段口径；09-13 晚随 0.2.4 版知识库全量审计同步——修正 handle_delete 的 undo/redo 口径、input 未识别键/按键实际报错（删除"静默失败点"表述）、physics 配对计数（15 对含空间查询）与 rid_store<PhysicsRidDomain> 标签名、script handle_reload 缓存失效归属、editor save_all_scenes 直接调用与文件树截断 max_depth 字段、config get_engine_version string 字段、property_set undo 注册、group find_node 3 处与响应字段、editor 撤销四件套全名、resource 收集函数实名等代码-文档偏差；A 组 180/366 复核不变；09-14 随修复批次同步——property_set/严格形状增 Vector2/2i 对象要求与数组报错、set_resource_property 接入严格转换、get_scene_tree 的 include_properties 属性摘要修复），基于当前工作树代码逐行核对（不依赖 git 历史）。
 > 覆盖范围：`src/tools/` 下 13 对 `.cpp/.hpp`：scene_ops、scene_tree_ops、property_ops、group_ops、input_ops、input_map_ops、physics_ops、nav_ops、resource_ops、script_ops、config_ops、doc_ops、editor_ops。
 > 统计口径：工具数以 `src/tools/*_tools.hpp` 的 `GDA_TOOL_CLASS(`/`GDA_TOOL_CLASS_SIDE(` 声明计数为准（一个工具 = 一个 `ToolBase` 真类，`handle_` 函数与之逐一对应，两口径一致）；当前 366 个域工具 = 317 个 `GDA_TOOL_CLASS(` + 49 个 `GDA_TOOL_CLASS_SIDE(`，L2 遍历只枚举前者（317 个）。注册经 `register_all.cpp` 调用 30 组 `<域>_tools::make_tools()` 汇入单一 `ToolRegistry`。
 
@@ -68,7 +68,7 @@ resource: src/tools/
 - **属性应用与异常安全（09-13 下午起）**：`properties` 经与 `property_set` 相同的严格转换链路应用；`applied_properties` 只列无 error 的属性，引擎调整值（CONVERTED）时追加 `property_warnings: [{path, property, warning}]`（无警告时字段缺席）；严格校验抛异常时删除已挂载的新节点并重新抛出（错误经 dispatch 透出完整 `ex.what()`），失败路径不再残留节点。
 - `handle_delete`：根节点拒绝删除（提示用 `close_editor_scene`）；有编辑器 undo/redo 时以 action `Delete Node <name>` 执行（do: remove_child + queue_free；undo: move_child/set_owner/add_child），响应附 `undoable`、`undo` 信息对象与 note（延迟释放销毁后无法复活）；无 undo manager 时直接 `queue_free()`。
 - `handle_instance`：`ResourceLoader.load` + `PackedScene.instantiate`；返回 `note` 提醒实例继承源场景的 CONNECT_PERSIST 连接。
-- 树导出 `node_to_json`：属性摘要过滤 `metadata/` 前缀、`_` 开头、OBJECT 类型，单节点上限 20 个属性。
+- 树导出 `node_to_json`：属性摘要过滤 `metadata/` 前缀、`_` 开头、OBJECT 类型，单节点上限 20 个属性；09-14 修复属性名类型判定（STRING 与 STRING_NAME 均接受），`include_properties:true` 此前恒空的问题解除。
 - 路径解析复用 `util::resolve_scene_node`（`src/util/scene_path.hpp`）。
 
 ## scene_tree_ops（8 工具）
@@ -102,7 +102,7 @@ resource: src/tools/
 关键实现事实：
 
 - `handle_set` 类型推导：`type_hint` 未指定时从属性字典自动推导——OBJECT 类型或 `PROPERTY_HINT_RESOURCE_TYPE` 用 `hint_string` 作为类名，否则用 Variant 类型名。
-- **严格 JSON 形状（09-13 下午起）**：值转换改走 `VariantJson::deserialize_strict`（`variant_json.hpp`）——Rect2/Rect2i 的 `size` 需 `{w,h}`（或别名 `{x,y}`，同轴两拼写并存且值不同即报错），AABB 的 `size` 需 `{w,h,d}`（或 `{x,y,z}`），Transform2D 必须 `columns`（≥3 列、每列 ≥2 数字），Transform3D 必须 `basis.rows`（≥3 行、每行 ≥3 数字）；违规抛 `std::runtime_error`，经 dispatch 以 `internal error in tool 'property_set': invalid ...` 透出完整提示（此前文档形状与实现不一致会导致静默零写入）。
+- **严格 JSON 形状（09-13 下午起）**：值转换改走 `VariantJson::deserialize_strict`（`variant_json.hpp`）——Rect2/Rect2i 的 `size` 需 `{w,h}`（或别名 `{x,y}`，同轴两拼写并存且值不同即报错），AABB 的 `size` 需 `{w,h,d}`（或 `{x,y,z}`），Transform2D 必须 `columns`（≥3 列、每列 ≥2 数字），Transform3D 必须 `basis.rows`（≥3 行、每行 ≥3 数字）；违规抛 `std::runtime_error`，经 dispatch 以 `internal error in tool 'property_set': invalid ...` 透出完整提示（此前文档形状与实现不一致会导致静默零写入）。09-14 起 Vector2/Vector2i 亦纳入严格分支：必须为 `{x,y}` 对象，数组输入报 `invalid Vector2: expected a JSON object, e.g. {"x":0,"y":0}`（此前数组静默写 0）。
 - 资源赋值接 `resource_ops::try_resolve_resource_value`；**拒绝把 `memory://` 内存资源赋给节点属性**（返回错误，说明会损坏场景文件，要求先 `save_resource` 落盘）。
 - **写后 undo 注册**：写入成功后把变更注册进编辑器 undo 栈（action `Set Property <property> on <path>`，do/undo 均写该属性），旧值随响应 `undo` 字段（path/property/old_value）返回；旧值或新值为 Object 引用时不注册，返回 `undoable:false` + `undo_skip_reason`（编辑器撤销栈无法可靠恢复对象引用）。
 - **Node 类型属性 + 节点路径自动转引用（09-13 扩展）**：`handle_set` 检测目标属性 `type==OBJECT`、hint 为 `PROPERTY_HINT_NODE_TYPE`（引擎值 34，含 C# `[Export]` 节点字段），或 hint 为 `PROPERTY_HINT_RESOURCE_TYPE` 且 `hint_string` 指向 Node 子类时，若 `value` 为字符串（节点路径），以编辑场景根 `get_node_or_null()` 解析后赋**节点对象引用**（而非 NodePath Variant），使其保存场景时正确落入 `node_paths`、实例化后还原为节点引用。解析失败返回 `error_detail`（含当前场景根与合法路径写法指引，不再静默 ok）；成功结果带 `converted_node_path` 字段标注。判断辅助 `parse_hint_class`/`is_node_class`（容错 `Type:` 前缀、逗号 token）。
@@ -226,7 +226,7 @@ resource: src/tools/
 - **三路解析**（`resolve_resource`）：`object_id_str`/`object_id` → `ObjectDB` + `resource_registry`（`core/resource_registry.cpp` 的 `name:<name>` 与 oid 数字键双键内存缓存）→ `path` 兜底 `ResourceLoader.load`；`path` 加载成功会把实例注册进 `resource_registry`（09-13 起），使后续调用经 `object_id`/`name:` 定位到同一实例、跨调用修改存活。磁盘加载路径返回 `warning`：磁盘副本**不含**内存中的未保存修改。
 - 序列化统一返回 `class/path/object_id/object_id_str/name` 五字段（`serialize_ref`）。
 - **`save_resource` copy-on-write（09-13 起）**：`path` 为定位路径与默认目标，`dest_path≠path` 且资源经 `path` 定位时，先 `duplicate(true)` 深拷贝再写盘——源缓存实例不被改写；响应增 `copy_on_write: true` 与 `source_path`，且验证加载时排除了"回读到源实例"的假阳性。`verified` 字段自 09-13 下午起改用 `CACHE_MODE_IGNORE` 从磁盘重读判定（绕过缓存，校验的是落盘内容）；Windows 安全保存会短暂替换文件，并发读者可能瞬时打开失败，工具描述已注明重试即可。
-- **`set_resource_property` readback（09-13 下午起）**：写后校验启用 `type_sensitive`（值类型走近似比较）——引擎调整值返回 `warning`、设置未生效（回读等于旧值）返回 REJECTED；与运行时 eval `set_property` 路径一致。
+- **`set_resource_property` readback（09-13 下午起）**：写后校验启用 `type_sensitive`（值类型走近似比较）——引擎调整值返回 `warning`、设置未生效（回读等于旧值）返回 REJECTED；与运行时 eval `set_property` 路径一致。值转换自 09-14 起同样走 `VariantJson::deserialize_strict`（严格形状同 `property_set`，含 Vector2/2i 数组输入报错）。
 - **`reload_resource`（09-13 新增）**：对 `path` 以 `CACHE_MODE_REPLACE` 强制重新加载，替换编辑器缓存实例；响应 `{result:"reloaded", path, replaced:true, reused_cached_instance}`——`replaced` 表示缓存已随 reload 刷新（当前实现恒为 true），`reused_cached_instance:true` 表示引擎复用了原实例而非新建。文件缺失/无法加载时报错。
 - `handle_reimport` 仅编辑器模式可用（`is_editor_hint` 校验）；空参时 `count=0` 返回 `reimport queued for 0 file(s)` 静默成功（AGENTS.md 契约缺口，确认属实）。**reimport 只对带 `.import` 伴生的文件有效**：对 `.tres/.gd` 等直接文本文件引擎会记 BUG 且无导入效果，工具仍报 queued——刷新这类文件用 `reload_resource`。
 - `handle_get_extensions`：缺 `type` 时调 `get_recognized_extensions_for_type("")` 返回全类型（AGENTS.md 契约缺口，确认属实）。

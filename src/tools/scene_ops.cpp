@@ -41,7 +41,9 @@ void collect_property_summary(godot::Node *node, mcp::JsonValue &j) {
   for (int i = 0; i < props.size() && count < MAX_PROPERTY_COUNT; i++) {
     godot::Dictionary prop = props[i];
     godot::Variant name_v = prop["name"];
-    if (name_v.get_type() != godot::Variant::STRING_NAME)
+    godot::Variant::Type name_type = name_v.get_type();
+    if (name_type != godot::Variant::STRING &&
+        name_type != godot::Variant::STRING_NAME)
       continue;
     godot::StringName prop_name = name_v;
     std::string name_str = util::to_std(godot::String(prop_name));

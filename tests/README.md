@@ -4,7 +4,7 @@
 
 测试体系分两层：
 
-- **L1 纯单测**（`gda_unit_tests`，126 个 gtest 用例）：不启动引擎，不触碰 Godot API，验证核心逻辑与工具注册管线。
+- **L1 纯单测**（`gda_unit_tests`，140 个 gtest 用例）：不启动引擎，不触碰 Godot API，验证核心逻辑与工具注册管线。
 - **L2 配置驱动引擎内测试**（`gda_test_runner` + `tests/config/*.json` 用例）：由 C++ 执行器自管 Godot headless 编辑器进程，经真实 MCP HTTP 全链路驱动领域工具，并按 JSON 用例中的断言语义（C++ 执行器侧）校验响应。**每份 config/*.json = 一次独立的编辑器生命周期最小闭环**（启动 → MCP 就绪 → 执行步骤 → 停止进程），文件间互不共享状态。
 
 架构一句话：进程内 GDExtension（EditorPlugin），领域工具经 `call_tool` 元工具代理，由 `register_all.cpp` 的 `g_handlers` 映射分发。
