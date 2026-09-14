@@ -397,7 +397,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         mcp::JsonValue ops_prop(mcp::JsonValue::object_tag);
         ops_prop["type"] = mcp::JsonValue("array");
         ops_prop["items"] = std::move(item);
-        ops_prop["description"] = mcp::JsonValue("Ordered list of operations to execute");
+        ops_prop["description"] = mcp::JsonValue("Ordered list of operations to execute; each result carries status 'ok'/'error'/'pending'. 'pending' means an async game tool whose request was sent but batch_execute does not await its response; call such tools via call_tool instead, because batch_execute discards the pending record and the game-side reply is reported as a late response. Response counts: 'pending' = async operations, 'total' = succeeded+failed+pending, 'skipped' = operations not run after stop_on_error truncation");
         props["operations"] = std::move(ops_prop);
         mcp::JsonValue stop_prop(mcp::JsonValue::object_tag);
         stop_prop["type"] = mcp::JsonValue("boolean");
@@ -410,7 +410,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         s["required"] = std::move(req);
         registry->add(std::make_unique<::godot_autopilot::MetaTool>(
             ToolMeta{"batch_execute",
-                     "Execute multiple tools in batch. Each operation runs in sequence; if stop_on_error is true and any operation fails, remaining operations are skipped.",
+                     "Execute multiple tools in batch. Each operation runs in sequence; if stop_on_error is true and any operation fails, remaining operations are skipped. Async game tools report status 'pending' and are not awaited; call those via call_tool to receive their response.",
                      "System", {"batch", "execute", "multi"}, true},
             [](const mcp::JsonValue& a) { return code_exec_ops::handle_batch_execute(a); },
             std::move(s)));

@@ -299,6 +299,48 @@ mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms) {
   return error_json("unexpected game response (missing result)");
 }
 
+bool payload_is_pending(const mcp::JsonValue &payload, int64_t *out_request_id) {
+  if (!payload.IsObject())
+    return false;
+  auto *pending_id = payload.Find("__gda_pending");
+  if (!pending_id || !pending_id->IsInt())
+    return false;
+  if (out_request_id)
+    *out_request_id = pending_id->GetInt();
+  return true;
+}
+
+bool discard_pending(int64_t request_id, std::string &out_detail) {
+  std::shared_ptr<PendingRequest> pending;
+  {
+    std::lock_guard<std::mutex> lock(g_pending_mtx);
+    auto it = g_pending.find(request_id);
+    if (it == g_pending.end()) {
+      out_detail = "no pending request found for request_id " +
+                   std::to_string(request_id);
+      return false;
+    }
+    pending = it->second;
+    g_pending.erase(it);
+  }
+
+  {
+    std::lock_guard<std::mutex> lock(pending->mtx);
+    if (pending->state == PendingRequest::State::Waiting)
+      pending->state = PendingRequest::State::Cancelled;
+  }
+  pending->cv.notify_all();
+
+  out_detail = "discarded pending request_id " + std::to_string(request_id) +
+               " (batch_execute does not await async game ops)";
+  LogSystem::instance().log(LogLevel::Warning, LogCategory::Tools,
+                            "batch_execute discarded pending request_id " +
+                                std::to_string(request_id) +
+                                " (async game op response will be logged as a "
+                                "late game response)");
+  return true;
+}
+
 void set_editor_queue(godot_autopilot::CommandQueue *q) {
   {
     std::lock_guard<std::mutex> lock(g_editor_queue_mtx);

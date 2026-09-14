@@ -31,6 +31,10 @@ void run_channel_self_check(int32_t p_session_id);
 
 mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms);
 
+bool payload_is_pending(const mcp::JsonValue &payload, int64_t *out_request_id);
+
+bool discard_pending(int64_t request_id, std::string &out_detail);
+
 mcp::JsonValue finalize_capture_response(const mcp::JsonValue &pending_result);
 
 void handle_game_response(const std::string &json_str);

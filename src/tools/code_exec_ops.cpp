@@ -3,6 +3,7 @@
 #include "core/resource_registry.hpp"
 #include "tools/debugger_ops.hpp"
 #include "tools/dispatch.hpp"
+#include "tools/runtime_ops.hpp"
 #include "util/error_util.hpp"
 #include "util/gdscript_wrap.hpp"
 #include "util/variant_json.hpp"
@@ -502,6 +503,7 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
   mcp::JsonValue results(mcp::JsonValue::array_tag);
   int succeeded = 0;
   int failed = 0;
+  int pending_count = 0;
   bool stopped = false;
   size_t stopped_after = 0;
 
@@ -560,6 +562,21 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
 
     mcp::JsonValue handler_result = dispatch::call_handler(tool_name, tool_args);
 
+    int64_t pending_id = 0;
+    if (runtime_ops::payload_is_pending(handler_result, &pending_id)) {
+      result_item["status"] = mcp::JsonValue("pending");
+      result_item["data"] = std::move(handler_result);
+      result_item["note"] = mcp::JsonValue(
+          "async game op sent; batch_execute does not await it — call this "
+          "tool via call_tool to receive the response");
+      std::string discard_detail;
+      runtime_ops::discard_pending(pending_id, discard_detail);
+      result_item["detail"] = mcp::JsonValue(discard_detail);
+      results.PushBack(std::move(result_item));
+      ++pending_count;
+      continue;
+    }
+
     if (auto *err = handler_result.Find("error")) {
       result_item["status"] = mcp::JsonValue("error");
       result_item["error"] = *err;
@@ -580,11 +597,12 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
 
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["results"] = std::move(results);
-  int64_t executed = succeeded + failed;
+  int64_t executed = succeeded + failed + pending_count;
   int64_t skipped = static_cast<int64_t>(arr.size()) - executed;
   r["total"] = mcp::JsonValue(executed);
   r["succeeded"] = mcp::JsonValue(static_cast<int64_t>(succeeded));
   r["failed"] = mcp::JsonValue(static_cast<int64_t>(failed));
+  r["pending"] = mcp::JsonValue(static_cast<int64_t>(pending_count));
   r["skipped"] = mcp::JsonValue(skipped);
   if (stopped) {
     r["note"] =
