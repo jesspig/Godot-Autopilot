@@ -2834,7 +2834,7 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue &args) {
     }
     resource_attached = true;
   } else {
-    value = VariantJson::deserialize(*args.Find("value"), type_hint);
+    value = VariantJson::deserialize_strict(*args.Find("value"), type_hint);
   }
 
   godot::Variant old_val = res->get(godot::StringName(prop.c_str()));

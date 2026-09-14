@@ -83,3 +83,31 @@ TEST(VariantJsonStrictTest, Transform3DRejectsTwoBasisRows) {
       strict_parse(R"({"basis":{"rows":[[1,0,0],[0,1,0]]}})", "Transform3D"),
       std::runtime_error);
 }
+
+TEST(VariantJsonStrictTest, Vector2RejectsArray) {
+  EXPECT_THROW(strict_parse("[1,2]", "Vector2"), std::runtime_error);
+}
+
+TEST(VariantJsonStrictTest, Vector2RejectsMissingY) {
+  EXPECT_THROW(strict_parse(R"({"x":1})", "Vector2"), std::runtime_error);
+}
+
+TEST(VariantJsonStrictTest, Vector2RejectsNonNumericX) {
+  EXPECT_THROW(strict_parse(R"({"x":"a","y":2})", "Vector2"),
+               std::runtime_error);
+}
+
+TEST(VariantJsonStrictTest, Vector2iRejectsArray) {
+  EXPECT_THROW(strict_parse("[1,2]", "Vector2i"), std::runtime_error);
+}
+
+TEST(VariantJsonStrictTest, Vector2ArrayMessage) {
+  try {
+    strict_parse("[1,2]", "Vector2");
+    FAIL() << "expected std::runtime_error";
+  } catch (const std::runtime_error &e) {
+    EXPECT_STREQ(e.what(),
+                 "invalid Vector2: expected a JSON object, e.g. "
+                 "{\"x\":0,\"y\":0}");
+  }
+}
