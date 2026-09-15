@@ -88,6 +88,19 @@ bool ServerContext::start() {
 
     mcp::ServerOptions opts;
     opts.server_info = mcp::Implementation{"godot-autopilot", GDA_VERSION};
+    // MCP 2026-07-28 规范要求六类 cacheable 结果携带缓存提示;经
+    // server/discover 协商到 2026 era 的客户端(如 zcode)会按必填
+    // 字段校验。ttlMs=0 表示"立即过期",仅满足字段声明,客户端仍
+    // 每次重新拉取,行为与未声明时一致。
+    const mcp::CacheHint immediate_expiry_hint{int64_t{0}, "private"};
+    opts.cache_hints = std::map<std::string, mcp::CacheHint, std::less<>>{
+        {"server/discover", immediate_expiry_hint},
+        {"tools/list", immediate_expiry_hint},
+        {"prompts/list", immediate_expiry_hint},
+        {"resources/list", immediate_expiry_hint},
+        {"resources/templates/list", immediate_expiry_hint},
+        {"resources/read", immediate_expiry_hint},
+    };
     opts.on_method_called = [this](std::string_view method) {
       LogSystem::instance().log(LogLevel::Debug, LogCategory::Transport,
                                 "MCP request: " + std::string(method));
