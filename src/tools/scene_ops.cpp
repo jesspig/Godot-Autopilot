@@ -7,8 +7,12 @@
 #include "util/variant_json.hpp"
 #include <algorithm>
 #include <exception>
+#include <string>
 #include <vector>
+#include <godot_cpp/classes/camera3d.hpp>
+#include <godot_cpp/classes/canvas_item.hpp>
 #include <godot_cpp/classes/class_db_singleton.hpp>
+#include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/editor_undo_redo_manager.hpp>
 #include <godot_cpp/classes/node.hpp>
@@ -17,6 +21,8 @@
 #include <godot_cpp/classes/packed_scene.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
+#include <godot_cpp/classes/sub_viewport.hpp>
+#include <godot_cpp/classes/viewport.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/variant/node_path.hpp>
@@ -25,6 +31,8 @@
 #include <godot_cpp/variant/transform2d.hpp>
 #include <godot_cpp/variant/transform3d.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
+#include <godot_cpp/variant/vector2.hpp>
+#include <godot_cpp/variant/vector3.hpp>
 
 namespace godot_autopilot {
 namespace scene_ops {
@@ -34,6 +42,7 @@ namespace {
 constexpr int DEFAULT_MAX_DEPTH = 8;
 constexpr int UNLIMITED_TREE_DEPTH = 100000;
 constexpr int MAX_PROPERTY_COUNT = 20;
+constexpr int MAX_SCREEN_RECT_PATHS = 50;
 
 void collect_property_summary(godot::Node *node, mcp::JsonValue &j) {
   godot::TypedArray<godot::Dictionary> props = node->get_property_list();
@@ -751,6 +760,215 @@ mcp::JsonValue handle_get_tree(const mcp::JsonValue &args) {
   node_to_json(root, max_depth, include_properties, result);
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(result);
+  return r;
+}
+
+mcp::JsonValue handle_get_node_screen_rect(const mcp::JsonValue &args) {
+  auto *paths_p = args.Find("paths");
+  if (!paths_p || !paths_p->IsArray()) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue("missing required parameter: paths (array)");
+    return e;
+  }
+  const auto &paths_arr = paths_p->GetArray();
+  if (paths_arr.empty() ||
+      paths_arr.size() > static_cast<size_t>(MAX_SCREEN_RECT_PATHS)) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue("parameter 'paths' must contain between 1 and " +
+                                std::to_string(MAX_SCREEN_RECT_PATHS) +
+                                " entries");
+    return e;
+  }
+  for (const auto &p : paths_arr) {
+    if (!p.IsString()) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] =
+          mcp::JsonValue("parameter 'paths' must be an array of strings");
+      return e;
+    }
+  }
+
+  std::string viewport_mode = "auto";
+  auto *vp_arg = args.Find("viewport");
+  if (vp_arg) {
+    if (!vp_arg->IsString()) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue("parameter 'viewport' must be a string");
+      return e;
+    }
+    viewport_mode = vp_arg->GetString();
+    if (viewport_mode != "auto" && viewport_mode != "2d" &&
+        viewport_mode != "3d") {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] =
+          mcp::JsonValue("parameter 'viewport' must be one of: auto, 2d, 3d");
+      return e;
+    }
+  }
+
+  auto *editor = godot::EditorInterface::get_singleton();
+  auto *scene_root = editor ? editor->get_edited_scene_root() : nullptr;
+  if (!editor || !scene_root) {
+    return util::error_detail(
+        "no edited scene root available",
+        "scene_ops.cpp handle_get_node_screen_rect", "an edited scene",
+        "open or create a scene first (create_editor_scene)");
+  }
+
+  godot::SubViewport *vp2d = editor->get_editor_viewport_2d();
+  godot::SubViewport *vp3d = editor->get_editor_viewport_3d(0);
+  godot::Transform2D t2d;
+  if (vp2d)
+    t2d = vp2d->get_screen_transform() * vp2d->get_global_canvas_transform();
+  godot::Transform2D t3d;
+  if (vp3d)
+    t3d = vp3d->get_screen_transform();
+  godot::Camera3D *camera = vp3d ? vp3d->get_camera_3d() : nullptr;
+
+  mcp::JsonValue items(mcp::JsonValue::array_tag);
+  std::string resolved_viewport;
+  godot::Transform2D resolved_transform;
+  bool has_resolved = false;
+
+  for (const auto &p : paths_arr) {
+    std::string path = p.GetString();
+    mcp::JsonValue item(mcp::JsonValue::object_tag);
+    item["path"] = mcp::JsonValue(path);
+
+    std::string hint;
+    godot::Node *node = util::resolve_scene_node(path, scene_root, &hint);
+    if (!node) {
+      item["ok"] = mcp::JsonValue(false);
+      item["error"] = mcp::JsonValue("node not found");
+      items.PushBack(std::move(item));
+      continue;
+    }
+
+    std::string type = util::to_std(node->get_class());
+    godot::Node3D *node_3d = godot::Object::cast_to<godot::Node3D>(node);
+    godot::CanvasItem *canvas_item =
+        godot::Object::cast_to<godot::CanvasItem>(node);
+    std::string space;
+    if (node_3d)
+      space = "3d";
+    else if (canvas_item)
+      space = "2d";
+    else {
+      item["ok"] = mcp::JsonValue(false);
+      item["error"] = mcp::JsonValue("unsupported node type");
+      items.PushBack(std::move(item));
+      continue;
+    }
+
+    if (viewport_mode != "auto" && viewport_mode != space) {
+      item["ok"] = mcp::JsonValue(false);
+      item["error"] = mcp::JsonValue(
+          "node type " + type + " is not compatible with viewport '" +
+          viewport_mode + "'");
+      items.PushBack(std::move(item));
+      continue;
+    }
+
+    if (space == "3d") {
+      if (!vp3d) {
+        item["ok"] = mcp::JsonValue(false);
+        item["error"] = mcp::JsonValue("3D editor viewport not available");
+        items.PushBack(std::move(item));
+        continue;
+      }
+      if (!camera) {
+        item["ok"] = mcp::JsonValue(false);
+        item["error"] = mcp::JsonValue("3D editor viewport has no camera");
+        items.PushBack(std::move(item));
+        continue;
+      }
+      godot::Vector3 world = node_3d->get_global_transform().get_origin();
+      godot::Vector2 local = camera->unproject_position(world);
+      godot::Vector2 pos = t3d.xform(local);
+      item["ok"] = mcp::JsonValue(true);
+      item["type"] = mcp::JsonValue(type);
+      mcp::JsonValue screen_position(mcp::JsonValue::object_tag);
+      screen_position["x"] = mcp::JsonValue(static_cast<double>(pos.x));
+      screen_position["y"] = mcp::JsonValue(static_cast<double>(pos.y));
+      item["screen_position"] = std::move(screen_position);
+      item["behind"] = mcp::JsonValue(camera->is_position_behind(world));
+      if (!has_resolved) {
+        has_resolved = true;
+        resolved_viewport = "3d";
+        resolved_transform = t3d;
+      }
+      items.PushBack(std::move(item));
+      continue;
+    }
+
+    if (!vp2d) {
+      item["ok"] = mcp::JsonValue(false);
+      item["error"] = mcp::JsonValue("2D editor viewport not available");
+      items.PushBack(std::move(item));
+      continue;
+    }
+    godot::Vector2 pos =
+        t2d.xform(canvas_item->get_global_transform().get_origin());
+    item["ok"] = mcp::JsonValue(true);
+    item["type"] = mcp::JsonValue(type);
+    mcp::JsonValue screen_position(mcp::JsonValue::object_tag);
+    screen_position["x"] = mcp::JsonValue(static_cast<double>(pos.x));
+    screen_position["y"] = mcp::JsonValue(static_cast<double>(pos.y));
+    item["screen_position"] = std::move(screen_position);
+    godot::Control *control = godot::Object::cast_to<godot::Control>(node);
+    if (control) {
+      godot::Transform2D global = control->get_global_transform();
+      godot::Vector2 corner_a = t2d.xform(global.xform(godot::Vector2()));
+      godot::Vector2 corner_b = t2d.xform(global.xform(control->get_size()));
+      double min_x = std::min(static_cast<double>(corner_a.x),
+                              static_cast<double>(corner_b.x));
+      double min_y = std::min(static_cast<double>(corner_a.y),
+                              static_cast<double>(corner_b.y));
+      double max_x = std::max(static_cast<double>(corner_a.x),
+                              static_cast<double>(corner_b.x));
+      double max_y = std::max(static_cast<double>(corner_a.y),
+                              static_cast<double>(corner_b.y));
+      mcp::JsonValue rect(mcp::JsonValue::object_tag);
+      mcp::JsonValue rect_position(mcp::JsonValue::object_tag);
+      rect_position["x"] = mcp::JsonValue(min_x);
+      rect_position["y"] = mcp::JsonValue(min_y);
+      mcp::JsonValue rect_size(mcp::JsonValue::object_tag);
+      rect_size["x"] = mcp::JsonValue(max_x - min_x);
+      rect_size["y"] = mcp::JsonValue(max_y - min_y);
+      rect["position"] = std::move(rect_position);
+      rect["size"] = std::move(rect_size);
+      item["rect"] = std::move(rect);
+    }
+    if (!has_resolved) {
+      has_resolved = true;
+      resolved_viewport = "2d";
+      resolved_transform = t2d;
+    }
+    items.PushBack(std::move(item));
+  }
+
+  if (!has_resolved) {
+    resolved_viewport = viewport_mode == "3d" ? "3d" : "2d";
+    resolved_transform = viewport_mode == "3d" ? t3d : t2d;
+  }
+
+  godot::Size2 resolved_scale = resolved_transform.get_scale();
+  godot::Vector2 resolved_origin = resolved_transform.get_origin();
+  mcp::JsonValue mapping(mcp::JsonValue::object_tag);
+  mapping["scale_x"] = mcp::JsonValue(static_cast<double>(resolved_scale.x));
+  mapping["scale_y"] = mcp::JsonValue(static_cast<double>(resolved_scale.y));
+  mapping["offset_x"] = mcp::JsonValue(static_cast<double>(resolved_origin.x));
+  mapping["offset_y"] = mcp::JsonValue(static_cast<double>(resolved_origin.y));
+
+  mcp::JsonValue inner(mcp::JsonValue::object_tag);
+  inner["viewport"] = mcp::JsonValue(resolved_viewport);
+  inner["window_id"] = mcp::JsonValue(0);
+  inner["space"] = mcp::JsonValue("window");
+  inner["mapping"] = std::move(mapping);
+  inner["items"] = std::move(items);
+
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["result"] = std::move(inner);
   return r;
 }
 

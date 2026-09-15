@@ -9,6 +9,11 @@ void fill_schema_render_audio(std::unordered_map<std::string, mcp::JsonValue>& m
             {"target", "string", "Target to capture: 'editor' (default) grabs the editor 2D viewport with a fallback to the 3D viewport; 'game' captures the running game's root window over the runtime channel — requires a game launched from the editor whose project loads the godot-autopilot extension", false},
             {"timeout_ms", "integer", "Response timeout in milliseconds for target='game' (default: 5000, max: 30000); ignored for target='editor'", false},
             {"save", "boolean", "Editor target only: when true the PNG is also written to user://godot_autopilot/captures/ and the result gains path; the captures folder keeps the 20 most recent files (default: false)", false},
+            {"region", "object", "Applies to both targets: crop the captured image to {x, y, width, height} in pixels (width/height must be positive); the rect is clamped to the image and an empty intersection fails with region_out_of_bounds; with target='game' the crop is applied inside the game process; example: {x: 0, y: 0, width: 640, height: 480}", false},
+            {"max_dimension", "integer", "Applies to both targets: downscale the output image so its longest side is at most this many pixels (64-4096); never upscales (default: no scaling); with target='game' the downscale is applied inside the game process", false},
+            {"space", "string", "Editor target only: 'viewport' (default) captures the editor 2D viewport with a 3D fallback; 'window' captures the editor main window root viewport exactly as shown on screen, including docks, toolbars and the 2D grid/selection overlays", false},
+            {"diff_against_last", "boolean", "Editor target only: when true the result gains a diff object comparing the final image with the previous editor capture (comparable, changed_ratio, changed_bbox, or a reason when not comparable); when the two sizes differ the shared top-left region is compared instead and the diff additionally reports size_mismatch=true plus current_size {x, y} alongside baseline_size (default: false)", false},
+            {"annotate", "boolean", "Applies to both targets: when true the output image is annotated with numbered red boxes around UI controls and the result gains an elements array of {id, path, type, text, position, size} in final-image pixels whose ids match the box numbers (text is omitted when empty, elements_truncated marks a 200-element cap); the editor target marks editor UI controls (window-level controls with space='window'), while target='game' marks Controls of the running game, annotated inside the game process (default: false)", false},
         });
 
         m["create_render_canvas_item"] = schema::build_schema({});
@@ -323,6 +328,9 @@ void fill_schema_render_audio(std::unordered_map<std::string, mcp::JsonValue>& m
         m["warp_display_mouse"] = schema::build_schema({
             {"x", "integer", "Mouse X position in pixels relative to the client area of the focused window (not screen coordinates), e.g. 640", true},
             {"y", "integer", "Mouse Y position in pixels relative to the client area of the focused window (not screen coordinates), e.g. 360", true},
+        });
+        m["get_display_window_rect"] = schema::build_schema({
+            {"window_id", "integer", "Window id to query (default: 0 = main window)", false},
         });
         m["capture_display_screen"] = schema::build_schema({
             {"screen", "integer", "Index of the physical screen to capture, default 0; valid range is 0 to count-1 from get_display_screen_count", false},
