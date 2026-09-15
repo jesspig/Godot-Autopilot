@@ -6,7 +6,7 @@ tags:
   - 模块
   - 入口
   - 运行时桥接
-timestamp: "2026-09-14T20:49:22+08:00"
+timestamp: "2026-09-16T00:58:57+08:00"
 resource:
   - src/main.cpp
   - src/runtime/
@@ -132,7 +132,7 @@ resource:
 
 `create_editor_scene` 的等待循环以 `timeout_ms` 为上限（默认取 `GDA_NEW_SCENE_SWITCH_WAIT_MS`；非整数或越界直接报错，超时按 `GDA_NEW_SCENE_POLL_MS` 累计等待），失败时返回 `waited_ms`/`timeout_ms`/`node_released`/`editor_state` 诊断并释放未被编辑器接管的临时根节点；实现细节见 [tools_ops_a.md](tools_ops_a.md) 的 editor_ops 小节。
 
-桥接相关常量在 `src/core/config.hpp`：`GDA_HEALTHY_ACTIVITY_THRESHOLD_MS=3000`、`GDA_ERROR_BUFFER_MAX=200`、`GDA_OUTPUT_BUFFER_MAX=500`、`GDA_EVAL_TRUNCATE_BYTES=8192`。
+桥接相关常量在 `src/core/config.hpp`：`GDA_HEALTHY_ACTIVITY_THRESHOLD_MS=3000`、`GDA_ERROR_BUFFER_MAX=200`、`GDA_OUTPUT_BUFFER_MAX=500`、`GDA_EVAL_TRUNCATE_BYTES=8192`；09-16 起新增 game 工具超时预算常量：`GDA_MAX_GAME_OP_TIMEOUT_MS=25000`（host 等待 +2000ms 宽限 < 30000 传输硬上限）、`GDA_LATE_RESULT_BUFFER_MAX=5`（超时后迟到结果保留条数）、`GDA_LATE_RESULT_SUMMARY_CHARS=200`（每条摘要截断），语义见 [modules/tools_ops_b.md](tools_ops_b.md) 的 runtime_ops 小节。
 
 ## 3. 运行时桥接三文件职责
 
@@ -165,7 +165,7 @@ resource:
 ### 3.3 game_bridge_eval.cpp — 异步求值
 
 - `op_eval` 分派 4 种 action：`script` / `get_property` / `set_property` / `call_method`。
-- `op_eval_script`：`source_code` → 实例化 `GDScript` 并 `reload()`（编译失败回错误 + 编译期错误增量文本）；构造临时 Node 挂脚本，`persist` 时挂载到 `/root/__gda_runtime/<persist_name>`（缺省 `eval_<request_id>`，重名报错）；要求脚本含 `_run()` 方法；调用 `_run()` 后若返回 `GDScriptFunctionState`（await）则转 `GameBridgeEvalAwaiter` 异步等待，否则同步返回序列化结果（并附运行期错误增量、persist 时补 `node_path`）。
+- `op_eval_script`：`source_code` → 实例化 `GDScript` 并 `reload()`（**编译失败 ≤2s 结构化返回（09-16 起）**：不再等待到超时，错误含 `gdscript://<id>.gd:<行号>` Parse Error 文本，供客户端直接定位）；构造临时 Node 挂脚本，`persist` 时挂载到 `/root/__gda_runtime/<persist_name>`（缺省 `eval_<request_id>`，重名报错）；要求脚本含 `_run()` 方法；调用 `_run()` 后若返回 `GDScriptFunctionState`（await）则转 `GameBridgeEvalAwaiter` 异步等待，否则同步返回序列化结果（并附运行期错误增量、persist 时补 `node_path`）；**MCP 响应取裸 result 值（09-16 起）**——成功 eval 的响应即脚本 `_run()` 返回值（`void` → `null`），不再包一层 result 字段结构。
 - `GameBridgeEvalAwaiter`（Node）：连接 state 的 `completed` 信号或超时（默认 5000ms）后响应；完成路径与超时路径都会 `send_response` 并清理（取消 handler、断信号、非 persist 时删除临时节点、queue_free）。
 - `get_property` / `call_method`：经 `resolve_node` 定位节点；call_method 校验 `has_method` 并把 args 按 JSON 反序列化后 `callv`。
 - `set_property`：查 `get_property_list` 取类型与 hint 构造 `type_hint`，`VariantJson::deserialize(value, type_hint)` 后 set，并用 `util::check_readback(..., type_sensitive=true)` 读回校验（09-13 下午起：值类型走分量近似比较，设置未生效（回读仍等于旧值）判 REJECTED 报错、引擎调整值附 warning）。

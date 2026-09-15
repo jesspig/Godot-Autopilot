@@ -1,6 +1,6 @@
 # Category Index
 
-All 379 domain tools of the godot-autopilot MCP server, grouped by their 30 source modules. Call domain tools through `call_tool`; confirm schemas with `get_tool_detail`.
+All 384 domain tools of the godot-autopilot MCP server, grouped by their 30 source modules. Call domain tools through `call_tool`; confirm schemas with `get_tool_detail`.
 
 ## Analysis - analyze_tools (3)
 
@@ -127,7 +127,7 @@ All 379 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `get_docs_method` - look up one method's reflected signature on a class
 - `get_docs_property` - look up one property's reflected info on a class
 
-## Editor - editor_tools (28)
+## Editor - editor_tools (30)
 
 - `get_editor_selection` - list the currently selected nodes
 - `set_editor_selection` - replace the editor selection with given paths
@@ -157,8 +157,10 @@ All 379 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `click_editor_element` - click an editor UI element by its element `path` (`button`, `double_click`, `warp`, `observe`)
 - `type_editor_element_text` - type `text` into an editor UI element (`path`, `submit`, `observe`)
 - `run_editor_shortcut` - run an editor keyboard `shortcut` (for example "ctrl+s")
+- `scene_tree_items` - enumerate the rows of the editor's Scene dock tree as the editor displays them (path, name, type, depth, selected, collapsed, visible, rect), with optional `filter`, `selected_only` and `max_items`
+- `select_scene_tree_node` - select a node in the Scene dock by scene-relative or absolute `path` and show it in the Inspector (`add`, `inspect`, `focus`)
 
-## Game - game_tools (10)
+## Game - game_tools (12)
 
 - `get_game_status` - query the running game's engine stats over the runtime channel
 - `execute_game_script` - run code inside the running game process
@@ -170,6 +172,8 @@ All 379 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `capture_game_viewport` - screenshot the running game as base64 PNG
 - `get_game_ui_elements` - enumerate Control nodes of the running game for click automation
 - `click_game_ui_element` - click a running-game Control by element `path` (`button_index`, `double_click`, `max_elements`)
+- `start_game_job` - submit a game op for asynchronous execution and return immediately with a `job_id` (`op`, `params`, `timeout_ms`; the job table holds at most 16 jobs) for long-running in-game work
+- `get_game_job` - poll, wait for or cancel a game job by `job_id` (`cancel`, `timeout_ms`; status pending/done/expired/cancelled)
 
 ## Group - group_tools (3)
 
@@ -458,12 +462,13 @@ All 379 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `apply_theme_to_control` - assign a .tres theme to a Control node in the edited scene
 - `set_control_anchor_preset` - apply one of the 16 Control layout presets
 
-## TileMap - tilemap_tools (4)
+## TileMap - tilemap_tools (5)
 
 - `create_tilemap` - create a TileMap node with a default TileSet of a given tile size
 - `create_tilemap_tileset` - create a TileSet resource in memory and register it as memory://name
 - `set_tilemap_cell` - set a single cell on a TileMap or TileMapLayer node
 - `set_tilemap_cells` - set multiple cells in one call; no fixed entry cap (larger batches: use code_execute); source_id -1 clears a cell
+- `fill_tilemap_rect` - fill an axis-aligned tile rectangle in one call (`from`/`to` corner cells, `source_id`/`atlas_coords` or `erase`, `layer`); capped at 100000 cells per call and committed as a single undo step
 
 ## TileMap - tileset_tools (3)
 

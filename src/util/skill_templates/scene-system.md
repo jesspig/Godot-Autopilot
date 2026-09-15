@@ -62,18 +62,21 @@ Save first, then retry. A `type` that is not a Node subclass fails with
 - `type` — any Node subclass (default `Node`)
 - `name` — unique among siblings (default `NewNode`)
 - `parent_path` — omit it only while the scene has no root; once a root exists, pass the parent path
-- `properties` — optional object of property values applied immediately after creation
+- `properties` — optional object of property values applied immediately after creation, including inline resource descriptions that create sub-resources
 
 Creating a node while the scene already has a root and no `parent_path` is
 given fails with `scene already has a root, use parent_path to add children`.
 
 The `properties` object assigns values right after creation through the same
-conversion chain as `property_set`: `NodePath` strings become node references
-and `{"path": "res://..."}` values resolve to resources. Any failing property
-frees the new node again and reports the property name, so a failed create
-leaves no half-configured node behind. Creation is one editor undo step; the
-response carries the new node's `path`, the applied properties, and an undo
-hint describing removal via `delete_scene_node`.
+conversion chain as `property_set`: `NodePath` strings become node references,
+`{"path": "res://..."}` values resolve to resources, and an inline resource
+description such as `{"type": "RectangleShape2D", "properties": {"size":
+{"x": 20, "y": 28}}}` creates a pathless sub-resource in one step. Any failing
+property frees the new node again and reports the property name, so a failed
+create leaves no half-configured node behind. Creation is one editor undo step;
+the response carries the new node's `path`, the applied properties, the
+inline_resources array for sub-resources created this way, and an undo hint
+describing removal via `delete_scene_node`.
 
 ```json
 {
@@ -169,6 +172,7 @@ value when it can and says so in the error.
 - Every successful set registers with the editor undo stack so Ctrl-Z reverts it (the response reports undoable:true). Exception: when the old or new value is an Object reference, no action is recorded and the response reports undoable:false with a skip reason.
 - Node-typed properties — engine hint `NodeType` (34), which includes C# `[Export]` node fields — accept a node path string; it is converted to a node reference automatically and the response reports converted_node_path. An unresolvable path is an error, not a silent ok.
 - Array properties convert elements one by one: node elements take a path string or `{"__node_ref__": "..."}`, resource elements take a `res://...` or `memory://...` string, `{"path": "res://..."}` or `{"resource": "memory://..."}`, and `null` leaves a slot empty. Passing a non-array value for an array property is an error instead of silently clearing it, and elements the tool cannot express safely are errors too. See `references/property-json-shapes.md`.
+- Resource-typed properties also accept an inline resource description: `{"type": "RectangleShape2D", "properties": {"size": {"x": 20, "y": 28}}}` creates a pathless sub-resource in one step. It is written into the scene file as a `sub_resource` when the scene is saved, the response echoes it in inline_resources, and nesting is limited to 4 levels. See `references/property-json-shapes.md`.
 - Assigning a string to an int property silently converts to 0 and reports ok. After any set with an unusual value shape, read back with `property_get` to confirm what actually landed.
 
 ```json
@@ -176,8 +180,8 @@ value when it can and says so in the error.
 ```
 
 JSON value shapes for all Godot types, the Godot 3 to 4 renamed-property
-table, default-value serialization rules and the memory:// restriction are in
-`references/property-json-shapes.md`.
+table, default-value serialization rules, the inline sub-resource shape and the
+memory:// restriction are in `references/property-json-shapes.md`.
 
 ## Signals
 
@@ -234,6 +238,7 @@ undo-loss caveat: `references/undo-history.md`.
 - When a script a scene depends on is updated, the editor may silently re-pack and re-instantiate the open scene and clear its undo history — undoable-only changes vanish without an error message.
 - Saving re-packs the scene and silently drops: nodes whose owner is not the saved scene root, connections without CONNECT_PERSIST, properties equal to the node's computed default value unless pinned, and instanced-subscene nodes with no local property or group changes (details in `references/scene-format-tokens.md`).
 - Saving a scene cascades to every dirty resource edited alongside it; dirty flags are cleared before writing and PackedScene resources are skipped.
+- Every scene write tool (`create_scene_node`, `delete_scene_node`, `rename_scene_node`, `property_set`, `attach_script_to_node`) reports scene_path and scene_unsaved in its response: scene_path is the edited scene's file path on disk, empty until the scene is saved (scene_unsaved is then true). When a scene switch silently fails — for example `create_editor_scene` refused because the current scene is unsaved — a following write lands in the still-open scene; read scene_path to notice the wrong target instead of a quietly misplaced node.
 - Property lines equal to the default value are omitted from the saved file — a missing line means "matches the default", not data loss (`references/property-json-shapes.md`).
 - 4.7+: tree order is parent before child on enter, `_ready` fires child before parent, and exit is child before parent — a node cannot rely on a sibling being ready inside `_enter_tree`.
 

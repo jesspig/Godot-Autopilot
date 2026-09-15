@@ -2,6 +2,10 @@
 
 > 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天。
 
+## 2026-09-16
+
+- **失败修复批次文档收尾（feature/failure-remediation）**：域工具 379→384（可达 391 / catalog 392，非 SIDE 324 / SIDE 60）、新增 5 工具（scene_tree_items / select_scene_tree_node / fill_tilemap_rect / start_game_job / get_game_job）、L1 172→229、L2 11→17 份、ctest 183→246；8 项行为变更已并入对应功能页（modules/tools_ops_a / modules/tools_ops_b / modules/entry_runtime / tests / modules/support）：eval 结构化错误、超时预算链与 late_results、batch_execute await_async、capture after_frames/when/scale、内联子资源、scene_path 回显、godot://skills 资源、get_game_status 无参；AGENTS.md / README 双语 / tests/README.md 与知识库 12 页同步。详见 `changelog/2026-09-16-log.md`
+
 ## 2026-09-15
 
 - **Computer Use grounding 增强（域工具 366→379）**：新增 13 个编辑器 UI 语义自动化 / 合成输入 / 坐标映射工具与游戏侧 `click_game_ui_element`，`capture_editor_viewport` 增 `region`/`max_dimension`/`space`/`annotate`/`diff_against_last`，游戏侧 wheel/`mouse_motion` 与 `op_capture` 增强；SIDE 49→57（`modifies_window` 12→19、`game_runtime` 5→6），MCP 可达 386 / catalog 387；L1 140→172（新增 EditorCoordsTest 32 项）、L2 9→11（09_editor_ui / 10_editor_input）、ctest 149→183；03 遍历 322 非 SIDE 工具 0 失败、warnings 4 条；GUI 验收 10/10。详见 `changelog/2026-09-15-log.md`

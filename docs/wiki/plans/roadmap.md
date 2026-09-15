@@ -12,7 +12,7 @@ resource: src/
 
 # 竞品对齐路线图
 
-> 记录 2026-08 功能分支 `feature/engine-aware-fs-and-tool-expansion` 的竞品对齐批次（P0/P1/P2 已交付；当前 ctest 共 183 项——L1 172 + L2 11，见 [测试体系](../tests.md)），与后续 P3 方向。工具侧实现细节见 [工具注册表](../modules/tools_registry.md)，运行时协议见 [入口与运行时](../modules/entry_runtime.md)。
+> 记录 2026-08 功能分支 `feature/engine-aware-fs-and-tool-expansion` 的竞品对齐批次（P0/P1/P2 已交付；当前 ctest 共 246 项——L1 229 + L2 17，见 [测试体系](../tests.md)），与后续 P3 方向。工具侧实现细节见 [工具注册表](../modules/tools_registry.md)，运行时协议见 [入口与运行时](../modules/entry_runtime.md)。
 
 ## 竞品全景（一行定位速记）
 
@@ -69,6 +69,15 @@ resource: src/
 - **截图增强**：`capture_editor_viewport` 新增 `region` / `max_dimension` / `space` / `annotate` / `diff_against_last`（与上次编辑器截图对比；尺寸不同按公共左上区域比较并标 `size_mismatch`；不可比较时 `reason` 为 `no_baseline`/`unsupported_format`/`baseline_too_large`）；游戏侧 `capture_game_viewport` 的 region/max_dimension/annotate 在游戏进程内执行
 - **游戏侧输入与点击**：`queue_game_input` / `sequence_game_inputs` 增 wheel 与单步 mouse_motion；`click_game_ui_element` 按节点 path 在游戏进程内完成枚举 + 坐标注入（单次协议往返）
 - **安全分级**：新增 8 个副作用工具全部标记（编辑器侧 7 个 `ModifiesWindow`、游戏侧 1 个 `GameRuntime`），未新增授权能力门；详见 [T0 安全边界与并发契约](../security_contract.md)
+
+## 已交付：失败修复批次（09-16，feature/failure-remediation）
+
+领域工具 379→**384**（净 +5；Editor 29→31、TileMap 7→8、Game 10→12），MCP 可达 391 / catalog-index 392；L1 172→229、L2 11→17 份、ctest 183→246。行为变更（eval 编译错误结构化返回、game 工具超时预算链、batch_execute await_async、capture after_frames/when/scale、内联子资源、scene_path 回显、godot://skills 资源等 8 项）详见 [changelog/2026-09-16-log.md](../changelog/2026-09-16-log.md)：
+
+- **编辑器场景树**：`scene_tree_items`（Scene dock 行枚举）/ `select_scene_tree_node`（按 path 选中并联动 Inspector）
+- **瓦片地图**：`fill_tilemap_rect`（矩形铺砖/擦除，>100000 格报错、单次 undo）
+- **长任务异步**：`start_game_job` / `get_game_job`（游戏脚本异步提交+轮询，job 表上限 16、过期宽限 2s，需 `game_runtime` 授权）
+- **MCP 资源**：新增 `godot://skills` 目录/单册/单文件资源组（技能经协议层可发现）
 
 ## 遗留：P3 待规划
 
