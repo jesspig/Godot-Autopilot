@@ -42,6 +42,15 @@ failure immediately after `play_editor_current_scene` is normal: wait a
 moment and retry. If the error persists, the game project does not load the
 extension.
 
+Every game call has a three-layer timeout budget: the host waits
+`timeout_ms` + 2000 ms (response grace) for the game answer, and that host
+wait must stay below the HTTP transport's hard 30 s limit. Accepted
+`timeout_ms` for game ops is therefore capped at 25000 ms (some tools reject,
+some clamp, and the low-level sender clamps every request), while
+editor-only tools keep the 30000 ms maximum. Budget long work as a chain of
+shorter calls and poll with `get_game_status` instead of raising
+`timeout_ms`.
+
 ## Check liveness with get_game_status
 
 `get_game_status` takes no parameters and reports the engine version, current
@@ -86,7 +95,7 @@ debug channel into the game process).
   with an error — a typo fails the call.
 - `wait_game_input` waits until an action reaches a transient state
   (`just_pressed` default, `just_released` or `pressed`) in a physics frame,
-  or `timeout_ms` elapses (default 2000, max 30000). Optional `inject` sends
+  or `timeout_ms` elapses (default 2000, max 25000). Optional `inject` sends
   the input first in the same call; `just_pressed`/`just_released` require
   `inject` — without it the one-frame transient window has already expired.
 - `sequence_game_inputs` fires a timeline of inputs on exact physics frame
@@ -127,7 +136,7 @@ Three tools, three targets:
 
 - `capture_game_viewport` — the running game's viewport over the runtime
   channel (`data`, `format`, `width`, `height`). Optional `timeout_ms` bounds
-  the wait (default 5000, max 30000).
+  the wait (default 5000, max 25000; see the budget chain above).
 - `capture_editor_viewport` — the default `target` `editor` grabs the editor
   2D viewport (falling back to the 3D viewport), so it works while you are
   still building a scene; `target` `game` captures the running game instead.
@@ -136,6 +145,50 @@ Three tools, three targets:
   targets keep only the 20 most recent capture files.
 - `capture_display_screen` — a whole physical screen by `screen` index, for
   desktop-level checks such as window placement; no running game required.
+
+### Reading small details: scale
+
+`scale` (integer 1-8, default 1) nearest-neighbour upscales the output image,
+which is how you read small HUD text: capture a `region` around the text and
+scale it up 4-8x. Order is region crop, then scale, then `max_dimension` —
+the cap still wins when both are given, and the result's `width`/`height`
+always report the final size. Nearest-neighbour keeps pixel edges crisp; the
+`max_dimension` downscale stays bilinear and comes last.
+
+### Capturing short-lived events: after_frames and when
+
+Sampling a 2 s banner or a 0.7 s death screen by polling `capture_game_viewport`
+races the event window and engine time-scale slow-motion corrupts the
+gameplay being verified. Instead hand the condition to the game and let it
+decide when to shoot:
+
+- `after_frames` (integer >= 0) — wait this many rendered frames after the
+  request before capturing (0 = immediately).
+- `when` — a GDScript expression evaluated once per rendered frame inside the
+  game; the capture fires on the first frame where it is true. An empty
+  string means no condition.
+
+Give both and the frame budget must be spent before the condition is even
+evaluated. `when` runs with the current scene as the base instance (the tree
+root when no scene is set), so conditions are plain node lookups, e.g. a HUD
+label whose text becomes non-empty, a `Visible` panel, or a health value
+crossing a threshold. A malformed expression fails immediately with a
+structured error carrying the Expression error text; an expression that keeps
+raising at runtime (a missing node, a wrong path) does not fail the call — its
+last error is attached to the timeout error instead. `timeout_ms` bounds the
+entire wait, and on expiry you get a structured error (code when_timeout) with
+the frames waited, never a silent hang.
+
+The forensics pattern is act first, then condition, then capture:
+
+```json
+{"name": "call_tool", "arguments": {"name": "capture_game_viewport", "arguments": {"when": "get_node(\"HUD/MessageLabel\").text != \"\"", "timeout_ms": 4000}}}
+```
+
+Both parameters exist on `capture_game_viewport` and on
+`capture_editor_viewport` with `target` `game`. The editor target rejects them:
+its capture runs synchronously on the editor main thread and cannot yield
+frames.
 
 Delivery: through `call_tool` the base64 PNG arrives as an MCP image content
 block, so a multimodal model sees the picture directly. The text JSON keeps

@@ -48,6 +48,24 @@ bool debugger_broadcast_request(const std::string &payload,
   return true;
 }
 
+bool debugger_broadcast_engine_command(const godot::String &command,
+                                       const godot::Array &data) {
+  auto *plugin = debugger_ops::DebugCapturePlugin::get_instance();
+  if (!plugin)
+    return false;
+  bool sent = false;
+  for (int32_t id : plugin->get_session_ids()) {
+    auto session = plugin->get_session(id);
+    if (!(session.is_valid() && session->is_active()))
+      continue;
+    if (!plugin->is_session_ready(id))
+      continue;
+    session->send_message(command, data);
+    sent = true;
+  }
+  return sent;
+}
+
 void debugger_send_cancel(int32_t session_id, int64_t request_id) {
   auto *plugin = debugger_ops::DebugCapturePlugin::get_instance();
   if (!plugin)

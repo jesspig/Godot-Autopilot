@@ -12,6 +12,7 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <deque>
 #include <godot_cpp/classes/editor_debugger_plugin.hpp>
 #include <godot_cpp/classes/editor_debugger_session.hpp>
 #include <godot_cpp/classes/file_access.hpp>
@@ -38,9 +39,10 @@ namespace {
 CommandQueue *g_editor_queue = nullptr;
 std::mutex g_editor_queue_mtx;
 
-constexpr int64_t RESPONSE_GRACE_MS = 2000;
+constexpr int64_t RESPONSE_GRACE_MS = GDA_RESPONSE_GRACE_MS;
 constexpr int64_t PHYSICS_STALL_DETECT_MS = 1000;
 constexpr size_t MAX_PAYLOAD_SUMMARY_CHARS = 256;
+constexpr size_t RECENT_REQUEST_MAX = 64;
 
 int64_t g_last_status_physics_frame = -1;
 std::chrono::steady_clock::time_point g_last_status_time;
@@ -76,10 +78,99 @@ struct PendingRequest {
   std::string op;
   int32_t session_id = -1;
   int32_t session_count = 0;
+  bool error_breaks_suppressed = false;
 };
 
 std::mutex g_pending_mtx;
 std::map<int64_t, std::shared_ptr<PendingRequest>> g_pending;
+
+GameJobTable g_game_jobs;
+std::mutex g_game_jobs_mtx;
+
+struct SentRequestRecord {
+  int64_t request_id = 0;
+  std::string op;
+  int64_t sent_ms = 0;
+};
+
+std::mutex g_recent_requests_mtx;
+std::deque<SentRequestRecord> g_recent_requests;
+
+std::mutex g_late_results_mtx;
+std::deque<LateResult> g_late_results;
+
+void record_sent_request(int64_t request_id, const std::string &op) {
+  SentRequestRecord record;
+  record.request_id = request_id;
+  record.op = op;
+  record.sent_ms = steady_now_ms();
+  std::lock_guard<std::mutex> lock(g_recent_requests_mtx);
+  g_recent_requests.push_back(std::move(record));
+  while (g_recent_requests.size() > RECENT_REQUEST_MAX)
+    g_recent_requests.pop_front();
+}
+
+void record_late_result(int64_t request_id, const JV &parsed) {
+  LateResult entry;
+  entry.request_id = request_id;
+  entry.summary = late_result_summary(parsed);
+  {
+    std::lock_guard<std::mutex> lock(g_recent_requests_mtx);
+    for (auto it = g_recent_requests.rbegin(); it != g_recent_requests.rend();
+         ++it) {
+      if (it->request_id == request_id) {
+        entry.op = it->op;
+        entry.age_ms = steady_now_ms() - it->sent_ms;
+        break;
+      }
+    }
+  }
+  std::lock_guard<std::mutex> lock(g_late_results_mtx);
+  push_late_result(g_late_results, std::move(entry),
+                   GDA_LATE_RESULT_BUFFER_MAX);
+}
+
+JV late_results_snapshot() {
+  std::lock_guard<std::mutex> lock(g_late_results_mtx);
+  JV arr(JV::array_tag);
+  for (const LateResult &entry : g_late_results) {
+    JV item(JV::object_tag);
+    item["request_id"] = JV(entry.request_id);
+    item["op"] = JV(entry.op);
+    item["age_ms"] = JV(entry.age_ms);
+    item["summary"] = JV(entry.summary);
+    arr.PushBack(std::move(item));
+  }
+  return arr;
+}
+
+constexpr const char *ENGINE_CMD_IGNORE_ERROR_BREAKS =
+    "set_ignore_error_breaks";
+
+std::mutex g_error_break_mtx;
+int g_error_break_suppression_owners = 0;
+bool g_error_break_ignore_active = false;
+
+bool broadcast_error_break_ignore(bool ignore) {
+  godot::Array data;
+  data.push_back(ignore);
+  return debugger_broadcast_engine_command(
+      godot::String(ENGINE_CMD_IGNORE_ERROR_BREAKS), data);
+}
+
+void send_error_break_restore() {
+  if (broadcast_error_break_ignore(false)) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
+                              "ignore-error-breaks restored after game eval "
+                              "script");
+    return;
+  }
+  LogSystem::instance().log(
+      LogLevel::Warning, LogCategory::Transport,
+      "ignore-error-breaks could not be restored: no active game debug "
+      "session — error breaks may stay disabled in the game until it "
+      "restarts");
+}
 
 void erase_pending(int64_t request_id,
                    const std::shared_ptr<PendingRequest> &pending) {
@@ -103,22 +194,34 @@ void cancel_all_pending(const std::string &reason) {
     g_pending.clear();
   }
 
+  int released_suppressions = 0;
   for (const auto &pending : pending_requests) {
     std::lock_guard<std::mutex> lock(pending->mtx);
     if (pending->state != PendingRequest::State::Waiting)
       continue;
     pending->state = PendingRequest::State::Cancelled;
     pending->response = error_json(reason);
+    if (pending->error_breaks_suppressed) {
+      pending->error_breaks_suppressed = false;
+      ++released_suppressions;
+    }
     pending->cv.notify_all();
   }
+  for (int i = 0; i < released_suppressions; ++i)
+    restore_error_breaks();
 }
 
-JV send_request(int64_t request_id, const std::string &op, const JV &params) {
+JV send_request(int64_t request_id, const std::string &op, const JV &params,
+                bool suppress_error_breaks) {
   if (!debugger_capture_initialized())
     return error_json("debugger capture plugin not initialized");
 
+  if (suppress_error_breaks)
+    suppress_error_breaks_for_eval();
+
   auto pending = std::make_shared<PendingRequest>();
   pending->op = op;
+  pending->error_breaks_suppressed = suppress_error_breaks;
   {
     std::lock_guard<std::mutex> lock(g_pending_mtx);
     g_pending[request_id] = pending;
@@ -136,8 +239,11 @@ JV send_request(int64_t request_id, const std::string &op, const JV &params) {
     {
       std::lock_guard<std::mutex> lock(pending->mtx);
       pending->state = PendingRequest::State::Cancelled;
+      pending->error_breaks_suppressed = false;
     }
     erase_pending(request_id, pending);
+    if (suppress_error_breaks)
+      restore_error_breaks();
     return error_json("game not ready: the game process has not reported gda "
                       "ready yet — wait a moment after play, or verify the "
                       "game project loads the godot-autopilot extension");
@@ -145,6 +251,7 @@ JV send_request(int64_t request_id, const std::string &op, const JV &params) {
 
   pending->session_id = used_session_id;
   pending->session_count = session_count;
+  record_sent_request(request_id, op);
 
   JV r(JV::object_tag);
   r["request_id"] = JV(request_id);
@@ -152,7 +259,179 @@ JV send_request(int64_t request_id, const std::string &op, const JV &params) {
   return r;
 }
 
+void send_timeout_recovery(int32_t session_id, int64_t request_id) {
+  if (session_id >= 0)
+    debugger_send_cancel(session_id, request_id);
+  if (debugger_breaked_session_ids().empty())
+    return;
+  debugger_broadcast_engine_command(godot::String("continue"), godot::Array());
+  LogSystem::instance().log(
+      LogLevel::Info, LogCategory::Transport,
+      "engine continue sent after game op timeout (request_id " +
+          std::to_string(request_id) + ")");
+}
+
+void schedule_timeout_recovery(int32_t session_id, int64_t request_id) {
+  CommandQueue *queue = current_editor_queue();
+  if (!queue || queue->is_closed())
+    return;
+  if (queue->is_main_thread()) {
+    send_timeout_recovery(session_id, request_id);
+    return;
+  }
+  try {
+    queue->submit([session_id, request_id]() {
+      send_timeout_recovery(session_id, request_id);
+    });
+  } catch (...) {
+  }
+}
+
 } // namespace
+
+std::string late_result_summary(const mcp::JsonValue &response) {
+  const mcp::JsonValue *source = response.Find(GDA_FIELD_ERROR);
+  if (!source)
+    source = response.Find(GDA_FIELD_RESULT);
+  if (!source)
+    return "";
+  std::string text = source->Dump();
+  if (text.size() > GDA_LATE_RESULT_SUMMARY_CHARS)
+    text.resize(GDA_LATE_RESULT_SUMMARY_CHARS);
+  return text;
+}
+
+void push_late_result(std::deque<LateResult> &buffer, LateResult entry,
+                       size_t cap) {
+  if (cap == 0)
+    return;
+  buffer.push_back(std::move(entry));
+  while (buffer.size() > cap)
+    buffer.pop_front();
+}
+
+int64_t GameJobTable::register_job(int64_t request_id, const std::string &op,
+                                    int64_t timeout_ms, int64_t now_ms) {
+  if (jobs.size() >= kMaxJobs)
+    return -1;
+  GameJob job;
+  job.job_id = next_id;
+  job.request_id = request_id;
+  job.op = op;
+  job.started_ms = now_ms;
+  job.timeout_ms = timeout_ms;
+  jobs.emplace(job.job_id, std::move(job));
+  return next_id++;
+}
+
+bool GameJobTable::contains(int64_t job_id) const {
+  return jobs.find(job_id) != jobs.end();
+}
+
+GameJobTable::CollectOutcome GameJobTable::collect(int64_t job_id,
+                                                   int64_t now_ms) {
+  CollectOutcome outcome;
+  auto it = jobs.find(job_id);
+  if (it == jobs.end())
+    return outcome;
+  outcome.found = true;
+  outcome.request_id = it->second.request_id;
+  outcome.expired =
+      (now_ms - it->second.started_ms) > (it->second.timeout_ms + kExpiryGraceMs);
+  jobs.erase(it);
+  return outcome;
+}
+
+int GameJobTable::expire_stale(int64_t now_ms) {
+  int removed = 0;
+  for (auto it = jobs.begin(); it != jobs.end();) {
+    if ((now_ms - it->second.started_ms) >
+        (it->second.timeout_ms + kExpiryGraceMs)) {
+      it = jobs.erase(it);
+      ++removed;
+    } else {
+      ++it;
+    }
+  }
+  return removed;
+}
+
+GameJobTable &game_jobs() { return g_game_jobs; }
+
+std::mutex &game_jobs_mutex() { return g_game_jobs_mtx; }
+
+bool needs_error_break_suppression(const std::string &op,
+                                   const std::string &action) {
+  return op == std::string(GDA_OP_EVAL) && action == "script";
+}
+
+void suppress_error_breaks_for_eval() {
+  bool first_owner = false;
+  {
+    std::lock_guard<std::mutex> lock(g_error_break_mtx);
+    ++g_error_break_suppression_owners;
+    first_owner = g_error_break_suppression_owners == 1;
+  }
+  if (!first_owner) {
+    LogSystem::instance().log(
+        LogLevel::Debug, LogCategory::Transport,
+        "ignore-error-breaks suppression already active for a game eval "
+        "script; skipping duplicate send");
+    return;
+  }
+
+  const bool sent = broadcast_error_break_ignore(true);
+  {
+    std::lock_guard<std::mutex> lock(g_error_break_mtx);
+    g_error_break_ignore_active = sent;
+  }
+  if (sent) {
+    LogSystem::instance().log(
+        LogLevel::Info, LogCategory::Transport,
+        "ignore-error-breaks enabled for a game eval script");
+  } else {
+    LogSystem::instance().log(
+        LogLevel::Debug, LogCategory::Transport,
+        "ignore-error-breaks not enabled: no active game debug session");
+  }
+}
+
+void restore_error_breaks() {
+  bool send_false = false;
+  {
+    std::lock_guard<std::mutex> lock(g_error_break_mtx);
+    if (g_error_break_suppression_owners > 0)
+      --g_error_break_suppression_owners;
+    if (g_error_break_suppression_owners == 0 && g_error_break_ignore_active) {
+      g_error_break_ignore_active = false;
+      send_false = true;
+    }
+  }
+  if (!send_false)
+    return;
+
+  CommandQueue *queue = current_editor_queue();
+  if (queue && !queue->is_closed()) {
+    if (queue->is_main_thread()) {
+      send_error_break_restore();
+      return;
+    }
+    try {
+      queue->submit([]() { send_error_break_restore(); });
+      return;
+    } catch (const std::exception &ex) {
+      LogSystem::instance().log(
+          LogLevel::Warning, LogCategory::Transport,
+          "failed to schedule ignore-error-breaks restore: " +
+              std::string(ex.what()));
+      return;
+    }
+  }
+  LogSystem::instance().log(
+      LogLevel::Warning, LogCategory::Transport,
+      "ignore-error-breaks restore skipped: editor command queue unavailable "
+      "— error breaks may stay disabled in the game until it restarts");
+}
 
 mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms) {
   std::shared_ptr<PendingRequest> pending;
@@ -177,6 +456,8 @@ mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms) {
     std::string op_name = pending->op.empty() ? "?" : pending->op;
     int32_t session_id = pending->session_id;
     int32_t session_count = pending->session_count;
+    bool release_error_breaks = pending->error_breaks_suppressed;
+    pending->error_breaks_suppressed = false;
     pending->state = PendingRequest::State::Cancelled;
     erase_pending(request_id, pending);
     lock.unlock();
@@ -198,18 +479,10 @@ mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms) {
       response_summary = "no gda:response received yet, pending: " +
                          std::to_string(pending_count);
     }
-    if (session_id >= 0) {
-      if (CommandQueue *queue = current_editor_queue(); queue &&
-          !queue->is_closed()) {
-        try {
-          queue->submit([session_id, request_id]() {
-            debugger_send_cancel(session_id, request_id);
-          });
-        } catch (...) {
-        }
-      }
-    }
-    return error_json(
+    schedule_timeout_recovery(session_id, request_id);
+    if (release_error_breaks)
+      restore_error_breaks();
+    JV error = error_json(
         "game op \"" + op_name + "\" timed out after " +
         std::to_string(timeout_ms) + " ms (request_id " +
         std::to_string(request_id) + ") — sent to " +
@@ -220,11 +493,22 @@ mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms) {
         "godot-autopilot extension. "
         "If the in-game script errored, a pending await may "
         "never complete — run get_game_log_entries to inspect "
-        "the game log.");
+        "the game log. The plugin cancelled the request and, when the "
+        "debugger session was breaked, sent an engine continue so the "
+        "game main thread is released.");
+    JV late_results = late_results_snapshot();
+    if (late_results.IsArray() && !late_results.GetArray().empty())
+      error["late_results"] = std::move(late_results);
+    return error;
   }
   erase_pending(request_id, pending);
-
+  bool release_error_breaks = pending->error_breaks_suppressed;
+  pending->error_breaks_suppressed = false;
   JV response = pending->response;
+  lock.unlock();
+  if (release_error_breaks)
+    restore_error_breaks();
+
   if (response.Contains("error")) {
     std::string error_text = response["error"].GetString();
     if (auto *ed = response.Find("error_details")) {
@@ -233,7 +517,10 @@ mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms) {
             "\n(game-side error details)\n" + ed->GetString();
       }
     }
-    return error_json(error_text);
+    JV error = error_json(error_text);
+    if (auto *se = response.Find("structured_error"))
+      error["structured_error"] = *se;
+    return error;
   }
   if (auto *result_p = response.Find(GDA_FIELD_RESULT)) {
     JV result = *result_p;
@@ -324,12 +611,17 @@ bool discard_pending(int64_t request_id, std::string &out_detail) {
     g_pending.erase(it);
   }
 
+  bool release_error_breaks = false;
   {
     std::lock_guard<std::mutex> lock(pending->mtx);
     if (pending->state == PendingRequest::State::Waiting)
       pending->state = PendingRequest::State::Cancelled;
+    release_error_breaks = pending->error_breaks_suppressed;
+    pending->error_breaks_suppressed = false;
   }
   pending->cv.notify_all();
+  if (release_error_breaks)
+    restore_error_breaks();
 
   out_detail = "discarded pending request_id " + std::to_string(request_id) +
                " (batch_execute does not await async game ops)";
@@ -339,6 +631,80 @@ bool discard_pending(int64_t request_id, std::string &out_detail) {
                                 " (async game op response will be logged as a "
                                 "late game response)");
   return true;
+}
+
+mcp::JsonValue start_pending_op(const std::string &op,
+                                const mcp::JsonValue &params,
+                                bool suppress_error_breaks,
+                                int64_t *out_request_id) {
+  int64_t request_id = g_next_request_id.fetch_add(1);
+  JV result;
+  try {
+    if (!has_editor_queue())
+      return error_json("editor command queue not initialized");
+    if (get_editor_queue().is_main_thread()) {
+      result = send_request(request_id, op, params, suppress_error_breaks);
+    } else {
+      result =
+          get_editor_queue()
+              .submit([&]() {
+                return send_request(request_id, op, params,
+                                    suppress_error_breaks);
+              })
+              .get();
+    }
+  } catch (const std::exception &ex) {
+    return error_json(std::string("failed to submit request to main thread: ") +
+                      ex.what());
+  }
+  if (result.Contains("error"))
+    return result;
+  if (out_request_id)
+    *out_request_id = request_id;
+  return result;
+}
+
+bool try_collect_response(int64_t request_id, mcp::JsonValue &out_response) {
+  std::shared_ptr<PendingRequest> pending;
+  {
+    std::lock_guard<std::mutex> lock(g_pending_mtx);
+    auto it = g_pending.find(request_id);
+    if (it == g_pending.end())
+      return false;
+    pending = it->second;
+  }
+  bool release_error_breaks = false;
+  {
+    std::lock_guard<std::mutex> lock(pending->mtx);
+    if (pending->state != PendingRequest::State::Completed)
+      return false;
+    out_response = pending->response;
+    pending->state = PendingRequest::State::Cancelled;
+    release_error_breaks = pending->error_breaks_suppressed;
+    pending->error_breaks_suppressed = false;
+    pending->cv.notify_all();
+  }
+  erase_pending(request_id, pending);
+  if (release_error_breaks)
+    restore_error_breaks();
+  return true;
+}
+
+void cancel_game_op_request(int64_t request_id) {
+  std::shared_ptr<PendingRequest> pending;
+  {
+    std::lock_guard<std::mutex> lock(g_pending_mtx);
+    auto it = g_pending.find(request_id);
+    if (it == g_pending.end())
+      return;
+    pending = it->second;
+  }
+  int32_t session_id = -1;
+  {
+    std::lock_guard<std::mutex> lock(pending->mtx);
+    session_id = pending->session_id;
+  }
+  schedule_timeout_recovery(session_id, request_id);
 }
 
 void set_editor_queue(godot_autopilot::CommandQueue *q) {
@@ -385,19 +751,22 @@ void maybe_recover_break() {
 }
 
 mcp::JsonValue handle_gda_send(const std::string &op,
-                               const mcp::JsonValue &params,
-                               int64_t timeout_ms) {
+                               const mcp::JsonValue &params, int64_t timeout_ms,
+                               bool suppress_error_breaks) {
   int64_t request_id = g_next_request_id.fetch_add(1);
   JV result;
   try {
     if (!has_editor_queue())
       return error_json("editor command queue not initialized");
     if (get_editor_queue().is_main_thread()) {
-      result = send_request(request_id, op, params);
+      result = send_request(request_id, op, params, suppress_error_breaks);
     } else {
       result =
           get_editor_queue()
-              .submit([&]() { return send_request(request_id, op, params); })
+              .submit([&]() {
+                return send_request(request_id, op, params,
+                                    suppress_error_breaks);
+              })
               .get();
     }
   } catch (const std::exception &ex) {
@@ -406,9 +775,14 @@ mcp::JsonValue handle_gda_send(const std::string &op,
   }
   if (result.Contains("error"))
     return result;
+  int64_t effective_timeout_ms = timeout_ms;
+  if (effective_timeout_ms > GDA_MAX_GAME_OP_TIMEOUT_MS)
+    effective_timeout_ms = GDA_MAX_GAME_OP_TIMEOUT_MS;
+  if (effective_timeout_ms < 1)
+    effective_timeout_ms = GDA_DEFAULT_TIMEOUT_MS;
   JV r(JV::object_tag);
   r["__gda_pending"] = JV(request_id);
-  r["timeout_ms"] = JV(timeout_ms + RESPONSE_GRACE_MS);
+  r["timeout_ms"] = JV(effective_timeout_ms + RESPONSE_GRACE_MS);
   return r;
 }
 
@@ -578,20 +952,26 @@ void handle_game_response(const std::string &json_str) {
                               "late game response discarded (request_id " +
                                   std::to_string(request_id) +
                                   ", editor wait already timed out)");
+    record_late_result(request_id, parsed);
     return;
   }
 
+  bool late_response = false;
   {
     std::lock_guard<std::mutex> lock(pending->mtx);
     if (pending->state != PendingRequest::State::Waiting) {
-      LogSystem::instance().log(
-          LogLevel::Warning, LogCategory::Tools,
-          "late game response discarded (request_id " +
-              std::to_string(request_id) + ")");
-      return;
+      late_response = true;
+    } else {
+      pending->response = std::move(parsed);
+      pending->state = PendingRequest::State::Completed;
     }
-    pending->response = std::move(parsed);
-    pending->state = PendingRequest::State::Completed;
+  }
+  if (late_response) {
+    LogSystem::instance().log(LogLevel::Warning, LogCategory::Tools,
+                              "late game response discarded (request_id " +
+                                  std::to_string(request_id) + ")");
+    record_late_result(request_id, parsed);
+    return;
   }
   pending->cv.notify_all();
 }

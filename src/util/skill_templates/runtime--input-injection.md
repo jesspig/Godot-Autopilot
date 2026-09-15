@@ -201,7 +201,7 @@ Rules verified in engine source:
   `amount`, `duration_ms`, `mode`, `timeout_ms`; anything else is rejected
   with an error.
 - `wait_game_input` — wait for `just_pressed` (default), `just_released` or
-  `pressed` within a physics frame, `timeout_ms` default 2000 max 30000.
+  `pressed` within a physics frame, `timeout_ms` default 2000 max 25000.
   `just_pressed`/`just_released` require `inject` — the transient window is
   one physics frame and always expired by the time a separate call could
   poll.
@@ -212,7 +212,7 @@ Rules verified in engine source:
   fields for that kind, including the wheel fields `direction` and
   `amount`; optional `pressed` (default true), `duration_ms`, `mode`.
   Max 256 items; `timeout_ms` defaults to
-  `max(at_frame) * 33 + 2000`, capped at 30000. Resolves with `completed`
+  `max(at_frame) * 33 + 2000`, capped at 25000. Resolves with `completed`
   and `executed` counts; `completed: false` means timeout.
 - `get_game_input_status` — `pressed`, `just_pressed`, `just_released`,
   `physics_frame`. Engine errors are never attached to this response; read

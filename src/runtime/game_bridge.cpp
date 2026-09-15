@@ -15,6 +15,7 @@
 #include <functional>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/engine_debugger.hpp>
+#include <godot_cpp/classes/expression.hpp>
 #include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/logger.hpp>
@@ -390,7 +391,93 @@ const UiElement *find_ui_element(const std::vector<UiElement> &elements,
   return nullptr;
 }
 
-JV op_capture(const JV &params, int64_t request_id) {
+constexpr int64_t kCaptureScaleMin = 1;
+constexpr int64_t kCaptureScaleMax = 8;
+
+struct CaptureRequest {
+  bool has_region = false;
+  double region_x = 0.0;
+  double region_y = 0.0;
+  double region_w = 0.0;
+  double region_h = 0.0;
+  int64_t max_dimension = 0;
+  int64_t scale = 1;
+  bool annotate = false;
+  int64_t after_frames = 0;
+  std::string when;
+  int64_t timeout_ms = GDA_DEFAULT_TIMEOUT_MS;
+};
+
+JV parse_capture_request(const JV &params, CaptureRequest *out) {
+  if (auto *region_p = params.Find("region")) {
+    if (!region_p->IsObject())
+      return error_result("capture region must be an object with numeric x, y, "
+                          "width and height");
+    const JV *rx = region_p->Find("x");
+    const JV *ry = region_p->Find("y");
+    const JV *rw = region_p->Find("width");
+    const JV *rh = region_p->Find("height");
+    if (!rx || !ry || !rw || !rh || !rx->IsNumber() || !ry->IsNumber() ||
+        !rw->IsNumber() || !rh->IsNumber())
+      return error_result("capture region must be an object with numeric x, y, "
+                          "width and height");
+    out->region_x = json_double(*rx);
+    out->region_y = json_double(*ry);
+    out->region_w = json_double(*rw);
+    out->region_h = json_double(*rh);
+    if (out->region_w <= 0.0 || out->region_h <= 0.0)
+      return error_result(
+          "capture region width and height must be greater than 0");
+    out->has_region = true;
+  }
+
+  if (auto *md_p = params.Find("max_dimension")) {
+    if (!md_p->IsInt())
+      return error_result("capture max_dimension must be an integer");
+    out->max_dimension = md_p->GetInt();
+    if (out->max_dimension < kCaptureMaxDimensionMin ||
+        out->max_dimension > kCaptureMaxDimensionMax)
+      return error_result("capture max_dimension out of range (64-4096): " +
+                          std::to_string(out->max_dimension));
+  }
+
+  if (auto *scale_p = params.Find("scale")) {
+    if (!scale_p->IsInt() || scale_p->GetInt() < kCaptureScaleMin ||
+        scale_p->GetInt() > kCaptureScaleMax)
+      return error_result("scale must be an integer between 1 and 8");
+    out->scale = scale_p->GetInt();
+  }
+
+  if (auto *annotate_p = params.Find("annotate")) {
+    if (!annotate_p->IsBool())
+      return error_result("capture annotate must be a boolean");
+    out->annotate = annotate_p->GetBool();
+  }
+
+  if (auto *after_p = params.Find("after_frames")) {
+    if (!after_p->IsInt() || after_p->GetInt() < 0)
+      return error_result(
+          "after_frames must be an integer greater than or equal to 0");
+    out->after_frames = after_p->GetInt();
+  }
+
+  if (auto *when_p = params.Find("when")) {
+    if (!when_p->IsString())
+      return error_result("when must be a string");
+    out->when = when_p->GetString();
+  }
+
+  if (auto *timeout_p = params.Find("timeout_ms")) {
+    if (!timeout_p->IsInt() || timeout_p->GetInt() <= 0)
+      return error_result("capture timeout_ms must be a positive integer");
+    out->timeout_ms = timeout_p->GetInt();
+    if (out->timeout_ms > GDA_MAX_TIMEOUT_MS)
+      out->timeout_ms = GDA_MAX_TIMEOUT_MS;
+  }
+  return JV();
+}
+
+JV capture_viewport_now(const CaptureRequest &request, int64_t request_id) {
   godot::SceneTree *tree = get_scene_tree();
   if (!tree)
     return error_result("no scene tree");
@@ -404,50 +491,11 @@ JV op_capture(const JV &params, int64_t request_id) {
   const int source_width = image->get_width();
   const int source_height = image->get_height();
 
-  bool has_region = false;
-  double region_x = 0.0;
-  double region_y = 0.0;
-  double region_w = 0.0;
-  double region_h = 0.0;
-  if (auto *region_p = params.Find("region")) {
-    if (!region_p->IsObject())
-      return error_result("capture region must be an object with numeric x, y, "
-                          "width and height");
-    const JV *rx = region_p->Find("x");
-    const JV *ry = region_p->Find("y");
-    const JV *rw = region_p->Find("width");
-    const JV *rh = region_p->Find("height");
-    if (!rx || !ry || !rw || !rh || !rx->IsNumber() || !ry->IsNumber() ||
-        !rw->IsNumber() || !rh->IsNumber())
-      return error_result("capture region must be an object with numeric x, y, "
-                          "width and height");
-    region_x = json_double(*rx);
-    region_y = json_double(*ry);
-    region_w = json_double(*rw);
-    region_h = json_double(*rh);
-    if (region_w <= 0.0 || region_h <= 0.0)
-      return error_result(
-          "capture region width and height must be greater than 0");
-    has_region = true;
-  }
-
-  int64_t max_dimension = 0;
-  if (auto *md_p = params.Find("max_dimension")) {
-    if (!md_p->IsInt())
-      return error_result("capture max_dimension must be an integer");
-    max_dimension = md_p->GetInt();
-    if (max_dimension < kCaptureMaxDimensionMin ||
-        max_dimension > kCaptureMaxDimensionMax)
-      return error_result("capture max_dimension out of range (64-4096): " +
-                          std::to_string(max_dimension));
-  }
-
-  bool annotate = false;
-  if (auto *annotate_p = params.Find("annotate")) {
-    if (!annotate_p->IsBool())
-      return error_result("capture annotate must be a boolean");
-    annotate = annotate_p->GetBool();
-  }
+  const bool has_region = request.has_region;
+  const double region_x = request.region_x;
+  const double region_y = request.region_y;
+  const double region_w = request.region_w;
+  const double region_h = request.region_h;
 
   int applied_region_x = 0;
   int applied_region_y = 0;
@@ -479,10 +527,26 @@ JV op_capture(const JV &params, int64_t request_id) {
   int final_height = image->get_height();
   const int cropped_width = final_width;
   const int cropped_height = final_height;
-  if (max_dimension > 0) {
+  if (request.scale > 1) {
+    const coords::ImageSize scaled = coords::scale_size(
+        coords::ImageSize{final_width, final_height},
+        static_cast<int>(request.scale));
+    if (scaled.width <= 0 || scaled.height <= 0) {
+      return capture_error(
+          "capture_dimensions_exceeded",
+          "scaled capture exceeds the image pixel limit (" +
+              std::to_string(final_width) + "x" + std::to_string(final_height) +
+              " x" + std::to_string(request.scale) + ")");
+    }
+    image->resize(scaled.width, scaled.height,
+                  godot::Image::INTERPOLATE_NEAREST);
+    final_width = scaled.width;
+    final_height = scaled.height;
+  }
+  if (request.max_dimension > 0) {
     const coords::ImageSize fitted = coords::fit_within(
         coords::ImageSize{final_width, final_height},
-        static_cast<int>(max_dimension));
+        static_cast<int>(request.max_dimension));
     if (fitted.width != final_width || fitted.height != final_height) {
       image->resize(fitted.width, fitted.height,
                     godot::Image::INTERPOLATE_BILINEAR);
@@ -499,7 +563,7 @@ JV op_capture(const JV &params, int64_t request_id) {
   }
 
   JV annotated_elements(JV::array_tag);
-  if (annotate) {
+  if (request.annotate) {
     bool truncated = false;
     const std::vector<UiElement> elements =
         collect_ui_elements(root, GDA_UI_ELEMENTS_MAX, truncated);
@@ -568,7 +632,7 @@ JV op_capture(const JV &params, int64_t request_id) {
     applied["height"] = JV(static_cast<int64_t>(applied_region_h));
     r["region"] = std::move(applied);
   }
-  if (annotate) {
+  if (request.annotate) {
     r["annotated"] = JV(true);
     r["elements"] = std::move(annotated_elements);
   }
@@ -577,6 +641,151 @@ JV op_capture(const JV &params, int64_t request_id) {
     r["source_height"] = JV(static_cast<int64_t>(source_height));
   }
   return ok_result(std::move(r));
+}
+
+class GameBridgeCaptureAwaiter : public godot::Node {
+  GDCLASS(GameBridgeCaptureAwaiter, godot::Node)
+
+  int64_t request_id_ = 0;
+  CaptureRequest request_;
+  godot::Ref<godot::Expression> when_expr_;
+  uint64_t start_process_frames_ = 0;
+  uint64_t start_ticks_ms_ = 0;
+  int64_t frames_waited_ = 0;
+  std::string when_error_;
+  bool finished_ = false;
+
+protected:
+  static void _bind_methods() {}
+
+public:
+  void setup(int64_t request_id, CaptureRequest request,
+             const godot::Ref<godot::Expression> &when_expr) {
+    request_id_ = request_id;
+    request_ = std::move(request);
+    when_expr_ = when_expr;
+    set_process_mode(godot::Node::PROCESS_MODE_ALWAYS);
+    set_process(true);
+    auto *engine = godot::Engine::get_singleton();
+    start_process_frames_ = engine ? engine->get_process_frames() : 0;
+    start_ticks_ms_ = godot::Time::get_singleton()
+                          ? godot::Time::get_singleton()->get_ticks_msec()
+                          : 0;
+  }
+
+  void cancel() {
+    if (finished_)
+      return;
+    finished_ = true;
+    unregister_cancel_handler(request_id_);
+    queue_free();
+  }
+
+  void _process(double delta) override {
+    (void)delta;
+    if (finished_)
+      return;
+    auto *engine = godot::Engine::get_singleton();
+    const uint64_t current_frame =
+        engine ? engine->get_process_frames() : start_process_frames_;
+    frames_waited_ = static_cast<int64_t>(current_frame - start_process_frames_);
+    bool satisfied = frames_waited_ >= request_.after_frames;
+    if (satisfied && when_expr_.is_valid()) {
+      godot::Node *base = nullptr;
+      if (godot::SceneTree *tree = get_scene_tree()) {
+        base = tree->get_current_scene();
+        if (!base)
+          base = tree->get_root();
+      }
+      godot::Variant value = when_expr_->execute(godot::Array(), base, false);
+      if (when_expr_->has_execute_failed()) {
+        when_error_ = util::to_std(when_expr_->get_error_text());
+        satisfied = false;
+      } else {
+        satisfied = value.booleanize();
+      }
+    }
+    if (satisfied) {
+      finish(capture_viewport_now(request_, request_id_));
+      return;
+    }
+    const uint64_t now_ms = godot::Time::get_singleton()
+                                ? godot::Time::get_singleton()->get_ticks_msec()
+                                : 0;
+    if (now_ms - start_ticks_ms_ >= static_cast<uint64_t>(request_.timeout_ms)) {
+      std::string message =
+          "capture condition not met within " +
+          std::to_string(request_.timeout_ms) + " ms (" +
+          std::to_string(frames_waited_) + " frames waited";
+      if (request_.after_frames > 0)
+        message += ", after_frames=" + std::to_string(request_.after_frames);
+      if (!request_.when.empty())
+        message += ", when=" + request_.when;
+      if (!when_error_.empty())
+        message += ", last expression error: " + when_error_;
+      message += ")";
+      JV body = error_result(message);
+      JV details(JV::object_tag);
+      details["code"] = JV("when_timeout");
+      details["frames_waited"] = JV(frames_waited_);
+      details["timeout_ms"] = JV(request_.timeout_ms);
+      if (request_.after_frames > 0)
+        details["after_frames"] = JV(request_.after_frames);
+      if (!request_.when.empty())
+        details["when"] = JV(request_.when);
+      if (!when_error_.empty())
+        details["when_error"] = JV(when_error_);
+      body["structured_error"] = std::move(details);
+      finish(std::move(body));
+    }
+  }
+
+private:
+  void finish(JV body) {
+    finished_ = true;
+    unregister_cancel_handler(request_id_);
+    send_response(request_id_, std::move(body));
+    queue_free();
+  }
+};
+
+JV op_capture(const JV &params, int64_t request_id) {
+  CaptureRequest request;
+  if (JV error = parse_capture_request(params, &request); !error.IsNull())
+    return error;
+
+  if (request.after_frames <= 0 && request.when.empty())
+    return capture_viewport_now(request, request_id);
+
+  godot::SceneTree *tree = get_scene_tree();
+  if (!tree)
+    return error_result("no scene tree");
+  if (!tree->get_root())
+    return error_result("no root window");
+
+  godot::Ref<godot::Expression> when_expr;
+  if (!request.when.empty()) {
+    when_expr.instantiate();
+    godot::Error parse_err =
+        when_expr->parse(godot::String(request.when.c_str()));
+    if (parse_err != godot::OK) {
+      const std::string text = util::to_std(when_expr->get_error_text());
+      JV body = error_result("invalid when expression: " + text +
+                             " (expression: " + request.when + ")");
+      JV details(JV::object_tag);
+      details["code"] = JV("when_parse_error");
+      details["when"] = JV(request.when);
+      details["expression_error"] = JV(text);
+      body["structured_error"] = std::move(details);
+      return body;
+    }
+  }
+
+  GameBridgeCaptureAwaiter *awaiter = memnew(GameBridgeCaptureAwaiter);
+  awaiter->setup(request_id, request, when_expr);
+  tree->get_root()->add_child(awaiter);
+  register_cancel_handler(request_id, [awaiter] { awaiter->cancel(); });
+  return JV();
 }
 
 JV op_get_errors(const JV &params) {
@@ -935,6 +1144,7 @@ void register_listener() {
     godot::ClassDB::register_class<GameBridgeListener>();
     register_eval_bridge_classes();
     register_input_bridge_classes();
+    godot::ClassDB::register_class<GameBridgeCaptureAwaiter>();
     godot::ClassDB::register_class<GameBridgeLogger>();
     class_registered = true;
   }
