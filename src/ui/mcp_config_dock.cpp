@@ -323,11 +323,11 @@ void McpConfigDock::_on_generate() {
 
   godot::String existing = read_file(abs_path);
   std::string existing_std = existing.utf8().get_data();
-  if (id == ClientId::Codex) {
-    TomlMergeResult result = merge_toml_config(port, existing_std);
+  if (uses_toml(id)) {
+    TomlMergeResult result = merge_toml_config(id, port, existing_std);
     if (result.status == TomlMergeResult::Status::AlreadyConfigured) {
       _report("Skipped " + godot::String(rel_path) +
-                  ": mcp_servers already present (existing config kept)",
+                  ": MCP servers already present (existing config kept)",
               theme_color("warning_color", godot::Color(0.95f, 0.8f, 0.4f)));
     } else if (write_file(abs_path, result.content)) {
       _report("Updated " + godot::String(rel_path) + " on port " +
