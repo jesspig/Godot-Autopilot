@@ -6,7 +6,7 @@ tags:
   - 约定
   - 命名
   - 规范
-timestamp: "2026-09-15T07:09:53+08:00"
+timestamp: "2026-09-16T00:58:57+08:00"
 resource: src/
 ---
 
@@ -19,7 +19,7 @@ resource: src/
 - **命名空间**：`godot_autopilot`（工具子命名空间 `<模块>_ops`，如 `godot_autopilot::scene_ops`）
 - **前缀**：核心常量 `GDA_*`（如 `GDA_DEFAULT_PORT`）；运行时协议 `gda:*`；导出宏 `GDA_EXPORT`
 - **产物与目录**：CMake 目标 `godot-autopilot`，部署到 `Example/addons/godot-autopilot/`
-- **工具命名**：约定 `<动词>_<类别>_<维度>_<对象>_<修饰>`（snake_case，**以动词置首为主导**，如 `create_scene_node`、`intersect_physics_2d_ray`、`set_input_map_action_deadzone`）；379 个工具名段数随粒度自然变化（2-8 段，如 `read_file` / `add_physics_3d_body_collision_exception`），`signal_connect`/`property_set` 等少量短名为规范内保留的名词前置形态
+- **工具命名**：约定 `<动词>_<类别>_<维度>_<对象>_<修饰>`（snake_case，**以动词置首为主导**，如 `create_scene_node`、`intersect_physics_2d_ray`、`set_input_map_action_deadzone`）；384 个工具名段数随粒度自然变化（2-8 段，如 `read_file` / `add_physics_3d_body_collision_exception`），`signal_connect`/`property_set` 等少量短名为规范内保留的名词前置形态
 - **头文件 include guard**：`GODOT_AUTOPILOT_<MODULE>_HPP`
 
 ## 日志

@@ -1,0 +1,253 @@
+{
+  "name": "15_scene_path",
+  "description": "P3-2 验证：编辑器写工具回显目标场景路径（scene_path/scene_unsaved），用于发现未切换场景时的静默误建。链路：新建未保存场景 PathRoot → create_scene_node/rename_scene_node/property_set/delete_scene_node 的响应均带 scene_path=\"\" 与 scene_unsaved=true（尚未落盘）→ create_editor_scene close_current=true 因当前场景未保存被拒（复现 P3-2 触发条件），随后的 create_scene_node 仍写入旧场景，scene_path 为空即暴露真实目标 → save_editor_scene_as 落盘后再建节点，create_scene_node 的 result.scene_path 与顶层 scene_path 均为落盘路径且 scene_unsaved=false → property_set/attach_script_to_node/delete_scene_node 同样回显顶层字段 → 保存、关闭、清理临时目录。断言引擎不支持数组下标，全部用点路径精确比对。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "stages": [
+      {
+        "id": "setup",
+        "steps": [
+          {
+            "id": "scene_path_create_dir",
+            "tool": "create_directory",
+            "args": { "path": "res://gda_tmp_scene_path" },
+            "expect": { "has_keys": ["created"] }
+          },
+          {
+            "id": "scene_path_new_scene",
+            "tool": "create_editor_scene",
+            "args": { "name": "PathRoot", "type": "Node2D", "close_current": true },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.path", "value": "PathRoot" },
+                { "key": "result.type", "value": "Node2D" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "unsaved_scene_writes",
+        "steps": [
+          {
+            "id": "create_node_in_unsaved_scene",
+            "tool": "create_scene_node",
+            "args": { "name": "Early", "type": "Node2D", "parent_path": "PathRoot" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.path", "value": "Early" },
+                { "key": "result.scene_path", "value": "" },
+                { "key": "result.scene_unsaved", "value": true },
+                { "key": "scene_path", "value": "" },
+                { "key": "scene_unsaved", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "rename_node_in_unsaved_scene",
+            "tool": "rename_scene_node",
+            "args": { "path": "Early", "new_name": "Renamed" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": "renamed" },
+                { "key": "path", "value": "Renamed" },
+                { "key": "scene_path", "value": "" },
+                { "key": "scene_unsaved", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "property_set_in_unsaved_scene",
+            "tool": "property_set",
+            "args": {
+              "path": "Renamed",
+              "property": "position",
+              "value": { "x": 5, "y": 6 }
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": "ok" },
+                { "key": "scene_path", "value": "" },
+                { "key": "scene_unsaved", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "delete_node_in_unsaved_scene",
+            "tool": "delete_scene_node",
+            "args": { "path": "Renamed" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": "deleted" },
+                { "key": "scene_path", "value": "" },
+                { "key": "scene_unsaved", "value": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "refused_switch_still_reports_old_scene",
+        "steps": [
+          {
+            "id": "switch_refused_unsaved_scene",
+            "tool": "create_editor_scene",
+            "args": { "name": "Misplaced", "close_current": true },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "current scene is unsaved — position: PathRoot — expected: scene saved before close — action: call save_editor_scene first, then create_editor_scene with close_current=true" }
+              ]
+            }
+          },
+          {
+            "id": "write_after_refused_switch_reports_empty_scene_path",
+            "tool": "create_scene_node",
+            "args": { "name": "Stray", "type": "Node2D", "parent_path": "PathRoot" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.path", "value": "Stray" },
+                { "key": "result.scene_path", "value": "" },
+                { "key": "result.scene_unsaved", "value": true },
+                { "key": "scene_unsaved", "value": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "saved_scene_writes",
+        "steps": [
+          {
+            "id": "save_scene_as_probe",
+            "tool": "save_editor_scene_as",
+            "args": { "path": "res://gda_tmp_scene_path/scene_path_probe.tscn" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": "saved" }
+              ]
+            }
+          },
+          {
+            "id": "create_node_after_save",
+            "tool": "create_scene_node",
+            "args": { "name": "Late", "type": "Node2D", "parent_path": "PathRoot" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.path", "value": "Late" },
+                { "key": "result.scene_path", "value": "res://gda_tmp_scene_path/scene_path_probe.tscn" },
+                { "key": "result.scene_unsaved", "value": false },
+                { "key": "scene_path", "value": "res://gda_tmp_scene_path/scene_path_probe.tscn" },
+                { "key": "scene_unsaved", "value": false }
+              ]
+            }
+          },
+          {
+            "id": "property_set_after_save",
+            "tool": "property_set",
+            "args": {
+              "path": "Late",
+              "property": "position",
+              "value": { "x": 1, "y": 2 }
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": "ok" },
+                { "key": "scene_path", "value": "res://gda_tmp_scene_path/scene_path_probe.tscn" },
+                { "key": "scene_unsaved", "value": false }
+              ]
+            }
+          },
+          {
+            "id": "scene_path_write_probe_script",
+            "tool": "create_script",
+            "args": {
+              "path": "res://gda_tmp_scene_path/scene_path_probe.gd",
+              "overwrite": true,
+              "source_code": "@tool\nextends Node2D\n"
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.path", "value": "res://gda_tmp_scene_path/scene_path_probe.gd" },
+                { "key": "result.verified", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "attach_script_after_save",
+            "tool": "attach_script_to_node",
+            "args": {
+              "node_path": "Late",
+              "script_path": "res://gda_tmp_scene_path/scene_path_probe.gd"
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": "script attached to Late" },
+                { "key": "scene_path", "value": "res://gda_tmp_scene_path/scene_path_probe.tscn" },
+                { "key": "scene_unsaved", "value": false }
+              ]
+            }
+          },
+          {
+            "id": "delete_node_after_save",
+            "tool": "delete_scene_node",
+            "args": { "path": "Late" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": "deleted" },
+                { "key": "scene_path", "value": "res://gda_tmp_scene_path/scene_path_probe.tscn" },
+                { "key": "scene_unsaved", "value": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "cleanup",
+        "steps": [
+          {
+            "id": "scene_path_final_save",
+            "tool": "save_editor_scene",
+            "args": {},
+            "expect": {
+              "has_keys": ["result", "path"],
+              "field_checks": [
+                { "key": "result", "value": "saved" },
+                { "key": "path", "value": "res://gda_tmp_scene_path/scene_path_probe.tscn" }
+              ]
+            }
+          },
+          {
+            "id": "scene_path_close_scene",
+            "tool": "close_editor_scene",
+            "args": {},
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "closed" }
+              ]
+            }
+          },
+          {
+            "id": "scene_path_trash_dir",
+            "tool": "move_os_file_to_trash",
+            "args": { "path": "res://gda_tmp_scene_path" },
+            "expect": { "has_keys": ["result"] }
+          }
+        ]
+      }
+    ]
+  }
+}

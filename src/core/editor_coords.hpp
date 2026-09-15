@@ -22,6 +22,7 @@ Rect rect_intersect(const Rect &a, const Rect &b);
 
 struct ImageSize { int width = 0; int height = 0; };
 ImageSize fit_within(ImageSize src, int max_dimension);
+ImageSize scale_size(ImageSize src, int scale);
 
 struct DiffResult { bool comparable = false; double changed_ratio = 0.0; bool has_bbox = false; Rect bbox{}; };
 DiffResult diff_sample(const uint8_t *a, const uint8_t *b, int width, int height, int channels,

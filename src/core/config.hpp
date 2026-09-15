@@ -10,6 +10,16 @@ constexpr int GDA_DEFAULT_PORT = 9527;
 constexpr int64_t GDA_HEALTHY_ACTIVITY_THRESHOLD_MS = 3000;
 constexpr int64_t GDA_DEFAULT_TIMEOUT_MS = 5000;
 constexpr int64_t GDA_MAX_TIMEOUT_MS = 30000;
+constexpr int64_t GDA_RESPONSE_GRACE_MS = 2000;
+constexpr int64_t GDA_MAX_GAME_OP_TIMEOUT_MS = 25000;
+constexpr int64_t GDA_TRANSPORT_TIMEOUT_MS = 30000;
+constexpr int64_t GDA_MAX_GAME_OP_HOST_WAIT_MS =
+    GDA_MAX_GAME_OP_TIMEOUT_MS + GDA_RESPONSE_GRACE_MS;
+static_assert(GDA_MAX_GAME_OP_HOST_WAIT_MS < GDA_TRANSPORT_TIMEOUT_MS,
+              "game op host wait (timeout_ms + response grace) must stay below "
+              "the HTTP transport timeout");
+constexpr size_t GDA_LATE_RESULT_BUFFER_MAX = 5;
+constexpr size_t GDA_LATE_RESULT_SUMMARY_CHARS = 200;
 constexpr size_t GDA_ERROR_BUFFER_MAX = 200;
 constexpr size_t GDA_OUTPUT_BUFFER_MAX = 500;
 constexpr size_t GDA_EVAL_TRUNCATE_BYTES = 8192;

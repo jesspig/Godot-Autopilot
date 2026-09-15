@@ -29,7 +29,7 @@ Details in `references/execution-gotchas.md`.
 |---|---|---|---|---|
 | `execute_script` | editor process, synchronous | no | none - long code blocks the editor | editor automation with `SceneRoot` access |
 | `call_script_node` | an existing node instance in the edited scene | yes | default tool timeout | calling one method with real instance state |
-| `execute_game_script` | the running game process | no | runtime channel default | game-state queries and mutations |
+| `execute_game_script` | the running game process | no | `timeout_ms` default 5000, cap 25000 | game-state queries and mutations |
 | `code_execute` | editor process, wrapped temporary node | wrapped for you | `timeout_ms`, default 5000, cap 30000 | loops, bulk edits, computed results |
 
 All four execute arbitrary GDScript and are treated as highest-risk side effects.

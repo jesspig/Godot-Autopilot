@@ -1,21 +1,30 @@
 #include "editor_ui_ops.hpp"
 #include "core/log_system.hpp"
 #include "util/error_util.hpp"
+#include "util/scene_path.hpp"
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <godot_cpp/classes/canvas_item.hpp>
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
+#include <godot_cpp/classes/editor_selection.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/object.hpp>
+#include <godot_cpp/classes/sprite2d.hpp>
 #include <godot_cpp/classes/sub_viewport.hpp>
+#include <godot_cpp/classes/tree.hpp>
+#include <godot_cpp/classes/tree_item.hpp>
 #include <godot_cpp/classes/viewport.hpp>
 #include <godot_cpp/classes/viewport_texture.hpp>
 #include <godot_cpp/variant/color.hpp>
+#include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/variant/rect2.hpp>
 #include <godot_cpp/variant/rect2i.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 #include <godot_cpp/variant/transform2d.hpp>
+#include <godot_cpp/variant/typed_array.hpp>
 #include <godot_cpp/variant/variant.hpp>
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/vector2i.hpp>
@@ -36,6 +45,8 @@ int clampi(int value, int low, int high) {
   return value;
 }
 
+} // namespace
+
 std::string lower_ascii(std::string text) {
   for (char &c : text) {
     if (c >= 'A' && c <= 'Z')
@@ -43,6 +54,32 @@ std::string lower_ascii(std::string text) {
   }
   return text;
 }
+
+int clamp_scene_tree_max_items(int value) { return clampi(value, 1, 1000); }
+
+bool scene_tree_row_matches(const std::string &path, const std::string &name,
+                            const std::string &filter, bool selected,
+                            bool selected_only) {
+  if (selected_only && !selected)
+    return false;
+  if (filter.empty())
+    return true;
+  const std::string needle = lower_ascii(filter);
+  if (lower_ascii(path).find(needle) != std::string::npos)
+    return true;
+  return lower_ascii(name).find(needle) != std::string::npos;
+}
+
+std::string scene_tree_relative_path(const std::string &parent_path,
+                                     const std::string &name) {
+  if (name.empty())
+    return parent_path;
+  if (parent_path.empty())
+    return name;
+  return parent_path + "/" + name;
+}
+
+namespace {
 
 std::string read_string_prop(const godot::Object *object, const godot::StringName &name) {
   const godot::Variant value = object->get(name);
@@ -213,6 +250,231 @@ godot::Control *find_control_walk(godot::Node *node, const std::string &path) {
     }
   }
   return nullptr;
+}
+
+bool node_is_self_or_descendant(const godot::Node *node,
+                                const godot::Node *ancestor) {
+  if (!node || !ancestor)
+    return false;
+  for (const godot::Node *current = node; current; current = current->get_parent()) {
+    if (current == ancestor)
+      return true;
+  }
+  return false;
+}
+
+godot::Node *scene_tree_metadata_node(godot::TreeItem *item,
+                                      godot::Node *scene_root) {
+  if (!item || !scene_root)
+    return nullptr;
+  const godot::Variant metadata = item->get_metadata(0);
+  if (metadata.get_type() != godot::Variant::NODE_PATH)
+    return nullptr;
+  const godot::NodePath node_path = static_cast<godot::NodePath>(metadata);
+  if (node_path.is_empty())
+    return nullptr;
+  godot::Node *node = scene_root->get_node_or_null(node_path);
+  if (!node || !node_is_self_or_descendant(node, scene_root))
+    return nullptr;
+  return node;
+}
+
+void collect_tree_controls(godot::Node *node,
+                           std::vector<godot::Tree *> *out) {
+  if (auto *tree = godot::Object::cast_to<godot::Tree>(node))
+    out->push_back(tree);
+  const int child_count = node->get_child_count(true);
+  for (int i = 0; i < child_count; ++i) {
+    godot::Node *child = node->get_child(i, true);
+    if (child)
+      collect_tree_controls(child, out);
+  }
+}
+
+int score_scene_tree_candidate(godot::Tree *tree, godot::Node *scene_root) {
+  godot::TreeItem *root = tree->get_root();
+  if (!root)
+    return 0;
+  if (scene_tree_metadata_node(root, scene_root) == scene_root)
+    return 3;
+  godot::TreeItem *child = root->get_first_child();
+  for (int guard = 0; child && guard < 64; child = child->get_next(), ++guard) {
+    if (scene_tree_metadata_node(child, scene_root))
+      return 2;
+  }
+  if (!root->get_text(0).is_empty() &&
+      root->get_text(0) == godot::String(scene_root->get_name()))
+    return 1;
+  return 0;
+}
+
+godot::Tree *find_scene_tree_walk(godot::Node *base, godot::Node *scene_root) {
+  std::vector<godot::Tree *> trees;
+  collect_tree_controls(base, &trees);
+  godot::Tree *best = nullptr;
+  int best_score = 0;
+  for (godot::Tree *tree : trees) {
+    const int score = score_scene_tree_candidate(tree, scene_root);
+    if (score > best_score) {
+      best_score = score;
+      best = tree;
+    }
+    if (best_score >= 3)
+      break;
+  }
+  return best;
+}
+
+godot::Tree *ancestor_tree_of(godot::Node *node) {
+  for (godot::Node *current = node; current; current = current->get_parent()) {
+    if (auto *tree = godot::Object::cast_to<godot::Tree>(current))
+      return tree;
+  }
+  return nullptr;
+}
+
+int tree_item_depth(godot::TreeItem *item) {
+  int depth = 0;
+  for (godot::TreeItem *parent = item->get_parent(); parent;
+       parent = parent->get_parent()) {
+    ++depth;
+  }
+  return depth;
+}
+
+std::string node_scene_path(godot::Node *node, godot::Node *scene_root) {
+  if (!node || !scene_root)
+    return std::string();
+  if (node == scene_root)
+    return util::to_std(node->get_name());
+  const godot::NodePath relative = scene_root->get_path_to(node);
+  const std::string path = util::to_std(godot::String(relative));
+  if (path.empty() || path.compare(0, 2, "..") == 0)
+    return std::string();
+  return path;
+}
+
+godot::Vector2 tree_client_origin(godot::Control *tree, int *out_window_id) {
+  if (out_window_id)
+    *out_window_id = 0;
+  if (!tree)
+    return godot::Vector2();
+  godot::Window *window = window_of(tree);
+  if (!window)
+    return tree->get_screen_position();
+  if (out_window_id)
+    *out_window_id = window->get_window_id();
+  const godot::Vector2i window_pos = window->get_position();
+  return tree->get_screen_position() -
+         godot::Vector2(static_cast<float>(window_pos.x),
+                        static_cast<float>(window_pos.y));
+}
+
+void fill_scene_tree_row(godot::Tree *tree, godot::TreeItem *item,
+                         godot::Node *node, const std::string &path,
+                         const std::string &name, int depth,
+                         const godot::Vector2 &tree_origin,
+                         SceneTreeRow *out) {
+  out->path = path;
+  out->name = name;
+  out->depth = depth;
+  out->selected = item->is_selected(0);
+  out->collapsed = item->is_collapsed();
+  out->visible = item->is_visible_in_tree();
+  if (node)
+    out->type = util::to_std(node->get_class());
+  if (out->visible) {
+    const godot::Rect2 rect = tree->get_item_area_rect(item, 0);
+    out->has_rect = true;
+    out->x = static_cast<double>(tree_origin.x + rect.position.x);
+    out->y = static_cast<double>(tree_origin.y + rect.position.y);
+    out->w = static_cast<double>(rect.size.x);
+    out->h = static_cast<double>(rect.size.y);
+  }
+}
+
+struct SceneTreeWalk {
+  godot::Tree *tree = nullptr;
+  godot::Node *scene_root = nullptr;
+  godot::Vector2 tree_origin;
+  std::string filter;
+  bool selected_only = false;
+  int max_items = 200;
+  std::vector<SceneTreeRow> *rows = nullptr;
+  bool *truncated = nullptr;
+};
+
+void walk_scene_tree_rows(godot::TreeItem *item, const std::string &parent_path,
+                          int depth, SceneTreeWalk *walk) {
+  for (godot::TreeItem *child = item->get_first_child(); child;
+       child = child->get_next()) {
+    godot::Node *node = scene_tree_metadata_node(child, walk->scene_root);
+    std::string name = util::to_std(child->get_text(0));
+    if (node)
+      name = util::to_std(node->get_name());
+    std::string path = node ? node_scene_path(node, walk->scene_root)
+                            : std::string();
+    if (path.empty())
+      path = scene_tree_relative_path(parent_path, name);
+    if (scene_tree_row_matches(path, name, walk->filter, child->is_selected(0),
+                               walk->selected_only)) {
+      if (static_cast<int>(walk->rows->size()) >= walk->max_items) {
+        *walk->truncated = true;
+        return;
+      }
+      SceneTreeRow row;
+      fill_scene_tree_row(walk->tree, child, node, path, name, depth,
+                          walk->tree_origin, &row);
+      walk->rows->push_back(std::move(row));
+    }
+    walk_scene_tree_rows(child, path, depth + 1, walk);
+    if (*walk->truncated)
+      return;
+  }
+}
+
+bool canvas_item_client_rect(godot::CanvasItem *item,
+                             const godot::Transform2D &canvas_to_client,
+                             godot::Rect2 *out) {
+  godot::Rect2 local;
+  if (auto *control = godot::Object::cast_to<godot::Control>(item)) {
+    local = control->get_rect();
+  } else if (auto *sprite = godot::Object::cast_to<godot::Sprite2D>(item)) {
+    local = sprite->get_rect();
+  } else {
+    return false;
+  }
+  const godot::Transform2D global = item->get_global_transform();
+  const godot::Vector2 corner_a = canvas_to_client.xform(global.xform(local.position));
+  const godot::Vector2 corner_b =
+      canvas_to_client.xform(global.xform(local.position + local.size));
+  out->position = godot::Vector2(std::min(corner_a.x, corner_b.x),
+                                 std::min(corner_a.y, corner_b.y));
+  out->size = godot::Vector2(std::fabs(corner_b.x - corner_a.x),
+                             std::fabs(corner_b.y - corner_a.y));
+  return true;
+}
+
+void collect_scene_node_hits(godot::Node *node,
+                             const godot::Transform2D &canvas_to_client,
+                             const godot::Vector2 &point,
+                             std::vector<godot::Node *> *hits) {
+  const int child_count = node->get_child_count(true);
+  for (int i = 0; i < child_count; ++i) {
+    godot::Node *child = node->get_child(i, true);
+    if (!child)
+      continue;
+    if (auto *canvas_item = godot::Object::cast_to<godot::CanvasItem>(child)) {
+      if (canvas_item->is_visible_in_tree()) {
+        godot::Rect2 rect;
+        if (canvas_item_client_rect(canvas_item, canvas_to_client, &rect) &&
+            rect.has_point(point)) {
+          hits->push_back(child);
+        }
+      }
+    }
+    collect_scene_node_hits(child, canvas_to_client, point, hits);
+  }
 }
 
 godot::SubViewport *resolve_editor_viewport(const std::string &which, int index,
@@ -430,6 +692,271 @@ godot::Window *window_for_id(int window_id) {
   return nullptr;
 }
 
+godot::Tree *find_scene_tree(std::string *error) {
+  auto *editor = godot::EditorInterface::get_singleton();
+  if (!editor) {
+    if (error)
+      *error = "EditorInterface not available";
+    return nullptr;
+  }
+  godot::Node *scene_root = editor->get_edited_scene_root();
+  if (!scene_root) {
+    if (error)
+      *error = "no scene currently open in the editor";
+    return nullptr;
+  }
+  godot::Control *base = editor->get_base_control();
+  if (!base) {
+    if (error)
+      *error = "editor base control not available";
+    return nullptr;
+  }
+  if (godot::Tree *tree = find_scene_tree_walk(base, scene_root))
+    return tree;
+  if (error)
+    *error = "editor scene tree control not found";
+  return nullptr;
+}
+
+bool collect_scene_tree_rows(godot::Tree *tree, const std::string &filter,
+                             bool selected_only, int max_items,
+                             std::vector<SceneTreeRow> *out, bool *out_truncated,
+                             int *out_window_id, std::string *error) {
+  if (out)
+    out->clear();
+  if (out_truncated)
+    *out_truncated = false;
+  if (out_window_id)
+    *out_window_id = 0;
+  if (!tree || !out) {
+    if (error)
+      *error = "editor scene tree control not available";
+    return false;
+  }
+  godot::TreeItem *root = tree->get_root();
+  if (!root) {
+    if (error)
+      *error = "editor scene tree has no root item";
+    return false;
+  }
+  auto *editor = godot::EditorInterface::get_singleton();
+  godot::Node *scene_root = editor ? editor->get_edited_scene_root() : nullptr;
+  if (!scene_root) {
+    if (error)
+      *error = "no scene currently open in the editor";
+    return false;
+  }
+
+  int window_id = 0;
+  const godot::Vector2 tree_origin = tree_client_origin(tree, &window_id);
+  if (out_window_id)
+    *out_window_id = window_id;
+
+  bool truncated = false;
+  const std::string root_name = util::to_std(scene_root->get_name());
+  if (scene_tree_row_matches(root_name, root_name, filter, root->is_selected(0),
+                             selected_only)) {
+    if (max_items <= 0) {
+      truncated = true;
+    } else {
+      SceneTreeRow row;
+      fill_scene_tree_row(tree, root, scene_root, root_name, root_name, 0,
+                          tree_origin, &row);
+      out->push_back(std::move(row));
+    }
+  }
+  if (!truncated) {
+    SceneTreeWalk walk;
+    walk.tree = tree;
+    walk.scene_root = scene_root;
+    walk.tree_origin = tree_origin;
+    walk.filter = filter;
+    walk.selected_only = selected_only;
+    walk.max_items = max_items;
+    walk.rows = out;
+    walk.truncated = &truncated;
+    walk_scene_tree_rows(root, root_name, 1, &walk);
+  }
+  if (out_truncated)
+    *out_truncated = truncated;
+  return true;
+}
+
+bool find_scene_tree_item(godot::Tree *tree, godot::Node *node,
+                          godot::TreeItem **out_item) {
+  if (out_item)
+    *out_item = nullptr;
+  if (!tree || !node)
+    return false;
+  auto *editor = godot::EditorInterface::get_singleton();
+  godot::Node *scene_root = editor ? editor->get_edited_scene_root() : nullptr;
+  if (!scene_root || !node_is_self_or_descendant(node, scene_root))
+    return false;
+  godot::TreeItem *root = tree->get_root();
+  if (!root)
+    return false;
+
+  const godot::NodePath expected = scene_root->get_path_to(node);
+  std::vector<godot::TreeItem *> stack;
+  stack.push_back(root);
+  while (!stack.empty()) {
+    godot::TreeItem *item = stack.back();
+    stack.pop_back();
+    const godot::Variant metadata = item->get_metadata(0);
+    if (metadata.get_type() == godot::Variant::NODE_PATH &&
+        static_cast<godot::NodePath>(metadata) == expected) {
+      if (out_item)
+        *out_item = item;
+      return true;
+    }
+    for (godot::TreeItem *child = item->get_first_child(); child;
+         child = child->get_next()) {
+      stack.push_back(child);
+    }
+  }
+  return false;
+}
+
+bool scene_tree_row_at_point(double window_x, double window_y, int window_id,
+                             SceneTreeRow *out, std::string *error) {
+  if (out)
+    *out = SceneTreeRow();
+  godot::Window *window = window_for_id(window_id);
+  if (!window) {
+    if (error)
+      *error = "window not found: id " + std::to_string(window_id);
+    return false;
+  }
+  const godot::Vector2 point(static_cast<float>(window_x),
+                             static_cast<float>(window_y));
+  godot::Control *hit = find_hit_control(window, point);
+  if (!hit)
+    return false;
+  godot::Tree *hit_tree = ancestor_tree_of(hit);
+  if (!hit_tree)
+    return false;
+
+  std::string tree_error;
+  godot::Tree *scene_tree = find_scene_tree(&tree_error);
+  if (!scene_tree) {
+    if (error)
+      *error = tree_error;
+    return false;
+  }
+  if (hit_tree != scene_tree)
+    return false;
+
+  const godot::Vector2 local =
+      scene_tree->get_global_transform().affine_inverse().xform(point);
+  godot::TreeItem *item = scene_tree->get_item_at_position(local);
+  if (!item)
+    return false;
+  auto *editor = godot::EditorInterface::get_singleton();
+  godot::Node *scene_root = editor ? editor->get_edited_scene_root() : nullptr;
+  godot::Node *node = scene_tree_metadata_node(item, scene_root);
+  if (!node)
+    return false;
+  const std::string path = node_scene_path(node, scene_root);
+  if (path.empty())
+    return false;
+
+  int ignored_window_id = 0;
+  const godot::Vector2 origin =
+      tree_client_origin(scene_tree, &ignored_window_id);
+  int depth = tree_item_depth(item);
+  if (scene_tree->is_root_hidden() && depth > 0)
+    --depth;
+  SceneTreeRow row;
+  fill_scene_tree_row(scene_tree, item, node, path,
+                      util::to_std(node->get_name()), depth, origin, &row);
+  if (out)
+    *out = std::move(row);
+  return true;
+}
+
+std::vector<SceneNodeHit> pick_scene_nodes_2d(double window_x, double window_y,
+                                              int window_id, int max_results,
+                                              std::string *error) {
+  std::vector<SceneNodeHit> hits;
+  if (max_results <= 0)
+    return hits;
+  auto *editor = godot::EditorInterface::get_singleton();
+  if (!editor) {
+    if (error)
+      *error = "EditorInterface not available";
+    return hits;
+  }
+  godot::Node *scene_root = editor->get_edited_scene_root();
+  if (!scene_root)
+    return hits;
+  godot::SubViewport *viewport = editor->get_editor_viewport_2d();
+  if (!viewport) {
+    if (error)
+      *error = "2D editor viewport not available";
+    return hits;
+  }
+  godot::Window *viewport_window = viewport->get_window();
+  if (!viewport_window || viewport_window->get_window_id() != window_id)
+    return hits;
+  if (auto *container =
+          godot::Object::cast_to<godot::Control>(viewport->get_parent())) {
+    if (!container->is_visible_in_tree())
+      return hits;
+  }
+
+  const godot::Vector2 point(static_cast<float>(window_x),
+                             static_cast<float>(window_y));
+  const godot::Transform2D screen_transform = viewport->get_screen_transform();
+  const godot::Vector2 viewport_point =
+      screen_transform.affine_inverse().xform(point);
+  if (!viewport->get_visible_rect().has_point(viewport_point))
+    return hits;
+
+  const godot::Transform2D canvas_to_client =
+      screen_transform * viewport->get_global_canvas_transform();
+  std::vector<godot::Node *> candidates;
+  collect_scene_node_hits(scene_root, canvas_to_client, point, &candidates);
+  for (auto it = candidates.rbegin();
+       it != candidates.rend() && static_cast<int>(hits.size()) < max_results;
+       ++it) {
+    SceneNodeHit hit;
+    hit.path = node_scene_path(*it, scene_root);
+    if (hit.path.empty())
+      continue;
+    hit.name = util::to_std((*it)->get_name());
+    hit.type = util::to_std((*it)->get_class());
+    hits.push_back(std::move(hit));
+  }
+  return hits;
+}
+
+mcp::JsonValue scene_tree_row_to_json(const SceneTreeRow &row) {
+  mcp::JsonValue object(mcp::JsonValue::object_tag);
+  object["path"] = mcp::JsonValue(row.path);
+  object["name"] = mcp::JsonValue(row.name);
+  if (!row.type.empty())
+    object["type"] = mcp::JsonValue(row.type);
+  object["depth"] = mcp::JsonValue(row.depth);
+  object["selected"] = mcp::JsonValue(row.selected);
+  object["collapsed"] = mcp::JsonValue(row.collapsed);
+  object["visible"] = mcp::JsonValue(row.visible);
+  if (row.has_rect) {
+    mcp::JsonValue rect(mcp::JsonValue::object_tag);
+    mcp::JsonValue position(mcp::JsonValue::object_tag);
+    position["x"] = mcp::JsonValue(row.x);
+    position["y"] = mcp::JsonValue(row.y);
+    mcp::JsonValue size(mcp::JsonValue::object_tag);
+    size["x"] = mcp::JsonValue(row.w);
+    size["y"] = mcp::JsonValue(row.h);
+    rect["position"] = std::move(position);
+    rect["size"] = std::move(size);
+    object["rect"] = std::move(rect);
+  } else {
+    object["rect"] = mcp::JsonValue(nullptr);
+  }
+  return object;
+}
+
 std::vector<Element> hit_test(double window_x, double window_y, int window_id, int max_results) {
   std::vector<Element> hits;
   if (max_results <= 0)
@@ -593,6 +1120,10 @@ mcp::JsonValue handle_hit_test_editor_point(const mcp::JsonValue &args) {
   if (!read_int_param(args, "max_results", 10, &max_results, &error))
     return util::error_json(error);
   max_results = clampi(max_results, 1, 64);
+  bool include_scene_nodes = false;
+  if (!read_bool_param(args, "include_scene_nodes", false, &include_scene_nodes,
+                       &error))
+    return util::error_json(error);
 
   const std::vector<Element> hits =
       hit_test(point.x, point.y, window_id, max_results);
@@ -605,6 +1136,192 @@ mcp::JsonValue handle_hit_test_editor_point(const mcp::JsonValue &args) {
   inner["hits"] = std::move(array);
   inner["count"] = mcp::JsonValue(static_cast<int>(hits.size()));
   inner["space"] = mcp::JsonValue("window");
+
+  if (include_scene_nodes) {
+    SceneTreeRow row;
+    std::string tree_error;
+    if (scene_tree_row_at_point(point.x, point.y, window_id, &row, &tree_error)) {
+      inner["scene_tree_item"] = scene_tree_row_to_json(row);
+    } else if (!tree_error.empty()) {
+      inner["scene_tree_error"] = mcp::JsonValue(tree_error);
+    }
+
+    std::string pick_error;
+    const std::vector<SceneNodeHit> scene_nodes =
+        pick_scene_nodes_2d(point.x, point.y, window_id, 8, &pick_error);
+    mcp::JsonValue scene_nodes_json(mcp::JsonValue::array_tag);
+    for (const SceneNodeHit &node : scene_nodes) {
+      mcp::JsonValue item(mcp::JsonValue::object_tag);
+      item["path"] = mcp::JsonValue(node.path);
+      item["name"] = mcp::JsonValue(node.name);
+      item["type"] = mcp::JsonValue(node.type);
+      scene_nodes_json.PushBack(std::move(item));
+    }
+    inner["scene_nodes"] = std::move(scene_nodes_json);
+    inner["scene_node_count"] = mcp::JsonValue(static_cast<int>(scene_nodes.size()));
+    if (!pick_error.empty())
+      inner["scene_nodes_error"] = mcp::JsonValue(pick_error);
+  }
+  return util::ok_result(std::move(inner));
+}
+
+mcp::JsonValue handle_scene_tree_items(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
+                            "scene_tree_items called");
+
+  std::string error;
+  std::string filter;
+  if (!read_string_param(args, "filter", &filter, &error))
+    return util::error_json(error);
+  bool selected_only = false;
+  if (!read_bool_param(args, "selected_only", false, &selected_only, &error))
+    return util::error_json(error);
+  int max_items = 200;
+  if (!read_int_param(args, "max_items", 200, &max_items, &error))
+    return util::error_json(error);
+  max_items = clamp_scene_tree_max_items(max_items);
+
+  auto *editor = godot::EditorInterface::get_singleton();
+  if (!editor)
+    return util::error_json("EditorInterface not available");
+  if (!editor->get_edited_scene_root()) {
+    return util::error_detail("no scene currently open in the editor",
+                              "scene_tree_items", "an edited scene",
+                              "open or create a scene first (create_editor_scene)");
+  }
+
+  std::string tree_error;
+  godot::Tree *tree = find_scene_tree(&tree_error);
+  if (!tree) {
+    return util::error_detail(
+        tree_error, "scene_tree_items",
+        "an editor Tree control whose first row metadata resolves to a node of "
+        "the edited scene",
+        "use get_scene_tree for the scene model, or retry once the editor UI is "
+        "ready");
+  }
+
+  std::vector<SceneTreeRow> rows;
+  bool truncated = false;
+  int window_id = 0;
+  if (!collect_scene_tree_rows(tree, filter, selected_only, max_items, &rows,
+                               &truncated, &window_id, &error)) {
+    return util::error_detail(error, "scene_tree_items",
+                              "a populated editor scene tree",
+                              "use get_scene_tree for the scene model");
+  }
+
+  mcp::JsonValue array(mcp::JsonValue::array_tag);
+  for (const SceneTreeRow &row : rows)
+    array.PushBack(scene_tree_row_to_json(row));
+
+  mcp::JsonValue inner(mcp::JsonValue::object_tag);
+  inner["rows"] = std::move(array);
+  inner["count"] = mcp::JsonValue(static_cast<int>(rows.size()));
+  inner["truncated"] = mcp::JsonValue(truncated);
+  inner["window_id"] = mcp::JsonValue(window_id);
+  inner["space"] = mcp::JsonValue("window");
+  return util::ok_result(std::move(inner));
+}
+
+mcp::JsonValue handle_select_scene_tree_node(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
+                            "select_scene_tree_node called");
+
+  std::string error;
+  std::string path;
+  if (!read_string_param(args, "path", &path, &error))
+    return util::error_json(error);
+  if (path.empty())
+    return util::error_json("missing required parameter: path");
+  bool add = false;
+  if (!read_bool_param(args, "add", false, &add, &error))
+    return util::error_json(error);
+  bool inspect = true;
+  if (!read_bool_param(args, "inspect", true, &inspect, &error))
+    return util::error_json(error);
+  bool focus = true;
+  if (!read_bool_param(args, "focus", true, &focus, &error))
+    return util::error_json(error);
+
+  auto *editor = godot::EditorInterface::get_singleton();
+  if (!editor)
+    return util::error_json("EditorInterface not available");
+  godot::Node *scene_root = editor->get_edited_scene_root();
+  if (!scene_root) {
+    return util::error_detail("no scene currently open in the editor",
+                              "select_scene_tree_node", "an edited scene",
+                              "open or create a scene first (create_editor_scene)");
+  }
+
+  std::string hint;
+  godot::Node *node = util::resolve_scene_node(path, scene_root, &hint);
+  if (!node) {
+    return util::error_detail(
+        "scene node not found: " + path, "select_scene_tree_node",
+        "an existing node in the edited scene root \"" +
+            util::to_std(scene_root->get_name()) + "\"",
+        "call scene_tree_items or get_scene_tree to list valid node paths");
+  }
+
+  auto *selection = editor->get_selection();
+  if (!selection)
+    return util::error_json("EditorSelection not available");
+
+  std::vector<godot::Node *> previous;
+  if (add) {
+    const godot::TypedArray<godot::Node> existing =
+        selection->get_selected_nodes();
+    previous.reserve(static_cast<size_t>(existing.size()));
+    for (int i = 0; i < existing.size(); ++i) {
+      if (godot::Node *selected = godot::Object::cast_to<godot::Node>(existing[i]))
+        previous.push_back(selected);
+    }
+  }
+
+  selection->clear();
+  selection->add_node(node);
+
+  bool inspected = false;
+  if (inspect) {
+    editor->edit_node(node);
+    inspected = true;
+  }
+
+  if (add && inspected) {
+    for (godot::Node *selected : previous) {
+      if (selected->is_inside_tree())
+        selection->add_node(selected);
+    }
+  }
+
+  bool tree_found = false;
+  bool focused = false;
+  std::string tree_error;
+  godot::Tree *tree = find_scene_tree(&tree_error);
+  if (tree) {
+    tree_found = true;
+    godot::TreeItem *item = nullptr;
+    if (find_scene_tree_item(tree, node, &item) && item && focus) {
+      tree->scroll_to_item(item, true);
+      focused = true;
+    }
+  }
+
+  const int selected_count =
+      static_cast<int>(selection->get_selected_nodes().size());
+
+  mcp::JsonValue inner(mcp::JsonValue::object_tag);
+  inner["ok"] = mcp::JsonValue(true);
+  inner["path"] = mcp::JsonValue(node_scene_path(node, scene_root));
+  inner["selected_count"] = mcp::JsonValue(selected_count);
+  inner["inspected"] = mcp::JsonValue(inspected);
+  inner["focused"] = mcp::JsonValue(focused);
+  inner["tree_found"] = mcp::JsonValue(tree_found);
+  if (!tree_found)
+    inner["note"] = mcp::JsonValue(
+        "editor scene tree control not found, so the row was not scrolled into "
+        "view; selection and inspector still applied");
   return util::ok_result(std::move(inner));
 }
 

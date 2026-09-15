@@ -14,6 +14,8 @@ void register_memory_resource(const godot::Ref<godot::Resource> &res,
                               const std::string &name);
 bool try_resolve_resource_value(const mcp::JsonValue &val, godot::Variant &out,
                                 std::string &out_error);
+godot::Ref<godot::Resource> instantiate_resource_class(const std::string &type,
+                                                       std::string &out_error);
 
 mcp::JsonValue handle_load(const mcp::JsonValue &args);
 mcp::JsonValue handle_reload(const mcp::JsonValue &args);

@@ -485,6 +485,7 @@ mcp::JsonValue handle_attach_to_node(const mcp::JsonValue &args) {
   r["result"] = mcp::JsonValue("script attached to " + node_path);
   bool instantiable = script->can_instantiate();
   r["instantiated"] = mcp::JsonValue(instantiable);
+  util::add_scene_info_fields(r, util::edited_scene_info());
   if (!instantiable) {
     r["note"] =
         mcp::JsonValue("script is not instantiable in the editor: method calls "

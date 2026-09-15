@@ -186,8 +186,20 @@ anchors. Persist with `save_editor_scene`.
 While the game runs, `get_game_ui_elements` walks the running Control tree:
 node path, type, visibility, optional text and global rectangle per Control
 (`max_elements` default 100 / hard cap 1000, truncated responses are flagged;
-`timeout_ms` default 5000 / max 30000). Use the rectangles to aim
+`timeout_ms` default 5000 / max 25000). Use the rectangles to aim
 `queue_game_input` - the game channel details are in the runtime skill.
+
+HUD-theme feedback is often short-lived (a toast that lives 2 s, a death
+overlay that blinks for 0.7 s), so screenshotting it needs a condition rather
+than a poll-and-race. `capture_game_viewport` (and `capture_editor_viewport`
+with `target` `game`) takes `after_frames` (rendered frames to wait) and
+`when` (a GDScript expression re-checked every rendered frame, run against the
+current scene, e.g. a HUD label's text becoming non-empty). Act first, then
+call capture with a condition - do not slow the game down. A malformed
+expression fails immediately; an expression that never turns true returns a
+structured timeout error instead of hanging. For small themed text, add
+`scale` (integer 1-8, nearest neighbour) after the `region` crop; the
+`max_dimension` cap still wins when both are given.
 
 Top gotchas (details in the reference):
 

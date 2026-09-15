@@ -1,0 +1,119 @@
+{
+  "name": "game_jobs",
+  "description": "start_game_job / get_game_job 的参数校验与 headless 运行时通道路径。前置条件：start_game_job 受 game_runtime capability 授权门保护，可由 GODOT_AUTOPILOT_ALLOW 环境变量或 user://godot_autopilot/config.json 的 allow 字段提供（env 优先于配置回落）；两者均未包含 game_runtime 时 start_game_job 三步返回 authorization required 错误；get_game_job 无授权门，无条件可断言。断言：start_game_job 缺 op 报 missing required parameter: op，op 非法值报 unsupported op，params 缺失报 missing required parameter: params；合法参数在无游戏时返回结构化 error+hint（证明抵达发送路径且不挂起）；get_game_job 缺 job_id 报 missing required parameter: job_id，未知 job_id 报含 position/expected/action 的四段式 unknown 错误，cancel 非布尔与 timeout_ms 越界各有类型错误。真实 job 生命周期（start → pending → done 的结果取回、expired 过期清理、cancel 取消与错误断点抑制释放）需要真实游戏进程，由 V3 复现验收覆盖，本文件不做断言。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "stages": [
+      {
+        "id": "start_arg_validation",
+        "steps": [
+          {
+            "id": "start_missing_op",
+            "tool": "start_game_job",
+            "args": {},
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "missing required parameter: op (currently only \"eval\")" }
+              ]
+            }
+          },
+          {
+            "id": "start_unsupported_op",
+            "tool": "start_game_job",
+            "args": { "op": "status", "params": {} },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "unsupported op: status — start_game_job currently supports op \"eval\" only" }
+              ]
+            }
+          },
+          {
+            "id": "start_missing_params",
+            "tool": "start_game_job",
+            "args": { "op": "eval" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "missing required parameter: params (object passed to the wrapped op verbatim, e.g. {\"action\":\"script\",\"source_code\":\"...\"})" }
+              ]
+            }
+          },
+          {
+            "id": "start_timeout_out_of_range",
+            "tool": "start_game_job",
+            "args": { "op": "eval", "params": { "action": "script", "source_code": "func _run() -> void: pass" }, "timeout_ms": 25001 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "timeout_ms must be an integer between 1 and 25000" }
+              ]
+            }
+          },
+          {
+            "id": "start_valid_args_no_game",
+            "tool": "start_game_job",
+            "args": { "op": "eval", "params": { "action": "script", "source_code": "func _run() -> void: pass" } },
+            "expect": {
+              "has_keys": ["error", "hint"],
+              "field_checks": [
+                { "key": "error", "not_empty": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "get_arg_validation",
+        "steps": [
+          {
+            "id": "get_missing_job_id",
+            "tool": "get_game_job",
+            "args": {},
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "missing required parameter: job_id (integer returned by start_game_job)" }
+              ]
+            }
+          },
+          {
+            "id": "get_unknown_job_id",
+            "tool": "get_game_job",
+            "args": { "job_id": 999999 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "unknown or already collected game job: 999999 — position: get_game_job — expected: a job_id returned by start_game_job that is still tracked — action: re-check the start_game_job response for the correct job_id; jobs are removed once collected or after they expire timeout_ms + 2000 ms after start" }
+              ]
+            }
+          },
+          {
+            "id": "get_cancel_wrong_type",
+            "tool": "get_game_job",
+            "args": { "job_id": 1, "cancel": "yes" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "cancel must be a boolean" }
+              ]
+            }
+          },
+          {
+            "id": "get_timeout_negative",
+            "tool": "get_game_job",
+            "args": { "job_id": 1, "timeout_ms": -1 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "timeout_ms must be an integer between 0 and 25000" }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -219,6 +219,7 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
 
   std::vector<std::string> applied_properties;
   std::vector<mcp::JsonValue> property_warnings;
+  std::vector<mcp::JsonValue> inline_resources;
   if (props_it) {
     auto *scene_root_now =
         editor ? editor->get_edited_scene_root() : nullptr;
@@ -261,6 +262,12 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
         w["warning"] = mcp::JsonValue(warn->GetString());
         property_warnings.push_back(std::move(w));
       }
+      auto *inline_rec = prop_result.Find("inline_resources");
+      if (inline_rec && inline_rec->IsArray()) {
+        for (const auto &entry : inline_rec->GetArray()) {
+          inline_resources.push_back(entry);
+        }
+      }
       applied_properties.push_back(kv.first);
     }
   }
@@ -283,13 +290,22 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
     result_path = scene_relative_path(obj, scene_root);
   }
 
+  const util::EditedSceneInfo scene_info = util::edited_scene_info();
+
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   mcp::JsonValue inner(mcp::JsonValue::object_tag);
   inner["path"] = mcp::JsonValue(result_path);
+  util::add_scene_info_fields(inner, scene_info);
   mcp::JsonValue applied(mcp::JsonValue::array_tag);
   for (const auto &applied_name : applied_properties)
     applied.PushBack(mcp::JsonValue(applied_name));
   inner["applied_properties"] = std::move(applied);
+  if (!inline_resources.empty()) {
+    mcp::JsonValue inlines(mcp::JsonValue::array_tag);
+    for (auto &entry : inline_resources)
+      inlines.PushBack(std::move(entry));
+    inner["inline_resources"] = std::move(inlines);
+  }
   if (!property_warnings.empty()) {
     mcp::JsonValue warnings(mcp::JsonValue::array_tag);
     for (auto &w : property_warnings)
@@ -299,6 +315,12 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
   inner["undo"] =
       mcp::JsonValue("delete node " + result_path + " (delete_scene_node)");
   r["result"] = std::move(inner);
+  util::add_scene_info_fields(r, scene_info);
+  if (!scene_info.has_scene) {
+    r["scene_info_note"] = mcp::JsonValue(
+        "no edited scene root — scene_path is empty and the write target is "
+        "unknown");
+  }
   scene_dirty_tracker::mark_scene_modified();
   return r;
 }
@@ -382,6 +404,7 @@ mcp::JsonValue handle_delete(const mcp::JsonValue &args) {
       mcp::JsonValue("recreate node " + node_name + " (" + node_type +
                      ") under " + parent_path + " (create_scene_node)");
   r["undo"] = std::move(undo_info);
+  util::add_scene_info_fields(r, util::edited_scene_info());
   scene_dirty_tracker::mark_scene_modified();
   return r;
 }
@@ -457,6 +480,7 @@ mcp::JsonValue handle_rename(const mcp::JsonValue &args) {
   r["name"] = mcp::JsonValue(util::to_std(node->get_name()));
   r["path"] =
       mcp::JsonValue(scene_relative_path(node, scene_root));
+  util::add_scene_info_fields(r, util::edited_scene_info());
   scene_dirty_tracker::mark_scene_modified();
   return r;
 }

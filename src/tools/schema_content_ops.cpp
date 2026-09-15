@@ -64,6 +64,16 @@ void fill_schema_content(std::unordered_map<std::string, mcp::JsonValue>& m) {
             {"cells", "array", "Array of cells, each {\"x\":int,\"y\":int,\"source_id\":int,\"atlas_coords\":{\"x\":int,\"y\":int}} — source_id is required per entry. No fixed server-side entry cap, but keep batches reasonably sized because client or transport layers may limit a single request payload (bigger layouts: loop in execute_script or code_execute). An entry with source_id -1 clears the cell at x, y (atlas_coords is ignored and may be omitted). Invalid entries are skipped and reported in the error plus warnings", true},
             {"layer", "integer", "Tile layer index (default: 0); TileMapLayer nodes ignore it", false},
         });
+        m["fill_tilemap_rect"] = schema::build_schema({
+            {"node_path", "string", "Path to the TileMap or TileMapLayer node", true},
+            {"from", "object", "Inclusive first corner cell {x, y}; the two corners are normalized internally, so from/to order does not matter", true},
+            {"to", "object", "Inclusive opposite corner cell {x, y}", true},
+            {"source_id", "integer", "TileSet source ID placed in every cell; required and must be >= 0 unless erase is true", false},
+            {"atlas_coords", "object", "Atlas coords {x, y} placed in every cell; both must be >= 0 and is required unless erase is true", false},
+            {"alternative", "integer", "Alternative tile id placed in every cell (default: 0; must be >= 0)", false},
+            {"erase", "boolean", "Clear every cell in the rect instead of placing tiles; source_id and atlas_coords are ignored (default: false)", false},
+            {"layer", "integer", "Tile layer index (default: 0); TileMapLayer nodes ignore it", false},
+        });
         m["create_tilemap_tileset"] = schema::build_schema({
             {"name", "string", "Resource name used as the memory:// reference for later tools (default: TileSet)", false},
             {"tile_size", "integer", "Base tile size in pixels (default: 16)", false},
