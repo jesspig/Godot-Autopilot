@@ -20,6 +20,7 @@ using godot_autopilot::coords::layout_marks;
 using godot_autopilot::coords::make_affine;
 using godot_autopilot::coords::rect_contains;
 using godot_autopilot::coords::rect_intersect;
+using godot_autopilot::coords::scale_size;
 using godot_autopilot::coords::transform_point;
 using godot_autopilot::coords::transform_rect;
 
@@ -235,6 +236,47 @@ TEST(EditorCoordsTest, FitWithinNonPositiveMaxReturnsSource) {
   const ImageSize negative = fit_within(ImageSize{4096, 2048}, -10);
   EXPECT_EQ(4096, negative.width);
   EXPECT_EQ(2048, negative.height);
+}
+
+TEST(EditorCoordsTest, ScaleSizeIdentityAtScaleOne) {
+  const ImageSize r = scale_size(ImageSize{640, 480}, 1);
+  EXPECT_EQ(640, r.width);
+  EXPECT_EQ(480, r.height);
+}
+
+TEST(EditorCoordsTest, ScaleSizeUpscalesByIntegerFactor) {
+  const ImageSize r = scale_size(ImageSize{160, 120}, 8);
+  EXPECT_EQ(1280, r.width);
+  EXPECT_EQ(960, r.height);
+}
+
+TEST(EditorCoordsTest, ScaleSizeRejectsInvalidInput) {
+  EXPECT_EQ(0, scale_size(ImageSize{640, 480}, 0).width);
+  EXPECT_EQ(0, scale_size(ImageSize{640, 480}, -2).width);
+  EXPECT_EQ(0, scale_size(ImageSize{640, 480}, 9).width);
+  EXPECT_EQ(0, scale_size(ImageSize{0, 480}, 2).width);
+  EXPECT_EQ(0, scale_size(ImageSize{640, -1}, 2).height);
+}
+
+TEST(EditorCoordsTest, ScaleSizeRejectsDimensionOverflow) {
+  const ImageSize pixels = scale_size(ImageSize{4096, 4096}, 8);
+  EXPECT_EQ(0, pixels.width);
+  EXPECT_EQ(0, pixels.height);
+  const ImageSize wide = scale_size(ImageSize{100000000, 1}, 1);
+  EXPECT_EQ(0, wide.width);
+  EXPECT_EQ(0, wide.height);
+}
+
+TEST(EditorCoordsTest, ScaleSizeThenFitWithinCapsLongestSide) {
+  const ImageSize scaled = scale_size(ImageSize{640, 480}, 2);
+  ASSERT_EQ(1280, scaled.width);
+  ASSERT_EQ(960, scaled.height);
+  const ImageSize fitted = fit_within(scaled, 1024);
+  EXPECT_EQ(1024, fitted.width);
+  EXPECT_EQ(768, fitted.height);
+  const ImageSize small = fit_within(scale_size(ImageSize{80, 60}, 8), 4096);
+  EXPECT_EQ(640, small.width);
+  EXPECT_EQ(480, small.height);
 }
 
 TEST(EditorCoordsTest, DiffSampleIdenticalImages) {

@@ -9,6 +9,15 @@
 namespace godot_autopilot {
 namespace coords {
 
+namespace {
+
+constexpr int kScaleMin = 1;
+constexpr int kScaleMax = 8;
+constexpr int64_t kImageMaxSide = 16777216;
+constexpr int64_t kImageMaxPixels = 268435456;
+
+} // namespace
+
 Affine make_affine(double xx, double xy, double yx, double yy, double ox, double oy) {
   Affine a;
   a.xx = xx;
@@ -111,6 +120,20 @@ ImageSize fit_within(ImageSize src, int max_dimension) {
   if (result.height < 1)
     result.height = 1;
   return result;
+}
+
+ImageSize scale_size(ImageSize src, int scale) {
+  if (src.width <= 0 || src.height <= 0)
+    return ImageSize{};
+  if (scale < kScaleMin || scale > kScaleMax)
+    return ImageSize{};
+  const int64_t width = static_cast<int64_t>(src.width) * scale;
+  const int64_t height = static_cast<int64_t>(src.height) * scale;
+  if (width > kImageMaxSide || height > kImageMaxSide)
+    return ImageSize{};
+  if (width * height > kImageMaxPixels)
+    return ImageSize{};
+  return ImageSize{static_cast<int>(width), static_cast<int>(height)};
 }
 
 DiffResult diff_sample(const uint8_t *a, const uint8_t *b, int width, int height, int channels,

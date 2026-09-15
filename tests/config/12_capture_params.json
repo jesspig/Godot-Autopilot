@@ -1,0 +1,92 @@
+{
+  "name": "capture_params",
+  "description": "capture_editor_viewport / capture_game_viewport 新增参数的参数校验路径（headless）：after_frames 负数与非整数、when 用于 target=editor、scale 越界均在抵达抓拍逻辑前返回 error；capture_game_viewport 带合法 after_frames 但无游戏运行时返回运行时通道错误（error+hint，不挂起）。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "stages": [
+      {
+        "id": "arg_validation",
+        "steps": [
+          {
+            "id": "after_frames_negative",
+            "tool": "capture_game_viewport",
+            "args": { "after_frames": -1 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "after_frames must be an integer greater than or equal to 0" }
+              ]
+            }
+          },
+          {
+            "id": "after_frames_wrong_type",
+            "tool": "capture_game_viewport",
+            "args": { "after_frames": "2" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "after_frames must be an integer greater than or equal to 0" }
+              ]
+            }
+          },
+          {
+            "id": "after_frames_editor_target",
+            "tool": "capture_editor_viewport",
+            "args": { "target": "editor", "after_frames": 3 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "after_frames/when are only supported for target='game'" }
+              ]
+            }
+          },
+          {
+            "id": "when_editor_target",
+            "tool": "capture_editor_viewport",
+            "args": { "target": "editor", "when": "get_node(\"/root\").get_child_count() > 0" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "after_frames/when are only supported for target='game'" }
+              ]
+            }
+          },
+          {
+            "id": "scale_below_min",
+            "tool": "capture_editor_viewport",
+            "args": { "scale": 0 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "scale must be an integer between 1 and 8" }
+              ]
+            }
+          },
+          {
+            "id": "scale_above_max",
+            "tool": "capture_game_viewport",
+            "args": { "scale": 9 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "scale must be an integer between 1 and 8" }
+              ]
+            }
+          },
+          {
+            "id": "game_capture_after_frames_no_game",
+            "tool": "capture_game_viewport",
+            "args": { "after_frames": 5, "when": "true" },
+            "expect": {
+              "has_keys": ["error", "hint"],
+              "field_checks": [
+                { "key": "error", "not_empty": true }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

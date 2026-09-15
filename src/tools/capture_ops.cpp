@@ -38,6 +38,8 @@ namespace {
 constexpr size_t kBaselineMaxBytes = 32u * 1024u * 1024u;
 constexpr int64_t kMaxDimensionMin = 64;
 constexpr int64_t kMaxDimensionMax = 4096;
+constexpr int64_t kScaleMin = 1;
+constexpr int64_t kScaleMax = 8;
 
 mcp::JsonValue capture_limit_error(const std::string &code,
                                    const std::string &message) {
@@ -215,14 +217,40 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
     annotate = annotate_p->GetBool();
   }
 
+  int64_t after_frames = 0;
+  if (auto *after_p = args.Find("after_frames")) {
+    if (!after_p->IsInt() || after_p->GetInt() < 0) {
+      return util::error_json(
+          "after_frames must be an integer greater than or equal to 0");
+    }
+    after_frames = after_p->GetInt();
+  }
+
+  std::string when;
+  if (auto *when_p = args.Find("when")) {
+    if (!when_p->IsString()) {
+      return util::error_json("when must be a string");
+    }
+    when = when_p->GetString();
+  }
+
+  int64_t scale = 1;
+  if (auto *scale_p = args.Find("scale")) {
+    if (!scale_p->IsInt() || scale_p->GetInt() < kScaleMin ||
+        scale_p->GetInt() > kScaleMax) {
+      return util::error_json("scale must be an integer between 1 and 8");
+    }
+    scale = scale_p->GetInt();
+  }
+
   if (target == "game") {
     int64_t timeout_ms = GDA_DEFAULT_TIMEOUT_MS;
     if (auto *tp = args.Find("timeout_ms")) {
       if (tp->IsInt() && tp->GetInt() > 0)
         timeout_ms = tp->GetInt();
     }
-    if (timeout_ms > GDA_MAX_TIMEOUT_MS)
-      timeout_ms = GDA_MAX_TIMEOUT_MS;
+    if (timeout_ms > GDA_MAX_GAME_OP_TIMEOUT_MS)
+      timeout_ms = GDA_MAX_GAME_OP_TIMEOUT_MS;
 
     RegionRequest region_request;
     if (mcp::JsonValue region_error =
@@ -244,6 +272,13 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
       params["max_dimension"] = mcp::JsonValue(max_dimension);
     if (annotate)
       params["annotate"] = mcp::JsonValue(true);
+    if (after_frames > 0)
+      params["after_frames"] = mcp::JsonValue(after_frames);
+    if (!when.empty())
+      params["when"] = mcp::JsonValue(when);
+    if (scale > 1)
+      params["scale"] = mcp::JsonValue(scale);
+    params["timeout_ms"] = mcp::JsonValue(timeout_ms);
     return runtime_ops::handle_gda_send("capture", params, timeout_ms);
   }
   if (target != "editor") {
@@ -251,6 +286,10 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
                               "capture_ops.cpp handle_capture_viewport",
                               "'editor' or 'game'",
                               "pass target='editor' or target='game'");
+  }
+  if (after_frames > 0 || !when.empty()) {
+    return util::error_json(
+        "after_frames/when are only supported for target='game'");
   }
 
   auto *editor = godot::EditorInterface::get_singleton();
@@ -361,6 +400,23 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
   int final_width = img->get_width();
   int final_height = img->get_height();
   bool scaled = false;
+  if (scale > 1) {
+    const coords::ImageSize scaled_size = coords::scale_size(
+        coords::ImageSize{final_width, final_height},
+        static_cast<int>(scale));
+    if (scaled_size.width <= 0 || scaled_size.height <= 0) {
+      return capture_limit_error(
+          "capture_dimensions_exceeded",
+          "scaled capture exceeds the image pixel limit (" +
+              std::to_string(final_width) + "x" + std::to_string(final_height) +
+              " x" + std::to_string(scale) + ")");
+    }
+    img->resize(scaled_size.width, scaled_size.height,
+                godot::Image::INTERPOLATE_NEAREST);
+    final_width = scaled_size.width;
+    final_height = scaled_size.height;
+    scaled = true;
+  }
   if (max_dimension > 0) {
     const coords::ImageSize fitted =
         coords::fit_within(coords::ImageSize{final_width, final_height},
