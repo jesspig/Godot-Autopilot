@@ -60,6 +60,38 @@ void fill_schema_editor_config(std::unordered_map<std::string, mcp::JsonValue>& 
         });
         m["close_editor_scene"] = schema::build_schema({});
 
+        m["get_editor_viewport_geometry"] = schema::build_schema({
+            {"viewport", "string", "Viewport to report: '2d' (default) or '3d'", false},
+            {"index", "integer", "3D viewport index, 0-3 (default: 0); ignored when viewport='2d'", false},
+        });
+        m["get_editor_ui_elements"] = schema::build_schema({
+            {"query", "string", "Case-insensitive substring filter matched against path, name, text, tooltip and placeholder", false},
+            {"type_filter", "string", "Exact class name to restrict results to, e.g. 'Button' or 'LineEdit'", false},
+            {"interactive_only", "boolean", "Keep only actionable controls such as buttons, line edits, trees and sliders (default: false)", false},
+            {"max_elements", "integer", "Maximum number of elements to return, an integer from 1 to 1000 (default: 100); the result reports truncated when the cap is hit", false},
+        });
+        m["hit_test_editor_point"] = schema::build_schema({
+            {"position", "object", "Point to test, object with numeric x and y fields, in pixels relative to the client area of window_id", true},
+            {"window_id", "integer", "Window to test against (default: 0 = main editor window), e.g. an id from get_editor_ui_elements", false},
+            {"max_results", "integer", "Maximum number of hit controls to return, an integer from 1 to 64 (default: 10)", false},
+        });
+        m["click_editor_element"] = schema::build_schema({
+            {"path", "string", "Element path as returned by get_editor_ui_elements or hit_test_editor_point", true},
+            {"button", "string", "Mouse button to click: left, right or middle (default: left)", false},
+            {"double_click", "boolean", "Send a second press/release pair carrying the double-click flag (default: false)", false},
+            {"warp", "boolean", "Warp the physical cursor onto the element center before clicking (default: true)", false},
+            {"observe", "boolean", "Append a fresh editor viewport capture to the result (default: false)", false},
+        });
+        m["type_editor_element_text"] = schema::build_schema({
+            {"path", "string", "Element path as returned by get_editor_ui_elements or hit_test_editor_point", true},
+            {"text", "string", "Text to write into the focused element; may contain any UTF-8 text", true},
+            {"submit", "boolean", "Append an Enter key press and release after the text (default: false)", false},
+            {"observe", "boolean", "Append a fresh editor viewport capture to the result (default: false)", false},
+        });
+        m["run_editor_shortcut"] = schema::build_schema({
+            {"shortcut", "string", "Shortcut string with '+'-separated modifiers (ctrl/control, shift, alt, meta/super) followed by the main key, e.g. 'ctrl+s', 'ctrl+shift+z' or 'f5'; the key accepts the input tool key names plus F1-F12", true},
+        });
+
         m["build_csharp_assembly"] = schema::build_schema({});
 
         m["get_project_settings"] = schema::build_schema({
@@ -152,6 +184,33 @@ void fill_schema_editor_config(std::unordered_map<std::string, mcp::JsonValue>& 
         m["release_input_mouse_button"] = schema::build_schema({
             {"button", "string", "Mouse button to release: left, right or middle only", true},
             {"position", "object", "Position of the release, object with numeric x and y fields (default: 0, 0)", false},
+        });
+        m["click_input_mouse"] = schema::build_schema({
+            {"position", "object", "Click position, object with numeric x and y fields, in pixels relative to the client area of the focused window", true},
+            {"button", "string", "Mouse button to click: left, right or middle (default: left)", false},
+            {"double_click", "boolean", "Send a second press/release pair to form a double click (default: false)", false},
+            {"warp", "boolean", "Warp the physical cursor onto the position before clicking (default: true)", false},
+            {"observe", "boolean", "Append a fresh editor viewport capture to the result (default: false)", false},
+        });
+        m["scroll_input_mouse"] = schema::build_schema({
+            {"direction", "string", "Wheel direction: up, down, left or right", true},
+            {"position", "object", "Pointer position the wheel event is routed to, object with numeric x and y fields, in pixels relative to the client area of the focused window", true},
+            {"amount", "integer", "Number of wheel detents, an integer from 1 to 10 (default: 1)", false},
+            {"warp", "boolean", "Warp the physical cursor onto the position first (default: true)", false},
+            {"observe", "boolean", "Append a fresh editor viewport capture to the result (default: false)", false},
+        });
+        m["drag_input_mouse"] = schema::build_schema({
+            {"from", "object", "Drag start position, object with numeric x and y fields, in pixels relative to the client area of the focused window", true},
+            {"to", "object", "Drag end position, object with numeric x and y fields, in pixels relative to the client area of the focused window", true},
+            {"button", "string", "Mouse button to drag with: left, right or middle (default: left)", false},
+            {"steps", "integer", "Number of interpolated motion events between from and to, an integer from 1 to 64 (default: 8)", false},
+            {"warp", "boolean", "Warp the physical cursor onto the start position first (default: true)", false},
+            {"observe", "boolean", "Append a fresh editor viewport capture to the result (default: false)", false},
+        });
+        m["type_input_text"] = schema::build_schema({
+            {"text", "string", "Text to write into the focused control; may contain any UTF-8 text", true},
+            {"submit", "boolean", "Append an Enter key press and release after the text (default: false)", false},
+            {"observe", "boolean", "Append a fresh editor viewport capture to the result (default: false)", false},
         });
         m["start_input_gamepad_vibration"] = schema::build_schema({
             {"device", "integer", "Gamepad device index (default: 0)", true},

@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "tools/input_click_ops.hpp"
 #include "tools/input_ops.hpp"
 #include "tools/tool_decl.hpp"
 
@@ -48,6 +49,22 @@ GDA_TOOL_CLASS(ReleaseInputMouseButtonTool, "release_input_mouse_button",
                "Inject a mouse button release into the editor process. 'button' accepts only left, right or middle, matching press_input_mouse_button. Optional 'position' sets where the release occurs, in pixels relative to the client area of the focused window (default (0, 0), that window's top-left corner — not a desktop/screen position); use the same client-area coordinates as the matching press. Editor controls commonly act on the press event itself, so a release alone often has no effect; call it after press_input_mouse_button to keep press and release paired. A running game is a separate process and will not receive these events. Returns 'result' set to 'ok'.",
                "Input", std::vector<std::string>({"input", "mouse", "release"}), input_ops::handle_mouse_button_release, false)
 
+GDA_TOOL_CLASS_SIDE(ClickInputMouseTool, "click_input_mouse",
+               "Click a point in the editor process by injecting a complete mouse sequence in one call: optional warp, a motion event, a press and a release, plus a second press/release pair when 'double_click' is true. 'position' is an object with numeric x and y fields, in pixels relative to the client area of the focused window — the editor main window while it has focus — so (0, 0) is that window's top-left corner, not a desktop/screen position and not the edited viewport. Prefer this composite over hand-chaining move_input_mouse, press_input_mouse_button and release_input_mouse_button; for editor UI elements prefer click_editor_element, which resolves the element to coordinates itself. 'button' accepts left, right or middle and defaults to left; 'warp' (default true) moves the physical cursor onto the target first. Controls that react to hover and drags depend on the physical mouse, so the effect may only settle on the next frame — re-observe before concluding that the click did nothing. Optional 'observe' (default false) appends a fresh editor viewport capture to the result. A running game is a separate process and will not receive these events. Returns result with ok true.",
+               "Input", std::vector<std::string>({"input", "mouse", "click"}), input_click_ops::handle_click_mouse, false, ::godot_autopilot::SideEffect::ModifiesWindow)
+
+GDA_TOOL_CLASS_SIDE(ScrollInputMouseTool, "scroll_input_mouse",
+               "Scroll the mouse wheel at a point in the editor process. 'direction' is required and accepts up, down, left or right; 'amount' is the number of wheel detents, an integer from 1 to 10 defaulting to 1, and out-of-range values return an error. 'position' is required because the wheel event is routed to the control hit at that point: an object with numeric x and y fields, in pixels relative to the client area of the focused window — the editor main window while it has focus — not a desktop/screen position. 'warp' (default true) moves the physical cursor onto that point first. Scroll containers depend on the physical mouse and advance over the next frame, so re-observe before concluding that the scroll did nothing. Optional 'observe' (default false) appends a fresh editor viewport capture to the result. A running game is a separate process and will not receive these events. Returns result with ok true.",
+               "Input", std::vector<std::string>({"input", "mouse", "scroll"}), input_click_ops::handle_scroll_mouse, false, ::godot_autopilot::SideEffect::ModifiesWindow)
+
+GDA_TOOL_CLASS_SIDE(DragInputMouseTool, "drag_input_mouse",
+               "Drag a point to another point in the editor process by injecting a complete mouse sequence in one call: optional warp to 'from', a motion event, a button press, 'steps' interpolated motion events and a release at 'to'. 'from' and 'to' are objects with numeric x and y fields, in pixels relative to the client area of the focused window — the editor main window while it has focus — not desktop/screen positions. 'button' accepts left, right or middle and defaults to left; 'steps' is the number of interpolated motion events, an integer from 1 to 64 defaulting to 8, and out-of-range values return an error, with the per-step relative delta derived from 'from' and 'to'; 'warp' (default true) moves the physical cursor onto 'from' first. Drag-and-drop depends on the physical mouse and the interpolated path, so the drop may only settle on the next frame — re-observe before concluding that the drag failed. Optional 'observe' (default false) appends a fresh editor viewport capture to the result. A running game is a separate process and will not receive these events. Returns result with ok true.",
+               "Input", std::vector<std::string>({"input", "mouse", "drag"}), input_click_ops::handle_drag_mouse, false, ::godot_autopilot::SideEffect::ModifiesWindow)
+
+GDA_TOOL_CLASS_SIDE(TypeInputTextTool, "type_input_text",
+               "Write text into the control that currently has keyboard focus in the editor process by pushing the whole string as one text-input event, not by simulating individual key presses. Focus the target first with click_input_mouse or click_editor_element; typing while a dock has no focus does nothing. 'text' is required and may contain any UTF-8 text; 'submit' (default false) appends an Enter key press and release, e.g. to confirm a LineEdit. Optional 'observe' (default false) appends a fresh editor viewport capture to the result. A running game is a separate process and will not receive this input. Returns result with ok true and 'length', the number of characters written.",
+               "Input", std::vector<std::string>({"input", "text", "type"}), input_click_ops::handle_type_text, false, ::godot_autopilot::SideEffect::ModifiesWindow)
+
 GDA_TOOL_CLASS(StartInputGamepadVibrationTool, "start_input_gamepad_vibration",
                "Start vibration on a gamepad connected to the editor process. 'device' is the gamepad index and defaults to 0; 'weak' and 'strong' set the two motor magnitudes from 0.0 to 1.0 and default to 0.5. 'duration' is in seconds and defaults to 0, which vibrates indefinitely until stop_input_gamepad_vibration is called. A running game is a separate process and is not affected.",
                "Input", std::vector<std::string>({"input", "gamepad", "vibration"}), input_ops::handle_gamepad_vibration_start, true)
@@ -58,7 +75,7 @@ GDA_TOOL_CLASS(StopInputGamepadVibrationTool, "stop_input_gamepad_vibration",
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(11);
+  v.reserve(15);
   v.push_back(std::make_unique<PressInputActionTool>());
   v.push_back(std::make_unique<ReleaseInputActionTool>());
   v.push_back(std::make_unique<IsInputActionPressedTool>());
@@ -68,6 +85,10 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(std::make_unique<MoveInputMouseTool>());
   v.push_back(std::make_unique<PressInputMouseButtonTool>());
   v.push_back(std::make_unique<ReleaseInputMouseButtonTool>());
+  v.push_back(std::make_unique<ClickInputMouseTool>());
+  v.push_back(std::make_unique<ScrollInputMouseTool>());
+  v.push_back(std::make_unique<DragInputMouseTool>());
+  v.push_back(std::make_unique<TypeInputTextTool>());
   v.push_back(std::make_unique<StartInputGamepadVibrationTool>());
   v.push_back(std::make_unique<StopInputGamepadVibrationTool>());
   return v;
