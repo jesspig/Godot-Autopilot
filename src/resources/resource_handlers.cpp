@@ -1,5 +1,6 @@
 #include "resources/resource_handlers.hpp"
 #include "core/log_system.hpp"
+#include "resources/skill_resources.hpp"
 #include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #include <ctime>
@@ -20,20 +21,27 @@
 #include <godot_cpp/variant/typed_array.hpp>
 #include <map>
 #include <string>
+#include <vector>
 
 namespace godot_autopilot {
 
 namespace {
 
-mcp::ReadResourceResult make_json_result(const std::string &uri,
-                                                const std::string &json) {
+mcp::ReadResourceResult make_text_result(const std::string &uri,
+                                         const std::string &mime_type,
+                                         const std::string &text) {
   mcp::TextResourceContents trc;
   trc.uri = uri;
-  trc.text = json;
-  trc.mime_type = "application/json";
+  trc.text = text;
+  trc.mime_type = mime_type;
   mcp::ReadResourceResult rr;
   rr.contents = {mcp::ResourceContents{trc}};
   return rr;
+}
+
+mcp::ReadResourceResult make_json_result(const std::string &uri,
+                                                const std::string &json) {
+  return make_text_result(uri, "application/json", json);
 }
 
 void set_error(std::string &json_str, const std::string &msg) {
@@ -201,6 +209,55 @@ godot::String to_godot_path(const std::string &path) {
     return godot::String(path.c_str());
   }
   return godot::String(("res://" + path).c_str());
+}
+
+const std::vector<skill_gen::SkillSpec> &embedded_skills() {
+  static const std::vector<skill_gen::SkillSpec> skills =
+      skill_gen::all_skills();
+  return skills;
+}
+
+int register_skill_resources(mcp::McpServer &server) {
+  auto handler = [](const std::string &uri) -> mcp::ReadResourceResult {
+    const skill_resources::ContentResult content =
+        skill_resources::resolve_content(embedded_skills(), uri);
+    if (!content.error.empty()) {
+      return make_json_result(uri, util::error_json(content.error).Dump(-1));
+    }
+    return make_text_result(uri, content.mime_type, content.text);
+  };
+
+  int registered = 0;
+  server.RegisterResource(
+      "skills", "godot://skills",
+      mcp::ResourceOptions{}
+          .Description("Skill catalog: every godot-autopilot skill book with "
+                       "its description and file list")
+          .MimeType("application/json"),
+      handler);
+  ++registered;
+
+  for (const skill_gen::SkillSpec &spec : embedded_skills()) {
+    const std::string skill_uri = "godot://skills/" + spec.name;
+    server.RegisterResource("skill-" + spec.name, skill_uri,
+                            mcp::ResourceOptions{}
+                                .Description(spec.description)
+                                .MimeType("text/markdown"),
+                            handler);
+    ++registered;
+
+    for (const skill_gen::SkillFile &file : spec.files) {
+      server.RegisterResource(
+          "skill-" + spec.name + "-" + file.relative_path,
+          skill_uri + "/" + file.relative_path,
+          mcp::ResourceOptions{}
+              .Description(spec.description)
+              .MimeType("text/markdown"),
+          handler);
+      ++registered;
+    }
+  }
+  return registered;
 }
 
 } // namespace
@@ -494,8 +551,12 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
         return make_json_result(uri, json_str);
       });
 
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Resources,
-                            "8 resource handlers registered");
+  const int skill_resource_count = register_skill_resources(server);
+
+  LogSystem::instance().log(
+      LogLevel::Info, LogCategory::Resources,
+      "8 resource handlers and " + std::to_string(skill_resource_count) +
+          " skill resources registered");
 }
 
 } // namespace godot_autopilot
