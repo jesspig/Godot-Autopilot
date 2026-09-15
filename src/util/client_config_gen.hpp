@@ -16,12 +16,25 @@ enum class ClientId {
   Trae,
   Qoder,
   WorkBuddy,
+  ZCode,
+  PiAgent,
+  CommandCode,
+  Kilo,
+  Roo,
+  GrokBuild,
+  KimiCode,
+  Zed,
+  CodeBuddy,
+  Crush,
+  CopilotVSCode,
+  Reasonix,
   COUNT
 };
 
 const char *display_name(ClientId id);
 const char *file_path(ClientId id);
 const char *description(ClientId id);
+bool uses_toml(ClientId id);
 std::string render_config(ClientId id, int port);
 
 struct MergeResult {
@@ -39,7 +52,8 @@ struct TomlMergeResult {
   std::string content;
 };
 
-TomlMergeResult merge_toml_config(int port, const std::string &existing);
+TomlMergeResult merge_toml_config(ClientId id, int port,
+                                  const std::string &existing);
 
 } // namespace godot_autopilot::client_config_gen
 

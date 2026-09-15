@@ -13,11 +13,39 @@ std::string server_url(int port) {
 }
 
 bool uses_type_field(ClientId id) {
-  return id != ClientId::Cursor && id != ClientId::Trae;
+  return id != ClientId::Cursor && id != ClientId::Trae &&
+         id != ClientId::PiAgent && id != ClientId::KimiCode &&
+         id != ClientId::Zed;
 }
 
 const char *type_value(ClientId id) {
-  return id == ClientId::OpenCode ? "remote" : "http";
+  if (id == ClientId::OpenCode) {
+    return "remote";
+  }
+  if (id == ClientId::Roo || id == ClientId::Kilo) {
+    return "streamable-http";
+  }
+  return "http";
+}
+
+bool uses_enabled_field(ClientId id) {
+  return id == ClientId::OpenCode || id == ClientId::ZCode ||
+         id == ClientId::KimiCode;
+}
+
+// 顶层 server 映射所在键;ZCode 额外嵌套一层("mcp" -> "servers"),
+// 在 build_top_object / merge_json_config 中单独处理。
+const char *top_key(ClientId id) {
+  if (id == ClientId::OpenCode || id == ClientId::Crush) {
+    return "mcp";
+  }
+  if (id == ClientId::CopilotVSCode) {
+    return "servers";
+  }
+  if (id == ClientId::Zed) {
+    return "context_servers";
+  }
+  return "mcpServers";
 }
 
 mcp::JsonValue build_server_entry(ClientId id, int port) {
@@ -26,18 +54,26 @@ mcp::JsonValue build_server_entry(ClientId id, int port) {
     entry["type"] = mcp::JsonValue(type_value(id));
   }
   entry["url"] = mcp::JsonValue(server_url(port));
-  if (id == ClientId::OpenCode) {
+  if (uses_enabled_field(id)) {
     entry["enabled"] = mcp::JsonValue(true);
   }
   return mcp::JsonValue(std::move(entry));
 }
 
-mcp::JsonValue::Object build_top_object(ClientId id, int port) {
+mcp::JsonValue build_top_object(ClientId id, int port) {
   mcp::JsonValue::Object root;
   mcp::JsonValue::Object servers;
   servers[kServerName] = build_server_entry(id, port);
-  root[id == ClientId::OpenCode ? "mcp" : "mcpServers"] =
-      mcp::JsonValue(std::move(servers));
+  if (id == ClientId::ZCode) {
+    mcp::JsonValue::Object mcp;
+    mcp["servers"] = mcp::JsonValue(std::move(servers));
+    root["mcp"] = mcp::JsonValue(std::move(mcp));
+    return root;
+  }
+  if (id == ClientId::Crush) {
+    root["$schema"] = mcp::JsonValue("https://charm.land/crush.json");
+  }
+  root[top_key(id)] = mcp::JsonValue(std::move(servers));
   return root;
 }
 
@@ -48,6 +84,11 @@ std::string render_json(ClientId id, int port) {
 std::string render_toml(int port) {
   return "[mcp_servers." + std::string(kServerName) + "]\nurl = \"" +
          server_url(port) + "\"\n";
+}
+
+std::string render_reasonix_toml(int port) {
+  return std::string("[[plugins]]\nname = \"") + kServerName +
+         "\"\ntype = \"http\"\nurl = \"" + server_url(port) + "\"\n";
 }
 
 struct ClientInfo {
@@ -72,6 +113,28 @@ constexpr ClientInfo kClients[] = {
      ".qoder/settings.json (mcpServers)"},
     {ClientId::WorkBuddy, "WorkBuddy", ".workbuddy/mcp.json",
      ".workbuddy/mcp.json (mcpServers)"},
+    {ClientId::ZCode, "ZCode", ".zcode/config.json",
+     ".zcode/config.json (mcp.servers)"},
+    {ClientId::PiAgent, "pi (pi-mcp-adapter)", ".pi/mcp.json",
+     ".pi/mcp.json (mcpServers)"},
+    {ClientId::CommandCode, "Command Code", ".mcp.json",
+     ".mcp.json (mcpServers, shared with Claude Code)"},
+    {ClientId::Kilo, "Kilo Code", ".kilo/mcp.json",
+     ".kilo/mcp.json (mcpServers)"},
+    {ClientId::Roo, "Roo Code", ".roo/mcp.json", ".roo/mcp.json (mcpServers)"},
+    {ClientId::GrokBuild, "Grok Build", ".grok/config.toml",
+     ".grok/config.toml (mcp_servers)"},
+    {ClientId::KimiCode, "Kimi Code", ".kimi-code/mcp.json",
+     ".kimi-code/mcp.json (mcpServers)"},
+    {ClientId::Zed, "Zed", ".zed/settings.json",
+     ".zed/settings.json (context_servers)"},
+    {ClientId::CodeBuddy, "CodeBuddy", ".mcp.json",
+     ".mcp.json (mcpServers, shared with Claude Code)"},
+    {ClientId::Crush, "Crush", ".crush.json", ".crush.json (mcp)"},
+    {ClientId::CopilotVSCode, "GitHub Copilot (VS Code)", ".vscode/mcp.json",
+     ".vscode/mcp.json (servers)"},
+    {ClientId::Reasonix, "Reasonix", "reasonix.toml",
+     "reasonix.toml ([[plugins]] array)"},
 };
 
 const ClientInfo *find_client(ClientId id) {
@@ -100,8 +163,16 @@ const char *description(ClientId id) {
   return info != nullptr ? info->description : "";
 }
 
+bool uses_toml(ClientId id) {
+  return id == ClientId::Codex || id == ClientId::GrokBuild ||
+         id == ClientId::Reasonix;
+}
+
 std::string render_config(ClientId id, int port) {
-  if (id == ClientId::Codex) {
+  if (id == ClientId::Reasonix) {
+    return render_reasonix_toml(port);
+  }
+  if (uses_toml(id)) {
     return render_toml(port);
   }
   return render_json(id, port);
@@ -121,8 +192,16 @@ MergeResult merge_json_config(ClientId id, int port,
   if (!doc.IsObject()) {
     return {MergeResult::Status::Unparsable, ""};
   }
-  const char *top_key = id == ClientId::OpenCode ? "mcp" : "mcpServers";
-  mcp::JsonValue &servers = doc[top_key];
+  mcp::JsonValue &servers = [&]() -> mcp::JsonValue & {
+    if (id != ClientId::ZCode) {
+      return doc[top_key(id)];
+    }
+    mcp::JsonValue &mcp_obj = doc["mcp"];
+    if (!mcp_obj.IsObject()) {
+      mcp_obj = mcp::JsonValue(mcp::JsonValue::object_tag);
+    }
+    return mcp_obj["servers"];
+  }();
   if (!servers.IsObject()) {
     servers = mcp::JsonValue(mcp::JsonValue::object_tag);
   }
@@ -130,15 +209,20 @@ MergeResult merge_json_config(ClientId id, int port,
   return {MergeResult::Status::Merged, doc.Dump(2)};
 }
 
-TomlMergeResult merge_toml_config(int port, const std::string &existing) {
-  if (existing.find("[mcp_servers") != std::string::npos) {
+TomlMergeResult merge_toml_config(ClientId id, int port,
+                                  const std::string &existing) {
+  const bool reasonix = id == ClientId::Reasonix;
+  const std::string marker =
+      reasonix ? "name = \"" + std::string(kServerName) + "\""
+               : std::string("[mcp_servers");
+  if (existing.find(marker) != std::string::npos) {
     return {TomlMergeResult::Status::AlreadyConfigured, ""};
   }
   std::string content = existing;
   if (!content.empty() && content.back() != '\n') {
     content.push_back('\n');
   }
-  content += render_toml(port);
+  content += reasonix ? render_reasonix_toml(port) : render_toml(port);
   return {TomlMergeResult::Status::Merged, content};
 }
 
