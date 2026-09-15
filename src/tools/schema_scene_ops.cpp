@@ -6,16 +6,16 @@ namespace godot_autopilot {
 void fill_schema_scene(std::unordered_map<std::string, mcp::JsonValue>& m) {
 
         m["create_scene_node"] = schema::build_schema({
-            {"parent_path", "string", "Parent node path in the edited scene (e.g. 'Player' or 'Player/Weapon'); omit only while the scene has no root — required once the scene already has a root", false},
+            {"parent_path", "string", "Parent node path in the edited scene (e.g. 'Player' or 'Player/Weapon'); omit only while the scene has no root — required once the scene already has a root. The response includes scene_path and scene_unsaved so the caller can confirm which scene received the node", false},
             {"name", "string", "Node name (string, default: NewNode)", true},
             {"type", "string", "Node class type (string, default: Node). Must be a Node subclass, e.g. Node2D, Sprite2D — other classes error", true},
             {"properties", "object", "Optional map of property names to values applied right after creation via the same conversion chain as property_set (object, e.g. {\"visible\": false, \"position\": {\"x\": 10, \"y\": 20}}); any failing property frees the new node and reports the failing name", false},
         });
         m["delete_scene_node"] = schema::build_schema({
-            {"path", "string", "Node path in the edited scene (e.g. 'Enemies/Enemy1'); the scene root cannot be deleted", true},
+            {"path", "string", "Node path in the edited scene (e.g. 'Enemies/Enemy1'); the scene root cannot be deleted. The response includes scene_path and scene_unsaved to confirm which scene was written", true},
         });
         m["rename_scene_node"] = schema::build_schema({
-            {"path", "string", "Node path in the edited scene (e.g. 'Player/Sprite2D')", true},
+            {"path", "string", "Node path in the edited scene (e.g. 'Player/Sprite2D'). The response includes scene_path and scene_unsaved to confirm which scene was written", true},
             {"new_name", "string", "New node name; must be unique among siblings and cannot contain '/' or ':' (string, e.g. 'Hero')", true},
         });
         m["reparent_node"] = schema::build_schema({
@@ -70,7 +70,7 @@ void fill_schema_scene(std::unordered_map<std::string, mcp::JsonValue>& m) {
             {"property", "string", "Property name to read (string, e.g. 'position', 'visible')", true},
         });
         m["property_set"] = schema::build_schema({
-            {"path", "string", "Node path (scene-relative or absolute). memory:// is a resource namespace and is NOT valid here — memory resources go in the value parameter (e.g. {\"resource\": \"memory://name\"})", true},
+            {"path", "string", "Node path (scene-relative or absolute). memory:// is a resource namespace and is NOT valid here — memory resources go in the value parameter (e.g. {\"resource\": \"memory://name\"}). The response includes scene_path and scene_unsaved so the caller can confirm which scene was written", true},
             {"property", "string", "Property name to set (string, e.g. 'position', 'modulate')", true},
             {"value", "object", "Property value to set. Resource references use two forms: {\"path\": \"res://xxx.tres\"} for a disk resource assigned to a node property, or {\"resource\": \"memory://name\"} for an in-memory resource (only valid in resource editing scenarios). Assigning a memory:// resource to a node property is rejected because it would corrupt the saved scene file", true},
             {"type_hint", "string", "Variant type hint (string, e.g. Vector2, Color, int, float). Omit to infer the type automatically from the property metadata", false},
@@ -215,7 +215,7 @@ void fill_schema_scene(std::unordered_map<std::string, mcp::JsonValue>& m) {
             {"overwrite", "boolean", "Overwrite an existing file (default: false); false errors when the file already exists", false},
         });
         m["attach_script_to_node"] = schema::build_schema({
-            {"node_path", "string", "Node path in the edited scene to attach the script to", true},
+            {"node_path", "string", "Node path in the edited scene to attach the script to. The response includes scene_path and scene_unsaved to confirm which scene was written", true},
             {"script_path", "string", "Resource path of a Script resource (e.g. a .gd file or another Script); the resource must be a Script", true},
         });
         m["detach_script_from_node"] = schema::build_schema({

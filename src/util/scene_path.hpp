@@ -3,6 +3,7 @@
 
 #include "error_util.hpp"
 
+#include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/variant/string.hpp>
@@ -69,6 +70,30 @@ inline godot::Node *resolve_scene_node(const std::string &path_str,
   if (out_hint)
     *out_hint = scene_path_hint(scene_root);
   return nullptr;
+}
+
+struct EditedSceneInfo {
+  bool has_scene = false;
+  std::string scene_path;
+  bool unsaved = true;
+};
+
+inline EditedSceneInfo edited_scene_info() {
+  EditedSceneInfo info;
+  auto *editor = godot::EditorInterface::get_singleton();
+  godot::Node *root = editor ? editor->get_edited_scene_root() : nullptr;
+  if (!root)
+    return info;
+  info.has_scene = true;
+  info.scene_path = to_std(root->get_scene_file_path());
+  info.unsaved = info.scene_path.empty();
+  return info;
+}
+
+inline void add_scene_info_fields(mcp::JsonValue &target,
+                                  const EditedSceneInfo &info) {
+  target["scene_path"] = mcp::JsonValue(info.scene_path);
+  target["scene_unsaved"] = mcp::JsonValue(info.unsaved);
 }
 
 } // namespace util
