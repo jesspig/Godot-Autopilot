@@ -74,6 +74,18 @@ void fill_schema_editor_config(std::unordered_map<std::string, mcp::JsonValue>& 
             {"position", "object", "Point to test, object with numeric x and y fields, in pixels relative to the client area of window_id", true},
             {"window_id", "integer", "Window to test against (default: 0 = main editor window), e.g. an id from get_editor_ui_elements", false},
             {"max_results", "integer", "Maximum number of hit controls to return, an integer from 1 to 64 (default: 10)", false},
+            {"include_scene_nodes", "boolean", "Append scene context (default: false): scene_tree_item, the scene-tree row under the point when a row is hit, and scene_nodes, the topmost-first scene node paths with name/type under the point inside the 2D editor viewport, plus scene_node_count; scene_tree_error/scene_nodes_error report unavailable context", false},
+        });
+        m["scene_tree_items"] = schema::build_schema({
+            {"filter", "string", "Case-insensitive substring filter matched against each row's scene-relative path or name", false},
+            {"selected_only", "boolean", "Keep only rows currently selected in the scene tree (default: false)", false},
+            {"max_items", "integer", "Maximum number of rows to return, an integer from 1 to 1000 (default: 200); the result reports truncated when the cap is hit", false},
+        });
+        m["select_scene_tree_node"] = schema::build_schema({
+            {"path", "string", "Node path in the edited scene: scene-relative such as 'Player' or 'Level1/Enemy', or absolute such as '/root/Level1/Enemy'; the previous selection is cleared first unless add is true", true},
+            {"add", "boolean", "true appends the node to the current selection instead of replacing it (default: false)", false},
+            {"inspect", "boolean", "Open the node in the Inspector through EditorInterface.edit_node (default: true)", false},
+            {"focus", "boolean", "Scroll the scene tree to the node row when the row is found (default: true)", false},
         });
         m["click_editor_element"] = schema::build_schema({
             {"path", "string", "Element path as returned by get_editor_ui_elements or hit_test_editor_point", true},
