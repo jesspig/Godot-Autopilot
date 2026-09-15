@@ -2,6 +2,10 @@
 
 > 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天。
 
+## 2026-09-15
+
+- **Computer Use grounding 增强（域工具 366→379）**：新增 13 个编辑器 UI 语义自动化 / 合成输入 / 坐标映射工具与游戏侧 `click_game_ui_element`，`capture_editor_viewport` 增 `region`/`max_dimension`/`space`/`annotate`/`diff_against_last`，游戏侧 wheel/`mouse_motion` 与 `op_capture` 增强；SIDE 49→57（`modifies_window` 12→19、`game_runtime` 5→6），MCP 可达 386 / catalog 387；L1 140→172（新增 EditorCoordsTest 32 项）、L2 9→11（09_editor_ui / 10_editor_input）、ctest 149→183；03 遍历 322 非 SIDE 工具 0 失败、warnings 4 条；GUI 验收 10/10。详见 `changelog/2026-09-15-log.md`
+
 ## 2026-09-14
 
 - **CI Windows 构建编码修复**：`embed_skills.py` 中文 print 在 cp1252 控制台 `UnicodeEncodeError`（8/30 起 develop CI 连败根因），脚本 stdout/stderr 强制 UTF-8 + `ci.yml`/`release.yml` 增 `PYTHONUTF8=1`；本地 cp1252 复现环境验证通过，生成头与产物一致。详见 `changelog/2026-09-14-log.md`
@@ -23,8 +27,3 @@
 - **skill 体系 19→7 册重构 + Godot 源码研究发现织入**：19 册合并为 `godot-autopilot` 总纲 + 6 册引擎指南（每册带 references/ 渐进披露），84 条 Godot 4.8.0-dev 源码研究发现织入引擎六册（4.7+/4.8 行内简注）；`skill_templates/` 28 个文件、registry 7 条、`SKILL_COUNT` 19→7；McpConfigDock 按钮 Generate/Update 动态化（Update 先清理 `godot-autopilot-` 前缀目录）；skill_gen_test 用例改名 + 白名单 176，ctest L1 103/103 全绿；support/tests/overview/AGENTS.md 知识库同步。详见 `changelog/2026-09-10-log.md`
 - **版本号 0.2.2 → 0.2.3**：根 `VERSION` 单一来源变更（CRLF 保留），AGENTS.md/build.md 示例同步，GDA_VERSION 注入验证通过，ctest L1 103/103。详见 `changelog/2026-09-10-log.md`
 
-## 2026-09-08
-
-- **skill 内容外置化重构（迁移零改写 + 构建期嵌入）**：19 册正文从 7 个 `skill_content_*.cpp` 迁出为 `src/util/skill_templates/`（23 个 .md + registry.json）+ `tools/embed_skills.py` 构建期嵌入（5 项校验，生成头入 `build/generated/`，gitignore 覆盖）；`skill_gen.hpp` 收敛为 `make_embedded_skills()`；ctest L1 103/103 零测试改动。详见 `changelog/2026-09-08-log.md`
-- **知识库审计与修复（三代理配对审计）**：tests.md 7 处数字修正并新增 skill_gen 测试小节、support.md 2 处精确性修正并补 project_path.hpp 小节、AGENTS.md 同步 103 gtest/110 注册点、index/overview/build 修复过时数字与 util 清单、security_contract 补 UI 写盘面、roadmap 补已交付条目。详见 `changelog/2026-09-08-log.md`
-- **一键生成 Agent Skills（19 册 + 生成器 + UI 按钮 + 测试全绿）**：新增 `src/util/skill_gen` 纯函数生成器与 7 个内容单元，聚合 19 册英文 Agent Skills（agentskills.io 规范，4 册带 references/ 全工具表）；McpConfigDock 新增 "Generate Skills" 按钮写入 `.agents/skills/<name>/SKILL.md`（frontmatter version 注入 GDA_VERSION，覆盖写仅限自有 19 册命名空间）；SkillGenTest 7 用例，ctest L1 103/103。详见 `changelog/2026-09-08-log.md`

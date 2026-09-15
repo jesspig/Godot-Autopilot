@@ -4,7 +4,7 @@
 
 - `uv run build.py` — Debug 构建并部署到 `Example/addons/godot-autopilot/`；`--release` 先清理 `.godot`/`addons` 再构建；`--package` 打包 `dist/godot-autopilot-<version>.zip`；`--package --libs-dir <dir>` 从目录递归收集三平台库合并打包（须与 `--package` 同用）
 - 手动：`cmake --preset debug && cmake --build --preset debug`；预设 `debug`/`release`（Ninja，`CMAKE_OSX_ARCHITECTURES=x86_64;arm64` universal，gdextension 用 `macos.{debug,release}.universal`）
-- **勿删 `build/<preset>/_deps/`**（godot-cpp/mcp-cpp-sdk/googletest 缓存）；**新增 `.cpp` 必须加入 `CMakeLists.txt:65` 的 `add_library()`**，业务源码另需同步 `tests/CMakeLists.txt:31` 的 `GDA_UNIT_BUSINESS_SOURCES`（漏了会 undefined symbol，header-only 除外）；`src/util/skill_templates/*.md` 为内容数据文件不进 add_library（经 `cmake/skill_gen.cmake` 构建期嵌入生成头）
+- **勿删 `build/<preset>/_deps/`**（godot-cpp/mcp-cpp-sdk/googletest 缓存）；**新增 `.cpp` 必须加入 `CMakeLists.txt:65` 的 `add_library()`**（如 `src/core/editor_coords.cpp`、`src/tools/input_click_ops.cpp`、`src/tools/editor_ui_ops.cpp`、`src/tools/editor_ui_actions.cpp`），业务源码另需同步 `tests/CMakeLists.txt:31` 的 `GDA_UNIT_BUSINESS_SOURCES`（漏了会 undefined symbol，header-only 除外；`src/tools/*_ops.cpp` 由 `tests/CMakeLists.txt:24-25` 的 GLOB 纳入，core 侧 `editor_coords.cpp` 与 `editor_ui_actions.cpp` 需显式加入）；`src/util/skill_templates/*.md` 为内容数据文件不进 add_library（经 `cmake/skill_gen.cmake` 构建期嵌入生成头）
 - 版本单一来源：根 `VERSION`（当前 `0.2.5`）→ `CMakeLists.txt:33 file(READ)` 喂 `project()` + `configure_file` 生成 `GDA_VERSION`（`server_info`/`system_status.version`）+ `build.py:34` 打包名；升版只改该文件后重新 configure
 
 ## 架构
@@ -12,8 +12,9 @@
 - 进程内 GDExtension，`MODULE_INITIALIZATION_LEVEL_EDITOR` 加载；`src/main.cpp:GDExtensionEntryPoint` 注册 `GodotAutopilotPlugin`，`_enter_tree()` 启动 `ServerContext`，`_exit_tree()` 停止
 - 线程：mcp-cpp-sdk HTTP 线程 → `CommandQueue::submit()`/`execute_sync()` → 主线程 `_process():s_queue.drain()`；**所有 Godot API 必须经队列执行**，直接调用必崩
 - 端口 9527 `/mcp`，优先级 `GODOT_AUTOPILOT_PORT` env > `user://godot_autopilot/config.json`（`PluginConfig`）> 9527；默认绑 `127.0.0.1`，`ServerContext::start()` 拒绝非环回 host；mcp-cpp-sdk 0.3.2 起 Host 仅允许环回主机名/IP
-- 工具注册 `ToolRegistry` 单一来源：366 域工具（30 个 `src/tools/<域>_tools.hpp`，`GDA_TOOL_CLASS`/`GDA_TOOL_CLASS_SIDE` + `make_tools()`）+ `system_status`（FnTool）+ 7 元工具（`MetaTool` 需 `IMetaTool`，`add()` 自动归类）；catalog/BM25/`g_handlers`/`RegisterTool` 全派生
-- 计数：373 = 7 元 + 366 域；374 = 366 域 + `system_status` + 7 元（catalog/index）；7 元 = `ping/search_tools/list_categories/get_tool_detail/call_tool/batch_execute/code_execute`
+- 工具注册 `ToolRegistry` 单一来源：379 域工具（30 个 `src/tools/<域>_tools.hpp`，`GDA_TOOL_CLASS`/`GDA_TOOL_CLASS_SIDE` + `make_tools()`）+ `system_status`（FnTool）+ 7 元工具（`MetaTool` 需 `IMetaTool`，`add()` 自动归类）；catalog/BM25/`g_handlers`/`RegisterTool` 全派生
+- 计数：386 = 7 元 + 379 域；387 = 379 域 + `system_status` + 7 元（catalog/index）；7 元 = `ping/search_tools/list_categories/get_tool_detail/call_tool/batch_execute/code_execute`
+- 新增 13 个工具（Display 1 / Scene 1 / Editor 6 / Input 4 / Game 1；非 SIDE 317→322、SIDE 49→57）：`get_display_window_rect`、`get_scene_node_screen_rect`、`get_editor_viewport_geometry`、`get_editor_ui_elements`、`hit_test_editor_point`、`click_editor_element`、`type_editor_element_text`、`run_editor_shortcut`、`click_input_mouse`、`scroll_input_mouse`、`drag_input_mouse`、`type_input_text`、`click_game_ui_element`；`capture_editor_viewport` 新增 `region`/`max_dimension`/`space`/`annotate`/`diff_against_last`，游戏侧新增 wheel 注入与单步 mouse_motion，`click_game_ui_element` 走游戏侧匹配+注入（单次协议往返）
 - 错误水印：响应顶层 `new_errors_since_last_call` 一次性消费（`error_watermark.hpp`）；`editor_readiness` 导入中返回 `retryable` 软错误
 - 互转：`VariantJson::serialize/deserialize`（`util/variant_json.hpp`）；错误 `{"error": "msg"}`，`call_tool` 置 `is_error=true`
 
@@ -32,10 +33,10 @@
 
 - 启用：`GDA_ENABLE_TESTS` 已在 `CMakePresets.json` debug/release 置 `ON`（裸 `cmake` 默认 `OFF`）
 - 运行：`ctest --preset debug`（L1 秒级，L2 约 2 分钟需 `GODOT_PATH`）；单跑 `build/debug/tests/gda_test_runner.exe --file 01_scene`；CI 仅 `ctest --preset debug -E "^gda_runner_"`（L1）
-- 结构：L1 `gda_unit_tests` 140 gtest；L2 `gda_test_runner` + `tests/config/*.json` 9 份（`00_meta`/`01_scene`/`02_property`/`03_tools_contract`/`04_resources_scripts`/`05_rename_references`/`06_move_references`/`07_scene_tabs`/`08_property_readback`）；当前 ctest 注册点共 149（L1 140 + L2 9；L2 需 `GODOT_PATH`）
-- skill_gen：内容源 `src/util/skill_templates/`（30 个 .md + registry.json，8 册技能 = 1 总纲 `godot-autopilot` + 6 引擎指南 + 1 C# 专册 `godot-autopilot-csharp`，每册带 references/；84 条 Godot 4.8.0-dev 源码研究发现织入引擎六册，4.7+/4.8 行内简注）+ `tools/embed_skills.py` 构建期嵌入（`SKILL_COUNT = 8`；5 项校验 name/description/files 结构与孤儿文件，生成头入 `build/<preset>/generated/`，gitignore 覆盖；渲染至 `.agents/skills/`，dock 按钮 Generate Skills/Update Skills 动态切换，Update 先递归清理 `godot-autopilot-` 前缀目录再重建），`tests/unit/skill_gen_test.cpp` 7 用例 L1 校验（8 册清单/name/description/文件布局/frontmatter/反引号词回验 catalog∪schema 参数名∪176 项白名单/每册 references 声明），无需 Godot；L1 140/140 全绿
+- 结构：L1 `gda_unit_tests` 172 gtest（新增 `tests/unit/editor_coords_test.cpp` 32 用例）；L2 `gda_test_runner` + `tests/config/*.json` 11 份（`00_meta`/`01_scene`/`02_property`/`03_tools_contract`/`04_resources_scripts`/`05_rename_references`/`06_move_references`/`07_scene_tabs`/`08_property_readback`/`09_editor_ui`/`10_editor_input`）；当前 ctest 注册点共 183（L1 172 + L2 11；L2 需 `GODOT_PATH`）
+- skill_gen：内容源 `src/util/skill_templates/`（30 个 .md + registry.json，8 册技能 = 1 总纲 `godot-autopilot` + 6 引擎指南 + 1 C# 专册 `godot-autopilot-csharp`，每册带 references/；84 条 Godot 4.8.0-dev 源码研究发现织入引擎六册，4.7+/4.8 行内简注；编辑器 UI/输入自动化工具用法已补充进相关分册）+ `tools/embed_skills.py` 构建期嵌入（`SKILL_COUNT = 8`；5 项校验 name/description/files 结构与孤儿文件，生成头入 `build/<preset>/generated/`，gitignore 覆盖；渲染至 `.agents/skills/`，dock 按钮 Generate Skills/Update Skills 动态切换，Update 先递归清理 `godot-autopilot-` 前缀目录再重建），`tests/unit/skill_gen_test.cpp` 7 用例 L1 校验（8 册清单/name/description/文件布局/frontmatter/反引号词回验 catalog∪schema 参数名∪176 项白名单/每册 references 声明），无需 Godot；L1 172/172 全绿
 - 新增用例 = 新建 `tests/config/*.json` 零 C++；Godot 路径 `GODOT_PATH` env > `.env`（`.env.template` 复制），缺失则执行器以退出码 2 报错（不自动跳过）
-- 遍历：`03_tools_contract` 枚举 366 域工具（解析器仅匹配 `GDA_TOOL_CLASS(`），49 个 `GDA_TOOL_CLASS_SIDE` 不进入枚举（`side_effect` 字段兜底判定保留），317 个做空参+冒烟；3 契约缺口 `create_scene_node`/`get_resource_extensions`/`reimport_resource_files` 记 warnings
+- 遍历：`03_tools_contract` 枚举 379 域工具（解析器仅匹配 `GDA_TOOL_CLASS(`），57 个 `GDA_TOOL_CLASS_SIDE` 不进入枚举（`side_effect` 字段兜底判定保留），322 个做空参+冒烟（0 失败）；实测 4 条 warnings：`start_input_gamepad_vibration`/`stop_input_gamepad_vibration`/`get_resource_extensions`/`reimport_resource_files`（`create_scene_node` 是否告警依赖运行期场景状态）
 - 副作用：L2 后 `Example/project.godot` 可能追加 `[audio]/[input]` 并生成 `default_bus_layout.tres`，`git checkout -- Example/project.godot` 清理
 
 ## 知识局限

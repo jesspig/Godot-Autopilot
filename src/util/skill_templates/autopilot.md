@@ -20,7 +20,7 @@ The MCP layer intentionally exposes only seven meta tools:
 - `batch_execute` - run several tool calls in sequence
 - `code_execute` - run GDScript in the editor
 
-The 366 domain tools (scene, property, resource, script, physics, render, audio, and so on) plus `system_status` are not registered as MCP tools directly. Call every domain tool through `call_tool`, passing the domain tool name and its arguments object.
+The 379 domain tools (scene, property, resource, script, physics, render, audio, and so on) plus `system_status` are not registered as MCP tools directly. Call every domain tool through `call_tool`, passing the domain tool name and its arguments object.
 
 Two groups are denied by default behind an authorization gate: `code_execute` and `execute_script` (arbitrary GDScript in the editor) need the `code_execute` capability, and the tools that reach the running game (`execute_game_script`, `queue_game_input`, `wait_game_input`, `sequence_game_inputs`, `reload_game_scripts`) need the `game_runtime` capability. The gate is checked on every call; the "batch_execute versus code_execute" section covers the enable paths.
 
@@ -41,7 +41,7 @@ Example domain call through `call_tool`:
 {"name": "create_scene_node", "arguments": {"type": "Node2D", "name": "Player", "parent_path": "Root/Actors"}}
 ```
 
-If `search_tools` does not surface a tool you suspect exists, browse references/tool-catalog.md: it lists all 366 domain tools grouped by their 30 source modules, one line each.
+If `search_tools` does not surface a tool you suspect exists, browse references/tool-catalog.md: it lists all 379 domain tools grouped by their 30 source modules, one line each.
 
 ### Search techniques
 
@@ -52,7 +52,7 @@ If `search_tools` does not surface a tool you suspect exists, browse references/
 - Rerun with synonyms before concluding a tool is missing: tile/cell, sprite/texture, log/output, delete/remove/erase, create/add/new. The index has no stemming, so exact wording matters.
 - Narrow with filters: pass `category` for a single domain or `tags` for required tags, and browse `list_categories` when you only know the domain.
 - Read `get_tool_detail` for the candidate's schema and side-effect marker before the first write; the marker says whether the tool writes files or config.
-- When a query still comes back empty, walk references/tool-catalog.md (all 366 domain tools grouped by module) before inventing anything. Never guess a tool name - `call_tool` with a name that does not exist fails by design.
+- When a query still comes back empty, walk references/tool-catalog.md (all 379 domain tools grouped by module) before inventing anything. Never guess a tool name - `call_tool` with a name that does not exist fails by design.
 
 ## Consult the engine documentation
 
@@ -80,6 +80,7 @@ Reduce the task to its object and intent first; the first matching row is usuall
 - Work with resources in memory or on disk -> the resource tools (`create_resource`, `load_resource`, `save_resource`).
 - Write, attach or call GDScript -> the script tools (`create_script`, `attach_script_to_node`, `call_script_node`).
 - Need an engine API fact -> the documentation tools (`find_docs_class`, `get_docs_class`, `get_docs_method`, `get_docs_property`) - never memory; see "Consult the engine documentation".
+- Automate the editor UI -> enumerate with `get_editor_ui_elements` or preview with `hit_test_editor_point`, then act with `click_editor_element`, `type_editor_element_text` or `run_editor_shortcut`; raw-coordinate fallbacks (`click_input_mouse`, `scroll_input_mouse`, `drag_input_mouse`, `type_input_text`) are for the 2D canvas, 3D viewport and custom-drawn controls (see godot-autopilot-runtime).
 - Run the game and observe it -> the runtime tools (`play_editor_current_scene`, `capture_game_viewport`, `queue_game_input`).
 - Diagnose from logs -> the log tools; see "Watch the engine state".
 - Repeat a fixed sequence of calls -> `batch_execute`; need loops, math or computed values -> `code_execute`; see "batch_execute versus code_execute".
@@ -100,6 +101,7 @@ The numbered procedure below applies to every route, and the tables after it lis
 | Editor selection | `get_editor_selection` |
 | Running game scene tree | `get_debugger_scene_tree` |
 | Running game UI | `get_game_ui_elements` |
+| Editor UI elements | `get_editor_ui_elements`, `hit_test_editor_point` |
 | Resources on disk | `get_resource_dir_files`, `get_resource_type`, `has_resource`, `get_resource_dependencies`, `get_resource_references` |
 | Project file system | `get_editor_file_system_tree`, `get_editor_file_system_status` |
 | Project / editor settings | `get_project_settings`, `has_project_settings`, `get_editor_settings` |
@@ -121,6 +123,7 @@ The numbered procedure below applies to every route, and the tables after it lis
 | Animation | `create_scene_animation_player`, `create_animation`, `create_animation_track`, `insert_animation_keyframe`, `create_scene_animation_tree`, `add_animation_machine_state`, `connect_animation_states` |
 | SpriteFrames | `create_spriteframes`, `add_spriteframes_animation`, `add_spriteframes_frame` |
 | Undo grouping | `create_editor_undo_redo_action`, `add_editor_undo_redo_do`, `add_editor_undo_redo_undo`, `commit_editor_undo_redo` |
+| Editor UI automation | `click_editor_element`, `type_editor_element_text`, `run_editor_shortcut`; raw-coordinate fallbacks `click_input_mouse`, `scroll_input_mouse`, `drag_input_mouse`, `type_input_text` |
 
 ### Run and debug
 
@@ -165,7 +168,7 @@ The watermark mechanics (one-shot consumption, retryable soft errors) are in Err
 The routing tables cover single calls; real work is a loop. `ok` means the call went through, not that the effect is what you wanted, so every iteration is change, observe, diagnose, fix, verify - and a fix is confirmed by the error watermark (see "Confirming a fix with the error watermark"), not by assumption:
 
 1. Change the project through tools (`property_set`, `create_script`, `write_file`, and so on), or orchestrate several through `batch_execute` / `code_execute`.
-2. Observe the result with a screenshot (`capture_editor_viewport`, `capture_game_viewport`), a read-back (`property_get`, `get_scene_tree`, `get_resource_property`) or output (`get_debugger_log`; with a running game `get_debugger_errors` and `get_debugger_output`, disk fallback `get_game_log_entries`).
+2. Observe the result with a screenshot (`capture_editor_viewport` — add `annotate` for numbered element boxes and `diff_against_last` to measure the change against the previous capture — `capture_game_viewport`), a read-back (`property_get`, `get_scene_tree`, `get_resource_property`) or output (`get_debugger_log`; with a running game `get_debugger_errors` and `get_debugger_output`, disk fallback `get_game_log_entries`).
 3. Diagnose from what you observed, fix, and re-observe until the observation shows the intended effect.
 
 references/development-workflow.md expands this into complete loops for UI and scene appearance, script logic, resources and imports, and runtime debugging with input injection - including how screenshots arrive as image content through `call_tool`.

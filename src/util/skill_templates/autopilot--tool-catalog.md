@@ -1,6 +1,6 @@
 # Category Index
 
-All 366 domain tools of the godot-autopilot MCP server, grouped by their 30 source modules. Call domain tools through `call_tool`; confirm schemas with `get_tool_detail`.
+All 379 domain tools of the godot-autopilot MCP server, grouped by their 30 source modules. Call domain tools through `call_tool`; confirm schemas with `get_tool_detail`.
 
 ## Analysis - analyze_tools (3)
 
@@ -44,9 +44,10 @@ All 366 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `get_audio_device_inputs` - list available audio input devices
 - `set_audio_device_input` - switch the editor's audio input device
 
-## Capture - capture_tools (1)
+## Capture - capture_tools (2)
 
-- `capture_editor_viewport` - screenshot the editor viewport (or the running game with target=game) as base64 PNG; save=true on the editor target also writes the PNG under user://godot_autopilot/captures/ and returns its path (only the 20 most recent captures are kept); through `call_tool` the PNG is delivered as image content (`data` becomes `<attached-as-image-content>` with image_attached: true)
+- `capture_editor_viewport` - screenshot the editor viewport (or the running game with target=game) as base64 PNG; save=true on the editor target also writes the PNG under user://godot_autopilot/captures/ and returns its path (only the 20 most recent captures are kept); `region` crops the capture, `max_dimension` caps its pixel size, `space` picks the captured viewport space, `annotate` draws numbered boxes plus an element table, and `diff_against_last` reports the changed ratio and bounding box against the previous capture of the same target; through `call_tool` the PNG is delivered as image content (`data` becomes `<attached-as-image-content>` with image_attached: true)
+- `get_editor_viewport_geometry` - map the captured editor viewport image onto the window client area so image pixels can be converted to click coordinates (`viewport`, `index`)
 
 ## Config - config_tools (13)
 
@@ -91,7 +92,7 @@ All 366 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `get_debugger_scene_tree` - read the running game's scene tree as text
 - `get_debugger_session_info` - read debug session state (active or stopped at a breakpoint)
 
-## Display - display_tools (24)
+## Display - display_tools (25)
 
 - `get_display_clipboard` - read the system clipboard text
 - `set_display_clipboard` - write text to the system clipboard
@@ -117,6 +118,7 @@ All 366 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `set_display_window_position` - move a window to screen coordinates
 - `set_display_window_size` - resize a window in pixels
 - `set_display_window_title` - set a window's title bar text
+- `get_display_window_rect` - read a window's client-area geometry, screen and scale factor (`window_id`)
 
 ## Docs - doc_tools (4)
 
@@ -125,7 +127,7 @@ All 366 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `get_docs_method` - look up one method's reflected signature on a class
 - `get_docs_property` - look up one property's reflected info on a class
 
-## Editor - editor_tools (23)
+## Editor - editor_tools (28)
 
 - `get_editor_selection` - list the currently selected nodes
 - `set_editor_selection` - replace the editor selection with given paths
@@ -150,8 +152,13 @@ All 366 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `play_editor_current_scene` - launch the edited scene as a game
 - `stop_editor_playing` - stop the running game process
 - `build_csharp_assembly` - trigger an async dotnet build of the C# project
+- `get_editor_ui_elements` - enumerate the editor's UI elements for semantic click automation (optional `query`, `type_filter`, `interactive_only`, `max_elements`)
+- `hit_test_editor_point` - preview which editor elements a client-area `position` lands on, without clicking (`window_id`, `max_results`)
+- `click_editor_element` - click an editor UI element by its element `path` (`button`, `double_click`, `warp`, `observe`)
+- `type_editor_element_text` - type `text` into an editor UI element (`path`, `submit`, `observe`)
+- `run_editor_shortcut` - run an editor keyboard `shortcut` (for example "ctrl+s")
 
-## Game - game_tools (9)
+## Game - game_tools (10)
 
 - `get_game_status` - query the running game's engine stats over the runtime channel
 - `execute_game_script` - run code inside the running game process
@@ -162,6 +169,7 @@ All 366 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `sequence_game_inputs` - schedule up to 256 input events on exact physics frame offsets
 - `capture_game_viewport` - screenshot the running game as base64 PNG
 - `get_game_ui_elements` - enumerate Control nodes of the running game for click automation
+- `click_game_ui_element` - click a running-game Control by element `path` (`button_index`, `double_click`, `max_elements`)
 
 ## Group - group_tools (3)
 
@@ -169,7 +177,7 @@ All 366 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `remove_group_node` - remove a node from a group (undo-tracked)
 - `has_group_node` - check whether a node belongs to a group
 
-## Input - input_tools (11)
+## Input - input_tools (15)
 
 - `press_input_action` - press an input action in the editor process
 - `release_input_action` - release a previously pressed input action
@@ -180,6 +188,10 @@ All 366 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `move_input_mouse` - inject mouse motion into the editor process
 - `press_input_mouse_button` - inject a left, right or middle mouse press into the editor
 - `release_input_mouse_button` - inject a mouse button release into the editor
+- `click_input_mouse` - click at a client-area `position` in the editor (`button`, `double_click`, `warp`, `observe`)
+- `scroll_input_mouse` - inject a wheel scroll in the editor (`direction`, `position`, `amount`, `warp`, `observe`)
+- `drag_input_mouse` - drag in the editor from `from` to `to` (`button`, `steps`, `warp`, `observe`)
+- `type_input_text` - type `text` into the editor (`submit`, `observe`)
 - `start_input_gamepad_vibration` - start gamepad vibration on the editor process
 - `stop_input_gamepad_vibration` - stop gamepad vibration
 
@@ -373,7 +385,7 @@ All 366 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `set_resource_property` - set a property on a located resource
 - `get_resource_property` - read a property from a located resource
 
-## Scene - scene_tools (6)
+## Scene - scene_tools (7)
 
 - `create_scene_node` - create a node in the edited scene with optional type, name, parent and inline properties
 - `delete_scene_node` - delete a node via editor undo/redo (refuses the scene root)
@@ -381,6 +393,7 @@ All 366 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `reparent_node` - move a node under a new parent as one undo step
 - `get_scene_tree` - walk the edited scene tree with optional depth and properties
 - `instantiate_scene` - instantiate a .tscn PackedScene into the edited scene
+- `get_scene_node_screen_rect` - map scene node `paths` to window client-area rectangles (`viewport`)
 
 ## Scene - scene_tree_tools (8)
 

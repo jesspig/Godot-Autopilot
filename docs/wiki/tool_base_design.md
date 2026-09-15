@@ -1,27 +1,27 @@
 ---
 type: 模块文档（设计+实现）
 title: ToolBase 工具统一标准化（接口 + 组合 + 真类化）
-description: 以接口 + 组合统一全体工具：ToolBase 接口、角色接口切片、GDA_TOOL_CLASS 真类宏、ToolRegistry 单一来源，366 域工具全部为独立 ToolBase 子类
+description: 以接口 + 组合统一全体工具：ToolBase 接口、角色接口切片、GDA_TOOL_CLASS 真类宏、ToolRegistry 单一来源，379 域工具全部为独立 ToolBase 子类
 tags:
   - 设计
   - 工具架构
   - 接口
   - 组合
-timestamp: "2026-09-13T21:47:51+08:00"
+timestamp: "2026-09-15T07:09:53+08:00"
 resource: src/tools/
 ---
 
 # ToolBase 工具统一标准化（设计定稿 + 全量真类化实现）
 
-> **当前 API 面（2026-08-22 复核；工具数/排除集于 2026-09-13 随收口批次同步）**
+> **当前 API 面（2026-08-22 复核；工具数/排除集于 2026-09-15 随 Computer Use grounding 批次同步）**
 > `tool_base.hpp`：`SideEffect` 枚举 + `side_effect_name`、`ToolMeta`、`ISideEffect`、`IMetaTool`、`ToolBase`（meta/execute/input_schema 三件套）、`side_effect_of` 自由函数、授权门 `authorization::capability_for_tool` / `deny_if_unauthorized`（`GDA_TOOL_CLASS`/`FnTool`/`MetaTool` 的 `execute()` 统一前置；`GODOT_AUTOPILOT_ALLOW` 优先于面板 `allow` 键）。
 > `tool_decl.hpp`：`GDA_TOOL_CLASS` / `GDA_TOOL_CLASS_SIDE` 真类宏；`fn_tool.hpp`：`FnTool(ToolMeta, HandlerFn, schema, SideEffect=None)`（实现 `ISideEffect`）+ `make_fn_tool`。
 > `tool_registry.hpp`：`make_tool_info` + `ToolRegistry`（`add` 按 `dynamic_cast<IMetaTool*>` 自动归类 / `find` / `find_meta` / `find_any` / `all` / `all_meta` / `all_any` / `size` / `meta_size` / `categories`，查找与列表返回 `std::shared_ptr<ToolBase>`）。
-> - **366 域工具全部为独立 `ToolBase` 子类**，分散于 `src/tools/<域>_tools.hpp`（30 个域文件），`execute` 委托既有 domain handler、`input_schema` 统一经 `tool_input_schema` 取；
+> - **379 域工具全部为独立 `ToolBase` 子类**，分散于 `src/tools/<域>_tools.hpp`（30 个域文件），`execute` 委托既有 domain handler、`input_schema` 统一经 `tool_input_schema` 取；
 > - `tool_defs.def` 已删除；`register_all` 注册 30 个域的 `make_tools()` + `system_status`（FnTool）+ 7 元工具（`MetaTool`，接口 + 组合），catalog / BM25 index / 分发 map 全部从 registry 派生；
 > - **元工具 = 接口 + 组合**：`IMetaTool` 标记接口 + `MetaTool`（`ToolBase`+`IMetaTool`，依赖组合注入），`ToolRegistry::add()` 用 `dynamic_cast<IMetaTool>` 自动归类——实现接口即元工具；
-> - **副作用驱动遍历排除**：`SideEffect` 枚举 8 值（`None/WritesFile/WritesConfig/ShowsAlert/ModifiesWindow/Process/CodeExecute/GameRuntime`）；49 个副作用工具用 `GDA_TOOL_CLASS_SIDE` 宏标记（实现 `ISideEffect`）；`get_tool_detail` 返回 `side_effect` 字段；遍历 runner 仅枚举 `GDA_TOOL_CLASS(` 的 317 个并读该字段兜底排除，删除硬编码 `kExcludedSideEffectTools`。
-> 验证口径：L1 **140** 用例 + L2 9 份配置 = ctest 注册点 **149**（已 `ctest --preset debug -N` 实测确认；L1 为源码 `TEST`/`TEST_F` 宏统计）；`03_tools_contract` 遍历口径：域工具 366，解析器枚举 317 + 49 个 SIDE 不枚举。权威计数：域工具 366、`system_status` 1、元工具 7、catalog/index 374、MCP 可达 373。
+> - **副作用驱动遍历排除**：`SideEffect` 枚举 8 值（`None/WritesFile/WritesConfig/ShowsAlert/ModifiesWindow/Process/CodeExecute/GameRuntime`）；57 个副作用工具用 `GDA_TOOL_CLASS_SIDE` 宏标记（实现 `ISideEffect`）；`get_tool_detail` 返回 `side_effect` 字段；遍历 runner 仅枚举 `GDA_TOOL_CLASS(` 的 322 个并读该字段兜底排除，删除硬编码 `kExcludedSideEffectTools`。
+> 验证口径：L1 **172** 用例 + L2 11 份配置 = ctest 注册点 **183**（已 `ctest --preset debug -N` 实测确认；L1 为源码 `TEST`/`TEST_F` 宏统计）；`03_tools_contract` 遍历口径：域工具 379，解析器枚举 322 + 57 个 SIDE 不枚举。权威计数：域工具 379、`system_status` 1、元工具 7、catalog/index 387、MCP 可达 386。
 >
 > 相关页面： [工具注册表](modules/tools_registry.md) · [工程约定](conventions.md) · [测试体系](tests.md) · [架构总览](overview.md)
 
