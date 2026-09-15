@@ -1,4 +1,6 @@
 #include "code_exec_ops.hpp"
+#include "core/command_queue.hpp"
+#include "core/config.hpp"
 #include "core/log_system.hpp"
 #include "core/resource_registry.hpp"
 #include "tools/debugger_ops.hpp"
@@ -486,18 +488,31 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
   if (rollback)
     rollback_on_error = rollback->GetBool();
 
+  bool await_async = false;
+  auto *await_async_p = args.Find("await_async");
+  if (await_async_p && !await_async_p->IsBool())
+    return util::error_json("await_async must be a boolean");
+  if (await_async_p)
+    await_async = await_async_p->GetBool();
+
+  const bool can_wait_off_main_thread =
+      runtime_ops::has_editor_queue() &&
+      !get_editor_queue().is_main_thread();
+
   godot::UndoRedo *history = nullptr;
   uint64_t version_before = 0;
-  if (stop_on_error && rollback_on_error) {
-    auto *editor = godot::EditorInterface::get_singleton();
-    auto *manager = editor ? editor->get_editor_undo_redo() : nullptr;
-    history =
-        manager
-            ? manager->get_history_undo_redo(static_cast<int32_t>(
-                  godot::EditorUndoRedoManager::GLOBAL_HISTORY))
-            : nullptr;
-    if (history)
-      version_before = history->get_version();
+  if (stop_on_error && rollback_on_error && runtime_ops::has_editor_queue()) {
+    get_editor_queue().execute_sync([&]() {
+      auto *editor = godot::EditorInterface::get_singleton();
+      auto *manager = editor ? editor->get_editor_undo_redo() : nullptr;
+      history =
+          manager
+              ? manager->get_history_undo_redo(static_cast<int32_t>(
+                    godot::EditorUndoRedoManager::GLOBAL_HISTORY))
+              : nullptr;
+      if (history)
+        version_before = history->get_version();
+    });
   }
 
   mcp::JsonValue results(mcp::JsonValue::array_tag);
@@ -564,16 +579,66 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
 
     int64_t pending_id = 0;
     if (runtime_ops::payload_is_pending(handler_result, &pending_id)) {
-      result_item["status"] = mcp::JsonValue("pending");
-      result_item["data"] = std::move(handler_result);
-      result_item["note"] = mcp::JsonValue(
-          "async game op sent; batch_execute does not await it — call this "
-          "tool via call_tool to receive the response");
-      std::string discard_detail;
-      runtime_ops::discard_pending(pending_id, discard_detail);
-      result_item["detail"] = mcp::JsonValue(discard_detail);
+      if (!await_async) {
+        result_item["status"] = mcp::JsonValue("error");
+        result_item["error"] = mcp::JsonValue(
+            "async game op '" + tool_name +
+            "' is not awaited by batch_execute (await_async=false) — call it "
+            "via call_tool to receive the response, or set await_async=true to "
+            "wait inside the batch");
+        std::string discard_detail;
+        runtime_ops::discard_pending(pending_id, discard_detail);
+        result_item["detail"] = mcp::JsonValue(discard_detail);
+        results.PushBack(std::move(result_item));
+        ++failed;
+        if (stop_on_error) {
+          stopped = true;
+          stopped_after = i + 1;
+          break;
+        }
+        continue;
+      }
+      if (!can_wait_off_main_thread) {
+        std::string discard_detail;
+        runtime_ops::discard_pending(pending_id, discard_detail);
+        result_item["status"] = mcp::JsonValue("error");
+        result_item["error"] = mcp::JsonValue(
+            "await_async cannot wait on the editor main thread — invoke "
+            "batch_execute directly (not through call_tool) so the wait runs "
+            "on the transport thread");
+        result_item["detail"] = mcp::JsonValue(discard_detail);
+        results.PushBack(std::move(result_item));
+        ++failed;
+        if (stop_on_error) {
+          stopped = true;
+          stopped_after = i + 1;
+          break;
+        }
+        continue;
+      }
+      int64_t wait_ms = GDA_DEFAULT_TIMEOUT_MS;
+      if (auto *timeout_p = handler_result.Find("timeout_ms");
+          timeout_p && timeout_p->IsInt() && timeout_p->GetInt() > 0)
+        wait_ms = timeout_p->GetInt();
+      mcp::JsonValue awaited =
+          runtime_ops::wait_pending_response(pending_id, wait_ms);
+      if (tool_name == "capture_game_viewport" && !awaited.Contains("error"))
+        awaited = runtime_ops::finalize_capture_response(awaited);
+      const bool awaited_error =
+          awaited.IsObject() && awaited.Find("error") != nullptr;
+      result_item["status"] = mcp::JsonValue(awaited_error ? "error" : "ok");
+      result_item["result"] = std::move(awaited);
       results.PushBack(std::move(result_item));
-      ++pending_count;
+      if (awaited_error) {
+        ++failed;
+        if (stop_on_error) {
+          stopped = true;
+          stopped_after = i + 1;
+          break;
+        }
+      } else {
+        ++succeeded;
+      }
       continue;
     }
 
@@ -611,15 +676,19 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
                        " (stop_on_error=true); " + std::to_string(skipped) +
                        " remaining operations were not executed. Set "
                        "stop_on_error=false to run all operations.");
-    if (history) {
-      int64_t actions_created =
-          static_cast<int64_t>(history->get_version() - version_before);
+    if (history && runtime_ops::has_editor_queue()) {
+      int64_t actions_created = 0;
       int64_t rolled_back = 0;
-      for (int64_t i = 0; i < actions_created; ++i) {
-        if (!history->has_undo() || !history->undo())
-          break;
-        ++rolled_back;
-      }
+      get_editor_queue().execute_sync([&]() {
+        actions_created =
+            static_cast<int64_t>(history->get_version() - version_before);
+        for (int64_t undo_index = 0; undo_index < actions_created;
+             ++undo_index) {
+          if (!history->has_undo() || !history->undo())
+            break;
+          ++rolled_back;
+        }
+      });
       r["rolled_back"] = mcp::JsonValue(rolled_back);
       r["rollback_partial"] =
           mcp::JsonValue(rolled_back != actions_created);

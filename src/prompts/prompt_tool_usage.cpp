@@ -555,7 +555,7 @@ std::string prompt_tool_usage() {
 - `stop_on_error` 默认为 true
 - 操作顺序执行，不是并行
 - 失败的操作用 `args` 字段提供错误信息
-- 异步 game 工具在 batch 中以 `status: "pending"` 返回（请求已发送但 batch 不等待其响应；该记录会被丢弃，游戏侧响应到达时记为 late response），需要结果时请改用 `call_tool` 逐条调用；响应新增 `pending` 计数，`total` = succeeded + failed + pending
+- 异步 game 工具（`execute_game_script`、`queue_game_input` 等）在 batch 中默认被明确报错拒绝（该操作 `status` 为 `"error"`，pending 记录被释放，不会悬挂等待），`total` = succeeded + failed；传 `await_async: true` 后 batch 经传输线程等待异步 op 的真实结果（受该 op 的 `timeout_ms` 约束）。注意：经 `call_tool` 间接调用 batch 且 `await_async: true` 会命中主线程兜底错误，需直接调用 `batch_execute`；长耗时游戏脚本也可用 `start_game_job` 异步提交（立即返回 `job_id`），再以 `get_game_job` 轮询结果
 
 ---
 
@@ -640,6 +640,20 @@ std::string prompt_tool_usage() {
 }
 ```
 
+**矩形区域 — fill_tilemap_rect 一次铺满：**
+```json
+{
+  "name": "fill_tilemap_rect",
+  "arguments": {
+    "node_path": "TileMap",
+    "from": {"x": 0, "y": 5},
+    "to": {"x": 31, "y": 5},
+    "source_id": 0,
+    "atlas_coords": {"x": 0, "y": 0}
+  }
+}
+```
+
 **替代路径（大批量推荐）— code_execute 循环铺 TileMap：**
 ```json
 {
@@ -651,6 +665,7 @@ std::string prompt_tool_usage() {
 ```
 
 **注意：**
+- 矩形区域优先用 `fill_tilemap_rect`：`from`/`to` 为两个对角格（含端点，先后顺序不限），整块记为一次 undo；单次上限 100000 格，传 `erase: true` 则清除区域内所有格子
 - `cells` 数组每请求建议保持 ~64 项以下——客户端侧参数构造可能截断更大载荷，导致 JSON 解析失败（报 parse error）
 - 大批量铺 TileMap（如整行、整面）改用 `code_execute`（或 `execute_game_script`）程序化循环生成，避免手工构造大型 JSON 出错
 - `code_execute` 单函数模式下代码内联在 `_run()` 中执行，循环结束后用 `return` 返回结果
