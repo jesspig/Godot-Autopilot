@@ -72,6 +72,7 @@ add_library(godot-autopilot SHARED
     src/core/plugin_config.cpp
     src/core/export_guard.cpp
     src/core/editor_readiness.cpp
+    src/core/editor_coords.cpp
     src/resources/resource_handlers.cpp
     src/resources/debugger_resources.cpp
     src/prompts/prompt_handlers.cpp
@@ -109,6 +110,9 @@ add_library(godot-autopilot SHARED
     src/tools/editor_ops.cpp
     src/tools/group_ops.cpp
     src/tools/input_ops.cpp
+    src/tools/input_click_ops.cpp
+    src/tools/editor_ui_ops.cpp
+    src/tools/editor_ui_actions.cpp
     src/tools/nav_ops.cpp
     src/tools/physics_ops.cpp
     src/tools/property_ops.cpp
