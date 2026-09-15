@@ -43,20 +43,23 @@ void fill_schema_debug_sys(std::unordered_map<std::string, mcp::JsonValue>& m) {
             {"paths", "array", "Non-empty array of res:// GDScript file paths to reload in the running game", true},
         });
         m["queue_game_input"] = schema::build_schema({
-            {"type", "string", "Input event type: 'key' (keyboard), 'mouse_button' (mouse click) or 'action' (named InputMap action)", true},
+            {"type", "string", "Input event type: 'key' (keyboard), 'mouse_button' (mouse click), 'wheel' (mouse wheel scroll), 'mouse_motion' (pointer move) or 'action' (named InputMap action)", true},
             {"keycode", "string", "Key for type='key': numeric key code (e.g. 65) or key name (e.g. 'A', 'space', 'KEY_LEFT')", false},
             {"pressed", "boolean", "Pressed state (default: true)", false},
-            {"button_index", "integer", "Mouse button index for type='mouse_button' (e.g. 1=left, 2=right, 3=middle)", false},
-            {"position", "object", "Mouse position {x, y} for type='mouse_button'", false},
+            {"button_index", "integer", "Mouse button index: 1=left, 2=right, 3=middle for type='mouse_button'; for type='wheel' a wheel button index (4=up, 5=down, 6=left, 7=right) used instead of direction", false},
+            {"position", "object", "Mouse position {x, y} for type='mouse_button', 'wheel' or 'mouse_motion'", false},
+            {"direction", "string", "Wheel direction for type='wheel': 'up', 'down', 'left' or 'right' (case-insensitive); ignored when button_index is given", false},
+            {"amount", "integer", "Wheel scroll amount for type='wheel' (integer 1-10, default: 1); the wheel button is injected pressed then released with this factor", false},
+            {"relative", "object", "Pointer movement delta {x, y} for type='mouse_motion' (default: zero vector)", false},
             {"action", "string", "Action name for type='action' (e.g. 'ui_accept'); transient states (is_action_just_pressed) are only visible in the next physics frame — use wait_game_input or get_game_input_status to observe effects. Transient states are not visible in _process (render frame)", false},
-            {"duration_ms", "integer", "Hold duration: auto-release the input after this many ms (0/absent = no auto-release); only meaningful when pressed=true", false},
+            {"duration_ms", "integer", "Hold duration: auto-release the input after this many ms (0/absent = no auto-release); only meaningful when pressed=true and ignored by type='wheel'", false},
             {"mode", "string", "Injection mode: 'event' (default, via Input.parse_input_event), 'api' (via Input.action_press/action_release, immediate) or 'hold' (event-style injection that stays pressed for duration_ms)", false},
             {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 30000)", false},
         });
         m["wait_game_input"] = schema::build_schema({
             {"action", "string", "Action name to wait on", true},
             {"state", "string", "Transient state to wait for: 'just_pressed' (default), 'just_released' or 'pressed'", false},
-            {"inject", "object", "Inject an input before waiting, in the same call (fields mirror queue_game_input: type/action/keycode/pressed/mode/duration_ms/button_index/position) — eliminates the inject-then-observe cross-roundtrip frame gap; required for state=just_pressed/just_released, without inject the transient window (1 physics frame) has already expired and the wait will always time out. Transient states are not visible in _process (render frame)", false},
+            {"inject", "object", "Inject an input before waiting, in the same call (fields mirror queue_game_input: type/action/keycode/pressed/mode/duration_ms/button_index/position/direction/amount/relative) — eliminates the inject-then-observe cross-roundtrip frame gap; required for state=just_pressed/just_released, without inject the transient window (1 physics frame) has already expired and the wait will always time out. Transient states are not visible in _process (render frame)", false},
             {"timeout_ms", "integer", "Wait timeout in milliseconds (default: 2000, max: 30000)", false},
         });
         m["get_game_input_status"] = schema::build_schema({
@@ -64,8 +67,15 @@ void fill_schema_debug_sys(std::unordered_map<std::string, mcp::JsonValue>& m) {
             {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 30000); responses never include recent_engine_errors — use get_debugger_errors for running-game errors or get_debugger_log for editor-process errors", false},
         });
         m["sequence_game_inputs"] = schema::build_schema({
-            {"inputs", "array", "Timeline items, each an object: kind ('key'|'mouse_button'|'mouse_motion'|'action'), at_frame (integer physics-frame offset from sequence start, 0 = immediately; out-of-order allowed, fires when its frame arrives) plus the queue_game_input fields for that kind — keycode for key, button_index and optional position {x,y} for mouse_button, position {x,y} for mouse_motion, action for action; optional pressed (default true), duration_ms (auto-release), mode ('event'|'api'|'hold'). Max 256 items. Example: [{\"kind\":\"key\",\"keycode\":\"X\",\"at_frame\":0},{\"kind\":\"mouse_button\",\"button_index\":1,\"position\":{\"x\":120,\"y\":80},\"at_frame\":5},{\"kind\":\"action\",\"action\":\"jump\",\"at_frame\":15}]", true},
+            {"inputs", "array", "Timeline items, each an object: kind ('key'|'mouse_button'|'mouse_motion'|'wheel'|'action'), at_frame (integer physics-frame offset from sequence start, 0 = immediately; out-of-order allowed, fires when its frame arrives) plus the queue_game_input fields for that kind — keycode for key, button_index and optional position {x,y} for mouse_button, position {x,y} for mouse_motion, direction ('up'|'down'|'left'|'right') or button_index 4-7 with optional amount 1-10 and position {x,y} for wheel, action for action; optional pressed (default true), duration_ms (auto-release), mode ('event'|'api'|'hold'). Max 256 items. Example: [{\"kind\":\"key\",\"keycode\":\"X\",\"at_frame\":0},{\"kind\":\"mouse_button\",\"button_index\":1,\"position\":{\"x\":120,\"y\":80},\"at_frame\":5},{\"kind\":\"action\",\"action\":\"jump\",\"at_frame\":15}]", true},
             {"timeout_ms", "integer", "Response timeout in milliseconds (default: max(at_frame)*33+2000, max: 30000); the call resolves with {completed:true, executed:n} once every item has fired, or {completed:false, executed:n} on expiry listing how many items fired before the deadline", false},
+        });
+        m["click_game_ui_element"] = schema::build_schema({
+            {"path", "string", "Node path of the UI element to click, as returned by get_game_ui_elements (e.g. '/root/Main/Menu/StartButton'); an exact match wins, otherwise a path ending with '/'+path is used", true},
+            {"button_index", "integer", "Mouse button to click: 1=left (default), 2=right, 3=middle", false},
+            {"double_click", "boolean", "Inject a second press/release pair (default: false)", false},
+            {"max_elements", "integer", "Maximum number of Control elements enumerated while resolving path (default: 1000, max: 1000)", false},
+            {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 30000); the game performs both the enumeration and the injection before answering", false},
         });
         m["get_game_ui_elements"] = schema::build_schema({
             {"max_elements", "integer", "Maximum number of Control-derived elements returned in tree order (default: 100, max: 1000); truncated=true signals more remain — raise the cap or narrow via execute_game_script", false},
@@ -73,6 +83,9 @@ void fill_schema_debug_sys(std::unordered_map<std::string, mcp::JsonValue>& m) {
         });
         m["capture_game_viewport"] = schema::build_schema({
             {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 30000); the capture is returned as a base64-encoded PNG", false},
+            {"region", "object", "Crop the captured image to {x, y, width, height} in viewport pixels (width/height must be positive); the rect is clamped to the image and an empty intersection fails with region_out_of_bounds", false},
+            {"max_dimension", "integer", "Downscale the output image so its longest side is at most this many pixels (64-4096); never upscales (default: no scaling)", false},
+            {"annotate", "boolean", "Draw a numbered box for every Control element on the captured image (default: false); the game-side result also carries annotated=true plus an elements array {id,path,type,text,position,size} in image pixels", false},
         });
 
         m["get_game_log_entries"] = schema::build_schema({

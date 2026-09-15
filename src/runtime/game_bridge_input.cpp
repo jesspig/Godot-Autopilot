@@ -147,7 +147,7 @@ void dispatch_input_event(godot::Input *input, int type_code,
                           const godot::Key &key, int64_t button_index,
                           const godot::Vector2 &position, bool has_position,
                           bool pressed, const godot::StringName &action,
-                          bool mode_api, bool flush) {
+                          bool mode_api, bool flush, float factor = 1.0f) {
   if (type_code == 0) {
     godot::Ref<godot::InputEventKey> ev;
     ev.instantiate();
@@ -160,6 +160,7 @@ void dispatch_input_event(godot::Input *input, int type_code,
     ev.instantiate();
     ev->set_pressed(pressed);
     ev->set_button_index(static_cast<godot::MouseButton>(button_index));
+    ev->set_factor(factor);
     if (has_position) {
       ev->set_position(position);
       ev->set_global_position(position);
@@ -454,18 +455,24 @@ godot::Key parse_keycode(const JV &keycode) {
   return godot::KEY_NONE;
 }
 
-bool extract_position(const JV &params, godot::Vector2 &out) {
-  auto *pos_p = params.Find("position");
-  if (!pos_p || !pos_p->IsObject())
+bool extract_vec2(const JV &value, godot::Vector2 &out) {
+  if (!value.IsObject())
     return false;
-  auto *x = pos_p->Find("x");
-  auto *y = pos_p->Find("y");
+  auto *x = value.Find("x");
+  auto *y = value.Find("y");
   if (!x || !y || !x->IsNumber() || !y->IsNumber())
     return false;
   double px = x->IsInt() ? static_cast<double>(x->GetInt()) : x->GetDouble();
   double py = y->IsInt() ? static_cast<double>(y->GetInt()) : y->GetDouble();
   out = godot::Vector2(px, py);
   return true;
+}
+
+bool extract_position(const JV &params, godot::Vector2 &out) {
+  auto *pos_p = params.Find("position");
+  if (!pos_p)
+    return false;
+  return extract_vec2(*pos_p, out);
 }
 
 bool param_pressed(const JV &params, bool default_value) {
@@ -491,7 +498,8 @@ std::string step_type(const JV &step) {
 std::string inject_step(const JV &step) {
   std::string type = step_type(step);
   if (type.empty()) {
-    return "input requires kind (key|mouse_button|mouse_motion|action)";
+    return "input requires kind "
+           "(key|mouse_button|mouse_motion|wheel|action)";
   }
 
   auto *input = godot::Input::get_singleton();
@@ -556,12 +564,63 @@ std::string inject_step(const JV &step) {
     if (!extract_position(step, pos))
       return "input mouse_motion requires position {x, y}";
     has_pos = true;
+    godot::Vector2 relative;
+    if (auto *relative_p = step.Find("relative")) {
+      if (!extract_vec2(*relative_p, relative))
+        return "input mouse_motion relative must contain numeric x and y";
+    }
     godot::Ref<godot::InputEventMouseMotion> ev;
     ev.instantiate();
     ev->set_position(pos);
     ev->set_global_position(pos);
+    ev->set_relative(relative);
     input->parse_input_event(ev);
     input->flush_buffered_events();
+    return "";
+  } else if (type == "wheel") {
+    int64_t wheel_button = 0;
+    if (auto *bi = step.Find("button_index")) {
+      if (!bi->IsInt())
+        return "input wheel button_index must be an integer (4-7)";
+      wheel_button = bi->GetInt();
+      if (wheel_button < godot::MOUSE_BUTTON_WHEEL_UP ||
+          wheel_button > godot::MOUSE_BUTTON_WHEEL_RIGHT)
+        return "input wheel button_index must be 4-7 "
+               "(up|down|left|right)";
+    } else {
+      auto *dir = step.Find("direction");
+      if (!dir || !dir->IsString())
+        return "input wheel requires direction (up|down|left|right) or "
+               "button_index (4-7)";
+      std::string direction = dir->GetString();
+      for (auto &c : direction)
+        c = ascii_upper(c);
+      if (direction == "UP")
+        wheel_button = godot::MOUSE_BUTTON_WHEEL_UP;
+      else if (direction == "DOWN")
+        wheel_button = godot::MOUSE_BUTTON_WHEEL_DOWN;
+      else if (direction == "LEFT")
+        wheel_button = godot::MOUSE_BUTTON_WHEEL_LEFT;
+      else if (direction == "RIGHT")
+        wheel_button = godot::MOUSE_BUTTON_WHEEL_RIGHT;
+      else
+        return "invalid wheel direction: " + dir->GetString() +
+               " (expected up|down|left|right)";
+    }
+    int64_t amount = 1;
+    if (auto *amount_p = step.Find("amount")) {
+      if (!amount_p->IsInt() || amount_p->GetInt() < 1 ||
+          amount_p->GetInt() > 10)
+        return "input wheel amount must be an integer between 1 and 10";
+      amount = amount_p->GetInt();
+    }
+    if (extract_position(step, pos))
+      has_pos = true;
+    const float factor = static_cast<float>(amount);
+    dispatch_input_event(input, 1, key, wheel_button, pos, has_pos, true,
+                         godot::StringName(), false, true, factor);
+    dispatch_input_event(input, 1, key, wheel_button, pos, has_pos, false,
+                         godot::StringName(), false, true, factor);
     return "";
   } else if (type == "action") {
     auto *act = step.Find("action");
@@ -725,15 +784,27 @@ JV op_input(const JV &params, int64_t request_id) {
   auto *type_p = params.Find("type");
   std::string unknown = unknown_field(
       params, {"type", "keycode", "pressed", "button_index", "position",
-               "action", "duration_ms", "mode", "sequence"});
+               "action", "duration_ms", "mode", "sequence", "direction",
+               "amount", "relative"});
   if (!unknown.empty())
     return error_result("unknown input parameter: " + unknown);
   if (!type_p || !type_p->IsString()) {
-    return error_result("input requires type (key|mouse_button|action)");
+    return error_result(
+        "input requires type (key|mouse_button|wheel|mouse_motion|action)");
   }
   if (type_p->GetString() != "key" && type_p->GetString() != "mouse_button" &&
+      type_p->GetString() != "wheel" &&
+      type_p->GetString() != "mouse_motion" &&
       type_p->GetString() != "action")
-    return error_result("input type must be key|mouse_button|action");
+    return error_result(
+        "input type must be key|mouse_button|wheel|mouse_motion|action");
+  if (auto *direction = params.Find("direction");
+      direction && !direction->IsString())
+    return error_result("input direction must be a string");
+  if (auto *amount = params.Find("amount");
+      amount && (!amount->IsInt() || amount->GetInt() < 1 ||
+                 amount->GetInt() > 10))
+    return error_result("input amount must be an integer between 1 and 10");
   if (auto *pressed = params.Find("pressed"); pressed && !pressed->IsBool())
     return error_result("input pressed must be a boolean");
   if (auto *duration = params.Find("duration_ms"); duration &&
@@ -750,6 +821,15 @@ JV op_input(const JV &params, int64_t request_id) {
     if (!position->IsObject() || !position->Find("x") || !position->Find("y") ||
         !position->Find("x")->IsNumber() || !position->Find("y")->IsNumber())
       return error_result("input position must contain numeric x and y");
+  }
+  if (auto *relative = params.Find("relative")) {
+    std::string relative_unknown = unknown_field(*relative, {"x", "y"});
+    if (!relative_unknown.empty())
+      return error_result("unknown input relative parameter: " +
+                          relative_unknown);
+    godot::Vector2 relative_value;
+    if (!extract_vec2(*relative, relative_value))
+      return error_result("input relative must contain numeric x and y");
   }
   std::string step_err = inject_step(params);
   if (!step_err.empty())
@@ -865,7 +945,8 @@ JV op_input_sequence(const JV &params, int64_t request_id) {
                           "(non-negative integer physics frame offset)");
     std::string item_unknown = unknown_field(
         item, {"kind", "type", "at_frame", "keycode", "pressed",
-               "button_index", "position", "action", "duration_ms", "mode"});
+               "button_index", "position", "action", "duration_ms", "mode",
+               "direction", "amount", "relative"});
     if (!item_unknown.empty())
       return error_result("unknown input_sequence item parameter: " +
                           item_unknown);

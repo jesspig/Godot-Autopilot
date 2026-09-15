@@ -39,8 +39,9 @@ void copy_optional(const JV &from, JV &to, const char *key) {
 }
 
 constexpr const char *INPUT_PARAM_WHITELIST[] = {
-    "type",   "keycode",     "pressed", "button_index", "position",
-    "action", "duration_ms", "mode",    "timeout_ms",
+    "type",      "keycode",    "pressed",   "button_index", "position",
+    "action",    "duration_ms", "mode",     "timeout_ms",   "direction",
+    "amount",    "relative",
 };
 
 bool has_only_fields(const JV &value, const char *const *allowed,
@@ -78,8 +79,10 @@ constexpr int64_t SEQUENCE_FRAME_BUDGET_MS = 33;
 constexpr int64_t SEQUENCE_BASE_TIMEOUT_MS = 2000;
 
 constexpr const char *SEQUENCE_ITEM_KINDS[] = {
-    "key", "mouse_button", "mouse_motion", "action",
+    "key", "mouse_button", "mouse_motion", "wheel", "action",
 };
+
+constexpr int64_t CLICK_MAX_ELEMENTS_LIMIT = 1000;
 
 bool is_sequence_item_kind(const std::string &kind) {
   for (const char *allowed : SEQUENCE_ITEM_KINDS) {
@@ -191,12 +194,20 @@ mcp::JsonValue handle_game_input(const mcp::JsonValue &args) {
     return error_json("unknown parameter for queue_game_input: " + unknown);
   auto *type_p = args.Find("type");
   if (!type_p || !type_p->IsString()) {
-    return error_json(
-        "missing required parameter: type (key|mouse_button|action)");
+    return error_json("missing required parameter: type "
+                      "(key|mouse_button|wheel|mouse_motion|action)");
   }
-  if (type_p->GetString() != "key" && type_p->GetString() != "mouse_button" &&
-      type_p->GetString() != "action")
-    return error_json("type must be key|mouse_button|action");
+  const std::string type = type_p->GetString();
+  if (type != "key" && type != "mouse_button" && type != "wheel" &&
+      type != "mouse_motion" && type != "action")
+    return error_json("type must be key|mouse_button|wheel|mouse_motion|action");
+  if (auto *direction = args.Find("direction"); direction && !direction->IsString())
+    return error_json("direction must be a string (up|down|left|right)");
+  if (auto *amount = args.Find("amount"); amount &&
+      (!amount->IsInt() || amount->GetInt() < 1 || amount->GetInt() > 10))
+    return error_json("amount must be an integer between 1 and 10");
+  if (auto *relative = args.Find("relative"); relative && !relative->IsObject())
+    return error_json("relative must be an object with numeric x and y");
   if (auto *pressed = args.Find("pressed"); pressed && !pressed->IsBool())
     return error_json("pressed must be a boolean");
   if (auto *duration = args.Find("duration_ms"); duration &&
@@ -213,7 +224,7 @@ mcp::JsonValue handle_game_input(const mcp::JsonValue &args) {
        timeout->GetInt() > GDA_MAX_TIMEOUT_MS))
     return error_json("timeout_ms must be an integer between 1 and 30000");
   JV params(JV::object_tag);
-  params["type"] = *type_p;
+  params["type"] = JV(type);
   copy_optional(args, params, "keycode");
   copy_optional(args, params, "pressed");
   copy_optional(args, params, "button_index");
@@ -221,6 +232,9 @@ mcp::JsonValue handle_game_input(const mcp::JsonValue &args) {
   copy_optional(args, params, "action");
   copy_optional(args, params, "duration_ms");
   copy_optional(args, params, "mode");
+  copy_optional(args, params, "direction");
+  copy_optional(args, params, "amount");
+  copy_optional(args, params, "relative");
 
   JV result = handle_gda_send("input", params, extract_timeout(args));
   append_runtime_degradation_hint(result);
@@ -319,7 +333,7 @@ mcp::JsonValue handle_sequence_game_inputs(const mcp::JsonValue &args) {
     if (!kind_p || !kind_p->IsString() ||
         !is_sequence_item_kind(kind_p->GetString())) {
       return error_json("each inputs item requires kind "
-                        "(key|mouse_button|mouse_motion|action)");
+                        "(key|mouse_button|mouse_motion|wheel|action)");
     }
     auto *frame_p = item.Find("at_frame");
     if (!frame_p || !frame_p->IsInt() || frame_p->GetInt() < 0) {
@@ -367,16 +381,112 @@ mcp::JsonValue handle_game_ui_elements(const mcp::JsonValue &args) {
                          extract_timeout(args));
 }
 
+mcp::JsonValue handle_click_game_ui_element(const mcp::JsonValue &args) {
+  JV denied = authorization::deny_if_unauthorized(
+      "click_game_ui_element", SideEffect::GameRuntime);
+  if (!denied.IsNull())
+    return denied;
+  if (!args.IsObject())
+    return error_json("click_game_ui_element parameters must be an object");
+  static constexpr const char *allowed[] = {"path", "button_index",
+                                             "double_click", "max_elements",
+                                             "timeout_ms"};
+  std::string unknown;
+  if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed), unknown))
+    return error_json("unknown parameter for click_game_ui_element: " + unknown);
+  auto *path_p = args.Find("path");
+  if (!path_p || !path_p->IsString() || path_p->GetString().empty()) {
+    return error_json("missing required parameter: path (non-empty node path "
+                      "from get_game_ui_elements)");
+  }
+  int64_t button_index = 1;
+  if (auto *button_p = args.Find("button_index")) {
+    if (!button_p->IsInt() || button_p->GetInt() < 1 || button_p->GetInt() > 3)
+      return error_json(
+          "button_index must be an integer between 1 and 3 (1=left, 2=right, "
+          "3=middle)");
+    button_index = button_p->GetInt();
+  }
+  bool double_click = false;
+  if (auto *double_p = args.Find("double_click")) {
+    if (!double_p->IsBool())
+      return error_json("double_click must be a boolean");
+    double_click = double_p->GetBool();
+  }
+  int64_t max_elements = CLICK_MAX_ELEMENTS_LIMIT;
+  if (auto *max_p = args.Find("max_elements")) {
+    if (!max_p->IsInt() || max_p->GetInt() <= 0)
+      return error_json("max_elements must be a positive integer");
+    max_elements = max_p->GetInt();
+    if (max_elements > CLICK_MAX_ELEMENTS_LIMIT)
+      max_elements = CLICK_MAX_ELEMENTS_LIMIT;
+  }
+  if (auto *timeout = args.Find("timeout_ms"); timeout &&
+      (!timeout->IsInt() || timeout->GetInt() <= 0 ||
+       timeout->GetInt() > GDA_MAX_TIMEOUT_MS))
+    return error_json("timeout_ms must be an integer between 1 and 30000");
+  const std::string path = path_p->GetString();
+  LogSystem::instance().log(
+      LogLevel::Debug, LogCategory::Tools,
+      "click_game_ui_element dispatch: path=" + path + ", button_index=" +
+          std::to_string(button_index) +
+          ", double_click=" + (double_click ? "true" : "false") +
+          ", max_elements=" + std::to_string(max_elements));
+
+  JV click(JV::object_tag);
+  click["path"] = JV(path);
+  click["button_index"] = JV(button_index);
+  click["double_click"] = JV(double_click);
+  JV params(JV::object_tag);
+  params["max_elements"] = JV(max_elements);
+  params["click"] = std::move(click);
+  JV result = handle_gda_send(std::string(GDA_OP_UI_ELEMENTS), params,
+                              extract_timeout(args));
+  append_runtime_degradation_hint(result);
+  return result;
+}
+
 mcp::JsonValue handle_game_capture(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "capture_game_viewport called");
   if (!args.IsObject())
     return error_json("capture_game_viewport parameters must be an object");
-  static constexpr const char *allowed[] = {"timeout_ms"};
+  static constexpr const char *allowed[] = {"timeout_ms", "region",
+                                             "max_dimension", "annotate"};
   std::string unknown;
   if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed), unknown))
     return error_json("unknown parameter for capture_game_viewport: " + unknown);
+  if (auto *region = args.Find("region")) {
+    if (!region->IsObject())
+      return error_json("region must be an object with numeric x, y, width and "
+                        "height");
+    const JV *rx = region->Find("x");
+    const JV *ry = region->Find("y");
+    const JV *rw = region->Find("width");
+    const JV *rh = region->Find("height");
+    if (!rx || !ry || !rw || !rh || !rx->IsNumber() || !ry->IsNumber() ||
+        !rw->IsNumber() || !rh->IsNumber())
+      return error_json("region must be an object with numeric x, y, width and "
+                        "height (width/height greater than 0)");
+    const double width = rw->IsInt() ? static_cast<double>(rw->GetInt())
+                                     : rw->GetDouble();
+    const double height = rh->IsInt() ? static_cast<double>(rh->GetInt())
+                                      : rh->GetDouble();
+    if (width <= 0.0 || height <= 0.0)
+      return error_json("region must be an object with numeric x, y, width and "
+                        "height (width/height greater than 0)");
+  }
+  if (auto *max_dimension = args.Find("max_dimension");
+      max_dimension && (!max_dimension->IsInt() ||
+                        max_dimension->GetInt() < 64 ||
+                        max_dimension->GetInt() > 4096))
+    return error_json("max_dimension must be an integer between 64 and 4096");
+  if (auto *annotate = args.Find("annotate"); annotate && !annotate->IsBool())
+    return error_json("annotate must be a boolean");
   JV params(JV::object_tag);
+  copy_optional(args, params, "region");
+  copy_optional(args, params, "max_dimension");
+  copy_optional(args, params, "annotate");
   JV result = handle_gda_send("capture", params, extract_timeout(args));
   append_runtime_degradation_hint(result);
   return result;
