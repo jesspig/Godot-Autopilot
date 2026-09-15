@@ -1,0 +1,542 @@
+{
+  "name": "13_inline_subresource",
+  "description": "P1-2 验证：节点子资源一步式创建入口（inline 描述 {\"type\": ..., \"properties\": {...}}）。链路：create_scene_node 的 properties 与 property_set 两条入口挂 CollisionShape2D.shape = RectangleShape2D(size 20x28) → property_get 读回 class/size → code_execute 复核 is RectangleShape2D 与 size == Vector2(20,28) → save_editor_scene_as 落盘 → read_file 证明文件可读（runner 断言引擎无子串匹配，故用 find_in_files 统计 sub_resource 命中文件数=1 作为落为 [sub_resource] 的文本证据）→ reload_editor_scene 后再次 property_get，证明子资源已持久化且未坏引用。嵌套：AtlasTexture 内嵌 AtlasTexture 成功（depth 2），5 层嵌套报 nesting limit 错误。负例：未知类名、非 Resource 类（Node2D）、抽象类（Shape2D）、properties 非对象。防误伤：导出 Dictionary 属性写入同形对象 {\"type\": \"enemy\", \"properties\": {...}} 仍按普通字典存值；{\"path\": \"res://...\"} 磁盘资源与 memory:// 拒绝文案（新增 inline 建议）各验证一条。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "stages": [
+      {
+        "id": "setup",
+        "steps": [
+          {
+            "id": "inline_create_dir",
+            "tool": "create_directory",
+            "args": { "path": "res://gda_tmp_inline" },
+            "expect": { "has_keys": ["created"] }
+          },
+          {
+            "id": "inline_write_probe_script",
+            "tool": "create_script",
+            "args": {
+              "path": "res://gda_tmp_inline/inline_probe.gd",
+              "overwrite": true,
+              "source_code": "@tool\nextends Node\n\n@export var payload: Dictionary\n"
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.path", "value": "res://gda_tmp_inline/inline_probe.gd" },
+                { "key": "result.verified", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "inline_new_scene",
+            "tool": "create_editor_scene",
+            "args": { "name": "InlineRoot", "type": "Node2D", "close_current": true },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result.path", "value": "InlineRoot" } ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "create_path",
+        "steps": [
+          {
+            "id": "create_node_with_inline_shape",
+            "tool": "create_scene_node",
+            "args": {
+              "name": "ShapeHolder",
+              "type": "CollisionShape2D",
+              "parent_path": "InlineRoot",
+              "properties": {
+                "shape": {
+                  "type": "RectangleShape2D",
+                  "properties": { "size": { "x": 20, "y": 28 } }
+                }
+              }
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.path", "value": "ShapeHolder" },
+                { "key": "result.applied_properties", "value": ["shape"] },
+                { "key": "result.inline_resources", "not_empty": true },
+                { "key": "result.undo", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "read_inline_shape_class",
+            "tool": "property_get",
+            "args": { "path": "ShapeHolder", "property": "shape" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.class", "value": "RectangleShape2D" },
+                { "key": "result.size.x", "value": 20 },
+                { "key": "result.size.y", "value": 28 }
+              ]
+            }
+          },
+          {
+            "id": "code_check_inline_shape",
+            "tool": "code_execute",
+            "args": {
+              "source_code": "var shape = SceneRoot.get_node(\"ShapeHolder\").shape\nreturn shape is RectangleShape2D and shape.size == Vector2(20, 28)"
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "value": true } ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "property_set_path",
+        "steps": [
+          {
+            "id": "create_setter_node",
+            "tool": "create_scene_node",
+            "args": { "name": "Setter", "type": "CollisionShape2D", "parent_path": "InlineRoot" },
+            "expect": {
+              "field_checks": [ { "key": "result.path", "value": "Setter" } ]
+            }
+          },
+          {
+            "id": "property_set_inline_shape",
+            "tool": "property_set",
+            "args": {
+              "path": "Setter",
+              "property": "shape",
+              "value": {
+                "type": "RectangleShape2D",
+                "properties": { "size": { "x": 20, "y": 28 } }
+              }
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": "ok" },
+                { "key": "inline_resources", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "property_get_inline_shape",
+            "tool": "property_get",
+            "args": { "path": "Setter", "property": "shape" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.class", "value": "RectangleShape2D" },
+                { "key": "result.size.x", "value": 20 },
+                { "key": "result.size.y", "value": 28 }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "nested_and_negatives",
+        "steps": [
+          {
+            "id": "create_texture_node",
+            "tool": "create_scene_node",
+            "args": { "name": "TexHolder", "type": "Sprite2D", "parent_path": "InlineRoot" },
+            "expect": {
+              "field_checks": [ { "key": "result.path", "value": "TexHolder" } ]
+            }
+          },
+          {
+            "id": "nested_inline_two_levels",
+            "tool": "property_set",
+            "args": {
+              "path": "TexHolder",
+              "property": "texture",
+              "value": {
+                "type": "AtlasTexture",
+                "properties": {
+                  "atlas": { "type": "AtlasTexture", "properties": {} }
+                }
+              }
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": "ok" },
+                { "key": "inline_resources", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "nested_inline_readback",
+            "tool": "property_get",
+            "args": { "path": "TexHolder", "property": "texture" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.class", "value": "AtlasTexture" },
+                { "key": "result.atlas.class", "value": "AtlasTexture" }
+              ]
+            }
+          },
+          {
+            "id": "inline_unknown_class_error",
+            "tool": "property_set",
+            "args": {
+              "path": "Setter",
+              "property": "shape",
+              "value": { "type": "NoSuchResourceTypeXYZ", "properties": {} }
+            },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                {
+                  "key": "error",
+                  "value": "cannot create inline resource 'NoSuchResourceTypeXYZ' for property 'shape' on Setter: NoSuchResourceTypeXYZ is not a known class: no engine class or registered global script class with this name exists — position: Setter — expected: an instantiable Resource subclass (engine class or global script class) — action: create the resource inline with {\"type\": \"RectangleShape2D\", \"properties\": {...}}, pass a res:// path in {\"path\": \"res://...\"}, or save the resource to disk first and pass its res:// path"
+                }
+              ]
+            }
+          },
+          {
+            "id": "inline_non_resource_class_error",
+            "tool": "property_set",
+            "args": {
+              "path": "Setter",
+              "property": "shape",
+              "value": { "type": "Node2D", "properties": {} }
+            },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                {
+                  "key": "error",
+                  "value": "cannot create inline resource 'Node2D' for property 'shape' on Setter: Node2D is not a Resource subclass — position: Setter — expected: an instantiable Resource subclass (engine class or global script class) — action: create the resource inline with {\"type\": \"RectangleShape2D\", \"properties\": {...}}, pass a res:// path in {\"path\": \"res://...\"}, or save the resource to disk first and pass its res:// path"
+                }
+              ]
+            }
+          },
+          {
+            "id": "inline_abstract_class_error",
+            "tool": "property_set",
+            "args": {
+              "path": "Setter",
+              "property": "shape",
+              "value": { "type": "Shape2D", "properties": {} }
+            },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                {
+                  "key": "error",
+                  "value": "cannot create inline resource 'Shape2D' for property 'shape' on Setter: Shape2D is abstract and cannot be instantiated — position: Setter — expected: an instantiable Resource subclass (engine class or global script class) — action: create the resource inline with {\"type\": \"RectangleShape2D\", \"properties\": {...}}, pass a res:// path in {\"path\": \"res://...\"}, or save the resource to disk first and pass its res:// path"
+                }
+              ]
+            }
+          },
+          {
+            "id": "inline_properties_not_object_error",
+            "tool": "property_set",
+            "args": {
+              "path": "Setter",
+              "property": "shape",
+              "value": { "type": "RectangleShape2D", "properties": 5 }
+            },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                {
+                  "key": "error",
+                  "value": "inline resource description for property 'shape' on Setter has a non-object 'properties' value — position: Setter — expected: an object mapping property names to values, e.g. {\"type\": \"RectangleShape2D\", \"properties\": {\"size\": {\"x\": 20, \"y\": 28}}} — action: pass an object, or omit 'properties' to create the resource with default values"
+                }
+              ]
+            }
+          },
+          {
+            "id": "inline_depth_limit_error",
+            "tool": "property_set",
+            "args": {
+              "path": "TexHolder",
+              "property": "texture",
+              "value": {
+                "type": "AtlasTexture",
+                "properties": {
+                  "atlas": {
+                    "type": "AtlasTexture",
+                    "properties": {
+                      "atlas": {
+                        "type": "AtlasTexture",
+                        "properties": {
+                          "atlas": {
+                            "type": "AtlasTexture",
+                            "properties": {
+                              "atlas": { "type": "AtlasTexture", "properties": {} }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                {
+                  "key": "error",
+                  "value": "inline resource description for property 'texture' on TexHolder nests 5 levels deep (limit 4) — position: TexHolder — expected: an inline resource hierarchy at most 4 levels deep — action: flatten the description, or save the inner resource to disk and reference it with {\"path\": \"res://...\"}"
+                }
+              ]
+            }
+          },
+          {
+            "id": "shape_unchanged_after_errors",
+            "tool": "property_get",
+            "args": { "path": "TexHolder", "property": "texture" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result.class", "value": "AtlasTexture" } ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "existing_semantics",
+        "steps": [
+          {
+            "id": "dictionary_property_keeps_type_like_object",
+            "tool": "create_scene_node",
+            "args": { "name": "DictHost", "type": "Node", "parent_path": "InlineRoot" },
+            "expect": {
+              "field_checks": [ { "key": "result.path", "value": "DictHost" } ]
+            }
+          },
+          {
+            "id": "dictionary_attach_script",
+            "tool": "attach_script_to_node",
+            "args": {
+              "node_path": "DictHost",
+              "script_path": "res://gda_tmp_inline/inline_probe.gd"
+            },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "script attached to DictHost" } ]
+            }
+          },
+          {
+            "id": "dictionary_set_same_shape_object",
+            "tool": "property_set",
+            "args": {
+              "path": "DictHost",
+              "property": "payload",
+              "value": { "type": "enemy", "properties": { "hp": 5 } }
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          },
+          {
+            "id": "dictionary_readback",
+            "tool": "property_get",
+            "args": { "path": "DictHost", "property": "payload" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.type", "value": "enemy" },
+                { "key": "result.properties.hp", "value": 5 }
+              ]
+            }
+          },
+          {
+            "id": "inline_probe_resource_created",
+            "tool": "create_resource",
+            "args": { "type": "RectangleShape2D", "name": "gda_inline_probe" },
+            "expect": {
+              "field_checks": [
+                { "key": "result.class", "value": "RectangleShape2D" },
+                { "key": "result.name", "value": "gda_inline_probe" }
+              ]
+            }
+          },
+          {
+            "id": "inline_probe_resource_size_set",
+            "tool": "set_resource_property",
+            "args": {
+              "name": "gda_inline_probe",
+              "property": "size",
+              "value": { "x": 20, "y": 28 }
+            },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          },
+          {
+            "id": "memory_resource_still_rejected",
+            "tool": "property_set",
+            "args": {
+              "path": "Setter",
+              "property": "shape",
+              "value": { "resource": "memory://gda_inline_probe" }
+            },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                {
+                  "key": "error",
+                  "value": "cannot assign memory resource 'gda_inline_probe' to node property 'shape' on Setter — memory:// resources are not persistent and will corrupt the scene file if saved. To create a pathless sub-resource in one step pass {\"type\": \"RectangleShape2D\", \"properties\": {...}} as the value (it is written as a sub_resource when the scene is saved). Alternatively save it first with save_resource and pass {\"path\": \"res://...\"}, or edit the memory resource itself with set_resource_property."
+                }
+              ]
+            }
+          },
+          {
+            "id": "inline_probe_resource_saved",
+            "tool": "save_resource",
+            "args": {
+              "name": "gda_inline_probe",
+              "path": "res://gda_tmp_inline/shape.tres"
+            },
+            "expect": {
+              "has_keys": ["result", "verified"],
+              "field_checks": [
+                { "key": "result", "value": 0 },
+                { "key": "verified", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "path_shape_still_works",
+            "tool": "property_set",
+            "args": {
+              "path": "Setter",
+              "property": "shape",
+              "value": { "path": "res://gda_tmp_inline/shape.tres" }
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": "ok" },
+                { "key": "resource_attached", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "path_shape_readback",
+            "tool": "property_get",
+            "args": { "path": "Setter", "property": "shape" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.class", "value": "RectangleShape2D" },
+                { "key": "result.size.x", "value": 20 },
+                { "key": "result.size.y", "value": 28 }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "persistence",
+        "steps": [
+          {
+            "id": "inline_save_scene_as",
+            "tool": "save_editor_scene_as",
+            "args": { "path": "res://gda_tmp_inline/inline_scene.tscn" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "value": "saved" } ]
+            }
+          },
+          {
+            "id": "inline_scene_file_readable",
+            "tool": "read_file",
+            "args": { "path": "res://gda_tmp_inline/inline_scene.tscn" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.path", "value": "res://gda_tmp_inline/inline_scene.tscn" },
+                { "key": "result.content", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "inline_scene_contains_sub_resource",
+            "tool": "find_in_files",
+            "args": {
+              "dir": "res://gda_tmp_inline",
+              "query": "sub_resource",
+              "extensions": ["tscn"]
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.total", "value": 1 },
+                { "key": "result.files", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "inline_scene_reloaded",
+            "tool": "reload_editor_scene",
+            "args": { "scene_path": "res://gda_tmp_inline/inline_scene.tscn" },
+            "expect": {
+              "has_keys": ["result", "scene_path"],
+              "field_checks": [
+                { "key": "result", "value": "reloaded" },
+                { "key": "scene_path", "value": "res://gda_tmp_inline/inline_scene.tscn" },
+                { "key": "observed", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "persisted_shape_readback",
+            "tool": "property_get",
+            "args": { "path": "ShapeHolder", "property": "shape" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.class", "value": "RectangleShape2D" },
+                { "key": "result.size.x", "value": 20 },
+                { "key": "result.size.y", "value": 28 }
+              ]
+            }
+          },
+          {
+            "id": "persisted_nested_shape_readback",
+            "tool": "property_get",
+            "args": { "path": "TexHolder", "property": "texture" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.class", "value": "AtlasTexture" },
+                { "key": "result.atlas.class", "value": "AtlasTexture" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "cleanup",
+        "steps": [
+          {
+            "id": "inline_close_scene",
+            "tool": "close_editor_scene",
+            "args": {},
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "closed" } ]
+            }
+          },
+          {
+            "id": "inline_trash_dir",
+            "tool": "move_os_file_to_trash",
+            "args": { "path": "res://gda_tmp_inline" },
+            "expect": { "has_keys": ["result"] }
+          }
+        ]
+      }
+    ]
+  }
+}
