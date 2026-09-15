@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "godot-autopilot": {
+      "url": "http://localhost:9527/mcp"
+    }
+  }
+}
