@@ -20,10 +20,16 @@ const mcp::ImageContent *image_at(const std::vector<mcp::ContentVariant> &conten
 
 } // namespace
 
-TEST(McpImageContentTest, WhitelistCoversThreeCaptureTools) {
+TEST(McpImageContentTest, WhitelistCoversCaptureAndObserveTools) {
     EXPECT_TRUE(is_image_capture_tool("capture_editor_viewport"));
     EXPECT_TRUE(is_image_capture_tool("capture_game_viewport"));
     EXPECT_TRUE(is_image_capture_tool("capture_display_screen"));
+    EXPECT_TRUE(is_image_capture_tool("click_input_mouse"));
+    EXPECT_TRUE(is_image_capture_tool("scroll_input_mouse"));
+    EXPECT_TRUE(is_image_capture_tool("drag_input_mouse"));
+    EXPECT_TRUE(is_image_capture_tool("type_input_text"));
+    EXPECT_TRUE(is_image_capture_tool("click_editor_element"));
+    EXPECT_TRUE(is_image_capture_tool("type_editor_element_text"));
     EXPECT_FALSE(is_image_capture_tool("create_scene_node"));
     EXPECT_FALSE(is_image_capture_tool(""));
 }

@@ -13,7 +13,11 @@ namespace util {
 inline bool is_image_capture_tool(const std::string &tool_name) {
   return tool_name == "capture_editor_viewport" ||
          tool_name == "capture_game_viewport" ||
-         tool_name == "capture_display_screen";
+         tool_name == "capture_display_screen" ||
+         tool_name == "click_input_mouse" || tool_name == "scroll_input_mouse" ||
+         tool_name == "drag_input_mouse" || tool_name == "type_input_text" ||
+         tool_name == "click_editor_element" ||
+         tool_name == "type_editor_element_text";
 }
 
 inline bool try_attach_image_content(

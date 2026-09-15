@@ -55,6 +55,12 @@ time: change, observe, diagnose, fix, verify.
   4096 pixels per side and an 8 MiB PNG; the JSON response cap is 4 MiB and
   base64 inflates the payload by about one third, so keep the captured
   resolution modest.
+  `capture_editor_viewport` also offers two low-cost verification options:
+  `annotate` draws numbered boxes over the elements on the image and adds
+  an element table to the result, and `diff_against_last` reports the
+  changed ratio and bounding box against the previous capture of the same
+  target. A diff of zero after an action that should have changed the UI
+  means the action did not land - check it before studying the pixels.
 - **Read-backs.** `property_get` / `property_get_list`, `get_scene_tree`,
   `get_editor_edited_scene_root` and `get_resource_property` show what the
   engine actually stored - the reliable check after `property_set`,
@@ -120,6 +126,21 @@ time: change, observe, diagnose, fix, verify.
    `get_debugger_errors`.
 4. Fix and verify: `reload_game_scripts` or restart, repeat the injection,
    and let the watermark confirm the fix produced no new errors.
+
+### Editor UI automation
+
+1. Enumerate: `get_editor_ui_elements` lists the editor's UI elements;
+   when a coordinate is already known, `hit_test_editor_point` previews
+   which element it would hit.
+2. Act: `click_editor_element` with the element `path`, or
+   `type_editor_element_text` / `run_editor_shortcut` for text entry and
+   shortcuts. Fall back to `click_input_mouse`, `scroll_input_mouse`,
+   `drag_input_mouse` or `type_input_text` only when no element path
+   exists (2D canvas, 3D viewport, custom-drawn controls).
+3. Verify: capture with `capture_editor_viewport`; `annotate` numbers the
+   elements it sees and `diff_against_last` measures what changed against
+   the previous capture. Re-enumerate before the next click when the
+   action may have rearranged the layout.
 
 ## See also
 

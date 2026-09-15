@@ -511,9 +511,16 @@ mcp::JsonValue finalize_capture_response(const mcp::JsonValue &pending_result) {
           r["format"] = JV("png");
           if (auto *w = pending_result.Find("width"))
             r["width"] = *w;
-          if (auto *h = pending_result.Find("height"))
-            r["height"] = *h;
-           r["path"] = JV(path);
+           if (auto *h = pending_result.Find("height"))
+             r["height"] = *h;
+            r["path"] = JV(path);
+           static constexpr const char *kCapturePassthroughFields[] = {
+               "region", "annotated", "elements", "source_width",
+               "source_height", "elements_truncated"};
+           for (const char *key : kCapturePassthroughFields) {
+             if (auto *value_p = pending_result.Find(key))
+               r[key] = *value_p;
+           }
            if (r.Dump().size() > GDA_MAX_JSON_RESPONSE_BYTES) {
              JV error = error_json(
                  "capture response exceeds the JSON response limit of " +

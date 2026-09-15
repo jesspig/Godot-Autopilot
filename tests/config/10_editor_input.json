@@ -1,0 +1,81 @@
+{
+  "name": "editor_input",
+  "description": "编辑器输入与 UI 动作工具的参数校验路径（headless）：全部在注入 warp/事件之前返回 error，不产生真实点击、拖拽、滚轮或文本输入副作用。覆盖 click_input_mouse 缺 position、scroll_input_mouse 非法 direction、drag_input_mouse 缺 to、type_input_text 缺 text、click_editor_element 缺 path、run_editor_shortcut 未知键。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "stages": [
+      {
+        "id": "arg_validation",
+        "steps": [
+          {
+            "id": "click_input_mouse_missing_position",
+            "tool": "click_input_mouse",
+            "args": {},
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "missing required parameter: position" }
+              ]
+            }
+          },
+          {
+            "id": "scroll_input_mouse_invalid_direction",
+            "tool": "scroll_input_mouse",
+            "args": { "direction": "sideways", "position": { "x": 1, "y": 1 } },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "invalid scroll direction: sideways" }
+              ]
+            }
+          },
+          {
+            "id": "drag_input_mouse_missing_to",
+            "tool": "drag_input_mouse",
+            "args": { "from": { "x": 0, "y": 0 } },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "missing required parameter: to" }
+              ]
+            }
+          },
+          {
+            "id": "type_input_text_missing_text",
+            "tool": "type_input_text",
+            "args": {},
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "missing required parameter: text" }
+              ]
+            }
+          },
+          {
+            "id": "click_editor_element_missing_path",
+            "tool": "click_editor_element",
+            "args": {},
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "missing required parameter: path" }
+              ]
+            }
+          },
+          {
+            "id": "run_editor_shortcut_unknown_key",
+            "tool": "run_editor_shortcut",
+            "args": { "shortcut": "ctrl+notakey" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "invalid shortcut key: notakey" }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

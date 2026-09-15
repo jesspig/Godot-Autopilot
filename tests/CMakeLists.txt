@@ -34,6 +34,7 @@ set(GDA_UNIT_BUSINESS_SOURCES
     ${CMAKE_SOURCE_DIR}/src/core/scene_dirty_tracker.cpp
     ${CMAKE_SOURCE_DIR}/src/core/export_guard.cpp
     ${CMAKE_SOURCE_DIR}/src/core/editor_readiness.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/editor_coords.cpp
     ${CMAKE_SOURCE_DIR}/src/util/bm25_index.cpp
     ${CMAKE_SOURCE_DIR}/src/util/error_util.cpp
     ${CMAKE_SOURCE_DIR}/src/util/readback_util.cpp
@@ -46,6 +47,7 @@ set(GDA_UNIT_BUSINESS_SOURCES
     ${CMAKE_SOURCE_DIR}/src/tools/register_all.cpp
     ${CMAKE_SOURCE_DIR}/src/tools/dispatch.cpp
     ${CMAKE_SOURCE_DIR}/src/tools/debugger_access.cpp
+    ${CMAKE_SOURCE_DIR}/src/tools/editor_ui_actions.cpp
     ${GDA_TOOLS_OPS_SOURCES})
 
 # ====================================================================

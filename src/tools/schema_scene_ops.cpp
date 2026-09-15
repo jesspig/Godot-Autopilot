@@ -33,6 +33,10 @@ void fill_schema_scene(std::unordered_map<std::string, mcp::JsonValue>& m) {
             {"name", "string", "Node name to override the instance root (string, default: scene root name)", false},
             {"owner", "boolean", "Set scene ownership so nodes are saved with the scene (boolean, default: true)", false},
         });
+        m["get_scene_node_screen_rect"] = schema::build_schema({
+            {"paths", "array", "Non-empty array (max 50) of node paths in the edited scene, e.g. ['Player','UI/HealthBar']", true},
+            {"viewport", "string", "Coordinate space: 'auto' (default, picks 2D or 3D by node type), '2d' or '3d'", false},
+        });
 
 
         m["call_scene_tree_group"] = schema::build_schema({

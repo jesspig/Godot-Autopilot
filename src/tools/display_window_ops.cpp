@@ -7,6 +7,7 @@
 #include <godot_cpp/variant/utility_functions.hpp>
 #include <godot_cpp/variant/vector2i.hpp>
 #include <string>
+#include <utility>
 
 namespace godot_autopilot {
 namespace display_ops {
@@ -21,6 +22,13 @@ int window_id_from_args(const JV &args) {
     return wp->GetInt();
   }
   return 0;
+}
+
+JV vec2i_to_json(const godot::Vector2i &value) {
+  JV o(JV::object_tag);
+  o["x"] = JV(static_cast<int64_t>(value.x));
+  o["y"] = JV(static_cast<int64_t>(value.y));
+  return o;
 }
 
 } // namespace
@@ -95,6 +103,47 @@ JV handle_window_delete(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "delete_display_window completed");
   return util::ok_result(JV("ok"));
+}
+
+JV handle_window_get_rect(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "get_display_window_rect called");
+  auto *wp = args.Find("window_id");
+  if (wp && !wp->IsInt()) {
+    return util::error_json("invalid parameter: window_id must be an integer");
+  }
+  int wid = window_id_from_args(args);
+  if (wid < 0) {
+    return util::error_json("invalid window_id: " + std::to_string(wid));
+  }
+  auto *ds = godot::DisplayServer::get_singleton();
+  if (!ds) {
+    return util::error_json("DisplayServer not available");
+  }
+  int screen = ds->window_get_current_screen(wid);
+  JV result(JV::object_tag);
+  result["window_id"] = JV(static_cast<int64_t>(wid));
+  result["position"] = vec2i_to_json(ds->window_get_position(wid));
+  result["size"] = vec2i_to_json(ds->window_get_size(wid));
+  result["decorated_position"] =
+      vec2i_to_json(ds->window_get_position_with_decorations(wid));
+  result["decorated_size"] =
+      vec2i_to_json(ds->window_get_size_with_decorations(wid));
+  result["screen"] = JV(static_cast<int64_t>(screen));
+  result["screen_scale"] =
+      JV(static_cast<double>(ds->screen_get_scale(screen)));
+  result["screen_position"] = vec2i_to_json(ds->screen_get_position(screen));
+  result["screen_size"] = vec2i_to_json(ds->screen_get_size(screen));
+  result["note"] = JV(
+      "position and size describe the window's client area in virtual desktop "
+      "coordinates; the input injection tools (warp_display_mouse, "
+      "move_input_mouse, press_input_mouse_button) take client-area-relative "
+      "coordinates, so subtract position from a desktop point to target it");
+  JV r(JV::object_tag);
+  r["result"] = std::move(result);
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "get_display_window_rect completed");
+  return r;
 }
 
 JV handle_window_move_to_foreground(const JV &args) {
