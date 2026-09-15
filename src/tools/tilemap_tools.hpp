@@ -24,16 +24,21 @@ GDA_TOOL_CLASS(SetTilemapCellsTool, "set_tilemap_cells",
                "Set multiple cells on a TileMap or TileMapLayer node in one call. Every entry must be an object with x, y and source_id (atlas_coords optional); an entry with source_id -1 clears the cell at x, y (atlas_coords is ignored for that entry). Invalid entries are skipped and reported via error plus warnings. Returns set_count and layer. There is no fixed entry cap, but keep batches reasonably sized because client-side request limits may apply; generate big layouts programmatically with execute_script or code_execute instead.",
                "TileMap", std::vector<std::string>({"tilemap", "cell", "set", "batch"}), tilemap_ops::handle_set_cells, true)
 
+GDA_TOOL_CLASS_SIDE(FillTilemapRectTool, "fill_tilemap_rect",
+               "Fill an axis-aligned tile rectangle on a TileMap or TileMapLayer node in one call. Requires node_path plus from and to {x, y} corner cells (both inclusive; the corner order does not matter). Pass source_id and atlas_coords to place one tile in every cell, or erase=true to clear the rect instead (source_id and atlas_coords are then ignored). Optional alternative (default 0) and layer (default 0, TileMapLayer ignores it). The rect is capped at 100000 cells per call, so split bigger areas into chunks. Implemented as a per-cell set_cell/erase_cell loop: it saves a round trip and produces a single undo action, but does not make the fill itself faster. Returns set_count, from, to, width, height and undo.",
+               "TileMap", std::vector<std::string>({"tilemap", "cell", "fill", "rect"}), tilemap_ops::handle_fill_rect, true, ::godot_autopilot::SideEffect::None)
+
 GDA_TOOL_CLASS(CreateTilemapTilesetTool, "create_tilemap_tileset",
                "Create a TileSet resource in memory and register it as memory://<name>; nothing is written to disk. Optional name (default TileSet) and tile_size in pixels (default 16). add_tilemap_atlas_source, add_tilemap_physics_layer and set_tilemap_tile_collision reference it by name. Returns class, name, path and object_id.",
                "TileMap", std::vector<std::string>({"tileset", "create"}), tilemap_ops::handle_tileset_create, true)
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(4);
+  v.reserve(5);
   v.push_back(std::make_unique<CreateTilemapTool>());
   v.push_back(std::make_unique<SetTilemapCellTool>());
   v.push_back(std::make_unique<SetTilemapCellsTool>());
+  v.push_back(std::make_unique<FillTilemapRectTool>());
   v.push_back(std::make_unique<CreateTilemapTilesetTool>());
   return v;
 }

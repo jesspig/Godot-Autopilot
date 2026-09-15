@@ -93,6 +93,49 @@ entry and may be omitted. The erase semantics come from the engine's
 {"name": "set_tilemap_cells", "arguments": {"node_path": "Ground", "cells": [{"x": 3, "y": 4, "source_id": -1}]}}
 ```
 
+### Rectangle fills
+
+For axis-aligned rectangles (floors, walls, platforms, blocked regions) use
+`fill_tilemap_rect` instead of hand-writing one JSON entry per cell for
+`set_tilemap_cells` or looping over `set_cell` in a script - a large layout
+rarely needs dozens of nearly identical entries:
+
+```json
+{"name": "fill_tilemap_rect", "arguments": {"node_path": "Ground", "from": {"x": 0, "y": 0}, "to": {"x": 9, "y": 2}, "source_id": 0, "atlas_coords": {"x": 0, "y": 0}}}
+```
+
+- `node_path` - the TileMap or TileMapLayer node.
+- `from` / `to` - inclusive corner cells `{x, y}`; the corner order does not
+  matter, the tool normalizes min/max (and the returned `from`/`to`) before
+  filling.
+- `source_id` and `atlas_coords` - the tile placed in every cell; both are
+  required unless `erase` is true. `source_id` and both atlas coordinates
+  must be >= 0: a negative value is an INVALID coordinate in the engine's
+  `set_cell`, which would silently clear the cells instead of placing a tile
+  (see "set_cell INVALID semantics" below).
+- `alternative` - alternative tile id (default 0).
+- `erase` - set true to clear every cell in the rect; `source_id` and
+  `atlas_coords` are then ignored.
+- `layer` - optional TileMap layer index (default 0); TileMapLayer nodes
+  ignore it.
+
+To clear a rect deliberately, pass `erase: true`:
+
+```json
+{"name": "fill_tilemap_rect", "arguments": {"node_path": "Ground", "from": {"x": 0, "y": 0}, "to": {"x": 9, "y": 2}, "erase": true}}
+```
+
+The response reports the number of cells set plus the normalized `from` and
+`to`, `width`, `height` and the `undo` action. The whole rect becomes a single
+"Fill TileMap Rect" undo step, so one undo reverts the entire fill; cells
+that were already occupied are restored to their previous tile on undo. A
+rect is capped at 100000 cells per call - split larger areas into chunks.
+
+`fill_tilemap_rect` is a per-cell write loop wrapped in one request: it
+saves a round trip, keeps the argument small and produces one undo action.
+It does not make the fill itself faster - the engine has no rectangle
+primitive, so the same number of cell writes happens either way.
+
 ### Bulk writes and request limits
 
 `set_tilemap_cells` writes many cells in one call. Every entry needs `x`, `y`
@@ -105,12 +148,13 @@ and `source_id`; `atlas_coords` is optional per entry.
 Keep batches reasonably sized: `set_tilemap_cells` imposes no fixed entry cap
 server-side, but oversized JSON arguments can hit client-side or transport
 parameter limits and fail with a JSON parse error before the tool ever runs -
-the symptom is a parse error, not a tool error. For row-, floor- or
-map-scale fills, generate the layout programmatically with `code_execute`
-(loop over `set_cell` in GDScript) or `execute_script` instead of
-hand-building a huge JSON array. Invalid entries are skipped rather than
-failing the whole call; the response reports how many cells were set plus a
-warnings list naming the skipped ones.
+the symptom is a parse error, not a tool error. Prefer `fill_tilemap_rect`
+for rectangles (see above); for non-rectangular or map-scale fills, generate
+the layout programmatically with `code_execute` (loop over `set_cell` in
+GDScript) or `execute_script` instead of hand-building a huge JSON array.
+Invalid entries are skipped rather than failing the whole call; the response
+reports how many cells were set plus a warnings list naming the skipped
+ones.
 
 ## Per-tile collision
 
@@ -202,7 +246,9 @@ passing plain booleans.
 | source not found | `source_id` was never added with `add_tilemap_atlas_source`. |
 | no physics layer N | Call `add_tilemap_physics_layer` before `set_tilemap_tile_collision`. |
 | texture errors | Texture path missing on disk or not imported; check the path. |
-| JSON parse error on a large cells call | Payload exceeded a client-side parameter limit; split into smaller batches or switch to `code_execute`. |
+| JSON parse error on a large cells call | Payload exceeded a client-side parameter limit; split into smaller batches, use `fill_tilemap_rect` for rectangles, or switch to `code_execute`. |
+| rect requires more than 100000 cells | The requested rect exceeds the per-call cell cap; split the area into chunks of at most 100000 cells and call `fill_tilemap_rect` once per chunk. |
+| invalid source_id / invalid atlas_coords / invalid alternative | A negative value is the engine's INVALID coordinate and would silently clear the cells instead of placing a tile; pass values >= 0, or `erase: true` to clear the rect. |
 
 ## See also
 
