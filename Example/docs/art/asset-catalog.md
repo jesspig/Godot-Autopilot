@@ -146,6 +146,81 @@
 | 终点 | `Items/Checkpoints/End/End (Idle).png` |
 | 静态危险 | `Traps/Spikes/Idle.png` |
 
+## 完整版资源映射（《Pink Man 大冒险》三关）
+
+本节只做"系统 → 本文件已登记资产"的映射，不新增资产事实；路径以本文既有表格为准。与既有"首版"列冲突处以本节为准（完整版启用首版未用素材）。
+
+### 敌人三型（出自 `Traps/`，行为见 [../gdd/mechanics.md](../gdd/mechanics.md)，区间见 [../gdd/level-design.md](../gdd/level-design.md)）
+
+| 系统 | 路径 | 用途 |
+|---|---|---|
+| `rock_head` 巡逻怪 | `Traps/Rock Head/Idle.png`、`Blink (42x42).png`、`Top/Bottom/Left/Right Hit (42x42).png` | 巡逻移动体；Blink 作预警；Hit 作受击/踩杀表现 |
+| `saw` 轨道锯 | `Traps/Saw/Off.png`、`On (38x38).png`、`Chain.png` | 轨道往复移动体；Chain 作轨道视觉 |
+| `fire` 定时火 | `Traps/Fire/Off.png`、`On (16x32).png`、`Hit (16x32).png` | 熄/燃两态；燃时为危险体 |
+
+### 问号箱（出自 `Items/Boxes/`）
+
+| 系统 | 路径 | 用途 |
+|---|---|---|
+| 可顶箱子 | `Box1/`、`Box2/`、`Box3/` 的 `Idle.png` 与 `Hit (28x24).png` | 未触发用 Idle；顶后切 Hit；三类箱子分关使用 |
+| 箱子碎裂表现 | 各目录 `Break.png` | 顶后可选碎裂表现在关卡结算时使用（可选） |
+
+### 水果（出自 `Items/Fruits/`，分关使用）
+
+| 关卡 | 水果 | 特效 |
+|---|---|---|
+| `level_01` | `Apple.png` | `Collected.png` |
+| `level_02` | `Bananas.png`、`Cherries.png` | `Collected.png` |
+| `level_03` | `Melon.png`、`Orange.png` | `Collected.png` |
+
+剩余 `Kiwi.png`、`Pineapple.png`、`Strawberry.png` 为备用，不进入三关布置。
+
+### 菜单（出自 `Menu/`，界面见 [../gdd/ui-hud.md](../gdd/ui-hud.md)）
+
+| 界面元素 | 路径 | 说明 |
+|---|---|---|
+| 主菜单 Play/选关入口 | `Menu/Buttons/Play.png`、`Levels.png` | Play 进最高解锁关，Levels 进选关 |
+| 退出游戏 | `Menu/Buttons/Close.png` | 主菜单与暂停菜单的退出项（素材无 Quit 按钮，以 Close 承担） |
+| 返回上级 | `Menu/Buttons/Back.png` | 选关/暂停菜单的返回项 |
+| 结算与暂停 | `Menu/Buttons/Next.png`、`Restart.png` | Next 下一关，Restart 重打本关 |
+| 选关翻页 | `Menu/Buttons/Previous.png` | 三关一屏时可不用；多屏时启用 |
+| 选关缩略图 | `Menu/Levels/01.png`、`02.png`、`03.png` | 未解锁置灰锁定；前导零保留 |
+| 菜单文字 | `Menu/Text/Text (White) (8x10).png`、`Text (Black) (8x10).png` | 按钮标签与标题按深浅底选用 |
+
+`Settings`、`Volume`、`Achievements`、`Leaderboard` 本次不用。`Levels/04.png` 到 `50.png` 本次不用。
+
+### 终点与氛围
+
+| 系统 | 路径 | 用途 |
+|---|---|---|
+| 终点触发 | `Items/Checkpoints/End/End (Pressed) (64x64).png` | 触碰终点后播放一次 |
+| 通关庆祝 | `Other/Confetti (16x16).png` | 结算面板表现（可选） |
+| 起点/检查点动态 | `Start (Moving) (64x64).png`、`Checkpoint (Flag Out) (64x64).png`、`Checkpoint (Flag Idle)(64x64).png` | 出生与激活过渡（可选，静态图为必需底线） |
+| 场景过渡 | `Other/Transition.png` | 菜单与关卡切换过渡（可选） |
+
+各关背景主题（`Background/` 七色）分配见 [../gdd/level-design.md](../gdd/level-design.md)。
+
+### 完整版资源集合
+
+| 需求 | 路径 |
+|---|---|
+| 默认角色 | `Main Characters/Pink Man/` 下七张状态图 |
+| 地形 | `Terrain/Terrain (16x16).png` |
+| 背景 | `Background/Blue.png`（L1）+ 两关主题背景（分配见关卡设计） |
+| 水果 | `Items/Fruits/` 下 Apple/Bananas/Cherries/Melon/Orange + `Collected.png` |
+| 问号箱 | `Items/Boxes/Box1/`、`Box2/`、`Box3/` |
+| 起点/检查点/终点 | `Items/Checkpoints/` 下 Start/Checkpoint/End（含 Pressed/Flag 系列） |
+| 静态危险 | `Traps/Spikes/Idle.png` |
+| 敌人 | `Traps/Rock Head/`、`Traps/Saw/`、`Traps/Fire/` |
+| 菜单 | `Menu/Buttons/` 下 Play/Levels/Back/Close/Next/Restart（+Previous 按需）、`Menu/Levels/01-03.png`、`Menu/Text/` |
+| 氛围 | `Other/Confetti (16x16).png`、`Other/Transition.png`（可选） |
+
+### 完整版使用检查
+
+- [ ] 完整版资源集合全部被实际引用且可加载；`04-50.png` 与 Settings 系按钮未被引用。
+- [ ] 使用的每个路径都能在本文表格中找到，未虚构不存在的文件（含 `Quit.png` 不存在，不得引用）。
+- [ ] 敌人动画按各自单帧尺寸切片（Rock Head 42×42、Saw 38×38、Fire 16×32、箱子 28×24）。
+
 ## 命名与使用注意
 
 - 路径中的空格、括号、大小写**必须原样保留**；自动化引用时注意转义。
