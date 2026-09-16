@@ -27,6 +27,27 @@
 namespace godot_autopilot {
 namespace script_ops {
 
+// —— 脚本取用口径（纯函数：不触碰 Godot 对象，L1 由
+// tests/unit/script_freshness_test.cpp 直接覆盖）——
+//
+// godot-cpp 生成头的 ResourceLoader::load() 缺省 p_cache_mode = (CacheMode)1，
+// 即 CACHE_MODE_REUSE：调用点只传 path 时会命中 ResourceCache 并原样返回旧实例，
+// 不读盘（core/io/resource_loader.cpp:800-809）。要拿到磁盘版本必须显式传
+// CACHE_MODE_IGNORE —— 该模式下 GDScript 格式加载器让 GDScriptCache 重新
+// load_source_code() + reload()（modules/gdscript/gdscript_resource_format.cpp:41-42
+// → modules/gdscript/gdscript_cache.cpp:372-381）。
+int script_load_cache_mode(bool fresh) {
+  return fresh ? static_cast<int>(godot::ResourceLoader::CACHE_MODE_IGNORE)
+               : static_cast<int>(godot::ResourceLoader::CACHE_MODE_REUSE);
+}
+
+// 只读检查类工具的可选 fresh 参数：只认字面 true。缺省或非布尔值保持既有 REUSE
+// 语义（不读盘），以免既有客户端在升版后取用口径发生静默变化。
+bool wants_fresh_load(const mcp::JsonValue &args) {
+  const mcp::JsonValue *flag = args.Find("fresh");
+  return flag != nullptr && flag->IsBool() && flag->GetBool();
+}
+
 namespace {
 
 constexpr const char *NODE_PATH_HINT =
@@ -92,46 +113,73 @@ mcp::JsonValue serialize_resource(const godot::Ref<godot::Resource> &res) {
   return j;
 }
 
-bool invalidate_cached_resource(const std::string &path) {
+// 只摘除 ResourceCache 里的实例（set_path("")），不触及 GDScriptCache —— 后者仍
+// 持有同一个 GDScript，REUSE 装载会直接返回它（gdscript_cache.cpp:352-358 命中
+// full_gdscript_cache 即早返回，不读盘）。脚本刷新已改用 load_script_fresh （IGNORE
+// 装载一次）；本函数保留给「只摘除、不重读」的场景。
+[[maybe_unused]] bool invalidate_cached_resource(const std::string &path) {
   auto *loader = godot::ResourceLoader::get_singleton();
-  if (!loader || !loader->has_cached(godot::String(path.c_str()))) {
+  if (!loader || !loader->has_cached(godot::String::utf8(path.c_str()))) {
     return false;
   }
-  auto cached = loader->get_cached_ref(godot::String(path.c_str()));
+  auto cached = loader->get_cached_ref(godot::String::utf8(path.c_str()));
   if (cached.is_valid()) {
     cached->set_path("");
   }
   return true;
 }
 
-bool load_script_or_error(const std::string &path,
+bool load_script_resource(const std::string &path, bool fresh,
                           godot::Ref<godot::Script> &out_script,
                           mcp::JsonValue &err_out) {
   auto *loader = godot::ResourceLoader::get_singleton();
   if (!loader) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("ResourceLoader not available");
-    err_out = std::move(e);
+    err_out = util::error_json("ResourceLoader not available");
     return false;
   }
 
-  godot::Ref<godot::Resource> res = loader->load(godot::String(path.c_str()));
+  godot::Ref<godot::Resource> res = loader->load(
+      godot::String::utf8(path.c_str()), "Script",
+      static_cast<godot::ResourceLoader::CacheMode>(
+          script_load_cache_mode(fresh)));
   if (res.is_null()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("failed to load script: " + path);
-    err_out = std::move(e);
+    err_out = util::error_json("failed to load script: " + path);
     return false;
   }
 
   godot::Ref<godot::Script> script = res;
   if (script.is_null()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("loaded resource is not a Script: " + path);
-    err_out = std::move(e);
+    err_out = util::error_json("loaded resource is not a Script: " + path);
     return false;
   }
   out_script = script;
   return true;
+}
+
+bool load_script_or_error(const std::string &path,
+                          godot::Ref<godot::Script> &out_script,
+                          mcp::JsonValue &err_out) {
+  return load_script_resource(path, false, out_script, err_out);
+}
+
+bool load_script_fresh(const std::string &path,
+                       godot::Ref<godot::Script> &out_script,
+                       mcp::JsonValue &err_out) {
+  if (!load_script_resource(path, true, out_script, err_out))
+    return false;
+  // IGNORE 装载已让 GDScriptCache 重新 load_source_code() 并 reload()；这里再按编辑器
+  // 同款姿势重编译一次（editor/script/script_editor_plugin.cpp:2562-2565），保证缓存实例
+  // 与其使用者看到的是磁盘版本。
+  out_script->reload(true);
+  return true;
+}
+
+bool load_script_for_read(const std::string &path, const mcp::JsonValue &args,
+                          godot::Ref<godot::Script> &out_script,
+                          mcp::JsonValue &err_out) {
+  return wants_fresh_load(args)
+             ? load_script_fresh(path, out_script, err_out)
+             : load_script_or_error(path, out_script, err_out);
 }
 
 } // namespace
@@ -196,7 +244,7 @@ mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue &args) {
     return e;
   }
 
-  script->set_source_code(godot::String(wrapped.c_str()));
+  script->set_source_code(godot::String::utf8(wrapped.c_str()));
   size_t compile_log_before = debugger_ops::capture_log_count();
   godot::Error parse_err2 = script->reload();
   if (parse_err2 != godot::OK) {
@@ -280,7 +328,7 @@ mcp::JsonValue handle_load(const mcp::JsonValue &args) {
 
   godot::Ref<godot::Script> script;
   mcp::JsonValue load_err;
-  if (!load_script_or_error(path, script, load_err))
+  if (!load_script_for_read(path, args, script, load_err))
     return load_err;
 
   mcp::JsonValue r(mcp::JsonValue::object_tag);
@@ -326,13 +374,14 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
     return e;
   }
 
-  script->set_source_code(godot::String(source_code.c_str()));
+  // 源文件按 UTF-8 落盘（ResourceFormatSaverGDScript::save → FileAccess::store_string
+  // 写入 String 的 UTF-8 字节），故必须用 String::utf8 构造；latin1 构造会让每个字节
+  // 变成一个字符，CJK 注释写出后变乱码且 readback 校验失败。
+  script->set_source_code(godot::String::utf8(source_code.c_str()));
   script->set_path_cache(godot::String(path.c_str()));
   size_t compile_log_before = debugger_ops::capture_log_count();
   godot::Error reload_err = script->reload();
   if (reload_err != godot::OK) {
-
-    invalidate_cached_resource(path);
     std::string message = "script compilation failed: ERR_PARSE_ERROR (code " +
                           std::to_string(static_cast<int>(reload_err)) + ")";
     std::string compile_err =
@@ -396,7 +445,12 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
     write_issue = "readback open failed";
   }
 
-  bool cache_invalidated = invalidate_cached_resource(path);
+  // 写盘后用 IGNORE 装载刷新一次：GDScriptCache 里的旧实例被重新读盘 + 重编译，
+  // 替代原先「从 ResourceCache 摘除」（摘除只动 ResourceCache，REUSE 装载仍会从
+  // GDScriptCache 取回旧实例）。刷新失败不使本次写入失败，但在响应中回报。
+  godot::Ref<godot::Script> refreshed;
+  mcp::JsonValue refresh_err;
+  bool cache_refreshed = load_script_fresh(path, refreshed, refresh_err);
   auto *editor = godot::EditorInterface::get_singleton();
   if (editor) {
     auto *efs = editor->get_resource_filesystem();
@@ -418,8 +472,13 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
   if (!write_warning.empty()) {
     j["warning"] = mcp::JsonValue(write_warning);
   }
-  if (cache_invalidated) {
-    j["cache_invalidated"] = mcp::JsonValue(true);
+  j["cache_refreshed"] = mcp::JsonValue(cache_refreshed);
+  if (!cache_refreshed) {
+    const mcp::JsonValue *refresh_msg = refresh_err.Find("error");
+    j["cache_refresh_error"] =
+        mcp::JsonValue(refresh_msg && refresh_msg->IsString()
+                           ? refresh_msg->GetString()
+                           : std::string("script cache refresh failed"));
   }
   godot::StringName global_name = script->get_global_name();
   if (global_name != godot::StringName()) {
@@ -466,7 +525,7 @@ mcp::JsonValue handle_attach_to_node(const mcp::JsonValue &args) {
 
   godot::Ref<godot::Script> script;
   mcp::JsonValue load_err;
-  if (!load_script_or_error(script_path, script, load_err))
+  if (!load_script_fresh(script_path, script, load_err))
     return load_err;
 
   auto *editor = godot::EditorInterface::get_singleton();
@@ -548,7 +607,7 @@ mcp::JsonValue handle_get_property(const mcp::JsonValue &args) {
     std::string script_path = it_path->GetString();
     godot::Ref<godot::Script> script;
     mcp::JsonValue load_err;
-    if (!load_script_or_error(script_path, script, load_err))
+    if (!load_script_for_read(script_path, args, script, load_err))
       return load_err;
 
     godot::StringName prop_name(property.c_str());
@@ -728,7 +787,7 @@ mcp::JsonValue handle_reload(const mcp::JsonValue &args) {
 
   godot::Ref<godot::Script> script;
   mcp::JsonValue load_err;
-  if (!load_script_or_error(path, script, load_err))
+  if (!load_script_fresh(path, script, load_err))
     return load_err;
 
   godot::Error reload_result = script->reload(keep_state);
@@ -748,7 +807,7 @@ mcp::JsonValue handle_get_variable_list(const mcp::JsonValue &args) {
 
   godot::Ref<godot::Script> script;
   mcp::JsonValue load_err;
-  if (!load_script_or_error(path, script, load_err))
+  if (!load_script_for_read(path, args, script, load_err))
     return load_err;
 
   godot::TypedArray<godot::Dictionary> props = script->get_script_property_list();
