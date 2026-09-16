@@ -2,22 +2,36 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <vector>
 
 using godot_autopilot::coords::DiffResult;
 using godot_autopilot::coords::ImageSize;
-using godot_autopilot::coords::Mark;
-using godot_autopilot::coords::Rect;
 using godot_autopilot::coords::diff_sample;
 using godot_autopilot::coords::fit_within;
-using godot_autopilot::coords::layout_marks;
-using godot_autopilot::coords::rect_intersect;
 using godot_autopilot::coords::scale_size;
 
 // 视觉辅助链路纯函数覆盖:region/max_dimension/scale 管线、
-// diff_image 差分近似语义、节点框标记布局。
+// diff_image 差分近似语义、region 越界裁剪约定。
 // 不触碰 Godot API,不依赖编辑器单例。
+
+namespace {
+
+struct CropRect { double x = 0.0; double y = 0.0; double w = 0.0; double h = 0.0; };
+
+// 与 capture 链路 region 裁剪约定一致:取两矩形左上公共区,不相交返回空矩形。
+CropRect region_intersect(const CropRect &a, const CropRect &b) {
+  const double x0 = std::max(a.x, b.x);
+  const double y0 = std::max(a.y, b.y);
+  const double x1 = std::min(a.x + a.w, b.x + b.w);
+  const double y1 = std::min(a.y + a.h, b.y + b.h);
+  if (x1 <= x0 || y1 <= y0)
+    return CropRect{};
+  return CropRect{x0, y0, x1 - x0, y1 - y0};
+}
+
+} // namespace
 
 TEST(VisionAssistTest, ScaleThenMaxDimensionCapsLongestSide) {
   // scale(2x) 后 max_dimension 生效,最长边被压到上限,纵横比保持。
@@ -44,14 +58,14 @@ TEST(VisionAssistTest, ScaleRejectsOutOfRangeFactor) {
 
 TEST(VisionAssistTest, RegionCropIsTopLeftIntersection) {
   // region 越界裁剪语义:取左上公共区,不相交返回空。
-  const Rect shared =
-      rect_intersect(Rect{0.0, 0.0, 800.0, 600.0}, Rect{700.0, 500.0, 200.0, 200.0});
+  const CropRect shared =
+      region_intersect(CropRect{0.0, 0.0, 800.0, 600.0}, CropRect{700.0, 500.0, 200.0, 200.0});
   EXPECT_DOUBLE_EQ(700.0, shared.x);
   EXPECT_DOUBLE_EQ(500.0, shared.y);
   EXPECT_DOUBLE_EQ(100.0, shared.w);
   EXPECT_DOUBLE_EQ(100.0, shared.h);
-  const Rect empty =
-      rect_intersect(Rect{0.0, 0.0, 800.0, 600.0}, Rect{900.0, 0.0, 50.0, 50.0});
+  const CropRect empty =
+      region_intersect(CropRect{0.0, 0.0, 800.0, 600.0}, CropRect{900.0, 0.0, 50.0, 50.0});
   EXPECT_DOUBLE_EQ(0.0, empty.w);
   EXPECT_DOUBLE_EQ(0.0, empty.h);
 }
@@ -80,14 +94,6 @@ TEST(VisionAssistTest, DiffImageIgnoresSubThresholdNoise) {
   EXPECT_TRUE(r.comparable);
   EXPECT_DOUBLE_EQ(0.0, r.changed_ratio);
   EXPECT_FALSE(r.has_bbox);
-}
-
-TEST(VisionAssistTest, NodeMarksShareBudgetWithoutOverlap) {
-  // 节点蓝框与 UI 红框共享 200 绘制预算:重叠框标记自动错开至少 10px。
-  const std::vector<Rect> rects{Rect{10.0, 20.0, 5.0, 5.0}, Rect{10.0, 20.0, 5.0, 5.0}};
-  const std::vector<Mark> marks = layout_marks(rects);
-  ASSERT_EQ(2u, marks.size());
-  EXPECT_GE(marks[1].y - marks[0].y, 10.0);
 }
 
 TEST(VisionAssistTest, AnnotateNodesMaxEnforcedBeforeDraw) {

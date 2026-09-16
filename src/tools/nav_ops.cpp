@@ -23,18 +23,6 @@ namespace nav_ops {
 
 using JV = mcp::JsonValue;
 
-namespace {
-
-JV vec2_to_json(const godot::Vector2 &v) {
-  return JV::FromObject({{"x", JV(v.x)}, {"y", JV(v.y)}});
-}
-
-JV vec3_to_json(const godot::Vector3 &v) {
-  return JV::FromObject({{"x", JV(v.x)}, {"y", JV(v.y)}, {"z", JV(v.z)}});
-}
-
-} // namespace
-
 JV handle_2d_map_create(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "create_nav_2d_map called");
@@ -137,7 +125,7 @@ JV handle_2d_path_query(const JV &args) {
       ns->map_get_path(map, origin, dest, optimize, nav_layers);
   JV arr(JV::array_tag);
   for (int i = 0; i < path.size(); i++) {
-    arr.PushBack(vec2_to_json(path[i]));
+    arr.PushBack(util::vec2_to_json(path[i]));
   }
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
@@ -339,7 +327,7 @@ JV handle_3d_path_query(const JV &args) {
       ns->map_get_path(map, origin, dest, optimize, nav_layers);
   JV arr(JV::array_tag);
   for (int i = 0; i < path.size(); i++) {
-    arr.PushBack(vec3_to_json(path[i]));
+    arr.PushBack(util::vec3_to_json(path[i]));
   }
 
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
@@ -388,7 +376,7 @@ JV handle_3d_path_query_segment(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "get_nav_3d_map_closest_point_to_segment completed");
   JV r(JV::object_tag);
-  r["result"] = JV::FromObject({{"point", vec3_to_json(point)}});
+  r["result"] = JV::FromObject({{"point", util::vec3_to_json(point)}});
   return r;
 }
 
@@ -503,8 +491,8 @@ JV handle_3d_agent_get_next_path(const JV &args) {
                             "get_nav_3d_agent_state completed");
   JV r(JV::object_tag);
   JV result(JV::object_tag);
-  result["position"] = vec3_to_json(pos);
-  result["velocity"] = vec3_to_json(vel);
+  result["position"] = util::vec3_to_json(pos);
+  result["velocity"] = util::vec3_to_json(vel);
   r["result"] = std::move(result);
   return r;
 }

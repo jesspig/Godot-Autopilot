@@ -107,7 +107,7 @@ if(MSVC)
 endif()
 
 # ── ctest 注册: 每份 config/*.json 一条 gda_runner_<name> 用例 ──
-# config/ 由后续阶段创建, 目录尚不存在时 GLOB 为空, foreach 自然跳过。
+# 用例文件在 configure 期经 GLOB 收集, config/ 目录新增 *.json 后重新 configure 即注册。
 file(GLOB GDA_TEST_CONFIGS CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/config/*.json")
 

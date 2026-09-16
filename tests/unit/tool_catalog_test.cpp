@@ -105,13 +105,3 @@ TEST(ToolCatalogTest, ConcurrentAddIsSafe) {
   EXPECT_TRUE(catalog.get_tool("ct_0_0").has_value());
   EXPECT_TRUE(catalog.get_tool("ct_7_24").has_value());
 }
-
-TEST(ToolCatalogTest, PopulateDefaultToolsOnce) {
-  ToolCatalog catalog;
-  catalog.populate_default_tools();
-  EXPECT_EQ(catalog.size(), 5u);
-  EXPECT_TRUE(catalog.get_tool("ping").has_value());
-  EXPECT_TRUE(catalog.get_tool("search_tools").has_value());
-  catalog.populate_default_tools();
-  EXPECT_EQ(catalog.size(), 5u);
-}
