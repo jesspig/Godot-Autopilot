@@ -890,7 +890,8 @@ mcp::JsonValue finalize_capture_response(const mcp::JsonValue &pending_result) {
             r["path"] = JV(path);
            static constexpr const char *kCapturePassthroughFields[] = {
                "region", "annotated", "elements", "source_width",
-               "source_height", "elements_truncated"};
+               "source_height", "elements_truncated", "node_elements",
+               "node_truncated"};
            for (const char *key : kCapturePassthroughFields) {
              if (auto *value_p = pending_result.Find(key))
                r[key] = *value_p;

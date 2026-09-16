@@ -1,0 +1,272 @@
+{
+  "name": "vision_assist",
+  "description": "视觉辅助链路参数校验（headless）：capture 双侧 annotate_nodes/annotate_nodes_max 形状与上限、diff_image 前置条件与目标约束、review_scene_visually 未知参数与字段校验。全部为抵达抓拍逻辑前的确定性 error 路径，不依赖渲染与游戏进程。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "stages": [
+      {
+        "id": "editor_annotate_validation",
+        "steps": [
+          {
+            "id": "annotate_nodes_not_array",
+            "tool": "capture_editor_viewport",
+            "args": { "target": "editor", "annotate_nodes": "Player" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "invalid parameter: annotate_nodes must be an array of node path strings" }
+              ]
+            }
+          },
+          {
+            "id": "annotate_nodes_empty",
+            "tool": "capture_editor_viewport",
+            "args": { "target": "editor", "annotate_nodes": [] },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "invalid parameter: annotate_nodes must contain between 1 and 50 entries" }
+              ]
+            }
+          },
+          {
+            "id": "annotate_nodes_empty_string",
+            "tool": "capture_editor_viewport",
+            "args": { "target": "editor", "annotate_nodes": [""] },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "invalid parameter: annotate_nodes must contain non-empty path strings" }
+              ]
+            }
+          },
+          {
+            "id": "annotate_nodes_max_not_int",
+            "tool": "capture_editor_viewport",
+            "args": { "target": "editor", "annotate_nodes": ["Player"], "annotate_nodes_max": "10" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "invalid parameter: annotate_nodes_max must be an integer" }
+              ]
+            }
+          },
+          {
+            "id": "annotate_nodes_max_out_of_range",
+            "tool": "capture_editor_viewport",
+            "args": { "target": "editor", "annotate_nodes_max": 0 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "invalid parameter: annotate_nodes_max out of range (1-50): 0" }
+              ]
+            }
+          },
+          {
+            "id": "annotate_nodes_exceeds_self_max",
+            "tool": "capture_editor_viewport",
+            "args": { "target": "editor", "annotate_nodes": ["A", "B"], "annotate_nodes_max": 1 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "invalid parameter: annotate_nodes length exceeds annotate_nodes_max (1)" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "diff_image_validation",
+        "steps": [
+          {
+            "id": "diff_image_not_bool",
+            "tool": "capture_editor_viewport",
+            "args": { "target": "editor", "diff_image": "yes" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "invalid parameter: diff_image must be a boolean" }
+              ]
+            }
+          },
+          {
+            "id": "diff_image_requires_diff",
+            "tool": "capture_editor_viewport",
+            "args": { "target": "editor", "diff_image": true },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "invalid parameter: diff_image requires diff_against_last" }
+              ]
+            }
+          },
+          {
+            "id": "diff_image_game_target",
+            "tool": "capture_editor_viewport",
+            "args": { "target": "game", "diff_image": true, "diff_against_last": true },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "diff_image is only supported for target='editor'" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "game_annotate_validation",
+        "steps": [
+          {
+            "id": "game_annotate_nodes_empty",
+            "tool": "capture_game_viewport",
+            "args": { "annotate_nodes": [] },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "annotate_nodes must be an array of 1-50 strings" }
+              ]
+            }
+          },
+          {
+            "id": "game_annotate_nodes_empty_string",
+            "tool": "capture_game_viewport",
+            "args": { "annotate_nodes": [""] },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "annotate_nodes must be an array of non-empty strings" }
+              ]
+            }
+          },
+          {
+            "id": "game_annotate_nodes_max_zero",
+            "tool": "capture_game_viewport",
+            "args": { "annotate_nodes_max": 0 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "annotate_nodes_max must be an integer between 1 and 50" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "review_validation",
+        "steps": [
+          {
+            "id": "review_unknown_param",
+            "tool": "review_scene_visually",
+            "args": { "bogus_param": 1 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "unknown parameter for review_scene_visually: bogus_param" }
+              ]
+            }
+          },
+          {
+            "id": "review_both_skipped",
+            "tool": "review_scene_visually",
+            "args": { "include_editor": false, "include_game": false },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "at least one of include_editor/include_game must be true" }
+              ]
+            }
+          },
+          {
+            "id": "review_annotate_nodes_empty",
+            "tool": "review_scene_visually",
+            "args": { "annotate_nodes": [] },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "annotate_nodes must be an array of 1-50 strings" }
+              ]
+            }
+          },
+          {
+            "id": "review_annotate_nodes_empty_string",
+            "tool": "review_scene_visually",
+            "args": { "annotate_nodes": [""] },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "annotate_nodes must be an array of non-empty strings" }
+              ]
+            }
+          },
+          {
+            "id": "review_annotate_nodes_max_zero",
+            "tool": "review_scene_visually",
+            "args": { "annotate_nodes_max": 0 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "annotate_nodes_max must be an integer between 1 and 50" }
+              ]
+            }
+          },
+          {
+            "id": "review_node_viewport_bad",
+            "tool": "review_scene_visually",
+            "args": { "node_viewport": "side" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "node_viewport must be one of: auto, 2d, 3d" }
+              ]
+            }
+          },
+          {
+            "id": "review_max_dimension_bad",
+            "tool": "review_scene_visually",
+            "args": { "max_dimension": 32 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "max_dimension must be an integer between 64 and 4096" }
+              ]
+            }
+          },
+          {
+            "id": "review_scale_bad",
+            "tool": "review_scene_visually",
+            "args": { "scale": 9 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "scale must be an integer between 1 and 8" }
+              ]
+            }
+          },
+          {
+            "id": "review_region_bad",
+            "tool": "review_scene_visually",
+            "args": { "region": { "x": 0, "y": 0 } },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "region must be an object with numeric x, y, width and height" }
+              ]
+            }
+          },
+          {
+            "id": "review_include_editor_not_bool",
+            "tool": "review_scene_visually",
+            "args": { "include_editor": "yes" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "include_editor must be a boolean" }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

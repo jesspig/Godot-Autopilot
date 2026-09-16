@@ -502,7 +502,8 @@ mcp::JsonValue handle_game_capture(const mcp::JsonValue &args) {
     return error_json("capture_game_viewport parameters must be an object");
   static constexpr const char *allowed[] = {
       "timeout_ms", "region",  "max_dimension", "annotate",
-      "after_frames", "when",  "scale"};
+      "after_frames", "when",  "scale",         "annotate_nodes",
+      "annotate_nodes_max"};
   std::string unknown;
   if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed), unknown))
     return error_json("unknown parameter for capture_game_viewport: " + unknown);
@@ -533,6 +534,20 @@ mcp::JsonValue handle_game_capture(const mcp::JsonValue &args) {
     return error_json("max_dimension must be an integer between 64 and 4096");
   if (auto *annotate = args.Find("annotate"); annotate && !annotate->IsBool())
     return error_json("annotate must be a boolean");
+  if (auto *nodes = args.Find("annotate_nodes")) {
+    if (!nodes->IsArray() || nodes->GetArray().empty() ||
+        nodes->GetArray().size() > 50)
+      return error_json("annotate_nodes must be an array of 1-50 strings");
+    for (const auto &item : nodes->GetArray()) {
+      if (!item.IsString() || item.GetString().empty())
+        return error_json(
+            "annotate_nodes must be an array of non-empty strings");
+    }
+  }
+  if (auto *nodes_max = args.Find("annotate_nodes_max");
+      nodes_max && (!nodes_max->IsInt() || nodes_max->GetInt() < 1 ||
+                    nodes_max->GetInt() > 50))
+    return error_json("annotate_nodes_max must be an integer between 1 and 50");
   if (auto *after_frames = args.Find("after_frames");
       after_frames && (!after_frames->IsInt() || after_frames->GetInt() < 0))
     return error_json(
@@ -546,6 +561,8 @@ mcp::JsonValue handle_game_capture(const mcp::JsonValue &args) {
   copy_optional(args, params, "region");
   copy_optional(args, params, "max_dimension");
   copy_optional(args, params, "annotate");
+  copy_optional(args, params, "annotate_nodes");
+  copy_optional(args, params, "annotate_nodes_max");
   copy_optional(args, params, "after_frames");
   copy_optional(args, params, "when");
   copy_optional(args, params, "scale");

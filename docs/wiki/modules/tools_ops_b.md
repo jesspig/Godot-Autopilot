@@ -6,7 +6,7 @@ tags:
   - 模块
   - 领域工具
   - B组
-timestamp: "2026-09-16T00:58:57+08:00"
+timestamp: "2026-09-16T14:08:21+08:00"
 resource: src/tools/
 ---
 
@@ -14,7 +14,7 @@ resource: src/tools/
 
 > 覆盖 `src/tools/` 下 22 个 `.cpp` handler 模块：debug_ops、debugger_ops、debugger_access、display_ops、display_window_ops、os_ops、runtime_ops、runtime_game_ops、audio_ops、render_ops、environment_ops、text_ops、tilemap_ops、tileset_ops、spriteframes_ops、animation_ops、theme_ops、analyze_ops、test_ops、code_exec_ops、log_ops、capture_ops。
 >
-> 工具总数（全系统）：**392**（`ToolRegistry`/catalog/index 口径）= **384 个领域工具**（30 个域 `*_tools.hpp` 以 `GDA_TOOL_CLASS(`/`GDA_TOOL_CLASS_SIDE(` 声明，经 `register_all.cpp` 注册各域 `<域>_tools::make_tools()`）+ `system_status` 1 + **7 个元工具**。本页 B 组占其中 **191 个领域工具**（A 组 193 + B 组 191 = 384；09-16 批次 B 组 +3：game +2、tilemap +1）；`code_execute`/`batch_execute` 为元工具经 `server.RegisterTool()` 直连、`system_status` 单独注册。数量以 `src/tools/*_tools.hpp` 声明与 `ToolRegistry` 运行时注册为准。
+> 工具总数（全系统）：**393**（`ToolRegistry`/catalog/index 口径）= **385 个领域工具**（30 个域 `*_tools.hpp` 以 `GDA_TOOL_CLASS(`/`GDA_TOOL_CLASS_SIDE(` 声明，经 `register_all.cpp` 注册各域 `<域>_tools::make_tools()`）+ `system_status` 1 + **7 个元工具**。本页 B 组占其中 **192 个领域工具**（A 组 193 + B 组 192 = 385；09-16 失败修复批次 B 组 +3：game +2、tilemap +1；视觉辅助批次 capture +1）；`code_execute`/`batch_execute` 为元工具经 `server.RegisterTool()` 直连、`system_status` 单独注册。数量以 `src/tools/*_tools.hpp` 声明与 `ToolRegistry` 运行时注册为准。
 >
 > 相关页面：[工具注册表](../modules/tools_registry.md) · [运行时通道](../modules/entry_runtime.md)
 
@@ -41,8 +41,8 @@ resource: src/tools/
 | `test_ops.cpp` | `godot_autopilot::test_ops` | `test_tools.hpp` | 2 |
 | `code_exec_ops.cpp` | `godot_autopilot::code_exec_ops` | —（元工具，不经 `*_tools.hpp`，不计入合计） | 2 |
 | `log_ops.cpp` | `godot_autopilot::log_ops` | `system_tools.hpp` | 1 |
-| `capture_ops.cpp` | `godot_autopilot::capture_ops` | `capture_tools.hpp` | 1 |
-| **合计（领域工具）** | | | **191** |
+| `capture_ops.cpp` | `godot_autopilot::capture_ops` | `capture_tools.hpp` | 2 |
+| **合计（领域工具）** | | | **192** |
 
 注：`environment_ops.cpp`、`display_window_ops.cpp`、`runtime_game_ops.cpp` 没有独立 hpp，handler 函数声明复用 `render_ops.hpp`、`display_ops.hpp`、`runtime_ops.hpp`；工具类声明统一落在对应 `<域>_tools.hpp`（分别为 `render_tools.hpp`/`display_tools.hpp`/`game_tools.hpp`），`make_tools()` 产出 `ToolBase` 实例。`animation_ops`/`theme_ops`/`analyze_ops`/`test_ops` 四模块各有独立 `*_ops.hpp`。显示（25）/渲染（49）两模块的 `_ops.cpp` 与 `_tools.hpp` 归并方式见上表。
 
@@ -122,7 +122,7 @@ resource: src/tools/
   - `sequence_game_inputs`（gda op `input_sequence`）：`inputs[]` 每项含 `at_frame`（物理帧偏移）与注入字段，由游戏侧 `GameBridgeFrameSequence` 节点逐物理帧执行，完成后响应 `{completed, executed}`；上限 256 步，超时默认按 `max_at_frame×33ms+2000ms` 推导并钳制 30000ms，可被 cancel。协议与帧调度细节见[入口与运行时](../modules/entry_runtime.md)。
   - `get_game_ui_elements`（gda op `ui_elements`）：DFS 遍历运行中 Control 树，每项 `{path, type, visible, text?, global_rect:{position,size}}`，`max_elements` 默认 100、上限 1000，超限标 `truncated:true`。
   - **游戏侧输入扩展（09-15）**：`queue_game_input` 的 `type` 新增 `wheel`（给 `direction` up/down/left/right，或 `button_index` 4/5/6/7 对应上/下/左/右；可选 `amount` 1-10 默认 1 与 `position {x,y}`；wheel 按键按 `factor=amount` 注入按下+释放）与 `mouse_motion`（`position {x,y}` 必填，可选 `relative {x,y}` 设定位移增量）；`sequence_game_inputs` 的 inputs 同增 `kind: wheel`/`mouse_motion` 及同名字段。
-  - **截图增强（09-15）**：`capture_game_viewport` 新增可选 `region {x,y,width,height}`（裁剪到图像内，空交集报 `region_out_of_bounds`）与 `max_dimension`（64-4096，最长边等比缩小、不放大），裁剪与缩放发生在游戏进程内；`annotate=true` 由游戏侧为每个可见 Control 画编号框，结果附 `annotated:true` 与 `elements`（id/path/type/text/position/size，图像像素）。
+  - **截图增强（09-15）**：`capture_game_viewport` 新增可选 `region {x,y,width,height}`（裁剪到图像内，空交集报 `region_out_of_bounds`）与 `max_dimension`（64-4096，最长边等比缩小、不放大），裁剪与缩放发生在游戏进程内；`annotate=true` 由游戏侧为每个可见 Control 画编号框，结果附 `annotated:true` 与 `elements`（id/path/type/text/position/size，图像像素）。09-16 起另支持 `annotate_nodes`（1-50 个游戏绝对路径，精确匹配优先、否则 `/<path>` 后缀匹配）与 `annotate_nodes_max`（1-50 自我限流），游戏进程内画蓝色编号框并回传 `node_elements`/`node_truncated`（经 `finalize_capture_response` 白名单透传），单项失败隔离（`ok:false` + `error` + 候选路径，不失败整体）。
   - **`click_game_ui_element`（09-15 新增）**：按 `path` 在游戏进程内枚举 Control 树（精确匹配优先，否则匹配以 `/<path>` 结尾的节点），在元素 `global_rect` 中心注入 mouse_button 按下/释放（`button_index` 1=左 默认/2=右/3=中，`double_click` 追加第二对）；枚举+注入在一次调用内完成（单次协议往返，避免编辑器主线程等待）；`max_elements` 默认/上限 1000、`timeout_ms` 默认 5000/上限 30000；未找到时错误附元素数与候选路径；以 `GDA_TOOL_CLASS_SIDE(` + `GameRuntime` 声明，受 `game_runtime` 授权门约束。
   - **降级指引（09-13 下午起）**：`capture_game_viewport` 与 4 个输入工具在运行时通道不可达的错误响应上附加 `hint` 字段，列出不依赖游戏进程的替代路径（`get_game_log_entries`、`capture_display_screen`、`capture_editor_viewport`、`get_plugin_log`）。
   - `runtime_game_ops.cpp` 无独立 hpp，声明在 `runtime_ops.hpp`。
@@ -284,6 +284,8 @@ resource: src/tools/
   - `target="editor"`（默认）优先 2D 视口（`EditorInterface::get_editor_viewport_2d`）回退 3D；`ViewportTexture::get_image` → `save_png_to_buffer` → `base64_encode`，返回 data/format/width/height；`save:true`（09-14 起，仅 editor 目标）额外把 PNG 写入 `user://godot_autopilot/captures/gda_capture_editor_<ticks>.png` 并在结果附 `path`。
   - **截图参数扩展（09-15）**：`space` 选编辑器目标取图范围——`viewport`（默认，2D 视口回退 3D）或 `window`（编辑器主窗口根视口，含 dock/工具栏与 2D 网格/选择框）；`region {x,y,width,height}` 裁剪（width/height 必须为正，矩形钳制到图像内，空交集报 `region_out_of_bounds`）与 `max_dimension`（64-4096，最长边缩小、不放大）对两个目标都生效（`target=game` 时在游戏进程内执行）；`annotate=true` 画编号红框并附 `elements` 数组（最终图像素）；`diff_against_last=true` 与上一次编辑器截图比较，返回 `diff`（`comparable` + `changed_ratio`，有变化附 `changed_bbox`），尺寸不同时按公共左上区域比较并附 `size_mismatch=true`/`current_size` 与 `baseline_size`，不可比较时 `comparable=false` 且 `reason` ∈ {`no_baseline`, `unsupported_format`, `baseline_too_large`}。输出图发生裁剪/缩放时附 `source_width`/`source_height`，结果 `width`/`height` 为最终图像尺寸。
   - **帧定时与条件抓拍（09-16，game 目标）**：`capture_game_viewport`（及 `capture_editor_viewport` 的 `target=game`）新增 `after_frames`（延迟 N 帧后抓拍）与 `when`（逐帧求值 GDScript 表达式、相对 `current_scene` 求条件，成立帧抓拍；解析失败报 `when_parse_error`、等待超时报 `when_timeout`）；另新增 `scale` 1-8 最近邻放大。处理顺序固定：`region` → `scale` → `max_dimension`。实测注意：条件成立帧与抓拍渲染帧相差约 1 帧，**取证场景条件宜留滞后余量**（如要求状态持续 2 帧再触发）。
+  - **场景节点标注（09-16 新增）**：`capture_editor_viewport` 与 `capture_game_viewport` 新增 `annotate_nodes`（1-50 个节点路径字符串，非空；空数组或超限直接报错）与 `annotate_nodes_max`（1-50 可选自我限流，缺席=50，超限报错）。节点框为蓝色、编号自 1 独立计数（与 `annotate` 红色 UI 框不混排），结果附 `node_elements[{id,path,type,ok,position,size,visible,behind?,error?}]`（最终图像素，与输入一一对应；单项失败置 `ok:false` + `error` 而整体不失败：`node not found` / `unsupported node type` / `viewport incompatible`；3D 相机背后点仅标 `behind:true`；不可见/零面积跳过绘制但保留 `visible:false` 条目）与 200 总框预算超限时的 `node_truncated`。编辑器侧解析编辑场景路径（复用 `resolve_scene_node`），游戏侧解析绝对路径。VLM 标准链路：截图（`annotate_nodes` 选框）→ `hit_test_editor_point` 复核坐标（见[领域工具 A 组](../modules/tools_ops_a.md)）→ 点击/输入动作 → `diff_against_last` 复验。
+  - **可视差分图与场景评审包（09-16 新增）**：`diff_image:true`（editor 目标专用，且须配 `diff_against_last:true`，否则报 `invalid parameter: diff_image requires diff_against_last`）在数值 `diff` 之外多返 `diff_image_data`（base64 PNG，在最终图拷贝上高亮 `changed_bbox`；无 `changed_bbox` 或不可比较时不返图；计入 PNG/JSON 上限，超限走既有 `capture_bytes_exceeded`/`response_too_large`）；`review_scene_visually`（Capture 类只读组合，一次返回 `editor_capture`/`game_capture`/`nodes`/`mapping` 四要素——编辑器图、游戏图、`get_scene_node_screen_rect` 节点表（`paths=annotate_nodes`，缺席时 `nodes={skipped:true}`）、`get_editor_viewport_geometry` 映射；各节失败隔离为按节 `error`，`include_editor/include_game=false` 跳过对应节、双 false 直接报错，未知参数拒绝；`node_viewport` 取 `auto`/`2d`/`3d`；`region/max_dimension/scale/annotate/annotate_nodes` 语义与截图工具一致，`timeout_ms` 仅约束游戏节；评审包内的编辑器截图同样刷新 `diff_against_last` 基线）。协议细节见[运行时通道](../modules/entry_runtime.md)。
   - **截图保留上限（09-14 起）**：`prune_capture_files` 按修改时间倒序只保留最近 20 个 `gda_capture*.png`——editor 侧在保存后清理 `user://godot_autopilot/captures/`，游戏侧 `op_capture` 同样清理 OS 缓存目录（`game_bridge.cpp`）。
   - **MCP image content 交付（09-13 起）**：经元工具 `call_tool` 直调三个截图工具（`capture_editor_viewport`/`capture_game_viewport`/`capture_display_screen`）时，`register_all.cpp` 经 `util::mcp_image_content.hpp` 的 `try_attach_image_content()` 把 PNG base64 转为 MCP image content 块随响应返回（多模态模型可直接看图）；文本 JSON 中该 `data` 替换为 `"<attached-as-image-content>"` 并加 `image_attached:true`，`format`/`width`/`height` 等其余字段保留。`batch_execute`/`code_execute` 内调用不附加 image 块，JSON 中仍是完整 base64；`format` 非 `"png"` 或无 data 时不转换。
   - `base64_encode` 为跨模块工具函数（display_ops 截图、runtime_ops 文件回读共用）。
