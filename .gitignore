@@ -35,22 +35,18 @@ import/
 *.lib
 
 # Dependencies (FetchContent)
-_build_/
 _deps/
-_download/
 
 # Tests
-tests/*.xml
 tests/output/
-report-*.json
-test-results/
+
+# 本地会话产出的端到端测试报告（人工/会话文档，勿入库）
+report/
 .env
 
 # OS
 .DS_Store
 Thumbs.db
 *.log
-
-report/*
 
 /dist
