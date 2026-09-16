@@ -7,7 +7,7 @@ tags:
   - 工具架构
   - 接口
   - 组合
-timestamp: "2026-09-16T17:06:25+08:00"
+timestamp: "2026-09-17T17:06:25+08:00"
 resource: src/tools/
 ---
 
@@ -21,7 +21,7 @@ resource: src/tools/
 > - `tool_defs.def` 已删除；`register_all` 注册 30 个域的 `make_tools()` + `system_status`（FnTool）+ 7 元工具（`MetaTool`，接口 + 组合），catalog / BM25 index / 分发 map 全部从 registry 派生；
 > - **元工具 = 接口 + 组合**：`IMetaTool` 标记接口 + `MetaTool`（`ToolBase`+`IMetaTool`，依赖组合注入），`ToolRegistry::add()` 用 `dynamic_cast<IMetaTool>` 自动归类——实现接口即元工具；
 > - **副作用驱动遍历排除**：`SideEffect` 枚举 8 值（`None/WritesFile/WritesConfig/ShowsAlert/ModifiesWindow/Process/CodeExecute/GameRuntime`）；60 个工具用 `GDA_TOOL_CLASS_SIDE` 宏标记（实现 `ISideEffect`，其中 `fill_tilemap_rect` 的 side_effect 为 None、仅靠宏前缀排除）；`get_tool_detail` 返回 `side_effect` 字段；遍历 runner 仅枚举 `GDA_TOOL_CLASS(` 的 325 个并读该字段兜底排除，删除硬编码 `kExcludedSideEffectTools`。
-> 验证口径：L1 **267** 用例 + L2 25 份配置 = ctest 注册点 **292**（L2 遍历与运行时 catalog 实证；L1 为源码 `TEST`/`TEST_F` 宏统计）；`03_tools_contract` 遍历口径：域工具 385，解析器枚举 325 + 60 个 SIDE 不枚举。权威计数：域工具 385、`system_status` 1、元工具 7、catalog/index 393、MCP 可达 392。
+> 验证口径：L1 **243** 用例 + L2 25 份配置 = ctest 注册点 **268**（09-17 精简批次 267→243；`ctest -N` 构建实测；L1 为源码 `TEST`/`TEST_F` 宏统计）；`03_tools_contract` 遍历口径：域工具 385，解析器枚举 325 + 60 个 SIDE 不枚举。权威计数：域工具 385、`system_status` 1、元工具 7、catalog/index 393、MCP 可达 392。
 >
 > 相关页面： [工具注册表](modules/tools_registry.md) · [工程约定](conventions.md) · [测试体系](tests.md) · [架构总览](overview.md)
 

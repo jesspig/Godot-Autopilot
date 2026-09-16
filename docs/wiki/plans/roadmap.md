@@ -6,13 +6,13 @@ tags:
   - 规划
   - 竞品对齐
   - 工具扩展
-timestamp: "2026-09-16T17:06:25+08:00"
+timestamp: "2026-09-17T17:06:25+08:00"
 resource: src/
 ---
 
 # 竞品对齐路线图
 
-> 记录 2026-08 功能分支 `feature/engine-aware-fs-and-tool-expansion` 的竞品对齐批次（P0/P1/P2 已交付；当前 ctest 共 292 项——L1 267 + L2 25，见 [测试体系](../tests.md)），与后续 P3 方向。工具侧实现细节见 [工具注册表](../modules/tools_registry.md)，运行时协议见 [入口与运行时](../modules/entry_runtime.md)。
+> 记录 2026-08 功能分支 `feature/engine-aware-fs-and-tool-expansion` 的竞品对齐批次（P0/P1/P2 已交付；当前 ctest 共 268 项——L1 243 + L2 25，见 [测试体系](../tests.md)），与后续 P3 方向。工具侧实现细节见 [工具注册表](../modules/tools_registry.md)，运行时协议见 [入口与运行时](../modules/entry_runtime.md)。
 
 ## 竞品全景（一行定位速记）
 
@@ -81,7 +81,7 @@ resource: src/
 
 ## 遗留：P3 待规划
 
-- **客户端一键配置扩展**：配置面板现支持 8 客户端（见[支撑模块](../modules/support.md)），对标 godot-ai 的 attach 桥与"Configure all"全家桶仍有差距（stdio bridge、状态点探测、更多客户端预设）
+- **客户端桥接深化**：一键配置已交付——配置面板现支持 20 个客户端（09-16 由 8 扩至 20，见[支撑模块](../modules/support.md)），对标 godot-ai 的 attach 桥与"Configure all"全家桶仍余 stdio bridge、状态点探测差距
 - **AssetLib 上架**：当前经 GitHub Release zip 分发（`uv run build.py --package`），未进 Godot Asset Library
 
 ## 出站链接
