@@ -122,7 +122,7 @@ resource:
 - **Allow code_execute / Allow game_runtime 复选框（09-13 下午新增 code_execute，09-14 新增 game_runtime）**：两个勾选框分别转发到共享槽函数 `_on_allow_toggled(capability, box, checked)`——勾选用 `authorization::allow_list_add` 追加能力（已生效或配置含 `all` 时保持原样），取消用 `allow_list_remove` 移除（先把 `all` 展开为全部已知能力再逐项删除）；初值与操作后校准均用 `allow_list_contains` + `set_pressed_no_signal`（dock 私有的 `split_allow`/`join_allow` 与 `code_execute_allowed()` 已删除）。下次工具调用即生效（授权门每次实时读取配置），`GODOT_AUTOPILOT_ALLOW` 环境变量存在时优先于该配置（tooltip 已注明）。`process` 无 dock 开关，需环境变量或手改配置的 `allow` 键；拒绝响应的 `enable` 文案同样只对 `code_execute`/`game_runtime` 提及 dock（`authorization::capability_has_dock_toggle`）。
 - **技能生成（动态按钮）**：按钮文本按 `.agents/skills/` 下是否已存在 `godot-autopilot-` 前缀目录动态切换——无 → "Generate Skills"，有 → "Update Skills"；Update 点击先递归删除全部前缀匹配目录再整体重新生成（语义详见下文 skill_gen 小节）
 - **端口管理**：`set_server_context(ServerContext*)` 注入服务器（null 时禁用 Apply）；Apply → `ServerContext::restart(port)` → 成功后 `PluginConfig::save_port(port)` 持久化，并刷新面板内运行状态 Label（"Running on port N" / "Server offline"，主题色标注）
-- **配置生成**：`_on_generate()` 只处理下拉选中的单个客户端——目标目录 `ProjectSettings::globalize_path("res://")`；文件不存在 → `render_config` 新建；JSON 已存在 → `merge_json_config` 合并（**先解析现有配置，保留其他键，仅更新对应顶层键下的 `godot-autopilot` 条目**，不覆盖用户的其他 agent 配置）；TOML 客户端（Codex/Grok Build/Reasonix，经 `uses_toml` 判定）已含 MCP 配置 → 跳过并提示；JSON 无法解析 → 跳过不写（防覆盖）；结果单文件报告「创建/更新/跳过」原因
+- **配置生成**：`_on_generate()` 只处理下拉选中的单个客户端——目标目录 `ProjectSettings::globalize_path("res://")`；目标父目录不存在时先递归创建（覆盖 `.zcode/`、`.cursor/` 等 14 个含目录路径客户端的首建场景）；文件不存在 → `render_config` 新建；JSON 已存在 → `merge_json_config` 合并（**先解析现有配置，保留其他键，仅更新对应顶层键下的 `godot-autopilot` 条目**，不覆盖用户的其他 agent 配置）；TOML 客户端（Codex/Grok Build/Reasonix，经 `uses_toml` 判定）已含 MCP 配置 → 跳过并提示；JSON 无法解析 → 跳过不写（防覆盖）；结果单文件报告「创建/更新/跳过」原因
 - **主题**：颜色经 `theme_color()` 从编辑器主题取 `success_color`/`error_color`/`warning_color`/`font_disabled_color`（无则回退硬编码色）
 
 ### client_config_gen（`src/util/client_config_gen.cpp/hpp`，命名空间 `godot_autopilot::client_config_gen`）
@@ -140,14 +140,14 @@ resource:
 | Qoder | `.qoder/settings.json` | `mcpServers` | `type=http`、`url` |
 | WorkBuddy | `.workbuddy/mcp.json` | `mcpServers` | `type=http`、`url` |
 | ZCode | `.zcode/config.json` | `mcp.servers`（双层嵌套） | `type=http`、`url`、`enabled=true`（09-16 新增；type 写 `http` 而非桌面端 legacy `remote`） |
-| pi（pi-mcp-adapter） | `.pi/mcp.json` | `mcpServers` | `url`（无 type；需先安装 pi-mcp-adapter 扩展） |
-| Command Code | `.mcp.json` | `mcpServers` | `type=http`、`url`（09-16 新增；与 Claude Code 共用同一文件同一条目） |
+| pi（pi-mcp-adapter） | `.mcp.json` | `mcpServers` | `url`（无 type；需先安装 pi-mcp-adapter 扩展；与 Command Code/CodeBuddy 共用同一文件同一条目） |
+| Command Code | `.mcp.json` | `mcpServers` | `type=http`、`url`（09-16 新增；与 Claude Code/pi 共用同一文件同一条目） |
 | Kilo Code | `.kilo/mcp.json` | `mcpServers` | `type=streamable-http`、`url`（09-16 新增；取旧格式，新核心自动迁移） |
 | Roo Code | `.roo/mcp.json` | `mcpServers` | `type=streamable-http`、`url`（09-16 新增；该客户端对 URL 型省略 type 会报错） |
 | Grok Build | `.grok/config.toml` | `[mcp_servers.godot-autopilot]`（TOML） | `url`（09-16 新增；与 Codex 同构） |
 | Kimi Code | `.kimi-code/mcp.json` | `mcpServers` | `url`、`enabled=true`（无 type，09-16 新增） |
 | Zed | `.zed/settings.json` | `context_servers` | `url`（无 type；09-16 新增；通用项目设置文件，merge 保留用户其他设置） |
-| CodeBuddy | `.mcp.json` | `mcpServers` | `type=http`、`url`（09-16 新增；与 Claude Code 共用同一文件同一条目） |
+| CodeBuddy | `.mcp.json` | `mcpServers` | `type=http`、`url`（09-16 新增；与 Claude Code/pi 共用同一文件同一条目） |
 | Crush | `.crush.json` | `mcp` | `type=http`、`url` + 顶层 `$schema`（09-16 新增；legacy JSON 体系，strict schema 不写 enabled） |
 | GitHub Copilot (VS Code) | `.vscode/mcp.json` | `servers`（非 `mcpServers`） | `type=http`、`url`（09-16 新增；覆盖 VS Code 内 Copilot Chat，`.github/mcp.json` 只覆盖 coding agent 与 Copilot CLI） |
 | Reasonix | `reasonix.toml` | `[[plugins]]` 数组（TOML） | `name`、`type=http`、`url`（09-16 新增） |
