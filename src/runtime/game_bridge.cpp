@@ -1250,6 +1250,24 @@ JV run_ui_click(const JV &click, const std::vector<UiElement> &elements,
   }
   const double center_x = match->x + match->w * 0.5;
   const double center_y = match->y + match->h * 0.5;
+  // UiElement 矩形来自 Control::get_global_rect()（画布空间），而注入的
+  // InputEventMouseButton.position 必须是窗口客户区坐标：引擎在
+  // viewport.cpp:_make_input_local 用 get_final_transform() 的反变换把窗口坐标
+  // 换回画布空间，stretch（Example：320x180 视口 → 1280x720 窗口 = 4x）与
+  // letterbox 边距都在这条链上。取控件所属视口的 screen transform 再复合它自己的
+  // canvas transform（默认画布的 Camera2D 或 CanvasLayer），无 transform 时按恒等
+  // 处理（保持旧行为）。
+  godot::Transform2D screen_transform;
+  if (godot::SceneTree *tree = get_scene_tree()) {
+    if (auto *ctrl = godot::Object::cast_to<godot::Control>(
+            resolve_game_node_suffixed(tree->get_root(), match->path))) {
+      if (godot::Viewport *viewport = ctrl->get_viewport())
+        screen_transform =
+            viewport->get_screen_transform() * ctrl->get_canvas_transform();
+    }
+  }
+  const godot::Vector2 window_center = coords::viewport_rect_center_to_window(
+      screen_transform, godot::Rect2(match->x, match->y, match->w, match->h));
   if (!authorization::capability_enabled("game_runtime"))
     return authorization::deny_if_unauthorized("click_game_ui_element",
                                                SideEffect::GameRuntime);
@@ -1261,8 +1279,8 @@ JV run_ui_click(const JV &click, const std::vector<UiElement> &elements,
       press["type"] = JV("mouse_button");
       press["button_index"] = JV(button_index);
       JV position(JV::object_tag);
-      position["x"] = JV(center_x);
-      position["y"] = JV(center_y);
+      position["x"] = JV(static_cast<double>(window_center.x));
+      position["y"] = JV(static_cast<double>(window_center.y));
       press["position"] = std::move(position);
       press["mode"] = JV("event");
       press["pressed"] = JV(pressed);
@@ -1274,10 +1292,20 @@ JV run_ui_click(const JV &click, const std::vector<UiElement> &elements,
   JV clicked(JV::object_tag);
   clicked["ok"] = JV(true);
   clicked["path"] = JV(match->path);
+  // position/viewport_position 保留画布空间坐标（向后兼容），window_position 是
+  // 实际注入窗口客户区的坐标。
   JV position(JV::object_tag);
   position["x"] = JV(center_x);
   position["y"] = JV(center_y);
   clicked["position"] = std::move(position);
+  JV viewport_position(JV::object_tag);
+  viewport_position["x"] = JV(center_x);
+  viewport_position["y"] = JV(center_y);
+  clicked["viewport_position"] = std::move(viewport_position);
+  JV window_position(JV::object_tag);
+  window_position["x"] = JV(static_cast<double>(window_center.x));
+  window_position["y"] = JV(static_cast<double>(window_center.y));
+  clicked["window_position"] = std::move(window_position);
   clicked["clicks"] = JV(static_cast<int64_t>(rounds));
   JV inner(JV::object_tag);
   inner["result"] = std::move(clicked);
