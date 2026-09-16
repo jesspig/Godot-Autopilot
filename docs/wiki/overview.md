@@ -6,7 +6,7 @@ tags:
   - 总览
   - 架构
   - 技术栈
-timestamp: "2026-09-16T14:19:49+08:00"
+timestamp: "2026-09-16T17:06:25+08:00"
 resource:
   - README.md
   - src/
@@ -14,7 +14,7 @@ resource:
 
 # 项目总览（Overview）
 
-> 审计日期：2026-09-16（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill_gen 与测试数值同步，同日随 skill 内容外置化修正 src/util 目录树注释；09-10 随 skill 体系 19→7 册重构同步目录树注释与 McpConfigDock 描述；09-13 上午随反馈修复批次同步工具数 365/372/373、Resources 26、L1 114、L2 8 份与技能 8 册；09-13 下午随 T22 收口批次同步工具数 366/373/374、L1 126、L2 9 份、授权门与 get_plugin_log；09-13 晚随 A 组知识库审计修复批次同步 docs 与 cmake 目录树补正、skill_templates 平铺命名澄清；随后跨组复核纠正类别分布口径——以工具 category 字段统计为准（physics_tools.hpp 48 个工具中 get_debug_object_info 归类 Debug，故 Physics 47/Debug 16，27 类合计 366）并同步 README 口径 ~366），基于当前工作树文件与代码逐项核对（不依赖 git 历史）；09-13 晚随 0.2.4 版知识库全量审计同步——补正目录树（core 注释补 EditorReadiness/ErrorWatermark，新增 tools/ 嵌入脚本条目）、EDITOR 级别注册类数 4→6、InputMap 并入 Input 措辞、catalog/index 374 派生来源表述；工具数 366/373/374、27 类、L1 126、L2 9 份、ctest 135 复核无误；09-14 随修复批次同步——McpConfigDock 增列 Allow game_runtime 复选框表述；09-14 修复批次后 L1 140、L2 9、ctest 149；09-15 随 Computer Use grounding 增强批次同步工具数 379/386/387、非 SIDE 322 / SIDE 57、新增 13 个编辑器 UI/输入/显示/场景/游戏工具与截图增强参数、L1 172、L2 11、ctest 183；09-15 随 README/README_zh 工具数同步批次——两版 README 已同步 ~379 域工具口径，本页类别表 Input 15→23 纠正（27 类合计 379）；09-16 随失败修复批次（feature/failure-remediation）文档收尾同步——工具数 384/391/392、非 SIDE 324 / SIDE 60（`fill_tilemap_rect` 以 SIDE 宏声明但 side_effect=None）、新增 5 工具（Editor 2 / TileMap 1 / Game 2）、类别 Editor 29→31 / TileMap 7→8 / Game 10→12（27 类合计 384）、MCP 资源新增 skills 组、L1 229、L2 17 份、ctest 246，两版 README 同步 ~384；09-16 文档复核——删除临时批次汇总页（内容已并入功能页与 changelog），消除本页失效链接；09-16 随客户端配置生成器扩容批次同步——McpConfigDock 一键生成 8→20 个客户端（新增 ZCode/pi/Command Code/Kilo/Roo/Grok Build/Kimi Code/Zed/CodeBuddy/Crush/Copilot VS Code/Reasonix，调研淘汰 Cline 与 Antigravity CLI）、目录树 L1 238；09-16 随视觉辅助场景批次同步——域工具 384→385（Capture 1→2，新增 `review_scene_visually`）、可达 391→392、catalog/index 392→393、L1 gtest 238→246（新增 `vision_assist` 8 用例）、L2 17→18 份（新增 `17_vision_assist.json`）、ctest 246→264）。
+> 审计日期：2026-09-16（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill_gen 与测试数值同步，同日随 skill 内容外置化修正 src/util 目录树注释；09-10 随 skill 体系 19→7 册重构同步目录树注释与 McpConfigDock 描述；09-13 上午随反馈修复批次同步工具数 365/372/373、Resources 26、L1 114、L2 8 份与技能 8 册；09-13 下午随 T22 收口批次同步工具数 366/373/374、L1 126、L2 9 份、授权门与 get_plugin_log；09-13 晚随 A 组知识库审计修复批次同步 docs 与 cmake 目录树补正、skill_templates 平铺命名澄清；随后跨组复核纠正类别分布口径——以工具 category 字段统计为准（physics_tools.hpp 48 个工具中 get_debug_object_info 归类 Debug，故 Physics 47/Debug 16，27 类合计 366）并同步 README 口径 ~366），基于当前工作树文件与代码逐项核对（不依赖 git 历史）；09-13 晚随 0.2.4 版知识库全量审计同步——补正目录树（core 注释补 EditorReadiness/ErrorWatermark，新增 tools/ 嵌入脚本条目）、EDITOR 级别注册类数 4→6、InputMap 并入 Input 措辞、catalog/index 374 派生来源表述；工具数 366/373/374、27 类、L1 126、L2 9 份、ctest 135 复核无误；09-14 随修复批次同步——McpConfigDock 增列 Allow game_runtime 复选框表述；09-14 修复批次后 L1 140、L2 9、ctest 149；09-15 随 Computer Use grounding 增强批次同步工具数 379/386/387、非 SIDE 322 / SIDE 57、新增 13 个编辑器 UI/输入/显示/场景/游戏工具与截图增强参数、L1 172、L2 11、ctest 183；09-15 随 README/README_zh 工具数同步批次——两版 README 已同步 ~379 域工具口径，本页类别表 Input 15→23 纠正（27 类合计 379）；09-16 随失败修复批次（feature/failure-remediation）文档收尾同步——工具数 384/391/392、非 SIDE 324 / SIDE 60（`fill_tilemap_rect` 以 SIDE 宏声明但 side_effect=None）、新增 5 工具（Editor 2 / TileMap 1 / Game 2）、类别 Editor 29→31 / TileMap 7→8 / Game 10→12（27 类合计 384）、MCP 资源新增 skills 组、L1 229、L2 17 份、ctest 246，两版 README 同步 ~384；09-16 文档复核——删除临时批次汇总页（内容已并入功能页与 changelog），消除本页失效链接；09-16 随客户端配置生成器扩容批次同步——McpConfigDock 一键生成 8→20 个客户端（新增 ZCode/pi/Command Code/Kilo/Roo/Grok Build/Kimi Code/Zed/CodeBuddy/Crush/Copilot VS Code/Reasonix，调研淘汰 Cline 与 Antigravity CLI）、目录树 L1 238；09-16 随视觉辅助场景批次同步——域工具 384→385（Capture 1→2，新增 `review_scene_visually`）、可达 391→392、catalog/index 392→393、L1 gtest 238→246（新增 `vision_assist` 8 用例）、L2 17→18 份（新增 `17_vision_assist.json`）、ctest 246→264）。09-16 随坐标换算/键名统一/脚本新鲜度/UID 守卫/CJK 往返/open 幂等/属性两轮批次同步——L1 246→267（新增 game_ui_coords 6 / keycode_alias 6 / script_freshness 7 / uid_guard 2）、unit 文件 21→25、L2 18→25 份（新增 18_script_freshness / 19_cjk_roundtrip / 22_uid_guard / 23_click_ui_coords / 24_keycode_alias / 25_open_scene_idempotent / 28_sprite_frames_animation）、ctest 264→292（267 L1 + 25 L2）。
 > 事实来源：根 `README.md` / `README_zh.md` / `AGENTS.md`、`CMakeLists.txt`、`cmake/FetchDependencies.cmake`、`src/main.cpp`、`src/core/server_context.cpp`、`src/tools/tool_registry.hpp`、`src/tools/*_tools.hpp`、`src/tools/dispatch.cpp`、`src/prompts/prompt_handlers.cpp`、`src/resources/resource_handlers.cpp`、`Example/project.godot`、`Example/docs/`。
 
 ## 项目定位
@@ -131,7 +131,7 @@ godot-self-driving/
 │   │                           #   skill_gen、skill_content_generated（构建期嵌入薄胶水）；内容目录
 │   │                           #   skill_templates/（8 册模板 = 平铺 30 个 .md：主册 <name>.md + 参考 <name>--<ref>.md，另有 registry.json）；
 │   │                           #   header-only：json_godot、rid_registry、scene_path、project_path、type_hint、gdscript_wrap、mcp_image_content
-├── tests/                      # L1 gda_unit_tests（246 个 gtest，含 vision_assist 8 用例）+ L2 gda_test_runner + config/*.json（18 份）
+├── tests/                      # L1 gda_unit_tests（267 个 gtest，含 game_ui_coords 6 / keycode_alias 6 / script_freshness 7 / uid_guard 2 用例）+ L2 gda_test_runner + config/*.json（25 份）
 ├── docs/                       # 本知识库（docs/wiki/，含 modules/、plans/、changelog/）
 └── Example/                    # 文档/示例工程（详见 example.md）
 ```

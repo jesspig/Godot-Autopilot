@@ -6,13 +6,13 @@ tags:
   - 规划
   - 竞品对齐
   - 工具扩展
-timestamp: "2026-09-15T07:09:53+08:00"
+timestamp: "2026-09-16T17:06:25+08:00"
 resource: src/
 ---
 
 # 竞品对齐路线图
 
-> 记录 2026-08 功能分支 `feature/engine-aware-fs-and-tool-expansion` 的竞品对齐批次（P0/P1/P2 已交付；当前 ctest 共 246 项——L1 229 + L2 17，见 [测试体系](../tests.md)），与后续 P3 方向。工具侧实现细节见 [工具注册表](../modules/tools_registry.md)，运行时协议见 [入口与运行时](../modules/entry_runtime.md)。
+> 记录 2026-08 功能分支 `feature/engine-aware-fs-and-tool-expansion` 的竞品对齐批次（P0/P1/P2 已交付；当前 ctest 共 292 项——L1 267 + L2 25，见 [测试体系](../tests.md)），与后续 P3 方向。工具侧实现细节见 [工具注册表](../modules/tools_registry.md)，运行时协议见 [入口与运行时](../modules/entry_runtime.md)。
 
 ## 竞品全景（一行定位速记）
 
