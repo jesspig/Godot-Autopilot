@@ -76,7 +76,7 @@ TEST(ClientConfigGenTest, FilePathsMatchClients) {
   EXPECT_STREQ(file_path(ClientId::Qoder), ".qoder/settings.json");
   EXPECT_STREQ(file_path(ClientId::WorkBuddy), ".workbuddy/mcp.json");
   EXPECT_STREQ(file_path(ClientId::ZCode), ".zcode/config.json");
-  EXPECT_STREQ(file_path(ClientId::PiAgent), ".pi/mcp.json");
+  EXPECT_STREQ(file_path(ClientId::PiAgent), ".mcp.json");
   EXPECT_STREQ(file_path(ClientId::CommandCode), ".mcp.json");
   EXPECT_STREQ(file_path(ClientId::Kilo), ".kilo/mcp.json");
   EXPECT_STREQ(file_path(ClientId::Roo), ".roo/mcp.json");

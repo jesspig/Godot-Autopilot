@@ -28,8 +28,6 @@ public:
   std::vector<std::string> get_categories() const;
   size_t size() const;
 
-  void populate_default_tools();
-
   ToolCatalog() = default;
 
 private:

@@ -20,7 +20,7 @@ The MCP layer intentionally exposes only seven meta tools:
 - `batch_execute` - run several tool calls in sequence
 - `code_execute` - run GDScript in the editor
 
-The 384 domain tools (scene, property, resource, script, physics, render, audio, and so on) plus `system_status` are not registered as MCP tools directly. Call every domain tool through `call_tool`, passing the domain tool name and its arguments object.
+The 385 domain tools (scene, property, resource, script, physics, render, audio, and so on) plus `system_status` are not registered as MCP tools directly. Call every domain tool through `call_tool`, passing the domain tool name and its arguments object.
 
 Two groups are denied by default behind an authorization gate: `code_execute` and `execute_script` (arbitrary GDScript in the editor) need the `code_execute` capability, and the tools that reach the running game (`execute_game_script`, `queue_game_input`, `wait_game_input`, `sequence_game_inputs`, `reload_game_scripts`) need the `game_runtime` capability. The gate is checked on every call; the "batch_execute versus code_execute" section covers the enable paths.
 
@@ -41,7 +41,7 @@ Example domain call through `call_tool`:
 {"name": "create_scene_node", "arguments": {"type": "Node2D", "name": "Player", "parent_path": "Root/Actors"}}
 ```
 
-If `search_tools` does not surface a tool you suspect exists, browse references/tool-catalog.md: it lists all 384 domain tools grouped by their 30 source modules, one line each.
+If `search_tools` does not surface a tool you suspect exists, browse references/tool-catalog.md: it lists all 385 domain tools grouped by their 30 source modules, one line each.
 
 ### Search techniques
 
@@ -52,7 +52,7 @@ If `search_tools` does not surface a tool you suspect exists, browse references/
 - Rerun with synonyms before concluding a tool is missing: tile/cell, sprite/texture, log/output, delete/remove/erase, create/add/new. The index has no stemming, so exact wording matters.
 - Narrow with filters: pass `category` for a single domain or `tags` for required tags, and browse `list_categories` when you only know the domain.
 - Read `get_tool_detail` for the candidate's schema and side-effect marker before the first write; the marker says whether the tool writes files or config.
-- When a query still comes back empty, walk references/tool-catalog.md (all 384 domain tools grouped by module) before inventing anything. Never guess a tool name - `call_tool` with a name that does not exist fails by design.
+- When a query still comes back empty, walk references/tool-catalog.md (all 385 domain tools grouped by module) before inventing anything. Never guess a tool name - `call_tool` with a name that does not exist fails by design.
 
 ## Consult the engine documentation
 

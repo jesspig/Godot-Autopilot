@@ -25,7 +25,7 @@
 
 - 工具注册总入口 `ToolRegistry`（单一来源）：**393 条目** = 385 域工具 + `system_status` + 7 元工具；域工具分 **27 类**（InputMap 并入 Input）；MCP 可达工具总数 **392** = 7 元 + 385 域
 - schema：非空/空数以运行时统计为准；`03_tools_contract` 遍历 warnings 实测 **4 条**（start/stop_input_gamepad_vibration、get_resource_extensions、reimport_resource_files；create_scene_node 是否告警视运行期场景状态）
-- 遍历排除 **60 个 SIDE 宏声明工具**（域 385 个中解析器仅按 `GDA_TOOL_CLASS(` 枚举 325 个，`GDA_TOOL_CLASS_SIDE` 60 个不进入枚举，其中 `fill_tilemap_rect` 的 side_effect 为 None，side_effect 字段兜底判定保留）；L1 单元测试 **267 个 gtest**（25 个 unit 文件）；L2 引擎用例 **25 个文件**（00_meta-10_editor_input 11 份 + 11_editor_tree/12_capture_params/13_inline_subresource/14_tilemap_rect/15_scene_path/16_game_jobs/17_vision_assist + 18_script_freshness/19_cjk_roundtrip/22_uid_guard/23_click_ui_coords/24_keycode_alias/25_open_scene_idempotent/28_sprite_frames_animation）；当前 ctest 注册点为 **292**（267 L1 + 25 L2，L2 需引擎环境与 `GODOT_AUTOPILOT_ALLOW`）
+- 遍历排除 **60 个 SIDE 宏声明工具**（域 385 个中解析器仅按 `GDA_TOOL_CLASS(` 枚举 325 个，`GDA_TOOL_CLASS_SIDE` 60 个不进入枚举，其中 `fill_tilemap_rect` 的 side_effect 为 None，side_effect 字段兜底判定保留）；L1 单元测试 **243 个 gtest**（25 个 unit 文件）；L2 引擎用例 **25 个文件**（00_meta-10_editor_input 11 份 + 11_editor_tree/12_capture_params/13_inline_subresource/14_tilemap_rect/15_scene_path/16_game_jobs/17_vision_assist + 18_script_freshness/19_cjk_roundtrip/22_uid_guard/23_click_ui_coords/24_keycode_alias/25_open_scene_idempotent/28_sprite_frames_animation）；当前 ctest 注册点为 **268**（243 L1 + 25 L2，L2 需引擎环境与 `GODOT_AUTOPILOT_ALLOW`）
 - 工具命名规范：`<动词>_<类别>_<维度>_<对象>_<修饰>`（动词置首，如 create_scene_node、intersect_physics_2d_ray）
 - MCP 端口 **9527**（`/mcp`），`GODOT_AUTOPILOT_PORT` 可覆盖；产物名 `godot-autopilot`
 

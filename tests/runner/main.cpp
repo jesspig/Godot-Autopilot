@@ -44,7 +44,7 @@
 
 #ifndef PROJECT_ROOT
 #error                                                                         \
-    "PROJECT_ROOT 编译宏未定义（参见 tests/CMakeLists.txt 中 gda_engine_tests 的配置）"
+    "PROJECT_ROOT 编译宏未定义（参见 tests/CMakeLists.txt 中 gda_test_runner 的配置）"
 #endif
 
 namespace gda_test {

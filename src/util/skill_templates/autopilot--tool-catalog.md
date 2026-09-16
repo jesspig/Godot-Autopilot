@@ -1,6 +1,6 @@
 # Category Index
 
-All 384 domain tools of the godot-autopilot MCP server, grouped by their 30 source modules. Call domain tools through `call_tool`; confirm schemas with `get_tool_detail`.
+All 385 domain tools of the godot-autopilot MCP server, grouped by their 30 source modules. Call domain tools through `call_tool`; confirm schemas with `get_tool_detail`.
 
 ## Analysis - analyze_tools (3)
 
@@ -47,7 +47,7 @@ All 384 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 ## Capture - capture_tools (2)
 
 - `capture_editor_viewport` - screenshot the editor viewport (or the running game with target=game) as base64 PNG; save=true on the editor target also writes the PNG under user://godot_autopilot/captures/ and returns its path (only the 20 most recent captures are kept); `region` crops the capture, `max_dimension` caps its pixel size, `space` picks the captured viewport space, `annotate` draws numbered boxes plus an element table, and `diff_against_last` reports the changed ratio and bounding box against the previous capture of the same target; through `call_tool` the PNG is delivered as image content (`data` becomes `<attached-as-image-content>` with image_attached: true)
-- `get_editor_viewport_geometry` - map the captured editor viewport image onto the window client area so image pixels can be converted to click coordinates (`viewport`, `index`)
+- `review_scene_visually` - one read-only visual review of the edited scene and running game: editor viewport capture, game viewport capture, visible-node rect table and the capture-to-window coordinate mapping; each section fails in isolation, and `include_editor`/`include_game` skip a capture
 
 ## Config - config_tools (13)
 
@@ -127,7 +127,7 @@ All 384 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `get_docs_method` - look up one method's reflected signature on a class
 - `get_docs_property` - look up one property's reflected info on a class
 
-## Editor - editor_tools (30)
+## Editor - editor_tools (31)
 
 - `get_editor_selection` - list the currently selected nodes
 - `set_editor_selection` - replace the editor selection with given paths
@@ -154,6 +154,7 @@ All 384 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `build_csharp_assembly` - trigger an async dotnet build of the C# project
 - `get_editor_ui_elements` - enumerate the editor's UI elements for semantic click automation (optional `query`, `type_filter`, `interactive_only`, `max_elements`)
 - `hit_test_editor_point` - preview which editor elements a client-area `position` lands on, without clicking (`window_id`, `max_results`)
+- `get_editor_viewport_geometry` - map the captured editor viewport image onto the window client area so image pixels can be converted to click coordinates (`viewport`, `index`)
 - `click_editor_element` - click an editor UI element by its element `path` (`button`, `double_click`, `warp`, `observe`)
 - `type_editor_element_text` - type `text` into an editor UI element (`path`, `submit`, `observe`)
 - `run_editor_shortcut` - run an editor keyboard `shortcut` (for example "ctrl+s")

@@ -34,6 +34,7 @@ godot::Color theme_color(const char *name, const godot::Color &fallback) {
 }
 
 bool write_file(const godot::String &path, const std::string &content) {
+  godot::DirAccess::make_dir_recursive_absolute(path.get_base_dir());
   godot::Ref<godot::FileAccess> file =
       godot::FileAccess::open(path, godot::FileAccess::WRITE);
   if (file.is_null()) {

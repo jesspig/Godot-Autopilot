@@ -6,13 +6,13 @@ tags:
   - 模块
   - 工具注册
   - schema
-timestamp: "2026-09-16T17:06:25+08:00"
+timestamp: "2026-09-17T17:06:25+08:00"
 resource: src/tools/
 ---
 
 # 工具注册表（src/tools/ 注册管线）
 
-> 审计日期：2026-09-16（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随 T0 安全边界与并发契约同步；09-13 上午随反馈修复批次同步工具数 365/372/373、Resources 26、SIDE 排除 49；09-13 下午随收口批次同步工具数 366/373/374 与 get_plugin_log；09-13 17:50 随 B 组知识库审计同步——修正契约缺口行号引用、schema 基线行号与元工具 schema 口径；09-13 晚随 0.2.4 版知识库全量审计同步——补正 populate_default_tools 存留状态与命名首段动词的 5 个既有例外；09-15 随 Computer Use grounding 批次同步工具数 379/386/387、非 SIDE 322 / SIDE 57、类别分布与遍历 warnings 实测 4 条；09-16 随失败修复批次同步工具数 384/391/392、非 SIDE 324 / SIDE 60（`fill_tilemap_rect` 以 SIDE 宏声明但 side_effect=None）、新增 5 工具与类别分布修正（Input 表列 15→23 系上轮笔误，实测 category 字段统计为 23）；09-16 随视觉辅助批次同步工具数 385/392/393、Capture 1→2（`review_scene_visually`）、非 SIDE 324→325，本轮坐标/键名/脚本新鲜度批次无新增工具）。
+> 审计日期：2026-09-17（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随 T0 安全边界与并发契约同步；09-13 上午随反馈修复批次同步工具数 365/372/373、Resources 26、SIDE 排除 49；09-13 下午随收口批次同步工具数 366/373/374 与 get_plugin_log；09-13 17:50 随 B 组知识库审计同步——修正契约缺口行号引用、schema 基线行号与元工具 schema 口径；09-13 晚随 0.2.4 版知识库全量审计同步——补正 populate_default_tools 存留状态与命名首段动词的 5 个既有例外；09-15 随 Computer Use grounding 批次同步工具数 379/386/387、非 SIDE 322 / SIDE 57、类别分布与遍历 warnings 实测 4 条；09-16 随失败修复批次同步工具数 384/391/392、非 SIDE 324 / SIDE 60（`fill_tilemap_rect` 以 SIDE 宏声明但 side_effect=None）、新增 5 工具与类别分布修正（Input 表列 15→23 系上轮笔误，实测 category 字段统计为 23）；09-16 随视觉辅助批次同步工具数 385/392/393、Capture 1→2（`review_scene_visually`）、非 SIDE 324→325，本轮坐标/键名/脚本新鲜度批次无新增工具）。
 > 覆盖范围：`register_all.cpp/hpp`、`dispatch.cpp/hpp`、`tool_catalog.cpp/hpp`、`schema_builder.cpp/hpp`、`schema_fills.hpp`、8 个 `schema_*_ops.cpp`（含 08-24 新增 `schema_animation_ops.cpp`/`schema_theme_ops.cpp`）、`tool_base.hpp`、`tool_registry.hpp`、`fn_tool.hpp`、`tool_decl.hpp`、`meta_tools.hpp`、30 个域 `*_tools.hpp`，对照 `tests/runner/traversal.cpp`、`tests/unit/register_all_test.cpp`、`tests/config/03_tools_contract.json` 与仓库根 `AGENTS.md` 工具段。
 > 相关页面：[测试体系](../tests.md) · [工具实现 B 组](../modules/tools_ops_b.md) · [工具实现 A 组](../modules/tools_ops_a.md) · [入口与运行时](../modules/entry_runtime.md) · [架构总览](../overview.md)
 
@@ -58,7 +58,7 @@ flowchart TD
 | 1 | 元工具 7 个：ping/search_tools/list_categories/get_tool_detail/call_tool/batch_execute/code_execute，均作为顶层工具提供 | 7 个经 registry `add()`（`dynamic_cast<IMetaTool*>` 自动入 meta_），统一在 `register_all.cpp` 循环 `server.RegisterTool`（描述/schema 取自 registry 工具）；名单由 `g_active_registry->all_meta()` 派生，与 `register_all_test.cpp` 的 `kMetaToolNames` 一致；L1 断言 `ListTools` 恰好 7 个 | **一致** |
 | 2 | 领域工具 385 个 | 30 个 `*_tools.hpp` 的 `GDA_TOOL_CLASS`/`GDA_TOOL_CLASS_SIDE` 共 385 个（325 + 60，无重复名）；registry `all()`=**386** = 385 + system_status | **一致**（system_status 是唯一非真类来源） |
 | 3 | 工具总体 = 7 元 + 385 域 | registry `all_any()`=**393**（386 域/系统 + 7 元）；MCP 顶层 7 元工具，MCP 可达总数 392 | **一致** |
-| 4 | ToolCatalog 393 条 | 由 registry `all_any()` 逐一 `make_tool_info` 派生 393 = 385 域 + system_status + 7 元；原 `populate_default_tools`（函数体尚存于 `tool_catalog.cpp:63` 但已无任何调用者）/meta 快照/`Auto` 补录链路整体废弃 | **一致**（单一来源派生，无独立填表） |
+| 4 | ToolCatalog 393 条 | 由 registry `all_any()` 逐一 `make_tool_info` 派生 393 = 385 域 + system_status + 7 元；原 `populate_default_tools`/meta 快照/`Auto` 补录链路已随 09-17 精简批次整体删除——catalog 无默认填充，完全由 ToolRegistry 经 `replace_tools` 动态填充（`register_all.cpp:465`） | **一致**（单一来源派生，无独立填表） |
 | 5 | schema 283 非空 / 73 空（旧值，已随重命名变化） | def/SCHEMA_NONE 静态口径已随 08-21 真类化与 08-22 清理整体废除（fill 表直接给出最终 schema，`tool_input_schema` 的 basic 参数为 no-op）；catalog 级非空/空数**以运行时 `SchemaStatisticsBaseline` 观测为准**，不硬编码 | **运行时统计口径** |
 | 6 | SchemaStatisticsBaseline 运行时统计断言，不硬编码 | `register_all_test.cpp:135-149` 只断言 `non_empty > empty`、`empty > 0`、总和 = `catalog.size()`；旧 283/73 为运行时实测值 | **一致** |
 | 7 | 3 个契约缺口 | 见下表（reimport_resource_files 的 schema 字段名不一致已随 08-24 批次修复，空参静默成功仍在；09-15 遍历实测 warnings 另含 start/stop_input_gamepad_vibration 两项同类命中） | **一致** |

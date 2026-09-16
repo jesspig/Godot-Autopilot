@@ -19,8 +19,6 @@ struct LogEntry {
   LogCategory category;
   std::string message;
   size_t serial = 0;
-
-  const LogEntry *operator->() const { return this; }
 };
 
 class LogSystem {
