@@ -17,7 +17,10 @@
 #include <godot_cpp/classes/engine_debugger.hpp>
 #include <godot_cpp/classes/expression.hpp>
 #include <godot_cpp/classes/image.hpp>
+#include <godot_cpp/classes/camera3d.hpp>
+#include <godot_cpp/classes/canvas_item.hpp>
 #include <godot_cpp/classes/control.hpp>
+#include <godot_cpp/classes/node3d.hpp>
 #include <godot_cpp/classes/logger.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/os.hpp>
@@ -32,6 +35,7 @@
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/callable.hpp>
+#include <godot_cpp/variant/color.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/rect2i.hpp>
 #include <godot_cpp/variant/string.hpp>
@@ -403,6 +407,8 @@ struct CaptureRequest {
   int64_t max_dimension = 0;
   int64_t scale = 1;
   bool annotate = false;
+  std::vector<std::string> annotate_nodes;
+  int64_t annotate_nodes_max = 50;
   int64_t after_frames = 0;
   std::string when;
   int64_t timeout_ms = GDA_DEFAULT_TIMEOUT_MS;
@@ -454,6 +460,33 @@ JV parse_capture_request(const JV &params, CaptureRequest *out) {
     out->annotate = annotate_p->GetBool();
   }
 
+  if (auto *max_p = params.Find("annotate_nodes_max")) {
+    if (!max_p->IsInt() || max_p->GetInt() < 1 || max_p->GetInt() > 50)
+      return error_result(
+          "capture annotate_nodes_max must be an integer between 1 and 50");
+    out->annotate_nodes_max = max_p->GetInt();
+  }
+
+  if (auto *nodes_p = params.Find("annotate_nodes")) {
+    if (!nodes_p->IsArray())
+      return error_result("capture annotate_nodes must be an array of strings");
+    const auto &items = nodes_p->GetArray();
+    if (items.empty() || items.size() > 50)
+      return error_result(
+          "capture annotate_nodes must contain 1-50 paths");
+    for (const auto &item : items) {
+      if (!item.IsString() || item.GetString().empty())
+        return error_result(
+            "capture annotate_nodes must be an array of non-empty strings");
+      out->annotate_nodes.push_back(item.GetString());
+    }
+    if (out->annotate_nodes.size() >
+        static_cast<size_t>(out->annotate_nodes_max))
+      return error_result("annotate_nodes exceeds annotate_nodes_max (" +
+                          std::to_string(out->annotate_nodes.size()) + " > " +
+                          std::to_string(out->annotate_nodes_max) + ")");
+  }
+
   if (auto *after_p = params.Find("after_frames")) {
     if (!after_p->IsInt() || after_p->GetInt() < 0)
       return error_result(
@@ -476,6 +509,200 @@ JV parse_capture_request(const JV &params, CaptureRequest *out) {
   }
   return JV();
 }
+
+namespace {
+
+constexpr size_t kNodeMarkBudget = 200;
+
+void fill_rect_clamped_blue(const godot::Ref<godot::Image> &image, int image_w,
+                                int image_h, int x, int y, int w, int h,
+                                const godot::Color &color) {
+  const int x0 = std::max(0, std::min(x, image_w));
+  const int y0 = std::max(0, std::min(y, image_h));
+  const int x1 = std::max(0, std::min(x + w, image_w));
+  const int y1 = std::max(0, std::min(y + h, image_h));
+  if (x1 <= x0 || y1 <= y0)
+    return;
+  image->fill_rect(godot::Rect2i(x0, y0, x1 - x0, y1 - y0), color);
+}
+
+void draw_blue_annotations(const godot::Ref<godot::Image> &image,
+                           const std::vector<editor_ui_ops::MarkRect> &marks) {
+  if (image.is_null() || marks.empty())
+    return;
+  const godot::Image::Format format = image->get_format();
+  if (format != godot::Image::FORMAT_RGBA8 &&
+      format != godot::Image::FORMAT_RGB8)
+    return;
+  const int image_w = image->get_width();
+  const int image_h = image->get_height();
+  if (image_w <= 0 || image_h <= 0)
+    return;
+  static const uint8_t kDigits[10][5] = {
+      {0x7, 0x5, 0x5, 0x5, 0x7}, {0x2, 0x6, 0x2, 0x2, 0x7},
+      {0x7, 0x1, 0x7, 0x4, 0x7}, {0x7, 0x1, 0x7, 0x1, 0x7},
+      {0x5, 0x5, 0x7, 0x1, 0x1}, {0x7, 0x4, 0x7, 0x1, 0x7},
+      {0x7, 0x4, 0x7, 0x5, 0x7}, {0x7, 0x1, 0x2, 0x2, 0x2},
+      {0x7, 0x5, 0x7, 0x5, 0x7}, {0x7, 0x5, 0x7, 0x1, 0x7},
+  };
+  const godot::Color box_color(0.25f, 0.55f, 1.0f, 1.0f);
+  const godot::Color label_bg(0.05f, 0.1f, 0.25f, 1.0f);
+  const godot::Color digit_color(1.0f, 1.0f, 1.0f, 1.0f);
+  constexpr int kScale = 2;
+  for (const auto &mark : marks) {
+    const int rx = static_cast<int>(std::lround(mark.x));
+    const int ry = static_cast<int>(std::lround(mark.y));
+    int rw = static_cast<int>(std::lround(mark.w));
+    int rh = static_cast<int>(std::lround(mark.h));
+    if (rw <= 0 || rh <= 0) {
+      continue;
+    }
+    fill_rect_clamped_blue(image, image_w, image_h, rx, ry, rw, 1, box_color);
+    fill_rect_clamped_blue(image, image_w, image_h, rx, ry + rh - 1, rw, 1,
+                           box_color);
+    fill_rect_clamped_blue(image, image_w, image_h, rx, ry, 1, rh, box_color);
+    fill_rect_clamped_blue(image, image_w, image_h, rx + rw - 1, ry, 1, rh,
+                           box_color);
+    const std::string label = std::to_string(mark.id);
+    const int digits = static_cast<int>(label.size());
+    if (digits == 0)
+      continue;
+    const int label_x = rx + 2;
+    const int label_y = ry + 2;
+    fill_rect_clamped_blue(image, image_w, image_h, label_x, label_y,
+                           digits * 4 * kScale + 2, 5 * kScale + 2, label_bg);
+    for (int d = 0; d < digits; ++d) {
+      const char ch = label[static_cast<size_t>(d)];
+      if (ch < '0' || ch > '9')
+        continue;
+      const int digit = ch - '0';
+      const int ox = label_x + 1 + d * 4 * kScale;
+      const int oy = label_y + 1;
+      for (int row = 0; row < 5; ++row) {
+        const uint8_t bits = kDigits[digit][row];
+        for (int col = 0; col < 3; ++col) {
+          if ((bits & (1u << (2 - col))) == 0)
+            continue;
+          for (int sy = 0; sy < kScale; ++sy)
+            for (int sx = 0; sx < kScale; ++sx) {
+              const int px = ox + col * kScale + sx;
+              const int py = oy + row * kScale + sy;
+              if (px < 0 || px >= image_w || py < 0 || py >= image_h)
+                continue;
+              image->set_pixel(px, py, digit_color);
+            }
+        }
+      }
+    }
+  }
+}
+
+void collect_game_paths(godot::Node *node, std::vector<std::string> &out,
+                        size_t cap) {
+  if (!node || out.size() >= cap)
+    return;
+  out.push_back(util::to_std(godot::String(node->get_path())));
+  const int64_t n = node->get_child_count();
+  for (int64_t i = 0; i < n && out.size() < cap; ++i)
+    collect_game_paths(node->get_child(i), out, cap);
+}
+
+godot::Node *resolve_game_node_suffixed(godot::Node *root,
+                                        const std::string &path) {
+  if (!root)
+    return nullptr;
+  if (godot::Node *direct = resolve_node(path))
+    return direct;
+  const std::string suffix = "/" + path;
+  std::vector<godot::Node *> stack;
+  stack.push_back(root);
+  while (!stack.empty()) {
+    godot::Node *node = stack.back();
+    stack.pop_back();
+    const std::string node_path =
+        util::to_std(godot::String(node->get_path()));
+    if (node_path == path)
+      return node;
+    if (node_path.size() >= suffix.size() &&
+        node_path.compare(node_path.size() - suffix.size(), suffix.size(),
+                          suffix) == 0)
+      return node;
+    const int64_t n = node->get_child_count();
+    for (int64_t i = 0; i < n; ++i)
+      if (godot::Node *child = node->get_child(i))
+        stack.push_back(child);
+  }
+  return nullptr;
+}
+
+struct GameNodeRect {
+  bool ok = false;
+  std::string type;
+  double x = 0.0;
+  double y = 0.0;
+  double w = 0.0;
+  double h = 0.0;
+  bool visible = true;
+  bool behind = false;
+  bool drawable = false;
+  std::string error;
+};
+
+GameNodeRect game_node_viewport_rect(godot::Node *node,
+                                     godot::Viewport *viewport,
+                                     godot::Camera3D *camera) {
+  GameNodeRect out;
+  if (!node || !viewport) {
+    out.error = "viewport incompatible";
+    return out;
+  }
+  out.type = util::to_std(godot::String(node->get_class()));
+  if (auto *ctrl = godot::Object::cast_to<godot::Control>(node)) {
+    const godot::Rect2 rect = ctrl->get_global_rect();
+    out.x = rect.position.x;
+    out.y = rect.position.y;
+    out.w = rect.size.x;
+    out.h = rect.size.y;
+    out.visible = ctrl->is_visible_in_tree();
+    out.ok = true;
+    out.drawable = out.visible && out.w > 0.0 && out.h > 0.0;
+    return out;
+  }
+  if (auto *item = godot::Object::cast_to<godot::CanvasItem>(node)) {
+    out.visible = item->is_visible_in_tree();
+    const godot::Transform2D canvas = viewport->get_canvas_transform();
+    const godot::Vector2 vp = canvas.xform(item->get_global_transform().get_origin());
+    out.x = vp.x;
+    out.y = vp.y;
+    out.w = 0.0;
+    out.h = 0.0;
+    out.ok = true;
+    out.drawable = false;
+    return out;
+  }
+  if (auto *node_3d = godot::Object::cast_to<godot::Node3D>(node)) {
+    (void)node_3d;
+    if (!camera) {
+      out.error = "3D camera not available";
+      return out;
+    }
+    const godot::Vector3 world = node_3d->get_global_transform().get_origin();
+    const godot::Vector2 pos = camera->unproject_position(world);
+    out.x = pos.x;
+    out.y = pos.y;
+    out.w = 0.0;
+    out.h = 0.0;
+    out.visible = true;
+    out.behind = camera->is_position_behind(world);
+    out.ok = true;
+    out.drawable = false;
+    return out;
+  }
+  out.error = "unsupported node type";
+  return out;
+}
+
+}  // namespace
 
 JV capture_viewport_now(const CaptureRequest &request, int64_t request_id) {
   godot::SceneTree *tree = get_scene_tree();
@@ -610,6 +837,92 @@ JV capture_viewport_now(const CaptureRequest &request, int64_t request_id) {
     editor_ui_ops::draw_annotations(image, marks);
   }
 
+  JV node_elements(JV::array_tag);
+  bool node_truncated = false;
+  if (!request.annotate_nodes.empty()) {
+    godot::Viewport *viewport = root;
+    godot::Camera3D *camera = viewport ? viewport->get_camera_3d() : nullptr;
+    const double scale_x =
+        cropped_width > 0 ? static_cast<double>(final_width) / cropped_width
+                          : 1.0;
+    const double scale_y =
+        cropped_height > 0 ? static_cast<double>(final_height) / cropped_height
+                           : 1.0;
+    const double offset_x = static_cast<double>(applied_region_x);
+    const double offset_y = static_cast<double>(applied_region_y);
+    const size_t ui_mark_count =
+        request.annotate ? annotated_elements.GetArray().size() : 0;
+    size_t node_budget = kNodeMarkBudget;
+    if (ui_mark_count < kNodeMarkBudget)
+      node_budget = kNodeMarkBudget - ui_mark_count;
+    else
+      node_budget = 0;
+    std::vector<editor_ui_ops::MarkRect> node_marks;
+    node_marks.reserve(request.annotate_nodes.size());
+    int64_t node_id = 1;
+    for (const std::string &node_path : request.annotate_nodes) {
+      JV item(JV::object_tag);
+      item["id"] = JV(node_id);
+      item["path"] = JV(node_path);
+      godot::Node *node = resolve_game_node_suffixed(root, node_path);
+      if (!node) {
+        item["ok"] = JV(false);
+        item["error"] = JV("node not found");
+        std::vector<std::string> candidates;
+        collect_game_paths(tree->get_current_scene() ? tree->get_current_scene()
+                                                     : root,
+                           candidates, 20);
+        JV arr(JV::array_tag);
+        for (const std::string &c : candidates)
+          arr.PushBack(JV(c));
+        item["candidates"] = std::move(arr);
+        node_elements.PushBack(std::move(item));
+        ++node_id;
+        continue;
+      }
+      GameNodeRect rect = game_node_viewport_rect(node, viewport, camera);
+      if (!rect.ok) {
+        item["ok"] = JV(false);
+        item["type"] = JV(rect.type);
+        item["error"] = JV(rect.error);
+        node_elements.PushBack(std::move(item));
+        ++node_id;
+        continue;
+      }
+      const double px = (rect.x - offset_x) * scale_x;
+      const double py = (rect.y - offset_y) * scale_y;
+      const double pw = rect.w * scale_x;
+      const double ph = rect.h * scale_y;
+      item["ok"] = JV(true);
+      item["type"] = JV(rect.type);
+      item["visible"] = JV(rect.visible);
+      if (rect.behind)
+        item["behind"] = JV(true);
+      JV position(JV::object_tag);
+      position["x"] = JV(px);
+      position["y"] = JV(py);
+      JV size(JV::object_tag);
+      size["x"] = JV(pw);
+      size["y"] = JV(ph);
+      item["position"] = std::move(position);
+      item["size"] = std::move(size);
+      node_elements.PushBack(std::move(item));
+      if (rect.drawable && node_marks.size() < node_budget) {
+        editor_ui_ops::MarkRect mark;
+        mark.id = static_cast<int>(node_id);
+        mark.x = px;
+        mark.y = py;
+        mark.w = pw;
+        mark.h = ph;
+        node_marks.push_back(mark);
+      } else if (rect.drawable && node_marks.size() >= node_budget) {
+        node_truncated = true;
+      }
+      ++node_id;
+    }
+    draw_blue_annotations(image, node_marks);
+  }
+
   std::string path = util::to_std(godot::OS::get_singleton()->get_cache_dir()) +
                      "/gda_capture_" + std::to_string(request_id) + ".png";
   godot::Error save_err = image->save_png(godot::String(path.c_str()));
@@ -635,6 +948,11 @@ JV capture_viewport_now(const CaptureRequest &request, int64_t request_id) {
   if (request.annotate) {
     r["annotated"] = JV(true);
     r["elements"] = std::move(annotated_elements);
+  }
+  if (!request.annotate_nodes.empty()) {
+    r["node_elements"] = std::move(node_elements);
+    if (node_truncated)
+      r["node_truncated"] = JV(true);
   }
   if (final_width != source_width || final_height != source_height) {
     r["source_width"] = JV(static_cast<int64_t>(source_width));
@@ -932,6 +1250,24 @@ JV run_ui_click(const JV &click, const std::vector<UiElement> &elements,
   }
   const double center_x = match->x + match->w * 0.5;
   const double center_y = match->y + match->h * 0.5;
+  // UiElement 矩形来自 Control::get_global_rect()（画布空间），而注入的
+  // InputEventMouseButton.position 必须是窗口客户区坐标：引擎在
+  // viewport.cpp:_make_input_local 用 get_final_transform() 的反变换把窗口坐标
+  // 换回画布空间，stretch（Example：320x180 视口 → 1280x720 窗口 = 4x）与
+  // letterbox 边距都在这条链上。取控件所属视口的 screen transform 再复合它自己的
+  // canvas transform（默认画布的 Camera2D 或 CanvasLayer），无 transform 时按恒等
+  // 处理（保持旧行为）。
+  godot::Transform2D screen_transform;
+  if (godot::SceneTree *tree = get_scene_tree()) {
+    if (auto *ctrl = godot::Object::cast_to<godot::Control>(
+            resolve_game_node_suffixed(tree->get_root(), match->path))) {
+      if (godot::Viewport *viewport = ctrl->get_viewport())
+        screen_transform =
+            viewport->get_screen_transform() * ctrl->get_canvas_transform();
+    }
+  }
+  const godot::Vector2 window_center = coords::viewport_rect_center_to_window(
+      screen_transform, godot::Rect2(match->x, match->y, match->w, match->h));
   if (!authorization::capability_enabled("game_runtime"))
     return authorization::deny_if_unauthorized("click_game_ui_element",
                                                SideEffect::GameRuntime);
@@ -943,8 +1279,8 @@ JV run_ui_click(const JV &click, const std::vector<UiElement> &elements,
       press["type"] = JV("mouse_button");
       press["button_index"] = JV(button_index);
       JV position(JV::object_tag);
-      position["x"] = JV(center_x);
-      position["y"] = JV(center_y);
+      position["x"] = JV(static_cast<double>(window_center.x));
+      position["y"] = JV(static_cast<double>(window_center.y));
       press["position"] = std::move(position);
       press["mode"] = JV("event");
       press["pressed"] = JV(pressed);
@@ -956,10 +1292,20 @@ JV run_ui_click(const JV &click, const std::vector<UiElement> &elements,
   JV clicked(JV::object_tag);
   clicked["ok"] = JV(true);
   clicked["path"] = JV(match->path);
+  // position/viewport_position 保留画布空间坐标（向后兼容），window_position 是
+  // 实际注入窗口客户区的坐标。
   JV position(JV::object_tag);
   position["x"] = JV(center_x);
   position["y"] = JV(center_y);
   clicked["position"] = std::move(position);
+  JV viewport_position(JV::object_tag);
+  viewport_position["x"] = JV(center_x);
+  viewport_position["y"] = JV(center_y);
+  clicked["viewport_position"] = std::move(viewport_position);
+  JV window_position(JV::object_tag);
+  window_position["x"] = JV(static_cast<double>(window_center.x));
+  window_position["y"] = JV(static_cast<double>(window_center.y));
+  clicked["window_position"] = std::move(window_position);
   clicked["clicks"] = JV(static_cast<int64_t>(rounds));
   JV inner(JV::object_tag);
   inner["result"] = std::move(clicked);

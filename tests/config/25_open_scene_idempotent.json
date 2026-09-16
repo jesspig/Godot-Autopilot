@@ -1,0 +1,119 @@
+{
+  "name": "25_open_scene_idempotent",
+  "description": "open_editor_scene 幂等成功态用例：write_file 造 res://gda_tmp_open_idem/idem.tscn → 第一次 open_editor_scene 断言 result=ok（编辑器可能因上一轮标签布局恢复而已打开该场景并直接命中幂等分支，故此处不断言 already_open，避免跨轮污染导致误报）→ get_scene_tree 断言 result.name=IdemRoot 证明场景确实处于打开状态（旧实现以“root 指针是否变化”判定成败，此步即回归点：目标为当前场景时引擎 _set_current_scene 直接 return，root 不变而被误报 failed to open scene at … — edited scene did not change）→ 第二次 open_editor_scene 同路径断言 result=ok / path=请求路径 / already_open=true，即幂等调用返回成功而非错误 → open_editor_scene 传 res://scenes/__no_such_scene__.tscn 断言 has_keys=[error] 且 error 非空，保证幂等改动不会把无效路径静默成功化 → cleanup 关闭场景并回收 res://gda_tmp_open_idem。响应体为顶层字段：{result:\"ok\", path:\"<请求路径>\", already_open:bool}（点路径 result / path / already_open）。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "stages": [
+      {
+        "id": "setup",
+        "steps": [
+          {
+            "id": "open_idem_create_dir",
+            "tool": "create_directory",
+            "args": { "path": "res://gda_tmp_open_idem" },
+            "expect": { "has_keys": ["created"] }
+          },
+          {
+            "id": "open_idem_write_scene",
+            "tool": "write_file",
+            "args": {
+              "path": "res://gda_tmp_open_idem/idem.tscn",
+              "content": "[gd_scene format=3]\n\n[node name=\"IdemRoot\" type=\"Node2D\"]\n"
+            },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "ok" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "idempotent_open",
+        "steps": [
+          {
+            "id": "open_idem_first",
+            "tool": "open_editor_scene",
+            "args": { "path": "res://gda_tmp_open_idem/idem.tscn" },
+            "expect": {
+              "has_keys": ["result", "path", "already_open"],
+              "field_checks": [
+                { "key": "result", "value": "ok" },
+                { "key": "path", "value": "res://gda_tmp_open_idem/idem.tscn" }
+              ]
+            }
+          },
+          {
+            "id": "open_idem_tree_after_first",
+            "tool": "get_scene_tree",
+            "expect": {
+              "field_checks": [
+                { "key": "result.name", "value": "IdemRoot" }
+              ]
+            }
+          },
+          {
+            "id": "open_idem_second_same_path",
+            "tool": "open_editor_scene",
+            "args": { "path": "res://gda_tmp_open_idem/idem.tscn" },
+            "expect": {
+              "has_keys": ["result", "path", "already_open"],
+              "field_checks": [
+                { "key": "result", "value": "ok" },
+                { "key": "path", "value": "res://gda_tmp_open_idem/idem.tscn" },
+                { "key": "already_open", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "open_idem_tree_after_second",
+            "tool": "get_scene_tree",
+            "expect": {
+              "field_checks": [
+                { "key": "result.name", "value": "IdemRoot" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "invalid_path_still_fails",
+        "steps": [
+          {
+            "id": "open_idem_missing_scene",
+            "tool": "open_editor_scene",
+            "args": { "path": "res://scenes/__no_such_scene__.tscn" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "not_empty": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "cleanup",
+        "steps": [
+          {
+            "id": "open_idem_close_scene",
+            "tool": "close_editor_scene",
+            "args": {},
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "closed" }
+              ]
+            }
+          },
+          {
+            "id": "open_idem_trash_dir",
+            "tool": "move_os_file_to_trash",
+            "args": { "path": "res://gda_tmp_open_idem" },
+            "expect": { "has_keys": ["result"] }
+          }
+        ]
+      }
+    ]
+  }
+}

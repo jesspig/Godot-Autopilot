@@ -104,6 +104,16 @@ Rect rect_intersect(const Rect &a, const Rect &b) {
   return result;
 }
 
+godot::Vector2 viewport_point_to_window(const godot::Transform2D &screen_transform,
+                                        const godot::Vector2 &viewport_point) {
+  return screen_transform.xform(viewport_point);
+}
+
+godot::Vector2 viewport_rect_center_to_window(const godot::Transform2D &screen_transform,
+                                              const godot::Rect2 &viewport_rect) {
+  return viewport_point_to_window(screen_transform, viewport_rect.get_center());
+}
+
 ImageSize fit_within(ImageSize src, int max_dimension) {
   if (max_dimension <= 0)
     return src;

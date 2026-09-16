@@ -2,6 +2,9 @@
 #define GODOT_AUTOPILOT_EDITOR_COORDS_HPP
 
 #include <cstdint>
+#include <godot_cpp/variant/rect2.hpp>
+#include <godot_cpp/variant/transform2d.hpp>
+#include <godot_cpp/variant/vector2.hpp>
 #include <vector>
 
 namespace godot_autopilot {
@@ -19,6 +22,17 @@ bool invert(const Affine &a, Affine &out);
 Rect transform_rect(const Affine &a, const Rect &r);
 bool rect_contains(const Rect &r, const Point &p);
 Rect rect_intersect(const Rect &a, const Rect &b);
+
+// 画布空间（Control::get_global_rect()/get_global_transform() 所在空间）→ 窗口
+// 客户区坐标。screen_transform = Viewport::get_screen_transform()（拉伸 +
+// letterbox 边距）复合 CanvasItem::get_canvas_transform()（默认画布的 Camera2D
+// 或 CanvasLayer 层变换）；注入的 InputEventMouseButton.position 正是窗口客户区
+// 坐标（引擎用 viewport.cpp:_make_input_local 的 get_final_transform() 反变换）。
+// 纯函数，无副作用：恒等变换原样返回。
+godot::Vector2 viewport_point_to_window(const godot::Transform2D &screen_transform,
+                                        const godot::Vector2 &viewport_point);
+godot::Vector2 viewport_rect_center_to_window(const godot::Transform2D &screen_transform,
+                                              const godot::Rect2 &viewport_rect);
 
 struct ImageSize { int width = 0; int height = 0; };
 ImageSize fit_within(ImageSize src, int max_dimension);

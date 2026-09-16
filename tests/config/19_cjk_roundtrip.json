@@ -1,0 +1,68 @@
+{
+  "name": "cjk_roundtrip",
+  "description": "CJK 文本落盘往返（headless）：文本内容必须按 UTF-8 进 Godot String（godot-cpp 的 String(const char*) 是 latin1 构造，会把每个 UTF-8 字节变成一个字符，落盘时再按 UTF-8 写出 → 3 字节 CJK 变 6 字节乱码，且 create_script 的 readback 校验字节数不符）。链路：① create_script 写入含中文注释的 res://tests_tmp/gda_cjk_probe.gd（内容定稿为 '# 中文注释测试\\nfunc probe() -> int:\\n\\treturn 42\\n'），断言 result.verified=true（修复前 readback 与 source_code 不等 → verified=false，此步必失败）、result.readback=true、result.cache_refreshed=true（修复前无该字段，亦必失败）→ ② read_file 读回并逐字节比对 result.content 等于原中文内容（修复前为乱码，必失败；精确比全量字符串即包含特定中文子串，比 not_empty 强）→ ③ find_in_files 在 res://tests_tmp 内以 '中文注释测试' 为 query、extensions=['gd'] 搜索，断言 result.total=1 且 result.files 非空（另一条独立读盘路径，字节级 find 命中即证明文件里确实是原 UTF-8 字节）→ after_all 回收 res://tests_tmp。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "after_all": [
+      {
+        "id": "cjk_trash_tmp_dir",
+        "tool": "move_os_file_to_trash",
+        "args": { "path": "res://tests_tmp" }
+      }
+    ],
+    "stages": [
+      {
+        "id": "cjk_roundtrip",
+        "steps": [
+          {
+            "id": "cjk_create_script",
+            "tool": "create_script",
+            "args": {
+              "path": "res://tests_tmp/gda_cjk_probe.gd",
+              "overwrite": true,
+              "source_code": "# 中文注释测试\nfunc probe() -> int:\n\treturn 42\n"
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.path", "value": "res://tests_tmp/gda_cjk_probe.gd" },
+                { "key": "result.verified", "value": true },
+                { "key": "result.readback", "value": true },
+                { "key": "result.cache_refreshed", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "cjk_read_back_exact_content",
+            "tool": "read_file",
+            "args": { "path": "res://tests_tmp/gda_cjk_probe.gd" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.path", "value": "res://tests_tmp/gda_cjk_probe.gd" },
+                { "key": "result.content", "value": "# 中文注释测试\nfunc probe() -> int:\n\treturn 42\n" }
+              ]
+            }
+          },
+          {
+            "id": "cjk_find_in_files_substring",
+            "tool": "find_in_files",
+            "args": {
+              "query": "中文注释测试",
+              "dir": "res://tests_tmp",
+              "extensions": ["gd"]
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.total", "value": 1 },
+                { "key": "result.files", "not_empty": true }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

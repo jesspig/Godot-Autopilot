@@ -19,7 +19,7 @@ Godot 编辑器
       ├── mcp-cpp-sdk: HTTP 服务器 (内部线程)
       ├── mcp-cpp-sdk: McpServer + Streamable HTTP
       ├── 命令队列 (HTTP 线程 → Godot 主线程桥接)
-      ├── ~384 个 MCP 工具，覆盖 27 个类别（数量随插件版本变化，以 MCP search_tools 返回为准）
+      ├── ~385 个 MCP 工具，覆盖 27 个类别（数量随插件版本变化，以 MCP search_tools 返回为准）
       ├── 内置文档 (离线引擎 API 文档)
       └── 自定义日志面板 (专属插件输出面板)
 ```
@@ -31,13 +31,13 @@ Godot 编辑器
 | **传输协议** | Streamable HTTP (POST /mcp) | MCP 标准协议，无桥接进程 |
 | **线程模型** | 命令队列 + 帧同步回调 | 安全访问 Godot 主线程独占 API |
 | **端口** | 9527 | 可通过 `GODOT_AUTOPILOT_PORT` 环境变量配置 |
-| **发现机制** | 三层渐进式 (目录→检视→执行) | ~384 个工具场景下节省上下文窗口（数量随插件版本变化） |
+| **发现机制** | 三层渐进式 (目录→检视→执行) | ~385 个工具场景下节省上下文窗口（数量随插件版本变化） |
 | **搜索** | BM25 关键词 | 工具按命名空间 + 描述组织 |
 | **构建** | CMake 3.28+ / C++17 | 跨平台，自动优化构建 |
 
 ## 功能特性
 
-### 🎮 完整引擎控制 (~384 工具，数量随插件版本变化，以 MCP search_tools 返回为准)
+### 🎮 完整引擎控制 (~385 工具，数量随插件版本变化，以 MCP search_tools 返回为准)
 
 | 类别 | 数量 | 说明 |
 |------|:----:|------|
@@ -67,7 +67,7 @@ Godot 编辑器
 | **分析** | 3 | 场景文件校验与项目分析辅助 |
 | **测试** | 2 | 编辑器内脚本测试辅助 |
 | **系统** | 1 | 插件级系统信息 |
-| **截图** | 1 | 编辑器视口截图 |
+| **截图** | 2 | 编辑器视口截图 + 可视化场景评审（`annotate_nodes`、`diff_image`、`review_scene_visually`） |
 
 ### 📖 内联 API 文档
 
@@ -77,6 +77,10 @@ Godot 编辑器
 - `find_docs_class` — 按名称或关键词搜索类
 - `get_docs_method` — 方法签名与说明
 - `get_docs_property` — 属性类型与说明
+
+### 📸 可视化场景验证
+
+截图工具同时是 AI 的视觉闭环：`capture_editor_viewport` / `capture_game_viewport` 支持 `region` 裁剪、`max_dimension` 等比缩小、`scale` 放大、UI 控件编号红框 `annotate`、指定场景节点的蓝色编号框 `annotate_nodes` / `annotate_nodes_max`，以及与上次截图对比变化的 `diff_against_last` / `diff_image`。`review_scene_visually` 将编辑器截图 + 游戏截图 + 节点矩形表 + 视口几何映射打包为一次只读调用——截图、核对坐标、执行动作、再截图确认。
 
 ### 📋 MCP 资源
 
@@ -90,6 +94,7 @@ godot://filesystem/tree             — 项目文件系统结构
 godot://filesystem/{path}           — 文件/目录内容
 godot://editor/selection            — 当前选中
 godot://editor/settings/{key}       — 编辑器设置
+godot://log/recent                  — 近期插件日志
 ```
 
 ### 📝 专属日志面板

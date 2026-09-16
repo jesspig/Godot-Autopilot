@@ -17,15 +17,15 @@ GDA_TOOL_CLASS_SIDE(ExecuteScriptTool, "execute_script",
                "Scripts", std::vector<std::string>({"script", "execute", "gdscript"}), script_ops::handle_execute_gdscript, true, ::godot_autopilot::SideEffect::CodeExecute)
 
 GDA_TOOL_CLASS(LoadScriptTool, "load_script",
-               "Load a GDScript resource from a res:// path. Requires path; errors when the file is missing or the loaded resource is not a Script. Returns the script's class, path and object_id. Use it before get_script_property or reload_script to obtain a valid script.",
+               "Load a GDScript resource from a res:// path. Requires path; errors when the file is missing or the loaded resource is not a Script. Returns the script's class, path and object_id. Use it before get_script_property or reload_script to obtain a valid script. Optional fresh (default false) re-reads the .gd file from disk with CACHE_MODE_IGNORE instead of returning the editor's cached instance — pass fresh:true after the file changed outside the editor, and leave it false for the cache-respecting behaviour.",
                "Scripts", std::vector<std::string>({"script", "load"}), script_ops::handle_load, true)
 
 GDA_TOOL_CLASS_SIDE(CreateScriptTool, "create_script",
-               "Create a new GDScript file and save it to disk. Requires path and source_code; the script is compiled before saving and compilation errors abort the call with parser output. overwrite defaults to false — an existing file errors unless overwrite=true. Returns path, class and overwritten; global_class_name is included when the script declares one. The file content is read back from disk after saving and verified against source_code (see verified/readback fields); locked-file write failures surface as verified=false instead of silent success. Do not issue create_script calls for the same file in parallel requests — serial writes to the same path are not synchronized.",
+               "Create a new GDScript file and save it to disk. Requires path and source_code; source_code is written as UTF-8, so non-ASCII (e.g. CJK) content round-trips byte-exact. The script is compiled before saving and compilation errors abort the call with parser output. overwrite defaults to false — an existing file errors unless overwrite=true. Returns path, class and overwritten; cache_refreshed reports whether the freshly written file was re-read into the resource cache (cache_refresh_error is included when that reload failed); global_class_name is included when the script declares one. The file content is read back from disk after saving and verified against source_code (see verified/readback fields); locked-file write failures surface as verified=false instead of silent success. Do not issue create_script calls for the same file in parallel requests — serial writes to the same path are not synchronized.",
                "Scripts", std::vector<std::string>({"script", "create"}), script_ops::handle_create, true, ::godot_autopilot::SideEffect::WritesFile)
 
 GDA_TOOL_CLASS(AttachScriptToNodeTool, "attach_script_to_node",
-               "Attach a Script resource (e.g. a .gd file or another Script) to a node in the edited scene, registered with the editor undo/redo. Requires node_path and script_path. Returns 'script attached to <path>' plus instantiated. When the script lacks @tool it cannot be instantiated in the editor, so its methods only run once the game runs — call_script_node reports the same restriction. Replacing an existing script does not migrate exported references (node_paths may be left dangling) — rewire them after attaching.",
+               "Attach a Script resource (e.g. a .gd file or another Script) to a node in the edited scene, registered with the editor undo/redo. Requires node_path and script_path. The script is always re-read from disk (CACHE_MODE_IGNORE) before attaching, so a node never receives a stale cached instance after the file changed outside the editor. Returns 'script attached to <path>' plus instantiated. When the script lacks @tool it cannot be instantiated in the editor, so its methods only run once the game runs — call_script_node reports the same restriction. Replacing an existing script does not migrate exported references (node_paths may be left dangling) — rewire them after attaching.",
                "Scripts", std::vector<std::string>({"script", "attach", "node"}), script_ops::handle_attach_to_node, true)
 
 GDA_TOOL_CLASS(DetachScriptFromNodeTool, "detach_script_from_node",
@@ -33,7 +33,7 @@ GDA_TOOL_CLASS(DetachScriptFromNodeTool, "detach_script_from_node",
                "Scripts", std::vector<std::string>({"script", "detach", "node"}), script_ops::handle_detach_from_node, true)
 
 GDA_TOOL_CLASS(GetScriptPropertyTool, "get_script_property",
-               "Read a property value from either a script or a scene node. With script_path it returns the script's declared default value for the property; with node_path it reads the node's current property value. Provide exactly one of the two. Returns the serialized value as 'result'; use get_script_property_list to discover property names.",
+               "Read a property value from either a script or a scene node. With script_path it returns the script's declared default value for the property; with node_path it reads the node's current property value. Provide exactly one of the two. Optional fresh (default false, script_path only) re-reads the .gd file from disk with CACHE_MODE_IGNORE so a freshly written file is observed instead of the editor's cached instance; an unknown property returns null. Returns the serialized value as 'result'; use get_script_property_list to discover property names.",
                "Scripts", std::vector<std::string>({"script", "property", "get"}), script_ops::handle_get_property, true)
 
 GDA_TOOL_CLASS(SetScriptPropertyTool, "set_script_property",
@@ -45,11 +45,11 @@ GDA_TOOL_CLASS(CallScriptNodeTool, "call_script_node",
                "Scripts", std::vector<std::string>({"script", "call", "function"}), script_ops::handle_call_function, true)
 
 GDA_TOOL_CLASS(ReloadScriptTool, "reload_script",
-               "Reload a GDScript resource from disk. Requires path; optional keep_state (default false) preserves instance state across the reload. Returns the Godot Error code as 'result'. Use it after editing a script file externally so the editor picks up the changes.",
+               "Reload a GDScript resource from disk: the .gd file is re-read with CACHE_MODE_IGNORE and recompiled, so the editor's cached instance observes the on-disk version instead of its previous source. Requires path; optional keep_state (default false) is passed to the final reload(true/false) — with live script instances (a node already uses the script) keep_state must be true, otherwise the returned Godot Error code is ERR_ALREADY_IN_USE. Returns the Godot Error code as 'result' (0 = OK). Use it after editing a script file externally so the editor picks up the changes.",
                "Scripts", std::vector<std::string>({"script", "reload"}), script_ops::handle_reload, true)
 
 GDA_TOOL_CLASS(GetScriptPropertyListTool, "get_script_property_list",
-               "List the declared variables of a GDScript file. Requires path; returns an array of entries with name, type_id, type name and usage flags, skipping internal and category entries. Use it to discover which properties get_script_property can read from the script.",
+               "List the declared variables of a GDScript file. Requires path; optional fresh (default false) re-reads the .gd file from disk with CACHE_MODE_IGNORE instead of listing the editor's cached instance — use fresh:true right after create_script or an external edit. Returns an array of entries with name, type_id, type name and usage flags, skipping internal and category entries. Use it to discover which properties get_script_property can read from the script.",
                "Scripts", std::vector<std::string>({"script", "variables", "list"}), script_ops::handle_get_variable_list, true)
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {

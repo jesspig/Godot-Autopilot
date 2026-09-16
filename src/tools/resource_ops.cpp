@@ -32,6 +32,11 @@
 namespace godot_autopilot {
 namespace resource_ops {
 
+// ResourceUID::add_id() asserts the id is absent while set_id() asserts it is
+// present (core/io/resource_uid.cpp:164 and :178 in the 4.7.2 tree), so table
+// membership, not the caller, decides which of the two writes may run.
+bool uid_needs_add(bool already_registered) { return !already_registered; }
+
 namespace {
 
 bool normalize_resource_path(const std::string &raw, std::string &out,
@@ -288,18 +293,19 @@ bool ensure_save_directory(const std::string &save_dir, bool &dirs_created,
 
 void sync_editor_and_uid_after_save(const std::string &src_path,
                                     const std::string &dest_path) {
+  const godot::String src_gs = godot::String::utf8(src_path.c_str());
+  const godot::String dest_gs = godot::String::utf8(dest_path.c_str());
   auto *editor = godot::EditorInterface::get_singleton();
   if (editor) {
-    godot::String src_gs(src_path.c_str());
-    godot::String dst_gs(dest_path.c_str());
     auto *efs = editor->get_resource_filesystem();
     if (efs) {
-      efs->update_file(dst_gs);
+      // This registers the saved file's uid in the ResourceUID table already.
+      efs->update_file(dest_gs);
     }
     if (dest_path != src_path) {
       auto *root = editor->get_edited_scene_root();
       if (root && root->get_scene_file_path() == src_gs) {
-        root->set_scene_file_path(dst_gs);
+        root->set_scene_file_path(dest_gs);
       }
     }
   }
@@ -307,10 +313,14 @@ void sync_editor_and_uid_after_save(const std::string &src_path,
   if (ruid) {
     auto *loader = godot::ResourceLoader::get_singleton();
     int64_t uid_val =
-        loader ? loader->get_resource_uid(godot::String(dest_path.c_str()))
+        loader ? loader->get_resource_uid(dest_gs)
                : godot::ResourceUID::INVALID_ID;
     if (uid_val != godot::ResourceUID::INVALID_ID) {
-      ruid->add_id(uid_val, godot::String(dest_path.c_str()));
+      if (uid_needs_add(ruid->has_id(uid_val))) {
+        ruid->add_id(uid_val, dest_gs);
+      } else {
+        ruid->set_id(uid_val, dest_gs);
+      }
     }
   }
 }
@@ -1490,7 +1500,12 @@ mcp::JsonValue handle_set_uid(const mcp::JsonValue &args) {
   } else {
     uid = uid_svc->create_id();
   }
-  uid_svc->set_id(uid, godot::String(path.c_str()));
+  const godot::String path_gs = godot::String::utf8(path.c_str());
+  if (uid_needs_add(uid_svc->has_id(uid))) {
+    uid_svc->add_id(uid, path_gs);
+  } else {
+    uid_svc->set_id(uid, path_gs);
+  }
   auto *editor = godot::EditorInterface::get_singleton();
   if (editor) {
     auto *efs = editor->get_resource_filesystem();

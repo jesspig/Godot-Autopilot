@@ -1,0 +1,109 @@
+{
+  "name": "click_ui_coords",
+  "description": "click_game_ui_element 的 L2 边界：编辑器侧参数校验与无游戏时的结构化通道错误（headless）。前置条件：click_game_ui_element 受 game_runtime capability 授权门保护（GODOT_AUTOPILOT_ALLOW 环境变量或 user://godot_autopilot/config.json 的 allow 字段，env 优先），未授权时全部步骤返回 authorization required 错误而 FAIL。断言：缺 path、path 非字符串、button_index 越界（0/4）、double_click 非布尔、max_elements<=0、timeout_ms 越界各自返回精确错误串；参数合法但无游戏在跑时返回 error+hint 的通道错误（game not ready，证明把请求送到了 debugger 通道且不挂起）。**覆盖力声明（重要）**：本文件不覆盖坐标换算——window_position 由游戏进程内的 run_ui_click 计算（viewport->get_screen_transform() 复合 Control::get_canvas_transform()），必须在真实游戏里点一个固定 rect 的控件才能观测；Example 项目当前没有任何 .tscn/主场景（视口 320x180、窗口 1280x720 的 4x stretch 配置也尚未落地），从编辑器启动游戏与 execute_game_script 均不可用，故端到端换算断言留待示例游戏恢复后补测，补测骨架：play_editor_current_scene -> execute_game_script(action=script) 创建 60x20、中心 (160,90) 的 Button -> click_game_ui_element(path) -> 断言 result.window_position 精确为 {x:640,y:360} 且 result.position 为 {x:160,y:90} -> stop_editor_playing（headless 下 stretch 仍由 Window::_update_viewport_size 计算，但窗口尺寸取决于 project.godot，需先确认 4x 成立）。防幻觉说明：坐标换算的正确性由 L1 tests/unit/game_ui_coords_test.cpp 覆盖（4x 拉伸、letterbox 边距、画布平移复合、rect 中心）。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "stages": [
+      {
+        "id": "arg_validation",
+        "steps": [
+          {
+            "id": "missing_path",
+            "tool": "click_game_ui_element",
+            "args": {},
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "missing required parameter: path (non-empty node path from get_game_ui_elements)" }
+              ]
+            }
+          },
+          {
+            "id": "path_wrong_type",
+            "tool": "click_game_ui_element",
+            "args": { "path": 7 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "missing required parameter: path (non-empty node path from get_game_ui_elements)" }
+              ]
+            }
+          },
+          {
+            "id": "button_index_out_of_range",
+            "tool": "click_game_ui_element",
+            "args": { "path": "Hud/Start", "button_index": 0 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "button_index must be an integer between 1 and 3 (1=left, 2=right, 3=middle)" }
+              ]
+            }
+          },
+          {
+            "id": "double_click_wrong_type",
+            "tool": "click_game_ui_element",
+            "args": { "path": "Hud/Start", "double_click": "yes" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "double_click must be a boolean" }
+              ]
+            }
+          },
+          {
+            "id": "max_elements_non_positive",
+            "tool": "click_game_ui_element",
+            "args": { "path": "Hud/Start", "max_elements": 0 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "max_elements must be a positive integer" }
+              ]
+            }
+          },
+          {
+            "id": "timeout_out_of_range",
+            "tool": "click_game_ui_element",
+            "args": { "path": "Hud/Start", "timeout_ms": 0 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "timeout_ms must be an integer between 1 and 25000" }
+              ]
+            }
+          },
+          {
+            "id": "unknown_parameter",
+            "tool": "click_game_ui_element",
+            "args": { "path": "Hud/Start", "window_position": { "x": 640, "y": 360 } },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "unknown parameter for click_game_ui_element: window_position" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "no_game_channel",
+        "steps": [
+          {
+            "id": "valid_args_without_running_game",
+            "tool": "click_game_ui_element",
+            "args": { "path": "Hud/Start", "button_index": 1 },
+            "expect": {
+              "has_keys": ["error", "hint"],
+              "field_checks": [
+                { "key": "error", "value": "game not ready: the game process has not reported gda ready yet — wait a moment after play, or verify the game project loads the godot-autopilot extension" },
+                { "key": "hint", "not_empty": true }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -16,7 +16,26 @@ void fill_schema_render_audio(std::unordered_map<std::string, mcp::JsonValue>& m
             {"when", "string", "target='game' only: GDScript expression evaluated once per rendered frame inside the game; the capture fires when it is true (empty string = no condition). It runs with the current scene as the base instance, so node lookups such as get_node(\"HUD/MessageLabel\").text != \"\" work directly. A malformed expression fails immediately with a structured error (code when_parse_error) carrying the Expression error text; a condition that never becomes true returns a structured error (code when_timeout) bounded by timeout_ms. target='editor' rejects it", false},
             {"space", "string", "Editor target only: 'viewport' (default) captures the editor 2D viewport with a 3D fallback; 'window' captures the editor main window root viewport exactly as shown on screen, including docks, toolbars and the 2D grid/selection overlays", false},
             {"diff_against_last", "boolean", "Editor target only: when true the result gains a diff object comparing the final image with the previous editor capture (comparable, changed_ratio, changed_bbox, or a reason when not comparable); when the two sizes differ the shared top-left region is compared instead and the diff additionally reports size_mismatch=true plus current_size {x, y} alongside baseline_size (default: false)", false},
+            {"diff_image", "boolean", "Editor target only: when true with diff_against_last, the result additionally gains diff_image_data (base64 PNG) highlighting changed_bbox on a copy of the final image; requires diff_against_last, default false = numbers only; not returned when the diff is not comparable or has no changed_bbox; counts toward the PNG/JSON response limits (default: false)", false},
             {"annotate", "boolean", "Applies to both targets: when true the output image is annotated with numbered red boxes around UI controls and the result gains an elements array of {id, path, type, text, position, size} in final-image pixels whose ids match the box numbers (text is omitted when empty, elements_truncated marks a 200-element cap); the editor target marks editor UI controls (window-level controls with space='window'), while target='game' marks Controls of the running game, annotated inside the game process (default: false)", false},
+            {"annotate_nodes", "array", "Applies to both targets: array of 1-50 scene node path strings to mark with numbered blue boxes (ids count independently from the red UI-control annotate boxes, starting at 1); the editor target resolves edited-scene paths while target='game' forwards the list for the game process to resolve absolute game paths; the result gains a node_elements array of {id, path, type, ok, position, size, visible, behind?, error?} in final-image pixels (one entry per input path, per-item failures carry ok:false plus error instead of failing the call; behind marks 3D nodes behind the camera; visible:false marks skipped boxes) plus node_truncated when the shared 200-box drawing budget with annotate is exceeded; single-item errors: node not found, unsupported node type, viewport incompatible (default: absent = disabled)", false},
+            {"annotate_nodes_max", "integer", "Optional self-imposed tighter cap (1-50, default: 50) on annotate_nodes length; the call fails when annotate_nodes holds more entries (default: absent = 50-entry server cap)", false},
+        });
+
+        m["review_scene_visually"] = schema::build_schema({
+            {"region", "object", "Crop both captures to {x, y, width, height} in pixels (width/height must be positive); clamped per image, empty intersection fails the review call with region_out_of_bounds", false},
+            {"max_dimension", "integer", "Downscale both captures so the longest side is at most this many pixels (64-4096); never upscales", false},
+            {"scale", "integer", "Integer nearest-neighbour upscale factor applied before max_dimension (1-8, default: 1)", false},
+            {"annotate", "boolean", "Draw numbered red UI-control boxes on both captures (default: false)", false},
+            {"annotate_nodes", "array", "Array of 1-50 scene node paths drawn as blue boxes on both captures and reused as the nodes table paths; per-item failures are isolated", false},
+            {"annotate_nodes_max", "integer", "Tighter self-imposed cap on annotate_nodes length (1-50)", false},
+            {"include_editor", "boolean", "Include the editor capture section (default: true); false returns skipped", false},
+            {"include_game", "boolean", "Include the game capture section over the runtime channel (default: true); false returns skipped; game not running returns a per-section error", false},
+            {"timeout_ms", "integer", "Positive timeout bounding only the game capture (default: 5000)", false},
+            {"space", "string", "Editor capture space: 'viewport' (default) or 'window'", false},
+            {"viewport", "string", "Editor mapping viewport: '2d' (default) or '3d'", false},
+            {"index", "integer", "Editor mapping 3D viewport index (default: 0)", false},
+            {"node_viewport", "string", "Nodes table viewport: 'auto' (default), '2d' or '3d'", false},
         });
 
         m["create_render_canvas_item"] = schema::build_schema({});
