@@ -80,6 +80,10 @@ GDA_TOOL_CLASS_SIDE(DeleteDisplayWindowTool, "delete_display_window",
                "Close and free a sub-window previously created with create_display_window. Use it to clean up windows that are no longer needed. Takes window_id as returned by create_display_window; errors when no window with the given id exists. Returns result 'ok'; the window is freed at the end of the frame.",
                "Display", std::vector<std::string>({"display", "window"}), display_ops::handle_window_delete, false, ::godot_autopilot::SideEffect::ModifiesWindow)
 
+GDA_TOOL_CLASS(GetDisplayWindowRectTool, "get_display_window_rect",
+               "Return the client-area rectangle of the main window (or of the window given by window_id) in virtual desktop coordinates, together with the geometry and scale of the screen it is on. Use it to place or compare windows and to translate between desktop points and window-client coordinates before injecting input: warp_display_mouse, move_input_mouse and press_input_mouse_button expect coordinates relative to the focused window's client area, so subtract position from a desktop point (or add position to client-area coordinates). Takes optional window_id (default: 0, the main window); negative ids return an error. Returns result as an object with window_id, position {x, y}, size {x, y} where x is the width and y the height, decorated_position, decorated_size, screen, screen_scale, screen_position, screen_size and a note field. Read-only; it does not modify the window.",
+               "Display", std::vector<std::string>({"display", "window", "geometry"}), display_ops::handle_window_get_rect, true)
+
 GDA_TOOL_CLASS_SIDE(MoveDisplayWindowToForegroundTool, "move_display_window_to_foreground",
                "Raise a window to the foreground of the desktop and give it focus. Use it to bring a sub-window to attention over the editor, e.g. right after creating it. Takes window_id, which defaults to the main window when omitted. Returns result 'ok'.",
                "Display", std::vector<std::string>({"display", "window"}), display_ops::handle_window_move_to_foreground, false, ::godot_autopilot::SideEffect::ModifiesWindow)
@@ -110,7 +114,7 @@ GDA_TOOL_CLASS_SIDE(SetDisplayWindowTitleTool, "set_display_window_title",
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(24);
+  v.reserve(25);
   v.push_back(std::make_unique<GetDisplayClipboardTool>());
   v.push_back(std::make_unique<SetDisplayClipboardTool>());
   v.push_back(std::make_unique<ShowDisplayDialogTool>());
@@ -128,6 +132,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(std::make_unique<StopDisplayTtsTool>());
   v.push_back(std::make_unique<CreateDisplayWindowTool>());
   v.push_back(std::make_unique<DeleteDisplayWindowTool>());
+  v.push_back(std::make_unique<GetDisplayWindowRectTool>());
   v.push_back(std::make_unique<MoveDisplayWindowToForegroundTool>());
   v.push_back(std::make_unique<RequestDisplayWindowAttentionTool>());
   v.push_back(std::make_unique<SetDisplayWindowFlagTool>());

@@ -196,6 +196,43 @@ TEST(SecurityHardening, CapabilityForToolMapping) {
   EXPECT_EQ(authorization::capability_for_tool("get_game_status", SideEffect::None), nullptr);
 }
 
+TEST(SecurityHardening, AllowListRemoveExpandsAll) {
+  using godot_autopilot::authorization::allow_list_remove;
+  EXPECT_EQ(allow_list_remove("all", "code_execute"), "process,game_runtime");
+  EXPECT_EQ(allow_list_remove("process,code_execute", "code_execute"),
+            "process");
+  EXPECT_EQ(allow_list_remove("process", "game_runtime"), "process");
+}
+
+TEST(SecurityHardening, AllowListAddAppends) {
+  using godot_autopilot::authorization::allow_list_add;
+  EXPECT_EQ(allow_list_add("", "game_runtime"), "game_runtime");
+  EXPECT_EQ(allow_list_add("process", "game_runtime"),
+            "process,game_runtime");
+  EXPECT_EQ(allow_list_add("all", "game_runtime"), "all");
+}
+
+TEST(SecurityHardening, EnableMessageDockHintOnlyForToggleable) {
+  EnvGuard g("GODOT_AUTOPILOT_ALLOW", nullptr);
+  using godot_autopilot::SideEffect;
+  auto dockable = godot_autopilot::authorization::deny_if_unauthorized(
+      "execute_game_script", SideEffect::GameRuntime);
+  ASSERT_FALSE(dockable.IsNull());
+  const mcp::JsonValue *dock_enable = dockable.Find("enable");
+  ASSERT_NE(dock_enable, nullptr);
+  EXPECT_NE(dock_enable->GetString().find("Allow game_runtime"),
+            std::string::npos);
+
+  auto env_only = godot_autopilot::authorization::deny_if_unauthorized(
+      "create_os_process", SideEffect::Process);
+  ASSERT_FALSE(env_only.IsNull());
+  const mcp::JsonValue *env_enable = env_only.Find("enable");
+  ASSERT_NE(env_enable, nullptr);
+  EXPECT_EQ(env_enable->GetString().find("dock"), std::string::npos);
+  EXPECT_NE(env_enable->GetString().find("restart the engine"),
+            std::string::npos);
+}
+
 // ---------------- T14: Config and limits ----------------
 TEST(SecurityHardening, ConfigConstantsSane) {
   EXPECT_EQ(godot_autopilot::GDA_DEFAULT_PORT, 9527);

@@ -6,6 +6,7 @@
 #include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
 #include <godot_cpp/variant/string.hpp>
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -18,6 +19,23 @@ namespace log_ops {
 
 using JV = mcp::JsonValue;
 
+std::vector<std::string> filter_log_lines(const std::vector<std::string> &lines,
+                                          const std::string &filter,
+                                          int64_t limit) {
+  if (filter.empty())
+    return lines;
+  std::vector<std::string> matched;
+  for (const std::string &line : lines) {
+    if (line.find(filter) != std::string::npos)
+      matched.push_back(line);
+  }
+  if (limit > 0 && static_cast<int64_t>(matched.size()) > limit) {
+    matched.erase(matched.begin(),
+                  matched.end() - static_cast<std::ptrdiff_t>(limit));
+  }
+  return matched;
+}
+
 namespace {
 
 constexpr char RUN_HINT[] = "game logs are written by the running game process "
@@ -25,6 +43,7 @@ constexpr char RUN_HINT[] = "game logs are written by the running game process "
 
 constexpr int64_t DEFAULT_LIMIT = 50;
 constexpr int64_t MAX_LIMIT = 500;
+constexpr int64_t FILTER_SCAN_LINES = 2000;
 
 std::string logs_dir_diagnostic(const godot::String &logs_dir) {
   auto dir = godot::DirAccess::open(logs_dir);
@@ -151,15 +170,29 @@ constexpr char ARCHIVE_WARNING[] =
     "primary log locked by game process; returned archive godot.log.1";
 
 JV build_result(const godot::String &path, const TailResult &tail,
-                bool from_archive) {
+                bool from_archive, const std::string &filter, int64_t limit) {
+  const bool has_filter = !filter.empty();
+  std::vector<std::string> filtered;
+  const std::vector<std::string> *lines = &tail.lines;
+  int64_t matched_lines = 0;
+  if (has_filter) {
+    matched_lines = static_cast<int64_t>(
+        filter_log_lines(tail.lines, filter, 0).size());
+    filtered = filter_log_lines(tail.lines, filter, limit);
+    lines = &filtered;
+  }
   JV entries(JV::array_tag);
-  for (const std::string &line : tail.lines) {
+  for (const std::string &line : *lines) {
     entries.PushBack(JV(line));
   }
   JV result(JV::object_tag);
   result["path"] = JV(util::to_std(path));
   result["entries"] = std::move(entries);
   result["total_lines"] = JV(tail.total_lines);
+  if (has_filter) {
+    result["matched_lines"] = JV(matched_lines);
+    result["filter"] = JV(filter);
+  }
   if (from_archive) {
     result["from_archive"] = JV(true);
     result["warning"] = JV(ARCHIVE_WARNING);
@@ -185,6 +218,15 @@ JV handle_log_get_game_entries(const JV &args) {
     if (limit < 0)
       limit = 0;
   }
+  std::string filter;
+  auto *fp = args.Find("filter");
+  if (fp) {
+    if (!fp->IsString())
+      return util::error_json("invalid parameter: filter must be a string");
+    filter = fp->GetString();
+  }
+  const bool has_filter = !filter.empty();
+  const int64_t scan_limit = has_filter ? FILTER_SCAN_LINES : limit;
   auto *os = godot::OS::get_singleton();
   if (!os)
     return util::error_json("OS singleton not available");
@@ -194,24 +236,24 @@ JV handle_log_get_game_entries(const JV &args) {
     return util::error_json("game log file not found: \"" + util::to_std(path) + "\" — " +
                       logs_dir_diagnostic(logs_dir) + " — " + RUN_HINT);
   }
-  TailResult tail = read_tail(path, limit);
+  TailResult tail = read_tail(path, scan_limit);
   if (!tail.opened) {
     os->delay_usec(100000);
-    tail = read_tail(path, limit);
+    tail = read_tail(path, scan_limit);
   }
   if (tail.opened) {
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                               "get_game_log_entries completed");
-    return build_result(path, tail, false);
+    return build_result(path, tail, false, filter, limit);
   }
   godot::String archive = logs_dir + "/godot.log.1";
   if (godot::FileAccess::file_exists(archive)) {
-    TailResult archived = read_tail(archive, limit);
+    TailResult archived = read_tail(archive, scan_limit);
     if (archived.opened) {
       LogSystem::instance().log(
           LogLevel::Info, LogCategory::Tools,
           "get_game_log_entries completed (from archive)");
-      return build_result(archive, archived, true);
+      return build_result(archive, archived, true, filter, limit);
     }
   }
   return util::error_detail(

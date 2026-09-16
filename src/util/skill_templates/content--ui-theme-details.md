@@ -151,7 +151,7 @@ text and its global rectangle (position and size).
 
 - `max_elements` defaults to 100, hard cap 1000; when the cap is hit the
   response is flagged as truncated - raise the cap or narrow the search.
-- `timeout_ms` (default 5000, max 30000) bounds the round trip to the
+- `timeout_ms` (default 5000, max 25000) bounds the round trip to the
   game.
 
 Use the returned rectangles to aim input injection - for example pressing a

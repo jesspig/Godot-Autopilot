@@ -1,0 +1,181 @@
+{
+  "name": "keycode_alias",
+  "description": "键名口径统一（裸名 P 与 KEY_P 等价）的运行期验收：编辑器侧 add_input_map_action_event 与游戏侧 queue_game_input 共用同一个键名判决（src/tools/input_map_ops.cpp:resolve_key_name_code，游戏侧 src/runtime/game_bridge_input.cpp:parse_keycode 调用）。步骤 1-9 在编辑器进程内完全可观测并可判定：裸字母 keycode \"P\"、KEY_ 前缀名 \"KEY_P\"、大小写归一 \"key_p\"（physical_keycode）、裸数字 \"0\" 与 \"KEY_0\"、裸特殊键 \"SPACE\" 与 \"KEY_SPACE\" 全部返回 result=ok（修复前裸名报 unknown key name: P），未知名 \"NOPE\" 报带可用形式说明的 unknown key name 错误；步骤 10-11 覆盖游戏侧 queue_game_input 的入参接受路径——headless 下没有游戏进程，键名解析发生在游戏进程内（无法在 L2 观测），因此只断言「参数未被编辑器侧拒绝、请求已抵达运行期通道路径」：合法参数返回结构化 error + hint 两键（无游戏会话时为 \"game not ready: …\"，编辑器的 hint 由 append_runtime_degradation_hint 附加），键名被拒时游戏侧错误不带 hint，故该断言可区分「被接受」与「被拒」。前置条件：game_runtime capability（GODOT_AUTOPILOT_ALLOW 或 user://godot_autopilot/config.json 的 allow 字段，与 16_game_jobs 相同）；键名判决本身由 L1 tests/unit/keycode_alias_test.cpp 全量覆盖。副作用：before_all/after_all 用 erase_input_map_action 清理探针动作 gda_keycode_alias_probe，中间步骤会写入并保存 Example/project.godot（与其它输入映射用例一致，跑完可 git checkout 清理）。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "before_all": [
+      {
+        "id": "reset_probe_action",
+        "tool": "erase_input_map_action",
+        "args": { "action": "gda_keycode_alias_probe" }
+      }
+    ],
+    "stages": [
+      {
+        "id": "editor_bare_key_names",
+        "steps": [
+          {
+            "id": "add_probe_action",
+            "tool": "add_input_map_action",
+            "args": { "action": "gda_keycode_alias_probe" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": "ok" }
+              ]
+            }
+          },
+          {
+            "id": "keycode_bare_letter",
+            "tool": "add_input_map_action_event",
+            "args": {
+              "action": "gda_keycode_alias_probe",
+              "event": { "class": "InputEventKey", "keycode": "P" }
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": "ok" }
+              ]
+            }
+          },
+          {
+            "id": "keycode_prefixed_letter",
+            "tool": "add_input_map_action_event",
+            "args": {
+              "action": "gda_keycode_alias_probe",
+              "event": { "class": "InputEventKey", "keycode": "KEY_P" }
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": "ok" }
+              ]
+            }
+          },
+          {
+            "id": "physical_keycode_case_insensitive",
+            "tool": "add_input_map_action_event",
+            "args": {
+              "action": "gda_keycode_alias_probe",
+              "event": { "class": "InputEventKey", "physical_keycode": "key_p" }
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": "ok" }
+              ]
+            }
+          },
+          {
+            "id": "keycode_bare_digit",
+            "tool": "add_input_map_action_event",
+            "args": {
+              "action": "gda_keycode_alias_probe",
+              "event": { "class": "InputEventKey", "keycode": "0" }
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": "ok" }
+              ]
+            }
+          },
+          {
+            "id": "keycode_prefixed_digit",
+            "tool": "add_input_map_action_event",
+            "args": {
+              "action": "gda_keycode_alias_probe",
+              "event": { "class": "InputEventKey", "keycode": "KEY_0" }
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": "ok" }
+              ]
+            }
+          },
+          {
+            "id": "keycode_bare_special",
+            "tool": "add_input_map_action_event",
+            "args": {
+              "action": "gda_keycode_alias_probe",
+              "event": { "class": "InputEventKey", "keycode": "SPACE" }
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": "ok" }
+              ]
+            }
+          },
+          {
+            "id": "keycode_prefixed_special",
+            "tool": "add_input_map_action_event",
+            "args": {
+              "action": "gda_keycode_alias_probe",
+              "event": { "class": "InputEventKey", "keycode": "KEY_SPACE" }
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": "ok" }
+              ]
+            }
+          },
+          {
+            "id": "keycode_unknown_name",
+            "tool": "add_input_map_action_event",
+            "args": {
+              "action": "gda_keycode_alias_probe",
+              "event": { "class": "InputEventKey", "keycode": "NOPE" }
+            },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "unknown key name: NOPE — use a bare letter/digit (e.g. P, 0), a KEY_* name (e.g. KEY_P, KEY_SPACE) or a numeric keycode (e.g. 65)" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "game_queue_keycode_accepted",
+        "steps": [
+          {
+            "id": "queue_keycode_prefixed_letter",
+            "tool": "queue_game_input",
+            "args": { "type": "key", "keycode": "KEY_P" },
+            "expect": {
+              "has_keys": ["error", "hint"],
+              "field_checks": [
+                { "key": "error", "not_empty": true },
+                { "key": "hint", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "queue_keycode_bare_letter",
+            "tool": "queue_game_input",
+            "args": { "type": "key", "keycode": "P" },
+            "expect": {
+              "has_keys": ["error", "hint"],
+              "field_checks": [
+                { "key": "error", "not_empty": true },
+                { "key": "hint", "not_empty": true }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "after_all": [
+      {
+        "id": "cleanup_probe_action",
+        "tool": "erase_input_map_action",
+        "args": { "action": "gda_keycode_alias_probe" }
+      }
+    ]
+  }
+}

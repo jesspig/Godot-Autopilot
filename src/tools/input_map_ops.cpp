@@ -3,6 +3,7 @@
 #include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #include <algorithm>
+#include <cctype>
 #include <godot_cpp/classes/input_event.hpp>
 #include <godot_cpp/classes/input_map.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
@@ -204,7 +205,66 @@ void persist_action(const std::string &action_name, godot::InputMap *im,
   ps->save();
 }
 
+// KEY_NAME_TO_CODE 的"剥 KEY_ 前缀"视图（键为大写裸名：P、SPACE、KP_ENTER…），
+// 供 resolve_key_name_code 查表；RETURN/CONTROL 是引擎 keyboard.cpp 表里的
+// 裸别名，其常量名与 Key 枚举名不同（KEY_ENTER/KEY_CTRL），在 KEY_NAME_TO_CODE
+// 里没有剥前缀形式，单独补上。
+const std::unordered_map<std::string, int64_t> &key_code_by_bare_name() {
+  static const std::unordered_map<std::string, int64_t> table = [] {
+    std::unordered_map<std::string, int64_t> t;
+    for (const auto &entry : KEY_NAME_TO_CODE) {
+      if (entry.first.rfind("KEY_", 0) == 0)
+        t[entry.first.substr(4)] = entry.second;
+    }
+    t["RETURN"] = KEY_NAME_TO_CODE.at("KEY_ENTER");
+    t["CONTROL"] = KEY_NAME_TO_CODE.at("KEY_CTRL");
+    return t;
+  }();
+  return table;
+}
+
 } // namespace
+
+// 键名 → 键码的唯一判决（编辑器侧 add_input_map_action_event 与游戏侧运行时
+// src/runtime/game_bridge_input.cpp:parse_keycode 共用，避免两侧口径漂移）。
+// 归一化顺序：ASCII 大写 → 剥掉 "KEY_" 前缀 → 单字符 A-Z/0-9 取 ASCII 值
+// （与 Key 枚举一致：A=65、0=48）→ 查裸名表 → 纯数字串按数值解析（> 8 位
+// 必然超出键码上限 0xFFFFFF，直接判无效）。返回 0（Key::KEY_NONE，不是合法
+// 键码）表示无法解析。
+int64_t resolve_key_name_code(const std::string &name) {
+  std::string u = name;
+  for (auto &c : u)
+    c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+  if (u.rfind("KEY_", 0) == 0)
+    u = u.substr(4);
+  if (u.empty())
+    return 0;
+
+  if (u.size() == 1) {
+    const char c = u[0];
+    if ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'))
+      return static_cast<int64_t>(c);
+    return 0;
+  }
+
+  auto it = key_code_by_bare_name().find(u);
+  if (it != key_code_by_bare_name().end())
+    return it->second;
+
+  bool all_digits = true;
+  for (char c : u) {
+    if (c < '0' || c > '9') {
+      all_digits = false;
+      break;
+    }
+  }
+  if (all_digits && u.size() <= 8) {
+    const int64_t value = std::stoll(u);
+    if (value > 0 && value <= 0xFFFFFF)
+      return value;
+  }
+  return 0;
+}
 
 JV handle_action_add_event(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -240,15 +300,20 @@ JV handle_action_add_event(const JV &args) {
     for (const char *field : {"physical_keycode", "keycode"}) {
       auto *fp = event_obj.Find(field);
       if (fp && fp->IsString()) {
-        auto it = KEY_NAME_TO_CODE.find(fp->GetString());
-        if (it == KEY_NAME_TO_CODE.end()) {
+        const std::string raw = fp->GetString();
+        auto it = KEY_NAME_TO_CODE.find(raw);
+        const int64_t code = (it != KEY_NAME_TO_CODE.end())
+                                 ? it->second
+                                 : resolve_key_name_code(raw);
+        if (code == 0) {
           JV e(JV::object_tag);
           e["error"] =
-              JV("unknown key name: " + fp->GetString() +
-                 " — use numeric keycode (e.g. 65) or a known KEY_* name");
+              JV("unknown key name: " + raw +
+                 " — use a bare letter/digit (e.g. P, 0), a KEY_* name (e.g. "
+                 "KEY_P, KEY_SPACE) or a numeric keycode (e.g. 65)");
           return e;
         }
-        event_obj[field] = JV(it->second);
+        event_obj[field] = JV(code);
       }
     }
   }

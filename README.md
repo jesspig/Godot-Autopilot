@@ -19,7 +19,7 @@ Godot Editor
       ├── mcp-cpp-sdk: HTTP server (internal threads)
       ├── mcp-cpp-sdk: McpServer + Streamable HTTP
       ├── Command Queue (HTTP thread → Godot main thread bridge)
-      ├── ~366 MCP Tools across 27 categories (count varies by plugin version; see MCP search_tools)
+      ├── ~385 MCP Tools across 27 categories (count varies by plugin version; see MCP search_tools)
       ├── Inline Documentation (offline engine docs)
       └── Custom Log Dock (dedicated plugin output panel)
 ```
@@ -31,34 +31,34 @@ Godot Editor
 | **Transport** | Streamable HTTP (POST /mcp) | Standard MCP protocol, no bridge process |
 | **Thread Model** | Command queue + frame sync | Safe Godot main-thread-only API access |
 | **Port** | 9527 | Configurable via `GODOT_AUTOPILOT_PORT` env var |
-| **Discovery** | 3-Tier Progressive (Catalog→Inspect→Execute) | Keeps context small with ~366 tools (count varies by plugin version) |
+| **Discovery** | 3-Tier Progressive (Catalog→Inspect→Execute) | Keeps context small with ~385 tools (count varies by plugin version) |
 | **Search** | BM25 keyword | Tools organized by namespace + descriptions |
 | **Build** | CMake 3.28+ / C++17 | Cross-platform, auto-optimized builds |
 
 ## Features
 
-### 🎮 Full Engine Control (~366 Tools, count varies by plugin version; see MCP search_tools)
+### 🎮 Full Engine Control (~385 Tools, count varies by plugin version; see MCP search_tools)
 
 | Category | Tools | Description |
 |----------|:-----:|-------------|
 | **Render** | 49 | Canvas items, cameras, lights, meshes, viewports, materials |
 | **Physics** | 47 | 2D/3D ray casts, body creation, force application, joints |
 | **Resources** | 26 | Load, save, create, copy, reload and list resources |
-| **Display** | 24 | Window, viewport and screen properties |
-| **Editor** | 23 | Selection, undo/redo, scene save, plugin management |
+| **Display** | 25 | Window, viewport and screen properties |
+| **Editor** | 31 | Selection, undo/redo, scene save, plugin management |
 | **Audio** | 20 | Bus management, stream playback, effects |
-| **Input** | 19 | Key/mouse/gamepad simulation, action queries (includes InputMap) |
+| **Input** | 23 | Key/mouse/gamepad simulation, action queries (includes InputMap) |
 | **OS** | 18 | Operating system, environment and clipboard access |
 | **Debug** | 16 | Performance monitors, profiling, diagnostics |
 | **Navigation** | 15 | Nav mesh, path queries, agents |
-| **Scene** | 14 | Node creation, deletion, scene tree inspection (e.g. `create_scene_node`) |
+| **Scene** | 15 | Node creation, deletion, scene tree inspection (e.g. `create_scene_node`) |
 | **Config** | 13 | Project settings, engine properties |
 | **Text** | 10 | String manipulation, parsing and formatting |
 | **Animation** | 10 | Animation players, tracks, mixers and playback |
 | **Scripts** | 10 | Execute GDScript and C#, call methods on any node |
-| **Game** | 9 | Game loop control and engine-wide state |
+| **Game** | 12 | Game loop control and engine-wide state |
 | **Theme** | 8 | Theme resources, style boxes and font variations |
-| **TileMap** | 7 | Tile map creation, cell manipulation and queries |
+| **TileMap** | 8 | Tile map creation, cell manipulation and queries |
 | **Debugger** | 6 | Debugger session control and inspection |
 | **Properties** | 5 | Get/set properties, list properties, signal connect (e.g. `property_set`) |
 | **Docs** | 4 | Query offline Godot API docs |
@@ -67,7 +67,7 @@ Godot Editor
 | **Analysis** | 3 | Scene file validation and project analysis helpers |
 | **Testing** | 2 | In-editor script test helpers |
 | **System** | 1 | Plugin-level system information |
-| **Capture** | 1 | Editor viewport screenshot |
+| **Capture** | 2 | Editor viewport screenshot + visual scene review (`annotate_nodes`, `diff_image`, `review_scene_visually`) |
 
 ### 📖 Inline API Documentation
 
@@ -77,6 +77,10 @@ Query Godot's built-in offline documentation directly through MCP tools. No web 
 - `find_docs_class` — Search classes by name or keyword
 - `get_docs_method` — Method signature and description
 - `get_docs_property` — Property type and description
+
+### 📸 Visual Scene Verification
+
+Screenshot tools double as a vision loop for AI agents: `capture_editor_viewport` / `capture_game_viewport` support `region` cropping, `max_dimension` downscaling, `scale` upscaling, numbered-box `annotate` overlays for UI controls, `annotate_nodes` / `annotate_nodes_max` blue-box overlays for specific scene nodes, and `diff_against_last` / `diff_image` change comparison against the previous capture. `review_scene_visually` bundles editor capture + game capture + node rect table + viewport geometry mapping into a single read-only call — screenshot, verify coordinates, act, then re-capture to confirm.
 
 ### 📋 MCP Resources
 

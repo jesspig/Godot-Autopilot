@@ -19,6 +19,7 @@ serialization rules that decide which property lines end up in the scene file.
 | RID | read back as `{"id": 42}`; JSON does not restore a RID, so RID parameters take the integer handles the tools return |
 | PackedByteArray | `[72, 101, 108, 108, 111]` |
 | Resource | `{"path": "res://icon.svg"}` |
+| Resource (inline sub-resource) | `{"type": "RectangleShape2D", "properties": {"size": {"x": 20, "y": 28}}}` |
 | Node reference | the node path string, e.g. `Player`; inside an array, `{"__node_ref__": "Player"}` is also accepted |
 | Typed array | a JSON array whose elements are converted by the array's declared element type — see "Array properties" below |
 
@@ -51,7 +52,43 @@ Example calls:
 ```
 
 `property_set` and `create_scene_node` (`properties` object) accept these
-shapes through the same conversion chain.
+shapes through the same conversion chain; set_resource_property uses the same
+strict conversion for resource fields.
+
+## Inline sub-resources
+
+`property_set` and `create_scene_node` (`properties` object) accept a third
+resource shape next to the file path and the memory reference: an inline
+description that creates the resource and assigns it to the node property in
+one step.
+
+```json
+{"name": "property_set", "arguments": {"path": "Player/CollisionShape2D", "property": "shape", "value": {"type": "RectangleShape2D", "properties": {"size": {"x": 20, "y": 28}}}}}
+```
+
+- `type` is a Resource class name — an engine class from ClassDB or a global
+  script class, resolved exactly like `create_resource` resolves it. Abstract
+  classes and unknown names error before anything is assigned.
+- `properties` is optional; it maps property names of the new resource to
+  values converted through the ordinary property chain (vectors, colors,
+  arrays, nested resource references). A name the resource does not have is an
+  error.
+- The instance is pathless, so the editor writes it into the scene file as a
+  `sub_resource` block when the scene is saved — unlike a memory:// resource,
+  it never leaves a broken reference behind.
+- Inline descriptions nest: a resource property may itself hold an inline
+  description (for example an `AtlasTexture` inside an `AtlasTexture`), up to 4
+  levels; deeper nesting errors before anything is created.
+- Successful calls echo the created sub-resources in the result as
+  inline_resources, an array of {property, type} entries.
+
+The shape applies to node property assignment only. `set_resource_property`
+does not accept it: build a standalone resource with `create_resource`, edit
+it with `set_resource_property`, then save it with `save_resource`.
+
+`{"path": "res://..."}` and `{"resource": "memory://..."}` keep their meaning;
+when an object carries `path` or `resource` next to `type`, the file or memory
+reference wins.
 
 ## Array properties
 
@@ -62,13 +99,16 @@ element by element against the declared element type:
   the path resolves against the edited scene root like any node reference.
 - Resource elements: a `res://...` or `memory://...` string, `{"path":
   "res://..."}` or `{"resource": "memory://..."}` (memory resources
-  registered in the current session).
+  registered in the current session); inline descriptions are not accepted as
+  array elements — assign them to a resource property instead.
 - `null` passes through and leaves the slot empty.
 
 Failure rules — these return an error instead of a silent write:
 
 - A non-array value assigned to an array property (it used to clear the array
   silently; pass `[]` to clear explicitly).
+- A JSON array assigned to a Vector2 or Vector2i property (arrays used to be
+  written as (0, 0) silently; pass the object form {"x": 1, "y": 2} instead).
 - An element of an array whose element type cannot be determined at all (an
   untyped `Array` holding object or array elements), or an element shape the
   tool cannot safely express for the declared element type.
@@ -146,12 +186,17 @@ validation, still prefer readable exported fields over derived values: C#
 properties without a getter are invisible to GDScript, so reading one returns
 null, which is easy to misread as a missing property.
 
-## memory:// resources must be saved first
+## memory:// resources must be saved or created inline
 
 `property_set` rejects memory:// resources (resources created in memory
 without a file path) as node property values — writing them into the scene
-file would corrupt it. Save the resource to disk with `save_resource` first,
-then assign it via its `res://` path in the `{"path": "res://..."}` shape.
+file would corrupt it. Two supported routes instead:
+
+- Create the resource inline with `{"type": "RectangleShape2D",
+  "properties": {...}}` (see "Inline sub-resources" above): a pathless
+  instance is written as a `sub_resource` when the scene is saved, in one call.
+- Save the resource to disk with `save_resource` first, then assign it via its
+  `res://` path in the `{"path": "res://..."}` shape.
 
 ## See also
 

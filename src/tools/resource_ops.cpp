@@ -32,6 +32,11 @@
 namespace godot_autopilot {
 namespace resource_ops {
 
+// ResourceUID::add_id() asserts the id is absent while set_id() asserts it is
+// present (core/io/resource_uid.cpp:164 and :178 in the 4.7.2 tree), so table
+// membership, not the caller, decides which of the two writes may run.
+bool uid_needs_add(bool already_registered) { return !already_registered; }
+
 namespace {
 
 bool normalize_resource_path(const std::string &raw, std::string &out,
@@ -288,18 +293,19 @@ bool ensure_save_directory(const std::string &save_dir, bool &dirs_created,
 
 void sync_editor_and_uid_after_save(const std::string &src_path,
                                     const std::string &dest_path) {
+  const godot::String src_gs = godot::String::utf8(src_path.c_str());
+  const godot::String dest_gs = godot::String::utf8(dest_path.c_str());
   auto *editor = godot::EditorInterface::get_singleton();
   if (editor) {
-    godot::String src_gs(src_path.c_str());
-    godot::String dst_gs(dest_path.c_str());
     auto *efs = editor->get_resource_filesystem();
     if (efs) {
-      efs->update_file(dst_gs);
+      // This registers the saved file's uid in the ResourceUID table already.
+      efs->update_file(dest_gs);
     }
     if (dest_path != src_path) {
       auto *root = editor->get_edited_scene_root();
       if (root && root->get_scene_file_path() == src_gs) {
-        root->set_scene_file_path(dst_gs);
+        root->set_scene_file_path(dest_gs);
       }
     }
   }
@@ -307,10 +313,14 @@ void sync_editor_and_uid_after_save(const std::string &src_path,
   if (ruid) {
     auto *loader = godot::ResourceLoader::get_singleton();
     int64_t uid_val =
-        loader ? loader->get_resource_uid(godot::String(dest_path.c_str()))
+        loader ? loader->get_resource_uid(dest_gs)
                : godot::ResourceUID::INVALID_ID;
     if (uid_val != godot::ResourceUID::INVALID_ID) {
-      ruid->add_id(uid_val, godot::String(dest_path.c_str()));
+      if (uid_needs_add(ruid->has_id(uid_val))) {
+        ruid->add_id(uid_val, dest_gs);
+      } else {
+        ruid->set_id(uid_val, dest_gs);
+      }
     }
   }
 }
@@ -394,6 +404,88 @@ godot::Ref<godot::Resource> resolve_memory_resource(const std::string &name) {
 void register_memory_resource(const godot::Ref<godot::Resource> &res,
                               const std::string &name) {
   resource_registry::register_resource(res, name);
+}
+
+godot::Ref<godot::Resource>
+instantiate_resource_class(const std::string &type, std::string &out_error) {
+  out_error.clear();
+  auto *cdbs = godot::ClassDBSingleton::get_singleton();
+  if (!cdbs) {
+    out_error = "ClassDB not available";
+    return godot::Ref<godot::Resource>();
+  }
+
+  godot::StringName class_name(type.c_str());
+  if (cdbs->is_parent_class(class_name, godot::StringName("Resource"))) {
+    if (!cdbs->can_instantiate(class_name)) {
+      out_error = type + " is abstract and cannot be instantiated";
+      return godot::Ref<godot::Resource>();
+    }
+    godot::Variant obj_var = cdbs->instantiate(class_name);
+    if (obj_var.get_type() == godot::Variant::NIL) {
+      out_error = "failed to instantiate: " + type;
+      return godot::Ref<godot::Resource>();
+    }
+    auto *obj = godot::Object::cast_to<godot::Resource>(obj_var);
+    if (!obj) {
+      out_error = "instantiated object is not a Resource: " + type;
+      return godot::Ref<godot::Resource>();
+    }
+    return godot::Ref<godot::Resource>(obj);
+  }
+
+  std::string script_path;
+  if (!find_global_class_path(type, script_path)) {
+    if (cdbs->class_exists(class_name)) {
+      out_error = type + " is not a Resource subclass";
+    } else {
+      out_error =
+          type +
+          " is not a known class: no engine class or registered global "
+          "script class with this name exists";
+    }
+    return godot::Ref<godot::Resource>();
+  }
+
+  auto *loader = godot::ResourceLoader::get_singleton();
+  godot::Ref<godot::Resource> loaded =
+      loader ? loader->load(godot::String(script_path.c_str()))
+             : godot::Ref<godot::Resource>();
+  godot::Ref<godot::Script> script = loaded;
+  if (script.is_null()) {
+    out_error = "failed to load global class script: " + script_path;
+    return godot::Ref<godot::Resource>();
+  }
+
+  godot::StringName base = script->get_instance_base_type();
+  if (base == godot::StringName()) {
+    out_error = "failed to resolve the base type of global class script: " +
+                script_path +
+                " (script may be invalid or its language is unavailable)";
+    return godot::Ref<godot::Resource>();
+  }
+  if (!cdbs->is_parent_class(base, godot::StringName("Resource"))) {
+    out_error = type + " is not a Resource subclass (global class script " +
+                script_path + " extends " + util::to_std(godot::String(base)) +
+                ")";
+    return godot::Ref<godot::Resource>();
+  }
+
+  if (!script->can_instantiate()) {
+    out_error = type +
+                " is not instantiable (abstract or invalid global class "
+                "script): " +
+                script_path;
+    return godot::Ref<godot::Resource>();
+  }
+
+  godot::Variant obj_var = script->call(godot::StringName("new"));
+  auto *obj = godot::Object::cast_to<godot::Resource>(obj_var);
+  if (!obj) {
+    out_error = "failed to instantiate global class: " + type;
+    return godot::Ref<godot::Resource>();
+  }
+  return godot::Ref<godot::Resource>(obj);
 }
 
 bool try_resolve_resource_value(const mcp::JsonValue &val, godot::Variant &out,
@@ -869,94 +961,13 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
   if (nm && nm->IsString())
     name = nm->GetString();
 
-  auto *cdbs = godot::ClassDBSingleton::get_singleton();
-  if (!cdbs) {
+  std::string instantiate_error;
+  godot::Ref<godot::Resource> res =
+      instantiate_resource_class(type, instantiate_error);
+  if (res.is_null()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("ClassDB not available");
+    e["error"] = mcp::JsonValue(instantiate_error);
     return e;
-  }
-
-  godot::Ref<godot::Resource> res;
-  if (cdbs->is_parent_class(godot::StringName(type.c_str()),
-                            godot::StringName("Resource"))) {
-    godot::Variant obj_var =
-        cdbs->instantiate(godot::StringName(type.c_str()));
-    if (obj_var.get_type() == godot::Variant::NIL) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue("failed to instantiate: " + type);
-      return e;
-    }
-
-    auto *obj = godot::Object::cast_to<godot::Resource>(obj_var);
-    if (!obj) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] =
-          mcp::JsonValue("instantiated object is not a Resource: " + type);
-      return e;
-    }
-    res = godot::Ref<godot::Resource>(obj);
-  } else {
-    std::string script_path;
-    if (!find_global_class_path(type, script_path)) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      if (cdbs->class_exists(godot::StringName(type.c_str()))) {
-        e["error"] = mcp::JsonValue(type + " is not a Resource subclass");
-      } else {
-        e["error"] = mcp::JsonValue(
-            type +
-            " is not a known class: no engine class or registered global "
-            "script class with this name exists");
-      }
-      return e;
-    }
-
-    auto *loader = godot::ResourceLoader::get_singleton();
-    godot::Ref<godot::Resource> loaded =
-        loader ? loader->load(godot::String(script_path.c_str()))
-               : godot::Ref<godot::Resource>();
-    godot::Ref<godot::Script> script = loaded;
-    if (script.is_null()) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue(
-          "failed to load global class script: " + script_path);
-      return e;
-    }
-
-    godot::StringName base = script->get_instance_base_type();
-    if (base == godot::StringName()) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue(
-          "failed to resolve the base type of global class script: " +
-          script_path +
-          " (script may be invalid or its language is unavailable)");
-      return e;
-    }
-    if (!cdbs->is_parent_class(base, godot::StringName("Resource"))) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue(
-          type + " is not a Resource subclass (global class script " +
-          script_path + " extends " + util::to_std(godot::String(base)) + ")");
-      return e;
-    }
-
-    if (!script->can_instantiate()) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue(
-          type +
-          " is not instantiable (abstract or invalid global class script): " +
-          script_path);
-      return e;
-    }
-
-    godot::Variant obj_var = script->call(godot::StringName("new"));
-    auto *obj = godot::Object::cast_to<godot::Resource>(obj_var);
-    if (!obj) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] =
-          mcp::JsonValue("failed to instantiate global class: " + type);
-      return e;
-    }
-    res = godot::Ref<godot::Resource>(obj);
   }
 
   if (!name.empty()) {
@@ -1393,41 +1404,6 @@ std::vector<std::string> extract_script_class_tokens(const godot::String &conten
   return out;
 }
 
-mcp::JsonValue collect_reference_hits(const std::string &target_path,
-                                      const std::string &target_uid,
-                                      const std::string &target_class) {
-  ResourceScanBudget budget;
-  bool truncated = false;
-  std::vector<std::string> text_files;
-  collect_matching_files_budget("res://", is_text_resource_entry, text_files, budget, 0, truncated);
-  mcp::JsonValue result(mcp::JsonValue::array_tag);
-  for (const std::string &fp : text_files) {
-    if (truncated) break;
-    godot::Ref<godot::FileAccess> fa = godot::FileAccess::open(
-        godot::String(fp.c_str()), godot::FileAccess::READ);
-    if (fa.is_null()) continue;
-    int64_t len = fa->get_length();
-    size_t file_bytes = len > 0 ? static_cast<size_t>(len) : 0;
-    if (budget.hit_limit(file_bytes, 0)) { truncated = true; break; }
-    budget.files_scanned++;
-    budget.bytes_scanned += file_bytes;
-    const godot::String content = fa->get_as_text();
-    const RefHit hit =
-        scan_reference_tokens(content, target_path, target_uid, target_class);
-    if (hit.path || hit.uid || hit.klass) {
-      mcp::JsonValue item(mcp::JsonValue::object_tag);
-      item["file"] = mcp::JsonValue(fp);
-      mcp::JsonValue matched(mcp::JsonValue::array_tag);
-      if (hit.path) matched.PushBack(mcp::JsonValue("path"));
-      if (hit.uid) matched.PushBack(mcp::JsonValue("uid"));
-      if (hit.klass) matched.PushBack(mcp::JsonValue("script_class"));
-      item["matched"] = std::move(matched);
-      result.PushBack(std::move(item));
-    }
-  }
-  return result;
-}
-
 mcp::JsonValue collect_reference_hits_budget(const std::string &target_path,
                                              const std::string &target_uid,
                                              const std::string &target_class,
@@ -1524,7 +1500,12 @@ mcp::JsonValue handle_set_uid(const mcp::JsonValue &args) {
   } else {
     uid = uid_svc->create_id();
   }
-  uid_svc->set_id(uid, godot::String(path.c_str()));
+  const godot::String path_gs = godot::String::utf8(path.c_str());
+  if (uid_needs_add(uid_svc->has_id(uid))) {
+    uid_svc->add_id(uid, path_gs);
+  } else {
+    uid_svc->set_id(uid, path_gs);
+  }
   auto *editor = godot::EditorInterface::get_singleton();
   if (editor) {
     auto *efs = editor->get_resource_filesystem();
@@ -2834,7 +2815,7 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue &args) {
     }
     resource_attached = true;
   } else {
-    value = VariantJson::deserialize(*args.Find("value"), type_hint);
+    value = VariantJson::deserialize_strict(*args.Find("value"), type_hint);
   }
 
   godot::Variant old_val = res->get(godot::StringName(prop.c_str()));

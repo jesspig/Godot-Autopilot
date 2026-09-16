@@ -1,0 +1,65 @@
+{
+  "name": "editor_ui",
+  "description": "编辑器 UI 语义查询正向路径 + 缺参错误路径（headless，无副作用）：get_editor_ui_elements 列表与 window 空间标记、get_editor_viewport_geometry 映射、hit_test_editor_point 命中链、get_display_window_rect 窗口矩形、get_scene_node_screen_rect 缺 paths 报错。headless 下元素数与命中数不确定，故只断言 result/space/count 存在，不断言元素非空。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "stages": [
+      {
+        "id": "editor_ui_readonly",
+        "steps": [
+          {
+            "id": "ui_elements_window_space",
+            "tool": "get_editor_ui_elements",
+            "args": { "max_elements": 5 },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.space", "value": "window" },
+                { "key": "result.count", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "viewport_geometry_window_space",
+            "tool": "get_editor_viewport_geometry",
+            "args": {},
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.space", "value": "window" }
+              ]
+            }
+          },
+          {
+            "id": "hit_test_point",
+            "tool": "hit_test_editor_point",
+            "args": { "position": { "x": 10, "y": 10 } },
+            "expect": {
+              "has_keys": ["result"]
+            }
+          },
+          {
+            "id": "display_window_rect",
+            "tool": "get_display_window_rect",
+            "args": {},
+            "expect": {
+              "has_keys": ["result"]
+            }
+          },
+          {
+            "id": "scene_node_screen_rect_missing_paths",
+            "tool": "get_scene_node_screen_rect",
+            "args": {},
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "missing required parameter: paths (array)" }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

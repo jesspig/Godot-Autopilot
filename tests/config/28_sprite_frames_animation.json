@@ -1,0 +1,115 @@
+{
+  "name": "sprite_frames_animation",
+  "description": "P2-2 回归：create_scene_node 的 properties 两轮应用（资源/OBJECT 类属性先、值类属性后）。根因：properties 按 mcp::JsonValue 的 std::map 字典序下发，animation 恒先于 sprite_frames 到达，此时 AnimatedSprite2D.frames 为 null，引擎 set_animation 把动画名清空（animated_sprite_2d.cpp）→ 插件回读得到 \"\" → property_warnings 里的 animation \"idle\"→\"\"（修复前）。步骤：create_scene_node（AnimatedSprite2D，properties 同时给 sprite_frames + animation）→ 断言 result.applied_properties 精确为 [\"sprite_frames\",\"animation\"]（唯一能正向表达两轮顺序的断言）→ property_get animation 精确为 \"idle\"（修复前为 \"\"，本用例最稳的必失败点）→ property_get sprite_frames 非空。property_warnings 本身不直接断言：assert_engine 只有 has_keys/field_checks(value 全等、not_empty)，键缺失一律判失败，因此无法表达「不含 property_warnings」——对 result.property_warnings 写 value:[] 会在修复后（字段缺失）反而判失败，故改用上述读回值证明干净路径（与 08_property_readback 的做法一致）。fixture：内存 SpriteFrames（两个动画名 idle/run）→ save_resource 落盘 res://gda_tmp_sprite_frames_anim/frames.tres；after_all 回收该目录。断言引擎不支持数组下标，全部用点路径。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "before_all": [
+      {
+        "id": "before_new_scene",
+        "tool": "create_editor_scene",
+        "args": { "name": "FramesRoot", "type": "Node2D", "close_current": true }
+      }
+    ],
+    "after_all": [
+      {
+        "id": "trash_sprite_frames_fixture",
+        "tool": "move_os_file_to_trash",
+        "args": { "path": "res://gda_tmp_sprite_frames_anim" }
+      }
+    ],
+    "stages": [
+      {
+        "id": "frames_fixture",
+        "steps": [
+          {
+            "id": "frames_tmp_dir",
+            "tool": "create_directory",
+            "args": { "path": "res://gda_tmp_sprite_frames_anim" },
+            "expect": { "has_keys": ["created"] }
+          },
+          {
+            "id": "frames_create",
+            "tool": "create_spriteframes",
+            "args": { "name": "GdaAnimFrames" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.class", "value": "SpriteFrames" },
+                { "key": "result.name", "value": "GdaAnimFrames" },
+                { "key": "result.default_animation_removed", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "frames_add_idle",
+            "tool": "add_spriteframes_animation",
+            "args": { "name": "GdaAnimFrames", "animation": "idle" },
+            "expect": { "field_checks": [ { "key": "result", "value": "ok" } ] }
+          },
+          {
+            "id": "frames_add_run",
+            "tool": "add_spriteframes_animation",
+            "args": { "name": "GdaAnimFrames", "animation": "run" },
+            "expect": { "field_checks": [ { "key": "result", "value": "ok" } ] }
+          },
+          {
+            "id": "frames_save",
+            "tool": "save_resource",
+            "args": { "name": "GdaAnimFrames", "path": "res://gda_tmp_sprite_frames_anim/frames.tres" },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": 0 },
+                { "key": "verified", "value": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "resource_before_value",
+        "steps": [
+          {
+            "id": "create_animated_sprite_with_frames_and_animation",
+            "tool": "create_scene_node",
+            "args": {
+              "name": "Anim",
+              "type": "AnimatedSprite2D",
+              "parent_path": "FramesRoot",
+              "properties": {
+                "sprite_frames": { "path": "res://gda_tmp_sprite_frames_anim/frames.tres" },
+                "animation": "idle"
+              }
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.path", "value": "Anim" },
+                { "key": "result.applied_properties", "value": ["sprite_frames", "animation"] },
+                { "key": "result.undo", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "readback_animation_name",
+            "tool": "property_get",
+            "args": { "path": "Anim", "property": "animation" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "value": "idle" } ]
+            }
+          },
+          {
+            "id": "readback_sprite_frames_present",
+            "tool": "property_get",
+            "args": { "path": "Anim", "property": "sprite_frames" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "not_empty": true } ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

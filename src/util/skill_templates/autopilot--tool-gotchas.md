@@ -92,6 +92,101 @@ text JSON keeps `format`, `width` and `height`, while `data` becomes
 `batch_execute` and `code_execute` no image block is attached - the JSON
 `data` field keeps the full base64 and must be decoded by the caller.
 
+## Async game tools inside batch_execute: refused, or awaited with await_async
+
+Several game tools answer asynchronously: their immediate return value is a
+pending marker, and only the awaiting call paths - call_tool, or
+batch_execute with `await_async=true` - wait for the game's answer and merge
+it into the response. Inside a plain batch_execute those tools are refused
+instead of silently dropped:
+
+- Default (`await_async=false`): the operation fails with status error and a
+  message naming the alternatives; the pending record is still released so
+  nothing leaks, and `pending` in the response counts 0. The default
+  `stop_on_error=true` then skips the remaining operations, so a batch that
+  must keep going needs `stop_on_error=false`.
+- `await_async=true`: batch_execute waits for the game response (bounded by
+  the op's `timeout_ms`) and writes the real response under result with
+  status ok or error. The wait runs on the transport thread, so invoke
+  batch_execute directly - calling it through call_tool with
+  `await_async=true` is refused with an error.
+
+If you need one game tool's result, call_tool is still the simplest path; use
+`await_async=true` when a later operation in the same batch depends on it.
+
+## Long game scripts: start_game_job submits, get_game_job polls
+
+`start_game_job` wraps a game op (currently only the `execute_game_script` op,
+with `params` carrying that op's arguments verbatim) and returns a `job_id`
+immediately instead of waiting - the right shape for in-game scripts that
+would exceed the 25 s per-call budget. Poll `get_game_job` with the `job_id`:
+a pending status means check again later, a done status carries the game's
+response verbatim (including its own error fields), expired means the job
+exceeded `timeout_ms` + 2000 ms after start and was dropped, and cancelled
+means `cancel=true` tore the request down after sending an idempotent engine
+cancel. A positive `timeout_ms` on the poll call waits internally instead of
+returning the pending status right away (0, the default, never blocks). The
+job table holds at most 16 jobs; entries leave it on collection, on expiry
+(2 s grace past the deadline) or on cancel, and each of those paths releases
+the eval error-break suppression, so abandoning a job never leaves error
+breaks disabled in the game.
+
+## Timeout budget chain: host wait = timeout_ms + 2000 ms, below the 30 s transport
+
+Game ops time out in three layers, and the smallest layer wins:
+
+1. The HTTP transport kills a stateless request after 30 s.
+2. The plugin waits `timeout_ms + 2000` ms on the host side for the game
+   answer (the extra 2000 ms is the response grace).
+3. Accepted `timeout_ms` for game ops is capped at 25000 ms, so the host wait
+   never exceeds 27000 ms - below the transport's 30 s.
+
+Values above 25000 are rejected by the tools that validate `timeout_ms`
+explicitly and clamped by the tools that only read it; the low-level game
+sender also clamps every request. Either way the effective budget is at most
+25000 ms and the returned `timeout_ms` reports the clamped host wait. Longer
+work must be split into shorter calls or polled with `get_game_status`. The
+30000 ms maximum still applies to editor-only tools (code_execute,
+run_gdscript_tests, create_editor_scene and editor-target captures), which
+never round-trip through the game.
+
+## After a game timeout: engine continue and late results
+
+When a game op times out, the plugin releases the pending record, sends the
+idempotent cancel and - when the game's debugger session is breaked -
+broadcasts an engine continue, so a game stopped in the debugger at a script
+error no longer stays frozen after the call returns. The continue is only
+sent while a breaked session exists; a normally running game never receives
+it.
+
+A game answer that arrives after the wait ended can no longer be delivered to
+the caller. Instead of only logging it, the plugin keeps the five most recent
+late responses (FIFO) and attaches them to the next timeout error as a
+late_results array: one object per entry with the request id, the op name,
+age in milliseconds since the request was sent, and a summary holding the
+error or result JSON text truncated to 200 characters. The field is omitted
+while nothing was seen late, so a timeout error carrying it proves the
+earlier calls did answer - read `get_plugin_log` when you need the full
+payloads.
+
+## Eval script compile errors return structured errors, not timeouts
+
+`execute_game_script` with the script action compiles the source inside the
+running game. When the game runs from the editor, a GDScript parse failure
+used to send the engine into its error breakpoint: the debugger blocked the
+game main thread waiting for a continue command, so the structured compile
+error the game had already prepared never reached the plugin and the call
+timed out. The plugin now disables engine error breaks for the duration of
+the eval request and restores the previous behaviour when the request
+finishes, times out or is cancelled, so a malformed script comes back
+quickly with the compile error text and line instead of a timeout. Only the
+script action is affected: `get_property`, `set_property` and `call_method`
+do not compile source and never disable error breaks. While an eval script
+request is in flight, unrelated error breaks in the game are ignored too;
+normal error breaks resume as soon as the request ends.
+
+Details: godot-autopilot-runtime.
+
 ## Size limits
 
 These limits are enforced by the server. Truncation is always detectable -
@@ -110,7 +205,8 @@ than silently dropping data.
 | Variant single string | 64 KiB | serialized Variant values |
 | Variant array elements | 10000 | arrays and packed arrays |
 | file scan | 10000 files, 2 MiB per file, 32 MiB total, depth 64 | resource/file scans |
-| default / max timeout | 5000 / 30000 ms | operations taking `timeout_ms` |
+| default / max timeout | 5000 / 30000 ms | editor-only operations taking `timeout_ms` |
+| default / max timeout, game ops | 5000 / 25000 ms | game tools taking `timeout_ms` (host wait = `timeout_ms` + 2000 ms, below the 30 s transport) |
 
 For bulk work near any of these limits, prefer `code_execute` loops over
 giant JSON payloads.
@@ -170,9 +266,11 @@ tools (`execute_game_script`, `queue_game_input`, `wait_game_input`,
 call returns an error carrying authorization_required plus an `enable` field
 (and writes a warning to the plugin log); enable a capability by setting
 `GODOT_AUTOPILOT_ALLOW` to it (or to `all`) and restarting the engine, or -
-for `code_execute` only - by ticking "Allow code_execute" in the plugin's MCP
-Config dock, which takes effect on the next call without a restart. When the
-environment variable is set it wins over the config.
+for `code_execute` and `game_runtime` - by ticking "Allow code_execute" or
+"Allow game_runtime" in the plugin's MCP Config dock, which takes effect on
+the next call without a restart. The process gate keeps no dock toggle: it
+needs the environment variable and a restart. When the environment variable
+is set it wins over the config.
 
 `code_execute` wraps your source in a generated @tool Node script. Four traps:
 

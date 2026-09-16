@@ -8,7 +8,7 @@ tags:
   - 资源
   - UI
   - 工具库
-timestamp: "2026-09-13T21:48:42+08:00"
+timestamp: "2026-09-16T00:58:57+08:00"
 resource:
   - src/prompts/
   - src/resources/
@@ -18,7 +18,7 @@ resource:
 
 # 支撑模块（src/prompts/、src/resources/、src/ui/、src/util/）
 
-> 审计日期：2026-09-13（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill_gen 一键生成 Agent Skills 与 skill 内容外置化同步；09-10 随 skill 体系 19→7 册重构、Godot 源码研究发现织入与 dock 按钮动态化同步；09-13 上午随 7→8 册（C# 专册与开发闭环）与 util 新增 mcp_image_content.hpp 同步；09-13 下午随收口批次同步——McpConfigDock Allow code_execute 复选框、VariantJson::deserialize_strict、readback_util 值类型近似比较与 16 类清单、技能 runtime 册日志四路来源；09-13 17:50 随 B 组知识库审计同步——修正 prompt_tool_usage 行数、resource_handlers 静态/模板配比、注册入口行号与 keycode 提示词状态；09-13 20 时随主册技能增强同步——description 必读定位与 autopilot.md 新增查文档时机/引擎状态观测/工具选择/搜索技巧四块正文；09-13 21 时统一 skill 为纯英文——scene-system.md 中文错误示例改英文转述、registry description 英文必读定位；09-13 晚随 0.2.4 版知识库全量审计同步——修正 PACKED_*_ARRAY 为 10 种、scene_path/json_number 消费方计数与 resolve_rid 未命中行为），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 审计日期：2026-09-15（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill_gen 一键生成 Agent Skills 与 skill 内容外置化同步；09-10 随 skill 体系 19→7 册重构、Godot 源码研究发现织入与 dock 按钮动态化同步；09-13 上午随 7→8 册（C# 专册与开发闭环）与 util 新增 mcp_image_content.hpp 同步；09-13 下午随收口批次同步——McpConfigDock Allow code_execute 复选框、VariantJson::deserialize_strict、readback_util 值类型近似比较与 16 类清单、技能 runtime 册日志四路来源；09-13 17:50 随 B 组知识库审计同步——修正 prompt_tool_usage 行数、resource_handlers 静态/模板配比、注册入口行号与 keycode 提示词状态；09-13 20 时随主册技能增强同步——description 必读定位与 autopilot.md 新增查文档时机/引擎状态观测/工具选择/搜索技巧四块正文；09-13 21 时统一 skill 为纯英文——scene-system.md 中文错误示例改英文转述、registry description 英文必读定位；09-13 晚随 0.2.4 版知识库全量审计同步——修正 PACKED_*_ARRAY 为 10 种、scene_path/json_number 消费方计数与 resolve_rid 未命中行为；09-14 随修复批次同步——McpConfigDock 新增 Allow game_runtime 复选框与 `allow_list_add`/`allow_list_remove` 共享切换逻辑（`all` 展开、`code_execute_allowed()` 删除）、Vector2/2i 严格形状与 set_resource_property 接入严格转换、capture 落盘 save 与两侧各保留 20 张、get_game_log_entries filter/matched_lines、batch_execute 异步 pending 计数）；09-15 随 Computer Use grounding 批次同步——skill_templates 4 册更新（工具目录 379、编辑器 UI 自动化闭环与游戏侧点击/滚轮）；09-16 随失败修复批次同步——resource_handlers 新增 `register_skill_resources`（`godot://skills` 资源组：目录/单册/单文件，技能经 MCP 协议层可发现），新增 `src/util/skill_resources`（URI 解析，L1 `skill_resources_test` 12 项），基于当前工作树代码逐行核对（不依赖 git 历史）。
 > 覆盖范围：`src/prompts/` 9 组文件（18 个）、`src/resources/` 2 组、`src/ui/` 2 组、`src/util/` 13 组（20 个文件，其中 `scene_path.hpp`/`json_godot.hpp`/`rid_registry.hpp`/`type_hint.hpp`/`gdscript_wrap.hpp`/`project_path.hpp`/`mcp_image_content.hpp` 为 header-only；另含内容目录 `skill_templates/` 31 个文件——30 个 .md + registry.json）。注册入口为 `src/core/server_context.cpp:214-220`（`register_tools()` 内五处注册调用：工具 → 资源 → 通用 prompt → 调试资源 → 调试 prompt）。
 
 ## 模块简介
@@ -26,7 +26,7 @@ resource:
 这四组文件不直接产生领域工具，而是为 MCP 服务器与编辑器体验提供支撑：
 
 - **Prompts**：向 MCP 客户端暴露 12 个 prompt 模板（7 通用 + 5 调试），全部经 `server.RegisterPrompt` 注册。
-- **Resources**：暴露 15 个 MCP resource URI（8 引擎侧 + 7 调试捕获侧），全部为 `godot://` 前缀。
+- **Resources**：暴露 15 个 MCP resource URI（8 引擎侧 + 7 调试捕获侧），全部为 `godot://` 前缀；09-16 起新增 skills 资源组（`godot://skills` 目录、`godot://skills/<name>`、`godot://skills/<name>/<file>`，按 8 册 30 个 .md 动态注册，技能经协议层可发现可读）。
 - **UI**：底部日志面板（`McpLogDock`）、右侧配置面板（`McpConfigDock`），消费 `LogSystem` 与服务器生命周期。
 - **Util**：与工具层共享的纯工具件——Variant↔JSON 互转、BM25 检索、错误 JSON 构造、写后读回校验、场景路径解析、JSON 数值/几何/RID 辅助、进程内 RID 注册表、类型提示推断、GDScript 包装流水线、MCP 图像内容交付、客户端 MCP 配置生成、Agent Skills 文档生成。
 
@@ -63,7 +63,7 @@ resource:
 | `debug-review-performance` | Review performance monitor data to identify bottlenecks | 无 | `get_debug_monitors`、`get_game_status` |
 | `debug-session-status` | Quick summary of the current debug session state | 无 | `get_debugger_session_info` 等 |
 
-## Resources（15 个 URI，均经 RegisterResource/RegisterResourceTemplate 注册）
+## Resources（15 个引擎/调试侧 URI + skills 资源组，均经 RegisterResource/RegisterResourceTemplate 注册）
 
 ### 职责表
 
@@ -118,11 +118,11 @@ resource:
 
 `EditorDock` 子类，标题 "MCP Config"，默认停靠右侧槽（`DOCK_SLOT_RIGHT_UR`），可关闭：
 
-- **布局**：VBoxContainer = "MCP Server" 标题 + 端口行（Label + SpinBox 1–65535 + Apply 按钮 + 运行状态 Label）→ Show timestamps 复选框 → Allow code_execute 复选框（09-13 下午新增）→ 分隔线 → 客户端配置区（`OptionButton` 下拉选择 8 个客户端，label 含配置文件路径）+ Generate 按钮 + 结果 Label + 生效条件提示 Label → 技能生成区（Generate Skills / Update Skills 动态按钮）
-- **Allow code_execute 复选框（09-13 下午新增）**：勾选/取消经 `PluginConfig::save_allow` 增删 `allow` 列表中的 `code_execute` 项（`code_execute_allowed()` 读配置计算初值，操作后用 `set_pressed_no_signal` 校准）；下次工具调用即生效（授权门每次实时读取配置），`GODOT_AUTOPILOT_ALLOW` 环境变量存在时优先于该配置（tooltip 已注明）。仅管理 `code_execute` 能力，`game_runtime`/`process` 需环境变量或手改配置的 `allow` 键。
+- **布局**：VBoxContainer = "MCP Server" 标题 + 端口行（Label + SpinBox 1–65535 + Apply 按钮 + 运行状态 Label）→ Show timestamps 复选框 → Allow code_execute 复选框（09-13 下午新增）→ Allow game_runtime 复选框（09-14 新增）→ 分隔线 → 客户端配置区（`OptionButton` 下拉选择 20 个客户端，label 含配置文件路径）+ Generate 按钮 + 结果 Label + 生效条件提示 Label → 技能生成区（Generate Skills / Update Skills 动态按钮）
+- **Allow code_execute / Allow game_runtime 复选框（09-13 下午新增 code_execute，09-14 新增 game_runtime）**：两个勾选框分别转发到共享槽函数 `_on_allow_toggled(capability, box, checked)`——勾选用 `authorization::allow_list_add` 追加能力（已生效或配置含 `all` 时保持原样），取消用 `allow_list_remove` 移除（先把 `all` 展开为全部已知能力再逐项删除）；初值与操作后校准均用 `allow_list_contains` + `set_pressed_no_signal`（dock 私有的 `split_allow`/`join_allow` 与 `code_execute_allowed()` 已删除）。下次工具调用即生效（授权门每次实时读取配置），`GODOT_AUTOPILOT_ALLOW` 环境变量存在时优先于该配置（tooltip 已注明）。`process` 无 dock 开关，需环境变量或手改配置的 `allow` 键；拒绝响应的 `enable` 文案同样只对 `code_execute`/`game_runtime` 提及 dock（`authorization::capability_has_dock_toggle`）。
 - **技能生成（动态按钮）**：按钮文本按 `.agents/skills/` 下是否已存在 `godot-autopilot-` 前缀目录动态切换——无 → "Generate Skills"，有 → "Update Skills"；Update 点击先递归删除全部前缀匹配目录再整体重新生成（语义详见下文 skill_gen 小节）
 - **端口管理**：`set_server_context(ServerContext*)` 注入服务器（null 时禁用 Apply）；Apply → `ServerContext::restart(port)` → 成功后 `PluginConfig::save_port(port)` 持久化，并刷新面板内运行状态 Label（"Running on port N" / "Server offline"，主题色标注）
-- **配置生成**：`_on_generate()` 只处理下拉选中的单个客户端——目标目录 `ProjectSettings::globalize_path("res://")`；文件不存在 → `render_config` 新建；JSON 已存在 → `merge_json_config` 合并（**先解析现有配置，保留其他键，仅更新 `mcp`/`mcpServers` 下的 `godot-autopilot` 条目**，不覆盖用户的其他 agent 配置）；Codex TOML 已含 `mcp_servers` → 跳过并提示；JSON 无法解析 → 跳过不写（防覆盖）；结果单文件报告「创建/更新/跳过」原因
+- **配置生成**：`_on_generate()` 只处理下拉选中的单个客户端——目标目录 `ProjectSettings::globalize_path("res://")`；文件不存在 → `render_config` 新建；JSON 已存在 → `merge_json_config` 合并（**先解析现有配置，保留其他键，仅更新对应顶层键下的 `godot-autopilot` 条目**，不覆盖用户的其他 agent 配置）；TOML 客户端（Codex/Grok Build/Reasonix，经 `uses_toml` 判定）已含 MCP 配置 → 跳过并提示；JSON 无法解析 → 跳过不写（防覆盖）；结果单文件报告「创建/更新/跳过」原因
 - **主题**：颜色经 `theme_color()` 从编辑器主题取 `success_color`/`error_color`/`warning_color`/`font_disabled_color`（无则回退硬编码色）
 
 ### client_config_gen（`src/util/client_config_gen.cpp/hpp`，命名空间 `godot_autopilot::client_config_gen`）
@@ -139,29 +139,43 @@ resource:
 | Trae | `.trae/mcp.json` | `mcpServers` | `url`（无 type） |
 | Qoder | `.qoder/settings.json` | `mcpServers` | `type=http`、`url` |
 | WorkBuddy | `.workbuddy/mcp.json` | `mcpServers` | `type=http`、`url` |
+| ZCode | `.zcode/config.json` | `mcp.servers`（双层嵌套） | `type=http`、`url`、`enabled=true`（09-16 新增；type 写 `http` 而非桌面端 legacy `remote`） |
+| pi（pi-mcp-adapter） | `.pi/mcp.json` | `mcpServers` | `url`（无 type；需先安装 pi-mcp-adapter 扩展） |
+| Command Code | `.mcp.json` | `mcpServers` | `type=http`、`url`（09-16 新增；与 Claude Code 共用同一文件同一条目） |
+| Kilo Code | `.kilo/mcp.json` | `mcpServers` | `type=streamable-http`、`url`（09-16 新增；取旧格式，新核心自动迁移） |
+| Roo Code | `.roo/mcp.json` | `mcpServers` | `type=streamable-http`、`url`（09-16 新增；该客户端对 URL 型省略 type 会报错） |
+| Grok Build | `.grok/config.toml` | `[mcp_servers.godot-autopilot]`（TOML） | `url`（09-16 新增；与 Codex 同构） |
+| Kimi Code | `.kimi-code/mcp.json` | `mcpServers` | `url`、`enabled=true`（无 type，09-16 新增） |
+| Zed | `.zed/settings.json` | `context_servers` | `url`（无 type；09-16 新增；通用项目设置文件，merge 保留用户其他设置） |
+| CodeBuddy | `.mcp.json` | `mcpServers` | `type=http`、`url`（09-16 新增；与 Claude Code 共用同一文件同一条目） |
+| Crush | `.crush.json` | `mcp` | `type=http`、`url` + 顶层 `$schema`（09-16 新增；legacy JSON 体系，strict schema 不写 enabled） |
+| GitHub Copilot (VS Code) | `.vscode/mcp.json` | `servers`（非 `mcpServers`） | `type=http`、`url`（09-16 新增；覆盖 VS Code 内 Copilot Chat，`.github/mcp.json` 只覆盖 coding agent 与 Copilot CLI） |
+| Reasonix | `reasonix.toml` | `[[plugins]]` 数组（TOML） | `name`、`type=http`、`url`（09-16 新增） |
+
+调研淘汰说明（09-16）：Cline（项目级 `.cline/mcp.json` 仅官方 CLI 文档化，VS Code 扩展未确认会读取）与 Antigravity CLI（官方文档支持 `.agents/mcp_config.json` 但 CLI v1.0.0 存在项目级 "read but ignored" 已知 bug）按"可能不生效即不支持"原则暂不纳入。
 
 - 服务器名常量 `kServerName = "godot-autopilot"`；URL 统一 `http://127.0.0.1:<port>/mcp`（DNS rebinding 保护要求 127.0.0.1）
-- `render_config(ClientId, port)` — 全新文件内容（JSON `Dump(2)` 缩进 / TOML 字符串）
-- `merge_json_config(ClientId, port, existing)` — 空串 → 视为新建；Parse 失败或非对象 → `Unparsable`；否则更新顶层键下同名条目并保留其余内容
-- `merge_toml_config(port, existing)` — 已含 `[mcp_servers` 段 → `AlreadyConfigured`；否则追加段（保留原文）
+- `render_config(ClientId, port)` — 全新文件内容（JSON `Dump(2)` 缩进 / TOML 字符串）；TOML 客户端判定 `uses_toml(id)`（Codex / GrokBuild / Reasonix）
+- `merge_json_config(ClientId, port, existing)` — 空串 → 视为新建；Parse 失败或非对象 → `Unparsable`；否则更新顶层键下同名条目并保留其余内容（ZCode 为 `mcp.servers` 双层，`mcp` 非 object 时重建为 object）
+- `merge_toml_config(ClientId, port, existing)` — Codex/GrokBuild：已含 `[mcp_servers` 段 → `AlreadyConfigured`，否则追加段；Reasonix：marker 为 `name = "godot-autopilot"`，否则追加 `[[plugins]]` 数组元素（均保留原文）
 - `display_name` / `file_path` / `description` — UI label 与报告用
 
 ### skill_gen（`src/util/skill_gen.cpp/hpp` + `skill_content_generated.cpp` + `skill_templates/`，命名空间 `godot_autopilot::skill_gen`，09-08 新增；09-10 由 19 册重构为 7 册；09-13 增补 C# 专册与开发闭环，共 8 册）
 
 "一键生成 Agent Skills"：把 8 册英文 Agent Skills（符合 agentskills.io 规范）写入项目根 `.agents/skills/`，供外部编码代理加载。与 `client_config_gen` 同为 UI 面板消费的纯函数生成器（**仅依赖 std，无 Godot API**，L1 可测）：
 
-- **结构（09-10 七册化，09-13 增补至八册）**：原 19 册合并为 7 册——1 册插件总纲 `godot-autopilot` + 6 册引擎指南（`godot-autopilot-{scene-system,resources,scripting,runtime,servers,content}`）；09-13 新增 1 册 C# 专册 `godot-autopilot-csharp`（C# 编译循环、`[GlobalClass]` 资源、`[Export]` 属性、无热重载限制）。渲染后每册均带 `references/` 子文档（渐进披露，细节由子文档承载，合计 22 个 references：新增 `autopilot--development-workflow.md`（改→跑→观察→诊断→修→复验的完整闭环）与 `csharp--tool-reference.md`；模板源目录为平铺命名，`<name>--<ref>.md` 经 registry.json 映射为 `references/<ref>.md`）。**全部 84 条 Godot 4.8.0-dev 源码研究发现织入引擎六册**（撤销三历史、RID 不级联、暂停矩阵、`just_pressed` 双计数器、调试三道闸门、uid 优先于 path、导航双缓冲、`set_cell` 静默清格等），行内以 "4.7+"/"4.8" 简注标注适用版本
+- **结构（09-10 七册化，09-13 增补至八册）**：原 19 册合并为 7 册——1 册插件总纲 `godot-autopilot` + 6 册引擎指南（`godot-autopilot-{scene-system,resources,scripting,runtime,servers,content}`）；09-13 新增 1 册 C# 专册 `godot-autopilot-csharp`（C# 编译循环、`[GlobalClass]` 资源、`[Export]` 属性、无热重载限制）。渲染后每册均带 `references/` 子文档（渐进披露，细节由子文档承载，合计 22 个 references：新增 `autopilot--development-workflow.md`（改→跑→观察→诊断→修→复验的完整闭环）与 `csharp--tool-reference.md`；模板源目录为平铺命名，`<name>--<ref>.md` 经 registry.json 映射为 `references/<ref>.md`）。**全部 84 条 Godot 4.8.0-dev 源码研究发现织入引擎六册**（撤销三历史、RID 不级联、暂停矩阵、`just_pressed` 双计数器、调试三道闸门、uid 优先于 path、导航双缓冲、`set_cell` 静默清格等），行内以 "4.7+"/"4.8" 简注标注适用版本；09-15 随工具目录 379 更新 4 册模板（`autopilot.md`、`autopilot--tool-catalog.md`、`autopilot--development-workflow.md`、`runtime--input-injection.md`）——工具数 379、编辑器 UI 自动化闭环（枚举/命中→点击/输入→复验）、编辑器与游戏侧点击/快捷键、wheel/mouse_motion 与原始坐标回退
 - **内容承载（09-08 外置化，09-13 随册数同步）**：正文不再由 7 个 `skill_content_*.cpp`（已删除）手写，外置为 `src/util/skill_templates/`（31 个文件——30 个 .md + `registry.json`；registry 含 8 条 name/description/files 映射，聚合顺序固化于此）+ `tools/embed_skills.py`（纯 stdlib）构建期嵌入——生成头 `skill_content_embedded.h` 入 `build/<preset>/generated/`（gitignore 覆盖），**内容变更不再触碰 C++**。构建期 5 项校验：恰 `SKILL_COUNT = 8` 条（常量，与 registry 册数保持同步）、name 规则唯一、description ≤1024、files 结构与 source 存在、孤儿 .md 与重复引用（失败非零退出）；定界符 `gda_s` 碰撞自动避让；`cmake/skill_gen.cmake` 中 py launcher 优先（`find_program(NAMES py python python3 REQUIRED)`，本机 python 为 WindowsApps 存根）并 configure 期 `--version` 自检（失败 FATAL_ERROR）
 - **API**：`SkillSpec{name, description, files}`；`skill_gen.hpp` 的 7 个 make_* 声明收敛为 1 个 `make_embedded_skills()`，`all_skills()` 改为其转发（顺序由 registry.json 固化）；`skill_file_path()` 拼生成路径；`render_skill_md()` 渲染 YAML frontmatter——`name`/`description`（值含 ": " 时加引号）/`metadata{author: godot-autopilot, version: "<GDA_VERSION>"}`（version 由 configure_file 注入，与 `server_info` 同源）
 - **生成路径**：`<res://>/.agents/skills/<name>/SKILL.md`；`name` 小写连字符且与目录一致、description ≤1024；8 册全部带 `references/` 子文件
 - **UI 入口（09-10 动态化）**：McpConfigDock 面板按钮文本动态切换（见上文 McpConfigDock 小节），槽函数 `_on_generate_skills()`：先 `has_existing_skills()` 探测——有既有 `godot-autopilot-` 前缀目录则经 `remove_legacy_skill_dirs()`（`remove_dir_recursive` 后序遍历 + `DirAccess::remove`）整体删除后重建，旧 19 册在用户项目中随之自动退役；随后 `DirAccess::make_dir_recursive_absolute` 建目录并复用 `write_file` 写入；成功文案动态计数 "Generated/Updated N skills in .agents/skills/ (M reference files)"，失败列相对路径
 - **覆盖写策略**：写入与清理均限于自有 `godot-autopilot-` 前缀命名空间，不触碰 `.agents/skills/` 下其他内容
 - **8 册清单**（name 与吸收来源）：
-  - `godot-autopilot`——插件总纲，description 以 "Required reading before using the GDA (godot-autopilot) plugin" 开头（全英文）并以此定位本册（09-13 晚增强；09-13 21 时 skills 内容与 description 统一纯英文）：连接前提、工具发现协议（search first, never guess；Discovery protocol 追加 Search techniques——按对象/动词搜索、同义词重试、`category`/`tags` 过滤、BM25 排序受措辞影响、无果查 references/tool-catalog.md）、引擎文档查询时机（新增 Consult the engine documentation——文档工具直读运行中引擎自带的离线文档缓存、随引擎版本匹配，禁止凭记忆调 API）、引擎状态观测（新增 Watch the engine state——写操作后先读 `new_errors_since_last_call`，经编辑器日志/调试器/磁盘日志/插件日志取真实错误行，不连续盲操作）、任务到工具选择清单（Task routing 前置 Choosing the right tool——改属性→`property_set` 并回读、查属性→`property_get`/`property_get_list`、瓦片→`set_tilemap_cell`/`set_tilemap_cells` 与 tileset 工具、节点/资源/脚本/文档/运行时/日志各归其工具、批量→`batch_execute`、循环与数学→`code_execute`）、错误协议（watermark/retryable）、改→跑→观察→诊断→修→复验的开发闭环，吸收原 usage / direct-http / tool-map / tips-gotchas（references：development-workflow、http-fallback、tool-catalog、tool-gotchas）
+  - `godot-autopilot`——插件总纲，description 以 "Required reading before using the GDA (godot-autopilot) plugin" 开头（全英文）并以此定位本册（09-13 晚增强；09-13 21 时 skills 内容与 description 统一纯英文）：连接前提、工具发现协议（search first, never guess；Discovery protocol 追加 Search techniques——按对象/动词搜索、同义词重试、`category`/`tags` 过滤、BM25 排序受措辞影响、无果查 references/tool-catalog.md）、引擎文档查询时机（新增 Consult the engine documentation——文档工具直读运行中引擎自带的离线文档缓存、随引擎版本匹配，禁止凭记忆调 API）、引擎状态观测（新增 Watch the engine state——写操作后先读 `new_errors_since_last_call`，经编辑器日志/调试器/磁盘日志/插件日志取真实错误行，不连续盲操作）、任务到工具选择清单（Task routing 前置 Choosing the right tool——改属性→`property_set` 并回读、查属性→`property_get`/`property_get_list`、瓦片→`set_tilemap_cell`/`set_tilemap_cells` 与 tileset 工具、节点/资源/脚本/文档/运行时/日志各归其工具、批量→`batch_execute`、循环与数学→`code_execute`、编辑器 UI 自动化→`get_editor_ui_elements`/`hit_test_editor_point` 定位后 `click_editor_element`/`type_editor_element_text`/`run_editor_shortcut`（原始坐标回退 `click_input_mouse`/`scroll_input_mouse`/`drag_input_mouse`/`type_input_text`）（09-15 增补））、错误协议（watermark/retryable）、改→跑→观察→诊断→修→复验的开发闭环，吸收原 usage / direct-http / tool-map / tips-gotchas（references：development-workflow、http-fallback、tool-catalog、tool-gotchas）
   - `godot-autopilot-scene-system`——场景系统：场景生命周期、节点增删改名换父、属性 JSON 值形状、信号接线、undo 历史与 .tscn 序列化，吸收原 scene-building + properties-signals + inspection 的编辑侧
   - `godot-autopilot-resources`——资源与文件：load/save/create/duplicate、事务化 rename/move 与引用改写、UID 与依赖管理、导入管线，吸收原 resources-files
   - `godot-autopilot-scripting`——GDScript：四执行通道、@tool 语义、static 初始化与编辑器/游戏进程边界，原 scripting 就地重写保留
-  - `godot-autopilot-runtime`——运行与调试：启停游戏、帧精确输入注入、暂停语义、日志四路来源（编辑器引擎日志/调试会话/磁盘日志/插件 LogSystem `get_plugin_log`）与 watermark 确认环、运行时检查，吸收原 running-games + debugging + inspection 的运行侧
+  - `godot-autopilot-runtime`——运行与调试：启停游戏、帧精确输入注入（09-15 增补 wheel/mouse_motion 与编辑器 UI 输入路径）、暂停语义、日志四路来源（编辑器引擎日志/调试会话/磁盘日志/插件 LogSystem `get_plugin_log`）与 watermark 确认环、运行时检查，吸收原 running-games + debugging + inspection 的运行侧
   - `godot-autopilot-servers`——服务器层 RID 工具：RenderingServer/PhysicsServer/NavigationServer 语义与静默失败、物理 tick 次序、导航同步槽，吸收原 physics-navigation + rendering-text
   - `godot-autopilot-content`——内容管线：TileMap/TileSet、AnimationPlayer/Tree、音频总线与播放、Control 主题与布局及各域静默失败，吸收原 tilemap + animation + audio + ui-theming + spriteframes
   - `godot-autopilot-csharp`（09-13 新增）——C#/.NET 项目指南：`build_csharp_assembly` 编译循环、经 `get_debugger_log` 读编译/解析错误、运行确认（`get_debugger_errors` + 错误水印）、`[GlobalClass]` 资源经 `create_resource`、`[Export]` 节点与 typed-array 的 `property_set` 转换、附加 C# 脚本，以及 .NET 程序集无热重载、GDScript 不可见等限制（references：tool-reference）
@@ -199,7 +213,7 @@ resource:
 - `type_hint` 非空 → `parse_type_hint`（约 50 个别名，含 snake_case 与紧凑别名如 `stringname`/`dict`/`packedbytearray`，大小写不敏感）→ `deserialize_typed`（覆盖全部值类型 + OBJECT + RID；**RID 只回空 Variant**）；hint 不是类型名时：字符串 → `ResourceLoader.load(path, type_hint)`（失败写 Resources 类别 Warning 日志）；对象 → `deserialize_as_object`（**09-13 起先识别 `__node_ref__` 并解析为编辑场景内节点引用，解析失败返回空 Variant 而非实例化游离节点**；否则 `ClassDB.instantiate` + `get_property_list` 元数据按属性类型反序列化 + 嵌套 `class` 递归，`class` 字段本身跳过）
 - 无 type_hint → `deserialize_inferred`：按 JSON 值类型推断；对象特例识别 `__node_ref__`（共用 `try_deserialize_node_ref`：经 `EditorInterface` 取编辑场景根、上溯到顶再 `get_node_or_null`）、`object_id_str`（stoll 解析失败写 System 类别 Warning 日志）/`object_id`（`ObjectDB::get_instance`）；否则递归为 Dictionary
 
-**deserialize_strict 严格形状（09-13 下午新增）**：Rect2/Rect2i 的 `size` 必须为对象且提供 `w`+`h`（或别名 `x`+`y`；同轴两种拼写并存且值不同即报 conflict），`position` 可省（默认 0）；AABB 的 `size` 需 `w`+`h`+`d`（或 `x`+`y`+`z`）；Transform2D 必须提供 `columns`（≥3 列、每列 ≥2 数字）；Transform3D 必须提供 `basis.rows`（≥3 行、每行 ≥3 数字），其余类型透传 `deserialize`。
+**deserialize_strict 严格形状（09-13 下午新增；09-14 增补 Vector2/2i）**：Rect2/Rect2i 的 `size` 必须为对象且提供 `w`+`h`（或别名 `x`+`y`；同轴两种拼写并存且值不同即报 conflict），`position` 可省（默认 0）；AABB 的 `size` 需 `w`+`h`+`d`（或 `x`+`y`+`z`）；Transform2D 必须提供 `columns`（≥3 列、每列 ≥2 数字）；Transform3D 必须提供 `basis.rows`（≥3 行、每行 ≥3 数字）；Vector2/Vector2i 必须为 `{x,y}` 对象，数组输入报 `invalid Vector2: expected a JSON object, e.g. {"x":0,"y":0}`（此前数组静默写 0）；其余类型透传 `deserialize`。接入方：`property_set`/`create_scene_node`（09-13 起）与 `set_resource_property`（09-14 起）。
 
 数值读取使用宽容辅助 `as_int64/as_double`（int/double 互转，非数字回默认 0）。`COLOR` 的 `a` 缺省 1.0。
 

@@ -23,6 +23,7 @@ mcp::JsonValue handle_tts_speak(const mcp::JsonValue &args);
 mcp::JsonValue handle_tts_stop(const mcp::JsonValue &args);
 mcp::JsonValue handle_window_create(const mcp::JsonValue &args);
 mcp::JsonValue handle_window_delete(const mcp::JsonValue &args);
+mcp::JsonValue handle_window_get_rect(const mcp::JsonValue &args);
 mcp::JsonValue handle_window_move_to_foreground(const mcp::JsonValue &args);
 mcp::JsonValue handle_window_request_attention(const mcp::JsonValue &args);
 mcp::JsonValue handle_window_set_flag(const mcp::JsonValue &args);

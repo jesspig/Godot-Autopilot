@@ -7,8 +7,12 @@
 #include "util/variant_json.hpp"
 #include <algorithm>
 #include <exception>
+#include <string>
 #include <vector>
+#include <godot_cpp/classes/camera3d.hpp>
+#include <godot_cpp/classes/canvas_item.hpp>
 #include <godot_cpp/classes/class_db_singleton.hpp>
+#include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/editor_undo_redo_manager.hpp>
 #include <godot_cpp/classes/node.hpp>
@@ -17,6 +21,8 @@
 #include <godot_cpp/classes/packed_scene.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
+#include <godot_cpp/classes/sub_viewport.hpp>
+#include <godot_cpp/classes/viewport.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/variant/node_path.hpp>
@@ -25,6 +31,8 @@
 #include <godot_cpp/variant/transform2d.hpp>
 #include <godot_cpp/variant/transform3d.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
+#include <godot_cpp/variant/vector2.hpp>
+#include <godot_cpp/variant/vector3.hpp>
 
 namespace godot_autopilot {
 namespace scene_ops {
@@ -34,6 +42,7 @@ namespace {
 constexpr int DEFAULT_MAX_DEPTH = 8;
 constexpr int UNLIMITED_TREE_DEPTH = 100000;
 constexpr int MAX_PROPERTY_COUNT = 20;
+constexpr int MAX_SCREEN_RECT_PATHS = 50;
 
 void collect_property_summary(godot::Node *node, mcp::JsonValue &j) {
   godot::TypedArray<godot::Dictionary> props = node->get_property_list();
@@ -41,7 +50,9 @@ void collect_property_summary(godot::Node *node, mcp::JsonValue &j) {
   for (int i = 0; i < props.size() && count < MAX_PROPERTY_COUNT; i++) {
     godot::Dictionary prop = props[i];
     godot::Variant name_v = prop["name"];
-    if (name_v.get_type() != godot::Variant::STRING_NAME)
+    godot::Variant::Type name_type = name_v.get_type();
+    if (name_type != godot::Variant::STRING &&
+        name_type != godot::Variant::STRING_NAME)
       continue;
     godot::StringName prop_name = name_v;
     std::string name_str = util::to_std(godot::String(prop_name));
@@ -101,6 +112,39 @@ void node_to_json(godot::Node *node, int remaining_depth,
       j["children"].PushBack(std::move(child_j));
     }
   }
+}
+
+// F2: tells apart resource/object-typed property values from value-typed ones.
+// OBJECT-typed properties (sprite_frames, texture, script, shape, ...) must be
+// applied first: the engine drops dependent values that arrive while their
+// resource is still unset (AnimatedSprite2D::set_animation resets the animation
+// name to empty and pushes an error when frames is null). The reflected
+// property list of the freshly instantiated node is the authority; unknown
+// properties fall back to the shape of the incoming JSON value.
+bool property_value_is_object_typed(const godot::Node *node,
+                                    const std::string &prop_name,
+                                    const mcp::JsonValue &raw_value) {
+  godot::TypedArray<godot::Dictionary> props = node->get_property_list();
+  for (int64_t i = 0; i < props.size(); i++) {
+    godot::Dictionary dict = props[i];
+    if (!dict.has("name") || !dict.has("type"))
+      continue;
+    if (util::to_std(dict["name"].operator godot::String()) != prop_name)
+      continue;
+    return static_cast<godot::Variant::Type>(static_cast<int>(dict["type"])) ==
+           godot::Variant::OBJECT;
+  }
+  if (raw_value.IsString()) {
+    const std::string str = raw_value.GetString();
+    return str.rfind("res://", 0) == 0 || str.rfind("memory://", 0) == 0;
+  }
+  if (raw_value.IsObject()) {
+    const mcp::JsonValue *ref = raw_value.Find("path");
+    if (!ref)
+      ref = raw_value.Find("resource");
+    return ref != nullptr && ref->IsString();
+  }
+  return false;
 }
 
 } // namespace
@@ -208,15 +252,21 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
 
   std::vector<std::string> applied_properties;
   std::vector<mcp::JsonValue> property_warnings;
+  std::vector<mcp::JsonValue> inline_resources;
   if (props_it) {
     auto *scene_root_now =
         editor ? editor->get_edited_scene_root() : nullptr;
     std::string node_rel_path = scene_relative_path(obj, scene_root_now);
-    for (const auto &kv : *props_it) {
+
+    // Applies one property through property_ops::handle_set and collects the
+    // applied name, its warning and any inline resource echo. Returns an empty
+    // object on success, an error object (same message as before) on failure.
+    auto apply_property = [&](const std::string &prop_name,
+                              const mcp::JsonValue &prop_value) {
       mcp::JsonValue prop_args(mcp::JsonValue::object_tag);
       prop_args["path"] = mcp::JsonValue(node_rel_path);
-      prop_args["property"] = mcp::JsonValue(kv.first);
-      prop_args["value"] = kv.second;
+      prop_args["property"] = mcp::JsonValue(prop_name);
+      prop_args["value"] = prop_value;
       mcp::JsonValue prop_result;
       try {
         prop_result = godot_autopilot::property_ops::handle_set(prop_args);
@@ -238,7 +288,7 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
         memdelete(obj);
         mcp::JsonValue e(mcp::JsonValue::object_tag);
         e["error"] =
-            mcp::JsonValue("failed to apply property '" + kv.first +
+            mcp::JsonValue("failed to apply property '" + prop_name +
                            "' on created node: " + err->GetString());
         return e;
       }
@@ -246,11 +296,40 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
       if (warn && warn->IsString()) {
         mcp::JsonValue w(mcp::JsonValue::object_tag);
         w["path"] = mcp::JsonValue(node_rel_path);
-        w["property"] = mcp::JsonValue(kv.first);
+        w["property"] = mcp::JsonValue(prop_name);
         w["warning"] = mcp::JsonValue(warn->GetString());
         property_warnings.push_back(std::move(w));
       }
-      applied_properties.push_back(kv.first);
+      auto *inline_rec = prop_result.Find("inline_resources");
+      if (inline_rec && inline_rec->IsArray()) {
+        for (const auto &entry : inline_rec->GetArray()) {
+          inline_resources.push_back(entry);
+        }
+      }
+      applied_properties.push_back(prop_name);
+      return mcp::JsonValue(mcp::JsonValue::object_tag);
+    };
+
+    // Two passes over the same key order (mcp::JsonValue iterates its backing
+    // std::map, i.e. lexicographically): resource/object-typed values first,
+    // then every remaining value-typed one. A dependent value such as
+    // AnimatedSprite2D.animation therefore lands after its sprite_frames.
+    std::vector<std::string> object_props;
+    for (const auto &kv : *props_it) {
+      if (property_value_is_object_typed(obj, kv.first, kv.second))
+        object_props.push_back(kv.first);
+    }
+    for (int pass = 0; pass < 2; pass++) {
+      for (const auto &kv : *props_it) {
+        const bool object_typed =
+            std::find(object_props.begin(), object_props.end(), kv.first) !=
+            object_props.end();
+        if (object_typed != (pass == 0))
+          continue;
+        mcp::JsonValue apply_error = apply_property(kv.first, kv.second);
+        if (apply_error.Find("error"))
+          return apply_error;
+      }
     }
   }
 
@@ -272,13 +351,22 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
     result_path = scene_relative_path(obj, scene_root);
   }
 
+  const util::EditedSceneInfo scene_info = util::edited_scene_info();
+
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   mcp::JsonValue inner(mcp::JsonValue::object_tag);
   inner["path"] = mcp::JsonValue(result_path);
+  util::add_scene_info_fields(inner, scene_info);
   mcp::JsonValue applied(mcp::JsonValue::array_tag);
   for (const auto &applied_name : applied_properties)
     applied.PushBack(mcp::JsonValue(applied_name));
   inner["applied_properties"] = std::move(applied);
+  if (!inline_resources.empty()) {
+    mcp::JsonValue inlines(mcp::JsonValue::array_tag);
+    for (auto &entry : inline_resources)
+      inlines.PushBack(std::move(entry));
+    inner["inline_resources"] = std::move(inlines);
+  }
   if (!property_warnings.empty()) {
     mcp::JsonValue warnings(mcp::JsonValue::array_tag);
     for (auto &w : property_warnings)
@@ -288,6 +376,12 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
   inner["undo"] =
       mcp::JsonValue("delete node " + result_path + " (delete_scene_node)");
   r["result"] = std::move(inner);
+  util::add_scene_info_fields(r, scene_info);
+  if (!scene_info.has_scene) {
+    r["scene_info_note"] = mcp::JsonValue(
+        "no edited scene root — scene_path is empty and the write target is "
+        "unknown");
+  }
   scene_dirty_tracker::mark_scene_modified();
   return r;
 }
@@ -371,6 +465,7 @@ mcp::JsonValue handle_delete(const mcp::JsonValue &args) {
       mcp::JsonValue("recreate node " + node_name + " (" + node_type +
                      ") under " + parent_path + " (create_scene_node)");
   r["undo"] = std::move(undo_info);
+  util::add_scene_info_fields(r, util::edited_scene_info());
   scene_dirty_tracker::mark_scene_modified();
   return r;
 }
@@ -446,6 +541,7 @@ mcp::JsonValue handle_rename(const mcp::JsonValue &args) {
   r["name"] = mcp::JsonValue(util::to_std(node->get_name()));
   r["path"] =
       mcp::JsonValue(scene_relative_path(node, scene_root));
+  util::add_scene_info_fields(r, util::edited_scene_info());
   scene_dirty_tracker::mark_scene_modified();
   return r;
 }
@@ -749,6 +845,215 @@ mcp::JsonValue handle_get_tree(const mcp::JsonValue &args) {
   node_to_json(root, max_depth, include_properties, result);
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(result);
+  return r;
+}
+
+mcp::JsonValue handle_get_node_screen_rect(const mcp::JsonValue &args) {
+  auto *paths_p = args.Find("paths");
+  if (!paths_p || !paths_p->IsArray()) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue("missing required parameter: paths (array)");
+    return e;
+  }
+  const auto &paths_arr = paths_p->GetArray();
+  if (paths_arr.empty() ||
+      paths_arr.size() > static_cast<size_t>(MAX_SCREEN_RECT_PATHS)) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue("parameter 'paths' must contain between 1 and " +
+                                std::to_string(MAX_SCREEN_RECT_PATHS) +
+                                " entries");
+    return e;
+  }
+  for (const auto &p : paths_arr) {
+    if (!p.IsString()) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] =
+          mcp::JsonValue("parameter 'paths' must be an array of strings");
+      return e;
+    }
+  }
+
+  std::string viewport_mode = "auto";
+  auto *vp_arg = args.Find("viewport");
+  if (vp_arg) {
+    if (!vp_arg->IsString()) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue("parameter 'viewport' must be a string");
+      return e;
+    }
+    viewport_mode = vp_arg->GetString();
+    if (viewport_mode != "auto" && viewport_mode != "2d" &&
+        viewport_mode != "3d") {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] =
+          mcp::JsonValue("parameter 'viewport' must be one of: auto, 2d, 3d");
+      return e;
+    }
+  }
+
+  auto *editor = godot::EditorInterface::get_singleton();
+  auto *scene_root = editor ? editor->get_edited_scene_root() : nullptr;
+  if (!editor || !scene_root) {
+    return util::error_detail(
+        "no edited scene root available",
+        "scene_ops.cpp handle_get_node_screen_rect", "an edited scene",
+        "open or create a scene first (create_editor_scene)");
+  }
+
+  godot::SubViewport *vp2d = editor->get_editor_viewport_2d();
+  godot::SubViewport *vp3d = editor->get_editor_viewport_3d(0);
+  godot::Transform2D t2d;
+  if (vp2d)
+    t2d = vp2d->get_screen_transform() * vp2d->get_global_canvas_transform();
+  godot::Transform2D t3d;
+  if (vp3d)
+    t3d = vp3d->get_screen_transform();
+  godot::Camera3D *camera = vp3d ? vp3d->get_camera_3d() : nullptr;
+
+  mcp::JsonValue items(mcp::JsonValue::array_tag);
+  std::string resolved_viewport;
+  godot::Transform2D resolved_transform;
+  bool has_resolved = false;
+
+  for (const auto &p : paths_arr) {
+    std::string path = p.GetString();
+    mcp::JsonValue item(mcp::JsonValue::object_tag);
+    item["path"] = mcp::JsonValue(path);
+
+    std::string hint;
+    godot::Node *node = util::resolve_scene_node(path, scene_root, &hint);
+    if (!node) {
+      item["ok"] = mcp::JsonValue(false);
+      item["error"] = mcp::JsonValue("node not found");
+      items.PushBack(std::move(item));
+      continue;
+    }
+
+    std::string type = util::to_std(node->get_class());
+    godot::Node3D *node_3d = godot::Object::cast_to<godot::Node3D>(node);
+    godot::CanvasItem *canvas_item =
+        godot::Object::cast_to<godot::CanvasItem>(node);
+    std::string space;
+    if (node_3d)
+      space = "3d";
+    else if (canvas_item)
+      space = "2d";
+    else {
+      item["ok"] = mcp::JsonValue(false);
+      item["error"] = mcp::JsonValue("unsupported node type");
+      items.PushBack(std::move(item));
+      continue;
+    }
+
+    if (viewport_mode != "auto" && viewport_mode != space) {
+      item["ok"] = mcp::JsonValue(false);
+      item["error"] = mcp::JsonValue(
+          "node type " + type + " is not compatible with viewport '" +
+          viewport_mode + "'");
+      items.PushBack(std::move(item));
+      continue;
+    }
+
+    if (space == "3d") {
+      if (!vp3d) {
+        item["ok"] = mcp::JsonValue(false);
+        item["error"] = mcp::JsonValue("3D editor viewport not available");
+        items.PushBack(std::move(item));
+        continue;
+      }
+      if (!camera) {
+        item["ok"] = mcp::JsonValue(false);
+        item["error"] = mcp::JsonValue("3D editor viewport has no camera");
+        items.PushBack(std::move(item));
+        continue;
+      }
+      godot::Vector3 world = node_3d->get_global_transform().get_origin();
+      godot::Vector2 local = camera->unproject_position(world);
+      godot::Vector2 pos = t3d.xform(local);
+      item["ok"] = mcp::JsonValue(true);
+      item["type"] = mcp::JsonValue(type);
+      mcp::JsonValue screen_position(mcp::JsonValue::object_tag);
+      screen_position["x"] = mcp::JsonValue(static_cast<double>(pos.x));
+      screen_position["y"] = mcp::JsonValue(static_cast<double>(pos.y));
+      item["screen_position"] = std::move(screen_position);
+      item["behind"] = mcp::JsonValue(camera->is_position_behind(world));
+      if (!has_resolved) {
+        has_resolved = true;
+        resolved_viewport = "3d";
+        resolved_transform = t3d;
+      }
+      items.PushBack(std::move(item));
+      continue;
+    }
+
+    if (!vp2d) {
+      item["ok"] = mcp::JsonValue(false);
+      item["error"] = mcp::JsonValue("2D editor viewport not available");
+      items.PushBack(std::move(item));
+      continue;
+    }
+    godot::Vector2 pos =
+        t2d.xform(canvas_item->get_global_transform().get_origin());
+    item["ok"] = mcp::JsonValue(true);
+    item["type"] = mcp::JsonValue(type);
+    mcp::JsonValue screen_position(mcp::JsonValue::object_tag);
+    screen_position["x"] = mcp::JsonValue(static_cast<double>(pos.x));
+    screen_position["y"] = mcp::JsonValue(static_cast<double>(pos.y));
+    item["screen_position"] = std::move(screen_position);
+    godot::Control *control = godot::Object::cast_to<godot::Control>(node);
+    if (control) {
+      godot::Transform2D global = control->get_global_transform();
+      godot::Vector2 corner_a = t2d.xform(global.xform(godot::Vector2()));
+      godot::Vector2 corner_b = t2d.xform(global.xform(control->get_size()));
+      double min_x = std::min(static_cast<double>(corner_a.x),
+                              static_cast<double>(corner_b.x));
+      double min_y = std::min(static_cast<double>(corner_a.y),
+                              static_cast<double>(corner_b.y));
+      double max_x = std::max(static_cast<double>(corner_a.x),
+                              static_cast<double>(corner_b.x));
+      double max_y = std::max(static_cast<double>(corner_a.y),
+                              static_cast<double>(corner_b.y));
+      mcp::JsonValue rect(mcp::JsonValue::object_tag);
+      mcp::JsonValue rect_position(mcp::JsonValue::object_tag);
+      rect_position["x"] = mcp::JsonValue(min_x);
+      rect_position["y"] = mcp::JsonValue(min_y);
+      mcp::JsonValue rect_size(mcp::JsonValue::object_tag);
+      rect_size["x"] = mcp::JsonValue(max_x - min_x);
+      rect_size["y"] = mcp::JsonValue(max_y - min_y);
+      rect["position"] = std::move(rect_position);
+      rect["size"] = std::move(rect_size);
+      item["rect"] = std::move(rect);
+    }
+    if (!has_resolved) {
+      has_resolved = true;
+      resolved_viewport = "2d";
+      resolved_transform = t2d;
+    }
+    items.PushBack(std::move(item));
+  }
+
+  if (!has_resolved) {
+    resolved_viewport = viewport_mode == "3d" ? "3d" : "2d";
+    resolved_transform = viewport_mode == "3d" ? t3d : t2d;
+  }
+
+  godot::Size2 resolved_scale = resolved_transform.get_scale();
+  godot::Vector2 resolved_origin = resolved_transform.get_origin();
+  mcp::JsonValue mapping(mcp::JsonValue::object_tag);
+  mapping["scale_x"] = mcp::JsonValue(static_cast<double>(resolved_scale.x));
+  mapping["scale_y"] = mcp::JsonValue(static_cast<double>(resolved_scale.y));
+  mapping["offset_x"] = mcp::JsonValue(static_cast<double>(resolved_origin.x));
+  mapping["offset_y"] = mcp::JsonValue(static_cast<double>(resolved_origin.y));
+
+  mcp::JsonValue inner(mcp::JsonValue::object_tag);
+  inner["viewport"] = mcp::JsonValue(resolved_viewport);
+  inner["window_id"] = mcp::JsonValue(0);
+  inner["space"] = mcp::JsonValue("window");
+  inner["mapping"] = std::move(mapping);
+  inner["items"] = std::move(items);
+
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["result"] = std::move(inner);
   return r;
 }
 

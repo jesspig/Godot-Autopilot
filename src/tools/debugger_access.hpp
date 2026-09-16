@@ -2,12 +2,17 @@
 #define GODOT_AUTOPILOT_DEBUGGER_ACCESS_HPP
 
 #include <cstdint>
+#include <godot_cpp/variant/array.hpp>
+#include <godot_cpp/variant/string.hpp>
 #include <string>
 #include <vector>
 
 namespace godot_autopilot {
 
 bool debugger_capture_initialized();
+
+bool debugger_broadcast_engine_command(const godot::String &command,
+                                       const godot::Array &data);
 
 bool debugger_broadcast_request(const std::string &payload,
                                 int32_t *out_first_session_id,

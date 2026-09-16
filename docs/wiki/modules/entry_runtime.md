@@ -6,7 +6,7 @@ tags:
   - 模块
   - 入口
   - 运行时桥接
-timestamp: "2026-09-13T17:50:28+08:00"
+timestamp: "2026-09-16T17:06:25+08:00"
 resource:
   - src/main.cpp
   - src/runtime/
@@ -14,7 +14,7 @@ resource:
 
 # 模块：入口与运行时桥接（entry_runtime）
 
-覆盖代码：`src/main.cpp`（326 行）与 `src/runtime/`（`gda_protocol.hpp` 53 行、`game_bridge.hpp` 79 行、`game_bridge.cpp` 701 行、`game_bridge_input.cpp` 939 行、`game_bridge_eval.cpp` 509 行）。
+覆盖代码：`src/main.cpp`（326 行）与 `src/runtime/`（`gda_protocol.hpp` 53 行、`game_bridge.hpp` 79 行、`game_bridge.cpp`（09-16 增窗口坐标换算约 30 行）、`game_bridge_input.cpp`（09-16 删本地键名表约 60 行、改调共用判定）、`game_bridge_eval.cpp` 509 行）。
 
 职责全景：`main.cpp` 是 GDExtension 的导出入口与编辑器插件本体；`src/runtime/` 是在**游戏运行时进程**内与编辑器进程通信的桥接层，通过 EngineDebugger 消息通道承载 GDA 协议。编辑器内的 MCP 服务器（`ServerContext`）与运行时桥接是两条相互独立的消息通路，本页只覆盖入口生命周期与运行时桥接，MCP 工具侧见相关模块页。
 
@@ -132,7 +132,7 @@ resource:
 
 `create_editor_scene` 的等待循环以 `timeout_ms` 为上限（默认取 `GDA_NEW_SCENE_SWITCH_WAIT_MS`；非整数或越界直接报错，超时按 `GDA_NEW_SCENE_POLL_MS` 累计等待），失败时返回 `waited_ms`/`timeout_ms`/`node_released`/`editor_state` 诊断并释放未被编辑器接管的临时根节点；实现细节见 [tools_ops_a.md](tools_ops_a.md) 的 editor_ops 小节。
 
-桥接相关常量在 `src/core/config.hpp`：`GDA_HEALTHY_ACTIVITY_THRESHOLD_MS=3000`、`GDA_ERROR_BUFFER_MAX=200`、`GDA_OUTPUT_BUFFER_MAX=500`、`GDA_EVAL_TRUNCATE_BYTES=8192`。
+桥接相关常量在 `src/core/config.hpp`：`GDA_HEALTHY_ACTIVITY_THRESHOLD_MS=3000`、`GDA_ERROR_BUFFER_MAX=200`、`GDA_OUTPUT_BUFFER_MAX=500`、`GDA_EVAL_TRUNCATE_BYTES=8192`；09-16 起新增 game 工具超时预算常量：`GDA_MAX_GAME_OP_TIMEOUT_MS=25000`（host 等待 +2000ms 宽限 < 30000 传输硬上限）、`GDA_LATE_RESULT_BUFFER_MAX=5`（超时后迟到结果保留条数）、`GDA_LATE_RESULT_SUMMARY_CHARS=200`（每条摘要截断），语义见 [modules/tools_ops_b.md](tools_ops_b.md) 的 runtime_ops 小节。
 
 ## 3. 运行时桥接三文件职责
 
@@ -144,7 +144,8 @@ resource:
 - `send_response(request_id, body)`：补 `request_id` 字段（`GDA_FIELD_REQUEST_ID` 常量），`EngineDebugger::send_message("gda:response", [json])`。
 - `GameBridgeLogger`（godot::Logger 子类）：`_log_error` 按错误类型（warning 判定码 3）经 `push_game_error` 入错误缓冲；`_log_message` 错误入错误缓冲、普通消息入输出缓冲。
 - 缓冲：`g_error_buffer`（环形，上限 200，每条带递增 `seq`，`g_error_seq` 单调）+ `g_output_buffer`（上限 500），互斥锁保护；`current_error_seq()` / `eval_error_delta(since_seq)` / `append_eval_runtime_errors` 供 eval 附加运行期错误增量（文本增量 + 仅首条的 `structured_error`）；`truncate_error_text` 超 8192 字节截断。
-- 状态与工具 op：`status`（版本/fps/physics_frame/paused/node_count/scene、活动字段）、`ping`（physics/process 帧 + 活动字段）、`cancel`（查 `g_cancel_handlers` 并调用 handler）、`capture`（根视口渲染存 PNG 到缓存目录，返回 path/width/height）、`get_errors`（limit 默认 50）、`get_output`（limit 默认 200）、`get_tree`（DFS，深度上限 64、节点上限 2000）、`ui_elements`（08-24 新增，见下）。
+- 状态与工具 op：`status`（版本/fps/physics_frame/paused/node_count/scene、活动字段）、`ping`（physics/process 帧 + 活动字段）、`cancel`（查 `g_cancel_handlers` 并调用 handler）、`capture`（根视口渲染存 PNG 到缓存目录，返回 path/width/height；09-14 起渲染后经 `capture_ops::prune_capture_files` 清理缓存目录，仅保留最近 20 张 `gda_capture*`）、`get_errors`（limit 默认 50）、`get_output`（limit 默认 200）、`get_tree`（DFS，深度上限 64、节点上限 2000）、`ui_elements`（08-24 新增，见下）、`ui_click`（09-16 补窗口坐标换算，见下）。
+- **`run_ui_click` 窗口坐标换算（09-16 起，`game_bridge.cpp`）**：`UiElement` 矩形来自 `Control::get_global_rect()`（画布空间），而 `InputEventMouseButton.position` 必须是窗口客户区坐标（引擎 `viewport.cpp:_make_input_local` 用 `get_final_transform()` 反变换换回画布空间，stretch 与 letterbox 边距都在该链上）。实现取控件所属视口的 `get_screen_transform()` 复合其 `get_canvas_transform()`（默认画布 Camera2D / CanvasLayer 层变换），经 `coords::viewport_rect_center_to_window`（`src/core/editor_coords.hpp/cpp` 新增纯函数，恒等变换原样返回）把 rect 中心换算后注入；无 transform 按恒等处理（保持旧行为）。响应保留画布空间 `position`（向后兼容）并新增 `viewport_position`（同值）与 `window_position`（实际注入坐标）。MCP 工具侧见 [modules/tools_ops_b.md](tools_ops_b.md) 的 `click_game_ui_element` 小节。
 - 辅助函数：`gda_string`（string_view → godot::String）、`error_result`/`ok_result`、`get_scene_tree`、`resolve_node`（空路径取当前场景，先场景内再根节点查询）。
 
 ### 3.2 game_bridge_input.cpp — 输入模拟
@@ -154,7 +155,7 @@ resource:
 - `GameBridgeInputWatcher`（Node，PROCESS_MODE_ALWAYS + physics process）：轮询动作的 `just_pressed`/`just_released`/`pressed` 三态，命中即回 `result: "matched"` + `matched_at_physics_frame`，超时（默认 2000ms，上限 30000ms）回错误；可被 cancel。
 - `GameBridgeDelayedRelease`（Node）：按键/鼠标/动作按下后按物理帧计数延时自动发送 release 事件（支持 `duration_ms` 与 hold）。
 - `GameBridgeInputSequence`（Node）：步骤数组按 `duration_ms` 间隔经 `SceneTreeTimer` 逐条执行 `inject_step`。
-- `parse_keycode`：接受整数码、纯数字字符串、单字符（小写转大写）、`KEY_` 前缀名或 57 项名称映射表。
+- `parse_keycode`（09-16 起删 57 项本地 `kKeyCodeNameTable`，直接调用编辑器侧 `input_map_ops::resolve_key_name_code`）：接受裸名（`P`/`space`）、`KEY_` 前缀名（大小写不敏感）、数字码字符串（与编辑器侧同一口径，见[领域工具 A 组](tools_ops_a.md)）；非法键名错误经 `invalid_keycode_error` 统一为 `invalid keycode: <名> — use a bare letter/digit (e.g. P, 0), a KEY_* name (e.g. KEY_P, KEY_SPACE) or a numeric key code (e.g. 4194309)`。
 - `op_input`：单步或 `sequence` 数组；返回 `injected_at_physics_frame` / `expected_visible_frame` / `parsed_physics_frame` / `parsed_process_frame`，游戏暂停时附 `warning`。注意：单步成功时返回**不带** `result` 包装的裸对象，而 `error_result` 与 sequence 走 `ok_result` 包装。
 - `op_input_wait`：校验 state 三态、可选 `inject` 子对象先注入再等待；挂 watcher 并注册取消 handler，**同步返回空 JSON**（响应由 watcher 在物理帧回调中异步发出）。
 - `op_input_status`：动作三态 + `physics_frame` + `paused`。
@@ -165,7 +166,7 @@ resource:
 ### 3.3 game_bridge_eval.cpp — 异步求值
 
 - `op_eval` 分派 4 种 action：`script` / `get_property` / `set_property` / `call_method`。
-- `op_eval_script`：`source_code` → 实例化 `GDScript` 并 `reload()`（编译失败回错误 + 编译期错误增量文本）；构造临时 Node 挂脚本，`persist` 时挂载到 `/root/__gda_runtime/<persist_name>`（缺省 `eval_<request_id>`，重名报错）；要求脚本含 `_run()` 方法；调用 `_run()` 后若返回 `GDScriptFunctionState`（await）则转 `GameBridgeEvalAwaiter` 异步等待，否则同步返回序列化结果（并附运行期错误增量、persist 时补 `node_path`）。
+- `op_eval_script`：`source_code` → 实例化 `GDScript` 并 `reload()`（**编译失败 ≤2s 结构化返回（09-16 起）**：不再等待到超时，错误含 `gdscript://<id>.gd:<行号>` Parse Error 文本，供客户端直接定位）；构造临时 Node 挂脚本，`persist` 时挂载到 `/root/__gda_runtime/<persist_name>`（缺省 `eval_<request_id>`，重名报错）；要求脚本含 `_run()` 方法；调用 `_run()` 后若返回 `GDScriptFunctionState`（await）则转 `GameBridgeEvalAwaiter` 异步等待，否则同步返回序列化结果（并附运行期错误增量、persist 时补 `node_path`）；**MCP 响应取裸 result 值（09-16 起）**——成功 eval 的响应即脚本 `_run()` 返回值（`void` → `null`），不再包一层 result 字段结构。
 - `GameBridgeEvalAwaiter`（Node）：连接 state 的 `completed` 信号或超时（默认 5000ms）后响应；完成路径与超时路径都会 `send_response` 并清理（取消 handler、断信号、非 persist 时删除临时节点、queue_free）。
 - `get_property` / `call_method`：经 `resolve_node` 定位节点；call_method 校验 `has_method` 并把 args 按 JSON 反序列化后 `callv`。
 - `set_property`：查 `get_property_list` 取类型与 hint 构造 `type_hint`，`VariantJson::deserialize(value, type_hint)` 后 set，并用 `util::check_readback(..., type_sensitive=true)` 读回校验（09-13 下午起：值类型走分量近似比较，设置未生效（回读仍等于旧值）判 REJECTED 报错、引擎调整值附 warning）。

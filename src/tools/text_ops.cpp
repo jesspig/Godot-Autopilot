@@ -200,7 +200,7 @@ JV handle_get_system_font_path(const JV &args) {
   if (!os)
     return util::error_json("OS singleton not available");
   godot::String path = os->get_system_font_path(
-      godot::String(font_name.c_str()), weight, stretch, italic);
+      godot::String::utf8(font_name.c_str()), weight, stretch, italic);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_text_font_system_path completed");
   JV r(JV::object_tag);
@@ -236,7 +236,7 @@ JV handle_is_locale_right_to_left(const JV &args) {
   if (!l || !l->IsString())
     return util::error_json("missing required parameter: locale");
   bool result =
-      ts->is_locale_right_to_left(godot::String(l->GetString().c_str()));
+      ts->is_locale_right_to_left(godot::String::utf8(l->GetString().c_str()));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "is_text_locale_right_to_left completed");
   JV r(JV::object_tag);
@@ -269,9 +269,9 @@ JV handle_shaped_text_add_string(const JV &args) {
   godot::TypedArray<godot::RID> fonts;
   fonts.append(font_rid);
   bool result = ts->shaped_text_add_string(
-      shaped_rid, godot::String(tp->GetString().c_str()), fonts,
+      shaped_rid, godot::String::utf8(tp->GetString().c_str()), fonts,
       static_cast<int64_t>(sp->GetInt()), godot::Dictionary(),
-      godot::String(language.c_str()));
+      godot::String::utf8(language.c_str()));
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "add_shaped_text_string completed");
   JV r(JV::object_tag);
@@ -343,12 +343,12 @@ JV build_script_diagnostics(const godot::String &gs_path,
            "panel to inspect errors");
     return diag;
   }
-  if (loader->has_cached(gs_path)) {
-    auto cached = loader->get_cached_ref(gs_path);
-    if (cached.is_valid())
-      cached->set_path(godot::String());
-  }
-  godot::Ref<godot::Resource> loaded = loader->load(gs_path);
+  // 诊断必须看到刚写入的磁盘内容：REUSE 装载会命中 ResourceCache / GDScriptCache
+  // 直接返回旧实例（core/io/resource_loader.cpp:800-809、
+  // modules/gdscript/gdscript_cache.cpp:352-358），只有 CACHE_MODE_IGNORE 会让
+  // GDScript 格式加载器重新读盘（modules/gdscript/gdscript_resource_format.cpp:41-42）。
+  godot::Ref<godot::Resource> loaded =
+      loader->load(gs_path, "Script", godot::ResourceLoader::CACHE_MODE_IGNORE);
   if (loaded.is_valid()) {
     diag["ok"] = JV(true);
     return diag;
@@ -396,7 +396,9 @@ JV handle_file_write(const JV &args) {
     return util::error_json("failed to open file: " + pp->GetString());
   if (mode == "APPEND")
     file->seek_end();
-  file->store_string(godot::String(cp->GetString().c_str()));
+  // 文本内容按 UTF-8 进 Godot：String(const char*) 是 latin1 构造，会让每个字节变成
+  // 一个字符，CJK 内容写盘后再读回即变乱码。
+  file->store_string(godot::String::utf8(cp->GetString().c_str()));
   file->close();
 
   JV r(JV::object_tag);

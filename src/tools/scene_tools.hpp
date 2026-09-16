@@ -13,7 +13,7 @@ namespace godot_autopilot {
 namespace scene_tools {
 
 GDA_TOOL_CLASS(CreateSceneNodeTool, "create_scene_node",
-               "Create a new node in the currently edited scene. Provide 'type' (any Node subclass, default Node) and 'name' (default NewNode); omit 'parent_path' only while the scene has no root, otherwise pass the parent node path. Optional 'properties' object applies values right after creation through the same conversion chain as property_set (NodePath strings become node references, resource references are resolved) — any failing property frees the new node and reports the property name. Returns the new node 'path', the 'applied_properties' array (property names applied without error; a property may still have been adjusted by the engine — it then also appears in 'property_warnings'), and an 'undo' hint describing how to remove the node via delete_scene_node. When the engine adjusts or flags a value after a successful set, the response additionally includes 'property_warnings', an array of {path, property, warning} objects; the field is absent when there are no warnings.",
+               "Create a new node in the currently edited scene. Provide 'type' (any Node subclass, default Node) and 'name' (default NewNode); omit 'parent_path' only while the scene has no root, otherwise pass the parent node path. Optional 'properties' object applies values right after creation through the same conversion chain as property_set (NodePath strings become node references, resource references are resolved, and an inline resource description such as {\"type\": \"RectangleShape2D\", \"properties\": {...}} creates a pathless sub-resource saved as a sub_resource) — any failing property frees the new node and reports the property name. Returns the new node 'path', the 'applied_properties' array (property names applied without error; a property may still have been adjusted by the engine — it then also appears in 'property_warnings'), the 'inline_resources' array ({property, type} entries present only when inline descriptions were applied) and an 'undo' hint describing how to remove the node via delete_scene_node. When the engine adjusts or flags a value after a successful set, the response additionally includes 'property_warnings', an array of {path, property, warning} objects; the field is absent when there are no warnings.",
                "Scene", std::vector<std::string>({"node", "create"}), scene_ops::handle_create, true)
 
 GDA_TOOL_CLASS(DeleteSceneNodeTool, "delete_scene_node",
@@ -36,15 +36,20 @@ GDA_TOOL_CLASS(InstantiateSceneTool, "instantiate_scene",
                "Instantiate a PackedScene from 'path' (.tscn file) into the edited scene. Optional 'parent_path' (default: scene root), 'name' and 'owner' (default true — sets scene ownership so children are saved). Returns the instance 'path', 'name' and 'type'. Instances inherit CONNECT_PERSIST connections saved in the source scene; do not reconnect the same signal pairs.",
                "Scene", std::vector<std::string>({"scene", "instance"}), scene_ops::handle_instance, true)
 
+GDA_TOOL_CLASS(GetSceneNodeScreenRectTool, "get_scene_node_screen_rect",
+               "Map nodes of the edited scene to editor window client-area coordinates, e.g. to aim click_input_mouse at a canvas node or to verify a node is on screen. Pass 'paths' (1-50 node paths in the edited scene). Optional 'viewport' picks the coordinate space: 'auto' (default) chooses the 2D canvas transform or the 3D viewport camera per node type, while '2d'/'3d' force one space and report a per-item error on a type mismatch. Node3D is projected through the 3D editor viewport camera (item 'behind' flags points behind it); Node2D and Control map through the 2D editor viewport, and Control items also carry the transformed 'rect'. Each item reports {path, ok, type, screen_position, rect?, behind?} and per-item errors never fail the whole call. The top-level 'mapping' (scale_x, scale_y, offset_x, offset_y) converts capture_editor_viewport image pixels to window client coordinates (client = offset + pixel * scale). Read-only.",
+               "Scene", std::vector<std::string>({"scene", "node", "screen", "rect"}), scene_ops::handle_get_node_screen_rect, true)
+
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(6);
+  v.reserve(7);
   v.push_back(std::make_unique<CreateSceneNodeTool>());
   v.push_back(std::make_unique<DeleteSceneNodeTool>());
   v.push_back(std::make_unique<RenameSceneNodeTool>());
   v.push_back(std::make_unique<ReparentNodeTool>());
   v.push_back(std::make_unique<GetSceneTreeTool>());
   v.push_back(std::make_unique<InstantiateSceneTool>());
+  v.push_back(std::make_unique<GetSceneNodeScreenRectTool>());
   return v;
 }
 

@@ -2,6 +2,7 @@
 #include "core/scene_dirty_tracker.hpp"
 #include "resource_ops.hpp"
 #include "util/error_util.hpp"
+#include "util/inline_resource_json.hpp"
 #include "util/readback_util.hpp"
 #include "util/scene_path.hpp"
 #include "util/type_hint.hpp"
@@ -12,6 +13,7 @@
 #include <godot_cpp/classes/editor_undo_redo_manager.hpp>
 #include <godot_cpp/classes/global_constants.hpp>
 #include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/classes/object.hpp>
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/core/error_macros.hpp>
 #include <godot_cpp/variant/array.hpp>
@@ -31,9 +33,9 @@ namespace property_ops {
 
 namespace {
 
-godot::Dictionary find_property_info(godot::Node *node,
+godot::Dictionary find_property_info(godot::Object *object,
                                      const std::string &prop_name) {
-  godot::TypedArray<godot::Dictionary> props = node->get_property_list();
+  godot::TypedArray<godot::Dictionary> props = object->get_property_list();
   for (int64_t i = 0; i < props.size(); i++) {
     godot::Dictionary dict = props[i];
     if (dict.has("name") &&
@@ -516,12 +518,13 @@ bool memory_resource_assignment_blocked(const godot::Variant &value,
   e["error"] = mcp::JsonValue(
       "cannot assign memory resource '" + res_name +
       "' to node property '" + prop_str + "' on " + path_str +
-      " — memory:// resources are not persistent and will corrupt the scene file if saved. "
-      "Use resource_save to save it to disk first, then pass {\"path\": "
-      "\"res://...\"}"
-      " Alternatively create the resource inline via code_execute (e.g. "
-      "node.shape = RectangleShape2D.new()) or use resource_set_property "
-      "to edit the memory resource itself.");
+      " — memory:// resources are not persistent and will corrupt the scene "
+      "file if saved. To create a pathless sub-resource in one step pass "
+      "{\"type\": \"RectangleShape2D\", \"properties\": {...}} as the value "
+      "(it is written as a sub_resource when the scene is saved). "
+      "Alternatively save it first with save_resource and pass {\"path\": "
+      "\"res://...\"}, or edit the memory resource itself with "
+      "set_resource_property.");
   out_error = std::move(e);
   return true;
 }
@@ -573,6 +576,231 @@ bool is_readback_value_type(godot::Variant::Type type) {
   default:
     return false;
   }
+}
+
+bool is_type_sensitive_property(const godot::Dictionary &info) {
+  if (!info.has("type")) {
+    return false;
+  }
+  auto prop_type =
+      static_cast<godot::Variant::Type>(static_cast<int>(info["type"]));
+  return prop_type == godot::Variant::OBJECT ||
+         prop_type == godot::Variant::ARRAY ||
+         is_readback_value_type(prop_type);
+}
+
+const char *const INLINE_RESOURCE_ACTION_TEXT =
+    "create the resource inline with {\"type\": \"RectangleShape2D\", "
+    "\"properties\": {...}}, pass a res:// path in {\"path\": \"res://...\"}, "
+    "or save the resource to disk first and pass its res:// path";
+
+struct InlineResourceBuild {
+  bool active = false;
+  bool has_error = false;
+  mcp::JsonValue error;
+  godot::Variant value;
+  std::string type;
+};
+
+InlineResourceBuild
+build_inline_resource_value(const godot::Dictionary &prop_info,
+                            const mcp::JsonValue &raw_value,
+                            const std::string &node_property,
+                            const std::string &path_str, int depth);
+
+bool apply_inline_resource_property(godot::Resource *res,
+                                    const std::string &sub_prop,
+                                    const std::string &node_property,
+                                    const std::string &path_str,
+                                    const mcp::JsonValue &raw_value, int depth,
+                                    mcp::JsonValue &out_error) {
+  const std::string owner_label =
+      "inline " + util::to_std(res->get_class()) + " resource for property '" +
+      node_property + "' on " + path_str;
+  godot::Dictionary info = find_property_info(res, sub_prop);
+  if (info.is_empty()) {
+    out_error = util::error_detail(
+        "property '" + sub_prop + "' does not exist on " + owner_label,
+        path_str, "a property name from the resource's property list",
+        "drop it from the inline description or fix the name — "
+        "get_docs_property lists the reflected properties of an engine "
+        "resource class");
+    return false;
+  }
+
+  godot::Variant value;
+  ArrayValueConversion array_conversion =
+      convert_array_value(info, sub_prop, path_str, raw_value);
+  if (array_conversion.has_error) {
+    out_error = std::move(array_conversion.error);
+    return false;
+  }
+  if (array_conversion.handled) {
+    value = array_conversion.value;
+  } else {
+    NodePathValueConversion node_path_conversion =
+        convert_node_path_value(info, sub_prop, path_str, raw_value);
+    if (node_path_conversion.has_error) {
+      out_error = std::move(node_path_conversion.error);
+      return false;
+    }
+    if (node_path_conversion.converted) {
+      value = node_path_conversion.value;
+    } else {
+      std::string resource_error;
+      bool resource_attached = false;
+      if (resource_ops::try_resolve_resource_value(raw_value, value,
+                                                   resource_error)) {
+        if (!resource_error.empty()) {
+          out_error = util::error_detail(
+              "cannot convert property '" + sub_prop + "' of " + owner_label +
+                  ": " + resource_error,
+              path_str,
+              "a " + util::to_std(res->get_class()) + " resource reference",
+              INLINE_RESOURCE_ACTION_TEXT);
+          return false;
+        }
+        resource_attached = true;
+      } else {
+        InlineResourceBuild nested = build_inline_resource_value(
+            info, raw_value, node_property, path_str, depth);
+        if (nested.has_error) {
+          out_error = std::move(nested.error);
+          return false;
+        }
+        if (nested.active) {
+          value = nested.value;
+        } else {
+          value = VariantJson::deserialize_strict(
+              raw_value, util::infer_type_hint(info, std::string()));
+        }
+      }
+      if (resource_attached) {
+        mcp::JsonValue blocked_error;
+        if (memory_resource_assignment_blocked(value, node_property, path_str,
+                                               blocked_error)) {
+          out_error = std::move(blocked_error);
+          return false;
+        }
+      }
+    }
+  }
+
+  godot::StringName prop_name(sub_prop.c_str());
+  godot::Variant old_val = res->get(prop_name);
+  res->set(prop_name, value);
+  godot::Variant new_val = res->get(prop_name);
+
+  std::string readback_detail;
+  util::ReadbackStatus readback =
+      util::check_readback(value, old_val, new_val, readback_detail,
+                           is_type_sensitive_property(info));
+  if (readback == util::ReadbackStatus::REJECTED) {
+    res->set(prop_name, old_val);
+    out_error = util::error_detail(
+        "value not applied: property '" + sub_prop + "' of " + owner_label,
+        path_str, "readback equals set value",
+        "the resource rejected the assigned value (type mismatch or "
+        "read-only): " +
+            readback_detail);
+    return false;
+  }
+  return true;
+}
+
+InlineResourceBuild
+build_inline_resource_value(const godot::Dictionary &prop_info,
+                            const mcp::JsonValue &raw_value,
+                            const std::string &node_property,
+                            const std::string &path_str, int depth) {
+  InlineResourceBuild result;
+  if (!prop_info.has("type") ||
+      static_cast<godot::Variant::Type>(static_cast<int>(prop_info["type"])) !=
+          godot::Variant::OBJECT) {
+    return result;
+  }
+  const util::inline_resource::Description description =
+      util::inline_resource::inspect(raw_value);
+  if (description.shape == util::inline_resource::Shape::not_inline) {
+    return result;
+  }
+  result.active = true;
+  result.type = description.type;
+  if (description.shape == util::inline_resource::Shape::invalid_properties) {
+    result.has_error = true;
+    result.error = util::error_detail(
+        "inline resource description for property '" + node_property +
+            "' on " + path_str + " has a non-object 'properties' value",
+        path_str,
+        "an object mapping property names to values, e.g. {\"type\": "
+        "\"RectangleShape2D\", \"properties\": {\"size\": {\"x\": 20, "
+        "\"y\": 28}}}",
+        "pass an object, or omit 'properties' to create the resource with "
+        "default values");
+    return result;
+  }
+  if (depth == 1) {
+    const int declared_depth = util::inline_resource::nested_depth(raw_value);
+    if (declared_depth > util::inline_resource::kMaxDepth) {
+      result.has_error = true;
+      result.error = util::error_detail(
+          "inline resource description for property '" + node_property +
+              "' on " + path_str + " nests " +
+              std::to_string(declared_depth) + " levels deep (limit " +
+              std::to_string(util::inline_resource::kMaxDepth) + ")",
+          path_str,
+          "an inline resource hierarchy at most " +
+              std::to_string(util::inline_resource::kMaxDepth) +
+              " levels deep",
+          "flatten the description, or save the inner resource to disk and "
+          "reference it with {\"path\": \"res://...\"}");
+      return result;
+    }
+  }
+  if (depth > util::inline_resource::kMaxDepth) {
+    result.has_error = true;
+    result.error = util::error_detail(
+        "inline resource for property '" + node_property + "' on " + path_str +
+            " exceeds the " +
+            std::to_string(util::inline_resource::kMaxDepth) +
+            "-level nesting limit (reached at type " + description.type + ")",
+        path_str,
+        "an inline resource hierarchy at most " +
+            std::to_string(util::inline_resource::kMaxDepth) + " levels deep",
+        "flatten the description, or save the inner resource to disk and "
+        "reference it with {\"path\": \"res://...\"}");
+    return result;
+  }
+  std::string class_error;
+  godot::Ref<godot::Resource> res =
+      resource_ops::instantiate_resource_class(description.type, class_error);
+  if (res.is_null()) {
+    result.has_error = true;
+    result.error = util::error_detail(
+        "cannot create inline resource '" + description.type +
+            "' for property '" + node_property + "' on " + path_str + ": " +
+            class_error,
+        path_str,
+        "an instantiable Resource subclass (engine class or global script "
+        "class)",
+        INLINE_RESOURCE_ACTION_TEXT);
+    return result;
+  }
+  const mcp::JsonValue *properties = raw_value.Find("properties");
+  if (properties != nullptr && properties->IsObject()) {
+    for (const auto &entry : *properties) {
+      mcp::JsonValue property_error;
+      if (!apply_inline_resource_property(res.ptr(), entry.first, node_property,
+                                          path_str, entry.second, depth + 1,
+                                          property_error)) {
+        result.has_error = true;
+        result.error = std::move(property_error);
+        return result;
+      }
+    }
+  }
+  result.value = godot::Variant(res.ptr());
+  return result;
 }
 
 } // namespace
@@ -700,6 +928,8 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
     }
   }
   bool resource_attached = false;
+  bool inline_attached = false;
+  std::string inline_type;
   if (!array_converted && !converted_node_path) {
     std::string resource_error;
     if (resource_ops::try_resolve_resource_value(*it_val, value,
@@ -711,7 +941,18 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
       }
       resource_attached = true;
     } else {
-      value = VariantJson::deserialize_strict(*it_val, type_hint);
+      InlineResourceBuild inline_build =
+          build_inline_resource_value(dict, *it_val, prop_str, path_str, 1);
+      if (inline_build.has_error) {
+        return inline_build.error;
+      }
+      if (inline_build.active) {
+        value = inline_build.value;
+        inline_attached = true;
+        inline_type = inline_build.type;
+      } else {
+        value = VariantJson::deserialize_strict(*it_val, type_hint);
+      }
     }
   }
 
@@ -731,19 +972,20 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
   if (resource_attached) {
     r["resource_attached"] = mcp::JsonValue(true);
   }
+  if (inline_attached) {
+    mcp::JsonValue inline_array(mcp::JsonValue::array_tag);
+    mcp::JsonValue inline_entry(mcp::JsonValue::object_tag);
+    inline_entry["property"] = mcp::JsonValue(prop_str);
+    inline_entry["type"] = mcp::JsonValue(inline_type);
+    inline_array.PushBack(std::move(inline_entry));
+    r["inline_resources"] = std::move(inline_array);
+  }
   if (converted_node_path) {
     r["converted_node_path"] = mcp::JsonValue(value_node_path);
   }
 
   std::string readback_detail;
-  bool type_sensitive = false;
-  if (dict.has("type")) {
-    auto prop_type = static_cast<godot::Variant::Type>(
-        static_cast<int>(dict["type"]));
-    type_sensitive = prop_type == godot::Variant::OBJECT ||
-                     prop_type == godot::Variant::ARRAY ||
-                     is_readback_value_type(prop_type);
-  }
+  bool type_sensitive = is_type_sensitive_property(dict);
   util::ReadbackStatus readback =
       util::check_readback(value, old_val, new_val, readback_detail,
                            type_sensitive);
@@ -763,6 +1005,7 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
   }
 
   add_camera2d_serialization_note(r, prop_str, node);
+  util::add_scene_info_fields(r, util::edited_scene_info());
 
   mcp::JsonValue undo_info(mcp::JsonValue::object_tag);
   undo_info["path"] = mcp::JsonValue(path_str);

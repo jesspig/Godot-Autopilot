@@ -1,0 +1,214 @@
+{
+  "name": "editor_tree",
+  "description": "编辑器场景树行枚举、按路径选中与检查器联动（headless，含选中副作用）。before_all 建 TreeRoot，挂 Alpha(Node2D)、Alpha/Beta(Node)、Gamma(Label)。断言：scene_tree_items 列出 4 行（场景根 + 3 个子节点），filter 对 path/name 做大小写不敏感子串匹配（alpha 命中 Alpha 与 Alpha/Beta 两行，Alpha/Beta 命中 1 行，no_such_row_xyz 命中 0 行），max_items=1 时 count=1 且 truncated=true；select_scene_tree_node 默认清空选择并选中，返回 ok/path/selected_count/inspected/tree_found 且 scene_tree_items(selected_only=true) 只返回 1 行，add=true 追加后 selected_count=2，inspect=false 时 inspected=false；focused 字段不在本文件断言：它仅在非 headless（真实编辑器窗口）下为 true，headless 下 Scene dock 的 Tree 不可见导致 scroll_to_item 不生效，实现返回 focused=false 是正确行为；节点不存在返回含 position/expected/action 的结构化错误，缺 path 参数返回 missing required parameter。每步独立断言，失败继续。风险：若 headless 下 Scene dock 的 Tree 控件不可用，scene_tree_items 会返回结构化 error（editor scene tree control not found，含 position/expected/action 字段），届时需把本文件第一步改为断言该 error 文本并按报告说明回退。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "before_all": [
+      {
+        "id": "before_new_scene",
+        "tool": "create_editor_scene",
+        "args": { "name": "TreeRoot" }
+      },
+      {
+        "id": "before_alpha",
+        "tool": "create_scene_node",
+        "args": { "name": "Alpha", "type": "Node2D", "parent_path": "TreeRoot" }
+      },
+      {
+        "id": "before_beta",
+        "tool": "create_scene_node",
+        "args": { "name": "Beta", "type": "Node", "parent_path": "TreeRoot/Alpha" }
+      },
+      {
+        "id": "before_gamma",
+        "tool": "create_scene_node",
+        "args": { "name": "Gamma", "type": "Label", "parent_path": "TreeRoot" }
+      }
+    ],
+    "stages": [
+      {
+        "id": "tree_items",
+        "steps": [
+          {
+            "id": "list_all_rows",
+            "tool": "scene_tree_items",
+            "args": {},
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.count", "value": 4 },
+                { "key": "result.truncated", "value": false },
+                { "key": "result.space", "value": "window" },
+                { "key": "result.rows", "not_empty": true },
+                { "key": "result.window_id", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "filter_is_case_insensitive_path_substring",
+            "tool": "scene_tree_items",
+            "args": { "filter": "alpha" },
+            "expect": {
+              "field_checks": [
+                { "key": "result.count", "value": 2 },
+                { "key": "result.truncated", "value": false }
+              ]
+            }
+          },
+          {
+            "id": "filter_exact_nested_path",
+            "tool": "scene_tree_items",
+            "args": { "filter": "Alpha/Beta" },
+            "expect": {
+              "field_checks": [
+                { "key": "result.count", "value": 1 },
+                { "key": "result.truncated", "value": false }
+              ]
+            }
+          },
+          {
+            "id": "filter_no_match",
+            "tool": "scene_tree_items",
+            "args": { "filter": "no_such_row_xyz" },
+            "expect": {
+              "field_checks": [
+                { "key": "result.count", "value": 0 },
+                { "key": "result.truncated", "value": false }
+              ]
+            }
+          },
+          {
+            "id": "max_items_truncates",
+            "tool": "scene_tree_items",
+            "args": { "max_items": 1 },
+            "expect": {
+              "field_checks": [
+                { "key": "result.count", "value": 1 },
+                { "key": "result.truncated", "value": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "select",
+        "steps": [
+          {
+            "id": "select_gamma_inspect_focus",
+            "tool": "select_scene_tree_node",
+            "args": { "path": "TreeRoot/Gamma" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.ok", "value": true },
+                { "key": "result.path", "value": "Gamma" },
+                { "key": "result.selected_count", "value": 1 },
+                { "key": "result.inspected", "value": true },
+                { "key": "result.tree_found", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "selected_only_reports_gamma",
+            "tool": "scene_tree_items",
+            "args": { "selected_only": true },
+            "expect": {
+              "field_checks": [
+                { "key": "result.count", "value": 1 },
+                { "key": "result.truncated", "value": false }
+              ]
+            }
+          },
+          {
+            "id": "selected_only_excludes_unselected_rows",
+            "tool": "scene_tree_items",
+            "args": { "selected_only": true, "filter": "Alpha" },
+            "expect": {
+              "field_checks": [
+                { "key": "result.count", "value": 0 }
+              ]
+            }
+          },
+          {
+            "id": "selection_visible_to_get_editor_selection",
+            "tool": "get_editor_selection",
+            "args": {},
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "select_beta_add_keeps_gamma",
+            "tool": "select_scene_tree_node",
+            "args": { "path": "Alpha/Beta", "add": true },
+            "expect": {
+              "field_checks": [
+                { "key": "result.path", "value": "Alpha/Beta" },
+                { "key": "result.selected_count", "value": 2 },
+                { "key": "result.inspected", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "select_root_replaces_and_skips_inspect",
+            "tool": "select_scene_tree_node",
+            "args": { "path": "TreeRoot", "inspect": false },
+            "expect": {
+              "field_checks": [
+                { "key": "result.path", "value": "TreeRoot" },
+                { "key": "result.selected_count", "value": 1 },
+                { "key": "result.inspected", "value": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "hit_context",
+        "steps": [
+          {
+            "id": "hit_test_with_scene_context",
+            "tool": "hit_test_editor_point",
+            "args": { "position": { "x": 10, "y": 10 }, "include_scene_nodes": true },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.count", "not_empty": true },
+                { "key": "result.scene_node_count", "not_empty": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "errors",
+        "steps": [
+          {
+            "id": "select_missing_node",
+            "tool": "select_scene_tree_node",
+            "args": { "path": "NoSuchNode" },
+            "expect": {
+              "field_checks": [
+                { "key": "error", "value": "scene node not found: NoSuchNode — position: select_scene_tree_node — expected: an existing node in the edited scene root \"TreeRoot\" — action: call scene_tree_items or get_scene_tree to list valid node paths" }
+              ]
+            }
+          },
+          {
+            "id": "select_missing_path_param",
+            "tool": "select_scene_tree_node",
+            "args": {},
+            "expect": {
+              "field_checks": [
+                { "key": "error", "value": "missing required parameter: path" }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

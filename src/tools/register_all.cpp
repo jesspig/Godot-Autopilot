@@ -360,7 +360,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
 
     registry->add(std::make_unique<::godot_autopilot::MetaTool>(
         ToolMeta{"call_tool",
-                 "Execute any tool by name. Use this to call all 367 non-meta tools (366 domain tools plus system_status).",
+                 "Execute any tool by name. Use this to call all 385 non-meta tools (384 domain tools plus system_status).",
                  "System", {"call", "dispatch", "proxy"}, true},
         [](const mcp::JsonValue& args) -> mcp::JsonValue {
             std::string name = args.Find("name") != nullptr && args["name"].IsString() ? args["name"].GetString() : std::string();
@@ -397,20 +397,25 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         mcp::JsonValue ops_prop(mcp::JsonValue::object_tag);
         ops_prop["type"] = mcp::JsonValue("array");
         ops_prop["items"] = std::move(item);
-        ops_prop["description"] = mcp::JsonValue("Ordered list of operations to execute");
+        ops_prop["description"] = mcp::JsonValue("Ordered list of operations to execute; each result carries status 'ok'/'error'. An async game op (execute_game_script, queue_game_input, wait_game_input, sequence_game_inputs, get_game_ui_elements, click_game_ui_element, capture_game_viewport, capture_editor_viewport with target='game') is refused with status 'error' unless await_async=true; its pending record is always released. Response counts: 'total' = executed operations (succeeded+failed), 'skipped' = operations not run after stop_on_error truncation");
         props["operations"] = std::move(ops_prop);
         mcp::JsonValue stop_prop(mcp::JsonValue::object_tag);
         stop_prop["type"] = mcp::JsonValue("boolean");
         stop_prop["description"] = mcp::JsonValue("Stop on first error");
         stop_prop["default"] = mcp::JsonValue(true);
         props["stop_on_error"] = std::move(stop_prop);
+        mcp::JsonValue await_prop(mcp::JsonValue::object_tag);
+        await_prop["type"] = mcp::JsonValue("boolean");
+        await_prop["description"] = mcp::JsonValue("Wait for async game ops instead of refusing them (default: false). With false an async game op is reported as an error telling you to use call_tool or await_async=true; with true batch_execute waits for the game response (bounded by the op's timeout_ms) and reports ok/error per response under result");
+        await_prop["default"] = mcp::JsonValue(false);
+        props["await_async"] = std::move(await_prop);
         s["properties"] = std::move(props);
         mcp::JsonValue req(mcp::JsonValue::array_tag);
         req.PushBack(mcp::JsonValue("operations"));
         s["required"] = std::move(req);
         registry->add(std::make_unique<::godot_autopilot::MetaTool>(
             ToolMeta{"batch_execute",
-                     "Execute multiple tools in batch. Each operation runs in sequence; if stop_on_error is true and any operation fails, remaining operations are skipped.",
+                     "Execute multiple tools in batch. Each operation runs in sequence; if stop_on_error is true and any operation fails, remaining operations are skipped. Async game tools are refused unless await_async=true, in which case batch_execute waits for the game response and reports it under result.",
                      "System", {"batch", "execute", "multi"}, true},
             [](const mcp::JsonValue& a) { return code_exec_ops::handle_batch_execute(a); },
             std::move(s)));
@@ -472,8 +477,15 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
                 mcp::JsonValue args = ctx.Params().arguments
                     ? *ctx.Params().arguments : mcp::JsonValue(mcp::JsonValue::object_tag);
                 auto tool = registry->find_meta(meta_name);
+                bool run_on_transport_thread = meta_name == "call_tool";
+                if (meta_name == "batch_execute") {
+                    if (auto *await_async = args.Find("await_async");
+                        await_async && await_async->IsBool() &&
+                        await_async->GetBool())
+                        run_on_transport_thread = true;
+                }
                 mcp::JsonValue res;
-                if (meta_name == "call_tool") {
+                if (run_on_transport_thread) {
                     res = tool->execute(args);
                 } else {
                     res = queue.execute_sync(

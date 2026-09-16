@@ -1,0 +1,188 @@
+{
+  "name": "uid_guard",
+  "description": "资源 UID 守卫（P2-5a，headless）：ResourceUID::add_id() 断言 id 不在表内、set_id() 断言 id 已在表内（core/io/resource_uid.cpp:164 / :178），既有代码两处写反导致每次调用都多一条引擎错误。用例逐步验证：① 保存资源（sync_editor_and_uid_after_save 的 efs->update_file 已先注册该 uid）与 ② set_resource_uid 显式 uid（表内不存在的新 id）后，用 execute_script 读 ResourceUID.get_id_path 回验注册成立；③ 同一显式 uid 再指向第二个文件，回验走 set_id 更新分支把路径改写到新文件（①②③ 在未修复代码上都取回空串而 FAIL）；④ uid 省略时 create_id() 产出的新 id 必须走 add_id，断言响应无 error；⑤ 用 get_game_log_entries 的 filter=unique_ids.has 断言 result.matched_lines == 0——引擎错误行会即时 flush 进 user://logs/godot.log，该文件在每个进程启动时轮转（logger.cpp:176 rotate_file），扫描窗口只覆盖本次进程日志，故修复前必 > 0。前置：execute_script 与 00_meta/04_resources_scripts 一样受 code_execute capability 授权门保护（GODOT_AUTOPILOT_ALLOW env 或 user://godot_autopilot/config.json 的 allow 字段，env 优先）；fixture 位于 res://gda_tmp_uid_guard/，after_all 回收。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "fail_fast",
+    "after_all": [
+      {
+        "id": "uid_guard_trash_fixture",
+        "tool": "move_os_file_to_trash",
+        "args": { "path": "res://gda_tmp_uid_guard" }
+      }
+    ],
+    "stages": [
+      {
+        "id": "log_baseline",
+        "steps": [
+          {
+            "id": "uid_guard_log_clean_before",
+            "tool": "get_game_log_entries",
+            "args": { "filter": "unique_ids.has", "limit": 5 },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.matched_lines", "value": 0 }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "fixture",
+        "steps": [
+          {
+            "id": "uid_guard_create_tmp_dir",
+            "tool": "create_directory",
+            "args": { "path": "res://gda_tmp_uid_guard" },
+            "expect": { "has_keys": ["created"] }
+          },
+          {
+            "id": "uid_guard_create_resource_a",
+            "tool": "create_resource",
+            "args": { "type": "Resource", "name": "gda_uid_guard_a" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.name", "value": "gda_uid_guard_a" }
+              ]
+            }
+          },
+          {
+            "id": "uid_guard_save_resource_a",
+            "tool": "save_resource",
+            "args": {
+              "name": "gda_uid_guard_a",
+              "path": "res://gda_tmp_uid_guard/guard_a.tres"
+            },
+            "expect": {
+              "has_keys": ["result", "verified"],
+              "field_checks": [
+                { "key": "result", "value": 0 },
+                { "key": "verified", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "uid_guard_create_resource_b",
+            "tool": "create_resource",
+            "args": { "type": "Resource", "name": "gda_uid_guard_b" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.name", "value": "gda_uid_guard_b" }
+              ]
+            }
+          },
+          {
+            "id": "uid_guard_save_resource_b",
+            "tool": "save_resource",
+            "args": {
+              "name": "gda_uid_guard_b",
+              "path": "res://gda_tmp_uid_guard/guard_b.tres"
+            },
+            "expect": {
+              "has_keys": ["result", "verified"],
+              "field_checks": [
+                { "key": "result", "value": 0 },
+                { "key": "verified", "value": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "explicit_uid_add",
+        "steps": [
+          {
+            "id": "uid_guard_set_new_uid",
+            "tool": "set_resource_uid",
+            "args": {
+              "path": "res://gda_tmp_uid_guard/guard_a.tres",
+              "uid": 9007199254
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": 9007199254 }
+              ]
+            }
+          },
+          {
+            "id": "uid_guard_new_uid_registered",
+            "tool": "execute_script",
+            "args": { "expression": "return ResourceUID.get_id_path(9007199254)" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": "res://gda_tmp_uid_guard/guard_a.tres" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "explicit_uid_set",
+        "steps": [
+          {
+            "id": "uid_guard_repoint_known_uid",
+            "tool": "set_resource_uid",
+            "args": {
+              "path": "res://gda_tmp_uid_guard/guard_b.tres",
+              "uid": 9007199254
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": 9007199254 }
+              ]
+            }
+          },
+          {
+            "id": "uid_guard_known_uid_repointed",
+            "tool": "execute_script",
+            "args": { "expression": "return ResourceUID.get_id_path(9007199254)" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": "res://gda_tmp_uid_guard/guard_b.tres" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "omitted_uid",
+        "steps": [
+          {
+            "id": "uid_guard_set_generated_uid",
+            "tool": "set_resource_uid",
+            "args": { "path": "res://gda_tmp_uid_guard/guard_b.tres" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "not_empty": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "engine_log_clean",
+        "steps": [
+          {
+            "id": "uid_guard_log_has_no_uid_assert",
+            "tool": "get_game_log_entries",
+            "args": { "filter": "unique_ids.has", "limit": 20 },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.matched_lines", "value": 0 }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

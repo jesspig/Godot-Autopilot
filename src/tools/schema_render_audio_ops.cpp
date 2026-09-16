@@ -7,7 +7,35 @@ void fill_schema_render_audio(std::unordered_map<std::string, mcp::JsonValue>& m
 
         m["capture_editor_viewport"] = schema::build_schema({
             {"target", "string", "Target to capture: 'editor' (default) grabs the editor 2D viewport with a fallback to the 3D viewport; 'game' captures the running game's root window over the runtime channel — requires a game launched from the editor whose project loads the godot-autopilot extension", false},
-            {"timeout_ms", "integer", "Response timeout in milliseconds for target='game' (default: 5000, max: 30000); ignored for target='editor'", false},
+            {"timeout_ms", "integer", "Response timeout in milliseconds for target='game' (default: 5000, max: 25000); ignored for target='editor'; when after_frames/when delay a game capture it also bounds the in-game wait and the game answers with a structured error (code when_timeout, plus frames_waited) on expiry. The host waits timeout_ms + 2000 ms and that budget must stay below the 30 s HTTP transport timeout, so 25000 ms is the hard cap — split long waits into shorter calls", false},
+            {"save", "boolean", "Editor target only: when true the PNG is also written to user://godot_autopilot/captures/ and the result gains path; the captures folder keeps the 20 most recent files (default: false). Game-target captures do not need it: the game always writes the PNG to the OS cache as the transport mechanism before the editor reads it back and returns it inline", false},
+            {"region", "object", "Applies to both targets: crop the captured image to {x, y, width, height} in pixels (width/height must be positive); the rect is clamped to the image and an empty intersection fails with region_out_of_bounds; with target='game' the crop is applied inside the game process; example: {x: 0, y: 0, width: 640, height: 480}", false},
+            {"max_dimension", "integer", "Applies to both targets: downscale the output image so its longest side is at most this many pixels (64-4096); never upscales (default: no scaling); with target='game' the downscale is applied inside the game process. Applied last: region crop first, then scale, then this cap — when both are given max_dimension wins and width/height report the final size", false},
+            {"scale", "integer", "Applies to both targets: integer nearest-neighbour upscale factor (1-8, default: 1) applied after the region crop and before max_dimension. The editor target returns the image inline and only writes a file when save=true; game-target captures are always written to the OS cache as the transport mechanism", false},
+            {"after_frames", "integer", "target='game' only: wait this many rendered frames before capturing (integer >= 0, default: 0 = capture immediately); combined with when, the frame budget must be spent first. target='editor' rejects it because the editor capture runs synchronously on the main thread and cannot yield frames", false},
+            {"when", "string", "target='game' only: GDScript expression evaluated once per rendered frame inside the game; the capture fires when it is true (empty string = no condition). It runs with the current scene as the base instance, so node lookups such as get_node(\"HUD/MessageLabel\").text != \"\" work directly. A malformed expression fails immediately with a structured error (code when_parse_error) carrying the Expression error text; a condition that never becomes true returns a structured error (code when_timeout) bounded by timeout_ms. target='editor' rejects it", false},
+            {"space", "string", "Editor target only: 'viewport' (default) captures the editor 2D viewport with a 3D fallback; 'window' captures the editor main window root viewport exactly as shown on screen, including docks, toolbars and the 2D grid/selection overlays", false},
+            {"diff_against_last", "boolean", "Editor target only: when true the result gains a diff object comparing the final image with the previous editor capture (comparable, changed_ratio, changed_bbox, or a reason when not comparable); when the two sizes differ the shared top-left region is compared instead and the diff additionally reports size_mismatch=true plus current_size {x, y} alongside baseline_size (default: false)", false},
+            {"diff_image", "boolean", "Editor target only: when true with diff_against_last, the result additionally gains diff_image_data (base64 PNG) highlighting changed_bbox on a copy of the final image; requires diff_against_last, default false = numbers only; not returned when the diff is not comparable or has no changed_bbox; counts toward the PNG/JSON response limits (default: false)", false},
+            {"annotate", "boolean", "Applies to both targets: when true the output image is annotated with numbered red boxes around UI controls and the result gains an elements array of {id, path, type, text, position, size} in final-image pixels whose ids match the box numbers (text is omitted when empty, elements_truncated marks a 200-element cap); the editor target marks editor UI controls (window-level controls with space='window'), while target='game' marks Controls of the running game, annotated inside the game process (default: false)", false},
+            {"annotate_nodes", "array", "Applies to both targets: array of 1-50 scene node path strings to mark with numbered blue boxes (ids count independently from the red UI-control annotate boxes, starting at 1); the editor target resolves edited-scene paths while target='game' forwards the list for the game process to resolve absolute game paths; the result gains a node_elements array of {id, path, type, ok, position, size, visible, behind?, error?} in final-image pixels (one entry per input path, per-item failures carry ok:false plus error instead of failing the call; behind marks 3D nodes behind the camera; visible:false marks skipped boxes) plus node_truncated when the shared 200-box drawing budget with annotate is exceeded; single-item errors: node not found, unsupported node type, viewport incompatible (default: absent = disabled)", false},
+            {"annotate_nodes_max", "integer", "Optional self-imposed tighter cap (1-50, default: 50) on annotate_nodes length; the call fails when annotate_nodes holds more entries (default: absent = 50-entry server cap)", false},
+        });
+
+        m["review_scene_visually"] = schema::build_schema({
+            {"region", "object", "Crop both captures to {x, y, width, height} in pixels (width/height must be positive); clamped per image, empty intersection fails the review call with region_out_of_bounds", false},
+            {"max_dimension", "integer", "Downscale both captures so the longest side is at most this many pixels (64-4096); never upscales", false},
+            {"scale", "integer", "Integer nearest-neighbour upscale factor applied before max_dimension (1-8, default: 1)", false},
+            {"annotate", "boolean", "Draw numbered red UI-control boxes on both captures (default: false)", false},
+            {"annotate_nodes", "array", "Array of 1-50 scene node paths drawn as blue boxes on both captures and reused as the nodes table paths; per-item failures are isolated", false},
+            {"annotate_nodes_max", "integer", "Tighter self-imposed cap on annotate_nodes length (1-50)", false},
+            {"include_editor", "boolean", "Include the editor capture section (default: true); false returns skipped", false},
+            {"include_game", "boolean", "Include the game capture section over the runtime channel (default: true); false returns skipped; game not running returns a per-section error", false},
+            {"timeout_ms", "integer", "Positive timeout bounding only the game capture (default: 5000)", false},
+            {"space", "string", "Editor capture space: 'viewport' (default) or 'window'", false},
+            {"viewport", "string", "Editor mapping viewport: '2d' (default) or '3d'", false},
+            {"index", "integer", "Editor mapping 3D viewport index (default: 0)", false},
+            {"node_viewport", "string", "Nodes table viewport: 'auto' (default), '2d' or '3d'", false},
         });
 
         m["create_render_canvas_item"] = schema::build_schema({});
@@ -322,6 +350,9 @@ void fill_schema_render_audio(std::unordered_map<std::string, mcp::JsonValue>& m
         m["warp_display_mouse"] = schema::build_schema({
             {"x", "integer", "Mouse X position in pixels relative to the client area of the focused window (not screen coordinates), e.g. 640", true},
             {"y", "integer", "Mouse Y position in pixels relative to the client area of the focused window (not screen coordinates), e.g. 360", true},
+        });
+        m["get_display_window_rect"] = schema::build_schema({
+            {"window_id", "integer", "Window id to query (default: 0 = main window)", false},
         });
         m["capture_display_screen"] = schema::build_schema({
             {"screen", "integer", "Index of the physical screen to capture, default 0; valid range is 0 to count-1 from get_display_screen_count", false},

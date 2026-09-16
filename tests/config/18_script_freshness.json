@@ -1,0 +1,164 @@
+{
+  "name": "script_freshness",
+  "description": "脚本取用口径回归（headless）：create_script 写盘后必须让编辑器后续取用看到磁盘版本（godot-cpp 的 ResourceLoader::load 缺省 CACHE_MODE_REUSE，命中 ResourceCache/GDScriptCache 就直接返回旧实例、不读盘）。setup：create_editor_scene FreshRoot + create_scene_node FreshProbe。链路：① create_script 写入含 GDA_MARKER_A 的 res://tests_tmp/gda_fresh_check.gd（overwrite=true；断言 result.verified=true、result.cache_refreshed=true——后者是写盘后 IGNORE 装载刷新的新字段，修复前不存在，此断言即 D 项回归点）→ ② reload_script 断言 result=0 → ③ create_script 覆写为含 GDA_MARKER_B 与 @export var probe_marker: int = 7 的版本（断言 result.overwritten=true、verified=true、cache_refreshed=true）→ ④ attach_script_to_node 挂到 FreshProbe（断言 result=\"script attached to FreshProbe\"、instantiated=true）→ ⑤ execute_script 读挂载后节点的 script.get_source_code() 并断言 result=true（源码含 GDA_MARKER_B；修复前挂上的仍是旧实例、含 GDA_MARKER_A，此步必失败）。说明：任务原文要求用 property_get 断言 script/source，但 property_get 的 find_property_info 只查节点属性表、Object::get 也不解析脚本子属性，script/source 会报 property not found（修复前后都一样），故改用 execute_script 读源码（需 code_execute capability，与 04_resources_scripts 同前提）→ ⑥ get_script_property {script_path, property:probe_marker, fresh:true} 断言 result=7（修复前 fresh 未实现且命中旧实例，probe_marker 不在旧脚本的默认值缓存里 → 返回 null，此步必失败；覆盖 C 项 fresh 参数）→ ⑦ property_get 节点 probe_marker 断言 result=7（修复前旧脚本没有该导出变量，find_property_info 找不到 → 报 property not found，此步必失败；覆盖 B 项 attach 取磁盘版）→ ⑧ property_set probe_marker=11 断言 result=ok → ⑨ property_get 读回断言 result=11（确认实例值生效）→ ⑩ delete_scene_node 回收节点，after_all 回收 res://tests_tmp。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "after_all": [
+      {
+        "id": "freshness_trash_tmp_dir",
+        "tool": "move_os_file_to_trash",
+        "args": { "path": "res://tests_tmp" }
+      }
+    ],
+    "stages": [
+      {
+        "id": "setup",
+        "steps": [
+          {
+            "id": "freshness_new_scene",
+            "tool": "create_editor_scene",
+            "args": { "name": "FreshRoot", "close_current": true },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result.path", "value": "FreshRoot" } ]
+            }
+          },
+          {
+            "id": "freshness_create_probe_node",
+            "tool": "create_scene_node",
+            "args": { "name": "FreshProbe", "type": "Node", "parent_path": "FreshRoot" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result.path", "value": "FreshProbe" } ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "freshness",
+        "steps": [
+          {
+            "id": "freshness_create_marker_a",
+            "tool": "create_script",
+            "args": {
+              "path": "res://tests_tmp/gda_fresh_check.gd",
+              "overwrite": true,
+              "source_code": "# GDA_MARKER_A\nextends Node\n\nfunc marker() -> String:\n\treturn \"A\"\n"
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.path", "value": "res://tests_tmp/gda_fresh_check.gd" },
+                { "key": "result.verified", "value": true },
+                { "key": "result.cache_refreshed", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "freshness_reload_after_create",
+            "tool": "reload_script",
+            "args": { "path": "res://tests_tmp/gda_fresh_check.gd" },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": 0 } ]
+            }
+          },
+          {
+            "id": "freshness_overwrite_marker_b",
+            "tool": "create_script",
+            "args": {
+              "path": "res://tests_tmp/gda_fresh_check.gd",
+              "overwrite": true,
+              "source_code": "# GDA_MARKER_B\nextends Node\n\n@export var probe_marker: int = 7\n\nfunc marker() -> String:\n\treturn \"B\"\n"
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.overwritten", "value": true },
+                { "key": "result.verified", "value": true },
+                { "key": "result.cache_refreshed", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "freshness_attach_fresh_script",
+            "tool": "attach_script_to_node",
+            "args": {
+              "node_path": "FreshProbe",
+              "script_path": "res://tests_tmp/gda_fresh_check.gd"
+            },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "script attached to FreshProbe" },
+                { "key": "instantiated", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "freshness_node_script_source_is_disk_version",
+            "tool": "execute_script",
+            "args": {
+              "expression": "var n = SceneRoot.get_node_or_null(\"FreshProbe\")\nif n == null:\n    return false\nvar s = n.get_script()\nif s == null:\n    return false\nreturn s.get_source_code().contains(\"GDA_MARKER_B\")"
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "value": true } ]
+            }
+          },
+          {
+            "id": "freshness_script_property_fresh_read",
+            "tool": "get_script_property",
+            "args": {
+              "script_path": "res://tests_tmp/gda_fresh_check.gd",
+              "property": "probe_marker",
+              "fresh": true
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "value": 7 } ]
+            }
+          },
+          {
+            "id": "freshness_node_property_after_attach",
+            "tool": "property_get",
+            "args": { "path": "FreshProbe", "property": "probe_marker" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "value": 7 } ]
+            }
+          },
+          {
+            "id": "freshness_node_property_set",
+            "tool": "property_set",
+            "args": { "path": "FreshProbe", "property": "probe_marker", "value": 11 },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          },
+          {
+            "id": "freshness_node_property_set_readback",
+            "tool": "property_get",
+            "args": { "path": "FreshProbe", "property": "probe_marker" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "value": 11 } ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "cleanup",
+        "steps": [
+          {
+            "id": "freshness_delete_probe_node",
+            "tool": "delete_scene_node",
+            "args": { "path": "FreshProbe" },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "deleted" } ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

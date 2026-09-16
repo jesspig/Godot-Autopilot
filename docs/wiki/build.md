@@ -6,7 +6,7 @@ tags:
   - 构建
   - CMake
   - 部署
-timestamp: "2026-09-14T03:26:00+08:00"
+timestamp: "2026-09-16T17:20:00+08:00"
 resource:
   - CMakeLists.txt
   - CMakePresets.json
@@ -16,7 +16,7 @@ resource:
 
 # 构建体系（build）
 
-> 审计日期：2026-09-10（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill 内容外置化同步；09-10 随 7 册重构同步；09-13 晚随 A 组知识库审计修复批次同步——skill_templates 8 册/30 个 .md、server_context/FetchDependencies 行号重核、AGENTS.md/README 对照段更新；09-13 晚随 0.2.3→0.2.4 升版同步示例版本号；09-13 晚随 0.2.4 版知识库全量审计同步——GODOT_PATH 缺失行为修正（退出码 2 报错，非“失败/跳过”），全页其余事实复核一致；09-14 随 CI Windows Python 编码修复同步——ci/release workflow 增 `PYTHONUTF8`、`embed_skills.py` 强制 UTF-8 输出），基于当前工作树文件逐项核对（不依赖 git 历史）。
+> 审计日期：2026-09-16（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill 内容外置化同步；09-10 随 7 册重构同步；09-13 晚随 A 组知识库审计修复批次同步——skill_templates 8 册/30 个 .md、server_context/FetchDependencies 行号重核、AGENTS.md/README 对照段更新；09-13 晚随 0.2.3→0.2.4 升版同步示例版本号；09-13 晚随 0.2.4 版知识库全量审计同步——GODOT_PATH 缺失行为修正（退出码 2 报错，非“失败/跳过”），全页其余事实复核一致；09-14 随 CI Windows Python 编码修复同步——ci/release workflow 增 `PYTHONUTF8`、`embed_skills.py` 强制 UTF-8 输出），基于当前工作树文件逐项核对（不依赖 git 历史）；09-15 随 Computer Use grounding 批次同步文档一致性段——`README.md` / `README_zh.md` 工具数口径已同步为 ~379（域工具），与 overview 的 379 域工具 / 可达 386 / catalog 387 一致；09-16 随失败修复批次同步——README 双语工具数口径更新为 ~384，与 overview 的 384 域工具 / 可达 391 / catalog 392 一致；09-16 随视觉辅助与坐标换算批次同步——wiki 实测 385 域工具 / 可达 392 / catalog 393（Capture 1→2），README 双语 ~384 为约数口径（差 1，可接受，待后续版本同步）；09-16 随 0.2.5 升版收尾同步——validate 示例 0.2.4→0.2.5（`VERSION`/AGENTS/changelog 早在 09-14 已同步，`GDA_VERSION` 已为 0.2.5）。
 > 事实来源：`build.py`（239 行）、`CMakeLists.txt`（169 行）、`CMakePresets.json`、`cmake/` 全部 7 个模块、`tools/embed_skills.py`、`.env.template`、根 `README.md` / `README_zh.md` / `AGENTS.md` 构建段、`.github/workflows/{ci,release}.yml`。
 
 ## 命令速查表
@@ -83,7 +83,7 @@ resource:
 
 | job | 内容 |
 |---|---|
-| validate | 校验 tag 与根 `VERSION` 一致（`v0.2.4` ↔ `0.2.4`，版本号以根 `VERSION` 为准，当前 0.2.4），不一致 fail |
+| validate | 校验 tag 与根 `VERSION` 一致（`v0.2.5` ↔ `0.2.5`，版本号以根 `VERSION` 为准，当前 0.2.5），不一致 fail |
 | build | 同 CI 环境（Ninja/sccache/msvc-dev-cmd），Release 构建后按精确文件名上传各平台库 artifact（天然排除 pdb） |
 | package | 下载全部 artifact → `python build.py --package --libs-dir dist` 合并 → 重命名为 `addons.zip` → softprops/action-gh-release 发布 |
 
@@ -166,7 +166,7 @@ version 8；`debug`/`release` 两个 configure 预设：Ninja 生成器、`build
 - 依赖版本 `godot-cpp 10.0.0-rc1` / `mcp-cpp-sdk 0.3.3`、FetchContent 非子模块 ✓（`FetchDependencies.cmake:19,28`）；
 - 编译器优先 Clang/clang-cl、MSVC/GCC 回退 ✓（根 CMakeLists 自动探测 + `CompilerOptions.cmake` 分发）；
 - 优化自适应（sccache/ccache、LTO、Unity、Ninja 作业池）✓；AGENTS.md 与实现一致：仅 `GDA_COMPILE_JOBS` / `GDA_LINK_JOBS` 支持 CACHE（`-D`）与进程环境变量双通道，`GDA_UNITY_BUILD`/`GDA_UNITY_BATCH_SIZE` 等内存参数只接受 `-D` CACHE；
-- **文档一致性**：`README.md` / `README_zh.md` 工具数口径 "~366 MCP Tools across 27 categories"（`README.md:22` / `README_zh.md:22`）为域工具口径（27 类合计 366），与 [overview.md](./overview.md) 的"366 域工具"一致；overview 的 **MCP 可达 373 / catalog 374** 是包含 7 元工具与 `system_status` 的另一口径，与 README 域工具口径不矛盾（README 未列这两个数字属口径差异，不再列为待同步项）；`--package` / `--debug` 两个 build.py 参数在 README 构建章节（`README.md:121-122`）未提及。
+- **文档一致性**：`README.md` / `README_zh.md` 工具数口径为 "~384 MCP Tools across 27 categories"（`README.md:22` / `README_zh.md:22`，域工具口径、自注 count varies by plugin version），与 [overview.md](./overview.md) 的 **385 域工具 / MCP 可达 392 / catalog 393** 基本一致（差 1 属约数口径，待后续版本同步）——392/393 含 7 元工具与 `system_status`，与 README 域工具口径不矛盾（README 未列这两个数字属口径差异）；`--package` / `--debug` 两个 build.py 参数在 README 构建章节（`README.md:121-122`）未提及。
 
 ## 关联页面
 

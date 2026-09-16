@@ -7,6 +7,8 @@
 #include <vector>
 
 #include "tools/editor_ops.hpp"
+#include "tools/editor_ui_actions.hpp"
+#include "tools/editor_ui_ops.hpp"
 #include "tools/tool_decl.hpp"
 
 namespace godot_autopilot {
@@ -104,9 +106,41 @@ GDA_TOOL_CLASS(CloseEditorSceneTool, "close_editor_scene",
                "Close the currently edited scene and return the editor to an empty state. Use it before opening or creating another scene, or when a scene is no longer needed. Refuses to close when the scene has unsaved changes, so call save_editor_scene first. Returns result 'closed'.",
                "Editor", std::vector<std::string>({"editor", "close", "scene"}), editor_ops::handle_close_scene, true)
 
+GDA_TOOL_CLASS(GetEditorViewportGeometryTool, "get_editor_viewport_geometry",
+               "Report how the editor viewport image maps onto the window client area as window = offset + image * scale. Use it to convert pixels of a capture_editor_viewport image into client-area coordinates for the input tools, or to project client-area points back into the 2D canvas. Returns result with viewport, window_id, image_width/image_height, viewport_size, mapping (scale_x, scale_y, offset_x, offset_y) and, for the 2D viewport, the canvas origin and zoom. Optional 'viewport' picks '2d' (default) or '3d', and 'index' selects the 3D viewport (0-3).",
+               "Editor", std::vector<std::string>({"editor", "viewport", "geometry"}), editor_ui_ops::handle_get_editor_viewport_geometry, true)
+
+GDA_TOOL_CLASS(GetEditorUiElementsTool, "get_editor_ui_elements",
+               "Enumerate the editor's UI controls (buttons, inputs, lists and other visible panels) with their semantic path, type, text, tooltip, client-area rectangle and window_id. Use it as the semantic-first path for editor automation: pick a target from the listing, then act on it with click_editor_element or type_editor_element_text instead of guessing raw coordinates. Optional 'query' matches path/name/text/tooltip/placeholder substrings, 'type_filter' restricts to an exact class name, 'interactive_only' keeps actionable controls such as buttons and line edits, and 'max_elements' caps the listing (1-1000, default 100). Returns result with elements, count and truncated.",
+               "Editor", std::vector<std::string>({"editor", "ui", "elements"}), editor_ui_ops::handle_get_editor_ui_elements, true)
+
+GDA_TOOL_CLASS(HitTestEditorPointTool, "hit_test_editor_point",
+               "Return the chain of editor UI controls under a client-area point, topmost control first. Use it to preview what click_editor_element would hit at a location or to identify a control from a screenshot coordinate; the hit rule approximates the engine's own rule (clipping, mouse_filter, visibility). Takes position (numeric x and y in the client area of window_id, default 0 = main editor window) plus optional max_results (1-64, default 10). Optional 'include_scene_nodes' (default false) appends scene context: scene_tree_item with the scene-tree row under the point when one is hit, and scene_nodes, the topmost-first scene node paths (Node2D/Control with a known rect) under the point inside the 2D editor viewport, with scene_node_count, plus scene_tree_error/scene_nodes_error when that context is unavailable. Returns result with hits, count and space.",
+               "Editor", std::vector<std::string>({"editor", "hit", "test"}), editor_ui_ops::handle_hit_test_editor_point, true)
+
+GDA_TOOL_CLASS(SceneTreeItemsTool, "scene_tree_items",
+               "Enumerate the rows of the editor's Scene dock tree, i.e. the scene nodes as the editor displays them. Use it to locate a scene node row before selecting or clicking it, because get_editor_ui_elements only lists Control nodes and cannot see Tree rows. Each row carries path (scene-relative, e.g. 'Player'), name, type, depth, selected, collapsed, visible and rect in window/client-area pixels (rect is null for rows hidden by a collapsed ancestor). The scene tree is located by finding the Tree control whose row metadata resolves to a node of the edited scene. Optional 'filter' matches path or name substrings case-insensitively, 'selected_only' keeps only rows selected in the tree and 'max_items' caps the listing (1-1000, default 200) with a truncated flag. Returns result with rows, count, truncated, window_id and space; errors when no scene is open or the scene tree control is unavailable, in which case use get_scene_tree for the scene model.",
+               "Editor", std::vector<std::string>({"editor", "scene_tree", "items", "list"}), editor_ui_ops::handle_scene_tree_items, true)
+
+GDA_TOOL_CLASS_SIDE(SelectSceneTreeNodeTool, "select_scene_tree_node",
+               "Select a node in the edited scene tree and show it in the Inspector, mirroring a user click in the Scene dock. Provide 'path' (scene-relative such as 'Player', or absolute such as '/root/Level1/Enemy'); the previous selection is cleared first unless 'add' is true, which appends to it. 'inspect' (default true) opens the node in the Inspector via EditorInterface.edit_node; 'focus' (default true) scrolls the scene tree to the row when the row is found. Selection and inspector still apply when the scene tree control is unavailable (tree_found=false and focused=false in the response). Returns result with ok, path, selected_count, inspected, focused and tree_found; errors when the node does not exist or no scene is open.",
+               "Editor", std::vector<std::string>({"editor", "scene_tree", "select", "node"}), editor_ui_ops::handle_select_scene_tree_node, true, ::godot_autopilot::SideEffect::ModifiesWindow)
+
+GDA_TOOL_CLASS_SIDE(ClickEditorElementTool, "click_editor_element",
+               "Click an editor UI element resolved by its path, injecting warp, motion, press and release in one call; double_click adds a second press/release pair carrying the double-click flag. Element paths come from get_editor_ui_elements or hit_test_editor_point, so prefer this over raw-coordinate clicks. Optional 'button' accepts left, right or middle (default left) and 'warp' (default true) moves the physical cursor onto the element first; disable it for controls that react to hover. Optional 'observe' (default false) appends a fresh editor viewport capture to the result. Returns result with ok, path, type, button, double_click, window_id and position. Editor process only.",
+               "Editor", std::vector<std::string>({"editor", "ui", "click"}), editor_ui_actions::handle_click_editor_element, true, ::godot_autopilot::SideEffect::ModifiesWindow)
+
+GDA_TOOL_CLASS_SIDE(TypeEditorElementTextTool, "type_editor_element_text",
+               "Focus an editor UI element and write text into it by pushing the whole string as one text-input event instead of simulating keystrokes. Use it to fill editor fields such as search boxes or property inputs resolved through get_editor_ui_elements; the element is focused with grab_focus when it does not already have focus. Optional 'submit' (default false) appends an Enter press and release. Optional 'observe' (default false) appends a fresh editor viewport capture to the result. Returns result with ok, path, length, focused and submit. Editor process only.",
+               "Editor", std::vector<std::string>({"editor", "ui", "type"}), editor_ui_actions::handle_type_editor_element_text, true, ::godot_autopilot::SideEffect::ModifiesWindow)
+
+GDA_TOOL_CLASS_SIDE(RunEditorShortcutTool, "run_editor_shortcut",
+               "Inject an editor keyboard shortcut to run a command, e.g. 'ctrl+s' to save, 'ctrl+shift+z' to redo or 'f5' to play the project. The string is parsed as '+'-separated modifiers (ctrl/control, shift, alt, meta/super, case-insensitive) followed by the main key, which accepts the same names as the input tools plus F1-F12. The press and release are injected with the modifier flags set; a malformed shortcut or an unknown key returns an error. Returns result with ok, shortcut, key and the ctrl/shift/alt/meta flags. Editor process only.",
+               "Editor", std::vector<std::string>({"editor", "shortcut", "input"}), editor_ui_actions::handle_run_editor_shortcut, true, ::godot_autopilot::SideEffect::ModifiesWindow)
+
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(23);
+  v.reserve(31);
   v.push_back(std::make_unique<GetEditorSelectionTool>());
   v.push_back(std::make_unique<SetEditorSelectionTool>());
   v.push_back(std::make_unique<GetEditorEditedSceneRootTool>());
@@ -130,6 +164,14 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(std::make_unique<SaveEditorSceneAsTool>());
   v.push_back(std::make_unique<BuildCsharpAssemblyTool>());
   v.push_back(std::make_unique<CloseEditorSceneTool>());
+  v.push_back(std::make_unique<GetEditorViewportGeometryTool>());
+  v.push_back(std::make_unique<GetEditorUiElementsTool>());
+  v.push_back(std::make_unique<HitTestEditorPointTool>());
+  v.push_back(std::make_unique<SceneTreeItemsTool>());
+  v.push_back(std::make_unique<SelectSceneTreeNodeTool>());
+  v.push_back(std::make_unique<ClickEditorElementTool>());
+  v.push_back(std::make_unique<TypeEditorElementTextTool>());
+  v.push_back(std::make_unique<RunEditorShortcutTool>());
   return v;
 }
 

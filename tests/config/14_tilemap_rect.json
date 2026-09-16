@@ -1,0 +1,218 @@
+{
+  "name": "tilemap_rect",
+  "description": "fill_tilemap_rect 矩形铺砖用例：before_all 建 Root 场景；create_tilemap_tileset + add_tilemap_atlas_source（Apple.png 切 16px 图集）+ save_resource 落盘 res://gda_tmp_tilemap_rect/ → 建 TileMapLayer 并 property_set 挂 tileset → 10×3 铺砖断言 set_count=30/宽高/归一化 from-to/单条 undo 动作 → 反序 erase 断言归一化与 set_count=30 → 缺 from、缺 source_id、超 100000 单元上限分别断言错误。after_all 回收 res://gda_tmp_tilemap_rect/。fill_tilemap_rect 声明为 GDA_TOOL_CLASS_SIDE，不进入 03_tools_contract 的域工具遍历。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "fail_fast",
+    "after_all": [
+      {
+        "id": "trash_tilemap_rect_fixture",
+        "tool": "move_os_file_to_trash",
+        "args": { "path": "res://gda_tmp_tilemap_rect" }
+      }
+    ],
+    "before_all": [
+      {
+        "id": "before_new_scene",
+        "tool": "create_editor_scene",
+        "args": { "name": "Root" }
+      }
+    ],
+    "stages": [
+      {
+        "id": "tileset_setup",
+        "steps": [
+          {
+            "id": "tileset_create",
+            "tool": "create_tilemap_tileset",
+            "args": { "name": "GdaRectTileSet", "tile_size": 16 },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.class", "value": "TileSet" },
+                { "key": "result.name", "value": "GdaRectTileSet" }
+              ]
+            }
+          },
+          {
+            "id": "atlas_add",
+            "tool": "add_tilemap_atlas_source",
+            "args": {
+              "name": "GdaRectTileSet",
+              "source_id": 0,
+              "texture": "res://assets/Items/Fruits/Apple.png",
+              "tile_size": { "x": 16, "y": 16 }
+            },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "ok" },
+                { "key": "source_id", "value": 0 },
+                { "key": "created_tiles", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "tileset_save",
+            "tool": "save_resource",
+            "args": { "name": "GdaRectTileSet", "path": "res://gda_tmp_tilemap_rect/main_tileset.tres" },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": 0 },
+                { "key": "verified", "value": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "layer_setup",
+        "steps": [
+          {
+            "id": "layer_create",
+            "tool": "create_scene_node",
+            "args": { "name": "Ground", "type": "TileMapLayer", "parent_path": "Root" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.path", "value": "Ground" }
+              ]
+            }
+          },
+          {
+            "id": "layer_assign_tileset",
+            "tool": "property_set",
+            "args": {
+              "path": "Ground",
+              "property": "tile_set",
+              "value": { "path": "res://gda_tmp_tilemap_rect/main_tileset.tres" }
+            },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "ok" },
+                { "key": "resource_attached", "value": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "fill_rect",
+        "steps": [
+          {
+            "id": "fill_rect_10x3",
+            "tool": "fill_tilemap_rect",
+            "args": {
+              "node_path": "Ground",
+              "from": { "x": 0, "y": 0 },
+              "to": { "x": 9, "y": 2 },
+              "source_id": 0,
+              "atlas_coords": { "x": 0, "y": 0 }
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.set_count", "value": 30 },
+                { "key": "result.width", "value": 10 },
+                { "key": "result.height", "value": 3 },
+                { "key": "result.from.x", "value": 0 },
+                { "key": "result.from.y", "value": 0 },
+                { "key": "result.to.x", "value": 9 },
+                { "key": "result.to.y", "value": 2 },
+                { "key": "result.undo.name", "value": "Fill TileMap Rect" },
+                { "key": "result.undo.undoable", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "fill_rect_cell_cap",
+            "tool": "fill_tilemap_rect",
+            "args": {
+              "node_path": "Ground",
+              "from": { "x": 0, "y": 0 },
+              "to": { "x": 1000, "y": 200 },
+              "source_id": 0,
+              "atlas_coords": { "x": 0, "y": 0 }
+            },
+            "expect": {
+              "field_checks": [
+                { "key": "error", "value": "rect requires more than 100000 cells — position: from (0, 0) to (1000, 200) — expected: at most 100000 cells per call — action: split the rect into chunks of at most 100000 cells and call fill_tilemap_rect per chunk" }
+              ]
+            }
+          },
+          {
+            "id": "fill_rect_erase_reversed_corners",
+            "tool": "fill_tilemap_rect",
+            "args": {
+              "node_path": "Ground",
+              "from": { "x": 9, "y": 2 },
+              "to": { "x": 0, "y": 0 },
+              "erase": true
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.set_count", "value": 30 },
+                { "key": "result.width", "value": 10 },
+                { "key": "result.height", "value": 3 },
+                { "key": "result.from.x", "value": 0 },
+                { "key": "result.from.y", "value": 0 },
+                { "key": "result.to.x", "value": 9 },
+                { "key": "result.to.y", "value": 2 }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "arg_validation",
+        "steps": [
+          {
+            "id": "fill_rect_missing_from",
+            "tool": "fill_tilemap_rect",
+            "args": {
+              "node_path": "Ground",
+              "to": { "x": 1, "y": 1 },
+              "source_id": 0,
+              "atlas_coords": { "x": 0, "y": 0 }
+            },
+            "expect": {
+              "field_checks": [
+                { "key": "error", "value": "missing required parameter: from" }
+              ]
+            }
+          },
+          {
+            "id": "fill_rect_missing_source_id",
+            "tool": "fill_tilemap_rect",
+            "args": {
+              "node_path": "Ground",
+              "from": { "x": 0, "y": 0 },
+              "to": { "x": 1, "y": 1 },
+              "atlas_coords": { "x": 0, "y": 0 }
+            },
+            "expect": {
+              "field_checks": [
+                { "key": "error", "value": "missing required parameter: source_id" }
+              ]
+            }
+          },
+          {
+            "id": "fill_rect_missing_node_path",
+            "tool": "fill_tilemap_rect",
+            "args": {
+              "from": { "x": 0, "y": 0 },
+              "to": { "x": 1, "y": 1 },
+              "source_id": 0,
+              "atlas_coords": { "x": 0, "y": 0 }
+            },
+            "expect": {
+              "field_checks": [
+                { "key": "error", "value": "missing required parameter: node_path" }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

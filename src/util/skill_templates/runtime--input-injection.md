@@ -194,12 +194,14 @@ Rules verified in engine source:
 ## Game-side injection tools
 
 - `queue_game_input` — one input. `type`: `key`, `mouse_button` or
-  `action`; `mode`: `event` (default), `api`, `hold` (event-style, held for
-  `duration_ms`). Whitelist: `type`, `keycode`, `pressed`, `button_index`,
-  `position`, `action`, `duration_ms`, `mode`, `timeout_ms`; anything else
-  is rejected with an error.
+  `action`; wheel scrolling is supported through `direction` and `amount`;
+  `mode`: `event` (default), `api`, `hold` (event-style, held for
+  `duration_ms`). Whitelist: `type`,
+  `keycode`, `pressed`, `button_index`, `position`, `action`, `direction`,
+  `amount`, `duration_ms`, `mode`, `timeout_ms`; anything else is rejected
+  with an error.
 - `wait_game_input` — wait for `just_pressed` (default), `just_released` or
-  `pressed` within a physics frame, `timeout_ms` default 2000 max 30000.
+  `pressed` within a physics frame, `timeout_ms` default 2000 max 25000.
   `just_pressed`/`just_released` require `inject` — the transient window is
   one physics frame and always expired by the time a separate call could
   poll.
@@ -207,9 +209,10 @@ Rules verified in engine source:
   item: `kind` (`key`, `mouse_button`, `mouse_motion`, `action`), `at_frame`
   (relative to sequence start, 0 = immediately; entries fire when their
   frame arrives even if listed out of order) plus the `queue_game_input`
-  fields for that kind; optional `pressed` (default true), `duration_ms`,
-  `mode`. Max 256 items; `timeout_ms` defaults to
-  `max(at_frame) * 33 + 2000`, capped at 30000. Resolves with `completed`
+  fields for that kind, including the wheel fields `direction` and
+  `amount`; optional `pressed` (default true), `duration_ms`, `mode`.
+  Max 256 items; `timeout_ms` defaults to
+  `max(at_frame) * 33 + 2000`, capped at 25000. Resolves with `completed`
   and `executed` counts; `completed: false` means timeout.
 - `get_game_input_status` — `pressed`, `just_pressed`, `just_released`,
   `physics_frame`. Engine errors are never attached to this response; read
@@ -261,6 +264,58 @@ To click an editor dock, button or tab:
 
 These events reach the editor process only; a separately launched game
 never receives them (see "Two processes, one lesson" above).
+
+## Editor UI automation (preferred path)
+
+Driving the editor UI through semantic elements is preferred over raw
+coordinates: the tools target a control by its element path, instead of
+clicking wherever a pair of pixels happens to land. The default order is
+enumerate, act, verify:
+
+1. **Enumerate or preview.** `get_editor_ui_elements` lists the editor's
+   UI elements (optional `query`, `type_filter`, `interactive_only`,
+   `max_elements`). `hit_test_editor_point` (`position`, `window_id`,
+   `max_results`) previews which elements a client-area point lands on
+   without clicking — use it to confirm the target before acting.
+2. **Act.** `click_editor_element` (`path`, `button`, `double_click`,
+   `warp`, `observe`), `type_editor_element_text` (`path`, `text`,
+   `submit`, `observe`), or `run_editor_shortcut` (`shortcut`, for example
+   `"ctrl+s"`).
+3. **Verify.** Re-enumerate with `get_editor_ui_elements`, read editor
+   state back, or capture with `capture_editor_viewport` — its `annotate`
+   and `diff_against_last` options make the check cheap.
+
+Fall back to the raw-coordinate tools when element enumeration cannot
+reach the target: the 2D canvas, the 3D viewport, custom-drawn controls,
+or a control that exposes no usable element path. The raw-coordinate tools
+are `click_input_mouse` (`position`, `button`, `double_click`, `warp`,
+`observe`), `scroll_input_mouse` (`direction`, `position`, `amount`,
+`warp`, `observe`), `drag_input_mouse` (`from`, `to`, `button`, `steps`,
+`warp`, `observe`) and `type_input_text` (`text`, `submit`, `observe`).
+They take the same window-client-area pixel basis as `move_input_mouse` /
+`warp_display_mouse` (see "Mouse coordinates and the click paradigm"
+above); three helpers produce coordinates on that basis:
+
+- `get_display_window_rect` (`window_id`) — the window's client-area
+  geometry, its screen and its scale factor.
+- `get_editor_viewport_geometry` (`viewport`, `index`) — how the captured
+  editor viewport image maps onto the window client area, so image pixels
+  can be converted into click coordinates.
+- `get_scene_node_screen_rect` (`paths`, `viewport`) — scene node paths to
+  client-area rectangles, for targeting nodes drawn in a viewport instead
+  of Control nodes.
+
+The action tools that take `observe` attach a screenshot taken after the
+action to the response (`run_editor_shortcut` and `click_game_ui_element`
+do not take it — pass one of the other action tools, or capture
+afterwards). Through `call_tool` that screenshot arrives as an image
+content block; inside `batch_execute` / `code_execute` it stays base64,
+like every other capture.
+
+Wheel input has two sides with the same two parameters: use
+`scroll_input_mouse` (`direction`, `amount`) on the editor side, and the
+wheel support of `queue_game_input` / `sequence_game_inputs` (`direction`,
+`amount`) to scroll inside the running game.
 
 ## See also
 
