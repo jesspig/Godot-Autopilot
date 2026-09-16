@@ -958,7 +958,23 @@ mcp::JsonValue handle_open_scene(const mcp::JsonValue &args) {
     return e;
   }
   auto *old_root = editor->get_edited_scene_root();
-  editor->open_scene_from_path(godot::String(path.c_str()));
+  // 引擎对「已打开」场景只切标签（editor/editor_node.cpp:4966-4974），请求目标恰为
+  // 当前场景时 _set_current_scene 直接 return（:4701-4704）→ root 指针不变；
+  // 因此以 root 指针是否变化判定成败会把幂等调用误判为失败，须先比对路径。
+  godot::String requested_path = godot::String::utf8(path.c_str());
+  if (old_root != nullptr && !path.empty()) {
+    godot::String open_path = old_root->get_scene_file_path();
+    if (!open_path.is_empty() && same_scene_path(requested_path, open_path)) {
+      mcp::JsonValue r(mcp::JsonValue::object_tag);
+      r["result"] = mcp::JsonValue("ok");
+      r["path"] = mcp::JsonValue(path);
+      r["already_open"] = mcp::JsonValue(true);
+      LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                                "open_editor_scene already open: " + path);
+      return r;
+    }
+  }
+  editor->open_scene_from_path(requested_path);
   auto *new_root = editor->get_edited_scene_root();
   if (new_root == old_root) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -976,6 +992,8 @@ mcp::JsonValue handle_open_scene(const mcp::JsonValue &args) {
   scene_dirty_tracker::clear_scene_modified();
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
+  r["path"] = mcp::JsonValue(path);
+  r["already_open"] = mcp::JsonValue(false);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "open_editor_scene completed");
   return r;

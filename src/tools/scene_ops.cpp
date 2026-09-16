@@ -114,6 +114,39 @@ void node_to_json(godot::Node *node, int remaining_depth,
   }
 }
 
+// F2: tells apart resource/object-typed property values from value-typed ones.
+// OBJECT-typed properties (sprite_frames, texture, script, shape, ...) must be
+// applied first: the engine drops dependent values that arrive while their
+// resource is still unset (AnimatedSprite2D::set_animation resets the animation
+// name to empty and pushes an error when frames is null). The reflected
+// property list of the freshly instantiated node is the authority; unknown
+// properties fall back to the shape of the incoming JSON value.
+bool property_value_is_object_typed(const godot::Node *node,
+                                    const std::string &prop_name,
+                                    const mcp::JsonValue &raw_value) {
+  godot::TypedArray<godot::Dictionary> props = node->get_property_list();
+  for (int64_t i = 0; i < props.size(); i++) {
+    godot::Dictionary dict = props[i];
+    if (!dict.has("name") || !dict.has("type"))
+      continue;
+    if (util::to_std(dict["name"].operator godot::String()) != prop_name)
+      continue;
+    return static_cast<godot::Variant::Type>(static_cast<int>(dict["type"])) ==
+           godot::Variant::OBJECT;
+  }
+  if (raw_value.IsString()) {
+    const std::string str = raw_value.GetString();
+    return str.rfind("res://", 0) == 0 || str.rfind("memory://", 0) == 0;
+  }
+  if (raw_value.IsObject()) {
+    const mcp::JsonValue *ref = raw_value.Find("path");
+    if (!ref)
+      ref = raw_value.Find("resource");
+    return ref != nullptr && ref->IsString();
+  }
+  return false;
+}
+
 } // namespace
 
 std::string scene_relative_path(godot::Node *node, godot::Node *scene_root) {
@@ -224,11 +257,16 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
     auto *scene_root_now =
         editor ? editor->get_edited_scene_root() : nullptr;
     std::string node_rel_path = scene_relative_path(obj, scene_root_now);
-    for (const auto &kv : *props_it) {
+
+    // Applies one property through property_ops::handle_set and collects the
+    // applied name, its warning and any inline resource echo. Returns an empty
+    // object on success, an error object (same message as before) on failure.
+    auto apply_property = [&](const std::string &prop_name,
+                              const mcp::JsonValue &prop_value) {
       mcp::JsonValue prop_args(mcp::JsonValue::object_tag);
       prop_args["path"] = mcp::JsonValue(node_rel_path);
-      prop_args["property"] = mcp::JsonValue(kv.first);
-      prop_args["value"] = kv.second;
+      prop_args["property"] = mcp::JsonValue(prop_name);
+      prop_args["value"] = prop_value;
       mcp::JsonValue prop_result;
       try {
         prop_result = godot_autopilot::property_ops::handle_set(prop_args);
@@ -250,7 +288,7 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
         memdelete(obj);
         mcp::JsonValue e(mcp::JsonValue::object_tag);
         e["error"] =
-            mcp::JsonValue("failed to apply property '" + kv.first +
+            mcp::JsonValue("failed to apply property '" + prop_name +
                            "' on created node: " + err->GetString());
         return e;
       }
@@ -258,7 +296,7 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
       if (warn && warn->IsString()) {
         mcp::JsonValue w(mcp::JsonValue::object_tag);
         w["path"] = mcp::JsonValue(node_rel_path);
-        w["property"] = mcp::JsonValue(kv.first);
+        w["property"] = mcp::JsonValue(prop_name);
         w["warning"] = mcp::JsonValue(warn->GetString());
         property_warnings.push_back(std::move(w));
       }
@@ -268,7 +306,30 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
           inline_resources.push_back(entry);
         }
       }
-      applied_properties.push_back(kv.first);
+      applied_properties.push_back(prop_name);
+      return mcp::JsonValue(mcp::JsonValue::object_tag);
+    };
+
+    // Two passes over the same key order (mcp::JsonValue iterates its backing
+    // std::map, i.e. lexicographically): resource/object-typed values first,
+    // then every remaining value-typed one. A dependent value such as
+    // AnimatedSprite2D.animation therefore lands after its sprite_frames.
+    std::vector<std::string> object_props;
+    for (const auto &kv : *props_it) {
+      if (property_value_is_object_typed(obj, kv.first, kv.second))
+        object_props.push_back(kv.first);
+    }
+    for (int pass = 0; pass < 2; pass++) {
+      for (const auto &kv : *props_it) {
+        const bool object_typed =
+            std::find(object_props.begin(), object_props.end(), kv.first) !=
+            object_props.end();
+        if (object_typed != (pass == 0))
+          continue;
+        mcp::JsonValue apply_error = apply_property(kv.first, kv.second);
+        if (apply_error.Find("error"))
+          return apply_error;
+      }
     }
   }
 
