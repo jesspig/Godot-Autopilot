@@ -6,6 +6,7 @@
 
 - **坐标换算/键名统一/脚本新鲜度/UID 守卫/CJK 往返/open 幂等/属性两轮批次**：`click_game_ui_element` 窗口坐标换算（`window_position`/`viewport_position` 回显）与键名两侧统一判定、脚本 `fresh` 取用口径与 `cache_refreshed`、UID 按表成员选 `add_id`/`set_id`、文本链路全 `String::utf8`、`open_editor_scene` 幂等 `already_open`、`create_scene_node` 属性两轮应用；L1 246→267（新增 game_ui_coords 6 / keycode_alias 6 / script_freshness 7 / uid_guard 2）、L2 18→25 份（新增 18/19/22/23/24/25/28）、ctest 264→292；工具数 385/392/393、SIDE 60（325+60）；计数为静态核算、待构建运行复核；`window_position` 端到端断言待示例游戏恢复后补测。详见 `changelog/2026-09-16-log.md`
 - **失败修复批次文档收尾（feature/failure-remediation）**：域工具 379→384（可达 391 / catalog 392，非 SIDE 324 / SIDE 60）、新增 5 工具（scene_tree_items / select_scene_tree_node / fill_tilemap_rect / start_game_job / get_game_job）、L1 172→229、L2 11→17 份、ctest 183→246；8 项行为变更已并入对应功能页（modules/tools_ops_a / modules/tools_ops_b / modules/entry_runtime / tests / modules/support）：eval 结构化错误、超时预算链与 late_results、batch_execute await_async、capture after_frames/when/scale、内联子资源、scene_path 回显、godot://skills 资源、get_game_status 无参；AGENTS.md / README 双语 / tests/README.md 与知识库 12 页同步。详见 `changelog/2026-09-16-log.md`
+- **0.2.5 升版收尾同步**：根 `VERSION` 与 `AGENTS.md` 早在 09-14 已为 0.2.5，本次补齐遗漏页——`build.md` release validate 示例同步至 `v0.2.5` ↔ `0.2.5`；全库复核无其他滞留 0.2.4 现行版表述。详见 `changelog/2026-09-16-log.md`
 
 ## 2026-09-15
 
