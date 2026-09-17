@@ -2,6 +2,12 @@
 
 > 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天。
 
+## 2026-09-17
+
+- **代码精简批次（纯删除零行为变化）**：27 文件 +104/−592，域工具 385 / SIDE 60 / catalog 393 不变；L1 267→243、ctest 注册点 292→268（构建 65/65、L1 243/243 全绿）；技能册计数 384→385 并同步 10 余页文档数字。详见 `changelog/2026-09-17-log.md`
+- **客户端配置写入修复**：`write_file` 先递归创建父目录（修复 14 个含目录路径客户端首建失败）；pi 路径 `.pi/mcp.json`→`.mcp.json`（与 Command Code/CodeBuddy 共用，merge 幂等）。详见 `changelog/2026-09-17-log.md`
+- **文档同步批次 T09+T12-docs（零代码）**：P2 释放 flush / P3 求值启发式 / P4 多签秒级失败 / P5 跨帧 undo / P7 文本点击与序号口径 / P8 改脚本工作流 / P12 登记状态如实返回等 7 项行为入 wiki；版本口径 godot-cpp rc1→rc2、mcp-cpp-sdk 0.3.3→0.3.4、compat 4.3→4.7；P12 回退恢复 fallback 与 `tab_rebuilt` 及 07/13 勘误。详见 `changelog/2026-09-17-log.md`
+
 ## 2026-09-16
 
 - **坐标换算/键名统一/脚本新鲜度/UID 守卫/CJK 往返/open 幂等/属性两轮批次**：`click_game_ui_element` 窗口坐标换算（`window_position`/`viewport_position` 回显）与键名两侧统一判定、脚本 `fresh` 取用口径与 `cache_refreshed`、UID 按表成员选 `add_id`/`set_id`、文本链路全 `String::utf8`、`open_editor_scene` 幂等 `already_open`、`create_scene_node` 属性两轮应用；L1 246→267（新增 game_ui_coords 6 / keycode_alias 6 / script_freshness 7 / uid_guard 2）、L2 18→25 份（新增 18/19/22/23/24/25/28）、ctest 264→292；工具数 385/392/393、SIDE 60（325+60）；计数为静态核算、待构建运行复核；`window_position` 端到端断言待示例游戏恢复后补测。详见 `changelog/2026-09-16-log.md`
@@ -27,9 +33,4 @@
 - **skill 统一纯英文**：`godot-autopilot` description 改为英文必读定位（"Required reading before using the GDA (godot-autopilot) plugin"，其余 7 册不动）、`scene-system.md` 中文错误提示引用改英文转述；全库扫描确认 `src/util/skill_templates/` 其余文件无中文字符；support.md 同步。详见 `changelog/2026-09-13-log.md`
 - **版本号 0.2.3 → 0.2.4**：根 `VERSION` 单一来源升版，AGENTS.md 与 build.md 示例同步；GDA_VERSION 注入与测试由主代理重新 configure/构建后验证。详见 `changelog/2026-09-13-log.md`
 - **0.2.4 后知识库全量一致性审计（14 页）与源码文案同步**：5 组并行逐页核对/修复（工具页逐工具名集合复核 A 180 + B 186 = 366；overview/core/support/tools_registry/build/tests/example/roadmap 等行号与行为口径修正），同步源码侧旧文案（queue_game_input 描述与 skill 模板的 `ignored_params`、debug monitors 58→59）及 `tests/README.md` 行号；重建后 L1 126/126 全绿。详见 `changelog/2026-09-13-log.md`
-
-## 2026-09-10
-
-- **skill 体系 19→7 册重构 + Godot 源码研究发现织入**：19 册合并为 `godot-autopilot` 总纲 + 6 册引擎指南（每册带 references/ 渐进披露），84 条 Godot 4.8.0-dev 源码研究发现织入引擎六册（4.7+/4.8 行内简注）；`skill_templates/` 28 个文件、registry 7 条、`SKILL_COUNT` 19→7；McpConfigDock 按钮 Generate/Update 动态化（Update 先清理 `godot-autopilot-` 前缀目录）；skill_gen_test 用例改名 + 白名单 176，ctest L1 103/103 全绿；support/tests/overview/AGENTS.md 知识库同步。详见 `changelog/2026-09-10-log.md`
-- **版本号 0.2.2 → 0.2.3**：根 `VERSION` 单一来源变更（CRLF 保留），AGENTS.md/build.md 示例同步，GDA_VERSION 注入验证通过，ctest L1 103/103。详见 `changelog/2026-09-10-log.md`
 
