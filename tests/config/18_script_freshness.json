@@ -1,6 +1,6 @@
 {
   "name": "script_freshness",
-  "description": "脚本取用口径回归（headless）：create_script 写盘后必须让编辑器后续取用看到磁盘版本（godot-cpp 的 ResourceLoader::load 缺省 CACHE_MODE_REUSE，命中 ResourceCache/GDScriptCache 就直接返回旧实例、不读盘）。setup：create_editor_scene FreshRoot + create_scene_node FreshProbe。链路：① create_script 写入含 GDA_MARKER_A 的 res://tests_tmp/gda_fresh_check.gd（overwrite=true；断言 result.verified=true、result.cache_refreshed=true——后者是写盘后 IGNORE 装载刷新的新字段，修复前不存在，此断言即 D 项回归点）→ ② reload_script 断言 result=0 → ③ create_script 覆写为含 GDA_MARKER_B 与 @export var probe_marker: int = 7 的版本（断言 result.overwritten=true、verified=true、cache_refreshed=true）→ ④ attach_script_to_node 挂到 FreshProbe（断言 result=\"script attached to FreshProbe\"、instantiated=true）→ ⑤ execute_script 读挂载后节点的 script.get_source_code() 并断言 result=true（源码含 GDA_MARKER_B；修复前挂上的仍是旧实例、含 GDA_MARKER_A，此步必失败）。说明：任务原文要求用 property_get 断言 script/source，但 property_get 的 find_property_info 只查节点属性表、Object::get 也不解析脚本子属性，script/source 会报 property not found（修复前后都一样），故改用 execute_script 读源码（需 code_execute capability，与 04_resources_scripts 同前提）→ ⑥ get_script_property {script_path, property:probe_marker, fresh:true} 断言 result=7（修复前 fresh 未实现且命中旧实例，probe_marker 不在旧脚本的默认值缓存里 → 返回 null，此步必失败；覆盖 C 项 fresh 参数）→ ⑦ property_get 节点 probe_marker 断言 result=7（修复前旧脚本没有该导出变量，find_property_info 找不到 → 报 property not found，此步必失败；覆盖 B 项 attach 取磁盘版）→ ⑧ property_set probe_marker=11 断言 result=ok → ⑨ property_get 读回断言 result=11（确认实例值生效）→ ⑩ delete_scene_node 回收节点，after_all 回收 res://tests_tmp。",
+  "description": "脚本取用口径回归（headless）：create_script 写盘后必须让编辑器后续取用看到磁盘版本（godot-cpp 的 ResourceLoader::load 缺省 CACHE_MODE_REUSE，命中 ResourceCache/GDScriptCache 就直接返回旧实例、不读盘）。setup：create_editor_scene FreshRoot + create_scene_node FreshProbe。链路：① create_script 写入含 GDA_MARKER_A 的 res://tests_tmp/gda_fresh_check.gd（overwrite=true；断言 result.verified=true、result.cache_refreshed=true——后者是写盘后 IGNORE 装载刷新的新字段，修复前不存在，此断言即 D 项回归点）→ ② reload_script 断言 result=0 → ③ create_script 覆写为含 GDA_MARKER_B 与 @export var probe_marker: int = 7 的版本（断言 result.overwritten=true、verified=true、cache_refreshed=true）→ ④ attach_script_to_node 挂到 FreshProbe（断言 result=\"script attached to FreshProbe\"、instantiated=false）→ ⑤ execute_script 读挂载后节点的 script.get_source_code() 并断言 result=true（源码含 GDA_MARKER_B；修复前挂上的仍是旧实例、含 GDA_MARKER_A，此步必失败）。说明：任务原文要求用 property_get 断言 script/source，但 property_get 的 find_property_info 只查节点属性表、Object::get 也不解析脚本子属性，script/source 会报 property not found（修复前后都一样），故改用 execute_script 读源码（需 code_execute capability，与 04_resources_scripts 同前提）→ ⑥ get_script_property {script_path, property:probe_marker, fresh:true} 断言 result=7（修复前 fresh 未实现且命中旧实例，probe_marker 不在旧脚本的默认值缓存里 → 返回 null，此步必失败；覆盖 C 项 fresh 参数）→ ⑦ property_get 节点 probe_marker 断言 result=7（修复前旧脚本没有该导出变量，find_property_info 找不到 → 报 property not found，此步必失败；覆盖 B 项 attach 取磁盘版）→ ⑧ property_set probe_marker=11 断言 result=ok → ⑨ property_get 读回断言 result=11（确认实例值生效）→ ⑩ delete_scene_node 回收节点，after_all 回收 res://tests_tmp。非 @tool 脚本在编辑器内 can_instantiate=false 系引擎语义，本用例新鲜度以源码 MARKER 与 property 链路为准。",
   "headless": true,
   "pipeline": {
     "on_failure": "continue",
@@ -90,7 +90,8 @@
             "expect": {
               "field_checks": [
                 { "key": "result", "value": "script attached to FreshProbe" },
-                { "key": "instantiated", "value": true }
+                { "key": "instantiated", "value": false },
+                { "key": "note", "not_empty": true }
               ]
             }
           },
