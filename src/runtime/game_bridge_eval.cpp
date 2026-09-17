@@ -3,6 +3,7 @@
 #include "core/config.hpp"
 #include "util/error_util.hpp"
 #include "util/readback_util.hpp"
+#include "util/type_hint.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/gd_script.hpp>
@@ -17,14 +18,19 @@
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/callable.hpp>
+#include <godot_cpp/variant/color.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
 #include <godot_cpp/variant/variant.hpp>
+#include <godot_cpp/variant/vector2.hpp>
+#include <godot_cpp/variant/vector3.hpp>
+#include <godot_cpp/variant/vector4.hpp>
 #include <mcp/JsonValue.hpp>
 #include <string>
+#include <vector>
 
 namespace godot_autopilot {
 namespace runtime {
@@ -388,6 +394,101 @@ JV op_eval_set_property(const JV &params) {
   return r;
 }
 
+bool call_arg_number(const JV &obj, const char *key, double &out) {
+  auto *v = obj.Find(key);
+  if (!v || !v->IsNumber())
+    return false;
+  out = v->IsInt() ? static_cast<double>(v->GetInt()) : v->GetDouble();
+  return true;
+}
+
+// JSON objects such as {"x":440,"y":150} carry no type tag, so a bare
+// deserialize() yields Dictionary and engine-side callv then fails with
+// CALL_ERROR_INVALID_ARGUMENT. Convert shapes that match a built-in value
+// type. Float variants are used ("x"+"y" becomes Vector2); integer variants
+// (Vector2i/Vector3i/...) are resolved through method-signature hints in
+// method_arg_hints(). Marker objects of the object-ref path
+// (__node_ref__/object_id/object_id_str/class) are left untouched.
+// Priority: Color > Vector4 > Vector3 > Vector2. Extra keys are ignored.
+bool try_heuristic_builtin_arg(const JV &arg, godot::Variant &out) {
+  if (!arg.IsObject())
+    return false;
+  if (arg.Find("__node_ref__") || arg.Find("object_id") ||
+      arg.Find("object_id_str") || arg.Find("class")) {
+    return false;
+  }
+  double r = 0.0, g = 0.0, b = 0.0, a = 1.0;
+  if (call_arg_number(arg, "r", r) && call_arg_number(arg, "g", g) &&
+      call_arg_number(arg, "b", b)) {
+    if (auto *pa = arg.Find("a")) {
+      if (!pa->IsNumber())
+        return false;
+      a = pa->IsInt() ? static_cast<double>(pa->GetInt()) : pa->GetDouble();
+    }
+    out = godot::Variant(
+        godot::Color(static_cast<float>(r), static_cast<float>(g),
+                     static_cast<float>(b), static_cast<float>(a)));
+    return true;
+  }
+  double x = 0.0, y = 0.0, z = 0.0, w = 0.0;
+  bool has_x = call_arg_number(arg, "x", x);
+  bool has_y = call_arg_number(arg, "y", y);
+  bool has_z = call_arg_number(arg, "z", z);
+  bool has_w = call_arg_number(arg, "w", w);
+  if (has_x && has_y && has_z && has_w) {
+    out = godot::Variant(godot::Vector4(x, y, z, w));
+    return true;
+  }
+  if (has_x && has_y && has_z) {
+    out = godot::Variant(godot::Vector3(x, y, z));
+    return true;
+  }
+  if (has_x && has_y) {
+    out = godot::Variant(godot::Vector2(x, y));
+    return true;
+  }
+  return false;
+}
+
+// Resolve per-argument type hints from the node's method list, reusing the
+// same typed path as set_property (util::infer_type_hint plus
+// deserialize(arg, hint)). Untyped (NIL) parameters yield an empty hint so the
+// heuristic/inferred path applies. Returns one entry per requested argument.
+std::vector<std::string> method_arg_hints(godot::Node *node,
+                                          const std::string &method_name,
+                                          size_t argc) {
+  std::vector<std::string> hints(argc);
+  if (argc == 0 || !node)
+    return hints;
+  godot::TypedArray<godot::Dictionary> methods = node->get_method_list();
+  for (int64_t i = 0; i < methods.size(); i++) {
+    godot::Dictionary info = methods[i];
+    if (!info.has("name"))
+      continue;
+    if (util::to_std(info["name"].operator godot::String()) != method_name)
+      continue;
+    if (!info.has("args"))
+      return hints;
+    godot::Array margs = info["args"];
+    for (size_t k = 0; k < argc && k < static_cast<size_t>(margs.size());
+         k++) {
+      godot::Dictionary arg_info = margs[static_cast<int64_t>(k)];
+      if (arg_info.has("type") &&
+          static_cast<int>(arg_info["type"]) ==
+              static_cast<int>(godot::Variant::NIL)) {
+        continue;
+      }
+      std::string hint;
+      if (arg_info.has("class_name")) {
+        hint = util::to_std(arg_info["class_name"].operator godot::String());
+      }
+      hints[k] = util::infer_type_hint(arg_info, hint);
+    }
+    return hints;
+  }
+  return hints;
+}
+
 JV op_eval_call_method(const JV &params, int64_t request_id) {
   auto *path_p = params.Find("node_path");
   auto *method_p = params.Find("method");
@@ -398,12 +499,30 @@ JV op_eval_call_method(const JV &params, int64_t request_id) {
   godot::Node *node = resolve_node(path_p->GetString());
   if (!node)
     return error_result("node not found: " + path_p->GetString());
+  std::string method_name = method_p->GetString();
+  const JV *args_p = params.Find("args");
+  size_t argc = (args_p && args_p->IsArray()) ? args_p->Size() : 0;
+  std::vector<std::string> arg_hints =
+      method_arg_hints(node, method_name, argc);
   godot::Array call_args;
-  if (auto *args_p = params.Find("args")) {
-    if (args_p->IsArray()) {
-      for (const auto &arg : args_p->GetArray()) {
-        call_args.push_back(VariantJson::deserialize(arg));
+  if (args_p && args_p->IsArray()) {
+    size_t index = 0;
+    for (const auto &arg : args_p->GetArray()) {
+      std::string hint =
+          index < arg_hints.size() ? arg_hints[index] : std::string();
+      godot::Variant value;
+      if (!hint.empty()) {
+        value = VariantJson::deserialize(arg, hint);
+      } else if (arg.IsObject()) {
+        godot::Variant heuristic;
+        value = try_heuristic_builtin_arg(arg, heuristic)
+                    ? heuristic
+                    : VariantJson::deserialize(arg);
+      } else {
+        value = VariantJson::deserialize(arg);
       }
+      call_args.push_back(value);
+      index++;
     }
   }
   godot::StringName method_sn(method_p->GetString().c_str());
@@ -437,7 +556,28 @@ JV op_eval_call_method(const JV &params, int64_t request_id) {
     return JV();
   }
 
-  return ok_result(VariantJson::serialize(result));
+  JV body = ok_result(VariantJson::serialize(result));
+  append_eval_runtime_errors(body, call_seq_before);
+  auto *call_err = body.Find("runtime_error");
+  bool engine_reported_error =
+      call_err && call_err->IsBool() && call_err->GetBool();
+  if (engine_reported_error &&
+      result.get_type() == godot::Variant::NIL) {
+    // callv reports failures (e.g. INVALID_ARGUMENT from a Dictionary passed
+    // where a built-in value type was expected) by returning null and logging
+    // an engine error. Surface that as an error instead of a bare success so
+    // an unconvertible argument can never look like a successful call.
+    JV err = error_result(
+        "call_method '" + method_p->GetString() + "' on " +
+        path_p->GetString() +
+        " failed (engine reported an error during the call; likely "
+        "INVALID_ARGUMENT: argument type mismatch, e.g. Dictionary where a "
+        "built-in value type such as Vector2 was expected; see "
+        "error_details)");
+    append_eval_runtime_errors(err, call_seq_before);
+    return err;
+  }
+  return body;
 }
 
 } // namespace
