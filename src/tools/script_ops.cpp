@@ -491,6 +491,12 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(j);
+  r["note"] = mcp::JsonValue(
+      "editor cache was refreshed for this file; if a game is running with the "
+      "old script, call reload_game_scripts first and then "
+      "reload_current_scene (or retry the operation) — reloading the scene "
+      "alone does not guarantee the on-disk version is re-read "
+      "(CACHE_MODE_REUSE)");
   return r;
 }
 
