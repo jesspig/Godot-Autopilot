@@ -65,7 +65,7 @@ def _generate_gdextension() -> None:
     (EXAMPLE_ADDON_DIR / "godot-autopilot.gdextension").write_text(
         "[configuration]\n"
         'entry_symbol = "GDExtensionEntryPoint"\n'
-        'compatibility_minimum = "4.3"\n'
+        'compatibility_minimum = "4.7"\n'
         "\n"
         "[libraries]\n"
         'windows.debug.x86_64 = "res://addons/godot-autopilot/godot-autopilot.dll"\n'
