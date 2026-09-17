@@ -437,16 +437,33 @@ mcp::JsonValue handle_click_game_ui_element(const mcp::JsonValue &args) {
     return denied;
   if (!args.IsObject())
     return error_json("click_game_ui_element parameters must be an object");
-  static constexpr const char *allowed[] = {"path", "button_index",
+  static constexpr const char *allowed[] = {"path", "text", "text_index", "button_index",
                                              "double_click", "max_elements",
                                              "timeout_ms"};
   std::string unknown;
   if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed), unknown))
-    return error_json("unknown parameter for click_game_ui_element: " + unknown);
+    return error_json("unknown parameter for click_game_ui_element: " + unknown + " — annotate id is a per-capture sequence number and is not clickable; use path from the same get_game_ui_elements row (path takes priority) or text/text_index");
   auto *path_p = args.Find("path");
-  if (!path_p || !path_p->IsString() || path_p->GetString().empty()) {
-    return error_json("missing required parameter: path (non-empty node path "
-                      "from get_game_ui_elements)");
+  auto *text_p = args.Find("text");
+  const bool has_path =
+      path_p && path_p->IsString() && !path_p->GetString().empty();
+  const bool has_text =
+      text_p && text_p->IsString() && !text_p->GetString().empty();
+  if (!has_path && !has_text) {
+    return error_json("missing required parameter: path or text (non-empty node path "
+                      "from get_game_ui_elements, or visible element text; path takes "
+                      "priority when both are given)");
+  }
+  int64_t text_index = 0;
+  const bool has_text_index = args.Find("text_index") != nullptr;
+  if (auto *index_p = args.Find("text_index")) {
+    if (!index_p->IsInt() || index_p->GetInt() < 0)
+      return error_json("text_index must be an integer greater than or equal "
+                        "to 0 (selects the nth visible text match)");
+    text_index = index_p->GetInt();
+    if (!has_text)
+      return error_json("text_index requires text (path takes priority when "
+                        "both path and text are given)");
   }
   int64_t button_index = 1;
   if (auto *button_p = args.Find("button_index")) {
@@ -474,16 +491,23 @@ mcp::JsonValue handle_click_game_ui_element(const mcp::JsonValue &args) {
       (!timeout->IsInt() || timeout->GetInt() <= 0 ||
        timeout->GetInt() > GDA_MAX_GAME_OP_TIMEOUT_MS))
     return error_json(game_op_timeout_error());
-  const std::string path = path_p->GetString();
+  const std::string path = has_path ? path_p->GetString() : std::string();
+  const std::string text = has_text ? text_p->GetString() : std::string();
   LogSystem::instance().log(
       LogLevel::Debug, LogCategory::Tools,
-      "click_game_ui_element dispatch: path=" + path + ", button_index=" +
+      "click_game_ui_element dispatch: path=" + path + ", text=" + text + ", button_index=" +
           std::to_string(button_index) +
           ", double_click=" + (double_click ? "true" : "false") +
-          ", max_elements=" + std::to_string(max_elements));
+          ", max_elements=" + std::to_string(max_elements) + ", text_index=" + std::to_string(text_index));
 
   JV click(JV::object_tag);
-  click["path"] = JV(path);
+  if (has_path)
+    click["path"] = JV(path);
+  if (has_text) {
+    click["text"] = JV(text);
+    if (has_text_index)
+      click["text_index"] = JV(text_index);
+  }
   click["button_index"] = JV(button_index);
   click["double_click"] = JV(double_click);
   JV params(JV::object_tag);
@@ -611,7 +635,7 @@ mcp::JsonValue handle_game_reload_scripts(const mcp::JsonValue &args) {
   JV result(JV::object_tag);
   result["result"] = std::move(inner);
   result["note"] = JV(
-      "soft reload is applied by the game on its next idle poll; no confirmation is returned — verify with get_game_log_entries");
+      "soft reload is applied by the game on its next idle poll; no confirmation is returned — verify with get_game_log_entries. Workflow after editing a script file: call reload_game_scripts first, then reload_current_scene (or retry the failed operation); reloading the scene alone does not guarantee the on-disk version is re-read (CACHE_MODE_REUSE).");
   return result;
 }
 

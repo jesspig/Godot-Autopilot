@@ -49,7 +49,7 @@ void fill_schema_editor_config(std::unordered_map<std::string, mcp::JsonValue>& 
         m["create_editor_scene"] = schema::build_schema({
             {"type", "string", "Godot class name of the root node to create, e.g. 'Node2D' or 'Node3D'; must be a Node subclass, defaults to 'Node'", false},
             {"name", "string", "Name of the new root node, defaults to 'NewRoot'", false},
-            {"close_current", "boolean", "Close the current scene first if it has no unsaved changes (default: false; errors if the current scene is unsaved)", false},
+            {"close_current", "boolean", "Close the current scene tab first if it has no unsaved changes (default: false; errors if the current scene is unsaved). Only the current tab is closed: with multiple scene tabs open, repeat close_editor_scene until no scene is open, otherwise create_editor_scene fails fast without entering the switch wait", false},
             {"timeout_ms", "integer", "Maximum time in milliseconds to wait for the editor to observe the new scene root after add_root_node (default: 2000, min: 50, max: 30000); on timeout the call errors with waited_ms, timeout_ms, node_released and editor_state diagnostics", false},
         });
         m["open_editor_scene"] = schema::build_schema({

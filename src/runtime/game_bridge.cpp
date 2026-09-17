@@ -379,6 +379,23 @@ std::vector<UiElement> collect_ui_elements(godot::Node *root,
   return elements;
 }
 
+std::vector<const UiElement *> find_ui_elements_by_text(
+    const std::vector<UiElement> &elements, const std::string &text) {
+  std::vector<const UiElement *> exact;
+  std::vector<const UiElement *> partial;
+  for (const UiElement &element : elements) {
+    if (!element.visible || !element.has_text)
+      continue;
+    if (element.text == text)
+      exact.push_back(&element);
+    else if (element.text.find(text) != std::string::npos)
+      partial.push_back(&element);
+  }
+  if (!exact.empty())
+    return exact;
+  return partial;
+}
+
 const UiElement *find_ui_element(const std::vector<UiElement> &elements,
                                  const std::string &path) {
   for (const UiElement &element : elements) {
@@ -1214,10 +1231,75 @@ JV run_ui_click(const JV &click, const std::vector<UiElement> &elements,
   if (!click.IsObject())
     return error_result("ui_elements click must be an object");
   auto *path_p = click.Find("path");
-  if (!path_p || !path_p->IsString() || path_p->GetString().empty())
-    return error_result("ui_elements click requires path (non-empty string)");
-  const std::string path = path_p->GetString();
+  auto *text_p = click.Find("text");
+  const bool want_path =
+      path_p && path_p->IsString() && !path_p->GetString().empty();
+  const bool want_text =
+      text_p && text_p->IsString() && !text_p->GetString().empty();
+  int64_t text_index = 0;
+  const bool has_text_index = click.Find("text_index") != nullptr;
+  if (auto *ti_p = click.Find("text_index")) {
+    if (!ti_p->IsInt() || ti_p->GetInt() < 0)
+      return error_result(
+          "ui_elements click text_index must be an integer >= 0");
+    text_index = ti_p->GetInt();
+  }
+  if (!want_path && !want_text)
+    return error_result("ui_elements click requires path or text (non-empty "
+                        "string; path takes priority when both are given)");
+  const std::string path = want_path ? path_p->GetString() : std::string();
+  const UiElement *match = nullptr;
+  if (!want_path) {
+    const std::string text = text_p->GetString();
+    const std::vector<const UiElement *> text_matches =
+        find_ui_elements_by_text(elements, text);
+    if (text_matches.empty()) {
+      std::string message = "click target text not found: \"" + text +
+                            "\" (enumerated " +
+                            std::to_string(elements.size()) + " elements";
+      if (truncated)
+        message += ", truncated at the max_elements cap";
+      message += "; candidates:";
+      const size_t preview = std::min<size_t>(elements.size(), 10);
+      if (preview == 0)
+        message += " none";
+      for (size_t i = 0; i < preview; i++)
+        message += " [" + elements[i].path + " text=\"" + elements[i].text +
+                   "\"]";
+      if (elements.size() > preview)
+        message += " ...";
+      message += ")";
+      return error_result(message);
+    }
+    if (!has_text_index && text_matches.size() > 1) {
+      std::string message = "ambiguous click text: \"" + text + "\" matches " +
+                            std::to_string(text_matches.size()) +
+                            " visible elements; pass text_index 0.." +
+                            std::to_string(text_matches.size() - 1) +
+                            " or a path instead; candidates:";
+      for (const UiElement *candidate : text_matches)
+        message += " [" + candidate->path + " text=\"" + candidate->text +
+                   "\"]";
+      return error_result(message);
+    }
+    if (text_index >= static_cast<int64_t>(text_matches.size())) {
+      std::string message = "click text_index out of range: " +
+                            std::to_string(text_index) + " for text \"" +
+                            text + "\" (" +
+                            std::to_string(text_matches.size()) +
+                            " match(es); candidates:";
+      for (const UiElement *candidate : text_matches)
+        message += " [" + candidate->path + " text=\"" + candidate->text +
+                   "\"]";
+      message += ")";
+      return error_result(message);
+    }
+    match = text_matches[static_cast<size_t>(text_index)];
+  }
   int64_t button_index = 1;
+  bool double_click = false;
+  {
+  button_index = 1;
   if (auto *button_p = click.Find("button_index")) {
     if (!button_p->IsInt() || button_p->GetInt() < 1 ||
         button_p->GetInt() > 3)
@@ -1225,15 +1307,17 @@ JV run_ui_click(const JV &click, const std::vector<UiElement> &elements,
           "ui_elements click button_index must be an integer between 1 and 3");
     button_index = button_p->GetInt();
   }
-  bool double_click = false;
+  double_click = false;
   if (auto *double_p = click.Find("double_click")) {
     if (!double_p->IsBool())
       return error_result("ui_elements click double_click must be a boolean");
     double_click = double_p->GetBool();
   }
-  const UiElement *match = find_ui_element(elements, path);
-  if (!match) {
-    std::string message = "click target not found: " + path + " (enumerated " +
+    if (want_path) match = find_ui_element(elements, path);
+  }
+  if (want_path && !match) {
+    std::string message = "click target not found: " + path +
+                          " (try text/text_index for a visible-text match; enumerated " +
                           std::to_string(elements.size()) + " elements";
     if (truncated)
       message += ", truncated at the max_elements cap";

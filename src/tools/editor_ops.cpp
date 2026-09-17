@@ -880,6 +880,22 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue &args) {
     }
     closed_previous = true;
     scene_dirty_tracker::clear_scene_modified();
+    // 多签：close_scene 仅关闭当前签；若仍有邻签占用，get_edited_scene_root()
+    // 仍非空。此时不得进入 add_root_node + 轮询（会空转至超时），须秒级明确失败。
+    auto *post_close_root = editor->get_edited_scene_root();
+    if (post_close_root) {
+      release_unclaimed_node(node, editor);
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue(
+          "close_scene only closed the current tab — another open scene tab "
+          "still occupies the editor; repeat close_editor_scene until no "
+          "scene is open, then retry create_editor_scene with "
+          "close_current=true");
+      e["editor_state"] = editor_scene_state_json(editor);
+      LogSystem::instance().log(LogLevel::Error, LogCategory::Tools,
+          "create_editor_scene aborted: neighbor tab still occupies editor");
+      return e;
+    }
   }
 
   editor->add_root_node(node);
@@ -899,7 +915,9 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue &args) {
     std::string message =
         "scene switch did not take effect within " + std::to_string(waited_ms) +
         " ms (create_editor_scene) — the new scene root was not observed after "
-        "add_root_node";
+        "add_root_node (neighbor-tab occupation is rejected before add and "
+        "never reaches this timeout; this timeout means the post-add switch "
+        "itself was not observed)";
     if (released) {
       message += "; the unclaimed node was released";
     } else {
@@ -1065,6 +1083,13 @@ mcp::JsonValue handle_save_scene_as(const mcp::JsonValue &args) {
       break;
     }
   }
+  // 存盘后页签仍登记旧路径时必须 close+reopen 重建标签：GDExtension 无页签
+  // 路径登记 API（EditorInterface 仅公开 open/close/save/get_open_scenes，无
+  // EditorData::set_scene_path 等价接口；Node::set_scene_file_path 只改节点
+  // 属性、不更新编辑器页签表，不得冒用），close+reopen 是唯一的同步手段。
+  // 代价是页签焦点可能变化（关闭再打开会切换焦点），为正确性必要代价。
+  // L2 07_scene_tabs / 13_inline_subresource 依赖此语义：无 reopen 时
+  // get_unsaved_scenes 报空路径、reload_editor_scene 报 scene is not open。
   bool tab_rebuilt = false;
   if (!tab_path_registered) {
     godot::Error close_err = editor->close_scene();

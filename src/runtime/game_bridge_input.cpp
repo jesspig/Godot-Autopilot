@@ -258,7 +258,7 @@ private:
     auto *input = godot::Input::get_singleton();
     if (input) {
       dispatch_input_event(input, type_, key_, button_index_, position_,
-                           has_position_, false, action_, mode_api_, false);
+                           has_position_, false, action_, mode_api_, true);
     }
   }
 };
@@ -554,7 +554,7 @@ std::string inject_step(const JV &step) {
       input->action_release(action);
     }
     dispatch_input_event(input, 2, key, button_index, pos, has_pos, pressed,
-                         action, mode_api, mode_api ? false : pressed);
+                         action, mode_api, true);
     release_type = "action";
   } else {
     return "unknown input type: " + type;

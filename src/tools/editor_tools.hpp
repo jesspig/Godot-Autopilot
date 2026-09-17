@@ -87,7 +87,7 @@ GDA_TOOL_CLASS_SIDE(SetEditorPluginEnabledTool, "set_editor_plugin_enabled",
                "Editor", std::vector<std::string>({"editor", "plugin", "enable"}), editor_ops::handle_set_plugin_enabled, true, ::godot_autopilot::SideEffect::WritesConfig)
 
 GDA_TOOL_CLASS(CreateEditorSceneTool, "create_editor_scene",
-               "Create a new empty scene with a root node of the given type in the editor. Use it to start building a new level; type defaults to Node, name defaults to NewRoot, and close_current (default false) closes the previous scene automatically when it has no unsaved changes. Returns result with path, type and closed_previous; errors when the current scene is unsaved or type is not a Node subclass.",
+               "Create a new empty scene with a root node of the given type in the editor. Use it to start building a new level; type defaults to Node, name defaults to NewRoot, and close_current (default false) closes the current scene tab automatically when it has no unsaved changes. Only the current tab is closed: with multiple scene tabs open, repeat close_editor_scene until no scene is open, otherwise this call fails fast with the neighboring tab reported in editor_state instead of waiting. Returns result with path, type and closed_previous; errors when the current scene is unsaved or type is not a Node subclass.",
                "Editor", std::vector<std::string>({"editor", "scene", "new"}), editor_ops::handle_new_scene, true)
 
 GDA_TOOL_CLASS(OpenEditorSceneTool, "open_editor_scene",
@@ -103,7 +103,7 @@ GDA_TOOL_CLASS_SIDE(BuildCsharpAssemblyTool, "build_csharp_assembly",
                "Editor", std::vector<std::string>({"build", "csharp", "dotnet"}), editor_ops::handle_build_csharp_assembly, true, ::godot_autopilot::SideEffect::Process)
 
 GDA_TOOL_CLASS(CloseEditorSceneTool, "close_editor_scene",
-               "Close the currently edited scene and return the editor to an empty state. Use it before opening or creating another scene, or when a scene is no longer needed. Refuses to close when the scene has unsaved changes, so call save_editor_scene first. Returns result 'closed'.",
+               "Close the currently edited scene tab and return the editor to an empty state when it was the last tab. Use it before opening or creating another scene, or when a scene is no longer needed. Only the current tab is closed: with multiple scene tabs open, call it repeatedly until no scene is open. Refuses to close when the scene has unsaved changes, so call save_editor_scene first. Returns result 'closed'.",
                "Editor", std::vector<std::string>({"editor", "close", "scene"}), editor_ops::handle_close_scene, true)
 
 GDA_TOOL_CLASS(GetEditorViewportGeometryTool, "get_editor_viewport_geometry",

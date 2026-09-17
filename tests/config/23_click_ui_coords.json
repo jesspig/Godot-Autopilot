@@ -15,7 +15,7 @@
             "expect": {
               "has_keys": ["error"],
               "field_checks": [
-                { "key": "error", "value": "missing required parameter: path (non-empty node path from get_game_ui_elements)" }
+                { "key": "error", "value": "missing required parameter: path or text (non-empty node path from get_game_ui_elements, or visible element text; path takes priority when both are given)" }
               ]
             }
           },
@@ -26,7 +26,7 @@
             "expect": {
               "has_keys": ["error"],
               "field_checks": [
-                { "key": "error", "value": "missing required parameter: path (non-empty node path from get_game_ui_elements)" }
+                { "key": "error", "value": "missing required parameter: path or text (non-empty node path from get_game_ui_elements, or visible element text; path takes priority when both are given)" }
               ]
             }
           },
@@ -81,7 +81,7 @@
             "expect": {
               "has_keys": ["error"],
               "field_checks": [
-                { "key": "error", "value": "unknown parameter for click_game_ui_element: window_position" }
+                { "key": "error", "value": "unknown parameter for click_game_ui_element: window_position — annotate id is a per-capture sequence number and is not clickable; use path from the same get_game_ui_elements row (path takes priority) or text/text_index" }
               ]
             }
           }

@@ -6,7 +6,7 @@ tags:
   - 测试
   - L1
   - L2
-timestamp: "2026-09-17T17:06:25+08:00"
+timestamp: "2026-09-17T23:40:00+08:00"
 resource: tests/
 ---
 
@@ -148,7 +148,7 @@ stdout/stderr 各接独立管道读线程持续消费，防 64KB 缓冲写满阻
 | `gda_runner_15_scene_path` | `15_scene_path.json` | 15_scene_path | 17 | 写工具响应回显目标场景路径（09-16 新增）：create_scene_node/delete_scene_node/property_set/rename_scene_node/attach_script_to_node 的 `scene_path`/`scene_unsaved` 字段——未保存场景上误建可被立刻发现，另有缺参错误路径 |
 | `gda_runner_16_game_jobs` | `16_game_jobs.json` | game_jobs | 9 | `start_game_job`/`get_game_job` 参数校验与 headless 运行时通道路径（09-16 新增）：op 仅支持 eval、job 表上限 16、过期宽限 2s、cancel 语义；**需 `game_runtime` capability 授权**（`GODOT_AUTOPILOT_ALLOW` env 或 `user://godot_autopilot/config.json` 的 `allow` 字段，env 优先），未授权时用例 FAIL |
 | `gda_runner_17_vision_assist` | `17_vision_assist.json` | vision_assist | 以 `17_vision_assist.json` 为准 | 视觉辅助截图参数（09-16 新增）：`annotate_nodes`/`annotate_nodes_max`、`diff_image`、`review_scene_visually` 参数校验与只读组合 |
-| `gda_runner_18_script_freshness` | `18_script_freshness.json` | script_freshness | 13 | 脚本取用口径回归（09-16 新增，headless）：`create_script` 写盘后 `cache_refreshed=true` → `reload_script` 结果 0 → 覆写含 `@export var probe_marker=7` 版本 → `attach_script_to_node` 取磁盘版 → `execute_script` 读源码含新 marker → `get_script_property {fresh:true}` 得 7 → 节点 `property_get/set` 读写回；需 `code_execute` 授权（`GODOT_AUTOPILOT_ALLOW` env 或 `allow` 字段，env 优先） |
+| `gda_runner_18_script_freshness` | `18_script_freshness.json` | script_freshness | 13 | 脚本取用口径回归（09-16 新增，headless）：`create_script` 写盘后 `cache_refreshed=true` → `reload_script` 结果 0 → 覆写含 `@export var probe_marker=7` 版本 → `attach_script_to_node` 取磁盘版（断言 `instantiated=false` + `note` 非空——非 `@tool` 脚本在编辑器内 `can_instantiate=false` 系引擎语义，新鲜度以源码 MARKER 与 property 链路为准，09-17-23 起） → `execute_script` 读源码含新 marker → `get_script_property {fresh:true}` 得 7 → 节点 `property_get/set` 读写回；需 `code_execute` 授权（`GODOT_AUTOPILOT_ALLOW` env 或 `allow` 字段，env 优先） |
 | `gda_runner_19_cjk_roundtrip` | `19_cjk_roundtrip.json` | cjk_roundtrip | 4 | CJK 文本落盘往返（09-16 新增，headless）：含中文注释脚本 `create_script`（`verified`/`readback`/`cache_refreshed` 全真）→ `read_file` 全量内容比对 → `find_in_files` 中文 query 命中 1 文件；after_all 回收 `res://tests_tmp` |
 | `gda_runner_22_uid_guard` | `22_uid_guard.json` | uid_guard | 13 | 资源 UID 守卫（09-16 新增，headless）：保存资源与 `set_resource_uid` 显式/省略 uid 三分支回验 + `get_game_log_entries` 配 `filter=unique_ids.has` 断言 `matched_lines=0`；需 `code_execute` 授权；fixture 位于 `res://gda_tmp_uid_guard/` |
 | `gda_runner_23_click_ui_coords` | `23_click_ui_coords.json` | click_ui_coords | 8 | `click_game_ui_element` 参数校验与无游戏通道错误（09-16 新增，headless）：缺 path/path 非串/button 越界/double 非布尔/max 非正/timeout 越界各精确报错；合法参数无游戏时返 `error+hint` 通道错误；坐标换算不断言（须真实游戏进程，留待示例游戏恢复后补测，换算由 L1 `game_ui_coords_test` 覆盖）；需 `game_runtime` 授权 |

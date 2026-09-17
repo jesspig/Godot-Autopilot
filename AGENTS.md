@@ -29,7 +29,7 @@
 ## 约定
 
 - 命名空间 `godot_autopilot`；日志仅 `System/Transport/Tools/Resources/Prompts`
-- 编译器优先 Clang/clang-cl，sccache/LTO/Unity/Ninja 池自适应；依赖 godot-cpp 10.0.0-rc1、mcp-cpp-sdk 0.3.3（FetchContent，无子模块）
+- 编译器优先 Clang/clang-cl，sccache/LTO/Unity/Ninja 池自适应；依赖 godot-cpp 10.0.0-rc2、mcp-cpp-sdk 0.3.4（FetchContent，无子模块）
 
 ## 测试
 
