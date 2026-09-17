@@ -5,6 +5,7 @@
 #include "util/readback_util.hpp"
 #include "util/type_hint.hpp"
 #include "util/variant_json.hpp"
+#include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/gd_script.hpp>
 #include <godot_cpp/classes/global_constants.hpp>
@@ -16,6 +17,7 @@
 #include <godot_cpp/classes/scene_tree_timer.hpp>
 #include <godot_cpp/classes/window.hpp>
 #include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/godot.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/callable.hpp>
 #include <godot_cpp/variant/color.hpp>
@@ -489,6 +491,132 @@ std::vector<std::string> method_arg_hints(godot::Node *node,
   return hints;
 }
 
+const char *eval_call_error_kind(GDExtensionCallErrorType type) {
+  switch (type) {
+  case GDEXTENSION_CALL_OK:
+    return "CALL_OK";
+  case GDEXTENSION_CALL_ERROR_INVALID_METHOD:
+    return "INVALID_METHOD";
+  case GDEXTENSION_CALL_ERROR_INVALID_ARGUMENT:
+    return "INVALID_ARGUMENT";
+  case GDEXTENSION_CALL_ERROR_TOO_MANY_ARGUMENTS:
+    return "TOO_MANY_ARGUMENTS";
+  case GDEXTENSION_CALL_ERROR_TOO_FEW_ARGUMENTS:
+    return "TOO_FEW_ARGUMENTS";
+  case GDEXTENSION_CALL_ERROR_INSTANCE_IS_NULL:
+    return "INSTANCE_IS_NULL";
+  case GDEXTENSION_CALL_ERROR_METHOD_NOT_CONST:
+    return "METHOD_NOT_CONST";
+  default:
+    return "UNKNOWN";
+  }
+}
+
+std::string eval_call_error_expected_text(const GDExtensionCallError &call_err) {
+  if (call_err.error == GDEXTENSION_CALL_ERROR_INVALID_ARGUMENT) {
+    return util::to_std(godot::Variant::get_type_name(
+        static_cast<godot::Variant::Type>(call_err.expected)));
+  }
+  return std::to_string(call_err.expected);
+}
+
+JV eval_call_error_result(const std::string &method_name,
+                          const std::string &node_path,
+                          const GDExtensionCallError &call_err, size_t argc) {
+  std::string kind = eval_call_error_kind(call_err.error);
+  std::string message;
+  if (call_err.error == GDEXTENSION_CALL_ERROR_INVALID_ARGUMENT ||
+      call_err.error == GDEXTENSION_CALL_ERROR_TOO_MANY_ARGUMENTS ||
+      call_err.error == GDEXTENSION_CALL_ERROR_TOO_FEW_ARGUMENTS) {
+    message = "call_method '" + method_name + "' on " + node_path + " failed (" +
+              kind + " at argument " + std::to_string(call_err.argument) +
+              ", expected " + eval_call_error_expected_text(call_err) +
+              "; got " + std::to_string(argc) + " argument(s))";
+  } else {
+    message = "call_method '" + method_name + "' on " + node_path + " failed (" +
+              kind + ")";
+  }
+  JV err = error_result(message);
+  err["call_error"] = JV(kind);
+  err["argument"] = JV(static_cast<int>(call_err.argument));
+  err["expected"] = JV(eval_call_error_expected_text(call_err));
+  return err;
+}
+
+// MethodBind hash for classdb_get_method_bind comes from the live method list
+// ("id" carries the bind hash, same value the generated bindings bake in).
+int64_t eval_native_method_hash(godot::Node *node,
+                                const std::string &method_name) {
+  godot::TypedArray<godot::Dictionary> methods = node->get_method_list();
+  for (int64_t i = 0; i < methods.size(); i++) {
+    godot::Dictionary info = methods[i];
+    if (!info.has("name") || !info.has("id")) {
+      continue;
+    }
+    if (util::to_std(info["name"].operator godot::String()) != method_name) {
+      continue;
+    }
+    return static_cast<int64_t>(info["id"]);
+  }
+  return -1;
+}
+
+GDExtensionMethodBindPtr
+eval_native_method_bind(godot::Node *node,
+                        const godot::StringName &method_sn,
+                        int64_t method_hash) {
+  if (node == nullptr || method_hash < 0) {
+    return nullptr;
+  }
+  godot::StringName cls(node->get_class());
+  for (int depth = 0; depth < 64; depth++) {
+    GDExtensionMethodBindPtr bind =
+        ::godot::gdextension_interface::classdb_get_method_bind(
+            cls._native_ptr(), method_sn._native_ptr(), method_hash);
+    if (bind != nullptr) {
+      return bind;
+    }
+    godot::ClassDBSingleton *cdb = godot::ClassDBSingleton::get_singleton();
+    if (cdb == nullptr) {
+      return nullptr;
+    }
+    godot::StringName parent = cdb->get_parent_class(cls);
+    if (parent.length() == 0 || parent == cls) {
+      return nullptr;
+    }
+    cls = parent;
+  }
+  return nullptr;
+}
+
+void eval_call_script_method(
+    godot::Node *node, const godot::StringName &method_sn,
+    const std::vector<const godot::Variant *> &arg_ptrs, godot::Variant &r_ret,
+    GDExtensionCallError &r_error) {
+  const GDExtensionConstVariantPtr *args =
+      arg_ptrs.empty() ? nullptr
+                       : reinterpret_cast<const GDExtensionConstVariantPtr *>(
+                             arg_ptrs.data());
+  ::godot::gdextension_interface::object_call_script_method(
+      node->_owner, method_sn._native_ptr(), args,
+      static_cast<GDExtensionInt>(arg_ptrs.size()), r_ret._native_ptr(),
+      &r_error);
+}
+
+void eval_call_native_method(
+    godot::Node *node, GDExtensionMethodBindPtr bind,
+    const std::vector<const godot::Variant *> &arg_ptrs, godot::Variant &r_ret,
+    GDExtensionCallError &r_error) {
+  const GDExtensionConstVariantPtr *args =
+      arg_ptrs.empty() ? nullptr
+                       : reinterpret_cast<const GDExtensionConstVariantPtr *>(
+                             arg_ptrs.data());
+  ::godot::gdextension_interface::object_method_bind_call(
+      bind, node->_owner, args,
+      static_cast<GDExtensionInt>(arg_ptrs.size()), r_ret._native_ptr(),
+      &r_error);
+}
+
 JV op_eval_call_method(const JV &params, int64_t request_id) {
   auto *path_p = params.Find("node_path");
   auto *method_p = params.Find("method");
@@ -504,7 +632,7 @@ JV op_eval_call_method(const JV &params, int64_t request_id) {
   size_t argc = (args_p && args_p->IsArray()) ? args_p->Size() : 0;
   std::vector<std::string> arg_hints =
       method_arg_hints(node, method_name, argc);
-  godot::Array call_args;
+  std::vector<godot::Variant> arg_values;
   if (args_p && args_p->IsArray()) {
     size_t index = 0;
     for (const auto &arg : args_p->GetArray()) {
@@ -521,7 +649,7 @@ JV op_eval_call_method(const JV &params, int64_t request_id) {
       } else {
         value = VariantJson::deserialize(arg);
       }
-      call_args.push_back(value);
+      arg_values.push_back(value);
       index++;
     }
   }
@@ -534,7 +662,48 @@ JV op_eval_call_method(const JV &params, int64_t request_id) {
         "get_property_list or the node's script to list available methods");
   }
   uint64_t call_seq_before = current_error_seq();
-  godot::Variant result = node->callv(method_sn, call_args);
+
+  // arg_values owns the converted arguments; arg_ptrs only borrows them and
+  // both outlive the synchronous interface calls below.
+  std::vector<const godot::Variant *> arg_ptrs;
+  arg_ptrs.reserve(arg_values.size());
+  for (const auto &v : arg_values) {
+    arg_ptrs.push_back(&v);
+  }
+
+  // Direct GDExtension call with synchronous CallError, mirroring engine
+  // Object::callp: script method first, native MethodBind on INVALID_METHOD
+  // fallback. Success (including void/null) is decided by r_error alone.
+  godot::Variant result;
+  GDExtensionCallError call_err{};
+  call_err.error = GDEXTENSION_CALL_OK;
+  call_err.argument = 0;
+  call_err.expected = 0;
+  bool done = false;
+  if (::godot::gdextension_interface::object_has_script_method(
+          node->_owner, method_sn._native_ptr()) != 0) {
+    eval_call_script_method(node, method_sn, arg_ptrs, result, call_err);
+    done = call_err.error != GDEXTENSION_CALL_ERROR_INVALID_METHOD;
+  }
+  if (!done) {
+    call_err.error = GDEXTENSION_CALL_OK;
+    call_err.argument = 0;
+    call_err.expected = 0;
+    GDExtensionMethodBindPtr bind = eval_native_method_bind(
+        node, method_sn, eval_native_method_hash(node, method_name));
+    if (bind == nullptr) {
+      call_err.error = GDEXTENSION_CALL_ERROR_INVALID_METHOD;
+    } else {
+      eval_call_native_method(node, bind, arg_ptrs, result, call_err);
+    }
+  }
+
+  if (call_err.error != GDEXTENSION_CALL_OK) {
+    JV err =
+        eval_call_error_result(method_name, path_p->GetString(), call_err, argc);
+    append_eval_runtime_errors(err, call_seq_before);
+    return err;
+  }
 
   godot::Object *state_obj = nullptr;
   if (result.get_type() == godot::Variant::OBJECT) {
@@ -558,25 +727,6 @@ JV op_eval_call_method(const JV &params, int64_t request_id) {
 
   JV body = ok_result(VariantJson::serialize(result));
   append_eval_runtime_errors(body, call_seq_before);
-  auto *call_err = body.Find("runtime_error");
-  bool engine_reported_error =
-      call_err && call_err->IsBool() && call_err->GetBool();
-  if (engine_reported_error &&
-      result.get_type() == godot::Variant::NIL) {
-    // callv reports failures (e.g. INVALID_ARGUMENT from a Dictionary passed
-    // where a built-in value type was expected) by returning null and logging
-    // an engine error. Surface that as an error instead of a bare success so
-    // an unconvertible argument can never look like a successful call.
-    JV err = error_result(
-        "call_method '" + method_p->GetString() + "' on " +
-        path_p->GetString() +
-        " failed (engine reported an error during the call; likely "
-        "INVALID_ARGUMENT: argument type mismatch, e.g. Dictionary where a "
-        "built-in value type such as Vector2 was expected; see "
-        "error_details)");
-    append_eval_runtime_errors(err, call_seq_before);
-    return err;
-  }
   return body;
 }
 
