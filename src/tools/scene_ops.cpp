@@ -14,6 +14,7 @@
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
+#include <godot_cpp/classes/editor_selection.hpp>
 #include <godot_cpp/classes/editor_undo_redo_manager.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/node2d.hpp>
@@ -439,24 +440,30 @@ mcp::JsonValue handle_delete(const mcp::JsonValue &args) {
   if (undo_redo && parent) {
     undo_redo->create_action(godot::String(("Delete Node " + node_name).c_str()));
     undo_redo->add_do_method(parent, godot::StringName("remove_child"), node);
-    undo_redo->add_do_method(node, godot::StringName("queue_free"));
+    undo_redo->add_undo_method(parent, godot::StringName("add_child"), node);
     undo_redo->add_undo_method(parent, godot::StringName("move_child"), node,
                                child_index);
     undo_redo->add_undo_method(node, godot::StringName("set_owner"),
                                old_owner);
-    undo_redo->add_undo_method(parent, godot::StringName("add_child"), node);
+    undo_redo->add_undo_reference(node);
     undo_redo->commit_action();
   } else {
     node->queue_free();
+  }
+
+  if (editor) {
+    if (auto *sel = editor->get_selection()) {
+      sel->remove_node(node);
+    }
   }
 
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("deleted");
   r["undoable"] = mcp::JsonValue(undo_redo != nullptr && parent != nullptr);
   r["note"] = mcp::JsonValue(
-      "undo restores the node via add_child while the deferred queue_free has "
-      "not yet destroyed it (same frame); once the node is freed a later undo "
-      "cannot resurrect it");
+      "undo restores the node via add_child/move_child/set_owner (native "
+      "SceneTreeDock order); the node is kept alive by an undo reference, so "
+      "undo works across frames");
   mcp::JsonValue undo_info(mcp::JsonValue::object_tag);
   undo_info["name"] = mcp::JsonValue(node_name);
   undo_info["type"] = mcp::JsonValue(node_type);
