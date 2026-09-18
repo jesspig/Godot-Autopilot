@@ -543,6 +543,57 @@ JV eval_call_error_result(const std::string &method_name,
   return err;
 }
 
+// Native-bind failure diagnosis (additive only): the KIND/message shape above
+// stays compatible; callers attach `diagnosis` + `hint` without changing it.
+// Covers zero-arg built-ins such as is_on_wall/is_on_floor whose MethodBind
+// hash may disagree with the live method list depending on call path.
+std::string eval_bind_suspected_cause(bool has_method, int64_t expected_hash,
+                                      bool bind_found,
+                                      GDExtensionCallErrorType err_type) {
+  if (err_type == GDEXTENSION_CALL_ERROR_METHOD_NOT_CONST) {
+    return "method_not_const";
+  }
+  if (!has_method) {
+    return "method_not_found_on_node";
+  }
+  if (!bind_found && expected_hash < 0) {
+    return "method_list_hash_missing";
+  }
+  if (!bind_found ||
+      err_type == GDEXTENSION_CALL_ERROR_INVALID_METHOD) {
+    return "hash_mismatch_or_const";
+  }
+  return "call_failed";
+}
+
+JV make_native_bind_diagnosis(const std::string &method_name,
+                              const std::string &node_class,
+                              int64_t expected_hash, bool has_method,
+                              bool has_script_method, bool tried_script_method,
+                              bool native_bind_found,
+                              const std::string &suspected_cause) {
+  JV diag(JV::object_tag);
+  diag["method"] = JV(method_name);
+  diag["node_class"] = JV(node_class);
+  diag["expected_hash"] = JV(expected_hash);
+  diag["has_method"] = JV(has_method);
+  diag["has_script_method"] = JV(has_script_method);
+  diag["tried_script_method"] = JV(tried_script_method);
+  diag["native_bind_found"] = JV(native_bind_found);
+  diag["suspected_cause"] = JV(suspected_cause);
+  return diag;
+}
+
+std::string make_native_bind_probe_hint(const std::string &method_name) {
+  return "native MethodBind lookup/call failed for '" + method_name +
+         "'; verify inside the game process with a GDScript probe "
+         "(execute_game_script action=script), e.g. func _run() returning "
+         "has_method/call results for '" +
+         method_name +
+         "'; the bind hash comes from the live method list and may disagree "
+         "with compiled bindings depending on the call path";
+}
+
 // MethodBind hash for classdb_get_method_bind comes from the live method list
 // ("id" carries the bind hash, same value the generated bindings bake in).
 int64_t eval_native_method_hash(godot::Node *node,
@@ -654,12 +705,27 @@ JV op_eval_call_method(const JV &params, int64_t request_id) {
     }
   }
   godot::StringName method_sn(method_p->GetString().c_str());
-  if (!node->has_method(method_sn)) {
-    return error_result(
+  const std::string node_class_str = util::to_std(node->get_class());
+  const bool has_method_bool = node->has_method(method_sn);
+  const int64_t expected_hash = eval_native_method_hash(node, method_name);
+  const bool has_script_method =
+      ::godot::gdextension_interface::object_has_script_method(
+          node->_owner, method_sn._native_ptr()) != 0;
+  if (!has_method_bool) {
+    JV err = error_result(
         "method not found: '" + method_p->GetString() + "' on " +
         path_p->GetString() +
         " — expected a built-in or script method of that node; use "
         "get_property_list or the node's script to list available methods");
+    const std::string cause = eval_bind_suspected_cause(
+        has_method_bool, expected_hash, /*bind_found=*/false,
+        GDEXTENSION_CALL_ERROR_INVALID_METHOD);
+    err["diagnosis"] = make_native_bind_diagnosis(
+        method_name, node_class_str, expected_hash, has_method_bool,
+        has_script_method, /*tried_script=*/false,
+        /*native_bind_found=*/false, cause);
+    err["hint"] = JV(make_native_bind_probe_hint(method_name));
+    return err;
   }
   uint64_t call_seq_before = current_error_seq();
 
@@ -680,8 +746,10 @@ JV op_eval_call_method(const JV &params, int64_t request_id) {
   call_err.argument = 0;
   call_err.expected = 0;
   bool done = false;
-  if (::godot::gdextension_interface::object_has_script_method(
-          node->_owner, method_sn._native_ptr()) != 0) {
+  bool tried_script_method = false;
+  bool native_bind_found = false;
+  if (has_script_method) {
+    tried_script_method = true;
     eval_call_script_method(node, method_sn, arg_ptrs, result, call_err);
     done = call_err.error != GDEXTENSION_CALL_ERROR_INVALID_METHOD;
   }
@@ -689,8 +757,9 @@ JV op_eval_call_method(const JV &params, int64_t request_id) {
     call_err.error = GDEXTENSION_CALL_OK;
     call_err.argument = 0;
     call_err.expected = 0;
-    GDExtensionMethodBindPtr bind = eval_native_method_bind(
-        node, method_sn, eval_native_method_hash(node, method_name));
+    GDExtensionMethodBindPtr bind =
+        eval_native_method_bind(node, method_sn, expected_hash);
+    native_bind_found = (bind != nullptr);
     if (bind == nullptr) {
       call_err.error = GDEXTENSION_CALL_ERROR_INVALID_METHOD;
     } else {
@@ -701,6 +770,12 @@ JV op_eval_call_method(const JV &params, int64_t request_id) {
   if (call_err.error != GDEXTENSION_CALL_OK) {
     JV err =
         eval_call_error_result(method_name, path_p->GetString(), call_err, argc);
+    const std::string cause = eval_bind_suspected_cause(
+        has_method_bool, expected_hash, native_bind_found, call_err.error);
+    err["diagnosis"] = make_native_bind_diagnosis(
+        method_name, node_class_str, expected_hash, has_method_bool,
+        has_script_method, tried_script_method, native_bind_found, cause);
+    err["hint"] = JV(make_native_bind_probe_hint(method_name));
     append_eval_runtime_errors(err, call_seq_before);
     return err;
   }
