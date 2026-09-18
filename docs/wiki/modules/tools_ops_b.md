@@ -6,11 +6,13 @@ tags:
   - 模块
   - 领域工具
   - B组
-timestamp: "2026-09-18T19:30:00+08:00"
+timestamp: "2026-09-18T21:15:00+08:00"
 resource: src/tools/
 ---
 
 # 工具实现模块 B（调试/显示/OS/运行时/渲染/资源/执行）
+
+> 09-18 CJK 传输链收敛批次增补（详见 `changelog/2026-09-18-log.md` 21:15 节）：`variant_json` 反序列化 10 处、`debugger_access` 广播/重载 2 处、`game_bridge_eval` 求值源码、`code_exec` 包装源码改 `String::utf8`；`runtime_ops` 错误整形透传游戏侧 `diagnosis`/`hint`（live 验证新发现，`method_not_found_on_node` 实测回传）。
 
 > 09-18 E2E 优化批次增补（详见 `changelog/2026-09-18-log.md` 19:30 节）：`property_get` 加批量 `properties[1..32]`（互斥、部分成功+`missing`）；`get_debugger_errors` 加 `group:true` 轻聚类；`execute_game_script` 加 `assert` 沙箱表达式；新增只读 `sample_game_property`/`collect_game_evidence`/`validate_game_ui_layout`（Game）；游戏侧 `send_response` 改 `String::utf8` 构造（CJK 元数据乱码根因，`game_bridge.cpp:1665`）；`debugger_access.cpp:39,132` 同病与 `VariantJson` 内约 8 处 `String(c_str())` 列为遗留待排期。
 
