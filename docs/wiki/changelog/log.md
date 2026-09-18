@@ -2,6 +2,10 @@
 
 > 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天。
 
+## 2026-09-18
+
+- **README 拆分与知识库一致性审计**：`README_zh.md` 删除，`README.md` 中文重写 + 新增 `README.en.md`（工具口径 badge `tools-385+` / 385+、前提 Godot 4.7+）；`register_all.cpp:363` 的 `call_tool` 描述 384→385 域对齐；wiki 同步 6 页（overview / build / tests / modules/core / modules/entry_runtime / example：README 引用、4.7 口径、行号重核）。详见 `changelog/2026-09-18-log.md`
+
 ## 2026-09-17
 
 - **代码精简批次（纯删除零行为变化）**：27 文件 +104/−592，域工具 385 / SIDE 60 / catalog 393 不变；L1 267→243、ctest 注册点 292→268（构建 65/65、L1 243/243 全绿）；技能册计数 384→385 并同步 10 余页文档数字。详见 `changelog/2026-09-17-log.md`
