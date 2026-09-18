@@ -40,9 +40,9 @@ All four execute arbitrary GDScript and are treated as highest-risk side effects
 
 ## The code_execute meta tool
 
-code_execute wraps your source into a `@tool` extends Node script, runs it on a temporary editor node, then cleans the node up.
+code_execute wraps your source into a `@tool` extends Node script, runs it on a temporary editor node, then cleans the node up. Which wrapper you get is decided by a line scan: leading spaces/tabs stripped, blank and `#`/`//` comment lines skipped - a line starting with `func ` (trailing space, even indented) selects multi-function mode, anything else is inlined.
 
-- Single-function mode (default): your code is indented into an implicit entry function, so top-level func definitions are not supported. Write straight-line code ending in return:
+- Single-function mode (no `func ` line found): your code is indented into an implicit entry function. Write straight-line code ending in return:
 
 ```gdscript
 var total = 0
@@ -51,7 +51,7 @@ for child in SceneRoot.get_children():
 return total
 ```
 
-- Multi-function mode: when the source contains func definitions they are preserved; pick the entry point with `function_name`:
+- Multi-function mode (a `func ` line found): the whole source is preserved verbatim; pick the entry point with `function_name` (default `_run`; a missing entry is stubbed with `func <name>(): pass`):
 
 ```gdscript
 func build_report():
@@ -63,6 +63,7 @@ func build_report():
 
 Pass `function_name` set to build_report to select it.
 
+- Write `func ` with a trailing space: `func` followed by a tab or `(` does not select multi-function mode and is rejected inside single-function mode.
 - Indentation (tabs or spaces) is auto-detected per source; mixing both aborts with an error.
 - `timeout_ms` defaults to 5000 and is clamped to 30000. The check runs once before execution: synchronous GDScript cannot be interrupted, so an infinite loop still blocks the editor until it returns.
 - A source calling `close_scene(` is rejected outright - it would destroy the node executing the code and crash the editor. Use `close_editor_scene` to close scenes.
@@ -93,6 +94,8 @@ For any subtree added to or removed from the scene tree, callbacks fire in a fix
 - `_exit_tree`: children before parents.
 
 The `tree_exited` signal fires once after the whole branch has been cut from the tree, not per node during removal. In a `@tool` script the same order applies to editor-side tree changes.
+
+Assembly recipe (stage required children before the parent enters the tree, or get_node_or_null guards): `references/execution-gotchas.md`.
 
 ## C# limitations
 

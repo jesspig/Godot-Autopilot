@@ -42,6 +42,8 @@ For any subtree attached to or removed from the scene tree, callbacks fire in a 
 - `tree_exited` is emitted once **after the whole branch has been cut from the tree**, not per node during removal - a handler connected to it sees a fully detached subtree.
 - The order is engine-level and applies identically in the editor process: in a `@tool` script the same phases run when scene operations (reparenting, scene open, undo/redo) add or remove nodes.
 
+Assembly recipe: add a subtree's required children to their parent BEFORE the parent enters the tree (or before the surrounding scene is opened or instantiated), so no `_enter_tree` handler observes a half-built branch and every parent `_ready` sees fully initialized descendants. When the order cannot be staged up front, resolve lazily with get_node_or_null(...) plus a null guard instead of `get_node(...)` - a missing node then reads as null instead of erroring.
+
 ## Frame order: signals, callbacks and deferred deletion
 
 Within one frame of the running game (verified in `SceneTree`):

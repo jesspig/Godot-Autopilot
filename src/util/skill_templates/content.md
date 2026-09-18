@@ -188,6 +188,8 @@ node path, type, visibility, optional text and global rectangle per Control
 (`max_elements` default 100 / hard cap 1000, truncated responses are flagged;
 `timeout_ms` default 5000 / max 25000). Use the rectangles to aim
 `queue_game_input` - the game channel details are in the runtime skill.
+The full-window root recipe (preset, zero-offset readback, grow-both
+centering) is in references/ui-theme-details.md.
 
 HUD-theme feedback is often short-lived (a toast that lives 2 s, a death
 overlay that blinks for 0.7 s), so screenshotting it needs a condition rather
