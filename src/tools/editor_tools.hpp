@@ -59,7 +59,7 @@ GDA_TOOL_CLASS(AddEditorUndoRedoUndoTool, "add_editor_undo_redo_undo",
                "Editor", std::vector<std::string>({"editor", "undo", "undo"}), editor_ops::handle_undo_redo_add_undo, true)
 
 GDA_TOOL_CLASS(GetEditorFileSystemTreeTool, "get_editor_file_system_tree",
-               "Fetch the editor's file system directory tree, optionally rooted at the given path. Use it to discover project structure and resource paths before loading files. Directory entries contain name, path, type and children; file entries carry name, path and type. Trees deeper than 12 levels are truncated and a max_depth field is returned; an invalid path returns null.",
+               "Fetch the editor's file system directory tree, optionally rooted at the given path. Use it to discover project structure and resource paths before loading files. Directory entries contain name, path, type and children; file entries carry name, path and type. Optional 'depth' caps levels below the root (default 12, deeper levels pruned with truncated and max_depth reported), 'prefix' narrows the tree to a subtree root (takes precedence over path) and 'filter' keeps only entries whose name or path contains the given substring case-insensitively (ancestors of matches kept, filtered reported); an invalid path returns null.",
                "Editor", std::vector<std::string>({"editor", "filesystem", "resources"}), editor_ops::handle_file_system_get_resources, true)
 
 GDA_TOOL_CLASS(ScanEditorFileSystemTool, "scan_editor_file_system",
@@ -97,6 +97,10 @@ GDA_TOOL_CLASS(OpenEditorSceneTool, "open_editor_scene",
 GDA_TOOL_CLASS_SIDE(SaveEditorSceneAsTool, "save_editor_scene_as",
                "Save the currently edited scene to a specific file path, creating missing parent directories automatically. Use it when the scene has no file path yet or when you want to store a copy at another location. Errors when the file is not created after saving. Returns result 'saved'.",
                "Editor", std::vector<std::string>({"editor", "scene", "save"}), editor_ops::handle_save_scene_as, true, ::godot_autopilot::SideEffect::WritesFile)
+
+GDA_TOOL_CLASS(VerifySceneSavedTool, "verify_scene_saved",
+               "Compare the in-memory edited scene tree against its on-disk .tscn file without modifying anything. Use it after save_editor_scene or save_editor_scene_as to prove the save persisted every node (e.g. after moving a subtree with children), or as a standalone consistency check. Returns result 'match' or 'mismatch' plus memory_nodes, disk_nodes, match, missing_paths (memory paths absent on disk, capped at 50 with missing_truncated) and path; optional scene_path overrides the compared file, include_hash adds FNV-1a memory_hash/disk_hash. Read-only.",
+               "Editor", std::vector<std::string>({"editor", "scene", "verify", "save"}), editor_ops::handle_verify_scene_saved, true)
 
 GDA_TOOL_CLASS_SIDE(BuildCsharpAssemblyTool, "build_csharp_assembly",
                "Trigger a C# project build by launching 'dotnet build --nologo <project>' as an async OS process on the res:// root .csproj/.sln. Intended for CI/command-line compile verification only: it does NOT rewind to an in-editor Build and does not hot-reload the loaded .NET assembly. Returns result {'project_file','command','started','pid','note'}; errors when the project is not a C# project or dotnet is not available.",
@@ -140,7 +144,7 @@ GDA_TOOL_CLASS_SIDE(RunEditorShortcutTool, "run_editor_shortcut",
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(31);
+  v.reserve(32);
   v.push_back(std::make_unique<GetEditorSelectionTool>());
   v.push_back(std::make_unique<SetEditorSelectionTool>());
   v.push_back(std::make_unique<GetEditorEditedSceneRootTool>());
@@ -162,6 +166,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(std::make_unique<CreateEditorSceneTool>());
   v.push_back(std::make_unique<OpenEditorSceneTool>());
   v.push_back(std::make_unique<SaveEditorSceneAsTool>());
+  v.push_back(std::make_unique<VerifySceneSavedTool>());
   v.push_back(std::make_unique<BuildCsharpAssemblyTool>());
   v.push_back(std::make_unique<CloseEditorSceneTool>());
   v.push_back(std::make_unique<GetEditorViewportGeometryTool>());

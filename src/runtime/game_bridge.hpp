@@ -26,6 +26,8 @@ void register_eval_bridge_classes();
 
 void register_input_bridge_classes();
 
+void register_verify_bridge_classes();
+
 struct EvalErrorDelta {
   std::string text;
   JV structured;
@@ -61,6 +63,24 @@ void register_cancel_handler(int64_t request_id,
 void unregister_cancel_handler(int64_t request_id);
 
 JV op_eval(const JV &params, int64_t request_id);
+
+JV op_eval_with_assert(const JV &params, int64_t request_id);
+
+JV op_sample_property(const JV &params, int64_t request_id);
+
+JV op_collect_evidence(const JV &params, int64_t request_id);
+
+JV op_validate_ui_layout(const JV &params);
+
+JV op_capture(const JV &params, int64_t request_id);
+
+JV op_get_errors(const JV &params);
+
+JV op_get_errors_grouped(int64_t group_limit);
+
+JV op_get_output(const JV &params);
+
+JV op_get_tree();
 
 JV op_input(const JV &params, int64_t request_id);
 

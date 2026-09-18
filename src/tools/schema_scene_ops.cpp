@@ -37,6 +37,12 @@ void fill_schema_scene(std::unordered_map<std::string, mcp::JsonValue>& m) {
             {"paths", "array", "Non-empty array (max 50) of node paths in the edited scene, e.g. ['Player','UI/HealthBar']", true},
             {"viewport", "string", "Coordinate space: 'auto' (default, picks 2D or 3D by node type), '2d' or '3d'", false},
         });
+        m["build_nodes_from_spec"] = schema::build_schema({
+            {"spec", "object", "Declarative subtree spec {type, name, props, children}: type is a Node subclass (default: Node), name must not contain '/' or ':' (default: Node), props maps property names to values applied through the property_set conversion chain with OBJECT-typed values applied first, children is an array of nested specs; recursion is capped at 32 levels and 500 nodes per call and any failure rolls the whole subtree back", true},
+            {"parent_path", "string", "Parent node path for the top spec node (default: scene root); omit only while the scene has no root, in which case the top spec node becomes the root", false},
+            {"dry_run", "boolean", "Validate the spec and return the node list without writing to the scene (default: false); either dry_run or preview enables preview-only mode", false},
+            {"preview", "boolean", "Alias of dry_run: validate and preview without writing (default: false)", false},
+        });
 
 
         m["call_scene_tree_group"] = schema::build_schema({
@@ -213,6 +219,14 @@ void fill_schema_scene(std::unordered_map<std::string, mcp::JsonValue>& m) {
             {"path", "string", "Script file path to create (e.g. res://scripts/enemy.gd)", true},
             {"source_code", "string", "GDScript source code; compiled before saving, compilation errors abort the call", false},
             {"overwrite", "boolean", "Overwrite an existing file (default: false); false errors when the file already exists", false},
+        });
+        m["patch_script"] = schema::build_schema({
+            {"path", "string", "Script file path to patch (e.g. res://player.gd); the file must already exist — patch_script never creates files, use create_script for new files", true},
+            {"anchor", "string", "Non-empty literal text located in the current file; only the first occurrence is modified and the total count is reported as anchor_occurrences — a missing anchor fails with zero disk writes", true},
+            {"replacement", "string", "New text; in replace mode it swaps the first anchor occurrence, in insert mode it is inserted right after it; empty string deletes the anchor in replace mode", true},
+            {"mode", "string", "Patch mode: 'replace' (default, swap the first anchor occurrence) or 'insert' (insert after the first anchor occurrence)", false},
+            {"preview", "boolean", "Return a diff preview with before_context and after_context without writing or compiling (default: false); either preview or dry_run enables preview-only mode", false},
+            {"dry_run", "boolean", "Alias of preview: validate and preview without writing (default: false)", false},
         });
         m["attach_script_to_node"] = schema::build_schema({
             {"node_path", "string", "Node path in the edited scene to attach the script to. The response includes scene_path and scene_unsaved to confirm which scene was written", true},

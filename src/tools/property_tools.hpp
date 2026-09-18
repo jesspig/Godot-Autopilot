@@ -13,7 +13,7 @@ namespace godot_autopilot {
 namespace property_tools {
 
 GDA_TOOL_CLASS(PropertyGetTool, "property_get",
-               "Read a single property value from a scene node. Requires 'path' and 'property'; errors with candidate suggestions when the node or property does not exist (use property_get_list to see valid names). Returns the exact serialized value — unlike get_scene_tree's include_properties summary, which returns up to 20 filtered properties in one snapshot.",
+               "Read a single property value from a scene node. Requires 'path' and 'property'; errors with candidate suggestions when the node or property does not exist (use property_get_list to see valid names). Returns the exact serialized value — unlike get_scene_tree's include_properties summary, which returns up to 20 filtered properties in one snapshot. Optional 'properties' (array of 1-32 non-empty names, mutually exclusive with 'property') reads many properties in one round trip and returns {name: value} plus 'missing' for absent names instead of failing the batch.",
                "Properties", std::vector<std::string>({"property", "get"}), property_ops::handle_get, true)
 
 GDA_TOOL_CLASS(PropertySetTool, "property_set",

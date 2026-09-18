@@ -1084,80 +1084,6 @@ private:
   }
 };
 
-JV op_capture(const JV &params, int64_t request_id) {
-  CaptureRequest request;
-  if (JV error = parse_capture_request(params, &request); !error.IsNull())
-    return error;
-
-  if (request.after_frames <= 0 && request.when.empty())
-    return capture_viewport_now(request, request_id);
-
-  godot::SceneTree *tree = get_scene_tree();
-  if (!tree)
-    return error_result("no scene tree");
-  if (!tree->get_root())
-    return error_result("no root window");
-
-  godot::Ref<godot::Expression> when_expr;
-  if (!request.when.empty()) {
-    when_expr.instantiate();
-    godot::Error parse_err =
-        when_expr->parse(godot::String(request.when.c_str()));
-    if (parse_err != godot::OK) {
-      const std::string text = util::to_std(when_expr->get_error_text());
-      JV body = error_result("invalid when expression: " + text +
-                             " (expression: " + request.when + ")");
-      JV details(JV::object_tag);
-      details["code"] = JV("when_parse_error");
-      details["when"] = JV(request.when);
-      details["expression_error"] = JV(text);
-      body["structured_error"] = std::move(details);
-      return body;
-    }
-  }
-
-  GameBridgeCaptureAwaiter *awaiter = memnew(GameBridgeCaptureAwaiter);
-  awaiter->setup(request_id, request, when_expr);
-  tree->get_root()->add_child(awaiter);
-  register_cancel_handler(request_id, [awaiter] { awaiter->cancel(); });
-  return JV();
-}
-
-JV op_get_errors(const JV &params) {
-  int64_t limit = 50;
-  if (auto *l = params.Find("limit")) {
-    if (l->IsInt() && l->GetInt() > 0)
-      limit = l->GetInt();
-  }
-  JV arr(JV::array_tag);
-  {
-    std::lock_guard<std::mutex> lock(g_buffer_mtx);
-    size_t start = (static_cast<size_t>(limit) >= g_error_buffer.size())
-                       ? 0
-                       : g_error_buffer.size() - static_cast<size_t>(limit);
-    for (size_t i = start; i < g_error_buffer.size(); i++) {
-      const GameErrorEntry &e = g_error_buffer[i];
-      JV item(JV::object_tag);
-      char time_buf[16];
-      snprintf(time_buf, sizeof(time_buf), "%02d:%02d:%02d.%03d", e.hr, e.min,
-               e.sec, e.msec);
-      item["time"] = JV(std::string(time_buf));
-      item["file"] = JV(e.file);
-      item["func"] = JV(e.func);
-      item["line"] = JV(static_cast<int64_t>(e.line));
-      item["error"] = JV(e.error);
-      item["descr"] = JV(e.descr);
-      item["is_warning"] = JV(e.is_warning);
-      JV stack(JV::array_tag);
-      for (const std::string &f : e.stack)
-        stack.PushBack(JV(f));
-      item["stack"] = std::move(stack);
-      arr.PushBack(std::move(item));
-    }
-  }
-  return ok_result(std::move(arr));
-}
-
 JV op_get_output(const JV &params) {
   int64_t limit = 200;
   if (auto *l = params.Find("limit")) {
@@ -1513,6 +1439,24 @@ public:
       body = op_ui_elements(params);
     } else if (op == GDA_OP_CAPTURE) {
       body = op_capture(params, request_id);
+    } else if (op == GDA_OP_EVAL_ASSERT) {
+      // I7 assert path shares the eval game_runtime gate; see
+      // game_bridge_verify.cpp.
+      if (!authorization::capability_enabled("game_runtime")) {
+        body = authorization::deny_if_unauthorized("game_runtime",
+                                                   SideEffect::GameRuntime);
+      } else {
+        body = op_eval_with_assert(params, request_id);
+      }
+    } else if (op == GDA_OP_SAMPLE) {
+      // I1 read-only sampling; same gate as status/capture (none).
+      body = op_sample_property(params, request_id);
+    } else if (op == GDA_OP_COLLECT_EVIDENCE) {
+      // I2 read-only evidence bundle; same gate as status/capture (none).
+      body = op_collect_evidence(params, request_id);
+    } else if (op == GDA_OP_VALIDATE_UI_LAYOUT) {
+      // I3 read-only layout scan; same gate as ui_elements (none).
+      body = op_validate_ui_layout(params);
     } else if (op == GDA_OP_GET_ERRORS) {
       body = op_get_errors(params);
     } else if (op == GDA_OP_GET_OUTPUT) {
@@ -1544,6 +1488,167 @@ bool g_registered = false;
 
 } // namespace
 
+JV op_capture(const JV &params, int64_t request_id) {
+  CaptureRequest request;
+  if (JV error = parse_capture_request(params, &request); !error.IsNull())
+    return error;
+
+  if (request.after_frames <= 0 && request.when.empty())
+    return capture_viewport_now(request, request_id);
+
+  godot::SceneTree *tree = get_scene_tree();
+  if (!tree)
+    return error_result("no scene tree");
+  if (!tree->get_root())
+    return error_result("no root window");
+
+  godot::Ref<godot::Expression> when_expr;
+  if (!request.when.empty()) {
+    when_expr.instantiate();
+    godot::Error parse_err =
+        when_expr->parse(godot::String(request.when.c_str()));
+    if (parse_err != godot::OK) {
+      const std::string text = util::to_std(when_expr->get_error_text());
+      JV body = error_result("invalid when expression: " + text +
+                             " (expression: " + request.when + ")");
+      JV details(JV::object_tag);
+      details["code"] = JV("when_parse_error");
+      details["when"] = JV(request.when);
+      details["expression_error"] = JV(text);
+      body["structured_error"] = std::move(details);
+      return body;
+    }
+  }
+
+  GameBridgeCaptureAwaiter *awaiter = memnew(GameBridgeCaptureAwaiter);
+  awaiter->setup(request_id, request, when_expr);
+  tree->get_root()->add_child(awaiter);
+  register_cancel_handler(request_id, [awaiter] { awaiter->cancel(); });
+  return JV();
+}
+
+JV op_get_errors(const JV &params) {
+  int64_t limit = 50;
+  if (auto *l = params.Find("limit")) {
+    if (l->IsInt() && l->GetInt() > 0)
+      limit = l->GetInt();
+  }
+  bool grouped = false;
+  if (auto *g = params.Find("group")) {
+    if (!g->IsBool())
+      return error_result("get_errors group must be a boolean");
+    grouped = g->GetBool();
+  }
+  if (grouped)
+    return op_get_errors_grouped(limit);
+  JV arr(JV::array_tag);
+  {
+    std::lock_guard<std::mutex> lock(g_buffer_mtx);
+    size_t start = (static_cast<size_t>(limit) >= g_error_buffer.size())
+                       ? 0
+                       : g_error_buffer.size() - static_cast<size_t>(limit);
+    for (size_t i = start; i < g_error_buffer.size(); i++) {
+      const GameErrorEntry &e = g_error_buffer[i];
+      JV item(JV::object_tag);
+      char time_buf[16];
+      snprintf(time_buf, sizeof(time_buf), "%02d:%02d:%02d.%03d", e.hr, e.min,
+               e.sec, e.msec);
+      item["time"] = JV(std::string(time_buf));
+      item["file"] = JV(e.file);
+      item["func"] = JV(e.func);
+      item["line"] = JV(static_cast<int64_t>(e.line));
+      item["error"] = JV(e.error);
+      item["descr"] = JV(e.descr);
+      item["is_warning"] = JV(e.is_warning);
+      JV stack(JV::array_tag);
+      for (const std::string &f : e.stack)
+        stack.PushBack(JV(f));
+      item["stack"] = std::move(stack);
+      arr.PushBack(std::move(item));
+    }
+  }
+  return ok_result(std::move(arr));
+}
+
+// I4 light grouping (game side): same shape as the editor-side
+// DebuggerCapture::get_grouped_errors.
+JV op_get_errors_grouped(int64_t group_limit) {
+  struct Group {
+    size_t count = 0;
+    size_t first_index = 0;
+    size_t last_index = 0;
+    size_t sample = 0;
+  };
+  std::unordered_map<std::string, size_t> index_by_key;
+  std::vector<Group> groups;
+  std::vector<GameErrorEntry> snapshot;
+  {
+    std::lock_guard<std::mutex> lock(g_buffer_mtx);
+    snapshot = g_error_buffer;
+  }
+  for (size_t i = 0; i < snapshot.size(); i++) {
+    const GameErrorEntry &e = snapshot[i];
+    const std::string key = e.file + "\n" + e.func + "\n" +
+                            std::to_string(e.line) + "\n" + e.error;
+    auto it = index_by_key.find(key);
+    if (it == index_by_key.end()) {
+      Group group;
+      group.count = 1;
+      group.first_index = i;
+      group.last_index = i;
+      group.sample = i;
+      index_by_key.emplace(key, groups.size());
+      groups.push_back(group);
+    } else {
+      Group &group = groups[it->second];
+      group.count++;
+      group.last_index = i;
+    }
+  }
+  std::vector<size_t> order(groups.size());
+  for (size_t i = 0; i < order.size(); i++)
+    order[i] = i;
+  std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) {
+    return groups[a].count > groups[b].count;
+  });
+  if (group_limit >= 0 &&
+      static_cast<size_t>(group_limit) < order.size())
+    order.resize(static_cast<size_t>(group_limit));
+  JV arr(JV::array_tag);
+  for (size_t gi : order) {
+    const GameErrorEntry &sample = snapshot[groups[gi].sample];
+    const GameErrorEntry &first = snapshot[groups[gi].first_index];
+    const GameErrorEntry &last = snapshot[groups[gi].last_index];
+    JV item(JV::object_tag);
+    item["count"] = JV(static_cast<int64_t>(groups[gi].count));
+    char first_buf[16];
+    snprintf(first_buf, sizeof(first_buf), "%02d:%02d:%02d.%03d", first.hr,
+             first.min, first.sec, first.msec);
+    item["first_time"] = JV(std::string(first_buf));
+    char last_buf[16];
+    snprintf(last_buf, sizeof(last_buf), "%02d:%02d:%02d.%03d", last.hr,
+             last.min, last.sec, last.msec);
+    item["last_time"] = JV(std::string(last_buf));
+    item["file"] = JV(sample.file);
+    item["func"] = JV(sample.func);
+    item["line"] = JV(static_cast<int64_t>(sample.line));
+    item["error"] = JV(sample.error);
+    item["descr"] = JV(sample.descr);
+    item["is_warning"] = JV(sample.is_warning);
+    JV stack(JV::array_tag);
+    for (size_t j = 0; j < sample.stack.size() && j < 8; j++)
+      stack.PushBack(JV(sample.stack[j]));
+    item["stack"] = std::move(stack);
+    arr.PushBack(std::move(item));
+  }
+  JV r(JV::object_tag);
+  r["grouped"] = JV(true);
+  r["groups"] = std::move(arr);
+  r["total_errors"] = JV(static_cast<int64_t>(snapshot.size()));
+  r["total_groups"] = JV(static_cast<int64_t>(groups.size()));
+  return ok_result(std::move(r));
+}
+
 void send_response(int64_t request_id, JV body) {
   body[GDA_FIELD_REQUEST_ID] = JV(request_id);
   std::string serialized = body.Dump();
@@ -1560,7 +1665,9 @@ void send_response(int64_t request_id, JV body) {
     serialized = body.Dump();
   }
   godot::Array payload;
-  payload.push_back(godot::String(serialized.c_str()));
+  // P2-1: Dump 输出为 UTF-8 字节；String(const char*) 是 latin1 构造，会把
+  // CJK 逐字节拆成字符，必须用 String::utf8（与 text_ops/script_ops 同模式）。
+  payload.push_back(godot::String::utf8(serialized.c_str()));
   if (auto *dbg = godot::EngineDebugger::get_singleton()) {
     dbg->send_message(gda_string(GDA_MSG_RESPONSE), payload);
   }
@@ -1574,6 +1681,7 @@ void register_listener() {
     godot::ClassDB::register_class<GameBridgeListener>();
     register_eval_bridge_classes();
     register_input_bridge_classes();
+    register_verify_bridge_classes();
     godot::ClassDB::register_class<GameBridgeCaptureAwaiter>();
     godot::ClassDB::register_class<GameBridgeLogger>();
     class_registered = true;

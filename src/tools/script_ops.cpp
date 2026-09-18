@@ -48,6 +48,54 @@ bool wants_fresh_load(const mcp::JsonValue &args) {
   return flag != nullptr && flag->IsBool() && flag->GetBool();
 }
 
+uint64_t fnv1a64(const std::string &bytes) {
+  uint64_t hash = 14695981039346656037ULL;
+  for (unsigned char c : bytes) {
+    hash ^= static_cast<uint64_t>(c);
+    hash *= 1099511628211ULL;
+  }
+  return hash;
+}
+
+std::string fnv1a64_hex(const std::string &bytes) {
+  static const char *digits = "0123456789abcdef";
+  uint64_t hash = fnv1a64(bytes);
+  std::string out(16, '0');
+  for (int i = 15; i >= 0; --i) {
+    out[static_cast<size_t>(i)] = digits[hash & 0xFULL];
+    hash >>= 4;
+  }
+  return out;
+}
+
+bool try_compile_source(const std::string &source_code,
+                        const std::string &path_for_cache,
+                        std::string &error_out) {
+  godot::Ref<godot::GDScript> script;
+  script.instantiate();
+  if (script.is_null()) {
+    error_out = "failed to create GDScript";
+    return false;
+  }
+  // 与写盘路径同款 UTF-8 构造（见 handle_create 注释），保证编译看到的与落盘一致。
+  script->set_source_code(godot::String::utf8(source_code.c_str()));
+  script->set_path_cache(godot::String(path_for_cache.c_str()));
+  size_t compile_log_before = debugger_ops::capture_log_count();
+  godot::Error reload_err = script->reload();
+  if (reload_err != godot::OK) {
+    std::string message = "script compilation failed: ERR_PARSE_ERROR (code " +
+                          std::to_string(static_cast<int>(reload_err)) + ")";
+    std::string compile_err =
+        debugger_ops::capture_new_error_text(compile_log_before);
+    if (!compile_err.empty()) {
+      message += "\n" + gdscript_wrap::truncate_capture_text(compile_err);
+    }
+    error_out = message;
+    return false;
+  }
+  return true;
+}
+
 namespace {
 
 constexpr const char *NODE_PATH_HINT =
@@ -183,6 +231,19 @@ bool load_script_for_read(const std::string &path, const mcp::JsonValue &args,
 }
 
 } // namespace
+
+bool refresh_script_cache(const std::string &path, std::string &error_out) {
+  godot::Ref<godot::Script> refreshed;
+  mcp::JsonValue refresh_err;
+  if (!load_script_fresh(path, refreshed, refresh_err)) {
+    const mcp::JsonValue *msg = refresh_err.Find("error");
+    error_out = (msg != nullptr && msg->IsString())
+                    ? msg->GetString()
+                    : std::string("script cache refresh failed");
+    return false;
+  }
+  return true;
+}
 
 mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue &args) {
   auto *it_expr = args.Find("expression");
@@ -366,6 +427,15 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
     return e;
   }
 
+  // 编译门（与 patch_script 共用 try_compile_source）：先编译后保存，
+  // 编译失败零写盘。语义与旧内联实现一致，仅错误文本收敛到同一函数。
+  std::string compile_error;
+  if (!try_compile_source(source_code, path, compile_error)) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue(compile_error);
+    return e;
+  }
+
   godot::Ref<godot::GDScript> script;
   script.instantiate();
   if (script.is_null()) {
@@ -379,18 +449,12 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
   // 变成一个字符，CJK 注释写出后变乱码且 readback 校验失败。
   script->set_source_code(godot::String::utf8(source_code.c_str()));
   script->set_path_cache(godot::String(path.c_str()));
-  size_t compile_log_before = debugger_ops::capture_log_count();
-  godot::Error reload_err = script->reload();
-  if (reload_err != godot::OK) {
-    std::string message = "script compilation failed: ERR_PARSE_ERROR (code " +
-                          std::to_string(static_cast<int>(reload_err)) + ")";
-    std::string compile_err =
-        debugger_ops::capture_new_error_text(compile_log_before);
-    if (!compile_err.empty()) {
-      message += "\n" + gdscript_wrap::truncate_capture_text(compile_err);
-    }
+  // 与编译门同一份源码，理论上恒成功；防御性复查，避免带坏文件落盘。
+  if (script->reload() != godot::OK) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(message);
+    e["error"] = mcp::JsonValue(compile_error.empty()
+                                    ? std::string("script compilation failed")
+                                    : compile_error);
     return e;
   }
 
@@ -421,13 +485,14 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
 
   bool verified = false;
   bool readback = false;
+  std::string read_back;
   std::string write_issue;
   std::string write_warning;
   auto readback_file = godot::FileAccess::open(
       godot::String(path.c_str()), godot::FileAccess::READ);
   if (readback_file.is_valid() && readback_file->is_open()) {
     readback = true;
-    std::string read_back = util::to_std(readback_file->get_as_text());
+    read_back = util::to_std(readback_file->get_as_text());
     godot::Error read_err = readback_file->get_error();
     if (read_err != godot::OK && read_err != godot::ERR_FILE_EOF) {
       write_issue = "readback read error";
@@ -448,9 +513,8 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
   // 写盘后用 IGNORE 装载刷新一次：GDScriptCache 里的旧实例被重新读盘 + 重编译，
   // 替代原先「从 ResourceCache 摘除」（摘除只动 ResourceCache，REUSE 装载仍会从
   // GDScriptCache 取回旧实例）。刷新失败不使本次写入失败，但在响应中回报。
-  godot::Ref<godot::Script> refreshed;
-  mcp::JsonValue refresh_err;
-  bool cache_refreshed = load_script_fresh(path, refreshed, refresh_err);
+  std::string cache_refresh_error;
+  bool cache_refreshed = refresh_script_cache(path, cache_refresh_error);
   auto *editor = godot::EditorInterface::get_singleton();
   if (editor) {
     auto *efs = editor->get_resource_filesystem();
@@ -466,6 +530,13 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
   j["overwritten"] = mcp::JsonValue(file_exists_on_disk);
   j["verified"] = mcp::JsonValue(verified);
   j["readback"] = mcp::JsonValue(readback);
+  // 成功态自证：disk_bytes 与 content_hash 均来自磁盘 readback（非内存回显），
+  // 失败态（readback 未打开/读取出错）沿旧口径只保留 write_issue/warning。
+  if (readback) {
+    j["disk_bytes"] = mcp::JsonValue(static_cast<int64_t>(read_back.size()));
+    j["content_hash"] = mcp::JsonValue(fnv1a64_hex(read_back));
+    j["content_hash_algo"] = mcp::JsonValue(content_hash_algo_name());
+  }
   if (!write_issue.empty()) {
     j["write_issue"] = mcp::JsonValue(write_issue);
   }
@@ -474,11 +545,7 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
   }
   j["cache_refreshed"] = mcp::JsonValue(cache_refreshed);
   if (!cache_refreshed) {
-    const mcp::JsonValue *refresh_msg = refresh_err.Find("error");
-    j["cache_refresh_error"] =
-        mcp::JsonValue(refresh_msg && refresh_msg->IsString()
-                           ? refresh_msg->GetString()
-                           : std::string("script cache refresh failed"));
+    j["cache_refresh_error"] = mcp::JsonValue(cache_refresh_error);
   }
   godot::StringName global_name = script->get_global_name();
   if (global_name != godot::StringName()) {
