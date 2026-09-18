@@ -36,6 +36,7 @@ void fill_schema_debug_sys(std::unordered_map<std::string, mcp::JsonValue>& m) {
             {"persist", "boolean", "Keep the script's temporary node alive after the call (default: false); the node is stored under /root/__gda_runtime and its path is returned in node_path for later get_property/call_method use", false},
             {"persist_name", "string", "Node name under /root/__gda_runtime when persist=true (default: auto-generated)", false},
             {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 25000); on expiry an idempotent cancel interrupts the pending in-game await, and the plugin broadcasts an engine continue when the debugger session was breaked. The host waits timeout_ms + 2000 ms and that budget must stay below the 30 s HTTP transport timeout, so 25000 ms is the hard cap — split long work into shorter calls", false},
+            {"assert", "string", "Optional sandboxed assertion expression (max 1024 chars) evaluated with the eval result bound as value, e.g. value > 0; the response carries assert {pass, expression} plus actual. Expression grammar only with no scene access, sharing the op timeout; coroutine results cannot be asserted — omit assert for awaitable calls", false},
         });
         m["start_game_job"] = schema::build_schema({
             {"op", "string", "Wrapped game op to submit for asynchronous execution; currently only 'eval' (the execute_game_script op) is supported", true},
@@ -90,6 +91,32 @@ void fill_schema_debug_sys(std::unordered_map<std::string, mcp::JsonValue>& m) {
         m["get_game_ui_elements"] = schema::build_schema({
             {"max_elements", "integer", "Maximum number of Control-derived elements returned in tree order (default: 100, max: 1000); truncated=true signals more remain — raise the cap or narrow via execute_game_script", false},
             {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 25000). The host waits timeout_ms + 2000 ms and that budget must stay below the 30 s HTTP transport timeout, so 25000 ms is the hard cap — split long work into shorter calls", false},
+        });
+        m["sample_game_property"] = schema::build_schema({
+            {"node_path", "string", "Node path in the running game process, e.g. /root/Main/Player", true},
+            {"property", "string", "Property name to sample; must exist on the node — missing names fail fast instead of collecting nulls", true},
+            {"frames", "integer", "How many samples to collect, an integer from 1 to 120", true},
+            {"interval_frames", "integer", "Sample every interval_frames+1-th process frame (integer 0-60, default: 0); frames*(interval_frames+1) must stay within 3600", false},
+            {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 25000); on expiry the call fails with code sample_timeout plus the samples collected so far, and a node freed mid-run fails with code sample_node_freed. The host waits timeout_ms + 2000 ms and that budget must stay below the 30 s HTTP transport timeout, so 25000 ms is the hard cap", false},
+        });
+        m["collect_game_evidence"] = schema::build_schema({
+            {"include_status", "boolean", "Include the game status section, same fields as get_game_status (default: true)", false},
+            {"include_capture", "boolean", "Include the game screenshot section, same semantics as capture_game_viewport immediate capture (default: true)", false},
+            {"include_errors", "boolean", "Include the recent game errors section, same list as get_debugger_errors (default: true)", false},
+            {"limit", "integer", "Maximum number of errors in the errors section, an integer from 1 to 200 (default: 20)", false},
+            {"region", "object", "Crop the captured image to {x, y, width, height} in viewport pixels; the rect is clamped to the image", false},
+            {"max_dimension", "integer", "Downscale the capture so its longest side is at most this many pixels (64-4096); never upscales", false},
+            {"scale", "integer", "Integer nearest-neighbour upscale factor for the capture (1-8, default: 1), applied before max_dimension", false},
+            {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 25000). The host waits timeout_ms + 2000 ms and that budget must stay below the 30 s HTTP transport timeout, so 25000 ms is the hard cap", false},
+        });
+        m["validate_game_ui_layout"] = schema::build_schema({
+            {"max_elements", "integer", "Maximum number of Control elements enumerated (default: 100); truncated=true signals more remain", false},
+            {"ignore_paths", "array", "Up to 50 exact or '/'-suffix paths suppressing known-good entries", false},
+            {"ignore_classes", "array", "Up to 20 class names suppressing known-good entries; subclasses match, e.g. Container covers layout-only containers", false},
+            {"min_area", "number", "Visible areas below this size report tiny_area info (default: 4.0)", false},
+            {"bounds_margin", "number", "Pixel tolerance around the viewport visible rect (default: 2.0)", false},
+            {"occlude_ratio", "number", "Fraction 0.5-1.0 of an element area covered by a later visible control before possibly_occluded warns (default: 0.98); occlusion is a document-order heuristic ignoring canvas_layer and z_index", false},
+            {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 25000). The host waits timeout_ms + 2000 ms and that budget must stay below the 30 s HTTP transport timeout, so 25000 ms is the hard cap", false},
         });
         m["capture_game_viewport"] = schema::build_schema({
             {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 25000); the capture is returned as a base64-encoded PNG; when after_frames/when delay the capture it also bounds the in-game wait and the game answers with a structured error (code when_timeout, plus frames_waited) on expiry. The host waits timeout_ms + 2000 ms and that budget must stay below the 30 s HTTP transport timeout, so 25000 ms is the hard cap — split long work into shorter calls", false},

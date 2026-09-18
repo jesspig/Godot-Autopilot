@@ -133,6 +133,11 @@ TEST_F(RegisteredServerFixture, CatalogEntriesWellFormed) {
 }
 
 TEST_F(RegisteredServerFixture, SchemaStatisticsBaseline) {
+  // 计数基线（改动域工具/元工具时同步更新）：
+  // catalog = 391 域工具（329 GDA_TOOL_CLASS + 62 GDA_TOOL_CLASS_SIDE，
+  // 以 src/tools/*_tools.hpp 宏统计为准）+ system_status + 7 元工具 = 399；
+  // 空 schema = 60 域工具（build_schema({})）+ system_status + ping +
+  // list_categories = 63；非空 = 336（331 域 + 5 元）。
   size_t non_empty = 0;
   size_t empty = 0;
   const auto tools = catalog.get_all_tools();
@@ -143,6 +148,9 @@ TEST_F(RegisteredServerFixture, SchemaStatisticsBaseline) {
       ++empty;
     }
   }
+  EXPECT_EQ(tools.size(), 399);
+  EXPECT_EQ(non_empty, 336);
+  EXPECT_EQ(empty, 63);
   EXPECT_EQ(non_empty + empty, tools.size());
   EXPECT_GT(non_empty, empty);
   EXPECT_GT(empty, 0);

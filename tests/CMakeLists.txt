@@ -28,6 +28,12 @@ file(GLOB GDA_TOOLS_OPS_SOURCES CONFIGURE_DEPENDS
 #   variant_json.cpp      — ops 大量调用 VariantJson::serialize/deserialize
 #   scene_dirty_tracker.cpp — editor/group/property/scene/tilemap ops 调用
 #   readback_util.cpp     — property/resource ops 调用 util::check_readback
+#   scene_verify.cpp      — editor_ops.cpp 的 save 收据与 verify_scene_saved 调用
+#                           scene_verify::compare_tree_with_text/read_text_file
+#                           (tools/*_ops.cpp 由上方 GLOB 自动纳入，
+#                           含 script_patch_ops.cpp 与 scene_spec_ops.cpp；
+#                           game_bridge_verify.cpp 为游戏侧运行时，
+#                           仅被 game_bridge.cpp 引用，不进 L1 业务源)
 set(GDA_UNIT_BUSINESS_SOURCES
     ${CMAKE_SOURCE_DIR}/src/core/log_system.cpp
     ${CMAKE_SOURCE_DIR}/src/core/resource_registry.cpp
@@ -38,6 +44,7 @@ set(GDA_UNIT_BUSINESS_SOURCES
     ${CMAKE_SOURCE_DIR}/src/util/bm25_index.cpp
     ${CMAKE_SOURCE_DIR}/src/util/error_util.cpp
     ${CMAKE_SOURCE_DIR}/src/util/readback_util.cpp
+    ${CMAKE_SOURCE_DIR}/src/util/scene_verify.cpp
     ${CMAKE_SOURCE_DIR}/src/util/variant_json.cpp
     ${CMAKE_SOURCE_DIR}/src/util/client_config_gen.cpp
     ${CMAKE_SOURCE_DIR}/src/util/skill_gen.cpp

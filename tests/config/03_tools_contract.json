@@ -1,6 +1,6 @@
 {
   "name": "tools_contract",
-  "description": "全工具遍历的配置驱动声明：域工具共 384 个，其中 324 个以 GDA_TOOL_CLASS( 声明进入遍历枚举，60 个以 GDA_TOOL_CLASS_SIDE( 声明的副作用工具不参与枚举（解析器前缀匹配），纳入枚举者另有 get_tool_detail 的 side_effect 字段兜底排除。步骤1 empty_args 对 324 个枚举工具空参调用校验响应契约（新增 reload_resource 亦在其中，缺 path 应报 missing required parameter: path；scene_tree_items 无场景时按结构化 error 处理并计为 error 而非失败）；步骤2 heuristic_smoke 对同一批 324 个工具按 schema 属性类型生成启发式参数冒烟调用。两步骤中每个工具均先经 get_tool_detail 校验存在性与工具名一致性（内置），warnings 不视为失败。执行器对 traverse 步骤不做分段，两次遍历均一次跑完 324 工具，共耗时约 2-3 分钟。",
+  "description": "全工具遍历的配置驱动声明：域工具共 391 个，其中 329 个以 GDA_TOOL_CLASS( 声明进入遍历枚举，62 个以 GDA_TOOL_CLASS_SIDE( 声明的副作用工具不参与枚举（解析器前缀匹配），纳入枚举者另有 get_tool_detail 的 side_effect 字段兜底排除。步骤1 empty_args 对 329 个枚举工具空参调用校验响应契约（新增 reload_resource 亦在其中，缺 path 应报 missing required parameter: path；scene_tree_items 无场景时按结构化 error 处理并计为 error 而非失败）；步骤2 heuristic_smoke 对同一批 329 个工具按 schema 属性类型生成启发式参数冒烟调用。两步骤中每个工具均先经 get_tool_detail 校验存在性与工具名一致性（内置），warnings 不视为失败。执行器对 traverse 步骤不做分段，两次遍历均一次跑完 329 工具，共耗时约 2-3 分钟。",
   "headless": true,
   "pipeline": {
     "on_failure": "continue",

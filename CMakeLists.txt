@@ -87,6 +87,7 @@ add_library(godot-autopilot SHARED
     src/runtime/game_bridge.cpp
     src/runtime/game_bridge_input.cpp
     src/runtime/game_bridge_eval.cpp
+    src/runtime/game_bridge_verify.cpp
     src/tools/animation_ops.cpp
     src/tools/audio_ops.cpp
     src/tools/capture_ops.cpp
@@ -134,7 +135,9 @@ add_library(godot-autopilot SHARED
     src/tools/runtime_ops.cpp
     src/tools/runtime_game_ops.cpp
     src/tools/scene_ops.cpp
+    src/tools/scene_spec_ops.cpp
     src/tools/script_ops.cpp
+    src/tools/script_patch_ops.cpp
     src/tools/spriteframes_ops.cpp
     src/tools/tool_catalog.cpp
     src/util/bm25_index.cpp
@@ -144,6 +147,7 @@ add_library(godot-autopilot SHARED
     src/util/skill_content_generated.cpp
     src/util/error_util.cpp
     src/util/readback_util.cpp
+    src/util/scene_verify.cpp
     src/ui/mcp_log_dock.cpp
     src/ui/mcp_config_dock.cpp)
 
