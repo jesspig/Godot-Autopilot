@@ -10,7 +10,10 @@ void fill_schema_editor_config(std::unordered_map<std::string, mcp::JsonValue>& 
             {"paths", "array", "Array of node paths in the edited scene to select, e.g. ['Player', 'Level1/Enemy'] or absolute like '/root/Level1/Enemy'; the previous selection is cleared first and unresolvable paths are skipped", true},
         });
         m["get_editor_edited_scene_root"] = schema::build_schema({});
-        m["save_editor_scene"] = schema::build_schema({});
+        m["save_editor_scene"] = schema::build_schema({
+            {"include_hash", "boolean", "Attach FNV-1a content hashes of the memory tree and the on-disk file (memory_hash/disk_hash); off by default, enable for byte-level save proof", false},
+            {"include_paths", "boolean", "Always attach the missing_paths list even when node counts match (default: attached only on mismatch)", false},
+        });
         m["save_editor_scenes"] = schema::build_schema({});
         m["reload_editor_scene"] = schema::build_schema({
             {"scene_path", "string", "Scene file path to reload from disk, e.g. 'res://game.tscn'; when omitted the currently edited scene is reloaded. All unsaved changes are discarded without confirmation", false},
@@ -34,6 +37,9 @@ void fill_schema_editor_config(std::unordered_map<std::string, mcp::JsonValue>& 
         });
         m["get_editor_file_system_tree"] = schema::build_schema({
             {"path", "string", "Directory path to root the tree at, e.g. 'res://scenes' or 'res://'; when omitted the whole project tree is returned. An invalid path returns null", false},
+            {"depth", "integer", "Maximum depth below the requested root (default: 12); deeper levels are pruned and the result reports truncated with max_depth", false},
+            {"prefix", "string", "Subtree root filter, e.g. 'res://scenes'; takes precedence over path when both are given", false},
+            {"filter", "string", "Case-insensitive substring filter matched against each entry's name or path; non-matching leaves are pruned while ancestors of matches are kept, and the result reports filtered", false},
         });
         m["scan_editor_file_system"] = schema::build_schema({});
         m["set_editor_main_scene"] = schema::build_schema({
@@ -57,6 +63,12 @@ void fill_schema_editor_config(std::unordered_map<std::string, mcp::JsonValue>& 
         });
         m["save_editor_scene_as"] = schema::build_schema({
             {"path", "string", "Target file path for the save, e.g. 'res://levels/level1.tscn'; missing parent directories are created automatically", true},
+            {"include_hash", "boolean", "Attach FNV-1a content hashes of the memory tree and the on-disk file (memory_hash/disk_hash); off by default, enable for byte-level save proof", false},
+            {"include_paths", "boolean", "Always attach the missing_paths list even when node counts match (default: attached only on mismatch)", false},
+        });
+        m["verify_scene_saved"] = schema::build_schema({
+            {"scene_path", "string", "Scene file path to compare against the in-memory tree, e.g. 'res://game.tscn'; when omitted the current scene file path is used", false},
+            {"include_hash", "boolean", "Attach FNV-1a content hashes of the memory tree and the on-disk file (memory_hash/disk_hash); off by default", false},
         });
         m["close_editor_scene"] = schema::build_schema({});
 
