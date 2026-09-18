@@ -22,6 +22,7 @@
 #include <mutex>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace godot_autopilot {
@@ -192,6 +193,87 @@ public:
       oss << "  ───\n\n";
     }
     return oss.str();
+  }
+
+  // I4 轻聚类：按 文件/函数/行/信息 归并，与游戏侧 get_errors(group=true)
+  // 同形状（count + 首末时间 + 一条堆栈采样）。limit 为最大分组数。
+  mcp::JsonValue get_grouped_errors(size_t group_limit) {
+    std::lock_guard<std::mutex> lock(mtx_);
+    struct Group {
+      size_t count = 0;
+      size_t first_index = 0;
+      size_t last_index = 0;
+      size_t sample = 0;
+    };
+    std::unordered_map<std::string, size_t> index_by_key;
+    std::vector<Group> groups;
+    auto time_text = [](const ErrorEntry &e) {
+      char buf[16];
+      snprintf(buf, sizeof(buf), "%02d:%02d:%02d.%03d", e.hr, e.min, e.sec,
+               e.msec);
+      return std::string(buf);
+    };
+    for (size_t i = 0; i < errors_.size(); i++) {
+      const ErrorEntry &e = errors_[i];
+      const std::string key = e.source_file + "\n" + e.source_func + "\n" +
+                              std::to_string(e.source_line) + "\n" + e.error;
+      auto it = index_by_key.find(key);
+      if (it == index_by_key.end()) {
+        Group group;
+        group.count = 1;
+        group.first_index = i;
+        group.last_index = i;
+        group.sample = i;
+        index_by_key.emplace(key, groups.size());
+        groups.push_back(group);
+      } else {
+        Group &group = groups[it->second];
+        group.count++;
+        group.last_index = i;
+      }
+    }
+    std::vector<size_t> order(groups.size());
+    for (size_t i = 0; i < order.size(); i++)
+      order[i] = i;
+    std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) {
+      return groups[a].count > groups[b].count;
+    });
+    if (group_limit < order.size())
+      order.resize(group_limit);
+    mcp::JsonValue arr(mcp::JsonValue::array_tag);
+    for (size_t gi : order) {
+      const ErrorEntry &sample = errors_[groups[gi].sample];
+      mcp::JsonValue item(mcp::JsonValue::object_tag);
+      item["count"] = mcp::JsonValue(static_cast<int64_t>(groups[gi].count));
+      item["first_time"] =
+          mcp::JsonValue(time_text(errors_[groups[gi].first_index]));
+      item["last_time"] =
+          mcp::JsonValue(time_text(errors_[groups[gi].last_index]));
+      item["file"] = mcp::JsonValue(sample.source_file);
+      item["func"] = mcp::JsonValue(sample.source_func);
+      item["line"] = mcp::JsonValue(static_cast<int64_t>(sample.source_line));
+      item["error"] = mcp::JsonValue(sample.error);
+      item["descr"] = mcp::JsonValue(sample.error_descr);
+      item["is_warning"] = mcp::JsonValue(sample.is_warning);
+      mcp::JsonValue stack(mcp::JsonValue::array_tag);
+      const size_t frames =
+          std::min<size_t>(sample.stack_files.size(), 8);
+      for (size_t j = 0; j < frames; j++) {
+        stack.PushBack(mcp::JsonValue(sample.stack_files[j] + ":" +
+                                      std::to_string(sample.stack_lines[j]) +
+                                      " @ " + sample.stack_funcs[j] + "()"));
+      }
+      item["stack"] = std::move(stack);
+      arr.PushBack(std::move(item));
+    }
+    mcp::JsonValue result(mcp::JsonValue::object_tag);
+    result["grouped"] = mcp::JsonValue(true);
+    result["groups"] = std::move(arr);
+    result["total_errors"] =
+        mcp::JsonValue(static_cast<int64_t>(errors_.size()));
+    result["total_groups"] =
+        mcp::JsonValue(static_cast<int64_t>(groups.size()));
+    return result;
   }
 
   std::string get_game_output_text(size_t limit) {
@@ -734,10 +816,25 @@ mcp::JsonValue handle_debugger_get_errors(const mcp::JsonValue &args) {
     if (l->IsInt())
       limit = static_cast<size_t>(l->GetInt());
   }
+  bool grouped = false;
+  if (auto *g = args.Find("group")) {
+    if (!g->IsBool())
+      return util::error_json("invalid parameter: group must be a boolean");
+    grouped = g->GetBool();
+  }
   if (capture_session_active()) {
     mcp::JsonValue params(mcp::JsonValue::object_tag);
     params["limit"] = mcp::JsonValue(static_cast<int64_t>(limit));
+    if (grouped)
+      params["group"] = mcp::JsonValue(true);
     return runtime_ops::handle_gda_send("get_errors", params, 5000);
+  }
+  if (grouped) {
+    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    r["result"] = DebuggerCapture::instance().get_grouped_errors(limit);
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                              "get_debugger_errors completed (grouped)");
+    return r;
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   std::string errors_text = DebuggerCapture::instance().get_errors_text(limit);

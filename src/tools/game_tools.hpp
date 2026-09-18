@@ -17,12 +17,24 @@ mcp::JsonValue handle_click_game_ui_element(const mcp::JsonValue &args);
 } // namespace runtime_ops
 namespace game_tools {
 
+GDA_TOOL_CLASS(SampleGamePropertyTool, "sample_game_property",
+               "Sample a game node property over N process frames in the running game process over the runtime debug channel, read-only: returns the serialized value per sample. Requires a game launched from the editor whose project loads the godot-autopilot extension. node_path and property select the target (property must exist — missing names fail fast instead of collecting nulls); frames (integer 1-120) sets how many samples to collect and interval_frames (integer 0-60, default 0) spaces them (every interval_frames+1-th process frame is sampled, keeping main-thread cost O(1) per frame); frames*(interval_frames+1) must stay within 3600. timeout_ms (default 5000, max 25000) bounds the whole sampling run — on expiry the call fails explicitly with code sample_timeout plus the samples collected so far; a node freed mid-run fails with code sample_node_freed. No polling loop on the caller side is needed.",
+               "Game", std::vector<std::string>({"game", "runtime", "sample", "property", "debug"}), runtime_ops::handle_game_sample_property, true)
+
+GDA_TOOL_CLASS(CollectGameEvidenceTool, "collect_game_evidence",
+               "Collect a read-only evidence bundle from the running game process over the runtime debug channel in one round trip, without any automatic verdict: game status (same fields as get_game_status, with healthy/last_activity measured at request time), game screenshot (same semantics as capture_game_viewport immediate capture) and recent game errors (same list as get_debugger_errors). Requires a game launched from the editor whose project loads the godot-autopilot extension. Each section fails in isolation with an error object instead of failing the call; pass include_status/include_capture/include_errors=false to skip a section. Optional limit (integer 1-200, default 20) caps the errors section; region/max_dimension/scale mirror the capture parameters. Prefer this over three separate calls when the three observations must belong to the same moment; for a verdict, compare the sections yourself.",
+               "Game", std::vector<std::string>({"game", "runtime", "evidence", "status", "debug"}), runtime_ops::handle_game_collect_evidence, true)
+
+GDA_TOOL_CLASS(ValidateGameUiLayoutTool, "validate_game_ui_layout",
+               "Scan the running game's Control tree for layout defects, read-only: zero-size visible controls, controls fully outside the viewport visible rect and possibly-occluded controls, each reported as {kind,severity,path,type,rect,detail}. Requires a game launched from the editor whose project loads the godot-autopilot extension. Invisible controls are always skipped; ignore_paths (up to 50 exact or '/'-suffix paths) and ignore_classes (up to 20 class names, subclasses match, e.g. 'Container' covers layout-only containers) suppress known-good entries. Thresholds guard against false positives: min_area (default 4.0, smaller visible areas report tiny_area info), bounds_margin (default 2.0 px tolerance around the viewport), occlude_ratio (0.5-1.0, default 0.98 — fraction of an element's area covered by a later visible control before possibly_occluded warns; occlusion is a document-order heuristic that ignores canvas_layer/z_index). max_elements caps the enumeration (default 100, max 1000); truncated=true signals more remain. No automatic verdict — triage the issues yourself.",
+               "Game", std::vector<std::string>({"game", "runtime", "ui", "layout", "validate", "debug"}), runtime_ops::handle_game_validate_ui_layout, true)
+
 GDA_TOOL_CLASS(GetGameStatusTool, "get_game_status",
                "Query a running game process over the runtime debug channel: engine version, current scene, node count, FPS, plus paused and physics_frame to distinguish a fake run. Requires a game launched from the editor whose project loads the godot-autopilot extension. healthy and last_activity_ms detect liveness/stall; physics_stalled indicates a frozen physics loop. An empty scene with a sharp node_count drop means a scene reload failed — stop and rerun the game.",
                "Game", std::vector<std::string>({"game", "runtime", "status", "debug"}), runtime_ops::handle_game_status, true)
 
 GDA_TOOL_CLASS_SIDE(ExecuteGameScriptTool, "execute_game_script",
-               "Run code or inspect/modify state inside the running game process over the runtime debug channel; requires a game launched from the editor whose project loads the godot-autopilot extension. action is 'script' (GDScript must extend Node and define func _run()), 'get_property', 'set_property' or 'call_method'. persist (default false) keeps the temporary node alive under /root/__gda_runtime and returns its path for later calls; persist_name names it. timeout_ms bounds the in-game execution (default 5000, max 25000; the host waits timeout_ms + 2000 ms, below the 30 s transport timeout); on expiry an idempotent cancel interrupts the pending await and, when the debugger session was breaked, the plugin sends an engine continue so the game is released. call_method on an await method waits for the coroutine to complete (bounded by timeout_ms) and returns its final result; on timeout it returns an error.",
+               "Run code or inspect/modify state inside the running game process over the runtime debug channel; requires a game launched from the editor whose project loads the godot-autopilot extension. action is 'script' (GDScript must extend Node and define func _run()), 'get_property', 'set_property' or 'call_method'. persist (default false) keeps the temporary node alive under /root/__gda_runtime and returns its path for later calls; persist_name names it. timeout_ms bounds the in-game execution (default 5000, max 25000; the host waits timeout_ms + 2000 ms, below the 30 s transport timeout); on expiry an idempotent cancel interrupts the pending await and, when the debugger session was breaked, the plugin sends an engine continue so the game is released. call_method on an await method waits for the coroutine to complete (bounded by timeout_ms) and returns its final result; on timeout it returns an error. Optional 'assert' (max 1024 chars) evaluates a sandboxed GDScript expression with the eval result bound as `value` (e.g. \"value > 0\") and attaches {assert:{pass,expression},actual}: Expression grammar only with no scene access, sharing the op timeout; coroutine (async) results cannot be asserted and fail explicitly — omit assert for awaitable calls.",
                "Game", std::vector<std::string>({"game", "runtime", "eval", "script", "debug"}), runtime_ops::handle_game_eval, true, ::godot_autopilot::SideEffect::GameRuntime)
 
 GDA_TOOL_CLASS_SIDE(StartGameJobTool, "start_game_job",
@@ -67,7 +79,7 @@ GDA_TOOL_CLASS_SIDE(ClickGameUiElementTool, "click_game_ui_element",
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(12);
+  v.reserve(15);
   v.push_back(std::make_unique<GetGameStatusTool>());
   v.push_back(std::make_unique<ExecuteGameScriptTool>());
   v.push_back(std::make_unique<StartGameJobTool>());
@@ -80,6 +92,9 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(std::make_unique<SequenceGameInputsTool>());
   v.push_back(std::make_unique<GetGameUiElementsTool>());
   v.push_back(std::make_unique<ClickGameUiElementTool>());
+  v.push_back(std::make_unique<SampleGamePropertyTool>());
+  v.push_back(std::make_unique<CollectGameEvidenceTool>());
+  v.push_back(std::make_unique<ValidateGameUiLayoutTool>());
   return v;
 }
 

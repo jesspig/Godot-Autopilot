@@ -21,7 +21,7 @@ GDA_TOOL_CLASS(GetPluginLogTool, "get_plugin_log",
                "Debugger", std::vector<std::string>({"debugger", "log", "plugin"}), debugger_ops::handle_plugin_log_get, false)
 
 GDA_TOOL_CLASS(GetDebuggerErrorsTool, "get_debugger_errors",
-               "Read script errors from the running game process as a structured list (time, file, func, line, error, descr, is_warning, stack). Requires a game launched from the editor (play_editor_current_scene) whose project loads the godot-autopilot extension; without an active debug session it returns an empty result plus a note — no editor-side fallback. Use get_debugger_log for script errors and output of the editor process instead. Optional 'limit' (default 20) caps the result.",
+               "Read script errors from the running game process as a structured list (time, file, func, line, error, descr, is_warning, stack). Requires a game launched from the editor (play_editor_current_scene) whose project loads the godot-autopilot extension; without an active debug session it returns an empty result plus a note — no editor-side fallback. Use get_debugger_log for script errors and output of the editor process instead. Optional 'limit' (default 20) caps the result; with an active session it caps raw entries (ungrouped) or returned groups (grouped). Optional 'group' (default false) clusters entries by file/function/line/message and returns {grouped:true, groups:[{count,first_time,last_time,file,func,line,error,descr,is_warning,stack}], total_errors, total_groups} instead of the raw list.",
                "Debugger", std::vector<std::string>({"debugger", "errors", "stack"}), debugger_ops::handle_debugger_get_errors, false)
 
 GDA_TOOL_CLASS(GetDebuggerOutputTool, "get_debugger_output",

@@ -76,12 +76,14 @@ bool has_only_fields(const JV &value, const char *const *allowed,
 bool is_eval_param_allowed(const std::string &key) {
   static constexpr const char *allowed[] = {
       "action", "node_path", "property", "value", "method", "args",
-      "source_code", "persist", "persist_name", "timeout_ms"};
+      "source_code", "persist", "persist_name", "timeout_ms", "assert"};
   for (const char *candidate : allowed)
     if (key == candidate)
       return true;
   return false;
 }
+
+constexpr int64_t EVAL_ASSERT_MAX_CHARS = 1024;
 
 constexpr size_t SEQUENCE_MAX_ITEMS = 256;
 constexpr int64_t SEQUENCE_FRAME_BUDGET_MS = 33;
@@ -204,6 +206,16 @@ mcp::JsonValue handle_game_eval(const mcp::JsonValue &args) {
       timeout && (!timeout->IsInt() || timeout->GetInt() <= 0 ||
                   timeout->GetInt() > GDA_MAX_GAME_OP_TIMEOUT_MS))
     return error_json(game_op_timeout_error());
+  bool has_assert = false;
+  if (auto *assert_p = args.Find("assert")) {
+    if (!assert_p->IsString() || assert_p->GetString().empty())
+      return error_json("assert must be a non-empty expression string with the "
+                        "eval result bound as `value` (e.g. \"value > 0\")");
+    if (assert_p->GetString().size() >
+        static_cast<size_t>(EVAL_ASSERT_MAX_CHARS))
+      return error_json("assert exceeds 1024 characters");
+    has_assert = true;
+  }
   if (args.IsObject()) {
     for (const auto &entry : args.GetObject()) {
       if (!is_eval_param_allowed(entry.first))
@@ -222,9 +234,13 @@ mcp::JsonValue handle_game_eval(const mcp::JsonValue &args) {
   copy_optional(args, params, "persist");
   copy_optional(args, params, "persist_name");
   copy_optional(args, params, "timeout_ms");
-  const std::string op(GDA_OP_EVAL);
+  copy_optional(args, params, "assert");
+  // assert 走同权限的新游戏 op（eval_assert）：不断言时保持原 eval 路径。
+  const std::string op =
+      has_assert ? std::string(GDA_OP_EVAL_ASSERT) : std::string(GDA_OP_EVAL);
   return handle_gda_send(op, params, extract_timeout(args),
-                         needs_error_break_suppression(op, action));
+                         needs_error_break_suppression(std::string(GDA_OP_EVAL),
+                                                       action));
 }
 
 mcp::JsonValue handle_game_input(const mcp::JsonValue &args) {
@@ -822,6 +838,187 @@ mcp::JsonValue handle_game_job_get(const mcp::JsonValue &args) {
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
+}
+
+namespace {
+
+double sample_json_number(const JV &value) {
+  return value.IsInt() ? static_cast<double>(value.GetInt())
+                       : value.GetDouble();
+}
+
+} // namespace
+
+mcp::JsonValue handle_game_sample_property(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "sample_game_property called");
+  if (!args.IsObject())
+    return error_json("sample_game_property parameters must be an object");
+  static constexpr const char *allowed[] = {"node_path", "property", "frames",
+                                            "interval_frames", "timeout_ms"};
+  std::string unknown;
+  if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed),
+                       unknown))
+    return error_json("unknown parameter for sample_game_property: " + unknown);
+  auto *path_p = args.Find("node_path");
+  auto *prop_p = args.Find("property");
+  auto *frames_p = args.Find("frames");
+  if (!path_p || !path_p->IsString() || path_p->GetString().empty())
+    return error_json("missing required parameter: node_path (non-empty node "
+                      "path in the running game)");
+  if (!prop_p || !prop_p->IsString() || prop_p->GetString().empty())
+    return error_json("missing required parameter: property (non-empty "
+                      "property name)");
+  if (!frames_p || !frames_p->IsInt())
+    return error_json("missing required parameter: frames (integer 1-120)");
+  const int64_t frames = frames_p->GetInt();
+  if (frames < 1 || frames > 120)
+    return error_json("frames out of range (1-120): " +
+                      std::to_string(frames));
+  int64_t interval = 0;
+  if (auto *interval_p = args.Find("interval_frames")) {
+    if (!interval_p->IsInt())
+      return error_json("interval_frames must be an integer");
+    interval = interval_p->GetInt();
+    if (interval < 0 || interval > 60)
+      return error_json("interval_frames out of range (0-60): " +
+                        std::to_string(interval));
+  }
+  if (frames * (interval + 1) > 3600)
+    return error_json("sample span frames*(interval_frames+1) exceeds 3600 "
+                      "process frames — raise interval_frames less, or split "
+                      "into shorter samples");
+  if (auto *timeout = args.Find("timeout_ms");
+      timeout && (!timeout->IsInt() || timeout->GetInt() <= 0 ||
+                  timeout->GetInt() > GDA_MAX_GAME_OP_TIMEOUT_MS))
+    return error_json(game_op_timeout_error());
+  JV params(JV::object_tag);
+  params["node_path"] = *path_p;
+  params["property"] = *prop_p;
+  params["frames"] = JV(frames);
+  params["interval_frames"] = JV(interval);
+  if (auto *timeout = args.Find("timeout_ms"))
+    params["timeout_ms"] = *timeout;
+  JV result = handle_gda_send(std::string(GDA_OP_SAMPLE), params,
+                              extract_timeout(args));
+  append_runtime_degradation_hint(result);
+  return result;
+}
+
+mcp::JsonValue handle_game_collect_evidence(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "collect_game_evidence called");
+  if (!args.IsObject())
+    return error_json("collect_game_evidence parameters must be an object");
+  static constexpr const char *allowed[] = {
+      "include_status", "include_capture", "include_errors", "limit",
+      "region", "max_dimension", "scale", "timeout_ms"};
+  std::string unknown;
+  if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed),
+                       unknown))
+    return error_json("unknown parameter for collect_game_evidence: " +
+                      unknown);
+  for (const char *key :
+       {"include_status", "include_capture", "include_errors"}) {
+    if (auto *v = args.Find(key); v && !v->IsBool())
+      return error_json(std::string(key) + " must be a boolean");
+  }
+  if (auto *limit = args.Find("limit");
+      limit && (!limit->IsInt() || limit->GetInt() < 1 ||
+                limit->GetInt() > 200))
+    return error_json("limit must be an integer between 1 and 200");
+  if (auto *region = args.Find("region");
+      region && !region->IsObject())
+    return error_json("region must be an object with numeric x, y, width and "
+                      "height");
+  if (auto *max_dimension = args.Find("max_dimension");
+      max_dimension && (!max_dimension->IsInt() ||
+                        max_dimension->GetInt() < 64 ||
+                        max_dimension->GetInt() > 4096))
+    return error_json("max_dimension must be an integer between 64 and 4096");
+  if (auto *scale = args.Find("scale");
+      scale && (!scale->IsInt() || scale->GetInt() < 1 ||
+                scale->GetInt() > 8))
+    return error_json("scale must be an integer between 1 and 8");
+  if (auto *timeout = args.Find("timeout_ms");
+      timeout && (!timeout->IsInt() || timeout->GetInt() <= 0 ||
+                  timeout->GetInt() > GDA_MAX_GAME_OP_TIMEOUT_MS))
+    return error_json(game_op_timeout_error());
+  JV params(JV::object_tag);
+  copy_optional(args, params, "include_status");
+  copy_optional(args, params, "include_capture");
+  copy_optional(args, params, "include_errors");
+  copy_optional(args, params, "limit");
+  copy_optional(args, params, "region");
+  copy_optional(args, params, "max_dimension");
+  copy_optional(args, params, "scale");
+  JV result = handle_gda_send(std::string(GDA_OP_COLLECT_EVIDENCE), params,
+                              extract_timeout(args));
+  append_runtime_degradation_hint(result);
+  return result;
+}
+
+mcp::JsonValue handle_game_validate_ui_layout(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "validate_game_ui_layout called");
+  if (!args.IsObject())
+    return error_json("validate_game_ui_layout parameters must be an object");
+  static constexpr const char *allowed[] = {
+      "max_elements", "ignore_paths", "ignore_classes", "min_area",
+      "bounds_margin", "occlude_ratio", "timeout_ms"};
+  std::string unknown;
+  if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed),
+                       unknown))
+    return error_json("unknown parameter for validate_game_ui_layout: " +
+                      unknown);
+  if (auto *max = args.Find("max_elements");
+      max && (!max->IsInt() || max->GetInt() < 1))
+    return error_json("max_elements must be a positive integer");
+  if (auto *v = args.Find("ignore_paths")) {
+    if (!v->IsArray() || v->GetArray().size() > 50)
+      return error_json("ignore_paths must be an array of at most 50 strings");
+    for (const auto &item : v->GetArray()) {
+      if (!item.IsString() || item.GetString().empty())
+        return error_json("ignore_paths must contain non-empty strings");
+    }
+  }
+  if (auto *v = args.Find("ignore_classes")) {
+    if (!v->IsArray() || v->GetArray().size() > 20)
+      return error_json(
+          "ignore_classes must be an array of at most 20 strings");
+    for (const auto &item : v->GetArray()) {
+      if (!item.IsString() || item.GetString().empty())
+        return error_json("ignore_classes must contain non-empty strings");
+    }
+  }
+  if (auto *v = args.Find("min_area")) {
+    if (!v->IsNumber() || sample_json_number(*v) < 0.0)
+      return error_json("min_area must be a non-negative number");
+  }
+  if (auto *v = args.Find("bounds_margin")) {
+    if (!v->IsNumber() || sample_json_number(*v) < 0.0)
+      return error_json("bounds_margin must be a non-negative number");
+  }
+  if (auto *v = args.Find("occlude_ratio")) {
+    if (!v->IsNumber() || sample_json_number(*v) < 0.5 ||
+        sample_json_number(*v) > 1.0)
+      return error_json("occlude_ratio must be a number between 0.5 and 1.0");
+  }
+  if (auto *timeout = args.Find("timeout_ms");
+      timeout && (!timeout->IsInt() || timeout->GetInt() <= 0 ||
+                  timeout->GetInt() > GDA_MAX_GAME_OP_TIMEOUT_MS))
+    return error_json(game_op_timeout_error());
+  JV params(JV::object_tag);
+  copy_optional(args, params, "max_elements");
+  copy_optional(args, params, "ignore_paths");
+  copy_optional(args, params, "ignore_classes");
+  copy_optional(args, params, "min_area");
+  copy_optional(args, params, "bounds_margin");
+  copy_optional(args, params, "occlude_ratio");
+  JV result = handle_gda_send(std::string(GDA_OP_VALIDATE_UI_LAYOUT), params,
+                              extract_timeout(args));
+  append_runtime_degradation_hint(result);
+  return result;
 }
 
 } // namespace runtime_ops
