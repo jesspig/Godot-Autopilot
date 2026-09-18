@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "tools/script_ops.hpp"
+#include "tools/script_patch_ops.hpp"
 #include "tools/tool_decl.hpp"
 
 namespace godot_autopilot {
@@ -21,8 +22,12 @@ GDA_TOOL_CLASS(LoadScriptTool, "load_script",
                "Scripts", std::vector<std::string>({"script", "load"}), script_ops::handle_load, true)
 
 GDA_TOOL_CLASS_SIDE(CreateScriptTool, "create_script",
-               "Create a new GDScript file and save it to disk. Requires path and source_code; source_code is written as UTF-8, so non-ASCII (e.g. CJK) content round-trips byte-exact. The script is compiled before saving and compilation errors abort the call with parser output. overwrite defaults to false — an existing file errors unless overwrite=true. Returns path, class and overwritten; cache_refreshed reports whether the freshly written file was re-read into the resource cache (cache_refresh_error is included when that reload failed); global_class_name is included when the script declares one. The file content is read back from disk after saving and verified against source_code (see verified/readback fields); locked-file write failures surface as verified=false instead of silent success. Do not issue create_script calls for the same file in parallel requests — serial writes to the same path are not synchronized. After changing a script that the running game uses, call reload_game_scripts first and then reload_current_scene (or retry the operation) — reloading the scene alone does not guarantee the on-disk version is re-read (CACHE_MODE_REUSE).",
+               "Create a new GDScript file and save it to disk. Requires path and source_code; source_code is written as UTF-8, so non-ASCII (e.g. CJK) content round-trips byte-exact. The script is compiled before saving and compilation errors abort the call with parser output. overwrite defaults to false — an existing file errors unless overwrite=true. Returns path, class and overwritten; cache_refreshed reports whether the freshly written file was re-read into the resource cache (cache_refresh_error is included when that reload failed); global_class_name is included when the script declares one. The file content is read back from disk after saving and verified against source_code (see verified/readback/disk_bytes/content_hash fields — disk_bytes is the read-back byte length and content_hash is the FNV-1a-64 hex of the bytes actually read from disk, with content_hash_algo naming the algorithm, so a successful response is self-proving without a follow-up read); locked-file write failures surface as verified=false instead of silent success. Do not issue create_script calls for the same file in parallel requests — serial writes to the same path are not synchronized. After changing a script that the running game uses, call reload_game_scripts first and then reload_current_scene (or retry the operation) — reloading the scene alone does not guarantee the on-disk version is re-read (CACHE_MODE_REUSE).",
                "Scripts", std::vector<std::string>({"script", "create"}), script_ops::handle_create, true, ::godot_autopilot::SideEffect::WritesFile)
+
+GDA_TOOL_CLASS_SIDE(PatchScriptTool, "patch_script",
+               "Patch one anchored spot in an existing GDScript file, coexisting with create_script (which writes whole files). Requires path, anchor (non-empty literal text located in the current file) and replacement (new text; empty string deletes the anchor in replace mode). Optional mode (default 'replace'): 'replace' swaps the first anchor occurrence for replacement, 'insert' inserts replacement right after the first anchor occurrence; further occurrences are left untouched and reported via anchor_occurrences. A missing anchor fails explicitly with zero disk writes. Optional preview/dry_run (default false; either true) returns a diff preview (before_context/after_context plus byte counts) without writing or compiling. The formal write compiles the patched text first via the same gate as create_script and aborts with zero disk writes on compilation failure; save/readback failures restore the original content best-effort (see rolled_back/rollback_error) and surface as verified=false with write_issue instead of silent success. Success responses mirror create_script self-proof fields (verified/readback/disk_bytes/content_hash/content_hash_algo, all derived from the disk readback). Do not issue patch_script/create_script calls for the same file in parallel requests — serial writes to the same path are not synchronized. After patching a script that the running game uses, call reload_game_scripts first and then reload_current_scene (or retry the operation) — reloading the scene alone does not guarantee the on-disk version is re-read (CACHE_MODE_REUSE).",
+               "Scripts", std::vector<std::string>({"script", "patch", "edit"}), script_patch_ops::handle_patch, true, ::godot_autopilot::SideEffect::WritesFile)
 
 GDA_TOOL_CLASS(AttachScriptToNodeTool, "attach_script_to_node",
                "Attach a Script resource (e.g. a .gd file or another Script) to a node in the edited scene, registered with the editor undo/redo. Requires node_path and script_path. The script is always re-read from disk (CACHE_MODE_IGNORE) before attaching, so a node never receives a stale cached instance after the file changed outside the editor. Returns 'script attached to <path>' plus instantiated. When the script lacks @tool it cannot be instantiated in the editor, so its methods only run once the game runs — call_script_node reports the same restriction. Replacing an existing script does not migrate exported references (node_paths may be left dangling) — rewire them after attaching.",
@@ -54,10 +59,11 @@ GDA_TOOL_CLASS(GetScriptPropertyListTool, "get_script_property_list",
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(10);
+  v.reserve(11);
   v.push_back(std::make_unique<ExecuteScriptTool>());
   v.push_back(std::make_unique<LoadScriptTool>());
   v.push_back(std::make_unique<CreateScriptTool>());
+  v.push_back(std::make_unique<PatchScriptTool>());
   v.push_back(std::make_unique<AttachScriptToNodeTool>());
   v.push_back(std::make_unique<DetachScriptFromNodeTool>());
   v.push_back(std::make_unique<GetScriptPropertyTool>());
