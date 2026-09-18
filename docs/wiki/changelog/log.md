@@ -4,6 +4,7 @@
 
 ## 2026-09-18
 
+- **CJK 传输链收敛批次**：14 处 latin1 构造改 UTF-8＋诊断透传＋L2-20 新用例；L1 单测方案纠偏回退；L1 243/243、19/20 与 live 25 步会话全绿。详见 `changelog/2026-09-18-log.md`
 - **E2E 优化批次（计划驱动执行，8 分支/T00–T09，未提交）**：新增 6 域工具（域 385→391、SIDE 60→62、catalog 393→399）；保存回执+只读复核、脚本哈希自证、局部补丁、声明式建树试点、批量读/采样/断言/证据包/布局校验、错误码文本、绑定诊断、CJK 传输修复；L1 243/243、03 603/603、25 份 L2 干净态全绿。详见 `changelog/2026-09-18-log.md`
 - **README 拆分与知识库一致性审计**：`README_zh.md` 删除，`README.md` 中文重写 + 新增 `README.en.md`（工具口径 badge `tools-385+` / 385+、前提 Godot 4.7+）；`register_all.cpp:363` 的 `call_tool` 描述 384→385 域对齐；wiki 同步 6 页（overview / build / tests / modules/core / modules/entry_runtime / example：README 引用、4.7 口径、行号重核）。详见 `changelog/2026-09-18-log.md`
 
