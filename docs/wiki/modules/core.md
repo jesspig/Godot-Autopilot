@@ -6,13 +6,13 @@ tags:
   - 模块
   - 核心层
   - 线程模型
-timestamp: "2026-09-16T17:06:25+08:00"
+timestamp: "2026-09-18T16:35:00+08:00"
 resource: src/core/
 ---
 
 # 核心模块（src/core/）
 
-> 审计日期：2026-09-13（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-13 上午随资源 path 加载注册进 ResourceRegistry 同步；09-13 下午随收口批次同步 PluginConfig allow 键、授权门与 call_tool MCP 线程例外；09-13 17:50 随 B 组知识库审计同步——补正主线程排空点行号、移除已删除的 architecture.md 对照行；09-13 晚随 0.2.4 版知识库全量审计同步——补正 query_recent/query_from 消费方注释、SCENE/EDITOR 两级初始化描述、GDA_FORCE_HEADLESS 语义与 editor_readiness 消费方；09-14 随修复批次同步——PluginConfig 消费方增列 Allow game_runtime 复选框；09-16 随坐标换算批次同步——补 `editor_coords` 职责行与新增纯函数（此前职责表漏列该模块），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 审计日期：2026-09-18（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-13 上午随资源 path 加载注册进 ResourceRegistry 同步；09-13 下午随收口批次同步 PluginConfig allow 键、授权门与 call_tool MCP 线程例外；09-13 17:50 随 B 组知识库审计同步——补正主线程排空点行号、移除已删除的 architecture.md 对照行；09-13 晚随 0.2.4 版知识库全量审计同步——补正 query_recent/query_from 消费方注释、SCENE/EDITOR 两级初始化描述、GDA_FORCE_HEADLESS 语义与 editor_readiness 消费方；09-14 随修复批次同步——PluginConfig 消费方增列 Allow game_runtime 复选框；09-16 随坐标换算批次同步——补 `editor_coords` 职责行与新增纯函数（此前职责表漏列该模块），基于当前工作树代码逐行核对（不依赖 git 历史）；09-18 随知识库一致性审计同步——`query_recent(50)` 消费方行号 470→527（以 `resource_handlers.cpp` 实测为准）、审计日期头补齐 09-16 改动的日期同步。
 > 覆盖范围：`src/core/` 下 9 个 cpp + 12 个头 + `version.hpp.in` 模板（`CommandQueue` 与 `error_watermark` 为 header-only，实际 12 业务组 + 版本）。注意：`CommandQueue` 为 header-only（仅 `command_queue.hpp`，无对应 `.cpp`），`error_watermark.hpp` 同为 header-only，`version.hpp.in` 经 `configure_file` 生成 `version.hpp`。
 
 ## 模块简介
@@ -62,7 +62,7 @@ resource: src/core/
 - 枚举：`LogLevel { Debug, Info, Warning, Error }`；`LogCategory { System, Transport, Tools, Resources, Prompts }`
 - `void log(LogLevel, LogCategory, const std::string&)` — 环形缓冲，上限 `MAX_ENTRIES = 10000`，超限 `pop_front`；分配递增 `serial`
 - `query(const Query&)` — 支持 `min_level` / `filter_text`（大小写不敏感） / `category` 过滤
-- `query_recent(size_t limit)` — 取最近 N 条（`godot://log/recent` 资源经 `query_recent(50)` 消费，`resource_handlers.cpp:470`）
+- `query_recent(size_t limit)` — 取最近 N 条（`godot://log/recent` 资源经 `query_recent(50)` 消费，`resource_handlers.cpp:527`）
 - `query_from(size_t start_index, size_t* next_index)` + `size_t next_index()` — 增量查询（`McpLogDock::poll_new_entries` 与 `get_plugin_log` 的 `since_index` 消费，`mcp_log_dock.cpp:217`、`debugger_ops.cpp:683`）
 - `static LogSystem& instance()` — 局部静态单例
 - **写入目标：仅内存；无文件、无回调、无 Godot 控制台直接输出**（`McpLogDock` 经 `poll_new_entries`/`query_from` 轮询消费）
@@ -189,10 +189,10 @@ flowchart LR
 | 文档 | 声称 | 代码事实 | 判定 |
 |---|---|---|---|
 | AGENTS.md（构建段） | 暗示每个模块有成对的 `.cpp/.hpp` 参与 `add_library()` | `command_queue.hpp` 无对应 `.cpp`，header-only，不进 CMake 源列表 | 文档未明说，审计时需注意 |
-| README.md（前提） | "Godot 4.3+" | Example 项目为 4.7（`Example/project.godot`），AGENTS.md 亦写 4.7 | 文档间冲突 |
-| README.md（安装） | "Open your Godot project — the server starts automatically" | cmdline/`GDA_FORCE_HEADLESS` 模式下 UI 与服务器被禁用（`main.cpp`） | 存在例外，描述不完整 |
+| README.md / README.en.md（前提） | "Godot 4.7+"（`README.md:5,53` / `README.en.md:5,53`） | Example 项目为 4.7（`Example/project.godot`），AGENTS.md 亦写 4.7 | 一致 ✓ |
+| README.md / README.en.md（安装） | "服务端自动启动……无需启用开关"（`README.md:65` / `README.en.md:65`） | cmdline/`GDA_FORCE_HEADLESS` 模式下 UI 与服务器被禁用（`main.cpp`） | 存在例外，描述不完整 |
 | AGENTS.md（架构/端口段） | 端口 9527、`/mcp`、`GODOT_AUTOPILOT_PORT` 覆盖、日志类别五枚举 | 全部与代码一致 | 一致 ✓ |
-| README.md（设计表） | Port 9527、线程模型"Command queue + frame sync" | 一致 ✓ | 一致 ✓ |
+| README.md / README.en.md（安全段） | 回环监听 + 端口 9527 + `/mcp`（`README.md:65,74` / `README.en.md:65,74`） | 与 `server_context.cpp` 一致 | 一致 ✓ |
 | AGENTS.md | 日志类别 "仅此几个：System、Transport、Tools、Resources、Prompts" | `LogCategory` 枚举完全相同 | 一致 ✓ |
 
 ## 相关页面

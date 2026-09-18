@@ -360,7 +360,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
 
     registry->add(std::make_unique<::godot_autopilot::MetaTool>(
         ToolMeta{"call_tool",
-                 "Execute any tool by name. Use this to call all 385 non-meta tools (384 domain tools plus system_status).",
+                 "Execute any tool by name. Use this to call all 386 non-meta tools (385 domain tools plus system_status).",
                  "System", {"call", "dispatch", "proxy"}, true},
         [](const mcp::JsonValue& args) -> mcp::JsonValue {
             std::string name = args.Find("name") != nullptr && args["name"].IsString() ? args["name"].GetString() : std::string();
