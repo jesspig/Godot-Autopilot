@@ -190,7 +190,7 @@ godot::Variant deserialize_inferred(const mcp::JsonValue &j) {
   if (j.IsDouble())
     return godot::Variant(j.GetDouble());
   if (j.IsString())
-    return godot::Variant(godot::String(j.GetString().c_str()));
+    return godot::Variant(godot::String::utf8(j.GetString().c_str()));
   if (j.IsArray()) {
     godot::Array arr;
     for (const auto &elem : j.GetArray()) {
@@ -228,7 +228,7 @@ godot::Variant deserialize_inferred(const mcp::JsonValue &j) {
     }
     godot::Dictionary d;
     for (const auto &[key, val] : obj) {
-      d[godot::String(key.c_str())] = deserialize_inferred(val);
+      d[godot::String::utf8(key.c_str())] = deserialize_inferred(val);
     }
     return godot::Variant(d);
   }
@@ -256,7 +256,7 @@ godot::Variant deserialize_typed(const mcp::JsonValue &j,
 
   case Variant::STRING: {
     auto s = get_string_or_dump(j);
-    return Variant(String(s.c_str()));
+    return Variant(String::utf8(s.c_str()));
   }
 
   case Variant::VECTOR2:
@@ -397,19 +397,19 @@ godot::Variant deserialize_typed(const mcp::JsonValue &j,
 
   case Variant::STRING_NAME: {
     auto s = get_string_or_dump(j);
-    return Variant(StringName(String(s.c_str())));
+    return Variant(StringName(String::utf8(s.c_str())));
   }
 
   case Variant::NODE_PATH: {
     auto s = get_string_or_dump(j);
-    return Variant(NodePath(String(s.c_str())));
+    return Variant(NodePath(String::utf8(s.c_str())));
   }
 
   case Variant::DICTIONARY: {
     Dictionary d;
     if (j.IsObject()) {
       for (const auto &[key, val] : j.GetObject()) {
-        d[String(key.c_str())] = deserialize_inferred(val);
+        d[String::utf8(key.c_str())] = deserialize_inferred(val);
       }
     }
     return Variant(d);
@@ -485,7 +485,7 @@ godot::Variant deserialize_typed(const mcp::JsonValue &j,
     if (j.IsArray()) {
       for (const auto &elem : j.GetArray()) {
         auto es = get_string_or_dump(elem);
-        a.append(String(es.c_str()));
+        a.append(String::utf8(es.c_str()));
       }
     }
     return Variant(a);
@@ -578,7 +578,7 @@ godot::Variant deserialize_typed(const mcp::JsonValue &j,
     if (j.IsString()) {
       auto *loader = godot::ResourceLoader::get_singleton();
       if (loader) {
-        godot::String path(j.GetString().c_str());
+        godot::String path(godot::String::utf8(j.GetString().c_str()));
         if (loader->exists(path)) {
           godot::Ref<godot::Resource> res = loader->load(path);
           if (res.is_valid()) {
@@ -1512,9 +1512,9 @@ godot::Variant VariantJson::deserialize(const mcp::JsonValue &j,
     if (j.IsString()) {
       auto *loader = godot::ResourceLoader::get_singleton();
       if (loader) {
-        godot::String res_path(j.GetString().c_str());
+        godot::String res_path(godot::String::utf8(j.GetString().c_str()));
         godot::Ref<godot::Resource> res =
-            loader->load(res_path, godot::String(type_hint.c_str()));
+            loader->load(res_path, godot::String::utf8(type_hint.c_str()));
         if (res.is_valid()) {
           return godot::Variant(res.ptr());
         }

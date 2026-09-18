@@ -36,7 +36,7 @@ bool debugger_broadcast_request(const std::string &payload,
   if (sessions.empty())
     return false;
   godot::Array arr;
-  arr.push_back(godot::String(payload.c_str()));
+  arr.push_back(godot::String::utf8(payload.c_str()));
   for (auto &session : sessions) {
     session->send_message(
         godot::String(std::string(GDA_MSG_REQUEST).c_str()), arr);
@@ -129,7 +129,7 @@ int32_t debugger_broadcast_reload_scripts(const std::vector<std::string> &script
     return static_cast<int32_t>(sessions.size());
   }
   for (const auto &path : script_paths) {
-    arr.push_back(godot::String(path.c_str()));
+    arr.push_back(godot::String::utf8(path.c_str()));
   }
   for (auto &session : sessions) {
     session->send_message(godot::String("reload_scripts"), arr);

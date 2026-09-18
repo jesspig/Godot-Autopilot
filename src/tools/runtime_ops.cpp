@@ -520,6 +520,10 @@ mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms) {
     JV error = error_json(error_text);
     if (auto *se = response.Find("structured_error"))
       error["structured_error"] = *se;
+    if (auto *dg = response.Find("diagnosis"))
+      error["diagnosis"] = *dg;
+    if (auto *hh = response.Find("hint"))
+      error["hint"] = *hh;
     return error;
   }
   if (auto *result_p = response.Find(GDA_FIELD_RESULT)) {

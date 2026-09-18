@@ -266,7 +266,7 @@ bool compile_and_map_errors(ExecContext &ctx, std::string &error_out) {
     return false;
   }
 
-  ctx.script->set_source_code(godot::String(ctx.wrapped.c_str()));
+  ctx.script->set_source_code(godot::String::utf8(ctx.wrapped.c_str()));
 
   size_t compile_log_before = godot_autopilot::debugger_ops::capture_log_count();
   godot::Error parse_err = ctx.script->reload();

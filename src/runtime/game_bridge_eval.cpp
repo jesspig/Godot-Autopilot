@@ -190,7 +190,7 @@ JV op_eval_script(const JV &params, int64_t request_id) {
   if (script.is_null())
     return error_result("failed to create GDScript instance");
 
-  script->set_source_code(godot::String(source.c_str()));
+  script->set_source_code(godot::String::utf8(source.c_str()));
   uint64_t compile_seq_before = current_error_seq();
   godot::Error parse_err = script->reload();
   if (parse_err != godot::OK) {
