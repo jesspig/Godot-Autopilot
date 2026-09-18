@@ -6,7 +6,7 @@ tags:
   - 测试
   - L1
   - L2
-timestamp: "2026-09-18T16:35:00+08:00"
+timestamp: "2026-09-18T19:30:00+08:00"
 resource: tests/
 ---
 
@@ -14,6 +14,8 @@ resource: tests/
 
 > 审计日期：2026-09-18（2026-08-29 0.2.2 发布审计——L1 77、L2 7 份；09-02 安全与并行硬化——L1 77→96（新增 security_parallel_hardening 17 项，覆盖队列/路径/鉴权/限额/日志）、核心路径/扫描/响应边界与构建大小写修复；09-08 技能生成器——L1 96→103（新增 skill_gen 7 项），ctest 注册点 103→110，同日 skill 内容外置化——测试零改动仍 103；09-10 skill 体系 19→7 册重构——用例改名与白名单扩充，仍 103；09-13 上午随反馈修复批次同步——L1 103→114（新增 mcp_image_content 11 项），L2 7→8 份（新增 07_scene_tabs），ctest 110→122；09-13 下午随收口批次同步——L1 114→126（新增 variant_json_strict 12 项），L2 8→9 份（新增 08_property_readback），ctest 122→135，L2 运行需 `GODOT_AUTOPILOT_ALLOW`；技能体系 8 册；09-13 晚随 A 组知识库审计修复批次同步——02/03/04/05/06 用例步骤与内容重核（02=before_all 2+39、03=1+2、04=after_all 1+28、05=13、06=26）、traversal/register_all_test 行号修正；09-13 晚随 0.2.4 版知识库全量审计同步——after_all 失败语义修正（工具报错不改变整体判定，仅进程死亡补 fatal_error）、CRASH_LOG_LIMIT 表述改为“截断至 2000 字符”、L2 用例发现机制改为“9 份均由 GLOB 自动发现”、历史事故出处修正并补 todo；09-14 随修复批次同步——L1 126→140（variant_json_strict 12→17、security_parallel_hardening 17→20、runtime_ops 1→3、新增 log_ops_test 4 项），unit 测试文件 14→15，L2 仍 9 份，ctest 注册点 135→149；09-15 随 Computer Use grounding 批次同步——L1 140→172（新增 editor_coords_test 32 项），unit 测试文件 15→16，L2 9→11 份（新增 09_editor_ui、10_editor_input），ctest 注册点 149→183；03_tools_contract 枚举 322 个非 SIDE 工具、0 失败、warnings 实测 4 条；09-16 随失败修复批次（feature/failure-remediation）同步——L1 172→229（新增 editor_ui_tree_test 6 / inline_resource_json_test 12 / skill_resources_test 12 / tilemap_ops_test 13 项，editor_coords_test +5、runtime_ops_test +9），unit 测试文件 16→20，L2 11→17 份（新增 11_editor_tree、12_capture_params、13_inline_subresource、14_tilemap_rect、15_scene_path、16_game_jobs），ctest 注册点 183→246；03 遍历 324 个非 SIDE 工具、0 失败、warnings 仍为基线 4 条；L2 授权前置改述：capability 由 `GODOT_AUTOPILOT_ALLOW` env 或 `user://godot_autopilot/config.json` 的 `allow` 字段提供（env 优先），16_game_jobs 的 start_game_job 需 `game_runtime`；09-16 随客户端配置生成器扩容批次同步——L1 229→238（client_config_gen_test 11→20，覆盖 20 客户端渲染与双 TOML 形态），ctest 注册点 246→255，基于当前工作树代码逐行核对（不依赖 git 历史）；09-16 随视觉辅助场景批次同步——L1 238→246（新增 `vision_assist_test` 8 项），unit 测试文件 20→21，L2 17→18 份（新增 17_vision_assist），ctest 注册点 255→264；09-16 随坐标换算/键名统一/脚本新鲜度/UID 守卫/CJK 往返/open 幂等/属性两轮批次同步——L1 246→267（新增 game_ui_coords_test 6 / keycode_alias_test 6 / script_freshness_test 7 / uid_guard_test 2 项），unit 测试文件 21→25，L2 18→25 份（新增 18_script_freshness、19_cjk_roundtrip、22_uid_guard、23_click_ui_coords、24_keycode_alias、25_open_scene_idempotent、28_sprite_frames_animation；20/21/26/27 号段空缺），ctest 注册点 264→292；03 遍历候选 324→325 个非 SIDE 工具（`review_scene_visually` 计入）、上限 650 步，warnings 仍为基线 4 条（本轮未动相关工具口径）；09-17 随 L1 精简批次同步——L1 267→243（`editor_coords_test` 37→15 删仿射子集用例、`vision_assist_test` 8→7、`tool_catalog_test` 7→6 删 `PopulateDefaultToolsOnce`，`populate_default_tools` 函数与声明整体删除），ctest 注册点 292→268，构建实测 L1 243/243 全绿。
 > 覆盖范围：`tests/` 全部（unit 25 文件、runner 7 实现 + 6 头文件、integration、config 25 JSON、`tests/CMakeLists.txt`），对照 `tests/README.md` 与仓库根 `AGENTS.md` 测试段逐条核算。243 项 L1 为 `TEST`/`TEST_F` 宏逐行统计口径（09-17 精简批次由 267→243：editor_coords 37→15、vision_assist 8→7、tool_catalog 删 `PopulateDefaultToolsOnce`；09-16 历史：新增 vision_assist 8 项 + 4 文件 21 项、client_config_gen 11→20）；ctest 注册点 268 已由构建实测（`ctest -N`，243 L1 + 25 L2）。
+> 09-18 E2E 优化批次：域 385→391（非 SIDE 325→329、SIDE 60→62，`patch_script` 计 writes_file 15→16、`build_nodes_from_spec` 计 None 1→2）、catalog 393→399；03 实测 603 步全过（空参 329 + 冒烟 273 + 56 跳过，warnings 基线 4 条不变）；L1 243 不变；本轮新增 L2 用例 0 份（25 份）。
+> 09-18 本地 L2 环境约束（残余风险）：`Example/` 含 E2E 残留游戏（`scenes/main.tscn` + `run/main_scene`）时，无头编辑器在首次文件扫描完成后约 0.5–0.8s 自开主场景，与用例 `before_all` 干净场景竞态（只读探针复现，移开 `scenes/` 后消失）；污染态 7 份（01/02/11/14/15/18/28）失败、干净态 25 份全绿，failing handler 所在域本批次零改动。本地跑 L2 前建议确认 `Example/.godot/editor/editor_layout.cfg` 无残留 open_scenes；`Example/project.godot` 的 34 行 E2E 增量保持原样。
 > 09-18 补记：`GDA_ENABLE_TESTS` 开关行号 `CMakeLists.txt:164`→`:168`（以根 `CMakeLists.txt` 实测为准，`option(GDA_ENABLE_TESTS` 在 `:168`）。
 
 ## 架构总览
@@ -163,7 +165,7 @@ stdout/stderr 各接独立管道读线程持续消费，防 64KB 缓冲写满阻
 
 ## 全量遍历（`traversal.cpp`）
 
-- **工具来源**：运行时遍历 `src/tools/*_tools.hpp` 解析 `GDA_TOOL_CLASS(` 第 2 参，**实测域工具 385 个（30 个域文件）**；解析器仅精确匹配 `GDA_TOOL_CLASS(`，以 `GDA_TOOL_CLASS_SIDE(` 声明的 **60 个**副作用工具不进入枚举，**实际枚举 325 个**；纳入枚举的工具再经 `get_tool_detail` 的 `side_effect` 字段兜底判定排除（当前 SIDE 已由宏前缀排除，兜底用于防回归）
+- **工具来源**：运行时遍历 `src/tools/*_tools.hpp` 解析 `GDA_TOOL_CLASS(` 第 2 参，**实测域工具 391 个（30 个域文件）**；解析器仅精确匹配 `GDA_TOOL_CLASS(`，以 `GDA_TOOL_CLASS_SIDE(` 声明的 **62 个**副作用工具不进入枚举，**实际枚举 329 个**；纳入枚举的工具再经 `get_tool_detail` 的 `side_effect` 字段兜底判定排除（当前 SIDE 已由宏前缀排除，兜底用于防回归）
 - **副作用排除**：每工具先 `get_tool_detail`（响应含 `side_effect` 字段）；字段非空即视为副作用工具，记录 excluded 并跳过（不再硬编码名单）；再校验存在性与工具名一致性（响应非对象或名字不匹配 → FAIL）
 - **`empty_args`**：空对象调用；响应非 JSON 对象 → FAIL；含 `error` 字段算"有错误响应"（统计 error 数，不 FAIL）；schema `required` 非空但空参未报错 → 记 **warnings**（不 FAIL）
 - **`heuristic_smoke`**：按 schema properties 类型生成启发值（integer→0、number→0.0、boolean→false、array→`[]`、object→`{}`、其余→`"test"`）；无 properties 的工具跳过（不产生步骤）
@@ -172,17 +174,17 @@ stdout/stderr 各接独立管道读线程持续消费，防 64KB 缓冲写满阻
 
 ### 步数核算（与 AGENTS.md "325 个做空参+冒烟" 对齐）
 
-- 每次遍历候选 = 域工具 385 中解析器枚举的 **325 个非 SIDE 工具**（60 个 `GDA_TOOL_CLASS_SIDE` 不进入枚举）
-- empty_args：325 个调用、每个产生 1 个步骤
-- heuristic_smoke：325 个候选中跳过无 properties 的工具，步骤数取决于运行时空 schema 数
-- **上限 650 步（325×2 减空 schema 跳过，以运行时报告为准）**，精确值以 `03_tools_contract` 运行输出为准
+- 每次遍历候选 = 域工具 391 中解析器枚举的 **329 个非 SIDE 工具**（62 个 `GDA_TOOL_CLASS_SIDE` 不进入枚举）
+- empty_args：329 个调用、每个产生 1 个步骤
+- heuristic_smoke：329 个候选中跳过无 properties 的工具，步骤数取决于运行时空 schema 数
+- **上限 658 步（329×2 减空 schema 跳过，以运行时报告为准）**，精确值以 `03_tools_contract` 运行输出为准（09-18 实测 603 步全过：空参 329 + 冒烟 273 + 56 跳过）
 - 耗时：`tests/README.md` 称 "约 2-3 分钟"（两次全量遍历 + 两次全量 get_tool_detail 的 HTTP 往返量级，随步数增长略有增加）。
 
-### 60 工具排除清单（`GDA_TOOL_CLASS_SIDE` 标记驱动，实测 60 = 15 + 6 + 4 + 20 + 6 + 7 + 1 + 1；08-21 起由 `side_effects()` 自动排除，不再硬编码名单）
+### 62 工具排除清单（`GDA_TOOL_CLASS_SIDE` 标记驱动，实测 62 = 16 + 6 + 4 + 20 + 6 + 7 + 1 + 2；08-21 起由 `side_effects()` 自动排除，不再硬编码名单）
 
 | side_effect | 数量 | 工具 |
 |---|---:|---|
-| `writes_file` | 15 | `save_editor_scene`、`save_editor_scene_as`、`save_editor_scenes`、`create_script`、`save_resource`、`copy_resource_file`、`move_resource_file`、`create_directory`、`create_theme_resource`、`set_theme_color`、`set_theme_constant`、`set_theme_font_size`、`set_theme_stylebox_flat`、`write_file`、`move_os_file_to_trash` |
+| `writes_file` | 16 | `save_editor_scene`、`save_editor_scene_as`、`save_editor_scenes`、`create_script`、`patch_script`、`save_resource`、`copy_resource_file`、`move_resource_file`、`create_directory`、`create_theme_resource`、`set_theme_color`、`set_theme_constant`、`set_theme_font_size`、`set_theme_stylebox_flat`、`write_file`、`move_os_file_to_trash` |
 | `writes_config` | 6 | `save_project_settings`、`set_editor_settings`、`set_editor_main_scene`、`set_editor_plugin_enabled`、`save_input_map`、`add_input_map_action_event` |
 | `shows_alert` | 4 | `show_os_alert`、`show_display_dialog`、`speak_display_tts`、`stop_display_tts` |
 | `modifies_window` | 20 | 原 12 个（`create_display_window`、`delete_display_window`、`move_display_window_to_foreground`、`request_display_window_attention`、`set_display_clipboard`、`set_display_mouse_mode`、`set_display_window_flag`、`set_display_window_mode`、`set_display_window_position`、`set_display_window_size`、`set_display_window_title`、`warp_display_mouse`）+ 09-15 新增 7 个（`click_editor_element`、`type_editor_element_text`、`run_editor_shortcut`、`click_input_mouse`、`scroll_input_mouse`、`drag_input_mouse`、`type_input_text`）+ 09-16 新增 1 个（`select_scene_tree_node`） |
@@ -216,13 +218,13 @@ stdout/stderr 各接独立管道读线程持续消费，防 64KB 缓冲写满阻
 | L2 用例文件数 | 25（00-10 共 11 份 + 11_editor_tree / 12_capture_params / 13_inline_subresource / 14_tilemap_rect / 15_scene_path / 16_game_jobs / 17_vision_assist + 18_script_freshness / 19_cjk_roundtrip / 22_uid_guard / 23_click_ui_coords / 24_keycode_alias / 25_open_scene_idempotent / 28_sprite_frames_animation；20/21/26/27 号段空缺） | 25 | 一致 |
 | ctest L2 用例 | gda_runner_<name> | 一致（`tests/CMakeLists.txt` 的 config GLOB 注册段，TIMEOUT 600；25 份均由 GLOB 自动发现，新增文件零配置） | 一致 |
 | ctest 注册点 | 268（243 L1 + 25 L2） | 268 | 一致（`ctest -N` 构建实测） |
-| 遍历工具数 | 385 | 385（30 个 `*_tools.hpp` 的 `GDA_TOOL_CLASS(_SIDE)` 计数；解析器仅枚举 `GDA_TOOL_CLASS(` 的 325 个） | 一致 |
-| 排除工具数 | 60 | 60（`GDA_TOOL_CLASS_SIDE` 标记 60 个：writes_file 15 / writes_config 6 / shows_alert 4 / modifies_window 20 / process 6 / game_runtime 7 / code_execute 1 / None 1；不进入枚举，`side_effect` 字段兜底判定保留） | 一致 |
-| 03 遍历步数 | 上限 650 步（325×2 减空 schema 跳过） | **上限 650 步**（域 385 中解析器枚举 325，60 个 SIDE 不枚举，以运行时为准） | 运行时统计口径 |
+| 遍历工具数 | 391 | 391（30 个 `*_tools.hpp` 的 `GDA_TOOL_CLASS(_SIDE)` 计数；解析器仅枚举 `GDA_TOOL_CLASS(` 的 329 个） | 一致 |
+| 排除工具数 | 62 | 62（`GDA_TOOL_CLASS_SIDE` 标记 62 个：writes_file 16 / writes_config 6 / shows_alert 4 / modifies_window 20 / process 6 / game_runtime 7 / code_execute 1 / None 2；不进入枚举，`side_effect` 字段兜底判定保留） | 一致 |
+| 03 遍历步数 | 上限 658 步（329×2 减空 schema 跳过） | **上限 658 步**（域 391 中解析器枚举 329，62 个 SIDE 不枚举，以运行时为准；09-18 实测 603 步全过） | 运行时统计口径 |
 | 03 耗时 | 约 2-3 分钟（随步数增长略有增加） | README：约 2-3 分钟 | 一致 |
 | schema 非空/空数 | 运行时观测 | `SchemaStatisticsBaseline` 仅断言非空>空>0（08-22 起 SCHEMA_NONE/BASIC 静态枚举已删，`tool_input_schema` 的 basic 参数为 no-op） | 无法静态精确核算，属运行时观测值 |
-| 工具总结构 | 7 元 + 385 领域 | 7 元工具经 `ToolRegistry::add()`（IMetaTool 自动归类）+RegisterTool；385 领域/系统经 30 域 `make_tools()`；`g_handlers` 派生=386（385+system_status） | 单一来源 |
-| ToolCatalog 393 条目 | 385 领域 + system_status + 7 元 | 全部由 registry `all_any()` 逐一 `make_tool_info` 派生，无独立填表 | 393 自洽 |
+| 工具总结构 | 7 元 + 391 领域 | 7 元工具经 `ToolRegistry::add()`（IMetaTool 自动归类）+RegisterTool；391 领域/系统经 30 域 `make_tools()`；`g_handlers` 派生=392（391+system_status） | 单一来源 |
+| ToolCatalog 399 条目 | 391 领域 + system_status + 7 元 | 全部由 registry `all_any()` 逐一 `make_tool_info` 派生，无独立填表 | 399 自洽 |
 
 > 对照说明：本表"源码核算"为逐文件/逐宏统计的本轮实测值；仓库 AGENTS.md 与 README 的对应数值由"维护入口"统一同步，若仍有旧值以本页实测为准。
 

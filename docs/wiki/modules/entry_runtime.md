@@ -6,13 +6,15 @@ tags:
   - 模块
   - 入口
   - 运行时桥接
-timestamp: "2026-09-18T16:35:00+08:00"
+timestamp: "2026-09-18T19:30:00+08:00"
 resource:
   - src/main.cpp
   - src/runtime/
 ---
 
 # 模块：入口与运行时桥接（entry_runtime）
+
+> 09-18 E2E 优化批次增补（详见 `changelog/2026-09-18-log.md` 19:30 节）：`call_method` native 失败路径附加 `diagnosis` + `hint`（`game_bridge_eval.cpp:550 eval_bind_suspected_cause` / `:569 make_native_bind_diagnosis`，成功路径零改动）；新增 `gda_protocol.hpp` 4 个 op（`eval_assert`/`sample`/`collect_evidence`/`validate_ui_layout`）与 `game_bridge_verify.cpp`（采样 awaiter + 校验类注册）。
 
 覆盖代码：`src/main.cpp`（326 行）与 `src/runtime/`（`gda_protocol.hpp` 53 行、`game_bridge.hpp` 79 行、`game_bridge.cpp`（09-16 增窗口坐标换算约 30 行）、`game_bridge_input.cpp`（09-16 删本地键名表约 60 行、改调共用判定）、`game_bridge_eval.cpp` 799 行）。
 
