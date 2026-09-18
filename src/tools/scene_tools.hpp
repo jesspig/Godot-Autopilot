@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "tools/scene_ops.hpp"
+#include "tools/scene_spec_ops.hpp"
 #include "tools/tool_decl.hpp"
 
 namespace godot_autopilot {
@@ -40,9 +41,13 @@ GDA_TOOL_CLASS(GetSceneNodeScreenRectTool, "get_scene_node_screen_rect",
                "Map nodes of the edited scene to editor window client-area coordinates, e.g. to aim click_input_mouse at a canvas node or to verify a node is on screen. Pass 'paths' (1-50 node paths in the edited scene). Optional 'viewport' picks the coordinate space: 'auto' (default) chooses the 2D canvas transform or the 3D viewport camera per node type, while '2d'/'3d' force one space and report a per-item error on a type mismatch. Node3D is projected through the 3D editor viewport camera (item 'behind' flags points behind it); Node2D and Control map through the 2D editor viewport, and Control items also carry the transformed 'rect'. Each item reports {path, ok, type, screen_position, rect?, behind?} and per-item errors never fail the whole call. The top-level 'mapping' (scale_x, scale_y, offset_x, offset_y) converts capture_editor_viewport image pixels to window client coordinates (client = offset + pixel * scale). Read-only.",
                "Scene", std::vector<std::string>({"scene", "node", "screen", "rect"}), scene_ops::handle_get_node_screen_rect, true)
 
+GDA_TOOL_CLASS_SIDE(BuildNodesFromSpecTool, "build_nodes_from_spec",
+                "用声明式 spec 一次建好整棵子树：传 'spec' 对象 {type（Node 子类，默认 Node）、name（默认 Node，'/' 与 ':' 非法）、props（经 property_set 同转换链逐节点应用，OBJECT 型值先行）、children（同形 spec 数组递归）}；可选 'parent_path'（默认场景根，仅在无场景时省略并让顶层 spec 节点成根）、'dry_run'/'preview'（任一 true 则只校验并返回节点清单，不写场景）。自顶向下挂接并设 owner 为场景根以保证落盘；任一步失败整体回滚（摘除顶层已建节点并释放子树，无残留）。递归上限 32 层、单次上限 500 节点。与 create_scene_node、code_execute 并存：定型结构用本工具，单次零散节点用 create_scene_node，异形逻辑（循环、条件、计算值）用 code_execute。返回 mode（built/dry_run）、node_count、created [{path, type}] 与 delete_scene_node 撤销提示。",
+                "Scene", std::vector<std::string>({"node", "build", "spec"}), scene_spec_ops::handle_build_from_spec, true, ::godot_autopilot::SideEffect::None)
+
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(7);
+  v.reserve(8);
   v.push_back(std::make_unique<CreateSceneNodeTool>());
   v.push_back(std::make_unique<DeleteSceneNodeTool>());
   v.push_back(std::make_unique<RenameSceneNodeTool>());
@@ -50,6 +55,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(std::make_unique<GetSceneTreeTool>());
   v.push_back(std::make_unique<InstantiateSceneTool>());
   v.push_back(std::make_unique<GetSceneNodeScreenRectTool>());
+  v.push_back(std::make_unique<BuildNodesFromSpecTool>());
   return v;
 }
 
