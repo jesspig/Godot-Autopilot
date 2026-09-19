@@ -18,6 +18,7 @@
 #include "core/scene_dirty_tracker.hpp"
 #include "core/server_context.hpp"
 #include "runtime/game_bridge.hpp"
+#include "tools/autopilot_tools.hpp"
 #include "tools/debugger_ops.hpp"
 #include "tools/runtime_ops.hpp"
 #include "ui/mcp_config_dock.hpp"
@@ -64,6 +65,7 @@ class GodotAutopilotPlugin : public godot::EditorPlugin {
 
   godot_autopilot::McpLogDock *log_dock;
   godot_autopilot::McpConfigDock *config_dock;
+  godot_autopilot::AutopilotTools *tools_singleton;
   godot::Ref<godot_autopilot::debugger_ops::OutputCaptureLogger>
       output_logger_;
   godot::Ref<godot_autopilot::debugger_ops::DebugCapturePlugin>
@@ -76,7 +78,7 @@ protected:
 
 public:
   GodotAutopilotPlugin()
-      : log_dock(nullptr), config_dock(nullptr) {}
+      : log_dock(nullptr), config_dock(nullptr), tools_singleton(nullptr) {}
 
   void _enter_tree() override;
   void _exit_tree() override;
@@ -102,6 +104,26 @@ void GodotAutopilotPlugin::_enter_tree() {
   using godot_autopilot::LogLevel;
 
   s_queue.open();
+  try {
+    auto *engine = godot::Engine::get_singleton();
+    if (!engine) {
+      get_log_system().log(LogLevel::Error, LogCategory::System,
+                           "AutopilotTools singleton not registered: Engine "
+                           "singleton unavailable");
+    } else {
+      if (engine->has_singleton("AutopilotTools")) {
+        engine->unregister_singleton("AutopilotTools");
+      }
+      tools_singleton = memnew(godot_autopilot::AutopilotTools);
+      engine->register_singleton("AutopilotTools", tools_singleton);
+      get_log_system().log(LogLevel::Info, LogCategory::System,
+                           "AutopilotTools singleton registered");
+    }
+  } catch (const std::exception &e) {
+    log_setup_failure("autopilot tools singleton", e);
+  } catch (...) {
+    log_setup_failure("autopilot tools singleton");
+  }
   get_log_system().log(LogLevel::Info, LogCategory::System,
                        "==== Godot Self-Driving plugin starting ====");
   godot_autopilot::runtime_ops::set_editor_queue(
@@ -212,6 +234,15 @@ void GodotAutopilotPlugin::_exit_tree() {
     s_queue.close();
     godot_autopilot::runtime_ops::set_editor_queue(nullptr);
 
+    if (tools_singleton) {
+      auto *engine = godot::Engine::get_singleton();
+      if (engine && engine->has_singleton("AutopilotTools")) {
+        engine->unregister_singleton("AutopilotTools");
+      }
+      memdelete(tools_singleton);
+      tools_singleton = nullptr;
+    }
+
     if (export_guard_.is_valid()) {
       remove_export_plugin(export_guard_);
       export_guard_.unref();
@@ -282,6 +313,7 @@ GDExtensionEntryPoint(GDExtensionInterfaceGetProcAddress p_get_proc_address,
 
         godot::ClassDB::register_class<godot_autopilot::McpLogDock>();
         godot::ClassDB::register_class<godot_autopilot::McpConfigDock>();
+        godot::ClassDB::register_class<godot_autopilot::AutopilotTools>();
         godot::ClassDB::register_class<godot_autopilot::ExportGuard>();
         godot::ClassDB::register_class<GodotAutopilotPlugin>();
         godot::EditorPlugins::add_by_type<GodotAutopilotPlugin>();

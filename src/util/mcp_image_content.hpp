@@ -20,15 +20,10 @@ inline bool is_image_capture_tool(const std::string &tool_name) {
          tool_name == "type_editor_element_text";
 }
 
-inline bool try_attach_image_content(
-    const std::string &tool_name, mcp::JsonValue &result_json,
+inline bool try_attach_image_data(
+    mcp::JsonValue &result_json,
     std::vector<mcp::ContentVariant> &content_out,
     std::string *reason = nullptr) {
-  if (!is_image_capture_tool(tool_name)) {
-    if (reason)
-      *reason = "tool not in image capture whitelist";
-    return false;
-  }
   if (!result_json.IsObject()) {
     if (reason)
       *reason = "result JSON is not an object";
@@ -68,6 +63,18 @@ inline bool try_attach_image_content(
   (*container)["image_attached"] = mcp::JsonValue(true);
   content_out.push_back(mcp::ImageContent{"image", std::move(b64), "image/png"});
   return true;
+}
+
+inline bool try_attach_image_content(
+    const std::string &tool_name, mcp::JsonValue &result_json,
+    std::vector<mcp::ContentVariant> &content_out,
+    std::string *reason = nullptr) {
+  if (!is_image_capture_tool(tool_name)) {
+    if (reason)
+      *reason = "tool not in image capture whitelist";
+    return false;
+  }
+  return try_attach_image_data(result_json, content_out, reason);
 }
 
 } // namespace util
