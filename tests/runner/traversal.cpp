@@ -4,21 +4,19 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <filesystem>
-#include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <string>
 #include <utility>
 
-#ifndef PROJECT_ROOT
-#error "PROJECT_ROOT 编译宏未定义（tests/CMakeLists.txt 已为 gda_test_runner 配置）"
-#endif
-
 namespace {
 
 const char* kModeEmptyArgs = "empty_args";
 const char* kModeHeuristicSmoke = "heuristic_smoke";
+
+const std::vector<std::string> kMetaToolNames = {
+    "ping",      "search_tools",  "list_categories", "get_tool_detail",
+    "call_tool", "batch_execute", "code_execute"};
 
 bool has_error_field(const mcp::JsonValue& j) {
     return j.IsObject() && j.Find("error") != nullptr;
@@ -81,7 +79,6 @@ mcp::JsonValue heuristic_value(const std::string& type) {
     return mcp::JsonValue("test");
 }
 
-// 经 call_tool 元工具代理调用领域工具；崩溃后响应文本可能为空/非 JSON。
 mcp::JsonValue call_domain_tool(gda_test::McpTestClient& client,
                                 const std::string& name,
                                 const mcp::JsonValue& args,
@@ -105,7 +102,7 @@ void print_stats(const std::string& mode, const gda_test::TraversalStats& s,
               << " | result: " << results << " | error: " << errors
               << " | error 含 'missing required': " << missing_req
               << " | 跳过(无 schema properties): " << skipped
-              << " | 排除(副作用): " << s.excluded << "\n";
+              << " | 排除(副作用/可变/dynamic): " << s.excluded << "\n";
     for (const auto& n : s.warnings) {
         std::cout << "  [schema 必填但空参未报错] " << n << "\n";
     }
@@ -113,7 +110,7 @@ void print_stats(const std::string& mode, const gda_test::TraversalStats& s,
         std::cout << "  [响应非 JSON 对象] " << n << "\n";
     }
     for (const auto& n : s.excluded_names) {
-        std::cout << "  [排除-副作用，跳过调用] " << n << "\n";
+        std::cout << "  " << n << "\n";
     }
 }
 
@@ -121,59 +118,31 @@ void print_stats(const std::string& mode, const gda_test::TraversalStats& s,
 
 namespace gda_test {
 
-std::vector<std::string> parse_domain_tool_names() {
-    const std::filesystem::path dir =
-        std::filesystem::path(std::string(PROJECT_ROOT)) / "src" / "tools";
-    if (!std::filesystem::exists(dir) ||
-        !std::filesystem::is_directory(dir)) {
-        throw std::runtime_error("工具源目录不存在或非目录: " + dir.string());
+std::vector<std::string> list_tool_names(McpTestClient& client) {
+    const std::string text = client.call_tool("search_tools", "{}");
+    const mcp::JsonValue parsed = mcp::JsonValue::Parse(text);
+    const mcp::JsonValue* results =
+        parsed.IsObject() ? parsed.Find("results") : nullptr;
+    if (!results || !results->IsArray()) {
+        throw std::runtime_error("search_tools 空 query 未返回 results 数组: " +
+                                 text.substr(0, 300));
     }
     std::vector<std::string> names;
-    for (const auto& entry : std::filesystem::directory_iterator(dir)) {
-        const std::string fname = entry.path().filename().string();
-        if (!entry.is_regular_file() ||
-            entry.path().extension() != ".hpp" ||
-            !(fname.size() >= 10 &&
-              fname.compare(fname.size() - 10, 10, "_tools.hpp") == 0)) {
+    for (const auto& item : results->GetArray()) {
+        if (!item.IsObject())
+            continue;
+        const mcp::JsonValue* name = item.Find("name");
+        if (!name || !name->IsString())
+            continue;
+        const std::string tool_name = name->GetString();
+        if (std::find(kMetaToolNames.begin(), kMetaToolNames.end(),
+                      tool_name) != kMetaToolNames.end()) {
             continue;
         }
-        const std::string file_path = entry.path().string();
-        std::ifstream in(file_path);
-        if (!in.is_open()) {
-            throw std::runtime_error("无法打开 " + file_path);
-        }
-        std::string line;
-        size_t line_no = 0;
-        while (std::getline(in, line)) {
-            ++line_no;
-            const size_t p = line.find("GDA_TOOL_CLASS(");
-            if (p == std::string::npos)
-                continue;
-            const size_t comma = line.find(',', p);
-            if (comma == std::string::npos) {
-                throw std::runtime_error(file_path + ":" +
-                                         std::to_string(line_no) +
-                                         " 含 GDA_TOOL_CLASS( 但缺逗号，无法解析工具名");
-            }
-            const size_t q1 = line.find('"', comma);
-            if (q1 == std::string::npos) {
-                throw std::runtime_error(file_path + ":" +
-                                         std::to_string(line_no) +
-                                         " 缺工具名引号字段，无法解析工具名");
-            }
-            const size_t q2 = line.find('"', q1 + 1);
-            if (q2 == std::string::npos) {
-                throw std::runtime_error(file_path + ":" +
-                                         std::to_string(line_no) +
-                                         " 工具名引号字段未闭合，无法解析工具名");
-            }
-            names.push_back(line.substr(q1 + 1, q2 - q1 - 1));
-        }
+        names.push_back(tool_name);
     }
-    if (names.empty()) {
-        throw std::runtime_error(
-            dir.string() + " 下未解析出任何工具名（未匹配 *_tools.hpp 或 GDA_TOOL_CLASS(）");
-    }
+    if (names.empty())
+        throw std::runtime_error("search_tools 返回空工具清单");
     return names;
 }
 
@@ -185,7 +154,7 @@ TraversalStats run_traversal(McpTestClient& client, const std::string& mode,
     }
     const bool is_empty_args = (mode == kModeEmptyArgs);
 
-    std::vector<std::string> names = parse_domain_tool_names();
+    std::vector<std::string> names = list_tool_names(client);
     if (!is_empty_args) {
         std::sort(names.begin(), names.end());
     }
@@ -205,15 +174,31 @@ TraversalStats run_traversal(McpTestClient& client, const std::string& mode,
         const mcp::JsonValue detail = mcp::JsonValue::Parse(detail_text);
         const auto* tool = detail.IsObject() ? detail.Find("tool") : nullptr;
 
-        // 副作用判定：读取 get_tool_detail 返回的 tool.side_effect，非空即排除
         std::string side_effect;
+        bool is_mutating = false;
+        bool is_dynamic = false;
         if (detail.IsObject() && tool && tool->IsObject()) {
             const auto* se = tool->Find("side_effect");
             if (se && se->IsString())
                 side_effect = se->GetString();
+            const auto* mutating = tool->Find("mutating");
+            if (mutating && mutating->IsBool())
+                is_mutating = mutating->GetBool();
+            const auto* dynamic = tool->Find("dynamic");
+            if (dynamic && dynamic->IsBool())
+                is_dynamic = dynamic->GetBool();
         }
-        if (!side_effect.empty()) {
-            stats.excluded_names.push_back(name);
+        std::string exclude_reason;
+        if (!side_effect.empty() || is_mutating)
+            exclude_reason = "副作用/可变";
+        if (is_dynamic) {
+            exclude_reason = exclude_reason.empty()
+                                 ? "dynamic"
+                                 : exclude_reason + "/dynamic";
+        }
+        if (!exclude_reason.empty()) {
+            stats.excluded_names.push_back("[排除-" + exclude_reason +
+                                           "，跳过调用] " + name);
             ++stats.excluded;
             continue;
         }
@@ -270,9 +255,6 @@ TraversalStats run_traversal(McpTestClient& client, const std::string& mode,
             } else {
                 ++results;
             }
-            // 历史教训：create_scene_node/get_resource_extensions/
-            // reimport_resource_files 带默认值的必填参数不校验 → 仅记 warnings，
-            // 不 FAIL。
             if (!required.empty() && !errored) {
                 stats.warnings.push_back("schema 必填但空参未报错: " + name);
             }
@@ -285,7 +267,6 @@ TraversalStats run_traversal(McpTestClient& client, const std::string& mode,
         } else {
             const auto props = schema_property_types(detail);
             if (props.empty()) {
-                // SCHEMA_NONE / 无 properties：只走空参契约，不冒烟
                 ++skipped;
                 continue;
             }
