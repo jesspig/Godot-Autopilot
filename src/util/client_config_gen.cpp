@@ -33,8 +33,6 @@ bool uses_enabled_field(ClientId id) {
          id == ClientId::KimiCode;
 }
 
-// 顶层 server 映射所在键;ZCode 额外嵌套一层("mcp" -> "servers"),
-// 在 build_top_object / merge_json_config 中单独处理。
 const char *top_key(ClientId id) {
   if (id == ClientId::OpenCode || id == ClientId::Crush) {
     return "mcp";

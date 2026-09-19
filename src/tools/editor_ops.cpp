@@ -56,7 +56,6 @@ std::string relative_path(godot::Node *node, godot::Node *root) {
   return abs_path;
 }
 
-// Error 枚举→名映射（仅 editor_ops 内静态函数，不碰 util/error_util 以免冲突）。
 std::string editor_error_name(godot::Error err) {
   switch (err) {
   case godot::Error::OK:
@@ -162,7 +161,6 @@ std::string editor_error_name(godot::Error err) {
   }
 }
 
-// 数字码配套的可操作提示（保留数字码，仅改善文本，不改行为）。
 std::string editor_error_hint(godot::Error err) {
   switch (err) {
   case godot::Error::ERR_DOES_NOT_EXIST:
@@ -207,9 +205,6 @@ std::string hash_hex(uint64_t value) {
   return std::string(buf);
 }
 
-// 保存成功回执：默认轻量计数（memory_nodes/disk_nodes/nodes_match），
-// 失配或 include_paths 时附 missing_paths，include_hash 时附哈希。
-// 只增字段，不改旧字段；磁盘重读失败只附 verify_error，不推翻 saved。
 void attach_save_receipt(mcp::JsonValue &r, const mcp::JsonValue &args,
                          godot::Node *root, const std::string &res_path) {
   if (!root || res_path.empty())
@@ -841,7 +836,6 @@ mcp::JsonValue handle_file_system_get_resources(const mcp::JsonValue &args) {
     return e;
   }
   godot::EditorFileSystemDirectory *dir = nullptr;
-  // prefix 作子树根过滤（缺省全量兼容）：提供时优先于 path。
   std::string root_path;
   auto *prefix_p = args.Find("prefix");
   auto *pp = args.Find("path");
@@ -1153,8 +1147,6 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue &args) {
     }
     closed_previous = true;
     scene_dirty_tracker::clear_scene_modified();
-    // 多签：close_scene 仅关闭当前签；若仍有邻签占用，get_edited_scene_root()
-    // 仍非空。此时不得进入 add_root_node + 轮询（会空转至超时），须秒级明确失败。
     auto *post_close_root = editor->get_edited_scene_root();
     if (post_close_root) {
       release_unclaimed_node(node, editor);
@@ -1249,9 +1241,6 @@ mcp::JsonValue handle_open_scene(const mcp::JsonValue &args) {
     return e;
   }
   auto *old_root = editor->get_edited_scene_root();
-  // 引擎对「已打开」场景只切标签（editor/editor_node.cpp:4966-4974），请求目标恰为
-  // 当前场景时 _set_current_scene 直接 return（:4701-4704）→ root 指针不变；
-  // 因此以 root 指针是否变化判定成败会把幂等调用误判为失败，须先比对路径。
   godot::String requested_path = godot::String::utf8(path.c_str());
   if (old_root != nullptr && !path.empty()) {
     godot::String open_path = old_root->get_scene_file_path();
@@ -1360,13 +1349,6 @@ mcp::JsonValue handle_save_scene_as(const mcp::JsonValue &args) {
       break;
     }
   }
-  // 存盘后页签仍登记旧路径时必须 close+reopen 重建标签：GDExtension 无页签
-  // 路径登记 API（EditorInterface 仅公开 open/close/save/get_open_scenes，无
-  // EditorData::set_scene_path 等价接口；Node::set_scene_file_path 只改节点
-  // 属性、不更新编辑器页签表，不得冒用），close+reopen 是唯一的同步手段。
-  // 代价是页签焦点可能变化（关闭再打开会切换焦点），为正确性必要代价。
-  // L2 07_scene_tabs / 13_inline_subresource 依赖此语义：无 reopen 时
-  // get_unsaved_scenes 报空路径、reload_editor_scene 报 scene is not open。
   bool tab_rebuilt = false;
   if (!tab_path_registered) {
     godot::Error close_err = editor->close_scene();
@@ -1389,7 +1371,6 @@ mcp::JsonValue handle_save_scene_as(const mcp::JsonValue &args) {
           "get_open_scenes/reload_editor_scene may not see " + path);
     }
   }
-  // 页签重建后编辑器根可能已替换，用最新根做保存回执比对。
   auto *verify_root = editor->get_edited_scene_root();
   if (!verify_root)
     verify_root = root;

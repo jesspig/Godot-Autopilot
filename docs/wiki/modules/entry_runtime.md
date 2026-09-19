@@ -6,7 +6,7 @@ tags:
   - 模块
   - 入口
   - 运行时桥接
-timestamp: "2026-09-18T19:30:00+08:00"
+timestamp: "2026-09-19T17:42:01+08:00"
 resource:
   - src/main.cpp
   - src/runtime/
@@ -193,3 +193,41 @@ resource:
 
 - 详见 [../modules/core.md](../modules/core.md)（命令队列与线程模型）
 - 详见 [../modules/tools_ops_b.md](../modules/tools_ops_b.md)（运行时/调试器工具的 MCP 封装）
+
+## 源码注释归档（2026-09-19）
+
+本批按"代码即文档"约定删除 `src/runtime/` 全部整行 `//` 注释与行内 `/*名字=*/` 标注（`game_bridge.cpp` 18 行、`game_bridge_eval.cpp` 23 行加 7 处行内标注、`game_bridge_input.cpp` 5 行、`game_bridge_verify.cpp` 24 行）。纯复述代码的注释直接删除，有信息量的"为什么"归档如下（行号均为清理前原文行号）：
+
+### game_bridge.cpp
+
+- `1263-1269` 窗口坐标换算：`UiElement` 矩形来自 `Control::get_global_rect()`（画布空间），而注入的 `InputEventMouseButton.position` 必须是窗口客户区坐标——引擎在 `viewport.cpp:_make_input_local` 用 `get_final_transform()` 反变换把窗口坐标换回画布空间，stretch 与 letterbox 边距都在该链上；实现取控件所属视口的 screen transform 再复合其 canvas transform（默认画布 Camera2D / CanvasLayer），无 transform 按恒等处理（正文 §3.1 已记录，此处保留原文要点）。
+- `1305-1306` 响应字段语义：`position`/`viewport_position` 保留画布空间坐标（向后兼容），`window_position` 为实际注入的窗口客户区坐标。
+- `1443-1458` 分发门禁：I7 `eval_assert` 与 eval 共用 `game_runtime` 门禁；I1 采样、I2 证据包、I3 布局校验为只读，无门禁（与 status/capture 同）。
+- `1573-1574` I4 轻量分组与编辑器侧 `DebuggerCapture::get_grouped_errors` 同形。
+- `1668-1669`（P2-1 定界）：`Dump` 输出为 UTF-8 字节，`String(const char*)` 是 latin1 构造会把 CJK 逐字节拆开，必须用 `String::utf8`（与 text_ops/script_ops 同模式）。
+
+### game_bridge_eval.cpp
+
+- `407-414` 启发式内建参数转换：JSON 对象无类型标签，裸 `deserialize()` 得 Dictionary，引擎侧 callv 报 `CALL_ERROR_INVALID_ARGUMENT`；匹配内建值类型的形状做转换，浮点变体（`x`+`y` 即 Vector2），整数变体经方法签名 hint 解析，对象引用标记（`__node_ref__`/`object_id`/`object_id_str`/`class`）原样保留；优先级 Color > Vector4 > Vector3 > Vector2，多余键忽略。
+- `455-458` 逐参类型 hint 取自节点方法表，复用 `set_property` 同一类型化路径（`util::infer_type_hint` 加 `deserialize(arg, hint)`），无类型（NIL）参数回退启发式路径。
+- `546-549` native-bind 失败诊断只做加法：KIND/message 形状保持兼容，调用方以 `diagnosis` + `hint` 附加；零参内建（如 `is_on_wall`/`is_on_floor`）的 MethodBind 哈希可能与实时方法表不一致（与调用路径有关）。
+- `597-598` `classdb_get_method_bind` 所需哈希取自实时方法表的 `id` 字段（与生成绑定烘焙值一致）。
+- `740-742` 直接 GDExtension 调用镜像引擎 `Object::callp` 顺序：先脚本方法，`INVALID_METHOD` 回退 native MethodBind；成功与否只看 `r_error`（void/null 不误报）。
+- 行内标注：删除 7 处 `/*名字=`/`*/`（`bind_found`/`tried_script`/`native_bind_found`/`target`/`parent`/`persist`/`persist_path`），函数签名本身已具名，不损失信息。
+
+### game_bridge_input.cpp
+
+- `31-32` 键名到键码的唯一判定实现在 `src/tools/input_map_ops.cpp`，此处仅跨 TU 前置声明（`input_map_ops.hpp` 只声明工具 handler）。
+- `366-368` 键名判定与编辑器侧 `add_input_map_action_event` 共用同一实现，接受裸名、`KEY_` 前缀（大小写不敏感）、数字码字符串（正文 §3.2 已记录，此处保留原文要点）。
+
+### game_bridge_verify.cpp
+
+- `43-49` 设计约束：单次协议往返（编辑器侧 handler 只做参数校验与转发，等待发生在传输线程，主线程永不阻塞，与 `click_game_ui_element` 的 enumerate+inject 单往返同构，见 [tools_ops_b.md](tools_ops_b.md)）；不碰 `game_bridge_eval.cpp`（eval 复用公开 `op_eval`，协程结果走已有 cancel 句柄释放，避免同一 request_id 双响应）；文本链路全 `String::utf8`（P2-1 定界）。
+- `71/94` I7 断言沙箱用 Expression 语法子集，`base_instance=null`，只能访问 `value` 与内建运算，接触不到场景节点（安全隔离）。
+- `275-276` `evidence_status` 的 healthy/last_activity 在请求时刻恒为真/零：该请求刚激活通道（入口已刷新），与分步 `get_game_status` 编辑器侧 healthy 回退语义一致；`physics_stalled` 需跨调用状态，略去。
+- `401-402` `get_property` 走 raw 取值，断言直接作用于 Variant，无 JSON 往返精度损失（Vector2/Color 等值类型保原类型，`value.x` 可用）。
+- `439-441` 其余动作复用 `op_eval`，对序列化结果推断反序列化后断言（标量/字符串/数组/字典精确，值类型以 `{"x":..}` 字典形态到达，用 `value["x"]` 写法）。
+- `452` `op_eval` 为协程挂起其内部 awaiter 时直接释放，避免同一 request_id 双响应；`eval_assert` 只接受同步结果，协程改用 `start_game_job`/`get_game_job` 观察。
+- `561` `collect_evidence` 只读组合不做自动判定，各节独立失败（与 `review_scene_visually` 同构）。
+- `693` 可见性快照先行过滤不可见与白名单节点，防误报。
+- `780-781` 遮挡启发式按文档序（后者覆盖前者），忽略 canvas_layer/z_index，故 kind 为 `possibly_occluded`、仅 warning。

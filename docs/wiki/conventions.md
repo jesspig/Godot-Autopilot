@@ -6,7 +6,7 @@ tags:
   - 约定
   - 命名
   - 规范
-timestamp: "2026-09-17T22:12:00+08:00"
+timestamp: "2026-09-19T03:31:01+08:00"
 resource: src/
 ---
 
@@ -19,7 +19,7 @@ resource: src/
 - **命名空间**：`godot_autopilot`（工具子命名空间 `<模块>_ops`，如 `godot_autopilot::scene_ops`）
 - **前缀**：核心常量 `GDA_*`（如 `GDA_DEFAULT_PORT`）；运行时协议 `gda:*`；导出宏 `GDA_EXPORT`
 - **产物与目录**：CMake 目标 `godot-autopilot`，部署到 `Example/addons/godot-autopilot/`
-- **工具命名**：约定 `<动词>_<类别>_<维度>_<对象>_<修饰>`（snake_case，**以动词置首为主导**，如 `create_scene_node`、`intersect_physics_2d_ray`、`set_input_map_action_deadzone`）；385 个工具名段数随粒度自然变化（2-8 段，如 `read_file` / `add_physics_3d_body_collision_exception`），`signal_connect`/`property_set` 等少量短名为规范内保留的名词前置形态
+- **工具命名**：约定 `<动词>_<类别>_<维度>_<对象>_<修饰>`（snake_case，**以动词置首为主导**，如 `create_scene_node`、`intersect_physics_2d_ray`、`set_input_map_action_deadzone`）；391 个工具名段数随粒度自然变化（2-8 段，如 `read_file` / `add_physics_3d_body_collision_exception`），`signal_connect`/`property_set` 等少量短名为规范内保留的名词前置形态
 - **头文件 include guard**：`GODOT_AUTOPILOT_<MODULE>_HPP`
 
 ## 日志
@@ -42,18 +42,20 @@ resource: src/
 
 ## 添加工具流程
 
-`ToolRegistry` 单一来源（无 `tool_defs.def`）：
+`ToolRegistry` 单一来源 + 全量 `ToolSpec` 数据记录（无 `tool_defs.def`、无宏/真类；设计见 [tool_base_design.md](tool_base_design.md)）：
 
-1. `<category>_ops.hpp` 声明 `mcp::JsonValue handle_xxx(const mcp::JsonValue& args);`
-2. `<category>_ops.cpp` 实现（返回 `{"error": ...}` 或结果对象）
-3. 该域 `<category>_tools.hpp` 用 `GDA_TOOL_CLASS`（有副作用用 `GDA_TOOL_CLASS_SIDE`）声明独立 ToolBase 子类并入 `make_tools()`——`register_all.cpp` 自动注册，无需手改；schema 由 `tool_input_schema(name, basic)` 单一源（转发 `build_schema_for`，`basic` 参数保留签名但已为 no-op）
-4. `CMakeLists.txt` `add_library()` 添加 `.cpp`（header-only 则无需）；带副作用（枚举 `SideEffect` 选值）用 `GDA_TOOL_CLASS_SIDE` 标记即自动进入遍历排除，无需手改 `tests/runner/traversal.cpp`
+1. `<域>_ops.hpp` 声明 `mcp::JsonValue handle_xxx(const mcp::JsonValue& args);`
+2. `<域>_ops.cpp` 实现（返回 `{"error": ...}` 或结果对象；取参用 `Args(raw, kXxxParams)` 的 opt_/require_/get_ 系列，必要时 `reject_unknown()` 拒未知键）
+3. 该域 `<域>_tools.hpp`：定义 `const std::vector<ParamSpec> kXxxParams = {...}` 参数表，并在 `make_tools()` 中以 `v.push_back(make_spec_tool(ToolSpec{name, description, category, {tags}, side_effect, flags, kXxxParams, handler}))` 一行注册——`register_all.cpp` 经各域 `make_tools()` 自动注册，无需手改；schema 从参数表自动派生（仅嵌套结构才用 `raw_schema` 手写 JSON）
+4. `side_effect`（`SideEffect` 枚举选值）与 `flags`（如 `kMutating`）按工具实际影响声明即自动进入遍历排除，无需手改 `tests/runner/traversal.cpp`；合成输入类可加 `kObserve` 复用执行管线的截图后处理
+5. 仅新增 `.cpp` 才需动 `CMakeLists.txt:65` 的 `add_library()`（header-only 无需）；迁移守卫 `tests/guard/` 拒绝旧宏（`GDA_TOOL_CLASS` 等）与 `schema_*_ops.cpp` 残留
 
 ## 测试纪律
 
 - L1（`gda_unit_tests`）禁止调用任何已注册工具 handler（无引擎时 godot-cpp 接口指针为 nullptr 会崩溃），只能测注册/分发/错误路径
 - 子代理迭代：只写代码不编译，主代理统一 configure + build 再分批跑测试（并行编译会锁）
 - 新增 `src/*.cpp` 同步更新 `tests/CMakeLists.txt` 的 `GDA_UNIT_BUSINESS_SOURCES`
+- 计数口径（L1 gtest 数、L2 `tests/config/*.json` 份数、ctest 注册点、遍历候选/步骤数）以运行时统计为准；迁移守卫经 `ctest --preset debug -R migration_guard` 零依赖运行
 
 ## 能力边界（08-20 确立）
 

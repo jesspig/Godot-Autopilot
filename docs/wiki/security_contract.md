@@ -6,12 +6,12 @@ tags:
   - 安全
   - 并发
   - 契约
-timestamp: "2026-09-17T07:09:53+08:00"
+timestamp: "2026-09-19T03:31:01+08:00"
 resource:
   - src/core/server_context.cpp
   - src/core/command_queue.hpp
   - src/tools/tool_base.hpp
-  - src/tools/meta_tools.hpp
+  - src/tools/tool_spec.hpp
 ---
 
 # T0 安全边界与并发契约
@@ -33,7 +33,7 @@ resource:
 
 ## 3. 高风险工具分类
 
-工具风险必须可从 `get_tool_detail` 的 `side_effect` 字段识别；新增会产生同类影响的工具必须标记 `GDA_TOOL_CLASS_SIDE`，不得依赖调用方自行猜测。
+工具风险必须可从 `get_tool_detail` 的 `side_effect` 字段识别；新增会产生同类影响的工具必须在 `ToolSpec` 声明对应 `side_effect`（如 `SideEffect::WritesFile`）并按需加 `tool_flags::kMutating`，不得依赖调用方自行猜测。
 
 | 风险类 | 机器可读标记/范围 | 处理要求 |
 |---|---|---|
@@ -47,7 +47,7 @@ resource:
 
 只读工具也必须遵守路径、结果大小和主线程条款；“无副作用”不等于“无需限制”。
 
-近期新增工具的分级（09-13）：`copy_resource_file` 注册为 `GDA_TOOL_CLASS_SIDE` + `SideEffect::WritesFile`（可覆盖已存在的 `dest_path`，属写文件类，须先确认路径在工程范围内）；`reload_resource` 未标记 `SideEffect`（仅以 `ResourceLoader CACHE_MODE_REPLACE` 刷新编辑器资源缓存，不写盘），其余约束仍按只读工具处理。
+近期新增工具的分级（09-13）：`copy_resource_file` 注册为 `SideEffect::WritesFile` + `tool_flags::kMutating`（可覆盖已存在的 `dest_path`，属写文件类，须先确认路径在工程范围内）；`reload_resource` 未声明 `SideEffect`（仅以 `ResourceLoader CACHE_MODE_REPLACE` 刷新编辑器资源缓存，不写盘），其余约束仍按只读工具处理。
 
 09-15 新增 13 个工具的分级：7 个编辑器 UI/输入工具（`click_editor_element`、`type_editor_element_text`、`run_editor_shortcut`、`click_input_mouse`、`scroll_input_mouse`、`drag_input_mouse`、`type_input_text`）标记 `ModifiesWindow`（`modifies_window` 清单 12→19，会移动物理光标并注入桌面输入）；游戏侧 `click_game_ui_element` 标记 `GameRuntime`（`game_runtime` 清单 5→6）；其余 5 个只读查询工具（`get_display_window_rect`、`get_scene_node_screen_rect`、`get_editor_viewport_geometry`、`get_editor_ui_elements`、`hit_test_editor_point`）不标副作用，仍按只读工具的路径/大小/主线程条款处理。本批未新增授权能力门（`ModifiesWindow` 不在 `code_execute`/`game_runtime`/`process` 能力集）。
 
@@ -56,9 +56,9 @@ resource:
 高风险能力除 `side_effect` 标记外还受调用级授权门约束，检查发生在**每次工具调用**（无缓存）：
 
 - 解析优先级：`GODOT_AUTOPILOT_ALLOW` 环境变量（逗号分隔，`all` 全放行）> 插件配置 `user://godot_autopilot/config.json` 的 `allow` 键 > **默认拒绝**；环境变量一旦设置即完全覆盖持久化配置。
-- 能力名与工具映射（`tool_base.hpp:capability_for_tool`）：`code_execute`（`code_execute`、`execute_script`）、`game_runtime`（`execute_game_script`、`start_game_job`、`reload_game_scripts`、`queue_game_input`、`wait_game_input`、`sequence_game_inputs`、`click_game_ui_element`）、`process`（`SideEffect::Process` 标记的 6 个：`build_csharp_assembly`、`create_os_process`、`execute_os_process`、`kill_os_process`、`open_os_path`、`set_os_environment`）。
+- 能力名与工具映射（`tool_base.hpp:capability_for_tool`）：`code_execute`（`code_execute`、`execute_script`）、`game_runtime`（`execute_game_script`、`start_game_job`、`reload_game_scripts`、`queue_game_input`、`wait_game_input`、`sequence_game_inputs`、`click_game_ui_element`）、`process`（`SideEffect::Process` 标记的 6 个：`build_csharp_assembly`、`create_os_process`、`execute_os_process`、`kill_os_process`、`open_os_path`、`set_os_environment`）；另有独立于 `capability_for_tool` 的 `user_tools` 能力，由 `AutopilotTools`（用户脚本动态工具，`autopilot_tools.cpp`）在注册与调用两侧检查——未授权时注册拒绝、调用返回 `user_tools` 授权错误。
 - 拒绝响应含 `error`、`authorization_required`（能力名）与 `enable`（启用指引）三个字段，并写 Warning 日志（Tools 类，可经 `get_plugin_log` 读取）。
-- 启用入口：环境变量（须重启引擎）或配置 `allow` 键；MCP Config 面板的 "Allow code_execute" 与 "Allow game_runtime" 复选框分别管理对应能力，勾选/取消经 `authorization::allow_list_add`/`allow_list_remove`（`add` 对已生效项含 `all` 保持原样；`remove` 先把 `all` 展开为全部已知能力再逐项删除），写入配置后下一次调用生效、无需重启。`process` 无面板开关，仍须环境变量或手改 `allow` 键。拒绝响应的 `enable` 文案只对 `code_execute`/`game_runtime` 提及 dock（`capability_has_dock_toggle`），`process` 仅给环境变量 + 重启指引。
+- 启用入口：环境变量（须重启引擎）或配置 `allow` 键；MCP Config 面板的 "Allow code_execute"、"Allow game_runtime" 与 "Allow user tools" 复选框分别管理对应能力，勾选/取消经 `authorization::allow_list_add`/`allow_list_remove`（`add` 对已生效项含 `all` 保持原样；`remove` 先把 `all` 展开为全部已知能力再逐项删除），写入配置后下一次调用生效、无需重启。`process` 无面板开关，仍须环境变量或手改 `allow` 键。拒绝响应的 `enable` 文案只对 `code_execute`/`game_runtime`/`user_tools` 提及 dock（`capability_has_dock_toggle`），`process` 仅给环境变量 + 重启指引。
 
 ## 4. Godot API 与线程
 

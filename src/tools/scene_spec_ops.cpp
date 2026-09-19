@@ -23,7 +23,6 @@ namespace scene_spec_ops {
 
 namespace {
 
-// 与 create_scene_node 同规则：节点名拒绝 '/' 与 ':'，避免路径歧义。
 bool spec_name_is_valid(const std::string &name) {
   return !name.empty() && name.find('/') == std::string::npos &&
          name.find(':') == std::string::npos;
@@ -35,7 +34,6 @@ mcp::JsonValue spec_error(const std::string &msg) {
   return e;
 }
 
-// 与 scene_ops.cpp 的 scene_relative_path 同语义（独立命名，避免 Unity 构建合并同名符号）。
 std::string spec_relative_path(godot::Node *node, godot::Node *scene_root) {
   if (!node)
     return "";
@@ -50,8 +48,6 @@ std::string spec_relative_path(godot::Node *node, godot::Node *scene_root) {
   return abs_path;
 }
 
-// 与 create_scene_node 同模式：OBJECT 型属性（贴图、脚本、子资源等）先行，
-// 避免依赖值在资源未就绪时被引擎丢弃（如先设 animation 后设 sprite_frames 会被重置）。
 bool spec_prop_is_object_typed(const godot::Node *node,
                                const std::string &prop_name,
                                const mcp::JsonValue &raw_value) {
@@ -88,7 +84,6 @@ void spec_read_node_fields(const mcp::JsonValue &spec, std::string &type,
     name = n->GetString();
 }
 
-// 纯校验递归：不写场景，只读 ClassDB。loc 为调试定位串，如 spec.children[1]。
 bool spec_validate_node(const mcp::JsonValue &spec, int depth, int &count,
                         int &max_depth_seen, const std::string &loc,
                         godot::ClassDBSingleton *cdbs, std::string &error) {
@@ -156,7 +151,6 @@ bool spec_validate_node(const mcp::JsonValue &spec, int depth, int &count,
   return true;
 }
 
-// 校验通过后收集 dry_run 预览清单：路径为 parent_path 拼接预测名。
 void spec_collect_preview(const mcp::JsonValue &spec, const std::string &parent_rel,
                           mcp::JsonValue &out) {
   std::string type, name;
@@ -178,7 +172,6 @@ void spec_collect_preview(const mcp::JsonValue &spec, const std::string &parent_
   }
 }
 
-// 经 property_set 同转换链应用单个节点属性，收集 warning；失败返回 false。
 bool spec_apply_props(godot::Node *node, const mcp::JsonValue &props,
                       const std::string &node_rel, const std::string &loc,
                       int64_t &applied_count,
@@ -229,8 +222,6 @@ bool spec_apply_props(godot::Node *node, const mcp::JsonValue &props,
   return true;
 }
 
-// 自顶向下建单节点并递归子节点：挂接后立刻设 owner 为场景根（根节点自身除外），
-// 落盘时 PackedScene 才不会静默丢弃。任一步失败返回 false，由顶层统一回滚整棵子树。
 bool spec_build_node(const mcp::JsonValue &spec, godot::Node *parent,
                      godot::Node *scene_root, const std::string &loc,
                      godot::ClassDBSingleton *cdbs,
@@ -279,7 +270,6 @@ bool spec_build_node(const mcp::JsonValue &spec, godot::Node *parent,
   return true;
 }
 
-// 显式自底向上释放子树，不依赖析构语义；调用前顶层节点已从父节点摘除。
 void spec_free_subtree(godot::Node *top) {
   if (!top)
     return;
@@ -293,7 +283,6 @@ void spec_free_subtree(godot::Node *top) {
   memdelete(top);
 }
 
-// 整体回滚：摘除顶层已建节点并释放整棵子树，场景无残留。
 void spec_rollback_subtree(godot::Node *top) {
   if (!top)
     return;
@@ -394,8 +383,6 @@ mcp::JsonValue handle_build_from_spec(const mcp::JsonValue &args) {
   std::string build_error;
   bool built_ok = false;
   try {
-    // 顶层节点先挂接（成根走 add_root_node，否则挂 parent 并设 owner 为场景根），
-    // 后续 props 与 children 走统一流程，任一步失败整体回滚。
     godot::Variant obj_var =
         cdbs->instantiate(godot::StringName(type.c_str()));
     top = godot::Object::cast_to<godot::Node>(obj_var);
@@ -469,7 +456,6 @@ mcp::JsonValue handle_build_from_spec(const mcp::JsonValue &args) {
     return e;
   }
 
-  // 与 create_scene_node 对齐：按顶层类型切换 2D/3D 主屏。
   if (scene_root) {
     godot::StringName top_sn(type.c_str());
     if (cdbs->is_parent_class(top_sn, godot::StringName("Node2D"))) {
@@ -499,7 +485,6 @@ mcp::JsonValue handle_build_from_spec(const mcp::JsonValue &args) {
     inner["property_warnings"] = std::move(warnings_arr);
   }
   inner["rolled_back"] = mcp::JsonValue(false);
-  // 成根时 delete_scene_node 会拒删根节点，撤销提示改为关场景。
   inner["undo"] = mcp::JsonValue(
       top_becomes_root
           ? "close scene " + result_path + " without saving (close_editor_scene)"

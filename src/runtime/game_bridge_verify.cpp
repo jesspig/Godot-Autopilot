@@ -40,14 +40,6 @@
 #include <unordered_map>
 #include <vector>
 
-// 游戏侧只读验证组合（I1 采样 / I7 断言 / I2 证据包 / I3 布局校验）。
-// 设计约束：
-// - 单次协议往返：编辑器侧 handler 只做参数校验与转发，等待发生在传输线程，
-//   主线程永不阻塞（与 click_game_ui_element 的 enumerate+inject 单往返同构）。
-// - 不碰 game_bridge_eval.cpp：eval 复用公开的 op_eval；协程结果走已有
-//   cancel 句柄释放，避免同一 request_id 双响应。
-// - 文本链路全 String::utf8（latin1 构造会逐字节破坏 CJK，见 P2-1 定界）。
-
 namespace godot_autopilot {
 namespace runtime {
 namespace game_bridge {
@@ -67,8 +59,6 @@ double json_number(const JV &value) {
   return value.IsInt() ? static_cast<double>(value.GetInt())
                        : value.GetDouble();
 }
-
-// ---- I7：assert 沙箱求值（Expression 语法子集，base=null，仅绑定 value） ----
 
 JV evaluate_assert_expression(const std::string &assert_expr,
                               const godot::Variant &value, bool &out_pass) {
@@ -91,7 +81,6 @@ JV evaluate_assert_expression(const std::string &assert_expr,
   }
   godot::Array inputs;
   inputs.push_back(value);
-  // base_instance=null：断言只能访问 value 与表达式内建运算，接触不到场景节点。
   godot::Variant outcome = expr->execute(inputs, nullptr, false);
   if (expr->has_execute_failed()) {
     JV body = error_result("eval_assert assert expression failed to evaluate: " +
@@ -126,8 +115,6 @@ void release_armed_eval_awaiter(int64_t request_id) {
   g_cancel_handlers.erase(it);
   handler();
 }
-
-// ---- I1：属性采样 awaiter（_process 计数，interval 降频） ----
 
 class GameBridgeSampleAwaiter : public godot::Node {
   GDCLASS(GameBridgeSampleAwaiter, godot::Node)
@@ -259,8 +246,6 @@ private:
   }
 };
 
-// ---- I2：证据包状态段（与 op_status 同字段；healthy/last_activity 在请求时刻恒为真/零） ----
-
 JV evidence_status() {
   JV r(JV::object_tag);
   auto *engine = godot::Engine::get_singleton();
@@ -272,8 +257,6 @@ JV evidence_status() {
     r["fps"] = JV(engine->get_frames_per_second());
     r["physics_frame"] = JV(static_cast<int64_t>(engine->get_physics_frames()));
   }
-  // 该请求刚刚激活了通道（on_gda_message 入口已刷新），与分步 get_game_status
-  // 的编辑器侧 healthy 回退语义一致；physics_stalled 需跨调用状态，略去。
   r[GDA_FIELD_LAST_ACTIVITY_MS] = JV(static_cast<int64_t>(0));
   r[GDA_FIELD_HEALTHY] = JV(true);
   if (auto *tree = get_scene_tree()) {
@@ -291,8 +274,6 @@ JV evidence_status() {
   }
   return r;
 }
-
-// ---- I3：布局校验（自有 Control  walk，与 walk_ui_elements 同枚举口径） ----
 
 struct ValidateElement {
   std::string path;
@@ -398,8 +379,6 @@ JV op_eval_with_assert(const JV &params, int64_t request_id) {
   const std::string action =
       (action_p && action_p->IsString()) ? action_p->GetString() : std::string();
 
-  // get_property 走 raw 取值：断言直接作用于 Variant，无 JSON 往返精度损失
-  //（Vector2/Color 等值类型保持原类型；value.x 写法可用）。
   if (action == "get_property") {
     const auto *path_p = params.Find("node_path");
     const auto *prop_p = params.Find("property");
@@ -436,9 +415,6 @@ JV op_eval_with_assert(const JV &params, int64_t request_id) {
     return body;
   }
 
-  // 其余动作复用 op_eval；同步完成时对序列化结果做推断反序列化后断言
-  //（标量/字符串/数组/字典精确；Vector2 等值类型以 {"x":..,"y":..} 字典形态
-  // 到达，请用 value["x"] 写法）。
   JV stripped(JV::object_tag);
   if (params.IsObject()) {
     for (const auto &entry : params.GetObject()) {
@@ -449,7 +425,6 @@ JV op_eval_with_assert(const JV &params, int64_t request_id) {
   }
   JV body = op_eval(stripped, request_id);
   if (body.IsNull()) {
-    // op_eval 已为协程挂起其内部 awaiter；直接释放，避免同一 request_id 双响应。
     release_armed_eval_awaiter(request_id);
     return error_result(
         "eval_assert requires a synchronous eval result, but the script/method "
@@ -558,7 +533,6 @@ JV op_collect_evidence(const JV &params, int64_t request_id) {
                           std::to_string(err_limit));
   }
 
-  // 只读组合，不做自动判定；各节独立失败（与 review_scene_visually 同构）。
   JV out(JV::object_tag);
   if (want_status) {
     out["status"] = evidence_status();
@@ -690,7 +664,6 @@ JV op_validate_ui_layout(const JV &params) {
   int order = 0;
   walk_validate_elements(root, 0, max_elements, elements, truncated, order);
 
-  // 可见性快照（白名单与不可见节点先行过滤，防误报）。
   struct VisibleItem {
     ValidateElement element;
     godot::Node *node = nullptr;
@@ -777,8 +750,6 @@ JV op_validate_ui_layout(const JV &params) {
     }
   }
 
-  // 遮挡启发式：文档序在后的可见控件覆盖在前者之上（忽略 canvas_layer/z_index，
-  // 故 kind 为 possibly_occluded，仅 warning）。
   for (size_t i = 0; i < visible.size(); i++) {
     const ValidateElement &lower = visible[i].element;
     if (lower.w <= 0.0 || lower.h <= 0.0)

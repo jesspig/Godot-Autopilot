@@ -2,6 +2,13 @@
 
 > 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天。
 
+## 2026-09-19
+
+- **ToolSpec 数据化重构 + 文档终态**：391 域工具 + `system_status` + 7 元工具全量改为 `ToolSpec` 数据记录（删除 `GDA_TOOL_CLASS` 宏/真类、`fn_tool.hpp`/`meta_tools.hpp`/`IMetaTool`、8 个 `schema_*_ops.cpp`/`schema_fills.hpp`/`tool_input_schema`）；新增 `tool_args`/`tool_pipeline`/`dynamic_spec_store`/`autopilot_tools`（用户脚本动态工具 + `user_tools` 授权门）与 `tests/guard/` 迁移守卫；L1 243→255、L2 26→27 份（`26_user_tools_code_mode`）、`ctest -E "^gda_runner_"` 256 项；遍历改为运行时枚举 392 条后按 `side_effect`/`mutating`/`dynamic` 排除（330 个进入两步骤，实测全过）；99 号诊断用例删除；wiki 11 页同步。详见 `changelog/2026-09-19-log.md`
+- **收尾第二轮（traits/invoke/rescan/batch，零代码）**：traits 终态（`kCaptureImage` 9/`kSceneTarget` 25/`kUndoable` 10）+ `tool_invoke`（深度 8）+ `rescan` + `batch_execute` 变量串联；L1 255→269（3 文件 14 项）、L2 27→28 份（`27_user_tools_rescan`）、ctest 283→298（298/298 全绿）；`Example/.gitignore` 白名单放行 `user_tools_samples/echo_tool.gd(.cs)`（C# 文档级，未经 CI 验证）。详见 `changelog/2026-09-19-log.md`
+- **示例目录迁移**：`Example/user_tools_samples/` → `samples/user-tools/`（`Example/` 为 L2 测试工程、示例属噪声；`Example/.gitignore` 白名单同步撤销；引用路径已全仓更新）。详见 `changelog/2026-09-19-log.md`
+- **源码注释清理**：执行 2026-08-12"不写注释"约定，删除 `src/` 241 行整行 `//`（+ 约 5 处行内 `/*名字=*/`）与 `tests/` 236 行整行 `//`（+ 14 处行尾 `//`），`// namespace` 结尾标记 500 处保留；有信息量解释移植进 wiki（`entry_runtime` 22 条/`tools_ops_a` 15 条等）；新增 `tests/guard/comment_guard.py` 防回退守卫；构建 OK、L1 `ctest -E "^gda_runner_"` 271/271 全绿、`src`/`tests` 整行 `//` 归零。详见 `changelog/2026-09-19-log.md`
+
 ## 2026-09-18
 
 - **CJK 传输链收敛批次**：14 处 latin1 构造改 UTF-8＋诊断透传＋L2-20 新用例；L1 单测方案纠偏回退；L1 243/243、19/20 与 live 25 步会话全绿。详见 `changelog/2026-09-18-log.md`

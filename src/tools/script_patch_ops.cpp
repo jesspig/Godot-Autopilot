@@ -44,7 +44,6 @@ std::string truncate_echo(const std::string &text, size_t limit) {
          std::to_string(text.size()) + " bytes)";
 }
 
-// 取编辑点前后各 CONTEXT_RADIUS 字节，越界处加 "..." 标记。
 std::string context_around(const std::string &text, size_t pos, size_t len) {
   size_t begin = pos > CONTEXT_RADIUS ? pos - CONTEXT_RADIUS : 0;
   size_t end = pos + len + CONTEXT_RADIUS;
@@ -76,7 +75,6 @@ bool read_disk_text(const std::string &path, std::string &out_text,
   return true;
 }
 
-// 尽力恢复原文（原文在内存中，出错路径调用；成功与否由返回值+error_out回报）。
 bool restore_disk_text(const std::string &path, const std::string &original,
                        std::string &error_out) {
   auto writer = godot::FileAccess::open(godot::String(path.c_str()),
@@ -85,7 +83,6 @@ bool restore_disk_text(const std::string &path, const std::string &original,
     error_out = "rollback failed: cannot reopen file for writing: " + path;
     return false;
   }
-  // 与写盘路径同款 UTF-8 构造，原文读回是什么字节就写回什么字节。
   if (!writer->store_string(godot::String::utf8(original.c_str()))) {
     error_out = "rollback failed: could not restore original content: " + path;
     return false;
@@ -108,7 +105,6 @@ bool save_patched_script(const std::string &path, const std::string &patched,
   }
   script->set_source_code(godot::String::utf8(patched.c_str()));
   script->set_path_cache(godot::String(path.c_str()));
-  // 编译门已在调用前通过；此处防御性复查，避免带坏文件落盘。
   if (script->reload() != godot::OK) {
     error_out = "script compilation failed on save; no file was written";
     return false;
@@ -197,7 +193,6 @@ mcp::JsonValue handle_patch(const mcp::JsonValue &args) {
         "'). No file was written.");
   }
 
-  // 多处命中只改第一处，并在响应中如实回报 anchor_occurrences 供调用方复核。
   std::string patched;
   size_t edit_pos = anchor_pos;
   if (is_replace) {
@@ -262,8 +257,6 @@ mcp::JsonValue handle_patch(const mcp::JsonValue &args) {
     return r;
   }
 
-  // 编译门（与 create_script 共用 script_ops::try_compile_source）：
-  // 先编译后保存，失败零写盘，无需回滚。
   std::string compile_error;
   if (!script_ops::try_compile_source(patched, path, compile_error)) {
     return util::error_json(compile_error + " No file was written.");
@@ -310,8 +303,6 @@ mcp::JsonValue handle_patch(const mcp::JsonValue &args) {
     write_issue = "readback open failed";
   }
 
-  // 回读失败即回滚原文，不留半写文件；沿 create_script 口径仍以 result
-  //（verified=false + write_issue/warning）回报，而非 error。
   bool rolled_back = false;
   std::string rollback_error;
   if (!verified) {
