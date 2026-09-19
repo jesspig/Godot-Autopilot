@@ -19,7 +19,7 @@ void add_required_flag(mcp::JsonValue &schema, const std::string &name) {
   }
 }
 
-mcp::JsonValue build_schema(std::initializer_list<ParamDef> params) {
+mcp::JsonValue build_schema(const std::vector<ParamDef> &params) {
   mcp::JsonValue s(mcp::JsonValue::object_tag);
   s["type"] = mcp::JsonValue("object");
   s["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);
@@ -29,7 +29,7 @@ mcp::JsonValue build_schema(std::initializer_list<ParamDef> params) {
   if (!props || !props->IsObject())
     return s;
 
-  for (auto &p : params) {
+  for (const auto &p : params) {
     mcp::JsonValue prop(mcp::JsonValue::object_tag);
     prop["type"] = mcp::JsonValue(p.type);
     if (!p.description.empty()) {
@@ -43,6 +43,10 @@ mcp::JsonValue build_schema(std::initializer_list<ParamDef> params) {
   }
 
   return s;
+}
+
+mcp::JsonValue build_schema(std::initializer_list<ParamDef> params) {
+  return build_schema(std::vector<ParamDef>(params));
 }
 
 } // namespace schema
