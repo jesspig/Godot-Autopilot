@@ -32,7 +32,6 @@ constexpr auto kPollInterval = std::chrono::milliseconds(200);
 constexpr auto kConnectProbeTimeout = std::chrono::seconds(5);
 constexpr auto kIoTimeoutMs = 5000;
 
-// WSA 启动/清理 RAII：所有 Winsock 操作前构造，避免重复初始化计数错乱
 class WsaGuard {
 public:
   WsaGuard() { WSAStartup(MAKEWORD(2, 2), &data_); }
@@ -48,14 +47,12 @@ std::string trim(const std::string &s) {
     return "";
   const auto last = s.find_last_not_of(" \t\r\n");
   std::string out = s.substr(first, last - first + 1);
-  // 键值可带引号，剥离首尾成对双引号
   if (out.size() >= 2 && out.front() == '"' && out.back() == '"') {
     out = out.substr(1, out.size() - 2);
   }
   return out;
 }
 
-// .env 解析：KEY=VALUE 格式，跳过空行与 # 注释
 std::string read_env_file_key(const std::string &key) {
   std::ifstream file(std::string(PROJECT_ROOT) + "/.env");
   if (!file)
@@ -75,7 +72,6 @@ std::string read_env_file_key(const std::string &key) {
   return "";
 }
 
-// 随机空闲端口：bind 127.0.0.1:0 由系统分配，取回后立即关闭
 int pick_free_port() {
   WsaGuard wsa;
   SOCKET s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -115,7 +111,6 @@ bool tcp_port_open(int port) {
   return open;
 }
 
-// MCP initialize 握手：POST /mcp 发 JSON-RPC initialize，响应含 serverInfo 即确认
 bool mcp_initialize_handshake(int port) {
   WsaGuard wsa;
   SOCKET s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -126,7 +121,6 @@ bool mcp_initialize_handshake(int port) {
   addr.sin_addr.s_addr = inet_addr("127.0.0.1");
   addr.sin_port = htons(static_cast<u_short>(port));
 
-  // 非阻塞 connect + select，5s 超时
   u_long nonblock = 1;
   ioctlsocket(s, FIONBIO, &nonblock);
   if (connect(s, reinterpret_cast<const sockaddr *>(&addr), sizeof(addr)) != 0) {
@@ -166,7 +160,6 @@ bool mcp_initialize_handshake(int port) {
     return false;
   }
 
-  // 阻塞 recv + 5s 读超时（服务器可能保持连接，超时退出而非挂死）
   DWORD timeout_ms = kIoTimeoutMs;
   setsockopt(s, SOL_SOCKET, SO_RCVTIMEO,
              reinterpret_cast<const char *>(&timeout_ms), sizeof(timeout_ms));
@@ -182,7 +175,6 @@ bool mcp_initialize_handshake(int port) {
   return resp.find("serverInfo") != std::string::npos;
 }
 
-// 独立读线程持续消费管道，防 64KB 缓冲写满阻塞子进程
 void pipe_read_loop(HANDLE read_pipe, std::mutex &mutex, std::string &buffer) {
   char buf[4096];
   DWORD read = 0;
@@ -200,7 +192,6 @@ bool create_pipe_pair(HANDLE &read_side, HANDLE &write_side) {
   return true;
 }
 
-// CreateProcess 启动，stdout/stderr 各接一条管道；stdin 兜底接 NUL
 bool launch_process(const std::string &cmdline, PROCESS_INFORMATION &pi,
                     HANDLE &stdout_read, HANDLE &stderr_read) {
   HANDLE stdout_write = nullptr;
@@ -325,7 +316,6 @@ struct GodotProcess::Impl {
 
 namespace {
 
-// 挂接进程句柄并启动两条日志读线程；须在等待/轮询前调用，避免管道缓冲阻塞
 void attach_process(GodotProcess::Impl &impl, PROCESS_INFORMATION &pi) {
   impl.process = pi.hProcess;
   CloseHandle(pi.hThread);
@@ -338,7 +328,6 @@ void attach_process(GodotProcess::Impl &impl, PROCESS_INFORMATION &pi) {
                   std::ref(impl.stderr_buf));
 }
 
-// 收拢进程：已退出则跳过强杀；句柄/线程 RAII 回收
 void close_process(GodotProcess::Impl &impl) {
   if (!impl.process)
     return;
@@ -396,7 +385,6 @@ bool GodotProcess::start(std::chrono::seconds ready_timeout) {
   const std::string headless_flag = impl_->headless ? "--headless " : "";
   PROCESS_INFORMATION pi{};
 
-  // 首次 --import：幂等同步执行，失败/超时不致命，记日志继续
   {
     const char *force_key = "GDA_FORCE_HEADLESS";
     char force_buf[64] = {0};
@@ -428,7 +416,6 @@ bool GodotProcess::start(std::chrono::seconds ready_timeout) {
     restore_force_env();
   }
 
-  // 常驻启动：临时注入端口环境变量，CreateProcess 继承后恢复
   const char *port_key = "GODOT_AUTOPILOT_PORT";
   char old_buf[64] = {0};
   const DWORD old_len =
@@ -466,7 +453,6 @@ bool GodotProcess::start(std::chrono::seconds ready_timeout) {
   restore_port_env();
   restore_force_env();
 
-  // 就绪轮询：TCP 探测成功后再做 MCP initialize 握手确认
   const auto deadline = std::chrono::steady_clock::now() + ready_timeout;
   bool ready = false;
   while (std::chrono::steady_clock::now() < deadline) {
@@ -489,7 +475,6 @@ bool GodotProcess::start(std::chrono::seconds ready_timeout) {
 void GodotProcess::stop() {
   if (!impl_->process)
     return;
-  // 软杀优先：taskkill → 等 5s → TerminateProcess 兜底
   if (WaitForSingleObject(impl_->process, 0) == WAIT_TIMEOUT) {
     run_taskkill(GetProcessId(impl_->process));
     if (WaitForSingleObject(impl_->process, kExitGraceSeconds * 1000) ==

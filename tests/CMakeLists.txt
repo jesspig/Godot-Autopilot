@@ -55,6 +55,9 @@ set(GDA_UNIT_BUSINESS_SOURCES
     ${CMAKE_SOURCE_DIR}/src/tools/dispatch.cpp
     ${CMAKE_SOURCE_DIR}/src/tools/debugger_access.cpp
     ${CMAKE_SOURCE_DIR}/src/tools/editor_ui_actions.cpp
+    ${CMAKE_SOURCE_DIR}/src/tools/tool_args.cpp
+    ${CMAKE_SOURCE_DIR}/src/tools/tool_pipeline.cpp
+    ${CMAKE_SOURCE_DIR}/src/tools/tool_invoke.cpp
     ${GDA_TOOLS_OPS_SOURCES})
 
 # ====================================================================
@@ -126,3 +129,15 @@ foreach(cfg ${GDA_TEST_CONFIGS})
     # 单文件含遍历约 2-4 分钟, 超时防挂死
     set_tests_properties(gda_runner_${TEST_NAME} PROPERTIES TIMEOUT 600)
 endforeach()
+
+# ── ctest 注册: 迁移守卫（零依赖，读源码断言，无需构建产物） ──
+add_test(NAME migration_guard
+    COMMAND ${CMAKE_COMMAND}
+            -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/guard/migration_guard.cmake)
+
+# ── ctest 注册: 注释守卫（零依赖，读源码断言，无需构建产物） ──
+# Python 解释器复用根 cmake/skill_gen.cmake 的 GDA_PYTHON_EXECUTABLE
+#（find_program NAMES py python python3，py 优先；WindowsApps 存根下裸 python3 不可用）
+add_test(NAME comment_guard
+    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/comment_guard.py")

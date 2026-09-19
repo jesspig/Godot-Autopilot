@@ -1,6 +1,6 @@
 {
   "name": "tilemap_rect",
-  "description": "fill_tilemap_rect 矩形铺砖用例：before_all 建 Root 场景；create_tilemap_tileset + add_tilemap_atlas_source（Apple.png 切 16px 图集）+ save_resource 落盘 res://gda_tmp_tilemap_rect/ → 建 TileMapLayer 并 property_set 挂 tileset → 10×3 铺砖断言 set_count=30/宽高/归一化 from-to/单条 undo 动作 → 反序 erase 断言归一化与 set_count=30 → 缺 from、缺 source_id、超 100000 单元上限分别断言错误。after_all 回收 res://gda_tmp_tilemap_rect/。fill_tilemap_rect 声明为 GDA_TOOL_CLASS_SIDE，不进入 03_tools_contract 的域工具遍历。",
+  "description": "fill_tilemap_rect 矩形铺砖用例：before_all 建 Root 场景；create_tilemap_tileset + add_tilemap_atlas_source（Apple.png 切 16px 图集）+ save_resource 落盘 res://gda_tmp_tilemap_rect/ → 建 TileMapLayer 并 property_set 挂 tileset → 10×3 铺砖断言 set_count=30/宽高/归一化 from-to/单条 undo 动作 → 反序 erase 断言归一化与 set_count=30 → 缺 from、缺 source_id、超 100000 单元上限分别断言错误。after_all 回收 res://gda_tmp_tilemap_rect/。fill_tilemap_rect 的 flags 含 mutating，不进入 03_tools_contract 的域工具遍历。",
   "headless": true,
   "pipeline": {
     "on_failure": "fail_fast",

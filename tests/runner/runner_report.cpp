@@ -17,7 +17,6 @@ namespace gda_test {
 
 namespace {
 
-// 状态: fatal_error 非空 → ERROR; passed → PASS; 否则 FAIL
 const char* status_text(const FileResult& result) {
     if (!result.fatal_error.empty()) {
         return "ERROR";
@@ -35,7 +34,6 @@ size_t passed_step_count(const FileResult& result) {
     return count;
 }
 
-// 耗时 < 10 秒显示毫秒, 否则显示秒(1 位小数)
 std::string duration_text(long long duration_ms) {
     if (duration_ms >= 10000) {
         char buf[32];
@@ -45,7 +43,6 @@ std::string duration_text(long long duration_ms) {
     return std::to_string(duration_ms) + " ms";
 }
 
-// 本地时间戳 YYYYmmdd_HHMMSS
 std::string local_timestamp() {
     const std::time_t now = std::time(nullptr);
     std::tm broken_down{};
