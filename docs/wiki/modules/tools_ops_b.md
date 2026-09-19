@@ -6,7 +6,7 @@ tags:
   - 模块
   - 领域工具
   - B组
-timestamp: "2026-09-18T21:15:00+08:00"
+timestamp: "2026-09-19T17:35:04+08:00"
 resource: src/tools/
 ---
 
@@ -16,9 +16,9 @@ resource: src/tools/
 
 > 09-18 E2E 优化批次增补（详见 `changelog/2026-09-18-log.md` 19:30 节）：`property_get` 加批量 `properties[1..32]`（互斥、部分成功+`missing`）；`get_debugger_errors` 加 `group:true` 轻聚类；`execute_game_script` 加 `assert` 沙箱表达式；新增只读 `sample_game_property`/`collect_game_evidence`/`validate_game_ui_layout`（Game）；游戏侧 `send_response` 改 `String::utf8` 构造（CJK 元数据乱码根因，`game_bridge.cpp:1665`）；`debugger_access.cpp:39,132` 同病与 `VariantJson` 内约 8 处 `String(c_str())` 列为遗留待排期。
 
-> 覆盖 `src/tools/` 下 22 个 `.cpp` handler 模块：debug_ops、debugger_ops、debugger_access、display_ops、display_window_ops、os_ops、runtime_ops、runtime_game_ops、audio_ops、render_ops、environment_ops、text_ops、tilemap_ops、tileset_ops、spriteframes_ops、animation_ops、theme_ops、analyze_ops、test_ops、code_exec_ops、log_ops、capture_ops。（09-16 随坐标换算/键名统一/CJK 往返批次同步——text_ops 全链路 `String::utf8` + 诊断 IGNORE 装载、click_game_ui 窗口坐标与键名错误文案，工具数 385 / B 组 192 / 非 SIDE 325 不变；09-17 随 T09+T12 文档同步批次更新输入释放 flush、click 文本选择/annotate 序号与改脚本工作流。）
+> 覆盖 `src/tools/` 下 22 个 `.cpp` handler 模块：debug_ops、debugger_ops、debugger_access、display_ops、display_window_ops、os_ops、runtime_ops、runtime_game_ops、audio_ops、render_ops、environment_ops、text_ops、tilemap_ops、tileset_ops、spriteframes_ops、animation_ops、theme_ops、analyze_ops、test_ops、code_exec_ops、log_ops、capture_ops（另有 09-18 新增 `src/runtime/game_bridge_verify.cpp` 游戏侧验证辅助）。（09-16 随坐标换算/键名统一/CJK 往返批次同步——text_ops 全链路 `String::utf8` + 诊断 IGNORE 装载、click_game_ui 窗口坐标与键名错误文案；09-17 随 T09+T12 文档同步批次更新输入释放 flush、click 文本选择/annotate 序号与改脚本工作流；09-18/09-19 工具数 385→391 / B 组 192→195，工具声明全量改为 `ToolSpec`。）
 >
-> 工具总数（全系统）：**393**（`ToolRegistry`/catalog/index 口径）= **385 个领域工具**（30 个域 `*_tools.hpp` 以 `GDA_TOOL_CLASS(`/`GDA_TOOL_CLASS_SIDE(` 声明，经 `register_all.cpp` 注册各域 `<域>_tools::make_tools()`）+ `system_status` 1 + **7 个元工具**。本页 B 组占其中 **192 个领域工具**（A 组 193 + B 组 192 = 385；09-16 失败修复批次 B 组 +3：game +2、tilemap +1；视觉辅助批次 capture +1）；`code_execute`/`batch_execute` 为元工具经 `server.RegisterTool()` 直连、`system_status` 单独注册。数量以 `src/tools/*_tools.hpp` 声明与 `ToolRegistry` 运行时注册为准。
+> 工具总数（全系统）：**399**（`ToolRegistry`/catalog/index 口径）= **391 个领域工具**（30 个域 `*_tools.hpp` 的 `make_tools()`，每工具一份 `ToolSpec`，经 `register_all.cpp` 注册）+ `system_status` 1 + **7 个元工具**。本页 B 组占其中 **195 个领域工具**（A 组 196 + B 组 195 = 391；09-16 失败修复批次 B 组 +3：game +2、tilemap +1；视觉辅助批次 capture +1；09-18 E2E 批次 game +3）；`code_execute`/`batch_execute` 为元工具经 `server.RegisterTool()` 直连、`system_status` 单独注册。数量以 `src/tools/*_tools.hpp` 声明与 `ToolRegistry` 运行时注册为准。
 >
 > 相关页面：[工具注册表](../modules/tools_registry.md) · [运行时通道](../modules/entry_runtime.md)
 
@@ -32,7 +32,7 @@ resource: src/tools/
 | `display_ops.cpp` + `display_window_ops.cpp` | `godot_autopilot::display_ops` | `display_tools.hpp` | 25 |
 | `os_ops.cpp` | `godot_autopilot::os_ops` | `os_tools.hpp` | 18（含 `text_ops` 的 `write_file`/`read_file`/`find_in_files`，归 OS 类） |
 | `runtime_ops.cpp` | `godot_autopilot::runtime_ops` | —（基础设施） | 0 |
-| `runtime_game_ops.cpp` | `godot_autopilot::runtime_ops` | `game_tools.hpp` | 12 |
+| `runtime_game_ops.cpp` | `godot_autopilot::runtime_ops` | `game_tools.hpp` | 15 |
 | `audio_ops.cpp` | `godot_autopilot::audio_ops` | `audio_tools.hpp` | 20 |
 | `render_ops.cpp` + `environment_ops.cpp` | `godot_autopilot::render_ops` | `render_tools.hpp` | 49 |
 | `text_ops.cpp` | `godot_autopilot::text_ops` | `text_tools.hpp` | 10（纯 TextServer/字形） |
@@ -40,15 +40,15 @@ resource: src/tools/
 | `tileset_ops.cpp` | `godot_autopilot::tileset_ops` | `tileset_tools.hpp` | 3 |
 | `spriteframes_ops.cpp` | `godot_autopilot::spriteframes_ops` | `spriteframes_tools.hpp` | 3 |
 | `animation_ops.cpp` | `godot_autopilot::animation_ops` | `animation_tools.hpp` | 10 |
-| `theme_ops.cpp` | `godot_autopilot::theme_ops` | `theme_tools.hpp` | 8（含 5 个 SIDE：主题资源写入） |
+| `theme_ops.cpp` | `godot_autopilot::theme_ops` | `theme_tools.hpp` | 8（含 5 个 `writes_file`：主题资源写入） |
 | `analyze_ops.cpp` | `godot_autopilot::analyze_ops` | `analyze_tools.hpp` | 3 |
 | `test_ops.cpp` | `godot_autopilot::test_ops` | `test_tools.hpp` | 2 |
 | `code_exec_ops.cpp` | `godot_autopilot::code_exec_ops` | —（元工具，不经 `*_tools.hpp`，不计入合计） | 2 |
 | `log_ops.cpp` | `godot_autopilot::log_ops` | `system_tools.hpp` | 1 |
 | `capture_ops.cpp` | `godot_autopilot::capture_ops` | `capture_tools.hpp` | 2 |
-| **合计（领域工具）** | | | **192** |
+| **合计（领域工具）** | | | **195** |
 
-注：`environment_ops.cpp`、`display_window_ops.cpp`、`runtime_game_ops.cpp` 没有独立 hpp，handler 函数声明复用 `render_ops.hpp`、`display_ops.hpp`、`runtime_ops.hpp`；工具类声明统一落在对应 `<域>_tools.hpp`（分别为 `render_tools.hpp`/`display_tools.hpp`/`game_tools.hpp`），`make_tools()` 产出 `ToolBase` 实例。`animation_ops`/`theme_ops`/`analyze_ops`/`test_ops` 四模块各有独立 `*_ops.hpp`。显示（25）/渲染（49）两模块的 `_ops.cpp` 与 `_tools.hpp` 归并方式见上表。
+注：`environment_ops.cpp`、`display_window_ops.cpp`、`runtime_game_ops.cpp` 没有独立 hpp，handler 函数声明复用 `render_ops.hpp`、`display_ops.hpp`、`runtime_ops.hpp`；工具类声明统一落在对应 `<域>_tools.hpp`（分别为 `render_tools.hpp`/`display_tools.hpp`/`game_tools.hpp`），`make_tools()` 产出 `SpecTool` 实例。`animation_ops`/`theme_ops`/`analyze_ops`/`test_ops` 四模块各有独立 `*_ops.hpp`。显示（25）/渲染（49）两模块的 `_ops.cpp` 与 `_tools.hpp` 归并方式见上表。
 
 ## debug_ops — 引擎诊断与性能监控（15 工具 + physics_ops 挂靠 1 个）
 
@@ -74,6 +74,7 @@ resource: src/tools/
   - `get_debugger_log` 命中 `Invalid access to property or key` 错误时追加 Godot 3→4 重命名提示（`RENAME_HINTS`：frames→sprite_frames、cast_to→target_position、translation→position 等 10 条，`debugger_ops.cpp:331-341`）。
   - 空结果附加 `capture_note_for_empty_result()`：提示启动 `play_editor_current_scene` 或改用 `get_game_log_entries`（辅助函数按会话状态预留两种文案，当前三个 handler 的调用点恒落在无会话分支）；09-13 起工具描述与 schema 同步删除了"编辑器捕获回退/上次场景树"的旧承诺。
 - **错误模式**：无会话场景返回 `result` 空串 + `note` 字段；会话内错误经通道原样返回 `{"error": ...}`。
+- **注释归档（09-19 注释清理批，`debugger_ops.cpp:198-199`）**：`get_grouped_errors` 按"文件/函数/行/信息"四元组归并，与游戏侧 `get_errors(group=true)` 同形状（`count` + 首末时间 + 一条堆栈采样），`limit` 为最大分组数。
 - 出站链接：[运行时通道](../modules/entry_runtime.md) · [工具注册表](../modules/tools_registry.md)
 
 ## debugger_access — 运行时通道的调试桥（0 工具）
@@ -92,7 +93,7 @@ resource: src/tools/
   - **`get_display_window_rect`（09-15 新增，只读）**：返回窗口客户区矩形 `position`/`size`（虚拟桌面坐标）、装饰后 `decorated_position`/`decorated_size`、所在屏幕 `screen` 与 `screen_scale`/`screen_position`/`screen_size`；`window_id` 默认 0（主窗口），负值报错。用于桌面坐标 ↔ 窗口客户区坐标换算（`warp_display_mouse`/输入工具都按客户区取坐标）。
   - `set_display_mouse_mode` 校验 mode 0-4，越界返回 `invalid mouse mode: N`（并非钳制到边界）；`show_display_dialog` 检查 `DisplayServer::dialog_show` 的返回 Error。
   - 鼠标坐标基准（09-13 下午起描述明确）：`get_display_mouse_position` 返回**桌面屏幕**坐标；`warp_display_mouse` 的 x/y 是**聚焦窗口客户区**像素（引擎转换后移动 OS 光标）——两者不可直接互喂，驱动编辑器 dock/UI 时 warp 与输入工具应使用同一客户区坐标（见 tools_ops_a 的 input_ops 小节）。
-  - 15 个副作用工具以 `GDA_TOOL_CLASS_SIDE(` 声明（`side_effect` 非空），遍历经 `get_tool_detail` 自动排除（见文末对照）；新增的 `get_display_window_rect` 不标记副作用。
+  - 15 个副作用工具声明非空 `side_effect` + `kMutating`，遍历经 `get_tool_detail` 自动排除（见文末对照）；新增的 `get_display_window_rect` 不标记副作用。
 - **错误模式**：`util::error_json`（"missing required parameter" / "DisplayServer not available" / "subwindows not supported on this platform"）。
 - 出站链接：[工具注册表](../modules/tools_registry.md) · [运行时通道](../modules/entry_runtime.md)
 
@@ -101,9 +102,9 @@ resource: src/tools/
 - **职责**：`OS`/`Time` 单例直通：弹窗、进程创建与执行、环境变量、系统信息、文件回收站、shell 打开。
 - **代表工具**：`show_os_alert`、`create_os_process`、`execute_os_process`、`get_os_datetime`、`get_os_environment`、`get_os_locale`、`get_os_system_fonts`、`get_os_system_info`、`get_os_unique_id`、`get_os_unix_time`、`get_os_user_data_dir`、`kill_os_process`、`move_os_file_to_trash`、`set_os_environment`、`open_os_path`。
 - **关键事实**：
-  - **8 个副作用工具**（含 `write_file`，handler 在 text_ops 但归 OS 类）以 `GDA_TOOL_CLASS_SIDE(` 声明，遍历经 `get_tool_detail` 的 `side_effect` 非空自动排除——`show_os_alert` 弹系统模态框；`execute_os_process`/`create_os_process` 拉起进程；`kill_os_process` 杀进程；`open_os_path` 打开 URI；`move_os_file_to_trash` 删文件；`set_os_environment` 改环境；`write_file` 写磁盘。
+  - **8 个副作用工具**（含 `write_file`，handler 在 text_ops 但归 OS 类）声明非空 `side_effect` + `kMutating`，遍历经 `get_tool_detail` 的 `side_effect` 非空自动排除——`show_os_alert` 弹系统模态框；`execute_os_process`/`create_os_process` 拉起进程；`kill_os_process` 杀进程；`open_os_path` 打开 URI；`move_os_file_to_trash` 删文件；`set_os_environment` 改环境；`write_file` 写磁盘。
   - `execute_os_process` 可选 `output: true` 捕获 stdout/stderr（`OS::execute` 第四参 true，返回 exit_code + 拼接输出）。
-  - 其余只读查询工具（datetime/环境/系统信息/时间/字体/唯一 ID 等）非副作用（`GDA_TOOL_CLASS(`），遍历会冒烟。
+  - 其余只读查询工具（datetime/环境/系统信息/时间/字体/唯一 ID 等）声明 `SideEffect::None` + `kNone`，遍历会冒烟。
 - **错误模式**：必填参数缺失 → error_json；单例缺失 → error_json；`kill_os_process`/`move_os_file_to_trash`/`open_os_path` 返回 Error 枚举数值。
 - 出站链接：[工具注册表](../modules/tools_registry.md) · [运行时通道](../modules/entry_runtime.md)
 
@@ -115,7 +116,7 @@ resource: src/tools/
   - **`set_editor_queue(CommandQueue*)`**：`main.cpp` 注入 Godot 主线程队列（`get_editor_queue()` 全局访问）。`handle_gda_send` 非主线程时经 `queue.submit(...).get()` 投递；游戏响应 `handle_game_response` 由 `DebugCapturePlugin::_capture` 喂入，以 request_id 匹配 `PendingRequest`（mutex + condition_variable）并唤醒等待线程。
   - 请求 ID 原子自增；`extract_timeout` 钳制到 `GDA_MAX_TIMEOUT_MS=30000`（默认 `GDA_DEFAULT_TIMEOUT_MS=5000`，`src/core/config.hpp`）；`handle_gda_send` 返回中间态 `{"__gda_pending": id, "timeout_ms": ...}`，由 `register_all.cpp::meta_call_tool_wait` 转 `wait_pending_response` 轮询合并；`capture_game_viewport` 额外走 `finalize_capture_response`（主线程读文件 → base64），经 `call_tool` 直调时 PNG 以 MCP image content 随响应交付（09-13 起，见 capture_ops 小节）。
   - **超时预算链（09-16 起）**：game 工具 `timeout_ms` 上限 `GDA_MAX_GAME_OP_TIMEOUT_MS=25000`——host 侧等待再加 2000ms 宽限仍低于 30000 传输硬上限，保证"超时错误 + 迟到结果"能在同一次协议往返内完整交付；超时后自动向游戏发 cancel（`breaked` 时再 engine continue），之后到达的游戏响应不再静默丢弃，而是以 `late_results`（≤`GDA_LATE_RESULT_BUFFER_MAX`=5 条、每条摘要截断 `GDA_LATE_RESULT_SUMMARY_CHARS`=200 字符）附在超时错误里。
-  - **异步 job（09-16 新增）**：`start_game_job` 把游戏 op（当前仅 `eval`，params 同 `execute_game_script` 字段）异步提交进游戏进程并立即返回 `job_id`——为超过 25s 单次预算的长脚本设计；`get_game_job` 按 `job_id` 轮询（`timeout_ms` 默认 0 = 非阻塞，上限 25000 的内部等待循环），status ∈ {`pending`, `done`（回传游戏响应原文）, `expired`（超过 timeout_ms + 2000ms 后丢弃）, `cancelled`（附带幂等 engine cancel）}；job 表上限 16，收集/过期/取消各自释放 eval 错误中断抑制。`start_game_job` 以 `GDA_TOOL_CLASS_SIDE` + `GameRuntime` 声明，受 `game_runtime` 授权门约束。
+  - **异步 job（09-16 新增）**：`start_game_job` 把游戏 op（当前仅 `eval`，params 同 `execute_game_script` 字段）异步提交进游戏进程并立即返回 `job_id`——为超过 25s 单次预算的长脚本设计；`get_game_job` 按 `job_id` 轮询（`timeout_ms` 默认 0 = 非阻塞，上限 25000 的内部等待循环），status ∈ {`pending`, `done`（回传游戏响应原文）, `expired`（超过 timeout_ms + 2000ms 后丢弃）, `cancelled`（附带幂等 engine cancel）}；job 表上限 16，收集/过期/取消各自释放 eval 错误中断抑制。`start_game_job` 声明 `SideEffect::GameRuntime` + `kMutating`，受 `game_runtime` 授权门约束。
   - **`get_game_status` 无参数（09-16 起）**：schema 已对齐实现——不接受任何参数（此前 schema 允许传参但 handler 忽略）。
   - **超时（09-13 下午增强）**：超时后经 `queue.submit` 向会话发 `debugger_send_cancel`（GDA_OP_CANCEL）；错误信息现含实际广播的**会话数**与响应账目——`responses received: N, last response X ms ago, pending: M`（从未收到响应时为 `no gda:response received yet`），据此可区分"请求未送达 / 游戏未回 / 响应未匹配"。
   - **响应出口日志化（09-13 下午起）**：`handle_game_response` 的静默失败出口（payload 非 JSON 对象、`request_id` 缺失或非整数）均写 Warning 日志（含 256 字符载荷预览），配合 `get_plugin_log` 可追踪迟到/丢弃响应。
@@ -127,10 +128,11 @@ resource: src/tools/
   - `get_game_ui_elements`（gda op `ui_elements`）：DFS 遍历运行中 Control 树，每项 `{path, type, visible, text?, global_rect:{position,size}}`，`max_elements` 默认 100、上限 1000，超限标 `truncated:true`。
   - **游戏侧输入扩展（09-15）**：`queue_game_input` 的 `type` 新增 `wheel`（给 `direction` up/down/left/right，或 `button_index` 4/5/6/7 对应上/下/左/右；可选 `amount` 1-10 默认 1 与 `position {x,y}`；wheel 按键按 `factor=amount` 注入按下+释放）与 `mouse_motion`（`position {x,y}` 必填，可选 `relative {x,y}` 设定位移增量）；`sequence_game_inputs` 的 inputs 同增 `kind: wheel`/`mouse_motion` 及同名字段。释放立即 flush（09-17 起）：`DelayedRelease` 到期释放与动作释放恒调 `flush_buffered_events`（此前按 mode/pressed 条件 flush），抬起事件不再滞留缓冲；注入与取消细节见[入口与运行时](../modules/entry_runtime.md)的输入模拟小节。
   - **截图增强（09-15）**：`capture_game_viewport` 新增可选 `region {x,y,width,height}`（裁剪到图像内，空交集报 `region_out_of_bounds`）与 `max_dimension`（64-4096，最长边等比缩小、不放大），裁剪与缩放发生在游戏进程内；`annotate=true` 由游戏侧为每个可见 Control 画编号框，结果附 `annotated:true` 与 `elements`（id/path/type/text/position/size，图像像素，`id` 为单次捕获序号、跨次不稳定，不可传给 `click_game_ui_element`，用同行 `path` 或 `text`/`text_index`）。09-16 起另支持 `annotate_nodes`（1-50 个游戏绝对路径，精确匹配优先、否则 `/<path>` 后缀匹配）与 `annotate_nodes_max`（1-50 自我限流），游戏进程内画蓝色编号框并回传 `node_elements`/`node_truncated`（经 `finalize_capture_response` 白名单透传），单项失败隔离（`ok:false` + `error` + 候选路径，不失败整体）。
-  - **`click_game_ui_element`（09-15 新增，09-16 补窗口坐标，09-17 加文本选择）**：按 `path`（优先）或可见文本 `text` + `text_index`（默认 0）在游戏进程内枚举 Control 树（path 精确匹配优先，否则匹配以 `/<path>` 结尾的节点；text 先在可见元素上精确匹配、再子串匹配，多命中无 `text_index` 即报歧义候选清单、`text_index` 越界另报错，`text_index` 须配 `text`），在元素 `global_rect` 中心注入 mouse_button 按下/释放（`button_index` 1=左 默认/2=右/3=中，`double_click` 追加第二对）；注入坐标须为窗口客户区坐标——`UiElement` 矩形来自 `Control::get_global_rect()`（画布空间），经控件所属视口的 `get_screen_transform()`（拉伸 + letterbox 边距）复合其 `get_canvas_transform()`（默认画布 Camera2D / CanvasLayer 层变换）换算，无 transform 按恒等处理；响应保留画布空间 `position`（向后兼容）并新增 `viewport_position`（同值）与 `window_position`（实际注入坐标）；枚举+注入在一次调用内完成（单次协议往返，避免编辑器主线程等待）；`max_elements` 默认/上限 1000、`timeout_ms` 默认 5000/上限 30000；未找到/歧义/越界时错误附元素数与候选路径；`annotate` 的 `id` 为单次捕获序号（1 起，跨次不稳定，不可传给本工具——未知参数错误会连带提示改用同行 `path` 或 `text`/`text_index`）；以 `GDA_TOOL_CLASS_SIDE(` + `GameRuntime` 声明，受 `game_runtime` 授权门约束。坐标换算正确性由 L1 `game_ui_coords_test`（4x 拉伸/letterbox/画布平移/rect 中心）覆盖，端到端换算断言待示例游戏恢复后补测（23_click_ui_coords L2 仅覆盖参数校验与无游戏通道错误）。
+  - **`click_game_ui_element`（09-15 新增，09-16 补窗口坐标，09-17 加文本选择）**：按 `path`（优先）或可见文本 `text` + `text_index`（默认 0）在游戏进程内枚举 Control 树（path 精确匹配优先，否则匹配以 `/<path>` 结尾的节点；text 先在可见元素上精确匹配、再子串匹配，多命中无 `text_index` 即报歧义候选清单、`text_index` 越界另报错，`text_index` 须配 `text`），在元素 `global_rect` 中心注入 mouse_button 按下/释放（`button_index` 1=左 默认/2=右/3=中，`double_click` 追加第二对）；注入坐标须为窗口客户区坐标——`UiElement` 矩形来自 `Control::get_global_rect()`（画布空间），经控件所属视口的 `get_screen_transform()`（拉伸 + letterbox 边距）复合其 `get_canvas_transform()`（默认画布 Camera2D / CanvasLayer 层变换）换算，无 transform 按恒等处理；响应保留画布空间 `position`（向后兼容）并新增 `viewport_position`（同值）与 `window_position`（实际注入坐标）；枚举+注入在一次调用内完成（单次协议往返，避免编辑器主线程等待）；`max_elements` 默认/上限 1000、`timeout_ms` 默认 5000/上限 30000；未找到/歧义/越界时错误附元素数与候选路径；`annotate` 的 `id` 为单次捕获序号（1 起，跨次不稳定，不可传给本工具——未知参数错误会连带提示改用同行 `path` 或 `text`/`text_index`）；声明 `SideEffect::GameRuntime` + `kMutating`，受 `game_runtime` 授权门约束。坐标换算正确性由 L1 `game_ui_coords_test`（4x 拉伸/letterbox/画布平移/rect 中心）覆盖，端到端换算断言待示例游戏恢复后补测（23_click_ui_coords L2 仅覆盖参数校验与无游戏通道错误）。
   - **改脚本后工作流（09-17 起）**：`reload_game_scripts` 为软重载、游戏下次空闲轮询生效且无确认回执——改完脚本先调它再 `reload_current_scene`/重试，单重载场景不保证重读磁盘版本（`CACHE_MODE_REUSE`），用 `get_game_log_entries` 验证；`create_script` 响应 `note` 同述（见 [A 组](../modules/tools_ops_a.md)的脚本小节）。
 - **降级指引（09-13 下午起）**：`capture_game_viewport` 与 4 个输入工具在运行时通道不可达的错误响应上附加 `hint` 字段，列出不依赖游戏进程的替代路径（`get_game_log_entries`、`capture_display_screen`、`capture_editor_viewport`、`get_plugin_log`）。
   - `runtime_game_ops.cpp` 无独立 hpp，声明在 `runtime_ops.hpp`。
+  - **注释归档（09-19 注释清理批，`runtime_game_ops.cpp:238`）**：`execute_game_script` 带 `assert` 时走同权限的新游戏 op（`eval_assert`），不断言时保持原 `eval` 路径。
 - **错误模式**：`error_json("game not ready: ...")`、超时错误（含 op 名/request_id/会话数、响应账目与 `late_results` 迟到结果摘要）、`unexpected game response (missing result)`；09-16 起超时后的迟到响应不再仅记 Warning 丢弃，进入 `late_results`（见上）。
 - 出站链接：[运行时通道](../modules/entry_runtime.md) · [工具注册表](../modules/tools_registry.md)
 
@@ -161,10 +163,10 @@ resource: src/tools/
 ## text_ops — 文本服务与字形（10 工具，纯 TextServer/字形）
 
 - **职责**：`TextServer` 直通：字体资源、shaped text、系统字体路径、RTL 检测；另含通用文件读写与项目内文本搜索工具。
-- **代表工具**（`text_tools.hpp` 的 10 个，纯 TextServer/字形）：`create_text_font`、`create_shaped_text`、`set_text_font_antialiasing`、`set_text_font_data`、`set_text_font_hinting`、`get_text_font_system_path`、`has_text_feature`、`is_text_locale_right_to_left`、`add_shaped_text_string`、`get_shaped_text_size`；`write_file`/`read_file`/`find_in_files` 的 handler 亦在本文件，但以 `GDA_TOOL_CLASS_SIDE(`/`GDA_TOOL_CLASS(` 声明于 `os_tools.hpp`（归 OS 类，见 os_ops）。
+- **代表工具**（`text_tools.hpp` 的 10 个，纯 TextServer/字形）：`create_text_font`、`create_shaped_text`、`set_text_font_antialiasing`、`set_text_font_data`、`set_text_font_hinting`、`get_text_font_system_path`、`has_text_feature`、`is_text_locale_right_to_left`、`add_shaped_text_string`、`get_shaped_text_size`；`write_file`/`read_file`/`find_in_files` 的 handler 亦在本文件，但声明于 `os_tools.hpp`（`write_file` 为 `WritesFile` + `kMutating`，`read_file`/`find_in_files` 为只读；归 OS 类，见 os_ops）。
 - **关键事实**：
   - **CJK 全链路 UTF-8（09-16 起）**：`get_text_font_system_path` / `is_text_locale_right_to_left` / `add_shaped_text_string`（含 `language`）的入参构造与 `write_file`（`file->store_string`）的内容写入统一改 `String::utf8`——`String(const char*)` 是 latin1 构造，CJK 内容会逐字节变字符、写盘后再读回即乱码；`build_script_diagnostics` 改 `CACHE_MODE_IGNORE` 装载（REUSE 会命中 ResourceCache/GDScriptCache 返回旧实例，诊断看不到刚写入的磁盘内容）。19_cjk_roundtrip L2（`verified`/`readback`/`cache_refreshed` + 全量内容比对 + `find_in_files` 字节级命中）覆盖。
-  - `set_text_font_data` 用 `FileAccess::get_file_as_bytes` 读字体文件；`write_file`（原 `file_write`，随全量重命名迁至 OS 类）用 `FileAccess` WRITE/READ_WRITE 直写磁盘，以 `GDA_TOOL_CLASS_SIDE(` 声明于 `os_tools.hpp`（`side_effect` 非空），遍历经 `get_tool_detail` 自动排除（写文件副作用，历史事故源之一）。
+  - `set_text_font_data` 用 `FileAccess::get_file_as_bytes` 读字体文件；`write_file`（原 `file_write`，随全量重命名迁至 OS 类）用 `FileAccess` WRITE/READ_WRITE 直写磁盘，声明 `SideEffect::WritesFile` + `kMutating` 于 `os_tools.hpp`，遍历经 `get_tool_detail` 自动排除（写文件副作用，历史事故源之一）。
   - **`read_file` / `find_in_files`（08-20 新增）**：`read_file` 与 `write_file` 对称，读任意文本文件返回 `{path, content}`；`find_in_files` 递归搜索目录下文本（`query` 必填，可选 `dir` 默认 `res://`、`extensions` 默认 gd/tscn/tres/cs/md/json/h/cpp、`case_sensitive`、`max_results` 默认 500，达到即截断返回 `truncated:true`），按扩展名过滤并统计每文件命中次数，**归 OS 类但 handler 在 text_ops**。路径拼接用 `join_search_path`（`res://` 根免三重斜杠）。
   - 本模块是 `get_os_system_fonts`（os_ops）之外的字体获取路径补充。
 - **错误模式**：`TextServer not available` / `missing or invalid parameter: font_rid` / `shaped_rid`；`write_file`/`read_file` 打开失败 → error_json；`find_in_files` 缺 query → missing required parameter。
@@ -178,7 +180,7 @@ resource: src/tools/
   - `create_tilemap` 经 `ClassDBSingleton::instantiate("TileMap")` 建节点，默认挂编辑场景根并 `set_owner`，返回路径（剥掉根前缀）。
   - `set_tilemap_cell`/`set_cells` 同时支持 `TileMap::set_cell(layer, coords, source_id, atlas_coords)` 与 `TileMapLayer::set_cell(coords, ...)` 两条 API 分支；`source_id=-1` 表示擦除该格（`atlas_coords` 忽略；源自引擎 `set_cell` 的 INVALID 语义，09-13 下午起描述与技能文档已写明）。
   - `set_cells` 无服务端固定条数上限（旧 "~64 条截断" 表述已删除）：批量过大可能在客户端/传输层触发参数上限、表现为工具执行前的 JSON 解析错误，建议分批或改用 `fill_tilemap_rect`/`execute_script`/`code_execute` 循环。
-  - **`fill_tilemap_rect`（09-16 新增）**：轴对齐矩形一次铺砖/擦除——`node_path` + `from`/`to` 角点格坐标（均含端点、角点顺序不限），传 `source_id` + `atlas_coords` 逐格放置同一瓦片，或 `erase:true` 清空矩形（忽略 source_id/atlas_coords）；可选 `alternative`（默认 0）与 `layer`（默认 0，TileMapLayer 忽略）；矩形上限 100000 格，超限报错需分块；实现为逐格 set_cell/erase_cell 循环——省一次协议往返并产生**单个 undo 动作**，但不加速填充本身；返回 `set_count`/`from`/`to`/`width`/`height`/`undo`。以 `GDA_TOOL_CLASS_SIDE(` 声明（`side_effect` 返回 None，仅靠宏前缀从遍历中排除）。
+  - **`fill_tilemap_rect`（09-16 新增）**：轴对齐矩形一次铺砖/擦除——`node_path` + `from`/`to` 角点格坐标（均含端点、角点顺序不限），传 `source_id` + `atlas_coords` 逐格放置同一瓦片，或 `erase:true` 清空矩形（忽略 source_id/atlas_coords）；可选 `alternative`（默认 0）与 `layer`（默认 0，TileMapLayer 忽略）；矩形上限 100000 格，超限报错需分块；实现为逐格 set_cell/erase_cell 循环——省一次协议往返并产生**单个 undo 动作**，但不加速填充本身；返回 `set_count`/`from`/`to`/`width`/`height`/`undo`。声明 `SideEffect::None` + `kMutating`（仅靠 `mutating` 从遍历中排除）。
   - `create_tilemap_tileset` 产出 **`memory://` 内存资源**（`resource_ops::register_memory_resource`），供 tileset_ops 解析。
   - 写场景后调用 `scene_dirty_tracker::mark_scene_modified()`；`set_cells` 部分无效条目 → error + warnings（"N cells skipped"）。
 - **错误模式**：节点类型不符 → error_json（含创建指引）；parent 未找到 → error_json。
@@ -218,12 +220,12 @@ resource: src/tools/
 - **错误模式**：参数缺失、节点不存在、场景未打开、名称或过渡重复、track_index 越界 → `{"error": ...}`。
 - 出站链接：[工具注册表](../modules/tools_registry.md) · [运行时通道](../modules/entry_runtime.md)
 
-## theme_ops — 主题资源与 Control 应用（8 工具，5 个 SIDE）
+## theme_ops — 主题资源与 Control 应用（8 工具，5 个 `writes_file`）
 
 - **职责**：磁盘 `Theme` 资源（.tres）的创建、写入、检视与对编辑场景 Control 的应用。
 - **代表工具（共 8 个）**：`create_theme_resource`、`set_theme_color`、`set_theme_constant`、`set_theme_font_size`、`set_theme_stylebox_flat`、`get_theme_info`、`apply_theme_to_control`、`set_control_anchor_preset`。
 - **关键事实**：
-  - 5 个写资源工具（create/set_color/set_constant/set_font_size/set_stylebox_flat）以 `GDA_TOOL_CLASS_SIDE(` 声明，每次修改经 `persist_theme` 用 `ResourceSaver` 落盘并 `EditorFileSystem::update_file` 刷新。
+  - 5 个写资源工具（create/set_color/set_constant/set_font_size/set_stylebox_flat）声明 `SideEffect::WritesFile` + `kMutating`，每次修改经 `persist_theme` 用 `ResourceSaver` 落盘并 `EditorFileSystem::update_file` 刷新。
   - `create_theme_resource` 拒绝 `user://` 路径（错误信息要求 res://）且目标文件不能已存在；可选 `base_type` 写入资源 metadata。
   - 颜色参数支持 `"#rrggbb"`/`"#rrggbbaa"` 或 `{r,g,b,a}`（通道 0-1）；`set_theme_stylebox_flat` 的 `stylebox` 对象支持 bg_color/border_color/border_width/corner_radius/content_margin，其中 width/radius/margin 可传数字（各边/角同值）或对象（left/top/right/bottom、四角键）。
   - `get_theme_info` 按 type 汇总 colors/constants/font_sizes/styleboxes 名单；`apply_theme_to_control` 与 `set_control_anchor_preset`（preset 0-15、可选 `keep_offsets`）只改内存并 `mark_scene_modified`，响应 note 提示用 `save_editor_scene` 持久化。
@@ -255,7 +257,7 @@ resource: src/tools/
 ## code_exec_ops — GDScript 动态执行（2 元工具）
 
 - **职责**：`code_execute` 在编辑器进程内动态编译并执行任意 GDScript；`batch_execute` 顺序批调任意工具。
-- **代表工具**：`code_execute`、`batch_execute`（均为元工具，`register_all.cpp` 以 `MetaTool` 加入 `ToolRegistry` 并经 `server.RegisterTool()` 直连注册，不经元工具 `call_tool` 代理；`batch_execute` 内部经 `dispatch::call_handler` 批调领域工具）。
+- **代表工具**：`code_execute`、`batch_execute`（均为元工具，`register_all.cpp` 以 `SpecTool`（`flags = kMeta`）加入 `ToolRegistry` 并经 `server.RegisterTool()` 直连注册，不经元工具 `call_tool` 代理；`batch_execute` 内部经 `dispatch::call_handler` 批调领域工具）。
 - **关键事实（执行机制）**：
   1. **安全检查** `check_source_safety`：禁止 `close_scene(` 调用（会销毁执行节点导致编辑器崩溃）。
   2. **源码包装** `build_wrapped_source`：`extends` 行注释化，包裹为 `@tool extends Node` 脚本；单函数模式（默认 `_run`）把用户代码逐行缩进进 `func _run():`，自动探测 tab/空格缩进风格（混合则报错）；多函数模式（检测到 `func `）保留用户函数，缺失的 `function_name` 补 `pass` 占位。
@@ -300,8 +302,45 @@ resource: src/tools/
 
 ## 与 AGENTS.md 对照结果
 
-- **副作用工具（60 个 SIDE 宏声明）排除机制**：工具以 `GDA_TOOL_CLASS_SIDE(` 声明并经 `ISideEffect` 暴露 `side_effect`；L2 遍历解析器（`tests/runner/traversal.cpp`）仅匹配 `GDA_TOOL_CLASS(`，这类工具天然不入枚举（385 域中 325 个入枚举），入枚举者再经 `get_tool_detail` 的 `tool.side_effect` 非空兜底排除，不再硬编码清单。B 组占 **36 个**——display_tools 15（`show_display_dialog`、`speak_display_tts`、`stop_display_tts`、`set_display_clipboard`、`set_display_mouse_mode`、`warp_display_mouse` 与 `display_window_*` 9 个）、os_tools 8（`show_os_alert`、`create_os_process`、`execute_os_process`、`kill_os_process`、`open_os_path`、`move_os_file_to_trash`、`set_os_environment`、`write_file`）、theme_tools 5、game_tools 7（09-15 增 `click_game_ui_element`、09-16 增 `start_game_job`）、tilemap_tools 1（09-16 增 `fill_tilemap_rect`，side_effect=None 仅宏前缀排除）；其余 24 个在 A 组：editor 10（原 6 含 `build_csharp_assembly` + `editor_ui_actions` 3 + 09-16 增 `select_scene_tree_node`）/input_map 2/config 2/resource 4（`save_resource`/`copy_resource_file`/`move_resource_file`/`create_directory`）/script 2（`execute_script`/`create_script`）/input_click_ops 4。按 `side_effects()` 返回值分布：writes_file 15、writes_config 6、shows_alert 4、modifies_window 20、process 6、game_runtime 7、code_execute 1、None 1（`tests/README.md` 为准）。**注意 `display_` 前缀并非全排除**：只读的 `get_display_clipboard`、`get_display_mouse_position`、`get_display_screen_*`（5 个）、`get_display_tts_voices`、`get_display_window_rect`、`capture_display_screen` 等非副作用工具遍历会冒烟。
+- **副作用/可变工具排除机制（62 个）**：工具在 `ToolSpec` 声明 `side_effect`（`ISideEffect` 暴露）与 `kMutating`；L2 遍历（`tests/runner/traversal.cpp`）运行时经 `search_tools` 枚举 392 条后按 `get_tool_detail` 的 `side_effect`/`mutating`/`dynamic` 字段排除（330 个进入两步骤），不再硬编码清单。B 组占 **36 个**——display_tools 15（`show_display_dialog`、`speak_display_tts`、`stop_display_tts`、`set_display_clipboard`、`set_display_mouse_mode`、`warp_display_mouse` 与 `display_window_*` 9 个）、os_tools 8（`show_os_alert`、`create_os_process`、`execute_os_process`、`kill_os_process`、`open_os_path`、`move_os_file_to_trash`、`set_os_environment`、`write_file`）、theme_tools 5、game_tools 7（09-15 增 `click_game_ui_element`、09-16 增 `start_game_job`）、tilemap_tools 1（09-16 增 `fill_tilemap_rect`，`side_effect=None` 仅 `kMutating` 排除）；其余 **26 个**在 A 组：editor 10（原 6 含 `build_csharp_assembly` + `editor_ui_actions` 3 + 09-16 增 `select_scene_tree_node`）/input_map 2/config 2/resource 4（`save_resource`/`copy_resource_file`/`move_resource_file`/`create_directory`）/script 3（`execute_script`/`create_script`/`patch_script`）/input_click_ops 4/scene 1（`build_nodes_from_spec`，`None`+`kMutating`）。按 `side_effect` 分布（60 个非空）：writes_file 16、writes_config 6、shows_alert 4、modifies_window 20、process 6、game_runtime 7、code_execute 1（以运行时统计为准）。**注意 `display_` 前缀并非全排除**：只读的 `get_display_clipboard`、`get_display_mouse_position`、`get_display_screen_*`（5 个）、`get_display_tts_voices`、`get_display_window_rect`、`capture_display_screen` 等非副作用工具遍历会冒烟。
 - **不一致点**：
   1. AGENTS.md「添加工具需在 `<category>_ops.hpp` 声明」与实现不符：`environment_ops.cpp`（7 工具）、`display_window_ops.cpp`（10 工具）无独立 hpp，handler 声明分别复用 `render_ops.hpp`、`display_ops.hpp`；工具类声明则统一落在对应 `<域>_tools.hpp`（`render_tools.hpp`/`display_tools.hpp`）。另 `runtime_game_ops.cpp`（12 工具）声明在 `runtime_ops.hpp`。
   2. `debugger_ops` 的 `get_debugger_*` 5 工具、`get_plugin_log` 与 `log_ops` 的 `get_game_log_entries` 覆盖四条不同日志来源（编辑器引擎日志 / 调试会话捕获 / 插件进程内 LogSystem / 游戏磁盘日志），AGENTS.md 未区分。
   3. AGENTS.md 称元工具"不经过 call_tool"：`batch_execute` 元工具本身直连注册 ✓，但其实现内部经 `dispatch::call_handler` 批调领域工具，路径上会与 `call_tool` 一致地命中 `ExportGuard` 等出口。
+
+## 注释归档 — 编辑器/场景/输入映射（09-19 注释清理批）
+
+> 本页无 editor/scene/input_map 独立小节（属 A 组页面范围），本批删除的整行 `//` 注释中有信息量的"为什么"归档于此；复述代码的已直接删除。行号为删除前位置。
+
+### editor_ops.cpp（19 行）
+
+- **错误名映射内聚（L59）**：`editor_error_name` 仅为 editor_ops 内静态函数，不碰 `util/error_util` 以免冲突。
+- **错误提示只改善文本（L165）**：`editor_error_hint` 保留数字码，仅改善可操作文本，不改行为。
+- **保存回执只增字段（L210-212）**：`attach_save_receipt` 默认轻量计数（`memory_nodes`/`disk_nodes`/`nodes_match`），失配或 `include_paths` 时附 `missing_paths`、`include_hash` 时附哈希；磁盘重读失败只附 `verify_error`，不推翻 `saved`。
+- **子树根过滤优先级（L844）**：`prefix` 作子树根过滤（缺省全量兼容），提供时优先于 `path`。
+- **多签 close 语义（L1156-1157）**：`close_scene` 仅关闭当前签；若邻签仍占用（`get_edited_scene_root()` 非空），不得进入 `add_root_node` + 轮询（会空转至超时），须秒级明确失败。
+- **open 幂等判定（L1252-1254）**：引擎对"已打开"场景只切标签（`editor/editor_node.cpp:4966-4974`），请求目标恰为当前场景时 `_set_current_scene` 直接 return（`:4701-4704`）→ root 指针不变；因此以 root 指针是否变化判定成败会把幂等调用误判为失败，须先比对路径。
+- **页签路径同步（L1363-1369）**：存盘后页签仍登记旧路径时必须 `close+reopen` 重建标签——GDExtension 无页签路径登记 API（`EditorInterface` 仅公开 open/close/save/get_open_scenes，无 `EditorData::set_scene_path` 等价接口；`Node::set_scene_file_path` 只改节点属性、不更新编辑器页签表，不得冒用），`close+reopen` 是唯一的同步手段；代价是页签焦点可能变化，为正确性必要代价。L2 `07_scene_tabs` / `13_inline_subresource` 依赖此语义：无 reopen 时 `get_unsaved_scenes` 报空路径、`reload_editor_scene` 报 scene is not open。
+- **回执用最新根（L1392）**：页签重建后编辑器根可能已替换，用最新根做保存回执比对。
+
+### editor_ui_ops.cpp（2 行）
+
+- **命中测试近似（L201-202）**：`find_hit_control` 近似 `Viewport::_gui_find_control_at_pos`——逆序遍历子节点，先递归子控件再测试自身。
+
+### scene_ops.cpp（14 行）
+
+- **OBJECT 属性两轮应用（L118-124、L314-317）**：`property_value_is_object_typed` 区分资源/对象型属性值与值类型——OBJECT 型（sprite_frames、texture、script、shape…）必须先应用，引擎会丢弃资源未就绪时到达的依赖值（`AnimatedSprite2D::set_animation` 在 frames 为 null 时把动画名重置为空并报错）；判定权威是新实例节点的反射属性表，未知属性回退按 JSON 值形状（`res://`/`memory://` 前缀、`path`/`resource` 引用）；两轮遍历同一键序（`mcp::JsonValue` 以 `std::map` 按字典序迭代），资源型先、值类型后（如 `AnimatedSprite2D.animation` 落在 `sprite_frames` 之后）。
+
+### input_map_ops.cpp（10 行）
+
+- **裸名视图与别名（L208-211）**：`key_code_by_bare_name` 是 `KEY_NAME_TO_CODE` 的"剥 `KEY_` 前缀"视图（大写裸名 P/SPACE/KP_ENTER…）；RETURN/CONTROL 是引擎 `keyboard.cpp` 表里的裸别名（常量名与 Key 枚举名不同：`KEY_ENTER`/`KEY_CTRL`），在表中没有剥前缀形式，单独补上。
+- **键名判决唯一口径（L228-233）**：`resolve_key_name_code` 是编辑器侧 `add_input_map_action_event` 与游戏侧 `src/runtime/game_bridge_input.cpp:parse_keycode` 共用的唯一判决，避免两侧口径漂移；归一化顺序：ASCII 大写 → 剥 `KEY_` 前缀 → 单字符 A-Z/0-9 取 ASCII 值（与 Key 枚举一致：A=65、0=48）→ 查裸名表 → 纯数字串按数值解析（>8 位必然超出键码上限 `0xFFFFFF`，直接判无效）；返回 0（`Key::KEY_NONE`，非合法键码）表示无法解析。
+
+### scene_spec_ops.cpp / .hpp（兜底发现，19 行）
+
+- **独立命名避符号合并（cpp L38）**：`spec_relative_path` 与 `scene_ops.cpp` 的 `scene_relative_path` 同语义但独立命名，避免 Unity 构建合并同名符号。
+- **OBJECT 先行同模式（cpp L53-54）**：与 `create_scene_node` 同模式，OBJECT 型属性先行（见 scene_ops 小节两轮应用）。
+- **挂接即设 owner（cpp L232-233）**：自顶向下建节点，挂接后立刻设 owner 为场景根（根自身除外），否则落盘时 `PackedScene` 静默丢弃；任一步失败由顶层统一回滚整棵子树。
+- **显式释放不依赖析构（cpp L282）**：`spec_free_subtree` 显式自底向上释放，调用前顶层节点已从父节点摘除。
+- **成根撤销提示（cpp L502）**：成根时 `delete_scene_node` 会拒删根节点，`undo` 提示改为关场景。
+- **spec 与代码分工（hpp L13-15）**：声明式 spec 一次建好整棵子树（`spec{type, name, props, children}` 递归，`dry_run`/`preview` 只校验并返回节点清单）；与 `create_scene_node` / `code_execute` 并存——定型结构用 spec，异形逻辑用代码；安全上限 `SPEC_MAX_DEPTH=32` / `SPEC_MAX_NODES=500`（hpp L9）。

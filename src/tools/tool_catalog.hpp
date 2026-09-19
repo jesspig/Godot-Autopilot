@@ -17,6 +17,8 @@ struct ToolInfo {
   std::string category;
   std::vector<std::string> tags;
   mcp::JsonValue input_schema;
+  bool dynamic = false;
+  bool mutating = false;
 };
 
 class ToolCatalog {

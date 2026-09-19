@@ -195,8 +195,6 @@ public:
     return oss.str();
   }
 
-  // I4 轻聚类：按 文件/函数/行/信息 归并，与游戏侧 get_errors(group=true)
-  // 同形状（count + 首末时间 + 一条堆栈采样）。limit 为最大分组数。
   mcp::JsonValue get_grouped_errors(size_t group_limit) {
     std::lock_guard<std::mutex> lock(mtx_);
     struct Group {

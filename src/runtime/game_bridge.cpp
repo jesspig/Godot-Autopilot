@@ -1260,13 +1260,6 @@ JV run_ui_click(const JV &click, const std::vector<UiElement> &elements,
   }
   const double center_x = match->x + match->w * 0.5;
   const double center_y = match->y + match->h * 0.5;
-  // UiElement 矩形来自 Control::get_global_rect()（画布空间），而注入的
-  // InputEventMouseButton.position 必须是窗口客户区坐标：引擎在
-  // viewport.cpp:_make_input_local 用 get_final_transform() 的反变换把窗口坐标
-  // 换回画布空间，stretch（Example：320x180 视口 → 1280x720 窗口 = 4x）与
-  // letterbox 边距都在这条链上。取控件所属视口的 screen transform 再复合它自己的
-  // canvas transform（默认画布的 Camera2D 或 CanvasLayer），无 transform 时按恒等
-  // 处理（保持旧行为）。
   godot::Transform2D screen_transform;
   if (godot::SceneTree *tree = get_scene_tree()) {
     if (auto *ctrl = godot::Object::cast_to<godot::Control>(
@@ -1302,8 +1295,6 @@ JV run_ui_click(const JV &click, const std::vector<UiElement> &elements,
   JV clicked(JV::object_tag);
   clicked["ok"] = JV(true);
   clicked["path"] = JV(match->path);
-  // position/viewport_position 保留画布空间坐标（向后兼容），window_position 是
-  // 实际注入窗口客户区的坐标。
   JV position(JV::object_tag);
   position["x"] = JV(center_x);
   position["y"] = JV(center_y);
@@ -1440,8 +1431,6 @@ public:
     } else if (op == GDA_OP_CAPTURE) {
       body = op_capture(params, request_id);
     } else if (op == GDA_OP_EVAL_ASSERT) {
-      // I7 assert path shares the eval game_runtime gate; see
-      // game_bridge_verify.cpp.
       if (!authorization::capability_enabled("game_runtime")) {
         body = authorization::deny_if_unauthorized("game_runtime",
                                                    SideEffect::GameRuntime);
@@ -1449,13 +1438,10 @@ public:
         body = op_eval_with_assert(params, request_id);
       }
     } else if (op == GDA_OP_SAMPLE) {
-      // I1 read-only sampling; same gate as status/capture (none).
       body = op_sample_property(params, request_id);
     } else if (op == GDA_OP_COLLECT_EVIDENCE) {
-      // I2 read-only evidence bundle; same gate as status/capture (none).
       body = op_collect_evidence(params, request_id);
     } else if (op == GDA_OP_VALIDATE_UI_LAYOUT) {
-      // I3 read-only layout scan; same gate as ui_elements (none).
       body = op_validate_ui_layout(params);
     } else if (op == GDA_OP_GET_ERRORS) {
       body = op_get_errors(params);
@@ -1570,8 +1556,6 @@ JV op_get_errors(const JV &params) {
   return ok_result(std::move(arr));
 }
 
-// I4 light grouping (game side): same shape as the editor-side
-// DebuggerCapture::get_grouped_errors.
 JV op_get_errors_grouped(int64_t group_limit) {
   struct Group {
     size_t count = 0;
@@ -1665,8 +1649,6 @@ void send_response(int64_t request_id, JV body) {
     serialized = body.Dump();
   }
   godot::Array payload;
-  // P2-1: Dump 输出为 UTF-8 字节；String(const char*) 是 latin1 构造，会把
-  // CJK 逐字节拆成字符，必须用 String::utf8（与 text_ops/script_ops 同模式）。
   payload.push_back(godot::String::utf8(serialized.c_str()));
   if (auto *dbg = godot::EngineDebugger::get_singleton()) {
     dbg->send_message(gda_string(GDA_MSG_RESPONSE), payload);

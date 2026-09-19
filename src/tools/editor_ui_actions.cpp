@@ -1,6 +1,5 @@
 #include "editor_ui_actions.hpp"
 #include "core/log_system.hpp"
-#include "tools/capture_ops.hpp"
 #include "tools/editor_ui_ops.hpp"
 #include "tools/input_click_ops.hpp"
 #include "util/error_util.hpp"
@@ -69,25 +68,6 @@ bool read_bool_arg(const mcp::JsonValue &args, const char *name,
   }
   *out = value->GetBool();
   return true;
-}
-
-void merge_observe_result(mcp::JsonValue &inner) {
-  mcp::JsonValue capture = capture_ops::handle_capture_viewport(
-      mcp::JsonValue::Parse(R"({"target":"editor"})"));
-  const mcp::JsonValue *capture_result = capture.Find("result");
-  if (capture_result && capture_result->IsObject()) {
-    const char *keys[] = {"data", "format", "width", "height", "path"};
-    for (const char *key : keys) {
-      if (const mcp::JsonValue *value = capture_result->Find(key))
-        inner[key] = *value;
-    }
-    return;
-  }
-  const mcp::JsonValue *error = capture.Find("error");
-  if (error && error->IsString())
-    inner["observe_error"] = *error;
-  else
-    inner["observe_error"] = mcp::JsonValue("capture failed");
 }
 
 bool inject_mouse_button_ex(godot::Vector2 pos, godot::MouseButton button,
@@ -186,6 +166,7 @@ mcp::JsonValue handle_click_editor_element(const mcp::JsonValue &args) {
   bool observe = false;
   if (!read_bool_arg(args, "observe", false, &observe, &error))
     return util::error_json(error);
+  (void)observe;
 
   const godot::Vector2 pos(
       static_cast<godot::real_t>(element.x + element.w / 2.0),
@@ -219,8 +200,6 @@ mcp::JsonValue handle_click_editor_element(const mcp::JsonValue &args) {
   position["x"] = mcp::JsonValue(static_cast<double>(pos.x));
   position["y"] = mcp::JsonValue(static_cast<double>(pos.y));
   inner["position"] = std::move(position);
-  if (observe)
-    merge_observe_result(inner);
   return util::ok_result(std::move(inner));
 }
 
@@ -242,6 +221,7 @@ mcp::JsonValue handle_type_editor_element_text(const mcp::JsonValue &args) {
   bool observe = false;
   if (!read_bool_arg(args, "observe", false, &observe, &error))
     return util::error_json(error);
+  (void)observe;
 
   editor_ui_ops::Element element;
   if (!editor_ui_ops::find_element_by_path(path, &element)) {
@@ -280,8 +260,6 @@ mcp::JsonValue handle_type_editor_element_text(const mcp::JsonValue &args) {
   inner["length"] = mcp::JsonValue(text_str.length());
   inner["focused"] = mcp::JsonValue(focused);
   inner["submit"] = mcp::JsonValue(submit);
-  if (observe)
-    merge_observe_result(inner);
   return util::ok_result(std::move(inner));
 }
 

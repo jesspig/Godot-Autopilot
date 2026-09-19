@@ -115,13 +115,6 @@ void node_to_json(godot::Node *node, int remaining_depth,
   }
 }
 
-// F2: tells apart resource/object-typed property values from value-typed ones.
-// OBJECT-typed properties (sprite_frames, texture, script, shape, ...) must be
-// applied first: the engine drops dependent values that arrive while their
-// resource is still unset (AnimatedSprite2D::set_animation resets the animation
-// name to empty and pushes an error when frames is null). The reflected
-// property list of the freshly instantiated node is the authority; unknown
-// properties fall back to the shape of the incoming JSON value.
 bool property_value_is_object_typed(const godot::Node *node,
                                     const std::string &prop_name,
                                     const mcp::JsonValue &raw_value) {
@@ -259,9 +252,6 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
         editor ? editor->get_edited_scene_root() : nullptr;
     std::string node_rel_path = scene_relative_path(obj, scene_root_now);
 
-    // Applies one property through property_ops::handle_set and collects the
-    // applied name, its warning and any inline resource echo. Returns an empty
-    // object on success, an error object (same message as before) on failure.
     auto apply_property = [&](const std::string &prop_name,
                               const mcp::JsonValue &prop_value) {
       mcp::JsonValue prop_args(mcp::JsonValue::object_tag);
@@ -311,10 +301,6 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
       return mcp::JsonValue(mcp::JsonValue::object_tag);
     };
 
-    // Two passes over the same key order (mcp::JsonValue iterates its backing
-    // std::map, i.e. lexicographically): resource/object-typed values first,
-    // then every remaining value-typed one. A dependent value such as
-    // AnimatedSprite2D.animation therefore lands after its sprite_frames.
     std::vector<std::string> object_props;
     for (const auto &kv : *props_it) {
       if (property_value_is_object_typed(obj, kv.first, kv.second))

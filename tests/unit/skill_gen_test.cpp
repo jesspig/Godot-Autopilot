@@ -23,7 +23,6 @@ namespace {
 
 using namespace godot_autopilot::skill_gen;
 
-// 契约 §1 的 8 册 name 定稿清单（逐字采用，顺序不限但必须精确匹配）。
 constexpr size_t kSkillCount = 8;
 const char *const kExpectedSkillNames[kSkillCount] = {
     "godot-autopilot",
@@ -35,31 +34,20 @@ const char *const kExpectedSkillNames[kSkillCount] = {
     "godot-autopilot-content",
     "godot-autopilot-csharp"};
 
-// 契约 §6 第 6 条手动白名单。初始清单来自契约；微调新增的均为明确非工具名/
-// 参数名的词（Godot API 方法、Godot 属性名、内部机制/返回字段、枚举值、
-// `game_*`/`create_*` 星号截断产物），不含任何待核实的工具名。
 const char *const kManualWhitelist[] = {
-    // 契约初始清单
     "new_errors_since_last_call", "retry_after_ms", "memory", "user", "res",
     "godot", "at_frame", "stop_on_error", "rollback_on_error", "parent_path",
     "max_depth", "include_properties", "source_code", "function_name",
     "timeout_ms", "auto_owner", "SceneRoot", "target", "retryable", "isError",
     "true", "false",
-    // 微调：插件/内部机制与域类别词
     "godot_autopilot", "editor_readiness", "resource_ops", "record_error",
     "writes_file", "is_error",
-    // 微调：运行状态/返回字段
     "already_playing", "physics_stalled", "node_count", "scan_truncated",
     "just_pressed", "global_rect",
-    // 微调：内联断言函数与 Godot API 方法
     "check_equal", "make_current", "close_scene", "get_tile_data",
-    // 微调：Godot 属性名（Godot 3→4 重命名表等）
     "target_position", "sprite_frames", "custom_minimum_size", "motion_mode",
-    // 微调：物理 joint 类型与操作类别词
     "cone_twist", "generic_6dof", "axis_lock", "collision_exception",
-    // 微调：`game_*`/`create_*` 星号截断产物
     "game_", "create_",
-    // 波次 2 内容册实测补充
     "add_render_canvas_item_", "api_type", "call_method",
     "can_instantiate", "cast_motion", "cast_to", "check_almost_equal",
     "collide_shape", "collider_id", "create_render_", "dependency_count",
@@ -71,7 +59,6 @@ const char *const kManualWhitelist[] = {
     "missing_dependency", "mouse_button", "mouse_motion", "parent_class",
     "physics_frame", "recent_engine_errors", "running_over_budget",
     "set_property", "total_lines", "unresolved_uids",
-    // 内容外置化与 7 册重构实测补充
     "action_press", "action_release", "alternative_tile", "anchor_",
     "anchors_preset", "call_deferred", "can_process", "create_tile",
     "create_timer", "current_physics_frame", "dest_files", "dest_md5",
@@ -107,8 +94,6 @@ bool is_lower_alnum(char c) {
 
 bool is_lower_alnum_us(char c) { return is_lower_alnum(c) || c == '_'; }
 
-// 契约 §6 第 6 条正则语义 ([a-z][a-z0-9]*_[a-z0-9_]*) 的手工实现：
-// 仅提取起点前不是单词字符的全小写含下划线词，避免从大写标识符中段误提取。
 void collect_snake_words(const std::string &segment, std::set<std::string> *out) {
   const size_t n = segment.size();
   size_t i = 0;
@@ -133,7 +118,6 @@ void collect_snake_words(const std::string &segment, std::set<std::string> *out)
   }
 }
 
-// 提取反引号包裹片段中的全小写含下划线词；``` 围栏代码块整体跳过不提取。
 std::set<std::string> extract_backtick_snake_words(const std::string &text) {
   std::set<std::string> words;
   size_t pos = 0;
@@ -190,9 +174,6 @@ bool starts_with(const std::string &text, const char *prefix) {
   return text.rfind(prefix, 0) == 0;
 }
 
-// 照抄 register_all_test.cpp 的 RegisteredServerFixture 构造方式：
-// L1 下经 register_all_tools 填充 catalog 拿全部工具名与 input_schema，
-// 仅注册不调用任何工具 handler。
 class SkillRegistryFixture : public ::testing::Test {
   std::unique_ptr<mcp::McpServer> server;
   std::unique_ptr<mcp::McpClient> client;
@@ -304,7 +285,6 @@ TEST(SkillGenTest, RenderedFrontmatterWellFormed) {
     EXPECT_NE(rendered.find(version_line), std::string::npos)
         << spec.name << ": missing " << version_line << " line";
 
-    // description 含冒号+空格时须以英文双引号包裹（契约 §2）；否则两种形态皆可。
     const std::string plain_desc =
         "description: " + spec.description + "\n";
     const std::string quoted_desc =
@@ -362,7 +342,6 @@ TEST_F(SkillRegistryFixture, ToolNamesExistInRegistry) {
 }
 
 TEST(SkillGenTest, EverySkillDeclaresReferences) {
-  // 契约 §1 的新结构：每册都带 references/ 文件，files[0] 固定为 SKILL.md。
   for (const SkillSpec &spec : all_skills()) {
     ASSERT_GE(spec.files.size(), size_t{2})
         << spec.name << " must declare at least one references/ file";

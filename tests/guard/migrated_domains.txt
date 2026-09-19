@@ -1,0 +1,33 @@
+# 迁移进度清单：一行一个域文件名（不含路径与扩展名），例如 scene
+# 特殊行 strict：全量迁移完成后启用，禁止旧宏/schema 文件/tool_input_schema 残留
+audio
+capture
+display
+render
+editor
+config
+input_map
+input
+physics
+nav
+resource
+script
+scene
+scene_tree
+property
+group
+debug
+game
+debugger
+doc
+analyze
+system
+test
+animation
+theme
+os
+text
+tilemap
+spriteframes
+tileset
+strict

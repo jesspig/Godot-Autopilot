@@ -6,13 +6,13 @@ tags:
   - 模块
   - 核心层
   - 线程模型
-timestamp: "2026-09-18T16:35:00+08:00"
+timestamp: "2026-09-19T17:39:40+08:00"
 resource: src/core/
 ---
 
 # 核心模块（src/core/）
 
-> 审计日期：2026-09-18（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-13 上午随资源 path 加载注册进 ResourceRegistry 同步；09-13 下午随收口批次同步 PluginConfig allow 键、授权门与 call_tool MCP 线程例外；09-13 17:50 随 B 组知识库审计同步——补正主线程排空点行号、移除已删除的 architecture.md 对照行；09-13 晚随 0.2.4 版知识库全量审计同步——补正 query_recent/query_from 消费方注释、SCENE/EDITOR 两级初始化描述、GDA_FORCE_HEADLESS 语义与 editor_readiness 消费方；09-14 随修复批次同步——PluginConfig 消费方增列 Allow game_runtime 复选框；09-16 随坐标换算批次同步——补 `editor_coords` 职责行与新增纯函数（此前职责表漏列该模块），基于当前工作树代码逐行核对（不依赖 git 历史）；09-18 随知识库一致性审计同步——`query_recent(50)` 消费方行号 470→527（以 `resource_handlers.cpp` 实测为准）、审计日期头补齐 09-16 改动的日期同步。
+> 审计日期：2026-09-19（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-13 上午随资源 path 加载注册进 ResourceRegistry 同步；09-13 下午随收口批次同步 PluginConfig allow 键、授权门与 call_tool MCP 线程例外；09-13 17:50 随 B 组知识库审计同步——补正主线程排空点行号、移除已删除的 architecture.md 对照行；09-13 晚随 0.2.4 版知识库全量审计同步——补正 query_recent/query_from 消费方注释、SCENE/EDITOR 两级初始化描述、GDA_FORCE_HEADLESS 语义与 editor_readiness 消费方；09-14 随修复批次同步——PluginConfig 消费方增列 Allow game_runtime 复选框；09-16 随坐标换算批次同步——补 `editor_coords` 职责行与新增纯函数（此前职责表漏列该模块），基于当前工作树代码逐行核对（不依赖 git 历史）；09-18 随知识库一致性审计同步——`query_recent(50)` 消费方行号 470→527（以 `resource_handlers.cpp` 实测为准）、审计日期头补齐 09-16 改动的日期同步；09-19 随注释清理批同步——坐标换算引擎映射与缓存提示取舍入文档（源码整行注释删除）。
 > 覆盖范围：`src/core/` 下 9 个 cpp + 12 个头 + `version.hpp.in` 模板（`CommandQueue` 与 `error_watermark` 为 header-only，实际 12 业务组 + 版本）。注意：`CommandQueue` 为 header-only（仅 `command_queue.hpp`，无对应 `.cpp`），`error_watermark.hpp` 同为 header-only，`version.hpp.in` 经 `configure_file` 生成 `version.hpp`。
 
 ## 模块简介
@@ -28,7 +28,7 @@ resource: src/core/
 | `ExportGuard` | `export_guard.cpp/hpp` | 导出期间置位全局原子标志，供工具分发判定"导出中" | `dispatch::export_blocked_result`、`_enter_tree` 注册 |
 | `LogSystem` | `log_system.cpp/hpp` | 进程内环形日志（仅内存，无文件输出），单例 | 全部模块、`McpLogDock`、log 类资源 |
 | `ModeDetector` | `mode_detector.cpp/hpp` | 运行时模式检测（编辑器/游戏/未知） | `_enter_tree` 启动日志 |
-| 坐标换算（`coords` 命名空间，纯函数） | `editor_coords.cpp/hpp` | 仿射/Rect/图像尺寸纯逻辑 + 画布空间→窗口客户区换算（09-16 新增 `viewport_point_to_window` / `viewport_rect_center_to_window`，`screen_transform×canvas` 复合，恒等原样返回） | 游戏侧 `run_ui_click` 注入坐标换算（见[入口与运行时](entry_runtime.md)） |
+| 坐标换算（`coords` 命名空间，纯函数） | `editor_coords.cpp/hpp` | 仿射/Rect/图像尺寸纯逻辑 + 画布空间→窗口客户区换算（09-16 新增 `viewport_point_to_window` / `viewport_rect_center_to_window`，`screen_transform×canvas` 复合，恒等原样返回；画布空间即 `Control::get_global_rect()`/`get_global_transform()` 所在空间，注入的 `InputEventMouseButton.position` 为窗口客户区坐标（引擎侧经 `get_final_transform()` 反变换）——`src/core/editor_coords.hpp:12-15`） | 游戏侧 `run_ui_click` 注入坐标换算（见[入口与运行时](entry_runtime.md)） |
 | `ResourceRegistry` | `resource_registry.cpp/hpp` | 内存资源缓存（oid 键 + `name:` 前缀键），全局 mutex 保护 | 资源类工具 |
 | `SceneDirtyTracker` | `scene_dirty_tracker.cpp/hpp` | 记录"当前编辑场景是否被修改"及根节点实例 ID | `GodotAutopilotPlugin::_get_unsaved_status` |
 | `error_watermark` | `error_watermark.hpp`（header-only） | 错误水印计数器：累积待消费错误数，供 MCP 响应附 `new_errors_since_last_call` doorbell | `register_all.cpp`（响应后处理）、`runtime_ops.cpp`（游戏 runtime_error 计数） |
@@ -113,6 +113,7 @@ resource: src/core/
 - `bool restart(uint16_t port)` — `stop()` → 更新 `port_` → `start()`；供配置面板运行时改端口（配置面板 Apply 后立即生效，无需重启编辑器）
 - `int get_port()` / `bool is_running()` / `const std::string& last_error()`
 - MCP 服务器标识：`mcp::Implementation{"godot-autopilot", GDA_VERSION}`（宏经 `configure_file` 由根 `VERSION` 文件生成，见 `build.md` "版本号单一来源"）
+- 缓存提示（`server_context.cpp:91-99`）：MCP 2026-07-28 规范要求六类 cacheable 结果携带缓存提示，协商到 2026 era 的客户端会按必填字段校验；`ttlMs=0` 表示"立即过期"，仅满足字段声明，客户端仍每次重新拉取，行为与未声明时一致
 - 生命周期回调（全部写 Transport 类别日志）：`on_method_called`（Debug）、`on_client_connected` / `on_initialized` / `on_transport_close`（Info）、`on_protocol_error` / `on_transport_error`（Error）
 - 诊断日志增强：初始化 / 注册工具 / 启动传输 / 停止 / 重启等关键流程均补充诊断日志；`start()` 启动失败不再硬编码 "unknown exception"，改为输出捕获到的真实异常类型，便于排查
 - `register_tools()` 注册四类：工具、资源、prompt、调试器专用资源/prompt

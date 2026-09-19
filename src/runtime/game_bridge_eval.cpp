@@ -404,14 +404,6 @@ bool call_arg_number(const JV &obj, const char *key, double &out) {
   return true;
 }
 
-// JSON objects such as {"x":440,"y":150} carry no type tag, so a bare
-// deserialize() yields Dictionary and engine-side callv then fails with
-// CALL_ERROR_INVALID_ARGUMENT. Convert shapes that match a built-in value
-// type. Float variants are used ("x"+"y" becomes Vector2); integer variants
-// (Vector2i/Vector3i/...) are resolved through method-signature hints in
-// method_arg_hints(). Marker objects of the object-ref path
-// (__node_ref__/object_id/object_id_str/class) are left untouched.
-// Priority: Color > Vector4 > Vector3 > Vector2. Extra keys are ignored.
 bool try_heuristic_builtin_arg(const JV &arg, godot::Variant &out) {
   if (!arg.IsObject())
     return false;
@@ -452,10 +444,6 @@ bool try_heuristic_builtin_arg(const JV &arg, godot::Variant &out) {
   return false;
 }
 
-// Resolve per-argument type hints from the node's method list, reusing the
-// same typed path as set_property (util::infer_type_hint plus
-// deserialize(arg, hint)). Untyped (NIL) parameters yield an empty hint so the
-// heuristic/inferred path applies. Returns one entry per requested argument.
 std::vector<std::string> method_arg_hints(godot::Node *node,
                                           const std::string &method_name,
                                           size_t argc) {
@@ -543,10 +531,6 @@ JV eval_call_error_result(const std::string &method_name,
   return err;
 }
 
-// Native-bind failure diagnosis (additive only): the KIND/message shape above
-// stays compatible; callers attach `diagnosis` + `hint` without changing it.
-// Covers zero-arg built-ins such as is_on_wall/is_on_floor whose MethodBind
-// hash may disagree with the live method list depending on call path.
 std::string eval_bind_suspected_cause(bool has_method, int64_t expected_hash,
                                       bool bind_found,
                                       GDExtensionCallErrorType err_type) {
@@ -594,8 +578,6 @@ std::string make_native_bind_probe_hint(const std::string &method_name) {
          "with compiled bindings depending on the call path";
 }
 
-// MethodBind hash for classdb_get_method_bind comes from the live method list
-// ("id" carries the bind hash, same value the generated bindings bake in).
 int64_t eval_native_method_hash(godot::Node *node,
                                 const std::string &method_name) {
   godot::TypedArray<godot::Dictionary> methods = node->get_method_list();
@@ -718,28 +700,23 @@ JV op_eval_call_method(const JV &params, int64_t request_id) {
         " — expected a built-in or script method of that node; use "
         "get_property_list or the node's script to list available methods");
     const std::string cause = eval_bind_suspected_cause(
-        has_method_bool, expected_hash, /*bind_found=*/false,
+        has_method_bool, expected_hash, false,
         GDEXTENSION_CALL_ERROR_INVALID_METHOD);
     err["diagnosis"] = make_native_bind_diagnosis(
         method_name, node_class_str, expected_hash, has_method_bool,
-        has_script_method, /*tried_script=*/false,
-        /*native_bind_found=*/false, cause);
+        has_script_method, false,
+        false, cause);
     err["hint"] = JV(make_native_bind_probe_hint(method_name));
     return err;
   }
   uint64_t call_seq_before = current_error_seq();
 
-  // arg_values owns the converted arguments; arg_ptrs only borrows them and
-  // both outlive the synchronous interface calls below.
   std::vector<const godot::Variant *> arg_ptrs;
   arg_ptrs.reserve(arg_values.size());
   for (const auto &v : arg_values) {
     arg_ptrs.push_back(&v);
   }
 
-  // Direct GDExtension call with synchronous CallError, mirroring engine
-  // Object::callp: script method first, native MethodBind on INVALID_METHOD
-  // fallback. Success (including void/null) is decided by r_error alone.
   godot::Variant result;
   GDExtensionCallError call_err{};
   call_err.error = GDEXTENSION_CALL_OK;
@@ -795,8 +772,8 @@ JV op_eval_call_method(const JV &params, int64_t request_id) {
     }
     GameBridgeEvalAwaiter *awaiter = memnew(GameBridgeEvalAwaiter);
     awaiter->setup(request_id, godot::Ref<godot::RefCounted>(result),
-                   /*target=*/nullptr, /*parent=*/nullptr, /*persist=*/false,
-                   /*persist_path=*/"", await_timeout_ms, call_seq_before);
+                   nullptr, nullptr, false,
+                   "", await_timeout_ms, call_seq_before);
     return JV();
   }
 

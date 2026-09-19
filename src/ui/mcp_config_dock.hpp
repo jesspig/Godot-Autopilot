@@ -29,6 +29,7 @@ class McpConfigDock : public godot::EditorDock {
   godot::CheckBox *show_time_check = nullptr;
   godot::CheckBox *allow_code_execute_check = nullptr;
   godot::CheckBox *allow_game_runtime_check = nullptr;
+  godot::CheckBox *allow_user_tools_check = nullptr;
   McpLogDock *log_dock_ = nullptr;
 
   ServerContext *server_ctx = nullptr;
@@ -54,6 +55,7 @@ private:
   void _on_show_time_toggled(bool checked);
   void _on_allow_code_execute_toggled(bool checked);
   void _on_allow_game_runtime_toggled(bool checked);
+  void _on_allow_user_tools_toggled(bool checked);
   void _on_allow_toggled(const char *capability, godot::CheckBox *box,
                          bool checked);
 };

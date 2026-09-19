@@ -32,9 +32,6 @@
 namespace godot_autopilot {
 namespace resource_ops {
 
-// ResourceUID::add_id() asserts the id is absent while set_id() asserts it is
-// present (core/io/resource_uid.cpp:164 and :178 in the 4.7.2 tree), so table
-// membership, not the caller, decides which of the two writes may run.
 bool uid_needs_add(bool already_registered) { return !already_registered; }
 
 namespace {
@@ -299,7 +296,6 @@ void sync_editor_and_uid_after_save(const std::string &src_path,
   if (editor) {
     auto *efs = editor->get_resource_filesystem();
     if (efs) {
-      // This registers the saved file's uid in the ResourceUID table already.
       efs->update_file(dest_gs);
     }
     if (dest_path != src_path) {
@@ -1289,8 +1285,6 @@ void collect_matching_files(const std::string &dir,
                             std::vector<std::string> &out) {
   ResourceScanBudget tmp;
   bool truncated = false;
-  // delegate to budget-aware version for backwards compatibility (no byte tracking)
-  // simple path without bytes tracking
   godot::Ref<godot::DirAccess> da =
       godot::DirAccess::open(godot::String(dir.c_str()));
   if (da.is_null()) {

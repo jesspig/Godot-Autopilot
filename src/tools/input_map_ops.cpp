@@ -205,10 +205,6 @@ void persist_action(const std::string &action_name, godot::InputMap *im,
   ps->save();
 }
 
-// KEY_NAME_TO_CODE 的"剥 KEY_ 前缀"视图（键为大写裸名：P、SPACE、KP_ENTER…），
-// 供 resolve_key_name_code 查表；RETURN/CONTROL 是引擎 keyboard.cpp 表里的
-// 裸别名，其常量名与 Key 枚举名不同（KEY_ENTER/KEY_CTRL），在 KEY_NAME_TO_CODE
-// 里没有剥前缀形式，单独补上。
 const std::unordered_map<std::string, int64_t> &key_code_by_bare_name() {
   static const std::unordered_map<std::string, int64_t> table = [] {
     std::unordered_map<std::string, int64_t> t;
@@ -225,12 +221,6 @@ const std::unordered_map<std::string, int64_t> &key_code_by_bare_name() {
 
 } // namespace
 
-// 键名 → 键码的唯一判决（编辑器侧 add_input_map_action_event 与游戏侧运行时
-// src/runtime/game_bridge_input.cpp:parse_keycode 共用，避免两侧口径漂移）。
-// 归一化顺序：ASCII 大写 → 剥掉 "KEY_" 前缀 → 单字符 A-Z/0-9 取 ASCII 值
-// （与 Key 枚举一致：A=65、0=48）→ 查裸名表 → 纯数字串按数值解析（> 8 位
-// 必然超出键码上限 0xFFFFFF，直接判无效）。返回 0（Key::KEY_NONE，不是合法
-// 键码）表示无法解析。
 int64_t resolve_key_name_code(const std::string &name) {
   std::string u = name;
   for (auto &c : u)

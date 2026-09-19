@@ -16,10 +16,13 @@ namespace godot_autopilot {
 void register_all_tools(mcp::McpServer &server, CommandQueue &queue,
                         ToolCatalog &catalog, Bm25Index &index, int port);
 
+void refresh_derived(const std::shared_ptr<ToolRegistry>& registry,
+                     ToolCatalog& catalog, Bm25Index& index);
+
+void refresh_dynamic_tools();
+
 std::shared_ptr<ToolRegistry> get_active_registry();
 void clear_active_registry();
-
-mcp::JsonValue tool_input_schema(const std::string& name, bool basic);
 
 } // namespace godot_autopilot
 

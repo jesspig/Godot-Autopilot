@@ -523,6 +523,128 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
   size_t stopped_after = 0;
 
   const auto &arr = ops->GetArray();
+  std::vector<mcp::JsonValue> payloads;
+  std::vector<bool> op_ok;
+  payloads.reserve(arr.size());
+  op_ok.reserve(arr.size());
+  auto push_payload = [&](const mcp::JsonValue &item) {
+    const auto *st = item.Find("status");
+    const bool ok =
+        st != nullptr && st->IsString() && st->GetString() == "ok";
+    op_ok.push_back(ok);
+    const mcp::JsonValue *v = nullptr;
+    if (ok) {
+      v = item.Find("data");
+      if (v == nullptr)
+        v = item.Find("result");
+    } else {
+      v = item.Find("error");
+      if (v == nullptr)
+        v = item.Find("result");
+    }
+    if (v != nullptr)
+      payloads.push_back(*v);
+    else
+      payloads.push_back(mcp::JsonValue());
+  };
+  std::function<bool(mcp::JsonValue &, size_t, std::string &)> resolve_refs =
+      [&](mcp::JsonValue &node, size_t cur, std::string &error_out) -> bool {
+    if (node.IsString()) {
+      const std::string s = node.GetString();
+      if (s == "$prev") {
+        if (cur == 0) {
+          error_out = "unresolvable reference '$prev': no previous operation";
+          return false;
+        }
+        node = payloads[cur - 1];
+        return true;
+      }
+      const std::string kPrefix = "$steps[";
+      if (s.compare(0, kPrefix.size(), kPrefix) == 0) {
+        const std::string kResultSuffix = "].result";
+        const std::string kErrorSuffix = "].error";
+        int kind = 0;
+        std::string middle;
+        if (s.size() > kPrefix.size() + kResultSuffix.size() &&
+            s.compare(s.size() - kResultSuffix.size(), kResultSuffix.size(),
+                      kResultSuffix) == 0) {
+          kind = 1;
+          middle = s.substr(kPrefix.size(),
+                            s.size() - kPrefix.size() - kResultSuffix.size());
+        } else if (s.size() > kPrefix.size() + kErrorSuffix.size() &&
+                   s.compare(s.size() - kErrorSuffix.size(),
+                             kErrorSuffix.size(), kErrorSuffix) == 0) {
+          kind = 2;
+          middle = s.substr(kPrefix.size(),
+                            s.size() - kPrefix.size() - kErrorSuffix.size());
+        } else {
+          return true;
+        }
+        bool valid = !middle.empty();
+        size_t pos = 0;
+        if (valid && middle[0] == '-') {
+          pos = 1;
+          if (middle.size() == 1)
+            valid = false;
+        }
+        for (; valid && pos < middle.size(); ++pos) {
+          if (!std::isdigit(static_cast<unsigned char>(middle[pos])))
+            valid = false;
+        }
+        long long n = 0;
+        if (valid) {
+          try {
+            n = std::stoll(middle);
+          } catch (...) {
+            valid = false;
+          }
+        }
+        if (!valid || n < 0 ||
+            n >= static_cast<long long>(arr.size())) {
+          error_out =
+              "unresolvable reference '" + s + "': index out of range";
+          return false;
+        }
+        if (n >= static_cast<long long>(cur)) {
+          error_out = "unresolvable reference '" + s +
+                      "': forward reference (operation " + middle +
+                      " has not executed yet)";
+          return false;
+        }
+        const size_t idx = static_cast<size_t>(n);
+        if (kind == 1 && !op_ok[idx]) {
+          error_out = "unresolvable reference '" + s +
+                      "': wrong status (operation " + middle +
+                      " did not succeed)";
+          return false;
+        }
+        if (kind == 2 && op_ok[idx]) {
+          error_out = "unresolvable reference '" + s +
+                      "': wrong status (operation " + middle +
+                      " did not fail)";
+          return false;
+        }
+        node = payloads[idx];
+        return true;
+      }
+      return true;
+    }
+    if (node.IsObject()) {
+      for (auto &kv : node.GetObject()) {
+        if (!resolve_refs(kv.second, cur, error_out))
+          return false;
+      }
+      return true;
+    }
+    if (node.IsArray()) {
+      for (auto &el : node.GetArray()) {
+        if (!resolve_refs(el, cur, error_out))
+          return false;
+      }
+      return true;
+    }
+    return true;
+  };
   for (size_t i = 0; i < arr.size(); ++i) {
     mcp::JsonValue result_item(mcp::JsonValue::object_tag);
     result_item["index"] = mcp::JsonValue(static_cast<int64_t>(i));
@@ -531,6 +653,7 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
     if (!op.IsObject()) {
       result_item["status"] = mcp::JsonValue("error");
       result_item["error"] = mcp::JsonValue("operation is not an object");
+      push_payload(result_item);
       results.PushBack(std::move(result_item));
       ++failed;
       if (stop_on_error) {
@@ -545,6 +668,7 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
     if (!tool || !tool->IsString()) {
       result_item["status"] = mcp::JsonValue("error");
       result_item["error"] = mcp::JsonValue("missing required field: tool");
+      push_payload(result_item);
       results.PushBack(std::move(result_item));
       ++failed;
       if (stop_on_error) {
@@ -563,6 +687,7 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
       if (!a->IsObject()) {
         result_item["status"] = mcp::JsonValue("error");
         result_item["error"] = mcp::JsonValue("operation args must be an object");
+        push_payload(result_item);
         results.PushBack(std::move(result_item));
         ++failed;
         if (stop_on_error) {
@@ -573,6 +698,23 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
         continue;
       }
       tool_args = *a;
+    }
+
+    {
+      std::string ref_error;
+      if (!resolve_refs(tool_args, i, ref_error)) {
+        result_item["status"] = mcp::JsonValue("error");
+        result_item["error"] = mcp::JsonValue(ref_error);
+        push_payload(result_item);
+        results.PushBack(std::move(result_item));
+        ++failed;
+        if (stop_on_error) {
+          stopped = true;
+          stopped_after = i + 1;
+          break;
+        }
+        continue;
+      }
     }
 
     mcp::JsonValue handler_result = dispatch::call_handler(tool_name, tool_args);
@@ -589,6 +731,7 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
         std::string discard_detail;
         runtime_ops::discard_pending(pending_id, discard_detail);
         result_item["detail"] = mcp::JsonValue(discard_detail);
+        push_payload(result_item);
         results.PushBack(std::move(result_item));
         ++failed;
         if (stop_on_error) {
@@ -607,6 +750,7 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
             "batch_execute directly (not through call_tool) so the wait runs "
             "on the transport thread");
         result_item["detail"] = mcp::JsonValue(discard_detail);
+        push_payload(result_item);
         results.PushBack(std::move(result_item));
         ++failed;
         if (stop_on_error) {
@@ -628,6 +772,7 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
           awaited.IsObject() && awaited.Find("error") != nullptr;
       result_item["status"] = mcp::JsonValue(awaited_error ? "error" : "ok");
       result_item["result"] = std::move(awaited);
+      push_payload(result_item);
       results.PushBack(std::move(result_item));
       if (awaited_error) {
         ++failed;
@@ -645,6 +790,7 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
     if (auto *err = handler_result.Find("error")) {
       result_item["status"] = mcp::JsonValue("error");
       result_item["error"] = *err;
+      push_payload(result_item);
       results.PushBack(std::move(result_item));
       ++failed;
       if (stop_on_error) {
@@ -655,6 +801,7 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
     } else {
       result_item["status"] = mcp::JsonValue("ok");
       result_item["data"] = std::move(handler_result);
+      push_payload(result_item);
       results.PushBack(std::move(result_item));
       ++succeeded;
     }

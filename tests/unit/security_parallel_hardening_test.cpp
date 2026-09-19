@@ -18,7 +18,6 @@ using godot_autopilot::LogEntry;
 using godot_autopilot::LogLevel;
 using godot_autopilot::LogSystem;
 
-// Helper to manage env var for authorization tests
 struct EnvGuard {
   std::string key;
   std::string old;
@@ -57,23 +56,17 @@ struct EnvGuard {
   }
 };
 
-// ---------------- T12: CommandQueue lifecycle ----------------
 
 TEST(SecurityHardening, QueueCloseRejectsPending) {
   CommandQueue q(4);
-  // Fill queue with 1 task and close before drain
   auto f = q.submit([] { return 42; });
   q.close();
   EXPECT_TRUE(q.is_closed());
-  // pending should be rejected with exception
   EXPECT_THROW(f.get(), std::runtime_error);
-  // submit after close also rejected
   auto f2 = q.submit([] { return 1; });
   EXPECT_THROW(f2.get(), std::runtime_error);
   EXPECT_TRUE(q.is_closed());
-  // drain after close returns false and does not execute
   EXPECT_FALSE(q.drain());
-  // open should succeed when no pending
   q.open();
   EXPECT_FALSE(q.is_closed());
   auto f3 = q.submit([] { return 99; });
@@ -85,9 +78,8 @@ TEST(SecurityHardening, QueueFullReturnsError) {
   CommandQueue q(2);
   auto f1 = q.submit([] { return 1; });
   auto f2 = q.submit([] { return 2; });
-  auto f3 = q.submit([] { return 3; }); // should be full
+  auto f3 = q.submit([] { return 3; });
   EXPECT_THROW(f3.get(), std::runtime_error);
-  // drain pending two
   q.drain();
   EXPECT_EQ(f1.get(), 1);
   EXPECT_EQ(f2.get(), 2);
@@ -95,13 +87,12 @@ TEST(SecurityHardening, QueueFullReturnsError) {
 
 TEST(SecurityHardening, DrainThreadCheck) {
   CommandQueue q;
-  q.drain(); // first drain fixes main thread
+  q.drain();
   EXPECT_TRUE(q.is_main_thread());
   bool other_drained = true;
   std::thread t([&] { other_drained = q.drain(); });
   t.join();
   EXPECT_FALSE(other_drained);
-  // main thread still can drain
   EXPECT_TRUE(q.drain());
 }
 
@@ -115,25 +106,17 @@ TEST(SecurityHardening, QueueOpenWithPendingThrows) {
   EXPECT_THROW(q.open(), std::logic_error);
   q.drain();
   f.get();
-  // after drain, open should work
   q.close();
   q.open();
   EXPECT_FALSE(q.is_closed());
 }
 
-// ---------------- T13: Path safety ----------------
 TEST(SecurityHardening, ProjectPathRejectsUnsupportedScheme) {
   auto r = godot_autopilot::util::normalize_project_path("http://evil.com/file", true);
   EXPECT_FALSE(r.valid());
 }
 TEST(SecurityHardening, ProjectPathRejectsParentTraversal) {
   auto r = godot_autopilot::util::normalize_project_path("res://../outside", false);
-  // lexical normalization should reject escaping
-  // our implementation returns path that would escape -> should be rejected due to outside? Actually relative path with .. that empties.
-  // We test that valid() is false or value does not contain ..
-  // The function treats .. at start as empty -> returns res:// + "" which may be considered valid but we check.
-  // Instead test absolute escaping
-  // For now check that res://a/../../b is rejected or normalized inside.
   auto r2 = godot_autopilot::util::normalize_project_path("res://a/../b", false);
   EXPECT_TRUE(r2.valid());
   EXPECT_EQ(r2.value, "res://b");
@@ -148,17 +131,13 @@ TEST(SecurityHardening, ProjectPathAcceptsResAndUser) {
   EXPECT_FALSE(r3.valid());
 }
 TEST(SecurityHardening, ProjectPathRejectsAbsoluteOutsideRoot) {
-  // Absolute OS paths are rejected unless inside project; in unit test without engine we just verify the API does not crash
-  // and that a relative path with parent traversal is handled.
   auto r = godot_autopilot::util::normalize_project_path("res://a/../b", false);
   EXPECT_TRUE(r.valid());
   EXPECT_EQ(r.value, "res://b");
-  // Unsupported scheme should be rejected without needing ProjectSettings
   auto r2 = godot_autopilot::util::normalize_project_path("http://evil.com/file", true);
   EXPECT_FALSE(r2.valid());
 }
 
-// ---------------- T13: Authorization ----------------
 TEST(SecurityHardening, AuthorizationDefaultDenies) {
   EnvGuard g("GODOT_AUTOPILOT_ALLOW", nullptr);
   EXPECT_FALSE(godot_autopilot::authorization::capability_enabled("process"));
@@ -198,7 +177,8 @@ TEST(SecurityHardening, CapabilityForToolMapping) {
 
 TEST(SecurityHardening, AllowListRemoveExpandsAll) {
   using godot_autopilot::authorization::allow_list_remove;
-  EXPECT_EQ(allow_list_remove("all", "code_execute"), "process,game_runtime");
+  EXPECT_EQ(allow_list_remove("all", "code_execute"),
+            "process,game_runtime,user_tools");
   EXPECT_EQ(allow_list_remove("process,code_execute", "code_execute"),
             "process");
   EXPECT_EQ(allow_list_remove("process", "game_runtime"), "process");
@@ -233,7 +213,6 @@ TEST(SecurityHardening, EnableMessageDockHintOnlyForToggleable) {
             std::string::npos);
 }
 
-// ---------------- T14: Config and limits ----------------
 TEST(SecurityHardening, ConfigConstantsSane) {
   EXPECT_EQ(godot_autopilot::GDA_DEFAULT_PORT, 9527);
   EXPECT_GT(godot_autopilot::GDA_MAX_TIMEOUT_MS, godot_autopilot::GDA_DEFAULT_TIMEOUT_MS);
@@ -243,10 +222,8 @@ TEST(SecurityHardening, ConfigConstantsSane) {
   EXPECT_GT(godot_autopilot::GDA_SCAN_MAX_DEPTH, 0u);
 }
 
-// Variant limits are enforced via config; test that config exists and truncation logic is defined
 TEST(SecurityHardening, VariantStringTruncates) {
   EXPECT_GT(godot_autopilot::GDA_VARIANT_MAX_STRING_BYTES, 0u);
-  // Simulate truncation marker check without needing Godot engine
   std::string big(godot_autopilot::GDA_VARIANT_MAX_STRING_BYTES + 100, 'x');
   std::string truncated = big;
   if (truncated.size() > godot_autopilot::GDA_VARIANT_MAX_STRING_BYTES) {
@@ -264,7 +241,6 @@ TEST(SecurityHardening, VariantArrayTruncates) {
   EXPECT_EQ(capped, godot_autopilot::GDA_VARIANT_MAX_ARRAY_ELEMENTS);
 }
 
-// Log snapshot stability already tested, add concurrent query test
 TEST(SecurityHardening, LogConcurrentQueryStable) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::System, "CONCURRENT_1");
   std::vector<std::thread> writers;
@@ -279,7 +255,6 @@ TEST(SecurityHardening, LogConcurrentQueryStable) {
   });
   for (auto &th : writers) th.join();
   reader.join();
-  // snapshots should be valid copies
   for (auto &snap : snapshots) {
     for (auto &e : snap) {
       EXPECT_FALSE(e.message.empty());

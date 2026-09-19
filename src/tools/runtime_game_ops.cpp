@@ -235,7 +235,6 @@ mcp::JsonValue handle_game_eval(const mcp::JsonValue &args) {
   copy_optional(args, params, "persist_name");
   copy_optional(args, params, "timeout_ms");
   copy_optional(args, params, "assert");
-  // assert 走同权限的新游戏 op（eval_assert）：不断言时保持原 eval 路径。
   const std::string op =
       has_assert ? std::string(GDA_OP_EVAL_ASSERT) : std::string(GDA_OP_EVAL);
   return handle_gda_send(op, params, extract_timeout(args),

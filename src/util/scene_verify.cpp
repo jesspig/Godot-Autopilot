@@ -43,7 +43,6 @@ void collect_memory_paths(godot::Node *root, std::vector<std::string> &out_paths
     godot::Node *child = root->get_child(i);
     if (!child)
       continue;
-    // 子树路径以子名开头（如 "Child"、"Child/Grand"），统一加根名前缀。
     std::vector<std::string> sub;
     collect_memory_paths(child, sub);
     for (std::string &p : sub) {
@@ -72,7 +71,6 @@ std::string trim_left(const std::string &s) {
   return s.substr(i);
 }
 
-// 提取 [node ...] 节中的 attr="value"，不支持转义引号（节点名极少含引号）。
 bool extract_attr(const std::string &section, const std::string &attr, std::string &out) {
   const std::string key = attr + "=\"";
   std::size_t pos = section.find(key);

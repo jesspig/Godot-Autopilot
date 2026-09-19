@@ -90,6 +90,7 @@ add_library(godot-autopilot SHARED
     src/runtime/game_bridge_verify.cpp
     src/tools/animation_ops.cpp
     src/tools/audio_ops.cpp
+    src/tools/autopilot_tools.cpp
     src/tools/capture_ops.cpp
     src/tools/code_exec_ops.cpp
     src/tools/config_ops.cpp
@@ -120,15 +121,7 @@ add_library(godot-autopilot SHARED
     src/tools/register_all.cpp
     src/tools/dispatch.cpp
     src/tools/analyze_ops.cpp
-    src/tools/schema_animation_ops.cpp
     src/tools/schema_builder.cpp
-    src/tools/schema_scene_ops.cpp
-    src/tools/schema_editor_config_ops.cpp
-    src/tools/schema_physics_ops.cpp
-    src/tools/schema_render_audio_ops.cpp
-    src/tools/schema_debug_sys_ops.cpp
-    src/tools/schema_content_ops.cpp
-    src/tools/schema_theme_ops.cpp
     src/tools/render_ops.cpp
     src/tools/environment_ops.cpp
     src/tools/resource_ops.cpp
@@ -140,6 +133,9 @@ add_library(godot-autopilot SHARED
     src/tools/script_patch_ops.cpp
     src/tools/spriteframes_ops.cpp
     src/tools/tool_catalog.cpp
+    src/tools/tool_args.cpp
+    src/tools/tool_pipeline.cpp
+    src/tools/tool_invoke.cpp
     src/util/bm25_index.cpp
     src/util/variant_json.cpp
     src/util/client_config_gen.cpp

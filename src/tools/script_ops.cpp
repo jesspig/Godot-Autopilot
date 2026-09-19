@@ -27,22 +27,11 @@
 namespace godot_autopilot {
 namespace script_ops {
 
-// —— 脚本取用口径（纯函数：不触碰 Godot 对象，L1 由
-// tests/unit/script_freshness_test.cpp 直接覆盖）——
-//
-// godot-cpp 生成头的 ResourceLoader::load() 缺省 p_cache_mode = (CacheMode)1，
-// 即 CACHE_MODE_REUSE：调用点只传 path 时会命中 ResourceCache 并原样返回旧实例，
-// 不读盘（core/io/resource_loader.cpp:800-809）。要拿到磁盘版本必须显式传
-// CACHE_MODE_IGNORE —— 该模式下 GDScript 格式加载器让 GDScriptCache 重新
-// load_source_code() + reload()（modules/gdscript/gdscript_resource_format.cpp:41-42
-// → modules/gdscript/gdscript_cache.cpp:372-381）。
 int script_load_cache_mode(bool fresh) {
   return fresh ? static_cast<int>(godot::ResourceLoader::CACHE_MODE_IGNORE)
                : static_cast<int>(godot::ResourceLoader::CACHE_MODE_REUSE);
 }
 
-// 只读检查类工具的可选 fresh 参数：只认字面 true。缺省或非布尔值保持既有 REUSE
-// 语义（不读盘），以免既有客户端在升版后取用口径发生静默变化。
 bool wants_fresh_load(const mcp::JsonValue &args) {
   const mcp::JsonValue *flag = args.Find("fresh");
   return flag != nullptr && flag->IsBool() && flag->GetBool();
@@ -77,7 +66,6 @@ bool try_compile_source(const std::string &source_code,
     error_out = "failed to create GDScript";
     return false;
   }
-  // 与写盘路径同款 UTF-8 构造（见 handle_create 注释），保证编译看到的与落盘一致。
   script->set_source_code(godot::String::utf8(source_code.c_str()));
   script->set_path_cache(godot::String(path_for_cache.c_str()));
   size_t compile_log_before = debugger_ops::capture_log_count();
@@ -161,10 +149,6 @@ mcp::JsonValue serialize_resource(const godot::Ref<godot::Resource> &res) {
   return j;
 }
 
-// 只摘除 ResourceCache 里的实例（set_path("")），不触及 GDScriptCache —— 后者仍
-// 持有同一个 GDScript，REUSE 装载会直接返回它（gdscript_cache.cpp:352-358 命中
-// full_gdscript_cache 即早返回，不读盘）。脚本刷新已改用 load_script_fresh （IGNORE
-// 装载一次）；本函数保留给「只摘除、不重读」的场景。
 [[maybe_unused]] bool invalidate_cached_resource(const std::string &path) {
   auto *loader = godot::ResourceLoader::get_singleton();
   if (!loader || !loader->has_cached(godot::String::utf8(path.c_str()))) {
@@ -215,9 +199,6 @@ bool load_script_fresh(const std::string &path,
                        mcp::JsonValue &err_out) {
   if (!load_script_resource(path, true, out_script, err_out))
     return false;
-  // IGNORE 装载已让 GDScriptCache 重新 load_source_code() 并 reload()；这里再按编辑器
-  // 同款姿势重编译一次（editor/script/script_editor_plugin.cpp:2562-2565），保证缓存实例
-  // 与其使用者看到的是磁盘版本。
   out_script->reload(true);
   return true;
 }
@@ -427,8 +408,6 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
     return e;
   }
 
-  // 编译门（与 patch_script 共用 try_compile_source）：先编译后保存，
-  // 编译失败零写盘。语义与旧内联实现一致，仅错误文本收敛到同一函数。
   std::string compile_error;
   if (!try_compile_source(source_code, path, compile_error)) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -444,12 +423,8 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
     return e;
   }
 
-  // 源文件按 UTF-8 落盘（ResourceFormatSaverGDScript::save → FileAccess::store_string
-  // 写入 String 的 UTF-8 字节），故必须用 String::utf8 构造；latin1 构造会让每个字节
-  // 变成一个字符，CJK 注释写出后变乱码且 readback 校验失败。
   script->set_source_code(godot::String::utf8(source_code.c_str()));
   script->set_path_cache(godot::String(path.c_str()));
-  // 与编译门同一份源码，理论上恒成功；防御性复查，避免带坏文件落盘。
   if (script->reload() != godot::OK) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
     e["error"] = mcp::JsonValue(compile_error.empty()
@@ -510,9 +485,6 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
     write_issue = "readback open failed";
   }
 
-  // 写盘后用 IGNORE 装载刷新一次：GDScriptCache 里的旧实例被重新读盘 + 重编译，
-  // 替代原先「从 ResourceCache 摘除」（摘除只动 ResourceCache，REUSE 装载仍会从
-  // GDScriptCache 取回旧实例）。刷新失败不使本次写入失败，但在响应中回报。
   std::string cache_refresh_error;
   bool cache_refreshed = refresh_script_cache(path, cache_refresh_error);
   auto *editor = godot::EditorInterface::get_singleton();
@@ -530,8 +502,6 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
   j["overwritten"] = mcp::JsonValue(file_exists_on_disk);
   j["verified"] = mcp::JsonValue(verified);
   j["readback"] = mcp::JsonValue(readback);
-  // 成功态自证：disk_bytes 与 content_hash 均来自磁盘 readback（非内存回显），
-  // 失败态（readback 未打开/读取出错）沿旧口径只保留 write_issue/warning。
   if (readback) {
     j["disk_bytes"] = mcp::JsonValue(static_cast<int64_t>(read_back.size()));
     j["content_hash"] = mcp::JsonValue(fnv1a64_hex(read_back));

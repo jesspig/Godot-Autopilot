@@ -553,7 +553,6 @@ void add_camera2d_serialization_note(mcp::JsonValue &result,
   }
 }
 
-// 与 util::check_readback 的值类型近似比较清单保持同步。
 bool is_readback_value_type(godot::Variant::Type type) {
   switch (type) {
   case godot::Variant::VECTOR2:
@@ -898,7 +897,6 @@ mcp::JsonValue handle_get(const mcp::JsonValue &args) {
   }
 
   if (has_batch) {
-    // 批量读：一次往返返回多属性；缺失项进 missing，不使整批失败。
     mcp::JsonValue values(mcp::JsonValue::object_tag);
     mcp::JsonValue missing(mcp::JsonValue::array_tag);
     for (const std::string &name : batch_names) {

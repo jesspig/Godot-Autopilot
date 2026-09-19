@@ -44,10 +44,12 @@ inline bool allow_list_contains(const std::string &value,
 }
 
 inline constexpr const char *kKnownCapabilities[] = {"process", "code_execute",
-                                                     "game_runtime"};
+                                                     "game_runtime",
+                                                     "user_tools"};
 
 inline bool capability_has_dock_toggle(std::string_view capability) {
-  return capability == "code_execute" || capability == "game_runtime";
+  return capability == "code_execute" || capability == "game_runtime" ||
+         capability == "user_tools";
 }
 
 inline std::string allow_list_add(std::string allow,

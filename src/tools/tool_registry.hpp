@@ -2,6 +2,7 @@
 #define GODOT_AUTOPILOT_TOOL_REGISTRY_HPP
 
 #include <algorithm>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -10,12 +11,17 @@
 
 #include <tools/tool_base.hpp>
 #include <tools/tool_catalog.hpp>
+#include <tools/tool_spec.hpp>
 
 namespace godot_autopilot {
 
 inline ToolInfo make_tool_info(const ToolBase& t) {
   const ToolMeta& m = t.meta();
-  return ToolInfo{m.name, m.description, m.category, m.tags, t.input_schema()};
+  const uint32_t flags = t.tool_flags();
+  ToolInfo info{m.name, m.description, m.category, m.tags, t.input_schema()};
+  info.dynamic = (flags & tool_flags::kDynamic) != 0;
+  info.mutating = (flags & tool_flags::kMutating) != 0;
+  return info;
 }
 
 class ToolRegistry {
@@ -23,7 +29,7 @@ public:
   void add(std::unique_ptr<ToolBase> tool) {
     std::lock_guard<std::mutex> lock(mutex_);
     const std::string name = tool->meta().name;
-    if (dynamic_cast<const IMetaTool*>(tool.get())) {
+    if ((tool->tool_flags() & tool_flags::kMeta) != 0) {
       meta_[name] = std::shared_ptr<ToolBase>(std::move(tool));
     } else {
       tools_[name] = std::shared_ptr<ToolBase>(std::move(tool));

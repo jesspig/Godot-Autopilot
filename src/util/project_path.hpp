@@ -32,7 +32,6 @@ inline std::string project_path_lexical(const std::string &path) {
     const std::string part = path.substr(
         start, end == std::string::npos ? std::string::npos : end - start);
     if (part.empty() || part == ".") {
-      // 忽略重复分隔符和当前目录片段。
     } else if (part == "..") {
       if (!parts.empty() && parts.back() != "..")
         parts.pop_back();
