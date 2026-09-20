@@ -6,7 +6,7 @@ tags:
   - 总览
   - 架构
   - 技术栈
-timestamp: "2026-09-19T03:31:01+08:00"
+timestamp: "2026-09-20T17:08:00+08:00"
 resource:
   - README.md
   - README.en.md
@@ -19,6 +19,7 @@ resource:
 > 09-18 补记：`README_zh.md` 已删除（中文 `README.md` + 英文 `README.en.md` 双版，工具口径 badge `tools-385+` / 385+ 个工具 / Over 385 tools），本页事实来源与工具总数段已改引新版 README；`call_tool` 描述字符串少算 1 个域工具已随源码注释修正（385 域 + `system_status` = 386 非元）。
 > 09-19 ToolSpec 数据化重构：391 域工具 + `system_status` + 7 元工具全量改为 `ToolSpec` 数据记录（`make_spec_tool`），删除 `GDA_TOOL_CLASS`/`fn_tool.hpp`/`meta_tools.hpp`/`IMetaTool`/8 个 `schema_*_ops.cpp`/`schema_fills.hpp`/`tool_input_schema`；新增 `tool_args`（取参器）、`tool_pipeline`（`kObserve` 截图后处理）、`dynamic_spec_store`/`autopilot_tools`（用户脚本动态工具 + `user_tools` 授权门）、`tests/guard/` 迁移守卫；MCP 恒 7 元、catalog 399 不变；L1 243→255、L2 26→27 份（新增 `26_user_tools_code_mode`）、`ctest -E "^gda_runner_"` 256 项；遍历改为运行时枚举 392 条后按 `side_effect`/`mutating`/`dynamic` 排除（330 个进入两步骤全过）。
 > 事实来源：根 `README.md` / `README.en.md` / `AGENTS.md`、`CMakeLists.txt`、`cmake/FetchDependencies.cmake`、`src/main.cpp`、`src/core/server_context.cpp`、`src/tools/tool_spec.hpp`、`src/tools/tool_registry.hpp`、`src/tools/*_tools.hpp`、`src/tools/dispatch.cpp`、`src/prompts/prompt_handlers.cpp`、`src/resources/resource_handlers.cpp`、`Example/project.godot`、`Example/docs/`。
+> 09-20 随 Release 触发修复同步一致性核查行——tag 触发改为双格式（`v*.*.*` / `[0-9]*.*.*`）+ `workflow_dispatch` 手动指定 tag。
 
 ## 项目定位
 
@@ -183,7 +184,7 @@ flowchart LR
 
 - 端口 9527、`/mcp`、`GODOT_AUTOPILOT_PORT`：README（英/中）、AGENTS.md、代码三方一致 ✓
 - 工具总数：`README.md` / `README.en.md` 口径为 badge `tools-385+`（`README.md:8` / `README.en.md:8`）与“385+ 个工具 / Over 385 tools”（域工具约数口径，数量随版本增长以 `search_tools` 查到的为准），wiki 实测 **可达 398 / catalog 399 / 27 类 = 391**（以工具 category 字段统计为准）——两者为“约数 vs 实测”口径差异，README 未列 `system_status` 与 7 元工具；`ToolRegistry`/catalog 口径自洽（registry 399 = 391 域 + `system_status` + 7 元）✓
-- CI：`.github/workflows/{ci,release}.yml`（develop 触发 CI、tag `v*` 触发 Release），AGENTS.md 声称属实 ✓
+- CI：`.github/workflows/{ci,release}.yml`（develop 触发 CI、tag 双格式 `v*.*.*` / `[0-9]*.*.*` 触发 Release，另支持 `workflow_dispatch` 手动指定 tag），AGENTS.md 声称属实 ✓
 - 目标引擎 4.7：与 `Example/project.godot` 一致 ✓；README 前提已为“Godot 4.7+”（`README.md:5,53` / `README.en.md:5,53`，与 wiki 的 `compatibility_minimum` 4.7 口径一致）
 - 详细对照见 [example.md](./example.md) 与 [modules/core.md](./modules/core.md) 的"不一致点"章节
 
