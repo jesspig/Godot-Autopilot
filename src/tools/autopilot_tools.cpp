@@ -24,6 +24,7 @@
 
 #include "core/command_queue.hpp"
 #include "core/log_system.hpp"
+#include "core/monitor.hpp"
 #include "core/plugin_config.hpp"
 #include "tools/authorization.hpp"
 #include "tools/dispatch.hpp"
@@ -441,6 +442,9 @@ int64_t AutopilotTools::register_tool(const godot::Dictionary &definition,
       "user tool '" + name + "' registered (handle " +
           std::to_string(handle) + ")",
       registration_detail);
+  monitor::lifecycle(
+      "user_tool_register",
+      monitor::build_attrs({{"tool", name}, {"enabled", "true"}}));
   refresh_dynamic_tools();
   return handle;
 }
@@ -470,6 +474,9 @@ bool AutopilotTools::unregister_tool(int64_t handle) {
         LogLevel::Info, LogCategory::Tools,
         "user tool handle " + std::to_string(handle) + " unregistered",
         "tool=" + removed_name + " handle=" + std::to_string(handle));
+    monitor::lifecycle(
+        "user_tool_unregister",
+        monitor::build_attrs({{"tool", removed_name}, {"enabled", "false"}}));
     refresh_dynamic_tools();
   }
   return removed;
@@ -580,6 +587,11 @@ void AutopilotTools::set_enabled(bool enabled) {
       enabled ? "user tools enabled" : "user tools disabled",
       "enabled=" + std::string(enabled ? "true" : "false") +
           " allow=" + (updated.empty() ? "(none)" : updated));
+  monitor::lifecycle(
+      "user_tool_set_enabled",
+      monitor::build_attrs(
+          {{"tool", std::string(kUserToolsCapability)},
+           {"enabled", std::string(enabled ? "true" : "false")}}));
 }
 
 godot::Dictionary AutopilotTools::rescan(const godot::String &directory) {

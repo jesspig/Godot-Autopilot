@@ -4,6 +4,7 @@
 #include "core/config.hpp"
 #include "core/error_watermark.hpp"
 #include "core/log_system.hpp"
+#include "core/monitor.hpp"
 #include "runtime/gda_protocol.hpp"
 #include "tools/capture_ops.hpp"
 #include "tools/debugger_access.hpp"
@@ -338,6 +339,9 @@ GameJobTable::CollectOutcome GameJobTable::collect(int64_t job_id,
   outcome.request_id = it->second.request_id;
   outcome.expired =
       (now_ms - it->second.started_ms) > (it->second.timeout_ms + kExpiryGraceMs);
+  if (outcome.expired) {
+    monitor::state("game_job_expired", "degraded", true);
+  }
   jobs.erase(it);
   return outcome;
 }
@@ -352,6 +356,9 @@ int GameJobTable::expire_stale(int64_t now_ms) {
     } else {
       ++it;
     }
+  }
+  if (removed > 0) {
+    monitor::state("game_job_expired", "degraded", true);
   }
   return removed;
 }
@@ -609,6 +616,7 @@ bool discard_pending(int64_t request_id, std::string &out_detail) {
     if (it == g_pending.end()) {
       out_detail = "no pending request found for request_id " +
                    std::to_string(request_id);
+      monitor::state("discard_pending", "degraded", true);
       return false;
     }
     pending = it->second;
@@ -634,6 +642,7 @@ bool discard_pending(int64_t request_id, std::string &out_detail) {
                                 std::to_string(request_id) +
                                 " (async game op response will be logged as a "
                                 "late game response)");
+  monitor::state("discard_pending", "discarded", true);
   return true;
 }
 
@@ -931,6 +940,7 @@ void handle_game_response(const std::string &json_str) {
         LogLevel::Warning, LogCategory::Tools,
         "game response discarded: payload is not a JSON object (payload: " +
             summarize_payload(json_str) + ")");
+    monitor::state("game_response", "discarded", true);
     return;
   }
   if (parsed.Contains("runtime_error"))
@@ -941,6 +951,7 @@ void handle_game_response(const std::string &json_str) {
         LogLevel::Warning, LogCategory::Tools,
         "game response discarded: missing or non-integer request_id (payload: " +
             summarize_payload(json_str) + ")");
+    monitor::state("game_response", "discarded", true);
     return;
   }
   int64_t request_id = rid->GetInt();
@@ -957,6 +968,7 @@ void handle_game_response(const std::string &json_str) {
                               "late game response discarded (request_id " +
                                   std::to_string(request_id) +
                                   ", editor wait already timed out)");
+    monitor::state("game_response_late", "discarded", true);
     record_late_result(request_id, parsed);
     return;
   }
@@ -975,6 +987,7 @@ void handle_game_response(const std::string &json_str) {
     LogSystem::instance().log(LogLevel::Warning, LogCategory::Tools,
                               "late game response discarded (request_id " +
                                   std::to_string(request_id) + ")");
+    monitor::state("game_response_late", "discarded", true);
     record_late_result(request_id, parsed);
     return;
   }
