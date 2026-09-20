@@ -174,3 +174,95 @@ TEST(TraceRecorderTest, ToJsonLineEscapesFieldsAndCarriesCoreKeys) {
     EXPECT_NE(line.find("\"tool\":\"unit_tool\""), std::string::npos);
     EXPECT_NE(line.find("line1\\nline2 \\\"q\\\""), std::string::npos);
 }
+
+TEST(TraceRecorderTest, ToJsonLineCarriesObservabilityKeys) {
+    TraceEvent event;
+    event.name = "obs_name_1";
+    event.request_id = "obs_req_1";
+    event.correlation_id = "obs_corr_1";
+    event.phase = "begin";
+    event.state = "started";
+    event.monotonic_ns = 4242;
+    event.thread_id = "obs_tid_7";
+    event.bytes = 99;
+    const std::string line = TraceRecorder::to_json_line(event);
+    EXPECT_NE(line.find("\"kind\":\"tool_call\""), std::string::npos);
+    EXPECT_NE(line.find("\"name\":\"obs_name_1\""), std::string::npos);
+    EXPECT_NE(line.find("\"request_id\":\"obs_req_1\""), std::string::npos);
+    EXPECT_NE(line.find("\"correlation_id\":\"obs_corr_1\""), std::string::npos);
+    EXPECT_NE(line.find("\"phase\":\"begin\""), std::string::npos);
+    EXPECT_NE(line.find("\"state\":\"started\""), std::string::npos);
+    EXPECT_NE(line.find("\"monotonic_ns\":4242"), std::string::npos);
+    EXPECT_NE(line.find("\"thread_id\":\"obs_tid_7\""), std::string::npos);
+    EXPECT_NE(line.find("\"bytes\":99"), std::string::npos);
+}
+
+TEST(TraceRecorderTest, QueryByRequestFiltersAndRejectsEmpty) {
+    TraceRecorder& recorder = TraceRecorder::instance();
+    recorder.clear_for_test();
+    TraceEvent a;
+    a.request_id = "req_a";
+    a.tool = "a";
+    TraceEvent b;
+    b.request_id = "req_a";
+    b.tool = "b";
+    TraceEvent c;
+    c.request_id = "req_c";
+    c.tool = "c";
+    recorder.record(a);
+    recorder.record(b);
+    recorder.record(c);
+    const std::vector<TraceEvent> hit = recorder.query_by_request("req_a");
+    ASSERT_EQ(hit.size(), 2u);
+    EXPECT_EQ(hit[0].tool, "a");
+    EXPECT_EQ(hit[1].tool, "b");
+    EXPECT_TRUE(recorder.query_by_request("req_missing").empty());
+    EXPECT_TRUE(recorder.query_by_request("").empty());
+    recorder.clear_for_test();
+}
+
+TEST(TraceRecorderTest, SanitizeArgsStripsGenericSensitiveKeysCaseInsensitive) {
+    const std::string payload =
+        "{\"TOKEN\":\"tokValueSecret\",\"api_key\":\"keyValueSecret\","
+        "\"Password\":\"passValueSecret\",\"my_secret\":\"secValueSecret\","
+        "\"name\":\"keptValue\"}";
+    const SanitizeResult result = TraceRecorder::sanitize_args(payload, true);
+    EXPECT_FALSE(result.truncated);
+    EXPECT_EQ(result.text.find("tokValueSecret"), std::string::npos);
+    EXPECT_EQ(result.text.find("keyValueSecret"), std::string::npos);
+    EXPECT_EQ(result.text.find("passValueSecret"), std::string::npos);
+    EXPECT_EQ(result.text.find("secValueSecret"), std::string::npos);
+    EXPECT_NE(result.text.find("keptValue"), std::string::npos);
+    EXPECT_NE(result.text.find("<stripped"), std::string::npos);
+}
+
+TEST(TraceRecorderTest, SanitizeArgsTruncatesPlainLongTextFlag) {
+    const std::string long_text(5000, 'z');
+    const SanitizeResult result = TraceRecorder::sanitize_args(long_text, true);
+    EXPECT_TRUE(result.truncated);
+    EXPECT_EQ(result.text.size(), TraceRecorder::kDesensitizedMaxChars);
+    EXPECT_EQ(result.text.size(), 4000u);
+}
+
+TEST(TraceRecorderTest, MonotonicNowNsIsNonDecreasing) {
+    const int64_t first = TraceRecorder::monotonic_now_ns();
+    const int64_t second = TraceRecorder::monotonic_now_ns();
+    EXPECT_GT(first, 0);
+    EXPECT_GE(second, first);
+}
+
+TEST(TraceRecorderTest, CurrentThreadIdIsStableAndNonEmpty) {
+    const std::string first = TraceRecorder::current_thread_id();
+    const std::string second = TraceRecorder::current_thread_id();
+    EXPECT_FALSE(first.empty());
+    EXPECT_EQ(first, second);
+}
+
+TEST(TraceRecorderTest, SanitizeTextTruncatesAndAppendsMarker) {
+    const std::string long_text(50, 'y');
+    const std::string cut = TraceRecorder::sanitize_text(long_text, 10);
+    EXPECT_EQ(cut.size(), 10u + std::string("...[truncated]").size());
+    EXPECT_EQ(cut.rfind("...[truncated]"),
+              cut.size() - std::string("...[truncated]").size());
+    EXPECT_EQ(TraceRecorder::sanitize_text("tiny", 10), "tiny");
+}

@@ -76,6 +76,9 @@ add_library(godot-autopilot SHARED
     src/core/editor_coords.cpp
     src/core/trace_recorder.cpp
     src/core/sanitize_policy.cpp
+    src/core/monitor.cpp
+    src/core/monitor_env.cpp
+    src/core/perf_sampler.cpp
     src/resources/resource_handlers.cpp
     src/resources/debugger_resources.cpp
     src/prompts/prompt_handlers.cpp

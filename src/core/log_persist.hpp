@@ -1,6 +1,7 @@
 #ifndef GODOT_AUTOPILOT_LOG_PERSIST_HPP
 #define GODOT_AUTOPILOT_LOG_PERSIST_HPP
 
+#include <atomic>
 #include <cstdint>
 #include <mutex>
 #include <string>
@@ -34,6 +35,18 @@ public:
   std::string session_id();
   std::string log_path();
   std::string trace_path();
+  std::string trace_dir();
+  std::string health_summary();
+
+  void note_pruned(std::size_t count);
+  void note_rotation();
+
+  uint64_t dropped_log_lines() const;
+  uint64_t dropped_trace_lines() const;
+  uint64_t bytes_written() const;
+  uint64_t flush_failures() const;
+  uint64_t rotations() const;
+  uint64_t pruned_files() const;
 
   static std::string level_name(LogLevel level);
   static std::string category_name(LogCategory category);
@@ -56,6 +69,14 @@ private:
   std::size_t last_log_serial_ = 0;
   uint64_t last_trace_seq_ = 0;
   bool write_failed_ = false;
+  std::atomic<uint64_t> dropped_log_lines_{0};
+  std::atomic<uint64_t> dropped_trace_lines_{0};
+  std::atomic<uint64_t> bytes_written_{0};
+  std::atomic<uint64_t> flush_failures_{0};
+  std::atomic<uint64_t> rotations_{0};
+  std::atomic<uint64_t> pruned_files_{0};
+  std::atomic<uint64_t> reported_dropped_logs_{0};
+  std::atomic<uint64_t> reported_dropped_traces_{0};
 };
 
 } // namespace godot_autopilot

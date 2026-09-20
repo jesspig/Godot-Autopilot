@@ -43,6 +43,7 @@ set(GDA_UNIT_BUSINESS_SOURCES
     ${CMAKE_SOURCE_DIR}/src/core/editor_readiness.cpp
     ${CMAKE_SOURCE_DIR}/src/core/editor_coords.cpp
     ${CMAKE_SOURCE_DIR}/src/core/trace_recorder.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/monitor.cpp
     ${CMAKE_SOURCE_DIR}/src/util/bm25_index.cpp
     ${CMAKE_SOURCE_DIR}/src/util/error_util.cpp
     ${CMAKE_SOURCE_DIR}/src/util/readback_util.cpp

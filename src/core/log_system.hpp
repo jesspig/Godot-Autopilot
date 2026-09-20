@@ -20,6 +20,8 @@ struct LogEntry {
   std::string message;
   std::string detail{};
   size_t serial = 0;
+  std::string trace_id{};
+  std::string span_id{};
 };
 
 class LogSystem {
@@ -30,6 +32,9 @@ public:
   void log(LogLevel level, LogCategory category, const std::string &message);
   void log_detailed(LogLevel level, LogCategory category,
                     const std::string &summary, const std::string &detail);
+  void log_detailed(LogLevel level, LogCategory category,
+                    const std::string &summary, const std::string &detail,
+                    const std::string &trace_id, const std::string &span_id);
 
   struct Query {
     LogLevel min_level = LogLevel::Debug;

@@ -53,3 +53,24 @@ TEST(LogPersistTest, CategoryNameCoversAllCategories) {
     EXPECT_EQ(LogPersist::category_name(LogCategory::Prompts), "prompts");
     EXPECT_EQ(LogPersist::category_name(static_cast<LogCategory>(42)), "unknown");
 }
+
+TEST(LogPersistTest, TraceDirUsesFixedUserPath) {
+    EXPECT_EQ(LogPersist::instance().trace_dir(), "user://godot_autopilot/traces");
+}
+
+TEST(LogPersistTest, NewAccessorsDefaultToZero) {
+    LogPersist& persist = LogPersist::instance();
+    EXPECT_EQ(persist.dropped_log_lines(), 0u);
+    EXPECT_EQ(persist.dropped_trace_lines(), 0u);
+    EXPECT_EQ(persist.bytes_written(), 0u);
+    EXPECT_EQ(persist.flush_failures(), 0u);
+    EXPECT_EQ(persist.rotations(), 0u);
+    EXPECT_EQ(persist.pruned_files(), 0u);
+}
+
+TEST(LogPersistTest, HealthSummaryCarriesObservabilityKeys) {
+    const std::string summary = LogPersist::instance().health_summary();
+    EXPECT_NE(summary.find("dropped_log_lines"), std::string::npos);
+    EXPECT_NE(summary.find("flush_failures"), std::string::npos);
+    EXPECT_NE(summary.find("bytes_written"), std::string::npos);
+}

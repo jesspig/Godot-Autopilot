@@ -1,8 +1,11 @@
 #include "trace_recorder.hpp"
 
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <cstdio>
+#include <cstring>
+#include <thread>
 #include <utility>
 
 namespace godot_autopilot {
@@ -11,60 +14,100 @@ namespace {
 
 std::atomic<uint64_t> g_id_counter{1};
 
-const char *kStripKeys[] = {"data", "base64", "script_content"};
-
 bool is_blank(char c) {
   return c == ' ' || c == '\t' || c == '\r' || c == '\n';
 }
 
+bool ends_with(const std::string &text, const char *suffix) {
+  const std::size_t n = std::strlen(suffix);
+  return text.size() >= n && text.compare(text.size() - n, n, suffix) == 0;
+}
+
+bool is_sensitive_key(const std::string &raw_key) {
+  std::string key;
+  key.reserve(raw_key.size());
+  for (char c : raw_key) {
+    key += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  }
+  static const char *kExact[] = {
+      "data",     "base64",  "script_content", "token",    "secret",
+      "password", "passwd",  "key",            "api_key",  "apikey",
+      "authorization", "credential", "cookie", "session_token"};
+  for (const char *candidate : kExact) {
+    if (key == candidate) {
+      return true;
+    }
+  }
+  return ends_with(key, "_token") || ends_with(key, "_key") ||
+         ends_with(key, "_secret") || ends_with(key, "_password");
+}
+
 std::string strip_key_values(const std::string &text) {
-  std::string out = text;
-  for (const char *key : kStripKeys) {
-    std::string token = "\"";
-    token += key;
-    token += "\"";
-    std::size_t pos = 0;
-    while ((pos = out.find(token, pos)) != std::string::npos) {
-      std::size_t cur = pos + token.size();
-      while (cur < out.size() && is_blank(out[cur])) {
-        ++cur;
-      }
-      if (cur >= out.size() || out[cur] != ':') {
-        pos += token.size();
+  std::string out;
+  out.reserve(text.size());
+  const std::size_t n = text.size();
+  std::size_t i = 0;
+  while (i < n) {
+    if (text[i] != '"') {
+      out += text[i];
+      ++i;
+      continue;
+    }
+    std::size_t key_end = i + 1;
+    bool key_closed = false;
+    while (key_end < n) {
+      if (text[key_end] == '\\') {
+        key_end += 2;
         continue;
       }
-      ++cur;
-      while (cur < out.size() && is_blank(out[cur])) {
-        ++cur;
-      }
-      if (cur >= out.size() || out[cur] != '"') {
-        pos += token.size();
-        continue;
-      }
-      ++cur;
-      std::size_t begin = cur;
-      bool closed = false;
-      while (cur < out.size()) {
-        if (out[cur] == '\\') {
-          cur += 2;
-          continue;
-        }
-        if (out[cur] == '"') {
-          closed = true;
-          break;
-        }
-        ++cur;
-      }
-      if (!closed) {
+      if (text[key_end] == '"') {
+        key_closed = true;
         break;
       }
-      char buf[64];
-      std::snprintf(buf, sizeof(buf), "<stripped len=%llu>",
-                    static_cast<unsigned long long>(cur - begin));
-      std::string replacement(buf);
-      out.replace(begin, cur - begin, replacement);
-      pos = begin + replacement.size();
+      ++key_end;
     }
+    if (!key_closed) {
+      out.append(text, i, n - i);
+      break;
+    }
+    const std::string raw_key = text.substr(i + 1, key_end - i - 1);
+    std::size_t colon = key_end + 1;
+    while (colon < n && is_blank(text[colon])) {
+      ++colon;
+    }
+    if (colon < n && text[colon] == ':' && is_sensitive_key(raw_key)) {
+      std::size_t value = colon + 1;
+      while (value < n && is_blank(text[value])) {
+        ++value;
+      }
+      if (value < n && text[value] == '"') {
+        std::size_t value_end = value + 1;
+        bool value_closed = false;
+        while (value_end < n) {
+          if (text[value_end] == '\\') {
+            value_end += 2;
+            continue;
+          }
+          if (text[value_end] == '"') {
+            value_closed = true;
+            break;
+          }
+          ++value_end;
+        }
+        if (value_closed) {
+          char buf[64];
+          std::snprintf(buf, sizeof(buf), "\"<stripped len=%llu>\"",
+                        static_cast<unsigned long long>(value_end - value - 1));
+          out.append(text, i, key_end + 1 - i);
+          out += ':';
+          out += buf;
+          i = value_end + 1;
+          continue;
+        }
+      }
+    }
+    out.append(text, i, key_end + 1 - i);
+    i = key_end + 1;
   }
   return out;
 }
@@ -138,6 +181,42 @@ void append_bool_field(std::string &out, const char *name, bool value, bool firs
 
 } // namespace
 
+const char *trace_kind_name(TraceKind kind) {
+  switch (kind) {
+    case TraceKind::ToolCall:
+      return "tool_call";
+    case TraceKind::ProtocolRequest:
+      return "protocol_request";
+    case TraceKind::ProtocolResponse:
+      return "protocol_response";
+    case TraceKind::ProtocolError:
+      return "protocol_error";
+    case TraceKind::ProtocolNotification:
+      return "protocol_notification";
+    case TraceKind::Lifecycle:
+      return "lifecycle";
+    case TraceKind::DataFlow:
+      return "data_flow";
+    case TraceKind::ExecutionState:
+      return "execution_state";
+    case TraceKind::Concurrency:
+      return "concurrency";
+    case TraceKind::Perf:
+      return "perf";
+    case TraceKind::Snapshot:
+      return "snapshot";
+    case TraceKind::Error:
+      return "error";
+    case TraceKind::PersistHealth:
+      return "persist_health";
+    case TraceKind::UiAction:
+      return "ui_action";
+    case TraceKind::Security:
+      return "security";
+  }
+  return "unknown";
+}
+
 TraceRecorder &TraceRecorder::instance() {
   static TraceRecorder recorder;
   return recorder;
@@ -174,6 +253,20 @@ std::vector<TraceEvent> TraceRecorder::query_by_trace(const std::string &trace_i
   std::vector<TraceEvent> out;
   for (const TraceEvent &event : events_) {
     if (event.trace_id == trace_id) {
+      out.push_back(event);
+    }
+  }
+  return out;
+}
+
+std::vector<TraceEvent> TraceRecorder::query_by_request(const std::string &request_id) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  std::vector<TraceEvent> out;
+  if (request_id.empty()) {
+    return out;
+  }
+  for (const TraceEvent &event : events_) {
+    if (event.request_id == request_id) {
       out.push_back(event);
     }
   }
@@ -217,6 +310,19 @@ int64_t TraceRecorder::wall_now_ms() {
       std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count());
 }
 
+int64_t TraceRecorder::monotonic_now_ns() {
+  auto now = std::chrono::steady_clock::now();
+  return static_cast<int64_t>(
+      std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count());
+}
+
+std::string TraceRecorder::current_thread_id() {
+  const std::size_t hash = std::hash<std::thread::id>{}(std::this_thread::get_id());
+  char buf[24];
+  std::snprintf(buf, sizeof(buf), "%zx", hash);
+  return std::string(buf);
+}
+
 std::string TraceRecorder::new_trace_id() {
   uint64_t n = g_id_counter.fetch_add(1);
   std::string id = "tr_";
@@ -233,6 +339,15 @@ std::string TraceRecorder::new_span_id() {
   id += "_";
   id += std::to_string(n);
   return id;
+}
+
+std::string TraceRecorder::sanitize_text(const std::string &text, std::size_t max_chars) {
+  std::string out = strip_key_values(text);
+  if (out.size() > max_chars) {
+    out.resize(max_chars);
+    out += "...[truncated]";
+  }
+  return out;
 }
 
 SanitizeResult TraceRecorder::sanitize_args(const std::string &args_dump, bool desensitize) {
@@ -329,6 +444,18 @@ std::string TraceRecorder::to_json_line(const TraceEvent &event) {
   append_string_field(out, "image_hash", event.image_hash, false);
   append_int_field(out, "image_width", static_cast<int64_t>(event.image_width), false);
   append_int_field(out, "image_height", static_cast<int64_t>(event.image_height), false);
+  append_string_field(out, "kind", trace_kind_name(event.kind), false);
+  append_string_field(out, "name", event.name, false);
+  append_string_field(out, "request_id", event.request_id, false);
+  append_string_field(out, "correlation_id", event.correlation_id, false);
+  append_string_field(out, "phase", event.phase, false);
+  append_string_field(out, "state", event.state, false);
+  append_int_field(out, "monotonic_ns", event.monotonic_ns, false);
+  append_string_field(out, "thread_id", event.thread_id, false);
+  append_string_field(out, "attrs", event.attrs, false);
+  append_string_field(out, "error_type", event.error_type, false);
+  append_string_field(out, "stack", event.stack, false);
+  append_int_field(out, "bytes", event.bytes, false);
   out += '}';
   return out;
 }

@@ -5,6 +5,22 @@
 
 namespace godot_autopilot {
 
+namespace {
+
+bool contains_ci(const std::string &haystack, const std::string &needle) {
+  if (needle.empty()) {
+    return true;
+  }
+  auto it = std::search(haystack.begin(), haystack.end(), needle.begin(),
+                        needle.end(), [](char a, char b) {
+                          return std::tolower(static_cast<unsigned char>(a)) ==
+                                 std::tolower(static_cast<unsigned char>(b));
+                        });
+  return it != haystack.end();
+}
+
+} // namespace
+
 void LogSystem::log(LogLevel level, LogCategory category,
                     const std::string &message) {
   LogEntry entry;
@@ -26,6 +42,14 @@ void LogSystem::log(LogLevel level, LogCategory category,
 void LogSystem::log_detailed(LogLevel level, LogCategory category,
                              const std::string &summary,
                              const std::string &detail) {
+  log_detailed(level, category, summary, detail, std::string(), std::string());
+}
+
+void LogSystem::log_detailed(LogLevel level, LogCategory category,
+                             const std::string &summary,
+                             const std::string &detail,
+                             const std::string &trace_id,
+                             const std::string &span_id) {
   LogEntry entry;
   entry.timestamp = std::chrono::system_clock::now();
   entry.level = level;
@@ -37,6 +61,8 @@ void LogSystem::log_detailed(LogLevel level, LogCategory category,
   } else {
     entry.detail = detail;
   }
+  entry.trace_id = trace_id;
+  entry.span_id = span_id;
 
   {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -59,26 +85,11 @@ std::vector<LogEntry> LogSystem::query(const Query &q) const {
     if (q.category.has_value() && e.category != *q.category) {
       continue;
     }
-    if (!q.filter_text.empty()) {
-      auto it =
-          std::search(e.message.begin(), e.message.end(), q.filter_text.begin(),
-                      q.filter_text.end(), [](char a, char b) {
-                        return std::tolower(static_cast<unsigned char>(a)) ==
-                               std::tolower(static_cast<unsigned char>(b));
-                      });
-      if (it == e.message.end()) {
-        auto dit = std::search(e.detail.begin(), e.detail.end(),
-                               q.filter_text.begin(), q.filter_text.end(),
-                               [](char a, char b) {
-                                 return std::tolower(
-                                            static_cast<unsigned char>(a)) ==
-                                        std::tolower(
-                                            static_cast<unsigned char>(b));
-                               });
-        if (dit == e.detail.end()) {
-          continue;
-        }
-      }
+    if (!q.filter_text.empty() && !contains_ci(e.message, q.filter_text) &&
+        !contains_ci(e.detail, q.filter_text) &&
+        !contains_ci(e.trace_id, q.filter_text) &&
+        !contains_ci(e.span_id, q.filter_text)) {
+      continue;
     }
     result.push_back(e);
   }
