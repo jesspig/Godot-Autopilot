@@ -4,6 +4,7 @@
 
 ## 2026-09-20
 
+- **代码-文档一致性审计**：`call_tool` 描述 385→391 域随源码修正（392 非元；overview 09-18"已修正"注记失实一并更正）；ctest 口径补计 `comment_guard`（270→271，全量 298→299，`tests.md` 新增守卫小节）；index/overview/build/roadmap 过时计数与 core/entry_runtime 行号重核同步。详见 `changelog/2026-09-20-log.md`
 - **Release 触发修复**：`release.yml` 的 `on.push.tags` 仅 `v*`，而 7 个已发布 tag 全是无 `v` 格式，故一次都没触发过；改为双格式 `v*.*.*` / `[0-9]*.*.*` + `workflow_dispatch` 手动指定 tag，`validate` 剥离 `v` 后比对 `VERSION`；历史 7 个 tag 暂不补发。详见 `changelog/2026-09-20-log.md`
 
 ## 2026-09-19

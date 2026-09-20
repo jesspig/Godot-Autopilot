@@ -6,7 +6,7 @@ tags:
   - 模块
   - 入口
   - 运行时桥接
-timestamp: "2026-09-19T17:42:01+08:00"
+timestamp: "2026-09-20T17:20:00+08:00"
 resource:
   - src/main.cpp
   - src/runtime/
@@ -14,9 +14,9 @@ resource:
 
 # 模块：入口与运行时桥接（entry_runtime）
 
-> 09-18 E2E 优化批次增补（详见 `changelog/2026-09-18-log.md` 19:30 节）：`call_method` native 失败路径附加 `diagnosis` + `hint`（`game_bridge_eval.cpp:550 eval_bind_suspected_cause` / `:569 make_native_bind_diagnosis`，成功路径零改动）；新增 `gda_protocol.hpp` 4 个 op（`eval_assert`/`sample`/`collect_evidence`/`validate_ui_layout`）与 `game_bridge_verify.cpp`（采样 awaiter + 校验类注册）。
+> 09-18 E2E 优化批次增补（详见 `changelog/2026-09-18-log.md` 19:30 节）：`call_method` native 失败路径附加 `diagnosis` + `hint`（`game_bridge_eval.cpp:534 eval_bind_suspected_cause` / `:553 make_native_bind_diagnosis`，成功路径零改动）；新增 `gda_protocol.hpp` 4 个 op（`eval_assert`/`sample`/`collect_evidence`/`validate_ui_layout`）与 `game_bridge_verify.cpp`（采样 awaiter + 校验类注册）。
 
-覆盖代码：`src/main.cpp`（326 行）与 `src/runtime/`（`gda_protocol.hpp` 53 行、`game_bridge.hpp` 79 行、`game_bridge.cpp`（09-16 增窗口坐标换算约 30 行）、`game_bridge_input.cpp`（09-16 删本地键名表约 60 行、改调共用判定）、`game_bridge_eval.cpp` 799 行）。
+覆盖代码：`src/main.cpp`（358 行）与 `src/runtime/`（`gda_protocol.hpp` 57 行、`game_bridge.hpp` 99 行、`game_bridge.cpp`（09-16 增窗口坐标换算约 30 行）、`game_bridge_input.cpp`（09-16 删本地键名表约 60 行、改调共用判定）、`game_bridge_eval.cpp` 851 行）。
 
 职责全景：`main.cpp` 是 GDExtension 的导出入口与编辑器插件本体；`src/runtime/` 是在**游戏运行时进程**内与编辑器进程通信的桥接层，通过 EngineDebugger 消息通道承载 GDA 协议。编辑器内的 MCP 服务器（`ServerContext`）与运行时桥接是两条相互独立的消息通路，本页只覆盖入口生命周期与运行时桥接，MCP 工具侧见相关模块页。
 
@@ -27,7 +27,7 @@ resource:
 - 以 `extern "C"` 导出，签名 `GDExtensionEntryPoint(GDExtensionInterfaceGetProcAddress, GDExtensionClassLibraryPtr, GDExtensionInitialization*)`。
 - 修饰宏 `GDA_EXPORT`：Windows（`_WIN32`）为 `__declspec(dllexport)`，其余平台为空。
 - 函数体：构造 `godot::GDExtensionBinding::InitObject`，注册 initializer 与 terminator 回调，最后返回 `init.init()`。
-- 两个回调内部均包 try/catch，异常只记录日志不中断；`_enter_tree` 内另有四组步骤级 try/catch（log dock / output logger / debugger plugin / config dock），catch 分支统一委托 `log_setup_failure` 助手（`main.cpp:30-42`，`std::exception` 与兜底两个重载）写 System 错误日志。
+- 两个回调内部均包 try/catch，异常只记录日志不中断；`_enter_tree` 内另有四组步骤级 try/catch（log dock / output logger / debugger plugin / config dock），catch 分支统一委托 `log_setup_failure` 助手（`main.cpp:31-43`，`std::exception` 与兜底两个重载）写 System 错误日志。
 
 ### 1.2 模块初始化（register_initializer）
 
@@ -65,7 +65,7 @@ resource:
 
 `_get_unsaved_status()`：`scene_dirty_tracker::is_current_scene_dirty()` 为真时返回场景名，否则返回空串。
 
-### 1.5 cmdline 模式检测（gda_cmdline_mode，main.cpp:46）
+### 1.5 cmdline 模式检测（gda_cmdline_mode，main.cpp:47）
 
 实际函数名是 `gda_cmdline_mode()`（**不存在** `gsd_cmdline_mode`）。语义：
 

@@ -6,20 +6,21 @@ tags:
   - 测试
   - L1
   - L2
-timestamp: "2026-09-19T17:45:23+08:00"
+timestamp: "2026-09-20T17:20:00+08:00"
 resource: tests/
 ---
 
 # 测试体系（tests/）
 
 > 审计日期：2026-09-19（2026-08-29 0.2.2 发布审计——L1 77、L2 7 份；09-02 安全与并行硬化——L1 77→96（新增 security_parallel_hardening 17 项，覆盖队列/路径/鉴权/限额/日志）、核心路径/扫描/响应边界与构建大小写修复；09-08 技能生成器——L1 96→103（新增 skill_gen 7 项），ctest 注册点 103→110，同日 skill 内容外置化——测试零改动仍 103；09-10 skill 体系 19→7 册重构——用例改名与白名单扩充，仍 103；09-13 上午随反馈修复批次同步——L1 103→114（新增 mcp_image_content 11 项），L2 7→8 份（新增 07_scene_tabs），ctest 110→122；09-13 下午随收口批次同步——L1 114→126（新增 variant_json_strict 12 项），L2 8→9 份（新增 08_property_readback），ctest 122→135，L2 运行需 `GODOT_AUTOPILOT_ALLOW`；技能体系 8 册；09-13 晚随 A 组知识库审计修复批次同步——02/03/04/05/06 用例步骤与内容重核（02=before_all 2+39、03=1+2、04=after_all 1+28、05=13、06=26）、traversal/register_all_test 行号修正；09-13 晚随 0.2.4 版知识库全量审计同步——after_all 失败语义修正（工具报错不改变整体判定，仅进程死亡补 fatal_error）、CRASH_LOG_LIMIT 表述改为“截断至 2000 字符”、L2 用例发现机制改为“9 份均由 GLOB 自动发现”、历史事故出处修正并补 todo；09-14 随修复批次同步——L1 126→140（variant_json_strict 12→17、security_parallel_hardening 17→20、runtime_ops 1→3、新增 log_ops_test 4 项），unit 测试文件 14→15，L2 仍 9 份，ctest 注册点 135→149；09-15 随 Computer Use grounding 批次同步——L1 140→172（新增 editor_coords_test 32 项），unit 测试文件 15→16，L2 9→11 份（新增 09_editor_ui、10_editor_input），ctest 注册点 149→183；03_tools_contract 枚举 322 个非 SIDE 工具、0 失败、warnings 实测 4 条；09-16 随失败修复批次（feature/failure-remediation）同步——L1 172→229（新增 editor_ui_tree_test 6 / inline_resource_json_test 12 / skill_resources_test 12 / tilemap_ops_test 13 项，editor_coords_test +5、runtime_ops_test +9），unit 测试文件 16→20，L2 11→17 份（新增 11_editor_tree、12_capture_params、13_inline_subresource、14_tilemap_rect、15_scene_path、16_game_jobs），ctest 注册点 183→246；03 遍历 324 个非 SIDE 工具、0 失败、warnings 仍为基线 4 条；L2 授权前置改述：capability 由 `GODOT_AUTOPILOT_ALLOW` env 或 `user://godot_autopilot/config.json` 的 `allow` 字段提供（env 优先），16_game_jobs 的 start_game_job 需 `game_runtime`；09-16 随客户端配置生成器扩容批次同步——L1 229→238（client_config_gen_test 11→20，覆盖 20 客户端渲染与双 TOML 形态），ctest 注册点 246→255，基于当前工作树代码逐行核对（不依赖 git 历史）；09-16 随视觉辅助场景批次同步——L1 238→246（新增 `vision_assist_test` 8 项），unit 测试文件 20→21，L2 17→18 份（新增 17_vision_assist），ctest 注册点 255→264；09-16 随坐标换算/键名统一/脚本新鲜度/UID 守卫/CJK 往返/open 幂等/属性两轮批次同步——L1 246→267（新增 game_ui_coords_test 6 / keycode_alias_test 6 / script_freshness_test 7 / uid_guard_test 2 项），unit 测试文件 21→25，L2 18→25 份（新增 18_script_freshness、19_cjk_roundtrip、22_uid_guard、23_click_ui_coords、24_keycode_alias、25_open_scene_idempotent、28_sprite_frames_animation；20/21/26/27 号段空缺），ctest 注册点 264→292；03 遍历候选 324→325 个非 SIDE 工具（`review_scene_visually` 计入）、上限 650 步，warnings 仍为基线 4 条（本轮未动相关工具口径）；09-17 随 L1 精简批次同步——L1 267→243（`editor_coords_test` 37→15 删仿射子集用例、`vision_assist_test` 8→7、`tool_catalog_test` 7→6 删 `PopulateDefaultToolsOnce`，`populate_default_tools` 函数与声明整体删除），ctest 注册点 292→268，构建实测 L1 243/243 全绿；09-19 收尾第二轮随 traits/invoke/rescan/batch 同步——L1 255→269（新增 `tool_pipeline_traits_test` 4 / `tool_invoke_test` 4 / `batch_refs_test` 6 三文件 14 项，unit 文件 26→29），L2 27→28 份（新增 `27_user_tools_rescan`），ctest 注册点 283→298（主代理全量实测 298/298 全绿）。
-> 覆盖范围：`tests/` 全部（unit 29 文件、runner 7 实现 + 6 头文件、integration、config 28 JSON、`tests/guard/` 迁移守卫、`tests/CMakeLists.txt`），对照 `tests/README.md` 与仓库根 `AGENTS.md` 测试段逐条核算。269 项 L1 为 `TEST`/`TEST_F` 宏逐行统计口径（09-19 数据化重构 243→255：新增 `tool_args_test` 11 项、`tool_registry_test` 5→6；收尾第二轮 255→269：新增 `tool_pipeline_traits_test` 4 / `tool_invoke_test` 4 / `batch_refs_test` 6；历史 09-17 精简批次 267→243：editor_coords 37→15、vision_assist 8→7、tool_catalog 删 `PopulateDefaultToolsOnce`；09-16 历史：新增 vision_assist 8 项 + 4 文件 21 项、client_config_gen 11→20）；ctest 注册点 298 = 269 gtest + 1 迁移守卫 + 28 份 L2（L2 与守卫计数可静态核实，最终以 `ctest -N` 为准）。
+> 覆盖范围：`tests/` 全部（unit 29 文件、runner 7 实现 + 6 头文件、integration、config 28 JSON、`tests/guard/` 迁移守卫与注释守卫、`tests/CMakeLists.txt`），对照 `tests/README.md` 与仓库根 `AGENTS.md` 测试段逐条核算。269 项 L1 为 `TEST`/`TEST_F` 宏逐行统计口径（09-19 数据化重构 243→255：新增 `tool_args_test` 11 项、`tool_registry_test` 5→6；收尾第二轮 255→269：新增 `tool_pipeline_traits_test` 4 / `tool_invoke_test` 4 / `batch_refs_test` 6；历史 09-17 精简批次 267→243：editor_coords 37→15、vision_assist 8→7、tool_catalog 删 `PopulateDefaultToolsOnce`；09-16 历史：新增 vision_assist 8 项 + 4 文件 21 项、client_config_gen 11→20）；ctest 注册点 298 = 269 gtest + 1 迁移守卫 + 28 份 L2（L2 与守卫计数可静态核实，最终以 `ctest -N` 为准）。
 > 09-19 ToolSpec 数据化重构：工具声明全量改为 `ToolSpec`（`make_spec_tool`，30 域 391 工具 + `system_status` + 7 元），删除 `GDA_TOOL_CLASS`/`tool_decl.hpp`/`fn_tool.hpp`/`meta_tools.hpp`/`IMetaTool`/8 个 `schema_*_ops.cpp`/`schema_fills.hpp`/`tool_input_schema`；新增 `tool_args`（L1 `tool_args_test` 11 项）/`tool_pipeline`（`kObserve` 截图后处理）/`dynamic_spec_store`/`autopilot_tools`（用户脚本动态工具，`user_tools` 授权门）与 `tests/guard/` 迁移守卫（30 域 + strict，实测 `OK (domains: 30, strict: on)`）；L2 新增 `26_user_tools_code_mode`（26→27 份，含 09-18 的 20 号）；遍历改为运行时经 `search_tools` 空 query 枚举 392 条后按 `side_effect`/`mutating`/`dynamic` 排除（实测 330 个进入空参+冒烟两步骤全过）；`tests/config/99_user_tools_diag.json` 诊断用例已删除。
 > 09-18 CJK 传输链收敛批次：L2 新增 `20_cjk_text_roundtrip`（11/11，零 C++，编辑器侧中文文本往返），L2 配置 25→26 份；L1 用例数不变（新增 5 个 CJK 单测因无 Godot 运行时整体回退，覆盖移交 L2-20）。
 > 09-18 E2E 优化批次：域 385→391（非 SIDE 325→329、SIDE 60→62，`patch_script` 计 writes_file 15→16、`build_nodes_from_spec` 计 None 1→2）、catalog 393→399；03 实测 603 步全过（空参 329 + 冒烟 273 + 56 跳过，warnings 基线 4 条不变）；L1 243 不变；本轮新增 L2 用例 0 份（25 份）。
 > 09-18 本地 L2 环境约束（残余风险）：`Example/` 含 E2E 残留游戏（`scenes/main.tscn` + `run/main_scene`）时，无头编辑器在首次文件扫描完成后约 0.5–0.8s 自开主场景，与用例 `before_all` 干净场景竞态（只读探针复现，移开 `scenes/` 后消失）；污染态 7 份（01/02/11/14/15/18/28）失败、干净态 25 份全绿，failing handler 所在域本批次零改动。本地跑 L2 前建议确认 `Example/.godot/editor/editor_layout.cfg` 无残留 open_scenes；`Example/project.godot` 的 34 行 E2E 增量保持原样。
 > 09-18 补记：`GDA_ENABLE_TESTS` 开关行号 `CMakeLists.txt:164`→`:168`（以根 `CMakeLists.txt` 实测为准，`option(GDA_ENABLE_TESTS` 在 `:168`）。
 > 09-19 收尾第二轮（traits/invoke/rescan/batch）：traits 收编终态（`kCaptureImage` 附件按 flag 判定/`kSceneTarget` 成功响应幂等补全/`kUndoable` 纯标记）+ `src/tools/tool_invoke.{hpp,cpp}`（`invoke_tool`/`invoke_depth`，深度上限 8）+ `AutopilotTools::rescan`（默认 `res://addons/godot-autopilot-tools`，256 文件/深度 8/逐文件隔离）+ `batch_execute` 最小变量串联（`$prev`/`$steps[N].result`/`$steps[N].error` 整字符串精确替换，`unresolvable reference` 前缀）；L1 新增 3 文件 14 项（269，29 文件），L2 新增 `27_user_tools_rescan`（28 份），ctest 注册点 298（269 + 1 + 28，主代理全量实测 298/298 全绿）；`samples/user-tools/echo_tool.gd` + `echo_tool.cs`（C# 文档级，未经本仓库 CI 验证）位于 `samples/user-tools/`，不在测试工程内。
+> 09-20 代码-文档一致性审计：ctest 注册点 298→299（补计 09-19 注释清理批新增的 `comment_guard`；`ctest -E "^gda_runner_"` 非 runner 口径 270→271）、新增"守卫"小节；269/28/391/399/62/330 等其余数值逐项复核一致。
 
 ## 架构总览
 
@@ -227,16 +228,22 @@ stdout/stderr 各接独立管道读线程持续消费，防 64KB 缓冲写满阻
 | L1 gtest 数量 | 269（29 个 unit 文件；09-19 新增 `tool_args_test` 11 项、`tool_registry_test` 5→6 增 flags 路由用例；收尾第二轮新增 `tool_pipeline_traits_test` 4 / `tool_invoke_test` 4 / `batch_refs_test` 6；历史见上方 L1 表） | 269（逐文件宏统计见上表） | 一致 |
 | L2 用例文件数 | 28（00-10 共 11 份 + 11_editor_tree / 12_capture_params / 13_inline_subresource / 14_tilemap_rect / 15_scene_path / 16_game_jobs / 17_vision_assist / 18_script_freshness / 19_cjk_roundtrip / 20_cjk_text_roundtrip / 22_uid_guard / 23_click_ui_coords / 24_keycode_alias / 25_open_scene_idempotent / 26_user_tools_code_mode / 27_user_tools_rescan / 28_sprite_frames_animation；21 号段空缺；99 号诊断用例已删） | 28（`tests/config/*.json` 实测） | 一致 |
 | ctest L2 用例 | gda_runner_<name> | 一致（`tests/CMakeLists.txt` 的 config GLOB 注册段，TIMEOUT 600；28 份均由 GLOB 自动发现，新增文件零配置） | 一致 |
-| ctest 注册点 | 298（269 L1 + 1 迁移守卫 + 28 L2） | 298（其中 L2 与守卫可静态核实；最终以 `ctest -N` 实测为准） | 以运行时统计为准 |
+| ctest 注册点 | 299（269 L1 + 2 守卫 + 28 L2） | 299（其中 L2 与守卫可静态核实；最终以 `ctest -N` 实测为准） | 以运行时统计为准 |
 | 遍历工具数 | 391 域 + `system_status` = 392 枚举 | 391（30 个 `*_tools.hpp` 的 `ToolSpec` 条目）+ system_status；运行时经 `search_tools` 空 query 枚举 | 一致 |
 | 排除工具数 | 62 | 62（`side_effect` 非空 60 = writes_file 16 / writes_config 6 / shows_alert 4 / modifies_window 20 / process 6 / game_runtime 7 / code_execute 1 + `side_effect=None` 但 `mutating` 2；运行时经 `get_tool_detail` 字段判定） | 一致 |
 | 03 遍历步数 | 上限 660 步（330 候选×2 减空 schema 跳过） | **上限 660 步**（392 枚举 - 62 排除 = 330 候选，以运行时为准；09-19 实测两步骤全过） | 运行时统计口径 |
 | 03 耗时 | 约 2-3 分钟（随步数增长略有增加） | README：约 2-3 分钟 | 一致 |
 | schema 非空/空数 | 运行时观测（当前精确基线 399 = 336 非空 + 63 空） | `SpecTool` 构造期从参数表/`raw_schema` 生成；`SchemaStatisticsBaseline` 精确断言（09-19） | 运行时统计口径 |
-| 工具总结构 | 7 元 + 391 领域 | 全部 `SpecTool`；7 元经 `kMeta` 归类 + RegisterTool；391 域/系统经 30 域 `make_tools()`；`g_handlers` 派生=392 | 单一来源 |
+| 工具总结构 | 7 元 + 391 领域 | 全部 `SpecTool`；7 元经 `kMeta` 归类 + RegisterTool；391 域经 30 域 `make_tools()` + `system_status`；`g_handlers` 派生=392 | 单一来源 |
 | ToolCatalog 399 条目 | 391 领域 + system_status + 7 元 | `refresh_derived` 对 `all_any()` 逐一 `make_tool_info` 派生，无独立填表 | 399 自洽 |
 
 > 对照说明：本表"源码核算"为逐文件/逐宏统计的本轮实测值；仓库 AGENTS.md 与 README 的对应数值由"维护入口"统一同步，若仍有旧值以本页实测为准。
+
+## 守卫（tests/guard/，ctest 常驻）
+
+- `migration_guard`（`migration_guard.cmake` + `migrated_domains.txt`，30 域 + `strict`）：零依赖源码断言，防旧宏/`schema_*_ops.cpp`/`tool_input_schema` 回退；迁移规则见 [ToolSpec 数据层与执行管线](tool_base_design.md)。
+- `comment_guard`（09-19 注释清理批新增，`comment_guard.py`）：递归扫描 `src/` 与 `tests/` 下 `*.cpp/*.hpp`，除 `// namespace` 结尾标记外禁止任何 `//`/`/*…*/` 注释（正确处理字符串/字符字面量与 `R"TAG(…)TAG"` raw string）；违规退出 1，判定时机为 ctest 而非编译。
+- 两守卫均不随 L2 引擎环境变化；`ctest --preset debug -E "^gda_runner_"` = 269 gtest + 2 守卫 = 271，全量 ctest = 271 + 28 L2 = 299（以 `ctest -N` 为准）。
 
 ## 已知引擎副作用
 
