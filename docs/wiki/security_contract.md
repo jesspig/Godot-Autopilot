@@ -6,10 +6,12 @@ tags:
   - 安全
   - 并发
   - 契约
-timestamp: "2026-09-19T03:31:01+08:00"
+timestamp: "2026-09-20T23:06:52+08:00"
 resource:
   - src/core/server_context.cpp
   - src/core/command_queue.hpp
+  - src/core/log_persist.hpp
+  - src/core/sanitize_policy.hpp
   - src/tools/tool_base.hpp
   - src/tools/tool_spec.hpp
 ---
@@ -59,11 +61,22 @@ resource:
 - 能力名与工具映射（`tool_base.hpp:capability_for_tool`）：`code_execute`（`code_execute`、`execute_script`）、`game_runtime`（`execute_game_script`、`start_game_job`、`reload_game_scripts`、`queue_game_input`、`wait_game_input`、`sequence_game_inputs`、`click_game_ui_element`）、`process`（`SideEffect::Process` 标记的 6 个：`build_csharp_assembly`、`create_os_process`、`execute_os_process`、`kill_os_process`、`open_os_path`、`set_os_environment`）；另有独立于 `capability_for_tool` 的 `user_tools` 能力，由 `AutopilotTools`（用户脚本动态工具，`autopilot_tools.cpp`）在注册与调用两侧检查——未授权时注册拒绝、调用返回 `user_tools` 授权错误。
 - 拒绝响应含 `error`、`authorization_required`（能力名）与 `enable`（启用指引）三个字段，并写 Warning 日志（Tools 类，可经 `get_plugin_log` 读取）。
 - 启用入口：环境变量（须重启引擎）或配置 `allow` 键；MCP Config 面板的 "Allow code_execute"、"Allow game_runtime" 与 "Allow user tools" 复选框分别管理对应能力，勾选/取消经 `authorization::allow_list_add`/`allow_list_remove`（`add` 对已生效项含 `all` 保持原样；`remove` 先把 `all` 展开为全部已知能力再逐项删除），写入配置后下一次调用生效、无需重启。`process` 无面板开关，仍须环境变量或手改 `allow` 键。拒绝响应的 `enable` 文案只对 `code_execute`/`game_runtime`/`user_tools` 提及 dock（`capability_has_dock_toggle`），`process` 仅给环境变量 + 重启指引。
+- 拒绝可审计（09-20 起）：授权门命中时除返回结构化拒绝与 Warning 日志外，另记录一条 `TraceEvent`（`auth="denied"`、`error_code="denied"`、`duration_ms=0`，含工具名/类别/副作用/flags），随 trace jsonl 落盘，供事后区分"未授权被拒"与"handler 业务错误"。
+
+### 3.2 数据脱敏开关（09-20 引入）
+
+工具调用参数会进入本地持久化与 trace 事件，故新增调用侧数据边界开关：
+
+- 解析优先级：`GODOT_AUTOPILOT_DESENSITIZE` 环境变量（`0`/`false`/`off` 关闭，其余非空值开启）> 配置 `user://godot_autopilot/config.json` 的 `desensitize` 键 > **默认开启**；入口 `sanitize_policy::initialize()` 读取一次，之后由 MCP Config 面板 "Desensitize data" 复选框实时改写并持久化（下一次工具调用生效，无需重启）。
+- 开启（默认）：`args_digest` 剥离 `data`/`base64`/`script_content` 的字符串值（替换为 `<stripped len=N>`），长度上限 4000 字符；`traces/images/` 不落盘任何截图，`image_ref` 为空，jsonl 只保留 `image_hash`/`image_bytes`/`image_width`/`image_height`。
+- 关闭：`args_digest` 保留原始参数，上限 64000 字符，超限置 `args_truncated`；PNG 结果以 `traces/images/trace-<session>-<span>-<kind>.png` 落盘并在 jsonl 记 `image_ref`。调用方应把它视为"把工程数据以明文/原始截图写入 `user://`"，仅在明确需要取证时关闭。
+- 环境变量与面板的作用范围：`initialize()` 在启动时一旦发现 env 就完全忽略配置 `desensitize` 键（与 `allow` 能力门同构）；但面板复选框在运行期直接调用 `sanitize_policy::set_enabled`，仍会改变本会话后续调用的实际口径（重启后 env 再次生效）。
 
 ## 4. Godot API 与线程
 
 - 所有 Godot API、场景/资源/编辑器对象访问和会触发引擎状态的操作，必须在 Godot 主线程执行。HTTP/SDK 线程不得直接调用。
-- 标准路径是 `CommandQueue::submit()` 入队，由 `GodotAutopilotPlugin::_process()` 的 `drain()` 在主线程排空，再通过 `future` 返回结果。唯一排空点是插件 `_process()`。
+- 标准路径是 `CommandQueue::submit()` 入队，由 `GodotAutopilotPlugin::_process()` 的 `drain()` 在主线程排空，再通过 `future` 返回结果。唯一排空点是插件 `_process()`；09-20 起 `_process()` 在 `drain()` 前先执行 `LogPersist::flush_on_main_thread()`（本地日志/trace 增量写盘，同为 Godot 文件 API，必须主线程）。
+- trace 上下文跨线程纪律（09-20 起）：`dispatch::call_handler` 在提交侧 `capture_trace_context()`（纯 std 线程局部变量，不触碰 Godot API）、执行侧用 `ScopedTraceContext` 恢复，并用 `steady_clock` 测量排队等待（`queue_wait_ms`）；`LogPersist` 的入队缓冲与游标虽被多线程访问，但均有互斥保护且只存纯 std 字符串，Godot `FileAccess` 仅在 flush 主线程路径调用。
 - 明确例外（09-13 起）：`call_tool` 元工具的编排回调在 MCP 线程执行——等待运行时响应（`runtime_ops::wait_pending_response`）与截图定型不再经 `execute_sync` 占用主线程；回调自身不触碰 Godot API（领域工具 handler 经 `dispatch` 路由回主线程、截图读盘经 `queue.submit`），从而保证等待期间调试器消息泵与编辑器主线程不被阻塞。
 - 只有不访问 Godot API 的纯 C++ 逻辑可留在 HTTP 线程；只读缓冲区若由代码明确保证线程安全，才可使用该例外。新增例外必须在代码和文档中同时说明。
 - 主线程判定以队列首次 `drain()` 记录的线程为准；队列必须在插件正常生命周期内先完成主线程初始化，再处理依赖 Godot API 的任务。
@@ -82,6 +95,7 @@ resource:
 - 读写工具应区分“工程资源路径”（如 `res://`）与 OS 文件路径，`resource_ops` 仅允许 `res://`，`text_ops` 允许 `res://`/`user://`；禁止把一个 namespace 的路径直接拼接到另一个 namespace。返回路径应使用稳定、可复现的规范形式，避免泄露无必要的本机绝对路径。
 - 每个入口必须限制输入深度、条目数、等待时间和输出字节数；限制应在解析/遍历前生效，截断结果必须带 `truncated`/`scan_truncated`/`scan_limit` 或等价可检测字段，不能静默丢数据。
 - 已落地的边界包括：默认/最大超时 `5000/30000 ms`、eval/错误文本截断 `8192` 字节、运行时错误/输出缓冲 `200/500` 条、场景树深度/节点数 `64/2000`、截图单边 `4096` 像素、`GDA_CAPTURE_MAX_PNG_BYTES=8 MiB`、`GDA_VARIANT_MAX_STRING_BYTES=64 KiB`、`GDA_VARIANT_MAX_ARRAY_ELEMENTS=10000`、`GDA_MAX_JSON_RESPONSE_BYTES=4 MiB`、`GDA_SCAN_MAX_FILES=10000`/`FILE_BYTES=2 MiB`/`TOTAL_BYTES=32 MiB`/`DEPTH=64`、`batch_execute`/`sequence` 上限 `256`。这些是实现上限，不是允许无限扩大的理由；新增响应应复用同一原则并避免把大结果一次性构造成无限 JSON。
+- 本地持久化边界（09-20 起）：日志/trace 两目录（外加 `traces/images/`）各保留最近 `20` 个文件且总量 ≤ `50 MiB`（`LogPersist::should_prune`，会话初始化时按 mtime 从旧到新修剪）；内存侧日志缓冲 `LogSystem::MAX_ENTRIES=10000`、trace 缓冲 `TraceRecorder::kCapacity=20000`、待落盘队列 `kBufferCap=20000`（超限丢最旧）；单条日志 detail 上限 `8192` 字符，`args_digest` 按脱敏开关取 `4000`/`64000` 字符；写失败一次告警后停用本会话持久化，不无限重试。
 
 ## 7. 验收清单
 
@@ -90,6 +104,7 @@ resource:
 - [ ] HTTP 线程路径中没有直接 Godot API 调用；任务只由主线程 `drain()` 执行。
 - [ ] stop/restart 的请求接入、队列任务、future、异步响应和对象释放顺序有可观察且不悬挂的结果。
 - [ ] 路径边界、遍历/输入上限和响应截断行为均可被调用方检测。
+- [ ] 本地日志/trace 落盘符合边界约定：两目录保留上限生效；默认脱敏开启时 jsonl 不含内联 base64，`args_digest` 已剥离敏感字段；关闭脱敏仅由显式配置触发。
 
 ## 相关页面
 

@@ -7,19 +7,19 @@ tags:
   - 工具架构
   - ToolSpec
   - 数据化
-timestamp: "2026-09-19T15:23:58+08:00"
+timestamp: "2026-09-20T23:06:52+08:00"
 resource: src/tools/
 ---
 
 # ToolSpec 工具数据层与执行管线（设计定稿 + 全量迁移）
 
-> **当前 API 面（2026-09-19 复核）**
+> **当前 API 面（2026-09-20 复核）**
 > `tool_spec.hpp`：`ToolSpec` 数据记录（name/description/category/tags/side_effect/flags/params/handler/raw_schema）+ `ParamSpec`（= `schema::ParamDef`）+ `tool_flags` 位标志 + `SpecTool : ToolBase, ISideEffect` + `make_spec_tool`；schema 由 `params` 经 `schema::build_schema` 派生，`raw_schema` 非空时优先。
 > `tool_args.hpp/cpp`：`Args` 取参器 + `ToolArgError`（opt_/require_/get_ 系列 + `reject_unknown`，空值视为缺失）。
 > `tool_pipeline.hpp/cpp`：`pipeline::run_post`（`SpecTool::execute` 授权门 → handler 之后的后处理：按 `kObserve` 合并编辑器截图、按 `kSceneTarget` 幂等补全场景路径）。
 > `register_all.hpp/cpp`：`build_registry` / `refresh_derived` / `refresh_dynamic_tools` / `get_active_registry`。
 > `dynamic_spec_store.hpp` + `autopilot_tools.{hpp,cpp}`：用户脚本动态工具（GDScript `AutopilotTools` 单例，含目录扫描 `rescan`）。
-> `tool_invoke.hpp/cpp`：工具间内部组合调用 `tools::invoke_tool` + `invoke_depth()`（深度上限 8）。
+> `tool_invoke.hpp/cpp`：工具间内部组合调用 `tools::invoke_tool` + `invoke_depth()`（深度上限 8）；09-20 起兼作 trace 上下文载体（`SpanGuard`/`capture_trace_context`/`ScopedTraceContext`/`queued_wait_ms`），每次 `SpecTool::execute` 记录一条 `TraceEvent`（缓冲 `TraceRecorder`，落盘 `LogPersist`，见 [核心模块](modules/core.md)）。
 > 相关页面：[工具注册表](modules/tools_registry.md) · [工程约定](conventions.md) · [测试体系](tests.md) · [架构总览](overview.md)
 
 ## 目标与约束
@@ -66,6 +66,17 @@ class SpecTool : public ToolBase, public ISideEffect {
 3. `pipeline::run_post(spec, args, result)`——`flags` 含 `kObserve` 且 `args.observe == true` 时，调用 `capture_ops::handle_capture_viewport({"target":"editor"})` 并把 `data/format/width/height/path` 合并进结果对象（失败写 `observe_error`）；`flags` 含 `kSceneTarget` 且响应成功（无 `error`）时，若 `result.scene_path` 缺失则幂等补全编辑器场景信息（`util::add_scene_info_fields` + `edited_scene_info()`，不做脏标记）；`kUndoable` 为纯标记，post 无动作（各 handler 自管 undo）；其余情况原样返回。
 
 `kObserve` 后处理自 2026-09-19 起统一由管线提供，Input 域 4 个合成输入工具（`click_input_mouse`/`scroll_input_mouse`/`drag_input_mouse`/`type_input_text`）与 Editor 域 2 个元素操作工具（`click_editor_element`/`type_editor_element_text`）已收编，`input_click_ops.cpp` 与 `editor_ui_actions.cpp` 中此前的重复实现已删除。
+
+## 执行埋点与可重放 trace（09-20 新增）
+
+`SpecTool::execute` 在授权门之前解析/继承 trace 上下文（`trace_id = current_trace_id()`，为空则新建；`span_id = new_span_id()`；`parent_span = current_span_id()`），随后记录一条 `TraceEvent` 并追加 `LogSystem::log_detailed` 诊断行：
+
+- **事件字段**：`seq/trace_id/span_id/parent_span/session_id/tool/category/flags/side_effect/depth/thread/queue_wait_ms/duration_ms/wall_start_ms/wall_end_ms/auth/ok/error_code/args_digest/args_truncated/result_size`（图片另附 `image_ref/image_bytes/image_hash/image_width/image_height`）；`args_digest` 按 `sanitize_policy::enabled()` 选择脱敏（4000 字符上限，剥离 `data`/`base64`/`script_content` 值）或原始（64000 字符上限）口径
+- **授权拒绝路径**：`deny_if_unauthorized` 命中时单独记录一条 `auth="denied"`、`error_code="denied"`、`duration_ms=0` 的事件（`category`/`flags`/`side_effect` 照填），与 handler 错误区分
+- **图片事件**：结果对象（或其 `result` 子对象）的 `data` 仅在 `format == "png"` 时收集；`diff_image_data` 只要为字符串即收集（不校验 `format`，空串亦会进入）。命中项计算 FNV-1a 哈希与字节数，`image_width`/`image_height` 取自同 scope 的整型 `width`/`height`（缺省 0），并在 `traces/images/` 落盘（仅脱敏关闭时，`LogPersist::store_trace_image`）；jsonl 行只写 `image_ref`（脱敏时为空，其余图片字段 `image_hash`/`image_bytes`/`image_width`/`image_height` 照写）
+- **日志等级**：失败或 `duration_ms > 2000ms`（`kSlowToolMs`）记 Warning，其余 Debug；detail 行附 `trace=/span=/parent=/depth=/queue=/dur=/auth=/err=/args=`，慢工具与 `retryable` 结果分别加 `slow_tool=true`/`retryable=true`
+- **`detail` 可见性**：`get_plugin_log` 响应条目只含 `serial`/`timestamp`/`level`/`category`/`message`，不含 `detail` 字段；detail 仅在 McpLogDock（"Detail" 开关，默认关闭）与落盘日志（`format_human_line(..., include_detail=true)`）中可见
+- **落盘链路**：事件进入 `TraceRecorder` 内存缓冲（容量 20000），主线程 `LogPersist::flush_on_main_thread()` 增量转写为 `traces/trace-<stamp>.jsonl`（首行含 `session_start`，服务器就绪后追加 `server_ready`，结构键见 [核心模块](modules/core.md)）
 
 ## traits 收编终态（kCaptureImage/kSceneTarget/kUndoable）
 
@@ -192,6 +203,8 @@ public partial class UserToolBootstrap : Node
 ## 内部组合调用（tool_invoke）
 
 `src/tools/tool_invoke.{hpp,cpp}` 提供服务端正式的工具间组合通道，供 handler 内部调用其他工具而不经过 MCP 往返：`tools::invoke_tool(name, args)` 按序处理导出态拦截（`ExportGuard::is_exporting()`，直接返回固定 error）→ 深度守卫（线程局部计数超 `kMaxInvokeDepth = 8` 返回 `tool invoke depth exceeded (max 8)`）→ `dispatch::call_handler` → 异步 pending 嵌套拦截（含 `__gda_pending` 时拒绝在主线程内嵌套调用异步工具）。诊断函数 `invoke_depth()` 返回当前线程组合调用深度。L1 `tests/unit/tool_invoke_test.cpp` 覆盖 4 项（未知透传/成功透传/pending 拦截/深度守卫）；导出分支无公开 setter，L1 未覆盖，注释已声明（由代码审查覆盖）。
+
+trace 相关扩展（09-20）：`invoke_tool` 在正常路径用 `SpanGuard(trace, span)` 压栈使嵌套调用继承父 span；三条拒绝路径（`export_blocked`/`depth_exceeded`/`async_nested`）也各记一条 `TraceEvent`+`log_detailed`。线程局部 span 栈经 `current_trace_id()`/`current_span_id()` 读取，跨线程时由 `capture_trace_context()`（HTTP 线程捕获取值）与 `ScopedTraceContext`（主线程执行前恢复，析构还原）传递——全仓共 22 处 `ScopedTraceContext` 恢复点（`grep -n ScopedTraceContext src/` 静态统计；`tool_invoke.hpp/cpp` 的 7 处为类型声明与构造/析构实现，不计入）：`resource_handlers.cpp` 8、`debugger_resources.cpp` 7、`autopilot_tools.cpp` 3（动态工具分发/call_tool/rescan）、`code_exec_ops.cpp` 2（batch_execute 的 undo 快照/回滚）、`register_all.cpp` 1（元工具 RegisterTool 回调）、`dispatch.cpp` 1（`call_handler`）；`set_queued_wait_ms()`/`take_queued_wait_ms()` 在 `dispatch::call_handler` 的 `execute_sync` 包装层测量排队等待并一次性取走；`invoke_thread_label()` 依 `runtime_ops::has_editor_queue()` 与 `CommandQueue::is_main_thread()` 标注 `main`/`non-main`。
 
 ## batch_execute 最小变量串联
 

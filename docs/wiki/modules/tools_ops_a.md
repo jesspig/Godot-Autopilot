@@ -6,7 +6,7 @@ tags:
   - 模块
   - 领域工具
   - A组
-timestamp: "2026-09-19T17:58:24+08:00"
+timestamp: "2026-09-20T23:08:39+08:00"
 resource: src/tools/
 ---
 
@@ -314,7 +314,7 @@ resource: src/tools/
 - 自带 `variant_to_json` 序列化（BOOL/INT/FLOAT/STRING/字典/数组/打包数组，其余 `stringify()` 兜底），未复用 `VariantJson`。
 - `get_docs_class` 返回 `name/parent_class/api_type/can_instantiate/methods/properties/signals` 结构，另含 `enums`/`constants` 两数组与 `note`（无 docstring 时提示）。
 
-## editor_ops（23 工具）
+## editor_ops（editor_tools.hpp 32 个 ToolSpec；editor_ops.cpp 25 个 handle_ 定义：24 个直接绑定工具，另 1 个 `handle_undo_redo_add_method` 为 add_do/add_undo 共用实现）
 
 职责：Godot 编辑器会话操作（EditorInterface/EditorSelection/EditorUndoRedoManager/EditorFileSystem）。注册工具：
 

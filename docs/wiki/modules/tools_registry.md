@@ -6,13 +6,13 @@ tags:
   - 模块
   - 工具注册
   - ToolSpec
-timestamp: "2026-09-19T15:23:58+08:00"
+timestamp: "2026-09-20T23:06:52+08:00"
 resource: src/tools/
 ---
 
 # 工具注册表（src/tools/ 注册管线）
 
-> 审计日期：2026-09-19（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随 T0 安全边界与并发契约同步；09-13 上午随反馈修复批次同步工具数 365/372/373、Resources 26、SIDE 排除 49；09-13 下午随收口批次同步工具数 366/373/374 与 get_plugin_log；09-13 17:50 随 B 组知识库审计同步——修正契约缺口行号引用、schema 基线行号与元工具 schema 口径；09-13 晚随 0.2.4 版知识库全量审计同步——补正 populate_default_tools 存留状态与命名首段动词的 5 个既有例外；09-15 随 Computer Use grounding 批次同步工具数 379/386/387、非 SIDE 322 / SIDE 57、类别分布与遍历 warnings 实测 4 条；09-16 随失败修复批次同步工具数 384/391/392、非 SIDE 324 / SIDE 60；09-16 随视觉辅助批次同步工具数 385/392/393、Capture 1→2；09-18 随 E2E 优化批次同步工具数 391/398/399 与新增 6 工具；09-19 随 ToolSpec 数据化重构整体重写——全量工具改为 `ToolSpec` 数据记录（不再有宏/真类），删除 `tool_decl.hpp`/`fn_tool.hpp`/`meta_tools.hpp`/`IMetaTool` 与 8 个 `schema_*_ops.cpp`/`schema_fills.hpp`，新增 `tool_args`/`tool_pipeline`/`dynamic_spec_store`/`autopilot_tools` 与 `tests/guard/` 迁移守卫；catalog 399、MCP 恒 7、遍历改为运行时枚举 392 条后按 `side_effect`/`mutating`/`dynamic` 排除，实测 330 个进入两步骤；09-19 收尾第二轮随 traits/invoke/rescan/batch 同步图片附件 flag 判定与 rescan 入口）。
+> 审计日期：2026-09-19（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随 T0 安全边界与并发契约同步；09-13 上午随反馈修复批次同步工具数 365/372/373、Resources 26、SIDE 排除 49；09-13 下午随收口批次同步工具数 366/373/374 与 get_plugin_log；09-13 17:50 随 B 组知识库审计同步——修正契约缺口行号引用、schema 基线行号与元工具 schema 口径；09-13 晚随 0.2.4 版知识库全量审计同步——补正 populate_default_tools 存留状态与命名首段动词的 5 个既有例外；09-15 随 Computer Use grounding 批次同步工具数 379/386/387、非 SIDE 322 / SIDE 57、类别分布与遍历 warnings 实测 4 条；09-16 随失败修复批次同步工具数 384/391/392、非 SIDE 324 / SIDE 60；09-16 随视觉辅助批次同步工具数 385/392/393、Capture 1→2；09-18 随 E2E 优化批次同步工具数 391/398/399 与新增 6 工具；09-19 随 ToolSpec 数据化重构整体重写——全量工具改为 `ToolSpec` 数据记录（不再有宏/真类），删除 `tool_decl.hpp`/`fn_tool.hpp`/`meta_tools.hpp`/`IMetaTool` 与 8 个 `schema_*_ops.cpp`/`schema_fills.hpp`，新增 `tool_args`/`tool_pipeline`/`dynamic_spec_store`/`autopilot_tools` 与 `tests/guard/` 迁移守卫；catalog 399、MCP 恒 7、遍历改为运行时枚举 392 条后按 `side_effect`/`mutating`/`dynamic` 排除，实测 330 个进入两步骤；09-19 收尾第二轮随 traits/invoke/rescan/batch 同步图片附件 flag 判定与 rescan 入口；09-20 晚随可重放监控批次同步——dispatch 分发层补 trace 上下文跨线程传递/排队等待测量与未捕获异常埋点，用户工具碰撞拒绝改 `log_detailed`）。
 > 覆盖范围：`register_all.cpp/hpp`、`dispatch.cpp/hpp`、`tool_catalog.cpp/hpp`、`schema_builder.cpp/hpp`、`tool_spec.hpp`、`tool_args.cpp/hpp`、`tool_pipeline.cpp/hpp`、`tool_base.hpp`、`tool_registry.hpp`、`dynamic_spec_store.hpp`、`autopilot_tools.cpp/hpp`、30 个域 `*_tools.hpp`，对照 `tests/runner/traversal.cpp`、`tests/unit/register_all_test.cpp`、`tests/unit/tool_registry_test.cpp`、`tests/guard/`、`tests/config/03_tools_contract.json` 与仓库根 `AGENTS.md` 工具段。
 > 相关页面：[ToolSpec 数据层与执行管线](../tool_base_design.md) · [测试体系](../tests.md) · [工具实现 A 组](../modules/tools_ops_a.md) · [工具实现 B 组](../modules/tools_ops_b.md) · [入口与运行时](../modules/entry_runtime.md) · [架构总览](../overview.md)
 
@@ -42,7 +42,7 @@ flowchart TD
 - **schema 单一源**：`SpecTool` 构造时 `schema_ = raw_schema.IsObject() ? raw_schema : schema::build_schema(params)`；域工具 schema 全部从参数表派生，7 元工具中 `search_tools`/`batch_execute`/`code_execute` 因嵌套结构手写 JSON 存入 `raw_schema`，其余经 `build_schema`（含 `system_status`）。
 - **取参统一 `Args`**（`tool_args.hpp/cpp`）：`opt_*`/`require_*`/`get_*` + `reject_unknown()`；`null` 视为缺失，`integer` 接受整数值 double、拒绝小数与越界，`boolean` 严格。错误消息 "missing required parameter: X" / "invalid parameter: X must be a ..." 由 handler 抛出后经 dispatch 统一包装。
 - **生命周期**：`g_active_registry` 为 mutex 保护的 `shared_ptr<ToolRegistry>`；`register_all_tools`/`refresh_dynamic_tools` 每次先构建局部 registry，再经 `refresh_derived` 批量替换 catalog/index/dispatch；dispatch handler lambda 捕获 registry 并在调用时 `find` 取工具，旧请求持有的 registry 由共享所有权延长生命周期。
-- **动态工具**：`AutopilotTools`（`autopilot_tools.cpp`）注册的用户工具 spec 存 `dynamic_spec_store.hpp` 的 store()（互斥保护），注册/注销后调 `refresh_dynamic_tools()` 全量重建；工具带 `kDynamic`；重名/与内置碰撞拒绝。执行受 `user_tools` capability 门（env `GODOT_AUTOPILOT_ALLOW` 优先于配置 `allow`）。目录批量注册入口 `rescan(directory)`（默认 `res://addons/godot-autopilot-tools`；门禁/marshal/前缀校验/256 文件/深度 8/逐文件错误隔离，返回 scanned/registered/failed/errors）；约定、示例与 L2 `27_user_tools_rescan` 见 [ToolSpec 数据层与执行管线](../tool_base_design.md)的目录扫描小节。
+- **动态工具**：`AutopilotTools`（`autopilot_tools.cpp`）注册的用户工具 spec 存 `dynamic_spec_store.hpp` 的 store()（互斥保护），注册/注销后调 `refresh_dynamic_tools()` 全量重建；工具带 `kDynamic`；重名/与内置碰撞拒绝（`log_detailed` 记 `reason=<message>`）。注册/注销/开关均走 `log_detailed`：注册成功 detail 含 `tool=<name> handle=<n> params=<n> tags=<n> category=<cat>`，注销记 `tool=<name> handle=<n>`，`set_enabled` 记 `enabled=<bool> allow=<list|(none)>`。执行受 `user_tools` capability 门（env `GODOT_AUTOPILOT_ALLOW` 优先于配置 `allow`）。目录批量注册入口 `rescan(directory)`（默认 `res://addons/godot-autopilot-tools`；门禁/marshal/前缀校验/256 文件/深度 8/逐文件错误隔离，返回 scanned/registered/failed/errors）；约定、示例与 L2 `27_user_tools_rescan` 见 [ToolSpec 数据层与执行管线](../tool_base_design.md)的目录扫描小节。
 - **分类边界**：`get_debug_object_info`（handler `physics_ops::handle_resolve_object`）归 `physics_tools` 但 Category "Debug"；`read_file/find_in_files/write_file`（handler `text_ops`）归 `os_tools`；Scene Tree 类工具 Category 均为 "Scene"、按 handler 分 `scene_tools`/`scene_tree_tools`；InputMap 工具 Category "Input"、归 `input_map_tools`。
 
 ## 三层结构
@@ -65,7 +65,7 @@ flowchart TD
 | 3 | 工具总体 = 7 元 + 391 域 | registry `all_any()`=**399**（392 域/系统 + 7 元）；MCP 顶层 7 元工具，MCP 可达总数 398 | **一致** |
 | 4 | ToolCatalog 399 条 | 由 registry `all_any()` 逐一 `make_tool_info` 派生 399 = 391 域 + system_status + 7 元；原 `populate_default_tools`/meta 快照链路已删除，catalog 完全由 `replace_tools` 动态填充 | **一致**（单一来源派生，无独立填表） |
 | 5 | schema 非空/空数 | 无静态填表；`SpecTool` 构造时从参数表（或元工具 `raw_schema`）生成，catalog 级非空/空数**以运行时 `SchemaStatisticsBaseline` 观测为准**（当前精确基线 399 = 336 非空 + 63 空） | **运行时统计口径** |
-| 6 | SchemaStatisticsBaseline 运行时统计断言 | `register_all_test.cpp:135-152` 断言 catalog 399 总条、非空 336、空 63（与 `tools.size()` 联动） | **一致** |
+| 6 | SchemaStatisticsBaseline 运行时统计断言 | `register_all_test.cpp:131-148` 断言 catalog 399 总条、非空 336、空 63（与 `tools.size()` 联动） | **一致** |
 | 7 | 3 个契约缺口 + 4 条遍历 warnings | 见下方契约缺口表；warnings 以运行时报告为准 | **一致** |
 | 8 | 遍历排除机制 | 遍历运行时枚举 392 条（391 域 + system_status），跳过 7 元工具，再按 `side_effect` 非空 / `mutating` / `dynamic` 任一命中排除；实测 330 个进入空参+冒烟两步骤（**以运行时 `03_tools_contract` 统计为准**） | **运行时统计口径** |
 | 9 | 命名约定 `<动词>_<类别>_<维度>_<对象>_<修饰>`（动词置首） | 391 个名字全部小写 snake_case；绝大多数首段为动词（create/get/set/add/remove/apply/intersect/play/stop/save/…），5 个名词置首的历史例外（property_get/property_set/property_get_list、signal_connect/signal_disconnect） | **一致（含 5 个既有例外）** |
@@ -104,8 +104,9 @@ warnings 判定逻辑在 `tests/runner/traversal.cpp`（"schema 声明必填但�
 
 ## 分发与错误路径（dispatch.cpp）
 
-- `call_handler`：编辑器队列存在且不在主线程时，经 `CommandQueue::execute_sync` 排到主线程执行；handler map 在锁内替换、复制后锁外执行。
-- 查找顺序：`g_handlers`（`all()` 派生 392 项）→ 命中即执行；异常捕获分两路——`std::exception` 透出 `ex.what()`（业务校验错误即经此路径透出），其余按 `unexpected C++ exception` 兜底；未命中再查 `g_meta_handlers`（7 元，`all_meta()` 派生）；否则返回 `domain tool 'X' not found — use search_tools to discover available tools`。
+- `call_handler`：编辑器队列存在且不在主线程时，经 `CommandQueue::execute_sync` 排到主线程执行；handler map 在锁内替换、复制后锁外执行。09-20 起在提交前 `tools::capture_trace_context()`、主线程 lambda 内用 `ScopedTraceContext` 恢复调用方 trace 上下文并按 `steady_clock` 计算排队等待（`set_queued_wait_ms`，由 `SpecTool::execute` 一次性取走写入 `queue_wait_ms`）。全仓共 22 处 `ScopedTraceContext` 恢复点（与 [ToolSpec 数据层与执行管线](../tool_base_design.md)同口径）：`resource_handlers.cpp` 8、`debugger_resources.cpp` 7、`autopilot_tools.cpp` 3、`code_exec_ops.cpp` 2、`register_all.cpp` 1、`dispatch.cpp` 1；`tool_invoke.hpp/cpp` 的 7 处为类型声明与构造/析构实现、不计入。
+- 查找顺序：`g_handlers`（`all()` 派生 392 项）→ 命中即执行；异常捕获分两路——`std::exception` 透出 `ex.what()`（业务校验错误即经此路径透出），其余按 `unexpected C++ exception` 兜底；两条异常路径均经 `record_dispatch_exception` 记一条 `error_code="internal"` 的 TraceEvent 与 Tools 类别 `log_detailed`；未命中再查 `g_meta_handlers`（7 元，`all_meta()` 派生）；否则返回 `domain tool 'X' not found — use search_tools to discover available tools`。
+- 排队计时清理：每次 `call_handler_impl` 返回前调用 `tools::take_queued_wait_ms()` 清掉本线程残留值，避免跨调用串值（`SpecTool::execute` 在入口一次性取走写入 `queue_wait_ms`）。
 - 导出保护：全部 7 个元工具回调前置 `ExportGuard::is_exporting()` 检查，命中返回 `export_blocked_result()`。
 - RegisterTool 回调分发：`call_tool` 直接在当前（MCP）线程执行 `tool->execute(args)`，`batch_execute` 在 `await_async=true` 时同样走 MCP 线程；其余元工具经 `queue.execute_sync` 投递主线程。
 - `debugger_access.hpp` 为 runtime_ops 提供的自由函数接口（capture/broadcast/cancel/continue/breaked/reload_scripts），实现于 `debugger_access.cpp`；依赖方向 runtime_ops.cpp → debugger_access.hpp、debugger_ops.cpp → runtime_ops.hpp，无环。
