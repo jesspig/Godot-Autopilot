@@ -1,0 +1,73 @@
+{
+  "name": "observability",
+  "description": "可观测性端到端验收（headless）：① system_status 热身（只读）断言服务器 running 且暴露 tool_count/queue_depth 运行指标；② execute_script 扫描 user://godot_autopilot/traces 下的 trace-*.jsonl（按修改时间取最新会话文件，同秒并列时按文件名时间戳取新的——session stamp 为 %Y%m%d_%H%M%S，字典序即时间序），断言最新文件含 kind=lifecycle（启动期 lifecycle 事件）、kind=snapshot（_enter_tree 内 environment_snapshot 写出，monitor_env.cpp 于 init_session 之后入队）、request_id/correlation_id/thread_id/monotonic_ns（每条 trace 行的可观测键），并断言任一 trace 文件含 kind=protocol_request（客户端连接与调用经 server_context begin_request 产生请求事件）。启动标记在同一会话文件首帧 flush，先于任何 MCP 调用执行，不依赖后续帧时序。③ execute_script 扫描 user://godot_autopilot/logs 下最新 gda-*.log，断言存在包含 trace= 的 detail 行（人类日志与 trace 关联；工具调用 detail 以 'trace=' 前缀写入，见 tool_spec.hpp / dispatch.cpp）。脚本内的搜索标记以运行时拼接或转义规避脚本自身 args_digest 被写入 jsonl/log 后污染扫描。前置：execute_script 受 code_execute capability 授权门保护（GODOT_AUTOPILOT_ALLOW env 或 user://godot_autopilot/config.json 的 allow 字段，env 优先）。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "fail_fast",
+    "stages": [
+      {
+        "id": "status",
+        "steps": [
+          {
+            "id": "observability_status_metrics",
+            "tool": "system_status",
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.running", "value": true },
+                { "key": "result.tool_count", "not_empty": true },
+                { "key": "result.queue_depth", "not_empty": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "trace_keys",
+        "steps": [
+          {
+            "id": "observability_trace_jsonl_keys",
+            "tool": "execute_script",
+            "args": {
+              "expression": "var dir = DirAccess.open(\"user://godot_autopilot/traces\")\nif dir == null:\n\treturn {\"trace_exists\": false, \"newest_trace\": \"\", \"newest_has_lifecycle\": false, \"newest_has_snapshot\": false, \"newest_has_request_id\": false, \"newest_has_correlation_id\": false, \"newest_has_thread_id\": false, \"newest_has_monotonic_ns\": false, \"any_has_protocol_request\": false}\nvar names = []\ndir.list_dir_begin()\nvar entry = dir.get_next()\nwhile entry != \"\":\n\tif not dir.current_is_dir() and entry.begins_with(\"trace-\") and entry.ends_with(\".jsonl\"):\n\t\tnames.append(entry)\n\tentry = dir.get_next()\ndir.list_dir_end()\nif names.is_empty():\n\treturn {\"trace_exists\": false, \"newest_trace\": \"\", \"newest_has_lifecycle\": false, \"newest_has_snapshot\": false, \"newest_has_request_id\": false, \"newest_has_correlation_id\": false, \"newest_has_thread_id\": false, \"newest_has_monotonic_ns\": false, \"any_has_protocol_request\": false}\nvar newest = \"\"\nvar newest_mtime = -1\nfor candidate in names:\n\tvar mtime = FileAccess.get_modified_time(\"user://godot_autopilot/traces/\" + candidate)\n\tif mtime > newest_mtime or (mtime == newest_mtime and candidate > newest):\n\t\tnewest_mtime = mtime\n\t\tnewest = candidate\nvar newest_text = \"\"\nvar newest_file = FileAccess.open(\"user://godot_autopilot/traces/\" + newest, FileAccess.READ)\nif newest_file != null:\n\tnewest_text = newest_file.get_as_text()\nvar any_protocol = false\nfor candidate in names:\n\tvar probe = FileAccess.open(\"user://godot_autopilot/traces/\" + candidate, FileAccess.READ)\n\tif probe != null:\n\t\tif probe.get_as_text().contains('\"kind\":\"protocol_request\"'):\n\t\t\tany_protocol = true\nreturn {\"trace_exists\": true, \"trace_files\": names.size(), \"newest_trace\": newest, \"newest_has_lifecycle\": newest_text.contains('\"kind\":\"lifecycle\"'), \"newest_has_snapshot\": newest_text.contains('\"kind\":\"snapshot\"'), \"newest_has_request_id\": newest_text.contains('\"request_id\"'), \"newest_has_correlation_id\": newest_text.contains('\"correlation_id\"'), \"newest_has_thread_id\": newest_text.contains('\"thread_id\"'), \"newest_has_monotonic_ns\": newest_text.contains('\"monotonic_ns\"'), \"any_has_protocol_request\": any_protocol}"
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.trace_exists", "value": true },
+                { "key": "result.newest_trace", "not_empty": true },
+                { "key": "result.newest_has_lifecycle", "value": true },
+                { "key": "result.newest_has_snapshot", "value": true },
+                { "key": "result.newest_has_request_id", "value": true },
+                { "key": "result.newest_has_correlation_id", "value": true },
+                { "key": "result.newest_has_thread_id", "value": true },
+                { "key": "result.newest_has_monotonic_ns", "value": true },
+                { "key": "result.any_has_protocol_request", "value": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "log_trace_link",
+        "steps": [
+          {
+            "id": "observability_log_trace_link",
+            "tool": "execute_script",
+            "args": {
+              "expression": "var dir = DirAccess.open(\"user://godot_autopilot/logs\")\nif dir == null:\n\treturn {\"log_exists\": false, \"newest_log\": \"\", \"has_trace_linked_line\": false}\nvar names = []\ndir.list_dir_begin()\nvar entry = dir.get_next()\nwhile entry != \"\":\n\tif not dir.current_is_dir() and entry.begins_with(\"gda-\") and entry.ends_with(\".log\"):\n\t\tnames.append(entry)\n\tentry = dir.get_next()\ndir.list_dir_end()\nif names.is_empty():\n\treturn {\"log_exists\": false, \"newest_log\": \"\", \"has_trace_linked_line\": false}\nvar newest = \"\"\nvar newest_mtime = -1\nfor candidate in names:\n\tvar mtime = FileAccess.get_modified_time(\"user://godot_autopilot/logs/\" + candidate)\n\tif mtime > newest_mtime or (mtime == newest_mtime and candidate > newest):\n\t\tnewest_mtime = mtime\n\t\tnewest = candidate\nvar text = \"\"\nvar newest_file = FileAccess.open(\"user://godot_autopilot/logs/\" + newest, FileAccess.READ)\nif newest_file != null:\n\ttext = newest_file.get_as_text()\nvar marker = \"tra\" + \"ce=\"\nreturn {\"log_exists\": true, \"log_files\": names.size(), \"newest_log\": newest, \"has_trace_linked_line\": text.contains(marker)}"
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.log_exists", "value": true },
+                { "key": "result.newest_log", "not_empty": true },
+                { "key": "result.has_trace_linked_line", "value": true }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
