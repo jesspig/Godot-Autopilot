@@ -3,10 +3,17 @@ name: Release
 on:
   push:
     tags:
-      - "v*"
+      - "v*.*.*"
+      - "[0-9]*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag name to release (e.g. 0.2.5 or v0.2.5)"
+        required: true
+        type: string
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.tag || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -16,12 +23,16 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
 
       - name: Verify tag matches VERSION
         run: |
           version="$(tr -d ' \t\r\n' < VERSION)"
-          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
-            echo "::error::Tag ${GITHUB_REF_NAME} does not match VERSION v${version}"
+          tag="${{ inputs.tag || github.ref_name }}"
+          tag="${tag#v}"
+          if [ "${tag}" != "${version}" ]; then
+            echo "::error::Tag ${{ inputs.tag || github.ref_name }} does not match VERSION ${version} (v prefix optional)"
             exit 1
           fi
 
@@ -42,6 +53,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -92,6 +105,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
 
       - name: Download platform libraries
         uses: actions/download-artifact@v4
@@ -107,4 +122,5 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
           files: addons.zip
