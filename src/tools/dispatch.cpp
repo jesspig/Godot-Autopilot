@@ -1,6 +1,7 @@
 #include "core/command_queue.hpp"
 #include "core/log_persist.hpp"
 #include "core/log_system.hpp"
+#include "core/monitor.hpp"
 #include "core/sanitize_policy.hpp"
 #include "core/trace_recorder.hpp"
 #include "tools/dispatch.hpp"
@@ -49,13 +50,16 @@ void record_dispatch_exception(const std::string &name,
   event.args_digest = sanitized.text;
   event.args_truncated = sanitized.truncated;
   event.result_size = static_cast<int64_t>(result.Dump().size());
-  TraceRecorder::instance().record(std::move(event));
+  event.name = name;
+  event.thread_id = TraceRecorder::current_thread_id();
+  event.monotonic_ns = TraceRecorder::monotonic_now_ns();
+  event.error_type = "internal";
   std::string args_text = sanitized.text;
   if (args_text.size() > 512) {
     args_text.resize(512);
   }
-  LogSystem::instance().log_detailed(
-      LogLevel::Error, LogCategory::Tools,
+  monitor::tool_call(
+      std::move(event), LogLevel::Error,
       "call_tool " + name + " -> error internal",
       "trace=" + trace + " span=" + span + " depth=" +
           std::to_string(tools::invoke_depth()) +
@@ -67,6 +71,7 @@ mcp::JsonValue call_handler_impl(const std::string &name,
   mcp::JsonValue result(mcp::JsonValue::object_tag);
   HandlerFn handler;
   {
+    monitor::LockProbe probe("dispatch_handlers_lock", 5.0);
     std::lock_guard<std::mutex> lock(g_handlers_mutex);
     auto it = g_handlers.find(name);
     if (it != g_handlers.end()) {
@@ -134,9 +139,11 @@ mcp::JsonValue call_handler(const std::string &name,
   }
   const auto submit_time = std::chrono::steady_clock::now();
   const tools::TraceContext trace_context = tools::capture_trace_context();
+  const std::string request_id = monitor::current_request_id();
   return get_editor_queue().execute_sync(
-      [name, args, submit_time, trace_context] {
+      [name, args, submit_time, trace_context, request_id] {
         tools::ScopedTraceContext restore(trace_context);
+        monitor::RequestScope request_scope(request_id);
         const int64_t waited_ms =
             std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::steady_clock::now() - submit_time)

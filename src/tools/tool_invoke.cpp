@@ -4,6 +4,7 @@
 #include "core/export_guard.hpp"
 #include "core/log_persist.hpp"
 #include "core/log_system.hpp"
+#include "core/monitor.hpp"
 #include "core/sanitize_policy.hpp"
 #include "core/trace_recorder.hpp"
 #include "tools/dispatch.hpp"
@@ -65,13 +66,15 @@ void record_invoke_trace(const std::string &name, const mcp::JsonValue &args,
   event.args_digest = sanitized.text;
   event.args_truncated = sanitized.truncated;
   event.result_size = static_cast<int64_t>(result.Dump().size());
-  TraceRecorder::instance().record(std::move(event));
+  event.name = name;
+  event.thread_id = TraceRecorder::current_thread_id();
+  event.monotonic_ns = TraceRecorder::monotonic_now_ns();
   std::string args_text = sanitized.text;
   if (args_text.size() > 512) {
     args_text.resize(512);
   }
-  LogSystem::instance().log_detailed(
-      LogLevel::Warning, LogCategory::Tools,
+  monitor::tool_call(
+      std::move(event), LogLevel::Warning,
       "call_tool " + name + " -> error " + error_code,
       "trace=" + trace + " span=" + span + " depth=" +
           std::to_string(g_depth) + " queue=0ms args=" + args_text +
@@ -114,10 +117,15 @@ TraceContext capture_trace_context() {
     ctx.trace_id = g_span_stack.back().first;
     ctx.span_id = g_span_stack.back().second;
   }
+  ctx.request_id = monitor::current_request_id();
   return ctx;
 }
 
 ScopedTraceContext::ScopedTraceContext(const TraceContext &ctx) {
+  if (!ctx.request_id.empty()) {
+    monitor::push_request(ctx.request_id);
+    request_active_ = true;
+  }
   if (!ctx.valid()) {
     return;
   }
@@ -129,6 +137,9 @@ ScopedTraceContext::ScopedTraceContext(const TraceContext &ctx) {
 ScopedTraceContext::~ScopedTraceContext() {
   if (active_) {
     g_span_stack = std::move(saved_);
+  }
+  if (request_active_) {
+    monitor::pop_request();
   }
 }
 
@@ -152,6 +163,19 @@ SpanGuard::SpanGuard(const std::string &trace_id, const std::string &span_id) {
 }
 
 SpanGuard::~SpanGuard() { pop_span(); }
+RequestSpanGuard::RequestSpanGuard(const std::string &trace_id,
+                                   const std::string &span_id) {
+  if (!trace_id.empty() && !span_id.empty()) {
+    push_span(trace_id, span_id);
+    active_ = true;
+  }
+}
+
+RequestSpanGuard::~RequestSpanGuard() {
+  if (active_) {
+    pop_span();
+  }
+}
 
 mcp::JsonValue invoke_tool(const std::string &name,
                            const mcp::JsonValue &args) {

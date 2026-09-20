@@ -30,10 +30,21 @@ struct SpanGuard {
   SpanGuard(const SpanGuard &) = delete;
   SpanGuard &operator=(const SpanGuard &) = delete;
 };
+class RequestSpanGuard {
+public:
+  RequestSpanGuard(const std::string &trace_id, const std::string &span_id);
+  ~RequestSpanGuard();
+  RequestSpanGuard(const RequestSpanGuard &) = delete;
+  RequestSpanGuard &operator=(const RequestSpanGuard &) = delete;
+
+private:
+  bool active_ = false;
+};
 
 struct TraceContext {
   std::string trace_id;
   std::string span_id;
+  std::string request_id;
   bool valid() const { return !trace_id.empty(); }
 };
 
@@ -47,6 +58,7 @@ struct ScopedTraceContext {
 
 private:
   bool active_ = false;
+  bool request_active_ = false;
   std::vector<std::pair<std::string, std::string>> saved_;
 };
 

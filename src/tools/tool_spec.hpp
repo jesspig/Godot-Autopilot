@@ -14,6 +14,7 @@
 #include <core/log_persist.hpp>
 #include <core/log_system.hpp>
 #include <core/trace_recorder.hpp>
+#include "core/monitor.hpp"
 #include "core/sanitize_policy.hpp"
 #include <tools/runtime_ops.hpp>
 #include <tools/schema_builder.hpp>
@@ -201,16 +202,21 @@ inline mcp::JsonValue SpecTool::execute(const mcp::JsonValue &args) {
     denied_event.args_digest = sanitized.text;
     denied_event.args_truncated = sanitized.truncated;
     denied_event.result_size = static_cast<int64_t>(denied.Dump().size());
-    TraceRecorder::instance().record(std::move(denied_event));
-    LogSystem::instance().log_detailed(
-        LogLevel::Warning, LogCategory::Tools,
-        "call_tool " + spec_.name + " -> error 0ms",
+    denied_event.name = spec_.name;
+    denied_event.request_id = monitor::current_request_id();
+    denied_event.thread_id = TraceRecorder::current_thread_id();
+    denied_event.monotonic_ns = TraceRecorder::monotonic_now_ns();
+    const std::string denied_summary =
+        "call_tool " + spec_.name + " -> error 0ms";
+    const std::string denied_detail =
         "trace=" + trace_id + " span=" + span_id + " parent=" + parent_span +
-            " depth=" + std::to_string(depth) + " queue=" +
-            std::to_string(queue_wait) + "ms dur=0ms auth=denied err=" +
-            denied_error + " args=" +
-            spec_detail::truncated_text(sanitized.text,
-                                        spec_detail::kArgsDetailMax));
+        " depth=" + std::to_string(depth) + " queue=" +
+        std::to_string(queue_wait) + "ms dur=0ms auth=denied err=" +
+        denied_error + " args=" +
+        spec_detail::truncated_text(sanitized.text,
+                                    spec_detail::kArgsDetailMax);
+    monitor::tool_call(std::move(denied_event), LogLevel::Warning,
+                       denied_summary, denied_detail);
     return denied;
   }
   mcp::JsonValue result = spec_.handler(args);
@@ -278,7 +284,10 @@ inline mcp::JsonValue SpecTool::execute(const mcp::JsonValue &args) {
     }
     image_detail += " img_bytes=" + std::to_string(image_bytes);
   }
-  TraceRecorder::instance().record(std::move(event));
+  event.name = spec_.name;
+  event.request_id = monitor::current_request_id();
+  event.thread_id = TraceRecorder::current_thread_id();
+  event.monotonic_ns = TraceRecorder::monotonic_now_ns();
   std::string detail = "trace=" + trace_id + " span=" + span_id + " parent=" +
                        parent_span + " depth=" + std::to_string(depth) +
                        " queue=" + std::to_string(queue_wait) + "ms dur=" +
@@ -297,11 +306,10 @@ inline mcp::JsonValue SpecTool::execute(const mcp::JsonValue &args) {
   if (!ok || slow) {
     level = LogLevel::Warning;
   }
-  LogSystem::instance().log_detailed(
-      level, LogCategory::Tools,
-      "call_tool " + spec_.name + " -> " + (ok ? "ok " : "error ") +
-          std::to_string(duration_ms) + "ms",
-      detail);
+  const std::string summary = "call_tool " + spec_.name + " -> " +
+                              (ok ? "ok " : "error ") +
+                              std::to_string(duration_ms) + "ms";
+  monitor::tool_call(std::move(event), level, summary, detail);
   return result;
 }
 
