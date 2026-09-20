@@ -12,6 +12,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 #ifdef GetObject
 #undef GetObject
@@ -123,23 +124,30 @@ int64_t steady_game_now_ms() {
 }
 
 void expire_stale_game_jobs(int64_t now_ms) {
-  std::vector<int64_t> stale_requests;
+  std::vector<std::pair<int64_t, int64_t>> stale_jobs;
   {
     std::lock_guard<std::mutex> lock(game_jobs_mutex());
     GameJobTable &table = game_jobs();
     for (auto it = table.jobs.begin(); it != table.jobs.end();) {
       if ((now_ms - it->second.started_ms) >
           (it->second.timeout_ms + GameJobTable::kExpiryGraceMs)) {
-        stale_requests.push_back(it->second.request_id);
+        stale_jobs.emplace_back(it->second.job_id, it->second.request_id);
         it = table.jobs.erase(it);
       } else {
         ++it;
       }
     }
   }
-  for (int64_t stale_request_id : stale_requests) {
+  for (const auto &stale : stale_jobs) {
     std::string stale_detail;
-    discard_pending(stale_request_id, stale_detail);
+    discard_pending(stale.second, stale_detail);
+    LogSystem::instance().log_detailed(
+        LogLevel::Warning, LogCategory::Tools,
+        "game job " + std::to_string(stale.first) +
+            " expired during stale cleanup",
+        "job_id=" + std::to_string(stale.first) +
+            " request_id=" + std::to_string(stale.second) +
+            " reason=expired");
   }
 }
 
@@ -710,6 +718,12 @@ mcp::JsonValue handle_game_job_start(const mcp::JsonValue &args) {
   if (job_id < 0) {
     std::string discard_detail;
     discard_pending(request_id, discard_detail);
+    LogSystem::instance().log_detailed(
+        LogLevel::Warning, LogCategory::Tools,
+        "start_game_job rejected: job table full",
+        "jobs=" + std::to_string(GameJobTable::kMaxJobs) + " op=" + op +
+            " timeout_ms=" + std::to_string(timeout_ms) +
+            " request_id=" + std::to_string(request_id));
     return util::error_detail(
         "game job table is full (" + std::to_string(GameJobTable::kMaxJobs) +
             " jobs)",
@@ -823,10 +837,13 @@ mcp::JsonValue handle_game_job_get(const mcp::JsonValue &args) {
       payload["job_id"] = JV(job_id);
       payload["request_id"] = JV(request_id);
       payload["timeout_ms"] = JV(job_timeout_ms);
-      LogSystem::instance().log(
+      LogSystem::instance().log_detailed(
           LogLevel::Info, LogCategory::Tools,
-          "get_game_job dropped expired job " + std::to_string(job_id) +
-              " (request_id " + std::to_string(request_id) + ")");
+          "get_game_job dropped expired job " + std::to_string(job_id),
+          "job_id=" + std::to_string(job_id) +
+              " request_id=" + std::to_string(request_id) + " timeout_ms=" +
+              std::to_string(job_timeout_ms) + " elapsed_ms=" +
+              std::to_string(now_ms - started_ms));
       return util::ok_result(std::move(payload));
     }
     if (wait_budget_ms <= 0 || now_ms >= deadline_ms) {

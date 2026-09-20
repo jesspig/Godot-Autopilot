@@ -351,10 +351,12 @@ void prune_capture_files(const godot::String &dir_path, int keep) {
     godot::Error err =
         godot::DirAccess::remove_absolute(dir_path.path_join(files[i].second));
     if (err != godot::OK) {
-      LogSystem::instance().log(
+      LogSystem::instance().log_detailed(
           LogLevel::Warning, LogCategory::Tools,
           "prune_capture_files: failed to remove " +
-              util::to_std(files[i].second));
+              util::to_std(files[i].second),
+          "path=" + util::to_std(files[i].second) +
+              " error_code=" + std::to_string(static_cast<int>(err)));
     }
   }
 }
@@ -1225,6 +1227,15 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
       "capture_editor_viewport completed: " +
           std::to_string(final_width) + "x" + std::to_string(final_height) +
           " space=" + space);
+  LogSystem::instance().log_detailed(
+      LogLevel::Info, LogCategory::Tools,
+      "capture_editor_viewport completed: " +
+          std::to_string(final_width) + "x" + std::to_string(final_height) +
+          " space=" + space,
+      "width=" + std::to_string(final_width) + " height=" +
+          std::to_string(final_height) + " space=" + space +
+          " save=" + (save ? "true" : "false") +
+          " annotate=" + (annotate ? "true" : "false"));
   return r;
 }
 

@@ -6,7 +6,7 @@ tags:
   - 构建
   - CMake
   - 部署
-timestamp: "2026-09-20T17:26:00+08:00"
+timestamp: "2026-09-21T01:24:00+08:00"
 resource:
   - CMakeLists.txt
   - CMakePresets.json
@@ -16,8 +16,8 @@ resource:
 
 # 构建体系（build）
 
-> 审计日期：2026-09-19（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill 内容外置化同步；09-10 随 7 册重构同步；09-13 晚随 A 组知识库审计修复批次同步——skill_templates 8 册/30 个 .md、server_context/FetchDependencies 行号重核、AGENTS.md/README 对照段更新；09-13 晚随 0.2.3→0.2.4 升版同步示例版本号；09-13 晚随 0.2.4 版知识库全量审计同步——GODOT_PATH 缺失行为修正（退出码 2 报错，非“失败/跳过”），全页其余事实复核一致；09-14 随 CI Windows Python 编码修复同步——ci/release workflow 增 `PYTHONUTF8`、`embed_skills.py` 强制 UTF-8 输出），基于当前工作树文件逐项核对（不依赖 git 历史）；09-15 随 Computer Use grounding 批次同步文档一致性段——`README.md` / `README_zh.md` 工具数口径已同步为 ~379（域工具），与 overview 的 379 域工具 / 可达 386 / catalog 387 一致；09-16 随失败修复批次同步——README 双语工具数口径更新为 ~384，与 overview 的 384 域工具 / 可达 391 / catalog 392 一致；09-16 随视觉辅助与坐标换算批次同步——wiki 实测 385 域工具 / 可达 392 / catalog 393（Capture 1→2），README 双语 ~384 为约数口径（差 1，可接受，待后续版本同步）；09-16 随 0.2.5 升版收尾同步——validate 示例 0.2.4→0.2.5（`VERSION`/AGENTS/changelog 早在 09-14 已同步，`GDA_VERSION` 已为 0.2.5）；09-17 随 T09+T12 文档同步批次更新 compatibility_minimum 4.3→4.7、godot-cpp 10.0.0-rc1→rc2（新增 GODOTCPP_API_VERSION "4.7" FORCE 覆盖旧缓存）、mcp-cpp-sdk 0.3.3→0.3.4；09-18 随知识库一致性审计与 README 拆分批次同步——`CMakeLists.txt` 行数 169→173（实测）、`README_zh.md` 已删除（中文 `README.md` + 英文 `README.en.md` 双版）故事实来源与文档一致性段改引新版 README 口径；09-19 随 ToolSpec 数据化重构同步文档一致性段——wiki 实测 391 域工具 / 可达 398 / catalog 399；09-20 随 Release 触发修复同步——tag 触发 `v*` 改双格式（`v*.*.*` / `[0-9]*.*.*`）+ `workflow_dispatch` 手动指定 tag，validate 去 `v` 后比对 `VERSION`；同日代码-文档一致性审计——add_library 分目录计数修正为 tools 48 / util 8 / runtime 4（总数 83 不变）；同日 0.2.6 升版——根 `VERSION` 0.2.5→0.2.6（单一来源），validate 示例同步至 `v0.2.6` ↔ `0.2.6`。
-> 事实来源：`build.py`（239 行）、`CMakeLists.txt`（173 行）、`CMakePresets.json`、`cmake/` 全部 7 个模块、`tools/embed_skills.py`、`.env.template`、根 `README.md` / `README.en.md` / `AGENTS.md` 构建段、`.github/workflows/{ci,release}.yml`。
+> 审计日期：2026-09-19（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill 内容外置化同步；09-10 随 7 册重构同步；09-13 晚随 A 组知识库审计修复批次同步——skill_templates 8 册/30 个 .md、server_context/FetchDependencies 行号重核、AGENTS.md/README 对照段更新；09-13 晚随 0.2.3→0.2.4 升版同步示例版本号；09-13 晚随 0.2.4 版知识库全量审计同步——GODOT_PATH 缺失行为修正（退出码 2 报错，非“失败/跳过”），全页其余事实复核一致；09-14 随 CI Windows Python 编码修复同步——ci/release workflow 增 `PYTHONUTF8`、`embed_skills.py` 强制 UTF-8 输出），基于当前工作树文件逐项核对（不依赖 git 历史）；09-15 随 Computer Use grounding 批次同步文档一致性段——`README.md` / `README_zh.md` 工具数口径已同步为 ~379（域工具），与 overview 的 379 域工具 / 可达 386 / catalog 387 一致；09-16 随失败修复批次同步——README 双语工具数口径更新为 ~384，与 overview 的 384 域工具 / 可达 391 / catalog 392 一致；09-16 随视觉辅助与坐标换算批次同步——wiki 实测 385 域工具 / 可达 392 / catalog 393（Capture 1→2），README 双语 ~384 为约数口径（差 1，可接受，待后续版本同步）；09-16 随 0.2.5 升版收尾同步——validate 示例 0.2.4→0.2.5（`VERSION`/AGENTS/changelog 早在 09-14 已同步，`GDA_VERSION` 已为 0.2.5）；09-17 随 T09+T12 文档同步批次更新 compatibility_minimum 4.3→4.7、godot-cpp 10.0.0-rc1→rc2（新增 GODOTCPP_API_VERSION "4.7" FORCE 覆盖旧缓存）、mcp-cpp-sdk 0.3.3→0.3.4；09-18 随知识库一致性审计与 README 拆分批次同步——`CMakeLists.txt` 行数 169→173（实测）、`README_zh.md` 已删除（中文 `README.md` + 英文 `README.en.md` 双版）故事实来源与文档一致性段改引新版 README 口径；09-19 随 ToolSpec 数据化重构同步文档一致性段——wiki 实测 391 域工具 / 可达 398 / catalog 399；09-20 随 Release 触发修复同步——tag 触发 `v*` 改双格式（`v*.*.*` / `[0-9]*.*.*`）+ `workflow_dispatch` 手动指定 tag，validate 去 `v` 后比对 `VERSION`；同日代码-文档一致性审计——add_library 分目录计数修正为 tools 48 / util 8 / runtime 4（总数 83 不变）；同日 0.2.6 升版——根 `VERSION` 0.2.5→0.2.6（单一来源），validate 示例同步至 `v0.2.6` ↔ `0.2.6`；09-20 晚随可重放监控批次同步——add_library 83→86（`src/core/` 9→12：log_persist / trace_recorder / sanitize_policy），块范围 `CMakeLists.txt:65-148`→`:65-151`；09-20 晚随依赖升级同步——godot-cpp 10.0.0-rc2→10.0.0-stable；mcp-cpp-sdk 维持 0.3.4（依赖升级范围经复核收缩，`FetchDependencies.cmake:20/29`，configure 实测 `[mcp] SDK version: 0.3.4`）；09-21 随可重放监控与日志系统批次同步——`add_library` 86→89（`src/core/` 12→15：新增 `monitor.cpp` / `monitor_env.cpp` / `perf_sampler.cpp`），`monitor.cpp` 进 L1 业务源、`monitor_env.cpp`（仅主线程）与 `perf_sampler.cpp`（依赖引擎 tick）不进 L1。
+> 事实来源：`build.py`（239 行）、`CMakeLists.txt`（176 行）、`CMakePresets.json`、`cmake/` 全部 7 个模块、`tools/embed_skills.py`、`.env.template`、根 `README.md` / `README.en.md` / `AGENTS.md` 构建段、`.github/workflows/{ci,release}.yml`。
 
 ## 命令速查表
 
@@ -104,19 +104,19 @@ macOS runner 为 ARM64，preset 设 `CMAKE_OSX_ARCHITECTURES=x86_64;arm64` 编�
 
 ## CMake 目标
 
-`add_library(godot-autopilot SHARED ...)`（`CMakeLists.txt:65-148`）共 **83 个 .cpp**：
+`add_library(godot-autopilot SHARED ...)`（`CMakeLists.txt:65` 起）共 **89 个 .cpp**：
 
 | 目录 | 数量 | 目录 | 数量 |
 |---|---:|---|---:|
 | `src/main.cpp` | 1 | `src/tools/` | 48 |
-| `src/core/` | 9（含 editor_readiness.cpp、editor_coords.cpp） | `src/util/` | 8（含 scene_verify；skill_gen + skill_content_generated 构建期嵌入薄胶水） |
+| `src/core/` | 15（含 editor_readiness.cpp、editor_coords.cpp、09-20 新增 log_persist / trace_recorder / sanitize_policy、09-21 新增 monitor / monitor_env / perf_sampler） | `src/util/` | 8（含 scene_verify；skill_gen + skill_content_generated 构建期嵌入薄胶水） |
 | `src/resources/` | 2 | `src/ui/` | 2 |
 | `src/prompts/` | 9 | `src/runtime/` | 4（含 09-18 新增 game_bridge_verify） |
 
-- **skill 内容嵌入头**：8 册技能正文外置为 `src/util/skill_templates/`（30 个 .md + registry.json，**不进 add_library**），`cmake/skill_gen.cmake` 在构建期经 `tools/embed_skills.py` 生成 `build/<preset>/generated/skill_content_embedded.h`（gitignore 覆盖）；`add_dependencies(godot-autopilot gda_skill_embed_header)`（`CMakeLists.txt:146`）保证生成先于编译；
+- **skill 内容嵌入头**：8 册技能正文外置为 `src/util/skill_templates/`（30 个 .md + registry.json，**不进 add_library**），`cmake/skill_gen.cmake` 在构建期经 `tools/embed_skills.py` 生成 `build/<preset>/generated/skill_content_embedded.h`（gitignore 覆盖）；`add_dependencies(godot-autopilot gda_skill_embed_header)`（`CMakeLists.txt:153`）保证生成先于编译；
 - 私有头文件目录：`${CMAKE_SOURCE_DIR}/src`；
 - 链接库（PRIVATE）：`godot-cpp`、`mcp-server`、`mcp-http`（后两者来自 mcp-cpp-sdk）；
-- MSVC（含 clang-cl）额外 `target_link_options "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>"`（`CMakeLists.txt:158`）—— 强制导出 godot-cpp 全部符号，防止 GDExtension 入口符号被链接器裁剪；
+- MSVC（含 clang-cl）额外 `target_link_options "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>"`（`CMakeLists.txt:165`）—— 强制导出 godot-cpp 全部符号，防止 GDExtension 入口符号被链接器裁剪；
 - **Unity 构建已接线生效**：`set_target_properties(godot-autopilot PROPERTIES UNITY_BUILD ${GDA_UNITY_ENABLED} UNITY_BUILD_BATCH_SIZE ${GDA_UNITY_BATCH})`（`CMakeLists.txt`，add_library 之后）——实测 Debug batch=8（16 核）；此前仅 BuildOptimization.cmake 计算参数、未挂到 target；
 - `option(GDA_ENABLE_TESTS ... OFF)`，开启后 `add_subdirectory(tests)`（详见 [tests.md](./tests.md)）。
 
@@ -130,7 +130,7 @@ macOS runner 为 ARM64，preset 设 `CMAKE_OSX_ARCHITECTURES=x86_64;arm64` 编�
 | `BuildOptimization.cmake` | 硬件感知并行度（核心规则） | `GDA_COMPILE_JOBS`、`GDA_LINK_JOBS`（CACHE 优先、其次 ENV）、`GDA_UNITY_BUILD`（ON 且核数 >1 时启用）、`GDA_UNITY_BATCH_SIZE`（0=auto）、`GDA_MAX_COMPILE_MEM_MB`（默认 1500）、`GDA_MAX_LINK_MEM_MB`（默认 4000）、`GDA_UNITY_MEM_MB`（默认 500） |
 | `CompilerOptions.cmake` | 按编译器分发 flags | Clang/clang-cl 与 MSVC：`/utf-8 /bigobj /W4 /EHsc` + `_CRT_SECURE_NO_WARNINGS`、`_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS`、`_WIN32_WINNT=0x0A00`；MSVC 调试信息 `Embedded`；GCC/Clang 非 Windows 非 CI 追加 `-march=native`；`find_package(Threads REQUIRED)`；`CMAKE_POSITION_INDEPENDENT_CODE ON` |
 | `Cache.cmake` | 编译缓存自动探测 | 优先 sccache（支持 MSVC），回退 ccache（仅 GCC/Clang）；命中则设 `CMAKE_C/CXX_COMPILER_LAUNCHER` |
-| `FetchDependencies.cmake` | FetchContent 依赖 | `godot-cpp` @ `10.0.0-rc2`（godotengine/godot-cpp，GIT_SHALLOW）+ `GODOTCPP_API_VERSION "4.7"`（CACHE/FORCE，覆盖旧缓存）、`mcp-cpp-sdk` @ `0.3.4`（jesspig/modelcontextprotocol-cpp-sdk，GIT_SHALLOW）；`FETCHCONTENT_QUIET OFF`；文件头部注释明确"禁止删除 _deps/" |
+| `FetchDependencies.cmake` | FetchContent 依赖 | `godot-cpp` @ `10.0.0-stable`（godotengine/godot-cpp，GIT_SHALLOW）+ `GODOTCPP_API_VERSION "4.7"`（CACHE/FORCE，覆盖旧缓存）、`mcp-cpp-sdk` @ `0.3.4`（jesspig/modelcontextprotocol-cpp-sdk，GIT_SHALLOW）；`FETCHCONTENT_QUIET OFF`；文件头部注释明确"禁止删除 _deps/" |
 | `Lto.cmake` | 仅 Release 的链接优化 | 优先级 Clang ThinLTO（`-flto=thin`）> MSVC LTCG（`CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE`）> GCC IPO（`CheckIPOSupported`）；非 Release 直接跳过 |
 | `skill_gen.cmake` | skill 模板构建期嵌入（09-08 新增） | `GDA_PYTHON_EXECUTABLE`（`find_program(NAMES py python python3 REQUIRED)`，py launcher 优先）+ configure 期 `--version` 自检（失败 FATAL_ERROR）；`add_custom_command` 生成 `<build>/generated/skill_content_embedded.h` + `add_custom_target(gda_skill_embed_header)`；依赖 `src/util/skill_templates/` 全部 .md 与 registry.json（CONFIGURE_DEPENDS） |
 
@@ -163,7 +163,7 @@ version 8；`debug`/`release` 两个 configure 预设：Ninja 生成器、`build
 - `uv run build.py` / `--release` 语义、手动 `cmake --preset` 命令 ✓；
 - "切勿删除 `build/<preset>/_deps/`" ✓（`build.py` AUTO-CLEAN 保留 + `FetchDependencies.cmake` 头注释）；
 - "添加新 .cpp 时必须在 `add_library()` 中加入" ✓（Unity 构建只编译列出的文件）；**精度补充**：`src/util/skill_templates/*.md` 与 `registry.json` 为内容数据文件，经生成头机制（`skill_gen.cmake` + `tools/embed_skills.py`）进入编译，不进 add_library；
-- 依赖版本 `godot-cpp 10.0.0-rc2` / `mcp-cpp-sdk 0.3.4`、FetchContent 非子模块 ✓（`FetchDependencies.cmake:17-29`，含 `GODOTCPP_API_VERSION "4.7"` FORCE）；
+- 依赖版本 `godot-cpp 10.0.0-stable` / `mcp-cpp-sdk 0.3.4`、FetchContent 非子模块 ✓（`FetchDependencies.cmake:17-29`，含 `GODOTCPP_API_VERSION "4.7"` FORCE）；
 - 编译器优先 Clang/clang-cl、MSVC/GCC 回退 ✓（根 CMakeLists 自动探测 + `CompilerOptions.cmake` 分发）；
 - 优化自适应（sccache/ccache、LTO、Unity、Ninja 作业池）✓；AGENTS.md 与实现一致：仅 `GDA_COMPILE_JOBS` / `GDA_LINK_JOBS` 支持 CACHE（`-D`）与进程环境变量双通道，`GDA_UNITY_BUILD`/`GDA_UNITY_BATCH_SIZE` 等内存参数只接受 `-D` CACHE；
 - **文档一致性**：`README.md` / `README.en.md` 工具数口径为 badge `tools-385+`（`README.md:8` / `README.en.md:8`）与“385+ 个工具 / Over 385 tools”（`README.md:26` / `README.en.md:26`，域工具约数口径，数量随版本增长以 `search_tools` 查到的为准），wiki 实测为 [overview.md](./overview.md) 的 **391 域工具**——398/399（MCP 可达 / catalog-index）含 7 元工具与 `system_status`，README 未列这两个数字属“约数 vs 实测”口径差异；新版 README 已无独立构建章节（`README.md:70` 指向 wiki [build.md](./build.md) 与 `tests/README.md`），`--package` / `--debug` 参数以本页命令速查表为准。

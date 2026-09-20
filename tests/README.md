@@ -4,7 +4,7 @@
 
 测试体系分两层：
 
-- **L1 纯单测**（`gda_unit_tests`，269 个 gtest 用例 / 29 个测试文件；另加迁移守卫 `migration_guard` 1 项，`ctest --preset debug -E "^gda_runner_"` 共 270 项）：不启动引擎，不触碰 Godot API，验证核心逻辑与工具注册管线。
+- **L1 纯单测**（`gda_unit_tests`，312 个 gtest 用例 / 33 个测试文件；另加迁移守卫 `migration_guard` 与注释守卫 `comment_guard` 各 1 项，`ctest --preset debug -E "^gda_runner_"` 共 314 项）：不启动引擎，不触碰 Godot API，验证核心逻辑与工具注册管线。
 - **L2 配置驱动引擎内测试**（`gda_test_runner` + `tests/config/*.json` 用例）：由 C++ 执行器自管 Godot headless 编辑器进程，经真实 MCP HTTP 全链路驱动领域工具，并按 JSON 用例中的断言语义（C++ 执行器侧）校验响应。**每份 config/*.json = 一次独立的编辑器生命周期最小闭环**（启动 → MCP 就绪 → 执行步骤 → 停止进程），文件间互不共享状态。
 
 架构一句话：进程内 GDExtension（EditorPlugin），领域工具经 `call_tool` 元工具代理，由 `register_all.cpp` 的 registry（`build_registry`，经 `refresh_derived` 派生 dispatch 映射）分发。
@@ -32,7 +32,7 @@ $env:GODOT_PATH="C:\path\to\Godot.exe"
 
 若二者皆无，`gda_test_runner` 退出码 2（"未找到 Godot 可执行文件"）。L1 不受影响。
 
-另有 L2 授权前置：涉及任意脚本/游戏运行时的用例（如 `00_meta` 的 code_execute、`04_resources_scripts` 的 execute_script、`16_game_jobs` 的 start_game_job、`23`/`24` 的游戏侧路径需 `game_runtime`，`18`/`22`/`26`/`27` 需 `code_execute`）需要 capability 授权——由 `GODOT_AUTOPILOT_ALLOW` 环境变量（如 `game_runtime`、`code_execute` 或 `all`）或 `user://godot_autopilot/config.json` 的 `allow` 字段提供，环境变量优先；缺失时相应用例被授权门拒绝而 FAIL。其中 `26_user_tools_code_mode` 与 `27_user_tools_rescan` 的用户工具注册/调用另受 `user_tools` 能力门保护：用例内 `AutopilotTools.set_enabled(true)` 写配置可自包含，但若 `GODOT_AUTOPILOT_ALLOW` 已设置且不含 `user_tools`/`all`，env 优先使 `set_enabled` 无效、用例失败（此时需在 env 中补 `user_tools` 或取消该 env）。
+另有 L2 授权前置：涉及任意脚本/游戏运行时的用例（如 `00_meta` 的 code_execute、`04_resources_scripts` 的 execute_script、`16_game_jobs` 的 start_game_job、`23`/`24` 的游戏侧路径需 `game_runtime`，`18`/`22`/`26`/`27`/`29`/`30` 需 `code_execute`）需要 capability 授权——由 `GODOT_AUTOPILOT_ALLOW` 环境变量（如 `game_runtime`、`code_execute` 或 `all`）或 `user://godot_autopilot/config.json` 的 `allow` 字段提供，环境变量优先；缺失时相应用例被授权门拒绝而 FAIL。其中 `26_user_tools_code_mode` 与 `27_user_tools_rescan` 的用户工具注册/调用另受 `user_tools` 能力门保护：用例内 `AutopilotTools.set_enabled(true)` 写配置可自包含，但若 `GODOT_AUTOPILOT_ALLOW` 已设置且不含 `user_tools`/`all`，env 优先使 `set_enabled` 无效、用例失败（此时需在 env 中补 `user_tools` 或取消该 env）。
 
 ## 4. 构建
 
@@ -57,9 +57,10 @@ cmake --build --preset debug --target gda_unit_tests gda_test_runner
 ctest --preset debug
 ```
 
-注册方式（`tests/CMakeLists.txt:118-130`）：**每份 `config/*.json` 一条 `gda_runner_<文件名去后缀>` 用例**，命令为 `gda_test_runner --file <name> --report-dir <build>/tests/output`，`TIMEOUT 600`（单文件含遍历约 2-4 分钟，超时防挂死）。当前 28 个 config 文件 → 28 条 ctest 用例（21 号段空缺，99 号诊断用例已删）：`gda_runner_00_meta`、`gda_runner_01_scene`、`gda_runner_02_property`、`gda_runner_03_tools_contract`、`gda_runner_04_resources_scripts`、`gda_runner_05_rename_references`、`gda_runner_06_move_references`、`gda_runner_07_scene_tabs`、`gda_runner_08_property_readback`、`gda_runner_09_editor_ui`、`gda_runner_10_editor_input`、`gda_runner_11_editor_tree`、`gda_runner_12_capture_params`、`gda_runner_13_inline_subresource`、`gda_runner_14_tilemap_rect`、`gda_runner_15_scene_path`、`gda_runner_16_game_jobs`、`gda_runner_17_vision_assist`、`gda_runner_18_script_freshness`、`gda_runner_19_cjk_roundtrip`、`gda_runner_20_cjk_text_roundtrip`、`gda_runner_22_uid_guard`、`gda_runner_23_click_ui_coords`、`gda_runner_24_keycode_alias`、`gda_runner_25_open_scene_idempotent`、`gda_runner_26_user_tools_code_mode`、`gda_runner_27_user_tools_rescan`、`gda_runner_28_sprite_frames_animation`。
+注册方式（`tests/CMakeLists.txt:118-130`）：**每份 `config/*.json` 一条 `gda_runner_<文件名去后缀>` 用例**，命令为 `gda_test_runner --file <name> --report-dir <build>/tests/output`，`TIMEOUT 600`（单文件含遍历约 2-4 分钟，超时防挂死）。当前 30 个 config 文件 → 30 条 ctest 用例（21 号段空缺，99 号诊断用例已删）：`gda_runner_00_meta`、`gda_runner_01_scene`、`gda_runner_02_property`、`gda_runner_03_tools_contract`、`gda_runner_04_resources_scripts`、`gda_runner_05_rename_references`、`gda_runner_06_move_references`、`gda_runner_07_scene_tabs`、`gda_runner_08_property_readback`、`gda_runner_09_editor_ui`、`gda_runner_10_editor_input`、`gda_runner_11_editor_tree`、`gda_runner_12_capture_params`、`gda_runner_13_inline_subresource`、`gda_runner_14_tilemap_rect`、`gda_runner_15_scene_path`、`gda_runner_16_game_jobs`、`gda_runner_17_vision_assist`、`gda_runner_18_script_freshness`、`gda_runner_19_cjk_roundtrip`、`gda_runner_20_cjk_text_roundtrip`、`gda_runner_22_uid_guard`、`gda_runner_23_click_ui_coords`、`gda_runner_24_keycode_alias`、`gda_runner_25_open_scene_idempotent`、`gda_runner_26_user_tools_code_mode`、`gda_runner_27_user_tools_rescan`、`gda_runner_28_sprite_frames_animation`、`gda_runner_29_trace_persistence`、`gda_runner_30_observability`。
 
-- L1 经 `gtest_discover_tests` 注册，每用例一条（如 `CommandQueueTest.*`，269 条），迁移守卫 `migration_guard` 为独立 ctest 用例 1 条（`tests/CMakeLists.txt:132-136`，零依赖读源码断言，不启动引擎也无需构建产物）——L1 过滤后共 **270** 条；ctest 总注册点 **298** = 270（L1）+ 28（L2）。
+- L1 经 `gtest_discover_tests` 注册，每用例一条（如 `CommandQueueTest.*`，312 条），迁移守卫 `migration_guard` 与注释守卫 `comment_guard` 各 1 条（`tests/CMakeLists.txt`，零依赖读源码断言，不启动引擎也无需构建产物）——L1 过滤后共 **314** 条；ctest 总注册点 **344** = 314（L1）+ 30（L2）。
+- **L1 单测清单**（33 文件，逐文件主题以 [docs/wiki/tests.md](../docs/wiki/tests.md) 为准）：09-21 可重放监控与日志系统批次新增 `monitor_test`（9）、`perf_sampler_test`（6），并把 `trace_recorder_test` 扩至 18、`log_system_test` 扩至 9、`log_persist_test` 扩至 8，覆盖统一埋点门面、性能采样/超时看门狗、trace 环缓冲（schema v2）与日志/持久化纯逻辑。
 - **耗时**：普通用例约 15s/文件（一次编辑器生命周期）；`03_tools_contract` 含两次全量遍历（330 个候选工具 ×2），为最慢单文件（约 2-3 分钟）。全量 ctest 总耗时随用例数与机器波动，以运行时统计为准。
 - 单跑一条：`ctest --preset debug -R gda_runner_00_meta` 或 `ctest --preset debug -R CommandQueueTest`。
 
@@ -201,7 +202,7 @@ build\debug\tests\gda_test_runner.exe --file 01_scene
 - **`not_empty`**：string 非空；array/object `Size() > 0`；null 判空失败；其他标量视为非空
 - 断言执行于 C++ 执行器侧，对 `call_tool` 的响应 JSON 校验；无 `expect` 时仅检查工具调用未返回 `error`
 
-### 用例文件（`tests/config/`，28 个）
+### 用例文件（`tests/config/`，30 个）
 
 | 文件 | name | 内容 |
 | ---- | ---- | ---- |
@@ -233,6 +234,8 @@ build\debug\tests\gda_test_runner.exe --file 01_scene
 | `26_user_tools_code_mode.json` | user_tools_code_mode | AutopilotTools 用户脚本工具端到端：`code_execute` 内注册 `user_echo_probe` → MCP `call_tool` 回显 → `search_tools`/`get_tool_detail` 标记 `dynamic=true` → code-mode 直连 → `unregister_tool` 后 not found；需 `code_execute` + `user_tools` 授权（见第 3 节） |
 | `27_user_tools_rescan.json` | user_tools_rescan | 目录扫描 rescan 端到端：`code_execute` 写 probe（`register_autopilot_tools(api)` 约定）→ `api.rescan` 注册非空 → MCP `call_tool` 回显 → 二次 rescan 幂等（`registered` 空、`failed` 存在）→ 清理；夹具目录 `res://gda_tmp_user_tools/`；需 `code_execute` + `user_tools` 授权（见第 3 节） |
 | `28_sprite_frames_animation.json` | sprite_frames_animation | `create_scene_node` 属性两轮应用回归：同传 `sprite_frames`+`animation`，断言 `applied_properties==["sprite_frames","animation"]` 且读回 `animation=="idle"` |
+| `29_trace_persistence.json` | trace_persistence | 日志/trace 双目录持久化端到端（09-20 新增）：`system_status` 热身 → `execute_script` 扫描 `user://godot_autopilot/traces` 最新 `trace-*.jsonl`（断言含 `session_start` 与 `server_ready` 启动标记、遍历全部 trace 文件断言不含 PNG base64 前缀）→ 扫描 `user://godot_autopilot/logs` 最新 `gda-*.log`（断言含启动日志行）；需 `code_execute` 授权（见第 3 节） |
+| `30_observability.json` | observability | 可重放监控与日志系统端到端（09-21 新增，3 stage）：`system_status` 断言 `tool_count`/`queue_depth` → `execute_script` 扫描 traces 最新 jsonl（断言含 `kind=lifecycle`/`snapshot`/`protocol_request` 与 schema v2 新字段）→ 扫描 logs 最新 `gda-*.log`（断言含 `trace=` 的 detail 行）；需 `code_execute` 授权（见第 3 节） |
 
 ## 7. 遍历与排除清单（`tests/runner/traversal.cpp`）
 

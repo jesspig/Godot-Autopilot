@@ -8,7 +8,7 @@ tags:
   - 资源
   - UI
   - 工具库
-timestamp: "2026-09-19T17:39:40+08:00"
+timestamp: "2026-09-21T01:24:00+08:00"
 resource:
   - src/prompts/
   - src/resources/
@@ -18,8 +18,8 @@ resource:
 
 # 支撑模块（src/prompts/、src/resources/、src/ui/、src/util/）
 
-> 审计日期：2026-09-19（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill_gen 一键生成 Agent Skills 与 skill 内容外置化同步；09-10 随 skill 体系 19→7 册重构、Godot 源码研究发现织入与 dock 按钮动态化同步；09-13 上午随 7→8 册（C# 专册与开发闭环）与 util 新增 mcp_image_content.hpp 同步；09-13 下午随收口批次同步——McpConfigDock Allow code_execute 复选框、VariantJson::deserialize_strict、readback_util 值类型近似比较与 16 类清单、技能 runtime 册日志四路来源；09-13 17:50 随 B 组知识库审计同步——修正 prompt_tool_usage 行数、resource_handlers 静态/模板配比、注册入口行号与 keycode 提示词状态；09-13 20 时随主册技能增强同步——description 必读定位与 autopilot.md 新增查文档时机/引擎状态观测/工具选择/搜索技巧四块正文；09-13 21 时统一 skill 为纯英文——scene-system.md 中文错误示例改英文转述、registry description 英文必读定位；09-13 晚随 0.2.4 版知识库全量审计同步——修正 PACKED_*_ARRAY 为 10 种、scene_path/json_number 消费方计数与 resolve_rid 未命中行为；09-14 随修复批次同步——McpConfigDock 新增 Allow game_runtime 复选框与 `allow_list_add`/`allow_list_remove` 共享切换逻辑（`all` 展开、`code_execute_allowed()` 删除）、Vector2/2i 严格形状与 set_resource_property 接入严格转换、capture 落盘 save 与两侧各保留 20 张、get_game_log_entries filter/matched_lines、batch_execute 异步 pending 计数）；09-15 随 Computer Use grounding 批次同步——skill_templates 4 册更新（工具目录 379、编辑器 UI 自动化闭环与游戏侧点击/滚轮）；09-16 随失败修复批次同步——resource_handlers 新增 `register_skill_resources`（`godot://skills` 资源组：目录/单册/单文件，技能经 MCP 协议层可发现），新增 `src/util/skill_resources`（URI 解析，L1 `skill_resources_test` 12 项），基于当前工作树代码逐行核对（不依赖 git 历史）；09-19 随注释清理批同步——新增 scene_verify 小节与 L1 单测意图备忘（源码整行注释删除）。
-> 覆盖范围：`src/prompts/` 9 组文件（18 个）、`src/resources/` 2 组、`src/ui/` 2 组、`src/util/` 13 组（20 个文件，其中 `scene_path.hpp`/`json_godot.hpp`/`rid_registry.hpp`/`type_hint.hpp`/`gdscript_wrap.hpp`/`project_path.hpp`/`mcp_image_content.hpp` 为 header-only；另含内容目录 `skill_templates/` 31 个文件——30 个 .md + registry.json）。注册入口为 `src/core/server_context.cpp:227-232`（`register_tools()` 内五处注册调用：工具 → 资源 → 通用 prompt → 调试资源 → 调试 prompt）。
+> 审计日期：2026-09-19（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill_gen 一键生成 Agent Skills 与 skill 内容外置化同步；09-10 随 skill 体系 19→7 册重构、Godot 源码研究发现织入与 dock 按钮动态化同步；09-13 上午随 7→8 册（C# 专册与开发闭环）与 util 新增 mcp_image_content.hpp 同步；09-13 下午随收口批次同步——McpConfigDock Allow code_execute 复选框、VariantJson::deserialize_strict、readback_util 值类型近似比较与 16 类清单、技能 runtime 册日志四路来源；09-13 17:50 随 B 组知识库审计同步——修正 prompt_tool_usage 行数、resource_handlers 静态/模板配比、注册入口行号与 keycode 提示词状态；09-13 20 时随主册技能增强同步——description 必读定位与 autopilot.md 新增查文档时机/引擎状态观测/工具选择/搜索技巧四块正文；09-13 21 时统一 skill 为纯英文——scene-system.md 中文错误示例改英文转述、registry description 英文必读定位；09-13 晚随 0.2.4 版知识库全量审计同步——修正 PACKED_*_ARRAY 为 10 种、scene_path/json_number 消费方计数与 resolve_rid 未命中行为；09-14 随修复批次同步——McpConfigDock 新增 Allow game_runtime 复选框与 `allow_list_add`/`allow_list_remove` 共享切换逻辑（`all` 展开、`code_execute_allowed()` 删除）、Vector2/2i 严格形状与 set_resource_property 接入严格转换、capture 落盘 save 与两侧各保留 20 张、get_game_log_entries filter/matched_lines、batch_execute 异步 pending 计数）；09-15 随 Computer Use grounding 批次同步——skill_templates 4 册更新（工具目录 379、编辑器 UI 自动化闭环与游戏侧点击/滚轮）；09-16 随失败修复批次同步——resource_handlers 新增 `register_skill_resources`（`godot://skills` 资源组：目录/单册/单文件，技能经 MCP 协议层可发现），新增 `src/util/skill_resources`（URI 解析，L1 `skill_resources_test` 12 项），基于当前工作树代码逐行核对（不依赖 git 历史）；09-19 随注释清理批同步——新增 scene_verify 小节与 L1 单测意图备忘（源码整行注释删除）；09-20 随可重放监控批次同步——McpLogDock 新增 Detail 切换与 Open Logs 按钮、McpConfigDock 新增 Desensitize data 复选框（脱敏开关持久化 + 即时生效）；09-21 随可重放监控与日志系统批次同步——McpLogDock 新增 Open Traces 按钮与 Trace 视图（可点击 `[trace]` 标记、按 trace_id 渲染 `TraceRecorder::query_by_trace` 结构化事件列表、搜索兼匹配 detail），两 dock 交互回调发 `monitor::ui_action`（脱敏/allow 变更另发 `monitor::security`）。
+> 覆盖范围：`src/prompts/` 9 组文件（18 个）、`src/resources/` 2 组、`src/ui/` 2 组、`src/util/` 13 组（20 个文件，其中 `scene_path.hpp`/`json_godot.hpp`/`rid_registry.hpp`/`type_hint.hpp`/`gdscript_wrap.hpp`/`project_path.hpp`/`mcp_image_content.hpp` 为 header-only；另含内容目录 `skill_templates/` 31 个文件——30 个 .md + registry.json）。注册入口为 `src/core/server_context.cpp:249-253`（`register_tools()` 内五处注册调用：工具 → 资源 → 通用 prompt → 调试资源 → 调试 prompt）。
 
 ## 模块简介
 
@@ -74,6 +74,8 @@ resource:
 
 **注意：`resource_handlers` 不是"扩展名注册表"**——它注册的是 MCP Resource（URI 分发），而非 Godot 资源扩展名映射；扩展名/类型相关逻辑在 `tools/resource_ops` 侧。
 
+**trace 上下文传递（09-20 起）**：两组成员的每个 handler 在 `queue.execute_sync()` 提交前调用 `tools::capture_trace_context()`，主线程 lambda 内用 `ScopedTraceContext` 恢复，使资源读取路径归入发起方 trace；上下文为纯 std 线程局部变量，不触碰 Godot API。09-21 起资源读取成功发 `monitor::data_flow("resource_read", bytes, {uri, request_id})`、失败发 `monitor::error_event`，调试资源注册发 `monitor::lifecycle`。
+
 ### resource_handlers 名单（application/json）
 
 | 名称 | URI | 输出要点 |
@@ -107,8 +109,13 @@ resource:
 
 `EditorDock` 子类，标题 "GDA Log"，默认停靠底部槽（`DOCK_SLOT_BOTTOM`），可关闭，最小高度 `DEFAULT_DOCK_HEIGHT = 200`：
 
-- **布局**：VBoxContainer = `RichTextLabel`（threaded、BBCode、scroll_follow、可选择、段落上限 `LINE_LIMIT = 5000` 超限删首段）+ 底部 `HFlowContainer`（Clear 按钮、Collapse 切换按钮、搜索 `LineEdit`、类别 `OptionButton`、4 个级别过滤按钮）
-- **过滤**：4 个级别按钮（Debug/Info/Warning/Error，图标 `Debug`/`Popup`/`StatusWarning`/`StatusError`，按钮文本显示各级计数）；类别下拉 All/System/Transport/Tools/Resources/Prompts；搜索为大小写不敏感子串（`findn`）；判定在 `_check_display`
+- **布局**：VBoxContainer = `RichTextLabel`（threaded、BBCode、scroll_follow、可选择、段落上限 `LINE_LIMIT = 5000` 超限删首段）+ 底部 `HFlowContainer`（Clear 按钮、Collapse 切换按钮、Detail 切换按钮、Open Logs 按钮、Open Traces 按钮、Trace 切换按钮、搜索 `LineEdit`、类别 `OptionButton`、4 个级别过滤按钮）
+- **Detail 切换（09-20 新增）**：toggle 按钮（默认关）控制是否在每条消息下缩进显示 `LogEntry.detail` 诊断行；`show_detail_` 变更触发 `_rebuild_log()` 全量重建
+- **Open Logs（09-20 新增）**：`_on_open_logs()` 把 `user://godot_autopilot/logs` 经 `ProjectSettings::globalize_path` 转绝对路径后 `OS::shell_open` 打开；失败记 System 错误日志
+- **Open Traces（09-21 新增）**：`_on_open_traces()` 把 `LogPersist::trace_dir()`（`user://godot_autopilot/traces`）经 `ProjectSettings::globalize_path` 转绝对路径后 `OS::shell_open` 打开；失败记 System 错误日志
+- **Trace 视图（09-21 新增）**：toggle 按钮（默认关）控制切换为「按 trace 查看」视图——人类日志行在 `entry.trace_id` 非空时追加可点击 `[trace]` 标记（`push_meta` + `meta_clicked`），点击后按该 trace_id 调用 `TraceRecorder::query_by_trace` 渲染结构化事件列表；默认行为不变（默认关闭 trace 视图）
+- **ui_action 埋点（09-21 新增）**：清空/折叠/Detail/Open Logs/Open Traces/Trace/过滤/搜索等交互回调发 `monitor::ui_action`
+- **过滤**：4 个级别按钮（Debug/Info/Warning/Error，图标 `Debug`/`Popup`/`StatusWarning`/`StatusError`，按钮文本显示各级计数）；类别下拉 All/System/Transport/Tools/Resources/Prompts；搜索为大小写不敏感子串（`findn`）；09-21 起搜索同时匹配 message 与 detail；判定在 `_check_display`
 - **时间前缀（Show timestamps）**：配置面板 "Show timestamps" 开关（默认开启，经 `user://godot_autopilot/config.json` 的 `show_time` 键持久化）控制每条日志前缀 `[HH:MM:SS]`（本地时、时分秒）；折叠（合并）重复日志时，除条数 `(N)` 前缀外**始终**显示最新一条的 `[HH:MM:SS]`，该最新时间显示不受总开关控制
 - **折叠**：`collapse` 开关，按消息聚合相同文本并显示 `(N)` 次数前缀；折叠模式改动触发全量重建
 - **主题**：`_update_theme()` 从编辑器主题取 `error_color`/`warning_color`/`font_color`（无则回退硬编码色）、`output_source*` 字体族、各按钮图标；`NOTIFICATION_ENTER_TREE`/`NOTIFICATION_THEME_CHANGED` 时刷新
@@ -118,11 +125,13 @@ resource:
 
 `EditorDock` 子类，标题 "MCP Config"，默认停靠右侧槽（`DOCK_SLOT_RIGHT_UR`），可关闭：
 
-- **布局**：VBoxContainer = "MCP Server" 标题 + 端口行（Label + SpinBox 1–65535 + Apply 按钮 + 运行状态 Label）→ Show timestamps 复选框 → Allow code_execute 复选框（09-13 下午新增）→ Allow game_runtime 复选框（09-14 新增）→ 分隔线 → 客户端配置区（`OptionButton` 下拉选择 20 个客户端，label 含配置文件路径）+ Generate 按钮 + 结果 Label + 生效条件提示 Label → 技能生成区（Generate Skills / Update Skills 动态按钮）
+- **布局**：VBoxContainer = "MCP Server" 标题 + 端口行（Label + SpinBox 1–65535 + Apply 按钮）→ Show timestamps 复选框 → Allow code_execute 复选框（09-13 下午新增）→ Allow game_runtime 复选框（09-14 新增）→ Allow user tools 复选框 → Desensitize data 复选框（09-20 新增）→ 运行状态 Label → 分隔线 → 客户端配置区（`OptionButton` 下拉选择 20 个客户端，label 含配置文件路径）→ Generate 按钮 → 技能生成区（Generate Skills / Update Skills 动态按钮）→ 结果 Label → 生效条件提示 Label
 - **Allow code_execute / Allow game_runtime 复选框（09-13 下午新增 code_execute，09-14 新增 game_runtime）**：两个勾选框分别转发到共享槽函数 `_on_allow_toggled(capability, box, checked)`——勾选用 `authorization::allow_list_add` 追加能力（已生效或配置含 `all` 时保持原样），取消用 `allow_list_remove` 移除（先把 `all` 展开为全部已知能力再逐项删除）；初值与操作后校准均用 `allow_list_contains` + `set_pressed_no_signal`（dock 私有的 `split_allow`/`join_allow` 与 `code_execute_allowed()` 已删除）。下次工具调用即生效（授权门每次实时读取配置），`GODOT_AUTOPILOT_ALLOW` 环境变量存在时优先于该配置（tooltip 已注明）。`process` 无 dock 开关，需环境变量或手改配置的 `allow` 键；拒绝响应的 `enable` 文案同样只对 `code_execute`/`game_runtime` 提及 dock（`authorization::capability_has_dock_toggle`）。
+- **Desensitize data 复选框（09-20 新增）**：`_on_desensitize_toggled(checked)` → `PluginConfig::save_desensitize(checked)` + `sanitize_policy::set_enabled(checked)`；初值取 `PluginConfig::load_desensitize()`（默认 true）并同步写入全局缓存。影响参数 digest 与 trace 图片落盘（详见 [安全边界](../security_contract.md) §3.2）；`GODOT_AUTOPILOT_DESENSITIZE` 环境变量仅在启动初始化时优先于配置，运行期复选框仍直接改写全局缓存（重启后 env 再次生效）。
 - **技能生成（动态按钮）**：按钮文本按 `.agents/skills/` 下是否已存在 `godot-autopilot-` 前缀目录动态切换——无 → "Generate Skills"，有 → "Update Skills"；Update 点击先递归删除全部前缀匹配目录再整体重新生成（语义详见下文 skill_gen 小节）
 - **端口管理**：`set_server_context(ServerContext*)` 注入服务器（null 时禁用 Apply）；Apply → `ServerContext::restart(port)` → 成功后 `PluginConfig::save_port(port)` 持久化，并刷新面板内运行状态 Label（"Running on port N" / "Server offline"，主题色标注）
 - **配置生成**：`_on_generate()` 只处理下拉选中的单个客户端——目标目录 `ProjectSettings::globalize_path("res://")`；目标父目录不存在时先递归创建（覆盖 `.zcode/`、`.cursor/` 等 14 个含目录路径客户端的首建场景）；文件不存在 → `render_config` 新建；JSON 已存在 → `merge_json_config` 合并（**先解析现有配置，保留其他键，仅更新对应顶层键下的 `godot-autopilot` 条目**，不覆盖用户的其他 agent 配置）；TOML 客户端（Codex/Grok Build/Reasonix，经 `uses_toml` 判定）已含 MCP 配置 → 跳过并提示；JSON 无法解析 → 跳过不写（防覆盖）；结果单文件报告「创建/更新/跳过」原因
+- **ui_action / security 埋点（09-21 新增）**：端口应用、脱敏切换、Allow 三开关、生成配置、生成技能等交互回调发 `monitor::ui_action`；脱敏与 allow 变更另发 `monitor::security`
 - **主题**：颜色经 `theme_color()` 从编辑器主题取 `success_color`/`error_color`/`warning_color`/`font_disabled_color`（无则回退硬编码色）
 
 ### client_config_gen（`src/util/client_config_gen.cpp/hpp`，命名空间 `godot_autopilot::client_config_gen`）
@@ -254,7 +263,7 @@ resource:
 | `NOOP` | 通用路径下与 old_value dump 相等（值类型路径先经近似比较判 `MATCHED`） | "value already at target (default)" |
 | `CONVERTED` | 其余（引擎调整了值） | "engine adjusted value: <expected> -> <actual>" |
 
-用途：属性写入后的读回校验（`property_ops.cpp:748` 传 `type_sensitive`、`resource_ops.cpp:2853`、`runtime/game_bridge_eval.cpp:376`），区分"被拒/命中/本就在目标/引擎换算"；`property_ops` 对 REJECTED 还会尝试恢复旧值并把恢复结果写入错误文案（09-13 起）。
+用途：属性写入后的读回校验（`property_ops.cpp:695,1069` 传 `type_sensitive`、`resource_ops.cpp:2828`、`runtime/game_bridge_eval.cpp:384`），区分"被拒/命中/本就在目标/引擎换算"；`property_ops` 对 REJECTED 还会尝试恢复旧值并把恢复结果写入错误文案（09-13 起）。
 
 ### scene_path.hpp（header-only，命名空间 `godot_autopilot::util`）
 
@@ -281,7 +290,7 @@ resource:
 
 - `class RidStore`：`std::unordered_map<int64_t, godot::RID>` 句柄↔RID 双向映射并保活。
 - `template <typename Domain> RidStore &rid_store()`：按域标签取独立实例（physics 与 text 各自命名空间互不串号）。
-- `template <typename Domain> RID resolve_rid(args, key)`：从工具参数解析整数 id 并查表，未命中返回空 `RID`（由调用方检查 `is_valid()` 后报错，如 `physics_ops.cpp:190`）。
+- `template <typename Domain> RID resolve_rid(args, key)`：从工具参数解析整数 id 并查表，未命中返回空 `RID`（由调用方检查 `is_valid()` 后报错，如 `physics_ops.cpp:189`）。
 
 消费方：physics_ops、text_ops。
 
@@ -330,7 +339,7 @@ MCP 截图交付的纯逻辑件（仅依赖 `mcp::JsonValue`/`mcp::ContentVarian
 
 以下口径原以源码整行注释形式存在，随"不写注释"约定移入此处；测试文件本批仅删除注释行，逻辑与断言未动（`git diff` 无新增行）：
 
-- 键名判定两侧同一口径（`keycode_alias_test.cpp`）：编辑器侧与游戏侧运行时（`src/runtime/game_bridge_input.cpp:353` 有同名判定函数）共用同一判定，裸名/`KEY_` 前缀（大小写不敏感）与数字码字符串解析到同一键码
+- 键名判定两侧同一口径（`keycode_alias_test.cpp`）：编辑器侧与游戏侧运行时（`src/runtime/game_bridge_input.cpp:33` 有同名判定函数）共用同一判定，裸名/`KEY_` 前缀（大小写不敏感）与数字码字符串解析到同一键码
 - 脚本新鲜度数值契约（`script_freshness_test.cpp`）：godot-cpp 缺省 `CacheMode = 1`（REUSE，命中缓存直接返回旧实例、不读盘），从磁盘刷新必须显式传 `0`（IGNORE）；只读工具 `fresh` 参数只认字面 `true`，缺省保持 REUSE 语义
 - UID 写选择（`uid_guard_test.cpp`）：按 ResourceUID 表成员决定——已在表中的 id 更新、表外 id 注册（对应 `add_id`/`set_id` 选择）
 - 变量串联（`batch_refs_test.cpp`）：`$prev`、`$steps[N].result`/`$steps[N].error` 整字符串精确替换，错误前缀 `unresolvable reference`

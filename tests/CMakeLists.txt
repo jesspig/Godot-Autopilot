@@ -36,11 +36,14 @@ file(GLOB GDA_TOOLS_OPS_SOURCES CONFIGURE_DEPENDS
 #                           仅被 game_bridge.cpp 引用，不进 L1 业务源)
 set(GDA_UNIT_BUSINESS_SOURCES
     ${CMAKE_SOURCE_DIR}/src/core/log_system.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/log_persist.cpp
     ${CMAKE_SOURCE_DIR}/src/core/resource_registry.cpp
     ${CMAKE_SOURCE_DIR}/src/core/scene_dirty_tracker.cpp
     ${CMAKE_SOURCE_DIR}/src/core/export_guard.cpp
     ${CMAKE_SOURCE_DIR}/src/core/editor_readiness.cpp
     ${CMAKE_SOURCE_DIR}/src/core/editor_coords.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/trace_recorder.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/monitor.cpp
     ${CMAKE_SOURCE_DIR}/src/util/bm25_index.cpp
     ${CMAKE_SOURCE_DIR}/src/util/error_util.cpp
     ${CMAKE_SOURCE_DIR}/src/util/readback_util.cpp

@@ -6,7 +6,7 @@ tags:
   - 模块
   - 领域工具
   - B组
-timestamp: "2026-09-19T17:35:04+08:00"
+timestamp: "2026-09-20T23:08:39+08:00"
 resource: src/tools/
 ---
 
@@ -15,6 +15,8 @@ resource: src/tools/
 > 09-18 CJK 传输链收敛批次增补（详见 `changelog/2026-09-18-log.md` 21:15 节）：`variant_json` 反序列化 10 处、`debugger_access` 广播/重载 2 处、`game_bridge_eval` 求值源码、`code_exec` 包装源码改 `String::utf8`；`runtime_ops` 错误整形透传游戏侧 `diagnosis`/`hint`（live 验证新发现，`method_not_found_on_node` 实测回传）。
 
 > 09-18 E2E 优化批次增补（详见 `changelog/2026-09-18-log.md` 19:30 节）：`property_get` 加批量 `properties[1..32]`（互斥、部分成功+`missing`）；`get_debugger_errors` 加 `group:true` 轻聚类；`execute_game_script` 加 `assert` 沙箱表达式；新增只读 `sample_game_property`/`collect_game_evidence`/`validate_game_ui_layout`（Game）；游戏侧 `send_response` 改 `String::utf8` 构造（CJK 元数据乱码根因，`game_bridge.cpp:1665`）；`debugger_access.cpp:39,132` 同病与 `VariantJson` 内约 8 处 `String(c_str())` 列为遗留待排期。
+
+> 09-20 可重放监控批次增补：`text_ops` 的 `write_file` `mode=APPEND` 在 `READ_WRITE` 打开失败时回退 `WRITE`（首次追加不再失败）；`runtime_game_ops`/`code_exec_ops`/`capture_ops` 的若干告警改 `log_detailed` 携带诊断 detail（游戏 job 过期/表满、batch 引用错误、截图完成参数），行为不变，详见 [核心模块](core.md) 的 LogSystem 小节。
 
 > 覆盖 `src/tools/` 下 22 个 `.cpp` handler 模块：debug_ops、debugger_ops、debugger_access、display_ops、display_window_ops、os_ops、runtime_ops、runtime_game_ops、audio_ops、render_ops、environment_ops、text_ops、tilemap_ops、tileset_ops、spriteframes_ops、animation_ops、theme_ops、analyze_ops、test_ops、code_exec_ops、log_ops、capture_ops（另有 09-18 新增 `src/runtime/game_bridge_verify.cpp` 游戏侧验证辅助）。（09-16 随坐标换算/键名统一/CJK 往返批次同步——text_ops 全链路 `String::utf8` + 诊断 IGNORE 装载、click_game_ui 窗口坐标与键名错误文案；09-17 随 T09+T12 文档同步批次更新输入释放 flush、click 文本选择/annotate 序号与改脚本工作流；09-18/09-19 工具数 385→391 / B 组 192→195，工具声明全量改为 `ToolSpec`。）
 >
@@ -71,7 +73,7 @@ resource: src/tools/
   - `get_plugin_log`（09-13 下午新增）：读插件进程内 LogSystem 环形缓冲，无需运行游戏；可选 `limit`（默认 100、上限 1000）、`level`（debug/info/warning/error，默认 debug 即不过滤）、`category`（system/transport/tools/resources/prompts）、`filter`（消息子串，大小写不敏感）与 `since_index`（增量读取）；返回 `entries`（serial/UTC timestamp/level/category/message）、`count`、`next_index`。插件侧诊断（授权拒绝、超时账目、迟到响应丢弃、通道自检结果）全部汇聚于此。
   - 内存捕获环形缓冲（`DebuggerCapture` 单例，mutex 保护）：日志 2000 条、错误 500 条、运行输出 2000 条、监视帧 500 条。
   - 会话激活时 `get_debugger_errors`/`get_output`/`get_scene_tree` **切换为经 `runtime_ops::handle_gda_send` 走运行时通道**（get_errors/get_output/get_tree，超时 5000ms）；**无会话时不再回退编辑器捕获**——返回空 `result` + `note`（说明无活动会话、指导 `play_editor_current_scene` 或改用 `get_game_log_entries`）。编辑器进程自身的脚本错误与输出统一读 `get_debugger_log`；栈回溯与监视帧仅存本地捕获缓冲（无对应 MCP 工具），经 `godot://debugger/stack-dump`、`godot://debugger/monitors` 资源读取。
-  - `get_debugger_log` 命中 `Invalid access to property or key` 错误时追加 Godot 3→4 重命名提示（`RENAME_HINTS`：frames→sprite_frames、cast_to→target_position、translation→position 等 10 条，`debugger_ops.cpp:331-341`）。
+  - `get_debugger_log` 命中 `Invalid access to property or key` 错误时追加 Godot 3→4 重命名提示（`RENAME_HINTS`：frames→sprite_frames、cast_to→target_position、translation→position 等 10 条，`debugger_ops.cpp:411-422`）。
   - 空结果附加 `capture_note_for_empty_result()`：提示启动 `play_editor_current_scene` 或改用 `get_game_log_entries`（辅助函数按会话状态预留两种文案，当前三个 handler 的调用点恒落在无会话分支）；09-13 起工具描述与 schema 同步删除了"编辑器捕获回退/上次场景树"的旧承诺。
 - **错误模式**：无会话场景返回 `result` 空串 + `note` 字段；会话内错误经通道原样返回 `{"error": ...}`。
 - **注释归档（09-19 注释清理批，`debugger_ops.cpp:198-199`）**：`get_grouped_errors` 按"文件/函数/行/信息"四元组归并，与游戏侧 `get_errors(group=true)` 同形状（`count` + 首末时间 + 一条堆栈采样），`limit` 为最大分组数。
@@ -123,7 +125,7 @@ resource: src/tools/
   - **通道自检（09-13 下午新增）** `run_channel_self_check`：游戏会话首次 ready 时在后台线程发起一次 `status` 往返（1500ms + 2s 宽限），成功/失败均写入插件日志（成功含往返毫秒数）——启动后即可凭 `get_plugin_log` 判断运行时通道是否健康，不必等首个 7s 超时。
   - `get_game_status` 响应注入派生字段：`healthy`（由 `last_activity_ms` 推导）与 `physics_stalled`（physics_frame 连续不变 ≥1000ms 且 fps>0）。
   - **断点自动恢复** `maybe_recover_break`：对全部 breaked 会话按 `GDA_AUTO_CONTINUE` 环境变量决定是否 `debugger_continue_session`，每会话上限 `GDA_AUTO_CONTINUE_MAX` 次。
-  - `queue_game_input` 参数白名单（type/keycode/pressed/button_index/position/relative/action/duration_ms/mode/direction/amount/timeout_ms），未知参数由 handler 严格校验并返回 `unknown parameter for queue_game_input: <name>` 错误（`runtime_game_ops.cpp:187-191`；`game_tools.hpp:32` 工具描述与 skill 模板中"忽略并回传 `ignored_params`"的旧表述已一并修正）；游戏侧键名判定自 09-16 起与编辑器侧共用 `input_map_ops::resolve_key_name_code`（裸名/`KEY_` 前缀/大小写不敏感/数字码等价，见[领域工具 A 组](../modules/tools_ops_a.md)），非法键名错误改为 `invalid keycode: <名> — use a bare letter/digit (e.g. P, 0), a KEY_* name (e.g. KEY_P, KEY_SPACE) or a numeric key code (e.g. 4194309)`；`get_game_input_status` 响应不附带 `recent_engine_errors`（handler 仍会读取本地错误缓冲，但该缓冲无写入方，字段实际不会出现）——运行中错误改读 `get_debugger_errors`，编辑器错误读 `get_debugger_log`。
+  - `queue_game_input` 参数白名单（type/keycode/pressed/button_index/position/relative/action/duration_ms/mode/direction/amount/timeout_ms），未知参数由 handler 严格校验并返回 `unknown parameter for queue_game_input: <name>` 错误（`runtime_game_ops.cpp:262-266`；`game_tools.hpp:189` 工具描述与 skill 模板中"忽略并回传 `ignored_params`"的旧表述已一并修正）；游戏侧键名判定自 09-16 起与编辑器侧共用 `input_map_ops::resolve_key_name_code`（裸名/`KEY_` 前缀/大小写不敏感/数字码等价，见[领域工具 A 组](../modules/tools_ops_a.md)），非法键名错误改为 `invalid keycode: <名> — use a bare letter/digit (e.g. P, 0), a KEY_* name (e.g. KEY_P, KEY_SPACE) or a numeric key code (e.g. 4194309)`；`get_game_input_status` 响应不附带 `recent_engine_errors`（handler 仍会读取本地错误缓冲，但该缓冲无写入方，字段实际不会出现）——运行中错误改读 `get_debugger_errors`，编辑器错误读 `get_debugger_log`。
   - `sequence_game_inputs`（gda op `input_sequence`）：`inputs[]` 每项含 `at_frame`（物理帧偏移）与注入字段，由游戏侧 `GameBridgeFrameSequence` 节点逐物理帧执行，完成后响应 `{completed, executed}`；上限 256 步，超时默认按 `max_at_frame×33ms+2000ms` 推导并钳制 30000ms，可被 cancel。协议与帧调度细节见[入口与运行时](../modules/entry_runtime.md)。
   - `get_game_ui_elements`（gda op `ui_elements`）：DFS 遍历运行中 Control 树，每项 `{path, type, visible, text?, global_rect:{position,size}}`，`max_elements` 默认 100、上限 1000，超限标 `truncated:true`。
   - **游戏侧输入扩展（09-15）**：`queue_game_input` 的 `type` 新增 `wheel`（给 `direction` up/down/left/right，或 `button_index` 4/5/6/7 对应上/下/左/右；可选 `amount` 1-10 默认 1 与 `position {x,y}`；wheel 按键按 `factor=amount` 注入按下+释放）与 `mouse_motion`（`position {x,y}` 必填，可选 `relative {x,y}` 设定位移增量）；`sequence_game_inputs` 的 inputs 同增 `kind: wheel`/`mouse_motion` 及同名字段。释放立即 flush（09-17 起）：`DelayedRelease` 到期释放与动作释放恒调 `flush_buffered_events`（此前按 mode/pressed 条件 flush），抬起事件不再滞留缓冲；注入与取消细节见[入口与运行时](../modules/entry_runtime.md)的输入模拟小节。
@@ -166,7 +168,7 @@ resource: src/tools/
 - **代表工具**（`text_tools.hpp` 的 10 个，纯 TextServer/字形）：`create_text_font`、`create_shaped_text`、`set_text_font_antialiasing`、`set_text_font_data`、`set_text_font_hinting`、`get_text_font_system_path`、`has_text_feature`、`is_text_locale_right_to_left`、`add_shaped_text_string`、`get_shaped_text_size`；`write_file`/`read_file`/`find_in_files` 的 handler 亦在本文件，但声明于 `os_tools.hpp`（`write_file` 为 `WritesFile` + `kMutating`，`read_file`/`find_in_files` 为只读；归 OS 类，见 os_ops）。
 - **关键事实**：
   - **CJK 全链路 UTF-8（09-16 起）**：`get_text_font_system_path` / `is_text_locale_right_to_left` / `add_shaped_text_string`（含 `language`）的入参构造与 `write_file`（`file->store_string`）的内容写入统一改 `String::utf8`——`String(const char*)` 是 latin1 构造，CJK 内容会逐字节变字符、写盘后再读回即乱码；`build_script_diagnostics` 改 `CACHE_MODE_IGNORE` 装载（REUSE 会命中 ResourceCache/GDScriptCache 返回旧实例，诊断看不到刚写入的磁盘内容）。19_cjk_roundtrip L2（`verified`/`readback`/`cache_refreshed` + 全量内容比对 + `find_in_files` 字节级命中）覆盖。
-  - `set_text_font_data` 用 `FileAccess::get_file_as_bytes` 读字体文件；`write_file`（原 `file_write`，随全量重命名迁至 OS 类）用 `FileAccess` WRITE/READ_WRITE 直写磁盘，声明 `SideEffect::WritesFile` + `kMutating` 于 `os_tools.hpp`，遍历经 `get_tool_detail` 自动排除（写文件副作用，历史事故源之一）。
+  - `set_text_font_data` 用 `FileAccess::get_file_as_bytes` 读字体文件；`write_file`（原 `file_write`，随全量重命名迁至 OS 类）用 `FileAccess` WRITE/READ_WRITE 直写磁盘，声明 `SideEffect::WritesFile` + `kMutating` 于 `os_tools.hpp`，遍历经 `get_tool_detail` 自动排除（写文件副作用，历史事故源之一）；09-20 起 `mode=APPEND` 在 `READ_WRITE` 打开失败（文件尚不存在，该模式不创建文件）时回退 `WRITE` 打开，避免首次追加失败（`text_ops.cpp`，与 `LogPersist::append_persist_file` 同一修复）。
   - **`read_file` / `find_in_files`（08-20 新增）**：`read_file` 与 `write_file` 对称，读任意文本文件返回 `{path, content}`；`find_in_files` 递归搜索目录下文本（`query` 必填，可选 `dir` 默认 `res://`、`extensions` 默认 gd/tscn/tres/cs/md/json/h/cpp、`case_sensitive`、`max_results` 默认 500，达到即截断返回 `truncated:true`），按扩展名过滤并统计每文件命中次数，**归 OS 类但 handler 在 text_ops**。路径拼接用 `join_search_path`（`res://` 根免三重斜杠）。
   - 本模块是 `get_os_system_fonts`（os_ops）之外的字体获取路径补充。
 - **错误模式**：`TextServer not available` / `missing or invalid parameter: font_rid` / `shaped_rid`；`write_file`/`read_file` 打开失败 → error_json；`find_in_files` 缺 query → missing required parameter。

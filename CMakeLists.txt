@@ -66,6 +66,7 @@ add_library(godot-autopilot SHARED
     src/main.cpp
     src/core/mode_detector.cpp
     src/core/log_system.cpp
+    src/core/log_persist.cpp
     src/core/resource_registry.cpp
     src/core/scene_dirty_tracker.cpp
     src/core/server_context.cpp
@@ -73,6 +74,11 @@ add_library(godot-autopilot SHARED
     src/core/export_guard.cpp
     src/core/editor_readiness.cpp
     src/core/editor_coords.cpp
+    src/core/trace_recorder.cpp
+    src/core/sanitize_policy.cpp
+    src/core/monitor.cpp
+    src/core/monitor_env.cpp
+    src/core/perf_sampler.cpp
     src/resources/resource_handlers.cpp
     src/resources/debugger_resources.cpp
     src/prompts/prompt_handlers.cpp

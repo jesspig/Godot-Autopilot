@@ -1,7 +1,9 @@
 #include "register_all.hpp"
+#include "core/command_queue.hpp"
 #include "core/error_watermark.hpp"
 #include "core/export_guard.hpp"
 #include "core/log_system.hpp"
+#include "core/monitor.hpp"
 #include <version.hpp>
 #include "tools/code_exec_ops.hpp"
 #include "tools/dispatch.hpp"
@@ -39,6 +41,7 @@
 #include "tools/runtime_ops.hpp"
 #include "tools/schema_builder.hpp"
 #include "tools/tool_base.hpp"
+#include "tools/tool_invoke.hpp"
 #include "tools/tool_registry.hpp"
 #include "util/mcp_image_content.hpp"
 #include <mcp/Content.hpp>
@@ -249,6 +252,7 @@ static mcp::JsonValue meta_call_tool_wait(const std::string& name, mcp::JsonValu
 
 void refresh_derived(const std::shared_ptr<ToolRegistry>& registry,
                      ToolCatalog& catalog, Bm25Index& index) {
+    const auto derived_start = std::chrono::steady_clock::now();
     std::vector<ToolInfo> catalog_tools;
     std::vector<Bm25Index::Entry> index_entries;
     for (const auto& t : registry->all_any()) {
@@ -278,17 +282,29 @@ void refresh_derived(const std::shared_ptr<ToolRegistry>& registry,
         std::lock_guard<std::mutex> lock(g_active_registry_mutex);
         g_active_registry = registry;
     }
+    const int64_t derived_duration_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - derived_start)
+            .count();
+    monitor::lifecycle(
+        "registry_refresh_derived",
+        monitor::build_attrs(
+            {{"tools", std::to_string(registry->all_any().size())},
+             {"handlers", std::to_string(registry->all().size())},
+             {"meta_handlers", std::to_string(registry->all_meta().size())},
+             {"duration_ms", std::to_string(derived_duration_ms)}}));
 }
 
 static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25Index& index, int port) {
 
     auto registry = std::make_shared<ToolRegistry>();
+    const auto registry_start = std::chrono::steady_clock::now();
 
     {
         ToolSpec spec{"system_status", "Get server status info", "System", {"status", "info"}};
         spec.side_effect = SideEffect::None;
         spec.flags = tool_flags::kNone;
-        spec.handler = [port, start = std::chrono::steady_clock::now()](const mcp::JsonValue&) -> mcp::JsonValue {
+        spec.handler = [port, registry, start = std::chrono::steady_clock::now()](const mcp::JsonValue&) -> mcp::JsonValue {
             auto uptime = std::chrono::duration_cast<std::chrono::seconds>(
                 std::chrono::steady_clock::now() - start).count();
             mcp::JsonValue status(mcp::JsonValue::object_tag);
@@ -296,6 +312,12 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
             status["port"] = mcp::JsonValue(static_cast<int64_t>(port));
             status["uptime_seconds"] = mcp::JsonValue(static_cast<int64_t>(uptime));
             status["running"] = mcp::JsonValue(true);
+            status["tool_count"] =
+                mcp::JsonValue(static_cast<int64_t>(registry->all_any().size()));
+            status["queue_depth"] = mcp::JsonValue(static_cast<int64_t>(
+                runtime_ops::has_editor_queue()
+                    ? get_editor_queue().stats().pending
+                    : 0));
             mcp::JsonValue r(mcp::JsonValue::object_tag);
             r["result"] = std::move(status);
             return r;
@@ -510,15 +532,28 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
         std::lock_guard<std::mutex> lock(dynamic_specs::mutex());
         for (const auto& spec : dynamic_specs::store()) {
             if (registry->find_any(spec.name) != nullptr) {
-                LogSystem::instance().log(
+                LogSystem::instance().log_detailed(
                     LogLevel::Warning, LogCategory::Tools,
                     "user tool '" + spec.name +
-                        "' skipped: name collides with a built-in MCP tool");
+                        "' skipped: name collides with a built-in MCP tool",
+                    "tool=" + spec.name +
+                        " params=" + std::to_string(spec.params.size()) +
+                        " reason=collision");
                 continue;
             }
             registry->add(make_spec_tool(spec));
         }
     }
+
+    const int64_t registry_duration_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - registry_start)
+            .count();
+    monitor::lifecycle(
+        "registry_build",
+        monitor::build_attrs(
+            {{"tools", std::to_string(registry->all_any().size())},
+             {"duration_ms", std::to_string(registry_duration_ms)}}));
 
     return registry;
 }
@@ -528,6 +563,14 @@ void refresh_dynamic_tools() {
         return;
     auto registry = build_registry(*g_catalog, *g_index, g_port);
     refresh_derived(registry, *g_catalog, *g_index);
+    std::size_t dynamic_count = 0;
+    {
+        std::lock_guard<std::mutex> lock(dynamic_specs::mutex());
+        dynamic_count = dynamic_specs::store().size();
+    }
+    monitor::lifecycle(
+        "registry_refresh_dynamic",
+        monitor::build_attrs({{"dynamic_tools", std::to_string(dynamic_count)}}));
 }
 
 void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog& catalog, Bm25Index& index, int port) {
@@ -544,6 +587,19 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         opts.Description(meta_tool->meta().description).InputSchema(meta_tool->input_schema());
         server.RegisterTool(meta_name, opts,
             [meta_name, registry, &queue](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
+                const std::string gda_request_id =
+                    monitor::request_id_text(ctx.GetRequest().id);
+                monitor::RequestScope gda_request_scope(gda_request_id);
+                monitor::RequestRecord gda_request_record;
+                std::string gda_request_trace;
+                std::string gda_request_span;
+                if (!gda_request_id.empty() &&
+                    monitor::registry().get(gda_request_id, &gda_request_record)) {
+                    gda_request_trace = gda_request_record.trace_id;
+                    gda_request_span = gda_request_record.span_id;
+                }
+                tools::RequestSpanGuard gda_span_scope(gda_request_trace,
+                                                       gda_request_span);
                 if (godot_autopilot::ExportGuard::is_exporting()) {
                     return dispatch::export_blocked_result();
                 }
@@ -561,8 +617,12 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
                 if (run_on_transport_thread) {
                     res = tool->execute(args);
                 } else {
-                    res = queue.execute_sync(
-                        [tool, args] { return tool->execute(args); });
+                    const tools::TraceContext trace_context =
+                        tools::capture_trace_context();
+                    res = queue.execute_sync([tool, args, trace_context] {
+                        tools::ScopedTraceContext restore(trace_context);
+                        return tool->execute(args);
+                    });
                 }
                 int64_t new_errors = error_watermark::count_response_errors(res);
                 if (new_errors > 0) {
@@ -610,6 +670,9 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
     auto count = catalog.size();
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
         std::to_string(count) + " tools registered via registry");
+    monitor::lifecycle(
+        "tools_registered",
+        monitor::build_attrs({{"count", std::to_string(count)}}));
 }
 
 std::shared_ptr<ToolRegistry> get_active_registry() {

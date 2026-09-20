@@ -17,7 +17,7 @@ set(CMAKE_DISABLE_FIND_PACKAGE_OpenSSL ON)
 set(GODOTCPP_API_VERSION "4.7" CACHE STRING "The Godot API version to target" FORCE)
 FetchContent_Declare(godot-cpp
     GIT_REPOSITORY https://github.com/godotengine/godot-cpp.git
-    GIT_TAG        10.0.0-rc2
+    GIT_TAG        10.0.0-stable
     GIT_SHALLOW    TRUE)
 FetchContent_MakeAvailable(godot-cpp)
 

@@ -6,7 +6,7 @@ tags:
   - 总览
   - 架构
   - 技术栈
-timestamp: "2026-09-20T17:20:00+08:00"
+timestamp: "2026-09-21T01:24:00+08:00"
 resource:
   - README.md
   - README.en.md
@@ -17,10 +17,14 @@ resource:
 
 > 审计日期：2026-09-19（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill_gen 与测试数值同步，同日随 skill 内容外置化修正 src/util 目录树注释；09-10 随 skill 体系 19→7 册重构同步目录树注释与 McpConfigDock 描述；09-13 上午随反馈修复批次同步工具数 365/372/373、Resources 26、L1 114、L2 8 份与技能 8 册；09-13 下午随 T22 收口批次同步工具数 366/373/374、L1 126、L2 9 份、授权门与 get_plugin_log；09-13 晚随 A 组知识库审计修复批次同步 docs 与 cmake 目录树补正、skill_templates 平铺命名澄清；随后跨组复核纠正类别分布口径——以工具 category 字段统计为准（physics_tools.hpp 48 个工具中 get_debug_object_info 归类 Debug，故 Physics 47/Debug 16，27 类合计 366）并同步 README 口径 ~366），基于当前工作树文件与代码逐项核对（不依赖 git 历史）；09-13 晚随 0.2.4 版知识库全量审计同步——补正目录树（core 注释补 EditorReadiness/ErrorWatermark，新增 tools/ 嵌入脚本条目）、EDITOR 级别注册类数 4→6、InputMap 并入 Input 措辞、catalog/index 374 派生来源表述；工具数 366/373/374、27 类、L1 126、L2 9 份、ctest 135 复核无误；09-14 随修复批次同步——McpConfigDock 增列 Allow game_runtime 复选框表述；09-14 修复批次后 L1 140、L2 9、ctest 149；09-15 随 Computer Use grounding 增强批次同步工具数 379/386/387、非 SIDE 322 / SIDE 57、新增 13 个编辑器 UI/输入/显示/场景/游戏工具与截图增强参数、L1 172、L2 11、ctest 183；09-15 随 README/README_zh 工具数同步批次——两版 README 已同步 ~379 域工具口径，本页类别表 Input 15→23 纠正（27 类合计 379）；09-16 随失败修复批次（feature/failure-remediation）文档收尾同步——工具数 384/391/392、非 SIDE 324 / SIDE 60（`fill_tilemap_rect` 以 SIDE 宏声明但 side_effect=None）、新增 5 工具（Editor 2 / TileMap 1 / Game 2）、类别 Editor 29→31 / TileMap 7→8 / Game 10→12（27 类合计 384）、MCP 资源新增 skills 组、L1 229、L2 17 份、ctest 246，两版 README 同步 ~384；09-16 文档复核——删除临时批次汇总页（内容已并入功能页与 changelog），消除本页失效链接；09-16 随客户端配置生成器扩容批次同步——McpConfigDock 一键生成 8→20 个客户端（新增 ZCode/pi/Command Code/Kilo/Roo/Grok Build/Kimi Code/Zed/CodeBuddy/Crush/Copilot VS Code/Reasonix，调研淘汰 Cline 与 Antigravity CLI）、目录树 L1 238；09-16 随视觉辅助场景批次同步——域工具 384→385（Capture 1→2，新增 `review_scene_visually`）、可达 391→392、catalog/index 392→393、L1 gtest 238→246（新增 `vision_assist` 8 用例）、L2 17→18 份（新增 `17_vision_assist.json`）、ctest 246→264）。09-16 随坐标换算/键名统一/脚本新鲜度/UID 守卫/CJK 往返/open 幂等/属性两轮批次同步——L1 246→267（新增 game_ui_coords 6 / keycode_alias 6 / script_freshness 7 / uid_guard 2）、unit 文件 21→25、L2 18→25 份（新增 18_script_freshness / 19_cjk_roundtrip / 22_uid_guard / 23_click_ui_coords / 24_keycode_alias / 25_open_scene_idempotent / 28_sprite_frames_animation）、ctest 264→292（267 L1 + 25 L2）；09-17 随 T09+T12 文档同步批次更新技术栈依赖口径为 godot-cpp rc2 / mcp-cpp-sdk 0.3.4。
 > 09-18 补记：`README_zh.md` 已删除（中文 `README.md` + 英文 `README.en.md` 双版，工具口径 badge `tools-385+` / 385+ 个工具 / Over 385 tools），本页事实来源与工具总数段已改引新版 README。
-> 09-20 代码-文档一致性审计：`register_all.cpp` 的 `call_tool` 描述字符串实测仍为旧口径"386 非元（385 域 + `system_status`）"，与 391 域实测不符（09-18"已修正"注记失实，系审计记录错误，源码并未改动），本轮已随源码修正为"392 非元（391 域 + `system_status`）"（`register_all.cpp:406`；仅描述文本，无行为影响，L1 无精确断言）。
+> 09-20 代码-文档一致性审计：`register_all.cpp` 的 `call_tool` 描述字符串实测仍为旧口径"386 非元（385 域 + `system_status`）"，与 391 域实测不符（09-18"已修正"注记失实，系审计记录错误，源码并未改动），本轮已随源码修正为"392 非元（391 域 + `system_status`）"（`register_all.cpp:407`；仅描述文本，无行为影响，L1 无精确断言）。
 > 09-19 ToolSpec 数据化重构：391 域工具 + `system_status` + 7 元工具全量改为 `ToolSpec` 数据记录（`make_spec_tool`），删除 `GDA_TOOL_CLASS`/`fn_tool.hpp`/`meta_tools.hpp`/`IMetaTool`/8 个 `schema_*_ops.cpp`/`schema_fills.hpp`/`tool_input_schema`；新增 `tool_args`（取参器）、`tool_pipeline`（`kObserve` 截图后处理）、`dynamic_spec_store`/`autopilot_tools`（用户脚本动态工具 + `user_tools` 授权门）、`tests/guard/` 迁移守卫；MCP 恒 7 元、catalog 399 不变；L1 243→255、L2 26→27 份（新增 `26_user_tools_code_mode`）、`ctest -E "^gda_runner_"` 256 项；遍历改为运行时枚举 392 条后按 `side_effect`/`mutating`/`dynamic` 排除（330 个进入两步骤全过）。
 > 事实来源：根 `README.md` / `README.en.md` / `AGENTS.md`、`CMakeLists.txt`、`cmake/FetchDependencies.cmake`、`src/main.cpp`、`src/core/server_context.cpp`、`src/tools/tool_spec.hpp`、`src/tools/tool_registry.hpp`、`src/tools/*_tools.hpp`、`src/tools/dispatch.cpp`、`src/prompts/prompt_handlers.cpp`、`src/resources/resource_handlers.cpp`、`Example/project.godot`、`Example/docs/`。
 > 09-20 随 Release 触发修复同步一致性核查行——tag 触发改为双格式（`v*.*.*` / `[0-9]*.*.*`）+ `workflow_dispatch` 手动指定 tag；同日代码-文档一致性审计——`call_tool` 描述口径随源码修正为 392 非元（391 域 + `system_status`），tests 目录数 255/27→269/28。
+> 09-20 可重放监控与双目录持久化批次：新增 `src/core/` 的 LogPersist（日志/trace 双目录落盘与修剪）、TraceRecorder（结构化事件环形缓冲）、sanitize_policy（脱敏开关），`LogSystem` 增 `log_detailed`/`detail` 且 `filter_text` 兼匹配 detail；`SpecTool::execute`/`dispatch`/`tool_invoke` 埋点记录 trace（跨线程 span 上下文 + 排队等待）；McpLogDock 增 Detail 切换与 Open Logs、McpConfigDock 增 Desensitize data 复选框；`write_file` APPEND 首建回退修复。计数：L1 269→285（unit 31 文件）、L2 28→29（`29_trace_persistence`）、ctest 299→316；工具总数 399 不变。详见 [测试体系](tests.md) 与 [核心模块](modules/core.md)。
+> 09-20 晚依赖升级：godot-cpp 10.0.0-rc2→10.0.0-stable（`cmake/FetchDependencies.cmake:20`；`_deps` checkout `10.0.0-stable`/507ed9d）；mcp-cpp-sdk 维持 0.3.4（依赖升级范围经复核收缩，`cmake/FetchDependencies.cmake:29`；configure 实测 `[mcp] SDK version: 0.3.4`）；`AGENTS.md` 与 wiki 三页（build/conventions/overview）同步。
+> 09-20 行号漂移修正（代码-文档一致性审计）：`register_all.cpp` 的 `call_tool` 描述字符串在 `:407`（`:406` 为 `ToolSpec` 起始）；目录树计数同步——`src/tools/` 48 个 .cpp、`src/util/` 8 个（补 `scene_verify.cpp`）、`src/runtime/` 4 个（补 `game_bridge_verify.cpp`），与 [build.md](./build.md) 分目录计数一致。
+> 09-21 可重放监控与日志系统批次：新增 `src/core/` 的 `monitor`（统一埋点门面，纯 std，可被 MCP worker 线程调用）、`monitor_env`（`environment_snapshot()` 仅主线程写 `kind=snapshot`）、`perf_sampler`（主线程周期采样 `kind=perf` + 请求超时看门狗）；`TraceRecorder` 增 `TraceKind` 与 `TraceEvent` 新字段（jsonl schema v2）、`LogEntry` 增 `trace_id`/`span_id`、`LogPersist` 增健康计数与 `trace_dir`、`CommandQueue` 增 `Stats`；`server_context` 经 `opts.on_request`/`opts.outgoing_filters` 关联协议请求（`begin_request`/`end_request`）、元工具经 `RequestScope`+`RequestSpanGuard` 端到端关联；McpLogDock 增 Open Traces 与 Trace 视图。计数：`add_library` 86→89（core 12→15）、L1 285→312（unit 33 文件）、L2 29→30（`30_observability`）、ctest 316→344（L1 过滤 287→314）；工具总数 399 不变。详见 [测试体系](tests.md) 与 [核心模块](modules/core.md)。
 
 ## 项目定位
 
@@ -83,12 +87,12 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 
 ### 运行时桥接（game_* 工具）
 
-编辑器进程的 MCP 服务器与游戏运行时进程经 EngineDebugger 消息通道（`gda:request` / `gda:response` / `gda:ready`）双向通信，`src/runtime/`（`game_bridge.cpp` / `game_bridge_input.cpp` / `game_bridge_eval.cpp` + `gda_protocol.hpp`）实现输入模拟、GDScript 求值、截图捕获、日志/错误回传、场景树查询等 op。工具侧封装见 `game_*` / `get_game_log_entries` 等。详见 [modules/entry_runtime.md](./modules/entry_runtime.md)。
+编辑器进程的 MCP 服务器与游戏运行时进程经 EngineDebugger 消息通道（`gda:request` / `gda:response` / `gda:ready`）双向通信，`src/runtime/`（`game_bridge.cpp` / `game_bridge_input.cpp` / `game_bridge_eval.cpp` / `game_bridge_verify.cpp` + `gda_protocol.hpp`）实现输入模拟、GDScript 求值、截图捕获、日志/错误回传、场景树查询等 op。工具侧封装见 `game_*` / `get_game_log_entries` 等。详见 [modules/entry_runtime.md](./modules/entry_runtime.md)。
 
 ### 编辑器 UI
 
-- 自定义底部日志面板 `McpLogDock`（"GDA Log"，按 LogLevel/LogCategory 过滤、文本搜索、折叠重复；配置面板 "Show timestamps" 开关控制每条日志时间前缀 `[HH:MM:SS]`（本地时、时分秒），开启时默认生效并经 `user://godot_autopilot/config.json` 的 `show_time` 键持久化；折叠合并重复日志时除条数外始终显示最新一条的 `[HH:MM:SS]`，不受总开关控制）。
-- 右侧配置面板 `McpConfigDock`（"MCP Config"：端口运行时重启 + 持久化、一键生成 20 个客户端 MCP 项目级配置（09-16 由 8 扩至 20：新增 ZCode/pi/Command Code/Kilo/Roo/Grok Build/Kimi Code/Zed/CodeBuddy/Crush/Copilot VS Code/Reasonix；调研淘汰 Cline 与 Antigravity CLI——项目级可能不生效）、Allow code_execute / Allow game_runtime / Allow user tools 授权复选框（写 `allow` 键持久化，下一次工具调用即生效，`GODOT_AUTOPILOT_ALLOW` 环境变量优先）、一键生成 8 册 Agent Skills 到项目根 .agents/skills/——Generate Skills / Update Skills 动态按钮，已有旧版技能目录时先清理再重建（详见 [modules/support.md](./modules/support.md)））。
+- 自定义底部日志面板 `McpLogDock`（"GDA Log"，按 LogLevel/LogCategory 过滤、文本搜索（09-21 起同匹配 message 与 detail）、折叠重复、Detail 切换显示诊断 detail、Open Logs 打开 `user://godot_autopilot/logs`、09-21 新增 Open Traces 打开 `user://godot_autopilot/traces` 与 Trace 视图（日志行带可点击 `[trace]` 标记，点击按 trace_id 渲染结构化事件列表，默认关闭）；配置面板 "Show timestamps" 开关控制每条日志时间前缀 `[HH:MM:SS]`（本地时、时分秒），开启时默认生效并经 `user://godot_autopilot/config.json` 的 `show_time` 键持久化；折叠合并重复日志时除条数外始终显示最新一条的 `[HH:MM:SS]`，不受总开关控制）。
+- 右侧配置面板 `McpConfigDock`（"MCP Config"：端口运行时重启 + 持久化、一键生成 20 个客户端 MCP 项目级配置（09-16 由 8 扩至 20：新增 ZCode/pi/Command Code/Kilo/Roo/Grok Build/Kimi Code/Zed/CodeBuddy/Crush/Copilot VS Code/Reasonix；调研淘汰 Cline 与 Antigravity CLI——项目级可能不生效）、Allow code_execute / Allow game_runtime / Allow user tools 授权复选框（写 `allow` 键持久化，下一次工具调用即生效，`GODOT_AUTOPILOT_ALLOW` 环境变量优先）、Desensitize data 复选框（09-20 新增，写 `desensitize` 键并即时改 `sanitize_policy`，`GODOT_AUTOPILOT_DESENSITIZE` 环境变量优先）、一键生成 8 册 Agent Skills 到项目根 .agents/skills/——Generate Skills / Update Skills 动态按钮，已有旧版技能目录时先清理再重建（详见 [modules/support.md](./modules/support.md)））。
 - `ExportGuard`：导出期间拒绝领域工具调用（返回 `{"error":"editor is exporting; ..."}`）。
 
 ### Computer Use grounding（09-15）
@@ -103,7 +107,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 | 层次 | 技术 | 来源 |
 |---|---|---|
 | 引擎 | Godot 4.x GDExtension（目标 4.7，见 `Example/project.godot` features） | — |
-| 绑定层 | godot-cpp，GIT_TAG `10.0.0-rc2` | `cmake/FetchDependencies.cmake` |
+| 绑定层 | godot-cpp，GIT_TAG `10.0.0-stable` | `cmake/FetchDependencies.cmake` |
 | MCP 协议 | mcp-cpp-sdk（modelcontextprotocol-cpp-sdk），GIT_TAG `0.3.4`，仓库 `jesspig/modelcontextprotocol-cpp-sdk` | 同上 |
 | HTTP / 异步 | mcp-cpp-sdk 自研网络栈（内部 HTTP 线程） | mcp-cpp-sdk 内置（0.3.x 起移除 libhv） |
 | JSON | mcp::JsonValue（SDK 内置，自研解析器） | mcp-cpp-sdk 内置（0.3.x 起移除 simdjson） |
@@ -125,19 +129,19 @@ godot-self-driving/
 ├── src/
 │   ├── main.cpp                # GDExtension 入口 + GodotAutopilotPlugin(EditorPlugin) 生命周期
 │   ├── core/                   # 基础设施：CommandQueue(header-only)、config、LogSystem、ModeDetector、
-│   │                           #   ResourceRegistry、SceneDirtyTracker、ExportGuard、ServerContext、PluginConfig、EditorReadiness、ErrorWatermark、EditorCoords
-│   ├── tools/                  # 领域工具：47 个 .cpp（*_ops + register_all/dispatch/tool_args/tool_pipeline/...）、
+│   │                           #   ResourceRegistry、SceneDirtyTracker、ExportGuard、ServerContext、PluginConfig、EditorReadiness、ErrorWatermark、EditorCoords、LogPersist、TraceRecorder、SanitizePolicy、Monitor、MonitorEnv、PerfSampler
+│   ├── tools/                  # 领域工具：48 个 .cpp（*_ops + register_all/dispatch/tool_args/tool_pipeline/...）、
 │   │                           #   30 个域 _tools.hpp（391 条 ToolSpec）+ tool_spec.hpp / tool_registry.hpp / dynamic_spec_store.hpp /
 │   │                           #   autopilot_tools.{hpp,cpp}（用户脚本动态工具 API）
 │   ├── resources/              # MCP Resources：resource_handlers + debugger_resources
 │   ├── prompts/                # 提示词模板：7 个主题 + debugger_prompts
-│   ├── runtime/                # 游戏运行时桥接：game_bridge(±input/eval) + gda_protocol.hpp
+│   ├── runtime/                # 游戏运行时桥接：game_bridge(±input/eval/verify) + gda_protocol.hpp
 │   ├── ui/                     # 编辑器 UI：mcp_config_dock、mcp_log_dock
-│   └── util/                   # 通用编译单元：variant_json、bm25_index、error_util、readback_util、client_config_gen、
+│   └── util/                   # 通用编译单元：variant_json、bm25_index、error_util、readback_util、scene_verify、client_config_gen、
 │   │                           #   skill_gen、skill_content_generated（构建期嵌入薄胶水）；内容目录
 │   │                           #   skill_templates/（8 册模板 = 平铺 30 个 .md：主册 <name>.md + 参考 <name>--<ref>.md，另有 registry.json）；
 │   │                           #   header-only：json_godot、rid_registry、scene_path、project_path、type_hint、gdscript_wrap、mcp_image_content
-├── tests/                      # L1 gda_unit_tests（269 个 gtest）+ L2 gda_test_runner + config/*.json（28 份）+ guard/ 迁移守卫与注释守卫
+├── tests/                      # L1 gda_unit_tests（312 个 gtest，33 文件）+ L2 gda_test_runner + config/*.json（30 份）+ guard/ 迁移守卫与注释守卫
 ├── docs/                       # 本知识库（docs/wiki/，含 modules/、plans/、changelog/）
 └── Example/                    # 文档/示例工程（详见 example.md）
 ```
@@ -157,9 +161,9 @@ flowchart LR
     HTTP -.future.get() 同步等待.-> HTTP
 ```
 
-- **线程模型**：所有 Godot API 调用必须经 `CommandQueue::submit()` 或 `execute_sync()` 由主线程执行——HTTP 线程直接调用会崩溃。`dispatch::call_handler` 按 `is_main_thread()` 决定直接执行或入队等待（`dispatch.cpp`）；`call_tool` 元工具的编排回调本身在 MCP 线程执行（等待游戏响应/截图定型不再阻塞主线程消息泵），其内部经 dispatch 把领域工具 handler 路由回主线程。排空点唯一：`GodotAutopilotPlugin::_process()` 调 `s_queue.drain()`（`main.cpp`）。
+- **线程模型**：所有 Godot API 调用必须经 `CommandQueue::submit()` 或 `execute_sync()` 由主线程执行——HTTP 线程直接调用会崩溃。`dispatch::call_handler` 按 `is_main_thread()` 决定直接执行或入队等待（`dispatch.cpp`）；`call_tool` 元工具的编排回调本身在 MCP 线程执行（等待游戏响应/截图定型不再阻塞主线程消息泵），其内部经 dispatch 把领域工具 handler 路由回主线程。排空点唯一：`GodotAutopilotPlugin::_process()` 先调 `perf_sampler::tick(delta)`（09-21 起周期采样与请求超时看门狗），再调 `LogPersist::flush_on_main_thread()`（本地持久化写盘），最后 `s_queue.drain()`（`main.cpp`）。
 - **生命周期**：`GDExtensionEntryPoint` → SCENE 级别（非编辑器进程注册桥接监听）/ EDITOR 级别（注册 6 个类：4 个插件/UI 类 + 2 个调试器捕获类，随后 `add_by_type`）→ 插件 `_enter_tree()` 建 UI、启 `ServerContext` → `_exit_tree()` 逆序清理。`gda_cmdline_mode()`（`GDA_FORCE_HEADLESS=1` 时禁用）下跳过 UI 与服务器。
-- **日志**：`LogCategory { System, Transport, Tools, Resources, Prompts }` 五类、`LogLevel { Debug, Info, Warning, Error }` 四级，内存环形缓冲上限 10000 条。
+- **观测/日志**：`LogCategory { System, Transport, Tools, Resources, Prompts }` 五类、`LogLevel { Debug, Info, Warning, Error }` 四级，内存环形缓冲上限 10000 条（另有 `log_detailed` 诊断 detail 与 `trace_id`/`span_id` 关联字段）；09-21 起所有埋点统一经 `src/core/monitor.*` 门面写入（可被 MCP SDK worker 线程调用），工具/协议请求/生命周期/数据流/性能/持久化健康等事件由 `TraceRecorder` 记录（容量 20000，`kind` 区分类型、`request_id` 串联端到端），`perf_sampler` 主线程周期采样、`monitor_env` 写 `kind=snapshot`；经 `LogPersist` 在主线程 flush 落盘 `user://godot_autopilot/logs/`（人类可读）与 `traces/`（结构化 jsonl，schema v2），默认脱敏。
 
 ## 命名约定
 

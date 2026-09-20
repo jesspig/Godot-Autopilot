@@ -2,12 +2,19 @@
 
 > 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天。
 
+## 2026-09-21
+
+- **可重放监控与日志系统**：新增 `src/core/` 的 monitor（统一埋点门面，纯 std，可被 MCP worker 线程调用）、monitor_env（`environment_snapshot()` 仅主线程，写 `kind=snapshot`）、perf_sampler（主线程周期采样 `kind=perf` + 请求超时看门狗 `kind=execution_state, state=timed_out`）；`TraceRecorder` 增 `TraceKind`（15 值）与 schema v2 新字段、`LogEntry` 增 `trace_id`/`span_id`、`LogPersist` 增健康计数与 `trace_dir`、`CommandQueue` 增 `Stats`；`server_context` 经 `opts.on_request`/`opts.outgoing_filters` 关联协议请求（`begin_request`/`end_request`），元工具经 `RequestScope`+`RequestSpanGuard` 端到端关联；McpLogDock 增 Open Traces 按钮与 Trace 视图（可点击 `[trace]`、搜索兼匹配 detail）。构建 add_library 86→89（core 12→15）、L1 285→312（33 文件）、L2 29→30（`30_observability`）、ctest 316→344（L1 过滤 287→314）；实测 jsonl 观测 `lifecycle`/`protocol_request`/`protocol_response`/`tool_call`/`persist_health`/`perf`/`snapshot`/`concurrency`，`request_id` 贯通、`protocol_response` 回填 `duration_ms`；工具总数 399 不变。详见 `changelog/2026-09-21-log.md`
+
 ## 2026-09-20
 
+- **依赖升级**：godot-cpp 升 10.0.0-stable（rc2→stable，`_deps` checkout `10.0.0-stable`/507ed9d）；mcp-cpp-sdk 维持 0.3.4（0.3.5 尝试后回滚，`cmake/FetchDependencies.cmake` 仅余 godot-cpp 一处变更；configure 实测 `[mcp] SDK version: 0.3.4`）；`AGENTS.md` 与 wiki 三页（build/conventions/overview）同步。详见 `changelog/2026-09-20-log.md`
+- **可重放监控 + 双目录持久化**：新增 LogPersist / TraceRecorder / sanitize_policy 三 core 模块与 `LogSystem::log_detailed`，工具调用 trace（图片只记 `image_ref`/hash，默认脱敏）落盘 `user://godot_autopilot/logs|traces`（各保留 20 文件 / 50MB），`_process` 先 flush 后 drain；McpLogDock 增 Detail/Open Logs、McpConfigDock 增 Desensitize data；修 `FileAccess::READ_WRITE` 不建文件导致的首次追加失败（log_persist + text_ops）。L1 269→285（31 文件）、L2 28→29（`29_trace_persistence`，实测 PASS）、ctest 299→316；终验 L1 287/287、L2 全量 29/29（707.95s），脱敏开关两端、GUI 图片落盘、跨线程 trace 与 Dock 新控件均有端到端探针实测。详见 `changelog/2026-09-20-log.md`
 - **0.2.6 升版**：`VERSION` 0.2.5→0.2.6 对齐发布 tag（run 35502180800 的 validate 拦截属守卫按设计工作）；`0.2.6` tag 重打到新提交后重推，release 重新触发。详见 `changelog/2026-09-20-log.md`
 
 - **代码-文档一致性审计**：`call_tool` 描述 385→391 域随源码修正（392 非元；overview 09-18"已修正"注记失实一并更正）；ctest 口径补计 `comment_guard`（270→271，全量 298→299，`tests.md` 新增守卫小节）；index/overview/build/roadmap 过时计数与 core/entry_runtime 行号重核同步。详见 `changelog/2026-09-20-log.md`
 - **Release 触发修复**：`release.yml` 的 `on.push.tags` 仅 `v*`，而 7 个已发布 tag 全是无 `v` 格式，故一次都没触发过；改为双格式 `v*.*.*` / `[0-9]*.*.*` + `workflow_dispatch` 手动指定 tag，`validate` 剥离 `v` 后比对 `VERSION`；历史 7 个 tag 暂不补发。详见 `changelog/2026-09-20-log.md`
+- **项目知识库二轮一致性审计**：`docs/wiki/` 15 个内容页 + changelog 3 页对照 `git diff HEAD`（42 修改 + 9 未跟踪）与源码逐项核实——消解 3 处语义冲突（LogPersist 消费方、图片收集门槛、`image_width`/`image_height`）、补录 5 处缺失事实（22 处 `ScopedTraceContext` 包装点、`get_plugin_log` detail 口径、PluginConfig/AutopilotTools `log_detailed`）、修正 28 处行号漂移与 5 项附加一致性（断链、try/catch 组数、dock 布局、`src/tools/` 48 cpp、editor_ops 标题口径）、11 页 frontmatter `timestamp` 同步；`AGENTS.md` 同步构建/测试/架构/知识库四段，数值口径以 [tests.md](../tests.md) 核算总表为准。详见 `changelog/2026-09-20-log.md`
 
 ## 2026-09-19
 

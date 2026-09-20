@@ -6,7 +6,7 @@ tags:
   - 约定
   - 命名
   - 规范
-timestamp: "2026-09-19T03:31:01+08:00"
+timestamp: "2026-09-21T01:24:00+08:00"
 resource: src/
 ---
 
@@ -26,8 +26,10 @@ resource: src/
 
 - 类别（仅 5 个）：`System`、`Transport`、`Tools`、`Resources`、`Prompts`（`LogCategory` 枚举）
 - 级别：`Debug`、`Info`、`Warning`、`Error`（`LogLevel` 枚举）
-- `LogSystem` 单例：环形缓冲上限 10000 条，仅内存写入（`McpLogDock` 轮询消费），**无文件输出**
-- 禁止记录密钥与 PII
+- `LogSystem` 单例：环形缓冲上限 10000 条，缓冲本体仅内存（`McpLogDock` 轮询消费）；磁盘落盘经 `LogPersist` 增量拉取到 `user://godot_autopilot/logs/gda-<stamp>.log`（人类可读，含 `log_detailed` 的 detail）与 `traces/trace-<stamp>.jsonl`（结构化事件），两目录各保留最近 20 文件 / 50MB
+- `log_detailed(level, category, summary, detail, trace_id = {}, span_id = {})` 用于带诊断上下文的日志（detail 上限 8192 字符，超出截断）；09-21 起扩展为 6 参重载（`trace_id`/`span_id` 关联字段，旧 4 参委托），`LogEntry` 追加 `trace_id`/`span_id`；`query` 的 `filter_text` 同时匹配 message、detail、`trace_id` 与 `span_id`
+- 日志/轨迹分离与关联（09-21 起）：人类日志（`logs/gda-*.log`）与结构化事件（`traces/trace-*.jsonl`）分离落盘，统一经 `src/core/monitor.{hpp,cpp}` 门面写入（`tool_call`/`lifecycle`/`data_flow`/`perf`/`persist_health`/`security` 等便捷函数）；trace 事件以 `kind`（`enum class TraceKind`）区分类型，并用 `request_id`/`correlation_id`/`parent_span` 串起「协议请求 → call_tool → 域工具」链路，`RequestRegistry` 维护 `request_id → trace/span` 关联（上限 4096、FIFO 淘汰）；jsonl 为追加式 schema v2（原键序后追加 `kind`/`request_id` 等新键，旧键保留）
+- 禁止记录密钥与 PII；参数/trace 数据默认经 `sanitize_policy` 脱敏（`GODOT_AUTOPILOT_DESENSITIZE` > 配置 `desensitize` > 默认 true），关闭后原始参数与截图会落盘 `user://`；脱敏键为大小写不敏感的通用集合（`token`/`secret`/`password`/`key`/`api_key`/`authorization`/`cookie`/`session_token` 及 `*_token`/`_key`/`_secret`/`_password` 后缀等）
 
 ## 错误模式
 
@@ -72,4 +74,4 @@ gda 聚焦「编辑器内的引擎操作」，以下能力**明确不做**，避
 ## 其他
 
 - CI/Release 工作流见 [build.md](./build.md)「CI 与 Release」；CI 仅跑 L1，L2 引擎用例仍仅本地执行（需 `GODOT_PATH`）
-- 依赖版本固定：godot-cpp 10.0.0-rc2、mcp-cpp-sdk 0.3.4（FetchContent，无子模块；另以 `GODOTCPP_API_VERSION "4.7"` FORCE 锁定目标 API，见 [build.md](./build.md)）
+- 依赖版本固定：godot-cpp 10.0.0-stable、mcp-cpp-sdk 0.3.4（FetchContent，无子模块；另以 `GODOTCPP_API_VERSION "4.7"` FORCE 锁定目标 API，见 [build.md](./build.md)）
