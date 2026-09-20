@@ -23,6 +23,31 @@ void LogSystem::log(LogLevel level, LogCategory category,
   }
 }
 
+void LogSystem::log_detailed(LogLevel level, LogCategory category,
+                             const std::string &summary,
+                             const std::string &detail) {
+  LogEntry entry;
+  entry.timestamp = std::chrono::system_clock::now();
+  entry.level = level;
+  entry.category = category;
+  entry.message = summary;
+  if (detail.size() > MAX_DETAIL_CHARS) {
+    entry.detail = detail.substr(0, MAX_DETAIL_CHARS);
+    entry.detail += "...[truncated]";
+  } else {
+    entry.detail = detail;
+  }
+
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (entries_.size() >= MAX_ENTRIES) {
+      entries_.pop_front();
+    }
+    entry.serial = next_serial_++;
+    entries_.push_back(std::move(entry));
+  }
+}
+
 std::vector<LogEntry> LogSystem::query(const Query &q) const {
   std::lock_guard<std::mutex> lock(mutex_);
 
@@ -42,7 +67,17 @@ std::vector<LogEntry> LogSystem::query(const Query &q) const {
                                std::tolower(static_cast<unsigned char>(b));
                       });
       if (it == e.message.end()) {
-        continue;
+        auto dit = std::search(e.detail.begin(), e.detail.end(),
+                               q.filter_text.begin(), q.filter_text.end(),
+                               [](char a, char b) {
+                                 return std::tolower(
+                                            static_cast<unsigned char>(a)) ==
+                                        std::tolower(
+                                            static_cast<unsigned char>(b));
+                               });
+        if (dit == e.detail.end()) {
+          continue;
+        }
       }
     }
     result.push_back(e);

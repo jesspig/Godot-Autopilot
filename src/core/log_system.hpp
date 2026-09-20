@@ -18,14 +18,18 @@ struct LogEntry {
   LogLevel level;
   LogCategory category;
   std::string message;
+  std::string detail{};
   size_t serial = 0;
 };
 
 class LogSystem {
 public:
   static constexpr int MAX_ENTRIES = 10000;
+  static constexpr size_t MAX_DETAIL_CHARS = 8192;
 
   void log(LogLevel level, LogCategory category, const std::string &message);
+  void log_detailed(LogLevel level, LogCategory category,
+                    const std::string &summary, const std::string &detail);
 
   struct Query {
     LogLevel min_level = LogLevel::Debug;
