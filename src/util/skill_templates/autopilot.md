@@ -20,7 +20,7 @@ The MCP layer intentionally exposes only seven meta tools:
 - `batch_execute` - run several tool calls in sequence
 - `code_execute` - run GDScript in the editor
 
-The 384 domain tools (scene, property, resource, script, physics, render, audio, and so on) plus `system_status` are not registered as MCP tools directly. Call every domain tool through `call_tool`, passing the domain tool name and its arguments object.
+The 385 domain tools (scene, property, resource, script, physics, render, audio, and so on) plus `system_status` are not registered as MCP tools directly. Call every domain tool through `call_tool`, passing the domain tool name and its arguments object.
 
 Two groups are denied by default behind an authorization gate: `code_execute` and `execute_script` (arbitrary GDScript in the editor) need the `code_execute` capability, and the tools that reach the running game (`execute_game_script`, `queue_game_input`, `wait_game_input`, `sequence_game_inputs`, `reload_game_scripts`) need the `game_runtime` capability. The gate is checked on every call; the "batch_execute versus code_execute" section covers the enable paths.
 
@@ -41,7 +41,7 @@ Example domain call through `call_tool`:
 {"name": "create_scene_node", "arguments": {"type": "Node2D", "name": "Player", "parent_path": "Root/Actors"}}
 ```
 
-If `search_tools` does not surface a tool you suspect exists, browse references/tool-catalog.md: it lists all 384 domain tools grouped by their 30 source modules, one line each.
+If `search_tools` does not surface a tool you suspect exists, browse references/tool-catalog.md: it lists all 385 domain tools grouped by their 30 source modules, one line each.
 
 ### Search techniques
 
@@ -52,7 +52,7 @@ If `search_tools` does not surface a tool you suspect exists, browse references/
 - Rerun with synonyms before concluding a tool is missing: tile/cell, sprite/texture, log/output, delete/remove/erase, create/add/new. The index has no stemming, so exact wording matters.
 - Narrow with filters: pass `category` for a single domain or `tags` for required tags, and browse `list_categories` when you only know the domain.
 - Read `get_tool_detail` for the candidate's schema and side-effect marker before the first write; the marker says whether the tool writes files or config.
-- When a query still comes back empty, walk references/tool-catalog.md (all 384 domain tools grouped by module) before inventing anything. Never guess a tool name - `call_tool` with a name that does not exist fails by design.
+- When a query still comes back empty, walk references/tool-catalog.md (all 385 domain tools grouped by module) before inventing anything. Never guess a tool name - `call_tool` with a name that does not exist fails by design.
 
 ## Consult the engine documentation
 
@@ -176,7 +176,7 @@ references/development-workflow.md expands this into complete loops for UI and s
 ## batch_execute versus code_execute
 
 - `batch_execute` orchestrates existing tools: an ordered `operations` list, run in sequence, at most 256 items, with `stop_on_error` (default true) and optional `rollback_on_error`. Choose it for deterministic sequences such as "set these five properties, then save". Async game tools inside a batch report status pending - the request was sent but not awaited, and the batch discards it - so call those tools one at a time when you need their response. The response counts them separately: total = succeeded + failed + pending, while skipped covers operations cut off by stop_on_error.
-- `code_execute` runs GDScript in the editor: the source is wrapped in a script extending Node, and the edited scene root is exposed as SceneRoot. Default mode inlines your code inside a single `_run()` function - top-level func definitions are unsupported (pass `function_name` for multi-function mode). `timeout_ms` defaults to 5000 with a 30000 maximum; timeout is checked before execution, not used to interrupt. `auto_owner` defaults to true so created nodes are saved with the scene.
+- `code_execute` runs GDScript in the editor: the source is wrapped in a script extending Node, and the edited scene root is exposed as SceneRoot. Without a line-start `func ` definition your code is inlined inside a single entry-function body - write straight-line code ending in return. When any non-comment line starts with `func ` (leading whitespace stripped, `#`/`//` comment lines ignored) the whole source is preserved verbatim and `function_name` (default `_run`) selects the entry point. The detector needs `func ` with a trailing space - `func` followed by a tab or `(` stays in single-function mode and is rejected there, and mixing tabs with spaces is rejected. `timeout_ms` defaults to 5000 with a 30000 maximum; timeout is checked before execution, not used to interrupt. `auto_owner` defaults to true so created nodes are saved with the scene.
 - Decision rule: expressible as a handful of existing tool calls - use `batch_execute`. Needs loops, math or conditions (laying out hundreds of tiles, bulk renames, computed values) - use `code_execute`. Very large payloads also favor `code_execute` to avoid huge JSON arguments.
 - Both are meta tools: call them directly at the MCP layer, not through `call_tool`.
 - Authorization: `code_execute` and `execute_script` are denied by default. Enable them either by setting the `GODOT_AUTOPILOT_ALLOW` environment variable to `code_execute` (or `all`) and restarting the engine, or by ticking "Allow code_execute" in the plugin's MCP Config dock, which saves to the plugin config and takes effect on the next tool call - no restart needed. When `GODOT_AUTOPILOT_ALLOW` is set it wins over the config, so do not rely on the dock checkbox while the variable is present. The game runtime tools need the `game_runtime` capability, enabled the same way via the environment variable or the `allow` key in the plugin config, or by ticking "Allow game_runtime" in the plugin's MCP Config dock (saves to the plugin config, effective on the next tool call - no restart). The process gate has no dock checkbox: it needs the environment variable and an engine restart.
@@ -224,7 +224,8 @@ The behaviors below bite most often; the full catalogue lives in references/tool
 - Never assign memory:// resources to node properties: `property_set` rejects them, because writing one into the scene file would corrupt it. Save with `save_resource` first, then assign the `res://` path.
 - Non-numeric strings into int properties become 0: `property_set` returns ok and stores 0. After any property write you are unsure about, read it back with `property_get` and assert the expected value.
 - Where the built-in prompt text and the implementation disagree, the implementation wins: trust `get_tool_detail` over prompt-quoted tool counts, keycodes or serialization claims.
-- `code_execute` has four traps: single-function mode is the default (top-level func definitions are rejected), `close_scene` on the editor interface is refused outright (use `close_editor_scene`), mixed tabs and spaces are rejected, and `SceneRoot` node paths carry no root-name prefix.
+- `code_execute` has four traps: without a line-start `func ` definition the source is inlined into one function body (a `func `/`func\t`/`func(` line there is rejected - move definitions out and pass `function_name`), `close_scene` on the editor interface is refused outright (use `close_editor_scene`), mixed tabs and spaces are rejected, and `SceneRoot` node paths carry no root-name prefix.
+- Recurring build recipes: reparent with `reparent_node` instead of hand-written remove/add (godot-autopilot-scene-system), full-window root Control via preset plus zero-offset readback (godot-autopilot-content), assemble required children before entering the tree or guard with get_node_or_null (godot-autopilot-scripting), and frame-accurate input via `sequence_game_inputs` offsets instead of round-trip timing (godot-autopilot-runtime).
 
 ## Limits
 

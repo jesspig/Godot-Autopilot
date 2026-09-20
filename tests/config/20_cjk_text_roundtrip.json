@@ -1,0 +1,103 @@
+{
+  "name": "20_cjk_text_roundtrip",
+  "description": "零 C++ 的 L2 用例（20 号段，headless）：编辑器侧中文文本往返——property_set 写中文到 Label.text、property_get 读回断言逐字相等（String::utf8 链路回归）；另覆盖缺失属性/缺失节点的错误分支（仅断言 error 非空，不锁定文案）。收尾 save_editor_scene_as 落盘 res://tests_tmp/cjk_text_probe.tscn 后 close_editor_scene（未落盘场景 close 会被拒，故必须先落盘），after_all 回收 res://tests_tmp，无残留文件、无会话污染。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "after_all": [
+      {
+        "id": "cjk_text_trash_tmp_dir",
+        "tool": "move_os_file_to_trash",
+        "args": { "path": "res://tests_tmp" }
+      }
+    ],
+    "before_all": [
+      {
+        "id": "new_scene",
+        "tool": "create_editor_scene",
+        "args": { "name": "CjkTextRoot" }
+      },
+      {
+        "id": "create_label_node",
+        "tool": "create_scene_node",
+        "args": { "name": "CjkLabel", "type": "Label", "parent_path": "CjkTextRoot" }
+      }
+    ],
+    "stages": [
+      {
+        "id": "main",
+        "steps": [
+          {
+            "id": "cjk_text_set",
+            "tool": "property_set",
+            "args": { "path": "CjkLabel", "property": "text", "value": "中文往返探针" },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          },
+          {
+            "id": "cjk_text_get",
+            "tool": "property_get",
+            "args": { "path": "CjkLabel", "property": "text" },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "中文往返探针" } ]
+            }
+          },
+          {
+            "id": "cjk_text_get_missing_property",
+            "tool": "property_get",
+            "args": { "path": "CjkLabel", "property": "no_such_prop" },
+            "expect": {
+              "field_checks": [ { "key": "error", "not_empty": true } ]
+            }
+          },
+          {
+            "id": "cjk_text_set_missing_property",
+            "tool": "property_set",
+            "args": { "path": "CjkLabel", "property": "no_such_prop", "value": 1 },
+            "expect": {
+              "field_checks": [ { "key": "error", "not_empty": true } ]
+            }
+          },
+          {
+            "id": "cjk_text_get_missing_node",
+            "tool": "property_get",
+            "args": { "path": "NoSuchNode", "property": "text" },
+            "expect": {
+              "field_checks": [ { "key": "error", "not_empty": true } ]
+            }
+          },
+          {
+            "id": "cjk_text_set_missing_node",
+            "tool": "property_set",
+            "args": { "path": "NoSuchNode", "property": "text", "value": "中文往返探针" },
+            "expect": {
+              "field_checks": [ { "key": "error", "not_empty": true } ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "cleanup",
+        "steps": [
+          {
+            "id": "cjk_text_save_scene",
+            "tool": "save_editor_scene_as",
+            "args": { "path": "res://tests_tmp/cjk_text_probe.tscn" },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "saved" } ]
+            }
+          },
+          {
+            "id": "cjk_text_close_scene",
+            "tool": "close_editor_scene",
+            "args": {},
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "closed" } ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -28,8 +28,6 @@
 #include <unordered_map>
 #include <vector>
 
-// 键名 → 键码的唯一判定实现在 src/tools/input_map_ops.cpp；此处仅为跨 TU
-// 前置声明（input_map_ops.hpp 只声明工具 handler，不含本函数）。
 namespace godot_autopilot {
 namespace input_map_ops {
 int64_t resolve_key_name_code(const std::string &name);
@@ -258,7 +256,7 @@ private:
     auto *input = godot::Input::get_singleton();
     if (input) {
       dispatch_input_event(input, type_, key_, button_index_, position_,
-                           has_position_, false, action_, mode_api_, false);
+                           has_position_, false, action_, mode_api_, true);
     }
   }
 };
@@ -363,9 +361,6 @@ godot::Key parse_keycode(const JV &keycode) {
   if (!keycode.IsString())
     return godot::KEY_NONE;
 
-  // 键名判定与编辑器侧 add_input_map_action_event 共用同一实现
-  // (src/tools/input_map_ops.cpp:resolve_key_name_code)，两侧接受同一组写法:
-  // 裸名 (P、space)、KEY_ 前缀名 (KEY_P，大小写不敏感)、数字码字符串 ("80")。
   std::string s = keycode.GetString();
   return parse_int_key(input_map_ops::resolve_key_name_code(s));
 }
@@ -554,7 +549,7 @@ std::string inject_step(const JV &step) {
       input->action_release(action);
     }
     dispatch_input_event(input, 2, key, button_index, pos, has_pos, pressed,
-                         action, mode_api, mode_api ? false : pressed);
+                         action, mode_api, true);
     release_type = "action";
   } else {
     return "unknown input type: " + type;

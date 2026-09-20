@@ -34,6 +34,7 @@ godot::Color theme_color(const char *name, const godot::Color &fallback) {
 }
 
 bool write_file(const godot::String &path, const std::string &content) {
+  godot::DirAccess::make_dir_recursive_absolute(path.get_base_dir());
   godot::Ref<godot::FileAccess> file =
       godot::FileAccess::open(path, godot::FileAccess::WRITE);
   if (file.is_null()) {
@@ -156,6 +157,23 @@ McpConfigDock::McpConfigDock() : port_spin(nullptr), apply_button(nullptr) {
       "toggled",
       callable_mp(this, &McpConfigDock::_on_allow_game_runtime_toggled));
 
+  auto *user_tools_row = memnew(godot::HBoxContainer);
+  root->add_child(user_tools_row);
+  auto *user_tools_label = memnew(godot::Label);
+  user_tools_label->set_text("Allow user tools:");
+  user_tools_row->add_child(user_tools_label);
+  allow_user_tools_check = memnew(godot::CheckBox);
+  allow_user_tools_check->set_pressed(
+      authorization::capability_enabled("user_tools"));
+  allow_user_tools_check->set_tooltip_text(
+      "Allow user tools registered from scripts through the AutopilotTools "
+      "engine singleton; read on the next tool call, no restart needed. When "
+      "the GODOT_AUTOPILOT_ALLOW environment variable is set it wins over "
+      "this setting.");
+  user_tools_row->add_child(allow_user_tools_check);
+  allow_user_tools_check->connect(
+      "toggled", callable_mp(this, &McpConfigDock::_on_allow_user_tools_toggled));
+
   status_label = memnew(godot::Label);
   root->add_child(status_label);
 
@@ -227,6 +245,10 @@ void McpConfigDock::_on_allow_code_execute_toggled(bool checked) {
 
 void McpConfigDock::_on_allow_game_runtime_toggled(bool checked) {
   _on_allow_toggled("game_runtime", allow_game_runtime_check, checked);
+}
+
+void McpConfigDock::_on_allow_user_tools_toggled(bool checked) {
+  _on_allow_toggled("user_tools", allow_user_tools_check, checked);
 }
 
 void McpConfigDock::_on_allow_toggled(const char *capability,

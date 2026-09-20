@@ -553,7 +553,6 @@ void add_camera2d_serialization_note(mcp::JsonValue &result,
   }
 }
 
-// 与 util::check_readback 的值类型近似比较清单保持同步。
 bool is_readback_value_type(godot::Variant::Type type) {
   switch (type) {
   case godot::Variant::VECTOR2:
@@ -805,22 +804,88 @@ build_inline_resource_value(const godot::Dictionary &prop_info,
 
 } // namespace
 
+namespace {
+
+constexpr int64_t kPropertyBatchMax = 32;
+
+mcp::JsonValue read_single_property(godot::Node *node,
+                                    const std::string &path_str,
+                                    const std::string &prop_str,
+                                    godot::Variant &out_value) {
+  godot::Dictionary prop_info = find_property_info(node, prop_str);
+  if (prop_info.is_empty()) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue(
+        "property not found: " + prop_str + " on node " + path_str +
+        " — use property_get_list to see available properties");
+    return e;
+  }
+  out_value =
+      node->get(godot::StringName(godot::String::utf8(prop_str.c_str())));
+  return mcp::JsonValue();
+}
+
+} // namespace
+
 mcp::JsonValue handle_get(const mcp::JsonValue &args) {
   auto *it_path = args.Find("path");
   auto *it_prop = args.Find("property");
+  auto *it_props = args.Find("properties");
   if (!it_path || !it_path->IsString()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
     e["error"] = mcp::JsonValue("missing required parameter: path");
     return e;
   }
-  if (!it_prop || !it_prop->IsString()) {
+  if (args.IsObject()) {
+    for (const auto &entry : args.GetObject()) {
+      if (entry.first != "path" && entry.first != "property" &&
+          entry.first != "properties") {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("unknown parameter for property_get: " +
+                                    entry.first);
+        return e;
+      }
+    }
+  }
+  const bool has_single = it_prop != nullptr;
+  const bool has_batch = it_props != nullptr;
+  if (has_single && has_batch) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue(
+        "property and properties are mutually exclusive — pass exactly one");
+    return e;
+  }
+  std::vector<std::string> batch_names;
+  if (has_batch) {
+    if (!it_props->IsArray() || it_props->GetArray().empty()) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue(
+          "properties must be a non-empty array of property name strings");
+      return e;
+    }
+    for (const auto &item : it_props->GetArray()) {
+      if (!item.IsString() || item.GetString().empty()) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue(
+            "properties must contain non-empty property name strings");
+        return e;
+      }
+      batch_names.push_back(item.GetString());
+    }
+    if (batch_names.size() > static_cast<size_t>(kPropertyBatchMax)) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue("properties exceeds maximum of " +
+                                  std::to_string(kPropertyBatchMax) +
+                                  " entries — split into smaller batches");
+      return e;
+    }
+  } else if (!has_single || !it_prop->IsString()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
     e["error"] = mcp::JsonValue("missing required parameter: property");
     return e;
   }
 
   std::string path_str = it_path->GetString();
-  std::string prop_str = it_prop->GetString();
 
   std::string hint;
   godot::Node *node =
@@ -831,18 +896,32 @@ mcp::JsonValue handle_get(const mcp::JsonValue &args) {
     return e;
   }
 
-  godot::StringName prop_name(prop_str.c_str());
-
-  godot::Dictionary prop_info = find_property_info(node, prop_str);
-  if (prop_info.is_empty()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(
-        "property not found: " + prop_str + " on node " + path_str +
-        " — use property_get_list to see available properties");
-    return e;
+  if (has_batch) {
+    mcp::JsonValue values(mcp::JsonValue::object_tag);
+    mcp::JsonValue missing(mcp::JsonValue::array_tag);
+    for (const std::string &name : batch_names) {
+      godot::Variant value;
+      mcp::JsonValue item_error =
+          read_single_property(node, path_str, name, value);
+      if (!item_error.IsNull()) {
+        missing.PushBack(mcp::JsonValue(name));
+        continue;
+      }
+      values[name] = VariantJson::serialize(value);
+    }
+    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    r["result"] = std::move(values);
+    if (missing.Size() > 0)
+      r["missing"] = std::move(missing);
+    return r;
   }
 
-  godot::Variant value = node->get(prop_name);
+  std::string prop_str = it_prop->GetString();
+  godot::Variant value;
+  if (mcp::JsonValue item_error =
+          read_single_property(node, path_str, prop_str, value);
+      !item_error.IsNull())
+    return item_error;
 
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = VariantJson::serialize(value);

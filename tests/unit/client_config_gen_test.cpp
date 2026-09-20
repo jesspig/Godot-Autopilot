@@ -21,7 +21,6 @@ std::string entry_url(const std::string &json, const char *top_key) {
   return url->GetString();
 }
 
-// 测试本地副本:客户端 -> 顶层 server 映射键(与实现保持一致)。
 const char *expected_top_key(ClientId id) {
   if (id == ClientId::OpenCode || id == ClientId::Crush) {
     return "mcp";
@@ -35,7 +34,6 @@ const char *expected_top_key(ClientId id) {
   return "mcpServers";
 }
 
-// 注意:返回指针借用 doc,调用方需保证 doc 生命周期覆盖使用区间。
 const mcp::JsonValue *find_entry_in(const mcp::JsonValue &doc, ClientId id) {
   const mcp::JsonValue *servers = nullptr;
   if (id == ClientId::ZCode) {
@@ -76,7 +74,7 @@ TEST(ClientConfigGenTest, FilePathsMatchClients) {
   EXPECT_STREQ(file_path(ClientId::Qoder), ".qoder/settings.json");
   EXPECT_STREQ(file_path(ClientId::WorkBuddy), ".workbuddy/mcp.json");
   EXPECT_STREQ(file_path(ClientId::ZCode), ".zcode/config.json");
-  EXPECT_STREQ(file_path(ClientId::PiAgent), ".pi/mcp.json");
+  EXPECT_STREQ(file_path(ClientId::PiAgent), ".mcp.json");
   EXPECT_STREQ(file_path(ClientId::CommandCode), ".mcp.json");
   EXPECT_STREQ(file_path(ClientId::Kilo), ".kilo/mcp.json");
   EXPECT_STREQ(file_path(ClientId::Roo), ".roo/mcp.json");

@@ -71,6 +71,9 @@ mcp::JsonValue handle_game_capture(const mcp::JsonValue &args);
 mcp::JsonValue handle_game_reload_scripts(const mcp::JsonValue &args);
 mcp::JsonValue handle_game_job_start(const mcp::JsonValue &args);
 mcp::JsonValue handle_game_job_get(const mcp::JsonValue &args);
+mcp::JsonValue handle_game_sample_property(const mcp::JsonValue &args);
+mcp::JsonValue handle_game_collect_evidence(const mcp::JsonValue &args);
+mcp::JsonValue handle_game_validate_ui_layout(const mcp::JsonValue &args);
 
 mcp::JsonValue handle_gda_send(const std::string &op,
                                const mcp::JsonValue &params,

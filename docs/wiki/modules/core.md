@@ -6,13 +6,13 @@ tags:
   - 模块
   - 核心层
   - 线程模型
-timestamp: "2026-09-16T17:06:25+08:00"
+timestamp: "2026-09-20T17:20:00+08:00"
 resource: src/core/
 ---
 
 # 核心模块（src/core/）
 
-> 审计日期：2026-09-13（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-13 上午随资源 path 加载注册进 ResourceRegistry 同步；09-13 下午随收口批次同步 PluginConfig allow 键、授权门与 call_tool MCP 线程例外；09-13 17:50 随 B 组知识库审计同步——补正主线程排空点行号、移除已删除的 architecture.md 对照行；09-13 晚随 0.2.4 版知识库全量审计同步——补正 query_recent/query_from 消费方注释、SCENE/EDITOR 两级初始化描述、GDA_FORCE_HEADLESS 语义与 editor_readiness 消费方；09-14 随修复批次同步——PluginConfig 消费方增列 Allow game_runtime 复选框；09-16 随坐标换算批次同步——补 `editor_coords` 职责行与新增纯函数（此前职责表漏列该模块），基于当前工作树代码逐行核对（不依赖 git 历史）。
+> 审计日期：2026-09-19（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-13 上午随资源 path 加载注册进 ResourceRegistry 同步；09-13 下午随收口批次同步 PluginConfig allow 键、授权门与 call_tool MCP 线程例外；09-13 17:50 随 B 组知识库审计同步——补正主线程排空点行号、移除已删除的 architecture.md 对照行；09-13 晚随 0.2.4 版知识库全量审计同步——补正 query_recent/query_from 消费方注释、SCENE/EDITOR 两级初始化描述、GDA_FORCE_HEADLESS 语义与 editor_readiness 消费方；09-14 随修复批次同步——PluginConfig 消费方增列 Allow game_runtime 复选框；09-16 随坐标换算批次同步——补 `editor_coords` 职责行与新增纯函数（此前职责表漏列该模块），基于当前工作树代码逐行核对（不依赖 git 历史）；09-18 随知识库一致性审计同步——`query_recent(50)` 消费方行号 470→527（以 `resource_handlers.cpp` 实测为准）、审计日期头补齐 09-16 改动的日期同步；09-19 随注释清理批同步——坐标换算引擎映射与缓存提示取舍入文档（源码整行注释删除）；09-20 代码-文档一致性审计——行号重核（`debugger_ops.cpp:683`→`:763`、`main.cpp:258-325`→`:291-357`、`main.cpp:46-54`→`:47-55`），其余复核一致。
 > 覆盖范围：`src/core/` 下 9 个 cpp + 12 个头 + `version.hpp.in` 模板（`CommandQueue` 与 `error_watermark` 为 header-only，实际 12 业务组 + 版本）。注意：`CommandQueue` 为 header-only（仅 `command_queue.hpp`，无对应 `.cpp`），`error_watermark.hpp` 同为 header-only，`version.hpp.in` 经 `configure_file` 生成 `version.hpp`。
 
 ## 模块简介
@@ -28,7 +28,7 @@ resource: src/core/
 | `ExportGuard` | `export_guard.cpp/hpp` | 导出期间置位全局原子标志，供工具分发判定"导出中" | `dispatch::export_blocked_result`、`_enter_tree` 注册 |
 | `LogSystem` | `log_system.cpp/hpp` | 进程内环形日志（仅内存，无文件输出），单例 | 全部模块、`McpLogDock`、log 类资源 |
 | `ModeDetector` | `mode_detector.cpp/hpp` | 运行时模式检测（编辑器/游戏/未知） | `_enter_tree` 启动日志 |
-| 坐标换算（`coords` 命名空间，纯函数） | `editor_coords.cpp/hpp` | 仿射/Rect/图像尺寸纯逻辑 + 画布空间→窗口客户区换算（09-16 新增 `viewport_point_to_window` / `viewport_rect_center_to_window`，`screen_transform×canvas` 复合，恒等原样返回） | 游戏侧 `run_ui_click` 注入坐标换算（见[入口与运行时](entry_runtime.md)） |
+| 坐标换算（`coords` 命名空间，纯函数） | `editor_coords.cpp/hpp` | 仿射/Rect/图像尺寸纯逻辑 + 画布空间→窗口客户区换算（09-16 新增 `viewport_point_to_window` / `viewport_rect_center_to_window`，`screen_transform×canvas` 复合，恒等原样返回；画布空间即 `Control::get_global_rect()`/`get_global_transform()` 所在空间，注入的 `InputEventMouseButton.position` 为窗口客户区坐标（引擎侧经 `get_final_transform()` 反变换）——`src/core/editor_coords.hpp:12-15`） | 游戏侧 `run_ui_click` 注入坐标换算（见[入口与运行时](entry_runtime.md)） |
 | `ResourceRegistry` | `resource_registry.cpp/hpp` | 内存资源缓存（oid 键 + `name:` 前缀键），全局 mutex 保护 | 资源类工具 |
 | `SceneDirtyTracker` | `scene_dirty_tracker.cpp/hpp` | 记录"当前编辑场景是否被修改"及根节点实例 ID | `GodotAutopilotPlugin::_get_unsaved_status` |
 | `error_watermark` | `error_watermark.hpp`（header-only） | 错误水印计数器：累积待消费错误数，供 MCP 响应附 `new_errors_since_last_call` doorbell | `register_all.cpp`（响应后处理）、`runtime_ops.cpp`（游戏 runtime_error 计数） |
@@ -62,8 +62,8 @@ resource: src/core/
 - 枚举：`LogLevel { Debug, Info, Warning, Error }`；`LogCategory { System, Transport, Tools, Resources, Prompts }`
 - `void log(LogLevel, LogCategory, const std::string&)` — 环形缓冲，上限 `MAX_ENTRIES = 10000`，超限 `pop_front`；分配递增 `serial`
 - `query(const Query&)` — 支持 `min_level` / `filter_text`（大小写不敏感） / `category` 过滤
-- `query_recent(size_t limit)` — 取最近 N 条（`godot://log/recent` 资源经 `query_recent(50)` 消费，`resource_handlers.cpp:470`）
-- `query_from(size_t start_index, size_t* next_index)` + `size_t next_index()` — 增量查询（`McpLogDock::poll_new_entries` 与 `get_plugin_log` 的 `since_index` 消费，`mcp_log_dock.cpp:217`、`debugger_ops.cpp:683`）
+- `query_recent(size_t limit)` — 取最近 N 条（`godot://log/recent` 资源经 `query_recent(50)` 消费，`resource_handlers.cpp:527`）
+- `query_from(size_t start_index, size_t* next_index)` + `size_t next_index()` — 增量查询（`McpLogDock::poll_new_entries` 与 `get_plugin_log` 的 `since_index` 消费，`mcp_log_dock.cpp:217`、`debugger_ops.cpp:763`）
 - `static LogSystem& instance()` — 局部静态单例
 - **写入目标：仅内存；无文件、无回调、无 Godot 控制台直接输出**（`McpLogDock` 经 `poll_new_entries`/`query_from` 轮询消费）
 - MCP 侧消费方：`get_plugin_log`（debugger_ops，09-13 下午新增）经 `query`/`query_from` 读取同一缓冲（级别/分类/子串/增量过滤，值拷贝快照），与 `McpLogDock` 并行消费互不影响
@@ -113,6 +113,7 @@ resource: src/core/
 - `bool restart(uint16_t port)` — `stop()` → 更新 `port_` → `start()`；供配置面板运行时改端口（配置面板 Apply 后立即生效，无需重启编辑器）
 - `int get_port()` / `bool is_running()` / `const std::string& last_error()`
 - MCP 服务器标识：`mcp::Implementation{"godot-autopilot", GDA_VERSION}`（宏经 `configure_file` 由根 `VERSION` 文件生成，见 `build.md` "版本号单一来源"）
+- 缓存提示（`server_context.cpp:91-99`）：MCP 2026-07-28 规范要求六类 cacheable 结果携带缓存提示，协商到 2026 era 的客户端会按必填字段校验；`ttlMs=0` 表示"立即过期"，仅满足字段声明，客户端仍每次重新拉取，行为与未声明时一致
 - 生命周期回调（全部写 Transport 类别日志）：`on_method_called`（Debug）、`on_client_connected` / `on_initialized` / `on_transport_close`（Info）、`on_protocol_error` / `on_transport_error`（Error）
 - 诊断日志增强：初始化 / 注册工具 / 启动传输 / 停止 / 重启等关键流程均补充诊断日志；`start()` 启动失败不再硬编码 "unknown exception"，改为输出捕获到的真实异常类型，便于排查
 - `register_tools()` 注册四类：工具、资源、prompt、调试器专用资源/prompt
@@ -146,7 +147,7 @@ flowchart LR
 
 ## 生命周期（插件 ↔ ServerContext）
 
-1. `GDExtensionEntryPoint`（`main.cpp:258-325`）：`MODULE_INITIALIZATION_LEVEL_SCENE` 在非编辑器进程调用 `game_bridge::register_listener()`（桥接类注册与消息捕获）；`MODULE_INITIALIZATION_LEVEL_EDITOR` 注册 debugger 类与 4 个类后 `EditorPlugins::add_by_type<GodotAutopilotPlugin>()`
+1. `GDExtensionEntryPoint`（`main.cpp:291-357`）：`MODULE_INITIALIZATION_LEVEL_SCENE` 在非编辑器进程调用 `game_bridge::register_listener()`（桥接类注册与消息捕获）；`MODULE_INITIALIZATION_LEVEL_EDITOR` 注册 debugger 类与 4 个类后 `EditorPlugins::add_by_type<GodotAutopilotPlugin>()`
 2. `_enter_tree`：设置 editor queue → Log Dock/输出捕获/调试器插件 → `new ServerContext(queue)` 并 `start()` → Config Dock → `add_export_plugin(ExportGuard)`；`gda_cmdline_mode()` 为真时跳过 UI/服务器（`GDA_FORCE_HEADLESS=1` 反向禁用 cmdline 模式，语义与变量名相反）
 3. `_process`：每帧 `drain()` + Dock 轮询
 4. `_exit_tree`：`ServerContext::stop()` + delete → 注销各组件
@@ -159,7 +160,7 @@ flowchart LR
 - 端口解析优先级：**环境变量 > `PluginConfig::load_port()`（user:// 持久化值，需 > 0）> `GDA_DEFAULT_PORT`（9527）**——环境变量优先保证测试/CI 场景不受面板配置影响
 - `GODOT_AUTOPILOT_HOST`：`resolve_host()` 用 `std::getenv` 读取，非空即生效；默认环回绑定 `127.0.0.1`，`ServerContext::start()` 拒绝非环回地址
 - 运行时改端口：`ServerContext::restart(uint16_t)`（配置面板 Apply 触发，成功后经 `PluginConfig::save_port` 持久化）
-- `GDA_FORCE_HEADLESS`：值为 `1` 时**禁用** cmdline 模式（强制建 UI/启服务器，语义与变量名相反；`main.cpp:46-54` 读取）
+- `GDA_FORCE_HEADLESS`：值为 `1` 时**禁用** cmdline 模式（强制建 UI/启服务器，语义与变量名相反；`main.cpp:47-55` 读取）
 
 监听、可信客户端模型、路径和响应大小边界见 [T0 安全边界与并发契约](../security_contract.md)。
 
@@ -189,10 +190,10 @@ flowchart LR
 | 文档 | 声称 | 代码事实 | 判定 |
 |---|---|---|---|
 | AGENTS.md（构建段） | 暗示每个模块有成对的 `.cpp/.hpp` 参与 `add_library()` | `command_queue.hpp` 无对应 `.cpp`，header-only，不进 CMake 源列表 | 文档未明说，审计时需注意 |
-| README.md（前提） | "Godot 4.3+" | Example 项目为 4.7（`Example/project.godot`），AGENTS.md 亦写 4.7 | 文档间冲突 |
-| README.md（安装） | "Open your Godot project — the server starts automatically" | cmdline/`GDA_FORCE_HEADLESS` 模式下 UI 与服务器被禁用（`main.cpp`） | 存在例外，描述不完整 |
+| README.md / README.en.md（前提） | "Godot 4.7+"（`README.md:5,53` / `README.en.md:5,53`） | Example 项目为 4.7（`Example/project.godot`），AGENTS.md 亦写 4.7 | 一致 ✓ |
+| README.md / README.en.md（安装） | "服务端自动启动……无需启用开关"（`README.md:65` / `README.en.md:65`） | cmdline/`GDA_FORCE_HEADLESS` 模式下 UI 与服务器被禁用（`main.cpp`） | 存在例外，描述不完整 |
 | AGENTS.md（架构/端口段） | 端口 9527、`/mcp`、`GODOT_AUTOPILOT_PORT` 覆盖、日志类别五枚举 | 全部与代码一致 | 一致 ✓ |
-| README.md（设计表） | Port 9527、线程模型"Command queue + frame sync" | 一致 ✓ | 一致 ✓ |
+| README.md / README.en.md（安全段） | 回环监听 + 端口 9527 + `/mcp`（`README.md:65,74` / `README.en.md:65,74`） | 与 `server_context.cpp` 一致 | 一致 ✓ |
 | AGENTS.md | 日志类别 "仅此几个：System、Transport、Tools、Resources、Prompts" | `LogCategory` 枚举完全相同 | 一致 ✓ |
 
 ## 相关页面

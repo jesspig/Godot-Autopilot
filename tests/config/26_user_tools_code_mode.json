@@ -1,0 +1,138 @@
+{
+  "name": "user_tools_code_mode",
+  "description": "AutopilotTools 用户脚本工具 API（运行时经脚本注册的 MCP 动态工具）端到端：① code_execute 内注册 Callable 用户工具 user_echo_probe（category User、params value:string/required）→ ② MCP call_tool 调用返回 result.echo=hi → ③ search_tools 命中该工具、get_tool_detail 标记 tool.dynamic=true → ④ code_execute 内 api.call_tool 直连 code-mode（get_engine_version 与 user_echo_probe 各调一次）→ ⑤ get_tool 取 handle 后 unregister_tool 移除，has_tool=false → ⑥ 再调报 domain tool not found。前置条件：脚本步骤均经 code_execute，需要 code_execute capability（GODOT_AUTOPILOT_ALLOW env 或 user://godot_autopilot/config.json 的 allow 字段，env 优先）；用户工具的注册与执行额外受 user_tools capability 门保护，before_all 调 AutopilotTools.set_enabled(true) 写配置自包含——env 优先意味着若 GODOT_AUTOPILOT_ALLOW 已设置且不含 user_tools（也无 all），set_enabled 无效，用例在步骤 1 失败（此时需在 env 中补 user_tools 或取消该 env）。runner 的 before_all/after_all 不支持 expect：before_all 脚本自检 Engine.get_singleton 与 is_enabled，失败经步骤 1 断言暴露；after_all 兜底 unregister 全部动态工具并 set_enabled(false) 反向写回配置（用户原有的 user_tools 允许状态会被关闭）。全部 headless，无项目内文件/场景残留（仅 user://godot_autopilot/config.json 的 allow 字段被写入后再移除 user_tools）。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "before_all": [
+      {
+        "id": "enable_user_tools",
+        "tool": "code_execute",
+        "args": {
+          "source_code": "var api = Engine.get_singleton(\"AutopilotTools\")\nif api == null:\n\treturn {\"error\": \"AutopilotTools singleton not registered\"}\napi.set_enabled(true)\nif not api.is_enabled():\n\treturn {\"error\": \"user_tools capability still disabled: GODOT_AUTOPILOT_ALLOW (if set) wins over the config file and may not include user_tools\"}\nreturn {\"ok\": true}\n"
+        }
+      }
+    ],
+    "after_all": [
+      {
+        "id": "cleanup_user_tools",
+        "tool": "code_execute",
+        "args": {
+          "source_code": "var api = Engine.get_singleton(\"AutopilotTools\")\nif api == null:\n\treturn {\"ok\": false, \"note\": \"AutopilotTools singleton not registered\"}\nvar removed = 0\nfor tool_name in api.list_tools():\n\tvar info = api.get_tool(str(tool_name))\n\tvar handle = int(info.get(\"handle\", 0))\n\tif handle > 0 and api.unregister_tool(handle):\n\t\tremoved += 1\napi.set_enabled(false)\nreturn {\"ok\": true, \"removed\": removed, \"enabled\": api.is_enabled()}\n"
+        }
+      }
+    ],
+    "stages": [
+      {
+        "id": "register_and_call",
+        "steps": [
+          {
+            "id": "register_user_tool",
+            "tool": "code_execute",
+            "args": {
+              "source_code": "class Probe extends RefCounted:\n\tfunc invoke(args: Dictionary) -> Dictionary:\n\t\treturn {\"echo\": args.get(\"value\", \"\")}\n\nfunc _run():\n\tvar api = Engine.get_singleton(\"AutopilotTools\")\n\tif api == null:\n\t\treturn {\"error\": \"AutopilotTools singleton not registered\"}\n\tvar probe := Probe.new()\n\tvar definition := {\n\t\t\"name\": \"user_echo_probe\",\n\t\t\"description\": \"Echo probe registered by the L2 user_tools_code_mode test\",\n\t\t\"category\": \"User\",\n\t\t\"tags\": [\"user\", \"test\", \"echo\"],\n\t\t\"side_effect\": \"\",\n\t\t\"params\": [\n\t\t\t{\n\t\t\t\t\"name\": \"value\",\n\t\t\t\t\"type\": \"string\",\n\t\t\t\t\"description\": \"Value to echo back\",\n\t\t\t\t\"required\": true\n\t\t\t}\n\t\t]\n\t}\n\tvar handle = api.register_tool(definition, Callable(probe, \"invoke\"))\n\treturn {\"handle\": handle, \"has\": api.has_tool(\"user_echo_probe\")}\n"
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.handle", "not_empty": true },
+                { "key": "result.has", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "call_user_tool_via_mcp",
+            "tool": "call_tool",
+            "args": { "name": "user_echo_probe", "arguments": { "value": "hi" } },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.echo", "value": "hi" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "discoverability",
+        "steps": [
+          {
+            "id": "search_user_tool",
+            "tool": "search_tools",
+            "args": { "query": "user_echo_probe" },
+            "expect": {
+              "has_keys": ["results"],
+              "field_checks": [
+                { "key": "results", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "detail_user_tool_dynamic",
+            "tool": "get_tool_detail",
+            "args": { "name": "user_echo_probe" },
+            "expect": {
+              "has_keys": ["tool"],
+              "field_checks": [
+                { "key": "tool.name", "value": "user_echo_probe" },
+                { "key": "tool.category", "value": "User" },
+                { "key": "tool.dynamic", "value": true },
+                { "key": "tool.input_schema.properties.value.type", "value": "string" },
+                { "key": "tool.input_schema.required", "not_empty": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "code_mode_bridge",
+        "steps": [
+          {
+            "id": "call_tools_from_code_execute",
+            "tool": "code_execute",
+            "args": {
+              "source_code": "var api = Engine.get_singleton(\"AutopilotTools\")\nif api == null:\n\treturn {\"error\": \"AutopilotTools singleton not registered\"}\nvar a = api.call_tool(\"get_engine_version\", {})\nvar b = api.call_tool(\"user_echo_probe\", {\"value\": \"mode\"})\nreturn {\"a\": a, \"b\": b}\n"
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.a.result", "not_empty": true },
+                { "key": "result.b.result.echo", "value": "mode" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "unregister",
+        "steps": [
+          {
+            "id": "unregister_user_tool",
+            "tool": "code_execute",
+            "args": {
+              "source_code": "var api = Engine.get_singleton(\"AutopilotTools\")\nif api == null:\n\treturn {\"error\": \"AutopilotTools singleton not registered\"}\nvar info = api.get_tool(\"user_echo_probe\")\nvar handle = int(info.get(\"handle\", -1))\nvar removed = false\nif handle > 0:\n\tremoved = api.unregister_tool(handle)\nreturn {\"removed\": removed, \"has\": api.has_tool(\"user_echo_probe\")}\n"
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.removed", "value": true },
+                { "key": "result.has", "value": false }
+              ]
+            }
+          },
+          {
+            "id": "call_unregistered_tool",
+            "tool": "call_tool",
+            "args": { "name": "user_echo_probe", "arguments": { "value": "hi" } },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "domain tool 'user_echo_probe' not found — use search_tools to discover available tools" }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

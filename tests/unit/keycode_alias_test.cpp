@@ -1,10 +1,3 @@
-// keycode_alias_test.cpp — 键名 → 键码判定 (resolve_key_name_code) 的 L1 覆盖
-//
-// 判定实现在 src/tools/input_map_ops.cpp，被编辑器侧 add_input_map_action_event
-// 与游戏侧运行时 src/runtime/game_bridge_input.cpp:parse_keycode 共用（后者只
-// 做 JV → std::string 取值与 0..0xFFFFFF 区间复核）。本测试固定两侧的同一口径：
-// 裸名 (P/0/SPACE)、KEY_ 前缀全名 (KEY_P/KEY_0/KEY_SPACE，大小写不敏感) 与数字码
-// 字符串都解析到同一键码。函数不触碰任何 Godot 运行时状态，可纯单元测试。
 
 #include "tools/input_map_ops.hpp"
 
@@ -16,7 +9,6 @@
 namespace godot_autopilot {
 namespace input_map_ops {
 
-// 定义于 src/tools/input_map_ops.cpp（input_map_ops.hpp 只声明工具 handler）。
 int64_t resolve_key_name_code(const std::string &name);
 
 } // namespace input_map_ops
@@ -63,9 +55,9 @@ TEST(KeycodeAliasTest, SpecialKeysAcceptBothSpellings) {
   EXPECT_EQ(kKeyCodeEscape, resolve_key_name_code("KEY_ESCAPE"));
   EXPECT_EQ(kKeyCodeEnter, resolve_key_name_code("KEY_ENTER"));
   EXPECT_EQ(kKeyCodeEnter, resolve_key_name_code("key_enter"));
-  EXPECT_EQ(kKeyCodeEnter, resolve_key_name_code("RETURN")); // 引擎表裸别名
+  EXPECT_EQ(kKeyCodeEnter, resolve_key_name_code("RETURN"));
   EXPECT_EQ(kKeyCodeCtrl, resolve_key_name_code("KEY_CTRL"));
-  EXPECT_EQ(kKeyCodeCtrl, resolve_key_name_code("CONTROL")); // 引擎表裸别名
+  EXPECT_EQ(kKeyCodeCtrl, resolve_key_name_code("CONTROL"));
 }
 
 TEST(KeycodeAliasTest, NumericStringsKeepWorking) {
@@ -82,8 +74,8 @@ TEST(KeycodeAliasTest, UnknownNamesResolveToNone) {
   EXPECT_EQ(kKeyCodeNone, resolve_key_name_code("KEY_NOPE"));
   EXPECT_EQ(kKeyCodeNone, resolve_key_name_code("-"));
   EXPECT_EQ(kKeyCodeNone, resolve_key_name_code("0x50"));
-  EXPECT_EQ(kKeyCodeNone, resolve_key_name_code("99999999"));  // 超出 0xFFFFFF
-  EXPECT_EQ(kKeyCodeNone, resolve_key_name_code("123456789")); // 9 位数字
+  EXPECT_EQ(kKeyCodeNone, resolve_key_name_code("99999999"));
+  EXPECT_EQ(kKeyCodeNone, resolve_key_name_code("123456789"));
 }
 
 TEST(KeycodeAliasTest, EveryLetterAndDigitResolvesToItsAsciiValue) {

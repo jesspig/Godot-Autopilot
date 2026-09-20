@@ -14,6 +14,7 @@
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
+#include <godot_cpp/classes/editor_selection.hpp>
 #include <godot_cpp/classes/editor_undo_redo_manager.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/node2d.hpp>
@@ -114,13 +115,6 @@ void node_to_json(godot::Node *node, int remaining_depth,
   }
 }
 
-// F2: tells apart resource/object-typed property values from value-typed ones.
-// OBJECT-typed properties (sprite_frames, texture, script, shape, ...) must be
-// applied first: the engine drops dependent values that arrive while their
-// resource is still unset (AnimatedSprite2D::set_animation resets the animation
-// name to empty and pushes an error when frames is null). The reflected
-// property list of the freshly instantiated node is the authority; unknown
-// properties fall back to the shape of the incoming JSON value.
 bool property_value_is_object_typed(const godot::Node *node,
                                     const std::string &prop_name,
                                     const mcp::JsonValue &raw_value) {
@@ -258,9 +252,6 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
         editor ? editor->get_edited_scene_root() : nullptr;
     std::string node_rel_path = scene_relative_path(obj, scene_root_now);
 
-    // Applies one property through property_ops::handle_set and collects the
-    // applied name, its warning and any inline resource echo. Returns an empty
-    // object on success, an error object (same message as before) on failure.
     auto apply_property = [&](const std::string &prop_name,
                               const mcp::JsonValue &prop_value) {
       mcp::JsonValue prop_args(mcp::JsonValue::object_tag);
@@ -310,10 +301,6 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
       return mcp::JsonValue(mcp::JsonValue::object_tag);
     };
 
-    // Two passes over the same key order (mcp::JsonValue iterates its backing
-    // std::map, i.e. lexicographically): resource/object-typed values first,
-    // then every remaining value-typed one. A dependent value such as
-    // AnimatedSprite2D.animation therefore lands after its sprite_frames.
     std::vector<std::string> object_props;
     for (const auto &kv : *props_it) {
       if (property_value_is_object_typed(obj, kv.first, kv.second))
@@ -439,24 +426,30 @@ mcp::JsonValue handle_delete(const mcp::JsonValue &args) {
   if (undo_redo && parent) {
     undo_redo->create_action(godot::String(("Delete Node " + node_name).c_str()));
     undo_redo->add_do_method(parent, godot::StringName("remove_child"), node);
-    undo_redo->add_do_method(node, godot::StringName("queue_free"));
+    undo_redo->add_undo_method(parent, godot::StringName("add_child"), node);
     undo_redo->add_undo_method(parent, godot::StringName("move_child"), node,
                                child_index);
     undo_redo->add_undo_method(node, godot::StringName("set_owner"),
                                old_owner);
-    undo_redo->add_undo_method(parent, godot::StringName("add_child"), node);
+    undo_redo->add_undo_reference(node);
     undo_redo->commit_action();
   } else {
     node->queue_free();
+  }
+
+  if (editor) {
+    if (auto *sel = editor->get_selection()) {
+      sel->remove_node(node);
+    }
   }
 
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("deleted");
   r["undoable"] = mcp::JsonValue(undo_redo != nullptr && parent != nullptr);
   r["note"] = mcp::JsonValue(
-      "undo restores the node via add_child while the deferred queue_free has "
-      "not yet destroyed it (same frame); once the node is freed a later undo "
-      "cannot resurrect it");
+      "undo restores the node via add_child/move_child/set_owner (native "
+      "SceneTreeDock order); the node is kept alive by an undo reference, so "
+      "undo works across frames");
   mcp::JsonValue undo_info(mcp::JsonValue::object_tag);
   undo_info["name"] = mcp::JsonValue(node_name);
   undo_info["type"] = mcp::JsonValue(node_type);

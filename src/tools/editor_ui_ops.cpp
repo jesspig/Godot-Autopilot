@@ -198,8 +198,6 @@ void collect_walk(godot::Node *node, const CollectFilter &filter, int max_elemen
   }
 }
 
-// Approximation of Viewport::_gui_find_control_at_pos: reverse child order,
-// recursing into children before testing the control itself.
 godot::Control *find_hit_control(godot::Node *node, const godot::Vector2 &point) {
   const int child_count = node->get_child_count(true);
   for (int i = child_count - 1; i >= 0; --i) {

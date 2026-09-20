@@ -1,179 +1,82 @@
 # Godot-Autopilot
 
-> **An MCP Server for Godot Engine — AI-native engine control at the API level**
+[![许可证](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![构建状态](https://github.com/jesspig/Godot-Autopilot/actions/workflows/ci.yml/badge.svg)](https://github.com/jesspig/Godot-Autopilot/actions)
+![Godot版本](https://img.shields.io/badge/Godot-4.7%2B-478CBF?logo=godotengine&logoColor=white)
+![支持平台](https://img.shields.io/badge/platform-Windows%7CLinux%7CmacOS-lightgrey)
+[![协议](https://img.shields.io/badge/MCP-Streamable_HTTP-blueviolet)](https://modelcontextprotocol.io/)
+![工具数](https://img.shields.io/badge/tools-385%2B-brightgreen)
 
-[中文版说明](README_zh.md)
+> **让 AI 代理在编辑器里帮你搭场景、试玩和排错。**
 
-Godot-Autopilot is an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that bridges AI agents with the Godot game engine at the **native engine API level**. Unlike conventional tools that operate from a user-UI perspective (simulating clicks or editor operations), this project gives AI agents direct, programmatic access to Godot's entire engine surface — scene tree manipulation, physics servers, rendering servers, audio, navigation, input simulation, script execution, and more.
+[English Version](README.en.md)
 
-This is an **in-process GDExtension plugin** that loads directly into the Godot editor. No standalone bridge process needed — the MCP server starts when your project opens, and stops when it closes.
+Godot-Autopilot 是一个住在 **Godot 编辑器内部**的插件型 [MCP](https://modelcontextprotocol.io/) 服务端。装好之后，你的 AI 编程助手（Claude Code、Cursor、Codex、OpenCode 等）就能像你一样操作项目：搭场景、调属性、运行游戏、点按钮、截图、看日志——然后根据看到的结果继续迭代。
 
-## Architecture
+不需要桥接进程，也不用把报错复制粘贴到聊天框。打开项目时服务端自动启动，关闭项目时自动停止。
 
-```
-MCP Host (Claude Desktop, Cursor, etc.)
-  │ POST http://127.0.0.1:9527/mcp
-  ▼
-Godot Editor
-  └── Godot-Autopilot (GDExtension)
-      ├── mcp-cpp-sdk: HTTP server (internal threads)
-      ├── mcp-cpp-sdk: McpServer + Streamable HTTP
-      ├── Command Queue (HTTP thread → Godot main thread bridge)
-      ├── ~385 MCP Tools across 27 categories (count varies by plugin version; see MCP search_tools)
-      ├── Inline Documentation (offline engine docs)
-      └── Custom Log Dock (dedicated plugin output panel)
-```
+## 端到端演示
 
-### Key Design Decisions
+端到端测试中 AI 实时控制游戏角色：
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| **Transport** | Streamable HTTP (POST /mcp) | Standard MCP protocol, no bridge process |
-| **Thread Model** | Command queue + frame sync | Safe Godot main-thread-only API access |
-| **Port** | 9527 | Configurable via `GODOT_AUTOPILOT_PORT` env var |
-| **Discovery** | 3-Tier Progressive (Catalog→Inspect→Execute) | Keeps context small with ~385 tools (count varies by plugin version) |
-| **Search** | BM25 keyword | Tools organized by namespace + descriptions |
-| **Build** | CMake 3.28+ / C++17 | Cross-platform, auto-optimized builds |
+![Demo 001](assets/demo-001.gif)
 
-## Features
+## 能做什么
 
-### 🎮 Full Engine Control (~385 Tools, count varies by plugin version; see MCP search_tools)
+**385+ 个工具**，覆盖从编辑器到游戏的完整闭环（数量随版本增长，以代理通过 `search_tools` 查到的为准）。举例：
 
-| Category | Tools | Description |
-|----------|:-----:|-------------|
-| **Render** | 49 | Canvas items, cameras, lights, meshes, viewports, materials |
-| **Physics** | 47 | 2D/3D ray casts, body creation, force application, joints |
-| **Resources** | 26 | Load, save, create, copy, reload and list resources |
-| **Display** | 25 | Window, viewport and screen properties |
-| **Editor** | 31 | Selection, undo/redo, scene save, plugin management |
-| **Audio** | 20 | Bus management, stream playback, effects |
-| **Input** | 23 | Key/mouse/gamepad simulation, action queries (includes InputMap) |
-| **OS** | 18 | Operating system, environment and clipboard access |
-| **Debug** | 16 | Performance monitors, profiling, diagnostics |
-| **Navigation** | 15 | Nav mesh, path queries, agents |
-| **Scene** | 15 | Node creation, deletion, scene tree inspection (e.g. `create_scene_node`) |
-| **Config** | 13 | Project settings, engine properties |
-| **Text** | 10 | String manipulation, parsing and formatting |
-| **Animation** | 10 | Animation players, tracks, mixers and playback |
-| **Scripts** | 10 | Execute GDScript and C#, call methods on any node |
-| **Game** | 12 | Game loop control and engine-wide state |
-| **Theme** | 8 | Theme resources, style boxes and font variations |
-| **TileMap** | 8 | Tile map creation, cell manipulation and queries |
-| **Debugger** | 6 | Debugger session control and inspection |
-| **Properties** | 5 | Get/set properties, list properties, signal connect (e.g. `property_set`) |
-| **Docs** | 4 | Query offline Godot API docs |
-| **Group** | 3 | Node group management and membership queries |
-| **SpriteFrames** | 3 | Sprite frame set creation and animation management |
-| **Analysis** | 3 | Scene file validation and project analysis helpers |
-| **Testing** | 2 | In-editor script test helpers |
-| **System** | 1 | Plugin-level system information |
-| **Capture** | 2 | Editor viewport screenshot + visual scene review (`annotate_nodes`, `diff_image`, `review_scene_visually`) |
+- **搭场景**——创建、改名、移动、删除节点，读写属性，连接信号（如 `create_scene_node`、`property_set`、`signal_connect`、`scene_tree_items`）。
+- **画面与声音**——网格材质、灯光环境、音频播放、动画、UI 主题、瓦片地图（如 `create_animation`、`play_audio_player`、`fill_tilemap_rect`）。
+- **物理与导航**——射线/形状检测、刚体、导航地图与寻路（如 `intersect_physics_3d_ray`、`create_nav_3d_map`、`get_nav_3d_map_path`）。
+- **动手：输入与 UI 自动化**——模拟键盘鼠标手柄，按名称点击编辑器控件，执行编辑器快捷键，点击运行中游戏的按钮（如 `click_input_mouse`、`get_editor_ui_elements`、`click_editor_element`、`run_editor_shortcut`、`click_game_ui_element`）。
+- **脚本与排错**——在编辑器或游戏中执行 GDScript，把耗时游戏脚本作为后台任务运行，读取插件/游戏/脚本错误日志（如 `execute_script`、`execute_game_script`、`start_game_job`、`get_plugin_log`）。
+- **项目与知识**——读写搜索项目文件，查看项目设置，离线查询引擎内置 API 文档（如 `read_file`、`find_in_files`、`get_project_settings`、`get_docs_class`）。
+- **试玩与视觉验证**——运行当前场景，注入定时输入序列，给编辑器和游戏截图并对比前后差异（如 `play_editor_current_scene`、`queue_game_input`、`capture_editor_viewport`、`capture_game_viewport`、`review_scene_visually`）。
 
-### 📖 Inline API Documentation
+## 代理的使用方式
 
-Query Godot's built-in offline documentation directly through MCP tools. No web searches needed — every class, method, property, and signal is documented from the engine's own `DocTools` cache:
+你不需要记住工具名。代理按这个循环工作：
 
-- `get_docs_class` — Full class docs (description, methods, properties, signals)
-- `find_docs_class` — Search classes by name or keyword
-- `get_docs_method` — Method signature and description
-- `get_docs_property` — Property type and description
+1. **发现**——用 `search_tools` 找候选，用 `get_tool_detail` 确认参数（不要猜名字）。
+2. **执行**——单步用 `call_tool`，批量用 `batch_execute`。
+3. **验证**——截图看结果，与上次截图对比，有问题就修，再确认。
 
-### 📸 Visual Scene Verification
+为了让代理开箱即用，插件内置 **8 册技能书**（总纲 + 场景、资源、脚本、运行时、服务器、内容、C# 分册）与 **7 篇新手指南**（3D 场景、角色控制器、物理排错、输入映射、GUI 等）。在 **MCP Config** 面板点一下，就能把技能渲染到项目的 `.agents/skills/` 目录。
 
-Screenshot tools double as a vision loop for AI agents: `capture_editor_viewport` / `capture_game_viewport` support `region` cropping, `max_dimension` downscaling, `scale` upscaling, numbered-box `annotate` overlays for UI controls, `annotate_nodes` / `annotate_nodes_max` blue-box overlays for specific scene nodes, and `diff_against_last` / `diff_image` change comparison against the previous capture. `review_scene_visually` bundles editor capture + game capture + node rect table + viewport geometry mapping into a single read-only call — screenshot, verify coordinates, act, then re-capture to confirm.
+插件自带两个编辑器面板：
 
-### 📋 MCP Resources
+- **MCP Config**——服务器状态与端口、一键生成客户端配置、高风险能力开关、技能生成。
+- **Log**——仅显示插件日志，支持级别/分类过滤与搜索，方便定位失败调用。
 
-The server exposes engine state as readable MCP Resources:
+## 快速开始
 
-```
-godot://engine/version              — Engine version info
-godot://scene/tree                  — Current scene node tree (JSON)
-godot://scene/{path}                — Node properties by path
-godot://filesystem/tree             — Project file system structure
-godot://filesystem/{path}           — File/directory content
-godot://editor/selection            — Current selection
-godot://editor/settings/{key}       — Editor settings
-godot://log/recent                  — Recent plugin log entries
-```
+需要 **Godot 4.7+**。
 
-### 📝 Dedicated Log Panel
+1. **获取插件**——从项目 GitHub Releases 页（[jesspig/Godot-Autopilot](https://github.com/jesspig/Godot-Autopilot)）下载 `godot-autopilot-<version>.zip`，把其中的 `godot-autopilot/` 文件夹复制到你项目的 `addons/` 目录：
+   ```
+   your-project/
+   └── addons/
+       └── godot-autopilot/
+           ├── godot-autopilot.dll      (Windows)
+           ├── libgodot-autopilot.so    (Linux)
+           ├── libgodot-autopilot.dylib (macOS)
+           └── godot-autopilot.gdextension
+   ```
+2. **打开项目**——服务端自动启动，监听插件配置的端口（默认 `http://127.0.0.1:9527/mcp`），无需启用开关。
+3. **连接 AI 客户端**——在编辑器的 **MCP Config** 面板选客户端并点击 **Generate**。支持 20 个客户端，包括 Claude Code、Codex、Cursor、OpenCode、Copilot 等；客户端如有提示请批准生成的配置文件。
+4. **解锁高级能力（可选）**——脚本执行（`code_execute`）与游戏控制（`game_runtime`）默认关闭，需要时在面板勾选。
+5. **提需求**——比如“创建一个能跑能跳的玩家角色，试玩一下并修掉看着不对的地方”。
 
-A custom `EditorDock` bottom panel displays plugin-only logs (system, tools, transport, resources, prompts) with:
+想从源码构建或参与贡献？见 [docs/wiki/](docs/wiki/)（入口 [index.md](docs/wiki/index.md)，构建见 [build.md](docs/wiki/build.md)）与 [tests/README.md](tests/README.md)。
 
-- Level filtering (Debug / Info / Warning / Error)
-- Category filtering
-- Text search
-- Collapse duplicate messages
-- Theme-consistent styling (matches Godot editor theme)
+## 安全说明
 
-## Getting Started
+服务端只监听本机回环地址（端口取自插件配置，默认 9527，路径固定 `/mcp`），非本机地址拒绝启动。脚本执行、游戏控制、操作系统进程类工具**默认全部拒绝**——只在你信任的本地项目中开启。详见 [docs/wiki/security_contract.md](docs/wiki/security_contract.md)。
 
-### Prerequisites
+## 素材声明
 
-- CMake 3.28+
-- C++17 compiler (Clang recommended, MSVC/GCC supported)
-- Godot 4.3+ with GDExtension support
+`Example/` 测试项目使用了 [Pixel Adventure 1](https://pixelfrog-assets.itch.io/pixel-adventure-1) 的像素艺术素材，版权归 Pixel Frog 所有。
 
-### Build
-
-```bash
-git clone https://github.com/jesspig/Godot-Autopilot.git
-cd Godot-Autopilot
-
-# Recommended: build + deploy to Example/addons/ in one step
-uv run build.py             # Debug
-uv run build.py --release   # Release (cleans first)
-
-# Or manual CMake (presets: debug, release, both Ninja)
-cmake --preset release && cmake --build --preset release
-```
-
-The built `.dll` / `.so` / `.dylib` will be in `build/release/`. `build.py` also generates the `.gdextension` file and copies artifacts to `Example/addons/godot-autopilot/`.
-
-### Install
-
-Copy to your Godot project:
-
-```
-your-project/
-└── addons/
-    └── godot-autopilot/
-        ├── godot-autopilot.dll      (or .so / .dylib)
-        └── godot-autopilot.gdextension
-```
-
-### Configure MCP Host
-
-```json
-{
-  "mcpServers": {
-    "godot-engine": {
-      "type": "streamable-http",
-      "url": "http://127.0.0.1:9527/mcp"
-    }
-  }
-}
-```
-
-Open your Godot project — the server starts automatically. The port displays in the editor status bar.
-
-## Technology Stack
-
-| Layer | Technology |
-|-------|-----------|
-| **Engine** | Godot 4.x (GDExtension) |
-| **Bindings** | godot-cpp (FetchContent) |
-| **MCP Protocol** | [modelcontextprotocol-cpp-sdk](https://github.com/jesspig/modelcontextprotocol-cpp-sdk) |
-| **HTTP / Async** | mcp-cpp-sdk (internal, self-hosted) |
-| **JSON** | mcp::JsonValue (SDK built-in) |
-| **Build** | CMake 3.28+ / C++17 |
-| **Optimization** | Clang-first, ThinLTO, Ninja, sccache, Unity Build |
-
-## Asset Attribution
-
-The `Example/` test project uses pixel art assets from [Pixel Adventure 1](https://pixelfrog-assets.itch.io/pixel-adventure-1) by Pixel Frog.
-
-## License
+## 许可证
 
 MIT

@@ -1,7 +1,5 @@
 
-//
 
-//
 
 #include <gtest/gtest.h>
 
@@ -22,8 +20,6 @@
 
 namespace {
 
-// 协议面常量：meta 工具集合（7 个）由服务端直接注册，独立于领域工具注册管线，
-// 不随插件工具数量变化，故保留精确值。
 constexpr size_t kMetaToolCount = 7;
 
 const char *const kMetaToolNames[kMetaToolCount] = {
@@ -143,6 +139,9 @@ TEST_F(RegisteredServerFixture, SchemaStatisticsBaseline) {
       ++empty;
     }
   }
+  EXPECT_EQ(tools.size(), 399);
+  EXPECT_EQ(non_empty, 336);
+  EXPECT_EQ(empty, 63);
   EXPECT_EQ(non_empty + empty, tools.size());
   EXPECT_GT(non_empty, empty);
   EXPECT_GT(empty, 0);

@@ -122,6 +122,11 @@ node and the new parent are both `Node2D` or both `Node3D`; other type
 combinations ignore it. If the previous owner was the scene root, the node
 stays owned by the current scene root so it is still saved with the scene.
 
+Never emulate a move with hand-written remove/add (for example
+remove_child plus add_child inside `code_execute`): the manual path
+records no editor undo step and skips the sibling-index and owner fix-up
+above, so always call `reparent_node`.
+
 ## Instantiating packed scenes
 
 `instantiate_scene` instantiates a PackedScene from `path` (a `.tscn` file)

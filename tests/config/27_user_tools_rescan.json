@@ -1,0 +1,109 @@
+{
+  "name": "user_tools_rescan",
+  "description": "AutopilotTools 目录扫描 rescan 端到端（headless，自包含）：① code_execute 经 FileAccess 在 res://gda_tmp_user_tools/ 写出 probe_tool.gd（工具名 user_rescan_probe，遵循 register_autopilot_tools(api) 实例方法约定，invoke 原样回显 value）→ ② code_execute 调 api.rescan('res://gda_tmp_user_tools')，断言 result.registered 非空 → ③ MCP call_tool 调 user_rescan_probe{value:'hi'}，断言 result.echo=='hi' → ④ 再次 rescan 验证幂等语义：同名工具注册被拒绝、无新增名字，断言 result.registered 为空数组且 result.failed 存在（failed 为整型标量，按 runner not_empty 语义恒非空，此处仅作存在性占位）→ ⑤ code_execute 清理：按 handle unregister 残留 + DirAccess.remove_absolute 删 probe 文件与夹具目录。前置条件：脚本步骤均经 code_execute，需要 code_execute capability（GODOT_AUTOPILOT_ALLOW env 或 user://godot_autopilot/config.json 的 allow 字段，env 优先）；rescan 的扫描与注册额外受 user_tools capability 门保护，before_all 调 AutopilotTools.set_enabled(true) 写配置自包含——env 优先意味着若 GODOT_AUTOPILOT_ALLOW 已设置且不含 user_tools（也无 all），set_enabled 无效，用例在步骤 1 失败（此时需在 env 中补 user_tools 或取消该 env）。runner 的 before_all/after_all 不支持 expect：before_all 脚本自检 Engine.get_singleton 与 is_enabled，失败经步骤 1 断言暴露；after_all 兜底 unregister 全部动态工具并 set_enabled(false) 反向写回配置（用户原有的 user_tools 允许状态会被关闭）。全部 headless，夹具目录 res://gda_tmp_user_tools/ 由步骤 ⑤ 与 after_all 双重回收，无项目内文件/场景残留（仅 user://godot_autopilot/config.json 的 allow 字段被写入后再移除 user_tools）。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "before_all": [
+      {
+        "id": "enable_user_tools",
+        "tool": "code_execute",
+        "args": {
+          "source_code": "var api = Engine.get_singleton(\"AutopilotTools\")\nif api == null:\n\treturn {\"error\": \"AutopilotTools singleton not registered\"}\napi.set_enabled(true)\nif not api.is_enabled():\n\treturn {\"error\": \"user_tools capability still disabled: GODOT_AUTOPILOT_ALLOW (if set) wins over the config file and may not include user_tools\"}\nreturn {\"ok\": true}\n"
+        }
+      }
+    ],
+    "after_all": [
+      {
+        "id": "cleanup_user_tools",
+        "tool": "code_execute",
+        "args": {
+          "source_code": "var api = Engine.get_singleton(\"AutopilotTools\")\nif api == null:\n\treturn {\"ok\": false, \"note\": \"AutopilotTools singleton not registered\"}\nvar removed = 0\nfor tool_name in api.list_tools():\n\tvar info = api.get_tool(str(tool_name))\n\tvar handle = int(info.get(\"handle\", 0))\n\tif handle > 0 and api.unregister_tool(handle):\n\t\tremoved += 1\napi.set_enabled(false)\nreturn {\"ok\": true, \"removed\": removed, \"enabled\": api.is_enabled()}\n"
+        }
+      }
+    ],
+    "stages": [
+      {
+        "id": "fixture",
+        "steps": [
+          {
+            "id": "rescan_write_probe_file",
+            "tool": "code_execute",
+            "args": {
+              "source_code": "func _run():\n\tvar dir_path = 'res://gda_tmp_user_tools'\n\tvar mk_err = DirAccess.make_dir_recursive_absolute(dir_path)\n\tif mk_err != OK:\n\t\treturn {'error': 'make_dir failed', 'code': mk_err}\n\tvar lines = [\n\t\t'extends RefCounted',\n\t\t'',\n\t\t'func register_autopilot_tools(api):',\n\t\t'\\tvar definition = {',\n\t\t'\\t\\t\\'name\\': \\'user_rescan_probe\\',',\n\t\t'\\t\\t\\'description\\': \\'Probe tool registered by the L2 user_tools_rescan test\\',',\n\t\t'\\t\\t\\'category\\': \\'User\\',',\n\t\t'\\t\\t\\'tags\\': [\\'user\\', \\'test\\', \\'rescan\\'],',\n\t\t'\\t\\t\\'side_effect\\': \\'\\',',\n\t\t'\\t\\t\\'params\\': [',\n\t\t'\\t\\t\\t{\\'name\\': \\'value\\', \\'type\\': \\'string\\', \\'description\\': \\'Value to echo back\\', \\'required\\': true}',\n\t\t'\\t\\t]',\n\t\t'\\t}',\n\t\t'\\treturn api.register_tool(definition, Callable(self, \\'invoke\\'))',\n\t\t'',\n\t\t'func invoke(args):',\n\t\t'\\treturn {\\'echo\\': args.get(\\'value\\', \\'\\')}',\n\t]\n\tvar source = '\\n'.join(lines) + '\\n'\n\tvar f = FileAccess.open('res://gda_tmp_user_tools/probe_tool.gd', FileAccess.WRITE)\n\tif f == null:\n\t\treturn {'error': 'failed to open probe file for writing'}\n\tf.store_string(source)\n\tf.close()\n\treturn {'ok': true, 'path': 'res://gda_tmp_user_tools/probe_tool.gd'}\n"
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.ok", "value": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "rescan_and_call",
+        "steps": [
+          {
+            "id": "rescan_first_scan",
+            "tool": "code_execute",
+            "args": {
+              "source_code": "func _run():\n\tvar api = Engine.get_singleton('AutopilotTools')\n\tif api == null:\n\t\treturn {'error': 'AutopilotTools singleton not registered'}\n\treturn api.rescan('res://gda_tmp_user_tools')\n"
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.registered", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "rescan_call_probed_tool",
+            "tool": "call_tool",
+            "args": { "name": "user_rescan_probe", "arguments": { "value": "hi" } },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.echo", "value": "hi" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "idempotent_rescan",
+        "steps": [
+          {
+            "id": "rescan_second_scan_idempotent",
+            "tool": "code_execute",
+            "args": {
+              "source_code": "func _run():\n\tvar api = Engine.get_singleton('AutopilotTools')\n\tif api == null:\n\t\treturn {'error': 'AutopilotTools singleton not registered'}\n\treturn api.rescan('res://gda_tmp_user_tools')\n"
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.registered", "value": [] },
+                { "key": "result.failed", "not_empty": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "cleanup",
+        "steps": [
+          {
+            "id": "rescan_cleanup_fixture",
+            "tool": "code_execute",
+            "args": {
+              "source_code": "func _run():\n\tvar api = Engine.get_singleton('AutopilotTools')\n\tvar removed = false\n\tif api != null:\n\t\tvar info = api.get_tool('user_rescan_probe')\n\t\tvar handle = int(info.get('handle', -1))\n\t\tif handle > 0:\n\t\t\tremoved = api.unregister_tool(handle)\n\tvar file_err = DirAccess.remove_absolute('res://gda_tmp_user_tools/probe_tool.gd')\n\tvar dir_err = DirAccess.remove_absolute('res://gda_tmp_user_tools')\n\treturn {'removed': removed, 'file_err': file_err, 'dir_err': dir_err}\n"
+            },
+            "expect": {
+              "has_keys": ["result"]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

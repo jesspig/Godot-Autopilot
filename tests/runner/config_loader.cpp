@@ -1,15 +1,3 @@
-// config_loader.cpp — JSON 用例文件加载与 schema 校验
-// 解析规则冻结版（tests/README.md 同步文档化）：
-//   1. 顶层必填 name(string)、pipeline(object)；description/headless 可选，headless 默认 true
-//   2. pipeline.on_failure 可选默认 "fail_fast"，仅接受 "fail_fast"|"continue"
-//   3. before_all/after_all 为 steps 数组（可缺省），元素 tool 必填 + args 可选 + id 可选
-//   4. stages 为数组（可缺省），每项 id 可选 + steps 必填，平铺进 TestCase.steps 保留顺序
-//   5. 步骤 tool 与 traverse 二选一；traverse 步骤 kind 必填 "domain_tools"，
-//      mode 缺省 "empty_args"，仅接受 "empty_args"|"heuristic_smoke"
-//   6. expect.has_keys 为 string 数组；field_checks 每项 key 必填，value 可选任意 JSON，not_empty 可选 bool
-//   7. args 的值任意 JSON，嵌套原样保留
-//   8. 数值字段类型严格校验，错误消息含字段路径
-
 #include "config_loader.hpp"
 
 #include <fstream>
@@ -145,7 +133,6 @@ Step ParseTraverseStep(const mcp::JsonValue& v, const std::string& path, size_t 
     return step;
 }
 
-// stages 内步骤：tool 与 traverse 二选一
 Step ParseStageStep(const mcp::JsonValue& v, const std::string& path, size_t index) {
     if (!v.IsObject()) Fail(path, "必须是 object");
     const bool has_tool = v.Contains("tool");
@@ -157,7 +144,6 @@ Step ParseStageStep(const mcp::JsonValue& v, const std::string& path, size_t ind
     return ParseTraverseStep(v, path, index);
 }
 
-// before_all/after_all 内步骤：仅 tool + args + id，不允许 traverse/expect
 Step ParsePlainStep(const mcp::JsonValue& v, const std::string& path) {
     if (!v.IsObject()) Fail(path, "必须是 object");
     if (v.Contains("traverse")) Fail(path + ".traverse", "before_all/after_all 步骤不支持 traverse");

@@ -5,13 +5,13 @@ description: Example 文档/示例工程定位、project.godot 事实、docs 文
 tags:
   - 示例工程
   - Example
-timestamp: "2026-09-13T21:50:35+08:00"
+timestamp: "2026-09-18T16:35:00+08:00"
 resource: Example/
 ---
 
 # 示例工程（Example/）
 
-> 审计日期：2026-09-13（2026-08-12 初稿；08-17 补 YAML frontmatter 并核对 project.godot；08-22 15 时全量一致性审计——`[audio]` 段与 `default_bus_layout.tres` 已随清理消失，改注为"L2 运行后可能追加"；08-29 随 0.2.2 版本与全量审计同步；09-13 随文档集重构同步——旧 6 篇结构（game-overview/gameplay-spec/architecture/level-spec/asset-catalog）迁移为 pitch/gdd/art/tech/test 共 11 篇，重核 project.godot 的 `[input]` 残留与 L2 临时目录；09-13 晚随跨组一致性修复更新——`gda_tmp_rename/` 与 `~godot-autopilot_0.pdb` 测试残留已清理，改注为"运行 L2/编辑器热重载可能生成、可安全清理"；09-13 晚随 0.2.4 版知识库全量审计同步——素材条目归属修正（`asset-catalog.md` 实为"未把'文件存在'当作'功能已实现'"，补充当前工程无 .tscn/.tres 的事实），其余条目复核一致），基于当前工作树 `Example/` 目录与文档核对。
+> 审计日期：2026-09-18（2026-08-12 初稿；08-17 补 YAML frontmatter 并核对 project.godot；08-22 15 时全量一致性审计——`[audio]` 段与 `default_bus_layout.tres` 已随清理消失，改注为"L2 运行后可能追加"；08-29 随 0.2.2 版本与全量审计同步；09-13 随文档集重构同步——旧 6 篇结构（game-overview/gameplay-spec/architecture/level-spec/asset-catalog）迁移为 pitch/gdd/art/tech/test 共 11 篇，重核 project.godot 的 `[input]` 残留与 L2 临时目录；09-13 晚随跨组一致性修复更新——`gda_tmp_rename/` 与 `~godot-autopilot_0.pdb` 测试残留已清理，改注为"运行 L2/编辑器热重载可能生成、可安全清理"；09-13 晚随 0.2.4 版知识库全量审计同步——素材条目归属修正（`asset-catalog.md` 实为"未把'文件存在'当作'功能已实现'"，补充当前工程无 .tscn/.tres 的事实），其余条目复核一致），基于当前工作树 `Example/` 目录与文档核对；09-18 随知识库一致性审计同步——根 README 前提已为“Godot 4.7+”（`README.md:5,53` / `README.en.md:5,53`），与 `project.godot` 的 4.7 三方一致，原“4.3+ 宽松下界”表述消除。
 > 事实来源：`Example/project.godot`、`Example/docs/`（11 篇）、`Example/assets/` 目录枚举、`Example/.gitignore`。
 
 ## 定位
@@ -71,7 +71,7 @@ resource: Example/
 ## 与根文档/代码的一致性
 
 - 端口 9527、`uv run build.py` 部署到 `Example/addons/godot-autopilot/`、`GODOT_AUTOPILOT_PORT` 覆盖：与根 README、AGENTS.md、`server_context.cpp` 一致 ✓
-- `project.godot` 的 "4.7" 与 AGENTS.md"目标引擎 Godot 4.7" 一致；根 README 前提 "Godot 4.3+" 为宽松下界（两者不冲突，但口径不一）
+- `project.godot` 的 "4.7"、AGENTS.md"目标引擎 Godot 4.7"、根 README 前提"Godot 4.7+"（`README.md:5,53` / `README.en.md:5,53`）三方一致 ✓
 - 旧文档（architecture.md / game-overview.md / gameplay-spec.md / level-spec.md）已删除，本文旧链接同步移除；新文档互链以 `Example/docs/README.md` 文档地图为准 ✓
 - 运行 L2/编辑器热重载可能生成临时产物（如 `gda_tmp_rename/*.tres`、`addons/.../~*.pdb`），可安全清理，非游戏内容；当前工作树另有 `project.godot` 的 `[input] test` 动作残留（测试产物，不影响 `Example/docs/README.md` 的"不包含任何游戏代码、场景或存档"论断）
 

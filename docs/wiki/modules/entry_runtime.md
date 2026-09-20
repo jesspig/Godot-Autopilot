@@ -6,7 +6,7 @@ tags:
   - 模块
   - 入口
   - 运行时桥接
-timestamp: "2026-09-16T17:06:25+08:00"
+timestamp: "2026-09-20T17:20:00+08:00"
 resource:
   - src/main.cpp
   - src/runtime/
@@ -14,7 +14,9 @@ resource:
 
 # 模块：入口与运行时桥接（entry_runtime）
 
-覆盖代码：`src/main.cpp`（326 行）与 `src/runtime/`（`gda_protocol.hpp` 53 行、`game_bridge.hpp` 79 行、`game_bridge.cpp`（09-16 增窗口坐标换算约 30 行）、`game_bridge_input.cpp`（09-16 删本地键名表约 60 行、改调共用判定）、`game_bridge_eval.cpp` 509 行）。
+> 09-18 E2E 优化批次增补（详见 `changelog/2026-09-18-log.md` 19:30 节）：`call_method` native 失败路径附加 `diagnosis` + `hint`（`game_bridge_eval.cpp:534 eval_bind_suspected_cause` / `:553 make_native_bind_diagnosis`，成功路径零改动）；新增 `gda_protocol.hpp` 4 个 op（`eval_assert`/`sample`/`collect_evidence`/`validate_ui_layout`）与 `game_bridge_verify.cpp`（采样 awaiter + 校验类注册）。
+
+覆盖代码：`src/main.cpp`（358 行）与 `src/runtime/`（`gda_protocol.hpp` 57 行、`game_bridge.hpp` 99 行、`game_bridge.cpp`（09-16 增窗口坐标换算约 30 行）、`game_bridge_input.cpp`（09-16 删本地键名表约 60 行、改调共用判定）、`game_bridge_eval.cpp` 851 行）。
 
 职责全景：`main.cpp` 是 GDExtension 的导出入口与编辑器插件本体；`src/runtime/` 是在**游戏运行时进程**内与编辑器进程通信的桥接层，通过 EngineDebugger 消息通道承载 GDA 协议。编辑器内的 MCP 服务器（`ServerContext`）与运行时桥接是两条相互独立的消息通路，本页只覆盖入口生命周期与运行时桥接，MCP 工具侧见相关模块页。
 
@@ -25,7 +27,7 @@ resource:
 - 以 `extern "C"` 导出，签名 `GDExtensionEntryPoint(GDExtensionInterfaceGetProcAddress, GDExtensionClassLibraryPtr, GDExtensionInitialization*)`。
 - 修饰宏 `GDA_EXPORT`：Windows（`_WIN32`）为 `__declspec(dllexport)`，其余平台为空。
 - 函数体：构造 `godot::GDExtensionBinding::InitObject`，注册 initializer 与 terminator 回调，最后返回 `init.init()`。
-- 两个回调内部均包 try/catch，异常只记录日志不中断；`_enter_tree` 内另有四组步骤级 try/catch（log dock / output logger / debugger plugin / config dock），catch 分支统一委托 `log_setup_failure` 助手（`main.cpp:30-42`，`std::exception` 与兜底两个重载）写 System 错误日志。
+- 两个回调内部均包 try/catch，异常只记录日志不中断；`_enter_tree` 内另有四组步骤级 try/catch（log dock / output logger / debugger plugin / config dock），catch 分支统一委托 `log_setup_failure` 助手（`main.cpp:31-43`，`std::exception` 与兜底两个重载）写 System 错误日志。
 
 ### 1.2 模块初始化（register_initializer）
 
@@ -63,7 +65,7 @@ resource:
 
 `_get_unsaved_status()`：`scene_dirty_tracker::is_current_scene_dirty()` 为真时返回场景名，否则返回空串。
 
-### 1.5 cmdline 模式检测（gda_cmdline_mode，main.cpp:46）
+### 1.5 cmdline 模式检测（gda_cmdline_mode，main.cpp:47）
 
 实际函数名是 `gda_cmdline_mode()`（**不存在** `gsd_cmdline_mode`）。语义：
 
@@ -130,7 +132,7 @@ resource:
 | `GDA_AUTO_CONTINUE_ENV` | `GDA_AUTO_CONTINUE` | `src/tools/runtime_ops.cpp`（自动继续次数环境变量） |
 | `GDA_AUTO_CONTINUE_MAX` | `3` | `src/tools/runtime_ops.cpp`（默认上限） |
 
-`create_editor_scene` 的等待循环以 `timeout_ms` 为上限（默认取 `GDA_NEW_SCENE_SWITCH_WAIT_MS`；非整数或越界直接报错，超时按 `GDA_NEW_SCENE_POLL_MS` 累计等待），失败时返回 `waited_ms`/`timeout_ms`/`node_released`/`editor_state` 诊断并释放未被编辑器接管的临时根节点；实现细节见 [tools_ops_a.md](tools_ops_a.md) 的 editor_ops 小节。
+`create_editor_scene` 的等待循环以 `timeout_ms` 为上限（默认取 `GDA_NEW_SCENE_SWITCH_WAIT_MS`；非整数或越界直接报错，超时按 `GDA_NEW_SCENE_POLL_MS` 累计等待），失败时返回 `waited_ms`/`timeout_ms`/`node_released`/`editor_state` 诊断并释放未被编辑器接管的临时根节点；多签占用另在 add 前秒级拦截（09-17 起：`close_current` 关后编辑根仍非空即报邻签占用，不进入等待循环，见 [A 组](tools_ops_a.md)的 editor_ops 小节）；实现细节见 [tools_ops_a.md](tools_ops_a.md) 的 editor_ops 小节。
 
 桥接相关常量在 `src/core/config.hpp`：`GDA_HEALTHY_ACTIVITY_THRESHOLD_MS=3000`、`GDA_ERROR_BUFFER_MAX=200`、`GDA_OUTPUT_BUFFER_MAX=500`、`GDA_EVAL_TRUNCATE_BYTES=8192`；09-16 起新增 game 工具超时预算常量：`GDA_MAX_GAME_OP_TIMEOUT_MS=25000`（host 等待 +2000ms 宽限 < 30000 传输硬上限）、`GDA_LATE_RESULT_BUFFER_MAX=5`（超时后迟到结果保留条数）、`GDA_LATE_RESULT_SUMMARY_CHARS=200`（每条摘要截断），语义见 [modules/tools_ops_b.md](tools_ops_b.md) 的 runtime_ops 小节。
 
@@ -151,7 +153,7 @@ resource:
 ### 3.2 game_bridge_input.cpp — 输入模拟
 
 - 取消机制实现在此文件：`g_cancel_handlers`（request_id → handler 映射）、`register_cancel_handler` / `unregister_cancel_handler`。
-- 注入方式：构造 `InputEventKey` / `InputEventMouseButton` / `InputEventAction` 经 `Input::parse_input_event` 注入并 `flush_buffered_events()`；`mode="api"` 时改走 `Input::action_press/action_release`；`mode="hold"` 时 `keep_pressed` 每帧重发 press 直到释放。
+- 注入方式：构造 `InputEventKey` / `InputEventMouseButton` / `InputEventAction` 经 `Input::parse_input_event` 注入并 `flush_buffered_events()`；`mode="api"` 时改走 `Input::action_press/action_release`；`mode="hold"` 时 `keep_pressed` 每帧重发 press 直到释放。释放恒立即 flush（09-17 起）：`DelayedRelease` 到期释放与 `inject_step` 的动作释放统一传 `flush=true`（此前按 mode/pressed 条件 flush），抬起事件不再滞留缓冲；MCP 工具侧见 [B 组](tools_ops_b.md)的游戏运行时小节。
 - `GameBridgeInputWatcher`（Node，PROCESS_MODE_ALWAYS + physics process）：轮询动作的 `just_pressed`/`just_released`/`pressed` 三态，命中即回 `result: "matched"` + `matched_at_physics_frame`，超时（默认 2000ms，上限 30000ms）回错误；可被 cancel。
 - `GameBridgeDelayedRelease`（Node）：按键/鼠标/动作按下后按物理帧计数延时自动发送 release 事件（支持 `duration_ms` 与 hold）。
 - `GameBridgeInputSequence`（Node）：步骤数组按 `duration_ms` 间隔经 `SceneTreeTimer` 逐条执行 `inject_step`。
@@ -168,7 +170,7 @@ resource:
 - `op_eval` 分派 4 种 action：`script` / `get_property` / `set_property` / `call_method`。
 - `op_eval_script`：`source_code` → 实例化 `GDScript` 并 `reload()`（**编译失败 ≤2s 结构化返回（09-16 起）**：不再等待到超时，错误含 `gdscript://<id>.gd:<行号>` Parse Error 文本，供客户端直接定位）；构造临时 Node 挂脚本，`persist` 时挂载到 `/root/__gda_runtime/<persist_name>`（缺省 `eval_<request_id>`，重名报错）；要求脚本含 `_run()` 方法；调用 `_run()` 后若返回 `GDScriptFunctionState`（await）则转 `GameBridgeEvalAwaiter` 异步等待，否则同步返回序列化结果（并附运行期错误增量、persist 时补 `node_path`）；**MCP 响应取裸 result 值（09-16 起）**——成功 eval 的响应即脚本 `_run()` 返回值（`void` → `null`），不再包一层 result 字段结构。
 - `GameBridgeEvalAwaiter`（Node）：连接 state 的 `completed` 信号或超时（默认 5000ms）后响应；完成路径与超时路径都会 `send_response` 并清理（取消 handler、断信号、非 persist 时删除临时节点、queue_free）。
-- `get_property` / `call_method`：经 `resolve_node` 定位节点；call_method 校验 `has_method` 并把 args 按 JSON 反序列化后 `callv`。
+- `get_property` / `call_method`：经 `resolve_node` 定位节点；`call_method` 先按方法签名表逐参推导类型提示（无类型参数回退启发式），无提示的对象参数走内置启发式转换（`{r,g,b[,a]}`→Color、`{x,y[,z,w]}`→Vector2/3/4，多余键忽略，对象引用标记原样保留），再直调 GDExtension 接口取同步 `r_error`（脚本方法经 `object_call_script_method`，`INVALID_METHOD` 回退按 `get_method_list` 的 `id` 取 `MethodBind` 经 `object_method_bind_call`，与引擎 `Object::callp` 同序）；方法不存在与参数错误均按 `r_error`（附 `call_error`/`argument`/`expected`）返回明确错误（含节点路径与可用方法查询指引），成功与否只看 `r_error`（`void`/`null` 不再误报），错误水印增量仅作上下文附加（09-17-23 起，见 `src/runtime/game_bridge_eval.cpp`）。
 - `set_property`：查 `get_property_list` 取类型与 hint 构造 `type_hint`，`VariantJson::deserialize(value, type_hint)` 后 set，并用 `util::check_readback(..., type_sensitive=true)` 读回校验（09-13 下午起：值类型走分量近似比较，设置未生效（回读仍等于旧值）判 REJECTED 报错、引擎调整值附 warning）。
 
 ## 4. 与现有文档对照
@@ -191,3 +193,41 @@ resource:
 
 - 详见 [../modules/core.md](../modules/core.md)（命令队列与线程模型）
 - 详见 [../modules/tools_ops_b.md](../modules/tools_ops_b.md)（运行时/调试器工具的 MCP 封装）
+
+## 源码注释归档（2026-09-19）
+
+本批按"代码即文档"约定删除 `src/runtime/` 全部整行 `//` 注释与行内 `/*名字=*/` 标注（`game_bridge.cpp` 18 行、`game_bridge_eval.cpp` 23 行加 7 处行内标注、`game_bridge_input.cpp` 5 行、`game_bridge_verify.cpp` 24 行）。纯复述代码的注释直接删除，有信息量的"为什么"归档如下（行号均为清理前原文行号）：
+
+### game_bridge.cpp
+
+- `1263-1269` 窗口坐标换算：`UiElement` 矩形来自 `Control::get_global_rect()`（画布空间），而注入的 `InputEventMouseButton.position` 必须是窗口客户区坐标——引擎在 `viewport.cpp:_make_input_local` 用 `get_final_transform()` 反变换把窗口坐标换回画布空间，stretch 与 letterbox 边距都在该链上；实现取控件所属视口的 screen transform 再复合其 canvas transform（默认画布 Camera2D / CanvasLayer），无 transform 按恒等处理（正文 §3.1 已记录，此处保留原文要点）。
+- `1305-1306` 响应字段语义：`position`/`viewport_position` 保留画布空间坐标（向后兼容），`window_position` 为实际注入的窗口客户区坐标。
+- `1443-1458` 分发门禁：I7 `eval_assert` 与 eval 共用 `game_runtime` 门禁；I1 采样、I2 证据包、I3 布局校验为只读，无门禁（与 status/capture 同）。
+- `1573-1574` I4 轻量分组与编辑器侧 `DebuggerCapture::get_grouped_errors` 同形。
+- `1668-1669`（P2-1 定界）：`Dump` 输出为 UTF-8 字节，`String(const char*)` 是 latin1 构造会把 CJK 逐字节拆开，必须用 `String::utf8`（与 text_ops/script_ops 同模式）。
+
+### game_bridge_eval.cpp
+
+- `407-414` 启发式内建参数转换：JSON 对象无类型标签，裸 `deserialize()` 得 Dictionary，引擎侧 callv 报 `CALL_ERROR_INVALID_ARGUMENT`；匹配内建值类型的形状做转换，浮点变体（`x`+`y` 即 Vector2），整数变体经方法签名 hint 解析，对象引用标记（`__node_ref__`/`object_id`/`object_id_str`/`class`）原样保留；优先级 Color > Vector4 > Vector3 > Vector2，多余键忽略。
+- `455-458` 逐参类型 hint 取自节点方法表，复用 `set_property` 同一类型化路径（`util::infer_type_hint` 加 `deserialize(arg, hint)`），无类型（NIL）参数回退启发式路径。
+- `546-549` native-bind 失败诊断只做加法：KIND/message 形状保持兼容，调用方以 `diagnosis` + `hint` 附加；零参内建（如 `is_on_wall`/`is_on_floor`）的 MethodBind 哈希可能与实时方法表不一致（与调用路径有关）。
+- `597-598` `classdb_get_method_bind` 所需哈希取自实时方法表的 `id` 字段（与生成绑定烘焙值一致）。
+- `740-742` 直接 GDExtension 调用镜像引擎 `Object::callp` 顺序：先脚本方法，`INVALID_METHOD` 回退 native MethodBind；成功与否只看 `r_error`（void/null 不误报）。
+- 行内标注：删除 7 处 `/*名字=`/`*/`（`bind_found`/`tried_script`/`native_bind_found`/`target`/`parent`/`persist`/`persist_path`），函数签名本身已具名，不损失信息。
+
+### game_bridge_input.cpp
+
+- `31-32` 键名到键码的唯一判定实现在 `src/tools/input_map_ops.cpp`，此处仅跨 TU 前置声明（`input_map_ops.hpp` 只声明工具 handler）。
+- `366-368` 键名判定与编辑器侧 `add_input_map_action_event` 共用同一实现，接受裸名、`KEY_` 前缀（大小写不敏感）、数字码字符串（正文 §3.2 已记录，此处保留原文要点）。
+
+### game_bridge_verify.cpp
+
+- `43-49` 设计约束：单次协议往返（编辑器侧 handler 只做参数校验与转发，等待发生在传输线程，主线程永不阻塞，与 `click_game_ui_element` 的 enumerate+inject 单往返同构，见 [tools_ops_b.md](tools_ops_b.md)）；不碰 `game_bridge_eval.cpp`（eval 复用公开 `op_eval`，协程结果走已有 cancel 句柄释放，避免同一 request_id 双响应）；文本链路全 `String::utf8`（P2-1 定界）。
+- `71/94` I7 断言沙箱用 Expression 语法子集，`base_instance=null`，只能访问 `value` 与内建运算，接触不到场景节点（安全隔离）。
+- `275-276` `evidence_status` 的 healthy/last_activity 在请求时刻恒为真/零：该请求刚激活通道（入口已刷新），与分步 `get_game_status` 编辑器侧 healthy 回退语义一致；`physics_stalled` 需跨调用状态，略去。
+- `401-402` `get_property` 走 raw 取值，断言直接作用于 Variant，无 JSON 往返精度损失（Vector2/Color 等值类型保原类型，`value.x` 可用）。
+- `439-441` 其余动作复用 `op_eval`，对序列化结果推断反序列化后断言（标量/字符串/数组/字典精确，值类型以 `{"x":..}` 字典形态到达，用 `value["x"]` 写法）。
+- `452` `op_eval` 为协程挂起其内部 awaiter 时直接释放，避免同一 request_id 双响应；`eval_assert` 只接受同步结果，协程改用 `start_game_job`/`get_game_job` 观察。
+- `561` `collect_evidence` 只读组合不做自动判定，各节独立失败（与 `review_scene_visually` 同构）。
+- `693` 可见性快照先行过滤不可见与白名单节点，防误报。
+- `780-781` 遮挡启发式按文档序（后者覆盖前者），忽略 canvas_layer/z_index，故 kind 为 `possibly_occluded`、仅 warning。

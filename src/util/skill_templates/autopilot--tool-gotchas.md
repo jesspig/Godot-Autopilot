@@ -274,10 +274,17 @@ is set it wins over the config.
 
 `code_execute` wraps your source in a generated @tool Node script. Four traps:
 
-- Single-function mode is the default: source is inlined inside a generated
-  function and top-level func definitions are rejected with an error. Inline
-  statements only, or define named functions and call one via `function_name`
-  (multi-function mode).
+- Two modes selected by a line scan: each line is stripped of leading
+  spaces/tabs, blank lines and `#`/`//` comment lines are skipped, and a line
+  starting with `func ` (func plus a trailing space, even indented) switches
+  to multi-function mode, where the whole source is preserved verbatim and
+  `function_name` (default `_run`) selects the entry point - a missing entry
+  gets a `func <name>(): pass` stub appended. Without such a line the source
+  is inlined into a single generated function body: write straight-line code
+  ending in return. An indented `func ` line still counts as a definition (it
+  flips modes); conversely `func` followed by a tab or `(` never flips modes
+  and is rejected inside single-function mode with a multi-function-mode
+  error, so always write `func ` with a space.
 - Calling close_scene on the editor interface is refused outright with an
   error telling you to use the `close_editor_scene` tool instead - the call
   would destroy the executing node and crash the editor.

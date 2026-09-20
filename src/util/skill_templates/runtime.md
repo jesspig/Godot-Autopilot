@@ -121,6 +121,12 @@ Two engine facts govern the timing of everything above:
   event injected during `_process` is dispatched at the start of the next
   frame. Use `sequence_game_inputs` offsets, not round-trip timing.
 
+**Frame-accuracy recipe:** script the whole interaction as one
+`sequence_game_inputs` timeline with explicit `at_frame` offsets, then
+verify with `get_game_input_status` or a conditioned capture - never assume
+an inject-then-read round trip lands on the same frame, because injected
+events dispatch at the next frame start.
+
 Full semantics — buffering and flush points, `api` mode forgery versus real
 key events, action matching and per-device state — are in
 `references/input-injection.md`.

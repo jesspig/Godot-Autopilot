@@ -33,8 +33,6 @@ bool uses_enabled_field(ClientId id) {
          id == ClientId::KimiCode;
 }
 
-// 顶层 server 映射所在键;ZCode 额外嵌套一层("mcp" -> "servers"),
-// 在 build_top_object / merge_json_config 中单独处理。
 const char *top_key(ClientId id) {
   if (id == ClientId::OpenCode || id == ClientId::Crush) {
     return "mcp";
@@ -115,8 +113,8 @@ constexpr ClientInfo kClients[] = {
      ".workbuddy/mcp.json (mcpServers)"},
     {ClientId::ZCode, "ZCode", ".zcode/config.json",
      ".zcode/config.json (mcp.servers)"},
-    {ClientId::PiAgent, "pi (pi-mcp-adapter)", ".pi/mcp.json",
-     ".pi/mcp.json (mcpServers)"},
+    {ClientId::PiAgent, "pi (pi-mcp-adapter)", ".mcp.json",
+     ".mcp.json (mcpServers)"},
     {ClientId::CommandCode, "Command Code", ".mcp.json",
      ".mcp.json (mcpServers, shared with Claude Code)"},
     {ClientId::Kilo, "Kilo Code", ".kilo/mcp.json",

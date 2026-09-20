@@ -1,6 +1,7 @@
 #ifndef GODOT_AUTOPILOT_TOOL_BASE_HPP
 #define GODOT_AUTOPILOT_TOOL_BASE_HPP
 
+#include <cstdint>
 #include <initializer_list>
 #include <mcp/JsonValue.hpp>
 #include <optional>
@@ -36,7 +37,6 @@ struct ToolMeta {
   std::string description;
   std::string category;
   std::vector<std::string> tags;
-  bool basic_schema;
 };
 
 class ISideEffect {
@@ -45,17 +45,13 @@ public:
   virtual SideEffect side_effects() const = 0;
 };
 
-class IMetaTool {
-public:
-  virtual ~IMetaTool() = default;
-};
-
 class ToolBase {
 public:
   virtual ~ToolBase() = default;
   virtual const ToolMeta &meta() const = 0;
   virtual mcp::JsonValue execute(const mcp::JsonValue &args) = 0;
   virtual mcp::JsonValue input_schema() const = 0;
+  virtual uint32_t tool_flags() const { return 0; }
 };
 
 inline SideEffect side_effect_of(const ToolBase &t) {

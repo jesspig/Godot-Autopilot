@@ -343,10 +343,6 @@ JV build_script_diagnostics(const godot::String &gs_path,
            "panel to inspect errors");
     return diag;
   }
-  // 诊断必须看到刚写入的磁盘内容：REUSE 装载会命中 ResourceCache / GDScriptCache
-  // 直接返回旧实例（core/io/resource_loader.cpp:800-809、
-  // modules/gdscript/gdscript_cache.cpp:352-358），只有 CACHE_MODE_IGNORE 会让
-  // GDScript 格式加载器重新读盘（modules/gdscript/gdscript_resource_format.cpp:41-42）。
   godot::Ref<godot::Resource> loaded =
       loader->load(gs_path, "Script", godot::ResourceLoader::CACHE_MODE_IGNORE);
   if (loaded.is_valid()) {
@@ -396,8 +392,6 @@ JV handle_file_write(const JV &args) {
     return util::error_json("failed to open file: " + pp->GetString());
   if (mode == "APPEND")
     file->seek_end();
-  // 文本内容按 UTF-8 进 Godot：String(const char*) 是 latin1 构造，会让每个字节变成
-  // 一个字符，CJK 内容写盘后再读回即变乱码。
   file->store_string(godot::String::utf8(cp->GetString().c_str()));
   file->close();
 

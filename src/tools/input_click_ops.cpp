@@ -1,6 +1,5 @@
 #include "input_click_ops.hpp"
 #include "core/log_system.hpp"
-#include "tools/capture_ops.hpp"
 #include "util/error_util.hpp"
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/display_server.hpp>
@@ -282,27 +281,6 @@ bool read_button_arg(const mcp::JsonValue &args, godot::MouseButton &out,
   return true;
 }
 
-void merge_observe_result(mcp::JsonValue &inner) {
-  mcp::JsonValue capture = capture_ops::handle_capture_viewport(
-      mcp::JsonValue::Parse(R"({"target":"editor"})"));
-  const mcp::JsonValue *capture_result = capture.Find("result");
-  if (capture_result && capture_result->IsObject()) {
-    const char *keys[] = {"data", "format", "width", "height", "path"};
-    for (const char *key : keys) {
-      if (const mcp::JsonValue *value = capture_result->Find(key)) {
-        inner[key] = *value;
-      }
-    }
-    return;
-  }
-  const mcp::JsonValue *error = capture.Find("error");
-  if (error && error->IsString()) {
-    inner["observe_error"] = *error;
-  } else {
-    inner["observe_error"] = mcp::JsonValue("capture failed");
-  }
-}
-
 } // namespace
 
 mcp::JsonValue handle_click_mouse(const mcp::JsonValue &args) {
@@ -332,6 +310,7 @@ mcp::JsonValue handle_click_mouse(const mcp::JsonValue &args) {
   bool observe = false;
   if (!read_bool_arg(args, "observe", false, observe, error))
     return util::error_json(error);
+  (void)observe;
 
   if (warp && !warp_to(pos))
     return util::error_json("DisplayServer not available");
@@ -351,8 +330,6 @@ mcp::JsonValue handle_click_mouse(const mcp::JsonValue &args) {
 
   mcp::JsonValue inner(mcp::JsonValue::object_tag);
   inner["ok"] = mcp::JsonValue(true);
-  if (observe)
-    merge_observe_result(inner);
   return util::ok_result(std::move(inner));
 }
 
@@ -399,6 +376,7 @@ mcp::JsonValue handle_scroll_mouse(const mcp::JsonValue &args) {
   bool observe = false;
   if (!read_bool_arg(args, "observe", false, observe, error))
     return util::error_json(error);
+  (void)observe;
 
   if (warp && !warp_to(pos))
     return util::error_json("DisplayServer not available");
@@ -410,8 +388,6 @@ mcp::JsonValue handle_scroll_mouse(const mcp::JsonValue &args) {
 
   mcp::JsonValue inner(mcp::JsonValue::object_tag);
   inner["ok"] = mcp::JsonValue(true);
-  if (observe)
-    merge_observe_result(inner);
   return util::ok_result(std::move(inner));
 }
 
@@ -449,6 +425,7 @@ mcp::JsonValue handle_drag_mouse(const mcp::JsonValue &args) {
   bool observe = false;
   if (!read_bool_arg(args, "observe", false, observe, error))
     return util::error_json(error);
+  (void)observe;
 
   if (warp && !warp_to(from))
     return util::error_json("DisplayServer not available");
@@ -472,8 +449,6 @@ mcp::JsonValue handle_drag_mouse(const mcp::JsonValue &args) {
 
   mcp::JsonValue inner(mcp::JsonValue::object_tag);
   inner["ok"] = mcp::JsonValue(true);
-  if (observe)
-    merge_observe_result(inner);
   return util::ok_result(std::move(inner));
 }
 
@@ -494,6 +469,7 @@ mcp::JsonValue handle_type_text(const mcp::JsonValue &args) {
   bool observe = false;
   if (!read_bool_arg(args, "observe", false, observe, error))
     return util::error_json(error);
+  (void)observe;
 
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor)
@@ -520,8 +496,6 @@ mcp::JsonValue handle_type_text(const mcp::JsonValue &args) {
   mcp::JsonValue inner(mcp::JsonValue::object_tag);
   inner["ok"] = mcp::JsonValue(true);
   inner["length"] = mcp::JsonValue(text_str.length());
-  if (observe)
-    merge_observe_result(inner);
   return util::ok_result(std::move(inner));
 }
 

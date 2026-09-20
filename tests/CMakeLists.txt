@@ -28,6 +28,12 @@ file(GLOB GDA_TOOLS_OPS_SOURCES CONFIGURE_DEPENDS
 #   variant_json.cpp      — ops 大量调用 VariantJson::serialize/deserialize
 #   scene_dirty_tracker.cpp — editor/group/property/scene/tilemap ops 调用
 #   readback_util.cpp     — property/resource ops 调用 util::check_readback
+#   scene_verify.cpp      — editor_ops.cpp 的 save 收据与 verify_scene_saved 调用
+#                           scene_verify::compare_tree_with_text/read_text_file
+#                           (tools/*_ops.cpp 由上方 GLOB 自动纳入，
+#                           含 script_patch_ops.cpp 与 scene_spec_ops.cpp；
+#                           game_bridge_verify.cpp 为游戏侧运行时，
+#                           仅被 game_bridge.cpp 引用，不进 L1 业务源)
 set(GDA_UNIT_BUSINESS_SOURCES
     ${CMAKE_SOURCE_DIR}/src/core/log_system.cpp
     ${CMAKE_SOURCE_DIR}/src/core/resource_registry.cpp
@@ -38,6 +44,7 @@ set(GDA_UNIT_BUSINESS_SOURCES
     ${CMAKE_SOURCE_DIR}/src/util/bm25_index.cpp
     ${CMAKE_SOURCE_DIR}/src/util/error_util.cpp
     ${CMAKE_SOURCE_DIR}/src/util/readback_util.cpp
+    ${CMAKE_SOURCE_DIR}/src/util/scene_verify.cpp
     ${CMAKE_SOURCE_DIR}/src/util/variant_json.cpp
     ${CMAKE_SOURCE_DIR}/src/util/client_config_gen.cpp
     ${CMAKE_SOURCE_DIR}/src/util/skill_gen.cpp
@@ -48,6 +55,9 @@ set(GDA_UNIT_BUSINESS_SOURCES
     ${CMAKE_SOURCE_DIR}/src/tools/dispatch.cpp
     ${CMAKE_SOURCE_DIR}/src/tools/debugger_access.cpp
     ${CMAKE_SOURCE_DIR}/src/tools/editor_ui_actions.cpp
+    ${CMAKE_SOURCE_DIR}/src/tools/tool_args.cpp
+    ${CMAKE_SOURCE_DIR}/src/tools/tool_pipeline.cpp
+    ${CMAKE_SOURCE_DIR}/src/tools/tool_invoke.cpp
     ${GDA_TOOLS_OPS_SOURCES})
 
 # ====================================================================
@@ -107,7 +117,7 @@ if(MSVC)
 endif()
 
 # ── ctest 注册: 每份 config/*.json 一条 gda_runner_<name> 用例 ──
-# config/ 由后续阶段创建, 目录尚不存在时 GLOB 为空, foreach 自然跳过。
+# 用例文件在 configure 期经 GLOB 收集, config/ 目录新增 *.json 后重新 configure 即注册。
 file(GLOB GDA_TEST_CONFIGS CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/config/*.json")
 
@@ -119,3 +129,15 @@ foreach(cfg ${GDA_TEST_CONFIGS})
     # 单文件含遍历约 2-4 分钟, 超时防挂死
     set_tests_properties(gda_runner_${TEST_NAME} PROPERTIES TIMEOUT 600)
 endforeach()
+
+# ── ctest 注册: 迁移守卫（零依赖，读源码断言，无需构建产物） ──
+add_test(NAME migration_guard
+    COMMAND ${CMAKE_COMMAND}
+            -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/guard/migration_guard.cmake)
+
+# ── ctest 注册: 注释守卫（零依赖，读源码断言，无需构建产物） ──
+# Python 解释器复用根 cmake/skill_gen.cmake 的 GDA_PYTHON_EXECUTABLE
+#（find_program NAMES py python python3，py 优先；WindowsApps 存根下裸 python3 不可用）
+add_test(NAME comment_guard
+    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/comment_guard.py")

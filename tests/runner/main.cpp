@@ -1,31 +1,3 @@
-// gda_test_runner — 自驱动用例跑批器（CLI 入口）
-//
-// 用法:
-//   gda_test_runner [--config-dir <dir>] [--file <name>] [--headless|--gui]
-//                   [--no-auto] [--keep-open] [--report-dir <dir>] [--help]
-//
-// 参数:
-//   --config-dir <dir>   JSON 用例目录（默认 PROJECT_ROOT/tests/config）
-//   --file <name>        只跑指定用例文件，name 可含或不含 .json 后缀
-//                        （默认跑目录下全部 *.json，按文件名排序）
-//   --headless           Godot 以 headless 模式启动（默认）
-//   --gui                Godot 以窗口模式启动
-//                        用例 JSON 的 headless 字段优先于 CLI；冲突时以用例
-//                        为准，并在 stderr 提示
-//   --no-auto            不启动 Godot 进程；端口取自环境变量
-//                        GODOT_AUTOPILOT_PORT，TCP+initialize 就绪后
-//                        直连外部 MCP 服务跑用例
-//   --keep-open          全部文件跑完后不停止 Godot 进程（进程保留）
-//   --report-dir <dir>   报告目录（默认 PROJECT_ROOT/tests/output，自动创建）
-//   --help               打印本说明并退出（退出码 0）
-//
-// 退出码语义:
-//   0  全部用例通过
-//   1  存在失败/ERROR 的用例文件
-//   2  参数或环境错误（未知参数、--headless/--gui 互斥、config-dir 不存在、
-//      GODOT_PATH 未配置、--no-auto 端口未设置或未就绪、--file 无匹配、
-//      目录无用例、未捕获异常）
-
 #include <algorithm>
 #include <chrono>
 #include <cstdlib>
@@ -44,7 +16,7 @@
 
 #ifndef PROJECT_ROOT
 #error                                                                         \
-    "PROJECT_ROOT 编译宏未定义（参见 tests/CMakeLists.txt 中 gda_engine_tests 的配置）"
+    "PROJECT_ROOT 编译宏未定义（参见 tests/CMakeLists.txt 中 gda_test_runner 的配置）"
 #endif
 
 namespace gda_test {
@@ -147,7 +119,6 @@ bool matches_filter(const std::string &filter, const fs::path &file) {
   return filter == file.filename().string() || filter == file.stem().string();
 }
 
-// 返回空集合时经 error 说明原因
 std::vector<fs::path> collect_test_files(const std::string &config_dir,
                                          const std::string &filter,
                                          std::string &error) {
@@ -170,7 +141,6 @@ std::vector<fs::path> collect_test_files(const std::string &config_dir,
   return files;
 }
 
-// 返回 -1 表示端口无效/未设置
 int resolve_external_port() {
   const char *raw = std::getenv(kPortEnvKey);
   if (!raw || !*raw)
@@ -194,8 +164,6 @@ FileResult make_error_result(const std::string &name, long long elapsed_ms,
   return result;
 }
 
-// 跑单个用例文件；stop_after 为 false 时保留 Godot 进程（--keep-open 且为
-// 最后一个文件）
 FileResult run_one_file(const fs::path &file, const CliOptions &opts,
                         const std::string &godot_path, int external_port,
                         bool stop_after) {

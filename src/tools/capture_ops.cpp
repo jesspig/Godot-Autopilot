@@ -204,10 +204,6 @@ int clamp_node_px(int value, int low, int high) {
   return value;
 }
 
-// Blue-box variant of the red UI-control annotation renderer. Lives here
-// (rather than beside editor_ui_ops::draw_annotations) so the editor UI
-// enumeration files stay untouched; the glyph renderer is intentionally
-// mirrored to keep both number styles identical.
 const uint8_t kNodeDigitGlyphs[10][5] = {
     {0x7, 0x5, 0x5, 0x5, 0x7}, {0x2, 0x6, 0x2, 0x2, 0x7}, {0x7, 0x1, 0x7, 0x4, 0x7},
     {0x7, 0x1, 0x7, 0x1, 0x7}, {0x5, 0x5, 0x7, 0x1, 0x1}, {0x7, 0x4, 0x7, 0x1, 0x7},
@@ -957,7 +953,6 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
   godot::Ref<godot::Image> diff_source = img;
   bool convertible = img->get_format() == godot::Image::FORMAT_RGBA8;
   if (!convertible) {
-    // Keep the original image intact; convert a copy only for diff/baseline.
     godot::Ref<godot::Image> copy;
     copy.instantiate();
     copy->copy_from(img);
@@ -1019,7 +1014,6 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
       const size_t common_bytes = row_bytes * static_cast<size_t>(ch);
       std::vector<uint8_t> tmp_current(common_bytes);
       std::vector<uint8_t> tmp_baseline(common_bytes);
-      // Row strides differ between the two buffers, so rows are copied one by one.
       for (int y = 0; y < ch; ++y) {
         std::copy_n(pixels.ptr() + static_cast<size_t>(y) * current_stride,
                     row_bytes,

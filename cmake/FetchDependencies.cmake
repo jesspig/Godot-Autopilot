@@ -14,9 +14,10 @@ set(CMAKE_DISABLE_FIND_PACKAGE_OpenSSL ON)
 # ====================================================================
 # godot-cpp — Godot Engine C++ 绑定层
 # ====================================================================
+set(GODOTCPP_API_VERSION "4.7" CACHE STRING "The Godot API version to target" FORCE)
 FetchContent_Declare(godot-cpp
     GIT_REPOSITORY https://github.com/godotengine/godot-cpp.git
-    GIT_TAG        10.0.0-rc1
+    GIT_TAG        10.0.0-rc2
     GIT_SHALLOW    TRUE)
 FetchContent_MakeAvailable(godot-cpp)
 
@@ -25,7 +26,7 @@ FetchContent_MakeAvailable(godot-cpp)
 # ====================================================================
 FetchContent_Declare(mcp-cpp-sdk
     GIT_REPOSITORY https://github.com/jesspig/modelcontextprotocol-cpp-sdk.git
-    GIT_TAG        0.3.3
+    GIT_TAG        0.3.4
     GIT_SHALLOW    TRUE)
 FetchContent_MakeAvailable(mcp-cpp-sdk)
 

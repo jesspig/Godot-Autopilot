@@ -73,11 +73,9 @@ TEST(LogSystemTest, QueryReturnsValueCopyNotDanglingPointer) {
     auto snap = log.query_recent(1);
     ASSERT_EQ(snap.size(), 1u);
     std::string msg = snap[0].message;
-    // flood to evict oldest
     for (int i = 0; i < LogSystem::MAX_ENTRIES + 10; ++i) {
         log.log(LogLevel::Info, LogCategory::System, "FLOOD_" + std::to_string(i));
     }
-    // snap should still be valid (value copy)
     EXPECT_EQ(msg, "SNAPSHOT_test_1");
     EXPECT_EQ(snap[0].message, "SNAPSHOT_test_1");
 }

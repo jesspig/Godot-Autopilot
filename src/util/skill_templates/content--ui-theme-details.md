@@ -139,6 +139,23 @@ Setting `position` or `size` via `property_set` on an anchored control is
 overridden by the anchor math on the next layout pass; set anchors and
 offsets instead.
 
+### Root Control full-window recipe
+
+For a scene-root Control that must fill the window and survive resizes:
+
+1. Apply preset 15 (`full_rect`) with `keep_offsets` false via
+   `set_control_anchor_preset`.
+2. Read back with `property_get` and assert offset_right == 0 and
+   offset_bottom == 0 (with offset_left/offset_top at 0) - a surviving
+   non-zero offset means the preset did not recompute; re-apply with
+   `keep_offsets` false instead of patching offsets by hand.
+3. For a floating centered root instead, use preset 8 (`center`) with both
+   grow directions set to both (confirm the enum order with
+   `property_get_list` first), then verify the laid-out rect with
+   `capture_editor_viewport`.
+4. Persist with `save_editor_scene` - anchors, offsets and grow are the saved
+   truth (`position`/`size` are not).
+
 ## Runtime UI reconnaissance
 
 While the game runs, `get_game_ui_elements` walks the running Control tree
