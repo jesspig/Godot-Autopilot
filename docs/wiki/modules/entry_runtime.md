@@ -6,7 +6,7 @@ tags:
   - 模块
   - 入口
   - 运行时桥接
-timestamp: "2026-09-20T23:12:48+08:00"
+timestamp: "2026-09-21T01:24:00+08:00"
 resource:
   - src/main.cpp
   - src/runtime/
@@ -15,6 +15,7 @@ resource:
 # 模块：入口与运行时桥接（entry_runtime）
 
 > 09-18 E2E 优化批次增补（详见 `changelog/2026-09-18-log.md` 19:30 节）：`call_method` native 失败路径附加 `diagnosis` + `hint`（`game_bridge_eval.cpp:534 eval_bind_suspected_cause` / `:553 make_native_bind_diagnosis`，成功路径零改动）；新增 `gda_protocol.hpp` 4 个 op（`eval_assert`/`sample`/`collect_evidence`/`validate_ui_layout`）与 `game_bridge_verify.cpp`（采样 awaiter + 校验类注册）。
+> 09-21 可重放监控与日志系统批次增补：`_enter_tree` 入口顺序增 `monitor::lifecycle("plugin_enter_tree")` → `perf_sampler::set_queue(&queue())` →（`s_queue.open()` 之后）`LogPersist::init_session()` → `monitor::environment_snapshot()`；`_process` 增 `perf_sampler::tick(delta)`；新 lifecycle 事件 `plugin_enter_tree`/`tools_singleton_registered`/`server_ready`/`plugin_ready`/`plugin_exit_tree`/`scene_level_initialized`/`editor_level_initialized`/`editor_level_terminated`/`scene_level_terminated`，server 启动失败发 `error_event`。
 
 覆盖代码：`src/main.cpp`（370 行）与 `src/runtime/`（`gda_protocol.hpp` 57 行、`game_bridge.hpp` 99 行、`game_bridge.cpp`（09-16 增窗口坐标换算约 30 行）、`game_bridge_input.cpp`（09-16 删本地键名表约 60 行、改调共用判定）、`game_bridge_eval.cpp` 851 行）。
 
@@ -33,13 +34,13 @@ resource:
 
 按模块级别分派：
 
-- **SCENE 级别**：仅当 `!Engine::is_editor_hint()`（即运行游戏的非编辑器进程）时调用 `runtime::game_bridge::register_listener()`。编辑器进程在此级别不注册桥接监听。
-- **EDITOR 级别**：先 `debugger_ops::register_classes()`，然后依次 `ClassDB::register_class` 注册 4 个类：`McpLogDock`、`McpConfigDock`、`ExportGuard`、`GodotAutopilotPlugin`，最后 `EditorPlugins::add_by_type<GodotAutopilotPlugin>()` 把插件类型注册进编辑器。
+- **SCENE 级别**：仅当 `!Engine::is_editor_hint()`（即运行游戏的非编辑器进程）时调用 `runtime::game_bridge::register_listener()`。编辑器进程在此级别不注册桥接监听。并记 `scene_level_initialized` lifecycle 事件。
+- **EDITOR 级别**：先 `debugger_ops::register_classes()`，然后依次 `ClassDB::register_class` 注册 4 个类：`McpLogDock`、`McpConfigDock`、`ExportGuard`、`GodotAutopilotPlugin`，最后 `EditorPlugins::add_by_type<GodotAutopilotPlugin>()` 把插件类型注册进编辑器。并记 `editor_level_initialized` lifecycle 事件。
 
 ### 1.3 模块终止（register_terminator）
 
-- **EDITOR 级别**：仅输出"Editor level terminated"日志。
-- **SCENE 级别**：**无条件**调用 `runtime::game_bridge::unregister_listener()`（与注册端点的 `!is_editor_hint()` 条件不对称，见第 4 节不一致点）。
+- **EDITOR 级别**：仅输出"Editor level terminated"日志（并记 `editor_level_terminated` lifecycle）。
+- **SCENE 级别**：**无条件**调用 `runtime::game_bridge::unregister_listener()`（与注册端点的 `!is_editor_hint()` 条件不对称，见第 4 节不一致点）。并记 `scene_level_terminated` lifecycle。
 
 ### 1.4 GodotAutopilotPlugin（EditorPlugin 子类）
 
@@ -51,17 +52,17 @@ resource:
 
 `_enter_tree()` 顺序（关键 UI/捕获步骤各自独立 try/catch，失败不中断后续；队列/脱敏/持久化初始化、ServerContext 创建与 export_guard 未包裹）：
 
-1. `s_queue.open()` → `sanitize_policy::initialize()`（解析脱敏开关）→ `LogPersist::instance().init_session()`（建 `logs/`/`traces/`、修剪旧文件、写 `session_start` trace 头，09-20 起排在最前，`main.cpp:108-110`）→ 日志 "plugin starting"，`runtime_ops::set_editor_queue(&queue())` 注入队列，`ModeDetector` 判定 Editor/Runtime 模式写日志。
+1. `monitor::lifecycle("plugin_enter_tree")` → `perf_sampler::set_queue(&queue())` → `s_queue.open()` → `sanitize_policy::initialize()`（解析脱敏开关）→ `LogPersist::instance().init_session()`（建 `logs/`/`traces/`、重置日志/轨迹游标、修剪旧文件、写 `session_start` trace 头）→ `monitor::environment_snapshot()`（写 `kind=snapshot`，仅主线程）→ 日志 "plugin starting"，`runtime_ops::set_editor_queue(&queue())` 注入队列，`ModeDetector` 判定 Editor/Runtime 模式写日志（09-21 起入口顺序如上）。
 2. `gda_cmdline_mode()` 为真则直接 return——不建 UI、不启服务器（队列已在步骤 1 注入）。
 3. 创建 `McpLogDock`（标题 "GDA Log"）`add_dock`。
 4. `debugger_ops::create_output_logger()` 经 `OS::add_logger` 注册；`debugger_ops::create_debug_plugin()` 经 `add_debugger_plugin` 注册。
-5. `new (std::nothrow) ServerContext(queue())` 并 `start()`；成功则记 Transport 日志（含端口）并 `LogPersist::enqueue_trace` 追加一条 `{"type":"server_ready","host","port"}` trace 标记（`main.cpp:198-203`），失败记 `last_error()`。
+5. `new (std::nothrow) ServerContext(queue())` 并 `start()`；成功发 `server_ready` lifecycle（记 Transport 日志含端口，并追加 `{"type":"server_ready","host","port"}` trace），失败发 `error_event` 并记 `last_error()`。
 6. 创建 `McpConfigDock` 并 `set_server_context`（面板内显示运行端口/离线状态）`add_dock`。
-7. `export_guard_.instantiate()` + `add_export_plugin`，日志 "Plugin ready"。
+7. `export_guard_.instantiate()` + `add_export_plugin`，日志 "Plugin ready"（并记 `plugin_ready` lifecycle）。
 
-`_exit_tree()` 逆序清理：停并删 `g_server_ctx` → 移除 ExportGuard → 移除 debugger plugin → `OS::remove_logger` → 移除并 memdelete 停靠面板，整体包 try/catch；末尾 `LogPersist::instance().flush_on_main_thread()` 收尾写入剩余缓冲（`main.cpp:298`）。
+`_exit_tree()` 逆序清理：停并删 `g_server_ctx` → 移除 ExportGuard → 移除 debugger plugin → `OS::remove_logger` → 移除并 memdelete 停靠面板，整体包 try/catch；并记 `plugin_exit_tree` lifecycle；末尾 `LogPersist::instance().flush_on_main_thread()` 收尾写入剩余缓冲（`main.cpp:298`）。
 
-`_process()`：`LogPersist::instance().flush_on_main_thread()`（先落盘上一帧以来累积的日志/trace）→ `s_queue.drain()` → `log_dock->poll_new_entries()`（`main.cpp:230-236`）。
+`_process()`：`perf_sampler::tick(delta)`（09-21 起按周期采样 `kind=perf` 并做请求超时看门狗）→ `LogPersist::instance().flush_on_main_thread()`（先落盘上一帧以来累积的日志/trace）→ `s_queue.drain()` → `log_dock->poll_new_entries()`。
 
 `_get_unsaved_status()`：`scene_dirty_tracker::is_current_scene_dirty()` 为真时返回场景名，否则返回空串。
 
@@ -177,7 +178,7 @@ resource:
 
 - AGENTS.md "入口点：src/main.cpp → GDExtensionEntryPoint → 注册 GodotAutopilotPlugin 并启动 ServerContext"：方向正确，但**严格说 ServerContext 不是入口点启动的**——`GDExtensionEntryPoint` 只做类注册与 `add_by_type`，插件实例由 Godot 创建后在其 `_enter_tree()` 中才 `new ServerContext` 并 `start()`（main.cpp:188-208）。实际链为：入口点 → 注册插件类型 → Godot 实例化 → `_enter_tree` → ServerContext 启动。
 - AGENTS.md "在 MODULE_INITIALIZATION_LEVEL_EDITOR 阶段加载到 Godot 编辑器"：编辑器侧类确在 EDITOR 级别注册；但运行时桥接 `register_listener` 注册在 **SCENE 级别**且仅非编辑器进程，属补充事实而非矛盾。
-- AGENTS.md 线程模型 "HTTP 线程 → CommandQueue::submit() → 主线程 _process() 排空"：与 `_process()` 中 `s_queue.drain()` 一致；09-20 起 `_process` 在 `drain()` 之前先执行 `LogPersist::flush_on_main_thread()`（本地持久化写盘同走主线程，不排队列）。
+- AGENTS.md 线程模型 "HTTP 线程 → CommandQueue::submit() → 主线程 _process() 排空"：与 `_process()` 中 `s_queue.drain()` 一致；09-20 起 `_process` 在 `drain()` 之前先执行 `LogPersist::flush_on_main_thread()`（本地持久化写盘同走主线程，不排队列），09-21 起再在其前执行 `perf_sampler::tick(delta)`（周期采样与请求超时看门狗）。
 - AGENTS.md 错误模式 `{"error": "..."}`：桥接层 `error_result` 同构；差异是桥接响应额外带布尔 `ok` 字段。
 - `game_*` 工具（get_game_status/queue_game_input/capture_game_viewport 等）正是本页桥接 op 在 MCP 工具侧的封装（原 Example/docs/architecture.md 已随 2026-09-13 Example 文档重构删除，不再作为对照基线）。
 

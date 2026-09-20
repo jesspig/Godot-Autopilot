@@ -2,6 +2,10 @@
 
 > 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天。
 
+## 2026-09-21
+
+- **可重放监控与日志系统**：新增 `src/core/` 的 monitor（统一埋点门面，纯 std，可被 MCP worker 线程调用）、monitor_env（`environment_snapshot()` 仅主线程，写 `kind=snapshot`）、perf_sampler（主线程周期采样 `kind=perf` + 请求超时看门狗 `kind=execution_state, state=timed_out`）；`TraceRecorder` 增 `TraceKind`（15 值）与 schema v2 新字段、`LogEntry` 增 `trace_id`/`span_id`、`LogPersist` 增健康计数与 `trace_dir`、`CommandQueue` 增 `Stats`；`server_context` 经 `opts.on_request`/`opts.outgoing_filters` 关联协议请求（`begin_request`/`end_request`），元工具经 `RequestScope`+`RequestSpanGuard` 端到端关联；McpLogDock 增 Open Traces 按钮与 Trace 视图（可点击 `[trace]`、搜索兼匹配 detail）。构建 add_library 86→89（core 12→15）、L1 285→312（33 文件）、L2 29→30（`30_observability`）、ctest 316→344（L1 过滤 287→314）；实测 jsonl 观测 `lifecycle`/`protocol_request`/`protocol_response`/`tool_call`/`persist_health`/`perf`/`snapshot`/`concurrency`，`request_id` 贯通、`protocol_response` 回填 `duration_ms`；工具总数 399 不变。详见 `changelog/2026-09-21-log.md`
+
 ## 2026-09-20
 
 - **依赖升级**：godot-cpp 升 10.0.0-stable（rc2→stable，`_deps` checkout `10.0.0-stable`/507ed9d）；mcp-cpp-sdk 维持 0.3.4（0.3.5 尝试后回滚，`cmake/FetchDependencies.cmake` 仅余 godot-cpp 一处变更；configure 实测 `[mcp] SDK version: 0.3.4`）；`AGENTS.md` 与 wiki 三页（build/conventions/overview）同步。详见 `changelog/2026-09-20-log.md`

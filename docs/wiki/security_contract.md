@@ -6,12 +6,13 @@ tags:
   - 安全
   - 并发
   - 契约
-timestamp: "2026-09-20T23:06:52+08:00"
+timestamp: "2026-09-21T01:24:00+08:00"
 resource:
   - src/core/server_context.cpp
   - src/core/command_queue.hpp
   - src/core/log_persist.hpp
   - src/core/sanitize_policy.hpp
+  - src/core/monitor.hpp
   - src/tools/tool_base.hpp
   - src/tools/tool_spec.hpp
 ---
@@ -61,22 +62,24 @@ resource:
 - 能力名与工具映射（`tool_base.hpp:capability_for_tool`）：`code_execute`（`code_execute`、`execute_script`）、`game_runtime`（`execute_game_script`、`start_game_job`、`reload_game_scripts`、`queue_game_input`、`wait_game_input`、`sequence_game_inputs`、`click_game_ui_element`）、`process`（`SideEffect::Process` 标记的 6 个：`build_csharp_assembly`、`create_os_process`、`execute_os_process`、`kill_os_process`、`open_os_path`、`set_os_environment`）；另有独立于 `capability_for_tool` 的 `user_tools` 能力，由 `AutopilotTools`（用户脚本动态工具，`autopilot_tools.cpp`）在注册与调用两侧检查——未授权时注册拒绝、调用返回 `user_tools` 授权错误。
 - 拒绝响应含 `error`、`authorization_required`（能力名）与 `enable`（启用指引）三个字段，并写 Warning 日志（Tools 类，可经 `get_plugin_log` 读取）。
 - 启用入口：环境变量（须重启引擎）或配置 `allow` 键；MCP Config 面板的 "Allow code_execute"、"Allow game_runtime" 与 "Allow user tools" 复选框分别管理对应能力，勾选/取消经 `authorization::allow_list_add`/`allow_list_remove`（`add` 对已生效项含 `all` 保持原样；`remove` 先把 `all` 展开为全部已知能力再逐项删除），写入配置后下一次调用生效、无需重启。`process` 无面板开关，仍须环境变量或手改 `allow` 键。拒绝响应的 `enable` 文案只对 `code_execute`/`game_runtime`/`user_tools` 提及 dock（`capability_has_dock_toggle`），`process` 仅给环境变量 + 重启指引。
-- 拒绝可审计（09-20 起）：授权门命中时除返回结构化拒绝与 Warning 日志外，另记录一条 `TraceEvent`（`auth="denied"`、`error_code="denied"`、`duration_ms=0`，含工具名/类别/副作用/flags），随 trace jsonl 落盘，供事后区分"未授权被拒"与"handler 业务错误"。
+- 拒绝可审计（09-20 起）：授权门命中时除返回结构化拒绝与 Warning 日志外，另记录一条 `TraceEvent`（`auth="denied"`、`error_code="denied"`、`duration_ms=0`，含工具名/类别/副作用/flags），随 trace jsonl 落盘，供事后区分"未授权被拒"与"handler 业务错误"；09-21 起 McpConfigDock 的 allow 变更另发 `monitor::security` 事件（与脱敏变更同口径）。
 
 ### 3.2 数据脱敏开关（09-20 引入）
 
 工具调用参数会进入本地持久化与 trace 事件，故新增调用侧数据边界开关：
 
 - 解析优先级：`GODOT_AUTOPILOT_DESENSITIZE` 环境变量（`0`/`false`/`off` 关闭，其余非空值开启）> 配置 `user://godot_autopilot/config.json` 的 `desensitize` 键 > **默认开启**；入口 `sanitize_policy::initialize()` 读取一次，之后由 MCP Config 面板 "Desensitize data" 复选框实时改写并持久化（下一次工具调用生效，无需重启）。
-- 开启（默认）：`args_digest` 剥离 `data`/`base64`/`script_content` 的字符串值（替换为 `<stripped len=N>`），长度上限 4000 字符；`traces/images/` 不落盘任何截图，`image_ref` 为空，jsonl 只保留 `image_hash`/`image_bytes`/`image_width`/`image_height`。
+- 开启（默认）：`args_digest` 剥离敏感键的字符串值（替换为 `<stripped len=N>`），长度上限 4000 字符；09-21 起敏感键判定为大小写不敏感的通用集合——`data`/`base64`/`script_content`/`token`/`secret`/`password`/`passwd`/`key`/`api_key`/`apikey`/`authorization`/`credential`/`cookie`/`session_token` 及 `*_token`/`_key`/`_secret`/`_password` 后缀；`traces/images/` 不落盘任何截图，`image_ref` 为空，jsonl 只保留 `image_hash`/`image_bytes`/`image_width`/`image_height`。
 - 关闭：`args_digest` 保留原始参数，上限 64000 字符，超限置 `args_truncated`；PNG 结果以 `traces/images/trace-<session>-<span>-<kind>.png` 落盘并在 jsonl 记 `image_ref`。调用方应把它视为"把工程数据以明文/原始截图写入 `user://`"，仅在明确需要取证时关闭。
 - 环境变量与面板的作用范围：`initialize()` 在启动时一旦发现 env 就完全忽略配置 `desensitize` 键（与 `allow` 能力门同构）；但面板复选框在运行期直接调用 `sanitize_policy::set_enabled`，仍会改变本会话后续调用的实际口径（重启后 env 再次生效）。
+- 变更可审计（09-21 起）：McpConfigDock 的脱敏切换与 allow 变更发 `monitor::security` 事件，其余交互（端口应用/生成配置/生成技能等）发 `monitor::ui_action`。
 
 ## 4. Godot API 与线程
 
 - 所有 Godot API、场景/资源/编辑器对象访问和会触发引擎状态的操作，必须在 Godot 主线程执行。HTTP/SDK 线程不得直接调用。
-- 标准路径是 `CommandQueue::submit()` 入队，由 `GodotAutopilotPlugin::_process()` 的 `drain()` 在主线程排空，再通过 `future` 返回结果。唯一排空点是插件 `_process()`；09-20 起 `_process()` 在 `drain()` 前先执行 `LogPersist::flush_on_main_thread()`（本地日志/trace 增量写盘，同为 Godot 文件 API，必须主线程）。
+- 标准路径是 `CommandQueue::submit()` 入队，由 `GodotAutopilotPlugin::_process()` 的 `drain()` 在主线程排空，再通过 `future` 返回结果。唯一排空点是插件 `_process()`；09-20 起 `_process()` 在 `drain()` 前先执行 `LogPersist::flush_on_main_thread()`（本地日志/trace 增量写盘，同为 Godot 文件 API，必须主线程），09-21 起再在其前执行 `perf_sampler::tick(delta)`（周期采样与请求超时看门狗）。
 - trace 上下文跨线程纪律（09-20 起）：`dispatch::call_handler` 在提交侧 `capture_trace_context()`（纯 std 线程局部变量，不触碰 Godot API）、执行侧用 `ScopedTraceContext` 恢复，并用 `steady_clock` 测量排队等待（`queue_wait_ms`）；`LogPersist` 的入队缓冲与游标虽被多线程访问，但均有互斥保护且只存纯 std 字符串，Godot `FileAccess` 仅在 flush 主线程路径调用。
+- 协议侧钩子线程（09-21 起）：`ServerContext` 接入 `opts.on_request`（`monitor::begin_request`，含 `_meta` 的 traceparent 提取）与 `opts.on_notification`，响应侧经 `opts.outgoing_filters`（`mcp::FilterPipeline` + `MessageFilterFuncAdapter`）在 SDK worker 线程捕获出站 `JsonRpcResponse`/`JsonRpcErrorResponse` 完成 `monitor::end_request`/`note_protocol_error`（SDK 的 `on_response` 仅用于「服务端发起请求的应答」，不覆盖我方回复客户端的响应）；这些钩子与 `monitor` 门面均为纯 std、不触碰 Godot API（仅写 `TraceRecorder`/`LogSystem` 内存缓冲，落盘仍由主线程 flush），`request_id→trace/span` 关联表 `RequestRegistry` 有互斥保护（上限 4096、FIFO 淘汰）。
 - 明确例外（09-13 起）：`call_tool` 元工具的编排回调在 MCP 线程执行——等待运行时响应（`runtime_ops::wait_pending_response`）与截图定型不再经 `execute_sync` 占用主线程；回调自身不触碰 Godot API（领域工具 handler 经 `dispatch` 路由回主线程、截图读盘经 `queue.submit`），从而保证等待期间调试器消息泵与编辑器主线程不被阻塞。
 - 只有不访问 Godot API 的纯 C++ 逻辑可留在 HTTP 线程；只读缓冲区若由代码明确保证线程安全，才可使用该例外。新增例外必须在代码和文档中同时说明。
 - 主线程判定以队列首次 `drain()` 记录的线程为准；队列必须在插件正常生命周期内先完成主线程初始化，再处理依赖 Godot API 的任务。
