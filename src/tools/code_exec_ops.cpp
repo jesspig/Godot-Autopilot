@@ -6,6 +6,7 @@
 #include "tools/debugger_ops.hpp"
 #include "tools/dispatch.hpp"
 #include "tools/runtime_ops.hpp"
+#include "tools/tool_invoke.hpp"
 #include "util/error_util.hpp"
 #include "util/gdscript_wrap.hpp"
 #include "util/variant_json.hpp"
@@ -502,7 +503,9 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
   godot::UndoRedo *history = nullptr;
   uint64_t version_before = 0;
   if (stop_on_error && rollback_on_error && runtime_ops::has_editor_queue()) {
-    get_editor_queue().execute_sync([&]() {
+    const tools::TraceContext ctx = tools::capture_trace_context();
+    get_editor_queue().execute_sync([&, ctx]() {
+      tools::ScopedTraceContext restore(ctx);
       auto *editor = godot::EditorInterface::get_singleton();
       auto *manager = editor ? editor->get_editor_undo_redo() : nullptr;
       history =
@@ -703,6 +706,21 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
     {
       std::string ref_error;
       if (!resolve_refs(tool_args, i, ref_error)) {
+        std::string reference;
+        const std::size_t quote_begin = ref_error.find('\'');
+        const std::size_t quote_end =
+            quote_begin == std::string::npos
+                ? std::string::npos
+                : ref_error.find('\'', quote_begin + 1);
+        if (quote_end != std::string::npos) {
+          reference =
+              ref_error.substr(quote_begin + 1, quote_end - quote_begin - 1);
+        }
+        LogSystem::instance().log_detailed(
+            LogLevel::Warning, LogCategory::Tools,
+            "batch_execute step " + std::to_string(i) + " reference error",
+            "step=" + std::to_string(i) + " tool=" + tool_name +
+                " variable=" + reference + " err=" + ref_error);
         result_item["status"] = mcp::JsonValue("error");
         result_item["error"] = mcp::JsonValue(ref_error);
         push_payload(result_item);
@@ -826,7 +844,9 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
     if (history && runtime_ops::has_editor_queue()) {
       int64_t actions_created = 0;
       int64_t rolled_back = 0;
-      get_editor_queue().execute_sync([&]() {
+      const tools::TraceContext ctx = tools::capture_trace_context();
+      get_editor_queue().execute_sync([&, ctx]() {
+        tools::ScopedTraceContext restore(ctx);
         actions_created =
             static_cast<int64_t>(history->get_version() - version_before);
         for (int64_t undo_index = 0; undo_index < actions_created;

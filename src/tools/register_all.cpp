@@ -39,6 +39,7 @@
 #include "tools/runtime_ops.hpp"
 #include "tools/schema_builder.hpp"
 #include "tools/tool_base.hpp"
+#include "tools/tool_invoke.hpp"
 #include "tools/tool_registry.hpp"
 #include "util/mcp_image_content.hpp"
 #include <mcp/Content.hpp>
@@ -510,10 +511,13 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
         std::lock_guard<std::mutex> lock(dynamic_specs::mutex());
         for (const auto& spec : dynamic_specs::store()) {
             if (registry->find_any(spec.name) != nullptr) {
-                LogSystem::instance().log(
+                LogSystem::instance().log_detailed(
                     LogLevel::Warning, LogCategory::Tools,
                     "user tool '" + spec.name +
-                        "' skipped: name collides with a built-in MCP tool");
+                        "' skipped: name collides with a built-in MCP tool",
+                    "tool=" + spec.name +
+                        " params=" + std::to_string(spec.params.size()) +
+                        " reason=collision");
                 continue;
             }
             registry->add(make_spec_tool(spec));
@@ -561,8 +565,12 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
                 if (run_on_transport_thread) {
                     res = tool->execute(args);
                 } else {
-                    res = queue.execute_sync(
-                        [tool, args] { return tool->execute(args); });
+                    const tools::TraceContext trace_context =
+                        tools::capture_trace_context();
+                    res = queue.execute_sync([tool, args, trace_context] {
+                        tools::ScopedTraceContext restore(trace_context);
+                        return tool->execute(args);
+                    });
                 }
                 int64_t new_errors = error_watermark::count_response_errors(res);
                 if (new_errors > 0) {

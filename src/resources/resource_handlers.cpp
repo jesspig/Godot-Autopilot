@@ -1,6 +1,7 @@
 #include "resources/resource_handlers.hpp"
 #include "core/log_system.hpp"
 #include "resources/skill_resources.hpp"
+#include "tools/tool_invoke.hpp"
 #include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #include <ctime>
@@ -270,7 +271,9 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           .MimeType("application/json"),
       [&queue](const std::string &uri) -> mcp::ReadResourceResult {
         std::string json_str;
-         queue.execute_sync([&json_str]() {
+        const tools::TraceContext ctx = tools::capture_trace_context();
+         queue.execute_sync([&json_str, ctx]() {
+              tools::ScopedTraceContext restore(ctx);
               auto *engine = godot::Engine::get_singleton();
               if (!engine) {
                 set_error(json_str, "Engine singleton not available");
@@ -290,7 +293,9 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           .MimeType("application/json"),
       [&queue](const std::string &uri) -> mcp::ReadResourceResult {
         std::string json_str;
-         queue.execute_sync([&json_str]() {
+        const tools::TraceContext ctx = tools::capture_trace_context();
+         queue.execute_sync([&json_str, ctx]() {
+              tools::ScopedTraceContext restore(ctx);
               auto *editor = godot::EditorInterface::get_singleton();
               if (!editor) {
                 set_error(json_str, "Not in editor mode");
@@ -319,7 +324,9 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           -> mcp::ReadResourceResult {
         std::string path = vars.at("path");
         std::string json_str;
-         queue.execute_sync([&json_str, &path]() {
+        const tools::TraceContext ctx = tools::capture_trace_context();
+         queue.execute_sync([&json_str, &path, ctx]() {
+              tools::ScopedTraceContext restore(ctx);
               auto *editor = godot::EditorInterface::get_singleton();
               if (!editor) {
                 set_error(json_str, "Not in editor mode");
@@ -362,7 +369,9 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           .MimeType("application/json"),
       [&queue](const std::string &uri) -> mcp::ReadResourceResult {
         std::string json_str;
-         queue.execute_sync([&json_str]() {
+        const tools::TraceContext ctx = tools::capture_trace_context();
+         queue.execute_sync([&json_str, ctx]() {
+              tools::ScopedTraceContext restore(ctx);
               auto *editor = godot::EditorInterface::get_singleton();
               if (!editor) {
                 set_error(json_str, "Not in editor mode");
@@ -396,7 +405,9 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           -> mcp::ReadResourceResult {
         std::string path = vars.at("path");
         std::string json_str;
-         queue.execute_sync([&json_str, &path]() {
+        const tools::TraceContext ctx = tools::capture_trace_context();
+         queue.execute_sync([&json_str, &path, ctx]() {
+              tools::ScopedTraceContext restore(ctx);
               auto *editor = godot::EditorInterface::get_singleton();
               if (!editor) {
                 set_error(json_str, "Not in editor mode");
@@ -444,7 +455,9 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           .MimeType("application/json"),
       [&queue](const std::string &uri) -> mcp::ReadResourceResult {
         std::string json_str;
-         queue.execute_sync([&json_str]() {
+        const tools::TraceContext ctx = tools::capture_trace_context();
+         queue.execute_sync([&json_str, ctx]() {
+              tools::ScopedTraceContext restore(ctx);
               auto *editor = godot::EditorInterface::get_singleton();
               if (!editor) {
                 set_error(json_str, "Not in editor mode");
@@ -490,7 +503,9 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           -> mcp::ReadResourceResult {
         std::string key = vars.at("key");
         std::string json_str;
-         queue.execute_sync([&json_str, &key]() {
+        const tools::TraceContext ctx = tools::capture_trace_context();
+         queue.execute_sync([&json_str, &key, ctx]() {
+              tools::ScopedTraceContext restore(ctx);
               auto *editor = godot::EditorInterface::get_singleton();
               if (!editor) {
                 set_error(json_str, "Not in editor mode");
@@ -522,7 +537,9 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           .MimeType("application/json"),
       [&queue](const std::string &uri) -> mcp::ReadResourceResult {
         std::string json_str;
-         queue.execute_sync([&json_str]() {
+        const tools::TraceContext ctx = tools::capture_trace_context();
+         queue.execute_sync([&json_str, ctx]() {
+              tools::ScopedTraceContext restore(ctx);
               auto &log = LogSystem::instance();
               auto entries = log.query_recent(50);
 

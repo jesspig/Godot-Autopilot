@@ -62,12 +62,16 @@ ServerContext::~ServerContext() {
 }
 
 bool ServerContext::start() {
+  const std::string endpoint = host_ + ":" + std::to_string(port_);
   try {
     if (!is_loopback_host(host_)) {
       last_error_ = "refusing non-loopback listen address '" + host_ +
                     "': remote listening requires application authentication";
       LogSystem::instance().log(LogLevel::Error, LogCategory::Transport,
                                 "MCP server start rejected: " + last_error_);
+      LogSystem::instance().log_detailed(
+          LogLevel::Error, LogCategory::Transport, "MCP server start rejected",
+          "endpoint=" + endpoint + " msg=" + last_error_);
       return false;
     }
 
@@ -110,23 +114,34 @@ bool ServerContext::start() {
       LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
                                 "Client initialization complete");
     };
-    opts.on_protocol_error = [](std::string_view error) {
+    opts.on_protocol_error = [endpoint](std::string_view error) {
       LogSystem::instance().log(LogLevel::Error, LogCategory::Transport,
                                 "Protocol error: " + std::string(error));
+      LogSystem::instance().log_detailed(
+          LogLevel::Error, LogCategory::Transport,
+          "Protocol error on " + endpoint,
+          "endpoint=" + endpoint + " msg=" + std::string(error));
     };
     opts.on_transport_close = [] {
       LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
                                 "Client disconnected");
     };
-    opts.on_transport_error = [](std::string_view msg) {
+    opts.on_transport_error = [endpoint](std::string_view msg) {
       LogSystem::instance().log(LogLevel::Error, LogCategory::Transport,
                                 "Transport error: " + std::string(msg));
+      LogSystem::instance().log_detailed(
+          LogLevel::Error, LogCategory::Transport,
+          "Transport error on " + endpoint,
+          "endpoint=" + endpoint + " msg=" + std::string(msg));
     };
     server_ = mcp::McpServer::Create(transport_, opts);
     if (!server_) {
       last_error_ = "McpServer::Create returned null";
       LogSystem::instance().log(LogLevel::Error, LogCategory::Transport,
                                 "MCP server start failed: " + last_error_);
+      LogSystem::instance().log_detailed(
+          LogLevel::Error, LogCategory::Transport, "MCP server start failed",
+          "endpoint=" + endpoint + " msg=" + last_error_);
       transport_.reset();
       dispatch::clear_handlers();
       clear_active_registry();
@@ -160,6 +175,9 @@ bool ServerContext::start() {
                   ": " + std::string(e.what());
     LogSystem::instance().log(LogLevel::Error, LogCategory::Transport,
                               "MCP server start failed: " + last_error_);
+    LogSystem::instance().log_detailed(
+        LogLevel::Error, LogCategory::Transport, "MCP server start failed",
+        "endpoint=" + endpoint + " msg=" + last_error_);
     if (server_) { try { server_->Close(); } catch (...) {} server_.reset(); }
     if (transport_) { try { transport_->Close(); } catch (...) {} transport_.reset(); }
     dispatch::clear_handlers();
@@ -176,6 +194,9 @@ bool ServerContext::start() {
     last_error_ = "transport start failed: " + detail;
     LogSystem::instance().log(LogLevel::Error, LogCategory::Transport,
                               "MCP server start failed: " + last_error_);
+    LogSystem::instance().log_detailed(
+        LogLevel::Error, LogCategory::Transport, "MCP server start failed",
+        "endpoint=" + endpoint + " msg=" + last_error_);
     if (server_) { try { server_->Close(); } catch (...) {} server_.reset(); }
     if (transport_) { try { transport_->Close(); } catch (...) {} transport_.reset(); }
     dispatch::clear_handlers();
@@ -209,6 +230,10 @@ bool ServerContext::restart(uint16_t port) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
                             "MCP server restart requested on port " +
                                 std::to_string(port));
+  LogSystem::instance().log_detailed(
+      LogLevel::Info, LogCategory::Transport, "MCP server restart requested",
+      "endpoint=" + host_ + ":" + std::to_string(port) +
+          " previous_port=" + std::to_string(port_));
   stop();
   port_ = port;
   return start();

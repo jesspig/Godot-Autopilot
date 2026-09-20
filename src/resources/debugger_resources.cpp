@@ -1,6 +1,7 @@
 #include "resources/debugger_resources.hpp"
 #include "core/log_system.hpp"
 #include "tools/debugger_ops.hpp"
+#include "tools/tool_invoke.hpp"
 
 namespace godot_autopilot {
 
@@ -23,7 +24,9 @@ void register_debugger_resources(mcp::McpServer &server, CommandQueue &queue) {
       ResourceOptions{}.Description(
           "Recent editor output log (print/printerr/script errors)"),
       [make_result, &queue](const std::string &uri) {
-        return make_result(uri, queue.execute_sync([] {
+        const tools::TraceContext ctx = tools::capture_trace_context();
+        return make_result(uri, queue.execute_sync([ctx] {
+          tools::ScopedTraceContext restore(ctx);
           return capture_get_log_text(200);
         }));
       });
@@ -33,7 +36,9 @@ void register_debugger_resources(mcp::McpServer &server, CommandQueue &queue) {
       ResourceOptions{}.Description(
           "Runtime errors and warnings from the running game"),
       [make_result, &queue](const std::string &uri) {
-        return make_result(uri, queue.execute_sync([] {
+        const tools::TraceContext ctx = tools::capture_trace_context();
+        return make_result(uri, queue.execute_sync([ctx] {
+          tools::ScopedTraceContext restore(ctx);
           return capture_get_errors_text(50);
         }));
       });
@@ -42,7 +47,10 @@ void register_debugger_resources(mcp::McpServer &server, CommandQueue &queue) {
                           ResourceOptions{}.Description(
                               "Runtime print() output from the running game"),
                           [make_result, &queue](const std::string &uri) {
-                            return make_result(uri, queue.execute_sync([] {
+                            const tools::TraceContext ctx =
+                                tools::capture_trace_context();
+                            return make_result(uri, queue.execute_sync([ctx] {
+                              tools::ScopedTraceContext restore(ctx);
                               return capture_get_game_output_text(200);
                             }));
                           });
@@ -52,7 +60,9 @@ void register_debugger_resources(mcp::McpServer &server, CommandQueue &queue) {
       ResourceOptions{}.Description(
           "Current stack trace when debugger is paused on a breakpoint"),
       [make_result, &queue](const std::string &uri) {
-        return make_result(uri, queue.execute_sync([] {
+        const tools::TraceContext ctx = tools::capture_trace_context();
+        return make_result(uri, queue.execute_sync([ctx] {
+          tools::ScopedTraceContext restore(ctx);
           return capture_get_stack_dump_text();
         }));
       });
@@ -61,7 +71,9 @@ void register_debugger_resources(mcp::McpServer &server, CommandQueue &queue) {
       "debugger-scene-tree", "godot://debugger/scene-tree",
       ResourceOptions{}.Description("Remote scene tree of the running game"),
       [make_result, &queue](const std::string &uri) {
-        return make_result(uri, queue.execute_sync([] {
+        const tools::TraceContext ctx = tools::capture_trace_context();
+        return make_result(uri, queue.execute_sync([ctx] {
+          tools::ScopedTraceContext restore(ctx);
           return capture_get_scene_tree_text();
         }));
       });
@@ -71,7 +83,9 @@ void register_debugger_resources(mcp::McpServer &server, CommandQueue &queue) {
       ResourceOptions{}.Description(
           "Latest performance monitor data from the running game"),
       [make_result, &queue](const std::string &uri) {
-        return make_result(uri, queue.execute_sync([] {
+        const tools::TraceContext ctx = tools::capture_trace_context();
+        return make_result(uri, queue.execute_sync([ctx] {
+          tools::ScopedTraceContext restore(ctx);
           return capture_get_monitors_text(5);
         }));
       });
@@ -81,7 +95,9 @@ void register_debugger_resources(mcp::McpServer &server, CommandQueue &queue) {
       ResourceOptions{}.Description(
           "Current debugger session state (active/breaked/running)"),
       [make_result, &queue](const std::string &uri) {
-        return make_result(uri, queue.execute_sync([] {
+        const tools::TraceContext ctx = tools::capture_trace_context();
+        return make_result(uri, queue.execute_sync([ctx] {
+          tools::ScopedTraceContext restore(ctx);
           return capture_get_session_info_text();
         }));
       });

@@ -31,6 +31,7 @@
 #include "tools/register_all.hpp"
 #include "tools/runtime_ops.hpp"
 #include "tools/tool_base.hpp"
+#include "tools/tool_invoke.hpp"
 #include "tools/tool_spec.hpp"
 #include "util/error_util.hpp"
 #include "util/variant_json.hpp"
@@ -105,8 +106,9 @@ bool parse_side_effect(const std::string &text, SideEffect &out) {
 int64_t reject_registration(const std::string &message) {
   godot::UtilityFunctions::push_error(
       godot::String::utf8(message.c_str()));
-  LogSystem::instance().log(LogLevel::Warning, LogCategory::Tools,
-                            "register_tool rejected: " + message);
+  LogSystem::instance().log_detailed(LogLevel::Warning, LogCategory::Tools,
+                                     "register_tool rejected: " + message,
+                                     "reason=" + message);
   return -1;
 }
 
@@ -148,9 +150,13 @@ mcp::JsonValue run_dynamic_handler(
     const std::shared_ptr<DynamicTarget> &target, const mcp::JsonValue &args) {
   if (runtime_ops::has_editor_queue() &&
       !get_editor_queue().is_main_thread()) {
+    const tools::TraceContext ctx = tools::capture_trace_context();
     try {
       return get_editor_queue().execute_sync(
-          [&target, &args] { return invoke_dynamic_target(target, args); });
+          [&target, &args, ctx] {
+            tools::ScopedTraceContext restore(ctx);
+            return invoke_dynamic_target(target, args);
+          });
     } catch (const std::exception &e) {
       return util::error_json(std::string("user tool dispatch failed: ") +
                               e.what());
@@ -420,14 +426,21 @@ int64_t AutopilotTools::register_tool(const godot::Dictionary &definition,
   };
 
   const int64_t handle = next_handle().fetch_add(1);
+  const std::string registration_detail =
+      "tool=" + name + " handle=" + std::to_string(handle) +
+      " params=" + std::to_string(spec.params.size()) +
+      " tags=" + std::to_string(spec.tags.size()) +
+      " category=" + spec.category;
   {
     std::lock_guard<std::mutex> lock(dynamic_specs::mutex());
     dynamic_specs::store().push_back(std::move(spec));
     handle_store().push_back(handle);
   }
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "user tool '" + name + "' registered (handle " +
-                                std::to_string(handle) + ")");
+  LogSystem::instance().log_detailed(
+      LogLevel::Info, LogCategory::Tools,
+      "user tool '" + name + "' registered (handle " +
+          std::to_string(handle) + ")",
+      registration_detail);
   refresh_dynamic_tools();
   return handle;
 }
@@ -437,6 +450,7 @@ bool AutopilotTools::unregister_tool(int64_t handle) {
     return false;
   }
   bool removed = false;
+  std::string removed_name;
   {
     std::lock_guard<std::mutex> lock(dynamic_specs::mutex());
     std::vector<int64_t> &handles = handle_store();
@@ -446,14 +460,16 @@ bool AutopilotTools::unregister_tool(int64_t handle) {
           static_cast<size_t>(std::distance(handles.begin(), it));
       handles.erase(it);
       std::vector<ToolSpec> &specs = dynamic_specs::store();
+      removed_name = specs[index].name;
       specs.erase(specs.begin() + static_cast<std::ptrdiff_t>(index));
       removed = true;
     }
   }
   if (removed) {
-    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                              "user tool handle " + std::to_string(handle) +
-                                  " unregistered");
+    LogSystem::instance().log_detailed(
+        LogLevel::Info, LogCategory::Tools,
+        "user tool handle " + std::to_string(handle) + " unregistered",
+        "tool=" + removed_name + " handle=" + std::to_string(handle));
     refresh_dynamic_tools();
   }
   return removed;
@@ -527,8 +543,12 @@ godot::Dictionary AutopilotTools::call_tool(const godot::String &name,
   try {
     if (runtime_ops::has_editor_queue() &&
         !get_editor_queue().is_main_thread()) {
+      const tools::TraceContext ctx = tools::capture_trace_context();
       result = get_editor_queue().execute_sync(
-          [&invoke] { return invoke(); });
+          [&invoke, ctx] {
+            tools::ScopedTraceContext restore(ctx);
+            return invoke();
+          });
     } else {
       result = invoke();
     }
@@ -551,9 +571,15 @@ bool AutopilotTools::is_enabled() const {
 
 void AutopilotTools::set_enabled(bool enabled) {
   const std::string allow = PluginConfig::load_allow();
-  PluginConfig::save_allow(
+  const std::string updated =
       enabled ? authorization::allow_list_add(allow, kUserToolsCapability)
-              : authorization::allow_list_remove(allow, kUserToolsCapability));
+              : authorization::allow_list_remove(allow, kUserToolsCapability);
+  PluginConfig::save_allow(updated);
+  LogSystem::instance().log_detailed(
+      LogLevel::Info, LogCategory::Tools,
+      enabled ? "user tools enabled" : "user tools disabled",
+      "enabled=" + std::string(enabled ? "true" : "false") +
+          " allow=" + (updated.empty() ? "(none)" : updated));
 }
 
 godot::Dictionary AutopilotTools::rescan(const godot::String &directory) {
@@ -566,10 +592,14 @@ godot::Dictionary AutopilotTools::rescan(const godot::String &directory) {
   }
   if (runtime_ops::has_editor_queue() &&
       !get_editor_queue().is_main_thread()) {
+    const tools::TraceContext ctx = tools::capture_trace_context();
     try {
       const godot::String dir_copy = directory;
       return get_editor_queue().execute_sync(
-          [this, dir_copy] { return rescan(dir_copy); });
+          [this, dir_copy, ctx] {
+            tools::ScopedTraceContext restore(ctx);
+            return rescan(dir_copy);
+          });
     } catch (const std::exception &e) {
       return rescan_error(std::string("rescan dispatch failed: ") + e.what());
     } catch (...) {

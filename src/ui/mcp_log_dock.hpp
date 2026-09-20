@@ -23,6 +23,8 @@ class McpLogDock : public godot::EditorDock {
   godot::OptionButton *category_filter;
   godot::Button *clear_button;
   godot::Button *collapse_button;
+  godot::Button *detail_button;
+  godot::Button *open_logs_button;
 
   struct ThemeCache {
     godot::Color error_color;
@@ -35,6 +37,7 @@ class McpLogDock : public godot::EditorDock {
   LogSystem *log_system;
   bool collapse = false;
   bool show_time_ = true;
+  bool show_detail_ = false;
   static constexpr int LINE_LIMIT = 5000;
   static constexpr float DEFAULT_DOCK_HEIGHT = 200.0f;
   size_t last_index_ = 0;
@@ -64,6 +67,8 @@ private:
   void _on_category_changed(int index);
   void _on_clear();
   void _on_collapse_toggled(bool enabled);
+  void _on_detail_toggled(bool enabled);
+  void _on_open_logs();
 };
 
 } // namespace godot_autopilot

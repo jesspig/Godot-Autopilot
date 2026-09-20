@@ -13,8 +13,10 @@
 
 #include "core/command_queue.hpp"
 #include "core/export_guard.hpp"
+#include "core/log_persist.hpp"
 #include "core/log_system.hpp"
 #include "core/mode_detector.hpp"
+#include "core/sanitize_policy.hpp"
 #include "core/scene_dirty_tracker.hpp"
 #include "core/server_context.hpp"
 #include "runtime/game_bridge.hpp"
@@ -104,6 +106,8 @@ void GodotAutopilotPlugin::_enter_tree() {
   using godot_autopilot::LogLevel;
 
   s_queue.open();
+  godot_autopilot::sanitize_policy::initialize();
+  godot_autopilot::LogPersist::instance().init_session();
   try {
     auto *engine = godot::Engine::get_singleton();
     if (!engine) {
@@ -191,6 +195,12 @@ void GodotAutopilotPlugin::_enter_tree() {
                             "MCP server listening on " +
                                 g_server_ctx->get_host() + ":" +
                                 std::to_string(port));
+      std::string ready = "{\"type\":\"server_ready\",\"host\":\"";
+      ready += g_server_ctx->get_host();
+      ready += "\",\"port\":";
+      ready += std::to_string(port);
+      ready += "}";
+      godot_autopilot::LogPersist::instance().enqueue_trace(ready);
     } else {
       get_log_system().log(LogLevel::Error, LogCategory::Transport,
                            "MCP server start failed: " +
@@ -218,6 +228,7 @@ void GodotAutopilotPlugin::_enter_tree() {
 }
 
 void GodotAutopilotPlugin::_process(double) {
+  godot_autopilot::LogPersist::instance().flush_on_main_thread();
   s_queue.drain();
   if (log_dock) {
     log_dock->poll_new_entries();
@@ -284,6 +295,7 @@ void GodotAutopilotPlugin::_exit_tree() {
                          godot_autopilot::LogCategory::System,
                          "exit tree exception: unknown exception");
   }
+  godot_autopilot::LogPersist::instance().flush_on_main_thread();
 }
 
 extern "C" {

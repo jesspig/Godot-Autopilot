@@ -14,6 +14,8 @@
 #include <godot_cpp/classes/font.hpp>
 #include <godot_cpp/classes/h_box_container.hpp>
 #include <godot_cpp/classes/h_flow_container.hpp>
+#include <godot_cpp/classes/os.hpp>
+#include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/classes/theme.hpp>
 #include <godot_cpp/classes/v_box_container.hpp>
 #include <godot_cpp/core/class_db.hpp>
@@ -73,6 +75,24 @@ McpLogDock::McpLogDock() : log_system(&LogSystem::instance()) {
       "occurrences.");
   bottom_hf->add_child(collapse_button);
 
+  detail_button = memnew(godot::Button);
+  detail_button->set_theme_type_variation("BottomPanelButton");
+  detail_button->set_focus_mode(godot::Control::FOCUS_ACCESSIBILITY);
+  detail_button->set_toggle_mode(true);
+  detail_button->set_pressed(false);
+  detail_button->set_text("Detail");
+  detail_button->set_tooltip_text(
+      "Show the detail line under each message when available.");
+  bottom_hf->add_child(detail_button);
+
+  open_logs_button = memnew(godot::Button);
+  open_logs_button->set_theme_type_variation("BottomPanelButton");
+  open_logs_button->set_focus_mode(godot::Control::FOCUS_ACCESSIBILITY);
+  open_logs_button->set_text("Open Logs");
+  open_logs_button->set_tooltip_text(
+      "Open the user://godot_autopilot/logs directory.");
+  bottom_hf->add_child(open_logs_button);
+
   search_box = memnew(godot::LineEdit);
   search_box->set_custom_minimum_size(godot::Vector2(150, 0));
   search_box->set_h_size_flags(godot::Control::SIZE_EXPAND_FILL);
@@ -114,6 +134,10 @@ McpLogDock::McpLogDock() : log_system(&LogSystem::instance()) {
   clear_button->connect("pressed", callable_mp(this, &McpLogDock::_on_clear));
   collapse_button->connect(
       "toggled", callable_mp(this, &McpLogDock::_on_collapse_toggled));
+  detail_button->connect(
+      "toggled", callable_mp(this, &McpLogDock::_on_detail_toggled));
+  open_logs_button->connect("pressed",
+                            callable_mp(this, &McpLogDock::_on_open_logs));
 
   _update_theme();
   _rebuild_log();
@@ -257,6 +281,10 @@ bool McpLogDock::_add_log_line(const LogEntry &entry, int count) {
   }
   log_display->add_text(text);
   log_display->newline();
+  if (show_detail_ && !entry.detail.empty()) {
+    log_display->add_text(godot::String("    ") + entry.detail.c_str());
+    log_display->newline();
+  }
   log_display->pop();
 
   if (log_display->get_paragraph_count() > LINE_LIMIT) {
@@ -392,6 +420,23 @@ void McpLogDock::_on_clear() {
 void McpLogDock::_on_collapse_toggled(bool enabled) {
   collapse = enabled;
   _rebuild_log();
+}
+
+void McpLogDock::_on_detail_toggled(bool enabled) {
+  show_detail_ = enabled;
+  _rebuild_log();
+}
+
+void McpLogDock::_on_open_logs() {
+  godot::String dir = godot::ProjectSettings::get_singleton()->globalize_path(
+      "user://godot_autopilot/logs");
+  godot::OS *os = godot::OS::get_singleton();
+  godot::Error err =
+      os ? os->shell_open(dir) : godot::Error::ERR_UNAVAILABLE;
+  if (err != godot::Error::OK) {
+    log_system->log(LogLevel::Error, LogCategory::System,
+                    "Open logs directory failed");
+  }
 }
 
 } // namespace godot_autopilot

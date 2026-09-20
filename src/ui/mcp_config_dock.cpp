@@ -14,6 +14,7 @@
 #include <godot_cpp/core/class_db.hpp>
 
 #include "core/plugin_config.hpp"
+#include "core/sanitize_policy.hpp"
 #include "tools/authorization.hpp"
 
 namespace godot_autopilot {
@@ -174,6 +175,22 @@ McpConfigDock::McpConfigDock() : port_spin(nullptr), apply_button(nullptr) {
   allow_user_tools_check->connect(
       "toggled", callable_mp(this, &McpConfigDock::_on_allow_user_tools_toggled));
 
+  auto *desensitize_row = memnew(godot::HBoxContainer);
+  root->add_child(desensitize_row);
+  auto *desensitize_label = memnew(godot::Label);
+  desensitize_label->set_text("Desensitize data:");
+  desensitize_row->add_child(desensitize_label);
+  desensitize_check = memnew(godot::CheckBox);
+  const bool desensitize = PluginConfig::load_desensitize();
+  desensitize_check->set_pressed(desensitize);
+  sanitize_policy::set_enabled(desensitize);
+  desensitize_check->set_tooltip_text(
+      "Strip sensitive key values from recorded data; read on the next "
+      "tool call, no restart needed.");
+  desensitize_row->add_child(desensitize_check);
+  desensitize_check->connect(
+      "toggled", callable_mp(this, &McpConfigDock::_on_desensitize_toggled));
+
   status_label = memnew(godot::Label);
   root->add_child(status_label);
 
@@ -249,6 +266,11 @@ void McpConfigDock::_on_allow_game_runtime_toggled(bool checked) {
 
 void McpConfigDock::_on_allow_user_tools_toggled(bool checked) {
   _on_allow_toggled("user_tools", allow_user_tools_check, checked);
+}
+
+void McpConfigDock::_on_desensitize_toggled(bool checked) {
+  PluginConfig::save_desensitize(checked);
+  sanitize_policy::set_enabled(checked);
 }
 
 void McpConfigDock::_on_allow_toggled(const char *capability,
