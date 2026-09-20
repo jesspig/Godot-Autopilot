@@ -13,6 +13,7 @@
 #include <godot_cpp/classes/v_box_container.hpp>
 #include <godot_cpp/core/class_db.hpp>
 
+#include "core/monitor.hpp"
 #include "core/plugin_config.hpp"
 #include "core/sanitize_policy.hpp"
 #include "tools/authorization.hpp"
@@ -257,20 +258,49 @@ void McpConfigDock::_on_show_time_toggled(bool checked) {
 }
 
 void McpConfigDock::_on_allow_code_execute_toggled(bool checked) {
+  monitor::ui_action(
+      "config_allow_toggle",
+      monitor::build_attrs(
+          {{"capability", "code_execute"}, {"enabled", checked ? "true" : "false"}}));
+  monitor::security(
+      "allow_change",
+      monitor::build_attrs(
+          {{"capability", "code_execute"}, {"enabled", checked ? "true" : "false"}}));
   _on_allow_toggled("code_execute", allow_code_execute_check, checked);
 }
 
 void McpConfigDock::_on_allow_game_runtime_toggled(bool checked) {
+  monitor::ui_action(
+      "config_allow_toggle",
+      monitor::build_attrs(
+          {{"capability", "game_runtime"}, {"enabled", checked ? "true" : "false"}}));
+  monitor::security(
+      "allow_change",
+      monitor::build_attrs(
+          {{"capability", "game_runtime"}, {"enabled", checked ? "true" : "false"}}));
   _on_allow_toggled("game_runtime", allow_game_runtime_check, checked);
 }
 
 void McpConfigDock::_on_allow_user_tools_toggled(bool checked) {
+  monitor::ui_action(
+      "config_allow_toggle",
+      monitor::build_attrs(
+          {{"capability", "user_tools"}, {"enabled", checked ? "true" : "false"}}));
+  monitor::security(
+      "allow_change",
+      monitor::build_attrs(
+          {{"capability", "user_tools"}, {"enabled", checked ? "true" : "false"}}));
   _on_allow_toggled("user_tools", allow_user_tools_check, checked);
 }
 
 void McpConfigDock::_on_desensitize_toggled(bool checked) {
   PluginConfig::save_desensitize(checked);
   sanitize_policy::set_enabled(checked);
+  monitor::ui_action(
+      "config_desensitize_toggle",
+      monitor::build_attrs({{"enabled", checked ? "true" : "false"}}));
+  monitor::security("desensitize",
+                    monitor::build_attrs({{"enabled", checked ? "true" : "false"}}));
 }
 
 void McpConfigDock::_on_allow_toggled(const char *capability,
@@ -331,6 +361,8 @@ void McpConfigDock::_on_apply_port() {
     return;
   }
   int port = static_cast<int>(port_spin->get_value());
+  monitor::ui_action("config_apply_port",
+                     monitor::build_attrs({{"port", std::to_string(port)}}));
   if (server_ctx->restart(static_cast<uint16_t>(port))) {
     PluginConfig::save_port(port);
     _refresh_status();
@@ -348,6 +380,10 @@ void McpConfigDock::_on_generate() {
 
   int port = static_cast<int>(port_spin->get_value());
   auto id = static_cast<ClientId>(client_select->get_selected_id());
+  monitor::ui_action(
+      "config_generate",
+      monitor::build_attrs({{"client", std::to_string(static_cast<int>(id))},
+                            {"port", std::to_string(port)}}));
   godot::String root =
       godot::ProjectSettings::get_singleton()->globalize_path("res://");
   godot::String abs_path = root.path_join(godot::String(file_path(id)));
@@ -438,6 +474,9 @@ void McpConfigDock::remove_legacy_skill_dirs() {
 
 void McpConfigDock::_on_generate_skills() {
   const bool updating = has_existing_skills();
+  monitor::ui_action(
+      "config_generate_skills",
+      monitor::build_attrs({{"updating", updating ? "true" : "false"}}));
   if (updating) {
     remove_legacy_skill_dirs();
   }

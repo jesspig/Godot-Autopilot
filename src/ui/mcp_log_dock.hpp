@@ -3,12 +3,14 @@
 
 #include <chrono>
 #include <cstddef>
+#include <string>
 
 #include <godot_cpp/classes/button.hpp>
 #include <godot_cpp/classes/editor_dock.hpp>
 #include <godot_cpp/classes/line_edit.hpp>
 #include <godot_cpp/classes/option_button.hpp>
 #include <godot_cpp/classes/rich_text_label.hpp>
+#include <godot_cpp/variant/variant.hpp>
 
 #include "../core/log_system.hpp"
 
@@ -25,6 +27,8 @@ class McpLogDock : public godot::EditorDock {
   godot::Button *collapse_button;
   godot::Button *detail_button;
   godot::Button *open_logs_button;
+  godot::Button *open_traces_button;
+  godot::Button *trace_button;
 
   struct ThemeCache {
     godot::Color error_color;
@@ -38,6 +42,8 @@ class McpLogDock : public godot::EditorDock {
   bool collapse = false;
   bool show_time_ = true;
   bool show_detail_ = false;
+  bool trace_mode_ = false;
+  std::string selected_trace_;
   static constexpr int LINE_LIMIT = 5000;
   static constexpr float DEFAULT_DOCK_HEIGHT = 200.0f;
   size_t last_index_ = 0;
@@ -69,6 +75,10 @@ private:
   void _on_collapse_toggled(bool enabled);
   void _on_detail_toggled(bool enabled);
   void _on_open_logs();
+  void _on_open_traces();
+  void _on_trace_toggled(bool enabled);
+  void _on_meta_clicked(const godot::Variant &meta);
+  void _rebuild_trace_view();
 };
 
 } // namespace godot_autopilot

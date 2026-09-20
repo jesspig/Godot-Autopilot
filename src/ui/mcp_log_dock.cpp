@@ -7,7 +7,10 @@
 #include <string>
 #include <unordered_map>
 
+#include "core/log_persist.hpp"
+#include "core/monitor.hpp"
 #include "core/plugin_config.hpp"
+#include "core/trace_recorder.hpp"
 
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/engine.hpp>
@@ -93,6 +96,24 @@ McpLogDock::McpLogDock() : log_system(&LogSystem::instance()) {
       "Open the user://godot_autopilot/logs directory.");
   bottom_hf->add_child(open_logs_button);
 
+  open_traces_button = memnew(godot::Button);
+  open_traces_button->set_theme_type_variation("BottomPanelButton");
+  open_traces_button->set_focus_mode(godot::Control::FOCUS_ACCESSIBILITY);
+  open_traces_button->set_text("Open Traces");
+  open_traces_button->set_tooltip_text(
+      "Open the user://godot_autopilot/traces directory.");
+  bottom_hf->add_child(open_traces_button);
+
+  trace_button = memnew(godot::Button);
+  trace_button->set_theme_type_variation("BottomPanelButton");
+  trace_button->set_focus_mode(godot::Control::FOCUS_ACCESSIBILITY);
+  trace_button->set_toggle_mode(true);
+  trace_button->set_pressed(false);
+  trace_button->set_text("Trace");
+  trace_button->set_tooltip_text(
+      "Show trace events instead of human log lines.");
+  bottom_hf->add_child(trace_button);
+
   search_box = memnew(godot::LineEdit);
   search_box->set_custom_minimum_size(godot::Vector2(150, 0));
   search_box->set_h_size_flags(godot::Control::SIZE_EXPAND_FILL);
@@ -138,6 +159,12 @@ McpLogDock::McpLogDock() : log_system(&LogSystem::instance()) {
       "toggled", callable_mp(this, &McpLogDock::_on_detail_toggled));
   open_logs_button->connect("pressed",
                             callable_mp(this, &McpLogDock::_on_open_logs));
+  open_traces_button->connect("pressed",
+                              callable_mp(this, &McpLogDock::_on_open_traces));
+  trace_button->connect("toggled",
+                        callable_mp(this, &McpLogDock::_on_trace_toggled));
+  log_display->connect("meta_clicked",
+                       callable_mp(this, &McpLogDock::_on_meta_clicked));
 
   _update_theme();
   _rebuild_log();
@@ -237,6 +264,9 @@ void McpLogDock::_update_theme() {
 void McpLogDock::refresh() { _rebuild_log(); }
 
 void McpLogDock::poll_new_entries() {
+  if (trace_mode_) {
+    return;
+  }
   size_t next = last_index_;
   auto entries = log_system->query_from(last_index_, &next);
   if (entries.empty())
@@ -280,6 +310,11 @@ bool McpLogDock::_add_log_line(const LogEntry &entry, int count) {
     text = entry.message.c_str();
   }
   log_display->add_text(text);
+  if (!entry.trace_id.empty()) {
+    log_display->push_meta(godot::String(entry.trace_id.c_str()));
+    log_display->add_text(" [trace]");
+    log_display->pop();
+  }
   log_display->newline();
   if (show_detail_ && !entry.detail.empty()) {
     log_display->add_text(godot::String("    ") + entry.detail.c_str());
@@ -325,7 +360,8 @@ bool McpLogDock::_check_display(const LogEntry &entry) const {
   if (!search_box->get_text().is_empty()) {
     godot::String filter = search_box->get_text();
     godot::String msg = entry.message.c_str();
-    if (msg.findn(filter) == -1)
+    godot::String detail = entry.detail.c_str();
+    if (msg.findn(filter) == -1 && detail.findn(filter) == -1)
       return false;
   }
 
@@ -333,6 +369,11 @@ bool McpLogDock::_check_display(const LogEntry &entry) const {
 }
 
 void McpLogDock::_rebuild_log() {
+  if (trace_mode_) {
+    _rebuild_trace_view();
+    return;
+  }
+
   log_display->clear();
 
   size_t next = 0;
@@ -407,27 +448,41 @@ void McpLogDock::_on_search_changed(const godot::String &text) {
 }
 
 void McpLogDock::_on_filter_toggled(bool active, int level_idx) {
+  monitor::ui_action("log_filter_toggle",
+                     monitor::build_attrs({{"level", std::to_string(level_idx)},
+                                           {"enabled", active ? "true" : "false"}}));
   _rebuild_log();
 }
 
-void McpLogDock::_on_category_changed(int index) { _rebuild_log(); }
+void McpLogDock::_on_category_changed(int index) {
+  monitor::ui_action("log_category_change",
+                     monitor::build_attrs({{"index", std::to_string(index)}}));
+  _rebuild_log();
+}
 
 void McpLogDock::_on_clear() {
+  monitor::ui_action("log_clear", monitor::build_attrs({{"mode", trace_mode_ ? "trace" : "log"}}));
   log_display->clear();
   last_index_ = log_system->next_index();
 }
 
 void McpLogDock::_on_collapse_toggled(bool enabled) {
   collapse = enabled;
+  monitor::ui_action(
+      "log_collapse_toggle",
+      monitor::build_attrs({{"enabled", enabled ? "true" : "false"}}));
   _rebuild_log();
 }
 
 void McpLogDock::_on_detail_toggled(bool enabled) {
   show_detail_ = enabled;
+  monitor::ui_action("log_detail_toggle",
+                     monitor::build_attrs({{"enabled", enabled ? "true" : "false"}}));
   _rebuild_log();
 }
 
 void McpLogDock::_on_open_logs() {
+  monitor::ui_action("log_open_dir", monitor::build_attrs({{"target", "logs"}}));
   godot::String dir = godot::ProjectSettings::get_singleton()->globalize_path(
       "user://godot_autopilot/logs");
   godot::OS *os = godot::OS::get_singleton();
@@ -437,6 +492,102 @@ void McpLogDock::_on_open_logs() {
     log_system->log(LogLevel::Error, LogCategory::System,
                     "Open logs directory failed");
   }
+}
+
+void McpLogDock::_on_open_traces() {
+  monitor::ui_action("log_open_dir", monitor::build_attrs({{"target", "traces"}}));
+  godot::String dir = godot::ProjectSettings::get_singleton()->globalize_path(
+      godot::String(LogPersist::instance().trace_dir().c_str()));
+  godot::OS *os = godot::OS::get_singleton();
+  godot::Error err =
+      os ? os->shell_open(dir) : godot::Error::ERR_UNAVAILABLE;
+  if (err != godot::Error::OK) {
+    log_system->log(LogLevel::Error, LogCategory::System,
+                    "Open traces directory failed");
+  }
+}
+
+void McpLogDock::_on_trace_toggled(bool enabled) {
+  trace_mode_ = enabled;
+  monitor::ui_action("log_trace_mode",
+                     monitor::build_attrs({{"enabled", enabled ? "true" : "false"}}));
+  _rebuild_log();
+}
+
+void McpLogDock::_on_meta_clicked(const godot::Variant &meta) {
+  godot::String meta_text = meta;
+  selected_trace_ = meta_text.utf8().get_data();
+  if (!trace_button->is_pressed()) {
+    trace_button->set_pressed(true);
+  }
+  detail_button->set_pressed(true);
+  search_box->set_text(meta_text);
+  _rebuild_log();
+}
+
+void McpLogDock::_rebuild_trace_view() {
+  log_display->clear();
+
+  std::string id = selected_trace_;
+  if (id.empty()) {
+    id = search_box->get_text().utf8().get_data();
+  }
+
+  if (id.empty()) {
+    _apply_entry_style(LogLevel::Info);
+    log_display->add_text(
+        "No trace selected. Click a [trace] marker or type a trace id in the "
+        "filter box.");
+    log_display->newline();
+    log_display->pop();
+    _update_filter_counts();
+    return;
+  }
+
+  auto events =
+      TraceRecorder::instance().query_by_trace(id);
+  if (events.empty()) {
+    _apply_entry_style(LogLevel::Warning);
+    log_display->add_text(godot::String("No trace events for ") +
+                          godot::String(id.c_str()));
+    log_display->newline();
+    log_display->pop();
+    _update_filter_counts();
+    return;
+  }
+
+  for (const auto &event : events) {
+    const bool bad = !event.ok || !event.error_code.empty();
+    _apply_entry_style(bad ? LogLevel::Error : LogLevel::Info);
+
+    godot::String line = "[";
+    line += godot::String::num_int64(static_cast<int64_t>(event.seq));
+    line += "] ";
+    line += godot::String(trace_kind_name(event.kind));
+    line += " ";
+    line += godot::String(event.name.c_str());
+    if (!event.tool.empty()) {
+      line += " tool=" + godot::String(event.tool.c_str());
+    }
+    if (!event.state.empty()) {
+      line += " state=" + godot::String(event.state.c_str());
+    }
+    line += " dur=" + godot::String::num_int64(event.duration_ms) + "ms";
+    if (!event.error_code.empty()) {
+      line += " err=" + godot::String(event.error_code.c_str());
+    }
+    line += " ok=" + godot::String(event.ok ? "true" : "false");
+
+    log_display->add_text(line);
+    log_display->newline();
+    log_display->pop();
+
+    if (log_display->get_paragraph_count() > LINE_LIMIT) {
+      log_display->remove_paragraph(0);
+    }
+  }
+
+  _update_filter_counts();
 }
 
 } // namespace godot_autopilot
