@@ -11,7 +11,8 @@ set(GDA_SKILL_TEMPLATES_DIR "${CMAKE_SOURCE_DIR}/src/util/skill_templates")
 set(GDA_SKILL_EMBED_HEADER "${CMAKE_BINARY_DIR}/generated/skill_content_embedded.h")
 
 file(GLOB GDA_SKILL_TEMPLATE_FILES CONFIGURE_DEPENDS
-    "${GDA_SKILL_TEMPLATES_DIR}/*.md")
+    "${GDA_SKILL_TEMPLATES_DIR}/*.md"
+    "${GDA_SKILL_TEMPLATES_DIR}/*.mjs")
 list(APPEND GDA_SKILL_TEMPLATE_FILES "${GDA_SKILL_TEMPLATES_DIR}/registry.json")
 
 add_custom_command(
