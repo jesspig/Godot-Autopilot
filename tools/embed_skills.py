@@ -12,7 +12,7 @@ from pathlib import Path, PurePath
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
 
-SKILL_COUNT = 8
+SKILL_COUNT = 9
 # 与 src/util/skill_templates/registry.json 的册数保持同步
 NAME_PATTERN = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 MAX_NAME_LEN = 64
@@ -106,14 +106,18 @@ def validate_and_load(templates_dir):
             if file_index == 0:
                 if path != "SKILL.md":
                     errors.append(f"{file_label}.path 首项须为 \"SKILL.md\"，实际 {path!r}")
-            elif not path.startswith("references/"):
-                errors.append(f"{file_label}.path 非首项须以 references/ 开头，实际 {path!r}")
+            # Non-first entries allow references/*.md or scripts/*.mjs (direct children only).
+            elif not (path.startswith("references/")
+                    or (path.startswith("scripts/") and path.endswith(".mjs")
+                        and "/" not in path[len("scripts/"):])):
+                errors.append(f"{file_label}.path 非首项须以 references/ 开头或为 scripts/ 直属 .mjs，实际 {path!r}")
             if path in seen_paths:
                 errors.append(f"{file_label}.path 重复: {path!r}")
             seen_paths.add(path)
 
-            if not source.endswith(".md"):
-                errors.append(f"{file_label}.source 须为 .md 文件: {source!r}")
+            # Source must be a flat .md or .mjs template file.
+            if not (source.endswith(".md") or source.endswith(".mjs")):
+                errors.append(f"{file_label}.source 须为 .md/.mjs 文件: {source!r}")
             if PurePath(source).name != source:
                 errors.append(f"{file_label}.source 须为模板目录内的平铺文件名: {source!r}")
             source_path = templates_dir / source
@@ -134,15 +138,18 @@ def validate_and_load(templates_dir):
         if files_valid and parsed_files:
             entries.append((name, description, parsed_files))
 
+    # Orphan check covers both .md and .mjs template files (registry.json excluded by glob).
     template_md_files = {p.name for p in templates_dir.glob("*.md")}
+    template_mjs_files = {p.name for p in templates_dir.glob("*.mjs")}
+    template_files = template_md_files | template_mjs_files
     referenced_sources = set(source_counts)
     for source, count in sorted(source_counts.items()):
         if count > 1:
-            errors.append(f"source 被引用 {count} 次（每个 .md 恰须一条引用）: {source!r}")
-    for orphan in sorted(template_md_files - referenced_sources):
-        errors.append(f"模板目录存在未被引用的孤儿 .md: {orphan!r}")
-    for dangling in sorted(referenced_sources - template_md_files):
-        errors.append(f"source 未对应模板目录中的 .md 文件: {dangling!r}")
+            errors.append(f"source 被引用 {count} 次（每个 .md/.mjs 恰须一条引用）: {source!r}")
+    for orphan in sorted(template_files - referenced_sources):
+        errors.append(f"模板目录存在未被引用的孤儿 .md/.mjs: {orphan!r}")
+    for dangling in sorted(referenced_sources - template_files):
+        errors.append(f"source 未对应模板目录中的 .md/.mjs 文件: {dangling!r}")
 
     return entries, errors
 

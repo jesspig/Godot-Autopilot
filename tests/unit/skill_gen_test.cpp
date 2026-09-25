@@ -23,9 +23,10 @@ namespace {
 
 using namespace godot_autopilot::skill_gen;
 
-constexpr size_t kSkillCount = 8;
+constexpr size_t kSkillCount = 9;
 const char *const kExpectedSkillNames[kSkillCount] = {
     "godot-autopilot",
+    "godot-autopilot-tools",
     "godot-autopilot-scene-system",
     "godot-autopilot-resources",
     "godot-autopilot-scripting",
@@ -52,7 +53,7 @@ const char *const kManualWhitelist[] = {
     "can_instantiate", "cast_motion", "cast_to", "check_almost_equal",
     "collide_shape", "collider_id", "create_render_", "dependency_count",
     "elapsed_ms", "from_archive", "gda_test", "get_node", "get_property",
-    "get_rest_info", "get_world_3d", "hint_string", "ignored_params",
+    "get_rest_info", "get_singleton", "get_world_3d", "hint_string", "ignored_params",
     "instance_id", "instantiate_failed", "intersect_point", "intersect_ray",
     "intersect_shape", "is_playing", "is_valid", "just_released",
     "keep_state", "last_activity_ms", "load_failed", "missing_dependencies",
@@ -81,7 +82,17 @@ const char *const kManualWhitelist[] = {
     "set_custom_mouse_cursor", "shows_alert", "side_effect", "source_file",
     "source_md5", "sub_resource", "tile_map_data", "tile_set", "to_uid_path",
     "track_insert_key", "tree_exited", "uid_cache", "unique_id",
-    "use_multiple_threads", "writes_config", "z_index", "set_suspend"};
+    "use_multiple_threads", "writes_config", "z_index", "set_suspend",
+
+    "register_tool", "unregister_tool", "has_tool", "list_tools", "get_tool",
+    "is_enabled", "set_enabled", "rescan", "register_autopilot_tools",
+    "user_tools", "definition", "callable", "handle", "scanned", "registered",
+    "failed", "errors", "directory", "enabled",
+
+    "gda_mcp",
+
+    "dynamic", "required", "type", "description", "error", "file", "args",
+    "name", "params", "tags", "category"};
 
 bool is_word_char(char c) {
   return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
@@ -174,6 +185,19 @@ bool starts_with(const std::string &text, const char *prefix) {
   return text.rfind(prefix, 0) == 0;
 }
 
+bool ends_with(const std::string &text, const char *suffix) {
+  const std::string tail(suffix);
+  return text.size() >= tail.size() &&
+         text.compare(text.size() - tail.size(), tail.size(), tail) == 0;
+}
+
+bool is_skill_aux_path(const std::string &path) {
+  if (starts_with(path, "references/")) {
+    return true;
+  }
+  return starts_with(path, "scripts/") && ends_with(path, ".mjs");
+}
+
 class SkillRegistryFixture : public ::testing::Test {
   std::unique_ptr<mcp::McpServer> server;
   std::unique_ptr<mcp::McpClient> client;
@@ -209,7 +233,7 @@ protected:
   }
 };
 
-TEST(SkillGenTest, AllEightSkillsPresent) {
+TEST(SkillGenTest, AllNineSkillsPresent) {
   const std::vector<SkillSpec> skills = all_skills();
   ASSERT_EQ(skills.size(), kSkillCount);
 
@@ -252,8 +276,8 @@ TEST(SkillGenTest, FilesLayout) {
     EXPECT_EQ(spec.files[0].relative_path, "SKILL.md")
         << "files[0] must be SKILL.md: " << spec.name;
     for (size_t i = 1; i < spec.files.size(); ++i) {
-      EXPECT_TRUE(starts_with(spec.files[i].relative_path, "references/"))
-          << spec.name << ": reference path must start with 'references/': "
+      EXPECT_TRUE(is_skill_aux_path(spec.files[i].relative_path))
+          << spec.name << ": file path must start with 'references/' or 'scripts/': "
           << spec.files[i].relative_path;
     }
     for (const SkillFile &file : spec.files) {
@@ -330,6 +354,9 @@ TEST_F(SkillRegistryFixture, ToolNamesExistInRegistry) {
 
   for (const SkillSpec &spec : all_skills()) {
     for (const SkillFile &file : spec.files) {
+      if (!ends_with(file.relative_path, ".md")) {
+        continue;
+      }
       const std::set<std::string> words =
           extract_backtick_snake_words(file.body);
       for (const std::string &word : words) {
@@ -341,6 +368,80 @@ TEST_F(SkillRegistryFixture, ToolNamesExistInRegistry) {
   }
 }
 
+TEST_F(SkillRegistryFixture, ToolCatalogCoverage) {
+  const std::vector<SkillSpec> skills = all_skills();
+  const SkillSpec *tools_skill = nullptr;
+  for (const SkillSpec &spec : skills) {
+    if (spec.name == "godot-autopilot-tools") {
+      tools_skill = &spec;
+    }
+  }
+  ASSERT_NE(tools_skill, nullptr);
+  const SkillFile *catalog_file = nullptr;
+  for (const SkillFile &file : tools_skill->files) {
+    if (file.relative_path == "references/tool-catalog.md") {
+      catalog_file = &file;
+    }
+  }
+  ASSERT_NE(catalog_file, nullptr);
+
+  const std::set<std::string> meta_tools = {
+      "ping", "search_tools", "list_categories", "get_tool_detail",
+      "call_tool", "batch_execute", "code_execute"};
+  for (const godot_autopilot::ToolInfo &tool :
+       registry_catalog().get_all_tools()) {
+    if (meta_tools.count(tool.name) > 0) {
+      continue;
+    }
+    EXPECT_NE(catalog_file->body.find("`" + tool.name + "`"),
+              std::string::npos)
+        << "missing tool in tool-catalog.md: " << tool.name;
+  }
+}
+
+TEST(SkillGenTest, ScriptChannelContract) {
+  const std::vector<SkillSpec> skills = all_skills();
+  const SkillSpec *tools_skill = nullptr;
+  for (const SkillSpec &spec : skills) {
+    if (spec.name == "godot-autopilot-tools") {
+      tools_skill = &spec;
+    }
+  }
+  ASSERT_NE(tools_skill, nullptr);
+  const SkillFile *script_file = nullptr;
+  const SkillFile *fallback_file = nullptr;
+  for (const SkillFile &file : tools_skill->files) {
+    if (file.relative_path == "scripts/gda_mcp.mjs") {
+      script_file = &file;
+    }
+    if (file.relative_path == "references/manual-fallback.md") {
+      fallback_file = &file;
+    }
+  }
+  ASSERT_NE(script_file, nullptr);
+  ASSERT_NE(fallback_file, nullptr);
+  EXPECT_FALSE(script_file->body.empty());
+  EXPECT_NE(script_file->body.find("127.0.0.1"), std::string::npos);
+  EXPECT_NE(script_file->body.find("tools/call"), std::string::npos);
+
+  for (const SkillSpec &spec : skills) {
+    ASSERT_FALSE(spec.files.empty()) << spec.name;
+    EXPECT_NE(spec.files[0].body.find("gda_mcp.mjs"), std::string::npos)
+        << spec.name << ": SKILL.md must mention gda_mcp.mjs";
+    EXPECT_NE(spec.files[0].body.find("manual-fallback"), std::string::npos)
+        << spec.name << ": SKILL.md must mention manual-fallback";
+    for (const SkillFile &file : spec.files) {
+      if (!ends_with(file.relative_path, ".md")) {
+        continue;
+      }
+      EXPECT_EQ(file.body.find("curl -"), std::string::npos)
+          << spec.name << "/" << file.relative_path;
+      EXPECT_EQ(file.body.find("Invoke-WebRequest"), std::string::npos)
+          << spec.name << "/" << file.relative_path;
+    }
+  }
+}
+
 TEST(SkillGenTest, EverySkillDeclaresReferences) {
   for (const SkillSpec &spec : all_skills()) {
     ASSERT_GE(spec.files.size(), size_t{2})
@@ -348,8 +449,8 @@ TEST(SkillGenTest, EverySkillDeclaresReferences) {
     EXPECT_EQ(spec.files[0].relative_path, "SKILL.md")
         << "files[0] must be SKILL.md: " << spec.name;
     for (size_t i = 1; i < spec.files.size(); ++i) {
-      EXPECT_TRUE(starts_with(spec.files[i].relative_path, "references/"))
-          << spec.name << ": reference path must start with 'references/': "
+      EXPECT_TRUE(is_skill_aux_path(spec.files[i].relative_path))
+          << spec.name << ": file path must start with 'references/' or 'scripts/': "
           << spec.files[i].relative_path;
     }
   }

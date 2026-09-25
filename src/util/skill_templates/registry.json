@@ -9,20 +9,42 @@
           "source": "autopilot.md"
         },
         {
-          "path": "references/http-fallback.md",
-          "source": "autopilot--http-fallback.md"
+          "path": "references/development-workflow.md",
+          "source": "autopilot--development-workflow.md"
+        }
+      ]
+    },
+    {
+      "name": "godot-autopilot-tools",
+      "description": "Calling the GDA (godot-autopilot) plugin: the two invocation channels (native MCP tools vs the gda_mcp.mjs script fallback), search-first tool discovery, meta-tool semantics including batch_execute/code_execute and the code_execute/game_runtime/user_tools capability gates, the error protocol and error watermark, limits, the full domain tool catalog, dynamic user tools, and the manual fallback guide for machines without Node.js. Load this skill whenever MCP tools are missing or you need calling-protocol facts.",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "source": "tools.md"
         },
         {
-          "path": "references/tool-catalog.md",
-          "source": "autopilot--tool-catalog.md"
+          "path": "references/script-access.md",
+          "source": "tools--script-access.md"
         },
         {
           "path": "references/tool-gotchas.md",
-          "source": "autopilot--tool-gotchas.md"
+          "source": "tools--tool-gotchas.md"
         },
         {
-          "path": "references/development-workflow.md",
-          "source": "autopilot--development-workflow.md"
+          "path": "references/tool-catalog.md",
+          "source": "tools--tool-catalog.md"
+        },
+        {
+          "path": "references/dynamic-user-tools.md",
+          "source": "tools--dynamic-user-tools.md"
+        },
+        {
+          "path": "references/manual-fallback.md",
+          "source": "tools--manual-fallback.md"
+        },
+        {
+          "path": "scripts/gda_mcp.mjs",
+          "source": "gda_mcp.mjs"
         }
       ]
     },

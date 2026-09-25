@@ -1,5 +1,7 @@
 # Godot Server RID Tools
 
+Invocation: use the native MCP tools first; when that channel is down, use the script bridge `node .agents/skills/godot-autopilot-tools/scripts/gda_mcp.mjs` (Node 18+ or Bun); with neither installed, build a manual plan per `references/manual-fallback.md` of the godot-autopilot-tools skill.
+
 godot-autopilot exposes the engine's server layer directly: `RenderingServer`,
 `TextServer`, `PhysicsServer2D`, `PhysicsServer3D`, `NavigationServer2D` and
 `NavigationServer3D`. These tools create and drive server-side objects through

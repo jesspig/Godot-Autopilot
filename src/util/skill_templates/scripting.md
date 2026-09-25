@@ -1,5 +1,7 @@
 # GDScript Workflows
 
+Invocation: use the native MCP tools first; when that channel is down, use the script bridge `node .agents/skills/godot-autopilot-tools/scripts/gda_mcp.mjs` (Node 18+ or Bun); with neither installed, build a manual plan per `references/manual-fallback.md` of the godot-autopilot-tools skill.
+
 Creating, attaching, editing and reloading GDScript through godot-autopilot, and the safety differences between the four execution channels plus the code_execute meta tool. Engine-level execution gotchas (placeholder instances, static initializers, editor-vs-game semantics, frame ordering) are summarized here and covered in depth in `references/execution-gotchas.md`.
 
 ## Script lifecycle
@@ -10,6 +12,7 @@ Creating, attaching, editing and reloading GDScript through godot-autopilot, and
 - `get_script_property_list` lists a script's declared variables with name, type and usage flags.
 - `get_script_property` reads a value: with `script_path` it returns the declared default; with `node_path` the node's current value. Pass exactly one of the two.
 - `set_script_property` writes a node property directly - no undo entry, no type or read-only validation. It is the lightweight channel for quick in-memory tweaks; use `property_set` when undo support and validation matter.
+- `patch_script` patches one anchored spot in an existing script file (first occurrence of the anchor text, replace or insert mode) instead of rewriting the whole file; like `create_script` it compiles before writing and proves the write with a disk-readback hash. Preview with dry_run first for a no-write diff.
 
 ## Gotcha: non-@tool scripts never execute in the editor
 
@@ -116,4 +119,4 @@ C#-specific workflows — `build_csharp_assembly`, the lack of in-editor .NET as
 
 - `godot-autopilot-runtime` - the game channel, input injection, pause semantics and status
 - `godot-autopilot-scene-system` - node CRUD, property JSON shapes and undo semantics
-- `godot-autopilot` - discovery protocol and the error watermark
+- `godot-autopilot-tools` - discovery protocol and the error watermark

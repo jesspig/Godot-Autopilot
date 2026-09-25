@@ -1,5 +1,7 @@
 # C# / .NET Workflows
 
+Invocation: use the native MCP tools first; when that channel is down, use the script bridge `node .agents/skills/godot-autopilot-tools/scripts/gda_mcp.mjs` (Node 18+ or Bun); with neither installed, build a manual plan per `references/manual-fallback.md` of the godot-autopilot-tools skill.
+
 C# projects run on the editor's .NET assembly, which changes the workflow in
 three ways: a build step sits between editing and observing, C# declarations
 such as `[GlobalClass]` and `[Export]` reach Godot through the assembly, and
@@ -113,5 +115,5 @@ as GDScript exports (full table in `godot-autopilot-scene-system`):
   `create_resource`.
 - `godot-autopilot-runtime` - launching the game, debug channel semantics
   and the log/error fallbacks used above.
-- `godot-autopilot` - tool discovery, the error watermark and retryable
+- `godot-autopilot-tools` - tool discovery, the error watermark and retryable
   soft errors.

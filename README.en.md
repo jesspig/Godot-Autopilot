@@ -41,7 +41,7 @@ You don't need to memorize tool names. The agent follows a simple loop:
 2. **Act** — `call_tool` for one step, `batch_execute` for a batch.
 3. **Verify** — screenshot the result, compare with the previous capture, fix, and repeat.
 
-To make agents good at this out of the box, the plugin ships **8 skill books** (scenes, resources, scripting, runtime, servers, content, C#, plus an overview) and **7 starter guides** (3D scene, character controller, physics debugging, input map, GUI, …). One click in the **MCP Config** panel renders the skills into your project's `.agents/skills/`.
+To make agents good at this out of the box, the plugin ships **9 skill books** (an overview, a calling guide, plus scenes, resources, scripting, runtime, servers, content, and C# volumes) and **7 starter guides** (3D scene, character controller, physics debugging, input map, GUI, …). One click in the **MCP Config** panel renders the skills into your project's `.agents/skills/`. Positioning: MCP is the primary product channel and skills/scripts are the experience layer — the calling guide falls back to a script bridge when MCP is down (needs Node 18+ or Bun) and to a manual guide with no script runtime.
 
 Two editor panels come with the plugin:
 

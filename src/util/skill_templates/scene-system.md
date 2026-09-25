@@ -1,5 +1,7 @@
 # Godot Scene System
 
+Invocation: use the native MCP tools first; when that channel is down, use the script bridge `node .agents/skills/godot-autopilot-tools/scripts/gda_mcp.mjs` (Node 18+ or Bun); with neither installed, build a manual plan per `references/manual-fallback.md` of the godot-autopilot-tools skill.
+
 godot-autopilot tools for creating, restructuring, saving and inspecting scenes
 in the Godot editor, plus the property read/write and signal wiring that turn a
 node tree into a working scene. Node paths resolve against the edited scene
@@ -54,6 +56,7 @@ Save first, then retry. A `type` that is not a Node subclass fails with
 - `close_editor_scene` refuses to close a scene with unsaved changes.
 - `reload_editor_scene` restores the scene from disk, dropping all unsaved changes without confirmation (the current scene, or `scene_path` if given). A target scene that is not open now errors with `scene is not open` instead of reporting a fake success; on success the response is `{"result": "reloaded", "scene_path": ...}` (optionally with `observed: true` when the reload was confirmed). Call `save_editor_scene` first when the changes matter. Reloading also clears the scene's undo history.
 - `set_editor_main_scene` takes a `path` such as `res://game.tscn` and persists the main scene setting to project.godot.
+- `verify_scene_saved` re-checks a save without writing anything: it compares the in-memory edited scene tree against its on-disk .tscn file and reports match or mismatch with the missing paths. Run it after `save_editor_scene` or `save_editor_scene_as` when every node must have persisted.
 
 ## Creating nodes
 
@@ -89,6 +92,8 @@ describing removal via `delete_scene_node`.
   }
 }
 ```
+
+- `build_nodes_from_spec` builds a whole subtree from one declarative spec (nested type/name/props/children shapes applied through the same conversion chain as `property_set`); pass dry_run for a validate-only preview that writes nothing, and any failed step rolls the whole build back with no residue.
 
 ## Deleting nodes
 
@@ -221,7 +226,7 @@ undo-loss caveat: `references/undo-history.md`.
 
 ## Workflow checklist
 
-1. Confirm tool names via `search_tools` and `get_tool_detail` — never guess (godot-autopilot).
+1. Confirm tool names via `search_tools` and `get_tool_detail` — never guess (godot-autopilot-tools).
 2. Make sure a scene is open: `create_editor_scene` for a fresh one, `open_editor_scene` for an existing file; save an unsaved scene first.
 3. Create the root — omit `parent_path` only while no root exists.
 4. Add children with `create_scene_node`, passing `properties` for creation-time values. For many same-shaped nodes, `batch_execute` runs tool calls sequentially (`stop_on_error` defaults to true).

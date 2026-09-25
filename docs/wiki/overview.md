@@ -6,7 +6,7 @@ tags:
   - 总览
   - 架构
   - 技术栈
-timestamp: "2026-09-21T01:24:00+08:00"
+timestamp: "2026-09-25T17:30:00+08:00"
 resource:
   - README.md
   - README.en.md
@@ -25,6 +25,7 @@ resource:
 > 09-20 晚依赖升级：godot-cpp 10.0.0-rc2→10.0.0-stable（`cmake/FetchDependencies.cmake:20`；`_deps` checkout `10.0.0-stable`/507ed9d）；mcp-cpp-sdk 维持 0.3.4（依赖升级范围经复核收缩，`cmake/FetchDependencies.cmake:29`；configure 实测 `[mcp] SDK version: 0.3.4`）；`AGENTS.md` 与 wiki 三页（build/conventions/overview）同步。
 > 09-20 行号漂移修正（代码-文档一致性审计）：`register_all.cpp` 的 `call_tool` 描述字符串在 `:407`（`:406` 为 `ToolSpec` 起始）；目录树计数同步——`src/tools/` 48 个 .cpp、`src/util/` 8 个（补 `scene_verify.cpp`）、`src/runtime/` 4 个（补 `game_bridge_verify.cpp`），与 [build.md](./build.md) 分目录计数一致。
 > 09-21 可重放监控与日志系统批次：新增 `src/core/` 的 `monitor`（统一埋点门面，纯 std，可被 MCP worker 线程调用）、`monitor_env`（`environment_snapshot()` 仅主线程写 `kind=snapshot`）、`perf_sampler`（主线程周期采样 `kind=perf` + 请求超时看门狗）；`TraceRecorder` 增 `TraceKind` 与 `TraceEvent` 新字段（jsonl schema v2）、`LogEntry` 增 `trace_id`/`span_id`、`LogPersist` 增健康计数与 `trace_dir`、`CommandQueue` 增 `Stats`；`server_context` 经 `opts.on_request`/`opts.outgoing_filters` 关联协议请求（`begin_request`/`end_request`）、元工具经 `RequestScope`+`RequestSpanGuard` 端到端关联；McpLogDock 增 Open Traces 与 Trace 视图。计数：`add_library` 86→89（core 12→15）、L1 285→312（unit 33 文件）、L2 29→30（`30_observability`）、ctest 316→344（L1 过滤 287→314）；工具总数 399 不变。详见 [测试体系](tests.md) 与 [核心模块](modules/core.md)。
+> 09-25 技能脚本通道批次：skill 8→9 册（新增 `godot-autopilot-tools` 调用专册：调用协议/脚本桥 `gda_mcp.mjs`/工具目录/用户工具/手动兜底）、模板 33 md + 1 mjs + registry、references 22→24；L1 312→315、ctest 注册点 344→348（过滤 314→318）；MCP 仍为主产品通道，skill/脚本为体验层。详见 [测试体系](tests.md) 与 [支撑模块](modules/support.md)。
 
 ## 项目定位
 
@@ -83,7 +84,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 
 `src/resources/debugger_resources.cpp` 另注册 7 个调试器资源：`godot://editor/output-log`、`godot://debugger/errors`、`godot://debugger/output`、`godot://debugger/stack-dump`、`godot://debugger/scene-tree`、`godot://debugger/monitors`、`godot://debugger/session`。
 
-09-16 批起新增 skills 资源组（同文件 `register_skill_resources`）：`godot://skills`（目录，JSON 目录清单）、`godot://skills/<name>`（每册 SKILL.md）、`godot://skills/<name>/<file>`（每册 references 文件）——按 8 册 30 个 .md 动态注册，技能经 MCP 协议层可发现可读。
+09-16 批起新增 skills 资源组（同文件 `register_skill_resources`）：`godot://skills`（目录，JSON 目录清单）、`godot://skills/<name>`（每册 SKILL.md）、`godot://skills/<name>/<file>`（每册 references/脚本文件）——按 9 册 33 个 .md + 1 个脚本动态注册，技能经 MCP 协议层可发现可读。
 
 ### 运行时桥接（game_* 工具）
 
@@ -92,7 +93,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 ### 编辑器 UI
 
 - 自定义底部日志面板 `McpLogDock`（"GDA Log"，按 LogLevel/LogCategory 过滤、文本搜索（09-21 起同匹配 message 与 detail）、折叠重复、Detail 切换显示诊断 detail、Open Logs 打开 `user://godot_autopilot/logs`、09-21 新增 Open Traces 打开 `user://godot_autopilot/traces` 与 Trace 视图（日志行带可点击 `[trace]` 标记，点击按 trace_id 渲染结构化事件列表，默认关闭）；配置面板 "Show timestamps" 开关控制每条日志时间前缀 `[HH:MM:SS]`（本地时、时分秒），开启时默认生效并经 `user://godot_autopilot/config.json` 的 `show_time` 键持久化；折叠合并重复日志时除条数外始终显示最新一条的 `[HH:MM:SS]`，不受总开关控制）。
-- 右侧配置面板 `McpConfigDock`（"MCP Config"：端口运行时重启 + 持久化、一键生成 20 个客户端 MCP 项目级配置（09-16 由 8 扩至 20：新增 ZCode/pi/Command Code/Kilo/Roo/Grok Build/Kimi Code/Zed/CodeBuddy/Crush/Copilot VS Code/Reasonix；调研淘汰 Cline 与 Antigravity CLI——项目级可能不生效）、Allow code_execute / Allow game_runtime / Allow user tools 授权复选框（写 `allow` 键持久化，下一次工具调用即生效，`GODOT_AUTOPILOT_ALLOW` 环境变量优先）、Desensitize data 复选框（09-20 新增，写 `desensitize` 键并即时改 `sanitize_policy`，`GODOT_AUTOPILOT_DESENSITIZE` 环境变量优先）、一键生成 8 册 Agent Skills 到项目根 .agents/skills/——Generate Skills / Update Skills 动态按钮，已有旧版技能目录时先清理再重建（详见 [modules/support.md](./modules/support.md)））。
+- 右侧配置面板 `McpConfigDock`（"MCP Config"：端口运行时重启 + 持久化、一键生成 20 个客户端 MCP 项目级配置（09-16 由 8 扩至 20：新增 ZCode/pi/Command Code/Kilo/Roo/Grok Build/Kimi Code/Zed/CodeBuddy/Crush/Copilot VS Code/Reasonix；调研淘汰 Cline 与 Antigravity CLI——项目级可能不生效）、Allow code_execute / Allow game_runtime / Allow user tools 授权复选框（写 `allow` 键持久化，下一次工具调用即生效，`GODOT_AUTOPILOT_ALLOW` 环境变量优先）、Desensitize data 复选框（09-20 新增，写 `desensitize` 键并即时改 `sanitize_policy`，`GODOT_AUTOPILOT_DESENSITIZE` 环境变量优先）、一键生成 9 册 Agent Skills 到项目根 .agents/skills/——Generate Skills / Update Skills 动态按钮，已有旧版技能目录时先清理再重建（详见 [modules/support.md](./modules/support.md)））。
 - `ExportGuard`：导出期间拒绝领域工具调用（返回 `{"error":"editor is exporting; ..."}`）。
 
 ### Computer Use grounding（09-15）
@@ -139,7 +140,7 @@ godot-self-driving/
 │   ├── ui/                     # 编辑器 UI：mcp_config_dock、mcp_log_dock
 │   └── util/                   # 通用编译单元：variant_json、bm25_index、error_util、readback_util、scene_verify、client_config_gen、
 │   │                           #   skill_gen、skill_content_generated（构建期嵌入薄胶水）；内容目录
-│   │                           #   skill_templates/（8 册模板 = 平铺 30 个 .md：主册 <name>.md + 参考 <name>--<ref>.md，另有 registry.json）；
+│   │                           #   skill_templates/（9 册模板 = 平铺 33 个 .md + `gda_mcp.mjs` 脚本桥，另有 registry.json）；
 │   │                           #   header-only：json_godot、rid_registry、scene_path、project_path、type_hint、gdscript_wrap、mcp_image_content
 ├── tests/                      # L1 gda_unit_tests（312 个 gtest，33 文件）+ L2 gda_test_runner + config/*.json（30 份）+ guard/ 迁移守卫与注释守卫
 ├── docs/                       # 本知识库（docs/wiki/，含 modules/、plans/、changelog/）

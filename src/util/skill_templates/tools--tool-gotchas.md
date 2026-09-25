@@ -330,6 +330,6 @@ change the running game's state. Treat both at the highest risk level.
 
 ## See also
 
-- godot-autopilot - usage overview, discovery protocol and the error watermark
+- godot-autopilot-tools - usage overview, discovery protocol and the error watermark
 - godot-autopilot-scripting - the script execution channels behind the code_execute traps
 - godot-autopilot-scene-system - property JSON value shapes and the memory:// rule

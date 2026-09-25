@@ -1,6 +1,8 @@
 # Resource and File Operations
 
-Working with .tres/.tscn files, .import sidecars, UIDs and the res:// layout through the resource domain tools plus three text-file tools (`write_file`, `read_file`, `find_in_files`). Every tool is invoked through `call_tool`; see the godot-autopilot skill for the discovery protocol.
+Invocation: use the native MCP tools first; when that channel is down, use the script bridge `node .agents/skills/godot-autopilot-tools/scripts/gda_mcp.mjs` (Node 18+ or Bun); with neither installed, build a manual plan per `references/manual-fallback.md` of the godot-autopilot-tools skill.
+
+Working with .tres/.tscn files, .import sidecars, UIDs and the res:// layout through the resource domain tools plus three text-file tools (`write_file`, `read_file`, `find_in_files`). Every tool is invoked through `call_tool`; see the godot-autopilot-tools skill for the discovery protocol.
 
 ## Load, create, duplicate and save
 
@@ -125,7 +127,8 @@ Wait for retry_after_ms, then retry the same call.
 
 ## See also
 
-- godot-autopilot - the discovery protocol, task-to-tool routing and the tool gotcha catalog
+- godot-autopilot - task-to-tool routing
+- godot-autopilot-tools - the discovery protocol and the tool gotcha catalog
 - godot-autopilot-scene-system - scene lifecycle (open scenes are saved and reloaded by rename/move) and assigning resources to node properties (memory:// is rejected)
 - godot-autopilot-content - the memory:// TileSet and SpriteFrames that must be saved before they can be assigned
 - references/import-and-sidecars.md - the import pipeline, hand-writing .import files, sidecar rules, duplicate UIDs and the scan state machine

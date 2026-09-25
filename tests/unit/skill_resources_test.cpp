@@ -24,6 +24,7 @@ const std::vector<SkillSpec> &skills() {
 
 const char *const kExpectedSkillNames[] = {
     "godot-autopilot",
+    "godot-autopilot-tools",
     "godot-autopilot-scene-system",
     "godot-autopilot-resources",
     "godot-autopilot-scripting",
@@ -56,10 +57,10 @@ TEST(SkillResourcesTest, ParsesSkillUri) {
 
 TEST(SkillResourcesTest, ParsesFileUri) {
   const ParsedUri single = godot_autopilot::skill_resources::parse_uri(
-      "godot://skills/godot-autopilot/references/http-fallback.md");
+      "godot://skills/godot-autopilot-tools/references/tool-catalog.md");
   EXPECT_EQ(single.kind, UriKind::file);
-  EXPECT_EQ(single.name, "godot-autopilot");
-  EXPECT_EQ(single.file, "references/http-fallback.md");
+  EXPECT_EQ(single.name, "godot-autopilot-tools");
+  EXPECT_EQ(single.file, "references/tool-catalog.md");
 
   const ParsedUri nested = godot_autopilot::skill_resources::parse_uri(
       "godot://skills/demo/a/b/c.md");
@@ -93,7 +94,7 @@ TEST(SkillResourcesTest, RejectsInvalidUris) {
 
 TEST(SkillResourcesTest, BuildsCatalogFromEmbeddedSkills) {
   const std::vector<SkillSpec> &all = skills();
-  ASSERT_EQ(all.size(), 8u);
+  ASSERT_EQ(all.size(), 9u);
 
   const std::vector<godot_autopilot::skill_resources::CatalogEntry> catalog =
       godot_autopilot::skill_resources::build_catalog(all);
@@ -113,7 +114,7 @@ TEST(SkillResourcesTest, BuildsCatalogFromEmbeddedSkills) {
     names.insert(catalog[i].name);
   }
 
-  EXPECT_EQ(names.size(), 8u);
+  EXPECT_EQ(names.size(), 9u);
   for (const char *name : kExpectedSkillNames) {
     EXPECT_TRUE(names.count(name) == 1) << "missing skill: " << name;
   }
@@ -171,10 +172,11 @@ TEST(SkillResourcesTest, ResolvesKnownAndUnknownTargets) {
 
   const godot_autopilot::skill_resources::ResolvedUri reference =
       godot_autopilot::skill_resources::resolve_uri(
-          all, "godot://skills/godot-autopilot/references/http-fallback.md");
+          all,
+          "godot://skills/godot-autopilot-tools/references/tool-catalog.md");
   ASSERT_NE(reference.skill, nullptr);
   ASSERT_NE(reference.file, nullptr);
-  EXPECT_EQ(reference.file->relative_path, "references/http-fallback.md");
+  EXPECT_EQ(reference.file->relative_path, "references/tool-catalog.md");
 
   const godot_autopilot::skill_resources::ResolvedUri unknown_skill =
       godot_autopilot::skill_resources::resolve_uri(all,
@@ -229,22 +231,42 @@ TEST(SkillResourcesTest, ResolvesSkillMarkdownContent) {
 
 TEST(SkillResourcesTest, ResolvesReferenceContentVerbatim) {
   const std::vector<SkillSpec> &all = skills();
-  const SkillSpec *spec =
-      godot_autopilot::skill_resources::find_skill(all, "godot-autopilot");
+  const SkillSpec *spec = godot_autopilot::skill_resources::find_skill(
+      all, "godot-autopilot-tools");
   ASSERT_NE(spec, nullptr);
   const SkillFile *file = godot_autopilot::skill_resources::find_file(
-      *spec, "references/http-fallback.md");
+      *spec, "references/tool-catalog.md");
   ASSERT_NE(file, nullptr);
 
   const ContentResult content =
       godot_autopilot::skill_resources::resolve_content(
-          all, "godot://skills/godot-autopilot/references/http-fallback.md");
+          all,
+          "godot://skills/godot-autopilot-tools/references/tool-catalog.md");
   EXPECT_TRUE(content.error.empty());
   EXPECT_EQ(content.kind, UriKind::file);
   EXPECT_EQ(content.mime_type, "text/markdown");
   EXPECT_FALSE(content.text.empty());
   EXPECT_EQ(content.text, file->body);
   EXPECT_EQ(content.text.find("author: godot-autopilot"), std::string::npos);
+}
+
+TEST(SkillResourcesTest, ScriptMimeType) {
+  const std::vector<SkillSpec> &all = skills();
+
+  const ContentResult script =
+      godot_autopilot::skill_resources::resolve_content(
+          all, "godot://skills/godot-autopilot-tools/scripts/gda_mcp.mjs");
+  EXPECT_TRUE(script.error.empty());
+  EXPECT_EQ(script.kind, UriKind::file);
+  EXPECT_EQ(script.mime_type, "text/javascript");
+  EXPECT_FALSE(script.text.empty());
+
+  const ContentResult reference =
+      godot_autopilot::skill_resources::resolve_content(
+          all,
+          "godot://skills/godot-autopilot-tools/references/tool-catalog.md");
+  EXPECT_TRUE(reference.error.empty());
+  EXPECT_EQ(reference.mime_type, "text/markdown");
 }
 
 TEST(SkillResourcesTest, AcceptsCaseInsensitiveSchemeForContent) {

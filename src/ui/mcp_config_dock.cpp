@@ -342,9 +342,17 @@ void McpConfigDock::_refresh_status() {
 void McpConfigDock::_refresh_generate_skills_button() {
   generate_skills_button->set_text(has_existing_skills() ? "Update Skills"
                                                          : "Generate Skills");
+  const std::vector<skill_gen::SkillSpec> skills = skill_gen::all_skills();
+  std::size_t total_files = 0;
+  for (const skill_gen::SkillSpec &spec : skills) {
+    total_files += spec.files.size();
+  }
   generate_skills_button->set_tooltip_text(
-      "Write the 8 godot-autopilot skills to .agents/skills/ "
-      "(updates existing entries)");
+      godot::String("Write the ") +
+      godot::String::num_int64(static_cast<int64_t>(skills.size())) +
+      " godot-autopilot skills (" +
+      godot::String::num_int64(static_cast<int64_t>(total_files)) +
+      " files) to .agents/skills/ (updates existing entries)");
 }
 
 void McpConfigDock::_report(const godot::String &text,
@@ -521,13 +529,13 @@ void McpConfigDock::_on_generate_skills() {
       _report("Updated " + godot::String::num_int64(generated_skills) +
                   " skills in .agents/skills/ (" +
                   godot::String::num_int64(generated_references) +
-                  " reference files)",
+                  " supporting files)",
               theme_color("success_color", godot::Color(0.4f, 0.9f, 0.4f)));
     } else {
       _report("Generated " + godot::String::num_int64(generated_skills) +
                   " skills in .agents/skills/ (" +
                   godot::String::num_int64(generated_references) +
-                  " reference files)",
+                  " supporting files)",
               theme_color("success_color", godot::Color(0.4f, 0.9f, 0.4f)));
     }
   } else {
