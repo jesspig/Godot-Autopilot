@@ -5,13 +5,14 @@ description: Example 文档/示例工程定位、project.godot 事实、docs 文
 tags:
   - 示例工程
   - Example
-timestamp: "2026-09-18T16:35:00+08:00"
+timestamp: "2026-09-25T14:55:18+08:00"
 resource: Example/
 ---
 
 # 示例工程（Example/）
 
-> 审计日期：2026-09-18（2026-08-12 初稿；08-17 补 YAML frontmatter 并核对 project.godot；08-22 15 时全量一致性审计——`[audio]` 段与 `default_bus_layout.tres` 已随清理消失，改注为"L2 运行后可能追加"；08-29 随 0.2.2 版本与全量审计同步；09-13 随文档集重构同步——旧 6 篇结构（game-overview/gameplay-spec/architecture/level-spec/asset-catalog）迁移为 pitch/gdd/art/tech/test 共 11 篇，重核 project.godot 的 `[input]` 残留与 L2 临时目录；09-13 晚随跨组一致性修复更新——`gda_tmp_rename/` 与 `~godot-autopilot_0.pdb` 测试残留已清理，改注为"运行 L2/编辑器热重载可能生成、可安全清理"；09-13 晚随 0.2.4 版知识库全量审计同步——素材条目归属修正（`asset-catalog.md` 实为"未把'文件存在'当作'功能已实现'"，补充当前工程无 .tscn/.tres 的事实），其余条目复核一致），基于当前工作树 `Example/` 目录与文档核对；09-18 随知识库一致性审计同步——根 README 前提已为“Godot 4.7+”（`README.md:5,53` / `README.en.md:5,53`），与 `project.godot` 的 4.7 三方一致，原“4.3+ 宽松下界”表述消除。
+> 审计日期：2026-09-25（2026-08-12 初稿；08-17 补 YAML frontmatter 并核对 project.godot；08-22 15 时全量一致性审计——`[audio]` 段与 `default_bus_layout.tres` 已随清理消失，改注为"L2 运行后可能追加"；08-29 随 0.2.2 版本与全量审计同步；09-13 随文档集重构同步——旧 6 篇结构（game-overview/gameplay-spec/architecture/level-spec/asset-catalog）迁移为 pitch/gdd/art/tech/test 共 11 篇，重核 project.godot 的 `[input]` 残留与 L2 临时目录；09-13 晚随跨组一致性修复更新——`gda_tmp_rename/` 与 `~godot-autopilot_0.pdb` 测试残留已清理，改注为"运行 L2/编辑器热重载可能生成、可安全清理"；09-13 晚随 0.2.4 版知识库全量审计同步——素材条目归属修正（`asset-catalog.md` 实为"未把'文件存在'当作'功能已实现'"，补充当前工程无 .tscn/.tres 的事实），其余条目复核一致），基于当前工作树 `Example/` 目录与文档核对；09-18 随知识库一致性审计同步——根 README 前提已为“Godot 4.7+”（`README.md:5,53` / `README.en.md:5,53`），与 `project.godot` 的 4.7 三方一致，原“4.3+ 宽松下界”表述消除；09-25 随项目级技能层落地同步——L2 引擎副作用的前向指针由 `AGENTS.md` 测试段改指 [tests.md](tests.md)。
+8（2026-08-12 初稿；08-17 补 YAML frontmatter 并核对 project.godot；08-22 15 时全量一致性审计——`[audio]` 段与 `default_bus_layout.tres` 已随清理消失，改注为"L2 运行后可能追加"；08-29 随 0.2.2 版本与全量审计同步；09-13 随文档集重构同步——旧 6 篇结构（game-overview/gameplay-spec/architecture/level-spec/asset-catalog）迁移为 pitch/gdd/art/tech/test 共 11 篇，重核 project.godot 的 `[input]` 残留与 L2 临时目录；09-13 晚随跨组一致性修复更新——`gda_tmp_rename/` 与 `~godot-autopilot_0.pdb` 测试残留已清理，改注为"运行 L2/编辑器热重载可能生成、可安全清理"；09-13 晚随 0.2.4 版知识库全量审计同步——素材条目归属修正（`asset-catalog.md` 实为"未把'文件存在'当作'功能已实现'"，补充当前工程无 .tscn/.tres 的事实），其余条目复核一致），基于当前工作树 `Example/` 目录与文档核对；09-18 随知识库一致性审计同步——根 README 前提已为“Godot 4.7+”（`README.md:5,53` / `README.en.md:5,53`），与 `project.godot` 的 4.7 三方一致，原“4.3+ 宽松下界”表述消除；09-25 随项目级技能层落地同步——L2 引擎副作用的前向指针由 `AGENTS.md` 测试段改指 [tests.md](tests.md)。
 > 事实来源：`Example/project.godot`、`Example/docs/`（11 篇）、`Example/assets/` 目录枚举、`Example/.gitignore`。
 
 ## 定位
@@ -42,7 +43,7 @@ resource: Example/
 | — | `run/main_scene` | （无） | **未配置主场景** |
 | — | `[audio]` | （无） | **未配置**音频总线（L2 运行后 headless 编辑器可能自动追加，`git checkout -- Example/project.godot` 可清理） |
 
-注：L2 再次运行后 headless 编辑器可能自动追加 `[audio]` 段并生成 `default_bus_layout.tres`（见 AGENTS.md 测试段），`git checkout -- Example/project.godot` + 手动删除 tres 可清理。
+注：L2 再次运行后 headless 编辑器可能自动追加 `[audio]` 段并生成 `default_bus_layout.tres`（见 [tests.md](tests.md)「已知引擎副作用」），`git checkout -- Example/project.godot` + 手动删除 tres 可清理。
 
 ## 文档索引表（Example/docs/ 共 11 篇）
 

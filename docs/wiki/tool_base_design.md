@@ -7,7 +7,7 @@ tags:
   - 工具架构
   - ToolSpec
   - 数据化
-timestamp: "2026-09-21T01:24:00+08:00"
+timestamp: "2026-09-25T14:55:18+08:00"
 resource: src/tools/
 ---
 
@@ -75,6 +75,7 @@ class SpecTool : public ToolBase, public ISideEffect {
 - **授权拒绝路径**：`deny_if_unauthorized` 命中时单独记录一条 `auth="denied"`、`error_code="denied"`、`duration_ms=0` 的事件（`category`/`flags`/`side_effect` 照填），与 handler 错误区分
 - **图片事件**：结果对象（或其 `result` 子对象）的 `data` 仅在 `format == "png"` 时收集；`diff_image_data` 只要为字符串即收集（不校验 `format`，空串亦会进入）。命中项计算 FNV-1a 哈希与字节数，`image_width`/`image_height` 取自同 scope 的整型 `width`/`height`（缺省 0），并在 `traces/images/` 落盘（仅脱敏关闭时，`LogPersist::store_trace_image`）；jsonl 行只写 `image_ref`（脱敏时为空，其余图片字段 `image_hash`/`image_bytes`/`image_width`/`image_height` 照写）
 - **日志等级**：失败或 `duration_ms > 2000ms`（`kSlowToolMs`）记 Warning，其余 Debug；detail 行附 `trace=/span=/parent=/depth=/queue=/dur=/auth=/err=/args=`，慢工具与 `retryable` 结果分别加 `slow_tool=true`/`retryable=true`
+- **`err=` 取值口径**：由 `spec_detail::error_code_of(result)`（`tool_spec.hpp:57-68`）决定——结果对象里存在 `structured_error` 且其 `code` 是字符串时取该值，否则统一回退字面量 `"error"`；trace 事件的 `error_code` 与 detail 行的 `err=` 同源，故按错误码统计时只能覆盖带 `structured_error.code` 的工具，普通 `{"error": "..."}` 一律记为 `error`
 - **`detail` 可见性**：`get_plugin_log` 响应条目只含 `serial`/`timestamp`/`level`/`category`/`message`，不含 `detail` 字段；detail 仅在 McpLogDock（"Detail" 开关，默认关闭）与落盘日志（`format_human_line(..., include_detail=true)`）中可见
 - **落盘链路**：事件进入 `TraceRecorder` 内存缓冲（容量 20000），主线程 `LogPersist::flush_on_main_thread()` 增量转写为 `traces/trace-<stamp>.jsonl`（首行含 `session_start`，服务器就绪后追加 `server_ready`，结构键见 [核心模块](modules/core.md)）；09-21 起 jsonl 内事件按 `kind` 区分（`lifecycle`/`protocol_request`/`protocol_response`/`tool_call`/`persist_health`/`perf`/`snapshot`/`concurrency` 等，schema v2 新键齐备），L2 `30_observability` 对字段与 kind 做断言
 
@@ -98,6 +99,8 @@ class SpecTool : public ToolBase, public ISideEffect {
 - `get_*` 带默认值；`reject_unknown()` 按参数表拒绝未知键（`"unknown parameter: <name>"`）。
 
 语义要点：`null` 一律视为缺失；`integer` 接受整数值的 JSON double（拒绝小数、拒绝越界）；`boolean` 严格（`1`/`0` 报错）；`reject_unknown` 对非对象输入直接放行。L1 `tool_args_test.cpp` 覆盖 11 项。
+
+> **接入状态（2026-09-25 实测）**：`Args` 是**可用但未接线**的能力——`src/` 下除 `tool_args.cpp` 自身外，没有任何文件 include `tool_args.hpp`，30 个领域的 handler 全部走 `args.Find(...)` + `util::error_json(...)`（约 490 处）。因此"取参统一 Args"只是收敛方向，不是现状；写新 handler 前先看所在域的邻居文件用哪种，避免同文件混用两种风格。真正的统一接入需要一次性改动全部 `*_ops.cpp` 并复跑 `03_tools_contract` 遍历。
 
 ## ToolRegistry 与注册派生
 
