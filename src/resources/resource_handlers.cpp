@@ -249,7 +249,8 @@ int register_skill_resources(mcp::McpServer &server) {
     server.RegisterResource("skill-" + spec.name, skill_uri,
                             mcp::ResourceOptions{}
                                 .Description(spec.description)
-                                .MimeType("text/markdown"),
+                                .MimeType(skill_resources::mime_type_for_path(
+                                    "SKILL.md")),
                             handler);
     ++registered;
 
@@ -259,7 +260,8 @@ int register_skill_resources(mcp::McpServer &server) {
           skill_uri + "/" + file.relative_path,
           mcp::ResourceOptions{}
               .Description(spec.description)
-              .MimeType("text/markdown"),
+              .MimeType(skill_resources::mime_type_for_path(
+                  file.relative_path)),
           handler);
       ++registered;
     }
