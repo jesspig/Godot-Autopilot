@@ -6,7 +6,7 @@ tags:
   - 安全
   - 并发
   - 契约
-timestamp: "2026-09-21T01:24:00+08:00"
+timestamp: "2026-09-25T14:55:18+08:00"
 resource:
   - src/core/server_context.cpp
   - src/core/command_queue.hpp
@@ -33,6 +33,10 @@ resource:
 - 截至 2026-09-02 实现，非环回地址在 `ServerContext::start()` 直接拒绝启动并返回 `refusing non-loopback listen address` 错误，不会进入工具注册或传输启动；该策略避免无认证远程控制面。后续如需支持远程，需先提供应用层认证并显式允许。
 - `GODOT_AUTOPILOT_HOST=0.0.0.0` 表示监听所有接口，只能作为明确的运维选择；文档、配置界面和诊断日志必须让该风险可见，当前实现会拒绝该值。
 - 端口解析顺序保持为环境变量 > `user://godot_autopilot/config.json` > `9527`；监听地址与端点为独立配置，端点固定为 `/mcp`。
+- 环回约束是**两层**，缺一不可，改任一层都要重新验证：
+  - **绑定层**（本项目）：`ServerContext::start()` 用 `is_loopback_host()` 判定 `127.0.0.1`/`::1`/`[::1]`，其余值拒绝启动（`src/core/server_context.cpp:28-29`、`:75-76`）。
+  - **请求层**（依赖）：mcp-cpp-sdk 在 HTTP 层校验请求 `Host` 头，默认白名单仅 `localhost`/`127.0.0.1`/`::1`（`Impl::IsLocalhostHost`），不匹配即拒绝；仅当构造 HTTP 服务时显式传入 `allowed_hosts` 才会改用自定义白名单，本项目未设置该选项。当前锁定版本见 `cmake/FetchDependencies.cmake` 的 mcp-cpp-sdk `GIT_TAG`（0.3.4）。
+  - 因此“把绑定地址放宽”并不能让非环回 Host 的请求可用；反向的 DNS 重绑定（用本机主机名或局域网 IP 访问）由请求层拦下。历史上 2026-08-28 的 changelog 曾把 `GODOT_AUTOPILOT_HOST` 描述为“可覆盖为 `0.0.0.0`”，该表述已被现行拒绝行为取代。
 
 ## 3. 高风险工具分类
 

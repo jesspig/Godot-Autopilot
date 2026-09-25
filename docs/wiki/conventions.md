@@ -6,7 +6,7 @@ tags:
   - 约定
   - 命名
   - 规范
-timestamp: "2026-09-21T01:24:00+08:00"
+timestamp: "2026-09-25T14:55:18+08:00"
 resource: src/
 ---
 
@@ -47,7 +47,7 @@ resource: src/
 `ToolRegistry` 单一来源 + 全量 `ToolSpec` 数据记录（无 `tool_defs.def`、无宏/真类；设计见 [tool_base_design.md](tool_base_design.md)）：
 
 1. `<域>_ops.hpp` 声明 `mcp::JsonValue handle_xxx(const mcp::JsonValue& args);`
-2. `<域>_ops.cpp` 实现（返回 `{"error": ...}` 或结果对象；取参用 `Args(raw, kXxxParams)` 的 opt_/require_/get_ 系列，必要时 `reject_unknown()` 拒未知键）
+2. `<域>_ops.cpp` 实现（返回 `{"error": ...}` 或结果对象）。取参现状必须知道：`Args(raw, kXxxParams)` 取参器（`tool_args.hpp`：opt_/require_/get_ + `reject_unknown()`）**已实现且有 L1 覆盖，但 `src/` 下没有任何领域 handler 接入**（除 `tool_args.cpp` 自身，全仓 0 处引用）；在架 handler 一律 `args.Find("name")` 手工判类型 + `util::error_json("missing required parameter: <name>")`（`util::error_json` 在 `src/tools/` 约 490 处、`util::ok_result` 约 45 处）。新增工具跟随所在域邻居的写法，不要在已用 `args.Find` 的文件里混入 `Args`，否则同一文件两种取参风格并存
 3. 该域 `<域>_tools.hpp`：定义 `const std::vector<ParamSpec> kXxxParams = {...}` 参数表，并在 `make_tools()` 中以 `v.push_back(make_spec_tool(ToolSpec{name, description, category, {tags}, side_effect, flags, kXxxParams, handler}))` 一行注册——`register_all.cpp` 经各域 `make_tools()` 自动注册，无需手改；schema 从参数表自动派生（仅嵌套结构才用 `raw_schema` 手写 JSON）
 4. `side_effect`（`SideEffect` 枚举选值）与 `flags`（如 `kMutating`）按工具实际影响声明即自动进入遍历排除，无需手改 `tests/runner/traversal.cpp`；合成输入类可加 `kObserve` 复用执行管线的截图后处理
 5. 仅新增 `.cpp` 才需动 `CMakeLists.txt:65` 的 `add_library()`（header-only 无需）；迁移守卫 `tests/guard/` 拒绝旧宏（`GDA_TOOL_CLASS` 等）与 `schema_*_ops.cpp` 残留
@@ -58,6 +58,12 @@ resource: src/
 - 子代理迭代：只写代码不编译，主代理统一 configure + build 再分批跑测试（并行编译会锁）
 - 新增 `src/*.cpp` 同步更新 `tests/CMakeLists.txt` 的 `GDA_UNIT_BUSINESS_SOURCES`
 - 计数口径（L1 gtest 数、L2 `tests/config/*.json` 份数、ctest 注册点、遍历候选/步骤数）以运行时统计为准；迁移守卫经 `ctest --preset debug -R migration_guard` 零依赖运行
+
+## 注释与提交
+
+- **源码禁止注释**：`src/` 与 `tests/` 下 `*.cpp/*.hpp` 除 `// namespace` 结尾标记外不得出现任何 `//` 或 `/*…*/`；需要解释的内容写进本知识库对应页，不留在代码里。门禁是 `comment_guard`（见 [tests.md](tests.md)「守卫」），判定时机在 ctest 而非编译，所以"编译过了"不等于"守住了"。
+- **提交信息**：`<type>(<scope>): <中文描述>`，type 取 `feat`/`fix`/`docs`/`test`/`chore` 等，scope 用中文功能域（实际历史例：`feat(编辑器界面): 新增 Trace 视图并补齐界面操作埋点`、`docs(知识库): 同步可观测性批次 wiki 页面与维护日志`）。一次交付按功能域拆成多个提交，不用 `--no-verify` 绕过守卫。
+- **行尾伪变更**：仓库无 `.gitattributes`，Windows 上 `git status` 会因 CRLF 显示大量 `M`；核查实际变更一律以 `git diff HEAD` 为准，不要据 `git status` 判断改动范围，更不要在提交前 `git checkout --` 批量还原（会连带回掉真实修改）。
 
 ## 能力边界（08-20 确立）
 
@@ -70,6 +76,7 @@ gda 聚焦「编辑器内的引擎操作」，以下能力**明确不做**，避
 ## 知识局限（文档提示）
 
 - **C# 只读/私有 setter 属性对 GDScript 不可见**（Godot .NET 绑定既有行为，非 gda 缺陷）：`get("MaxHealth")` 对无 getter 的属性返回 null。AI 用 GDScript/`property_get` 校验 C# 派生值时易误判——应改为检查可读导出引用而非派生值。
+- **目标引擎按 Godot 4.7 口径写 API**（本项目 `GODOTCPP_API_VERSION "4.7"` 锁定，见 [build.md](build.md)）：`TileSetAtlasSource.get_tile_data()` 的入参是 `atlas_coords`+`source_id`+`alternative_tile`（不是 3.x 的 `source_id` 打头）；`AnimatedSprite2D` 的帧集合属性名是 `sprite_frames`（不是 `frames`）；`CharacterBody2D/3D.motion_mode` 枚举值 `GROUNDED=0`、`FLOATING=1`。这三条在工具描述与 skill 模板里都是踩点写死的，改动前先在引擎头文件核对。
 
 ## 其他
 
