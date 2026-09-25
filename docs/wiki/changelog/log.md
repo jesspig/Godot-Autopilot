@@ -8,6 +8,7 @@
 - **纠正三处失实记载**：`raw_schema` 手写实际仅 3 个元工具（非"7 元全手写"）；`Args` 取参器"可用但未接线"（`src/` 下 0 个领域 handler include，现网仍是 `args.Find` + `util::error_json` 约 490 处）；Host 环回校验改按当前 SDK 行为记载为**绑定层 + 请求层两层**，并指认 08-28 changelog 的"可覆盖为 `0.0.0.0`"已被拒绝启动行为取代。另记：授权门只覆盖 `process`/`code_execute`/`game_runtime`/`user_tools`，`writes_file` 等枚举不进授权门。
 - **wiki 同步 7 页**：`index.md` 新增"三层文档分工""编写规则"两节并把技能纳入维护入口与页面索引；`conventions.md` 新增"注释与提交"段与 Godot 4.7 API 口径三条；`security_contract.md` §2 两层环回；`modules/core.md` 协议埋点接线；`tool_base_design.md` `error_code` 口径 + `Args` 接入状态；`tests.md`/`build.md` 行号与守卫输出修正、L2 时长与 googletest 缓存兜底。
 - **验证**：9 个改动文件相对链接 0 断链；`comment_guard` OK；`migration_guard` 输出 `-- [migration-guard] OK (domains: 30, strict: on)`；零 C++ 与测试配置改动，未触发构建与 ctest 全量。
+- **技能脚本通道文档同步（T13）**：skill 8→9 册（新增 `godot-autopilot-tools` 调用专册）、模板 33 md + 1 mjs + registry、references 22→24；L1 312→315、ctest 注册点 344→348（过滤 314→318，G1 实测 318/318 全绿）；同步 `support.md`/`tests.md`/`security_contract.md`（新增 §3.3）/`overview.md`/`build.md` 与双语 README（"MCP 为主产品，skill/脚本是体验层"）；只改 `.md`，未编译/测试/提交。Example 生成验证待 E2E 验证。详见 [2026-09-25-log.md](2026-09-25-log.md)
 
 ## 2026-09-21
 

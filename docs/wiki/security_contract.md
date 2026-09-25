@@ -6,7 +6,7 @@ tags:
   - 安全
   - 并发
   - 契约
-timestamp: "2026-09-25T14:55:18+08:00"
+timestamp: "2026-09-25T17:30:00+08:00"
 resource:
   - src/core/server_context.cpp
   - src/core/command_queue.hpp
@@ -78,6 +78,16 @@ resource:
 - 环境变量与面板的作用范围：`initialize()` 在启动时一旦发现 env 就完全忽略配置 `desensitize` 键（与 `allow` 能力门同构）；但面板复选框在运行期直接调用 `sanitize_policy::set_enabled`，仍会改变本会话后续调用的实际口径（重启后 env 再次生效）。
 - 变更可审计（09-21 起）：McpConfigDock 的脱敏切换与 allow 变更发 `monitor::security` 事件，其余交互（端口应用/生成配置/生成技能等）发 `monitor::ui_action`。
 
+### 3.3 技能脚本通道与手动兜底（09-25 新增）
+
+随技能生成的 `scripts/gda_mcp.mjs`（Node 18+ 或 Bun 运行）是 MCP 客户端失效时的本地调用桥，不是第二服务端；其安全包络由脚本头注释与 L1 `ScriptChannelContract` 共同约束：
+
+- 目标固定为 `127.0.0.1` 字面量（`const HOST = "127.0.0.1"`），仅端口可调（1–65535，`--port` > `GODOT_AUTOPILOT_PORT` > trace/config > 9527 五级来源）；代理环境变量被刻意忽略，保持环回直连。
+- 请求头仅 `Content-Type: application/json` 与 `Accept`，无代理配置、无认证头；响应内容只做 `JSON.parse`，永不求值或执行。
+- 唯一写盘是 `--save-images DIR` 内的解码图片（自生成文件名 `gda_<timestamp>_<n>.png`）；`--args-file` 只读 JSON，不写盘。
+- 技能文档禁手写 HTTP：全部 33 个 .md 不得出现 `curl -` 与 `Invoke-WebRequest`（L1 逐文件断言），调用统一走脚本桥；无脚本运行时则停止自动化、按 `manual-fallback.md` 出手动指南，不得编造请求。
+- 本节不改变默认安全姿态：监听仍仅环回（§2）、高风险能力仍默认拒绝（§3.1）、脱敏仍默认开启（§3.2）。
+
 ## 4. Godot API 与线程
 
 - 所有 Godot API、场景/资源/编辑器对象访问和会触发引擎状态的操作，必须在 Godot 主线程执行。HTTP/SDK 线程不得直接调用。
@@ -98,7 +108,7 @@ resource:
 ## 6. 路径与响应大小
 
 - 外部路径必须先通过 `util/project_path.hpp::normalize_project_path` 规范化并校验边界，再交给 Godot 文件/资源 API；拒绝路径穿越、绝对路径逃逸、未知 scheme 和工程范围外的写入，`text_ops`/`resource_ops` 全量入口已接入该校验。路径校验失败返回结构化 `error`，不得以空路径或当前目录兜底。
-- MCP 工具面之外存在一处工程内写盘途径：编辑器面板 "Generate Skills" 按钮（`skill_gen`），固定写入 `<res://>/.agents/skills/`，仅覆盖 godot-autopilot 自有 8 册命名空间、不触碰其他文件（更新时先清理 `godot-autopilot-*` 前缀的既有目录再重建）；该途径不经 MCP 暴露、无远程触发面。
+- MCP 工具面之外存在一处工程内写盘途径：编辑器面板 "Generate Skills" 按钮（`skill_gen`），固定写入 `<res://>/.agents/skills/`，仅覆盖 godot-autopilot 自有 9 册命名空间、不触碰其他文件（更新时先清理 `godot-autopilot-*` 前缀的既有目录再重建）；该途径不经 MCP 暴露、无远程触发面。
 - 读写工具应区分“工程资源路径”（如 `res://`）与 OS 文件路径，`resource_ops` 仅允许 `res://`，`text_ops` 允许 `res://`/`user://`；禁止把一个 namespace 的路径直接拼接到另一个 namespace。返回路径应使用稳定、可复现的规范形式，避免泄露无必要的本机绝对路径。
 - 每个入口必须限制输入深度、条目数、等待时间和输出字节数；限制应在解析/遍历前生效，截断结果必须带 `truncated`/`scan_truncated`/`scan_limit` 或等价可检测字段，不能静默丢数据。
 - 已落地的边界包括：默认/最大超时 `5000/30000 ms`、eval/错误文本截断 `8192` 字节、运行时错误/输出缓冲 `200/500` 条、场景树深度/节点数 `64/2000`、截图单边 `4096` 像素、`GDA_CAPTURE_MAX_PNG_BYTES=8 MiB`、`GDA_VARIANT_MAX_STRING_BYTES=64 KiB`、`GDA_VARIANT_MAX_ARRAY_ELEMENTS=10000`、`GDA_MAX_JSON_RESPONSE_BYTES=4 MiB`、`GDA_SCAN_MAX_FILES=10000`/`FILE_BYTES=2 MiB`/`TOTAL_BYTES=32 MiB`/`DEPTH=64`、`batch_execute`/`sequence` 上限 `256`。这些是实现上限，不是允许无限扩大的理由；新增响应应复用同一原则并避免把大结果一次性构造成无限 JSON。
@@ -112,6 +122,7 @@ resource:
 - [ ] stop/restart 的请求接入、队列任务、future、异步响应和对象释放顺序有可观察且不悬挂的结果。
 - [ ] 路径边界、遍历/输入上限和响应截断行为均可被调用方检测。
 - [ ] 本地日志/trace 落盘符合边界约定：两目录保留上限生效；默认脱敏开启时 jsonl 不含内联 base64，`args_digest` 已剥离敏感字段；关闭脱敏仅由显式配置触发。
+- [ ] 技能脚本通道符合 §3.3 包络：目标为 `127.0.0.1` 仅端口可调、无代理与认证头、响应不执行、写盘仅限 `--save-images` 目录；技能文档无手写 HTTP 请求。
 
 ## 相关页面
 
