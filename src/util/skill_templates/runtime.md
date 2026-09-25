@@ -1,5 +1,7 @@
 # Runtime and Debugging with godot-autopilot
 
+Invocation: use the native MCP tools first; when that channel is down, use the script bridge `node .agents/skills/godot-autopilot-tools/scripts/gda_mcp.mjs` (Node 18+ or Bun); with neither installed, build a manual plan per `references/manual-fallback.md` of the godot-autopilot-tools skill.
+
 This book covers the game process life cycle: launching and stopping the
 game, the `game_*` runtime channel, input injection, viewport capture and the
 visual verification loop, UI reconnaissance, the four log and error paths,
@@ -229,6 +231,8 @@ automation: locate buttons and panels here, then drive them with
 `sequence_game_inputs` or `queue_game_input` using `global_rect`
 coordinates, or with `execute_game_script` using `path`.
 
+- `validate_game_ui_layout` scans the running game's Control tree for layout defects (zero-size visible controls, off-viewport controls, possibly-occluded controls) and reports each as a triage item with no automatic verdict. It complements `get_game_ui_elements` reconnaissance before click automation.
+
 ## Pause, reload and run code in the game
 
 - `set_scene_tree_pause` (`paused` boolean) pauses or resumes the running
@@ -291,6 +295,8 @@ coordinates, or with `execute_game_script` using `path`.
 
 The on-disk log matters more than it looks: the debugger transport silently
 drops messages under load (see below), but the log file does not.
+
+- `collect_game_evidence` collects status, screenshot and recent errors from the running game in one read-only round trip so the three observations belong to the same moment; each section fails in isolation, and triage is left to you. Prefer it over separate `get_game_status`, `capture_game_viewport` and `get_debugger_errors` calls when moment-consistency matters.
 
 ## Confirm a fix with the error watermark
 
@@ -369,6 +375,7 @@ modify code, run `run_gdscript_tests`, re-run the game, then confirm via
   a full snapshot of all 58 monitors. Custom monitors via
   `get_debug_custom_monitor_names`, `get_debug_custom_monitor` (JSON
   Variant value) and `remove_debug_custom_monitor`.
+- `sample_game_property` samples one game node property across N process frames without a caller-side polling loop, returning the serialized value per sample; the property must exist and the run is bounded by a timeout. Use it to watch a value evolve instead of hammering single reads.
 - Leaks and stacks: `get_debug_object_count` and `get_debug_node_count` —
   compare before/after an operation; a rising node count suggests leaks.
   `get_debug_memory_usage` is static engine memory only. `get_debug_stack`
@@ -397,5 +404,5 @@ process is in `references/debug-paths.md`.
   of the running game.
 - `godot-autopilot-scripting` — the four script execution channels,
   including `execute_game_script`.
-- `godot-autopilot` — tool discovery protocol, watermark details and
+- `godot-autopilot-tools` — tool discovery protocol, watermark details and
   retryable soft errors.
