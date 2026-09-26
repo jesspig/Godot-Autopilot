@@ -11,7 +11,7 @@
 | [tests.md](tests.md) | L1/L2 测试体系、遍历排除清单、数值统计 | `tests/` |
 | [conventions.md](conventions.md) | 工程约定：命名、日志、错误模式、添加工具流程 | 全仓库 |
 | [security_contract.md](security_contract.md) | T0 安全边界与并发契约：可信客户端、监听、风险工具、主线程、生命周期与边界原则 | `src/core/`、`src/tools/`、`src/main.cpp` |
-| [example.md](example.md) | Example 示例项目与文档 | `Example/` |
+| [example.md](example.md) | 原 Example 示例工程的历史记录（当前部署与打包目标见 build.md，L2 测试床见 tests.md） | 原 `Example/`，现由 `demo/` 承接 |
 | [tool_base_design.md](tool_base_design.md) | ToolSpec 工具数据层与执行管线：391 域工具全为 ToolSpec 数据记录、SpecTool 统一执行授权/后处理、Args 取参器、用户脚本动态工具、迁移规则与守卫 | `tool_spec.hpp`、`tool_args.hpp`、`tool_pipeline.hpp`、`dynamic_spec_store.hpp`、`autopilot_tools.{hpp,cpp}`、30 个域 `*_tools.hpp`、`register_all.cpp` |
 | [modules/core.md](modules/core.md) | 核心层：线程模型、端口、统一埋点门面（monitor/monitor_env/perf_sampler）、日志与本地持久化（日志/trace 双目录、脱敏）、配置常量 | `src/core/` |
 | [modules/entry_runtime.md](modules/entry_runtime.md) | 插件入口与运行时桥接、gda 协议 | `src/main.cpp`、`src/runtime/` |
@@ -45,7 +45,7 @@
 | 做法 | 根 `.agents/skills/project-*/SKILL.md` | **可执行指南**：流程步骤、决策判据、边界与反例、检查清单 | 易漂移的数值（改为指向 wiki 页）、一次性事实 |
 
 - 维护时机与本项目一致：完成功能 / 交付指南 / 提交前。**知识库自我迭代时必须顺带核对受影响的项目级技能**——事实变了而技能里的步骤或判据失效，属于本层未同步，比 wiki 漏更危险（技能会被当作行动依据）。
-- 技能与交付给 MCP 客户端的技能书不是一回事：后者由 skill_gen 从 `src/util/skill_templates/` 生成、渲染到 `Example/.agents/skills/godot-autopilot*`，教的是"怎么用这套工具"；前者是 `project-*` 前缀、教的是"怎么改这个仓库"，清理逻辑按前缀区分，互不删除。
+- 技能与交付给 MCP 客户端的技能书不是一回事：后者由 skill_gen 从 `src/util/skill_templates/` 生成、渲染到当前打开工程的 `res://.agents/skills/godot-autopilot*`（仓库内即 `tests/testbed/.agents/skills/`），教的是"怎么用这套工具"；前者是 `project-*` 前缀、教的是"怎么改这个仓库"，清理逻辑按前缀区分，互不删除。
 - 归属不确定时按此判据：不写下来 agent 会做错动作 → 技能；写下来只是让人知道现状 → wiki；两者都不需要、但每次会话都要遵守 → `AGENTS.md`。
 
 ## 编写规则

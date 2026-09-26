@@ -52,7 +52,7 @@ description: 本项目文档随代码演进需要同步时使用：更新 docs/w
 - 技能正文变成 wiki 摘录：全是"是什么"，没有"怎么做/何时停"。
 - changelog 时间按提交时间或估算填写。
 - 改了 wiki 没回看技能：技能里的步骤仍然指向已删除的行为，比 wiki 过期更危险，因为它会被当行动依据。
-- 把交付给 MCP 客户端的 `godot-autopilot-*` 技能书（生成到 `Example/.agents/skills/`）与开发用 `project-*` 技能混为一谈，或手改生成产物。
+- 把交付给 MCP 客户端的 `godot-autopilot-*` 技能书（生成到当前打开工程的 `res://.agents/skills/`，本仓库内即 `tests/testbed/.agents/skills/`）与开发用 `project-*` 技能混为一谈，或手改生成产物。
 
 ## 检查清单
 
