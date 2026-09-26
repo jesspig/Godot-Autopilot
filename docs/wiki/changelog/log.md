@@ -2,6 +2,10 @@
 
 > 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天。
 
+## 2026-09-26
+
+- **构建入口 main.py 化与 scripts/ 拆分 + TUI 新增**：`build.py` 删除，拆为 `main.py`（build/package/clean/tui）与 `scripts/` 6 模块，部署目标改 `demo/×5`（`--demos` 可选子集），`questionary` 入依赖；`AGENTS.md`/构建技能/CI/wiki 引用同步。详见 [2026-09-26-log.md](2026-09-26-log.md)
+
 ## 2026-09-25
 
 - **项目级技能层落地 + `AGENTS.md` 退为最小入口**：新增 `.agents/skills/project-*/SKILL.md` 共 8 个（构建登记、加工具、写 handler、跑测试、写埋点、读 trace 排障、安全授权门、三层文档维护），与交付给客户端的 `godot-autopilot-*` 技能书按前缀隔离；`AGENTS.md` 由 23448 字符精简到 4044（只留定位、命令、6 条硬约束、三层分工、技能索引、协作）。删除前用三个只读子代理逐条核对覆盖度，并把独有事实与错号补进 wiki。详见 [2026-09-25-log.md](2026-09-25-log.md)
