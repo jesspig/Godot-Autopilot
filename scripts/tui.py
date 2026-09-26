@@ -13,7 +13,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from . import cmake_ops, clean_ops, deploy, package, test_ops
-from .config import DEMO_DIRS, DEMO_NAMES, PLATFORM_LIBS, _addon_dir, resolve_demos
+from .config import DEPLOY_TARGETS, DEMO_NAMES, PLATFORM_LIBS, _addon_dir, resolve_demos
 
 console = Console()
 
@@ -59,17 +59,17 @@ def _fmt_mtime(path: Path) -> str:
     return datetime.fromtimestamp(path.stat().st_mtime).strftime("%m-%d %H:%M")
 
 
-def demo_status_rows() -> list[tuple[str, str, str]]:
+def deploy_status_rows() -> list[tuple[str, str, str]]:
     system = platform.system().lower()
     lib_name = PLATFORM_LIBS.get(system, "")
     rows = []
-    for demo in DEMO_DIRS:
-        addon_dir = _addon_dir(demo)
+    for project_dir in DEPLOY_TARGETS:
+        addon_dir = _addon_dir(project_dir)
         gdext = addon_dir / "godot-autopilot.gdextension"
         lib = addon_dir / lib_name if lib_name else None
         rows.append(
             (
-                demo.name,
+                project_dir.name,
                 f"✓ {_fmt_mtime(gdext)}" if gdext.exists() else "✗",
                 f"✓ {_fmt_mtime(lib)}" if lib is not None and lib.exists() else "✗",
             )
@@ -78,11 +78,11 @@ def demo_status_rows() -> list[tuple[str, str, str]]:
 
 
 def render_status_table() -> Table:
-    table = Table(title="Demo 部署状态")
-    table.add_column("demo", style="cyan")
+    table = Table(title="插件部署状态")
+    table.add_column("工程", style="cyan")
     table.add_column("gdextension")
     table.add_column("平台库")
-    for name, gdext, lib in demo_status_rows():
+    for name, gdext, lib in deploy_status_rows():
         table.add_row(name, gdext, lib)
     return table
 

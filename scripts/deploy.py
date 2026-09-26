@@ -5,7 +5,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from .config import BUILD_DIR, DEMO_DIRS, PLATFORM_LIBS, PLATFORM_PDB, _addon_dir
+from .config import BUILD_DIR, DEMO_DIRS, PLATFORM_LIBS, PLATFORM_PDB, TESTBED_DIR, _addon_dir
 
 
 def _generate_gdextension(addon_dir: Path) -> None:
@@ -34,8 +34,8 @@ def _deploy(preset: str, demos: list[Path] | None = None) -> None:
     if not lib_name:
         print(f"[ERROR] Unsupported platform: {system}", flush=True)
         sys.exit(1)
-    for demo_dir in demos or DEMO_DIRS:
-        addon_dir = _addon_dir(demo_dir)
+    for project_dir in [*(demos or DEMO_DIRS), TESTBED_DIR]:
+        addon_dir = _addon_dir(project_dir)
         addon_dir.mkdir(parents=True, exist_ok=True)
         # Remove any Godot hot-reload backup DLLs from previous runs to avoid loading errors
         for f in addon_dir.glob("~*"):
@@ -55,10 +55,10 @@ def _deploy(preset: str, demos: list[Path] | None = None) -> None:
                 size_kb = pdb_src.stat().st_size / 1024
                 print(f"  {PLATFORM_PDB}  ({size_kb:.0f} KB)", flush=True)
         print(f"  -> {addon_dir}", flush=True)
-        _validate_addon_integrity(addon_dir, demo_dir)
+        _validate_addon_integrity(addon_dir, project_dir)
 
 
-def _validate_addon_integrity(addon_dir: Path, demo_dir: Path) -> None:
+def _validate_addon_integrity(addon_dir: Path, project_dir: Path) -> None:
     system = platform.system().lower()
     platform_key = {"windows": "windows", "linux": "linux", "darwin": "macos"}.get(system)
     if not platform_key:
@@ -76,7 +76,7 @@ def _validate_addon_integrity(addon_dir: Path, demo_dir: Path) -> None:
             key, _, value = stripped.partition("=")
             if key.split(".", 1)[0] == platform_key:
                 res_path = value.strip().strip('"')
-                disk_path = demo_dir / res_path.removeprefix("res://")
+                disk_path = project_dir / res_path.removeprefix("res://")
                 if not disk_path.exists():
                     missing.append(res_path)
     if missing:
