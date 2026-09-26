@@ -82,7 +82,7 @@ resource: src/
 ## 遗留：P3 待规划
 
 - **客户端桥接深化**：一键配置已交付——配置面板现支持 20 个客户端（09-16 由 8 扩至 20，见[支撑模块](../modules/support.md)），对标 godot-ai 的 attach 桥与"Configure all"全家桶仍余 stdio bridge、状态点探测差距
-- **AssetLib 上架**：当前经 GitHub Release zip 分发（`uv run build.py --package`），未进 Godot Asset Library
+- **AssetLib 上架**：当前经 GitHub Release zip 分发（`uv run main.py package`），未进 Godot Asset Library
 
 ## 出站链接
 

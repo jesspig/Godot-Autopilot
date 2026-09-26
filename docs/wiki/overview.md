@@ -32,8 +32,8 @@ resource:
 Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **GDExtension 插件**形式**进程内加载到 Godot 编辑器**，在原生引擎 API 层面把 AI Agent 与 Godot 连接（场景树、物理服务器、渲染服务器、音频、导航、输入模拟、脚本执行等），而非模拟用户 UI 操作。
 
 - **进程内 GDExtension**：插件随编辑器启动而启动、随编辑器关闭而停止，无独立桥接进程（`src/main.cpp` 的 `GDExtensionEntryPoint` 注册 `GodotAutopilotPlugin`，`_enter_tree()` 中创建并启动 `ServerContext`）。
-- **产物名**：`godot-autopilot`（`.dll` / `.so` / `.dylib` + `.gdextension`），部署目录 `Example/addons/godot-autopilot/`。
-- **附属工程**：`Example/` 是文档/示例工程（详见 [example.md](./example.md)），`build.py` 构建后部署插件到其中。
+- **产物名**：`godot-autopilot`（`.dll` / `.so` / `.dylib` + `.gdextension`），部署目录 `demo/*/addons/godot-autopilot/`（5 个官方示例工程）。
+- **附属工程**：`demo/` 下 5 个官方示例工程的素材与干净配置（脚本/场景未入库），`main.py build` 构建后部署插件到其中。
 
 ## 核心能力
 
@@ -124,7 +124,8 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 godot-self-driving/
 ├── CMakeLists.txt              # add_library(godot-autopilot SHARED ...)，新 .cpp 必须登记
 ├── CMakePresets.json           # debug / release（Ninja）
-├── build.py                    # 构建 + 部署到 Example/addons/godot-autopilot/
+├── main.py                     # 构建入口（build/package/clean/tui 子命令）
+├── scripts/                    # 构建模块：config/cmake_ops/deploy/package/clean_ops/tui
 ├── cmake/                      # 构建模块：FetchDependencies / BuildOptimization / Lto / Cache / CompilerOptions / Platform / skill_gen
 ├── tools/                      # 构建辅助脚本：embed_skills.py（经 cmake/skill_gen.cmake 调用，构建期嵌入 skill 内容）
 ├── src/

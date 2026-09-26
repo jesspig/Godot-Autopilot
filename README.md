@@ -75,7 +75,7 @@ Godot-Autopilot 是一个住在 **Godot 编辑器内部**的插件型 [MCP](http
 
 ## 素材声明
 
-`Example/` 测试项目使用了 [Pixel Adventure 1](https://pixelfrog-assets.itch.io/pixel-adventure-1) 的像素艺术素材，版权归 Pixel Frog 所有。
+`demo/` 下的 5 个示例项目（2D/3D 入门教程、UI 控件全览、视口复合、网络 Pong）来自官方 [Godot 演示合集](https://github.com/godotengine/godot-demo-projects)，仓库仅保留其素材与干净工程配置用于测试，版权与授权见各项目目录内的 README 与 LICENSE。
 
 ## 许可证
 

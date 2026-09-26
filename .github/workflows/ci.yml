@@ -58,7 +58,7 @@ jobs:
           key: deps-debug-${{ runner.os }}-${{ hashFiles('cmake/FetchDependencies.cmake') }}
 
       - name: Build (Debug)
-        run: python build.py
+        run: python main.py build
 
       - name: L1 unit tests
         run: ctest --preset debug -E "^gda_runner_" --output-on-failure

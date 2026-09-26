@@ -6,7 +6,7 @@ Godot Autopilot（GDA）：进程内 GDExtension，把 Godot 编辑器经 MCP（
 
 ## 命令
 
-- 构建部署：`uv run build.py`（`--release` / `--package` / `--package --libs-dir <dir>`）
+- 构建部署：`uv run main.py build` + `uv run main.py deploy`（子命令：`build` / `deploy` / `package` / `clean` / `test` / `tui`；`deploy` 下 `--release` / `--demos <名称...>`，`package` 下 `--libs-dir <dir>`）
 - 手动构建：`cmake --preset debug && cmake --build --preset debug`
 - 快速验证：`ctest --preset debug -E "^gda_runner_"`（L1 + 两守卫，秒级）
 - 版本只改根 `VERSION`，随后重新 configure
