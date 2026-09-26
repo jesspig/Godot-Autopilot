@@ -1,0 +1,11 @@
+# L2 测试床：只入库工程定义与用例依赖的素材，引擎缓存与用例产物一律忽略
+*
+
+!*/
+!.gitignore
+!project.godot
+!assets/
+!assets/**/
+!assets/**/*.png
+
+.godot/
