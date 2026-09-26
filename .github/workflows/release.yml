@@ -84,16 +84,19 @@ jobs:
           key: deps-release-${{ runner.os }}-${{ hashFiles('cmake/FetchDependencies.cmake') }}
 
       - name: Build (Release)
-        run: python build.py --release
+        run: python main.py build --release
+
+      - name: Deploy to demo projects
+        run: python main.py deploy --release
 
       - name: Upload platform library
         uses: actions/upload-artifact@v4
         with:
           name: gdext-${{ runner.os }}
           path: |
-            Example/addons/godot-autopilot/godot-autopilot.dll
-            Example/addons/godot-autopilot/libgodot-autopilot.so
-            Example/addons/godot-autopilot/libgodot-autopilot.dylib
+            demo/2d_dodge_the_creeps/addons/godot-autopilot/godot-autopilot.dll
+            demo/2d_dodge_the_creeps/addons/godot-autopilot/libgodot-autopilot.so
+            demo/2d_dodge_the_creeps/addons/godot-autopilot/libgodot-autopilot.dylib
           if-no-files-found: error
 
   package:
@@ -116,7 +119,7 @@ jobs:
 
       - name: Package addons.zip
         run: |
-          python build.py --package --libs-dir dist
+          python main.py package --libs-dir dist
           mv dist/godot-autopilot-*.zip addons.zip
 
       - name: Create GitHub Release
