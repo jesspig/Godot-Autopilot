@@ -4,7 +4,7 @@
 
 测试体系分两层：
 
-- **L1 纯单测**（`gda_unit_tests`，312 个 gtest 用例 / 33 个测试文件；另加迁移守卫 `migration_guard` 与注释守卫 `comment_guard` 各 1 项，`ctest --preset debug -E "^gda_runner_"` 共 314 项）：不启动引擎，不触碰 Godot API，验证核心逻辑与工具注册管线。
+- **L1 纯单测**（`gda_unit_tests`，gtest 用例与测试文件数、含两守卫与 `skill_scripts` 的过滤集计数均以 [docs/wiki/tests.md](../docs/wiki/tests.md) 的数值核算总表为准）：不启动引擎，不触碰 Godot API，验证核心逻辑与工具注册管线。
 - **L2 配置驱动引擎内测试**（`gda_test_runner` + `tests/config/*.json` 用例）：由 C++ 执行器自管 Godot headless 编辑器进程，经真实 MCP HTTP 全链路驱动领域工具，并按 JSON 用例中的断言语义（C++ 执行器侧）校验响应。**每份 config/*.json = 一次独立的编辑器生命周期最小闭环**（启动 → MCP 就绪 → 执行步骤 → 停止进程），文件间互不共享状态。
 
 架构一句话：进程内 GDExtension（EditorPlugin），领域工具经 `call_tool` 元工具代理，由 `register_all.cpp` 的 registry（`build_registry`，经 `refresh_derived` 派生 dispatch 映射）分发。
@@ -17,6 +17,7 @@
 | Ninja | 构建生成器（预设 `debug` / `release` 均为 Ninja） |
 | clang-cl | 编译器（MSVC/GCC 自动回退，测试继承根配置） |
 | Godot 可执行文件 | 仅 L2 需要，见第 3 节 |
+| L2 测试床 | `tests/testbed/` 专用工程：入库的只有工程定义（`project.godot`、`.gitignore` 与 `14_tilemap_rect` 依赖的 `assets/Items/Fruits/Apple.png`），`addons/`、`.godot/`、`gda_tmp_*` 等产物不入库。插件由 `uv run main.py deploy` 写入（床恒被部署，与 `--demos` 子集无关）；床或床内 gdextension 缺失时执行器秒级退出码 2 |
 | googletest | CMake FetchContent 自动拉取（v1.15.2，GIT_SHALLOW），无需手动安装；仅 L1 链接 |
 
 ## 3. 配置 Godot 路径
@@ -280,12 +281,13 @@ build\debug\tests\gda_test_runner.exe --file 01_scene
 
 ## 8. 已知引擎副作用
 
-L2 每次运行后，`Example/project.godot` 可能被引擎自动追加 `[audio]` 段（`buses/default_bus_layout="uid://c6hb2nshs2igl"`），并生成 `Example/default_bus_layout.tres`。这是 headless 编辑器自身的自动保存行为，**非测试工具写入**，无害（不弹窗、不影响功能），但会弄脏 git 工作区。清理方式：
+L2 运行会把床的 `tests/testbed/project.godot` 弄脏：mono 编辑器重存工程时补写 `[dotnet] project/assembly_name`，`03_tools_contract` 遍历经 `add_input_map_action` 落盘一个 `[input] test` 动作。执行器自身不写工程文件，机制与逐项核实见 [docs/wiki/tests.md](../docs/wiki/tests.md) 的「已知引擎副作用」（数值与副作用口径的权威落点也在该页）。收尾清理：
 
 ```powershell
-git checkout -- Example/project.godot
-Remove-Item Example/default_bus_layout.tres
+git checkout -- tests/testbed/project.godot
 ```
+
+床内其它产物（`addons/`、`.godot/`、`gda_tmp_*`、`tests_tmp`、`*.uid`）已被 `tests/testbed/.gitignore` 忽略，不会出现在 `git status`。
 
 ## 9. 与参考项目（GodotMind-Archive）的差异
 

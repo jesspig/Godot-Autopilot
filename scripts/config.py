@@ -15,6 +15,11 @@ DEMO_NAMES: tuple[str, ...] = (
 
 DEMO_DIRS: list[Path] = [PROJECT_ROOT / "demo" / name for name in DEMO_NAMES]
 
+TESTBED_DIR = PROJECT_ROOT / "tests" / "testbed"
+
+# 插件写入的全部工程：demo 是交付物，testbed 只服务 L2 回归，不进 --demos 与打包
+DEPLOY_TARGETS: list[Path] = [*DEMO_DIRS, TESTBED_DIR]
+
 
 def _addon_dir(demo_dir: Path) -> Path:
     return demo_dir / "addons" / "godot-autopilot"

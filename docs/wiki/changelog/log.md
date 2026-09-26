@@ -5,6 +5,7 @@
 ## 2026-09-26
 
 - **构建入口 main.py 化与 scripts/ 拆分 + TUI 新增**：`build.py` 删除，拆为 `main.py`（build/package/clean/tui）与 `scripts/` 6 模块，部署目标改 `demo/×5`（`--demos` 可选子集），`questionary` 入依赖；`AGENTS.md`/构建技能/CI/wiki 引用同步。详见 [2026-09-26-log.md](2026-09-26-log.md)
+- **修 ctest：L2 专用测试床 `tests/testbed/`**：执行器原把编辑器起在已随 `6c50b99` 删除的 `Example/`，30 份 `gda_runner_*` 全灭；现改用新床（入库工程定义三件，含 `14_tilemap_rect` 依赖的 `Apple.png`，产物忽略），床路径收为单一权威并新增缺失前置校验（秒级退出码 2），deploy/clean 纳入床而 `--demos`/打包不变。同批移除 `22_uid_guard` 两道靠 `%APPDATA%` 残留才通过的 `get_game_log_entries` 伪守卫，并定位 `add_input_map_action` 声明为 `SideEffect::None` 却落盘、被 03 遍历污染床的问题。实测 348/348 全绿（514.54s）。详见 [2026-09-26-log.md](2026-09-26-log.md)
 
 ## 2026-09-25
 

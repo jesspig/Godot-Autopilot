@@ -361,9 +361,7 @@ void append_log(GodotProcess::Impl &impl, const std::string &line) {
 
 GodotProcess::GodotProcess(Options opts) : impl_(std::make_unique<Impl>()) {
   impl_->godot_path = opts.godot_path;
-  impl_->project_path =
-      opts.project_path.empty() ? std::string(PROJECT_ROOT) + "/Example"
-                                : opts.project_path;
+  impl_->project_path = opts.project_path;
   impl_->headless = opts.headless;
   impl_->port = opts.port;
 }

@@ -6,7 +6,7 @@ tags:
   - 构建
   - CMake
   - 部署
-timestamp: "2026-09-26T16:51:25+08:00"
+timestamp: "2026-09-26T22:35:00+08:00"
 resource:
   - CMakeLists.txt
   - CMakePresets.json
@@ -17,7 +17,7 @@ resource:
 
 # 构建体系（build）
 
-> 审计日期：2026-09-25（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill 内容外置化同步；09-10 随 7 册重构同步；09-13 晚随 A 组知识库审计修复批次同步——skill_templates 8 册/30 个 .md、server_context/FetchDependencies 行号重核、AGENTS.md/README 对照段更新；09-13 晚随 0.2.3→0.2.4 升版同步示例版本号；09-13 晚随 0.2.4 版知识库全量审计同步——GODOT_PATH 缺失行为修正（退出码 2 报错，非“失败/跳过”），全页其余事实复核一致；09-14 随 CI Windows Python 编码修复同步——ci/release workflow 增 `PYTHONUTF8`、`embed_skills.py` 强制 UTF-8 输出），基于当前工作树文件逐项核对（不依赖 git 历史）；09-15 随 Computer Use grounding 批次同步文档一致性段——`README.md` / `README_zh.md` 工具数口径已同步为 ~379（域工具），与 overview 的 379 域工具 / 可达 386 / catalog 387 一致；09-16 随失败修复批次同步——README 双语工具数口径更新为 ~384，与 overview 的 384 域工具 / 可达 391 / catalog 392 一致；09-16 随视觉辅助与坐标换算批次同步——wiki 实测 385 域工具 / 可达 392 / catalog 393（Capture 1→2），README 双语 ~384 为约数口径（差 1，可接受，待后续版本同步）；09-16 随 0.2.5 升版收尾同步——validate 示例 0.2.4→0.2.5（`VERSION`/AGENTS/changelog 早在 09-14 已同步，`GDA_VERSION` 已为 0.2.5）；09-17 随 T09+T12 文档同步批次更新 compatibility_minimum 4.3→4.7、godot-cpp 10.0.0-rc1→rc2（新增 GODOTCPP_API_VERSION "4.7" FORCE 覆盖旧缓存）、mcp-cpp-sdk 0.3.3→0.3.4；09-18 随知识库一致性审计与 README 拆分批次同步——`CMakeLists.txt` 行数 169→173（实测）、`README_zh.md` 已删除（中文 `README.md` + 英文 `README.en.md` 双版）故事实来源与文档一致性段改引新版 README 口径；09-19 随 ToolSpec 数据化重构同步文档一致性段——wiki 实测 391 域工具 / 可达 398 / catalog 399；09-20 随 Release 触发修复同步——tag 触发 `v*` 改双格式（`v*.*.*` / `[0-9]*.*.*`）+ `workflow_dispatch` 手动指定 tag，validate 去 `v` 后比对 `VERSION`；同日代码-文档一致性审计——add_library 分目录计数修正为 tools 48 / util 8 / runtime 4（总数 83 不变）；同日 0.2.6 升版——根 `VERSION` 0.2.5→0.2.6（单一来源），validate 示例同步至 `v0.2.6` ↔ `0.2.6`；09-20 晚随可重放监控批次同步——add_library 83→86（`src/core/` 9→12：log_persist / trace_recorder / sanitize_policy），块范围 `CMakeLists.txt:65-148`→`:65-151`；09-20 晚随依赖升级同步——godot-cpp 10.0.0-rc2→10.0.0-stable；mcp-cpp-sdk 维持 0.3.4（依赖升级范围经复核收缩，`FetchDependencies.cmake:20/29`，configure 实测 `[mcp] SDK version: 0.3.4`）；09-21 随可重放监控与日志系统批次同步——`add_library` 86→89（`src/core/` 12→15：新增 `monitor.cpp` / `monitor_env.cpp` / `perf_sampler.cpp`），`monitor.cpp` 进 L1 业务源、`monitor_env.cpp`（仅主线程）与 `perf_sampler.cpp`（依赖引擎 tick）不进 L1；09-25 随项目级技能层落地同步——`CMakeLists.txt` 行数 176→179、`add_dependencies` `:153`→`:156`、`WHOLEARCHIVE` `:165`→`:168`（均按当前工作树重核）。
+> 审计日期：2026-09-26（09-26 随 L2 测试床迁移同步——`Example/` 已移除，床改 `tests/testbed/`；2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill 内容外置化同步；09-10 随 7 册重构同步；09-13 晚随 A 组知识库审计修复批次同步——skill_templates 8 册/30 个 .md、server_context/FetchDependencies 行号重核、AGENTS.md/README 对照段更新；09-13 晚随 0.2.3→0.2.4 升版同步示例版本号；09-13 晚随 0.2.4 版知识库全量审计同步——GODOT_PATH 缺失行为修正（退出码 2 报错，非“失败/跳过”），全页其余事实复核一致；09-14 随 CI Windows Python 编码修复同步——ci/release workflow 增 `PYTHONUTF8`、`embed_skills.py` 强制 UTF-8 输出），基于当前工作树文件逐项核对（不依赖 git 历史）；09-15 随 Computer Use grounding 批次同步文档一致性段——`README.md` / `README_zh.md` 工具数口径已同步为 ~379（域工具），与 overview 的 379 域工具 / 可达 386 / catalog 387 一致；09-16 随失败修复批次同步——README 双语工具数口径更新为 ~384，与 overview 的 384 域工具 / 可达 391 / catalog 392 一致；09-16 随视觉辅助与坐标换算批次同步——wiki 实测 385 域工具 / 可达 392 / catalog 393（Capture 1→2），README 双语 ~384 为约数口径（差 1，可接受，待后续版本同步）；09-16 随 0.2.5 升版收尾同步——validate 示例 0.2.4→0.2.5（`VERSION`/AGENTS/changelog 早在 09-14 已同步，`GDA_VERSION` 已为 0.2.5）；09-17 随 T09+T12 文档同步批次更新 compatibility_minimum 4.3→4.7、godot-cpp 10.0.0-rc1→rc2（新增 GODOTCPP_API_VERSION "4.7" FORCE 覆盖旧缓存）、mcp-cpp-sdk 0.3.3→0.3.4；09-18 随知识库一致性审计与 README 拆分批次同步——`CMakeLists.txt` 行数 169→173（实测）、`README_zh.md` 已删除（中文 `README.md` + 英文 `README.en.md` 双版）故事实来源与文档一致性段改引新版 README 口径；09-19 随 ToolSpec 数据化重构同步文档一致性段——wiki 实测 391 域工具 / 可达 398 / catalog 399；09-20 随 Release 触发修复同步——tag 触发 `v*` 改双格式（`v*.*.*` / `[0-9]*.*.*`）+ `workflow_dispatch` 手动指定 tag，validate 去 `v` 后比对 `VERSION`；同日代码-文档一致性审计——add_library 分目录计数修正为 tools 48 / util 8 / runtime 4（总数 83 不变）；同日 0.2.6 升版——根 `VERSION` 0.2.5→0.2.6（单一来源），validate 示例同步至 `v0.2.6` ↔ `0.2.6`；09-20 晚随可重放监控批次同步——add_library 83→86（`src/core/` 9→12：log_persist / trace_recorder / sanitize_policy），块范围 `CMakeLists.txt:65-148`→`:65-151`；09-20 晚随依赖升级同步——godot-cpp 10.0.0-rc2→10.0.0-stable；mcp-cpp-sdk 维持 0.3.4（依赖升级范围经复核收缩，`FetchDependencies.cmake:20/29`，configure 实测 `[mcp] SDK version: 0.3.4`）；09-21 随可重放监控与日志系统批次同步——`add_library` 86→89（`src/core/` 12→15：新增 `monitor.cpp` / `monitor_env.cpp` / `perf_sampler.cpp`），`monitor.cpp` 进 L1 业务源、`monitor_env.cpp`（仅主线程）与 `perf_sampler.cpp`（依赖引擎 tick）不进 L1；09-25 随项目级技能层落地同步——`CMakeLists.txt` 行数 176→179、`add_dependencies` `:153`→`:156`、`WHOLEARCHIVE` `:165`→`:168`（均按当前工作树重核）。
 9（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill 内容外置化同步；09-10 随 7 册重构同步；09-13 晚随 A 组知识库审计修复批次同步——skill_templates 8 册/30 个 .md、server_context/FetchDependencies 行号重核、AGENTS.md/README 对照段更新；09-13 晚随 0.2.3→0.2.4 升版同步示例版本号；09-13 晚随 0.2.4 版知识库全量审计同步——GODOT_PATH 缺失行为修正（退出码 2 报错，非“失败/跳过”），全页其余事实复核一致；09-14 随 CI Windows Python 编码修复同步——ci/release workflow 增 `PYTHONUTF8`、`embed_skills.py` 强制 UTF-8 输出），基于当前工作树文件逐项核对（不依赖 git 历史）；09-15 随 Computer Use grounding 批次同步文档一致性段——`README.md` / `README_zh.md` 工具数口径已同步为 ~379（域工具），与 overview 的 379 域工具 / 可达 386 / catalog 387 一致；09-16 随失败修复批次同步——README 双语工具数口径更新为 ~384，与 overview 的 384 域工具 / 可达 391 / catalog 392 一致；09-16 随视觉辅助与坐标换算批次同步——wiki 实测 385 域工具 / 可达 392 / catalog 393（Capture 1→2），README 双语 ~384 为约数口径（差 1，可接受，待后续版本同步）；09-16 随 0.2.5 升版收尾同步——validate 示例 0.2.4→0.2.5（`VERSION`/AGENTS/changelog 早在 09-14 已同步，`GDA_VERSION` 已为 0.2.5）；09-17 随 T09+T12 文档同步批次更新 compatibility_minimum 4.3→4.7、godot-cpp 10.0.0-rc1→rc2（新增 GODOTCPP_API_VERSION "4.7" FORCE 覆盖旧缓存）、mcp-cpp-sdk 0.3.3→0.3.4；09-18 随知识库一致性审计与 README 拆分批次同步——`CMakeLists.txt` 行数 169→173（实测）、`README_zh.md` 已删除（中文 `README.md` + 英文 `README.en.md` 双版）故事实来源与文档一致性段改引新版 README 口径；09-19 随 ToolSpec 数据化重构同步文档一致性段——wiki 实测 391 域工具 / 可达 398 / catalog 399；09-20 随 Release 触发修复同步——tag 触发 `v*` 改双格式（`v*.*.*` / `[0-9]*.*.*`）+ `workflow_dispatch` 手动指定 tag，validate 去 `v` 后比对 `VERSION`；同日代码-文档一致性审计——add_library 分目录计数修正为 tools 48 / util 8 / runtime 4（总数 83 不变）；同日 0.2.6 升版——根 `VERSION` 0.2.5→0.2.6（单一来源），validate 示例同步至 `v0.2.6` ↔ `0.2.6`；09-20 晚随可重放监控批次同步——add_library 83→86（`src/core/` 9→12：log_persist / trace_recorder / sanitize_policy），块范围 `CMakeLists.txt:65-148`→`:65-151`；09-20 晚随依赖升级同步——godot-cpp 10.0.0-rc2→10.0.0-stable；mcp-cpp-sdk 维持 0.3.4（依赖升级范围经复核收缩，`FetchDependencies.cmake:20/29`，configure 实测 `[mcp] SDK version: 0.3.4`）；09-21 随可重放监控与日志系统批次同步——`add_library` 86→89（`src/core/` 12→15：新增 `monitor.cpp` / `monitor_env.cpp` / `perf_sampler.cpp`），`monitor.cpp` 进 L1 业务源、`monitor_env.cpp`（仅主线程）与 `perf_sampler.cpp`（依赖引擎 tick）不进 L1；09-25 随项目级技能层落地同步——`CMakeLists.txt` 行数 176→179、`add_dependencies` `:153`→`:156`、`WHOLEARCHIVE` `:165`→`:168`（均按当前工作树重核）。；09-26 随构建入口 main.py 化与 scripts/ 拆分同步——build.py 删除（main.py build/deploy/package/clean/test/tui 六子命令 + scripts/ 7 模块：config/cmake_ops/deploy/package/clean_ops/test_ops/tui），部署目标 Example/addons→demo/×5（--demos 可选子集），打包与 CI artifact 取首个 demo，TUI（rich 状态表 + questionary 复选/单选/确认）新增；questionary 2.1.1 入 pyproject 依赖
 > 事实来源：`main.py` + `scripts/` 6 模块（config/cmake_ops/deploy/package/clean_ops/tui）、`CMakeLists.txt`（179 行）、`CMakePresets.json`、`cmake/` 全部 7 个模块、`tools/embed_skills.py`、`.env.template`、根 `README.md` / `README.en.md` / `AGENTS.md` 构建段、`.github/workflows/{ci,release}.yml`。
 > 09-25 技能脚本通道批次：skill 8→9 册，模板 33 md + 1 mjs（`gda_mcp.mjs` 脚本桥）+ registry，嵌入校验扩展 `.mjs`/`scripts/`（`SKILL_COUNT = 9`）；构建接线不变（内容数据文件不进 add_library）。
@@ -28,7 +28,7 @@ resource:
 |---|---|
 | `uv run main.py build` | Debug：配置 + 构建（不部署） |
 | `uv run main.py build --release` | Release 配置 + 构建（不部署、不清理） |
-| `uv run main.py deploy` | 部署 Debug 产物到 `demo/*/addons/godot-autopilot/`（5 个 demo，可用 `--demos 名称...` 只部署子集） |
+| `uv run main.py deploy` | 部署 Debug 产物到 `demo/*/addons/godot-autopilot/`（5 个 demo，可用 `--demos 名称...` 只部署子集）与 L2 测试床 `tests/testbed/addons/godot-autopilot/`（恒被部署，不受子集影响） |
 | `uv run main.py deploy --release` | 先清理，再部署 Release 产物 |
 | `uv run main.py build --release --package` | 不再支持：构建与部署已拆分，按 `build --release` → `deploy --release` → `package` 分步执行 |
 | `uv run main.py package` | 仅打包已部署的 addons（不触发构建，未部署则报错退出） |
@@ -57,10 +57,12 @@ resource:
 
 ### 1. 清理（`deploy --release` 顺带，或 `clean` 子命令）
 
-`_clean()`（`scripts/clean_ops.py`）逐个 demo 删除两类目录，**不触碰 `build/`**：
+`_clean()`（`scripts/clean_ops.py`）按 `DEPLOY_TARGETS` 逐个工程删除两类目录，**不触碰 `build/`**：
 
-- `demo/*/.godot` — Godot 引擎缓存
-- `demo/*/addons/godot-autopilot/` — 旧部署产物
+- `<工程>/.godot` — Godot 引擎缓存
+- `<工程>/addons/godot-autopilot/` — 旧部署产物
+
+`DEPLOY_TARGETS`（`scripts/config.py`）= 5 个 `demo/*` + L2 测试床 `tests/testbed`。清理刻意与部署同口径，否则会留下 demo 已是 Release 库、床仍是 Debug 库的幽灵态；代价是 `deploy --release` 后跑 L2 须先重新 `deploy`。
 
 ### 2. 配置 `_configure(preset)`（`scripts/cmake_ops.py`）
 
@@ -74,7 +76,7 @@ resource:
 
 ### 4. 部署 `_deploy(preset, demos)`（`scripts/deploy.py`）
 
-逐个 demo 循环（`--demos` 未指定即全部 5 个）：
+逐个工程循环（`--demos` 未指定即全部 5 个 demo），循环体末尾恒追加 L2 测试床 `tests/testbed`，因此 `--demos` 子集部署同样会刷新床的插件：
 
 1. 创建部署目录，删除 Godot 热重载遗留的备份库（glob `~*`）；
 2. 生成 `godot-autopilot.gdextension`（见下节）；
@@ -110,7 +112,7 @@ macOS runner 为 ARM64，preset 设 `CMAKE_OSX_ARCHITECTURES=x86_64;arm64` 编�
 | `godot-autopilot.gdextension` | 部署目录（每次部署重新生成） | 入口 `entry_symbol = "GDExtensionEntryPoint"`、`compatibility_minimum = "4.7"`、`[libraries]` 6 条平台路径（windows/linux 为 `x86_64`，macos 为 `universal`） |
 | `dist/godot-autopilot-<version>.zip` | `dist/` | `--package` 产物（版本号取自根 `VERSION` 文件） |
 
-部署目录：`demo/*/addons/godot-autopilot/`（5 个 demo；打包与 CI artifact 取首个）；`main.py` 与 CI/Release 均使用仓库实际目录大小写，大小写敏感平台不会产生分叉目录。
+部署目录：`demo/*/addons/godot-autopilot/`（5 个 demo；打包与 CI artifact 取首个）与 `tests/testbed/addons/godot-autopilot/`（L2 测试床，不入库、不参与打包）；`main.py` 与 CI/Release 均使用仓库实际目录大小写，大小写敏感平台不会产生分叉目录。
 
 ## CMake 目标
 
