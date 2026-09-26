@@ -75,7 +75,7 @@ The server only listens on your machine's loopback address (port from the plugin
 
 ## Asset attribution
 
-The `Example/` test project uses pixel art from [Pixel Adventure 1](https://pixelfrog-assets.itch.io/pixel-adventure-1) by Pixel Frog.
+The 5 sample projects under `demo/` (2D/3D beginner tutorials, UI control gallery, viewport composition, networked Pong) come from the official [Godot demo projects](https://github.com/godotengine/godot-demo-projects); only their assets and clean project configurations are kept for testing. Copyright and licensing details live in each project's README and LICENSE files.
 
 ## License
 

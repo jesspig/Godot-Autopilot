@@ -1,0 +1,30 @@
+# demo/ 下所有子项目的公共忽略规则
+# 仅入库：配置、文档与素材，其余脚本场景与生成文件一律忽略
+# Godot 4+ specific ignores
+*
+
+!*/
+!.gitignore
+!project.godot
+!icon.webp
+!README.md
+!LICENSE
+!**/docs/**/*.md
+!*.png
+!*.jpg
+!*.jpeg
+!*.webp
+!*.ogg
+!*.wav
+!*.mp3
+!*.ttf
+!*.otf
+!*.woff
+!*.glb
+!*.gltf
+!*.blend
+!*.fbx
+
+.godot/
+android/
+logs/
