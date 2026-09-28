@@ -224,6 +224,10 @@ void attach_save_receipt(mcp::JsonValue &r, const mcp::JsonValue &args,
   r["memory_nodes"] = mcp::JsonValue(vr.memory_nodes);
   r["disk_nodes"] = mcp::JsonValue(vr.disk_nodes);
   r["nodes_match"] = mcp::JsonValue(vr.match);
+  r["memory_connections"] = mcp::JsonValue(vr.memory_connections);
+  r["disk_connections"] = mcp::JsonValue(vr.disk_connections);
+  r["connections_match"] =
+      mcp::JsonValue(vr.memory_connections == vr.disk_connections);
   if (!vr.match || want_paths) {
     mcp::JsonValue arr(mcp::JsonValue::array_tag);
     for (const std::string &p : vr.missing_paths)
@@ -238,9 +242,11 @@ void attach_save_receipt(mcp::JsonValue &r, const mcp::JsonValue &args,
   }
   if (!vr.match && r.Find("warning") == nullptr) {
     r["warning"] = mcp::JsonValue(
-        "memory/disk node mismatch after save (memory " +
+        "memory/disk mismatch after save (nodes memory " +
         std::to_string(vr.memory_nodes) + " vs disk " +
-        std::to_string(vr.disk_nodes) +
+        std::to_string(vr.disk_nodes) + "; connections memory " +
+        std::to_string(vr.memory_connections) + " vs disk " +
+        std::to_string(vr.disk_connections) +
         ") — inspect missing_paths, then run verify_scene_saved; if nodes were "
         "moved with remove_child/add_child, use reparent_node so owners persist");
   }
@@ -1491,6 +1497,10 @@ mcp::JsonValue handle_verify_scene_saved(const mcp::JsonValue &args) {
   r["path"] = mcp::JsonValue(target_path);
   r["memory_nodes"] = mcp::JsonValue(vr.memory_nodes);
   r["disk_nodes"] = mcp::JsonValue(vr.disk_nodes);
+  r["memory_connections"] = mcp::JsonValue(vr.memory_connections);
+  r["disk_connections"] = mcp::JsonValue(vr.disk_connections);
+  r["connections_match"] =
+      mcp::JsonValue(vr.memory_connections == vr.disk_connections);
   mcp::JsonValue arr(mcp::JsonValue::array_tag);
   for (const std::string &p : vr.missing_paths)
     arr.PushBack(mcp::JsonValue(p));

@@ -1,8 +1,8 @@
 # Resource Tool Reference
 
-The 26 resource domain tools plus the three text-file tools from the OS domain. Domain tools are invoked through `call_tool`; see the godot-autopilot skill for the protocol.
+The 27 resource domain tools plus the three text-file tools from the OS domain. Domain tools are invoked through `call_tool`; see the godot-autopilot skill for the protocol.
 
-## Resource domain (26 tools)
+## Resource domain (27 tools)
 
 | Tool | Purpose |
 |---|---|
@@ -30,6 +30,7 @@ The 26 resource domain tools plus the three text-file tools from the OS domain. 
 | `has_resource_dependency` | Check whether a resource depends on one specific file. |
 | `get_resource_references` | Reverse lookup: which .tscn/.tres files reference a resource (by `path`, `uid` or `class_name`). |
 | `reimport_resource_files` | Queue reimport of one or more files; asynchronous, editor only. |
+| `set_resource_import_options` | Set whitelisted `.import` `[params]` keys on an imported asset and queue a reimport; hand-writing `.import` files is deprecated. |
 | `set_resource_property` | Set a property on a resource located by `object_id`/`object_id_str`, `name` or `path`. |
 | `get_resource_property` | Read a property value from a located resource. |
 

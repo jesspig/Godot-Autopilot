@@ -66,6 +66,23 @@ void record_dispatch_exception(const std::string &name,
           " queue=0ms args=" + args_text + " err=internal");
 }
 
+std::string received_keys_suffix(const mcp::JsonValue &args) {
+  if (!args.IsObject() || args.GetObject().empty()) {
+    return " (received no parameters)";
+  }
+  std::string text = " (received keys: ";
+  bool first = true;
+  for (const auto &entry : args.GetObject()) {
+    if (!first) {
+      text += ", ";
+    }
+    first = false;
+    text += entry.first;
+  }
+  text += ")";
+  return text;
+}
+
 mcp::JsonValue call_handler_impl(const std::string &name,
                                  const mcp::JsonValue &args) {
   mcp::JsonValue result(mcp::JsonValue::object_tag);
@@ -111,7 +128,8 @@ mcp::JsonValue call_handler_impl(const std::string &name,
     result = mcp::JsonValue(mcp::JsonValue::object_tag);
     result["error"] =
         mcp::JsonValue("domain tool '" + name +
-                       "' not found — use search_tools to discover available "
+                       "' not found" + received_keys_suffix(args) +
+                       " — use search_tools to discover available "
                        "tools");
   }
   bool has_error = result.IsObject() && result.Find("error") != nullptr;

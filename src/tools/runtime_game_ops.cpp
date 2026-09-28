@@ -51,7 +51,7 @@ void copy_optional(const JV &from, JV &to, const char *key) {
 constexpr const char *INPUT_PARAM_WHITELIST[] = {
     "type",      "keycode",    "pressed",   "button_index", "position",
     "action",    "duration_ms", "mode",     "timeout_ms",   "direction",
-    "amount",    "relative",
+    "amount",    "relative",   "click",     "double_click",
 };
 
 bool has_only_fields(const JV &value, const char *const *allowed,
@@ -282,6 +282,11 @@ mcp::JsonValue handle_game_input(const mcp::JsonValue &args) {
     return error_json("relative must be an object with numeric x and y");
   if (auto *pressed = args.Find("pressed"); pressed && !pressed->IsBool())
     return error_json("pressed must be a boolean");
+  if (auto *click = args.Find("click"); click && !click->IsBool())
+    return error_json("click must be a boolean");
+  if (auto *double_click = args.Find("double_click");
+      double_click && !double_click->IsBool())
+    return error_json("double_click must be a boolean");
   if (auto *duration = args.Find("duration_ms"); duration &&
       (!duration->IsInt() || duration->GetInt() < 0))
     return error_json("duration_ms must be a non-negative integer");
@@ -307,6 +312,8 @@ mcp::JsonValue handle_game_input(const mcp::JsonValue &args) {
   copy_optional(args, params, "direction");
   copy_optional(args, params, "amount");
   copy_optional(args, params, "relative");
+  copy_optional(args, params, "click");
+  copy_optional(args, params, "double_click");
 
   JV result = handle_gda_send("input", params, extract_timeout(args));
   append_runtime_degradation_hint(result);
@@ -647,7 +654,7 @@ mcp::JsonValue handle_game_reload_scripts(const mcp::JsonValue &args) {
   int32_t sent = debugger_broadcast_reload_scripts(paths_vec);
   if (sent <= 0) {
     return error_json(
-        "game not ready: no active debug session — start the game from the editor first");
+        "game not running: no active debug session — start the game from the editor first");
   }
   JV paths_arr(JV::array_tag);
   for (const auto &path : paths_vec)

@@ -560,9 +560,11 @@ godot::Dictionary AutopilotTools::call_tool(const godot::String &name,
       result = invoke();
     }
   } catch (const std::exception &e) {
-    result = util::error_json(std::string("call_tool failed: ") + e.what());
+    result = util::error_json("call_tool '" + tool_name +
+                              "' failed: " + e.what());
   } catch (...) {
-    result = util::error_json("call_tool failed: unknown exception");
+    result =
+        util::error_json("call_tool '" + tool_name + "' failed: unknown exception");
   }
 
   godot::Variant out = VariantJson::deserialize(result, "dictionary");

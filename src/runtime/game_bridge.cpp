@@ -60,7 +60,8 @@ JV error_result(const std::string &message) {
 
 JV ok_result(JV result) {
   JV r(JV::object_tag);
-  r["result"] = std::move(result);
+  r["result"] = result;
+  r["data"] = std::move(result);
   return r;
 }
 

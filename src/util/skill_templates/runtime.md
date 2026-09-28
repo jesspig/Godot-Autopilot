@@ -32,10 +32,12 @@ Two prerequisites must hold:
 2. The game project loads the godot-autopilot extension (plugin enabled in
    that project).
 
-Until the game reports ready, tools fail with:
+Without an attached game, tools fail with `game not running` — start the
+game from the editor first, then retry. Once attached but not yet ready,
+tools fail with:
 
 ```text
-game not ready: the game process has not reported gda ready yet — wait a moment
+game started but not ready: the game process has not reported gda ready yet — wait a moment
 after play, or verify the game project loads the godot-autopilot extension
 ```
 

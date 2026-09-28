@@ -95,6 +95,7 @@ To discard a whole directory, `move_os_file_to_trash` (OS domain) trashes a res:
 ## Imports and editor readiness
 
 - `reimport_resource_files` (editor only) queues one or more files (`files` array or a single `path`) for reimport. It is asynchronous: the response confirms the queued count, not completion. Reimport only has an effect on files that carry a .import sidecar: for a .tres/.gd and similar non-imported files the engine logs a BUG error and the tool still reports "reimport queued" - refresh those with `reload_resource` instead. Poll `get_editor_file_system_status` (editor domain) until scanning is false.
+- `set_resource_import_options` (editor only) is the supported way to change import parameters: it writes whitelisted `.import` `[params]` keys (audio loop/compression and texture filter/mipmap families; any other key is rejected) and queues a reimport in one call. Hand-writing `.import` files is deprecated for parameter changes. The response reports the applied keys with reimport queued - poll `get_editor_file_system_status` until scanning is false, then verify with `get_resource_type` or `read_file` on the `.import`.
 - `set_resource_uid` triggers a filesystem reimport so the assignment persists.
 - `scan_editor_file_system` rescans the project - run it after a class_name rename that left script_class tokens, or after out-of-band file changes; directory moves trigger one automatically.
 

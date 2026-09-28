@@ -1096,6 +1096,20 @@ mcp::JsonValue handle_get_editor_ui_elements(const mcp::JsonValue &args) {
   inner["count"] = mcp::JsonValue(static_cast<int>(elements.size()));
   inner["truncated"] = mcp::JsonValue(truncated);
   inner["space"] = mcp::JsonValue("window");
+  if (elements.empty()) {
+    std::string note =
+        "no visible editor UI elements matched: the editor window may not be "
+        "in the foreground or may be minimized, every enumerated control may "
+        "be hidden, or the active filters excluded everything — adjust the "
+        "filters and retry; no elements were fabricated";
+    if (!query.empty())
+      note += " (query='" + query + "')";
+    if (!type_filter.empty())
+      note += " (type_filter='" + type_filter + "')";
+    if (interactive_only)
+      note += " (interactive_only=true)";
+    inner["note"] = mcp::JsonValue(note);
+  }
   return util::ok_result(std::move(inner));
 }
 

@@ -19,13 +19,17 @@
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/node2d.hpp>
 #include <godot_cpp/classes/node3d.hpp>
+#include <godot_cpp/classes/object.hpp>
+#include <godot_cpp/classes/scene_state.hpp>
 #include <godot_cpp/classes/packed_scene.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/classes/sub_viewport.hpp>
 #include <godot_cpp/classes/viewport.hpp>
 #include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/core/error_macros.hpp>
 #include <godot_cpp/core/memory.hpp>
+#include <godot_cpp/variant/callable.hpp>
 #include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
@@ -45,10 +49,39 @@ constexpr int UNLIMITED_TREE_DEPTH = 100000;
 constexpr int MAX_PROPERTY_COUNT = 20;
 constexpr int MAX_SCREEN_RECT_PATHS = 50;
 
+int property_summary_key_weight(const std::string &name) {
+  if (name == "scale")
+    return 100;
+  if (name == "z_index")
+    return 90;
+  if (name == "position")
+    return 80;
+  if (name == "rotation")
+    return 70;
+  if (name == "size")
+    return 60;
+  if (name == "modulate")
+    return 50;
+  if (name == "self_modulate")
+    return 40;
+  if (name == "text")
+    return 30;
+  if (name == "offset")
+    return 20;
+  return 0;
+}
+
 void collect_property_summary(godot::Node *node, mcp::JsonValue &j) {
   godot::TypedArray<godot::Dictionary> props = node->get_property_list();
-  int count = 0;
-  for (int i = 0; i < props.size() && count < MAX_PROPERTY_COUNT; i++) {
+  godot::ClassDBSingleton *cdbs = godot::ClassDBSingleton::get_singleton();
+  const godot::StringName cls = node->get_class();
+  struct Candidate {
+    std::string name;
+    godot::Variant value;
+    int tier;
+  };
+  std::vector<Candidate> cands;
+  for (int i = 0; i < props.size(); i++) {
     godot::Dictionary prop = props[i];
     godot::Variant name_v = prop["name"];
     godot::Variant::Type name_type = name_v.get_type();
@@ -64,7 +97,33 @@ void collect_property_summary(godot::Node *node, mcp::JsonValue &j) {
     if (static_cast<godot::Variant::Type>(static_cast<int>(prop["type"])) ==
         godot::Variant::OBJECT)
       continue;
-    j[name_str] = VariantJson::serialize(node->get(prop_name));
+    godot::Variant current = node->get(prop_name);
+    bool is_default = false;
+    if (cdbs) {
+      godot::Variant def =
+          cdbs->class_get_property_default_value(cls, prop_name);
+      if (def.get_type() == godot::Variant::NIL)
+        is_default = current.get_type() == godot::Variant::NIL;
+      else
+        is_default = current == def;
+    }
+    const int weight = property_summary_key_weight(name_str);
+    int tier = 3;
+    if (!is_default)
+      tier = weight > 0 ? 0 : 1;
+    else if (weight > 0)
+      tier = 2;
+    cands.push_back(Candidate{name_str, current, tier});
+  }
+  std::stable_sort(cands.begin(), cands.end(),
+                   [](const Candidate &a, const Candidate &b) {
+                     return a.tier < b.tier;
+                   });
+  int count = 0;
+  for (const Candidate &c : cands) {
+    if (count >= MAX_PROPERTY_COUNT)
+      break;
+    j[c.name] = VariantJson::serialize(c.value);
     count++;
   }
 }
@@ -139,6 +198,57 @@ bool property_value_is_object_typed(const godot::Node *node,
     return ref != nullptr && ref->IsString();
   }
   return false;
+}
+
+godot::Node *instance_state_node(godot::Node *instance,
+                                 const godot::NodePath &rel) {
+  if (!instance)
+    return nullptr;
+  const std::string rel_str = util::to_std(rel);
+  if (rel_str.empty() || rel_str == ".")
+    return instance;
+  return instance->get_node_or_null(rel);
+}
+
+void audit_instance_persist_connections(godot::PackedScene *packed_scene,
+                                        godot::Node *instance, int &skipped,
+                                        int &connected, int &unresolved) {
+  skipped = 0;
+  connected = 0;
+  unresolved = 0;
+  if (!packed_scene || !instance)
+    return;
+  godot::Ref<godot::SceneState> state = packed_scene->get_state();
+  if (state.is_null())
+    return;
+  const int32_t total = state->get_connection_count();
+  for (int32_t i = 0; i < total; i++) {
+    const int32_t flags = state->get_connection_flags(i);
+    if ((flags &
+         static_cast<int32_t>(godot::Object::CONNECT_PERSIST)) == 0)
+      continue;
+    godot::Node *src_node =
+        instance_state_node(instance, state->get_connection_source(i));
+    godot::Node *dst_node =
+        instance_state_node(instance, state->get_connection_target(i));
+    if (!src_node || !dst_node) {
+      unresolved++;
+      continue;
+    }
+    godot::StringName sig = state->get_connection_signal(i);
+    godot::StringName method = state->get_connection_method(i);
+    godot::Callable callable(dst_node, method);
+    if (src_node->is_connected(sig, callable)) {
+      skipped++;
+      continue;
+    }
+    godot::Error err =
+        src_node->connect(sig, callable, godot::Object::CONNECT_PERSIST);
+    if (err == godot::OK)
+      connected++;
+    else
+      unresolved++;
+  }
 }
 
 } // namespace
@@ -764,6 +874,12 @@ mcp::JsonValue handle_instance(const mcp::JsonValue &args) {
     instance->set_name(godot::StringName(n->GetString().c_str()));
   }
 
+  int persist_skipped = 0;
+  int persist_connected = 0;
+  int persist_unresolved = 0;
+  audit_instance_persist_connections(packed_scene, instance, persist_skipped,
+                                     persist_connected, persist_unresolved);
+
   parent->add_child(instance);
 
   bool set_owner = true;
@@ -800,7 +916,10 @@ mcp::JsonValue handle_instance(const mcp::JsonValue &args) {
   r["note"] = mcp::JsonValue(
       "instance inherits CONNECT_PERSIST connections saved in its source "
       "scene; do not reconnect the same signal+callable pairs on instances to "
-      "avoid duplicate-connection errors");
+      "avoid duplicate-connection errors; persist audit on this instance: " +
+      std::to_string(persist_skipped) + " already connected (skipped), " +
+      std::to_string(persist_connected) + " missing and reconnected, " +
+      std::to_string(persist_unresolved) + " unresolvable");
 
   scene_dirty_tracker::mark_scene_modified();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,

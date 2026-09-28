@@ -22,6 +22,8 @@ serialization rules that decide which property lines end up in the scene file.
 | Resource (inline sub-resource) | `{"type": "RectangleShape2D", "properties": {"size": {"x": 20, "y": 28}}}` |
 | Node reference | the node path string, e.g. `Player`; inside an array, `{"__node_ref__": "Player"}` is also accepted |
 | Typed array | a JSON array whose elements are converted by the array's declared element type — see "Array properties" below |
+| Dictionary | a JSON object, e.g. `{"speed": 1.5, "tags": ["a"]}`; a non-object value errors instead of writing an empty dict |
+| SpriteFrames animations | engine array `[{"name": "idle", "frames": [...], "speed": 5.0, "loop": true}]` or dict `{"idle": {"frames": [...], "speed": 5.0, "loop": true}}` — see "SpriteFrames animations" below |
 
 Size and transform key rules:
 
@@ -49,11 +51,17 @@ Example calls:
 {"name": "property_set", "arguments": {"path": "Player", "property": "position", "value": {"x": 12.5, "y": -3.25}}}
 {"name": "property_set", "arguments": {"path": "Player", "property": "modulate", "value": {"r": 1, "g": 0.5, "b": 0.25, "a": 1}}}
 {"name": "property_set", "arguments": {"path": "Sprite", "property": "texture", "value": {"path": "res://icon.svg"}}}
+{"name": "property_set", "arguments": {"path": "Player", "properties": {"position": {"x": 0, "y": -10}, "visible": false}}}
+{"name": "property_set", "arguments": {"path": "Hero", "property": "sprite_frames.animations", "value": {"idle": {"frames": [{"texture": "res://icon.svg"}], "speed": 5.0, "loop": true}}}}
 ```
 
-`property_set` and `create_scene_node` (`properties` object) accept these
-shapes through the same conversion chain; set_resource_property uses the same
-strict conversion for resource fields.
+`property_set` single form (`property` + `value`) and batch form (`properties`
+object, max 32, object-typed entries first) plus `create_scene_node`
+(`properties` object) accept these shapes through the same conversion chain;
+set_resource_property uses the same strict conversion for resource fields.
+Batch failures report `failed_property` and `applied_properties`; dot paths
+(`a.b.c`) address sub-resources with full-path errors; dictionary exports that
+happen to carry `type`/`properties` keys are still stored as plain dicts.
 
 ## Inline sub-resources
 
@@ -113,6 +121,39 @@ Failure rules — these return an error instead of a silent write:
   untyped `Array` holding object or array elements), or an element shape the
   tool cannot safely express for the declared element type.
 - A node path that does not resolve in the edited scene.
+
+## Dictionary properties
+
+Dictionary-typed exports take a JSON object through inferred deserialization.
+A non-object value (array, string, number) errors instead of silently writing
+an empty dict. An object that happens to look like an inline resource
+(`{"type": "enemy", "properties": {...}}`) is still stored as a plain dict —
+inline descriptions only trigger for object-typed properties.
+
+## SpriteFrames animations
+
+`SpriteFrames.animations` is an engine array of
+`{name, frames, speed, loop}` dicts. `property_set` accepts both shapes:
+
+- engine array: `[{"name": "idle", "frames": [...], "speed": 5.0, "loop": true}]`
+- dict: `{"idle": {"frames": [...], "speed": 5.0, "loop": true}}` or
+  `{"idle": [...]}` (frames array directly, speed 5.0 and loop true by default)
+
+Each `frames` entry is a texture ref (`res://...`, `{"path": "..."}`) or a
+`{texture, duration}` object; `speed`/`fps` must be a number, `loop` a boolean,
+`name` non-empty and matching the dict key when both are present. Failures name
+the real resource (`SpriteFrames resource 'res://...'`), not the host node.
+When the reflected type is dictionary rather than array, the same dict input is
+stored directly — both engine shapes keep working.
+
+## Dotted property paths
+
+`property_set` (and inline `properties` maps) accept `a.b.c` paths into
+sub-resources: each intermediate is fetched with `get`, must be a non-null
+object, and the leaf is type-checked and `set` through the same chain. Only
+plain property names joined by dots — no method calls, indexing, or expression
+evaluation. Failures carry the full path plus the owner's candidates, and the
+owner is reported as the real resource path when the leaf lives on a resource.
 
 ## Silent conversions to watch
 

@@ -124,6 +124,220 @@ std::string find_property_candidates(godot::Node *node,
   return result;
 }
 
+std::string find_object_candidates(godot::Object *object,
+                                     const std::string &prop_name) {
+  struct Candidate {
+    int distance;
+    std::string name;
+  };
+  godot::TypedArray<godot::Dictionary> props = object->get_property_list();
+  std::vector<Candidate> candidates;
+  for (int64_t i = 0; i < props.size(); i++) {
+    godot::Dictionary dict = props[i];
+    if (!dict.has("name"))
+      continue;
+    std::string name = util::to_std(dict["name"].operator godot::String());
+    candidates.push_back({levenshtein_distance(prop_name, name), name});
+  }
+  for (const PropertyRenameHint &hint : PROPERTY_RENAME_HINTS) {
+    if (prop_name == hint.old_name) {
+      candidates.push_back({-1, hint.new_name});
+      break;
+    }
+  }
+  std::sort(candidates.begin(), candidates.end(),
+            [](const Candidate &x, const Candidate &y) {
+              if (x.distance != y.distance)
+                return x.distance < y.distance;
+              return x.name < y.name;
+            });
+  size_t unique_count = 0;
+  for (size_t k = 0; k < candidates.size(); k++) {
+    if (unique_count > 0 &&
+        candidates[unique_count - 1].name == candidates[k].name)
+      continue;
+    candidates[unique_count++] = candidates[k];
+  }
+  candidates.resize(unique_count);
+  std::string result;
+  for (size_t k = 0; k < candidates.size() && k < 4; k++) {
+    if (!result.empty())
+      result += ", ";
+    result += candidates[k].name;
+  }
+  return result;
+}
+
+std::vector<std::string> split_property_path(const std::string &full) {
+  std::vector<std::string> parts;
+  std::string current;
+  for (char c : full) {
+    if (c == '.') {
+      parts.push_back(current);
+      current.clear();
+    } else {
+      current.push_back(c);
+    }
+  }
+  parts.push_back(current);
+  return parts;
+}
+
+bool is_valid_path_segment(const std::string &seg) {
+  if (seg.empty())
+    return false;
+  for (char c : seg) {
+    if (c == '/' || c == ':' || c == '(' || c == ')' || c == '[' ||
+        c == ']' || c == ' ' || c == '\t' || c == '"' || c == '\'')
+      return false;
+  }
+  return true;
+}
+
+std::string describe_property_owner(godot::Object *owner,
+                                    const std::string &fallback_path) {
+  godot::Resource *as_res = godot::Object::cast_to<godot::Resource>(owner);
+  if (as_res) {
+    std::string res_path = util::to_std(as_res->get_path());
+    if (!res_path.empty())
+      return util::to_std(as_res->get_class()) + " resource '" + res_path +
+             "'";
+    return util::to_std(as_res->get_class()) +
+           " resource (pathless sub-resource)";
+  }
+  godot::Node *as_node = godot::Object::cast_to<godot::Node>(owner);
+  if (as_node)
+    return fallback_path;
+  return util::to_std(owner->get_class()) + " object";
+}
+
+struct DottedTarget {
+  bool ok = false;
+  godot::Object *owner = nullptr;
+  std::string leaf;
+  godot::Dictionary info;
+  mcp::JsonValue error;
+};
+
+DottedTarget resolve_dotted_target(godot::Object *root,
+                                   const std::string &full,
+                                   const std::string &path_str) {
+  DottedTarget out;
+  std::vector<std::string> parts = split_property_path(full);
+  if (parts.size() == 1) {
+    if (!is_valid_path_segment(full)) {
+      out.error = util::error_detail(
+          "invalid property path '" + full + "' on " + path_str, path_str,
+          "a property name or dot-separated property path (a.b.c)",
+          "use property_get_list to see available properties");
+      return out;
+    }
+    godot::Dictionary info = find_property_info(root, full);
+    if (info.is_empty()) {
+      std::string owner_desc = describe_property_owner(root, path_str);
+      std::string candidates;
+      godot::Node *as_node = godot::Object::cast_to<godot::Node>(root);
+      if (as_node)
+        candidates = find_property_candidates(as_node, full);
+      else
+        candidates = find_object_candidates(root, full);
+      out.error = util::error_detail(
+          "property '" + full + "' does not exist on " + owner_desc, path_str,
+          "a valid property name from get_property_list",
+          "use property_get_list to see available properties; candidate: " +
+              candidates);
+      return out;
+    }
+    out.ok = true;
+    out.owner = root;
+    out.leaf = full;
+    out.info = info;
+    return out;
+  }
+  godot::Object *current = root;
+  for (size_t i = 0; i + 1 < parts.size(); i++) {
+    const std::string &seg = parts[i];
+    if (!is_valid_path_segment(seg)) {
+      out.error = util::error_detail(
+          "invalid segment '" + seg + "' in property path '" + full + "' on " +
+              path_str,
+          path_str,
+          "dot-separated property names without method calls or indexing",
+          "use plain property names joined by '.', e.g. material.albedo_color");
+      return out;
+    }
+    godot::Dictionary seg_info = find_property_info(current, seg);
+    if (seg_info.is_empty()) {
+      std::string owner_desc = describe_property_owner(current, path_str);
+      std::string candidates;
+      godot::Node *as_node = godot::Object::cast_to<godot::Node>(current);
+      if (as_node)
+        candidates = find_property_candidates(as_node, seg);
+      else
+        candidates = find_object_candidates(current, seg);
+      out.error = util::error_detail(
+          "property path '" + full + "' does not exist on " + path_str +
+              ": segment '" + seg + "' not found on " + owner_desc,
+          path_str, "a valid property path from get_property_list",
+          "use property_get_list to see available properties; candidate: " +
+              candidates);
+      return out;
+    }
+    godot::Variant intermediate =
+        current->get(godot::StringName(seg.c_str()));
+    if (intermediate.get_type() != godot::Variant::OBJECT) {
+      out.error = util::error_detail(
+          "property path '" + full + "' does not exist on " + path_str +
+              ": segment '" + seg + "' is not an object and cannot be traversed",
+          path_str, "an object-typed intermediate property",
+          "use property_get_list to see available properties");
+      return out;
+    }
+    godot::Object *next = intermediate.operator godot::Object *();
+    if (!next) {
+      out.error = util::error_detail(
+          "property path '" + full + "' does not exist on " + path_str +
+              ": segment '" + seg + "' holds a null object",
+          path_str, "a non-null object-typed intermediate property",
+          "assign the intermediate property first, then set '" + full + "'");
+      return out;
+    }
+    current = next;
+  }
+  const std::string &leaf = parts.back();
+  if (!is_valid_path_segment(leaf)) {
+    out.error = util::error_detail(
+        "invalid segment '" + leaf + "' in property path '" + full + "' on " +
+            path_str,
+        path_str,
+        "dot-separated property names without method calls or indexing",
+        "use plain property names joined by '.', e.g. material.albedo_color");
+    return out;
+  }
+  godot::Dictionary leaf_info = find_property_info(current, leaf);
+  if (leaf_info.is_empty()) {
+    std::string owner_desc = describe_property_owner(current, path_str);
+    std::string candidates;
+    godot::Node *as_node = godot::Object::cast_to<godot::Node>(current);
+    if (as_node)
+      candidates = find_property_candidates(as_node, leaf);
+    else
+      candidates = find_object_candidates(current, leaf);
+    out.error = util::error_detail(
+        "property path '" + full + "' does not exist on " + path_str +
+            ": leaf '" + leaf + "' not found on " + owner_desc,
+        path_str, "a valid property path from get_property_list",
+        "use property_get_list to see available properties; candidate: " +
+            candidates);
+    return out;
+  }
+  out.ok = true;
+  out.owner = current;
+  out.leaf = leaf;
+  out.info = leaf_info;
+  return out;
+}
+
 godot::Node *find_edited_scene_root() {
   auto editor = godot::EditorInterface::get_singleton();
   if (editor) {
@@ -497,6 +711,315 @@ convert_array_value(const godot::Dictionary &dict, const std::string &prop_str,
   return result;
 }
 
+struct DictionaryValueConversion {
+  bool handled = false;
+  bool has_error = false;
+  mcp::JsonValue error;
+  godot::Variant value;
+};
+
+DictionaryValueConversion
+convert_dictionary_value(const godot::Dictionary &dict,
+                         const std::string &prop_str,
+                         const std::string &path_str,
+                         const mcp::JsonValue &raw_value) {
+  DictionaryValueConversion result;
+  if (dict.is_empty() || !dict.has("type")) {
+    return result;
+  }
+  if (static_cast<godot::Variant::Type>(static_cast<int>(dict["type"])) !=
+      godot::Variant::DICTIONARY) {
+    return result;
+  }
+  result.handled = true;
+  if (!raw_value.IsObject()) {
+    result.has_error = true;
+    result.error = util::error_detail(
+        "value for dictionary property '" + prop_str + "' on " + path_str +
+            " is not a JSON object; refusing to write",
+        path_str, "a JSON object",
+        "pass an object mapping keys to values");
+    return result;
+  }
+  std::string hint = util::infer_type_hint(dict, std::string());
+  result.value = VariantJson::deserialize(raw_value, hint);
+  return result;
+}
+
+double animations_number(const mcp::JsonValue &v, double fallback) {
+  if (v.IsInt())
+    return static_cast<double>(v.GetInt());
+  if (v.IsDouble())
+    return v.GetDouble();
+  return fallback;
+}
+
+bool convert_animation_frame(const mcp::JsonValue &frame,
+                             const std::string &anim_name,
+                             const std::string &full_prop,
+                             const std::string &path_str,
+                             const std::string &owner_desc,
+                             godot::Variant &out_value,
+                             mcp::JsonValue &out_error) {
+  godot::Variant texture_value;
+  double duration = 1.0;
+  bool direct_ref = frame.IsString();
+  if (!direct_ref && frame.IsObject()) {
+    direct_ref = frame.Find("path") != nullptr || frame.Find("resource") != nullptr;
+  }
+  if (direct_ref) {
+    std::string resolve_error;
+    godot::Variant resolved;
+    bool attempted = resource_ops::try_resolve_resource_value(frame, resolved,
+                                                              resolve_error);
+    if (!attempted || !resolve_error.empty()) {
+      std::string detail = resolve_error.empty()
+                               ? "unsupported texture reference"
+                               : resolve_error;
+      out_error = util::error_detail(
+          "cannot convert frame of animation '" + anim_name +
+              "' in property '" + full_prop + "' of " + owner_desc + ": " +
+              detail,
+          path_str, "a Texture2D resource reference",
+          "pass a res:// path string or {\"path\": \"res://...\"}");
+      return false;
+    }
+    texture_value = resolved;
+  } else if (frame.IsObject()) {
+    auto *tex_field = frame.Find("texture");
+    if (!tex_field) {
+      out_error = util::error_detail(
+          "cannot convert frame of animation '" + anim_name +
+              "' in property '" + full_prop + "' of " + owner_desc +
+              ": missing 'texture'",
+          path_str, "a frame with a Texture2D 'texture' and optional 'duration'",
+          "pass {\"texture\": \"res://...\", \"duration\": 1.0}");
+      return false;
+    }
+    std::string resolve_error;
+    godot::Variant resolved;
+    bool attempted = resource_ops::try_resolve_resource_value(
+        *tex_field, resolved, resolve_error);
+    if (!attempted || !resolve_error.empty()) {
+      std::string detail = resolve_error.empty()
+                               ? "unsupported texture reference"
+                               : resolve_error;
+      out_error = util::error_detail(
+          "cannot convert frame texture of animation '" + anim_name +
+              "' in property '" + full_prop + "' of " + owner_desc + ": " +
+              detail,
+          path_str, "a Texture2D resource reference",
+          "pass a res:// path string or {\"path\": \"res://...\"}");
+      return false;
+    }
+    texture_value = resolved;
+    auto *dur_field = frame.Find("duration");
+    if (dur_field) {
+      if (!dur_field->IsNumber()) {
+        out_error = util::error_detail(
+            "cannot convert frame of animation '" + anim_name +
+                "' in property '" + full_prop + "' of " + owner_desc +
+                ": 'duration' must be a number",
+            path_str, "a numeric 'duration'", "pass a number, e.g. 1.0");
+        return false;
+      }
+      duration = animations_number(*dur_field, 1.0);
+    }
+  } else {
+    out_error = util::error_detail(
+        "cannot convert frame of animation '" + anim_name +
+            "' in property '" + full_prop + "' of " + owner_desc,
+        path_str, "a Texture2D resource reference or a frame object",
+        "pass a res:// path string or {\"texture\": \"res://...\", "
+        "\"duration\": 1.0}");
+    return false;
+  }
+  godot::Dictionary frame_dict;
+  frame_dict[godot::String("texture")] = texture_value;
+  frame_dict[godot::String("duration")] = duration;
+  out_value = godot::Variant(frame_dict);
+  return true;
+}
+
+bool convert_single_animation(const std::string &anim_name,
+                              const mcp::JsonValue &def,
+                              const std::string &full_prop,
+                              const std::string &path_str,
+                              const std::string &owner_desc,
+                              godot::Dictionary &out_dict,
+                              mcp::JsonValue &out_error) {
+  if (anim_name.empty()) {
+    out_error = util::error_detail(
+        "cannot convert property '" + full_prop + "' of " + owner_desc +
+            ": animation name must be non-empty",
+        path_str, "non-empty animation names",
+        "use the animation name as the object key");
+    return false;
+  }
+  const mcp::JsonValue *frames_field = nullptr;
+  double speed = 5.0;
+  bool loop = true;
+  if (def.IsArray()) {
+    frames_field = &def;
+  } else if (def.IsObject()) {
+    auto *name_field = def.Find("name");
+    if (name_field && name_field->IsString() &&
+        name_field->GetString() != anim_name) {
+      out_error = util::error_detail(
+          "cannot convert animation '" + anim_name + "' in property '" +
+              full_prop + "' of " + owner_desc +
+              ": 'name' field does not match the object key",
+          path_str, "a matching 'name' or no 'name' field",
+          "remove 'name' or make it equal to the object key");
+      return false;
+    }
+    auto *f = def.Find("frames");
+    if (!f || !f->IsArray()) {
+      out_error = util::error_detail(
+          "cannot convert animation '" + anim_name + "' in property '" +
+              full_prop + "' of " + owner_desc + ": missing 'frames' array",
+          path_str, "an object with a 'frames' array",
+          "pass {\"frames\": [...], \"speed\": 5.0, \"loop\": true}");
+      return false;
+    }
+    frames_field = f;
+    auto *speed_field = def.Find("speed");
+    if (!speed_field)
+      speed_field = def.Find("fps");
+    if (speed_field) {
+      if (!speed_field->IsNumber()) {
+        out_error = util::error_detail(
+            "cannot convert animation '" + anim_name + "' in property '" +
+                full_prop + "' of " + owner_desc + ": 'speed' must be a number",
+            path_str, "a numeric 'speed'", "pass a number, e.g. 5.0");
+        return false;
+      }
+      speed = animations_number(*speed_field, 5.0);
+    }
+    auto *loop_field = def.Find("loop");
+    if (loop_field) {
+      if (!loop_field->IsBool()) {
+        out_error = util::error_detail(
+            "cannot convert animation '" + anim_name + "' in property '" +
+                full_prop + "' of " + owner_desc + ": 'loop' must be a boolean",
+            path_str, "a boolean 'loop'", "pass true or false");
+        return false;
+      }
+      loop = loop_field->GetBool();
+    }
+  } else {
+    out_error = util::error_detail(
+        "cannot convert animation '" + anim_name + "' in property '" +
+            full_prop + "' of " + owner_desc + ": expected an array or object",
+        path_str, "a frames array or an animation object",
+        "pass {\"frames\": [...]} or [...]");
+    return false;
+  }
+  godot::Array frames_array;
+  const mcp::JsonValue::Array &frames = frames_field->GetArray();
+  for (size_t i = 0; i < frames.size(); i++) {
+    godot::Variant converted;
+    mcp::JsonValue frame_error;
+    if (!convert_animation_frame(frames[i], anim_name, full_prop, path_str,
+                                 owner_desc, converted, frame_error)) {
+      out_error = std::move(frame_error);
+      return false;
+    }
+    frames_array.append(converted);
+  }
+  out_dict[godot::String("name")] = godot::String::utf8(anim_name.c_str());
+  out_dict[godot::String("frames")] = frames_array;
+  out_dict[godot::String("speed")] = speed;
+  out_dict[godot::String("loop")] = loop;
+  return true;
+}
+
+struct SpriteFramesAnimationsConversion {
+  bool handled = false;
+  bool has_error = false;
+  mcp::JsonValue error;
+  godot::Variant value;
+};
+
+SpriteFramesAnimationsConversion convert_spriteframes_animations(
+    godot::Object *owner, const std::string &leaf,
+    const std::string &full_prop, const std::string &path_str,
+    const mcp::JsonValue &raw_value) {
+  SpriteFramesAnimationsConversion result;
+  if (leaf != "animations") {
+    return result;
+  }
+  if (util::to_std(owner->get_class()) != "SpriteFrames") {
+    return result;
+  }
+  result.handled = true;
+  std::string owner_desc = describe_property_owner(owner, path_str);
+  godot::Array out_array;
+  if (raw_value.IsObject()) {
+    for (const auto &entry : raw_value.GetObject()) {
+      godot::Dictionary anim_dict;
+      mcp::JsonValue item_error;
+      if (!convert_single_animation(entry.first, entry.second, full_prop,
+                                    path_str, owner_desc, anim_dict,
+                                    item_error)) {
+        result.has_error = true;
+        result.error = std::move(item_error);
+        return result;
+      }
+      out_array.append(anim_dict);
+    }
+    result.value = godot::Variant(out_array);
+    return result;
+  }
+  if (raw_value.IsArray()) {
+    const mcp::JsonValue::Array &items = raw_value.GetArray();
+    for (size_t i = 0; i < items.size(); i++) {
+      const mcp::JsonValue &item = items[i];
+      if (!item.IsObject()) {
+        result.has_error = true;
+        result.error = util::error_detail(
+            "cannot convert element " + std::to_string(i) + " of property '" +
+                full_prop + "' of " + owner_desc +
+                ": expected an object with name/frames/speed/loop",
+            path_str, "animation objects",
+            "pass {\"name\": \"idle\", \"frames\": [...], \"speed\": 5.0, "
+            "\"loop\": true}");
+        return result;
+      }
+      auto *name_field = item.Find("name");
+      if (!name_field || !name_field->IsString() ||
+          name_field->GetString().empty()) {
+        result.has_error = true;
+        result.error = util::error_detail(
+            "cannot convert element " + std::to_string(i) + " of property '" +
+                full_prop + "' of " + owner_desc + ": missing 'name'",
+            path_str, "an animation object with a non-empty 'name'",
+            "pass {\"name\": \"idle\", \"frames\": [...]}");
+        return result;
+      }
+      std::string anim_name = name_field->GetString();
+      godot::Dictionary anim_dict;
+      mcp::JsonValue item_error;
+      if (!convert_single_animation(anim_name, item, full_prop, path_str,
+                                    owner_desc, anim_dict, item_error)) {
+        result.has_error = true;
+        result.error = std::move(item_error);
+        return result;
+      }
+      out_array.append(anim_dict);
+    }
+    result.value = godot::Variant(out_array);
+    return result;
+  }
+  result.has_error = true;
+  result.error = util::error_detail(
+      "value for property '" + full_prop + "' of " + owner_desc +
+          " is not an array or object; refusing to write",
+      path_str, "a JSON array or an object mapping animation names to definitions",
+      "pass [{\"name\": \"idle\", ...}] or {\"idle\": {\"frames\": [...]}}");
+  return result;
+}
+
 bool memory_resource_assignment_blocked(const godot::Variant &value,
                                         const std::string &prop_str,
                                         const std::string &path_str,
@@ -613,30 +1136,61 @@ bool apply_inline_resource_property(godot::Resource *res,
                                     const std::string &path_str,
                                     const mcp::JsonValue &raw_value, int depth,
                                     mcp::JsonValue &out_error) {
+  DottedTarget target = resolve_dotted_target(res, sub_prop, path_str);
+  if (!target.ok) {
+    out_error = std::move(target.error);
+    return false;
+  }
+  godot::Object *owner = target.owner;
+  const std::string &leaf = target.leaf;
+  godot::Dictionary info = target.info;
+  std::string owner_resource_desc = describe_property_owner(owner, path_str);
   const std::string owner_label =
-      "inline " + util::to_std(res->get_class()) + " resource for property '" +
-      node_property + "' on " + path_str;
-  godot::Dictionary info = find_property_info(res, sub_prop);
-  if (info.is_empty()) {
-    out_error = util::error_detail(
-        "property '" + sub_prop + "' does not exist on " + owner_label,
-        path_str, "a property name from the resource's property list",
-        "drop it from the inline description or fix the name — "
-        "get_docs_property lists the reflected properties of an engine "
-        "resource class");
-    return false;
-  }
-
+      owner == static_cast<godot::Object *>(res)
+          ? "inline " + util::to_std(res->get_class()) +
+                " resource for property '" + node_property + "' on " + path_str
+          : owner_resource_desc + " for property '" + node_property + "' on " +
+                path_str;
   godot::Variant value;
-  ArrayValueConversion array_conversion =
-      convert_array_value(info, sub_prop, path_str, raw_value);
-  if (array_conversion.has_error) {
-    out_error = std::move(array_conversion.error);
+  bool value_ready = false;
+  SpriteFramesAnimationsConversion sprite_conversion =
+      convert_spriteframes_animations(owner, leaf, sub_prop, path_str,
+                                      raw_value);
+  if (sprite_conversion.has_error) {
+    out_error = std::move(sprite_conversion.error);
     return false;
   }
-  if (array_conversion.handled) {
-    value = array_conversion.value;
-  } else {
+  if (sprite_conversion.handled) {
+    value = sprite_conversion.value;
+    value_ready = true;
+  }
+  ArrayValueConversion array_conversion;
+  DictionaryValueConversion dictionary_conversion;
+  if (!value_ready) {
+    array_conversion =
+        convert_array_value(info, sub_prop, path_str, raw_value);
+    if (array_conversion.has_error) {
+      out_error = std::move(array_conversion.error);
+      return false;
+    }
+    if (array_conversion.handled) {
+      value = array_conversion.value;
+      value_ready = true;
+    }
+  }
+  if (!value_ready) {
+    dictionary_conversion =
+        convert_dictionary_value(info, sub_prop, path_str, raw_value);
+    if (dictionary_conversion.has_error) {
+      out_error = std::move(dictionary_conversion.error);
+      return false;
+    }
+    if (dictionary_conversion.handled) {
+      value = dictionary_conversion.value;
+      value_ready = true;
+    }
+  }
+  if (!value_ready) {
     NodePathValueConversion node_path_conversion =
         convert_node_path_value(info, sub_prop, path_str, raw_value);
     if (node_path_conversion.has_error) {
@@ -645,6 +1199,7 @@ bool apply_inline_resource_property(godot::Resource *res,
     }
     if (node_path_conversion.converted) {
       value = node_path_conversion.value;
+      value_ready = true;
     } else {
       std::string resource_error;
       bool resource_attached = false;
@@ -655,11 +1210,12 @@ bool apply_inline_resource_property(godot::Resource *res,
               "cannot convert property '" + sub_prop + "' of " + owner_label +
                   ": " + resource_error,
               path_str,
-              "a " + util::to_std(res->get_class()) + " resource reference",
+              "a " + util::to_std(owner->get_class()) + " resource reference",
               INLINE_RESOURCE_ACTION_TEXT);
           return false;
         }
         resource_attached = true;
+        value_ready = true;
       } else {
         InlineResourceBuild nested = build_inline_resource_value(
             info, raw_value, node_property, path_str, depth);
@@ -669,9 +1225,11 @@ bool apply_inline_resource_property(godot::Resource *res,
         }
         if (nested.active) {
           value = nested.value;
+          value_ready = true;
         } else {
           value = VariantJson::deserialize_strict(
               raw_value, util::infer_type_hint(info, std::string()));
+          value_ready = true;
         }
       }
       if (resource_attached) {
@@ -685,17 +1243,17 @@ bool apply_inline_resource_property(godot::Resource *res,
     }
   }
 
-  godot::StringName prop_name(sub_prop.c_str());
-  godot::Variant old_val = res->get(prop_name);
-  res->set(prop_name, value);
-  godot::Variant new_val = res->get(prop_name);
+  godot::StringName prop_name(leaf.c_str());
+  godot::Variant old_val = owner->get(prop_name);
+  owner->set(prop_name, value);
+  godot::Variant new_val = owner->get(prop_name);
 
   std::string readback_detail;
   util::ReadbackStatus readback =
       util::check_readback(value, old_val, new_val, readback_detail,
                            is_type_sensitive_property(info));
   if (readback == util::ReadbackStatus::REJECTED) {
-    res->set(prop_name, old_val);
+    owner->set(prop_name, old_val);
     out_error = util::error_detail(
         "value not applied: property '" + sub_prop + "' of " + owner_label,
         path_str, "readback equals set value",
@@ -807,6 +1365,43 @@ build_inline_resource_value(const godot::Dictionary &prop_info,
 namespace {
 
 constexpr int64_t kPropertyBatchMax = 32;
+
+bool batch_property_is_object_typed(godot::Node *node,
+                                    const std::string &prop_name,
+                                    const mcp::JsonValue &raw_value) {
+  std::string root_name = prop_name;
+  size_t dot = prop_name.find('.');
+  if (dot != std::string::npos)
+    root_name = prop_name.substr(0, dot);
+  godot::TypedArray<godot::Dictionary> props = node->get_property_list();
+  for (int64_t i = 0; i < props.size(); i++) {
+    godot::Dictionary dict = props[i];
+    if (!dict.has("name") || !dict.has("type"))
+      continue;
+    if (util::to_std(dict["name"].operator godot::String()) != root_name)
+      continue;
+    if (static_cast<godot::Variant::Type>(static_cast<int>(dict["type"])) ==
+        godot::Variant::OBJECT)
+      return true;
+    break;
+  }
+  if (raw_value.IsString()) {
+    const std::string str = raw_value.GetString();
+    return str.rfind("res://", 0) == 0 || str.rfind("memory://", 0) == 0;
+  }
+  if (raw_value.IsObject()) {
+    const mcp::JsonValue *ref = raw_value.Find("path");
+    if (!ref)
+      ref = raw_value.Find("resource");
+    if (ref && ref->IsString())
+      return true;
+    const mcp::JsonValue *type_field = raw_value.Find("type");
+    if (type_field && type_field->IsString() &&
+        !type_field->GetString().empty())
+      return true;
+  }
+  return false;
+}
 
 mcp::JsonValue read_single_property(godot::Node *node,
                                     const std::string &path_str,
@@ -932,24 +1527,76 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
   auto *it_path = args.Find("path");
   auto *it_prop = args.Find("property");
   auto *it_val = args.Find("value");
+  auto *it_batch = args.Find("properties");
+  auto *it_hint_early = args.Find("type_hint");
   if (!it_path || !it_path->IsString()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
     e["error"] = mcp::JsonValue("missing required parameter: path");
     return e;
   }
-  if (!it_prop || !it_prop->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: property");
-    return e;
-  }
-  if (!it_val) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: value");
-    return e;
-  }
-
   std::string path_str = it_path->GetString();
-  std::string prop_str = it_prop->GetString();
+  bool has_single_prop = it_prop != nullptr;
+  bool has_single_val = it_val != nullptr;
+  bool has_batch = it_batch != nullptr;
+  if (has_batch && (has_single_prop || has_single_val)) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue(
+        "property/value and properties are mutually exclusive — pass exactly one form");
+    return e;
+  }
+  if (has_batch && it_hint_early) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue(
+        "type_hint cannot be used with properties — omit it to infer each property type");
+    return e;
+  }
+  if (!has_batch) {
+    if (!it_prop || !it_prop->IsString()) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue("missing required parameter: property");
+      return e;
+    }
+    if (!it_val) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue("missing required parameter: value");
+      return e;
+    }
+    if (args.IsObject()) {
+      for (const auto &entry : args.GetObject()) {
+        if (entry.first != "path" && entry.first != "property" &&
+            entry.first != "value" && entry.first != "type_hint") {
+          mcp::JsonValue e(mcp::JsonValue::object_tag);
+          e["error"] = mcp::JsonValue("unknown parameter for property_set: " +
+                                      entry.first);
+          return e;
+        }
+      }
+    }
+  } else {
+    if (args.IsObject()) {
+      for (const auto &entry : args.GetObject()) {
+        if (entry.first != "path" && entry.first != "properties") {
+          mcp::JsonValue e(mcp::JsonValue::object_tag);
+          e["error"] = mcp::JsonValue("unknown parameter for property_set: " +
+                                      entry.first);
+          return e;
+        }
+      }
+    }
+    if (!it_batch->IsObject() || it_batch->GetObject().empty()) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue(
+          "properties must be a non-empty object mapping property names to values");
+      return e;
+    }
+    if (it_batch->GetObject().size() > static_cast<size_t>(kPropertyBatchMax)) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue("properties exceeds maximum of " +
+                                  std::to_string(kPropertyBatchMax) +
+                                  " entries — split into smaller batches");
+      return e;
+    }
+  }
 
   std::string hint;
   godot::Node *node =
@@ -964,15 +1611,128 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
     e["error"] = mcp::JsonValue(err);
     return e;
   }
-
-  godot::Dictionary dict = find_property_info(node, prop_str);
-  if (dict.is_empty()) {
-    return util::error_detail(
-        "property '" + prop_str + "' does not exist on " + path_str, path_str,
-        "a valid property name from get_property_list",
-        "use property_get_list to see available properties; candidate: " +
-            find_property_candidates(node, prop_str));
+  if (has_batch) {
+    std::vector<std::string> object_props;
+    for (const auto &entry : it_batch->GetObject()) {
+      if (entry.first.empty()) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue(
+            "properties must contain non-empty property name strings");
+        return e;
+      }
+      if (batch_property_is_object_typed(node, entry.first, entry.second))
+        object_props.push_back(entry.first);
+    }
+    std::vector<std::string> applied;
+    std::vector<mcp::JsonValue> warnings;
+    std::vector<mcp::JsonValue> inlines;
+    mcp::JsonValue converted(mcp::JsonValue::object_tag);
+    size_t converted_count = 0;
+    mcp::JsonValue undo_entries(mcp::JsonValue::array_tag);
+    bool all_undoable = true;
+    std::string undo_skip;
+    for (int pass = 0; pass < 2; pass++) {
+      for (const auto &entry : it_batch->GetObject()) {
+        bool is_object = std::find(object_props.begin(), object_props.end(),
+                                   entry.first) != object_props.end();
+        if (is_object != (pass == 0))
+          continue;
+        mcp::JsonValue sub_args(mcp::JsonValue::object_tag);
+        sub_args["path"] = mcp::JsonValue(path_str);
+        sub_args["property"] = mcp::JsonValue(entry.first);
+        mcp::JsonValue value_copy = entry.second;
+        sub_args["value"] = std::move(value_copy);
+        mcp::JsonValue sub = handle_set(sub_args);
+        auto *sub_err = sub.Find("error");
+        if (sub_err) {
+          std::string sub_msg =
+              sub_err->IsString() ? sub_err->GetString() : sub_err->Dump();
+          mcp::JsonValue e(mcp::JsonValue::object_tag);
+          e["error"] = mcp::JsonValue("failed to apply property '" +
+                                      entry.first + "' on " + path_str + ": " +
+                                      sub_msg);
+          e["failed_property"] = mcp::JsonValue(entry.first);
+          if (!applied.empty()) {
+            mcp::JsonValue ap(mcp::JsonValue::array_tag);
+            for (const std::string &name : applied)
+              ap.PushBack(mcp::JsonValue(name));
+            e["applied_properties"] = std::move(ap);
+          }
+          return e;
+        }
+        applied.push_back(entry.first);
+        auto *warn = sub.Find("warning");
+        if (warn && warn->IsString()) {
+          mcp::JsonValue w(mcp::JsonValue::object_tag);
+          w["path"] = mcp::JsonValue(path_str);
+          w["property"] = mcp::JsonValue(entry.first);
+          w["warning"] = mcp::JsonValue(warn->GetString());
+          warnings.push_back(std::move(w));
+        }
+        auto *inline_rec = sub.Find("inline_resources");
+        if (inline_rec && inline_rec->IsArray()) {
+          for (const auto &inline_entry : inline_rec->GetArray()) {
+            mcp::JsonValue inline_copy = inline_entry;
+            inlines.push_back(std::move(inline_copy));
+          }
+        }
+        auto *conv = sub.Find("converted_node_path");
+        if (conv && conv->IsString()) {
+          converted[entry.first] = mcp::JsonValue(conv->GetString());
+          converted_count++;
+        }
+        auto *undo_entry = sub.Find("undo");
+        if (undo_entry) {
+          mcp::JsonValue undo_copy = *undo_entry;
+          undo_entries.PushBack(std::move(undo_copy));
+        }
+        auto *undoable_flag = sub.Find("undoable");
+        if (undoable_flag && undoable_flag->IsBool() &&
+            !undoable_flag->GetBool()) {
+          all_undoable = false;
+          auto *reason = sub.Find("undo_skip_reason");
+          if (reason && reason->IsString())
+            undo_skip = reason->GetString();
+        }
+      }
+    }
+    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    r["result"] = mcp::JsonValue("ok");
+    mcp::JsonValue ap(mcp::JsonValue::array_tag);
+    for (const std::string &name : applied)
+      ap.PushBack(mcp::JsonValue(name));
+    r["applied_properties"] = std::move(ap);
+    if (!warnings.empty()) {
+      mcp::JsonValue warr(mcp::JsonValue::array_tag);
+      for (auto &w : warnings)
+        warr.PushBack(std::move(w));
+      r["property_warnings"] = std::move(warr);
+    }
+    if (!inlines.empty()) {
+      mcp::JsonValue iarr(mcp::JsonValue::array_tag);
+      for (auto &item : inlines)
+        iarr.PushBack(std::move(item));
+      r["inline_resources"] = std::move(iarr);
+    }
+    if (converted_count > 0)
+      r["converted_node_paths"] = std::move(converted);
+    r["undo"] = std::move(undo_entries);
+    r["undoable"] = mcp::JsonValue(all_undoable);
+    if (!all_undoable && !undo_skip.empty())
+      r["undo_skip_reason"] = mcp::JsonValue(undo_skip);
+    util::add_scene_info_fields(r, util::edited_scene_info());
+    scene_dirty_tracker::mark_scene_modified();
+    return r;
   }
+  std::string prop_str = it_prop->GetString();
+
+  DottedTarget target = resolve_dotted_target(node, prop_str, path_str);
+  if (!target.ok) {
+    return target.error;
+  }
+  godot::Object *target_owner = target.owner;
+  std::string leaf_name = target.leaf;
+  godot::Dictionary dict = target.info;
 
   std::string type_hint;
   auto *it_hint = args.Find("type_hint");
@@ -981,20 +1741,45 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
   }
   type_hint = util::infer_type_hint(dict, std::move(type_hint));
 
-  godot::StringName prop_name(prop_str.c_str());
+  godot::StringName prop_name(leaf_name.c_str());
   std::string value_node_path;
   godot::Variant value;
   bool converted_node_path = false;
-  ArrayValueConversion array_conversion =
-      convert_array_value(dict, prop_str, path_str, *it_val);
-  if (array_conversion.has_error) {
-    return array_conversion.error;
+  bool value_ready = false;
+  SpriteFramesAnimationsConversion sprite_conversion =
+      convert_spriteframes_animations(target_owner, leaf_name, prop_str,
+                                      path_str, *it_val);
+  if (sprite_conversion.has_error) {
+    return sprite_conversion.error;
   }
-  bool array_converted = array_conversion.handled;
-  if (array_converted) {
-    value = array_conversion.value;
+  if (sprite_conversion.handled) {
+    value = sprite_conversion.value;
+    value_ready = true;
   }
-  if (!array_converted) {
+  ArrayValueConversion array_conversion;
+  DictionaryValueConversion dictionary_conversion;
+  if (!value_ready) {
+    array_conversion = convert_array_value(dict, prop_str, path_str, *it_val);
+    if (array_conversion.has_error) {
+      return array_conversion.error;
+    }
+    if (array_conversion.handled) {
+      value = array_conversion.value;
+      value_ready = true;
+    }
+  }
+  if (!value_ready) {
+    dictionary_conversion =
+        convert_dictionary_value(dict, prop_str, path_str, *it_val);
+    if (dictionary_conversion.has_error) {
+      return dictionary_conversion.error;
+    }
+    if (dictionary_conversion.handled) {
+      value = dictionary_conversion.value;
+      value_ready = true;
+    }
+  }
+  if (!value_ready) {
     NodePathValueConversion node_path_conversion =
         convert_node_path_value(dict, prop_str, path_str, *it_val);
     if (node_path_conversion.has_error) {
@@ -1004,12 +1789,13 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
       value = node_path_conversion.value;
       converted_node_path = true;
       value_node_path = node_path_conversion.node_path;
+      value_ready = true;
     }
   }
   bool resource_attached = false;
   bool inline_attached = false;
   std::string inline_type;
-  if (!array_converted && !converted_node_path) {
+  if (!value_ready) {
     std::string resource_error;
     if (resource_ops::try_resolve_resource_value(*it_val, value,
                                                  resource_error)) {
@@ -1041,10 +1827,10 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
     return blocked_error;
   }
 
-  godot::Variant old_val = node->get(prop_name);
-  node->set(prop_name, value);
+  godot::Variant old_val = target_owner->get(prop_name);
+  target_owner->set(prop_name, value);
 
-  godot::Variant new_val = node->get(prop_name);
+  godot::Variant new_val = target_owner->get(prop_name);
 
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
@@ -1069,8 +1855,8 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
       util::check_readback(value, old_val, new_val, readback_detail,
                            type_sensitive);
   if (readback == util::ReadbackStatus::REJECTED) {
-    node->set(prop_name, old_val);
-    bool restored = node->get(prop_name) == old_val;
+    target_owner->set(prop_name, old_val);
+    bool restored = target_owner->get(prop_name) == old_val;
     return util::error_detail(
         "value not applied: '" + prop_str + "' on " + path_str, path_str,
         "readback equals set value",
@@ -1109,8 +1895,8 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
     } else {
       undo_redo->create_action(godot::String(
           ("Set Property " + prop_str + " on " + path_str).c_str()));
-      undo_redo->add_do_property(node, prop_name, new_val);
-      undo_redo->add_undo_property(node, prop_name, old_val);
+      undo_redo->add_do_property(target_owner, prop_name, new_val);
+      undo_redo->add_undo_property(target_owner, prop_name, old_val);
       undo_redo->commit_action(false);
       undoable = true;
     }

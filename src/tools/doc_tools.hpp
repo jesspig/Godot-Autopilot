@@ -15,7 +15,9 @@ namespace doc_tools {
 namespace {
 
 const std::vector<ParamSpec> kGetDocsClassParams = {
-    {"class", "string", "Godot class name (e.g. 'Node2D', 'TileMap'); returns reflected signature info with no docstrings", true},
+    {"class", "string", "Godot class name (e.g. 'Node2D', 'TileMap') or builtin Variant type name (e.g. 'Vector2', 'Color', 'Rect2', 'StringName'); builtin types return value_kind/variant_type/json_shape plus a curated methods/constants subset", true},
+    {"section", "string", "Optional comma-separated subset of sections to return: methods, properties, signals, enums, constants (default: all). Use it to shrink huge classes", false},
+    {"member", "string", "Optional case-insensitive substring filter on member names within the returned sections (default: empty = no filter)", false},
 };
 
 const std::vector<ParamSpec> kFindDocsClassParams = {
@@ -39,7 +41,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.reserve(4);
   v.push_back(make_spec_tool(ToolSpec{
       "get_docs_class",
-      "Get a Godot class's reflected signature info from ClassDB (no docstrings, unlike the official documentation): parent_class, api_type, can_instantiate, methods, properties, signals, enums and constants. Requires the class name. Errors when the class does not exist. Combine with find_docs_class to locate classes first.",
+      "Get a Godot class's reflected signature info from ClassDB (no docstrings, unlike the official documentation): parent_class, api_type, can_instantiate, methods, properties, signals, enums and constants. Requires the class name. Builtin Variant type names (Vector2, Color, Rect2, StringName and the rest of the Variant codec coverage) are accepted too and return value_kind/variant_type/json_shape with a curated methods/constants subset. Errors when the class does not exist. Optional section (comma-separated methods/properties/signals/enums/constants) and member (case-insensitive substring) narrow the output for huge classes. Combine with find_docs_class to locate classes first.",
       "Docs", {"docs", "class", "get"}, SideEffect::None, tool_flags::kNone,
       kGetDocsClassParams, doc_ops::handle_get_class}));
   v.push_back(make_spec_tool(ToolSpec{
@@ -54,7 +56,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       kGetDocsMethodParams, doc_ops::handle_get_method}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_docs_property",
-      "Look up the reflected property info of a single property on a class via ClassDB. Requires class and property names; returns the property dictionary (name, type, hint, usage, class_name). Errors when the class or property does not exist. Explore a class with get_docs_class first.",
+      "Look up the reflected property info of a single property on a class via ClassDB. Requires class and property names; returns the property dictionary (name, type, hint, usage, class_name). Errors when the class or property does not exist. Per-node theme_override_* values are not ClassDB properties: querying one here returns guidance to use property_get_list on the live node instead. Explore a class with get_docs_class first.",
       "Docs", {"docs", "property", "get"}, SideEffect::None, tool_flags::kNone,
       kGetDocsPropertyParams, doc_ops::handle_get_property}));
   return v;

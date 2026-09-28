@@ -196,10 +196,11 @@ Rules verified in engine source:
 - `queue_game_input` — one input. `type`: `key`, `mouse_button` or
   `action`; wheel scrolling is supported through `direction` and `amount`;
   `mode`: `event` (default), `api`, `hold` (event-style, held for
-  `duration_ms`). Whitelist: `type`,
+  `duration_ms`). `click`/`double_click` on `mouse_button` inject a paired
+  press/release (see "Mouse click pairing" below). Whitelist: `type`,
   `keycode`, `pressed`, `button_index`, `position`, `action`, `direction`,
-  `amount`, `duration_ms`, `mode`, `timeout_ms`; anything else is rejected
-  with an error.
+  `amount`, `duration_ms`, `mode`, `timeout_ms`, `click`, `double_click`;
+  anything else is rejected with an error.
 - `wait_game_input` — wait for `just_pressed` (default), `just_released` or
   `pressed` within a physics frame, `timeout_ms` default 2000 max 25000.
   `just_pressed`/`just_released` require `inject` — the transient window is
@@ -226,6 +227,30 @@ Rules verified in engine source:
   {"kind": "action", "action": "jump", "at_frame": 15}
 ]}}
 ```
+
+### Mouse click pairing (BaseButton pitfall)
+
+`BaseButton` uses `ACTION_MODE_BUTTON_RELEASE` by default: the `pressed`
+signal fires on the **release** edge, not the press. A lone
+`queue_game_input` with `type: "mouse_button", pressed: true` therefore
+leaves the button held down and never triggers it — the call itself
+succeeds, so the failure is silent. Always inject a pair:
+
+- `queue_game_input` with `click: true` injects press+release at the same
+  position in one call (the release follows 2 physics frames after the
+  press); `double_click: true` performs two pairs. `click` overrides
+  `pressed` for the paired injection.
+- `sequence_game_inputs`: put the press and the release on `at_frame`
+  values at least 2 apart, or set `click`/`double_click` on a single
+  mouse_button item.
+- `click_game_ui_element` already injects the pair (two pairs with
+  `double_click`) and needs no manual pairing.
+
+Self-check after a click: read the control back with
+`execute_game_script` (`get_property` on `button_pressed` / `is_hovered`)
+or poll the bound action with `get_game_input_status`. If `button_pressed`
+stays true, the release never landed — re-inject the release instead of
+pressing again.
 
 ## Editor-side input tools
 

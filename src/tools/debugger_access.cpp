@@ -48,6 +48,13 @@ bool debugger_broadcast_request(const std::string &payload,
   return true;
 }
 
+int32_t debugger_active_session_count() {
+  auto *plugin = debugger_ops::DebugCapturePlugin::get_instance();
+  if (!plugin)
+    return 0;
+  return static_cast<int32_t>(plugin->get_session_ids().size());
+}
+
 bool debugger_broadcast_engine_command(const godot::String &command,
                                        const godot::Array &data) {
   auto *plugin = debugger_ops::DebugCapturePlugin::get_instance();

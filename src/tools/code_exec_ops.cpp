@@ -545,9 +545,19 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
       if (v == nullptr)
         v = item.Find("result");
     }
-    if (v != nullptr)
+    if (v != nullptr) {
+      if (ok && v->IsObject() && v->Size() == 1u) {
+        if (const mcp::JsonValue *unwrapped = v->Find("result")) {
+          payloads.push_back(*unwrapped);
+          return;
+        }
+        if (const mcp::JsonValue *unwrapped = v->Find("data")) {
+          payloads.push_back(*unwrapped);
+          return;
+        }
+      }
       payloads.push_back(*v);
-    else
+    } else
       payloads.push_back(mcp::JsonValue());
   };
   std::function<bool(mcp::JsonValue &, size_t, std::string &)> resolve_refs =
@@ -566,6 +576,7 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
       if (s.compare(0, kPrefix.size(), kPrefix) == 0) {
         const std::string kResultSuffix = "].result";
         const std::string kErrorSuffix = "].error";
+        const std::string kDataSuffix = "].data";
         int kind = 0;
         std::string middle;
         if (s.size() > kPrefix.size() + kResultSuffix.size() &&
@@ -580,6 +591,12 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
           kind = 2;
           middle = s.substr(kPrefix.size(),
                             s.size() - kPrefix.size() - kErrorSuffix.size());
+        } else if (s.size() > kPrefix.size() + kDataSuffix.size() &&
+                   s.compare(s.size() - kDataSuffix.size(),
+                             kDataSuffix.size(), kDataSuffix) == 0) {
+          kind = 3;
+          middle = s.substr(kPrefix.size(),
+                            s.size() - kPrefix.size() - kDataSuffix.size());
         } else {
           return true;
         }
@@ -615,7 +632,7 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
           return false;
         }
         const size_t idx = static_cast<size_t>(n);
-        if (kind == 1 && !op_ok[idx]) {
+        if ((kind == 1 || kind == 3) && !op_ok[idx]) {
           error_out = "unresolvable reference '" + s +
                       "': wrong status (operation " + middle +
                       " did not succeed)";
@@ -789,6 +806,12 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
       const bool awaited_error =
           awaited.IsObject() && awaited.Find("error") != nullptr;
       result_item["status"] = mcp::JsonValue(awaited_error ? "error" : "ok");
+      if (awaited_error) {
+        if (auto *awaited_err = awaited.Find("error");
+            awaited_err && awaited_err->IsString())
+          result_item["error"] = *awaited_err;
+      }
+      result_item["data"] = awaited;
       result_item["result"] = std::move(awaited);
       push_payload(result_item);
       results.PushBack(std::move(result_item));
@@ -808,6 +831,9 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
     if (auto *err = handler_result.Find("error")) {
       result_item["status"] = mcp::JsonValue("error");
       result_item["error"] = *err;
+      mcp::JsonValue error_body(mcp::JsonValue::object_tag);
+      error_body["error"] = *err;
+      result_item["result"] = std::move(error_body);
       push_payload(result_item);
       results.PushBack(std::move(result_item));
       ++failed;
@@ -818,7 +844,8 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
       }
     } else {
       result_item["status"] = mcp::JsonValue("ok");
-      result_item["data"] = std::move(handler_result);
+      result_item["data"] = handler_result;
+      result_item["result"] = std::move(handler_result);
       push_payload(result_item);
       results.PushBack(std::move(result_item));
       ++succeeded;

@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/classes/object.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <unordered_set>
 
@@ -58,6 +59,18 @@ int64_t count_memory_nodes(godot::Node *root) {
   const int child_count = root->get_child_count();
   for (int i = 0; i < child_count; i++) {
     count += count_memory_nodes(root->get_child(i));
+  }
+  return count;
+}
+
+int64_t count_memory_connections(godot::Node *root) {
+  if (!root)
+    return 0;
+  int64_t count =
+      static_cast<int64_t>(root->get_incoming_connections().size());
+  const int child_count = root->get_child_count();
+  for (int i = 0; i < child_count; i++) {
+    count += count_memory_connections(root->get_child(i));
   }
   return count;
 }
@@ -119,12 +132,29 @@ std::vector<std::string> parse_tscn_paths(const std::string &tscn_text, int64_t 
   return paths;
 }
 
+int64_t count_tscn_connections(const std::string &tscn_text) {
+  int64_t count = 0;
+  std::size_t pos = 0;
+  while (pos < tscn_text.size()) {
+    std::size_t line_end = tscn_text.find('\n', pos);
+    std::string line = tscn_text.substr(pos, line_end == std::string::npos
+                                                   ? std::string::npos
+                                                   : line_end - pos);
+    pos = (line_end == std::string::npos) ? tscn_text.size() : line_end + 1;
+    if (trim_left(line).compare(0, 12, "[connection ") == 0)
+      count++;
+  }
+  return count;
+}
+
 VerifyResult compare_tree_with_text(godot::Node *root, const std::string &tscn_text,
                                     bool compute_hash) {
   VerifyResult result;
   std::vector<std::string> memory_paths;
   collect_memory_paths(root, memory_paths);
   result.memory_nodes = static_cast<int64_t>(memory_paths.size());
+  result.memory_connections = count_memory_connections(root);
+  result.disk_connections = count_tscn_connections(tscn_text);
   std::vector<std::string> disk_paths = parse_tscn_paths(tscn_text, result.disk_nodes);
 
   std::unordered_set<std::string> disk_set(disk_paths.begin(), disk_paths.end());
@@ -137,7 +167,8 @@ VerifyResult compare_tree_with_text(godot::Node *root, const std::string &tscn_t
     }
   }
   result.match = result.missing_paths.empty() && !result.missing_truncated &&
-                 result.memory_nodes == result.disk_nodes && result.memory_nodes > 0;
+                 result.memory_nodes == result.disk_nodes && result.memory_nodes > 0 &&
+                 result.memory_connections == result.disk_connections;
 
   if (compute_hash) {
     std::vector<std::string> mem_sorted = memory_paths;

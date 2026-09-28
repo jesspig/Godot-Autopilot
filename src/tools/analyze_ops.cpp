@@ -2,6 +2,7 @@
 
 #include "../util/error_util.hpp"
 #include "../util/scene_path.hpp"
+#include "../util/scene_verify.hpp"
 #include <godot_cpp/classes/editor_file_system.hpp>
 #include <godot_cpp/classes/editor_file_system_directory.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
@@ -124,6 +125,79 @@ void collect_files(
                      util::to_std(dir->get_file_type(i)));
   for (int i = 0; i < dir->get_subdir_count(); i++)
     collect_files(dir->get_subdir(i), out);
+}
+
+std::string extract_path_token_on_line(const std::string &line) {
+  const std::string key = "path=\"";
+  std::size_t pos = line.find(key);
+  if (pos == std::string::npos)
+    return "";
+  pos += key.size();
+  std::size_t end = line.find('"', pos);
+  if (end == std::string::npos)
+    return "";
+  return line.substr(pos, end - pos);
+}
+
+int64_t supplement_references_from_text(
+    const std::vector<std::pair<std::string, std::string>> &files,
+    const std::vector<std::string> &empty_dep_files,
+    const std::set<std::string> &unresolved_uids,
+    std::set<std::string> &referenced, bool &truncated) {
+  truncated = false;
+  if (empty_dep_files.empty() && unresolved_uids.empty())
+    return 0;
+  std::vector<std::pair<std::string, std::string>> path_tokens;
+  for (const std::string &p : empty_dep_files) {
+    if (referenced.count(p) == 0)
+      path_tokens.emplace_back("path=\"" + p + "\"", p);
+  }
+  std::vector<std::string> uid_tokens;
+  for (const std::string &u : unresolved_uids)
+    uid_tokens.push_back("uid=\"" + u + "\"");
+  if (path_tokens.empty() && uid_tokens.empty())
+    return 0;
+  int64_t supplemented = 0;
+  size_t bytes_read = 0;
+  for (const auto &entry : files) {
+    if (!ends_with(entry.first, ".tscn") && !ends_with(entry.first, ".tres"))
+      continue;
+    if (bytes_read > 32 * 1024 * 1024) {
+      truncated = true;
+      break;
+    }
+    bool ok = false;
+    const std::string text = scene_verify::read_text_file(entry.first, ok);
+    if (!ok)
+      continue;
+    if (text.size() > 2 * 1024 * 1024) {
+      truncated = true;
+      continue;
+    }
+    bytes_read += text.size();
+    std::size_t pos = 0;
+    while (pos < text.size()) {
+      std::size_t line_end = text.find('\n', pos);
+      std::string line = text.substr(pos, line_end == std::string::npos
+                                                ? std::string::npos
+                                                : line_end - pos);
+      pos = (line_end == std::string::npos) ? text.size() : line_end + 1;
+      for (const auto &tok : path_tokens) {
+        if (line.find(tok.first) == std::string::npos)
+          continue;
+        if (referenced.insert(tok.second).second)
+          supplemented++;
+      }
+      for (const std::string &tok : uid_tokens) {
+        if (line.find(tok) == std::string::npos)
+          continue;
+        const std::string hit_path = extract_path_token_on_line(line);
+        if (!hit_path.empty() && referenced.insert(hit_path).second)
+          supplemented++;
+      }
+    }
+  }
+  return supplemented;
 }
 
 std::string describe_node(godot::Node *node, godot::Node *scene_root) {
@@ -280,6 +354,7 @@ mcp::JsonValue handle_find_unused_resources(const mcp::JsonValue &args) {
   auto *efs = editor ? editor->get_resource_filesystem() : nullptr;
   if (!efs)
     return make_error("editor resource filesystem is unavailable");
+  const bool efs_scanning = efs->is_scanning();
 
   godot::EditorFileSystemDirectory *start_dir = nullptr;
   if (directory.empty() || directory == "res://" || directory == "/") {
@@ -305,9 +380,12 @@ mcp::JsonValue handle_find_unused_resources(const mcp::JsonValue &args) {
 
   std::set<std::string> referenced;
   std::set<std::string> unresolved_uids;
+  std::vector<std::string> empty_dep_files;
   for (const auto &entry : files) {
     godot::PackedStringArray deps =
         loader->get_dependencies(godot::String(entry.first.c_str()));
+    if (deps.size() == 0)
+      empty_dep_files.push_back(entry.first);
     for (int i = 0; i < deps.size(); i++) {
       std::string dep = util::to_std(deps[i]);
       bool resolved_ok = false;
@@ -319,6 +397,9 @@ mcp::JsonValue handle_find_unused_resources(const mcp::JsonValue &args) {
       referenced.insert(resolved);
     }
   }
+  bool text_truncated = false;
+  const int64_t text_supplemented = supplement_references_from_text(
+      files, empty_dep_files, unresolved_uids, referenced, text_truncated);
 
   std::set<std::string> exempted;
   auto exempt = [&exempted](const std::string &p) {
@@ -373,9 +454,27 @@ mcp::JsonValue handle_find_unused_resources(const mcp::JsonValue &args) {
 
   mcp::JsonValue inner(mcp::JsonValue::object_tag);
   inner["scanned"] = mcp::JsonValue(static_cast<int64_t>(files.size()));
+  inner["filesystem_scanning"] = mcp::JsonValue(efs_scanning);
   inner["unused"] = std::move(unused);
   inner["unresolved_uids"] = std::move(unresolved_arr);
   inner["exempted"] = std::move(exempted_arr);
+  if (text_supplemented > 0)
+    inner["text_supplemented"] = mcp::JsonValue(text_supplemented);
+  if (text_truncated)
+    inner["text_scan_truncated"] = mcp::JsonValue(true);
+  std::string note;
+  if (efs_scanning)
+    note += "editor filesystem is scanning, results may be stale — run "
+            "scan_editor_file_system first and retry; ";
+  if (!unresolved_uids.empty())
+    note += "unresolved_uids is non-empty, results may be incomplete; ";
+  if (text_supplemented > 0)
+    note += "text fallback matched " + std::to_string(text_supplemented) +
+            " extra reference(s) from .tscn/.tres ext_resource tokens; ";
+  if (text_truncated)
+    note += "text fallback hit its size budget and skipped files; ";
+  if (!note.empty())
+    inner["note"] = mcp::JsonValue(note);
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(inner);
   return r;

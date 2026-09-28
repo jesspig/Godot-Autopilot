@@ -64,7 +64,7 @@ Read the fields as combinations, not in isolation:
 |---|---|---|
 | `healthy` true, `physics_stalled` false | live game, physics ticking | safe to inject, capture, reload |
 | `healthy` true, `physics_stalled` true | render loop runs but physics is frozen — a deadlocked or disabled physics step, or a stall in a physics callback | inspect with `get_debug_monitors`; do not trust input timing; `reload_scene_tree_current_scene` or restart |
-| `healthy` false shortly after play | startup still in progress | wait a moment and retry — one early `game not ready` failure is normal |
+| `healthy` false shortly after play | startup still in progress | wait a moment and retry — one early `game started but not ready` failure is normal |
 | `healthy` false for good | the process is gone or wedged | `stop_editor_playing`, then `play_editor_current_scene` again |
 | empty scene with a sharp `node_count` drop | a failed reload left a half-dead process | do not debug it — stop and rerun |
 | `paused` true | tree paused; physics simulation stopped server-side; transient input states are lost | unpause with `set_scene_tree_pause` before input automation |

@@ -15,6 +15,20 @@ mcp::JsonValue ok_result(mcp::JsonValue value) {
   return r;
 }
 
+const mcp::JsonValue *find_result_or_data(const mcp::JsonValue &body) {
+  if (const mcp::JsonValue *v = body.Find("result")) {
+    return v;
+  }
+  return body.Find("data");
+}
+
+mcp::JsonValue *find_result_or_data(mcp::JsonValue &body) {
+  if (mcp::JsonValue *v = body.Find("result")) {
+    return v;
+  }
+  return body.Find("data");
+}
+
 std::string to_std(const godot::String &s) {
   godot::CharString utf8 = s.utf8();
   return std::string(utf8.ptr());

@@ -170,9 +170,18 @@ Check what exists and what state the editor is in before modifying it:
 - `property_get_list` (`path`, optional `only_script_variables`, `property_filter`) — every property with its metadata: name, type, hint, hint_string, usage flags and class_name. The optional filters narrow the listing to script variables (`only_script_variables`) or to names containing a case-sensitive substring (`property_filter`). Query it first to discover valid property names and enum ordering before `property_get` or `property_set`.
 - `get_scene_tree` with `include_properties` — a convenience snapshot of up to 20 filtered properties per node (metadata/, underscore-prefixed and Object-typed properties are skipped). Use `property_get` for the exact full value.
 
-`property_set` takes `path`, `property` and `value`. Omit `type_hint` to infer
-the Variant type from the property metadata. After writing, the value is read
-back: a mismatch is reported either as an error (the property may be
+`property_set` single form takes `path`, `property` and `value`; batch form
+takes `path` plus `properties` as an object map instead (mutually exclusive,
+max 32 entries, `type_hint` must be omitted). Batch applies object-typed
+entries first, then the rest — the same two-pass order as `create_scene_node`
+— and returns `applied_properties`, `property_warnings`, `inline_resources`,
+`converted_node_paths` plus per-property `undo` entries. A failing entry
+reports `failed_property` and the properties already applied. Property names
+accept dot paths (`a.b.c`) into sub-resources: intermediates are fetched with
+`get`, the leaf is type-checked and `set`, and failures carry the full path
+plus candidates; no expression evaluation or method calls. Omit `type_hint` to
+infer the Variant type from the property metadata. After writing, the value is
+read back: a mismatch is reported either as an error (the property may be
 read-only, nonexistent, or need an explicit `type_hint`) or as a warning when
 the engine converted the value. For Object- and Array-typed properties a value
 the engine does not actually apply (readback null, an emptied array, or a null
@@ -182,11 +191,14 @@ value when it can and says so in the error.
 - Every successful set registers with the editor undo stack so Ctrl-Z reverts it (the response reports undoable:true). Exception: when the old or new value is an Object reference, no action is recorded and the response reports undoable:false with a skip reason.
 - Node-typed properties — engine hint `NodeType` (34), which includes C# `[Export]` node fields — accept a node path string; it is converted to a node reference automatically and the response reports converted_node_path. An unresolvable path is an error, not a silent ok.
 - Array properties convert elements one by one: node elements take a path string or `{"__node_ref__": "..."}`, resource elements take a `res://...` or `memory://...` string, `{"path": "res://..."}` or `{"resource": "memory://..."}`, and `null` leaves a slot empty. Passing a non-array value for an array property is an error instead of silently clearing it, and elements the tool cannot express safely are errors too. See `references/property-json-shapes.md`.
+- Dictionary properties take a JSON object; a non-object value errors instead of writing an empty dict. SpriteFrames `animations` accepts either the engine array form or a dict mapping names to `{frames, speed, loop}` (frames as texture refs or `{texture, duration}` objects), assembled into the engine array of `{name, frames, speed, loop}` dicts with per-item validation; sub-resource errors name the real resource path, not the host node. See `references/property-json-shapes.md`.
 - Resource-typed properties also accept an inline resource description: `{"type": "RectangleShape2D", "properties": {"size": {"x": 20, "y": 28}}}` creates a pathless sub-resource in one step. It is written into the scene file as a `sub_resource` when the scene is saved, the response echoes it in inline_resources, and nesting is limited to 4 levels. See `references/property-json-shapes.md`.
 - Assigning a string to an int property silently converts to 0 and reports ok. After any set with an unusual value shape, read back with `property_get` to confirm what actually landed.
 
 ```json
 {"name": "property_set", "arguments": {"path": "Player", "property": "position", "value": {"x": 12.5, "y": -3.25}}}
+{"name": "property_set", "arguments": {"path": "Player", "properties": {"position": {"x": 0, "y": -10}, "visible": false}}}
+{"name": "property_set", "arguments": {"path": "Hero", "property": "sprite_frames.animations", "value": {"idle": {"frames": [{"texture": "res://icon.svg"}], "speed": 5.0, "loop": true}}}}
 ```
 
 JSON value shapes for all Godot types, the Godot 3 to 4 renamed-property

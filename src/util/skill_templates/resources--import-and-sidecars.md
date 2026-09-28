@@ -1,6 +1,6 @@
 # Import Pipeline and Sidecar Files
 
-How the editor imports assets, how .import and .uid sidecar files are produced and maintained, how duplicate UIDs are resolved, and how the file-system scan state machine gates writes. These are engine behaviors behind `reimport_resource_files`, `scan_editor_file_system`, `set_resource_uid`, `rename_resource_file` and `move_resource_file`.
+How the editor imports assets, how .import and .uid sidecar files are produced and maintained, how duplicate UIDs are resolved, and how the file-system scan state machine gates writes. These are engine behaviors behind `reimport_resource_files`, `set_resource_import_options`, `scan_editor_file_system`, `set_resource_uid`, `rename_resource_file` and `move_resource_file`.
 
 ## The import pipeline
 
@@ -16,9 +16,9 @@ How the editor imports assets, how .import and .uid sidecar files are produced a
 - **Failure writes `valid=false`.** When an import fails, the .import file is still (re)written, but instead of a `path=` output entry it carries `valid=false`. The file then looks import-configured but produces no importable resource - check the .import content when a texture/audio asset refuses to load.
 - **Files without a .import have no import effect.** Reimporting a text resource or script (for example .tres or .gd) that carries no .import sidecar does nothing importable: the engine records a BUG-class error, yet the tool still reports "reimport queued" because the queue call itself succeeded. To refresh the editor's cached instance of such a file after it changed on disk, use `reload_resource` instead.
 
-## Writing .import files by hand
+## Writing .import files by hand (deprecated)
 
-Prefer `reimport_resource_files`; hand-write a .import only to repair one that is broken or missing, when you know the importer and its parameters.
+Use `set_resource_import_options` to change import parameters: it validates the option keys against a whitelist (audio loop/compression and texture filter/mipmap families), writes the `.import` `[params]` section, and queues a reimport in one call. Hand-writing a .import file is deprecated for parameter changes and is only a repair fallback for a broken or missing sidecar, when you know the importer and its parameters.
 
 - **`[remap]` must be the first section.** The engine writes the file manually in a fixed order and states it directly: order matters, `[remap]` has to go first. Its quick readers rely on that layout.
 - **Section layout, in order:**
@@ -26,7 +26,7 @@ Prefer `reimport_resource_files`; hand-write a .import only to repair one that i
   - `[deps]` - `source_file=` and, when there is output, `dest_files=` and `files=`.
   - `[params]` - one line per importer option (`name=value`), written in the importer's declared option order.
 - **MD5s live in a separate file.** Checksums are not stored in the .import file: the engine writes a sibling `<import-output>.md5` file (under `.godot/imported/`) holding `source_md5=` and `dest_md5=` lines. This separation is deliberate so .import files stay stable under version control.
-- After any hand edit, run `reimport_resource_files` on the file (or `scan_editor_file_system`) so the engine re-reads it and rewrites it in canonical form.
+- After any hand edit, run `reimport_resource_files` on the file (or `scan_editor_file_system`) so the engine re-reads it and rewrites it in canonical form. For parameter changes prefer `set_resource_import_options`, which performs the write plus the queued reimport for you.
 
 ## Importer parameter merge order
 
@@ -36,7 +36,7 @@ For one file the engine assembles the parameter map in this sequence (a later st
 2. **Importer option defaults** fill every option the file did not set.
 3. **`importer_defaults/<importer_name>` from project settings** are applied on top - but only when the importer was matched by file extension, i.e. the .import named no importer or an unknown one. A file whose .import names a valid importer never consults importer_defaults.
 
-Practical consequence: project-wide importer_defaults act as fallbacks for newly discovered files, not as a live override for files that already carry a valid importer name. To change parameters of an already-imported asset, edit its .import `[params]` and reimport.
+Practical consequence: project-wide importer_defaults act as fallbacks for newly discovered files, not as a live override for files that already carry a valid importer name. To change parameters of an already-imported asset, call `set_resource_import_options` with the whitelisted `[params]` keys and let it queue the reimport.
 
 ## Sidecar files
 

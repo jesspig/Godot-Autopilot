@@ -21,9 +21,10 @@ const std::vector<ParamSpec> kPropertyGetParams = {
 
 const std::vector<ParamSpec> kPropertySetParams = {
     {"path", "string", "Node path (scene-relative or absolute). memory:// is a resource namespace and is NOT valid here — memory resources go in the value parameter (e.g. {\"resource\": \"memory://name\"}). The response includes scene_path and scene_unsaved so the caller can confirm which scene was written", true},
-    {"property", "string", "Property name to set (string, e.g. 'position', 'modulate')", true},
-    {"value", "object", "Property value to set. Resource references use two forms: {\"path\": \"res://xxx.tres\"} for a disk resource assigned to a node property, or {\"resource\": \"memory://name\"} for an in-memory resource (only valid in resource editing scenarios). Assigning a memory:// resource to a node property is rejected because it would corrupt the saved scene file", true},
-    {"type_hint", "string", "Variant type hint (string, e.g. Vector2, Color, int, float). Omit to infer the type automatically from the property metadata", false},
+    {"property", "string", "Single property name to set, dot-separated paths allowed (e.g. 'position', 'material.albedo_color'). Mutually exclusive with 'properties'; required in single form", false},
+    {"value", "object", "Single property value. Resource references use two forms: {\"path\": \"res://xxx.tres\"} or {\"resource\": \"memory://name\"} (memory rejected on nodes). Dictionary properties take a JSON object; SpriteFrames 'animations' accepts an array or an object mapping names to {frames, speed, loop}. Required in single form", false},
+    {"properties", "object", "Batch map of property names to values applied in one call (e.g. {\"position\": {\"x\": 1, \"y\": 2}, \"visible\": false}). Object-typed entries run first, then the rest, mirroring create_scene_node; mutually exclusive with property/value; max 32 entries", false},
+    {"type_hint", "string", "Variant type hint for single form only (e.g. Vector2, Color, int, float). Omit to infer from metadata; must not be used with 'properties'", false},
 };
 
 const std::vector<ParamSpec> kPropertyGetListParams = {
@@ -59,7 +60,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       kPropertyGetParams, property_ops::handle_get}));
   v.push_back(make_spec_tool(ToolSpec{
       "property_set",
-      "Set a property on a scene node. Requires 'path', 'property' and 'value'. Omit 'type_hint' to infer the Variant type automatically from the property metadata (query property_get_list first for enum ordering). Resource values resolve via {\"path\": \"res://...\"}; an object-typed property also accepts an inline resource description {\"type\": \"RectangleShape2D\", \"properties\": {\"size\": {\"x\": 20, \"y\": 28}}} which creates a pathless sub-resource in one step (saved as a sub_resource with the scene, nesting limit 4) and is echoed in 'inline_resources' as {property, type} entries. memory:// resources are rejected to protect the scene file. Read-only or invalid assignments error; returns 'ok' with an 'undo' entry (old value) and registers the change with the editor undo stack so Ctrl-Z reverts it (undoable:true), except when the old or new value is an Object reference — then no action is recorded and the response reports undoable:false with undo_skip_reason.",
+      "Set properties on a scene node. Single form requires 'path', 'property' and 'value'; batch form passes 'properties' as an object map instead (mutually exclusive, max 32, object-typed entries first then the rest, mirroring create_scene_node). Property names accept dot paths (a.b.c) into sub-resources with full-path errors and candidates. Omit 'type_hint' to infer the Variant type from metadata (single form only). Resource values resolve via {\"path\": \"res://...\"}; object-typed properties accept inline {\"type\": \"RectangleShape2D\", \"properties\": {...}} (nesting limit 4, echoed in 'inline_resources'). Dictionary properties take JSON objects; SpriteFrames 'animations' accepts an engine array or a dict mapping names to {frames, speed, loop} assembled into the engine array form. memory:// rejected on nodes. Returns 'ok' with undo info and editor undo registration (undoable:false for object values).",
       "Properties", {"property", "set"}, SideEffect::None, tool_flags::kNone | tool_flags::kSceneTarget | tool_flags::kUndoable,
       kPropertySetParams, property_ops::handle_set}));
   v.push_back(make_spec_tool(ToolSpec{

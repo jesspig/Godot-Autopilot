@@ -12,6 +12,10 @@ mcp::JsonValue error_json(const std::string &msg);
 
 mcp::JsonValue ok_result(mcp::JsonValue value);
 
+const mcp::JsonValue *find_result_or_data(const mcp::JsonValue &body);
+
+mcp::JsonValue *find_result_or_data(mcp::JsonValue &body);
+
 std::string to_std(const godot::String &s);
 
 mcp::JsonValue error_detail(const std::string &fact,

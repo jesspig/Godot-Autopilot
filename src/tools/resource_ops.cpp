@@ -10,11 +10,13 @@
 #include "util/type_hint.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/class_db_singleton.hpp>
+#include <godot_cpp/classes/config_file.hpp>
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/editor_file_system.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/file_access.hpp>
+#include <godot_cpp/classes/object.hpp>
 #include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/classes/resource.hpp>
@@ -265,8 +267,20 @@ std::string scan_directory_case_conflict(const std::string &save_dir) {
   return {};
 }
 
+bool is_filesystem_root_dir(const std::string &dir) {
+  return dir.empty() || dir == "res://" || dir == "res:/" || dir == "res:" ||
+         dir == "user://" || dir == "user:/" || dir == "user:";
+}
+
 bool ensure_save_directory(const std::string &save_dir, bool &dirs_created,
                            std::string &out_error) {
+  if (is_filesystem_root_dir(save_dir)) {
+    return true;
+  }
+  if (godot::DirAccess::dir_exists_absolute(
+          godot::String(save_dir.c_str()))) {
+    return true;
+  }
   auto dir = godot::DirAccess::open(godot::String("res://"));
   if (!dir.is_valid()) {
     return true;
@@ -886,12 +900,14 @@ mcp::JsonValue handle_save(const mcp::JsonValue &args) {
   size_t last_slash = save_dir.find_last_of('/');
   if (last_slash != std::string::npos) {
     save_dir = save_dir.substr(0, last_slash);
-    case_conflict = scan_directory_case_conflict(save_dir);
-    std::string dir_error;
-    if (!ensure_save_directory(save_dir, dirs_created, dir_error)) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue(dir_error);
-      return e;
+    if (!is_filesystem_root_dir(save_dir)) {
+      case_conflict = scan_directory_case_conflict(save_dir);
+      std::string dir_error;
+      if (!ensure_save_directory(save_dir, dirs_created, dir_error)) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue(dir_error);
+        return e;
+      }
     }
   }
 
@@ -2479,12 +2495,14 @@ mcp::JsonValue handle_copy(const mcp::JsonValue &args) {
   const size_t last_slash = dest_path.find_last_of('/');
   if (last_slash != std::string::npos) {
     const std::string dest_dir = dest_path.substr(0, last_slash);
-    bool dirs_created = false;
-    std::string dir_error;
-    if (!ensure_save_directory(dest_dir, dirs_created, dir_error)) {
-      mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue(dir_error);
-      return e;
+    if (!is_filesystem_root_dir(dest_dir)) {
+      bool dirs_created = false;
+      std::string dir_error;
+      if (!ensure_save_directory(dest_dir, dirs_created, dir_error)) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue(dir_error);
+        return e;
+      }
     }
   }
 
@@ -2747,6 +2765,139 @@ mcp::JsonValue handle_reimport(const mcp::JsonValue &args) {
   return r;
 }
 
+mcp::JsonValue handle_set_import_options(const mcp::JsonValue &args) {
+  auto *it_path = args.Find("path");
+  if (!it_path || !it_path->IsString()) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue("missing required parameter: path");
+    return e;
+  }
+  auto *it_opts = args.Find("options");
+  if (!it_opts || !it_opts->IsObject() || it_opts->GetObject().empty()) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue(
+        "missing required parameter: options (non-empty object of import "
+        "option keys to values)");
+    return e;
+  }
+  std::string path;
+  std::string path_error;
+  if (!normalize_resource_path(it_path->GetString(), path, path_error))
+    return util::error_detail("path rejected", "path", path_error,
+                              "set import options only inside res://");
+  auto *engine = godot::Engine::get_singleton();
+  if (engine && engine->is_editor_hint() == false) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue(
+        "set_resource_import_options is only available in editor mode");
+    return e;
+  }
+  auto *editor = godot::EditorInterface::get_singleton();
+  if (!editor) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue("EditorInterface not available");
+    return e;
+  }
+  auto *efs = editor->get_resource_filesystem();
+  if (!efs) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue("EditorFileSystem not available");
+    return e;
+  }
+  if (is_import_in_progress()) {
+    return busy_error();
+  }
+  if (!godot::FileAccess::file_exists(godot::String(path.c_str()))) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue("source does not exist: " + path +
+                                " — check the path with get_resource_dir_files");
+    return e;
+  }
+  const std::string import_path = path + ".import";
+  if (!godot::FileAccess::file_exists(godot::String(import_path.c_str()))) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue(
+        "no .import sidecar for " + path +
+        ": file is not imported — refresh text resources with reload_resource "
+        "instead of setting import options");
+    return e;
+  }
+  static const char *allowed[] = {
+      "loop",         "loop_mode",     "loop_begin",
+      "loop_end",     "compression",   "compress/mode",
+      "compress/high_quality",         "compress/lossy_quality",
+      "compress/hdr_compression",      "compress/bptc_ldr",
+      "compress/normal_map",           "mipmaps/generate",
+      "mipmaps/limit",                 "generate_mipmaps",
+      "filter",       "anisotropy",    "roughness/mode",
+      "roughness/src_normal",          "process/hdr_as_srgb",
+      "process/fix_alpha_border",      "process/premult_alpha",
+      "process/normal_map_invert_y",   "process/invert_color",
+      "process/hdr_clamp_exposure",    "stream",
+      "size_limit",   "detect_3d/compress_to"};
+  std::vector<std::string> keys;
+  for (const auto &entry : it_opts->GetObject()) {
+    keys.push_back(entry.first);
+  }
+  for (const std::string &key : keys) {
+    bool ok = false;
+    for (const char *a : allowed) {
+      if (key == a) {
+        ok = true;
+        break;
+      }
+    }
+    if (!ok) {
+      std::string allowed_list;
+      for (const char *a : allowed) {
+        if (!allowed_list.empty()) {
+          allowed_list += ", ";
+        }
+        allowed_list += a;
+      }
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue("unsupported import option: '" + key +
+                                  "' — allowed keys: " + allowed_list);
+      return e;
+    }
+  }
+  godot::Ref<godot::ConfigFile> cfg;
+  cfg.instantiate();
+  godot::String import_gs(import_path.c_str());
+  if (cfg->load(import_gs) != godot::OK) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue("failed to read .import file: " + import_path +
+                                " — check the file with read_file");
+    return e;
+  }
+  for (const std::string &key : keys) {
+    const mcp::JsonValue *val = it_opts->Find(key.c_str());
+    godot::Variant v = VariantJson::deserialize_strict(*val, "");
+    cfg->set_value(godot::String("params"), godot::String(key.c_str()), v);
+  }
+  if (cfg->save(import_gs) != godot::OK) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue("failed to write .import file: " + import_path);
+    return e;
+  }
+  godot::PackedStringArray files;
+  files.append(godot::String(path.c_str()));
+  efs->reimport_files(files);
+  mcp::JsonValue applied(mcp::JsonValue::array_tag);
+  for (const std::string &key : keys) {
+    applied.PushBack(mcp::JsonValue(key));
+  }
+  mcp::JsonValue ro(mcp::JsonValue::object_tag);
+  ro["result"] = mcp::JsonValue("ok");
+  ro["path"] = mcp::JsonValue(path);
+  ro["applied"] = std::move(applied);
+  ro["reimport"] = mcp::JsonValue("queued");
+  ro["poll"] = mcp::JsonValue(
+      "poll get_editor_file_system_status until scanning is false, then verify "
+      "with get_resource_type or read_file on the .import [params]");
+  return ro;
+}
+
 mcp::JsonValue handle_set_property(const mcp::JsonValue &args) {
   auto *it_prop = args.Find("property");
   if (!it_prop || !it_prop->IsString()) {
@@ -2779,12 +2930,55 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue &args) {
     return e;
   }
 
+  std::vector<std::string> prop_parts;
+  size_t part_begin = 0;
+  while (true) {
+    size_t dot = prop.find('.', part_begin);
+    if (dot == std::string::npos) {
+      prop_parts.push_back(prop.substr(part_begin));
+      break;
+    }
+    prop_parts.push_back(prop.substr(part_begin, dot - part_begin));
+    part_begin = dot + 1;
+  }
+  for (const std::string &part : prop_parts) {
+    if (part.empty()) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue(
+          "invalid property path: '" + prop +
+          "' contains an empty segment — use dot-separated names like 'a.b.c'");
+      return e;
+    }
+  }
+  godot::Object *target_obj = res.ptr();
+  std::string walked;
+  for (size_t i = 0; i + 1 < prop_parts.size(); i++) {
+    const std::string &seg = prop_parts[i];
+    godot::Variant seg_val = target_obj->get(godot::StringName(seg.c_str()));
+    godot::Object *next_obj = nullptr;
+    if (seg_val.get_type() == godot::Variant::OBJECT) {
+      next_obj = seg_val.operator godot::Object *();
+    }
+    if (next_obj == nullptr) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      std::string at = walked.empty() ? seg : walked + "." + seg;
+      e["error"] = mcp::JsonValue(
+          "property path '" + prop + "' failed at '" + at +
+          "': value is null or not an object on " +
+          util::to_std(target_obj->get_class()) +
+          " — use resource_get_property_list or check the property name");
+      return e;
+    }
+    target_obj = next_obj;
+    walked = walked.empty() ? seg : walked + "." + seg;
+  }
+  const std::string &leaf = prop_parts.back();
   bool found = false;
-  godot::TypedArray<godot::Dictionary> props = res->get_property_list();
+  godot::TypedArray<godot::Dictionary> props = target_obj->get_property_list();
   for (int64_t i = 0; i < props.size(); i++) {
     godot::Dictionary dict = props[i];
     if (dict.has("name") &&
-        util::to_std(dict["name"].operator godot::String()) == prop) {
+        util::to_std(dict["name"].operator godot::String()) == leaf) {
       found = true;
       type_hint = util::infer_type_hint(dict, std::move(type_hint));
       break;
@@ -2812,10 +3006,10 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue &args) {
     value = VariantJson::deserialize_strict(*args.Find("value"), type_hint);
   }
 
-  godot::Variant old_val = res->get(godot::StringName(prop.c_str()));
-  res->set(godot::StringName(prop.c_str()), value);
+  godot::Variant old_val = target_obj->get(godot::StringName(leaf.c_str()));
+  target_obj->set(godot::StringName(leaf.c_str()), value);
 
-  godot::Variant new_val = res->get(godot::StringName(prop.c_str()));
+  godot::Variant new_val = target_obj->get(godot::StringName(leaf.c_str()));
 
   LogSystem::instance().log(
       LogLevel::Info, LogCategory::Tools,

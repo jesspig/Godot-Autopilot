@@ -673,15 +673,27 @@ async function main() {
     transportError("the response carries neither text nor image content.", "Retry the call.");
   }
 
-  const hasInnerError = (p) => !!p && typeof p === "object" && !Array.isArray(p) && "error" in p;
+  const hasInnerError = (p) => {
+    if (!p || typeof p !== "object" || Array.isArray(p)) return false;
+    if ("error" in p) return true;
+    const innerResult = p.result !== undefined ? p.result : p.data;
+    if (innerResult && typeof innerResult === "object" && !Array.isArray(innerResult) && "error" in innerResult) return true;
+    if (Array.isArray(p.results)) {
+      return p.results.some((it) => it && typeof it === "object" && (it.status === "error" || "error" in it));
+    }
+    return false;
+  };
   const toolFailed =
     (result && result.isError === true) ||
     (Array.isArray(display) ? display.some(hasInnerError) : hasInnerError(display));
 
   if (call.projectResults && display && typeof display === "object" && !Array.isArray(display)) {
-    const inner = display.result;
-    if (inner && typeof inner === "object" && Array.isArray(inner.results)) {
-      display = inner.results;
+    const scopes = [display.results, display.result && display.result.results, display.data && display.data.results];
+    for (const candidate of scopes) {
+      if (Array.isArray(candidate)) {
+        display = candidate;
+        break;
+      }
     }
   }
 

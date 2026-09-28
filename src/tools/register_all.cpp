@@ -201,12 +201,29 @@ static mcp::JsonValue meta_get_tool_detail_impl(
     return j;
 }
 
+static std::string received_keys_text(const mcp::JsonValue& args) {
+    if (!args.IsObject() || args.GetObject().empty()) {
+        return "(received no parameters)";
+    }
+    std::string text = "(received keys: ";
+    bool first = true;
+    for (const auto& entry : args.GetObject()) {
+        if (!first) {
+            text += ", ";
+        }
+        first = false;
+        text += entry.first;
+    }
+    text += ")";
+    return text;
+}
+
 static mcp::JsonValue meta_call_tool_impl(mcp::JsonValue args) {
     auto *name_p = args.Find("name");
     if (!name_p || !name_p->IsString() || name_p->GetString().empty()) {
         LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "call_tool failed: missing name");
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("missing required parameter: name");
+        e["error"] = mcp::JsonValue("missing required parameter: name " + received_keys_text(args));
         return e;
     }
 
@@ -218,13 +235,13 @@ static mcp::JsonValue meta_call_tool_impl(mcp::JsonValue args) {
 
     if (auto *a = args.Find("arguments"); a && !a->IsObject()) {
         mcp::JsonValue e(mcp::JsonValue::object_tag);
-        e["error"] = mcp::JsonValue("arguments must be an object");
+        e["error"] = mcp::JsonValue("invalid parameter for call_tool '" + name + "': arguments must be an object " + received_keys_text(args));
         return e;
     }
     for (const auto &entry : args.GetObject()) {
         if (entry.first != "name" && entry.first != "arguments") {
             mcp::JsonValue e(mcp::JsonValue::object_tag);
-            e["error"] = mcp::JsonValue("unknown parameter for call_tool: " + entry.first);
+            e["error"] = mcp::JsonValue("unknown parameter for call_tool '" + name + "': " + entry.first + " (expected only 'name' and 'arguments') " + received_keys_text(args));
             return e;
         }
     }
@@ -246,6 +263,11 @@ static mcp::JsonValue meta_call_tool_wait(const std::string& name, mcp::JsonValu
             final = runtime_ops::finalize_capture_response(final);
         }
         result = std::move(final);
+    }
+    if (!result.IsObject()) {
+        mcp::JsonValue wrapped(mcp::JsonValue::object_tag);
+        wrapped["result"] = std::move(result);
+        result = std::move(wrapped);
     }
     return result;
 }

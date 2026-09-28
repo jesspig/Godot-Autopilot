@@ -45,6 +45,7 @@ mcp::JsonValue handle_get_dependencies(const mcp::JsonValue &args);
 mcp::JsonValue handle_has_dependency(const mcp::JsonValue &args);
 mcp::JsonValue handle_get_references(const mcp::JsonValue &args);
 mcp::JsonValue handle_reimport(const mcp::JsonValue &args);
+mcp::JsonValue handle_set_import_options(const mcp::JsonValue &args);
 
 } // namespace resource_ops
 } // namespace godot_autopilot

@@ -115,8 +115,9 @@ public:
     done_ = true;
     JV body = ok_result(VariantJson::serialize(p_result));
     if (persist_ && !persist_path_.empty()) {
-      if (body["result"].IsObject()) {
+      if (body["result"].IsObject() && body["data"].IsObject()) {
         body["result"]["node_path"] = JV(persist_path_);
+        body["data"]["node_path"] = JV(persist_path_);
       } else {
         JV inner(JV::object_tag);
         inner["value"] = std::move(body["result"]);
@@ -177,6 +178,25 @@ private:
     queue_free();
   }
 };
+
+struct EvalDottedTarget {
+  bool ok = false;
+  godot::Object *owner = nullptr;
+  std::string leaf;
+  godot::Dictionary info;
+  JV error;
+};
+
+std::vector<std::string> split_eval_property(const std::string &full);
+bool eval_segment_valid(const std::string &seg);
+godot::Dictionary eval_object_property_info(godot::Object *obj,
+                                            const std::string &name);
+EvalDottedTarget resolve_eval_dotted_target(godot::Object *root,
+                                            const std::string &full,
+                                            const std::string &node_path);
+JV eval_set_object_leaf(godot::Object *owner, const godot::Dictionary &prop_info,
+                        const std::string &leaf, const std::string &full,
+                        const std::string &node_path, const JV &value_json);
 
 JV op_eval_script(const JV &params, int64_t request_id) {
   auto *code_p = params.Find("source_code");
@@ -289,8 +309,9 @@ JV op_eval_script(const JV &params, int64_t request_id) {
   JV body = ok_result(VariantJson::serialize(result));
   append_eval_runtime_errors(body, run_seq_before);
   if (persist) {
-    if (body["result"].IsObject()) {
+    if (body["result"].IsObject() && body["data"].IsObject()) {
       body["result"]["node_path"] = JV("/root/__gda_runtime/" + persist_name);
+      body["data"]["node_path"] = JV("/root/__gda_runtime/" + persist_name);
     } else {
       JV inner(JV::object_tag);
       inner["value"] = std::move(body["result"]);
@@ -311,9 +332,24 @@ JV op_eval_get_property(const JV &params) {
   godot::Node *node = resolve_node(path_p->GetString());
   if (!node)
     return error_result("node not found: " + path_p->GetString());
-  godot::Variant value =
-      node->get(godot::StringName(prop_p->GetString().c_str()));
-  return ok_result(VariantJson::serialize(value));
+  std::string prop_name = prop_p->GetString();
+  uint64_t get_seq_before = current_error_seq();
+  if (prop_name.find('.') == std::string::npos) {
+    godot::Variant value =
+        node->get(godot::StringName(prop_name.c_str()));
+    JV body = ok_result(VariantJson::serialize(value));
+    append_eval_runtime_errors(body, get_seq_before);
+    return body;
+  }
+  EvalDottedTarget target =
+      resolve_eval_dotted_target(node, prop_name, path_p->GetString());
+  if (!target.ok)
+    return target.error;
+  godot::Variant dotted_value =
+      target.owner->get(godot::StringName(target.leaf.c_str()));
+  JV dotted_body = ok_result(VariantJson::serialize(dotted_value));
+  append_eval_runtime_errors(dotted_body, get_seq_before);
+  return dotted_body;
 }
 
 godot::Dictionary find_property_info(godot::Node *node,
@@ -329,27 +365,122 @@ godot::Dictionary find_property_info(godot::Node *node,
   return godot::Dictionary();
 }
 
-JV op_eval_set_property(const JV &params) {
-  auto *path_p = params.Find("node_path");
-  auto *prop_p = params.Find("property");
-  auto *value_p = params.Find("value");
-  if (!path_p || !path_p->IsString())
-    return error_result("eval set_property requires node_path");
-  if (!prop_p || !prop_p->IsString())
-    return error_result("eval set_property requires property");
-  if (!value_p)
-    return error_result("eval set_property requires value");
-  godot::Node *node = resolve_node(path_p->GetString());
-  if (!node)
-    return error_result("node not found: " + path_p->GetString());
-  std::string prop_name = prop_p->GetString();
-
-  godot::Dictionary prop_info = find_property_info(node, prop_name);
-  if (prop_info.is_empty()) {
-    return error_result("property not found: " + prop_name + " on " +
-                        path_p->GetString());
+std::vector<std::string> split_eval_property(const std::string &full) {
+  std::vector<std::string> parts;
+  std::string current;
+  for (char c : full) {
+    if (c == '.') {
+      parts.push_back(current);
+      current.clear();
+    } else {
+      current.push_back(c);
+    }
   }
+  parts.push_back(current);
+  return parts;
+}
 
+bool eval_segment_valid(const std::string &seg) {
+  if (seg.empty())
+    return false;
+  for (char c : seg) {
+    if (c == '/' || c == ':' || c == '(' || c == ')' || c == '[' ||
+        c == ']' || c == ' ' || c == '\t' || c == '"' || c == '\'')
+      return false;
+  }
+  return true;
+}
+
+godot::Dictionary eval_object_property_info(godot::Object *obj,
+                                            const std::string &name) {
+  godot::TypedArray<godot::Dictionary> props = obj->get_property_list();
+  for (int64_t i = 0; i < props.size(); i++) {
+    godot::Dictionary dict = props[i];
+    if (dict.has("name") &&
+        util::to_std(dict["name"].operator godot::String()) == name) {
+      return dict;
+    }
+  }
+  return godot::Dictionary();
+}
+
+EvalDottedTarget resolve_eval_dotted_target(godot::Object *root,
+                                            const std::string &full,
+                                            const std::string &node_path) {
+  EvalDottedTarget out;
+  std::vector<std::string> parts = split_eval_property(full);
+  if (parts.size() == 1) {
+    if (!eval_segment_valid(full)) {
+      out.error = error_result("invalid property path '" + full + "' on " +
+                               node_path);
+      return out;
+    }
+    godot::Dictionary info = eval_object_property_info(root, full);
+    if (info.is_empty()) {
+      out.error = error_result("property not found: " + full + " on " +
+                               node_path);
+      return out;
+    }
+    out.ok = true;
+    out.owner = root;
+    out.leaf = full;
+    out.info = info;
+    return out;
+  }
+  godot::Object *current = root;
+  for (size_t i = 0; i + 1 < parts.size(); i++) {
+    const std::string &seg = parts[i];
+    if (!eval_segment_valid(seg)) {
+      out.error = error_result("invalid segment '" + seg +
+                               "' in property path '" + full + "' on " +
+                               node_path);
+      return out;
+    }
+    if (eval_object_property_info(current, seg).is_empty()) {
+      out.error = error_result("property path '" + full + "' on " + node_path +
+                               ": segment '" + seg + "' not found");
+      return out;
+    }
+    godot::Variant intermediate =
+        current->get(godot::StringName(seg.c_str()));
+    if (intermediate.get_type() != godot::Variant::OBJECT) {
+      out.error = error_result("property path '" + full + "' on " + node_path +
+                               ": segment '" + seg +
+                               "' is not an object and cannot be traversed");
+      return out;
+    }
+    godot::Object *next =
+        godot::Object::cast_to<godot::Object>(intermediate);
+    if (next == nullptr) {
+      out.error = error_result("property path '" + full + "' on " + node_path +
+                               ": segment '" + seg + "' holds a null object");
+      return out;
+    }
+    current = next;
+  }
+  const std::string &leaf = parts.back();
+  if (!eval_segment_valid(leaf)) {
+    out.error = error_result("invalid segment '" + leaf +
+                             "' in property path '" + full + "' on " +
+                             node_path);
+    return out;
+  }
+  godot::Dictionary leaf_info = eval_object_property_info(current, leaf);
+  if (leaf_info.is_empty()) {
+    out.error = error_result("property path '" + full + "' on " + node_path +
+                             ": leaf '" + leaf + "' not found");
+    return out;
+  }
+  out.ok = true;
+  out.owner = current;
+  out.leaf = leaf;
+  out.info = leaf_info;
+  return out;
+}
+
+JV eval_set_object_leaf(godot::Object *owner, const godot::Dictionary &prop_info,
+                        const std::string &leaf, const std::string &full,
+                        const std::string &node_path, const JV &value_json) {
   std::string type_hint;
   if (prop_info.has("type")) {
     int type_id = static_cast<int>(prop_info["type"]);
@@ -372,28 +503,64 @@ JV op_eval_set_property(const JV &params) {
           static_cast<godot::Variant::Type>(type_id)));
     }
   }
-
-  godot::StringName prop_name_sn(prop_name.c_str());
-  godot::Variant value = VariantJson::deserialize(*value_p, type_hint);
-  godot::Variant old_val = node->get(prop_name_sn);
-  node->set(prop_name_sn, value);
-  godot::Variant new_val = node->get(prop_name_sn);
-
+  godot::StringName leaf_sn(leaf.c_str());
+  godot::Variant value = VariantJson::deserialize(value_json, type_hint);
+  godot::Variant old_val = owner->get(leaf_sn);
+  owner->set(leaf_sn, value);
+  godot::Variant new_val = owner->get(leaf_sn);
   std::string readback_detail;
   util::ReadbackStatus readback =
       util::check_readback(value, old_val, new_val, readback_detail, true);
   if (readback == util::ReadbackStatus::REJECTED) {
     return util::error_detail(
-        "property rejected: '" + prop_name + "' on " + path_p->GetString(),
-        path_p->GetString(), "readback equals set value",
+        "property rejected: '" + full + "' on " + node_path, node_path,
+        "readback equals set value",
         "property may not exist, be read-only, or require a type hint");
   }
   JV r(JV::object_tag);
   r["result"] = JV("ok");
+  r["data"] = JV("ok");
   if (readback == util::ReadbackStatus::CONVERTED) {
     r["warning"] = JV("set applied; " + readback_detail);
   }
   return r;
+}
+
+JV op_eval_set_property(const JV &params) {
+  auto *path_p = params.Find("node_path");
+  auto *prop_p = params.Find("property");
+  auto *value_p = params.Find("value");
+  if (!path_p || !path_p->IsString())
+    return error_result("eval set_property requires node_path");
+  if (!prop_p || !prop_p->IsString())
+    return error_result("eval set_property requires property");
+  if (!value_p)
+    return error_result("eval set_property requires value");
+  godot::Node *node = resolve_node(path_p->GetString());
+  if (!node)
+    return error_result("node not found: " + path_p->GetString());
+  std::string prop_name = prop_p->GetString();
+  uint64_t set_seq_before = current_error_seq();
+  JV set_body;
+  if (prop_name.find('.') == std::string::npos) {
+    godot::Dictionary prop_info = find_property_info(node, prop_name);
+    if (prop_info.is_empty()) {
+      return error_result("property not found: " + prop_name + " on " +
+                          path_p->GetString());
+    }
+    set_body = eval_set_object_leaf(node, prop_info, prop_name, prop_name,
+                                    path_p->GetString(), *value_p);
+  } else {
+    EvalDottedTarget target =
+        resolve_eval_dotted_target(node, prop_name, path_p->GetString());
+    if (!target.ok)
+      return target.error;
+    set_body = eval_set_object_leaf(target.owner, target.info, target.leaf,
+                                    prop_name, path_p->GetString(), *value_p);
+  }
+  if (set_body.Find("error") == nullptr)
+    append_eval_runtime_errors(set_body, set_seq_before);
+  return set_body;
 }
 
 bool call_arg_number(const JV &obj, const char *key, double &out) {

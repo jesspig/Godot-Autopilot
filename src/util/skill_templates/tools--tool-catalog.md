@@ -1,6 +1,6 @@
 # Category Index
 
-All 391 domain tools of the godot-autopilot MCP server, grouped by their 30 source modules, plus `system_status`. Call domain tools through `call_tool`; confirm schemas with `get_tool_detail`.
+All 392 domain tools of the godot-autopilot MCP server, grouped by their 30 source modules, plus `system_status`. Call domain tools through `call_tool`; confirm schemas with `get_tool_detail`.
 
 ## Analysis - analyze_tools (3)
 
@@ -365,7 +365,7 @@ All 391 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `set_render_instance_layer_mask` - set a rendering instance's camera layer mask
 - `find_render_node_from_rid` - validate an RID and find scene nodes using it
 
-## Resources - resource_tools (26)
+## Resources - resource_tools (27)
 
 - `load_resource` - load a resource file from disk into memory
 - `reload_resource` - force-reload a resource file from disk, replacing the editor's cached instance
@@ -391,6 +391,7 @@ All 391 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `has_resource_dependency` - check whether a resource depends on a specific file
 - `get_resource_references` - reverse lookup: which files reference a resource
 - `reimport_resource_files` - queue an async reimport through the editor file system
+- `set_resource_import_options` - set whitelisted .import params on an imported asset and queue a reimport
 - `set_resource_property` - set a property on a located resource
 - `get_resource_property` - read a property from a located resource
 

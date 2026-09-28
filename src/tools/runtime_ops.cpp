@@ -245,9 +245,16 @@ JV send_request(int64_t request_id, const std::string &op, const JV &params,
     erase_pending(request_id, pending);
     if (suppress_error_breaks)
       restore_error_breaks();
-    return error_json("game not ready: the game process has not reported gda "
-                      "ready yet — wait a moment after play, or verify the "
-                      "game project loads the godot-autopilot extension");
+    if (debugger_active_session_count() > 0) {
+      return error_json(
+          "game started but not ready: the game process has not reported gda "
+          "ready yet — wait a moment after play, or verify the "
+          "game project loads the godot-autopilot extension");
+    }
+    return error_json("game not running: no game process is attached — start "
+                      "the game from the editor first (play the scene), then "
+                      "retry; if the game was just started, wait a moment for "
+                      "it to report ready");
   }
 
   pending->session_id = used_session_id;
@@ -294,6 +301,8 @@ std::string late_result_summary(const mcp::JsonValue &response) {
   const mcp::JsonValue *source = response.Find(GDA_FIELD_ERROR);
   if (!source)
     source = response.Find(GDA_FIELD_RESULT);
+  if (!source)
+    source = response.Find("data");
   if (!source)
     return "";
   std::string text = source->Dump();
@@ -531,9 +540,13 @@ mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms) {
       error["diagnosis"] = *dg;
     if (auto *hh = response.Find("hint"))
       error["hint"] = *hh;
+    if (auto *re = response.Find("runtime_error"))
+      error["runtime_error"] = *re;
+    if (auto *erd = response.Find("error_details"))
+      error["error_details"] = *erd;
     return error;
   }
-  if (auto *result_p = response.Find(GDA_FIELD_RESULT)) {
+  if (auto *result_p = util::find_result_or_data(response)) {
     JV result = *result_p;
     if (pending->op == std::string(GDA_OP_STATUS) && result.IsObject()) {
 

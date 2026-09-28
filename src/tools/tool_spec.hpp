@@ -104,12 +104,16 @@ inline void append_image_hit(std::vector<ImageHit> &hits,
 
 inline std::vector<ImageHit> collect_trace_images(const mcp::JsonValue &result) {
   std::vector<ImageHit> hits;
-  const mcp::JsonValue *scopes[2] = {nullptr, nullptr};
+  const mcp::JsonValue *scopes[3] = {nullptr, nullptr, nullptr};
   if (result.IsObject()) {
     scopes[0] = &result;
     if (const mcp::JsonValue *inner = result.Find("result");
         inner && inner->IsObject()) {
       scopes[1] = inner;
+    }
+    if (const mcp::JsonValue *inner = result.Find("data");
+        inner && inner->IsObject()) {
+      scopes[2] = inner;
     }
   }
   for (const mcp::JsonValue *scope : scopes) {

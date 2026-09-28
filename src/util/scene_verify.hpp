@@ -26,6 +26,8 @@ std::vector<std::string> parse_tscn_paths(const std::string &tscn_text, int64_t 
 struct VerifyResult {
   int64_t memory_nodes = 0;
   int64_t disk_nodes = 0;
+  int64_t memory_connections = 0;
+  int64_t disk_connections = 0;
   bool match = false;
   std::vector<std::string> missing_paths;
   bool missing_truncated = false;

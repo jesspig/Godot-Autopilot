@@ -656,11 +656,13 @@ JV handle_persist(const JV &args) {
          "ProjectSettings.get_setting('input/<action>'), not "
          "get_setting('input').");
   r["skipped_count"] = JV(static_cast<int64_t>(skipped.size()));
-  JV skipped_arr(JV::array_tag);
-  for (const auto &name : skipped) {
-    skipped_arr.PushBack(JV(name));
+  if (!has_allowlist) {
+    JV skipped_arr(JV::array_tag);
+    for (const auto &name : skipped) {
+      skipped_arr.PushBack(JV(name));
+    }
+    r["skipped"] = std::move(skipped_arr);
   }
-  r["skipped"] = std::move(skipped_arr);
   JV missing_arr(JV::array_tag);
   for (const auto &name : skipped_missing) {
     missing_arr.PushBack(JV(name));

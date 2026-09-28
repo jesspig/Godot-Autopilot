@@ -129,6 +129,11 @@ const std::vector<ParamSpec> kReimportResourceFilesParams = {
     {"files", "array", "Array of resource file paths to reimport; alternative to a single path", false},
 };
 
+const std::vector<ParamSpec> kSetResourceImportOptionsParams = {
+    {"path", "string", "Imported asset path inside res:// that already carries a .import sidecar, e.g. res://assets/sfx/jump.wav; files without a sidecar are rejected", true},
+    {"options", "object", "Non-empty object mapping whitelisted importer option keys to new values (audio loop/compression and texture filter/mipmap families, e.g. loop, loop_begin, loop_end, compression, compress/mode, mipmaps/generate, filter); any other key is rejected", true},
+};
+
 const std::vector<ParamSpec> kSetResourcePropertyParams = {
     {"object_id_str", "string", "Object ID as decimal string, alternative to object_id", false},
     {"object_id", "integer", "Object ID of an in-memory resource (from create_resource or load_resource)", false},
@@ -152,7 +157,7 @@ const std::vector<ParamSpec> kGetResourcePropertyParams = {
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(26);
+  v.reserve(27);
   v.push_back(make_spec_tool(ToolSpec{
       "load_resource",
       "Load a resource file from disk into memory. Use it to bring a .tres or .tscn file into the editor for inspection or modification, with an optional type_hint to guide loading. Returns the resource reference with class, path, object_id and object_id_str, which set_resource_property and get_resource_property accept as locators. Errors when the file is missing or fails to load.",
@@ -273,6 +278,11 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       "Queue reimport of one or more files through the editor file system. Accepts files (array of paths) or a single path; editor only, calling it outside the editor returns an error. Reimport runs asynchronously, so the result confirms the queued count, not completion; poll the file system status to know when it finishes.",
       "Resources", {"resource", "reimport"}, SideEffect::None, tool_flags::kNone,
       kReimportResourceFilesParams, resource_ops::handle_reimport}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "set_resource_import_options",
+      "Set whitelisted import options on an already-imported asset's .import [params] section and queue a reimport. Requires path (a res:// file that already carries a .import sidecar) and options (a non-empty object mapping option keys to values). Only safe importer keys are accepted (audio loop/compression and texture filter/mipmap families, e.g. loop, loop_mode, loop_begin, loop_end, compression, compress/mode, compress/high_quality, compress/lossy_quality, mipmaps/generate, mipmaps/limit, filter, anisotropy, process/hdr_as_srgb, roughness/mode, stream, size_limit); any other key is rejected. Do not hand-write .import files — this tool is the supported way to change import parameters. The reimport is asynchronous: the response reports applied keys with reimport queued, so poll get_editor_file_system_status until scanning is false, then verify with get_resource_type or read_file on the .import. Errors when the file has no .import sidecar (use reload_resource for plain text resources) or while the editor is importing/scanning.",
+      "Resources", {"resource", "import", "options"}, SideEffect::WritesFile, tool_flags::kMutating,
+      kSetResourceImportOptionsParams, resource_ops::handle_set_import_options}));
   v.push_back(make_spec_tool(ToolSpec{
       "set_resource_property",
       "Set a property on a resource. Locate the resource by object_id/object_id_str (from create_resource or load_resource), name (in-memory) or path (loaded from disk). value is a serialized JSON value; resource-typed properties accept {'path': 'res://...'} or {'resource': 'memory://name'} references, and type_hint guides deserialization. Returns ok with class, path, object_id, resource_attached and possible readback warnings.",

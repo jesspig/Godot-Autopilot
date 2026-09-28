@@ -114,6 +114,22 @@ instead of silently dropped:
 If you need one game tool's result, call_tool is still the simplest path; use
 `await_async=true` when a later operation in the same batch depends on it.
 
+## batch_execute operation shape and result counts
+
+Each entry in `operations[]` takes exactly two fields: `tool` (required
+string) and `args` (optional object, defaults to `{}`). The `call_tool`-style
+`name`/`arguments` keys are not accepted inside a batch - an operation without
+`tool` fails with "missing required field: tool", and a non-object `args`
+fails with "operation args must be an object". No `name`/`arguments` aliases
+are provided, so write `tool`/`args` literally.
+
+Each entry in `results[]` carries `index`, `tool` and `status` (`ok`/`error`):
+successes nest the tool response under `data` (async ops awaited with
+`await_async=true` nest it under `result` instead), failures carry the message
+under `error`. Counts: `total` = executed operations (`succeeded` + `failed` +
+`pending`), `skipped` = operations never run after a `stop_on_error` early
+stop, and `total` + `skipped` always equals the length of `operations`.
+
 ## Long game scripts: start_game_job submits, get_game_job polls
 
 `start_game_job` wraps a game op (currently only the `execute_game_script` op,
