@@ -187,8 +187,8 @@ bool is_valid_path_segment(const std::string &seg) {
   if (seg.empty())
     return false;
   for (char c : seg) {
-    if (c == '/' || c == ':' || c == '(' || c == ')' || c == '[' ||
-        c == ']' || c == ' ' || c == '\t' || c == '"' || c == '\'')
+    if (c == ':' || c == '(' || c == ')' || c == '[' || c == ']' ||
+        c == ' ' || c == '\t' || c == '"' || c == '\'')
       return false;
   }
   return true;
@@ -241,11 +241,16 @@ DottedTarget resolve_dotted_target(godot::Object *root,
         candidates = find_property_candidates(as_node, full);
       else
         candidates = find_object_candidates(root, full);
+      std::string family_hint;
+      std::vector<std::string> family = find_property_family(root, full);
+      if (!family.empty())
+        family_hint =
+            "; the exact name is per item, e.g. '" + family[0] + "'";
       out.error = util::error_detail(
           "property '" + full + "' does not exist on " + owner_desc, path_str,
           "a valid property name from get_property_list",
           "use property_get_list to see available properties; candidate: " +
-              candidates);
+              candidates + family_hint);
       return out;
     }
     out.ok = true;
@@ -323,12 +328,16 @@ DottedTarget resolve_dotted_target(godot::Object *root,
       candidates = find_property_candidates(as_node, leaf);
     else
       candidates = find_object_candidates(current, leaf);
+    std::string family_hint;
+    std::vector<std::string> family = find_property_family(current, leaf);
+    if (!family.empty())
+      family_hint = "; the exact name is per item, e.g. '" + family[0] + "'";
     out.error = util::error_detail(
         "property path '" + full + "' does not exist on " + path_str +
             ": leaf '" + leaf + "' not found on " + owner_desc,
         path_str, "a valid property path from get_property_list",
         "use property_get_list to see available properties; candidate: " +
-            candidates);
+            candidates + family_hint);
     return out;
   }
   out.ok = true;
@@ -336,6 +345,61 @@ DottedTarget resolve_dotted_target(godot::Object *root,
   out.leaf = leaf;
   out.info = leaf_info;
   return out;
+}
+
+mcp::JsonValue try_expand_property_family(godot::Object *node,
+                                          const std::string &prop,
+                                          const mcp::JsonValue &value,
+                                          const mcp::JsonValue &args,
+                                          const std::string &path_str) {
+  if (prop.find('.') != std::string::npos || !value.IsObject() ||
+      value.GetObject().empty())
+    return mcp::JsonValue();
+  std::vector<std::string> family = find_property_family(node, prop);
+  if (family.empty())
+    return mcp::JsonValue();
+  std::vector<std::string> available;
+  for (const std::string &full_name : family)
+    available.push_back(full_name.substr(prop.size() + 1));
+  mcp::JsonValue expanded_props(mcp::JsonValue::object_tag);
+  std::string invalid_item;
+  for (const auto &entry : value.GetObject()) {
+    std::string name = prop + "/" + entry.first;
+    godot::Dictionary info = find_property_info(node, name);
+    if (info.is_empty()) {
+      invalid_item = entry.first;
+      break;
+    }
+    expanded_props[name] = entry.second;
+  }
+  if (!invalid_item.empty()) {
+    std::string available_list;
+    for (size_t i = 0; i < available.size(); i++) {
+      if (i > 0)
+        available_list += ", ";
+      available_list += "'" + available[i] + "'";
+    }
+    return util::error_detail(
+        "property '" + prop + "' on " +
+            describe_property_owner(node, path_str) +
+            " is a property family and must be expanded per item; item '" +
+            invalid_item + "' is not a valid family item",
+        path_str, "an object mapping family item names to values",
+        "available items: " + available_list +
+            "; pass the exact names (e.g. '" + prop + "/" + available[0] +
+            "') or an object with these suffixes");
+  }
+  mcp::JsonValue new_args(mcp::JsonValue::object_tag);
+  const mcp::JsonValue *original_path = args.Find("path");
+  if (original_path && original_path->IsString())
+    new_args["path"] = *original_path;
+  else
+    new_args["path"] = mcp::JsonValue(path_str);
+  new_args["properties"] = std::move(expanded_props);
+  mcp::JsonValue result = handle_set(new_args);
+  if (result.IsObject() && !result.Find("error"))
+    result["expanded_from"] = mcp::JsonValue(prop);
+  return result;
 }
 
 godot::Node *find_edited_scene_root() {
@@ -1116,19 +1180,7 @@ const char *const INLINE_RESOURCE_ACTION_TEXT =
     "\"properties\": {...}}, pass a res:// path in {\"path\": \"res://...\"}, "
     "or save the resource to disk first and pass its res:// path";
 
-struct InlineResourceBuild {
-  bool active = false;
-  bool has_error = false;
-  mcp::JsonValue error;
-  godot::Variant value;
-  std::string type;
-};
-
-InlineResourceBuild
-build_inline_resource_value(const godot::Dictionary &prop_info,
-                            const mcp::JsonValue &raw_value,
-                            const std::string &node_property,
-                            const std::string &path_str, int depth);
+} // namespace
 
 bool apply_inline_resource_property(godot::Resource *res,
                                     const std::string &sub_prop,
@@ -1360,8 +1412,6 @@ build_inline_resource_value(const godot::Dictionary &prop_info,
   return result;
 }
 
-} // namespace
-
 namespace {
 
 constexpr int64_t kPropertyBatchMax = 32;
@@ -1421,6 +1471,29 @@ mcp::JsonValue read_single_property(godot::Node *node,
 }
 
 } // namespace
+
+std::vector<std::string> find_property_family(godot::Object *object,
+                                              const std::string &prefix,
+                                              size_t limit) {
+  std::vector<std::string> names;
+  if (!object || prefix.empty() || limit == 0)
+    return names;
+  const std::string needle = prefix + "/";
+  godot::TypedArray<godot::Dictionary> props = object->get_property_list();
+  for (int64_t i = 0; i < props.size(); i++) {
+    godot::Dictionary dict = props[i];
+    if (!dict.has("name"))
+      continue;
+    std::string name = util::to_std(dict["name"].operator godot::String());
+    if (name.size() <= needle.size() ||
+        name.compare(0, needle.size(), needle) != 0)
+      continue;
+    names.push_back(name);
+    if (names.size() >= limit)
+      break;
+  }
+  return names;
+}
 
 mcp::JsonValue handle_get(const mcp::JsonValue &args) {
   auto *it_path = args.Find("path");
@@ -1728,6 +1801,10 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
 
   DottedTarget target = resolve_dotted_target(node, prop_str, path_str);
   if (!target.ok) {
+    mcp::JsonValue expanded =
+        try_expand_property_family(node, prop_str, *it_val, args, path_str);
+    if (!expanded.IsNull())
+      return expanded;
     return target.error;
   }
   godot::Object *target_owner = target.owner;

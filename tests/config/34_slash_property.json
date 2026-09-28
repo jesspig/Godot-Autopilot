@@ -1,0 +1,276 @@
+{
+  "name": "34_slash_property",
+  "description": "B5 回归：引擎原生斜杠属性名与属性族 dict 展开。theme_override_colors/font_color 等属性由 Control::_get_property_list 动态生成、Control::_set 消费，但 resolve_dotted_target 的格式白名单曾把 '/' 判为非法，单段分支在查属性表之前就拒绝（报告 B5）——本用例直写该属性即回归点：修复前 property_set 报错、has_keys 与 result=ok 断言失败。修复：① is_valid_path_segment 放行 '/'（点号深路径语法与 scene_path 节点路径解析不受影响）；② 属性不存在时若存在同前缀族（find_property_family），单段/点号叶子错误文案的 action 追加 \"; the exact name is per item, e.g. '<全名>'\"；③ property_set 在精确名不存在、值为非空对象、且存在同前缀族时按 '<prop>/<key>' 展开为 properties 批量写入（复用批量路径的逐项 set+回读，成功响应追加 expanded_from；非法键报 error 并列出可用项）；④ build_nodes_from_spec 的 dry_run 用同一族识别按各项属性 info 走 spec_trial_value 试运行，通过/报错与真实写入一致。链路：create_editor_scene SlashRoot(Node) + create_scene_node SlashLabel(Label) → property_get_list(property_filter=theme_override_colors) 证明族存在 → 直写 theme_override_colors/font_color={r:0,g:0,b:0,a:1} 读回 r=0/a=1 → 族展开 theme_override_colors={font_color:{r:1,g:0,b:0,a:1}} 断言 expanded_from 并读回 r=1 → 直写 theme_override_font_sizes/font_size=32 读回 32 → 负例：族展开键 nope 报 error 非空 → dry_run 正例（Label.props 族展开）断言 writable=true 与 trial_property_count=1，负例（nope）报 error 非空 → 点号深路径回归：解析器只支持 Object 中段，任务书给出的 position.x（Vector2）会报 \"segment 'position' is not an object and cannot be traversed\"，故改用 Label.material（Object 中段）：property_set material=内联 StandardMaterial3D → property_set material.albedo_color={r:1,g:0,b:0,a:1} → property_get material 读 result.class 与 result.albedo_color.r=1 → code_execute 复核 SceneRoot.get_node(\"SlashLabel\").material.albedo_color == Color(1,0,0,1) 为 true → create_directory res://gda_tmp_slash + save_editor_scene_as 落盘 result=saved + read_file 读回 content 非空 → cleanup close_editor_scene 后 move_os_file_to_trash 回收目录。runner 断言引擎无数组下标与子串匹配，故数组用 not_empty、错误用精确等值或非空判定。前置：code_execute 步骤受 code_execute capability 授权门保护（GODOT_AUTOPILOT_ALLOW env 或 user://godot_autopilot/config.json 的 allow 字段，env 优先）。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "before_all": [
+      {
+        "id": "slash_scene",
+        "tool": "create_editor_scene",
+        "args": { "name": "SlashRoot" }
+      },
+      {
+        "id": "slash_label",
+        "tool": "create_scene_node",
+        "args": { "name": "SlashLabel", "type": "Label", "parent_path": "SlashRoot" }
+      }
+    ],
+    "stages": [
+      {
+        "id": "slash_direct",
+        "steps": [
+          {
+            "id": "slash_family_listed",
+            "tool": "property_get_list",
+            "args": { "path": "SlashLabel", "property_filter": "theme_override_colors" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "not_empty": true } ]
+            }
+          },
+          {
+            "id": "slash_direct_set",
+            "tool": "property_set",
+            "args": {
+              "path": "SlashLabel",
+              "property": "theme_override_colors/font_color",
+              "value": { "r": 0, "g": 0, "b": 0, "a": 1 }
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          },
+          {
+            "id": "slash_direct_read",
+            "tool": "property_get",
+            "args": { "path": "SlashLabel", "property": "theme_override_colors/font_color" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.r", "value": 0 },
+                { "key": "result.a", "value": 1 }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "family_expand",
+        "steps": [
+          {
+            "id": "family_expand_set",
+            "tool": "property_set",
+            "args": {
+              "path": "SlashLabel",
+              "property": "theme_override_colors",
+              "value": { "font_color": { "r": 1, "g": 0, "b": 0, "a": 1 } }
+            },
+            "expect": {
+              "has_keys": ["result", "expanded_from", "applied_properties"],
+              "field_checks": [
+                { "key": "result", "value": "ok" },
+                { "key": "expanded_from", "value": "theme_override_colors" },
+                { "key": "applied_properties", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "family_expand_read",
+            "tool": "property_get",
+            "args": { "path": "SlashLabel", "property": "theme_override_colors/font_color" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result.r", "value": 1 } ]
+            }
+          },
+          {
+            "id": "family_size_direct_set",
+            "tool": "property_set",
+            "args": {
+              "path": "SlashLabel",
+              "property": "theme_override_font_sizes/font_size",
+              "value": 32
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          },
+          {
+            "id": "family_size_direct_read",
+            "tool": "property_get",
+            "args": { "path": "SlashLabel", "property": "theme_override_font_sizes/font_size" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "value": 32 } ]
+            }
+          },
+          {
+            "id": "family_expand_invalid",
+            "tool": "property_set",
+            "args": {
+              "path": "SlashLabel",
+              "property": "theme_override_colors",
+              "value": { "nope": { "r": 1, "g": 0, "b": 0, "a": 1 } }
+            },
+            "expect": {
+              "field_checks": [ { "key": "error", "not_empty": true } ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "dry_run_consistency",
+        "steps": [
+          {
+            "id": "family_dry_run_ok",
+            "tool": "build_nodes_from_spec",
+            "args": {
+              "dry_run": true,
+              "spec": {
+                "type": "Label",
+                "name": "DrySlashLabel",
+                "props": {
+                  "theme_override_colors": { "font_color": { "r": 0, "g": 0, "b": 1, "a": 1 } }
+                }
+              }
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.mode", "value": "dry_run" },
+                { "key": "result.writable", "value": true },
+                { "key": "result.trial_node_count", "value": 1 },
+                { "key": "result.trial_property_count", "value": 1 }
+              ]
+            }
+          },
+          {
+            "id": "family_dry_run_invalid",
+            "tool": "build_nodes_from_spec",
+            "args": {
+              "dry_run": true,
+              "spec": {
+                "type": "Label",
+                "name": "DrySlashBad",
+                "props": {
+                  "theme_override_colors": { "nope": { "r": 0, "g": 0, "b": 1, "a": 1 } }
+                }
+              }
+            },
+            "expect": {
+              "field_checks": [ { "key": "error", "not_empty": true } ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "dotted_regression",
+        "steps": [
+          {
+            "id": "dotted_material_inline",
+            "tool": "property_set",
+            "args": {
+              "path": "SlashLabel",
+              "property": "material",
+              "value": { "type": "StandardMaterial3D", "properties": {} }
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          },
+          {
+            "id": "dotted_material_set",
+            "tool": "property_set",
+            "args": {
+              "path": "SlashLabel",
+              "property": "material.albedo_color",
+              "value": { "r": 1, "g": 0, "b": 0, "a": 1 }
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          },
+          {
+            "id": "dotted_material_get",
+            "tool": "property_get",
+            "args": { "path": "SlashLabel", "property": "material" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.class", "value": "StandardMaterial3D" },
+                { "key": "result.albedo_color.r", "value": 1 }
+              ]
+            }
+          },
+          {
+            "id": "dotted_material_code",
+            "tool": "code_execute",
+            "args": {
+              "source_code": "return SceneRoot.get_node(\"SlashLabel\").material.albedo_color == Color(1, 0, 0, 1)"
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "value": true } ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "persistence",
+        "steps": [
+          {
+            "id": "slash_create_dir",
+            "tool": "create_directory",
+            "args": { "path": "res://gda_tmp_slash" },
+            "expect": { "has_keys": ["created"] }
+          },
+          {
+            "id": "slash_save_scene_as",
+            "tool": "save_editor_scene_as",
+            "args": { "path": "res://gda_tmp_slash/slash_root.tscn" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "value": "saved" } ]
+            }
+          },
+          {
+            "id": "slash_scene_file_readable",
+            "tool": "read_file",
+            "args": { "path": "res://gda_tmp_slash/slash_root.tscn" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.path", "value": "res://gda_tmp_slash/slash_root.tscn" },
+                { "key": "result.content", "not_empty": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "cleanup",
+        "steps": [
+          {
+            "id": "slash_close_scene",
+            "tool": "close_editor_scene",
+            "args": {},
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "closed" } ]
+            }
+          },
+          {
+            "id": "slash_trash_dir",
+            "tool": "move_os_file_to_trash",
+            "args": { "path": "res://gda_tmp_slash" },
+            "expect": { "has_keys": ["result"] }
+          }
+        ]
+      }
+    ]
+  }
+}
