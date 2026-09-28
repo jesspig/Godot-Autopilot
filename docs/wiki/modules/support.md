@@ -8,7 +8,7 @@ tags:
   - 资源
   - UI
   - 工具库
-timestamp: "2026-09-26T22:35:00+08:00"
+timestamp: "2026-09-29T01:15:06+08:00"
 resource:
   - src/prompts/
   - src/resources/
@@ -18,8 +18,8 @@ resource:
 
 # 支撑模块（src/prompts/、src/resources/、src/ui/、src/util/）
 
-> 审计日期：2026-09-26（09-26 随 L2 测试床迁移同步——`Example/` 已移除，床改 `tests/testbed/`；2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill_gen 一键生成 Agent Skills 与 skill 内容外置化同步；09-10 随 skill 体系 19→7 册重构、Godot 源码研究发现织入与 dock 按钮动态化同步；09-13 上午随 7→8 册（C# 专册与开发闭环）与 util 新增 mcp_image_content.hpp 同步；09-13 下午随收口批次同步——McpConfigDock Allow code_execute 复选框、VariantJson::deserialize_strict、readback_util 值类型近似比较与 16 类清单、技能 runtime 册日志四路来源；09-13 17:50 随 B 组知识库审计同步——修正 prompt_tool_usage 行数、resource_handlers 静态/模板配比、注册入口行号与 keycode 提示词状态；09-13 20 时随主册技能增强同步——description 必读定位与 autopilot.md 新增查文档时机/引擎状态观测/工具选择/搜索技巧四块正文；09-13 21 时统一 skill 为纯英文——scene-system.md 中文错误示例改英文转述、registry description 英文必读定位；09-13 晚随 0.2.4 版知识库全量审计同步——修正 PACKED_*_ARRAY 为 10 种、scene_path/json_number 消费方计数与 resolve_rid 未命中行为；09-14 随修复批次同步——McpConfigDock 新增 Allow game_runtime 复选框与 `allow_list_add`/`allow_list_remove` 共享切换逻辑（`all` 展开、`code_execute_allowed()` 删除）、Vector2/2i 严格形状与 set_resource_property 接入严格转换、capture 落盘 save 与两侧各保留 20 张、get_game_log_entries filter/matched_lines、batch_execute 异步 pending 计数）；09-15 随 Computer Use grounding 批次同步——skill_templates 4 册更新（工具目录 379、编辑器 UI 自动化闭环与游戏侧点击/滚轮）；09-16 随失败修复批次同步——resource_handlers 新增 `register_skill_resources`（`godot://skills` 资源组：目录/单册/单文件，技能经 MCP 协议层可发现），新增 `src/util/skill_resources`（URI 解析，L1 `skill_resources_test` 12 项），基于当前工作树代码逐行核对（不依赖 git 历史）；09-19 随注释清理批同步——新增 scene_verify 小节与 L1 单测意图备忘（源码整行注释删除）；09-20 随可重放监控批次同步——McpLogDock 新增 Detail 切换与 Open Logs 按钮、McpConfigDock 新增 Desensitize data 复选框（脱敏开关持久化 + 即时生效）；09-21 随可重放监控与日志系统批次同步——McpLogDock 新增 Open Traces 按钮与 Trace 视图（可点击 `[trace]` 标记、按 trace_id 渲染 `TraceRecorder::query_by_trace` 结构化事件列表、搜索兼匹配 detail），两 dock 交互回调发 `monitor::ui_action`（脱敏/allow 变更另发 `monitor::security`）；09-25 随技能脚本通道批次同步——skill 8→9 册（新增 `godot-autopilot-tools` 调用专册）、模板 33 md + 1 mjs + registry、references 22→24、http-fallback 废弃由 script-access + manual-fallback 取代、嵌入校验与面板文案同步。
-> 覆盖范围：`src/prompts/` 9 组文件（18 个）、`src/resources/` 2 组、`src/ui/` 2 组、`src/util/` 13 组（20 个文件，其中 `scene_path.hpp`/`json_godot.hpp`/`rid_registry.hpp`/`type_hint.hpp`/`gdscript_wrap.hpp`/`project_path.hpp`/`mcp_image_content.hpp` 为 header-only；另含内容目录 `skill_templates/` 35 个文件——33 个 .md + 1 个 .mjs（`gda_mcp.mjs` 脚本通道）+ registry.json）。注册入口为 `src/core/server_context.cpp:249-253`（`register_tools()` 内五处注册调用：工具 → 资源 → 通用 prompt → 调试资源 → 调试 prompt）。
+> 审计日期：2026-09-29（09-26 随 L2 测试床迁移同步——`Example/` 已移除，床改 `tests/testbed/`；2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill_gen 一键生成 Agent Skills 与 skill 内容外置化同步；09-10 随 skill 体系 19→7 册重构、Godot 源码研究发现织入与 dock 按钮动态化同步；09-13 上午随 7→8 册（C# 专册与开发闭环）与 util 新增 mcp_image_content.hpp 同步；09-13 下午随收口批次同步——McpConfigDock Allow code_execute 复选框、VariantJson::deserialize_strict、readback_util 值类型近似比较与 16 类清单、技能 runtime 册日志四路来源；09-13 17:50 随 B 组知识库审计同步——修正 prompt_tool_usage 行数、resource_handlers 静态/模板配比、注册入口行号与 keycode 提示词状态；09-13 20 时随主册技能增强同步——description 必读定位与 autopilot.md 新增查文档时机/引擎状态观测/工具选择/搜索技巧四块正文；09-13 21 时统一 skill 为纯英文——scene-system.md 中文错误示例改英文转述、registry description 英文必读定位；09-13 晚随 0.2.4 版知识库全量审计同步——修正 PACKED_*_ARRAY 为 10 种、scene_path/json_number 消费方计数与 resolve_rid 未命中行为；09-14 随修复批次同步——McpConfigDock 新增 Allow game_runtime 复选框与 `allow_list_add`/`allow_list_remove` 共享切换逻辑（`all` 展开、`code_execute_allowed()` 删除）、Vector2/2i 严格形状与 set_resource_property 接入严格转换、capture 落盘 save 与两侧各保留 20 张、get_game_log_entries filter/matched_lines、batch_execute 异步 pending 计数）；09-15 随 Computer Use grounding 批次同步——skill_templates 4 册更新（工具目录 379、编辑器 UI 自动化闭环与游戏侧点击/滚轮）；09-16 随失败修复批次同步——resource_handlers 新增 `register_skill_resources`（`godot://skills` 资源组：目录/单册/单文件，技能经 MCP 协议层可发现），新增 `src/util/skill_resources`（URI 解析，L1 `skill_resources_test` 12 项），基于当前工作树代码逐行核对（不依赖 git 历史）；09-19 随注释清理批同步——新增 scene_verify 小节与 L1 单测意图备忘（源码整行注释删除）；09-20 随可重放监控批次同步——McpLogDock 新增 Detail 切换与 Open Logs 按钮、McpConfigDock 新增 Desensitize data 复选框（脱敏开关持久化 + 即时生效）；09-21 随可重放监控与日志系统批次同步——McpLogDock 新增 Open Traces 按钮与 Trace 视图（可点击 `[trace]` 标记、按 trace_id 渲染 `TraceRecorder::query_by_trace` 结构化事件列表、搜索兼匹配 detail），两 dock 交互回调发 `monitor::ui_action`（脱敏/allow 变更另发 `monitor::security`）；09-25 随技能脚本通道批次同步——skill 8→9 册（新增 `godot-autopilot-tools` 调用专册）、模板 33 md + 1 mjs + registry、references 22→24、http-fallback 废弃由 script-access + manual-fallback 取代、嵌入校验与面板文案同步；09-29 随工具语义与韧性批次同步——`VariantJson` 严格分支补齐 Plane 与向量/四元数/Basis/Projection/Color 分量、新增 `resource_fs.hpp` 共享路径工具（命名空间根判定 + 父目录创建，theme/resource/script 写盘复用）、`gdscript_wrap` 扩展为三脚本通道统一包装层（`wrap_bare_body`/`wrap_whole_script`/行号映射）、`scene_verify` 改可落盘集合口径（`collect_inherited_paths` 与 inherited 字段，删除死代码 `count_memory_nodes`）。
+> 覆盖范围：`src/prompts/` 9 组文件（18 个）、`src/resources/` 2 组、`src/ui/` 2 组、`src/util/` 14 组（21 个文件，其中 `scene_path.hpp`/`json_godot.hpp`/`rid_registry.hpp`/`type_hint.hpp`/`gdscript_wrap.hpp`/`project_path.hpp`/`resource_fs.hpp`/`mcp_image_content.hpp` 为 header-only；另含内容目录 `skill_templates/` 35 个文件——33 个 .md + 1 个 .mjs（`gda_mcp.mjs` 脚本通道）+ registry.json）。注册入口为 `src/core/server_context.cpp:249-253`（`register_tools()` 内五处注册调用：工具 → 资源 → 通用 prompt → 调试资源 → 调试 prompt）。
 
 ## 模块简介
 
@@ -223,7 +223,7 @@ resource:
 - `type_hint` 非空 → `parse_type_hint`（约 50 个别名，含 snake_case 与紧凑别名如 `stringname`/`dict`/`packedbytearray`，大小写不敏感）→ `deserialize_typed`（覆盖全部值类型 + OBJECT + RID；**RID 只回空 Variant**）；hint 不是类型名时：字符串 → `ResourceLoader.load(path, type_hint)`（失败写 Resources 类别 Warning 日志）；对象 → `deserialize_as_object`（**09-13 起先识别 `__node_ref__` 并解析为编辑场景内节点引用，解析失败返回空 Variant 而非实例化游离节点**；否则 `ClassDB.instantiate` + `get_property_list` 元数据按属性类型反序列化 + 嵌套 `class` 递归，`class` 字段本身跳过）
 - 无 type_hint → `deserialize_inferred`：按 JSON 值类型推断；对象特例识别 `__node_ref__`（共用 `try_deserialize_node_ref`：经 `EditorInterface` 取编辑场景根、上溯到顶再 `get_node_or_null`）、`object_id_str`（stoll 解析失败写 System 类别 Warning 日志）/`object_id`（`ObjectDB::get_instance`）；否则递归为 Dictionary
 
-**deserialize_strict 严格形状（09-13 下午新增；09-14 增补 Vector2/2i）**：Rect2/Rect2i 的 `size` 必须为对象且提供 `w`+`h`（或别名 `x`+`y`；同轴两种拼写并存且值不同即报 conflict），`position` 可省（默认 0）；AABB 的 `size` 需 `w`+`h`+`d`（或 `x`+`y`+`z`）；Transform2D 必须提供 `columns`（≥3 列、每列 ≥2 数字）；Transform3D 必须提供 `basis.rows`（≥3 行、每行 ≥3 数字）；Vector2/Vector2i 必须为 `{x,y}` 对象，数组输入报 `invalid Vector2: expected a JSON object, e.g. {"x":0,"y":0}`（此前数组静默写 0）；其余类型透传 `deserialize`。接入方：`property_set`/`create_scene_node`（09-13 起）与 `set_resource_property`（09-14 起）。
+**deserialize_strict 严格形状（09-13 下午新增；09-14 增补 Vector2/2i；09-29 补齐 Plane 与分量分支）**：Rect2/Rect2i 的 `size` 必须为对象且提供 `w`+`h`（或别名 `x`+`y`；同轴两种拼写并存且值不同即报 conflict），`position` 可省（默认 0）；AABB 的 `size` 需 `w`+`h`+`d`（或 `x`+`y`+`z`）；Transform2D 必须提供 `columns`（≥3 列、每列 ≥2 数字）；Transform3D 必须提供 `basis.rows`（≥3 行、每行 ≥3 数字）；Vector2/Vector2i 必须为 `{x,y}` 对象，数组输入报 `invalid Vector2: expected a JSON object, e.g. {"x":0,"y":0}`（此前数组静默写 0）；Plane 接受 `{normal:{x,y,z},d}` 与顶层 `{x,y,z,d}` 两种形状（缺字段或混用两种形状报错；零法线且 `d`≠0 报错并点名 `WorldBoundaryShape3D`/Jolt）；Vector3/Vector3i/Vector4/Vector4i/Quaternion/Color 分量字段必填（缺字段报错）；Basis/Projection 保持 `rows`/`columns` 形状并逐分量校验；其余类型透传 `deserialize`。接入方：`property_set`/`create_scene_node`（09-13 起）与 `set_resource_property`（09-14 起），09-29 起 `build_nodes_from_spec` 的 dry_run 走同一转换链。
 
 数值读取使用宽容辅助 `as_int64/as_double`（int/double 互转，非数字回默认 0）。`COLOR` 的 `a` 缺省 1.0。
 
@@ -302,30 +302,48 @@ resource:
 
 消费方：property_ops（含数组元素转换）、resource_ops。
 
-### gdscript_wrap.hpp（header-only，命名空间 `godot_autopilot::util`，08-22 新增）
+### gdscript_wrap.hpp（header-only，命名空间 `godot_autopilot::util`，08-22 新增；09-29 扩展为三通道统一包装层）
 
-GDScript 包装流水线共享件（script_ops 与 code_exec_ops 共用）：
+GDScript 包装流水线共享件（`code_execute`、`execute_script`、游戏侧 `execute_game_script` 共用同一包装与行映射）：
 
 | 符号 | 说明 |
 |---|---|
 | `MAX_CAPTURE_BYTES = 8192` | 输出截断上限常量 |
 | `NODE_NOT_FOUND_HINT` | 节点路径错误提示常量（指导用 `SceneRoot.get_node(...)`） |
 | `truncate_capture_text(text)` | 超 8192 字节截断 |
-| `strip_extends_lines / has_top_level_func_def / defines_function_named` | 单表达式判定与 extends 剥离 |
+| `wrap_bare_body(source, entry, inject_line, single_expression_auto_return)` | 裸语句/单表达式包装为 `@tool extends Node` + `func <entry>()`，返回 `WrapResult{ok, wrapped, header_lines, error, mode}`；`single_expression_auto_return=false`（`code_execute` 口径）时不自动 `return`，须显式 `return` |
+| `wrap_whole_script(source, entry)` | 多函数模式：源码原样保留，要求存在 `func <entry>()` 入口 |
+| `map_error_line_numbers(text, offset)` | 编译/运行错误行号回映射，offset 取 `header_lines + 1`（三通道统一，`execute_script` 09-29 起启用行映射） |
+| `compose_compile_failure_message(...)` | 编译失败消息拼装（错误文本 + wrapped source） |
+| `strip_extends_lines / has_top_level_func_def / defines_function_named / is_single_expression` | extends 剥离与包装模式判定 |
 | `IndentStyle / scan_indent_style / indent_prefix / reindent_lines` | 包装时缩进风格探测与重排 |
 
 ### project_path.hpp（header-only，命名空间 `godot_autopilot::util`，09-02 新增）
 
 工程资源路径规范化与边界校验的单一入口：`normalize_project_path(raw, allow_user, allow_root = true)` 返回 `ProjectPath{value, error}`——反斜杠归一为 `/` 后词法消解，拒绝 `..` 路径穿越；绝对路径经 `ProjectSettings` 定位工程根做大小写不敏感前缀校验，工程外报错；scheme 仅 `res://`/`user://`（`user://` 受 `allow_user` 开关控制），未知 scheme 报错；`allow_root = false` 时拒绝命名空间根本身。失败返回结构化 `error`，不以空路径兜底。消费方：`text_ops`/`resource_ops` 全量入口（边界要求见 [../security_contract.md](../security_contract.md)）。
 
-### scene_verify（`scene_verify.cpp/hpp`，命名空间 `godot_autopilot::scene_verify`）
+### resource_fs.hpp（header-only，命名空间 `godot_autopilot::resource_fs`，09-29 新增）
 
-内存场景树与落盘 `.tscn` 文本的只读比对件：
+资源写盘路径的共享小工具，供多个写盘模块复用：
 
-- `collect_memory_paths`（`scene_verify.cpp:36-52`）以场景根名为起点收集相对路径（根记为根名，子树路径统一加根名前缀）；`parse_tscn_paths` 解析 `[node name=".." parent=".."]` 节重建相对路径清单（无 `parent` 即根，`parent="."` 挂根下，`out_count` 为 `[node]` 节总数含根）
-- `compare_tree_with_text`（`scene_verify.hpp:37-38`）只读比对：无缺失（`missing_paths` 上限 `kMaxMissingPaths = 50`，超限记 `missing_truncated`）且内存/落盘计数相等且大于 0 时 `match`；`compute_hash` 为真时才计算哈希（默认轻量计数）
+| 函数 | 行为 |
+|---|---|
+| `is_resource_root_dir(dir)` | 判定 `res://`/`user://` 命名空间根本身（含缺斜杠变体与空串），避免把根目录当可创建目录 |
+| `parent_directory_of(path)` | 经 `String::get_base_dir()` 求父目录 |
+| `ensure_parent_directory(path, out_created, out_error)` | 父目录为命名空间根时直接成功；存在即成功；缺失则 `make_dir_recursive_absolute`，失败返回结构化 error |
+
+消费方：`theme_ops::persist_theme`（主题落盘父目录）、`resource_ops::is_filesystem_root_dir`（save 根判定）、`script_ops::create_script`（父目录创建失败不再被吞、直接报错）。
+
+### scene_verify（`scene_verify.cpp/hpp`，命名空间 `godot_autopilot::scene_verify`；09-29 起核验口径为"可落盘集合"）
+
+内存场景树与落盘 `.tscn` 文本的只读比对件，只统计会写入 `.tscn` 的部分（节点 `owner == 场景根`，根自特判；子场景实例内部节点与连接不落盘）：
+
+- `collect_memory_paths` 收集可落盘相对路径（根记为根名，子树路径统一加根名前缀）；`collect_inherited_paths` 收集不落盘的继承节点路径；`count_memory_connections(root, out_inherited)` 只数两侧都可落盘的连接、继承连接经 `out_inherited` 返回（死代码 `count_memory_nodes` 已删除）
+- `parse_tscn_paths` 解析 `[node name=".." parent=".."]` 节重建相对路径清单（无 `parent` 即根，`parent="."` 挂根下，`out_count` 为 `[node]` 节总数含根）；`count_tscn_connections` 数 `[connection]` 节
+- `compare_tree_with_text` 只读比对：`VerifyResult` 含 `memory_nodes`/`disk_nodes`/`memory_connections`/`disk_connections` 与 `inherited_nodes`/`inherited_connections`（继承计数不参与 match）、`inherited_paths`（上限 `kMaxMissingPaths = 50`，超限记 `inherited_truncated`）；无真缺失（`missing_paths` 仅真缺失，`missing_truncated` 同限）且可落盘节点/连接计数相等且内存节点数 > 0 时 `match`；`compute_hash` 为真时才计算哈希（默认轻量计数）
 - 哈希取舍：仓内无现成哈希工具时使用 FNV-1a 64 位（无外部依赖）；`extract_attr` 提取 `attr="value"` 不支持转义引号（节点名极少含引号）
 - `read_text_file` 经 `FileAccess` 读取 `res://` 文本，失败时 `ok=false`（路径边界见 [../security_contract.md](../security_contract.md)）
+- 消费方：`editor_ops` 的 `save_editor_scene[_as]` 保存回执与只读 `verify_scene_saved`；失配等多项告警以分号拼接在 `warning` 中，不再互相覆盖。
 
 ### mcp_image_content.hpp（header-only，命名空间 `godot_autopilot::util`，09-13 新增）
 

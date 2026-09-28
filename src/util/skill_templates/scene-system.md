@@ -93,7 +93,7 @@ describing removal via `delete_scene_node`.
 }
 ```
 
-- `build_nodes_from_spec` builds a whole subtree from one declarative spec (nested type/name/props/children shapes applied through the same conversion chain as `property_set`); pass dry_run for a validate-only preview that writes nothing, and any failed step rolls the whole build back with no residue.
+- `build_nodes_from_spec` builds a whole subtree from one declarative spec (nested type/name/props/children shapes applied through the same conversion chain as `property_set`); pass dry_run for a validate-only preview that writes nothing but runs the same conversion and validation as a real write (inline sub-resources and property families included), and any failed step rolls the whole build back with no residue.
 
 ## Deleting nodes
 

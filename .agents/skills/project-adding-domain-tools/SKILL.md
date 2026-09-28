@@ -28,7 +28,7 @@ description: 在 Godot Autopilot 新增一个领域 MCP 工具（ops handler + T
 - **命名**：`<动词>_<类别>_<维度>_<对象>_<修饰>` snake_case，动词置首（`create_scene_node`、`set_tilemap_cell`）。名词前置形态（`signal_connect`）是历史保留，新工具不要新增这种。
 - **schema 一律由参数表派生**。`raw_schema` 只在确有嵌套结构、参数表表达不了时才手写；现状是全仓仅 3 个元工具（`search_tools`/`batch_execute`/`code_execute`）手写，"元工具都手写 raw_schema"是过时说法。参数描述写进表里第三字段——它是模型唯一能看到的说明。
 - **`side_effect` 选值即声明风险**（`SideEffect`：`None`/`WritesFile`/`WritesConfig`/`ShowsAlert`/`ModifiesWindow`/`Process`/`CodeExecute`/`GameRuntime`）。只读工具用 `None` + `tool_flags::kNone`；有写入/可变动作用用对应值 + `kMutating`。声明正确才会自动进遍历排除，**不要去改 `tests/runner/traversal.cpp` 加白名单**。
-- **flags 语义**（`tool_flags`，可 `|` 组合）：`kMeta` 归元工具表；`kDynamic` 动态工具；`kMutating` 可变态；`kObserve` 执行管线成功后合并编辑器截图（合成输入类工具用，别自己再实现一份截图）；`kCaptureImage` 图片附件判定单一来源；`kSceneTarget` `run_post` 在成功响应缺 `scene_path` 时幂等补全（不置脏）；`kUndoable` 纯标记，撤销仍由 handler 自管。
+- **flags 语义**（`tool_flags`，可 `|` 组合）：`kMeta` 归元工具表；`kDynamic` 动态工具；`kMutating` 可变态；`kObserve` 执行管线成功后合并编辑器截图（合成输入类工具用，别自己再实现一份截图）；`kCaptureImage` 图片附件判定单一来源；`kSceneTarget` `run_post` 在成功响应缺 `scene_path` 时幂等补全（不置脏）；`kUndoable` 纯标记，撤销仍由 handler 自管；`kHealthProbe` 健康探针（MCP 主线程等待改走 5s 短预算，仅 `ping`/`system_status` 用）；`kLongBlocking` 长阻塞例外（绕过等待预算、无限等待，只有确实可能长时间占主线程的工具才打，现状为 `code_execute`/`batch_execute`）。
 - **迁移守卫会拒绝旧写法**：域文件里出现 `GDA_TOOL_CLASS`、新建 `schema_*_ops.cpp`、引用 `tool_input_schema`/`tool_decl.hpp` 都会让 `migration_guard` 失败。
 
 ## 联动清单（漏一项就是交付不完整）

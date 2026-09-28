@@ -9,13 +9,18 @@ serialization rules that decide which property lines end up in the scene file.
 | Godot type | JSON shape |
 |---|---|
 | Vector2 | `{"x": 1, "y": 2}` |
-| Vector3 | `{"x": 1, "y": 2, "z": 3}` |
-| Color | `{"r": 1, "g": 0.5, "b": 0.25, "a": 1}` |
+| Vector3 / Vector3i | `{"x": 1, "y": 2, "z": 3}` — all three components required |
+| Vector4 / Vector4i | `{"x": 1, "y": 2, "z": 3, "w": 4}` — all four components required |
+| Quaternion | `{"x": 0, "y": 0, "z": 0, "w": 1}` — all four components required |
+| Color | `{"r": 1, "g": 0.5, "b": 0.25, "a": 1}` — `a` optional, defaults to 1 |
 | Rect2 | `{"position": {"x": 0, "y": 0}, "size": {"w": 64, "h": 32}}` |
 | Rect2i | `{"position": {"x": 0, "y": 0}, "size": {"w": 64, "h": 32}}` |
 | AABB | `{"position": {"x": 0, "y": 0, "z": 0}, "size": {"w": 64, "h": 32, "d": 16}}` |
+| Plane | `{"normal": {"x": 0, "y": 1, "z": 0}, "d": 0}` or `{"x": 0, "y": 1, "z": 0, "d": 0}` |
 | Transform2D | `{"columns": [[1, 0], [0, 1], [x, y]]}` |
 | Transform3D | `{"basis": {"rows": [[1, 0, 0], [0, 1, 0], [0, 0, 1]]}, "origin": {"x": 0, "y": 0, "z": 0}}` |
+| Basis | `{"rows": [[1, 0, 0], [0, 1, 0], [0, 0, 1]]}` |
+| Projection | `{"columns": [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]}` |
 | RID | read back as `{"id": 42}`; JSON does not restore a RID, so RID parameters take the integer handles the tools return |
 | PackedByteArray | `[72, 101, 108, 108, 111]` |
 | Resource | `{"path": "res://icon.svg"}` |
@@ -39,6 +44,16 @@ Size and transform key rules:
   spelling is not read.
 - Transform3D requires `basis.rows` (3 arrays of 3 numbers); `origin` is
   optional and defaults to `(0, 0, 0)`.
+- Plane accepts either shape above but not both at once: `normal` and
+  top-level `x`/`y`/`z` are mutually exclusive, and `d` is always required.
+  A zero normal is rejected when `d` is non-zero (WorldBoundaryShape3D and
+  Jolt reject such planes); zero normal with `d == 0` is accepted.
+- Vector3/Vector3i, Vector4/Vector4i and Quaternion require every component
+  listed in the table as a JSON number; a missing or non-numeric component
+  errors instead of silently defaulting to 0.
+- Basis requires `rows` (at least 3 arrays of at least 3 numbers); Projection
+  requires `columns` (at least 4 arrays of at least 4 numbers).
+- Color requires `r`, `g` and `b` numbers; `a` is optional and defaults to 1.
 - A RID property reads back as an object with an `id` number, but the
   conversion chain does not turn JSON back into a RID. RID-typed parameters
   take the integer handles returned by the tools that create or expose RIDs.
@@ -146,14 +161,38 @@ the real resource (`SpriteFrames resource 'res://...'`), not the host node.
 When the reflected type is dictionary rather than array, the same dict input is
 stored directly — both engine shapes keep working.
 
-## Dotted property paths
+## Slash names, dotted paths and property families
 
-`property_set` (and inline `properties` maps) accept `a.b.c` paths into
-sub-resources: each intermediate is fetched with `get`, must be a non-null
-object, and the leaf is type-checked and `set` through the same chain. Only
-plain property names joined by dots — no method calls, indexing, or expression
-evaluation. Failures carry the full path plus the owner's candidates, and the
-owner is reported as the real resource path when the leaf lives on a resource.
+`property_set` (and inline `properties` maps) address properties in three
+ways:
+
+- **Exact full names, including names that contain `/`**: write the whole
+  name as one string — "theme_override_colors/font_color",
+  "theme_override_font_sizes/font_size", "metadata/my_key". The slash is part
+  of the engine property name; do not split it or treat it as a path
+  separator.
+- **Dotted paths (`a.b.c`) into sub-resources**: each intermediate is fetched
+  with `get` and must be a non-null **object**, so deep navigation works over
+  object-typed intermediates such as "material.albedo_color" or
+  `sprite_frames.animations`. A dot path whose intermediate is a value type
+  errors with `segment '<name>' is not an object and cannot be traversed`
+  (for example `position.x` on a Node2D — position is a Vector2, not an
+  object). Only plain property names joined by dots — no method calls,
+  indexing, or expression evaluation. Failures carry the full path plus the
+  owner's candidates, and the owner is reported as the real resource path
+  when the leaf lives on a resource.
+- **Property family dict expansion**: when a single-segment name does not
+  exist on the node but is a prefix of an engine property family, a non-empty
+  object value is expanded item by item — this call writes
+  theme_override_colors/font_color:
+
+  ```json
+  {"name": "property_set", "arguments": {"path": "Label", "property": "theme_override_colors", "value": {"font_color": {"r": 1, "g": 0, "b": 0, "a": 1}}}}
+  ```
+
+  The success response adds an expanded_from field; an unknown item errors
+  and lists the available suffixes. `build_nodes_from_spec` applies the same
+  recognition in `dry_run` and in a real write.
 
 ## Silent conversions to watch
 

@@ -33,18 +33,21 @@ Two prerequisites must hold:
    that project).
 
 Without an attached game, tools fail with `game not running` — start the
-game from the editor first, then retry. Once attached but not yet ready,
-tools fail with:
+game from the editor first, then retry. Once attached but not yet ready, the
+default `wait_ready: true` queues the request and replays it as soon as the
+game reports `gda:ready`, so the call waits instead of failing; pass
+`wait_ready: false` to fail immediately with:
 
 ```text
 game started but not ready: the game process has not reported gda ready yet — wait a moment
 after play, or verify the game project loads the godot-autopilot extension
 ```
 
-The bridge reports ready asynchronously right after launch, so one early
-failure immediately after `play_editor_current_scene` is normal: wait a
-moment and retry. If the error persists, the game project does not load the
-extension.
+The bridge reports ready asynchronously right after launch. A queued call
+times out if `gda:ready` never arrives (the timeout error says the request
+was queued for readiness); if `wait_ready: false` calls keep failing while a
+game process is attached, the game project does not load the extension —
+enable the plugin there.
 
 Every game call has a three-layer timeout budget: the host waits
 `timeout_ms` + 2000 ms (response grace) for the game answer, and that host
@@ -249,9 +252,13 @@ coordinates, or with `execute_game_script` using `path`.
   modifications reset to the saved file. Without a running scene it returns
   `ERR_UNCONFIGURED` (3).
 - `execute_game_script` runs code inside the game process: `action` `script`
-  (the source must extend Node and define `_run()`), `get_property`,
-  `set_property` or `call_method`. `persist` (default false) keeps the
-  temporary node alive under `/root/__gda_runtime`.
+  takes either a complete GDScript defining `func _run()` (used as-is) or
+  bare statements, auto-wrapped into `extends Node` + `func _run()` — the
+  same bare-statement wrapping as the editor channels, so a value needs an
+  explicit `return` and wrapped calls report `wrapped: true`; `get_property`,
+  `set_property` or `call_method` inspect or modify node state instead.
+  `persist` (default false) keeps the temporary node alive under
+  `/root/__gda_runtime`.
 - `reload_game_scripts` reloads GDScript files in the running game without
   restarting it (pass a `paths` array of `res://` script paths). The request
   is applied during the game's next idle poll and no confirmation is

@@ -127,7 +127,7 @@
             "expect": {
               "has_keys": ["error"],
               "field_checks": [
-                { "key": "error", "value": "domain tool 'user_echo_probe' not found — use search_tools to discover available tools" }
+                { "key": "error", "value": "domain tool 'user_echo_probe' not found (received keys: value) — use search_tools to discover available tools" }
               ]
             }
           }

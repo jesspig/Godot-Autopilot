@@ -6,7 +6,7 @@ tags:
   - 模块
   - 入口
   - 运行时桥接
-timestamp: "2026-09-21T01:24:00+08:00"
+timestamp: "2026-09-29T01:12:05+08:00"
 resource:
   - src/main.cpp
   - src/runtime/
@@ -16,8 +16,9 @@ resource:
 
 > 09-18 E2E 优化批次增补（详见 `changelog/2026-09-18-log.md` 19:30 节）：`call_method` native 失败路径附加 `diagnosis` + `hint`（`game_bridge_eval.cpp:534 eval_bind_suspected_cause` / `:553 make_native_bind_diagnosis`，成功路径零改动）；新增 `gda_protocol.hpp` 4 个 op（`eval_assert`/`sample`/`collect_evidence`/`validate_ui_layout`）与 `game_bridge_verify.cpp`（采样 awaiter + 校验类注册）。
 > 09-21 可重放监控与日志系统批次增补：`_enter_tree` 入口顺序增 `monitor::lifecycle("plugin_enter_tree")` → `perf_sampler::set_queue(&queue())` →（`s_queue.open()` 之后）`LogPersist::init_session()` → `monitor::environment_snapshot()`；`_process` 增 `perf_sampler::tick(delta)`；新 lifecycle 事件 `plugin_enter_tree`/`tools_singleton_registered`/`server_ready`/`plugin_ready`/`plugin_exit_tree`/`scene_level_initialized`/`editor_level_initialized`/`editor_level_terminated`/`scene_level_terminated`，server 启动失败发 `error_event`。
+> 09-29 B1–B7 修复批次增补：`gda_protocol.hpp` 新增 `GDA_OP_SCENE_TREE = "scene_tree"`（游戏侧 8 action：set_pause/is_paused/reload_current_scene/set_debug_collisions_hint/call_group/notify_group/get_nodes_in_group/create_timer），编辑器侧 8 个 SceneTree 工具改为向游戏进程转发；游戏通道就绪窗口：`wait_ready`（默认 true）在无 ready 会话时把请求排队、收到 `gda:ready` 后自动重放（决策表 `src/tools/ready_policy.hpp`，重放 `on_session_ready`）；`debugger_active_session_count` 只计 `is_active()` 会话（修复无 peer 的常驻会话被计入）；`op_eval_script` 两次尝试（原样编译失败且无顶层函数定义时自动包装裸语句重试，成功响应带 `wrapped:true`）；非主线程调用统一经 `dispatch::run_on_main_thread_with_budget`（默认 27000ms / 健康探针 5000ms / 长阻塞无预算，超时取消 + `main_thread_timeout`）。
 
-覆盖代码：`src/main.cpp`（370 行）与 `src/runtime/`（`gda_protocol.hpp` 57 行、`game_bridge.hpp` 99 行、`game_bridge.cpp`（09-16 增窗口坐标换算约 30 行）、`game_bridge_input.cpp`（09-16 删本地键名表约 60 行、改调共用判定）、`game_bridge_eval.cpp` 851 行）。
+覆盖代码：`src/main.cpp`（392 行）与 `src/runtime/`（`gda_protocol.hpp` 58 行、`game_bridge.hpp` 99 行、`game_bridge.cpp` 1890 行（09-16 增窗口坐标换算、09-29 增 SceneTree op 分派）、`game_bridge_input.cpp`（09-16 删本地键名表约 60 行、改调共用判定）、`game_bridge_eval.cpp` 1105 行）。
 
 职责全景：`main.cpp` 是 GDExtension 的导出入口与编辑器插件本体；`src/runtime/` 是在**游戏运行时进程**内与编辑器进程通信的桥接层，通过 EngineDebugger 消息通道承载 GDA 协议。编辑器内的 MCP 服务器（`ServerContext`）与运行时桥接是两条相互独立的消息通路，本页只覆盖入口生命周期与运行时桥接，MCP 工具侧见相关模块页。
 
@@ -73,6 +74,10 @@ resource:
 - 环境变量 `GDA_FORCE_HEADLESS` 值等于 `"1"` → 直接返回 `false`，即**强制禁用** cmdline 模式（此时即使无头编辑器也照常建 UI/启服务器，变量名与直觉相反）。
 - 否则：需要 `Engine::is_editor_hint()` 为真且 `DisplayServer` 存在，且 `!ds->window_can_draw()`（窗口无法绘制）才返回 `true`。
 
+### 1.6 主线程等待预算（09-29 起，dispatch.cpp）
+
+非主线程的领域工具调用统一经 `dispatch::run_on_main_thread_with_budget` 入口等待主线程（`call_tool` 代理与直连 meta 工具共用同一入口；`call_tool` 编排回调自身仍在 MCP 线程执行）：预算由 `dispatch::main_thread_wait_budget_ms(flags, default_ms, health_ms)` 决策——`kLongBlocking`（`code_execute`/`batch_execute`）返回 0（无限等待，优先于健康探针判定）、`kHealthProbe`（`ping`/`system_status`）用健康预算（默认 5000ms，env `GODOT_AUTOPILOT_HEALTH_TIMEOUT_MS`）、其余用默认预算（27000ms，env `GODOT_AUTOPILOT_DISPATCH_TIMEOUT_MS`，`static_assert` 低于 `GDA_TRANSPORT_TIMEOUT_MS=30000`）。超时时先 `cancel(id)` 取消未执行任务，再返回结构化 `main_thread_timeout` 错误（含 `retryable`/`tool`/`waited_ms`/`queue_depth`/`oldest_pending_ms`/`last_drain_age_ms`/`cancelled`），同时直写一条 trace 与 Transport Warning。
+
 ## 2. GDA 协议常量（gda_protocol.hpp）
 
 协议载体：EngineDebugger 消息通道（`register_message_capture("gda", ...)` / `send_message`）。消息正文为 JSON 字符串。消息方向：`gda:request` 由工具侧（`src/tools/debugger_access.cpp`）发向运行时，`gda:response` / `gda:ready` 由运行时（`game_bridge.cpp`）发出；工具侧接收方在 `src/tools/debugger_ops.cpp`（09-13 下午起：ready 首次标记会话就绪时触发一次 `runtime_ops::run_channel_self_check` 后台 status 往返自检；ready/response 消息均返回 true 消费，消除编辑器 `Unknown message` 噪声）。
@@ -103,6 +108,13 @@ resource:
 | `GDA_OP_GET_ERRORS` | `get_errors` | `op_get_errors` |
 | `GDA_OP_GET_OUTPUT` | `get_output` | `op_get_output` |
 | `GDA_OP_GET_TREE` | `get_tree` | `op_get_tree` |
+| `GDA_OP_EVAL_ASSERT` | `eval_assert` | `op_eval_with_assert`（game_bridge_verify.cpp，受 `game_runtime` 门禁） |
+| `GDA_OP_SAMPLE` | `sample` | `op_sample_property`（game_bridge_verify.cpp，只读） |
+| `GDA_OP_COLLECT_EVIDENCE` | `collect_evidence` | `op_collect_evidence`（game_bridge_verify.cpp，只读） |
+| `GDA_OP_VALIDATE_UI_LAYOUT` | `validate_ui_layout` | `op_validate_ui_layout`（game_bridge_verify.cpp，只读） |
+| `GDA_OP_SCENE_TREE` | `scene_tree` | `op_scene_tree`（game_bridge.cpp，受 `game_runtime` 门禁；8 action 见下） |
+
+`scene_tree` 的 8 个 action：`set_pause`（`paused`）/`is_paused`/`reload_current_scene`/`set_debug_collisions_hint`（`enabled`）/`call_group`（`group_name`/`method`/`args`）/`notify_group`（`group_name`/`notification`）/`get_nodes_in_group`（`group_name`）/`create_timer`（`delay_sec`/`process_always`/`process_in_physics`），未知 action 返回结构化 error；编辑器侧 8 个 SceneTree 工具（`set_scene_tree_pause` 等）均组装为 `GDA_OP_SCENE_TREE` 转发，`SideEffect::GameRuntime`。
 
 未知 op 返回 `{"error": "unknown op: <op>"}`。
 
@@ -135,7 +147,11 @@ resource:
 
 `create_editor_scene` 的等待循环以 `timeout_ms` 为上限（默认取 `GDA_NEW_SCENE_SWITCH_WAIT_MS`；非整数或越界直接报错，超时按 `GDA_NEW_SCENE_POLL_MS` 累计等待），失败时返回 `waited_ms`/`timeout_ms`/`node_released`/`editor_state` 诊断并释放未被编辑器接管的临时根节点；多签占用另在 add 前秒级拦截（09-17 起：`close_current` 关后编辑根仍非空即报邻签占用，不进入等待循环，见 [A 组](tools_ops_a.md)的 editor_ops 小节）；实现细节见 [tools_ops_a.md](tools_ops_a.md) 的 editor_ops 小节。
 
-桥接相关常量在 `src/core/config.hpp`：`GDA_HEALTHY_ACTIVITY_THRESHOLD_MS=3000`、`GDA_ERROR_BUFFER_MAX=200`、`GDA_OUTPUT_BUFFER_MAX=500`、`GDA_EVAL_TRUNCATE_BYTES=8192`；09-16 起新增 game 工具超时预算常量：`GDA_MAX_GAME_OP_TIMEOUT_MS=25000`（host 等待 +2000ms 宽限 < 30000 传输硬上限）、`GDA_LATE_RESULT_BUFFER_MAX=5`（超时后迟到结果保留条数）、`GDA_LATE_RESULT_SUMMARY_CHARS=200`（每条摘要截断），语义见 [modules/tools_ops_b.md](tools_ops_b.md) 的 runtime_ops 小节。
+桥接相关常量在 `src/core/config.hpp`：`GDA_HEALTHY_ACTIVITY_THRESHOLD_MS=3000`、`GDA_ERROR_BUFFER_MAX=200`、`GDA_OUTPUT_BUFFER_MAX=500`、`GDA_EVAL_TRUNCATE_BYTES=8192`；09-16 起新增 game 工具超时预算常量：`GDA_MAX_GAME_OP_TIMEOUT_MS=25000`（host 等待 +2000ms 宽限 < 30000 传输硬上限）、`GDA_LATE_RESULT_BUFFER_MAX=5`（超时后迟到结果保留条数）、`GDA_LATE_RESULT_SUMMARY_CHARS=200`（每条摘要截断），语义见 [modules/tools_ops_b.md](tools_ops_b.md) 的 runtime_ops 小节；09-29 起新增 dispatch 主线程等待预算（`GDA_DISPATCH_WAIT_DEFAULT_MS=27000` / `GDA_DISPATCH_WAIT_HEALTH_MS=5000`），见 §1.6。
+
+### 2.5 就绪窗口与请求重放（工具侧，09-29）
+
+编辑器侧发送游戏请求（`runtime_ops.cpp`）时：已 ready 会话 → 直接广播；无活动会话（`debugger_active_session_count` 只计 `is_active()` 会话）→ 返回 `game not running: ...`；有活动会话但未 ready → `wait_ready`（游戏工具参数，默认 true；`game_tools.hpp`/`capture_tools.hpp` 的 `boolean` 可选参数）为真时把请求标记 `awaiting_ready` 排队并立即返回 `queued_for_ready:true`，`gda:ready` 到达后由 `on_session_ready` 逐个重放（广播失败则重新挂起、等下一次 ready）；`wait_ready=false` 立即返回 `game started but not ready: ...`。决策纯函数在 `src/tools/ready_policy.hpp`（`decide_game_request`：ready>0 → SendNow、active<=0 → FailNotRunning、否则 wait_ready ? QueueForReady : FailNotReady；L1 `ready_policy_test` 5 项）。
 
 ## 3. 运行时桥接三文件职责
 
@@ -147,7 +163,7 @@ resource:
 - `send_response(request_id, body)`：补 `request_id` 字段（`GDA_FIELD_REQUEST_ID` 常量），`EngineDebugger::send_message("gda:response", [json])`。
 - `GameBridgeLogger`（godot::Logger 子类）：`_log_error` 按错误类型（warning 判定码 3）经 `push_game_error` 入错误缓冲；`_log_message` 错误入错误缓冲、普通消息入输出缓冲。
 - 缓冲：`g_error_buffer`（环形，上限 200，每条带递增 `seq`，`g_error_seq` 单调）+ `g_output_buffer`（上限 500），互斥锁保护；`current_error_seq()` / `eval_error_delta(since_seq)` / `append_eval_runtime_errors` 供 eval 附加运行期错误增量（文本增量 + 仅首条的 `structured_error`）；`truncate_error_text` 超 8192 字节截断。
-- 状态与工具 op：`status`（版本/fps/physics_frame/paused/node_count/scene、活动字段）、`ping`（physics/process 帧 + 活动字段）、`cancel`（查 `g_cancel_handlers` 并调用 handler）、`capture`（根视口渲染存 PNG 到缓存目录，返回 path/width/height；09-14 起渲染后经 `capture_ops::prune_capture_files` 清理缓存目录，仅保留最近 20 张 `gda_capture*`）、`get_errors`（limit 默认 50）、`get_output`（limit 默认 200）、`get_tree`（DFS，深度上限 64、节点上限 2000）、`ui_elements`（08-24 新增，见下）、`ui_click`（09-16 补窗口坐标换算，见下）。
+- 状态与工具 op：`status`（版本/fps/physics_frame/paused/node_count/scene、活动字段）、`ping`（physics/process 帧 + 活动字段）、`cancel`（查 `g_cancel_handlers` 并调用 handler）、`capture`（根视口渲染存 PNG 到缓存目录，返回 path/width/height；09-14 起渲染后经 `capture_ops::prune_capture_files` 清理缓存目录，仅保留最近 20 张 `gda_capture*`）、`get_errors`（limit 默认 50）、`get_output`（limit 默认 200）、`get_tree`（DFS，深度上限 64、节点上限 2000）、`ui_elements`（08-24 新增，见下）、`ui_click`（09-16 补窗口坐标换算，见下）、`scene_tree`（09-29 新增：8 个 action 见 §2.2，受 `game_runtime` 门禁，编辑器侧 8 个 SceneTree 工具统一经此 op 转发）。
 - **`run_ui_click` 窗口坐标换算（09-16 起，`game_bridge.cpp`）**：`UiElement` 矩形来自 `Control::get_global_rect()`（画布空间），而 `InputEventMouseButton.position` 必须是窗口客户区坐标（引擎 `viewport.cpp:_make_input_local` 用 `get_final_transform()` 反变换换回画布空间，stretch 与 letterbox 边距都在该链上）。实现取控件所属视口的 `get_screen_transform()` 复合其 `get_canvas_transform()`（默认画布 Camera2D / CanvasLayer 层变换），经 `coords::viewport_rect_center_to_window`（`src/core/editor_coords.hpp/cpp` 新增纯函数，恒等变换原样返回）把 rect 中心换算后注入；无 transform 按恒等处理（保持旧行为）。响应保留画布空间 `position`（向后兼容）并新增 `viewport_position`（同值）与 `window_position`（实际注入坐标）。MCP 工具侧见 [modules/tools_ops_b.md](tools_ops_b.md) 的 `click_game_ui_element` 小节。
 - 辅助函数：`gda_string`（string_view → godot::String）、`error_result`/`ok_result`、`get_scene_tree`、`resolve_node`（空路径取当前场景，先场景内再根节点查询）。
 
@@ -169,7 +185,7 @@ resource:
 ### 3.3 game_bridge_eval.cpp — 异步求值
 
 - `op_eval` 分派 4 种 action：`script` / `get_property` / `set_property` / `call_method`。
-- `op_eval_script`：`source_code` → 实例化 `GDScript` 并 `reload()`（**编译失败 ≤2s 结构化返回（09-16 起）**：不再等待到超时，错误含 `gdscript://<id>.gd:<行号>` Parse Error 文本，供客户端直接定位）；构造临时 Node 挂脚本，`persist` 时挂载到 `/root/__gda_runtime/<persist_name>`（缺省 `eval_<request_id>`，重名报错）；要求脚本含 `_run()` 方法；调用 `_run()` 后若返回 `GDScriptFunctionState`（await）则转 `GameBridgeEvalAwaiter` 异步等待，否则同步返回序列化结果（并附运行期错误增量、persist 时补 `node_path`）；**MCP 响应取裸 result 值（09-16 起）**——成功 eval 的响应即脚本 `_run()` 返回值（`void` → `null`），不再包一层 result 字段结构。
+- `op_eval_script`：`source_code` → 实例化 `GDScript` 并 `reload()`（**编译失败 ≤2s 结构化返回（09-16 起）**：不再等待到超时，错误含 `gdscript://<id>.gd:<行号>` Parse Error 文本，供客户端直接定位；09-29 起为两次尝试——原样 `reload()` 失败且源码不含顶层函数定义（`has_top_level_func_def` 为假）时，经 `util/gdscript_wrap.hpp` 的 `wrap_bare_body` 自动包装为 `extends Node` + `_run()` 裸语句体重试，重试报错行号经 `map_error_line_numbers` 映射回原源码，重试成功时响应附 `wrapped:true`）；构造临时 Node 挂脚本，`persist` 时挂载到 `/root/__gda_runtime/<persist_name>`（缺省 `eval_<request_id>`，重名报错）；要求脚本含 `_run()` 方法；调用 `_run()` 后若返回 `GDScriptFunctionState`（await）则转 `GameBridgeEvalAwaiter` 异步等待，否则同步返回序列化结果（并附运行期错误增量、persist 时补 `node_path`）；**MCP 响应取裸 result 值（09-16 起）**——成功 eval 的响应即脚本 `_run()` 返回值（`void` → `null`），不再包一层 result 字段结构。
 - `GameBridgeEvalAwaiter`（Node）：连接 state 的 `completed` 信号或超时（默认 5000ms）后响应；完成路径与超时路径都会 `send_response` 并清理（取消 handler、断信号、非 persist 时删除临时节点、queue_free）。
 - `get_property` / `call_method`：经 `resolve_node` 定位节点；`call_method` 先按方法签名表逐参推导类型提示（无类型参数回退启发式），无提示的对象参数走内置启发式转换（`{r,g,b[,a]}`→Color、`{x,y[,z,w]}`→Vector2/3/4，多余键忽略，对象引用标记原样保留），再直调 GDExtension 接口取同步 `r_error`（脚本方法经 `object_call_script_method`，`INVALID_METHOD` 回退按 `get_method_list` 的 `id` 取 `MethodBind` 经 `object_method_bind_call`，与引擎 `Object::callp` 同序）；方法不存在与参数错误均按 `r_error`（附 `call_error`/`argument`/`expected`）返回明确错误（含节点路径与可用方法查询指引），成功与否只看 `r_error`（`void`/`null` 不再误报），错误水印增量仅作上下文附加（09-17-23 起，见 `src/runtime/game_bridge_eval.cpp`）。
 - `set_property`：查 `get_property_list` 取类型与 hint 构造 `type_hint`，`VariantJson::deserialize(value, type_hint)` 后 set，并用 `util::check_readback(..., type_sensitive=true)` 读回校验（09-13 下午起：值类型走分量近似比较，设置未生效（回读仍等于旧值）判 REJECTED 报错、引擎调整值附 warning）。
@@ -178,7 +194,7 @@ resource:
 
 - AGENTS.md "入口点：src/main.cpp → GDExtensionEntryPoint → 注册 GodotAutopilotPlugin 并启动 ServerContext"：方向正确，但**严格说 ServerContext 不是入口点启动的**——`GDExtensionEntryPoint` 只做类注册与 `add_by_type`，插件实例由 Godot 创建后在其 `_enter_tree()` 中才 `new ServerContext` 并 `start()`（main.cpp:188-208）。实际链为：入口点 → 注册插件类型 → Godot 实例化 → `_enter_tree` → ServerContext 启动。
 - AGENTS.md "在 MODULE_INITIALIZATION_LEVEL_EDITOR 阶段加载到 Godot 编辑器"：编辑器侧类确在 EDITOR 级别注册；但运行时桥接 `register_listener` 注册在 **SCENE 级别**且仅非编辑器进程，属补充事实而非矛盾。
-- AGENTS.md 线程模型 "HTTP 线程 → CommandQueue::submit() → 主线程 _process() 排空"：与 `_process()` 中 `s_queue.drain()` 一致；09-20 起 `_process` 在 `drain()` 之前先执行 `LogPersist::flush_on_main_thread()`（本地持久化写盘同走主线程，不排队列），09-21 起再在其前执行 `perf_sampler::tick(delta)`（周期采样与请求超时看门狗）。
+- AGENTS.md 线程模型 "HTTP 线程 → CommandQueue::submit() → 主线程 _process() 排空"：与 `_process()` 中 `s_queue.drain()` 一致；09-20 起 `_process` 在 `drain()` 之前先执行 `LogPersist::flush_on_main_thread()`（本地持久化写盘同走主线程，不排队列），09-21 起再在其前执行 `perf_sampler::tick(delta)`（周期采样与请求超时看门狗）；09-29 起 `dispatch` 为跨线程调用设主线程等待预算（默认 27000ms、健康探针 5000ms、长阻塞不设预算），超时取消并返回 `main_thread_timeout`（见 §1.6）。
 - AGENTS.md 错误模式 `{"error": "..."}`：桥接层 `error_result` 同构；差异是桥接响应额外带布尔 `ok` 字段。
 - `game_*` 工具（get_game_status/queue_game_input/capture_game_viewport 等）正是本页桥接 op 在 MCP 工具侧的封装（原 Example/docs/architecture.md 已随 2026-09-13 Example 文档重构删除，不再作为对照基线）。
 

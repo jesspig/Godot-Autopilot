@@ -6,7 +6,7 @@ tags:
   - 总览
   - 架构
   - 技术栈
-timestamp: "2026-09-26T22:35:00+08:00"
+timestamp: "2026-09-29T01:12:05+08:00"
 resource:
   - README.md
   - README.en.md
@@ -15,7 +15,7 @@ resource:
 
 # 项目总览（Overview）
 
-> 审计日期：2026-09-26（09-26 随 L2 测试床迁移同步——`Example/` 已移除，床改 `tests/testbed/`；2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill_gen 与测试数值同步，同日随 skill 内容外置化修正 src/util 目录树注释；09-10 随 skill 体系 19→7 册重构同步目录树注释与 McpConfigDock 描述；09-13 上午随反馈修复批次同步工具数 365/372/373、Resources 26、L1 114、L2 8 份与技能 8 册；09-13 下午随 T22 收口批次同步工具数 366/373/374、L1 126、L2 9 份、授权门与 get_plugin_log；09-13 晚随 A 组知识库审计修复批次同步 docs 与 cmake 目录树补正、skill_templates 平铺命名澄清；随后跨组复核纠正类别分布口径——以工具 category 字段统计为准（physics_tools.hpp 48 个工具中 get_debug_object_info 归类 Debug，故 Physics 47/Debug 16，27 类合计 366）并同步 README 口径 ~366），基于当前工作树文件与代码逐项核对（不依赖 git 历史）；09-13 晚随 0.2.4 版知识库全量审计同步——补正目录树（core 注释补 EditorReadiness/ErrorWatermark，新增 tools/ 嵌入脚本条目）、EDITOR 级别注册类数 4→6、InputMap 并入 Input 措辞、catalog/index 374 派生来源表述；工具数 366/373/374、27 类、L1 126、L2 9 份、ctest 135 复核无误；09-14 随修复批次同步——McpConfigDock 增列 Allow game_runtime 复选框表述；09-14 修复批次后 L1 140、L2 9、ctest 149；09-15 随 Computer Use grounding 增强批次同步工具数 379/386/387、非 SIDE 322 / SIDE 57、新增 13 个编辑器 UI/输入/显示/场景/游戏工具与截图增强参数、L1 172、L2 11、ctest 183；09-15 随 README/README_zh 工具数同步批次——两版 README 已同步 ~379 域工具口径，本页类别表 Input 15→23 纠正（27 类合计 379）；09-16 随失败修复批次（feature/failure-remediation）文档收尾同步——工具数 384/391/392、非 SIDE 324 / SIDE 60（`fill_tilemap_rect` 以 SIDE 宏声明但 side_effect=None）、新增 5 工具（Editor 2 / TileMap 1 / Game 2）、类别 Editor 29→31 / TileMap 7→8 / Game 10→12（27 类合计 384）、MCP 资源新增 skills 组、L1 229、L2 17 份、ctest 246，两版 README 同步 ~384；09-16 文档复核——删除临时批次汇总页（内容已并入功能页与 changelog），消除本页失效链接；09-16 随客户端配置生成器扩容批次同步——McpConfigDock 一键生成 8→20 个客户端（新增 ZCode/pi/Command Code/Kilo/Roo/Grok Build/Kimi Code/Zed/CodeBuddy/Crush/Copilot VS Code/Reasonix，调研淘汰 Cline 与 Antigravity CLI）、目录树 L1 238；09-16 随视觉辅助场景批次同步——域工具 384→385（Capture 1→2，新增 `review_scene_visually`）、可达 391→392、catalog/index 392→393、L1 gtest 238→246（新增 `vision_assist` 8 用例）、L2 17→18 份（新增 `17_vision_assist.json`）、ctest 246→264）。09-16 随坐标换算/键名统一/脚本新鲜度/UID 守卫/CJK 往返/open 幂等/属性两轮批次同步——L1 246→267（新增 game_ui_coords 6 / keycode_alias 6 / script_freshness 7 / uid_guard 2）、unit 文件 21→25、L2 18→25 份（新增 18_script_freshness / 19_cjk_roundtrip / 22_uid_guard / 23_click_ui_coords / 24_keycode_alias / 25_open_scene_idempotent / 28_sprite_frames_animation）、ctest 264→292（267 L1 + 25 L2）；09-17 随 T09+T12 文档同步批次更新技术栈依赖口径为 godot-cpp rc2 / mcp-cpp-sdk 0.3.4。
+> 审计日期：2026-09-29（09-29 随 B1–B7 修复批次同步——工具 399→400（域工具 392，新增 `remove_resource_file`；8 个 SceneTree 工具改经 `GDA_OP_SCENE_TREE` 转发到游戏进程）、schema 基线 400 = 338 非空 + 62 空、遍历排除 62→71 / 候选 330→322；L1 315→391（unit 文件 33→36）、L2 30→37、ctest 注册点 431；游戏通道就绪门（`wait_ready` 排队重放，`ready_policy.hpp`）与 dispatch 主线程等待预算（默认 27000ms / 健康探针 5000ms）落地。详见 [测试体系](tests.md) 与 [核心模块](modules/core.md)；09-26 随 L2 测试床迁移同步——`Example/` 已移除，床改 `tests/testbed/`；2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill_gen 与测试数值同步，同日随 skill 内容外置化修正 src/util 目录树注释；09-10 随 skill 体系 19→7 册重构同步目录树注释与 McpConfigDock 描述；09-13 上午随反馈修复批次同步工具数 365/372/373、Resources 26、L1 114、L2 8 份与技能 8 册；09-13 下午随 T22 收口批次同步工具数 366/373/374、L1 126、L2 9 份、授权门与 get_plugin_log；09-13 晚随 A 组知识库审计修复批次同步 docs 与 cmake 目录树补正、skill_templates 平铺命名澄清；随后跨组复核纠正类别分布口径——以工具 category 字段统计为准（physics_tools.hpp 48 个工具中 get_debug_object_info 归类 Debug，故 Physics 47/Debug 16，27 类合计 366）并同步 README 口径 ~366），基于当前工作树文件与代码逐项核对（不依赖 git 历史）；09-13 晚随 0.2.4 版知识库全量审计同步——补正目录树（core 注释补 EditorReadiness/ErrorWatermark，新增 tools/ 嵌入脚本条目）、EDITOR 级别注册类数 4→6、InputMap 并入 Input 措辞、catalog/index 374 派生来源表述；工具数 366/373/374、27 类、L1 126、L2 9 份、ctest 135 复核无误；09-14 随修复批次同步——McpConfigDock 增列 Allow game_runtime 复选框表述；09-14 修复批次后 L1 140、L2 9、ctest 149；09-15 随 Computer Use grounding 增强批次同步工具数 379/386/387、非 SIDE 322 / SIDE 57、新增 13 个编辑器 UI/输入/显示/场景/游戏工具与截图增强参数、L1 172、L2 11、ctest 183；09-15 随 README/README_zh 工具数同步批次——两版 README 已同步 ~379 域工具口径，本页类别表 Input 15→23 纠正（27 类合计 379）；09-16 随失败修复批次（feature/failure-remediation）文档收尾同步——工具数 384/391/392、非 SIDE 324 / SIDE 60（`fill_tilemap_rect` 以 SIDE 宏声明但 side_effect=None）、新增 5 工具（Editor 2 / TileMap 1 / Game 2）、类别 Editor 29→31 / TileMap 7→8 / Game 10→12（27 类合计 384）、MCP 资源新增 skills 组、L1 229、L2 17 份、ctest 246，两版 README 同步 ~384；09-16 文档复核——删除临时批次汇总页（内容已并入功能页与 changelog），消除本页失效链接；09-16 随客户端配置生成器扩容批次同步——McpConfigDock 一键生成 8→20 个客户端（新增 ZCode/pi/Command Code/Kilo/Roo/Grok Build/Kimi Code/Zed/CodeBuddy/Crush/Copilot VS Code/Reasonix，调研淘汰 Cline 与 Antigravity CLI）、目录树 L1 238；09-16 随视觉辅助场景批次同步——域工具 384→385（Capture 1→2，新增 `review_scene_visually`）、可达 391→392、catalog/index 392→393、L1 gtest 238→246（新增 `vision_assist` 8 用例）、L2 17→18 份（新增 `17_vision_assist.json`）、ctest 246→264）。09-16 随坐标换算/键名统一/脚本新鲜度/UID 守卫/CJK 往返/open 幂等/属性两轮批次同步——L1 246→267（新增 game_ui_coords 6 / keycode_alias 6 / script_freshness 7 / uid_guard 2）、unit 文件 21→25、L2 18→25 份（新增 18_script_freshness / 19_cjk_roundtrip / 22_uid_guard / 23_click_ui_coords / 24_keycode_alias / 25_open_scene_idempotent / 28_sprite_frames_animation）、ctest 264→292（267 L1 + 25 L2）；09-17 随 T09+T12 文档同步批次更新技术栈依赖口径为 godot-cpp rc2 / mcp-cpp-sdk 0.3.4。
 > 09-18 补记：`README_zh.md` 已删除（中文 `README.md` + 英文 `README.en.md` 双版，工具口径 badge `tools-385+` / 385+ 个工具 / Over 385 tools），本页事实来源与工具总数段已改引新版 README。
 > 09-20 代码-文档一致性审计：`register_all.cpp` 的 `call_tool` 描述字符串实测仍为旧口径"386 非元（385 域 + `system_status`）"，与 391 域实测不符（09-18"已修正"注记失实，系审计记录错误，源码并未改动），本轮已随源码修正为"392 非元（391 域 + `system_status`）"（`register_all.cpp:407`；仅描述文本，无行为影响，L1 无精确断言）。
 > 09-19 ToolSpec 数据化重构：391 域工具 + `system_status` + 7 元工具全量改为 `ToolSpec` 数据记录（`make_spec_tool`），删除 `GDA_TOOL_CLASS`/`fn_tool.hpp`/`meta_tools.hpp`/`IMetaTool`/8 个 `schema_*_ops.cpp`/`schema_fills.hpp`/`tool_input_schema`；新增 `tool_args`（取参器）、`tool_pipeline`（`kObserve` 截图后处理）、`dynamic_spec_store`/`autopilot_tools`（用户脚本动态工具 + `user_tools` 授权门）、`tests/guard/` 迁移守卫；MCP 恒 7 元、catalog 399 不变；L1 243→255、L2 26→27 份（新增 `26_user_tools_code_mode`）、`ctest -E "^gda_runner_"` 256 项；遍历改为运行时枚举 392 条后按 `side_effect`/`mutating`/`dynamic` 排除（330 个进入两步骤全过）。
@@ -37,9 +37,9 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 
 ## 核心能力
 
-### MCP 工具：可达 398 个 = 7 元工具 + 391 领域工具
+### MCP 工具：可达 399 个 = 7 元工具 + 392 领域工具
 
-数值以 `src/tools/tool_spec.hpp`（`ToolSpec` 数据层）、`src/tools/tool_registry.hpp`（`ToolRegistry` 单一来源）与 `src/tools/*_tools.hpp`（391 域工具的 `make_tools()`，每工具一份 `ToolSpec`）为准，catalog/index 399 条目由 `register_all.cpp` 从 registry 派生；`get_active_registry()` 暴露活跃 registry，数量随插件版本变化，运行时可经 `search_tools` 确认。工具名遵循 `<动词>_<类别>_<维度>_<对象>_<修饰>`（动词置首，snake_case）。
+数值以 `src/tools/tool_spec.hpp`（`ToolSpec` 数据层）、`src/tools/tool_registry.hpp`（`ToolRegistry` 单一来源）与 `src/tools/*_tools.hpp`（392 域工具的 `make_tools()`，每工具一份 `ToolSpec`）为准，catalog/index 400 条目由 `register_all.cpp` 从 registry 派生；`get_active_registry()` 暴露活跃 registry，数量随插件版本变化，运行时可经 `search_tools` 确认。工具名遵循 `<动词>_<类别>_<维度>_<对象>_<修饰>`（动词置首，snake_case）。
 
 **7 个元工具**（`SpecTool` + `tool_flags::kMeta`，顶层 MCP 工具，见 `register_all.cpp`）：
 
@@ -53,13 +53,13 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 | `batch_execute` | 顺序批量执行多工具 |
 | `code_execute` | 执行任意 GDScript（临时 Node + `_run()`，可选 `function_name` 多函数模式） |
 
-**391 个领域工具**（经 `call_tool` 代理，`g_handlers` 映射分发），按 27 个类别组织（InputMap 并入 Input；TileMap 含 tileset），各类别数量以工具 category 字段/catalog 统计为准（如 `get_debug_object_info` 定义于 `physics_tools.hpp` 但归类 Debug）：
+**392 个领域工具**（经 `call_tool` 代理，`g_handlers` 映射分发），按 27 个类别组织（InputMap 并入 Input；TileMap 含 tileset），各类别数量以工具 category 字段/catalog 统计为准（如 `get_debug_object_info` 定义于 `physics_tools.hpp` 但归类 Debug）：
 
 | 类别 | 数量 | 类别 | 数量 |
 |---|---:|---|---:|
 | Render | 49 | Text | 10 |
 | Physics | 47 | Animation | 10 |
-| Resources | 26 | Scripts | 11 |
+| Resources | 27 | Scripts | 11 |
 | Display | 25 | Game | 15 |
 | Editor | 32 | Theme | 8 |
 | Audio | 20 | TileMap | 8（tilemap 5+tileset 3） |
@@ -72,7 +72,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 | Testing | 2 | System | 1 |
 | Capture | 2 |  |  |
 
-另有 `system_status`（端口/版本/运行时长，`SpecTool`）经 `call_tool` 调用，不直接注册为 MCP 工具；`ToolCatalog`/BM25 index 合计 399 条目（391 域 + `system_status` + 7 元工具）。
+另有 `system_status`（端口/版本/运行时长，`SpecTool`）经 `call_tool` 调用，不直接注册为 MCP 工具；`ToolCatalog`/BM25 index 合计 400 条目（392 域 + `system_status` + 7 元工具）。
 
 ### 提示词模板：7 个
 
@@ -88,7 +88,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 
 ### 运行时桥接（game_* 工具）
 
-编辑器进程的 MCP 服务器与游戏运行时进程经 EngineDebugger 消息通道（`gda:request` / `gda:response` / `gda:ready`）双向通信，`src/runtime/`（`game_bridge.cpp` / `game_bridge_input.cpp` / `game_bridge_eval.cpp` / `game_bridge_verify.cpp` + `gda_protocol.hpp`）实现输入模拟、GDScript 求值、截图捕获、日志/错误回传、场景树查询等 op。工具侧封装见 `game_*` / `get_game_log_entries` 等。详见 [modules/entry_runtime.md](./modules/entry_runtime.md)。
+编辑器进程的 MCP 服务器与游戏运行时进程经 EngineDebugger 消息通道（`gda:request` / `gda:response` / `gda:ready`）双向通信，`src/runtime/`（`game_bridge.cpp` / `game_bridge_input.cpp` / `game_bridge_eval.cpp` / `game_bridge_verify.cpp` + `gda_protocol.hpp`）实现输入模拟、GDScript 求值、截图捕获、日志/错误回传、场景树查询与 SceneTree 操作（09-29 新增 `scene_tree` op）等 op；游戏工具默认 `wait_ready=true`——游戏已启动但未就绪时请求排队、收到 `gda:ready` 后自动重放，无游戏进程时立即返回 `game not running: ...`。工具侧封装见 `game_*` / `get_game_log_entries` 等。详见 [modules/entry_runtime.md](./modules/entry_runtime.md)。
 
 ### 编辑器 UI
 
@@ -133,8 +133,8 @@ godot-self-driving/
 │   ├── core/                   # 基础设施：CommandQueue(header-only)、config、LogSystem、ModeDetector、
 │   │                           #   ResourceRegistry、SceneDirtyTracker、ExportGuard、ServerContext、PluginConfig、EditorReadiness、ErrorWatermark、EditorCoords、LogPersist、TraceRecorder、SanitizePolicy、Monitor、MonitorEnv、PerfSampler
 │   ├── tools/                  # 领域工具：48 个 .cpp（*_ops + register_all/dispatch/tool_args/tool_pipeline/...）、
-│   │                           #   30 个域 _tools.hpp（391 条 ToolSpec）+ tool_spec.hpp / tool_registry.hpp / dynamic_spec_store.hpp /
-│   │                           #   autopilot_tools.{hpp,cpp}（用户脚本动态工具 API）
+│   │                           #   30 个域 _tools.hpp（392 条 ToolSpec）+ tool_spec.hpp / tool_registry.hpp / dynamic_spec_store.hpp /
+│   │                           #   ready_policy.hpp（游戏通道就绪决策，header-only）/ autopilot_tools.{hpp,cpp}（用户脚本动态工具 API）
 │   ├── resources/              # MCP Resources：resource_handlers + debugger_resources
 │   ├── prompts/                # 提示词模板：7 个主题 + debugger_prompts
 │   ├── runtime/                # 游戏运行时桥接：game_bridge(±input/eval/verify) + gda_protocol.hpp
@@ -142,8 +142,8 @@ godot-self-driving/
 │   └── util/                   # 通用编译单元：variant_json、bm25_index、error_util、readback_util、scene_verify、client_config_gen、
 │   │                           #   skill_gen、skill_content_generated（构建期嵌入薄胶水）；内容目录
 │   │                           #   skill_templates/（9 册模板 = 平铺 33 个 .md + `gda_mcp.mjs` 脚本桥，另有 registry.json）；
-│   │                           #   header-only：json_godot、rid_registry、scene_path、project_path、type_hint、gdscript_wrap、mcp_image_content
-├── tests/                      # L1 gda_unit_tests（315 个 gtest，33 文件）+ L2 gda_test_runner + config/*.json（30 份）+ testbed/（L2 测试床工程）+ guard/ 迁移守卫与注释守卫
+│   │                           #   header-only：json_godot、rid_registry、scene_path、project_path、type_hint、gdscript_wrap、resource_fs、mcp_image_content
+├── tests/                      # L1 gda_unit_tests（391 个 gtest，36 文件）+ L2 gda_test_runner + config/*.json（37 份）+ testbed/（L2 测试床工程）+ guard/ 迁移守卫与注释守卫
 ├── docs/                       # 本知识库（docs/wiki/，含 modules/、plans/、changelog/）
 └── demo/                       # 官方 demo 合集（5 个工程：文档/素材/工程配置，插件部署目标之一）
 ```
@@ -163,7 +163,7 @@ flowchart LR
     HTTP -.future.get() 同步等待.-> HTTP
 ```
 
-- **线程模型**：所有 Godot API 调用必须经 `CommandQueue::submit()` 或 `execute_sync()` 由主线程执行——HTTP 线程直接调用会崩溃。`dispatch::call_handler` 按 `is_main_thread()` 决定直接执行或入队等待（`dispatch.cpp`）；`call_tool` 元工具的编排回调本身在 MCP 线程执行（等待游戏响应/截图定型不再阻塞主线程消息泵），其内部经 dispatch 把领域工具 handler 路由回主线程。排空点唯一：`GodotAutopilotPlugin::_process()` 先调 `perf_sampler::tick(delta)`（09-21 起周期采样与请求超时看门狗），再调 `LogPersist::flush_on_main_thread()`（本地持久化写盘），最后 `s_queue.drain()`（`main.cpp`）。
+- **线程模型**：所有 Godot API 调用必须经 `CommandQueue::submit()` 或 `execute_sync()` 由主线程执行——HTTP 线程直接调用会崩溃。`dispatch::call_handler` 按 `is_main_thread()` 决定直接执行或入队等待（`dispatch.cpp`）；09-29 起非主线程调用经 `run_on_main_thread_with_budget` 设主线程等待预算（默认 27000ms、健康探针 5000ms、长阻塞不设预算），超时取消未执行任务并返回 `main_thread_timeout`；`call_tool` 元工具的编排回调本身在 MCP 线程执行（等待游戏响应/截图定型不再阻塞主线程消息泵），其内部经 dispatch 把领域工具 handler 路由回主线程。排空点唯一：`GodotAutopilotPlugin::_process()` 先调 `perf_sampler::tick(delta)`（09-21 起周期采样与请求超时看门狗），再调 `LogPersist::flush_on_main_thread()`（本地持久化写盘），最后 `s_queue.drain()`（`main.cpp`）。
 - **生命周期**：`GDExtensionEntryPoint` → SCENE 级别（非编辑器进程注册桥接监听）/ EDITOR 级别（注册 6 个类：4 个插件/UI 类 + 2 个调试器捕获类，随后 `add_by_type`）→ 插件 `_enter_tree()` 建 UI、启 `ServerContext` → `_exit_tree()` 逆序清理。`gda_cmdline_mode()`（`GDA_FORCE_HEADLESS=1` 时禁用）下跳过 UI 与服务器。
 - **观测/日志**：`LogCategory { System, Transport, Tools, Resources, Prompts }` 五类、`LogLevel { Debug, Info, Warning, Error }` 四级，内存环形缓冲上限 10000 条（另有 `log_detailed` 诊断 detail 与 `trace_id`/`span_id` 关联字段）；09-21 起所有埋点统一经 `src/core/monitor.*` 门面写入（可被 MCP SDK worker 线程调用），工具/协议请求/生命周期/数据流/性能/持久化健康等事件由 `TraceRecorder` 记录（容量 20000，`kind` 区分类型、`request_id` 串联端到端），`perf_sampler` 主线程周期采样、`monitor_env` 写 `kind=snapshot`；经 `LogPersist` 在主线程 flush 落盘 `user://godot_autopilot/logs/`（人类可读）与 `traces/`（结构化 jsonl，schema v2），默认脱敏。
 
@@ -182,7 +182,7 @@ flowchart LR
 | 项 | 值 |
 |---|---|
 | MCP 端口 / 端点 | 9527 / `/mcp`（环境变量 `GODOT_AUTOPILOT_PORT` 覆盖；默认仅绑定 `127.0.0.1`，非环回 host 启动时拒绝） |
-| 工具总数 | MCP 可达 398 = 7 元 + 391 领域（领域 27 类别，其中 Capture 2）；ToolCatalog/index 399 条目（含 `system_status`） |
+| 工具总数 | MCP 可达 399 = 7 元 + 392 领域（领域 27 类别，其中 Capture 2）；ToolCatalog/index 400 条目（含 `system_status`） |
 | 提示词 / 资源 | 7 模板 / 15 资源 |
 | 日志类别 | 5（System / Transport / Tools / Resources / Prompts） |
 | 引擎目标 | Godot 4.7（`demo/*/project.godot` features） |
@@ -190,7 +190,7 @@ flowchart LR
 ## 文档一致性核查（速览）
 
 - 端口 9527、`/mcp`、`GODOT_AUTOPILOT_PORT`：README（英/中）、AGENTS.md、代码三方一致 ✓
-- 工具总数：`README.md` / `README.en.md` 口径为 badge `tools-385+`（`README.md:8` / `README.en.md:8`）与“385+ 个工具 / Over 385 tools”（域工具约数口径，数量随版本增长以 `search_tools` 查到的为准），wiki 实测 **可达 398 / catalog 399 / 27 类 = 391**（以工具 category 字段统计为准）——两者为“约数 vs 实测”口径差异，README 未列 `system_status` 与 7 元工具；`ToolRegistry`/catalog 口径自洽（registry 399 = 391 域 + `system_status` + 7 元）✓
+- 工具总数：`README.md` / `README.en.md` 口径为 badge `tools-385+`（`README.md:8` / `README.en.md:8`）与“385+ 个工具 / Over 385 tools”（域工具约数口径，数量随版本增长以 `search_tools` 查到的为准），wiki 实测 **可达 399 / catalog 400 / 27 类 = 392**（以工具 category 字段统计为准）——两者为“约数 vs 实测”口径差异，README 未列 `system_status` 与 7 元工具；`ToolRegistry`/catalog 口径自洽（registry 400 = 392 域 + `system_status` + 7 元）✓
 - CI：`.github/workflows/{ci,release}.yml`（develop 触发 CI、tag 双格式 `v*.*.*` / `[0-9]*.*.*` 触发 Release，另支持 `workflow_dispatch` 手动指定 tag），AGENTS.md 声称属实 ✓
 - 目标引擎 4.7：与 `demo/*/project.godot` 及 `tests/testbed/project.godot` 的 features 一致 ✓；README 前提已为“Godot 4.7+”（`README.md:5,53` / `README.en.md:5,53`，与 wiki 的 `compatibility_minimum` 4.7 口径一致）
 - 详细对照见 [example.md](./example.md) 与 [modules/core.md](./modules/core.md) 的"不一致点"章节

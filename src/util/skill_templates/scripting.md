@@ -37,13 +37,13 @@ Details in `references/execution-gotchas.md`.
 
 All four execute arbitrary GDScript and are treated as highest-risk side effects.
 
-- `execute_script` auto-returns a single expression's value; multi-line code needs an explicit return. print() output lands in the output field, errors in the errors field. The environment exposes `SceneRoot` (the edited scene root); reach scene nodes via SceneRoot.get_node(...).
+- `execute_script` auto-returns a single expression's value; multi-line code needs an explicit return. Bare statements (no top-level `func`) are auto-wrapped into `extends Node` + `func _run()` — the same wrapper the game channel applies; a complete script must define `func _run()` and is used as-is. Compile errors are line-mapped back to your source. print() output lands in the output field, errors in the errors field. The environment exposes `SceneRoot` (the edited scene root); reach scene nodes via SceneRoot.get_node(...).
 - `call_script_node` runs inside the existing node instance, so its state is real, not reconstructed. Its parameters are `node_path`, `function` (the method name — not `method`) and optional `args`. Non-`@tool` scripts error - run the game instead for those.
-- `execute_game_script` runs inside the running game. Unlike the code_execute sandbox, temporary nodes it creates can persist in the game after the call returns. Game-channel prerequisites are covered by the godot-autopilot-runtime skill.
+- `execute_game_script` runs inside the running game. Its `action` `script` accepts either a complete GDScript defining `func _run()` (used as-is; required for a persistent entry point) or bare statements, auto-wrapped into `extends Node` + `func _run()` exactly like the editor channels — a value needs an explicit `return`, and wrapped calls report `wrapped: true`. Unlike the code_execute sandbox, temporary nodes it creates can persist in the game after the call returns. Game-channel prerequisites are covered by the godot-autopilot-runtime skill.
 
 ## The code_execute meta tool
 
-code_execute wraps your source into a `@tool` extends Node script, runs it on a temporary editor node, then cleans the node up. Which wrapper you get is decided by a line scan: leading spaces/tabs stripped, blank and `#`/`//` comment lines skipped - a line starting with `func ` (trailing space, even indented) selects multi-function mode, anything else is inlined.
+code_execute wraps your source into a `@tool` extends Node script, runs it on a temporary editor node, then cleans the node up. Bare-statement wrapping is shared with `execute_script` and the game channel — all three channels wrap, reindent and line-map through one implementation. Which wrapper you get is decided by a line scan: leading spaces/tabs stripped, blank and `#`/`//` comment lines skipped - a line starting with `func ` (trailing space, even indented; `static func` too) selects multi-function mode, anything else is inlined into the entry function (`func`-like lines such as `func(` are rejected in single-function mode).
 
 - Single-function mode (no `func ` line found): your code is indented into an implicit entry function. Write straight-line code ending in return:
 

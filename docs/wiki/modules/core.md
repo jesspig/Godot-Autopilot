@@ -6,14 +6,13 @@ tags:
   - 模块
   - 核心层
   - 线程模型
-timestamp: "2026-09-26T22:35:00+08:00"
+timestamp: "2026-09-29T01:12:05+08:00"
 resource: src/core/
 ---
 
 # 核心模块（src/core/）
 
-> 审计日期：2026-09-26（09-26 随 L2 测试床迁移同步——`Example/` 已移除，床改 `tests/testbed/`；2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-13 上午随资源 path 加载注册进 ResourceRegistry 同步；09-13 下午随收口批次同步 PluginConfig allow 键、授权门与 call_tool MCP 线程例外；09-13 17:50 随 B 组知识库审计同步——补正主线程排空点行号、移除已删除的 architecture.md 对照行；09-13 晚随 0.2.4 版知识库全量审计同步——补正 query_recent/query_from 消费方注释、SCENE/EDITOR 两级初始化描述、GDA_FORCE_HEADLESS 语义与 editor_readiness 消费方；09-14 随修复批次同步——PluginConfig 消费方增列 Allow game_runtime 复选框；09-16 随坐标换算批次同步——补 `editor_coords` 职责行与新增纯函数（此前职责表漏列该模块），基于当前工作树代码逐行核对（不依赖 git 历史）；09-18 随知识库一致性审计同步——`query_recent(50)` 消费方行号 470→527（以 `resource_handlers.cpp` 实测为准）、审计日期头补齐 09-16 改动的日期同步；09-19 随注释清理批同步——坐标换算引擎映射与缓存提示取舍入文档（源码整行注释删除）；09-20 代码-文档一致性审计——行号重核（`debugger_ops.cpp:683`→`:763`、`main.cpp:258-325`→`:291-357`、`main.cpp:46-54`→`:47-55`），其余复核一致；09-20 晚随可重放监控与双目录持久化批次同步——新增 `LogPersist`/`TraceRecorder`/`sanitize_policy` 三模块（cpp 9→12、头 12→15）、`LogSystem::log_detailed` 与 `LogEntry.detail`、PluginConfig `desensitize` 键、`_process` 先 flush 后 drain；09-20 深夜代码-文档一致性审计（本页二轮）——修正 `LogPersist` 消费方口径（`tool_invoke`/`dispatch` 为 `TraceRecorder` 事件记录 + `session_id` 回显，`enqueue_trace` 外部调用仅 `main.cpp` 的 `server_ready` 与 `init_session` 的 `session_start`）、脱敏开启时图片字段仍保留 `image_width`/`image_height`、`get_plugin_log` 增量分支过滤与响应字段差异、PluginConfig `save_*` 失败改记 `log_detailed`，并重核行号（`main.cpp:302-369`/`:49-57`、`resource_handlers.cpp:544`、`mcp_log_dock.cpp:241`、`server_context.cpp:95-103`）；09-21 随可重放监控与日志系统批次同步——新增 `monitor`/`monitor_env`/`perf_sampler` 三模块（cpp 12→15、头 15→18）、`TraceRecorder` 的 `TraceKind` 与 `TraceEvent` 新字段（jsonl schema v2）、`LogEntry` 关联字段与 `log_detailed` 6 参重载、`LogPersist` 健康计数与 `trace_dir`、`CommandQueue::stats()`，并登记 `GODOT_AUTOPILOT_PERF_INTERVAL_MS`/`GODOT_AUTOPILOT_REQUEST_TIMEOUT_MS`）；09-25 随项目级技能层落地同步——ServerContext 段补 09-21 协议埋点接线（`on_request` / `outgoing_filters`，以及 SDK `on_response` 不覆盖我方出站响应的原因）。
-9（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-13 上午随资源 path 加载注册进 ResourceRegistry 同步；09-13 下午随收口批次同步 PluginConfig allow 键、授权门与 call_tool MCP 线程例外；09-13 17:50 随 B 组知识库审计同步——补正主线程排空点行号、移除已删除的 architecture.md 对照行；09-13 晚随 0.2.4 版知识库全量审计同步——补正 query_recent/query_from 消费方注释、SCENE/EDITOR 两级初始化描述、GDA_FORCE_HEADLESS 语义与 editor_readiness 消费方；09-14 随修复批次同步——PluginConfig 消费方增列 Allow game_runtime 复选框；09-16 随坐标换算批次同步——补 `editor_coords` 职责行与新增纯函数（此前职责表漏列该模块），基于当前工作树代码逐行核对（不依赖 git 历史）；09-18 随知识库一致性审计同步——`query_recent(50)` 消费方行号 470→527（以 `resource_handlers.cpp` 实测为准）、审计日期头补齐 09-16 改动的日期同步；09-19 随注释清理批同步——坐标换算引擎映射与缓存提示取舍入文档（源码整行注释删除）；09-20 代码-文档一致性审计——行号重核（`debugger_ops.cpp:683`→`:763`、`main.cpp:258-325`→`:291-357`、`main.cpp:46-54`→`:47-55`），其余复核一致；09-20 晚随可重放监控与双目录持久化批次同步——新增 `LogPersist`/`TraceRecorder`/`sanitize_policy` 三模块（cpp 9→12、头 12→15）、`LogSystem::log_detailed` 与 `LogEntry.detail`、PluginConfig `desensitize` 键、`_process` 先 flush 后 drain；09-20 深夜代码-文档一致性审计（本页二轮）——修正 `LogPersist` 消费方口径（`tool_invoke`/`dispatch` 为 `TraceRecorder` 事件记录 + `session_id` 回显，`enqueue_trace` 外部调用仅 `main.cpp` 的 `server_ready` 与 `init_session` 的 `session_start`）、脱敏开启时图片字段仍保留 `image_width`/`image_height`、`get_plugin_log` 增量分支过滤与响应字段差异、PluginConfig `save_*` 失败改记 `log_detailed`，并重核行号（`main.cpp:302-369`/`:49-57`、`resource_handlers.cpp:544`、`mcp_log_dock.cpp:241`、`server_context.cpp:95-103`）；09-21 随可重放监控与日志系统批次同步——新增 `monitor`/`monitor_env`/`perf_sampler` 三模块（cpp 12→15、头 15→18）、`TraceRecorder` 的 `TraceKind` 与 `TraceEvent` 新字段（jsonl schema v2）、`LogEntry` 关联字段与 `log_detailed` 6 参重载、`LogPersist` 健康计数与 `trace_dir`、`CommandQueue::stats()`，并登记 `GODOT_AUTOPILOT_PERF_INTERVAL_MS`/`GODOT_AUTOPILOT_REQUEST_TIMEOUT_MS`）；09-25 随项目级技能层落地同步——ServerContext 段补 09-21 协议埋点接线（`on_request` / `outgoing_filters`，以及 SDK `on_response` 不覆盖我方出站响应的原因）。
+> 审计日期：2026-09-29（09-29 随 B1–B7 修复批次同步——`CommandQueue` 容器改 `std::deque` 并新增 `submit_tracked`/`cancel(id)`/`last_drain_age_ms()`/`oldest_pending_age_ms()`/`Stats::cancelled` 与 drain 心跳；dispatch 新增主线程等待预算（`GDA_DISPATCH_WAIT_DEFAULT_MS=27000` / `GDA_DISPATCH_WAIT_HEALTH_MS=5000`、`kHealthProbe`/`kLongBlocking`、超时取消 + `main_thread_timeout`）；`LogPersist::write_trace_now` 线程安全直接追加；09-26 随 L2 测试床迁移同步——`Example/` 已移除，床改 `tests/testbed/`；2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-13 上午随资源 path 加载注册进 ResourceRegistry 同步；09-13 下午随收口批次同步 PluginConfig allow 键、授权门与 call_tool MCP 线程例外；09-13 17:50 随 B 组知识库审计同步——补正主线程排空点行号、移除已删除的 architecture.md 对照行；09-13 晚随 0.2.4 版知识库全量审计同步——补正 query_recent/query_from 消费方注释、SCENE/EDITOR 两级初始化描述、GDA_FORCE_HEADLESS 语义与 editor_readiness 消费方；09-14 随修复批次同步——PluginConfig 消费方增列 Allow game_runtime 复选框；09-16 随坐标换算批次同步——补 `editor_coords` 职责行与新增纯函数（此前职责表漏列该模块），基于当前工作树代码逐行核对（不依赖 git 历史）；09-18 随知识库一致性审计同步——`query_recent(50)` 消费方行号 470→527（以 `resource_handlers.cpp` 实测为准）、审计日期头补齐 09-16 改动的日期同步；09-19 随注释清理批同步——坐标换算引擎映射与缓存提示取舍入文档（源码整行注释删除）；09-20 代码-文档一致性审计——行号重核（`debugger_ops.cpp:683`→`:763`、`main.cpp:258-325`→`:291-357`、`main.cpp:46-54`→`:47-55`），其余复核一致；09-20 晚随可重放监控与双目录持久化批次同步——新增 `LogPersist`/`TraceRecorder`/`sanitize_policy` 三模块（cpp 9→12、头 12→15）、`LogSystem::log_detailed` 与 `LogEntry.detail`、PluginConfig `desensitize` 键、`_process` 先 flush 后 drain；09-20 深夜代码-文档一致性审计（本页二轮）——修正 `LogPersist` 消费方口径（`tool_invoke`/`dispatch` 为 `TraceRecorder` 事件记录 + `session_id` 回显，`enqueue_trace` 外部调用仅 `main.cpp` 的 `server_ready` 与 `init_session` 的 `session_start`）、脱敏开启时图片字段仍保留 `image_width`/`image_height`、`get_plugin_log` 增量分支过滤与响应字段差异、PluginConfig `save_*` 失败改记 `log_detailed`，并重核行号（`main.cpp:302-369`/`:49-57`、`resource_handlers.cpp:544`、`mcp_log_dock.cpp:241`、`server_context.cpp:95-103`）；09-21 随可重放监控与日志系统批次同步——新增 `monitor`/`monitor_env`/`perf_sampler` 三模块（cpp 12→15、头 15→18）、`TraceRecorder` 的 `TraceKind` 与 `TraceEvent` 新字段（jsonl schema v2）、`LogEntry` 关联字段与 `log_detailed` 6 参重载、`LogPersist` 健康计数与 `trace_dir`、`CommandQueue::stats()`，并登记 `GODOT_AUTOPILOT_PERF_INTERVAL_MS`/`GODOT_AUTOPILOT_REQUEST_TIMEOUT_MS`）；09-25 随项目级技能层落地同步——ServerContext 段补 09-21 协议埋点接线（`on_request` / `outgoing_filters`，以及 SDK `on_response` 不覆盖我方出站响应的原因）。
 > 覆盖范围：`src/core/` 下 15 个 cpp + 18 个头 + `version.hpp.in` 模板（`CommandQueue`、`error_watermark`、`config.hpp` 为 header-only，实际 18 业务组 + 版本）。注意：`CommandQueue` 为 header-only（仅 `command_queue.hpp`，无对应 `.cpp`），`error_watermark.hpp` 同为 header-only，`config.hpp` 为纯常量表，`version.hpp.in` 经 `configure_file` 生成 `version.hpp`。
 
 ## 模块简介
@@ -24,11 +23,11 @@ resource: src/core/
 
 | 模块 | 文件 | 职责 | 消费方 |
 |---|---|---|---|
-| `CommandQueue` | `command_queue.hpp`（header-only） | 跨线程任务队列：`submit()` 入队并返回 `std::future`，主线程 `drain()` 批量执行；09-21 起累计 `Stats`（submitted/executed/rejected_closed/rejected_full/dropped_on_close/lock_wait_ns/pending/capacity）经 `stats()` 暴露 | 所有工具/resource/prompt handler、`main.cpp`、`perf_sampler`（队列深度/拒绝数） |
+| `CommandQueue` | `command_queue.hpp`（header-only） | 跨线程任务队列（容器 `std::deque`）：`submit()` 入队并返回 `std::future`，主线程 `drain()` 批量执行（入口刷新 `last_drain_ns_` 心跳）；`submit_tracked()` 额外返回任务 id 供 `cancel(id)` 移除未执行任务；`last_drain_age_ms()`/`oldest_pending_age_ms()` 暴露最近 drain 与最老待执行任务的年龄（无记录/空队列为 -1）；09-21 起累计 `Stats`（submitted/executed/rejected_closed/rejected_full/dropped_on_close/cancelled/lock_wait_ns/pending/capacity）经 `stats()` 暴露 | 所有工具/resource/prompt handler、`main.cpp`、`dispatch`（等待预算与超时诊断）、`perf_sampler`（队列深度/拒绝数） |
 | 配置常量 | `config.hpp` | 端口、超时、缓冲区上限等编译期常量（GDA_ 前缀） | `server_context.cpp`、`runtime/game_bridge.cpp` 等 |
 | `ExportGuard` | `export_guard.cpp/hpp` | 导出期间置位全局原子标志，供工具分发判定"导出中" | `dispatch::export_blocked_result`、`_enter_tree` 注册 |
 | `LogSystem` | `log_system.cpp/hpp` | 进程内环形日志（内存缓冲，含可选 `detail` 诊断行与 `trace_id`/`span_id` 关联字段），单例 | 全部模块、`McpLogDock`、log 类资源、`LogPersist`（增量落盘） |
-| `LogPersist` | `log_persist.cpp/hpp`（09-20 新增） | 日志/trace 双目录持久化：`user://godot_autopilot/logs/gda-<stamp>.log`（人类可读全量含 detail）与 `traces/trace-<stamp>.jsonl`（结构化事件）+ `traces/images/`（仅脱敏关闭时图片落盘）；两目录各保留最近 20 文件 / 50MB；09-21 起暴露健康计数（`dropped_log_lines`/`dropped_trace_lines`/`bytes_written`/`flush_failures`/`rotations`/`pruned_files`）与 `health_summary()`/`trace_dir()`，溢出/写失败/rotate/prune 均发 `kind=persist_health` 事件 | `main.cpp`（`_enter_tree` 初始化、`_process`/`_exit_tree` flush）、`SpecTool::execute`（`session_id`/`store_trace_image`）、`tool_invoke`/`dispatch`（`TraceRecorder` 事件记录 + `session_id` 回显）、`McpLogDock`（Open Traces 打开 `trace_dir()`） |
+| `LogPersist` | `log_persist.cpp/hpp`（09-20 新增） | 日志/trace 双目录持久化：`user://godot_autopilot/logs/gda-<stamp>.log`（人类可读全量含 detail）与 `traces/trace-<stamp>.jsonl`（结构化事件）+ `traces/images/`（仅脱敏关闭时图片落盘）；两目录各保留最近 20 文件 / 50MB；`write_trace_now(line)`（09-29 新增）线程安全直接追加（互斥 + 追加写 `init_session` 主线程 globalize 的 OS 路径，供 dispatch 超时等关键观测绕过缓冲区落盘）；09-21 起暴露健康计数（`dropped_log_lines`/`dropped_trace_lines`/`bytes_written`/`flush_failures`/`rotations`/`pruned_files`）与 `health_summary()`/`trace_dir()`，溢出/写失败/rotate/prune 均发 `kind=persist_health` 事件 | `main.cpp`（`_enter_tree` 初始化、`_process`/`_exit_tree` flush）、`SpecTool::execute`（`session_id`/`store_trace_image`）、`tool_invoke`/`dispatch`（`TraceRecorder` 事件记录 + `session_id` 回显；dispatch 超时经 `write_trace_now` 直写）、`McpLogDock`（Open Traces 打开 `trace_dir()`） |
 | `TraceRecorder` | `trace_recorder.cpp/hpp`（09-20 新增） | 进程内 trace 事件环形缓冲（容量 20000）：`record`/`query_recent`/`query_by_trace`/`query_by_request`/`query_since`/`next_seq`；09-21 起新增 `enum class TraceKind`（15 值）与 `trace_kind_name()`，`TraceEvent` 追加 `kind/name/request_id/correlation_id/phase/state/monotonic_ns/thread_id/attrs/error_type/stack/bytes`（`to_json_line` 在原键序之后追加，jsonl schema v2），敏感键剥离改为大小写不敏感通用集合；纯函数含 id 生成、参数脱敏、`sanitize_text`、`monotonic_now_ns`/`current_thread_id`、FNV-1a 哈希、base64 解码、JSON 行格式化 | `monitor`（统一写入）、`SpecTool::execute`、`dispatch`、`tool_invoke`、`LogPersist` |
 | `sanitize_policy` | `sanitize_policy.cpp/hpp`（09-20 新增，header 内含原子缓存） | 脱敏开关全局缓存：`enabled()`/`set_enabled()` 供热路径读取，`initialize()` 按 env > config > 默认 true 解析 | `main.cpp`（入口初始化）、`McpConfigDock`（复选框切换）、`SpecTool::execute`/`tool_invoke`/`LogPersist::store_trace_image` |
 | `monitor`（统一埋点门面） | `monitor.hpp/cpp`（09-21 新增，纯 std，可被 MCP SDK worker 线程调用） | 统一埋点入口：`emit/tool_call/lifecycle/data_flow/ui_action/security/state/error_event/perf` 写入便捷函数、`begin_request/end_request/note_protocol_error/note_notification/note_client/note_transport` 协议侧钩子、`RequestRegistry`（request_id→trace/span 关联表，上限 4096、FIFO 淘汰）、`RequestScope`/`push_request`/`pop_request`/`current_request_id`、`Counters`/`counters()`、`sanitize_field`/`json_escape`/`build_attrs`、`request_id_text(RequestId)`、`persist_health`、`LockProbe`（锁等待超过阈值才记录，否则零开销） | `tool_spec`/`dispatch`/`tool_invoke`、`server_context`、`main.cpp`、`autopilot_tools`、`runtime_ops`、`resource_handlers`/`debugger_resources`、`mcp_log_dock`/`mcp_config_dock` |
@@ -49,12 +48,15 @@ resource: src/core/
 ### CommandQueue（header-only）
 
 - `template <typename Fn> auto submit(Fn&&) -> std::future<std::invoke_result_t<Fn>>` — 入队任务，返回 future；任务异常通过 `promise.set_exception` 传播
-- `bool drain()` — 主线程调用；关闭或线程不匹配时返回 `false`，否则锁定交换批量任务后逐个执行；首次调用固定当前线程为主线程
+- `bool drain()` — 主线程调用；入口先刷新 `last_drain_ns_` 心跳（drain 活性观测），关闭或线程不匹配时返回 `false`，否则锁定交换批量任务后逐个执行；首次调用固定当前线程为主线程
 - `void open()` / `void close()` / `bool is_closed()` — 管理队列生命周期；默认容量为 1024，关闭时拒绝并完成未执行任务的 future
 - `execute_sync(Fn&&)` — 主线程直接执行，其他线程提交后等待 future
 - `bool is_main_thread() const` — 与记录的线程 ID 比较
-- `Stats stats() const`（09-21 新增）— 返回 `submitted`/`executed`/`rejected_closed`/`rejected_full`/`dropped_on_close`/`lock_wait_ns`/`pending`/`capacity`；`submit`/`drain`/`close` 计数并累计锁等待纳秒（供 `perf_sampler` 与 `system_status.queue_depth` 读取）
-- 内部结构：`std::queue<std::unique_ptr<TaskBase>>` + `std::mutex` + 关闭状态 + 容量限制 + 主线程 ID
+- `Stats stats() const`（09-21 新增，09-29 补 `cancelled`）— 返回 `submitted`/`executed`/`rejected_closed`/`rejected_full`/`dropped_on_close`/`cancelled`/`lock_wait_ns`/`pending`/`capacity`；`submit`/`drain`/`close`/`cancel` 计数并累计锁等待纳秒（供 `perf_sampler` 与 `system_status` 读取）
+- `submit_tracked(Fn&&)`（09-29 新增）— 同 `submit` 但返回 `TrackedSubmission{id, future}`，id 供 `cancel` 定位
+- `bool cancel(uint64_t id)`（09-29 新增）— 移除尚未执行的排队任务并以 `"CommandQueue task cancelled before execution"` 终止其 future；命中返回 true 并累加 `Stats::cancelled`，任务已被取走或未知 id 返回 false
+- `int64_t last_drain_age_ms() const` / `int64_t oldest_pending_age_ms() const`（09-29 新增）— 距最近一次 drain / 最老待执行任务的毫秒数，无 drain 记录或队列为空返回 -1（供 `dispatch` 超时诊断与 `system_status.main_thread` 读取）
+- 内部结构：`std::deque<std::unique_ptr<TaskBase>>` + `std::mutex` + 关闭状态 + 容量限制 + 主线程 ID；每个任务记录递增 `task_id` 与入队时刻（供 `cancel`/`oldest_pending_age_ms` 使用）
 - 实例：`GodotAutopilotPlugin::s_queue`（静态成员），经静态 `queue()` 访问器暴露；`runtime_ops::set_editor_queue` 也持有同一指针
 
 ### config.hpp（全部常量，见文末常量表）
@@ -83,6 +85,7 @@ resource: src/core/
 
 - `init_session()` — 生成会话 id（`new_trace_id()`）与 UTC 时间戳 `%Y%m%d_%H%M%S`；递归创建 `user://godot_autopilot/logs` 与 `.../traces`；先 `rotate_on_init()` 修剪两目录（含 `traces/images/`，按前缀/后缀匹配文件，保留最近 `kMaxFiles = 20` 个且总量 ≤ `kMaxTotalBytes = 50 MiB`，`should_prune` 判定，按 mtime 从旧到新删），再入队一条 `{"type":"session_start","session_id","gda_version","stamp"}` trace 头；09-21 起 `init_session` 重置日志/轨迹游标（`last_log_serial_`/`last_trace_seq_`），rotate/prune 经 `note_rotation`/`note_pruned` 累加健康计数并发 `kind=persist_health` 事件
 - 增量拉取：`flush_on_main_thread()` 以 `last_log_serial_`（对 `LogSystem::next_index()`/`query_from`）与 `last_trace_seq_`（对 `TraceRecorder::next_seq()`/`query_since`）为游标，把新日志经 `format_human_line` 格式化为 `[wall_ms] [level] [category] summary | detail`（含 detail）追加到 `gda-<stamp>.log`，把 trace 事件经 `to_json_line` 追加到 `trace-<stamp>.jsonl`；两条写入缓冲上限均为 `kBufferCap = 20000`（互斥保护，超限丢最旧）；09-21 起 flush 用 `LockProbe`（阈值 10ms，超阈值才记录）测量互斥锁等待，缓冲溢出丢最旧时累加 `dropped_log_lines`/`dropped_trace_lines`
+- `write_trace_now(const std::string&)`（09-29 新增）— 线程安全的即时追加：互斥保护下把整行经 `append_persist_line` 追写到 `trace_os_path_`（`init_session` 主线程经 `ProjectSettings::globalize_path` 求得的 OS 路径）并 flush；成功累加 `bytes_written`，失败累加 `flush_failures` 并仅首次记 System Warning。供 dispatch 超时等关键观测绕过内存缓冲直接落盘
 - 写失败降级：`FileAccess` 以 `READ_WRITE` 打开失败时回退 `WRITE`（前者不创建新文件），仍失败或 `store_string` 失败时 `write_failed_` 置位——仅首次记一条 System 错误日志，本会话后续 flush 丢弃缓冲、不再重试；09-21 起每次失败累加 `flush_failures` 并发 `kind=persist_health` 事件
 - `store_trace_image(span_id, kind, base64_png)` — 仅脱敏关闭时落盘 `traces/images/trace-<session>-<span>-<kind>.png`，返回相对路径 `images/...` 作为 `image_ref`；脱敏开启直接返回空串（`image_ref` 为空，jsonl 内仍保留 `image_hash`/`image_bytes`/`image_width`/`image_height`）；写盘成功后累加 `bytes_written`
 - 健康计数（09-21 新增）：`dropped_log_lines()`/`dropped_trace_lines()`/`bytes_written()`/`flush_failures()`/`rotations()`/`pruned_files()` 访问器 + `health_summary()`（汇总文本），随 `kind=persist_health` 事件一并落盘；`trace_dir()` 返回 `user://godot_autopilot/traces`（供 McpLogDock 「Open Traces」按钮使用）
@@ -202,6 +205,7 @@ flowchart LR
 - 唯一编排层例外（09-13 下午起）：`call_tool` 元工具回调在 MCP 线程执行（等待运行时响应/截图定型不再经 `execute_sync` 占用主线程），编排逻辑自身不触碰 Godot API、领域工具 handler 仍由 dispatch 路由回主线程；其余 6 个元工具仍走 `execute_sync`
 - 排空点唯一：`GodotAutopilotPlugin::_process(double)` 先 `perf_sampler::tick(delta)`（09-21 起按周期采样 `kind=perf` 并做请求超时看门狗）再 `LogPersist::instance().flush_on_main_thread()`（把上一帧以来累积的日志/trace 增量写盘）再 `s_queue.drain()`，随后轮询 `McpLogDock`；`LogPersist` 的缓冲与游标有互斥保护（入队可发生在任意线程），写盘固定主线程
 - `drain()` 首次执行时把当前线程记为"主线程"，此后 `is_main_thread()` 据此判定
+- 主线程等待预算（09-29 起，`dispatch.cpp`）：非主线程的领域工具调用经 `run_on_main_thread_with_budget` 统一入口（`call_tool` 代理与直连 meta 工具共用）等待主线程，预算由 `main_thread_wait_budget_ms` 按 flags 决策——默认 `GDA_DISPATCH_WAIT_DEFAULT_MS`（27000ms，env `GODOT_AUTOPILOT_DISPATCH_TIMEOUT_MS`）、`kHealthProbe` 用 `GDA_DISPATCH_WAIT_HEALTH_MS`（5000ms，env `GODOT_AUTOPILOT_HEALTH_TIMEOUT_MS`）、`kLongBlocking` 不设预算（budget=0 无限等待，优先于健康探针判定）；超时先 `cancel(id)`（命中表示任务尚未被执行、不会执行；未命中表示已被主线程取走）再返回结构化 `main_thread_timeout` 错误（附 `queue_depth`/`oldest_pending_ms`/`last_drain_age_ms`/`cancelled`），并直写 trace 与 Transport Warning；`ping`/`system_status` 为健康探针，`code_execute`/`batch_execute` 为长阻塞工具
 
 ## 生命周期（插件 ↔ ServerContext）
 
@@ -222,6 +226,8 @@ flowchart LR
 - `GODOT_AUTOPILOT_DESENSITIZE`（09-20 新增）：脱敏开关的最高优先级来源，`0`/`false`/`off` 关闭、其余非空值开启；未设置时读 `user://godot_autopilot/config.json` 的 `desensitize` 键，再默认开启（`sanitize_policy::initialize`，仅在入口读取一次）
 - `GODOT_AUTOPILOT_PERF_INTERVAL_MS`（09-21 新增）：`perf_sampler` 采样周期毫秒数，默认 `5000`
 - `GODOT_AUTOPILOT_REQUEST_TIMEOUT_MS`（09-21 新增）：`perf_sampler` 请求超时看门狗阈值毫秒数，默认 `60000`
+- `GODOT_AUTOPILOT_DISPATCH_TIMEOUT_MS`（09-29 新增）：dispatch 主线程等待默认预算毫秒数，默认 `27000`（须低于传输硬上限 30000，保证超时错误能送达客户端）
+- `GODOT_AUTOPILOT_HEALTH_TIMEOUT_MS`（09-29 新增）：健康探针（`ping`/`system_status`）主线程等待预算毫秒数，默认 `5000`
 
 监听、可信客户端模型、路径和响应大小边界见 [T0 安全边界与并发契约](../security_contract.md)。
 
@@ -233,6 +239,14 @@ flowchart LR
 | `GDA_HEALTHY_ACTIVITY_THRESHOLD_MS` | `3000` | `int64_t` | `get_game_status` 健康判定阈值（`game_bridge.cpp`） |
 | `GDA_DEFAULT_TIMEOUT_MS` | `5000` | `int64_t` | 默认操作超时 |
 | `GDA_MAX_TIMEOUT_MS` | `30000` | `int64_t` | 超时上限（与 `code_execute` 工具 30s 上限呼应） |
+| `GDA_RESPONSE_GRACE_MS` | `2000` | `int64_t` | 游戏 op 超时后的响应宽限 |
+| `GDA_MAX_GAME_OP_TIMEOUT_MS` | `25000` | `int64_t` | 游戏工具单次 op 超时上限 |
+| `GDA_MAX_GAME_OP_HOST_WAIT_MS` | `27000`（= 25000 + 2000） | `int64_t` | 游戏 op host 侧总等待预算（`static_assert` 低于传输上限） |
+| `GDA_TRANSPORT_TIMEOUT_MS` | `30000` | `int64_t` | HTTP 传输硬超时；dispatch 预算与游戏 op host 等待都必须低于它 |
+| `GDA_DISPATCH_WAIT_DEFAULT_MS` | `27000` | `int64_t` | dispatch 主线程等待默认预算（`static_assert` 低于传输硬超时） |
+| `GDA_DISPATCH_WAIT_HEALTH_MS` | `5000` | `int64_t` | 健康探针（`ping`/`system_status`）主线程等待预算 |
+| `GDA_LATE_RESULT_BUFFER_MAX` | `5` | `size_t` | 游戏 op 超时后迟到结果保留条数 |
+| `GDA_LATE_RESULT_SUMMARY_CHARS` | `200` | `size_t` | 迟到结果摘要截断字符数 |
 | `GDA_ERROR_BUFFER_MAX` | `200` | `size_t` | 错误缓冲上限（`game_bridge.cpp`） |
 | `GDA_OUTPUT_BUFFER_MAX` | `500` | `size_t` | 输出缓冲上限（`game_bridge.cpp`） |
 | `GDA_EVAL_TRUNCATE_BYTES` | `8192` | `size_t` | eval 输出截断字节数（`game_bridge.cpp`） |
