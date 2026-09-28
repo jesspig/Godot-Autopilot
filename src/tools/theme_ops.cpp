@@ -2,6 +2,8 @@
 
 #include "core/scene_dirty_tracker.hpp"
 #include "util/error_util.hpp"
+#include "util/project_path.hpp"
+#include "util/resource_fs.hpp"
 #include "util/scene_path.hpp"
 
 #include <godot_cpp/classes/control.hpp>
@@ -69,38 +71,50 @@ bool load_theme_or_error(const std::string &path,
 }
 
 bool persist_theme(const godot::Ref<godot::Theme> &theme,
-                   const std::string &path, std::string &out_error) {
+                   const std::string &path, std::string &out_error,
+                   bool &out_verified) {
+  out_verified = false;
+  const util::ProjectPath checked =
+      util::normalize_project_path(path, true, false);
+  if (!checked.valid()) {
+    out_error = "invalid theme path: " + path + " — " + checked.error;
+    return false;
+  }
+  const std::string normalized_path = checked.value;
+
   auto *saver = godot::ResourceSaver::get_singleton();
   if (!saver) {
     out_error = "ResourceSaver not available";
     return false;
   }
-  std::string dir_path = path;
-  size_t last_slash = dir_path.find_last_of('/');
-  if (last_slash != std::string::npos) {
-    dir_path = dir_path.substr(0, last_slash);
-    godot::String dir_gs(dir_path.c_str());
-    if (!godot::DirAccess::dir_exists_absolute(dir_gs)) {
-      godot::Error mk_err =
-          godot::DirAccess::make_dir_recursive_absolute(dir_gs);
-      if (mk_err != godot::Error::OK) {
-        out_error = "failed to create directory: " + dir_path + " (error " +
-                    std::to_string(static_cast<int>(mk_err)) + ")";
-        return false;
-      }
-    }
+  std::string dir_created;
+  std::string dir_error;
+  if (!resource_fs::ensure_parent_directory(normalized_path, dir_created,
+                                            dir_error)) {
+    out_error = dir_error;
+    return false;
   }
-  godot::Error err = saver->save(theme, godot::String(path.c_str()));
+  godot::Error err = saver->save(theme, godot::String(normalized_path.c_str()));
   if (err != godot::OK) {
     out_error = "failed to save theme, error code: " +
                 std::to_string(static_cast<int>(err));
     return false;
   }
+  auto *loader = godot::ResourceLoader::get_singleton();
+  if (loader) {
+    godot::Ref<godot::Resource> verify =
+        loader->load(godot::String(normalized_path.c_str()),
+                     godot::String("Theme"),
+                     godot::ResourceLoader::CACHE_MODE_IGNORE);
+    out_verified =
+        verify.is_valid() &&
+        godot::Object::cast_to<godot::Theme>(verify.ptr()) != nullptr;
+  }
   auto *editor = godot::EditorInterface::get_singleton();
   if (editor) {
     auto *efs = editor->get_resource_filesystem();
     if (efs) {
-      efs->update_file(godot::String(path.c_str()));
+      efs->update_file(godot::String(normalized_path.c_str()));
     }
   }
   return true;
@@ -233,7 +247,8 @@ mcp::JsonValue handle_create_theme_resource(const mcp::JsonValue &args) {
   }
 
   std::string save_error;
-  if (!persist_theme(theme, path, save_error)) {
+  bool verified = false;
+  if (!persist_theme(theme, path, save_error, verified)) {
     return util::error_json(save_error);
   }
 
@@ -241,6 +256,7 @@ mcp::JsonValue handle_create_theme_resource(const mcp::JsonValue &args) {
   r["result"] = mcp::JsonValue("ok");
   r["path"] = mcp::JsonValue(path);
   r["saved"] = mcp::JsonValue(true);
+  r["verified"] = mcp::JsonValue(verified);
   if (!base_type.empty()) {
     r["base_type"] = mcp::JsonValue(base_type);
   }
@@ -276,7 +292,8 @@ mcp::JsonValue handle_set_theme_color(const mcp::JsonValue &args) {
   theme->set_color(godot::StringName(varname.c_str()),
                    godot::StringName(theme_type.c_str()), color);
 
-  if (!persist_theme(theme, path, error)) {
+  bool verified = false;
+  if (!persist_theme(theme, path, error, verified)) {
     return util::error_json(error);
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
@@ -285,6 +302,7 @@ mcp::JsonValue handle_set_theme_color(const mcp::JsonValue &args) {
   r["theme_type"] = mcp::JsonValue(theme_type);
   r["varname"] = mcp::JsonValue(varname);
   r["saved"] = mcp::JsonValue(true);
+  r["verified"] = mcp::JsonValue(verified);
   return r;
 }
 
@@ -314,7 +332,8 @@ mcp::JsonValue handle_set_theme_constant(const mcp::JsonValue &args) {
   theme->set_constant(godot::StringName(varname.c_str()),
                       godot::StringName(theme_type.c_str()), constant);
 
-  if (!persist_theme(theme, path, error)) {
+  bool verified = false;
+  if (!persist_theme(theme, path, error, verified)) {
     return util::error_json(error);
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
@@ -323,6 +342,7 @@ mcp::JsonValue handle_set_theme_constant(const mcp::JsonValue &args) {
   r["theme_type"] = mcp::JsonValue(theme_type);
   r["varname"] = mcp::JsonValue(varname);
   r["saved"] = mcp::JsonValue(true);
+  r["verified"] = mcp::JsonValue(verified);
   return r;
 }
 
@@ -352,7 +372,8 @@ mcp::JsonValue handle_set_theme_font_size(const mcp::JsonValue &args) {
   theme->set_font_size(godot::StringName(varname.c_str()),
                        godot::StringName(theme_type.c_str()), font_size);
 
-  if (!persist_theme(theme, path, error)) {
+  bool verified = false;
+  if (!persist_theme(theme, path, error, verified)) {
     return util::error_json(error);
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
@@ -361,6 +382,7 @@ mcp::JsonValue handle_set_theme_font_size(const mcp::JsonValue &args) {
   r["theme_type"] = mcp::JsonValue(theme_type);
   r["varname"] = mcp::JsonValue(varname);
   r["saved"] = mcp::JsonValue(true);
+  r["verified"] = mcp::JsonValue(verified);
   return r;
 }
 
@@ -449,7 +471,8 @@ mcp::JsonValue handle_set_theme_stylebox_flat(const mcp::JsonValue &args) {
   theme->set_stylebox(godot::StringName(varname.c_str()),
                       godot::StringName(theme_type.c_str()), box);
 
-  if (!persist_theme(theme, path, error)) {
+  bool verified = false;
+  if (!persist_theme(theme, path, error, verified)) {
     return util::error_json(error);
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
@@ -458,6 +481,7 @@ mcp::JsonValue handle_set_theme_stylebox_flat(const mcp::JsonValue &args) {
   r["theme_type"] = mcp::JsonValue(theme_type);
   r["varname"] = mcp::JsonValue(varname);
   r["saved"] = mcp::JsonValue(true);
+  r["verified"] = mcp::JsonValue(verified);
   return r;
 }
 
