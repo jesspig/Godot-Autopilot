@@ -6,6 +6,7 @@
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/editor_plugin.hpp>
 #include <godot_cpp/classes/engine.hpp>
+#include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/core/class_db.hpp>
@@ -108,6 +109,7 @@ void GodotAutopilotPlugin::_enter_tree() {
   using godot_autopilot::LogLevel;
 
   godot_autopilot::monitor::lifecycle("plugin_enter_tree");
+  set_process_mode(godot::Node::PROCESS_MODE_ALWAYS);
   s_queue.open();
   godot_autopilot::perf_sampler::set_queue(&GodotAutopilotPlugin::queue());
   godot_autopilot::sanitize_policy::initialize();

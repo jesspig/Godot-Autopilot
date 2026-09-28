@@ -3,9 +3,12 @@
 #include <algorithm>
 #include <chrono>
 #include <ctime>
+#include <filesystem>
+#include <fstream>
 
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/file_access.hpp>
+#include <godot_cpp/classes/project_settings.hpp>
 #include <version.hpp>
 
 #include "log_system.hpp"
@@ -186,11 +189,22 @@ void LogPersist::init_session() {
       session_stamp_from_ticks(static_cast<uint64_t>(TraceRecorder::wall_now_ms()));
   godot::DirAccess::make_dir_recursive_absolute(kLogDir);
   godot::DirAccess::make_dir_recursive_absolute(kTraceDir);
+  const std::string trace_rel =
+      std::string(kTraceDir) + "/trace-" + stamp + ".jsonl";
+  std::string trace_os;
+  if (auto *settings = godot::ProjectSettings::get_singleton()) {
+    trace_os = std::string(
+        settings->globalize_path(godot::String::utf8(trace_rel.c_str()))
+            .utf8()
+            .get_data());
+  }
   {
     std::lock_guard<std::mutex> lock(mutex_);
     session_id_ = id;
     log_path_ = std::string(kLogDir) + "/gda-" + stamp + ".log";
-    trace_path_ = std::string(kTraceDir) + "/trace-" + stamp + ".jsonl";
+    trace_path_ = trace_rel;
+    trace_os_path_ = trace_os;
+    trace_now_failure_reported_ = false;
     write_failed_ = false;
     last_log_serial_ = 0;
     last_trace_seq_ = 0;
@@ -332,6 +346,36 @@ void LogPersist::flush_on_main_thread() {
         monitor::build_attrs(
             {{"dropped_log_lines", std::to_string(dropped_logs)},
              {"dropped_trace_lines", std::to_string(dropped_traces)}}));
+  }
+}
+
+void LogPersist::write_trace_now(const std::string &line) {
+  try {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (trace_os_path_.empty()) {
+      return;
+    }
+    std::string payload;
+    append_persist_line(payload, line);
+    std::ofstream out(std::filesystem::u8path(trace_os_path_),
+                      std::ios::app | std::ios::binary);
+    if (out.is_open()) {
+      out.write(payload.data(), static_cast<std::streamsize>(payload.size()));
+      out.flush();
+      out.close();
+    }
+    if (out.good()) {
+      bytes_written_.fetch_add(payload.size(), std::memory_order_relaxed);
+      return;
+    }
+    flush_failures_.fetch_add(1, std::memory_order_relaxed);
+    if (!trace_now_failure_reported_) {
+      trace_now_failure_reported_ = true;
+      LogSystem::instance().log(
+          LogLevel::Warning, LogCategory::System,
+          "mirror trace write failed: " + trace_os_path_);
+    }
+  } catch (...) {
   }
 }
 

@@ -26,6 +26,7 @@ public:
   void enqueue_log(const std::string &line);
   void enqueue_trace(const std::string &line);
   void flush_on_main_thread();
+  void write_trace_now(const std::string &line);
   void rotate_on_init();
 
   std::string store_trace_image(const std::string &span_id,
@@ -66,9 +67,11 @@ private:
   std::string session_id_;
   std::string log_path_;
   std::string trace_path_;
+  std::string trace_os_path_;
   std::size_t last_log_serial_ = 0;
   uint64_t last_trace_seq_ = 0;
   bool write_failed_ = false;
+  bool trace_now_failure_reported_ = false;
   std::atomic<uint64_t> dropped_log_lines_{0};
   std::atomic<uint64_t> dropped_trace_lines_{0};
   std::atomic<uint64_t> bytes_written_{0};

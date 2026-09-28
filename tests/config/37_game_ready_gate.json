@@ -1,0 +1,66 @@
+{
+  "name": "game_ready_gate",
+  "description": "游戏就绪窗口门（B7）的 L2 边界：无游戏进程时，默认 wait_ready=true 的游戏工具必须立即落入 FailNotRunning 路径并返回 \"game not running: ...\"（修复前 debugger_active_session_count 把无 peer 的常驻会话也计数，导致该文案几乎不可达）；wait_ready=false 的等价调用必须走同一立即失败路径（无游戏时两者文案一致，因为 active==0 优先于 wait_ready 分流）。断言：execute_game_script（简单脚本，受 game_runtime capability 授权门保护）与 capture_game_viewport（无授权门，返回 error+hint）在无游戏时 error 精确等于 \"game not running: ...\" 全串、不挂起；另加两者 wait_ready=false 的等价调用仍立即失败且文案相同。前置条件：测试床需给 game_runtime 授权（GODOT_AUTOPILOT_ALLOW 含 game_runtime 或 all），否则 execute_game_script 两步返回 authorization required 而 FAIL（capture_game_viewport 不受影响）。就绪窗口（peer 已连接但 gda:ready 未到）的排队与重放需要真实游戏进程，由 V3 复现验收覆盖，本文件不做断言；决策表由 L1 tests/unit/ready_policy_test.cpp 覆盖。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "stages": [
+      {
+        "id": "not_running_gate",
+        "steps": [
+          {
+            "id": "eval_wait_default_no_game",
+            "tool": "execute_game_script",
+            "args": { "action": "script", "source_code": "func _run() -> void: pass" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "game not running: no game process is attached — start the game from the editor first (play the scene), then retry; if the game was just started, wait a moment for it to report ready" }
+              ]
+            }
+          },
+          {
+            "id": "capture_wait_default_no_game",
+            "tool": "capture_game_viewport",
+            "args": {},
+            "expect": {
+              "has_keys": ["error", "hint"],
+              "field_checks": [
+                { "key": "error", "value": "game not running: no game process is attached — start the game from the editor first (play the scene), then retry; if the game was just started, wait a moment for it to report ready" },
+                { "key": "hint", "not_empty": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "no_wait_gate",
+        "steps": [
+          {
+            "id": "eval_wait_false_no_game",
+            "tool": "execute_game_script",
+            "args": { "action": "script", "source_code": "func _run() -> void: pass", "wait_ready": false },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "game not running: no game process is attached — start the game from the editor first (play the scene), then retry; if the game was just started, wait a moment for it to report ready" }
+              ]
+            }
+          },
+          {
+            "id": "capture_wait_false_no_game",
+            "tool": "capture_game_viewport",
+            "args": { "wait_ready": false },
+            "expect": {
+              "has_keys": ["error", "hint"],
+              "field_checks": [
+                { "key": "error", "value": "game not running: no game process is attached — start the game from the editor first (play the scene), then retry; if the game was just started, wait a moment for it to report ready" },
+                { "key": "hint", "not_empty": true }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

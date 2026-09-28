@@ -578,6 +578,13 @@ void DebugCapturePlugin::_setup_session(int32_t p_session_id) {
   }
 }
 
+void DebugCapturePlugin::forget_ready_session(int32_t session_id) {
+  std::lock_guard<std::mutex> lock(session_mtx_);
+  ready_session_ids_.erase(std::remove(ready_session_ids_.begin(),
+                                       ready_session_ids_.end(), session_id),
+                           ready_session_ids_.end());
+}
+
 bool DebugCapturePlugin::_capture(const godot::String &p_message,
                                   const godot::Array &p_data,
                                   int32_t p_session_id) {
@@ -595,6 +602,7 @@ bool DebugCapturePlugin::_capture(const godot::String &p_message,
     }
     if (newly_ready) {
       godot_autopilot::runtime_ops::run_channel_self_check(p_session_id);
+      godot_autopilot::runtime_ops::on_session_ready(p_session_id);
     }
     return true;
   }

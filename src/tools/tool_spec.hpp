@@ -34,6 +34,8 @@ constexpr uint32_t kObserve = 1u << 3;
 constexpr uint32_t kCaptureImage = 1u << 4;
 constexpr uint32_t kSceneTarget = 1u << 5;
 constexpr uint32_t kUndoable = 1u << 6;
+constexpr uint32_t kHealthProbe = 1u << 7;
+constexpr uint32_t kLongBlocking = 1u << 8;
 } // namespace tool_flags
 
 struct ToolSpec {

@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <stdexcept>
 #include <thread>
 
@@ -74,4 +75,40 @@ TEST(CommandQueueTest, EmptyDrainIsHarmless) {
     q.drain();
     q.drain();
     EXPECT_TRUE(q.is_main_thread());
+}
+
+TEST(CommandQueueTest, CancelRemovesQueuedTaskAndRejectsFuture) {
+    CommandQueue q;
+    bool ran = false;
+    auto tracked = q.submit_tracked([&ran] { ran = true; });
+    EXPECT_TRUE(q.cancel(tracked.id));
+    q.drain();
+    EXPECT_FALSE(ran);
+    EXPECT_THROW(tracked.future.get(), std::runtime_error);
+    EXPECT_EQ(q.stats().cancelled, 1u);
+}
+
+TEST(CommandQueueTest, CancelExecutedTaskReturnsFalse) {
+    CommandQueue q;
+    bool ran = false;
+    auto tracked = q.submit_tracked([&ran] { ran = true; });
+    q.drain();
+    EXPECT_TRUE(ran);
+    EXPECT_FALSE(q.cancel(tracked.id));
+    tracked.future.get();
+}
+
+TEST(CommandQueueTest, CancelUnknownIdReturnsFalse) {
+    CommandQueue q;
+    EXPECT_FALSE(q.cancel(12345));
+    EXPECT_FALSE(q.cancel(0));
+}
+
+TEST(CommandQueueTest, LastDrainAgeAdvancesAfterDrain) {
+    CommandQueue q;
+    EXPECT_EQ(q.last_drain_age_ms(), -1);
+    q.drain();
+    EXPECT_GE(q.last_drain_age_ms(), 0);
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    EXPECT_GE(q.last_drain_age_ms(), 1);
 }
