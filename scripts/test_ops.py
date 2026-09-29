@@ -1,4 +1,4 @@
-"""测试运行：L1 快筛、单跑、L2、全量（ctest 薄封装，口径见 project-running-tests）。"""
+"""测试运行：L1 快筛、单跑、L2、全量（ctest 薄封装，口径见 docs/wiki/tests.md）。"""
 
 import subprocess
 from pathlib import Path
