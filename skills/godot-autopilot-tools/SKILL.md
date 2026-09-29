@@ -1,3 +1,8 @@
+---
+name: godot-autopilot-tools
+description: "Calling the GDA (godot-autopilot) plugin: the two invocation channels (native MCP tools vs the gda_mcp.mjs script fallback), search-first tool discovery, meta-tool semantics including batch_execute/code_execute and the code_execute/game_runtime/user_tools capability gates, the error protocol and error watermark, limits, the full domain tool catalog, dynamic user tools, and the manual fallback guide for machines without Node.js. Load this skill whenever MCP tools are missing or you need calling-protocol facts."
+---
+
 # Godot Autopilot Tools
 
 This volume is the cross-domain calling knowledge for the godot-autopilot plugin: the channel ladder, the discovery protocol, meta-tool semantics, the error protocol and the limits. The MCP server is the product; skills and scripts are the experience layer on top of it. Whichever channel you use, the same rules hold: discover every tool name with `search_tools` and never guess one; call every domain tool through `call_tool`; read the `new_errors_since_last_call` watermark after every call.
