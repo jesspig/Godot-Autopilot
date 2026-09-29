@@ -1,6 +1,6 @@
 # GDA (Godot Autopilot) 项目知识库
 
-本知识库与源码同步维护，所有事实以当前代码为准；数值以运行时统计为准。维护记录见 [changelog/log.md](changelog/log.md)。
+本知识库与源码同步维护，所有事实以当前代码为准；数值以运行时统计为准。维护记录见 [log.md](log.md)。
 
 ## 页面索引
 
@@ -20,7 +20,7 @@
 | [modules/tools_ops_b.md](modules/tools_ops_b.md) | 领域工具 B 组（调试/显示/OS/运行时/音频/渲染/瓦片等 18 模块，195 工具；A 197 + B 195 = 392） | `src/tools/*_ops.cpp` |
 | [modules/support.md](modules/support.md) | 提示词、MCP 资源、UI、工具库 | `src/prompts/`、`src/resources/`、`src/ui/`、`src/util/` |
 | [plans/roadmap.md](plans/roadmap.md) | 竞品对齐路线图：竞品定位速览与 P0-P3 批次交付状态 | 全仓库 |
-| [.agents/skills/](../../.agents/skills/) | 项目级可执行技能 `project-*`：怎么做、何时停、做错的表现 | 全仓库流程与纪律 |
+| [.agents/skills/](../../.agents/skills/) | 项目级可执行技能：怎么做、何时停、做错的表现 | 全仓库流程与纪律 |
 
 ## 关键数值速查（以运行时统计为准）
 
@@ -32,7 +32,7 @@
 
 ## 维护入口
 
-代码改动后：更新受影响页面 → 同步页头"审计日期"（带日期行的页面：overview / build / tests / example / modules/tools_registry / tools_ops_a / support / core；无日期头的页面不新增）→ 更新 frontmatter 的 `timestamp`（真实系统时间，ISO 8601）→ 重核数值 → 追加 `changelog/<YYYY-MM-DD>-log.md`（按小时记录，[log.md](changelog/log.md) 仅留最近 7 天）→ 按 [项目级技能](../../.agents/skills/) 的分工核对是否要同步技能（见下"三层文档分工"）→ 需要时才改 [AGENTS.md](../../AGENTS.md)。
+代码改动后：更新受影响页面 → 同步页头"审计日期"（带日期行的页面：overview / build / tests / example / modules/tools_registry / tools_ops_a / support / core；无日期头的页面不新增）→ 更新 frontmatter 的 `timestamp`（真实系统时间，ISO 8601）→ 重核数值 → 追加 `changelog/<YYYY-MM-DD>-log.md`（按小时记录，[log.md](log.md) 仅留最近 7 天）→ 按 [项目级技能](../../.agents/skills/) 的分工核对是否要同步技能（见下"三层文档分工"）→ 需要时才改 [AGENTS.md](../../AGENTS.md)。
 
 ## 三层文档分工
 
@@ -42,17 +42,17 @@
 |---|---|---|---|
 | 入口 | 根 `AGENTS.md` | 每次会话都必须在场的**最小**事实：命令、硬约束、分工规则、索引 | 架构细节、批次历史、计数、流程步骤 |
 | 事实 | `docs/wiki/`（本页为入口） | **陈述性事实**：架构、模块行为、数值口径（`tests.md` 数值核算总表为唯一权威）、已知坑与历史结论 | 可执行的分步流程、检查清单 |
-| 做法 | 根 `.agents/skills/project-*/SKILL.md` | **可执行指南**：流程步骤、决策判据、边界与反例、检查清单 | 易漂移的数值（改为指向 wiki 页）、一次性事实 |
+| 做法 | 根 `.agents/skills/*/SKILL.md` | **可执行指南**：流程步骤、决策判据、边界与反例、检查清单 | 易漂移的数值（改为指向 wiki 页）、一次性事实 |
 
 - 维护时机与本项目一致：完成功能 / 交付指南 / 提交前。**知识库自我迭代时必须顺带核对受影响的项目级技能**——事实变了而技能里的步骤或判据失效，属于本层未同步，比 wiki 漏更危险（技能会被当作行动依据）。
-- 技能与交付给 MCP 客户端的技能书不是一回事：后者以标准 Agent Skills 目录布局存于 `skills/`、由 skill_gen 构建期嵌入并渲染到当前打开工程的 `res://.agents/skills/godot-autopilot*`（仓库内即 `tests/testbed/.agents/skills/`），教的是"怎么用这套工具"；前者是 `project-*` 前缀、教的是"怎么改这个仓库"，清理逻辑按前缀区分，互不删除。
+- 技能与交付给 MCP 客户端的技能书不是一回事：后者以标准 Agent Skills 目录布局存于 `skills/`、由 skill_gen 构建期嵌入并渲染到当前打开工程的 `res://.agents/skills/godot-autopilot*`（仓库内即 `tests/testbed/.agents/skills/`），教的是"怎么用这套工具"；前者存于 `.agents/skills/`、教的是"怎么改这个仓库"，两者按目录隔离，互不删除。
 - 归属不确定时按此判据：不写下来 agent 会做错动作 → 技能；写下来只是让人知道现状 → wiki；两者都不需要、但每次会话都要遵守 → `AGENTS.md`。
 
 ## 编写规则
 
 - 语言简体中文；事实来源限本仓库代码、文档化行为与用户明确讨论结果，**禁止推测**。
 - 更新前以 `git diff HEAD` 核查实际变更范围（`git status` 的 CRLF 伪变更不作依据）；无法核实的论断标 `> [!todo] 待补充`，不要写成结论。
-- frontmatter 必含 `type`/`title`/`description`/`tags`/`timestamp`/`resource`，例外页仅 `index.md`、`changelog/log.md`、`changelog/*-log.md`。
+- frontmatter 必含 `type`/`title`/`description`/`tags`/`timestamp`/`resource`，例外页仅 `index.md`、`log.md`、`changelog/*-log.md`。
 - 每页至少 1 条相对链接指向仓库内真实文件；`changelog/*` 是历史记录页，只保证"新增条目至少 1 条相对链接"，不回溯补链。
 - 只改受影响页；被取代的描述直接删除，不留"已废弃"" formerly"之类标记。
 - 数值一律以运行时统计为准，口径以 [tests.md](tests.md) 的"数值核算总表"为准。
