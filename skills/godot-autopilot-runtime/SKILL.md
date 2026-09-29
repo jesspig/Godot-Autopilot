@@ -1,3 +1,8 @@
+---
+name: godot-autopilot-runtime
+description: "Godot runtime and debugging guide: launch and stop the game, input injection with frame-accurate timing, pause semantics, three log and error paths, the error watermark confirmation loop and runtime inspection. Use when running the game, simulating input or diagnosing problems."
+---
+
 # Runtime and Debugging with godot-autopilot
 
 Invocation: use the native MCP tools first; when that channel is down, use the script bridge `node .agents/skills/godot-autopilot-tools/scripts/gda_mcp.mjs` (Node 18+ or Bun); with neither installed, build a manual plan per `references/manual-fallback.md` of the godot-autopilot-tools skill.
@@ -195,8 +200,14 @@ the frames waited, never a silent hang.
 The forensics pattern is act first, then condition, then capture:
 
 ```json
-{"name": "call_tool", "arguments": {"name": "capture_game_viewport", "arguments": {"when": "get_node(\"HUD/MessageLabel\").text != \"\"", "timeout_ms": 4000}}}
+{"name": "call_tool", "arguments": {"name": "capture_game_viewport", "arguments": {"when": "get_node(\"HUD/MessageLabel\").visible and get_node(\"HUD/MessageLabel\").text != \"\"", "timeout_ms": 4000}}}
 ```
+
+Always gate text conditions on visibility: hiding a label does not reset
+its text, so a text-only condition stays true forever once the text was
+set. The full deterministic-verification recipe (single-script
+teleport-await-read, no cross-call timing) is in
+references/runtime-inspection.md.
 
 Both parameters exist on `capture_game_viewport` and on
 `capture_editor_viewport` with `target` `game`. The editor target rejects them:

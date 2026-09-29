@@ -1,3 +1,8 @@
+---
+name: godot-autopilot-scene-system
+description: "Godot scene system operations guide: scene lifecycle, node create/delete/rename/reparent, property read/write with JSON value shapes, signal wiring, the editor undo history model and .tscn serialization details. Use when building or restructuring scenes, setting properties or connecting signals."
+---
+
 # Godot Scene System
 
 Invocation: use the native MCP tools first; when that channel is down, use the script bridge `node .agents/skills/godot-autopilot-tools/scripts/gda_mcp.mjs` (Node 18+ or Bun); with neither installed, build a manual plan per `references/manual-fallback.md` of the godot-autopilot-tools skill.
