@@ -1,3 +1,8 @@
+---
+name: godot-autopilot-scripting
+description: "Godot GDScript guide: script lifecycle, the four execution channels (execute_script, call_script_node, execute_game_script, code_execute), @tool semantics, static initializers and the editor-vs-game process boundary. Use when writing, attaching or running GDScript."
+---
+
 # GDScript Workflows
 
 Invocation: use the native MCP tools first; when that channel is down, use the script bridge `node .agents/skills/godot-autopilot-tools/scripts/gda_mcp.mjs` (Node 18+ or Bun); with neither installed, build a manual plan per `references/manual-fallback.md` of the godot-autopilot-tools skill.

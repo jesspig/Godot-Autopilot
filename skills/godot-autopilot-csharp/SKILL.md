@@ -1,3 +1,8 @@
+---
+name: godot-autopilot-csharp
+description: "Godot C#/.NET project guide: the dotnet build loop with build_csharp_assembly, reading compile and parse errors through get_debugger_log, running the game and confirming with get_debugger_errors plus the error watermark, C# [GlobalClass] resources via create_resource, [Export] node and typed-array conversion in property_set, attaching C# scripts, and the no-hot-reload and GDScript-visibility limits of .NET assembly state. Use when working in a C# Godot project."
+---
+
 # C# / .NET Workflows
 
 Invocation: use the native MCP tools first; when that channel is down, use the script bridge `node .agents/skills/godot-autopilot-tools/scripts/gda_mcp.mjs` (Node 18+ or Bun); with neither installed, build a manual plan per `references/manual-fallback.md` of the godot-autopilot-tools skill.

@@ -1,3 +1,8 @@
+---
+name: godot-autopilot-servers
+description: "Godot server-layer RID tools guide: RenderingServer, PhysicsServer and NavigationServer semantics - RID lifecycles and silent failures, physics tick ordering, navigation sync slots and the editor single-thread assumption. Use for server-side drawing, physics simulation or pathfinding."
+---
+
 # Godot Server RID Tools
 
 Invocation: use the native MCP tools first; when that channel is down, use the script bridge `node .agents/skills/godot-autopilot-tools/scripts/gda_mcp.mjs` (Node 18+ or Bun); with neither installed, build a manual plan per `references/manual-fallback.md` of the godot-autopilot-tools skill.
