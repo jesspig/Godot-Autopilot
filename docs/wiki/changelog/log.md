@@ -6,6 +6,7 @@
 
 - **B1–B7 韧性与工具语义修复批次**：B1 韧性子系统（插件 `PROCESS_MODE_ALWAYS`、CommandQueue 任务取消/心跳、dispatch 等待预算与 `main_thread_timeout`、8 个 SceneTree 工具改游戏通道转发）；B2 严格 JSON 形状（Vector3/4、Plane、Quaternion、Basis、Projection、Color）与 dry_run 真校验；B3 `resource_fs` 统一根路径与 theme `verified` 回读；B4 子场景实例继承节点分离计数；B5 斜杠属性全名与属性族展开；B6 编辑器/游戏三通道统一 GDScript 包装；B7 就绪窗口排队重放与 `wait_ready`。实测 L1 391 gtest（36 文件）全绿、全量 L2 37/37 全绿、`ctest -N` 431（394 + 37），`VERSION` 0.2.7。详见 [2026-09-29-log.md](2026-09-29-log.md)
 - **知识库与模板同步**：`tests.md`/`tests/README.md` 数值口径与用例清单（L2 30→37、遍历 393 枚举/71 排除/322 候选）、模板 `scene-system--property-json-shapes.md`（Plane 等严格形状、斜杠属性与族展开）与 `runtime.md`/`runtime--runtime-inspection.md`（就绪窗口排队语义）、项目技能 `project-diagnosing-with-traces`/`project-adding-domain-tools` 随 B1/B7 同步；床工程 `[audio]` 副作用本轮复现并记录。详见 [2026-09-29-log.md](2026-09-29-log.md)
+- **插件技能书源改标准目录布局**：`src/util/skill_templates/`（平铺 + registry.json）迁为仓库根 `skills/<name>/SKILL.md + references/*.md`（调用专册另有 `scripts/gda_mcp.mjs`），正文逐字节保留，description 入各册 frontmatter，registry.json 删除；`embed_skills.py`/`skill_gen.cmake`/单测脚本/项目技能/wiki 引用同步，394/394 全绿。详见 [2026-09-29-log.md](2026-09-29-log.md)
 
 ## 2026-09-26
 

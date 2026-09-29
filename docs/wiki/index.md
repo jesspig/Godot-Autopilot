@@ -45,7 +45,7 @@
 | 做法 | 根 `.agents/skills/project-*/SKILL.md` | **可执行指南**：流程步骤、决策判据、边界与反例、检查清单 | 易漂移的数值（改为指向 wiki 页）、一次性事实 |
 
 - 维护时机与本项目一致：完成功能 / 交付指南 / 提交前。**知识库自我迭代时必须顺带核对受影响的项目级技能**——事实变了而技能里的步骤或判据失效，属于本层未同步，比 wiki 漏更危险（技能会被当作行动依据）。
-- 技能与交付给 MCP 客户端的技能书不是一回事：后者由 skill_gen 从 `src/util/skill_templates/` 生成、渲染到当前打开工程的 `res://.agents/skills/godot-autopilot*`（仓库内即 `tests/testbed/.agents/skills/`），教的是"怎么用这套工具"；前者是 `project-*` 前缀、教的是"怎么改这个仓库"，清理逻辑按前缀区分，互不删除。
+- 技能与交付给 MCP 客户端的技能书不是一回事：后者以标准 Agent Skills 目录布局存于 `skills/`、由 skill_gen 构建期嵌入并渲染到当前打开工程的 `res://.agents/skills/godot-autopilot*`（仓库内即 `tests/testbed/.agents/skills/`），教的是"怎么用这套工具"；前者是 `project-*` 前缀、教的是"怎么改这个仓库"，清理逻辑按前缀区分，互不删除。
 - 归属不确定时按此判据：不写下来 agent 会做错动作 → 技能；写下来只是让人知道现状 → wiki；两者都不需要、但每次会话都要遵守 → `AGENTS.md`。
 
 ## 编写规则

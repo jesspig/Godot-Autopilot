@@ -37,7 +37,7 @@ description: 在 Godot Autopilot 新增一个领域 MCP 工具（ops handler + T
 - [ ] `register_all_test` 的 `SchemaStatisticsBaseline` 会断言 catalog 总数与非空/空 schema 计数：新工具带参数即改变基线，跑一次 L1 按实测更新该测试基线，并在 `docs/wiki/tests.md` 数值核算总表同步。
 - [ ] `03_tools_contract` 遍历候选数随 `side_effect`/`mutating` 声明变化：只读工具会新增两步空参+冒烟，跑 L2 确认不新增 warnings。
 - [ ] `docs/wiki/modules/tools_ops_a.md` 或 `_b.md` 增补该工具的行为描述（行为事实归 wiki，AGENTS.md 不写）。
-- [ ] 新增域工具必须同步 `src/util/skill_templates/tools--tool-catalog.md`：在对应域分节按既有 `- \`name\` - 描述` 格式增一条目，描述取 ToolSpec description 首句；漏同步则 L1 的 `ToolCatalogCoverage` 用例失败。格式示例：`- \`get_audio_bus_count\` - count audio buses including Master`。反引号词回验规则不变：模板正文反引号词须在 catalog∪schema 参数名∪白名单内可回验，否则 `skill_gen_test`（`ToolNamesExistInRegistry`）失败。
+- [ ] 新增域工具必须同步 `skills/godot-autopilot-tools/references/tool-catalog.md`：在对应域分节按既有 `- \`name\` - 描述` 格式增一条目，描述取 ToolSpec description 首句；漏同步则 L1 的 `ToolCatalogCoverage` 用例失败。格式示例：`- \`get_audio_bus_count\` - count audio buses including Master`。反引号词回验规则不变：模板正文反引号词须在 catalog∪schema 参数名∪白名单内可回验，否则 `skill_gen_test`（`ToolNamesExistInRegistry`）失败。
 - [ ] 需要引擎内验证的新行为，用新增 `tests/config/*.json` 覆盖（零 C++）。
 
 ## 常见错误
