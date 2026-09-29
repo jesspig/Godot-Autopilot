@@ -20,6 +20,16 @@ How the editor imports assets, how .import and .uid sidecar files are produced a
 
 Use `set_resource_import_options` to change import parameters: it validates the option keys against a whitelist (audio loop/compression and texture filter/mipmap families), writes the `.import` `[params]` section, and queues a reimport in one call. Hand-writing a .import file is deprecated for parameter changes and is only a repair fallback for a broken or missing sidecar, when you know the importer and its parameters.
 
+Looping background music is the canonical case: the track plays once and
+stops mid-game while its length far exceeds one loop. Set the loop flag
+through the tool instead of editing the sidecar, then poll
+`get_editor_file_system_status` until scanning is false and confirm with
+`read_file` on the .import plus a game run:
+
+```json
+{"name": "call_tool", "arguments": {"name": "set_resource_import_options", "arguments": {"path": "res://art/music.ogg", "options": {"loop": true}}}}
+```
+
 - **`[remap]` must be the first section.** The engine writes the file manually in a fixed order and states it directly: order matters, `[remap]` has to go first. Its quick readers rely on that layout.
 - **Section layout, in order:**
   - `[remap]` - `importer=`, optional `importer_version=`, optional `type=`, `uid=` (in uid:// text form), optional `group_file=`; then exactly one output declaration: `path=`, one or more `path.<variant>=` lines for variant imports, or `valid=false` when the last import failed; optional `metadata=` and `generator_parameters=` also live here.
