@@ -1,0 +1,135 @@
+{
+  "name": "31_theme_root",
+  "description": "B3 回归（headless）：theme 五工具共用的 persist_theme 与 create_script 曾用 find_last_of('/') 手工切割父目录，res://x.tres 会切出 \"res:/\"，make_dir_recursive_absolute 随之报 failed to create directory: res:/ (error 20)；create_script 同款切割但吞掉失败。修复：新增 header-only src/util/resource_fs.hpp（is_resource_root_dir / parent_directory_of / ensure_parent_directory，父目录经 String::get_base_dir 推导，res:// 与 user:// 根直接跳过建目录），theme persist_theme 与 script handle_create 统一改走该实现；theme 落盘前先 normalize_project_path 并拒绝根路径，落盘后以 CACHE_MODE_IGNORE 回读校验 Theme 类型并新增 verified 字段。用例步骤：① 在测试床 res:// 根 create_theme_resource res://gda_l2_theme_root.tres，断言 result=ok、path、saved=true、verified=true——修复前响应只有 error 且缺 result/path/saved/verified，has_keys 即 FAIL，故这些断言同时证明响应中未出现 failed to create directory → ② 对根文件 set_theme_font_size（Label/font_size/42）断言 saved=true、verified=true（同一 persist_theme 路径）→ ③ get_theme_info 读回断言 result.path 与 type_count=1、types 非空 → ④ has_resource 命中根文件 → ⑤ 子目录回归：create_theme_resource res://sub_dir_theme/gda_l2_theme_sub.tres（目录不存在，需递归建目录）断言 saved=true、verified=true，has_resource 再命中 → ⑥ 根路径 create_script res://gda_l2_root_script.gd 断言 result.verified=true、readback=true、cache_refreshed=true。after_all 用 remove_resource_file(force=true) 回收两个根文件（连同 .uid 边车），move_os_file_to_trash 回收 res://sub_dir_theme。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "fail_fast",
+    "after_all": [
+      {
+        "id": "theme_root_remove_script",
+        "tool": "remove_resource_file",
+        "args": { "path": "res://gda_l2_root_script.gd", "force": true }
+      },
+      {
+        "id": "theme_root_remove_theme",
+        "tool": "remove_resource_file",
+        "args": { "path": "res://gda_l2_theme_root.tres", "force": true }
+      },
+      {
+        "id": "theme_subdir_trash_dir",
+        "tool": "move_os_file_to_trash",
+        "args": { "path": "res://sub_dir_theme" }
+      }
+    ],
+    "stages": [
+      {
+        "id": "theme_root",
+        "steps": [
+          {
+            "id": "theme_root_create",
+            "tool": "create_theme_resource",
+            "args": { "path": "res://gda_l2_theme_root.tres" },
+            "expect": {
+              "has_keys": ["result", "path", "saved", "verified"],
+              "field_checks": [
+                { "key": "result", "value": "ok" },
+                { "key": "path", "value": "res://gda_l2_theme_root.tres" },
+                { "key": "saved", "value": true },
+                { "key": "verified", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "theme_root_set_font_size",
+            "tool": "set_theme_font_size",
+            "args": {
+              "path": "res://gda_l2_theme_root.tres",
+              "theme_type": "Label",
+              "varname": "font_size",
+              "font_size": 42
+            },
+            "expect": {
+              "has_keys": ["result", "saved", "verified"],
+              "field_checks": [
+                { "key": "result", "value": "ok" },
+                { "key": "saved", "value": true },
+                { "key": "verified", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "theme_root_info_readback",
+            "tool": "get_theme_info",
+            "args": { "path": "res://gda_l2_theme_root.tres" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.path", "value": "res://gda_l2_theme_root.tres" },
+                { "key": "result.type_count", "value": 1 },
+                { "key": "result.types", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "theme_root_file_exists",
+            "tool": "has_resource",
+            "args": { "path": "res://gda_l2_theme_root.tres" },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": true } ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "theme_subdir",
+        "steps": [
+          {
+            "id": "theme_subdir_create",
+            "tool": "create_theme_resource",
+            "args": { "path": "res://sub_dir_theme/gda_l2_theme_sub.tres" },
+            "expect": {
+              "has_keys": ["result", "path", "saved", "verified"],
+              "field_checks": [
+                { "key": "result", "value": "ok" },
+                { "key": "path", "value": "res://sub_dir_theme/gda_l2_theme_sub.tres" },
+                { "key": "saved", "value": true },
+                { "key": "verified", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "theme_subdir_file_exists",
+            "tool": "has_resource",
+            "args": { "path": "res://sub_dir_theme/gda_l2_theme_sub.tres" },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": true } ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "script_root",
+        "steps": [
+          {
+            "id": "script_root_create",
+            "tool": "create_script",
+            "args": {
+              "path": "res://gda_l2_root_script.gd",
+              "source_code": "extends Node\n\nfunc gda_l2_probe() -> int:\n\treturn 1\n"
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.path", "value": "res://gda_l2_root_script.gd" },
+                { "key": "result.class", "value": "GDScript" },
+                { "key": "result.verified", "value": true },
+                { "key": "result.readback", "value": true },
+                { "key": "result.cache_refreshed", "value": true }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

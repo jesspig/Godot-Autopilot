@@ -28,7 +28,7 @@ description: 在 Godot Autopilot 新增一个领域 MCP 工具（ops handler + T
 - **命名**：`<动词>_<类别>_<维度>_<对象>_<修饰>` snake_case，动词置首（`create_scene_node`、`set_tilemap_cell`）。名词前置形态（`signal_connect`）是历史保留，新工具不要新增这种。
 - **schema 一律由参数表派生**。`raw_schema` 只在确有嵌套结构、参数表表达不了时才手写；现状是全仓仅 3 个元工具（`search_tools`/`batch_execute`/`code_execute`）手写，"元工具都手写 raw_schema"是过时说法。参数描述写进表里第三字段——它是模型唯一能看到的说明。
 - **`side_effect` 选值即声明风险**（`SideEffect`：`None`/`WritesFile`/`WritesConfig`/`ShowsAlert`/`ModifiesWindow`/`Process`/`CodeExecute`/`GameRuntime`）。只读工具用 `None` + `tool_flags::kNone`；有写入/可变动作用用对应值 + `kMutating`。声明正确才会自动进遍历排除，**不要去改 `tests/runner/traversal.cpp` 加白名单**。
-- **flags 语义**（`tool_flags`，可 `|` 组合）：`kMeta` 归元工具表；`kDynamic` 动态工具；`kMutating` 可变态；`kObserve` 执行管线成功后合并编辑器截图（合成输入类工具用，别自己再实现一份截图）；`kCaptureImage` 图片附件判定单一来源；`kSceneTarget` `run_post` 在成功响应缺 `scene_path` 时幂等补全（不置脏）；`kUndoable` 纯标记，撤销仍由 handler 自管。
+- **flags 语义**（`tool_flags`，可 `|` 组合）：`kMeta` 归元工具表；`kDynamic` 动态工具；`kMutating` 可变态；`kObserve` 执行管线成功后合并编辑器截图（合成输入类工具用，别自己再实现一份截图）；`kCaptureImage` 图片附件判定单一来源；`kSceneTarget` `run_post` 在成功响应缺 `scene_path` 时幂等补全（不置脏）；`kUndoable` 纯标记，撤销仍由 handler 自管；`kHealthProbe` 健康探针（MCP 主线程等待改走 5s 短预算，仅 `ping`/`system_status` 用）；`kLongBlocking` 长阻塞例外（绕过等待预算、无限等待，只有确实可能长时间占主线程的工具才打，现状为 `code_execute`/`batch_execute`）。
 - **迁移守卫会拒绝旧写法**：域文件里出现 `GDA_TOOL_CLASS`、新建 `schema_*_ops.cpp`、引用 `tool_input_schema`/`tool_decl.hpp` 都会让 `migration_guard` 失败。
 
 ## 联动清单（漏一项就是交付不完整）
@@ -37,7 +37,7 @@ description: 在 Godot Autopilot 新增一个领域 MCP 工具（ops handler + T
 - [ ] `register_all_test` 的 `SchemaStatisticsBaseline` 会断言 catalog 总数与非空/空 schema 计数：新工具带参数即改变基线，跑一次 L1 按实测更新该测试基线，并在 `docs/wiki/tests.md` 数值核算总表同步。
 - [ ] `03_tools_contract` 遍历候选数随 `side_effect`/`mutating` 声明变化：只读工具会新增两步空参+冒烟，跑 L2 确认不新增 warnings。
 - [ ] `docs/wiki/modules/tools_ops_a.md` 或 `_b.md` 增补该工具的行为描述（行为事实归 wiki，AGENTS.md 不写）。
-- [ ] 新增域工具必须同步 `src/util/skill_templates/tools--tool-catalog.md`：在对应域分节按既有 `- \`name\` - 描述` 格式增一条目，描述取 ToolSpec description 首句；漏同步则 L1 的 `ToolCatalogCoverage` 用例失败。格式示例：`- \`get_audio_bus_count\` - count audio buses including Master`。反引号词回验规则不变：模板正文反引号词须在 catalog∪schema 参数名∪白名单内可回验，否则 `skill_gen_test`（`ToolNamesExistInRegistry`）失败。
+- [ ] 新增域工具必须同步 `skills/godot-autopilot-tools/references/tool-catalog.md`：在对应域分节按既有 `- \`name\` - 描述` 格式增一条目，描述取 ToolSpec description 首句；漏同步则 L1 的 `ToolCatalogCoverage` 用例失败。格式示例：`- \`get_audio_bus_count\` - count audio buses including Master`。反引号词回验规则不变：模板正文反引号词须在 catalog∪schema 参数名∪白名单内可回验，否则 `skill_gen_test`（`ToolNamesExistInRegistry`）失败。
 - [ ] 需要引擎内验证的新行为，用新增 `tests/config/*.json` 覆盖（零 C++）。
 
 ## 常见错误

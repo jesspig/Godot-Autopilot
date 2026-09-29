@@ -19,7 +19,7 @@ uint64_t fnv1a_64(const std::string &data);
 uint64_t hash_sorted_paths(const std::vector<std::string> &sorted_paths);
 
 void collect_memory_paths(godot::Node *root, std::vector<std::string> &out_paths);
-int64_t count_memory_nodes(godot::Node *root);
+void collect_inherited_paths(godot::Node *root, std::vector<std::string> &out_paths);
 
 std::vector<std::string> parse_tscn_paths(const std::string &tscn_text, int64_t &out_count);
 
@@ -28,9 +28,13 @@ struct VerifyResult {
   int64_t disk_nodes = 0;
   int64_t memory_connections = 0;
   int64_t disk_connections = 0;
+  int64_t inherited_nodes = 0;
+  int64_t inherited_connections = 0;
   bool match = false;
   std::vector<std::string> missing_paths;
   bool missing_truncated = false;
+  std::vector<std::string> inherited_paths;
+  bool inherited_truncated = false;
   uint64_t memory_hash = 0;
   uint64_t disk_hash = 0;
   bool hash_computed = false;

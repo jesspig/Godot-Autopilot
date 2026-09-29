@@ -8,7 +8,7 @@ description: 本项目文档随代码演进需要同步时使用：更新 docs/w
 ## 适用范围
 
 - 用于：功能完成后同步知识、提交前收尾、发现文档与代码不一致、需要新增或修订项目级技能、知识库自我迭代。
-- 不适用：跨项目的个人偏好沉淀（用户级 `personal-*` 技能）；面向 MCP 客户端的技能书内容（`src/util/skill_templates/`，走 `project-adding-domain-tools` 的联动清单）。
+- 不适用：跨项目的个人偏好沉淀（用户级 `personal-*` 技能）；面向 MCP 客户端的技能书内容（`skills/`，走 `project-adding-domain-tools` 的联动清单）。
 
 ## 三层分工（先决定落点，再动笔）
 

@@ -20,6 +20,8 @@ bool debugger_broadcast_request(const std::string &payload,
 
 int32_t debugger_active_session_count();
 
+int32_t debugger_ready_session_count();
+
 void debugger_send_cancel(int32_t session_id, int64_t request_id);
 
 std::vector<int32_t> debugger_breaked_session_ids();

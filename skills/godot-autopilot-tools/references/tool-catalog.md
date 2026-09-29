@@ -408,14 +408,14 @@ All 392 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 
 ## Scene - scene_tree_tools (8)
 
-- `call_scene_tree_group` - call a method on every node in a group
-- `notify_scene_tree_group` - send a Godot notification to every node in a group
-- `get_scene_tree_nodes_in_group` - list node paths of all nodes in a group
-- `create_scene_tree_timer` - create a SceneTreeTimer for delayed logic
-- `is_scene_tree_paused` - check whether the running scene tree is paused
-- `set_scene_tree_pause` - pause or unpause the running scene tree
-- `set_scene_tree_debug_collisions_hint` - toggle collision shape debug visualization
-- `reload_scene_tree_current_scene` - reload the currently running scene from disk
+- `call_scene_tree_group` - call a method on every node in a group in the running game's scene tree
+- `notify_scene_tree_group` - send a Godot notification to every node in a group in the running game's scene tree
+- `get_scene_tree_nodes_in_group` - list node paths of all nodes in a group in the running game's scene tree
+- `create_scene_tree_timer` - create a SceneTreeTimer for delayed logic in the running game's scene tree
+- `is_scene_tree_paused` - check whether the running game's scene tree is paused
+- `set_scene_tree_pause` - pause or unpause the running game's scene tree
+- `set_scene_tree_debug_collisions_hint` - toggle collision shape debug visualization in the running game's scene tree
+- `reload_scene_tree_current_scene` - reload the game's currently running scene from disk
 
 ## Scripts - script_tools (11)
 

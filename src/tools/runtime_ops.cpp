@@ -6,6 +6,7 @@
 #include "core/log_system.hpp"
 #include "core/monitor.hpp"
 #include "runtime/gda_protocol.hpp"
+#include "ready_policy.hpp"
 #include "tools/capture_ops.hpp"
 #include "tools/debugger_access.hpp"
 #include "util/error_util.hpp"
@@ -77,9 +78,11 @@ struct PendingRequest {
   State state = State::Waiting;
   JV response;
   std::string op;
+  std::string payload;
   int32_t session_id = -1;
   int32_t session_count = 0;
   bool error_breaks_suppressed = false;
+  bool awaiting_ready = false;
 };
 
 std::mutex g_pending_mtx;
@@ -213,7 +216,7 @@ void cancel_all_pending(const std::string &reason) {
 }
 
 JV send_request(int64_t request_id, const std::string &op, const JV &params,
-                bool suppress_error_breaks) {
+                bool suppress_error_breaks, bool wait_ready) {
   if (!debugger_capture_initialized())
     return error_json("debugger capture plugin not initialized");
 
@@ -233,10 +236,33 @@ JV send_request(int64_t request_id, const std::string &op, const JV &params,
   payload[GDA_FIELD_OP] = JV(op);
   payload[GDA_FIELD_PARAMS] = params;
 
+  const std::string payload_text = payload.Dump();
   int32_t used_session_id = -1;
   int32_t session_count = 0;
-  if (!debugger_broadcast_request(payload.Dump(), &used_session_id,
+  if (!debugger_broadcast_request(payload_text, &used_session_id,
                                   &session_count)) {
+    const ReadyDecision decision =
+        decide_game_request(debugger_ready_session_count(),
+                            debugger_active_session_count(), wait_ready);
+    if (decision == ReadyDecision::SendNow ||
+        decision == ReadyDecision::QueueForReady) {
+      {
+        std::lock_guard<std::mutex> lock(pending->mtx);
+        pending->payload = payload_text;
+        pending->awaiting_ready = true;
+      }
+      LogSystem::instance().log(
+          LogLevel::Info, LogCategory::Transport,
+          "game op \"" + op +
+              "\" queued until the game process reports gda:ready "
+              "(request_id " +
+              std::to_string(request_id) + ")");
+      JV queued(JV::object_tag);
+      queued["request_id"] = JV(request_id);
+      queued["result"] = JV("sent");
+      queued["queued_for_ready"] = JV(true);
+      return queued;
+    }
     {
       std::lock_guard<std::mutex> lock(pending->mtx);
       pending->state = PendingRequest::State::Cancelled;
@@ -245,16 +271,16 @@ JV send_request(int64_t request_id, const std::string &op, const JV &params,
     erase_pending(request_id, pending);
     if (suppress_error_breaks)
       restore_error_breaks();
-    if (debugger_active_session_count() > 0) {
-      return error_json(
-          "game started but not ready: the game process has not reported gda "
-          "ready yet — wait a moment after play, or verify the "
-          "game project loads the godot-autopilot extension");
+    if (decision == ReadyDecision::FailNotRunning) {
+      return error_json("game not running: no game process is attached — start "
+                        "the game from the editor first (play the scene), then "
+                        "retry; if the game was just started, wait a moment for "
+                        "it to report ready");
     }
-    return error_json("game not running: no game process is attached — start "
-                      "the game from the editor first (play the scene), then "
-                      "retry; if the game was just started, wait a moment for "
-                      "it to report ready");
+    return error_json(
+        "game started but not ready: the game process has not reported gda "
+        "ready yet — wait a moment after play, or verify the "
+        "game project loads the godot-autopilot extension");
   }
 
   pending->session_id = used_session_id;
@@ -473,10 +499,11 @@ mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms) {
     int32_t session_id = pending->session_id;
     int32_t session_count = pending->session_count;
     bool release_error_breaks = pending->error_breaks_suppressed;
+    bool awaiting_ready = pending->awaiting_ready;
     pending->error_breaks_suppressed = false;
     pending->state = PendingRequest::State::Cancelled;
-    erase_pending(request_id, pending);
     lock.unlock();
+    erase_pending(request_id, pending);
 
     size_t pending_count = 0;
     {
@@ -498,30 +525,43 @@ mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms) {
     schedule_timeout_recovery(session_id, request_id);
     if (release_error_breaks)
       restore_error_breaks();
-    JV error = error_json(
-        "game op \"" + op_name + "\" timed out after " +
-        std::to_string(timeout_ms) + " ms (request_id " +
-        std::to_string(request_id) + ") — sent to " +
-        std::to_string(session_count) + " debug session(s); " +
-        response_summary +
-        "; the game process may be paused or physics-frozen (query "
-        "get_game_status), or the game project may not load the "
-        "godot-autopilot extension. "
-        "If the in-game script errored, a pending await may "
-        "never complete — run get_game_log_entries to inspect "
-        "the game log. The plugin cancelled the request and, when the "
-        "debugger session was breaked, sent an engine continue so the "
-        "game main thread is released.");
+    JV error;
+    if (awaiting_ready) {
+      error = error_json(
+          "game op \"" + op_name + "\" timed out after " +
+          std::to_string(timeout_ms) + " ms (request_id " +
+          std::to_string(request_id) +
+          ") — the game process is connected but never reported gda:ready "
+          "while the request was queued (no gda:ready arrived during the "
+          "wait): verify the game project loads the godot-autopilot "
+          "extension, then wait a moment after play and retry; " +
+          response_summary);
+    } else {
+      error = error_json(
+          "game op \"" + op_name + "\" timed out after " +
+          std::to_string(timeout_ms) + " ms (request_id " +
+          std::to_string(request_id) + ") — sent to " +
+          std::to_string(session_count) + " debug session(s); " +
+          response_summary +
+          "; the game process may be paused or physics-frozen (query "
+          "get_game_status), or the game project may not load the "
+          "godot-autopilot extension. "
+          "If the in-game script errored, a pending await may "
+          "never complete — run get_game_log_entries to inspect "
+          "the game log. The plugin cancelled the request and, when the "
+          "debugger session was breaked, sent an engine continue so the "
+          "game main thread is released.");
+    }
     JV late_results = late_results_snapshot();
     if (late_results.IsArray() && !late_results.GetArray().empty())
       error["late_results"] = std::move(late_results);
     return error;
   }
-  erase_pending(request_id, pending);
   bool release_error_breaks = pending->error_breaks_suppressed;
   pending->error_breaks_suppressed = false;
   JV response = pending->response;
   lock.unlock();
+  erase_pending(request_id, pending);
   if (release_error_breaks)
     restore_error_breaks();
 
@@ -662,20 +702,21 @@ bool discard_pending(int64_t request_id, std::string &out_detail) {
 mcp::JsonValue start_pending_op(const std::string &op,
                                 const mcp::JsonValue &params,
                                 bool suppress_error_breaks,
-                                int64_t *out_request_id) {
+                                int64_t *out_request_id, bool wait_ready) {
   int64_t request_id = g_next_request_id.fetch_add(1);
   JV result;
   try {
     if (!has_editor_queue())
       return error_json("editor command queue not initialized");
     if (get_editor_queue().is_main_thread()) {
-      result = send_request(request_id, op, params, suppress_error_breaks);
+      result =
+          send_request(request_id, op, params, suppress_error_breaks, wait_ready);
     } else {
       result =
           get_editor_queue()
               .submit([&]() {
                 return send_request(request_id, op, params,
-                                    suppress_error_breaks);
+                                    suppress_error_breaks, wait_ready);
               })
               .get();
     }
@@ -778,20 +819,21 @@ void maybe_recover_break() {
 
 mcp::JsonValue handle_gda_send(const std::string &op,
                                const mcp::JsonValue &params, int64_t timeout_ms,
-                               bool suppress_error_breaks) {
+                               bool suppress_error_breaks, bool wait_ready) {
   int64_t request_id = g_next_request_id.fetch_add(1);
   JV result;
   try {
     if (!has_editor_queue())
       return error_json("editor command queue not initialized");
     if (get_editor_queue().is_main_thread()) {
-      result = send_request(request_id, op, params, suppress_error_breaks);
+      result =
+          send_request(request_id, op, params, suppress_error_breaks, wait_ready);
     } else {
       result =
           get_editor_queue()
               .submit([&]() {
                 return send_request(request_id, op, params,
-                                    suppress_error_breaks);
+                                    suppress_error_breaks, wait_ready);
               })
               .get();
     }
@@ -865,6 +907,69 @@ void run_channel_self_check(int32_t p_session_id) {
         LogLevel::Warning, LogCategory::Tools,
         std::string("runtime channel self-check failed to start waiter: ") +
             ex.what());
+  }
+}
+
+void on_session_ready(int32_t session_id) {
+  struct ReplayItem {
+    std::shared_ptr<PendingRequest> pending;
+    int64_t request_id = 0;
+    std::string op;
+    std::string payload;
+  };
+  std::vector<ReplayItem> replay_items;
+  {
+    std::lock_guard<std::mutex> lock(g_pending_mtx);
+    for (auto &entry : g_pending) {
+      const std::shared_ptr<PendingRequest> &pending = entry.second;
+      std::lock_guard<std::mutex> pending_lock(pending->mtx);
+      if (!pending->awaiting_ready ||
+          pending->state != PendingRequest::State::Waiting)
+        continue;
+      pending->awaiting_ready = false;
+      ReplayItem item;
+      item.pending = pending;
+      item.request_id = entry.first;
+      item.op = pending->op;
+      item.payload = pending->payload;
+      replay_items.push_back(std::move(item));
+    }
+  }
+  if (replay_items.empty())
+    return;
+  LogSystem::instance().log(
+      LogLevel::Info, LogCategory::Transport,
+      "gda:ready received (session " + std::to_string(session_id) + "): " +
+          std::to_string(replay_items.size()) +
+          " queued game op(s) to replay");
+  for (ReplayItem &item : replay_items) {
+    int32_t used_session_id = -1;
+    int32_t session_count = 0;
+    if (debugger_broadcast_request(item.payload, &used_session_id,
+                                   &session_count)) {
+      {
+        std::lock_guard<std::mutex> lock(item.pending->mtx);
+        item.pending->session_id = used_session_id;
+        item.pending->session_count = session_count;
+      }
+      record_sent_request(item.request_id, item.op);
+      LogSystem::instance().log(
+          LogLevel::Info, LogCategory::Transport,
+          "queued game op \"" + item.op + "\" replayed after gda:ready " +
+              "(request_id " + std::to_string(item.request_id) +
+              ", session " + std::to_string(used_session_id) + ")");
+      continue;
+    }
+    {
+      std::lock_guard<std::mutex> lock(item.pending->mtx);
+      item.pending->awaiting_ready = true;
+    }
+    LogSystem::instance().log(
+        LogLevel::Warning, LogCategory::Transport,
+        "queued game op \"" + item.op +
+            "\" could not be replayed; waiting for the next gda:ready "
+            "(request_id " +
+            std::to_string(item.request_id) + ")");
   }
 }
 

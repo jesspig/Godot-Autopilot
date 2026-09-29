@@ -5,6 +5,7 @@
 #include "property_ops.hpp"
 #include "resource_ops.hpp"
 #include "util/error_util.hpp"
+#include "util/inline_resource_json.hpp"
 #include "util/type_hint.hpp"
 #include "util/variant_json.hpp"
 #include <algorithm>
@@ -341,6 +342,31 @@ bool spec_trial_value(const godot::Dictionary &info,
                 "）失败：" + resource_error;
         return false;
       }
+      return true;
+    }
+    if (util::inline_resource::inspect(raw_value).shape !=
+        util::inline_resource::Shape::not_inline) {
+      property_ops::InlineResourceBuild inline_build;
+      try {
+        inline_build = property_ops::build_inline_resource_value(
+            info, raw_value, prop_name, loc, 1);
+      } catch (const std::exception &e) {
+        error = "应用属性 '" + prop_name + "'（位于 " + loc +
+                "）时发生异常：" + e.what();
+        return false;
+      } catch (...) {
+        error = "应用属性 '" + prop_name + "'（位于 " + loc +
+                "）时发生异常：unknown exception";
+        return false;
+      }
+      if (inline_build.has_error) {
+        const mcp::JsonValue *detail = inline_build.error.Find("error");
+        error = "应用属性 '" + prop_name + "'（位于 " + loc + "）失败：" +
+                (detail && detail->IsString()
+                     ? detail->GetString()
+                     : std::string("inline resource build failed"));
+        return false;
+      }
     }
     return true;
   }
@@ -409,6 +435,38 @@ bool spec_trial_props(godot::Node *node, const mcp::JsonValue &props,
   for (const auto &kv : props) {
     godot::Dictionary info;
     if (!spec_trial_find_property(node, kv.first, info)) {
+      if (kv.first.find('.') == std::string::npos && kv.second.IsObject() &&
+          !kv.second.GetObject().empty()) {
+        std::vector<std::string> family =
+            property_ops::find_property_family(node, kv.first);
+        if (!family.empty()) {
+          for (const auto &sub : kv.second.GetObject()) {
+            std::string name = kv.first + "/" + sub.first;
+            godot::Dictionary sub_info;
+            if (!spec_trial_find_property(node, name, sub_info)) {
+              std::string available;
+              for (size_t i = 0; i < family.size(); i++) {
+                if (i > 0)
+                  available += ", ";
+                available +=
+                    "'" + family[i].substr(kv.first.size() + 1) + "'";
+              }
+              error = "应用属性 '" + kv.first + "'（位于 " + loc +
+                      "）失败：property '" + kv.first +
+                      "' is a property family and must be expanded per item; "
+                      "item '" +
+                      sub.first +
+                      "' is not a valid family item; available items: " +
+                      available;
+              return false;
+            }
+            if (!spec_trial_value(sub_info, name, sub.second, loc, error))
+              return false;
+          }
+          checked_count++;
+          continue;
+        }
+      }
       error = "应用属性 '" + kv.first + "'（位于 " + loc +
               "）失败：property '" + kv.first + "' does not exist on " +
               util::to_std(node->get_class());

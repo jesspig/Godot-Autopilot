@@ -78,7 +78,8 @@ mcp::JsonValue handle_game_validate_ui_layout(const mcp::JsonValue &args);
 mcp::JsonValue handle_gda_send(const std::string &op,
                                const mcp::JsonValue &params,
                                int64_t timeout_ms,
-                               bool suppress_error_breaks = false);
+                               bool suppress_error_breaks = false,
+                               bool wait_ready = true);
 
 bool needs_error_break_suppression(const std::string &op,
                                    const std::string &action);
@@ -89,12 +90,15 @@ void restore_error_breaks();
 
 void run_channel_self_check(int32_t p_session_id);
 
+void on_session_ready(int32_t session_id);
+
 mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms);
 
 mcp::JsonValue start_pending_op(const std::string &op,
                                 const mcp::JsonValue &params,
                                 bool suppress_error_breaks,
-                                int64_t *out_request_id);
+                                int64_t *out_request_id,
+                                bool wait_ready = true);
 
 bool try_collect_response(int64_t request_id, mcp::JsonValue &out_response);
 

@@ -35,62 +35,8 @@ using namespace godot_autopilot;
 
 namespace {
 
-constexpr int WRAP_HEADER_LINES_SINGLE = 5;
-constexpr int WRAP_HEADER_LINES_MULTI = 5;
 constexpr int CODE_EXEC_DEFAULT_TIMEOUT_MS = 5000;
 constexpr int CODE_EXEC_MAX_TIMEOUT_MS = 30000;
-
-std::string map_line_numbers(const std::string &err_text, int offset,
-                             const std::string &tag) {
-  std::string mapped;
-  mapped.reserve(err_text.size());
-  const std::string marker = "gdscript://";
-  size_t pos = 0;
-  while (true) {
-    size_t mark = err_text.find(marker, pos);
-    if (mark == std::string::npos) {
-      mapped.append(err_text, pos, std::string::npos);
-      break;
-    }
-    mapped.append(err_text, pos, mark - pos);
-    size_t name_start = mark + marker.size();
-    size_t name_end = err_text.find('.', name_start);
-    bool is_gd_colon = name_end != std::string::npos &&
-                       err_text.compare(name_end, 4, ".gd:") == 0;
-    bool name_matches =
-        tag.empty() || err_text.compare(name_start, tag.size(), tag) == 0;
-    if (!is_gd_colon || !name_matches) {
-      mapped.append(marker);
-      pos = name_start;
-      continue;
-    }
-    size_t num_start = name_end + 4;
-    size_t num_end = num_start;
-    while (num_end < err_text.size() &&
-           std::isdigit(static_cast<unsigned char>(err_text[num_end]))) {
-      ++num_end;
-    }
-    if (num_end == num_start) {
-      mapped.append(marker);
-      pos = name_start;
-      continue;
-    }
-    std::string name = err_text.substr(name_start, name_end - name_start);
-    int original = std::stoi(err_text.substr(num_start, num_end - num_start));
-    std::string replacement;
-    if (original - offset > 0) {
-      replacement = "gdscript://" + name +
-                    ".gd:" + std::to_string(original - offset) +
-                    " (mapped to user source line " +
-                    std::to_string(original - offset) + ")";
-    } else {
-      replacement = "gdscript://" + name + ".gd:" + std::to_string(original);
-    }
-    mapped += replacement;
-    pos = num_end;
-  }
-  return mapped;
-}
 
 struct TempNodeGuard {
   godot::Node *&node;
@@ -161,6 +107,7 @@ struct ExecContext {
   std::chrono::steady_clock::time_point start_time;
   bool has_func_def = false;
   std::string wrapped;
+  int wrap_offset = 5;
   godot::Ref<godot::GDScript> script;
   godot::Node *scene_root_for_leak = nullptr;
   int child_count_before = 0;
@@ -208,54 +155,17 @@ bool build_wrapped_source(ExecContext &ctx, std::string &error_out) {
     if (!gdscript_wrap::defines_function_named(cleaned, ctx.func_name)) {
       ctx.wrapped += "func " + ctx.func_name + "():\n    pass\n";
     }
+    ctx.wrap_offset = 5;
   } else {
-    std::string cleaned = gdscript_wrap::strip_extends_lines(ctx.source_code);
-
-    {
-      std::istringstream stream(cleaned);
-      std::string line;
-      while (std::getline(stream, line)) {
-        size_t pos = line.find_first_not_of(" \t");
-        if (pos == std::string::npos || line[pos] == '#')
-          continue;
-        if (pos + 1 < line.size() && line[pos] == '/' && line[pos + 1] == '/')
-          continue;
-        if (line.compare(pos, 5, "func ") == 0 ||
-            line.compare(pos, 5, "func\t") == 0 ||
-            (line.compare(pos, 4, "func") == 0 && pos + 4 < line.size() &&
-             line[pos + 4] == '(')) {
-          mcp::JsonValue detail = godot_autopilot::util::error_detail(
-              "func definition detected in single-function mode", "source_code",
-              "no func definitions while in single-function mode",
-              "top-level func definitions require multi-function mode; use "
-              "editor script_create or wrap in a lambda");
-          error_out = detail.Find("error")->GetString();
-          return false;
-        }
-      }
-    }
-
-    gdscript_wrap::IndentStyle indent =
-        gdscript_wrap::scan_indent_style(cleaned);
-
-    if (indent.uses_tabs && indent.uses_spaces) {
-      mcp::JsonValue detail = godot_autopilot::util::error_detail(
-          "mixed tab/space indentation detected in source", "source_code",
-          "consistent indentation",
-          "reindent source with only tabs or only spaces; note the wrapper "
-          "requires the same indentation style throughout");
-      error_out = detail.Find("error")->GetString();
+    gdscript_wrap::WrapResult wrap = gdscript_wrap::wrap_bare_body(
+        ctx.source_code, ctx.func_name,
+        "var SceneRoot := EditorInterface.get_edited_scene_root()", false);
+    if (!wrap.ok) {
+      error_out = wrap.error;
       return false;
     }
-
-    std::string prefix = gdscript_wrap::indent_prefix(indent);
-
-    ctx.wrapped = "@tool\nextends Node\n\nfunc " + ctx.func_name + "():\n";
-
-    ctx.wrapped +=
-        prefix + "var SceneRoot := EditorInterface.get_edited_scene_root()\n";
-    ctx.wrapped += gdscript_wrap::reindent_lines(cleaned, prefix);
-    ctx.wrapped += "\n";
+    ctx.wrapped = wrap.wrapped;
+    ctx.wrap_offset = wrap.header_lines + 1;
   }
   return true;
 }
@@ -276,8 +186,6 @@ bool compile_and_map_errors(ExecContext &ctx, std::string &error_out) {
     std::string err_name = "ERR_UNKNOWN";
     if (code == 43)
       err_name = "ERR_PARSE_ERROR";
-    int map_offset =
-        ctx.has_func_def ? WRAP_HEADER_LINES_MULTI : WRAP_HEADER_LINES_SINGLE;
     std::string message = gdscript_wrap::compose_compile_failure_message(
         "GDScript compilation failed: " + err_name +
             " (code " + std::to_string(code) + ")",
@@ -286,7 +194,8 @@ bool compile_and_map_errors(ExecContext &ctx, std::string &error_out) {
         ctx.wrapped,
         [&](const std::string &captured) {
           return gdscript_wrap::truncate_capture_text(
-                     map_line_numbers(captured, map_offset, "")) +
+                     gdscript_wrap::map_error_line_numbers(
+                         captured, ctx.wrap_offset)) +
                  "\nerror lines above were mapped from the generated wrapper "
                  "script";
         });

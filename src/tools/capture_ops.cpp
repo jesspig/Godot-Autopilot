@@ -433,6 +433,14 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
   }
 
   if (target == "game") {
+    bool wait_ready = true;
+    if (auto *wait_p = args.Find("wait_ready")) {
+      if (!wait_p->IsBool()) {
+        return util::error_json(
+            "invalid parameter: wait_ready must be a boolean");
+      }
+      wait_ready = wait_p->GetBool();
+    }
     int64_t timeout_ms = GDA_DEFAULT_TIMEOUT_MS;
     if (auto *tp = args.Find("timeout_ms")) {
       if (tp->IsInt() && tp->GetInt() > 0)
@@ -479,7 +487,8 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
       return util::error_json(
           "diff_image is only supported for target='editor'");
     }
-    return runtime_ops::handle_gda_send("capture", params, timeout_ms);
+    return runtime_ops::handle_gda_send("capture", params, timeout_ms, false,
+                                        wait_ready);
   }
   if (target != "editor") {
     return util::error_detail("invalid target '" + target + "'",

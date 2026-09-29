@@ -6,37 +6,37 @@ tags:
   - 模块
   - 领域工具
   - A组
-timestamp: "2026-09-20T23:08:39+08:00"
+timestamp: "2026-09-29T01:15:06+08:00"
 resource: src/tools/
 ---
 
 # 领域工具模块（src/tools/，A 组 16 模块）
 
-> 09-18 E2E 优化批次增补（详见 `changelog/2026-09-18-log.md` 19:30 节）：`save_editor_scene[_as]` 成功回执 `memory_nodes/disk_nodes/nodes_match`（失配附 `missing_paths`+`warning`，可选 `include_paths/include_hash`，`src/tools/editor_ops.cpp:213 attach_save_receipt`）+ 只读 `verify_scene_saved`（`src/util/scene_verify.*` 新建，FNV-1a 可选哈希）；`save_editor_scene_as` 补 `path` 回显；`create_script` 成功态补 `result.disk_bytes/content_hash/content_hash_algo`（`result` 信封内）；新增 `patch_script`（`SideEffect::WritesFile` + `kMutating`，锚点 replace/insert + preview/dry_run + 编译门 + 回滚，`src/tools/script_patch_ops.*`）；`get_editor_file_system_tree` 加 `depth/prefix/filter`；数字错误码统一 `error_code/error_name/hint`（49 项映射，`editor_ops.cpp:64 editor_error_name`）；`build_nodes_from_spec`（`SideEffect::None` + `kMutating`，声明式建树+整体回滚，`src/tools/scene_spec_ops.*`）。
+> 09-18 E2E 优化批次增补（详见 `changelog/2026-09-18-log.md` 19:30 节）：`save_editor_scene[_as]` 成功回执 `memory_nodes/disk_nodes/nodes_match`（失配附 `missing_paths`+`warning`，可选 `include_paths/include_hash`，`attach_save_receipt`；09-29 起核验口径改为可落盘集合并附 `inherited_*`，见下文 editor_ops 小节）+ 只读 `verify_scene_saved`（`src/util/scene_verify.*` 新建，FNV-1a 可选哈希）；`save_editor_scene_as` 补 `path` 回显；`create_script` 成功态补 `result.disk_bytes/content_hash/content_hash_algo`（`result` 信封内）；新增 `patch_script`（`SideEffect::WritesFile` + `kMutating`，锚点 replace/insert + preview/dry_run + 编译门 + 回滚，`src/tools/script_patch_ops.*`）；`get_editor_file_system_tree` 加 `depth/prefix/filter`；数字错误码统一 `error_code/error_name/hint`（49 项映射，`editor_ops.cpp:64 editor_error_name`）；`build_nodes_from_spec`（`SideEffect::None` + `kMutating`，声明式建树+整体回滚，`src/tools/scene_spec_ops.*`）。
 
-> 审计日期：2026-09-19（2026-08-12 初稿；08-17 补 YAML frontmatter；08-20 随 rename 事务化 + 新工具同步；08-21 随 ToolBase 类重构同步——`tool_defs.def`/`TOOL_ENTRY` 移除，注册与计数口径改为 `<域>_tools.hpp`/`ToolRegistry`；08-22 15 时全量一致性审计——editor 计数 23、RENAME_HINTS 10 条、resolve_scene_node/RidStore/rid_from_json/NODE_NOT_FOUND_HINT 归一至 util 共享头、get_docs_class 补 enums/constants；08-29 随 0.2.2 版本与全量审计同步——336→363、35→42、174→178、26→30 域重核；09-13 上午随反馈修复批次同步——363→365、42→49、178→180，property 数组/NodeType 转换与写失败 fail fast、资源 CoW/reload_resource/copy_resource_file/标签清理、create_editor_scene timeout_ms 诊断；09-13 下午随收口批次同步——A 组 180 不变（新增 get_plugin_log 归 B 组，域工具 365→366）、严格 JSON 形状与值类型 readback、save_resource 磁盘重读 verified、ray 空间诊断字段、get_editor_settings enum 元数据；09-13 17:50 随 B 组知识库审计同步——补全 scene_ops 工具表（rename_scene_node/reparent_node）与 rename stale_references 字段口径；09-13 晚随 0.2.4 版知识库全量审计同步——修正 handle_delete 的 undo/redo 口径、input 未识别键/按键实际报错（删除"静默失败点"表述）、physics 配对计数（15 对含空间查询）与 rid_store<PhysicsRidDomain> 标签名、script handle_reload 缓存失效归属、editor save_all_scenes 直接调用与文件树截断 max_depth 字段、config get_engine_version string 字段、property_set undo 注册、group find_node 3 处与响应字段、editor 撤销四件套全名、resource 收集函数实名等代码-文档偏差；A 组 180/366 复核不变；09-14 随修复批次同步——property_set/严格形状增 Vector2/2i 对象要求与数组报错、set_resource_property 接入严格转换、get_scene_tree 的 include_properties 属性摘要修复；09-15 随 Computer Use grounding 批次同步——域工具 379 = 322 非 SIDE + 57 SIDE，A 组 191（新增 editor_ui_ops 3 / editor_ui_actions 3 / input_click_ops 4，scene +1、input +4、editor +6）、scene_ops 的 get_scene_node_screen_rect、catalog/index 387；09-16 随失败修复批次同步——域工具 384 = 324 非 SIDE + 60 SIDE，A 组 193（editor_ui_ops +2：scene_tree_items / select_scene_tree_node）、写工具响应回显 scene_path/scene_unsaved、资源属性内联描述一步创建 [sub_resource]、catalog/index 392），09-16 随坐标换算/键名统一/脚本新鲜度/UID 守卫/CJK 往返/open 幂等/属性两轮批次同步——scene 两轮应用、input_map 裸名等价、script fresh 与 cache_refreshed、resource add/set 选择、open already_open，域工具 384→385（B 组 capture +1，非 SIDE 324→325），基于当前工作树代码逐行核对（不依赖 git 历史）；09-17 随 T09+T12 文档同步批次更新 save_editor_scene_as 登记口径（删 tab_rebuilt 与 close+reopen）、create_editor_scene 多签秒级失败、delete_scene_node 跨帧 undo 与选中清理、改脚本后先 reload_game_scripts 工作流）；09-18 E2E 优化批次与 09-19 ToolSpec 数据化重构——域工具 385→391、A 组 193→196（新增 `verify_scene_saved`/`patch_script`/`build_nodes_from_spec`，新增 handler 文件 `scene_spec_ops`/`script_patch_ops`），工具声明全量改为 `ToolSpec` 数据记录（删除 `GDA_TOOL_CLASS` 宏/真类与全部 schema 文件），遍历改为运行时枚举 392 条后按 `side_effect`/`mutating`/`dynamic` 字段排除（330 个进入空参+冒烟两步骤，实测全过）。
+> 审计日期：2026-09-29（2026-08-12 初稿；08-17 补 YAML frontmatter；08-20 随 rename 事务化 + 新工具同步；08-21 随 ToolBase 类重构同步——`tool_defs.def`/`TOOL_ENTRY` 移除，注册与计数口径改为 `<域>_tools.hpp`/`ToolRegistry`；08-22 15 时全量一致性审计——editor 计数 23、RENAME_HINTS 10 条、resolve_scene_node/RidStore/rid_from_json/NODE_NOT_FOUND_HINT 归一至 util 共享头、get_docs_class 补 enums/constants；08-29 随 0.2.2 版本与全量审计同步——336→363、35→42、174→178、26→30 域重核；09-13 上午随反馈修复批次同步——363→365、42→49、178→180，property 数组/NodeType 转换与写失败 fail fast、资源 CoW/reload_resource/copy_resource_file/标签清理、create_editor_scene timeout_ms 诊断；09-13 下午随收口批次同步——A 组 180 不变（新增 get_plugin_log 归 B 组，域工具 365→366）、严格 JSON 形状与值类型 readback、save_resource 磁盘重读 verified、ray 空间诊断字段、get_editor_settings enum 元数据；09-13 17:50 随 B 组知识库审计同步——补全 scene_ops 工具表（rename_scene_node/reparent_node）与 rename stale_references 字段口径；09-13 晚随 0.2.4 版知识库全量审计同步——修正 handle_delete 的 undo/redo 口径、input 未识别键/按键实际报错（删除"静默失败点"表述）、physics 配对计数（15 对含空间查询）与 rid_store<PhysicsRidDomain> 标签名、script handle_reload 缓存失效归属、editor save_all_scenes 直接调用与文件树截断 max_depth 字段、config get_engine_version string 字段、property_set undo 注册、group find_node 3 处与响应字段、editor 撤销四件套全名、resource 收集函数实名等代码-文档偏差；A 组 180/366 复核不变；09-14 随修复批次同步——property_set/严格形状增 Vector2/2i 对象要求与数组报错、set_resource_property 接入严格转换、get_scene_tree 的 include_properties 属性摘要修复；09-15 随 Computer Use grounding 批次同步——域工具 379 = 322 非 SIDE + 57 SIDE，A 组 191（新增 editor_ui_ops 3 / editor_ui_actions 3 / input_click_ops 4，scene +1、input +4、editor +6）、scene_ops 的 get_scene_node_screen_rect、catalog/index 387；09-16 随失败修复批次同步——域工具 384 = 324 非 SIDE + 60 SIDE，A 组 193（editor_ui_ops +2：scene_tree_items / select_scene_tree_node）、写工具响应回显 scene_path/scene_unsaved、资源属性内联描述一步创建 [sub_resource]、catalog/index 392），09-16 随坐标换算/键名统一/脚本新鲜度/UID 守卫/CJK 往返/open 幂等/属性两轮批次同步——scene 两轮应用、input_map 裸名等价、script fresh 与 cache_refreshed、resource add/set 选择、open already_open，域工具 384→385（B 组 capture +1，非 SIDE 324→325），基于当前工作树代码逐行核对（不依赖 git 历史）；09-17 随 T09+T12 文档同步批次更新 save_editor_scene_as 登记口径（删 tab_rebuilt 与 close+reopen）、create_editor_scene 多签秒级失败、delete_scene_node 跨帧 undo 与选中清理、改脚本后先 reload_game_scripts 工作流）；09-18 E2E 优化批次与 09-19 ToolSpec 数据化重构——域工具 385→391、A 组 193→196（新增 `verify_scene_saved`/`patch_script`/`build_nodes_from_spec`，新增 handler 文件 `scene_spec_ops`/`script_patch_ops`），工具声明全量改为 `ToolSpec` 数据记录（删除 `GDA_TOOL_CLASS` 宏/真类与全部 schema 文件），遍历改为运行时枚举 392 条后按 `side_effect`/`mutating`/`dynamic` 字段排除（330 个进入空参+冒烟两步骤，实测全过）；09-29 随工具语义与韧性批次（B1–B7）同步——域工具按运行时核算 392（A 组 197）、全系统 400（338 非空 schema + 62 空），遍历枚举 393 条、候选 322、排除 71（含 8 个 SceneTree 工具改走游戏通道，`SideEffect::GameRuntime`）；property 路径支持引擎原生斜杠属性名与属性族展开、严格形状补齐 Plane 与向量分量分支；`scene_verify` 核验口径改可落盘集合（新增 `inherited_*` 输出）；三脚本通道统一 `gdscript_wrap` 包装与行映射；游戏通道新增 `wait_ready` 就绪排队与重放；dispatch 增加主线程预算与停摆快速失败（详见 [security_contract](../security_contract.md) §4）。
 > 覆盖范围：`src/tools/` 下 18 对 `.cpp/.hpp`：scene_ops、scene_tree_ops、property_ops、group_ops、input_ops、input_map_ops、physics_ops、nav_ops、resource_ops、script_ops、config_ops、doc_ops、editor_ops、editor_ui_ops、editor_ui_actions、input_click_ops、scene_spec_ops（09-18 新增，`build_nodes_from_spec`）、script_patch_ops（09-18 新增，`patch_script`）。
-> 统计口径：工具数以 `src/tools/*_tools.hpp` 的 `make_tools()`/`ToolSpec` 条目为准（一个工具 = 一份 `ToolSpec` 数据 + 一个 `handle_` 函数，两口径一致）；当前 391 个域工具中本页 16 模块占 196 个。每个工具的参数表（`std::vector<ParamSpec>`）与 `make_spec_tool(ToolSpec{...})` 内联在对应 `<域>_tools.hpp`。注册经 `register_all.cpp` 调用 30 组 `<域>_tools::make_tools()` 汇入单一 `ToolRegistry`；L2 遍历不再按源码枚举，改为运行时经 `search_tools` 枚举后按字段排除（见 [../modules/tools_registry.md](../modules/tools_registry.md)）。
+> 统计口径：工具数以 `src/tools/*_tools.hpp` 的 `make_tools()`/`ToolSpec` 条目为准（一个工具 = 一份 `ToolSpec` 数据 + 一个 `handle_` 函数，两口径一致）；当前 392 个域工具中本页 16 模块占 197 个（09-29 起口径：全系统 400 = 392 域工具 + `system_status` 1 + 7 个元工具；遍历运行时枚举 393 条 / 排除 71 / 候选 322；数值以运行时统计为准，见 [../tests.md](../tests.md)）。每个工具的参数表（`std::vector<ParamSpec>`）与 `make_spec_tool(ToolSpec{...})` 内联在对应 `<域>_tools.hpp`。注册经 `register_all.cpp` 调用 30 组 `<域>_tools::make_tools()` 汇入单一 `ToolRegistry`；L2 遍历不再按源码枚举，改为运行时经 `search_tools` 枚举后按字段排除（见 [../modules/tools_registry.md](../modules/tools_registry.md)）。
 
 ## 模块简介
 
 这 16 个模块是领域工具的前半部分：覆盖场景节点操作、属性/信号、分组、输入模拟与 InputMap、物理（2D/3D 双份）、导航、资源生命周期、脚本与 GDScript 执行、项目/引擎/编辑器配置、引擎类文档查询、编辑器会话管理，以及编辑器 UI 语义自动化（元素枚举/命中/点击/文本/快捷键）与合成鼠标输入。全部位于命名空间 `godot_autopilot::<模块>_ops`，与 AGENTS.md 约定一致。
 
-30 个域 `_tools.hpp` 共声明 **391 个领域工具**（每工具一份 `ToolSpec`；其中 60 个声明非空 `side_effect`、62 个带 `kMutating`），本页 16 模块占其中 **196 个（50.1%）**。`register_all.cpp` 注册 30 组 `<域>_tools::make_tools()`（另加 `system_status` 1 与 7 个元工具，catalog/index 共 399）汇入单一 `ToolRegistry`，catalog/index/`dispatch::g_handlers`/`server.RegisterTool()` 全部由其派生；领域工具不直接注册到 MCP 服务器，统一经元工具 `call_tool` 分发（见 [../modules/tools_registry.md](../modules/tools_registry.md)）。
+30 个域 `_tools.hpp` 共声明 **392 个领域工具**（每工具一份 `ToolSpec`；其中 69 个声明非空 `side_effect`，另有 2 个仅以 `kMutating` 排除，遍历共排除 71 个），本页 16 模块占其中 **197 个（50.3%）**。`register_all.cpp` 注册 30 组 `<域>_tools::make_tools()`（另加 `system_status` 1 与 7 个元工具，catalog/index 共 400；schema 统计 338 非空 + 62 空）汇入单一 `ToolRegistry`，catalog/index/`dispatch::g_handlers`/`server.RegisterTool()` 全部由其派生；领域工具不直接注册到 MCP 服务器，统一经元工具 `call_tool` 分发（见 [../modules/tools_registry.md](../modules/tools_registry.md)）。
 
 ## 模块总览
 
 | 模块（命名空间） | handle_ 函数数 | 注册工具数 | 核心职责 |
 |---|---|---|---|
 | `scene_ops` | 7 | 8（`build_nodes_from_spec` 的 handler 在 `scene_spec_ops`） | 编辑场景节点创建/删除/实例化/树遍历/节点屏幕坐标映射/声明式建树 |
-| `scene_tree_ops` | 8 | 8 | SceneTree 层操作：组调用、暂停、定时器 |
+| `scene_tree_ops` | 8 | 8 | 运行中游戏进程的 SceneTree 转发（组调用、暂停、定时器、重载；经游戏通道，永不触碰编辑器树） |
 | `property_ops` | 5 | 5 | 节点属性读写、属性列表、信号连接 |
 | `group_ops` | 3 | 3 | 节点分组增删查（可撤销、持久化） |
 | `input_ops` | 11 | 15（4 个新增合成输入 handler 在 input_click_ops） | Input 单例模拟按键/鼠标/手柄/动作 |
 | `input_map_ops` | 8 | 8 | InputMap 运行期动作增删改查与持久化 |
 | `physics_ops` | 48 | 48 | PhysicsServer 2D/3D 对象与空间查询（含挂靠 Debug 类的 `get_debug_object_info`） |
 | `nav_ops` | 15 | 15 | NavigationServer 2D/3D 地图/区域/代理 |
-| `resource_ops` | 26 | 26 | 资源加载/保存/创建/重载/复制/UID/导入/依赖/反查（含 09-13 新增 reload_resource/copy_resource_file） |
+| `resource_ops` | 27 | 27 | 资源加载/保存/创建/重载/复制/UID/导入与导入选项/依赖/反查（含 09-13 新增 reload_resource/copy_resource_file） |
 | `script_ops` | 10 | 11（`patch_script` 的 handler 在 `script_patch_ops`） | GDScript 执行、脚本附加/属性/调用、锚点补丁 |
 | `config_ops` | 13 | 13 | ProjectSettings/Engine/EditorSettings |
 | `doc_ops` | 4 | 4 | ClassDB 类/方法/属性文档查询 |
@@ -44,9 +44,9 @@ resource: src/tools/
 | `editor_ui_ops` | 5 | —（工具注册计入 editor_ops 行） | 编辑器 UI：元素枚举、命中测试、视口几何映射、场景树行枚举（只读） |
 | `editor_ui_actions` | 3 | —（工具注册计入 editor_ops 行） | 编辑器 UI 动作：按元素 path 点击、文本输入、快捷键注入（副作用） |
 | `input_click_ops` | 4 | —（工具注册计入 input_ops 行） | 编辑器进程合成鼠标点击/滚轮/拖拽与焦点文本输入（副作用） |
-| **合计** | **—** | **196** | |
+| **合计** | **—** | **197** | |
 
-> 注：`handle_ 函数数`按实现文件计数（跨文件 handler 单独成行，如 `scene_spec_ops`/`script_patch_ops`），`注册工具数`按域归并（跨文件 handler 计入对应域），两列口径不同故不做行合计；注册工具数合计 196 与域计数一致。
+> 注：`handle_ 函数数`按实现文件计数（跨文件 handler 单独成行，如 `scene_spec_ops`/`script_patch_ops`），`注册工具数`按域归并（跨文件 handler 计入对应域），两列口径不同故不做行合计；注册工具数合计 197 与域计数一致。
 
 ## 公共模式
 
@@ -54,7 +54,7 @@ resource: src/tools/
 - **成功返回**：`{"result": <值>}`；写场景类工具额外带 `undo` 提示字段（如 `create_scene_node` 返回 `undo: "delete node <path> (delete_scene_node)"`），部分带 `note`/`warning`/`serialization_note` 辅助字段。
 - **脏标记**：scene_ops、group_ops、property_ops 修改编辑场景后调用 `scene_dirty_tracker::mark_scene_modified()`；editor_ops 不标记脏，而是在保存/新建/打开场景成功后调用 `clear_scene_modified()`（见 [../modules/core.md](../modules/core.md)）。
 - **异常兜底**：`dispatch::call_handler` 对 handler 的 C++ 异常 `catch(...)` 后返回 `{"error": "internal error in tool '<name>'..."}`；导出期间（ExportGuard 置位）所有领域工具返回固定错误 `{"error":"editor is exporting; retry after export completes"}`。
-- **线程**：handler 内部不直接判断线程；`dispatch::call_handler`（`dispatch.cpp`）在非主线程时经 `CommandQueue::submit().get()` 桥接，与 core.md 的线程模型一致。
+- **线程**：handler 内部不直接判断线程；`dispatch::call_handler`（`dispatch.cpp`）在非主线程时经 `dispatch::run_on_main_thread_with_budget` 桥接——默认预算、健康探针与 `kLongBlocking` 例外见 [security_contract](../security_contract.md) §4；超时取消未 drain 任务并返回结构化 `main_thread_timeout` 错误，与 core.md 的线程模型一致。
 
 ## scene_ops（7 工具）
 
@@ -83,24 +83,24 @@ resource: src/tools/
 - **写工具场景回显（09-16 起）**：create_scene_node / delete_scene_node / property_set / rename_scene_node / attach_script_to_node 的成功响应附 `scene_path`（目标场景磁盘路径）与 `scene_unsaved`（是否未保存）——用于发现"未切换到预期场景时的静默误建"；15_scene_path L2 用例覆盖。
 - 路径解析复用 `util::resolve_scene_node`（`src/util/scene_path.hpp`）。
 
-## scene_tree_ops（8 工具）
+## scene_tree_ops（8 工具，全部经游戏通道）
 
-职责：`SceneTree` 级操作（运行期/编辑器通用）。注册工具：
+职责：对**运行中游戏进程**的 `SceneTree` 操作（09-29 起语义变更）。8 个工具全部经游戏通道转发 `GDA_OP_SCENE_TREE`（`scene_tree` op）到游戏进程执行，**永不触碰编辑器树**；声明 `SideEffect::GameRuntime`，受 `game_runtime` 授权门约束，无游戏进程时返回结构化错误。注册工具：
 
-| 工具名 | 说明 |
-|---|---|
-| `call_scene_tree_group` / `notify_scene_tree_group` | 对组内节点调用方法 / 发通知 |
-| `create_scene_tree_timer` | 创建 SceneTreeTimer |
-| `get_scene_tree_nodes_in_group` | 组内节点路径列表 |
-| `is_scene_tree_paused` / `set_scene_tree_pause` | 暂停状态读写 |
-| `set_scene_tree_debug_collisions_hint` | 碰撞调试绘制开关 |
-| `reload_scene_tree_current_scene` | 重载当前场景 |
+| 工具名 | 游戏侧 action | 说明 |
+|---|---|---|
+| `call_scene_tree_group` / `notify_scene_tree_group` | `call_group` / `notify_group` | 对组内节点调用方法（可选 `arguments` 数组）/ 发通知（整数 `notification`） |
+| `create_scene_tree_timer` | `create_timer` | 创建 SceneTreeTimer（`delay_sec` + 可选 `process_always`/`process_in_physics`） |
+| `get_scene_tree_nodes_in_group` | `get_nodes_in_group` | 组内节点绝对路径列表 |
+| `is_scene_tree_paused` / `set_scene_tree_pause` | `is_paused` / `set_pause` | 游戏 SceneTree 暂停状态读写（编辑器自身永不被暂停） |
+| `set_scene_tree_debug_collisions_hint` | `set_debug_collisions_hint` | 游戏进程碰撞调试绘制开关 |
+| `reload_scene_tree_current_scene` | `reload_current_scene` | 从磁盘重载游戏当前场景 |
 
 关键实现事实：
 
-- `get_tree()` 解析顺序：`EditorInterface.get_edited_scene_root().get_tree()` → 回退 `Engine.get_main_loop()` cast 为 `SceneTree`；两者皆无返回 `{"error": "SceneTree not available"}`。
-- `handle_call_group`：参数经 `VariantJson::deserialize` 转 Godot 数组后传 `tree->call_group(group, method, args)`；无参数时调用两参版本。
-- `handle_create_timer` 返回 `SceneTreeTimer` 序列化结果；`handle_reload_current_scene` 直接返回 `godot::Error` 枚举整数值（不映射为可读字符串）。
+- 每个 handler 校验必填参数（`group_name`/`method`/`notification`/`enabled`/`paused`/`delay_sec`）后经 `runtime_ops::handle_gda_send` 提交；游戏侧 `op_scene_tree`（`src/runtime/game_bridge.cpp`）支持上述 8 个 action，未知 action 返回支持清单。
+- 附加信息（`set_pause` 的 `paused`、`set_debug_collisions_hint` 的 `enabled`、`create_timer` 的 `note` 等）挂在 `result` 的兄弟键；客户端可见值仍是 `result`。`reload_current_scene` 无当前场景时返回引擎 `ERR_UNCONFIGURED`（3）整数；`create_timer` 不回传 SceneTreeTimer 对象（跨进程不可传，note 提示在游戏侧观察效果）。
+- 与编辑器侧场景工具（`get_scene_tree`、`scene_tree_items` 等）职责正交：那些工具操作编辑场景，本组只操作运行中游戏。
 
 ## property_ops（5 工具）
 
@@ -114,15 +114,16 @@ resource: src/tools/
 关键实现事实：
 
 - `handle_set` 类型推导：`type_hint` 未指定时从属性字典自动推导——OBJECT 类型或 `PROPERTY_HINT_RESOURCE_TYPE` 用 `hint_string` 作为类名，否则用 Variant 类型名。
-- **严格 JSON 形状（09-13 下午起）**：值转换改走 `VariantJson::deserialize_strict`（`variant_json.hpp`）——Rect2/Rect2i 的 `size` 需 `{w,h}`（或别名 `{x,y}`，同轴两拼写并存且值不同即报错），AABB 的 `size` 需 `{w,h,d}`（或 `{x,y,z}`），Transform2D 必须 `columns`（≥3 列、每列 ≥2 数字），Transform3D 必须 `basis.rows`（≥3 行、每行 ≥3 数字）；违规抛 `std::runtime_error`，经 dispatch 以 `internal error in tool 'property_set': invalid ...` 透出完整提示（此前文档形状与实现不一致会导致静默零写入）。09-14 起 Vector2/Vector2i 亦纳入严格分支：必须为 `{x,y}` 对象，数组输入报 `invalid Vector2: expected a JSON object, e.g. {"x":0,"y":0}`（此前数组静默写 0）。
+- **严格 JSON 形状（09-13 下午起）**：值转换改走 `VariantJson::deserialize_strict`（`variant_json.hpp`）——Rect2/Rect2i 的 `size` 需 `{w,h}`（或别名 `{x,y}`，同轴两拼写并存且值不同即报错），AABB 的 `size` 需 `{w,h,d}`（或 `{x,y,z}`），Transform2D 必须 `columns`（≥3 列、每列 ≥2 数字），Transform3D 必须 `basis.rows`（≥3 行、每行 ≥3 数字）；违规抛 `std::runtime_error`，经 dispatch 以 `internal error in tool 'property_set': invalid ...` 透出完整提示（此前文档形状与实现不一致会导致静默零写入）。09-14 起 Vector2/Vector2i 亦纳入严格分支：必须为 `{x,y}` 对象，数组输入报 `invalid Vector2: expected a JSON object, e.g. {"x":0,"y":0}`（此前数组静默写 0）。09-29 起再补齐：`Plane` 支持 `{normal:{x,y,z},d}` 与顶层 `{x,y,z,d}` 两种形状（缺字段或混用两种形状报错；零法线且 `d`≠0 报错并点名 `WorldBoundaryShape3D`/Jolt 拒绝该平面）；`Vector3/Vector3i/Vector4/Vector4i/Quaternion/Color` 分量字段必填（缺字段报错），`Basis`/`Projection` 保持 `rows`/`columns` 形状并逐分量校验。
 - 资源赋值接 `resource_ops::try_resolve_resource_value`；**拒绝把 `memory://` 内存资源赋给节点属性**（返回错误，说明会损坏场景文件，要求先 `save_resource` 落盘）。
+- **引擎原生斜杠属性名与属性族展开（09-29 起）**：属性路径先查反射属性表，斜杠属性名（如 `theme_override_colors/font_color`）不再被格式校验拒绝；不存在时错误附候选与族提示（`the exact name is per item, e.g. 'theme_override_colors/font_color'`）。把**属性族名**作为键、对象作为值（如 `theme_override_colors: {"font_color": ...}`）时，若对象的全部键都能映射到 `族名/键` 精确属性则展开为逐项写入，响应附 `expanded_from`；任一键无效即确定性报错（列出可用项），不做部分写入。`property_set` 与 `build_nodes_from_spec` 的 dry_run 走同一展开判定。
 - **写后 undo 注册**：写入成功后把变更注册进编辑器 undo 栈（action `Set Property <property> on <path>`，do/undo 均写该属性），旧值随响应 `undo` 字段（path/property/old_value）返回；旧值或新值为 Object 引用时不注册，返回 `undoable:false` + `undo_skip_reason`（编辑器撤销栈无法可靠恢复对象引用）。
 - **Node 类型属性 + 节点路径自动转引用（09-13 扩展）**：`handle_set` 检测目标属性 `type==OBJECT`、hint 为 `PROPERTY_HINT_NODE_TYPE`（引擎值 34，含 C# `[Export]` 节点字段），或 hint 为 `PROPERTY_HINT_RESOURCE_TYPE` 且 `hint_string` 指向 Node 子类时，若 `value` 为字符串（节点路径），以编辑场景根 `get_node_or_null()` 解析后赋**节点对象引用**（而非 NodePath Variant），使其保存场景时正确落入 `node_paths`、实例化后还原为节点引用。解析失败返回 `error_detail`（含当前场景根与合法路径写法指引，不再静默 ok）；成功结果带 `converted_node_path` 字段标注。判断辅助 `parse_hint_class`/`is_node_class`（容错 `Type:` 前缀、逗号 token）。
 - **数组属性逐元素转换（09-13 新增）**：属性 `type==ARRAY` 时不再整体反序列化——① 非数组 JSON 值直接报错 `refusing to write (a non-array value would silently clear the array)`（传 `[]` 显式清空）；② 从属性元数据 `hint_string`（`PROPERTY_HINT_TYPE_STRING` 形如 `type/hint:class`）解析元素类型（`util::parse_array_element_hint`，`type_hint.hpp`）；Node 元素接受路径字符串或 `{"__node_ref__": "..."}`，资源元素接受 `res://`/`memory://` 字符串或 `{"path": ...}`/`{"resource": ...}`，`null` 留空槽；③ 元素类型无法确定而元素是对象/数组时拒绝写入；④ 依声明类型构建 typed array，元素不匹配时报错。无法安全表达的元素一律报错，不静默丢弃。
 - 写后 readback 校验：`util::check_readback` 的 `type_sensitive` 参数（`readback_util.hpp`）在 Object/数组属性外，09-13 下午起对 16 类值类型（Vector2/2i、Rect2/2i、Vector3/3i、Transform2D、Vector4/4i、Plane、Quaternion、AABB、Basis、Transform3D、Projection、Color）同样启用——先按分量近似比较（1e-5 相对 + 1e-6 绝对）判定 MATCHED；回读值仍等于旧值判 REJECTED（"设置未生效"）；值被引擎调整判 CONVERTED（附 `warning`）。Object/数组路径保留原语义（回读为 nil、数组被清空或元素为 null 判 REJECTED，返回 `value not applied` 错误并尝试恢复旧值，恢复结果写入错误文案）。
 - `property_get_list` 新增可选过滤（09-13 起）：`only_script_variables`（仅 usage 含 `PROPERTY_USAGE_SCRIPT_VARIABLE`（4096）的脚本声明变量）与 `property_filter`（属性名大小写敏感子串）。
 - Camera2D 特例：`enabled`（默认值 true 不序列化）与 `current`（无 setter，需 `code_execute` 调 `make_current()`）返回 `serialization_note` 指导。
-- 属性名纠错提示：Levenshtein 距离候选 + `PROPERTY_RENAME_HINTS` 重命名映射表（10 条，如 `frames→sprite_frames`、`cast_to→target_position`、`rect_position→position`、`translation→position` 等，与 AGENTS.md 中 Godot 4.x 迁移事实一致；表定义在 `property_ops.cpp:67-78`）。
+- 属性名纠错提示：Levenshtein 距离候选 + `PROPERTY_RENAME_HINTS` 重命名映射表（10 条，如 `frames→sprite_frames`、`cast_to→target_position`、`rect_position→position`、`translation→position` 等，与 AGENTS.md 中 Godot 4.x 迁移事实一致；表定义在 `property_ops.cpp:67-78`）；斜杠属性族前缀（如 `theme_override_colors`）另给 "the exact name is per item" 提示。
 - 信号连接默认 `persist=true`（CONNECT_PERSIST，随场景保存）；`signal_disconnect` 幂等（`not_connected` 不算错误）。
 - **源码注释归档 2026-09-19**（行号为归档前 HEAD 行号）：`is_readback_value_type` 的值类型清单与 `util::check_readback` 的近似比较清单保持同步，改清单时两处同改（`property_ops.cpp:556`）；`property_get` 批量读一次往返返回多属性，缺失项进 `missing`、不使整批失败（`property_ops.cpp:901`）。
 
@@ -224,7 +225,7 @@ resource: src/tools/
 - 地图创建默认不激活（`map_set_active` 需显式传 `active: true`）；区域创建支持 `enabled`/`navigation_layers` 初始参数。
 - `set_nav_3d_region_navigation_mesh` 接受 `NavigationMesh` 资源（可经 `ResourceLoader` 加载路径传入）；路径返回点为 Vector2/Vector3 数组序列化（`{x,y[,z]}`）。
 
-## resource_ops（26 工具）
+## resource_ops（27 工具）
 
 职责：资源生命周期管理——加载/保存/重载/创建/复制/UID/文件操作/依赖/反查/导入，是资源类工具（Resources 类别）的完整实现。注册工具：
 
@@ -235,7 +236,7 @@ resource: src/tools/
 | `get_resource_type` / `has_resource` / `get_resource_types` / `get_resource_extensions` | 类型与存在性 |
 | `get_resource_dir_files` / `get_resource_uid` / `set_resource_uid` / `remove_resource_file` / `rename_resource_file` / `move_resource_file` / `create_directory` | 文件系统操作 |
 | `get_resource_dependencies` / `has_resource_dependency` / `get_resource_references` | 依赖正向查询 / 反查（谁引用了某资源） |
-| `reimport_resource_files` | 编辑器导入（原 `resource_import` 已删除） |
+| `reimport_resource_files` / `set_resource_import_options` | 编辑器导入（原 `resource_import` 已删除）/ 已导入资产 `.import` 白名单选项写入 + 排队重导入 |
 | `get_resource_property` / `set_resource_property` | 内存资源属性 |
 
 关键实现事实：
@@ -255,7 +256,7 @@ resource: src/tools/
 - **`rename_resource_file` 事务化（08-20 起）**：改名不再只是 Move+索引重建——① 先搬运伴生 `.uid` 文件（保 uid 不重生成，P0-2 修复）；② rename 前扫描 res:// 全部 `.tscn/.tres` 收集依赖，rename 后对命中 `path="<旧>"` 的依赖做文本回写（P0-1 修复），写前关闭读句柄、写后 flush/close 并回读验证，验证不过入 `stale_references` 而非乐观上报；③ 返回结构化影响报告 `{result, updated_files:[{file,changes}], stale_references:[{file,token}], uid_preserved}`（P2-1；`token` 为残留引用字面量，二进制资源另见 `unsupported_binary_references:[{file,reason}]`）；④ `script_class` 因无法可靠确认全局类名（曾依赖 `ResourceLoader.load` 重入编辑器文件系统，有崩溃风险）一律列入 `stale_references` 由调用方人工确认。**目录参数 fail fast（09-13 起）**：`path` 是目录时报"directory rename not supported"并指引改用 `move_resource_file`（目录改名不会改写依赖引用）。`get_resource_references` 复用同一扫描器反查引用（path/uid/class_name 三选一）。
 - **目录 move 排除 sidecar（09-13 起）**：`move_resource_file` 目录遍历时跳过 `.uid`/`.import` sidecar，主文件各自走引用改写事务、sidecar 随主文件迁移再统一清理，避免 sidecar 被当独立文件重复搬运。
 - **移动/删除后自动关闭旧路径标签（09-13 起）**：rename/move/remove 后仍指向旧路径的已打开场景标签会被自动关闭，响应附 `closed_tabs`；当前正在编辑的标签或无法关闭的标签留开并在 `closed_tabs_warning` 中说明；`remove_resource_file` dry-run 另在 `open_tabs` 中预告受影响标签。
-- 工程约束：res:// 下文本/文件递归收集（`collect_matching_files(_budget)`/`collect_all_file_paths(_budget)`）统一用 `join_path` 拼接（`res://` 根免产生 `res:///` 三重斜杠，否则 WRITE 提交会失败并残留 `.tmp`）。
+- 工程约束：res:// 下文本/文件递归收集（`collect_matching_files(_budget)`/`collect_all_file_paths(_budget)`）统一用 `join_path` 拼接（`res://` 根免产生 `res:///` 三重斜杠，否则 WRITE 提交会失败并残留 `.tmp`）；文件系统根判定（save 目标是否为 `res://`/`user://` 命名空间根）09-29 起经共享 `util/resource_fs.hpp::is_resource_root_dir` 实现。
 - **源码注释归档 2026-09-19**：`uid_needs_add` 的 add/set 选择依据引擎断言行号 `core/io/resource_uid.cpp:164`（`add_id` 要求 id 不在表）与 `:178`（`set_id` 要求已在表）（4.7.2 树，注释原位于 `resource_ops.cpp:35-37`，归档前 HEAD 行号）。
 
 ## script_ops（10 工具）
@@ -264,7 +265,7 @@ resource: src/tools/
 
 | 工具名 | 说明 |
 |---|---|
-| `execute_script` | 执行 GDScript（单表达式自动返回） |
+| `execute_script` | 执行 GDScript（单表达式自动返回；单函数/裸语句统一包装并支持行号映射） |
 | `load_script` / `create_script` / `reload_script` | 脚本资源加载/创建/重载 |
 | `attach_script_to_node` / `detach_script_from_node` | 附加/分离 |
 | `get_script_property` / `set_script_property` / `call_script_node` | 属性与方法调用 |
@@ -272,11 +273,12 @@ resource: src/tools/
 
 关键实现事实：
 
-- `handle_execute_gdscript`：`is_single_expression` 判定（无换行、非纯赋值、首词不在 18 个关键字黑名单如 if/for/func/return/var/await…）时自动把表达式值作为返回值；多行代码需显式 `return`；输出经 `truncate_capture_text` 截断至 `MAX_CAPTURE_BYTES = 8192` 字节（两常量均定义于共享头 `util/gdscript_wrap.hpp`，与 code_exec_ops 共用）。
+- `handle_execute_gdscript`（09-29 起包装与行映射统一到 `gdscript_wrap`）：`is_single_expression` 判定（无换行、非纯赋值、首词不在 18 个关键字黑名单如 if/for/func/return/var/await…）时自动把表达式值作为返回值（`wrap_bare_body` 的 `single_expression_auto_return=true`）；多行/裸语句需显式 `return`；单函数与裸语句模式共用同一包装层，编译/运行错误经 `gdscript_wrap::map_error_line_numbers` 按 `header_lines + 1` 回映射（09-29 起新增行映射）；输出经 `truncate_capture_text` 截断至 `MAX_CAPTURE_BYTES = 8192` 字节（常量与包装层定义于共享头 `util/gdscript_wrap.hpp`，与 code_exec_ops/游戏侧共用）。
 - 节点路径提示常量：执行节点挂在 `/root` 下而非编辑场景内，`NODE_NOT_FOUND_HINT`（`util/gdscript_wrap.hpp`）指导用 `SceneRoot.get_node(...)` 访问编辑场景节点。
 - `handle_reload`：默认从磁盘重读并重编译（见下 `fresh` 口径），`keep_state`（默认 false）透传给最终 `reload(keep_state)`——已有存活实例（节点已挂该脚本）时 `keep_state` 须为 true，否则返回 `ERR_ALREADY_IN_USE`；返回 Error 整数码（0=OK）。`invalidate_cached_resource`（仅摘除 ResourceCache 实例、不碰 GDScriptCache，REUSE 装载仍命中旧实例）已退为 `[[maybe_unused]]` 保留给「只摘除、不重读」场景，不再用于刷新路径。
 - 资源序列化 `serialize_resource` 返回 `class/path/object_id/object_id_str`（无 name）。
 - **脚本取用口径 fresh（09-16 起）**：godot-cpp 生成头的 `ResourceLoader::load()` 缺省 `p_cache_mode=(CacheMode)1=CACHE_MODE_REUSE`——只传 path 会命中 ResourceCache/GDScriptCache 直接返回旧实例、不读盘；从磁盘拿版本必须显式传 `CACHE_MODE_IGNORE`（GDScript 格式加载器经此重 `load_source_code()+reload()`）。`script_load_cache_mode(fresh)` / `wants_fresh_load(args)`（纯函数，L1 直测）封装该选择：只读工具 `load_script` / `get_script_property`（仅 script_path 分支）/ `get_script_property_list` 新增可选 `fresh`（缺省 false，只认字面 true，保持既有 REUSE 语义）；`attach_script_to_node` 与 `reload_script` 恒走 fresh 重读（节点不再拿到陈旧实例，`reload_script` 另按编辑器同款姿势再 `reload(true)` 一次保证缓存与使用者一致）。`create_script` 写盘后改走 `load_script_fresh`（IGNORE 装载刷新一次）替代原摘除逻辑：响应字段 `cache_invalidated` 改为 `cache_refreshed`（bool）+ 失败时 `cache_refresh_error`（刷新失败不使写入失败）；`source_code` 与 `execute_script` 包装源码、`build_script_diagnostics`（`text_ops.cpp` 同改 IGNORE 装载）统一改 `String::utf8` 构造——`String(const char*)` 是 latin1 构造，CJK 内容会逐字节变字符、落盘成乱码且 readback 失败。18_script_freshness / 19_cjk_roundtrip L2 与 `script_freshness_test` L1 覆盖。改完运行中游戏所用脚本后先调 `reload_game_scripts` 再 `reload_current_scene`/重试——单重载场景不保证重读磁盘版本（`CACHE_MODE_REUSE`），`create_script` 响应 `note` 与游戏侧注记同述（09-17 起，见 [B 组](../modules/tools_ops_b.md)的游戏运行时小节）。
+- **`create_script` 目录创建与写盘（09-29 起）**：父目录经共享 `resource_fs::ensure_parent_directory` 创建，创建失败直接报错，不再被吞掉后静默失败。
 
 - **源码注释归档 2026-09-19**（行号均为归档前 HEAD 行号）：缺省 `p_cache_mode=(CacheMode)1` 即 `CACHE_MODE_REUSE` 出自 godot-cpp 生成头（注释原位于 `script_ops.cpp:30-38`）；`fresh` 只认字面 `true`，缺省/非布尔值保持 REUSE，防既有客户端升版后取用口径静默变化（`script_ops.cpp:44-45`）；`load_script_fresh` 的二次 `reload(true)` 对标编辑器同款姿势 `editor/script/script_editor_plugin.cpp:2562-2565`（`script_ops.cpp:218-220`）；落盘链为 `ResourceFormatSaverGDScript::save → FileAccess::store_string`（写 String 的 UTF-8 字节），`latin1` 构造会让 CJK 逐字节变字符（`script_ops.cpp:447-449`）；写盘自证用 FNV-1a-64 因仓内无 SHA 实现，`disk_bytes`/`content_hash` 均来自磁盘 readback 而非内存回显（`script_ops.hpp:12-16`、`script_ops.cpp:533-534`）；编译门 `path_for_cache` 仅用于 `set_path_cache`、不触碰磁盘（`script_ops.hpp:21-24`）；`patch_script` 多处命中只改第一处并如实回报 `anchor_occurrences`（`script_patch_ops.cpp:200`），回读失败回滚原文后仍以 `result`（`verified=false` + `write_issue/warning`）而非 `error` 回报（`script_patch_ops.cpp:313-314`），回滚写回用同款 UTF-8 构造保证字节一致（`script_patch_ops.cpp:88`）；同文件并发写不加锁，调用方须串行，沿用 `create_script` 口径（`script_patch_ops.hpp:9-13`）。
 
@@ -331,6 +333,7 @@ resource: src/tools/
 关键实现事实：
 
 - `handle_save_all_scenes` 直接调 `editor->save_all_scenes()`；`get_unsaved_scenes` 经 `editor->call()` 反射获取（godot-cpp 无该 API 绑定），用于 create/open/close 的未保存检测与 `editor_scene_state_json` 诊断。
+- **保存回执与 `verify_scene_saved` 的可落盘核验口径（09-29 起）**：`scene_verify` 只统计会写入 `.tscn` 的节点与连接（`owner==场景根`，根自特判），子场景实例内部节点/连接不落盘、计入 `inherited_nodes`/`inherited_connections`（不参与 match）；`verify_scene_saved` 与保存回执在存在时输出 `inherited_nodes`/`inherited_connections`/`inherited_paths`（上限 50，超限 `inherited_truncated`）；`missing_paths` 仅列真正缺失的节点；失配等多项告警在 `warning` 中以分号拼接，不再互相覆盖（保存回执另含 `memory_connections`/`disk_connections`/`connections_match`）。
 - **`create_editor_scene` 可靠性（09-13 起）**：新增 `timeout_ms`（默认 `GDA_NEW_SCENE_SWITCH_WAIT_MS=2000`，允许 50-30000，非整数或越界直接报错）；超时失败时释放未被编辑器接管的临时根节点（`node_released`），并返回 `waited_ms`/`timeout_ms`/`node_released`/`editor_state`（`edited_root`/`unsaved_scenes`/`file_system{scanning,progress}`）诊断；`close_current` 各失败路径先释放临时节点再报错；多签占用秒级失败（09-17 起）：`close_current` 仅关闭当前签，关闭后编辑根仍非空说明另有邻签占用，直接返回明确错误 + `editor_state`，不进入 `add_root_node` + 轮询空转至超时——多签并存时逐个调 `close_editor_scene` 关空后再建。
 - **`save_editor_scene` 失败返回 `error` 字段**（含 error code 与路径，不再只回原始枚举值）；**`save_editor_scene_as` 成功返回 `{result:"saved"}`** 并附 `tab_path_registered`/`tab_rebuilt`——Godot 4.7 的 `EditorInterface::save_scene_as` 不更新编辑器内部标签路径，且 GDExtension 无页签登记 API（`Node::set_scene_file_path` 只改节点属性、不更新编辑器页签表，不得冒用），故路径未注册时 close+reopen 重建标签以保持路径一致（`tab_rebuilt` 为 reopen 后编辑根路径匹配结果），重建失败附 `warning`（09-13 起；09-17 纠正：P12 初版曾删除该 fallback，经 L2 实证为负载行为已恢复）。caveat：重建会关闭再打开场景，页签焦点可能变化，为正确性必要代价；L2 `07_scene_tabs`/`13_inline_subresource` 依赖此语义（无 reopen 时 `get_unsaved_scenes` 报空路径、`reload_editor_scene` 报 scene is not open）。
 - **`reload_editor_scene` 未打开的场景返回 error**（"scene is not open"）而非假成功；成功返回 `{result:"reloaded", scene_path, observed?}`（`observed:true` 表示已确认编辑根路径匹配）（09-13 起）。
@@ -391,6 +394,7 @@ resource: src/tools/
 - 自顶向下建单节点并递归子节点：挂接后立刻设 `owner` 为场景根（根节点自身除外），否则落盘时 `PackedScene` 静默丢弃；任一步失败由顶层统一回滚整棵子树（`scene_spec_ops.cpp:232-233`）。
 - 释放语义：显式自底向上释放子树，不依赖析构语义，调用前顶层节点已从父节点摘除；整体回滚摘除顶层已建节点并释放整棵子树，场景无残留（`scene_spec_ops.cpp:282`、`296`、`397-398`）。
 - 与 `create_scene_node` 对齐：按顶层类型切换 2D/3D 主屏（`scene_spec_ops.cpp:472`）；成根时 `delete_scene_node` 会拒删根节点，撤销提示改为关场景（`scene_spec_ops.cpp:502`）。
+- **dry_run 与真实写入一致（09-29 起）**：dry_run 试运行对 OBJECT 内联资源描述走与真实写入相同的构建器 `property_ops::build_inline_resource_value`（已在 `property_ops.hpp` 公开），逐属性应用含回读；属性族对象值按与 `property_set` 相同的展开判定逐项校验；全部通过才返回可写入。
 
 ## text_ops（源码注释归档 2026-09-19）
 
@@ -412,10 +416,10 @@ resource: src/tools/
 | 文档 | 声称 | 代码事实 | 判定 |
 |---|---|---|---|
 | AGENTS.md（命名约定） | 工具命名 `<动词>_<类别>_<维度>_<对象>_<修饰>`，动词置首，如 `intersect_physics_2d_ray` | 本组符合；`signal_connect`/`signal_disconnect`（动词置首，无类别段）、config_ops 的 `get_project_settings`/`set_engine_*`/`get_editor_settings`（类别段为 project/engine/editor，与文件名 `config_` 不一致）属规范内的长短变化 | 一致 ✓（动词置首） |
-| AGENTS.md（工具总数） | 391 领域工具 | 30 个 `*_tools.hpp` 的 `make_tools()` 恰为 391 份 `ToolSpec`；本页 16 模块 196 个 | 一致 ✓ |
+| AGENTS.md（工具总数） | 以运行时统计为准 | 30 个 `*_tools.hpp` 的 `make_tools()` 恰为 392 份 `ToolSpec`；本页 16 模块 197 个；全系统 400（含 `system_status` 与 7 个元工具） | 一致 ✓ |
 | AGENTS.md（错误模式） | 领域工具返回 `{"error": "消息"}` | 一致；另有 `error_detail` 扩展格式与 dispatch `catch(...)` 兜底、导出期固定错误 | 一致 ✓（有扩展） |
-| AGENTS.md（契约缺口 3 项） | `create_scene_node` 不校验必填；`get_resource_extensions` 缺 type 返回全类型；`reimport_resource_files` 空参静默成功 | 三项均在代码中逐一确认（默认 "NewNode"/"Node"；空 type 传 `""`；count=0 返回 queued） | 一致 ✓ |
-| AGENTS.md（遍历排除） | 62 个 `side_effect`/`mutating` 工具排除 | 60 个工具声明非空 `side_effect` + `kMutating`，另 2 个（`fill_tilemap_rect`/`build_nodes_from_spec`）仅 `kMutating`；L2 遍历运行时枚举 392 条后经 `get_tool_detail` 的 `side_effect`/`mutating`/`dynamic` 字段排除（330 个进入两步骤），不再硬编码清单 | 一致 ✓ |
+| AGENTS.md（契约缺口 3 项 + 已知 schema 告警 4 项） | `create_scene_node` 不校验必填；`get_resource_extensions` 缺 type 返回全类型；`reimport_resource_files` 空参静默成功；L2 另有 4 项已知 schema 告警（schema 声明必填而空参不报错）：`get_resource_extensions`、`reimport_resource_files`、`start/stop_input_gamepad_vibration` | 均在代码中逐一确认（默认 "NewNode"/"Node"；空 type 传 `""`；count=0 返回 queued；振动缺参回退 device/weak/strong 默认值） | 一致 ✓ |
+| AGENTS.md（遍历排除） | 数值以运行时统计为准 | 69 个工具声明非空 `side_effect`，另 2 个（`fill_tilemap_rect`/`build_nodes_from_spec`）仅 `kMutating`，排除合计 71；L2 遍历运行时枚举 393 条后经 `get_tool_detail` 的 `side_effect`/`mutating`/`dynamic` 字段排除（322 个进入两步骤），不再硬编码清单 | 一致 ✓ |
 | 命名归属 | 类别前缀应反映模块 | `get_scene_tree` 注册在 scene_ops（非 scene_tree_ops）——旧 `scene_tree_get`/`scene_get_tree` 双名已合并，不再语义重叠 | 已消解 ✓ |
 | AGENTS.md（架构） | 工具经 `call_tool` 代理、`register_all.cpp` 的 `g_handlers` 映射分发 | 工具由 `<域>_tools::make_tools()` 汇入 `ToolRegistry`，`register_all.cpp` 由 registry 派生填充 `g_handlers` 与 catalog；`dispatch.cpp` 非主线程走 `queue.submit()` | 一致 ✓ |
 | `input_ops` | （无文档声明） | `parse_key`/`parse_mouse_button` 对未识别名称返回 `KEY_NONE`/`MOUSE_BUTTON_NONE`，但 `press/release_input_key`、`press/release_input_mouse_button` 随即返回 `invalid key`/`invalid mouse button` 错误 | 一致 ✓（本页已注明，非静默失败） |

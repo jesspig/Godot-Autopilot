@@ -7,6 +7,7 @@
 #include "util/error_util.hpp"
 #include "util/readback_util.hpp"
 #include "util/project_path.hpp"
+#include "util/resource_fs.hpp"
 #include "util/type_hint.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/class_db_singleton.hpp>
@@ -268,8 +269,7 @@ std::string scan_directory_case_conflict(const std::string &save_dir) {
 }
 
 bool is_filesystem_root_dir(const std::string &dir) {
-  return dir.empty() || dir == "res://" || dir == "res:/" || dir == "res:" ||
-         dir == "user://" || dir == "user:/" || dir == "user:";
+  return resource_fs::is_resource_root_dir(dir);
 }
 
 bool ensure_save_directory(const std::string &save_dir, bool &dirs_created,

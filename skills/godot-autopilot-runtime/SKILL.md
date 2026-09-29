@@ -1,3 +1,8 @@
+---
+name: godot-autopilot-runtime
+description: "Godot runtime and debugging guide: launch and stop the game, input injection with frame-accurate timing, pause semantics, three log and error paths, the error watermark confirmation loop and runtime inspection. Use when running the game, simulating input or diagnosing problems."
+---
+
 # Runtime and Debugging with godot-autopilot
 
 Invocation: use the native MCP tools first; when that channel is down, use the script bridge `node .agents/skills/godot-autopilot-tools/scripts/gda_mcp.mjs` (Node 18+ or Bun); with neither installed, build a manual plan per `references/manual-fallback.md` of the godot-autopilot-tools skill.
@@ -33,18 +38,21 @@ Two prerequisites must hold:
    that project).
 
 Without an attached game, tools fail with `game not running` — start the
-game from the editor first, then retry. Once attached but not yet ready,
-tools fail with:
+game from the editor first, then retry. Once attached but not yet ready, the
+default `wait_ready: true` queues the request and replays it as soon as the
+game reports `gda:ready`, so the call waits instead of failing; pass
+`wait_ready: false` to fail immediately with:
 
 ```text
 game started but not ready: the game process has not reported gda ready yet — wait a moment
 after play, or verify the game project loads the godot-autopilot extension
 ```
 
-The bridge reports ready asynchronously right after launch, so one early
-failure immediately after `play_editor_current_scene` is normal: wait a
-moment and retry. If the error persists, the game project does not load the
-extension.
+The bridge reports ready asynchronously right after launch. A queued call
+times out if `gda:ready` never arrives (the timeout error says the request
+was queued for readiness); if `wait_ready: false` calls keep failing while a
+game process is attached, the game project does not load the extension —
+enable the plugin there.
 
 Every game call has a three-layer timeout budget: the host waits
 `timeout_ms` + 2000 ms (response grace) for the game answer, and that host
@@ -192,8 +200,14 @@ the frames waited, never a silent hang.
 The forensics pattern is act first, then condition, then capture:
 
 ```json
-{"name": "call_tool", "arguments": {"name": "capture_game_viewport", "arguments": {"when": "get_node(\"HUD/MessageLabel\").text != \"\"", "timeout_ms": 4000}}}
+{"name": "call_tool", "arguments": {"name": "capture_game_viewport", "arguments": {"when": "get_node(\"HUD/MessageLabel\").visible and get_node(\"HUD/MessageLabel\").text != \"\"", "timeout_ms": 4000}}}
 ```
+
+Always gate text conditions on visibility: hiding a label does not reset
+its text, so a text-only condition stays true forever once the text was
+set. The full deterministic-verification recipe (single-script
+teleport-await-read, no cross-call timing) is in
+references/runtime-inspection.md.
 
 Both parameters exist on `capture_game_viewport` and on
 `capture_editor_viewport` with `target` `game`. The editor target rejects them:
@@ -249,9 +263,13 @@ coordinates, or with `execute_game_script` using `path`.
   modifications reset to the saved file. Without a running scene it returns
   `ERR_UNCONFIGURED` (3).
 - `execute_game_script` runs code inside the game process: `action` `script`
-  (the source must extend Node and define `_run()`), `get_property`,
-  `set_property` or `call_method`. `persist` (default false) keeps the
-  temporary node alive under `/root/__gda_runtime`.
+  takes either a complete GDScript defining `func _run()` (used as-is) or
+  bare statements, auto-wrapped into `extends Node` + `func _run()` — the
+  same bare-statement wrapping as the editor channels, so a value needs an
+  explicit `return` and wrapped calls report `wrapped: true`; `get_property`,
+  `set_property` or `call_method` inspect or modify node state instead.
+  `persist` (default false) keeps the temporary node alive under
+  `/root/__gda_runtime`.
 - `reload_game_scripts` reloads GDScript files in the running game without
   restarting it (pass a `paths` array of `res://` script paths). The request
   is applied during the game's next idle poll and no confirmation is

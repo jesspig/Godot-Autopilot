@@ -1,19 +1,18 @@
 #!/usr/bin/env python3
-"""构建期把 src/util/skill_templates/ 嵌入为 C++ 生成头（契约 gda_embed_contract.md §3）。"""
+"""构建期把 skills/ 标准目录布局嵌入为 C++ 生成头。"""
 
 import argparse
 import json
-import re
 import sys
-from collections import Counter
-from pathlib import Path, PurePath
+from pathlib import Path
+import re
 
 # Windows 控制台默认 cp1252，中文日志会触发 UnicodeEncodeError；CI 经 PYTHONUTF8 双保险
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
 
 SKILL_COUNT = 9
-# 与 src/util/skill_templates/registry.json 的册数保持同步
+# 与 skills/ 下的子目录数保持同步
 NAME_PATTERN = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 MAX_NAME_LEN = 64
 MAX_DESCRIPTION_LEN = 1024
@@ -27,131 +26,199 @@ def die(errors):
     sys.exit(1)
 
 
-def read_text(path):
-    # newline="" 保留原始换行，保证嵌入内容与 .md 逐字节一致
-    with open(path, "r", encoding="utf-8", newline="") as f:
+def read_bytes(path):
+    with open(path, "rb") as f:
         return f.read()
+
+
+def unescape_quoted(inner, label, errors):
+    out = []
+    i = 0
+    while i < len(inner):
+        c = inner[i]
+        if c == "\\":
+            if i + 1 >= len(inner):
+                errors.append(f"{label}: 字符串尾部悬空转义")
+                return None
+            nxt = inner[i + 1]
+            if nxt == '"' or nxt == "\\":
+                out.append(nxt)
+                i += 2
+            else:
+                errors.append(f"{label}: 非法转义 \\{nxt}")
+                return None
+        else:
+            out.append(c)
+            i += 1
+    return "".join(out)
+
+
+def parse_skill_md(data, label, errors):
+    if data.startswith(b"\xef\xbb\xbf"):
+        errors.append(f"{label}: 含 UTF-8 BOM")
+        return None
+    nl = b"\r\n" if data.startswith(b"---\r\n") else b"\n"
+    if not data.startswith(b"---" + nl):
+        errors.append(f"{label}: 首行须为 ---")
+        return None
+    lines = data.split(nl)
+    try:
+        end = lines.index(b"---", 1)
+    except ValueError:
+        errors.append(f"{label}: frontmatter 缺少结束 ---")
+        return None
+    fields = {}
+    for raw in lines[1:end]:
+        try:
+            text = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            errors.append(f"{label}: frontmatter 非 UTF-8")
+            return None
+        if not text.strip():
+            errors.append(f"{label}: frontmatter 内不允许空行")
+            return None
+        if ":" not in text:
+            errors.append(f"{label}: frontmatter 行缺键: {text!r}")
+            return None
+        key, _, value = text.partition(":")
+        key = key.strip()
+        value = value.strip()
+        if key in fields:
+            errors.append(f"{label}: frontmatter 键重复: {key!r}")
+            return None
+        if key not in ("name", "description"):
+            errors.append(f"{label}: frontmatter 未知键: {key!r}")
+            return None
+        fields[key] = value
+    for key in ("name", "description"):
+        if key not in fields:
+            errors.append(f"{label}: frontmatter 缺键: {key!r}")
+            return None
+    name = fields["name"]
+    if len(name) >= 2 and name[0] == '"' and name[-1] == '"':
+        errors.append(f"{label}: name 须为裸字符串")
+        return None
+    desc_raw = fields["description"]
+    if not (len(desc_raw) >= 2 and desc_raw[0] == '"' and desc_raw[-1] == '"'):
+        errors.append(f"{label}: description 须为双引号字符串")
+        return None
+    description = unescape_quoted(desc_raw[1:-1], label, errors)
+    if description is None:
+        return None
+    rest = lines[end + 1:]
+    while rest and rest[0] == b"":
+        rest = rest[1:]
+    try:
+        body = nl.join(rest).decode("utf-8")
+    except UnicodeDecodeError:
+        errors.append(f"{label}: 正文非 UTF-8")
+        return None
+    return name, description, body
+
+
+def validate_and_load(skills_dir):
+    errors = []
+    if not skills_dir.is_dir():
+        die([f"skills 目录不存在: {skills_dir}"])
+
+    entries = []
+    seen_names = set()
+    referenced = set()
+    for child in sorted(skills_dir.iterdir(), key=lambda p: p.name):
+        if not child.is_dir():
+            errors.append(f"skills/ 根下不允许零散文件: {child.name!r}")
+            continue
+        name = child.name
+        label = f"skills/{name}"
+        if not NAME_PATTERN.fullmatch(name):
+            errors.append(f"{label}: 目录名非法（须匹配 ^[a-z0-9]+(-[a-z0-9]+)*$）")
+        elif len(name) > MAX_NAME_LEN:
+            errors.append(f"{label}: 目录名超长: {len(name)} > {MAX_NAME_LEN}")
+        elif name in seen_names:
+            errors.append(f"{label}: skill 重复")
+        else:
+            seen_names.add(name)
+
+        skill_md = child / "SKILL.md"
+        if not skill_md.is_file():
+            errors.append(f"{label}: 缺 SKILL.md")
+            continue
+        parsed = parse_skill_md(read_bytes(skill_md), label + "/SKILL.md", errors)
+        if parsed is None:
+            continue
+        parsed_name, description, body = parsed
+        if parsed_name != name:
+            errors.append(f"{label}/SKILL.md: frontmatter name {parsed_name!r} 与目录名不一致")
+            continue
+        if not description:
+            errors.append(f"{label}/SKILL.md: description 须为非空字符串")
+            continue
+        if len(description) > MAX_DESCRIPTION_LEN:
+            errors.append(f"{label}/SKILL.md: description 超长: {len(description)} > {MAX_DESCRIPTION_LEN}")
+            continue
+        referenced.add(skill_md)
+
+        files = [("SKILL.md", body)]
+        files_ok = True
+        for sub in sorted(child.iterdir(), key=lambda p: p.name):
+            if sub == skill_md:
+                continue
+            if sub.is_dir():
+                if sub.name not in ("references", "scripts"):
+                    errors.append(f"{label}: 未知子目录: {sub.name!r}")
+                    files_ok = False
+                    continue
+                for item in sorted(sub.iterdir(), key=lambda p: p.name):
+                    if not item.is_file():
+                        errors.append(f"{label}/{sub.name}: 不允许嵌套目录: {item.name!r}")
+                        files_ok = False
+                        continue
+                    rel = f"{sub.name}/{item.name}"
+                    if sub.name == "references":
+                        if not item.name.endswith(".md"):
+                            errors.append(f"{label}: {rel} 须为 .md 文件")
+                            files_ok = False
+                            continue
+                    else:
+                        if not item.name.endswith(".mjs"):
+                            errors.append(f"{label}: {rel} 须为 .mjs 文件")
+                            files_ok = False
+                            continue
+                    raw = read_bytes(item)
+                    if raw.startswith(b"\xef\xbb\xbf"):
+                        errors.append(f"{label}: {rel} 含 UTF-8 BOM")
+                        files_ok = False
+                        continue
+                    try:
+                        files.append((rel, raw.decode("utf-8")))
+                    except UnicodeDecodeError:
+                        errors.append(f"{label}: {rel} 非 UTF-8")
+                        files_ok = False
+                        continue
+                    referenced.add(item)
+            else:
+                errors.append(f"{label}: 根下不允许零散文件: {sub.name!r}")
+                files_ok = False
+        if files_ok:
+            entries.append((name, description, files))
+
+    if len(entries) != SKILL_COUNT:
+        errors.append(f"skills 须恰 {SKILL_COUNT} 个，实际 {len(entries)} 个")
+
+    for path in sorted(skills_dir.rglob("*")):
+        if path.is_file() and path not in referenced:
+            try:
+                rel = path.relative_to(skills_dir).as_posix()
+            except ValueError:
+                rel = path.name
+            errors.append(f"存在未被引用的孤儿文件: {rel!r}")
+
+    return entries, errors
 
 
 def cpp_string_literal(text):
     # JSON 字符串转义与 C++ 字符串字面量兼容，兜底 name/path 中的特殊字符
     return json.dumps(text, ensure_ascii=False)
-
-
-def validate_and_load(templates_dir):
-    errors = []
-    registry_path = templates_dir / "registry.json"
-    if not registry_path.is_file():
-        die([f"registry.json 不存在: {registry_path}"])
-
-    raw = read_text(registry_path)
-    try:
-        registry = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        die([f"registry.json 不是合法 JSON: {exc}"])
-
-    if not isinstance(registry, dict) or not isinstance(registry.get("skills"), list):
-        die(["registry.json 顶层须为含 skills 数组的对象"])
-
-    skills = registry["skills"]
-    if len(skills) != SKILL_COUNT:
-        errors.append(f"skills 须恰 {SKILL_COUNT} 条，实际 {len(skills)} 条")
-
-    entries = []
-    seen_names = set()
-    source_counts = Counter()
-    for index, skill in enumerate(skills):
-        label = f"skills[{index}]"
-        if not isinstance(skill, dict):
-            errors.append(f"{label}: 须为对象")
-            continue
-        name = skill.get("name")
-        description = skill.get("description")
-        files = skill.get("files")
-
-        if not isinstance(name, str):
-            errors.append(f"{label}.name: 须为字符串")
-        elif not NAME_PATTERN.fullmatch(name):
-            errors.append(f"{label}.name 非法: {name!r}（须匹配 ^[a-z0-9]+(-[a-z0-9]+)*$）")
-        elif len(name) > MAX_NAME_LEN:
-            errors.append(f"{label}.name 超长: {len(name)} > {MAX_NAME_LEN}")
-        elif name in seen_names:
-            errors.append(f"{label}.name 重复: {name!r}")
-        else:
-            seen_names.add(name)
-
-        if not isinstance(description, str) or not description:
-            errors.append(f"{label}.description: 须为非空字符串")
-        elif len(description) > MAX_DESCRIPTION_LEN:
-            errors.append(f"{label}.description 超长: {len(description)} > {MAX_DESCRIPTION_LEN}")
-
-        if not isinstance(files, list) or not files:
-            errors.append(f"{label}.files: 须为非空数组")
-            continue
-
-        seen_paths = set()
-        parsed_files = []
-        files_valid = True
-        for file_index, file_entry in enumerate(files):
-            file_label = f"{label}.files[{file_index}]"
-            if (not isinstance(file_entry, dict)
-                    or not isinstance(file_entry.get("path"), str)
-                    or not isinstance(file_entry.get("source"), str)):
-                errors.append(f"{file_label}: 须为含 path/source 字符串字段的对象")
-                files_valid = False
-                continue
-            path = file_entry["path"]
-            source = file_entry["source"]
-
-            if file_index == 0:
-                if path != "SKILL.md":
-                    errors.append(f"{file_label}.path 首项须为 \"SKILL.md\"，实际 {path!r}")
-            # Non-first entries allow references/*.md or scripts/*.mjs (direct children only).
-            elif not (path.startswith("references/")
-                    or (path.startswith("scripts/") and path.endswith(".mjs")
-                        and "/" not in path[len("scripts/"):])):
-                errors.append(f"{file_label}.path 非首项须以 references/ 开头或为 scripts/ 直属 .mjs，实际 {path!r}")
-            if path in seen_paths:
-                errors.append(f"{file_label}.path 重复: {path!r}")
-            seen_paths.add(path)
-
-            # Source must be a flat .md or .mjs template file.
-            if not (source.endswith(".md") or source.endswith(".mjs")):
-                errors.append(f"{file_label}.source 须为 .md/.mjs 文件: {source!r}")
-            if PurePath(source).name != source:
-                errors.append(f"{file_label}.source 须为模板目录内的平铺文件名: {source!r}")
-            source_path = templates_dir / source
-            if not source_path.is_file():
-                errors.append(f"{file_label}.source 不存在: {source!r}")
-                files_valid = False
-                continue
-
-            source_counts[source] += 1
-            body = read_text(source_path)
-            if body.startswith("\ufeff"):
-                errors.append(f"{file_label}.source 含 UTF-8 BOM: {source!r}")
-                files_valid = False
-                continue
-            if files_valid:
-                parsed_files.append((path, body))
-
-        if files_valid and parsed_files:
-            entries.append((name, description, parsed_files))
-
-    # Orphan check covers both .md and .mjs template files (registry.json excluded by glob).
-    template_md_files = {p.name for p in templates_dir.glob("*.md")}
-    template_mjs_files = {p.name for p in templates_dir.glob("*.mjs")}
-    template_files = template_md_files | template_mjs_files
-    referenced_sources = set(source_counts)
-    for source, count in sorted(source_counts.items()):
-        if count > 1:
-            errors.append(f"source 被引用 {count} 次（每个 .md/.mjs 恰须一条引用）: {source!r}")
-    for orphan in sorted(template_files - referenced_sources):
-        errors.append(f"模板目录存在未被引用的孤儿 .md/.mjs: {orphan!r}")
-    for dangling in sorted(referenced_sources - template_files):
-        errors.append(f"source 未对应模板目录中的 .md/.mjs 文件: {dangling!r}")
-
-    return entries, errors
 
 
 def choose_delimiter(entries):
@@ -167,7 +234,7 @@ def choose_delimiter(entries):
 def render_header(entries, delimiter):
     lines = [
         "// 由 tools/embed_skills.py 生成，勿手改。",
-        "// 源：src/util/skill_templates/（registry.json + *.md）",
+        "// 源：skills/（<name>/SKILL.md + references/*.md + scripts/*.mjs）",
         "#pragma once",
         "#include <string>",
         "#include <vector>",
@@ -190,7 +257,7 @@ def render_header(entries, delimiter):
     ]
     for name, description, files in entries:
         lines.append(f"      {{{cpp_string_literal(name)}, R\"{delimiter}({description}){delimiter}\",")
-        # 首个文件紧随开括号（契约示例 {{\"SKILL.md\", ...}}），其余换行缩进对齐
+        # 首个文件紧随开括号（契约示例 {{"SKILL.md", ...}}），其余换行缩进对齐
         parts = [
             f"{{{cpp_string_literal(path)}, R\"{delimiter}({body}){delimiter}\"}}"
             for path, body in files
@@ -207,23 +274,20 @@ def render_header(entries, delimiter):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="把 skill 模板目录嵌入为 C++ 生成头")
-    parser.add_argument("--templates", required=True, help="skill_templates 目录")
+    parser = argparse.ArgumentParser(description="把 skills 标准目录嵌入为 C++ 生成头")
+    parser.add_argument("--skills", required=True, help="skills 目录")
     parser.add_argument("--output", required=True, help="生成头输出路径")
     args = parser.parse_args()
 
-    templates_dir = Path(args.templates)
-    output_path = Path(args.output)
-    if not templates_dir.is_dir():
-        die([f"模板目录不存在: {templates_dir}"])
-
-    entries, errors = validate_and_load(templates_dir)
+    skills_dir = Path(args.skills)
+    entries, errors = validate_and_load(skills_dir)
     if errors:
         die(errors)
 
     delimiter = choose_delimiter(entries)
     content = render_header(entries, delimiter)
 
+    output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     # UTF-8 无 BOM、\n 换行
     with open(output_path, "w", encoding="utf-8", newline="\n") as f:

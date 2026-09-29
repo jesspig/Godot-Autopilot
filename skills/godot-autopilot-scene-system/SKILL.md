@@ -1,3 +1,8 @@
+---
+name: godot-autopilot-scene-system
+description: "Godot scene system operations guide: scene lifecycle, node create/delete/rename/reparent, property read/write with JSON value shapes, signal wiring, the editor undo history model and .tscn serialization details. Use when building or restructuring scenes, setting properties or connecting signals."
+---
+
 # Godot Scene System
 
 Invocation: use the native MCP tools first; when that channel is down, use the script bridge `node .agents/skills/godot-autopilot-tools/scripts/gda_mcp.mjs` (Node 18+ or Bun); with neither installed, build a manual plan per `references/manual-fallback.md` of the godot-autopilot-tools skill.
@@ -93,7 +98,7 @@ describing removal via `delete_scene_node`.
 }
 ```
 
-- `build_nodes_from_spec` builds a whole subtree from one declarative spec (nested type/name/props/children shapes applied through the same conversion chain as `property_set`); pass dry_run for a validate-only preview that writes nothing, and any failed step rolls the whole build back with no residue.
+- `build_nodes_from_spec` builds a whole subtree from one declarative spec (nested type/name/props/children shapes applied through the same conversion chain as `property_set`); pass dry_run for a validate-only preview that writes nothing but runs the same conversion and validation as a real write (inline sub-resources and property families included), and any failed step rolls the whole build back with no residue.
 
 ## Deleting nodes
 

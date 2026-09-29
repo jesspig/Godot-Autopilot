@@ -228,6 +228,10 @@ void attach_save_receipt(mcp::JsonValue &r, const mcp::JsonValue &args,
   r["disk_connections"] = mcp::JsonValue(vr.disk_connections);
   r["connections_match"] =
       mcp::JsonValue(vr.memory_connections == vr.disk_connections);
+  if (vr.inherited_nodes > 0)
+    r["inherited_nodes"] = mcp::JsonValue(vr.inherited_nodes);
+  if (vr.inherited_connections > 0)
+    r["inherited_connections"] = mcp::JsonValue(vr.inherited_connections);
   if (!vr.match || want_paths) {
     mcp::JsonValue arr(mcp::JsonValue::array_tag);
     for (const std::string &p : vr.missing_paths)
@@ -236,19 +240,37 @@ void attach_save_receipt(mcp::JsonValue &r, const mcp::JsonValue &args,
     if (vr.missing_truncated)
       r["missing_truncated"] = mcp::JsonValue(true);
   }
+  if (!vr.inherited_paths.empty() && (want_paths || !vr.match)) {
+    mcp::JsonValue inherited_arr(mcp::JsonValue::array_tag);
+    for (const std::string &p : vr.inherited_paths)
+      inherited_arr.PushBack(mcp::JsonValue(p));
+    r["inherited_paths"] = std::move(inherited_arr);
+    if (vr.inherited_truncated)
+      r["inherited_truncated"] = mcp::JsonValue(true);
+  }
   if (want_hash && vr.hash_computed) {
     r["memory_hash"] = mcp::JsonValue(hash_hex(vr.memory_hash));
     r["disk_hash"] = mcp::JsonValue(hash_hex(vr.disk_hash));
   }
-  if (!vr.match && r.Find("warning") == nullptr) {
-    r["warning"] = mcp::JsonValue(
+  if (!vr.match) {
+    const std::string mismatch_text =
         "memory/disk mismatch after save (nodes memory " +
         std::to_string(vr.memory_nodes) + " vs disk " +
         std::to_string(vr.disk_nodes) + "; connections memory " +
         std::to_string(vr.memory_connections) + " vs disk " +
         std::to_string(vr.disk_connections) +
-        ") — inspect missing_paths, then run verify_scene_saved; if nodes were "
-        "moved with remove_child/add_child, use reparent_node so owners persist");
+        "; inherited instance nodes and their connections are excluded from "
+        "these counts) — inspect missing_paths, then run verify_scene_saved; "
+        "if persisted nodes were moved with remove_child/add_child, use "
+        "reparent_node so owners persist";
+    auto *existing_warning = r.Find("warning");
+    if (existing_warning != nullptr && existing_warning->IsString() &&
+        !existing_warning->GetString().empty()) {
+      r["warning"] =
+          mcp::JsonValue(existing_warning->GetString() + "; " + mismatch_text);
+    } else {
+      r["warning"] = mcp::JsonValue(mismatch_text);
+    }
   }
 }
 
@@ -1507,6 +1529,16 @@ mcp::JsonValue handle_verify_scene_saved(const mcp::JsonValue &args) {
   r["missing_paths"] = std::move(arr);
   if (vr.missing_truncated)
     r["missing_truncated"] = mcp::JsonValue(true);
+  r["inherited_nodes"] = mcp::JsonValue(vr.inherited_nodes);
+  r["inherited_connections"] = mcp::JsonValue(vr.inherited_connections);
+  if (!vr.inherited_paths.empty()) {
+    mcp::JsonValue inherited_arr(mcp::JsonValue::array_tag);
+    for (const std::string &p : vr.inherited_paths)
+      inherited_arr.PushBack(mcp::JsonValue(p));
+    r["inherited_paths"] = std::move(inherited_arr);
+  }
+  if (vr.inherited_truncated)
+    r["inherited_truncated"] = mcp::JsonValue(true);
   if (want_hash && vr.hash_computed) {
     r["memory_hash"] = mcp::JsonValue(hash_hex(vr.memory_hash));
     r["disk_hash"] = mcp::JsonValue(hash_hex(vr.disk_hash));

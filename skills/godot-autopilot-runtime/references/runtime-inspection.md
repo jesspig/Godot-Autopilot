@@ -64,13 +64,40 @@ Read the fields as combinations, not in isolation:
 |---|---|---|
 | `healthy` true, `physics_stalled` false | live game, physics ticking | safe to inject, capture, reload |
 | `healthy` true, `physics_stalled` true | render loop runs but physics is frozen — a deadlocked or disabled physics step, or a stall in a physics callback | inspect with `get_debug_monitors`; do not trust input timing; `reload_scene_tree_current_scene` or restart |
-| `healthy` false shortly after play | startup still in progress | wait a moment and retry — one early `game started but not ready` failure is normal |
+| `healthy` false shortly after play | startup still in progress | wait a moment; game calls default to `wait_ready: true`, which queues the request and replays it once the game reports `gda:ready` instead of failing |
 | `healthy` false for good | the process is gone or wedged | `stop_editor_playing`, then `play_editor_current_scene` again |
 | empty scene with a sharp `node_count` drop | a failed reload left a half-dead process | do not debug it — stop and rerun |
 | `paused` true | tree paused; physics simulation stopped server-side; transient input states are lost | unpause with `set_scene_tree_pause` before input automation |
 
 Rule of thumb: never build automation on top of a half-dead process.
 Stopping and replaying is cheaper than diagnosing zombie state.
+
+## Deterministic in-game verification
+
+Timing-sensitive checks (wall jumps, stomps, pickups, patrol turnarounds)
+must converge into a single `execute_game_script` call: teleport or set up
+state, await physics frames inside the script, then read the values back.
+Never split setup, wait and read across separate tool calls — the round
+trip between calls lets the game advance (the player lands, slides or dies)
+and the verdict becomes a misread of stale timing rather than of the logic.
+
+```gdscript
+extends Node
+func _run():
+    var player = get_node("/root/Main/Player")
+    player.global_position = Vector2(100, 200)
+    player.velocity = Vector2(120, -300)
+    for i in range(30):
+        await physics_frame
+    return {"pos": player.global_position, "on_wall": player.is_on_wall()}
+```
+
+Drive inputs with `sequence_game_inputs` on explicit `at_frame` offsets
+instead of chained single presses, and watch a value evolve with
+`sample_game_property` instead of a hand-rolled poll loop. Gate the call
+behind `get_game_status` (`healthy`, non-empty current scene) and confirm
+with `get_debugger_errors` plus the `new_errors_since_last_call` watermark,
+cross-checking `get_game_log_entries` on error-storm paths.
 
 ## Reload without a running scene
 

@@ -18,7 +18,7 @@ description: 排查本项目运行期故障时使用：工具无响应/超时、
 
 ## 症状到查法的映射
 
-- **调用完全无响应**：`kind=protocol_request` 有但同 `request_id` 没有 `protocol_response` → 响应侧接线或传输问题；只有 `tool_call` 无响应 → 主线程没 drain（队列积压），看 `system_status` 的 `queue_depth` 与 `kind=concurrency`、`kind=perf`（队列深度/拒绝数/锁等待）。
+- **调用完全无响应**：先看响应形态——主线程调用有等待预算（默认 27000ms，`ping`/`system_status` 等健康探针 5000ms，`GODOT_AUTOPILOT_DISPATCH_TIMEOUT_MS`/`GODOT_AUTOPILOT_HEALTH_TIMEOUT_MS` 可调），预算耗尽返回结构化 `main_thread_timeout`（`retryable:true`，带 `queue_depth`/`oldest_pending_ms`/`last_drain_age_ms`/`cancelled`，trace 里落 `type=dispatch_timeout` 行），队列满/关闭返回 `queue_unavailable`；`kind=protocol_request` 有但同 `request_id` 没有 `protocol_response` → 响应侧接线或传输问题；只有 `tool_call` 无响应且无上述结构化错误 → 主线程没 drain（队列积压），看 `system_status.result.main_thread` 与 `kind=concurrency`、`kind=perf`（队列深度/拒绝数/锁等待）。
 - **请求超时**：`kind=execution_state, state=timed_out`（看门狗默认 60s）→ 找同一 `trace_id` 里最后一条 `tool_call`，其 `duration_ms`/`queue_wait_ms` 区分"卡在排队"还是"卡在 handler 里"。
 - **工具慢**：`tool_call` 的 `duration_ms > 2000`（`kSlowToolMs`）会以 Warning 落人类日志并带 `slow_tool=true`。
 - **授权被拒**：trace `auth=` 字段 / 响应里 `authorization_required` + `enable`。`process`、`code_execute`、`game_runtime`、`user_tools` 四类才走授权门；`writes_file`/`writes_config` 只是风险标记，不会拦。

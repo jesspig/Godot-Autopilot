@@ -101,7 +101,7 @@
             "args": { "name": "no_such_tool_xyz", "arguments": {} },
             "expect": {
               "field_checks": [
-                { "key": "error", "value": "domain tool 'no_such_tool_xyz' not found — use search_tools to discover available tools" }
+                { "key": "error", "value": "domain tool 'no_such_tool_xyz' not found (received no parameters) — use search_tools to discover available tools" }
               ]
             }
           },
@@ -111,7 +111,7 @@
             "args": {},
             "expect": {
               "field_checks": [
-                { "key": "error", "value": "missing required parameter: name" }
+                { "key": "error", "value": "missing required parameter: name (received no parameters)" }
               ]
             }
           },

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mock MCP conformance tests for src/util/skill_templates/gda_mcp.mjs.
+"""Mock MCP conformance tests for skills/godot-autopilot-tools/scripts/gda_mcp.mjs.
 
 Spins up an in-process mock MCP server (http.server on 127.0.0.1 with a
 random port) that mimics the real server's wire behavior, then drives the
@@ -24,7 +24,7 @@ import threading
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = ROOT / "src" / "util" / "skill_templates" / "gda_mcp.mjs"
+SCRIPT = ROOT / "skills" / "godot-autopilot-tools" / "scripts" / "gda_mcp.mjs"
 
 CALL_TIMEOUT = 30
 

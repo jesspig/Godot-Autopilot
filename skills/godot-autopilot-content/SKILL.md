@@ -1,3 +1,8 @@
+---
+name: godot-autopilot-content
+description: "Godot content pipeline guide: TileMap and TileSet, AnimationPlayer and AnimationTree, audio buses and playback, and Control theming and layout - with the silent-failure gotchas of each domain. Use when building tile levels, animating, configuring sound or styling UI."
+---
+
 # Godot Content Pipeline
 
 Invocation: use the native MCP tools first; when that channel is down, use the script bridge `node .agents/skills/godot-autopilot-tools/scripts/gda_mcp.mjs` (Node 18+ or Bun); with neither installed, build a manual plan per `references/manual-fallback.md` of the godot-autopilot-tools skill.

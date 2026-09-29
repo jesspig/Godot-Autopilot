@@ -4,6 +4,7 @@
 #include "tools/debugger_ops.hpp"
 #include "tools/scene_ops.hpp"
 #include "util/gdscript_wrap.hpp"
+#include "util/resource_fs.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/editor_file_system.hpp>
@@ -93,49 +94,6 @@ constexpr const char *NODE_PATH_HINT =
 
 constexpr int PROPERTY_USAGE_CATEGORY = 0x80;
 constexpr int PROPERTY_USAGE_INTERNAL = 0x08;
-
-constexpr const char *SINGLE_EXPR_BLOCKING_KEYWORDS[] = {
-    "if",   "for",   "while", "match",  "func",  "return",
-    "var",  "const", "class", "static", "break", "continue",
-    "pass", "await", "try",   "assert", "super", "self",
-};
-
-bool is_plain_assignment(const std::string &text) {
-  for (size_t i = 0; i < text.size(); ++i) {
-    if (text[i] != '=')
-      continue;
-    char prev = i > 0 ? text[i - 1] : '\0';
-    char next = i + 1 < text.size() ? text[i + 1] : '\0';
-    bool prev_is_op = prev == '=' || prev == '!' || prev == '<' || prev == '>';
-    bool next_is_op = next == '=' || next == '!' || next == '<' || next == '>';
-    if (!prev_is_op && !next_is_op)
-      return true;
-  }
-  return false;
-}
-
-bool is_single_expression(const std::string &text) {
-  if (text.find('\n') != std::string::npos)
-    return false;
-  size_t start = text.find_first_not_of(" \t");
-  if (start == std::string::npos || text[start] == '#')
-    return false;
-  if (is_plain_assignment(text))
-    return false;
-  size_t word_end = start;
-  while (word_end < text.size()) {
-    char c = text[word_end];
-    if (c == ' ' || c == '\t' || c == '(' || c == ':')
-      break;
-    ++word_end;
-  }
-  std::string first_word = text.substr(start, word_end - start);
-  for (const char *keyword : SINGLE_EXPR_BLOCKING_KEYWORDS) {
-    if (first_word == keyword)
-      return false;
-  }
-  return true;
-}
 
 mcp::JsonValue serialize_resource(const godot::Ref<godot::Resource> &res) {
   if (res.is_null())
@@ -240,6 +198,7 @@ mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue &args) {
   std::string cleaned = gdscript_wrap::strip_extends_lines(expression);
 
   std::string wrapped;
+  int wrap_offset = 5;
   if (gdscript_wrap::has_top_level_func_def(cleaned)) {
 
     if (!gdscript_wrap::defines_function_named(cleaned, "_run")) {
@@ -251,31 +210,17 @@ mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue &args) {
     wrapped = "@tool\nextends Node\n\nvar SceneRoot := "
               "EditorInterface.get_edited_scene_root()\n\n" +
               cleaned + "\n";
-  } else if (is_single_expression(expression)) {
-    wrapped = "@tool\nextends Node\n\nfunc _run():\n";
-
-    wrapped += "    var SceneRoot := EditorInterface.get_edited_scene_root()\n";
-    wrapped += "    return " + cleaned + "\n";
-    wrapped += "\n";
   } else {
-
-    gdscript_wrap::IndentStyle indent =
-        gdscript_wrap::scan_indent_style(cleaned);
-    if (indent.uses_tabs && indent.uses_spaces) {
+    gdscript_wrap::WrapResult wrap = gdscript_wrap::wrap_bare_body(
+        expression, "_run",
+        "var SceneRoot := EditorInterface.get_edited_scene_root()", true);
+    if (!wrap.ok) {
       mcp::JsonValue e(mcp::JsonValue::object_tag);
-      e["error"] = mcp::JsonValue(
-          "mixed tab/space indentation detected in source — reindent source "
-          "with only tabs or only spaces; note the wrapper requires the same "
-          "indentation style throughout");
+      e["error"] = mcp::JsonValue(wrap.error);
       return e;
     }
-    std::string prefix = gdscript_wrap::indent_prefix(indent);
-    wrapped = "@tool\nextends Node\n\nfunc _run():\n";
-
-    wrapped +=
-        prefix + "var SceneRoot := EditorInterface.get_edited_scene_root()\n";
-    wrapped += gdscript_wrap::reindent_lines(cleaned, prefix);
-    wrapped += "\n";
+    wrapped = wrap.wrapped;
+    wrap_offset = wrap.header_lines + 1;
   }
 
   godot::Ref<godot::GDScript> script;
@@ -294,7 +239,13 @@ mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue &args) {
         "GDScript compilation failed: ERR_PARSE_ERROR (code " +
             std::to_string(static_cast<int>(parse_err2)) + ")",
         debugger_ops::capture_new_error_text(compile_log_before), wrapped,
-        gdscript_wrap::truncate_capture_text);
+        [&](const std::string &captured) {
+          return gdscript_wrap::truncate_capture_text(
+                     gdscript_wrap::map_error_line_numbers(captured,
+                                                           wrap_offset)) +
+                 "\nerror lines above were mapped from the generated wrapper "
+                 "script";
+        });
     mcp::JsonValue e(mcp::JsonValue::object_tag);
     e["error"] = mcp::JsonValue(message);
     return e;
@@ -440,14 +391,12 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
     return e;
   }
 
-  std::string dir_path = path;
-  size_t last_slash = dir_path.find_last_of('/');
-  if (last_slash != std::string::npos) {
-    dir_path = dir_path.substr(0, last_slash);
-    auto dir = godot::DirAccess::open(godot::String("res://"));
-    if (dir.is_valid()) {
-      dir->make_dir_recursive(godot::String(dir_path.c_str()));
-    }
+  std::string dir_created;
+  std::string dir_error;
+  if (!resource_fs::ensure_parent_directory(path, dir_created, dir_error)) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue(dir_error);
+    return e;
   }
 
   godot::Error err = saver->save(script, godot::String(path.c_str()));

@@ -32,7 +32,7 @@ description: 构建、部署或打包 Godot Autopilot GDExtension，新增或删
   - 有意**不进 L1** 的三个：`sanitize_policy.cpp`（只在 `main.cpp` 调 `initialize()`）、`monitor_env.cpp`（仅主线程）、`perf_sampler.cpp`（依赖引擎 tick）。别为了"覆盖"把它们塞进业务源，会在无引擎环境链接或运行失败。
 - **勿删 `build/<preset>/_deps/`**：里面是 godot-cpp / mcp-cpp-sdk / googletest 的 FetchContent 缓存，删了要重新联网拉取；网络受限时用 `-DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=build/debug/_deps/googletest-src` 指回已有缓存。
 - `--release`（`deploy` 下）会先清理各 demo 与 L2 测试床的 `.godot` 与 `addons`，之后引擎要重新导入，别在同事正在编辑器里跑的时候顺手 `--release`；床被清过之后跑 L2 必须先 `deploy` 重新写入插件。
-- `src/util/skill_templates/*.md` 是内容数据文件，**不进 `add_library`**，由 `cmake/skill_gen.cmake` 构建期经 `tools/embed_skills.py` 嵌入生成头（落在 `build/<preset>/generated/`，已被 gitignore）。
+- `skills/*/*.md` 是内容数据文件，**不进 `add_library`**，由 `cmake/skill_gen.cmake` 构建期经 `tools/embed_skills.py` 嵌入生成头（落在 `build/<preset>/generated/`，已被 gitignore）。
 - `GDA_ENABLE_TESTS` 已固化在 `CMakePresets.json` 的 debug/release 预设；裸 `cmake`（不带 `--preset`）配置默认是 OFF，此时看不到测试目标不是 bug。
 
 ## 常见错误

@@ -325,7 +325,7 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
     {
         ToolSpec spec{"system_status", "Get server status info", "System", {"status", "info"}};
         spec.side_effect = SideEffect::None;
-        spec.flags = tool_flags::kNone;
+        spec.flags = tool_flags::kHealthProbe;
         spec.handler = [port, registry, start = std::chrono::steady_clock::now()](const mcp::JsonValue&) -> mcp::JsonValue {
             auto uptime = std::chrono::duration_cast<std::chrono::seconds>(
                 std::chrono::steady_clock::now() - start).count();
@@ -336,10 +336,35 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
             status["running"] = mcp::JsonValue(true);
             status["tool_count"] =
                 mcp::JsonValue(static_cast<int64_t>(registry->all_any().size()));
-            status["queue_depth"] = mcp::JsonValue(static_cast<int64_t>(
-                runtime_ops::has_editor_queue()
-                    ? get_editor_queue().stats().pending
-                    : 0));
+            mcp::JsonValue main_thread(mcp::JsonValue::object_tag);
+            main_thread["last_drain_age_ms"] =
+                mcp::JsonValue(static_cast<int64_t>(-1));
+            main_thread["queue_depth"] = mcp::JsonValue(static_cast<int64_t>(0));
+            main_thread["queue_cancelled"] =
+                mcp::JsonValue(static_cast<int64_t>(0));
+            main_thread["queue_rejected_full"] =
+                mcp::JsonValue(static_cast<int64_t>(0));
+            main_thread["oldest_pending_ms"] =
+                mcp::JsonValue(static_cast<int64_t>(-1));
+            if (runtime_ops::has_editor_queue()) {
+                CommandQueue &queue = get_editor_queue();
+                const CommandQueue::Stats queue_stats = queue.stats();
+                status["queue_depth"] =
+                    mcp::JsonValue(static_cast<int64_t>(queue_stats.pending));
+                main_thread["last_drain_age_ms"] =
+                    mcp::JsonValue(queue.last_drain_age_ms());
+                main_thread["queue_depth"] =
+                    mcp::JsonValue(static_cast<int64_t>(queue_stats.pending));
+                main_thread["queue_cancelled"] =
+                    mcp::JsonValue(static_cast<int64_t>(queue_stats.cancelled));
+                main_thread["queue_rejected_full"] = mcp::JsonValue(
+                    static_cast<int64_t>(queue_stats.rejected_full));
+                main_thread["oldest_pending_ms"] =
+                    mcp::JsonValue(queue.oldest_pending_age_ms());
+            } else {
+                status["queue_depth"] = mcp::JsonValue(static_cast<int64_t>(0));
+            }
+            status["main_thread"] = std::move(main_thread);
             mcp::JsonValue r(mcp::JsonValue::object_tag);
             r["result"] = std::move(status);
             return r;
@@ -388,7 +413,7 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
     {
         ToolSpec spec{"ping", "Health check ping", "Meta", {"health", "ping"}};
         spec.side_effect = SideEffect::None;
-        spec.flags = tool_flags::kMeta;
+        spec.flags = tool_flags::kMeta | tool_flags::kHealthProbe;
         spec.handler = [](const mcp::JsonValue&) { return meta_ping_impl(); };
         spec.raw_schema = schema::build_schema({});
         registry->add(make_spec_tool(std::move(spec)));
@@ -471,7 +496,7 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
                       "Execute multiple tools in batch. Each operation runs in sequence; if stop_on_error is true and any operation fails, remaining operations are skipped. Async game tools are refused unless await_async=true, in which case batch_execute waits for the game response and reports it under result.",
                       "System", {"batch", "execute", "multi"}};
         spec.side_effect = SideEffect::None;
-        spec.flags = tool_flags::kMeta;
+        spec.flags = tool_flags::kMeta | tool_flags::kLongBlocking;
         spec.handler = [](const mcp::JsonValue& a) { return code_exec_ops::handle_batch_execute(a); };
         mcp::JsonValue s(mcp::JsonValue::object_tag);
         s["type"] = mcp::JsonValue("object");
@@ -519,7 +544,7 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
                       "Execute arbitrary GDScript code. The source code is wrapped in a script that extends Node, compiled, attached to a temporary node, and executed. Returns the function result serialized as JSON. Without a line-start `func ` definition the source is inlined inside the entry-function body: write straight-line code ending in return. When any non-comment line starts with `func ` (leading spaces/tabs stripped; `#` and `//` comment lines ignored) the whole source is preserved verbatim and function_name (default _run) selects the entry point, with a `func <name>(): pass` stub appended when the named entry is missing. Detection needs `func ` with a trailing space: `func<TAB>name():` or `func(` do not switch modes and are rejected in single-function mode; mixing tab and space indentation is rejected. Execution environment exposes SceneRoot (the edited scene root node) for node access; see SceneRoot.get_node(\"Child\").",
                       "System", {"code", "execute", "script", "gdscript"}};
         spec.side_effect = SideEffect::None;
-        spec.flags = tool_flags::kMeta;
+        spec.flags = tool_flags::kMeta | tool_flags::kLongBlocking;
         spec.handler = [](const mcp::JsonValue& a) { return code_exec_ops::handle_code_execute(a); };
         mcp::JsonValue s(mcp::JsonValue::object_tag);
         s["type"] = mcp::JsonValue("object");
@@ -608,7 +633,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         mcp::ToolOptions opts;
         opts.Description(meta_tool->meta().description).InputSchema(meta_tool->input_schema());
         server.RegisterTool(meta_name, opts,
-            [meta_name, registry, &queue](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
+            [meta_name, registry, &queue, meta_tool](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
                 const std::string gda_request_id =
                     monitor::request_id_text(ctx.GetRequest().id);
                 monitor::RequestScope gda_request_scope(gda_request_id);
@@ -641,10 +666,12 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
                 } else {
                     const tools::TraceContext trace_context =
                         tools::capture_trace_context();
-                    res = queue.execute_sync([tool, args, trace_context] {
-                        tools::ScopedTraceContext restore(trace_context);
-                        return tool->execute(args);
-                    });
+                    res = dispatch::run_on_main_thread_with_budget(
+                        queue, meta_name, meta_tool->tool_flags(),
+                        [tool, args, trace_context] {
+                            tools::ScopedTraceContext restore(trace_context);
+                            return tool->execute(args);
+                        });
                 }
                 int64_t new_errors = error_watermark::count_response_errors(res);
                 if (new_errors > 0) {

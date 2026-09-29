@@ -138,6 +138,20 @@ Saving a scene packs it first, and packing drops content without warnings:
   serialized at all, and main-resource properties equal to their default are
   omitted line-by-line ("missing line = matches the default").
 
+## Save-verify recipe: disk text is the truth
+
+After `save_editor_scene` or `save_editor_scene_as`, prove the save with
+`read_file` on the .tscn plus `validate_scene_file` — not with another
+save. Count `[node]` and `[connection]` blocks in the text and compare
+against the design list; `verify_scene_saved` re-checks without writing.
+
+One normal mismatch to expect: the in-memory tree contains inherited
+instance children while the file only stores the scene's own nodes, so a
+memory-vs-disk count gap whose missing entries are all inherited children
+is healthy, not data loss. Re-save loops never fix it. A real loss (moved
+subtree, dropped ownership) shows up as missing own nodes or missing
+[connection] lines in the text — that is when you investigate.
+
 ## See also
 
 - references/property-json-shapes.md — default-value omission from the property side

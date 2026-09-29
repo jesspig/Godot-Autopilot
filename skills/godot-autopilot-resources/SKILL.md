@@ -1,3 +1,8 @@
+---
+name: godot-autopilot-resources
+description: "Godot resource and file operations guide: load, save, create and duplicate resources; transactional rename and move with reference rewriting; UID and dependency management; the import pipeline and path rules. Use when working with .tres/.tscn/.import files or the project layout."
+---
+
 # Resource and File Operations
 
 Invocation: use the native MCP tools first; when that channel is down, use the script bridge `node .agents/skills/godot-autopilot-tools/scripts/gda_mcp.mjs` (Node 18+ or Bun); with neither installed, build a manual plan per `references/manual-fallback.md` of the godot-autopilot-tools skill.

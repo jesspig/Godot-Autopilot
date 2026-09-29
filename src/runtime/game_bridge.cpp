@@ -9,6 +9,7 @@
 #include "tools/editor_ui_ops.hpp"
 #include "tools/tool_base.hpp"
 #include "util/error_util.hpp"
+#include "util/variant_json.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -27,6 +28,7 @@
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
+#include <godot_cpp/classes/scene_tree_timer.hpp>
 #include <godot_cpp/classes/script_backtrace.hpp>
 #include <godot_cpp/classes/time.hpp>
 #include <godot_cpp/classes/viewport.hpp>
@@ -85,6 +87,8 @@ godot::Node *resolve_node(const std::string &node_path) {
   }
   return tree->get_root()->get_node_or_null(path);
 }
+
+JV op_scene_tree(const JV &params);
 
 namespace {
 
@@ -1450,6 +1454,13 @@ public:
       body = op_get_output(params);
     } else if (op == GDA_OP_GET_TREE) {
       body = op_get_tree();
+    } else if (op == GDA_OP_SCENE_TREE) {
+      if (!authorization::capability_enabled("game_runtime")) {
+        body = authorization::deny_if_unauthorized("game_runtime",
+                                                   SideEffect::GameRuntime);
+      } else {
+        body = op_scene_tree(params);
+      }
     } else {
       body = error_result("unknown op: " + op);
     }
@@ -1474,6 +1485,153 @@ godot::Ref<GameBridgeLogger> g_logger;
 bool g_registered = false;
 
 } // namespace
+
+JV op_scene_tree(const JV &params) {
+  auto *action_p = params.Find("action");
+  if (!action_p || !action_p->IsString()) {
+    return error_result(
+        "scene_tree requires action (string); supported actions: set_pause, "
+        "is_paused, reload_current_scene, set_debug_collisions_hint, "
+        "call_group, notify_group, get_nodes_in_group, create_timer");
+  }
+  const std::string action = action_p->GetString();
+  godot::SceneTree *tree = get_scene_tree();
+  if (!tree)
+    return error_result("no scene tree");
+
+  if (action == "set_pause") {
+    auto *paused_p = params.Find("paused");
+    if (!paused_p || !paused_p->IsBool())
+      return error_result("set_pause requires paused (boolean)");
+    tree->set_pause(paused_p->GetBool());
+    JV r(JV::object_tag);
+    r["result"] = JV(true);
+    r["paused"] = JV(tree->is_paused());
+    return r;
+  }
+
+  if (action == "is_paused") {
+    JV r(JV::object_tag);
+    r["result"] = JV(tree->is_paused());
+    return r;
+  }
+
+  if (action == "reload_current_scene") {
+    JV r(JV::object_tag);
+    r["result"] = JV(static_cast<int64_t>(tree->reload_current_scene()));
+    return r;
+  }
+
+  if (action == "set_debug_collisions_hint") {
+    auto *enabled_p = params.Find("enabled");
+    if (!enabled_p || !enabled_p->IsBool())
+      return error_result(
+          "set_debug_collisions_hint requires enabled (boolean)");
+    const bool enabled = enabled_p->GetBool();
+    tree->set_debug_collisions_hint(enabled);
+    JV r(JV::object_tag);
+    r["result"] = JV("ok");
+    r["enabled"] = JV(enabled);
+    return r;
+  }
+
+  if (action == "call_group") {
+    auto *group_p = params.Find("group_name");
+    if (!group_p || !group_p->IsString() || group_p->GetString().empty())
+      return error_result("call_group requires group_name (non-empty string)");
+    auto *method_p = params.Find("method");
+    if (!method_p || !method_p->IsString() || method_p->GetString().empty())
+      return error_result("call_group requires method (non-empty string)");
+    auto *arguments_p = params.Find("arguments");
+    if (arguments_p && !arguments_p->IsArray())
+      return error_result("call_group arguments must be an array");
+    const godot::StringName group_name(group_p->GetString().c_str());
+    const godot::StringName method(method_p->GetString().c_str());
+    if (arguments_p) {
+      godot::Array call_arguments;
+      for (const auto &item : arguments_p->GetArray())
+        call_arguments.push_back(VariantJson::deserialize(item));
+      tree->call_group(group_name, method, call_arguments);
+    } else {
+      tree->call_group(group_name, method);
+    }
+    JV r(JV::object_tag);
+    r["result"] = JV("ok");
+    return r;
+  }
+
+  if (action == "notify_group") {
+    auto *group_p = params.Find("group_name");
+    if (!group_p || !group_p->IsString() || group_p->GetString().empty())
+      return error_result("notify_group requires group_name (non-empty string)");
+    auto *notification_p = params.Find("notification");
+    if (!notification_p || !notification_p->IsInt())
+      return error_result("notify_group requires notification (integer)");
+    tree->notify_group(godot::StringName(group_p->GetString().c_str()),
+                       static_cast<int32_t>(notification_p->GetInt()));
+    JV r(JV::object_tag);
+    r["result"] = JV("ok");
+    return r;
+  }
+
+  if (action == "get_nodes_in_group") {
+    auto *group_p = params.Find("group_name");
+    if (!group_p || !group_p->IsString() || group_p->GetString().empty())
+      return error_result(
+          "get_nodes_in_group requires group_name (non-empty string)");
+    const godot::TypedArray<godot::Node> nodes = tree->get_nodes_in_group(
+        godot::StringName(group_p->GetString().c_str()));
+    JV paths(JV::array_tag);
+    for (int64_t i = 0; i < nodes.size(); i++) {
+      auto *node = godot::Object::cast_to<godot::Node>(nodes[i]);
+      if (!node)
+        continue;
+      paths.PushBack(JV(util::to_std(godot::String(node->get_path()))));
+    }
+    JV r(JV::object_tag);
+    r["result"] = std::move(paths);
+    return r;
+  }
+
+  if (action == "create_timer") {
+    auto *delay_p = params.Find("delay_sec");
+    if (!delay_p || !delay_p->IsNumber())
+      return error_result("create_timer requires delay_sec (number)");
+    const double delay = delay_p->IsDouble()
+                             ? delay_p->GetDouble()
+                             : static_cast<double>(delay_p->GetInt());
+    bool process_always = true;
+    if (auto *always_p = params.Find("process_always")) {
+      if (!always_p->IsBool())
+        return error_result("create_timer process_always must be a boolean");
+      process_always = always_p->GetBool();
+    }
+    bool process_in_physics = false;
+    if (auto *physics_p = params.Find("process_in_physics")) {
+      if (!physics_p->IsBool())
+        return error_result("create_timer process_in_physics must be a boolean");
+      process_in_physics = physics_p->GetBool();
+    }
+    godot::Ref<godot::SceneTreeTimer> timer =
+        tree->create_timer(delay, process_always, process_in_physics);
+    if (timer.is_null())
+      return error_result("failed to create timer");
+    JV r(JV::object_tag);
+    r["result"] = JV("ok");
+    r["note"] = JV(
+        "the SceneTreeTimer was created in the game process; its object "
+        "reference cannot be returned across processes — observe its effect "
+        "in the game (await or timeout callback) instead of holding a "
+        "reference");
+    return r;
+  }
+
+  return error_result("unknown scene_tree action '" + action +
+                      "'; supported: set_pause, is_paused, "
+                      "reload_current_scene, set_debug_collisions_hint, "
+                      "call_group, notify_group, get_nodes_in_group, "
+                      "create_timer");
+}
 
 JV op_capture(const JV &params, int64_t request_id) {
   CaptureRequest request;

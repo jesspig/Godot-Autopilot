@@ -6,7 +6,7 @@ tags:
   - 安全
   - 并发
   - 契约
-timestamp: "2026-09-25T17:30:00+08:00"
+timestamp: "2026-09-29T01:15:06+08:00"
 resource:
   - src/core/server_context.cpp
   - src/core/command_queue.hpp
@@ -50,7 +50,7 @@ resource:
 | 窗口/剪贴板/鼠标 | `modifies_window` | 视为影响编辑器或桌面状态的副作用；含编辑器 UI 元素点击/文本/快捷键注入与合成鼠标输入（09-15 扩展、09-16 增 `select_scene_tree_node`，共 20 个）。 |
 | 进程与环境 | `process` | 视为最高风险；包括启动、终止、构建、打开 OS 路径和修改环境。 |
 | 任意脚本 | `code_execute`（`execute_script`） | 最高风险处理；脚本可读写场景、资源、文件并调用方法，未标记的等价脚本执行能力同样按此处理。 |
-| 运行时变更 | `game_*` 输入、求值的 set/call 等 | 视为目标游戏状态变更；必须受超时、取消和响应关联约束。 |
+| 运行时变更 | `game_*` 输入、求值的 set/call、SceneTree 转发的 8 个 `*_scene_tree_*` 工具等 | 视为目标游戏状态变更；必须受超时、取消和响应关联约束；无运行中游戏时返回结构化错误，不落回编辑器树。 |
 
 只读工具也必须遵守路径、结果大小和主线程条款；“无副作用”不等于“无需限制”。
 
@@ -58,12 +58,14 @@ resource:
 
 09-15 新增 13 个工具的分级：7 个编辑器 UI/输入工具（`click_editor_element`、`type_editor_element_text`、`run_editor_shortcut`、`click_input_mouse`、`scroll_input_mouse`、`drag_input_mouse`、`type_input_text`）标记 `ModifiesWindow`（`modifies_window` 清单 12→19，会移动物理光标并注入桌面输入）；游戏侧 `click_game_ui_element` 标记 `GameRuntime`（`game_runtime` 清单 5→6）；其余 5 个只读查询工具（`get_display_window_rect`、`get_scene_node_screen_rect`、`get_editor_viewport_geometry`、`get_editor_ui_elements`、`hit_test_editor_point`）不标副作用，仍按只读工具的路径/大小/主线程条款处理。本批未新增授权能力门（`ModifiesWindow` 不在 `code_execute`/`game_runtime`/`process` 能力集）。
 
+09-29 E2E 韧性批次：8 个 SceneTree 工具（`set_scene_tree_pause`、`is_scene_tree_paused`、`reload_scene_tree_current_scene`、`set_scene_tree_debug_collisions_hint`、`call_scene_tree_group`、`notify_scene_tree_group`、`get_scene_tree_nodes_in_group`、`create_scene_tree_timer`）由操作编辑器树改为经游戏通道 `scene_tree` op 转发到运行中游戏进程，全部标记 `SideEffect::GameRuntime`（`game_runtime` 授权面 +8，含只读的 `is_scene_tree_paused`/`get_scene_tree_nodes_in_group`）；无游戏进程时返回结构化错误，编辑器树不再被这些工具触碰。本批未放宽任何默认安全姿态（授权仍默认拒绝、脱敏仍默认开启、监听仍仅环回）。
+
 ### 3.1 能力授权门（09-02 引入，09-13 扩展）
 
 高风险能力除 `side_effect` 标记外还受调用级授权门约束，检查发生在**每次工具调用**（无缓存）：
 
 - 解析优先级：`GODOT_AUTOPILOT_ALLOW` 环境变量（逗号分隔，`all` 全放行）> 插件配置 `user://godot_autopilot/config.json` 的 `allow` 键 > **默认拒绝**；环境变量一旦设置即完全覆盖持久化配置。
-- 能力名与工具映射（`tool_base.hpp:capability_for_tool`）：`code_execute`（`code_execute`、`execute_script`）、`game_runtime`（`execute_game_script`、`start_game_job`、`reload_game_scripts`、`queue_game_input`、`wait_game_input`、`sequence_game_inputs`、`click_game_ui_element`）、`process`（`SideEffect::Process` 标记的 6 个：`build_csharp_assembly`、`create_os_process`、`execute_os_process`、`kill_os_process`、`open_os_path`、`set_os_environment`）；另有独立于 `capability_for_tool` 的 `user_tools` 能力，由 `AutopilotTools`（用户脚本动态工具，`autopilot_tools.cpp`）在注册与调用两侧检查——未授权时注册拒绝、调用返回 `user_tools` 授权错误。
+- 能力名与工具映射（`tool_base.hpp:capability_for_tool`，按 `SideEffect` 统一判定）：`code_execute`（`code_execute`、`execute_script`）、`game_runtime`（`SideEffect::GameRuntime` 全部工具：`execute_game_script`、`start_game_job`、`reload_game_scripts`、`queue_game_input`、`wait_game_input`、`sequence_game_inputs`、`click_game_ui_element`，以及 09-29 起转入游戏通道的 8 个 SceneTree 工具）、`process`（`SideEffect::Process` 标记的 6 个：`build_csharp_assembly`、`create_os_process`、`execute_os_process`、`kill_os_process`、`open_os_path`、`set_os_environment`）；另有独立于 `capability_for_tool` 的 `user_tools` 能力，由 `AutopilotTools`（用户脚本动态工具，`autopilot_tools.cpp`）在注册与调用两侧检查——未授权时注册拒绝、调用返回 `user_tools` 授权错误。
 - 拒绝响应含 `error`、`authorization_required`（能力名）与 `enable`（启用指引）三个字段，并写 Warning 日志（Tools 类，可经 `get_plugin_log` 读取）。
 - 启用入口：环境变量（须重启引擎）或配置 `allow` 键；MCP Config 面板的 "Allow code_execute"、"Allow game_runtime" 与 "Allow user tools" 复选框分别管理对应能力，勾选/取消经 `authorization::allow_list_add`/`allow_list_remove`（`add` 对已生效项含 `all` 保持原样；`remove` 先把 `all` 展开为全部已知能力再逐项删除），写入配置后下一次调用生效、无需重启。`process` 无面板开关，仍须环境变量或手改 `allow` 键。拒绝响应的 `enable` 文案只对 `code_execute`/`game_runtime`/`user_tools` 提及 dock（`capability_has_dock_toggle`），`process` 仅给环境变量 + 重启指引。
 - 拒绝可审计（09-20 起）：授权门命中时除返回结构化拒绝与 Warning 日志外，另记录一条 `TraceEvent`（`auth="denied"`、`error_code="denied"`、`duration_ms=0`，含工具名/类别/副作用/flags），随 trace jsonl 落盘，供事后区分"未授权被拒"与"handler 业务错误"；09-21 起 McpConfigDock 的 allow 变更另发 `monitor::security` 事件（与脱敏变更同口径）。
@@ -91,7 +93,8 @@ resource:
 ## 4. Godot API 与线程
 
 - 所有 Godot API、场景/资源/编辑器对象访问和会触发引擎状态的操作，必须在 Godot 主线程执行。HTTP/SDK 线程不得直接调用。
-- 标准路径是 `CommandQueue::submit()` 入队，由 `GodotAutopilotPlugin::_process()` 的 `drain()` 在主线程排空，再通过 `future` 返回结果。唯一排空点是插件 `_process()`；09-20 起 `_process()` 在 `drain()` 前先执行 `LogPersist::flush_on_main_thread()`（本地日志/trace 增量写盘，同为 Godot 文件 API，必须主线程），09-21 起再在其前执行 `perf_sampler::tick(delta)`（周期采样与请求超时看门狗）。
+- 主线程停摆快速失败（09-29 起）：插件节点进程模式为 `PROCESS_MODE_ALWAYS`（`src/main.cpp`），编辑器树暂停时 `_process()` 仍会排空队列；非主线程工具调用统一经 `dispatch::run_on_main_thread_with_budget`（`dispatch.cpp`）提交——默认预算 27000ms（`GODOT_AUTOPILOT_DISPATCH_TIMEOUT_MS`，钳制 1000-29000）、健康探针 `ping`/`system_status`（`tool_flags::kHealthProbe`）5000ms（`GODOT_AUTOPILOT_HEALTH_TIMEOUT_MS`）、`code_execute`/`batch_execute`（`tool_flags::kLongBlocking`）不设预算；超时对未 drain 任务调 `CommandQueue::cancel(id)`（future 抛 `cancelled before execution`，计入 `Stats::cancelled`），返回结构化 `main_thread_timeout` 错误（`retryable=true`，含 `queue_depth`/`oldest_pending_ms`/`last_drain_age_ms`/`cancelled`）、写 Warning 日志并向 trace 即时追加 `dispatch_timeout` 事件（`LogPersist::write_trace_now`，纯 std `std::ofstream` 直接追加，OS 路径在 `init_session` 主线程求得，不触碰 Godot API）；`server.RegisterTool()` 直连路径与 `call_tool` 代理路径共用该预算入口。`system_status.result.main_thread` 暴露 `last_drain_age_ms`/`queue_depth`/`queue_cancelled`/`queue_rejected_full`/`oldest_pending_ms` 供诊断。
+- 标准路径是 `CommandQueue::submit()` 入队（带预算的调用走 `submit_tracked()` 以获得任务 id 与取消能力），由 `GodotAutopilotPlugin::_process()` 的 `drain()` 在主线程排空，再通过 `future` 返回结果。唯一排空点是插件 `_process()`；09-20 起 `_process()` 在 `drain()` 前先执行 `LogPersist::flush_on_main_thread()`（本地日志/trace 增量写盘，同为 Godot 文件 API，必须主线程），09-21 起再在其前执行 `perf_sampler::tick(delta)`（周期采样与请求超时看门狗）。
 - trace 上下文跨线程纪律（09-20 起）：`dispatch::call_handler` 在提交侧 `capture_trace_context()`（纯 std 线程局部变量，不触碰 Godot API）、执行侧用 `ScopedTraceContext` 恢复，并用 `steady_clock` 测量排队等待（`queue_wait_ms`）；`LogPersist` 的入队缓冲与游标虽被多线程访问，但均有互斥保护且只存纯 std 字符串，Godot `FileAccess` 仅在 flush 主线程路径调用。
 - 协议侧钩子线程（09-21 起）：`ServerContext` 接入 `opts.on_request`（`monitor::begin_request`，含 `_meta` 的 traceparent 提取）与 `opts.on_notification`，响应侧经 `opts.outgoing_filters`（`mcp::FilterPipeline` + `MessageFilterFuncAdapter`）在 SDK worker 线程捕获出站 `JsonRpcResponse`/`JsonRpcErrorResponse` 完成 `monitor::end_request`/`note_protocol_error`（SDK 的 `on_response` 仅用于「服务端发起请求的应答」，不覆盖我方回复客户端的响应）；这些钩子与 `monitor` 门面均为纯 std、不触碰 Godot API（仅写 `TraceRecorder`/`LogSystem` 内存缓冲，落盘仍由主线程 flush），`request_id→trace/span` 关联表 `RequestRegistry` 有互斥保护（上限 4096、FIFO 淘汰）。
 - 明确例外（09-13 起）：`call_tool` 元工具的编排回调在 MCP 线程执行——等待运行时响应（`runtime_ops::wait_pending_response`）与截图定型不再经 `execute_sync` 占用主线程；回调自身不触碰 Godot API（领域工具 handler 经 `dispatch` 路由回主线程、截图读盘经 `queue.submit`），从而保证等待期间调试器消息泵与编辑器主线程不被阻塞。
@@ -102,7 +105,7 @@ resource:
 
 - 停止顺序是：阻止服务器继续接受新请求，调用 `McpServer::Close()`，再调用 transport `Close()`，清理 handler 与 registry，最后释放 `ServerContext`。插件退出时先停服务器，再 `CommandQueue::close()` 并清空 `runtime_ops` 指针，最后释放其他插件组件（`main.cpp:_exit_tree`）。
 - 重载/改端口是原子意图而非并行启动：先执行 `stop()`，再更新端口并 `start()`；`start()` 任意阶段失败会清理已创建的 transport/server 并重置 handler/registry，不会假报运行中。
-- `CommandQueue` 已具备 `open/close/is_closed`、容量限制（默认 1024）、关闭时拒绝未执行任务并通过 `future` 抛异常、首次 `drain()` 固定主线程且错误线程 `drain()` 返回 false 的语义；析构自动 `close()`。实现保证停止期间未完成 future 有明确结果，且不会在 `ServerContext` 已销毁后触碰 Godot 对象。
+- `CommandQueue` 已具备 `open/close/is_closed`、容量限制（默认 1024）、关闭时拒绝未执行任务并通过 `future` 抛异常、首次 `drain()` 固定主线程且错误线程 `drain()` 返回 false 的语义；09-29 起另有 `submit_tracked()`（返回任务 id + future）、`cancel(id)`（仅取消尚未 drain 的任务并在 future 抛 `cancelled before execution`）、`last_drain_age_ms()`（最近一次 drain 距今毫秒数，未 drain 为 -1）、`oldest_pending_age_ms()`（最旧排队任务年龄，空队为 -1）与 `Stats::cancelled` 计数；析构自动 `close()`。实现保证停止期间未完成 future 有明确结果，且不会在 `ServerContext` 已销毁后触碰 Godot 对象。
 - 停止/重载与队列排空并发时，禁止产生悬垂引用、重复响应或把旧实例任务交给新实例。异步运行时请求必须以 request id 关联，`runtime_ops` 保证先登记 pending 再广播、超时后标记 `Cancelled`、迟到响应丢弃并告警。
 
 ## 6. 路径与响应大小
@@ -119,6 +122,7 @@ resource:
 - [ ] 默认启动日志和配置可证明监听为 `127.0.0.1`；非环回监听只能由显式配置触发。
 - [ ] 每个高风险工具都能通过 `get_tool_detail.side_effect` 或本页补充规则识别。
 - [ ] HTTP 线程路径中没有直接 Godot API 调用；任务只由主线程 `drain()` 执行。
+- [ ] 主线程停摆时工具调用快速失败并返回可诊断的结构化错误（`main_thread_timeout` + 队列深度/心跳/取消标记），默认安全姿态未被放宽。
 - [ ] stop/restart 的请求接入、队列任务、future、异步响应和对象释放顺序有可观察且不悬挂的结果。
 - [ ] 路径边界、遍历/输入上限和响应截断行为均可被调用方检测。
 - [ ] 本地日志/trace 落盘符合边界约定：两目录保留上限生效；默认脱敏开启时 jsonl 不含内联 base64，`args_digest` 已剥离敏感字段；关闭脱敏仅由显式配置触发。

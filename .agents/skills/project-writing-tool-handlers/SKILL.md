@@ -17,7 +17,7 @@ description: 编写或修改 src/tools/ 下领域工具 handler 的实现逻辑�
 
 ## 规则与边界
 
-- **线程纪律**：任何 Godot API 调用必须在主线程。handler 内不要自开线程去 `load()`/`get_tree()`；确需从其它线程回主线程，用 `CommandQueue::submit()`/`execute_sync()`，且跨线程时用 `tools::capture_trace_context()` + `ScopedTraceContext` 包住，否则该次调用的 trace 链路会断（既有 `execute_sync` 调用点都已按此包装，数量以 grep `ScopedTraceContext` 为准）。
+- **线程纪律**：任何 Godot API 调用必须在主线程。handler 内不要自开线程去 `load()`/`get_tree()`；确需从其它线程回主线程，用 `CommandQueue::submit()`/`execute_sync()`，且跨线程时用 `tools::capture_trace_context()` + `ScopedTraceContext` 包住，否则该次调用的 trace 链路会断（既有 `execute_sync` 调用点都已按此包装，数量以 grep `ScopedTraceContext` 为准）。MCP 侧对主线程调用有等待预算（默认 27000ms，健康探针 5000ms），预算耗尽会返回结构化 `main_thread_timeout` 并取消未执行任务——handler 别长时间占主线程，确需长阻塞的工具要在声明侧打 `kLongBlocking`（见 `project-adding-domain-tools`）。
 - **取参现状要认清**：`Args`（`tool_args.hpp`）已实现且 L1 覆盖，但**没有任何领域 handler 接入**。在架 handler 统一 `args.Find("name")` 判类型，缺失返回 `util::error_json("missing required parameter: <name>")`。写新 handler 跟随所在文件的邻居风格，不要在同一文件混用两种取参方式。
 - **返回结构**：失败 `util::error_json("...")`（顶层 `error` 键，`call_tool` 据此置 `is_error=true`）；需要包成功载荷用 `util::ok_result(...)`。需要机器可读错误码时才带 `structured_error`，注意 trace 的 `error_code` 只取 `structured_error.code`，其余一律记成 `error`。
 - **错误消息必须给下一步**：本仓库好的错误写法是"是什么 + 为什么 + 用什么工具修"，例如 `"node is not a TileMap or TileMapLayer: <path> — create one with create_tilemap (TileMap) or create_scene_node + property_set (TileMapLayer), or fix the path"`。模型会照错误消息决定下一次调用，只写 `"invalid node"` 等于把诊断推回给用户。

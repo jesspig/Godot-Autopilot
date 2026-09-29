@@ -7,14 +7,15 @@ tags:
   - 工具架构
   - ToolSpec
   - 数据化
-timestamp: "2026-09-25T14:55:18+08:00"
+timestamp: "2026-09-29T01:12:05+08:00"
 resource: src/tools/
 ---
 
 # ToolSpec 工具数据层与执行管线（设计定稿 + 全量迁移）
 
-> **当前 API 面（2026-09-21 复核）**
-> `tool_spec.hpp`：`ToolSpec` 数据记录（name/description/category/tags/side_effect/flags/params/handler/raw_schema）+ `ParamSpec`（= `schema::ParamDef`）+ `tool_flags` 位标志 + `SpecTool : ToolBase, ISideEffect` + `make_spec_tool`；schema 由 `params` 经 `schema::build_schema` 派生，`raw_schema` 非空时优先。
+> **当前 API 面（2026-09-29 复核）**
+> `tool_spec.hpp`：`ToolSpec` 数据记录（name/description/category/tags/side_effect/flags/params/handler/raw_schema）+ `ParamSpec`（= `schema::ParamDef`）+ `tool_flags` 位标志 + `SpecTool : ToolBase, ISideEffect` + `make_spec_tool`；schema 由 `params` 经 `schema::build_schema` 派生，`raw_schema` 非空时优先。`tool_flags` 现为 9 位（09-29 新增 `kHealthProbe` 健康探针短预算 / `kLongBlocking` 长阻塞不设主线程等待预算）。
+> `dispatch.hpp/cpp`：跨线程调用统一入口 `run_on_main_thread_with_budget` + `main_thread_wait_budget_ms`（09-29；默认 27000ms / 健康探针 5000ms / 长阻塞无预算，超时取消 + `main_thread_timeout` 结构化错误）。
 > `tool_args.hpp/cpp`：`Args` 取参器 + `ToolArgError`（opt_/require_/get_ 系列 + `reject_unknown`，空值视为缺失）。
 > `tool_pipeline.hpp/cpp`：`pipeline::run_post`（`SpecTool::execute` 授权门 → handler 之后的后处理：按 `kObserve` 合并编辑器截图、按 `kSceneTarget` 幂等补全场景路径）。
 > `register_all.hpp/cpp`：`build_registry` / `refresh_derived` / `refresh_dynamic_tools` / `get_active_registry`。
@@ -48,7 +49,7 @@ inline std::unique_ptr<ToolBase> make_spec_tool(ToolSpec spec);
 ```
 
 - `ParamSpec`/`schema::ParamDef` 四字段：`{name, type, description, required}`；`type` 为 JSON schema 类型字符串（`string`/`integer`/`number`/`boolean`/`object`/`array`）。
-- `tool_flags` 位标志（`tool_flags::kNone` + 7 个位）：`kMeta`（元工具归类）、`kDynamic`（用户脚本注册）、`kMutating`（改动状态，遍历排除依据）、`kObserve`（支持 `observe` 参数合并截图）、`kCaptureImage`（图片附件判定）、`kSceneTarget`（成功响应幂等补全场景路径）、`kUndoable`（纯标记）。收编终态：`kCaptureImage` 9 工具 / `kSceneTarget` 25 工具 / `kUndoable` 10 工具（源码静态统计，详见下节 traits 小节）。
+- `tool_flags` 位标志（`tool_flags::kNone` + 9 个位）：`kMeta`（元工具归类）、`kDynamic`（用户脚本注册）、`kMutating`（改动状态，遍历排除依据）、`kObserve`（支持 `observe` 参数合并截图）、`kCaptureImage`（图片附件判定）、`kSceneTarget`（成功响应幂等补全场景路径）、`kUndoable`（纯标记）、`kHealthProbe`（09-29 新增，健康探针：`ping`/`system_status`，主线程等待用 5000ms 短预算）、`kLongBlocking`（09-29 新增，长阻塞：`code_execute`/`batch_execute`，不设主线程等待预算）。收编终态：`kCaptureImage` 9 工具 / `kSceneTarget` 25 工具 / `kUndoable` 10 工具（源码静态统计，详见下节 traits 小节）。
 - 域侧写法：`const std::vector<ParamSpec> kXxxParams = {...};` 参数表与工具名一一对应，`make_tools()` 中 `v.push_back(make_spec_tool(ToolSpec{name, description, category, {tags}, side_effect, flags, kXxxParams, handler}))`（`side_effect` 取 `SideEffect` 枚举 8 值，见 [安全边界与并发契约](security_contract.md)）。
 
 ## SpecTool 与执行管线
@@ -66,6 +67,16 @@ class SpecTool : public ToolBase, public ISideEffect {
 3. `pipeline::run_post(spec, args, result)`——`flags` 含 `kObserve` 且 `args.observe == true` 时，调用 `capture_ops::handle_capture_viewport({"target":"editor"})` 并把 `data/format/width/height/path` 合并进结果对象（失败写 `observe_error`）；`flags` 含 `kSceneTarget` 且响应成功（无 `error`）时，若 `result.scene_path` 缺失则幂等补全编辑器场景信息（`util::add_scene_info_fields` + `edited_scene_info()`，不做脏标记）；`kUndoable` 为纯标记，post 无动作（各 handler 自管 undo）；其余情况原样返回。
 
 `kObserve` 后处理自 2026-09-19 起统一由管线提供，Input 域 4 个合成输入工具（`click_input_mouse`/`scroll_input_mouse`/`drag_input_mouse`/`type_input_text`）与 Editor 域 2 个元素操作工具（`click_editor_element`/`type_editor_element_text`）已收编，`input_click_ops.cpp` 与 `editor_ui_actions.cpp` 中此前的重复实现已删除。
+
+## 线程路由与 dispatch 预算（09-29 新增）
+
+`SpecTool::execute()` 在非主线程被调用时，由 `dispatch::call_handler` 经 `run_on_main_thread_with_budget` 统一入口路由到 Godot 主线程（`call_tool` 代理与直连 meta 工具共用同入口；`call_tool` 编排回调自身仍在 MCP 线程执行）。等待预算由 `dispatch::main_thread_wait_budget_ms(flags, default_ms, health_ms)` 决策：
+
+- `kLongBlocking`（`code_execute`/`batch_execute`）→ 0（无限等待，优先于健康探针判定）；
+- `kHealthProbe`（`ping`/`system_status`）→ 健康预算，默认 `GDA_DISPATCH_WAIT_HEALTH_MS = 5000ms`（env `GODOT_AUTOPILOT_HEALTH_TIMEOUT_MS`）；
+- 其余工具 → 默认预算 `GDA_DISPATCH_WAIT_DEFAULT_MS = 27000ms`（env `GODOT_AUTOPILOT_DISPATCH_TIMEOUT_MS`，`static_assert` 低于 `GDA_TRANSPORT_TIMEOUT_MS = 30000`，保证超时错误能送达客户端）。
+
+等待超时：先 `CommandQueue::cancel(id)`（命中表示任务尚未执行、不会执行；未命中表示已被主线程取走），然后返回结构化错误——`error`（含 waited_ms/队列诊断与"retry、健康预算"提示）、`code="main_thread_timeout"`、`retryable=true`、`tool`、`waited_ms`、`queue_depth`、`oldest_pending_ms`、`last_drain_age_ms`、`cancelled`；`false` 与否来自 `cancel` 命中，并直写一条 `type=dispatch_timeout` trace（`LogPersist::write_trace_now`）与 Transport Warning。队列满/关闭时返回 `queue_unavailable`（不进入等待）。L1 `dispatch_budget_test` 覆盖预算决策与队列不可用返回 10 项。
 
 ## 执行埋点与可重放 trace（09-20 新增）
 
@@ -86,7 +97,7 @@ class SpecTool : public ToolBase, public ISideEffect {
 - **`kUndoable`（10 工具，纯标记）**：各 handler 自管 undo，`run_post` 无动作。
 - 计数为源码静态统计（`src/tools/*_tools.hpp` 的 flag 出现次数减 `tool_spec.hpp` 定义行），运行时以 `get_tool_detail` 回显为准。
 
-- **线程契约**：handler 经 `dispatch::call_handler` →（非主线程时）`CommandQueue::execute_sync` 路由到 Godot 主线程执行；唯一例外是 `call_tool` 元工具的编排回调在 MCP 线程执行（等待游戏响应/截图定型，不触碰 Godot API），领域工具 handler 仍由 dispatch 路由回主线程。类内部不得另起线程触碰 Godot API。
+- **线程契约**：handler 经 `dispatch::call_handler` →（非主线程时）`run_on_main_thread_with_budget`（09-29 起，含等待预算与超时取消，见上节）路由到 Godot 主线程执行；唯一例外是 `call_tool` 元工具的编排回调在 MCP 线程执行（等待游戏响应/截图定型，不触碰 Godot API），领域工具 handler 仍由 dispatch 路由回主线程。类内部不得另起线程触碰 Godot API。
 - 错误直接返回 `{"error": msg}` JSON 对象（构造用 `util::error_json`/`util::ok_result` 助手）。
 - 导出禁用不做角色接口：`server.RegisterTool` 回调统一前置 `ExportGuard::is_exporting()` 检查；异步 `__gda_pending` 约定由 `call_tool` 的等待逻辑统一处理（`runtime_ops::wait_pending_response`）。
 

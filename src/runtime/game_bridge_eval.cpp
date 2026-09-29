@@ -2,6 +2,7 @@
 
 #include "core/config.hpp"
 #include "util/error_util.hpp"
+#include "util/gdscript_wrap.hpp"
 #include "util/readback_util.hpp"
 #include "util/type_hint.hpp"
 #include "util/variant_json.hpp"
@@ -51,6 +52,7 @@ class GameBridgeEvalAwaiter : public godot::Node {
   godot::Node *target_ = nullptr;
   godot::Node *parent_ = nullptr;
   bool persist_ = false;
+  bool wrapped_ = false;
   bool connected_ = false;
   std::string persist_path_;
   godot::Ref<godot::SceneTreeTimer> timer_;
@@ -70,13 +72,14 @@ public:
   void setup(int64_t request_id, const godot::Ref<godot::RefCounted> &state_ref,
              godot::Node *target, godot::Node *parent, bool persist,
              const std::string &persist_path, int64_t timeout_ms,
-             uint64_t errors_since_seq) {
+             uint64_t errors_since_seq, bool wrapped) {
     request_id_ = request_id;
     timeout_ms_ = timeout_ms;
     state_ref_ = state_ref;
     target_ = target;
     parent_ = parent;
     persist_ = persist;
+    wrapped_ = wrapped;
     persist_path_ = persist_path;
     errors_since_seq_ = errors_since_seq;
     godot::SceneTree *tree = get_scene_tree();
@@ -125,6 +128,8 @@ public:
         body = ok_result(std::move(inner));
       }
     }
+    if (wrapped_)
+      body["wrapped"] = JV(true);
     append_eval_runtime_errors(body, errors_since_seq_);
     send_response(request_id_, std::move(body));
     cleanup();
@@ -198,6 +203,55 @@ JV eval_set_object_leaf(godot::Object *owner, const godot::Dictionary &prop_info
                         const std::string &leaf, const std::string &full,
                         const std::string &node_path, const JV &value_json);
 
+constexpr const char *EVAL_MISSING_RUN_ERROR =
+    "function _run not found in compiled script — script must extend Node and "
+    "define func _run()";
+
+constexpr const char *EVAL_BARE_STATEMENT_HINT =
+    "the source is treated as bare statements and wrapped into `extends "
+    "Node` + `func _run()`; provide a complete script defining `func _run()` "
+    "if you need a persistent entry point";
+
+std::string eval_missing_run_message() {
+  return std::string(EVAL_MISSING_RUN_ERROR) +
+         " — or pass bare statements (no top-level func) and they will be "
+         "auto-wrapped";
+}
+
+bool eval_wrap_bare_retry(const godot::Ref<godot::GDScript> &script,
+                          const std::string &source,
+                          const std::string &attempt1_error,
+                          int &wrapped_offset, std::string &error_out) {
+  gdscript_wrap::WrapResult wrap =
+      gdscript_wrap::wrap_bare_body(source, "_run", "", false);
+  if (!wrap.ok) {
+    error_out = attempt1_error + "\nauto-wrap attempt failed: " + wrap.error +
+                "\n" + EVAL_BARE_STATEMENT_HINT;
+    return false;
+  }
+  wrapped_offset = wrap.header_lines + 1;
+  script->set_source_code(godot::String::utf8(wrap.wrapped.c_str()));
+  uint64_t wrapped_seq_before = current_error_seq();
+  godot::Error wrapped_err = script->reload();
+  if (wrapped_err == godot::OK)
+    return true;
+  std::string message =
+      attempt1_error +
+      "\n[auto-wrap retry] wrapped as bare statements (extends Node + func "
+      "_run()) but compilation failed (ERR code " +
+      std::to_string(static_cast<int>(wrapped_err)) + ")";
+  EvalErrorDelta wrapped_delta = eval_error_delta(wrapped_seq_before);
+  if (!wrapped_delta.text.empty()) {
+    message += "\n" + gdscript_wrap::truncate_capture_text(
+                          gdscript_wrap::map_error_line_numbers(
+                              wrapped_delta.text, wrapped_offset));
+  }
+  message += "\nwrapped source:\n" + wrap.wrapped;
+  message += std::string("\n") + EVAL_BARE_STATEMENT_HINT;
+  error_out = message;
+  return false;
+}
+
 JV op_eval_script(const JV &params, int64_t request_id) {
   auto *code_p = params.Find("source_code");
   if (!code_p || !code_p->IsString()) {
@@ -213,14 +267,29 @@ JV op_eval_script(const JV &params, int64_t request_id) {
   script->set_source_code(godot::String::utf8(source.c_str()));
   uint64_t compile_seq_before = current_error_seq();
   godot::Error parse_err = script->reload();
+  std::string attempt1_error;
   if (parse_err != godot::OK) {
-    std::string message = "GDScript compilation failed (ERR code " +
-                          std::to_string(static_cast<int>(parse_err)) + ")";
+    attempt1_error = "GDScript compilation failed (ERR code " +
+                     std::to_string(static_cast<int>(parse_err)) + ")";
     EvalErrorDelta compile_delta = eval_error_delta(compile_seq_before);
     if (!compile_delta.text.empty()) {
-      message += "\n" + truncate_error_text(compile_delta.text);
+      attempt1_error += "\n" + truncate_error_text(compile_delta.text);
     }
-    return error_result(message);
+  }
+
+  const bool wrap_eligible = !gdscript_wrap::has_top_level_func_def(source);
+  bool wrapped_attempt = false;
+  int wrapped_offset = 0;
+
+  if (parse_err != godot::OK) {
+    if (!wrap_eligible)
+      return error_result(attempt1_error);
+    std::string wrap_error;
+    if (!eval_wrap_bare_retry(script, source, attempt1_error, wrapped_offset,
+                              wrap_error)) {
+      return error_result(wrap_error);
+    }
+    wrapped_attempt = true;
   }
 
   bool persist = false;
@@ -274,10 +343,26 @@ JV op_eval_script(const JV &params, int64_t request_id) {
 
   godot::StringName run_fn("_run");
   if (!temp_node->has_method(run_fn)) {
-    parent->remove_child(temp_node);
-    memdelete(temp_node);
-    return error_result("function _run not found in compiled script — script "
-                        "must extend Node and define func _run()");
+    if (!wrap_eligible) {
+      parent->remove_child(temp_node);
+      memdelete(temp_node);
+      return error_result(eval_missing_run_message());
+    }
+    temp_node->set_script(godot::Variant());
+    std::string wrap_error;
+    if (!eval_wrap_bare_retry(script, source, EVAL_MISSING_RUN_ERROR,
+                              wrapped_offset, wrap_error)) {
+      parent->remove_child(temp_node);
+      memdelete(temp_node);
+      return error_result(wrap_error);
+    }
+    temp_node->set_script(godot::Variant(script));
+    wrapped_attempt = true;
+    if (!temp_node->has_method(run_fn)) {
+      parent->remove_child(temp_node);
+      memdelete(temp_node);
+      return error_result(eval_missing_run_message());
+    }
   }
 
   uint64_t run_seq_before = current_error_seq();
@@ -297,7 +382,7 @@ JV op_eval_script(const JV &params, int64_t request_id) {
     GameBridgeEvalAwaiter *awaiter = memnew(GameBridgeEvalAwaiter);
     awaiter->setup(request_id, godot::Ref<godot::RefCounted>(result), temp_node,
                    parent, persist, persist_path, await_timeout_ms,
-                   run_seq_before);
+                   run_seq_before, wrapped_attempt);
     return JV();
   }
 
@@ -319,6 +404,8 @@ JV op_eval_script(const JV &params, int64_t request_id) {
       body = ok_result(std::move(inner));
     }
   }
+  if (wrapped_attempt)
+    body["wrapped"] = JV(true);
   return body;
 }
 
@@ -940,7 +1027,7 @@ JV op_eval_call_method(const JV &params, int64_t request_id) {
     GameBridgeEvalAwaiter *awaiter = memnew(GameBridgeEvalAwaiter);
     awaiter->setup(request_id, godot::Ref<godot::RefCounted>(result),
                    nullptr, nullptr, false,
-                   "", await_timeout_ms, call_seq_before);
+                   "", await_timeout_ms, call_seq_before, false);
     return JV();
   }
 
