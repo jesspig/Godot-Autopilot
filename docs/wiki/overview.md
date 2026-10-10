@@ -112,8 +112,8 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 | MCP 协议 | mcp-cpp-sdk（modelcontextprotocol-cpp-sdk），tag `0.3.4`，submodule commit `e2ed352`，仓库 `jesspig/modelcontextprotocol-cpp-sdk` | 同上 |
 | HTTP / 异步 | mcp-cpp-sdk 自研网络栈（内部 HTTP 线程） | mcp-cpp-sdk 内置（0.3.x 起移除 libhv） |
 | JSON | mcp::JsonValue（SDK 内置，自研解析器） | mcp-cpp-sdk 内置（0.3.x 起移除 simdjson） |
-| 构建 | CMake 3.28+（`cmake_minimum_required(3.28...4.2)`）、C++17、Ninja 预设（`debug`/`release`） | 根 `CMakeLists.txt`、`CMakePresets.json` |
-| 编译 | 优先 Clang/clang-cl 自动探测，MSVC/GCC 回退；sccache/ccache、LTO（ThinLTO/LTCG/IPO）、Unity 构建、作业池 | `cmake/BuildOptimization.cmake` 等 |
+| 构建 | CMake 3.28+（`cmake_minimum_required(3.28...4.2)`）、C++17、生成器双路径预设（有 ninja 用 `debug`/`release`，无则 `debug-portable`/`release-portable`） | 根 `CMakeLists.txt`、`CMakePresets.json`、`scripts/config.py` |
+| 编译 | 优先 Clang/clang-cl 自动探测，MSVC/GCC 回退；sccache/ccache、LTO（ThinLTO/LTCG/IPO）、Unity 构建、作业池（仅 Ninja 注册）、按 ninja 可用性自动选预设 | `cmake/BuildOptimization.cmake`、`scripts/cmake_ops.py` 等 |
 | 测试 | googletest（`third_party/googletest` 子模块，tag `v1.15.2` / commit `b514bdc`，L1）；自研 `gda_test_runner` + `tests/config/*.json`（L2） | `tests/` |
 
 构建优化参数分两类：`GDA_COMPILE_JOBS`、`GDA_LINK_JOBS` 支持 CACHE（`-D`）与进程环境变量双通道；其余（`GDA_UNITY_BUILD`、`GDA_UNITY_BATCH_SIZE`、`GDA_MAX_COMPILE_MEM_MB`、`GDA_MAX_LINK_MEM_MB`、`GDA_UNITY_MEM_MB`）仅支持 `-D` CACHE 参数；`GDA_ARCH`、`GDA_IS_CI` 为探测结果变量，`GDA_CCACHE`/`GDA_SCCACHE` 为 `find_program` 探测结果（均非用户配置入口）。详见 [build.md](./build.md)。
@@ -123,7 +123,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 ```text
 godot-self-driving/
 ├── CMakeLists.txt              # add_library(godot-autopilot SHARED ...)，新 .cpp 必须登记
-├── CMakePresets.json           # debug / release（Ninja）
+├── CMakePresets.json           # 6 个 configure 预设：base-debug/base-release（hidden 基座）+ debug/release（Ninja）+ debug-portable/release-portable（平台默认生成器）
 ├── main.py                     # 构建入口（build/package/clean/tui 子命令）
 ├── scripts/                    # 构建模块：config/cmake_ops/deploy/package/clean_ops/tui
 ├── cmake/                      # 构建模块：Dependencies / BuildOptimization / Lto / Cache / CompilerOptions / Platform / skill_gen

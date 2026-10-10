@@ -6,7 +6,7 @@ tags:
   - 构建
   - CMake
   - 部署
-timestamp: "2026-10-10T15:03:54+08:00"
+timestamp: "2026-10-10T19:12:07+08:00"
 resource:
   - CMakeLists.txt
   - CMakePresets.json
@@ -18,9 +18,9 @@ resource:
 
 # 构建体系（build）
 
-> 审计日期：2026-10-10（10-10 随依赖 submodule 化同步——`cmake/FetchDependencies.cmake` 更名为 `cmake/Dependencies.cmake` 并改为纯 `add_subdirectory`，FetchContent 全部移除；godot-cpp / mcp-cpp-sdk / googletest 改为 `third_party/` 下的 git submodule，版本由 gitlink commit 锁定（`10.0.0-stable`/`507ed9d`、`0.3.4`/`e2ed352`、`v1.15.2`/`b514bdc`），configure 零网络访问；AUTO-CLEAN、CI 缓存、AGENTS.md 对照段与依赖版本口径同步）；09-26 随 L2 测试床迁移同步——`Example/` 已移除，床改 `tests/testbed/`；2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill 内容外置化同步；09-10 随 7 册重构同步；09-13 晚随 A 组知识库审计修复批次同步——skill_templates 8 册/30 个 .md、server_context/FetchDependencies 行号重核、AGENTS.md/README 对照段更新；09-13 晚随 0.2.3→0.2.4 升版同步示例版本号；09-13 晚随 0.2.4 版知识库全量审计同步——GODOT_PATH 缺失行为修正（退出码 2 报错，非“失败/跳过”），全页其余事实复核一致；09-14 随 CI Windows Python 编码修复同步——ci/release workflow 增 `PYTHONUTF8`、`embed_skills.py` 强制 UTF-8 输出），基于当前工作树文件逐项核对（不依赖 git 历史）；09-15 随 Computer Use grounding 批次同步文档一致性段——`README.md` / `README_zh.md` 工具数口径已同步为 ~379（域工具），与 overview 的 379 域工具 / 可达 386 / catalog 387 一致；09-16 随失败修复批次同步——README 双语工具数口径更新为 ~384，与 overview 的 384 域工具 / 可达 391 / catalog 392 一致；09-16 随视觉辅助与坐标换算批次同步——wiki 实测 385 域工具 / 可达 392 / catalog 393（Capture 1→2），README 双语 ~384 为约数口径（差 1，可接受，待后续版本同步）；09-16 随 0.2.5 升版收尾同步——validate 示例 0.2.4→0.2.5（`VERSION`/AGENTS/changelog 早在 09-14 已同步，`GDA_VERSION` 已为 0.2.5）；09-17 随 T09+T12 文档同步批次更新 compatibility_minimum 4.3→4.7、godot-cpp 10.0.0-rc1→rc2（新增 GODOTCPP_API_VERSION "4.7" FORCE 覆盖旧缓存）、mcp-cpp-sdk 0.3.3→0.3.4；09-18 随知识库一致性审计与 README 拆分批次同步——`CMakeLists.txt` 行数 169→173（实测）、`README_zh.md` 已删除（中文 `README.md` + 英文 `README.en.md` 双版）故事实来源与文档一致性段改引新版 README 口径；09-19 随 ToolSpec 数据化重构同步文档一致性段——wiki 实测 391 域工具 / 可达 398 / catalog 399；09-20 随 Release 触发修复同步——tag 触发 `v*` 改双格式（`v*.*.*` / `[0-9]*.*.*`）+ `workflow_dispatch` 手动指定 tag，validate 去 `v` 后比对 `VERSION`；同日代码-文档一致性审计——add_library 分目录计数修正为 tools 48 / util 8 / runtime 4（总数 83 不变）；同日 0.2.6 升版——根 `VERSION` 0.2.5→0.2.6（单一来源），validate 示例同步至 `v0.2.6` ↔ `0.2.6`；09-20 晚随可重放监控批次同步——add_library 83→86（`src/core/` 9→12：log_persist / trace_recorder / sanitize_policy），块范围 `CMakeLists.txt:65-148`→`:65-151`；09-20 晚随依赖升级同步——godot-cpp 10.0.0-rc2→10.0.0-stable；mcp-cpp-sdk 维持 0.3.4（依赖升级范围经复核收缩，`FetchDependencies.cmake:20/29`，configure 实测 `[mcp] SDK version: 0.3.4`）；09-21 随可重放监控与日志系统批次同步——`add_library` 86→89（`src/core/` 12→15：新增 `monitor.cpp` / `monitor_env.cpp` / `perf_sampler.cpp`），`monitor.cpp` 进 L1 业务源、`monitor_env.cpp`（仅主线程）与 `perf_sampler.cpp`（依赖引擎 tick）不进 L1；09-25 随项目级技能层落地同步——`CMakeLists.txt` 行数 176→179、`add_dependencies` `:153`→`:156`、`WHOLEARCHIVE` `:165`→`:168`（均按当前工作树重核）。09-29 随技能书源标准目录迁移同步。
+> 审计日期：2026-10-10（10-10 晚随多配置生成器适配批次同步——Visual Studio 等**多配置生成器**下三个只在真跑起来才暴露的坑：① `cmake/CompilerOptions.cmake` 的 MSVC 分支补 `/Zc:lambda`（修 `error C3493`，MSVC 拒绝 lambda 经 `[&]` 隐式引用捕获局部 `const`/`constexpr` 变量，clang 接受同一写法）；② 多配置生成器的产物多一层配置名子目录（`build/debug/Debug/godot-autopilot.dll`、`build/debug/tests/Debug/gda_unit_tests.exe`），`scripts/config.py` 新增 `cached_generator()` 与 `artifact_dir()`，`scripts/deploy.py` 改用 `artifact_dir()`，`scripts/cmake_ops.py` 的私有 `_cached_generator()` 删除、上移复用；③ ctest 在多配置生成器下须 `-C <config>`，否则只注册 40 个测试且 3 个非 gtest 用例报 `Test not available without configuration`，修法为 `CMakePresets.json` 的 portable build/test 预设补 `configuration` 字段（CMake 自动转 `--config` / `-C`，Python 侧零改动）。实测 Windows 无 ninja 无 DevShell 下 L1 全量 394 通过、部署 5 demo + 测试床成功）；10-10 晚随构建环境自适应批次同步——[CMakePresets.json](../../CMakePresets.json) 的 configure 预设 2→6：`base-debug`/`base-release` 为 `hidden` 基座（承载 `binaryDir` 与 `cacheVariables`），派生 `debug`/`release`（显式 `generator: Ninja`）与 `debug-portable`/`release-portable`（省略 `generator` 走 CMake 常规发现），两条路径**共用同一 `binaryDir`**；build/test 预设各 4 个。`scripts/config.py` 新增 `resolve_preset()` 按 `shutil.which("ninja")` 选路；`scripts/cmake_ops.py` 新增 `_cached_generator()`（读 `CMakeCache.txt` 比对生成器并在切换时 AUTO-CLEAN）、`_subprocess_env()`（把当前解释器目录前置到子进程 PATH）；`cmake/skill_gen.cmake` 改 `find_package(Python3)` 优先。命令行接口零变更）；10-10 随依赖 submodule 化同步——`cmake/FetchDependencies.cmake` 更名为 `cmake/Dependencies.cmake` 并改为纯 `add_subdirectory`，FetchContent 全部移除；godot-cpp / mcp-cpp-sdk / googletest 改为 `third_party/` 下的 git submodule，版本由 gitlink commit 锁定（`10.0.0-stable`/`507ed9d`、`0.3.4`/`e2ed352`、`v1.15.2`/`b514bdc`），configure 零网络访问；AUTO-CLEAN、CI 缓存、AGENTS.md 对照段与依赖版本口径同步）；09-26 随 L2 测试床迁移同步——`Example/` 已移除，床改 `tests/testbed/`；2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill 内容外置化同步；09-10 随 7 册重构同步；09-13 晚随 A 组知识库审计修复批次同步——skill_templates 8 册/30 个 .md、server_context/FetchDependencies 行号重核、AGENTS.md/README 对照段更新；09-13 晚随 0.2.3→0.2.4 升版同步示例版本号；09-13 晚随 0.2.4 版知识库全量审计同步——GODOT_PATH 缺失行为修正（退出码 2 报错，非“失败/跳过”），全页其余事实复核一致；09-14 随 CI Windows Python 编码修复同步——ci/release workflow 增 `PYTHONUTF8`、`embed_skills.py` 强制 UTF-8 输出），基于当前工作树文件逐项核对（不依赖 git 历史）；09-15 随 Computer Use grounding 批次同步文档一致性段——`README.md` / `README_zh.md` 工具数口径已同步为 ~379（域工具），与 overview 的 379 域工具 / 可达 386 / catalog 387 一致；09-16 随失败修复批次同步——README 双语工具数口径更新为 ~384，与 overview 的 384 域工具 / 可达 391 / catalog 392 一致；09-16 随视觉辅助与坐标换算批次同步——wiki 实测 385 域工具 / 可达 392 / catalog 393（Capture 1→2），README 双语 ~384 为约数口径（差 1，可接受，待后续版本同步）；09-16 随 0.2.5 升版收尾同步——validate 示例 0.2.4→0.2.5（`VERSION`/AGENTS/changelog 早在 09-14 已同步，`GDA_VERSION` 已为 0.2.5）；09-17 随 T09+T12 文档同步批次更新 compatibility_minimum 4.3→4.7、godot-cpp 10.0.0-rc1→rc2（新增 GODOTCPP_API_VERSION "4.7" FORCE 覆盖旧缓存）、mcp-cpp-sdk 0.3.3→0.3.4；09-18 随知识库一致性审计与 README 拆分批次同步——`CMakeLists.txt` 行数 169→173（实测）、`README_zh.md` 已删除（中文 `README.md` + 英文 `README.en.md` 双版）故事实来源与文档一致性段改引新版 README 口径；09-19 随 ToolSpec 数据化重构同步文档一致性段——wiki 实测 391 域工具 / 可达 398 / catalog 399；09-20 随 Release 触发修复同步——tag 触发 `v*` 改双格式（`v*.*.*` / `[0-9]*.*.*`）+ `workflow_dispatch` 手动指定 tag，validate 去 `v` 后比对 `VERSION`；同日代码-文档一致性审计——add_library 分目录计数修正为 tools 48 / util 8 / runtime 4（总数 83 不变）；同日 0.2.6 升版——根 `VERSION` 0.2.5→0.2.6（单一来源），validate 示例同步至 `v0.2.6` ↔ `0.2.6`；09-20 晚随可重放监控批次同步——add_library 83→86（`src/core/` 9→12：log_persist / trace_recorder / sanitize_policy），块范围 `CMakeLists.txt:65-148`→`:65-151`；09-20 晚随依赖升级同步——godot-cpp 10.0.0-rc2→10.0.0-stable；mcp-cpp-sdk 维持 0.3.4（依赖升级范围经复核收缩，`FetchDependencies.cmake:20/29`，configure 实测 `[mcp] SDK version: 0.3.4`）；09-21 随可重放监控与日志系统批次同步——`add_library` 86→89（`src/core/` 12→15：新增 `monitor.cpp` / `monitor_env.cpp` / `perf_sampler.cpp`），`monitor.cpp` 进 L1 业务源、`monitor_env.cpp`（仅主线程）与 `perf_sampler.cpp`（依赖引擎 tick）不进 L1；09-25 随项目级技能层落地同步——`CMakeLists.txt` 行数 176→179、`add_dependencies` `:153`→`:156`、`WHOLEARCHIVE` `:165`→`:168`（均按当前工作树重核）。09-29 随技能书源标准目录迁移同步。
 9（2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-08 随 skill 内容外置化同步；09-10 随 7 册重构同步；09-13 晚随 A 组知识库审计修复批次同步——skill_templates 8 册/30 个 .md、server_context/FetchDependencies 行号重核、AGENTS.md/README 对照段更新；09-13 晚随 0.2.3→0.2.4 升版同步示例版本号；09-13 晚随 0.2.4 版知识库全量审计同步——GODOT_PATH 缺失行为修正（退出码 2 报错，非“失败/跳过”），全页其余事实复核一致；09-14 随 CI Windows Python 编码修复同步——ci/release workflow 增 `PYTHONUTF8`、`embed_skills.py` 强制 UTF-8 输出），基于当前工作树文件逐项核对（不依赖 git 历史）；09-15 随 Computer Use grounding 批次同步文档一致性段——`README.md` / `README_zh.md` 工具数口径已同步为 ~379（域工具），与 overview 的 379 域工具 / 可达 386 / catalog 387 一致；09-16 随失败修复批次同步——README 双语工具数口径更新为 ~384，与 overview 的 384 域工具 / 可达 391 / catalog 392 一致；09-16 随视觉辅助与坐标换算批次同步——wiki 实测 385 域工具 / 可达 392 / catalog 393（Capture 1→2），README 双语 ~384 为约数口径（差 1，可接受，待后续版本同步）；09-16 随 0.2.5 升版收尾同步——validate 示例 0.2.4→0.2.5（`VERSION`/AGENTS/changelog 早在 09-14 已同步，`GDA_VERSION` 已为 0.2.5）；09-17 随 T09+T12 文档同步批次更新 compatibility_minimum 4.3→4.7、godot-cpp 10.0.0-rc1→rc2（新增 GODOTCPP_API_VERSION "4.7" FORCE 覆盖旧缓存）、mcp-cpp-sdk 0.3.3→0.3.4；09-18 随知识库一致性审计与 README 拆分批次同步——`CMakeLists.txt` 行数 169→173（实测）、`README_zh.md` 已删除（中文 `README.md` + 英文 `README.en.md` 双版）故事实来源与文档一致性段改引新版 README 口径；09-19 随 ToolSpec 数据化重构同步文档一致性段——wiki 实测 391 域工具 / 可达 398 / catalog 399；09-20 随 Release 触发修复同步——tag 触发 `v*` 改双格式（`v*.*.*` / `[0-9]*.*.*`）+ `workflow_dispatch` 手动指定 tag，validate 去 `v` 后比对 `VERSION`；同日代码-文档一致性审计——add_library 分目录计数修正为 tools 48 / util 8 / runtime 4（总数 83 不变）；同日 0.2.6 升版——根 `VERSION` 0.2.5→0.2.6（单一来源），validate 示例同步至 `v0.2.6` ↔ `0.2.6`；09-20 晚随可重放监控批次同步——add_library 83→86（`src/core/` 9→12：log_persist / trace_recorder / sanitize_policy），块范围 `CMakeLists.txt:65-148`→`:65-151`；09-20 晚随依赖升级同步——godot-cpp 10.0.0-rc2→10.0.0-stable；mcp-cpp-sdk 维持 0.3.4（依赖升级范围经复核收缩，`FetchDependencies.cmake:20/29`，configure 实测 `[mcp] SDK version: 0.3.4`）；09-21 随可重放监控与日志系统批次同步——`add_library` 86→89（`src/core/` 12→15：新增 `monitor.cpp` / `monitor_env.cpp` / `perf_sampler.cpp`），`monitor.cpp` 进 L1 业务源、`monitor_env.cpp`（仅主线程）与 `perf_sampler.cpp`（依赖引擎 tick）不进 L1；09-25 随项目级技能层落地同步——`CMakeLists.txt` 行数 176→179、`add_dependencies` `:153`→`:156`、`WHOLEARCHIVE` `:165`→`:168`（均按当前工作树重核）。；09-26 随构建入口 main.py 化与 scripts/ 拆分同步——build.py 删除（main.py build/deploy/package/clean/test/tui 六子命令 + scripts/ 7 模块：config/cmake_ops/deploy/package/clean_ops/test_ops/tui），部署目标 Example/addons→demo/×5（--demos 可选子集），打包与 CI artifact 取首个 demo，TUI（rich 状态表 + questionary 复选/单选/确认）新增；questionary 2.1.1 入 pyproject 依赖
-> 事实来源：`main.py` + `scripts/` 6 模块（config/cmake_ops/deploy/package/clean_ops/tui）、`CMakeLists.txt`（179 行）、`CMakePresets.json`、`cmake/` 全部 7 个模块、`tools/embed_skills.py`、`.env.template`、根 `README.md` / `README.en.md` / `AGENTS.md` 构建段、`.github/workflows/{ci,release}.yml`。
+> 事实来源：`main.py` + `scripts/` 7 模块（config/cmake_ops/test_ops/deploy/package/clean_ops/tui）、`CMakeLists.txt`（179 行）、`CMakePresets.json`、`cmake/` 全部 7 个模块、`tools/embed_skills.py`、`.env.template`、根 `README.md` / `README.en.md` / `AGENTS.md` 构建段、`.github/workflows/{ci,release}.yml`。
 > 09-25 技能脚本通道批次：skill 8→9 册，模板 33 md + 1 mjs（`gda_mcp.mjs` 脚本桥）+ registry，嵌入校验扩展 `.mjs`/`scripts/`（`SKILL_COUNT = 9`）；构建接线不变（内容数据文件不进 add_library）。
 
 ## 命令速查表
@@ -38,7 +38,7 @@ resource:
 | `uv run main.py clean` | 清理各 demo 的 `.godot` 与 `addons`（原仅 `--release` 顺带做，现独立子命令） |
 | `uv run main.py test` | 跑测试（默认 L1 快筛；`--l2 [用例名]`、`--single <用例名>`、`--all` 全量，`--preset` 切预设） |
 | `uv run main.py tui` | 交互式构建控制台（rich + questionary，需终端；覆盖构建/打包/清理/状态查看，demo 复选） |
-| `cmake --preset debug && cmake --build --preset debug` | 手动构建（不部署） |
+| `cmake --preset debug && cmake --build --preset debug` | 手动构建（不部署）。预设名不带 `-portable` 后缀即**固定 Ninja**，须本机 PATH 有 ninja；无 ninja 时改用 `debug-portable` / `release-portable`，或直接用 `uv run main.py build` 由脚本自动选路（见「预设」小节） |
 
 约束：`build`/`deploy` 各自的 `--release` 与 `--debug` 互斥，同时指定报错退出（`main.py:22/39`）；`package` 的 `--libs-dir` 缺任一平台库即报错退出；`--demos` 名称不在 5 个 demo 内时报错退出并列出可选名。
 
@@ -67,17 +67,22 @@ resource:
 
 ### 2. 配置 `_configure(preset)`（`scripts/cmake_ops.py`）
 
-1. 先尝试 `cmake --preset <debug|release>`；
-2. 失败且 `build/<preset>/` 存在 → **AUTO-CLEAN**：删除该目录内除 `_deps/` 外的全部文件与目录（目录递归删除、文件 unlink），然后重试一次；
-3. 依赖源码在 `third_party/` 子模块（不在 `build/` 下），因此清空 `build/<preset>/` 不会丢依赖；子模块二进制目录 `build/<preset>/_sub/` 会被一并删除并在下一次 configure 重建。脚本仍跳过名为 `_deps` 的条目（FetchContent 时代的残留目录名，保留无害）。
+先由 [`scripts/config.py:resolve_preset()`](../../scripts/config.py) 把逻辑预设名 `debug|release` 解析为实际预设名（按 ninja 可用性在 `<preset>` 与 `<preset>-portable` 间二选一，两条路径共用 `build/<preset>/`），随后：
+
+1. **生成器切换检测（configure 前主动执行）**：[`scripts/cmake_ops.py`](../../scripts/cmake_ops.py) 的 `_configure()` 调 [`scripts/config.py:cached_generator()`](../../scripts/config.py) 读 `build/<preset>/CMakeCache.txt` 的 `CMAKE_GENERATOR:INTERNAL=` 条目——**类型在首个冒号之后**，故先按 `:` 拆出值再按 `=` 取值，否则解析不到；再与「本次期望是否 Ninja」比对，不一致则打印 `[AUTO-CLEAN] Generator changed: <旧> -> <Ninja|platform default>` 并清空该构建目录后重配。读取逻辑上移到 `config.py` 是因为 `artifact_dir()` 需按同一份「实际生成器」判定产物落点（见「scripts/ 模块职责」），`cmake_ops.py` 不再自带私有副本。
+2. `cmake --preset <解析后的预设名>`；
+3. 失败且 `build/<preset>/` 存在 → **AUTO-CLEAN**：删除该目录内除 `_deps/` 外的全部文件与目录（目录递归删除、文件 unlink），然后重试一次；
+4. 依赖源码在 `third_party/` 子模块（不在 `build/` 下），因此清空 `build/<preset>/` 不会丢依赖；子模块二进制目录 `build/<preset>/_sub/` 会被一并删除并在下一次 configure 重建。脚本仍跳过名为 `_deps` 的条目（FetchContent 时代的残留目录名，保留无害）。
+
+子进程环境：`_subprocess_env()` 把 `Path(sys.executable).parent` 前置到 `PATH`，`uv run main.py build` 下即 `.venv/Scripts`（必然含可用的 `python.exe`），从而让 [`cmake/skill_gen.cmake`](../../cmake/skill_gen.cmake) 的解释器探测不依赖系统 PATH 顺序，也不会命中 Microsoft Store 的 `python` 存根。
 
 ### 3. 构建 `_build(preset)`
 
-`cmake --build --preset <preset>`（Ninja 生成器）。
+`cmake --build --preset <解析后的预设名>`（`resolve_preset` 的返回值）。实际生成器由该预设决定：有 ninja 时为 Ninja，否则为平台默认生成器（并行度计算对两者一致生效）。`-portable` 预设带 `configuration` 字段（见「预设」小节），CMake 自动翻译为 `--config Debug|Release`，多配置生成器（Visual Studio / Xcode / Ninja Multi-Config）据此把产物落进配置名子目录。
 
 ### 4. 部署 `_deploy(preset, demos)`（`scripts/deploy.py`）
 
-逐个工程循环（`--demos` 未指定即全部 5 个 demo），循环体末尾恒追加 L2 测试床 `tests/testbed`，因此 `--demos` 子集部署同样会刷新床的插件：
+逐个工程循环（`--demos` 未指定即全部 5 个 demo），循环体末尾恒追加 L2 测试床 `tests/testbed`，因此 `--demos` 子集部署同样会刷新床的插件。库源目录取 [`scripts/config.py:artifact_dir(preset)`](../../scripts/config.py) 而非 `BUILD_DIR / preset` —— 多配置生成器的产物多一层配置名子目录（见「多配置生成器的产物路径」小节）：
 
 1. 创建部署目录，删除 Godot 热重载遗留的备份库（glob `~*`）；
 2. 生成 `godot-autopilot.gdextension`（见下节）；
@@ -90,14 +95,14 @@ resource:
 
 ## CI 与 Release
 
-`.github/workflows/ci.yml` — develop push/PR 触发：三平台 matrix（ubuntu-latest / macos-latest / windows-2022）Debug 编译 + L1 测试 `ctest --preset debug -E "^gda_runner_"`（L2 需 Godot 不在 CI 跑）；sccache + `third_party/` 子模块缓存加速（`actions/checkout` 带 `submodules: true`；`actions/cache` 的 path 为 `third_party/godot-cpp`、`third_party/mcp-cpp-sdk`、`third_party/googletest`，key `submodules-debug-${{ runner.os }}-${{ hashFiles('.gitmodules') }}`）。job 级 env 含 `PYTHONUTF8: "1"`（Windows runner 控制台为 cp1252，保证 `main.py` 及其子进程 `embed_skills.py` 的中文日志不触发 `UnicodeEncodeError`；脚本自身亦对 stdout/stderr 强制 UTF-8，本地 Windows 终端同样受益）。`release.yml` 的 job env 同。
+`.github/workflows/ci.yml` — develop push/PR 触发：三平台 matrix（ubuntu-latest / macos-latest / windows-2022）Debug 编译 + L1 测试 `ctest --preset debug -E "^gda_runner_"`（L2 需 Godot 不在 CI 跑）；ninja 由 `seanmiddleditch/gha-setup-ninja@v5` 装入 PATH，因此 `resolve_preset` 恒选 `debug` 而非 `debug-portable`（ctest 步骤直接写死 `ctest --preset debug`、不经过 `resolve_preset`，依赖这一前提成立）；sccache + `third_party/` 子模块缓存加速（`actions/checkout` 带 `submodules: true`；`actions/cache` 的 path 为 `third_party/godot-cpp`、`third_party/mcp-cpp-sdk`、`third_party/googletest`，key `submodules-debug-${{ runner.os }}-${{ hashFiles('.gitmodules') }}`）。job 级 env 含 `PYTHONUTF8: "1"`（Windows runner 控制台为 cp1252，保证 `main.py` 及其子进程 `embed_skills.py` 的中文日志不触发 `UnicodeEncodeError`；脚本自身亦对 stdout/stderr 强制 UTF-8，本地 Windows 终端同样受益）。`release.yml` 的 job env 同。
 
 `.github/workflows/release.yml` — tag 双格式触发（`v*.*.*` / `[0-9]*.*.*`，另支持 `workflow_dispatch` 手动指定 tag）：
 
 | job | 内容 |
 |---|---|
 | validate | 校验 tag 与根 `VERSION` 一致（`v` 前缀可选：`v0.2.6` / `0.2.6` ↔ `0.2.6`，版本号以根 `VERSION` 为准，当前 0.2.6），不一致 fail |
-| build | 同 CI 环境（Ninja/sccache/msvc-dev-cmd；checkout 带 `submodules: true`，缓存同 CI 改为 `key: submodules-release-${{ runner.os }}-${{ hashFiles('.gitmodules') }}`），Release 构建后按精确文件名上传各平台库 artifact（天然排除 pdb） |
+| build | 同 CI 环境（Ninja/sccache/msvc-dev-cmd，ninja 由 `seanmiddleditch/gha-setup-ninja@v5` 提供，故 `resolve_preset` 恒选 `release`；checkout 带 `submodules: true`，缓存同 CI 改为 `key: submodules-release-${{ runner.os }}-${{ hashFiles('.gitmodules') }}`），Release 构建后按精确文件名上传各平台库 artifact（天然排除 pdb） |
 | package | 下载全部 artifact → `python main.py package --libs-dir dist` 合并 → 重命名为 `addons.zip` → softprops/action-gh-release 发布 |
 
 macOS runner 为 ARM64，preset 设 `CMAKE_OSX_ARCHITECTURES=x86_64;arm64` 编译 universal 双架构（仅 Apple 平台生效），gdextension 对应条目为 `macos.{debug,release}.universal`。
@@ -106,12 +111,22 @@ macOS runner 为 ARM64，preset 设 `CMAKE_OSX_ARCHITECTURES=x86_64;arm64` 编�
 
 | 产物 | 位置 | 说明 |
 |---|---|---|
-| `godot-autopilot.dll` | `build/{debug,release}/` → 部署目录 | Windows 平台库 |
+| `godot-autopilot.dll` | `build/{debug,release}/`（多配置生成器再套一层 `Debug`/`Release`）→ 部署目录 | Windows 平台库 |
 | `libgodot-autopilot.so` | 同上 | Linux |
 | `libgodot-autopilot.dylib` | 同上 | macOS |
 | `godot-autopilot.pdb` | 同上（Windows，存在时复制） | 调试符号 |
 | `godot-autopilot.gdextension` | 部署目录（每次部署重新生成） | 入口 `entry_symbol = "GDExtensionEntryPoint"`、`compatibility_minimum = "4.7"`、`[libraries]` 6 条平台路径（windows/linux 为 `x86_64`，macos 为 `universal`） |
 | `dist/godot-autopilot-<version>.zip` | `dist/` | `--package` 产物（版本号取自根 `VERSION` 文件） |
+
+**构建目录布局随生成器而变**：单配置生成器（Ninja / Unix Makefiles）直接落 `build/debug/godot-autopilot.dll`；多配置生成器（Visual Studio / Xcode / Ninja Multi-Config）**再套一层以配置命名的子目录**，实测（Windows，`CMAKE_GENERATOR:INTERNAL=Visual Studio 18 2026`，`CMAKE_CONFIGURATION_TYPES=Debug;Release;MinSizeRel;RelWithDebInfo`）：
+
+| 产物 | 单配置生成器 | 多配置生成器 |
+|---|---|---|
+| 平台库 | `build/debug/godot-autopilot.dll` | `build/debug/Debug/godot-autopilot.dll`（同目录另有 `.exp`/`.lib`/`.pdb`） |
+| L1 测试可执行 | `build/debug/tests/gda_unit_tests.exe` | `build/debug/tests/Debug/gda_unit_tests.exe` |
+| L2 执行器 | `build/debug/tests/gda_test_runner.exe` | `build/debug/tests/Debug/gda_test_runner.exe` |
+
+程序侧一律用 [`scripts/config.py:artifact_dir(preset)`](../../scripts/config.py) 取平台库源目录，不写死 `BUILD_DIR / preset`（见「scripts/ 模块职责」）。
 
 部署目录：`demo/*/addons/godot-autopilot/`（5 个 demo；打包与 CI artifact 取首个）与 `tests/testbed/addons/godot-autopilot/`（L2 测试床，不入库、不参与打包）；`main.py` 与 CI/Release 均使用仓库实际目录大小写，大小写敏感平台不会产生分叉目录。
 
@@ -140,12 +155,14 @@ macOS runner 为 ARM64，preset 设 `CMAKE_OSX_ARCHITECTURES=x86_64;arm64` 编�
 | 文件 | 职责 | 关键变量 |
 |---|---|---|
 | `Platform.cmake` | 架构与 CI 探测 | `GDA_ARCH`（`x86_64`/`x86`，按指针宽度）、`GDA_IS_CI`（进程环境存在 `CI` 即 ON） |
-| `BuildOptimization.cmake` | 硬件感知并行度（核心规则） | `GDA_COMPILE_JOBS`、`GDA_LINK_JOBS`（CACHE 优先、其次 ENV）、`GDA_UNITY_BUILD`（ON 且核数 >1 时启用）、`GDA_UNITY_BATCH_SIZE`（0=auto）、`GDA_MAX_COMPILE_MEM_MB`（默认 1500）、`GDA_MAX_LINK_MEM_MB`（默认 4000）、`GDA_UNITY_MEM_MB`（默认 500） |
-| `CompilerOptions.cmake` | 按编译器分发 flags | Clang/clang-cl 与 MSVC：`/utf-8 /bigobj /W4 /EHsc` + `_CRT_SECURE_NO_WARNINGS`、`_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS`、`_WIN32_WINNT=0x0A00`；MSVC 调试信息 `Embedded`；GCC/Clang 非 Windows 非 CI 追加 `-march=native`；`find_package(Threads REQUIRED)`；`CMAKE_POSITION_INDEPENDENT_CODE ON` |
+| `BuildOptimization.cmake` | 硬件感知并行度（核心规则） | `GDA_COMPILE_JOBS`、`GDA_LINK_JOBS`（CACHE 优先、其次 ENV）、`GDA_UNITY_BUILD`（ON 且核数 >1 时启用）、`GDA_UNITY_BATCH_SIZE`（0=auto）、`GDA_MAX_COMPILE_MEM_MB`（默认 1500）、`GDA_MAX_LINK_MEM_MB`（默认 4000）、`GDA_UNITY_MEM_MB`（默认 500）；`CMAKE_BUILD_PARALLEL_LEVEL` 对**所有**生成器生效；`gda_compile_pool`/`gda_link_pool` 仅在 `if(CMAKE_GENERATOR MATCHES "Ninja")` 时注册（`:84-91`），非 Ninja 只打印 `[gda] Ninja jobs: N (non-Ninja generator)`，其余并行度与 Unity 计算照常 |
+| `CompilerOptions.cmake` | 按编译器分发 flags | Clang/clang-cl 与 MSVC：`/utf-8 /bigobj /W4 /EHsc` + `_CRT_SECURE_NO_WARNINGS`、`_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS`、`_WIN32_WINNT=0x0A00`；**MSVC 分支（`elseif(MSVC)`，即真正的 cl.exe）额外 `/Zc:lambda`**，clang-cl 走的是第一个 `if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")` 分支、不加该开关（见下「MSVC lambda 捕获差异」小节）；MSVC 调试信息 `Embedded`；GCC/Clang 非 Windows 非 CI 追加 `-march=native`；`find_package(Threads REQUIRED)`；`CMAKE_POSITION_INDEPENDENT_CODE ON` |
 | `Cache.cmake` | 编译缓存自动探测 | 优先 sccache（支持 MSVC），回退 ccache（仅 GCC/Clang）；命中则设 `CMAKE_C/CXX_COMPILER_LAUNCHER` |
 | `Dependencies.cmake` | `third_party/` 子模块依赖（纯 `add_subdirectory`，无 FetchContent） | `GDA_THIRD_PARTY_DIR`（`${CMAKE_SOURCE_DIR}/third_party`）、`GDA_SUBMODULE_BIN_DIR`（`${CMAKE_BINARY_DIR}/_sub`）、`gda_require_submodule(<name>)`（子模块缺失即 `FATAL_ERROR` 并提示 `git submodule update --init --recursive`，故意不做网络回退）、`CMAKE_DISABLE_FIND_PACKAGE_OpenSSL ON`、`GODOTCPP_API_VERSION "4.7"`（CACHE/FORCE）；`godot-cpp` @ `10.0.0-stable`（commit `507ed9d`）、`mcp-cpp-sdk` @ `0.3.4`（commit `e2ed352`） |
 | `Lto.cmake` | 仅 Release 的链接优化 | 优先级 Clang ThinLTO（`-flto=thin`）> MSVC LTCG（`CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE`）> GCC IPO（`CheckIPOSupported`）；非 Release 直接跳过 |
-| `skill_gen.cmake` | skill 标准目录构建期嵌入（09-08 新增） | `GDA_PYTHON_EXECUTABLE`（`find_program(NAMES py python python3 REQUIRED)`，py launcher 优先）+ configure 期 `--version` 自检（失败 FATAL_ERROR）；`add_custom_command` 生成 `<build>/generated/skill_content_embedded.h` + `add_custom_target(gda_skill_embed_header)`；依赖 `skills/*/[SKILL.md|references/*.md|scripts/*.mjs]`（CONFIGURE_DEPENDS） |
+| `skill_gen.cmake` | skill 标准目录构建期嵌入（09-08 新增） | `GDA_PYTHON_EXECUTABLE`（**先** `find_package(Python3 QUIET COMPONENTS Interpreter)`，命中取 `Python3_EXECUTABLE`；否则回退 `find_program(NAMES py python python3)`；两者皆无才 `FATAL_ERROR` 并提示改用 `uv run main.py build`）+ configure 期 `--version` 可用性自检（失败 FATAL_ERROR）；`add_custom_command` 生成 `<build>/generated/skill_content_embedded.h` + `add_custom_target(gda_skill_embed_header)`；依赖 `skills/*/[SKILL.md|references/*.md|scripts/*.mjs]`（CONFIGURE_DEPENDS） |
+
+解释器探测为何放宽：`find_package(Python3)` 会**真正执行解释器做验证**，因此不会命中 Microsoft Store 的 `python` 存根，且能识别 `python3.12` 这类带版本号的文件名；而 `find_program(NAMES py python python3)` 只认三个裸名字，uv/conda 等安装的版本化可执行名会漏掉。godot-cpp 已先调用过 `find_package(Python3)`，此处复用其结果。配合 `scripts/cmake_ops.py` 的 `_subprocess_env()`（见「构建流水线 → 配置」），`uv run main.py build` 下必能拿到 `.venv/Scripts` 里的可用解释器。
 
 ### 依赖获取（`third_party/` 子模块）
 
@@ -171,7 +188,63 @@ macOS runner 为 ARM64，preset 设 `CMAKE_OSX_ARCHITECTURES=x86_64;arm64` 编�
 
 ### 预设（`CMakePresets.json`）
 
-version 8；`debug`/`release` 两个 configure 预设：Ninja 生成器、`build/{debug,release}`、`CMAKE_BUILD_TYPE` 对应、`CMAKE_EXPORT_COMPILE_COMMANDS=ON`、`CMAKE_OSX_ARCHITECTURES=x86_64;arm64`（仅 Apple 平台生效，产出 universal 双架构库）；build/test 预设各两个。根 `CMakeLists.txt` 在 `project()` 之前自动探测编译器（Windows 找 `clang-cl`，非 Windows 找 `clang++-19/18/17/16` 回退 `clang++`），并用 `find_program(ninja)` 提示非 Ninja 生成器。
+version 8，**6 个 configure 预设**（2 个 hidden 基座 + 4 个可直接 `--preset` 使用），build / test 预设各 4 个：
+
+| configure 预设 | `inherits` | `generator` | `binaryDir` | 说明 |
+|---|---|---|---|---|
+| `base-debug` | — | 不声明 | `build/debug` | `hidden: true`，仅供继承，**不可直接 `--preset` 使用** |
+| `debug` | `base-debug` | `"Ninja"` | 继承（同一目录） | 检测到 ninja 时使用 |
+| `debug-portable` | `base-debug` | 省略 | 继承（同一目录） | 无 ninja 时的回退 |
+| `base-release` | — | 不声明 | `build/release` | `hidden: true`，仅供继承 |
+| `release` | `base-release` | `"Ninja"` | 继承（同一目录） | 检测到 ninja 时使用 |
+| `release-portable` | `base-release` | 省略 | 继承（同一目录） | 无 ninja 时的回退 |
+
+- **两个基座承载全部共性**，经 `inherits` 复用不重复声明：`CMAKE_BUILD_TYPE` = Debug / Release、`CMAKE_EXPORT_COMPILE_COMMANDS=ON`、`CMAKE_OSX_ARCHITECTURES=x86_64;arm64`（仅 Apple 平台生效，产出 universal 双架构库）、`GDA_ENABLE_TESTS=ON`。
+- **两条路径共用同一 `binaryDir`**（`build/debug` / `build/release`），不是分开目录；切换生成器时由 [`scripts/cmake_ops.py`](../../scripts/cmake_ops.py) 的 AUTO-CLEAN 重建缓存（见下）。
+- **省略 `generator` 的依据**：CMake 官方文档中 `generator` 字段 "If omitted, CMake will fall back to regular generator discovery procedure" —— 无 ninja 的机器因此仍可 configure（Windows → Visual Studio，Linux/macOS → Unix Makefiles）。
+- **选路入口只有一处**：`scripts/config.py:resolve_preset()` 用 `shutil.which("ninja")` 探测，命中返回 `<preset>`，否则返回 `<preset>-portable`。动机：Windows 上 ninja 通常只存在于 VS 开发环境（DevShell），普通终端探测不到。
+- **命令行接口零变更**：`uv run main.py build [--release]` / `deploy` / `package` / `clean` / `test [--preset debug|release]` / `tui` 全部照旧，`test --preset` 的可选值仍只有 `debug` / `release` 两个，实际 preset 名由 `scripts/test_ops.py` 内部调 `resolve_preset` 解析；`scripts/tui.py` 同理。手动 `cmake --preset` / `ctest --preset` 绕过脚本，必须自己按 ninja 可用性补 `-portable` 后缀。
+- **build / test 预设**：`debug`、`debug-portable`、`release`、`release-portable` 四个，各自 `configurePreset` 关联同名 configure 预设。**`-portable` 的 build 与 test 预设额外声明 `configuration`**（`debug-portable` = `Debug`、`release-portable` = `Release`），Ninja 的 `debug`/`release` 不声明——多配置生成器下 ctest 缺 `-C` 会漏注册测试（见下「ctest 在多配置生成器下需要 `-C`」小节）。
+- 根 [`CMakeLists.txt`](../../CMakeLists.txt) 在 `project()` 之前自动探测编译器（Windows 找 `clang-cl` 并加 `--target=x86_64-pc-windows-msvc`，非 Windows 找 `clang++-19/18/17/16` 回退 `clang++`；都找不到就交给系统默认），并在 `find_program(ninja)` 命中但生成器非 Ninja 时给出 `WARNING [gda] Ninja available (...) but generator is '...'. Use -G Ninja for faster builds.`。实测在无 DevShell 的普通 PowerShell 中，CMake 能自行发现 Visual Studio 18 并使用 MSVC，无需 vcvars 环境。
+
+#### 生成器切换（已知坑）
+
+`-portable` 预设省略 `generator` 时，CMake **会沿用 cache 里已有的生成器而非重新发现**。因此在装过 ninja 的 DevShell 里构建过一次、再切到探测不到 ninja 的普通终端时，`build/<preset>/CMakeCache.txt` 会留下不可用的 ninja 路径，后续构建必然失败。故 `_configure()` 在 configure 前主动比对并清空目录，而不是等 configure 自己报错——机制与实现见上文「构建流水线 → 配置」。`BuildOptimization.cmake` 的并行度与 Unity 计算对所有生成器一致生效。
+
+#### MSVC lambda 捕获差异（已知坑）
+
+上一批让「无 ninja 机器能 configure」之后，MSVC 路径的**首次全量编译**才暴露出第二个问题：
+
+- **现象**：`src/tools/runtime_ops.cpp(891,33): error C3493` 与 `tests/unit/tool_catalog_test.cpp(93,27): error C3493`。
+- **根因**：MSVC **拒绝 lambda 经 `[&]` 隐式引用捕获局部 `const`/`constexpr` 变量**，clang（clang-cl）接受同一写法。典型形态是函数内 `constexpr size_t N = 256;` 配合 `std::thread([&s]{ ... s.size() > N ... })`；经最小复现逐条定位，属 MSVC 实现开关而非源码违规 —— 源码本身合法，只在两个编译器间行为不一致。
+- **修法**：[`cmake/CompilerOptions.cmake:48`](../../cmake/CompilerOptions.cmake) 的 MSVC 分支（`elseif(MSVC)`，即真正的 cl.exe；clang-cl 命中的是前面的 `if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")` 分支，不受影响）追加 `/Zc:lambda`。这是 MSVC 的 lambda 标准符合性开关，**CMake 默认不启用**。加上后**零源码改动**即可编译，并顺带拉齐了 clang 与 MSVC 的行为差异。
+
+#### 多配置生成器的产物路径（已知坑）
+
+- **现象**：在 Visual Studio 生成器下构建成功，但 `deploy` 报 `[WARN] godot-autopilot.dll not found in <dir>`，库根本没复制出去。
+- **根因**：Visual Studio / Xcode / Ninja Multi-Config 等**多配置生成器**会把产物再放进一层**以配置命名的子目录**。实测落点：`build/debug/Debug/godot-autopilot.dll`、`build/debug/tests/Debug/gda_unit_tests.exe`、`build/debug/tests/Debug/gda_test_runner.exe`；单配置生成器（Ninja / Unix Makefiles）则直接落 `build/debug/godot-autopilot.dll`。对照表见「产物清单」。
+- **修法**：[`scripts/config.py`](../../scripts/config.py) 新增 `cached_generator(target)`（读 `CMakeCache.txt` 的 `CMAKE_GENERATOR:INTERNAL=`，**类型在首个冒号之后**，须先按 `:` 拆再按 `=` 取值）与 `artifact_dir(preset)`；后者按前缀表 `("Visual Studio", "Xcode", "Ninja Multi-Config")` 判定，命中则返回 `build/<preset>/Debug|Release`，否则返回 `build/<preset>`。**判定依据是构建目录里实际记录的生成器，而非预设名** —— 手动用 `--preset debug-portable` 而 PATH 恰有 ninja 时，CMake 发现的仍是单配置生成器，产物就在 `build/debug` 根下。消费方 `scripts/deploy.py:_deploy()`（`binary_dir = artifact_dir(preset)`）不再写死 `BUILD_DIR / preset`。
+- **去重**：读取生成器的逻辑原先是 `scripts/cmake_ops.py` 的私有 `_cached_generator()`，现已删除、改为从 `config` 导入 `cached_generator` —— 全仓库只有一份实现，`artifact_dir()` 与 `_configure()` 共用。
+
+#### ctest 在多配置生成器下需要 `-C`（已知坑）
+
+- **现象**：只跑 `ctest --preset debug-portable` 时**只注册了 40 个测试**，且三个非 gtest 用例直接报 `Test not available without configuration. (Missing "-C <config>"?)`。
+- **根因**：多配置生成器下 `gtest_discover_tests`（[`tests/CMakeLists.txt:91`](../../tests/CMakeLists.txt)）生成的**发现文件名带配置名**。实测 `build/debug/tests/` 下为 `gda_unit_tests_e3b0c442_Debug_tests.cmake`（另有 `_include.cmake` / `_discovery.cmake` 以及 Release / RelWithDebInfo / MinSizeRel 对应文件）；ctest 不带 `-C` 时不会 include 对应配置的发现文件，于是 gtest 用例整体缺席。
+- **对照实测**：`ctest --test-dir build/debug -N` → **40** 个；`ctest --test-dir build/debug -C Debug -N` → **431** 个（与 [tests.md](./tests.md) 口径一致）。
+- **修法**：在 [`CMakePresets.json`](../../CMakePresets.json) 的 build/test 预设上加 `configuration` 字段（`debug-portable` = `Debug`、`release-portable` = `Release`；Ninja 的两个预设不加）。CMake 会自动把它翻译成 `--config` / `-C`，因此 **`scripts/test_ops.py` 与 `main.py` 零改动**，`uv run main.py test` 在两类生成器下行为一致。
+- **注意**：这是「配置名」维度，与预设名正交 —— 手动执行 `ctest --preset debug-portable` 已自动带上 `-C Debug`；若绕过 preset 直接 `ctest --test-dir build/debug`，则须自己补 `-C Debug`。
+
+## scripts/ 模块职责（7 个模块）
+
+| 模块 | 职责 |
+|---|---|
+| [`config.py`](../../scripts/config.py) | 路径与集合常量（`PROJECT_ROOT`/`BUILD_DIR`/`TESTBED_DIR`/`DEMO_DIRS`/`DEPLOY_TARGETS`/`PLATFORM_LIBS`）、`ADDON_VERSION`（读根 `VERSION`，版本号单一来源）、**`resolve_preset()`**（按 `shutil.which("ninja")` 在 `<preset>` 与 `<preset>-portable` 间选路，生成器双路径的**唯一决策点**）、**`cached_generator(target)`**（读 `CMakeCache.txt` 的 `CMAKE_GENERATOR:INTERNAL=`，无缓存返回 `None`，生成器读取的唯一实现）、**`artifact_dir(preset)`**（按实际生成器判定多配置生成器的配置名子目录，返回 `build/<preset>/Debug|Release` 或 `build/<preset>`）、`resolve_demos()` |
+| [`cmake_ops.py`](../../scripts/cmake_ops.py) | `_configure()` / `_build()`：preset 解析 → 从 `config` 导入的 `cached_generator()` 比对 cache 生成器、切换时 `_purge()` 后重配 → `cmake --preset` → 失败重试清目录重配一次；`_subprocess_env()` 把当前解释器目录前置到子进程 PATH；`_run()` 统一打印命令行并按返回码判成败 |
+| [`test_ops.py`](../../scripts/test_ops.py) | ctest 薄封装（`run_l1`/`run_l2`/`run_single`/`run_all`）；preset 名经 `resolve_preset` 解析，故 `main.py test --preset` 的可选值仍只有 `debug`/`release` 两个 |
+| [`deploy.py`](../../scripts/deploy.py) | 把 `artifact_dir(preset)` 指向的产物（**不是** `BUILD_DIR / preset`，多配置生成器下多一层配置名子目录）复制到 `DEPLOY_TARGETS`，生成 `.gdextension`，`_validate_addon_integrity()` 逐条校验 res:// 路径存在（库缺失时报错并以退出码 1 结束） |
+| [`package.py`](../../scripts/package.py) | 打包首个 demo 的 addons；`_collect_platform_libs()` 递归收集三平台库 |
+| [`clean_ops.py`](../../scripts/clean_ops.py) | 按 `DEPLOY_TARGETS` 清 `.godot/` 与 `addons/godot-autopilot/`，**不碰 `build/`** |
+| [`tui.py`](../../scripts/tui.py) | 交互式构建控制台；构建类型与测试预设的可选值仍只有 Debug/Release，走同一 `resolve_preset` |
 
 ## 环境变量
 
@@ -188,12 +261,12 @@ version 8；`debug`/`release` 两个 configure 预设：Ninja 生成器、`build
 
 逐条核对结论（一致，另有一处精度补充）：
 
-- `uv run main.py build` / `--release` 语义、手动 `cmake --preset` 命令 ✓；
+- `uv run main.py build` / `--release` 语义、手动 `cmake --preset` 命令 ✓（**精度补充**：手动命令绕过 `resolve_preset`，无 ninja 时须改写 `debug-portable` / `release-portable`，见「预设」小节）；
 - "依赖以 `third_party/` 子模块随仓库检出" ✓（`cmake/Dependencies.cmake` 的 `gda_require_submodule` 缺依赖即 FATAL_ERROR，`.gitmodules` 锁定 commit）；
 - "添加新 .cpp 时必须在 `add_library()` 中加入" ✓（Unity 构建只编译列出的文件）；**精度补充**：`skills/` 下 .md 为内容数据文件，经生成头机制（`skill_gen.cmake` + `tools/embed_skills.py`）进入编译，不进 add_library；
 - 依赖版本 `godot-cpp 10.0.0-stable`（`507ed9d`）/ `mcp-cpp-sdk 0.3.4`（`e2ed352`）、git submodule 检出 ✓（`cmake/Dependencies.cmake` + `.gitmodules`，含 `GODOTCPP_API_VERSION "4.7"` FORCE）；
-- 编译器优先 Clang/clang-cl、MSVC/GCC 回退 ✓（根 CMakeLists 自动探测 + `CompilerOptions.cmake` 分发）；
-- 优化自适应（sccache/ccache、LTO、Unity、Ninja 作业池）✓；AGENTS.md 与实现一致：仅 `GDA_COMPILE_JOBS` / `GDA_LINK_JOBS` 支持 CACHE（`-D`）与进程环境变量双通道，`GDA_UNITY_BUILD`/`GDA_UNITY_BATCH_SIZE` 等内存参数只接受 `-D` CACHE；
+- 编译器优先 Clang/clang-cl、MSVC/GCC 回退 ✓（根 CMakeLists 自动探测 + `CompilerOptions.cmake` 分发）；**精度补充**：MSVC 分支的 `/Zc:lambda` 是 clang-cl 路径不需要的符合性开关，仅为让 MSVC 接受 clang 已接受的写法而加（见「MSVC lambda 捕获差异」小节）；
+- 优化自适应（sccache/ccache、LTO、Unity、生成器自适应 + Ninja 作业池）✓；**精度补充**：「生成器自适应」覆盖的不只是能否 configure，还包括多配置生成器下的产物路径（`artifact_dir`）与 ctest 配置维度（preset `configuration`）；AGENTS.md 与实现一致：仅 `GDA_COMPILE_JOBS` / `GDA_LINK_JOBS` 支持 CACHE（`-D`）与进程环境变量双通道，`GDA_UNITY_BUILD`/`GDA_UNITY_BATCH_SIZE` 等内存参数只接受 `-D` CACHE；
 - **文档一致性**：`README.md` / `README.en.md` 工具数口径为 badge `tools-385+`（`README.md:8` / `README.en.md:8`）与“385+ 个工具 / Over 385 tools”（`README.md:26` / `README.en.md:26`，域工具约数口径，数量随版本增长以 `search_tools` 查到的为准），wiki 实测为 [overview.md](./overview.md) 的 **391 域工具**——398/399（MCP 可达 / catalog-index）含 7 元工具与 `system_status`，README 未列这两个数字属“约数 vs 实测”口径差异；新版 README 已无独立构建章节（`README.md:70` 指向 wiki [build.md](./build.md) 与 `tests/README.md`），`--package` / `--debug` 参数以本页命令速查表为准。
 
 ## 关联页面
