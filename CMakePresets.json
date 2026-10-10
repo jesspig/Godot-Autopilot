@@ -2,9 +2,8 @@
     "version": 8,
     "configurePresets": [
         {
-            "name": "debug",
-            "displayName": "Debug",
-            "generator": "Ninja",
+            "name": "base-debug",
+            "hidden": true,
             "binaryDir": "${sourceDir}/build/debug",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
@@ -14,9 +13,21 @@
             }
         },
         {
-            "name": "release",
-            "displayName": "Release",
-            "generator": "Ninja",
+            "name": "debug",
+            "displayName": "Debug (Ninja)",
+            "description": "检测到 ninja 时使用（scripts/config.py:resolve_preset 自动选择）",
+            "inherits": "base-debug",
+            "generator": "Ninja"
+        },
+        {
+            "name": "debug-portable",
+            "displayName": "Debug (platform generator)",
+            "description": "无 ninja 时的回退：省略 generator，CMake 走常规生成器发现（Windows→Visual Studio，Linux/macOS→Unix Makefiles）",
+            "inherits": "base-debug"
+        },
+        {
+            "name": "base-release",
+            "hidden": true,
             "binaryDir": "${sourceDir}/build/release",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
@@ -24,14 +35,31 @@
                 "CMAKE_OSX_ARCHITECTURES": "x86_64;arm64",
                 "GDA_ENABLE_TESTS": "ON"
             }
+        },
+        {
+            "name": "release",
+            "displayName": "Release (Ninja)",
+            "description": "检测到 ninja 时使用（scripts/config.py:resolve_preset 自动选择）",
+            "inherits": "base-release",
+            "generator": "Ninja"
+        },
+        {
+            "name": "release-portable",
+            "displayName": "Release (platform generator)",
+            "description": "无 ninja 时的回退：省略 generator，CMake 走常规生成器发现（Windows→Visual Studio，Linux/macOS→Unix Makefiles）",
+            "inherits": "base-release"
         }
     ],
     "buildPresets": [
-        { "name": "debug",   "configurePreset": "debug" },
-        { "name": "release", "configurePreset": "release" }
+        { "name": "debug",            "configurePreset": "debug" },
+        { "name": "debug-portable",   "configurePreset": "debug-portable",   "configuration": "Debug" },
+        { "name": "release",          "configurePreset": "release" },
+        { "name": "release-portable", "configurePreset": "release-portable", "configuration": "Release" }
     ],
     "testPresets": [
-        { "name": "debug",   "configurePreset": "debug" },
-        { "name": "release", "configurePreset": "release" }
+        { "name": "debug",            "configurePreset": "debug" },
+        { "name": "debug-portable",   "configurePreset": "debug-portable",   "configuration": "Debug" },
+        { "name": "release",          "configurePreset": "release" },
+        { "name": "release-portable", "configurePreset": "release-portable", "configuration": "Release" }
     ]
 }

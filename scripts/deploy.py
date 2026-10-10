@@ -5,7 +5,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from .config import BUILD_DIR, DEMO_DIRS, PLATFORM_LIBS, PLATFORM_PDB, TESTBED_DIR, _addon_dir
+from .config import DEMO_DIRS, PLATFORM_LIBS, PLATFORM_PDB, TESTBED_DIR, _addon_dir, artifact_dir
 
 
 def _generate_gdextension(addon_dir: Path) -> None:
@@ -28,7 +28,7 @@ def _generate_gdextension(addon_dir: Path) -> None:
 
 
 def _deploy(preset: str, demos: list[Path] | None = None) -> None:
-    binary_dir = BUILD_DIR / preset
+    binary_dir = artifact_dir(preset)
     system = platform.system().lower()
     lib_name = PLATFORM_LIBS.get(system)
     if not lib_name:

@@ -3,14 +3,14 @@
 import subprocess
 from pathlib import Path
 
-from .config import PROJECT_ROOT
+from .config import PROJECT_ROOT, resolve_preset
 
 L1_EXCLUDE_PATTERN = "^gda_runner_"
 L2_ONLY_PATTERN = "^gda_runner_"
 
 
 def _ctest(extra: list[str], preset: str = "debug") -> int:
-    cmd = ["ctest", "--preset", preset, *extra]
+    cmd = ["ctest", "--preset", resolve_preset(preset), *extra]
     print(f"\n$ {' '.join(cmd)}", flush=True)
     return subprocess.run(cmd, cwd=PROJECT_ROOT).returncode
 

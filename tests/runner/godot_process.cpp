@@ -72,6 +72,17 @@ std::string read_env_file_key(const std::string &key) {
   return "";
 }
 
+std::string resolve_allow_list() {
+  if (const char *env = std::getenv("GODOT_AUTOPILOT_ALLOW")) {
+    if (*env)
+      return std::string(env);
+  }
+  const std::string from_file = read_env_file_key("GODOT_AUTOPILOT_ALLOW");
+  if (!from_file.empty())
+    return from_file;
+  return "all";
+}
+
 int pick_free_port() {
   WsaGuard wsa;
   SOCKET s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -425,6 +436,21 @@ bool GodotProcess::start(std::chrono::seconds ready_timeout) {
   };
   SetEnvironmentVariableA(port_key, std::to_string(impl_->port).c_str());
 
+  const char *allow_key = "GODOT_AUTOPILOT_ALLOW";
+  char allow_old_buf[256] = {0};
+  const DWORD allow_old_len =
+      GetEnvironmentVariableA(allow_key, allow_old_buf, sizeof(allow_old_buf));
+  const bool had_allow =
+      allow_old_len > 0 && allow_old_len < sizeof(allow_old_buf);
+  const std::string allow_old_value =
+      had_allow ? std::string(allow_old_buf) : "";
+  const auto restore_allow_env = [&] {
+    SetEnvironmentVariableA(allow_key,
+                            had_allow ? allow_old_value.c_str() : nullptr);
+  };
+  const std::string allow_value = resolve_allow_list();
+  SetEnvironmentVariableA(allow_key, allow_value.c_str());
+
   const char *force_key = "GDA_FORCE_HEADLESS";
   char force_buf[64] = {0};
   const DWORD force_len =
@@ -442,6 +468,7 @@ bool GodotProcess::start(std::chrono::seconds ready_timeout) {
                                           headless_flag + "--editor"),
                       pi, impl_->stdout_read, impl_->stderr_read)) {
     restore_port_env();
+    restore_allow_env();
     restore_force_env();
     impl_->last_error =
         "启动编辑器进程失败（错误码 " + std::to_string(GetLastError()) + "）";
@@ -449,6 +476,7 @@ bool GodotProcess::start(std::chrono::seconds ready_timeout) {
   }
   attach_process(*impl_, pi);
   restore_port_env();
+  restore_allow_env();
   restore_force_env();
 
   const auto deadline = std::chrono::steady_clock::now() + ready_timeout;
