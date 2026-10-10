@@ -18,7 +18,7 @@
 | clang-cl | 编译器（MSVC/GCC 自动回退，测试继承根配置） |
 | Godot 可执行文件 | 仅 L2 需要，见第 3 节 |
 | L2 测试床 | `tests/testbed/` 专用工程：入库的只有工程定义（`project.godot`、`.gitignore` 与 `14_tilemap_rect` 依赖的 `assets/Items/Fruits/Apple.png`），`addons/`、`.godot/`、`gda_tmp_*` 等产物不入库。插件由 `uv run main.py deploy` 写入（床恒被部署，与 `--demos` 子集无关）；床或床内 gdextension 缺失时执行器秒级退出码 2 |
-| googletest | CMake FetchContent 自动拉取（v1.15.2，GIT_SHALLOW），无需手动安装；仅 L1 链接 |
+| googletest | `third_party/googletest` 子模块（tag `v1.15.2`，commit `b514bdc898e2951020cbdca1304b75f5950d1f59`），随仓库检出：`git clone --recurse-submodules <repo>`，或 `git submodule update --init --recursive`；缺失即 configure 报错，不做网络回退；仅 L1 链接 |
 
 ## 3. 配置 Godot 路径
 

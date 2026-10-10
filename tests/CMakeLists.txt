@@ -3,18 +3,15 @@
 # 编译器探测/编译选项/C++17 已在根 CMakeLists.txt 完成, 测试目标继承。
 # ====================================================================
 
-# ── googletest (GIT_TAG 与 mcp-cpp-sdk 使用的 v1.15.2 一致) ──
-# 若 SDK 侧已开启 MCP_BUILD_TESTS 并先声明了 googletest, 此处跳过避免重复声明。
-include(FetchContent)
+# ── googletest (v1.15.2 / b514bdc, third_party submodule) ──
+# gda_require_submodule 与 GDA_THIRD_PARTY_DIR 由根 include(Dependencies) 提供。
+# 守卫保留: 若 SDK 侧已开启 MCP_BUILD_TESTS 并先声明了 googletest, 此处跳过避免重复声明。
 if(NOT TARGET GTest::gtest_main)
-    FetchContent_Declare(googletest
-        GIT_REPOSITORY https://github.com/google/googletest.git
-        GIT_TAG        v1.15.2
-        GIT_SHALLOW    TRUE)
+    gda_require_submodule(googletest)
     set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
     set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
-    FetchContent_MakeAvailable(googletest)
+    add_subdirectory("${GDA_THIRD_PARTY_DIR}/googletest" "${GDA_SUBMODULE_BIN_DIR}/googletest")
 endif()
 
 include(GoogleTest)

@@ -53,7 +53,7 @@ include(Platform)
 include(BuildOptimization)
 include(CompilerOptions)
 include(Cache)
-include(FetchDependencies)
+include(Dependencies)
 include(Lto)
 include(skill_gen)
 

@@ -15,7 +15,7 @@ Godot Autopilot（GDA）：进程内 GDExtension，把 Godot 编辑器经 MCP（
 
 - **所有 Godot API 必须经 `CommandQueue` 在主线程执行**（`submit()` / `execute_sync()`）；直接调用必崩。
 - **新增 `.cpp` 要在两处登记**：根 `CMakeLists.txt` 的 `add_library()` 与 `tests/CMakeLists.txt` 的 `GDA_UNIT_BUSINESS_SOURCES`；漏后者只在 L1 链接期报错。
-- **勿删 `build/<preset>/_deps/`**（FetchContent 缓存）。
+- **依赖是 `third_party/` 下的 git submodule**：构建前必须已检出（`git clone --recurse-submodules`，或 `git submodule update --init --recursive`），缺失则 configure 直接报错，不做网络回退。
 - **源码禁止注释**：除 `// namespace` 结尾标记外不得有 `//` 或 `/*…*/`，解释写进 wiki；`comment_guard` 在 ctest 阶段拦，编译通过不算过。
 - **默认安全姿态不可静默放宽**：仅绑环回、脱敏默认开、授权列表默认为空、导出期拒绝工具调用。
 - **数值一律以运行时统计为准**，权威口径见 `docs/wiki/tests.md` 的数值核算总表；本页不记录计数。
