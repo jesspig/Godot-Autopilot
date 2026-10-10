@@ -6,7 +6,7 @@ tags:
   - 约定
   - 命名
   - 规范
-timestamp: "2026-10-10T15:03:54+08:00"
+timestamp: "2026-10-10T18:51:33+08:00"
 resource: src/
 ---
 
@@ -57,7 +57,7 @@ resource: src/
 - L1（`gda_unit_tests`）禁止调用任何已注册工具 handler（无引擎时 godot-cpp 接口指针为 nullptr 会崩溃），只能测注册/分发/错误路径
 - 子代理迭代：只写代码不编译，主代理统一 configure + build 再分批跑测试（并行编译会锁）
 - 新增 `src/*.cpp` 同步更新 `tests/CMakeLists.txt` 的 `GDA_UNIT_BUSINESS_SOURCES`
-- 计数口径（L1 gtest 数、L2 `tests/config/*.json` 份数、ctest 注册点、遍历候选/步骤数）以运行时统计为准；迁移守卫经 `ctest --preset debug -R migration_guard` 零依赖运行
+- 计数口径（L1 gtest 数、L2 `tests/config/*.json` 份数、ctest 注册点、遍历候选/步骤数）以运行时统计为准；迁移守卫经 `ctest --preset debug -R migration_guard` 零依赖运行（该预设固定 Ninja 生成器，无 ninja 时改用 `debug-portable`，见 [build.md](build.md)「预设」）
 
 ## 注释与提交
 
