@@ -34,9 +34,6 @@ import/
 *.exp
 *.lib
 
-# Dependencies (FetchContent)
-_deps/
-
 # Tests
 tests/output/
 

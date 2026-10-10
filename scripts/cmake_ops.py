@@ -17,9 +17,10 @@ def _configure(preset: str) -> bool:
         return True
     target = BUILD_DIR / preset
     if target.exists():
-        deps_dir = target / "_deps"
         print(f"\n[AUTO-CLEAN] Removing {target} (preserving _deps/)...", flush=True)
         for item in list(target.iterdir()):
+            # 回退路径（third_party/ submodule 未检出）下 _deps 仍是 FetchContent
+            # 缓存，删除会导致重新下载，故始终跳过。
             if item.name != "_deps":
                 if item.is_dir():
                     shutil.rmtree(item, ignore_errors=True)
