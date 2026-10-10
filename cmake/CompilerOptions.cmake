@@ -41,6 +41,11 @@ elseif(MSVC)
         /wd4244
         /wd4267
         /EHsc
+        # lambda 捕获的符合性开关，CMake 默认未启用。缺它时 MSVC 拒绝
+        # 「lambda 经 [&] 隐式引用捕获局部 const/constexpr 变量」并报 error C3493，
+        # 而 clang 接受同一写法。该开关拉齐两者，使同一份源码在 clang-cl 与
+        # MSVC 下都能编译。
+        /Zc:lambda
     )
     add_compile_definitions(
         _CRT_SECURE_NO_WARNINGS
