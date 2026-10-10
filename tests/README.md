@@ -13,8 +13,8 @@
 
 | 依赖 | 说明 |
 | ---- | ---- |
-| CMake 3.28+ | 测试目标经根 `CMakeLists.txt` 的 `GDA_ENABLE_TESTS` 选项引入；该开关已固化在 `CMakePresets.json` debug/release 预设（默认 ON），清理 `build/` 后重新配置自动恢复（裸 `cmake` 不带 preset 时默认 OFF，`CMakeLists.txt:168`） |
-| Ninja | 构建生成器（预设 `debug` / `release` 均为 Ninja） |
+| CMake 3.28+ | 测试目标经根 `CMakeLists.txt` 的 `GDA_ENABLE_TESTS` 选项引入；该开关已固化在 `CMakePresets.json` 的 `base-debug`/`base-release` 基座（默认 ON）并经 `inherits` 下发给全部 4 个可执行 configure 预设，清理 `build/` 后重新配置自动恢复（裸 `cmake` 不带 preset 时默认 OFF） |
+| Ninja（可选） | 构建生成器。有 ninja 时用 `debug`/`release`（更快，且 Ninja 作业池生效）；无 ninja 时自动落到 `debug-portable`/`release-portable`（省略 generator，由 CMake 发现平台默认生成器），共用同一 `build/{debug,release}` 目录。`uv run main.py` 各子命令自动选路，手动 `cmake --preset` / `ctest --preset` 须自己选对预设名 |
 | clang-cl | 编译器（MSVC/GCC 自动回退，测试继承根配置） |
 | Godot 可执行文件 | 仅 L2 需要，见第 3 节 |
 | L2 测试床 | `tests/testbed/` 专用工程：入库的只有工程定义（`project.godot`、`.gitignore` 与 `14_tilemap_rect` 依赖的 `assets/Items/Fruits/Apple.png`），`addons/`、`.godot/`、`gda_tmp_*` 等产物不入库。插件由 `uv run main.py deploy` 写入（床恒被部署，与 `--demos` 子集无关）；床或床内 gdextension 缺失时执行器秒级退出码 2 |
