@@ -542,8 +542,10 @@ mcp::JsonValue handle_game_ui_elements(const mcp::JsonValue &args) {
     return error_json("wait_ready must be a boolean");
   JV params(JV::object_tag);
   copy_optional(args, params, "max_elements");
-  return handle_gda_send(std::string(GDA_OP_UI_ELEMENTS), params,
-                         extract_timeout(args), false, wait_ready);
+  JV result = handle_gda_send(std::string(GDA_OP_UI_ELEMENTS), params,
+                              extract_timeout(args), false, wait_ready);
+  append_runtime_degradation_hint(result);
+  return result;
 }
 
 mcp::JsonValue handle_click_game_ui_element(const mcp::JsonValue &args) {

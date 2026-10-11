@@ -892,6 +892,11 @@ convert_array_value(const godot::Dictionary &dict, const std::string &prop_str,
           if (load_element_script(element_class_name_str, element_script)) {
             array_script = godot::Variant(element_script.ptr());
             element_script_loaded = true;
+            godot::StringName base_type =
+                element_script->get_instance_base_type();
+            if (base_type != godot::StringName()) {
+              element_class_name = base_type;
+            }
           }
         }
       }

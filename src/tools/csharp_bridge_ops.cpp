@@ -33,6 +33,8 @@ namespace {
 using JV = mcp::JsonValue;
 
 constexpr const char *kBridgeSingleton = "GdaCSharpBridge";
+constexpr const char *kBridgeScriptPath =
+    "res://addons/godot-autopilot/GdaCSharpBridge.cs";
 constexpr const char *kBridgeHolderNode = "__gda_runtime";
 constexpr size_t kMaxCallArgs = 16;
 
@@ -272,26 +274,54 @@ bool check_allowed(const JV &args, const std::string &tool,
   return true;
 }
 
-bool fetch_editor_bridge(godot::Object *&out_bridge, JV &err) {
+bool fetch_editor_bridge(godot::Object *&out_bridge,
+                         godot::Variant &out_holder, JV &err) {
   out_bridge = nullptr;
+  out_holder = godot::Variant();
   auto *engine = godot::Engine::get_singleton();
   if (!engine) {
     err = util::error_json("Engine singleton not available");
     return false;
   }
-  if (!engine->has_singleton(kBridgeSingleton)) {
+  if (engine->has_singleton(kBridgeSingleton)) {
+    out_bridge = engine->get_singleton(kBridgeSingleton);
+    if (!out_bridge) {
+      err = util::error_json(
+          "csharp bridge singleton 'GdaCSharpBridge' resolved to null");
+      return false;
+    }
+    return true;
+  }
+  auto *loader = godot::ResourceLoader::get_singleton();
+  godot::Ref<godot::Resource> script;
+  if (loader) {
+    script = loader->load(godot::String(kBridgeScriptPath));
+  }
+  if (script.is_null()) {
     err = util::error_json(
         "csharp bridge singleton 'GdaCSharpBridge' is not registered: run a "
         ".NET editor build with the bridge registered via "
         "Engine.register_singleton, then retry");
     return false;
   }
-  out_bridge = engine->get_singleton(kBridgeSingleton);
-  if (!out_bridge) {
+  godot::Variant instance = script->call(godot::StringName("new"));
+  if (instance.get_type() == godot::Variant::NIL) {
     err = util::error_json(
-        "csharp bridge singleton 'GdaCSharpBridge' resolved to null");
+        "csharp bridge singleton 'GdaCSharpBridge' is not registered: run a "
+        ".NET editor build with the bridge registered via "
+        "Engine.register_singleton, then retry");
     return false;
   }
+  godot::Object *obj = instance;
+  if (!obj) {
+    err = util::error_json(
+        "csharp bridge singleton 'GdaCSharpBridge' is not registered: run a "
+        ".NET editor build with the bridge registered via "
+        "Engine.register_singleton, then retry");
+    return false;
+  }
+  out_holder = instance;
+  out_bridge = obj;
   return true;
 }
 
@@ -518,7 +548,8 @@ mcp::JsonValue handle_csharp_get(const mcp::JsonValue &args) {
     return target.error;
   }
   godot::Object *bridge = nullptr;
-  if (!fetch_editor_bridge(bridge, err)) {
+  godot::Variant bridge_holder;
+  if (!fetch_editor_bridge(bridge, bridge_holder, err)) {
     return err;
   }
   godot::Array bridge_args;
@@ -598,7 +629,8 @@ mcp::JsonValue handle_csharp_set(const mcp::JsonValue &args) {
     return target.error;
   }
   godot::Object *bridge = nullptr;
-  if (!fetch_editor_bridge(bridge, err)) {
+  godot::Variant bridge_holder;
+  if (!fetch_editor_bridge(bridge, bridge_holder, err)) {
     return err;
   }
   godot::Array bridge_args;
@@ -678,7 +710,8 @@ mcp::JsonValue handle_csharp_call(const mcp::JsonValue &args) {
     return target.error;
   }
   godot::Object *bridge = nullptr;
-  if (!fetch_editor_bridge(bridge, err)) {
+  godot::Variant bridge_holder;
+  if (!fetch_editor_bridge(bridge, bridge_holder, err)) {
     return err;
   }
   godot::Array bridge_args;
@@ -768,7 +801,8 @@ mcp::JsonValue handle_csharp_subscribe(const mcp::JsonValue &args) {
     return sink.error;
   }
   godot::Object *bridge = nullptr;
-  if (!fetch_editor_bridge(bridge, err)) {
+  godot::Variant bridge_holder;
+  if (!fetch_editor_bridge(bridge, bridge_holder, err)) {
     return err;
   }
   godot::Array bridge_args;
@@ -844,7 +878,8 @@ mcp::JsonValue handle_csharp_unsubscribe(const mcp::JsonValue &args) {
     return forward_game_eval(source, timeout_ms, wait_ready);
   }
   godot::Object *bridge = nullptr;
-  if (!fetch_editor_bridge(bridge, err)) {
+  godot::Variant bridge_holder;
+  if (!fetch_editor_bridge(bridge, bridge_holder, err)) {
     return err;
   }
   godot::Array bridge_args;
