@@ -1355,6 +1355,80 @@ JV op_ui_elements(const JV &params) {
     rect_json["position"] = std::move(position);
     rect_json["size"] = std::move(size);
     item["global_rect"] = std::move(rect_json);
+    godot::Transform2D element_transform;
+    bool has_viewport = false;
+    if (auto *ctrl = godot::Object::cast_to<godot::Control>(
+            resolve_game_node_suffixed(root, element.path))) {
+      if (godot::Viewport *viewport = ctrl->get_viewport()) {
+        element_transform =
+            viewport->get_screen_transform() * ctrl->get_canvas_transform();
+        has_viewport = true;
+      }
+    }
+    double window_x = element.x;
+    double window_y = element.y;
+    double window_w = element.w;
+    double window_h = element.h;
+    double window_cx = element.x + element.w * 0.5;
+    double window_cy = element.y + element.h * 0.5;
+    if (has_viewport) {
+      const godot::Rect2 viewport_rect(element.x, element.y, element.w,
+                                       element.h);
+      const godot::Vector2 corner_a = coords::viewport_point_to_window(
+          element_transform, viewport_rect.position);
+      const godot::Vector2 corner_b = coords::viewport_point_to_window(
+          element_transform,
+          viewport_rect.position + godot::Vector2(viewport_rect.size.x, 0.0f));
+      const godot::Vector2 corner_c = coords::viewport_point_to_window(
+          element_transform,
+          viewport_rect.position + godot::Vector2(0.0f, viewport_rect.size.y));
+      const godot::Vector2 corner_d = coords::viewport_point_to_window(
+          element_transform, viewport_rect.position + viewport_rect.size);
+      const double min_x = std::min(
+          std::min(static_cast<double>(corner_a.x),
+                   static_cast<double>(corner_b.x)),
+          std::min(static_cast<double>(corner_c.x),
+                   static_cast<double>(corner_d.x)));
+      const double min_y = std::min(
+          std::min(static_cast<double>(corner_a.y),
+                   static_cast<double>(corner_b.y)),
+          std::min(static_cast<double>(corner_c.y),
+                   static_cast<double>(corner_d.y)));
+      const double max_x = std::max(
+          std::max(static_cast<double>(corner_a.x),
+                   static_cast<double>(corner_b.x)),
+          std::max(static_cast<double>(corner_c.x),
+                   static_cast<double>(corner_d.x)));
+      const double max_y = std::max(
+          std::max(static_cast<double>(corner_a.y),
+                   static_cast<double>(corner_b.y)),
+          std::max(static_cast<double>(corner_c.y),
+                   static_cast<double>(corner_d.y)));
+      window_x = min_x;
+      window_y = min_y;
+      window_w = max_x - min_x;
+      window_h = max_y - min_y;
+      const godot::Vector2 window_center =
+          coords::viewport_rect_center_to_window(element_transform,
+                                                 viewport_rect);
+      window_cx = static_cast<double>(window_center.x);
+      window_cy = static_cast<double>(window_center.y);
+    }
+    JV window_position(JV::object_tag);
+    window_position["x"] = JV(window_x);
+    window_position["y"] = JV(window_y);
+    JV window_size(JV::object_tag);
+    window_size["x"] = JV(window_w);
+    window_size["y"] = JV(window_h);
+    JV window_rect(JV::object_tag);
+    window_rect["position"] = std::move(window_position);
+    window_rect["size"] = std::move(window_size);
+    item["window_rect"] = std::move(window_rect);
+    JV window_center_json(JV::object_tag);
+    window_center_json["x"] = JV(window_cx);
+    window_center_json["y"] = JV(window_cy);
+    item["window_center"] = std::move(window_center_json);
+    item["window_approx"] = JV(has_viewport);
     arr.PushBack(std::move(item));
   }
   JV r(JV::object_tag);
