@@ -1,6 +1,7 @@
 #include "game_bridge.hpp"
 
 #include "core/config.hpp"
+#include "core/editor_coords.hpp"
 #include "gda_protocol.hpp"
 #include "util/error_util.hpp"
 #include <cctype>
@@ -475,6 +476,21 @@ bool param_pressed(const JV &params, bool default_value) {
   return default_value;
 }
 
+godot::Transform2D root_screen_transform() {
+  godot::SceneTree *tree = get_scene_tree();
+  if (!tree)
+    return godot::Transform2D();
+  godot::Window *root = tree->get_root();
+  if (!root)
+    return godot::Transform2D();
+  return root->get_screen_transform();
+}
+
+godot::Vector2 to_window_position(const godot::Vector2 &viewport_point) {
+  return coords::viewport_point_to_window(root_screen_transform(),
+                                          viewport_point);
+}
+
 std::string step_type(const JV &step) {
   if (auto *k = step.Find("kind")) {
     if (k->IsString())
@@ -506,6 +522,14 @@ std::string inject_step(const JV &step) {
 
   bool mode_api = (mode == "api");
   bool keep_pressed = (mode == "hold");
+  std::string coord_space = "window";
+  if (auto *space_p = step.Find("coord_space")) {
+    if (!space_p->IsString() || (space_p->GetString() != "window" &&
+                                 space_p->GetString() != "viewport"))
+      return "input coord_space must be window|viewport";
+    coord_space = space_p->GetString();
+  }
+  const bool viewport_space = (coord_space == "viewport");
   int64_t duration_ms = 0;
   if (auto *dur_p = step.Find("duration_ms")) {
     if (dur_p->IsInt() && dur_p->GetInt() > 0)
@@ -541,8 +565,11 @@ std::string inject_step(const JV &step) {
       return "input mouse_button requires button_index (integer)";
     }
     button_index = bi->GetInt();
-    if (extract_position(step, pos))
+    if (extract_position(step, pos)) {
       has_pos = true;
+      if (viewport_space)
+        pos = to_window_position(pos);
+    }
     bool click = false;
     if (auto *click_p = step.Find("click")) {
       if (click_p->IsBool())
@@ -572,6 +599,8 @@ std::string inject_step(const JV &step) {
     if (!extract_position(step, pos))
       return "input mouse_motion requires position {x, y}";
     has_pos = true;
+    if (viewport_space)
+      pos = to_window_position(pos);
     godot::Vector2 relative;
     if (auto *relative_p = step.Find("relative")) {
       if (!extract_vec2(*relative_p, relative))
@@ -622,8 +651,11 @@ std::string inject_step(const JV &step) {
         return "input wheel amount must be an integer between 1 and 10";
       amount = amount_p->GetInt();
     }
-    if (extract_position(step, pos))
+    if (extract_position(step, pos)) {
       has_pos = true;
+      if (viewport_space)
+        pos = to_window_position(pos);
+    }
     const float factor = static_cast<float>(amount);
     dispatch_input_event(input, 1, key, wheel_button, pos, has_pos, true,
                          godot::StringName(), false, true, factor);
@@ -793,7 +825,7 @@ JV op_input(const JV &params, int64_t request_id) {
   std::string unknown = unknown_field(
       params, {"type", "keycode", "pressed", "button_index", "position",
                "action", "duration_ms", "mode", "sequence", "direction",
-               "amount", "relative", "click", "double_click"});
+               "amount", "relative", "click", "double_click", "coord_space"});
   if (!unknown.empty())
     return error_result("unknown input parameter: " + unknown);
   if (!type_p || !type_p->IsString()) {
@@ -827,6 +859,10 @@ JV op_input(const JV &params, int64_t request_id) {
       (!mode->IsString() || (mode->GetString() != "event" &&
                              mode->GetString() != "api" && mode->GetString() != "hold")))
     return error_result("input mode must be event|api|hold");
+  if (auto *space = params.Find("coord_space"); space &&
+      (!space->IsString() || (space->GetString() != "window" &&
+                              space->GetString() != "viewport")))
+    return error_result("input coord_space must be window|viewport");
   if (auto *position = params.Find("position"); position) {
     std::string position_unknown = unknown_field(*position, {"x", "y"});
     if (!position_unknown.empty())
@@ -932,7 +968,8 @@ JV op_input_wait(const JV &params, int64_t request_id) {
 }
 
 JV op_input_sequence(const JV &params, int64_t request_id) {
-  std::string unknown = unknown_field(params, {"inputs", "timeout_ms"});
+  std::string unknown =
+      unknown_field(params, {"inputs", "timeout_ms", "coord_space"});
   if (!unknown.empty())
     return error_result("unknown input_sequence parameter: " + unknown);
   auto *inputs_p = params.Find("inputs");
@@ -944,6 +981,13 @@ JV op_input_sequence(const JV &params, int64_t request_id) {
   if (items.size() > GDA_SEQUENCE_MAX_ITEMS)
     return error_result("input_sequence inputs exceeds maximum of " +
                         std::to_string(GDA_SEQUENCE_MAX_ITEMS) + " items");
+  std::string sequence_space = "window";
+  if (auto *space_p = params.Find("coord_space")) {
+    if (!space_p->IsString() || (space_p->GetString() != "window" &&
+                                 space_p->GetString() != "viewport"))
+      return error_result("input_sequence coord_space must be window|viewport");
+    sequence_space = space_p->GetString();
+  }
 
   std::vector<FrameInputItem> timed;
   timed.reserve(items.size());
@@ -959,7 +1003,8 @@ JV op_input_sequence(const JV &params, int64_t request_id) {
     std::string item_unknown = unknown_field(
         item, {"kind", "type", "at_frame", "keycode", "pressed",
                "button_index", "position", "action", "duration_ms", "mode",
-               "direction", "amount", "relative", "click", "double_click"});
+               "direction", "amount", "relative", "click", "double_click",
+               "coord_space"});
     if (!item_unknown.empty())
       return error_result("unknown input_sequence item parameter: " +
                           item_unknown);
@@ -968,6 +1013,11 @@ JV op_input_sequence(const JV &params, int64_t request_id) {
       return error_result("input_sequence item kind must be a string");
     if (auto *mode = item.Find("mode"); mode && !mode->IsString())
       return error_result("input_sequence item mode must be a string");
+    if (auto *space = item.Find("coord_space"); space &&
+        (!space->IsString() || (space->GetString() != "window" &&
+                                space->GetString() != "viewport")))
+      return error_result(
+          "input_sequence item coord_space must be window|viewport");
     if (auto *pressed = item.Find("pressed"); pressed && !pressed->IsBool())
       return error_result("input_sequence item pressed must be a boolean");
     if (auto *click = item.Find("click"); click && !click->IsBool())
@@ -978,6 +1028,8 @@ JV op_input_sequence(const JV &params, int64_t request_id) {
     FrameInputItem entry;
     entry.at_frame = frame_p->GetInt();
     entry.payload = item;
+    if (!entry.payload.Find("coord_space"))
+      entry.payload["coord_space"] = JV(sequence_space);
     if (entry.at_frame > max_at_frame)
       max_at_frame = entry.at_frame;
     timed.push_back(std::move(entry));

@@ -11,6 +11,8 @@ namespace coords {
 
 godot::Vector2 viewport_point_to_window(const godot::Transform2D &screen_transform,
                                         const godot::Vector2 &viewport_point);
+godot::Vector2 window_point_to_viewport(const godot::Transform2D &screen_transform,
+                                        const godot::Vector2 &window_point);
 godot::Vector2 viewport_rect_center_to_window(const godot::Transform2D &screen_transform,
                                               const godot::Rect2 &viewport_rect);
 

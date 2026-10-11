@@ -1,6 +1,7 @@
 #include "editor_coords.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 
@@ -19,6 +20,13 @@ constexpr int64_t kImageMaxPixels = 268435456;
 godot::Vector2 viewport_point_to_window(const godot::Transform2D &screen_transform,
                                         const godot::Vector2 &viewport_point) {
   return screen_transform.xform(viewport_point);
+}
+
+godot::Vector2 window_point_to_viewport(const godot::Transform2D &screen_transform,
+                                        const godot::Vector2 &window_point) {
+  if (std::fabs(screen_transform.determinant()) < 1e-9)
+    return window_point;
+  return screen_transform.affine_inverse().xform(window_point);
 }
 
 godot::Vector2 viewport_rect_center_to_window(const godot::Transform2D &screen_transform,

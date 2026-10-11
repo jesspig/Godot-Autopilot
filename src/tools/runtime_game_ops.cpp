@@ -64,6 +64,7 @@ constexpr const char *INPUT_PARAM_WHITELIST[] = {
     "type",      "keycode",    "pressed",   "button_index", "position",
     "action",    "duration_ms", "mode",     "timeout_ms",   "direction",
     "amount",    "relative",   "click",     "double_click", "wait_ready",
+    "coord_space",
 };
 
 bool has_only_fields(const JV &value, const char *const *allowed,
@@ -343,6 +344,10 @@ mcp::JsonValue handle_game_input(const mcp::JsonValue &args) {
       (!mode->IsString() || (mode->GetString() != "event" &&
                              mode->GetString() != "api" && mode->GetString() != "hold")))
     return error_json("mode must be event|api|hold");
+  if (auto *space = args.Find("coord_space"); space &&
+      (!space->IsString() || (space->GetString() != "window" &&
+                              space->GetString() != "viewport")))
+    return error_json("coord_space must be window|viewport");
   if (auto *position = args.Find("position"); position && !position->IsObject())
     return error_json("position must be an object");
   if (auto *timeout = args.Find("timeout_ms"); timeout &&
@@ -366,6 +371,7 @@ mcp::JsonValue handle_game_input(const mcp::JsonValue &args) {
   copy_optional(args, params, "relative");
   copy_optional(args, params, "click");
   copy_optional(args, params, "double_click");
+  copy_optional(args, params, "coord_space");
 
   JV result =
       handle_gda_send("input", params, extract_timeout(args), false, wait_ready);
@@ -451,10 +457,14 @@ mcp::JsonValue handle_sequence_game_inputs(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "sequence_game_inputs called");
   static constexpr const char *allowed[] = {"inputs", "timeout_ms",
-                                             "wait_ready"};
+                                             "wait_ready", "coord_space"};
   std::string unknown;
   if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed), unknown))
     return error_json("unknown parameter for sequence_game_inputs: " + unknown);
+  if (auto *space = args.Find("coord_space"); space &&
+      (!space->IsString() || (space->GetString() != "window" &&
+                              space->GetString() != "viewport")))
+    return error_json("coord_space must be window|viewport");
   auto *inputs_p = args.Find("inputs");
   if (!inputs_p || !inputs_p->IsArray() || inputs_p->GetArray().empty()) {
     return error_json(
@@ -485,6 +495,10 @@ mcp::JsonValue handle_sequence_game_inputs(const mcp::JsonValue &args) {
     }
     if (frame_p->GetInt() > max_at_frame)
       max_at_frame = frame_p->GetInt();
+    if (auto *space = item.Find("coord_space"); space &&
+        (!space->IsString() || (space->GetString() != "window" &&
+                                space->GetString() != "viewport")))
+      return error_json("coord_space must be window|viewport");
   }
 
   int64_t timeout;
@@ -501,6 +515,7 @@ mcp::JsonValue handle_sequence_game_inputs(const mcp::JsonValue &args) {
   JV params(JV::object_tag);
   params["inputs"] = *inputs_p;
   params["timeout_ms"] = JV(timeout);
+  copy_optional(args, params, "coord_space");
 
   bool wait_ready = true;
   if (!extract_wait_ready(args, &wait_ready))

@@ -496,7 +496,17 @@ instantiate_resource_class(const std::string &type, std::string &out_error) {
     return godot::Ref<godot::Resource>();
   }
 
-  if (!script->can_instantiate()) {
+  if (script->can_instantiate()) {
+    godot::Variant obj_var = script->call(godot::StringName("new"));
+    auto *obj = godot::Object::cast_to<godot::Resource>(obj_var);
+    if (!obj) {
+      out_error = "failed to instantiate global class: " + type;
+      return godot::Ref<godot::Resource>();
+    }
+    return godot::Ref<godot::Resource>(obj);
+  }
+
+  if (script->is_abstract()) {
     out_error = type +
                 " is not instantiable (abstract or invalid global class "
                 "script): " +
@@ -507,7 +517,11 @@ instantiate_resource_class(const std::string &type, std::string &out_error) {
   godot::Variant obj_var = script->call(godot::StringName("new"));
   auto *obj = godot::Object::cast_to<godot::Resource>(obj_var);
   if (!obj) {
-    out_error = "failed to instantiate global class: " + type;
+    out_error = type +
+                " is not instantiable (abstract or invalid global class "
+                "script): " +
+                script_path +
+                " (precheck=false, is_abstract=false, new_probe_failed)";
     return godot::Ref<godot::Resource>();
   }
   return godot::Ref<godot::Resource>(obj);
@@ -1149,6 +1163,7 @@ mcp::JsonValue handle_list_types(const mcp::JsonValue &) {
 
   auto *settings = godot::ProjectSettings::get_singleton();
   auto *loader = godot::ResourceLoader::get_singleton();
+  mcp::JsonValue observed(mcp::JsonValue::object_tag);
   if (settings && loader) {
     std::vector<std::string> script_classes;
     godot::TypedArray<godot::Dictionary> classes =
@@ -1165,11 +1180,13 @@ mcp::JsonValue handle_list_types(const mcp::JsonValue &) {
       godot::Ref<godot::Resource> loaded =
           loader->load(godot::String(script_path.c_str()));
       godot::Ref<godot::Script> script = loaded;
-      if (script.is_null() || !script->can_instantiate())
+      if (script.is_null())
         continue;
+      observed[cls] = mcp::JsonValue(script->can_instantiate());
       godot::StringName base = script->get_instance_base_type();
       if (base == godot::StringName() ||
-          !cdbs->is_parent_class(base, godot::StringName("Resource"))) {
+          !cdbs->is_parent_class(base, godot::StringName("Resource")) ||
+          script->is_abstract()) {
         continue;
       }
       script_classes.push_back(cls);
@@ -1184,6 +1201,7 @@ mcp::JsonValue handle_list_types(const mcp::JsonValue &) {
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(types);
+  r["observed"] = std::move(observed);
   return r;
 }
 

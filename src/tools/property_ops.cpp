@@ -18,7 +18,10 @@
 #include <godot_cpp/classes/node2d.hpp>
 #include <godot_cpp/classes/node3d.hpp>
 #include <godot_cpp/classes/object.hpp>
+#include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/classes/resource.hpp>
+#include <godot_cpp/classes/resource_loader.hpp>
+#include <godot_cpp/classes/script.hpp>
 #include <godot_cpp/core/error_macros.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/basis.hpp>
@@ -452,6 +455,71 @@ bool is_node_class(const std::string &class_name) {
   return cdbs->is_parent_class(cls, godot::StringName("Node"));
 }
 
+bool find_array_element_script_path(const std::string &class_name,
+                                    std::string &out_path) {
+  out_path.clear();
+  if (class_name.empty()) {
+    return false;
+  }
+  auto *settings = godot::ProjectSettings::get_singleton();
+  if (!settings) {
+    return false;
+  }
+  godot::TypedArray<godot::Dictionary> classes =
+      settings->get_global_class_list();
+  for (int64_t i = 0; i < classes.size(); i++) {
+    godot::Dictionary entry = classes[i];
+    if (!entry.has("class") || !entry.has("path")) {
+      continue;
+    }
+    std::string cls =
+        util::to_std(entry["class"].operator godot::String());
+    if (cls != class_name) {
+      continue;
+    }
+    std::string path =
+        util::to_std(entry["path"].operator godot::String());
+    if (path.empty()) {
+      return false;
+    }
+    out_path = path;
+    return true;
+  }
+  return false;
+}
+
+bool is_native_engine_class(const std::string &class_name) {
+  if (class_name.empty()) {
+    return false;
+  }
+  auto *cdbs = godot::ClassDBSingleton::get_singleton();
+  if (!cdbs) {
+    return false;
+  }
+  return cdbs->class_exists(godot::StringName(class_name.c_str()));
+}
+
+bool load_element_script(const std::string &class_name,
+                         godot::Ref<godot::Script> &out_script) {
+  out_script.unref();
+  std::string script_path;
+  if (!find_array_element_script_path(class_name, script_path)) {
+    return false;
+  }
+  auto *loader = godot::ResourceLoader::get_singleton();
+  if (!loader) {
+    return false;
+  }
+  godot::Ref<godot::Resource> loaded =
+      loader->load(godot::String(script_path.c_str()));
+  godot::Ref<godot::Script> script = loaded;
+  if (script.is_null()) {
+    return false;
+  }
+  out_script = script;
+  return true;
+}
+
 std::string hint_name(int hint) {
   static const std::unordered_map<int, std::string> names = {
       {0, "None"},
@@ -682,7 +750,64 @@ bool convert_array_element(const mcp::JsonValue &element,
     if (resource_ops::try_resolve_resource_value(element, out_value,
                                                  resolve_error)) {
       if (resolve_error.empty()) {
-        return true;
+        if (out_value.get_type() == godot::Variant::NIL) {
+          return true;
+        }
+        if (out_value.get_type() != godot::Variant::OBJECT) {
+          out_error = util::error_detail(
+              "cannot convert " + element_label + " to a " + resource_label +
+                  " resource reference",
+              path_str, "a res:// path string or a resource object",
+              "pass a res:// path string, {\"path\": \"res://...\"} or "
+              "{\"resource\": \"memory://...\"} (or null to clear the slot)");
+          return false;
+        }
+        godot::Object *obj = out_value.operator godot::Object *();
+        if (!obj) {
+          return true;
+        }
+        if (element_class.empty()) {
+          return true;
+        }
+        if (is_native_engine_class(element_class)) {
+          if (obj->is_class(godot::String(element_class.c_str()))) {
+            return true;
+          }
+          out_error = util::error_detail(
+              "cannot convert " + element_label + ": resource class '" +
+                  util::to_std(obj->get_class()) + "' is not '" +
+                  element_class + "'",
+              path_str, "a " + resource_label + " resource reference",
+              "pass a res:// path string, {\"path\": \"res://...\"} or "
+              "{\"resource\": \"memory://...\"} (or null to clear the slot)");
+          return false;
+        }
+        godot::Ref<godot::Script> element_script;
+        if (!load_element_script(element_class, element_script)) {
+          out_error = util::error_detail(
+              "cannot convert " + element_label +
+                  ": cannot resolve array element class '" + element_class +
+                  "'",
+              path_str, "a " + resource_label + " resource reference",
+              "ensure the global class exists and its script loads, or use "
+              "code_execute to build the array manually");
+          return false;
+        }
+        godot::Variant obj_script = obj->get_script();
+        godot::Object *obj_script_obj = nullptr;
+        if (obj_script.get_type() == godot::Variant::OBJECT) {
+          obj_script_obj = obj_script.operator godot::Object *();
+        }
+        if (obj_script_obj == element_script.ptr()) {
+          return true;
+        }
+        out_error = util::error_detail(
+            "cannot convert " + element_label + ": resource script is not '" +
+                element_class + "'",
+            path_str, "a " + resource_label + " resource reference",
+            "pass a res:// path string, {\"path\": \"res://...\"} or "
+            "{\"resource\": \"memory://...\"} (or null to clear the slot)");
+        return false;
       }
       out_error = util::error_detail(
           "cannot convert " + element_label + ": " + resolve_error, path_str,
@@ -752,15 +877,25 @@ convert_array_value(const godot::Dictionary &dict, const std::string &prop_str,
     godot::Variant::Type element_type = element_hint->type;
     godot::StringName element_class_name;
     std::string element_class_name_str;
+    godot::Variant array_script;
+    bool element_script_loaded = false;
     if (element_hint->hint == godot::PROPERTY_HINT_RESOURCE_TYPE ||
         element_hint->hint == godot::PROPERTY_HINT_NODE_TYPE) {
       element_class_name_str = parse_hint_class(element_hint->hint_string);
       if (!element_class_name_str.empty()) {
         element_type = godot::Variant::OBJECT;
-        element_class_name = godot::StringName(element_class_name_str.c_str());
+        if (is_native_engine_class(element_class_name_str)) {
+          element_class_name =
+              godot::StringName(element_class_name_str.c_str());
+        } else {
+          godot::Ref<godot::Script> element_script;
+          if (load_element_script(element_class_name_str, element_script)) {
+            array_script = godot::Variant(element_script.ptr());
+            element_script_loaded = true;
+          }
+        }
       }
     }
-    godot::Variant array_script;
     godot::Array typed_array(out_array, element_type, element_class_name,
                              array_script);
     if (typed_array.size() != out_array.size()) {
@@ -775,6 +910,8 @@ convert_array_value(const godot::Dictionary &dict, const std::string &prop_str,
           path_str, "elements assignable to the declared array element type",
           "pass elements matching the declared array element type, or use "
           "code_execute to build the array manually");
+      result.error["element_script_loaded"] =
+          mcp::JsonValue(element_script_loaded);
       return result;
     }
     out_array = typed_array;
@@ -1425,6 +1562,127 @@ namespace {
 
 constexpr int64_t kPropertyBatchMax = 32;
 
+const char kMetadataPrefix[] = "metadata/";
+
+bool is_metadata_property(const std::string &name) {
+  return name.rfind(kMetadataPrefix, 0) == 0;
+}
+
+bool validate_metadata_key(const std::string &key, std::string &reason) {
+  if (key.empty()) {
+    reason = "metadata key must be non-empty";
+    return false;
+  }
+  if (key.find("..") != std::string::npos) {
+    reason = "metadata key must not contain '..'";
+    return false;
+  }
+  for (char c : key) {
+    if (c == ' ' || c == '\t' || c == ':' || c == '(' || c == ')' ||
+        c == '[' || c == ']' || c == '"' || c == '\'' || c == '/') {
+      reason = "metadata key contains an invalid character";
+      return false;
+    }
+  }
+  return true;
+}
+
+mcp::JsonValue metadata_key_error(const std::string &prop_str,
+                                  const std::string &path_str,
+                                  const std::string &reason) {
+  std::string key = prop_str.substr(sizeof(kMetadataPrefix) - 1);
+  return util::error_detail(
+      "invalid metadata key '" + key + "' in property '" + prop_str +
+          "' on " + path_str + ": " + reason,
+      path_str, "a non-empty metadata key without spaces, :, (), [], / or ..",
+      "pass 'metadata/<key>' with a plain key, e.g. 'metadata/my_key'");
+}
+
+mcp::JsonValue apply_metadata_get(godot::Node *node,
+                                  const std::string &prop_str,
+                                  const std::string &path_str) {
+  std::string key = prop_str.substr(sizeof(kMetadataPrefix) - 1);
+  std::string reason;
+  if (!validate_metadata_key(key, reason)) {
+    return metadata_key_error(prop_str, path_str, reason);
+  }
+  godot::StringName meta_key(key.c_str());
+  if (!node->has_meta(meta_key)) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue("meta not found: '" + key + "' on node " +
+                                path_str);
+    return e;
+  }
+  godot::Variant stored = node->get_meta(meta_key);
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["result"] = VariantJson::serialize(stored);
+  return r;
+}
+
+mcp::JsonValue apply_metadata_set(godot::Node *node,
+                                  const std::string &prop_str,
+                                  const std::string &path_str,
+                                  const mcp::JsonValue &raw_value) {
+  std::string key = prop_str.substr(sizeof(kMetadataPrefix) - 1);
+  std::string reason;
+  if (!validate_metadata_key(key, reason)) {
+    return metadata_key_error(prop_str, path_str, reason);
+  }
+  godot::StringName meta_key(key.c_str());
+  bool had_old = node->has_meta(meta_key);
+  godot::Variant old_val;
+  if (had_old) {
+    old_val = node->get_meta(meta_key);
+  }
+  godot::Variant new_val = VariantJson::deserialize(raw_value);
+  node->set_meta(meta_key, new_val);
+  scene_dirty_tracker::mark_scene_modified();
+  auto *editor = godot::EditorInterface::get_singleton();
+  auto *undo_redo = editor ? editor->get_editor_undo_redo() : nullptr;
+  bool undoable = false;
+  std::string undo_skip;
+  if (!undo_redo) {
+    undo_skip = "EditorUndoRedoManager not available";
+  } else {
+    undo_redo->create_action(
+        godot::String(("Set Metadata " + key + " on " + path_str).c_str()));
+    undo_redo->add_do_method(node, godot::StringName("set_meta"), meta_key,
+                             new_val);
+    if (had_old) {
+      undo_redo->add_undo_method(node, godot::StringName("set_meta"), meta_key,
+                                 old_val);
+    } else {
+      undo_redo->add_undo_method(node, godot::StringName("remove_meta"),
+                                 meta_key);
+    }
+    undo_redo->commit_action(false);
+    undoable = true;
+  }
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["result"] = mcp::JsonValue("ok");
+  if (had_old) {
+    r["meta_old"] = VariantJson::serialize(old_val);
+  } else {
+    r["meta_old"] = mcp::JsonValue(nullptr);
+  }
+  r["meta_new"] = VariantJson::serialize(new_val);
+  mcp::JsonValue undo_info(mcp::JsonValue::object_tag);
+  undo_info["path"] = mcp::JsonValue(path_str);
+  undo_info["property"] = mcp::JsonValue(prop_str);
+  if (had_old) {
+    undo_info["old_value"] = VariantJson::serialize(old_val);
+  } else {
+    undo_info["old_value"] = mcp::JsonValue(nullptr);
+  }
+  r["undo"] = std::move(undo_info);
+  r["undoable"] = mcp::JsonValue(undoable);
+  if (!undoable) {
+    r["undo_skip_reason"] = mcp::JsonValue(undo_skip);
+  }
+  util::add_scene_info_fields(r, util::edited_scene_info());
+  return r;
+}
+
 bool batch_property_is_object_typed(godot::Node *node,
                                     const std::string &prop_name,
                                     const mcp::JsonValue &raw_value) {
@@ -1577,6 +1835,17 @@ mcp::JsonValue handle_get(const mcp::JsonValue &args) {
     mcp::JsonValue values(mcp::JsonValue::object_tag);
     mcp::JsonValue missing(mcp::JsonValue::array_tag);
     for (const std::string &name : batch_names) {
+      if (is_metadata_property(name)) {
+        mcp::JsonValue meta_result = apply_metadata_get(node, name, path_str);
+        const mcp::JsonValue *meta_value = meta_result.Find("result");
+        if (meta_value) {
+          mcp::JsonValue value_copy = *meta_value;
+          values[name] = std::move(value_copy);
+        } else {
+          missing.PushBack(mcp::JsonValue(name));
+        }
+        continue;
+      }
       godot::Variant value;
       mcp::JsonValue item_error =
           read_single_property(node, path_str, name, value);
@@ -1594,6 +1863,9 @@ mcp::JsonValue handle_get(const mcp::JsonValue &args) {
   }
 
   std::string prop_str = it_prop->GetString();
+  if (is_metadata_property(prop_str)) {
+    return apply_metadata_get(node, prop_str, path_str);
+  }
   godot::Variant value;
   if (mcp::JsonValue item_error =
           read_single_property(node, path_str, prop_str, value);
@@ -1702,7 +1974,8 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
             "properties must contain non-empty property name strings");
         return e;
       }
-      if (batch_property_is_object_typed(node, entry.first, entry.second))
+      if (!is_metadata_property(entry.first) &&
+          batch_property_is_object_typed(node, entry.first, entry.second))
         object_props.push_back(entry.first);
     }
     std::vector<std::string> applied;
@@ -1807,6 +2080,9 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
     return r;
   }
   std::string prop_str = it_prop->GetString();
+  if (is_metadata_property(prop_str)) {
+    return apply_metadata_set(node, prop_str, path_str, *it_val);
+  }
 
   DottedTarget target = resolve_dotted_target(node, prop_str, path_str);
   if (!target.ok) {
@@ -2055,6 +2331,19 @@ mcp::JsonValue handle_set_batch(const mcp::JsonValue &args) {
   std::vector<BatchWork> work;
   work.reserve(it_batch->GetObject().size() * 2);
   for (const auto &entry : it_batch->GetObject()) {
+    if (is_metadata_property(entry.first)) {
+      std::string meta_key_str =
+          entry.first.substr(sizeof(kMetadataPrefix) - 1);
+      std::string meta_reason;
+      if (!validate_metadata_key(meta_key_str, meta_reason)) {
+        return metadata_key_error(entry.first, path_str, meta_reason);
+      }
+      BatchWork item;
+      item.name = entry.first;
+      item.value = entry.second;
+      work.push_back(item);
+      continue;
+    }
     DottedTarget probe = resolve_dotted_target(node, entry.first, path_str);
     if (probe.ok) {
       BatchWork item;
@@ -2123,6 +2412,9 @@ mcp::JsonValue handle_set_batch(const mcp::JsonValue &args) {
   }
   std::vector<std::string> object_names;
   for (const auto &item : work) {
+    if (is_metadata_property(item.name)) {
+      continue;
+    }
     if (batch_property_is_object_typed(node, item.name, item.value)) {
       object_names.push_back(item.name);
     }
@@ -2133,6 +2425,8 @@ mcp::JsonValue handle_set_batch(const mcp::JsonValue &args) {
     godot::StringName leaf;
     godot::Variant old_value;
     godot::Variant new_value;
+    bool is_meta = false;
+    bool had_old = false;
   };
   std::vector<BatchApplied> applied;
   applied.reserve(work.size());
@@ -2177,12 +2471,87 @@ mcp::JsonValue handle_set_batch(const mcp::JsonValue &args) {
       if (seen) {
         continue;
       }
+      if (is_metadata_property(prop_str)) {
+        std::string meta_key_str =
+            prop_str.substr(sizeof(kMetadataPrefix) - 1);
+        std::string meta_reason;
+        if (!validate_metadata_key(meta_key_str, meta_reason)) {
+          std::string sub_msg = error_text_of(
+              metadata_key_error(prop_str, path_str, meta_reason));
+          if (atomic) {
+            for (auto rit = applied.rbegin(); rit != applied.rend(); ++rit) {
+              if (rit->is_meta) {
+                if (rit->had_old) {
+                  rit->owner->set_meta(rit->leaf, rit->old_value);
+                } else {
+                  rit->owner->remove_meta(rit->leaf);
+                }
+              } else {
+                rit->owner->set(rit->leaf, rit->old_value);
+              }
+            }
+            mcp::JsonValue rolled(mcp::JsonValue::array_tag);
+            for (const BatchApplied &done : applied) {
+              rolled.PushBack(mcp::JsonValue(done.name));
+            }
+            mcp::JsonValue one_failed(mcp::JsonValue::array_tag);
+            mcp::JsonValue fitem(mcp::JsonValue::object_tag);
+            fitem["property"] = mcp::JsonValue(prop_str);
+            fitem["error"] = mcp::JsonValue(sub_msg);
+            one_failed.PushBack(std::move(fitem));
+            mcp::JsonValue e(mcp::JsonValue::object_tag);
+            e["error"] = mcp::JsonValue("failed to apply property '" +
+                                        prop_str + "' on " + path_str + ": " +
+                                        sub_msg + " (atomic rollback: " +
+                                        std::to_string(applied.size()) +
+                                        " reverted)");
+            e["failed_property"] = mcp::JsonValue(prop_str);
+            e["failed"] = std::move(one_failed);
+            mcp::JsonValue empty_applied(mcp::JsonValue::array_tag);
+            e["applied_properties"] = std::move(empty_applied);
+            e["rolled_back"] = std::move(rolled);
+            return e;
+          }
+          mcp::JsonValue fitem(mcp::JsonValue::object_tag);
+          fitem["property"] = mcp::JsonValue(prop_str);
+          fitem["error"] = mcp::JsonValue(sub_msg);
+          failed.PushBack(std::move(fitem));
+          failed_names.push_back(prop_str);
+          continue;
+        }
+        godot::StringName meta_key(meta_key_str.c_str());
+        bool meta_had_old = node->has_meta(meta_key);
+        godot::Variant meta_old;
+        if (meta_had_old) {
+          meta_old = node->get_meta(meta_key);
+        }
+        godot::Variant meta_new = VariantJson::deserialize(raw_value);
+        node->set_meta(meta_key, meta_new);
+        BatchApplied rec;
+        rec.name = prop_str;
+        rec.owner = node;
+        rec.leaf = meta_key;
+        rec.old_value = meta_old;
+        rec.new_value = meta_new;
+        rec.is_meta = true;
+        rec.had_old = meta_had_old;
+        applied.push_back(rec);
+        continue;
+      }
       DottedTarget target = resolve_dotted_target(node, prop_str, path_str);
       if (!target.ok) {
         std::string sub_msg = error_text_of(target.error);
         if (atomic) {
           for (auto rit = applied.rbegin(); rit != applied.rend(); ++rit) {
-            rit->owner->set(rit->leaf, rit->old_value);
+            if (rit->is_meta) {
+              if (rit->had_old) {
+                rit->owner->set_meta(rit->leaf, rit->old_value);
+              } else {
+                rit->owner->remove_meta(rit->leaf);
+              }
+            } else {
+              rit->owner->set(rit->leaf, rit->old_value);
+            }
           }
           mcp::JsonValue rolled(mcp::JsonValue::array_tag);
           for (const BatchApplied &done : applied) {
@@ -2331,7 +2700,15 @@ mcp::JsonValue handle_set_batch(const mcp::JsonValue &args) {
       if (item_failed) {
         if (atomic) {
           for (auto rit = applied.rbegin(); rit != applied.rend(); ++rit) {
-            rit->owner->set(rit->leaf, rit->old_value);
+            if (rit->is_meta) {
+              if (rit->had_old) {
+                rit->owner->set_meta(rit->leaf, rit->old_value);
+              } else {
+                rit->owner->remove_meta(rit->leaf);
+              }
+            } else {
+              rit->owner->set(rit->leaf, rit->old_value);
+            }
           }
           mcp::JsonValue rolled(mcp::JsonValue::array_tag);
           for (const BatchApplied &done : applied) {
@@ -2443,8 +2820,22 @@ mcp::JsonValue handle_set_batch(const mcp::JsonValue &args) {
     } else {
       undo_redo->create_action(godot::String(undo_action.c_str()));
       for (const BatchApplied &done : applied) {
-        undo_redo->add_do_property(done.owner, done.leaf, done.new_value);
-        undo_redo->add_undo_property(done.owner, done.leaf, done.old_value);
+        if (done.is_meta) {
+          undo_redo->add_do_method(done.owner, godot::StringName("set_meta"),
+                                   done.leaf, done.new_value);
+          if (done.had_old) {
+            undo_redo->add_undo_method(done.owner,
+                                       godot::StringName("set_meta"),
+                                       done.leaf, done.old_value);
+          } else {
+            undo_redo->add_undo_method(done.owner,
+                                       godot::StringName("remove_meta"),
+                                       done.leaf);
+          }
+        } else {
+          undo_redo->add_do_property(done.owner, done.leaf, done.new_value);
+          undo_redo->add_undo_property(done.owner, done.leaf, done.old_value);
+        }
       }
       undo_redo->commit_action(false);
       undoable = true;
