@@ -2,6 +2,11 @@
 
 > 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天。
 
+## 2026-10-11
+
+- **批量工具扩充知识库同步（+51 域工具，392→443）**：工作树 `git diff HEAD` 纯增量 48 文件 +8194/-30（8 新增：`file_dir_ops.*`、`gridmap_ops.*`、`gridmap_tools.hpp`、`tween_ops.*`、`tween_tools.hpp`；40 修改）。`src/tools/register_all.cpp` 新增 `gridmap`/`tween` 两注册域，`tests/unit/register_all_test.cpp` 基线 400=338+62 → 451=385+66；根 `CMakeLists.txt` 补 3 个新 `.cpp`，测试侧经 `GDA_TOOLS_OPS_SOURCES` glob 自动收录。`skills/godot-autopilot-tools/references/tool-catalog.md` 头行已同步为 443 域 / 32 源模块。静态核算（`src/tools/*_tools.hpp` 的 `make_spec_tool` 子串计数总和 443 + 内联 `system_status` + 7 元 = 451）与测试基线自洽；`call_tool` 描述行“443 非元（442 域 + system_status)”差 1（正确 444 非元）列为遗留未改代码。Wiki 更新 index / tools_registry / tools_ops_a（197→221）/ tools_ops_b（195→222，新增 gridmap/tween 小节）/ tool_base_design（32 域口径澄清）/ tests（枚举 393→444，排除与候选待运行时复核）；未跑构建与测试。详见 [2026-10-11-log.md](changelog/2026-10-11-log.md)
+- **技能核对结论（未落盘）**：`cpp-registration`、`domain-tool-authoring`、`wiki-maintainer` 覆盖仍有效，无需新建技能；仅提案 `domain-tool-authoring` 加一句到 `cpp-registration` 的排序引用（新 `.cpp` + 新域工具组合触发时先判双登记），待用户确认后实施。详见 [2026-10-11-log.md](changelog/2026-10-11-log.md)
+
 ## 2026-10-10
 
 - **依赖管理 FetchContent → git submodule（纯 submodule，零 FetchContent）**：分支 `feature/submodule-deps`。`_deps` 位于被 `.gitignore` 排除的 `build/` 下，无法随仓库流转，换机或内网克隆后必然重新访问 GitHub；改为 submodule 后源码在 `third_party/`，检出后 configure 零网络。`cmake/FetchDependencies.cmake` 经 `git mv` 改名 `Dependencies.cmake` 并重写为纯 `add_subdirectory`，新增 `gda_require_submodule()` 缺失即 `FATAL_ERROR`、**故意不做网络回退**。CI build job checkout 加 `submodules: true`，cache 路径改 `third_party/` 三目录、key 取 gitlink sha（不可用 `hashFiles('.gitmodules')`，否则升级 commit 会命中旧源码缓存）。**验证**：代理指向不可达地址时 configure 仍成功（零网络）；构建产出 `godot-autopilot.dll` 与 `gda_unit_tests.exe`；L1 **394/394 全绿**（含两守卫与 `skill_scripts`，225.99 s）。详见 [2026-10-10-log.md](changelog/2026-10-10-log.md)

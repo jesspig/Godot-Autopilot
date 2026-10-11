@@ -1,6 +1,6 @@
 # Category Index
 
-All 392 domain tools of the godot-autopilot MCP server, grouped by their 30 source modules, plus `system_status`. Call domain tools through `call_tool`; confirm schemas with `get_tool_detail`.
+All 443 domain tools of the godot-autopilot MCP server, grouped by their 32 source modules, plus `system_status`. Call domain tools through `call_tool`; confirm schemas with `get_tool_detail`.
 
 ## Analysis - analyze_tools (3)
 
@@ -8,7 +8,7 @@ All 392 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `find_unused_resources` - find project files never referenced by any other file's dependencies
 - `trace_signal_flow` - trace signal wiring around a node of the edited scene
 
-## Animation - animation_tools (10)
+## Animation - animation_tools (11)
 
 - `create_scene_animation_player` - create an AnimationPlayer node in the edited scene
 - `create_animation` - create an Animation resource in a player's default library
@@ -17,11 +17,12 @@ All 392 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `create_animation_track` - add a value or method track to an animation
 - `insert_animation_keyframe` - insert one key into a track at a given time
 - `remove_animation_track` - remove a whole track from an animation
+- `set_animation_track_bundle` - create one animation track with all its keys in a single all-or-nothing call
 - `create_scene_animation_tree` - create an AnimationTree with an empty state machine root
 - `add_animation_machine_state` - append a state to the AnimationTree state machine
 - `connect_animation_states` - connect two states, optionally with a transition condition
 
-## Audio - audio_tools (20)
+## Audio - audio_tools (24)
 
 - `get_audio_bus_layout` - read the complete audio bus layout including effect chains
 - `set_audio_bus_layout` - replace the whole audio bus layout
@@ -43,13 +44,17 @@ All 392 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `set_audio_device_output` - switch the editor's audio output device
 - `get_audio_device_inputs` - list available audio input devices
 - `set_audio_device_input` - switch the editor's audio input device
+- `start_audio_input_capture` - start capturing audio from the input device into the input buffer
+- `stop_audio_input_capture` - stop capture and drain buffered frames into a memory WAV
+- `create_audiostream_wav` - build an AudioStreamWAV from inline samples under a memory name
+- `get_audio_input_devices` - list audio input devices with capture state
 
 ## Capture - capture_tools (2)
 
 - `capture_editor_viewport` - screenshot the editor viewport (or the running game with target=game) as base64 PNG; save=true on the editor target also writes the PNG under user://godot_autopilot/captures/ and returns its path (only the 20 most recent captures are kept); `region` crops the capture, `max_dimension` caps its pixel size, `space` picks the captured viewport space, `annotate` draws numbered boxes plus an element table, and `diff_against_last` reports the changed ratio and bounding box against the previous capture of the same target; through `call_tool` the PNG is delivered as image content (`data` becomes `<attached-as-image-content>` with image_attached: true)
 - `review_scene_visually` - one read-only visual review of the edited scene and running game: editor viewport capture, game viewport capture, visible-node rect table and the capture-to-window coordinate mapping; each section fails in isolation, and `include_editor`/`include_game` skip a capture
 
-## Config - config_tools (13)
+## Config - config_tools (17)
 
 - `get_project_settings` - read one project.godot setting
 - `set_project_settings` - set a project setting in memory only (call save afterwards)
@@ -64,6 +69,10 @@ All 392 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `get_editor_settings` - read one editor preference
 - `set_editor_settings` - set an editor preference (persists automatically)
 - `has_editor_settings` - check whether an editor preference exists
+- `get_autoload_list` - list autoload singletons in load order
+- `add_autoload` - add an autoload singleton and save project settings immediately
+- `remove_autoload` - remove an autoload singleton and report stale references
+- `move_autoload` - move an autoload singleton to a new load-order position
 
 ## Debug - debug_tools (15)
 
@@ -162,7 +171,7 @@ All 392 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `scene_tree_items` - enumerate the rows of the editor's Scene dock tree as the editor displays them (path, name, type, depth, selected, collapsed, visible, rect), with optional `filter`, `selected_only` and `max_items`
 - `select_scene_tree_node` - select a node in the Scene dock by scene-relative or absolute `path` and show it in the Inspector (`add`, `inspect`, `focus`)
 
-## Game - game_tools (15)
+## Game - game_tools (19)
 
 - `sample_game_property` - sample a running-game node property over successive process frames
 - `collect_game_evidence` - collect a read-only evidence bundle of game status, screenshot and recent errors in one round trip
@@ -179,6 +188,17 @@ All 392 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `click_game_ui_element` - click a running-game Control by element `path` (`button_index`, `double_click`, `max_elements`)
 - `start_game_job` - submit a game op for asynchronous execution and return immediately with a `job_id` (`op`, `params`, `timeout_ms`; the job table holds at most 16 jobs) for long-running in-game work
 - `get_game_job` - poll, wait for or cancel a game job by `job_id` (`cancel`, `timeout_ms`; status pending/done/expired/cancelled)
+- `get_game_locale` - read the running game locale from the TranslationServer
+- `set_game_locale` - switch the running game locale on the TranslationServer
+- `get_translation_list` - list locales with loaded translations
+- `translate_text` - translate a message key under the current game locale
+
+## Game - tween_tools (4)
+
+- `create_game_tween` - animate a property on a running-game node and return a tween handle
+- `control_game_tween` - play, pause, stop or kill a game-side tween by handle
+- `get_game_tween_list` - list active tweens of the running game
+- `tween_editor_property` - preview a property tween on an edited-scene node without running the game
 
 ## Group - group_tools (3)
 
@@ -204,7 +224,7 @@ All 392 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `start_input_gamepad_vibration` - start gamepad vibration on the editor process
 - `stop_input_gamepad_vibration` - stop gamepad vibration
 
-## Input - input_map_tools (8)
+## Input - input_map_tools (9)
 
 - `get_input_map_actions` - list all input action names of the editor project
 - `has_input_map_action` - check whether an input action exists
@@ -214,6 +234,7 @@ All 392 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `set_input_map_action_deadzone` - set an action's analog deadzone
 - `erase_input_map_action` - remove an action and its persisted setting
 - `save_input_map` - persist the editor InputMap to project settings
+- `set_input_map_action_bundle` - ensure an input action exists and apply deadzone plus events in one call
 
 ## Navigation - nav_tools (15)
 
@@ -233,7 +254,7 @@ All 392 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `get_nav_3d_agent_state` - read a 3D agent's position and velocity
 - `create_nav_3d_obstacle` - create a 3D obstacle avoidance agents steer around
 
-## OS - os_tools (18)
+## OS - os_tools (22)
 
 - `show_os_alert` - show a blocking native alert dialog (blocks the editor UI)
 - `create_os_process` - start a detached background process and return its PID
@@ -253,8 +274,12 @@ All 392 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `read_file` - read a text file from disk
 - `find_in_files` - recursively search text files for a query string
 - `move_os_file_to_trash` - move a file or folder to the system trash
+- `list_directory` - list files and subdirectories of a project directory
+- `get_file_info` - report filesystem metadata for a project path
+- `copy_file` - copy one file byte-for-byte without engine resource tracking
+- `ensure_directory` - create a directory with missing parents, idempotent
 
-## Physics - physics_tools (48)
+## Physics - physics_tools (51)
 
 - `get_physics_2d_space_direct_state` - read a 2D physics space's direct state before queries
 - `intersect_physics_2d_ray` - cast a 2D ray and return the first hit (space auto-detected from the edited scene)
@@ -304,16 +329,21 @@ All 392 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `set_physics_3d_shape_data` - set a sphere shape's geometry
 - `get_physics_node_rid` - get the RID of a scene physics node for server-side tools
 - `get_debug_object_info` - resolve an ObjectID to its class and identity
+- `set_physics_body_bundle` - create a server physics body with shape and parameters, or configure the server body of a scene collision object
+- `create_collision_shape` - create an in-memory Shape2D or Shape3D resource for a CollisionShape node
+- `assign_collision_shape` - assign a Shape resource to a CollisionShape2D or CollisionShape3D node
 
-## Properties - property_tools (5)
+## Properties - property_tools (7)
 
 - `property_get` - read one property value from a scene node
 - `property_get_list` - list every property of a node with metadata
 - `property_set` - set a node property (editor undo, errors carry candidate suggestions)
 - `signal_connect` - connect a signal to a target method (persisted with the scene by default)
 - `signal_disconnect` - remove a signal connection (idempotent)
+- `set_properties_batch` - set many properties on one node in a single undo step, all-or-nothing or best-effort
+- `set_node_transform` - set position, rotation and scale of a node in local or global space in one undo step
 
-## Render - render_tools (49)
+## Render - render_tools (52)
 
 - `create_render_canvas_item` - create a server-side 2D canvas item and return its RID
 - `add_render_canvas_item_rect` - draw a filled rectangle on a canvas item
@@ -364,8 +394,11 @@ All 392 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `set_render_instance_visible` - set a rendering instance's visibility
 - `set_render_instance_layer_mask` - set a rendering instance's camera layer mask
 - `find_render_node_from_rid` - validate an RID and find scene nodes using it
+- `restart_particles` - restart a particle node from the beginning even while emitting
+- `set_particles_params` - set playback parameters on a particle node
+- `get_particles_state` - read playback state of a particle node
 
-## Resources - resource_tools (27)
+## Resources - resource_tools (34)
 
 - `load_resource` - load a resource file from disk into memory
 - `reload_resource` - force-reload a resource file from disk, replacing the editor's cached instance
@@ -394,8 +427,15 @@ All 392 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `set_resource_import_options` - set whitelisted .import params on an imported asset and queue a reimport
 - `set_resource_property` - set a property on a located resource
 - `get_resource_property` - read a property from a located resource
+- `create_curve_resource` - create an in-memory Curve2D or Curve3D registered under a memory name
+- `set_curve_points` - replace all control points of an in-memory curve all-or-nothing
+- `get_curve_baked_points` - read the baked polyline of an in-memory curve
+- `create_primitive_mesh` - create an in-memory PrimitiveMesh of a given type registered under a memory name
+- `create_array_mesh` - create an in-memory ArrayMesh triangle surface from vertices registered under a memory name
+- `set_mesh_surface_material` - assign a Material to one surface of a mesh
+- `assign_mesh_to_instance` - assign a mesh to a MeshInstance2D or MeshInstance3D node
 
-## Scene - scene_tools (8)
+## Scene - scene_tools (15)
 
 - `create_scene_node` - create a node in the edited scene with optional type, name, parent and inline properties
 - `delete_scene_node` - delete a node via editor undo/redo (refuses the scene root)
@@ -405,6 +445,13 @@ All 392 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `instantiate_scene` - instantiate a .tscn PackedScene into the edited scene
 - `get_scene_node_screen_rect` - map scene node `paths` to window client-area rectangles (`viewport`)
 - `build_nodes_from_spec` - build a whole subtree from a declarative spec with per-node props and children, rolling back on failure
+- `get_scene_snapshot` - read-only tree, verify summary and optional screen positions plus viewport capture of the edited scene in one call
+- `spawn_node_bundle` - create one node with properties, script, groups and signal connections atomically with full rollback
+- `create_path_node` - create a Path2D or Path3D node bound to an in-memory curve resource
+- `advance_path_follow` - move a PathFollow node along its parent curve by a pixel offset
+- `focus_camera_on_node` - point a Camera2D or Camera3D at a target node in one undo step
+- `set_camera_params` - update zoom, clip planes or limits on a scene camera in one undo step
+- `get_camera_view_rect` - describe what a scene camera sees in window client coordinates
 
 ## Scene - scene_tree_tools (8)
 
@@ -463,7 +510,7 @@ All 392 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `add_shaped_text_string` - add a text string to a shaped text object
 - `get_shaped_text_size` - measure a shaped text object's rendered size in pixels
 
-## Theme - theme_tools (8)
+## Theme - theme_tools (10)
 
 - `create_theme_resource` - create an empty .tres theme file on disk
 - `set_theme_color` - set a color item on a saved theme
@@ -473,6 +520,16 @@ All 392 domain tools of the godot-autopilot MCP server, grouped by their 30 sour
 - `get_theme_info` - inspect a saved theme's types and items
 - `apply_theme_to_control` - assign a .tres theme to a Control node in the edited scene
 - `set_control_anchor_preset` - apply one of the 16 Control layout presets
+- `set_control_layout` - set combined Control layout (preset, anchors, offsets, size flags, grow, minimum size) in one undo step
+- `set_theme_item_bundle` - set many colors, constants, font sizes and styleboxes on a saved theme in one save
+
+## TileMap - gridmap_tools (5)
+
+- `create_gridmap` - create a GridMap node in the edited scene with a given cell size
+- `create_meshlibrary_item` - add a meshed item to an in-memory MeshLibrary for GridMap cells
+- `set_gridmap_cell` - set or clear a single GridMap cell by item id
+- `fill_gridmap_box` - fill or clear an axis-aligned GridMap cell box in one call
+- `get_gridmap_used_cells` - list the used cells of a GridMap node
 
 ## TileMap - tilemap_tools (5)
 
