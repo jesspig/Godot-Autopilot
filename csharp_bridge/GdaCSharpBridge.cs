@@ -32,32 +32,32 @@ public partial class GdaCSharpBridge : RefCounted
             _method = method;
         }
 
-        public void F0()
+        public void Forward()
         {
-            Forward(System.Array.Empty<object>());
+            ForwardCore(System.Array.Empty<object>());
         }
 
-        public void F1(object a0)
+        public void Forward<T0>(T0 a0)
         {
-            Forward(new object[] { a0 });
+            ForwardCore(new object[] { a0 });
         }
 
-        public void F2(object a0, object a1)
+        public void Forward<T0, T1>(T0 a0, T1 a1)
         {
-            Forward(new object[] { a0, a1 });
+            ForwardCore(new object[] { a0, a1 });
         }
 
-        public void F3(object a0, object a1, object a2)
+        public void Forward<T0, T1, T2>(T0 a0, T1 a1, T2 a2)
         {
-            Forward(new object[] { a0, a1, a2 });
+            ForwardCore(new object[] { a0, a1, a2 });
         }
 
-        public void F4(object a0, object a1, object a2, object a3)
+        public void Forward<T0, T1, T2, T3>(T0 a0, T1 a1, T2 a2, T3 a3)
         {
-            Forward(new object[] { a0, a1, a2, a3 });
+            ForwardCore(new object[] { a0, a1, a2, a3 });
         }
 
-        private void Forward(object[] eventArgs)
+        private void ForwardCore(object[] eventArgs)
         {
             try
             {
@@ -74,9 +74,9 @@ public partial class GdaCSharpBridge : RefCounted
         }
     }
 
-    public Dictionary ping()
+    public Godot.Collections.Dictionary ping()
     {
-        return new Dictionary
+        return new Godot.Collections.Dictionary
         {
             { "ok", true },
             { "bridge", "csharp" },
@@ -84,7 +84,7 @@ public partial class GdaCSharpBridge : RefCounted
         };
     }
 
-    public Dictionary get_prop(Variant obj, StringName name)
+    public Godot.Collections.Dictionary get_prop(Variant obj, StringName name)
     {
         try
         {
@@ -123,7 +123,7 @@ public partial class GdaCSharpBridge : RefCounted
         }
     }
 
-    public Dictionary set_prop(Variant obj, StringName name, Variant value)
+    public Godot.Collections.Dictionary set_prop(Variant obj, StringName name, Variant value)
     {
         try
         {
@@ -179,7 +179,7 @@ public partial class GdaCSharpBridge : RefCounted
         }
     }
 
-    public Dictionary call_method(Variant obj, StringName method, Array args)
+    public Godot.Collections.Dictionary call_method(Variant obj, StringName method, Godot.Collections.Array args)
     {
         try
         {
@@ -263,7 +263,7 @@ public partial class GdaCSharpBridge : RefCounted
         }
     }
 
-    public Dictionary subscribe(Variant obj, string eventName, Variant target, StringName targetMethod)
+    public Godot.Collections.Dictionary subscribe(Variant obj, string eventName, Variant target, StringName targetMethod)
     {
         try
         {
@@ -285,10 +285,38 @@ public partial class GdaCSharpBridge : RefCounted
             {
                 return Fail("event '" + eventName + "' has " + ps.Length + " parameters; at most 4 are supported");
             }
-            MethodInfo forwarder = typeof(Forwarder).GetMethod("F" + ps.Length, MemberFlags);
+            MethodInfo forwarder = null;
+            MethodInfo[] forwarders = typeof(Forwarder).GetMethods(MemberFlags);
+            for (int i = 0; i < forwarders.Length; i++)
+            {
+                MethodInfo cand = forwarders[i];
+                if (cand.Name != "Forward" || cand.GetParameters().Length != ps.Length)
+                {
+                    continue;
+                }
+                if (ps.Length == 0 && !cand.IsGenericMethodDefinition)
+                {
+                    forwarder = cand;
+                    break;
+                }
+                if (ps.Length > 0 && cand.IsGenericMethodDefinition && cand.GetGenericArguments().Length == ps.Length)
+                {
+                    forwarder = cand;
+                    break;
+                }
+            }
             if (forwarder == null)
             {
                 return Fail("event '" + eventName + "' has " + ps.Length + " parameters; at most 4 are supported");
+            }
+            if (ps.Length > 0)
+            {
+                Type[] typeArgs = new Type[ps.Length];
+                for (int i = 0; i < ps.Length; i++)
+                {
+                    typeArgs[i] = ps[i].ParameterType;
+                }
+                forwarder = forwarder.MakeGenericMethod(typeArgs);
             }
             Forwarder closure = new Forwarder(sink, targetMethod);
             Delegate handler;
@@ -308,7 +336,7 @@ public partial class GdaCSharpBridge : RefCounted
             sub.Event = ev;
             sub.Handler = handler;
             _subscriptions[token] = sub;
-            return new Dictionary
+            return new Godot.Collections.Dictionary
             {
                 { "ok", true },
                 { "token", (long)token }
@@ -320,7 +348,7 @@ public partial class GdaCSharpBridge : RefCounted
         }
     }
 
-    public Dictionary unsubscribe(ulong token)
+    public Godot.Collections.Dictionary unsubscribe(ulong token)
     {
         try
         {
@@ -364,10 +392,10 @@ public partial class GdaCSharpBridge : RefCounted
 
     private static bool HasEngineProperty(GodotObject target, string key)
     {
-        Array props = target.GetPropertyList();
+        Godot.Collections.Array<Godot.Collections.Dictionary> props = target.GetPropertyList();
         for (int i = 0; i < props.Count; i++)
         {
-            Dictionary info = props[i].AsGodotDictionary();
+            Godot.Collections.Dictionary info = props[i];
             Variant raw;
             if (info.TryGetValue("name", out raw) && raw.ToString() == key)
             {
@@ -377,19 +405,19 @@ public partial class GdaCSharpBridge : RefCounted
         return false;
     }
 
-    private static Dictionary Ok()
+    private static Godot.Collections.Dictionary Ok()
     {
-        return new Dictionary { { "ok", true } };
+        return new Godot.Collections.Dictionary { { "ok", true } };
     }
 
-    private static Dictionary OkWithValue(Variant value)
+    private static Godot.Collections.Dictionary OkWithValue(Variant value)
     {
-        return new Dictionary { { "ok", true }, { "value", value } };
+        return new Godot.Collections.Dictionary { { "ok", true }, { "value", value } };
     }
 
-    private static Dictionary Fail(string message)
+    private static Godot.Collections.Dictionary Fail(string message)
     {
-        return new Dictionary { { "ok", false }, { "error", message } };
+        return new Godot.Collections.Dictionary { { "ok", false }, { "error", message } };
     }
 
     private static bool TryConvertArg(Variant v, Type t, out object result)
@@ -510,12 +538,12 @@ public partial class GdaCSharpBridge : RefCounted
             }
             return false;
         }
-        if (t == typeof(Array) && v.VariantType == Variant.Type.Array)
+        if (t == typeof(Godot.Collections.Array) && v.VariantType == Variant.Type.Array)
         {
             result = v.AsGodotArray();
             return true;
         }
-        if (t == typeof(Dictionary) && v.VariantType == Variant.Type.Dictionary)
+        if (t == typeof(Godot.Collections.Dictionary) && v.VariantType == Variant.Type.Dictionary)
         {
             result = v.AsGodotDictionary();
             return true;
@@ -665,7 +693,7 @@ public partial class GdaCSharpBridge : RefCounted
         {
             return ToVariant(raw);
         }
-        if (raw is GodotObject || raw is Array || raw is Dictionary)
+        if (raw is GodotObject || raw is Godot.Collections.Array || raw is Godot.Collections.Dictionary)
         {
             return ToVariant(raw);
         }
@@ -690,13 +718,13 @@ public partial class GdaCSharpBridge : RefCounted
         {
             return (GodotObject)raw;
         }
-        if (raw is Array)
+        if (raw is Godot.Collections.Array)
         {
-            return (Array)raw;
+            return (Godot.Collections.Array)raw;
         }
-        if (raw is Dictionary)
+        if (raw is Godot.Collections.Dictionary)
         {
-            return (Dictionary)raw;
+            return (Godot.Collections.Dictionary)raw;
         }
         if (raw is string)
         {
@@ -798,52 +826,52 @@ public partial class GdaCSharpBridge : RefCounted
         {
             return (Color)raw;
         }
-        if (raw is PackedByteArray)
+        if (raw is byte[])
         {
-            return (PackedByteArray)raw;
+            return (byte[])raw;
         }
-        if (raw is PackedInt32Array)
+        if (raw is int[])
         {
-            return (PackedInt32Array)raw;
+            return (int[])raw;
         }
-        if (raw is PackedInt64Array)
+        if (raw is long[])
         {
-            return (PackedInt64Array)raw;
+            return (long[])raw;
         }
-        if (raw is PackedFloat32Array)
+        if (raw is float[])
         {
-            return (PackedFloat32Array)raw;
+            return (float[])raw;
         }
-        if (raw is PackedFloat64Array)
+        if (raw is double[])
         {
-            return (PackedFloat64Array)raw;
+            return (double[])raw;
         }
-        if (raw is PackedStringArray)
+        if (raw is string[])
         {
-            return (PackedStringArray)raw;
+            return (string[])raw;
         }
-        if (raw is PackedVector2Array)
+        if (raw is Vector2[])
         {
-            return (PackedVector2Array)raw;
+            return (Vector2[])raw;
         }
-        if (raw is PackedVector3Array)
+        if (raw is Vector3[])
         {
-            return (PackedVector3Array)raw;
+            return (Vector3[])raw;
         }
-        if (raw is PackedColorArray)
+        if (raw is Color[])
         {
-            return (PackedColorArray)raw;
+            return (Color[])raw;
         }
-        if (raw is PackedVector4Array)
+        if (raw is Vector4[])
         {
-            return (PackedVector4Array)raw;
+            return (Vector4[])raw;
         }
         return raw.ToString();
     }
 
-    private static Dictionary StructDict(object raw, Type t, int depth)
+    private static Godot.Collections.Dictionary StructDict(object raw, Type t, int depth)
     {
-        Dictionary fields = new Dictionary();
+        Godot.Collections.Dictionary fields = new Godot.Collections.Dictionary();
         FieldInfo[] fis = t.GetFields(BindingFlags.Public | BindingFlags.Instance);
         for (int i = 0; i < fis.Length; i++)
         {
@@ -876,7 +904,7 @@ public partial class GdaCSharpBridge : RefCounted
             }
             fields[pis[i].Name] = WrapResult(val, depth + 1);
         }
-        return new Dictionary
+        return new Godot.Collections.Dictionary
         {
             { "__csharp_struct", true },
             { "type", t.FullName },
@@ -884,9 +912,9 @@ public partial class GdaCSharpBridge : RefCounted
         };
     }
 
-    private static Dictionary Truncated(Type t)
+    private static Godot.Collections.Dictionary Truncated(Type t)
     {
-        return new Dictionary
+        return new Godot.Collections.Dictionary
         {
             { "__truncated", true },
             { "type", t.FullName }
