@@ -14,6 +14,8 @@ mcp::JsonValue handle_set_theme_stylebox_flat(const mcp::JsonValue &args);
 mcp::JsonValue handle_get_theme_info(const mcp::JsonValue &args);
 mcp::JsonValue handle_apply_theme_to_control(const mcp::JsonValue &args);
 mcp::JsonValue handle_set_control_anchor_preset(const mcp::JsonValue &args);
+mcp::JsonValue handle_set_control_layout(const mcp::JsonValue &args);
+mcp::JsonValue handle_set_theme_item_bundle(const mcp::JsonValue &args);
 
 } // namespace theme_ops
 } // namespace godot_autopilot

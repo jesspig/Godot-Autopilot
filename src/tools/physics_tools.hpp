@@ -293,11 +293,36 @@ const std::vector<ParamSpec> kGetDebugObjectInfoParams = {
     {"object_id", "integer", "Object instance ID (ObjectID) to resolve, as returned by scene or physics tools; looked up in ObjectDB. Returns class, name, node_path (Node) or resource_path (Resource)", true},
 };
 
+const std::vector<ParamSpec> kSetPhysicsBodyBundleParams = {
+    {"dimension", "string", "Required. Physics dimension: '2d' uses PhysicsServer2D, '3d' uses PhysicsServer3D; the shape type and the node_path node type must belong to it", true},
+    {"body_type", "string", "Required. Body mode name: 'static', 'kinematic', 'rigid' or 'rigid_linear'; overridden by numeric 'mode' when both are given", true},
+    {"shape", "object", "Required. Shape description with 'type' plus dimensions: 2D 'circle' {radius}, 'rectangle' {size {x, y} full extents}, 'capsule' {radius, height}; 3D 'sphere' {radius}, 'box' {size {x, y, z} full extents}, 'capsule' {radius, height}", true},
+    {"body_rid", "integer", "Optional. Existing body handle to reuse instead of creating one; mutually exclusive with 'node_path'", false},
+    {"node_path", "string", "Optional. Scene path of a CollisionObject2D (dimension '2d') or CollisionObject3D (dimension '3d') whose server body is configured; mutually exclusive with 'body_rid'", false},
+    {"layer", "integer", "Optional. Collision layer bitfield applied via body_set_collision_layer", false},
+    {"mask", "integer", "Optional. Collision mask bitfield applied via body_set_collision_mask", false},
+    {"mass", "number", "Optional. Body mass applied via body_set_param; must be positive", false},
+    {"friction", "number", "Optional. Body friction applied via body_set_param; must be >= 0", false},
+    {"bounce", "number", "Optional. Body bounce applied via body_set_param; must be >= 0", false},
+    {"mode", "number", "Optional. Numeric BodyMode 0=static, 1=kinematic, 2=rigid, 3=rigid_linear; overrides 'body_type' when given", false},
+};
+
+const std::vector<ParamSpec> kCreateCollisionShapeParams = {
+    {"dim", "string", "Required. Physics dimension: '2d' creates a Shape2D resource for CollisionShape2D, '3d' creates a Shape3D resource for CollisionShape3D; the shape type must belong to it", true},
+    {"shape", "string", "Required. Shape type name: 2D 'circle', 'rectangle' or 'capsule'; 3D 'sphere', 'box' or 'capsule'; must belong to dim", true},
+    {"params", "object", "Required. Shape dimensions object: circle/sphere {radius}, rectangle {size {x, y} full extents}, box {size {x, y, z} full extents}, capsule {radius, height}; every number must be > 0. RectangleShape2D and BoxShape3D sizes are full extents and need no halving, unlike PhysicsServer2D rectangle shapes which take half extents", true},
+};
+
+const std::vector<ParamSpec> kAssignCollisionShapeParams = {
+    {"node_path", "string", "Required. Scene path of a CollisionShape2D or CollisionShape3D node in the edited scene; other node types fail with the actual class", true},
+    {"shape_ref", "object", "Required. Shape resource reference: an object_id integer from create_collision_shape, a res:// or memory:// string, or {\"path\": \"res://...\"} / {\"resource\": \"memory://...\"} / {\"object_id\": ...} / {\"object_id_str\": ...} / {\"name\": ...}; memory:// resources are rejected, save them first with save_resource and pass the res:// path. Must be a Shape2D for CollisionShape2D and a Shape3D for CollisionShape3D, otherwise the actual class is reported", true},
+};
+
 } // namespace
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(48);
+  v.reserve(51);
   v.push_back(make_spec_tool(ToolSpec{
       "get_physics_2d_space_direct_state",
       "Get the direct state of a 2D physics space, the gateway for physics intersection queries. Pass the space RID and use this before the intersect_physics_2d_* tools to confirm the space is active and attached to a scene. Returns the space RID, a valid flag and the available queries (intersect_ray, intersect_point, intersect_shape, cast_motion, collide_shape, get_rest_info). Fails when the space is inactive or not in a scene",
@@ -538,6 +563,21 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       "Resolve an object instance ID (ObjectID) to its class and identity. Use it with object IDs obtained from scene or physics tools to identify what an object is. Returns result 'ok', class (Godot class name), name and node_path (for Nodes), plus resource_path (for Resources); errors out if the ID is stale or invalid.",
       "Debug", {"utility", "debug", "physics"}, SideEffect::None, tool_flags::kNone,
       kGetDebugObjectInfoParams, physics_ops::handle_resolve_object}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "set_physics_body_bundle",
+      "Create a physics body together with its collision shape and parameters in one call: creates (or reuses) the body, creates the shape, attaches it with body_add_shape and applies mode, layer, mask, mass, friction and bounce. Required 'dimension' is '2d' (PhysicsServer2D) or '3d' (PhysicsServer3D); required 'body_type' is 'static', 'kinematic', 'rigid' or 'rigid_linear' (optional numeric 'mode' 0-3 overrides it). Required 'shape' carries 'type' plus dimensions: 2D 'circle' with radius, 'rectangle' with full-extent size {x, y}, 'capsule' with radius and height; 3D 'sphere' with radius, 'box' with full-extent size {x, y, z}, 'capsule' with radius and height; the type must belong to the requested dimension. Omit both 'body_rid' and 'node_path' to create a new server body, pass 'body_rid' to reuse an existing body handle, or pass 'node_path' to configure the server body of a CollisionObject2D (2d) or CollisionObject3D (3d) in the edited scene; 'body_rid' and 'node_path' are mutually exclusive. The returned body_rid and shape_rid are physics-server handles: a shape RID cannot be assigned directly to CollisionShape2D.shape or CollisionShape3D.shape, which expect Shape2D/Shape3D resources, so bridge through save_resource plus set_property instead, and use the RIDs with the intersect_physics_* and set_physics_* server tools. Returns 'body_rid', 'shape_rid' and 'params_applied'.",
+      "Physics", {"physics", "body", "bundle"}, SideEffect::None, tool_flags::kMutating | tool_flags::kSceneTarget,
+      kSetPhysicsBodyBundleParams, physics_ops::handle_body_bundle}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "create_collision_shape",
+      "Create a Shape2D or Shape3D resource in memory for a CollisionShape node. Required 'dim' is '2d' (Shape2D for CollisionShape2D) or '3d' (Shape3D for CollisionShape3D); required 'shape' is the type name: 2D 'circle', 'rectangle' or 'capsule', 3D 'sphere', 'box' or 'capsule', and must belong to dim. Required 'params' carries the dimensions: circle/sphere {radius}, rectangle {size {x, y} full extents}, box {size {x, y, z} full extents}, capsule {radius, height}, every number > 0. RectangleShape2D and BoxShape3D sizes are full extents and need no halving, unlike PhysicsServer2D rectangle shapes which take half extents; capsule radius/height map directly to CapsuleShape2D/CapsuleShape3D properties, unlike the server Array/Dictionary shape_set_data forms. The resource is pathless and registered for lookup via the returned object_id, so it can be passed to assign_collision_shape; memory:// resources from create_resource cannot be assigned to nodes. Returns class, object_id, object_id_str, path, dim and shape.",
+      "Physics", {"physics", "shape", "create"}, SideEffect::None, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
+      kCreateCollisionShapeParams, physics_ops::handle_collision_shape_create}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "assign_collision_shape",
+      "Assign a Shape resource to a CollisionShape node in the edited scene. Required 'node_path' is a CollisionShape2D or CollisionShape3D node; other node types fail with the actual class. Required 'shape_ref' is the shape to assign: an object_id integer from create_collision_shape, a res:// or memory:// string, or {\"path\": \"res://...\"} / {\"resource\": \"memory://...\"} / {\"object_id\": ...} / {\"object_id_str\": ...} / {\"name\": ...}. Memory:// resources are rejected because they are not persistent: save them first with save_resource to a res:// path and pass that path instead. The resource must match the node dimension: Shape2D for CollisionShape2D and Shape3D for CollisionShape3D, otherwise the actual class is reported. Only the in-memory scene changes, call save_editor_scene afterwards to persist. Returns ok with assigned, node_path, shape_class, object_id and undo info.",
+      "Physics", {"physics", "shape", "assign"}, SideEffect::None, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
+      kAssignCollisionShapeParams, physics_ops::handle_collision_shape_assign}));
   return v;
 }
 

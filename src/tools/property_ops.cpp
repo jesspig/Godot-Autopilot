@@ -8,21 +8,30 @@
 #include "util/type_hint.hpp"
 #include "util/variant_json.hpp"
 #include <algorithm>
+#include <godot_cpp/classes/canvas_item.hpp>
 #include <godot_cpp/classes/class_db_singleton.hpp>
+#include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/editor_undo_redo_manager.hpp>
 #include <godot_cpp/classes/global_constants.hpp>
 #include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/classes/node2d.hpp>
+#include <godot_cpp/classes/node3d.hpp>
 #include <godot_cpp/classes/object.hpp>
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/core/error_macros.hpp>
 #include <godot_cpp/variant/array.hpp>
+#include <godot_cpp/variant/basis.hpp>
 #include <godot_cpp/variant/callable.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
+#include <godot_cpp/variant/transform2d.hpp>
+#include <godot_cpp/variant/transform3d.hpp>
 #include <godot_cpp/variant/variant.hpp>
+#include <godot_cpp/variant/vector2.hpp>
+#include <godot_cpp/variant/vector3.hpp>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -1984,6 +1993,787 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
   }
   scene_dirty_tracker::mark_scene_modified();
   return r;
+}
+
+mcp::JsonValue handle_set_batch(const mcp::JsonValue &args) {
+  auto *it_path = args.Find("path");
+  auto *it_batch = args.Find("properties");
+  auto *it_atomic = args.Find("atomic");
+  if (!it_path || !it_path->IsString()) {
+    return util::error_json("missing required parameter: path");
+  }
+  if (args.IsObject()) {
+    for (const auto &entry : args.GetObject()) {
+      if (entry.first != "path" && entry.first != "properties" &&
+          entry.first != "atomic") {
+        return util::error_json("unknown parameter for set_properties_batch: " +
+                                entry.first);
+      }
+    }
+  }
+  if (!it_batch) {
+    return util::error_json("missing required parameter: properties");
+  }
+  if (!it_batch->IsObject() || it_batch->GetObject().empty()) {
+    return util::error_json(
+        "properties must be a non-empty object mapping property names to values");
+  }
+  if (it_batch->GetObject().size() > static_cast<size_t>(kPropertyBatchMax)) {
+    return util::error_json("properties exceeds maximum of " +
+                            std::to_string(kPropertyBatchMax) +
+                            " entries — split into smaller batches");
+  }
+  bool atomic = true;
+  if (it_atomic) {
+    if (!it_atomic->IsBool()) {
+      return util::error_json("atomic must be a boolean");
+    }
+    atomic = it_atomic->GetBool();
+  }
+  std::string path_str = it_path->GetString();
+  std::string hint;
+  godot::Node *node =
+      util::resolve_scene_node(path_str, find_edited_scene_root(), &hint);
+  if (!node) {
+    std::string err = "node not found: " + path_str + " — " + hint;
+    const std::string memory_prefix = "memory://";
+    if (path_str.compare(0, memory_prefix.size(), memory_prefix) == 0) {
+      err += " memory:// is a resource namespace, not a node path; to reference a memory resource pass it as the value (e.g. {\"resource\": \"memory://name\"}) or create the resource inline with code_execute";
+    }
+    return util::error_json(err);
+  }
+  for (const auto &entry : it_batch->GetObject()) {
+    if (entry.first.empty()) {
+      return util::error_json(
+          "properties must contain non-empty property name strings");
+    }
+  }
+  struct BatchWork {
+    std::string name;
+    mcp::JsonValue value;
+  };
+  std::vector<BatchWork> work;
+  work.reserve(it_batch->GetObject().size() * 2);
+  for (const auto &entry : it_batch->GetObject()) {
+    DottedTarget probe = resolve_dotted_target(node, entry.first, path_str);
+    if (probe.ok) {
+      BatchWork item;
+      item.name = entry.first;
+      item.value = entry.second;
+      work.push_back(item);
+      continue;
+    }
+    bool maybe_family = entry.first.find('.') == std::string::npos &&
+                        entry.second.IsObject() &&
+                        !entry.second.GetObject().empty();
+    std::vector<std::string> family;
+    if (maybe_family) {
+      family = find_property_family(node, entry.first);
+    }
+    if (!maybe_family || family.empty()) {
+      return probe.error;
+    }
+    std::vector<std::string> available;
+    for (const std::string &full_name : family) {
+      available.push_back(full_name.substr(entry.first.size() + 1));
+    }
+    std::string bad_item;
+    for (const auto &sub : entry.second.GetObject()) {
+      std::string full = entry.first + "/" + sub.first;
+      godot::Dictionary info = find_property_info(node, full);
+      if (info.is_empty()) {
+        bad_item = sub.first;
+        break;
+      }
+    }
+    if (!bad_item.empty()) {
+      std::string available_list;
+      for (size_t i = 0; i < available.size(); i++) {
+        if (i > 0) {
+          available_list += ", ";
+        }
+        available_list += "'" + available[i] + "'";
+      }
+      return util::error_detail(
+          "property '" + entry.first + "' on " +
+              describe_property_owner(node, path_str) +
+              " is a property family and must be expanded per item; item '" +
+              bad_item + "' is not a valid family item",
+          path_str, "an object mapping family item names to values",
+          "available items: " + available_list + "; pass the exact names " +
+              "(e.g. '" + entry.first + "/" + available[0] +
+              "') or an object with these suffixes");
+    }
+    for (const auto &sub : entry.second.GetObject()) {
+      std::string full = entry.first + "/" + sub.first;
+      BatchWork item;
+      item.name = full;
+      item.value = sub.second;
+      work.push_back(item);
+    }
+  }
+  if (work.empty()) {
+    return util::error_json(
+        "properties must be a non-empty object mapping property names to values");
+  }
+  if (work.size() > static_cast<size_t>(kPropertyBatchMax)) {
+    return util::error_json(
+        "properties exceeds maximum of " + std::to_string(kPropertyBatchMax) +
+        " entries after expansion — split into smaller batches");
+  }
+  std::vector<std::string> object_names;
+  for (const auto &item : work) {
+    if (batch_property_is_object_typed(node, item.name, item.value)) {
+      object_names.push_back(item.name);
+    }
+  }
+  struct BatchApplied {
+    std::string name;
+    godot::Object *owner = nullptr;
+    godot::StringName leaf;
+    godot::Variant old_value;
+    godot::Variant new_value;
+  };
+  std::vector<BatchApplied> applied;
+  applied.reserve(work.size());
+  std::vector<mcp::JsonValue> warnings;
+  std::vector<mcp::JsonValue> inlines;
+  mcp::JsonValue converted(mcp::JsonValue::object_tag);
+  size_t converted_count = 0;
+  mcp::JsonValue failed(mcp::JsonValue::array_tag);
+  std::vector<std::string> failed_names;
+  auto error_text_of = [](const mcp::JsonValue &err) -> std::string {
+    const mcp::JsonValue *msg = err.Find("error");
+    if (msg && msg->IsString()) {
+      return msg->GetString();
+    }
+    return err.Dump();
+  };
+  for (int pass = 0; pass < 2; pass++) {
+    for (const auto &item : work) {
+      const std::string &prop_str = item.name;
+      const mcp::JsonValue &raw_value = item.value;
+      bool is_object = std::find(object_names.begin(), object_names.end(),
+                                 prop_str) != object_names.end();
+      if (is_object != (pass == 0)) {
+        continue;
+      }
+      bool seen = false;
+      for (const BatchApplied &done : applied) {
+        if (done.name == prop_str) {
+          seen = true;
+          break;
+        }
+      }
+      if (seen) {
+        continue;
+      }
+      for (const std::string &fname : failed_names) {
+        if (fname == prop_str) {
+          seen = true;
+          break;
+        }
+      }
+      if (seen) {
+        continue;
+      }
+      DottedTarget target = resolve_dotted_target(node, prop_str, path_str);
+      if (!target.ok) {
+        std::string sub_msg = error_text_of(target.error);
+        if (atomic) {
+          for (auto rit = applied.rbegin(); rit != applied.rend(); ++rit) {
+            rit->owner->set(rit->leaf, rit->old_value);
+          }
+          mcp::JsonValue rolled(mcp::JsonValue::array_tag);
+          for (const BatchApplied &done : applied) {
+            rolled.PushBack(mcp::JsonValue(done.name));
+          }
+          mcp::JsonValue one_failed(mcp::JsonValue::array_tag);
+          mcp::JsonValue fitem(mcp::JsonValue::object_tag);
+          fitem["property"] = mcp::JsonValue(prop_str);
+          fitem["error"] = mcp::JsonValue(sub_msg);
+          one_failed.PushBack(std::move(fitem));
+          mcp::JsonValue e(mcp::JsonValue::object_tag);
+          e["error"] = mcp::JsonValue("failed to apply property '" + prop_str +
+                                      "' on " + path_str + ": " + sub_msg +
+                                      " (atomic rollback: " +
+                                      std::to_string(applied.size()) +
+                                      " reverted)");
+          e["failed_property"] = mcp::JsonValue(prop_str);
+          e["failed"] = std::move(one_failed);
+          mcp::JsonValue empty_applied(mcp::JsonValue::array_tag);
+          e["applied_properties"] = std::move(empty_applied);
+          e["rolled_back"] = std::move(rolled);
+          return e;
+        }
+        mcp::JsonValue fitem(mcp::JsonValue::object_tag);
+        fitem["property"] = mcp::JsonValue(prop_str);
+        fitem["error"] = mcp::JsonValue(sub_msg);
+        failed.PushBack(std::move(fitem));
+        failed_names.push_back(prop_str);
+        continue;
+      }
+      godot::Object *target_owner = target.owner;
+      std::string leaf_name = target.leaf;
+      godot::Dictionary dict = target.info;
+      std::string type_hint = util::infer_type_hint(dict, std::string());
+      godot::StringName prop_name(leaf_name.c_str());
+      std::string value_node_path;
+      godot::Variant value;
+      bool converted_node_path = false;
+      bool value_ready = false;
+      bool item_failed = false;
+      std::string item_error;
+      SpriteFramesAnimationsConversion sprite_conversion =
+          convert_spriteframes_animations(target_owner, leaf_name, prop_str,
+                                          path_str, raw_value);
+      if (sprite_conversion.has_error) {
+        item_failed = true;
+        item_error = error_text_of(sprite_conversion.error);
+      } else if (sprite_conversion.handled) {
+        value = sprite_conversion.value;
+        value_ready = true;
+      }
+      ArrayValueConversion array_conversion;
+      DictionaryValueConversion dictionary_conversion;
+      if (!item_failed && !value_ready) {
+        array_conversion =
+            convert_array_value(dict, prop_str, path_str, raw_value);
+        if (array_conversion.has_error) {
+          item_failed = true;
+          item_error = error_text_of(array_conversion.error);
+        } else if (array_conversion.handled) {
+          value = array_conversion.value;
+          value_ready = true;
+        }
+      }
+      if (!item_failed && !value_ready) {
+        dictionary_conversion =
+            convert_dictionary_value(dict, prop_str, path_str, raw_value);
+        if (dictionary_conversion.has_error) {
+          item_failed = true;
+          item_error = error_text_of(dictionary_conversion.error);
+        } else if (dictionary_conversion.handled) {
+          value = dictionary_conversion.value;
+          value_ready = true;
+        }
+      }
+      if (!item_failed && !value_ready) {
+        NodePathValueConversion node_path_conversion =
+            convert_node_path_value(dict, prop_str, path_str, raw_value);
+        if (node_path_conversion.has_error) {
+          item_failed = true;
+          item_error = error_text_of(node_path_conversion.error);
+        } else if (node_path_conversion.converted) {
+          value = node_path_conversion.value;
+          converted_node_path = true;
+          value_node_path = node_path_conversion.node_path;
+          value_ready = true;
+        }
+      }
+      bool resource_attached = false;
+      bool inline_attached = false;
+      std::string inline_type;
+      if (!item_failed && !value_ready) {
+        std::string resource_error;
+        if (resource_ops::try_resolve_resource_value(raw_value, value,
+                                                     resource_error)) {
+          if (!resource_error.empty()) {
+            item_failed = true;
+            item_error = resource_error;
+          } else {
+            resource_attached = true;
+          }
+        } else {
+          InlineResourceBuild inline_build = build_inline_resource_value(
+              dict, raw_value, prop_str, path_str, 1);
+          if (inline_build.has_error) {
+            item_failed = true;
+            item_error = error_text_of(inline_build.error);
+          } else if (inline_build.active) {
+            value = inline_build.value;
+            inline_attached = true;
+            inline_type = inline_build.type;
+          } else {
+            value = VariantJson::deserialize_strict(raw_value, type_hint);
+          }
+        }
+      }
+      if (!item_failed && resource_attached) {
+        mcp::JsonValue blocked_error;
+        if (memory_resource_assignment_blocked(value, prop_str, path_str,
+                                               blocked_error)) {
+          item_failed = true;
+          item_error = error_text_of(blocked_error);
+        }
+      }
+      godot::Variant old_val;
+      godot::Variant new_val;
+      std::string readback_warning;
+      if (!item_failed) {
+        old_val = target_owner->get(prop_name);
+        target_owner->set(prop_name, value);
+        new_val = target_owner->get(prop_name);
+        std::string readback_detail;
+        bool type_sensitive = is_type_sensitive_property(dict);
+        util::ReadbackStatus readback = util::check_readback(
+            value, old_val, new_val, readback_detail, type_sensitive);
+        if (readback == util::ReadbackStatus::REJECTED) {
+          target_owner->set(prop_name, old_val);
+          item_failed = true;
+          item_error = "value not applied: '" + prop_str + "' on " + path_str +
+                       " — property rejected the assigned value (type mismatch "
+                       "or read-only); old value restored";
+        } else if (readback == util::ReadbackStatus::CONVERTED) {
+          readback_warning = "set applied; " + readback_detail;
+        }
+      }
+      if (item_failed) {
+        if (atomic) {
+          for (auto rit = applied.rbegin(); rit != applied.rend(); ++rit) {
+            rit->owner->set(rit->leaf, rit->old_value);
+          }
+          mcp::JsonValue rolled(mcp::JsonValue::array_tag);
+          for (const BatchApplied &done : applied) {
+            rolled.PushBack(mcp::JsonValue(done.name));
+          }
+          mcp::JsonValue one_failed(mcp::JsonValue::array_tag);
+          mcp::JsonValue fitem(mcp::JsonValue::object_tag);
+          fitem["property"] = mcp::JsonValue(prop_str);
+          fitem["error"] = mcp::JsonValue(item_error);
+          one_failed.PushBack(std::move(fitem));
+          mcp::JsonValue e(mcp::JsonValue::object_tag);
+          e["error"] = mcp::JsonValue("failed to apply property '" + prop_str +
+                                      "' on " + path_str + ": " + item_error +
+                                      " (atomic rollback: " +
+                                      std::to_string(applied.size()) +
+                                      " reverted)");
+          e["failed_property"] = mcp::JsonValue(prop_str);
+          e["failed"] = std::move(one_failed);
+          mcp::JsonValue empty_applied(mcp::JsonValue::array_tag);
+          e["applied_properties"] = std::move(empty_applied);
+          e["rolled_back"] = std::move(rolled);
+          return e;
+        }
+        mcp::JsonValue fitem(mcp::JsonValue::object_tag);
+        fitem["property"] = mcp::JsonValue(prop_str);
+        fitem["error"] = mcp::JsonValue(item_error);
+        failed.PushBack(std::move(fitem));
+        failed_names.push_back(prop_str);
+        continue;
+      }
+      BatchApplied rec;
+      rec.name = prop_str;
+      rec.owner = target_owner;
+      rec.leaf = prop_name;
+      rec.old_value = old_val;
+      rec.new_value = new_val;
+      applied.push_back(rec);
+      if (!readback_warning.empty()) {
+        mcp::JsonValue w(mcp::JsonValue::object_tag);
+        w["path"] = mcp::JsonValue(path_str);
+        w["property"] = mcp::JsonValue(prop_str);
+        w["warning"] = mcp::JsonValue(readback_warning);
+        warnings.push_back(std::move(w));
+      }
+      if (inline_attached) {
+        mcp::JsonValue inline_entry(mcp::JsonValue::object_tag);
+        inline_entry["property"] = mcp::JsonValue(prop_str);
+        inline_entry["type"] = mcp::JsonValue(inline_type);
+        inlines.push_back(std::move(inline_entry));
+      }
+      if (converted_node_path) {
+        converted[prop_str] = mcp::JsonValue(value_node_path);
+        converted_count++;
+      }
+    }
+  }
+  if (applied.empty()) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    if (failed.Size() > 0) {
+      const mcp::JsonValue &first = failed.GetArray()[0];
+      const mcp::JsonValue *emsg = first.Find("error");
+      const mcp::JsonValue *pmsg = first.Find("property");
+      std::string pname;
+      std::string fmsg;
+      if (pmsg && pmsg->IsString()) {
+        pname = pmsg->GetString();
+      }
+      if (emsg && emsg->IsString()) {
+        fmsg = emsg->GetString();
+      } else {
+        fmsg = first.Dump();
+      }
+      e["error"] = mcp::JsonValue("failed to apply properties on " + path_str +
+                                  ": " + fmsg);
+      if (!pname.empty()) {
+        e["failed_property"] = mcp::JsonValue(pname);
+      }
+      mcp::JsonValue failed_copy = failed;
+      e["failed"] = std::move(failed_copy);
+    } else {
+      e["error"] = mcp::JsonValue("failed to apply properties on " + path_str +
+                                  ": no properties applied");
+      e["failed"] = std::move(failed);
+    }
+    mcp::JsonValue empty_applied(mcp::JsonValue::array_tag);
+    e["applied_properties"] = std::move(empty_applied);
+    return e;
+  }
+  bool has_object_value = false;
+  for (const BatchApplied &done : applied) {
+    if (done.old_value.get_type() == godot::Variant::OBJECT ||
+        done.new_value.get_type() == godot::Variant::OBJECT) {
+      has_object_value = true;
+      break;
+    }
+  }
+  bool undoable = false;
+  std::string undo_skip_reason;
+  std::string undo_action = "Set Properties (" +
+                            std::to_string(applied.size()) + ") on " + path_str;
+  if (has_object_value) {
+    undo_skip_reason = "object-typed value: the editor undo stack cannot "
+                       "restore object references reliably";
+  } else {
+    auto *editor = godot::EditorInterface::get_singleton();
+    auto *undo_redo = editor ? editor->get_editor_undo_redo() : nullptr;
+    if (!undo_redo) {
+      undo_skip_reason = "EditorUndoRedoManager not available";
+    } else {
+      undo_redo->create_action(godot::String(undo_action.c_str()));
+      for (const BatchApplied &done : applied) {
+        undo_redo->add_do_property(done.owner, done.leaf, done.new_value);
+        undo_redo->add_undo_property(done.owner, done.leaf, done.old_value);
+      }
+      undo_redo->commit_action(false);
+      undoable = true;
+    }
+  }
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["result"] = mcp::JsonValue("ok");
+  r["atomic"] = mcp::JsonValue(atomic);
+  mcp::JsonValue ap(mcp::JsonValue::array_tag);
+  for (const BatchApplied &done : applied) {
+    ap.PushBack(mcp::JsonValue(done.name));
+  }
+  r["applied_properties"] = std::move(ap);
+  r["failed"] = std::move(failed);
+  if (!warnings.empty()) {
+    mcp::JsonValue warr(mcp::JsonValue::array_tag);
+    for (auto &w : warnings) {
+      warr.PushBack(std::move(w));
+    }
+    r["property_warnings"] = std::move(warr);
+  }
+  if (!inlines.empty()) {
+    mcp::JsonValue iarr(mcp::JsonValue::array_tag);
+    for (auto &item : inlines) {
+      iarr.PushBack(std::move(item));
+    }
+    r["inline_resources"] = std::move(iarr);
+  }
+  if (converted_count > 0) {
+    r["converted_node_paths"] = std::move(converted);
+  }
+  mcp::JsonValue undo_entries(mcp::JsonValue::array_tag);
+  for (const BatchApplied &done : applied) {
+    mcp::JsonValue u(mcp::JsonValue::object_tag);
+    u["path"] = mcp::JsonValue(path_str);
+    u["property"] = mcp::JsonValue(done.name);
+    u["old_value"] = VariantJson::serialize(done.old_value);
+    undo_entries.PushBack(std::move(u));
+  }
+  r["undo"] = std::move(undo_entries);
+  r["undo_action"] = mcp::JsonValue(undo_action);
+  r["undoable"] = mcp::JsonValue(undoable);
+  if (!undoable) {
+    r["undo_skip_reason"] = mcp::JsonValue(undo_skip_reason);
+  }
+  util::add_scene_info_fields(r, util::edited_scene_info());
+  scene_dirty_tracker::mark_scene_modified();
+  return r;
+}
+
+mcp::JsonValue handle_set_transform(const mcp::JsonValue &args) {
+  auto *it_path = args.Find("path");
+  auto *it_space = args.Find("space");
+  auto *it_position = args.Find("position");
+  auto *it_rotation = args.Find("rotation");
+  auto *it_scale = args.Find("scale");
+  if (!it_path || !it_path->IsString()) {
+    return util::error_json("missing required parameter: path");
+  }
+  if (args.IsObject()) {
+    for (const auto &entry : args.GetObject()) {
+      if (entry.first != "path" && entry.first != "space" &&
+          entry.first != "position" && entry.first != "rotation" &&
+          entry.first != "scale") {
+        return util::error_json("unknown parameter for set_node_transform: " +
+                                entry.first);
+      }
+    }
+  }
+  std::string space = "local";
+  if (it_space) {
+    if (!it_space->IsString() || (it_space->GetString() != "local" &&
+                                  it_space->GetString() != "global")) {
+      return util::error_json("space must be \"local\" or \"global\"");
+    }
+    space = it_space->GetString();
+  }
+  bool has_pos = it_position != nullptr;
+  bool has_rot = it_rotation != nullptr;
+  bool has_scale = it_scale != nullptr;
+  if (!has_pos && !has_rot && !has_scale) {
+    return util::error_json("set_node_transform requires at least one of: "
+                            "position, rotation, scale");
+  }
+  std::string path_str = it_path->GetString();
+  std::string hint;
+  godot::Node *node =
+      util::resolve_scene_node(path_str, find_edited_scene_root(), &hint);
+  if (!node) {
+    std::string err = "node not found: " + path_str + " — " + hint;
+    const std::string memory_prefix = "memory://";
+    if (path_str.compare(0, memory_prefix.size(), memory_prefix) == 0) {
+      err += " memory:// is a resource namespace, not a node path; to reference a memory resource pass it as the value (e.g. {\"resource\": \"memory://name\"}) or create the resource inline with code_execute";
+    }
+    return util::error_json(err);
+  }
+  godot::Node3D *node_3d = godot::Object::cast_to<godot::Node3D>(node);
+  godot::CanvasItem *item = godot::Object::cast_to<godot::CanvasItem>(node);
+  bool is_3d = node_3d != nullptr;
+  if (!is_3d && item == nullptr) {
+    return util::error_detail(
+        "node " + path_str + " of type " + util::to_std(node->get_class()) +
+            " has no 2D/3D transform",
+        path_str, "a Node2D, Control or Node3D inside the edited scene",
+        "use property_get_list to see available properties, or property_set "
+        "for other properties");
+  }
+  auto num_value = [](const mcp::JsonValue *v) -> double {
+    return v->IsDouble() ? v->GetDouble() : static_cast<double>(v->GetInt());
+  };
+  auto parse_vector = [&](const mcp::JsonValue *raw, const char *field,
+                          bool need_z,
+                          std::vector<double> &out) -> mcp::JsonValue {
+    mcp::JsonValue ok;
+    std::string want =
+        need_z ? "{\"x\": number, \"y\": number, \"z\": number}"
+               : "{\"x\": number, \"y\": number}";
+    if (!raw->IsObject()) {
+      return util::error_detail(std::string("invalid '") + field +
+                                    "': expected an object, e.g. " + want,
+                                path_str, want,
+                                std::string("pass an object with numeric "
+                                            "fields, e.g. ") +
+                                    want);
+    }
+    for (const auto &entry : raw->GetObject()) {
+      bool known = entry.first == "x" || entry.first == "y" ||
+                   (need_z && entry.first == "z");
+      if (!known) {
+        return util::error_detail(std::string("unknown field '") +
+                                      entry.first + "' in '" + field +
+                                      "': expected " + want,
+                                  path_str, want,
+                                  "remove the unknown field and retry");
+      }
+    }
+    const char *axes[3] = {"x", "y", "z"};
+    size_t count = need_z ? 3 : 2;
+    for (size_t i = 0; i < count; i++) {
+      const mcp::JsonValue *f = raw->Find(axes[i]);
+      if (!f || !f->IsNumber()) {
+        return util::error_detail(std::string("invalid '") + field + "': '" +
+                                      axes[i] + "' must be a number, e.g. " +
+                                      want,
+                                  path_str, want,
+                                  std::string("pass numeric values, e.g. ") +
+                                      want);
+      }
+      out.push_back(num_value(f));
+    }
+    return ok;
+  };
+  std::vector<double> pos_vals;
+  std::vector<double> scale_vals;
+  std::vector<double> rot_vals;
+  if (has_pos) {
+    mcp::JsonValue err = parse_vector(it_position, "position", is_3d, pos_vals);
+    if (!err.IsNull()) {
+      return err;
+    }
+  }
+  if (has_scale) {
+    mcp::JsonValue err = parse_vector(it_scale, "scale", is_3d, scale_vals);
+    if (!err.IsNull()) {
+      return err;
+    }
+  }
+  if (has_rot) {
+    if (it_rotation->IsNumber()) {
+      if (is_3d) {
+        return util::error_detail(
+            "invalid 'rotation' for Node3D: expected an object of euler "
+            "angles in radians, e.g. {\"x\": 0, \"y\": 1.5707963, \"z\": 0}",
+            path_str, "an object {\"x\": number, \"y\": number, \"z\": number}",
+            "pass euler angles in radians for each axis");
+      }
+      rot_vals.push_back(num_value(it_rotation));
+    } else if (it_rotation->IsObject()) {
+      if (it_rotation->Find("degrees")) {
+        return util::error_detail(
+            "invalid 'rotation': rotation is always radians — convert degrees "
+            "with radians = degrees * 3.1415926535 / 180 (e.g. 90 degrees = "
+            "1.5707963 radians)",
+            path_str,
+            "a radians number or {\"radians\": number} (2D), or euler "
+            "{\"x\", \"y\", \"z\"} in radians (3D)",
+            "convert the value to radians and retry");
+      }
+      if (!is_3d) {
+        const mcp::JsonValue *rad = it_rotation->Find("radians");
+        if (!rad || !rad->IsNumber() || it_rotation->GetObject().size() != 1) {
+          return util::error_detail(
+              "invalid 'rotation': expected a radians number or {\"radians\": "
+              "number}",
+              path_str, "a radians number or {\"radians\": number}",
+              "pass a number in radians, e.g. 1.5707963");
+        }
+        rot_vals.push_back(num_value(rad));
+      } else {
+        mcp::JsonValue err =
+            parse_vector(it_rotation, "rotation", true, rot_vals);
+        if (!err.IsNull()) {
+          return err;
+        }
+      }
+    } else {
+      return util::error_detail(
+          "invalid 'rotation': expected a radians number or an object",
+          path_str,
+          "a radians number, {\"radians\": number} (2D), or euler {\"x\", "
+          "\"y\", \"z\"} in radians (3D)",
+          "pass the rotation in radians and retry");
+    }
+  }
+  auto vec2_json = [](double x, double y) {
+    mcp::JsonValue o(mcp::JsonValue::object_tag);
+    o["x"] = mcp::JsonValue(x);
+    o["y"] = mcp::JsonValue(y);
+    return o;
+  };
+  auto vec3_json = [](double x, double y, double z) {
+    mcp::JsonValue o(mcp::JsonValue::object_tag);
+    o["x"] = mcp::JsonValue(x);
+    o["y"] = mcp::JsonValue(y);
+    o["z"] = mcp::JsonValue(z);
+    return o;
+  };
+  mcp::JsonValue batch_props(mcp::JsonValue::object_tag);
+  if (space == "local") {
+    if (has_pos) {
+      batch_props["position"] =
+          is_3d ? vec3_json(pos_vals[0], pos_vals[1], pos_vals[2])
+                : vec2_json(pos_vals[0], pos_vals[1]);
+    }
+    if (has_rot) {
+      batch_props["rotation"] =
+          is_3d ? vec3_json(rot_vals[0], rot_vals[1], rot_vals[2])
+                : mcp::JsonValue(rot_vals[0]);
+    }
+    if (has_scale) {
+      batch_props["scale"] =
+          is_3d ? vec3_json(scale_vals[0], scale_vals[1], scale_vals[2])
+                : vec2_json(scale_vals[0], scale_vals[1]);
+    }
+  } else if (!is_3d) {
+    godot::Transform2D parent_global;
+    if (godot::Node *parent = node->get_parent()) {
+      if (godot::CanvasItem *pitem =
+              godot::Object::cast_to<godot::CanvasItem>(parent)) {
+        parent_global = pitem->get_global_transform();
+      }
+    }
+    godot::Transform2D want = item->get_global_transform();
+    if (has_pos) {
+      want.set_origin(godot::Vector2(pos_vals[0], pos_vals[1]));
+    }
+    if (has_rot) {
+      want.set_rotation(rot_vals[0]);
+    }
+    if (has_scale) {
+      want.set_scale(godot::Vector2(scale_vals[0], scale_vals[1]));
+    }
+    godot::Transform2D local = parent_global.affine_inverse() * want;
+    if (has_pos) {
+      godot::Vector2 p = local.get_origin();
+      batch_props["position"] =
+          vec2_json(static_cast<double>(p.x), static_cast<double>(p.y));
+    }
+    if (has_rot) {
+      batch_props["rotation"] =
+          mcp::JsonValue(static_cast<double>(local.get_rotation()));
+    }
+    if (has_scale) {
+      godot::Vector2 s = local.get_scale();
+      batch_props["scale"] =
+          vec2_json(static_cast<double>(s.x), static_cast<double>(s.y));
+    }
+  } else {
+    godot::Transform3D parent_global;
+    if (godot::Node *parent = node->get_parent()) {
+      if (godot::Node3D *p3d =
+              godot::Object::cast_to<godot::Node3D>(parent)) {
+        parent_global = p3d->get_global_transform();
+      }
+    }
+    godot::Transform3D want = node_3d->get_global_transform();
+    if (has_rot || has_scale) {
+      godot::Vector3 euler =
+          has_rot ? godot::Vector3(rot_vals[0], rot_vals[1], rot_vals[2])
+                  : want.get_basis().get_euler();
+      godot::Vector3 scl =
+          has_scale
+              ? godot::Vector3(scale_vals[0], scale_vals[1], scale_vals[2])
+              : want.get_basis().get_scale();
+      want.set_basis(godot::Basis::from_euler(euler).scaled(scl));
+    }
+    if (has_pos) {
+      want.set_origin(
+          godot::Vector3(pos_vals[0], pos_vals[1], pos_vals[2]));
+    }
+    godot::Transform3D local = parent_global.affine_inverse() * want;
+    if (has_pos) {
+      godot::Vector3 p = local.get_origin();
+      batch_props["position"] = vec3_json(static_cast<double>(p.x),
+                                          static_cast<double>(p.y),
+                                          static_cast<double>(p.z));
+    }
+    if (has_rot) {
+      godot::Vector3 e = local.get_basis().get_euler();
+      batch_props["rotation"] = vec3_json(static_cast<double>(e.x),
+                                          static_cast<double>(e.y),
+                                          static_cast<double>(e.z));
+    }
+    if (has_scale) {
+      godot::Vector3 s = local.get_basis().get_scale();
+      batch_props["scale"] = vec3_json(static_cast<double>(s.x),
+                                       static_cast<double>(s.y),
+                                       static_cast<double>(s.z));
+    }
+  }
+  mcp::JsonValue batch_args(mcp::JsonValue::object_tag);
+  batch_args["path"] = mcp::JsonValue(path_str);
+  batch_args["properties"] = std::move(batch_props);
+  batch_args["atomic"] = mcp::JsonValue(true);
+  mcp::JsonValue result = handle_set_batch(batch_args);
+  if (result.IsObject() && !result.Find("error")) {
+    result["space"] = mcp::JsonValue(space);
+  }
+  return result;
 }
 
 mcp::JsonValue handle_get_list(const mcp::JsonValue &args) {

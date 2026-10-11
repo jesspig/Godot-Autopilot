@@ -31,6 +31,8 @@ std::vector<std::string> find_property_family(godot::Object *object,
 
 mcp::JsonValue handle_get(const mcp::JsonValue &args);
 mcp::JsonValue handle_set(const mcp::JsonValue &args);
+mcp::JsonValue handle_set_batch(const mcp::JsonValue &args);
+mcp::JsonValue handle_set_transform(const mcp::JsonValue &args);
 mcp::JsonValue handle_get_list(const mcp::JsonValue &args);
 mcp::JsonValue handle_signal_connect(const mcp::JsonValue &args);
 mcp::JsonValue handle_signal_disconnect(const mcp::JsonValue &args);

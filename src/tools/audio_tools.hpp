@@ -98,11 +98,33 @@ const std::vector<ParamSpec> kSetAudioDeviceInputParams = {
     {"device", "string", "Input device name as returned by get_audio_device_inputs", true},
 };
 
+const std::vector<ParamSpec> kStartAudioInputCaptureParams = {
+    {"device", "string", "Optional input device name as returned by get_audio_input_devices; when given, the device is selected before capture starts, otherwise the current device keeps being used", false},
+};
+
+const std::vector<ParamSpec> kStopAudioInputCaptureParams = {
+    {"name", "string", "Registration name for the captured take; the resulting AudioStreamWAV stays alive as 'memory://name' for later tools", true},
+    {"format", "integer", "Sample format in bits; 8 or 16 (default 16); any other value is rejected", false},
+    {"mix_rate", "integer", "Mix rate in Hz stored on the WAV (default: current input mix rate); must be an integer in 1000..192000", false},
+    {"stereo", "boolean", "Capture both channels interleaved when true (default false keeps the left channel only)", false},
+    {"max_frames", "integer", "Maximum frames to drain from the input buffer (default: all available); must be at least 1; captures longer than 1000000 frames keep only the first 1000000 and report truncated true", false},
+};
+
+const std::vector<ParamSpec> kCreateAudioStreamWavParams = {
+    {"name", "string", "Registration name for the new stream; the AudioStreamWAV stays alive as 'memory://name' for later tools", true},
+    {"format", "integer", "Sample format in bits; 8 or 16 (default 16); any other value is rejected", false},
+    {"mix_rate", "integer", "Mix rate in Hz stored on the WAV (default 44100); must be an integer in 1000..192000", false},
+    {"stereo", "boolean", "Treat samples as flat interleaved L/R pairs when true (default false treats them as mono)", false},
+    {"samples", "array", "Audio samples as floats in [-1, 1] (out-of-range values are clamped); mono samples when stereo is false, flat interleaved L/R pairs when stereo is true; total frames (samples divided by channel count) must be between 1 and 1000000", true},
+};
+
+const std::vector<ParamSpec> kGetAudioInputDevicesParams = {};
+
 } // namespace
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(20);
+  v.reserve(24);
   v.push_back(make_spec_tool(ToolSpec{
       "get_audio_bus_layout",
       "Get the complete audio bus layout from the audio server, including the Master bus and every bus effect chain. Use this to inspect the current bus routing or to snapshot a layout before making changes. Returns the serialized AudioBusLayout object in 'result'. No parameters are required.",
@@ -203,6 +225,26 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       "Switch the audio input device of the editor process, for example to a different microphone. 'device' must be one of the names returned by get_audio_device_inputs; a running game process keeps its own device. List devices first to get valid names. Returns 'result' set to 'ok'.",
       "Audio", {"audio", "device"}, SideEffect::None, tool_flags::kNone,
       kSetAudioDeviceInputParams, audio_ops::handle_set_input_device}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "start_audio_input_capture",
+      "Start capturing audio from the input device into the AudioServer input buffer. Optionally pass 'device' (a name from get_audio_input_devices) to select the device first, otherwise the current device keeps being used. Pair with stop_audio_input_capture, which drains the buffer into a memory WAV. Returns 'result' set to 'ok'.",
+      "Audio", {"audio", "input", "capture"}, SideEffect::None, tool_flags::kNone,
+      kStartAudioInputCaptureParams, audio_ops::handle_start_input_capture}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "stop_audio_input_capture",
+      "Stop input capture and drain the buffered frames into a new AudioStreamWAV registered as 'memory://name'. 'name' is required; 'format' accepts 8 or 16 (default 16) and any other value is rejected; 'mix_rate' defaults to the current input mix rate; 'stereo' false keeps the left channel only while true interleaves both channels; 'max_frames' drains at most that many frames (default: all available). When more than 1000000 frames are requested only the first 1000000 are kept and 'truncated' is set to true. Returns the WAV locator with format, mix_rate, stereo, frames and truncated in 'result'. Save it to disk before assigning it to a node property.",
+      "Audio", {"audio", "input", "capture"}, SideEffect::None, tool_flags::kNone,
+      kStopAudioInputCaptureParams, audio_ops::handle_stop_input_capture}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "create_audiostream_wav",
+      "Build an AudioStreamWAV from inline 'samples' and register it as 'memory://name' for later tools. 'format' accepts 8 or 16 (default 16) and any other value is rejected; 'mix_rate' defaults to 44100; 'stereo' false treats samples as mono while true expects flat interleaved L/R pairs; total frames (samples divided by channel count) must be between 1 and 1000000. Returns the WAV locator with format, mix_rate, stereo and frames in 'result'. Save it to disk before assigning it to a node property.",
+      "Audio", {"audio", "wav", "create"}, SideEffect::None, tool_flags::kNone,
+      kCreateAudioStreamWavParams, audio_ops::handle_create_wav}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "get_audio_input_devices",
+      "List the audio input devices available on this machine, such as microphones, together with the current capture state. Use a returned device name as the 'device' value for start_audio_input_capture or set_audio_device_input. Returns an object with 'devices' (array of device name strings), 'current', 'input_mix_rate' and 'frames_available' in 'result'.",
+      "Audio", {"audio", "device", "input"}, SideEffect::None, tool_flags::kNone,
+      kGetAudioInputDevicesParams, audio_ops::handle_get_input_devices}));
   return v;
 }
 

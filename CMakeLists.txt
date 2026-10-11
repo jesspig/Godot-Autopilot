@@ -110,6 +110,9 @@ add_library(godot-autopilot SHARED
     src/tools/text_ops.cpp
     src/tools/tilemap_ops.cpp
     src/tools/tileset_ops.cpp
+    src/tools/file_dir_ops.cpp
+    src/tools/gridmap_ops.cpp
+    src/tools/tween_ops.cpp
     src/tools/debug_ops.cpp
     src/tools/debugger_ops.cpp
     src/tools/debugger_access.cpp

@@ -467,6 +467,139 @@ JV handle_add_action(const JV &args) {
   return r;
 }
 
+JV handle_set_action_bundle(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "set_input_map_action_bundle called");
+  auto *ap = args.Find("action");
+  if (!ap || !ap->IsString()) {
+    JV e(JV::object_tag);
+    e["error"] = JV("missing required parameter: action");
+    return e;
+  }
+  std::string action = ap->GetString();
+  bool has_deadzone = false;
+  float deadzone = 0.5f;
+  auto *dp = args.Find("deadzone");
+  if (dp) {
+    if (!dp->IsNumber()) {
+      JV e(JV::object_tag);
+      e["error"] = JV("invalid parameter: deadzone must be a number");
+      return e;
+    }
+    deadzone = static_cast<float>(
+        dp->IsDouble() ? dp->GetDouble() : static_cast<double>(dp->GetInt()));
+    has_deadzone = true;
+  }
+  bool persist = false;
+  auto *pp = args.Find("persist");
+  if (pp) {
+    if (!pp->IsBool()) {
+      JV e(JV::object_tag);
+      e["error"] = JV("invalid parameter: persist must be a boolean");
+      return e;
+    }
+    persist = pp->GetBool();
+  }
+  std::vector<JV> pending;
+  auto *evp = args.Find("events");
+  if (evp) {
+    if (!evp->IsArray()) {
+      JV e(JV::object_tag);
+      e["error"] = JV("invalid parameter: events must be an array of event objects");
+      return e;
+    }
+    const auto &arr = evp->GetArray();
+    pending.reserve(arr.size());
+    for (const auto &item : arr) {
+      if (!item.IsObject()) {
+        JV e(JV::object_tag);
+        e["error"] =
+            JV("invalid event entry: must be an object with a concrete 'class' field");
+        return e;
+      }
+      pending.push_back(item);
+    }
+  }
+  auto *im = godot::InputMap::get_singleton();
+  if (!im) {
+    JV e(JV::object_tag);
+    e["error"] = JV("InputMap not available");
+    return e;
+  }
+  for (auto &event_obj : pending) {
+    auto *class_field = event_obj.Find("class");
+    if (!class_field || !class_field->IsString() ||
+        class_field->GetString().empty()) {
+      JV e(JV::object_tag);
+      e["error"] = JV(
+          "missing required field 'class': must specify a concrete InputEvent subclass, e.g. {\"class\":\"InputEventKey\", \"keycode\":65} — use search_tools to find InputEvent* subclasses");
+      return e;
+    }
+    std::string event_class = class_field->GetString();
+    if (event_class == "InputEventKey") {
+      for (const char *field : {"physical_keycode", "keycode"}) {
+        auto *fp = event_obj.Find(field);
+        if (fp && fp->IsString()) {
+          const std::string raw = fp->GetString();
+          auto it = KEY_NAME_TO_CODE.find(raw);
+          const int64_t code = (it != KEY_NAME_TO_CODE.end())
+                                   ? it->second
+                                   : resolve_key_name_code(raw);
+          if (code == 0) {
+            JV e(JV::object_tag);
+            e["error"] = JV(
+                "unknown key name: " + raw +
+                " — use a bare letter/digit (e.g. P, 0), a KEY_* name (e.g. KEY_P, KEY_SPACE) or a numeric keycode (e.g. 65)");
+            return e;
+          }
+          event_obj[field] = JV(code);
+        }
+      }
+    }
+  }
+  std::vector<godot::Ref<godot::InputEvent>> staged;
+  staged.reserve(pending.size());
+  for (auto &event_obj : pending) {
+    std::string event_class = event_obj.Find("class")->GetString();
+    godot::Variant event_var = VariantJson::deserialize(event_obj, event_class);
+    auto event = godot::Ref<godot::InputEvent>(event_var);
+    if (event.is_null()) {
+      JV e(JV::object_tag);
+      e["error"] = JV(
+          "failed to deserialize InputEvent — specify a concrete class e.g. \"InputEventKey\" with field \"class\" (common: InputEventKey, InputEventMouseButton, InputEventJoypadButton, InputEventAction, InputEventShortcut)");
+      return e;
+    }
+    staged.push_back(event);
+  }
+  godot::StringName action_name(action.c_str());
+  if (!im->has_action(action_name)) {
+    im->add_action(action_name, has_deadzone ? deadzone : 0.5f);
+  } else if (has_deadzone) {
+    im->action_set_deadzone(action_name, deadzone);
+  }
+  for (auto &event : staged) {
+    im->action_add_event(action_name, event);
+  }
+  if (persist) {
+    auto *ps = godot::ProjectSettings::get_singleton();
+    if (!ps) {
+      JV e(JV::object_tag);
+      e["error"] = JV("ProjectSettings not available");
+      return e;
+    }
+    persist_action(action, im, ps);
+  }
+  JV r(JV::object_tag);
+  r["result"] = JV("ok");
+  r["action"] = JV(action);
+  r["events_added"] = JV(static_cast<int64_t>(staged.size()));
+  r["deadzone"] = JV(static_cast<double>(im->action_get_deadzone(action_name)));
+  r["persisted"] = JV(persist);
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "set_input_map_action_bundle completed");
+  return r;
+}
+
 JV handle_erase_action(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "erase_input_map_action called");

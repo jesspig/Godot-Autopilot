@@ -7,13 +7,13 @@ tags:
   - 工具架构
   - ToolSpec
   - 数据化
-timestamp: "2026-09-29T01:12:05+08:00"
+timestamp: "2026-10-11T12:43:34+08:00"
 resource: src/tools/
 ---
 
 # ToolSpec 工具数据层与执行管线（设计定稿 + 全量迁移）
 
-> **当前 API 面（2026-09-29 复核）**
+> **当前 API 面（2026-10-11 复核：注册共 32 域 443 工具 + `system_status` + 7 元，catalog 共 451）**
 > `tool_spec.hpp`：`ToolSpec` 数据记录（name/description/category/tags/side_effect/flags/params/handler/raw_schema）+ `ParamSpec`（= `schema::ParamDef`）+ `tool_flags` 位标志 + `SpecTool : ToolBase, ISideEffect` + `make_spec_tool`；schema 由 `params` 经 `schema::build_schema` 派生，`raw_schema` 非空时优先。`tool_flags` 现为 9 位（09-29 新增 `kHealthProbe` 健康探针短预算 / `kLongBlocking` 长阻塞不设主线程等待预算）。
 > `dispatch.hpp/cpp`：跨线程调用统一入口 `run_on_main_thread_with_budget` + `main_thread_wait_budget_ms`（09-29；默认 27000ms / 健康探针 5000ms / 长阻塞无预算，超时取消 + `main_thread_timeout` 结构化错误）。
 > `tool_args.hpp/cpp`：`Args` 取参器 + `ToolArgError`（opt_/require_/get_ 系列 + `reject_unknown`，空值视为缺失）。
@@ -226,14 +226,14 @@ trace 相关扩展（09-20）：`invoke_tool` 在正常路径用 `SpanGuard(trac
 
 ## 迁移规则与守卫
 
-数据化迁移已全量完成（30 域 + `system_status` + 7 元工具全部为 `SpecTool`），以下旧机制**禁止回退**：
+数据化迁移已全量完成（32 域 + `system_status` + 7 元工具全部为 `SpecTool`，其中 30 域为 09-19 迁移、2 域 `gridmap`/`tween` 为 10-11 原生新增），以下旧机制**禁止回退**：
 
 - 旧宏 `GDA_TOOL_CLASS` / `GDA_TOOL_CLASS_SIDE`（`tool_decl.hpp` 已删）；
 - `fn_tool.hpp` / `FnTool` / `make_fn_tool`、`meta_tools.hpp` / `MetaTool` / `IMetaTool`（元工具现按 `kMeta` flag 归类）；
 - `tool_input_schema` / `build_schema_for` / `schema_fills.hpp` / `schema_*_ops.cpp`（schema 现从参数表派生）；
 - `tool_defs.def`（历史已删）。
 
-守卫位于 `tests/guard/`：`migration_guard.cmake` 读 `migrated_domains.txt`（30 个域 + `strict` 行）做零依赖源码断言——每个已迁移域 `src/tools/<域>_tools.hpp` 不含旧宏；strict 模式追加全域文件无旧宏、无 `schema_*_ops.cpp` 残留、全仓 `src/tools/*.hpp|*.cpp` 无 `tool_input_schema` / `tools/tool_decl.hpp` 引用。运行方式：`ctest --preset debug -R migration_guard`，或 `cmake -DSOURCE_DIR=<仓库根> -P tests/guard/migration_guard.cmake`（实测输出 `OK (domains: 30, strict: on)`）。
+守卫位于 `tests/guard/`：`migration_guard.cmake` 读 `migrated_domains.txt`（30 个已迁移域 + `strict` 行；10-11 新增的 `gridmap`/`tween` 为原生 ToolSpec 新域，不在迁移清单内，注册共 32 域）做零依赖源码断言——每个已迁移域 `src/tools/<域>_tools.hpp` 不含旧宏；strict 模式追加全域文件无旧宏、无 `schema_*_ops.cpp` 残留、全仓 `src/tools/*.hpp|*.cpp` 无 `tool_input_schema` / `tools/tool_decl.hpp` 引用。运行方式：`ctest --preset debug -R migration_guard`，或 `cmake -DSOURCE_DIR=<仓库根> -P tests/guard/migration_guard.cmake`（实测输出 `OK (domains: 30, strict: on)`，其中 domains 指迁移清单数，不是注册总数 32）。
 
 ## 迁移历史
 

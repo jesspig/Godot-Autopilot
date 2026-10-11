@@ -6,47 +6,49 @@ tags:
   - 模块
   - 领域工具
   - A组
-timestamp: "2026-09-29T01:15:06+08:00"
+timestamp: "2026-10-11T12:43:34+08:00"
 resource: src/tools/
 ---
 
 # 领域工具模块（src/tools/，A 组 16 模块）
 
+> 10-11 批量工具扩充增补：本页 16 模块 197→221（+24：`config` +4 autoload、`input_map` +1 bundle、`physics` +3 body/shape、`property` +2 batch/transform、`resource` +7 curve/mesh、`scene` +7 snapshot/bundle/path/camera；无新域、无新文件）；全系统 400→451（443 域 + `system_status` + 7 元），源模块 30→32（新增 `gridmap`/`tween` 在 B 组），schema 基线 451 = 385 非空 + 66 空，遍历枚举 393→444、排除与候选以运行时报告为准（旧 71/322 已过时）。
+
 > 09-18 E2E 优化批次增补（详见 `changelog/2026-09-18-log.md` 19:30 节）：`save_editor_scene[_as]` 成功回执 `memory_nodes/disk_nodes/nodes_match`（失配附 `missing_paths`+`warning`，可选 `include_paths/include_hash`，`attach_save_receipt`；09-29 起核验口径改为可落盘集合并附 `inherited_*`，见下文 editor_ops 小节）+ 只读 `verify_scene_saved`（`src/util/scene_verify.*` 新建，FNV-1a 可选哈希）；`save_editor_scene_as` 补 `path` 回显；`create_script` 成功态补 `result.disk_bytes/content_hash/content_hash_algo`（`result` 信封内）；新增 `patch_script`（`SideEffect::WritesFile` + `kMutating`，锚点 replace/insert + preview/dry_run + 编译门 + 回滚，`src/tools/script_patch_ops.*`）；`get_editor_file_system_tree` 加 `depth/prefix/filter`；数字错误码统一 `error_code/error_name/hint`（49 项映射，`editor_ops.cpp:64 editor_error_name`）；`build_nodes_from_spec`（`SideEffect::None` + `kMutating`，声明式建树+整体回滚，`src/tools/scene_spec_ops.*`）。
 
 > 审计日期：2026-09-29（2026-08-12 初稿；08-17 补 YAML frontmatter；08-20 随 rename 事务化 + 新工具同步；08-21 随 ToolBase 类重构同步——`tool_defs.def`/`TOOL_ENTRY` 移除，注册与计数口径改为 `<域>_tools.hpp`/`ToolRegistry`；08-22 15 时全量一致性审计——editor 计数 23、RENAME_HINTS 10 条、resolve_scene_node/RidStore/rid_from_json/NODE_NOT_FOUND_HINT 归一至 util 共享头、get_docs_class 补 enums/constants；08-29 随 0.2.2 版本与全量审计同步——336→363、35→42、174→178、26→30 域重核；09-13 上午随反馈修复批次同步——363→365、42→49、178→180，property 数组/NodeType 转换与写失败 fail fast、资源 CoW/reload_resource/copy_resource_file/标签清理、create_editor_scene timeout_ms 诊断；09-13 下午随收口批次同步——A 组 180 不变（新增 get_plugin_log 归 B 组，域工具 365→366）、严格 JSON 形状与值类型 readback、save_resource 磁盘重读 verified、ray 空间诊断字段、get_editor_settings enum 元数据；09-13 17:50 随 B 组知识库审计同步——补全 scene_ops 工具表（rename_scene_node/reparent_node）与 rename stale_references 字段口径；09-13 晚随 0.2.4 版知识库全量审计同步——修正 handle_delete 的 undo/redo 口径、input 未识别键/按键实际报错（删除"静默失败点"表述）、physics 配对计数（15 对含空间查询）与 rid_store<PhysicsRidDomain> 标签名、script handle_reload 缓存失效归属、editor save_all_scenes 直接调用与文件树截断 max_depth 字段、config get_engine_version string 字段、property_set undo 注册、group find_node 3 处与响应字段、editor 撤销四件套全名、resource 收集函数实名等代码-文档偏差；A 组 180/366 复核不变；09-14 随修复批次同步——property_set/严格形状增 Vector2/2i 对象要求与数组报错、set_resource_property 接入严格转换、get_scene_tree 的 include_properties 属性摘要修复；09-15 随 Computer Use grounding 批次同步——域工具 379 = 322 非 SIDE + 57 SIDE，A 组 191（新增 editor_ui_ops 3 / editor_ui_actions 3 / input_click_ops 4，scene +1、input +4、editor +6）、scene_ops 的 get_scene_node_screen_rect、catalog/index 387；09-16 随失败修复批次同步——域工具 384 = 324 非 SIDE + 60 SIDE，A 组 193（editor_ui_ops +2：scene_tree_items / select_scene_tree_node）、写工具响应回显 scene_path/scene_unsaved、资源属性内联描述一步创建 [sub_resource]、catalog/index 392），09-16 随坐标换算/键名统一/脚本新鲜度/UID 守卫/CJK 往返/open 幂等/属性两轮批次同步——scene 两轮应用、input_map 裸名等价、script fresh 与 cache_refreshed、resource add/set 选择、open already_open，域工具 384→385（B 组 capture +1，非 SIDE 324→325），基于当前工作树代码逐行核对（不依赖 git 历史）；09-17 随 T09+T12 文档同步批次更新 save_editor_scene_as 登记口径（删 tab_rebuilt 与 close+reopen）、create_editor_scene 多签秒级失败、delete_scene_node 跨帧 undo 与选中清理、改脚本后先 reload_game_scripts 工作流）；09-18 E2E 优化批次与 09-19 ToolSpec 数据化重构——域工具 385→391、A 组 193→196（新增 `verify_scene_saved`/`patch_script`/`build_nodes_from_spec`，新增 handler 文件 `scene_spec_ops`/`script_patch_ops`），工具声明全量改为 `ToolSpec` 数据记录（删除 `GDA_TOOL_CLASS` 宏/真类与全部 schema 文件），遍历改为运行时枚举 392 条后按 `side_effect`/`mutating`/`dynamic` 字段排除（330 个进入空参+冒烟两步骤，实测全过）；09-29 随工具语义与韧性批次（B1–B7）同步——域工具按运行时核算 392（A 组 197）、全系统 400（338 非空 schema + 62 空），遍历枚举 393 条、候选 322、排除 71（含 8 个 SceneTree 工具改走游戏通道，`SideEffect::GameRuntime`）；property 路径支持引擎原生斜杠属性名与属性族展开、严格形状补齐 Plane 与向量分量分支；`scene_verify` 核验口径改可落盘集合（新增 `inherited_*` 输出）；三脚本通道统一 `gdscript_wrap` 包装与行映射；游戏通道新增 `wait_ready` 就绪排队与重放；dispatch 增加主线程预算与停摆快速失败（详见 [security_contract](../security_contract.md) §4）。
 > 覆盖范围：`src/tools/` 下 18 对 `.cpp/.hpp`：scene_ops、scene_tree_ops、property_ops、group_ops、input_ops、input_map_ops、physics_ops、nav_ops、resource_ops、script_ops、config_ops、doc_ops、editor_ops、editor_ui_ops、editor_ui_actions、input_click_ops、scene_spec_ops（09-18 新增，`build_nodes_from_spec`）、script_patch_ops（09-18 新增，`patch_script`）。
-> 统计口径：工具数以 `src/tools/*_tools.hpp` 的 `make_tools()`/`ToolSpec` 条目为准（一个工具 = 一份 `ToolSpec` 数据 + 一个 `handle_` 函数，两口径一致）；当前 392 个域工具中本页 16 模块占 197 个（09-29 起口径：全系统 400 = 392 域工具 + `system_status` 1 + 7 个元工具；遍历运行时枚举 393 条 / 排除 71 / 候选 322；数值以运行时统计为准，见 [../tests.md](../tests.md)）。每个工具的参数表（`std::vector<ParamSpec>`）与 `make_spec_tool(ToolSpec{...})` 内联在对应 `<域>_tools.hpp`。注册经 `register_all.cpp` 调用 30 组 `<域>_tools::make_tools()` 汇入单一 `ToolRegistry`；L2 遍历不再按源码枚举，改为运行时经 `search_tools` 枚举后按字段排除（见 [../modules/tools_registry.md](../modules/tools_registry.md)）。
+> 统计口径：工具数以 `src/tools/*_tools.hpp` 的 `make_tools()`/`ToolSpec` 条目为准（一个工具 = 一份 `ToolSpec` 数据 + 一个 `handle_` 函数，两口径一致）；当前 443 个域工具中本页 16 模块占 221 个（10-11 起口径：全系统 451 = 443 域工具 + `system_status` 1 + 7 个元工具；遍历运行时枚举 444 条 / 排除与候选以运行时报告为准；数值以运行时统计为准，见 [../tests.md](../tests.md)）。每个工具的参数表（`std::vector<ParamSpec>`）与 `make_spec_tool(ToolSpec{...})` 内联在对应 `<域>_tools.hpp`。注册经 `register_all.cpp` 调用 32 组 `<域>_tools::make_tools()` 汇入单一 `ToolRegistry`；L2 遍历不再按源码枚举，改为运行时经 `search_tools` 枚举后按字段排除（见 [../modules/tools_registry.md](../modules/tools_registry.md)）。
 
 ## 模块简介
 
 这 16 个模块是领域工具的前半部分：覆盖场景节点操作、属性/信号、分组、输入模拟与 InputMap、物理（2D/3D 双份）、导航、资源生命周期、脚本与 GDScript 执行、项目/引擎/编辑器配置、引擎类文档查询、编辑器会话管理，以及编辑器 UI 语义自动化（元素枚举/命中/点击/文本/快捷键）与合成鼠标输入。全部位于命名空间 `godot_autopilot::<模块>_ops`，与 AGENTS.md 约定一致。
 
-30 个域 `_tools.hpp` 共声明 **392 个领域工具**（每工具一份 `ToolSpec`；其中 69 个声明非空 `side_effect`，另有 2 个仅以 `kMutating` 排除，遍历共排除 71 个），本页 16 模块占其中 **197 个（50.3%）**。`register_all.cpp` 注册 30 组 `<域>_tools::make_tools()`（另加 `system_status` 1 与 7 个元工具，catalog/index 共 400；schema 统计 338 非空 + 62 空）汇入单一 `ToolRegistry`，catalog/index/`dispatch::g_handlers`/`server.RegisterTool()` 全部由其派生；领域工具不直接注册到 MCP 服务器，统一经元工具 `call_tool` 分发（见 [../modules/tools_registry.md](../modules/tools_registry.md)）。
+32 个域 `_tools.hpp` 共声明 **443 个领域工具**（每工具一份 `ToolSpec`；遍历排除数以运行时 `03_tools_contract` 报告为准，旧基线 71 已过时），本页 16 模块占其中 **221 个（49.9%）**。`register_all.cpp` 注册 32 组 `<域>_tools::make_tools()`（另加 `system_status` 1 与 7 个元工具，catalog/index 共 451；schema 统计 385 非空 + 66 空）汇入单一 `ToolRegistry`，catalog/index/`dispatch::g_handlers`/`server.RegisterTool()` 全部由其派生；领域工具不直接注册到 MCP 服务器，统一经元工具 `call_tool` 分发（见 [../modules/tools_registry.md](../modules/tools_registry.md)）。
 
 ## 模块总览
 
 | 模块（命名空间） | handle_ 函数数 | 注册工具数 | 核心职责 |
 |---|---|---|---|
-| `scene_ops` | 7 | 8（`build_nodes_from_spec` 的 handler 在 `scene_spec_ops`） | 编辑场景节点创建/删除/实例化/树遍历/节点屏幕坐标映射/声明式建树 |
+| `scene_ops` | 13 | 15（`spawn_node_bundle` 的 handler 在 `scene_spec_ops`） | 编辑场景节点创建/删除/实例化/树遍历/节点屏幕坐标映射/声明式建树/快照与捆绑创建/路径与相机 |
 | `scene_tree_ops` | 8 | 8 | 运行中游戏进程的 SceneTree 转发（组调用、暂停、定时器、重载；经游戏通道，永不触碰编辑器树） |
-| `property_ops` | 5 | 5 | 节点属性读写、属性列表、信号连接 |
+| `property_ops` | 7 | 7 | 节点属性读写、属性列表、信号连接、批量与变换 |
 | `group_ops` | 3 | 3 | 节点分组增删查（可撤销、持久化） |
 | `input_ops` | 11 | 15（4 个新增合成输入 handler 在 input_click_ops） | Input 单例模拟按键/鼠标/手柄/动作 |
-| `input_map_ops` | 8 | 8 | InputMap 运行期动作增删改查与持久化 |
-| `physics_ops` | 48 | 48 | PhysicsServer 2D/3D 对象与空间查询（含挂靠 Debug 类的 `get_debug_object_info`） |
+| `input_map_ops` | 9 | 9 | InputMap 运行期动作增删改查与持久化、打包配置 |
+| `physics_ops` | 51 | 51 | PhysicsServer 2D/3D 对象与空间查询（含挂靠 Debug 类的 `get_debug_object_info`）、刚体打包与碰撞形状 |
 | `nav_ops` | 15 | 15 | NavigationServer 2D/3D 地图/区域/代理 |
-| `resource_ops` | 27 | 27 | 资源加载/保存/创建/重载/复制/UID/导入与导入选项/依赖/反查（含 09-13 新增 reload_resource/copy_resource_file） |
+| `resource_ops` | 34 | 34 | 资源加载/保存/创建/重载/复制/UID/文件操作/依赖/反查（含 09-13 新增 reload_resource/copy_resource_file）、曲线与网格 |
 | `script_ops` | 10 | 11（`patch_script` 的 handler 在 `script_patch_ops`） | GDScript 执行、脚本附加/属性/调用、锚点补丁 |
-| `config_ops` | 13 | 13 | ProjectSettings/Engine/EditorSettings |
+| `config_ops` | 17 | 17 | ProjectSettings/Engine/EditorSettings、自启动项 |
 | `doc_ops` | 4 | 4 | ClassDB 类/方法/属性文档查询 |
 | `editor_ops` | 24 | 32（8 个新增 UI handler 在 editor_ui_ops / editor_ui_actions；`verify_scene_saved` 在本文件） | 编辑器会话：选择/场景/撤销/播放/文件系统/C# 构建/保存只读复核 |
 | `editor_ui_ops` | 5 | —（工具注册计入 editor_ops 行） | 编辑器 UI：元素枚举、命中测试、视口几何映射、场景树行枚举（只读） |
 | `editor_ui_actions` | 3 | —（工具注册计入 editor_ops 行） | 编辑器 UI 动作：按元素 path 点击、文本输入、快捷键注入（副作用） |
 | `input_click_ops` | 4 | —（工具注册计入 input_ops 行） | 编辑器进程合成鼠标点击/滚轮/拖拽与焦点文本输入（副作用） |
-| **合计** | **—** | **197** | |
+| **合计** | **—** | **221** | |
 
-> 注：`handle_ 函数数`按实现文件计数（跨文件 handler 单独成行，如 `scene_spec_ops`/`script_patch_ops`），`注册工具数`按域归并（跨文件 handler 计入对应域），两列口径不同故不做行合计；注册工具数合计 197 与域计数一致。
+> 注：`handle_ 函数数`按实现文件计数（跨文件 handler 单独成行，如 `scene_spec_ops`/`script_patch_ops`），`注册工具数`按域归并（跨文件 handler 计入对应域），两列口径不同故不做行合计；注册工具数合计 221 与域计数一致。
 
 ## 公共模式
 
@@ -56,7 +58,7 @@ resource: src/tools/
 - **异常兜底**：`dispatch::call_handler` 对 handler 的 C++ 异常 `catch(...)` 后返回 `{"error": "internal error in tool '<name>'..."}`；导出期间（ExportGuard 置位）所有领域工具返回固定错误 `{"error":"editor is exporting; retry after export completes"}`。
 - **线程**：handler 内部不直接判断线程；`dispatch::call_handler`（`dispatch.cpp`）在非主线程时经 `dispatch::run_on_main_thread_with_budget` 桥接——默认预算、健康探针与 `kLongBlocking` 例外见 [security_contract](../security_contract.md) §4；超时取消未 drain 任务并返回结构化 `main_thread_timeout` 错误，与 core.md 的线程模型一致。
 
-## scene_ops（7 工具）
+## scene_ops（15 工具）
 
 职责：编辑场景的节点生命周期与树读取。注册工具：
 
@@ -69,6 +71,13 @@ resource: src/tools/
 | `instantiate_scene` | 实例化 PackedScene 到编辑场景 |
 | `get_scene_tree` | 编辑场景树（默认深度 8 + 可选属性摘要；旧 `scene_tree_get`/`scene_get_tree` 双名合并） |
 | `get_scene_node_screen_rect` | 节点 → 编辑器窗口客户区坐标映射（09-15 新增，只读） |
+| `get_scene_snapshot` | 只读树 + 核验摘要 + 可选屏坐标 + 视口截图一次调用（10-11 新增，只读） |
+| `spawn_node_bundle` | 建单节点 + 属性 + 脚本 + 分组 + 信号原子提交全回滚（10-11 新增，handler 在 `scene_spec_ops`） |
+| `create_path_node` | 建 Path2D/Path3D 并绑定内存曲线（10-11 新增） |
+| `advance_path_follow` | 按像素偏移推进 PathFollow（10-11 新增） |
+| `focus_camera_on_node` | 相机对准目标节点单 undo 步（10-11 新增） |
+| `set_camera_params` | 改相机 zoom/裁剪/限制单 undo 步（10-11 新增） |
+| `get_camera_view_rect` | 相机视野窗客户区描述（10-11 新增，只读） |
 
 关键实现事实：
 
@@ -102,13 +111,15 @@ resource: src/tools/
 - 附加信息（`set_pause` 的 `paused`、`set_debug_collisions_hint` 的 `enabled`、`create_timer` 的 `note` 等）挂在 `result` 的兄弟键；客户端可见值仍是 `result`。`reload_current_scene` 无当前场景时返回引擎 `ERR_UNCONFIGURED`（3）整数；`create_timer` 不回传 SceneTreeTimer 对象（跨进程不可传，note 提示在游戏侧观察效果）。
 - 与编辑器侧场景工具（`get_scene_tree`、`scene_tree_items` 等）职责正交：那些工具操作编辑场景，本组只操作运行中游戏。
 
-## property_ops（5 工具）
+## property_ops（7 工具）
 
 职责：编辑场景节点属性读写与信号连接（属性层复用 `scene_path` 节点解析）。注册工具：
 
 | 工具名 | 说明 |
 |---|---|
 | `property_get` / `property_set` / `property_get_list` | 属性读/写/列表 |
+| `set_properties_batch` | 单节点多属性单 undo 步（10-11 新增，all-or-nothing 或 best-effort） |
+| `set_node_transform` | 单节点位移/旋转/缩放局部或全局单 undo 步（10-11 新增） |
 | `signal_connect` / `signal_disconnect` | 信号连接/断开（幂等） |
 
 关键实现事实：
@@ -166,7 +177,7 @@ resource: src/tools/
 - **合成输入四件套（09-15 新增，handler 在 `input_click_ops`）**：`click_input_mouse` 一次注入 warp + 移动 + 按下 + 释放（`double_click` 追加第二对；`button` left/right/middle 默认 left），`scroll_input_mouse` 需 `direction`（up/down/left/right，非法值报 `invalid scroll direction: <值>`）与 `amount`（1-10 默认 1，越界报错），`drag_input_mouse` 注入 `from`→`to` 与 `steps`（1-64 默认 8）段插值移动，`type_input_text` 向当前焦点控件推送单个文本事件（不逐键模拟）且需先聚焦（`click_input_mouse` 或 `click_editor_element`），可选 `submit` 追加回车。四者坐标基准与既有 move/press/release 一致（聚焦窗口客户区），均带可选 `observe`（追加一张编辑器视口截图），且依赖物理鼠标的 hover/拖拽效果可能要到下一帧才稳定；以 `SideEffect::ModifiesWindow` + `tool_flags::kMutating | tool_flags::kObserve` 声明，遍历自动排除（`kObserve` 由执行管线统一合并截图后处理）。
 - 全部 handler 日志级别为 Debug（区别于其他模块的 Info）。
 
-## input_map_ops（8 工具）
+## input_map_ops（9 工具）
 
 职责：`InputMap` 运行期动作定义管理（不模拟按键，而是改映射本身）。注册工具：
 
@@ -175,6 +186,7 @@ resource: src/tools/
 | `add_input_map_action` / `erase_input_map_action` / `has_input_map_action` / `get_input_map_actions` | 动作增删查 |
 | `add_input_map_action_event` / `erase_input_map_action_event` / `set_input_map_action_deadzone` | 动作事件增删/死区 |
 | `save_input_map` | 运行期改动写入 ProjectSettings 并保存到磁盘 |
+| `set_input_map_action_bundle` | 确保动作存在并一次应用死区与事件（10-11 新增） |
 
 关键实现事实：
 
@@ -183,7 +195,7 @@ resource: src/tools/
 - 事件构造基于 `InputEvent`（键盘/鼠标/手柄事件）；`action_set_deadzone` 调 `InputMap::action_set_deadzone`。
 - `save_input_map` 是**持久化副作用**：把动作写入 `ProjectSettings` 的 `input/<action>` 并 `save()`；`add_input_map_action_event` 同理。二者均声明 `side_effect=WritesConfig` + `kMutating`；L2 契约遍历经 `get_tool_detail` 的 `side_effect`/`mutating` 字段自动排除（与 AGENTS.md 遍历排除约定一致）。
 
-## physics_ops（48 工具）
+## physics_ops（51 工具）
 
 职责：经 `PhysicsServer2D/3D` 与 `PhysicsDirectSpaceState2D/3D` 直接操作物理世界（对象全部为 RID 句柄，非场景节点）。注册工具：
 
@@ -198,6 +210,7 @@ resource: src/tools/
 | `set_physics_3d_space_solver_iterations` / `set_physics_3d_space_solver_params` / `set_physics_3d_space_param`、`get_physics_2d_space_direct_state` / `get_physics_3d_space_direct_state` | 空间级操作 |
 | `create_physics_3d_soft_body` / `set_physics_3d_soft_body_mesh` | 软体 |
 | `get_physics_node_rid` / `get_debug_object_info` | 节点 ↔ 物理 RID 解析 / 对象 ID → 类名、名称、节点路径或资源路径（挂靠本模块，归 Debug 类） |
+| `set_physics_body_bundle` / `create_collision_shape` / `assign_collision_shape` | 服务端刚体打包创建或配置场景碰撞体 + 内存形状创建与挂载（10-11 新增 3 个） |
 
 关键实现事实：
 
@@ -225,7 +238,7 @@ resource: src/tools/
 - 地图创建默认不激活（`map_set_active` 需显式传 `active: true`）；区域创建支持 `enabled`/`navigation_layers` 初始参数。
 - `set_nav_3d_region_navigation_mesh` 接受 `NavigationMesh` 资源（可经 `ResourceLoader` 加载路径传入）；路径返回点为 Vector2/Vector3 数组序列化（`{x,y[,z]}`）。
 
-## resource_ops（27 工具）
+## resource_ops（34 工具）
 
 职责：资源生命周期管理——加载/保存/重载/创建/复制/UID/文件操作/依赖/反查/导入，是资源类工具（Resources 类别）的完整实现。注册工具：
 
@@ -238,6 +251,8 @@ resource: src/tools/
 | `get_resource_dependencies` / `has_resource_dependency` / `get_resource_references` | 依赖正向查询 / 反查（谁引用了某资源） |
 | `reimport_resource_files` / `set_resource_import_options` | 编辑器导入（原 `resource_import` 已删除）/ 已导入资产 `.import` 白名单选项写入 + 排队重导入 |
 | `get_resource_property` / `set_resource_property` | 内存资源属性 |
+| `create_curve_resource` / `set_curve_points` / `get_curve_baked_points` | 内存 Curve2D/3D 创建 + 控制点全量替换 + 烘焙折线读取（10-11 新增 3 个） |
+| `create_primitive_mesh` / `create_array_mesh` / `set_mesh_surface_material` / `assign_mesh_to_instance` | 内存 PrimitiveMesh/ArrayMesh 创建 + 表面材质指派 + 网格挂载到实例（10-11 新增 4 个） |
 
 关键实现事实：
 
@@ -282,7 +297,7 @@ resource: src/tools/
 
 - **源码注释归档 2026-09-19**（行号均为归档前 HEAD 行号）：缺省 `p_cache_mode=(CacheMode)1` 即 `CACHE_MODE_REUSE` 出自 godot-cpp 生成头（注释原位于 `script_ops.cpp:30-38`）；`fresh` 只认字面 `true`，缺省/非布尔值保持 REUSE，防既有客户端升版后取用口径静默变化（`script_ops.cpp:44-45`）；`load_script_fresh` 的二次 `reload(true)` 对标编辑器同款姿势 `editor/script/script_editor_plugin.cpp:2562-2565`（`script_ops.cpp:218-220`）；落盘链为 `ResourceFormatSaverGDScript::save → FileAccess::store_string`（写 String 的 UTF-8 字节），`latin1` 构造会让 CJK 逐字节变字符（`script_ops.cpp:447-449`）；写盘自证用 FNV-1a-64 因仓内无 SHA 实现，`disk_bytes`/`content_hash` 均来自磁盘 readback 而非内存回显（`script_ops.hpp:12-16`、`script_ops.cpp:533-534`）；编译门 `path_for_cache` 仅用于 `set_path_cache`、不触碰磁盘（`script_ops.hpp:21-24`）；`patch_script` 多处命中只改第一处并如实回报 `anchor_occurrences`（`script_patch_ops.cpp:200`），回读失败回滚原文后仍以 `result`（`verified=false` + `write_issue/warning`）而非 `error` 回报（`script_patch_ops.cpp:313-314`），回滚写回用同款 UTF-8 构造保证字节一致（`script_patch_ops.cpp:88`）；同文件并发写不加锁，调用方须串行，沿用 `create_script` 口径（`script_patch_ops.hpp:9-13`）。
 
-## config_ops（13 工具）
+## config_ops（17 工具）
 
 职责：项目/引擎/编辑器三层配置读写。注册工具：
 
@@ -291,6 +306,7 @@ resource: src/tools/
 | `get_project_settings` / `set_project_settings` / `has_project_settings` / `save_project_settings` | ProjectSettings |
 | `get_engine_version` / `get_engine_fps` / `get_engine_frames_drawn` / `set_engine_time_scale` / `get_engine_time_scale` / `set_engine_max_fps` | Engine |
 | `get_editor_settings` / `set_editor_settings` / `has_editor_settings` | EditorSettings |
+| `get_autoload_list` / `add_autoload` / `remove_autoload` / `move_autoload` | 自启动单例清单/增删/排序（10-11 新增 4 个，增删即存盘，`remove_autoload` 回报陈旧引用） |
 
 关键实现事实：
 
@@ -416,10 +432,10 @@ resource: src/tools/
 | 文档 | 声称 | 代码事实 | 判定 |
 |---|---|---|---|
 | AGENTS.md（命名约定） | 工具命名 `<动词>_<类别>_<维度>_<对象>_<修饰>`，动词置首，如 `intersect_physics_2d_ray` | 本组符合；`signal_connect`/`signal_disconnect`（动词置首，无类别段）、config_ops 的 `get_project_settings`/`set_engine_*`/`get_editor_settings`（类别段为 project/engine/editor，与文件名 `config_` 不一致）属规范内的长短变化 | 一致 ✓（动词置首） |
-| AGENTS.md（工具总数） | 以运行时统计为准 | 30 个 `*_tools.hpp` 的 `make_tools()` 恰为 392 份 `ToolSpec`；本页 16 模块 197 个；全系统 400（含 `system_status` 与 7 个元工具） | 一致 ✓ |
+| AGENTS.md（工具总数） | 以运行时统计为准 | 32 个 `*_tools.hpp` 的 `make_tools()` 恰为 443 份 `ToolSpec`；本页 16 模块 221 个；全系统 451（含 `system_status` 与 7 个元工具） | 一致 ✓ |
 | AGENTS.md（错误模式） | 领域工具返回 `{"error": "消息"}` | 一致；另有 `error_detail` 扩展格式与 dispatch `catch(...)` 兜底、导出期固定错误 | 一致 ✓（有扩展） |
 | AGENTS.md（契约缺口 3 项 + 已知 schema 告警 4 项） | `create_scene_node` 不校验必填；`get_resource_extensions` 缺 type 返回全类型；`reimport_resource_files` 空参静默成功；L2 另有 4 项已知 schema 告警（schema 声明必填而空参不报错）：`get_resource_extensions`、`reimport_resource_files`、`start/stop_input_gamepad_vibration` | 均在代码中逐一确认（默认 "NewNode"/"Node"；空 type 传 `""`；count=0 返回 queued；振动缺参回退 device/weak/strong 默认值） | 一致 ✓ |
-| AGENTS.md（遍历排除） | 数值以运行时统计为准 | 69 个工具声明非空 `side_effect`，另 2 个（`fill_tilemap_rect`/`build_nodes_from_spec`）仅 `kMutating`，排除合计 71；L2 遍历运行时枚举 393 条后经 `get_tool_detail` 的 `side_effect`/`mutating`/`dynamic` 字段排除（322 个进入两步骤），不再硬编码清单 | 一致 ✓ |
+| AGENTS.md（遍历排除） | 数值以运行时统计为准 | 遍历运行时枚举 444 条后经 `get_tool_detail` 的 `side_effect`/`mutating`/`dynamic` 字段排除，候选与排除数以运行时报告为准（旧基线 71 排除 / 322 候选已过时，待本轮实测复核），不再硬编码清单 | 一致 ✓ |
 | 命名归属 | 类别前缀应反映模块 | `get_scene_tree` 注册在 scene_ops（非 scene_tree_ops）——旧 `scene_tree_get`/`scene_get_tree` 双名已合并，不再语义重叠 | 已消解 ✓ |
 | AGENTS.md（架构） | 工具经 `call_tool` 代理、`register_all.cpp` 的 `g_handlers` 映射分发 | 工具由 `<域>_tools::make_tools()` 汇入 `ToolRegistry`，`register_all.cpp` 由 registry 派生填充 `g_handlers` 与 catalog；`dispatch.cpp` 非主线程走 `queue.submit()` | 一致 ✓ |
 | `input_ops` | （无文档声明） | `parse_key`/`parse_mouse_button` 对未识别名称返回 `KEY_NONE`/`MOUSE_BUTTON_NONE`，但 `press/release_input_key`、`press/release_input_mouse_button` 随即返回 `invalid key`/`invalid mouse button` 错误 | 一致 ✓（本页已注明，非静默失败） |

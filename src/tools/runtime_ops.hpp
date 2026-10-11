@@ -74,6 +74,10 @@ mcp::JsonValue handle_game_job_get(const mcp::JsonValue &args);
 mcp::JsonValue handle_game_sample_property(const mcp::JsonValue &args);
 mcp::JsonValue handle_game_collect_evidence(const mcp::JsonValue &args);
 mcp::JsonValue handle_game_validate_ui_layout(const mcp::JsonValue &args);
+mcp::JsonValue handle_get_game_locale(const mcp::JsonValue &args);
+mcp::JsonValue handle_set_game_locale(const mcp::JsonValue &args);
+mcp::JsonValue handle_get_translation_list(const mcp::JsonValue &args);
+mcp::JsonValue handle_translate_text(const mcp::JsonValue &args);
 
 mcp::JsonValue handle_gda_send(const std::string &op,
                                const mcp::JsonValue &params,

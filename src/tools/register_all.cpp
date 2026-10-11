@@ -38,6 +38,8 @@
 #include "tools/theme_tools.hpp"
 #include "tools/test_tools.hpp"
 #include "tools/analyze_tools.hpp"
+#include "tools/gridmap_tools.hpp"
+#include "tools/tween_tools.hpp"
 #include "tools/runtime_ops.hpp"
 #include "tools/schema_builder.hpp"
 #include "tools/tool_base.hpp"
@@ -409,6 +411,8 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
     add_domain_tools(theme_tools::make_tools);
     add_domain_tools(test_tools::make_tools);
     add_domain_tools(analyze_tools::make_tools);
+    add_domain_tools(gridmap_tools::make_tools);
+    add_domain_tools(tween_tools::make_tools);
 
     {
         ToolSpec spec{"ping", "Health check ping", "Meta", {"health", "ping"}};
@@ -472,7 +476,7 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
 
     {
         ToolSpec spec{"call_tool",
-                      "Execute any tool by name. Use this to call all 392 non-meta tools (391 domain tools plus system_status).",
+                      "Execute any tool by name. Use this to call all 443 non-meta tools (442 domain tools plus system_status).",
                       "System", {"call", "dispatch", "proxy"}};
         spec.side_effect = SideEffect::None;
         spec.flags = tool_flags::kMeta;

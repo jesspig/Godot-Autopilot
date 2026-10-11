@@ -42,6 +42,13 @@ const std::vector<ParamSpec> kEraseInputMapActionParams = {
     {"action", "string", "Action name identifier to remove, e.g. 'mario_jump'; erased from the editor project InputMap and its persisted setting", true},
 };
 
+const std::vector<ParamSpec> kSetInputMapActionBundleParams = {
+    {"action", "string", "Action name identifier to create or update, e.g. 'mario_jump'", true},
+    {"events", "array", "Optional array of input event objects to append, each with a concrete 'class' field, e.g. {'class':'InputEventKey','keycode':'KEY_A'}; keycode and physical_keycode accept numeric codes or KEY_* names; unknown key names are rejected; when omitted no events are bound", false},
+    {"deadzone", "number", "Optional deadzone 0.0 to 1.0, the analog threshold below which input is ignored; defaults to 0.5 for a newly created action, existing deadzone is kept when omitted", false},
+    {"persist", "boolean", "Whether to write ProjectSettings input/<action> and save to disk (default: false); false only modifies the editor InputMap at runtime", false},
+};
+
 const std::vector<ParamSpec> kGetInputMapActionsParams = {};
 
 const std::vector<ParamSpec> kHasInputMapActionParams = {
@@ -52,7 +59,7 @@ const std::vector<ParamSpec> kHasInputMapActionParams = {
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(8);
+  v.reserve(9);
   v.push_back(make_spec_tool(ToolSpec{
       "save_input_map",
       "Write the current editor InputMap into ProjectSettings and save it to disk. Optional 'actions' restricts persistence to the listed action names; when omitted, actions prefixed with 'ui_' or containing '/' are skipped. Returns 'result' set to 'persisted', plus 'actions_persisted', 'readback_verified', 'skipped' and 'save_error' fields. The running game loads persisted actions at startup; the editor does not reload them until restart.",
@@ -93,6 +100,11 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       "Check whether an input action exists in the editor project InputMap. Use it to decide whether add_input_map_action is needed before binding events. A running game process has its own InputMap loaded at startup, so this reflects only the editor project state. Returns a boolean in 'result'.",
       "Input", {"input", "map"}, SideEffect::None, tool_flags::kNone,
       kHasInputMapActionParams, input_map_ops::handle_has_action}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "set_input_map_action_bundle",
+      "Ensure an input action exists and apply deadzone plus events in one call in the editor project InputMap. 'action' is required; 'events' optionally appends each event object with the same 'class' plus keycode/physical_keycode KEY_* handling as add_input_map_action_event and unknown key names are rejected; 'deadzone' optionally sets the analog threshold (0.5 for a new action, existing value kept when omitted). Dual persistence: persist=false (default) only modifies the editor InputMap at runtime (effective SideEffect None, runtime-smokeable with action alone); persist=true additionally writes ProjectSettings input/<action> and saves to disk (effective SideEffect WritesConfig). A running game process will not see the change until it restarts. Returns 'result' set to 'ok' plus 'persisted'.",
+      "Input", {"input", "map"}, SideEffect::WritesConfig, tool_flags::kMutating,
+      kSetInputMapActionBundleParams, input_map_ops::handle_set_action_bundle}));
   return v;
 }
 

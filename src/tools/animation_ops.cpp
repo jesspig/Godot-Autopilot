@@ -1,4 +1,6 @@
 #include "animation_ops.hpp"
+#include <algorithm>
+#include <vector>
 #include "../core/scene_dirty_tracker.hpp"
 #include "../util/error_util.hpp"
 #include "../util/scene_path.hpp"
@@ -458,6 +460,209 @@ mcp::JsonValue handle_insert_keyframe(const mcp::JsonValue &args) {
   inner["time"] = mcp::JsonValue(time);
   inner["key_count"] = mcp::JsonValue(static_cast<int64_t>(
       anim->track_get_key_count(static_cast<int32_t>(track_index))));
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["result"] = std::move(inner);
+  scene_dirty_tracker::mark_scene_modified();
+  return r;
+}
+
+mcp::JsonValue handle_set_track_bundle(const mcp::JsonValue &args) {
+  std::string player_path;
+  std::string anim_name;
+  std::string track_type;
+  std::string node_path;
+  if (!require_string_arg(args, "player_path", player_path))
+    return make_error("missing required parameter: player_path");
+  if (!require_string_arg(args, "anim_name", anim_name))
+    return make_error("missing required parameter: anim_name");
+  if (!require_string_arg(args, "track_type", track_type))
+    return make_error(
+        "missing required parameter: track_type (\"value\" or \"method\")");
+  if (!require_string_arg(args, "node_path", node_path))
+    return make_error("missing required parameter: node_path");
+
+  std::string property;
+  bool has_property = read_string_arg(args, "property", property);
+
+  auto *keys_v = args.Find("keys");
+  if (!keys_v || !keys_v->IsArray())
+    return make_error("missing required parameter: keys (array of 1-256 "
+                      "{\"time\": <number >= 0>, \"value\": <json>} objects)");
+  const mcp::JsonValue::Array &keys_arr = keys_v->GetArray();
+  if (keys_arr.empty() || keys_arr.size() > 256)
+    return make_error("keys must contain 1-256 entries (got " +
+                      std::to_string(keys_arr.size()) + ")");
+
+  bool overwrite = false;
+  auto *overwrite_v = args.Find("overwrite");
+  if (overwrite_v) {
+    if (!overwrite_v->IsBool())
+      return make_error("overwrite must be a boolean");
+    overwrite = overwrite_v->GetBool();
+  }
+
+  godot::Animation::TrackType type;
+  std::string track_path;
+  if (track_type == "value") {
+    if (!has_property || property.empty())
+      return make_error("value tracks require 'property' (e.g. \"position:x\", "
+                        "\"modulate\") — the track path becomes "
+                        "<node_path>:<property>");
+    type = godot::Animation::TYPE_VALUE;
+    track_path = node_path + ":" + property;
+  } else if (track_type == "method") {
+    type = godot::Animation::TYPE_METHOD;
+    track_path = node_path;
+  } else {
+    return make_error("unsupported track_type: " + track_type +
+                      " — use \"value\" or \"method\"");
+  }
+
+  std::string msg;
+  godot::AnimationPlayer *player = resolve_player(player_path, msg);
+  if (!player)
+    return make_error(msg);
+
+  godot::StringName anim_sn(anim_name.c_str());
+  if (!player->has_animation(anim_sn))
+    return make_error("animation not found on " + player_path + ": " +
+                      anim_name);
+
+  godot::Ref<godot::Animation> anim = player->get_animation(anim_sn);
+  godot::NodePath path(track_path.c_str());
+  if (anim->find_track(path, type) >= 0)
+    return make_error("a " + track_type + " track for \"" + track_path +
+                      "\" already exists in animation \"" + anim_name + "\"");
+
+  int32_t idx = anim->add_track(type);
+  anim->track_set_path(idx, path);
+  if (type == godot::Animation::TYPE_VALUE)
+    anim->value_track_set_update_mode(idx,
+                                      godot::Animation::UPDATE_CONTINUOUS);
+
+  struct BundleKey {
+    double time = 0.0;
+    const mcp::JsonValue *value = nullptr;
+    size_t order = 0;
+  };
+  std::vector<BundleKey> work;
+  work.reserve(keys_arr.size());
+  for (size_t i = 0; i < keys_arr.size(); i++) {
+    const mcp::JsonValue &entry = keys_arr[i];
+    std::string where = "keys[" + std::to_string(i) + "]";
+    if (!entry.IsObject()) {
+      anim->remove_track(idx);
+      return make_error(where + " must be an object of the form {\"time\": "
+                               "<number >= 0>, \"value\": <json>}");
+    }
+    auto *time_v = entry.Find("time");
+    if (!time_v || !time_v->IsNumber()) {
+      anim->remove_track(idx);
+      return make_error(where + " requires 'time' (number, seconds since "
+                               "animation start, must be >= 0)");
+    }
+    double time = time_v->IsInt() ? static_cast<double>(time_v->GetInt())
+                                  : time_v->GetDouble();
+    if (time < 0.0) {
+      anim->remove_track(idx);
+      return make_error(where + " requires 'time' >= 0 (got " +
+                        std::to_string(time) + ")");
+    }
+    auto *value_v = entry.Find("value");
+    if (!value_v || value_v->IsNull()) {
+      anim->remove_track(idx);
+      return make_error(where + " requires 'value'");
+    }
+    if (type == godot::Animation::TYPE_METHOD) {
+      if (!value_v->IsObject()) {
+        anim->remove_track(idx);
+        return make_error(where + " method track keys need an object value of "
+                                 "the form {\"method\": \"do_something\", "
+                                 "\"args\": [...]}, got a non-object JSON "
+                                 "value");
+      }
+      auto *method_v = value_v->Find("method");
+      if (!method_v || !method_v->IsString() ||
+          method_v->GetString().empty()) {
+        anim->remove_track(idx);
+        return make_error(where + " method track key object requires a "
+                                 "non-empty string field 'method'");
+      }
+      auto *args_v = value_v->Find("args");
+      if (args_v && !args_v->IsArray()) {
+        anim->remove_track(idx);
+        return make_error(where + " method track key field 'args' must be an "
+                                 "array when present");
+      }
+    }
+    BundleKey item;
+    item.time = time;
+    item.value = value_v;
+    item.order = i;
+    work.push_back(item);
+  }
+
+  std::stable_sort(work.begin(), work.end(),
+                   [](const BundleKey &a, const BundleKey &b) {
+                     if (a.time != b.time)
+                       return a.time < b.time;
+                     return a.order < b.order;
+                   });
+
+  if (!overwrite) {
+    for (size_t i = 1; i < work.size(); i++) {
+      if (work[i].time == work[i - 1].time) {
+        anim->remove_track(idx);
+        return make_error("duplicate key time " +
+                          std::to_string(work[i].time) +
+                          " — pass overwrite=true to keep the last key at a "
+                          "repeated time");
+      }
+    }
+  } else {
+    std::vector<BundleKey> deduped;
+    deduped.reserve(work.size());
+    for (size_t i = 0; i < work.size(); i++) {
+      if (i + 1 < work.size() && work[i + 1].time == work[i].time)
+        continue;
+      deduped.push_back(work[i]);
+    }
+    work.swap(deduped);
+  }
+
+  mcp::JsonValue times(mcp::JsonValue::array_tag);
+  for (const BundleKey &item : work) {
+    godot::Variant key_value;
+    if (type == godot::Animation::TYPE_METHOD) {
+      auto *method_v = item.value->Find("method");
+      godot::Dictionary key;
+      key[godot::StringName("method")] =
+          godot::Variant(godot::StringName(method_v->GetString().c_str()));
+      godot::Array call_args;
+      auto *args_v = item.value->Find("args");
+      if (args_v && args_v->IsArray()) {
+        const mcp::JsonValue::Array &arr = args_v->GetArray();
+        for (const mcp::JsonValue &call_item : arr)
+          call_args.append(VariantJson::deserialize(call_item));
+      }
+      key[godot::StringName("args")] = godot::Variant(call_args);
+      key_value = key;
+    } else {
+      key_value = VariantJson::deserialize(*item.value);
+    }
+    anim->track_insert_key(idx, item.time, key_value);
+    times.PushBack(mcp::JsonValue(item.time));
+  }
+
+  mcp::JsonValue inner(mcp::JsonValue::object_tag);
+  inner["player_path"] = mcp::JsonValue(player_path);
+  inner["anim_name"] = mcp::JsonValue(anim_name);
+  inner["track_index"] = mcp::JsonValue(static_cast<int64_t>(idx));
+  inner["track_path"] = mcp::JsonValue(track_path);
+  inner["track_type"] = mcp::JsonValue(track_type);
+  inner["key_count"] = mcp::JsonValue(static_cast<int64_t>(
+      anim->track_get_key_count(idx)));
+  inner["times"] = std::move(times);
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(inner);
   scene_dirty_tracker::mark_scene_modified();
