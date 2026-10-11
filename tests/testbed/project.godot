@@ -25,3 +25,7 @@ window/stretch/aspect="expand"
 [rendering]
 
 rendering_device/driver.windows="d3d12"
+
+[dotnet]
+
+assembly_name="GDA Testbed"

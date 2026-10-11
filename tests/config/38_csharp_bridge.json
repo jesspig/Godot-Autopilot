@@ -1,0 +1,335 @@
+{
+  "name": "csharp_bridge",
+  "description": "C# 反射桥（B-T4）的 L2 边界：csharp_get_property / csharp_call_method / csharp_subscribe_event 三域工具的编辑器侧参数校验（定位器互斥、必填成员名、runtime 取值、game-only 选项隔离、args 形态），以及非 .NET 编辑器下的精确跳过探针（bridge unavailable 全串 + build_csharp_assembly 工程探测），仿 23_click_ui_coords.json 的无游戏 error 写法。链路：before_all 用 create_editor_scene 建未落盘场景 CSharpBridgeProbe（根节点名即合法 scene-path 定位器，resolve_scene_node 剥离根名后直接命中根节点）→ ① 参数校验 20 步全部在 handler 入口返回精确错误串，不触及桥单例（定位器缺失/互斥、property/method/event/method 缺失、runtime 非法值、unknown parameter、timeout_ms/wait_ready 在 runtime=editor 下被拒、object_id/object_id_str 类型错误、memory:// 命名空间误用、memory 缺失的四段式定位错误、args 非数组/超 16 上限、runtime=game 下 timeout_ms 越界与 wait_ready 类型错误）→ ② 非 mono 探针：定位合法但编辑器进程无 GdaCSharpBridge 单例时三工具精确返回 not-registered 全串（标准 Godot 编辑器无 mono 模块，Engine.has_singleton 恒 false；.NET 编辑器已注册桥时此处改为真调见下）；runtime=game 合法定位在无游戏时经运行时通道返回 game not running 全串（csharp 转发不附加 runtime_game_ops 的 degradation hint，故只断言 error 单键）；build_csharp_assembly 探测返回 result.project_file == res://testbed.csproj 与 command 全串（started/pid 取决于 dotnet 是否可用，不断言）→ ③ cleanup save_editor_scene_as 落盘 res://gda_tmp_csharp_bridge/probe_root.tscn → close_editor_scene → move_os_file_to_trash 回收目录（与 35_scene_tree_gate 同一收尾口径）。前置条件：csharp_* 三工具受 code_execute capability 授权门保护（SpecTool::execute 集中检查，handler 校验之前），runtime=game 步骤另需 game_runtime，build_csharp_assembly 需 process（GODOT_AUTOPILOT_ALLOW env 或 user://godot_autopilot/config.json 的 allow 字段，env 优先），缺失时对应步骤返回 authorization required 而 FAIL。双态声明（重要）：本文件在 CI/标准编辑器下断言非 mono 跳过语义；.NET 编辑器（桥已按 skills/godot-autopilot-csharp/references/csharp-bridge.md 注册单例）下的真调由人工按此骨架验证——csharp_get_property{path:CSharpBridgeProbe 挂载 TestTypes 实例, property:ReadOnlyName} 取回 gda-probe、{property:Scores} 取回 Array、csharp_call_method{method:GetOffset, args:[2]} 取回 Vector2(2,4) 的序列化字典、csharp_subscribe_event{event:Pinged, target_path, method:_on_pinged} 取回 token 后调 RaisePinged(3) 在接收端观测到 3；测试床 TestTypes（tests/testbed/TestTypes.cs，[GlobalClass] Resource 派生、[Export] Array<int>、只读属性、返回 Vector2 struct 的方法、event Action<int>）与 testbed.csproj（net10 / PublishAot=false）即为该真调夹具，非 mono 下仅作 build 探测；成员 reflection 边界覆盖由 L1（csharp 桥单测）承担。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "before_all": [
+      {
+        "id": "csharp_before_scene",
+        "tool": "create_editor_scene",
+        "args": { "name": "CSharpBridgeProbe" }
+      }
+    ],
+    "stages": [
+      {
+        "id": "arg_validation",
+        "steps": [
+          {
+            "id": "get_missing_locator",
+            "tool": "csharp_get_property",
+            "args": { "property": "ReadOnlyName" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "missing required parameter: path (or object_id, object_id_str, memory)" }
+              ]
+            }
+          },
+          {
+            "id": "get_missing_property",
+            "tool": "csharp_get_property",
+            "args": { "path": "CSharpBridgeProbe" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "missing required parameter: property (non-empty C# member name)" }
+              ]
+            }
+          },
+          {
+            "id": "get_locators_exclusive",
+            "tool": "csharp_get_property",
+            "args": { "path": "CSharpBridgeProbe", "object_id": 1, "property": "ReadOnlyName" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "object_id, object_id_str, memory and path are mutually exclusive for csharp_get_property — pass exactly one" }
+              ]
+            }
+          },
+          {
+            "id": "get_bad_runtime",
+            "tool": "csharp_get_property",
+            "args": { "path": "CSharpBridgeProbe", "property": "ReadOnlyName", "runtime": "editorial" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "runtime must be \"editor\" or \"game\" for csharp_get_property" }
+              ]
+            }
+          },
+          {
+            "id": "get_unknown_param",
+            "tool": "csharp_get_property",
+            "args": { "path": "CSharpBridgeProbe", "property": "ReadOnlyName", "bogus": 1 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "unknown parameter for csharp_get_property: bogus" }
+              ]
+            }
+          },
+          {
+            "id": "get_timeout_editor_only",
+            "tool": "csharp_get_property",
+            "args": { "path": "CSharpBridgeProbe", "property": "ReadOnlyName", "timeout_ms": 100 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "timeout_ms only applies when runtime=\"game\"" }
+              ]
+            }
+          },
+          {
+            "id": "get_wait_ready_editor_only",
+            "tool": "csharp_get_property",
+            "args": { "path": "CSharpBridgeProbe", "property": "ReadOnlyName", "wait_ready": false },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "wait_ready only applies when runtime=\"game\"" }
+              ]
+            }
+          },
+          {
+            "id": "get_object_id_type",
+            "tool": "csharp_get_property",
+            "args": { "object_id": "123", "property": "ReadOnlyName" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "object_id must be an integer object id" }
+              ]
+            }
+          },
+          {
+            "id": "get_object_id_str_empty",
+            "tool": "csharp_get_property",
+            "args": { "object_id_str": "", "property": "ReadOnlyName" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "object_id_str must be a non-empty integer string" }
+              ]
+            }
+          },
+          {
+            "id": "get_memory_namespace_rejected",
+            "tool": "csharp_get_property",
+            "args": { "path": "memory://Foo", "property": "ReadOnlyName" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "path 'memory://Foo' is a resource namespace, not a node path — pass the bare name in memory instead" }
+              ]
+            }
+          },
+          {
+            "id": "get_memory_missing",
+            "tool": "csharp_get_property",
+            "args": { "memory": "gda_no_such_memory", "property": "ReadOnlyName" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "memory resource 'gda_no_such_memory' not found (create it first, e.g. with create_resource) — position: csharp_get_property — expected: exactly one of object_id, object_id_str, memory or path — action: pass a live object_id, a memory resource name, a res:// resource path or a scene node path" }
+              ]
+            }
+          },
+          {
+            "id": "call_missing_method",
+            "tool": "csharp_call_method",
+            "args": { "path": "CSharpBridgeProbe" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "missing required parameter: method (non-empty C# method name)" }
+              ]
+            }
+          },
+          {
+            "id": "call_args_not_array",
+            "tool": "csharp_call_method",
+            "args": { "path": "CSharpBridgeProbe", "method": "GetOffset", "args": {} },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "args must be a JSON array" }
+              ]
+            }
+          },
+          {
+            "id": "call_args_too_many",
+            "tool": "csharp_call_method",
+            "args": { "path": "CSharpBridgeProbe", "method": "GetOffset", "args": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17] },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "args exceeds maximum of 16 entries — split into smaller calls" }
+              ]
+            }
+          },
+          {
+            "id": "call_game_timeout_range",
+            "tool": "csharp_call_method",
+            "args": { "path": "CSharpBridgeProbe", "method": "GetOffset", "runtime": "game", "timeout_ms": 0 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "timeout_ms must be an integer between 1 and 25000" }
+              ]
+            }
+          },
+          {
+            "id": "call_game_wait_ready_type",
+            "tool": "csharp_call_method",
+            "args": { "path": "CSharpBridgeProbe", "method": "GetOffset", "runtime": "game", "wait_ready": "yes" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "wait_ready must be a boolean" }
+              ]
+            }
+          },
+          {
+            "id": "sub_missing_event",
+            "tool": "csharp_subscribe_event",
+            "args": { "path": "CSharpBridgeProbe", "target_path": "CSharpBridgeProbe", "method": "_on_pinged" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "missing required parameter: event (non-empty C# event name)" }
+              ]
+            }
+          },
+          {
+            "id": "sub_missing_method",
+            "tool": "csharp_subscribe_event",
+            "args": { "path": "CSharpBridgeProbe", "target_path": "CSharpBridgeProbe", "event": "Pinged" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "missing required parameter: method (non-empty receiver method name)" }
+              ]
+            }
+          },
+          {
+            "id": "sub_missing_sink",
+            "tool": "csharp_subscribe_event",
+            "args": { "path": "CSharpBridgeProbe", "event": "Pinged", "method": "_on_pinged" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "missing required parameter: target_path (or target_object_id, target_object_id_str, target_memory)" }
+              ]
+            }
+          },
+          {
+            "id": "sub_unknown_param",
+            "tool": "csharp_subscribe_event",
+            "args": { "path": "CSharpBridgeProbe", "target_path": "CSharpBridgeProbe", "event": "Pinged", "method": "_on_pinged", "bogus": 1 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "unknown parameter for csharp_subscribe_event: bogus" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "non_mono_probe",
+        "steps": [
+          {
+            "id": "probe_get_bridge_absent",
+            "tool": "csharp_get_property",
+            "args": { "path": "CSharpBridgeProbe", "property": "ReadOnlyName" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "csharp bridge singleton 'GdaCSharpBridge' is not registered: run a .NET editor build with the bridge registered via Engine.register_singleton, then retry" }
+              ]
+            }
+          },
+          {
+            "id": "probe_call_bridge_absent",
+            "tool": "csharp_call_method",
+            "args": { "path": "CSharpBridgeProbe", "method": "GetOffset", "args": [2] },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "csharp bridge singleton 'GdaCSharpBridge' is not registered: run a .NET editor build with the bridge registered via Engine.register_singleton, then retry" }
+              ]
+            }
+          },
+          {
+            "id": "probe_subscribe_bridge_absent",
+            "tool": "csharp_subscribe_event",
+            "args": { "path": "CSharpBridgeProbe", "event": "Pinged", "target_path": "CSharpBridgeProbe", "method": "_on_pinged" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "csharp bridge singleton 'GdaCSharpBridge' is not registered: run a .NET editor build with the bridge registered via Engine.register_singleton, then retry" }
+              ]
+            }
+          },
+          {
+            "id": "probe_game_no_game",
+            "tool": "csharp_get_property",
+            "args": { "path": "CSharpBridgeProbe", "property": "ReadOnlyName", "runtime": "game" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "game not running: no game process is attached — start the game from the editor first (play the scene), then retry; if the game was just started, wait a moment for it to report ready" }
+              ]
+            }
+          },
+          {
+            "id": "probe_build_assembly",
+            "tool": "build_csharp_assembly",
+            "args": {},
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.project_file", "value": "res://testbed.csproj" },
+                { "key": "result.command", "value": "dotnet build --nologo res://testbed.csproj" },
+                { "key": "result.note", "not_empty": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "cleanup",
+        "steps": [
+          {
+            "id": "csharp_save_scene",
+            "tool": "save_editor_scene_as",
+            "args": { "path": "res://gda_tmp_csharp_bridge/probe_root.tscn" },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "saved" }
+              ]
+            }
+          },
+          {
+            "id": "csharp_close_scene",
+            "tool": "close_editor_scene",
+            "args": {},
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "closed" }
+              ]
+            }
+          },
+          {
+            "id": "csharp_trash_dir",
+            "tool": "move_os_file_to_trash",
+            "args": { "path": "res://gda_tmp_csharp_bridge" },
+            "expect": { "has_keys": ["result"] }
+          }
+        ]
+      }
+    ]
+  }
+}

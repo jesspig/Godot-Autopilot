@@ -140,6 +140,7 @@ resource: src/tools/
   - `runtime_game_ops.cpp` 无独立 hpp，声明在 `runtime_ops.hpp`。
   - **注释归档（09-19 注释清理批，`runtime_game_ops.cpp:238`）**：`execute_game_script` 带 `assert` 时走同权限的新游戏 op（`eval_assert`），不断言时保持原 `eval` 路径。
   - **`execute_game_script` 两次尝试（09-29 起）**：先按原样编译并使用（要求脚本定义 `func _run()`）；编译失败、或编译成功但实例缺少 `_run()` 且源码无顶层 `func` 时，自动把裸语句包装为 `extends Node` + `func _run()` 重试（`gdscript_wrap::wrap_bare_body`，行号映射同步偏移），成功响应带 `wrapped:true`（含 await 完成路径）；无顶层 `func` 且两次尝试均失败时错误附包装源码与提示。裸语句须显式 `return` 才产生值。
+  - **C# 反射指引**：`execute_game_script` 的 GDScript 通道看不到 C# 私有或无 getter 成员——读 C# 属性/字段、调 C# 方法、订阅 C# 事件改用 `csharp_get_property` / `csharp_call_method` / `csharp_subscribe_event`（`runtime="game"` 经同一运行时通道转发；端点、反射边界与订阅 token 语义见 `godot-autopilot-csharp` 技能的 references/csharp-bridge.md）。
 - **错误模式**：`game not running`（无真实 active peer，09-29 起文案可达）、`game started but not ready`（有 peer 但未 ready 且 `wait_ready=false`）、超时错误（含 op 名/request_id/会话数、响应账目与 `late_results` 迟到结果摘要；排队等待 ready 的超时另有专属文案）、`unexpected game response (missing result)`；09-16 起超时后的迟到响应不再仅记 Warning 丢弃，进入 `late_results`（见上）。
 - 出站链接：[运行时通道](../modules/entry_runtime.md) · [工具注册表](../modules/tools_registry.md)
 

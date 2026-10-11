@@ -110,6 +110,10 @@ as GDScript exports (full table in `godot-autopilot-scene-system`):
   returns null, which is easy to misread as a missing property. Validate
   through readable exported fields rather than derived or write-only ones.
 
+## Reflection bridge: C# members that GDScript cannot see
+
+`property_get` and `execute_game_script` only reach members visible to GDScript: a C# property without a getter reads back null and non-public members do not resolve at all. For those, plus C# method overloads and C# events, use `csharp_get_property`, `csharp_call_method` and `csharp_subscribe_event` (`runtime` editor resolves in the editor process, game forwards through the running game). Endpoints, reflection limits, export-build caution and subscription token lifetime are documented in references/csharp-bridge.md.
+
 ## See also
 
 - `godot-autopilot-scripting` - the GDScript execution channels, unaffected

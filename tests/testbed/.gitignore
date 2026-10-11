@@ -7,5 +7,7 @@
 !assets/
 !assets/**/
 !assets/**/*.png
+!*.csproj
+!*.cs
 
 .godot/

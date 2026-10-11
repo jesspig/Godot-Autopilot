@@ -100,6 +100,7 @@ add_library(godot-autopilot SHARED
     src/tools/capture_ops.cpp
     src/tools/code_exec_ops.cpp
     src/tools/config_ops.cpp
+    src/tools/csharp_bridge_ops.cpp
     src/tools/display_ops.cpp
     src/tools/input_map_ops.cpp
     src/tools/log_ops.cpp

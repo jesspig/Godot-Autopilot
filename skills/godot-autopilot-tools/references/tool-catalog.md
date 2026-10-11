@@ -1,6 +1,6 @@
 # Category Index
 
-All 443 domain tools of the godot-autopilot MCP server, grouped by their 32 source modules, plus `system_status`. Call domain tools through `call_tool`; confirm schemas with `get_tool_detail`.
+All 446 domain tools of the godot-autopilot MCP server, grouped by their 33 source modules, plus `system_status`. Call domain tools through `call_tool`; confirm schemas with `get_tool_detail`.
 
 ## Analysis - analyze_tools (3)
 
@@ -477,6 +477,12 @@ All 443 domain tools of the godot-autopilot MCP server, grouped by their 32 sour
 - `get_script_property` - read a script's declared default or a node's current property value
 - `set_script_property` - set a node property without undo entry or validation
 - `get_script_property_list` - list the declared variables of a GDScript file
+
+## Scripts - csharp_tools (3)
+
+- `csharp_get_property` - read a C# member invisible to GDScript through the editor bridge singleton or the game bridge (runtime game)
+- `csharp_call_method` - call a C# method with overload resolution by argument count through the editor bridge singleton or the game bridge (runtime game)
+- `csharp_subscribe_event` - subscribe a receiver method to a C# event through the editor bridge singleton or the game bridge (runtime game), returns a subscription token
 
 ## SpriteFrames - spriteframes_tools (3)
 

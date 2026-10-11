@@ -12,6 +12,7 @@
 #include "tools/capture_tools.hpp"
 #include "tools/spriteframes_tools.hpp"
 #include "tools/config_tools.hpp"
+#include "tools/csharp_tools.hpp"
 #include "tools/debug_tools.hpp"
 #include "tools/audio_tools.hpp"
 #include "tools/render_tools.hpp"
@@ -385,6 +386,7 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
     add_domain_tools(capture_tools::make_tools);
     add_domain_tools(spriteframes_tools::make_tools);
     add_domain_tools(config_tools::make_tools);
+    add_domain_tools(csharp_tools::make_tools);
     add_domain_tools(debug_tools::make_tools);
     add_domain_tools(audio_tools::make_tools);
     add_domain_tools(render_tools::make_tools);
@@ -476,7 +478,7 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
 
     {
         ToolSpec spec{"call_tool",
-                      "Execute any tool by name. Use this to call all 443 non-meta tools (442 domain tools plus system_status).",
+                      "Execute any tool by name. Use this to call all 447 non-meta tools (446 domain tools plus system_status).",
                       "System", {"call", "dispatch", "proxy"}};
         spec.side_effect = SideEffect::None;
         spec.flags = tool_flags::kMeta;

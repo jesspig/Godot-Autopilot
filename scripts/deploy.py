@@ -5,7 +5,19 @@ import shutil
 import sys
 from pathlib import Path
 
-from .config import DEMO_DIRS, PLATFORM_LIBS, PLATFORM_PDB, TESTBED_DIR, _addon_dir, artifact_dir
+from .config import DEMO_DIRS, PLATFORM_LIBS, PLATFORM_PDB, PROJECT_ROOT, TESTBED_DIR, _addon_dir, artifact_dir
+
+
+BRIDGE_TEMPLATE = PROJECT_ROOT / "csharp_bridge" / "GdaCSharpBridge.cs"
+
+
+def _deploy_csharp_bridge(addon_dir: Path) -> None:
+    if BRIDGE_TEMPLATE.is_file():
+        shutil.copy2(BRIDGE_TEMPLATE, addon_dir / BRIDGE_TEMPLATE.name)
+        size_kb = BRIDGE_TEMPLATE.stat().st_size / 1024
+        print(f"  {BRIDGE_TEMPLATE.name}  ({size_kb:.0f} KB)", flush=True)
+    else:
+        print(f"[WARN] {BRIDGE_TEMPLATE.name} not found in {BRIDGE_TEMPLATE.parent}", flush=True)
 
 
 def _generate_gdextension(addon_dir: Path) -> None:
@@ -54,6 +66,7 @@ def _deploy(preset: str, demos: list[Path] | None = None) -> None:
                 shutil.copy2(pdb_src, addon_dir / PLATFORM_PDB)
                 size_kb = pdb_src.stat().st_size / 1024
                 print(f"  {PLATFORM_PDB}  ({size_kb:.0f} KB)", flush=True)
+        _deploy_csharp_bridge(addon_dir)
         print(f"  -> {addon_dir}", flush=True)
         _validate_addon_integrity(addon_dir, project_dir)
 

@@ -58,9 +58,9 @@ cmake --build --preset debug --target gda_unit_tests gda_test_runner
 ctest --preset debug
 ```
 
-注册方式（`tests/CMakeLists.txt:118-130`）：**每份 `config/*.json` 一条 `gda_runner_<文件名去后缀>` 用例**，命令为 `gda_test_runner --file <name> --report-dir <build>/tests/output`，`TIMEOUT 600`（单文件含遍历约 2-4 分钟，超时防挂死）。当前 37 个 config 文件 → 37 条 ctest 用例（21 号段空缺，99 号诊断用例已删）：`gda_runner_00_meta`、`gda_runner_01_scene`、`gda_runner_02_property`、`gda_runner_03_tools_contract`、`gda_runner_04_resources_scripts`、`gda_runner_05_rename_references`、`gda_runner_06_move_references`、`gda_runner_07_scene_tabs`、`gda_runner_08_property_readback`、`gda_runner_09_editor_ui`、`gda_runner_10_editor_input`、`gda_runner_11_editor_tree`、`gda_runner_12_capture_params`、`gda_runner_13_inline_subresource`、`gda_runner_14_tilemap_rect`、`gda_runner_15_scene_path`、`gda_runner_16_game_jobs`、`gda_runner_17_vision_assist`、`gda_runner_18_script_freshness`、`gda_runner_19_cjk_roundtrip`、`gda_runner_20_cjk_text_roundtrip`、`gda_runner_22_uid_guard`、`gda_runner_23_click_ui_coords`、`gda_runner_24_keycode_alias`、`gda_runner_25_open_scene_idempotent`、`gda_runner_26_user_tools_code_mode`、`gda_runner_27_user_tools_rescan`、`gda_runner_28_sprite_frames_animation`、`gda_runner_29_trace_persistence`、`gda_runner_30_observability`、`gda_runner_31_theme_root`、`gda_runner_32_plane_inline`、`gda_runner_33_verified_inherit`、`gda_runner_34_slash_property`、`gda_runner_35_scene_tree_gate`、`gda_runner_36_stall_immunity`、`gda_runner_37_game_ready_gate`。
+注册方式（`tests/CMakeLists.txt:118-130`）：**每份 `config/*.json` 一条 `gda_runner_<文件名去后缀>` 用例**，命令为 `gda_test_runner --file <name> --report-dir <build>/tests/output`，`TIMEOUT 600`（单文件含遍历约 2-4 分钟，超时防挂死）。当前 38 个 config 文件 → 38 条 ctest 用例（21 号段空缺，99 号诊断用例已删）：`gda_runner_00_meta`、`gda_runner_01_scene`、`gda_runner_02_property`、`gda_runner_03_tools_contract`、`gda_runner_04_resources_scripts`、`gda_runner_05_rename_references`、`gda_runner_06_move_references`、`gda_runner_07_scene_tabs`、`gda_runner_08_property_readback`、`gda_runner_09_editor_ui`、`gda_runner_10_editor_input`、`gda_runner_11_editor_tree`、`gda_runner_12_capture_params`、`gda_runner_13_inline_subresource`、`gda_runner_14_tilemap_rect`、`gda_runner_15_scene_path`、`gda_runner_16_game_jobs`、`gda_runner_17_vision_assist`、`gda_runner_18_script_freshness`、`gda_runner_19_cjk_roundtrip`、`gda_runner_20_cjk_text_roundtrip`、`gda_runner_22_uid_guard`、`gda_runner_23_click_ui_coords`、`gda_runner_24_keycode_alias`、`gda_runner_25_open_scene_idempotent`、`gda_runner_26_user_tools_code_mode`、`gda_runner_27_user_tools_rescan`、`gda_runner_28_sprite_frames_animation`、`gda_runner_29_trace_persistence`、`gda_runner_30_observability`、`gda_runner_31_theme_root`、`gda_runner_32_plane_inline`、`gda_runner_33_verified_inherit`、`gda_runner_34_slash_property`、`gda_runner_35_scene_tree_gate`、`gda_runner_36_stall_immunity`、`gda_runner_37_game_ready_gate`、`gda_runner_38_csharp_bridge`。
 
-- L1 经 `gtest_discover_tests` 注册，每用例一条（如 `CommandQueueTest.*`，391 条，36 个 unit 文件、37 个 gtest suite）；迁移守卫 `migration_guard` 与注释守卫 `comment_guard` 各 1 条（`tests/CMakeLists.txt`，零依赖读源码断言，不启动引擎也无需构建产物）——L1 过滤后共 **394** 条；ctest 总注册点 **431** = 394（L1）+ 37（L2）。
+- L1 经 `gtest_discover_tests` 注册，每用例一条（如 `CommandQueueTest.*`，391 条，36 个 unit 文件、37 个 gtest suite）；迁移守卫 `migration_guard` 与注释守卫 `comment_guard` 各 1 条（`tests/CMakeLists.txt`，零依赖读源码断言，不启动引擎也无需构建产物）——L1 过滤后共 **394** 条；ctest 总注册点 **432** = 394（L1）+ 38（L2）。
 - **L1 单测清单**（36 个 unit 文件，逐文件主题以 [docs/wiki/tests.md](../docs/wiki/tests.md) 的 L1 表为准）：09-29 B1–B7 修复批次新增 `gdscript_wrap_test`（26）、`dispatch_budget_test`（10）、`ready_policy_test`（5），并把 `command_queue_test` 扩至 11、`variant_json_strict_test` 扩至 47、`error_util_test` 扩至 4，覆盖三通道 GDScript 包装、主线程等待预算、游戏就绪决策表、队列取消/心跳与严格 JSON 形状；09-21 可重放监控与日志系统批次新增 `monitor_test`（9）、`perf_sampler_test`（6），并把 `trace_recorder_test` 扩至 18、`log_system_test` 扩至 9、`log_persist_test` 扩至 8，覆盖统一埋点门面、性能采样/超时看门狗、trace 环缓冲（schema v2）与日志/持久化纯逻辑。
 - **耗时**：普通用例约 15s/文件（一次编辑器生命周期）；`03_tools_contract` 含两次全量遍历（运行时枚举后按声明排除的候选工具 ×2，候选数以运行时报告为准），为最慢单文件（约 2-3 分钟）。全量 ctest 总耗时随用例数与机器波动，以运行时统计为准。
 - 单跑一条：`ctest --preset debug -R gda_runner_00_meta` 或 `ctest --preset debug -R CommandQueueTest`。
@@ -203,7 +203,7 @@ build\debug\tests\gda_test_runner.exe --file 01_scene
 - **`not_empty`**：string 非空；array/object `Size() > 0`；null 判空失败；其他标量视为非空
 - 断言执行于 C++ 执行器侧，对 `call_tool` 的响应 JSON 校验；无 `expect` 时仅检查工具调用未返回 `error`
 
-### 用例文件（`tests/config/`，37 个）
+### 用例文件（`tests/config/`，38 个）
 
 | 文件 | name | 内容 |
 | ---- | ---- | ---- |
@@ -244,6 +244,7 @@ build\debug\tests\gda_test_runner.exe --file 01_scene
 | `35_scene_tree_gate.json` | scene_tree_gate | B1 8 个 SceneTree 工具游戏门控：无游戏时逐一返回结构化 `error`（已授权为运行时通道错误，未授权为授权门拒绝，两种授权态都通过），并用 `code_execute` 回读 `get_tree().paused == false` 证明编辑器树未被触碰；需 `code_execute` 授权 |
 | `36_stall_immunity.json` | 36_stall_immunity | B1 通道停摆免疫：暂停编辑器 `SceneTree.set_pause(true)` 后 `ping` 仍返回 `pong`、`system_status.main_thread` 五字段（`last_drain_age_ms`/`queue_depth`/`queue_cancelled`/`queue_rejected_full`/`oldest_pending_ms`）非空，恢复后 ping 正常；需 `code_execute` 授权 |
 | `37_game_ready_gate.json` | game_ready_gate | B7 无游戏就绪门：`execute_game_script`（授权后）与 `capture_game_viewport`（无授权门）默认 `wait_ready=true` 即返回精确 `game not running: …` 不挂起，`wait_ready=false` 等价文案；需 `game_runtime` 授权 |
+| `38_csharp_bridge.json` | csharp_bridge | B-T4 C# 反射桥三域工具（csharp_get_property / csharp_call_method / csharp_subscribe_event）编辑器侧参数校验（定位器互斥、必填成员名、runtime 取值、game-only 选项隔离、args 形态）+ 非 mono 精确跳过探针（bridge unavailable 全串 + build_csharp_assembly 工程探测）；需 `code_execute` + `game_runtime` + `process` 授权 |
 
 ## 7. 遍历与排除清单（`tests/runner/traversal.cpp`）
 
