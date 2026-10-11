@@ -61,11 +61,58 @@ const std::vector<ParamSpec> kBuildNodesFromSpecParams = {
     {"preview", "boolean", "Alias of dry_run: validate and preview without writing (default: false)", false},
 };
 
+const std::vector<ParamSpec> kGetSceneSnapshotParams = {
+    {"max_depth", "integer", "Maximum tree depth to include (integer, default: 8; -1 means unlimited)", false},
+    {"include_properties", "boolean", "Add up to 20 properties per node, skipping metadata/* keys, names starting with '_' and Object-typed values (boolean, default: false)", false},
+    {"verify", "boolean", "Compare the in-memory tree against the on-disk scene file and attach a verify summary with match, node and connection counts plus missing_paths (boolean, default: true)", false},
+    {"observe", "boolean", "Observe/capture toggle: append a fresh editor viewport capture to the result through the observe pipeline (boolean, default: false); a capture failure is reported as observe_error without failing the call", false},
+    {"paths", "array", "Optional non-empty array (max 50) of node paths in the edited scene; when present a nodes section with per-node screen positions is attached and per-item errors never fail the call", false},
+};
+
+const std::vector<ParamSpec> kSpawnNodeBundleParams = {
+    {"type", "string", "Node class type (string, default: Node). Must be a Node subclass, e.g. Node2D, Sprite2D — other classes error", false},
+    {"name", "string", "Node name (string, default: Node); '/' and ':' are rejected", false},
+    {"parent_path", "string", "Parent node path in the edited scene (string, default: edited scene root); omit only while the scene has no root, in which case the new node becomes the root", false},
+    {"properties", "object", "Optional map of property names to values applied via set_properties_batch with atomic:true (object, e.g. {\"visible\": false}); any failing property rolls the whole bundle back", false},
+    {"script_path", "string", "Optional Script resource path to attach via attach_script_to_node (string, must start with 'res://'); the script is re-read from disk before attaching", false},
+    {"groups", "array", "Optional array of 1..16 group names added persistently via add_group_node with editor undo registration", false},
+    {"connections", "array", "Optional array of {signal, target_path, method, persist} objects connected from the new node via signal_connect; persist defaults to true (CONNECT_PERSIST, saved with the scene)", false},
+    {"owner", "boolean", "Set scene ownership so the node is saved with the scene (boolean, default: true)", false},
+    {"dry_run", "boolean", "Validate parameters and return the preview without writing to the scene (default: false); either dry_run or preview enables preview-only mode", false},
+    {"preview", "boolean", "Alias of dry_run: validate and preview without writing (default: false)", false},
+};
+
+const std::vector<ParamSpec> kCreatePathNodeParams = {
+    {"name", "string", "Path node name (e.g. 'EnemyPath')", true},
+    {"parent_path", "string", "Parent node path in the edited scene; omit only while the scene has no root, in which case the new path node becomes the root", false},
+    {"curve", "string", "Registration name of a curve from create_curve_resource (memory://name); a Curve2D creates a Path2D, a Curve3D creates a Path3D", true},
+};
+
+const std::vector<ParamSpec> kAdvancePathFollowParams = {
+    {"path", "string", "Node path of a PathFollow2D/PathFollow3D in the edited scene (e.g. 'EnemyPath/Follower')", true},
+    {"offset", "number", "Distance in pixels to advance along the curve; negative values move backward", true},
+};
+
+const std::vector<ParamSpec> kFocusCameraOnNodeParams = {
+    {"camera_path", "string", "Camera node path in the edited scene (a Camera2D for 2D targets, a Camera3D for 3D targets)", true},
+    {"target_path", "string", "Target node path in the edited scene to focus on (Node2D or Control for 2D cameras, Node3D for 3D cameras)", true},
+    {"margin", "number", "Extra padding: grows the 2D focus rect around the target anchor, or pulls a 3D camera back along its view direction by this many world units (number, default: 0, must not be negative)", false},
+};
+
+const std::vector<ParamSpec> kSetCameraParamsParams = {
+    {"camera_path", "string", "Camera node path in the edited scene (Camera2D and Camera3D accept different params keys)", true},
+    {"params", "object", "Camera settings to apply with at least one entry: 'zoom' (Camera2D only, number above 0 or {x, y} object with components above 0), 'fov' (Camera3D only, 1 to 179), 'near' (Camera3D only, above 0 and below far), 'far' (Camera3D only, above 0 and above near), 'limits' (Camera2D only, object with any of limit_left, limit_top, limit_right, limit_bottom integers and limit_smoothed boolean); unknown keys error", true},
+};
+
+const std::vector<ParamSpec> kGetCameraViewRectParams = {
+    {"camera_path", "string", "Camera node path in the edited scene (Camera2D or Camera3D)", true},
+};
+
 } // namespace
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(8);
+  v.reserve(15);
   v.push_back(make_spec_tool(ToolSpec{
       "create_scene_node",
       "Create a new node in the currently edited scene. Provide 'type' (any Node subclass, default Node) and 'name' (default NewNode); omit 'parent_path' only while the scene has no root, otherwise pass the parent node path. Optional 'properties' object applies values right after creation through the same conversion chain as property_set (NodePath strings become node references, resource references are resolved, and an inline resource description such as {\"type\": \"RectangleShape2D\", \"properties\": {...}} creates a pathless sub-resource saved as a sub_resource) — any failing property frees the new node and reports the property name. Returns the new node 'path', the 'applied_properties' array (property names applied without error; a property may still have been adjusted by the engine — it then also appears in 'property_warnings'), the 'inline_resources' array ({property, type} entries present only when inline descriptions were applied) and an 'undo' hint describing how to remove the node via delete_scene_node. When the engine adjusts or flags a value after a successful set, the response additionally includes 'property_warnings', an array of {path, property, warning} objects; the field is absent when there are no warnings.",
@@ -106,6 +153,41 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       "用声明式 spec 一次建好整棵子树：传 'spec' 对象 {type（Node 子类，默认 Node）、name（默认 Node，'/' 与 ':' 非法）、props（经 property_set 同转换链逐节点应用，OBJECT 型值先行）、children（同形 spec 数组递归）}；可选 'parent_path'（默认场景根，仅在无场景时省略并让顶层 spec 节点成根）、'dry_run'/'preview'（任一 true 则只校验并返回节点清单，不写场景）。自顶向下挂接并设 owner 为场景根以保证落盘；任一步失败整体回滚（摘除顶层已建节点并释放子树，无残留）。递归上限 32 层、单次上限 500 节点。与 create_scene_node、code_execute 并存：定型结构用本工具，单次零散节点用 create_scene_node，异形逻辑（循环、条件、计算值）用 code_execute。返回 mode（built/dry_run）、node_count、created [{path, type}] 与 delete_scene_node 撤销提示。",
       "Scene", {"node", "build", "spec"}, SideEffect::None, tool_flags::kMutating | tool_flags::kSceneTarget,
       kBuildNodesFromSpecParams, scene_spec_ops::handle_build_from_spec}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "get_scene_snapshot",
+      "Read-only snapshot of the currently edited scene in one call: tree (same name/type/path/children walk as get_scene_tree with max_depth and include_properties), verify summary (same memory-versus-disk comparison as verify_scene_saved with match, node and connection counts plus missing_paths; unavailable when the scene has no file path) and, when paths is given, a nodes section with per-node screen positions (same items as get_scene_node_screen_rect; per-item errors never fail the call). Optional verify (default true) toggles the verify summary; optional observe (default false) appends a fresh editor viewport capture through the observe pipeline and a capture failure is reported as observe_error without failing the call. Never marks the scene dirty and never touches undo history. Errors only when no scene is open or paths is malformed.",
+      "Scene", {"snapshot", "tree", "verify"}, SideEffect::None, tool_flags::kObserve,
+      kGetSceneSnapshotParams, scene_ops::handle_get_snapshot}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "spawn_node_bundle",
+      "Create one node and finish its common setup in a single atomic call: 'type' (any Node subclass, default Node) and 'name' (default Node, '/' and ':' rejected) under 'parent_path' (default: edited scene root; omit only while the scene has no root, in which case the new node becomes the root). Optional 'properties' object is applied via set_properties_batch with atomic:true, optional 'script_path' (must start with 'res://') is attached via attach_script_to_node with a fresh disk re-read, optional 'groups' (array of 1..16 names) is added persistently via add_group_node with editor undo registration, and optional 'connections' (array of {signal, target_path, method, persist} with persist defaulting to true for CONNECT_PERSIST scene-saved wiring) is connected from the new node via signal_connect. Optional 'owner' (default true) keeps scene ownership so the node is saved; 'dry_run'/'preview' (either true) only validates and previews without writing. The steps run in order properties, script, groups, connections; any failing step removes the new node and rolls the whole bundle back with no residue. Returns the new node 'path' and 'type', the 'applied' property name array, 'groups_connected' and 'signals_connected' counts, and an 'undo' hint describing how to remove the node via delete_scene_node.",
+      "Scene", {"node", "bundle", "spawn"}, SideEffect::None, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
+      kSpawnNodeBundleParams, scene_spec_ops::handle_spawn_bundle}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "create_path_node",
+      "Create a Path2D/Path3D node in the edited scene bound to a curve created by create_curve_resource. Requires 'name' and 'curve' (the memory:// reference); the curve type decides the node type (Curve2D creates Path2D, Curve3D creates Path3D). Optional 'parent_path' (default: scene root; omit only while the scene has no root, in which case the new node becomes the root). Sets scene ownership so the node is saved. Returns the new node 'path', 'type', 'curve' and an 'undo' hint describing how to remove the node via delete_scene_node.",
+      "Scene", {"node", "path", "create"}, SideEffect::None, tool_flags::kNone | tool_flags::kSceneTarget,
+      kCreatePathNodeParams, scene_ops::handle_create_path_node}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "advance_path_follow",
+      "Advance a PathFollow2D/PathFollow3D node along its parent path curve by 'offset' pixels (negative moves backward). Requires 'path' (the follower node path in the edited scene) and 'offset' (number). Sets progress to current progress plus offset and reports the new progress, progress_ratio and global position. Marks the scene modified.",
+      "Scene", {"node", "path", "follow", "advance"}, SideEffect::None, tool_flags::kNone | tool_flags::kSceneTarget,
+      kAdvancePathFollowParams, scene_ops::handle_advance_path_follow}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "focus_camera_on_node",
+      "Point a scene camera at a node: pass 'camera_path' (a Camera2D for 2D targets, a Camera3D for 3D targets) and 'target_path' (Node2D or Control for 2D cameras, Node3D for 3D cameras; other types error naming the actual class). A 2D camera is centered on the target anchor (the Control global-rect center, otherwise the canvas origin) and reports the padded 'focus_rect'; a 3D camera keeps its position and turns toward the target via look_at, reporting whether the target is 'behind' it. Optional 'margin' (number, default 0, must not be negative) grows the 2D focus rect, or pulls a 3D camera back along its view direction before aiming. One editor undo step; marks the scene modified. Returns camera and target paths and types, space, position, zoom and focus_rect (2D) or target_position and behind (3D), plus margin.",
+      "Scene", {"camera", "focus"}, SideEffect::None, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
+      kFocusCameraOnNodeParams, scene_ops::handle_focus_camera_on_node}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "set_camera_params",
+      "Update settings on a scene camera in one editor undo step: pass 'camera_path' and 'params' (object with at least one entry). 'zoom' (Camera2D only: number above 0 or {x, y} object with components above 0), 'fov' (Camera3D only: 1 to 179), 'near' and 'far' (Camera3D only: above 0 with near below far), 'limits' (Camera2D only: object with any of limit_left, limit_top, limit_right, limit_bottom integers and limit_smoothed boolean); keys for the wrong camera type or unknown keys error naming the actual class. Marks the scene modified. Returns the camera path, type, the applied key array, and the resulting position, zoom and limits (2D) or fov, near and far (3D).",
+      "Scene", {"camera", "params"}, SideEffect::None, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
+      kSetCameraParamsParams, scene_ops::handle_set_camera_params}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "get_camera_view_rect",
+      "Describe what a scene camera sees in editor window client-area coordinates with the same mapping as get_scene_node_screen_rect (client = offset + pixel * scale). Pass 'camera_path' (a Camera2D or Camera3D; other types error naming the actual class). Returns camera_path, camera_type, viewport, window_id, space, world_position, window_center, 'view_rect' ({position, size} centered on the projected camera origin with the editor viewport size), 'behind' (always false for 2D; true when a 3D camera origin sits behind the 3D editor camera), zoom (2D) or forward, fov, near and far (3D), viewport_size and the pixel mapping. Read-only.",
+      "Scene", {"camera", "view", "rect"}, SideEffect::None, tool_flags::kNone,
+      kGetCameraViewRectParams, scene_ops::handle_get_camera_view_rect}));
   return v;
 }
 

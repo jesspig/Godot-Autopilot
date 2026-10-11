@@ -59,11 +59,28 @@ const std::vector<ParamSpec> kHasEditorSettingsParams = {
     {"name", "string", "Editor setting name to check for existence in the editor's preferences", true},
 };
 
+const std::vector<ParamSpec> kGetAutoloadListParams = {};
+
+const std::vector<ParamSpec> kAddAutoloadParams = {
+    {"name", "string", "Autoload singleton name, e.g. Global; becomes the autoload/Name project setting and the node's name in the scene tree; must not exist yet and must not contain '/'.", true},
+    {"path", "string", "res:// scene or script to autoload, e.g. res://global.gd; must exist, load and be instantiable", true},
+    {"enabled", "boolean", "Whether the singleton marker is stored; defaults to true, which writes the leading * marker exactly like the editor does", false},
+};
+
+const std::vector<ParamSpec> kRemoveAutoloadParams = {
+    {"name", "string", "Autoload singleton name to remove, e.g. Global; must already be registered", true},
+};
+
+const std::vector<ParamSpec> kMoveAutoloadParams = {
+    {"name", "string", "Autoload singleton name to reposition, e.g. Global; must already be registered", true},
+    {"new_index", "integer", "Zero-based target position in the autoload load order; must lie between 0 and the list size minus one", true},
+};
+
 } // namespace
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(13);
+  v.reserve(17);
   v.push_back(make_spec_tool(ToolSpec{
       "get_project_settings",
       "Read a project setting by name from the project configuration (project.godot). Use it to query project-wide values such as display, physics or input defaults. The optional default is returned when the setting does not exist. Returns the serialized value; contrast with get_editor_settings, which reads editor preferences.",
@@ -129,6 +146,26 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       "Check whether an editor preference exists by name in the editor's settings store. Use it to probe whether a preference is customized before reading it with get_editor_settings. Contrast with has_project_settings, which tests the project configuration (project.godot) instead. Returns a boolean result.",
       "Config", {"config", "editor", "settings", "has"}, SideEffect::None, tool_flags::kNone,
       kHasEditorSettingsParams, config_ops::handle_editor_settings_has}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "get_autoload_list",
+      "List all autoload singletons registered in the project configuration (project.godot) in load order. Each entry carries name, path (the res:// target with the leading * singleton marker stripped), enabled (whether the * marker is present) and order. Read-only; change the list with add_autoload, remove_autoload or move_autoload. Returns the entries in result plus count.",
+      "Config", {"config", "autoload", "list"}, SideEffect::None, tool_flags::kNone,
+      kGetAutoloadListParams, config_ops::handle_autoload_list}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "add_autoload",
+      "Add a new autoload singleton to the project configuration. name must be unique (an existing autoload/Name setting is rejected) and must not contain '/'; path must be a res:// scene or script that loads and can be instantiated. enabled defaults to true and controls the leading * singleton marker, stored exactly like the editor writes it. The change is saved to project.godot immediately. Returns ok plus name, path, enabled and order.",
+      "Config", {"config", "autoload", "add"}, SideEffect::WritesConfig, tool_flags::kMutating,
+      kAddAutoloadParams, config_ops::handle_autoload_add}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "remove_autoload",
+      "Remove an autoload singleton from the project configuration. The autoload/Name setting is cleared and project.godot is saved, reported under updated_files. Files under res:// that still mention the removed name or path are reported as stale_references {file, token} objects so callers can clean them up; name matches are substring-based and may include false positives. Returns ok plus removed, updated_files, stale_references and a note.",
+      "Config", {"config", "autoload", "remove"}, SideEffect::WritesConfig, tool_flags::kMutating,
+      kRemoveAutoloadParams, config_ops::handle_autoload_remove}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "move_autoload",
+      "Move an autoload singleton to a new position in the load order. new_index is zero-based and must lie within the current list; every entry is then renumbered 0..n-1 through the project setting order and project.godot is saved. Returns ok plus name, old_index and new_index.",
+      "Config", {"config", "autoload", "move"}, SideEffect::WritesConfig, tool_flags::kMutating,
+      kMoveAutoloadParams, config_ops::handle_autoload_move}));
   return v;
 }
 

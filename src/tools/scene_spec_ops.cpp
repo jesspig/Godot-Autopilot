@@ -1,4 +1,5 @@
 #include "scene_spec_ops.hpp"
+#include "tool_invoke.hpp"
 #include "../util/scene_path.hpp"
 #include "core/log_system.hpp"
 #include "core/scene_dirty_tracker.hpp"
@@ -824,6 +825,298 @@ mcp::JsonValue handle_build_from_spec(const mcp::JsonValue &args) {
   scene_dirty_tracker::mark_scene_modified();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "build_nodes_from_spec completed");
+  return r;
+}
+
+mcp::JsonValue handle_spawn_bundle(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "spawn_node_bundle called");
+  std::string type = "Node";
+  if (auto *t = args.Find("type")) {
+    if (!t->IsString() || t->GetString().empty())
+      return spec_error("parameter 'type' must be a non-empty string");
+    type = t->GetString();
+  }
+  std::string name = "Node";
+  if (auto *n = args.Find("name")) {
+    if (!n->IsString())
+      return spec_error("parameter 'name' must be a string");
+    if (!n->GetString().empty())
+      name = n->GetString();
+  }
+  if (!spec_name_is_valid(name))
+    return spec_error("parameter 'name' '" + name +
+                      "' is invalid — '/' and ':' are not allowed in node names");
+  std::string parent_path;
+  if (auto *pp = args.Find("parent_path")) {
+    if (!pp->IsString())
+      return spec_error("parameter 'parent_path' must be a string");
+    parent_path = pp->GetString();
+  }
+  const mcp::JsonValue *properties = args.Find("properties");
+  if (properties && !properties->IsObject())
+    return spec_error("parameter 'properties' must be an object mapping "
+                      "property names to values");
+  std::string script_path;
+  bool has_script = false;
+  if (auto *sp = args.Find("script_path")) {
+    if (!sp->IsString() || sp->GetString().empty())
+      return spec_error("parameter 'script_path' must be a non-empty string");
+    script_path = sp->GetString();
+    if (script_path.rfind("res://", 0) != 0)
+      return spec_error("parameter 'script_path' must start with 'res://'");
+    has_script = true;
+  }
+  std::vector<std::string> groups;
+  if (auto *g = args.Find("groups")) {
+    if (!g->IsArray())
+      return spec_error("parameter 'groups' must be an array of 1..16 group "
+                        "name strings");
+    const auto &arr = g->GetArray();
+    if (arr.empty() || arr.size() > 16)
+      return spec_error("parameter 'groups' must contain 1..16 group names");
+    for (size_t i = 0; i < arr.size(); i++) {
+      if (!arr[i].IsString() || arr[i].GetString().empty())
+        return spec_error("groups[" + std::to_string(i) +
+                          "] must be a non-empty string");
+      groups.push_back(arr[i].GetString());
+    }
+  }
+  struct BundleConn {
+    std::string sig;
+    std::string target;
+    std::string method;
+    bool persist = true;
+  };
+  std::vector<BundleConn> connections;
+  if (auto *c = args.Find("connections")) {
+    if (!c->IsArray())
+      return spec_error("parameter 'connections' must be an array of {signal, "
+                        "target_path, method, persist} objects");
+    const auto &arr = c->GetArray();
+    for (size_t i = 0; i < arr.size(); i++) {
+      const std::string loc = "connections[" + std::to_string(i) + "]";
+      if (!arr[i].IsObject())
+        return spec_error(loc + " must be an object");
+      auto *s = arr[i].Find("signal");
+      auto *tp = arr[i].Find("target_path");
+      auto *m = arr[i].Find("method");
+      if (!s || !s->IsString() || s->GetString().empty())
+        return spec_error(loc + ".signal must be a non-empty string");
+      if (!tp || !tp->IsString() || tp->GetString().empty())
+        return spec_error(loc + ".target_path must be a non-empty string");
+      if (!m || !m->IsString() || m->GetString().empty())
+        return spec_error(loc + ".method must be a non-empty string");
+      BundleConn conn;
+      conn.sig = s->GetString();
+      conn.target = tp->GetString();
+      conn.method = m->GetString();
+      if (auto *p = arr[i].Find("persist")) {
+        if (!p->IsBool())
+          return spec_error(loc + ".persist must be a boolean");
+        conn.persist = p->GetBool();
+      }
+      connections.push_back(std::move(conn));
+    }
+  }
+  bool want_owner = true;
+  if (auto *o = args.Find("owner")) {
+    if (!o->IsBool())
+      return spec_error("parameter 'owner' must be a boolean");
+    want_owner = o->GetBool();
+  }
+  bool dry_run = false;
+  for (const char *flag : {"dry_run", "preview"}) {
+    if (auto *f = args.Find(flag)) {
+      if (!f->IsBool())
+        return spec_error(std::string("parameter '") + flag +
+                          "' must be a boolean");
+      dry_run = dry_run || f->GetBool();
+    }
+  }
+  auto *cdbs = godot::ClassDBSingleton::get_singleton();
+  if (!cdbs)
+    return spec_error("ClassDB singleton not available");
+  if (!cdbs->is_parent_class(godot::StringName(type.c_str()),
+                             godot::StringName("Node"))) {
+    mcp::JsonValue e = spec_error(type + " is not a Node subclass");
+    e["rolled_back"] = mcp::JsonValue(false);
+    return e;
+  }
+  auto *editor = godot::EditorInterface::get_singleton();
+  if (!editor)
+    return spec_error("EditorInterface not available");
+  godot::Node *scene_root = editor->get_edited_scene_root();
+  const util::EditedSceneInfo scene_info = util::edited_scene_info();
+  std::string create_parent = parent_path;
+  if (create_parent.empty() && scene_root)
+    create_parent = util::to_std(scene_root->get_name());
+  if (dry_run) {
+    if (!parent_path.empty()) {
+      std::string hint;
+      if (!util::resolve_scene_node(parent_path, scene_root, &hint)) {
+        mcp::JsonValue e =
+            spec_error("parent node not found: " + parent_path + " — " + hint);
+        e["rolled_back"] = mcp::JsonValue(false);
+        return e;
+      }
+    }
+    std::string preview_path =
+        create_parent.empty() ? name : create_parent + "/" + name;
+    mcp::JsonValue inner(mcp::JsonValue::object_tag);
+    inner["mode"] = mcp::JsonValue("dry_run");
+    inner["path"] = mcp::JsonValue(preview_path);
+    inner["type"] = mcp::JsonValue(type);
+    mcp::JsonValue preview_applied(mcp::JsonValue::array_tag);
+    if (properties) {
+      for (const auto &kv : *properties)
+        preview_applied.PushBack(mcp::JsonValue(kv.first));
+    }
+    inner["applied"] = std::move(preview_applied);
+    inner["groups_connected"] =
+        mcp::JsonValue(static_cast<int64_t>(groups.size()));
+    inner["signals_connected"] =
+        mcp::JsonValue(static_cast<int64_t>(connections.size()));
+    inner["undo"] =
+        mcp::JsonValue("delete node " + preview_path + " (delete_scene_node)");
+    inner["writable"] = mcp::JsonValue(true);
+    inner["note"] = mcp::JsonValue(
+        "dry_run only validates parameters without writing to the scene");
+    util::add_scene_info_fields(inner, scene_info);
+    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    r["result"] = std::move(inner);
+    util::add_scene_info_fields(r, scene_info);
+    return r;
+  }
+  mcp::JsonValue create_args(mcp::JsonValue::object_tag);
+  create_args["type"] = mcp::JsonValue(type);
+  create_args["name"] = mcp::JsonValue(name);
+  if (!create_parent.empty())
+    create_args["parent_path"] = mcp::JsonValue(create_parent);
+  mcp::JsonValue created =
+      tools::invoke_tool("create_scene_node", create_args);
+  if (auto *err = created.Find("error")) {
+    mcp::JsonValue e = spec_error(
+        err->IsString() ? err->GetString() : created.Dump());
+    e["rolled_back"] = mcp::JsonValue(false);
+    return e;
+  }
+  std::string bundle_path;
+  if (auto *res = created.Find("result")) {
+    if (auto *p = res->Find("path"); p && p->IsString())
+      bundle_path = p->GetString();
+  }
+  if (bundle_path.empty()) {
+    mcp::JsonValue e =
+        spec_error("create_scene_node returned no node path; aborting bundle");
+    e["rolled_back"] = mcp::JsonValue(false);
+    return e;
+  }
+  auto rollback_bundle = [&]() {
+    auto *ed = godot::EditorInterface::get_singleton();
+    godot::Node *root_now = ed ? ed->get_edited_scene_root() : nullptr;
+    godot::Node *top =
+        util::resolve_scene_node(bundle_path, root_now);
+    if (top)
+      spec_rollback_subtree(top);
+  };
+  auto bundle_step_error = [&](const std::string &msg) {
+    rollback_bundle();
+    mcp::JsonValue e = spec_error(msg + "；已整体回滚，无残留");
+    e["rolled_back"] = mcp::JsonValue(true);
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                              "spawn_node_bundle rolled back");
+    return e;
+  };
+  std::vector<std::string> applied_names;
+  if (properties && !properties->GetObject().empty()) {
+    mcp::JsonValue batch_args(mcp::JsonValue::object_tag);
+    batch_args["path"] = mcp::JsonValue(bundle_path);
+    batch_args["properties"] = *properties;
+    batch_args["atomic"] = mcp::JsonValue(true);
+    mcp::JsonValue batch_result =
+        tools::invoke_tool("set_properties_batch", batch_args);
+    if (auto *err = batch_result.Find("error"))
+      return bundle_step_error(err->IsString() ? err->GetString()
+                                               : batch_result.Dump());
+    if (auto *ap = batch_result.Find("applied_properties");
+        ap && ap->IsArray()) {
+      for (const auto &item : ap->GetArray()) {
+        if (item.IsString())
+          applied_names.push_back(item.GetString());
+      }
+    }
+  }
+  if (has_script) {
+    mcp::JsonValue script_args(mcp::JsonValue::object_tag);
+    script_args["node_path"] = mcp::JsonValue(bundle_path);
+    script_args["script_path"] = mcp::JsonValue(script_path);
+    mcp::JsonValue script_result =
+        tools::invoke_tool("attach_script_to_node", script_args);
+    if (auto *err = script_result.Find("error"))
+      return bundle_step_error(err->IsString() ? err->GetString()
+                                               : script_result.Dump());
+  }
+  int64_t groups_connected = 0;
+  for (const auto &group_name : groups) {
+    mcp::JsonValue group_args(mcp::JsonValue::object_tag);
+    group_args["node_path"] = mcp::JsonValue(bundle_path);
+    group_args["group_name"] = mcp::JsonValue(group_name);
+    mcp::JsonValue group_result =
+        tools::invoke_tool("add_group_node", group_args);
+    if (auto *err = group_result.Find("error"))
+      return bundle_step_error(err->IsString() ? err->GetString()
+                                               : group_result.Dump());
+    groups_connected++;
+  }
+  int64_t signals_connected = 0;
+  for (const auto &conn : connections) {
+    mcp::JsonValue conn_args(mcp::JsonValue::object_tag);
+    conn_args["source_path"] = mcp::JsonValue(bundle_path);
+    conn_args["signal"] = mcp::JsonValue(conn.sig);
+    conn_args["target_path"] = mcp::JsonValue(conn.target);
+    conn_args["method"] = mcp::JsonValue(conn.method);
+    conn_args["persist"] = mcp::JsonValue(conn.persist);
+    mcp::JsonValue conn_result =
+        tools::invoke_tool("signal_connect", conn_args);
+    if (auto *err = conn_result.Find("error"))
+      return bundle_step_error(err->IsString() ? err->GetString()
+                                               : conn_result.Dump());
+    signals_connected++;
+  }
+  godot::Node *scene_root_now = editor->get_edited_scene_root();
+  godot::Node *bundle_node =
+      util::resolve_scene_node(bundle_path, scene_root_now);
+  std::string actual_type = type;
+  if (bundle_node)
+    actual_type = util::to_std(bundle_node->get_class());
+  if (bundle_node && bundle_node != scene_root_now) {
+    if (want_owner) {
+      if (!bundle_node->get_owner() && scene_root_now)
+        bundle_node->set_owner(scene_root_now);
+    } else if (bundle_node->get_owner()) {
+      bundle_node->set_owner(nullptr);
+    }
+  }
+  const util::EditedSceneInfo scene_info_now = util::edited_scene_info();
+  mcp::JsonValue inner(mcp::JsonValue::object_tag);
+  inner["path"] = mcp::JsonValue(bundle_path);
+  inner["type"] = mcp::JsonValue(actual_type);
+  mcp::JsonValue applied(mcp::JsonValue::array_tag);
+  for (const auto &applied_name : applied_names)
+    applied.PushBack(mcp::JsonValue(applied_name));
+  inner["applied"] = std::move(applied);
+  inner["groups_connected"] = mcp::JsonValue(groups_connected);
+  inner["signals_connected"] = mcp::JsonValue(signals_connected);
+  inner["undo"] =
+      mcp::JsonValue("delete node " + bundle_path + " (delete_scene_node)");
+  util::add_scene_info_fields(inner, scene_info_now);
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["result"] = std::move(inner);
+  util::add_scene_info_fields(r, scene_info_now);
+  scene_dirty_tracker::mark_scene_modified();
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "spawn_node_bundle completed");
   return r;
 }
 

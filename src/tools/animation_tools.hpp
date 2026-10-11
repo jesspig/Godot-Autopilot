@@ -57,6 +57,16 @@ const std::vector<ParamSpec> kRemoveAnimationTrackParams = {
     {"track_index", "integer", "Index of the track to remove; must be within [0, track_count)", true},
 };
 
+const std::vector<ParamSpec> kSetAnimationTrackBundleParams = {
+    {"player_path", "string", "Path of the AnimationPlayer node in the edited scene", true},
+    {"anim_name", "string", "Animation name to add the track to; must already exist", true},
+    {"track_type", "string", "Track kind: 'value' (animates a property) or 'method' (invokes a method per key)", true},
+    {"node_path", "string", "Scene-relative path of the target node the track drives, e.g. 'Sprite2D'", true},
+    {"property", "string", "Property to animate for value tracks, e.g. 'position:x' or 'modulate:a'; required when track_type is 'value', ignored for method tracks — the track path becomes <node_path>:<property>", false},
+    {"keys", "array", "Array of 1-256 key objects, each {\"time\": <number >= 0>, \"value\": <json>}; keys are inserted in ascending time order — value tracks deserialize each value to a Variant (e.g. 1.5 or {\"x\":0,\"y\":1}), method tracks require each value to be an object like {\"method\":\"jump\",\"args\":[42]}", true},
+    {"overwrite", "boolean", "Duplicate key-time policy (default false): false rejects repeated times in keys, true keeps the last key at each repeated time", false},
+};
+
 const std::vector<ParamSpec> kCreateSceneAnimationTreeParams = {
     {"parent_path", "string", "Parent node path in the edited scene (e.g. 'Root')", true},
     {"name", "string", "Node name for the new AnimationTree (string, default: AnimationTree)", false},
@@ -80,7 +90,7 @@ const std::vector<ParamSpec> kConnectAnimationStatesParams = {
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(10);
+  v.reserve(11);
   v.push_back(make_spec_tool(ToolSpec{
       "create_scene_animation_player",
       "Create an AnimationPlayer node in the edited scene under 'parent_path' (required string, scene-relative node path, e.g. \"Root/Actors\"). Optional 'name' (string, default AnimationPlayer). Returns the new node 'path' plus an 'undo' hint; follow up with create_animation to add clips.",
@@ -116,6 +126,11 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       "Remove the whole track 'track_index' (required int) from animation 'anim_name' on player 'player_path' (both required strings). Index must be within [0, track_count), otherwise an error is returned. Returns removed_track_index and removed_track_path.",
       "Animation", {"animation", "track", "delete"}, SideEffect::None, tool_flags::kNone | tool_flags::kSceneTarget,
       kRemoveAnimationTrackParams, animation_ops::handle_remove_track}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "set_animation_track_bundle",
+      "Create one track plus all of its keys on animation 'anim_name' of player 'player_path' in a single call (both required strings). Required 'track_type': \"value\" or \"method\". Required 'node_path' (scene-relative target node); for value tracks also pass 'property' (string like \"position:x\") — the track path becomes <node_path>:<property> with continuous update mode, method tracks ignore 'property'. Required 'keys': array of 1-256 {\"time\": <number >= 0>, \"value\": <json>} objects, inserted in ascending time order — value-track values deserialize to Variants, method-track values must be {\"method\":\"name\",\"args\":[...]} objects. Optional 'overwrite' (boolean, default false): false rejects repeated key times, true keeps the last key per repeated time. A duplicate track for the same path+type is rejected. Any key failure removes the new track so the call is all-or-nothing. Returns 'track_index', 'key_count' and sorted 'times'.",
+      "Animation", {"animation", "track", "keyframe", "bundle"}, SideEffect::None, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
+      kSetAnimationTrackBundleParams, animation_ops::handle_set_track_bundle}));
   v.push_back(make_spec_tool(ToolSpec{
       "create_scene_animation_tree",
       "Create an AnimationTree under required 'parent_path' in the edited scene, with an empty AnimationNodeStateMachine as its tree_root. Optional 'name' (string, default AnimationTree) and optional 'anim_player' (scene-relative AnimationPlayer path, e.g. \"Root/AnimationPlayer\") wired into the tree's animation_player property. Returns 'path', initial 'states' list and a 'next' hint pointing at add_animation_machine_state.",

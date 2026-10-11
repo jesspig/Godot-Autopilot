@@ -7,6 +7,7 @@
 #include "tools/debugger_access.hpp"
 #include "tools/tool_base.hpp"
 #include "util/error_util.hpp"
+#include <godot_cpp/classes/translation_server.hpp>
 #include <chrono>
 #include <cstdint>
 #include <mutex>
@@ -172,6 +173,30 @@ int64_t erase_game_job(int64_t job_id) {
   int64_t request_id = it->second.request_id;
   jobs.erase(it);
   return request_id;
+}
+
+bool is_valid_game_locale(const std::string &locale) {
+  const size_t sep = locale.find('_');
+  const std::string lang =
+      (sep == std::string::npos) ? locale : locale.substr(0, sep);
+  if (lang.size() < 2 || lang.size() > 3)
+    return false;
+  for (char c : lang) {
+    if (c < 'a' || c > 'z')
+      return false;
+  }
+  if (sep == std::string::npos)
+    return true;
+  const std::string region = locale.substr(sep + 1);
+  if (region.size() != 2)
+    return false;
+  if (region.find('_') != std::string::npos)
+    return false;
+  for (char c : region) {
+    if (c < 'A' || c > 'Z')
+      return false;
+  }
+  return true;
 }
 
 } // namespace
@@ -1108,6 +1133,111 @@ mcp::JsonValue handle_game_validate_ui_layout(const mcp::JsonValue &args) {
                               extract_timeout(args), false, wait_ready);
   append_runtime_degradation_hint(result);
   return result;
+}
+
+mcp::JsonValue handle_get_game_locale(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "get_game_locale called");
+  if (!args.IsObject())
+    return error_json("get_game_locale parameters must be an object");
+  if (!args.GetObject().empty())
+    return error_json("get_game_locale accepts no parameters");
+  auto *server = godot::TranslationServer::get_singleton();
+  if (!server)
+    return error_json("TranslationServer singleton not available");
+  const std::string locale = util::to_std(server->get_locale());
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "get_game_locale completed");
+  JV r(JV::object_tag);
+  r["result"] = JV(locale);
+  return r;
+}
+
+mcp::JsonValue handle_set_game_locale(const mcp::JsonValue &args) {
+  JV denied = authorization::deny_if_unauthorized(
+      "set_game_locale", SideEffect::GameRuntime);
+  if (!denied.IsNull())
+    return denied;
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "set_game_locale called");
+  if (!args.IsObject())
+    return error_json("set_game_locale parameters must be an object");
+  static constexpr const char *allowed[] = {"locale"};
+  std::string unknown;
+  if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed),
+                       unknown))
+    return error_json("unknown parameter for set_game_locale: " + unknown);
+  auto *locale_p = args.Find("locale");
+  if (!locale_p || !locale_p->IsString() || locale_p->GetString().empty())
+    return error_json("missing required parameter: locale (non-empty locale "
+                      "in en or en_US format, e.g. en_US)");
+  const std::string locale = locale_p->GetString();
+  if (!is_valid_game_locale(locale))
+    return error_json("invalid locale '" + locale +
+                      "': expected en or en_US format (e.g. en_US, zh_CN)");
+  auto *server = godot::TranslationServer::get_singleton();
+  if (!server)
+    return error_json("TranslationServer singleton not available");
+  server->set_locale(godot::String::utf8(locale.c_str()));
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "set_game_locale completed");
+  JV r(JV::object_tag);
+  r["result"] = JV("ok");
+  r["locale"] = JV(locale);
+  return r;
+}
+
+mcp::JsonValue handle_get_translation_list(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "get_translation_list called");
+  if (!args.IsObject())
+    return error_json("get_translation_list parameters must be an object");
+  if (!args.GetObject().empty())
+    return error_json("get_translation_list accepts no parameters");
+  auto *server = godot::TranslationServer::get_singleton();
+  if (!server)
+    return error_json("TranslationServer singleton not available");
+  const godot::PackedStringArray locales = server->get_loaded_locales();
+  JV arr(JV::array_tag);
+  for (int i = 0; i < locales.size(); ++i)
+    arr.PushBack(JV(util::to_std(locales[i])));
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "get_translation_list completed");
+  JV r(JV::object_tag);
+  r["result"] = std::move(arr);
+  return r;
+}
+
+mcp::JsonValue handle_translate_text(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "translate_text called");
+  if (!args.IsObject())
+    return error_json("translate_text parameters must be an object");
+  static constexpr const char *allowed[] = {"key"};
+  std::string unknown;
+  if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed),
+                       unknown))
+    return error_json("unknown parameter for translate_text: " + unknown);
+  auto *key_p = args.Find("key");
+  if (!key_p || !key_p->IsString() || key_p->GetString().empty())
+    return error_json("missing required parameter: key (non-empty source "
+                      "message to translate)");
+  const std::string key = key_p->GetString();
+  auto *server = godot::TranslationServer::get_singleton();
+  if (!server)
+    return error_json("TranslationServer singleton not available");
+  const std::string current = util::to_std(server->get_locale());
+  const std::string text =
+      util::to_std(server->translate(godot::String::utf8(key.c_str())));
+  if (text == key)
+    return error_json("unknown translation key: " + key);
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "translate_text completed");
+  JV r(JV::object_tag);
+  r["result"] = JV(text);
+  r["key"] = JV(key);
+  r["locale"] = JV(current);
+  return r;
 }
 
 } // namespace runtime_ops

@@ -10,6 +10,7 @@ inline constexpr int SPEC_MAX_DEPTH = 32;
 inline constexpr int SPEC_MAX_NODES = 500;
 
 mcp::JsonValue handle_build_from_spec(const mcp::JsonValue &args);
+mcp::JsonValue handle_spawn_bundle(const mcp::JsonValue &args);
 
 } // namespace scene_spec_ops
 } // namespace godot_autopilot

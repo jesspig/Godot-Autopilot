@@ -19,6 +19,10 @@ mcp::JsonValue handle_engine_set_max_fps(const mcp::JsonValue &args);
 mcp::JsonValue handle_editor_settings_get(const mcp::JsonValue &args);
 mcp::JsonValue handle_editor_settings_set(const mcp::JsonValue &args);
 mcp::JsonValue handle_editor_settings_has(const mcp::JsonValue &args);
+mcp::JsonValue handle_autoload_list(const mcp::JsonValue &args);
+mcp::JsonValue handle_autoload_add(const mcp::JsonValue &args);
+mcp::JsonValue handle_autoload_remove(const mcp::JsonValue &args);
+mcp::JsonValue handle_autoload_move(const mcp::JsonValue &args);
 
 } // namespace config_ops
 } // namespace godot_autopilot

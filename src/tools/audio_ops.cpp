@@ -1,5 +1,6 @@
 #include "audio_ops.hpp"
 #include "core/log_system.hpp"
+#include "resource_ops.hpp"
 #include "util/error_util.hpp"
 #include "util/json_godot.hpp"
 #include "util/scene_path.hpp"
@@ -8,6 +9,7 @@
 #include <godot_cpp/classes/audio_effect.hpp>
 #include <godot_cpp/classes/audio_server.hpp>
 #include <godot_cpp/classes/audio_stream.hpp>
+#include <godot_cpp/classes/audio_stream_wav.hpp>
 #include <godot_cpp/classes/audio_stream_player.hpp>
 #include <godot_cpp/classes/audio_stream_player2d.hpp>
 #include <godot_cpp/classes/audio_stream_player3d.hpp>
@@ -17,8 +19,12 @@
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/variant/packed_byte_array.hpp>
+#include <godot_cpp/variant/packed_vector2_array.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
+#include <godot_cpp/variant/vector2.hpp>
+#include <cstdint>
 #include <string>
 
 namespace godot_autopilot {
@@ -137,6 +143,145 @@ AudioPlayerVariant resolve_audio_player(godot::Node *node) {
   if (!r.p1 && !r.p2)
     r.p3 = godot::Object::cast_to<godot::AudioStreamPlayer3D>(node);
   return r;
+}
+
+constexpr int kMaxCaptureFrames = 1000000;
+constexpr int kDefaultWavMixRate = 44100;
+constexpr int kMinWavMixRate = 1000;
+constexpr int kMaxWavMixRate = 192000;
+
+bool parse_wav_name(const mcp::JsonValue &args, std::string &out_name,
+                    std::string &out_error) {
+  out_name.clear();
+  out_error.clear();
+  auto *n = args.Find("name");
+  if (!n || !n->IsString() || n->GetString().empty()) {
+    out_error = "missing required parameter: name";
+    return false;
+  }
+  out_name = n->GetString();
+  return true;
+}
+
+bool parse_wav_format(const mcp::JsonValue &args, int &out_bits,
+                      std::string &out_error) {
+  out_bits = 16;
+  out_error.clear();
+  auto *f = args.Find("format");
+  if (!f) {
+    return true;
+  }
+  if (!f->IsInt() || (f->GetInt() != 8 && f->GetInt() != 16)) {
+    out_error = "unsupported format: expected 8 or 16";
+    return false;
+  }
+  out_bits = static_cast<int>(f->GetInt());
+  return true;
+}
+
+bool parse_wav_mix_rate(const mcp::JsonValue &args, int fallback_rate,
+                        int &out_rate, std::string &out_error) {
+  out_rate = fallback_rate;
+  out_error.clear();
+  auto *m = args.Find("mix_rate");
+  if (!m) {
+    return true;
+  }
+  if (!m->IsInt() || m->GetInt() < kMinWavMixRate ||
+      m->GetInt() > kMaxWavMixRate) {
+    out_error = "invalid mix_rate: expected an integer in 1000..192000";
+    return false;
+  }
+  out_rate = static_cast<int>(m->GetInt());
+  return true;
+}
+
+bool parse_wav_stereo(const mcp::JsonValue &args, bool &out_stereo,
+                      std::string &out_error) {
+  out_stereo = false;
+  out_error.clear();
+  auto *s = args.Find("stereo");
+  if (!s) {
+    return true;
+  }
+  if (!s->IsBool()) {
+    out_error = "invalid stereo: expected a boolean";
+    return false;
+  }
+  out_stereo = s->GetBool();
+  return true;
+}
+
+void encode_sample(godot::PackedByteArray &bytes, int64_t &cursor,
+                   float sample, int format_bits) {
+  float c = sample;
+  if (c > 1.0f) {
+    c = 1.0f;
+  }
+  if (c < -1.0f) {
+    c = -1.0f;
+  }
+  if (format_bits == 8) {
+    int v = static_cast<int>(c * 127.0f + 128.0f);
+    if (v < 0) {
+      v = 0;
+    }
+    if (v > 255) {
+      v = 255;
+    }
+    bytes[cursor++] = static_cast<uint8_t>(v);
+  } else {
+    int32_t v = static_cast<int32_t>(c * 32767.0f);
+    if (v < -32768) {
+      v = -32768;
+    }
+    if (v > 32767) {
+      v = 32767;
+    }
+    uint16_t u = static_cast<uint16_t>(v);
+    bytes[cursor++] = static_cast<uint8_t>(u & 0xFF);
+    bytes[cursor++] = static_cast<uint8_t>((u >> 8) & 0xFF);
+  }
+}
+
+godot::Ref<godot::AudioStreamWAV> instantiate_wav(std::string &out_error) {
+  out_error.clear();
+  auto *cdbs = godot::ClassDBSingleton::get_singleton();
+  if (!cdbs) {
+    out_error = "ClassDB singleton not available";
+    return godot::Ref<godot::AudioStreamWAV>();
+  }
+  godot::Variant wav_var =
+      cdbs->instantiate(godot::StringName("AudioStreamWAV"));
+  if (wav_var.get_type() == godot::Variant::NIL) {
+    out_error = "failed to instantiate AudioStreamWAV";
+    return godot::Ref<godot::AudioStreamWAV>();
+  }
+  godot::Ref<godot::AudioStreamWAV> wav = wav_var;
+  if (wav.is_null()) {
+    out_error = "instantiated object is not an AudioStreamWAV";
+    return godot::Ref<godot::AudioStreamWAV>();
+  }
+  return wav;
+}
+
+mcp::JsonValue wav_locator(const std::string &name,
+                           const godot::Ref<godot::AudioStreamWAV> &wav,
+                           int format_bits, int mix_rate, bool stereo,
+                           int64_t frames) {
+  mcp::JsonValue info(mcp::JsonValue::object_tag);
+  info["class"] = mcp::JsonValue("AudioStreamWAV");
+  info["name"] = mcp::JsonValue(name);
+  info["path"] = mcp::JsonValue("memory://" + name);
+  info["object_id"] =
+      mcp::JsonValue(static_cast<int64_t>(wav->get_instance_id()));
+  info["object_id_str"] = mcp::JsonValue(
+      std::to_string(static_cast<int64_t>(wav->get_instance_id())));
+  info["format"] = mcp::JsonValue(static_cast<int64_t>(format_bits));
+  info["mix_rate"] = mcp::JsonValue(static_cast<int64_t>(mix_rate));
+  info["stereo"] = mcp::JsonValue(stereo);
+  info["frames"] = mcp::JsonValue(frames);
+  return info;
 }
 
 } // namespace
@@ -673,6 +818,228 @@ mcp::JsonValue handle_set_input_device(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_device_input completed");
   return util::ok_result(mcp::JsonValue("ok"));
+}
+
+mcp::JsonValue handle_start_input_capture(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "start_audio_input_capture called");
+  auto *server = godot::AudioServer::get_singleton();
+  if (!server) {
+    return util::error_json("AudioServer not available");
+  }
+  auto *dv = args.Find("device");
+  if (dv) {
+    if (!dv->IsString() || dv->GetString().empty()) {
+      return util::error_json("invalid device: expected a non-empty device "
+                              "name from get_audio_input_devices");
+    }
+    server->set_input_device(godot::String(dv->GetString().c_str()));
+  }
+  godot::Error err = server->set_input_device_active(true);
+  if (err != godot::Error::OK) {
+    return util::error_json("failed to start audio input capture (error " +
+                            std::to_string(static_cast<int>(err)) + ")");
+  }
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "start_audio_input_capture completed");
+  return util::ok_result(mcp::JsonValue("ok"));
+}
+
+mcp::JsonValue handle_stop_input_capture(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "stop_audio_input_capture called");
+  auto *server = godot::AudioServer::get_singleton();
+  if (!server) {
+    return util::error_json("AudioServer not available");
+  }
+  std::string name;
+  std::string param_error;
+  if (!parse_wav_name(args, name, param_error)) {
+    return util::error_json(param_error);
+  }
+  int format_bits = 16;
+  if (!parse_wav_format(args, format_bits, param_error)) {
+    return util::error_json(param_error);
+  }
+  bool stereo = false;
+  if (!parse_wav_stereo(args, stereo, param_error)) {
+    return util::error_json(param_error);
+  }
+  int fallback_rate = static_cast<int>(server->get_input_mix_rate());
+  if (fallback_rate <= 0) {
+    fallback_rate = kDefaultWavMixRate;
+  }
+  int mix_rate = fallback_rate;
+  if (!parse_wav_mix_rate(args, fallback_rate, mix_rate, param_error)) {
+    return util::error_json(param_error);
+  }
+  int64_t max_frames = -1;
+  auto *mf = args.Find("max_frames");
+  if (mf) {
+    if (!mf->IsInt() || mf->GetInt() < 1) {
+      return util::error_json(
+          "invalid max_frames: expected an integer of at least 1");
+    }
+    max_frames = mf->GetInt();
+  }
+  int64_t available =
+      static_cast<int64_t>(server->get_input_frames_available());
+  if (available < 0) {
+    available = 0;
+  }
+  int64_t want = available;
+  if (max_frames >= 0 && max_frames < want) {
+    want = max_frames;
+  }
+  bool truncated = false;
+  if (want > kMaxCaptureFrames) {
+    want = kMaxCaptureFrames;
+    truncated = true;
+  }
+  godot::PackedVector2Array captured;
+  if (want > 0) {
+    captured = server->get_input_frames(static_cast<int>(want));
+  }
+  int64_t frames = static_cast<int64_t>(captured.size());
+  int channels = stereo ? 2 : 1;
+  int bytes_per_sample = (format_bits == 8) ? 1 : 2;
+  godot::PackedByteArray data;
+  data.resize(frames * channels * bytes_per_sample);
+  int64_t cursor = 0;
+  for (int64_t i = 0; i < frames; i++) {
+    godot::Vector2 frame = captured[i];
+    encode_sample(data, cursor, frame.x, format_bits);
+    if (stereo) {
+      encode_sample(data, cursor, frame.y, format_bits);
+    }
+  }
+  std::string wav_error;
+  godot::Ref<godot::AudioStreamWAV> wav = instantiate_wav(wav_error);
+  if (wav.is_null()) {
+    server->set_input_device_active(false);
+    return util::error_json(wav_error);
+  }
+  wav->set_format(
+      static_cast<godot::AudioStreamWAV::Format>(format_bits == 8 ? 0 : 1));
+  wav->set_mix_rate(mix_rate);
+  wav->set_stereo(stereo);
+  wav->set_data(data);
+  resource_ops::register_memory_resource(wav, name);
+  wav->set_path(godot::String(("memory://" + name).c_str()));
+  godot::Error stop_err = server->set_input_device_active(false);
+  if (stop_err != godot::Error::OK) {
+    return util::error_json("failed to stop audio input capture (error " +
+                            std::to_string(static_cast<int>(stop_err)) + ")");
+  }
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  mcp::JsonValue info = wav_locator(name, wav, format_bits, mix_rate, stereo,
+                                    frames);
+  info["truncated"] = mcp::JsonValue(truncated);
+  r["result"] = std::move(info);
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "stop_audio_input_capture completed");
+  return r;
+}
+
+mcp::JsonValue handle_create_wav(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "create_audiostream_wav called");
+  std::string name;
+  std::string param_error;
+  if (!parse_wav_name(args, name, param_error)) {
+    return util::error_json(param_error);
+  }
+  int format_bits = 16;
+  if (!parse_wav_format(args, format_bits, param_error)) {
+    return util::error_json(param_error);
+  }
+  int mix_rate = kDefaultWavMixRate;
+  if (!parse_wav_mix_rate(args, kDefaultWavMixRate, mix_rate, param_error)) {
+    return util::error_json(param_error);
+  }
+  bool stereo = false;
+  if (!parse_wav_stereo(args, stereo, param_error)) {
+    return util::error_json(param_error);
+  }
+  auto *samples_val = args.Find("samples");
+  if (!samples_val || !samples_val->IsArray()) {
+    return util::error_json("missing required parameter: samples");
+  }
+  const auto &samples = samples_val->GetArray();
+  if (samples.empty()) {
+    return util::error_json("samples must not be empty");
+  }
+  int channels = stereo ? 2 : 1;
+  if (stereo && samples.size() % 2 != 0) {
+    return util::error_json(
+        "samples has an odd length " + std::to_string(samples.size()) +
+        " for stereo: expected flat interleaved L/R pairs");
+  }
+  int64_t frames =
+      static_cast<int64_t>(samples.size() / static_cast<size_t>(channels));
+  if (frames > kMaxCaptureFrames) {
+    return util::error_json(
+        "samples exceed the capture limit of 1000000 frames (got " +
+        std::to_string(frames) + ")");
+  }
+  int bytes_per_sample = (format_bits == 8) ? 1 : 2;
+  godot::PackedByteArray data;
+  data.resize(frames * channels * bytes_per_sample);
+  int64_t cursor = 0;
+  for (size_t i = 0; i < samples.size(); i++) {
+    if (!samples[i].IsNumber()) {
+      return util::error_json("invalid sample at index " +
+                              std::to_string(i) + ": expected a number");
+    }
+    encode_sample(data, cursor,
+                  static_cast<float>(util::json_number(&samples[i], 0.0)),
+                  format_bits);
+  }
+  std::string wav_error;
+  godot::Ref<godot::AudioStreamWAV> wav = instantiate_wav(wav_error);
+  if (wav.is_null()) {
+    return util::error_json(wav_error);
+  }
+  wav->set_format(
+      static_cast<godot::AudioStreamWAV::Format>(format_bits == 8 ? 0 : 1));
+  wav->set_mix_rate(mix_rate);
+  wav->set_stereo(stereo);
+  wav->set_data(data);
+  resource_ops::register_memory_resource(wav, name);
+  wav->set_path(godot::String(("memory://" + name).c_str()));
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["result"] =
+      wav_locator(name, wav, format_bits, mix_rate, stereo, frames);
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "create_audiostream_wav completed");
+  return r;
+}
+
+mcp::JsonValue handle_get_input_devices(const mcp::JsonValue &) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "get_audio_input_devices called");
+  auto *server = godot::AudioServer::get_singleton();
+  if (!server) {
+    return util::error_json("AudioServer not available");
+  }
+  auto devices = server->get_input_device_list();
+  mcp::JsonValue arr(mcp::JsonValue::array_tag);
+  for (int i = 0; i < devices.size(); i++) {
+    arr.PushBack(mcp::JsonValue(util::to_std(devices[i])));
+  }
+  mcp::JsonValue info(mcp::JsonValue::object_tag);
+  info["devices"] = std::move(arr);
+  info["current"] =
+      mcp::JsonValue(util::to_std(server->get_input_device()));
+  info["input_mix_rate"] =
+      mcp::JsonValue(static_cast<double>(server->get_input_mix_rate()));
+  info["frames_available"] = mcp::JsonValue(
+      static_cast<int64_t>(server->get_input_frames_available()));
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["result"] = std::move(info);
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "get_audio_input_devices completed");
+  return r;
 }
 
 } // namespace audio_ops

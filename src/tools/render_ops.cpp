@@ -1,11 +1,16 @@
 #include "render_ops.hpp"
 #include "core/log_system.hpp"
+#include "core/scene_dirty_tracker.hpp"
 #include "util/error_util.hpp"
 #include "util/json_godot.hpp"
 #include "util/scene_path.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/canvas_item.hpp>
+#include <godot_cpp/classes/cpu_particles2d.hpp>
+#include <godot_cpp/classes/cpu_particles3d.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
+#include <godot_cpp/classes/gpu_particles2d.hpp>
+#include <godot_cpp/classes/gpu_particles3d.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/variant/array.hpp>
@@ -1360,6 +1365,323 @@ JV handle_resolve_rid(const JV &args) {
     }
   }
   r["result"] = JV("ok");
+  return r;
+}
+
+struct NodeParticles {
+  godot::GPUParticles2D *gpu2 = nullptr;
+  godot::GPUParticles3D *gpu3 = nullptr;
+  godot::CPUParticles2D *cpu2 = nullptr;
+  godot::CPUParticles3D *cpu3 = nullptr;
+  bool valid = false;
+  std::string type;
+};
+
+NodeParticles resolve_node_particles(godot::Node *node) {
+  NodeParticles out;
+  if (!node) {
+    return out;
+  }
+  out.gpu2 = godot::Object::cast_to<godot::GPUParticles2D>(node);
+  if (out.gpu2) {
+    out.valid = true;
+    out.type = "GPUParticles2D";
+    return out;
+  }
+  out.gpu3 = godot::Object::cast_to<godot::GPUParticles3D>(node);
+  if (out.gpu3) {
+    out.valid = true;
+    out.type = "GPUParticles3D";
+    return out;
+  }
+  out.cpu2 = godot::Object::cast_to<godot::CPUParticles2D>(node);
+  if (out.cpu2) {
+    out.valid = true;
+    out.type = "CPUParticles2D";
+    return out;
+  }
+  out.cpu3 = godot::Object::cast_to<godot::CPUParticles3D>(node);
+  if (out.cpu3) {
+    out.valid = true;
+    out.type = "CPUParticles3D";
+    return out;
+  }
+  return out;
+}
+
+JV handle_node_particles_restart(const JV &args) {
+  auto *pp = args.Find("path");
+  if (!pp || !pp->IsString()) {
+    JV r(JV::object_tag);
+    r["error"] = JV("missing required parameter: path");
+    return r;
+  }
+  std::string path = pp->GetString();
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "restart_particles called");
+  auto *editor = godot::EditorInterface::get_singleton();
+  if (!editor) {
+    JV r(JV::object_tag);
+    r["error"] = JV("EditorInterface not available");
+    return r;
+  }
+  auto *root = editor->get_edited_scene_root();
+  if (!root) {
+    JV r(JV::object_tag);
+    r["error"] = JV("no edited scene root");
+    return r;
+  }
+  std::string hint;
+  godot::Node *node = util::resolve_scene_node(path, root, &hint);
+  if (!node) {
+    JV r(JV::object_tag);
+    r["error"] = JV("node not found: " + path + " - " + hint);
+    return r;
+  }
+  NodeParticles p = resolve_node_particles(node);
+  if (!p.valid) {
+    JV r(JV::object_tag);
+    r["error"] = JV("node is not a GPUParticles2D/GPUParticles3D/CPUParticles2D/CPUParticles3D: " + path + " (actual class: " + util::to_std(node->get_class()) + ")");
+    return r;
+  }
+  if (p.gpu2) {
+    p.gpu2->restart();
+  } else if (p.gpu3) {
+    p.gpu3->restart();
+  } else if (p.cpu2) {
+    p.cpu2->restart();
+  } else if (p.cpu3) {
+    p.cpu3->restart();
+  }
+  scene_dirty_tracker::mark_scene_modified();
+  LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
+                            "restart_particles completed");
+  JV r(JV::object_tag);
+  r["result"] = JV("ok");
+  return r;
+}
+
+JV handle_node_particles_set_params(const JV &args) {
+  auto *pp = args.Find("path");
+  if (!pp || !pp->IsString()) {
+    JV r(JV::object_tag);
+    r["error"] = JV("missing required parameter: path");
+    return r;
+  }
+  std::string path = pp->GetString();
+  auto *em = args.Find("emitting");
+  auto *am = args.Find("amount");
+  auto *lt = args.Find("lifetime");
+  auto *os = args.Find("one_shot");
+  auto *ss = args.Find("speed_scale");
+  auto *ex = args.Find("explosiveness");
+  if (em && !em->IsBool()) {
+    JV r(JV::object_tag);
+    r["error"] = JV("emitting must be a boolean");
+    return r;
+  }
+  if (am && !am->IsNumber()) {
+    JV r(JV::object_tag);
+    r["error"] = JV("amount must be an integer");
+    return r;
+  }
+  if (lt && !lt->IsNumber()) {
+    JV r(JV::object_tag);
+    r["error"] = JV("lifetime must be a number");
+    return r;
+  }
+  if (os && !os->IsBool()) {
+    JV r(JV::object_tag);
+    r["error"] = JV("one_shot must be a boolean");
+    return r;
+  }
+  if (ss && !ss->IsNumber()) {
+    JV r(JV::object_tag);
+    r["error"] = JV("speed_scale must be a number");
+    return r;
+  }
+  if (ex && !ex->IsNumber()) {
+    JV r(JV::object_tag);
+    r["error"] = JV("explosiveness must be a number");
+    return r;
+  }
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "set_particles_params called");
+  auto *editor = godot::EditorInterface::get_singleton();
+  if (!editor) {
+    JV r(JV::object_tag);
+    r["error"] = JV("EditorInterface not available");
+    return r;
+  }
+  auto *root = editor->get_edited_scene_root();
+  if (!root) {
+    JV r(JV::object_tag);
+    r["error"] = JV("no edited scene root");
+    return r;
+  }
+  std::string hint;
+  godot::Node *node = util::resolve_scene_node(path, root, &hint);
+  if (!node) {
+    JV r(JV::object_tag);
+    r["error"] = JV("node not found: " + path + " - " + hint);
+    return r;
+  }
+  NodeParticles p = resolve_node_particles(node);
+  if (!p.valid) {
+    JV r(JV::object_tag);
+    r["error"] = JV("node is not a GPUParticles2D/GPUParticles3D/CPUParticles2D/CPUParticles3D: " + path + " (actual class: " + util::to_std(node->get_class()) + ")");
+    return r;
+  }
+  if (em) {
+    bool v = em->GetBool();
+    if (p.gpu2) {
+      p.gpu2->set_emitting(v);
+    } else if (p.gpu3) {
+      p.gpu3->set_emitting(v);
+    } else if (p.cpu2) {
+      p.cpu2->set_emitting(v);
+    } else if (p.cpu3) {
+      p.cpu3->set_emitting(v);
+    }
+  }
+  if (am) {
+    int32_t v = static_cast<int32_t>(am->IsInt() ? am->GetInt() : am->GetDouble());
+    if (p.gpu2) {
+      p.gpu2->set_amount(v);
+    } else if (p.gpu3) {
+      p.gpu3->set_amount(v);
+    } else if (p.cpu2) {
+      p.cpu2->set_amount(v);
+    } else if (p.cpu3) {
+      p.cpu3->set_amount(v);
+    }
+  }
+  if (lt) {
+    double v = lt->IsInt() ? static_cast<double>(lt->GetInt()) : lt->GetDouble();
+    if (p.gpu2) {
+      p.gpu2->set_lifetime(v);
+    } else if (p.gpu3) {
+      p.gpu3->set_lifetime(v);
+    } else if (p.cpu2) {
+      p.cpu2->set_lifetime(v);
+    } else if (p.cpu3) {
+      p.cpu3->set_lifetime(v);
+    }
+  }
+  if (os) {
+    bool v = os->GetBool();
+    if (p.gpu2) {
+      p.gpu2->set_one_shot(v);
+    } else if (p.gpu3) {
+      p.gpu3->set_one_shot(v);
+    } else if (p.cpu2) {
+      p.cpu2->set_one_shot(v);
+    } else if (p.cpu3) {
+      p.cpu3->set_one_shot(v);
+    }
+  }
+  if (ss) {
+    double v = ss->IsInt() ? static_cast<double>(ss->GetInt()) : ss->GetDouble();
+    if (p.gpu2) {
+      p.gpu2->set_speed_scale(v);
+    } else if (p.gpu3) {
+      p.gpu3->set_speed_scale(v);
+    } else if (p.cpu2) {
+      p.cpu2->set_speed_scale(v);
+    } else if (p.cpu3) {
+      p.cpu3->set_speed_scale(v);
+    }
+  }
+  if (ex) {
+    float v = static_cast<float>(ex->IsInt() ? static_cast<double>(ex->GetInt()) : ex->GetDouble());
+    if (p.gpu2) {
+      p.gpu2->set_explosiveness_ratio(v);
+    } else if (p.gpu3) {
+      p.gpu3->set_explosiveness_ratio(v);
+    } else if (p.cpu2) {
+      p.cpu2->set_explosiveness_ratio(v);
+    } else if (p.cpu3) {
+      p.cpu3->set_explosiveness_ratio(v);
+    }
+  }
+  scene_dirty_tracker::mark_scene_modified();
+  LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
+                            "set_particles_params completed");
+  JV r(JV::object_tag);
+  r["result"] = JV("ok");
+  return r;
+}
+
+JV handle_node_particles_get_state(const JV &args) {
+  auto *pp = args.Find("path");
+  if (!pp || !pp->IsString()) {
+    JV r(JV::object_tag);
+    r["error"] = JV("missing required parameter: path");
+    return r;
+  }
+  std::string path = pp->GetString();
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "get_particles_state called");
+  auto *editor = godot::EditorInterface::get_singleton();
+  if (!editor) {
+    JV r(JV::object_tag);
+    r["error"] = JV("EditorInterface not available");
+    return r;
+  }
+  auto *root = editor->get_edited_scene_root();
+  if (!root) {
+    JV r(JV::object_tag);
+    r["error"] = JV("no edited scene root");
+    return r;
+  }
+  std::string hint;
+  godot::Node *node = util::resolve_scene_node(path, root, &hint);
+  if (!node) {
+    JV r(JV::object_tag);
+    r["error"] = JV("node not found: " + path + " - " + hint);
+    return r;
+  }
+  NodeParticles p = resolve_node_particles(node);
+  if (!p.valid) {
+    JV r(JV::object_tag);
+    r["error"] = JV("node is not a GPUParticles2D/GPUParticles3D/CPUParticles2D/CPUParticles3D: " + path + " (actual class: " + util::to_std(node->get_class()) + ")");
+    return r;
+  }
+  JV state(JV::object_tag);
+  state["type"] = JV(p.type);
+  if (p.gpu2) {
+    state["emitting"] = JV(p.gpu2->is_emitting());
+    state["amount"] = JV(static_cast<int64_t>(p.gpu2->get_amount()));
+    state["lifetime"] = JV(static_cast<double>(p.gpu2->get_lifetime()));
+    state["one_shot"] = JV(p.gpu2->get_one_shot());
+    state["speed_scale"] = JV(static_cast<double>(p.gpu2->get_speed_scale()));
+    state["explosiveness"] = JV(static_cast<double>(p.gpu2->get_explosiveness_ratio()));
+  } else if (p.gpu3) {
+    state["emitting"] = JV(p.gpu3->is_emitting());
+    state["amount"] = JV(static_cast<int64_t>(p.gpu3->get_amount()));
+    state["lifetime"] = JV(static_cast<double>(p.gpu3->get_lifetime()));
+    state["one_shot"] = JV(p.gpu3->get_one_shot());
+    state["speed_scale"] = JV(static_cast<double>(p.gpu3->get_speed_scale()));
+    state["explosiveness"] = JV(static_cast<double>(p.gpu3->get_explosiveness_ratio()));
+  } else if (p.cpu2) {
+    state["emitting"] = JV(p.cpu2->is_emitting());
+    state["amount"] = JV(static_cast<int64_t>(p.cpu2->get_amount()));
+    state["lifetime"] = JV(static_cast<double>(p.cpu2->get_lifetime()));
+    state["one_shot"] = JV(p.cpu2->get_one_shot());
+    state["speed_scale"] = JV(static_cast<double>(p.cpu2->get_speed_scale()));
+    state["explosiveness"] = JV(static_cast<double>(p.cpu2->get_explosiveness_ratio()));
+  } else if (p.cpu3) {
+    state["emitting"] = JV(p.cpu3->is_emitting());
+    state["amount"] = JV(static_cast<int64_t>(p.cpu3->get_amount()));
+    state["lifetime"] = JV(static_cast<double>(p.cpu3->get_lifetime()));
+    state["one_shot"] = JV(p.cpu3->get_one_shot());
+    state["speed_scale"] = JV(static_cast<double>(p.cpu3->get_speed_scale()));
+    state["explosiveness"] = JV(static_cast<double>(p.cpu3->get_explosiveness_ratio()));
+  }
+  LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
+                            "get_particles_state completed");
+  JV r(JV::object_tag);
+  r["result"] = std::move(state);
   return r;
 }
 
