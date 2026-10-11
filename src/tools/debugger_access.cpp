@@ -25,8 +25,11 @@ bool debugger_broadcast_request(const std::string &payload,
   std::vector<godot::Ref<godot::EditorDebuggerSession>> sessions;
   for (int32_t id : plugin->get_session_ids()) {
     auto session = plugin->get_session(id);
-    if (!(session.is_valid() && session->is_active()))
+    if (!(session.is_valid() && session->is_active())) {
+      if (session.is_valid())
+        plugin->forget_ready_session(id);
       continue;
+    }
     if (!plugin->is_session_ready(id))
       continue;
     sessions.push_back(session);
@@ -48,6 +51,33 @@ bool debugger_broadcast_request(const std::string &payload,
   return true;
 }
 
+int32_t debugger_active_session_count() {
+  auto *plugin = debugger_ops::DebugCapturePlugin::get_instance();
+  if (!plugin)
+    return 0;
+  int32_t count = 0;
+  for (int32_t id : plugin->get_session_ids()) {
+    auto session = plugin->get_session(id);
+    if (session.is_valid() && session->is_active())
+      ++count;
+  }
+  return count;
+}
+
+int32_t debugger_ready_session_count() {
+  auto *plugin = debugger_ops::DebugCapturePlugin::get_instance();
+  if (!plugin)
+    return 0;
+  int32_t count = 0;
+  for (int32_t id : plugin->get_session_ids()) {
+    auto session = plugin->get_session(id);
+    if (session.is_valid() && session->is_active() &&
+        plugin->is_session_ready(id))
+      ++count;
+  }
+  return count;
+}
+
 bool debugger_broadcast_engine_command(const godot::String &command,
                                        const godot::Array &data) {
   auto *plugin = debugger_ops::DebugCapturePlugin::get_instance();
@@ -56,8 +86,11 @@ bool debugger_broadcast_engine_command(const godot::String &command,
   bool sent = false;
   for (int32_t id : plugin->get_session_ids()) {
     auto session = plugin->get_session(id);
-    if (!(session.is_valid() && session->is_active()))
+    if (!(session.is_valid() && session->is_active())) {
+      if (session.is_valid())
+        plugin->forget_ready_session(id);
       continue;
+    }
     if (!plugin->is_session_ready(id))
       continue;
     session->send_message(command, data);
@@ -113,8 +146,11 @@ int32_t debugger_broadcast_reload_scripts(const std::vector<std::string> &script
   std::vector<godot::Ref<godot::EditorDebuggerSession>> sessions;
   for (int32_t id : plugin->get_session_ids()) {
     auto session = plugin->get_session(id);
-    if (!(session.is_valid() && session->is_active()))
+    if (!(session.is_valid() && session->is_active())) {
+      if (session.is_valid())
+        plugin->forget_ready_session(id);
       continue;
+    }
     if (!plugin->is_session_ready(id))
       continue;
     sessions.push_back(session);

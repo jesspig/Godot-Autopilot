@@ -1,46 +1,14 @@
 #include "scene_tree_ops.hpp"
+#include "core/config.hpp"
 #include "core/log_system.hpp"
-#include "util/error_util.hpp"
-#include "util/variant_json.hpp"
-#include <godot_cpp/classes/editor_interface.hpp>
-#include <godot_cpp/classes/engine.hpp>
-#include <godot_cpp/classes/node.hpp>
-#include <godot_cpp/classes/ref.hpp>
-#include <godot_cpp/classes/scene_tree.hpp>
-#include <godot_cpp/classes/scene_tree_timer.hpp>
-#include <godot_cpp/variant/string.hpp>
-#include <godot_cpp/variant/string_name.hpp>
-#include <godot_cpp/variant/typed_array.hpp>
+#include "runtime/gda_protocol.hpp"
+#include "tools/runtime_ops.hpp"
 #include <string>
 
 namespace godot_autopilot {
 namespace scene_tree_ops {
 
 using JV = mcp::JsonValue;
-
-namespace {
-
-godot::SceneTree *get_tree() {
-  auto *editor = godot::EditorInterface::get_singleton();
-  if (editor) {
-    auto *root = editor->get_edited_scene_root();
-    if (root) {
-      auto *tree = root->get_tree();
-      if (tree)
-        return tree;
-    }
-  }
-  auto *engine = godot::Engine::get_singleton();
-  if (engine) {
-    auto *ml = engine->get_main_loop();
-    if (ml) {
-      return godot::Object::cast_to<godot::SceneTree>(ml);
-    }
-  }
-  return nullptr;
-}
-
-} // namespace
 
 JV handle_call_group(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -57,32 +25,16 @@ JV handle_call_group(const JV &args) {
     e["error"] = JV("missing required parameter: method");
     return e;
   }
-  auto *tree = get_tree();
-  if (!tree) {
-    JV e(JV::object_tag);
-    e["error"] = JV("SceneTree not available");
-    return e;
-  }
-  std::string group_name = gn->GetString();
-  std::string method = mn->GetString();
+  JV params(JV::object_tag);
+  params["action"] = JV("call_group");
+  params["group_name"] = JV(gn->GetString());
+  params["method"] = JV(mn->GetString());
   auto *ap = args.Find("arguments");
   if (ap && ap->IsArray()) {
-    const auto &arr = ap->GetArray();
-    godot::Array gd_args;
-    for (const auto &item : arr) {
-      gd_args.push_back(VariantJson::deserialize(item));
-    }
-    tree->call_group(godot::StringName(group_name.c_str()),
-                     godot::StringName(method.c_str()), gd_args);
-  } else {
-    tree->call_group(godot::StringName(group_name.c_str()),
-                     godot::StringName(method.c_str()));
+    params["arguments"] = *ap;
   }
-  JV r(JV::object_tag);
-  r["result"] = JV("ok");
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "call_scene_tree_group completed");
-  return r;
+  return runtime_ops::handle_gda_send(std::string(GDA_OP_SCENE_TREE), params,
+                                      GDA_DEFAULT_TIMEOUT_MS);
 }
 
 JV handle_create_timer(const JV &args) {
@@ -94,35 +46,23 @@ JV handle_create_timer(const JV &args) {
     e["error"] = JV("missing required parameter: delay_sec");
     return e;
   }
-  auto *tree = get_tree();
-  if (!tree) {
-    JV e(JV::object_tag);
-    e["error"] = JV("SceneTree not available");
-    return e;
+  JV params(JV::object_tag);
+  params["action"] = JV("create_timer");
+  if (dp->IsDouble()) {
+    params["delay_sec"] = JV(dp->GetDouble());
+  } else {
+    params["delay_sec"] = JV(static_cast<double>(dp->GetInt()));
   }
-  double delay =
-      dp->IsDouble() ? dp->GetDouble() : static_cast<double>(dp->GetInt());
-  bool process_always = true;
   auto *pa = args.Find("process_always");
   if (pa && pa->IsBool()) {
-    process_always = pa->GetBool();
+    params["process_always"] = JV(pa->GetBool());
   }
-  bool process_in_physics = false;
   auto *pp = args.Find("process_in_physics");
   if (pp && pp->IsBool()) {
-    process_in_physics = pp->GetBool();
+    params["process_in_physics"] = JV(pp->GetBool());
   }
-  auto timer = tree->create_timer(delay, process_always, process_in_physics);
-  if (timer.is_null()) {
-    JV e(JV::object_tag);
-    e["error"] = JV("failed to create timer");
-    return e;
-  }
-  JV r(JV::object_tag);
-  r["result"] = VariantJson::serialize(godot::Variant(timer));
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "create_scene_tree_timer completed");
-  return r;
+  return runtime_ops::handle_gda_send(std::string(GDA_OP_SCENE_TREE), params,
+                                      GDA_DEFAULT_TIMEOUT_MS);
 }
 
 JV handle_get_nodes_in_group(const JV &args) {
@@ -134,43 +74,20 @@ JV handle_get_nodes_in_group(const JV &args) {
     e["error"] = JV("missing required parameter: group_name");
     return e;
   }
-  auto *tree = get_tree();
-  if (!tree) {
-    JV e(JV::object_tag);
-    e["error"] = JV("SceneTree not available");
-    return e;
-  }
-  std::string group_name = gn->GetString();
-  auto nodes = tree->get_nodes_in_group(godot::StringName(group_name.c_str()));
-  JV result_arr(JV::array_tag);
-  for (int i = 0; i < nodes.size(); i++) {
-    auto *node = godot::Object::cast_to<godot::Node>(nodes[i]);
-    if (!node)
-      continue;
-    result_arr.PushBack(JV(util::to_std(node->get_path())));
-  }
-  JV r(JV::object_tag);
-  r["result"] = std::move(result_arr);
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "get_scene_tree_nodes_in_group completed");
-  return r;
+  JV params(JV::object_tag);
+  params["action"] = JV("get_nodes_in_group");
+  params["group_name"] = JV(gn->GetString());
+  return runtime_ops::handle_gda_send(std::string(GDA_OP_SCENE_TREE), params,
+                                      GDA_DEFAULT_TIMEOUT_MS);
 }
 
 JV handle_is_paused(const JV &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "is_scene_tree_paused called");
-  auto *tree = get_tree();
-  if (!tree) {
-    JV e(JV::object_tag);
-    e["error"] = JV("SceneTree not available");
-    return e;
-  }
-  bool paused = tree->is_paused();
-  JV r(JV::object_tag);
-  r["result"] = JV(paused);
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "is_scene_tree_paused completed");
-  return r;
+  JV params(JV::object_tag);
+  params["action"] = JV("is_paused");
+  return runtime_ops::handle_gda_send(std::string(GDA_OP_SCENE_TREE), params,
+                                      GDA_DEFAULT_TIMEOUT_MS);
 }
 
 JV handle_notify_group(const JV &args) {
@@ -188,37 +105,21 @@ JV handle_notify_group(const JV &args) {
     e["error"] = JV("missing required parameter: notification");
     return e;
   }
-  auto *tree = get_tree();
-  if (!tree) {
-    JV e(JV::object_tag);
-    e["error"] = JV("SceneTree not available");
-    return e;
-  }
-  std::string group_name = gn->GetString();
-  int notification = ni->GetInt();
-  tree->notify_group(godot::StringName(group_name.c_str()), notification);
-  JV r(JV::object_tag);
-  r["result"] = JV("ok");
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "notify_scene_tree_group completed");
-  return r;
+  JV params(JV::object_tag);
+  params["action"] = JV("notify_group");
+  params["group_name"] = JV(gn->GetString());
+  params["notification"] = JV(ni->GetInt());
+  return runtime_ops::handle_gda_send(std::string(GDA_OP_SCENE_TREE), params,
+                                      GDA_DEFAULT_TIMEOUT_MS);
 }
 
 JV handle_reload_current_scene(const JV &) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "reload_scene_tree_current_scene called");
-  auto *tree = get_tree();
-  if (!tree) {
-    JV e(JV::object_tag);
-    e["error"] = JV("SceneTree not available");
-    return e;
-  }
-  godot::Error err = tree->reload_current_scene();
-  JV r(JV::object_tag);
-  r["result"] = JV(static_cast<int64_t>(err));
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "reload_scene_tree_current_scene completed");
-  return r;
+  JV params(JV::object_tag);
+  params["action"] = JV("reload_current_scene");
+  return runtime_ops::handle_gda_send(std::string(GDA_OP_SCENE_TREE), params,
+                                      GDA_DEFAULT_TIMEOUT_MS);
 }
 
 JV handle_set_debug_collisions(const JV &args) {
@@ -230,18 +131,11 @@ JV handle_set_debug_collisions(const JV &args) {
     e["error"] = JV("missing required parameter: enabled");
     return e;
   }
-  auto *tree = get_tree();
-  if (!tree) {
-    JV e(JV::object_tag);
-    e["error"] = JV("SceneTree not available");
-    return e;
-  }
-  tree->set_debug_collisions_hint(ep->GetBool());
-  JV r(JV::object_tag);
-  r["result"] = JV("ok");
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "set_scene_tree_debug_collisions_hint completed");
-  return r;
+  JV params(JV::object_tag);
+  params["action"] = JV("set_debug_collisions_hint");
+  params["enabled"] = JV(ep->GetBool());
+  return runtime_ops::handle_gda_send(std::string(GDA_OP_SCENE_TREE), params,
+                                      GDA_DEFAULT_TIMEOUT_MS);
 }
 
 JV handle_set_pause(const JV &args) {
@@ -253,18 +147,11 @@ JV handle_set_pause(const JV &args) {
     e["error"] = JV("missing required parameter: paused");
     return e;
   }
-  auto *tree = get_tree();
-  if (!tree) {
-    JV e(JV::object_tag);
-    e["error"] = JV("SceneTree not available");
-    return e;
-  }
-  tree->set_pause(pp->GetBool());
-  JV r(JV::object_tag);
-  r["result"] = JV("ok");
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "set_scene_tree_pause completed");
-  return r;
+  JV params(JV::object_tag);
+  params["action"] = JV("set_pause");
+  params["paused"] = JV(pp->GetBool());
+  return runtime_ops::handle_gda_send(std::string(GDA_OP_SCENE_TREE), params,
+                                      GDA_DEFAULT_TIMEOUT_MS);
 }
 
 } // namespace scene_tree_ops

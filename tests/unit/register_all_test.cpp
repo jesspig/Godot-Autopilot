@@ -139,9 +139,9 @@ TEST_F(RegisteredServerFixture, SchemaStatisticsBaseline) {
       ++empty;
     }
   }
-  EXPECT_EQ(tools.size(), 399);
-  EXPECT_EQ(non_empty, 336);
-  EXPECT_EQ(empty, 63);
+  EXPECT_EQ(tools.size(), 451);
+  EXPECT_EQ(non_empty, 385);
+  EXPECT_EQ(empty, 66);
   EXPECT_EQ(non_empty + empty, tools.size());
   EXPECT_GT(non_empty, empty);
   EXPECT_GT(empty, 0);

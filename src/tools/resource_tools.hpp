@@ -129,6 +129,11 @@ const std::vector<ParamSpec> kReimportResourceFilesParams = {
     {"files", "array", "Array of resource file paths to reimport; alternative to a single path", false},
 };
 
+const std::vector<ParamSpec> kSetResourceImportOptionsParams = {
+    {"path", "string", "Imported asset path inside res:// that already carries a .import sidecar, e.g. res://assets/sfx/jump.wav; files without a sidecar are rejected", true},
+    {"options", "object", "Non-empty object mapping whitelisted importer option keys to new values (audio loop/compression and texture filter/mipmap families, e.g. loop, loop_begin, loop_end, compression, compress/mode, mipmaps/generate, filter); any other key is rejected", true},
+};
+
 const std::vector<ParamSpec> kSetResourcePropertyParams = {
     {"object_id_str", "string", "Object ID as decimal string, alternative to object_id", false},
     {"object_id", "integer", "Object ID of an in-memory resource (from create_resource or load_resource)", false},
@@ -148,11 +153,50 @@ const std::vector<ParamSpec> kGetResourcePropertyParams = {
     {"type_hint", "string", "Accepted for parity with set_resource_property; reading always returns the raw serialized value", false},
 };
 
+const std::vector<ParamSpec> kCreateCurveResourceParams = {
+    {"name", "string", "Registration name so later calls can reference the curve as memory://name and via the returned object_id", true},
+    {"dimension", "string", "Curve dimension: '2d' creates a Curve2D (default), '3d' creates a Curve3D", false},
+    {"bake_interval", "number", "Distance between baked points in pixels; must be greater than 0 when provided", false},
+};
+
+const std::vector<ParamSpec> kSetCurvePointsParams = {
+    {"name", "string", "Registration name of a curve from create_curve_resource (memory://name)", true},
+    {"points", "array", "Array of 1-256 point objects, each {pos, in?, out?} where pos is required and in/out are optional control handles; Curve2D entries use {x, y}, Curve3D entries use {x, y, z}; unknown fields are rejected and the whole call fails without modifying the curve", true},
+};
+
+const std::vector<ParamSpec> kGetCurveBakedPointsParams = {
+    {"name", "string", "Registration name of a curve from create_curve_resource (memory://name)", true},
+};
+
+const std::vector<ParamSpec> kCreatePrimitiveMeshParams = {
+    {"type", "string", "Primitive kind: one of box, capsule, plane, quad, sphere, torus, tube, text; maps to BoxMesh, CapsuleMesh, PlaneMesh, QuadMesh, SphereMesh, TorusMesh, TubeTrailMesh, TextMesh", true},
+    {"name", "string", "Registration name so later calls can reference the mesh as memory://name and via the returned object_id; when omitted only the object_id is registered", false},
+    {"params", "object", "Optional property overrides applied to the new primitive, e.g. size, radius, height; unknown property names are rejected and nothing is registered", false},
+};
+
+const std::vector<ParamSpec> kCreateArrayMeshParams = {
+    {"vertices", "array", "Triangle vertex positions as 1-65536 {x, y, z} objects; without indices every 3 vertices form one triangle", true},
+    {"normals", "array", "Optional per-vertex normals as {x, y, z} objects; must match vertices in length when provided", false},
+    {"indices", "array", "Optional triangle indices as integers in [0, vertex_count); each entry must reference a valid vertex", false},
+    {"name", "string", "Registration name so later calls can reference the mesh as memory://name and via the returned object_id; when omitted only the object_id is registered", false},
+};
+
+const std::vector<ParamSpec> kSetMeshSurfaceMaterialParams = {
+    {"mesh_ref", "object", "Mesh locator: memory://name string, bare registration name, res:// path, decimal object_id string, or {name|path|object_id|resource} object", true},
+    {"surface_idx", "integer", "Zero-based surface index to assign the material to; must be below the mesh surface count", true},
+    {"material_path", "string", "Material locator: res:// path, memory://name or bare registration name of an in-memory Material", true},
+};
+
+const std::vector<ParamSpec> kAssignMeshToInstanceParams = {
+    {"node_path", "string", "Scene-relative path to a MeshInstance2D or MeshInstance3D node, e.g. 'Level/Enemy' or absolute '/root/Level/Enemy'", true},
+    {"mesh_ref", "object", "Mesh locator: memory://name string, bare registration name, res:// path, decimal object_id string, or {name|path|object_id|resource} object", true},
+};
+
 } // namespace
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(26);
+  v.reserve(34);
   v.push_back(make_spec_tool(ToolSpec{
       "load_resource",
       "Load a resource file from disk into memory. Use it to bring a .tres or .tscn file into the editor for inspection or modification, with an optional type_hint to guide loading. Returns the resource reference with class, path, object_id and object_id_str, which set_resource_property and get_resource_property accept as locators. Errors when the file is missing or fails to load.",
@@ -274,6 +318,11 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       "Resources", {"resource", "reimport"}, SideEffect::None, tool_flags::kNone,
       kReimportResourceFilesParams, resource_ops::handle_reimport}));
   v.push_back(make_spec_tool(ToolSpec{
+      "set_resource_import_options",
+      "Set whitelisted import options on an already-imported asset's .import [params] section and queue a reimport. Requires path (a res:// file that already carries a .import sidecar) and options (a non-empty object mapping option keys to values). Only safe importer keys are accepted (audio loop/compression and texture filter/mipmap families, e.g. loop, loop_mode, loop_begin, loop_end, compression, compress/mode, compress/high_quality, compress/lossy_quality, mipmaps/generate, mipmaps/limit, filter, anisotropy, process/hdr_as_srgb, roughness/mode, stream, size_limit); any other key is rejected. Do not hand-write .import files — this tool is the supported way to change import parameters. The reimport is asynchronous: the response reports applied keys with reimport queued, so poll get_editor_file_system_status until scanning is false, then verify with get_resource_type or read_file on the .import. Errors when the file has no .import sidecar (use reload_resource for plain text resources) or while the editor is importing/scanning.",
+      "Resources", {"resource", "import", "options"}, SideEffect::WritesFile, tool_flags::kMutating,
+      kSetResourceImportOptionsParams, resource_ops::handle_set_import_options}));
+  v.push_back(make_spec_tool(ToolSpec{
       "set_resource_property",
       "Set a property on a resource. Locate the resource by object_id/object_id_str (from create_resource or load_resource), name (in-memory) or path (loaded from disk). value is a serialized JSON value; resource-typed properties accept {'path': 'res://...'} or {'resource': 'memory://name'} references, and type_hint guides deserialization. Returns ok with class, path, object_id, resource_attached and possible readback warnings.",
       "Resources", {"resource", "property", "set"}, SideEffect::None, tool_flags::kNone,
@@ -283,6 +332,41 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       "Read a property value from a resource. Locate the resource by object_id/object_id_str, name (in-memory) or path (loaded from disk), and pass the property name. Returns the serialized value; errors when the resource cannot be resolved. Use set_resource_property to modify it.",
       "Resources", {"resource", "property", "get"}, SideEffect::None, tool_flags::kNone,
       kGetResourcePropertyParams, resource_ops::handle_get_property}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "create_curve_resource",
+      "Create a Curve2D ('2d', default) or Curve3D ('3d') in memory and register it as memory://<name>; nothing is written to disk. Optional bake_interval (number greater than 0) sets the distance between baked points. Returns class, name, path, object_id, object_id_str and dimension; use set_curve_points to fill control points and get_curve_baked_points to read the baked polyline.",
+      "Resources", {"resource", "curve", "create"}, SideEffect::None, tool_flags::kNone,
+      kCreateCurveResourceParams, resource_ops::handle_create_curve}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "set_curve_points",
+      "Replace all control points of a curve created by create_curve_resource. Requires name (the memory:// reference) and points (array of 1-256 {pos, in?, out?} objects; pos is required, in/out are optional handles; Curve2D uses {x, y}, Curve3D uses {x, y, z}; unknown fields are rejected). The update is all-or-nothing: any invalid entry leaves the curve untouched. Returns ok with name, class and point_count.",
+      "Resources", {"resource", "curve", "points", "set"}, SideEffect::None, tool_flags::kNone,
+      kSetCurvePointsParams, resource_ops::handle_set_curve_points}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "get_curve_baked_points",
+      "Read the baked polyline of a curve created by create_curve_resource without modifying it. Requires name (the memory:// reference). Returns points as an array of {x, y} (Curve2D) or {x, y, z} (Curve3D) objects with count, baked_length, class and name. Read-only.",
+      "Resources", {"resource", "curve", "baked", "get"}, SideEffect::None, tool_flags::kNone,
+      kGetCurveBakedPointsParams, resource_ops::handle_get_curve_baked_points}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "create_primitive_mesh",
+      "Create a PrimitiveMesh in memory and register it as memory://<name>; nothing is written to disk. type selects the mesh (box, capsule, plane, quad, sphere, torus, tube, text map to BoxMesh, CapsuleMesh, PlaneMesh, QuadMesh, SphereMesh, TorusMesh, TubeTrailMesh, TextMesh). Optional params applies property overrides such as size or radius; unknown properties are rejected and nothing is registered. Returns class, name, path, object_id, object_id_str, type and mesh_ref; pass mesh_ref to set_mesh_surface_material or assign_mesh_to_instance.",
+      "Resources", {"resource", "mesh", "primitive", "create"}, SideEffect::None, tool_flags::kMutating,
+      kCreatePrimitiveMeshParams, resource_ops::handle_create_primitive_mesh}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "create_array_mesh",
+      "Create an ArrayMesh with one triangle surface in memory and register it as memory://<name>; nothing is written to disk. Requires vertices (array of 1-65536 {x, y, z} objects; without indices every 3 vertices form one triangle). Optional normals (per-vertex {x, y, z}, must match vertices in length) and indices (integers in [0, vertex_count)). Returns class, name, path, object_id, object_id_str, mesh_ref, vertex_count, index_count, has_normals and surface_count; omitting normals yields a warning that shaded materials may render flat. Pass mesh_ref to set_mesh_surface_material or assign_mesh_to_instance.",
+      "Resources", {"resource", "mesh", "array", "create"}, SideEffect::None, tool_flags::kMutating,
+      kCreateArrayMeshParams, resource_ops::handle_create_array_mesh}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "set_mesh_surface_material",
+      "Assign a Material to one surface of a mesh. Requires mesh_ref (memory://name string, bare registration name, res:// path, decimal object_id string, or locator object), surface_idx (zero-based, must be below the mesh surface count) and material_path (res:// path, memory://name or bare registration name of an in-memory Material). Returns ok with class, surface_idx, surface_count and material. Errors when the mesh or material cannot be resolved, the resolved values are not a Mesh/Material, or the surface index is out of range.",
+      "Resources", {"resource", "mesh", "material", "set"}, SideEffect::None, tool_flags::kMutating,
+      kSetMeshSurfaceMaterialParams, resource_ops::handle_set_mesh_surface_material}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "assign_mesh_to_instance",
+      "Assign a mesh to a MeshInstance2D or MeshInstance3D node in the edited scene. Requires node_path (scene-relative path such as 'Level/Enemy' or absolute '/root/Level/Enemy') and mesh_ref (memory://name string, bare registration name, res:// path, decimal object_id string, or locator object). Nodes of any other class are rejected with their actual class name. Returns ok with assigned, node_path, mesh_ref and class; a mesh without normals yields a shading warning. When the instance rejects the in-memory mesh, save it with save_resource first and assign the saved res:// path instead.",
+      "Resources", {"resource", "mesh", "assign", "instance"}, SideEffect::None, tool_flags::kMutating,
+      kAssignMeshToInstanceParams, resource_ops::handle_assign_mesh_to_instance}));
   return v;
 }
 

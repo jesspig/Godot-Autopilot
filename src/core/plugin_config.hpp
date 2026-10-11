@@ -13,6 +13,9 @@ public:
   static bool load_show_time();
   static bool save_show_time(bool show);
 
+  static bool load_desensitize();
+  static bool save_desensitize(bool value);
+
   static std::string load_allow();
   static bool save_allow(const std::string &allow);
 };

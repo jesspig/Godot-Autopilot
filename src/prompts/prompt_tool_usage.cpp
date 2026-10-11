@@ -509,6 +509,15 @@ std::string prompt_tool_usage() {
 
 **功能：** 按顺序执行多个工具操作，可选择遇错即停。
 
+**operations[] 字段表（每个操作只认这两个字段）：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `tool` | string | 是 | 要执行的域名工具名，先用 `search_tools` 确认 exact 名称 |
+| `args` | object | 否 | 该工具的参数对象，缺省为 `{}` |
+
+`call_tool` 风格的 `name`/`arguments` 在 operations 里不可用：缺 `tool` 的操作直接判错，不会替你改名。
+
 **输入：**
 ```json
 {
@@ -546,16 +555,19 @@ std::string prompt_tool_usage() {
   ],
   "total": 2,
   "succeeded": 2,
-  "failed": 0
+  "failed": 0,
+  "pending": 0,
+  "skipped": 0
 }
 ```
 
 **注意：**
-- 每个操作需要 `tool`（必填）和 `args`（可选）字段
+- 每个操作需要 `tool`（必填）和 `args`（可选，缺省 `{}`）字段；`name`/`arguments` 在此不可用
 - `stop_on_error` 默认为 true
 - 操作顺序执行，不是并行
-- 失败的操作用 `args` 字段提供错误信息
-- 异步 game 工具（`execute_game_script`、`queue_game_input` 等）在 batch 中默认被明确报错拒绝（该操作 `status` 为 `"error"`，pending 记录被释放，不会悬挂等待），`total` = succeeded + failed；传 `await_async: true` 后 batch 经传输线程等待异步 op 的真实结果（受该 op 的 `timeout_ms` 约束）。注意：经 `call_tool` 间接调用 batch 且 `await_async: true` 会命中主线程兜底错误，需直接调用 `batch_execute`；长耗时游戏脚本也可用 `start_game_job` 异步提交（立即返回 `job_id`），再以 `get_game_job` 轮询结果
+- 成功的操作把工具返回包在 `data` 下（`await_async` 等到的异步 op 结果放在 `result` 下）；失败的操作 `status` 为 `"error"`，错误文本放在 `error` 字段
+- 计数口径：`total` = 已执行数 = `succeeded` + `failed` + `pending`；`skipped` = 遇错即停后未执行的操作数；`total` + `skipped` = `operations` 长度
+- 异步 game 工具（`execute_game_script`、`queue_game_input` 等）在 batch 中默认被明确报错拒绝（该操作 `status` 为 `"error"`，pending 记录被释放，不会悬挂等待），`total` 只计已执行数（含 `pending`）；传 `await_async: true` 后 batch 经传输线程等待异步 op 的真实结果（受该 op 的 `timeout_ms` 约束）。注意：经 `call_tool` 间接调用 batch 且 `await_async: true` 会命中主线程兜底错误，需直接调用 `batch_execute`；长耗时游戏脚本也可用 `start_game_job` 异步提交（立即返回 `job_id`），再以 `get_game_job` 轮询结果
 
 ---
 

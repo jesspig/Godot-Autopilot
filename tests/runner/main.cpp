@@ -31,7 +31,7 @@ constexpr int kExitError = 2;
 
 const std::string kDefaultConfigDir = std::string(PROJECT_ROOT) + "/tests/config";
 const std::string kDefaultReportDir = std::string(PROJECT_ROOT) + "/tests/output";
-const std::string kProjectPath = std::string(PROJECT_ROOT) + "/Example";
+const std::string kProjectPath = std::string(PROJECT_ROOT) + "/tests/testbed";
 const char *kPortEnvKey = "GODOT_AUTOPILOT_PORT";
 
 constexpr auto kPostStopSleep = std::chrono::seconds(2);
@@ -271,6 +271,17 @@ int run_main(int argc, char **argv) {
       std::cerr << "错误: 未找到 Godot 可执行文件。请设置 GODOT_PATH 环境"
                    "变量，或参照 .env.template 在仓库根 .env 中配置 "
                    "GODOT_PATH"
+                << std::endl;
+      return kExitError;
+    }
+    const fs::path bed = fs::path(kProjectPath);
+    if (!fs::is_regular_file(bed / "project.godot") ||
+        !fs::is_regular_file(bed / "addons" / "godot-autopilot" /
+                                     "godot-autopilot.gdextension")) {
+      std::cerr << "错误: L2 测试床未就绪: " << kProjectPath
+                << " 缺少 project.godot 或 addons/godot-autopilot/"
+                   "godot-autopilot.gdextension，请先运行 uv run main.py build "
+                   "与 uv run main.py deploy"
                 << std::endl;
       return kExitError;
     }

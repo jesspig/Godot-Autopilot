@@ -26,6 +26,10 @@ mcp::JsonValue handle_get_output_device_list(const mcp::JsonValue &args);
 mcp::JsonValue handle_set_output_device(const mcp::JsonValue &args);
 mcp::JsonValue handle_get_input_device_list(const mcp::JsonValue &args);
 mcp::JsonValue handle_set_input_device(const mcp::JsonValue &args);
+mcp::JsonValue handle_start_input_capture(const mcp::JsonValue &args);
+mcp::JsonValue handle_stop_input_capture(const mcp::JsonValue &args);
+mcp::JsonValue handle_create_wav(const mcp::JsonValue &args);
+mcp::JsonValue handle_get_input_devices(const mcp::JsonValue &args);
 
 } // namespace audio_ops
 } // namespace godot_autopilot

@@ -264,6 +264,24 @@ const std::vector<ParamSpec> kSetRenderParticlesLifetimeParams = {
     {"lifetime", "number", "Particle lifetime in seconds; controls how long each particle stays alive (default: 1.0)", false},
 };
 
+const std::vector<ParamSpec> kRestartParticlesParams = {
+    {"path", "string", "Node path of a GPUParticles2D, GPUParticles3D, CPUParticles2D or CPUParticles3D node in the edited scene; example: 'Level1/Sparks' (leading slash and root/ prefix are tolerated)", true},
+};
+
+const std::vector<ParamSpec> kSetParticlesParamsParams = {
+    {"path", "string", "Node path of a GPUParticles2D, GPUParticles3D, CPUParticles2D or CPUParticles3D node in the edited scene; example: 'Level1/Sparks' (leading slash and root/ prefix are tolerated)", true},
+    {"emitting", "boolean", "Emit particles, true starts and false stops emission", false},
+    {"amount", "integer", "Particle amount, number of particles in the system", false},
+    {"lifetime", "number", "Particle lifetime in seconds; controls how long each particle stays alive (default: 1.0)", false},
+    {"one_shot", "boolean", "One-shot emission, true emits once then stops (default: false)", false},
+    {"speed_scale", "number", "Speed scale multiplier for particle playback (default: 1.0)", false},
+    {"explosiveness", "number", "Explosiveness ratio 0.0-1.0, higher values emit particles together at the start (default: 0.0)", false},
+};
+
+const std::vector<ParamSpec> kGetParticlesStateParams = {
+    {"path", "string", "Node path of a GPUParticles2D, GPUParticles3D, CPUParticles2D or CPUParticles3D node in the edited scene; example: 'Level1/Sparks' (leading slash and root/ prefix are tolerated)", true},
+};
+
 const std::vector<ParamSpec> kCreateRenderReflectionProbeParams = {};
 
 const std::vector<ParamSpec> kCreateRenderDecalParams = {};
@@ -297,7 +315,7 @@ const std::vector<ParamSpec> kFindRenderNodeFromRidParams = {
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(49);
+  v.reserve(52);
   v.push_back(make_spec_tool(ToolSpec{
       "create_render_canvas_item",
       "Create a server-side 2D canvas item and return its RID as result.rid. Use this to build custom 2D drawing independent of scene nodes, then draw shapes with add_render_canvas_item_rect, add_render_canvas_item_circle, add_render_canvas_item_texture_rect or add_render_canvas_item_line and control visibility with set_render_canvas_item_visible. Returns an error if the RenderingServer is unavailable.",
@@ -543,6 +561,21 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       "Check whether an RID is valid and find edited-scene nodes that use it, mainly for debugging render RIDs. Returns rid, is_valid and, when matching nodes exist, a nodes array with node_path and type entries. It is the reverse of get_render_canvas_item_rid. Returns 'ok' even for invalid RIDs.",
       "Render", {"utility", "debug", "render"}, SideEffect::None, tool_flags::kNone,
       kFindRenderNodeFromRidParams, render_ops::handle_resolve_rid}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "restart_particles",
+      "Restart a particle node in the edited scene from the beginning, even if it is currently emitting. Pass the node path of a GPUParticles2D, GPUParticles3D, CPUParticles2D or CPUParticles3D node. Unlike setting emitting alone, this forces a fresh emission cycle. Use it to replay bursts, e.g. explosions or one-shot effects. Returns 'ok'. Errors if the node is missing or is not a particle node.",
+      "Render", {"render", "particles", "restart"}, SideEffect::None, tool_flags::kMutating,
+      kRestartParticlesParams, render_ops::handle_node_particles_restart}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "set_particles_params",
+      "Set playback parameters on a particle node in the edited scene. Pass the node path of a GPUParticles2D, GPUParticles3D, CPUParticles2D or CPUParticles3D node; all value parameters are optional and only the given ones are applied: emitting toggles emission, amount sets the particle count, lifetime sets seconds per particle, one_shot selects single-burst emission, speed_scale scales playback speed and explosiveness sets the burst ratio. Returns 'ok'. Errors if the node is missing, is not a particle node, or a value has the wrong type.",
+      "Render", {"render", "particles", "params"}, SideEffect::None, tool_flags::kMutating,
+      kSetParticlesParamsParams, render_ops::handle_node_particles_set_params}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "get_particles_state",
+      "Get the playback state of a particle node in the edited scene. Pass the node path of a GPUParticles2D, GPUParticles3D, CPUParticles2D or CPUParticles3D node. Returns type plus emitting, amount, lifetime, one_shot, speed_scale and explosiveness in 'result'. Read-only and never marks the scene dirty. Errors if the node is missing or is not a particle node.",
+      "Render", {"render", "particles", "state"}, SideEffect::None, tool_flags::kNone,
+      kGetParticlesStateParams, render_ops::handle_node_particles_get_state}));
   return v;
 }
 

@@ -67,6 +67,7 @@ public:
     return std::find(ready_session_ids_.begin(), ready_session_ids_.end(),
                      id) != ready_session_ids_.end();
   }
+  void forget_ready_session(int32_t session_id);
 
 private:
   std::vector<int32_t> session_ids_;

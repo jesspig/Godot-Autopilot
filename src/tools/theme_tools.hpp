@@ -62,11 +62,32 @@ const std::vector<ParamSpec> kSetControlAnchorPresetParams = {
     {"keep_offsets", "boolean", "Keep the node's current offsets instead of recomputing them for the new anchors (boolean, default: false)", false},
 };
 
+const std::vector<ParamSpec> kSetControlLayoutParams = {
+    {"path", "string", "Path of the Control node in the edited scene; only the in-memory scene changes — call save_editor_scene to persist", true},
+    {"preset", "integer", "Control LayoutPreset integer 0..15, same numbering as set_control_anchor_preset: top_left=0, top_right=1, bottom_left=2, bottom_right=3, center_left=4, center_top=5, center_right=6, center_bottom=7, center=8, left_wide=9, top_wide=10, right_wide=11, bottom_wide=12, vcenter_wide=13, hcenter_wide=14, full_rect=15; mutually exclusive with anchors", false},
+    {"keep_offsets", "boolean", "Keep current offsets when applying preset (boolean, default false); only used with preset", false},
+    {"anchors", "object", "Anchor overrides as object with optional left, top, right, bottom floats; mutually exclusive with preset; partial objects apply only the given sides", false},
+    {"offsets", "object", "Offset overrides as object with optional left, top, right, bottom numbers in pixels; applied after preset and anchors; partial objects apply only the given sides", false},
+    {"size_flags_h", "integer", "Horizontal size flags integer to assign", false},
+    {"size_flags_v", "integer", "Vertical size flags integer to assign", false},
+    {"grow_h", "integer", "Horizontal grow direction integer to assign", false},
+    {"grow_v", "integer", "Vertical grow direction integer to assign", false},
+    {"min_size", "object", "Custom minimum size as object with optional x, y numbers; partial objects keep the other axis", false},
+};
+
+const std::vector<ParamSpec> kSetThemeItemBundleParams = {
+    {"path", "string", "Path of a saved .tres theme file created with create_theme_resource, e.g. 'res://themes/main.tres'", true},
+    {"colors", "object", "Color items as object mapping theme_type to {varname: color} objects, e.g. {'Button': {'font_color': '#ff0000'}}; each color accepts a hex string like '#rrggbb' or '#rrggbbaa' or an object {r,g,b,a} with floats in 0..1", false},
+    {"constants", "object", "Constant items as object mapping theme_type to {varname: integer} objects, e.g. {'Button': {'separation': 4}}", false},
+    {"font_sizes", "object", "Font size items as object mapping theme_type to {varname: integer} objects, e.g. {'Label': {'font_size': 16}}", false},
+    {"styleboxes", "object", "Stylebox items as object mapping theme_type to {varname: stylebox} objects, e.g. {'Button': {'normal': {'bg_color': '#202020'}}}; each stylebox holds optional bg_color and border_color (hex string or {r,g,b,a}), border_width {left,top,right,bottom}, corner_radius {top_left,top_right,bottom_right,bottom_left} and content_margin {left,top,right,bottom} — every field is optional, and border_width/content_margin also accept a single number applied to all sides", false},
+};
+
 } // namespace
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(8);
+  v.reserve(10);
   v.push_back(make_spec_tool(ToolSpec{
       "create_theme_resource",
       "Create an empty Theme resource on disk at path (a res:// .tres path — res:// only; user:// rejected). Missing directories are created and the editor file system is refreshed after saving; an existing file is never overwritten. Optional base_type (e.g. Control) is stored as resource metadata for reference — Godot themes carry no global base type, so actual items are added with set_theme_color, set_theme_constant, set_theme_font_size and set_theme_stylebox_flat. Returns ok with the saved path.",
@@ -107,6 +128,16 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       "Apply one of the 16 Control layout presets (LayoutPreset integer) to a node in the edited scene: top_left=0, top_right=1, bottom_left=2, bottom_right=3, center_left=4..center=8, left_wide=9, top_wide=10, right_wide=11, bottom_wide=12, vcenter_wide=13, hcenter_wide=14, full_rect=15. keep_offsets (default false) keeps the node's current offsets instead of recomputing them for the new anchors. Only the in-memory scene changes — call save_editor_scene to persist. Returns ok with the applied preset.",
       "Theme", {"control", "anchor", "layout"}, SideEffect::None, tool_flags::kNone | tool_flags::kSceneTarget,
       kSetControlAnchorPresetParams, theme_ops::handle_set_control_anchor_preset}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "set_control_layout",
+      "Set combined Control layout in the edited scene in one undo step. Optional preset applies a LayoutPreset first, then anchors, offsets, size flags, grow directions and custom minimum size are applied in fixed order. preset and anchors are mutually exclusive. Only the in-memory scene changes — call save_editor_scene to persist. Returns ok with the final anchors, offsets, size flags, grow and minimum size.",
+      "Theme", {"control", "layout"}, SideEffect::None, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
+      kSetControlLayoutParams, theme_ops::handle_set_control_layout}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "set_theme_item_bundle",
+      "Set many theme items on a saved .tres theme in one save. Requires path plus at least one of colors, constants, font_sizes or styleboxes, each mapping theme_type to {varname: value} objects. Colors accept hex strings like \"#rrggbb\" or \"#rrggbbaa\" or objects {r,g,b,a} with floats in 0..1; constants and font_sizes take integers; styleboxes take StyleBoxFlat definitions with the same fields as set_theme_stylebox_flat. The theme is loaded, all items are modified in memory and saved back to disk once with a reload verification. Use get_theme_info to discover valid type and name pairs. Returns ok with per-kind applied counts plus saved and verified.",
+      "Theme", {"theme", "bundle"}, SideEffect::WritesFile, tool_flags::kMutating,
+      kSetThemeItemBundleParams, theme_ops::handle_set_theme_item_bundle}));
   return v;
 }
 

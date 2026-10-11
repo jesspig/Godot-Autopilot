@@ -10,6 +10,7 @@ mcp::JsonValue handle_action_add_event(const mcp::JsonValue &args);
 mcp::JsonValue handle_action_erase_event(const mcp::JsonValue &args);
 mcp::JsonValue handle_action_set_deadzone(const mcp::JsonValue &args);
 mcp::JsonValue handle_add_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_set_action_bundle(const mcp::JsonValue &args);
 mcp::JsonValue handle_erase_action(const mcp::JsonValue &args);
 mcp::JsonValue handle_get_actions(const mcp::JsonValue &args);
 mcp::JsonValue handle_has_action(const mcp::JsonValue &args);

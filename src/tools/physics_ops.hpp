@@ -57,6 +57,9 @@ mcp::JsonValue handle_2d_shape_create(const mcp::JsonValue &args);
 mcp::JsonValue handle_2d_shape_set_data(const mcp::JsonValue &args);
 mcp::JsonValue handle_physics_node_get_rid(const mcp::JsonValue &args);
 mcp::JsonValue handle_resolve_object(const mcp::JsonValue &args);
+mcp::JsonValue handle_body_bundle(const mcp::JsonValue &args);
+mcp::JsonValue handle_collision_shape_create(const mcp::JsonValue &args);
+mcp::JsonValue handle_collision_shape_assign(const mcp::JsonValue &args);
 
 } // namespace physics_ops
 } // namespace godot_autopilot

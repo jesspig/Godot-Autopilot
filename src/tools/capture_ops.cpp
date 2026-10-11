@@ -351,10 +351,12 @@ void prune_capture_files(const godot::String &dir_path, int keep) {
     godot::Error err =
         godot::DirAccess::remove_absolute(dir_path.path_join(files[i].second));
     if (err != godot::OK) {
-      LogSystem::instance().log(
+      LogSystem::instance().log_detailed(
           LogLevel::Warning, LogCategory::Tools,
           "prune_capture_files: failed to remove " +
-              util::to_std(files[i].second));
+              util::to_std(files[i].second),
+          "path=" + util::to_std(files[i].second) +
+              " error_code=" + std::to_string(static_cast<int>(err)));
     }
   }
 }
@@ -431,6 +433,14 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
   }
 
   if (target == "game") {
+    bool wait_ready = true;
+    if (auto *wait_p = args.Find("wait_ready")) {
+      if (!wait_p->IsBool()) {
+        return util::error_json(
+            "invalid parameter: wait_ready must be a boolean");
+      }
+      wait_ready = wait_p->GetBool();
+    }
     int64_t timeout_ms = GDA_DEFAULT_TIMEOUT_MS;
     if (auto *tp = args.Find("timeout_ms")) {
       if (tp->IsInt() && tp->GetInt() > 0)
@@ -477,7 +487,8 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
       return util::error_json(
           "diff_image is only supported for target='editor'");
     }
-    return runtime_ops::handle_gda_send("capture", params, timeout_ms);
+    return runtime_ops::handle_gda_send("capture", params, timeout_ms, false,
+                                        wait_ready);
   }
   if (target != "editor") {
     return util::error_detail("invalid target '" + target + "'",
@@ -1225,6 +1236,15 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
       "capture_editor_viewport completed: " +
           std::to_string(final_width) + "x" + std::to_string(final_height) +
           " space=" + space);
+  LogSystem::instance().log_detailed(
+      LogLevel::Info, LogCategory::Tools,
+      "capture_editor_viewport completed: " +
+          std::to_string(final_width) + "x" + std::to_string(final_height) +
+          " space=" + space,
+      "width=" + std::to_string(final_width) + " height=" +
+          std::to_string(final_height) + " space=" + space +
+          " save=" + (save ? "true" : "false") +
+          " annotate=" + (annotate ? "true" : "false"));
   return r;
 }
 

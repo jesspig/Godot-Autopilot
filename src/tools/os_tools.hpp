@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "tools/file_dir_ops.hpp"
 #include "tools/os_ops.hpp"
 #include "tools/text_ops.hpp"
 #include <tools/tool_spec.hpp>
@@ -86,11 +87,30 @@ const std::vector<ParamSpec> kFindInFilesParams = {
     {"max_results", "integer", "Maximum number of matching files to return (integer, default: 500); stops searching early and sets truncated: true when exceeded", false},
 };
 
+const std::vector<ParamSpec> kListDirectoryParams = {
+    {"path", "string", "Directory to list (res:// or user://; absolute paths inside the project root are normalized to res://)", true},
+    {"include_hidden", "boolean", "Include dotfile entries starting with '.' (boolean, default: false); when false hidden entries are skipped", false},
+    {"max_entries", "integer", "Maximum number of entries to return (integer, default: 500, minimum: 1); stops collecting early and sets truncated: true when exceeded", false},
+};
+
+const std::vector<ParamSpec> kGetFileInfoParams = {
+    {"path", "string", "File or directory path to inspect (res:// or user://; absolute paths inside the project root are normalized to res://)", true},
+};
+
+const std::vector<ParamSpec> kCopyFileGenericParams = {
+    {"path", "string", "Source file path to copy (res:// or user://; must exist as a file)", true},
+    {"dest_path", "string", "Destination file path to write (res:// or user://); missing parent directories are created recursively and an existing file is overwritten", true},
+};
+
+const std::vector<ParamSpec> kEnsureDirectoryParams = {
+    {"path", "string", "Directory to create below the namespace root (res:// or user://); missing parents are created recursively; idempotent when the directory already exists", true},
+};
+
 } // namespace
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(18);
+  v.reserve(22);
   v.push_back(make_spec_tool(ToolSpec{
       "show_os_alert",
       "Show a modal alert dialog with the given text and optional title. The call blocks the editor UI until the user dismisses the dialog, so avoid it in unattended or automated runs where it would hang. Requires 'text' (string); returns result 'ok' once dismissed.",
@@ -181,6 +201,26 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       "Recursively search text files under a directory (default res://) for a query string, returning each matching file with its occurrence count. Optional 'dir', 'extensions' (array, default gd/tscn/tres/cs/md/json/h/cpp), 'case_sensitive' (default false) and 'max_results' (default 500). Stops early once max_results files are collected and reports truncated: true; the result also carries the files array and total count.",
       "OS", {"file", "search"}, SideEffect::None, tool_flags::kNone,
       kFindInFilesParams, text_ops::handle_find_in_files}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "list_directory",
+      "List files and subdirectories of a project directory via plain filesystem I/O with no editor resource tracking. Accepts res:// and user:// paths (absolute paths inside the project root are normalized to res://). Requires 'path'; optional 'include_hidden' (default false, dotfile entries are skipped unless true) and 'max_entries' (default 500, minimum 1). Returns result with path, entries as {name, path, is_dir} objects, total and truncated (true when more entries exist than max_entries).",
+      "OS", {"file", "directory", "list"}, SideEffect::None, tool_flags::kNone,
+      kListDirectoryParams, file_dir_ops::handle_list_directory}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "get_file_info",
+      "Report plain filesystem metadata for a project path with no editor resource tracking. Accepts res:// and user:// paths (absolute paths inside the project root are normalized to res://). Requires 'path'. Returns result with path, exists, is_dir, is_file, size (bytes, 0 for directories and missing paths) and modified_time (engine timestamp, 0 when unavailable).",
+      "OS", {"file", "info"}, SideEffect::None, tool_flags::kNone,
+      kGetFileInfoParams, file_dir_ops::handle_get_file_info}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "copy_file",
+      "Copy a single file to dest_path as plain byte-for-byte filesystem I/O with no editor resource tracking. Both 'path' and 'dest_path' are required res:// or user:// paths (absolute paths inside the project root are normalized to res://). Missing parent directories of dest_path are created recursively and an existing file at dest_path is overwritten. The .import and .uid sidecars are not copied or handled. Returns result (copied), from, to and overwritten. Use copy_resource_file when engine resource semantics are needed.",
+      "OS", {"file", "copy"}, SideEffect::WritesFile, tool_flags::kMutating,
+      kCopyFileGenericParams, file_dir_ops::handle_copy_file_generic}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "ensure_directory",
+      "Create a directory and any missing parents as plain filesystem I/O with no editor resource tracking. Requires 'path' as a res:// or user:// directory below the namespace root (the root itself is rejected). Idempotent: an existing directory succeeds with already_existed true. Returns result (ok), path and already_existed.",
+      "OS", {"file", "directory", "create"}, SideEffect::WritesFile, tool_flags::kMutating,
+      kEnsureDirectoryParams, file_dir_ops::handle_ensure_directory}));
   return v;
 }
 

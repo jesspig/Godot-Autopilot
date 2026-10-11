@@ -3,18 +3,15 @@
 # 编译器探测/编译选项/C++17 已在根 CMakeLists.txt 完成, 测试目标继承。
 # ====================================================================
 
-# ── googletest (GIT_TAG 与 mcp-cpp-sdk 使用的 v1.15.2 一致) ──
-# 若 SDK 侧已开启 MCP_BUILD_TESTS 并先声明了 googletest, 此处跳过避免重复声明。
-include(FetchContent)
+# ── googletest (v1.15.2 / b514bdc, third_party submodule) ──
+# gda_require_submodule 与 GDA_THIRD_PARTY_DIR 由根 include(Dependencies) 提供。
+# 守卫保留: 若 SDK 侧已开启 MCP_BUILD_TESTS 并先声明了 googletest, 此处跳过避免重复声明。
 if(NOT TARGET GTest::gtest_main)
-    FetchContent_Declare(googletest
-        GIT_REPOSITORY https://github.com/google/googletest.git
-        GIT_TAG        v1.15.2
-        GIT_SHALLOW    TRUE)
+    gda_require_submodule(googletest)
     set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
     set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
-    FetchContent_MakeAvailable(googletest)
+    add_subdirectory("${GDA_THIRD_PARTY_DIR}/googletest" "${GDA_SUBMODULE_BIN_DIR}/googletest")
 endif()
 
 include(GoogleTest)
@@ -36,11 +33,14 @@ file(GLOB GDA_TOOLS_OPS_SOURCES CONFIGURE_DEPENDS
 #                           仅被 game_bridge.cpp 引用，不进 L1 业务源)
 set(GDA_UNIT_BUSINESS_SOURCES
     ${CMAKE_SOURCE_DIR}/src/core/log_system.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/log_persist.cpp
     ${CMAKE_SOURCE_DIR}/src/core/resource_registry.cpp
     ${CMAKE_SOURCE_DIR}/src/core/scene_dirty_tracker.cpp
     ${CMAKE_SOURCE_DIR}/src/core/export_guard.cpp
     ${CMAKE_SOURCE_DIR}/src/core/editor_readiness.cpp
     ${CMAKE_SOURCE_DIR}/src/core/editor_coords.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/trace_recorder.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/monitor.cpp
     ${CMAKE_SOURCE_DIR}/src/util/bm25_index.cpp
     ${CMAKE_SOURCE_DIR}/src/util/error_util.cpp
     ${CMAKE_SOURCE_DIR}/src/util/readback_util.cpp
@@ -141,3 +141,8 @@ add_test(NAME migration_guard
 #（find_program NAMES py python python3，py 优先；WindowsApps 存根下裸 python3 不可用）
 add_test(NAME comment_guard
     COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/comment_guard.py")
+
+# ── ctest 注册: 技能脚本 mock conformance（纯 stdlib + 自带 mock server）──
+# node 缺失时测试文件自行打印 SKIP 并 exit 0，ctest 视为通过；bun 仅在存在时加跑核心子集。
+add_test(NAME skill_scripts
+    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_skill_scripts.py")

@@ -29,6 +29,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -51,14 +53,24 @@ jobs:
           so1="$(find /usr/lib/gcc/x86_64-linux-gnu /usr/lib/x86_64-linux-gnu -name 'libgcc_s.so.1' 2>/dev/null | head -n1)"
           if [ -n "$so1" ]; then sudo ln -sf "$so1" /usr/lib/x86_64-linux-gnu/libgcc_s.so; fi
 
-      - name: Cache FetchContent dependencies
+      # 子模块版本由 gitlink（160000 mode）记录，.gitmodules 文本不变时 commit 仍可能
+      # 升级，故 cache key 取自 git ls-files 的权威 sha，避免命中旧源码缓存。
+      - name: Resolve submodule commits
+        id: submodules
+        shell: bash
+        run: echo "shas=$(git ls-files -s third_party | awk '{print $2}' | sort | tr '\n' '-')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache third_party submodules
         uses: actions/cache@v4
         with:
-          path: build/debug/_deps
-          key: deps-debug-${{ runner.os }}-${{ hashFiles('cmake/FetchDependencies.cmake') }}
+          path: |
+            third_party/godot-cpp
+            third_party/mcp-cpp-sdk
+            third_party/googletest
+          key: submodules-debug-${{ runner.os }}-${{ steps.submodules.outputs.shas }}
 
       - name: Build (Debug)
-        run: python build.py
+        run: python main.py build
 
       - name: L1 unit tests
         run: ctest --preset debug -E "^gda_runner_" --output-on-failure

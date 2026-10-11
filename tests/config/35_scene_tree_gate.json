@@ -1,0 +1,156 @@
+{
+  "name": "scene_tree_gate",
+  "description": "B1 第三层 SceneTree 工具语义回归（headless）：8 个 SceneTree 工具（set_scene_tree_pause / is_scene_tree_paused / reload_scene_tree_current_scene / set_scene_tree_debug_collisions_hint / call_scene_tree_group / notify_scene_tree_group / get_scene_tree_nodes_in_group / create_scene_tree_timer）已统一改为把请求组装为 GDA_OP_SCENE_TREE 并经运行时通道转发到游戏进程，编辑器自身的场景树永不被这些工具触碰。链路：before_all 用 create_editor_scene 建未落盘场景 SceneTreeGateRoot → ① 无游戏时依次调用 8 个工具（set_scene_tree_pause 用 paused:true），逐一断言 error 非空：授权已给时是运行时通道错误（game not running / game started but not ready），未给 game_runtime 时是授权门拒绝；执行器只能按值精确比较或判非空、无子串匹配，故以非空结构化 error 作为共同判定（与 16_game_jobs 的无游戏步同一判定口径），两条消息文本均含 game → ② code_execute 读 get_tree().paused 断言 false：本步是 B1 事故回归守卫——set_scene_tree_pause 已用 paused:true 调用过，若它还操作编辑器树，编辑器 SceneTree 将被暂停且插件进程停摆，此处必失败 → cleanup save_editor_scene_as 落盘 res://gda_tmp_scene_tree_gate/gate_root.tscn（未落盘场景 close 会被拒，故先落盘）→ close_editor_scene → move_os_file_to_trash 回收目录。on_failure=continue：8 个工具各自独立，单个失败不应掩盖其余工具的结论，编辑器树回读步仍会执行。前置：8 个工具受 game_runtime capability 授权门保护，编辑器树回读经 code_execute 受 code_execute capability 保护（GODOT_AUTOPILOT_ALLOW 或 user://godot_autopilot/config.json 的 allow 字段，env 优先）；8 个工具未授权时返回 authorization required 错误，仍满足 error 非空断言（两种授权态下用例都应通过，这正是选用非空判定而非精确文案的原因），编辑器树回读步缺 code_execute 授权则 FAIL。覆盖力声明：本用例不覆盖真实游戏进程内的 SceneTree 行为（暂停态、计时器创建、组调用与通知、当前场景重载），无游戏进程时那些路径不可达，需真实游戏由 V3/L3 复现验收覆盖。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "before_all": [
+      {
+        "id": "scene_tree_gate_before_scene",
+        "tool": "create_editor_scene",
+        "args": { "name": "SceneTreeGateRoot" }
+      }
+    ],
+    "stages": [
+      {
+        "id": "no_game_structured_errors",
+        "steps": [
+          {
+            "id": "gate_set_pause_no_game",
+            "tool": "set_scene_tree_pause",
+            "args": { "paused": true },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "gate_is_paused_no_game",
+            "tool": "is_scene_tree_paused",
+            "args": {},
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "gate_reload_scene_no_game",
+            "tool": "reload_scene_tree_current_scene",
+            "args": {},
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "gate_debug_collisions_no_game",
+            "tool": "set_scene_tree_debug_collisions_hint",
+            "args": { "enabled": true },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "gate_call_group_no_game",
+            "tool": "call_scene_tree_group",
+            "args": { "group_name": "gda_scene_tree_gate_probe", "method": "gda_probe_method" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "gate_notify_group_no_game",
+            "tool": "notify_scene_tree_group",
+            "args": { "group_name": "gda_scene_tree_gate_probe", "notification": 13 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "gate_nodes_in_group_no_game",
+            "tool": "get_scene_tree_nodes_in_group",
+            "args": { "group_name": "gda_scene_tree_gate_probe" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "gate_create_timer_no_game",
+            "tool": "create_scene_tree_timer",
+            "args": { "delay_sec": 0.05, "process_always": true, "process_in_physics": false },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "not_empty": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "editor_tree_untouched",
+        "steps": [
+          {
+            "id": "gate_editor_tree_not_paused",
+            "tool": "code_execute",
+            "args": { "source_code": "return get_tree().paused" },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "cleanup",
+        "steps": [
+          {
+            "id": "gate_save_scene",
+            "tool": "save_editor_scene_as",
+            "args": { "path": "res://gda_tmp_scene_tree_gate/gate_root.tscn" },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "saved" }
+              ]
+            }
+          },
+          {
+            "id": "gate_close_scene",
+            "tool": "close_editor_scene",
+            "args": {},
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "closed" }
+              ]
+            }
+          },
+          {
+            "id": "gate_trash_dir",
+            "tool": "move_os_file_to_trash",
+            "args": { "path": "res://gda_tmp_scene_tree_gate" },
+            "expect": { "has_keys": ["result"] }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "name": "trace_persistence",
+  "description": "可重放监控批次端到端：落盘日志与 trace jsonl 的持久化验收（headless）。① system_status 热身（只读，证明服务器与调用链可用）；② execute_script 扫描 user://godot_autopilot/traces 下的 trace-*.jsonl（按修改时间选最新会话文件，同秒并列时按文件名时间戳取新的——session stamp 为 %Y%m%d_%H%M%S，字典序即时间序），断言该文件同时包含 session_start 与 server_ready 两条启动标记；这两个 JSON 行在 _enter_tree 内 init_session()/ServerContext::start() 成功后立即入队（log_persist.cpp:193、main.cpp:198），任何 MCP 调用都必须经 _process 的 s_queue.drain() 在 flush_on_main_thread() 之后执行（main.cpp:230-232），故首帧 flush 必已写入，不依赖后续帧时序；③ 同一脚本遍历全部 trace-*.jsonl 断言不含 PNG base64 前缀 iVBORw0KGgo（验收关键：图片只以 image_ref/image_hash 记录，永不内联 base64；sanitize 默认开启时 store_trace_image 直接返回空）；④ execute_script 扫描 user://godot_autopilot/logs 下最新的 gda-*.log，断言包含启动日志行 'Godot Self-Driving plugin starting'。脚本内的标记字面量全部运行时拼接（'iVBORw0'+'KGgo'、'session'+'_start' 等），避免脚本自身的 args_digest 被写入 jsonl 后污染后续扫描；不调用 capture_editor_viewport（headless 无视口渲染）。前置：execute_script 受 code_execute capability 授权门保护（GODOT_AUTOPILOT_ALLOW env 或 user://godot_autopilot/config.json 的 allow 字段，env 优先）。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "fail_fast",
+    "stages": [
+      {
+        "id": "warmup",
+        "steps": [
+          {
+            "id": "trace_persistence_warmup_status",
+            "tool": "system_status",
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.running", "value": true },
+                { "key": "result.version", "not_empty": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "trace_jsonl",
+        "steps": [
+          {
+            "id": "trace_persistence_jsonl_clean_and_markers",
+            "tool": "execute_script",
+            "args": {
+              "expression": "var dir = DirAccess.open(\"user://godot_autopilot/traces\")\nif dir == null:\n\treturn {\"trace_exists\": false, \"newest_trace\": \"\", \"newest_has_session_start\": false, \"newest_has_server_ready\": false, \"any_file_has_png_prefix\": false}\nvar names = []\ndir.list_dir_begin()\nvar entry = dir.get_next()\nwhile entry != \"\":\n\tif not dir.current_is_dir() and entry.begins_with(\"trace-\") and entry.ends_with(\".jsonl\"):\n\t\tnames.append(entry)\n\tentry = dir.get_next()\ndir.list_dir_end()\nif names.is_empty():\n\treturn {\"trace_exists\": false, \"newest_trace\": \"\", \"newest_has_session_start\": false, \"newest_has_server_ready\": false, \"any_file_has_png_prefix\": false}\nvar newest = \"\"\nvar newest_mtime = -1\nfor candidate in names:\n\tvar mtime = FileAccess.get_modified_time(\"user://godot_autopilot/traces/\" + candidate)\n\tif mtime > newest_mtime or (mtime == newest_mtime and candidate > newest):\n\t\tnewest_mtime = mtime\n\t\tnewest = candidate\nvar newest_text = \"\"\nvar newest_file = FileAccess.open(\"user://godot_autopilot/traces/\" + newest, FileAccess.READ)\nif newest_file != null:\n\tnewest_text = newest_file.get_as_text()\nvar png_magic = \"iVBORw0\" + \"KGgo\"\nvar any_png = false\nfor candidate in names:\n\tvar probe = FileAccess.open(\"user://godot_autopilot/traces/\" + candidate, FileAccess.READ)\n\tif probe != null:\n\t\tif probe.get_as_text().contains(png_magic):\n\t\t\tany_png = true\nreturn {\"trace_exists\": true, \"trace_files\": names.size(), \"newest_trace\": newest, \"newest_has_session_start\": newest_text.contains(\"session\" + \"_start\"), \"newest_has_server_ready\": newest_text.contains(\"server\" + \"_ready\"), \"any_file_has_png_prefix\": any_png}"
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.trace_exists", "value": true },
+                { "key": "result.newest_trace", "not_empty": true },
+                { "key": "result.newest_has_session_start", "value": true },
+                { "key": "result.newest_has_server_ready", "value": true },
+                { "key": "result.any_file_has_png_prefix", "value": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "session_log",
+        "steps": [
+          {
+            "id": "trace_persistence_session_log_written",
+            "tool": "execute_script",
+            "args": {
+              "expression": "var dir = DirAccess.open(\"user://godot_autopilot/logs\")\nif dir == null:\n\treturn {\"log_exists\": false, \"newest_log\": \"\", \"log_has_startup_line\": false}\nvar names = []\ndir.list_dir_begin()\nvar entry = dir.get_next()\nwhile entry != \"\":\n\tif not dir.current_is_dir() and entry.begins_with(\"gda-\") and entry.ends_with(\".log\"):\n\t\tnames.append(entry)\n\tentry = dir.get_next()\ndir.list_dir_end()\nif names.is_empty():\n\treturn {\"log_exists\": false, \"newest_log\": \"\", \"log_has_startup_line\": false}\nvar newest = \"\"\nvar newest_mtime = -1\nfor candidate in names:\n\tvar mtime = FileAccess.get_modified_time(\"user://godot_autopilot/logs/\" + candidate)\n\tif mtime > newest_mtime or (mtime == newest_mtime and candidate > newest):\n\t\tnewest_mtime = mtime\n\t\tnewest = candidate\nvar text = \"\"\nvar newest_file = FileAccess.open(\"user://godot_autopilot/logs/\" + newest, FileAccess.READ)\nif newest_file != null:\n\ttext = newest_file.get_as_text()\nreturn {\"log_exists\": true, \"log_files\": names.size(), \"newest_log\": newest, \"log_has_startup_line\": text.contains(\"Godot Self-Driving plugin starting\")}"
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.log_exists", "value": true },
+                { "key": "result.newest_log", "not_empty": true },
+                { "key": "result.log_has_startup_line", "value": true }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

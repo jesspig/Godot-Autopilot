@@ -54,6 +54,18 @@ inline bool ascii_iequals(const std::string &lhs, const std::string &rhs) {
   return true;
 }
 
+inline std::string mime_type_for_path(const std::string &relative_path) {
+  if (relative_path.size() >= 4 &&
+      ascii_iequals(relative_path.substr(relative_path.size() - 4), ".mjs")) {
+    return "text/javascript";
+  }
+  if (relative_path.size() >= 3 &&
+      ascii_iequals(relative_path.substr(relative_path.size() - 3), ".md")) {
+    return "text/markdown";
+  }
+  return "text/plain";
+}
+
 inline ParsedUri parse_uri(const std::string &uri) {
   static const std::string kPrefix = "godot://skills";
   ParsedUri parsed;
@@ -196,7 +208,7 @@ inline ContentResult resolve_content(
       out.error = "Skill not found: " + resolved.parsed.name;
       return out;
     }
-    out.mime_type = "text/markdown";
+    out.mime_type = mime_type_for_path("SKILL.md");
     out.text = skill_gen::render_skill_md(*resolved.skill);
     return out;
   case UriKind::file:
@@ -209,7 +221,7 @@ inline ContentResult resolve_content(
                   resolved.parsed.file;
       return out;
     }
-    out.mime_type = "text/markdown";
+    out.mime_type = mime_type_for_path(resolved.file->relative_path);
     out.text = resolved.file->relative_path == "SKILL.md"
                    ? skill_gen::render_skill_md(*resolved.skill)
                    : resolved.file->body;

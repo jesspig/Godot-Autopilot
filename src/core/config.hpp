@@ -13,6 +13,11 @@ constexpr int64_t GDA_MAX_TIMEOUT_MS = 30000;
 constexpr int64_t GDA_RESPONSE_GRACE_MS = 2000;
 constexpr int64_t GDA_MAX_GAME_OP_TIMEOUT_MS = 25000;
 constexpr int64_t GDA_TRANSPORT_TIMEOUT_MS = 30000;
+constexpr int64_t GDA_DISPATCH_WAIT_DEFAULT_MS = 27000;
+constexpr int64_t GDA_DISPATCH_WAIT_HEALTH_MS = 5000;
+static_assert(GDA_DISPATCH_WAIT_DEFAULT_MS < GDA_TRANSPORT_TIMEOUT_MS,
+              "dispatch wait budget must stay below the HTTP transport timeout "
+              "so a structured timeout result can reach the client");
 constexpr int64_t GDA_MAX_GAME_OP_HOST_WAIT_MS =
     GDA_MAX_GAME_OP_TIMEOUT_MS + GDA_RESPONSE_GRACE_MS;
 static_assert(GDA_MAX_GAME_OP_HOST_WAIT_MS < GDA_TRANSPORT_TIMEOUT_MS,

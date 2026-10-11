@@ -6,6 +6,7 @@
 
 using godot_autopilot::util::error_detail;
 using godot_autopilot::util::error_json;
+using godot_autopilot::util::find_result_or_data;
 using godot_autopilot::util::ok_result;
 
 TEST(ErrorUtilTest, ErrorJsonShape) {
@@ -38,5 +39,24 @@ TEST(ErrorUtilTest, OkResultShape) {
     ASSERT_NE(result, nullptr);
     EXPECT_TRUE(result->IsString());
     EXPECT_EQ(result->GetString(), "v");
+}
+
+TEST(ErrorUtilTest, FindResultOrDataPrefersResult) {
+    auto both = mcp::JsonValue::Parse(R"({"result":1,"data":2})");
+    const mcp::JsonValue* found = find_result_or_data(both);
+    ASSERT_NE(found, nullptr);
+    EXPECT_EQ(found->GetInt(), 1);
+    auto legacy = mcp::JsonValue::Parse(R"({"data":2})");
+    found = find_result_or_data(legacy);
+    ASSERT_NE(found, nullptr);
+    EXPECT_EQ(found->GetInt(), 2);
+    auto none = mcp::JsonValue::Parse(R"({"error":"x"})");
+    EXPECT_EQ(find_result_or_data(none), nullptr);
+    mcp::JsonValue mutable_body =
+        mcp::JsonValue::Parse(R"({"data":{"v":3}})");
+    mcp::JsonValue* slot = find_result_or_data(mutable_body);
+    ASSERT_NE(slot, nullptr);
+    ASSERT_TRUE(slot->IsObject());
+    EXPECT_NE(slot->Find("v"), nullptr);
 }
 

@@ -14,6 +14,10 @@ namespace runtime_ops {
 mcp::JsonValue handle_sequence_game_inputs(const mcp::JsonValue &args);
 mcp::JsonValue handle_game_ui_elements(const mcp::JsonValue &args);
 mcp::JsonValue handle_click_game_ui_element(const mcp::JsonValue &args);
+mcp::JsonValue handle_get_game_locale(const mcp::JsonValue &args);
+mcp::JsonValue handle_set_game_locale(const mcp::JsonValue &args);
+mcp::JsonValue handle_get_translation_list(const mcp::JsonValue &args);
+mcp::JsonValue handle_translate_text(const mcp::JsonValue &args);
 } // namespace runtime_ops
 namespace game_tools {
 
@@ -25,6 +29,7 @@ const std::vector<ParamSpec> kSampleGamePropertyParams = {
     {"frames", "integer", "How many samples to collect, an integer from 1 to 120", true},
     {"interval_frames", "integer", "Sample every interval_frames+1-th process frame (integer 0-60, default: 0); frames*(interval_frames+1) must stay within 3600", false},
     {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 25000); on expiry the call fails with code sample_timeout plus the samples collected so far, and a node freed mid-run fails with code sample_node_freed. The host waits timeout_ms + 2000 ms and that budget must stay below the 30 s HTTP transport timeout, so 25000 ms is the hard cap", false},
+    {"wait_ready", "boolean", "Wait for the game process to report ready (gda:ready) before failing; while the game is starting, the request is queued and replayed as soon as readiness arrives. Set false to fail immediately (previous behaviour). Default: true", false},
 };
 
 const std::vector<ParamSpec> kCollectGameEvidenceParams = {
@@ -36,6 +41,7 @@ const std::vector<ParamSpec> kCollectGameEvidenceParams = {
     {"max_dimension", "integer", "Downscale the capture so its longest side is at most this many pixels (64-4096); never upscales", false},
     {"scale", "integer", "Integer nearest-neighbour upscale factor for the capture (1-8, default: 1), applied before max_dimension", false},
     {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 25000). The host waits timeout_ms + 2000 ms and that budget must stay below the 30 s HTTP transport timeout, so 25000 ms is the hard cap", false},
+    {"wait_ready", "boolean", "Wait for the game process to report ready (gda:ready) before failing; while the game is starting, the request is queued and replayed as soon as readiness arrives. Set false to fail immediately (previous behaviour). Default: true", false},
 };
 
 const std::vector<ParamSpec> kValidateGameUiLayoutParams = {
@@ -46,9 +52,12 @@ const std::vector<ParamSpec> kValidateGameUiLayoutParams = {
     {"bounds_margin", "number", "Pixel tolerance around the viewport visible rect (default: 2.0)", false},
     {"occlude_ratio", "number", "Fraction 0.5-1.0 of an element area covered by a later visible control before possibly_occluded warns (default: 0.98); occlusion is a document-order heuristic ignoring canvas_layer and z_index", false},
     {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 25000). The host waits timeout_ms + 2000 ms and that budget must stay below the 30 s HTTP transport timeout, so 25000 ms is the hard cap", false},
+    {"wait_ready", "boolean", "Wait for the game process to report ready (gda:ready) before failing; while the game is starting, the request is queued and replayed as soon as readiness arrives. Set false to fail immediately (previous behaviour). Default: true", false},
 };
 
-const std::vector<ParamSpec> kGetGameStatusParams = {};
+const std::vector<ParamSpec> kGetGameStatusParams = {
+    {"wait_ready", "boolean", "Wait for the game process to report ready (gda:ready) before failing; while the game is starting, the request is queued and replayed as soon as readiness arrives. Set false to fail immediately (previous behaviour). Default: true", false},
+};
 
 const std::vector<ParamSpec> kExecuteGameScriptParams = {
     {"action", "string", "Action to run in the game process: 'script' (execute arbitrary GDScript), 'get_property', 'set_property' or 'call_method'", true},
@@ -57,17 +66,19 @@ const std::vector<ParamSpec> kExecuteGameScriptParams = {
     {"value", "object", "Value to set for set_property", false},
     {"method", "string", "Method name for call_method; await methods are awaited to completion (bounded by timeout_ms) and return their final result", false},
     {"args", "array", "Arguments for call_method", false},
-    {"source_code", "string", "GDScript source for action='script' — must extend Node and define func _run()", false},
+    {"source_code", "string", "GDScript source for action='script' — a complete script defining func _run() (used as-is), or bare statements auto-wrapped into extends Node + func _run() (an explicit return is needed to produce a value)", false},
     {"persist", "boolean", "Keep the script's temporary node alive after the call (default: false); the node is stored under /root/__gda_runtime and its path is returned in node_path for later get_property/call_method use", false},
     {"persist_name", "string", "Node name under /root/__gda_runtime when persist=true (default: auto-generated)", false},
     {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 25000); on expiry an idempotent cancel interrupts the pending in-game await, and the plugin broadcasts an engine continue when the debugger session was breaked. The host waits timeout_ms + 2000 ms and that budget must stay below the 30 s HTTP transport timeout, so 25000 ms is the hard cap — split long work into shorter calls", false},
     {"assert", "string", "Optional sandboxed assertion expression (max 1024 chars) evaluated with the eval result bound as value, e.g. value > 0; the response carries assert {pass, expression} plus actual. Expression grammar only with no scene access, sharing the op timeout; coroutine results cannot be asserted — omit assert for awaitable calls", false},
+    {"wait_ready", "boolean", "Wait for the game process to report ready (gda:ready) before failing; while the game is starting, the request is queued and replayed as soon as readiness arrives. Set false to fail immediately (previous behaviour). Default: true", false},
 };
 
 const std::vector<ParamSpec> kStartGameJobParams = {
     {"op", "string", "Wrapped game op to submit for asynchronous execution; currently only 'eval' (the execute_game_script op) is supported", true},
     {"params", "object", "Parameters object passed to the wrapped op verbatim — same fields as execute_game_script, e.g. {\"action\":\"script\",\"source_code\":\"...\"}", true},
     {"timeout_ms", "integer", "In-game execution budget in milliseconds (default: 5000, maximum: 25000); the call returns immediately with a job_id and does not wait, so this bounds the in-game run and the job expiry check (expiry at timeout_ms + 2000 ms) instead of the transport wait. The job table holds at most 16 entries — collect finished jobs with get_game_job to free slots. Same budget chain as execute_game_script: values above 25000 are rejected, keeping every host wait below the 30 s HTTP transport timeout", false},
+    {"wait_ready", "boolean", "Wait for the game process to report ready (gda:ready) before failing; while the game is starting, the request is queued and replayed as soon as readiness arrives. Set false to fail immediately (previous behaviour). Default: true", false},
 };
 
 const std::vector<ParamSpec> kGetGameJobParams = {
@@ -91,8 +102,11 @@ const std::vector<ParamSpec> kQueueGameInputParams = {
     {"relative", "object", "Pointer movement delta {x, y} for type='mouse_motion' (default: zero vector)", false},
     {"action", "string", "Action name for type='action' (e.g. 'ui_accept'); transient states (is_action_just_pressed) are only visible in the next physics frame — use wait_game_input or get_game_input_status to observe effects. Transient states are not visible in _process (render frame)", false},
     {"duration_ms", "integer", "Hold duration: auto-release the input after this many ms (0/absent = no auto-release); only meaningful when pressed=true and ignored by type='wheel'", false},
+    {"click", "boolean", "Paired click helper for type='mouse_button': injects a press/release pair at position in one call (default: false); the release follows 2 physics frames after the press so BaseButton controls using the default ACTION_MODE_BUTTON_RELEASE observe both edges — a lone pressed=true without release leaves the button held and never fires its pressed signal. double_click=true performs two pairs. Overrides pressed for the paired injection. Verify with get_game_input_status or by reading button_pressed/is_hovered via execute_game_script", false},
+    {"double_click", "boolean", "Inject a second press/release pair after the first for type='mouse_button' (default: false); implies the click pairing behaviour", false},
     {"mode", "string", "Injection mode: 'event' (default, via Input.parse_input_event), 'api' (via Input.action_press/action_release, immediate) or 'hold' (event-style injection that stays pressed for duration_ms)", false},
     {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 25000). The host waits timeout_ms + 2000 ms and that budget must stay below the 30 s HTTP transport timeout, so 25000 ms is the hard cap — split long work into shorter calls", false},
+    {"wait_ready", "boolean", "Wait for the game process to report ready (gda:ready) before failing; while the game is starting, the request is queued and replayed as soon as readiness arrives. Set false to fail immediately (previous behaviour). Default: true", false},
 };
 
 const std::vector<ParamSpec> kCaptureGameViewportParams = {
@@ -105,28 +119,33 @@ const std::vector<ParamSpec> kCaptureGameViewportParams = {
     {"annotate", "boolean", "Draw a numbered box for every Control element on the captured image (default: false); the game-side result also carries annotated=true plus an elements array {id,path,type,text,position,size} in image pixels; id is a per-capture sequence number — click with the same row's path or text/text_index, never with id", false},
     {"annotate_nodes", "array", "Draw numbered blue boxes for the listed game scene nodes (1-50 absolute paths, exact match first then '/'+path suffix match); per-item failures carry ok:false plus error and candidates without failing the call; result adds node_elements[{id,path,type,ok,position,size,visible,behind,error}] in final-image pixels plus node_truncated when the 200-box budget truncates node marks", false},
     {"annotate_nodes_max", "integer", "Optional self limit 1-50 for annotate_nodes; the call fails when annotate_nodes is longer than this value", false},
+    {"wait_ready", "boolean", "Wait for the game process to report ready (gda:ready) before failing; while the game is starting, the request is queued and replayed as soon as readiness arrives. Set false to fail immediately (previous behaviour). Default: true", false},
 };
 
 const std::vector<ParamSpec> kWaitGameInputParams = {
     {"action", "string", "Action name to wait on", true},
     {"state", "string", "Transient state to wait for: 'just_pressed' (default), 'just_released' or 'pressed'", false},
-    {"inject", "object", "Inject an input before waiting, in the same call (fields mirror queue_game_input: type/action/keycode/pressed/mode/duration_ms/button_index/position/direction/amount/relative) — eliminates the inject-then-observe cross-roundtrip frame gap; required for state=just_pressed/just_released, without inject the transient window (1 physics frame) has already expired and the wait will always time out. Transient states are not visible in _process (render frame)", false},
+    {"inject", "object", "Inject an input before waiting, in the same call (fields mirror queue_game_input: type/action/keycode/pressed/mode/duration_ms/button_index/position/direction/amount/relative/click/double_click) — eliminates the inject-then-observe cross-roundtrip frame gap; required for state=just_pressed/just_released, without inject the transient window (1 physics frame) has already expired and the wait will always time out. Transient states are not visible in _process (render frame)", false},
     {"timeout_ms", "integer", "Wait timeout in milliseconds (default: 2000, max: 25000). The host waits timeout_ms + 2000 ms and that budget must stay below the 30 s HTTP transport timeout, so 25000 ms is the hard cap — split long work into shorter calls", false},
+    {"wait_ready", "boolean", "Wait for the game process to report ready (gda:ready) before failing; while the game is starting, the request is queued and replayed as soon as readiness arrives. Set false to fail immediately (previous behaviour). Default: true", false},
 };
 
 const std::vector<ParamSpec> kGetGameInputStatusParams = {
     {"action", "string", "Action name to query; the response includes paused and physics_frame so transient input consumption can be diagnosed when the game is paused", true},
     {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 25000); responses never include recent_engine_errors — use get_debugger_errors for running-game errors or get_debugger_log for editor-process errors. The host waits timeout_ms + 2000 ms and that budget must stay below the 30 s HTTP transport timeout, so 25000 ms is the hard cap — split long work into shorter calls", false},
+    {"wait_ready", "boolean", "Wait for the game process to report ready (gda:ready) before failing; while the game is starting, the request is queued and replayed as soon as readiness arrives. Set false to fail immediately (previous behaviour). Default: true", false},
 };
 
 const std::vector<ParamSpec> kSequenceGameInputsParams = {
-    {"inputs", "array", "Timeline items, each an object: kind ('key'|'mouse_button'|'mouse_motion'|'wheel'|'action'), at_frame (integer physics-frame offset from sequence start, 0 = immediately; out-of-order allowed, fires when its frame arrives) plus the queue_game_input fields for that kind — keycode for key, button_index and optional position {x,y} for mouse_button, position {x,y} for mouse_motion, direction ('up'|'down'|'left'|'right') or button_index 4-7 with optional amount 1-10 and position {x,y} for wheel, action for action; optional pressed (default true), duration_ms (auto-release), mode ('event'|'api'|'hold'). Max 256 items. Example: [{\"kind\":\"key\",\"keycode\":\"X\",\"at_frame\":0},{\"kind\":\"mouse_button\",\"button_index\":1,\"position\":{\"x\":120,\"y\":80},\"at_frame\":5},{\"kind\":\"action\",\"action\":\"jump\",\"at_frame\":15}]", true},
+    {"inputs", "array", "Timeline items, each an object: kind ('key'|'mouse_button'|'mouse_motion'|'wheel'|'action'), at_frame (integer physics-frame offset from sequence start, 0 = immediately; out-of-order allowed, fires when its frame arrives) plus the queue_game_input fields for that kind — keycode for key, button_index and optional position {x,y} for mouse_button, position {x,y} for mouse_motion, direction ('up'|'down'|'left'|'right') or button_index 4-7 with optional amount 1-10 and position {x,y} for wheel, action for action; optional pressed (default true), duration_ms (auto-release), mode ('event'|'api'|'hold'). mouse_button items accept click/double_click for paired press/release injection with the release 2 physics frames after the press (required for BaseButton controls using the default ACTION_MODE_BUTTON_RELEASE, which never fires on a lone press). Max 256 items. Example: [{\"kind\":\"key\",\"keycode\":\"X\",\"at_frame\":0},{\"kind\":\"mouse_button\",\"button_index\":1,\"position\":{\"x\":120,\"y\":80},\"at_frame\":5},{\"kind\":\"action\",\"action\":\"jump\",\"at_frame\":15}]", true},
     {"timeout_ms", "integer", "Response timeout in milliseconds (default: max(at_frame)*33+2000, max: 25000); the call resolves with {completed:true, executed:n} once every item has fired, or {completed:false, executed:n} on expiry listing how many items fired before the deadline. The host waits timeout_ms + 2000 ms and that budget must stay below the 30 s HTTP transport timeout, so 25000 ms is the hard cap — split long sequences into shorter ones", false},
+    {"wait_ready", "boolean", "Wait for the game process to report ready (gda:ready) before failing; while the game is starting, the request is queued and replayed as soon as readiness arrives. Set false to fail immediately (previous behaviour). Default: true", false},
 };
 
 const std::vector<ParamSpec> kGetGameUiElementsParams = {
     {"max_elements", "integer", "Maximum number of Control-derived elements returned in tree order (default: 100, max: 1000); truncated=true signals more remain — raise the cap or narrow via execute_game_script", false},
     {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 25000). The host waits timeout_ms + 2000 ms and that budget must stay below the 30 s HTTP transport timeout, so 25000 ms is the hard cap — split long work into shorter calls", false},
+    {"wait_ready", "boolean", "Wait for the game process to report ready (gda:ready) before failing; while the game is starting, the request is queued and replayed as soon as readiness arrives. Set false to fail immediately (previous behaviour). Default: true", false},
 };
 
 const std::vector<ParamSpec> kClickGameUiElementParams = {
@@ -137,13 +156,26 @@ const std::vector<ParamSpec> kClickGameUiElementParams = {
     {"double_click", "boolean", "Inject a second press/release pair (default: false)", false},
     {"max_elements", "integer", "Maximum number of Control elements enumerated while resolving path (default: 1000, max: 1000)", false},
     {"timeout_ms", "integer", "Response timeout in milliseconds (default: 5000, max: 25000); the game performs both the enumeration and the injection before answering. The host waits timeout_ms + 2000 ms and that budget must stay below the 30 s HTTP transport timeout, so 25000 ms is the hard cap — split long work into shorter calls", false},
+    {"wait_ready", "boolean", "Wait for the game process to report ready (gda:ready) before failing; while the game is starting, the request is queued and replayed as soon as readiness arrives. Set false to fail immediately (previous behaviour). Default: true", false},
+};
+
+const std::vector<ParamSpec> kGetGameLocaleParams = {};
+
+const std::vector<ParamSpec> kSetGameLocaleParams = {
+    {"locale", "string", "Game locale to activate in en or en_US format (e.g. en_US, zh_CN, en); other formats are rejected without changing state", true},
+};
+
+const std::vector<ParamSpec> kGetTranslationListParams = {};
+
+const std::vector<ParamSpec> kTranslateTextParams = {
+    {"key", "string", "Source message key to translate under the current game locale; unknown keys fail instead of echoing the key", true},
 };
 
 } // namespace
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(15);
+  v.reserve(19);
   v.push_back(make_spec_tool(ToolSpec{
       "sample_game_property",
       "Sample a game node property over N process frames in the running game process over the runtime debug channel, read-only: returns the serialized value per sample. Requires a game launched from the editor whose project loads the godot-autopilot extension. node_path and property select the target (property must exist — missing names fail fast instead of collecting nulls); frames (integer 1-120) sets how many samples to collect and interval_frames (integer 0-60, default 0) spaces them (every interval_frames+1-th process frame is sampled, keeping main-thread cost O(1) per frame); frames*(interval_frames+1) must stay within 3600. timeout_ms (default 5000, max 25000) bounds the whole sampling run — on expiry the call fails explicitly with code sample_timeout plus the samples collected so far; a node freed mid-run fails with code sample_node_freed. No polling loop on the caller side is needed.",
@@ -166,7 +198,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       kGetGameStatusParams, runtime_ops::handle_game_status}));
   v.push_back(make_spec_tool(ToolSpec{
       "execute_game_script",
-      "Run code or inspect/modify state inside the running game process over the runtime debug channel; requires a game launched from the editor whose project loads the godot-autopilot extension. action is 'script' (GDScript must extend Node and define func _run()), 'get_property', 'set_property' or 'call_method'. persist (default false) keeps the temporary node alive under /root/__gda_runtime and returns its path for later calls; persist_name names it. timeout_ms bounds the in-game execution (default 5000, max 25000; the host waits timeout_ms + 2000 ms, below the 30 s transport timeout); on expiry an idempotent cancel interrupts the pending await and, when the debugger session was breaked, the plugin sends an engine continue so the game is released. call_method on an await method waits for the coroutine to complete (bounded by timeout_ms) and returns its final result; on timeout it returns an error. Optional 'assert' (max 1024 chars) evaluates a sandboxed GDScript expression with the eval result bound as `value` (e.g. \"value > 0\") and attaches {assert:{pass,expression},actual}: Expression grammar only with no scene access, sharing the op timeout; coroutine (async) results cannot be asserted and fail explicitly — omit assert for awaitable calls.",
+      "Run code or inspect/modify state inside the running game process over the runtime debug channel; requires a game launched from the editor whose project loads the godot-autopilot extension. action is 'script': pass either a complete GDScript defining `func _run()` (used as-is) or bare statements (auto-wrapped into `extends Node` + `func _run()`; explicit `return` needed for a value) — success responses for auto-wrapped sources carry wrapped: true. Other actions are 'get_property', 'set_property' or 'call_method'. persist (default false) keeps the temporary node alive under /root/__gda_runtime and returns its path for later calls; persist_name names it. timeout_ms bounds the in-game execution (default 5000, max 25000; the host waits timeout_ms + 2000 ms, below the 30 s transport timeout); on expiry an idempotent cancel interrupts the pending await and, when the debugger session was breaked, the plugin sends an engine continue so the game is released. call_method on an await method waits for the coroutine to complete (bounded by timeout_ms) and returns its final result; on timeout it returns an error. Optional 'assert' (max 1024 chars) evaluates a sandboxed GDScript expression with the eval result bound as `value` (e.g. \"value > 0\") and attaches {assert:{pass,expression},actual}: Expression grammar only with no scene access, sharing the op timeout; coroutine (async) results cannot be asserted and fail explicitly — omit assert for awaitable calls.",
       "Game", {"game", "runtime", "eval", "script", "debug"}, SideEffect::GameRuntime, tool_flags::kMutating,
       kExecuteGameScriptParams, runtime_ops::handle_game_eval}));
   v.push_back(make_spec_tool(ToolSpec{
@@ -186,7 +218,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       kReloadGameScriptsParams, runtime_ops::handle_game_reload_scripts}));
   v.push_back(make_spec_tool(ToolSpec{
       "queue_game_input",
-      "Simulate input inside the running game process over the runtime debug channel; unlike the editor-process input_* tools, the running game receives these events. Requires a game launched from the editor whose project loads the godot-autopilot extension. type is 'key', 'mouse_button', 'wheel', 'mouse_motion' or 'action'; mode is 'event' (parse_input_event, default), 'api' (action_press/release, immediate) or 'hold' (event-style, kept pressed for duration_ms). wheel scrolls the mouse wheel: give direction ('up', 'down', 'left', 'right', case-insensitive) or button_index (4=up, 5=down, 6=left, 7=right), optional amount (integer 1-10, default 1) and optional position {x,y}; the wheel button is injected pressed then released with factor=amount. mouse_motion moves the pointer: position {x,y} is required and optional relative {x,y} sets the movement delta. Unknown parameters are rejected with an error. Transient states (is_action_just_pressed) are visible only in the first physics frame after injection and are lost when paused — check get_game_input_status's paused/physics_frame fields to diagnose. Transient states are tracked against physics frames only: is_action_just_pressed polled in _process (render frame) will not observe injected input — poll in _physics_process instead. 同帧内连续 press+release 会使 just_pressed 与 just_released 同时为真，边沿观察需跨物理帧（sequence_game_inputs 按帧排布可规避）。hold 模式逐帧注入有固定开销，长按慎用时长。动作与同名物理键位共存时，事件释放只清自身槽位不等价全局释放；如需全局释放用 api 模式.",
+      "Simulate input inside the running game process over the runtime debug channel; unlike the editor-process input_* tools, the running game receives these events. Requires a game launched from the editor whose project loads the godot-autopilot extension. type is 'key', 'mouse_button', 'wheel', 'mouse_motion' or 'action'; mode is 'event' (parse_input_event, default), 'api' (action_press/release, immediate) or 'hold' (event-style, kept pressed for duration_ms). wheel scrolls the mouse wheel: give direction ('up', 'down', 'left', 'right', case-insensitive) or button_index (4=up, 5=down, 6=left, 7=right), optional amount (integer 1-10, default 1) and optional position {x,y}; the wheel button is injected pressed then released with factor=amount. mouse_motion moves the pointer: position {x,y} is required and optional relative {x,y} sets the movement delta. Unknown parameters are rejected with an error. Transient states (is_action_just_pressed) are visible only in the first physics frame after injection and are lost when paused — check get_game_input_status's paused/physics_frame fields to diagnose. Transient states are tracked against physics frames only: is_action_just_pressed polled in _process (render frame) will not observe injected input — poll in _physics_process instead. 同帧内连续 press+release 会使 just_pressed 与 just_released 同时为真，边沿观察需跨物理帧（sequence_game_inputs 按帧排布可规避）。hold 模式逐帧注入有固定开销，长按慎用时长。mouse_button 推荐 click:true（一次调用注入同坐标 press+release，释放晚 2 物理帧；double_click 则两轮），BaseButton 默认 ACTION_MODE_BUTTON_RELEASE 只在释放沿触发，单发 pressed=true 会使按钮保持按下且不发射 pressed 信号；注入后用 get_game_input_status 或 execute_game_script 读 button_pressed/is_hovered 自检。动作与同名物理键位共存时，事件释放只清自身槽位不等价全局释放；如需全局释放用 api 模式.",
       "Game", {"game", "runtime", "input", "simulate", "debug"}, SideEffect::GameRuntime, tool_flags::kMutating,
       kQueueGameInputParams, runtime_ops::handle_game_input}));
   v.push_back(make_spec_tool(ToolSpec{
@@ -219,6 +251,26 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       "Click a UI element in the running game process by node path or visible text over the runtime debug channel: the game enumerates its Control tree, resolves path (exact match first, otherwise a node path ending with '/'+path) or text (exact match over visible elements first, then substring) and injects a mouse_button press/release pair at the element's global_rect centre through the same path as queue_game_input. Requires a game launched from the editor whose project loads the godot-autopilot extension and the game_runtime authorization gate. path (from get_game_ui_elements) or text (visible control text) selects the element — pass exactly one of them, path wins when both are given; text matches visible elements exactly first, then by substring, and text_index (default 0) picks the nth match when several match. The annotate id from capture_game_viewport is a per-capture sequence number and is not clickable — use the same row's path or its text instead; button_index (1=left default, 2=right, 3=middle) and double_click (default false, adds a second press/release pair) are optional. max_elements caps the enumeration (default 1000, max 1000); timeout_ms defaults to 5000 (max 25000; the host waits timeout_ms + 2000 ms, below the 30 s transport timeout). One call performs both steps (enumerate + inject) and resolves with {\"result\":{\"ok\":true,\"path\":...,\"position\":{x,y},\"clicks\":n}}; when the path is not found the error lists the element count and candidate paths.",
       "Game", {"game", "runtime", "input", "click", "ui", "debug"}, SideEffect::GameRuntime, tool_flags::kMutating,
       kClickGameUiElementParams, runtime_ops::handle_click_game_ui_element}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "get_game_locale",
+      "Read the game locale from the TranslationServer singleton (e.g. en_US). Use it to check which language translate_text resolves against before switching with set_game_locale. Takes no parameters; returns the locale string.",
+      "Game", {"game", "locale", "i18n"}, SideEffect::None, tool_flags::kNone,
+      kGetGameLocaleParams, runtime_ops::handle_get_game_locale}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "set_game_locale",
+      "Set the game locale on the TranslationServer singleton. Requires locale in en or en_US format (e.g. en_US, zh_CN); other formats are rejected without changing state. Returns result ok plus the applied locale. Requires the game_runtime authorization gate.",
+      "Game", {"game", "locale", "i18n"}, SideEffect::GameRuntime, tool_flags::kMutating,
+      kSetGameLocaleParams, runtime_ops::handle_set_game_locale}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "get_translation_list",
+      "List locales with loaded translations from the TranslationServer singleton (same set as get_loaded_locales). Use it to pick a valid set_game_locale value or to check i18n coverage. Takes no parameters; returns an array of locale strings.",
+      "Game", {"game", "locale", "i18n", "translation"}, SideEffect::None, tool_flags::kNone,
+      kGetTranslationListParams, runtime_ops::handle_get_translation_list}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "translate_text",
+      "Translate a message key with the TranslationServer singleton under the current game locale (see get_game_locale). Requires key (non-empty source message); unknown keys fail with an error instead of echoing the key. Returns the translated string plus the resolving key and locale.",
+      "Game", {"game", "locale", "i18n", "translation"}, SideEffect::None, tool_flags::kNone,
+      kTranslateTextParams, runtime_ops::handle_translate_text}));
   return v;
 }
 

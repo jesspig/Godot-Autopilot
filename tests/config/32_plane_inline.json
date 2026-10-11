@@ -1,0 +1,241 @@
+{
+  "name": "32_plane_inline",
+  "description": "dry_run 真校验回归（B2 第二层）：build_nodes_from_spec 的 dry_run 必须与真实写入同路径同结论——OBJECT 型内联资源描述不再被提前放行，而是经 property_ops 共享的 build_inline_resource_value 真实构建并严格校验内层属性。setup 建 Node3D 场景 PlaneRoot + 临时目录 res://gda_tmp_plane；① 真实写入 CollisionShape3D/Wall，shape 内联 WorldBoundaryShape3D.plane 用四元形状 {\"x\":-1,\"y\":0,\"z\":0,\"d\":-15}，断言 mode=built/path=Wall/type=CollisionShape3D/node_count=1/applied_property_count=1，code_execute 确认节点存在并读回 shape.plane（Plane 序列化为 {\"normal\":{\"x\":…,\"y\":…,\"z\":…},\"d\":…}，断言 normal.x=-1、normal.y=0、normal.z=0、d=-15）；② dry_run 负例（缺 d）：plane {\"x\":-1,\"y\":0,\"z\":0} → error 精确等于 \"应用属性 'shape'（位于 spec）时发生异常：invalid Plane: 'd' is required, e.g. …\"（与真实写入经 spec_apply_props 捕获的异常文案一致）；③ dry_run 负例（零法线）：plane {\"x\":0,\"y\":0,\"z\":0,\"d\":-15} → error 精确等于 \"应用属性 'shape'（位于 spec）时发生异常：invalid Plane: normal must not be zero …\"；④ dry_run 负例（未知内联类）：shape {\"type\":\"NoSuchShape3DXYZ\",\"properties\":{}} → 共享构建器 has_error 分支，error 精确等于 \"应用属性 'shape'（位于 spec）失败：cannot create inline resource …\"；⑤ dry_run 正例：plane {\"normal\":{\"x\":0,\"y\":1,\"z\":0},\"d\":-10} → 断言 mode=dry_run/writable=true/trial_node_count=1/trial_property_count=1/nodes 非空，并用 code_execute 断言 SceneRoot 无该试运行节点（dry_run 零写入）；⑥ save_editor_scene_as 落盘证明真实写入的内联子资源可持久化；cleanup 关闭场景并回收 res://gda_tmp_plane。前置：code_execute 步骤需 code_execute capability 授权（GODOT_AUTOPILOT_ALLOW env 或 user://godot_autopilot/config.json 的 allow 字段，env 优先），未授权时用例 FAIL（见 tests/README.md 第 3 节）。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "stages": [
+      {
+        "id": "setup",
+        "steps": [
+          {
+            "id": "plane_create_dir",
+            "tool": "create_directory",
+            "args": { "path": "res://gda_tmp_plane" },
+            "expect": { "has_keys": ["created"] }
+          },
+          {
+            "id": "plane_new_scene",
+            "tool": "create_editor_scene",
+            "args": { "name": "PlaneRoot", "type": "Node3D", "close_current": true },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.path", "value": "PlaneRoot" },
+                { "key": "result.type", "value": "Node3D" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "real_write",
+        "steps": [
+          {
+            "id": "plane_build_wall",
+            "tool": "build_nodes_from_spec",
+            "args": {
+              "spec": {
+                "type": "CollisionShape3D",
+                "name": "Wall",
+                "props": {
+                  "shape": {
+                    "type": "WorldBoundaryShape3D",
+                    "properties": {
+                      "plane": { "x": -1, "y": 0, "z": 0, "d": -15 }
+                    }
+                  }
+                }
+              }
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.mode", "value": "built" },
+                { "key": "result.path", "value": "Wall" },
+                { "key": "result.name", "value": "Wall" },
+                { "key": "result.type", "value": "CollisionShape3D" },
+                { "key": "result.node_count", "value": 1 },
+                { "key": "result.applied_property_count", "value": 1 }
+              ]
+            }
+          },
+          {
+            "id": "plane_wall_exists",
+            "tool": "code_execute",
+            "args": { "source_code": "return SceneRoot.has_node(\"Wall\")" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "value": true } ]
+            }
+          },
+          {
+            "id": "plane_read_shape_plane",
+            "tool": "code_execute",
+            "args": { "source_code": "return SceneRoot.get_node(\"Wall\").shape.plane" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.normal.x", "value": -1 },
+                { "key": "result.normal.y", "value": 0 },
+                { "key": "result.normal.z", "value": 0 },
+                { "key": "result.d", "value": -15 }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "dry_run_negatives",
+        "steps": [
+          {
+            "id": "plane_dry_run_missing_d",
+            "tool": "build_nodes_from_spec",
+            "args": {
+              "dry_run": true,
+              "spec": {
+                "type": "CollisionShape3D",
+                "name": "DryWallMissingD",
+                "props": {
+                  "shape": {
+                    "type": "WorldBoundaryShape3D",
+                    "properties": {
+                      "plane": { "x": -1, "y": 0, "z": 0 }
+                    }
+                  }
+                }
+              }
+            },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "应用属性 'shape'（位于 spec）时发生异常：invalid Plane: 'd' is required, e.g. {\"normal\":{\"x\":0,\"y\":1,\"z\":0},\"d\":0} or {\"x\":0,\"y\":1,\"z\":0,\"d\":0}" }
+              ]
+            }
+          },
+          {
+            "id": "plane_dry_run_zero_normal",
+            "tool": "build_nodes_from_spec",
+            "args": {
+              "dry_run": true,
+              "spec": {
+                "type": "CollisionShape3D",
+                "name": "DryWallZeroNormal",
+                "props": {
+                  "shape": {
+                    "type": "WorldBoundaryShape3D",
+                    "properties": {
+                      "plane": { "x": 0, "y": 0, "z": 0, "d": -15 }
+                    }
+                  }
+                }
+              }
+            },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "应用属性 'shape'（位于 spec）时发生异常：invalid Plane: normal must not be zero when 'd' is non-zero (WorldBoundaryShape3D/Jolt reject such planes with this error), e.g. {\"normal\":{\"x\":0,\"y\":1,\"z\":0},\"d\":0} or {\"x\":0,\"y\":1,\"z\":0,\"d\":0}" }
+              ]
+            }
+          },
+          {
+            "id": "plane_dry_run_unknown_inline_class",
+            "tool": "build_nodes_from_spec",
+            "args": {
+              "dry_run": true,
+              "spec": {
+                "type": "CollisionShape3D",
+                "name": "DryWallUnknownClass",
+                "props": {
+                  "shape": { "type": "NoSuchShape3DXYZ", "properties": {} }
+                }
+              }
+            },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "应用属性 'shape'（位于 spec）失败：cannot create inline resource 'NoSuchShape3DXYZ' for property 'shape' on spec: NoSuchShape3DXYZ is not a known class: no engine class or registered global script class with this name exists — position: spec — expected: an instantiable Resource subclass (engine class or global script class) — action: create the resource inline with {\"type\": \"RectangleShape2D\", \"properties\": {...}}, pass a res:// path in {\"path\": \"res://...\"}, or save the resource to disk first and pass its res:// path" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "dry_run_positive",
+        "steps": [
+          {
+            "id": "plane_dry_run_valid",
+            "tool": "build_nodes_from_spec",
+            "args": {
+              "dry_run": true,
+              "spec": {
+                "type": "CollisionShape3D",
+                "name": "DryWallValid",
+                "props": {
+                  "shape": {
+                    "type": "WorldBoundaryShape3D",
+                    "properties": {
+                      "plane": { "normal": { "x": 0, "y": 1, "z": 0 }, "d": -10 }
+                    }
+                  }
+                }
+              }
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.mode", "value": "dry_run" },
+                { "key": "result.writable", "value": true },
+                { "key": "result.trial_node_count", "value": 1 },
+                { "key": "result.trial_property_count", "value": 1 },
+                { "key": "result.nodes", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "plane_dry_run_wrote_nothing",
+            "tool": "code_execute",
+            "args": { "source_code": "return SceneRoot.has_node(\"DryWallValid\")" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "value": false } ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "persistence",
+        "steps": [
+          {
+            "id": "plane_save_scene_as",
+            "tool": "save_editor_scene_as",
+            "args": { "path": "res://gda_tmp_plane/plane_inline.tscn" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [ { "key": "result", "value": "saved" } ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "cleanup",
+        "steps": [
+          {
+            "id": "plane_close_scene",
+            "tool": "close_editor_scene",
+            "args": {},
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "closed" } ]
+            }
+          },
+          {
+            "id": "plane_trash_dir",
+            "tool": "move_os_file_to_trash",
+            "args": { "path": "res://gda_tmp_plane" },
+            "expect": { "has_keys": ["result"] }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -6,6 +6,7 @@
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/editor_plugin.hpp>
 #include <godot_cpp/classes/engine.hpp>
+#include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/core/class_db.hpp>
@@ -13,8 +14,12 @@
 
 #include "core/command_queue.hpp"
 #include "core/export_guard.hpp"
+#include "core/log_persist.hpp"
 #include "core/log_system.hpp"
 #include "core/mode_detector.hpp"
+#include "core/monitor.hpp"
+#include "core/perf_sampler.hpp"
+#include "core/sanitize_policy.hpp"
 #include "core/scene_dirty_tracker.hpp"
 #include "core/server_context.hpp"
 #include "runtime/game_bridge.hpp"
@@ -103,7 +108,13 @@ void GodotAutopilotPlugin::_enter_tree() {
   using godot_autopilot::LogCategory;
   using godot_autopilot::LogLevel;
 
+  godot_autopilot::monitor::lifecycle("plugin_enter_tree");
+  set_process_mode(godot::Node::PROCESS_MODE_ALWAYS);
   s_queue.open();
+  godot_autopilot::perf_sampler::set_queue(&GodotAutopilotPlugin::queue());
+  godot_autopilot::sanitize_policy::initialize();
+  godot_autopilot::LogPersist::instance().init_session();
+  godot_autopilot::monitor::environment_snapshot();
   try {
     auto *engine = godot::Engine::get_singleton();
     if (!engine) {
@@ -118,6 +129,7 @@ void GodotAutopilotPlugin::_enter_tree() {
       engine->register_singleton("AutopilotTools", tools_singleton);
       get_log_system().log(LogLevel::Info, LogCategory::System,
                            "AutopilotTools singleton registered");
+      godot_autopilot::monitor::lifecycle("tools_singleton_registered");
     }
   } catch (const std::exception &e) {
     log_setup_failure("autopilot tools singleton", e);
@@ -191,10 +203,23 @@ void GodotAutopilotPlugin::_enter_tree() {
                             "MCP server listening on " +
                                 g_server_ctx->get_host() + ":" +
                                 std::to_string(port));
+      std::string ready = "{\"type\":\"server_ready\",\"host\":\"";
+      ready += g_server_ctx->get_host();
+      ready += "\",\"port\":";
+      ready += std::to_string(port);
+      ready += "}";
+      godot_autopilot::LogPersist::instance().enqueue_trace(ready);
+      godot_autopilot::monitor::lifecycle(
+          "server_ready",
+          godot_autopilot::monitor::build_attrs(
+              {{"host", g_server_ctx->get_host()},
+               {"port", std::to_string(port)}}));
     } else {
       get_log_system().log(LogLevel::Error, LogCategory::Transport,
                            "MCP server start failed: " +
                                g_server_ctx->last_error());
+      godot_autopilot::monitor::error_event("server_start_failed", "server",
+                                            g_server_ctx->last_error());
     }
   }
 
@@ -215,9 +240,12 @@ void GodotAutopilotPlugin::_enter_tree() {
   add_export_plugin(export_guard_);
 
   get_log_system().log(LogLevel::Info, LogCategory::System, "Plugin ready");
+  godot_autopilot::monitor::lifecycle("plugin_ready");
 }
 
-void GodotAutopilotPlugin::_process(double) {
+void GodotAutopilotPlugin::_process(double delta) {
+  godot_autopilot::perf_sampler::tick(delta);
+  godot_autopilot::LogPersist::instance().flush_on_main_thread();
   s_queue.drain();
   if (log_dock) {
     log_dock->poll_new_entries();
@@ -284,6 +312,8 @@ void GodotAutopilotPlugin::_exit_tree() {
                          godot_autopilot::LogCategory::System,
                          "exit tree exception: unknown exception");
   }
+  godot_autopilot::LogPersist::instance().flush_on_main_thread();
+  godot_autopilot::monitor::lifecycle("plugin_exit_tree");
 }
 
 extern "C" {
@@ -303,11 +333,13 @@ GDExtensionEntryPoint(GDExtensionInterfaceGetProcAddress p_get_proc_address,
         get_log_system().log(godot_autopilot::LogLevel::Info,
                              godot_autopilot::LogCategory::System,
                              "Scene level initialized");
+        godot_autopilot::monitor::lifecycle("scene_level_initialized");
       }
       if (p_level == godot::MODULE_INITIALIZATION_LEVEL_EDITOR) {
         get_log_system().log(godot_autopilot::LogLevel::Info,
                              godot_autopilot::LogCategory::System,
                              "Editor level initialized");
+        godot_autopilot::monitor::lifecycle("editor_level_initialized");
 
         godot_autopilot::debugger_ops::register_classes();
 
@@ -335,12 +367,14 @@ GDExtensionEntryPoint(GDExtensionInterfaceGetProcAddress p_get_proc_address,
         get_log_system().log(godot_autopilot::LogLevel::Info,
                              godot_autopilot::LogCategory::System,
                              "Editor level terminated");
+        godot_autopilot::monitor::lifecycle("editor_level_terminated");
       }
       if (p_level == godot::MODULE_INITIALIZATION_LEVEL_SCENE) {
         godot_autopilot::runtime::game_bridge::unregister_listener();
         get_log_system().log(godot_autopilot::LogLevel::Info,
                              godot_autopilot::LogCategory::System,
                              "Scene level terminated");
+        godot_autopilot::monitor::lifecycle("scene_level_terminated");
       }
     } catch (const std::exception &e) {
       get_log_system().log(godot_autopilot::LogLevel::Error,

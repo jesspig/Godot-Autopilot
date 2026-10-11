@@ -5,7 +5,12 @@
 #include <algorithm>
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/classes/object.hpp>
+#include <godot_cpp/variant/dictionary.hpp>
+#include <godot_cpp/variant/signal.hpp>
 #include <godot_cpp/variant/string.hpp>
+#include <godot_cpp/variant/typed_array.hpp>
+#include <godot_cpp/variant/variant.hpp>
 #include <unordered_set>
 
 namespace godot_autopilot {
@@ -33,33 +38,84 @@ uint64_t hash_sorted_paths(const std::vector<std::string> &sorted_paths) {
   return hash;
 }
 
-void collect_memory_paths(godot::Node *root, std::vector<std::string> &out_paths) {
-  if (!root)
+namespace {
+
+bool node_is_persisted(godot::Node *node, godot::Node *root) {
+  return node == root || (node != nullptr && node->get_owner() == root);
+}
+
+void collect_paths_recursive(godot::Node *node, godot::Node *root,
+                             const std::string &parent_path, bool node_persisted,
+                             bool collect_persisted,
+                             std::vector<std::string> &out_paths) {
+  if (!node)
     return;
-  const std::string root_name = util::to_std(root->get_name());
-  out_paths.push_back(root_name);
-  const int child_count = root->get_child_count();
+  const std::string name = util::to_std(node->get_name());
+  const std::string path = parent_path.empty() ? name : parent_path + "/" + name;
+  if (node_persisted == collect_persisted)
+    out_paths.push_back(path);
+  const int child_count = node->get_child_count();
   for (int i = 0; i < child_count; i++) {
-    godot::Node *child = root->get_child(i);
+    godot::Node *child = node->get_child(i);
     if (!child)
       continue;
-    std::vector<std::string> sub;
-    collect_memory_paths(child, sub);
-    for (std::string &p : sub) {
-      out_paths.push_back(root_name + "/" + p);
-    }
+    collect_paths_recursive(child, root, path, node_is_persisted(child, root),
+                            collect_persisted, out_paths);
   }
 }
 
-int64_t count_memory_nodes(godot::Node *root) {
+bool connection_source_is_persisted(const godot::Dictionary &connection,
+                                    godot::Node *root) {
+  const godot::Signal signal = connection["signal"].operator godot::Signal();
+  if (signal.is_null())
+    return false;
+  auto *source = godot::Object::cast_to<godot::Node>(signal.get_object());
+  return node_is_persisted(source, root);
+}
+
+void count_connections_recursive(godot::Node *node, godot::Node *root,
+                                 int64_t &out_persisted, int64_t &out_filtered) {
+  if (!node)
+    return;
+  const bool target_persisted = node_is_persisted(node, root);
+  const godot::TypedArray<godot::Dictionary> connections =
+      node->get_incoming_connections();
+  const int64_t connection_count = connections.size();
+  for (int64_t i = 0; i < connection_count; i++) {
+    const godot::Dictionary connection = connections[i];
+    if (target_persisted && connection_source_is_persisted(connection, root))
+      out_persisted++;
+    else
+      out_filtered++;
+  }
+  const int child_count = node->get_child_count();
+  for (int i = 0; i < child_count; i++)
+    count_connections_recursive(node->get_child(i), root, out_persisted,
+                                out_filtered);
+}
+
+} // namespace
+
+void collect_memory_paths(godot::Node *root, std::vector<std::string> &out_paths) {
+  if (!root)
+    return;
+  collect_paths_recursive(root, root, "", true, true, out_paths);
+}
+
+void collect_inherited_paths(godot::Node *root,
+                             std::vector<std::string> &out_paths) {
+  if (!root)
+    return;
+  collect_paths_recursive(root, root, "", true, false, out_paths);
+}
+
+int64_t count_memory_connections(godot::Node *root, int64_t &out_filtered) {
+  out_filtered = 0;
   if (!root)
     return 0;
-  int64_t count = 1;
-  const int child_count = root->get_child_count();
-  for (int i = 0; i < child_count; i++) {
-    count += count_memory_nodes(root->get_child(i));
-  }
-  return count;
+  int64_t persisted = 0;
+  count_connections_recursive(root, root, persisted, out_filtered);
+  return persisted;
 }
 
 namespace {
@@ -119,12 +175,38 @@ std::vector<std::string> parse_tscn_paths(const std::string &tscn_text, int64_t 
   return paths;
 }
 
+int64_t count_tscn_connections(const std::string &tscn_text) {
+  int64_t count = 0;
+  std::size_t pos = 0;
+  while (pos < tscn_text.size()) {
+    std::size_t line_end = tscn_text.find('\n', pos);
+    std::string line = tscn_text.substr(pos, line_end == std::string::npos
+                                                   ? std::string::npos
+                                                   : line_end - pos);
+    pos = (line_end == std::string::npos) ? tscn_text.size() : line_end + 1;
+    if (trim_left(line).compare(0, 12, "[connection ") == 0)
+      count++;
+  }
+  return count;
+}
+
 VerifyResult compare_tree_with_text(godot::Node *root, const std::string &tscn_text,
                                     bool compute_hash) {
   VerifyResult result;
   std::vector<std::string> memory_paths;
   collect_memory_paths(root, memory_paths);
+  std::vector<std::string> inherited_paths;
+  collect_inherited_paths(root, inherited_paths);
   result.memory_nodes = static_cast<int64_t>(memory_paths.size());
+  result.inherited_nodes = static_cast<int64_t>(inherited_paths.size());
+  const std::size_t inherited_keep =
+      std::min(inherited_paths.size(), kMaxMissingPaths);
+  for (std::size_t i = 0; i < inherited_keep; i++)
+    result.inherited_paths.push_back(inherited_paths[i]);
+  result.inherited_truncated = inherited_paths.size() > kMaxMissingPaths;
+  result.memory_connections =
+      count_memory_connections(root, result.inherited_connections);
+  result.disk_connections = count_tscn_connections(tscn_text);
   std::vector<std::string> disk_paths = parse_tscn_paths(tscn_text, result.disk_nodes);
 
   std::unordered_set<std::string> disk_set(disk_paths.begin(), disk_paths.end());
@@ -137,7 +219,8 @@ VerifyResult compare_tree_with_text(godot::Node *root, const std::string &tscn_t
     }
   }
   result.match = result.missing_paths.empty() && !result.missing_truncated &&
-                 result.memory_nodes == result.disk_nodes && result.memory_nodes > 0;
+                 result.memory_nodes == result.disk_nodes && result.memory_nodes > 0 &&
+                 result.memory_connections == result.disk_connections;
 
   if (compute_hash) {
     std::vector<std::string> mem_sorted = memory_paths;

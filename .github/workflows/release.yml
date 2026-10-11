@@ -55,6 +55,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.tag || github.ref }}
+          submodules: true
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -77,23 +78,36 @@ jobs:
           so1="$(find /usr/lib/gcc/x86_64-linux-gnu /usr/lib/x86_64-linux-gnu -name 'libgcc_s.so.1' 2>/dev/null | head -n1)"
           if [ -n "$so1" ]; then sudo ln -sf "$so1" /usr/lib/x86_64-linux-gnu/libgcc_s.so; fi
 
-      - name: Cache FetchContent dependencies
+      # 子模块版本由 gitlink（160000 mode）记录，.gitmodules 文本不变时 commit 仍可能
+      # 升级，故 cache key 取自 git ls-files 的权威 sha，避免命中旧源码缓存。
+      - name: Resolve submodule commits
+        id: submodules
+        shell: bash
+        run: echo "shas=$(git ls-files -s third_party | awk '{print $2}' | sort | tr '\n' '-')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache third_party submodules
         uses: actions/cache@v4
         with:
-          path: build/release/_deps
-          key: deps-release-${{ runner.os }}-${{ hashFiles('cmake/FetchDependencies.cmake') }}
+          path: |
+            third_party/godot-cpp
+            third_party/mcp-cpp-sdk
+            third_party/googletest
+          key: submodules-release-${{ runner.os }}-${{ steps.submodules.outputs.shas }}
 
       - name: Build (Release)
-        run: python build.py --release
+        run: python main.py build --release
+
+      - name: Deploy to demo projects
+        run: python main.py deploy --release
 
       - name: Upload platform library
         uses: actions/upload-artifact@v4
         with:
           name: gdext-${{ runner.os }}
           path: |
-            Example/addons/godot-autopilot/godot-autopilot.dll
-            Example/addons/godot-autopilot/libgodot-autopilot.so
-            Example/addons/godot-autopilot/libgodot-autopilot.dylib
+            demo/2d_dodge_the_creeps/addons/godot-autopilot/godot-autopilot.dll
+            demo/2d_dodge_the_creeps/addons/godot-autopilot/libgodot-autopilot.so
+            demo/2d_dodge_the_creeps/addons/godot-autopilot/libgodot-autopilot.dylib
           if-no-files-found: error
 
   package:
@@ -116,7 +130,7 @@ jobs:
 
       - name: Package addons.zip
         run: |
-          python build.py --package --libs-dir dist
+          python main.py package --libs-dir dist
           mv dist/godot-autopilot-*.zip addons.zip
 
       - name: Create GitHub Release

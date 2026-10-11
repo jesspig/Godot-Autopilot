@@ -45,6 +45,14 @@ mcp::JsonValue handle_get_dependencies(const mcp::JsonValue &args);
 mcp::JsonValue handle_has_dependency(const mcp::JsonValue &args);
 mcp::JsonValue handle_get_references(const mcp::JsonValue &args);
 mcp::JsonValue handle_reimport(const mcp::JsonValue &args);
+mcp::JsonValue handle_set_import_options(const mcp::JsonValue &args);
+mcp::JsonValue handle_create_curve(const mcp::JsonValue &args);
+mcp::JsonValue handle_set_curve_points(const mcp::JsonValue &args);
+mcp::JsonValue handle_get_curve_baked_points(const mcp::JsonValue &args);
+mcp::JsonValue handle_create_primitive_mesh(const mcp::JsonValue &args);
+mcp::JsonValue handle_create_array_mesh(const mcp::JsonValue &args);
+mcp::JsonValue handle_set_mesh_surface_material(const mcp::JsonValue &args);
+mcp::JsonValue handle_assign_mesh_to_instance(const mcp::JsonValue &args);
 
 } // namespace resource_ops
 } // namespace godot_autopilot

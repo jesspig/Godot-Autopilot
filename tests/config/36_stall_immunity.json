@@ -1,0 +1,128 @@
+{
+  "name": "36_stall_immunity",
+  "description": "B1 第二层通道停摆免疫回归（headless）：验证编辑器 SceneTree 被暂停（get_tree().paused = true，模拟暂停/模态/停摆态）后 MCP 调用通道仍能应答。链路：before_all 用 create_editor_scene 建未落盘场景 StallRoot → ① code_execute 读 get_tree().paused 断言 false 基线 → ② code_execute 置 get_tree().paused = true 并回读断言 true → ③ 暂停态下 ping 断言 result=pong（kHealthProbe 健康探针走 5000ms 短预算的 dispatch::call_handler 等待路径）→ ④ 暂停态下 system_status 断言 result.main_thread 调度观测面存在且五个字段均非空（last_drain_age_ms/queue_depth/queue_cancelled/queue_rejected_full/oldest_pending_ms；插件以 PROCESS_MODE_ALWAYS 继续 drain，故 last_drain_age_ms 有值）→ ⑤ code_execute 恢复 get_tree().paused = false 并回读断言 false → ⑥ ping 再断言成功 → cleanup save_editor_scene_as 落盘 res://gda_tmp_stall/stall_root.tscn（未落盘场景 close 会被拒，故先落盘）→ close_editor_scene → move_os_file_to_trash 回收目录。on_failure=fail_fast：本用例是回归守卫，健康探针在停摆时会于 5s 内返回结构化 main_thread_timeout 错误而非挂死，不依赖 ctest 600s 超时；暂停期间仅执行 ping/system_status/code_execute 三类调用。前置：code_execute 受 code_execute capability 授权门保护（GODOT_AUTOPILOT_ALLOW 或 user://godot_autopilot/config.json 的 allow 字段，env 优先）。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "fail_fast",
+    "before_all": [
+      {
+        "id": "stall_before_scene",
+        "tool": "create_editor_scene",
+        "args": { "name": "StallRoot" }
+      }
+    ],
+    "stages": [
+      {
+        "id": "baseline",
+        "steps": [
+          {
+            "id": "stall_tree_unpaused_baseline",
+            "tool": "code_execute",
+            "args": { "source_code": "return get_tree().paused" },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": false }
+              ]
+            }
+          },
+          {
+            "id": "stall_tree_pause",
+            "tool": "code_execute",
+            "args": { "source_code": "get_tree().paused = true\nreturn get_tree().paused" },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "paused_channel",
+        "steps": [
+          {
+            "id": "stall_ping_while_paused",
+            "tool": "ping",
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": "pong" }
+              ]
+            }
+          },
+          {
+            "id": "stall_system_status_while_paused",
+            "tool": "system_status",
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.main_thread", "not_empty": true },
+                { "key": "result.main_thread.last_drain_age_ms", "not_empty": true },
+                { "key": "result.main_thread.queue_depth", "not_empty": true },
+                { "key": "result.main_thread.queue_cancelled", "not_empty": true },
+                { "key": "result.main_thread.queue_rejected_full", "not_empty": true },
+                { "key": "result.main_thread.oldest_pending_ms", "not_empty": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "recovery",
+        "steps": [
+          {
+            "id": "stall_tree_resume",
+            "tool": "code_execute",
+            "args": { "source_code": "get_tree().paused = false\nreturn get_tree().paused" },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": false }
+              ]
+            }
+          },
+          {
+            "id": "stall_ping_after_resume",
+            "tool": "ping",
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": "pong" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "cleanup",
+        "steps": [
+          {
+            "id": "stall_save_scene",
+            "tool": "save_editor_scene_as",
+            "args": { "path": "res://gda_tmp_stall/stall_root.tscn" },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "saved" }
+              ]
+            }
+          },
+          {
+            "id": "stall_close_scene",
+            "tool": "close_editor_scene",
+            "args": {},
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "closed" }
+              ]
+            }
+          },
+          {
+            "id": "stall_trash_dir",
+            "tool": "move_os_file_to_trash",
+            "args": { "path": "res://gda_tmp_stall" },
+            "expect": { "has_keys": ["result"] }
+          }
+        ]
+      }
+    ]
+  }
+}

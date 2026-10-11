@@ -271,6 +271,80 @@ void schedule_release(const std::string &type, const godot::Key &key,
                  mode_api, duration_ms / 1000.0, keep_pressed);
 }
 
+class GameBridgeClickPair : public godot::Node {
+  GDCLASS(GameBridgeClickPair, godot::Node)
+
+  int64_t button_index_ = 0;
+  godot::Vector2 position_;
+  bool has_position_ = false;
+  int rounds_ = 1;
+  int64_t start_frame_ = 0;
+  bool released_once_ = false;
+  bool pressed_twice_ = false;
+
+protected:
+  static void _bind_methods() {}
+
+public:
+  void setup(int64_t button_index, const godot::Vector2 &position,
+             bool has_position, int rounds) {
+    button_index_ = button_index;
+    position_ = position;
+    has_position_ = has_position;
+    rounds_ = rounds;
+    godot::SceneTree *tree = get_scene_tree();
+    if (!tree) {
+      memdelete(this);
+      return;
+    }
+    tree->get_root()->add_child(this);
+    auto *engine = godot::Engine::get_singleton();
+    start_frame_ =
+        engine ? static_cast<int64_t>(engine->get_physics_frames()) : 0;
+    set_physics_process(true);
+  }
+
+  void _physics_process(double delta) override {
+    (void)delta;
+    auto *engine = godot::Engine::get_singleton();
+    auto *input = godot::Input::get_singleton();
+    if (!engine || !input) {
+      queue_free();
+      return;
+    }
+    int64_t elapsed = static_cast<int64_t>(engine->get_physics_frames()) -
+                      start_frame_;
+    if (!released_once_ && elapsed >= 2) {
+      released_once_ = true;
+      dispatch_input_event(input, 1, godot::KEY_NONE, button_index_, position_,
+                           has_position_, false, godot::StringName(), false,
+                           true);
+      if (rounds_ < 2) {
+        queue_free();
+        return;
+      }
+    }
+    if (rounds_ >= 2 && released_once_ && !pressed_twice_ && elapsed >= 4) {
+      pressed_twice_ = true;
+      dispatch_input_event(input, 1, godot::KEY_NONE, button_index_, position_,
+                           has_position_, true, godot::StringName(), false,
+                           true);
+    }
+    if (pressed_twice_ && elapsed >= 6) {
+      dispatch_input_event(input, 1, godot::KEY_NONE, button_index_, position_,
+                           has_position_, false, godot::StringName(), false,
+                           true);
+      queue_free();
+    }
+  }
+};
+
+void schedule_click(int64_t button_index, const godot::Vector2 &position,
+                    bool has_position, int rounds) {
+  GameBridgeClickPair *pair = memnew(GameBridgeClickPair);
+  pair->setup(button_index, position, has_position, rounds);
+}
+
 class GameBridgeInputSequence : public godot::Node {
   GDCLASS(GameBridgeInputSequence, godot::Node)
 
@@ -469,6 +543,24 @@ std::string inject_step(const JV &step) {
     button_index = bi->GetInt();
     if (extract_position(step, pos))
       has_pos = true;
+    bool click = false;
+    if (auto *click_p = step.Find("click")) {
+      if (click_p->IsBool())
+        click = click_p->GetBool();
+    }
+    bool double_click = false;
+    if (auto *double_p = step.Find("double_click")) {
+      if (double_p->IsBool())
+        double_click = double_p->GetBool();
+    }
+    if (click || double_click) {
+      dispatch_input_event(input, 1, key, button_index, pos, has_pos, false,
+                           godot::StringName(), false, true);
+      dispatch_input_event(input, 1, key, button_index, pos, has_pos, true,
+                           godot::StringName(), false, true);
+      schedule_click(button_index, pos, has_pos, double_click ? 2 : 1);
+      return "";
+    }
     if (pressed) {
       dispatch_input_event(input, 1, key, button_index, pos, has_pos, false,
                            godot::StringName(), false, true);
@@ -701,7 +793,7 @@ JV op_input(const JV &params, int64_t request_id) {
   std::string unknown = unknown_field(
       params, {"type", "keycode", "pressed", "button_index", "position",
                "action", "duration_ms", "mode", "sequence", "direction",
-               "amount", "relative"});
+               "amount", "relative", "click", "double_click"});
   if (!unknown.empty())
     return error_result("unknown input parameter: " + unknown);
   if (!type_p || !type_p->IsString()) {
@@ -723,6 +815,11 @@ JV op_input(const JV &params, int64_t request_id) {
     return error_result("input amount must be an integer between 1 and 10");
   if (auto *pressed = params.Find("pressed"); pressed && !pressed->IsBool())
     return error_result("input pressed must be a boolean");
+  if (auto *click = params.Find("click"); click && !click->IsBool())
+    return error_result("input click must be a boolean");
+  if (auto *double_click = params.Find("double_click");
+      double_click && !double_click->IsBool())
+    return error_result("input double_click must be a boolean");
   if (auto *duration = params.Find("duration_ms"); duration &&
       (!duration->IsInt() || duration->GetInt() < 0))
     return error_result("input duration_ms must be a non-negative integer");
@@ -862,7 +959,7 @@ JV op_input_sequence(const JV &params, int64_t request_id) {
     std::string item_unknown = unknown_field(
         item, {"kind", "type", "at_frame", "keycode", "pressed",
                "button_index", "position", "action", "duration_ms", "mode",
-               "direction", "amount", "relative"});
+               "direction", "amount", "relative", "click", "double_click"});
     if (!item_unknown.empty())
       return error_result("unknown input_sequence item parameter: " +
                           item_unknown);
@@ -873,6 +970,11 @@ JV op_input_sequence(const JV &params, int64_t request_id) {
       return error_result("input_sequence item mode must be a string");
     if (auto *pressed = item.Find("pressed"); pressed && !pressed->IsBool())
       return error_result("input_sequence item pressed must be a boolean");
+    if (auto *click = item.Find("click"); click && !click->IsBool())
+      return error_result("input_sequence item click must be a boolean");
+    if (auto *double_click = item.Find("double_click");
+        double_click && !double_click->IsBool())
+      return error_result("input_sequence item double_click must be a boolean");
     FrameInputItem entry;
     entry.at_frame = frame_p->GetInt();
     entry.payload = item;
@@ -927,6 +1029,7 @@ JV op_input_status(const JV &params) {
 void register_input_bridge_classes() {
   godot::ClassDB::register_class<GameBridgeInputWatcher>();
   godot::ClassDB::register_class<GameBridgeDelayedRelease>();
+  godot::ClassDB::register_class<GameBridgeClickPair>();
   godot::ClassDB::register_class<GameBridgeInputSequence>();
   godot::ClassDB::register_class<GameBridgeFrameSequence>();
 }

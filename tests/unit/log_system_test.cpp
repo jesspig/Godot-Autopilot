@@ -86,3 +86,39 @@ TEST(LogSystemTest, QueryRecentLimitsResults) {
     auto recent = log.query_recent(2);
     EXPECT_LE(recent.size(), 2u);
 }
+
+TEST(LogSystemTest, DetailedLogCarriesTraceAndSpanIdsIntoFilter) {
+    LogSystem& log = LogSystem::instance();
+    const std::string trace_marker = "LOGTRACEUNIQ_5ab1";
+    const std::string span_marker = "LOGSPANUNIQ_5ab1";
+    log.log_detailed(LogLevel::Info, LogCategory::System, "LOGDETAILMARK_5ab1",
+                     "detail body", trace_marker, span_marker);
+
+    LogSystem::Query q;
+    q.filter_text = trace_marker;
+    auto by_trace = log.query(q);
+    ASSERT_FALSE(by_trace.empty());
+    bool found = false;
+    for (const auto& entry : by_trace) {
+        if (entry.trace_id == trace_marker && entry.span_id == span_marker) found = true;
+    }
+    EXPECT_TRUE(found);
+
+    LogSystem::Query q_span;
+    q_span.filter_text = span_marker;
+    auto by_span = log.query(q_span);
+    ASSERT_FALSE(by_span.empty());
+    EXPECT_EQ(by_span[0].span_id, span_marker);
+}
+
+TEST(LogSystemTest, LegacyDetailedLogLeavesTraceIdEmpty) {
+    LogSystem& log = LogSystem::instance();
+    const std::string marker = "LEGACYLOGMARK_6cd2";
+    log.log_detailed(LogLevel::Info, LogCategory::System, marker, "legacy detail");
+    LogSystem::Query q;
+    q.filter_text = marker;
+    auto results = log.query(q);
+    ASSERT_FALSE(results.empty());
+    EXPECT_TRUE(results[0].trace_id.empty());
+    EXPECT_TRUE(results[0].span_id.empty());
+}

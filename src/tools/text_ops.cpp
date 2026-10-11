@@ -388,6 +388,8 @@ JV handle_file_write(const JV &args) {
   const std::string normalized_path = checked.value;
   godot::String gs_path(normalized_path.c_str());
   auto file = godot::FileAccess::open(gs_path, flag);
+  if (file.is_null() && mode == "APPEND")
+    file = godot::FileAccess::open(gs_path, godot::FileAccess::WRITE);
   if (file.is_null())
     return util::error_json("failed to open file: " + pp->GetString());
   if (mode == "APPEND")

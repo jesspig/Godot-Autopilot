@@ -21,9 +21,24 @@ const std::vector<ParamSpec> kPropertyGetParams = {
 
 const std::vector<ParamSpec> kPropertySetParams = {
     {"path", "string", "Node path (scene-relative or absolute). memory:// is a resource namespace and is NOT valid here — memory resources go in the value parameter (e.g. {\"resource\": \"memory://name\"}). The response includes scene_path and scene_unsaved so the caller can confirm which scene was written", true},
-    {"property", "string", "Property name to set (string, e.g. 'position', 'modulate')", true},
-    {"value", "object", "Property value to set. Resource references use two forms: {\"path\": \"res://xxx.tres\"} for a disk resource assigned to a node property, or {\"resource\": \"memory://name\"} for an in-memory resource (only valid in resource editing scenarios). Assigning a memory:// resource to a node property is rejected because it would corrupt the saved scene file", true},
-    {"type_hint", "string", "Variant type hint (string, e.g. Vector2, Color, int, float). Omit to infer the type automatically from the property metadata", false},
+    {"property", "string", "Single property name to set, dot-separated paths allowed (e.g. 'position', 'material.albedo_color'). Mutually exclusive with 'properties'; required in single form", false},
+    {"value", "object", "Single property value. Resource references use two forms: {\"path\": \"res://xxx.tres\"} or {\"resource\": \"memory://name\"} (memory rejected on nodes). Dictionary properties take a JSON object; SpriteFrames 'animations' accepts an array or an object mapping names to {frames, speed, loop}. Required in single form", false},
+    {"properties", "object", "Batch map of property names to values applied in one call (e.g. {\"position\": {\"x\": 1, \"y\": 2}, \"visible\": false}). Object-typed entries run first, then the rest, mirroring create_scene_node; mutually exclusive with property/value; max 32 entries", false},
+    {"type_hint", "string", "Variant type hint for single form only (e.g. Vector2, Color, int, float). Omit to infer from metadata; must not be used with 'properties'", false},
+};
+
+const std::vector<ParamSpec> kSetPropertiesBatchParams = {
+    {"path", "string", "Node path in the edited scene (string, e.g. 'Player' or 'Player/Camera2D')", true},
+    {"properties", "object", "Batch map of property names to values applied in one call (e.g. {\"position\": {\"x\": 1, \"y\": 2}, \"visible\": false}). Object-typed entries run first, then the rest, mirroring property_set batch; slash families accept an object of suffixes; max 32 entries after expansion", true},
+    {"atomic", "boolean", "When true (default) the batch is all-or-nothing: first failure rolls back already applied entries and returns an error; when false best-effort partial success is returned with applied_properties plus failed entries", false},
+};
+
+const std::vector<ParamSpec> kSetNodeTransformParams = {
+    {"path", "string", "Node path in the edited scene (string, e.g. 'Player' or 'Player/Camera2D')", true},
+    {"space", "string", "Transform space: 'local' (default) writes the values directly to position/rotation/scale; 'global' interprets them in world space and converts to local via the parent global transform", false},
+    {"position", "object", "Target position as an object with numeric fields: {x, y} for 2D nodes (Node2D, Control), {x, y, z} for Node3D", false},
+    {"rotation", "number", "Rotation in radians: a number for 2D nodes (or {radians: n}); an euler object {x, y, z} for Node3D. Degrees are rejected — convert with radians = degrees * 3.1415926535 / 180", false},
+    {"scale", "object", "Target scale as an object with numeric fields: {x, y} for 2D nodes, {x, y, z} for Node3D", false},
 };
 
 const std::vector<ParamSpec> kPropertyGetListParams = {
@@ -49,9 +64,11 @@ const std::vector<ParamSpec> kSignalDisconnectParams = {
 
 } // namespace
 
+inline ToolSpec make_set_node_transform_spec();
+
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(5);
+  v.reserve(7);
   v.push_back(make_spec_tool(ToolSpec{
       "property_get",
       "Read a single property value from a scene node. Requires 'path' and 'property'; errors with candidate suggestions when the node or property does not exist (use property_get_list to see valid names). Returns the exact serialized value — unlike get_scene_tree's include_properties summary, which returns up to 20 filtered properties in one snapshot. Optional 'properties' (array of 1-32 non-empty names, mutually exclusive with 'property') reads many properties in one round trip and returns {name: value} plus 'missing' for absent names instead of failing the batch.",
@@ -59,7 +76,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       kPropertyGetParams, property_ops::handle_get}));
   v.push_back(make_spec_tool(ToolSpec{
       "property_set",
-      "Set a property on a scene node. Requires 'path', 'property' and 'value'. Omit 'type_hint' to infer the Variant type automatically from the property metadata (query property_get_list first for enum ordering). Resource values resolve via {\"path\": \"res://...\"}; an object-typed property also accepts an inline resource description {\"type\": \"RectangleShape2D\", \"properties\": {\"size\": {\"x\": 20, \"y\": 28}}} which creates a pathless sub-resource in one step (saved as a sub_resource with the scene, nesting limit 4) and is echoed in 'inline_resources' as {property, type} entries. memory:// resources are rejected to protect the scene file. Read-only or invalid assignments error; returns 'ok' with an 'undo' entry (old value) and registers the change with the editor undo stack so Ctrl-Z reverts it (undoable:true), except when the old or new value is an Object reference — then no action is recorded and the response reports undoable:false with undo_skip_reason.",
+      "Set properties on a scene node. Single form requires 'path', 'property' and 'value'; batch form passes 'properties' as an object map instead (mutually exclusive, max 32, object-typed entries first then the rest, mirroring create_scene_node). Property names accept dot paths (a.b.c) into sub-resources with full-path errors and candidates. Omit 'type_hint' to infer the Variant type from metadata (single form only). Resource values resolve via {\"path\": \"res://...\"}; object-typed properties accept inline {\"type\": \"RectangleShape2D\", \"properties\": {...}} (nesting limit 4, echoed in 'inline_resources'). Dictionary properties take JSON objects; SpriteFrames 'animations' accepts an engine array or a dict mapping names to {frames, speed, loop} assembled into the engine array form. memory:// rejected on nodes. Returns 'ok' with undo info and editor undo registration (undoable:false for object values).",
       "Properties", {"property", "set"}, SideEffect::None, tool_flags::kNone | tool_flags::kSceneTarget | tool_flags::kUndoable,
       kPropertySetParams, property_ops::handle_set}));
   v.push_back(make_spec_tool(ToolSpec{
@@ -77,7 +94,22 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       "Remove a signal connection previously created by signal_connect. Requires the same four parameters: 'source_path', 'signal', 'target_path', 'method'. Returns 'disconnected', or 'not_connected' when the signal+callable pair does not exist (idempotent — repeated calls are safe). Persistent connections removed here stop being saved with the scene.",
       "Properties", {"signal", "disconnect"}, SideEffect::None, tool_flags::kNone,
       kSignalDisconnectParams, property_ops::handle_signal_disconnect}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "set_properties_batch",
+      "Set many properties on one scene node in a single undo step. Requires 'path' and 'properties' as an object map (max 32 entries after slash-family expansion); 'atomic' (boolean, default true) selects all-or-nothing rollback versus best-effort partial success. Object-typed entries apply first, then the rest, mirroring property_set. Each entry uses the same strict conversion chain as property_set (resource references resolved, NodePath strings become node references, arrays converted per element, inline resource descriptions create pathless sub-resources, slash families expand per item). Each entry is read back and rejected values restore the old value. All applied entries share one editor undo action; object-typed values report undoable:false with a reason. Returns applied_properties, property_warnings ({path, property, warning} only when the engine adjusted a value), failed ([{property, error}] empty on full success, non-empty on atomic:false partial success), undo ([{path, property, old_value}]) plus undoable state.",
+      "Properties", {"property", "batch"}, SideEffect::None, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
+      kSetPropertiesBatchParams, property_ops::handle_set_batch}));
+  v.push_back(make_spec_tool(make_set_node_transform_spec()));
   return v;
+}
+
+inline ToolSpec make_set_node_transform_spec() {
+  return ToolSpec{
+      "set_node_transform",
+      "Set the transform of a scene node in a single undo step. Requires 'path' plus at least one of 'position', 'rotation', 'scale'. 2D nodes (Node2D, Control) take position as {x, y}, rotation as a radians number (or {radians: n}) and scale as {x, y}; Node3D takes position as {x, y, z}, rotation as euler angles {x, y, z} in radians and scale as {x, y, z}. Rotation is always radians: a 'degrees' field is rejected with the conversion formula. 'space' selects 'local' (default, values written directly) or 'global' (values interpreted in world space and converted to local via the parent global transform). Values flow through the same strict conversion and readback chain as set_properties_batch with one shared editor undo action. Returns applied_properties, space, failed (empty on success), property_warnings only when the engine adjusted a value, undo entries plus scene_path and scene_unsaved.",
+      "Properties", {"property", "transform"}, SideEffect::None,
+      tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
+      kSetNodeTransformParams, property_ops::handle_set_transform};
 }
 
 } // namespace property_tools

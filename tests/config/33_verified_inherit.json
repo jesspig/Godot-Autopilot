@@ -1,0 +1,149 @@
+{
+  "name": "33_verified_inherit",
+  "description": "B4 场景保存核验口径修正：包含子场景实例的场景，实例内部继承节点（owner 非场景根、本不落盘）不再计入 memory/disk 对比，save_editor_scene_as 回执不再必然把这类场景判成 mismatch。链路：create_directory res://gda_tmp_verify_inherit → create_editor_scene InheritChild(Node3D) + create_scene_node ChildPart → save_editor_scene_as child.tscn（2/2 节点、nodes_match=true）→ create_editor_scene InheritMain(Node3D, close_current) → instantiate_scene child.tscn 为 ChildInstance（实例根 owner=InheritMain、内部 ChildPart 为继承节点）→ save_editor_scene_as main.tscn（nodes_match=true、connections_match=true、inherited_nodes=1，即回执把不落盘继承节点分离计数而非报 mismatch）→ verify_scene_saved（match=true、missing_paths=[]、memory_nodes=disk_nodes=2、inherited_nodes=1、inherited_connections=0、inherited_paths 精确列出 InheritMain/ChildInstance/ChildPart）→ cleanup 关闭场景并 move_os_file_to_trash 回收目录。断言引擎不支持数组下标与大于比较，空数组用 value=[] 精确比对、正例用精确计数（inherited_nodes=1）替代 >0。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "stages": [
+      {
+        "id": "child_scene_fixture",
+        "steps": [
+          {
+            "id": "inherit_create_dir",
+            "tool": "create_directory",
+            "args": { "path": "res://gda_tmp_verify_inherit" },
+            "expect": { "has_keys": ["created"] }
+          },
+          {
+            "id": "inherit_child_scene",
+            "tool": "create_editor_scene",
+            "args": { "name": "InheritChild", "type": "Node3D", "close_current": true },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.path", "value": "InheritChild" },
+                { "key": "result.type", "value": "Node3D" }
+              ]
+            }
+          },
+          {
+            "id": "inherit_child_part",
+            "tool": "create_scene_node",
+            "args": { "name": "ChildPart", "type": "Node3D", "parent_path": "InheritChild" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.path", "value": "ChildPart" },
+                { "key": "result.applied_properties", "value": [] }
+              ]
+            }
+          },
+          {
+            "id": "inherit_save_child_scene",
+            "tool": "save_editor_scene_as",
+            "args": { "path": "res://gda_tmp_verify_inherit/child.tscn" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": "saved" },
+                { "key": "nodes_match", "value": true },
+                { "key": "connections_match", "value": true },
+                { "key": "memory_nodes", "value": 2 },
+                { "key": "disk_nodes", "value": 2 }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "instance_and_verify",
+        "steps": [
+          {
+            "id": "inherit_main_scene",
+            "tool": "create_editor_scene",
+            "args": { "name": "InheritMain", "type": "Node3D", "close_current": true },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.path", "value": "InheritMain" },
+                { "key": "result.type", "value": "Node3D" }
+              ]
+            }
+          },
+          {
+            "id": "inherit_instantiate_child",
+            "tool": "instantiate_scene",
+            "args": {
+              "path": "res://gda_tmp_verify_inherit/child.tscn",
+              "name": "ChildInstance"
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.path", "value": "ChildInstance" },
+                { "key": "result.name", "value": "ChildInstance" },
+                { "key": "result.type", "value": "Node3D" }
+              ]
+            }
+          },
+          {
+            "id": "inherit_save_main_scene",
+            "tool": "save_editor_scene_as",
+            "args": { "path": "res://gda_tmp_verify_inherit/main.tscn" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": "saved" },
+                { "key": "nodes_match", "value": true },
+                { "key": "connections_match", "value": true },
+                { "key": "memory_nodes", "value": 2 },
+                { "key": "disk_nodes", "value": 2 },
+                { "key": "inherited_nodes", "value": 1 }
+              ]
+            }
+          },
+          {
+            "id": "inherit_verify_scene",
+            "tool": "verify_scene_saved",
+            "args": {},
+            "expect": {
+              "has_keys": ["inherited_nodes", "inherited_connections", "inherited_paths"],
+              "field_checks": [
+                { "key": "result", "value": "match" },
+                { "key": "match", "value": true },
+                { "key": "missing_paths", "value": [] },
+                { "key": "memory_nodes", "value": 2 },
+                { "key": "disk_nodes", "value": 2 },
+                { "key": "memory_connections", "value": 0 },
+                { "key": "disk_connections", "value": 0 },
+                { "key": "connections_match", "value": true },
+                { "key": "inherited_nodes", "value": 1 },
+                { "key": "inherited_connections", "value": 0 },
+                { "key": "inherited_paths", "value": ["InheritMain/ChildInstance/ChildPart"] }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "cleanup",
+        "steps": [
+          {
+            "id": "inherit_close_scene",
+            "tool": "close_editor_scene",
+            "args": {},
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "closed" } ]
+            }
+          },
+          {
+            "id": "inherit_trash_dir",
+            "tool": "move_os_file_to_trash",
+            "args": { "path": "res://gda_tmp_verify_inherit" },
+            "expect": { "has_keys": ["result"] }
+          }
+        ]
+      }
+    ]
+  }
+}
