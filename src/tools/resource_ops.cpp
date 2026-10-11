@@ -218,25 +218,181 @@ bool load_resource_or_error(const std::string &path,
   return true;
 }
 
-bool find_global_class_path(const std::string &class_name,
-                            std::string &out_path) {
-  out_path.clear();
-  auto *settings = godot::ProjectSettings::get_singleton();
-  if (!settings)
-    return false;
-  godot::TypedArray<godot::Dictionary> classes =
-      settings->get_global_class_list();
-  for (int i = 0; i < classes.size(); i++) {
-    const godot::Dictionary entry = classes[i];
-    const std::string cls = util::to_std(godot::String(entry["class"]));
-    if (cls != class_name)
+constexpr size_t kGlobalClassFallbackMaxFiles = 500;
+constexpr size_t kGlobalClassAttrWindow = 512;
+
+bool is_global_class_word_char(char c) {
+  return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+         (c >= '0' && c <= '9') || c == '_';
+}
+
+bool matches_gdscript_global_class(const std::string &text,
+                                   const std::string &class_name) {
+  const std::string key("class_name");
+  size_t pos = 0;
+  while ((pos = text.find(key, pos)) != std::string::npos) {
+    size_t after = pos + key.size();
+    bool head_ok = (pos == 0) || !is_global_class_word_char(text[pos - 1]);
+    bool tail_ok =
+        (after >= text.size()) || !is_global_class_word_char(text[after]);
+    if (!head_ok || !tail_ok) {
+      pos = after;
       continue;
-    const std::string path = util::to_std(godot::String(entry["path"]));
-    if (path.empty())
-      return false;
-    out_path = path;
+    }
+    size_t p = after;
+    while (p < text.size() && (text[p] == ' ' || text[p] == '\t' ||
+                              text[p] == '\r' || text[p] == '\n')) {
+      ++p;
+    }
+    if (text.compare(p, class_name.size(), class_name) == 0) {
+      size_t end = p + class_name.size();
+      if (end >= text.size() || !is_global_class_word_char(text[end])) {
+        return true;
+      }
+    }
+    pos = after;
+  }
+  return false;
+}
+
+bool matches_csharp_global_class(const std::string &text,
+                                 const std::string &class_name) {
+  const std::string attr("[GlobalClass");
+  const std::string key("class");
+  size_t pos = 0;
+  while ((pos = text.find(key, pos)) != std::string::npos) {
+    size_t after = pos + key.size();
+    bool head_ok = (pos == 0) || !is_global_class_word_char(text[pos - 1]);
+    bool tail_ok =
+        (after >= text.size()) || !is_global_class_word_char(text[after]);
+    if (!head_ok || !tail_ok) {
+      pos = after;
+      continue;
+    }
+    size_t p = after;
+    while (p < text.size() && (text[p] == ' ' || text[p] == '\t' ||
+                              text[p] == '\r' || text[p] == '\n')) {
+      ++p;
+    }
+    size_t name_begin = p;
+    while (p < text.size() && is_global_class_word_char(text[p])) {
+      ++p;
+    }
+    if (name_begin < p &&
+        text.compare(name_begin, class_name.size(), class_name) == 0 &&
+        (name_begin + class_name.size()) == p) {
+      size_t win_start =
+          pos > kGlobalClassAttrWindow ? pos - kGlobalClassAttrWindow : 0;
+      size_t attr_pos = text.find(attr, win_start);
+      if (attr_pos != std::string::npos && attr_pos < pos) {
+        return true;
+      }
+    }
+    pos = after;
+  }
+  return false;
+}
+
+bool script_file_declares_class(const std::string &path,
+                                const std::string &class_name) {
+  bool is_cs =
+      path.size() >= 3 && path.compare(path.size() - 3, 3, ".cs") == 0;
+  bool is_gd =
+      path.size() >= 3 && path.compare(path.size() - 3, 3, ".gd") == 0;
+  if (!is_cs && !is_gd) {
+    return false;
+  }
+  godot::Ref<godot::FileAccess> fa = godot::FileAccess::open(
+      godot::String(path.c_str()), godot::FileAccess::READ);
+  if (fa.is_null()) {
+    return false;
+  }
+  const std::string text = util::to_std(fa->get_as_text());
+  if (is_gd) {
+    return matches_gdscript_global_class(text, class_name);
+  }
+  return matches_csharp_global_class(text, class_name);
+}
+
+bool scan_dir_for_global_class(const std::string &dir,
+                               const std::string &class_name, size_t &checked,
+                               std::string &found, bool &truncated) {
+  if (!found.empty() || truncated) {
+    return !found.empty();
+  }
+  godot::Ref<godot::DirAccess> da =
+      godot::DirAccess::open(godot::String(dir.c_str()));
+  if (da.is_null()) {
+    return false;
+  }
+  da->list_dir_begin();
+  godot::String entry = da->get_next();
+  while (!entry.is_empty()) {
+    if (truncated || !found.empty()) {
+      break;
+    }
+    if (entry != "." && entry != "..") {
+      const std::string name = util::to_std(entry);
+      std::string child = dir;
+      if (!child.empty() && child.back() != '/') {
+        child += '/';
+      }
+      child += name;
+      if (da->current_is_dir()) {
+        scan_dir_for_global_class(child, class_name, checked, found, truncated);
+      } else {
+        bool candidate =
+            (child.size() >= 3 &&
+             (child.compare(child.size() - 3, 3, ".cs") == 0 ||
+              child.compare(child.size() - 3, 3, ".gd") == 0));
+        if (candidate) {
+          if (checked >= kGlobalClassFallbackMaxFiles) {
+            truncated = true;
+            break;
+          }
+          ++checked;
+          if (script_file_declares_class(child, class_name)) {
+            found = child;
+            break;
+          }
+        }
+      }
+    }
+    entry = da->get_next();
+  }
+  da->list_dir_end();
+  return !found.empty();
+}
+
+bool find_global_class_path(const std::string &class_name,
+                            std::string &out_path, bool &out_truncated) {
+  out_path.clear();
+  out_truncated = false;
+  auto *settings = godot::ProjectSettings::get_singleton();
+  if (settings) {
+    godot::TypedArray<godot::Dictionary> classes =
+        settings->get_global_class_list();
+    for (int i = 0; i < classes.size(); i++) {
+      const godot::Dictionary entry = classes[i];
+      const std::string cls = util::to_std(godot::String(entry["class"]));
+      if (cls != class_name)
+        continue;
+      const std::string path = util::to_std(godot::String(entry["path"]));
+      if (path.empty())
+        return false;
+      out_path = path;
+      return true;
+    }
+  }
+  size_t checked = 0;
+  std::string found;
+  bool truncated = false;
+  scan_dir_for_global_class("res://", class_name, checked, found, truncated);
+  if (!found.empty()) {
+    out_path = found;
     return true;
   }
+  out_truncated = truncated;
   return false;
 }
 
@@ -460,7 +616,17 @@ instantiate_resource_class(const std::string &type, std::string &out_error) {
   }
 
   std::string script_path;
-  if (!find_global_class_path(type, script_path)) {
+  bool fallback_truncated = false;
+  if (!find_global_class_path(type, script_path, fallback_truncated)) {
+    if (fallback_truncated) {
+      out_error = "global class '" + type +
+                  "' not found in the global class cache and the fallback "
+                  "source scan stopped after " +
+                  std::to_string(kGlobalClassFallbackMaxFiles) +
+                  " files — open the project in the editor to register "
+                  "global classes, then retry";
+      return godot::Ref<godot::Resource>();
+    }
     if (cdbs->class_exists(class_name)) {
       out_error = type + " is not a Resource subclass";
     } else {

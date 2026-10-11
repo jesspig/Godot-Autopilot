@@ -10,6 +10,20 @@ public partial class TestTypes : Resource
 
     public string ReadOnlyName => "gda-probe";
 
+    public struct NestedInner
+    {
+        public int Value;
+        public Vector2 Pos;
+    }
+
+    public struct NestedOuter
+    {
+        public NestedInner Inner;
+        public Color Tint;
+    }
+
+    public NestedOuter ReadOnlyNested => new NestedOuter { Inner = new NestedInner { Value = 3, Pos = new Vector2(1, 2) }, Tint = new Color(1, 0, 0) };
+
     private int _secret = 7;
 
     public Vector2 GetOffset(int scale)
@@ -23,4 +37,6 @@ public partial class TestTypes : Resource
     {
         Pinged?.Invoke(value);
     }
+
+    public string JoinAll(params string[] parts) { return string.Join("|", parts); }
 }

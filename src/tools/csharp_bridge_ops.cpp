@@ -440,7 +440,7 @@ JV require_game_scene_path(const CSharpTarget &target,
 
 constexpr const char *kGetAllowed[] = {
     "object_id", "object_id_str", "memory", "path", "property",
-    "runtime",   "timeout_ms",    "wait_ready"};
+    "allow_non_public", "runtime", "timeout_ms", "wait_ready"};
 
 constexpr const char *kCallAllowed[] = {
     "object_id", "object_id_str", "memory", "path", "method",
@@ -451,6 +451,14 @@ constexpr const char *kSubscribeAllowed[] = {
     "event",            "target_object_id", "target_object_id_str",
     "target_memory",    "target_path",   "method",         "runtime",
     "timeout_ms",       "wait_ready"};
+
+constexpr const char *kSetAllowed[] = {
+    "object_id", "object_id_str", "memory", "path", "property",
+    "value",     "allow_non_public", "runtime",    "timeout_ms",
+    "wait_ready"};
+
+constexpr const char *kUnsubscribeAllowed[] = {
+    "token", "runtime", "timeout_ms", "wait_ready"};
 
 } // namespace
 
@@ -478,6 +486,13 @@ mcp::JsonValue handle_csharp_get(const mcp::JsonValue &args) {
         "missing required parameter: property (non-empty C# member name)");
   }
   const std::string prop = prop_p->GetString();
+  bool allow_non_public = false;
+  if (const JV *allow_p = args.Find("allow_non_public")) {
+    if (!allow_p->IsBool()) {
+      return util::error_json("allow_non_public must be a boolean");
+    }
+    allow_non_public = allow_p->GetBool();
+  }
   CSharpTarget target = resolve_locator(args, "", tool);
   if (!target.ok) {
     return target.error;
@@ -495,7 +510,8 @@ mcp::JsonValue handle_csharp_get(const mcp::JsonValue &args) {
     std::string source = emit_bridge_header();
     source += emit_resolve_node("__gda_target", target.scene_path);
     source += "return __gda_bridge.get_prop(__gda_target, &\"" +
-              gdscript_escape(prop) + "\")\n";
+              gdscript_escape(prop) + "\", " +
+              (allow_non_public ? "true" : "false") + ")\n";
     return forward_game_eval(source, timeout_ms, wait_ready);
   }
   if (!resolve_editor_object(target).IsNull()) {
@@ -508,6 +524,7 @@ mcp::JsonValue handle_csharp_get(const mcp::JsonValue &args) {
   godot::Array bridge_args;
   bridge_args.append(godot::Variant(target.object));
   bridge_args.append(godot::Variant(godot::StringName(prop.c_str())));
+  bridge_args.append(godot::Variant(allow_non_public));
   godot::Dictionary dict;
   if (!invoke_bridge(bridge, "get_prop", bridge_args, dict, err)) {
     return err;
@@ -516,6 +533,87 @@ mcp::JsonValue handle_csharp_get(const mcp::JsonValue &args) {
   r["result"] = VariantJson::serialize(dict["value"]);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "csharp_get_property completed");
+  return r;
+}
+
+mcp::JsonValue handle_csharp_set(const mcp::JsonValue &args) {
+  const std::string tool = "csharp_set_property";
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "csharp_set_property called");
+  JV err;
+  if (!check_allowed(args, tool, kSetAllowed,
+                     sizeof(kSetAllowed) / sizeof(*kSetAllowed), err)) {
+    return err;
+  }
+  bool is_game = false;
+  if (!parse_runtime(args, tool, is_game, err)) {
+    return err;
+  }
+  int64_t timeout_ms = GDA_DEFAULT_TIMEOUT_MS;
+  bool wait_ready = true;
+  if (!parse_game_options(args, tool, is_game, timeout_ms, wait_ready, err)) {
+    return err;
+  }
+  const JV *prop_p = args.Find("property");
+  if (!prop_p || !prop_p->IsString() || prop_p->GetString().empty()) {
+    return util::error_json(
+        "missing required parameter: property (non-empty C# member name)");
+  }
+  const std::string prop = prop_p->GetString();
+  const JV *value_p = args.Find("value");
+  if (!value_p) {
+    return util::error_json("missing required parameter: value");
+  }
+  bool allow_non_public = false;
+  if (const JV *allow_p = args.Find("allow_non_public")) {
+    if (!allow_p->IsBool()) {
+      return util::error_json("allow_non_public must be a boolean");
+    }
+    allow_non_public = allow_p->GetBool();
+  }
+  CSharpTarget target = resolve_locator(args, "", tool);
+  if (!target.ok) {
+    return target.error;
+  }
+  if (is_game) {
+    JV denied = authorization::deny_if_unauthorized(
+        "csharp_set_property", SideEffect::GameRuntime);
+    if (!denied.IsNull()) {
+      return denied;
+    }
+    JV locator_err = require_game_scene_path(target, tool);
+    if (!locator_err.IsNull()) {
+      return locator_err;
+    }
+    std::string source = emit_bridge_header();
+    source += emit_resolve_node("__gda_target", target.scene_path);
+    source += "var __gda_value = JSON.parse_string(\"" +
+              gdscript_escape(value_p->Dump()) + "\")\n";
+    source += "return __gda_bridge.set_prop(__gda_target, &\"" +
+              gdscript_escape(prop) + "\", __gda_value, " +
+              (allow_non_public ? "true" : "false") + ")\n";
+    return forward_game_eval(source, timeout_ms, wait_ready);
+  }
+  if (!resolve_editor_object(target).IsNull()) {
+    return target.error;
+  }
+  godot::Object *bridge = nullptr;
+  if (!fetch_editor_bridge(bridge, err)) {
+    return err;
+  }
+  godot::Array bridge_args;
+  bridge_args.append(godot::Variant(target.object));
+  bridge_args.append(godot::Variant(godot::StringName(prop.c_str())));
+  bridge_args.append(VariantJson::deserialize(*value_p));
+  bridge_args.append(godot::Variant(allow_non_public));
+  godot::Dictionary dict;
+  if (!invoke_bridge(bridge, "set_prop", bridge_args, dict, err)) {
+    return err;
+  }
+  JV r(JV::object_tag);
+  r["result"] = JV("ok");
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "csharp_set_property completed");
   return r;
 }
 
@@ -697,6 +795,68 @@ mcp::JsonValue handle_csharp_subscribe(const mcp::JsonValue &args) {
   r["result"] = std::move(token);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "csharp_subscribe_event completed");
+  return r;
+}
+
+mcp::JsonValue handle_csharp_unsubscribe(const mcp::JsonValue &args) {
+  const std::string tool = "csharp_unsubscribe_event";
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "csharp_unsubscribe_event called");
+  JV err;
+  if (!check_allowed(args, tool, kUnsubscribeAllowed,
+                     sizeof(kUnsubscribeAllowed) / sizeof(*kUnsubscribeAllowed),
+                     err)) {
+    return err;
+  }
+  bool is_game = false;
+  if (!parse_runtime(args, tool, is_game, err)) {
+    return err;
+  }
+  int64_t timeout_ms = GDA_DEFAULT_TIMEOUT_MS;
+  bool wait_ready = true;
+  if (!parse_game_options(args, tool, is_game, timeout_ms, wait_ready, err)) {
+    return err;
+  }
+  const JV *token_p = args.Find("token");
+  if (!token_p) {
+    return util::error_json("missing required parameter: token (integer "
+                            "subscription token from csharp_subscribe_event)");
+  }
+  if (!token_p->IsInt()) {
+    return util::error_json(
+        "token must be an integer subscription token from "
+        "csharp_subscribe_event");
+  }
+  const int64_t token = token_p->GetInt();
+  if (token <= 0) {
+    return util::error_json(
+        "token must be a positive integer subscription token");
+  }
+  if (is_game) {
+    JV denied = authorization::deny_if_unauthorized(
+        "csharp_unsubscribe_event", SideEffect::GameRuntime);
+    if (!denied.IsNull()) {
+      return denied;
+    }
+    std::string source = emit_bridge_header();
+    source += "return __gda_bridge.unsubscribe(" + std::to_string(token) +
+              ")\n";
+    return forward_game_eval(source, timeout_ms, wait_ready);
+  }
+  godot::Object *bridge = nullptr;
+  if (!fetch_editor_bridge(bridge, err)) {
+    return err;
+  }
+  godot::Array bridge_args;
+  bridge_args.append(godot::Variant(token));
+  godot::Dictionary dict;
+  if (!invoke_bridge(bridge, "unsubscribe", bridge_args, dict, err)) {
+    return err;
+  }
+  JV r(JV::object_tag);
+  r["result"] = JV("ok");
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "csharp_unsubscribe_event completed");
   return r;
 }
 

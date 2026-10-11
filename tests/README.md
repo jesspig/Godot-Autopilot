@@ -244,7 +244,7 @@ build\debug\tests\gda_test_runner.exe --file 01_scene
 | `35_scene_tree_gate.json` | scene_tree_gate | B1 8 个 SceneTree 工具游戏门控：无游戏时逐一返回结构化 `error`（已授权为运行时通道错误，未授权为授权门拒绝，两种授权态都通过），并用 `code_execute` 回读 `get_tree().paused == false` 证明编辑器树未被触碰；需 `code_execute` 授权 |
 | `36_stall_immunity.json` | 36_stall_immunity | B1 通道停摆免疫：暂停编辑器 `SceneTree.set_pause(true)` 后 `ping` 仍返回 `pong`、`system_status.main_thread` 五字段（`last_drain_age_ms`/`queue_depth`/`queue_cancelled`/`queue_rejected_full`/`oldest_pending_ms`）非空，恢复后 ping 正常；需 `code_execute` 授权 |
 | `37_game_ready_gate.json` | game_ready_gate | B7 无游戏就绪门：`execute_game_script`（授权后）与 `capture_game_viewport`（无授权门）默认 `wait_ready=true` 即返回精确 `game not running: …` 不挂起，`wait_ready=false` 等价文案；需 `game_runtime` 授权 |
-| `38_csharp_bridge.json` | csharp_bridge | B-T4 C# 反射桥三域工具（csharp_get_property / csharp_call_method / csharp_subscribe_event）编辑器侧参数校验（定位器互斥、必填成员名、runtime 取值、game-only 选项隔离、args 形态）+ 非 mono 精确跳过探针（bridge unavailable 全串 + build_csharp_assembly 工程探测）；需 `code_execute` + `game_runtime` + `process` 授权 |
+| `38_csharp_bridge.json` | csharp_bridge | B-T4 C# 反射桥五域工具（csharp_get_property / csharp_call_method / csharp_subscribe_event / csharp_set_property / csharp_unsubscribe_event）编辑器侧参数校验（定位器互斥、必填成员名、runtime 取值、game-only 选项隔离、args 形态）+ 非 mono 精确跳过探针（bridge unavailable 全串 + build_csharp_assembly 工程探测）；需 `code_execute` + `game_runtime` + `process` 授权 |
 
 ## 7. 遍历与排除清单（`tests/runner/traversal.cpp`）
 

@@ -1,6 +1,6 @@
 {
   "name": "csharp_bridge",
-  "description": "C# 反射桥（B-T4）的 L2 边界：csharp_get_property / csharp_call_method / csharp_subscribe_event 三域工具的编辑器侧参数校验（定位器互斥、必填成员名、runtime 取值、game-only 选项隔离、args 形态），以及非 .NET 编辑器下的精确跳过探针（bridge unavailable 全串 + build_csharp_assembly 工程探测），仿 23_click_ui_coords.json 的无游戏 error 写法。链路：before_all 用 create_editor_scene 建未落盘场景 CSharpBridgeProbe（根节点名即合法 scene-path 定位器，resolve_scene_node 剥离根名后直接命中根节点）→ ① 参数校验 20 步全部在 handler 入口返回精确错误串，不触及桥单例（定位器缺失/互斥、property/method/event/method 缺失、runtime 非法值、unknown parameter、timeout_ms/wait_ready 在 runtime=editor 下被拒、object_id/object_id_str 类型错误、memory:// 命名空间误用、memory 缺失的四段式定位错误、args 非数组/超 16 上限、runtime=game 下 timeout_ms 越界与 wait_ready 类型错误）→ ② 非 mono 探针：定位合法但编辑器进程无 GdaCSharpBridge 单例时三工具精确返回 not-registered 全串（标准 Godot 编辑器无 mono 模块，Engine.has_singleton 恒 false；.NET 编辑器已注册桥时此处改为真调见下）；runtime=game 合法定位在无游戏时经运行时通道返回 game not running 全串（csharp 转发不附加 runtime_game_ops 的 degradation hint，故只断言 error 单键）；build_csharp_assembly 探测返回 result.project_file == res://testbed.csproj 与 command 全串（started/pid 取决于 dotnet 是否可用，不断言）→ ③ cleanup save_editor_scene_as 落盘 res://gda_tmp_csharp_bridge/probe_root.tscn → close_editor_scene → move_os_file_to_trash 回收目录（与 35_scene_tree_gate 同一收尾口径）。前置条件：csharp_* 三工具受 code_execute capability 授权门保护（SpecTool::execute 集中检查，handler 校验之前），runtime=game 步骤另需 game_runtime，build_csharp_assembly 需 process（GODOT_AUTOPILOT_ALLOW env 或 user://godot_autopilot/config.json 的 allow 字段，env 优先），缺失时对应步骤返回 authorization required 而 FAIL。双态声明（重要）：本文件在 CI/标准编辑器下断言非 mono 跳过语义；.NET 编辑器（桥已按 skills/godot-autopilot-csharp/references/csharp-bridge.md 注册单例）下的真调由人工按此骨架验证——csharp_get_property{path:CSharpBridgeProbe 挂载 TestTypes 实例, property:ReadOnlyName} 取回 gda-probe、{property:Scores} 取回 Array、csharp_call_method{method:GetOffset, args:[2]} 取回 Vector2(2,4) 的序列化字典、csharp_subscribe_event{event:Pinged, target_path, method:_on_pinged} 取回 token 后调 RaisePinged(3) 在接收端观测到 3；测试床 TestTypes（tests/testbed/TestTypes.cs，[GlobalClass] Resource 派生、[Export] Array<int>、只读属性、返回 Vector2 struct 的方法、event Action<int>）与 testbed.csproj（net10 / PublishAot=false）即为该真调夹具，非 mono 下仅作 build 探测；成员 reflection 边界覆盖由 L1（csharp 桥单测）承担。",
+  "description": "C# 反射桥（B-T4）的 L2 边界：csharp_get_property / csharp_set_property / csharp_call_method / csharp_subscribe_event / csharp_unsubscribe_event 五域工具的编辑器侧参数校验（定位器互斥、必填成员名、runtime 取值、game-only 选项隔离、args 形态），以及非 .NET 编辑器下的精确跳过探针（bridge unavailable 全串 + build_csharp_assembly 工程探测），仿 23_click_ui_coords.json 的无游戏 error 写法。链路：before_all 用 create_editor_scene 建未落盘场景 CSharpBridgeProbe（根节点名即合法 scene-path 定位器，resolve_scene_node 剥离根名后直接命中根节点）→ ① 参数校验 30 步全部在 handler 入口返回精确错误串，不触及桥单例（定位器缺失/互斥、property/method/event/method/value/token 缺失、token 类型与正数、allow_non_public 类型、runtime 非法值、unknown parameter、timeout_ms/wait_ready 在 runtime=editor 下被拒、object_id/object_id_str 类型错误、memory:// 命名空间误用、memory 缺失的四段式定位错误、args 非数组/超 16 上限、runtime=game 下 timeout_ms 越界与 wait_ready 类型错误）→ ② 非 mono 探针：定位合法但编辑器进程无 GdaCSharpBridge 单例时五工具精确返回 not-registered 全串（标准 Godot 编辑器无 mono 模块，Engine.has_singleton 恒 false；.NET 编辑器已注册桥时此处改为真调见下）；runtime=game 合法定位在无游戏时经运行时通道返回 game not running 全串（csharp 转发不附加 runtime_game_ops 的 degradation hint，故只断言 error 单键）；build_csharp_assembly 探测返回 result.project_file == res://testbed.csproj 与 command 全串（started/pid 取决于 dotnet 是否可用，不断言）→ ②b allow_non_public 真调两步（默认读 _secret 精确错、显式开读到 7；标准编辑器下两步均因桥缺席而 FAIL，仅 .NET 真调通过）→ ②c 私有写三步（set 默认写 _secret 精确错、显式开写 ok、同条件读回 42；unsubscribe 真调解绑需前后 token 串联、L2 步骤间无传值故只做参数校验与桥缺席探针、解绑链路走人工验证；标准编辑器下真调步均因桥缺席而 FAIL，需 mono——同 runtime=game 缺 game_runtime 时 FAIL 的既有惯例）→ ③ cleanup save_editor_scene_as 落盘 res://gda_tmp_csharp_bridge/probe_root.tscn → close_editor_scene → move_os_file_to_trash 回收目录（与 35_scene_tree_gate 同一收尾口径）。前置条件：csharp_* 五工具受 code_execute capability 授权门保护（SpecTool::execute 集中检查，handler 校验之前），runtime=game 步骤另需 game_runtime，build_csharp_assembly 需 process（GODOT_AUTOPILOT_ALLOW env 或 user://godot_autopilot/config.json 的 allow 字段，env 优先），缺失时对应步骤返回 authorization required 而 FAIL。双态声明（重要）：本文件在 CI/标准编辑器下断言非 mono 跳过语义；.NET 编辑器（桥已按 skills/godot-autopilot-csharp/references/csharp-bridge.md 注册单例）下的真调由人工按此骨架验证——csharp_get_property{path:CSharpBridgeProbe 挂载 TestTypes 实例, property:ReadOnlyName} 取回 gda-probe、{property:Scores} 取回 Array、csharp_call_method{method:GetOffset, args:[2]} 取回 Vector2(2,4) 的序列化字典、csharp_subscribe_event{event:Pinged, target_path, method:_on_pinged} 取回 token 后调 RaisePinged(3) 在接收端观测到 3，csharp_unsubscribe_event{token:<subscribe 所得>} 解绑 ok、二次解绑报 unknown subscription token；allow_non_public 真调两步（同挂载下 {property:_secret} 默认精确报 property '_secret' not found on TestTypes，{property:_secret, allow_non_public:true} 取回 7，csharp_set_property{property:_secret, value:42} 默认精确错 property '_secret' not found on TestTypes、{property:_secret, value:42, allow_non_public:true} 写 ok 后同条件读回 42；标准编辑器下真调步均因桥单例缺席而 FAIL，仅 .NET 真调通过）；测试床 TestTypes（tests/testbed/TestTypes.cs，[GlobalClass] Resource 派生、[Export] Array<int>、只读属性、返回 Vector2 struct 的方法、event Action<int>）与 testbed.csproj（net10 / PublishAot=false）即为该真调夹具，非 mono 下仅作 build 探测；成员 reflection 边界覆盖由 L1（csharp 桥单测）承担。",
   "headless": true,
   "pipeline": {
     "on_failure": "continue",
@@ -234,6 +234,116 @@
                 { "key": "error", "value": "unknown parameter for csharp_subscribe_event: bogus" }
               ]
             }
+          },
+          {
+            "id": "set_missing_property",
+            "tool": "csharp_set_property",
+            "args": { "path": "CSharpBridgeProbe", "value": [1] },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "missing required parameter: property (non-empty C# member name)" }
+              ]
+            }
+          },
+          {
+            "id": "set_missing_value",
+            "tool": "csharp_set_property",
+            "args": { "path": "CSharpBridgeProbe", "property": "Scores" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "missing required parameter: value" }
+              ]
+            }
+          },
+          {
+            "id": "set_allow_non_public_type",
+            "tool": "csharp_set_property",
+            "args": { "path": "CSharpBridgeProbe", "property": "Scores", "value": [1], "allow_non_public": "yes" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "allow_non_public must be a boolean" }
+              ]
+            }
+          },
+          {
+            "id": "set_unknown_param",
+            "tool": "csharp_set_property",
+            "args": { "path": "CSharpBridgeProbe", "property": "Scores", "value": [1], "bogus": 1 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "unknown parameter for csharp_set_property: bogus" }
+              ]
+            }
+          },
+          {
+            "id": "unsub_missing_token",
+            "tool": "csharp_unsubscribe_event",
+            "args": {},
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "missing required parameter: token (integer subscription token from csharp_subscribe_event)" }
+              ]
+            }
+          },
+          {
+            "id": "unsub_token_type",
+            "tool": "csharp_unsubscribe_event",
+            "args": { "token": "1" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "token must be an integer subscription token from csharp_subscribe_event" }
+              ]
+            }
+          },
+          {
+            "id": "unsub_token_non_positive",
+            "tool": "csharp_unsubscribe_event",
+            "args": { "token": 0 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "token must be a positive integer subscription token" }
+              ]
+            }
+          },
+          {
+            "id": "unsub_unknown_param",
+            "tool": "csharp_unsubscribe_event",
+            "args": { "token": 1, "bogus": 1 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "unknown parameter for csharp_unsubscribe_event: bogus" }
+              ]
+            }
+          },
+          {
+            "id": "unsub_bad_runtime",
+            "tool": "csharp_unsubscribe_event",
+            "args": { "token": 1, "runtime": "editorial" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "runtime must be \"editor\" or \"game\" for csharp_unsubscribe_event" }
+              ]
+            }
+          },
+          {
+            "id": "unsub_timeout_editor_only",
+            "tool": "csharp_unsubscribe_event",
+            "args": { "token": 1, "timeout_ms": 100 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "timeout_ms only applies when runtime=\"game\"" }
+              ]
+            }
           }
         ]
       },
@@ -274,6 +384,28 @@
             }
           },
           {
+            "id": "probe_set_bridge_absent",
+            "tool": "csharp_set_property",
+            "args": { "path": "CSharpBridgeProbe", "property": "Scores", "value": [1] },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "csharp bridge singleton 'GdaCSharpBridge' is not registered: run a .NET editor build with the bridge registered via Engine.register_singleton, then retry" }
+              ]
+            }
+          },
+          {
+            "id": "probe_unsubscribe_bridge_absent",
+            "tool": "csharp_unsubscribe_event",
+            "args": { "token": 1 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "csharp bridge singleton 'GdaCSharpBridge' is not registered: run a .NET editor build with the bridge registered via Engine.register_singleton, then retry" }
+              ]
+            }
+          },
+          {
             "id": "probe_game_no_game",
             "tool": "csharp_get_property",
             "args": { "path": "CSharpBridgeProbe", "property": "ReadOnlyName", "runtime": "game" },
@@ -294,6 +426,68 @@
                 { "key": "result.project_file", "value": "res://testbed.csproj" },
                 { "key": "result.command", "value": "dotnet build --nologo res://testbed.csproj" },
                 { "key": "result.note", "not_empty": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "private_member_gate",
+        "steps": [
+          {
+            "id": "get_private_default_denied",
+            "tool": "csharp_get_property",
+            "args": { "path": "CSharpBridgeProbe", "property": "_secret" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "property '_secret' not found on TestTypes" }
+              ]
+            }
+          },
+          {
+            "id": "get_private_allowed_reads_seven",
+            "tool": "csharp_get_property",
+            "args": { "path": "CSharpBridgeProbe", "property": "_secret", "allow_non_public": true },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": 7 }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "set_private_write",
+        "steps": [
+          {
+            "id": "set_private_default_denied",
+            "tool": "csharp_set_property",
+            "args": { "path": "CSharpBridgeProbe", "property": "_secret", "value": 42 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "property '_secret' not found on TestTypes" }
+              ]
+            }
+          },
+          {
+            "id": "set_private_allowed_writes_ok",
+            "tool": "csharp_set_property",
+            "args": { "path": "CSharpBridgeProbe", "property": "_secret", "value": 42, "allow_non_public": true },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "ok" }
+              ]
+            }
+          },
+          {
+            "id": "get_private_allowed_reads_back",
+            "tool": "csharp_get_property",
+            "args": { "path": "CSharpBridgeProbe", "property": "_secret", "allow_non_public": true },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": 42 }
               ]
             }
           }

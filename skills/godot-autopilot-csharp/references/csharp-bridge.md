@@ -1,6 +1,6 @@
 # C# Reflection Bridge
 
-The three reflection tools and the two bridge endpoints behind them. `csharp_get_property` reads a C# property or field, `csharp_call_method` calls a C# method, `csharp_subscribe_event` wires a receiver method to a C# event. Domain tools run through `call_tool`; confirm schemas with `get_tool_detail`. Reach for this reference when GDScript-side reads (`property_get`, `get_script_property`, `execute_game_script`) come back null or missing for a member you know exists in C#.
+The five reflection tools and the two bridge endpoints behind them. `csharp_get_property` reads a C# property or field, `csharp_call_method` calls a C# method, `csharp_subscribe_event` wires a receiver method to a C# event. Domain tools run through `call_tool`; confirm schemas with `get_tool_detail`. Reach for this reference when GDScript-side reads (`property_get`, `get_script_property`, `execute_game_script`) come back null or missing for a member you know exists in C#.
 
 ## Endpoints
 
@@ -23,7 +23,7 @@ The bridge is runtime reflection over exact member names. Members reached only t
 
 ## Subscription tokens
 
-`csharp_subscribe_event` returns a result token identifying the wiring on the bridge instance that created it. Each call adds one more handler: subscribing twice forwards each event twice. There is no unsubscribe tool yet, so a wiring lasts until the source object is freed or its bridge instance goes away; the bridge holds a reference to the receiver while subscribed. Tokens are scoped to one bridge instance: the editor singleton lives with the editor session, while the game bridge lives on the `GdaCSharpRuntime` node, so restarting the game or reloading its scene drops every subscription and you must subscribe again.
+`csharp_subscribe_event` returns a result token identifying the wiring on the bridge instance that created it. Each call adds one more handler: subscribing twice forwards each event twice. `csharp_unsubscribe_event` releases a wiring early by token, so a wiring lasts until the token is released, the source object is freed, or its bridge instance goes away; the bridge holds a reference to the receiver while subscribed. Tokens are scoped to one bridge instance: the editor singleton lives with the editor session, while the game bridge lives on the `GdaCSharpRuntime` node, so restarting the game or reloading its scene drops every subscription and you must subscribe again.
 
 ## Singleton registration
 

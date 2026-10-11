@@ -8,16 +8,18 @@ from pathlib import Path
 from .config import DEMO_DIRS, PLATFORM_LIBS, PLATFORM_PDB, PROJECT_ROOT, TESTBED_DIR, _addon_dir, artifact_dir
 
 
-BRIDGE_TEMPLATE = PROJECT_ROOT / "csharp_bridge" / "GdaCSharpBridge.cs"
+BRIDGE_DIR = PROJECT_ROOT / "csharp_bridge"
 
 
 def _deploy_csharp_bridge(addon_dir: Path) -> None:
-    if BRIDGE_TEMPLATE.is_file():
-        shutil.copy2(BRIDGE_TEMPLATE, addon_dir / BRIDGE_TEMPLATE.name)
-        size_kb = BRIDGE_TEMPLATE.stat().st_size / 1024
-        print(f"  {BRIDGE_TEMPLATE.name}  ({size_kb:.0f} KB)", flush=True)
+    sources = sorted(BRIDGE_DIR.glob("*.cs"))
+    if sources:
+        for src in sources:
+            shutil.copy2(src, addon_dir / src.name)
+            size_kb = src.stat().st_size / 1024
+            print(f"  {src.name}  ({size_kb:.0f} KB)", flush=True)
     else:
-        print(f"[WARN] {BRIDGE_TEMPLATE.name} not found in {BRIDGE_TEMPLATE.parent}", flush=True)
+        print(f"[WARN] no bridge sources found in {BRIDGE_DIR}", flush=True)
 
 
 def _generate_gdextension(addon_dir: Path) -> None:
