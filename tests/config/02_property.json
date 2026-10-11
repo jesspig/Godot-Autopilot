@@ -1,6 +1,6 @@
 {
   "name": "property_tools",
-  "description": "T3.3 迁移自 tests/integration/property_tools_test.cpp 的 11 个 TEST_F（PropertyToolsTest）：property_get/set/get_list 的返回结构、错误措辞、readback MATCHED、int 字符串静默转 0、缺参报错。节点选型 Label（Control 子类），规避 set_main_screen_editor 调用。本轮新增：临时脚本导出的 Node 引用属性（路径字符串转换 + converted_node_path 回执，坏路径报错）、typed 数组元素级转换（Array[Node2D] 接受路径字符串与 {\"__node_ref__\": 路径}，Array[PackedScene] 接受 res:// 路径；坏元素与非数组值报错）、property_get_list 的 only_script_variables / property_filter 过滤行为。fixture 位于 res://gda_tmp_prop_refs/，cleanup 阶段回收。",
+  "description": "T3.3 迁移自 tests/integration/property_tools_test.cpp 的 11 个 TEST_F（PropertyToolsTest）：property_get/set/get_list 的返回结构、错误措辞、readback MATCHED、int 字符串静默转 0、缺参报错。节点选型 Label（Control 子类），规避 set_main_screen_editor 调用。本轮新增：临时脚本导出的 Node 引用属性（路径字符串转换 + converted_node_path 回执，坏路径报错）、typed 数组元素级转换（Array[Node2D] 接受路径字符串与 {\"__node_ref__\": 路径}，Array[PackedScene] 接受 res:// 路径；坏元素与非数组值报错）、property_get_list 的 only_script_variables / property_filter 过滤行为。fixture 位于 res://gda_tmp_prop_refs/，cleanup 阶段回收。本轮再增：GDScript 全局类（class_name GdaPropItem extends Resource）数组回归——create_resource 建实例 + property_set 经 {\"resource\": \"memory://名\"} 写入 Array[GdaPropItem]（脚本同一性分支）+ property_get 回读 + 坏元素报错。",
   "headless": true,
   "pipeline": {
     "on_failure": "continue",
@@ -177,12 +177,28 @@
         "id": "script_property_refs",
         "steps": [
           {
+            "id": "prop_gd_item_created",
+            "tool": "create_script",
+            "args": {
+              "path": "res://gda_tmp_prop_refs/prop_gd_item.gd",
+              "overwrite": true,
+              "source_code": "@tool\nclass_name GdaPropItem\nextends Resource\n\n@export var title: String\n"
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.path", "value": "res://gda_tmp_prop_refs/prop_gd_item.gd" },
+                { "key": "result.verified", "value": true }
+              ]
+            }
+          },
+          {
             "id": "prop_fixture_script_created",
             "tool": "create_script",
             "args": {
               "path": "res://gda_tmp_prop_refs/prop_export_probe.gd",
               "overwrite": true,
-              "source_code": "@tool\nextends Node\n\n@export var node_link: Node2D\n@export var node_list: Array[Node2D]\n@export var packed_list: Array[PackedScene]\n"
+              "source_code": "@tool\nextends Node\n\n@export var node_link: Node2D\n@export var node_list: Array[Node2D]\n@export var packed_list: Array[PackedScene]\n@export var gd_items: Array[GdaPropItem]\n"
             },
             "expect": {
               "has_keys": ["result"],
@@ -319,6 +335,42 @@
             "id": "packed_array_set_bad_shape",
             "tool": "property_set",
             "args": { "path": "LabelNode/PropHost", "property": "packed_list", "value": [ { "bogus": true } ] },
+            "expect": {
+              "field_checks": [ { "key": "error", "not_empty": true } ]
+            }
+          },
+          {
+            "id": "gd_item_resource_created",
+            "tool": "create_resource",
+            "args": { "type": "GdaPropItem", "name": "gda_prop_gd_item" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.class", "not_empty": true },
+                { "key": "result.name", "value": "gda_prop_gd_item" }
+              ]
+            }
+          },
+          {
+            "id": "gd_array_set_ok",
+            "tool": "property_set",
+            "args": { "path": "LabelNode/PropHost", "property": "gd_items", "value": [ { "resource": "memory://gda_prop_gd_item" } ] },
+            "expect": {
+              "field_checks": [ { "key": "result", "value": "ok" } ]
+            }
+          },
+          {
+            "id": "gd_array_get",
+            "tool": "property_get",
+            "args": { "path": "LabelNode/PropHost", "property": "gd_items" },
+            "expect": {
+              "field_checks": [ { "key": "result", "not_empty": true } ]
+            }
+          },
+          {
+            "id": "gd_array_set_bad_shape",
+            "tool": "property_set",
+            "args": { "path": "LabelNode/PropHost", "property": "gd_items", "value": [ { "bogus": true } ] },
             "expect": {
               "field_checks": [ { "key": "error", "not_empty": true } ]
             }
