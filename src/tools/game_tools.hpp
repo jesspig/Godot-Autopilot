@@ -14,6 +14,10 @@ namespace runtime_ops {
 mcp::JsonValue handle_sequence_game_inputs(const mcp::JsonValue &args);
 mcp::JsonValue handle_game_ui_elements(const mcp::JsonValue &args);
 mcp::JsonValue handle_click_game_ui_element(const mcp::JsonValue &args);
+mcp::JsonValue handle_get_game_locale(const mcp::JsonValue &args);
+mcp::JsonValue handle_set_game_locale(const mcp::JsonValue &args);
+mcp::JsonValue handle_get_translation_list(const mcp::JsonValue &args);
+mcp::JsonValue handle_translate_text(const mcp::JsonValue &args);
 } // namespace runtime_ops
 namespace game_tools {
 
@@ -155,11 +159,23 @@ const std::vector<ParamSpec> kClickGameUiElementParams = {
     {"wait_ready", "boolean", "Wait for the game process to report ready (gda:ready) before failing; while the game is starting, the request is queued and replayed as soon as readiness arrives. Set false to fail immediately (previous behaviour). Default: true", false},
 };
 
+const std::vector<ParamSpec> kGetGameLocaleParams = {};
+
+const std::vector<ParamSpec> kSetGameLocaleParams = {
+    {"locale", "string", "Game locale to activate in en or en_US format (e.g. en_US, zh_CN, en); other formats are rejected without changing state", true},
+};
+
+const std::vector<ParamSpec> kGetTranslationListParams = {};
+
+const std::vector<ParamSpec> kTranslateTextParams = {
+    {"key", "string", "Source message key to translate under the current game locale; unknown keys fail instead of echoing the key", true},
+};
+
 } // namespace
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(15);
+  v.reserve(19);
   v.push_back(make_spec_tool(ToolSpec{
       "sample_game_property",
       "Sample a game node property over N process frames in the running game process over the runtime debug channel, read-only: returns the serialized value per sample. Requires a game launched from the editor whose project loads the godot-autopilot extension. node_path and property select the target (property must exist — missing names fail fast instead of collecting nulls); frames (integer 1-120) sets how many samples to collect and interval_frames (integer 0-60, default 0) spaces them (every interval_frames+1-th process frame is sampled, keeping main-thread cost O(1) per frame); frames*(interval_frames+1) must stay within 3600. timeout_ms (default 5000, max 25000) bounds the whole sampling run — on expiry the call fails explicitly with code sample_timeout plus the samples collected so far; a node freed mid-run fails with code sample_node_freed. No polling loop on the caller side is needed.",
@@ -235,6 +251,26 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       "Click a UI element in the running game process by node path or visible text over the runtime debug channel: the game enumerates its Control tree, resolves path (exact match first, otherwise a node path ending with '/'+path) or text (exact match over visible elements first, then substring) and injects a mouse_button press/release pair at the element's global_rect centre through the same path as queue_game_input. Requires a game launched from the editor whose project loads the godot-autopilot extension and the game_runtime authorization gate. path (from get_game_ui_elements) or text (visible control text) selects the element — pass exactly one of them, path wins when both are given; text matches visible elements exactly first, then by substring, and text_index (default 0) picks the nth match when several match. The annotate id from capture_game_viewport is a per-capture sequence number and is not clickable — use the same row's path or its text instead; button_index (1=left default, 2=right, 3=middle) and double_click (default false, adds a second press/release pair) are optional. max_elements caps the enumeration (default 1000, max 1000); timeout_ms defaults to 5000 (max 25000; the host waits timeout_ms + 2000 ms, below the 30 s transport timeout). One call performs both steps (enumerate + inject) and resolves with {\"result\":{\"ok\":true,\"path\":...,\"position\":{x,y},\"clicks\":n}}; when the path is not found the error lists the element count and candidate paths.",
       "Game", {"game", "runtime", "input", "click", "ui", "debug"}, SideEffect::GameRuntime, tool_flags::kMutating,
       kClickGameUiElementParams, runtime_ops::handle_click_game_ui_element}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "get_game_locale",
+      "Read the game locale from the TranslationServer singleton (e.g. en_US). Use it to check which language translate_text resolves against before switching with set_game_locale. Takes no parameters; returns the locale string.",
+      "Game", {"game", "locale", "i18n"}, SideEffect::None, tool_flags::kNone,
+      kGetGameLocaleParams, runtime_ops::handle_get_game_locale}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "set_game_locale",
+      "Set the game locale on the TranslationServer singleton. Requires locale in en or en_US format (e.g. en_US, zh_CN); other formats are rejected without changing state. Returns result ok plus the applied locale. Requires the game_runtime authorization gate.",
+      "Game", {"game", "locale", "i18n"}, SideEffect::GameRuntime, tool_flags::kMutating,
+      kSetGameLocaleParams, runtime_ops::handle_set_game_locale}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "get_translation_list",
+      "List locales with loaded translations from the TranslationServer singleton (same set as get_loaded_locales). Use it to pick a valid set_game_locale value or to check i18n coverage. Takes no parameters; returns an array of locale strings.",
+      "Game", {"game", "locale", "i18n", "translation"}, SideEffect::None, tool_flags::kNone,
+      kGetTranslationListParams, runtime_ops::handle_get_translation_list}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "translate_text",
+      "Translate a message key with the TranslationServer singleton under the current game locale (see get_game_locale). Requires key (non-empty source message); unknown keys fail with an error instead of echoing the key. Returns the translated string plus the resolving key and locale.",
+      "Game", {"game", "locale", "i18n", "translation"}, SideEffect::None, tool_flags::kNone,
+      kTranslateTextParams, runtime_ops::handle_translate_text}));
   return v;
 }
 
