@@ -17,6 +17,7 @@
 #include <deque>
 #include <godot_cpp/classes/editor_debugger_plugin.hpp>
 #include <godot_cpp/classes/editor_debugger_session.hpp>
+#include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/variant/array.hpp>
@@ -237,6 +238,31 @@ JV send_request(int64_t request_id, const std::string &op, const JV &params,
   payload[GDA_FIELD_PARAMS] = params;
 
   const std::string payload_text = payload.Dump();
+  if (wait_ready && debugger_ready_session_count() == 0) {
+    bool should_queue = debugger_active_session_count() > 0;
+    if (!should_queue) {
+      if (auto *editor = godot::EditorInterface::get_singleton())
+        should_queue = editor->is_playing_scene();
+    }
+    if (should_queue) {
+      {
+        std::lock_guard<std::mutex> lock(pending->mtx);
+        pending->payload = payload_text;
+        pending->awaiting_ready = true;
+      }
+      LogSystem::instance().log(
+          LogLevel::Info, LogCategory::Transport,
+          "game op \"" + op +
+              "\" queued until the game process reports gda:ready "
+              "(request_id " +
+              std::to_string(request_id) + ")");
+      JV queued(JV::object_tag);
+      queued["request_id"] = JV(request_id);
+      queued["result"] = JV("sent");
+      queued["queued_for_ready"] = JV(true);
+      return queued;
+    }
+  }
   int32_t used_session_id = -1;
   int32_t session_count = 0;
   if (!debugger_broadcast_request(payload_text, &used_session_id,

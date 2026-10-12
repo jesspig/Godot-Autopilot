@@ -389,6 +389,9 @@ bool find_global_class_path(const std::string &class_name,
   bool truncated = false;
   scan_dir_for_global_class("res://", class_name, checked, found, truncated);
   if (!found.empty()) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                              "global class '" + class_name +
+                                  "' resolved via source fallback scan: " + found);
     out_path = found;
     return true;
   }
