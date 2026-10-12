@@ -75,6 +75,12 @@ const std::vector<ParamSpec> kWriteFileParams = {
     {"mode", "string", "Write mode: 'WRITE' overwrites existing content (default), 'APPEND' appends to the end of the file", false},
 };
 
+const std::vector<ParamSpec> kCreateCSharpScriptParams = {
+    {"path", "string", "C# file path to create under res:// (e.g. res://scripts/Player.cs); the file stem must equal the declared class name", true},
+    {"source_code", "string", "C# source code; must declare one partial class deriving from a Godot base class, covered by the project .csproj", true},
+    {"overwrite", "boolean", "Overwrite an existing file (default: false); false errors when the file already exists", false},
+};
+
 const std::vector<ParamSpec> kReadFileParams = {
     {"path", "string", "File path to read (absolute path, or res:// / user://-relative); plain file I/O with no editor resource tracking", true},
 };
@@ -110,7 +116,7 @@ const std::vector<ParamSpec> kEnsureDirectoryParams = {
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(22);
+  v.reserve(23);
   v.push_back(make_spec_tool(ToolSpec{
       "show_os_alert",
       "Show a modal alert dialog with the given text and optional title. The call blocks the editor UI until the user dismisses the dialog, so avoid it in unattended or automated runs where it would hang. Requires 'text' (string); returns result 'ok' once dismissed.",
@@ -191,6 +197,11 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       "Write or append text content to a file. Paths inside the project (res://) are engine-managed: after writing, the file is synced with the editor file system — imported asset types (images, audio, fonts, 3D models, translations, or any file that already has a .import sidecar) are queued for reimport while plain text files get update_file; script-like files (.gd/.gdshader/.gdshaderinc/.cs) additionally return a diagnostics object reporting whether the written script still loads. External paths (user:// or absolute) are written as plain I/O outside editor tracking and report engine_managed: false. Requires 'path' and 'content' (strings); optional 'mode' is 'WRITE' (overwrite, default) or 'APPEND'. Returns result 'ok', plus engine_managed and action ('reimport' or 'update_file') for managed writes.",
       "OS", {"file", "write"}, SideEffect::WritesFile, tool_flags::kMutating,
       kWriteFileParams, text_ops::handle_file_write}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "create_csharp_script",
+      "Create a new C# script file under res:// with pre-write validation. Requires path (must end in .cs) and source_code; overwrite defaults to false. Three gates fail with an actionable patch instead of a silent ok: the file stem must equal the declared class name, the class must be partial and derive from a ClassDB-known Godot base class, and the res:// root .csproj must reference the file (SDK-style globs count as referenced). Returns the CSharpFileRecord {path, class_name, csproj_ref_exists} plus base_class, project_file, is_dotnet_editor, verified/readback and a diagnostics object; the .cs diagnostics hint reports the .NET-editor state, the assembly build state and where in get_debugger_log to look. C# compiles out of band: run build_csharp_assembly afterwards and confirm via get_debugger_log, since nothing hot-reloads.",
+      "Scripts", {"script", "csharp", "create"}, SideEffect::WritesFile, tool_flags::kMutating,
+      kCreateCSharpScriptParams, text_ops::handle_create_csharp_script}));
   v.push_back(make_spec_tool(ToolSpec{
       "read_file",
       "Read a text file from disk (absolute path, or res:// / user://-relative) and return its full text content. This is the read-side counterpart of write_file: plain file I/O with no editor resource tracking. Requires 'path'. Returns result {'path', 'content'} on success; errors when the file cannot be opened.",

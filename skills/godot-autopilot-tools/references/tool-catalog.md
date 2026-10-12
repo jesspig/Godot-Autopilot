@@ -1,6 +1,6 @@
 # Category Index
 
-All 448 domain tools of the godot-autopilot MCP server, grouped by their 33 source modules, plus `system_status`. Call domain tools through `call_tool`; confirm schemas with `get_tool_detail`.
+All 451 domain tools of the godot-autopilot MCP server, grouped by their 33 source modules, plus `system_status`. Call domain tools through `call_tool`; confirm schemas with `get_tool_detail`.
 
 ## Analysis - analyze_tools (3)
 
@@ -136,7 +136,7 @@ All 448 domain tools of the godot-autopilot MCP server, grouped by their 33 sour
 - `get_docs_method` - look up one method's reflected signature on a class
 - `get_docs_property` - look up one property's reflected info on a class
 
-## Editor - editor_tools (32)
+## Editor - editor_tools (33)
 
 - `get_editor_selection` - list the currently selected nodes
 - `set_editor_selection` - replace the editor selection with given paths
@@ -162,6 +162,7 @@ All 448 domain tools of the godot-autopilot MCP server, grouped by their 33 sour
 - `play_editor_current_scene` - launch the edited scene as a game
 - `stop_editor_playing` - stop the running game process
 - `build_csharp_assembly` - trigger an async dotnet build of the C# project
+- `dotnet_environment` - probe the dotnet SDK and C# project setup without building anything
 - `get_editor_ui_elements` - enumerate the editor's UI elements for semantic click automation (optional `query`, `type_filter`, `interactive_only`, `max_elements`)
 - `hit_test_editor_point` - preview which editor elements a client-area `position` lands on, without clicking (`window_id`, `max_results`)
 - `get_editor_viewport_geometry` - map the captured editor viewport image onto the window client area so image pixels can be converted to click coordinates (`viewport`, `index`)
@@ -254,7 +255,7 @@ All 448 domain tools of the godot-autopilot MCP server, grouped by their 33 sour
 - `get_nav_3d_agent_state` - read a 3D agent's position and velocity
 - `create_nav_3d_obstacle` - create a 3D obstacle avoidance agents steer around
 
-## OS - os_tools (22)
+## OS - os_tools (23)
 
 - `show_os_alert` - show a blocking native alert dialog (blocks the editor UI)
 - `create_os_process` - start a detached background process and return its PID
@@ -271,6 +272,7 @@ All 448 domain tools of the godot-autopilot MCP server, grouped by their 33 sour
 - `get_os_environment` - read an editor process environment variable
 - `set_os_environment` - set an editor process environment variable
 - `write_file` - write or append text to a file under res:// or user://
+- `create_csharp_script` - create a C# script file under res:// with pre-write validation
 - `read_file` - read a text file from disk
 - `find_in_files` - recursively search text files for a query string
 - `move_os_file_to_trash` - move a file or folder to the system trash
@@ -478,13 +480,14 @@ All 448 domain tools of the godot-autopilot MCP server, grouped by their 33 sour
 - `set_script_property` - set a node property without undo entry or validation
 - `get_script_property_list` - list the declared variables of a GDScript file
 
-## Scripts - csharp_tools (5)
+## Scripts - csharp_tools (6)
 
 - `csharp_get_property` - read a C# member invisible to GDScript through the editor bridge singleton or the game bridge (runtime game)
 - `csharp_set_property` - write a C# member invisible to GDScript through the editor bridge singleton or the game bridge (runtime game), honors allow_non_public like the read path
 - `csharp_call_method` - call a C# method with overload resolution by argument count through the editor bridge singleton or the game bridge (runtime game)
 - `csharp_subscribe_event` - subscribe a receiver method to a C# event through the editor bridge singleton or the game bridge (runtime game), returns a subscription token
 - `csharp_unsubscribe_event` - release a subscription token from csharp_subscribe_event on the same editor or game bridge instance
+- `csharp_list_members` - list C# members visible to GDScript and C# callers for pre-call discovery, read-only with no bridge required
 
 ## SpriteFrames - spriteframes_tools (3)
 

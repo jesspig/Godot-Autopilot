@@ -103,7 +103,12 @@ const std::vector<ParamSpec> kVerifySceneSavedParams = {
     {"include_hash", "boolean", "Attach FNV-1a content hashes of the memory tree and the on-disk file (memory_hash/disk_hash); off by default", false},
 };
 
-const std::vector<ParamSpec> kBuildCsharpAssemblyParams = {};
+const std::vector<ParamSpec> kBuildCsharpAssemblyParams = {
+    {"wait", "boolean", "When true run dotnet build synchronously via OS.execute and wait for the BuildResult with exit_code, success, errors and output_digest; when false or omitted launch via OS.create_process and return immediately with pid and started", false},
+    {"timeout_ms", "integer", "Declared wait budget in milliseconds for wait=true only, an integer between 1 and 25000 (default 25000); validated to stay below the dispatch default 27000ms and the transport timeout; rejected when wait is not true", false},
+};
+
+const std::vector<ParamSpec> kDotnetEnvironmentParams = {};
 
 const std::vector<ParamSpec> kCloseEditorSceneParams = {};
 
@@ -162,7 +167,7 @@ const std::vector<ParamSpec> kRunEditorShortcutParams = {
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(32);
+  v.reserve(33);
   v.push_back(make_spec_tool(ToolSpec{
       "get_editor_selection",
       "Retrieve the list of nodes currently selected in the edited scene. Use it to see which nodes the user has selected before operating on them with scene tools. Returns result as an array of objects, each with name, class and path fields relative to the scene root; an empty array means nothing is selected.",
@@ -275,9 +280,14 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       kVerifySceneSavedParams, editor_ops::handle_verify_scene_saved}));
   v.push_back(make_spec_tool(ToolSpec{
       "build_csharp_assembly",
-      "Trigger a C# project build by launching 'dotnet build --nologo <project>' as an async OS process on the res:// root .csproj/.sln. Intended for CI/command-line compile verification only: it does NOT rewind to an in-editor Build and does not hot-reload the loaded .NET assembly. Returns result {'project_file','command','started','pid','note'}; errors when the project is not a C# project or dotnet is not available.",
+      "Trigger a C# project build with dotnet build --nologo on the res:// root .csproj/.sln. Intended for CI/command-line compile verification only: it does NOT rewind to an in-editor Build and does not hot-reload the loaded .NET assembly. By default (wait omitted or false) it launches via OS.create_process and returns immediately with result {project_file,command,pid,started,note}. With wait=true it runs synchronously via OS.execute and waits for the six-field BuildResult {project_file,command,exit_code,success,errors,output_digest}: exit_code is the dotnet exit code, success is exit_code==0, errors lists output lines containing error (capped at 50 with errors_truncated), output_digest is the combined stdout/stderr truncated to 4000 chars when desensitized else 64000 chars with output_truncated when cut; timeout_ms declares the wait budget (1-25000, default 25000) validated to stay below the dispatch default 27000ms; errors when the project is not a C# project or dotnet is not available.",
       "Editor", {"build", "csharp", "dotnet"}, SideEffect::Process, tool_flags::kMutating,
       kBuildCsharpAssemblyParams, editor_ops::handle_build_csharp_assembly}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "dotnet_environment",
+      "Probe the .NET/C# environment of the current project without building anything. Use it before build_csharp_assembly or any C# workflow to learn whether the project is a C# project, whether the dotnet CLI is usable and which SDK version it reports, whether the editor itself is a .NET build, and whether the C# runtime looks loaded. Locates the res:// root .csproj/.sln exactly like build_csharp_assembly, runs 'dotnet --version' synchronously to capture the version string, and treats OS.has_feature mono plus CSharpScript class presence as unverified heuristics (see hint). Returns result with dotnet_available, dotnet_version, project_file, is_dotnet_editor, assembly_loaded and hint; errors when the project is not a C# project or dotnet is not available.",
+      "Editor", {"dotnet", "csharp", "environment"}, SideEffect::Process, tool_flags::kNone,
+      kDotnetEnvironmentParams, editor_ops::handle_dotnet_environment}));
   v.push_back(make_spec_tool(ToolSpec{
       "close_editor_scene",
       "Close the currently edited scene tab and return the editor to an empty state when it was the last tab. Use it before opening or creating another scene, or when a scene is no longer needed. Only the current tab is closed: with multiple scene tabs open, call it repeatedly until no scene is open. Refuses to close when the scene has unsaved changes, so call save_editor_scene first. Returns result 'closed'.",

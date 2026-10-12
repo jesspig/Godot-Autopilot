@@ -8,22 +8,32 @@ public partial class GdaCSharpBridge : RefCounted
 
     private static bool TryConvertArg(Variant v, Type t, out object result)
     {
+        int cost;
+        return TryConvertScored(v, t, out result, out cost);
+    }
+
+    private static bool TryConvertScored(Variant v, Type t, out object result, out int cost)
+    {
         result = null;
+        cost = 0;
         if (t == typeof(Variant))
         {
             result = v;
+            cost = 0;
             return true;
         }
-        Type underlying = Nullable.GetUnderlyingType(t);
-        if (underlying != null)
+        Type nullableInner = Nullable.GetUnderlyingType(t);
+        bool wasNullable = nullableInner != null;
+        if (wasNullable)
         {
-            t = underlying;
+            t = nullableInner;
         }
         if (v.VariantType == Variant.Type.Nil)
         {
-            if (!t.IsValueType)
+            if (!t.IsValueType || wasNullable)
             {
                 result = null;
+                cost = 0;
                 return true;
             }
             return false;
@@ -31,6 +41,7 @@ public partial class GdaCSharpBridge : RefCounted
         if (t == typeof(object))
         {
             result = ToPlainObject(v);
+            cost = 4;
             return true;
         }
         if (typeof(GodotObject).IsAssignableFrom(t))
@@ -43,11 +54,13 @@ public partial class GdaCSharpBridge : RefCounted
             if (o == null)
             {
                 result = null;
+                cost = 0;
                 return true;
             }
             if (t.IsInstanceOfType(o))
             {
                 result = o;
+                cost = o.GetType() == t ? 0 : 1;
                 return true;
             }
             return false;
@@ -57,6 +70,7 @@ public partial class GdaCSharpBridge : RefCounted
             if (v.VariantType == Variant.Type.String || v.VariantType == Variant.Type.StringName)
             {
                 result = v.ToString();
+                cost = 0;
                 return true;
             }
             return false;
@@ -66,6 +80,7 @@ public partial class GdaCSharpBridge : RefCounted
             if (v.VariantType == Variant.Type.String || v.VariantType == Variant.Type.StringName)
             {
                 result = new StringName(v.ToString());
+                cost = 0;
                 return true;
             }
             return false;
@@ -75,6 +90,7 @@ public partial class GdaCSharpBridge : RefCounted
             if (v.VariantType == Variant.Type.String || v.VariantType == Variant.Type.NodePath)
             {
                 result = new NodePath(v.ToString());
+                cost = 0;
                 return true;
             }
             return false;
@@ -84,6 +100,7 @@ public partial class GdaCSharpBridge : RefCounted
             if (v.VariantType == Variant.Type.Bool)
             {
                 result = v.AsBool();
+                cost = 0;
                 return true;
             }
             return false;
@@ -95,11 +112,13 @@ public partial class GdaCSharpBridge : RefCounted
                 if (v.VariantType == Variant.Type.Int)
                 {
                     result = Enum.ToObject(t, v.AsInt64());
+                    cost = 1;
                     return true;
                 }
-                if (v.VariantType == Variant.Type.String)
+                if (v.VariantType == Variant.Type.String || v.VariantType == Variant.Type.StringName)
                 {
-                    result = Enum.Parse(t, v.AsString());
+                    result = Enum.Parse(t, v.ToString(), true);
+                    cost = 2;
                     return true;
                 }
             }
@@ -112,26 +131,94 @@ public partial class GdaCSharpBridge : RefCounted
         {
             if (t == typeof(float) || t == typeof(double) || t == typeof(decimal))
             {
-                return AssignNumber(System.Convert.ToDouble(v.AsInt64()), t, out result);
+                if (AssignNumber(System.Convert.ToDouble(v.AsInt64()), t, out result))
+                {
+                    cost = t == typeof(double) ? 0 : 1;
+                    return true;
+                }
+                return false;
             }
-            return AssignNumber(v.AsInt64(), t, out result);
+            if (AssignNumber(v.AsInt64(), t, out result))
+            {
+                cost = t == typeof(long) ? 0 : 1;
+                return true;
+            }
+            return false;
         }
         if (v.VariantType == Variant.Type.Float)
         {
             if (t == typeof(float) || t == typeof(double) || t == typeof(decimal))
             {
-                return AssignNumber(v.AsDouble(), t, out result);
+                if (AssignNumber(v.AsDouble(), t, out result))
+                {
+                    cost = t == typeof(double) ? 0 : 1;
+                    return true;
+                }
             }
             return false;
         }
         if (t == typeof(Godot.Collections.Array) && v.VariantType == Variant.Type.Array)
         {
             result = v.AsGodotArray();
+            cost = 0;
             return true;
         }
         if (t == typeof(Godot.Collections.Dictionary) && v.VariantType == Variant.Type.Dictionary)
         {
             result = v.AsGodotDictionary();
+            cost = 0;
+            return true;
+        }
+        if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Godot.Collections.Array<>))
+        {
+            return TryConvertGodotSequence(v, t.GetGenericArguments()[0], out result, out cost);
+        }
+        if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Godot.Collections.Dictionary<,>))
+        {
+            Type[] sides = t.GetGenericArguments();
+            return TryConvertGodotMapping(v, sides[0], sides[1], out result, out cost);
+        }
+        Type sequenceElement;
+        if (TryGetSequenceElementType(t, out sequenceElement))
+        {
+            return TryConvertSequence(v, t, sequenceElement, out result, out cost);
+        }
+        Type mapKey;
+        Type mapValue;
+        if (TryGetDictionaryKeyValueTypes(t, out mapKey, out mapValue))
+        {
+            return TryConvertMapping(v, mapKey, mapValue, out result, out cost);
+        }
+        if (t == typeof(System.Collections.IEnumerable) || t == typeof(System.Collections.IList) || t == typeof(System.Collections.ICollection))
+        {
+            Variant[] items;
+            if (!TryGetVariantItems(v, out items))
+            {
+                return false;
+            }
+            System.Collections.ArrayList built = new System.Collections.ArrayList(items.Length);
+            for (int i = 0; i < items.Length; i++)
+            {
+                built.Add(ToPlainObject(items[i]));
+            }
+            result = built;
+            cost = 2;
+            return true;
+        }
+        if (t == typeof(System.Collections.IDictionary))
+        {
+            if (v.VariantType != Variant.Type.Dictionary)
+            {
+                return false;
+            }
+            Godot.Collections.Dictionary raw = v.AsGodotDictionary();
+            System.Collections.Hashtable built = new System.Collections.Hashtable();
+            foreach (Variant entry in raw.Keys)
+            {
+                built[ToPlainObject(entry)] = ToPlainObject(raw[entry]);
+            }
+            result = built;
+            cost = 2;
             return true;
         }
         if (t.Namespace == "Godot" && t.IsValueType)
@@ -140,11 +227,438 @@ public partial class GdaCSharpBridge : RefCounted
             if (boxed != null && t.IsInstanceOfType(boxed))
             {
                 result = boxed;
+                cost = 0;
                 return true;
             }
             return false;
         }
         return false;
+    }
+
+    private static bool TryGetSequenceElementType(Type t, out Type element)
+    {
+        element = null;
+        if (t.IsArray)
+        {
+            if (t.GetArrayRank() != 1)
+            {
+                return false;
+            }
+            element = t.GetElementType();
+            return true;
+        }
+        if (t.IsGenericType)
+        {
+            Type generic = t.GetGenericTypeDefinition();
+            if (generic == typeof(System.Collections.Generic.List<>) || generic == typeof(System.Collections.Generic.IList<>) || generic == typeof(System.Collections.Generic.ICollection<>) || generic == typeof(System.Collections.Generic.IEnumerable<>) || generic == typeof(System.Collections.Generic.IReadOnlyList<>) || generic == typeof(System.Collections.Generic.IReadOnlyCollection<>))
+            {
+                element = t.GetGenericArguments()[0];
+                return true;
+            }
+        }
+        if (t.IsInterface)
+        {
+            Type found = null;
+            Type[] faces = t.GetInterfaces();
+            for (int i = 0; i < faces.Length; i++)
+            {
+                if (faces[i].IsGenericType && faces[i].GetGenericTypeDefinition() == typeof(System.Collections.Generic.IEnumerable<>))
+                {
+                    if (found != null)
+                    {
+                        return false;
+                    }
+                    found = faces[i].GetGenericArguments()[0];
+                }
+            }
+            if (found != null)
+            {
+                element = found;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static bool TryGetDictionaryKeyValueTypes(Type t, out Type key, out Type value)
+    {
+        key = null;
+        value = null;
+        if (!t.IsGenericType)
+        {
+            return false;
+        }
+        Type generic = t.GetGenericTypeDefinition();
+        if (generic == typeof(System.Collections.Generic.Dictionary<,>) || generic == typeof(System.Collections.Generic.IDictionary<,>) || generic == typeof(System.Collections.Generic.IReadOnlyDictionary<,>))
+        {
+            Type[] sides = t.GetGenericArguments();
+            key = sides[0];
+            value = sides[1];
+            return true;
+        }
+        return false;
+    }
+
+    private static bool TryGetVariantItems(Variant v, out Variant[] items)
+    {
+        items = null;
+        if (v.VariantType == Variant.Type.Array)
+        {
+            Godot.Collections.Array raw = v.AsGodotArray();
+            items = new Variant[raw.Count];
+            for (int i = 0; i < raw.Count; i++)
+            {
+                items[i] = raw[i];
+            }
+            return true;
+        }
+        if (v.VariantType == Variant.Type.PackedByteArray)
+        {
+            byte[] raw = v.AsByteArray();
+            items = new Variant[raw.Length];
+            for (int i = 0; i < raw.Length; i++)
+            {
+                items[i] = Variant.From(raw[i]);
+            }
+            return true;
+        }
+        if (v.VariantType == Variant.Type.PackedInt32Array)
+        {
+            int[] raw = v.AsInt32Array();
+            items = new Variant[raw.Length];
+            for (int i = 0; i < raw.Length; i++)
+            {
+                items[i] = Variant.From(raw[i]);
+            }
+            return true;
+        }
+        if (v.VariantType == Variant.Type.PackedInt64Array)
+        {
+            long[] raw = v.AsInt64Array();
+            items = new Variant[raw.Length];
+            for (int i = 0; i < raw.Length; i++)
+            {
+                items[i] = Variant.From(raw[i]);
+            }
+            return true;
+        }
+        if (v.VariantType == Variant.Type.PackedFloat32Array)
+        {
+            float[] raw = v.AsFloat32Array();
+            items = new Variant[raw.Length];
+            for (int i = 0; i < raw.Length; i++)
+            {
+                items[i] = Variant.From(raw[i]);
+            }
+            return true;
+        }
+        if (v.VariantType == Variant.Type.PackedFloat64Array)
+        {
+            double[] raw = v.AsFloat64Array();
+            items = new Variant[raw.Length];
+            for (int i = 0; i < raw.Length; i++)
+            {
+                items[i] = Variant.From(raw[i]);
+            }
+            return true;
+        }
+        if (v.VariantType == Variant.Type.PackedStringArray)
+        {
+            string[] raw = v.AsStringArray();
+            items = new Variant[raw.Length];
+            for (int i = 0; i < raw.Length; i++)
+            {
+                items[i] = Variant.From(raw[i]);
+            }
+            return true;
+        }
+        if (v.VariantType == Variant.Type.PackedVector2Array)
+        {
+            Vector2[] raw = v.AsVector2Array();
+            items = new Variant[raw.Length];
+            for (int i = 0; i < raw.Length; i++)
+            {
+                items[i] = Variant.From(raw[i]);
+            }
+            return true;
+        }
+        if (v.VariantType == Variant.Type.PackedVector3Array)
+        {
+            Vector3[] raw = v.AsVector3Array();
+            items = new Variant[raw.Length];
+            for (int i = 0; i < raw.Length; i++)
+            {
+                items[i] = Variant.From(raw[i]);
+            }
+            return true;
+        }
+        if (v.VariantType == Variant.Type.PackedColorArray)
+        {
+            Color[] raw = v.AsColorArray();
+            items = new Variant[raw.Length];
+            for (int i = 0; i < raw.Length; i++)
+            {
+                items[i] = Variant.From(raw[i]);
+            }
+            return true;
+        }
+        if (v.VariantType == Variant.Type.PackedVector4Array)
+        {
+            Vector4[] raw = v.AsVector4Array();
+            items = new Variant[raw.Length];
+            for (int i = 0; i < raw.Length; i++)
+            {
+                items[i] = Variant.From(raw[i]);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private static bool TryConvertSequence(Variant v, Type t, Type element, out object result, out int cost)
+    {
+        result = null;
+        cost = 0;
+        Variant[] items;
+        if (!TryGetVariantItems(v, out items))
+        {
+            return false;
+        }
+        if (t.IsArray)
+        {
+            System.Array built = System.Array.CreateInstance(element, items.Length);
+            int worst = 0;
+            for (int i = 0; i < items.Length; i++)
+            {
+                object one;
+                int oneCost;
+                if (!TryConvertScored(items[i], element, out one, out oneCost))
+                {
+                    return false;
+                }
+                built.SetValue(one, i);
+                if (oneCost > worst)
+                {
+                    worst = oneCost;
+                }
+            }
+            result = built;
+            cost = 2 + worst;
+            return true;
+        }
+        object made;
+        try
+        {
+            made = System.Activator.CreateInstance(typeof(System.Collections.Generic.List<>).MakeGenericType(element));
+        }
+        catch
+        {
+            return false;
+        }
+        System.Collections.IList table = made as System.Collections.IList;
+        if (table == null)
+        {
+            return false;
+        }
+        int peak = 0;
+        for (int i = 0; i < items.Length; i++)
+        {
+            object one;
+            int oneCost;
+            if (!TryConvertScored(items[i], element, out one, out oneCost))
+            {
+                return false;
+            }
+            table.Add(one);
+            if (oneCost > peak)
+            {
+                peak = oneCost;
+            }
+        }
+        result = made;
+        cost = 2 + peak;
+        return true;
+    }
+
+    private static bool TryConvertMapping(Variant v, Type key, Type value, out object result, out int cost)
+    {
+        result = null;
+        cost = 0;
+        if (v.VariantType != Variant.Type.Dictionary)
+        {
+            return false;
+        }
+        Godot.Collections.Dictionary raw = v.AsGodotDictionary();
+        object made;
+        try
+        {
+            made = System.Activator.CreateInstance(typeof(System.Collections.Generic.Dictionary<,>).MakeGenericType(key, value));
+        }
+        catch
+        {
+            return false;
+        }
+        System.Collections.IDictionary table = made as System.Collections.IDictionary;
+        if (table == null)
+        {
+            return false;
+        }
+        int worst = 0;
+        foreach (Variant entry in raw.Keys)
+        {
+            object oneKey;
+            int keyCost;
+            if (!TryConvertScored(entry, key, out oneKey, out keyCost))
+            {
+                return false;
+            }
+            object oneValue;
+            int valueCost;
+            if (!TryConvertScored(raw[entry], value, out oneValue, out valueCost))
+            {
+                return false;
+            }
+            table.Add(oneKey, oneValue);
+            if (keyCost > worst)
+            {
+                worst = keyCost;
+            }
+            if (valueCost > worst)
+            {
+                worst = valueCost;
+            }
+        }
+        result = made;
+        cost = 2 + worst;
+        return true;
+    }
+
+    private static bool TryConvertGodotSequence(Variant v, Type element, out object result, out int cost)
+    {
+        result = null;
+        cost = 0;
+        Variant[] items;
+        if (!TryGetVariantItems(v, out items))
+        {
+            return false;
+        }
+        Type target = typeof(Godot.Collections.Array<>).MakeGenericType(element);
+        object made;
+        try
+        {
+            made = System.Activator.CreateInstance(target);
+        }
+        catch
+        {
+            return false;
+        }
+        MethodInfo add;
+        try
+        {
+            add = target.GetMethod("Add");
+        }
+        catch
+        {
+            return false;
+        }
+        if (add == null)
+        {
+            return false;
+        }
+        int worst = 0;
+        for (int i = 0; i < items.Length; i++)
+        {
+            object one;
+            int oneCost;
+            if (!TryConvertScored(items[i], element, out one, out oneCost))
+            {
+                return false;
+            }
+            try
+            {
+                add.Invoke(made, new object[] { one });
+            }
+            catch
+            {
+                return false;
+            }
+            if (oneCost > worst)
+            {
+                worst = oneCost;
+            }
+        }
+        result = made;
+        cost = 1 + worst;
+        return true;
+    }
+
+    private static bool TryConvertGodotMapping(Variant v, Type key, Type value, out object result, out int cost)
+    {
+        result = null;
+        cost = 0;
+        if (v.VariantType != Variant.Type.Dictionary)
+        {
+            return false;
+        }
+        Godot.Collections.Dictionary raw = v.AsGodotDictionary();
+        Type target = typeof(Godot.Collections.Dictionary<,>).MakeGenericType(key, value);
+        object made;
+        try
+        {
+            made = System.Activator.CreateInstance(target);
+        }
+        catch
+        {
+            return false;
+        }
+        MethodInfo add;
+        try
+        {
+            add = target.GetMethod("Add");
+        }
+        catch
+        {
+            return false;
+        }
+        if (add == null)
+        {
+            return false;
+        }
+        int worst = 0;
+        foreach (Variant entry in raw.Keys)
+        {
+            object oneKey;
+            int keyCost;
+            if (!TryConvertScored(entry, key, out oneKey, out keyCost))
+            {
+                return false;
+            }
+            object oneValue;
+            int valueCost;
+            if (!TryConvertScored(raw[entry], value, out oneValue, out valueCost))
+            {
+                return false;
+            }
+            try
+            {
+                add.Invoke(made, new object[] { oneKey, oneValue });
+            }
+            catch
+            {
+                return false;
+            }
+            if (keyCost > worst)
+            {
+                worst = keyCost;
+            }
+            if (valueCost > worst)
+            {
+                worst = valueCost;
+            }
+        }
+        result = made;
+        cost = 1 + worst;
+        return true;
     }
 
     private static bool AssignNumber(object raw, Type t, out object result)
@@ -283,6 +797,18 @@ public partial class GdaCSharpBridge : RefCounted
         {
             return ToVariant(raw);
         }
+        if (raw is System.Array && IsPackedResultArray(t))
+        {
+            return ToVariant(raw);
+        }
+        if (IsDictionaryLike(t))
+        {
+            return DictionaryFromEntries(raw, t, depth);
+        }
+        if (raw is System.Collections.IEnumerable && !(raw is string))
+        {
+            return ArrayFromSequence(raw, t, depth);
+        }
         if (t.Namespace == "Godot")
         {
             return ToVariant(raw);
@@ -296,6 +822,115 @@ public partial class GdaCSharpBridge : RefCounted
             return StructDict(raw, t, depth);
         }
         return ToVariant(raw);
+    }
+
+    private static bool IsPackedResultArray(Type t)
+    {
+        if (!t.IsArray || t.GetArrayRank() != 1)
+        {
+            return false;
+        }
+        Type element = t.GetElementType();
+        return element == typeof(byte) || element == typeof(int) || element == typeof(long) || element == typeof(float) || element == typeof(double) || element == typeof(string) || element == typeof(Vector2) || element == typeof(Vector3) || element == typeof(Color) || element == typeof(Vector4);
+    }
+
+    private static bool IsDictionaryLike(Type t)
+    {
+        if (typeof(System.Collections.IDictionary).IsAssignableFrom(t))
+        {
+            return true;
+        }
+        if (t.IsGenericType)
+        {
+            Type generic = t.GetGenericTypeDefinition();
+            if (generic == typeof(System.Collections.Generic.Dictionary<,>) || generic == typeof(Godot.Collections.Dictionary<,>))
+            {
+                return true;
+            }
+        }
+        Type[] faces = t.GetInterfaces();
+        for (int i = 0; i < faces.Length; i++)
+        {
+            if (faces[i].IsGenericType && faces[i].GetGenericTypeDefinition() == typeof(System.Collections.Generic.IDictionary<,>))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static bool TrySplitKeyValue(object item, out object entryKey, out object entryValue)
+    {
+        entryKey = null;
+        entryValue = null;
+        if (item == null)
+        {
+            return false;
+        }
+        if (item is System.Collections.DictionaryEntry)
+        {
+            System.Collections.DictionaryEntry pair = (System.Collections.DictionaryEntry)item;
+            entryKey = pair.Key;
+            entryValue = pair.Value;
+            return true;
+        }
+        Type itemType = item.GetType();
+        if (!itemType.IsGenericType || itemType.GetGenericTypeDefinition() != typeof(System.Collections.Generic.KeyValuePair<,>))
+        {
+            return false;
+        }
+        PropertyInfo keyProp = itemType.GetProperty("Key");
+        PropertyInfo valueProp = itemType.GetProperty("Value");
+        if (keyProp == null || valueProp == null)
+        {
+            return false;
+        }
+        entryKey = keyProp.GetValue(item);
+        entryValue = valueProp.GetValue(item);
+        return true;
+    }
+
+    private static Variant DictionaryFromEntries(object raw, Type t, int depth)
+    {
+        if (depth > 4)
+        {
+            return Truncated(t, depth);
+        }
+        Godot.Collections.Dictionary table = new Godot.Collections.Dictionary();
+        if (raw is System.Collections.IDictionary)
+        {
+            System.Collections.IDictionary plain = (System.Collections.IDictionary)raw;
+            foreach (System.Collections.DictionaryEntry entry in plain)
+            {
+                table[WrapResult(entry.Key, depth + 1)] = WrapResult(entry.Value, depth + 1);
+            }
+            return table;
+        }
+        foreach (object item in (System.Collections.IEnumerable)raw)
+        {
+            object entryKey;
+            object entryValue;
+            if (!TrySplitKeyValue(item, out entryKey, out entryValue))
+            {
+                return raw.ToString();
+            }
+            table[WrapResult(entryKey, depth + 1)] = WrapResult(entryValue, depth + 1);
+        }
+        return table;
+    }
+
+    private static Variant ArrayFromSequence(object raw, Type t, int depth)
+    {
+        if (depth > 4)
+        {
+            return Truncated(t, depth);
+        }
+        Godot.Collections.Array seq = new Godot.Collections.Array();
+        foreach (object item in (System.Collections.IEnumerable)raw)
+        {
+            seq.Add(WrapResult(item, depth + 1));
+        }
+        return seq;
     }
 
     private static Variant ToVariant(object raw)

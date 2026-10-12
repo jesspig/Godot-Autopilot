@@ -17,7 +17,7 @@
 | Ninja（可选） | 构建生成器。有 ninja 时用 `debug`/`release`（更快，且 Ninja 作业池生效）；无 ninja 时自动落到 `debug-portable`/`release-portable`（省略 generator，由 CMake 发现平台默认生成器），共用同一 `build/{debug,release}` 目录。`uv run main.py` 各子命令自动选路，手动 `cmake --preset` / `ctest --preset` 须自己选对预设名 |
 | clang-cl | 编译器（MSVC/GCC 自动回退，测试继承根配置） |
 | Godot 可执行文件 | 仅 L2 需要，见第 3 节 |
-| L2 测试床 | `tests/testbed/` 专用工程：入库的只有工程定义（`project.godot`、`.gitignore` 与 `14_tilemap_rect` 依赖的 `assets/Items/Fruits/Apple.png`），`addons/`、`.godot/`、`gda_tmp_*` 等产物不入库。插件由 `uv run main.py deploy` 写入（床恒被部署，与 `--demos` 子集无关）；床或床内 gdextension 缺失时执行器秒级退出码 2 |
+| L2 测试床 | `tests/testbed/` 专用工程：入库的只有工程定义（`project.godot`、`.gitignore` 与 `14_tilemap_rect` 依赖的 `assets/Items/Fruits/Apple.png`），`TestTypes.cs`/`testbed.csproj` 由 `38_csharp_bridge` 用例动态创建、`fixtures/gda_prop_item.gd` 由 `02_property` 用例自生成，均不入库；`addons/`、`.godot/`、`gda_tmp_*` 等产物不入库。插件由 `uv run main.py deploy` 写入（床恒被部署，与 `--demos` 子集无关）；床或床内 gdextension 缺失时执行器秒级退出码 2 |
 | googletest | `third_party/googletest` 子模块（tag `v1.15.2`，commit `b514bdc898e2951020cbdca1304b75f5950d1f59`），随仓库检出：`git clone --recurse-submodules <repo>`，或 `git submodule update --init --recursive`；缺失即 configure 报错，不做网络回退；仅 L1 链接 |
 
 ## 3. 配置 Godot 路径

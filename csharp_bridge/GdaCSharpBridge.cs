@@ -7,7 +7,7 @@ using Godot.Collections;
 public partial class GdaCSharpBridge : RefCounted
 {
 
-    public const int AbiVersion = 1;
+    public const int AbiVersion = 2;
 
     private const BindingFlags MemberFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
 
@@ -19,7 +19,9 @@ public partial class GdaCSharpBridge : RefCounted
         {
             { "ok", true },
             { "bridge", "csharp" },
-            { "abi", AbiVersion }
+            { "abi", AbiVersion },
+            { "overload_rule", "convertibility-score" },
+            { "collection_converters", new Godot.Collections.Array { "T[]", "List<T>", "IEnumerable<T>", "IList<T>", "Dictionary<K,V>", "IDictionary<K,V>", "Godot.Array<T>", "Godot.Dictionary<K,V>", "Nullable<T>", "Enum:String" } }
         };
     }
 

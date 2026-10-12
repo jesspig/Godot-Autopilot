@@ -4,13 +4,19 @@
 !*/
 !.gitignore
 !project.godot
-!assets/
-!assets/**/
-!assets/**/*.png
-!fixtures/
-!fixtures/**/
-!fixtures/**/*.gd
-!*.csproj
-!*.cs
+!*.png
+!*.jpg
+!*.jpeg
+!*.webp
+!*.ogg
+!*.wav
+!*.mp3
+!*.ttf
+!*.otf
+!*.woff
+!*.glb
+!*.gltf
+!*.blend
+!*.fbx
 
 .godot/

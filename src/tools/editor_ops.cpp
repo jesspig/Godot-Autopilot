@@ -2,8 +2,10 @@
 #include "../runtime/gda_protocol.hpp"
 #include "../util/scene_path.hpp"
 #include "../util/scene_verify.hpp"
+#include "core/config.hpp"
 #include "core/editor_readiness.hpp"
 #include "core/log_system.hpp"
+#include "core/sanitize_policy.hpp"
 #include "core/scene_dirty_tracker.hpp"
 #include "util/error_util.hpp"
 #include "util/variant_json.hpp"
@@ -1409,7 +1411,7 @@ mcp::JsonValue handle_save_scene_as(const mcp::JsonValue &args) {
   return r;
 }
 
-mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &) {
+mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "build_csharp_assembly called");
   static const char *kNote =
@@ -1417,7 +1419,36 @@ mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &) {
       "GDExtension(C++) 无公共 API 触发编辑器内的 C# 程序集重载——该能力位于引擎 "
       "modules/mono 内部，非 GDExtension 可调用。适合 CI / 命令行式编译验证；若需编辑器内"
       "类或签名变更后校验渲染，仍须用户在编辑器中点 Build 或重启编辑器。";
-
+  bool wait = false;
+  int64_t timeout_ms = GDA_MAX_GAME_OP_TIMEOUT_MS;
+  if (args.IsObject()) {
+    for (const auto &entry : args.GetObject()) {
+      if (entry.first != "wait" && entry.first != "timeout_ms") {
+        return util::error_json(
+            "unknown parameter for build_csharp_assembly: " + entry.first);
+      }
+    }
+  }
+  auto *wait_p = args.Find("wait");
+  if (wait_p) {
+    if (!wait_p->IsBool()) {
+      return util::error_json("wait must be a boolean");
+    }
+    wait = wait_p->GetBool();
+  }
+  auto *timeout_p = args.Find("timeout_ms");
+  if (timeout_p) {
+    if (!wait) {
+      return util::error_json("timeout_ms only applies when wait=true");
+    }
+    if (!timeout_p->IsInt() || timeout_p->GetInt() <= 0 ||
+        timeout_p->GetInt() > GDA_MAX_GAME_OP_TIMEOUT_MS) {
+      return util::error_json("timeout_ms must be an integer between 1 and " +
+                              std::to_string(GDA_MAX_GAME_OP_TIMEOUT_MS));
+    }
+    timeout_ms = timeout_p->GetInt();
+  }
+  (void)timeout_ms;
   std::string project_file;
   godot::Ref<godot::DirAccess> da = godot::DirAccess::open("res://");
   if (!da.is_null()) {
@@ -1435,33 +1466,164 @@ mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &) {
   }
   if (project_file.empty())
     return util::error_json("当前项目不是 C# 工程，未发现 .csproj/.sln");
-
   auto *os = godot::OS::get_singleton();
   if (!os)
     return util::error_json("OS singleton not available");
-
-  godot::PackedStringArray argv;
-  argv.append("build");
-  argv.append("--nologo");
-  argv.append(godot::String(project_file.c_str()));
-  int32_t pid = os->create_process("dotnet", argv);
-
   std::string command = "dotnet build --nologo " + project_file;
+  if (!wait) {
+    godot::PackedStringArray argv;
+    argv.append("build");
+    argv.append("--nologo");
+    argv.append(godot::String(project_file.c_str()));
+    int32_t pid = os->create_process("dotnet", argv);
+    mcp::JsonValue inner(mcp::JsonValue::object_tag);
+    inner["project_file"] = mcp::JsonValue(project_file);
+    inner["command"] = mcp::JsonValue(command);
+    inner["pid"] = mcp::JsonValue(static_cast<int64_t>(pid));
+    inner["note"] = mcp::JsonValue(kNote);
+    inner["started"] = mcp::JsonValue(pid > 0);
+    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    r["result"] = std::move(inner);
+    if (pid <= 0) {
+      r["error"] = mcp::JsonValue(
+          "启动 dotnet 失败（SDK 缺失或不在 PATH？），请确认已安装 .NET SDK 且 "
+          "dotnet 命令可用");
+    }
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                              "build_csharp_assembly completed");
+    return r;
+  }
+  godot::PackedStringArray build_args;
+  build_args.append("build");
+  build_args.append("--nologo");
+  build_args.append(godot::String(project_file.c_str()));
+  godot::Array output;
+  output.append(godot::PackedStringArray());
+  int32_t exit_code =
+      os->execute(godot::String("dotnet"), build_args, output, true);
+  std::string combined;
+  for (int i = 0; i < output.size(); ++i) {
+    godot::PackedStringArray lines = output[i];
+    for (int j = 0; j < lines.size(); ++j) {
+      std::string line = util::to_std(lines[j]);
+      if (!combined.empty()) {
+        combined += "\n";
+      }
+      combined += line;
+    }
+  }
+  mcp::JsonValue errors_arr(mcp::JsonValue::array_tag);
+  const size_t kMaxErrors = 50;
+  size_t error_total = 0;
+  bool errors_truncated = false;
+  std::string line_buf;
+  line_buf.reserve(256);
+  for (size_t idx = 0; idx <= combined.size(); ++idx) {
+    char ch = (idx < combined.size()) ? combined[idx] : '\n';
+    if (ch == '\n' || ch == '\r') {
+      if (!line_buf.empty()) {
+        std::string lowered = line_buf;
+        std::transform(lowered.begin(), lowered.end(), lowered.begin(),
+                       [](unsigned char c) {
+                         return static_cast<char>(std::tolower(c));
+                       });
+        if (lowered.find("error") != std::string::npos) {
+          if (error_total < kMaxErrors) {
+            errors_arr.PushBack(mcp::JsonValue(line_buf));
+          } else {
+            errors_truncated = true;
+          }
+          ++error_total;
+        }
+      }
+      line_buf.clear();
+    } else {
+      line_buf += ch;
+    }
+  }
+  size_t digest_limit = sanitize_policy::enabled() ? 4000 : 64000;
+  std::string digest = combined;
+  bool output_truncated = false;
+  if (digest.size() > digest_limit) {
+    size_t total = digest.size();
+    digest = digest.substr(0, digest_limit) + "\n...(truncated, total " +
+             std::to_string(total) + " chars)";
+    output_truncated = true;
+  }
   mcp::JsonValue inner(mcp::JsonValue::object_tag);
   inner["project_file"] = mcp::JsonValue(project_file);
   inner["command"] = mcp::JsonValue(command);
-  inner["pid"] = mcp::JsonValue(static_cast<int64_t>(pid));
+  inner["exit_code"] = mcp::JsonValue(static_cast<int64_t>(exit_code));
+  inner["success"] = mcp::JsonValue(exit_code == 0);
+  inner["errors"] = std::move(errors_arr);
+  inner["output_digest"] = mcp::JsonValue(digest);
+  if (output_truncated) {
+    inner["output_truncated"] = mcp::JsonValue(true);
+  }
+  if (errors_truncated) {
+    inner["errors_truncated"] = mcp::JsonValue(true);
+  }
   inner["note"] = mcp::JsonValue(kNote);
-  inner["started"] = mcp::JsonValue(pid > 0);
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(inner);
-  if (pid <= 0) {
-    r["error"] = mcp::JsonValue(
-        "启动 dotnet 失败（SDK 缺失或不在 PATH？），请确认已安装 .NET SDK 且 "
-        "dotnet 命令可用");
-  }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "build_csharp_assembly completed");
+  return r;
+}
+
+mcp::JsonValue handle_dotnet_environment(const mcp::JsonValue &) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "dotnet_environment called");
+  std::string project_file;
+  godot::Ref<godot::DirAccess> da = godot::DirAccess::open("res://");
+  if (!da.is_null()) {
+    da->list_dir_begin();
+    godot::String entry = da->get_next();
+    while (entry != godot::String()) {
+      if (entry != "." && entry != ".." && !da->current_is_dir() &&
+          (entry.ends_with(".csproj") || entry.ends_with(".sln"))) {
+        project_file = "res://" + util::to_std(entry);
+        break;
+      }
+      entry = da->get_next();
+    }
+    da->list_dir_end();
+  }
+  if (project_file.empty())
+    return util::error_json("当前项目不是 C# 工程，未发现 .csproj/.sln");
+  auto *os = godot::OS::get_singleton();
+  if (!os)
+    return util::error_json("OS singleton not available");
+  godot::PackedStringArray version_args;
+  version_args.append(godot::String("--version"));
+  godot::Array output;
+  output.append(godot::PackedStringArray());
+  int32_t exit_code =
+      os->execute(godot::String("dotnet"), version_args, output, true);
+  if (exit_code != 0)
+    return util::error_json("启动 dotnet 失败（SDK 缺失或不在 PATH？），请确认已安装 .NET SDK 且 dotnet 命令可用");
+  std::string dotnet_version;
+  if (output.size() > 0) {
+    godot::PackedStringArray out_lines = output[0];
+    if (out_lines.size() > 0)
+      dotnet_version = util::to_std(out_lines[0].strip_edges());
+  }
+  bool is_dotnet_editor = os->has_feature(godot::String("mono"));
+  bool assembly_loaded = false;
+  auto *cdbs = godot::ClassDBSingleton::get_singleton();
+  if (cdbs)
+    assembly_loaded = cdbs->class_exists(godot::StringName("CSharpScript"));
+  mcp::JsonValue inner(mcp::JsonValue::object_tag);
+  inner["dotnet_available"] = mcp::JsonValue(true);
+  inner["dotnet_version"] = mcp::JsonValue(dotnet_version);
+  inner["project_file"] = mcp::JsonValue(project_file);
+  inner["is_dotnet_editor"] = mcp::JsonValue(is_dotnet_editor);
+  inner["assembly_loaded"] = mcp::JsonValue(assembly_loaded);
+  inner["hint"] = mcp::JsonValue("is_dotnet_editor 经 OS.has_feature(mono) 推测、assembly_loaded 经 CSharpScript 类存在性推测，均未在 .NET 编辑器下实测验证，后续需真机复核");
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["result"] = std::move(inner);
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "dotnet_environment completed");
   return r;
 }
 
