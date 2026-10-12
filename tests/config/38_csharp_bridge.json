@@ -6,6 +6,21 @@
     "on_failure": "continue",
     "before_all": [
       {
+        "id": "csharp_ensure_csproj",
+        "tool": "write_file",
+        "args": { "path": "res://testbed.csproj", "content": "<Project Sdk=\"Godot.NET.Sdk/4.7.0\">\n  <PropertyGroup>\n    <TargetFramework>net10.0</TargetFramework>\n    <AssemblyName>GDA Testbed</AssemblyName>\n    <PublishAot>false</PublishAot>\n  </PropertyGroup>\n</Project>\n" }
+      },
+      {
+        "id": "csharp_ensure_testtypes",
+        "tool": "create_csharp_script",
+        "args": { "path": "res://TestTypes.cs", "overwrite": true, "source_code": "using System;\nusing Godot;\nusing Godot.Collections;\n\n[GlobalClass]\npublic partial class TestTypes : Resource\n{\n    [Export]\n    public Array<int> Scores { get; set; } = new Array<int>();\n\n    public string ReadOnlyName => \"gda-probe\";\n\n    public struct NestedInner\n    {\n        public int Value;\n        public Vector2 Pos;\n    }\n\n    public struct NestedOuter\n    {\n        public NestedInner Inner;\n        public Color Tint;\n    }\n\n    public NestedOuter ReadOnlyNested => new NestedOuter { Inner = new NestedInner { Value = 3, Pos = new Vector2(1, 2) }, Tint = new Color(1, 0, 0) };\n\n    private int _secret = 7;\n\n    public Vector2 GetOffset(int scale)\n    {\n        return new Vector2(scale, scale * 2);\n    }\n\n    public event Action<int> Pinged;\n\n    public void RaisePinged(int value)\n    {\n        Pinged?.Invoke(value);\n    }\n\n    public string JoinAll(params string[] parts) { return string.Join(\"|\", parts); }\n}\n" }
+      },
+      {
+        "id": "csharp_build_assembly",
+        "tool": "build_csharp_assembly",
+        "args": { "wait": true }
+      },
+      {
         "id": "csharp_before_scene",
         "tool": "create_editor_scene",
         "args": { "name": "CSharpBridgeProbe" }
@@ -572,6 +587,18 @@
             "id": "csharp_trash_dir",
             "tool": "move_os_file_to_trash",
             "args": { "path": "res://gda_tmp_csharp_bridge" },
+            "expect": { "has_keys": ["result"] }
+          },
+          {
+            "id": "csharp_trash_cs",
+            "tool": "move_os_file_to_trash",
+            "args": { "path": "res://TestTypes.cs" },
+            "expect": { "has_keys": ["result"] }
+          },
+          {
+            "id": "csharp_trash_csproj",
+            "tool": "move_os_file_to_trash",
+            "args": { "path": "res://testbed.csproj" },
             "expect": { "has_keys": ["result"] }
           }
         ]
