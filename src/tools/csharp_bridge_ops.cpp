@@ -367,6 +367,40 @@ bool invoke_bridge(godot::Object *bridge, const std::string &method,
   return true;
 }
 
+constexpr int64_t kBridgeAbiV1 = 1;
+constexpr int64_t kBridgeAbiV2 = 2;
+
+int64_t resolve_bridge_abi(godot::Object *bridge) {
+  godot::Array empty;
+  godot::Dictionary reply;
+  JV probe_err;
+  if (!invoke_bridge(bridge, "ping", empty, reply, probe_err)) {
+    return kBridgeAbiV1;
+  }
+  if (!reply.has("abi")) {
+    return kBridgeAbiV1;
+  }
+  godot::Variant abi_var = reply["abi"];
+  if (abi_var.get_type() != godot::Variant::INT) {
+    return kBridgeAbiV1;
+  }
+  int64_t abi = abi_var.operator int64_t();
+  if (abi < kBridgeAbiV1) {
+    return kBridgeAbiV1;
+  }
+  return abi;
+}
+
+bool invoke_bridge_abi(godot::Object *bridge, const std::string &method,
+                       const godot::Array &bridge_args,
+                       godot::Dictionary &out_result, JV &err) {
+  int64_t abi = resolve_bridge_abi(bridge);
+  if (abi < kBridgeAbiV2) {
+    return invoke_bridge(bridge, method, bridge_args, out_result, err);
+  }
+  return invoke_bridge(bridge, method, bridge_args, out_result, err);
+}
+
 bool parse_call_args(const JV &args, godot::Array &out_args, JV &err) {
   const JV *p = args.Find("args");
   if (!p)
@@ -561,7 +595,7 @@ mcp::JsonValue handle_csharp_get(const mcp::JsonValue &args) {
   bridge_args.append(godot::Variant(godot::StringName(prop.c_str())));
   bridge_args.append(godot::Variant(allow_non_public));
   godot::Dictionary dict;
-  if (!invoke_bridge(bridge, "get_prop", bridge_args, dict, err)) {
+  if (!invoke_bridge_abi(bridge, "get_prop", bridge_args, dict, err)) {
     return err;
   }
   JV r(JV::object_tag);
@@ -643,7 +677,7 @@ mcp::JsonValue handle_csharp_set(const mcp::JsonValue &args) {
   bridge_args.append(VariantJson::deserialize(*value_p));
   bridge_args.append(godot::Variant(allow_non_public));
   godot::Dictionary dict;
-  if (!invoke_bridge(bridge, "set_prop", bridge_args, dict, err)) {
+  if (!invoke_bridge_abi(bridge, "set_prop", bridge_args, dict, err)) {
     return err;
   }
   JV r(JV::object_tag);
@@ -723,7 +757,7 @@ mcp::JsonValue handle_csharp_call(const mcp::JsonValue &args) {
   bridge_args.append(godot::Variant(godot::StringName(method.c_str())));
   bridge_args.append(godot::Variant(call_args));
   godot::Dictionary dict;
-  if (!invoke_bridge(bridge, "call_method", bridge_args, dict, err)) {
+  if (!invoke_bridge_abi(bridge, "call_method", bridge_args, dict, err)) {
     return err;
   }
   JV r(JV::object_tag);
@@ -815,7 +849,7 @@ mcp::JsonValue handle_csharp_subscribe(const mcp::JsonValue &args) {
   bridge_args.append(godot::Variant(sink.object));
   bridge_args.append(godot::Variant(godot::StringName(method.c_str())));
   godot::Dictionary dict;
-  if (!invoke_bridge(bridge, "subscribe", bridge_args, dict, err)) {
+  if (!invoke_bridge_abi(bridge, "subscribe", bridge_args, dict, err)) {
     return err;
   }
   if (!dict.has("token")) {
@@ -889,7 +923,7 @@ mcp::JsonValue handle_csharp_unsubscribe(const mcp::JsonValue &args) {
   godot::Array bridge_args;
   bridge_args.append(godot::Variant(token));
   godot::Dictionary dict;
-  if (!invoke_bridge(bridge, "unsubscribe", bridge_args, dict, err)) {
+  if (!invoke_bridge_abi(bridge, "unsubscribe", bridge_args, dict, err)) {
     return err;
   }
   JV r(JV::object_tag);

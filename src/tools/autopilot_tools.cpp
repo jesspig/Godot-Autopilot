@@ -14,8 +14,10 @@
 #include <utility>
 #include <vector>
 
+#include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
@@ -449,6 +451,92 @@ int64_t AutopilotTools::register_tool(const godot::Dictionary &definition,
   return handle;
 }
 
+godot::Dictionary AutopilotTools::register_csharp_tool(
+    const godot::Dictionary &definition, const godot::Callable &callable) {
+  const std::string name = string_field(definition, "name", "");
+  if (!authorization::capability_enabled(kUserToolsCapability)) {
+    godot::Dictionary denied;
+    denied["error"] = godot::String::utf8(kUserToolsDisabledMessage);
+    denied["authorization_required"] =
+        godot::String::utf8(kUserToolsCapability);
+    denied["tool_name"] = godot::String::utf8(name.c_str());
+    denied["handle"] = static_cast<int64_t>(-1);
+    return denied;
+  }
+  if (name.empty()) {
+    godot::Dictionary out = rescan_error(
+        "register_csharp_tool: definition.name must be a non-empty string");
+    out["tool_name"] = godot::String::utf8(name.c_str());
+    out["handle"] = static_cast<int64_t>(-1);
+    return out;
+  }
+  bool is_dotnet_editor = false;
+  bool assembly_loaded = false;
+  if (godot::OS *os = godot::OS::get_singleton()) {
+    is_dotnet_editor = os->has_feature(godot::String("mono"));
+  }
+  if (godot::ClassDBSingleton *cdbs =
+          godot::ClassDBSingleton::get_singleton()) {
+    assembly_loaded = cdbs->class_exists(godot::StringName("CSharpScript"));
+  }
+  if (!is_dotnet_editor) {
+    godot::Dictionary out = rescan_error(
+        "register_csharp_tool: tool '" + name +
+        "' not registered: editor is NOT a .NET build "
+        "(OS.has_feature mono is false), so C# callables cannot load in "
+        "this editor; open the project in the .NET editor build and retry");
+    out["tool_name"] = godot::String::utf8(name.c_str());
+    out["handle"] = static_cast<int64_t>(-1);
+    return out;
+  }
+  if (!assembly_loaded) {
+    godot::Dictionary out = rescan_error(
+        "register_csharp_tool: tool '" + name +
+        "' not registered: C# assembly not loaded "
+        "(CSharpScript class missing); run build_csharp_assembly with "
+        "wait=true and confirm via get_debugger_log before registering");
+    out["tool_name"] = godot::String::utf8(name.c_str());
+    out["handle"] = static_cast<int64_t>(-1);
+    return out;
+  }
+  {
+    const std::set<std::string> existing = dynamic_tool_name_set();
+    if (existing.find(name) != existing.end()) {
+      godot::Dictionary out = rescan_error(
+          "register_csharp_tool: tool '" + name +
+          "' is already registered (idempotent reject; unregister first "
+          "or reuse handle)");
+      out["tool_name"] = godot::String::utf8(name.c_str());
+      out["handle"] = static_cast<int64_t>(-1);
+      return out;
+    }
+  }
+  if (auto registry = get_active_registry()) {
+    if (registry->find_any(name) != nullptr) {
+      godot::Dictionary out = rescan_error(
+          "register_csharp_tool: tool '" + name +
+          "' collides with a built-in MCP tool");
+      out["tool_name"] = godot::String::utf8(name.c_str());
+      out["handle"] = static_cast<int64_t>(-1);
+      return out;
+    }
+  }
+  const int64_t handle = register_tool(definition, callable);
+  if (handle <= 0) {
+    godot::Dictionary out = rescan_error(
+        "register_csharp_tool: registration rejected for tool '" + name +
+        "'; see editor log for register_tool reason");
+    out["tool_name"] = godot::String::utf8(name.c_str());
+    out["handle"] = static_cast<int64_t>(-1);
+    return out;
+  }
+  godot::Dictionary out;
+  out["tool_name"] = godot::String::utf8(name.c_str());
+  out["handle"] = handle;
+  out["call_result"] = get_tool(godot::String::utf8(name.c_str()));
+  return out;
+}
+
 bool AutopilotTools::unregister_tool(int64_t handle) {
   if (handle <= 0) {
     return false;
@@ -655,6 +743,9 @@ void AutopilotTools::_bind_methods() {
   godot::ClassDB::bind_method(
       godot::D_METHOD("register_tool", "definition", "callable"),
       &AutopilotTools::register_tool);
+  godot::ClassDB::bind_method(
+      godot::D_METHOD("register_csharp_tool", "definition", "callable"),
+      &AutopilotTools::register_csharp_tool);
   godot::ClassDB::bind_method(
       godot::D_METHOD("unregister_tool", "handle"),
       &AutopilotTools::unregister_tool);

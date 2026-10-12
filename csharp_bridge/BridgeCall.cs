@@ -49,6 +49,7 @@ public partial class GdaCSharpBridge : RefCounted
             }
             System.Collections.Generic.List<MethodInfo> applicable = new System.Collections.Generic.List<MethodInfo>();
             System.Collections.Generic.List<object[]> applicableArgs = new System.Collections.Generic.List<object[]>();
+            System.Collections.Generic.List<int> applicableScores = new System.Collections.Generic.List<int>();
             string lastError = string.Empty;
             for (int i = 0; i < candidates.Count; i++)
             {
@@ -58,17 +59,20 @@ public partial class GdaCSharpBridge : RefCounted
                 if (!isParams)
                 {
                     object[] callArgs = new object[count];
+                    int total = 0;
                     bool convertible = true;
                     for (int j = 0; j < count; j++)
                     {
                         object one;
-                        if (!TryConvertArg(given[j], ps[j].ParameterType, out one))
+                        int oneCost;
+                        if (!TryConvertScored(given[j], ps[j].ParameterType, out one, out oneCost))
                         {
                             convertible = false;
                             lastError = "argument " + j + " cannot convert to " + ps[j].ParameterType.FullName;
                             break;
                         }
                         callArgs[j] = one;
+                        total = total + oneCost;
                     }
                     if (!convertible)
                     {
@@ -76,6 +80,7 @@ public partial class GdaCSharpBridge : RefCounted
                     }
                     applicable.Add(mi);
                     applicableArgs.Add(callArgs);
+                    applicableScores.Add(total);
                     continue;
                 }
                 int fixedCount = ps.Length - 1;
@@ -86,17 +91,20 @@ public partial class GdaCSharpBridge : RefCounted
                     continue;
                 }
                 object[] paramsArgs = new object[ps.Length];
+                int paramsTotal = 1;
                 bool paramsConvertible = true;
                 for (int j = 0; j < fixedCount; j++)
                 {
                     object one;
-                    if (!TryConvertArg(given[j], ps[j].ParameterType, out one))
+                    int oneCost;
+                    if (!TryConvertScored(given[j], ps[j].ParameterType, out one, out oneCost))
                     {
                         paramsConvertible = false;
                         lastError = "argument " + j + " cannot convert to " + ps[j].ParameterType.FullName;
                         break;
                     }
                     paramsArgs[j] = one;
+                    paramsTotal = paramsTotal + oneCost;
                 }
                 if (!paramsConvertible)
                 {
@@ -104,16 +112,22 @@ public partial class GdaCSharpBridge : RefCounted
                 }
                 int rest = count - fixedCount;
                 System.Array packed = System.Array.CreateInstance(elementType, rest);
+                int packedMax = 0;
                 for (int j = 0; j < rest; j++)
                 {
                     object one;
-                    if (!TryConvertArg(given[fixedCount + j], elementType, out one))
+                    int oneCost;
+                    if (!TryConvertScored(given[fixedCount + j], elementType, out one, out oneCost))
                     {
                         paramsConvertible = false;
                         lastError = "argument " + (fixedCount + j) + " cannot convert to " + elementType.FullName;
                         break;
                     }
                     packed.SetValue(one, j);
+                    if (oneCost > packedMax)
+                    {
+                        packedMax = oneCost;
+                    }
                 }
                 if (!paramsConvertible)
                 {
@@ -122,19 +136,36 @@ public partial class GdaCSharpBridge : RefCounted
                 paramsArgs[fixedCount] = packed;
                 applicable.Add(mi);
                 applicableArgs.Add(paramsArgs);
+                applicableScores.Add(paramsTotal + packedMax);
             }
             if (applicable.Count == 0)
             {
                 return Fail("no overload of '" + key + "' on " + t.FullName + " matches: " + lastError);
             }
-            if (applicable.Count > 1)
+            int best = 0;
+            for (int i = 1; i < applicable.Count; i++)
             {
-                return Fail("ambiguous call to '" + key + "' on " + t.FullName + " with " + count + " argument(s): " + applicable.Count + " overload(s) match");
+                if (applicableScores[i] < applicableScores[best])
+                {
+                    best = i;
+                }
+            }
+            int tied = 0;
+            for (int i = 0; i < applicable.Count; i++)
+            {
+                if (applicableScores[i] == applicableScores[best])
+                {
+                    tied = tied + 1;
+                }
+            }
+            if (tied > 1)
+            {
+                return Fail("ambiguous call to '" + key + "' on " + t.FullName + " with " + count + " argument(s): " + tied + " overload(s) match");
             }
             try
             {
-                MethodInfo best = applicable[0];
-                object result = best.Invoke(best.IsStatic ? null : (object)target, applicableArgs[0]);
+                MethodInfo winner = applicable[best];
+                object result = winner.Invoke(winner.IsStatic ? null : (object)target, applicableArgs[best]);
                 return OkWithValue(WrapResult(result, 0));
             }
             catch (TargetInvocationException tie)
