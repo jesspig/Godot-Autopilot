@@ -103,7 +103,10 @@ const std::vector<ParamSpec> kVerifySceneSavedParams = {
     {"include_hash", "boolean", "Attach FNV-1a content hashes of the memory tree and the on-disk file (memory_hash/disk_hash); off by default", false},
 };
 
-const std::vector<ParamSpec> kBuildCsharpAssemblyParams = {};
+const std::vector<ParamSpec> kBuildCsharpAssemblyParams = {
+    {"wait", "boolean", "When true run dotnet build synchronously via OS.execute and wait for the BuildResult with exit_code, success, errors and output_digest; when false or omitted launch via OS.create_process and return immediately with pid and started", false},
+    {"timeout_ms", "integer", "Declared wait budget in milliseconds for wait=true only, an integer between 1 and 25000 (default 25000); validated to stay below the dispatch default 27000ms and the transport timeout; rejected when wait is not true", false},
+};
 
 const std::vector<ParamSpec> kDotnetEnvironmentParams = {};
 
@@ -277,7 +280,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       kVerifySceneSavedParams, editor_ops::handle_verify_scene_saved}));
   v.push_back(make_spec_tool(ToolSpec{
       "build_csharp_assembly",
-      "Trigger a C# project build by launching 'dotnet build --nologo <project>' as an async OS process on the res:// root .csproj/.sln. Intended for CI/command-line compile verification only: it does NOT rewind to an in-editor Build and does not hot-reload the loaded .NET assembly. Returns result {'project_file','command','started','pid','note'}; errors when the project is not a C# project or dotnet is not available.",
+      "Trigger a C# project build with dotnet build --nologo on the res:// root .csproj/.sln. Intended for CI/command-line compile verification only: it does NOT rewind to an in-editor Build and does not hot-reload the loaded .NET assembly. By default (wait omitted or false) it launches via OS.create_process and returns immediately with result {project_file,command,pid,started,note}. With wait=true it runs synchronously via OS.execute and waits for the six-field BuildResult {project_file,command,exit_code,success,errors,output_digest}: exit_code is the dotnet exit code, success is exit_code==0, errors lists output lines containing error (capped at 50 with errors_truncated), output_digest is the combined stdout/stderr truncated to 4000 chars when desensitized else 64000 chars with output_truncated when cut; timeout_ms declares the wait budget (1-25000, default 25000) validated to stay below the dispatch default 27000ms; errors when the project is not a C# project or dotnet is not available.",
       "Editor", {"build", "csharp", "dotnet"}, SideEffect::Process, tool_flags::kMutating,
       kBuildCsharpAssemblyParams, editor_ops::handle_build_csharp_assembly}));
   v.push_back(make_spec_tool(ToolSpec{

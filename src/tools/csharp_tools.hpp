@@ -74,11 +74,21 @@ const std::vector<ParamSpec> kCSharpUnsubscribeEventParams = {
     {"wait_ready", "boolean", "Wait for the game process to report ready before failing when runtime=game (default: true); rejected when runtime=editor", false},
 };
 
+const std::vector<ParamSpec> kCSharpListMembersParams = {
+    {"object_id", "integer", "Live object id from a previous result (editor process only); mutually exclusive with object_id_str, memory and path", false},
+    {"object_id_str", "string", "Live object id as a decimal string for ids beyond 32-bit range (editor process only); mutually exclusive with object_id, memory and path", false},
+    {"memory", "string", "Memory resource name registered via create_resource (editor process only); mutually exclusive with object_id, object_id_str and path", false},
+    {"path", "string", "Scene node path in the edited scene (editor) or the running game (runtime=game), or a res:// resource path (editor only). memory:// is rejected here — pass the bare name in memory instead", false},
+    {"runtime", "string", "Target process: editor (default, resolve the locator in the editor and read Object reflection directly with no bridge required) or game (forward the scene-path locator over the runtime channel and read Object reflection on the running game node; only the scene-path locator form is accepted)", false},
+    {"timeout_ms", "integer", "Response timeout in milliseconds for runtime=game (default: 5000, max: 25000); rejected when runtime=editor", false},
+    {"wait_ready", "boolean", "Wait for the game process to report ready before failing when runtime=game (default: true); rejected when runtime=editor", false},
+};
+
 } // namespace
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(5);
+  v.reserve(6);
   v.push_back(make_spec_tool(ToolSpec{
       "csharp_get_property",
       "Read a C# member through the frozen GdaCSharpBridge ABI (get_prop): engine properties plus C# properties and fields that GDScript cannot see, including non-public members when the bridge allows them. The locator takes exactly one of object_id, object_id_str, memory or path. With runtime=editor (default) the object is resolved in the editor process and read via the GdaCSharpBridge engine singleton (requires a .NET editor build with the bridge registered). With runtime=game the scene-path locator is forwarded to the game bridge over the runtime channel (requires a running .NET game with GdaCSharpRuntime; object_id, object_id_str and memory locators are rejected there). Always needs the code_execute authorization gate, plus game_runtime when runtime=game. Returns the serialized member value.",
@@ -104,6 +114,11 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       "Release a C# event subscription created by csharp_subscribe_event through the frozen GdaCSharpBridge ABI (unsubscribe) so the receiver stops getting event arguments. The token comes from the result of csharp_subscribe_event and is scoped to one bridge instance: with runtime=editor (default) the subscription is released on the GdaCSharpBridge engine singleton (requires a .NET editor build with the bridge registered), with runtime=game it is forwarded to the game bridge over the runtime channel (requires a running .NET game with GdaCSharpRuntime; restarting the game already drops every subscription). Always needs the code_execute authorization gate, plus game_runtime when runtime=game. Returns ok on success; unknown or already-released tokens are rejected.",
       "Scripts", {"csharp", "reflection", "event", "unsubscribe"}, SideEffect::CodeExecute, tool_flags::kMutating,
       kCSharpUnsubscribeEventParams, csharp_bridge_ops::handle_csharp_unsubscribe}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "csharp_list_members",
+      "List members visible to GDScript and C# callers through Object reflection (get_method_list/get_property_list/get_signal_list) for pre-call discovery before csharp_get_property/csharp_call_method/csharp_subscribe_event. The locator takes exactly one of object_id, object_id_str, memory or path. With runtime=editor (default) the object is resolved in the editor process and its method, property and signal tables are read directly with no bridge required. With runtime=game the scene-path locator is forwarded over the runtime channel and the three tables are read on the running game node (object_id, object_id_str and memory locators are rejected there; no bridge required). Always needs the code_execute authorization gate, plus game_runtime when runtime=game. Returns the MemberList tables as methods, properties and signals.",
+      "Scripts", {"csharp", "reflection", "members", "list"}, SideEffect::CodeExecute, tool_flags::kNone,
+      kCSharpListMembersParams, csharp_bridge_ops::handle_csharp_list}));
   return v;
 }
 

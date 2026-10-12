@@ -490,6 +490,10 @@ constexpr const char *kSetAllowed[] = {
 constexpr const char *kUnsubscribeAllowed[] = {
     "token", "runtime", "timeout_ms", "wait_ready"};
 
+constexpr const char *kListAllowed[] = {
+    "object_id", "object_id_str", "memory", "path", "runtime",
+    "timeout_ms",  "wait_ready"};
+
 } // namespace
 
 mcp::JsonValue handle_csharp_get(const mcp::JsonValue &args) {
@@ -893,6 +897,81 @@ mcp::JsonValue handle_csharp_unsubscribe(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "csharp_unsubscribe_event completed");
   return r;
+}
+
+mcp::JsonValue handle_csharp_list(const mcp::JsonValue &args) {
+  const std::string tool = "csharp_list_members";
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "csharp_list_members called");
+  JV err;
+  if (!check_allowed(args, tool, kListAllowed,
+                     sizeof(kListAllowed) / sizeof(*kListAllowed), err)) {
+    return err;
+  }
+  bool is_game = false;
+  if (!parse_runtime(args, tool, is_game, err)) {
+    return err;
+  }
+  int64_t timeout_ms = GDA_DEFAULT_TIMEOUT_MS;
+  bool wait_ready = true;
+  if (!parse_game_options(args, tool, is_game, timeout_ms, wait_ready, err)) {
+    return err;
+  }
+  CSharpTarget target = resolve_locator(args, "", tool);
+  if (!target.ok) {
+    return target.error;
+  }
+  if (is_game) {
+    JV denied = authorization::deny_if_unauthorized(
+        "csharp_list_members", SideEffect::GameRuntime);
+    if (!denied.IsNull()) {
+      return denied;
+    }
+    JV locator_err = require_game_scene_path(target, tool);
+    if (!locator_err.IsNull()) {
+      return locator_err;
+    }
+    std::string source = emit_resolve_node("__gda_target", target.scene_path);
+    source += "var __gda_methods = __gda_target.get_method_list()\n";
+    source += "var __gda_props = __gda_target.get_property_list()\n";
+    source += "var __gda_signals = __gda_target.get_signal_list()\n";
+    source += "return {\"methods\": __gda_methods, \"properties\": __gda_props, \"signals\": __gda_signals}\n";
+    return forward_game_eval(source, timeout_ms, wait_ready);
+  }
+  if (!resolve_editor_object(target).IsNull()) {
+    return target.error;
+  }
+  godot::Object *obj = target.object;
+  if (!obj) {
+    return util::error_json("node not found: " + target.scene_path);
+  }
+  godot::TypedArray<godot::Dictionary> methods = obj->get_method_list();
+  godot::TypedArray<godot::Dictionary> props = obj->get_property_list();
+  godot::TypedArray<godot::Dictionary> signals = obj->get_signal_list();
+  JV jmethods(JV::array_tag);
+  for (int64_t i = 0; i < methods.size(); i++) {
+    godot::Dictionary d = methods[i];
+    jmethods.PushBack(VariantJson::serialize(godot::Variant(d)));
+  }
+  JV jprops(JV::array_tag);
+  for (int64_t i = 0; i < props.size(); i++) {
+    godot::Dictionary d = props[i];
+    jprops.PushBack(VariantJson::serialize(godot::Variant(d)));
+  }
+  JV jsignals(JV::array_tag);
+  for (int64_t i = 0; i < signals.size(); i++) {
+    godot::Dictionary d = signals[i];
+    jsignals.PushBack(VariantJson::serialize(godot::Variant(d)));
+  }
+  JV members(JV::object_tag);
+  members["methods"] = std::move(jmethods);
+  members["properties"] = std::move(jprops);
+  members["signals"] = std::move(jsignals);
+  JV lr(JV::object_tag);
+  lr["result"] = std::move(members);
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "csharp_list_members completed");
+  return lr;
 }
 
 } // namespace csharp_bridge_ops
