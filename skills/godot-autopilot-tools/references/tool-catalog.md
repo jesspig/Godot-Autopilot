@@ -1,6 +1,6 @@
 # Category Index
 
-All 448 domain tools of the godot-autopilot MCP server, grouped by their 33 source modules, plus `system_status`. Call domain tools through `call_tool`; confirm schemas with `get_tool_detail`.
+All 449 domain tools of the godot-autopilot MCP server, grouped by their 33 source modules, plus `system_status`. Call domain tools through `call_tool`; confirm schemas with `get_tool_detail`.
 
 ## Analysis - analyze_tools (3)
 
@@ -136,7 +136,7 @@ All 448 domain tools of the godot-autopilot MCP server, grouped by their 33 sour
 - `get_docs_method` - look up one method's reflected signature on a class
 - `get_docs_property` - look up one property's reflected info on a class
 
-## Editor - editor_tools (32)
+## Editor - editor_tools (33)
 
 - `get_editor_selection` - list the currently selected nodes
 - `set_editor_selection` - replace the editor selection with given paths
@@ -162,6 +162,7 @@ All 448 domain tools of the godot-autopilot MCP server, grouped by their 33 sour
 - `play_editor_current_scene` - launch the edited scene as a game
 - `stop_editor_playing` - stop the running game process
 - `build_csharp_assembly` - trigger an async dotnet build of the C# project
+- `dotnet_environment` - probe the dotnet SDK and C# project setup without building anything
 - `get_editor_ui_elements` - enumerate the editor's UI elements for semantic click automation (optional `query`, `type_filter`, `interactive_only`, `max_elements`)
 - `hit_test_editor_point` - preview which editor elements a client-area `position` lands on, without clicking (`window_id`, `max_results`)
 - `get_editor_viewport_geometry` - map the captured editor viewport image onto the window client area so image pixels can be converted to click coordinates (`viewport`, `index`)

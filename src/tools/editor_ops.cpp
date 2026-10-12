@@ -1465,6 +1465,62 @@ mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &) {
   return r;
 }
 
+mcp::JsonValue handle_dotnet_environment(const mcp::JsonValue &) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "dotnet_environment called");
+  std::string project_file;
+  godot::Ref<godot::DirAccess> da = godot::DirAccess::open("res://");
+  if (!da.is_null()) {
+    da->list_dir_begin();
+    godot::String entry = da->get_next();
+    while (entry != godot::String()) {
+      if (entry != "." && entry != ".." && !da->current_is_dir() &&
+          (entry.ends_with(".csproj") || entry.ends_with(".sln"))) {
+        project_file = "res://" + util::to_std(entry);
+        break;
+      }
+      entry = da->get_next();
+    }
+    da->list_dir_end();
+  }
+  if (project_file.empty())
+    return util::error_json("当前项目不是 C# 工程，未发现 .csproj/.sln");
+  auto *os = godot::OS::get_singleton();
+  if (!os)
+    return util::error_json("OS singleton not available");
+  godot::PackedStringArray version_args;
+  version_args.append(godot::String("--version"));
+  godot::Array output;
+  output.append(godot::PackedStringArray());
+  int32_t exit_code =
+      os->execute(godot::String("dotnet"), version_args, output, true);
+  if (exit_code != 0)
+    return util::error_json("启动 dotnet 失败（SDK 缺失或不在 PATH？），请确认已安装 .NET SDK 且 dotnet 命令可用");
+  std::string dotnet_version;
+  if (output.size() > 0) {
+    godot::PackedStringArray out_lines = output[0];
+    if (out_lines.size() > 0)
+      dotnet_version = util::to_std(out_lines[0].strip_edges());
+  }
+  bool is_dotnet_editor = os->has_feature(godot::String("mono"));
+  bool assembly_loaded = false;
+  auto *cdbs = godot::ClassDBSingleton::get_singleton();
+  if (cdbs)
+    assembly_loaded = cdbs->class_exists(godot::StringName("CSharpScript"));
+  mcp::JsonValue inner(mcp::JsonValue::object_tag);
+  inner["dotnet_available"] = mcp::JsonValue(true);
+  inner["dotnet_version"] = mcp::JsonValue(dotnet_version);
+  inner["project_file"] = mcp::JsonValue(project_file);
+  inner["is_dotnet_editor"] = mcp::JsonValue(is_dotnet_editor);
+  inner["assembly_loaded"] = mcp::JsonValue(assembly_loaded);
+  inner["hint"] = mcp::JsonValue("is_dotnet_editor 经 OS.has_feature(mono) 推测、assembly_loaded 经 CSharpScript 类存在性推测，均未在 .NET 编辑器下实测验证，后续需真机复核");
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["result"] = std::move(inner);
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "dotnet_environment completed");
+  return r;
+}
+
 mcp::JsonValue handle_verify_scene_saved(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "verify_scene_saved called");

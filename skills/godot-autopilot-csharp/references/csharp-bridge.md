@@ -13,13 +13,13 @@ Game-side plumbing: add a `GdaCSharpRuntime` node anywhere in the game scene. It
 
 - Lookup order for reads: engine property list first, then C# property, then C# field, by exact name. Only public members resolve unless the bridge instance was configured to allow non-public access.
 - Indexers are rejected, as are write-only members on read and read-only members on write.
-- Method overloads match by argument count only, with at most 16 arguments. Generic method definitions are skipped and params-array overloads are rejected: expose a fixed-arity overload instead.
+- Method overloads match by argument count, with at most 16 arguments. Generic method definitions are skipped; params-array overloads pack trailing arguments into the array.
 - Values serialize with full Variant fidelity in the editor; across the game channel arguments must be JSON-native values. Returned C# structs arrive as dictionaries carrying their type plus fields; deeper nesting collapses to a type marker.
 - Editor calls need the `code_execute` gate; game calls need `code_execute` plus `game_runtime`.
 
 ## Export-build caution
 
-The bridge is runtime reflection over exact member names. Members reached only through the bridge must survive managed trimming in exported builds: keep them referenced from compiled code or the lookup fails with a not-found error at runtime. The fixed limits above (no generic definitions, no params arrays, no indexers, void handlers with at most 4 parameters) apply on every build.
+The bridge is runtime reflection over exact member names. Members reached only through the bridge must survive managed trimming in exported builds: keep them referenced from compiled code or the lookup fails with a not-found error at runtime. The fixed limits above (no generic definitions, no indexers, void handlers with at most 4 parameters; params arrays are packed from trailing arguments) apply on every build.
 
 ## Subscription tokens
 

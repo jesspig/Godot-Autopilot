@@ -31,7 +31,7 @@ const std::vector<ParamSpec> kCSharpCallMethodParams = {
     {"object_id_str", "string", "Live object id as a decimal string for ids beyond 32-bit range (editor process only); mutually exclusive with object_id, memory and path", false},
     {"memory", "string", "Memory resource name registered via create_resource (editor process only); mutually exclusive with object_id, object_id_str and path", false},
     {"path", "string", "Scene node path in the edited scene (editor) or the running game (runtime=game), or a res:// resource path (editor only). memory:// is rejected here — pass the bare name in memory instead", false},
-    {"method", "string", "C# method name to call (params-array overloads are rejected by the bridge; overloads are matched by argument count with per-argument conversion)", true},
+    {"method", "string", "C# method name to call (params-array overloads are packed from trailing arguments by the bridge; overloads are matched by argument count with per-argument conversion)", true},
     {"args", "array", "Call arguments as a JSON array (max 16 entries); editor values deserialize with full Variant fidelity, game values cross as JSON-native values only", false},
     {"runtime", "string", "Target process: editor (default, resolve the locator in the editor and call the GdaCSharpBridge engine singleton) or game (forward to the game bridge over the runtime channel; only the scene-path locator form is accepted, needs a running .NET game with GdaCSharpRuntime)", false},
     {"timeout_ms", "integer", "Response timeout in milliseconds for runtime=game (default: 5000, max: 25000); rejected when runtime=editor", false},
