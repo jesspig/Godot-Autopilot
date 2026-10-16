@@ -131,7 +131,7 @@ JV handle_2d_path_query(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "get_nav_2d_map_path completed");
   JV r(JV::object_tag);
-  r["result"] = JV::FromObject({{"path", std::move(arr)}});
+  r["result"] = JV(JV::Object{{"path", std::move(arr)}});
   return r;
 }
 
@@ -333,7 +333,7 @@ JV handle_3d_path_query(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "get_nav_3d_map_path completed");
   JV r(JV::object_tag);
-  r["result"] = JV::FromObject({{"path", std::move(arr)}});
+  r["result"] = JV(JV::Object{{"path", std::move(arr)}});
   return r;
 }
 
@@ -376,7 +376,7 @@ JV handle_3d_path_query_segment(const JV &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
                             "get_nav_3d_map_closest_point_to_segment completed");
   JV r(JV::object_tag);
-  r["result"] = JV::FromObject({{"point", util::vec3_to_json(point)}});
+  r["result"] = JV(JV::Object{{"point", util::vec3_to_json(point)}});
   return r;
 }
 

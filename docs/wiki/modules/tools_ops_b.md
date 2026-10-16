@@ -6,7 +6,7 @@ tags:
   - 模块
   - 领域工具
   - B组
-timestamp: "2026-10-11T12:43:34+08:00"
+timestamp: "2026-10-16T17:43:07+08:00"
 resource: src/tools/
 ---
 
@@ -18,11 +18,13 @@ resource: src/tools/
 
 > 10-11 批量工具扩充增补：本页 195→222（+27：`animation` +1 bundle、`audio` +4 输入捕获与 WAV、`os` +4 文件目录（新实现 `file_dir_ops`）、`game` +4 本地化翻译、新域 `tween` 4、`render` +3 粒子、`theme` +2 布局与打包、新域 `gridmap` 5；handler 文件 22→25 个，新增 `file_dir_ops`/`gridmap_ops`/`tween_ops`）；全系统 400→451（443 域 + `system_status` + 7 元），schema 基线 451 = 385 非空 + 66 空，遍历枚举 393→444、排除与候选以运行时报告为准（旧 71/322 已过时）。
 
+> 10-16 计数复核增补：本页 222→229（+7：新域 `csharp` 6 项（`csharp_tools.hpp`，handler 在 `csharp_bridge_ops.cpp`，全部 `code_execute`）、`os` +1 `create_csharp_script`（handler 在 `text_ops`，`writes_file` + `kMutating`））；全系统 451→459（域工具 443→451：A 222 + B 229 = 451），schema 基线 459 = 393 非空 + 66 空，遍历枚举 449→452，验证证据见 [changelog/2026-10-16-log.md](../changelog/2026-10-16-log.md)。
+
 > 09-20 可重放监控批次增补：`text_ops` 的 `write_file` `mode=APPEND` 在 `READ_WRITE` 打开失败时回退 `WRITE`（首次追加不再失败）；`runtime_game_ops`/`code_exec_ops`/`capture_ops` 的若干告警改 `log_detailed` 携带诊断 detail（游戏 job 过期/表满、batch 引用错误、截图完成参数），行为不变，详见 [核心模块](core.md) 的 LogSystem 小节。
 
-> 覆盖 `src/tools/` 下 25 个 `.cpp` handler 模块：debug_ops、debugger_ops、debugger_access、display_ops、display_window_ops、os_ops、file_dir_ops（10-11 新增，handler 挂 `os_tools`）、runtime_ops、runtime_game_ops、audio_ops、render_ops、environment_ops、text_ops、tilemap_ops、tileset_ops、gridmap_ops（10-11 新域）、spriteframes_ops、animation_ops、theme_ops、tween_ops（10-11 新域）、analyze_ops、test_ops、code_exec_ops、log_ops、capture_ops（另有 09-18 新增 `src/runtime/game_bridge_verify.cpp` 游戏侧验证辅助）；基础设施 `src/tools/ready_policy.hpp`（09-29 新增，游戏请求就绪决策纯函数）。（09-16 随坐标换算/键名统一/CJK 往返批次同步——text_ops 全链路 `String::utf8` + 诊断 IGNORE 装载、click_game_ui 窗口坐标与键名错误文案；09-17 随 T09+T12 文档同步批次更新输入释放 flush、click 文本选择/annotate 序号与改脚本工作流；09-18/09-19 工具数 385→391 / B 组 192→195，工具声明全量改为 `ToolSpec`；09-29 随工具语义与韧性批次同步——域工具按运行时核算 392（B 组 195）、全系统 400，SceneTree 八工具改经游戏通道 `scene_tree` op 转发（`GameRuntime`）、全部游戏通道工具新增 `wait_ready` 就绪排队与重放、`execute_game_script` 支持裸语句自动包装（`wrapped:true`）、`scene_verify` 改可落盘集合口径、theme 写后 `verified` 回读。）
+> 覆盖 `src/tools/` 下 26 个 `.cpp` handler 模块：debug_ops、debugger_ops、debugger_access、display_ops、display_window_ops、os_ops、file_dir_ops（10-11 新增，handler 挂 `os_tools`）、runtime_ops、runtime_game_ops、audio_ops、render_ops、environment_ops、text_ops、tilemap_ops、tileset_ops、gridmap_ops（10-11 新域）、spriteframes_ops、animation_ops、theme_ops、tween_ops（10-11 新域）、analyze_ops、test_ops、code_exec_ops、log_ops、capture_ops（另有 09-18 新增 `src/runtime/game_bridge_verify.cpp` 游戏侧验证辅助）、csharp_bridge_ops（10-12 新增，handler 挂 `csharp_tools`）；基础设施 `src/tools/ready_policy.hpp`（09-29 新增，游戏请求就绪决策纯函数）。（09-16 随坐标换算/键名统一/CJK 往返批次同步——text_ops 全链路 `String::utf8` + 诊断 IGNORE 装载、click_game_ui 窗口坐标与键名错误文案；09-17 随 T09+T12 文档同步批次更新输入释放 flush、click 文本选择/annotate 序号与改脚本工作流；09-18/09-19 工具数 385→391 / B 组 192→195，工具声明全量改为 `ToolSpec`；09-29 随工具语义与韧性批次同步——域工具按运行时核算 392（B 组 195）、全系统 400，SceneTree 八工具改经游戏通道 `scene_tree` op 转发（`GameRuntime`）、全部游戏通道工具新增 `wait_ready` 就绪排队与重放、`execute_game_script` 支持裸语句自动包装（`wrapped:true`）、`scene_verify` 改可落盘集合口径、theme 写后 `verified` 回读。）
 >
-> 工具总数（全系统）：**451**（`ToolRegistry`/catalog/index 口径）= **443 个领域工具**（32 个域 `*_tools.hpp` 的 `make_tools()`，每工具一份 `ToolSpec`，经 `register_all.cpp` 注册）+ `system_status` 1 + **7 个元工具**；schema 统计 385 非空 + 66 空，遍历候选与排除以运行时报告为准（旧基线 322 / 71 已过时，见 [../tests.md](../tests.md)）。本页 B 组占其中 **222 个领域工具**（A 组 221 + B 组 222 = 443）；`code_execute`/`batch_execute` 为元工具经 `server.RegisterTool()` 直连、`system_status` 单独注册。数量以 `src/tools/*_tools.hpp` 声明与 `ToolRegistry` 运行时注册为准。
+> 工具总数（全系统）：**459**（`ToolRegistry`/catalog/index 口径）= **451 个领域工具**（33 个域 `*_tools.hpp` 的 `make_tools()`，每工具一份 `ToolSpec`，经 `register_all.cpp` 注册）+ `system_status` 1 + **7 个元工具**；schema 统计 393 非空 + 66 空，遍历候选与排除以运行时报告为准（旧基线 322 / 71 已过时，见 [../tests.md](../tests.md)）。本页 B 组占其中 **229 个领域工具**（A 组 222 + B 组 229 = 451）；`code_execute`/`batch_execute` 为元工具经 `server.RegisterTool()` 直连、`system_status` 单独注册。数量以 `src/tools/*_tools.hpp` 声明与 `ToolRegistry` 运行时注册为准。
 >
 > 相关页面：[工具注册表](../modules/tools_registry.md) · [运行时通道](../modules/entry_runtime.md)
 
@@ -34,7 +36,7 @@ resource: src/tools/
 | `debugger_ops.cpp` | `godot_autopilot::debugger_ops` | `debugger_tools.hpp` | 6 |
 | `debugger_access.cpp` | `godot_autopilot`（自由函数） | —（无工具） | 0 |
 | `display_ops.cpp` + `display_window_ops.cpp` | `godot_autopilot::display_ops` | `display_tools.hpp` | 25 |
-| `os_ops.cpp` + `file_dir_ops.cpp` | `godot_autopilot::os_ops` + `godot_autopilot::file_dir_ops` | `os_tools.hpp` | 22（含 `text_ops` 的 `write_file`/`read_file`/`find_in_files`，归 OS 类；10-11 新增 `list_directory`/`get_file_info`/`copy_file`/`ensure_directory`，handler 在 `file_dir_ops`） |
+| `os_ops.cpp` + `file_dir_ops.cpp` | `godot_autopilot::os_ops` + `godot_autopilot::file_dir_ops` | `os_tools.hpp` | 23（含 `text_ops` 的 `write_file`/`read_file`/`find_in_files`（归 OS 类）与 10-12 新增的 `create_csharp_script`（handler 在 `text_ops`，category 为 Scripts）；10-11 新增 `list_directory`/`get_file_info`/`copy_file`/`ensure_directory`，handler 在 `file_dir_ops`） |
 | `runtime_ops.cpp` | `godot_autopilot::runtime_ops` | —（基础设施） | 0 |
 | `runtime_game_ops.cpp` + `tween_ops.cpp`（游戏侧 3 工具） | `godot_autopilot::runtime_ops` + `godot_autopilot::tween_ops` | `game_tools.hpp` + `tween_tools.hpp` | 23（`game_tools` 19 + `tween_tools` 4，其中 `tween_editor_property` 为编辑器侧预览仍归 Game 类） |
 | `audio_ops.cpp` | `godot_autopilot::audio_ops` | `audio_tools.hpp` | 24 |
@@ -51,9 +53,10 @@ resource: src/tools/
 | `code_exec_ops.cpp` | `godot_autopilot::code_exec_ops` | —（元工具，不经 `*_tools.hpp`，不计入合计） | 2 |
 | `log_ops.cpp` | `godot_autopilot::log_ops` | `system_tools.hpp` | 1 |
 | `capture_ops.cpp` | `godot_autopilot::capture_ops` | `capture_tools.hpp` | 2 |
-| **合计（领域工具）** | | | **222** |
+| `csharp_bridge_ops.cpp` | `godot_autopilot::csharp_bridge_ops` | `csharp_tools.hpp` | 6（10-12 新域，反射桥：get/set property、call method、subscribe/unsubscribe event、list members，全部 `code_execute`） |
+| **合计（领域工具）** | | | **229** |
 
-注：`environment_ops.cpp`、`display_window_ops.cpp`、`runtime_game_ops.cpp` 没有独立 hpp，handler 函数声明复用 `render_ops.hpp`、`display_ops.hpp`、`runtime_ops.hpp`；工具类声明统一落在对应 `<域>_tools.hpp`（分别为 `render_tools.hpp`/`display_tools.hpp`/`game_tools.hpp`），`make_tools()` 产出 `SpecTool` 实例。`animation_ops`/`theme_ops`/`analyze_ops`/`test_ops` 四模块各有独立 `*_ops.hpp`。显示（25）/渲染（49）两模块的 `_ops.cpp` 与 `_tools.hpp` 归并方式见上表。
+注：`environment_ops.cpp`、`display_window_ops.cpp`、`runtime_game_ops.cpp` 没有独立 hpp，handler 函数声明复用 `render_ops.hpp`、`display_ops.hpp`、`runtime_ops.hpp`；工具类声明统一落在对应 `<域>_tools.hpp`（分别为 `render_tools.hpp`/`display_tools.hpp`/`game_tools.hpp`），`make_tools()` 产出 `SpecTool` 实例。`animation_ops`/`theme_ops`/`analyze_ops`/`test_ops` 四模块各有独立 `*_ops.hpp`。显示（25）/渲染（52）两模块的 `_ops.cpp` 与 `_tools.hpp` 归并方式见上表。
 
 ## debug_ops — 引擎诊断与性能监控（15 工具 + physics_ops 挂靠 1 个）
 
@@ -329,7 +332,7 @@ resource: src/tools/
 
 ## 与 AGENTS.md 对照结果
 
-- **副作用/可变工具排除机制（旧基线 71，已过时）**：工具在 `ToolSpec` 声明 `side_effect`（`ISideEffect` 暴露）与 `kMutating`；L2 遍历（`tests/runner/traversal.cpp`）运行时经 `search_tools` 枚举 444 条后按 `get_tool_detail` 的 `side_effect`/`mutating`/`dynamic` 字段排除，候选与排除数以运行时报告为准（旧基线 71 排除 / 322 候选为 09-29 口径，待本轮实测复核）。旧分布（09-29，B 36 + A 35）仅作历史参考：B 组 36——display_tools 15、os_tools 8、theme_tools 5、game_tools 7、tilemap_tools 1（`fill_tilemap_rect`，`None`+`kMutating`）；A 组 35——editor 10 / input_map 2 / config 2 / resource 5 / script 3 / input_click_ops 4 / scene 1（`build_nodes_from_spec`）/ scene_tree 8。本轮静态可见的新增排除至少含 `gridmap` 5（全 `None`+`kMutating`）、`tween` 3（2 游戏侧 `GameRuntime` + `tween_editor_property` 的 `kMutating`，`get_game_tween_list` 只读不排除）、其余 bundle/批量工具多带 `kMutating`，精确数待运行时核定。
+- **副作用/可变工具排除机制（10-16 实测 111 排除 / 341 候选）**：工具在 `ToolSpec` 声明 `side_effect`（`ISideEffect` 暴露）与 `kMutating`；L2 遍历（`tests/runner/traversal.cpp`）运行时经 `search_tools` 枚举 452 条后按 `get_tool_detail` 的 `side_effect`/`mutating`/`dynamic` 字段排除，候选与排除数以运行时报告为准（旧基线 71 排除 / 322 候选为 09-29 口径，已过时）。旧分布（09-29，B 36 + A 35）仅作历史参考：B 组 36——display_tools 15、os_tools 8、theme_tools 5、game_tools 7、tilemap_tools 1（`fill_tilemap_rect`，`None`+`kMutating`）；A 组 35——editor 10 / input_map 2 / config 2 / resource 5 / script 3 / input_click_ops 4 / scene 1（`build_nodes_from_spec`）/ scene_tree 8。10-11 批次静态可见的新增排除至少含 `gridmap` 5（全 `None`+`kMutating`）、`tween` 3（2 游戏侧 `GameRuntime` + `tween_editor_property` 的 `kMutating`，`get_game_tween_list` 只读不排除）、其余 bundle/批量工具多带 `kMutating`；精确数见 10-16 实测（111 排除 / 341 候选）。
 - **不一致点**：
   1. AGENTS.md「添加工具需在 `<category>_ops.hpp` 声明」与实现不符：`environment_ops.cpp`（7 工具）、`display_window_ops.cpp`（10 工具）无独立 hpp，handler 声明分别复用 `render_ops.hpp`、`display_ops.hpp`；工具类声明则统一落在对应 `<域>_tools.hpp`（`render_tools.hpp`/`display_tools.hpp`）。另 `runtime_game_ops.cpp`（工具 19 个在 `game_tools.hpp`）与 `file_dir_ops.cpp`（工具 4 个挂 `os_tools.hpp`）的 handler 声明分别在 `runtime_ops.hpp` 与 `file_dir_ops.hpp`。
   2. `debugger_ops` 的 `get_debugger_*` 5 工具、`get_plugin_log` 与 `log_ops` 的 `get_game_log_entries` 覆盖四条不同日志来源（编辑器引擎日志 / 调试会话捕获 / 插件进程内 LogSystem / 游戏磁盘日志），AGENTS.md 未区分。

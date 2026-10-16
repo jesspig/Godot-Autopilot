@@ -41,7 +41,7 @@ set(GODOTCPP_API_VERSION "4.7" CACHE STRING "The Godot API version to target" FO
 add_subdirectory("${GDA_THIRD_PARTY_DIR}/godot-cpp" "${GDA_SUBMODULE_BIN_DIR}/godot-cpp")
 
 # ====================================================================
-# mcp-cpp-sdk — MCP 协议 C++ SDK (0.3.4 / e2ed352)
+# mcp-cpp-sdk — MCP 协议 C++ SDK (0.3.7 / 7dfe088)
 # ====================================================================
 gda_require_submodule(mcp-cpp-sdk)
 add_subdirectory("${GDA_THIRD_PARTY_DIR}/mcp-cpp-sdk" "${GDA_SUBMODULE_BIN_DIR}/mcp-cpp-sdk")

@@ -2,6 +2,12 @@
 
 > 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天。
 
+## 2026-10-16
+
+- **依赖升级：mcp-cpp-sdk 0.3.4 → 0.3.7（仅安全迁移，未启用新特性）**：分支 `feature/mcp-sdk-0.3.7`（基线 `736f3b4`），**改动全部留在工作树，未提交 / 未合并 / 未推送**。子模块 gitlink `e2ed352`→`7dfe088`（tag `0.3.7`；远端无 `0.3.6`）；唯一编译期破坏为 SDK 自 0.3.5 起删除 `JsonValue::FromObject` / `FromArray`，就地替换 8 处为 `JsonValue(JsonValue::Object{...})`（`json_godot.hpp` 3 / `environment_ops.cpp` 2 / `nav_ops.cpp` 3），全仓归零。重核确认 `mcp-ext` 传递链接、协议常量 `"2026-07-28"`、`kSdkVersion = "0.3.7"` 均无碍；`ValidateToolCallArguments` 无条件校验与 `InvokeAsync` 异常通道因 GDA 恒经 `call_tool` 包装且异常在 `dispatch.cpp` 被吞而不可观测。验证：configure 实测 `[mcp] SDK version: 0.3.7`；L1 **428/428**（与 0.3.4 基线一致）；L2 定向 4/4、全量 **37/38**。唯一失败 `38_csharp_bridge` 定位为**既有缺陷**（`parse_csharp_classes` 未跳过类名与 `:` 之间空白；且首轮 L2 全量曾误跑 10-12 的旧部署副本 DLL——**跑 L2 前必须先 `uv run main.py deploy`**），非本迁移引入，未修。文档同步 `cmake/Dependencies.cmake` + wiki 四页；技能无受影响项。详见 [2026-10-16-log.md](changelog/2026-10-16-log.md)
+
+- **`parse_csharp_classes` 基类解析缺陷修复 + 计数口径复核（域 448→451 / 全系统 456→459）**：`text_ops.cpp` 补「类名与 `:` 之间空白」及 `Foo <T>` 泛型形态的跳过；`text_ops.hpp` 导出解析接缝，新增 L1 `text_ops_csharp_test`（10 项，先红 6 失败 → 全绿）。验证：L1 **438/438**、L2 全量 **38/38**（38 号转绿；修复部署后与最终树各跑一轮）、`ctest -N` 476；`03_tools_contract` 实测枚举 452 / 排除 111 / 候选 341 / 625 步全过、warnings 仍 4 条（同名同数）；`register_all.cpp:481` 的 `call_tool` 描述同步「452 非元（451 域 + `system_status`）」；wiki 九页同步计数。**改动全部留在工作树，未提交**。详见 [2026-10-16-log.md](changelog/2026-10-16-log.md)
+
 ## 2026-10-11
 
 - **批量工具扩充知识库同步（+51 域工具，392→443）**：工作树 `git diff HEAD` 纯增量 48 文件 +8194/-30（8 新增：`file_dir_ops.*`、`gridmap_ops.*`、`gridmap_tools.hpp`、`tween_ops.*`、`tween_tools.hpp`；40 修改）。`src/tools/register_all.cpp` 新增 `gridmap`/`tween` 两注册域，`tests/unit/register_all_test.cpp` 基线 400=338+62 → 451=385+66；根 `CMakeLists.txt` 补 3 个新 `.cpp`，测试侧经 `GDA_TOOLS_OPS_SOURCES` glob 自动收录。`skills/godot-autopilot-tools/references/tool-catalog.md` 头行已同步为 443 域 / 32 源模块。静态核算（`src/tools/*_tools.hpp` 的 `make_spec_tool` 子串计数总和 443 + 内联 `system_status` + 7 元 = 451）与测试基线自洽；`call_tool` 描述行“443 非元（442 域 + system_status)”差 1（正确 444 非元）列为遗留未改代码。Wiki 更新 index / tools_registry / tools_ops_a（197→221）/ tools_ops_b（195→222，新增 gridmap/tween 小节）/ tool_base_design（32 域口径澄清）/ tests（枚举 393→444，排除与候选待运行时复核）；未跑构建与测试。详见 [2026-10-11-log.md](changelog/2026-10-11-log.md)

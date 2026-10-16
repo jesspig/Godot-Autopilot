@@ -478,7 +478,7 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
 
     {
         ToolSpec spec{"call_tool",
-                      "Execute any tool by name. Use this to call all 449 non-meta tools (448 domain tools plus system_status).",
+                      "Execute any tool by name. Use this to call all 452 non-meta tools (451 domain tools plus system_status).",
                       "System", {"call", "dispatch", "proxy"}};
         spec.side_effect = SideEffect::None;
         spec.flags = tool_flags::kMeta;

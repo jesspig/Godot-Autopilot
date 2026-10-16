@@ -441,12 +441,7 @@ std::string code_without_strings_and_comments(const std::string &source) {
   return out;
 }
 
-struct CSharpClassInfo {
-  bool found = false;
-  std::string name;
-  bool is_partial = false;
-  std::string base;
-};
+} // namespace
 
 std::vector<CSharpClassInfo> parse_csharp_classes(const std::string &source) {
   std::vector<CSharpClassInfo> infos;
@@ -484,6 +479,8 @@ std::vector<CSharpClassInfo> parse_csharp_classes(const std::string &source) {
     info.name = code.substr(ns, m - ns);
     info.is_partial = partial;
     size_t b = m;
+    while (b < n && is_csharp_space(code[b]))
+      ++b;
     if (b < n && code[b] == '<') {
       int depth = 0;
       while (b < n) {
@@ -498,9 +495,9 @@ std::vector<CSharpClassInfo> parse_csharp_classes(const std::string &source) {
         }
         ++b;
       }
-      while (b < n && is_csharp_space(code[b]))
-        ++b;
     }
+    while (b < n && is_csharp_space(code[b]))
+      ++b;
     if (b < n && code[b] == ':') {
       ++b;
       while (b < n && is_csharp_space(code[b]))
@@ -516,6 +513,8 @@ std::vector<CSharpClassInfo> parse_csharp_classes(const std::string &source) {
   }
   return infos;
 }
+
+namespace {
 
 std::string csharp_file_stem(const std::string &normalized_path) {
   size_t slash = normalized_path.find_last_of('/');

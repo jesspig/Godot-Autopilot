@@ -3,8 +3,20 @@
 
 #include <mcp/JsonValue.hpp>
 
+#include <string>
+#include <vector>
+
 namespace godot_autopilot {
 namespace text_ops {
+
+struct CSharpClassInfo {
+  bool found = false;
+  std::string name;
+  bool is_partial = false;
+  std::string base;
+};
+
+std::vector<CSharpClassInfo> parse_csharp_classes(const std::string &source);
 
 mcp::JsonValue handle_create_font(const mcp::JsonValue &args);
 mcp::JsonValue handle_create_shaped_text(const mcp::JsonValue &args);
