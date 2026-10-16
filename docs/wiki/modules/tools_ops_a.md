@@ -6,11 +6,13 @@ tags:
   - 模块
   - 领域工具
   - A组
-timestamp: "2026-10-11T12:43:34+08:00"
+timestamp: "2026-10-16T17:43:07+08:00"
 resource: src/tools/
 ---
 
 # 领域工具模块（src/tools/，A 组 16 模块）
+
+> 10-16 计数复核增补：本页 16 模块 221→222（+1：`editor_tools` 32→33 `dotnet_environment`）；全系统 451→459（域工具 443→451：本页 +1，B 组 +7 = `csharp` 新域 6 项 + `os` 侧 `create_csharp_script`；A 222 + B 229 = 451），验证证据见 [changelog/2026-10-16-log.md](../changelog/2026-10-16-log.md)。
 
 > 10-11 批量工具扩充增补：本页 16 模块 197→221（+24：`config` +4 autoload、`input_map` +1 bundle、`physics` +3 body/shape、`property` +2 batch/transform、`resource` +7 curve/mesh、`scene` +7 snapshot/bundle/path/camera；无新域、无新文件）；全系统 400→451（443 域 + `system_status` + 7 元），源模块 30→32（新增 `gridmap`/`tween` 在 B 组），schema 基线 451 = 385 非空 + 66 空，遍历枚举 393→444、排除与候选以运行时报告为准（旧 71/322 已过时）。
 
@@ -18,13 +20,13 @@ resource: src/tools/
 
 > 审计日期：2026-09-29（2026-08-12 初稿；08-17 补 YAML frontmatter；08-20 随 rename 事务化 + 新工具同步；08-21 随 ToolBase 类重构同步——`tool_defs.def`/`TOOL_ENTRY` 移除，注册与计数口径改为 `<域>_tools.hpp`/`ToolRegistry`；08-22 15 时全量一致性审计——editor 计数 23、RENAME_HINTS 10 条、resolve_scene_node/RidStore/rid_from_json/NODE_NOT_FOUND_HINT 归一至 util 共享头、get_docs_class 补 enums/constants；08-29 随 0.2.2 版本与全量审计同步——336→363、35→42、174→178、26→30 域重核；09-13 上午随反馈修复批次同步——363→365、42→49、178→180，property 数组/NodeType 转换与写失败 fail fast、资源 CoW/reload_resource/copy_resource_file/标签清理、create_editor_scene timeout_ms 诊断；09-13 下午随收口批次同步——A 组 180 不变（新增 get_plugin_log 归 B 组，域工具 365→366）、严格 JSON 形状与值类型 readback、save_resource 磁盘重读 verified、ray 空间诊断字段、get_editor_settings enum 元数据；09-13 17:50 随 B 组知识库审计同步——补全 scene_ops 工具表（rename_scene_node/reparent_node）与 rename stale_references 字段口径；09-13 晚随 0.2.4 版知识库全量审计同步——修正 handle_delete 的 undo/redo 口径、input 未识别键/按键实际报错（删除"静默失败点"表述）、physics 配对计数（15 对含空间查询）与 rid_store<PhysicsRidDomain> 标签名、script handle_reload 缓存失效归属、editor save_all_scenes 直接调用与文件树截断 max_depth 字段、config get_engine_version string 字段、property_set undo 注册、group find_node 3 处与响应字段、editor 撤销四件套全名、resource 收集函数实名等代码-文档偏差；A 组 180/366 复核不变；09-14 随修复批次同步——property_set/严格形状增 Vector2/2i 对象要求与数组报错、set_resource_property 接入严格转换、get_scene_tree 的 include_properties 属性摘要修复；09-15 随 Computer Use grounding 批次同步——域工具 379 = 322 非 SIDE + 57 SIDE，A 组 191（新增 editor_ui_ops 3 / editor_ui_actions 3 / input_click_ops 4，scene +1、input +4、editor +6）、scene_ops 的 get_scene_node_screen_rect、catalog/index 387；09-16 随失败修复批次同步——域工具 384 = 324 非 SIDE + 60 SIDE，A 组 193（editor_ui_ops +2：scene_tree_items / select_scene_tree_node）、写工具响应回显 scene_path/scene_unsaved、资源属性内联描述一步创建 [sub_resource]、catalog/index 392），09-16 随坐标换算/键名统一/脚本新鲜度/UID 守卫/CJK 往返/open 幂等/属性两轮批次同步——scene 两轮应用、input_map 裸名等价、script fresh 与 cache_refreshed、resource add/set 选择、open already_open，域工具 384→385（B 组 capture +1，非 SIDE 324→325），基于当前工作树代码逐行核对（不依赖 git 历史）；09-17 随 T09+T12 文档同步批次更新 save_editor_scene_as 登记口径（删 tab_rebuilt 与 close+reopen）、create_editor_scene 多签秒级失败、delete_scene_node 跨帧 undo 与选中清理、改脚本后先 reload_game_scripts 工作流）；09-18 E2E 优化批次与 09-19 ToolSpec 数据化重构——域工具 385→391、A 组 193→196（新增 `verify_scene_saved`/`patch_script`/`build_nodes_from_spec`，新增 handler 文件 `scene_spec_ops`/`script_patch_ops`），工具声明全量改为 `ToolSpec` 数据记录（删除 `GDA_TOOL_CLASS` 宏/真类与全部 schema 文件），遍历改为运行时枚举 392 条后按 `side_effect`/`mutating`/`dynamic` 字段排除（330 个进入空参+冒烟两步骤，实测全过）；09-29 随工具语义与韧性批次（B1–B7）同步——域工具按运行时核算 392（A 组 197）、全系统 400（338 非空 schema + 62 空），遍历枚举 393 条、候选 322、排除 71（含 8 个 SceneTree 工具改走游戏通道，`SideEffect::GameRuntime`）；property 路径支持引擎原生斜杠属性名与属性族展开、严格形状补齐 Plane 与向量分量分支；`scene_verify` 核验口径改可落盘集合（新增 `inherited_*` 输出）；三脚本通道统一 `gdscript_wrap` 包装与行映射；游戏通道新增 `wait_ready` 就绪排队与重放；dispatch 增加主线程预算与停摆快速失败（详见 [security_contract](../security_contract.md) §4）。
 > 覆盖范围：`src/tools/` 下 18 对 `.cpp/.hpp`：scene_ops、scene_tree_ops、property_ops、group_ops、input_ops、input_map_ops、physics_ops、nav_ops、resource_ops、script_ops、config_ops、doc_ops、editor_ops、editor_ui_ops、editor_ui_actions、input_click_ops、scene_spec_ops（09-18 新增，`build_nodes_from_spec`）、script_patch_ops（09-18 新增，`patch_script`）。
-> 统计口径：工具数以 `src/tools/*_tools.hpp` 的 `make_tools()`/`ToolSpec` 条目为准（一个工具 = 一份 `ToolSpec` 数据 + 一个 `handle_` 函数，两口径一致）；当前 443 个域工具中本页 16 模块占 221 个（10-11 起口径：全系统 451 = 443 域工具 + `system_status` 1 + 7 个元工具；遍历运行时枚举 444 条 / 排除与候选以运行时报告为准；数值以运行时统计为准，见 [../tests.md](../tests.md)）。每个工具的参数表（`std::vector<ParamSpec>`）与 `make_spec_tool(ToolSpec{...})` 内联在对应 `<域>_tools.hpp`。注册经 `register_all.cpp` 调用 32 组 `<域>_tools::make_tools()` 汇入单一 `ToolRegistry`；L2 遍历不再按源码枚举，改为运行时经 `search_tools` 枚举后按字段排除（见 [../modules/tools_registry.md](../modules/tools_registry.md)）。
+> 统计口径：工具数以 `src/tools/*_tools.hpp` 的 `make_tools()`/`ToolSpec` 条目为准（一个工具 = 一份 `ToolSpec` 数据 + 一个 `handle_` 函数，两口径一致）；当前 451 个域工具中本页 16 模块占 222 个（10-16 起口径：全系统 459 = 451 域工具 + `system_status` 1 + 7 个元工具；遍历运行时枚举 452 条 / 排除 111 / 候选 341（10-16 实测）；数值以运行时统计为准，见 [../tests.md](../tests.md)）。每个工具的参数表（`std::vector<ParamSpec>`）与 `make_spec_tool(ToolSpec{...})` 内联在对应 `<域>_tools.hpp`。注册经 `register_all.cpp` 调用 33 组 `<域>_tools::make_tools()` 汇入单一 `ToolRegistry`；L2 遍历不再按源码枚举，改为运行时经 `search_tools` 枚举后按字段排除（见 [../modules/tools_registry.md](../modules/tools_registry.md)）。
 
 ## 模块简介
 
 这 16 个模块是领域工具的前半部分：覆盖场景节点操作、属性/信号、分组、输入模拟与 InputMap、物理（2D/3D 双份）、导航、资源生命周期、脚本与 GDScript 执行、项目/引擎/编辑器配置、引擎类文档查询、编辑器会话管理，以及编辑器 UI 语义自动化（元素枚举/命中/点击/文本/快捷键）与合成鼠标输入。全部位于命名空间 `godot_autopilot::<模块>_ops`，与 AGENTS.md 约定一致。
 
-32 个域 `_tools.hpp` 共声明 **443 个领域工具**（每工具一份 `ToolSpec`；遍历排除数以运行时 `03_tools_contract` 报告为准，旧基线 71 已过时），本页 16 模块占其中 **221 个（49.9%）**。`register_all.cpp` 注册 32 组 `<域>_tools::make_tools()`（另加 `system_status` 1 与 7 个元工具，catalog/index 共 451；schema 统计 385 非空 + 66 空）汇入单一 `ToolRegistry`，catalog/index/`dispatch::g_handlers`/`server.RegisterTool()` 全部由其派生；领域工具不直接注册到 MCP 服务器，统一经元工具 `call_tool` 分发（见 [../modules/tools_registry.md](../modules/tools_registry.md)）。
+33 个域 `_tools.hpp` 共声明 **451 个领域工具**（每工具一份 `ToolSpec`；遍历排除数以运行时 `03_tools_contract` 报告为准，10-16 实测 111 排除 / 341 候选），本页 16 模块占其中 **222 个（49.2%）**。`register_all.cpp` 注册 33 组 `<域>_tools::make_tools()`（另加 `system_status` 1 与 7 个元工具，catalog/index 共 459；schema 统计 393 非空 + 66 空）汇入单一 `ToolRegistry`，catalog/index/`dispatch::g_handlers`/`server.RegisterTool()` 全部由其派生；领域工具不直接注册到 MCP 服务器，统一经元工具 `call_tool` 分发（见 [../modules/tools_registry.md](../modules/tools_registry.md)）。
 
 ## 模块总览
 
@@ -42,13 +44,13 @@ resource: src/tools/
 | `script_ops` | 10 | 11（`patch_script` 的 handler 在 `script_patch_ops`） | GDScript 执行、脚本附加/属性/调用、锚点补丁 |
 | `config_ops` | 17 | 17 | ProjectSettings/Engine/EditorSettings、自启动项 |
 | `doc_ops` | 4 | 4 | ClassDB 类/方法/属性文档查询 |
-| `editor_ops` | 24 | 32（8 个新增 UI handler 在 editor_ui_ops / editor_ui_actions；`verify_scene_saved` 在本文件） | 编辑器会话：选择/场景/撤销/播放/文件系统/C# 构建/保存只读复核 |
+| `editor_ops` | 24 | 33（8 个新增 UI handler 在 editor_ui_ops / editor_ui_actions；`verify_scene_saved` 在本文件） | 编辑器会话：选择/场景/撤销/播放/文件系统/C# 构建/保存只读复核 |
 | `editor_ui_ops` | 5 | —（工具注册计入 editor_ops 行） | 编辑器 UI：元素枚举、命中测试、视口几何映射、场景树行枚举（只读） |
 | `editor_ui_actions` | 3 | —（工具注册计入 editor_ops 行） | 编辑器 UI 动作：按元素 path 点击、文本输入、快捷键注入（副作用） |
 | `input_click_ops` | 4 | —（工具注册计入 input_ops 行） | 编辑器进程合成鼠标点击/滚轮/拖拽与焦点文本输入（副作用） |
-| **合计** | **—** | **221** | |
+| **合计** | **—** | **222** | |
 
-> 注：`handle_ 函数数`按实现文件计数（跨文件 handler 单独成行，如 `scene_spec_ops`/`script_patch_ops`），`注册工具数`按域归并（跨文件 handler 计入对应域），两列口径不同故不做行合计；注册工具数合计 221 与域计数一致。
+> 注：`handle_ 函数数`按实现文件计数（跨文件 handler 单独成行，如 `scene_spec_ops`/`script_patch_ops`），`注册工具数`按域归并（跨文件 handler 计入对应域），两列口径不同故不做行合计；注册工具数合计 222 与域计数一致。
 
 ## 公共模式
 
@@ -434,10 +436,10 @@ resource: src/tools/
 | 文档 | 声称 | 代码事实 | 判定 |
 |---|---|---|---|
 | AGENTS.md（命名约定） | 工具命名 `<动词>_<类别>_<维度>_<对象>_<修饰>`，动词置首，如 `intersect_physics_2d_ray` | 本组符合；`signal_connect`/`signal_disconnect`（动词置首，无类别段）、config_ops 的 `get_project_settings`/`set_engine_*`/`get_editor_settings`（类别段为 project/engine/editor，与文件名 `config_` 不一致）属规范内的长短变化 | 一致 ✓（动词置首） |
-| AGENTS.md（工具总数） | 以运行时统计为准 | 32 个 `*_tools.hpp` 的 `make_tools()` 恰为 443 份 `ToolSpec`；本页 16 模块 221 个；全系统 451（含 `system_status` 与 7 个元工具） | 一致 ✓ |
+| AGENTS.md（工具总数） | 以运行时统计为准 | 33 个 `*_tools.hpp` 的 `make_tools()` 恰为 451 份 `ToolSpec`；本页 16 模块 222 个；全系统 459（含 `system_status` 与 7 个元工具） | 一致 ✓ |
 | AGENTS.md（错误模式） | 领域工具返回 `{"error": "消息"}` | 一致；另有 `error_detail` 扩展格式与 dispatch `catch(...)` 兜底、导出期固定错误 | 一致 ✓（有扩展） |
 | AGENTS.md（契约缺口 3 项 + 已知 schema 告警 4 项） | `create_scene_node` 不校验必填；`get_resource_extensions` 缺 type 返回全类型；`reimport_resource_files` 空参静默成功；L2 另有 4 项已知 schema 告警（schema 声明必填而空参不报错）：`get_resource_extensions`、`reimport_resource_files`、`start/stop_input_gamepad_vibration` | 均在代码中逐一确认（默认 "NewNode"/"Node"；空 type 传 `""`；count=0 返回 queued；振动缺参回退 device/weak/strong 默认值） | 一致 ✓ |
-| AGENTS.md（遍历排除） | 数值以运行时统计为准 | 遍历运行时枚举 444 条后经 `get_tool_detail` 的 `side_effect`/`mutating`/`dynamic` 字段排除，候选与排除数以运行时报告为准（旧基线 71 排除 / 322 候选已过时，待本轮实测复核），不再硬编码清单 | 一致 ✓ |
+| AGENTS.md（遍历排除） | 数值以运行时统计为准 | 遍历运行时枚举 452 条后经 `get_tool_detail` 的 `side_effect`/`mutating`/`dynamic` 字段排除，候选与排除数以运行时报告为准（10-16 实测 111 排除 / 341 候选；旧基线 71/322 为 09-29 口径，已过时），不再硬编码清单 | 一致 ✓ |
 | 命名归属 | 类别前缀应反映模块 | `get_scene_tree` 注册在 scene_ops（非 scene_tree_ops）——旧 `scene_tree_get`/`scene_get_tree` 双名已合并，不再语义重叠 | 已消解 ✓ |
 | AGENTS.md（架构） | 工具经 `call_tool` 代理、`register_all.cpp` 的 `g_handlers` 映射分发 | 工具由 `<域>_tools::make_tools()` 汇入 `ToolRegistry`，`register_all.cpp` 由 registry 派生填充 `g_handlers` 与 catalog；`dispatch.cpp` 非主线程走 `queue.submit()` | 一致 ✓ |
 | `input_ops` | （无文档声明） | `parse_key`/`parse_mouse_button` 对未识别名称返回 `KEY_NONE`/`MOUSE_BUTTON_NONE`，但 `press/release_input_key`、`press/release_input_mouse_button` 随即返回 `invalid key`/`invalid mouse button` 错误 | 一致 ✓（本页已注明，非静默失败） |

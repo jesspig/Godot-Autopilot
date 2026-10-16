@@ -7,13 +7,13 @@ tags:
   - 工具架构
   - ToolSpec
   - 数据化
-timestamp: "2026-10-11T12:43:34+08:00"
+timestamp: "2026-10-16T17:43:07+08:00"
 resource: src/tools/
 ---
 
 # ToolSpec 工具数据层与执行管线（设计定稿 + 全量迁移）
 
-> **当前 API 面（2026-10-11 复核：注册共 32 域 443 工具 + `system_status` + 7 元，catalog 共 451）**
+> **当前 API 面（2026-10-16 复核：注册共 33 域 451 工具 + `system_status` + 7 元，catalog 共 459）**
 > `tool_spec.hpp`：`ToolSpec` 数据记录（name/description/category/tags/side_effect/flags/params/handler/raw_schema）+ `ParamSpec`（= `schema::ParamDef`）+ `tool_flags` 位标志 + `SpecTool : ToolBase, ISideEffect` + `make_spec_tool`；schema 由 `params` 经 `schema::build_schema` 派生，`raw_schema` 非空时优先。`tool_flags` 现为 9 位（09-29 新增 `kHealthProbe` 健康探针短预算 / `kLongBlocking` 长阻塞不设主线程等待预算）。
 > `dispatch.hpp/cpp`：跨线程调用统一入口 `run_on_main_thread_with_budget` + `main_thread_wait_budget_ms`（09-29；默认 27000ms / 健康探针 5000ms / 长阻塞无预算，超时取消 + `main_thread_timeout` 结构化错误）。
 > `tool_args.hpp/cpp`：`Args` 取参器 + `ToolArgError`（opt_/require_/get_ 系列 + `reject_unknown`，空值视为缺失）。
