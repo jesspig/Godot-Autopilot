@@ -1,11 +1,14 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 
-import { isAlive, spawnEditor, stopForce } from "../src/process";
+import { isAlive, stopForce } from "../src/process";
+import { killImage, killPid, removeDirWithRetry, waitDead, waitFor } from "./support/cleanup";
+
+const RUN_TAG = `gda-detach-${Math.random().toString(36).slice(2, 8)}`;
 
 const FAKE_GODOT_SOURCE = `
 const port = Number(process.env.GODOT_AUTOPILOT_PORT ?? "0");
@@ -19,10 +22,11 @@ s.on("connection", (c) => c.end("ok"));
 
 let tmp: string;
 let fakeGodotExe: string | undefined;
+const editorPids: number[] = [];
 
 beforeAll(async () => {
-  tmp = fs.mkdtempSync(path.join(os.tmpdir(), "gda-detach-"));
-  const scriptPath = path.join(tmp, "fake_godot.js");
+  tmp = fs.mkdtempSync(path.join(os.tmpdir(), `${RUN_TAG}-`));
+  const scriptPath = path.join(tmp, `${RUN_TAG}.js`);
   fs.writeFileSync(scriptPath, FAKE_GODOT_SOURCE);
   const result = await Bun.build({
     entrypoints: [scriptPath],
@@ -37,17 +41,17 @@ beforeAll(async () => {
   if (process.platform !== "win32") {
     fs.chmodSync(fakeGodotExe, 0o755);
   }
-});
+}, 60_000);
 
-afterAll(() => {
-  if (process.platform === "win32") {
-    spawnSync("powershell", [
-      "-Command",
-      "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'gda-detach' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }",
-    ], { stdio: "ignore" });
+afterAll(async () => {
+  for (const pid of editorPids) {
+    await killPid(pid);
   }
-  fs.rmSync(tmp, { recursive: true, force: true });
-});
+  if (process.platform === "win32" && fakeGodotExe !== undefined) {
+    await killImage(path.basename(fakeGodotExe));
+  }
+  await removeDirWithRetry(tmp);
+}, 60_000);
 
 function findFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -77,6 +81,7 @@ describe.serial("spawnEditor 脱父验证", () => {
         headless: true,
         godot: ${JSON.stringify(fakeGodotExe)},
         logPath: ${JSON.stringify(logPath)},
+        timeoutMs: 20000,
       });
       console.log("PID=" + result.pid);
       process.exit(0);
@@ -88,28 +93,30 @@ describe.serial("spawnEditor 脱父验证", () => {
     });
 
     let stdout = "";
+    let stderr = "";
     child.stdout.on("data", (d: Buffer) => {
       stdout += d.toString();
+    });
+    child.stderr.on("data", (d: Buffer) => {
+      stderr += d.toString();
     });
 
     const exitCode = await new Promise<number>((resolve) => {
       child.on("exit", (code) => resolve(code ?? 0));
     });
+    if (exitCode !== 0) {
+      process.stderr.write(`[detach] helper exited with ${exitCode}, stderr: ${stderr}\n`);
+    }
     expect(exitCode).toBe(0);
 
     const match = stdout.match(/PID=(\d+)/);
     expect(match).not.toBeNull();
     const pid = parseInt(match![1], 10);
+    editorPids.push(pid);
 
-    await Bun.sleep(500);
-    expect(isAlive(pid)).toBe(true);
+    expect(await waitFor(() => isAlive(pid))).toBe(true);
 
     stopForce(pid);
-    const start = Date.now();
-    while (Date.now() - start < 5000) {
-      if (!isAlive(pid)) break;
-      await Bun.sleep(100);
-    }
-    expect(isAlive(pid)).toBe(false);
-  }, 30000);
+    expect(await waitDead(pid, 10_000)).toBe(true);
+  }, 60_000);
 });
