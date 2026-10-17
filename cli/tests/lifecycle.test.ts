@@ -154,9 +154,19 @@ if (!noListen) {
       if (url.pathname !== "/mcp") return new Response("not found", { status: 404 });
       let body = {};
       try { body = await req.json(); } catch {}
-      report.calls.push({ method: body.method, name: body.params?.arguments?.name ?? null });
+      const params = body.params ?? {};
+      const isDirect = params.name !== "call_tool";
+      const toolName = isDirect ? (params.name ?? null) : (params.arguments?.name ?? null);
+      report.calls.push({ method: body.method, name: toolName, direct: isDirect });
       saveReport(report);
       if (body?.method === "notifications/initialized") return new Response("{}", { status: 200 });
+      if (toolName === "ping" && !isDirect) {
+        return new Response(JSON.stringify({
+          jsonrpc: "2.0",
+          id: body?.id ?? 1,
+          error: { code: -32602, message: "ping is a meta tool and must be called directly" },
+        }), { status: 400, headers: { "content-type": "application/json" } });
+      }
       const payload = {
         jsonrpc: "2.0",
         id: body?.id ?? 1,
@@ -198,7 +208,7 @@ afterAll(async () => {
   fs.rmSync(fakeGodotDir, { recursive: true, force: true });
 });
 
-function readReport(): { pid: number; argv: string[]; env: Record<string, string | null>; import: unknown; calls: { method: string; name: string | null }[] } | null {
+function readReport(): { pid: number; argv: string[]; env: Record<string, string | null>; import: unknown; calls: { method: string; name: string | null; direct: boolean }[] } | null {
   if (!fs.existsSync(fakeReportPath)) return null;
   return JSON.parse(fs.readFileSync(fakeReportPath, "utf8"));
 }
@@ -220,7 +230,7 @@ async function startFake(opts: { headless?: boolean; play?: boolean; noImport?: 
       headless: opts.headless ?? true,
       play: opts.play ?? false,
       portText: opts.portText,
-      waitText: opts.waitText ?? "10",
+      waitText: opts.waitText ?? "3",
     }),
   );
 }
@@ -293,7 +303,16 @@ describe("start", () => {
     expect(report!.argv).toContain("--headless");
     expect(report!.argv).toContain("--editor");
     expect(report!.argv).toContain("--path");
-    expect(report!.calls.some((c) => c.name === "ping")).toBe(true);
+    expect(report!.calls.some((c) => c.name === "ping" && c.direct === true)).toBe(true);
+  });
+
+  test("ping 直达探测 1s 内就绪", async () => {
+    const projectDir = makeProjectDir();
+    const start = Date.now();
+    const { code } = await startFake({ projectDir, headless: true, noImport: true, waitText: "1" });
+    const elapsed = Date.now() - start;
+    expect(code).toBe(ExitCode.Success);
+    expect(elapsed).toBeLessThan(1000);
   });
 
   test("幂等：同 project 二次 start 不重复启动", async () => {
@@ -302,14 +321,14 @@ describe("start", () => {
     expect(first.code).toBe(ExitCode.Success);
     const instances = registeredInstances();
     expect(instances).toHaveLength(1);
-    expect(readReport()!.calls.filter((c) => c.name === "ping")).toHaveLength(1);
+    expect(readReport()!.calls.filter((c) => c.name === "ping" && c.direct === true)).toHaveLength(1);
 
     const second = await startFake({ projectDir, headless: true, resetReport: false });
     expect(second.code).toBe(ExitCode.Success);
     const parsed = JSON.parse(second.stdout);
     expect(parsed.id).toBe(instances[0].id);
     expect(registeredInstances()).toHaveLength(1);
-    expect(readReport()!.calls.filter((c) => c.name === "ping")).toHaveLength(1);
+    expect(readReport()!.calls.filter((c) => c.name === "ping" && c.direct === true)).toHaveLength(1);
   });
 
   test("默认执行 import 预步，--no-import 跳过", async () => {

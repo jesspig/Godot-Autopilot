@@ -123,7 +123,7 @@ async function waitForReady(port: number, pid: number, waitSec: number, logPath:
       );
     }
     try {
-      await callTool("ping", {}, { port, timeoutSec: PROBE_TIMEOUT_SEC });
+      await callTool("ping", {}, { port, timeoutSec: PROBE_TIMEOUT_SEC, direct: true });
       return;
     } catch {
       if (Date.now() >= deadline) {
