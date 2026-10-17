@@ -69,6 +69,27 @@ Godot-Autopilotは、プラグインとして**Godotエディター内部**に�
 
 ソースからビルドしたり貢献したりしたい場合は、[docs/wiki/](docs/wiki/)（まずは[index.md](docs/wiki/index.md)、ビルドは[build.md](docs/wiki/build.md)）と[tests/README.md](tests/README.md)をご覧ください。
 
+## コマンドラインからの利用
+
+チャットクライアントではなくターミナルから操作したいですか？GDA CLI は実行中の GDA インスタンスをシェルから操作します。MCPクライアントの統合は不要です。Bun + TypeScript 製で、ソースから直接実行でき、**実行時依存関係ゼロ**、ビルド手順もありません。
+
+`bunx` でその場実行します（PowerShell では `#` がコメント開始になるため引用符が必要です）：
+
+```
+bunx "github:jesspig/Godot-Autopilot#0.2.7" ping
+```
+
+または一度グローバルインストールして、`gda` コマンドを使います：
+
+```
+bun install -g github:jesspig/Godot-Autopilot#0.2.7
+gda ping
+```
+
+コマンドファミリー：**呼び出し系** — `ping` / `status` / `categories` / `search` / `describe` / `call`；**ライフサイクル** — `list` / `start` / `stop` / `logs`。
+
+**Bun** が必要です。詳細なリファレンスは [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md) をご覧ください。
+
 ## 安全上の注意
 
 サーバーはお使いのマシンのループバックアドレス上でのみ待ち受けます（プラグイン設定のポート、既定では9527、パスは`/mcp`固定）。ローカル外のアドレスは拒否します。スクリプト実行、ゲーム制御、OSプロセスのツールは**既定で拒否**されます。信頼できるローカルプロジェクトでのみ有効化します。詳細は[docs/wiki/security_contract.md](docs/wiki/security_contract.md)をご覧ください。

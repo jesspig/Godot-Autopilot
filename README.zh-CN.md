@@ -69,6 +69,27 @@ Godot-Autopilot 是一个住在 **Godot 编辑器内部**的插件型 [MCP](http
 
 想从源码构建或参与贡献？见 [docs/wiki/](docs/wiki/)（入口 [index.md](docs/wiki/index.md)，构建见 [build.md](docs/wiki/build.md)）与 [tests/README.md](tests/README.md)。
 
+## 命令行访问
+
+更想直接敲命令而不接 MCP 客户端？GDA CLI 让你在终端里驱动正在运行的 GDA 实例，无需集成 MCP 客户端。它基于 Bun + TypeScript，源码直跑，**零运行时依赖**、无构建步骤。
+
+用 `bunx` 单次执行（PowerShell 下需加引号，因为 `#` 会被当作注释）：
+
+```
+bunx "github:jesspig/Godot-Autopilot#0.2.7" ping
+```
+
+或全局安装一次，之后直接用 `gda` 命令：
+
+```
+bun install -g github:jesspig/Godot-Autopilot#0.2.7
+gda ping
+```
+
+命令族：**调用族** —— `ping` / `status` / `categories` / `search` / `describe` / `call`；**生命周期** —— `list` / `start` / `stop` / `logs`。
+
+需要 **Bun**。完整参考见 [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md)。
+
 ## 安全说明
 
 服务端只监听本机回环地址（端口取自插件配置，默认 9527，路径固定 `/mcp`），非本机地址拒绝启动。脚本执行、游戏控制、操作系统进程类工具**默认全部拒绝**——只在你信任的本地项目中开启。详见 [docs/wiki/security_contract.md](docs/wiki/security_contract.md)。
