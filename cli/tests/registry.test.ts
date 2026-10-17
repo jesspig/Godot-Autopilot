@@ -97,7 +97,7 @@ describe.serial("loadRegistry 三态", () => {
       stopForce(pid);
       await waitForDead(pid);
     }
-  });
+  }, 30000);
 });
 
 describe.serial("死 pid 清理", () => {
@@ -158,7 +158,7 @@ describe.serial("findById", () => {
       stopForce(pid);
       await waitForDead(pid);
     }
-  });
+  }, 30000);
 });
 
 describe.serial("findLiveByProject", () => {
@@ -178,5 +178,5 @@ describe.serial("findLiveByProject", () => {
       stopForce(pid);
       await waitForDead(pid);
     }
-  });
+  }, 30000);
 });

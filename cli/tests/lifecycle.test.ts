@@ -11,43 +11,46 @@ import { run as runStop } from "../src/commands/stop";
 import { ExitCode } from "../src/errors";
 import { isAlive, stopForce } from "../src/process";
 import { loadRegistry, stateDir, type InstanceEntry } from "../src/registry";
+import { killImage, killPid, removeDirWithRetry, waitDead, waitFor } from "./support/cleanup";
+
+// 端口反查（netstat 轮询）+ ping 探测引入固定延迟，2s 阈值在系统负载高时不足
+// 首次执行的编译产物冷启动实测 3.5-3.8s（缓存命中后 ~1s），3s 就绪预算必然偶发超时
+const START_READY_MAX_MS = 10_000;
+const START_WAIT_TEXT = "10";
+const TEST_TIMEOUT_MS = 60_000;
+const HOOK_TIMEOUT_MS = 60_000;
+
+const RUN_TAG = `gda-lifecycle-${Math.random().toString(36).slice(2, 8)}`;
 
 let tmp: string;
 let prevHome: string | undefined;
 
 beforeEach(() => {
-  tmp = fs.mkdtempSync(path.join(os.tmpdir(), "gda-lifecycle-"));
+  tmp = fs.mkdtempSync(path.join(os.tmpdir(), `${RUN_TAG}-`));
   prevHome = process.env.GODOT_AUTOPILOT_CLI_HOME;
   process.env.GODOT_AUTOPILOT_CLI_HOME = tmp;
 });
 
 afterEach(async () => {
-  await killAllRegistered();
-  await killOrphanFakeGodot();
-  if (prevHome === undefined) {
-    delete process.env.GODOT_AUTOPILOT_CLI_HOME;
-  } else {
-    process.env.GODOT_AUTOPILOT_CLI_HOME = prevHome;
+  try {
+    await killAllRegistered();
+    await killOrphanFakeGodot();
+    await removeDirWithRetry(tmp);
+  } catch (error) {
+    process.stderr.write(`[cleanup] afterEach failed: ${String(error)}\n`);
+  } finally {
+    if (prevHome === undefined) {
+      delete process.env.GODOT_AUTOPILOT_CLI_HOME;
+    } else {
+      process.env.GODOT_AUTOPILOT_CLI_HOME = prevHome;
+    }
   }
-  fs.rmSync(tmp, { recursive: true, force: true });
-});
-
-async function waitDead(pid: number, timeoutMs = 500): Promise<void> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    if (!isAlive(pid)) return;
-    await Bun.sleep(100);
-  }
-}
+}, HOOK_TIMEOUT_MS);
 
 async function killAllRegistered(): Promise<void> {
   try {
     for (const entry of loadRegistry().instances) {
-      try {
-        stopForce(entry.pid);
-      } catch {
-      }
-      await waitDead(entry.pid);
+      await killPid(entry.pid);
     }
   } catch {
   }
@@ -56,9 +59,7 @@ async function killAllRegistered(): Promise<void> {
 async function killOrphanFakeGodot(): Promise<void> {
   if (fakeGodotExe === undefined) return;
   if (process.platform !== "win32") return;
-  const exeName = path.basename(fakeGodotExe);
-  spawnSync("taskkill", ["/F", "/IM", exeName], { stdio: "ignore" });
-  await Bun.sleep(200);
+  await killImage(path.basename(fakeGodotExe));
 }
 
 function writeEntry(entry: InstanceEntry): void {
@@ -193,8 +194,8 @@ if (!noListen) {
 `;
 
 beforeAll(async () => {
-  fakeGodotDir = fs.mkdtempSync(path.join(os.tmpdir(), "gda-lifecycle-fake-godot-"));
-  const scriptPath = path.join(fakeGodotDir, "fake_godot.js");
+  fakeGodotDir = fs.mkdtempSync(path.join(os.tmpdir(), `${RUN_TAG}-fake-godot-`));
+  const scriptPath = path.join(fakeGodotDir, `${RUN_TAG}.js`);
   fs.writeFileSync(scriptPath, FAKE_GODOT_SOURCE);
   const result = await Bun.build({
     entrypoints: [scriptPath],
@@ -210,21 +211,41 @@ beforeAll(async () => {
     fs.chmodSync(fakeGodotExe, 0o755);
   }
   fakeReportPath = path.join(fakeGodotDir, "report.json");
-});
+  spawnSync(fakeGodotExe, ["--headless", "--import", "--path", fakeGodotDir], {
+    env: { ...process.env, GDA_FAKE_GODOT_REPORT: fakeReportPath },
+    stdio: "ignore",
+    timeout: 30_000,
+  });
+}, HOOK_TIMEOUT_MS);
 
 afterAll(async () => {
-  await killAllRegistered();
-  await killOrphanFakeGodot();
-  fs.rmSync(fakeGodotDir, { recursive: true, force: true });
-});
+  try {
+    await killAllRegistered();
+    await killOrphanFakeGodot();
+    await removeDirWithRetry(fakeGodotDir);
+  } catch (error) {
+    process.stderr.write(`[cleanup] afterAll failed: ${String(error)}\n`);
+  }
+}, HOOK_TIMEOUT_MS);
+
+type FakeReport = NonNullable<ReturnType<typeof readReport>>;
 
 function readReport(): { pid: number; argv: string[]; env: Record<string, string | null>; import: unknown; calls: { method: string; name: string | null; direct: boolean }[] } | null {
   if (!fs.existsSync(fakeReportPath)) return null;
   return JSON.parse(fs.readFileSync(fakeReportPath, "utf8"));
 }
 
-// 端口反查（netstat 轮询）+ ping 探测引入固定延迟，2s 阈值在系统负载高时不足
-const START_READY_MAX_MS = 10_000;
+async function reportWhen(probe: (report: FakeReport) => boolean, timeoutMs = 2000): Promise<boolean> {
+  return waitFor(() => {
+    const report = readReport();
+    return report !== null && probe(report);
+  }, timeoutMs);
+}
+
+async function waitForInstances(count: number): Promise<InstanceEntry[]> {
+  await waitFor(() => registeredInstances().length === count);
+  return registeredInstances();
+}
 
 async function startFake(opts: { headless?: boolean; play?: boolean; noImport?: boolean; portText?: string; waitText?: string; projectDir?: string; noListen?: boolean; resetReport?: boolean }) {
   process.env.GDA_FAKE_GODOT_REPORT = fakeReportPath;
@@ -243,7 +264,7 @@ async function startFake(opts: { headless?: boolean; play?: boolean; noImport?: 
       headless: opts.headless ?? true,
       play: opts.play ?? false,
       portText: opts.portText,
-      waitText: opts.waitText ?? "3",
+      waitText: opts.waitText ?? START_WAIT_TEXT,
     }),
   );
 }
@@ -296,7 +317,7 @@ describe.serial("start", () => {
     const { code } = await startFake({ projectDir, headless: true, noImport: true });
     expect(code).toBe(ExitCode.Success);
 
-    const instances = registeredInstances();
+    const instances = await waitForInstances(1);
     expect(instances).toHaveLength(1);
     const entry = instances[0];
     expect(entry.id).toMatch(/^p\d+$/);
@@ -309,6 +330,7 @@ describe.serial("start", () => {
     expect(entry.log).toBe(path.join(stateDir(), "logs", `${entry.id}.log`));
     expect(fs.existsSync(entry.log)).toBe(true);
 
+    expect(await reportWhen((r) => r.calls.some((c) => c.name === "ping" && c.direct === true))).toBe(true);
     const report = readReport();
     expect(report).not.toBeNull();
     expect(report!.env.GODOT_AUTOPILOT_PORT).toBe(String(entry.port));
@@ -317,7 +339,7 @@ describe.serial("start", () => {
     expect(report!.argv).toContain("--editor");
     expect(report!.argv).toContain("--path");
     expect(report!.calls.some((c) => c.name === "ping" && c.direct === true)).toBe(true);
-  }, 30000);
+  }, TEST_TIMEOUT_MS);
 
   test("ping 直达探测 1s 内就绪", async () => {
     const projectDir = makeProjectDir();
@@ -326,68 +348,73 @@ describe.serial("start", () => {
     const elapsed = Date.now() - start;
     expect(code).toBe(ExitCode.Success);
     expect(elapsed).toBeLessThan(START_READY_MAX_MS);
-  }, 30000);
+  }, TEST_TIMEOUT_MS);
 
   test("幂等：同 project 二次 start 不重复启动", async () => {
     const projectDir = makeProjectDir();
     const first = await startFake({ projectDir, headless: true });
     expect(first.code).toBe(ExitCode.Success);
-    const instances = registeredInstances();
+    const instances = await waitForInstances(1);
     expect(instances).toHaveLength(1);
+    expect(await reportWhen((r) => r.calls.filter((c) => c.name === "ping" && c.direct === true).length === 1)).toBe(true);
     expect(readReport()!.calls.filter((c) => c.name === "ping" && c.direct === true)).toHaveLength(1);
 
     const second = await startFake({ projectDir, headless: true, resetReport: false });
     expect(second.code).toBe(ExitCode.Success);
     const parsed = JSON.parse(second.stdout);
     expect(parsed.id).toBe(instances[0].id);
-    expect(registeredInstances()).toHaveLength(1);
+    expect((await waitForInstances(1))).toHaveLength(1);
     expect(readReport()!.calls.filter((c) => c.name === "ping" && c.direct === true)).toHaveLength(1);
-  }, 30000);
+  }, TEST_TIMEOUT_MS);
 
   test("默认执行 import 预步，--no-import 跳过", async () => {
     const withImport = await startFake({ headless: true, noImport: false });
     expect(withImport.code).toBe(ExitCode.Success);
+    expect(await reportWhen((r) => r.import !== null)).toBe(true);
     expect(readReport()!.import).not.toBeNull();
     await killAllRegistered();
 
     const withoutImport = await startFake({ headless: true, noImport: true });
     expect(withoutImport.code).toBe(ExitCode.Success);
+    expect(await reportWhen((r) => r.import === null)).toBe(true);
     expect(readReport()!.import).toBeNull();
-  }, 30000);
+  }, TEST_TIMEOUT_MS);
 
   test("--play 就绪后调用 play_editor_current_scene", async () => {
     const { code } = await startFake({ headless: true, play: true });
     expect(code).toBe(ExitCode.Success);
+    expect(await reportWhen((r) => r.calls.some((c) => c.name === "play_editor_current_scene"))).toBe(true);
     const report = readReport();
     expect(report!.calls.some((c) => c.name === "play_editor_current_scene")).toBe(true);
-  }, 30000);
+  }, TEST_TIMEOUT_MS);
 
   test("端口被占用时自动跳过选择下一个", async () => {
     const blocker = Bun.serve({ port: 9530, hostname: "127.0.0.1", fetch: () => new Response("x") });
     try {
       const { code } = await startFake({ headless: true });
       expect(code).toBe(ExitCode.Success);
-      const instances = registeredInstances();
+      const instances = await waitForInstances(1);
       expect(instances).toHaveLength(1);
       expect(instances[0].port).not.toBe(9530);
     } finally {
       blocker.stop();
     }
-  }, 30000);
+  }, TEST_TIMEOUT_MS);
 
   test("显式 --port 直接使用", async () => {
     const { code } = await startFake({ headless: true, portText: "9567" });
     expect(code).toBe(ExitCode.Success);
-    expect(registeredInstances()[0].port).toBe(9567);
-  }, 30000);
+    expect((await waitForInstances(1))[0].port).toBe(9567);
+  }, TEST_TIMEOUT_MS);
 
   test("非 headless 不注入无头环境", async () => {
     const { code } = await startFake({ headless: false });
     expect(code).toBe(ExitCode.Success);
+    expect(await waitFor(() => readReport() !== null)).toBe(true);
     const report = readReport();
     expect(report!.env.GDA_FORCE_HEADLESS).toBeNull();
     expect(report!.argv).not.toContain("--headless");
-  }, 30000);
+  }, TEST_TIMEOUT_MS);
 
   test("就绪超时返回 exit 2 且不登记", async () => {
     process.env.GDA_FAKE_GODOT_REPORT = fakeReportPath;
@@ -407,13 +434,12 @@ describe.serial("start", () => {
       expect(registeredInstances()).toHaveLength(0);
       const report = readReport();
       if (report !== null) {
-        stopForce(report.pid);
-        await waitDead(report.pid);
+        await killPid(report.pid);
       }
     } finally {
       delete process.env.GDA_FAKE_GODOT_NO_LISTEN;
     }
-  }, 30000);
+  }, TEST_TIMEOUT_MS);
 });
 
 describe.serial("stop", () => {
@@ -442,7 +468,7 @@ describe.serial("stop", () => {
       stopForce(runner.pid);
       await waitDead(runner.pid);
     }
-  }, 30000);
+  }, TEST_TIMEOUT_MS);
 
   test("--force 终止进程并清理登记", async () => {
     const runner = spawn(process.execPath, ["-e", "setTimeout(()=>{},20000)"], { stdio: "ignore" });
@@ -453,7 +479,7 @@ describe.serial("stop", () => {
     expect(JSON.parse(stdout).ok).toBe(true);
     expect(isAlive(pid)).toBe(false);
     expect(registeredInstances()).toHaveLength(0);
-  }, 30000);
+  }, TEST_TIMEOUT_MS);
 
   test("进程已死时直接清理登记", async () => {
     const runner = spawn(process.execPath, ["-e", "setTimeout(()=>{},20000)"], { stdio: "ignore" });
@@ -464,7 +490,7 @@ describe.serial("stop", () => {
     const { code } = await captureStdout(() => runStop([`p${pid}`], {}));
     expect(code).toBe(ExitCode.Success);
     expect(registeredInstances()).toHaveLength(0);
-  }, 30000);
+  }, TEST_TIMEOUT_MS);
 
   test("--project 按工程路径定位实例", async () => {
     const runner = spawn(process.execPath, ["-e", "setTimeout(()=>{},20000)"], { stdio: "ignore" });
@@ -474,7 +500,7 @@ describe.serial("stop", () => {
     expect(code).toBe(ExitCode.Success);
     expect(isAlive(runner.pid)).toBe(false);
     expect(registeredInstances()).toHaveLength(0);
-  }, 30000);
+  }, TEST_TIMEOUT_MS);
 });
 
 describe.serial("logs", () => {
