@@ -142,7 +142,18 @@ add_test(NAME migration_guard
 add_test(NAME comment_guard
     COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/comment_guard.py")
 
-# ── ctest 注册: 技能脚本 mock conformance（纯 stdlib + 自带 mock server）──
-# node 缺失时测试文件自行打印 SKIP 并 exit 0，ctest 视为通过；bun 仅在存在时加跑核心子集。
-add_test(NAME skill_scripts
-    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_skill_scripts.py")
+# ── ctest 注册: 版本号三处一致性守卫（零依赖，读源码断言，无需构建产物） ──
+add_test(NAME version_sync_guard
+    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/version_sync_guard.py")
+
+# ── ctest 注册: 双载体 CLI 契约 mock conformance（纯 stdlib + 自带 mock server）──
+# node 缺失时测试文件自行打印 SKIP 并 exit 0，ctest 视为通过；bun 缺失时
+# bun 子集（legacy 核心子集与新 CLI 组）打印 SKIP 且不 FAIL。
+add_test(NAME cli_contract
+    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_cli_contract.py")
+
+# ── ctest 注册: 新 CLI TS 单测（bun test cli/tests，cwd 为仓库根）──
+# bun 缺失时测试文件自行打印 SKIP 并 exit 0，ctest 视为通过。
+add_test(NAME cli_unit
+    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_cli_unit.py")
+set_tests_properties(cli_unit PROPERTIES TIMEOUT 300)

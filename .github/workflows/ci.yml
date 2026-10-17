@@ -37,6 +37,19 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.x"
+
+      - name: Install CLI dependencies
+        run: bun install --frozen-lockfile
+
+      # typecheck 为纯静态检查，三平台结果一致，仅 ubuntu 执行省时
+      - name: CLI typecheck
+        if: matrix.os == 'ubuntu-latest'
+        run: bun run typecheck
+
       - name: Install Ninja
         uses: seanmiddleditch/gha-setup-ninja@v5
 

@@ -13,7 +13,7 @@ export interface GlobalOptions {
   tagsText?: string;
   argsJson?: string;
   argsFile?: string;
-  saveImages?: boolean;
+  saveImages?: string;
   help?: boolean;
   version?: boolean;
   godot?: string;
@@ -34,6 +34,7 @@ const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
   "--tags": "tagsText",
   "--args": "argsJson",
   "--args-file": "argsFile",
+  "--save-images": "saveImages",
   "--godot": "godot",
   "--wait": "waitText",
   "--tail": "tailText",
@@ -43,7 +44,6 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--pretty": "pretty",
   "--raw": "raw",
   "--quiet": "quiet",
-  "--saveImages": "saveImages",
   "--help": "help",
   "--version": "version",
   "--headless": "headless",
@@ -125,12 +125,12 @@ export function usageText(): string {
   --pretty            美化 JSON 输出（缩进 2 空格）
   --raw              原始 JSON 输出
   --quiet            静默模式
-  --timeout <text>    调用超时（毫秒）
+  --timeout <text>    调用超时（秒）
   --category <text>   按类别过滤
   --tags <text>       按标签过滤（逗号分隔）
   --args <json>       工具调用参数（JSON 字符串）
   --args-file <path>  工具调用参数（JSON 文件）
-  --save-images       保存返回的图片到本地
+  --save-images <dir> 保存返回的图片到本地目录
   --godot <path>      显式指定 Godot 可执行文件（start）
   --headless          以无头模式启动编辑器（start）
   --play              就绪后播放当前场景（start）
