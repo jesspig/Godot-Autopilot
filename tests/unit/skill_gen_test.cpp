@@ -90,7 +90,7 @@ const char *const kManualWhitelist[] = {
     "user_tools", "definition", "callable", "handle", "scanned", "registered",
     "failed", "errors", "directory", "enabled",
 
-    "gda_mcp",
+    "gda",
 
     "dynamic", "required", "type", "description", "error", "file", "args",
     "name", "params", "tags", "category"};
@@ -412,7 +412,7 @@ TEST(SkillGenTest, ScriptChannelContract) {
   const SkillFile *script_file = nullptr;
   const SkillFile *fallback_file = nullptr;
   for (const SkillFile &file : tools_skill->files) {
-    if (file.relative_path == "scripts/gda_mcp.mjs") {
+    if (file.relative_path == "scripts/gda.mjs") {
       script_file = &file;
     }
     if (file.relative_path == "references/manual-fallback.md") {
@@ -427,10 +427,16 @@ TEST(SkillGenTest, ScriptChannelContract) {
 
   for (const SkillSpec &spec : skills) {
     ASSERT_FALSE(spec.files.empty()) << spec.name;
-    EXPECT_NE(spec.files[0].body.find("gda_mcp.mjs"), std::string::npos)
-        << spec.name << ": SKILL.md must mention gda_mcp.mjs";
+    EXPECT_NE(spec.files[0].body.find("godot-autopilot-tools"), std::string::npos)
+        << spec.name << ": SKILL.md must mention godot-autopilot-tools";
     EXPECT_NE(spec.files[0].body.find("manual-fallback"), std::string::npos)
         << spec.name << ": SKILL.md must mention manual-fallback";
+    if (spec.name == "godot-autopilot-tools") {
+      EXPECT_NE(spec.files[0].body.find("gda.mjs"), std::string::npos)
+          << spec.name << ": SKILL.md must mention gda.mjs";
+      EXPECT_NE(spec.files[0].body.find("bunx"), std::string::npos)
+          << spec.name << ": SKILL.md must mention bunx";
+    }
     for (const SkillFile &file : spec.files) {
       if (!ends_with(file.relative_path, ".md")) {
         continue;

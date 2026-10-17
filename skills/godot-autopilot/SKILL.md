@@ -141,9 +141,10 @@ references/development-workflow.md expands this into complete loops for UI and s
 
 If your MCP client shows an empty tool list or calls fail right after the editor restarted, the server is usually fine and the client harness simply did not reconnect. Work down this ladder:
 
-1. Native MCP tools - retry the connection first; this is the normal channel.
-2. Script bridge - run `node .agents/skills/godot-autopilot-tools/scripts/gda_mcp.mjs` (requires Node 18+ or Bun) to reach the same server without a working MCP client.
-3. Neither installed - fall back to a manual plan per `references/manual-fallback.md` of the godot-autopilot-tools skill.
+1. Native MCP Tools - retry the connection first; this is the normal channel.
+2. GDA CLI (Bun) - run `bunx --no-install "github:jesspig/Godot-Autopilot#0.2.7" <cmd>` first; if not cached, `bunx "github:jesspig/Godot-Autopilot#0.2.7" <cmd>` downloads once. Quotes are required on PowerShell because `#` starts a comment. Calling commands: ping/status/categories/search/describe/call; lifecycle: list/start/stop/logs. See the godot-autopilot-tools skill for the full reference.
+3. Script bridge - when Bun is unavailable but Node 18+ or Bun exists, run `node .agents/skills/godot-autopilot-tools/scripts/gda.mjs` to reach the same server without a working MCP client.
+4. No script runtime either - fall back to a manual plan per `references/manual-fallback.md` of the godot-autopilot-tools skill.
 
 ## See also
 

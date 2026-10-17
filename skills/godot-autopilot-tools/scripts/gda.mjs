@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// gda_mcp.mjs - call the Godot Autopilot (GDA) MCP server over plain HTTP.
+// gda.mjs - call the Godot Autopilot (GDA) MCP server over plain HTTP.
 //
 // This script pins the two-step protocol documented in tools--script-access.md
 // into code so callers do not hand-craft requests: it resolves the server
@@ -56,7 +56,7 @@ function makeEnvelope(id, name, args, direct) {
 
 function usageText() {
   return [
-    "Usage: gda_mcp.mjs [options] <command> [arguments]",
+    "Usage: gda.mjs [options] <command> [arguments]",
     "",
     "Commands:",
     "  ping                              Call the ping meta tool.",
@@ -85,9 +85,9 @@ function usageText() {
     "Exit codes: 0 success, 1 tool-level failure, 2 transport failure, 3 usage error.",
     "",
     "Examples:",
-    "  node gda_mcp.mjs ping",
-    "  node gda_mcp.mjs search \"spawn enemy\" --category scene-system",
-    "  node gda_mcp.mjs call create_scene_node --args '{\"type\":\"Node2D\",\"name\":\"Player\"}'",
+    "  node gda.mjs ping",
+    "  node gda.mjs search \"spawn enemy\" --category scene-system",
+    "  node gda.mjs call create_scene_node --args '{\"type\":\"Node2D\",\"name\":\"Player\"}'",
   ].join("\n");
 }
 

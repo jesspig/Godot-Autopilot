@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Mock MCP conformance tests for skills/godot-autopilot-tools/scripts/gda_mcp.mjs.
+"""Mock MCP conformance tests for skills/godot-autopilot-tools/scripts/gda.mjs.
 
 Spins up an in-process mock MCP server (http.server on 127.0.0.1 with a
 random port) that mimics the real server's wire behavior, then drives the
-actual gda_mcp.mjs CLI through node (and a core subset through bun when
+actual gda.mjs CLI through node (and a core subset through bun when
 available) and asserts stdout JSON, exit codes, and side effects.
 
 Stdlib only. Never writes inside the repo (image drops go to tempfile).
@@ -24,7 +24,7 @@ import threading
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = ROOT / "skills" / "godot-autopilot-tools" / "scripts" / "gda_mcp.mjs"
+SCRIPT = ROOT / "skills" / "godot-autopilot-tools" / "scripts" / "gda.mjs"
 
 CALL_TIMEOUT = 30
 
@@ -208,7 +208,7 @@ def main():
         print("SKIP: node not found on PATH, mock MCP conformance tests skipped")
         return 0
     if not SCRIPT.is_file():
-        print(f"FAIL: gda_mcp.mjs not found at {SCRIPT}")
+        print(f"FAIL: gda.mjs not found at {SCRIPT}")
         return 1
     bun = shutil.which("bun")
 

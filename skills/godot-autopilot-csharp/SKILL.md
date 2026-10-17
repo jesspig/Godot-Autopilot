@@ -5,7 +5,7 @@ description: "Godot C#/.NET project guide: the dotnet build loop with build_csha
 
 # C# / .NET Workflows
 
-Invocation: use the native MCP tools first; when that channel is down, use the script bridge `node .agents/skills/godot-autopilot-tools/scripts/gda_mcp.mjs` (Node 18+ or Bun); with neither installed, build a manual plan per `references/manual-fallback.md` of the godot-autopilot-tools skill.
+Invocation: use the native MCP tools first; when that channel is down, follow the calling ladder in the godot-autopilot-tools skill (bunx gda CLI or the bundled script bridge); with neither available, work through its references/manual-fallback.md.
 
 C# projects run on the editor's .NET assembly, which changes the workflow in
 three ways: a build step sits between editing and observing, C# declarations
