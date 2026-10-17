@@ -2,6 +2,10 @@
 
 > 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天。
 
+## 2026-10-18
+
+- **CLI 载体落地 + 双载体协议握手升级 + 真机缺陷修复 + 测试稳定性修复**：分支 `feature/cli-skills`（合并入 `feature/cli`）。新增 `cli/`（Bun + TS 源码直跑，零运行时依赖）+ 根 `package.json`/`bun.lock`；命令 `gda`（调用族 6 + 生命周期 4），寻址链对齐 legacy 五级链，登记表 `instances.json` + 锁 + 死 pid 清理，生命周期 `start`（Godot 链/端口 9530–9599/导入预步/就绪探测/Windows 蹦床脱父）/`stop`（优雅优先，`--force` 强杀）。双载体（CLI + `gda.mjs`）协议握手升级为标准 MCP `initialize` 流程（SDK 0.3.7 旧懒握手只发 `initialized` 被拒 `-32600`）。真机验收修复两个缺陷（Windows 脱父、start 就绪探测直达标志）。测试稳定性修复（串行化 + Windows 清理时序）。ctest 注册点 476→478（`skill_scripts` 由 `cli_contract` + `cli_unit` 取代，新增 `version_sync_guard`）。验证：`bun test cli/tests` 102/102、`ctest -N` 478、`skills/` 35 文件。wiki 七页同步。**改动全部留在工作树，未提交**。详见 [2026-10-18-log.md](changelog/2026-10-18-log.md)
+
 ## 2026-10-16
 
 - **依赖升级：mcp-cpp-sdk 0.3.4 → 0.3.7（仅安全迁移，未启用新特性）**：分支 `feature/mcp-sdk-0.3.7`（基线 `736f3b4`），**改动全部留在工作树，未提交 / 未合并 / 未推送**。子模块 gitlink `e2ed352`→`7dfe088`（tag `0.3.7`；远端无 `0.3.6`）；唯一编译期破坏为 SDK 自 0.3.5 起删除 `JsonValue::FromObject` / `FromArray`，就地替换 8 处为 `JsonValue(JsonValue::Object{...})`（`json_godot.hpp` 3 / `environment_ops.cpp` 2 / `nav_ops.cpp` 3），全仓归零。重核确认 `mcp-ext` 传递链接、协议常量 `"2026-07-28"`、`kSdkVersion = "0.3.7"` 均无碍；`ValidateToolCallArguments` 无条件校验与 `InvokeAsync` 异常通道因 GDA 恒经 `call_tool` 包装且异常在 `dispatch.cpp` 被吞而不可观测。验证：configure 实测 `[mcp] SDK version: 0.3.7`；L1 **428/428**（与 0.3.4 基线一致）；L2 定向 4/4、全量 **37/38**。唯一失败 `38_csharp_bridge` 定位为**既有缺陷**（`parse_csharp_classes` 未跳过类名与 `:` 之间空白；且首轮 L2 全量曾误跑 10-12 的旧部署副本 DLL——**跑 L2 前必须先 `uv run main.py deploy`**），非本迁移引入，未修。文档同步 `cmake/Dependencies.cmake` + wiki 四页；技能无受影响项。详见 [2026-10-16-log.md](changelog/2026-10-16-log.md)
