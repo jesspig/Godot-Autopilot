@@ -6,7 +6,7 @@ tags:
   - 安全
   - 并发
   - 契约
-timestamp: "2026-10-16T16:59:53+08:00"
+timestamp: "2026-10-18T04:01:49+08:00"
 resource:
   - src/core/server_context.cpp
   - src/core/command_queue.hpp
@@ -20,6 +20,8 @@ resource:
 # T0 安全边界与并发契约
 
 本页是 MCP 服务器进程内 GDExtension 的最小安全与并发契约。实现、评审和后续测试以本页条款为验收标准；代码事实见 [核心模块](modules/core.md) 与 [工具注册表](modules/tools_registry.md)。
+
+> 审计日期：2026-10-18（随 CLI 载体落地批次同步——§3.3 补记 SDK 0.3.7 握手升级与双载体修复，新增 §3.4 CLI 安全包络；详见 [changelog/2026-10-18-log.md](changelog/2026-10-18-log.md)）
 
 ## 1. 可信客户端模型
 
@@ -88,7 +90,19 @@ resource:
 - 请求头仅 `Content-Type: application/json` 与 `Accept`，无代理配置、无认证头；响应内容只做 `JSON.parse`，永不求值或执行。
 - 唯一写盘是 `--save-images DIR` 内的解码图片（自生成文件名 `gda_<timestamp>_<n>.png`）；`--args-file` 只读 JSON，不写盘。
 - 技能文档禁手写 HTTP：全部 33 个 .md 不得出现 `curl -` 与 `Invoke-WebRequest`（L1 逐文件断言），调用统一走脚本桥；无脚本运行时则停止自动化、按 `manual-fallback.md` 出手动指南，不得编造请求。
+- 握手升级（2026-10-18）：mcp-cpp-sdk 0.3.7 起严格要求完整 MCP 握手（`initialize` → `notifications/initialized`），旧懒握手只发 `notifications/initialized` 被拒 `-32600`。脚本桥（`6234a95`）与 CLI（`840e648`）同步升级为标准 `initialize` 流程；`test_cli_contract.py` 的 mock 服务器严格模拟该语义（未初始化时 `tools/call` 返回 400 + `-32600`）。
 - 本节不改变默认安全姿态：监听仍仅环回（§2）、高风险能力仍默认拒绝（§3.1）、脱敏仍默认开启（§3.2）。
+
+### 3.4 CLI 安全包络（2026-10-18 新增）
+
+gda CLI（Bun + TS 源码直跑，详见 [CLI 载体](modules/cli.md)）是技能书调用阶梯第二级，其安全包络如下：
+
+- **目标固定为 `127.0.0.1` 字面量**（`src/mcp/client.ts` 的 `HOST = "127.0.0.1"`），仅端口可调（1–65535）；无 URL 选项、无代理配置，与脚本桥 §3.3 同口径。
+- **无 shell 拼接**：进程 spawn 全部经 argv 数组（`node:child_process` 的 `spawn`/`spawnSync`），不经过 shell 解释；Windows 脱父用 `cmd /c start "" /b` 蹦床 + `netstat` 端口反查，参数均为字面量或数字 pid，无可注入面。
+- **状态文件仅落 state dir**：`instances.json`、`instances.lock`、`logs/` 全部限定在 `GODOT_AUTOPILOT_CLI_HOME` > `%LOCALAPPDATA%\godot-autopilot` > `$XDG_STATE_HOME/godot-autopilot` 解析出的目录内，不写工程目录、不写仓库。
+- **生命周期动作约束**：`start` 只启动 Godot 可执行文件链（`--godot` > `GODOT_PATH` > `.env` > PATH）指向的编辑器进程，注入 `GODOT_AUTOPILOT_PORT` 环境变量；`stop` 默认优雅（`taskkill /PID` / `SIGTERM`），失败只报告并提示 `--force`，**强杀必须显式 `--force`**（`taskkill /F /T /PID` / `SIGKILL`），不静默升级。
+- **不收集个人信息**：CLI 不读取工程内容、不上报任何遥测；唯一本地状态是实例登记表（id/project/port/pid/startedAt/headless/godot/log），且只存本机路径与 pid。
+- 与脚本桥一致：不改变默认安全姿态——监听仍仅环回（§2）、高风险能力仍默认拒绝（§3.1）、脱敏仍默认开启（§3.2）；CLI 自身不绕过 MCP 授权门（仍经 `call_tool` 受 `code_execute`/`game_runtime`/`user_tools` 门约束）。
 
 ## 4. Godot API 与线程
 
@@ -127,10 +141,12 @@ resource:
 - [ ] 路径边界、遍历/输入上限和响应截断行为均可被调用方检测。
 - [ ] 本地日志/trace 落盘符合边界约定：两目录保留上限生效；默认脱敏开启时 jsonl 不含内联 base64，`args_digest` 已剥离敏感字段；关闭脱敏仅由显式配置触发。
 - [ ] 技能脚本通道符合 §3.3 包络：目标为 `127.0.0.1` 仅端口可调、无代理与认证头、响应不执行、写盘仅限 `--save-images` 目录；技能文档无手写 HTTP 请求。
+- [ ] CLI 符合 §3.4 包络：目标为 `127.0.0.1` 字面量、spawn 无 shell 拼接、状态文件仅落 state dir、`stop` 强杀须显式 `--force`、不收集个人信息。
 
 ## 相关页面
 
 - [核心模块](modules/core.md)
 - [工具注册表](modules/tools_registry.md)
 - [入口与运行时桥接](modules/entry_runtime.md)
+- [CLI 载体](modules/cli.md)
 - [工程约定](conventions.md)
