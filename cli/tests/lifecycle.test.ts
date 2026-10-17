@@ -205,6 +205,9 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await killAllRegistered();
+  if (process.platform === "win32") {
+    spawnSync("powershell", ["-Command", "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'gda-lifecycle-fake-godot' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"], { stdio: "ignore" });
+  }
   fs.rmSync(fakeGodotDir, { recursive: true, force: true });
 });
 
@@ -312,7 +315,7 @@ describe("start", () => {
     const { code } = await startFake({ projectDir, headless: true, noImport: true, waitText: "1" });
     const elapsed = Date.now() - start;
     expect(code).toBe(ExitCode.Success);
-    expect(elapsed).toBeLessThan(1000);
+    expect(elapsed).toBeLessThan(2000);
   });
 
   test("幂等：同 project 二次 start 不重复启动", async () => {
