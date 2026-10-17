@@ -9,7 +9,17 @@ export interface JsonRpcResponse {
 export interface CallToolOptions {
   port: number;
   timeoutSec?: number;
+  direct?: boolean;
 }
+
+export const META_DIRECT_TOOLS: ReadonlySet<string> = new Set([
+  "ping",
+  "search_tools",
+  "list_categories",
+  "get_tool_detail",
+  "batch_execute",
+  "code_execute",
+]);
 
 const HOST = "127.0.0.1";
 const DEFAULT_TIMEOUT_SEC = 60;
@@ -48,12 +58,15 @@ interface RawResponse {
   text: string;
 }
 
-function makeCallEnvelope(id: number, name: string, args: Record<string, unknown>): string {
+function makeCallEnvelope(id: number, name: string, args: Record<string, unknown>, direct: boolean): string {
+  const params = direct
+    ? { name, arguments: args }
+    : { name: "call_tool", arguments: { name, arguments: args } };
   return JSON.stringify({
     jsonrpc: "2.0",
     id,
     method: "tools/call",
-    params: { name: "call_tool", arguments: { name, arguments: args } },
+    params,
   });
 }
 
@@ -157,7 +170,7 @@ export async function callTool(
   const url = `http://${HOST}:${opts.port}/mcp`;
 
   let id = nextRequestId++;
-  const body = makeCallEnvelope(id, name, args);
+  const body = makeCallEnvelope(id, name, args, opts.direct === true);
   const bodyBytes = Buffer.byteLength(body, "utf8");
   if (bodyBytes > MAX_BODY_BYTES) {
     throw new CliError(ExitCode.Transport, `request body exceeds 4 MiB (${bodyBytes} bytes).`);
@@ -183,7 +196,7 @@ export async function callTool(
         throw new CliError(ExitCode.Transport, `handshake failed with HTTP ${hs.status}.`, adviceForStatus(hs.status));
       }
       id = nextRequestId++;
-      res = await postJson(url, makeCallEnvelope(id, name, args), timeoutMs);
+      res = await postJson(url, makeCallEnvelope(id, name, args, opts.direct === true), timeoutMs);
       extracted = extractEnvelope(res);
     }
   }
