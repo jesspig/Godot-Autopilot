@@ -1,3 +1,4 @@
+import { CLI_VERSION } from "../version";
 import { CliError, ExitCode } from "../errors";
 
 export interface JsonRpcResponse {
@@ -26,6 +27,8 @@ const DEFAULT_TIMEOUT_SEC = 60;
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
 const HANDSHAKE_METHOD = "notifications/initialized";
 const HANDSHAKE_ERROR_CODE = -32600;
+const PROTOCOL_VERSION = "2025-03-26";
+const CLIENT_NAME = "gda-cli";
 
 const CONNECT_FAILURE_SUGGESTION =
   "Is the editor open with the Godot Autopilot plugin enabled? Verify the port with --port or GODOT_AUTOPILOT_PORT.";
@@ -51,6 +54,7 @@ function adviceForStatus(status: number, bodyBytes?: number): string {
 }
 
 let nextRequestId = 1;
+let handshakeDone = false;
 
 interface RawResponse {
   status: number;
@@ -68,6 +72,31 @@ function makeCallEnvelope(id: number, name: string, args: Record<string, unknown
     method: "tools/call",
     params,
   });
+}
+
+function makeInitializeEnvelope(): string {
+  return JSON.stringify({
+    jsonrpc: "2.0",
+    id: nextRequestId++,
+    method: "initialize",
+    params: {
+      protocolVersion: PROTOCOL_VERSION,
+      capabilities: {},
+      clientInfo: { name: CLIENT_NAME, version: CLI_VERSION },
+    },
+  });
+}
+
+async function performHandshake(url: string, timeoutMs: number): Promise<void> {
+  const initRes = await postJson(url, makeInitializeEnvelope(), timeoutMs);
+  if (initRes.status < 200 || initRes.status >= 300) {
+    throw new CliError(ExitCode.Transport, `initialize failed with HTTP ${initRes.status}.`);
+  }
+  const ackRes = await postJson(url, JSON.stringify({ jsonrpc: "2.0", method: HANDSHAKE_METHOD }), timeoutMs);
+  if (ackRes.status < 200 || ackRes.status >= 300) {
+    throw new CliError(ExitCode.Transport, `handshake failed with HTTP ${ackRes.status}.`);
+  }
+  handshakeDone = true;
 }
 
 async function postJson(url: string, body: string, timeoutMs: number): Promise<RawResponse> {
@@ -179,8 +208,9 @@ export async function callTool(
   let res = await postJson(url, body, timeoutMs);
   let extracted = extractEnvelope(res);
   if (
-    (extracted.kind === "envelope" && needsHandshake(res.status, extracted.envelope)) ||
-    (res.status === 400 && extracted.kind !== "envelope")
+    !handshakeDone &&
+    ((extracted.kind === "envelope" && needsHandshake(res.status, extracted.envelope)) ||
+      (res.status === 400 && extracted.kind !== "envelope"))
   ) {
     let envelope = extracted.kind === "envelope" ? extracted.envelope : null;
     if (envelope === null) {
@@ -191,10 +221,7 @@ export async function callTool(
       }
     }
     if (envelope === null || needsHandshake(res.status, envelope)) {
-      const hs = await postJson(url, JSON.stringify({ jsonrpc: "2.0", method: HANDSHAKE_METHOD }), timeoutMs);
-      if (hs.status < 200 || hs.status >= 300) {
-        throw new CliError(ExitCode.Transport, `handshake failed with HTTP ${hs.status}.`, adviceForStatus(hs.status));
-      }
+      await performHandshake(url, timeoutMs);
       id = nextRequestId++;
       res = await postJson(url, makeCallEnvelope(id, name, args, opts.direct === true), timeoutMs);
       extracted = extractEnvelope(res);

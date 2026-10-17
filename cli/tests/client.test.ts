@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { callTool } from "../src/mcp/client";
+import { CLI_VERSION } from "../src/version";
 import { CliError, ExitCode } from "../src/errors";
 
 const servers: Bun.Server[] = [];
@@ -78,27 +79,7 @@ describe("callTool", () => {
     expect(seen!.params).toEqual({ name: "call_tool", arguments: { name: "move_agent", arguments: { x: 1 } } });
   });
 
-  test("懒握手：400 → initialized → 递增 id 重发成功", async () => {
-    const calls: { method?: string; params?: unknown; id?: number }[] = [];
-    const port = serve(async (req) => {
-      const body = (await req.json()) as { method?: string; params?: unknown; id?: number };
-      calls.push(body);
-      if (calls.length === 1) {
-        return jsonResponse({ jsonrpc: "2.0", id: 1, error: { code: -32600, message: "not initialized" } }, 400);
-      }
-      if (calls.length === 2) {
-        expect(body.method).toBe("notifications/initialized");
-        return new Response("{}", { status: 200 });
-      }
-      return sseResponse({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: "{}" }] } });
-    });
-    const res = await callTool("system_status", {}, { port });
-    expect(calls.length).toBe(3);
-    expect(calls[2].id).toBeGreaterThan(calls[0].id!);
-    expect(res.result).toEqual({ content: [{ type: "text", text: "{}" }] });
-  });
-
-  test("握手请求非 2xx 报传输错误", async () => {
+  test("initialize 非 2xx 报传输错误", async () => {
     let n = 0;
     const port = serve(async () => {
       n += 1;
@@ -107,7 +88,66 @@ describe("callTool", () => {
     });
     const err = await catchError(callTool("x", {}, { port }));
     expect(err.code).toBe(ExitCode.Transport);
+    expect(err.message).toBe("initialize failed with HTTP 500.");
+  });
+
+  test("initialized 通知非 2xx 报传输错误", async () => {
+    const port = serve(async (req) => {
+      const body = (await req.json()) as { method?: string; id?: number };
+      if (body.method === "initialize") {
+        return sseResponse({
+          jsonrpc: "2.0",
+          id: body.id,
+          result: { protocolVersion: "2025-03-26", capabilities: {}, serverInfo: { name: "gda-testbed", version: "1.0.0" } },
+        });
+      }
+      if (body.method === "notifications/initialized") {
+        return new Response("{}", { status: 500 });
+      }
+      return jsonResponse({ error: { code: -32600, message: "invalid request: tools/call" } }, 400);
+    });
+    const err = await catchError(callTool("x", {}, { port }));
+    expect(err.code).toBe(ExitCode.Transport);
     expect(err.message).toBe("handshake failed with HTTP 500.");
+  });
+
+  test("懒握手：400 → initialize + initialized → 递增 id 重发成功，进程内不重复握手", async () => {
+    const calls: { method?: string; params?: unknown; id?: number }[] = [];
+    let initialized = false;
+    const port = serve(async (req) => {
+      const body = (await req.json()) as { method?: string; params?: unknown; id?: number };
+      calls.push(body);
+      if (body.method === "initialize") {
+        initialized = true;
+        return sseResponse({
+          jsonrpc: "2.0",
+          id: body.id,
+          result: { protocolVersion: "2025-03-26", capabilities: {}, serverInfo: { name: "gda-testbed", version: "1.0.0" } },
+        });
+      }
+      if (body.method === "notifications/initialized") {
+        if (!initialized) {
+          return jsonResponse({ error: { code: -32600, message: "invalid request: notifications/initialized" } }, 400);
+        }
+        return new Response("", { status: 202 });
+      }
+      if (!initialized) {
+        return jsonResponse({ error: { code: -32600, message: "invalid request: tools/call" } }, 400);
+      }
+      return sseResponse({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: "{}" }] } });
+    });
+    const res = await callTool("system_status", {}, { port });
+    expect(calls.map((c) => c.method)).toEqual(["tools/call", "initialize", "notifications/initialized", "tools/call"]);
+    expect(calls[1].params).toEqual({
+      protocolVersion: "2025-03-26",
+      capabilities: {},
+      clientInfo: { name: "gda-cli", version: CLI_VERSION },
+    });
+    expect(calls[3].id).toBeGreaterThan(calls[0].id!);
+    expect(res.result).toEqual({ content: [{ type: "text", text: "{}" }] });
+
+    await callTool("system_status", {}, { port });
+    expect(calls.map((c) => c.method)).toEqual(["tools/call", "initialize", "notifications/initialized", "tools/call", "tools/call"]);
   });
 
   test("超时", async () => {
