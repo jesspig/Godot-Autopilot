@@ -141,7 +141,7 @@ macOS runner 为 ARM64，preset 设 `CMAKE_OSX_ARCHITECTURES=x86_64;arm64` 编�
 | `src/resources/` | 2 | `src/ui/` | 2 |
 | `src/prompts/` | 9 | `src/runtime/` | 4（含 09-18 新增 game_bridge_verify） |
 
-- **skill 内容嵌入头**：9 册技能正文存于仓库根 `skills/` 标准目录（33 个 .md + 1 个 .mjs 脚本桥，**不进 add_library**），`cmake/skill_gen.cmake` 在构建期经 `tools/embed_skills.py` 生成 `build/<preset>/generated/skill_content_embedded.h`（gitignore 覆盖）；`add_dependencies(godot-autopilot gda_skill_embed_header)`（`CMakeLists.txt:156`）保证生成先于编译；
+- **skill 内容嵌入头**：9 册技能正文存于仓库根 `skills/` 标准目录（34 个 .md + 1 个 .mjs 脚本桥，**不进 add_library**），`cmake/skill_gen.cmake` 在构建期经 `tools/embed_skills.py` 生成 `build/<preset>/generated/skill_content_embedded.h`（gitignore 覆盖）；`add_dependencies(godot-autopilot gda_skill_embed_header)`（`CMakeLists.txt:156`）保证生成先于编译；
 - 私有头文件目录：`${CMAKE_SOURCE_DIR}/src`；
 - 链接库（PRIVATE）：`godot-cpp`、`mcp-server`、`mcp-http`（后两者来自 mcp-cpp-sdk）；
 - MSVC（含 clang-cl）额外 `target_link_options "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>"`（`CMakeLists.txt:168`，处于 `if(MSVC)` 块 `:167-169`）—— 强制导出 godot-cpp 全部符号，防止 GDExtension 入口符号被链接器裁剪；

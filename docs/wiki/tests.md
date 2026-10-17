@@ -140,7 +140,7 @@ stdout/stderr 各接独立管道读线程持续消费，防 64KB 缓冲写满阻
 
 ### skill_gen 技能生成器测试（`skill_gen_test.cpp`，09-08 新增）
 
-生成器 `src/util/skill_gen.cpp`；9 册正文存于仓库根 `skills/` 标准目录（34 个文件——9 个 `SKILL.md`（name/description 存 frontmatter）+ 24 个 `references/*.md` + 调用专册 `scripts/gda_mcp.mjs`；聚合顺序为目录名字序），经 `tools/embed_skills.py` 构建期嵌入为生成头 `skill_content_embedded.h`（入 `build/<preset>/generated/`，gitignore 覆盖），渲染目标 `.agents/skills/<name>/SKILL.md`。纯 C++ 不触碰 Godot API，L1 可跑无需引擎。09-08 内容外置化重构（7 个 `skill_content_*.cpp` → 模板目录 + 构建期嵌入）测试零改动全绿；**09-10 skill 体系 19→7 册重构（每册带 references/ 渐进披露 + 84 条 Godot 4.8.0-dev 源码研究发现织入引擎六册）后，用例改名与白名单扩充；09-13 新增 `godot-autopilot-csharp` 册（8 册）并同步 `SKILL_COUNT = 8`（用例仍为 7 项，未随收口批次变化）**；09-25 新增 `godot-autopilot-tools` 调用专册（9 册）并同步 `SKILL_COUNT = 9`，新增 `ScriptChannelContract` 与 `ToolCatalogCoverage`（用例 7→9，`AllEightSkillsPresent` 改名 `AllNineSkillsPresent`）。9 个用例：
+生成器 `src/util/skill_gen.cpp`；9 册正文存于仓库根 `skills/` 标准目录（35 个文件——9 个 `SKILL.md`（name/description 存 frontmatter）+ 25 个 `references/*.md` + 调用专册 `scripts/gda.mjs`；聚合顺序为目录名字序），经 `tools/embed_skills.py` 构建期嵌入为生成头 `skill_content_embedded.h`（入 `build/<preset>/generated/`，gitignore 覆盖），渲染目标 `.agents/skills/<name>/SKILL.md`。纯 C++ 不触碰 Godot API，L1 可跑无需引擎。09-08 内容外置化重构（7 个 `skill_content_*.cpp` → 模板目录 + 构建期嵌入）测试零改动全绿；**09-10 skill 体系 19→7 册重构（每册带 references/ 渐进披露 + 84 条 Godot 4.8.0-dev 源码研究发现织入引擎六册）后，用例改名与白名单扩充；09-13 新增 `godot-autopilot-csharp` 册（8 册）并同步 `SKILL_COUNT = 8`（用例仍为 7 项，未随收口批次变化）**；09-25 新增 `godot-autopilot-tools` 调用专册（9 册）并同步 `SKILL_COUNT = 9`，新增 `ScriptChannelContract` 与 `ToolCatalogCoverage`（用例 7→9，`AllEightSkillsPresent` 改名 `AllNineSkillsPresent`）。9 个用例：
 
 | 用例 | 内容 |
 |---|---|
@@ -148,7 +148,7 @@ stdout/stderr 各接独立管道读线程持续消费，防 64KB 缓冲写满阻
 | `SkillNamesFollowSpecRules` | name 匹配 `^[a-z0-9]+(-[a-z0-9]+)*$`、≤64 字符、路径 `.agents/skills/<name>/SKILL.md` |
 | `DescriptionsValid` | description 非空、≤1024 字符 |
 | `FilesLayout` | `files[0]` 必为 SKILL.md，其余须 `references/` 或 `scripts/` 前缀（`scripts/` 仅直属 `.mjs`）；body 非空、无 PLACEHOLDER 残留 |
-| `ScriptChannelContract` | 调用通道契约（09-25 新增）：调用专册须含 `scripts/gda_mcp.mjs`（非空且含 `127.0.0.1`/`tools/call`）与 `references/manual-fallback.md`；每册 SKILL.md 必提 `gda_mcp.mjs` 与 `manual-fallback`；全部 .md 禁 `curl -` 与 `Invoke-WebRequest`（禁手写 HTTP，统一走脚本桥） |
+| `ScriptChannelContract` | 调用通道契约（09-25 新增）：调用专册须含 `scripts/gda.mjs`（非空且含 `127.0.0.1`/`tools/call`）与 `references/manual-fallback.md`；每册 SKILL.md 必提 `gda.mjs` 与 `manual-fallback`；全部 .md 禁 `curl -` 与 `Invoke-WebRequest`（禁手写 HTTP，统一走脚本桥） |
 | `RenderedFrontmatterWellFormed` | 渲染产物 frontmatter 完整：name/author/`version`（取 `GDA_VERSION`）/description 含 `: ` 必加引号/`metadata:` 与收尾 `---` |
 | `SkillRegistryFixture.ToolNamesExistInRegistry` | 工具名回验（机制见下） |
 | `SkillRegistryFixture.ToolCatalogCoverage` | 目录反向覆盖（09-25 新增）：`tool-catalog.md` 须逐字含 registry 全部非元工具名（7 元工具跳过），防目录与注册漂移 |
