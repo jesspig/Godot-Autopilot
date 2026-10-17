@@ -84,7 +84,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 
 `src/resources/debugger_resources.cpp` 另注册 7 个调试器资源：`godot://editor/output-log`、`godot://debugger/errors`、`godot://debugger/output`、`godot://debugger/stack-dump`、`godot://debugger/scene-tree`、`godot://debugger/monitors`、`godot://debugger/session`。
 
-09-16 批起新增 skills 资源组（同文件 `register_skill_resources`）：`godot://skills`（目录，JSON 目录清单）、`godot://skills/<name>`（每册 SKILL.md）、`godot://skills/<name>/<file>`（每册 references/脚本文件）——按 9 册 33 个 .md + 1 个脚本动态注册，技能经 MCP 协议层可发现可读。
+09-16 批起新增 skills 资源组（同文件 `register_skill_resources`）：`godot://skills`（目录，JSON 目录清单）、`godot://skills/<name>`（每册 SKILL.md）、`godot://skills/<name>/<file>`（每册 references/脚本文件）——按 9 册 34 个 .md + 1 个脚本动态注册，技能经 MCP 协议层可发现可读。
 
 ### 运行时桥接（game_* 工具）
 

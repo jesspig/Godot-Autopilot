@@ -84,12 +84,12 @@ resource:
 
 ### 3.3 技能脚本通道与手动兜底（09-25 新增）
 
-随技能生成的 `scripts/gda_mcp.mjs`（Node 18+ 或 Bun 运行）是 MCP 客户端失效时的本地调用桥，不是第二服务端；其安全包络由脚本头注释与 L1 `ScriptChannelContract` 共同约束：
+随技能生成的 `scripts/gda.mjs`（Node 18+ 或 Bun 运行）是 MCP 客户端失效时的本地调用桥，不是第二服务端；其安全包络由脚本头注释与 L1 `ScriptChannelContract` 共同约束：
 
 - 目标固定为 `127.0.0.1` 字面量（`const HOST = "127.0.0.1"`），仅端口可调（1–65535，`--port` > `GODOT_AUTOPILOT_PORT` > trace/config > 9527 五级来源）；代理环境变量被刻意忽略，保持环回直连。
 - 请求头仅 `Content-Type: application/json` 与 `Accept`，无代理配置、无认证头；响应内容只做 `JSON.parse`，永不求值或执行。
 - 唯一写盘是 `--save-images DIR` 内的解码图片（自生成文件名 `gda_<timestamp>_<n>.png`）；`--args-file` 只读 JSON，不写盘。
-- 技能文档禁手写 HTTP：全部 33 个 .md 不得出现 `curl -` 与 `Invoke-WebRequest`（L1 逐文件断言），调用统一走脚本桥；无脚本运行时则停止自动化、按 `manual-fallback.md` 出手动指南，不得编造请求。
+- 技能文档禁手写 HTTP：全部 34 个 .md 不得出现 `curl -` 与 `Invoke-WebRequest`（L1 逐文件断言），调用统一走脚本桥；无脚本运行时则停止自动化、按 `manual-fallback.md` 出手动指南，不得编造请求。
 - 握手升级（2026-10-18）：mcp-cpp-sdk 0.3.7 起严格要求完整 MCP 握手（`initialize` → `notifications/initialized`），旧懒握手只发 `notifications/initialized` 被拒 `-32600`。脚本桥（`6234a95`）与 CLI（`840e648`）同步升级为标准 `initialize` 流程；`test_cli_contract.py` 的 mock 服务器严格模拟该语义（未初始化时 `tools/call` 返回 400 + `-32600`）。
 - 本节不改变默认安全姿态：监听仍仅环回（§2）、高风险能力仍默认拒绝（§3.1）、脱敏仍默认开启（§3.2）。
 
