@@ -1,13 +1,17 @@
 #!/usr/bin/env node
 // gda.mjs - call the Godot Autopilot (GDA) MCP server over plain HTTP.
 //
-// This script pins the two-step protocol documented in tools--script-access.md
-// into code so callers do not hand-craft requests: it resolves the server
-// port, POSTs a JSON-RPC tools/call to http://127.0.0.1:<port>/mcp,
-// performs the lazy initialized-handshake on demand, and prints the
-// business payload as indented JSON.
+// This script pins the standard MCP handshake documented in
+// tools--script-access.md into code so callers do not hand-craft requests: it
+// resolves the server port, POSTs a JSON-RPC tools/call to
+// http://127.0.0.1:<port>/mcp, performs the lazy initialize handshake on
+// demand, and prints the business payload as indented JSON.
 //
 // Request flow notes:
+// - The server requires the standard MCP handshake: a tools/call sent before
+//   initialize is rejected with HTTP 400 and JSON-RPC error -32600. On that
+//   reply the script POSTs initialize, then notifications/initialized, then
+//   retries the call once (lazily, at most once per process).
 // - The server answers successful calls with HTTP 200 and a single SSE
 //   frame (event: message plus data: <JSON-RPC>). Continuation lines that
 //   start with "data:" are joined with "\n" before JSON parsing.
@@ -38,6 +42,11 @@ const DEFAULT_PORT = 9527;
 const DEFAULT_TIMEOUT_SEC = 60;
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
 const JSONRPC_METHOD = "tools/call";
+const HANDSHAKE_INIT_METHOD = "initialize";
+const HANDSHAKE_INIT_ACK_METHOD = "notifications/initialized";
+const HANDSHAKE_PROTOCOL_VERSION = "2025-03-26";
+const HANDSHAKE_CLIENT_NAME = "gda-script";
+const HANDSHAKE_CLIENT_VERSION = "1.0";
 const META_DIRECT_TOOLS = new Set([
   "ping",
   "search_tools",
@@ -52,6 +61,23 @@ function makeEnvelope(id, name, args, direct) {
     ? { name, arguments: args }
     : { name: "call_tool", arguments: { name, arguments: args } };
   return { jsonrpc: "2.0", id, method: JSONRPC_METHOD, params };
+}
+
+function makeInitializeEnvelope(id) {
+  return {
+    jsonrpc: "2.0",
+    id,
+    method: HANDSHAKE_INIT_METHOD,
+    params: {
+      protocolVersion: HANDSHAKE_PROTOCOL_VERSION,
+      capabilities: {},
+      clientInfo: { name: HANDSHAKE_CLIENT_NAME, version: HANDSHAKE_CLIENT_VERSION },
+    },
+  };
+}
+
+function makeInitializedNotification() {
+  return { jsonrpc: "2.0", method: HANDSHAKE_INIT_ACK_METHOD };
 }
 
 function usageText() {
@@ -567,18 +593,24 @@ async function main() {
     if (envelope !== null && !needsHandshake(res.status, envelope)) {
       // Fall through to the generic status handling below.
     } else {
-      const hsBody = JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" });
-      const hs = await postJson(url, hsBody, timeoutMs);
-      if (hs.status < 200 || hs.status >= 300) {
+      const initRes = await postJson(url, JSON.stringify(makeInitializeEnvelope(1)), timeoutMs);
+      if (initRes.status < 200 || initRes.status >= 300) {
         transportError(
-          `handshake failed with HTTP ${hs.status}.`,
+          `initialize failed with HTTP ${initRes.status}.`,
+          "Restart the editor session, then retry.",
+        );
+      }
+      const ackRes = await postJson(url, JSON.stringify(makeInitializedNotification()), timeoutMs);
+      if (ackRes.status < 200 || ackRes.status >= 300) {
+        transportError(
+          `handshake failed with HTTP ${ackRes.status}.`,
           "Restart the editor session, then retry.",
         );
       }
       res = await postJson(url, JSON.stringify(makeEnvelope(2, call.tool, call.args, call.direct)), timeoutMs);
       extracted = extractEnvelope(res);
       handshakeDone = true;
-      audit("handshake: sent notifications/initialized and retried the call once");
+      audit("handshake: sent initialize + notifications/initialized and retried the call once");
     }
   }
   if (!handshakeDone) audit("handshake: not needed");

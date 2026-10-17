@@ -9,6 +9,10 @@ in-process mock MCP server via --port / GODOT_AUTOPILOT_PORT.
 Spins up an in-process mock MCP server (http.server on 127.0.0.1 with a
 random port) that mimics the real server's wire behavior, then drives both
 CLIs and asserts stdout JSON, exit codes, wire shapes, and side effects.
+The mock is strict about the standard MCP handshake: initialize returns 200
+with an SSE frame (capabilities/protocolVersion/serverInfo),
+notifications/initialized returns 202, and a tools/call received before
+initialize is rejected with 400 + error code -32600.
 
 SKIP semantics: no node -> whole script prints SKIP and exits 0; no bun ->
 the bun subsets (legacy core subset and new CLI group) print SKIP and the
@@ -102,12 +106,26 @@ class MockHandler(http.server.BaseHTTPRequestHandler):
         if not isinstance(body, dict):
             self._send_json(400, {"error": {"code": -32600, "message": "invalid request"}})
             return
-        if body.get("method") == "notifications/initialized":
+        method = body.get("method")
+        if method == "initialize":
             with type(self).lock:
                 type(self).initialized = True
-            self._send_json(200, {})
+            self._send_sse(
+                {
+                    "jsonrpc": "2.0",
+                    "id": body.get("id"),
+                    "result": {
+                        "capabilities": {"tools": {}},
+                        "protocolVersion": "2025-03-26",
+                        "serverInfo": {"name": "mock-gda", "version": "0.3.7"},
+                    },
+                }
+            )
             return
-        if body.get("method") != "tools/call":
+        if method == "notifications/initialized":
+            self._send(202, "application/json", b"{}")
+            return
+        if method != "tools/call":
             self._send_json(
                 400, {"jsonrpc": "2.0", "id": body.get("id"), "error": {"code": -32600, "message": "bad method"}}
             )
@@ -120,7 +138,7 @@ class MockHandler(http.server.BaseHTTPRequestHandler):
                 {
                     "jsonrpc": "2.0",
                     "id": body.get("id"),
-                    "error": {"code": -32600, "message": "Server not initialized"},
+                    "error": {"code": -32600, "message": "invalid request: tools/call"},
                 },
             )
             return
