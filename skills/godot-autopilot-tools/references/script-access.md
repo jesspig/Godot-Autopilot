@@ -1,5 +1,7 @@
 # Script Access to the Godot Autopilot MCP Server
 
+If Bun is available, prefer the gda CLI (channel 2 of the calling ladder); this reference covers the script bridge used when it is not.
+
 Companion reference of the godot-autopilot-tools volume: how to call the server through the bundled script when the native MCP channel is broken. The server itself is almost always fine — typically the client harness lost its tool list after an editor restart.
 
 Hard rule: never send hand-written HTTP requests with command-line HTTP utilities or raw request code. Every call goes through the harness MCP tools or this script. This reference documents the only sanctioned fallback.
@@ -57,7 +59,7 @@ Pass `--port` explicitly whenever you already know the editor was configured wit
 Domain calls carry the domain tool name plus its arguments object. The arguments travel in a JSON file:
 
 ```
-node .agents/skills/godot-autopilot-tools/scripts/gda_mcp.mjs call <tool> --args-file args.json
+node .agents/skills/godot-autopilot-tools/scripts/gda.mjs call <tool> --args-file args.json
 ```
 
 with args.json holding the arguments object, for example:
@@ -69,10 +71,10 @@ with args.json holding the arguments object, for example:
 Further examples:
 
 ```
-node .agents/skills/godot-autopilot-tools/scripts/gda_mcp.mjs ping
-node .agents/skills/godot-autopilot-tools/scripts/gda_mcp.mjs status
-node .agents/skills/godot-autopilot-tools/scripts/gda_mcp.mjs search "tilemap cell"
-node .agents/skills/godot-autopilot-tools/scripts/gda_mcp.mjs describe create_scene_node
+node .agents/skills/godot-autopilot-tools/scripts/gda.mjs ping
+node .agents/skills/godot-autopilot-tools/scripts/gda.mjs status
+node .agents/skills/godot-autopilot-tools/scripts/gda.mjs search "tilemap cell"
+node .agents/skills/godot-autopilot-tools/scripts/gda.mjs describe create_scene_node
 ```
 
 `status` is shorthand for a `call_tool` round trip to `system_status`. `search` mirrors `search_tools` ranking (object-first queries, synonym retries, `--category` and `--tags` filters) and prints a compact projection of the matches. `describe` mirrors `get_tool_detail` — read it before the first write, same as on the native channel.

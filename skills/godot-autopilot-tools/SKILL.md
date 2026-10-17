@@ -1,6 +1,6 @@
 ---
 name: godot-autopilot-tools
-description: "Calling the GDA (godot-autopilot) plugin: the two invocation channels (native MCP tools vs the gda_mcp.mjs script fallback), search-first tool discovery, meta-tool semantics including batch_execute/code_execute and the code_execute/game_runtime/user_tools capability gates, the error protocol and error watermark, limits, the full domain tool catalog, dynamic user tools, and the manual fallback guide for machines without Node.js. Load this skill whenever MCP tools are missing or you need calling-protocol facts."
+description: "Calling the GDA (godot-autopilot) plugin: the invocation ladder (native MCP tools, bunx gda CLI, gda.mjs script bridge, manual fallback), search-first tool discovery, meta-tool semantics including batch_execute/code_execute and the code_execute/game_runtime/user_tools capability gates, the error protocol and error watermark, limits, the full domain tool catalog, dynamic user tools, and the manual fallback guide for machines without a JS runtime. Load this skill whenever MCP tools are missing or you need calling-protocol facts."
 ---
 
 # Godot Autopilot Tools
@@ -11,13 +11,14 @@ This volume carries no domain knowledge. Scene and property work, resources and 
 
 ## Channel ladder
 
-Three channels, in preference order. Move one step down only when the channel above is unavailable.
+Four channels, in preference order. Drop to the next only when the current one is unavailable.
 
 1. Native MCP tools. Whenever the client harness lists the MCP tools, use them directly: `ping`, `search_tools`, `list_categories`, `get_tool_detail`, `call_tool`, `batch_execute`, `code_execute`. This is the primary channel with full schemas, structured errors and image content.
-2. Script bridge. When the MCP client lost its tool list (typically right after an editor restart) but a shell with Node 18+ or Bun exists, use the bundled script `node .agents/skills/godot-autopilot-tools/scripts/gda_mcp.mjs` documented in references/script-access.md. It speaks the same protocol, resolves the port the same way and reports the same errors.
-3. Manual guide. When there is neither a working MCP client nor a script runtime, or the harness has no shell at all, stop automating and hand the user step-by-step editor instructions as documented in references/manual-fallback.md.
+2. GDA CLI (Bun). When the MCP channel is down, run `bunx --no-install "github:jesspig/Godot-Autopilot#0.2.7" <cmd>` first (instant when the bunx cache is warm; a fast failure otherwise); if not cached, `bunx "github:jesspig/Godot-Autopilot#0.2.7" <cmd>` downloads once. Quotes are required on PowerShell because `#` starts a comment. Calling commands: ping/status/categories/search/describe/call; lifecycle: list/start/stop/logs. Run `<prefix> --help` for the full reference; stdout is compact JSON, diagnostics go to stderr.
+3. Script bridge. When Bun is unavailable but Node 18+ or Bun exists, use the bundled script `node .agents/skills/godot-autopilot-tools/scripts/gda.mjs` — calling commands only; offline-capable, same protocol and exit codes.
+4. Manual guide. When there is neither a working MCP client nor a script runtime, hand the user step-by-step editor instructions per references/manual-fallback.md.
 
-Never hand-write HTTP requests in any channel: no raw requests, no ad-hoc scripts against the endpoint. Every call goes through the harness MCP tools or the bundled script.
+Never hand-write HTTP requests in any channel: no raw requests, no ad-hoc scripts against the endpoint. Every call goes through the harness MCP tools, the gda CLI, or the bundled script.
 
 ## Discovery protocol — search first, never guess
 
