@@ -60,24 +60,60 @@ function searchPath(): string | null {
   return null;
 }
 
-export function spawnEditor(opts: { projectDir: string; port: number; headless: boolean; godot: string; logPath: string }): { pid: number } {
+export async function spawnEditor(opts: { projectDir: string; port: number; headless: boolean; godot: string; logPath: string; timeoutMs?: number }): Promise<{ pid: number }> {
   const args = opts.headless
     ? [opts.godot, "--headless", "--editor", "--path", resolvePath(opts.projectDir)]
     : [opts.godot, "--editor", "--path", resolvePath(opts.projectDir)];
   const logFd = fs.openSync(resolvePath(opts.logPath), "a");
-  const child = spawn(args[0], args.slice(1), {
-    stdio: ["ignore", logFd, logFd],
-    env: {
-      ...process.env,
-      GODOT_AUTOPILOT_PORT: String(opts.port),
-      ...(opts.headless ? { GDA_FORCE_HEADLESS: "1" } : {}),
-    },
-  });
-  fs.closeSync(logFd);
-  if (child.pid === undefined) {
-    throw new CliError(ExitCode.Transport, "failed to spawn the editor process");
+  const env = {
+    ...process.env,
+    GODOT_AUTOPILOT_PORT: String(opts.port),
+    ...(opts.headless ? { GDA_FORCE_HEADLESS: "1" } : {}),
+  };
+  try {
+    if (process.platform === "win32") {
+      const child = spawn("cmd", ["/c", "start", "", "/b", ...args], {
+        stdio: ["ignore", logFd, logFd],
+        env,
+      });
+      if (child.pid === undefined) {
+        throw new CliError(ExitCode.Transport, "failed to spawn the editor process");
+      }
+      const godotPid = await resolvePidByPort(opts.port, opts.timeoutMs ?? 10_000);
+      return { pid: godotPid };
+    }
+    const child = spawn(args[0], args.slice(1), {
+      stdio: ["ignore", logFd, logFd],
+      env,
+    });
+    if (child.pid === undefined) {
+      throw new CliError(ExitCode.Transport, "failed to spawn the editor process");
+    }
+    return { pid: child.pid };
+  } finally {
+    fs.closeSync(logFd);
   }
-  return { pid: child.pid };
+}
+
+async function resolvePidByPort(port: number, timeoutMs: number): Promise<number> {
+  const deadline = Date.now() + timeoutMs;
+  const portPattern = new RegExp(`:${port}\\b`);
+  for (;;) {
+    const r = spawnSync("netstat", ["-ano", "-p", "tcp"], { encoding: "utf8" });
+    const out = r.stdout ?? "";
+    for (const line of out.split("\n")) {
+      if (portPattern.test(line) && line.includes("LISTENING")) {
+        const pid = parseInt(line.trim().split(/\s/).pop() ?? "", 10);
+        if (!isNaN(pid) && pid > 0) {
+          return pid;
+        }
+      }
+    }
+    if (Date.now() >= deadline) {
+      throw new CliError(ExitCode.Transport, "failed to resolve editor pid from listening port");
+    }
+    await Bun.sleep(200);
+  }
 }
 
 export function stopGraceful(pid: number): { ok: boolean } {

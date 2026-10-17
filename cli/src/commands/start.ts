@@ -55,7 +55,7 @@ async function start(opts: GlobalOptions): Promise<number> {
 
   let pid: number;
   try {
-    pid = spawnEditor({ projectDir, port, headless, godot: bin, logPath: pendingLogPath }).pid;
+    pid = (await spawnEditor({ projectDir, port, headless, godot: bin, logPath: pendingLogPath, timeoutMs: waitSec * 1000 })).pid;
   } catch (error) {
     fs.rmSync(pendingLogPath, { force: true });
     throw error;
@@ -123,7 +123,7 @@ async function waitForReady(port: number, pid: number, waitSec: number, logPath:
       );
     }
     try {
-      await callTool("ping", {}, { port, timeoutSec: PROBE_TIMEOUT_SEC });
+      await callTool("ping", {}, { port, timeoutSec: PROBE_TIMEOUT_SEC, direct: true });
       return;
     } catch {
       if (Date.now() >= deadline) {
