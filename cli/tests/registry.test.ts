@@ -62,13 +62,13 @@ async function waitForDead(pid: number, timeoutMs = 12000): Promise<void> {
   throw new Error(`process ${pid} still alive after ${timeoutMs}ms`);
 }
 
-describe("stateDir", () => {
+describe.serial("stateDir", () => {
   test("返回 GODOT_AUTOPILOT_CLI_HOME 环境变量", () => {
     expect(stateDir()).toBe(tmp);
   });
 });
 
-describe("loadRegistry 三态", () => {
+describe.serial("loadRegistry 三态", () => {
   test("文件不存在返回空数据", () => {
     expect(loadRegistry()).toEqual({ version: 1, instances: [] });
   });
@@ -100,7 +100,7 @@ describe("loadRegistry 三态", () => {
   });
 });
 
-describe("死 pid 清理", () => {
+describe.serial("死 pid 清理", () => {
   test("加载时剔除死 pid 条目并原子回写", () => {
     saveRegistry({ version: 1, instances: [makeEntry()] });
     const loaded = loadRegistry();
@@ -110,7 +110,7 @@ describe("死 pid 清理", () => {
   });
 });
 
-describe("withLock 并发竞速", () => {
+describe.serial("withLock 并发竞速", () => {
   test("跨进程后进入者等待前者释放且都成功", async () => {
     const registryAbs = path.join(import.meta.dir, "..", "src", "registry.ts");
     const child = spawn(process.execPath, ["-e", `
@@ -147,7 +147,7 @@ describe("withLock 并发竞速", () => {
   });
 });
 
-describe("findById", () => {
+describe.serial("findById", () => {
   test("命中与未命中", async () => {
     const pid = spawnLongRunner();
     try {
@@ -161,7 +161,7 @@ describe("findById", () => {
   });
 });
 
-describe("findLiveByProject", () => {
+describe.serial("findLiveByProject", () => {
   test("归一化路径比较并复核存活", async () => {
     const pid = spawnLongRunner();
     try {

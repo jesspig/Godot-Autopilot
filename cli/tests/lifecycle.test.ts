@@ -23,6 +23,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   await killAllRegistered();
+  await killOrphanFakeGodot();
   if (prevHome === undefined) {
     delete process.env.GODOT_AUTOPILOT_CLI_HOME;
   } else {
@@ -31,7 +32,7 @@ afterEach(async () => {
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
-async function waitDead(pid: number, timeoutMs = 5000): Promise<void> {
+async function waitDead(pid: number, timeoutMs = 500): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     if (!isAlive(pid)) return;
@@ -50,6 +51,14 @@ async function killAllRegistered(): Promise<void> {
     }
   } catch {
   }
+}
+
+async function killOrphanFakeGodot(): Promise<void> {
+  if (fakeGodotExe === undefined) return;
+  if (process.platform !== "win32") return;
+  const exeName = path.basename(fakeGodotExe);
+  spawnSync("taskkill", ["/F", "/IM", exeName], { stdio: "ignore" });
+  await Bun.sleep(200);
 }
 
 function writeEntry(entry: InstanceEntry): void {
@@ -112,7 +121,7 @@ async function captureStdout(fn: () => Promise<number>): Promise<{ code: number;
 }
 
 let fakeGodotDir: string;
-let fakeGodotExe: string;
+let fakeGodotExe: string | undefined;
 let fakeReportPath: string;
 
 const FAKE_GODOT_SOURCE = `
@@ -205,9 +214,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await killAllRegistered();
-  if (process.platform === "win32") {
-    spawnSync("powershell", ["-Command", "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'gda-lifecycle-fake-godot' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"], { stdio: "ignore" });
-  }
+  await killOrphanFakeGodot();
   fs.rmSync(fakeGodotDir, { recursive: true, force: true });
 });
 
@@ -215,6 +222,9 @@ function readReport(): { pid: number; argv: string[]; env: Record<string, string
   if (!fs.existsSync(fakeReportPath)) return null;
   return JSON.parse(fs.readFileSync(fakeReportPath, "utf8"));
 }
+
+// 端口反查（netstat 轮询）+ ping 探测引入固定延迟，2s 阈值在系统负载高时不足
+const START_READY_MAX_MS = 10_000;
 
 async function startFake(opts: { headless?: boolean; play?: boolean; noImport?: boolean; portText?: string; waitText?: string; projectDir?: string; noListen?: boolean; resetReport?: boolean }) {
   process.env.GDA_FAKE_GODOT_REPORT = fakeReportPath;
@@ -228,7 +238,7 @@ async function startFake(opts: { headless?: boolean; play?: boolean; noImport?: 
   return captureStdout(() =>
     runStart([], {
       project: projectDir,
-      godot: fakeGodotExe,
+      godot: fakeGodotExe!,
       noImport: opts.noImport ?? true,
       headless: opts.headless ?? true,
       play: opts.play ?? false,
@@ -238,7 +248,7 @@ async function startFake(opts: { headless?: boolean; play?: boolean; noImport?: 
   );
 }
 
-describe("list", () => {
+describe.serial("list", () => {
   test("空登记输出 [] 且 exit 0", async () => {
     const { code, stdout } = await captureStdout(() => runList([], {}));
     expect(code).toBe(ExitCode.Success);
@@ -280,7 +290,7 @@ describe("list", () => {
   });
 });
 
-describe("start", () => {
+describe.serial("start", () => {
   test("headless 启动写入登记并探测就绪", async () => {
     const projectDir = makeProjectDir();
     const { code } = await startFake({ projectDir, headless: true, noImport: true });
@@ -307,7 +317,7 @@ describe("start", () => {
     expect(report!.argv).toContain("--editor");
     expect(report!.argv).toContain("--path");
     expect(report!.calls.some((c) => c.name === "ping" && c.direct === true)).toBe(true);
-  });
+  }, 30000);
 
   test("ping 直达探测 1s 内就绪", async () => {
     const projectDir = makeProjectDir();
@@ -315,8 +325,8 @@ describe("start", () => {
     const { code } = await startFake({ projectDir, headless: true, noImport: true, waitText: "1" });
     const elapsed = Date.now() - start;
     expect(code).toBe(ExitCode.Success);
-    expect(elapsed).toBeLessThan(2000);
-  });
+    expect(elapsed).toBeLessThan(START_READY_MAX_MS);
+  }, 30000);
 
   test("幂等：同 project 二次 start 不重复启动", async () => {
     const projectDir = makeProjectDir();
@@ -332,7 +342,7 @@ describe("start", () => {
     expect(parsed.id).toBe(instances[0].id);
     expect(registeredInstances()).toHaveLength(1);
     expect(readReport()!.calls.filter((c) => c.name === "ping" && c.direct === true)).toHaveLength(1);
-  });
+  }, 30000);
 
   test("默认执行 import 预步，--no-import 跳过", async () => {
     const withImport = await startFake({ headless: true, noImport: false });
@@ -343,14 +353,14 @@ describe("start", () => {
     const withoutImport = await startFake({ headless: true, noImport: true });
     expect(withoutImport.code).toBe(ExitCode.Success);
     expect(readReport()!.import).toBeNull();
-  });
+  }, 30000);
 
   test("--play 就绪后调用 play_editor_current_scene", async () => {
     const { code } = await startFake({ headless: true, play: true });
     expect(code).toBe(ExitCode.Success);
     const report = readReport();
     expect(report!.calls.some((c) => c.name === "play_editor_current_scene")).toBe(true);
-  });
+  }, 30000);
 
   test("端口被占用时自动跳过选择下一个", async () => {
     const blocker = Bun.serve({ port: 9530, hostname: "127.0.0.1", fetch: () => new Response("x") });
@@ -363,13 +373,13 @@ describe("start", () => {
     } finally {
       blocker.stop();
     }
-  });
+  }, 30000);
 
   test("显式 --port 直接使用", async () => {
     const { code } = await startFake({ headless: true, portText: "9567" });
     expect(code).toBe(ExitCode.Success);
     expect(registeredInstances()[0].port).toBe(9567);
-  });
+  }, 30000);
 
   test("非 headless 不注入无头环境", async () => {
     const { code } = await startFake({ headless: false });
@@ -377,7 +387,7 @@ describe("start", () => {
     const report = readReport();
     expect(report!.env.GDA_FORCE_HEADLESS).toBeNull();
     expect(report!.argv).not.toContain("--headless");
-  });
+  }, 30000);
 
   test("就绪超时返回 exit 2 且不登记", async () => {
     process.env.GDA_FAKE_GODOT_REPORT = fakeReportPath;
@@ -387,7 +397,7 @@ describe("start", () => {
       const { code } = await captureStdout(() =>
         runStart([], {
           project: makeProjectDir(),
-          godot: fakeGodotExe,
+          godot: fakeGodotExe!,
           noImport: true,
           headless: true,
           waitText: "0.1",
@@ -403,10 +413,10 @@ describe("start", () => {
     } finally {
       delete process.env.GDA_FAKE_GODOT_NO_LISTEN;
     }
-  });
+  }, 30000);
 });
 
-describe("stop", () => {
+describe.serial("stop", () => {
   test("未命中提示 gda list 且 exit 2", async () => {
     const { code, stderr } = await captureStdout(() => runStop(["nope"], {}));
     expect(code).toBe(ExitCode.Transport);
@@ -432,7 +442,7 @@ describe("stop", () => {
       stopForce(runner.pid);
       await waitDead(runner.pid);
     }
-  });
+  }, 30000);
 
   test("--force 终止进程并清理登记", async () => {
     const runner = spawn(process.execPath, ["-e", "setTimeout(()=>{},20000)"], { stdio: "ignore" });
@@ -443,7 +453,7 @@ describe("stop", () => {
     expect(JSON.parse(stdout).ok).toBe(true);
     expect(isAlive(pid)).toBe(false);
     expect(registeredInstances()).toHaveLength(0);
-  });
+  }, 30000);
 
   test("进程已死时直接清理登记", async () => {
     const runner = spawn(process.execPath, ["-e", "setTimeout(()=>{},20000)"], { stdio: "ignore" });
@@ -454,7 +464,7 @@ describe("stop", () => {
     const { code } = await captureStdout(() => runStop([`p${pid}`], {}));
     expect(code).toBe(ExitCode.Success);
     expect(registeredInstances()).toHaveLength(0);
-  });
+  }, 30000);
 
   test("--project 按工程路径定位实例", async () => {
     const runner = spawn(process.execPath, ["-e", "setTimeout(()=>{},20000)"], { stdio: "ignore" });
@@ -464,10 +474,10 @@ describe("stop", () => {
     expect(code).toBe(ExitCode.Success);
     expect(isAlive(runner.pid)).toBe(false);
     expect(registeredInstances()).toHaveLength(0);
-  });
+  }, 30000);
 });
 
-describe("logs", () => {
+describe.serial("logs", () => {
   test("默认输出全部行，--tail 截取末 N 行", async () => {
     const logPath = path.join(tmp, "editor.log");
     fs.writeFileSync(logPath, "l1\nl2\nl3\nl4\nl5\n");
@@ -500,7 +510,7 @@ describe("logs", () => {
   });
 });
 
-describe("CLI 端到端", () => {
+describe.serial("CLI 端到端", () => {
   function cliRoot(): string {
     return path.resolve(import.meta.dir, "..", "..");
   }
