@@ -1,0 +1,12 @@
+{
+  "name": "godot-autopilot-cli",
+  "bin": { "gda": "cli/bin/gda.ts" },
+  "scripts": {
+    "test": "bun test cli/tests",
+    "typecheck": "bun x tsc -p cli/tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "@types/bun": "latest"
+  }
+}
