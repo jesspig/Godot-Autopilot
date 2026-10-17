@@ -16,6 +16,13 @@ export interface GlobalOptions {
   saveImages?: string;
   help?: boolean;
   version?: boolean;
+  godot?: string;
+  waitText?: string;
+  tailText?: string;
+  headless?: boolean;
+  play?: boolean;
+  noImport?: boolean;
+  force?: boolean;
 }
 
 const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
@@ -28,6 +35,9 @@ const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
   "--args": "argsJson",
   "--args-file": "argsFile",
   "--save-images": "saveImages",
+  "--godot": "godot",
+  "--wait": "waitText",
+  "--tail": "tailText",
 };
 
 const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
@@ -36,6 +46,10 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--quiet": "quiet",
   "--help": "help",
   "--version": "version",
+  "--headless": "headless",
+  "--play": "play",
+  "--no-import": "noImport",
+  "--force": "force",
 };
 
 export function parseArgv(argv: string[]): { opts: GlobalOptions; positionals: string[] } {
@@ -117,6 +131,13 @@ export function usageText(): string {
   --args <json>       工具调用参数（JSON 字符串）
   --args-file <path>  工具调用参数（JSON 文件）
   --save-images <dir> 保存返回的图片到本地目录
+  --godot <path>      显式指定 Godot 可执行文件（start）
+  --headless          以无头模式启动编辑器（start）
+  --play              就绪后播放当前场景（start）
+  --no-import          跳过启动时的资源导入（start）
+  --wait <sec>        就绪/停止等待秒数，0=不等待（start/stop）
+  --force             强制停止进程（stop）
+  --tail <n>          日志末尾行数（logs）
   --help              显示本帮助
   --version           显示版本
 
