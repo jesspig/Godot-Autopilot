@@ -44,6 +44,9 @@ export function readProjectName(startDir: string): string | null {
 
 export function userDataBase(): string | null {
   try {
+    // 显式覆写：测试与非常规安装路径下绕过平台推断；未设或为空白时走下方原生分支
+    const override = process.env.GODOT_AUTOPILOT_USERDATA;
+    if (override !== undefined && override.trim() !== "") return override;
     if (process.platform === "win32") {
       const appData = process.env.APPDATA;
       if (!appData) return null;
