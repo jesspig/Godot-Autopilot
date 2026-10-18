@@ -50,3 +50,12 @@ Thumbs.db
 
 # Node
 node_modules/
+
+# agent
+.handoff/
+.worktrees/
+.cursor/
+.claude/
+.trae/
+.qoder/
+.workbuddy/
