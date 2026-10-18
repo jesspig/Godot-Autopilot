@@ -8,7 +8,7 @@ tags:
   - Bun
   - TypeScript
   - MCP
-timestamp: "2026-10-18T04:01:49+08:00"
+timestamp: "2026-10-19T00:00:00+08:00"
 resource:
   - cli/
   - package.json
@@ -17,9 +17,9 @@ resource:
 
 # CLI 载体（`cli/`，命令 `gda`）
 
-> 审计日期：2026-10-18（随 CLI 载体落地批次同步——新增 `cli/`（Bun + TS 源码直跑，零运行时依赖）、根 `package.json`/`bun.lock`；双载体（CLI + `gda.mjs`）协议握手升级为标准 MCP `initialize` 流程（SDK 0.3.7 兼容）；真机验收修复两个缺陷（Windows 脱父、start 就绪探测直达标志）；测试稳定性修复（串行化 + Windows 清理时序）；`version_sync_guard`/`cli_contract`/`cli_unit` 三个新 ctest 点；详见 [changelog/2026-10-18-log.md](../changelog/2026-10-18-log.md)）
+> 审计日期：2026-10-19（随 MCP 协议版本协商修正批次同步——`cli/src/mcp/client.ts` 与技能书 `gda.mjs` 脚本桥声明版本 `2025-03-26`→`2025-11-25`（SDK 旧世代当前版本，GDA 未钉 `ServerOptions::protocol_version` 时服务端对旧版声明原样尊重）；握手状态由进程级单例改按目标 URL 键控（多目标进程各自握手）；新增 initialize 响应 `result.protocolVersion` 协商版本学习（仅已知五版本表内），后续 POST 按学习值携带 `MCP-Protocol-Version` 头（modern 声明学习值不发头，规避 stateless 传输 hold-open 长连接）；新增 `cli/tests/client_handshake.test.ts` 6 项，TS 单测 102→108 用例 / 6→7 文件；`test_cli_contract.py` mock initialize 响应同步 `2025-11-25`）；2026-10-18（随 CLI 载体落地批次同步——新增 `cli/`（Bun + TS 源码直跑，零运行时依赖）、根 `package.json`/`bun.lock`；双载体（CLI + `gda.mjs`）协议握手升级为标准 MCP `initialize` 流程（SDK 0.3.7 兼容）；真机验收修复两个缺陷（Windows 脱父、start 就绪探测直达标志）；测试稳定性修复（串行化 + Windows 清理时序）；`version_sync_guard`/`cli_contract`/`cli_unit` 三个新 ctest 点；详见 [changelog/2026-10-18-log.md](../changelog/2026-10-18-log.md)）
 
-> 覆盖范围：`cli/` 全部（`bin/gda.ts` 入口、`src/` 11 模块、`src/commands/` 10 命令、`src/mcp/client.ts` 协议客户端、`tests/` 6 测试文件）+ 根 [`package.json`](../../../package.json) 与 [`bun.lock`](../../../bun.lock)。CLI 是技能书调用阶梯的第二级（原生 MCP → **bunx gda CLI** → `gda.mjs` 脚本桥 → 手动），定位与分发见下文。
+> 覆盖范围：`cli/` 全部（`bin/gda.ts` 入口、`src/` 11 模块、`src/commands/` 10 命令、`src/mcp/client.ts` 协议客户端、`tests/` 7 测试文件）+ 根 [`package.json`](../../../package.json) 与 [`bun.lock`](../../../bun.lock)。CLI 是技能书调用阶梯的第二级（原生 MCP → **bunx gda CLI** → `gda.mjs` 脚本桥 → 手动），定位与分发见下文。
 
 ## 定位与分发
 
@@ -183,7 +183,9 @@ resource:
 
 ## 协议（[`src/mcp/client.ts`](../../../cli/src/mcp/client.ts)）
 
-**标准 MCP 握手**：`initialize`（protocolVersion `2025-03-26`，clientInfo `gda-cli`）→ `notifications/initialized` → `tools/call`。懒握手：首次调用遇 400 + `-32600`（未初始化）时自动补握手并重试一次。
+**标准 MCP 握手**：`initialize`（protocolVersion `2025-11-25`，clientInfo `gda-cli`）→ `notifications/initialized` → `tools/call`。懒握手：首次调用遇 400 + `-32600`（未初始化）时自动补握手并重试一次；握手状态按目标 URL 键控（同进程切换目标时各自握手，单目标进程行为不变）。
+
+**协议版本对齐（2026-10-19）**：声明版本取 SDK 旧世代当前版本 `kLegacyProtocolVersion = "2025-11-25"`——GDA 未配置 `ServerOptions::protocol_version`，客户端声明受支持的旧版时服务端原样尊重（封顶 `2025-11-25`；modern `2026-07-28` 仅 `server/discover` 路径可达，与本客户端无关）。握手成功后从 initialize 响应 `result.protocolVersion` 学习协商版本，同一目标的后续 POST 携带 `MCP-Protocol-Version` 头；学习值为 modern 或不在已知五版本表（2024-11-05 / 2025-03-26 / 2025-06-18 / 2025-11-25 / 2026-07-28）内时不发头——modern 头会触发 stateless 传输 hold-open 长连接，与单响应客户端不兼容；握手失败不留下学习值。`gda.mjs` 脚本桥行为一致（单目标进程，模块级状态）。
 
 **直连工具集**（`META_DIRECT_TOOLS`）：`ping`/`search_tools`/`list_categories`/`get_tool_detail`/`batch_execute`/`code_execute` 直接发 `tools/call`；其余工具经 `call_tool` 包装（`{name: "call_tool", arguments: {name, arguments}}`）。
 
@@ -212,7 +214,7 @@ resource:
 
 | 层 | 位置 | 规模 | 说明 |
 |---|---|---|---|
-| TS 单测 | [`cli/tests/`](../../../cli/tests/) | 6 文件 102 用例（291 expect） | `bun test cli/tests`；client 17 / commands 38 / detach 1 / lifecycle 23 / registry 8 / target 15 |
+| TS 单测 | [`cli/tests/`](../../../cli/tests/) | 7 文件 108 用例（301 expect） | `bun test cli/tests`；client 23 / commands 38 / detach 1 / lifecycle 23 / registry 8 / target 15 |
 | ctest `cli_unit` | [`tests/scripts/run_cli_unit.py`](../../../tests/scripts/run_cli_unit.py) | 封装 `bun test` | bun 缺失时 SKIP 并 exit 0 |
 | ctest `cli_contract` | [`tests/scripts/test_cli_contract.py`](../../../tests/scripts/test_cli_contract.py) | 双载体 mock conformance | node 驱动 legacy `gda.mjs` + bun 驱动新 CLI；node/bun 缺失时 SKIP |
 | ctest `version_sync_guard` | [`tests/guard/version_sync_guard.py`](../../../tests/guard/version_sync_guard.py) | 三处版本一致 | `VERSION`/技能书 pin/`CLI_VERSION` |

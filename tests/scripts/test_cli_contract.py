@@ -116,7 +116,7 @@ class MockHandler(http.server.BaseHTTPRequestHandler):
                     "id": body.get("id"),
                     "result": {
                         "capabilities": {"tools": {}},
-                        "protocolVersion": "2025-03-26",
+                        "protocolVersion": "2025-11-25",
                         "serverInfo": {"name": "mock-gda", "version": "0.3.7"},
                     },
                 }

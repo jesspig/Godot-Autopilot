@@ -98,7 +98,7 @@ describe("callTool", () => {
         return sseResponse({
           jsonrpc: "2.0",
           id: body.id,
-          result: { protocolVersion: "2025-03-26", capabilities: {}, serverInfo: { name: "gda-testbed", version: "1.0.0" } },
+          result: { protocolVersion: "2025-11-25", capabilities: {}, serverInfo: { name: "gda-testbed", version: "1.0.0" } },
         });
       }
       if (body.method === "notifications/initialized") {
@@ -122,7 +122,7 @@ describe("callTool", () => {
         return sseResponse({
           jsonrpc: "2.0",
           id: body.id,
-          result: { protocolVersion: "2025-03-26", capabilities: {}, serverInfo: { name: "gda-testbed", version: "1.0.0" } },
+          result: { protocolVersion: "2025-11-25", capabilities: {}, serverInfo: { name: "gda-testbed", version: "1.0.0" } },
         });
       }
       if (body.method === "notifications/initialized") {
@@ -139,7 +139,7 @@ describe("callTool", () => {
     const res = await callTool("system_status", {}, { port });
     expect(calls.map((c) => c.method)).toEqual(["tools/call", "initialize", "notifications/initialized", "tools/call"]);
     expect(calls[1].params).toEqual({
-      protocolVersion: "2025-03-26",
+      protocolVersion: "2025-11-25",
       capabilities: {},
       clientInfo: { name: "gda-cli", version: CLI_VERSION },
     });

@@ -12,6 +12,10 @@
 //   initialize is rejected with HTTP 400 and JSON-RPC error -32600. On that
 //   reply the script POSTs initialize, then notifications/initialized, then
 //   retries the call once (lazily, at most once per process).
+// - After a successful initialize the script learns the negotiated protocol
+//   version from the response result and sends it as the MCP-Protocol-Version
+//   header on later requests; the modern 2026-07-28 era is excluded because
+//   the stateless transport would hold the connection open for it.
 // - The server answers successful calls with HTTP 200 and a single SSE
 //   frame (event: message plus data: <JSON-RPC>). Continuation lines that
 //   start with "data:" are joined with "\n" before JSON parsing.
@@ -44,7 +48,15 @@ const MAX_BODY_BYTES = 4 * 1024 * 1024;
 const JSONRPC_METHOD = "tools/call";
 const HANDSHAKE_INIT_METHOD = "initialize";
 const HANDSHAKE_INIT_ACK_METHOD = "notifications/initialized";
-const HANDSHAKE_PROTOCOL_VERSION = "2025-03-26";
+const HANDSHAKE_PROTOCOL_VERSION = "2025-11-25";
+const MODERN_PROTOCOL_VERSION = "2026-07-28";
+const KNOWN_PROTOCOL_VERSIONS = [
+  "2024-11-05",
+  "2025-03-26",
+  "2025-06-18",
+  "2025-11-25",
+  "2026-07-28",
+];
 const HANDSHAKE_CLIENT_NAME = "gda-script";
 const HANDSHAKE_CLIENT_VERSION = "1.0";
 const META_DIRECT_TOOLS = new Set([
@@ -55,6 +67,8 @@ const META_DIRECT_TOOLS = new Set([
   "batch_execute",
   "code_execute",
 ]);
+
+let negotiatedVersion = null;
 
 function makeEnvelope(id, name, args, direct) {
   const params = direct
@@ -423,15 +437,37 @@ function buildCall(sub, rest, opts) {
   }
 }
 
+function isModernProtocolVersion(version) {
+  return version >= MODERN_PROTOCOL_VERSION;
+}
+
+function learnNegotiatedVersion(res) {
+  const extracted = extractEnvelope(res);
+  if (extracted.kind !== "envelope") return;
+  const envelope = extracted.envelope;
+  const version = envelope && envelope.result ? envelope.result.protocolVersion : undefined;
+  if (typeof version === "string" && KNOWN_PROTOCOL_VERSIONS.includes(version)) {
+    negotiatedVersion = version;
+  }
+}
+
+function requestHeaders() {
+  const headers = {
+    "Content-Type": "application/json",
+    Accept: "application/json, text/event-stream",
+  };
+  if (negotiatedVersion !== null && !isModernProtocolVersion(negotiatedVersion)) {
+    headers["MCP-Protocol-Version"] = negotiatedVersion;
+  }
+  return headers;
+}
+
 async function postJson(url, body, timeoutMs) {
   let res;
   try {
     res = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json, text/event-stream",
-      },
+      headers: requestHeaders(),
       body,
       signal: AbortSignal.timeout(timeoutMs),
     });
@@ -600,6 +636,7 @@ async function main() {
           "Restart the editor session, then retry.",
         );
       }
+      learnNegotiatedVersion(initRes);
       const ackRes = await postJson(url, JSON.stringify(makeInitializedNotification()), timeoutMs);
       if (ackRes.status < 200 || ackRes.status >= 300) {
         transportError(

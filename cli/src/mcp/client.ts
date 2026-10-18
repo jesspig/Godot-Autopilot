@@ -27,7 +27,15 @@ const DEFAULT_TIMEOUT_SEC = 60;
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
 const HANDSHAKE_METHOD = "notifications/initialized";
 const HANDSHAKE_ERROR_CODE = -32600;
-const PROTOCOL_VERSION = "2025-03-26";
+const PROTOCOL_VERSION = "2025-11-25";
+const MODERN_PROTOCOL_VERSION = "2026-07-28";
+const KNOWN_PROTOCOL_VERSIONS: readonly string[] = [
+  "2024-11-05",
+  "2025-03-26",
+  "2025-06-18",
+  "2025-11-25",
+  "2026-07-28",
+];
 const CLIENT_NAME = "gda-cli";
 
 const CONNECT_FAILURE_SUGGESTION =
@@ -54,7 +62,22 @@ function adviceForStatus(status: number, bodyBytes?: number): string {
 }
 
 let nextRequestId = 1;
-let handshakeDone = false;
+
+interface HandshakeState {
+  done: boolean;
+  version: string | null;
+}
+
+const handshakeStates = new Map<string, HandshakeState>();
+
+function handshakeStateFor(url: string): HandshakeState {
+  let state = handshakeStates.get(url);
+  if (state === undefined) {
+    state = { done: false, version: null };
+    handshakeStates.set(url, state);
+  }
+  return state;
+}
 
 interface RawResponse {
   status: number;
@@ -87,16 +110,44 @@ function makeInitializeEnvelope(): string {
   });
 }
 
+function isModernProtocolVersion(version: string): boolean {
+  return version >= MODERN_PROTOCOL_VERSION;
+}
+
+function learnNegotiatedVersion(res: RawResponse, state: HandshakeState): void {
+  const extracted = extractEnvelope(res);
+  if (extracted.kind !== "envelope") return;
+  const envelope = extracted.envelope as { result?: { protocolVersion?: unknown } };
+  const version = envelope.result?.protocolVersion;
+  if (typeof version === "string" && KNOWN_PROTOCOL_VERSIONS.includes(version)) {
+    state.version = version;
+  }
+}
+
+function requestHeaders(url: string): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/json, text/event-stream",
+  };
+  const version = handshakeStateFor(url).version;
+  if (version !== null && !isModernProtocolVersion(version)) {
+    headers["MCP-Protocol-Version"] = version;
+  }
+  return headers;
+}
+
 async function performHandshake(url: string, timeoutMs: number): Promise<void> {
+  const state = handshakeStateFor(url);
   const initRes = await postJson(url, makeInitializeEnvelope(), timeoutMs);
   if (initRes.status < 200 || initRes.status >= 300) {
     throw new CliError(ExitCode.Transport, `initialize failed with HTTP ${initRes.status}.`);
   }
+  learnNegotiatedVersion(initRes, state);
   const ackRes = await postJson(url, JSON.stringify({ jsonrpc: "2.0", method: HANDSHAKE_METHOD }), timeoutMs);
   if (ackRes.status < 200 || ackRes.status >= 300) {
     throw new CliError(ExitCode.Transport, `handshake failed with HTTP ${ackRes.status}.`);
   }
-  handshakeDone = true;
+  state.done = true;
 }
 
 async function postJson(url: string, body: string, timeoutMs: number): Promise<RawResponse> {
@@ -104,10 +155,7 @@ async function postJson(url: string, body: string, timeoutMs: number): Promise<R
   try {
     res = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json, text/event-stream",
-      },
+      headers: requestHeaders(url),
       body,
       signal: AbortSignal.timeout(timeoutMs),
     });
@@ -208,7 +256,7 @@ export async function callTool(
   let res = await postJson(url, body, timeoutMs);
   let extracted = extractEnvelope(res);
   if (
-    !handshakeDone &&
+    !handshakeStateFor(url).done &&
     ((extracted.kind === "envelope" && needsHandshake(res.status, extracted.envelope)) ||
       (res.status === 400 && extracted.kind !== "envelope"))
   ) {
