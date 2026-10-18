@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "target": "ESNext",
+    "noEmit": true,
+    "types": ["bun"]
+  },
+  "include": ["src", "tests"],
+  "exclude": ["tests"]
+}

@@ -69,6 +69,27 @@ Requires **Godot 4.7+**.
 
 Want to build from source or contribute? See [docs/wiki/](docs/wiki/) (start at [index.md](docs/wiki/index.md), building at [build.md](docs/wiki/build.md)) and [tests/README.md](tests/README.md).
 
+## Command-line access
+
+Prefer a terminal to a chat client? The GDA CLI drives a running GDA instance from the shell — no MCP client integration needed. It is Bun + TypeScript, runs from source, and has **zero runtime dependencies** and no build step.
+
+Run it one-off with `bunx` (quoted on PowerShell, because `#` starts a comment):
+
+```
+bunx "github:jesspig/Godot-Autopilot#0.2.7" ping
+```
+
+Or install it globally once and use the `gda` command:
+
+```
+bun install -g github:jesspig/Godot-Autopilot#0.2.7
+gda ping
+```
+
+Command families: **calling** — `ping` / `status` / `categories` / `search` / `describe` / `call`; **lifecycle** — `list` / `start` / `stop` / `logs`.
+
+Requires **Bun**. See [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md) for the full reference.
+
 ## Safety notes
 
 The server only listens on your machine's loopback address (port from the plugin settings, 9527 by default, fixed path `/mcp`) and refuses non-local addresses. Script execution, game control, and OS process tools are **denied by default** — enable them only in a local project you trust. Details: [docs/wiki/security_contract.md](docs/wiki/security_contract.md).

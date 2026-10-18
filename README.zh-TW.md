@@ -69,6 +69,27 @@ Godot-Autopilot 是一個住在 **Godot 編輯器內部**的外掛型 [MCP](http
 
 想從原始碼建置或參與貢獻？見 [docs/wiki/](docs/wiki/)（入口 [index.md](docs/wiki/index.md)，建置見 [build.md](docs/wiki/build.md)）與 [tests/README.md](tests/README.md)。
 
+## 命令列存取
+
+想直接下指令而不接 MCP 客戶端？GDA CLI 讓你在終端機中驅動執行中的 GDA 實例，無需整合 MCP 客戶端。它基於 Bun + TypeScript，原始碼直跑，**零執行階段依賴**、無建置步驟。
+
+用 `bunx` 單次執行（PowerShell 下需加引號，因為 `#` 會被視為註解）：
+
+```
+bunx "github:jesspig/Godot-Autopilot#0.2.7" ping
+```
+
+或全域安裝一次，之後直接使用 `gda` 命令：
+
+```
+bun install -g github:jesspig/Godot-Autopilot#0.2.7
+gda ping
+```
+
+命令族：**呼叫族** —— `ping` / `status` / `categories` / `search` / `describe` / `call`；**生命週期** —— `list` / `start` / `stop` / `logs`。
+
+需要 **Bun**。完整參考見 [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md)。
+
 ## 安全性說明
 
 服務端僅監聽本機迴環位址（連接埠取自外掛設定，預設 9527，路徑固定為 `/mcp`），非本機位址一律拒絕。腳本執行、遊戲控制、作業系統程序類工具**預設全部拒絕**——僅在你信任的本機專案中開啟。詳見 [docs/wiki/security_contract.md](docs/wiki/security_contract.md)。

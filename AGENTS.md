@@ -9,6 +9,7 @@ Godot Autopilot（GDA）：进程内 GDExtension，把 Godot 编辑器经 MCP（
 - 构建部署：`uv run main.py build` + `uv run main.py deploy`（子命令：`build` / `deploy` / `package` / `clean` / `test` / `tui`；`deploy` 下 `--release` / `--demos <名称...>`，`package` 下 `--libs-dir <dir>`）
 - 手动构建：`cmake --preset debug && cmake --build --preset debug`
 - 快速验证：`ctest --preset debug -E "^gda_runner_"`（L1 + 两守卫，秒级）
+- CLI 单测：`bun test cli/tests`（Bun + TS，秒级）
 - 版本只改根 `VERSION`，随后重新 configure
 
 ## 每次在场的硬约束
@@ -20,6 +21,7 @@ Godot Autopilot（GDA）：进程内 GDExtension，把 Godot 编辑器经 MCP（
 - **源码禁止注释**：除 `// namespace` 结尾标记外不得有 `//` 或 `/*…*/`，解释写进 wiki；`comment_guard` 在 ctest 阶段拦，编译通过不算过。
 - **默认安全姿态不可静默放宽**：仅绑环回、脱敏默认开、授权列表默认为空、导出期拒绝工具调用。
 - **数值一律以运行时统计为准**，权威口径见 `docs/wiki/tests.md` 的数值核算总表；本页不记录计数。
+- **CLI 为 Bun+TS 源码直跑**：零运行时依赖、无构建步骤、不产出二进制；技能书钉 `#<VERSION>`（由 `version_sync_guard` 兜底）。
 
 ## 三层文档分工
 

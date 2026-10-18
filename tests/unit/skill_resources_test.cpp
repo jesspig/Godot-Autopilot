@@ -255,7 +255,7 @@ TEST(SkillResourcesTest, ScriptMimeType) {
 
   const ContentResult script =
       godot_autopilot::skill_resources::resolve_content(
-          all, "godot://skills/godot-autopilot-tools/scripts/gda_mcp.mjs");
+          all, "godot://skills/godot-autopilot-tools/scripts/gda.mjs");
   EXPECT_TRUE(script.error.empty());
   EXPECT_EQ(script.kind, UriKind::file);
   EXPECT_EQ(script.mime_type, "text/javascript");

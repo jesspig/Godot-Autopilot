@@ -19,6 +19,7 @@
 | [modules/tools_ops_a.md](modules/tools_ops_a.md) | 领域工具 A 组（场景/属性/输入/物理/导航/资源/脚本/配置/文档/编辑器 16 模块，222 工具） | `src/tools/*_ops.cpp` |
 | [modules/tools_ops_b.md](modules/tools_ops_b.md) | 领域工具 B 组（调试/显示/OS/运行时/音频/渲染/C# 桥/瓦片等 20 模块，229 工具；A 222 + B 229 = 451） | `src/tools/*_ops.cpp` |
 | [modules/support.md](modules/support.md) | 提示词、MCP 资源、UI、工具库 | `src/prompts/`、`src/resources/`、`src/ui/`、`src/util/` |
+| [modules/cli.md](modules/cli.md) | CLI 载体（gda）：Bun + TS 源码直跑、命令参考、寻址链、登记表、生命周期、协议握手与已知限制 | `cli/`、`package.json`、`bun.lock` |
 | [plans/roadmap.md](plans/roadmap.md) | 竞品对齐路线图：竞品定位速览与 P0-P3 批次交付状态 | 全仓库 |
 | [.agents/skills/](../../.agents/skills/) | 项目级可执行技能：怎么做、何时停、做错的表现 | 全仓库流程与纪律 |
 
@@ -26,7 +27,7 @@
 
 - 工具注册总入口 `ToolRegistry`（单一来源）：**459 条目** = 451 域工具 + `system_status` + 7 元工具；域工具分 **27 类**（InputMap 并入 Input）与 **33 个源模块**（32 存量 + 新增 `csharp`，`file_dir` 挂 `os` 无独立域）；MCP 可达工具总数 **458** = 7 元 + 451 域
 - schema：**459 = 393 非空 + 66 空**（L1 `SchemaStatisticsBaseline` 精确断言）；`03_tools_contract` 遍历 warnings 以运行时报告为准（基线 4 条：`start_input_gamepad_vibration`、`stop_input_gamepad_vibration`、`get_resource_extensions`、`reimport_resource_files`；10-16 全量复核仍为这 4 条）
-- 遍历排除 **`side_effect`/`mutating` 工具**（运行时经 `search_tools` 空 query 枚举 452 条 = 451 域 + `system_status`，跳过 7 元后按 `side_effect`/`mutating`/`dynamic` 字段排除，进入空参+冒烟两步骤，上限 904 步；`dynamic` 分支为防回归保留；排除数与候选数以运行时 `03_tools_contract` 报告为准，旧基线 71 排除 / 322 候选已过时）；L1 单元测试 **435 个 gtest**（41 个 unit 文件）+ 迁移守卫 + 注释守卫 + `skill_scripts`（`ctest -E "^gda_runner_"` 共 **438**）；L2 引擎用例 **38 个文件**（00-10 共 11 份 + 11-20 共 10 份 + 22-30 共 9 份 + 31_theme_root/32_plane_inline/33_verified_inherit/34_slash_property/35_scene_tree_gate/36_stall_immunity/37_game_ready_gate 共 7 份 + 38_csharp_bridge；21 号段空缺，99 号诊断用例已删）；ctest 注册点 **476**（435 + 2 守卫 + `skill_scripts` + 38 L2；10-16 `ctest -N` 实测，L2 需引擎环境与 `GODOT_AUTOPILOT_ALLOW`，26/27 号另需 `user_tools`，32/34/35/36/38 号需 `code_execute`，16/23/24/35/37 号需 `game_runtime`）
+- 遍历排除 **`side_effect`/`mutating` 工具**（运行时经 `search_tools` 空 query 枚举 452 条 = 451 域 + `system_status`，跳过 7 元后按 `side_effect`/`mutating`/`dynamic` 字段排除，进入空参+冒烟两步骤，上限 904 步；`dynamic` 分支为防回归保留；排除数与候选数以运行时 `03_tools_contract` 报告为准，旧基线 71 排除 / 322 候选已过时）；L1 单元测试 **435 个 gtest**（41 个 unit 文件）+ 迁移守卫 + 注释守卫 + `version_sync_guard` + `cli_contract` + `cli_unit`（`ctest -E "^gda_runner_"` 共 **440**）；L2 引擎用例 **38 个文件**（00-10 共 11 份 + 11-20 共 10 份 + 22-30 共 9 份 + 31_theme_root/32_plane_inline/33_verified_inherit/34_slash_property/35_scene_tree_gate/36_stall_immunity/37_game_ready_gate 共 7 份 + 38_csharp_bridge；21 号段空缺，99 号诊断用例已删）；ctest 注册点 **478**（435 + 2 守卫 + `version_sync_guard` + `cli_contract` + `cli_unit` + 38 L2；10-18 `ctest -N` 实测，L2 需引擎环境与 `GODOT_AUTOPILOT_ALLOW`，26/27 号另需 `user_tools`，32/34/35/36/38 号需 `code_execute`，16/23/24/35/37 号需 `game_runtime`；10-17 起由 `cli_contract` + `cli_unit` 取代）
 - 工具命名规范：`<动词>_<类别>_<维度>_<对象>_<修饰>`（动词置首，如 create_scene_node、intersect_physics_2d_ray）
 - MCP 端口 **9527**（`/mcp`），`GODOT_AUTOPILOT_PORT` 可覆盖；产物名 `godot-autopilot`
 
