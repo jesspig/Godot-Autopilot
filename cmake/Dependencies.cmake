@@ -29,10 +29,6 @@ function(gda_require_submodule name)
     endif()
 endfunction()
 
-# mcp-cpp-sdk 的 OpenSSL/TLS 为可选依赖，本插件 MCP 服务仅监听 127.0.0.1 明文 HTTP，
-# 统一禁用以保证三平台产物一致（macOS homebrew 仅有 arm64 OpenSSL，universal 链接会失败）。
-set(CMAKE_DISABLE_FIND_PACKAGE_OpenSSL ON)
-
 # ====================================================================
 # godot-cpp — Godot Engine C++ 绑定层 (10.0.0-stable / 507ed9d)
 # ====================================================================
@@ -41,9 +37,14 @@ set(GODOTCPP_API_VERSION "4.7" CACHE STRING "The Godot API version to target" FO
 add_subdirectory("${GDA_THIRD_PARTY_DIR}/godot-cpp" "${GDA_SUBMODULE_BIN_DIR}/godot-cpp")
 
 # ====================================================================
-# mcp-cpp-sdk — MCP 协议 C++ SDK (0.3.7 / 7dfe088)
+# mcp-cpp-sdk — MCP 协议 C++ SDK (0.3.8 / d79f9b1)
 # ====================================================================
 gda_require_submodule(mcp-cpp-sdk)
+# OpenSSL/TLS 为可选依赖，启用与否由 SDK 的 MCP_WITH_OPENSSL 三态开关（AUTO/ON/OFF）决定；
+# 本插件 MCP 服务仅监听 127.0.0.1 明文 HTTP，故显式 OFF，
+# 与"仅绑环回"的安全姿态一致，同时保证三平台产物一致
+# （macOS homebrew 仅有 arm64 OpenSSL，AUTO 下三平台行为会分叉，universal 链接亦会失败）。
+set(MCP_WITH_OPENSSL "OFF" CACHE STRING "OpenSSL integration: AUTO/ON/OFF" FORCE)
 add_subdirectory("${GDA_THIRD_PARTY_DIR}/mcp-cpp-sdk" "${GDA_SUBMODULE_BIN_DIR}/mcp-cpp-sdk")
 
 message(STATUS "[gda] Dependencies: godot-cpp + mcp-cpp-sdk (third_party submodule)")
