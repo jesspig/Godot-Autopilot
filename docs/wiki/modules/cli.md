@@ -8,7 +8,7 @@ tags:
   - Bun
   - TypeScript
   - MCP
-timestamp: "2026-10-18T04:01:49+08:00"
+timestamp: "2026-10-19T00:00:00+08:00"
 resource:
   - cli/
   - package.json
@@ -17,7 +17,7 @@ resource:
 
 # CLI 载体（`cli/`，命令 `gda`）
 
-> 审计日期：2026-10-18（随 CLI 载体落地批次同步——新增 `cli/`（Bun + TS 源码直跑，零运行时依赖）、根 `package.json`/`bun.lock`；双载体（CLI + `gda.mjs`）协议握手升级为标准 MCP `initialize` 流程（SDK 0.3.7 兼容）；真机验收修复两个缺陷（Windows 脱父、start 就绪探测直达标志）；测试稳定性修复（串行化 + Windows 清理时序）；`version_sync_guard`/`cli_contract`/`cli_unit` 三个新 ctest 点；详见 [changelog/2026-10-18-log.md](../changelog/2026-10-18-log.md)）
+> 审计日期：2026-10-19（随 CLI 跨平台修复批次同步——`userDataBase()` 新增 `GODOT_AUTOPILOT_USERDATA` 显式覆写（未设或空白走原生分支，既有解析语义不变）；`target.test.ts` 改经覆写变量注入临时 userdata，不再依赖 Windows 专属 `APPDATA` 语义（Linux/macOS 寻址链用例原先必败）；`lifecycle.test.ts` 优雅停止失败用例改用显式忽略 SIGTERM 的子进程，去除内嵌 Windows `taskkill` 无 `/F` 语义、两平台同语义；寻址链小节补 userdata 目录解析与覆写变量说明）；2026-10-18（随 CLI 载体落地批次同步——新增 `cli/`（Bun + TS 源码直跑，零运行时依赖）、根 `package.json`/`bun.lock`；双载体（CLI + `gda.mjs`）协议握手升级为标准 MCP `initialize` 流程（SDK 0.3.7 兼容）；真机验收修复两个缺陷（Windows 脱父、start 就绪探测直达标志）；测试稳定性修复（串行化 + Windows 清理时序）；`version_sync_guard`/`cli_contract`/`cli_unit` 三个新 ctest 点；详见 [changelog/2026-10-18-log.md](../changelog/2026-10-18-log.md)）
 
 > 覆盖范围：`cli/` 全部（`bin/gda.ts` 入口、`src/` 11 模块、`src/commands/` 10 命令、`src/mcp/client.ts` 协议客户端、`tests/` 6 测试文件）+ 根 [`package.json`](../../../package.json) 与 [`bun.lock`](../../../bun.lock)。CLI 是技能书调用阶梯的第二级（原生 MCP → **bunx gda CLI** → `gda.mjs` 脚本桥 → 手动），定位与分发见下文。
 
@@ -124,6 +124,8 @@ resource:
 | 7 | 默认 9527 | 兜底 |
 
 即无显式选项时的环境链为 **env → cwd 登记 → trace → config → 9527**，对齐 legacy 脚本桥五级链（[`script-access.md`](../../../skills/godot-autopilot-tools/references/script-access.md)）。
+
+**Godot userdata 目录解析**（trace/config 两级定位用，[`src/platform.ts`](../../../cli/src/platform.ts) `userDataBase()`）：`GODOT_AUTOPILOT_USERDATA` 显式覆写 > `%APPDATA%\Godot\app_userdata`（Windows）/ `~/Library/Application Support/Godot/app_userdata`（macOS）/ `~/.local/share/godot/app_userdata`（其他平台）。覆写变量供测试与非常规安装路径绕过平台推断，未设或为空白时走原生分支（既有解析语义不变）；其下再按 `<userdata>/<project_name>/godot_autopilot/` 读 `server_ready` trace 与 `config.json`。
 
 ## 登记表（[`src/registry.ts`](../../../cli/src/registry.ts)）
 
