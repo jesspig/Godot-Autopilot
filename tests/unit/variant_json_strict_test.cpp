@@ -45,6 +45,21 @@ TEST(VariantJsonStrictTest, Rect2MissingSizeMessage) {
   }
 }
 
+TEST(VariantJsonStrictTest, Rect2MissingSizeMessageSurvivesHeapChurn) {
+  try {
+    strict_parse(R"({"position":{"x":1,"y":2}})", "Rect2");
+    FAIL() << "expected std::runtime_error";
+  } catch (const std::runtime_error &e) {
+    for (int i = 0; i < 32; ++i) {
+      std::string scratch(96, static_cast<char>('a' + (i % 26)));
+      scratch.assign(scratch.size(), 'z');
+    }
+    EXPECT_STREQ(e.what(),
+                 "invalid Rect2: 'size' must be an object, e.g. "
+                 "{\"position\":{\"x\":0,\"y\":0},\"size\":{\"w\":64,\"h\":32}}");
+  }
+}
+
 TEST(VariantJsonStrictTest, Rect2RejectsNonObject) {
   EXPECT_THROW(strict_parse("[1,2,3]", "Rect2"), std::runtime_error);
 }

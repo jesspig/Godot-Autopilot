@@ -1,5 +1,7 @@
 #include "runner_report.hpp"
 
+#include "util/owned_exception.hpp"
+
 #include <mcp/JsonValue.hpp>
 
 #include <cstdio>
@@ -14,6 +16,8 @@
 #include <vector>
 
 namespace gda_test {
+
+using godot_autopilot::RuntimeError;
 
 namespace {
 
@@ -120,7 +124,7 @@ std::string save_json_report(const std::vector<FileResult>& results, const std::
     std::error_code ec;
     std::filesystem::create_directories(dir, ec);
     if (ec) {
-        throw std::runtime_error("创建报告目录失败(位置: " + dir + "): " + ec.message()
+        throw RuntimeError("创建报告目录失败(位置: " + dir + "): " + ec.message()
                                  + " (期望: 目录可创建)");
     }
 
@@ -160,11 +164,11 @@ std::string save_json_report(const std::vector<FileResult>& results, const std::
 
     std::ofstream out(file_path);
     if (!out) {
-        throw std::runtime_error("无法打开报告文件(位置: " + file_path + "): (期望: 文件可写)");
+        throw RuntimeError("无法打开报告文件(位置: " + file_path + "): (期望: 文件可写)");
     }
     out << root.Dump(2) << '\n';
     if (!out) {
-        throw std::runtime_error("写入报告文件失败(位置: " + file_path + "): (期望: 文件可写)");
+        throw RuntimeError("写入报告文件失败(位置: " + file_path + "): (期望: 文件可写)");
     }
     return file_path;
 }

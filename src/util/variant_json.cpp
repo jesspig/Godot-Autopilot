@@ -1,6 +1,7 @@
 #include "variant_json.hpp"
 #include "core/config.hpp"
 #include "core/log_system.hpp"
+#include "util/owned_exception.hpp"
 #include <cctype>
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
@@ -612,7 +613,7 @@ const mcp::JsonValue *strict_number_field(const mcp::JsonValue &obj,
   if (!v)
     return nullptr;
   if (!v->IsNumber())
-    throw std::runtime_error(std::string("invalid ") + type_name + ": '" + path +
+    throw RuntimeError(std::string("invalid ") + type_name + ": '" + path +
                              "' must be a number, e.g. " + example);
   return v;
 }
@@ -625,7 +626,7 @@ const mcp::JsonValue *strict_required_number(const mcp::JsonValue &obj,
   const mcp::JsonValue *v =
       strict_number_field(obj, key, key, type_name, example);
   if (!v)
-    throw std::runtime_error(std::string("invalid ") + type_name + ": " +
+    throw RuntimeError(std::string("invalid ") + type_name + ": " +
                              missing_message + ", e.g. " + example);
   return v;
 }
@@ -643,7 +644,7 @@ const mcp::JsonValue *pick_size_axis(const mcp::JsonValue &size,
     bool conflict = int_semantics ? as_int64(*p) != as_int64(*a)
                                   : as_double(*p) != as_double(*a);
     if (conflict) {
-      throw std::runtime_error(std::string("invalid ") + type_name + ": '" +
+      throw RuntimeError(std::string("invalid ") + type_name + ": '" +
                                container + "." + primary + "' and '" +
                                container + "." + alias + "' conflict, e.g. " +
                                example);
@@ -662,25 +663,25 @@ godot::Variant deserialize_rect2_strict(const mcp::JsonValue &j,
   const char *example =
       "{\"position\":{\"x\":0,\"y\":0},\"size\":{\"w\":64,\"h\":32}}";
   if (!j.IsObject())
-    throw std::runtime_error(std::string("invalid ") + type_name +
+    throw RuntimeError(std::string("invalid ") + type_name +
                              ": expected a JSON object, e.g. " + example);
   auto *size_j = j.Find("size");
   if (!size_j || !size_j->IsObject())
-    throw std::runtime_error(std::string("invalid ") + type_name +
+    throw RuntimeError(std::string("invalid ") + type_name +
                              ": 'size' must be an object, e.g. " + example);
   const mcp::JsonValue *sx_j = pick_size_axis(*size_j, "size", "x", "w",
                                               int_semantics, type_name, example);
   const mcp::JsonValue *sy_j = pick_size_axis(*size_j, "size", "y", "h",
                                               int_semantics, type_name, example);
   if (!sx_j || !sy_j)
-    throw std::runtime_error(std::string("invalid ") + type_name +
+    throw RuntimeError(std::string("invalid ") + type_name +
                              ": 'size' must provide 'w' and 'h' (or 'x' and "
                              "'y'), e.g. " + example);
   const mcp::JsonValue *px_j = nullptr;
   const mcp::JsonValue *py_j = nullptr;
   if (auto *pos_j = j.Find("position")) {
     if (!pos_j->IsObject())
-      throw std::runtime_error(std::string("invalid ") + type_name +
+      throw RuntimeError(std::string("invalid ") + type_name +
                                ": 'position' must be an object, e.g. " +
                                example);
     px_j = strict_number_field(*pos_j, "x", "position.x", type_name, example);
@@ -703,10 +704,10 @@ godot::Variant deserialize_vector2_strict(const mcp::JsonValue &j,
   const char *type_name = int_semantics ? "Vector2i" : "Vector2";
   const char *example = "{\"x\":0,\"y\":0}";
   if (!j.IsObject())
-    throw std::runtime_error(std::string("invalid ") + type_name +
+    throw RuntimeError(std::string("invalid ") + type_name +
                              ": expected a JSON object, e.g. " + example);
   if (!j.Find("x") || !j.Find("y"))
-    throw std::runtime_error(std::string("invalid ") + type_name +
+    throw RuntimeError(std::string("invalid ") + type_name +
                              ": 'x' and 'y' are required numbers, e.g. " +
                              example);
   const mcp::JsonValue *x_j =
@@ -724,11 +725,11 @@ godot::Variant deserialize_aabb_strict(const mcp::JsonValue &j) {
       "{\"position\":{\"x\":0,\"y\":0,\"z\":0},\"size\":{\"w\":64,\"h\":32,"
       "\"d\":16}}";
   if (!j.IsObject())
-    throw std::runtime_error(
+    throw RuntimeError(
         std::string("invalid AABB: expected a JSON object, e.g. ") + example);
   auto *size_j = j.Find("size");
   if (!size_j || !size_j->IsObject())
-    throw std::runtime_error(
+    throw RuntimeError(
         std::string("invalid AABB: 'size' must be an object, e.g. ") + example);
   const mcp::JsonValue *sx_j =
       pick_size_axis(*size_j, "size", "x", "w", false, "AABB", example);
@@ -737,7 +738,7 @@ godot::Variant deserialize_aabb_strict(const mcp::JsonValue &j) {
   const mcp::JsonValue *sz_j =
       pick_size_axis(*size_j, "size", "z", "d", false, "AABB", example);
   if (!sx_j || !sy_j || !sz_j)
-    throw std::runtime_error(
+    throw RuntimeError(
         std::string("invalid AABB: 'size' must provide 'w', 'h' and 'd' (or "
                     "'x', 'y' and 'z'), e.g. ") + example);
   const mcp::JsonValue *px_j = nullptr;
@@ -745,7 +746,7 @@ godot::Variant deserialize_aabb_strict(const mcp::JsonValue &j) {
   const mcp::JsonValue *pz_j = nullptr;
   if (auto *pos_j = j.Find("position")) {
     if (!pos_j->IsObject())
-      throw std::runtime_error(
+      throw RuntimeError(
           std::string("invalid AABB: 'position' must be an object, e.g. ") +
           example);
     px_j = strict_number_field(*pos_j, "x", "position.x", "AABB", example);
@@ -762,7 +763,7 @@ godot::Variant deserialize_aabb_strict(const mcp::JsonValue &j) {
 godot::Variant deserialize_transform2d_strict(const mcp::JsonValue &j) {
   const char *example = "{\"columns\":[[1,0],[0,1],[x,y]]}";
   if (!j.IsObject())
-    throw std::runtime_error(
+    throw RuntimeError(
         std::string("invalid Transform2D: expected a JSON object, e.g. ") +
         example);
   const std::string columns_error =
@@ -771,18 +772,18 @@ godot::Variant deserialize_transform2d_strict(const mcp::JsonValue &j) {
       example;
   auto *cols_j = j.Find("columns");
   if (!cols_j || !cols_j->IsArray())
-    throw std::runtime_error(columns_error);
+    throw RuntimeError(columns_error);
   const auto &arr = cols_j->GetArray();
   if (arr.size() < 3)
-    throw std::runtime_error(columns_error);
+    throw RuntimeError(columns_error);
   godot::Vector2 cols[3];
   for (int i = 0; i < 3; ++i) {
     const auto &c = arr[i];
     if (!c.IsArray())
-      throw std::runtime_error(columns_error);
+      throw RuntimeError(columns_error);
     const auto &ca = c.GetArray();
     if (ca.size() < 2 || !ca[0].IsNumber() || !ca[1].IsNumber())
-      throw std::runtime_error(columns_error);
+      throw RuntimeError(columns_error);
     cols[i] = godot::Vector2(as_double(ca[0]), as_double(ca[1]));
   }
   return godot::Variant(godot::Transform2D(cols[0], cols[1], cols[2]));
@@ -793,7 +794,7 @@ godot::Variant deserialize_transform3d_strict(const mcp::JsonValue &j) {
       "{\"basis\":{\"rows\":[[1,0,0],[0,1,0],[0,0,1]]},\"origin\":{\"x\":0,"
       "\"y\":0,\"z\":0}}";
   if (!j.IsObject())
-    throw std::runtime_error(
+    throw RuntimeError(
         std::string("invalid Transform3D: expected a JSON object, e.g. ") +
         example);
   const std::string rows_error =
@@ -802,22 +803,22 @@ godot::Variant deserialize_transform3d_strict(const mcp::JsonValue &j) {
       example;
   auto *basis_j = j.Find("basis");
   if (!basis_j || !basis_j->IsObject())
-    throw std::runtime_error(rows_error);
+    throw RuntimeError(rows_error);
   auto *rows_j = basis_j->Find("rows");
   if (!rows_j || !rows_j->IsArray())
-    throw std::runtime_error(rows_error);
+    throw RuntimeError(rows_error);
   const auto &arr = rows_j->GetArray();
   if (arr.size() < 3)
-    throw std::runtime_error(rows_error);
+    throw RuntimeError(rows_error);
   godot::Basis b;
   for (int i = 0; i < 3; ++i) {
     const auto &r = arr[i];
     if (!r.IsArray())
-      throw std::runtime_error(rows_error);
+      throw RuntimeError(rows_error);
     const auto &ra = r.GetArray();
     if (ra.size() < 3 || !ra[0].IsNumber() || !ra[1].IsNumber() ||
         !ra[2].IsNumber())
-      throw std::runtime_error(rows_error);
+      throw RuntimeError(rows_error);
     b.rows[i] =
         godot::Vector3(as_double(ra[0]), as_double(ra[1]), as_double(ra[2]));
   }
@@ -826,7 +827,7 @@ godot::Variant deserialize_transform3d_strict(const mcp::JsonValue &j) {
   const mcp::JsonValue *oz_j = nullptr;
   if (auto *origin_j = j.Find("origin")) {
     if (!origin_j->IsObject())
-      throw std::runtime_error(
+      throw RuntimeError(
           std::string("invalid Transform3D: 'origin' must be an object, e.g. ") +
           example);
     ox_j =
@@ -848,7 +849,7 @@ godot::Variant deserialize_vector3_strict(const mcp::JsonValue &j,
   const char *example = "{\"x\":0,\"y\":0,\"z\":0}";
   const char *missing = "'x', 'y' and 'z' are required numbers";
   if (!j.IsObject())
-    throw std::runtime_error(std::string("invalid ") + type_name +
+    throw RuntimeError(std::string("invalid ") + type_name +
                              ": expected a JSON object, e.g. " + example);
   const mcp::JsonValue *x_j =
       strict_required_number(j, "x", type_name, example, missing);
@@ -870,7 +871,7 @@ godot::Variant deserialize_vector4_strict(const mcp::JsonValue &j,
   const char *example = "{\"x\":0,\"y\":0,\"z\":0,\"w\":0}";
   const char *missing = "'x', 'y', 'z' and 'w' are required numbers";
   if (!j.IsObject())
-    throw std::runtime_error(std::string("invalid ") + type_name +
+    throw RuntimeError(std::string("invalid ") + type_name +
                              ": expected a JSON object, e.g. " + example);
   const mcp::JsonValue *x_j =
       strict_required_number(j, "x", type_name, example, missing);
@@ -893,14 +894,14 @@ godot::Variant deserialize_plane_strict(const mcp::JsonValue &j) {
       "{\"normal\":{\"x\":0,\"y\":1,\"z\":0},\"d\":0} or "
       "{\"x\":0,\"y\":1,\"z\":0,\"d\":0}";
   if (!j.IsObject())
-    throw std::runtime_error(
+    throw RuntimeError(
         std::string("invalid Plane: expected a JSON object, e.g. ") + example);
   auto *normal_j = j.Find("normal");
   const bool has_components = j.Find("x") != nullptr ||
                               j.Find("y") != nullptr ||
                               j.Find("z") != nullptr;
   if (normal_j && has_components)
-    throw std::runtime_error(
+    throw RuntimeError(
         std::string("invalid Plane: cannot mix 'normal' with top-level 'x', "
                     "'y' or 'z', e.g. ") +
         example);
@@ -909,7 +910,7 @@ godot::Variant deserialize_plane_strict(const mcp::JsonValue &j) {
   double nz = 0.0;
   if (normal_j) {
     if (!normal_j->IsObject())
-      throw std::runtime_error(
+      throw RuntimeError(
           std::string("invalid Plane: 'normal' must be an object with 'x', "
                       "'y' and 'z' numbers, e.g. ") +
           example);
@@ -938,7 +939,7 @@ godot::Variant deserialize_plane_strict(const mcp::JsonValue &j) {
     ny = as_double(*y_j);
     nz = as_double(*z_j);
   } else {
-    throw std::runtime_error(
+    throw RuntimeError(
         std::string("invalid Plane: provide 'normal' with 'x', 'y' and 'z' or "
                     "top-level 'x', 'y' and 'z', e.g. ") +
         example);
@@ -947,7 +948,7 @@ godot::Variant deserialize_plane_strict(const mcp::JsonValue &j) {
       strict_required_number(j, "d", "Plane", example, "'d' is required");
   const double d = as_double(*d_j);
   if (nx == 0.0 && ny == 0.0 && nz == 0.0 && d != 0.0)
-    throw std::runtime_error(
+    throw RuntimeError(
         std::string("invalid Plane: normal must not be zero when 'd' is "
                     "non-zero (WorldBoundaryShape3D/Jolt reject such planes "
                     "with this error), e.g. ") +
@@ -960,7 +961,7 @@ godot::Variant deserialize_quaternion_strict(const mcp::JsonValue &j) {
   const char *example = "{\"x\":0,\"y\":0,\"z\":0,\"w\":1}";
   const char *missing = "'x', 'y', 'z' and 'w' are required numbers";
   if (!j.IsObject())
-    throw std::runtime_error(std::string("invalid ") + type_name +
+    throw RuntimeError(std::string("invalid ") + type_name +
                              ": expected a JSON object, e.g. " + example);
   const mcp::JsonValue *x_j =
       strict_required_number(j, "x", type_name, example, missing);
@@ -977,7 +978,7 @@ godot::Variant deserialize_quaternion_strict(const mcp::JsonValue &j) {
 godot::Variant deserialize_basis_strict(const mcp::JsonValue &j) {
   const char *example = "{\"rows\":[[1,0,0],[0,1,0],[0,0,1]]}";
   if (!j.IsObject())
-    throw std::runtime_error(
+    throw RuntimeError(
         std::string("invalid Basis: expected a JSON object, e.g. ") + example);
   const std::string rows_error =
       std::string("invalid Basis: 'rows' must be an array of at least 3 "
@@ -985,19 +986,19 @@ godot::Variant deserialize_basis_strict(const mcp::JsonValue &j) {
       example;
   auto *rows_j = j.Find("rows");
   if (!rows_j || !rows_j->IsArray())
-    throw std::runtime_error(rows_error);
+    throw RuntimeError(rows_error);
   const auto &arr = rows_j->GetArray();
   if (arr.size() < 3)
-    throw std::runtime_error(rows_error);
+    throw RuntimeError(rows_error);
   godot::Basis b;
   for (int i = 0; i < 3; ++i) {
     const auto &r = arr[i];
     if (!r.IsArray())
-      throw std::runtime_error(rows_error);
+      throw RuntimeError(rows_error);
     const auto &ra = r.GetArray();
     if (ra.size() < 3 || !ra[0].IsNumber() || !ra[1].IsNumber() ||
         !ra[2].IsNumber())
-      throw std::runtime_error(rows_error);
+      throw RuntimeError(rows_error);
     b.rows[i] =
         godot::Vector3(as_double(ra[0]), as_double(ra[1]), as_double(ra[2]));
   }
@@ -1008,7 +1009,7 @@ godot::Variant deserialize_projection_strict(const mcp::JsonValue &j) {
   const char *example =
       "{\"columns\":[[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]}";
   if (!j.IsObject())
-    throw std::runtime_error(
+    throw RuntimeError(
         std::string("invalid Projection: expected a JSON object, e.g. ") +
         example);
   const std::string columns_error =
@@ -1017,19 +1018,19 @@ godot::Variant deserialize_projection_strict(const mcp::JsonValue &j) {
       example;
   auto *cols_j = j.Find("columns");
   if (!cols_j || !cols_j->IsArray())
-    throw std::runtime_error(columns_error);
+    throw RuntimeError(columns_error);
   const auto &arr = cols_j->GetArray();
   if (arr.size() < 4)
-    throw std::runtime_error(columns_error);
+    throw RuntimeError(columns_error);
   godot::Vector4 cols[4];
   for (int i = 0; i < 4; ++i) {
     const auto &c = arr[i];
     if (!c.IsArray())
-      throw std::runtime_error(columns_error);
+      throw RuntimeError(columns_error);
     const auto &ca = c.GetArray();
     if (ca.size() < 4 || !ca[0].IsNumber() || !ca[1].IsNumber() ||
         !ca[2].IsNumber() || !ca[3].IsNumber())
-      throw std::runtime_error(columns_error);
+      throw RuntimeError(columns_error);
     cols[i] = godot::Vector4(as_double(ca[0]), as_double(ca[1]),
                              as_double(ca[2]), as_double(ca[3]));
   }
@@ -1041,7 +1042,7 @@ godot::Variant deserialize_color_strict(const mcp::JsonValue &j) {
   const char *example = "{\"r\":0,\"g\":0,\"b\":0,\"a\":1}";
   const char *missing = "'r', 'g' and 'b' are required numbers";
   if (!j.IsObject())
-    throw std::runtime_error(std::string("invalid ") + type_name +
+    throw RuntimeError(std::string("invalid ") + type_name +
                              ": expected a JSON object, e.g. " + example);
   const mcp::JsonValue *r_j =
       strict_required_number(j, "r", type_name, example, missing);
