@@ -261,7 +261,7 @@ version 8，**6 个 configure 预设**（2 个 hidden 基座 + 4 个可直接 `-
 
 CLI 载体（`cli/`）为 Bun + TypeScript 源码直跑，**不参与 `main.py build`/`deploy`/`package` 构建流水线**。本地开发只需 Bun：
 
-- 跑测试：`bun test cli/tests`（102 用例，秒级）
+- 跑测试：`bun test cli/tests`（108 用例，秒级）
 - 类型检查：`bun x tsc -p cli/tsconfig.json --noEmit`
 - 手动调用：`bun cli/bin/gda.ts --help`
 
