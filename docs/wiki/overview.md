@@ -6,7 +6,7 @@ tags:
   - 总览
   - 架构
   - 技术栈
-timestamp: "2026-10-18T04:01:49+08:00"
+timestamp: "2026-10-19T05:03:48+08:00"
 resource:
   - README.md
   - README.en.md
@@ -145,7 +145,7 @@ godot-self-driving/
 │   │                           #   header-only：json_godot、rid_registry、scene_path、project_path、type_hint、gdscript_wrap、resource_fs、mcp_image_content
 ├── skills/                     # 插件技能书源（标准 Agent Skills 目录布局：9 册各一 SKILL.md + references/，调用专册另有 scripts/gda.mjs）
 ├── cli/                        # CLI 载体（Bun + TS 源码直跑，零运行时依赖）：bin/gda.ts 入口 + src/ 11 模块 + src/commands/ 10 命令 + src/mcp/ 协议客户端 + tests/ 6 文件 102 用例
-├── tests/                      # L1 gda_unit_tests（435 个 gtest，41 文件）+ L2 gda_test_runner + config/*.json（38 份）+ testbed/（L2 测试床工程）+ guard/ 迁移守卫与注释守卫 + scripts/ CLI 契约与单测
+├── tests/                      # L1 gda_unit_tests（436 个 gtest，41 文件）+ L2 gda_test_runner + config/*.json（38 份）+ testbed/（L2 测试床工程）+ guard/ 迁移守卫与注释守卫 + scripts/ CLI 契约与单测
 ├── docs/                       # 本知识库（docs/wiki/，含 modules/、plans/、changelog/）
 ├── package.json                # CLI 包定义（name godot-autopilot-cli，bin gda → cli/bin/gda.ts，零运行时依赖）
 ├── bun.lock                    # CLI devDependency 锁（@types/bun + typescript）
