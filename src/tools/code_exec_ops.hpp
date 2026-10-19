@@ -6,6 +6,8 @@
 namespace godot_autopilot {
 namespace code_exec_ops {
 
+int max_timeout_ms();
+
 mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args);
 mcp::JsonValue handle_code_execute(const mcp::JsonValue &args);
 

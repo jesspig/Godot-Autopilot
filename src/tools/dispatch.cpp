@@ -178,14 +178,6 @@ int64_t dispatch_wait_health_ms() {
   return value;
 }
 
-int64_t dispatch_wait_long_blocking_ms() {
-  static const int64_t value = env_int_clamped(
-      "GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS",
-      GDA_DISPATCH_WAIT_LONG_BLOCKING_MS, GDA_DISPATCH_WAIT_MIN_MS,
-      GDA_DISPATCH_WAIT_MAX_MS);
-  return value;
-}
-
 mcp::JsonValue queue_unavailable_result(const std::string &name,
                                         const std::string &reason) {
   mcp::JsonValue result(mcp::JsonValue::object_tag);
@@ -284,6 +276,14 @@ void replace_handlers(HandlerMap handlers, HandlerMap meta_handlers) {
 }
 
 void clear_handlers() { replace_handlers({}, {}); }
+
+int64_t dispatch_wait_long_blocking_ms() {
+  static const int64_t value = env_int_clamped(
+      "GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS",
+      GDA_DISPATCH_WAIT_LONG_BLOCKING_MS, GDA_DISPATCH_WAIT_MIN_MS,
+      GDA_DISPATCH_WAIT_MAX_MS);
+  return value;
+}
 
 int64_t main_thread_wait_budget_ms(uint32_t flags, int64_t default_ms,
                                    int64_t health_ms,

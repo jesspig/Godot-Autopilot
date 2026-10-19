@@ -1,9 +1,11 @@
 #include "prompts/prompt_tool_usage.hpp"
+#include "tools/code_exec_ops.hpp"
+#include <string>
 
 namespace godot_autopilot {
 
 std::string prompt_tool_usage() {
-  return R"gda(# 常用工具使用示例
+  std::string doc = R"gda(# 常用工具使用示例
 
 本文档提供了 19 个最常用 MCP 工具的详细使用示例，包含输入输出格式和注意事项。
 
@@ -498,7 +500,9 @@ std::string prompt_tool_usage() {
 - 访问编辑场景节点请用 `SceneRoot.get_node("Child")`，不要带根节点名前缀（如 `SceneRoot.get_node("Player")`、`SceneRoot.get_node("Player/CollisionShape2D")`）；执行节点挂在 `/root` 下，`/root` 路径下没有编辑场景
 - 使用 `EditorInterface.get_edited_scene_root()` 获取当前场景根节点（不是 `get_tree()`）
 - 代码中的 `extends` 行会被自动注释掉
-- 默认超时 5000ms，最大 30000ms
+- 默认超时 5000ms，最大 )gda";
+  doc += std::to_string(code_exec_ops::max_timeout_ms());
+  doc += R"gda(ms
 - 可以定义多个函数，指定 `function_name` 调用指定函数
 - 默认（单函数）模式下源码包装进 `_run()` 函数体内执行，不支持顶层 `func` 定义——代码需内联为表达式/语句；多函数模式（定义命名函数并传 `function_name`）才允许函数定义
 - 临时节点会挂载到场景树上，可以访问 `get_tree()`
@@ -708,6 +712,7 @@ std::string prompt_tool_usage() {
 2. **属性值类型**：Vector2→`{x,y}`、Vector3→`{x,y,z}`、Color→`{r,g,b,a}`、Rect2→`{position:{x,y},size:{w,h}}`（size 也可用 `{x,y}` 别名，position 可省略；同一轴两种拼写并存且值不同会报错）
 3. **错误处理**：所有工具返回 `{"error": "消息"}` 表示失败
 4. **线程安全**：所有 Godot API 调用通过 CommandQueue 在主线程执行)gda";
+  return doc;
 }
 
 } // namespace godot_autopilot
