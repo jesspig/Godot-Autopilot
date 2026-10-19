@@ -142,6 +142,12 @@ add_test(NAME migration_guard
 add_test(NAME comment_guard
     COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/comment_guard.py")
 
+# ── ctest 注册: 主线程契约守卫（零依赖，读源码断言 Godot API 直接调用）──
+# 扫描 src/ 下的 *.cpp/*.hpp：外线程文件里的 Godot API 调用默认违规，
+# 豁免表与线程上下文分类表以显式常量写在 guard/main_thread_guard.py 内。
+add_test(NAME main_thread_guard
+    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/main_thread_guard.py")
+
 # ── ctest 注册: 版本号三处一致性守卫（零依赖，读源码断言，无需构建产物） ──
 add_test(NAME version_sync_guard
     COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/version_sync_guard.py")
