@@ -139,12 +139,15 @@ references/development-workflow.md expands this into complete loops for UI and s
 
 ## If MCP tools are missing
 
-If your MCP client shows an empty tool list or calls fail right after the editor restarted, the server is usually fine and the client harness simply did not reconnect. Work down this ladder:
+Two situations land here. **No MCP client is configured** — the user installed the plugin in Godot but never wired a GDA server into your harness, so no GDA tools exist in your tool list; the plugin is fine and you can still drive it. **Or the client lost its tools** — the list shows GDA tools but they went empty or calls fail right after an editor restart, and reconnecting did not help.
+
+Probe the machine first (`bun --version`, then `node --version`), then work down this ladder:
 
 1. Native MCP Tools - retry the connection first; this is the normal channel.
 2. GDA CLI (Bun) - run `bunx --no-install "github:jesspig/Godot-Autopilot#0.2.7" <cmd>` first; if not cached, `bunx "github:jesspig/Godot-Autopilot#0.2.7" <cmd>` downloads once. Quotes are required on PowerShell because `#` starts a comment. Calling commands: ping/status/categories/search/describe/call; lifecycle: list/start/stop/logs. See the godot-autopilot-tools skill for the full reference.
 3. Script bridge - when Bun is unavailable but Node 18+ or Bun exists, run `node .agents/skills/godot-autopilot-tools/scripts/gda.mjs` to reach the same server without a working MCP client.
-4. No script runtime either - fall back to a manual plan per `references/manual-fallback.md` of the godot-autopilot-tools skill.
+4. Standalone binary - when neither Bun nor Node exists, download the `gda` release asset for the user's OS and CPU, verify it against the release's `sha256sums.txt`, and run it like the CLI. Asset names and platform caveats: `references/cli-access.md` of the godot-autopilot-tools skill.
+5. No runtime and no download - fall back to a manual plan per `references/manual-fallback.md` of the godot-autopilot-tools skill.
 
 ## See also
 

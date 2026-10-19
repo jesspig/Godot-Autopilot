@@ -52,7 +52,7 @@ Godot-Autopilotは、プラグインとして**Godotエディター内部**に�
 
 **Godot 4.7+**が必要です。
 
-1. **プラグインの入手** — プロジェクトのGitHub Releasesページ（[jesspig/Godot-Autopilot](https://github.com/jesspig/Godot-Autopilot)）から`godot-autopilot-<version>.zip`をダウンロードし、`godot-autopilot/`フォルダーをプロジェクトの`addons/`ディレクトリーにコピーします：
+1. **プラグインの入手** — プロジェクトのGitHub Releasesページ（[jesspig/Godot-Autopilot](https://github.com/jesspig/Godot-Autopilot)）から`addons.zip`をダウンロードし、`godot-autopilot/`フォルダーをプロジェクトの`addons/`ディレクトリーにコピーします：
     ```
     your-project/
     └── addons/
@@ -88,7 +88,37 @@ gda ping
 
 コマンドファミリー：**呼び出し系** — `ping` / `status` / `categories` / `search` / `describe` / `call`；**ライフサイクル** — `list` / `start` / `stop` / `logs`。
 
-**Bun** が必要です。詳細なリファレンスは [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md) をご覧ください。
+**Bun** が必要です。Bun も Node も無い環境では、Releases の `gda` 単体バイナリを使ってください（詳細は [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md)）。
+
+## AI にセットアップさせる
+
+上の手順を手作業でなぞる代わりに、同じマシンでシェルを実行できるコーディングエージェントに任せられます。下のブロックをコピーし、プロジェクトの絶対パスを埋めて送ってください：
+
+```text
+Set up Godot Autopilot (GDA) on this machine end to end, then prove it works.
+
+Project: <ABSOLUTE PATH TO YOUR GODOT PROJECT> (Godot 4.7+).
+
+1. Install the plugin: download addons.zip from
+   https://github.com/jesspig/Godot-Autopilot/releases/latest and extract it so that
+   <project>/addons/godot-autopilot/godot-autopilot.gdextension exists.
+2. Start the editor: run `godot --editor --path <project>` (ask me for the engine path if it is
+   not on PATH) and wait until http://127.0.0.1:9527/mcp answers.
+3. Verify the server from a shell. Try in this order, stop at the first that works, and tell me
+   which one it was:
+   - bunx "github:jesspig/Godot-Autopilot#0.2.7" ping
+   - download the gda release asset for this OS and CPU from the same Releases page, verify it
+     against sha256sums.txt, then run ./gda ping
+4. Connect my AI client: add
+   {"mcpServers":{"godot-autopilot":{"url":"http://127.0.0.1:9527/mcp"}}}
+   to its MCP configuration, or tell me to use the plugin's MCP Config panel instead.
+5. Summarize: which channel worked, every command you ran, and anything that failed.
+
+Rules: never hand-write HTTP requests against the port; never expose 9527 beyond loopback;
+leave code_execute and game_runtime disabled unless I ask for them.
+```
+
+クライアントがスキルに対応している場合（Claude Code、Codex、Cursor など）は、このリポジトリの `skills/` ディレクトリも指定してください。エージェントが推測せずに完全な呼び出しプロトコルを参照できます。
 
 ## 安全上の注意
 

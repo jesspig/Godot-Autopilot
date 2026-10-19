@@ -6,7 +6,7 @@ tags:
   - 约定
   - 命名
   - 规范
-timestamp: "2026-10-16T16:59:53+08:00"
+timestamp: "2026-10-19T05:03:48+08:00"
 resource: src/
 ---
 
@@ -35,6 +35,7 @@ resource: src/
 
 - 领域工具失败返回 `{"error": "消息"}` JSON（构造经 `util::error_json`，成功结果经 `util::ok_result` 包 `result`，见 `src/util/error_util.hpp`；个别执行类响应另带 `error_details`/`structured_error` 诊断字段），`call_tool` 元工具检查 `error` 字段并设 `is_error = true`
 - 命名契约：`get/fetch/load` 目标必存在否则抛异常；`find/search/query` 允许为空；`validate/check` 失败即抛；`apply/compute` 为纯函数
+- **C++ 抛动态消息（`std::string` 拼接结果或 `std::string` 局部量）一律用 `godot_autopilot::RuntimeError` / `InvalidArgument**（`src/util/owned_exception.hpp`：以成员 `std::string` 自持消息并覆写 `what()`，仍派生自 `std::runtime_error`／`std::invalid_argument`，既有 `catch (const std::runtime_error&)` 捕获点与 `EXPECT_THROW(..., std::runtime_error)` 断言无需改动）。原因：MSVC STL 的 `runtime_error(const std::string&)` 只把 `c_str()` 转交 `exception(const char*, int)`，后者原样保存指针、不做拷贝（`<stdexcept>`/`<exception>` 头文件实证），消息临时量在 throw 完整表达式结束即销毁、`std::string` 局部量在栈展开离开函数帧时销毁，`what()` 随之野悬，释放块被复用即读到乱码；libstdc++/libc++ 会拷贝消息，故仅 Windows 复现。10-19 CI `VariantJsonStrictTest.Rect2MissingSizeMessage` 实测复现（本地亦确定性复现），根因为我方代码长期潜伏的 UB，SDK 0.3.7 升级只改变堆布局使其显性化；纯字面量消息为静态存储期、无此风险，可继续用 `std::` 原类型（`src/core/command_queue.hpp` 即如此）
 
 ## 线程纪律
 
@@ -81,4 +82,4 @@ gda 聚焦「编辑器内的引擎操作」，以下能力**明确不做**，避
 ## 其他
 
 - CI/Release 工作流见 [build.md](./build.md)「CI 与 Release」；CI 仅跑 L1，L2 引擎用例仍仅本地执行（需 `GODOT_PATH`）
-- 依赖版本固定：godot-cpp `10.0.0-stable`（commit `507ed9d`）、mcp-cpp-sdk `0.3.7`（commit `7dfe088`），二者与 googletest `v1.15.2`（commit `b514bdc`）均为 `third_party/` 下的 git submodule，版本由 gitlink 锁定的 commit 唯一确定，检出方式为 `git clone --recurse-submodules` 或 `git submodule update --init --recursive`（另以 `GODOTCPP_API_VERSION "4.7"` FORCE 锁定目标 API，见 [build.md](./build.md)）
+- 依赖版本固定：godot-cpp `10.0.0-stable`（commit `507ed9d`）、mcp-cpp-sdk `0.3.8`（commit `d79f9b1`），二者与 googletest `v1.15.2`（commit `b514bdc`）均为 `third_party/` 下的 git submodule，版本由 gitlink 锁定的 commit 唯一确定，检出方式为 `git clone --recurse-submodules` 或 `git submodule update --init --recursive`（另以 `GODOTCPP_API_VERSION "4.7"` FORCE 锁定目标 API，OpenSSL 集成由 `MCP_WITH_OPENSSL "OFF"` 显式关闭，见 [build.md](./build.md)）

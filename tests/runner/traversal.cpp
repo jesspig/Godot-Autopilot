@@ -2,6 +2,8 @@
 
 #include "integration/mcp_test_client.hpp"
 
+#include "util/owned_exception.hpp"
+
 #include <algorithm>
 #include <cstddef>
 #include <iostream>
@@ -118,13 +120,16 @@ void print_stats(const std::string& mode, const gda_test::TraversalStats& s,
 
 namespace gda_test {
 
+using godot_autopilot::RuntimeError;
+using godot_autopilot::InvalidArgument;
+
 std::vector<std::string> list_tool_names(McpTestClient& client) {
     const std::string text = client.call_tool("search_tools", "{}");
     const mcp::JsonValue parsed = mcp::JsonValue::Parse(text);
     const mcp::JsonValue* results =
         parsed.IsObject() ? parsed.Find("results") : nullptr;
     if (!results || !results->IsArray()) {
-        throw std::runtime_error("search_tools 空 query 未返回 results 数组: " +
+        throw RuntimeError("search_tools 空 query 未返回 results 数组: " +
                                  text.substr(0, 300));
     }
     std::vector<std::string> names;
@@ -142,14 +147,14 @@ std::vector<std::string> list_tool_names(McpTestClient& client) {
         names.push_back(tool_name);
     }
     if (names.empty())
-        throw std::runtime_error("search_tools 返回空工具清单");
+        throw RuntimeError("search_tools 返回空工具清单");
     return names;
 }
 
 TraversalStats run_traversal(McpTestClient& client, const std::string& mode,
                              std::vector<StepResult>& out_steps) {
     if (mode != kModeEmptyArgs && mode != kModeHeuristicSmoke) {
-        throw std::invalid_argument("run_traversal: 未知 mode '" + mode +
+        throw InvalidArgument("run_traversal: 未知 mode '" + mode +
                                     "'（仅支持 empty_args / heuristic_smoke）");
     }
     const bool is_empty_args = (mode == kModeEmptyArgs);

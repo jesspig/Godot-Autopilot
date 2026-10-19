@@ -6,7 +6,7 @@ tags:
   - 安全
   - 并发
   - 契约
-timestamp: "2026-10-18T04:01:49+08:00"
+timestamp: "2026-10-19T13:40:00+08:002026-10-18T04:01:49+08:00"
 resource:
   - src/core/server_context.cpp
   - src/core/command_queue.hpp
@@ -21,7 +21,7 @@ resource:
 
 本页是 MCP 服务器进程内 GDExtension 的最小安全与并发契约。实现、评审和后续测试以本页条款为验收标准；代码事实见 [核心模块](modules/core.md) 与 [工具注册表](modules/tools_registry.md)。
 
-> 审计日期：2026-10-18（随 CLI 载体落地批次同步——§3.3 补记 SDK 0.3.7 握手升级与双载体修复，新增 §3.4 CLI 安全包络；详见 [changelog/2026-10-18-log.md](changelog/2026-10-18-log.md)）
+> 审计日期：2026-10-19（10-19 随 CLI 引擎定位收窄批次同步——`gda start` 不再读 `GODOT_PATH` 与 `<project>/.env`（前者仅 L2 引擎测试使用，生产环境不存在），可执行文件链收敛为 `--godot` > PATH，未命中即报错提示 `--godot`；新增 `cli/tests/process.test.ts` 3 项（TS 108→111、expect 301→310）；原记（2026-10-18）：随 CLI 载体落地批次同步——§3.3 补记 SDK 0.3.7 握手升级与双载体修复，新增 §3.4 CLI 安全包络；详见 [changelog/2026-10-18-log.md](changelog/2026-10-18-log.md)）
 
 ## 1. 可信客户端模型
 
@@ -37,7 +37,7 @@ resource:
 - 端口解析顺序保持为环境变量 > `user://godot_autopilot/config.json` > `9527`；监听地址与端点为独立配置，端点固定为 `/mcp`。
 - 环回约束是**两层**，缺一不可，改任一层都要重新验证：
   - **绑定层**（本项目）：`ServerContext::start()` 用 `is_loopback_host()` 判定 `127.0.0.1`/`::1`/`[::1]`，其余值拒绝启动（`src/core/server_context.cpp:28-29`、`:75-76`）。
-  - **请求层**（依赖）：mcp-cpp-sdk 在 HTTP 层校验请求 `Host` 头，默认白名单仅 `localhost`/`127.0.0.1`/`::1`（`Impl::IsLocalhostHost`），不匹配即拒绝；仅当构造 HTTP 服务时显式传入 `allowed_hosts` 才会改用自定义白名单，本项目未设置该选项。当前锁定版本见 `third_party/mcp-cpp-sdk` 子模块（tag `0.3.7`，commit `7dfe08876021b3c0aaaf3a375137d7e8ec7a219d`，由 `.gitmodules` 与 gitlink 确定）。
+  - **请求层**（依赖）：mcp-cpp-sdk 在 HTTP 层校验请求 `Host` 头，默认白名单仅 `localhost`/`127.0.0.1`/`::1`（`Impl::IsLocalhostHost`），不匹配即拒绝；仅当构造 HTTP 服务时显式传入 `allowed_hosts` 才会改用自定义白名单，本项目未设置该选项。当前锁定版本见 `third_party/mcp-cpp-sdk` 子模块（tag `0.3.8`，commit `d79f9b16ffe512282a62b9bd6c786d0887ee6963`，由 `.gitmodules` 与 gitlink 确定）。
   - 因此“把绑定地址放宽”并不能让非环回 Host 的请求可用；反向的 DNS 重绑定（用本机主机名或局域网 IP 访问）由请求层拦下。历史上 2026-08-28 的 changelog 曾把 `GODOT_AUTOPILOT_HOST` 描述为“可覆盖为 `0.0.0.0`”，该表述已被现行拒绝行为取代。
 
 ## 3. 高风险工具分类
@@ -100,7 +100,7 @@ gda CLI（Bun + TS 源码直跑，详见 [CLI 载体](modules/cli.md)）是技�
 - **目标固定为 `127.0.0.1` 字面量**（`src/mcp/client.ts` 的 `HOST = "127.0.0.1"`），仅端口可调（1–65535）；无 URL 选项、无代理配置，与脚本桥 §3.3 同口径。
 - **无 shell 拼接**：进程 spawn 全部经 argv 数组（`node:child_process` 的 `spawn`/`spawnSync`），不经过 shell 解释；Windows 脱父用 `cmd /c start "" /b` 蹦床 + `netstat` 端口反查，参数均为字面量或数字 pid，无可注入面。
 - **状态文件仅落 state dir**：`instances.json`、`instances.lock`、`logs/` 全部限定在 `GODOT_AUTOPILOT_CLI_HOME` > `%LOCALAPPDATA%\godot-autopilot` > `$XDG_STATE_HOME/godot-autopilot` 解析出的目录内，不写工程目录、不写仓库。
-- **生命周期动作约束**：`start` 只启动 Godot 可执行文件链（`--godot` > `GODOT_PATH` > `.env` > PATH）指向的编辑器进程，注入 `GODOT_AUTOPILOT_PORT` 环境变量；`stop` 默认优雅（`taskkill /PID` / `SIGTERM`），失败只报告并提示 `--force`，**强杀必须显式 `--force`**（`taskkill /F /T /PID` / `SIGKILL`），不静默升级。
+- **生命周期动作约束**：`start` 只启动 Godot 可执行文件链（`--godot` > PATH）指向的编辑器进程，注入 `GODOT_AUTOPILOT_PORT` 环境变量；**不读 `GODOT_PATH`**（该变量仅服务 L2 引擎测试，生产环境不存在，避免把测试引擎路径带入生产启动）；`stop` 默认优雅（`taskkill /PID` / `SIGTERM`），失败只报告并提示 `--force`，**强杀必须显式 `--force`**（`taskkill /F /T /PID` / `SIGKILL`），不静默升级。
 - **不收集个人信息**：CLI 不读取工程内容、不上报任何遥测；唯一本地状态是实例登记表（id/project/port/pid/startedAt/headless/godot/log），且只存本机路径与 pid。
 - 与脚本桥一致：不改变默认安全姿态——监听仍仅环回（§2）、高风险能力仍默认拒绝（§3.1）、脱敏仍默认开启（§3.2）；CLI 自身不绕过 MCP 授权门（仍经 `call_tool` 受 `code_execute`/`game_runtime`/`user_tools` 门约束）。
 

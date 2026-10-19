@@ -1,5 +1,7 @@
 #include "config_loader.hpp"
 
+#include "util/owned_exception.hpp"
+
 #include <fstream>
 #include <iterator>
 #include <sstream>
@@ -8,10 +10,12 @@
 
 namespace gda_test {
 
+using godot_autopilot::RuntimeError;
+
 namespace {
 
 [[noreturn]] void Fail(const std::string& path, const std::string& msg) {
-    throw std::runtime_error(path + ": " + msg);
+    throw RuntimeError(path + ": " + msg);
 }
 
 std::string TypeName(const mcp::JsonValue& v) {
@@ -35,7 +39,7 @@ void RequireType(const mcp::JsonValue& v, const std::string& path, const std::st
 std::string ReadFile(const std::string& json_path) {
     std::ifstream in(json_path, std::ios::binary);
     if (!in) {
-        throw std::runtime_error(json_path + ": 无法打开测试用例文件");
+        throw RuntimeError(json_path + ": 无法打开测试用例文件");
     }
     std::ostringstream ss;
     ss << in.rdbuf();
@@ -170,7 +174,7 @@ TestCase load_test_case(const std::string& json_path) {
     try {
         root = mcp::JsonValue::Parse(text);
     } catch (const std::runtime_error&) {
-        throw std::runtime_error(json_path + ": JSON 语法错误");
+        throw RuntimeError(json_path + ": JSON 语法错误");
     }
     if (!root.IsObject()) Fail("", "顶层必须是 object");
 

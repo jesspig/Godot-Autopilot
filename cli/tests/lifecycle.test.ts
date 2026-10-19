@@ -455,7 +455,9 @@ describe.serial("stop", () => {
   });
 
   test("优雅停止失败不静默升级，提示 --force 且保留登记", async () => {
-    const runner = spawn(process.execPath, ["-e", "setTimeout(()=>{},20000)"], { stdio: "ignore" });
+    // 平台无关的「杀不掉」进程：POSIX 上显式忽略 SIGTERM（Windows 上 taskkill 无 /F
+    // 本就不终止控制台进程），两平台均稳定落入优雅停止失败分支
+    const runner = spawn(process.execPath, ["-e", "process.on('SIGTERM',()=>{});setTimeout(()=>{},20000)"], { stdio: "ignore" });
     try {
       writeEntry(makeEntry({ id: `p${runner.pid}`, pid: runner.pid, project: makeProjectDir() }));
       const { code, stderr, stdout } = await captureStdout(() => runStop([`p${runner.pid}`], { waitText: "1" }));

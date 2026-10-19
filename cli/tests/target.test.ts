@@ -7,22 +7,23 @@ import { CliError, ExitCode } from "../src/errors";
 
 let work: string;
 let userData: string;
-let originalAppData: string | undefined;
+let originalUserData: string | undefined;
 
 beforeEach(() => {
   work = fs.mkdtempSync(path.join(os.tmpdir(), "gda-target-"));
   userData = path.join(work, "userdata");
   fs.mkdirSync(userData, { recursive: true });
-  originalAppData = process.env.APPDATA;
-  process.env.APPDATA = userData;
+  // 经 GODOT_AUTOPILOT_USERDATA 覆写注入，跨平台一致（不再依赖 APPDATA 的 Windows 专属语义）
+  originalUserData = process.env.GODOT_AUTOPILOT_USERDATA;
+  process.env.GODOT_AUTOPILOT_USERDATA = userData;
   delete process.env.GODOT_AUTOPILOT_PORT;
 });
 
 afterEach(() => {
-  if (originalAppData === undefined) {
-    delete process.env.APPDATA;
+  if (originalUserData === undefined) {
+    delete process.env.GODOT_AUTOPILOT_USERDATA;
   } else {
-    process.env.APPDATA = originalAppData;
+    process.env.GODOT_AUTOPILOT_USERDATA = originalUserData;
   }
   delete process.env.GODOT_AUTOPILOT_PORT;
   fs.rmSync(work, { recursive: true, force: true });
@@ -56,7 +57,9 @@ function writeProject(dir: string, name: string): string {
 }
 
 function gdaDir(): string {
-  return path.join(userData, "Godot", "app_userdata", "TestProj", "godot_autopilot");
+  // GODOT_AUTOPILOT_USERDATA 覆写值即 app_userdata 基本身（等价于各平台原生解析结果），
+  // 故此处直接以其为根，不再拼 Godot/app_userdata 两级
+  return path.join(userData, "TestProj", "godot_autopilot");
 }
 
 function writeTrace(port: number): void {

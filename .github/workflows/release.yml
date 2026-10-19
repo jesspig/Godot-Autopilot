@@ -110,8 +110,94 @@ jobs:
             demo/2d_dodge_the_creeps/addons/godot-autopilot/libgodot-autopilot.dylib
           if-no-files-found: error
 
+  # gda CLI 独立可执行文件：单个自包含二进制（内嵌 Bun 运行时），供没装 Bun / Node 的用户
+  # 直接下载使用。产物名带版本与目标：gda-<version>-<asset>.{zip,tar.gz}。
+  # macOS 交叉编译产物必须 ad-hoc 签名，否则 Apple Silicon 内核会直接终止进程。
+  cli:
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            target: bun-windows-x64
+            asset: windows-x64
+            ext: .exe
+          - os: ubuntu-latest
+            target: bun-linux-x64
+            asset: linux-x64
+            ext: ""
+          - os: ubuntu-latest
+            target: bun-linux-x64-musl
+            asset: linux-x64-musl
+            ext: ""
+          - os: macos-latest
+            target: bun-darwin-arm64
+            asset: macos-arm64
+            ext: ""
+          - os: macos-latest
+            target: bun-darwin-x64
+            asset: macos-x64
+            ext: ""
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.x"
+
+      - name: Build gda binary
+        shell: bash
+        run: |
+          version="$(tr -d ' \t\r\n' < VERSION)"
+          mkdir -p dist
+          out="dist/gda${{ matrix.ext }}"
+          bun build cli/bin/gda.ts --compile --minify --target=${{ matrix.target }} --outfile "$out"
+
+      - name: Ad-hoc sign (macOS)
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          codesign --force --sign - "dist/gda${{ matrix.ext }}"
+          codesign -dvv "dist/gda${{ matrix.ext }}" 2>&1 | head -5
+
+      - name: Verify binary runs
+        shell: bash
+        run: |
+          chmod +x "dist/gda${{ matrix.ext }}" || true
+          "dist/gda${{ matrix.ext }}" --version
+          "dist/gda${{ matrix.ext }}" list
+
+      - name: Package
+        shell: bash
+        run: |
+          version="$(tr -d ' \t\r\n' < VERSION)"
+          name="gda-${version}-${{ matrix.asset }}"
+          if [ "${{ matrix.os }}" = "windows-2022" ]; then
+            powershell.exe -NoProfile -Command "Compress-Archive -Path 'dist/gda.exe' -DestinationPath 'dist/${name}.zip' -Force"
+          else
+            tar -czf "dist/${name}.tar.gz" -C dist gda
+            rm -f dist/gda
+          fi
+          ls -l dist
+
+      - name: Upload CLI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gda-${{ matrix.asset }}
+          path: |
+            dist/gda-*.zip
+            dist/gda-*.tar.gz
+          if-no-files-found: error
+
   package:
-    needs: build
+    needs: [build, cli]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -128,13 +214,30 @@ jobs:
           pattern: gdext-*
           path: dist
 
+      # CLI 产物单独放，避免污染 --libs-dir dist 的三平台库收集
+      - name: Download CLI binaries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: gda-*
+          path: cli-dist
+          merge-multiple: true
+
       - name: Package addons.zip
         run: |
           python main.py package --libs-dir dist
           mv dist/godot-autopilot-*.zip addons.zip
 
+      - name: Checksums
+        run: |
+          cd cli-dist
+          sha256sum gda-* > sha256sums.txt
+          cat sha256sums.txt
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
-          files: addons.zip
+          files: |
+            addons.zip
+            cli-dist/gda-*
+            cli-dist/sha256sums.txt

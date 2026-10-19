@@ -5,7 +5,7 @@ description: "Godot runtime and debugging guide: launch and stop the game, input
 
 # Runtime and Debugging with godot-autopilot
 
-Invocation: use the native MCP tools first; when that channel is down, follow the calling ladder in the godot-autopilot-tools skill (bunx gda CLI or the bundled script bridge); with neither available, work through its references/manual-fallback.md.
+Invocation: use the native MCP tools first; when that channel is down, follow the calling ladder in the godot-autopilot-tools skill (bunx gda CLI, the standalone gda binary, or the bundled script bridge); with neither available, work through its references/manual-fallback.md.
 
 This book covers the game process life cycle: launching and stopping the
 game, the `game_*` runtime channel, input injection, viewport capture and the

@@ -38,14 +38,14 @@ export async function main(argv: string[]): Promise<number> {
 
   const commandName = positionals[0];
   if (commandName === undefined) {
-    err("缺少命令");
+    err("missing command");
     process.stderr.write(`${usageText()}\n`);
     return ExitCode.Usage;
   }
 
   const command = COMMANDS[commandName];
   if (command === undefined) {
-    err(`未知命令: ${commandName}`);
+    err(`unknown command: ${commandName}`);
     process.stderr.write(`${usageText()}\n`);
     return ExitCode.Usage;
   }
