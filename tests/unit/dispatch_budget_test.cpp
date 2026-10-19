@@ -21,36 +21,49 @@ namespace {
 
 constexpr int64_t kDefaultMs = 27000;
 constexpr int64_t kHealthMs = 5000;
+constexpr int64_t kLongBlockingMs = 30000;
 
 } // namespace
 
 TEST(DispatchBudgetTest, NoneReturnsDefaultBudget) {
-  EXPECT_EQ(main_thread_wait_budget_ms(kNone, kDefaultMs, kHealthMs), kDefaultMs);
+  EXPECT_EQ(
+      main_thread_wait_budget_ms(kNone, kDefaultMs, kHealthMs, kLongBlockingMs),
+      kDefaultMs);
 }
 
 TEST(DispatchBudgetTest, HealthProbeReturnsHealthBudget) {
-  EXPECT_EQ(main_thread_wait_budget_ms(kHealthProbe, kDefaultMs, kHealthMs),
+  EXPECT_EQ(main_thread_wait_budget_ms(kHealthProbe, kDefaultMs, kHealthMs,
+                                       kLongBlockingMs),
             kHealthMs);
 }
 
 TEST(DispatchBudgetTest, HealthProbeWithMetaReturnsHealthBudget) {
-  EXPECT_EQ(main_thread_wait_budget_ms(kMeta | kHealthProbe, kDefaultMs, kHealthMs),
+  EXPECT_EQ(main_thread_wait_budget_ms(kMeta | kHealthProbe, kDefaultMs,
+                                       kHealthMs, kLongBlockingMs),
             kHealthMs);
 }
 
-TEST(DispatchBudgetTest, LongBlockingReturnsZeroBudget) {
-  EXPECT_EQ(main_thread_wait_budget_ms(kLongBlocking, kDefaultMs, kHealthMs), 0);
+TEST(DispatchBudgetTest, LongBlockingReturnsLongBlockingBudget) {
+  EXPECT_EQ(main_thread_wait_budget_ms(kLongBlocking, kDefaultMs, kHealthMs,
+                                       kLongBlockingMs),
+            kLongBlockingMs);
 }
 
 TEST(DispatchBudgetTest, LongBlockingOverridesHealthProbe) {
-  EXPECT_EQ(
-      main_thread_wait_budget_ms(kLongBlocking | kHealthProbe, kDefaultMs, kHealthMs),
-      0);
+  EXPECT_EQ(main_thread_wait_budget_ms(kLongBlocking | kHealthProbe, kDefaultMs,
+                                       kHealthMs, kLongBlockingMs),
+            kLongBlockingMs);
 }
 
-TEST(DispatchBudgetTest, LongBlockingWithMetaReturnsZeroBudget) {
-  EXPECT_EQ(main_thread_wait_budget_ms(kMeta | kLongBlocking, kDefaultMs, kHealthMs),
-            0);
+TEST(DispatchBudgetTest, LongBlockingWithMetaReturnsLongBlockingBudget) {
+  EXPECT_EQ(main_thread_wait_budget_ms(kMeta | kLongBlocking, kDefaultMs,
+                                       kHealthMs, kLongBlockingMs),
+            kLongBlockingMs);
+}
+
+TEST(DispatchBudgetTest, LongBlockingFallsBackToDefaultWhenBudgetNotPositive) {
+  EXPECT_EQ(main_thread_wait_budget_ms(kLongBlocking, kDefaultMs, kHealthMs, 0),
+            kDefaultMs);
 }
 
 TEST(DispatchBudgetTest, UnrelatedFlagCombinationsReturnDefaultBudget) {
@@ -66,13 +79,17 @@ TEST(DispatchBudgetTest, UnrelatedFlagCombinationsReturnDefaultBudget) {
           kUndoable,
   };
   for (uint32_t flags : combos) {
-    EXPECT_EQ(main_thread_wait_budget_ms(flags, kDefaultMs, kHealthMs), kDefaultMs);
+    EXPECT_EQ(
+        main_thread_wait_budget_ms(flags, kDefaultMs, kHealthMs, kLongBlockingMs),
+        kDefaultMs);
   }
 }
 
 TEST(DispatchBudgetTest, CustomBudgetsArePassedThrough) {
-  EXPECT_EQ(main_thread_wait_budget_ms(kNone, 12345, 6789), 12345);
-  EXPECT_EQ(main_thread_wait_budget_ms(kHealthProbe, 12345, 6789), 6789);
+  EXPECT_EQ(main_thread_wait_budget_ms(kNone, 12345, 6789, kLongBlockingMs),
+            12345);
+  EXPECT_EQ(main_thread_wait_budget_ms(kHealthProbe, 12345, 6789, kLongBlockingMs),
+            6789);
 }
 
 TEST(DispatchBudgetTest, ClosedQueueReturnsQueueUnavailable) {

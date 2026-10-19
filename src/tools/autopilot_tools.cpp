@@ -25,6 +25,7 @@
 #include <godot_cpp/variant/utility_functions.hpp>
 
 #include "core/command_queue.hpp"
+#include "core/config.hpp"
 #include "core/log_system.hpp"
 #include "core/monitor.hpp"
 #include "core/plugin_config.hpp"
@@ -154,19 +155,19 @@ mcp::JsonValue run_dynamic_handler(
   if (runtime_ops::has_editor_queue() &&
       !get_editor_queue().is_main_thread()) {
     const tools::TraceContext ctx = tools::capture_trace_context();
-    try {
-      return get_editor_queue().execute_sync(
-          [&target, &args, ctx] {
-            tools::ScopedTraceContext restore(ctx);
-            return invoke_dynamic_target(target, args);
-          });
-    } catch (const std::exception &e) {
-      return util::error_json(std::string("user tool dispatch failed: ") +
-                              e.what());
-    } catch (...) {
-      return util::error_json(
-          "user tool dispatch failed: unknown exception");
+    auto state = std::make_shared<mcp::JsonValue>();
+    dispatch::BoundedWaitOutcome outcome =
+        dispatch::run_bounded_on_main_thread(
+            get_editor_queue(), "user tool dispatch", state,
+            [target, args, ctx](mcp::JsonValue &result) {
+              tools::ScopedTraceContext restore(ctx);
+              result = invoke_dynamic_target(target, args);
+            },
+            GDA_DISPATCH_WAIT_DEFAULT_MS);
+    if (!outcome.ok) {
+      return util::error_json(outcome.error);
     }
+    return *state;
   }
   try {
     return invoke_dynamic_target(target, args);
@@ -629,7 +630,7 @@ godot::Dictionary AutopilotTools::get_tool(const godot::String &name) const {
 godot::Dictionary AutopilotTools::call_tool(const godot::String &name,
                                             const godot::Dictionary &args) {
   const std::string tool_name = util::to_std(name);
-  auto invoke = [&tool_name, &args]() -> mcp::JsonValue {
+  auto invoke = [tool_name, args]() -> mcp::JsonValue {
     mcp::JsonValue json_args = VariantJson::serialize(godot::Variant(args));
     return dispatch::call_handler(tool_name, json_args);
   };
@@ -639,11 +640,20 @@ godot::Dictionary AutopilotTools::call_tool(const godot::String &name,
     if (runtime_ops::has_editor_queue() &&
         !get_editor_queue().is_main_thread()) {
       const tools::TraceContext ctx = tools::capture_trace_context();
-      result = get_editor_queue().execute_sync(
-          [&invoke, ctx] {
-            tools::ScopedTraceContext restore(ctx);
-            return invoke();
-          });
+      auto state = std::make_shared<mcp::JsonValue>();
+      dispatch::BoundedWaitOutcome outcome =
+          dispatch::run_bounded_on_main_thread(
+              get_editor_queue(), "call_tool " + tool_name, state,
+              [invoke, ctx](mcp::JsonValue &value) {
+                tools::ScopedTraceContext restore(ctx);
+                value = invoke();
+              },
+              GDA_DISPATCH_WAIT_DEFAULT_MS);
+      if (!outcome.ok) {
+        result = util::error_json(outcome.error);
+      } else {
+        result = *state;
+      }
     } else {
       result = invoke();
     }
@@ -695,18 +705,20 @@ godot::Dictionary AutopilotTools::rescan(const godot::String &directory) {
   if (runtime_ops::has_editor_queue() &&
       !get_editor_queue().is_main_thread()) {
     const tools::TraceContext ctx = tools::capture_trace_context();
-    try {
-      const godot::String dir_copy = directory;
-      return get_editor_queue().execute_sync(
-          [this, dir_copy, ctx] {
-            tools::ScopedTraceContext restore(ctx);
-            return rescan(dir_copy);
-          });
-    } catch (const std::exception &e) {
-      return rescan_error(std::string("rescan dispatch failed: ") + e.what());
-    } catch (...) {
-      return rescan_error("rescan dispatch failed: unknown exception");
+    const godot::String dir_copy = directory;
+    auto state = std::make_shared<godot::Dictionary>();
+    dispatch::BoundedWaitOutcome outcome =
+        dispatch::run_bounded_on_main_thread(
+            get_editor_queue(), "rescan", state,
+            [this, dir_copy, ctx](godot::Dictionary &value) {
+              tools::ScopedTraceContext restore(ctx);
+              value = rescan(dir_copy);
+            },
+            GDA_DISPATCH_WAIT_DEFAULT_MS);
+    if (!outcome.ok) {
+      return rescan_error(outcome.error);
     }
+    return *state;
   }
   const std::string dir = util::to_std(directory);
   if (dir.compare(0, 6, "res://") != 0 && dir.compare(0, 7, "user://") != 0) {
