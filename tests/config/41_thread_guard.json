@@ -1,0 +1,112 @@
+{
+  "name": "thread_guard",
+  "description": "主线程契约的 L2 侧补充覆盖（headless）：trace 与日志改由主线程 flush 通道统一落盘后的行完整性回归。① system_status 热身（只读）断言服务器 running 且 result.main_thread 调度观测面存在（last_drain_age_ms/queue_depth 等非空），证明主线程仍在 drain 队列并驱动 flush_on_main_thread；② execute_script 扫描 user://godot_autopilot/traces 下最新的 trace-*.jsonl（按修改时间选最新会话文件，同秒并列时按文件名时间戳取新的——session stamp 为 %Y%m%d_%H%M%S，字典序即时间序），断言：该会话文件存在、同时含 session_start 与 server_ready 两条启动标记（启动期入队、首帧 flush 落盘）、**每一行非空行都是可解析的 JSON**（T-10 把 write_trace_now 的 ofstream 追加与 flush_on_main_thread 的 FileAccess 追加统一到同一条持锁通道后，并发追加不再可能撕裂 jsonl 行）、含本轮 call_tool 事件行（证明 transport 线程侧的轨迹记录在截图落盘改为主线程缓冲后仍然照常写出）、且任一 trace 文件不含 PNG base64 前缀（图片只以 image_ref/image_hash 记录，永不内联 base64）；③ execute_script 扫描 user://godot_autopilot/logs 下最新的 gda-*.log，断言含启动日志行且行数非零（人类日志同样由主线程 flush 通道落盘）。脚本内的标记字面量全部运行时拼接（'iVBORw0'+'KGgo'、'session'+'_start'、'\\\"tool\\\":\\\"call'+'_tool' 等），避免脚本自身的 args_digest 被写入 jsonl 后污染后续扫描。覆盖力声明（重要）：本文件**不覆盖导出期拒绝**——_export_begin/_export_end 由引擎导出流程在编辑器主线程触发，L2 的 MCP 通道无法可靠触发一次真实导出，故「导出期标志置位后工具调用被拒」无法在此构造；建议由资源/prompts 导出期拒绝的分支补齐该场景的 L2 覆盖。前置：execute_script 受 code_execute capability 授权门保护（GODOT_AUTOPILOT_ALLOW env 或 user://godot_autopilot/config.json 的 allow 字段，env 优先）。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "fail_fast",
+    "stages": [
+      {
+        "id": "warmup",
+        "steps": [
+          {
+            "id": "thread_guard_warmup_status",
+            "tool": "system_status",
+            "expect": {
+              "has_keys": [
+                "result"
+              ],
+              "field_checks": [
+                {
+                  "key": "result.running",
+                  "value": true
+                },
+                {
+                  "key": "result.main_thread",
+                  "not_empty": true
+                },
+                {
+                  "key": "result.main_thread.last_drain_age_ms",
+                  "not_empty": true
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "trace_jsonl_integrity",
+        "steps": [
+          {
+            "id": "thread_guard_trace_jsonl_lines_intact",
+            "tool": "execute_script",
+            "args": {
+              "expression": "var dir = DirAccess.open(\"user://godot_autopilot/traces\")\nif dir == null:\n\treturn {\"trace_exists\": false, \"newest_trace\": \"\", \"newest_has_session_start\": false, \"newest_has_server_ready\": false, \"has_lines\": false, \"broken_line_count\": 1, \"any_file_has_png_prefix\": false, \"has_call_tool_event\": false}\nvar names = []\ndir.list_dir_begin()\nvar entry = dir.get_next()\nwhile entry != \"\":\n\tif not dir.current_is_dir() and entry.begins_with(\"trace-\") and entry.ends_with(\".jsonl\"):\n\t\tnames.append(entry)\n\tentry = dir.get_next()\ndir.list_dir_end()\nif names.is_empty():\n\treturn {\"trace_exists\": false, \"newest_trace\": \"\", \"newest_has_session_start\": false, \"newest_has_server_ready\": false, \"has_lines\": false, \"broken_line_count\": 1, \"any_file_has_png_prefix\": false, \"has_call_tool_event\": false}\nvar newest = \"\"\nvar newest_mtime = -1\nfor candidate in names:\n\tvar mtime = FileAccess.get_modified_time(\"user://godot_autopilot/traces/\" + candidate)\n\tif mtime > newest_mtime or (mtime == newest_mtime and candidate > newest):\n\t\tnewest_mtime = mtime\n\t\tnewest = candidate\nvar newest_text = \"\"\nvar newest_file = FileAccess.open(\"user://godot_autopilot/traces/\" + newest, FileAccess.READ)\nif newest_file != null:\n\tnewest_text = newest_file.get_as_text()\n\tnewest_file.close()\nvar broken = 0\nvar total = 0\nvar any_png = false\nvar png_magic = \"iVBORw0\" + \"KGgo\"\nfor candidate in names:\n\tvar probe = FileAccess.open(\"user://godot_autopilot/traces/\" + candidate, FileAccess.READ)\n\tif probe == null:\n\t\tcontinue\n\tvar text = probe.get_as_text()\n\tprobe.close()\n\tif text.contains(png_magic):\n\t\tany_png = true\n\tfor raw in text.split(\"\\n\"):\n\t\tif raw.strip_edges().is_empty():\n\t\t\tcontinue\n\t\ttotal += 1\n\t\tif JSON.parse_string(raw) == null:\n\t\t\tbroken += 1\nvar call_tool_marker = \"\\\"tool\\\":\\\"call\" + \"_tool\\\"\"\nreturn {\"trace_exists\": true, \"trace_files\": names.size(), \"newest_trace\": newest, \"newest_has_session_start\": newest_text.contains(\"session\" + \"_start\"), \"newest_has_server_ready\": newest_text.contains(\"server\" + \"_ready\"), \"has_lines\": total > 0, \"broken_line_count\": broken, \"any_file_has_png_prefix\": any_png, \"has_call_tool_event\": newest_text.contains(call_tool_marker)}"
+            },
+            "expect": {
+              "has_keys": [
+                "result"
+              ],
+              "field_checks": [
+                {
+                  "key": "result.trace_exists",
+                  "value": true
+                },
+                {
+                  "key": "result.newest_has_session_start",
+                  "value": true
+                },
+                {
+                  "key": "result.newest_has_server_ready",
+                  "value": true
+                },
+                {
+                  "key": "result.has_lines",
+                  "value": true
+                },
+                {
+                  "key": "result.broken_line_count",
+                  "value": 0
+                },
+                {
+                  "key": "result.any_file_has_png_prefix",
+                  "value": false
+                },
+                {
+                  "key": "result.has_call_tool_event",
+                  "value": true
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "session_log_integrity",
+        "steps": [
+          {
+            "id": "thread_guard_session_log_written",
+            "tool": "execute_script",
+            "args": {
+              "expression": "var dir = DirAccess.open(\"user://godot_autopilot/logs\")\nif dir == null:\n\treturn {\"log_exists\": false, \"newest_log\": \"\", \"log_has_startup_line\": false, \"log_line_count\": 0}\nvar names = []\ndir.list_dir_begin()\nvar entry = dir.get_next()\nwhile entry != \"\":\n\tif not dir.current_is_dir() and entry.begins_with(\"gda-\") and entry.ends_with(\".log\"):\n\t\tnames.append(entry)\n\tentry = dir.get_next()\ndir.list_dir_end()\nif names.is_empty():\n\treturn {\"log_exists\": false, \"newest_log\": \"\", \"log_has_startup_line\": false, \"log_line_count\": 0}\nvar newest = \"\"\nvar newest_mtime = -1\nfor candidate in names:\n\tvar mtime = FileAccess.get_modified_time(\"user://godot_autopilot/logs/\" + candidate)\n\tif mtime > newest_mtime or (mtime == newest_mtime and candidate > newest):\n\t\tnewest_mtime = mtime\n\t\tnewest = candidate\nvar text = \"\"\nvar newest_file = FileAccess.open(\"user://godot_autopilot/logs/\" + newest, FileAccess.READ)\nif newest_file != null:\n\ttext = newest_file.get_as_text()\n\tnewest_file.close()\nvar lines = 0\nfor raw in text.split(\"\\n\"):\n\tif raw.strip_edges().is_empty():\n\t\tcontinue\n\tlines += 1\nreturn {\"log_exists\": true, \"log_files\": names.size(), \"newest_log\": newest, \"log_has_startup_line\": text.contains(\"Godot Self\" + \"-Driving plugin starting\"), \"log_line_count\": lines}"
+            },
+            "expect": {
+              "has_keys": [
+                "result"
+              ],
+              "field_checks": [
+                {
+                  "key": "result.log_exists",
+                  "value": true
+                },
+                {
+                  "key": "result.log_has_startup_line",
+                  "value": true
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

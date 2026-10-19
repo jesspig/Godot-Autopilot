@@ -1,12 +1,33 @@
 #include "core/log_persist.hpp"
+#include "core/sanitize_policy.hpp"
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
+#include <thread>
 
 using godot_autopilot::LogCategory;
 using godot_autopilot::LogLevel;
 using godot_autopilot::LogPersist;
+
+namespace {
+
+class SanitizePolicyGuard {
+public:
+  explicit SanitizePolicyGuard(bool enabled)
+      : previous_(godot_autopilot::sanitize_policy::enabled()) {
+    godot_autopilot::sanitize_policy::set_enabled(enabled);
+  }
+  ~SanitizePolicyGuard() { godot_autopilot::sanitize_policy::set_enabled(previous_); }
+  SanitizePolicyGuard(const SanitizePolicyGuard &) = delete;
+  SanitizePolicyGuard &operator=(const SanitizePolicyGuard &) = delete;
+
+private:
+  bool previous_;
+};
+
+} // namespace
 
 TEST(LogPersistTest, FormatHumanLineAppendsDetailOnlyWhenRequested) {
     const std::string without_detail =
@@ -73,4 +94,28 @@ TEST(LogPersistTest, HealthSummaryCarriesObservabilityKeys) {
     EXPECT_NE(summary.find("dropped_log_lines"), std::string::npos);
     EXPECT_NE(summary.find("flush_failures"), std::string::npos);
     EXPECT_NE(summary.find("bytes_written"), std::string::npos);
+}
+
+TEST(LogPersistTest, StoreTraceImageBuffersBytesFromNonMainThread) {
+    SanitizePolicyGuard guard(false);
+    LogPersist &persist = LogPersist::instance();
+    const std::size_t entries_before = persist.pending_trace_image_count();
+    const uint64_t bytes_before = persist.pending_trace_image_bytes();
+    const uint64_t dropped_before = persist.dropped_trace_images();
+    std::string ref;
+    std::thread worker([&ref]() {
+        ref = LogPersist::instance().store_trace_image("span-thread", "cap", "aGVsbG8=");
+    });
+    worker.join();
+    EXPECT_EQ(persist.pending_trace_image_count(), entries_before + 1);
+    EXPECT_EQ(persist.pending_trace_image_bytes(), bytes_before + 5);
+    EXPECT_EQ(persist.dropped_trace_images(), dropped_before);
+    EXPECT_EQ(ref.rfind("images/trace-", 0), 0u);
+    EXPECT_NE(ref.find("-span-thread-cap.png"), std::string::npos);
+}
+
+TEST(LogPersistTest, StoreTraceImageReturnsEmptyWhenDesensitized) {
+    SanitizePolicyGuard guard(true);
+    EXPECT_EQ(LogPersist::instance().store_trace_image("span-thread", "cap", "aGVsbG8="),
+              std::string());
 }
