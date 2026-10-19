@@ -189,7 +189,7 @@ static mcp::JsonValue meta_get_tool_detail_impl(
     }
     t["tags"] = std::move(tags);
     t["input_schema"] = info->input_schema;
-    const char* se = "";
+    const char* se = "none";
     uint32_t flags = 0;
     if (auto tool = registry->find_any(name)) {
         se = ::godot_autopilot::side_effect_name(
@@ -501,7 +501,7 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
         ToolSpec spec{"batch_execute",
                       "Execute multiple tools in batch. Each operation runs in sequence; if stop_on_error is true and any operation fails, remaining operations are skipped. Async game tools are refused unless await_async=true, in which case batch_execute waits for the game response and reports it under result.",
                       "System", {"batch", "execute", "multi"}};
-        spec.side_effect = SideEffect::None;
+        spec.side_effect = SideEffect::CodeExecute;
         spec.flags = tool_flags::kMeta | tool_flags::kLongBlocking;
         spec.handler = [](const mcp::JsonValue& a) { return code_exec_ops::handle_batch_execute(a); };
         mcp::JsonValue s(mcp::JsonValue::object_tag);
@@ -549,7 +549,7 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
         ToolSpec spec{"code_execute",
                       "Execute arbitrary GDScript code. The source code is wrapped in a script that extends Node, compiled, attached to a temporary node, and executed. Returns the function result serialized as JSON. Without a line-start `func ` definition the source is inlined inside the entry-function body: write straight-line code ending in return. When any non-comment line starts with `func ` (leading spaces/tabs stripped; `#` and `//` comment lines ignored) the whole source is preserved verbatim and function_name (default _run) selects the entry point, with a `func <name>(): pass` stub appended when the named entry is missing. Detection needs `func ` with a trailing space: `func<TAB>name():` or `func(` do not switch modes and are rejected in single-function mode; mixing tab and space indentation is rejected. Execution environment exposes SceneRoot (the edited scene root node) for node access; see SceneRoot.get_node(\"Child\").",
                       "System", {"code", "execute", "script", "gdscript"}};
-        spec.side_effect = SideEffect::None;
+        spec.side_effect = SideEffect::CodeExecute;
         spec.flags = tool_flags::kMeta | tool_flags::kLongBlocking;
         spec.handler = [](const mcp::JsonValue& a) { return code_exec_ops::handle_code_execute(a); };
         mcp::JsonValue s(mcp::JsonValue::object_tag);

@@ -169,9 +169,12 @@ TEST(SecurityHardening, AuthorizationAllKeyword) {
 TEST(SecurityHardening, CapabilityForToolMapping) {
   using namespace godot_autopilot;
   EXPECT_STREQ(authorization::capability_for_tool("create_os_process", SideEffect::Process), "process");
-  EXPECT_STREQ(authorization::capability_for_tool("code_execute", SideEffect::None), "code_execute");
-  EXPECT_STREQ(authorization::capability_for_tool("execute_script", SideEffect::None), "code_execute");
-  EXPECT_STREQ(authorization::capability_for_tool("execute_game_script", SideEffect::None), "game_runtime");
+  EXPECT_STREQ(authorization::capability_for_tool("code_execute", SideEffect::CodeExecute), "code_execute");
+  EXPECT_STREQ(authorization::capability_for_tool("execute_script", SideEffect::CodeExecute), "code_execute");
+  EXPECT_STREQ(authorization::capability_for_tool("execute_game_script", SideEffect::GameRuntime), "game_runtime");
+  EXPECT_EQ(authorization::capability_for_tool("code_execute", SideEffect::None), nullptr);
+  EXPECT_EQ(authorization::capability_for_tool("execute_script", SideEffect::None), nullptr);
+  EXPECT_EQ(authorization::capability_for_tool("execute_game_script", SideEffect::None), nullptr);
   EXPECT_EQ(authorization::capability_for_tool("get_game_status", SideEffect::None), nullptr);
 }
 

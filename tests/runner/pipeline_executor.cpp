@@ -23,7 +23,20 @@ enum class StepOutcome { ok, failed, crashed };
 struct StepBatch {
     StepOutcome outcome = StepOutcome::ok;
     std::vector<StepResult> steps;
+    std::vector<TraversalSummary> traversals;
+    bool baseline_matched = true;
 };
+
+std::string join_strings(const std::vector<std::string>& items) {
+    std::string out;
+    for (size_t i = 0; i < items.size(); ++i) {
+        if (i > 0) {
+            out += "; ";
+        }
+        out += items[i];
+    }
+    return out;
+}
 
 bool expect_empty(const StepExpect& expect) {
     return expect.has_keys.empty() && expect.field_checks.empty();
@@ -105,8 +118,29 @@ StepBatch exec_step(const Step& step, GodotProcess* proc, McpTestClient& client,
     const std::string mode = step.traverse_mode.empty() ? DEFAULT_TRAVERSE_MODE
                                                         : step.traverse_mode;
     try {
-        auto stats = run_traversal(client, mode, batch.steps);
-        (void)stats;
+        const TraversalStats stats = run_traversal(client, mode, batch.steps);
+        TraversalSummary summary;
+        summary.mode = mode;
+        summary.enumerated = stats.enumerated;
+        summary.excluded = stats.excluded;
+        summary.candidates = stats.candidates;
+        summary.warnings = stats.warnings.size();
+        summary.total_calls = stats.total;
+        summary.failed_steps = stats.failed;
+        summary.exempt_errors = stats.exempt_errors;
+        summary.baseline_matched = stats.baseline_matched;
+        summary.baseline_diffs = stats.baseline_diffs;
+        batch.traversals.push_back(std::move(summary));
+        if (!stats.baseline_matched) {
+            batch.baseline_matched = false;
+            StepResult sr;
+            sr.step_id = step.id.empty() ? traverse_tool_name(mode) : step.id;
+            sr.tool = traverse_tool_name(mode);
+            sr.passed = false;
+            sr.detail = "遍历统计与基线不符: " +
+                        join_strings(stats.baseline_diffs);
+            batch.steps.push_back(std::move(sr));
+        }
     } catch (const std::exception& e) {
         StepResult sr;
         sr.step_id = step.id.empty() ? traverse_tool_name(mode) : step.id;
@@ -134,6 +168,12 @@ void merge_batch(FileResult& result, StepBatch& batch) {
             ++result.call_success;
         }
         result.steps.push_back(std::move(sr));
+    }
+    for (TraversalSummary& summary : batch.traversals) {
+        result.traversals.push_back(std::move(summary));
+    }
+    if (!batch.baseline_matched) {
+        result.baseline_matched = false;
     }
 }
 
@@ -224,7 +264,8 @@ FileResult run_pipeline_inner(const TestCase& tc, GodotProcess* proc,
         }
     }
 
-    result.passed = all_steps_passed && result.fatal_error.empty();
+    result.passed = all_steps_passed && result.fatal_error.empty() &&
+                    result.baseline_matched;
     return result;
 }
 
