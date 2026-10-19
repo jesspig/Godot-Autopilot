@@ -3,7 +3,8 @@ import { CliError, ExitCode } from "../errors";
 import { err } from "../output";
 import { isAlive, stopForce, stopGraceful } from "../process";
 import { findLiveByProject, loadRegistry, saveRegistry, type InstanceEntry } from "../registry";
-import { readRawEntry } from "./registry-raw";
+import { assertSingleSelector, parseTargetPort } from "../target";
+import { readRawEntries, readRawEntry } from "./registry-raw";
 import { writeJson } from "./json-output";
 
 const DEFAULT_WAIT_SEC = 10;
@@ -52,14 +53,32 @@ async function stop(positional: string[], opts: GlobalOptions): Promise<number> 
 }
 
 function resolveTarget(positional: string[], opts: GlobalOptions): InstanceEntry {
-  const id = positional[0];
-  if (id !== undefined) {
-    const entry = readRawEntry(id);
+  const positionalId = positional[0];
+  if (positionalId !== undefined) {
+    if (opts.id !== undefined || opts.portText !== undefined || opts.project !== undefined) {
+      throw new CliError(ExitCode.Usage, "use only one of <id>/--id/--port/--project");
+    }
+    return registeredEntry(positionalId);
+  }
+
+  assertSingleSelector(opts);
+
+  if (opts.id !== undefined) {
+    return registeredEntry(opts.id);
+  }
+
+  if (opts.portText !== undefined) {
+    const port = parseTargetPort(opts.portText);
+    const entry = entryByPort(port);
     if (entry === undefined) {
-      throw new CliError(ExitCode.Transport, `unknown instance: ${id} (run "gda list" to see running instances)`);
+      throw new CliError(
+        ExitCode.Transport,
+        `no registered instance on port ${port} (the CLI can only stop instances it started; run "gda list" to see running instances)`,
+      );
     }
     return entry;
   }
+
   if (opts.project !== undefined) {
     const entry = findLiveByProject(opts.project);
     if (entry === undefined) {
@@ -67,7 +86,24 @@ function resolveTarget(positional: string[], opts: GlobalOptions): InstanceEntry
     }
     return entry;
   }
-  throw new CliError(ExitCode.Usage, "usage: gda stop <id> [--force] [--wait <sec>] | gda stop --project <dir> [--force] [--wait <sec>]");
+
+  throw new CliError(
+    ExitCode.Usage,
+    "usage: gda stop <id> [--force] [--wait <sec>] | gda stop (--id <id> | --port <port> | --project <dir>) [--force] [--wait <sec>]",
+  );
+}
+
+function registeredEntry(id: string): InstanceEntry {
+  const entry = readRawEntry(id);
+  if (entry === undefined) {
+    throw new CliError(ExitCode.Transport, `unknown instance: ${id} (run "gda list" to see running instances)`);
+  }
+  return entry;
+}
+
+function entryByPort(port: number): InstanceEntry | undefined {
+  const entries = readRawEntries().filter((e) => e.port === port);
+  return entries.find((e) => isAlive(e.pid)) ?? entries[0];
 }
 
 function removeFromRegistry(id: string): void {

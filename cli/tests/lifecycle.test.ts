@@ -503,6 +503,47 @@ describe.serial("stop", () => {
     expect(isAlive(runner.pid)).toBe(false);
     expect(registeredInstances()).toHaveLength(0);
   }, TEST_TIMEOUT_MS);
+
+  test("--id 终止登记实例并清理登记", async () => {
+    const runner = spawn(process.execPath, ["-e", "setTimeout(()=>{},20000)"], { stdio: "ignore" });
+    const pid = runner.pid;
+    writeEntry(makeEntry({ id: `p${pid}`, pid, port: 9601, project: makeProjectDir() }));
+    const { code, stdout } = await captureStdout(() => runStop([], { id: `p${pid}`, force: true }));
+    expect(code).toBe(ExitCode.Success);
+    expect(JSON.parse(stdout).ok).toBe(true);
+    expect(isAlive(pid)).toBe(false);
+    expect(registeredInstances()).toHaveLength(0);
+  }, TEST_TIMEOUT_MS);
+
+  test("--port 终止该端口上的登记实例", async () => {
+    const runner = spawn(process.execPath, ["-e", "setTimeout(()=>{},20000)"], { stdio: "ignore" });
+    const pid = runner.pid;
+    writeEntry(makeEntry({ id: `p${pid}`, pid, port: 9602, project: makeProjectDir() }));
+    const { code, stdout } = await captureStdout(() => runStop([], { portText: "9602", force: true }));
+    expect(code).toBe(ExitCode.Success);
+    expect(JSON.parse(stdout).ok).toBe(true);
+    expect(isAlive(pid)).toBe(false);
+    expect(registeredInstances()).toHaveLength(0);
+  }, TEST_TIMEOUT_MS);
+
+  test("--port 无登记实例时报传输错误且不输出 ok:true", async () => {
+    const { code, stdout, stderr } = await captureStdout(() => runStop([], { portText: "9603" }));
+    expect(code).toBe(ExitCode.Transport);
+    expect(stdout.trim()).toBe("");
+    expect(stderr).toContain("no registered instance on port 9603");
+  }, TEST_TIMEOUT_MS);
+
+  test("--id 与 --port 互斥报用法错误", async () => {
+    const { code, stderr } = await captureStdout(() => runStop([], { id: "p1", portText: "9604" }));
+    expect(code).toBe(ExitCode.Usage);
+    expect(stderr).toContain("use only one of");
+  }, TEST_TIMEOUT_MS);
+
+  test("位置 id 与 --id 互斥报用法错误", async () => {
+    const { code, stderr } = await captureStdout(() => runStop(["p1"], { id: "p1" }));
+    expect(code).toBe(ExitCode.Usage);
+    expect(stderr).toContain("use only one of");
+  }, TEST_TIMEOUT_MS);
 });
 
 describe.serial("logs", () => {

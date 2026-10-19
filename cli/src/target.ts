@@ -27,7 +27,7 @@ export interface ResolvedTarget {
   instance?: InstanceEntry;
 }
 
-type TargetOptions = Pick<GlobalOptions, "portText" | "id" | "project">;
+export type TargetSelector = Pick<GlobalOptions, "portText" | "id" | "project">;
 
 const DEFAULT_PORT = 9527;
 
@@ -43,6 +43,21 @@ function parsePortText(text: string): number | null {
 
 function normalizePath(p: string): string {
   return path.resolve(p);
+}
+
+export function assertSingleSelector(opts: TargetSelector): void {
+  const explicitCount = [opts.portText, opts.id, opts.project].filter((v) => v !== undefined).length;
+  if (explicitCount > 1) {
+    throw new CliError(ExitCode.Usage, "use only one of --id/--port/--project");
+  }
+}
+
+export function parseTargetPort(text: string): number {
+  const port = parsePortText(text);
+  if (port === null) {
+    throw new CliError(ExitCode.Usage, `--port must be an integer in 1-65535, got: ${text}`);
+  }
+  return port;
 }
 
 function portFromLatestTrace(godotAutopilotDir: string): number | null {
@@ -109,11 +124,8 @@ function portFromTraceOrConfig(startDir: string): { port: number; source: string
   return null;
 }
 
-export function resolveTarget(opts: TargetOptions, ctx: TargetContext): ResolvedTarget {
-  const explicitCount = [opts.portText, opts.id, opts.project].filter((v) => v !== undefined).length;
-  if (explicitCount > 1) {
-    throw new CliError(ExitCode.Usage, "use only one of --id/--port/--project");
-  }
+export function resolveTarget(opts: TargetSelector, ctx: TargetContext): ResolvedTarget {
+  assertSingleSelector(opts);
 
   if (opts.id !== undefined) {
     const entry = ctx.findById(opts.id);
@@ -124,11 +136,7 @@ export function resolveTarget(opts: TargetOptions, ctx: TargetContext): Resolved
   }
 
   if (opts.portText !== undefined) {
-    const port = parsePortText(opts.portText);
-    if (port === null) {
-      throw new CliError(ExitCode.Usage, `--port must be an integer in 1-65535, got: ${opts.portText}`);
-    }
-    return { port, source: "cli" };
+    return { port: parseTargetPort(opts.portText), source: "cli" };
   }
 
   if (opts.project !== undefined) {
