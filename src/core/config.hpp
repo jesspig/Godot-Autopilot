@@ -42,8 +42,8 @@ static_assert(GDA_DISPATCH_WAIT_LONG_BLOCKING_MS < GDA_TRANSPORT_TIMEOUT_MS,
               "the effective long blocking dispatch wait budget must stay "
               "below the HTTP transport timeout so a structured timeout "
               "result can reach the client");
-constexpr int64_t GDA_CODE_EXEC_MAX_TIMEOUT_MS = 28000;
-constexpr int64_t GDA_CODE_EXEC_BUDGET_MARGIN_MS = 1000;
+constexpr int64_t GDA_CODE_EXEC_MAX_TIMEOUT_MS = 27000;
+constexpr int64_t GDA_CODE_EXEC_BUDGET_MARGIN_MS = 2000;
 constexpr int64_t GDA_CODE_EXEC_TRANSPORT_MARGIN_MS = 2000;
 static_assert(GDA_CODE_EXEC_MAX_TIMEOUT_MS <= GDA_DISPATCH_WAIT_MAX_MS,
               "the code_execute timeout ceiling must not exceed the dispatch "
