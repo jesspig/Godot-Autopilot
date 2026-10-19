@@ -5,7 +5,7 @@ description: "Godot content pipeline guide: TileMap and TileSet, AnimationPlayer
 
 # Godot Content Pipeline
 
-Invocation: use the native MCP tools first; when that channel is down, follow the calling ladder in the godot-autopilot-tools skill (bunx gda CLI, the standalone gda binary, or the bundled script bridge); with neither available, work through its references/manual-fallback.md.
+Invocation: use the native MCP tools first; when that channel is down, follow the calling ladder in the godot-autopilot-tools skill (the gda CLI, via bunx, a global install, or the standalone gda binary); with no CLI available, work through its references/manual-fallback.md.
 
 Four content domains via godot-autopilot: TileMap and TileSet levels,
 AnimationPlayer and AnimationTree animation, audio buses and playback, and

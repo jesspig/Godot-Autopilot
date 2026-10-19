@@ -5,7 +5,7 @@ description: "Godot GDScript guide: script lifecycle, the four execution channel
 
 # GDScript Workflows
 
-Invocation: use the native MCP tools first; when that channel is down, follow the calling ladder in the godot-autopilot-tools skill (bunx gda CLI, the standalone gda binary, or the bundled script bridge); with neither available, work through its references/manual-fallback.md.
+Invocation: use the native MCP tools first; when that channel is down, follow the calling ladder in the godot-autopilot-tools skill (the gda CLI, via bunx, a global install, or the standalone gda binary); with no CLI available, work through its references/manual-fallback.md.
 
 Creating, attaching, editing and reloading GDScript through godot-autopilot, and the safety differences between the four execution channels plus the code_execute meta tool. Engine-level execution gotchas (placeholder instances, static initializers, editor-vs-game semantics, frame ordering) are summarized here and covered in depth in `references/execution-gotchas.md`.
 
