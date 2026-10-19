@@ -1,12 +1,13 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import net from "node:net";
+import path from "node:path";
 
 import type { GlobalOptions } from "../args";
 import { callTool } from "../mcp/client";
 import { CliError, ExitCode } from "../errors";
 import { err } from "../output";
-import { joinPath, resolvePath } from "../platform";
+import { joinPath } from "../platform";
 import { isAlive, resolveGodotBin, spawnEditor } from "../process";
 import { findLiveByProject, loadRegistry, saveRegistry, stateDir, type InstanceEntry } from "../registry";
 import { writeJson } from "./json-output";
@@ -34,7 +35,7 @@ export async function run(_positional: string[], opts: GlobalOptions): Promise<n
 }
 
 async function start(opts: GlobalOptions): Promise<number> {
-  const projectDir = resolvePath(opts.project ?? process.cwd());
+  const projectDir = path.resolve(opts.project ?? process.cwd());
 
   const existing = findLiveByProject(projectDir);
   if (existing !== undefined) {
@@ -64,7 +65,7 @@ async function start(opts: GlobalOptions): Promise<number> {
   const id = `p${pid}`;
   let finalLogPath = joinPath(logsDir, `${id}.log`);
   try {
-    fs.renameSync(resolvePath(pendingLogPath), finalLogPath);
+    fs.renameSync(pendingLogPath, finalLogPath);
   } catch {
     finalLogPath = pendingLogPath;
   }
@@ -75,7 +76,7 @@ async function start(opts: GlobalOptions): Promise<number> {
 
   const entry: InstanceEntry = {
     id,
-    project: resolvePath(projectDir),
+    project: projectDir,
     port,
     pid,
     startedAt: new Date().toISOString(),
@@ -141,7 +142,7 @@ async function waitForReady(port: number, pid: number, waitSec: number, logPath:
 async function runImportStep(bin: string, projectDir: string, skip: boolean): Promise<void> {
   if (skip) return;
   try {
-    const result = spawnSync(bin, ["--headless", "--import", "--path", resolvePath(projectDir)], {
+    const result = spawnSync(bin, ["--headless", "--import", "--path", projectDir], {
       timeout: IMPORT_TIMEOUT_MS,
       stdio: ["ignore", "pipe", "pipe"],
     });

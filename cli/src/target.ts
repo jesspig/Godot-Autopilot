@@ -45,6 +45,11 @@ function normalizePath(p: string): string {
   return path.resolve(p);
 }
 
+export function projectPathKey(p: string): string {
+  const resolved = path.resolve(p);
+  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
+}
+
 export function assertSingleSelector(opts: TargetSelector): void {
   const explicitCount = [opts.portText, opts.id, opts.project].filter((v) => v !== undefined).length;
   if (explicitCount > 1) {

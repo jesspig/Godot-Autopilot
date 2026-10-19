@@ -10,7 +10,8 @@ import { run as runStart } from "../src/commands/start";
 import { run as runStop } from "../src/commands/stop";
 import { ExitCode } from "../src/errors";
 import { isAlive, stopForce } from "../src/process";
-import { loadRegistry, stateDir, type InstanceEntry } from "../src/registry";
+import { findById, findLiveByProject, loadRegistry, stateDir, type InstanceEntry } from "../src/registry";
+import { resolveTarget } from "../src/target";
 import { killImage, killPid, removeDirWithRetry, waitDead, waitFor } from "./support/cleanup";
 
 // 端口反查（netstat 轮询）+ ping 探测引入固定延迟，2s 阈值在系统负载高时不足
@@ -543,6 +544,24 @@ describe.serial("stop", () => {
     const { code, stderr } = await captureStdout(() => runStop(["p1"], { id: "p1" }));
     expect(code).toBe(ExitCode.Usage);
     expect(stderr).toContain("use only one of");
+  }, TEST_TIMEOUT_MS);
+
+  test("含 .. 的相对 --project 在寻址链与 stop 下解析到同一实例", async () => {
+    const runner = spawn(process.execPath, ["-e", "setTimeout(()=>{},20000)"], { stdio: "ignore" });
+    const pid = runner.pid;
+    const projectDir = path.join(tmp, "proj", "nested");
+    fs.mkdirSync(projectDir, { recursive: true });
+    writeEntry(makeEntry({ id: `p${pid}`, pid, port: 9605, project: path.resolve(projectDir) }));
+    const messy = `sub${path.sep}..${path.sep}${path.relative(process.cwd(), projectDir)}`;
+
+    const target = resolveTarget({ project: messy }, { findById, findLiveByProject });
+    expect(target.source).toBe("project");
+    expect(target.instance?.id).toBe(`p${pid}`);
+
+    const { code } = await captureStdout(() => runStop([], { project: messy, force: true }));
+    expect(code).toBe(ExitCode.Success);
+    expect(isAlive(pid)).toBe(false);
+    expect(registeredInstances()).toHaveLength(0);
   }, TEST_TIMEOUT_MS);
 });
 
