@@ -148,7 +148,7 @@ add_test(NAME comment_guard
 add_test(NAME main_thread_guard
     COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/main_thread_guard.py")
 
-# ── ctest 注册: 版本号三处一致性守卫（零依赖，读源码断言，无需构建产物） ──
+# ── ctest 注册: 版本号一致性守卫（零依赖，读源码断言，全部版本钉与 VERSION 同值） ──
 add_test(NAME version_sync_guard
     COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/version_sync_guard.py")
 
