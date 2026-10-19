@@ -234,7 +234,7 @@ def choose_delimiter(entries):
 def render_header(entries, delimiter):
     lines = [
         "// 由 tools/embed_skills.py 生成，勿手改。",
-        "// 源：skills/（<name>/SKILL.md + references/*.md + scripts/*.mjs）",
+        "// 源：skills/ 的各册目录（SKILL.md 与 references/、scripts/ 下的文件）",
         "#pragma once",
         "#include <string>",
         "#include <vector>",
@@ -242,7 +242,7 @@ def render_header(entries, delimiter):
         "namespace godot_autopilot::skill_gen::embedded {",
         "",
         "struct EmbeddedFile {",
-        "  const char *path; // \"SKILL.md\" 或 \"references/XXX.md\"",
+        "  const char *path; // 相对路径：SKILL.md 或 references/、scripts/ 下的文件",
         "  const char *body;",
         "};",
         "",

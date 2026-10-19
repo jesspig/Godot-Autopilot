@@ -118,6 +118,13 @@ TEST(SkillResourcesTest, BuildsCatalogFromEmbeddedSkills) {
   for (const char *name : kExpectedSkillNames) {
     EXPECT_TRUE(names.count(name) == 1) << "missing skill: " << name;
   }
+
+  std::size_t resources = 1;
+  for (const SkillSpec &spec : all) {
+    resources += 1 + spec.files.size();
+  }
+  EXPECT_EQ(resources, std::size_t{44})
+      << "skill resources (1 catalog + one per volume + one per embedded file)";
 }
 
 TEST(SkillResourcesTest, CatalogJsonCarriesCountAndEntries) {
@@ -250,23 +257,25 @@ TEST(SkillResourcesTest, ResolvesReferenceContentVerbatim) {
   EXPECT_EQ(content.text.find("author: godot-autopilot"), std::string::npos);
 }
 
-TEST(SkillResourcesTest, ScriptMimeType) {
+TEST(SkillResourcesTest, MarkdownMimeType) {
   const std::vector<SkillSpec> &all = skills();
-
-  const ContentResult script =
-      godot_autopilot::skill_resources::resolve_content(
-          all, "godot://skills/godot-autopilot-tools/scripts/gda.mjs");
-  EXPECT_TRUE(script.error.empty());
-  EXPECT_EQ(script.kind, UriKind::file);
-  EXPECT_EQ(script.mime_type, "text/javascript");
-  EXPECT_FALSE(script.text.empty());
 
   const ContentResult reference =
       godot_autopilot::skill_resources::resolve_content(
           all,
           "godot://skills/godot-autopilot-tools/references/tool-catalog.md");
   EXPECT_TRUE(reference.error.empty());
+  EXPECT_EQ(reference.kind, UriKind::file);
   EXPECT_EQ(reference.mime_type, "text/markdown");
+  EXPECT_FALSE(reference.text.empty());
+
+  EXPECT_EQ(godot_autopilot::skill_resources::mime_type_for_path("SKILL.md"),
+            "text/markdown");
+  EXPECT_EQ(godot_autopilot::skill_resources::mime_type_for_path(
+                "references/tool-catalog.md"),
+            "text/markdown");
+  EXPECT_EQ(godot_autopilot::skill_resources::mime_type_for_path("notes.txt"),
+            "text/plain");
 }
 
 TEST(SkillResourcesTest, AcceptsCaseInsensitiveSchemeForContent) {
