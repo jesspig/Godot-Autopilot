@@ -370,6 +370,20 @@ inline std::string deadline_check_line() {
          ": return " + TIMEOUT_SENTINEL_NAME;
 }
 
+inline std::string deadline_break_line() {
+  return std::string("if Time.get_ticks_msec() > ") + DEADLINE_CONST_NAME +
+         ": break";
+}
+
+inline bool declares_return_type(const std::string &signature) {
+  return signature.find("->") != std::string::npos;
+}
+
+inline bool is_function_signature_line(const std::string &trimmed) {
+  return trimmed.compare(0, 5, "func ") == 0 ||
+         trimmed.compare(0, 11, "static func ") == 0;
+}
+
 inline std::string deadline_loop_condition() {
   return std::string("Time.get_ticks_msec() <= ") + DEADLINE_CONST_NAME;
 }
@@ -475,12 +489,24 @@ inline DeadlineTransform inject_deadline_checks(const std::string &source) {
   result.ok = true;
   const std::vector<std::string> lines = split_lines(source);
   const std::string check = deadline_check_line();
+  const std::string break_check = deadline_break_line();
   std::vector<std::string> out;
   out.reserve(lines.size());
+  bool enclosing_function_typed = false;
+  int64_t enclosing_function_indent = -1;
   for (size_t index = 0; index < lines.size(); ++index) {
     const std::string &current = lines[index];
     const std::string indent = leading_whitespace(current);
     const std::string trimmed = current.substr(indent.size());
+    if (!trimmed.empty() && is_function_signature_line(trimmed)) {
+      enclosing_function_typed = declares_return_type(trimmed);
+      enclosing_function_indent = static_cast<int64_t>(indent.size());
+    } else if (!trimmed.empty() && enclosing_function_indent >= 0 &&
+               static_cast<int64_t>(indent.size()) <=
+                   enclosing_function_indent) {
+      enclosing_function_typed = false;
+      enclosing_function_indent = -1;
+    }
     const bool loop_header =
         !trimmed.empty() && !is_comment_only(trimmed) &&
         (is_while_header(trimmed) || is_for_header(trimmed));
@@ -495,6 +521,8 @@ inline DeadlineTransform inject_deadline_checks(const std::string &source) {
     }
     const std::string head = trimmed.substr(0, colon);
     const std::string body = trim_whitespace(trimmed.substr(colon + 1));
+    const std::string &loop_check =
+        enclosing_function_typed ? break_check : check;
     if (body.empty()) {
       out.push_back(current);
       size_t scan = index + 1;
@@ -507,7 +535,7 @@ inline DeadlineTransform inject_deadline_checks(const std::string &source) {
           continue;
         }
         if (next_indent.size() > indent.size()) {
-          out.push_back(next_indent + check);
+          out.push_back(next_indent + loop_check);
         }
         break;
       }
@@ -522,6 +550,33 @@ inline DeadlineTransform inject_deadline_checks(const std::string &source) {
   }
   result.source = join_lines(out);
   return result;
+}
+
+inline std::string insert_after_header(const std::string &source,
+                                       const std::string &declarations) {
+  const std::vector<std::string> lines = split_lines(source);
+  std::vector<std::string> out;
+  out.reserve(lines.size() + 2);
+  size_t index = 0;
+  while (index < lines.size()) {
+    const std::string trimmed = trim_whitespace(lines[index]);
+    const bool blank = trimmed.empty();
+    const bool header = !blank && (trimmed[0] == '@' ||
+                                   trimmed.compare(0, 8, "extends ") == 0 ||
+                                   trimmed.compare(0, 11, "class_name ") == 0);
+    if (!blank && !header) {
+      break;
+    }
+    out.push_back(lines[index]);
+    ++index;
+  }
+  for (const std::string &declaration : split_lines(declarations)) {
+    out.push_back(declaration);
+  }
+  for (; index < lines.size(); ++index) {
+    out.push_back(lines[index]);
+  }
+  return join_lines(out);
 }
 
 inline std::string insert_entry_check(const std::string &source,
@@ -541,6 +596,9 @@ inline std::string insert_entry_check(const std::string &source,
     const std::string indent = leading_whitespace(current);
     const std::string trimmed = current.substr(indent.size());
     if (trimmed.compare(0, signature.size(), signature) != 0) {
+      continue;
+    }
+    if (declares_return_type(trimmed)) {
       continue;
     }
     size_t scan = index + 1;

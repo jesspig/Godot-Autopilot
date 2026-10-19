@@ -92,3 +92,19 @@ TEST(ExecBudgetTest, EntryCheckIsSkippedWhenEntryFunctionAbsent) {
       deadline_check_line());
   EXPECT_FALSE(contains(transformed, "__gda_deadline_ms"));
 }
+
+TEST(ExecBudgetTest, TypedFunctionUsesBreakCheckpointInsteadOfReturn) {
+  const godot_autopilot::gdscript_wrap::DeadlineTransform transform =
+      inject_deadline_checks("func _run() -> void:\n\twhile true:\n\t\tpass\n");
+  ASSERT_TRUE(transform.ok);
+  EXPECT_TRUE(contains(transform.source,
+                        "if Time.get_ticks_msec() > __gda_deadline_ms: break"));
+  EXPECT_FALSE(contains(transform.source, "return __GDA_TIMEOUT__"));
+}
+
+TEST(ExecBudgetTest, EntryCheckIsSkippedForTypedEntryFunction) {
+  const std::string transformed = insert_entry_check(
+      "func _run() -> void:\n\tpass\n", "_run",
+      deadline_check_line());
+  EXPECT_FALSE(contains(transformed, "__gda_deadline_ms"));
+}
