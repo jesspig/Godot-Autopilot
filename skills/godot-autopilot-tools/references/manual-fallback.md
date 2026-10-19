@@ -6,7 +6,7 @@ Companion reference of the godot-autopilot-tools volume: what to do when no auto
 
 Enter this mode only when at least one holds:
 
-- No working MCP client and no Node 18+ / Bun runtime to run the script bridge.
+- No working MCP client, no Node 18+ / Bun runtime to run the script bridge, and no way to fetch the standalone binary.
 - The harness has no shell at all, so neither the native channel nor the script can run.
 - The user explicitly asks for manual steps.
 
