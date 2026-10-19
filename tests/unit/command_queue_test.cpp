@@ -112,3 +112,31 @@ TEST(CommandQueueTest, LastDrainAgeAdvancesAfterDrain) {
     std::this_thread::sleep_for(std::chrono::milliseconds(5));
     EXPECT_GE(q.last_drain_age_ms(), 1);
 }
+
+TEST(CommandQueueTest, BoundedSubmitCompletesWithinBudget) {
+    CommandQueue q;
+    auto submission = q.submit_tracked_bounded([] { return 42; }, 1000);
+    EXPECT_FALSE(submission.timed_out);
+    EXPECT_FALSE(submission.cancelled);
+    EXPECT_GE(submission.waited_ms, 0);
+    EXPECT_EQ(submission.future.get(), 42);
+}
+
+TEST(CommandQueueTest, BoundedSubmitTimeoutCancelsPendingTask) {
+    CommandQueue q;
+    bool ran = false;
+    auto submission = q.submit_tracked_bounded([&ran] { ran = true; }, 50);
+    EXPECT_TRUE(submission.timed_out);
+    EXPECT_TRUE(submission.cancelled);
+    EXPECT_GE(submission.waited_ms, 0);
+    q.drain();
+    EXPECT_FALSE(ran);
+}
+
+TEST(CommandQueueTest, BoundedSubmitTimeoutIncrementsCancelledCounter) {
+    CommandQueue q;
+    const uint64_t cancelled_before = q.stats().cancelled;
+    auto submission = q.submit_tracked_bounded([] { return 7; }, 30);
+    EXPECT_TRUE(submission.timed_out);
+    EXPECT_EQ(q.stats().cancelled, cancelled_before + 1);
+}
