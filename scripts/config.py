@@ -75,11 +75,28 @@ PLATFORM_LIBS: dict[str, str] = {
 
 PLATFORM_PDB = "godot-autopilot.pdb"
 
+BRIDGE_DIR = PROJECT_ROOT / "csharp_bridge"
+
+# C# 桥源码清单：随插件包分发，缺任一即视为打包失败（Godot 侧按文件名加载）
+BRIDGE_SOURCES: tuple[str, ...] = (
+    "BridgeCall.cs",
+    "BridgeConvert.cs",
+    "BridgeEvents.cs",
+    "BridgeGetSet.cs",
+    "GdaCSharpBridge.cs",
+    "GdaCSharpRuntime.cs",
+)
+
 ADDON_VERSION = (PROJECT_ROOT / "VERSION").read_text(encoding="utf-8").strip()
 
 
 def resolve_demos(names: list[str] | None) -> list[Path]:
-    if not names:
+    """把 demo 名列表解析为工程目录。
+
+    None 表示未传 --demos，返回全部 demo；空列表表示显式传了空的 --demos
+    （`--demos` 后不跟名字），返回空列表，即不部署任何 demo。
+    """
+    if names is None:
         return list(DEMO_DIRS)
     known = {d.name: d for d in DEMO_DIRS}
     unknown = [n for n in names if n not in known]

@@ -5,20 +5,29 @@ import shutil
 import sys
 from pathlib import Path
 
-from .config import DEMO_DIRS, PLATFORM_LIBS, PLATFORM_PDB, PROJECT_ROOT, TESTBED_DIR, _addon_dir, artifact_dir
-
-
-BRIDGE_DIR = PROJECT_ROOT / "csharp_bridge"
+from .config import (
+    BRIDGE_DIR,
+    DEMO_DIRS,
+    PLATFORM_LIBS,
+    PLATFORM_PDB,
+    TESTBED_DIR,
+    _addon_dir,
+    artifact_dir,
+)
 
 
 def _deploy_csharp_bridge(addon_dir: Path) -> None:
     sources = sorted(BRIDGE_DIR.glob("*.cs"))
-    if sources:
-        for src in sources:
-            shutil.copy2(src, addon_dir / src.name)
-            size_kb = src.stat().st_size / 1024
-            print(f"  {src.name}  ({size_kb:.0f} KB)", flush=True)
-    else:
+    source_names = {src.name for src in sources}
+    for stale in sorted(addon_dir.glob("*.cs")):
+        if stale.name not in source_names:
+            stale.unlink()
+            print(f"  removed stale {stale.name}", flush=True)
+    for src in sources:
+        shutil.copy2(src, addon_dir / src.name)
+        size_kb = src.stat().st_size / 1024
+        print(f"  {src.name}  ({size_kb:.0f} KB)", flush=True)
+    if not sources:
         print(f"[WARN] no bridge sources found in {BRIDGE_DIR}", flush=True)
 
 
@@ -48,7 +57,7 @@ def _deploy(preset: str, demos: list[Path] | None = None) -> None:
     if not lib_name:
         print(f"[ERROR] Unsupported platform: {system}", flush=True)
         sys.exit(1)
-    for project_dir in [*(demos or DEMO_DIRS), TESTBED_DIR]:
+    for project_dir in [*(DEMO_DIRS if demos is None else demos), TESTBED_DIR]:
         addon_dir = _addon_dir(project_dir)
         addon_dir.mkdir(parents=True, exist_ok=True)
         # Remove any Godot hot-reload backup DLLs from previous runs to avoid loading errors
