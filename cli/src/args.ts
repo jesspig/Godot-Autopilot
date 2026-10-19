@@ -77,7 +77,7 @@ export function parseArgv(argv: string[]): { opts: GlobalOptions; positionals: s
         } else {
           const next = argv[i + 1];
           if (next === undefined || next.startsWith("-")) {
-            throw new CliError(ExitCode.Usage, `选项 ${name} 缺少值`);
+            throw new CliError(ExitCode.Usage, `option ${name} requires a value`);
           }
           value = next;
           i += 1;
@@ -85,11 +85,11 @@ export function parseArgv(argv: string[]): { opts: GlobalOptions; positionals: s
         opts[stringKey] = value;
       } else if (boolKey !== undefined) {
         if (eq !== -1) {
-          throw new CliError(ExitCode.Usage, `布尔选项 ${name} 不接受值`);
+          throw new CliError(ExitCode.Usage, `boolean option ${name} does not take a value`);
         }
         opts[boolKey] = true;
       } else {
-        throw new CliError(ExitCode.Usage, `未知选项: ${name}`);
+        throw new CliError(ExitCode.Usage, `unknown option: ${name}`);
       }
       i += 1;
     } else {
@@ -103,47 +103,47 @@ export function parseArgv(argv: string[]): { opts: GlobalOptions; positionals: s
 export function usageText(): string {
   return `gda ${CLI_VERSION} — Godot Autopilot CLI
 
-用法:
-  gda [全局选项] <命令> [参数...]
+Usage:
+  gda [global options] <command> [args...]
 
-命令:
-  ping                测试与 MCP 服务的连通性
-  status              显示服务状态与工程信息
-  categories          列出工具类别
-  search <关键词>     搜索工具
-  describe <工具名>   显示工具详情
-  call <工具名>       调用工具
-  list                列出已启动的 Godot 进程
-  start               启动 Godot 进程
-  stop                停止 Godot 进程
-  logs                查看进程日志
+Commands:
+  ping                Check connectivity to the MCP server
+  status              Show server status and project info
+  categories          List tool categories
+  search <query>      Search tools
+  describe <tool>     Show one tool's schema and side effects
+  call <tool>         Call a tool
+  list                List running Godot instances
+  start               Start a Godot editor
+  stop                Stop a Godot editor
+  logs                Show an instance log
 
-全局选项:
-  --port <text>       MCP 服务端口（默认 9527）
-  --id <text>         目标服务实例 ID
-  --project <text>    工程路径
-  --pretty            美化 JSON 输出（缩进 2 空格）
-  --raw              原始 JSON 输出
-  --quiet            静默模式
-  --timeout <text>    调用超时（秒）
-  --category <text>   按类别过滤
-  --tags <text>       按标签过滤（逗号分隔）
-  --args <json>       工具调用参数（JSON 字符串）
-  --args-file <path>  工具调用参数（JSON 文件）
-  --save-images <dir> 保存返回的图片到本地目录
-  --godot <path>      显式指定 Godot 可执行文件（start）
-  --headless          以无头模式启动编辑器（start）
-  --play              就绪后播放当前场景（start）
-  --no-import          跳过启动时的资源导入（start）
-  --wait <sec>        就绪/停止等待秒数，0=不等待（start/stop）
-  --force             强制停止进程（stop）
-  --tail <n>          日志末尾行数（logs）
-  --help              显示本帮助
-  --version           显示版本
+Global options:
+  --port <text>       MCP server port (default 9527)
+  --id <text>         Target instance id from the registry
+  --project <text>    Project directory
+  --pretty            Pretty-print JSON output (2-space indent)
+  --raw               Raw JSON envelope output
+  --quiet             Suppress payload output
+  --timeout <text>    Call timeout in seconds
+  --category <text>   Filter search results by category
+  --tags <text>       Filter search results by tags (comma separated)
+  --args <json>       Tool arguments as a JSON string
+  --args-file <path>  Tool arguments from a JSON file
+  --save-images <dir> Write returned images to a local directory
+  --godot <path>      Explicit Godot executable (start)
+  --headless          Start the editor headless (start)
+  --play              Play the current scene once ready (start)
+  --no-import         Skip the asset import pre-step (start)
+  --wait <sec>        Readiness/stop wait in seconds, 0 = do not wait (start/stop)
+  --force             Force-stop the process (stop)
+  --tail <n>          Number of trailing log lines (logs)
+  --help              Show this help
+  --version           Show the version
 
-退出码:
-  0  成功
-  1  工具失败
-  2  传输失败
-  3  用法错误`;
+Exit codes:
+  0  success
+  1  tool failure
+  2  transport or environment failure
+  3  usage error`;
 }
