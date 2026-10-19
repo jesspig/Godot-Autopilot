@@ -1,0 +1,34 @@
+{
+  "name": "exec_budget",
+  "description": "执行预算与超时治理回归（headless）：验证 code_execute 的 timeout_ms 在脚本执行期生效。链路：① code_execute 传入死循环脚本 `while true: pass` 与 timeout_ms=300，包装脚本注入的截止时间检查点使循环在上限到达后退出，断言响应含 code 键且其值等于 exec_timeout（不挂死编辑器主线程）→ ② code_execute 传入立即返回的脚本与 timeout_ms=30000，断言 result 键存在（正常路径未被超时机制误伤）。on_failure=fail_fast：①若未返回 exec_timeout 说明超时机制失效，继续执行②会掩盖缺陷。需 code_execute 授权（GODOT_AUTOPILOT_ALLOW 或 user://godot_autopilot/config.json 的 allow 字段，env 优先）。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "fail_fast",
+    "stages": [
+      {
+        "id": "exec_budget",
+        "steps": [
+          {
+            "id": "exec_infinite_loop_times_out",
+            "tool": "code_execute",
+            "args": { "source_code": "while true: pass", "timeout_ms": 300 },
+            "expect": {
+              "has_keys": ["code"],
+              "field_checks": [
+                { "key": "code", "value": "exec_timeout" }
+              ]
+            }
+          },
+          {
+            "id": "exec_fast_script_returns_result",
+            "tool": "code_execute",
+            "args": { "source_code": "return 21 * 2", "timeout_ms": 30000 },
+            "expect": {
+              "has_keys": ["result"]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
