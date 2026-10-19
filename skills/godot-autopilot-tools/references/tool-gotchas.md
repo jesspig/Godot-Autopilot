@@ -162,9 +162,12 @@ explicitly and clamped by the tools that only read it; the low-level game
 sender also clamps every request. Either way the effective budget is at most
 25000 ms and the returned `timeout_ms` reports the clamped host wait. Longer
 work must be split into shorter calls or polled with `get_game_status`. The
-30000 ms maximum still applies to editor-only tools (code_execute,
-run_gdscript_tests, create_editor_scene and editor-target captures), which
-never round-trip through the game.
+30000 ms maximum still applies to the editor-only tools that keep a fixed
+cap (run_gdscript_tests, create_editor_scene and editor-target captures),
+which never round-trip through the game. `code_execute` is the exception:
+its ceiling follows the host's long-blocking dispatch budget, so the server
+reports the accepted maximum in the `code_execute` schema - read it there
+instead of assuming a number.
 
 ## Timeout and dispatch error codes: what to do with each
 
@@ -174,7 +177,7 @@ code, not on the message.
 
 | Code | Raised when | Retryable | What to do |
 |---|---|---|---|
-| exec_timeout | a `code_execute` script outran its `timeout_ms` | no | The script was interrupted and the work it already did is not rolled back - read the state back before retrying. Split the script into smaller pieces, or raise `timeout_ms` (max 30000 ms). |
+| exec_timeout | a `code_execute` script outran its `timeout_ms` | no | The script was interrupted and the work it already did is not rolled back - read the state back before retrying. Split the script into smaller pieces, or raise `timeout_ms` (up to the maximum the `code_execute` schema reports). |
 | eval_timeout | a game-side `eval` script outlived the host wait (25000 ms), or the editor gave up waiting for the eval answer | not immediately | The game main thread may still be running that script - a running GDScript call cannot be interrupted. Wait for the game to become responsive (`get_game_status`) before sending more work, then retry. |
 | eval_cancelled | the eval request was torn down by a cancel handle | no | The request is gone and no answer will arrive. Re-issue it if the result is still needed. |
 | main_thread_timeout | the editor main thread did not process the tool inside its dispatch budget | yes | The editor may be paused, blocked by a modal dialog, exporting or busy. Clear the blocker, then retry the same call. |
@@ -241,7 +244,7 @@ than silently dropping data.
 | Variant single string | 64 KiB | serialized Variant values |
 | Variant array elements | 10000 | arrays and packed arrays |
 | file scan | 10000 files, 2 MiB per file, 32 MiB total, depth 64 | resource/file scans |
-| default / max timeout | 5000 / 30000 ms | editor-only operations taking `timeout_ms` |
+| default / max timeout | 5000 / schema-reported max | editor-only operations taking `timeout_ms` (the `code_execute` ceiling is the one the schema reports) |
 | default / max timeout, game ops | 5000 / 25000 ms | game tools taking `timeout_ms` (host wait = `timeout_ms` + 2000 ms, below the 30 s transport) |
 
 For bulk work near any of these limits, prefer `code_execute` loops over
@@ -356,7 +359,9 @@ What that means for a caller:
   to completion, so keep the work between two checks short.
 - The work done before the interruption is not rolled back. Read the state
   back before retrying.
-- The maximum accepted `timeout_ms` is 30000 ms. To do more than that, split
+- The maximum accepted `timeout_ms` is the ceiling the `code_execute` schema
+  reports - the editor-side long-blocking budget decides it, so read it from
+  the schema instead of assuming a fixed number. To do more than that, split
   the work into several calls.
 - A script that hits the deadline returns the exec_timeout code, not a plain
   error, so it can be told apart from a compile or runtime failure.

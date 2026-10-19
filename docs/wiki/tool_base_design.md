@@ -7,7 +7,7 @@ tags:
   - 工具架构
   - ToolSpec
   - 数据化
-timestamp: "2026-10-20T02:27:22+08:00"
+timestamp: "2026-10-20T04:01:51+08:00"
 resource: src/tools/
 ---
 
@@ -15,7 +15,7 @@ resource: src/tools/
 
 > **当前 API 面（2026-10-20 复核：注册共 33 域 451 工具 + `system_status` + 7 元，catalog 共 459）**
 > `tool_spec.hpp`：`ToolSpec` 数据记录（name/description/category/tags/side_effect/flags/params/handler/raw_schema）+ `ParamSpec`（= `schema::ParamDef`）+ `tool_flags` 位标志 + `SpecTool : ToolBase, ISideEffect` + `make_spec_tool`；schema 由 `params` 经 `schema::build_schema` 派生，`raw_schema` 非空时优先。`tool_flags` 现为 9 位（09-29 新增 `kHealthProbe` 健康探针短预算 / `kLongBlocking` 长阻塞预算）。
-> `dispatch.hpp/cpp`：跨线程调用统一入口 `run_on_main_thread_with_budget` + `main_thread_wait_budget_ms`（09-29；10-20 起改 4 参，新增 `long_blocking_ms`；默认 27000ms / 健康探针 5000ms / 长阻塞常量 30000ms（经 `[1000, 29000]` 钳制后实际生效 29000ms），超时取消 + `main_thread_timeout` 结构化错误）。
+> `dispatch.hpp/cpp`：跨线程调用统一入口 `run_on_main_thread_with_budget` + `main_thread_wait_budget_ms`（09-29；10-20 起改 4 参，新增 `long_blocking_ms`；默认 27000ms / 健康探针 5000ms / 长阻塞 29000ms（常量 `GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = GDA_DISPATCH_WAIT_MAX_MS`，env `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS` 可下调至 `[1000, 29000]`），超时取消 + `main_thread_timeout` 结构化错误）。
 > `tool_args.hpp/cpp`：`Args` 取参器 + `ToolArgError`（opt_/require_/get_ 系列 + `reject_unknown`，空值视为缺失）。
 > `tool_pipeline.hpp/cpp`：`pipeline::run_post`（`SpecTool::execute` 授权门 → handler 之后的后处理：按 `kObserve` 合并编辑器截图、按 `kSceneTarget` 幂等补全场景路径）。
 > `register_all.hpp/cpp`：`build_registry` / `refresh_derived` / `refresh_dynamic_tools` / `get_active_registry`。
@@ -49,7 +49,7 @@ inline std::unique_ptr<ToolBase> make_spec_tool(ToolSpec spec);
 ```
 
 - `ParamSpec`/`schema::ParamDef` 四字段：`{name, type, description, required}`；`type` 为 JSON schema 类型字符串（`string`/`integer`/`number`/`boolean`/`object`/`array`）。
-- `tool_flags` 位标志（`tool_flags::kNone` + 9 个位）：`kMeta`（元工具归类）、`kDynamic`（用户脚本注册）、`kMutating`（改动状态，遍历排除依据）、`kObserve`（支持 `observe` 参数合并截图）、`kCaptureImage`（图片附件判定）、`kSceneTarget`（成功响应幂等补全场景路径）、`kUndoable`（纯标记）、`kHealthProbe`（09-29 新增，健康探针：`ping`/`system_status`，主线程等待用 5000ms 短预算）、`kLongBlocking`（09-29 新增，长阻塞：`code_execute`/`batch_execute`，主线程等待用长阻塞预算，常量 `GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = 30000ms`、经 `[1000, 29000]` 钳制后实际生效 29000ms）。收编终态（2026-10-20 按 451 个 `ToolSpec` 块逐块统计，口径为「有多少个工具声明了该 flag」）：`kSceneTarget` 42 工具 / `kUndoable` 24 工具 / `kCaptureImage` 9 工具 / `kObserve` 7 工具 / `kMutating` 100 工具 / `kNone` 347 工具（详见下节 traits 小节）。
+- `tool_flags` 位标志（`tool_flags::kNone` + 9 个位）：`kMeta`（元工具归类）、`kDynamic`（用户脚本注册）、`kMutating`（改动状态，遍历排除依据）、`kObserve`（支持 `observe` 参数合并截图）、`kCaptureImage`（图片附件判定）、`kSceneTarget`（成功响应幂等补全场景路径）、`kUndoable`（纯标记）、`kHealthProbe`（09-29 新增，健康探针：`ping`/`system_status`，主线程等待用 5000ms 短预算）、`kLongBlocking`（09-29 新增，长阻塞：`code_execute`/`batch_execute`，主线程等待用长阻塞预算，常量 `GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = 29000ms`（= `GDA_DISPATCH_WAIT_MAX_MS`，env `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS` 可下调至 `[1000, 29000]`））。收编终态（2026-10-20 按 451 个 `ToolSpec` 块逐块统计，口径为「有多少个工具声明了该 flag」）：`kSceneTarget` 42 工具 / `kUndoable` 24 工具 / `kCaptureImage` 9 工具 / `kObserve` 7 工具 / `kMutating` 100 工具 / `kNone` 347 工具（详见下节 traits 小节）。
 - 域侧写法：`const std::vector<ParamSpec> kXxxParams = {...};` 参数表与工具名一一对应，`make_tools()` 中 `v.push_back(make_spec_tool(ToolSpec{name, description, category, {tags}, side_effect, flags, kXxxParams, handler}))`（`side_effect` 取 `SideEffect` 枚举 8 值，见 [安全边界与并发契约](security_contract.md)）。
 
 ## SpecTool 与执行管线
@@ -78,15 +78,17 @@ class SpecTool : public ToolBase, public ISideEffect {
 
 `SpecTool::execute()` 在非主线程被调用时，由 `dispatch::call_handler` 经 `run_on_main_thread_with_budget` 统一入口路由到 Godot 主线程（`call_tool` 代理与直连 meta 工具共用同入口；`call_tool` 编排回调自身仍在 MCP 线程执行）。等待预算由 `dispatch::main_thread_wait_budget_ms(flags, default_ms, health_ms, long_blocking_ms)` 决策（2026-10-20 起为 **4 参**，较原 3 参新增 `long_blocking_ms`）：
 
-- `kLongBlocking`（`code_execute`/`batch_execute`）→ 长阻塞预算，常量 `GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = 30000ms`（env `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS`），经 `env_int_clamped` 钳制在 `[1000, 29000]`（钳制上限常量 `kDispatchWaitMaxMs = 29000`，`dispatch.cpp:149`）——**钳制上限优先于回退常量，未设环境变量时实际生效 29000ms**；**不再返回 0（无限等待）**；参数非正时回退默认预算（`dispatch.cpp:294-296`）；
+- `kLongBlocking`（`code_execute`/`batch_execute`）→ 长阻塞预算，常量 `GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = 29000ms`（= `GDA_DISPATCH_WAIT_MAX_MS`，env `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS`），经 `env_int_clamped` 钳制在 `[1000, 29000]`（`dispatch.cpp:148-165`）——**未设环境变量时生效 29000ms，设了则可下调**；**不再返回 0（无限等待）**；参数非正时回退默认预算（`dispatch.cpp:291-292`）；
 - `kHealthProbe`（`ping`/`system_status`）→ 健康预算，默认 `GDA_DISPATCH_WAIT_HEALTH_MS = 5000ms`（env `GODOT_AUTOPILOT_HEALTH_TIMEOUT_MS`）；
 - 其余工具 → 默认预算 `GDA_DISPATCH_WAIT_DEFAULT_MS = 27000ms`（env `GODOT_AUTOPILOT_DISPATCH_TIMEOUT_MS`，`static_assert` 低于 `GDA_TRANSPORT_TIMEOUT_MS = 30000`，保证超时错误能送达客户端）。
 
+**`code_execute` 的 `timeout_ms` 上界与派发预算同源（10-20 起）**：上界不是写死的字面量，而是由 `code_exec_ops::max_timeout_ms()`（`src/tools/code_exec_ops.cpp:464-470`）在运行期算出——取 `min(GDA_CODE_EXEC_MAX_TIMEOUT_MS = 27000, 生效长阻塞派发预算)`；生效派发预算默认 29000ms（`src/tools/dispatch.cpp:280-286`），故默认环境下上界为 **27000ms**；若 `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS` 把预算下调，上界随之下调。派发侧余量 2000ms（`GDA_CODE_EXEC_BUDGET_MARGIN_MS`，`src/core/config.hpp:46`）保证脚本 deadline 先于派发预算到期，传输侧余量 2000ms（`GDA_CODE_EXEC_TRANSPORT_MARGIN_MS`，`src/core/config.hpp:47`）保证结构化超时结果能在传输硬超时前回到客户端。该值有三处消费且都取自同一实现点：handler 的参数校验（`code_exec_ops.cpp:963-973`）、schema 的 `maximum`（`register_all.cpp:568-577`）、提示词的「最大 …ms」拼串（`prompt_tool_usage.cpp:504`）。
+
 等待超时：先 `CommandQueue::cancel(id)`（命中表示任务尚未执行、不会执行；未命中表示已被主线程取走），然后返回结构化错误——`error`（含 waited_ms/队列诊断与"retry、健康预算"提示）、`code="main_thread_timeout"`、`retryable=true`、`tool`、`waited_ms`、`queue_depth`、`oldest_pending_ms`、`last_drain_age_ms`、`cancelled`；`false` 与否来自 `cancel` 命中，并直写一条 `type=dispatch_timeout` trace（`LogPersist::write_trace_now`）与 Transport Warning。队列满/关闭时返回 `queue_unavailable`（不进入等待）。
 
-**超时执行路径（2026-10-20 新增）**：`CommandQueue` 新增 `submit_tracked_bounded(Fn, budget_ms)`（`src/core/command_queue.hpp:260`），在提交侧即以预算轮询 future，超时自动 `cancel(id)` 并回填 `TrackedSubmission` 新增的 `timed_out`/`waited_ms`/`cancelled` 三个字段（原 `TrackedSubmission` 只有 `id` + `future`）；`dispatch::run_bounded_on_main_thread`（`src/tools/dispatch.hpp:45-64`）以此为底座，回填 `BoundedWaitOutcome{ok,timed_out,cancelled,waited_ms,error}`。编辑器内 GDScript 协作式超时时另走 `dispatch::exec_timeout_result(timeout_ms, execution_time_ms)`，返回 `code="exec_timeout"`（`code_execute` 的 `run_with_timeout` 命中超时后调用，`code_exec_ops.cpp:977-982`）；游戏侧 eval 超时统一为 `code="eval_timeout"`（编辑器侧等待超时与游戏侧协作式截止两处均产出该码，见 [入口与运行时](modules/entry_runtime.md)）。
+**超时执行路径（2026-10-20 新增）**：`CommandQueue` 新增 `submit_tracked_bounded(Fn, budget_ms)`（`src/core/command_queue.hpp:260`），在提交侧即以预算轮询 future，超时自动 `cancel(id)` 并回填 `TrackedSubmission` 新增的 `timed_out`/`waited_ms`/`cancelled` 三个字段（原 `TrackedSubmission` 只有 `id` + `future`）；`dispatch::run_bounded_on_main_thread`（`src/tools/dispatch.hpp:45-64`）以此为底座，回填 `BoundedWaitOutcome{ok,timed_out,cancelled,waited_ms,error}`。编辑器内 GDScript 协作式超时时另走 `dispatch::exec_timeout_result(timeout_ms, execution_time_ms)`，返回 `code="exec_timeout"`（`code_execute` 的 `run_with_timeout` 命中超时后调用，`code_exec_ops.cpp:994-995`）；游戏侧 eval 超时统一为 `code="eval_timeout"`（编辑器侧等待超时与游戏侧协作式截止两处均产出该码，见 [入口与运行时](modules/entry_runtime.md)）。
 
-L1 `dispatch_budget_test` 覆盖预算决策与队列不可用返回 **11 项**（`tests/unit/dispatch_budget_test.cpp` 实测 `TEST` 宏计数）。
+L1 `dispatch_budget_test` 覆盖预算决策与队列不可用返回 **14 项**，另有 `dispatch_queue_unavailable_test` 覆盖无编辑器队列时的返回 **3 项**（均为 `tests/unit/` 下 `TEST` 宏逐行计数）。
 
 ## 执行埋点与可重放 trace（09-20 新增）
 

@@ -52,6 +52,7 @@
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <utility>
 #ifdef GetObject
 #undef GetObject
@@ -564,10 +565,16 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
         fn["description"] = mcp::JsonValue("Function name to call (default: _run)");
         props["function_name"] = std::move(fn);
         mcp::JsonValue tm(mcp::JsonValue::object_tag);
+        const int64_t code_exec_max_timeout_ms =
+            static_cast<int64_t>(code_exec_ops::max_timeout_ms());
+        const int64_t code_exec_default_timeout_ms =
+            code_exec_max_timeout_ms < 5000 ? code_exec_max_timeout_ms : 5000;
         tm["type"] = mcp::JsonValue("integer");
-        tm["description"] = mcp::JsonValue("Execution timeout in milliseconds (max 30000)");
-        tm["default"] = mcp::JsonValue(static_cast<int64_t>(5000));
-        tm["maximum"] = mcp::JsonValue(static_cast<int64_t>(30000));
+        tm["description"] = mcp::JsonValue(
+            "Execution timeout in milliseconds (max " +
+            std::to_string(code_exec_max_timeout_ms) + ")");
+        tm["default"] = mcp::JsonValue(code_exec_default_timeout_ms);
+        tm["maximum"] = mcp::JsonValue(code_exec_max_timeout_ms);
         props["timeout_ms"] = std::move(tm);
         mcp::JsonValue ao(mcp::JsonValue::object_tag);
         ao["type"] = mcp::JsonValue("boolean");

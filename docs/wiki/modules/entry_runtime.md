@@ -6,7 +6,7 @@ tags:
   - 模块
   - 入口
   - 运行时桥接
-timestamp: "2026-10-20T02:27:22+08:00"
+timestamp: "2026-10-20T04:01:51+08:00"
 resource:
   - src/main.cpp
   - src/runtime/
@@ -16,8 +16,10 @@ resource:
 
 > 09-18 E2E 优化批次增补（详见 `changelog/2026-09-18-log.md` 19:30 节）：`call_method` native 失败路径附加 `diagnosis` + `hint`（`game_bridge_eval.cpp:534 eval_bind_suspected_cause` / `:553 make_native_bind_diagnosis`，成功路径零改动）；新增 `gda_protocol.hpp` 4 个 op（`eval_assert`/`sample`/`collect_evidence`/`validate_ui_layout`）与 `game_bridge_verify.cpp`（采样 awaiter + 校验类注册）。
 > 09-21 可重放监控与日志系统批次增补：`_enter_tree` 入口顺序增 `monitor::lifecycle("plugin_enter_tree")` → `perf_sampler::set_queue(&queue())` →（`s_queue.open()` 之后）`LogPersist::init_session()` → `monitor::environment_snapshot()`；`_process` 增 `perf_sampler::tick(delta)`；新 lifecycle 事件 `plugin_enter_tree`/`tools_singleton_registered`/`server_ready`/`plugin_ready`/`plugin_exit_tree`/`scene_level_initialized`/`editor_level_initialized`/`editor_level_terminated`/`scene_level_terminated`，server 启动失败发 `error_event`。
-> 09-29 B1–B7 修复批次增补：`gda_protocol.hpp` 新增 `GDA_OP_SCENE_TREE = "scene_tree"`（游戏侧 8 action：set_pause/is_paused/reload_current_scene/set_debug_collisions_hint/call_group/notify_group/get_nodes_in_group/create_timer），编辑器侧 8 个 SceneTree 工具改为向游戏进程转发；游戏通道就绪窗口：`wait_ready`（默认 true）在无 ready 会话时把请求排队、收到 `gda:ready` 后自动重放（决策表 `src/tools/ready_policy.hpp`，重放 `on_session_ready`）；`debugger_active_session_count` 只计 `is_active()` 会话（修复无 peer 的常驻会话被计入）；`op_eval_script` 两次尝试（原样编译失败且无顶层函数定义时自动包装裸语句重试，成功响应带 `wrapped:true`）；非主线程调用统一经 `dispatch::run_on_main_thread_with_budget`（默认 27000ms / 健康探针 5000ms / 长阻塞常量 30000ms（经 `[1000, 29000]` 钳制后实际生效 29000ms），超时取消 + `main_thread_timeout`）。
+> 09-29 B1–B7 修复批次增补：`gda_protocol.hpp` 新增 `GDA_OP_SCENE_TREE = "scene_tree"`（游戏侧 8 action：set_pause/is_paused/reload_current_scene/set_debug_collisions_hint/call_group/notify_group/get_nodes_in_group/create_timer），编辑器侧 8 个 SceneTree 工具改为向游戏进程转发；游戏通道就绪窗口：`wait_ready`（默认 true）在无 ready 会话时把请求排队、收到 `gda:ready` 后自动重放（决策表 `src/tools/ready_policy.hpp`，重放 `on_session_ready`）；`debugger_active_session_count` 只计 `is_active()` 会话（修复无 peer 的常驻会话被计入）；`op_eval_script` 两次尝试（原样编译失败且无顶层函数定义时自动包装裸语句重试，成功响应带 `wrapped:true`）；非主线程调用统一经 `dispatch::run_on_main_thread_with_budget`（默认 27000ms / 健康探针 5000ms / 长阻塞 29000ms（常量 `GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = GDA_DISPATCH_WAIT_MAX_MS`，env `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS` 可下调至 `[1000, 29000]`），超时取消 + `main_thread_timeout`）。
 > 10-20 知识库事实描述页收敛批次增补：文件行数全部重测并给「总行数 / 有效代码行」两个口径（原 392/58/99/1890/1105 一律过期）；运行时桥接由「三文件」更正为**四文件**（`game_bridge.cpp`/`_input`/`_eval`/`_verify`），并补写 §3.4 `game_bridge_verify.cpp`；`register_listener()` 注册的桥接类 7 → **10** 个（input 组 5 个、verify 组 1 个、`GameBridgeCaptureAwaiter`/`GameBridgeClickPair` 此前漏计）；编辑器侧 `ClassDB::register_class` 注册 4 → **5** 个类（补 `AutopilotTools`）；游戏侧 eval 新增**协作式截止时间**（宿主上限 `GDA_MAX_GAME_OP_TIMEOUT_MS = 25000ms`，`timeout_ms` 缺省 5000 并向上钳制）与统一错误码 `eval_timeout` / `eval_cancelled`；`main_thread_wait_budget_ms` 由 3 参改 **4 参**（新增 `long_blocking_ms`），长阻塞工具不再无限等待；GDA 协议仍由 EngineDebugger 消息通道承载（`gda:request`/`gda:response`/`gda:ready`），**无版本字段、无鉴权**；`main.cpp` 行号漂移修正（入口点 `:319-392`、收尾 flush `:315`、`gda_cmdline_mode` `:52-60`、队列 open `:113`、注入 editor queue `:141-142`）。
+
+> 10-20 随 `code_execute` 超时上限收敛批次增补：长阻塞派发预算收敛为**单值 29000ms**（`GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = GDA_DISPATCH_WAIT_MAX_MS`，删去「常量 30000 / 实际生效 29000」双值写法）；`code_execute` 的 `timeout_ms` 参数上界与该预算同源——取 `min(GDA_CODE_EXEC_MAX_TIMEOUT_MS = 27000, 生效长阻塞预算)`，默认环境下 27000ms，由 `code_exec_ops::max_timeout_ms()` 单一来源给出；队列缺失/关闭/满时返回结构化 `queue_unavailable` 错误。
 
 覆盖代码：`src/main.cpp`（392 行 / 353 有效代码行）与 `src/runtime/`（`gda_protocol.hpp` 58 行 / 47 有效、`game_bridge.hpp` 99 行 / 59 有效、`game_bridge.cpp` 1964 行 / 1850 有效（09-16 增窗口坐标换算、09-29 增 SceneTree op 分派）、`game_bridge_input.cpp` 1091 行 / 1005 有效（09-16 删本地键名表约 60 行、改调共用判定）、`game_bridge_eval.cpp` 1227 行 / 1153 有效（10-20 增 eval 宿主截止时间与 `eval_timeout`/`eval_cancelled`）、`game_bridge_verify.cpp` 798 行 / 754 有效）。
 
@@ -81,7 +83,9 @@ resource:
 
 ### 1.6 主线程等待预算（09-29 起，dispatch.cpp）
 
-非主线程的领域工具调用统一经 `dispatch::run_on_main_thread_with_budget` 入口等待主线程（`call_tool` 代理与直连 meta 工具共用同一入口；`call_tool` 编排回调自身仍在 MCP 线程执行）：预算由 `dispatch::main_thread_wait_budget_ms(flags, default_ms, health_ms, long_blocking_ms)` 决策（**2026-10-20 起为 4 参**，较原 3 参新增 `long_blocking_ms`）——`kLongBlocking`（`code_execute`/`batch_execute`）用长阻塞预算，常量 `GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = 30000ms`（env `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS`，经 `env_int_clamped` 钳制在 `[1000, 29000]`、钳制上限常量 `kDispatchWaitMaxMs = 29000`，**未设环境变量时实际生效 29000ms**；**不再是无界等待**；参数非正时回退默认预算）、`kHealthProbe`（`ping`/`system_status`）用健康预算（默认 5000ms，env `GODOT_AUTOPILOT_HEALTH_TIMEOUT_MS`）、其余用默认预算（27000ms，env `GODOT_AUTOPILOT_DISPATCH_TIMEOUT_MS`，`static_assert` 低于 `GDA_TRANSPORT_TIMEOUT_MS=30000`）。超时时先 `cancel(id)` 取消未执行任务，再返回结构化 `main_thread_timeout` 错误（含 `retryable`/`tool`/`waited_ms`/`queue_depth`/`oldest_pending_ms`/`last_drain_age_ms`/`cancelled`），同时直写一条 trace 与 Transport Warning。
+非主线程的领域工具调用统一经 `dispatch::run_on_main_thread_with_budget` 入口等待主线程（`call_tool` 代理与直连 meta 工具共用同一入口；`call_tool` 编排回调自身仍在 MCP 线程执行）：预算由 `dispatch::main_thread_wait_budget_ms(flags, default_ms, health_ms, long_blocking_ms)` 决策（**2026-10-20 起为 4 参**，较原 3 参新增 `long_blocking_ms`）——`kLongBlocking`（`code_execute`/`batch_execute`）用长阻塞预算，常量 `GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = 29000ms`（= `GDA_DISPATCH_WAIT_MAX_MS`，env `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS`，经 `env_int_clamped` 钳制在 `[1000, 29000]`，**未设环境变量时生效 29000ms、设了可下调**；**不再是无界等待**；参数非正时回退默认预算）、`kHealthProbe`（`ping`/`system_status`）用健康预算（默认 5000ms，env `GODOT_AUTOPILOT_HEALTH_TIMEOUT_MS`）、其余用默认预算（27000ms，env `GODOT_AUTOPILOT_DISPATCH_TIMEOUT_MS`，`static_assert` 低于 `GDA_TRANSPORT_TIMEOUT_MS=30000`）。超时时先 `cancel(id)` 取消未执行任务，再返回结构化 `main_thread_timeout` 错误（含 `retryable`/`tool`/`waited_ms`/`queue_depth`/`oldest_pending_ms`/`last_drain_age_ms`/`cancelled`），同时直写一条 trace 与 Transport Warning；队列满/关闭时返回 `code="queue_unavailable"`（`retryable=true`）。
+
+`code_execute` 的 `timeout_ms` 参数上界与长阻塞预算同源：`code_exec_ops::max_timeout_ms()` 取 `min(GDA_CODE_EXEC_MAX_TIMEOUT_MS = 27000, 本节生效的长阻塞预算)`，默认环境下为 27000ms；该值同时写入 schema 的 `maximum` 与提示词，详见 [工具数据层与执行管线](../tool_base_design.md)。
 
 ## 2. GDA 协议常量（gda_protocol.hpp）
 
@@ -211,7 +215,7 @@ resource:
 
 - AGENTS.md "入口点：src/main.cpp → GDExtensionEntryPoint → 注册 GodotAutopilotPlugin 并启动 ServerContext"：方向正确，但**严格说 ServerContext 不是入口点启动的**——`GDExtensionEntryPoint` 只做类注册与 `add_by_type`，插件实例由 Godot 创建后在其 `_enter_tree()` 中才 `new ServerContext` 并 `start()`（main.cpp:196-216）。实际链为：入口点 → 注册插件类型 → Godot 实例化 → `_enter_tree` → ServerContext 启动。
 - AGENTS.md "在 MODULE_INITIALIZATION_LEVEL_EDITOR 阶段加载到 Godot 编辑器"：编辑器侧类确在 EDITOR 级别注册；但运行时桥接 `register_listener` 注册在 **SCENE 级别**且仅非编辑器进程，属补充事实而非矛盾。
-- AGENTS.md 线程模型 "HTTP 线程 → CommandQueue::submit() → 主线程 _process() 排空"：与 `_process()` 中 `s_queue.drain()` 一致；09-20 起 `_process` 在 `drain()` 之前先执行 `LogPersist::flush_on_main_thread()`（本地持久化写盘同走主线程，不排队列），09-21 起再在其前执行 `perf_sampler::tick(delta)`（周期采样与请求超时看门狗）；09-29 起 `dispatch` 为跨线程调用设主线程等待预算（默认 27000ms、健康探针 5000ms、长阻塞常量 30000ms 经 `[1000, 29000]` 钳制后实际生效 29000ms），超时取消并返回 `main_thread_timeout`（见 §1.6）。
+- AGENTS.md 线程模型 "HTTP 线程 → CommandQueue::submit() → 主线程 _process() 排空"：与 `_process()` 中 `s_queue.drain()` 一致；09-20 起 `_process` 在 `drain()` 之前先执行 `LogPersist::flush_on_main_thread()`（本地持久化写盘同走主线程，不排队列），09-21 起再在其前执行 `perf_sampler::tick(delta)`（周期采样与请求超时看门狗）；09-29 起 `dispatch` 为跨线程调用设主线程等待预算（默认 27000ms、健康探针 5000ms、长阻塞 29000ms（常量 `GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = GDA_DISPATCH_WAIT_MAX_MS`，env `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS` 可下调）），超时取消并返回 `main_thread_timeout`（见 §1.6）。
 - AGENTS.md 错误模式 `{"error": "..."}`：桥接层 `error_result` 同构；差异是桥接响应额外带布尔 `ok` 字段。
 - `game_*` 工具（get_game_status/queue_game_input/capture_game_viewport 等）正是本页桥接 op 在 MCP 工具侧的封装（原 Example/docs/architecture.md 已随 2026-09-13 Example 文档重构删除，不再作为对照基线）。
 

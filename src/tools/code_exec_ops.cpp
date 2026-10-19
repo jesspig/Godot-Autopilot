@@ -39,10 +39,10 @@ using namespace godot_autopilot;
 namespace {
 
 constexpr int CODE_EXEC_DEFAULT_TIMEOUT_MS = 5000;
-constexpr int CODE_EXEC_MAX_TIMEOUT_MS =
-    static_cast<int>(GDA_DISPATCH_WAIT_LONG_BLOCKING_MS);
-static_assert(GDA_DISPATCH_WAIT_LONG_BLOCKING_MS <=
-                  static_cast<int64_t>(std::numeric_limits<int>::max()),
+static_assert(GDA_CODE_EXEC_MAX_TIMEOUT_MS <=
+                      static_cast<int64_t>(std::numeric_limits<int>::max()) &&
+                  GDA_DISPATCH_WAIT_MAX_MS <=
+                      static_cast<int64_t>(std::numeric_limits<int>::max()),
               "the code_execute timeout ceiling must stay inside int range");
 
 struct UndoHistorySnapshot {
@@ -460,6 +460,14 @@ mcp::JsonValue build_exec_result(ExecContext &ctx) {
 
 namespace godot_autopilot {
 namespace code_exec_ops {
+
+int max_timeout_ms() {
+  const int64_t budget = dispatch::dispatch_wait_long_blocking_ms();
+  const int64_t ceiling = budget < GDA_CODE_EXEC_MAX_TIMEOUT_MS
+                               ? budget
+                               : GDA_CODE_EXEC_MAX_TIMEOUT_MS;
+  return static_cast<int>(ceiling);
+}
 
 mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -952,17 +960,17 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue &args) {
     ctx.func_name = fn->GetString();
   }
 
+  const int max_timeout = max_timeout_ms();
   ctx.timeout_ms = CODE_EXEC_DEFAULT_TIMEOUT_MS;
   if (auto *tm = args.Find("timeout_ms")) {
-    if (!tm->IsInt() || tm->GetInt() <= 0 ||
-        tm->GetInt() > CODE_EXEC_MAX_TIMEOUT_MS)
+    if (!tm->IsInt() || tm->GetInt() <= 0 || tm->GetInt() > max_timeout)
       return util::error_json("timeout_ms must be an integer between 1 and " +
-                               std::to_string(CODE_EXEC_MAX_TIMEOUT_MS));
+                               std::to_string(max_timeout));
     ctx.timeout_ms = static_cast<int>(tm->GetInt());
   }
   if (ctx.timeout_ms <= 0)
     ctx.timeout_ms = CODE_EXEC_DEFAULT_TIMEOUT_MS;
-  ctx.timeout_ms = std::min(ctx.timeout_ms, CODE_EXEC_MAX_TIMEOUT_MS);
+  ctx.timeout_ms = std::min(ctx.timeout_ms, max_timeout);
 
   ctx.auto_owner = true;
   if (auto *ao = args.Find("auto_owner")) {

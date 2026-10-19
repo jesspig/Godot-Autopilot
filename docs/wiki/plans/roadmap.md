@@ -6,13 +6,13 @@ tags:
   - 规划
   - 竞品对齐
   - 工具扩展
-timestamp: "2026-10-20T02:55:00+08:00"
+timestamp: "2026-10-20T04:01:51+08:00"
 resource: src/
 ---
 
 # 竞品对齐路线图
 
-> 记录 2026-08 功能分支 `feature/engine-aware-fs-and-tool-expansion` 的竞品对齐批次（P0/P1/P2 已交付）与后续 P3 方向，工具侧实现细节见 [工具注册表](../modules/tools_registry.md)，运行时协议见 [入口与运行时](../modules/entry_runtime.md)。**当前口径（2026-10-20）**：域工具 **451**（27 类 / 33 个源模块）、catalog 条目 459、MCP 可达 458、schema 基线 459 = 393 非空 + 66 空、遍历枚举 452 / 排除 111 / 候选 341、L1 **458** 个 gtest（43 个 unit 文件）、L2 **41** 份用例、守卫与脚本 6 项、**ctest 注册点 505**（458 + 41 + 6）、技能书 9 册 / 34 文件、根 `CMakeLists.txt` 的 `add_library` 收录 **93** 个 `.cpp`；各项的权威核算口径见 [测试体系](../tests.md) 的数值核算总表。下列各节的批次内计数是**该批次交付当时的增量**，不代表当前值。
+> 记录 2026-08 功能分支 `feature/engine-aware-fs-and-tool-expansion` 的竞品对齐批次（P0/P1/P2 已交付）与后续 P3 方向，工具侧实现细节见 [工具注册表](../modules/tools_registry.md)，运行时协议见 [入口与运行时](../modules/entry_runtime.md)。**当前口径（2026-10-20）**：域工具 **451**（27 类 / 33 个源模块）、catalog 条目 459、MCP 可达 458、schema 基线 459 = 393 非空 + 66 空、遍历枚举 452 / 排除 111 / 候选 341、L1 **467** 个 gtest（44 个 unit 文件）、L2 **41** 份用例、守卫与脚本 6 项、**ctest 注册点 514**（467 + 41 + 6）、技能书 9 册 / 34 文件、根 `CMakeLists.txt` 的 `add_library` 收录 **93** 个 `.cpp`；各项的权威核算口径见 [测试体系](../tests.md) 的数值核算总表。下列各节的批次内计数是**该批次交付当时的增量**，不代表当前值。
 
 ## 竞品全景（一行定位速记）
 
@@ -40,7 +40,7 @@ resource: src/
 - **错误水印 doorbell**：所有 MCP 响应顶层附 `new_errors_since_last_call`（一次性消费）；编辑器侧计 error 结果、游戏侧计 runtime_error（`src/core/error_watermark.hpp`）
 - **undo 接入**：create/delete/rename/reparent 场景节点全走 `EditorUndoRedoManager`（响应带 `undoable` 字段）；`property_set` 可撤销（Object 型值降级 `undoable:false`）；`batch_execute` 新增 `rollback_on_error`（按 EditorUndoRedo version 差值整批撤销）
 - **readiness 门控**（`src/core/editor_readiness.{hpp,cpp}`）：导入/扫描进行中时 reimport 类调用返回 `retryable:true` 软错误（retry_after_ms=500），scan 幂等跳过
-- **`code_execute` timeout 上限 30000ms**（越界值直接报错而非静默接受；此前 schema 声称上限但实现未校验）
+- **`code_execute` timeout 上界与派发预算同源**（越界值直接报错而非静默接受；此前 schema 声称上限但实现未校验）——上界取 `min(GDA_CODE_EXEC_MAX_TIMEOUT_MS = 27000, 生效长阻塞派发预算)`，默认环境下 27000ms，由 `code_exec_ops::max_timeout_ms()` 单一来源给出
 - **BM25 中文检索**：分词器支持 CJK bigram（`src/util/bm25_index.cpp`），`search_tools` 中文查询可用
 - **`capture_editor_viewport` target='game' 接通**：08-24 初始接通；09-13 下午改为非阻塞 pending 协议——返回 `{"__gda_pending": id, "timeout_ms": ...}`，由 `call_tool` 等待并经 `finalize_capture_response` 定型（阻塞式 `runtime_ops::game_capture_blocking` 已删除），`timeout_ms` 参数保留（默认 5000、钳制 30000）
 
@@ -115,7 +115,7 @@ resource: src/
 
 ## 已交付：执行预算与契约治理（10-20）
 
-- **执行预算与超时治理**：`kLongBlocking` 由「无限等待」改为长阻塞预算档（常量 30000，经 `[1000, 29000]` 钳制后**实际生效 29000ms**，env `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS` 可覆盖）；`CommandQueue::execute_sync` 在 `src/` 内已无调用点，资源 / 提示词 / 动态工具 / 游戏通道的等待全部改走带预算的 `submit_tracked_bounded`；新增 `code_execute` 协作式执行期超时（`code="exec_timeout"`）与游戏侧 eval 超时 / 取消（`eval_timeout` / `eval_cancelled`）。
+- **执行预算与超时治理**：`kLongBlocking` 由「无限等待」改为长阻塞预算档（常量 `GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = GDA_DISPATCH_WAIT_MAX_MS` = 29000，env `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS` 可下调至 `[1000, 29000]`）；`code_execute` 的 `timeout_ms` 上界取 `min(27000, 生效长阻塞派发预算)`（`code_exec_ops::max_timeout_ms()` 单一来源，schema `maximum` 与提示词同源）；`CommandQueue::execute_sync` 在 `src/` 内已无调用点，资源 / 提示词 / 动态工具 / 游戏通道的等待全部改走带预算的 `submit_tracked_bounded`；新增 `code_execute` 协作式执行期超时（`code="exec_timeout"`）与游戏侧 eval 超时 / 取消（`eval_timeout` / `eval_cancelled`）；无编辑器队列时返回 `queue_unavailable` 结构化错误。
 - **工具契约强制**：`code_execute` 与 `batch_execute` 的 `side_effect` 由 `None` 改为 `CodeExecute`——**`batch_execute` 由此受 `code_execute` 能力门保护，属对外行为变更**；能力门判定去掉工具名特判，只按 `side_effect` 统一判定；`side_effect_name(None)` 由空串改为 `"none"`，任何工具的 `side_effect` 都非空（L1 + L2 双层断言锁定）。
 - **主线程契约守卫**：新增 `tests/guard/main_thread_guard.py` 并注册 ctest 用例；trace 截图落盘与轨迹写盘统一到主线程持锁通道；`ExportGuard` 改实例级标志并补齐异常安全复位，导出期拒绝覆盖工具调用 / MCP 资源 / MCP 提示词三类入口。
 - **发布产物完整性**：新增 `scripts/test_package_integrity.py`（三平台库 / C# 桥源码 / gdextension 条目 / 无 `.pdb`）并接入 CI 构建后与发布前；`addons.zip` 纳入 C# 桥源码并统一两条打包路径口径。

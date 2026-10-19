@@ -25,6 +25,8 @@ void clear_handlers();
 int64_t main_thread_wait_budget_ms(uint32_t tool_flags, int64_t default_ms,
                                    int64_t health_ms, int64_t long_blocking_ms);
 
+int64_t dispatch_wait_long_blocking_ms();
+
 std::string main_thread_timeout_message(const std::string &label,
                                         int64_t waited_ms, bool cancelled);
 

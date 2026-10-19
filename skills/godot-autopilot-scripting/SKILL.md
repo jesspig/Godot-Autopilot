@@ -38,7 +38,7 @@ Details in `references/execution-gotchas.md`.
 | `execute_script` | editor process, synchronous | no | none - long code blocks the editor | editor automation with `SceneRoot` access |
 | `call_script_node` | an existing node instance in the edited scene | yes | default tool timeout | calling one method with real instance state |
 | `execute_game_script` | the running game process | no | `timeout_ms` default 5000, cap 25000 | game-state queries and mutations |
-| `code_execute` | editor process, wrapped temporary node | wrapped for you | `timeout_ms`, default 5000, cap 30000 | loops, bulk edits, computed results |
+| `code_execute` | editor process, wrapped temporary node | wrapped for you | `timeout_ms`, default 5000, cap reported by the schema | loops, bulk edits, computed results |
 
 All four execute arbitrary GDScript and are treated as highest-risk side effects.
 
@@ -73,7 +73,7 @@ Pass `function_name` set to build_report to select it.
 
 - Write `func ` with a trailing space: `func` followed by a tab or `(` does not select multi-function mode and is rejected inside single-function mode.
 - Indentation (tabs or spaces) is auto-detected per source; mixing both aborts with an error.
-- `timeout_ms` defaults to 5000 and is clamped to 30000. The check runs once before execution: synchronous GDScript cannot be interrupted, so an infinite loop still blocks the editor until it returns.
+- `timeout_ms` defaults to 5000 and is clamped to the maximum the `code_execute` schema reports - that ceiling follows the host's long-blocking dispatch budget and can be lowered per deployment, so read it from the schema rather than assuming a fixed number. The deadline is injected into the script and checked while it runs, so a long loop is interrupted once the deadline passes.
 - A source calling `close_scene(` is rejected outright - it would destroy the node executing the code and crash the editor. Use `close_editor_scene` to close scenes.
 - `SceneRoot` is injected as the edited scene root; the wrapper node itself lives under /root, so scene nodes are reachable only through SceneRoot.get_node(...).
 - Node cleanup: with `auto_owner`=true, nodes created during execution get their owner assigned recursively and survive (reported in auto_owner_set); with false, newly created ownerless children are deleted after the run.
