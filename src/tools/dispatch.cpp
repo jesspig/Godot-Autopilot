@@ -330,6 +330,18 @@ mcp::JsonValue main_thread_timeout_result(const std::string &label,
   return result;
 }
 
+mcp::JsonValue exec_timeout_result(int64_t timeout_ms,
+                                   int64_t execution_time_ms) {
+  mcp::JsonValue result(mcp::JsonValue::object_tag);
+  result["error"] = mcp::JsonValue("execution timed out after " +
+                                   std::to_string(timeout_ms) + " ms");
+  result["code"] = mcp::JsonValue("exec_timeout");
+  result["retryable"] = mcp::JsonValue(false);
+  result["execution_time_ms"] = mcp::JsonValue(execution_time_ms);
+  result["timeout_ms"] = mcp::JsonValue(timeout_ms);
+  return result;
+}
+
 mcp::JsonValue run_on_main_thread_with_budget(
     CommandQueue &queue, const std::string &tool_name, uint32_t flags,
     std::function<mcp::JsonValue()> fn) {

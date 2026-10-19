@@ -31,6 +31,9 @@ std::string main_thread_timeout_message(const std::string &label,
 mcp::JsonValue main_thread_timeout_result(const std::string &label,
                                           int64_t waited_ms, bool cancelled);
 
+mcp::JsonValue exec_timeout_result(int64_t timeout_ms,
+                                   int64_t execution_time_ms);
+
 struct BoundedWaitOutcome {
   bool ok = false;
   bool timed_out = false;

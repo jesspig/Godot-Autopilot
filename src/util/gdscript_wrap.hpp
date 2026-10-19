@@ -3,8 +3,10 @@
 
 #include <cctype>
 #include <cstddef>
+#include <cstdint>
 #include <sstream>
 #include <string>
+#include <vector>
 
 namespace godot_autopilot {
 namespace gdscript_wrap {
@@ -347,6 +349,220 @@ inline std::string map_error_line_numbers(const std::string &error_text,
     pos = num_end;
   }
   return mapped;
+}
+
+constexpr const char *DEADLINE_CONST_NAME = "__gda_deadline_ms";
+constexpr const char *TIMEOUT_SENTINEL_NAME = "__GDA_TIMEOUT__";
+constexpr const char *TIMEOUT_SENTINEL_VALUE = "__GDA_TIMEOUT__";
+
+inline std::string deadline_declaration(int64_t deadline_ms) {
+  return std::string("const ") + DEADLINE_CONST_NAME + " := " +
+         std::to_string(deadline_ms);
+}
+
+inline std::string timeout_sentinel_declaration() {
+  return std::string("const ") + TIMEOUT_SENTINEL_NAME + " := \"" +
+         TIMEOUT_SENTINEL_VALUE + "\"";
+}
+
+inline std::string deadline_check_line() {
+  return std::string("if Time.get_ticks_msec() > ") + DEADLINE_CONST_NAME +
+         ": return " + TIMEOUT_SENTINEL_NAME;
+}
+
+inline std::string deadline_loop_condition() {
+  return std::string("Time.get_ticks_msec() <= ") + DEADLINE_CONST_NAME;
+}
+
+inline bool is_timeout_sentinel_text(const std::string &text) {
+  return text == TIMEOUT_SENTINEL_VALUE;
+}
+
+inline std::string leading_whitespace(const std::string &line) {
+  size_t index = 0;
+  while (index < line.size() &&
+         (line[index] == ' ' || line[index] == '\t')) {
+    ++index;
+  }
+  return line.substr(0, index);
+}
+
+inline std::string trim_whitespace(const std::string &text) {
+  size_t begin = 0;
+  while (begin < text.size() &&
+         (text[begin] == ' ' || text[begin] == '\t')) {
+    ++begin;
+  }
+  size_t end = text.size();
+  while (end > begin &&
+         (text[end - 1] == ' ' || text[end - 1] == '\t')) {
+    --end;
+  }
+  return text.substr(begin, end - begin);
+}
+
+inline bool is_comment_only(const std::string &trimmed) {
+  return !trimmed.empty() && trimmed[0] == '#';
+}
+
+inline bool is_while_header(const std::string &trimmed) {
+  return trimmed.compare(0, 6, "while ") == 0;
+}
+
+inline bool is_for_header(const std::string &trimmed) {
+  return trimmed.compare(0, 4, "for ") == 0;
+}
+
+inline size_t find_top_level_colon(const std::string &text) {
+  int depth = 0;
+  char quote = 0;
+  for (size_t index = 0; index < text.size(); ++index) {
+    const char current = text[index];
+    if (quote != 0) {
+      if (current == quote) {
+        quote = 0;
+      }
+      continue;
+    }
+    if (current == '"' || current == '\'') {
+      quote = current;
+      continue;
+    }
+    if (current == '(' || current == '[' || current == '{') {
+      ++depth;
+      continue;
+    }
+    if (current == ')' || current == ']' || current == '}') {
+      --depth;
+      continue;
+    }
+    if (current == ':' && depth == 0) {
+      return index;
+    }
+  }
+  return std::string::npos;
+}
+
+inline std::vector<std::string> split_lines(const std::string &text) {
+  std::vector<std::string> lines;
+  std::istringstream stream(text);
+  std::string line;
+  while (std::getline(stream, line)) {
+    lines.push_back(line);
+  }
+  return lines;
+}
+
+inline std::string join_lines(const std::vector<std::string> &lines) {
+  std::string out;
+  for (size_t index = 0; index < lines.size(); ++index) {
+    if (index > 0) {
+      out += "\n";
+    }
+    out += lines[index];
+  }
+  return out;
+}
+
+struct DeadlineTransform {
+  bool ok = false;
+  std::string source;
+  std::string error;
+};
+
+inline DeadlineTransform inject_deadline_checks(const std::string &source) {
+  DeadlineTransform result;
+  result.ok = true;
+  const std::vector<std::string> lines = split_lines(source);
+  const std::string check = deadline_check_line();
+  std::vector<std::string> out;
+  out.reserve(lines.size());
+  for (size_t index = 0; index < lines.size(); ++index) {
+    const std::string &current = lines[index];
+    const std::string indent = leading_whitespace(current);
+    const std::string trimmed = current.substr(indent.size());
+    const bool loop_header =
+        !trimmed.empty() && !is_comment_only(trimmed) &&
+        (is_while_header(trimmed) || is_for_header(trimmed));
+    if (!loop_header) {
+      out.push_back(current);
+      continue;
+    }
+    const size_t colon = find_top_level_colon(trimmed);
+    if (colon == std::string::npos) {
+      out.push_back(current);
+      continue;
+    }
+    const std::string head = trimmed.substr(0, colon);
+    const std::string body = trim_whitespace(trimmed.substr(colon + 1));
+    if (body.empty()) {
+      out.push_back(current);
+      size_t scan = index + 1;
+      while (scan < lines.size()) {
+        const std::string next_indent = leading_whitespace(lines[scan]);
+        const std::string next_trimmed =
+            lines[scan].substr(next_indent.size());
+        if (next_trimmed.empty() || is_comment_only(next_trimmed)) {
+          ++scan;
+          continue;
+        }
+        if (next_indent.size() > indent.size()) {
+          out.push_back(next_indent + check);
+        }
+        break;
+      }
+      continue;
+    }
+    if (is_while_header(trimmed)) {
+      out.push_back(indent + "while (" + head.substr(6) + ") and " +
+                    deadline_loop_condition() + ": " + body);
+      continue;
+    }
+    out.push_back(current);
+  }
+  result.source = join_lines(out);
+  return result;
+}
+
+inline std::string insert_entry_check(const std::string &source,
+                                      const std::string &entry_name,
+                                      const std::string &check) {
+  const std::vector<std::string> lines = split_lines(source);
+  const std::string signature = "func " + entry_name + "(";
+  std::vector<std::string> out;
+  out.reserve(lines.size() + 1);
+  bool inserted = false;
+  for (size_t index = 0; index < lines.size(); ++index) {
+    const std::string &current = lines[index];
+    out.push_back(current);
+    if (inserted) {
+      continue;
+    }
+    const std::string indent = leading_whitespace(current);
+    const std::string trimmed = current.substr(indent.size());
+    if (trimmed.compare(0, signature.size(), signature) != 0) {
+      continue;
+    }
+    size_t scan = index + 1;
+    std::string body_indent;
+    while (scan < lines.size()) {
+      const std::string next_indent = leading_whitespace(lines[scan]);
+      const std::string next_trimmed = lines[scan].substr(next_indent.size());
+      if (next_trimmed.empty() || is_comment_only(next_trimmed)) {
+        ++scan;
+        continue;
+      }
+      if (next_indent.size() > indent.size()) {
+        body_indent = next_indent;
+      }
+      break;
+    }
+    if (!body_indent.empty()) {
+      out.push_back(body_indent + check);
+      inserted = true;
+    }
+  }
+  return join_lines(out);
 }
 
 } // namespace gdscript_wrap
