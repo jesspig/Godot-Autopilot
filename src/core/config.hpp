@@ -13,15 +13,35 @@ constexpr int64_t GDA_MAX_TIMEOUT_MS = 30000;
 constexpr int64_t GDA_RESPONSE_GRACE_MS = 2000;
 constexpr int64_t GDA_MAX_GAME_OP_TIMEOUT_MS = 25000;
 constexpr int64_t GDA_TRANSPORT_TIMEOUT_MS = 30000;
+constexpr int64_t GDA_DISPATCH_WAIT_MIN_MS = 1000;
+constexpr int64_t GDA_DISPATCH_WAIT_MAX_MS = 29000;
 constexpr int64_t GDA_DISPATCH_WAIT_DEFAULT_MS = 27000;
 constexpr int64_t GDA_DISPATCH_WAIT_HEALTH_MS = 5000;
-constexpr int64_t GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = GDA_MAX_TIMEOUT_MS;
-static_assert(GDA_DISPATCH_WAIT_DEFAULT_MS < GDA_TRANSPORT_TIMEOUT_MS,
-              "dispatch wait budget must stay below the HTTP transport timeout "
-              "so a structured timeout result can reach the client");
-static_assert(GDA_DISPATCH_WAIT_LONG_BLOCKING_MS <= GDA_TRANSPORT_TIMEOUT_MS,
-              "long blocking dispatch wait budget must stay within the HTTP "
-              "transport timeout");
+constexpr int64_t GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = GDA_DISPATCH_WAIT_MAX_MS;
+static_assert(GDA_DISPATCH_WAIT_MIN_MS <= GDA_DISPATCH_WAIT_MAX_MS,
+              "the dispatch wait clamp floor must not exceed the clamp "
+              "ceiling");
+static_assert(GDA_DISPATCH_WAIT_MAX_MS < GDA_TRANSPORT_TIMEOUT_MS,
+              "the dispatch wait clamp ceiling must stay below the HTTP "
+              "transport timeout so a structured timeout result can reach "
+              "the client");
+static_assert(GDA_DISPATCH_WAIT_MIN_MS <= GDA_DISPATCH_WAIT_DEFAULT_MS &&
+                  GDA_DISPATCH_WAIT_DEFAULT_MS <= GDA_DISPATCH_WAIT_MAX_MS,
+              "the default dispatch wait budget must stay inside the clamp "
+              "interval so the constant equals the effective budget");
+static_assert(GDA_DISPATCH_WAIT_MIN_MS <= GDA_DISPATCH_WAIT_HEALTH_MS &&
+                  GDA_DISPATCH_WAIT_HEALTH_MS <= GDA_DISPATCH_WAIT_MAX_MS,
+              "the health probe dispatch wait budget must stay inside the "
+              "clamp interval so the constant equals the effective budget");
+static_assert(GDA_DISPATCH_WAIT_MIN_MS <=
+                      GDA_DISPATCH_WAIT_LONG_BLOCKING_MS &&
+                  GDA_DISPATCH_WAIT_LONG_BLOCKING_MS <= GDA_DISPATCH_WAIT_MAX_MS,
+              "the long blocking dispatch wait budget must stay inside the "
+              "clamp interval so the constant equals the effective budget");
+static_assert(GDA_DISPATCH_WAIT_LONG_BLOCKING_MS < GDA_TRANSPORT_TIMEOUT_MS,
+              "the effective long blocking dispatch wait budget must stay "
+              "below the HTTP transport timeout so a structured timeout "
+              "result can reach the client");
 constexpr int64_t GDA_MAX_GAME_OP_HOST_WAIT_MS =
     GDA_MAX_GAME_OP_TIMEOUT_MS + GDA_RESPONSE_GRACE_MS;
 static_assert(GDA_MAX_GAME_OP_HOST_WAIT_MS < GDA_TRANSPORT_TIMEOUT_MS,

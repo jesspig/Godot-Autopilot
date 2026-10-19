@@ -145,9 +145,6 @@ mcp::JsonValue call_handler_impl(const std::string &name,
   return result;
 }
 
-constexpr int64_t kDispatchWaitMinMs = 1000;
-constexpr int64_t kDispatchWaitMaxMs = 29000;
-
 int64_t env_int_clamped(const char *name, int64_t fallback, int64_t min_value,
                         int64_t max_value) {
   int64_t value = fallback;
@@ -170,22 +167,22 @@ int64_t env_int_clamped(const char *name, int64_t fallback, int64_t min_value,
 int64_t dispatch_wait_default_ms() {
   static const int64_t value = env_int_clamped(
       "GODOT_AUTOPILOT_DISPATCH_TIMEOUT_MS", GDA_DISPATCH_WAIT_DEFAULT_MS,
-      kDispatchWaitMinMs, kDispatchWaitMaxMs);
+      GDA_DISPATCH_WAIT_MIN_MS, GDA_DISPATCH_WAIT_MAX_MS);
   return value;
 }
 
 int64_t dispatch_wait_health_ms() {
   static const int64_t value = env_int_clamped(
       "GODOT_AUTOPILOT_HEALTH_TIMEOUT_MS", GDA_DISPATCH_WAIT_HEALTH_MS,
-      kDispatchWaitMinMs, kDispatchWaitMaxMs);
+      GDA_DISPATCH_WAIT_MIN_MS, GDA_DISPATCH_WAIT_MAX_MS);
   return value;
 }
 
 int64_t dispatch_wait_long_blocking_ms() {
   static const int64_t value = env_int_clamped(
       "GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS",
-      GDA_DISPATCH_WAIT_LONG_BLOCKING_MS, kDispatchWaitMinMs,
-      kDispatchWaitMaxMs);
+      GDA_DISPATCH_WAIT_LONG_BLOCKING_MS, GDA_DISPATCH_WAIT_MIN_MS,
+      GDA_DISPATCH_WAIT_MAX_MS);
   return value;
 }
 

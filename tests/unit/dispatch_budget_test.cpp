@@ -1,3 +1,4 @@
+#include "core/config.hpp"
 #include "tools/dispatch.hpp"
 #include "tools/tool_spec.hpp"
 
@@ -6,6 +7,12 @@
 using godot_autopilot::CommandQueue;
 using godot_autopilot::dispatch::main_thread_wait_budget_ms;
 using godot_autopilot::dispatch::run_on_main_thread_with_budget;
+using godot_autopilot::GDA_DISPATCH_WAIT_DEFAULT_MS;
+using godot_autopilot::GDA_DISPATCH_WAIT_HEALTH_MS;
+using godot_autopilot::GDA_DISPATCH_WAIT_LONG_BLOCKING_MS;
+using godot_autopilot::GDA_DISPATCH_WAIT_MAX_MS;
+using godot_autopilot::GDA_DISPATCH_WAIT_MIN_MS;
+using godot_autopilot::GDA_TRANSPORT_TIMEOUT_MS;
 using godot_autopilot::tool_flags::kCaptureImage;
 using godot_autopilot::tool_flags::kDynamic;
 using godot_autopilot::tool_flags::kHealthProbe;
@@ -90,6 +97,26 @@ TEST(DispatchBudgetTest, CustomBudgetsArePassedThrough) {
             12345);
   EXPECT_EQ(main_thread_wait_budget_ms(kHealthProbe, 12345, 6789, kLongBlockingMs),
             6789);
+}
+
+TEST(DispatchBudgetTest, SharedBudgetConstantsStayInsideTheClampInterval) {
+  EXPECT_LE(GDA_DISPATCH_WAIT_MIN_MS, GDA_DISPATCH_WAIT_MAX_MS);
+  EXPECT_LE(GDA_DISPATCH_WAIT_MIN_MS, GDA_DISPATCH_WAIT_DEFAULT_MS);
+  EXPECT_LE(GDA_DISPATCH_WAIT_DEFAULT_MS, GDA_DISPATCH_WAIT_MAX_MS);
+  EXPECT_LE(GDA_DISPATCH_WAIT_MIN_MS, GDA_DISPATCH_WAIT_HEALTH_MS);
+  EXPECT_LE(GDA_DISPATCH_WAIT_HEALTH_MS, GDA_DISPATCH_WAIT_MAX_MS);
+  EXPECT_LE(GDA_DISPATCH_WAIT_MIN_MS, GDA_DISPATCH_WAIT_LONG_BLOCKING_MS);
+  EXPECT_LE(GDA_DISPATCH_WAIT_LONG_BLOCKING_MS, GDA_DISPATCH_WAIT_MAX_MS);
+}
+
+TEST(DispatchBudgetTest, LongBlockingConstantEqualsTheClampCeiling) {
+  EXPECT_EQ(GDA_DISPATCH_WAIT_LONG_BLOCKING_MS, GDA_DISPATCH_WAIT_MAX_MS);
+}
+
+TEST(DispatchBudgetTest, ClampCeilingStaysBelowTheTransportTimeout) {
+  EXPECT_LT(GDA_DISPATCH_WAIT_MAX_MS, GDA_TRANSPORT_TIMEOUT_MS);
+  EXPECT_LT(GDA_DISPATCH_WAIT_LONG_BLOCKING_MS, GDA_TRANSPORT_TIMEOUT_MS);
+  EXPECT_LT(GDA_DISPATCH_WAIT_DEFAULT_MS, GDA_TRANSPORT_TIMEOUT_MS);
 }
 
 TEST(DispatchBudgetTest, ClosedQueueReturnsQueueUnavailable) {
