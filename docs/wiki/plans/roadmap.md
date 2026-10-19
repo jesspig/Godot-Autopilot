@@ -6,13 +6,13 @@ tags:
   - 规划
   - 竞品对齐
   - 工具扩展
-timestamp: "2026-10-20T00:56:32+08:00"
+timestamp: "2026-10-20T02:55:00+08:00"
 resource: src/
 ---
 
 # 竞品对齐路线图
 
-> 记录 2026-08 功能分支 `feature/engine-aware-fs-and-tool-expansion` 的竞品对齐批次（P0/P1/P2 已交付）与后续 P3 方向，工具侧实现细节见 [工具注册表](../modules/tools_registry.md)，运行时协议见 [入口与运行时](../modules/entry_runtime.md)。**当前口径（2026-10-20）**：域工具 **451**（27 类 / 33 个源模块）、catalog 条目 459、MCP 可达 458、schema 基线 459 = 393 非空 + 66 空、遍历枚举 452 / 排除 111 / 候选 341、L1 **458** 个 gtest（43 个 unit 文件）、L2 **41** 份用例、守卫与脚本 6 项、**ctest 注册点 505**（458 + 41 + 6）、技能书 9 册 / 36 文件、根 `CMakeLists.txt` 的 `add_library` 收录 **93** 个 `.cpp`；各项的权威核算口径见 [测试体系](../tests.md) 的数值核算总表。下列各节的批次内计数是**该批次交付当时的增量**，不代表当前值。
+> 记录 2026-08 功能分支 `feature/engine-aware-fs-and-tool-expansion` 的竞品对齐批次（P0/P1/P2 已交付）与后续 P3 方向，工具侧实现细节见 [工具注册表](../modules/tools_registry.md)，运行时协议见 [入口与运行时](../modules/entry_runtime.md)。**当前口径（2026-10-20）**：域工具 **451**（27 类 / 33 个源模块）、catalog 条目 459、MCP 可达 458、schema 基线 459 = 393 非空 + 66 空、遍历枚举 452 / 排除 111 / 候选 341、L1 **458** 个 gtest（43 个 unit 文件）、L2 **41** 份用例、守卫与脚本 6 项、**ctest 注册点 505**（458 + 41 + 6）、技能书 9 册 / 34 文件、根 `CMakeLists.txt` 的 `add_library` 收录 **93** 个 `.cpp`；各项的权威核算口径见 [测试体系](../tests.md) 的数值核算总表。下列各节的批次内计数是**该批次交付当时的增量**，不代表当前值。
 
 ## 竞品全景（一行定位速记）
 
@@ -58,7 +58,7 @@ resource: src/
 
 ## 已交付：Agent Skills 生成
 
-- **skill_gen 一键生成 Agent Skills**（2026-09-08 交付首版 7 册，09-13 扩至 8 册，09-25 随技能脚本通道落地增至 **9 册**（`skills/` 36 文件 = 9 份 `SKILL.md` + 26 份 references + 1 个 `mjs` 桥），10-19 随独立二进制分发再扩为五级调用阶梯；生成器 + UI 按钮 + 7 用例 L1）：写入项目根 `.agents/skills/`，覆盖写仅限自有命名空间
+- **skill_gen 一键生成 Agent Skills**（2026-09-08 交付首版 7 册，09-13 扩至 8 册，09-25 随技能脚本通道落地增至 **9 册**（`skills/` 36 文件 = 9 份 `SKILL.md` + 26 份 references + 1 个 `mjs` 桥），10-19 随独立二进制分发再扩为五级调用阶梯，10-20 随技能书自带的脚本桥删除收敛为**三级**（原生 MCP → GDA CLI → 手动兜底，`bunx`、全局安装与独立二进制合为 GDA CLI 一档的三种分发方式；`skills/` 36→**34** 文件 = 9 份 `SKILL.md` + 25 份 references）；生成器 + UI 按钮 + 7 用例 L1）：写入项目根 `.agents/skills/`，覆盖写仅限自有命名空间
 
 ## 已交付：Computer Use grounding 增强（09-15）
 
@@ -101,8 +101,8 @@ resource: src/
 
 ## 已交付：CLI 载体落地（10-18）
 
-- **新增 `cli/`**（Bun + TS 源码直跑，零运行时依赖、无构建步骤）+ 根 `package.json` / `bun.lock`；命令族 `gda`（调用族 6 + 生命周期 4），寻址链对齐 legacy 五级链，登记表 `instances.json` + 锁 + 死 pid 清理，生命周期 `start`（Godot 链 / 端口 9530–9599 / 导入预步 / 就绪探测 / Windows 蹦床脱父）/ `stop`（优雅优先，`--force` 强杀）。
-- **双载体协议握手升级**：CLI 与 `gda.mjs` 脚本桥同步改为标准 MCP `initialize` 流程。
+- **新增 `cli/`**（Bun + TS 源码直跑，零运行时依赖、无构建步骤）+ 根 `package.json` / `bun.lock`；命令族 `gda`（调用族 6 + 生命周期 4），寻址链五级（`GODOT_AUTOPILOT_PORT` → cwd 登记 → trace → config → 9527），登记表 `instances.json` + 锁 + 死 pid 清理，生命周期 `start`（Godot 链 / 端口 9530–9599 / 导入预步 / 就绪探测 / Windows 蹦床脱父）/ `stop`（优雅优先，`--force` 强杀）。
+- **协议握手升级**：CLI 改为标准 MCP `initialize` 流程（mcp-cpp-sdk 0.3.7 起严格要求完整握手）。
 - **新增 `version_sync_guard` 守卫**，ctest 注册点 476→478。
 - 详见 [changelog/2026-10-18-log.md](../changelog/2026-10-18-log.md)。
 
