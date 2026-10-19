@@ -1,22 +1,19 @@
 #!/usr/bin/env python3
-"""Dual-carrier CLI mock MCP conformance tests.
+"""Single-carrier CLI mock MCP conformance tests.
 
-Carrier 1 (legacy, behavior frozen): skills/godot-autopilot-tools/scripts/gda.mjs
-driven by node, plus a core subset driven by bun when bun is available.
-Carrier 2 (new CLI): cli/bin/gda.ts driven by bun, pointed at the same
-in-process mock MCP server via --port / GODOT_AUTOPILOT_PORT.
+Carrier: cli/bin/gda.ts driven by bun, pointed at the same in-process mock
+MCP server via --port / GODOT_AUTOPILOT_PORT.
 
 Spins up an in-process mock MCP server (http.server on 127.0.0.1 with a
-random port) that mimics the real server's wire behavior, then drives both
-CLIs and asserts stdout JSON, exit codes, wire shapes, and side effects.
+random port) that mimics the real server's wire behavior, then drives the
+CLI and asserts stdout JSON, exit codes, wire shapes, and side effects.
 The mock is strict about the standard MCP handshake: initialize returns 200
 with an SSE frame (capabilities/protocolVersion/serverInfo),
 notifications/initialized returns 202, and a tools/call received before
 initialize is rejected with 400 + error code -32600.
 
-SKIP semantics: no node -> whole script prints SKIP and exits 0; no bun ->
-the bun subsets (legacy core subset and new CLI group) print SKIP and the
-script continues without failing.
+SKIP semantics: no bun -> the script prints SKIP and exits 0 without
+failing; with bun every assertion runs.
 
 Stdlib only. Never writes inside the repo (image drops go to tempfile).
 Each CLI invocation has a timeout; the mock server runs on a daemon thread
@@ -36,7 +33,6 @@ import threading
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-LEGACY_SCRIPT = ROOT / "skills" / "godot-autopilot-tools" / "scripts" / "gda.mjs"
 CLI_SCRIPT = ROOT / "cli" / "bin" / "gda.ts"
 
 CALL_TIMEOUT = 30
@@ -224,11 +220,10 @@ def free_port():
 
 
 class Context:
-    def __init__(self, runtime, script, port, empty_dir):
+    def __init__(self, runtime, script, port):
         self.runtime = runtime
         self.script = script
         self.port = port
-        self.empty_dir = empty_dir
 
     def run(self, *args, env_port=None, timeout=CALL_TIMEOUT):
         env = dict(os.environ)
@@ -237,13 +232,10 @@ class Context:
         else:
             env["GODOT_AUTOPILOT_PORT"] = str(env_port)
         cmd = [self.runtime, str(self.script), *args]
-        # node/bun 管道输出为 UTF-8；显式指定避免 Windows locale(GBK) 解码崩溃
+        # bun 管道输出为 UTF-8；显式指定避免 Windows locale(GBK) 解码崩溃
         return subprocess.run(
             cmd, capture_output=True, encoding="utf-8", errors="replace", timeout=timeout, env=env
         )
-
-    def run_port(self, *args, **kwargs):
-        return self.run(*args, "--port", str(self.port), "--project-dir", self.empty_dir, **kwargs)
 
 
 def check(name, cond, detail=""):
@@ -251,131 +243,13 @@ def check(name, cond, detail=""):
         raise AssertionError(f"{name}: {detail}")
 
 
-def run_legacy_cases(ctx, bun, port, empty_dir):
-    """Carrier 1: gda.mjs via node plus the frozen bun core subset."""
-    passed = 0
-
-    MockHandler.initialized = False
-    r = ctx.run_port("ping")
-    check("lazy-handshake/exit", r.returncode == 0, f"exit={r.returncode} stderr={r.stderr[-500:]}")
-    check("lazy-handshake/retry", "notifications/initialized" in r.stderr, r.stderr[-500:])
-    check("lazy-handshake/pong", "pong" in r.stdout, r.stdout[-500:])
-    passed += 1
-
-    r = ctx.run_port("ping")
-    check("ping/exit", r.returncode == 0, r.stderr[-500:])
-    check("ping/body", json.loads(r.stdout).get("pong") is True, r.stdout[-500:])
-    check("ping/no-retry", "not needed" in r.stderr, r.stderr[-500:])
-    passed += 1
-
-    r = ctx.run_port("status")
-    check("status/exit", r.returncode == 0, r.stderr[-500:])
-    body = json.loads(r.stdout)
-    check("status/body", body.get("ok") is True and body.get("engine") == "mock", r.stdout[-500:])
-    passed += 1
-
-    r = ctx.run_port("categories")
-    check("categories/exit", r.returncode == 0, r.stderr[-500:])
-    check("categories/body", "mock-cat" in r.stdout, r.stdout[-500:])
-    passed += 1
-
-    r = ctx.run_port("search", "mock")
-    check("search/exit", r.returncode == 0, r.stderr[-500:])
-    check("search/multiline-projection", json.loads(r.stdout) == SEARCH_RESULTS, r.stdout[-500:])
-    passed += 1
-
-    r = ctx.run_port("search", "mock", "--category", "mock-cat", "--tags", "a,b")
-    check("search-filter/exit", r.returncode == 0, r.stderr[-500:])
-    check("search-filter/body", json.loads(r.stdout) == SEARCH_RESULTS, r.stdout[-500:])
-    seen = MockHandler.last_search_args
-    check("search-filter/category", (seen or {}).get("category") == "mock-cat", repr(seen))
-    check("search-filter/tags", (seen or {}).get("tags") == ["a", "b"], repr(seen))
-    passed += 1
-
-    r = ctx.run_port("describe", "mock_tool")
-    check("describe/exit", r.returncode == 0, r.stderr[-500:])
-    body = json.loads(r.stdout)
-    check("describe/body", body.get("name") == "mock_tool" and "inputSchema" in body, r.stdout[-500:])
-    passed += 1
-
-    payload = {"x": 1, "s": "hi"}
-    r1 = ctx.run_port("call", "mock_echo", "--args", json.dumps(payload))
-    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
-        json.dump(payload, f)
-        args_file = f.name
-    try:
-        r2 = ctx.run_port("call", "mock_echo", "--args-file", args_file)
-    finally:
-        os.unlink(args_file)
-    check("call-args/exit", r1.returncode == 0 and r2.returncode == 0, f"{r1.returncode}/{r2.returncode}")
-    check(
-        "call-args/equivalent",
-        json.loads(r1.stdout) == json.loads(r2.stdout) == {"echo": payload},
-        f"{r1.stdout[-300:]} vs {r2.stdout[-300:]}",
-    )
-    passed += 1
-
-    r = ctx.run_port("call", "no_such_tool_xyz")
-    check("tool-error/exit1", r.returncode == 1, f"exit={r.returncode}")
-    passed += 1
-
-    r = ctx.run_port("call", "mock_503")
-    check("http503/exit2", r.returncode == 2, f"exit={r.returncode} stderr={r.stderr[-300:]}")
-    passed += 1
-
-    closed = free_port()
-    r = ctx.run("--port", str(closed), "--project-dir", empty_dir, "ping")
-    check("refused/exit2", r.returncode == 2, f"exit={r.returncode}")
-    passed += 1
-
-    for uargs in (["boguscmd"], ["ping", "--category", "x"], ["describe"]):
-        r = ctx.run_port(*uargs)
-        check(f"usage/exit3:{uargs}", r.returncode == 3, f"exit={r.returncode} {r.stderr[-300:]}")
-    passed += 1
-
-    with tempfile.TemporaryDirectory() as img_dir:
-        r = ctx.run_port("call", "mock_image", "--save-images", img_dir)
-        check("image/exit", r.returncode == 0, f"exit={r.returncode} stderr={r.stderr[-500:]}")
-        check("image/no-base64", PNG_B64[:40] not in r.stdout, r.stdout[-300:])
-        body = json.loads(r.stdout)
-        check("image/report", "images" in body and body["images"][0]["saved"] is True, r.stdout[-500:])
-        pngs = list(Path(img_dir).glob("*.png"))
-        check("image/file", len(pngs) == 1, os.listdir(img_dir))
-        check("image/magic", pngs[0].read_bytes()[:8] == base64.b64decode(PNG_B64)[:8], "bad PNG header")
-    passed += 1
-
-    r = ctx.run("--port", str(port), "--project-dir", empty_dir, "ping", env_port=closed)
-    check("port-flag/exit", r.returncode == 0, r.stderr[-500:])
-    check("port-flag/wins", "pong" in r.stdout, r.stdout[-300:])
-    passed += 1
-
-    r = ctx.run("--project-dir", empty_dir, "ping", env_port=port)
-    check("port-env/exit", r.returncode == 0, r.stderr[-500:])
-    check("port-env/used", "pong" in r.stdout, r.stdout[-300:])
-    passed += 1
-
-    if bun is not None:
-        bctx = Context(bun, LEGACY_SCRIPT, port, empty_dir)
-        r = bctx.run_port("ping")
-        check("bun/ping", r.returncode == 0 and "pong" in r.stdout, f"{r.returncode} {r.stderr[-300:]}")
-        r = bctx.run_port("call", "mock_echo", "--args", '{"x":1}')
-        check("bun/call", r.returncode == 0 and json.loads(r.stdout) == {"echo": {"x": 1}}, r.stdout[-300:])
-        r = bctx.run_port("call", "no_such_tool_xyz")
-        check("bun/tool-error", r.returncode == 1, f"exit={r.returncode}")
-        passed += 1
-        print("bun subset: ping + call + tool-error exit codes OK")
-    else:
-        print("SKIP bun subset: bun not found on PATH")
-    return passed
-
-
 def run_cli_cases(bctx, port):
-    """Carrier 2: cli/bin/gda.ts via bun against the same mock server."""
+    """Single carrier: cli/bin/gda.ts via bun against the mock server."""
     passed = 0
 
-    def cli_run(*args, env_port=None):
+    def cli_run(*args):
         # 新 CLI 的 --port/--id/--project 三选一，故只附 --port，不再附 --project-dir
-        return bctx.run(*args, "--port", str(port), env_port=env_port)
+        return bctx.run(*args, "--port", str(port))
 
     MockHandler.initialized = False
     MockHandler.last_search_args = None
@@ -416,6 +290,14 @@ def run_cli_cases(bctx, port):
     check("cli-search/direct", MockHandler.last_direct_name == "search_tools", repr(MockHandler.last_direct_name))
     passed += 1
 
+    r = cli_run("search", "mock", "--category", "mock-cat", "--tags", "a,b")
+    check("cli-search-filter/exit", r.returncode == 0, f"exit={r.returncode} stderr={r.stderr[-500:]}")
+    check("cli-search-filter/projection", json.loads(r.stdout) == SEARCH_RESULTS, r.stdout[-500:])
+    seen = MockHandler.last_search_args
+    check("cli-search-filter/category", (seen or {}).get("category") == "mock-cat", repr(seen))
+    check("cli-search-filter/tags", (seen or {}).get("tags") == ["a", "b"], repr(seen))
+    passed += 1
+
     r = cli_run("describe", "mock_tool")
     check("cli-describe/exit", r.returncode == 0, f"exit={r.returncode} stderr={r.stderr[-500:]}")
     body = json.loads(r.stdout)
@@ -434,6 +316,23 @@ def run_cli_cases(bctx, port):
     )
     passed += 1
 
+    payload = {"x": 1, "s": "hi"}
+    r1 = cli_run("call", "mock_echo", "--args", json.dumps(payload))
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+        json.dump(payload, f)
+        args_file = f.name
+    try:
+        r2 = cli_run("call", "mock_echo", "--args-file", args_file)
+    finally:
+        os.unlink(args_file)
+    check("cli-call-args-file/exit", r1.returncode == 0 and r2.returncode == 0, f"{r1.returncode}/{r2.returncode}")
+    check(
+        "cli-call-args-file/equivalent",
+        json.loads(r1.stdout) == json.loads(r2.stdout) == {"echo": payload},
+        f"{r1.stdout[-300:]} vs {r2.stdout[-300:]}",
+    )
+    passed += 1
+
     r = cli_run("call", "ping")
     check("cli-call-direct/exit", r.returncode == 0, f"exit={r.returncode} stderr={r.stderr[-500:]}")
     check("cli-call-direct/body", json.loads(r.stdout) == {"pong": True}, r.stdout[-500:])
@@ -445,7 +344,6 @@ def run_cli_cases(bctx, port):
     passed += 1
 
     # 顶层 JSON-RPC error 信封（无 result.content）按工具失败处理，退出码 1。
-    # legacy 载体 gda.mjs 把同一信封判为传输失败（退出码 2），该行为已冻结，不在此断言。
     r = cli_run("call", "mock_rpc_error")
     check("cli-rpc-error/exit1", r.returncode == 1, f"exit={r.returncode} stderr={r.stderr[-300:]}")
     check("cli-rpc-error/stderr", "mock top-level JSON-RPC error" in r.stderr, r.stderr[-300:])
@@ -454,6 +352,10 @@ def run_cli_cases(bctx, port):
         json.loads(r.stdout).get("error", {}).get("code") == -32602,
         r.stdout[-300:],
     )
+    passed += 1
+
+    r = cli_run("call", "mock_503")
+    check("cli-http503/exit2", r.returncode == 2, f"exit={r.returncode} stderr={r.stderr[-300:]}")
     passed += 1
 
     closed = free_port()
@@ -466,6 +368,27 @@ def run_cli_cases(bctx, port):
         check(f"cli-usage/exit3:{uargs}", r.returncode == 3, f"exit={r.returncode} {r.stderr[-300:]}")
     passed += 1
 
+    with tempfile.TemporaryDirectory() as img_dir:
+        r = cli_run("call", "mock_image", "--save-images", img_dir)
+        check("cli-image/exit", r.returncode == 0, f"exit={r.returncode} stderr={r.stderr[-500:]}")
+        check("cli-image/no-base64", PNG_B64[:40] not in r.stdout, r.stdout[-300:])
+        body = json.loads(r.stdout)
+        check("cli-image/report", "images" in body and body["images"][0]["saved"] is True, r.stdout[-500:])
+        pngs = list(Path(img_dir).glob("*.png"))
+        check("cli-image/file", len(pngs) == 1, os.listdir(img_dir))
+        check("cli-image/magic", pngs[0].read_bytes()[:8] == base64.b64decode(PNG_B64)[:8], "bad PNG header")
+    passed += 1
+
+    r = bctx.run("--port", str(port), "ping", env_port=closed)
+    check("cli-port-flag/exit", r.returncode == 0, f"exit={r.returncode} stderr={r.stderr[-500:]}")
+    check("cli-port-flag/wins", "pong" in r.stdout, r.stdout[-300:])
+    passed += 1
+
+    r = bctx.run("ping", env_port=port)
+    check("cli-port-env/exit", r.returncode == 0, f"exit={r.returncode} stderr={r.stderr[-500:]}")
+    check("cli-port-env/used", "pong" in r.stdout, r.stdout[-300:])
+    passed += 1
+
     r = cli_run("ping", "--pretty")
     check("cli-pretty/exit", r.returncode == 0, f"exit={r.returncode} stderr={r.stderr[-500:]}")
     check("cli-pretty/multiline", len(r.stdout.strip().splitlines()) > 1, repr(r.stdout[-200:]))
@@ -476,14 +399,13 @@ def run_cli_cases(bctx, port):
 
 
 def main():
-    node = shutil.which("node")
-    if node is None:
-        print("SKIP: node not found on PATH, mock MCP conformance tests skipped")
-        return 0
-    if not LEGACY_SCRIPT.is_file():
-        print(f"FAIL: gda.mjs not found at {LEGACY_SCRIPT}")
-        return 1
     bun = shutil.which("bun")
+    if bun is None:
+        print("SKIP: bun not found on PATH, mock MCP conformance tests skipped")
+        return 0
+    if not CLI_SCRIPT.is_file():
+        print(f"FAIL: gda.ts not found at {CLI_SCRIPT}")
+        return 1
 
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), MockHandler)
     port = server.server_address[1]
@@ -492,24 +414,13 @@ def main():
 
     passed = 0
     try:
-        with tempfile.TemporaryDirectory() as empty_dir:
-            passed += run_legacy_cases(Context(node, LEGACY_SCRIPT, port, empty_dir), bun, port, empty_dir)
-
-            if bun is None:
-                print("SKIP bun cli subset")
-            else:
-                if not CLI_SCRIPT.is_file():
-                    print(f"FAIL: gda.ts not found at {CLI_SCRIPT}")
-                    return 1
-                cli_passed = run_cli_cases(Context(bun, CLI_SCRIPT, port, empty_dir), port)
-                passed += cli_passed
-                print(f"bun cli subset: {cli_passed} cases passed")
+        passed += run_cli_cases(Context(bun, CLI_SCRIPT, port), port)
     finally:
         server.shutdown()
         server.server_close()
         thread.join(timeout=10)
 
-    print(f"cli-contract mock conformance: {passed} cases passed (node={node}, bun={bun})")
+    print(f"cli-contract mock conformance: {passed} cases passed (bun={bun})")
     return 0
 
 
