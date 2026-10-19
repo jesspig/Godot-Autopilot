@@ -6,7 +6,7 @@ tags:
   - 模块
   - 领域工具
   - B组
-timestamp: "2026-10-20T02:27:22+08:00"
+timestamp: "2026-10-20T04:01:51+08:00"
 resource: src/tools/
 ---
 
@@ -287,15 +287,15 @@ resource: src/tools/
 ## code_exec_ops — GDScript 动态执行（2 元工具）
 
 - **职责**：`code_execute` 在编辑器进程内动态编译并执行任意 GDScript；`batch_execute` 顺序批调任意工具。
-- **代表工具**：`code_execute`、`batch_execute`（均为元工具，`register_all.cpp` 以 `SpecTool`（`flags = kMeta | kLongBlocking`）加入 `ToolRegistry` 并经 `server.RegisterTool()` 直连注册，不经元工具 `call_tool` 代理；`batch_execute` 内部经 `dispatch::call_handler` 批调领域工具）。`kLongBlocking` 表示不设 dispatch 主线程默认预算，长脚本不会被 `main_thread_timeout` 取消（预算口径见 [security_contract](../security_contract.md) §4）。
+- **代表工具**：`code_execute`、`batch_execute`（均为元工具，`register_all.cpp` 以 `SpecTool`（`flags = kMeta | kLongBlocking`）加入 `ToolRegistry` 并经 `server.RegisterTool()` 直连注册，不经元工具 `call_tool` 代理；`batch_execute` 内部经 `dispatch::call_handler` 批调领域工具）。`kLongBlocking` 表示改用**长阻塞派发预算**（29000ms，env `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS` 可下调至 `[1000, 29000]`），而非默认预算档（预算口径见 [security_contract](../security_contract.md) §4）。
 - **关键事实（执行机制）**：
   1. **安全检查** `check_source_safety`：禁止 `close_scene(` 调用（会销毁执行节点导致编辑器崩溃）。
   2. **源码包装** `build_wrapped_source`（09-29 起统一走 `gdscript_wrap::wrap_bare_body`/`strip_extends_lines`，与 `execute_script`/游戏侧 `execute_game_script` 同一包装层）：`extends` 行注释化，包裹为 `@tool extends Node` 脚本；单函数模式（默认 `_run`）把用户代码逐行缩进进 `func _run():`，自动探测 tab/空格缩进风格（混合则报错）；多函数模式（检测到 `func `）保留用户函数，缺失的 `function_name` 补 `pass` 占位。**`code_execute` 恒不启用单表达式自动 return**——须显式 `return`（与 `execute_script` 的单表达式自动返回口径不同）。
   3. **编译** `compile_and_map_errors`：`GDScript::set_source_code` + `reload()`；失败时取 `capture_new_error_text` 并经 `gdscript_wrap::map_error_line_numbers` 把 wrapper 行号回映射为用户源码行（偏移 `header_lines + 1`，09-29 起取代固定 5 行），错误文本截断 8192 字节并附 wrapped source。
-  4. **执行** `run_with_timeout`：`memnew(Node)` + `set_script` 挂到 SceneTree 根（失败则挂编辑场景根），`TempNodeGuard` 确保析构回收；超时仅在执行前检查一次（同步调用不可中断）。
+  4. **执行** `run_with_timeout`：`memnew(Node)` + `set_script` 挂到 SceneTree 根（失败则挂编辑场景根），`TempNodeGuard` 确保析构回收；**协作式执行期超时**——wrapper 注入 `__gda_deadline_ms` 声明与循环检查点（`gdscript_wrap::inject_deadline_checks` + `insert_entry_check`，deadline 起算于 handler 入口之后的包装时刻），长循环在截止时刻退出并返回 `code="exec_timeout"`（`dispatch::exec_timeout_result`）。
   5. **结果回收** `reconcile_leaked_children`：执行后比对编辑场景根的子节点数，`auto_owner=true` 递归 `set_owner`（计入 auto_owner_set），false 则删除无主新子节点。
   - **SceneRoot 暴露**：wrapper 内 `var SceneRoot := EditorInterface.get_edited_scene_root()`；错误提示说明执行节点在 `/root` 下、须经 `SceneRoot.get_node("Child")` 访问编辑场景节点。
-  - **timeout_ms**：默认 5000；实现钳制上限 30000（`CODE_EXEC_MAX_TIMEOUT_MS`，非正值回落默认；08-24 前仅 `static_cast<int>` 未钳制，已修复，与 runtime_ops 的 `GDA_MAX_TIMEOUT_MS` 钳制对齐）。
+  - **timeout_ms**：默认 5000；上界由 `code_exec_ops::max_timeout_ms()` 单一来源给出——取 `min(GDA_CODE_EXEC_MAX_TIMEOUT_MS = 27000, 生效长阻塞派发预算)`（`src/tools/code_exec_ops.cpp:464-470`），默认环境下为 **27000ms**；非正值回落默认，越界值直接报错而非静默接受。派发侧余量 2000ms（`GDA_CODE_EXEC_BUDGET_MARGIN_MS`）保证脚本 deadline 先于派发预算到期，传输侧余量 2000ms（`GDA_CODE_EXEC_TRANSPORT_MARGIN_MS`）保证结构化超时结果能在传输硬超时前回到客户端。该值同时写入 schema 的 `maximum`（`register_all.cpp:568-577`）与提示词（`prompt_tool_usage.cpp:504`）。
   - 返回字段：result（`VariantJson::serialize`）、execution_time_ms、auto_owner_set、wrapped_source、output（≤8192）、runtime_error/error_details/structured_error（首行解析 file/line/message）。
   - 结果为 Resource 时自动 `resource_registry::register_resource`（registered_resource 字段）。
   - **异步 game 工具的 pending 语义（09-14 起，09-16 扩展 await_async）**：`operations` 里异步 game 工具返回的中间态 `{"__gda_pending": id}` 经 `runtime_ops::payload_is_pending` 识别——`await_async=false`（默认）时该条报错并释放 pending（不再假报成功，游戏侧随后到达的响应按迟到响应处理）；`await_async=true` 时等待真实结果合并进该条（**必须直接调用 `batch_execute`**；经 `call_tool` 间接调用会在主线程兜底报错）。响应新增 `pending` 计数，`total` = succeeded + failed + pending，`skipped` 为 `stop_on_error` 截断后未执行数。

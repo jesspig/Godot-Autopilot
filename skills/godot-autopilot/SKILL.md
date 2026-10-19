@@ -21,7 +21,7 @@ Every domain tool is executed through `call_tool` by passing the domain tool nam
 
 `batch_execute` is behind the `code_execute` capability, exactly like `code_execute` itself: a client that enabled only `process` or `game_runtime` cannot run a batch, and the operations never start. The four capability names and the enable paths are in the godot-autopilot-tools skill.
 
-`code_execute` interrupts a script that outruns its `timeout_ms` (max 30000 ms). The deadline is injected into the script, so a long loop really does stop instead of freezing the editor, and the call comes back as a timeout failure. Split long work into several calls, or raise `timeout_ms` up to the 30000 ms ceiling.
+`code_execute` interrupts a script that outruns its `timeout_ms`. The accepted maximum is reported by the server in the `code_execute` schema - it follows the host's long-blocking dispatch budget and can be lowered per deployment, so read it from the schema instead of assuming a fixed number. The deadline is injected into the script, so a long loop really does stop instead of freezing the editor, and the call comes back as a timeout failure. Split long work into several calls, or raise `timeout_ms` up to the ceiling the schema reports.
 
 ## Consult the engine documentation
 
