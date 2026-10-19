@@ -6,7 +6,7 @@ tags:
   - 模块
   - 领域工具
   - B组
-timestamp: "2026-10-16T17:43:07+08:00"
+timestamp: "2026-10-20T02:27:22+08:00"
 resource: src/tools/
 ---
 
@@ -101,7 +101,7 @@ resource: src/tools/
   - **`get_display_window_rect`（09-15 新增，只读）**：返回窗口客户区矩形 `position`/`size`（虚拟桌面坐标）、装饰后 `decorated_position`/`decorated_size`、所在屏幕 `screen` 与 `screen_scale`/`screen_position`/`screen_size`；`window_id` 默认 0（主窗口），负值报错。用于桌面坐标 ↔ 窗口客户区坐标换算（`warp_display_mouse`/输入工具都按客户区取坐标）。
   - `set_display_mouse_mode` 校验 mode 0-4，越界返回 `invalid mouse mode: N`（并非钳制到边界）；`show_display_dialog` 检查 `DisplayServer::dialog_show` 的返回 Error。
   - 鼠标坐标基准（09-13 下午起描述明确）：`get_display_mouse_position` 返回**桌面屏幕**坐标；`warp_display_mouse` 的 x/y 是**聚焦窗口客户区**像素（引擎转换后移动 OS 光标）——两者不可直接互喂，驱动编辑器 dock/UI 时 warp 与输入工具应使用同一客户区坐标（见 tools_ops_a 的 input_ops 小节）。
-  - 15 个副作用工具声明非空 `side_effect` + `kMutating`，遍历经 `get_tool_detail` 自动排除（见文末对照）；新增的 `get_display_window_rect` 不标记副作用。
+  - 15 个副作用工具声明 `side_effect != "none"` + `kMutating`，遍历经 `get_tool_detail` 自动排除（见文末对照）；新增的 `get_display_window_rect` 不标记副作用。
 - **错误模式**：`util::error_json`（"missing required parameter" / "DisplayServer not available" / "subwindows not supported on this platform"）。
 - 出站链接：[工具注册表](../modules/tools_registry.md) · [运行时通道](../modules/entry_runtime.md)
 
@@ -110,7 +110,7 @@ resource: src/tools/
 - **职责**：`OS`/`Time` 单例直通：弹窗、进程创建与执行、环境变量、系统信息、文件回收站、shell 打开；10-11 新增 `file_dir_ops` 4 个项目内文件目录工具（handler 独立文件，声明仍挂 `os_tools.hpp`，归 OS 类）。
 - **代表工具**：`show_os_alert`、`create_os_process`、`execute_os_process`、`get_os_datetime`、`get_os_environment`、`get_os_locale`、`get_os_system_fonts`、`get_os_system_info`、`get_os_unique_id`、`get_os_unix_time`、`get_os_user_data_dir`、`kill_os_process`、`move_os_file_to_trash`、`set_os_environment`、`open_os_path`、`list_directory`、`get_file_info`、`copy_file`、`ensure_directory`（10-11 新增 4 个：目录列举/元信息/字节复制/幂等建目录）。
 - **关键事实**：
-  - **8 个副作用工具**（含 `write_file`，handler 在 text_ops 但归 OS 类）声明非空 `side_effect` + `kMutating`，遍历经 `get_tool_detail` 的 `side_effect` 非空自动排除——`show_os_alert` 弹系统模态框；`execute_os_process`/`create_os_process` 拉起进程；`kill_os_process` 杀进程；`open_os_path` 打开 URI；`move_os_file_to_trash` 删文件；`set_os_environment` 改环境；`write_file` 写磁盘。
+  - **8 个副作用工具**（含 `write_file`，handler 在 text_ops 但归 OS 类）声明 `side_effect != "none"` + `kMutating`，遍历经 `get_tool_detail` 的 `side_effect` 判定自动排除（判据是「非空且非 `none`」，`traversal.cpp` 的 `kSideEffectNone`）——`show_os_alert` 弹系统模态框；`execute_os_process`/`create_os_process` 拉起进程；`kill_os_process` 杀进程；`open_os_path` 打开 URI；`move_os_file_to_trash` 删文件；`set_os_environment` 改环境；`write_file` 写磁盘。
   - `execute_os_process` 可选 `output: true` 捕获 stdout/stderr（`OS::execute` 第四参 true，返回 exit_code + 拼接输出）。
   - 其余只读查询工具（datetime/环境/系统信息/时间/字体/唯一 ID 等）声明 `SideEffect::None` + `kNone`，遍历会冒烟。
 - **错误模式**：必填参数缺失 → error_json；单例缺失 → error_json；`kill_os_process`/`move_os_file_to_trash`/`open_os_path` 返回 Error 枚举数值。

@@ -19,6 +19,10 @@ The MCP layer exposes the meta tools `ping`, `search_tools`, `list_categories`, 
 
 Every domain tool is executed through `call_tool` by passing the domain tool name and its arguments object. A few high-effect groups sit behind capability gates; the enable paths are in the godot-autopilot-tools skill.
 
+`batch_execute` is behind the `code_execute` capability, exactly like `code_execute` itself: a client that enabled only `process` or `game_runtime` cannot run a batch, and the operations never start. The four capability names and the enable paths are in the godot-autopilot-tools skill.
+
+`code_execute` interrupts a script that outruns its `timeout_ms` (max 30000 ms). The deadline is injected into the script, so a long loop really does stop instead of freezing the editor, and the call comes back as a timeout failure. Split long work into several calls, or raise `timeout_ms` up to the 30000 ms ceiling.
+
 ## Consult the engine documentation
 
 Never call engine APIs from memory. Property names, method signatures, enum values, defaults and class members change between Godot versions, and recalled signatures are a common source of silent failures. The server exposes a documentation family - `find_docs_class`, `get_docs_class`, `get_docs_method`, `get_docs_property` - that answers straight from the offline documentation cache bundled with the running editor.
@@ -144,7 +148,7 @@ Two situations land here. **No MCP client is configured** — the user installed
 Probe the machine first (`bun --version`, then `node --version`), then work down this ladder:
 
 1. Native MCP Tools - retry the connection first; this is the normal channel.
-2. GDA CLI (Bun) - run `bunx --no-install "github:jesspig/Godot-Autopilot#0.2.7" <cmd>` first; if not cached, `bunx "github:jesspig/Godot-Autopilot#0.2.7" <cmd>` downloads once. Quotes are required on PowerShell because `#` starts a comment. Calling commands: ping/status/categories/search/describe/call; lifecycle: list/start/stop/logs. See the godot-autopilot-tools skill for the full reference.
+2. GDA CLI (Bun) - run `bunx --no-install "github:jesspig/Godot-Autopilot#0.2.7" <cmd>` first; if not cached, `bunx "github:jesspig/Godot-Autopilot#0.2.7" <cmd>` downloads once. Quotes are required on PowerShell because `#` starts a comment. Calling commands: ping/status/categories/search/describe/call; lifecycle: list/start/stop/logs. See the godot-autopilot-tools skill for the full reference. Known limitation: the pinned release tag was cut before the CLI existed - that tag's tree has no `cli/` directory and no root `package.json`, so the pinned command cannot resolve a `gda` binary and fails every time. Do not spend retries on it. Use `bunx "github:jesspig/Godot-Autopilot#develop" <cmd>` instead (that branch does ship the CLI, but it is an unreleased moving target, not a pinned version), or the standalone `gda` release asset once a release ships it, or rung 3.
 3. Script bridge - when Bun is unavailable but Node 18+ or Bun exists, run `node .agents/skills/godot-autopilot-tools/scripts/gda.mjs` to reach the same server without a working MCP client.
 4. Standalone binary - when neither Bun nor Node exists, download the `gda` release asset for the user's OS and CPU, verify it against the release's `sha256sums.txt`, and run it like the CLI. Asset names and platform caveats: `references/cli-access.md` of the godot-autopilot-tools skill.
 5. No runtime and no download - fall back to a manual plan per `references/manual-fallback.md` of the godot-autopilot-tools skill.

@@ -5,7 +5,7 @@
 ![Godot版本](https://img.shields.io/badge/Godot-4.7%2B-478CBF?logo=godotengine&logoColor=white)
 ![支持平台](https://img.shields.io/badge/platform-Windows%7CLinux%7CmacOS-lightgrey)
 [![协议](https://img.shields.io/badge/MCP-Streamable_HTTP-blueviolet)](https://modelcontextprotocol.io/)
-![工具数](https://img.shields.io/badge/tools-443%2B-brightgreen)
+![工具数](https://img.shields.io/badge/tools-451%2B-brightgreen)
 
 > **让 AI 代理在编辑器里帮你搭场景、试玩和排错。**
 
@@ -23,7 +23,7 @@ Godot-Autopilot 是一个住在 **Godot 编辑器内部**的插件型 [MCP](http
 
 ## 能做什么
 
-**443+ 个工具**，覆盖从编辑器到游戏的完整闭环（数量随版本增长，以代理通过 `search_tools` 查到的为准）。举例：
+**451+ 个工具**，覆盖从编辑器到游戏的完整闭环（数量随版本增长，以代理通过 `search_tools` 查到的为准）。举例：
 
 - **搭场景**——创建、改名、移动、删除节点，读写属性，连接信号，三维块地图 GridMap 搭关卡（如 `create_scene_node`、`property_set`、`signal_connect`、`scene_tree_items`；GridMap：`create_gridmap`、`set_gridmap_cell`、`fill_gridmap_box`）。
 - **画面与声音**——网格材质、灯光环境、音频播放、动画与补间、UI 主题、瓦片地图（如 `create_animation`、`tween_editor_property`、`create_game_tween`、`play_audio_player`、`fill_tilemap_rect`）。

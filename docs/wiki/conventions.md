@@ -6,7 +6,7 @@ tags:
   - 约定
   - 命名
   - 规范
-timestamp: "2026-10-19T05:03:48+08:00"
+timestamp: "2026-10-20T00:57:31+08:00"
 resource: src/
 ---
 
@@ -39,26 +39,52 @@ resource: src/
 
 ## 线程纪律
 
-- **所有 Godot API 调用必须通过 `queue.submit()`**（HTTP 线程直接调用会崩溃）；例外：`debugger_prompts` 为纯静态模板文本、不触碰 Godot API 亦不经队列，`debugger_resources` 读取捕获缓冲仍经 `queue.execute_sync()`；`call_tool` 元工具编排回调在 MCP 线程执行但自身不触碰 Godot API（领域工具经 dispatch 路由回主线程，2026-09-13 起）
+- **所有 Godot API 调用必须通过 `CommandQueue` 在主线程执行**（HTTP 线程直接调用会崩溃）；`CommandQueue::execute_sync()` **已无调用点**且是无界等待，**不得新增调用**——跨线程进主线程一律走 `submit()` 或带预算的等待入口（`dispatch::run_on_main_thread_with_budget` / `dispatch::run_bounded_on_main_thread`）。例外：`debugger_prompts` 为纯静态模板文本、不触碰 Godot API 亦不经队列；`debugger_resources` 与 `resource_handlers` 读取捕获缓冲经 `dispatch::run_bounded_on_main_thread`（默认预算 `GDA_DISPATCH_WAIT_DEFAULT_MS`）提交到主线程执行；`call_tool` 元工具编排回调在 MCP 线程执行但自身不触碰 Godot API（领域工具经 dispatch 路由回主线程，2026-09-13 起）
+- **主线程契约由静态守卫强制**：`tests/guard/main_thread_guard.py` 扫描 `src/` 下全部 `*.cpp/*.hpp`，把每个源文件按「线程上下文分类」归入 `main`（主线程）/ `managed`（受管，游戏进程侧经 SceneTreeTimer 与 awaiter 排到游戏主线程）/ `foreign`（外线程）三类；`foreign` 类文件里的 Godot API 直接调用默认违规，只有落在该文件显式登记的主线程作用域（`FOREIGN_MAIN_THREAD_SCOPES`）里才放行。词法层面先剥离字符串字面量（含 raw string）与注释再匹配标识符，避免把字面量/注释里的 API 名误判为真实调用。判定在 ctest 阶段（`ctest --preset debug -R main_thread_guard`），无违规打印 `main-thread-guard OK` 退出 0，有违规退出 1，文件读/解码失败退出 2。
 - `CommandQueue`：header-only，`submit()` 返回 `std::future`（异常经 `set_exception` 传播），主线程 `_process()` 每帧 `drain()`
-- 导出期间（`ExportGuard` 原子标记）`dispatch` 拒绝工具调用
+- 导出期间（`ExportGuard` **实例级**导出标志——每个实例各持一份 `ExportState`，`is_exporting()` 遍历实例注册表、任一实例在导出期即返回 true）`dispatch` 拒绝工具调用
 
 ## 添加工具流程
 
 `ToolRegistry` 单一来源 + 全量 `ToolSpec` 数据记录（无 `tool_defs.def`、无宏/真类；设计见 [tool_base_design.md](tool_base_design.md)）：
 
 1. `<域>_ops.hpp` 声明 `mcp::JsonValue handle_xxx(const mcp::JsonValue& args);`
-2. `<域>_ops.cpp` 实现（返回 `{"error": ...}` 或结果对象）。取参现状必须知道：`Args(raw, kXxxParams)` 取参器（`tool_args.hpp`：opt_/require_/get_ + `reject_unknown()`）**已实现且有 L1 覆盖，但 `src/` 下没有任何领域 handler 接入**（除 `tool_args.cpp` 自身，全仓 0 处引用）；在架 handler 一律 `args.Find("name")` 手工判类型 + `util::error_json("missing required parameter: <name>")`（`util::error_json` 在 `src/tools/` 约 490 处、`util::ok_result` 约 45 处）。新增工具跟随所在域邻居的写法，不要在已用 `args.Find` 的文件里混入 `Args`，否则同一文件两种取参风格并存
+2. `<域>_ops.cpp` 实现（返回 `{"error": ...}` 或结果对象）。取参现状必须知道：`Args(raw, kXxxParams)` 取参器（`tool_args.hpp`：opt_/require_/get_ + `reject_unknown()`）**已实现且有 L1 覆盖，但 `src/` 下没有任何领域 handler 接入**（除 `tool_args.cpp` 自身，全仓 0 处 include）；在架 handler 一律 `args.Find("name")` 手工判类型 + `util::error_json("missing required parameter: <name>")`（`util::error_json` 在 `src/tools/*.cpp` 实测 759 行、`util::ok_result` 46 行）。33 个领域的 handler 全部走 `args.Find(...)`。新增工具跟随所在域邻居的写法，不要在已用 `args.Find` 的文件里混入 `Args`，否则同一文件两种取参风格并存
 3. 该域 `<域>_tools.hpp`：定义 `const std::vector<ParamSpec> kXxxParams = {...}` 参数表，并在 `make_tools()` 中以 `v.push_back(make_spec_tool(ToolSpec{name, description, category, {tags}, side_effect, flags, kXxxParams, handler}))` 一行注册——`register_all.cpp` 经各域 `make_tools()` 自动注册，无需手改；schema 从参数表自动派生（仅嵌套结构才用 `raw_schema` 手写 JSON）
 4. `side_effect`（`SideEffect` 枚举选值）与 `flags`（如 `kMutating`）按工具实际影响声明即自动进入遍历排除，无需手改 `tests/runner/traversal.cpp`；合成输入类可加 `kObserve` 复用执行管线的截图后处理
-5. 仅新增 `.cpp` 才需动 `CMakeLists.txt:65` 的 `add_library()`（header-only 无需）；迁移守卫 `tests/guard/` 拒绝旧宏（`GDA_TOOL_CLASS` 等）与 `schema_*_ops.cpp` 残留
+5. 仅新增 `.cpp` 才需动 `CMakeLists.txt:65` 的 `add_library()`（header-only 无需；**所有**新增 `.cpp` 都要逐项登记，Unity 构建只编译列出的文件）；迁移守卫 `tests/guard/` 拒绝旧宏（`GDA_TOOL_CLASS` 等）与 `schema_*_ops.cpp` 残留
 
 ## 测试纪律
 
 - L1（`gda_unit_tests`）禁止调用任何已注册工具 handler（无引擎时 godot-cpp 接口指针为 nullptr 会崩溃），只能测注册/分发/错误路径
 - 子代理迭代：只写代码不编译，主代理统一 configure + build 再分批跑测试（并行编译会锁）
-- 新增 `src/*.cpp` 同步更新 `tests/CMakeLists.txt` 的 `GDA_UNIT_BUSINESS_SOURCES`
+- **新增 `src/*.cpp` 的登记分两处、口径不同**：
+  - 根 `CMakeLists.txt:65` 的 `add_library()`：**所有**新增 `.cpp` 都要逐项登记（含 `src/tools/*_ops.cpp`），漏登记即漏编译；
+  - `tests/CMakeLists.txt` 的 `GDA_UNIT_BUSINESS_SOURCES`：**只有非 `*_ops.cpp` 的源文件才需登记**——`src/tools/*_ops.cpp` 已由 `file(GLOB GDA_TOOLS_OPS_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/tools/*_ops.cpp")`（`tests/CMakeLists.txt:21-22`）自动纳入 L1 业务源，新加的 `*_ops.cpp` 无需手改清单（`CONFIGURE_DEPENDS` 保证 reconfigure 时重新收集）；其余目录（`src/core/`、`src/util/`，以及 `src/tools/` 下的非 ops 文件如 `register_all.cpp`/`dispatch.cpp`/`tool_catalog.cpp`/`schema_builder.cpp`/`tool_args.cpp`/`tool_pipeline.cpp`/`tool_invoke.cpp`/`debugger_access.cpp`/`editor_ui_actions.cpp`）仍需显式登记，漏登记只在 L1 链接期报错。
 - 计数口径（L1 gtest 数、L2 `tests/config/*.json` 份数、ctest 注册点、遍历候选/步骤数）以运行时统计为准；迁移守卫经 `ctest --preset debug -R migration_guard` 零依赖运行（该预设固定 Ninja 生成器，无 ninja 时改用 `debug-portable`，见 [build.md](build.md)「预设」）
+
+## 守卫（guards）
+
+守卫是「不靠人自觉」的静态门禁，全部在 ctest 阶段判定（**编译通过不等于守住**），当前 6 个：
+
+| 守卫 | 载体 | 守住什么 |
+|---|---|---|
+| `migration_guard` | `tests/guard/migration_guard.cmake` | 旧宏 / 旧 schema 文件零残留 |
+| `comment_guard` | `tests/guard/comment_guard.py` | `src/` 与 `tests/` 下源码无注释 |
+| `main_thread_guard` | `tests/guard/main_thread_guard.py` | 外线程文件不直接调用 Godot API |
+| `version_sync_guard` | `tests/guard/version_sync_guard.py` | 版本号单一来源（根 `VERSION`）在各载体间一致 |
+| `cli_contract` | `tests/scripts/test_cli_contract.py` | CLI 载体与 MCP 双载体契约一致 |
+| `cli_unit` | `tests/scripts/run_cli_unit.py` | CLI 单测（封装 `bun test cli/tests`） |
+
+**新增守卫的命名与登记约定**：
+
+1. **命名**：`<主题>_guard`（`.py` 或 `.cmake`），落在 `tests/guard/`；`tests/CMakeLists.txt` 里的 ctest 名字与文件名一致（`add_test(NAME <主题>_guard COMMAND ...)`），便于 `ctest -R <主题>_guard` 单独跑。
+2. **豁免清单**：守卫若需豁免，**豁免必须显式登记在守卫文件自己的清单常量里**，不允许靠「文件不在扫描范围」或注释绕过。已登记的两处清单：
+   - `main_thread_guard.py` 的 `THREAD_CONTEXT_RULES`（逐文件标注 `main`/`managed`/`foreign` 三类线程上下文 + 判定理由）与 `FOREIGN_MAIN_THREAD_SCOPES`（外线程文件里允许触碰 Godot API 的主线程作用域白名单，当前仅 `src/core/log_persist.cpp` 的 6 个函数）；
+   - `migration_guard.cmake` 的 `migrated_domains.txt`（已迁移域清单 + `strict` 行）。
+3. **零依赖**：守卫只允许用标准库或 CMake 自带能力，不引入第三方依赖、不启动引擎、不联网。
+4. **退出码约定**：0 = 通过（打印一行可辨识的 OK 文案），1 = 有违规（逐条打印 `文件:行号: 片段`），2 = 用法/环境错误（参数错误、文件读不到）。CI 靠退出码判定。
+5. **豁免要写进知识库**：新增或调整豁免清单后，同步更新本页与对应模块页，避免「代码里放行了、文档里没记」。
 
 ## 注释与提交
 

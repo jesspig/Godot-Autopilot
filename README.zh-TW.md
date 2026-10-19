@@ -5,7 +5,7 @@
 ![Godot版本](https://img.shields.io/badge/Godot-4.7%2B-478CBF?logo=godotengine&logoColor=white)
 ![支援平台](https://img.shields.io/badge/platform-Windows%7CLinux%7CmacOS-lightgrey)
 [![協議](https://img.shields.io/badge/MCP-Streamable_HTTP-blueviolet)](https://modelcontextprotocol.io/)
-![工具數](https://img.shields.io/badge/tools-443%2B-brightgreen)
+![工具數](https://img.shields.io/badge/tools-451%2B-brightgreen)
 
 > **讓 AI 代理在編輯器內幫你搭建場景、試玩與除錯。**
 
@@ -23,7 +23,7 @@ Godot-Autopilot 是一個住在 **Godot 編輯器內部**的外掛型 [MCP](http
 
 ## 能做什麼
 
-超過 **443 個工具**，涵蓋從編輯器到遊戲的完整閉環（數量隨版本增長，以代理透過 `search_tools` 查到的為準）。重點功能：
+超過 **451 個工具**，涵蓋從編輯器到遊戲的完整閉環（數量隨版本增長，以代理透過 `search_tools` 查到的為準）。重點功能：
 
 - **搭建場景**——建立、重新命名、移動、刪除節點；讀寫屬性；連接訊號；以 GridMap 搭建三維方塊地圖關卡（如 `create_scene_node`、`property_set`、`signal_connect`、`scene_tree_items`；GridMap：`create_gridmap`、`set_gridmap_cell`、`fill_gridmap_box`）。
 - **畫面、聲音與手感**——網格與材質、燈光與環境、音訊播放、動畫與補間、UI 主題、圖塊地圖（如 `create_animation`、`tween_editor_property`、`create_game_tween`、`play_audio_player`、`fill_tilemap_rect`）。

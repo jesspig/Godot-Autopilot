@@ -166,6 +166,26 @@ work must be split into shorter calls or polled with `get_game_status`. The
 run_gdscript_tests, create_editor_scene and editor-target captures), which
 never round-trip through the game.
 
+## Timeout and dispatch error codes: what to do with each
+
+Failures that carry a machine-readable `code` are the ones to branch on. The
+`error` text is prose and gets reworded; the code is stable. Match on the
+code, not on the message.
+
+| Code | Raised when | Retryable | What to do |
+|---|---|---|---|
+| exec_timeout | a `code_execute` script outran its `timeout_ms` | no | The script was interrupted and the work it already did is not rolled back - read the state back before retrying. Split the script into smaller pieces, or raise `timeout_ms` (max 30000 ms). |
+| eval_timeout | a game-side `eval` script outlived the host wait (25000 ms), or the editor gave up waiting for the eval answer | not immediately | The game main thread may still be running that script - a running GDScript call cannot be interrupted. Wait for the game to become responsive (`get_game_status`) before sending more work, then retry. |
+| eval_cancelled | the eval request was torn down by a cancel handle | no | The request is gone and no answer will arrive. Re-issue it if the result is still needed. |
+| main_thread_timeout | the editor main thread did not process the tool inside its dispatch budget | yes | The editor may be paused, blocked by a modal dialog, exporting or busy. Clear the blocker, then retry the same call. |
+| queue_unavailable | the editor main-thread queue was full or already closed | yes, later | The editor is shutting down or overloaded. Wait and retry; if it keeps failing, the editor is going down. |
+
+The two eval codes arrive nested under a structured_error object inside the
+tool payload; the other three come back as the top-level result of the call.
+The dispatch codes carry `retryable` set to true and the exec code carries it
+false; the eval codes carry no flag at all, so treat a missing flag as "do not
+retry immediately".
+
 ## After a game timeout: engine continue and late results
 
 When a game op times out, the plugin releases the pending record, sends the
@@ -288,6 +308,12 @@ the next call without a restart. The process gate keeps no dock toggle: it
 needs the environment variable and a restart. When the environment variable
 is set it wins over the config.
 
+`batch_execute` sits behind the same `code_execute` gate as `code_execute`
+itself, even when the batch only calls ordinary domain tools. A client that
+enabled `process` or `game_runtime` but not `code_execute` used to be able to
+run a batch and now gets an authorization_required error on the batch itself -
+the operations never run. Check the capability before reaching for a batch.
+
 `code_execute` wraps your source in a generated @tool Node script. Four traps:
 
 - Two modes selected by a line scan: each line is stripped of leading
@@ -312,6 +338,29 @@ is set it wins over the config.
 
 Details: godot-autopilot-scripting.
 
+## code_execute: the timeout now really fires
+
+`timeout_ms` used to be checked only once, before the script started, so a
+script with an endless loop inside kept the editor main thread busy forever -
+the editor froze and the call never came back. The deadline is now injected
+into the script itself: a check is placed at every function entry and inside
+loop bodies, and the script stops at the first check that runs after the
+deadline passes. The call then comes back as an exec_timeout failure.
+
+What that means for a caller:
+
+- A long loop is really interrupted now. Never write a script that assumes it
+  may run for minutes.
+- The interruption is cooperative - it can only fire where a check sits. A
+  single blocking engine call (one heavy expression, a long await) still runs
+  to completion, so keep the work between two checks short.
+- The work done before the interruption is not rolled back. Read the state
+  back before retrying.
+- The maximum accepted `timeout_ms` is 30000 ms. To do more than that, split
+  the work into several calls.
+- A script that hits the deadline returns the exec_timeout code, not a plain
+  error, so it can be told apart from a compile or runtime failure.
+
 ## The GDA_FORCE_HEADLESS environment variable
 
 The name is inverted. Setting GDA_FORCE_HEADLESS=1 does not force headless
@@ -323,9 +372,10 @@ unset.
 
 ## Side effect classes
 
-`get_tool_detail` reports a `side_effect` marker for every tool that can act
-beyond reading editor state. Read it before calling anything you have not
-used before. The classes, in increasing order of risk:
+`get_tool_detail` reports a `side_effect` marker for every tool, and the
+marker is never empty: a tool that only reads reports `none`. Read it before
+calling anything you have not used before. The classes, in increasing order of
+risk:
 
 - `writes_file` - writes files under res:// or user://. Confirm the path
   stays inside the project before calling.
@@ -343,6 +393,12 @@ used before. The classes, in increasing order of risk:
 Two cases deserve the same caution as `process`: the `code_execute` meta tool
 runs arbitrary GDScript in the editor process, and tools marked `game_runtime`
 change the running game's state. Treat both at the highest risk level.
+
+The two script-running meta tools, `code_execute` and `batch_execute`, both
+report `code_execute`. The authorization gate is derived from this marker
+alone - the server keeps no per-tool-name exception list - so a tool can start
+requiring a capability because its class changed, not because its name is
+special.
 
 ## See also
 

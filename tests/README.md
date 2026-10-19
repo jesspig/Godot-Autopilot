@@ -1,10 +1,12 @@
 # 测试体系说明
 
+> **本文件的定位**：L1/L2 两层测试的**使用说明与用例清单**（怎么配、怎么跑、每份用例覆盖什么）。**全套数值的权威落点是 [docs/wiki/tests.md](../docs/wiki/tests.md) 的「数值核算总表」**——本文件不另立数值口径，出现不一致时以该页为准。
+
 ## 1. 概述
 
 测试体系分两层：
 
-- **L1 纯单测**（`gda_unit_tests`，gtest 用例与测试文件数、含两守卫与 `skill_scripts` 的过滤集计数均以 [docs/wiki/tests.md](../docs/wiki/tests.md) 的数值核算总表为准）：不启动引擎，不触碰 Godot API，验证核心逻辑与工具注册管线。
+- **L1 纯单测**（`gda_unit_tests`，gtest 用例与测试文件数、含 6 个守卫与脚本项（源码守卫 `migration_guard` / `comment_guard` / `main_thread_guard` / `version_sync_guard` + 脚本项 `cli_contract` / `cli_unit`）的过滤集计数均以 [docs/wiki/tests.md](../docs/wiki/tests.md) 的数值核算总表为准）：不启动引擎，不触碰 Godot API，验证核心逻辑与工具注册管线。
 - **L2 配置驱动引擎内测试**（`gda_test_runner` + `tests/config/*.json` 用例）：由 C++ 执行器自管 Godot headless 编辑器进程，经真实 MCP HTTP 全链路驱动领域工具，并按 JSON 用例中的断言语义（C++ 执行器侧）校验响应。**每份 config/*.json = 一次独立的编辑器生命周期最小闭环**（启动 → MCP 就绪 → 执行步骤 → 停止进程），文件间互不共享状态。
 
 架构一句话：进程内 GDExtension（EditorPlugin），领域工具经 `call_tool` 元工具代理，由 `register_all.cpp` 的 registry（`build_registry`，经 `refresh_derived` 派生 dispatch 映射）分发。
@@ -17,7 +19,7 @@
 | Ninja（可选） | 构建生成器。有 ninja 时用 `debug`/`release`（更快，且 Ninja 作业池生效）；无 ninja 时自动落到 `debug-portable`/`release-portable`（省略 generator，由 CMake 发现平台默认生成器），共用同一 `build/{debug,release}` 目录。`uv run main.py` 各子命令自动选路，手动 `cmake --preset` / `ctest --preset` 须自己选对预设名 |
 | clang-cl | 编译器（MSVC/GCC 自动回退，测试继承根配置） |
 | Godot 可执行文件 | 仅 L2 需要，见第 3 节 |
-| L2 测试床 | `tests/testbed/` 专用工程：入库的只有工程定义（`project.godot`、`.gitignore` 与 `14_tilemap_rect` 依赖的 `assets/Items/Fruits/Apple.png`），`TestTypes.cs`/`testbed.csproj` 由 `38_csharp_bridge` 用例动态创建、`fixtures/gda_prop_item.gd` 由 `02_property` 用例自生成，均不入库；`addons/`、`.godot/`、`gda_tmp_*` 等产物不入库。插件由 `uv run main.py deploy` 写入（床恒被部署，与 `--demos` 子集无关）；床或床内 gdextension 缺失时执行器秒级退出码 2 |
+| L2 测试床 | `tests/testbed/` 专用工程：入库的只有工程定义（`project.godot`、`.gitignore` 与 `14_tilemap_rect` 依赖的 `assets/Items/Fruits/Apple.png`），`project.godot` 的入库内容含 `config/features=PackedStringArray("4.7", "Forward Plus", "C#")` 与 `[dotnet] assembly_name="GDA Testbed"`；`TestTypes.cs`/`testbed.csproj` 由 `38_csharp_bridge` 用例动态创建、`fixtures/gda_prop_item.gd` 由 `02_property` 用例自生成，均不入库；`addons/`、`.godot/`、`gda_tmp_*` 等产物不入库。插件由 `uv run main.py deploy` 写入（床恒被部署，与 `--demos` 子集无关）；床或床内 gdextension 缺失时执行器秒级退出码 2 |
 | googletest | `third_party/googletest` 子模块（tag `v1.15.2`，commit `b514bdc898e2951020cbdca1304b75f5950d1f59`），随仓库检出：`git clone --recurse-submodules <repo>`，或 `git submodule update --init --recursive`；缺失即 configure 报错，不做网络回退；仅 L1 链接 |
 
 ## 3. 配置 Godot 路径
@@ -33,7 +35,7 @@ $env:GODOT_PATH="C:\path\to\Godot.exe"
 
 若二者皆无，`gda_test_runner` 退出码 2（"未找到 Godot 可执行文件"）。L1 不受影响。
 
-另有 L2 授权前置：涉及任意脚本/游戏运行时的用例（如 `00_meta` 的 code_execute、`04_resources_scripts` 的 execute_script、`16_game_jobs` 的 start_game_job、`23`/`24` 的游戏侧路径、`37` 的 execute_game_script 需 `game_runtime`，`18`/`22`/`26`/`27`/`29`/`30`/`32`/`34`/`35`/`36` 需 `code_execute`；`35` 的 8 个 SceneTree 工具受 `game_runtime` 门保护，但未授权时也满足其 error 断言，两种授权态都应通过）需要 capability 授权——由 `GODOT_AUTOPILOT_ALLOW` 环境变量（如 `game_runtime`、`code_execute` 或 `all`）或 `user://godot_autopilot/config.json` 的 `allow` 字段提供，环境变量优先；缺失时相应用例被授权门拒绝而 FAIL。其中 `26_user_tools_code_mode` 与 `27_user_tools_rescan` 的用户工具注册/调用另受 `user_tools` 能力门保护：用例内 `AutopilotTools.set_enabled(true)` 写配置可自包含，但若 `GODOT_AUTOPILOT_ALLOW` 已设置且不含 `user_tools`/`all`，env 优先使 `set_enabled` 无效、用例失败（此时需在 env 中补 `user_tools` 或取消该 env）。
+另有 L2 授权前置：涉及任意脚本/游戏运行时的用例（如 `00_meta` 的 code_execute、`04_resources_scripts` 的 execute_script、`13_inline_subresource` 的 code_execute、`16_game_jobs` 的 start_game_job、`23`/`24` 的游戏侧路径、`37` 的 execute_game_script 需 `game_runtime`，`18`/`22`/`26`/`27`/`29`/`30`/`32`/`34`/`35`/`36`/`39`/`40`/`41` 需 `code_execute`；`35` 的 8 个 SceneTree 工具受 `game_runtime` 门保护，但未授权时也满足其 error 断言，两种授权态都应通过）需要 capability 授权——由 `GODOT_AUTOPILOT_ALLOW` 环境变量（如 `game_runtime`、`code_execute` 或 `all`）或 `user://godot_autopilot/config.json` 的 `allow` 字段提供，环境变量优先；缺失时相应用例被授权门拒绝而 FAIL。其中 `26_user_tools_code_mode` 与 `27_user_tools_rescan` 的用户工具注册/调用另受 `user_tools` 能力门保护：用例内 `AutopilotTools.set_enabled(true)` 写配置可自包含，但若 `GODOT_AUTOPILOT_ALLOW` 已设置且不含 `user_tools`/`all`，env 优先使 `set_enabled` 无效、用例失败（此时需在 env 中补 `user_tools` 或取消该 env）。
 
 ## 4. 构建
 
@@ -58,10 +60,10 @@ cmake --build --preset debug --target gda_unit_tests gda_test_runner
 ctest --preset debug
 ```
 
-注册方式（`tests/CMakeLists.txt:118-130`）：**每份 `config/*.json` 一条 `gda_runner_<文件名去后缀>` 用例**，命令为 `gda_test_runner --file <name> --report-dir <build>/tests/output`，`TIMEOUT 600`（单文件含遍历约 2-4 分钟，超时防挂死）。当前 38 个 config 文件 → 38 条 ctest 用例（21 号段空缺，99 号诊断用例已删）：`gda_runner_00_meta`、`gda_runner_01_scene`、`gda_runner_02_property`、`gda_runner_03_tools_contract`、`gda_runner_04_resources_scripts`、`gda_runner_05_rename_references`、`gda_runner_06_move_references`、`gda_runner_07_scene_tabs`、`gda_runner_08_property_readback`、`gda_runner_09_editor_ui`、`gda_runner_10_editor_input`、`gda_runner_11_editor_tree`、`gda_runner_12_capture_params`、`gda_runner_13_inline_subresource`、`gda_runner_14_tilemap_rect`、`gda_runner_15_scene_path`、`gda_runner_16_game_jobs`、`gda_runner_17_vision_assist`、`gda_runner_18_script_freshness`、`gda_runner_19_cjk_roundtrip`、`gda_runner_20_cjk_text_roundtrip`、`gda_runner_22_uid_guard`、`gda_runner_23_click_ui_coords`、`gda_runner_24_keycode_alias`、`gda_runner_25_open_scene_idempotent`、`gda_runner_26_user_tools_code_mode`、`gda_runner_27_user_tools_rescan`、`gda_runner_28_sprite_frames_animation`、`gda_runner_29_trace_persistence`、`gda_runner_30_observability`、`gda_runner_31_theme_root`、`gda_runner_32_plane_inline`、`gda_runner_33_verified_inherit`、`gda_runner_34_slash_property`、`gda_runner_35_scene_tree_gate`、`gda_runner_36_stall_immunity`、`gda_runner_37_game_ready_gate`、`gda_runner_38_csharp_bridge`。
+注册方式（`tests/CMakeLists.txt:121-131`）：**每份 `config/*.json` 一条 `gda_runner_<文件名去后缀>` 用例**，命令为 `gda_test_runner --file <name> --report-dir <build>/tests/output`，`TIMEOUT 600`（单文件含遍历约 2-4 分钟，超时防挂死）。当前 41 个 config 文件 → 41 条 ctest 用例（21 号段空缺，99 号诊断用例已删）：`gda_runner_00_meta`、`gda_runner_01_scene`、`gda_runner_02_property`、`gda_runner_03_tools_contract`、`gda_runner_04_resources_scripts`、`gda_runner_05_rename_references`、`gda_runner_06_move_references`、`gda_runner_07_scene_tabs`、`gda_runner_08_property_readback`、`gda_runner_09_editor_ui`、`gda_runner_10_editor_input`、`gda_runner_11_editor_tree`、`gda_runner_12_capture_params`、`gda_runner_13_inline_subresource`、`gda_runner_14_tilemap_rect`、`gda_runner_15_scene_path`、`gda_runner_16_game_jobs`、`gda_runner_17_vision_assist`、`gda_runner_18_script_freshness`、`gda_runner_19_cjk_roundtrip`、`gda_runner_20_cjk_text_roundtrip`、`gda_runner_22_uid_guard`、`gda_runner_23_click_ui_coords`、`gda_runner_24_keycode_alias`、`gda_runner_25_open_scene_idempotent`、`gda_runner_26_user_tools_code_mode`、`gda_runner_27_user_tools_rescan`、`gda_runner_28_sprite_frames_animation`、`gda_runner_29_trace_persistence`、`gda_runner_30_observability`、`gda_runner_31_theme_root`、`gda_runner_32_plane_inline`、`gda_runner_33_verified_inherit`、`gda_runner_34_slash_property`、`gda_runner_35_scene_tree_gate`、`gda_runner_36_stall_immunity`、`gda_runner_37_game_ready_gate`、`gda_runner_38_csharp_bridge`、`gda_runner_39_exec_budget`、`gda_runner_40_contract_assert`、`gda_runner_41_thread_guard`。
 
-- L1 经 `gtest_discover_tests` 注册，每用例一条（如 `CommandQueueTest.*`，391 条，36 个 unit 文件、37 个 gtest suite）；迁移守卫 `migration_guard` 与注释守卫 `comment_guard` 各 1 条（`tests/CMakeLists.txt`，零依赖读源码断言，不启动引擎也无需构建产物）——L1 过滤后共 **394** 条；ctest 总注册点 **432** = 394（L1）+ 38（L2）。
-- **L1 单测清单**（36 个 unit 文件，逐文件主题以 [docs/wiki/tests.md](../docs/wiki/tests.md) 的 L1 表为准）：09-29 B1–B7 修复批次新增 `gdscript_wrap_test`（26）、`dispatch_budget_test`（10）、`ready_policy_test`（5），并把 `command_queue_test` 扩至 11、`variant_json_strict_test` 扩至 47、`error_util_test` 扩至 4，覆盖三通道 GDScript 包装、主线程等待预算、游戏就绪决策表、队列取消/心跳与严格 JSON 形状；09-21 可重放监控与日志系统批次新增 `monitor_test`（9）、`perf_sampler_test`（6），并把 `trace_recorder_test` 扩至 18、`log_system_test` 扩至 9、`log_persist_test` 扩至 8，覆盖统一埋点门面、性能采样/超时看门狗、trace 环缓冲（schema v2）与日志/持久化纯逻辑。
+- L1 经 `gtest_discover_tests` 注册，每用例一条（如 `CommandQueueTest.*`，460 条，43 个 unit 文件、44 个 gtest suite）；另有 6 个守卫与脚本项各占 1 条——4 个源码守卫 `migration_guard` / `comment_guard` / `main_thread_guard` / `version_sync_guard`（零依赖读源码断言，不启动引擎也无需构建产物）与 2 个脚本项 `cli_contract` / `cli_unit`——非 L2 的 ctest 点共 **466** 条 = 460（L1 gtest）+ 6（守卫与脚本项）；ctest 总注册点 **507** = 466（非 L2）+ 41（L2）。
+- **L1 单测清单**（43 个 unit 文件，逐文件主题以 [docs/wiki/tests.md](../docs/wiki/tests.md) 的 L1 表为准）：10-20 主线程契约与执行预算批次新增 `exec_budget_test`（10，`exec_timeout` 结构化错误契约与 GDScript 截止检查注入）与 `export_guard_test`（4，导出期标志的实例级隔离与异常安全复位），并把 `register_all_test` 扩至 16（`side_effect` 可读性断言）、`command_queue_test` 扩至 16（带预算 submit、超时取消与取消计数、owner 线程内联执行、预算非正时仍等完成）、`dispatch_budget_test` 扩至 11（`kLongBlocking` 返回**传入的**长阻塞预算——用例常量 30000 ms，纯函数透传；运行时另经钳制，实际生效 29000 ms；函数签名由 3 参改 4 参）、`log_persist_test` 扩至 10（健康摘要与 trace 图片落盘）；09-29 B1–B7 修复批次新增 `gdscript_wrap_test`（26）、`dispatch_budget_test`（10）、`ready_policy_test`（5），并把 `command_queue_test` 扩至 11、`variant_json_strict_test` 扩至 47、`error_util_test` 扩至 4，覆盖三通道 GDScript 包装、主线程等待预算、游戏就绪决策表、队列取消/心跳与严格 JSON 形状；09-21 可重放监控与日志系统批次新增 `monitor_test`（9）、`perf_sampler_test`（6），并把 `trace_recorder_test` 扩至 18、`log_system_test` 扩至 9、`log_persist_test` 扩至 8，覆盖统一埋点门面、性能采样/超时看门狗、trace 环缓冲（schema v2）与日志/持久化纯逻辑。
 - **耗时**：普通用例约 15s/文件（一次编辑器生命周期）；`03_tools_contract` 含两次全量遍历（运行时枚举后按声明排除的候选工具 ×2，候选数以运行时报告为准），为最慢单文件（约 2-3 分钟）。全量 ctest 总耗时随用例数与机器波动，以运行时统计为准。
 - 单跑一条：`ctest --preset debug -R gda_runner_00_meta` 或 `ctest --preset debug -R CommandQueueTest`。
 
@@ -104,6 +106,16 @@ build\debug\tests\gda_test_runner.exe --file 01_scene
 - 位置：`tests/guard/migration_guard.cmake` + 清单 `tests/guard/migrated_domains.txt`（30 个域 + `strict` 行）。
 - 内容：零依赖读源码断言，`strict` 模式下禁止旧机制回退——已迁移域与全部 `src/tools/*_tools.hpp` 不得含旧宏 `GDA_TOOL_CLASS`/`GDA_TOOL_CLASS_SIDE`；不得残留 `src/tools/schema_*_ops.cpp`；`src/tools/*.hpp|*.cpp` 不得引用 `tool_input_schema` 或 `tools/tool_decl.hpp`。
 - 运行：`ctest --preset debug -R migration_guard`（configure 后即可运行，不依赖构建产物），或直接 `cmake -DSOURCE_DIR=<仓库根> -P tests/guard/migration_guard.cmake`；实测输出 `OK (domains: 30, strict: on)`。
+
+### 5.6 其它源码守卫与脚本项
+
+ctest 上除 L1/L2 外还有 6 个守卫与脚本项常驻（注册见 `tests/CMakeLists.txt`；逐项说明见 [docs/wiki/tests.md](../docs/wiki/tests.md) 的「守卫与脚本项」）：
+
+- `comment_guard`（`tests/guard/comment_guard.py`）：扫描 `src/` 与 `tests/` 下的 C++ 文件，除 `// namespace` 结尾标记外禁止任何 `//`/`/*…*/` 注释；无违规退出 0，违规退出 1，文件无法解码退出 2。
+- `main_thread_guard`（`tests/guard/main_thread_guard.py`）：主线程契约守卫，静态扫描 `src/` 下 `*.cpp/*.hpp` 里的 Godot API 直接调用。判定依据是「线程上下文分类」——每个源文件被显式归入主线程（`main`）/受管（`managed`）/外线程（`foreign`）三类，外线程文件里的 Godot API 调用默认违规，只有落在该文件显式登记的主线程作用域里才放行。退出码：0 = 无违规、1 = 有违规、2 = 文件读或解码失败。
+- `version_sync_guard`（`tests/guard/version_sync_guard.py`）：版本号一致性——扫描 `skills/` 下全部文本文件与根 `README*.md` 的每一处版本钉，均须与根 `VERSION` 同值，另含 `VERSION` 与 `CLI_VERSION` 两个值源；非版本引用（如 `#develop`）只登记、不参与比对。退出码：0 = 全部一致、1 = 存在版本漂移（逐条打印 `文件:行号 = 值 (标签)`）、2 = 关键文件缺钉 / 未知引用形态 / 文件读失败。覆盖范围以守卫脚本为准。
+- `cli_contract`（`tests/scripts/test_cli_contract.py`）：双载体 CLI 契约 mock conformance（legacy `gda.mjs` + 新 CLI `gda.ts`）；PATH 无 `node` 时打印 `SKIP` 并退出 0，无 `bun` 时 bun 子集打印 `SKIP` 且不 FAIL。
+- `cli_unit`（`tests/scripts/run_cli_unit.py`）：封装 `bun test cli/tests`（TS 单测 132 项 / 9 文件）；bun 缺失时打印 `SKIP` 并退出 0。
 
 ## 6. JSON 用例 Schema（`tests/runner/config_loader.cpp` 冻结解析规则）
 
@@ -203,14 +215,14 @@ build\debug\tests\gda_test_runner.exe --file 01_scene
 - **`not_empty`**：string 非空；array/object `Size() > 0`；null 判空失败；其他标量视为非空
 - 断言执行于 C++ 执行器侧，对 `call_tool` 的响应 JSON 校验；无 `expect` 时仅检查工具调用未返回 `error`
 
-### 用例文件（`tests/config/`，38 个）
+### 用例文件（`tests/config/`，41 个）
 
 | 文件 | name | 内容 |
 | ---- | ---- | ---- |
 | `00_meta.json` | meta_tools | 15 步元工具语义（ping / search_tools / list_categories / get_tool_detail / call_tool / batch_execute / code_execute），全部无持久副作用 |
 | `01_scene.json` | 01_scene | 场景节点创建/查询/删除/撤销，`before_all` 用 `create_editor_scene` 建干净根 Root |
 | `02_property.json` | property_tools | 属性读写用例，含 readback MATCHED、int 字符串静默转 0、缺参报错；本轮新增 Node 引用（hint 34）转换、typed 数组元素转换与 fail fast、`property_get_list` 过滤参数 |
-| `03_tools_contract.json` | tools_contract | 两个遍历步骤（empty_args + heuristic_smoke），运行时枚举 393 条（392 域 + system_status）、排除 71 条后对 322 个候选工具做契约与冒烟（09-29 实测两步骤全过、warnings 仍 4 条）；含 reload_resource 空参契约 |
+| `03_tools_contract.json` | tools_contract | 三个步骤（1 步 `reload_resource` 缺 path 契约 + 2 个遍历步骤：empty_args + heuristic_smoke），运行时枚举 452 条（451 域 + system_status）、排除 111 条后对 341 个候选工具做契约与冒烟（基线常量 `kBaselineEnumerated` / `kBaselineExcluded` / `kBaselineCandidates`，实测 625 步全过、warnings 仍 4 条） |
 | `04_resources_scripts.json` | resources_scripts | execute_script 四种行为（单表达式自返 / 多行显式 return / 语法错误 / 缺参报错）+ 资源只读查询；本轮新增 save_resource copy-on-write、reload_resource、duplicate_resource name、copy_resource_file 用例 |
 | `05_rename_references.json` | 05_rename_references | 单文件 rename 引用重写 + 目录 rename fail fast（错误指引 move_resource_file） |
 | `06_move_references.json` | 06_move_references | 单文件与目录级 move 的引用重写验证（find_in_files / get_resource_references 双向） |
@@ -228,7 +240,7 @@ build\debug\tests\gda_test_runner.exe --file 01_scene
 | `18_script_freshness.json` | script_freshness | 脚本取用口径回归：`create_script` 后 `cache_refreshed`、覆写探针版本后 `attach_script_to_node`/`execute_script`/`get_script_property {fresh:true}` 均取磁盘新版；需 `code_execute` 授权 |
 | `19_cjk_roundtrip.json` | cjk_roundtrip | CJK 文本落盘往返：含中文注释脚本 `create_script`（verified/readback/cache_refreshed）+ `read_file` 全量内容比对 + `find_in_files` 中文 query 命中；after_all 回收 `res://tests_tmp` |
 | `20_cjk_text_roundtrip.json` | 20_cjk_text_roundtrip | 编辑器侧中文文本往返：`property_set` 写中文到 Label.text、`property_get` 读回逐字相等（`String::utf8` 链路回归）+ 缺失属性/缺失节点错误分支；`save_editor_scene_as` 落盘后 `close_editor_scene`，after_all 回收 `res://tests_tmp` |
-| `22_uid_guard.json` | uid_guard | 资源 UID 守卫：保存资源与 `set_resource_uid` 显式/省略 uid 分支回验 + `get_game_log_entries` 配 filter 断言 `matched_lines`；需 `code_execute` 授权 |
+| `22_uid_guard.json` | uid_guard | 资源 UID 守卫：保存资源与 `set_resource_uid` 显式/省略 uid 三分支回验（未注册走 `add_id`、已注册走 `set_id`）；需 `code_execute` 授权 |
 | `23_click_ui_coords.json` | click_ui_coords | `click_game_ui_element` 参数校验与无游戏通道错误（error+hint，无游戏进程时精确断言 `game not running: …`，就绪窗口为 `game started but not ready`）；坐标换算由 L1 `game_ui_coords_test` 覆盖，端到端断言待示例游戏恢复后补测；需 `game_runtime` 授权 |
 | `24_keycode_alias.json` | keycode_alias | 键名→键码统一判定：编辑器侧裸名/`KEY_` 前缀/大小写归一/裸数字、未知名精确报错；游戏侧 `queue_game_input` 入参；探针动作前后清理；需 `game_runtime` 授权 |
 | `25_open_scene_idempotent.json` | 25_open_scene_idempotent | `open_editor_scene` 幂等：首次打开 `ok` → `get_scene_tree` 确认 → 同路径二次打开 `already_open=true` → 无效路径仍报错 |
@@ -244,35 +256,46 @@ build\debug\tests\gda_test_runner.exe --file 01_scene
 | `35_scene_tree_gate.json` | scene_tree_gate | B1 8 个 SceneTree 工具游戏门控：无游戏时逐一返回结构化 `error`（已授权为运行时通道错误，未授权为授权门拒绝，两种授权态都通过），并用 `code_execute` 回读 `get_tree().paused == false` 证明编辑器树未被触碰；需 `code_execute` 授权 |
 | `36_stall_immunity.json` | 36_stall_immunity | B1 通道停摆免疫：暂停编辑器 `SceneTree.set_pause(true)` 后 `ping` 仍返回 `pong`、`system_status.main_thread` 五字段（`last_drain_age_ms`/`queue_depth`/`queue_cancelled`/`queue_rejected_full`/`oldest_pending_ms`）非空，恢复后 ping 正常；需 `code_execute` 授权 |
 | `37_game_ready_gate.json` | game_ready_gate | B7 无游戏就绪门：`execute_game_script`（授权后）与 `capture_game_viewport`（无授权门）默认 `wait_ready=true` 即返回精确 `game not running: …` 不挂起，`wait_ready=false` 等价文案；需 `game_runtime` 授权 |
-| `38_csharp_bridge.json` | csharp_bridge | B-T4 C# 反射桥五域工具（csharp_get_property / csharp_call_method / csharp_subscribe_event / csharp_set_property / csharp_unsubscribe_event）编辑器侧参数校验（定位器互斥、必填成员名、runtime 取值、game-only 选项隔离、args 形态）+ 非 mono 精确跳过探针（bridge unavailable 全串 + build_csharp_assembly 工程探测）；需 `code_execute` + `game_runtime` + `process` 授权 |
+| `38_csharp_bridge.json` | csharp_bridge | B-T4 C# 反射桥**六**域工具（csharp_get_property / csharp_call_method / csharp_subscribe_event / csharp_set_property / csharp_unsubscribe_event / csharp_list_members）编辑器侧参数校验（定位器互斥、必填成员名、runtime 取值、game-only 选项隔离、args 形态）+ 非 mono 精确跳过探针（bridge unavailable 全串 + build_csharp_assembly 工程探测）；需 `code_execute` + `game_runtime` + `process` 授权 |
+| `39_exec_budget.json` | exec_budget | 脚本执行预算与协作式超时：`code_execute` 跑 `while true: pass` 并置 `timeout_ms=300`，断言返回 `code == "exec_timeout"`；再跑 `timeout_ms=30000` 的正常脚本断言 `result` 存在且未超时；需 `code_execute` 授权 |
+| `40_contract_assert.json` | contract_assert | 工具契约强制断言：`call_tool` 包 `get_tool_detail(name=code_execute)`，断言 `tool.name == "code_execute"` 且 `tool.side_effect == "code_execute"`（副作用可读性）；再 `call_tool` 跑 `code_execute` 断言 `result` 存在；需 `code_execute` 授权 |
+| `41_thread_guard.json` | thread_guard | 主线程契约可观测面：`system_status` 断言 `running` 与 `main_thread.last_drain_age_ms` 非空 → `execute_script` 扫 `user://godot_autopilot/traces` 最新 `trace-*.jsonl`（断言含 `session_start`/`server_ready`、`broken_line_count == 0`、无 PNG base64 前缀、含 `call_tool` 事件）→ `execute_script` 扫 `user://godot_autopilot/logs` 最新 `gda-*.log` 断言含启动日志行；需 `code_execute` 授权 |
 
 ## 7. 遍历与排除清单（`tests/runner/traversal.cpp`）
 
 遍历模式：
 
-- **工具来源**：运行时经 `search_tools` 空 query 枚举全部 catalog 工具名（`list_tool_names`，响应形如 `{"results":[{"name","score"},...]}`，跳过 7 个协议级元工具）。域工具 392 个（30 个 `<域>_tools.hpp` 全部经 ToolSpec 声明；本分支新增 `set_resource_import_options`）+ system_status = **393 个**；枚举纳入的工具再经 `mutating`/`dynamic`/`side_effect` 字段判定排除（见下）。解析失败（响应非 JSON 对象/缺 results 数组/清单为空）抛异常
+- **工具来源**：运行时经 `search_tools` 空 query 枚举全部 catalog 工具名（`list_tool_names`，响应形如 `{"results":[{"name","score"},...]}`，跳过 7 个协议级元工具）。域工具 451 个（33 个 `<域>_tools.hpp` 全部经 ToolSpec 声明）+ system_status = **452 个**（基线常量 `traversal.cpp:22` `kBaselineEnumerated = 452`）；枚举纳入的工具再经 `mutating`/`dynamic`/`side_effect` 字段判定排除（见下）。解析失败（响应非 JSON 对象/缺 results 数组/清单为空）抛异常
 - **内置前置校验**：每个工具先经 `get_tool_detail` 校验存在性与工具名一致性（响应非 JSON 对象或工具名不匹配 → FAIL）
-- **`empty_args`**（空参契约）：空对象调用。响应非 JSON 对象 → FAIL；返回 `error` 字段算"有错误响应"（统计 error 数，不 FAIL）；schema 声明必填但空参未报错 → 记 **warnings**（不 FAIL）
-- **`heuristic_smoke`**（启发式冒烟）：按 schema properties 类型生成启发式参数（`integer`→0、`number`→0.0、`boolean`→false、`array`→`[]`、`object`→`{}`、其余→`"test"`）；无 properties 的工具（SCHEMA_NONE）跳过
+- **`empty_args`**（空参契约）：空对象调用。响应非 JSON 对象 → FAIL；返回 `error` 字段算"有错误响应"——文案命中预期错误标记表则**豁免为通过**，否则**判失败**（见下「错误判失败与预期错误豁免」）；schema 声明必填但空参未报错 → 记 **warnings**（不 FAIL）
+- **`heuristic_smoke`**（启发式冒烟）：按 schema properties 类型生成启发式参数（`integer`→0、`number`→0.0、`boolean`→false、`array`→`[]`、`object`→`{}`、其余→`"test"`）；无 properties 的工具（SCHEMA_NONE）跳过；错误判定与豁免同 `empty_args`
 - **崩溃检测**：遍历中每步调用后检查编辑器进程存活，进程死亡即 fatal_error（附 stdout/stderr 日志截断 2000 字符）
-- 统计输出：调用总数 / 通过 / 失败 / result 数 / error 数 / "missing required" 数 / 跳过 / 排除
+- **基线断言**：`traversal.cpp:198-220` 的 `compare_baseline` 对每种模式逐项比对 `enumerated` / `excluded` / `candidates` / `warnings` 与基线常量（452 / 111 / 341 / 4；`warnings` 仅 `empty_args` 模式断言为 4，`heuristic_smoke` 断言为 0），任一不符即判失败
+- 统计输出：调用总数 / 通过 / 失败 / result 数 / error 数 / "missing required" 数 / 跳过 / 排除 / 豁免错误数
+
+### 错误判失败与预期错误豁免
+
+遍历对「工具返回 `error`」的处理口径（`traversal.cpp:86-96` 的 `is_expected_error` + `:29-36` 的 `kExpectedErrorMarkers`）：
+
+- **豁免**（判通过，计入 `exempt_errors`）：响应含 `structured_error` 字段，或错误文案（大小写不敏感）命中预期错误标记表——`requir` / `missing` / `invalid` / `must be` / `expected` / `unknown` / `not found` / `not available` / `is not` / `not running` / `not ready` / `no scene` / `no edited scene` / `no window` / `no theme` / `unsupported` / `cannot` / `failed to` / `does not exist` / `has no` / `already` / `did not return a resource` / `mutually exclusive` / `must contain` / `must have` / `no object found` / `out of range` / `unsaved changes`
+- **判失败**（步骤 `passed=false`，计入 `failed`）：错误文案**不**命中标记表，即参数校验类错误（缺参/类型/范围/互斥）被豁免，真实缺陷类错误（崩溃、断言不成立、契约破坏）判失败
 
 ### 副作用驱动排除（`get_tool_detail.side_effect`）
 
-副作用工具在 empty_args 与 heuristic_smoke 两个遍历中一律跳过。运行时枚举不区分工具来源：对每个工具先调 `get_tool_detail`，若返回的 `tool.side_effect` 非空、`tool.mutating` 为 true 或 `tool.dynamic` 为 true 即排除（计入 `excluded` 统计，见 `traversal.cpp`）。排除项共 **71 个**，全部由 `ToolSpec.side_effect` 与 `flags`（`tool_flags::kMutating`）承载：69 个 `side_effect` 非空，另有 `fill_tilemap_rect`、`build_nodes_from_spec` 两个工具 `side_effect` 为 None、仅以 `mutating` 排除（历史事故：`set_editor_main_scene` 曾把 `application/run/main_scene` 写成 `"test"` 写入 `Example/project.godot`；`save_editor_scene` 空参生成 `Example/NewNode.tscn`；`show_os_alert` 弹系统模态对话框；`set_display_clipboard` 覆盖系统剪贴板；`speak_display_tts` 系统朗读）。09-29 起 8 个 SceneTree 工具改走游戏通道并声明 `SideEffect::GameRuntime`，排除数随声明增加 8。
+副作用工具在 empty_args 与 heuristic_smoke 两个遍历中一律跳过。运行时枚举不区分工具来源：对每个工具先调 `get_tool_detail`，按返回的 `tool.side_effect` / `tool.mutating` / `tool.dynamic` 三个字段判定是否排除（计入 `excluded` 统计）。**排除判据与逐条名单以 [docs/wiki/tests.md](../docs/wiki/tests.md) 的「遍历排除」与「排除工具清单」为准**（实现见 `tests/runner/traversal.cpp` 的 `has_side_effect`），本文件不另立判据。排除项共 **111 个**，全部由 `ToolSpec.side_effect` 与 `flags`（`tool_flags::kMutating`）承载：87 个 `side_effect` 非 `none`，另有 24 个工具 `side_effect` 为 None、仅以 `mutating` 排除（基线常量 `traversal.cpp:23` `kBaselineExcluded = 111`；历史事故：`set_editor_main_scene` 曾把 `application/run/main_scene` 写成 `"test"` 写入 `Example/project.godot`；`save_editor_scene` 空参生成 `Example/NewNode.tscn`；`show_os_alert` 弹系统模态对话框；`set_display_clipboard` 覆盖系统剪贴板；`speak_display_tts` 系统朗读）。分类口径与逐条名单以 `src/tools/*_tools.hpp` 的 451 条 `ToolSpec` 为准（本节表格与 [docs/wiki/tests.md](../docs/wiki/tests.md) 的「排除工具清单」同源，权威落点在该页）。
 
-**副作用分类（71 个排除项 = 69 个非空 `side_effect` + 2 个仅 mutating）**——按 `ToolSpec.side_effect` 返回值分布（`writes_file`/`writes_config`/`process`/`game_runtime`/`code_execute` 为持久或运行时副作用，`shows_alert`/`modifies_window` 会直接干扰用户桌面）：
+**副作用分类（111 个排除项 = 87 个 `side_effect` 非 `none` + 24 个仅 mutating）**——按 `ToolSpec.side_effect` 返回值分布（`writes_file`/`writes_config`/`process`/`game_runtime`/`code_execute` 为持久或运行时副作用，`shows_alert`/`modifies_window` 会直接干扰用户桌面）：
 
-| side_effect | 数量 | 分布（`*_tools.hpp`）与工具 |
+| side_effect | 数量 | 工具（与 [docs/wiki/tests.md](../docs/wiki/tests.md) 的「排除工具清单」同源，权威落点在该页） |
 | ---- | ---- | ---- |
-| `writes_file` | 17 | editor 3（`save_editor_scene` / `save_editor_scenes` / `save_editor_scene_as`）、resource 5（`save_resource` / `copy_resource_file` / `move_resource_file` / `create_directory` / `set_resource_import_options`）、script 2（`create_script` / `patch_script`）、theme 5（`create_theme_resource` / `set_theme_color` / `set_theme_constant` / `set_theme_font_size` / `set_theme_stylebox_flat`）、os 2（`write_file` / `move_os_file_to_trash`） |
-| `writes_config` | 6 | config 2（`save_project_settings` / `set_editor_settings`）、editor 2（`set_editor_main_scene` / `set_editor_plugin_enabled`）、input_map 2（`save_input_map` / `add_input_map_action_event`） |
-| `shows_alert` | 4 | os 1（`show_os_alert`）、display 3（`show_display_dialog` / `speak_display_tts` / `stop_display_tts`） |
-| `modifies_window` | 20 | display 12（`create_display_window` / `delete_display_window` / `move_display_window_to_foreground` / `request_display_window_attention` / `set_display_clipboard` / `set_display_mouse_mode` / `set_display_window_flag` / `set_display_window_mode` / `set_display_window_position` / `set_display_window_size` / `set_display_window_title` / `warp_display_mouse`）、editor 4（`click_editor_element` / `type_editor_element_text` / `run_editor_shortcut` / `select_scene_tree_node`）、input 4（`click_input_mouse` / `scroll_input_mouse` / `drag_input_mouse` / `type_input_text`） |
-| `process` | 6 | os 5（`create_os_process` / `execute_os_process` / `kill_os_process` / `open_os_path` / `set_os_environment`）、editor 1（`build_csharp_assembly`） |
-| `game_runtime` | 15 | game 7（`execute_game_script` / `start_game_job` / `reload_game_scripts` / `queue_game_input` / `wait_game_input` / `sequence_game_inputs` / `click_game_ui_element`；`start_game_job` 为 09-16 批次新增）、scene_tree 8（`set_scene_tree_pause` / `is_scene_tree_paused` / `reload_scene_tree_current_scene` / `set_scene_tree_debug_collisions_hint` / `call_scene_tree_group` / `notify_scene_tree_group` / `get_scene_tree_nodes_in_group` / `create_scene_tree_timer`；09-29 由编辑器树改为经 `GDA_OP_SCENE_TREE` 转发到游戏进程） |
-| `code_execute` | 1 | script 1（`execute_script`） |
-| `None`（仅 mutating） | 2 | tilemap 1（`fill_tilemap_rect`，09-16 批次新增：flags 含 `tool_flags::kMutating` 使遍历跳过，`side_effect` 为 None——批量铺砖虽可撤销，仍不进入自动冒烟）、scene 1（`build_nodes_from_spec`，flags 含 `tool_flags::kMutating`，`side_effect` 为 None——声明式建树整体可回滚，仍不进入自动冒烟） |
+| `writes_file` | 21 | `save_editor_scene`、`save_editor_scenes`、`save_editor_scene_as`、`create_script`、`patch_script`、`save_resource`、`copy_resource_file`、`move_resource_file`、`create_directory`、`create_theme_resource`、`set_theme_color`、`set_theme_constant`、`set_theme_font_size`、`set_theme_stylebox_flat`、`set_theme_item_bundle`、`write_file`、`move_os_file_to_trash`、`create_csharp_script`、`copy_file`、`ensure_directory`、`set_resource_import_options` |
+| `writes_config` | 10 | `save_project_settings`、`set_editor_settings`、`add_autoload`、`remove_autoload`、`move_autoload`、`set_editor_main_scene`、`set_editor_plugin_enabled`、`save_input_map`、`add_input_map_action_event`、`set_input_map_action_bundle` |
+| `shows_alert` | 4 | `show_os_alert`、`show_display_dialog`、`speak_display_tts`、`stop_display_tts` |
+| `modifies_window` | 20 | `create_display_window`、`delete_display_window`、`move_display_window_to_foreground`、`request_display_window_attention`、`set_display_clipboard`、`set_display_mouse_mode`、`set_display_window_flag`、`set_display_window_mode`、`set_display_window_position`、`set_display_window_size`、`set_display_window_title`、`warp_display_mouse`、`click_editor_element`、`type_editor_element_text`、`run_editor_shortcut`、`select_scene_tree_node`、`click_input_mouse`、`scroll_input_mouse`、`drag_input_mouse`、`type_input_text` |
+| `process` | 7 | `build_csharp_assembly`、`dotnet_environment`、`create_os_process`、`execute_os_process`、`kill_os_process`、`open_os_path`、`set_os_environment` |
+| `game_runtime` | 18 | `execute_game_script`、`start_game_job`、`reload_game_scripts`、`queue_game_input`、`wait_game_input`、`sequence_game_inputs`、`click_game_ui_element`、`set_game_locale`、`set_scene_tree_pause`、`is_scene_tree_paused`、`reload_scene_tree_current_scene`、`set_scene_tree_debug_collisions_hint`、`call_scene_tree_group`、`notify_scene_tree_group`、`get_scene_tree_nodes_in_group`、`create_scene_tree_timer`、`create_game_tween`、`control_game_tween` |
+| `code_execute` | 7 | `execute_script`、`csharp_get_property`、`csharp_call_method`、`csharp_subscribe_event`、`csharp_set_property`、`csharp_unsubscribe_event`、`csharp_list_members` |
+| `None`（仅 mutating） | 24 | `set_animation_track_bundle`、`create_gridmap`、`create_meshlibrary_item`、`set_gridmap_cell`、`fill_gridmap_box`、`get_gridmap_used_cells`、`set_physics_body_bundle`、`create_collision_shape`、`assign_collision_shape`、`set_properties_batch`、`set_node_transform`、`restart_particles`、`set_particles_params`、`create_primitive_mesh`、`create_array_mesh`、`set_mesh_surface_material`、`assign_mesh_to_instance`、`build_nodes_from_spec`、`spawn_node_bundle`、`focus_camera_on_node`、`set_camera_params`、`set_control_layout`、`fill_tilemap_rect`、`tween_editor_property`：`side_effect` 为 None，仅靠 `mutating` 排除——批量铺砖/声明式建树等可撤销操作仍不进入自动冒烟 |
 
 ### warnings 语义（4 条实测契约缺口，测试发现并验证，业务代码未改）
 
