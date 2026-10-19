@@ -181,6 +181,8 @@ class MockHandler(http.server.BaseHTTPRequestHandler):
             )
         elif name == "mock_503":
             self._send_json(503, {"error": {"code": -32603, "message": "editor busy"}})
+        elif name == "mock_rpc_error":
+            self._send_rpc_error(req_id)
         else:
             self._ok(req_id, {"error": {"code": -32602, "message": f"unknown tool: {name}"}})
 
@@ -199,8 +201,20 @@ class MockHandler(http.server.BaseHTTPRequestHandler):
             )
         elif inner == "mock_503":
             self._send_json(503, {"error": {"code": -32603, "message": "editor busy"}})
+        elif inner == "mock_rpc_error":
+            self._send_rpc_error(req_id)
         else:
             self._ok(req_id, {"error": {"code": -32602, "message": f"unknown tool: {inner}"}})
+
+    def _send_rpc_error(self, req_id):
+        """Top-level JSON-RPC error envelope (no result.content) with HTTP 200."""
+        self._send_sse(
+            {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "error": {"code": -32602, "message": "mock top-level JSON-RPC error"},
+            }
+        )
 
 
 def free_port():
@@ -428,6 +442,18 @@ def run_cli_cases(bctx, port):
 
     r = cli_run("call", "no_such_tool_xyz")
     check("cli-tool-error/exit1", r.returncode == 1, f"exit={r.returncode}")
+    passed += 1
+
+    # 顶层 JSON-RPC error 信封（无 result.content）按工具失败处理，退出码 1。
+    # legacy 载体 gda.mjs 把同一信封判为传输失败（退出码 2），该行为已冻结，不在此断言。
+    r = cli_run("call", "mock_rpc_error")
+    check("cli-rpc-error/exit1", r.returncode == 1, f"exit={r.returncode} stderr={r.stderr[-300:]}")
+    check("cli-rpc-error/stderr", "mock top-level JSON-RPC error" in r.stderr, r.stderr[-300:])
+    check(
+        "cli-rpc-error/stdout",
+        json.loads(r.stdout).get("error", {}).get("code") == -32602,
+        r.stdout[-300:],
+    )
     passed += 1
 
     closed = free_port()
