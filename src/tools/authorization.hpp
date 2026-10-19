@@ -43,13 +43,18 @@ inline bool allow_list_contains(const std::string &value,
   return false;
 }
 
-inline constexpr const char *kKnownCapabilities[] = {"process", "code_execute",
-                                                     "game_runtime",
-                                                     "user_tools"};
+inline constexpr const char *kCapabilityProcess = "process";
+inline constexpr const char *kCapabilityCodeExecute = "code_execute";
+inline constexpr const char *kCapabilityGameRuntime = "game_runtime";
+inline constexpr const char *kCapabilityUserTools = "user_tools";
+
+inline constexpr const char *kKnownCapabilities[] = {
+    kCapabilityProcess, kCapabilityCodeExecute, kCapabilityGameRuntime,
+    kCapabilityUserTools};
 
 inline bool capability_has_dock_toggle(std::string_view capability) {
-  return capability == "code_execute" || capability == "game_runtime" ||
-         capability == "user_tools";
+  return capability == kCapabilityCodeExecute ||
+         capability == kCapabilityGameRuntime || capability == kCapabilityUserTools;
 }
 
 inline std::string allow_list_add(std::string allow,

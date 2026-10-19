@@ -20,7 +20,7 @@ enum class SideEffect { None, WritesFile, WritesConfig, ShowsAlert, ModifiesWind
 
 inline const char* side_effect_name(SideEffect e) {
   switch (e) {
-    case SideEffect::None: return "";
+    case SideEffect::None: return "none";
     case SideEffect::WritesFile: return "writes_file";
     case SideEffect::WritesConfig: return "writes_config";
     case SideEffect::ShowsAlert: return "shows_alert";
@@ -29,7 +29,7 @@ inline const char* side_effect_name(SideEffect e) {
     case SideEffect::CodeExecute: return "code_execute";
     case SideEffect::GameRuntime: return "game_runtime";
   }
-  return "";
+  return "none";
 }
 
 struct ToolMeta {
@@ -62,13 +62,13 @@ inline SideEffect side_effect_of(const ToolBase &t) {
 namespace authorization {
 inline const char *capability_for_tool(std::string_view name,
                                        SideEffect effect) {
+  (void)name;
   if (effect == SideEffect::Process)
-    return "process";
-  if (effect == SideEffect::CodeExecute || name == "code_execute" ||
-      name == "execute_script")
-    return "code_execute";
-  if (effect == SideEffect::GameRuntime || name == "execute_game_script")
-    return "game_runtime";
+    return kCapabilityProcess;
+  if (effect == SideEffect::CodeExecute)
+    return kCapabilityCodeExecute;
+  if (effect == SideEffect::GameRuntime)
+    return kCapabilityGameRuntime;
   return nullptr;
 }
 } // namespace authorization
