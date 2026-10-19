@@ -407,8 +407,12 @@ mcp::JsonValue run_on_main_thread_with_budget(
 
 mcp::JsonValue call_handler(const std::string &name,
                             const mcp::JsonValue &args) {
-  if (!godot_autopilot::runtime_ops::has_editor_queue() ||
-      get_editor_queue().is_main_thread()) {
+  if (!godot_autopilot::runtime_ops::has_editor_queue()) {
+    return queue_unavailable_result(
+        name, "the plugin has not attached the editor main thread queue yet "
+              "(startup) or has already detached it (shutdown)");
+  }
+  if (get_editor_queue().is_main_thread()) {
     return call_handler_impl(name, args);
   }
   CommandQueue &queue = get_editor_queue();
