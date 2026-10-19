@@ -181,6 +181,14 @@ int64_t dispatch_wait_health_ms() {
   return value;
 }
 
+int64_t dispatch_wait_long_blocking_ms() {
+  static const int64_t value = env_int_clamped(
+      "GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS",
+      GDA_DISPATCH_WAIT_LONG_BLOCKING_MS, kDispatchWaitMinMs,
+      kDispatchWaitMaxMs);
+  return value;
+}
+
 mcp::JsonValue queue_unavailable_result(const std::string &name,
                                         const std::string &reason) {
   mcp::JsonValue result(mcp::JsonValue::object_tag);
@@ -281,14 +289,57 @@ void replace_handlers(HandlerMap handlers, HandlerMap meta_handlers) {
 void clear_handlers() { replace_handlers({}, {}); }
 
 int64_t main_thread_wait_budget_ms(uint32_t flags, int64_t default_ms,
-                                   int64_t health_ms) {
+                                   int64_t health_ms,
+                                   int64_t long_blocking_ms) {
   if ((flags & tool_flags::kLongBlocking) != 0) {
-    return 0;
+    return long_blocking_ms > 0 ? long_blocking_ms : default_ms;
   }
   if ((flags & tool_flags::kHealthProbe) != 0) {
     return health_ms;
   }
   return default_ms;
+}
+
+std::string main_thread_timeout_message(const std::string &label,
+                                        int64_t waited_ms, bool cancelled) {
+  std::string message = "editor main thread did not process '" + label +
+                        "' within " + std::to_string(waited_ms) + " ms";
+  message += " — the editor may be paused, blocked by a modal dialog, "
+             "exporting, or busy; ";
+  if (cancelled) {
+    message += "the call was cancelled before execution";
+  } else {
+    message += "the main thread already picked the call up, so it may still "
+               "execute";
+  }
+  message += " (retry once the editor is responsive)";
+  return message;
+}
+
+mcp::JsonValue main_thread_timeout_result(const std::string &label,
+                                          int64_t waited_ms,
+                                          bool cancelled) {
+  mcp::JsonValue result(mcp::JsonValue::object_tag);
+  result["error"] = mcp::JsonValue(
+      main_thread_timeout_message(label, waited_ms, cancelled));
+  result["code"] = mcp::JsonValue("main_thread_timeout");
+  result["retryable"] = mcp::JsonValue(true);
+  result["target"] = mcp::JsonValue(label);
+  result["waited_ms"] = mcp::JsonValue(waited_ms);
+  result["cancelled"] = mcp::JsonValue(cancelled);
+  return result;
+}
+
+mcp::JsonValue exec_timeout_result(int64_t timeout_ms,
+                                   int64_t execution_time_ms) {
+  mcp::JsonValue result(mcp::JsonValue::object_tag);
+  result["error"] = mcp::JsonValue("execution timed out after " +
+                                   std::to_string(timeout_ms) + " ms");
+  result["code"] = mcp::JsonValue("exec_timeout");
+  result["retryable"] = mcp::JsonValue(false);
+  result["execution_time_ms"] = mcp::JsonValue(execution_time_ms);
+  result["timeout_ms"] = mcp::JsonValue(timeout_ms);
+  return result;
 }
 
 mcp::JsonValue run_on_main_thread_with_budget(
@@ -297,8 +348,12 @@ mcp::JsonValue run_on_main_thread_with_budget(
   if (queue.is_main_thread()) {
     return fn();
   }
-  const int64_t budget_ms = main_thread_wait_budget_ms(
-      flags, dispatch_wait_default_ms(), dispatch_wait_health_ms());
+  int64_t budget_ms = main_thread_wait_budget_ms(
+      flags, dispatch_wait_default_ms(), dispatch_wait_health_ms(),
+      dispatch_wait_long_blocking_ms());
+  if (budget_ms <= 0) {
+    budget_ms = dispatch_wait_default_ms();
+  }
   const auto submit_time = std::chrono::steady_clock::now();
   CommandQueue::TrackedSubmission<mcp::JsonValue> submission;
   try {
@@ -317,9 +372,6 @@ mcp::JsonValue run_on_main_thread_with_budget(
     return queue_unavailable_result(tool_name, std::string(ex.what()));
   } catch (...) {
     return queue_unavailable_result(tool_name, "unknown queue failure");
-  }
-  if (budget_ms <= 0) {
-    return submission.future.get();
   }
   std::future_status status = std::future_status::timeout;
   try {
@@ -389,9 +441,14 @@ mcp::JsonValue call_handler(const std::string &name,
 mcp::CallToolResult export_blocked_result() {
   mcp::CallToolResult err;
   err.is_error = true;
-  err.content.push_back(mcp::TextContent{
-      "text", R"({"error":"editor is exporting; retry after export completes"})"});
+  mcp::JsonValue body(mcp::JsonValue::object_tag);
+  body["error"] = mcp::JsonValue(export_blocked_error_text());
+  err.content.push_back(mcp::TextContent{"text", body.Dump()});
   return err;
+}
+
+std::string export_blocked_error_text() {
+  return "editor is exporting; retry after export completes";
 }
 
 } // namespace dispatch

@@ -1,7 +1,10 @@
 #include "resources/resource_handlers.hpp"
+#include "core/config.hpp"
+#include "core/export_guard.hpp"
 #include "core/log_system.hpp"
 #include "core/monitor.hpp"
 #include "resources/skill_resources.hpp"
+#include "tools/dispatch.hpp"
 #include "tools/tool_invoke.hpp"
 #include "util/error_util.hpp"
 #include "util/variant_json.hpp"
@@ -22,7 +25,9 @@
 #include <godot_cpp/variant/string_name.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
 #include <map>
+#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace godot_autopilot {
@@ -50,6 +55,47 @@ void set_error(std::string &json_str, const std::string &msg) {
   mcp::JsonValue err(mcp::JsonValue::object_tag);
   err["error"] = mcp::JsonValue(msg);
   json_str = err.Dump(-1);
+}
+
+mcp::ReadResourceResult export_blocked_resource_result(
+    const std::string &uri) {
+  mcp::JsonValue err(mcp::JsonValue::object_tag);
+  err["error"] = mcp::JsonValue(dispatch::export_blocked_error_text());
+  return make_json_result(uri, err.Dump(-1));
+}
+
+struct ResourceTaskState {
+  std::string json_str;
+  std::string error_code;
+};
+
+struct ResourceTaskResult {
+  std::string json_str;
+  std::string error_code;
+};
+
+template <typename Fn>
+ResourceTaskResult run_resource_task(
+    CommandQueue &queue, const std::string &uri,
+    const std::shared_ptr<ResourceTaskState> &state, Fn task) {
+  ResourceTaskResult result;
+  dispatch::BoundedWaitOutcome outcome = dispatch::run_bounded_on_main_thread(
+      queue, uri, state, std::move(task), GDA_DISPATCH_WAIT_DEFAULT_MS);
+  if (outcome.timed_out) {
+    result.error_code = "main_thread_timeout";
+    result.json_str = dispatch::main_thread_timeout_result(
+                          uri, outcome.waited_ms, outcome.cancelled)
+                          .Dump(-1);
+    return result;
+  }
+  if (!outcome.ok) {
+    result.error_code = "resource_read_failed";
+    set_error(result.json_str, outcome.error);
+    return result;
+  }
+  result.json_str = state->json_str;
+  result.error_code = state->error_code;
+  return result;
 }
 
 const char *level_to_string(LogLevel level) {
@@ -221,6 +267,9 @@ const std::vector<skill_gen::SkillSpec> &embedded_skills() {
 
 int register_skill_resources(mcp::McpServer &server) {
   auto handler = [](const std::string &uri) -> mcp::ReadResourceResult {
+    if (godot_autopilot::ExportGuard::is_exporting()) {
+      return export_blocked_resource_result(uri);
+    }
     const skill_resources::ContentResult content =
         skill_resources::resolve_content(embedded_skills(), uri);
     if (!content.error.empty()) {
@@ -278,31 +327,35 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           .Description("Godot engine version information")
           .MimeType("application/json"),
       [&queue](const std::string &uri) -> mcp::ReadResourceResult {
-        std::string json_str;
-        std::string error_code;
+        if (godot_autopilot::ExportGuard::is_exporting()) {
+          return export_blocked_resource_result(uri);
+        }
         const tools::TraceContext ctx = tools::capture_trace_context();
-         queue.execute_sync([&json_str, &error_code, ctx]() {
+        auto state = std::make_shared<ResourceTaskState>();
+        ResourceTaskResult result = run_resource_task(
+            queue, uri, state,
+            [state, ctx](ResourceTaskState &st) {
               tools::ScopedTraceContext restore(ctx);
               auto *engine = godot::Engine::get_singleton();
               if (!engine) {
-                set_error(json_str, "Engine singleton not available");
-                error_code = "resource_read_failed";
+                set_error(st.json_str, "Engine singleton not available");
+                st.error_code = "resource_read_failed";
                 return;
               }
               godot::Dictionary v = engine->get_version_info();
               auto jv = VariantJson::serialize(v);
-              json_str = jv.Dump(-1);
-             });
-        if (error_code.empty()) {
+              st.json_str = jv.Dump(-1);
+            });
+        if (result.error_code.empty()) {
           monitor::data_flow(
-              "resource_read", static_cast<int64_t>(json_str.size()),
+              "resource_read", static_cast<int64_t>(result.json_str.size()),
               monitor::build_attrs(
                   {{"uri", uri},
                    {"request_id", monitor::current_request_id()}}));
         } else {
-          monitor::error_event(error_code, "resource", uri);
+          monitor::error_event(result.error_code, "resource", uri);
         }
-        return make_json_result(uri, json_str);
+        return make_json_result(uri, result.json_str);
       });
 
   server.RegisterResource(
@@ -311,38 +364,42 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           .Description("Current edited scene node tree")
           .MimeType("application/json"),
       [&queue](const std::string &uri) -> mcp::ReadResourceResult {
-        std::string json_str;
-        std::string error_code;
+        if (godot_autopilot::ExportGuard::is_exporting()) {
+          return export_blocked_resource_result(uri);
+        }
         const tools::TraceContext ctx = tools::capture_trace_context();
-         queue.execute_sync([&json_str, &error_code, ctx]() {
+        auto state = std::make_shared<ResourceTaskState>();
+        ResourceTaskResult result = run_resource_task(
+            queue, uri, state,
+            [state, ctx](ResourceTaskState &st) {
               tools::ScopedTraceContext restore(ctx);
               auto *editor = godot::EditorInterface::get_singleton();
               if (!editor) {
-                set_error(json_str, "Not in editor mode");
-                error_code = "resource_read_failed";
+                set_error(st.json_str, "Not in editor mode");
+                st.error_code = "resource_read_failed";
                 return;
               }
               auto *root = editor->get_edited_scene_root();
               if (!root) {
-                set_error(json_str, "No scene open");
-                error_code = "resource_not_found";
+                set_error(st.json_str, "No scene open");
+                st.error_code = "resource_not_found";
                 return;
               }
               std::string root_prefix = util::to_std(root->get_path());
-              mcp::JsonValue result(mcp::JsonValue::object_tag);
-              node_to_json(root, root_prefix, result);
-              json_str = result.Dump(-1);
-             });
-        if (error_code.empty()) {
+              mcp::JsonValue node_json(mcp::JsonValue::object_tag);
+              node_to_json(root, root_prefix, node_json);
+              st.json_str = node_json.Dump(-1);
+            });
+        if (result.error_code.empty()) {
           monitor::data_flow(
-              "resource_read", static_cast<int64_t>(json_str.size()),
+              "resource_read", static_cast<int64_t>(result.json_str.size()),
               monitor::build_attrs(
                   {{"uri", uri},
                    {"request_id", monitor::current_request_id()}}));
         } else {
-          monitor::error_event(error_code, "resource", uri);
+          monitor::error_event(result.error_code, "resource", uri);
         }
-        return make_json_result(uri, json_str);
+        return make_json_result(uri, result.json_str);
       });
 
   server.RegisterResourceTemplate(
@@ -354,21 +411,25 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
                const std::map<std::string, std::string> &vars)
           -> mcp::ReadResourceResult {
         std::string path = vars.at("path");
-        std::string json_str;
-        std::string error_code;
+        if (godot_autopilot::ExportGuard::is_exporting()) {
+          return export_blocked_resource_result(uri);
+        }
         const tools::TraceContext ctx = tools::capture_trace_context();
-         queue.execute_sync([&json_str, &path, &error_code, ctx]() {
+        auto state = std::make_shared<ResourceTaskState>();
+        ResourceTaskResult result = run_resource_task(
+            queue, uri, state,
+            [state, path, ctx](ResourceTaskState &st) {
               tools::ScopedTraceContext restore(ctx);
               auto *editor = godot::EditorInterface::get_singleton();
               if (!editor) {
-                set_error(json_str, "Not in editor mode");
-                error_code = "resource_read_failed";
+                set_error(st.json_str, "Not in editor mode");
+                st.error_code = "resource_read_failed";
                 return;
               }
               auto *root = editor->get_edited_scene_root();
               if (!root) {
-                set_error(json_str, "No scene open");
-                error_code = "resource_not_found";
+                set_error(st.json_str, "No scene open");
+                st.error_code = "resource_not_found";
                 return;
               }
 
@@ -385,25 +446,25 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
               }
 
               if (!node) {
-                set_error(json_str, "Node not found: " + path);
-                error_code = "resource_not_found";
+                set_error(st.json_str, "Node not found: " + path);
+                st.error_code = "resource_not_found";
                 return;
               }
 
               std::string root_prefix = util::to_std(root->get_path());
               auto jv = node_detail_to_json(node, root_prefix);
-              json_str = jv.Dump(-1);
-             });
-        if (error_code.empty()) {
+              st.json_str = jv.Dump(-1);
+            });
+        if (result.error_code.empty()) {
           monitor::data_flow(
-              "resource_read", static_cast<int64_t>(json_str.size()),
+              "resource_read", static_cast<int64_t>(result.json_str.size()),
               monitor::build_attrs(
                   {{"uri", uri},
                    {"request_id", monitor::current_request_id()}}));
         } else {
-          monitor::error_event(error_code, "resource", uri);
+          monitor::error_event(result.error_code, "resource", uri);
         }
-        return make_json_result(uri, json_str);
+        return make_json_result(uri, result.json_str);
       });
 
   server.RegisterResource(
@@ -412,44 +473,48 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           .Description("Project file system structure")
           .MimeType("application/json"),
       [&queue](const std::string &uri) -> mcp::ReadResourceResult {
-        std::string json_str;
-        std::string error_code;
+        if (godot_autopilot::ExportGuard::is_exporting()) {
+          return export_blocked_resource_result(uri);
+        }
         const tools::TraceContext ctx = tools::capture_trace_context();
-         queue.execute_sync([&json_str, &error_code, ctx]() {
+        auto state = std::make_shared<ResourceTaskState>();
+        ResourceTaskResult result = run_resource_task(
+            queue, uri, state,
+            [state, ctx](ResourceTaskState &st) {
               tools::ScopedTraceContext restore(ctx);
               auto *editor = godot::EditorInterface::get_singleton();
               if (!editor) {
-                set_error(json_str, "Not in editor mode");
-                error_code = "resource_read_failed";
+                set_error(st.json_str, "Not in editor mode");
+                st.error_code = "resource_read_failed";
                 return;
               }
               auto *fs = editor->get_resource_filesystem();
               if (!fs) {
-                set_error(json_str, "File system not available");
-                error_code = "resource_read_failed";
+                set_error(st.json_str, "File system not available");
+                st.error_code = "resource_read_failed";
                 return;
               }
               auto *root_dir = fs->get_filesystem();
               if (!root_dir) {
-                set_error(json_str, "File system still scanning");
-                error_code = "resource_read_failed";
+                set_error(st.json_str, "File system still scanning");
+                st.error_code = "resource_read_failed";
                 return;
               }
 
-              mcp::JsonValue result(mcp::JsonValue::object_tag);
-              dir_to_json(root_dir, result);
-              json_str = result.Dump(-1);
-             });
-        if (error_code.empty()) {
+              mcp::JsonValue dir_json(mcp::JsonValue::object_tag);
+              dir_to_json(root_dir, dir_json);
+              st.json_str = dir_json.Dump(-1);
+            });
+        if (result.error_code.empty()) {
           monitor::data_flow(
-              "resource_read", static_cast<int64_t>(json_str.size()),
+              "resource_read", static_cast<int64_t>(result.json_str.size()),
               monitor::build_attrs(
                   {{"uri", uri},
                    {"request_id", monitor::current_request_id()}}));
         } else {
-          monitor::error_event(error_code, "resource", uri);
+          monitor::error_event(result.error_code, "resource", uri);
         }
-        return make_json_result(uri, json_str);
+        return make_json_result(uri, result.json_str);
       });
 
   server.RegisterResourceTemplate(
@@ -461,21 +526,25 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
                const std::map<std::string, std::string> &vars)
           -> mcp::ReadResourceResult {
         std::string path = vars.at("path");
-        std::string json_str;
-        std::string error_code;
+        if (godot_autopilot::ExportGuard::is_exporting()) {
+          return export_blocked_resource_result(uri);
+        }
         const tools::TraceContext ctx = tools::capture_trace_context();
-         queue.execute_sync([&json_str, &path, &error_code, ctx]() {
+        auto state = std::make_shared<ResourceTaskState>();
+        ResourceTaskResult result = run_resource_task(
+            queue, uri, state,
+            [state, path, ctx](ResourceTaskState &st) {
               tools::ScopedTraceContext restore(ctx);
               auto *editor = godot::EditorInterface::get_singleton();
               if (!editor) {
-                set_error(json_str, "Not in editor mode");
-                error_code = "resource_read_failed";
+                set_error(st.json_str, "Not in editor mode");
+                st.error_code = "resource_read_failed";
                 return;
               }
               auto *fs = editor->get_resource_filesystem();
               if (!fs) {
-                set_error(json_str, "File system not available");
-                error_code = "resource_read_failed";
+                set_error(st.json_str, "File system not available");
+                st.error_code = "resource_read_failed";
                 return;
               }
 
@@ -483,39 +552,39 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
 
               auto *dir = fs->get_filesystem_path(gd_path);
               if (dir) {
-                mcp::JsonValue result(mcp::JsonValue::object_tag);
-                dir_to_json(dir, result);
-                result["path"] = mcp::JsonValue(path);
-                json_str = result.Dump(-1);
+                mcp::JsonValue dir_json(mcp::JsonValue::object_tag);
+                dir_to_json(dir, dir_json);
+                dir_json["path"] = mcp::JsonValue(path);
+                st.json_str = dir_json.Dump(-1);
                 return;
               }
 
               godot::String file_type = fs->get_file_type(gd_path);
               if (!file_type.is_empty()) {
-                mcp::JsonValue result(mcp::JsonValue::object_tag);
+                mcp::JsonValue file_json(mcp::JsonValue::object_tag);
                 auto pos = path.rfind('/');
                 std::string fname =
                     (pos != std::string::npos) ? path.substr(pos + 1) : path;
-                result["name"] = mcp::JsonValue(fname);
-                result["path"] = mcp::JsonValue(path);
-                result["type"] = mcp::JsonValue(util::to_std(file_type));
-                json_str = result.Dump(-1);
+                file_json["name"] = mcp::JsonValue(fname);
+                file_json["path"] = mcp::JsonValue(path);
+                file_json["type"] = mcp::JsonValue(util::to_std(file_type));
+                st.json_str = file_json.Dump(-1);
                 return;
               }
 
-              set_error(json_str, "Path not found in file system: " + path);
-              error_code = "resource_not_found";
-             });
-        if (error_code.empty()) {
+              set_error(st.json_str, "Path not found in file system: " + path);
+              st.error_code = "resource_not_found";
+            });
+        if (result.error_code.empty()) {
           monitor::data_flow(
-              "resource_read", static_cast<int64_t>(json_str.size()),
+              "resource_read", static_cast<int64_t>(result.json_str.size()),
               monitor::build_attrs(
                   {{"uri", uri},
                    {"request_id", monitor::current_request_id()}}));
         } else {
-          monitor::error_event(error_code, "resource", uri);
+          monitor::error_event(result.error_code, "resource", uri);
         }
-        return make_json_result(uri, json_str);
+        return make_json_result(uri, result.json_str);
       });
 
   server.RegisterResource(
@@ -524,20 +593,24 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           .Description("Currently selected nodes in the editor")
           .MimeType("application/json"),
       [&queue](const std::string &uri) -> mcp::ReadResourceResult {
-        std::string json_str;
-        std::string error_code;
+        if (godot_autopilot::ExportGuard::is_exporting()) {
+          return export_blocked_resource_result(uri);
+        }
         const tools::TraceContext ctx = tools::capture_trace_context();
-         queue.execute_sync([&json_str, &error_code, ctx]() {
+        auto state = std::make_shared<ResourceTaskState>();
+        ResourceTaskResult result = run_resource_task(
+            queue, uri, state,
+            [state, ctx](ResourceTaskState &st) {
               tools::ScopedTraceContext restore(ctx);
               auto *editor = godot::EditorInterface::get_singleton();
               if (!editor) {
-                set_error(json_str, "Not in editor mode");
-                error_code = "resource_read_failed";
+                set_error(st.json_str, "Not in editor mode");
+                st.error_code = "resource_read_failed";
                 return;
               }
               auto *sel = editor->get_selection();
               if (!sel) {
-                json_str = "[]";
+                st.json_str = "[]";
                 return;
               }
 
@@ -560,18 +633,18 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
                     mcp::JsonValue(compute_relative_path(node, root_prefix));
                 arr.PushBack(std::move(item));
               }
-              json_str = arr.Dump(-1);
-             });
-        if (error_code.empty()) {
+              st.json_str = arr.Dump(-1);
+            });
+        if (result.error_code.empty()) {
           monitor::data_flow(
-              "resource_read", static_cast<int64_t>(json_str.size()),
+              "resource_read", static_cast<int64_t>(result.json_str.size()),
               monitor::build_attrs(
                   {{"uri", uri},
                    {"request_id", monitor::current_request_id()}}));
         } else {
-          monitor::error_event(error_code, "resource", uri);
+          monitor::error_event(result.error_code, "resource", uri);
         }
-        return make_json_result(uri, json_str);
+        return make_json_result(uri, result.json_str);
       });
 
   server.RegisterResourceTemplate(
@@ -583,45 +656,49 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
                const std::map<std::string, std::string> &vars)
           -> mcp::ReadResourceResult {
         std::string key = vars.at("key");
-        std::string json_str;
-        std::string error_code;
+        if (godot_autopilot::ExportGuard::is_exporting()) {
+          return export_blocked_resource_result(uri);
+        }
         const tools::TraceContext ctx = tools::capture_trace_context();
-         queue.execute_sync([&json_str, &key, &error_code, ctx]() {
+        auto state = std::make_shared<ResourceTaskState>();
+        ResourceTaskResult result = run_resource_task(
+            queue, uri, state,
+            [state, key, ctx](ResourceTaskState &st) {
               tools::ScopedTraceContext restore(ctx);
               auto *editor = godot::EditorInterface::get_singleton();
               if (!editor) {
-                set_error(json_str, "Not in editor mode");
-                error_code = "resource_read_failed";
+                set_error(st.json_str, "Not in editor mode");
+                st.error_code = "resource_read_failed";
                 return;
               }
               auto settings = editor->get_editor_settings();
               if (settings.is_null()) {
-                set_error(json_str, "Editor settings not available");
-                error_code = "resource_read_failed";
+                set_error(st.json_str, "Editor settings not available");
+                st.error_code = "resource_read_failed";
                 return;
               }
 
               godot::String gd_key(key.c_str());
               if (!settings->has_setting(gd_key)) {
-                set_error(json_str, "Setting not found: " + key);
-                error_code = "resource_not_found";
+                set_error(st.json_str, "Setting not found: " + key);
+                st.error_code = "resource_not_found";
                 return;
               }
 
               godot::Variant val = settings->get_setting(gd_key);
               auto jv = VariantJson::serialize(val);
-              json_str = jv.Dump(-1);
-             });
-        if (error_code.empty()) {
+              st.json_str = jv.Dump(-1);
+            });
+        if (result.error_code.empty()) {
           monitor::data_flow(
-              "resource_read", static_cast<int64_t>(json_str.size()),
+              "resource_read", static_cast<int64_t>(result.json_str.size()),
               monitor::build_attrs(
                   {{"uri", uri},
                    {"request_id", monitor::current_request_id()}}));
         } else {
-          monitor::error_event(error_code, "resource", uri);
+          monitor::error_event(result.error_code, "resource", uri);
         }
-        return make_json_result(uri, json_str);
+        return make_json_result(uri, result.json_str);
       });
 
   server.RegisterResource(
@@ -630,9 +707,14 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           .Description("Recent log entries from the plugin's log system")
           .MimeType("application/json"),
       [&queue](const std::string &uri) -> mcp::ReadResourceResult {
-        std::string json_str;
+        if (godot_autopilot::ExportGuard::is_exporting()) {
+          return export_blocked_resource_result(uri);
+        }
         const tools::TraceContext ctx = tools::capture_trace_context();
-         queue.execute_sync([&json_str, ctx]() {
+        auto state = std::make_shared<ResourceTaskState>();
+        ResourceTaskResult result = run_resource_task(
+            queue, uri, state,
+            [state, ctx](ResourceTaskState &st) {
               tools::ScopedTraceContext restore(ctx);
               auto &log = LogSystem::instance();
               auto entries = log.query_recent(50);
@@ -657,14 +739,18 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
 
                 arr.PushBack(std::move(item));
               }
-              json_str = arr.Dump(-1);
-             });
-        monitor::data_flow(
-            "resource_read", static_cast<int64_t>(json_str.size()),
-            monitor::build_attrs(
-                {{"uri", uri},
-                 {"request_id", monitor::current_request_id()}}));
-        return make_json_result(uri, json_str);
+              st.json_str = arr.Dump(-1);
+            });
+        if (result.error_code.empty()) {
+          monitor::data_flow(
+              "resource_read", static_cast<int64_t>(result.json_str.size()),
+              monitor::build_attrs(
+                  {{"uri", uri},
+                   {"request_id", monitor::current_request_id()}}));
+        } else {
+          monitor::error_event(result.error_code, "resource", uri);
+        }
+        return make_json_result(uri, result.json_str);
       });
 
   const int skill_resource_count = register_skill_resources(server);
