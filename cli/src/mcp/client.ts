@@ -27,6 +27,7 @@ const DEFAULT_TIMEOUT_SEC = 60;
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
 const HANDSHAKE_METHOD = "notifications/initialized";
 const HANDSHAKE_ERROR_CODE = -32600;
+const MAX_REHANDSHAKES = 1;
 const PROTOCOL_VERSION = "2025-11-25";
 const MODERN_PROTOCOL_VERSION = "2026-07-28";
 const KNOWN_PROTOCOL_VERSIONS: readonly string[] = [
@@ -66,6 +67,7 @@ let nextRequestId = 1;
 interface HandshakeState {
   done: boolean;
   version: string | null;
+  rehandshakes: number;
 }
 
 const handshakeStates = new Map<string, HandshakeState>();
@@ -73,7 +75,7 @@ const handshakeStates = new Map<string, HandshakeState>();
 function handshakeStateFor(url: string): HandshakeState {
   let state = handshakeStates.get(url);
   if (state === undefined) {
-    state = { done: false, version: null };
+    state = { done: false, version: null, rehandshakes: 0 };
     handshakeStates.set(url, state);
   }
   return state;
@@ -222,6 +224,12 @@ function needsHandshake(status: number, envelope: unknown): boolean {
   return (err as { code?: unknown }).code === HANDSHAKE_ERROR_CODE;
 }
 
+function handshakeRequired(res: RawResponse, extracted: Extracted): boolean {
+  if (res.status !== 400) return false;
+  if (extracted.kind === "envelope") return needsHandshake(res.status, extracted.envelope);
+  return true;
+}
+
 function serverMessage(text: string): string {
   let serverMsg = "";
   try {
@@ -255,20 +263,15 @@ export async function callTool(
 
   let res = await postJson(url, body, timeoutMs);
   let extracted = extractEnvelope(res);
-  if (
-    !handshakeStateFor(url).done &&
-    ((extracted.kind === "envelope" && needsHandshake(res.status, extracted.envelope)) ||
-      (res.status === 400 && extracted.kind !== "envelope"))
-  ) {
-    let envelope = extracted.kind === "envelope" ? extracted.envelope : null;
-    if (envelope === null) {
-      try {
-        envelope = JSON.parse(res.text);
-      } catch {
-        envelope = null;
+  const state = handshakeStateFor(url);
+  if (handshakeRequired(res, extracted)) {
+    const expired = state.done;
+    if (!expired || state.rehandshakes < MAX_REHANDSHAKES) {
+      if (expired) {
+        state.done = false;
+        state.version = null;
+        state.rehandshakes += 1;
       }
-    }
-    if (envelope === null || needsHandshake(res.status, envelope)) {
       await performHandshake(url, timeoutMs);
       id = nextRequestId++;
       res = await postJson(url, makeCallEnvelope(id, name, args, opts.direct === true), timeoutMs);

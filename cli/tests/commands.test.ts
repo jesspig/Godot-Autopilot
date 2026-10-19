@@ -359,6 +359,32 @@ describe("toolFailed", () => {
     cap.restore();
     expect(code).toBe(ExitCode.ToolFailure);
   });
+
+  test("JSON-RPC 顶层 error 信封导致 exit 1 并透出服务端消息", async () => {
+    const { port } = recordingServer(() =>
+      sseResponse({ jsonrpc: "2.0", id: 1, error: { code: -32602, message: "mock top-level error" } }),
+    );
+    const cap = captureOutput();
+    const code = await ping([], { portText: String(port) });
+    cap.restore();
+    expect(code).toBe(ExitCode.ToolFailure);
+    expect(cap.stderr()).toContain("mock top-level error");
+    expect(cap.stderr()).toContain("-32602");
+    expect(JSON.parse(cap.stdout())).toEqual({ error: { code: -32602, message: "mock top-level error" } });
+  });
+
+  test("JSON-RPC 顶层 error 信封在 --raw 下仍输出脱敏信封并 exit 1", async () => {
+    const { port } = recordingServer(() =>
+      sseResponse({ jsonrpc: "2.0", id: 7, error: { code: -32602, message: "mock top-level error" } }),
+    );
+    const cap = captureOutput();
+    const code = await ping([], { portText: String(port), raw: true });
+    cap.restore();
+    expect(code).toBe(ExitCode.ToolFailure);
+    const display = JSON.parse(cap.stdout());
+    expect(display.id).toBe(7);
+    expect(display.error.code).toBe(-32602);
+  });
 });
 
 describe("用法错误", () => {

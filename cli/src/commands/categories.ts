@@ -10,6 +10,6 @@ export async function run(_positional: string[], opts: GlobalOptions): Promise<n
   assertCallFamilyUsage("categories", opts);
   const target = resolveTarget(opts, TARGET_CONTEXT);
   const envelope = await callTool("list_categories", {}, { port: target.port, timeoutSec: callTimeoutSec(opts), direct: true });
-  const { display, toolFailed } = extractPayload(envelope, { saveImages: opts.saveImages, raw: opts.raw });
-  return emit(display, toolFailed, opts);
+  const extracted = extractPayload(envelope, { saveImages: opts.saveImages, raw: opts.raw });
+  return emit(extracted, opts);
 }

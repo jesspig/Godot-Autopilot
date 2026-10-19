@@ -156,3 +156,78 @@ describe("callTool 协议版本协商", () => {
     expect(err.message).toBe("initialize failed with HTTP 500.");
   });
 });
+
+interface RestartableServer {
+  port: number;
+  calls: Recorded[];
+  restart(): void;
+}
+
+function serveRestartableServer(): RestartableServer {
+  const calls: Recorded[] = [];
+  let sessionValid = false;
+  const port = serve(async (req) => {
+    const body = (await req.json()) as { method?: string; id?: number };
+    calls.push({ method: body.method, version: req.headers.get("mcp-protocol-version") });
+    if (body.method === "initialize") {
+      sessionValid = true;
+      return sseResponse({
+        jsonrpc: "2.0",
+        id: body.id,
+        result: { protocolVersion: "2025-11-25", capabilities: {}, serverInfo: SERVER_INFO },
+      });
+    }
+    if (body.method === "notifications/initialized") {
+      return new Response("", { status: 202 });
+    }
+    if (!sessionValid) {
+      return jsonResponse({ error: { code: -32600, message: "invalid request: tools/call" } }, 400);
+    }
+    return sseResponse({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: "{}" }] } });
+  });
+  return {
+    port,
+    calls,
+    restart: () => {
+      sessionValid = false;
+    },
+  };
+}
+
+describe("callTool 握手状态失效", () => {
+  test("服务端重启后同一进程重新握手并调用成功", async () => {
+    const server = serveRestartableServer();
+    const first = await callTool("system_status", {}, { port: server.port });
+    expect(first.result).toEqual({ content: [{ type: "text", text: "{}" }] });
+
+    server.restart();
+    const second = await callTool("system_status", {}, { port: server.port });
+    expect(second.result).toEqual({ content: [{ type: "text", text: "{}" }] });
+    expect(server.calls.map((c) => c.method)).toEqual([
+      "tools/call",
+      "initialize",
+      "notifications/initialized",
+      "tools/call",
+      "tools/call",
+      "initialize",
+      "notifications/initialized",
+      "tools/call",
+    ]);
+  });
+
+  test("重握手次数达上限后直接报传输错误，不无限重试", async () => {
+    const server = serveRestartableServer();
+    await callTool("system_status", {}, { port: server.port });
+
+    server.restart();
+    const recovered = await callTool("system_status", {}, { port: server.port });
+    expect(recovered.result).toBeDefined();
+
+    server.restart();
+    const err = await catchError(callTool("system_status", {}, { port: server.port }));
+    expect(err.code).toBe(ExitCode.Transport);
+    expect(err.message).toContain("HTTP 400");
+    const methods = server.calls.map((c) => c.method);
+    expect(methods.filter((m) => m === "initialize")).toHaveLength(2);
+  });
+});

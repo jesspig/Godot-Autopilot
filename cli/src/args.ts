@@ -7,7 +7,6 @@ export interface GlobalOptions {
   project?: string;
   pretty?: boolean;
   raw?: boolean;
-  quiet?: boolean;
   timeoutText?: string;
   category?: string;
   tagsText?: string;
@@ -43,7 +42,6 @@ const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
 const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--pretty": "pretty",
   "--raw": "raw",
-  "--quiet": "quiet",
   "--help": "help",
   "--version": "version",
   "--headless": "headless",
@@ -115,7 +113,7 @@ Commands:
   call <tool>         Call a tool
   list                List running Godot instances
   start               Start a Godot editor
-  stop                Stop a Godot editor
+  stop                Stop a Godot editor (<id> | --id | --port | --project)
   logs                Show an instance log
 
 Global options:
@@ -124,7 +122,6 @@ Global options:
   --project <text>    Project directory
   --pretty            Pretty-print JSON output (2-space indent)
   --raw               Raw JSON envelope output
-  --quiet             Suppress payload output
   --timeout <text>    Call timeout in seconds
   --category <text>   Filter search results by category
   --tags <text>       Filter search results by tags (comma separated)

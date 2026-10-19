@@ -2,7 +2,8 @@ import fs from "node:fs";
 
 import { CliError, ExitCode } from "./errors";
 import { isAlive } from "./process";
-import { joinPath, resolvePath, sep } from "./platform";
+import { joinPath } from "./platform";
+import { projectPathKey } from "./target";
 
 export interface InstanceEntry {
   id: string;
@@ -138,12 +139,6 @@ export function findById(id: string): InstanceEntry | undefined {
 }
 
 export function findLiveByProject(project: string): InstanceEntry | undefined {
-  const target = normalizeProjectPath(project);
-  return loadRegistry().instances.find((e) => normalizeProjectPath(e.project) === target && isAlive(e.pid));
-}
-
-function normalizeProjectPath(p: string): string {
-  let n = resolvePath(p).replace(/\//g, sep());
-  if (process.platform === "win32") n = n.toLowerCase();
-  return n;
+  const target = projectPathKey(project);
+  return loadRegistry().instances.find((e) => projectPathKey(e.project) === target && isAlive(e.pid));
 }

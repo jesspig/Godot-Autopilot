@@ -10,7 +10,8 @@ import { run as runStart } from "../src/commands/start";
 import { run as runStop } from "../src/commands/stop";
 import { ExitCode } from "../src/errors";
 import { isAlive, stopForce } from "../src/process";
-import { loadRegistry, stateDir, type InstanceEntry } from "../src/registry";
+import { findById, findLiveByProject, loadRegistry, stateDir, type InstanceEntry } from "../src/registry";
+import { resolveTarget } from "../src/target";
 import { killImage, killPid, removeDirWithRetry, waitDead, waitFor } from "./support/cleanup";
 
 // 端口反查（netstat 轮询）+ ping 探测引入固定延迟，2s 阈值在系统负载高时不足
@@ -170,6 +171,13 @@ if (!noListen) {
       report.calls.push({ method: body.method, name: toolName, direct: isDirect });
       saveReport(report);
       if (body?.method === "notifications/initialized") return new Response("{}", { status: 200 });
+      if (toolName === "ping" && isDirect && process.env.GDA_FAKE_GODOT_PING_FAIL === "1") {
+        return new Response(JSON.stringify({
+          jsonrpc: "2.0",
+          id: body?.id ?? 1,
+          error: { code: -32602, message: "mock ping failure" },
+        }), { status: 400, headers: { "content-type": "application/json" } });
+      }
       if (toolName === "ping" && !isDirect) {
         return new Response(JSON.stringify({
           jsonrpc: "2.0",
@@ -247,10 +255,15 @@ async function waitForInstances(count: number): Promise<InstanceEntry[]> {
   return registeredInstances();
 }
 
-async function startFake(opts: { headless?: boolean; play?: boolean; noImport?: boolean; portText?: string; waitText?: string; projectDir?: string; noListen?: boolean; resetReport?: boolean }) {
+async function startFake(opts: { headless?: boolean; play?: boolean; noImport?: boolean; portText?: string; waitText?: string; projectDir?: string; noListen?: boolean; resetReport?: boolean; pingFail?: boolean }) {
   process.env.GDA_FAKE_GODOT_REPORT = fakeReportPath;
   if (opts.noListen === true) {
     process.env.GDA_FAKE_GODOT_NO_LISTEN = "1";
+  }
+  if (opts.pingFail === true) {
+    process.env.GDA_FAKE_GODOT_PING_FAIL = "1";
+  } else {
+    delete process.env.GDA_FAKE_GODOT_PING_FAIL;
   }
   if (opts.resetReport !== false) {
     fs.rmSync(fakeReportPath, { force: true });
@@ -440,6 +453,26 @@ describe.serial("start", () => {
       delete process.env.GDA_FAKE_GODOT_NO_LISTEN;
     }
   }, TEST_TIMEOUT_MS);
+
+  test("就绪探测失败时终止进程、清理 pending 日志且不登记", async () => {
+    const { code, stderr } = await startFake({
+      headless: true,
+      noImport: true,
+      waitText: "0.2",
+      pingFail: true,
+    });
+    expect(code).toBe(ExitCode.Transport);
+    expect(stderr).toContain("was terminated");
+    expect(registeredInstances()).toHaveLength(0);
+
+    const report = readReport();
+    expect(report).not.toBeNull();
+    expect(await waitFor(() => !isAlive(report!.pid), 5000)).toBe(true);
+
+    const logsDir = path.join(stateDir(), "logs");
+    const pending = fs.existsSync(logsDir) ? fs.readdirSync(logsDir).filter((n) => n.startsWith(".pending-")) : [];
+    expect(pending).toHaveLength(0);
+  }, TEST_TIMEOUT_MS);
 });
 
 describe.serial("stop", () => {
@@ -501,6 +534,65 @@ describe.serial("stop", () => {
     const { code } = await captureStdout(() => runStop([], { project: projectDir, force: true }));
     expect(code).toBe(ExitCode.Success);
     expect(isAlive(runner.pid)).toBe(false);
+    expect(registeredInstances()).toHaveLength(0);
+  }, TEST_TIMEOUT_MS);
+
+  test("--id 终止登记实例并清理登记", async () => {
+    const runner = spawn(process.execPath, ["-e", "setTimeout(()=>{},20000)"], { stdio: "ignore" });
+    const pid = runner.pid;
+    writeEntry(makeEntry({ id: `p${pid}`, pid, port: 9601, project: makeProjectDir() }));
+    const { code, stdout } = await captureStdout(() => runStop([], { id: `p${pid}`, force: true }));
+    expect(code).toBe(ExitCode.Success);
+    expect(JSON.parse(stdout).ok).toBe(true);
+    expect(isAlive(pid)).toBe(false);
+    expect(registeredInstances()).toHaveLength(0);
+  }, TEST_TIMEOUT_MS);
+
+  test("--port 终止该端口上的登记实例", async () => {
+    const runner = spawn(process.execPath, ["-e", "setTimeout(()=>{},20000)"], { stdio: "ignore" });
+    const pid = runner.pid;
+    writeEntry(makeEntry({ id: `p${pid}`, pid, port: 9602, project: makeProjectDir() }));
+    const { code, stdout } = await captureStdout(() => runStop([], { portText: "9602", force: true }));
+    expect(code).toBe(ExitCode.Success);
+    expect(JSON.parse(stdout).ok).toBe(true);
+    expect(isAlive(pid)).toBe(false);
+    expect(registeredInstances()).toHaveLength(0);
+  }, TEST_TIMEOUT_MS);
+
+  test("--port 无登记实例时报传输错误且不输出 ok:true", async () => {
+    const { code, stdout, stderr } = await captureStdout(() => runStop([], { portText: "9603" }));
+    expect(code).toBe(ExitCode.Transport);
+    expect(stdout.trim()).toBe("");
+    expect(stderr).toContain("no registered instance on port 9603");
+  }, TEST_TIMEOUT_MS);
+
+  test("--id 与 --port 互斥报用法错误", async () => {
+    const { code, stderr } = await captureStdout(() => runStop([], { id: "p1", portText: "9604" }));
+    expect(code).toBe(ExitCode.Usage);
+    expect(stderr).toContain("use only one of");
+  }, TEST_TIMEOUT_MS);
+
+  test("位置 id 与 --id 互斥报用法错误", async () => {
+    const { code, stderr } = await captureStdout(() => runStop(["p1"], { id: "p1" }));
+    expect(code).toBe(ExitCode.Usage);
+    expect(stderr).toContain("use only one of");
+  }, TEST_TIMEOUT_MS);
+
+  test("含 .. 的相对 --project 在寻址链与 stop 下解析到同一实例", async () => {
+    const runner = spawn(process.execPath, ["-e", "setTimeout(()=>{},20000)"], { stdio: "ignore" });
+    const pid = runner.pid;
+    const projectDir = path.join(tmp, "proj", "nested");
+    fs.mkdirSync(projectDir, { recursive: true });
+    writeEntry(makeEntry({ id: `p${pid}`, pid, port: 9605, project: path.resolve(projectDir) }));
+    const messy = `sub${path.sep}..${path.sep}${path.relative(process.cwd(), projectDir)}`;
+
+    const target = resolveTarget({ project: messy }, { findById, findLiveByProject });
+    expect(target.source).toBe("project");
+    expect(target.instance?.id).toBe(`p${pid}`);
+
+    const { code } = await captureStdout(() => runStop([], { project: messy, force: true }));
+    expect(code).toBe(ExitCode.Success);
+    expect(isAlive(pid)).toBe(false);
     expect(registeredInstances()).toHaveLength(0);
   }, TEST_TIMEOUT_MS);
 });

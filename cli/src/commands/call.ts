@@ -52,6 +52,6 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
     timeoutSec: callTimeoutSec(opts),
     direct: META_DIRECT_TOOLS.has(tool),
   });
-  const { display, toolFailed } = extractPayload(envelope, { saveImages: opts.saveImages, raw: opts.raw });
-  return emit(display, toolFailed, opts);
+  const extracted = extractPayload(envelope, { saveImages: opts.saveImages, raw: opts.raw });
+  return emit(extracted, opts);
 }
