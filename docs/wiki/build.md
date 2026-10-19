@@ -95,15 +95,16 @@ resource:
 
 ## CI 与 Release
 
-`.github/workflows/ci.yml` — develop push/PR 触发：三平台 matrix（ubuntu-latest / macos-latest / windows-2022）Debug 编译 + L1 测试 `ctest --preset debug -E "^gda_runner_"`（L2 需 Godot 不在 CI 跑）；ninja 由 `seanmiddleditch/gha-setup-ninja@v5` 装入 PATH，因此 `resolve_preset` 恒选 `debug` 而非 `debug-portable`（ctest 步骤直接写死 `ctest --preset debug`、不经过 `resolve_preset`，依赖这一前提成立）；sccache + `third_party/` 子模块缓存加速（`actions/checkout` 带 `submodules: true`；`actions/cache` 的 path 为 `third_party/godot-cpp`、`third_party/mcp-cpp-sdk`、`third_party/googletest`，key `submodules-debug-${{ runner.os }}-${{ hashFiles('.gitmodules') }}`）。job 级 env 含 `PYTHONUTF8: "1"`（Windows runner 控制台为 cp1252，保证 `main.py` 及其子进程 `embed_skills.py` 的中文日志不触发 `UnicodeEncodeError`；脚本自身亦对 stdout/stderr 强制 UTF-8，本地 Windows 终端同样受益）。`release.yml` 的 job env 同。
+`.github/workflows/ci.yml` — develop push/PR 触发：三平台 matrix（ubuntu-latest / macos-latest / windows-2022）Debug 编译 + L1 测试 `ctest --preset debug -E "^gda_runner_"`（L2 需 Godot 不在 CI 跑）；ninja 由 `seanmiddleditch/gha-setup-ninja@v5` 装入 PATH，因此 `resolve_preset` 恒选 `debug` 而非 `debug-portable`（ctest 步骤直接写死 `ctest --preset debug`、不经过 `resolve_preset`，依赖这一前提成立）；sccache + `third_party/` 子模块缓存加速（`actions/checkout` 带 `submodules: true`；`actions/cache` 的 path 为 `third_party/godot-cpp`、`third_party/mcp-cpp-sdk`、`third_party/googletest`，key `submodules-debug-${{ runner.os }}-${{ steps.submodules.outputs.shas }}`，shas 取 `git ls-files -s third_party` 的 gitlink sha，子模块升级即换 key）。job 级 env 含 `PYTHONUTF8: "1"`（Windows runner 控制台为 cp1252，保证 `main.py` 及其子进程 `embed_skills.py` 的中文日志不触发 `UnicodeEncodeError`；脚本自身亦对 stdout/stderr 强制 UTF-8，本地 Windows 终端同样受益）。`release.yml` 的 job env 同。另有 `cli-bins` 作业：三平台各自 `bun build --compile` 出可执行文件并跑 `--version` / `list` 冒烟，**不发布**（发布走 `release.yml` 的 `cli` 作业）。
 
 `.github/workflows/release.yml` — tag 双格式触发（`v*.*.*` / `[0-9]*.*.*`，另支持 `workflow_dispatch` 手动指定 tag）：
 
 | job | 内容 |
 |---|---|
-| validate | 校验 tag 与根 `VERSION` 一致（`v` 前缀可选：`v0.2.6` / `0.2.6` ↔ `0.2.6`，版本号以根 `VERSION` 为准，当前 0.2.6），不一致 fail |
-| build | 同 CI 环境（Ninja/sccache/msvc-dev-cmd，ninja 由 `seanmiddleditch/gha-setup-ninja@v5` 提供，故 `resolve_preset` 恒选 `release`；checkout 带 `submodules: true`，缓存同 CI 改为 `key: submodules-release-${{ runner.os }}-${{ hashFiles('.gitmodules') }}`），Release 构建后按精确文件名上传各平台库 artifact（天然排除 pdb） |
-| package | 下载全部 artifact → `python main.py package --libs-dir dist` 合并 → 重命名为 `addons.zip` → softprops/action-gh-release 发布 |
+| validate | 校验 tag 与根 `VERSION` 一致（`v` 前缀可选：`v0.2.7` / `0.2.7` ↔ `0.2.7`，版本号以根 `VERSION` 为准，当前 0.2.7），不一致 fail |
+| build | 同 CI 环境（Ninja/sccache/msvc-dev-cmd，ninja 由 `seanmiddleditch/gha-setup-ninja@v5` 提供，故 `resolve_preset` 恒选 `release`；checkout 带 `submodules: true`，缓存同 CI 改为 `key: submodules-release-${{ runner.os }}-${{ steps.submodules.outputs.shas }}`），Release 构建后按精确文件名上传各平台库 artifact（天然排除 pdb） |
+| cli | 5 个目标的 `bun build --compile` 独立二进制（`windows-x64` / `linux-x64` / `linux-x64-musl` / `macos-arm64` / `macos-x64`），macOS 产物 ad-hoc 签名（`codesign --force --sign -`），各自打 zip/tar.gz 后上传 artifact；二进制名带根 `VERSION` |
+| package | 下载全部 artifact → `python main.py package --libs-dir dist` 合并 → 重命名为 `addons.zip` → 收集 `cli-dist/` 下二进制并生成 `sha256sums.txt` → softprops/action-gh-release 一并发布（`addons.zip` + `gda-<version>-<platform>.*` + 校验和） |
 
 macOS runner 为 ARM64，preset 设 `CMAKE_OSX_ARCHITECTURES=x86_64;arm64` 编译 universal 双架构（仅 Apple 平台生效），gdextension 对应条目为 `macos.{debug,release}.universal`。
 

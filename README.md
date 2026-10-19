@@ -52,7 +52,7 @@ Two editor panels come with the plugin:
 
 Requires **Godot 4.7+**.
 
-1. **Get the plugin** — download `godot-autopilot-<version>.zip` from the project's GitHub Releases page ([jesspig/Godot-Autopilot](https://github.com/jesspig/Godot-Autopilot)) and copy the `godot-autopilot/` folder into your project's `addons/` directory:
+1. **Get the plugin** — download `addons.zip` from the project's GitHub Releases page ([jesspig/Godot-Autopilot](https://github.com/jesspig/Godot-Autopilot)) and copy the `godot-autopilot/` folder into your project's `addons/` directory:
    ```
    your-project/
    └── addons/
@@ -88,7 +88,37 @@ gda ping
 
 Command families: **calling** — `ping` / `status` / `categories` / `search` / `describe` / `call`; **lifecycle** — `list` / `start` / `stop` / `logs`.
 
-Requires **Bun**. See [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md) for the full reference.
+Requires **Bun**; on a machine without Bun or Node, use the standalone `gda` binary from the Releases page instead (see [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md) for the full reference).
+
+## Let an AI set it up for you
+
+Rather than following the steps above by hand, hand them to a coding agent that has shell access on the same machine. Copy the block below, fill in the absolute path of your project, and send it:
+
+```text
+Set up Godot Autopilot (GDA) on this machine end to end, then prove it works.
+
+Project: <ABSOLUTE PATH TO YOUR GODOT PROJECT> (Godot 4.7+).
+
+1. Install the plugin: download addons.zip from
+   https://github.com/jesspig/Godot-Autopilot/releases/latest and extract it so that
+   <project>/addons/godot-autopilot/godot-autopilot.gdextension exists.
+2. Start the editor: run `godot --editor --path <project>` (ask me for the engine path if it is
+   not on PATH) and wait until http://127.0.0.1:9527/mcp answers.
+3. Verify the server from a shell. Try in this order, stop at the first that works, and tell me
+   which one it was:
+   - bunx "github:jesspig/Godot-Autopilot#0.2.7" ping
+   - download the gda release asset for this OS and CPU from the same Releases page, verify it
+     against sha256sums.txt, then run ./gda ping
+4. Connect my AI client: add
+   {"mcpServers":{"godot-autopilot":{"url":"http://127.0.0.1:9527/mcp"}}}
+   to its MCP configuration, or tell me to use the plugin's MCP Config panel instead.
+5. Summarize: which channel worked, every command you ran, and anything that failed.
+
+Rules: never hand-write HTTP requests against the port; never expose 9527 beyond loopback;
+leave code_execute and game_runtime disabled unless I ask for them.
+```
+
+If your client supports skills (Claude Code, Codex, Cursor and others do), also point it at this repository's `skills/` directory so the agent gets the full calling protocol instead of improvising.
 
 ## Safety notes
 

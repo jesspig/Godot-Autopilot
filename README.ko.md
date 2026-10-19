@@ -52,7 +52,7 @@ Godot-Autopilot은 **Godot 에디터 내부**에서 플러그인으로 동작하
 
 **Godot 4.7+**가 필요합니다.
 
-1. **플러그인 가져오기** — 프로젝트의 GitHub 릴리스 페이지([jesspig/Godot-Autopilot](https://github.com/jesspig/Godot-Autopilot))에서 `godot-autopilot-<version>.zip`을 다운로드한 뒤 `godot-autopilot/` 폴더를 프로젝트의 `addons/` 디렉터리에 복사합니다.
+1. **플러그인 가져오기** — 프로젝트의 GitHub 릴리스 페이지([jesspig/Godot-Autopilot](https://github.com/jesspig/Godot-Autopilot))에서 `addons.zip`을 다운로드한 뒤 `godot-autopilot/` 폴더를 프로젝트의 `addons/` 디렉터리에 복사합니다.
    ```
    your-project/
    └── addons/
@@ -88,7 +88,37 @@ gda ping
 
 명령 계열: **호출 계열** — `ping` / `status` / `categories` / `search` / `describe` / `call`；**수명 주기** — `list` / `start` / `stop` / `logs`.
 
-**Bun**이 필요합니다. 전체 참조는 [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md)를 참조하십시오.
+**Bun**이 필요합니다. Bun도 Node도 없는 환경에서는 Releases의 `gda` 단일 실행 파일을 사용하세요 (전체 참조는 [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md)).
+
+## AI에게 설치를 맡기기
+
+위 단계를 직접 따라 하는 대신, 같은 머신에서 셸을 실행할 수 있는 코딩 에이전트에게 맡길 수 있습니다. 아래 블록을 복사하고 프로젝트의 절대 경로를 채워 보내세요:
+
+```text
+Set up Godot Autopilot (GDA) on this machine end to end, then prove it works.
+
+Project: <ABSOLUTE PATH TO YOUR GODOT PROJECT> (Godot 4.7+).
+
+1. Install the plugin: download addons.zip from
+   https://github.com/jesspig/Godot-Autopilot/releases/latest and extract it so that
+   <project>/addons/godot-autopilot/godot-autopilot.gdextension exists.
+2. Start the editor: run `godot --editor --path <project>` (ask me for the engine path if it is
+   not on PATH) and wait until http://127.0.0.1:9527/mcp answers.
+3. Verify the server from a shell. Try in this order, stop at the first that works, and tell me
+   which one it was:
+   - bunx "github:jesspig/Godot-Autopilot#0.2.7" ping
+   - download the gda release asset for this OS and CPU from the same Releases page, verify it
+     against sha256sums.txt, then run ./gda ping
+4. Connect my AI client: add
+   {"mcpServers":{"godot-autopilot":{"url":"http://127.0.0.1:9527/mcp"}}}
+   to its MCP configuration, or tell me to use the plugin's MCP Config panel instead.
+5. Summarize: which channel worked, every command you ran, and anything that failed.
+
+Rules: never hand-write HTTP requests against the port; never expose 9527 beyond loopback;
+leave code_execute and game_runtime disabled unless I ask for them.
+```
+
+클라이언트가 스킬을 지원한다면(Claude Code, Codex, Cursor 등) 이 저장소의 `skills/` 디렉터리도 함께 지정하세요. 에이전트가 추측하지 않고 전체 호출 프로토콜을 참조할 수 있습니다.
 
 ## 안전 참고 사항
 

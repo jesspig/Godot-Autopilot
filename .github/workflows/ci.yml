@@ -87,3 +87,39 @@ jobs:
 
       - name: L1 unit tests
         run: ctest --preset debug -E "^gda_runner_" --output-on-failure
+
+  # 可执行文件冒烟：只验证 `bun build --compile` 在三平台都能产出并启动，不发布。
+  # 发布产物由 release.yml 的 cli 作业构建（含 macOS ad-hoc 签名与校验和）。
+  cli-bins:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-2022]
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.x"
+
+      - name: Build standalone gda
+        shell: bash
+        run: |
+          version="$(tr -d ' \t\r\n' < VERSION)"
+          out="dist/gda-${version}-${{ matrix.os }}"
+          case "${{ matrix.os }}" in windows*) out="${out}.exe";; esac
+          mkdir -p dist
+          bun build cli/bin/gda.ts --compile --minify --outfile "$out"
+          echo "GDA_BIN=${out}" >> "$GITHUB_ENV"
+
+      - name: Smoke test
+        shell: bash
+        run: |
+          chmod +x "$GDA_BIN" || true
+          "$GDA_BIN" --version
+          "$GDA_BIN" list

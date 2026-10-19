@@ -1,6 +1,6 @@
 # Script Access to the Godot Autopilot MCP Server
 
-If Bun is available, prefer the gda CLI (channel 2 of the calling ladder); this reference covers the script bridge used when it is not.
+If Bun is available, prefer the gda CLI (channel 2 of the calling ladder); this reference covers the script bridge used when it is not. When no JavaScript runtime exists at all, use the standalone binary described in references/cli-access.md (channel 4).
 
 Companion reference of the godot-autopilot-tools volume: how to call the server through the bundled script when the native MCP channel is broken. The server itself is almost always fine — typically the client harness lost its tool list after an editor restart.
 

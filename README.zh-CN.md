@@ -52,7 +52,7 @@ Godot-Autopilot 是一个住在 **Godot 编辑器内部**的插件型 [MCP](http
 
 需要 **Godot 4.7+**。
 
-1. **获取插件**——从项目 GitHub Releases 页（[jesspig/Godot-Autopilot](https://github.com/jesspig/Godot-Autopilot)）下载 `godot-autopilot-<version>.zip`，把其中的 `godot-autopilot/` 文件夹复制到你项目的 `addons/` 目录：
+1. **获取插件**——从项目 GitHub Releases 页（[jesspig/Godot-Autopilot](https://github.com/jesspig/Godot-Autopilot)）下载 `addons.zip`，把其中的 `godot-autopilot/` 文件夹复制到你项目的 `addons/` 目录：
    ```
    your-project/
    └── addons/
@@ -88,7 +88,37 @@ gda ping
 
 命令族：**调用族** —— `ping` / `status` / `categories` / `search` / `describe` / `call`；**生命周期** —— `list` / `start` / `stop` / `logs`。
 
-需要 **Bun**。完整参考见 [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md)。
+需要 **Bun**；机器上没有 Bun 或 Node 时，直接改用 Releases 页的 `gda` 独立可执行文件（完整参考见 [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md)）。
+
+## 让 AI 自己装好并验证
+
+不想照上面的步骤手动来？把下面这段直接交给能在这台机器上执行命令的编码代理，填上你项目的绝对路径即可：
+
+```text
+Set up Godot Autopilot (GDA) on this machine end to end, then prove it works.
+
+Project: <ABSOLUTE PATH TO YOUR GODOT PROJECT> (Godot 4.7+).
+
+1. Install the plugin: download addons.zip from
+   https://github.com/jesspig/Godot-Autopilot/releases/latest and extract it so that
+   <project>/addons/godot-autopilot/godot-autopilot.gdextension exists.
+2. Start the editor: run `godot --editor --path <project>` (ask me for the engine path if it is
+   not on PATH) and wait until http://127.0.0.1:9527/mcp answers.
+3. Verify the server from a shell. Try in this order, stop at the first that works, and tell me
+   which one it was:
+   - bunx "github:jesspig/Godot-Autopilot#0.2.7" ping
+   - download the gda release asset for this OS and CPU from the same Releases page, verify it
+     against sha256sums.txt, then run ./gda ping
+4. Connect my AI client: add
+   {"mcpServers":{"godot-autopilot":{"url":"http://127.0.0.1:9527/mcp"}}}
+   to its MCP configuration, or tell me to use the plugin's MCP Config panel instead.
+5. Summarize: which channel worked, every command you ran, and anything that failed.
+
+Rules: never hand-write HTTP requests against the port; never expose 9527 beyond loopback;
+leave code_execute and game_runtime disabled unless I ask for them.
+```
+
+如果你的客户端支持技能（Claude Code、Codex、Cursor 等都支持），再把本仓库的 `skills/` 目录指给它，代理就能拿到完整的调用协议，而不必自己摸索。
 
 ## 安全说明
 
