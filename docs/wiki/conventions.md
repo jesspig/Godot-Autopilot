@@ -73,7 +73,7 @@ resource: src/
 | `comment_guard` | `tests/guard/comment_guard.py` | `src/` 与 `tests/` 下源码无注释 |
 | `main_thread_guard` | `tests/guard/main_thread_guard.py` | 外线程文件不直接调用 Godot API |
 | `version_sync_guard` | `tests/guard/version_sync_guard.py` | 版本号单一来源（根 `VERSION`）在各载体间一致 |
-| `cli_contract` | `tests/scripts/test_cli_contract.py` | CLI 载体与 MCP 双载体契约一致 |
+| `cli_contract` | `tests/scripts/test_cli_contract.py` | CLI 载体与 MCP 服务端的调用契约一致 |
 | `cli_unit` | `tests/scripts/run_cli_unit.py` | CLI 单测（封装 `bun test cli/tests`） |
 
 **新增守卫的命名与登记约定**：

@@ -6,7 +6,7 @@ tags:
   - 安全
   - 并发
   - 契约
-timestamp: "2026-10-20T00:56:32+08:00"
+timestamp: "2026-10-20T02:55:00+08:00"
 resource:
   - src/core/server_context.cpp
   - src/core/command_queue.hpp
@@ -21,7 +21,7 @@ resource:
 
 本页是 MCP 服务器进程内 GDExtension 的最小安全与并发契约。实现、评审和后续测试以本页条款为验收标准；代码事实见 [核心模块](modules/core.md) 与 [工具注册表](modules/tools_registry.md)。
 
-> 审计日期：2026-10-20（10-20 随执行预算与并发契约治理批次同步——① 修正两条与代码冲突的断言：§4「Godot `FileAccess` 仅在 flush 主线程路径调用」与「`call_tool` 编排回调不触碰 Godot API」均按修复后的事实重写；② §3 补记 `side_effect` 全量非空与能力门只按 `side_effect` 判定、§3.1 补记 `batch_execute` 纳入 `code_execute` 能力门（**对外行为变更**）；③ §4 补记长阻塞预算档、等待全预算化、`code_execute` 协作式执行期超时、`main_thread_guard` 静态守卫与 `ExportGuard` 实例级异常安全复位、导出期拒绝覆盖三类入口；④ 补记守卫的固有局限；⑤ §3.4 按本轮 CLI 启动路径修复改写「Windows 脱父」断言——`cmd /c start "" /b` 蹦床 + `netstat` 端口反查**已移除**，改为直连 `spawn` + `detached: true`、pid 取 `spawn` 返回值、存活判定改解析 `tasklist /FO CSV`，并补记启动失败回滚三态与可执行补救指令。详见 [changelog/2026-10-20-log.md](changelog/2026-10-20-log.md)；原记（2026-10-19）：随 CLI 引擎定位收窄批次同步——`gda start` 不再读 `GODOT_PATH` 与 `<project>/.env`（前者仅 L2 引擎测试使用，生产环境不存在），可执行文件链收敛为 `--godot` > PATH，未命中即报错提示 `--godot`；新增 `cli/tests/process.test.ts` 3 项（TS 108→111、expect 301→310）；原记（2026-10-18）：随 CLI 载体落地批次同步——§3.3 补记 SDK 0.3.7 握手升级与双载体修复，新增 §3.4 CLI 安全包络；详见 [changelog/2026-10-18-log.md](changelog/2026-10-18-log.md)）
+> 审计日期：2026-10-20（10-20 随技能书调用阶梯收敛批次同步——技能书自带的脚本桥 `gda.mjs` 与 `references/script-access.md` 删除，§3.3 改写为「技能通道与手动兜底」：脚本化调用通道只剩 GDA CLI，脚本桥的安全包络条款并入 §3.4（环回绑定、退出码四态、`--godot` 引擎定位收敛、失败回滚不残留孤儿进程）；10-20 随执行预算与并发契约治理批次同步——① 修正两条与代码冲突的断言：§4「Godot `FileAccess` 仅在 flush 主线程路径调用」与「`call_tool` 编排回调不触碰 Godot API」均按修复后的事实重写；② §3 补记 `side_effect` 全量非空与能力门只按 `side_effect` 判定、§3.1 补记 `batch_execute` 纳入 `code_execute` 能力门（**对外行为变更**）；③ §4 补记长阻塞预算档、等待全预算化、`code_execute` 协作式执行期超时、`main_thread_guard` 静态守卫与 `ExportGuard` 实例级异常安全复位、导出期拒绝覆盖三类入口；④ 补记守卫的固有局限；⑤ §3.4 按本轮 CLI 启动路径修复改写「Windows 脱父」断言——`cmd /c start "" /b` 蹦床 + `netstat` 端口反查**已移除**，改为直连 `spawn` + `detached: true`、pid 取 `spawn` 返回值、存活判定改解析 `tasklist /FO CSV`，并补记启动失败回滚三态与可执行补救指令。详见 [changelog/2026-10-20-log.md](changelog/2026-10-20-log.md)；原记（2026-10-19）：随 CLI 引擎定位收窄批次同步——`gda start` 不再读 `GODOT_PATH` 与 `<project>/.env`（前者仅 L2 引擎测试使用，生产环境不存在），可执行文件链收敛为 `--godot` > PATH，未命中即报错提示 `--godot`；新增 `cli/tests/process.test.ts` 3 项（TS 108→111、expect 301→310）；原记（2026-10-18）：随 CLI 载体落地批次同步——§3.3 补记 SDK 0.3.7 握手升级与双载体修复，新增 §3.4 CLI 安全包络；详见 [changelog/2026-10-18-log.md](changelog/2026-10-18-log.md)）
 
 ## 1. 可信客户端模型
 
@@ -91,30 +91,31 @@ resource:
 - 环境变量与面板的作用范围：`initialize()` 在启动时一旦发现 env 就完全忽略配置 `desensitize` 键（与 `allow` 能力门同构）；但面板复选框在运行期直接调用 `sanitize_policy::set_enabled`，仍会改变本会话后续调用的实际口径（重启后 env 再次生效）。
 - 变更可审计（09-21 起）：McpConfigDock 的脱敏切换与 allow 变更发 `monitor::security` 事件，其余交互（端口应用/生成配置/生成技能等）发 `monitor::ui_action`。
 
-### 3.3 技能脚本通道与手动兜底（09-25 新增）
+### 3.3 技能通道与手动兜底（09-25 新增）
 
-随技能生成的 `scripts/gda.mjs`（Node 18+ 或 Bun 运行）是 MCP 客户端失效时的本地调用桥，不是第二服务端；其安全包络由脚本头注释与 L1 `ScriptChannelContract` 共同约束：
+技能书是 MCP 客户端失效时的说明书，同时是**唯一**的脚本化调用载体；而脚本化调用通道只有一条——GDA CLI（`bunx`、全局安装、独立二进制是同一载体的三种分发方式）。GDA CLI 不是第二服务端，它只经 MCP 协议与编辑器进程内的同一台服务器对话：
 
-- 目标固定为 `127.0.0.1` 字面量（`const HOST = "127.0.0.1"`），仅端口可调（1–65535，`--port` > `GODOT_AUTOPILOT_PORT` > trace/config > 9527 五级来源）；代理环境变量被刻意忽略，保持环回直连。
-- 请求头仅 `Content-Type: application/json` 与 `Accept`，无代理配置、无认证头；响应内容只做 `JSON.parse`，永不求值或执行。
-- 唯一写盘是 `--save-images DIR` 内的解码图片（自生成文件名 `gda_<timestamp>_<n>.png`）；`--args-file` 只读 JSON，不写盘。
-- 技能文档禁手写 HTTP：全部 34 个 .md 不得出现 `curl -` 与 `Invoke-WebRequest`（L1 逐文件断言），调用统一走脚本桥；无脚本运行时则停止自动化、按 `manual-fallback.md` 出手动指南，不得编造请求。
-- 握手升级（2026-10-18）：mcp-cpp-sdk 0.3.7 起严格要求完整 MCP 握手（`initialize` → `notifications/initialized`），旧懒握手只发 `notifications/initialized` 被拒 `-32600`。脚本桥（`6234a95`）与 CLI（`840e648`）同步升级为标准 `initialize` 流程；`test_cli_contract.py` 的 mock 服务器严格模拟该语义（未初始化时 `tools/call` 返回 400 + `-32600`）。
+- 目标固定为 `127.0.0.1` 字面量（`src/mcp/client.ts` 的 `HOST = "127.0.0.1"`），仅端口可调（1–65535）；无 URL 选项、无代理配置，代理环境变量被刻意忽略，保持环回直连。
+- 请求头仅 `Content-Type: application/json` 与 `Accept`，无代理配置、无认证头；响应内容只做 JSON 解析，永不求值或执行。
+- 写盘只有两处：`--save-images DIR` 内的解码图片（自生成文件名）与 CLI 自身的 state dir（实例登记表与日志，见 §3.4）；`--args-file` 只读 JSON，不写盘。
+- 技能文档禁手写 HTTP：技能文档的全部 .md 不得出现 `curl -` 与 `Invoke-WebRequest`（L1 逐文件断言），调用统一走 GDA CLI；无 CLI 可用则停止自动化、按 `manual-fallback.md` 出手动指南，不得编造请求。
+- 握手：mcp-cpp-sdk 0.3.7 起严格要求完整 MCP 握手（`initialize` → `notifications/initialized`），旧懒握手只发 `notifications/initialized` 被拒 `-32600`；CLI 已升级为标准 `initialize` 流程（`840e648`），`test_cli_contract.py` 的 mock 服务器严格模拟该语义（未初始化时 `tools/call` 返回 400 + `-32600`）。
 - 本节不改变默认安全姿态：监听仍仅环回（§2）、高风险能力仍默认拒绝（§3.1）、脱敏仍默认开启（§3.2）。
 
 ### 3.4 CLI 安全包络（2026-10-18 新增）
 
 gda CLI（Bun + TS 源码直跑，详见 [CLI 载体](modules/cli.md)）是技能书调用阶梯第二级，其安全包络如下：
 
-- **目标固定为 `127.0.0.1` 字面量**（`src/mcp/client.ts` 的 `HOST = "127.0.0.1"`），仅端口可调（1–65535）；无 URL 选项、无代理配置，与脚本桥 §3.3 同口径。
+- **目标固定为 `127.0.0.1` 字面量**（`src/mcp/client.ts` 的 `HOST = "127.0.0.1"`），仅端口可调（1–65535）；无 URL 选项、无代理配置。
+- **退出码四态**：0 = 成功；1 = 工具失败（业务载荷含 `error`，读载荷不读传输层）；2 = 传输或环境失败（连接拒绝、超时、HTTP 错误、引擎缺失）；3 = 用法错误（未知命令、缺参、非法选项）。1 属业务层，2 与 3 属通道自身不可用——客户端据此决定重试还是改用法，不得把 2 读成「工具无返回」。
 - **无 shell 拼接**：进程 spawn 全部经 argv 数组（`node:child_process` 的 `spawn`/`spawnSync`），不经过 shell 解释；参数均为字面量或数字 pid，无可注入面。
 - **启动即脱父，pid 就是本次拉起的编辑器（10-20 修正）**：Windows 上的编辑器启动是**直连 `spawn(编辑器, args, { detached: true })`**（`cli/src/process.ts:68-102`）——`detached` 让编辑器脱离父进程与控制台，随后 `child.unref()`；`spawn` 的返回值即**本次拉起的编辑器自身 pid**。此前 Windows 走 `cmd /c start "" /b` 蹦床 + `netstat` 端口反查真实 pid 的做法**已移除**：端口反查是按端口/映像名/时间窗匹配，既可能匹配到无关进程，也拿不到「本次拉起」的确切 pid。现路径下**不再有任何端口反查**，登记表里的 pid 精确等于被拉起的编辑器。
 - **存活判定与系统语言无关（10-20 修正）**：`isAlive` 在 Windows 上解析 `tasklist /FO CSV` 的 pid 字段（`cli/src/process.ts:26-39`，正则 `^"[^"]*","(\d+)"`），**不依赖输出文本**。此前靠「输出是否以 `INFO`/`消息` 开头」判断「无匹配任务」的做法在中文 Windows 上恒判为存活（实际输出是「信息:」）；现按 CSV 的 pid 列比对，行为与系统语言无关。进程表查不到时**保守返回存活**——不得因查不到就跳过终止动作而留下孤儿进程。
 - **启动失败不留孤儿进程（10-20 修正）**：`gda start` 的失败回滚是**三态**——`the editor process (pid N) had already exited`（已自行退出）/ `the editor process (pid N) was terminated`（已终止）/ `the editor process (pid N) could not be terminated, stop it manually: taskkill /F /T /PID N`（Windows；POSIX 为 `kill -9 N`）。引擎不可执行时报 `failed to launch the editor executable: ENOENT: …` 并提示检查 `--godot` 路径。CLI 退出后编辑器仍存活（脱父语义），由 `cli/tests/detach.test.ts` 覆盖；三态与补救指令由 `cli/tests/process.test.ts` 覆盖。
 - **状态文件仅落 state dir**：`instances.json`、`instances.lock`、`logs/` 全部限定在 `GODOT_AUTOPILOT_CLI_HOME` > `%LOCALAPPDATA%\godot-autopilot` > `$XDG_STATE_HOME/godot-autopilot` 解析出的目录内，不写工程目录、不写仓库。
-- **生命周期动作约束**：`start` 只启动 Godot 可执行文件链（`--godot` > PATH）指向的编辑器进程，注入 `GODOT_AUTOPILOT_PORT` 环境变量；**不读 `GODOT_PATH`**（该变量仅服务 L2 引擎测试，生产环境不存在，避免把测试引擎路径带入生产启动）；`stop` 默认优雅（`taskkill /PID` / `SIGTERM`），失败只报告并提示 `--force`，**强杀必须显式 `--force`**（`taskkill /F /T /PID` / `SIGKILL`），不静默升级。
+- **生命周期动作约束**：`start` 只启动 Godot 可执行文件链（`--godot` > PATH）指向的编辑器进程，注入 `GODOT_AUTOPILOT_PORT` 环境变量；**引擎定位只此一条链**——**不读 `GODOT_PATH`**（该变量仅服务 L2 引擎测试，生产环境不存在，避免把测试引擎路径带入生产启动），**也不读 `<project>/.env`**；`stop` 默认优雅（`taskkill /PID` / `SIGTERM`），失败只报告并提示 `--force`，**强杀必须显式 `--force`**（`taskkill /F /T /PID` / `SIGKILL`），不静默升级。
 - **不收集个人信息**：CLI 不读取工程内容、不上报任何遥测；唯一本地状态是实例登记表（id/project/port/pid/startedAt/headless/godot/log），且只存本机路径与 pid。
-- 与脚本桥一致：不改变默认安全姿态——监听仍仅环回（§2）、高风险能力仍默认拒绝（§3.1）、脱敏仍默认开启（§3.2）；CLI 自身不绕过 MCP 授权门（仍经 `call_tool` 受 `code_execute`/`game_runtime`/`user_tools` 门约束）。
+- 不改变默认安全姿态：监听仍仅环回（§2）、高风险能力仍默认拒绝（§3.1）、脱敏仍默认开启（§3.2）；CLI 自身不绕过 MCP 授权门（仍经 `call_tool` 受 `code_execute`/`game_runtime`/`user_tools` 门约束）。
 
 ## 4. Godot API 与线程
 
@@ -163,8 +164,8 @@ gda CLI（Bun + TS 源码直跑，详见 [CLI 载体](modules/cli.md)）是技�
 - [ ] stop/restart 的请求接入、队列任务、future、异步响应和对象释放顺序有可观察且不悬挂的结果。
 - [ ] 路径边界、遍历/输入上限和响应截断行为均可被调用方检测。
 - [ ] 本地日志/trace 落盘符合边界约定：两目录保留上限生效；默认脱敏开启时 jsonl 不含内联 base64，`args_digest` 已剥离敏感字段；关闭脱敏仅由显式配置触发。
-- [ ] 技能脚本通道符合 §3.3 包络：目标为 `127.0.0.1` 仅端口可调、无代理与认证头、响应不执行、写盘仅限 `--save-images` 目录；技能文档无手写 HTTP 请求。
-- [ ] CLI 符合 §3.4 包络：目标为 `127.0.0.1` 字面量、spawn 无 shell 拼接、状态文件仅落 state dir、`stop` 强杀须显式 `--force`、不收集个人信息；启动路径为直连 `spawn` + `detached` 脱父且 pid 取自 `spawn` 返回值（无端口反查），存活判定与系统语言无关，`gda start` 失败回滚不留孤儿进程。
+- [ ] 技能通道符合 §3.3 包络：脚本化调用只有 GDA CLI，目标为 `127.0.0.1` 仅端口可调、无代理与认证头、响应不执行、写盘仅限 `--save-images` 目录与 CLI state dir；技能文档无手写 HTTP 请求。
+- [ ] CLI 符合 §3.4 包络：目标为 `127.0.0.1` 字面量、spawn 无 shell 拼接、退出码四态（0/1/2/3）语义稳定、状态文件仅落 state dir、`stop` 强杀须显式 `--force`、不收集个人信息；引擎定位只走 `--godot` > PATH 一条链（不读 `GODOT_PATH` 与 `<project>/.env`）；启动路径为直连 `spawn` + `detached` 脱父且 pid 取自 `spawn` 返回值（无端口反查），存活判定与系统语言无关，`gda start` 失败回滚不留孤儿进程。
 
 ## 相关页面
 

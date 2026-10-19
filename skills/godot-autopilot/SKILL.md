@@ -10,7 +10,7 @@ Read this skill before using the godot-autopilot plugin: it is the required entr
 ## Prerequisites
 
 - The Godot editor must be open with the godot-autopilot plugin enabled. The MCP server starts automatically with the plugin and stops when the plugin is disabled or the editor closes.
-- The MCP endpoint is `http://127.0.0.1:9527/mcp` by default, but the port is configurable. Never assume 9527; see the godot-autopilot-tools skill (references/script-access.md) for the port discovery order.
+- The MCP endpoint is `http://127.0.0.1:9527/mcp` by default, but the port is configurable. Never assume 9527; see the godot-autopilot-tools skill (references/cli-access.md) for the port discovery order.
 - The server listens on the loopback interface only, with no authentication. It is meant for trusted local MCP clients on the same machine.
 
 ## What the server exposes
@@ -148,10 +148,8 @@ Two situations land here. **No MCP client is configured** — the user installed
 Probe the machine first (`bun --version`, then `node --version`), then work down this ladder:
 
 1. Native MCP Tools - retry the connection first; this is the normal channel.
-2. GDA CLI (Bun) - run `bunx --no-install "github:jesspig/Godot-Autopilot#0.2.7" <cmd>` first; if not cached, `bunx "github:jesspig/Godot-Autopilot#0.2.7" <cmd>` downloads once. Quotes are required on PowerShell because `#` starts a comment. Calling commands: ping/status/categories/search/describe/call; lifecycle: list/start/stop/logs. See the godot-autopilot-tools skill for the full reference. Known limitation: the pinned release tag was cut before the CLI existed - that tag's tree has no `cli/` directory and no root `package.json`, so the pinned command cannot resolve a `gda` binary and fails every time. Do not spend retries on it. Use `bunx "github:jesspig/Godot-Autopilot#develop" <cmd>` instead (that branch does ship the CLI, but it is an unreleased moving target, not a pinned version), or the standalone `gda` release asset once a release ships it, or rung 3.
-3. Script bridge - when Bun is unavailable but Node 18+ or Bun exists, run `node .agents/skills/godot-autopilot-tools/scripts/gda.mjs` to reach the same server without a working MCP client.
-4. Standalone binary - when neither Bun nor Node exists, download the `gda` release asset for the user's OS and CPU, verify it against the release's `sha256sums.txt`, and run it like the CLI. Asset names and platform caveats: `references/cli-access.md` of the godot-autopilot-tools skill.
-5. No runtime and no download - fall back to a manual plan per `references/manual-fallback.md` of the godot-autopilot-tools skill.
+2. GDA CLI - drive the server from a shell with the `gda` command; it is the only scripted channel and speaks the same protocol, subcommands and exit codes as the native one. Pick the first distribution that works on the machine: `bunx "github:jesspig/Godot-Autopilot#0.2.7" <cmd>` (Bun present, nothing installed - try `--no-install` first for a warm-cache instant hit), `bun install -g` then plain `gda`, or the standalone `gda` release asset when no JavaScript runtime exists (verify it against the release's `sha256sums.txt` first). Calling commands: ping/status/categories/search/describe/call; lifecycle: list/start/stop/logs. See the godot-autopilot-tools skill for the full reference. Known limitation: the pinned release tag was cut before the CLI existed - that tag's tree has no `cli/` directory and no root `package.json`, so the pinned command cannot resolve a `gda` binary and fails every time. Do not spend retries on it. Use `bunx "github:jesspig/Godot-Autopilot#develop" <cmd>` instead (that branch does ship the CLI, but it is an unreleased moving target, not a pinned version), or the standalone `gda` release asset once a release ships it, or rung 3.
+3. No CLI and no download - fall back to a manual plan per `references/manual-fallback.md` of the godot-autopilot-tools skill.
 
 ## See also
 
