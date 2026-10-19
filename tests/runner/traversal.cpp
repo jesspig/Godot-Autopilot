@@ -5,6 +5,7 @@
 #include "util/owned_exception.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cstddef>
 #include <iostream>
 #include <stdexcept>
@@ -16,12 +17,82 @@ namespace {
 const char* kModeEmptyArgs = "empty_args";
 const char* kModeHeuristicSmoke = "heuristic_smoke";
 
+const char* kSideEffectNone = "none";
+
+constexpr size_t kBaselineEnumerated = 452;
+constexpr size_t kBaselineExcluded = 111;
+constexpr size_t kBaselineCandidates = 341;
+constexpr size_t kBaselineWarnings = 4;
+
+constexpr size_t kErrorDetailMax = 300;
+
+const char* const kExpectedErrorMarkers[] = {
+    "requir",      "missing",    "invalid",     "must be",   "expected",
+    "unknown",     "not found",  "not available", "is not",  "not running",
+    "not ready",   "no scene",   "no edited scene", "no window", "no theme",
+    "unsupported", "cannot",     "failed to",   "does not exist", "has no",
+    "already",     "did not return a resource", "mutually exclusive",
+    "must contain", "must have", "no object found",
+    "out of range", "unsaved changes"};
+
 const std::vector<std::string> kMetaToolNames = {
     "ping",      "search_tools",  "list_categories", "get_tool_detail",
     "call_tool", "batch_execute", "code_execute"};
 
 bool has_error_field(const mcp::JsonValue& j) {
     return j.IsObject() && j.Find("error") != nullptr;
+}
+
+std::string error_message_text(const mcp::JsonValue& resp) {
+    if (!resp.IsObject()) {
+        return std::string();
+    }
+    const auto* err = resp.Find("error");
+    if (!err) {
+        return std::string();
+    }
+    if (err->IsString()) {
+        return err->GetString();
+    }
+    return err->Dump();
+}
+
+std::string truncate_text(const std::string& text) {
+    if (text.size() <= kErrorDetailMax) {
+        return text;
+    }
+    return text.substr(0, kErrorDetailMax) + " (truncated)";
+}
+
+bool contains_ignore_case(const std::string& text, const char* marker) {
+    const size_t marker_len = std::string(marker).size();
+    if (marker_len == 0 || text.size() < marker_len) {
+        return false;
+    }
+    for (size_t i = 0; i + marker_len <= text.size(); ++i) {
+        size_t j = 0;
+        while (j < marker_len &&
+               std::tolower(static_cast<unsigned char>(text[i + j])) ==
+                   std::tolower(static_cast<unsigned char>(marker[j]))) {
+            ++j;
+        }
+        if (j == marker_len) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool is_expected_error(const mcp::JsonValue& resp, const std::string& message) {
+    if (resp.IsObject() && resp.Find("structured_error") != nullptr) {
+        return true;
+    }
+    for (const char* marker : kExpectedErrorMarkers) {
+        if (contains_ignore_case(message, marker)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 std::vector<std::string> schema_required_params(const mcp::JsonValue& detail) {
@@ -99,12 +170,20 @@ void print_stats(const std::string& mode, const gda_test::TraversalStats& s,
                  size_t skipped,
                  const std::vector<std::string>& non_object_names) {
     std::cout << "\n=== 工具遍历: " << mode << " ===\n"
+              << "  枚举数: " << s.enumerated << " | 排除数: " << s.excluded
+              << " | 候选数: " << s.candidates << "\n"
               << "  调用总数: " << s.total << " | 通过: " << s.passed
               << " | 失败: " << s.failed
               << " | result: " << results << " | error: " << errors
+              << " | 豁免错误: " << s.exempt_errors
               << " | error 含 'missing required': " << missing_req
               << " | 跳过(无 schema properties): " << skipped
               << " | 排除(副作用/可变/dynamic): " << s.excluded << "\n";
+    std::cout << "  基线比对: " << (s.baseline_matched ? "一致" : "不一致")
+              << "\n";
+    for (const auto& d : s.baseline_diffs) {
+        std::cout << "  [基线差异] " << d << "\n";
+    }
     for (const auto& n : s.warnings) {
         std::cout << "  [schema 必填但空参未报错] " << n << "\n";
     }
@@ -114,6 +193,30 @@ void print_stats(const std::string& mode, const gda_test::TraversalStats& s,
     for (const auto& n : s.excluded_names) {
         std::cout << "  " << n << "\n";
     }
+}
+
+void compare_baseline(const std::string& mode, gda_test::TraversalStats& stats) {
+    struct BaselineItem {
+        const char* name;
+        size_t actual;
+        size_t expected;
+    };
+    const size_t expected_warnings =
+        (mode == kModeEmptyArgs) ? kBaselineWarnings : 0;
+    const BaselineItem items[] = {
+        {"enumerated", stats.enumerated, kBaselineEnumerated},
+        {"excluded", stats.excluded, kBaselineExcluded},
+        {"candidates", stats.candidates, kBaselineCandidates},
+        {"warnings", stats.warnings.size(), expected_warnings},
+    };
+    for (const BaselineItem& item : items) {
+        if (item.actual != item.expected) {
+            stats.baseline_diffs.push_back(
+                std::string(item.name) + ": 实际 " + std::to_string(item.actual) +
+                " / 基线 " + std::to_string(item.expected));
+        }
+    }
+    stats.baseline_matched = stats.baseline_diffs.empty();
 }
 
 } // namespace
@@ -165,6 +268,7 @@ TraversalStats run_traversal(McpTestClient& client, const std::string& mode,
     }
 
     TraversalStats stats;
+    stats.enumerated = names.size();
     size_t results = 0;
     size_t errors = 0;
     size_t missing_req = 0;
@@ -194,7 +298,9 @@ TraversalStats run_traversal(McpTestClient& client, const std::string& mode,
                 is_dynamic = dynamic->GetBool();
         }
         std::string exclude_reason;
-        if (!side_effect.empty() || is_mutating)
+        const bool has_side_effect =
+            !side_effect.empty() && side_effect != kSideEffectNone;
+        if (has_side_effect || is_mutating)
             exclude_reason = "副作用/可变";
         if (is_dynamic) {
             exclude_reason = exclude_reason.empty()
@@ -249,12 +355,11 @@ TraversalStats run_traversal(McpTestClient& client, const std::string& mode,
                 continue;
             }
             const bool errored = has_error_field(resp);
+            std::string error_text;
             if (errored) {
                 ++errors;
-                const auto* err = resp.Find("error");
-                const std::string msg =
-                    err && err->IsString() ? err->GetString() : "";
-                if (msg.find("missing required") != std::string::npos) {
+                error_text = error_message_text(resp);
+                if (error_text.find("missing required") != std::string::npos) {
                     ++missing_req;
                 }
             } else {
@@ -264,11 +369,26 @@ TraversalStats run_traversal(McpTestClient& client, const std::string& mode,
                 stats.warnings.push_back("schema 必填但空参未报错: " + name);
             }
             StepResult sr;
-            sr.passed = true;
-            sr.detail = "空参调用完成: " + name +
-                        (errored ? " (error)" : " (result)");
+            if (errored && !is_expected_error(resp, error_text)) {
+                sr.passed = false;
+                sr.detail = "工具 '" + name + "' 空参调用返回错误: " +
+                            truncate_text(error_text);
+            } else {
+                sr.passed = true;
+                if (errored) {
+                    ++stats.exempt_errors;
+                    sr.detail = "空参调用完成: " + name +
+                                " (预期错误: " + truncate_text(error_text) + ")";
+                } else {
+                    sr.detail = "空参调用完成: " + name + " (result)";
+                }
+            }
             out_steps.push_back(std::move(sr));
-            ++stats.passed;
+            if (sr.passed) {
+                ++stats.passed;
+            } else {
+                ++stats.failed;
+            }
         } else {
             const auto props = schema_property_types(detail);
             if (props.empty()) {
@@ -294,20 +414,39 @@ TraversalStats run_traversal(McpTestClient& client, const std::string& mode,
                 continue;
             }
             const bool errored = has_error_field(resp);
+            std::string error_text;
             if (errored) {
                 ++errors;
+                error_text = error_message_text(resp);
             } else {
                 ++results;
             }
             StepResult sr;
-            sr.passed = true;
-            sr.detail = "启发式冒烟完成: " + name +
-                        (errored ? " (error)" : " (result)");
+            if (errored && !is_expected_error(resp, error_text)) {
+                sr.passed = false;
+                sr.detail = "工具 '" + name + "' 启发式冒烟返回错误: " +
+                            truncate_text(error_text);
+            } else {
+                sr.passed = true;
+                if (errored) {
+                    ++stats.exempt_errors;
+                    sr.detail = "启发式冒烟完成: " + name +
+                                " (预期错误: " + truncate_text(error_text) + ")";
+                } else {
+                    sr.detail = "启发式冒烟完成: " + name + " (result)";
+                }
+            }
             out_steps.push_back(std::move(sr));
-            ++stats.passed;
+            if (sr.passed) {
+                ++stats.passed;
+            } else {
+                ++stats.failed;
+            }
         }
     }
 
+    stats.candidates = stats.enumerated - stats.excluded;
+    compare_baseline(mode, stats);
     print_stats(mode, stats, results, errors, missing_req, skipped,
                 non_object_names);
     return stats;
