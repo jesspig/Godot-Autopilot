@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/editor_undo_redo_manager.hpp>
@@ -38,7 +39,11 @@ using namespace godot_autopilot;
 namespace {
 
 constexpr int CODE_EXEC_DEFAULT_TIMEOUT_MS = 5000;
-constexpr int CODE_EXEC_MAX_TIMEOUT_MS = 30000;
+constexpr int CODE_EXEC_MAX_TIMEOUT_MS =
+    static_cast<int>(GDA_DISPATCH_WAIT_LONG_BLOCKING_MS);
+static_assert(GDA_DISPATCH_WAIT_LONG_BLOCKING_MS <=
+                  static_cast<int64_t>(std::numeric_limits<int>::max()),
+              "the code_execute timeout ceiling must stay inside int range");
 
 struct UndoHistorySnapshot {
   godot::UndoRedo *history = nullptr;
@@ -951,7 +956,8 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue &args) {
   if (auto *tm = args.Find("timeout_ms")) {
     if (!tm->IsInt() || tm->GetInt() <= 0 ||
         tm->GetInt() > CODE_EXEC_MAX_TIMEOUT_MS)
-      return util::error_json("timeout_ms must be an integer between 1 and 30000");
+      return util::error_json("timeout_ms must be an integer between 1 and " +
+                               std::to_string(CODE_EXEC_MAX_TIMEOUT_MS));
     ctx.timeout_ms = static_cast<int>(tm->GetInt());
   }
   if (ctx.timeout_ms <= 0)

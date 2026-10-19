@@ -1,4 +1,5 @@
 
+#include "core/command_queue.hpp"
 #include "tools/dispatch.hpp"
 #include "tools/runtime_ops.hpp"
 #include "tools/tool_invoke.hpp"
@@ -27,8 +28,11 @@ std::string error_of(const mcp::JsonValue &value) {
 
 class ToolInvokeTest : public ::testing::Test {
 protected:
+  godot_autopilot::CommandQueue queue;
+
   void SetUp() override {
-    godot_autopilot::runtime_ops::set_editor_queue(nullptr);
+    queue.drain();
+    godot_autopilot::runtime_ops::set_editor_queue(&queue);
     godot_autopilot::dispatch::replace_handlers({}, {});
   }
 

@@ -145,9 +145,6 @@ mcp::JsonValue call_handler_impl(const std::string &name,
   return result;
 }
 
-constexpr int64_t kDispatchWaitMinMs = 1000;
-constexpr int64_t kDispatchWaitMaxMs = 29000;
-
 int64_t env_int_clamped(const char *name, int64_t fallback, int64_t min_value,
                         int64_t max_value) {
   int64_t value = fallback;
@@ -170,22 +167,22 @@ int64_t env_int_clamped(const char *name, int64_t fallback, int64_t min_value,
 int64_t dispatch_wait_default_ms() {
   static const int64_t value = env_int_clamped(
       "GODOT_AUTOPILOT_DISPATCH_TIMEOUT_MS", GDA_DISPATCH_WAIT_DEFAULT_MS,
-      kDispatchWaitMinMs, kDispatchWaitMaxMs);
+      GDA_DISPATCH_WAIT_MIN_MS, GDA_DISPATCH_WAIT_MAX_MS);
   return value;
 }
 
 int64_t dispatch_wait_health_ms() {
   static const int64_t value = env_int_clamped(
       "GODOT_AUTOPILOT_HEALTH_TIMEOUT_MS", GDA_DISPATCH_WAIT_HEALTH_MS,
-      kDispatchWaitMinMs, kDispatchWaitMaxMs);
+      GDA_DISPATCH_WAIT_MIN_MS, GDA_DISPATCH_WAIT_MAX_MS);
   return value;
 }
 
 int64_t dispatch_wait_long_blocking_ms() {
   static const int64_t value = env_int_clamped(
       "GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS",
-      GDA_DISPATCH_WAIT_LONG_BLOCKING_MS, kDispatchWaitMinMs,
-      kDispatchWaitMaxMs);
+      GDA_DISPATCH_WAIT_LONG_BLOCKING_MS, GDA_DISPATCH_WAIT_MIN_MS,
+      GDA_DISPATCH_WAIT_MAX_MS);
   return value;
 }
 
@@ -410,8 +407,12 @@ mcp::JsonValue run_on_main_thread_with_budget(
 
 mcp::JsonValue call_handler(const std::string &name,
                             const mcp::JsonValue &args) {
-  if (!godot_autopilot::runtime_ops::has_editor_queue() ||
-      get_editor_queue().is_main_thread()) {
+  if (!godot_autopilot::runtime_ops::has_editor_queue()) {
+    return queue_unavailable_result(
+        name, "the plugin has not attached the editor main thread queue yet "
+              "(startup) or has already detached it (shutdown)");
+  }
+  if (get_editor_queue().is_main_thread()) {
     return call_handler_impl(name, args);
   }
   CommandQueue &queue = get_editor_queue();

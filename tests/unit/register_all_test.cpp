@@ -10,6 +10,7 @@
 #include "core/command_queue.hpp"
 #include "tools/dispatch.hpp"
 #include "tools/register_all.hpp"
+#include "tools/runtime_ops.hpp"
 #include "tools/tool_catalog.hpp"
 #include "tools/tool_registry.hpp"
 #include "util/bm25_index.hpp"
@@ -67,9 +68,13 @@ struct RegisteredServerFixture : ::testing::Test {
     cops.client_info = mcp::Implementation{"GsdTestClient", "1.0.0"};
     cops.connect_mode = mcp::ConnectMode::Auto;
     client = mcp::McpClient::Create(pair.client, cops);
+
+    queue.drain();
+    godot_autopilot::runtime_ops::set_editor_queue(&queue);
   }
 
   void TearDown() override {
+    godot_autopilot::runtime_ops::set_editor_queue(nullptr);
     if (client)
       client->Close();
     if (server)
