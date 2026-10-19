@@ -3,8 +3,7 @@
 
 判定依据是「线程上下文分类」：每个源文件被显式归入主线程（main）、受管
 （managed）或外线程（foreign）三类。外线程文件里的 Godot API 调用默认
-违规，只有落在该文件显式登记的主线程作用域里才放行；已确认但尚未修复的
-越界点登记在 KNOWN_FOREIGN_API_SITES 里，不计入违规但会在 stderr 提示。
+违规，只有落在该文件显式登记的主线程作用域里才放行。
 
 词法层面先剥离字符串字面量（含转义）、字符字面量与 R"TAG(...)TAG" raw
 string，再剥离注释，最后才做标识符匹配，避免把字符串与注释里的 API 名
@@ -183,18 +182,12 @@ FOREIGN_MAIN_THREAD_SCOPES = {
     "src/core/log_persist.cpp": (
         "godot_autopilot::LogPersist::init_session",
         "godot_autopilot::LogPersist::flush_on_main_thread",
+        "godot_autopilot::LogPersist::flush_trace_images",
         "godot_autopilot::LogPersist::rotate_on_init",
         "godot_autopilot::append_persist_file",
         "godot_autopilot::prune_persist_dir",
     ),
 }
-
-KNOWN_FOREIGN_API_SITES = (
-    ("src/core/log_persist.cpp",
-     "godot_autopilot::LogPersist::store_trace_image",
-     "已知越界：transport 线程直接落盘 trace 截图，违反主线程契约；"
-     "改为入主线程缓冲后应移除本条。"),
-)
 
 GODOT_API_PATTERNS = (
     ("godot::FileAccess", r"\bgodot::FileAccess\b"),
@@ -493,14 +486,10 @@ def scan_file(rel_path, text):
     masked = _strip_comments(_mask_literals(text))
     scopes = _build_scopes(masked)
     starts = _line_starts(text)
-    context = _context_of(rel_path)
-    if context != CTX_FOREIGN:
-        return [], []
+    if _context_of(rel_path) != CTX_FOREIGN:
+        return []
     allowed = FOREIGN_MAIN_THREAD_SCOPES.get(rel_path, ())
-    known = [(path, scope) for path, scope, _reason in KNOWN_FOREIGN_API_SITES
-             if path == rel_path]
     violations = []
-    notes = []
     seen = set()
     source_lines = text.split("\n")
     for symbol, pattern in GODOT_API_PATTERNS:
@@ -510,17 +499,14 @@ def scan_file(rel_path, text):
             if any(name in allowed for name in functions):
                 continue
             line = _line_of(starts, m.start())
-            scope = functions[-1] if functions else ""
-            record = (rel_path, line, scope)
+            record = (rel_path, line)
             if record in seen:
                 continue
             seen.add(record)
             snippet = source_lines[line - 1].rstrip("\r").strip()[:SNIPPET_MAX]
-            if any(scope == known_scope for _path, known_scope in known):
-                notes.append((rel_path, line, snippet, symbol, scope))
-                continue
-            violations.append((rel_path, line, snippet, symbol, scope))
-    return violations, notes
+            violations.append((rel_path, line, snippet, symbol,
+                               functions[-1] if functions else ""))
+    return violations
 
 
 def main():
@@ -537,7 +523,6 @@ def main():
         scan_dir = Path(sys.argv[1]).resolve()
     decode_errors = []
     violations = []
-    notes = []
     for path in _collect_files(scan_dir):
         rel = _display_path(path, scan_dir)
         try:
@@ -550,16 +535,11 @@ def main():
         except UnicodeDecodeError as exc:
             decode_errors.append(rel + ": decode error: " + str(exc))
             continue
-        found, noted = scan_file(rel, text)
-        violations.extend(found)
-        notes.extend(noted)
+        violations.extend(scan_file(rel, text))
     if decode_errors:
         for item in decode_errors:
             print(item, file=sys.stderr)
         return 2
-    for rel, line, _snippet, _symbol, scope in notes:
-        print("known-foreign-api-site: " + rel + ":" + str(line) + ": " + scope,
-              file=sys.stderr)
     if violations:
         for rel, line, snippet, _symbol, _scope in violations:
             print(rel + ":" + str(line) + ": " + snippet)
