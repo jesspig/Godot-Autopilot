@@ -223,9 +223,14 @@ jobs:
           merge-multiple: true
 
       - name: Package addons.zip
-        run: |
-          python main.py package --libs-dir dist
-          mv dist/godot-autopilot-*.zip addons.zip
+        run: python main.py package --libs-dir dist
+
+      # 自检失败即中止发布：残缺包不得挂到 GitHub Release
+      - name: Verify package integrity
+        run: python scripts/test_package_integrity.py dist/godot-autopilot-*.zip
+
+      - name: Stage addons.zip
+        run: mv dist/godot-autopilot-*.zip addons.zip
 
       - name: Checksums
         run: |
