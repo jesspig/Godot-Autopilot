@@ -43,7 +43,7 @@ async function start(opts: GlobalOptions): Promise<number> {
   }
 
   const waitSec = parseWaitSec(opts.waitText, DEFAULT_WAIT_SEC);
-  const { bin } = resolveGodotBin({ explicit: opts.godot, projectDir });
+  const { bin } = resolveGodotBin({ explicit: opts.godot });
   await runImportStep(bin, projectDir, opts.noImport === true);
 
   const port = opts.portText !== undefined ? parseExplicitPort(opts.portText) : await pickFreePort();

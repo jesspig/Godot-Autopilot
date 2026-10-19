@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { CliError, ExitCode } from "./errors";
-import { joinPath, readTextFile, resolvePath } from "./platform";
+import { joinPath, resolvePath } from "./platform";
 
 export function isAlive(pid: number): boolean {
   if (process.platform === "win32") {
@@ -19,29 +19,15 @@ export function isAlive(pid: number): boolean {
   }
 }
 
-export function resolveGodotBin(opts: { explicit?: string; projectDir?: string }): { bin: string; source: string } {
+export function resolveGodotBin(opts: { explicit?: string }): { bin: string; source: string } {
   if (opts.explicit) {
     return { bin: resolvePath(opts.explicit), source: "explicit" };
-  }
-  const envBin = process.env.GODOT_PATH;
-  if (envBin) {
-    return { bin: resolvePath(envBin), source: "env" };
-  }
-  if (opts.projectDir) {
-    const envFile = joinPath(resolvePath(opts.projectDir), ".env");
-    try {
-      const m = readTextFile(envFile).match(/^GODOT_PATH=(.+)$/m);
-      if (m && m[1].trim().length > 0) {
-        return { bin: resolvePath(m[1].trim()), source: "env-file" };
-      }
-    } catch {
-    }
   }
   const fromPath = searchPath();
   if (fromPath !== null) {
     return { bin: fromPath, source: "path" };
   }
-  throw new CliError(ExitCode.Transport, "cannot locate the Godot executable (use --godot, GODOT_PATH, .env GODOT_PATH, or PATH)");
+  throw new CliError(ExitCode.Transport, "cannot locate the Godot executable (pass --godot or put godot on PATH)");
 }
 
 function searchPath(): string | null {
