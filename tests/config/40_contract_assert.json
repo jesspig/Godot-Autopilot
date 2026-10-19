@@ -1,0 +1,47 @@
+{
+  "name": "contract_assert",
+  "description": "工具契约强制用例（FR-05/FR-06/FR-07 的 L2 证据）：① 经 call_tool 调 get_tool_detail(name=code_execute)，断言响应含 tool.side_effect 且值精确等于 code_execute（最高风险工具的副作用等级必须机器可读，不再是空串）；② 经 call_tool 调 code_execute(source_code='var x = 1')，断言响应含 result 键（工具在授权放行后确实执行并返回结果对象，而非被授权门拒绝）。前置条件：步骤 ② 需要 code_execute capability 授权（GODOT_AUTOPILOT_ALLOW 含 code_execute 或 all，或 user://godot_autopilot/config.json 的 allow 字段，env 优先）；未授权时步骤 ② 返回 authorization required 错误对象、缺 result 键而 FAIL。步骤 ① 不需要授权（get_tool_detail 无授权门）。全部 headless，无工程内文件/场景残留。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "fail_fast",
+    "stages": [
+      {
+        "id": "side_effect_declaration",
+        "steps": [
+          {
+            "id": "code_execute_side_effect",
+            "tool": "call_tool",
+            "args": {
+              "name": "get_tool_detail",
+              "arguments": { "name": "code_execute" }
+            },
+            "expect": {
+              "has_keys": ["tool"],
+              "field_checks": [
+                { "key": "tool.name", "value": "code_execute" },
+                { "key": "tool.side_effect", "not_empty": true },
+                { "key": "tool.side_effect", "value": "code_execute" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "code_execute_contract",
+        "steps": [
+          {
+            "id": "code_execute_result_key",
+            "tool": "call_tool",
+            "args": {
+              "name": "code_execute",
+              "arguments": { "source_code": "var x = 1" }
+            },
+            "expect": {
+              "has_keys": ["result"]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

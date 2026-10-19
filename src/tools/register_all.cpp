@@ -189,7 +189,7 @@ static mcp::JsonValue meta_get_tool_detail_impl(
     }
     t["tags"] = std::move(tags);
     t["input_schema"] = info->input_schema;
-    const char* se = "";
+    const char* se = "none";
     uint32_t flags = 0;
     if (auto tool = registry->find_any(name)) {
         se = ::godot_autopilot::side_effect_name(
