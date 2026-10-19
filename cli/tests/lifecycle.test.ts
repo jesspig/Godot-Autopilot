@@ -14,7 +14,7 @@ import { findById, findLiveByProject, loadRegistry, stateDir, type InstanceEntry
 import { resolveTarget } from "../src/target";
 import { killImage, killPid, removeDirWithRetry, waitDead, waitFor } from "./support/cleanup";
 
-// 端口反查（netstat 轮询）+ ping 探测引入固定延迟，2s 阈值在系统负载高时不足
+// ping 探测与编译产物冷启动引入固定延迟，2s 阈值在系统负载高时不足
 // 首次执行的编译产物冷启动实测 3.5-3.8s（缓存命中后 ~1s），3s 就绪预算必然偶发超时
 const START_READY_MAX_MS = 10_000;
 const START_WAIT_TEXT = "10";
@@ -155,6 +155,9 @@ if (argv.includes("--import")) {
   process.exit(0);
 }
 saveReport(report);
+if (process.env.GDA_FAKE_GODOT_EXIT === "1") {
+  process.exit(3);
+}
 if (!noListen) {
   const port = Number(process.env.GODOT_AUTOPILOT_PORT ?? "0");
   Bun.serve({
@@ -429,12 +432,12 @@ describe.serial("start", () => {
     expect(report!.argv).not.toContain("--headless");
   }, TEST_TIMEOUT_MS);
 
-  test("就绪超时返回 exit 2 且不登记", async () => {
+  test("就绪超时返回 exit 2、终止编辑器、清 pending 日志且不登记", async () => {
     process.env.GDA_FAKE_GODOT_REPORT = fakeReportPath;
     process.env.GDA_FAKE_GODOT_NO_LISTEN = "1";
     fs.rmSync(fakeReportPath, { force: true });
     try {
-      const { code } = await captureStdout(() =>
+      const { code, stderr } = await captureStdout(() =>
         runStart([], {
           project: makeProjectDir(),
           godot: fakeGodotExe!,
@@ -445,12 +448,56 @@ describe.serial("start", () => {
       );
       expect(code).toBe(ExitCode.Transport);
       expect(registeredInstances()).toHaveLength(0);
+
+      const report = readReport();
+      expect(report).not.toBeNull();
+      expect(stderr).toContain(`the editor process (pid ${report!.pid})`);
+      expect(stderr).toContain("was terminated");
+      expect(await waitFor(() => !isAlive(report!.pid), 5000)).toBe(true);
+
+      const logsDir = path.join(stateDir(), "logs");
+      const pending = fs.existsSync(logsDir) ? fs.readdirSync(logsDir).filter((n) => n.startsWith(".pending-")) : [];
+      expect(pending).toHaveLength(0);
+    } finally {
+      delete process.env.GDA_FAKE_GODOT_NO_LISTEN;
       const report = readReport();
       if (report !== null) {
         await killPid(report.pid);
       }
+    }
+  }, TEST_TIMEOUT_MS);
+
+  test("编辑器进程立即退出时不登记、清 pending 日志且不留残留", async () => {
+    process.env.GDA_FAKE_GODOT_REPORT = fakeReportPath;
+    process.env.GDA_FAKE_GODOT_EXIT = "1";
+    fs.rmSync(fakeReportPath, { force: true });
+    try {
+      const { code, stderr } = await captureStdout(() =>
+        runStart([], {
+          project: makeProjectDir(),
+          godot: fakeGodotExe!,
+          noImport: true,
+          headless: true,
+          waitText: "0.2",
+        }),
+      );
+      expect(code).toBe(ExitCode.Transport);
+      expect(registeredInstances()).toHaveLength(0);
+
+      const report = readReport();
+      expect(report).not.toBeNull();
+      expect(stderr).toContain(`the editor process (pid ${report!.pid})`);
+      expect(await waitFor(() => !isAlive(report!.pid), 5000)).toBe(true);
+
+      const logsDir = path.join(stateDir(), "logs");
+      const pending = fs.existsSync(logsDir) ? fs.readdirSync(logsDir).filter((n) => n.startsWith(".pending-")) : [];
+      expect(pending).toHaveLength(0);
     } finally {
-      delete process.env.GDA_FAKE_GODOT_NO_LISTEN;
+      delete process.env.GDA_FAKE_GODOT_EXIT;
+      const report = readReport();
+      if (report !== null) {
+        await killPid(report.pid);
+      }
     }
   }, TEST_TIMEOUT_MS);
 
@@ -467,6 +514,7 @@ describe.serial("start", () => {
 
     const report = readReport();
     expect(report).not.toBeNull();
+    expect(stderr).toContain(`the editor process (pid ${report!.pid})`);
     expect(await waitFor(() => !isAlive(report!.pid), 5000)).toBe(true);
 
     const logsDir = path.join(stateDir(), "logs");

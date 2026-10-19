@@ -35,6 +35,15 @@ export function imageRunning(imageName: string): boolean {
   return (result.stdout ?? "").toLowerCase().includes(`"${imageName.toLowerCase()}"`);
 }
 
+export function imageNameOf(pid: number): string | null {
+  const result = spawnSync("tasklist", ["/FI", `PID eq ${pid}`, "/NH", "/FO", "CSV"], { encoding: "utf8" });
+  for (const line of (result.stdout ?? "").split(/\r?\n/)) {
+    const m = /^"([^"]*)","(\d+)"/.exec(line.trim());
+    if (m !== null && Number(m[2]) === pid) return m[1];
+  }
+  return null;
+}
+
 export async function killImage(imageName: string, timeoutMs = KILL_TIMEOUT_MS): Promise<void> {
   if (!imageRunning(imageName)) return;
   spawnSync("taskkill", ["/F", "/IM", imageName], { stdio: "ignore" });

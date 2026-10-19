@@ -8,7 +8,7 @@ import { callTool } from "../mcp/client";
 import { CliError, ExitCode } from "../errors";
 import { err } from "../output";
 import { joinPath } from "../platform";
-import { isAlive, resolveGodotBin, spawnEditor, stopForce } from "../process";
+import { isAlive, resolveGodotBin, spawnEditor, terminateProcess, terminationNote } from "../process";
 import { findLiveByProject, loadRegistry, saveRegistry, stateDir, type InstanceEntry } from "../registry";
 import { writeJson } from "./json-output";
 
@@ -18,8 +18,6 @@ const DEFAULT_WAIT_SEC = 60;
 const IMPORT_TIMEOUT_MS = 120_000;
 const PROBE_TIMEOUT_SEC = 5;
 const PROBE_INTERVAL_MS = 500;
-const TERMINATE_CONFIRM_MS = 2000;
-const TERMINATE_POLL_MS = 100;
 const LOG_TAIL_LINES = 5;
 const LOG_TAIL_MAX_CHARS = 400;
 
@@ -60,7 +58,7 @@ async function start(opts: GlobalOptions): Promise<number> {
 
   let pid: number;
   try {
-    pid = (await spawnEditor({ projectDir, port, headless, godot: bin, logPath: pendingLogPath, timeoutMs: waitSec * 1000 })).pid;
+    pid = (await spawnEditor({ projectDir, port, headless, godot: bin, logPath: pendingLogPath })).pid;
   } catch (error) {
     fs.rmSync(pendingLogPath, { force: true });
     throw error;
@@ -148,24 +146,10 @@ async function waitForReady(port: number, pid: number, waitSec: number, logPath:
 }
 
 async function rollbackFailedStart(error: unknown, pid: number, logPath: string): Promise<CliError> {
-  const terminated = await terminateStartedEditor(pid);
+  const outcome = await terminateProcess(pid);
   const base = error instanceof CliError ? error : new CliError(ExitCode.Transport, String(error));
-  const processNote =
-    terminated === true
-      ? `the editor process (pid ${pid}) was terminated`
-      : `the editor process (pid ${pid}) could not be terminated, stop it manually`;
+  const processNote = terminationNote(outcome, pid);
   return new CliError(base.code, `${base.message}; ${processNote}; ${removePendingLog(logPath)}`, base.suggestion);
-}
-
-async function terminateStartedEditor(pid: number): Promise<boolean> {
-  if (!isAlive(pid)) return true;
-  stopForce(pid);
-  const deadline = Date.now() + TERMINATE_CONFIRM_MS;
-  for (;;) {
-    if (!isAlive(pid)) return true;
-    if (Date.now() >= deadline) return false;
-    await Bun.sleep(TERMINATE_POLL_MS);
-  }
 }
 
 function removePendingLog(logPath: string): string {
