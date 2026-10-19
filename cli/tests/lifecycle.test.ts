@@ -171,6 +171,13 @@ if (!noListen) {
       report.calls.push({ method: body.method, name: toolName, direct: isDirect });
       saveReport(report);
       if (body?.method === "notifications/initialized") return new Response("{}", { status: 200 });
+      if (toolName === "ping" && isDirect && process.env.GDA_FAKE_GODOT_PING_FAIL === "1") {
+        return new Response(JSON.stringify({
+          jsonrpc: "2.0",
+          id: body?.id ?? 1,
+          error: { code: -32602, message: "mock ping failure" },
+        }), { status: 400, headers: { "content-type": "application/json" } });
+      }
       if (toolName === "ping" && !isDirect) {
         return new Response(JSON.stringify({
           jsonrpc: "2.0",
@@ -248,10 +255,15 @@ async function waitForInstances(count: number): Promise<InstanceEntry[]> {
   return registeredInstances();
 }
 
-async function startFake(opts: { headless?: boolean; play?: boolean; noImport?: boolean; portText?: string; waitText?: string; projectDir?: string; noListen?: boolean; resetReport?: boolean }) {
+async function startFake(opts: { headless?: boolean; play?: boolean; noImport?: boolean; portText?: string; waitText?: string; projectDir?: string; noListen?: boolean; resetReport?: boolean; pingFail?: boolean }) {
   process.env.GDA_FAKE_GODOT_REPORT = fakeReportPath;
   if (opts.noListen === true) {
     process.env.GDA_FAKE_GODOT_NO_LISTEN = "1";
+  }
+  if (opts.pingFail === true) {
+    process.env.GDA_FAKE_GODOT_PING_FAIL = "1";
+  } else {
+    delete process.env.GDA_FAKE_GODOT_PING_FAIL;
   }
   if (opts.resetReport !== false) {
     fs.rmSync(fakeReportPath, { force: true });
@@ -440,6 +452,26 @@ describe.serial("start", () => {
     } finally {
       delete process.env.GDA_FAKE_GODOT_NO_LISTEN;
     }
+  }, TEST_TIMEOUT_MS);
+
+  test("就绪探测失败时终止进程、清理 pending 日志且不登记", async () => {
+    const { code, stderr } = await startFake({
+      headless: true,
+      noImport: true,
+      waitText: "0.2",
+      pingFail: true,
+    });
+    expect(code).toBe(ExitCode.Transport);
+    expect(stderr).toContain("was terminated");
+    expect(registeredInstances()).toHaveLength(0);
+
+    const report = readReport();
+    expect(report).not.toBeNull();
+    expect(await waitFor(() => !isAlive(report!.pid), 5000)).toBe(true);
+
+    const logsDir = path.join(stateDir(), "logs");
+    const pending = fs.existsSync(logsDir) ? fs.readdirSync(logsDir).filter((n) => n.startsWith(".pending-")) : [];
+    expect(pending).toHaveLength(0);
   }, TEST_TIMEOUT_MS);
 });
 

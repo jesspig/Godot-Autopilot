@@ -8,7 +8,7 @@ import { callTool } from "../mcp/client";
 import { CliError, ExitCode } from "../errors";
 import { err } from "../output";
 import { joinPath } from "../platform";
-import { isAlive, resolveGodotBin, spawnEditor } from "../process";
+import { isAlive, resolveGodotBin, spawnEditor, stopForce } from "../process";
 import { findLiveByProject, loadRegistry, saveRegistry, stateDir, type InstanceEntry } from "../registry";
 import { writeJson } from "./json-output";
 
@@ -18,6 +18,10 @@ const DEFAULT_WAIT_SEC = 60;
 const IMPORT_TIMEOUT_MS = 120_000;
 const PROBE_TIMEOUT_SEC = 5;
 const PROBE_INTERVAL_MS = 500;
+const TERMINATE_CONFIRM_MS = 2000;
+const TERMINATE_POLL_MS = 100;
+const LOG_TAIL_LINES = 5;
+const LOG_TAIL_MAX_CHARS = 400;
 
 export async function run(_positional: string[], opts: GlobalOptions): Promise<number> {
   try {
@@ -63,15 +67,19 @@ async function start(opts: GlobalOptions): Promise<number> {
   }
 
   const id = `p${pid}`;
+  if (waitSec > 0) {
+    try {
+      await waitForReady(port, pid, waitSec, pendingLogPath);
+    } catch (error) {
+      throw await rollbackFailedStart(error, pid, pendingLogPath);
+    }
+  }
+
   let finalLogPath = joinPath(logsDir, `${id}.log`);
   try {
     fs.renameSync(pendingLogPath, finalLogPath);
   } catch {
     finalLogPath = pendingLogPath;
-  }
-
-  if (waitSec > 0) {
-    await waitForReady(port, pid, waitSec, finalLogPath);
   }
 
   const entry: InstanceEntry = {
@@ -119,7 +127,7 @@ async function waitForReady(port: number, pid: number, waitSec: number, logPath:
     if (!isAlive(pid)) {
       throw new CliError(
         ExitCode.Transport,
-        `editor process exited before becoming ready (log: ${logPath})`,
+        `editor process exited before becoming ready${logTailSuffix(logPath)}`,
         "check the editor log and the Godot binary",
       );
     }
@@ -130,13 +138,61 @@ async function waitForReady(port: number, pid: number, waitSec: number, logPath:
       if (Date.now() >= deadline) {
         throw new CliError(
           ExitCode.Transport,
-          `editor not ready within ${waitSec}s on port ${port} (log: ${logPath})`,
+          `editor not ready within ${waitSec}s on port ${port}${logTailSuffix(logPath)}`,
           "raise --wait, or check that the Godot Autopilot plugin is enabled",
         );
       }
       await new Promise((resolve) => setTimeout(resolve, PROBE_INTERVAL_MS));
     }
   }
+}
+
+async function rollbackFailedStart(error: unknown, pid: number, logPath: string): Promise<CliError> {
+  const terminated = await terminateStartedEditor(pid);
+  const base = error instanceof CliError ? error : new CliError(ExitCode.Transport, String(error));
+  const processNote =
+    terminated === true
+      ? `the editor process (pid ${pid}) was terminated`
+      : `the editor process (pid ${pid}) could not be terminated, stop it manually`;
+  return new CliError(base.code, `${base.message}; ${processNote}; ${removePendingLog(logPath)}`, base.suggestion);
+}
+
+async function terminateStartedEditor(pid: number): Promise<boolean> {
+  if (!isAlive(pid)) return true;
+  stopForce(pid);
+  const deadline = Date.now() + TERMINATE_CONFIRM_MS;
+  for (;;) {
+    if (!isAlive(pid)) return true;
+    if (Date.now() >= deadline) return false;
+    await Bun.sleep(TERMINATE_POLL_MS);
+  }
+}
+
+function removePendingLog(logPath: string): string {
+  try {
+    fs.rmSync(logPath, { force: true });
+    return "its pending log was removed";
+  } catch (error) {
+    return `its pending log could not be removed (${(error as Error).message})`;
+  }
+}
+
+function logTailSuffix(logPath: string): string {
+  const tail = readLogTail(logPath);
+  return tail === "" ? "" : ` (log tail: ${tail})`;
+}
+
+function readLogTail(logPath: string): string {
+  let text: string;
+  try {
+    text = fs.readFileSync(logPath, "utf8");
+  } catch {
+    return "";
+  }
+  const lines = text.split(/\r?\n/).filter((line) => line.trim() !== "");
+  if (lines.length === 0) return "";
+  const tail = lines.slice(-LOG_TAIL_LINES).join(" | ");
+  return tail.length > LOG_TAIL_MAX_CHARS ? `${tail.slice(0, LOG_TAIL_MAX_CHARS)}...` : tail;
 }
 
 async function runImportStep(bin: string, projectDir: string, skip: boolean): Promise<void> {
