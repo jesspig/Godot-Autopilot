@@ -10,6 +10,8 @@
 
 #include "command_queue.hpp"
 #include "config.hpp"
+#include "port_resolver.hpp"
+#include "project_store.hpp"
 
 namespace godot_autopilot {
 
@@ -21,6 +23,8 @@ public:
   ServerContext(CommandQueue &queue);
   ~ServerContext();
 
+  static ServerContext *instance();
+
   bool start();
   void stop();
   bool restart(uint16_t port);
@@ -30,6 +34,11 @@ public:
   bool is_running() const;
 
   const std::string &last_error() const { return last_error_; }
+
+  const PortAssignment &port_assignment() const;
+  void set_port_assignment(const PortAssignment &assignment);
+  const EndpointTable &endpoints() const;
+  void set_endpoints(const EndpointTable &endpoints);
 
 private:
   CommandQueue &queue_;
@@ -41,6 +50,8 @@ private:
   std::string host_ = "127.0.0.1";
   bool running_ = false;
   std::string last_error_;
+  PortAssignment port_assignment_;
+  EndpointTable endpoints_;
 
   void register_tools();
   int resolve_port();

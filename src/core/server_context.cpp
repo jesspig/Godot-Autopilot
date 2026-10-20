@@ -29,7 +29,11 @@ bool is_loopback_host(std::string_view host) {
   return host == "127.0.0.1" || host == "::1" || host == "[::1]";
 }
 
+ServerContext *g_server_context_instance = nullptr;
+
 } // namespace
+
+ServerContext *ServerContext::instance() { return g_server_context_instance; }
 
 int ServerContext::resolve_port() {
   if (const char *env_port = std::getenv("GODOT_AUTOPILOT_PORT")) {
@@ -55,6 +59,7 @@ ServerContext::ServerContext(CommandQueue &queue)
       bm25_index_(std::make_unique<Bm25Index>()) {
   port_ = resolve_port();
   host_ = resolve_host();
+  g_server_context_instance = this;
   LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
                             "Server configured on " + host_ + ":" +
                                 std::to_string(port_));
@@ -64,6 +69,9 @@ ServerContext::ServerContext(CommandQueue &queue)
 }
 
 ServerContext::~ServerContext() {
+  if (g_server_context_instance == this) {
+    g_server_context_instance = nullptr;
+  }
   if (running_ || server_ || transport_) {
     stop();
   }
@@ -310,6 +318,20 @@ int ServerContext::get_port() const { return port_; }
 const std::string &ServerContext::get_host() const { return host_; }
 
 bool ServerContext::is_running() const { return running_; }
+
+const PortAssignment &ServerContext::port_assignment() const {
+  return port_assignment_;
+}
+
+void ServerContext::set_port_assignment(const PortAssignment &assignment) {
+  port_assignment_ = assignment;
+}
+
+const EndpointTable &ServerContext::endpoints() const { return endpoints_; }
+
+void ServerContext::set_endpoints(const EndpointTable &endpoints) {
+  endpoints_ = endpoints;
+}
 
 void ServerContext::register_tools() {
   register_all_tools(*server_, queue_, *catalog_, *bm25_index_, port_);
