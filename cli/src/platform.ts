@@ -1,4 +1,7 @@
 import fs from "node:fs";
+import os from "node:os";
+
+const GDA_HOME_DIR_NAME = ".godot-autopilot";
 
 export function sep(): string {
   return process.platform === "win32" ? "\\" : "/";
@@ -20,6 +23,16 @@ export function resolvePath(p: string): string {
 
 export function readTextFile(path: string): string {
   return fs.readFileSync(path, "utf8");
+}
+
+export function gdaHome(): string {
+  const override = process.env.GODOT_AUTOPILOT_HOME;
+  if (override !== undefined && override.trim() !== "") return resolvePath(override.trim());
+  return resolvePath(os.homedir());
+}
+
+export function gdaRoot(): string {
+  return joinPath(gdaHome(), GDA_HOME_DIR_NAME);
 }
 
 export function readProjectName(startDir: string): string | null {

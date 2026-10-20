@@ -89,6 +89,9 @@ async function start(opts: GlobalOptions): Promise<number> {
     headless,
     godot: bin,
     log: finalLogPath,
+    projectPath: projectDir,
+    instancePort: port,
+    apiAvailable: false,
   };
   const data = loadRegistry();
   data.instances = data.instances.filter((e) => e.id !== id);

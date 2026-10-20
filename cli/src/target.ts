@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { GlobalOptions } from "./args";
 import { CliError, ExitCode } from "./errors";
-import { readProjectName, userDataBase } from "./platform";
+import { gdaRoot, readProjectName, userDataBase } from "./platform";
 import { isAlive } from "./process";
 
 export interface InstanceEntry {
@@ -30,6 +30,7 @@ export interface ResolvedTarget {
 export type TargetSelector = Pick<GlobalOptions, "portText" | "id" | "project">;
 
 const DEFAULT_PORT = 9527;
+const PLUGIN_INSTANCE_INDEX_FILE = "instances.json";
 
 function validPort(value: number | null | undefined): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 65535;
@@ -129,6 +130,70 @@ function portFromTraceOrConfig(startDir: string): { port: number; source: string
   return null;
 }
 
+interface PluginInstanceRecord {
+  port: number;
+  projectPath: string;
+}
+
+function readPluginInstanceRecords(): PluginInstanceRecord[] {
+  let raw: string;
+  try {
+    raw = fs.readFileSync(path.join(gdaRoot(), PLUGIN_INSTANCE_INDEX_FILE), "utf8");
+  } catch {
+    return [];
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (typeof parsed !== "object" || parsed === null) return [];
+  const items = (parsed as { instances?: unknown }).instances;
+  if (!Array.isArray(items)) return [];
+  const records: PluginInstanceRecord[] = [];
+  for (const item of items) {
+    if (typeof item !== "object" || item === null) continue;
+    const doc = item as Record<string, unknown>;
+    const projectPath = stringField(doc, "project_path") ?? stringField(doc, "projectPath");
+    if (projectPath === undefined) continue;
+    const port = portField(doc);
+    if (port === null) continue;
+    records.push({ port, projectPath });
+  }
+  return records;
+}
+
+function stringField(doc: Record<string, unknown>, key: string): string | undefined {
+  const value = doc[key];
+  return typeof value === "string" && value !== "" ? value : undefined;
+}
+
+function portField(doc: Record<string, unknown>): number | null {
+  const direct = doc["port"];
+  if (typeof direct === "number") return validPort(direct) ? direct : null;
+  if (typeof direct === "string") return parsePortText(direct);
+  const endpoints = doc["endpoints"];
+  if (typeof endpoints === "object" && endpoints !== null) {
+    const table = endpoints as Record<string, unknown>;
+    for (const name of ["mcp", "api"]) {
+      const entry = table[name];
+      if (typeof entry !== "object" || entry === null) continue;
+      const value = (entry as Record<string, unknown>)["port"];
+      if (typeof value === "number" && validPort(value)) return value;
+    }
+  }
+  return null;
+}
+
+function portFromInstanceRegistry(projectPath: string): number | null {
+  const key = projectPathKey(projectPath);
+  for (const record of readPluginInstanceRecords()) {
+    if (projectPathKey(record.projectPath) === key) return record.port;
+  }
+  return null;
+}
+
 export function resolveTarget(opts: TargetSelector, ctx: TargetContext): ResolvedTarget {
   assertSingleSelector(opts);
 
@@ -150,6 +215,8 @@ export function resolveTarget(opts: TargetSelector, ctx: TargetContext): Resolve
     if (entry !== undefined) {
       return { port: entry.port, source: "project", instance: entry };
     }
+    const registered = portFromInstanceRegistry(normalized);
+    if (registered !== null) return { port: registered, source: "registry" };
     const found = portFromTraceOrConfig(normalized);
     if (found !== null) return found;
     return { port: DEFAULT_PORT, source: "default" };
@@ -164,6 +231,8 @@ export function resolveTarget(opts: TargetSelector, ctx: TargetContext): Resolve
   if (cwdEntry !== undefined) {
     return { port: cwdEntry.port, source: "cwd", instance: cwdEntry };
   }
+  const cwdRegistered = portFromInstanceRegistry(process.cwd());
+  if (cwdRegistered !== null) return { port: cwdRegistered, source: "registry" };
   const found = portFromTraceOrConfig(process.cwd());
   if (found !== null) return found;
   return { port: DEFAULT_PORT, source: "default" };
