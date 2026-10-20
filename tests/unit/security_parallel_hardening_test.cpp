@@ -185,7 +185,7 @@ TEST(SecurityHardening, CapabilityForToolMapping) {
 TEST(SecurityHardening, AllowListRemoveExpandsAll) {
   using godot_autopilot::authorization::allow_list_remove;
   EXPECT_EQ(allow_list_remove("all", "code_execute"),
-            "process,game_runtime,user_tools,read,write");
+            "process,game_runtime,destructive,user_tools,read,write");
   EXPECT_EQ(allow_list_remove("process,code_execute", "code_execute"),
             "process");
   EXPECT_EQ(allow_list_remove("process", "game_runtime"), "process");
