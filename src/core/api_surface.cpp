@@ -16,7 +16,6 @@
 #include "core/api_envelope.hpp"
 #include "core/command_queue.hpp"
 #include "core/http_parse.hpp"
-#include "core/http_transport_ext.hpp"
 #include "tools/dispatch.hpp"
 #include "tools/register_all.hpp"
 #include "tools/runtime_ops.hpp"
@@ -228,8 +227,6 @@ bool default_verify_token(
 RuntimeInfo default_runtime_info() {
   RuntimeInfo info;
   info.version = GDA_VERSION;
-  info.port = static_cast<int>(http_transport_instance().bound_port());
-  info.pid = 0;
   return info;
 }
 

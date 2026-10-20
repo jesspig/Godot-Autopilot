@@ -13,5 +13,6 @@ set(GDA_API_TRANSPORT_SOURCES
     src/core/mcp_http_shim.cpp
     src/core/api_surface.cpp
     src/core/api_server.cpp
+    src/core/api_server_routes.cpp
     src/core/api_auth.cpp
     src/core/api_token.cpp)
