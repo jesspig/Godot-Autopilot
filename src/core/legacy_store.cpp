@@ -18,16 +18,16 @@ namespace {
 
 constexpr const char *kLegacyDirPath = "user://godot_autopilot";
 constexpr const char *kLegacyConfigFileName = "config.json";
-constexpr const char *kLogsDirName = "logs";
-constexpr const char *kTracesDirName = "traces";
-constexpr const char *kCapturesDirName = "captures";
-constexpr std::size_t kSummaryNameLimit = 8;
+constexpr const char *kLegacyLogsDirName = "logs";
+constexpr const char *kLegacyTracesDirName = "traces";
+constexpr const char *kLegacyCapturesDirName = "captures";
+constexpr std::size_t kLegacySummaryNameLimit = 8;
 
-std::string join_names(const std::vector<std::string> &names) {
+std::string legacy_join_names(const std::vector<std::string> &names) {
   std::string out;
   std::size_t shown = 0;
   for (const std::string &name : names) {
-    if (shown >= kSummaryNameLimit) {
+    if (shown >= kLegacySummaryNameLimit) {
       if (!out.empty()) {
         out += ", ";
       }
@@ -43,9 +43,9 @@ std::string join_names(const std::vector<std::string> &names) {
   return out;
 }
 
-void collect_relative_files(const std::filesystem::path &base,
-                             const std::string &prefix,
-                             std::vector<std::string> &out) {
+void legacy_collect_relative_files(const std::filesystem::path &base,
+                                   const std::string &prefix,
+                                   std::vector<std::string> &out) {
   std::error_code ec;
   std::filesystem::directory_iterator iterator(base, ec);
   if (ec) {
@@ -59,14 +59,14 @@ void collect_relative_files(const std::filesystem::path &base,
     }
     const std::string relative = prefix.empty() ? name : prefix + "/" + name;
     if (entry.is_directory(entry_ec) && !entry_ec) {
-      collect_relative_files(entry.path(), relative, out);
+      legacy_collect_relative_files(entry.path(), relative, out);
       continue;
     }
     out.push_back(relative);
   }
 }
 
-bool path_exists(const std::string &path) {
+bool legacy_path_exists(const std::string &path) {
   if (path.empty()) {
     return false;
   }
@@ -176,13 +176,13 @@ LegacyTarget LegacyStore::classify_relative_path(
   if (tail.empty()) {
     return LegacyTarget::kUnsupported;
   }
-  if (head == kLogsDirName) {
+  if (head == kLegacyLogsDirName) {
     return LegacyTarget::kProjectLogs;
   }
-  if (head == kTracesDirName) {
+  if (head == kLegacyTracesDirName) {
     return LegacyTarget::kProjectTraces;
   }
-  if (head == kCapturesDirName) {
+  if (head == kLegacyCapturesDirName) {
     return LegacyTarget::kProjectCaptures;
   }
   return LegacyTarget::kUnsupported;
@@ -299,14 +299,14 @@ LegacyImportResult LegacyStore::import_legacy_data(
   }
 
   std::vector<std::string> relative_paths;
-  collect_relative_files(legacy_root, std::string(), relative_paths);
+  legacy_collect_relative_files(legacy_root, std::string(), relative_paths);
 
   std::vector<LegacyImportEntry> entries;
   entries.reserve(relative_paths.size());
   for (const std::string &relative : relative_paths) {
     LegacyImportEntry entry;
     entry.relative_path = relative;
-    entry.destination_exists = path_exists(destination_absolute_path(
+    entry.destination_exists = legacy_path_exists(destination_absolute_path(
         classify_relative_path(relative), relative, global_config_dir,
         project_dir));
     entries.push_back(entry);
@@ -324,7 +324,7 @@ LegacyImportResult LegacyStore::import_legacy_data(
         classify_relative_path(relative), relative, global_config_dir,
         project_dir);
     const LegacyCopyOutcome outcome = copy_file_preserving_source(
-        source, destination, path_exists(destination));
+        source, destination, legacy_path_exists(destination));
     if (outcome.copied) {
       ++result.copied;
       continue;
@@ -348,14 +348,14 @@ std::string LegacyStore::format_import_summary(
                         ", failed " + std::to_string(result.failed) + ".";
   if (!result.skipped_existing_paths.empty()) {
     summary += " Skipped (already present): " +
-               join_names(result.skipped_existing_paths);
+               legacy_join_names(result.skipped_existing_paths);
   }
   if (!result.skipped_unsupported_paths.empty()) {
     summary += " Skipped (unsupported layout): " +
-               join_names(result.skipped_unsupported_paths);
+               legacy_join_names(result.skipped_unsupported_paths);
   }
   if (!result.failures.empty()) {
-    summary += " Failures: " + join_names(result.failures);
+    summary += " Failures: " + legacy_join_names(result.failures);
   }
   return summary;
 }
