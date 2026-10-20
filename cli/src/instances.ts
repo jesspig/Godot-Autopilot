@@ -109,12 +109,14 @@ function parseRecord(item: unknown): PluginInstanceRecord | null {
   if (typeof item !== "object" || item === null || Array.isArray(item)) return null;
   const doc = item as Record<string, unknown>;
   const endpoints = readObject(doc["endpoints"]);
-  const flatPort = readPort(doc);
-  const mcpPort = readEndpointPort(endpoints["mcp"]) ?? flatPort;
-  const apiPort = readEndpointPort(endpoints["api"]) ?? mcpPort ?? flatPort;
+  const declaredMcpPort = readEndpointPort(endpoints["mcp"]);
+  const declaredApiPort = readEndpointPort(endpoints["api"]);
+  const sharedPort = declaredMcpPort ?? declaredApiPort ?? readPort(doc);
+  const mcpPort = declaredMcpPort ?? sharedPort;
+  const apiPort = declaredApiPort ?? sharedPort;
   return {
     instanceId: readString(doc, ["instance_id", "instanceId", "id"]) ?? "",
-    port: flatPort ?? mcpPort ?? apiPort,
+    port: sharedPort,
     pid: readNumber(doc, ["pid"]),
     projectPath: readString(doc, ["project_path", "projectPath", "project"]) ?? "",
     apiToken: readString(doc, ["api_token", "apiToken", "token"]) ?? "",
