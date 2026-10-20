@@ -8,8 +8,10 @@
 
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/file_access.hpp>
+#include <godot_cpp/classes/os.hpp>
 #include <version.hpp>
 
+#include "core/project_store.hpp"
 #include "core/storage_paths.hpp"
 #include "log_system.hpp"
 #include "monitor.hpp"
@@ -20,6 +22,11 @@
 namespace godot_autopilot {
 
 namespace {
+
+constexpr const char *kStorageRootEnvName = "GODOT_AUTOPILOT_STORAGE_ROOT";
+constexpr const char *kProjectDirEnvName = "GODOT_AUTOPILOT_PROJECT_DIR";
+constexpr const char *kLogDirEnvName = "GODOT_AUTOPILOT_LOG_DIR";
+constexpr const char *kTraceDirEnvName = "GODOT_AUTOPILOT_TRACE_DIR";
 
 void append_persist_line(std::string &payload, const std::string &line) {
   payload += line;
@@ -188,6 +195,19 @@ void LogPersist::init_session() {
   const std::string project_path = util::current_project_root_path();
   const std::string log_dir_path = StoragePaths::log_dir(project_path);
   const std::string trace_dir_path = StoragePaths::trace_dir(project_path);
+  auto *os = godot::OS::get_singleton();
+  if (os) {
+    os->set_environment(kStorageRootEnvName,
+                        godot::String::utf8(
+                            ProjectStore::root_dir().c_str()));
+    os->set_environment(kProjectDirEnvName,
+                        godot::String::utf8(
+                            StoragePaths::project_dir(project_path).c_str()));
+    os->set_environment(kLogDirEnvName,
+                        godot::String::utf8(log_dir_path.c_str()));
+    os->set_environment(kTraceDirEnvName,
+                        godot::String::utf8(trace_dir_path.c_str()));
+  }
   if (log_dir_path.empty() || trace_dir_path.empty()) {
     LogSystem::instance().log(
         LogLevel::Error, LogCategory::System,
