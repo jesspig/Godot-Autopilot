@@ -9,6 +9,8 @@
 #include <mcp/JsonValue.hpp>
 #include <mcp/ProtocolVersion.hpp>
 
+#include "core/http_stream_registry.hpp"
+
 namespace godot_autopilot {
 
 namespace mcp_wire {
@@ -62,6 +64,20 @@ std::string build_error_response_text(int code, const std::string &message) {
   return root.Dump();
 }
 
+std::string build_event_frame(const std::string &event,
+                               const std::string &data) {
+  std::string escaped;
+  escaped.reserve(data.size());
+  for (char c : data) {
+    if (c == '\n') {
+      escaped += "\ndata: ";
+    } else {
+      escaped.push_back(c);
+    }
+  }
+  return "event: " + event + "\ndata: " + escaped + "\n\n";
+}
+
 bool is_supported_protocol_version(const std::string &version) {
   if (version.empty()) {
     return true;
@@ -75,6 +91,20 @@ bool is_supported_protocol_version(const std::string &version) {
 }
 
 }
+
+namespace {
+
+std::mutex &transport_instance_mutex() {
+  static std::mutex mutex;
+  return mutex;
+}
+
+std::shared_ptr<GodotTransport> &transport_instance_slot() {
+  static std::shared_ptr<GodotTransport> instance;
+  return instance;
+}
+
+} // namespace
 
 GodotTransport::GodotTransport() = default;
 
@@ -101,6 +131,8 @@ void GodotTransport::SendMessageAsync(mcp::JsonRpcMessage message) {
     }
     key = mcp_wire::request_id_key(*failure->id);
   } else {
+    http_stream::broadcast(
+        mcp_wire::build_event_frame("message", mcp::SerializeMessage(message)));
     return;
   }
   std::shared_ptr<std::promise<mcp::JsonRpcMessage>> waiter;
@@ -151,7 +183,7 @@ bool GodotTransport::submit(const mcp_wire::ParsedRequest &parsed,
 }
 
 bool GodotTransport::await_response(const std::string &request_id,
-                                    std::string &response_text,
+                                    mcp::JsonRpcMessage &message,
                                     std::chrono::milliseconds timeout) {
   std::shared_future<mcp::JsonRpcMessage> future;
   {
@@ -167,19 +199,48 @@ bool GodotTransport::await_response(const std::string &request_id,
     pending_.erase(request_id);
     return false;
   }
-  mcp::JsonRpcMessage response = future.get();
+  message = future.get();
   {
     std::lock_guard<std::mutex> lock(pending_mutex_);
     pending_.erase(request_id);
   }
-  response_text = mcp_wire::build_response_text(response);
+  return true;
+}
+
+bool GodotTransport::await_response(const std::string &request_id,
+                                    std::string &response_text,
+                                    std::chrono::milliseconds timeout) {
+  mcp::JsonRpcMessage message;
+  if (!await_response(request_id, message, timeout)) {
+    return false;
+  }
+  response_text = mcp_wire::build_response_text(message);
   return true;
 }
 
 std::shared_ptr<GodotTransport> godot_transport_instance() {
-  static std::shared_ptr<GodotTransport> instance =
-      std::make_shared<GodotTransport>();
-  return instance;
+  std::lock_guard<std::mutex> lock(transport_instance_mutex());
+  auto &slot = transport_instance_slot();
+  if (!slot) {
+    slot = std::make_shared<GodotTransport>();
+  }
+  return slot;
+}
+
+std::shared_ptr<GodotTransport> godot_transport_reset() {
+  std::shared_ptr<GodotTransport> previous;
+  std::shared_ptr<GodotTransport> fresh;
+  {
+    std::lock_guard<std::mutex> lock(transport_instance_mutex());
+    auto &slot = transport_instance_slot();
+    previous = slot;
+    fresh = std::make_shared<GodotTransport>();
+    slot = fresh;
+  }
+  if (previous) {
+    previous->Close();
+  }
+  return fresh;
 }
 
 } // namespace godot_autopilot

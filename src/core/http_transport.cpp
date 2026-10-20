@@ -1,10 +1,16 @@
 #include "core/http_transport.hpp"
 
 #include <algorithm>
+#include <chrono>
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <deque>
+#include <memory>
+#include <mutex>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -16,7 +22,9 @@
 #include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/string.hpp>
 
+#include "core/config.hpp"
 #include "core/http_parse.hpp"
+#include "core/http_stream_registry.hpp"
 #include "core/http_transport_ext.hpp"
 #include "core/log_system.hpp"
 
@@ -25,6 +33,29 @@ namespace godot_autopilot {
 namespace {
 
 constexpr const char *kTransportContentType = "application/json";
+constexpr const char *kTransportEventStreamType = "text/event-stream";
+
+struct PendingJob {
+  HttpRequest request;
+  HttpRouteHandler handler;
+  HttpResponse preset;
+  bool use_preset{false};
+  bool keep_alive{true};
+};
+
+struct CompletedReply {
+  HttpResponse response;
+  bool keep_alive{true};
+};
+
+struct ConnectionChannel {
+  std::mutex mutex;
+  std::condition_variable cv;
+  std::deque<PendingJob> jobs;
+  std::deque<CompletedReply> replies;
+  bool closed{false};
+  bool finished{false};
+};
 
 struct TransportConnection {
   godot::Ref<godot::StreamPeerTCP> peer;
@@ -32,13 +63,19 @@ struct TransportConnection {
   std::string outbox;
   bool close_after_write{false};
   bool dead{false};
+  bool streaming{false};
+  uint64_t id{0};
+  std::shared_ptr<ConnectionChannel> channel;
+  std::shared_ptr<http_stream::Sink> sink;
+  std::thread worker;
 };
 
 struct TransportState {
   godot::Ref<godot::TCPServer> server;
   uint16_t bound_port{0};
-  std::vector<TransportConnection> connections;
+  std::vector<std::shared_ptr<TransportConnection>> connections;
   HttpRouteTable routes;
+  uint64_t next_connection_id{1};
 };
 
 TransportState &transport_state() {
@@ -75,13 +112,33 @@ std::string transport_json_escape(const std::string &text) {
 std::string transport_find_header(
     const std::unordered_map<std::string, std::string> &headers,
     const std::string &name) {
-  const std::string lowered = http_parse::to_lower(name);
-  for (const auto &entry : headers) {
-    if (http_parse::to_lower(entry.first) == lowered) {
-      return entry.second;
+  const std::string *found = http_parse::find_header(headers, name);
+  if (found == nullptr) {
+    return std::string();
+  }
+  return *found;
+}
+
+std::string transport_hex(uint64_t value) {
+  static const char *kDigits = "0123456789abcdef";
+  std::string out;
+  bool started = false;
+  for (int shift = 60; shift >= 0; shift -= 4) {
+    const int nibble = static_cast<int>((value >> shift) & 0xF);
+    if (nibble != 0 || started || shift == 0) {
+      out.push_back(kDigits[nibble]);
+      started = true;
     }
   }
-  return std::string();
+  return out;
+}
+
+std::string transport_chunk(const std::string &data) {
+  if (data.empty()) {
+    return std::string();
+  }
+  return transport_hex(static_cast<uint64_t>(data.size())) + "\r\n" + data +
+         "\r\n";
 }
 
 std::string transport_build_response(const HttpResponse &response,
@@ -98,7 +155,7 @@ std::string transport_build_response(const HttpResponse &response,
   for (const auto &entry : response.headers) {
     const std::string lowered = http_parse::to_lower(entry.first);
     if (lowered == "content-type" || lowered == "content-length" ||
-        lowered == "connection") {
+        lowered == "connection" || lowered == kStreamIdHeader) {
       continue;
     }
     head += entry.first + ": " + entry.second + "\r\n";
@@ -108,16 +165,149 @@ std::string transport_build_response(const HttpResponse &response,
   return head + response.body;
 }
 
-void transport_enqueue_error(TransportConnection &connection, int status_code,
-                             const std::string &status_text,
-                             const std::string &message) {
+std::string transport_build_stream_response(const HttpResponse &response) {
+  std::string head = "HTTP/1.1 " + std::to_string(response.status_code) + " " +
+                     response.status_text + "\r\n";
+  std::string content_type =
+      transport_find_header(response.headers, "Content-Type");
+  if (content_type.empty()) {
+    content_type = kTransportEventStreamType;
+  }
+  head += "Content-Type: " + content_type + "\r\n";
+  head += "Cache-Control: no-cache\r\n";
+  head += "Transfer-Encoding: chunked\r\n";
+  head += "Connection: keep-alive\r\n\r\n";
+  return head + transport_chunk(response.body);
+}
+
+HttpResponse transport_error_response(int status_code,
+                                      const std::string &status_text,
+                                      const std::string &message) {
   HttpResponse response;
   response.status_code = status_code;
   response.status_text = status_text;
   response.headers["Content-Type"] = kTransportContentType;
   response.body = "{\"error\":\"" + transport_json_escape(message) + "\"}";
-  connection.outbox += transport_build_response(response, false);
-  connection.close_after_write = true;
+  return response;
+}
+
+void transport_execute_job(const PendingJob &job, HttpResponse &response) {
+  if (job.use_preset) {
+    response = job.preset;
+    return;
+  }
+  if (!job.handler) {
+    response = transport_error_response(
+        404, "Not Found", "no route for " + job.request.path);
+    return;
+  }
+  try {
+    (job.handler)(job.request, response);
+  } catch (const std::exception &e) {
+    response = transport_error_response(500, "Internal Server Error",
+                                        std::string("handler failed: ") +
+                                            e.what());
+  } catch (...) {
+    response = transport_error_response(500, "Internal Server Error",
+                                        "handler failed: unknown exception");
+  }
+}
+
+void transport_worker_loop(const std::shared_ptr<ConnectionChannel> &channel) {
+  while (true) {
+    PendingJob job;
+    {
+      std::unique_lock<std::mutex> lock(channel->mutex);
+      channel->cv.wait(lock, [&channel] {
+        return channel->closed || !channel->jobs.empty();
+      });
+      if (channel->closed) {
+        return;
+      }
+      job = std::move(channel->jobs.front());
+      channel->jobs.pop_front();
+    }
+    HttpResponse response;
+    transport_execute_job(job, response);
+    {
+      std::lock_guard<std::mutex> lock(channel->mutex);
+      if (channel->closed) {
+        return;
+      }
+      CompletedReply reply;
+      reply.response = std::move(response);
+      reply.keep_alive = job.keep_alive;
+      channel->replies.push_back(std::move(reply));
+    }
+  }
+}
+
+void transport_worker_main(const std::shared_ptr<ConnectionChannel> &channel) {
+  transport_worker_loop(channel);
+  {
+    std::lock_guard<std::mutex> lock(channel->mutex);
+    channel->finished = true;
+  }
+  channel->cv.notify_all();
+}
+
+void transport_enqueue_job(TransportConnection &connection, PendingJob job) {
+  {
+    std::lock_guard<std::mutex> lock(connection.channel->mutex);
+    if (connection.channel->closed) {
+      return;
+    }
+    connection.channel->jobs.push_back(std::move(job));
+  }
+  connection.channel->cv.notify_one();
+}
+
+void transport_wait_worker(const std::shared_ptr<ConnectionChannel> &channel,
+                           std::chrono::milliseconds budget) {
+  std::unique_lock<std::mutex> lock(channel->mutex);
+  channel->cv.wait_for(lock, budget,
+                       [&channel] { return channel->finished; });
+}
+
+void transport_retire_connections(
+    std::vector<std::shared_ptr<TransportConnection>> &connections,
+    bool wait_for_workers) {
+  for (const std::shared_ptr<TransportConnection> &connection : connections) {
+    if (!connection) {
+      continue;
+    }
+    {
+      std::lock_guard<std::mutex> lock(connection->channel->mutex);
+      connection->channel->closed = true;
+    }
+    connection->channel->cv.notify_all();
+  }
+  const std::chrono::steady_clock::time_point deadline =
+      std::chrono::steady_clock::now() +
+      std::chrono::milliseconds(GDA_RESPONSE_GRACE_MS);
+  for (const std::shared_ptr<TransportConnection> &connection : connections) {
+    if (!connection) {
+      continue;
+    }
+    if (wait_for_workers) {
+      const std::chrono::steady_clock::time_point now =
+          std::chrono::steady_clock::now();
+      if (now < deadline) {
+        transport_wait_worker(
+            connection->channel,
+            std::chrono::duration_cast<std::chrono::milliseconds>(deadline -
+                                                                  now));
+      }
+    }
+    if (connection->worker.joinable()) {
+      connection->worker.detach();
+    }
+    http_stream::release(std::to_string(connection->id));
+    if (connection->peer.is_valid()) {
+      connection->peer->disconnect_from_host();
+    }
+  }
+  connections.clear();
 }
 
 void transport_read(TransportConnection &connection) {
@@ -150,13 +340,24 @@ void transport_read(TransportConnection &connection) {
                            static_cast<size_t>(chunk_size));
 }
 
+void transport_enqueue_error_job(TransportConnection &connection,
+                                  int status_code,
+                                  const std::string &status_text,
+                                  const std::string &message) {
+  PendingJob job;
+  job.use_preset = true;
+  job.preset = transport_error_response(status_code, status_text, message);
+  job.keep_alive = false;
+  transport_enqueue_job(connection, std::move(job));
+}
+
 void transport_dispatch(TransportState &state, TransportConnection &connection) {
   while (true) {
     const size_t header_end = connection.inbox.find("\r\n\r\n");
     if (header_end == std::string::npos) {
       if (connection.inbox.size() > http_parse::kMaxHeaderBlockBytes) {
-        transport_enqueue_error(connection, 400, "Bad Request",
-                                "header block exceeds the length limit");
+        transport_enqueue_error_job(connection, 400, "Bad Request",
+                                    "header block exceeds the length limit");
         connection.inbox.clear();
       }
       return;
@@ -171,27 +372,28 @@ void transport_dispatch(TransportState &state, TransportConnection &connection) 
 
     http_parse::RequestLine request_line;
     if (!http_parse::parse_request_line(request_line_text, request_line)) {
-      transport_enqueue_error(connection, 400, "Bad Request", request_line.error);
+      transport_enqueue_error_job(connection, 400, "Bad Request",
+                                  request_line.error);
       connection.inbox.clear();
       return;
     }
     http_parse::HeaderBlock headers;
     if (!http_parse::parse_headers(header_text, headers)) {
-      transport_enqueue_error(connection, 400, "Bad Request", headers.error);
+      transport_enqueue_error_job(connection, 400, "Bad Request", headers.error);
       connection.inbox.clear();
       return;
     }
     size_t content_length = 0;
     if (!http_parse::parse_content_length(headers, content_length)) {
-      transport_enqueue_error(connection, 400, "Bad Request",
-                              "content-length is not a valid length");
+      transport_enqueue_error_job(connection, 400, "Bad Request",
+                                  "content-length is not a valid length");
       connection.inbox.clear();
       return;
     }
     if (http_parse::decide_body(content_length) ==
         http_parse::BodyDecision::kTooLarge) {
-      transport_enqueue_error(connection, 413, "Payload Too Large",
-                              "request body exceeds the accepted limit");
+      transport_enqueue_error_job(connection, 413, "Payload Too Large",
+                                  "request body exceeds the accepted limit");
       connection.inbox.clear();
       return;
     }
@@ -210,26 +412,55 @@ void transport_dispatch(TransportState &state, TransportConnection &connection) 
       request.headers[std::string(http_parse::kQueryHeaderPrefix) + entry.first] =
           entry.second;
     }
+    request.headers[kConnectionIdHeader] = std::to_string(connection.id);
 
-    const bool keep_alive =
+    PendingJob job;
+    job.request = std::move(request);
+    job.keep_alive =
         http_parse::request_keeps_alive(request_line.version, headers);
-    HttpResponse response;
+    const bool keep_alive = job.keep_alive;
     const HttpRouteHandler *handler =
-        state.routes.find(request.method, request.path);
+        state.routes.find(job.request.method, job.request.path);
     if (handler != nullptr) {
-      (*handler)(request, response);
-    } else {
-      response.status_code = 404;
-      response.status_text = "Not Found";
-      response.headers["Content-Type"] = kTransportContentType;
-      response.body = "{\"error\":\"no route for " +
-                      transport_json_escape(request.path) + "\"}";
+      job.handler = *handler;
     }
-    connection.outbox += transport_build_response(response, keep_alive);
+    transport_enqueue_job(connection, std::move(job));
     if (!keep_alive) {
-      connection.close_after_write = true;
       return;
     }
+  }
+}
+
+void transport_collect_replies(TransportConnection &connection) {
+  std::deque<CompletedReply> replies;
+  {
+    std::lock_guard<std::mutex> lock(connection.channel->mutex);
+    replies.swap(connection.channel->replies);
+  }
+  for (CompletedReply &reply : replies) {
+    const std::string stream_id =
+        transport_find_header(reply.response.headers, kStreamIdHeader);
+    if (!stream_id.empty()) {
+      connection.streaming = true;
+      connection.sink = http_stream::acquire(stream_id);
+      connection.outbox += transport_build_stream_response(reply.response);
+      continue;
+    }
+    connection.outbox += transport_build_response(reply.response, reply.keep_alive);
+    if (!reply.keep_alive) {
+      connection.close_after_write = true;
+      break;
+    }
+  }
+}
+
+void transport_drain_stream(TransportConnection &connection) {
+  if (!connection.streaming || !connection.sink) {
+    return;
+  }
+  const std::vector<std::string> frames = connection.sink->drain();
+  for (const std::string &frame : frames) {
+    connection.outbox += transport_chunk(frame);
   }
 }
 
@@ -280,7 +511,14 @@ void transport_process(TransportState &state, TransportConnection &connection,
     return;
   }
   transport_read(connection);
-  transport_dispatch(state, connection);
+  if (connection.dead) {
+    return;
+  }
+  if (!connection.streaming) {
+    transport_dispatch(state, connection);
+  }
+  transport_collect_replies(connection);
+  transport_drain_stream(connection);
   transport_flush(connection, write_budget);
   if (connection.outbox.empty() && connection.close_after_write) {
     connection.dead = true;
@@ -298,12 +536,11 @@ bool http_transport_is_listening() {
   return transport_state().server.is_valid();
 }
 
-bool HttpTransport::listen(uint16_t port, const std::string &host) {
+bool http_transport_bind(uint16_t port, const std::string &host,
+                         std::string &error) {
+  error.clear();
   if (!transport_host_is_loopback(host)) {
-    LogSystem::instance().log(
-        LogLevel::Error, LogCategory::Transport,
-        "HTTP transport listen rejected: '" + host +
-            "' is not a loopback address");
+    error = "listen address '" + host + "' is not a loopback address";
     return false;
   }
   TransportState &state = transport_state();
@@ -311,35 +548,38 @@ bool HttpTransport::listen(uint16_t port, const std::string &host) {
     state.server->stop();
     state.server.unref();
   }
-  state.connections.clear();
+  transport_retire_connections(state.connections, true);
   state.bound_port = 0;
 
   godot::Ref<godot::TCPServer> server;
   server.instantiate();
-  const godot::Error error = server->listen(port, godot::String(host.c_str()));
-  if (error != godot::OK) {
-    LogSystem::instance().log(
-        LogLevel::Error, LogCategory::Transport,
-        "HTTP transport listen failed on " + host + ":" + std::to_string(port) +
-            " (error " + std::to_string(static_cast<int>(error)) + ")");
+  const godot::Error listen_error = server->listen(port, godot::String(host.c_str()));
+  if (listen_error != godot::OK) {
+    error = "listen failed on " + host + ":" + std::to_string(port) +
+            " (error " + std::to_string(static_cast<int>(listen_error)) + ")";
     return false;
   }
   state.server = server;
   state.bound_port = static_cast<uint16_t>(server->get_local_port());
+  return true;
+}
+
+bool HttpTransport::listen(uint16_t port, const std::string &host) {
+  std::string error;
+  if (!http_transport_bind(port, host, error)) {
+    LogSystem::instance().log(LogLevel::Error, LogCategory::Transport,
+                              "HTTP transport listen failed: " + error);
+    return false;
+  }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
                             "HTTP transport listening on " + host + ":" +
-                                std::to_string(state.bound_port));
+                                std::to_string(transport_state().bound_port));
   return true;
 }
 
 void HttpTransport::stop() {
   TransportState &state = transport_state();
-  for (TransportConnection &connection : state.connections) {
-    if (connection.peer.is_valid()) {
-      connection.peer->disconnect_from_host();
-    }
-  }
-  state.connections.clear();
+  transport_retire_connections(state.connections, true);
   if (state.server.is_valid()) {
     state.server->stop();
     state.server.unref();
@@ -373,8 +613,11 @@ void HttpTransport::pump() {
       peer->disconnect_from_host();
       continue;
     }
-    TransportConnection connection;
-    connection.peer = peer;
+    auto connection = std::make_shared<TransportConnection>();
+    connection->peer = peer;
+    connection->id = state.next_connection_id++;
+    connection->channel = std::make_shared<ConnectionChannel>();
+    connection->worker = std::thread(transport_worker_main, connection->channel);
     state.connections.push_back(std::move(connection));
     ++accepted;
   }
@@ -384,15 +627,22 @@ void HttpTransport::pump() {
        index < state.connections.size() &&
        serviced < limits.max_connections_per_frame;
        ++index) {
-    transport_process(state, state.connections[index], write_budget);
+    transport_process(state, *state.connections[index], write_budget);
     ++serviced;
   }
-  state.connections.erase(
-      std::remove_if(state.connections.begin(), state.connections.end(),
-                     [](const TransportConnection &connection) {
-                       return connection.dead;
-                     }),
-      state.connections.end());
+  std::vector<std::shared_ptr<TransportConnection>> survivors;
+  std::vector<std::shared_ptr<TransportConnection>> retired;
+  survivors.reserve(state.connections.size());
+  for (const std::shared_ptr<TransportConnection> &connection :
+       state.connections) {
+    if (connection->dead) {
+      retired.push_back(connection);
+    } else {
+      survivors.push_back(connection);
+    }
+  }
+  state.connections.swap(survivors);
+  transport_retire_connections(retired, false);
 }
 
 } // namespace godot_autopilot

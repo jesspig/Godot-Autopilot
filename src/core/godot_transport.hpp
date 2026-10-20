@@ -28,6 +28,7 @@ struct ParsedRequest {
 ParsedRequest parse_request(const std::string &body);
 std::string build_response_text(const mcp::JsonRpcMessage &message);
 std::string build_error_response_text(int code, const std::string &message);
+std::string build_event_frame(const std::string &event, const std::string &data);
 bool is_supported_protocol_version(const std::string &version);
 std::string request_id_key(const mcp::RequestId &id);
 
@@ -45,6 +46,9 @@ public:
   bool submit(const mcp_wire::ParsedRequest &parsed, std::string &error);
   bool await_response(const std::string &request_id, std::string &response_text,
                       std::chrono::milliseconds timeout);
+  bool await_response(const std::string &request_id,
+                      mcp::JsonRpcMessage &message,
+                      std::chrono::milliseconds timeout);
 
 private:
   struct PendingExchange {
@@ -57,6 +61,8 @@ private:
 };
 
 std::shared_ptr<GodotTransport> godot_transport_instance();
+
+std::shared_ptr<GodotTransport> godot_transport_reset();
 
 } // namespace godot_autopilot
 

@@ -4,6 +4,7 @@
 #include <mcp/transport/InMemoryTransport.hpp>
 
 #include "core/godot_transport.hpp"
+#include "core/mcp_http_shim.hpp"
 
 #include <chrono>
 #include <cstdint>
@@ -19,6 +20,9 @@
 namespace {
 
 using godot_autopilot::GodotTransport;
+using godot_autopilot::HttpRequest;
+using godot_autopilot::HttpResponse;
+using godot_autopilot::McpHttpShim;
 using godot_autopilot::mcp_wire::ParsedRequest;
 using godot_autopilot::mcp_wire::parse_request;
 
@@ -173,12 +177,91 @@ int run_path_bc() {
   return ok ? 0 : 1;
 }
 
+HttpRequest make_post_request(const std::string &body) {
+  HttpRequest request;
+  request.method = "POST";
+  request.path = "/mcp";
+  request.headers["accept"] = "application/json, text/event-stream";
+  request.headers["content-type"] = "application/json";
+  request.body = body;
+  return request;
+}
+
+int run_path_shim() {
+  auto transport = godot_autopilot::godot_transport_reset();
+  auto server = mcp::McpServer::Create(transport, probe_options());
+  register_probe_tool(*server);
+
+  const McpHttpShim shim;
+  bool ok = true;
+
+  HttpResponse initialize_response;
+  shim.handle(make_post_request(kInitializeBody), initialize_response);
+  std::cout << "PATH_SHIM initialize status: "
+            << initialize_response.status_code << std::endl;
+  std::cout << "PATH_SHIM initialize body: " << initialize_response.body
+            << std::endl;
+  ok = ok && initialize_response.status_code == 200 &&
+       looks_like_response(initialize_response.body);
+
+  HttpResponse list_response;
+  shim.handle(make_post_request(kToolsListBody), list_response);
+  std::cout << "PATH_SHIM tools/list status: " << list_response.status_code
+            << std::endl;
+  ok = ok && list_response.status_code == 200 &&
+       looks_like_response(list_response.body);
+
+  HttpRequest bad_accept = make_post_request(kToolsListBody);
+  bad_accept.headers["accept"] = "application/json";
+  HttpResponse bad_accept_response;
+  shim.handle(bad_accept, bad_accept_response);
+  std::cout << "PATH_SHIM bad accept status: "
+            << bad_accept_response.status_code << std::endl;
+  ok = ok && bad_accept_response.status_code == 406;
+
+  HttpRequest bad_content_type = make_post_request(kToolsListBody);
+  bad_content_type.headers["content-type"] = "text/plain";
+  HttpResponse bad_content_type_response;
+  shim.handle(bad_content_type, bad_content_type_response);
+  std::cout << "PATH_SHIM bad content type status: "
+            << bad_content_type_response.status_code << std::endl;
+  ok = ok && bad_content_type_response.status_code == 415;
+
+  HttpRequest bad_version = make_post_request(kToolsListBody);
+  bad_version.headers["mcp-protocol-version"] = "1999-01-01";
+  HttpResponse bad_version_response;
+  shim.handle(bad_version, bad_version_response);
+  std::cout << "PATH_SHIM bad version status: "
+            << bad_version_response.status_code << std::endl;
+  ok = ok && bad_version_response.status_code == 400;
+
+  HttpRequest stream_request;
+  stream_request.method = "GET";
+  stream_request.path = "/mcp";
+  stream_request.headers["accept"] = "text/event-stream";
+  stream_request.headers["x-gda-connection-id"] = "probe-1";
+  HttpResponse stream_response;
+  shim.handle(stream_request, stream_response);
+  std::cout << "PATH_SHIM event stream status: " << stream_response.status_code
+            << std::endl;
+  std::cout << "PATH_SHIM event stream body: " << stream_response.body
+            << std::endl;
+  ok = ok && stream_response.status_code == 200 &&
+       stream_response.body.find("event: endpoint") != std::string::npos;
+
+  std::cout << "PATH_SHIM result: " << (ok ? "PASS" : "FAIL") << std::endl;
+  server->Close();
+  return ok ? 0 : 1;
+}
+
 } // namespace
 
 int main() {
   const int path_a = run_path_a();
   const int path_bc = run_path_bc();
+  const int path_shim = run_path_shim();
   std::cout << "gate summary: path_a=" << (path_a == 0 ? "PASS" : "FAIL")
-            << " path_bc=" << (path_bc == 0 ? "PASS" : "FAIL") << std::endl;
-  return (path_a == 0 && path_bc == 0) ? 0 : 1;
+            << " path_bc=" << (path_bc == 0 ? "PASS" : "FAIL")
+            << " path_shim=" << (path_shim == 0 ? "PASS" : "FAIL") << std::endl;
+  return (path_a == 0 && path_bc == 0 && path_shim == 0) ? 0 : 1;
 }

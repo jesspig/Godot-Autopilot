@@ -13,14 +13,24 @@
 #include "util/bm25_index.hpp"
 #include "monitor.hpp"
 #include <cstdlib>
+#include <chrono>
 #include <exception>
+#include <map>
 #include <string_view>
 #include <typeinfo>
+#include <vector>
 #include <mcp/Content.hpp>
 #include <mcp/JsonRpc.hpp>
 #include <mcp/server/ServerOptions.hpp>
 #include <mcp/protocol/MessageFilter.hpp>
 #include <memory>
+
+#include "core/gda_home.hpp"
+#include "core/http_transport.hpp"
+#include "core/http_transport_ext.hpp"
+#include "core/instance_registry.hpp"
+#include "core/mcp_http_shim.hpp"
+#include "util/api_host_context.hpp"
 
 namespace godot_autopilot {
 
@@ -31,19 +41,34 @@ bool is_loopback_host(std::string_view host) {
 
 ServerContext *g_server_context_instance = nullptr;
 
+int64_t now_epoch_ms() {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(
+             std::chrono::system_clock::now().time_since_epoch())
+      .count();
+}
+
 } // namespace
 
 ServerContext *ServerContext::instance() { return g_server_context_instance; }
 
-int ServerContext::resolve_port() {
-  if (const char *env_port = std::getenv("GODOT_AUTOPILOT_PORT")) {
-    return std::atoi(env_port);
+int ServerContext::resolve_explicit_port() {
+  const char *env_port = std::getenv("GODOT_AUTOPILOT_PORT");
+  if (env_port == nullptr || *env_port == '\0') {
+    return 0;
   }
-  int saved_port = PluginConfig::load_port();
-  if (saved_port > 0) {
-    return saved_port;
+  const int parsed = std::atoi(env_port);
+  if (parsed <= 0 || parsed > 65535) {
+    return 0;
   }
-  return GDA_DEFAULT_PORT;
+  return parsed;
+}
+
+int ServerContext::resolve_preferred_port() {
+  const int saved_port = PluginConfig::load_port();
+  if (saved_port <= 0 || saved_port > 65535) {
+    return 0;
+  }
+  return saved_port;
 }
 
 std::string ServerContext::resolve_host() {
@@ -57,7 +82,11 @@ ServerContext::ServerContext(CommandQueue &queue)
     : queue_(queue),
       catalog_(std::make_unique<ToolCatalog>()),
       bm25_index_(std::make_unique<Bm25Index>()) {
-  port_ = resolve_port();
+  const int explicit_port = resolve_explicit_port();
+  const int preferred_port = resolve_preferred_port();
+  port_ = explicit_port > 0
+              ? explicit_port
+              : (preferred_port > 0 ? preferred_port : GDA_DEFAULT_PORT);
   host_ = resolve_host();
   g_server_context_instance = this;
   LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
@@ -77,6 +106,55 @@ ServerContext::~ServerContext() {
   }
 }
 
+bool ServerContext::bind_transport() {
+  const int pid = util::api_host_process_id();
+  const int explicit_port = resolve_explicit_port();
+  const int preferred_port = resolve_preferred_port();
+  PortAssignment assignment;
+  if (requested_port_ > 0) {
+    assignment.port = requested_port_;
+    assignment.source = PortSource::kUserApplied;
+    assignment.requested_port = requested_port_;
+  } else {
+    assignment = PortResolver::resolve(explicit_port, preferred_port, pid);
+  }
+  std::string error;
+  if (assignment.source == PortSource::kAutoAssigned) {
+    const std::vector<int> candidates = PortResolver::candidate_sequence(pid);
+    int probed = 0;
+    bool bound = false;
+    for (int candidate : candidates) {
+      if (probed >= GDA_PORT_PROBE_LIMIT) {
+        break;
+      }
+      ++probed;
+      if (http_transport_bind(static_cast<uint16_t>(candidate), host_, error)) {
+        assignment.port = candidate;
+        bound = true;
+        break;
+      }
+    }
+    if (!bound) {
+      last_error_ = "no free port candidate bound after " +
+                    std::to_string(probed) + " probes: " + error;
+      return false;
+    }
+    assignment.note = assignment.note + "; bound port " +
+                      std::to_string(assignment.port);
+  } else {
+    if (!http_transport_bind(static_cast<uint16_t>(assignment.port), host_,
+                             error)) {
+      last_error_ = "the requested port " + std::to_string(assignment.port) +
+                    " is unavailable: " + error;
+      return false;
+    }
+  }
+  port_ = assignment.port;
+  port_assignment_ = assignment;
+  requested_port_ = 0;
+  return true;
+}
+
 bool ServerContext::start() {
   const std::string endpoint = host_ + ":" + std::to_string(port_);
   try {
@@ -92,20 +170,21 @@ bool ServerContext::start() {
       return false;
     }
 
-    mcp::StreamableHttpServerOptions http_opts;
-    http_opts.port = static_cast<uint16_t>(port_);
-    http_opts.endpoint = "/mcp";
-    http_opts.stateless = true;
-    http_opts.enable_legacy_sse = false;
-    http_opts.host = host_;
+    if (!bind_transport()) {
+      LogSystem::instance().log(LogLevel::Error, LogCategory::Transport,
+                                "MCP server start rejected: " + last_error_);
+      LogSystem::instance().log_detailed(
+          LogLevel::Error, LogCategory::Transport, "MCP server start rejected",
+          "endpoint=" + endpoint + " msg=" + last_error_);
+      monitor::error_event("server_start_failed", "server", last_error_);
+      return false;
+    }
 
     LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
-                              "MCP server initializing: host=" +
-                                  http_opts.host + " port=" +
-                                  std::to_string(port_));
+                              "MCP server initializing: host=" + host_ +
+                                  " port=" + std::to_string(port_));
 
-    transport_ =
-        std::make_shared<mcp::StreamableHttpServerTransport>(http_opts);
+    transport_ = godot_transport_reset();
 
     mcp::ServerOptions opts;
     opts.server_info = mcp::Implementation{"godot-autopilot", GDA_VERSION};
@@ -219,19 +298,22 @@ bool ServerContext::start() {
     LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
                               "Tool registration complete");
 
-    LogSystem::instance().log(LogLevel::Debug, LogCategory::Transport,
-                              "Starting HTTP transport on " +
-                                  http_opts.host + ":" +
-                                  std::to_string(port_));
+    const McpHttpShim shim;
+    const HttpRouteHandler mcp_route = [shim](const HttpRequest &request,
+                                               HttpResponse &response) {
+      shim.handle(request, response);
+    };
+    HttpTransport &http_transport = http_transport_instance();
+    http_transport.register_route("POST", GDA_MCP_PATH, mcp_route);
+    http_transport.register_route("GET", GDA_MCP_PATH, mcp_route);
+    http_transport.register_route("DELETE", GDA_MCP_PATH, mcp_route);
 
-    transport_->Start();
-
-    port_ = http_opts.port;
     running_ = true;
+    write_instance_record();
 
     LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
-                              "MCP server started on " + http_opts.host +
-                                  ":" + std::to_string(port_));
+                              "MCP server started on " + host_ + ":" +
+                                  std::to_string(port_));
     monitor::lifecycle("server_start",
                        monitor::build_attrs({{"host", host_},
                                              {"port", std::to_string(port_)}}));
@@ -246,6 +328,7 @@ bool ServerContext::start() {
         "endpoint=" + endpoint + " msg=" + last_error_);
     if (server_) { try { server_->Close(); } catch (...) {} server_.reset(); }
     if (transport_) { try { transport_->Close(); } catch (...) {} transport_.reset(); }
+    http_transport_instance().stop();
     dispatch::clear_handlers();
     clear_active_registry();
     monitor::error_event("server_start_failed", "server", last_error_);
@@ -266,11 +349,52 @@ bool ServerContext::start() {
         "endpoint=" + endpoint + " msg=" + last_error_);
     if (server_) { try { server_->Close(); } catch (...) {} server_.reset(); }
     if (transport_) { try { transport_->Close(); } catch (...) {} transport_.reset(); }
+    http_transport_instance().stop();
     dispatch::clear_handlers();
     clear_active_registry();
     monitor::error_event("server_start_failed", "server", last_error_);
     return false;
   }
+}
+
+void ServerContext::write_instance_record() {
+  const std::string project_path = util::api_host_project_root();
+  const int pid = util::api_host_process_id();
+  const int64_t started_at = now_epoch_ms();
+  InstanceRecord record;
+  record.instance_id = "gda-" + ProjectStore::project_path_hash(project_path) +
+                        "-" + std::to_string(pid) + "-" +
+                        std::to_string(started_at);
+  record.port = port_;
+  record.pid = pid;
+  record.project_path = project_path;
+  record.api_token = "";
+  record.endpoints.mcp =
+      EndpointEntry{host_, port_, GDA_MCP_PATH, "mcp", "none"};
+  record.endpoints.api =
+      EndpointEntry{host_, port_, GDA_API_PATH, "http", "none"};
+  record.gda_home = HomeResolver::gda_home();
+  record.started_at = started_at;
+  record.version = GDA_VERSION;
+  if (!InstanceRegistry::write(record)) {
+    LogSystem::instance().log(LogLevel::Error, LogCategory::System,
+                              "Instance registry write failed for port " +
+                                  std::to_string(port_));
+    return;
+  }
+  instance_id_ = record.instance_id;
+}
+
+void ServerContext::remove_instance_record() {
+  if (instance_id_.empty()) {
+    return;
+  }
+  if (!InstanceRegistry::remove(instance_id_)) {
+    LogSystem::instance().log(LogLevel::Warning, LogCategory::System,
+                              "Instance registry entry removal failed: " +
+                                  instance_id_);
+  }
+  instance_id_.clear();
 }
 
 void ServerContext::stop() {
@@ -287,8 +411,12 @@ void ServerContext::stop() {
     transport_->Close();
   server_.reset();
   transport_.reset();
+  if (http_transport_is_listening()) {
+    http_transport_instance().stop();
+  }
   dispatch::clear_handlers();
   clear_active_registry();
+  remove_instance_record();
 
   LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
                             "MCP server stopped");
@@ -309,6 +437,7 @@ bool ServerContext::restart(uint16_t port) {
                      monitor::build_attrs({{"host", host_},
                                            {"port", std::to_string(port)}}));
   stop();
+  requested_port_ = port;
   port_ = port;
   return start();
 }

@@ -2,6 +2,7 @@
 #define GODOT_AUTOPILOT_HTTP_TRANSPORT_EXT_HPP
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 
@@ -9,6 +10,9 @@
 #include "core/http_transport.hpp"
 
 namespace godot_autopilot {
+
+constexpr const char *kConnectionIdHeader = "x-gda-connection-id";
+constexpr const char *kStreamIdHeader = "x-gda-stream-id";
 
 struct HttpPumpLimits {
   size_t max_accepts_per_frame{8};
@@ -26,6 +30,9 @@ inline const HttpPumpLimits &http_pump_limits() {
 HttpTransport &http_transport_instance();
 
 bool http_transport_is_listening();
+
+bool http_transport_bind(uint16_t port, const std::string &host,
+                         std::string &error);
 
 inline std::unordered_map<std::string, std::string>
 http_request_query_params(const HttpRequest &request) {
