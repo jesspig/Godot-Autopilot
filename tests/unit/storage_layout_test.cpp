@@ -1,3 +1,4 @@
+#include "core/project_store.hpp"
 #include "core/storage_paths.hpp"
 
 #include <gtest/gtest.h>
