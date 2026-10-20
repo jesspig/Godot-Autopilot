@@ -164,8 +164,9 @@ bool parse_body_object(const std::string &body, mcp::JsonValue &out,
     out = empty_object();
     return true;
   }
+  mcp::JsonValue parsed;
   try {
-    mcp::JsonValue parsed = mcp::JsonValue::Parse(trimmed);
+    parsed = mcp::JsonValue::Parse(trimmed);
   } catch (const std::exception &) {
     error = "the request body is not valid JSON";
     return false;
