@@ -1,5 +1,7 @@
 #include <cstdlib>
+#include <exception>
 #include <functional>
+#include <new>
 #include <string>
 #include <typeinfo>
 #include <utility>
@@ -14,10 +16,12 @@
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/godot.hpp>
+#include <godot_cpp/variant/string.hpp>
 
 #include "core/command_queue.hpp"
 #include "core/export_guard.hpp"
 #include "core/gda_home.hpp"
+#include "core/http_transport_ext.hpp"
 #include "core/log_persist.hpp"
 #include "core/log_system.hpp"
 #include "core/mode_detector.hpp"
@@ -332,6 +336,7 @@ void GodotAutopilotPlugin::_process(double delta) {
   godot_autopilot::perf_sampler::tick(delta);
   godot_autopilot::LogPersist::instance().flush_on_main_thread();
   s_queue.drain();
+  godot_autopilot::http_transport_instance().pump();
   if (log_dock) {
     log_dock->poll_new_entries();
   }
