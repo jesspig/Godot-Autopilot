@@ -12,7 +12,7 @@ resource: src/
 
 # 竞品对齐路线图
 
-> 记录 2026-08 功能分支 `feature/engine-aware-fs-and-tool-expansion` 的竞品对齐批次（P0/P1/P2 已交付）与后续 P3 方向，工具侧实现细节见 [工具注册表](../modules/tools_registry.md)，运行时协议见 [入口与运行时](../modules/entry_runtime.md)。**当前口径（2026-10-20）**：域工具 **451**（27 类 / 33 个源模块）、catalog 条目 459、MCP 可达 458、schema 基线 459 = 393 非空 + 66 空、遍历枚举 452 / 排除 111 / 候选 341、L1 **467** 个 gtest（44 个 unit 文件）、L2 **41** 份用例、守卫与脚本 6 项、**ctest 注册点 514**（467 + 41 + 6）、技能书 9 册 / 34 文件、根 `CMakeLists.txt` 的 `add_library` 收录 **93** 个 `.cpp`；各项的权威核算口径见 [测试体系](../tests.md) 的数值核算总表。下列各节的批次内计数是**该批次交付当时的增量**，不代表当前值。
+> 记录 2026-08 功能分支 `feature/engine-aware-fs-and-tool-expansion` 的竞品对齐批次（P0/P1/P2 已交付）与后续 P3 方向，工具侧实现细节见 [工具注册表](../modules/tools_registry.md)，运行时协议见 [入口与运行时](../modules/entry_runtime.md)。**当前口径（2026-10-21）**：域工具 **451**（27 类 / 33 个源模块）、catalog 条目 459、MCP 可达 458、schema 基线 459 = 393 非空 + 66 空、遍历枚举 452 / 排除 111 / 候选 341、L1 **675** 个 gtest（61 个 unit 文件）、L2 **41** 份用例、守卫与脚本 6 项、**ctest 注册点 722**（675 + 41 + 6，`ctest -N` 实测）、技能书 9 册 / 35 文件、根 `CMakeLists.txt` 的 `add_library` 收录 **113** 个 `.cpp`；各项的权威核算口径见 [测试体系](../tests.md) 的数值核算总表。下列各节的批次内计数是**该批次交付当时的增量**，不代表当前值。
 
 ## 竞品全景（一行定位速记）
 

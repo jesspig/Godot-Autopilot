@@ -139,7 +139,7 @@ L1 `dispatch_budget_test` 覆盖预算决策与队列不可用返回 **14 项**�
 | `unregister_tool(handle)` | 按 handle 移除，成功触发重建 |
 | `has_tool(name)` / `list_tools()` / `get_tool(name)` | 查询已注册工具（get_tool 含 name/description/category/tags/side_effect/params/handle） |
 | `call_tool(name, args)` | 直连 dispatch 调任意工具（自动回主线程） |
-| `is_enabled()` / `set_enabled(bool)` | 读写 `user_tools` capability（写 `user://godot_autopilot/config.json` 的 `allow` 字段） |
+| `is_enabled()` / `set_enabled(bool)` | 读写 `user_tools` capability（写集中根下的全局级 `config.json` 的 `allow` 字段） |
 
 - **definition 字段**：`name`（必填、非空）、`description`、`category`（默认 `User`）、`tags`、`side_effect`（注册方声明的**输入**字段：空串或省略即 `SideEffect::None`，其余取 `writes_file`/`writes_config`/`shows_alert`/`modifies_window`/`process`/`code_execute`/`game_runtime`；注意 `"none"` **不是**合法输入值，只读动态工具须留空）、`params`（`[{name, type, description, required}]`）。动态工具的 `side_effect` **回显**恒非空——只读工具回显 `"none"`（`autopilot_tools.cpp:613` 经 `side_effect_name`），输入侧的空串不会出现在回显里。
 - **存储与重建**：spec 存入 `dynamic_specs::store()`（`dynamic_spec_store.hpp`，互斥保护），`register_tool`/`unregister_tool` 成功后调 `refresh_dynamic_tools()` 重建 registry（动态 spec 带 `kDynamic` flag）；重名（已注册或与内置工具碰撞）拒绝注册。

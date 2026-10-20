@@ -14,7 +14,7 @@
 
 - **知识库与技能书同步**：新增 [REST 接口面](modules/api.md) 与 [端口与实例登记](modules/ports.md) 两页；更新 [核心模块](modules/core.md)、[工具注册表](modules/tools_registry.md)、[CLI 载体](modules/cli.md)（寻址链由六级改七级、新增 `gda api list|describe|call` 与 `gda endpoints`、state dir 迁到集中根）、[T0 安全边界与并发契约](security_contract.md)（新增 §3.5 REST 安全条款）、[测试体系](tests.md)（数值核算总表补录本次新增项）、[页面索引](index.md)、[构建体系](build.md)、[项目总览](overview.md) 与 [支撑模块](modules/support.md)；技能书新增 REST 接口参考（Python / JavaScript 两段最小示例、令牌获取方式、状态码对照），调用阶梯加入 REST 通道，并修正过时说法（超时与队列不可用「均可重试」、导出拒绝「无机器可读码」、副作用类清单缺 `destructive`、能力名四条改七条、旧路径 `user://godot_autopilot/...` 作为当前路径的表述）。
 
-- **当前口径（2026-10-21，权威核算见 [测试体系](tests.md) 数值核算总表）**：域工具 **451**（27 类 / 33 个源模块）、catalog **459** = 451 域 + `system_status` + 7 元、MCP 可达 **458** = 7 元 + 451 域、schema 基线 **459** = 393 非空 + 66 空、遍历枚举 452 / 排除 111 / 候选 341 / 步数上限 904、L1 **668** 个 gtest（59 个 unit 文件）、L2 **41** 份用例、守卫与脚本 **6** 项、ctest 注册点 **715**（推导值，最终以合并后 `ctest -N` 实测为准）、非 L2 口径 **674**、CLI TS 单测 **180**（11 个文件）、技能书 **9** 册 / 35 文件（9 `SKILL.md` + 26 references）、MCP skills 资源 **45**、`add_library` 收录 **111** 个 `.cpp`、REST 端点 **7** 条、REST 令牌 32 字节、请求体上限 4 MiB、授权 3 档 / 7 能力名、端口候选区间 20000–29999（探测上限 256）。
+- **当前口径（2026-10-21，权威核算见 [测试体系](tests.md) 数值核算总表）**：域工具 **451**（27 类 / 33 个源模块）、catalog **459** = 451 域 + `system_status` + 7 元、MCP 可达 **458** = 7 元 + 451 域、schema 基线 **459** = 393 非空 + 66 空、遍历枚举 452 / 排除 111 / 候选 341 / 步数上限 904、L1 **675** 个 gtest（61 个 unit 文件）、L2 **41** 份用例、守卫与脚本 **6** 项、ctest 注册点 **722**（`ctest -N` 实测：675 + 41 + 6）、非 L2 口径 **681**、CLI TS 单测 **180**（11 个文件）、技能书 **9** 册 / 35 文件（9 `SKILL.md` + 26 references）、MCP skills 资源 **45**、`add_library` 收录 **113** 个 `.cpp`、REST 端点 **8** 条、REST 令牌 32 字节、请求体上限 4 MiB、授权 3 档 / 7 能力名、端口候选区间 20000–29999（探测上限 256）。
 
 ## 2026-10-20
 
