@@ -127,6 +127,17 @@ inline ProjectPath normalize_project_path(const std::string &raw,
   return {scheme + "://" + clean, {}};
 }
 
+inline std::string current_project_root_path() {
+  auto *settings = godot::ProjectSettings::get_singleton();
+  if (!settings)
+    return std::string();
+  std::string root =
+      project_path_slashes(util::to_std(settings->globalize_path("res://")));
+  while (root.size() > 1 && root.back() == '/')
+    root.pop_back();
+  return root;
+}
+
 } // namespace util
 } // namespace godot_autopilot
 

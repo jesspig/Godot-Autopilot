@@ -75,8 +75,9 @@ TEST(LogPersistTest, CategoryNameCoversAllCategories) {
     EXPECT_EQ(LogPersist::category_name(static_cast<LogCategory>(42)), "unknown");
 }
 
-TEST(LogPersistTest, TraceDirUsesFixedUserPath) {
-    EXPECT_EQ(LogPersist::instance().trace_dir(), "user://godot_autopilot/traces");
+TEST(LogPersistTest, StorageDirsAreEmptyBeforeSessionInit) {
+    EXPECT_TRUE(LogPersist::instance().log_dir().empty());
+    EXPECT_TRUE(LogPersist::instance().trace_dir().empty());
 }
 
 TEST(LogPersistTest, NewAccessorsDefaultToZero) {

@@ -4,4 +4,5 @@
 # 由并行子任务分支「API 存储」独占维护：新增编译单元只登记到本文件，
 # 不改根 CMakeLists.txt，避免多分支归并冲突。
 # ====================================================================
-set(GDA_API_STORAGE_SOURCES)
+set(GDA_API_STORAGE_SOURCES
+    src/core/storage_paths.cpp)

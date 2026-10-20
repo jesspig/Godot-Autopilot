@@ -8,20 +8,18 @@
 
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/file_access.hpp>
-#include <godot_cpp/classes/project_settings.hpp>
 #include <version.hpp>
 
+#include "core/storage_paths.hpp"
 #include "log_system.hpp"
 #include "monitor.hpp"
 #include "sanitize_policy.hpp"
 #include "trace_recorder.hpp"
+#include "util/project_path.hpp"
 
 namespace godot_autopilot {
 
 namespace {
-
-const char *kLogDir = "user://godot_autopilot/logs";
-const char *kTraceDir = "user://godot_autopilot/traces";
 
 void append_persist_line(std::string &payload, const std::string &line) {
   payload += line;
@@ -187,31 +185,41 @@ void LogPersist::init_session() {
   std::string id = TraceRecorder::new_trace_id();
   std::string stamp =
       session_stamp_from_ticks(static_cast<uint64_t>(TraceRecorder::wall_now_ms()));
-  godot::DirAccess::make_dir_recursive_absolute(kLogDir);
-  godot::DirAccess::make_dir_recursive_absolute(kTraceDir);
-  const std::string trace_rel =
-      std::string(kTraceDir) + "/trace-" + stamp + ".jsonl";
-  std::string trace_os;
-  if (auto *settings = godot::ProjectSettings::get_singleton()) {
-    trace_os = std::string(
-        settings->globalize_path(godot::String::utf8(trace_rel.c_str()))
-            .utf8()
-            .get_data());
+  const std::string project_path = util::current_project_root_path();
+  const std::string log_dir_path = StoragePaths::log_dir(project_path);
+  const std::string trace_dir_path = StoragePaths::trace_dir(project_path);
+  if (log_dir_path.empty() || trace_dir_path.empty()) {
+    LogSystem::instance().log(
+        LogLevel::Error, LogCategory::System,
+        "GDA storage paths unavailable, log persistence disabled for this "
+        "session");
+  } else {
+    godot::DirAccess::make_dir_recursive_absolute(
+        godot::String::utf8(log_dir_path.c_str()));
+    godot::DirAccess::make_dir_recursive_absolute(
+        godot::String::utf8(trace_dir_path.c_str()));
   }
+  const std::string trace_path =
+      trace_dir_path.empty()
+          ? std::string()
+          : trace_dir_path + "/trace-" + stamp + ".jsonl";
   {
     std::lock_guard<std::mutex> lock(mutex_);
     session_id_ = id;
-    log_path_ = std::string(kLogDir) + "/gda-" + stamp + ".log";
-    trace_path_ = trace_rel;
-    trace_os_path_ = trace_os;
+    log_dir_ = log_dir_path;
+    trace_dir_ = trace_dir_path;
+    log_path_ = log_dir_path.empty()
+                    ? std::string()
+                    : log_dir_path + "/gda-" + stamp + ".log";
+    trace_path_ = trace_path;
     trace_now_failure_reported_ = false;
     write_failed_ = false;
     last_log_serial_ = 0;
     last_trace_seq_ = 0;
   }
-  if (trace_os.empty()) {
+  if (trace_path.empty()) {
     LogSystem::instance().log(LogLevel::Error, LogCategory::System,
-                              "trace os path unavailable, trace mirroring "
+                              "trace path unavailable, trace persistence "
                               "disabled for this session");
   }
   reported_dropped_logs_.store(dropped_log_lines_.load());
@@ -360,10 +368,10 @@ void LogPersist::flush_on_main_thread() {
 
 bool LogPersist::append_trace_payload(const std::string &payload) {
   std::lock_guard<std::mutex> lock(mutex_);
-  if (trace_os_path_.empty()) {
+  if (trace_path_.empty()) {
     return false;
   }
-  std::ofstream out(std::filesystem::u8path(trace_os_path_),
+  std::ofstream out(std::filesystem::u8path(trace_path_),
                     std::ios::app | std::ios::binary);
   if (!out.is_open()) {
     return false;
@@ -376,6 +384,7 @@ bool LogPersist::append_trace_payload(const std::string &payload) {
 
 void LogPersist::flush_trace_images() {
   std::vector<TraceImagePayload> images;
+  std::string trace_dir_path;
   {
     std::lock_guard<std::mutex> lock(mutex_);
     if (image_buffer_.empty()) {
@@ -383,8 +392,9 @@ void LogPersist::flush_trace_images() {
     }
     images.swap(image_buffer_);
     image_buffer_bytes_ = 0;
+    trace_dir_path = trace_dir_;
   }
-  const std::string dir = std::string(kTraceDir) + "/images";
+  const std::string dir = trace_dir_path + "/images";
   godot::DirAccess::make_dir_recursive_absolute(godot::String::utf8(dir.c_str()));
   for (const TraceImagePayload &image : images) {
     godot::Ref<godot::FileAccess> file = godot::FileAccess::open(
@@ -415,7 +425,7 @@ void LogPersist::write_trace_now(const std::string &line) {
     append_persist_line(payload, line);
     {
       std::lock_guard<std::mutex> lock(mutex_);
-      if (trace_os_path_.empty()) {
+      if (trace_path_.empty()) {
         return;
       }
     }
@@ -428,7 +438,7 @@ void LogPersist::write_trace_now(const std::string &line) {
     std::string path;
     {
       std::lock_guard<std::mutex> lock(mutex_);
-      path = trace_os_path_;
+      path = trace_path_;
       if (!trace_now_failure_reported_) {
         trace_now_failure_reported_ = true;
         report = true;
@@ -436,7 +446,7 @@ void LogPersist::write_trace_now(const std::string &line) {
     }
     if (report) {
       LogSystem::instance().log(LogLevel::Warning, LogCategory::System,
-                                "mirror trace write failed: " + path);
+                                "trace write failed: " + path);
     }
   } catch (...) {
   }
@@ -478,9 +488,11 @@ std::string LogPersist::store_trace_image(const std::string &span_id,
     return std::string();
   }
   std::string session;
+  std::string trace_dir_path;
   {
     std::lock_guard<std::mutex> lock(mutex_);
     session = session_id_;
+    trace_dir_path = trace_dir_;
   }
   const std::string decoded = TraceRecorder::decode_base64(base64_png);
   if (decoded.empty()) {
@@ -489,7 +501,7 @@ std::string LogPersist::store_trace_image(const std::string &span_id,
         "span=" + span_id + " kind=" + kind);
     return std::string();
   }
-  const std::string dir = std::string(kTraceDir) + "/images";
+  const std::string dir = trace_dir_path + "/images";
   const std::string name =
       "trace-" + session + "-" + span_id + "-" + kind + ".png";
   TraceImagePayload payload;
@@ -501,9 +513,18 @@ std::string LogPersist::store_trace_image(const std::string &span_id,
 }
 
 void LogPersist::rotate_on_init() {
-  prune_persist_dir(kLogDir, "gda-", ".log");
-  prune_persist_dir(kTraceDir, "trace-", ".jsonl");
-  prune_persist_dir(godot::String(kTraceDir) + "/images", "trace-", ".png");
+  std::string log_dir_path;
+  std::string trace_dir_path;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    log_dir_path = log_dir_;
+    trace_dir_path = trace_dir_;
+  }
+  prune_persist_dir(godot::String::utf8(log_dir_path.c_str()), "gda-", ".log");
+  prune_persist_dir(godot::String::utf8(trace_dir_path.c_str()), "trace-",
+                    ".jsonl");
+  prune_persist_dir(godot::String::utf8((trace_dir_path + "/images").c_str()),
+                    "trace-", ".png");
   const uint64_t pruned = pruned_files_.load(std::memory_order_relaxed);
   note_rotation();
   monitor::persist_health(
@@ -573,7 +594,15 @@ std::string LogPersist::trace_path() {
   return trace_path_;
 }
 
-std::string LogPersist::trace_dir() { return std::string(kTraceDir); }
+std::string LogPersist::log_dir() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return log_dir_;
+}
+
+std::string LogPersist::trace_dir() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return trace_dir_;
+}
 
 std::string LogPersist::health_summary() {
   return monitor::build_attrs(
