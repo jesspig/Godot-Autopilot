@@ -6,11 +6,13 @@ tags:
   - 模块
   - 领域工具
   - B组
-timestamp: "2026-10-20T04:01:51+08:00"
+timestamp: "2026-10-21T04:47:54+08:00"
 resource: src/tools/
 ---
 
 # 工具实现模块 B（调试/显示/OS/运行时/渲染/资源/执行）
+
+> 10-21 数值同步批次增补：遍历排除数/候选数改为引用 [../tests.md](../tests.md)「数值核算总表」的遍历各行（最近一次 L2 实测：枚举 452 / 排除 147 / 候选 305 / 实测 558 步 / `empty_args` warnings 基线 0）；OS 类的副作用工具数 **8→11**（补 `copy_file`/`ensure_directory`/`create_csharp_script`，按集成分支 `os_tools.hpp` 逐条统计）。
 
 > 09-18 CJK 传输链收敛批次增补（详见 `changelog/2026-09-18-log.md` 21:15 节）：`variant_json` 反序列化 10 处、`debugger_access` 广播/重载 2 处、`game_bridge_eval` 求值源码、`code_exec` 包装源码改 `String::utf8`；`runtime_ops` 错误整形透传游戏侧 `diagnosis`/`hint`（live 验证新发现，`method_not_found_on_node` 实测回传）。
 
@@ -110,7 +112,7 @@ resource: src/tools/
 - **职责**：`OS`/`Time` 单例直通：弹窗、进程创建与执行、环境变量、系统信息、文件回收站、shell 打开；10-11 新增 `file_dir_ops` 4 个项目内文件目录工具（handler 独立文件，声明仍挂 `os_tools.hpp`，归 OS 类）。
 - **代表工具**：`show_os_alert`、`create_os_process`、`execute_os_process`、`get_os_datetime`、`get_os_environment`、`get_os_locale`、`get_os_system_fonts`、`get_os_system_info`、`get_os_unique_id`、`get_os_unix_time`、`get_os_user_data_dir`、`kill_os_process`、`move_os_file_to_trash`、`set_os_environment`、`open_os_path`、`list_directory`、`get_file_info`、`copy_file`、`ensure_directory`（10-11 新增 4 个：目录列举/元信息/字节复制/幂等建目录）。
 - **关键事实**：
-  - **8 个副作用工具**（含 `write_file`，handler 在 text_ops 但归 OS 类）声明 `side_effect != "none"` + `kMutating`，遍历经 `get_tool_detail` 的 `side_effect` 判定自动排除（判据是「非空且非 `none`」，`traversal.cpp` 的 `kSideEffectNone`）——`show_os_alert` 弹系统模态框；`execute_os_process`/`create_os_process` 拉起进程；`kill_os_process` 杀进程；`open_os_path` 打开 URI；`move_os_file_to_trash` 删文件；`set_os_environment` 改环境；`write_file` 写磁盘。
+  - **11 个副作用工具**（注册在 `os_tools.hpp`、声明 `side_effect != "none"` + `kMutating`，遍历经 `get_tool_detail` 的 `side_effect` 判定自动排除，判据是「非空且非 `none`」，`traversal.cpp` 的 `kSideEffectNone`）——`show_os_alert` 弹系统模态框；`execute_os_process`/`create_os_process` 拉起进程；`kill_os_process` 杀进程；`open_os_path` 打开 URI；`move_os_file_to_trash` 删文件；`set_os_environment` 改环境；`write_file` 写磁盘（handler 在 text_ops 但归 OS 类）；`copy_file` 字节复制、`ensure_directory` 幂等建目录（handler 在 file_dir_ops）；`create_csharp_script` 写 C# 脚本文件（handler 在 text_ops）。
   - `execute_os_process` 可选 `output: true` 捕获 stdout/stderr（`OS::execute` 第四参 true，返回 exit_code + 拼接输出）。
   - 其余只读查询工具（datetime/环境/系统信息/时间/字体/唯一 ID 等）声明 `SideEffect::None` + `kNone`，遍历会冒烟。
 - **错误模式**：必填参数缺失 → error_json；单例缺失 → error_json；`kill_os_process`/`move_os_file_to_trash`/`open_os_path` 返回 Error 枚举数值。
@@ -332,7 +334,7 @@ resource: src/tools/
 
 ## 与 AGENTS.md 对照结果
 
-- **副作用/可变工具排除机制（10-16 实测 111 排除 / 341 候选）**：工具在 `ToolSpec` 声明 `side_effect`（`ISideEffect` 暴露）与 `kMutating`；L2 遍历（`tests/runner/traversal.cpp`）运行时经 `search_tools` 枚举 452 条后按 `get_tool_detail` 的 `side_effect`/`mutating`/`dynamic` 字段排除，候选与排除数以运行时报告为准（旧基线 71 排除 / 322 候选为 09-29 口径，已过时）。旧分布（09-29，B 36 + A 35）仅作历史参考：B 组 36——display_tools 15、os_tools 8、theme_tools 5、game_tools 7、tilemap_tools 1（`fill_tilemap_rect`，`None`+`kMutating`）；A 组 35——editor 10 / input_map 2 / config 2 / resource 5 / script 3 / input_click_ops 4 / scene 1（`build_nodes_from_spec`）/ scene_tree 8。10-11 批次静态可见的新增排除至少含 `gridmap` 5（全 `None`+`kMutating`）、`tween` 3（2 游戏侧 `GameRuntime` + `tween_editor_property` 的 `kMutating`，`get_game_tween_list` 只读不排除）、其余 bundle/批量工具多带 `kMutating`；精确数见 10-16 实测（111 排除 / 341 候选）。
+- **副作用/可变工具排除机制（运行时统计口径）**：工具在 `ToolSpec` 声明 `side_effect`（`ISideEffect` 暴露）与 `kMutating`；L2 遍历（`tests/runner/traversal.cpp`）运行时经 `search_tools` 枚举 452 条后按 `get_tool_detail` 的 `side_effect`/`mutating`/`dynamic` 字段排除，候选与排除数以运行时报告为准，当前值见 [../tests.md](../tests.md)「数值核算总表」的遍历各行（本页不复制数值）。旧分布（09-29，B 36 + A 35）仅作历史参考：B 组 36——display_tools 15、os_tools 8、theme_tools 5、game_tools 7、tilemap_tools 1（`fill_tilemap_rect`，`None`+`kMutating`）；A 组 35——editor 10 / input_map 2 / config 2 / resource 5 / script 3 / input_click_ops 4 / scene 1（`build_nodes_from_spec`）/ scene_tree 8。10-11 批次静态可见的新增排除至少含 `gridmap` 5（全 `None`+`kMutating`）、`tween` 3（2 游戏侧 `GameRuntime` + `tween_editor_property` 的 `kMutating`，`get_game_tween_list` 只读不排除）、其余 bundle/批量工具多带 `kMutating`；精确数取运行时 `03_tools_contract` 报告。
 - **不一致点**：
   1. AGENTS.md「添加工具需在 `<category>_ops.hpp` 声明」与实现不符：`environment_ops.cpp`（7 工具）、`display_window_ops.cpp`（10 工具）无独立 hpp，handler 声明分别复用 `render_ops.hpp`、`display_ops.hpp`；工具类声明则统一落在对应 `<域>_tools.hpp`（`render_tools.hpp`/`display_tools.hpp`）。另 `runtime_game_ops.cpp`（工具 19 个在 `game_tools.hpp`）与 `file_dir_ops.cpp`（工具 4 个挂 `os_tools.hpp`）的 handler 声明分别在 `runtime_ops.hpp` 与 `file_dir_ops.hpp`。
   2. `debugger_ops` 的 `get_debugger_*` 5 工具、`get_plugin_log` 与 `log_ops` 的 `get_game_log_entries` 覆盖四条不同日志来源（编辑器引擎日志 / 调试会话捕获 / 插件进程内 LogSystem / 游戏磁盘日志），AGENTS.md 未区分。

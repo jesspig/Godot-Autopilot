@@ -4,7 +4,9 @@
 
 ## 2026-10-21
 
-- **开放接口面落地**：插件在同一监听端口上新增 REST 风格的 `/api` 端点集（7 条：服务清单、工具清单、工具详情、工具调用、批量、健康探针、OpenAPI），与既有 `/mcp` 并列。除健康探针外均需 Bearer 令牌（32 字节随机值的十六进制，来源优先 `GODOT_AUTOPILOT_API_TOKEN`）；错误信封归一为 `error` + `code`，状态码由码决定（401/400/404/403/503/504/500，其余 422）。**超时标记已取消且不可重试**（`main_thread_timeout` 的 `retryable` 由 true 改为 false），队列不可用仍返回 `queue_unavailable`。契约见 [REST 接口面](modules/api.md)。
+- **知识库数值同步（遍历基线）**：按最近一次 L2 实测（主代理在集成分支 `feature/api-surface` 上运行 `03_tools_contract`）更正 [测试体系](tests.md) 的遍历基线口径——枚举 452（不变）/ 排除 **111→147** / 候选 **341→305** / 实测步数 **625→558** / `empty_args` warnings 基线 **4→0**（该批次基线常量已同步至 `tests/runner/traversal.cpp:22-25`）；「排除工具清单」按 `side_effect` 分布重算（新增 `destructive` 类 1 项，`writes_file` 21→25、`writes_config` 10→18、`modifies_window` 20→43）；数值总表仍是全库唯一权威落点，其它页（工具注册表 / 工具域页 / 路线图 / 本摘要）改为引用不再复制口径。
+
+- **开放接口面落地**：插件在同一监听端口上新增 REST 风格的 `/api` 端点集（**8 条**：服务清单 `GET /api`、工具清单 `GET /api/tools`、工具详情 `GET /api/tools/{tool}`、工具调用 `POST /api/tools/{tool}`、批量 `POST /api/batch`、健康探针 `GET /api/health`、发现端点 `GET /api/endpoints`、OpenAPI `GET /api/openapi.json`），与既有 `/mcp` 并列。除健康探针外均需 Bearer 令牌（32 字节随机值的十六进制，来源优先 `GODOT_AUTOPILOT_API_TOKEN`）；错误信封归一为 `error` + `code`，状态码由码决定（401/400/404/403/503/504/500，其余 422）。**超时标记已取消且不可重试**（`main_thread_timeout` 的 `retryable` 由 true 改为 false），队列不可用仍返回 `queue_unavailable`。契约见 [REST 接口面](modules/api.md)。
 
 - **存储布局迁移 + 端口模型**：插件数据从 `user://godot_autopilot/` 迁到**家目录集中根** `~/.godot-autopilot/`（根下放全局配置与全局实例索引，工程级数据按工程隔离）；根目录四级解析（显式覆写 → 平台环境变量 → 派生兜底 → 结果校验）；旧数据**不自动搬迁**，配置项缺键时回退读旧路径并注明来源，控制面板提供**复制式**导入。端口解析改为「环境变量 → 工程级配置偏好 → 自动分配」，自动候选先试 9527、其后从 `20000 + (pid mod 10000)` 起顺延到 29999 并回绕，**显式指定端口绑定失败不自动更换**；实例登记落集中根并汇总出全局索引，CLI 寻址链改为七级。口径见 [端口与实例登记](modules/ports.md) 与 [核心模块](modules/core.md)。
 
@@ -14,7 +16,7 @@
 
 - **知识库与技能书同步**：新增 [REST 接口面](modules/api.md) 与 [端口与实例登记](modules/ports.md) 两页；更新 [核心模块](modules/core.md)、[工具注册表](modules/tools_registry.md)、[CLI 载体](modules/cli.md)（寻址链由六级改七级、新增 `gda api list|describe|call` 与 `gda endpoints`、state dir 迁到集中根）、[T0 安全边界与并发契约](security_contract.md)（新增 §3.5 REST 安全条款）、[测试体系](tests.md)（数值核算总表补录本次新增项）、[页面索引](index.md)、[构建体系](build.md)、[项目总览](overview.md) 与 [支撑模块](modules/support.md)；技能书新增 REST 接口参考（Python / JavaScript 两段最小示例、令牌获取方式、状态码对照），调用阶梯加入 REST 通道，并修正过时说法（超时与队列不可用「均可重试」、导出拒绝「无机器可读码」、副作用类清单缺 `destructive`、能力名四条改七条、旧路径 `user://godot_autopilot/...` 作为当前路径的表述）。
 
-- **当前口径（2026-10-21，权威核算见 [测试体系](tests.md) 数值核算总表）**：域工具 **451**（27 类 / 33 个源模块）、catalog **459** = 451 域 + `system_status` + 7 元、MCP 可达 **458** = 7 元 + 451 域、schema 基线 **459** = 393 非空 + 66 空、遍历枚举 452 / 排除 111 / 候选 341 / 步数上限 904、L1 **675** 个 gtest（61 个 unit 文件）、L2 **41** 份用例、守卫与脚本 **6** 项、ctest 注册点 **722**（`ctest -N` 实测：675 + 41 + 6）、非 L2 口径 **681**、CLI TS 单测 **180**（11 个文件）、技能书 **9** 册 / 35 文件（9 `SKILL.md` + 26 references）、MCP skills 资源 **45**、`add_library` 收录 **113** 个 `.cpp`、REST 端点 **8** 条、REST 令牌 32 字节、请求体上限 4 MiB、授权 3 档 / 7 能力名、端口候选区间 20000–29999（探测上限 256）。
+- **当前口径（2026-10-21，权威核算见 [测试体系](tests.md) 数值核算总表）**：域工具 **451**（27 类 / 33 个源模块）、catalog **459** = 451 域 + `system_status` + 7 元、MCP 可达 **458** = 7 元 + 451 域、schema 基线 **459** = 393 非空 + 66 空、遍历枚举 452 / 排除 **147** / 候选 **305** / 步数上限 904（`03_tools_contract` 实测 **558** 步、warnings 基线 **0**，最近一次 L2 实测）、L1 **675** 个 gtest（61 个 unit 文件）、L2 **41** 份用例、守卫与脚本 **6** 项、ctest 注册点 **722**（`ctest -N` 实测：675 + 41 + 6）、非 L2 口径 **681**、CLI TS 单测 **180**（11 个文件）、技能书 **9** 册 / 35 文件（9 `SKILL.md` + 26 references）、MCP skills 资源 **45**、`add_library` 收录 **113** 个 `.cpp`、REST 端点 **8** 条、REST 令牌 32 字节、请求体上限 4 MiB、授权 3 档 / 7 能力名、端口候选区间 20000–29999（探测上限 256）。
 
 ## 2026-10-20
 
