@@ -62,7 +62,10 @@ def _deploy(preset: str, demos: list[Path] | None = None) -> None:
         addon_dir.mkdir(parents=True, exist_ok=True)
         # Remove any Godot hot-reload backup DLLs from previous runs to avoid loading errors
         for f in addon_dir.glob("~*"):
-            f.unlink(missing_ok=True)
+            try:
+                f.unlink(missing_ok=True)
+            except OSError as exc:
+                print(f"  [WARN] skip locked temp file {f.name}: {exc}", flush=True)
         _generate_gdextension(addon_dir)
         lib_src = binary_dir / lib_name
         if lib_src.exists():
