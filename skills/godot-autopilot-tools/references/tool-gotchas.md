@@ -180,14 +180,15 @@ code, not on the message.
 | exec_timeout | a `code_execute` script outran its `timeout_ms` | no | The script was interrupted and the work it already did is not rolled back - read the state back before retrying. Split the script into smaller pieces, or raise `timeout_ms` (up to the maximum the `code_execute` schema reports). |
 | eval_timeout | a game-side `eval` script outlived the host wait (25000 ms), or the editor gave up waiting for the eval answer | not immediately | The game main thread may still be running that script - a running GDScript call cannot be interrupted. Wait for the game to become responsive (`get_game_status`) before sending more work, then retry. |
 | eval_cancelled | the eval request was torn down by a cancel handle | no | The request is gone and no answer will arrive. Re-issue it if the result is still needed. |
-| main_thread_timeout | the editor main thread did not process the tool inside its dispatch budget | yes | The editor may be paused, blocked by a modal dialog, exporting or busy. Clear the blocker, then retry the same call. |
+| main_thread_timeout | the editor main thread did not process the tool inside its dispatch budget | no | The editor may be paused, blocked by a modal dialog, exporting or busy. The call was cancelled, but the work may still run in the editor afterwards - clear the blocker, read the state back, then decide whether to repeat the call. |
 | queue_unavailable | the editor main-thread queue was full or already closed | yes, later | The editor is shutting down or overloaded. Wait and retry; if it keeps failing, the editor is going down. |
 
 The two eval codes arrive nested under a structured_error object inside the
 tool payload; the other three come back as the top-level result of the call.
-The dispatch codes carry `retryable` set to true and the exec code carries it
-false; the eval codes carry no flag at all, so treat a missing flag as "do not
-retry immediately".
+The dispatch codes carry a `retryable` flag: it is false for main_thread_timeout
+and true for queue_unavailable, while exec_timeout also carries it false and
+the eval codes carry no flag at all, so treat a missing flag as "do not retry
+immediately".
 
 ## After a game timeout: engine continue and late results
 
@@ -298,18 +299,27 @@ Two editor states block otherwise valid calls. Both have a defined recovery:
 
 ## code_execute traps
 
-Before the traps: both `code_execute` and `execute_script` are denied by
-default behind the `code_execute` authorization gate, and the game runtime
-tools (`execute_game_script`, `queue_game_input`, `wait_game_input`,
-`sequence_game_inputs`, `reload_game_scripts`) behind `game_runtime`. A denied
-call returns an error carrying authorization_required plus an `enable` field
-(and writes a warning to the plugin log); enable a capability by setting
-`GODOT_AUTOPILOT_ALLOW` to it (or to `all`) and restarting the engine, or -
-for `code_execute` and `game_runtime` - by ticking "Allow code_execute" or
-"Allow game_runtime" in the plugin's MCP Config dock, which takes effect on
-the next call without a restart. The process gate keeps no dock toggle: it
-needs the environment variable and a restart. When the environment variable
-is set it wins over the config.
+Before the traps: the capability gate now has three tiers. Read-only tools
+(class `none`) are allowed by default. Write tools - `writes_file`,
+`writes_config`, `shows_alert`, `modifies_window` - are denied by default and
+need the `write` capability, so a client that used to save a file or set a
+project setting without any allow-list entry now gets an authorization error
+unless `write` (or `all`) is allowed. Danger tools are denied by default and
+need their own capability: `code_execute` covers `code_execute` and
+`execute_script`, `game_runtime` covers the game runtime tools
+(`execute_game_script`, `queue_game_input`, `wait_game_input`,
+`sequence_game_inputs`, `reload_game_scripts`), `process` covers the process
+and environment tools, and `destructive` covers operations that destroy
+something that already exists. `user_tools` is a separate capability guarding
+user-registered dynamic tools. A denied call returns an error carrying
+authorization_required plus an `enable` field (and writes a warning to the
+plugin log); enable a capability by setting `GODOT_AUTOPILOT_ALLOW` to it (or
+to `all`) and restarting the engine, or - for `code_execute`, `game_runtime`
+and `user_tools` - by ticking "Allow code_execute", "Allow game_runtime" or
+"Allow user tools" in the plugin's MCP Config dock, which takes effect on the
+next call without a restart. The `write`, `process` and `destructive` gates keep
+no dock toggle: they need the environment variable and a restart. When the
+environment variable is set it wins over the config.
 
 `batch_execute` sits behind the same `code_execute` gate as `code_execute`
 itself, even when the batch only calls ordinary domain tools. A client that

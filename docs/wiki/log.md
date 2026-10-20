@@ -1,6 +1,20 @@
 # 维护日志摘要
 
-> 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天（按有变更的日期段计，最新一段 2026-10-20，窗口 10-14 – 10-20；更早的批次留档在 changelog 目录，如 [2026-10-10-log.md](changelog/2026-10-10-log.md)）。
+> 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天（按有变更的日期段计，最新一段 2026-10-21，窗口 10-16 – 10-21；更早的批次留档在 changelog 目录，如 [2026-10-10-log.md](changelog/2026-10-10-log.md)）。
+
+## 2026-10-21
+
+- **开放接口面落地**：插件在同一监听端口上新增 REST 风格的 `/api` 端点集（7 条：服务清单、工具清单、工具详情、工具调用、批量、健康探针、OpenAPI），与既有 `/mcp` 并列。除健康探针外均需 Bearer 令牌（32 字节随机值的十六进制，来源优先 `GODOT_AUTOPILOT_API_TOKEN`）；错误信封归一为 `error` + `code`，状态码由码决定（401/400/404/403/503/504/500，其余 422）。**超时标记已取消且不可重试**（`main_thread_timeout` 的 `retryable` 由 true 改为 false），队列不可用仍返回 `queue_unavailable`。契约见 [REST 接口面](modules/api.md)。
+
+- **存储布局迁移 + 端口模型**：插件数据从 `user://godot_autopilot/` 迁到**家目录集中根** `~/.godot-autopilot/`（根下放全局配置与全局实例索引，工程级数据按工程隔离）；根目录四级解析（显式覆写 → 平台环境变量 → 派生兜底 → 结果校验）；旧数据**不自动搬迁**，配置项缺键时回退读旧路径并注明来源，控制面板提供**复制式**导入。端口解析改为「环境变量 → 工程级配置偏好 → 自动分配」，自动候选先试 9527、其后从 `20000 + (pid mod 10000)` 起顺延到 29999 并回绕，**显式指定端口绑定失败不自动更换**；实例登记落集中根并汇总出全局索引，CLI 寻址链改为七级。口径见 [端口与实例登记](modules/ports.md) 与 [核心模块](modules/core.md)。
+
+- **授权三档（对外行为变更）**：读类（`none`）默认放行；**写类（`writes_file`/`writes_config`/`shows_alert`/`modifies_window`）默认拒绝**，需允许列表含 `write`；危险类（`process`/`code_execute`/`game_runtime`/`destructive`）默认拒绝且需显式开启。能力名由四条扩为七条，新增 `destructive` 副作用类。既有客户端若不做适配，调用写类工具会收到 403 `authorization_required`。契约见 [T0 安全边界与并发契约](security_contract.md) §3.1 / §3.5。
+
+- **已知缺口（如实记录）**：统一执行入口 `tools::execute_tool_chain`（导出拦截 → 工具存在 → 参数校验 → 授权 → 派发 → 信封）已实现并由 L1 覆盖，但 `api_surface` 的执行器槽位在生产路径上无注册点、MCP `call_tool` 走 `execute_tool_core` 直派，故该链**尚未接入生产请求路径**——REST 面的导出期拒绝与参数校验当前不生效，授权门两套面都生效。
+
+- **知识库与技能书同步**：新增 [REST 接口面](modules/api.md) 与 [端口与实例登记](modules/ports.md) 两页；更新 [核心模块](modules/core.md)、[工具注册表](modules/tools_registry.md)、[CLI 载体](modules/cli.md)（寻址链由六级改七级、新增 `gda api list|describe|call` 与 `gda endpoints`、state dir 迁到集中根）、[T0 安全边界与并发契约](security_contract.md)（新增 §3.5 REST 安全条款）、[测试体系](tests.md)（数值核算总表补录本次新增项）、[页面索引](index.md)、[构建体系](build.md)、[项目总览](overview.md) 与 [支撑模块](modules/support.md)；技能书新增 REST 接口参考（Python / JavaScript 两段最小示例、令牌获取方式、状态码对照），调用阶梯加入 REST 通道，并修正过时说法（超时与队列不可用「均可重试」、导出拒绝「无机器可读码」、副作用类清单缺 `destructive`、能力名四条改七条、旧路径 `user://godot_autopilot/...` 作为当前路径的表述）。
+
+- **当前口径（2026-10-21，权威核算见 [测试体系](tests.md) 数值核算总表）**：域工具 **451**（27 类 / 33 个源模块）、catalog **459** = 451 域 + `system_status` + 7 元、MCP 可达 **458** = 7 元 + 451 域、schema 基线 **459** = 393 非空 + 66 空、遍历枚举 452 / 排除 111 / 候选 341 / 步数上限 904、L1 **668** 个 gtest（59 个 unit 文件）、L2 **41** 份用例、守卫与脚本 **6** 项、ctest 注册点 **715**（推导值，最终以合并后 `ctest -N` 实测为准）、非 L2 口径 **674**、CLI TS 单测 **180**（11 个文件）、技能书 **9** 册 / 35 文件（9 `SKILL.md` + 26 references）、MCP skills 资源 **45**、`add_library` 收录 **111** 个 `.cpp`、REST 端点 **7** 条、REST 令牌 32 字节、请求体上限 4 MiB、授权 3 档 / 7 能力名、端口候选区间 20000–29999（探测上限 256）。
 
 ## 2026-10-20
 
