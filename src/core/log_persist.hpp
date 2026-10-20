@@ -45,6 +45,7 @@ public:
   std::string session_id();
   std::string log_path();
   std::string trace_path();
+  std::string log_dir();
   std::string trace_dir();
   std::string health_summary();
 
@@ -83,9 +84,10 @@ private:
   std::vector<TraceImagePayload> image_buffer_;
   uint64_t image_buffer_bytes_ = 0;
   std::string session_id_;
+  std::string log_dir_;
+  std::string trace_dir_;
   std::string log_path_;
   std::string trace_path_;
-  std::string trace_os_path_;
   std::size_t last_log_serial_ = 0;
   uint64_t last_trace_seq_ = 0;
   bool write_failed_ = false;
