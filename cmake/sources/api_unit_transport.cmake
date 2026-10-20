@@ -11,7 +11,7 @@ set(GDA_UNIT_TRANSPORT_SOURCES
     ${CMAKE_SOURCE_DIR}/src/core/godot_transport.cpp
     ${CMAKE_SOURCE_DIR}/src/core/mcp_http_shim.cpp
     ${CMAKE_SOURCE_DIR}/src/core/api_surface.cpp
-    ${CMAKE_SOURCE_DIR}/src/core/api_server.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/api_server_routes.cpp
     ${CMAKE_SOURCE_DIR}/src/core/api_auth.cpp
     ${CMAKE_SOURCE_DIR}/src/core/api_token.cpp
     ${CMAKE_SOURCE_DIR}/tests/unit/http_transport_test.cpp
