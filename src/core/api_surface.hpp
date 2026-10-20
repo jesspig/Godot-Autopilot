@@ -66,6 +66,7 @@ enum class RouteKind {
   kBatch,
   kHealth,
   kOpenApi,
+  kEndpoints,
   kNotFound,
   kMethodNotAllowed,
 };

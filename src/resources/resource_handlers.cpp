@@ -1,4 +1,5 @@
 #include "resources/resource_handlers.hpp"
+#include "core/api_endpoints.hpp"
 #include "core/config.hpp"
 #include "core/export_guard.hpp"
 #include "core/log_system.hpp"
@@ -356,6 +357,25 @@ void register_all_resources(mcp::McpServer &server, CommandQueue &queue) {
           monitor::error_event(result.error_code, "resource", uri);
         }
         return make_json_result(uri, result.json_str);
+      });
+
+  server.RegisterResource(
+      "endpoints", "godot://endpoints",
+      mcp::ResourceOptions{}
+          .Description("Endpoint table: instance identity, version, process "
+                       "id, project path and the MCP/REST endpoints")
+          .MimeType("application/json"),
+      [](const std::string &uri) -> mcp::ReadResourceResult {
+        if (godot_autopilot::ExportGuard::is_exporting()) {
+          return export_blocked_resource_result(uri);
+        }
+        const std::string payload = api_endpoints::endpoint_document_json();
+        monitor::data_flow(
+            "resource_read", static_cast<int64_t>(payload.size()),
+            monitor::build_attrs(
+                {{"uri", uri},
+                 {"request_id", monitor::current_request_id()}}));
+        return make_json_result(uri, payload);
       });
 
   server.RegisterResource(

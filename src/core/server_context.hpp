@@ -28,6 +28,7 @@ public:
   bool start();
   void stop();
   bool restart(uint16_t port);
+  bool restart(const PortAssignment &assignment);
 
   int get_port() const;
   const std::string &get_host() const;
@@ -59,6 +60,7 @@ private:
   bool bind_transport();
   void write_instance_record();
   void remove_instance_record();
+  void register_endpoint_info_provider();
   static int resolve_explicit_port();
   static int resolve_preferred_port();
   static std::string resolve_host();
