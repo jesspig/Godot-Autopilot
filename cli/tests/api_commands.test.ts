@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -15,15 +14,11 @@ import {
   readPluginInstanceIndex,
 } from "../src/instances";
 import { probeEndpoint } from "../src/probe";
-import { isAlive, stopForce } from "../src/process";
-import { saveRegistry } from "../src/registry";
+import { findById, findLiveByProject, saveRegistry } from "../src/registry";
 import { resolveTarget, type TargetContext } from "../src/target";
 
 const servers: Bun.Server[] = [];
-const TARGET_CONTEXT: TargetContext = {
-  findById: () => undefined,
-  findLiveByProject: () => undefined,
-};
+const TARGET_CONTEXT: TargetContext = { findById, findLiveByProject };
 
 let work: string;
 let prevHome: string | undefined;
@@ -38,7 +33,7 @@ beforeEach(() => {
   prevUserData = process.env.GODOT_AUTOPILOT_USERDATA;
   prevPort = process.env.GODOT_AUTOPILOT_PORT;
   process.env.GODOT_AUTOPILOT_HOME = work;
-  delete process.env.GODOT_AUTOPILOT_CLI_HOME;
+  process.env.GODOT_AUTOPILOT_CLI_HOME = path.join(work, "cli");
   process.env.GODOT_AUTOPILOT_USERDATA = path.join(work, "userdata");
   delete process.env.GODOT_AUTOPILOT_PORT;
 });
@@ -93,26 +88,6 @@ function pluginRecord(overrides: Record<string, unknown> = {}): Record<string, u
     version: "0.0.0",
     ...overrides,
   };
-}
-
-function spawnLongRunner(): number {
-  const child = spawn(process.execPath, ["-e", "setTimeout(()=>{},20000)"], { stdio: "ignore" });
-  return child.pid!;
-}
-
-async function waitForDead(pid: number, timeoutMs = 12000): Promise<void> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    if (!isAlive(pid)) return;
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error(`process ${pid} still alive after ${timeoutMs}ms`);
-}
-
-async function killRunner(pid: number): Promise<void> {
-  if (!isAlive(pid)) return;
-  stopForce(pid);
-  await waitForDead(pid);
 }
 
 interface CapturedRequest {
@@ -280,32 +255,27 @@ describe("发现链", () => {
     expect(t.chain).toBe("env");
   });
 
-  test("CLI 本地注册表命中活跃条目", async () => {
-    const pid = spawnLongRunner();
-    try {
-      saveRegistry({
-        version: 1,
-        instances: [
-          {
-            id: "p1",
-            project: process.cwd(),
-            port: 9622,
-            pid,
-            startedAt: "2026-10-20T00:00:00.000Z",
-            headless: false,
-            godot: "godot",
-            log: "x.log",
-          },
-        ],
-      });
-      const t = resolveTarget({}, TARGET_CONTEXT);
-      expect(t.port).toBe(9622);
-      expect(t.source).toBe("cwd");
-      expect(t.chain).toBe("cli-registry");
-    } finally {
-      await killRunner(pid);
-    }
-  }, 30000);
+  test("CLI 本地注册表命中活跃条目", () => {
+    saveRegistry({
+      version: 1,
+      instances: [
+        {
+          id: "p1",
+          project: process.cwd(),
+          port: 9622,
+          pid: process.pid,
+          startedAt: "2026-10-20T00:00:00.000Z",
+          headless: false,
+          godot: "godot",
+          log: "x.log",
+        },
+      ],
+    });
+    const t = resolveTarget({}, TARGET_CONTEXT);
+    expect(t.port).toBe(9622);
+    expect(t.source).toBe("cwd");
+    expect(t.chain).toBe("cli-registry");
+  });
 
   test("插件全局实例索引命中工程路径", () => {
     writeIndex({ instances: [pluginRecord({ port: 9633 })] });

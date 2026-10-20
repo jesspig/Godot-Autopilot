@@ -162,8 +162,9 @@ export function resolveTarget(opts: TargetSelector, ctx: TargetContext): Resolve
     if (port !== null) return { port, source: "env", chain: "env" };
   }
 
-  const scoped = opts.project !== undefined;
-  const projectPath = scoped ? normalizePath(opts.project) : process.cwd();
+  const projectOption = opts.project;
+  const scoped = projectOption !== undefined;
+  const projectPath = scoped ? normalizePath(projectOption) : process.cwd();
 
   const entry = ctx.findLiveByProject(projectPath);
   if (entry !== undefined) {
