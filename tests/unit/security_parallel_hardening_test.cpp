@@ -172,16 +172,20 @@ TEST(SecurityHardening, CapabilityForToolMapping) {
   EXPECT_STREQ(authorization::capability_for_tool("code_execute", SideEffect::CodeExecute), "code_execute");
   EXPECT_STREQ(authorization::capability_for_tool("execute_script", SideEffect::CodeExecute), "code_execute");
   EXPECT_STREQ(authorization::capability_for_tool("execute_game_script", SideEffect::GameRuntime), "game_runtime");
-  EXPECT_EQ(authorization::capability_for_tool("code_execute", SideEffect::None), nullptr);
-  EXPECT_EQ(authorization::capability_for_tool("execute_script", SideEffect::None), nullptr);
-  EXPECT_EQ(authorization::capability_for_tool("execute_game_script", SideEffect::None), nullptr);
-  EXPECT_EQ(authorization::capability_for_tool("get_game_status", SideEffect::None), nullptr);
+  EXPECT_STREQ(authorization::capability_for_tool("code_execute", SideEffect::None), "read");
+  EXPECT_STREQ(authorization::capability_for_tool("execute_script", SideEffect::None), "read");
+  EXPECT_STREQ(authorization::capability_for_tool("execute_game_script", SideEffect::None), "read");
+  EXPECT_STREQ(authorization::capability_for_tool("get_game_status", SideEffect::None), "read");
+  EXPECT_STREQ(authorization::capability_for_tool("save_resource", SideEffect::WritesFile), "write");
+  EXPECT_STREQ(authorization::capability_for_tool("save_project_settings", SideEffect::WritesConfig), "write");
+  EXPECT_STREQ(authorization::capability_for_tool("show_display_dialog", SideEffect::ShowsAlert), "write");
+  EXPECT_STREQ(authorization::capability_for_tool("warp_display_mouse", SideEffect::ModifiesWindow), "write");
 }
 
 TEST(SecurityHardening, AllowListRemoveExpandsAll) {
   using godot_autopilot::authorization::allow_list_remove;
   EXPECT_EQ(allow_list_remove("all", "code_execute"),
-            "process,game_runtime,user_tools");
+            "process,game_runtime,user_tools,read,write");
   EXPECT_EQ(allow_list_remove("process,code_execute", "code_execute"),
             "process");
   EXPECT_EQ(allow_list_remove("process", "game_runtime"), "process");

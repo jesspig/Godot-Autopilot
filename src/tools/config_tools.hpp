@@ -89,7 +89,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "set_project_settings",
       "Set a project setting in memory. Note: the change is NOT written to project.godot automatically, so call save_project_settings afterwards or the setting is lost when the editor closes. value is a serialized JSON value; the engine keeps the existing type when known. Differs from set_editor_settings, which persists automatically. Returns ok.",
-      "Config", {"config", "project", "settings", "set"}, SideEffect::None, tool_flags::kNone,
+      "Config", {"config", "project", "settings", "set"}, SideEffect::WritesConfig, tool_flags::kMutating,
       kSetProjectSettingsParams, config_ops::handle_project_settings_set}));
   v.push_back(make_spec_tool(ToolSpec{
       "has_project_settings",
@@ -119,7 +119,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "set_engine_time_scale",
       "Set the global time scale multiplier for the game loop: 1.0 is real time, 0.5 halves the speed, 2.0 doubles it. The scale affects both process and physics timing; values below 1.0 create slow-motion effects, and 0.0 stops gameplay processing. Returns ok; read the current value with get_engine_time_scale.",
-      "Config", {"config", "engine", "time", "scale", "set"}, SideEffect::None, tool_flags::kNone,
+      "Config", {"config", "engine", "time", "scale", "set"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kSetEngineTimeScaleParams, config_ops::handle_engine_set_time_scale}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_engine_time_scale",
@@ -129,7 +129,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "set_engine_max_fps",
       "Cap the engine's frame rate at fps frames per second; 0 disables the cap entirely and lets the engine run uncapped. This sets an upper limit only, it does not measure the actual rate, use get_engine_fps for that. Returns ok.",
-      "Config", {"config", "engine", "fps", "max"}, SideEffect::None, tool_flags::kNone,
+      "Config", {"config", "engine", "fps", "max"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kSetEngineMaxFpsParams, config_ops::handle_engine_set_max_fps}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_editor_settings",

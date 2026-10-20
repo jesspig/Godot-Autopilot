@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include <core/api_envelope.hpp>
 #include <tools/dispatch.hpp>
 #include <tools/register_all.hpp>
 #include <tools/tool_base.hpp>
@@ -35,6 +36,20 @@ std::shared_ptr<ToolBase> find_registered_tool(const std::string &name) {
     return nullptr;
   }
   return registry->find_any(name);
+}
+
+mcp::JsonValue default_authorization_policy(const std::string &name) {
+  std::shared_ptr<ToolBase> tool = find_registered_tool(name);
+  if (!tool) {
+    return mcp::JsonValue();
+  }
+  return authorization::deny_if_unauthorized(name, side_effect_of(*tool));
+}
+
+mcp::JsonValue default_envelope_builder(const std::string &name,
+                                        const mcp::JsonValue &result) {
+  ApiEnvelope envelope;
+  return envelope.build(result, name);
 }
 
 } // namespace
@@ -71,6 +86,22 @@ struct ToolExecutorRegistration {
 };
 
 const ToolExecutorRegistration g_tool_executor_registration;
+
+struct AuthorizationPolicyRegistration {
+  AuthorizationPolicyRegistration() {
+    register_authorization_policy(&default_authorization_policy);
+  }
+};
+
+const AuthorizationPolicyRegistration g_authorization_policy_registration;
+
+struct EnvelopeBuilderRegistration {
+  EnvelopeBuilderRegistration() {
+    register_envelope_builder(&default_envelope_builder);
+  }
+};
+
+const EnvelopeBuilderRegistration g_envelope_builder_registration;
 
 } // namespace
 

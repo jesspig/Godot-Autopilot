@@ -72,15 +72,38 @@ std::string read_env_file_key(const std::string &key) {
   return "";
 }
 
+bool allow_list_has(const std::string &allow, const std::string &capability) {
+  size_t begin = 0;
+  while (begin <= allow.size()) {
+    const size_t end = allow.find(',', begin);
+    const std::string entry =
+        allow.substr(begin, end == std::string::npos ? std::string::npos
+                                                      : end - begin);
+    if (entry == capability || entry == "all")
+      return true;
+    if (end == std::string::npos)
+      break;
+    begin = end + 1;
+  }
+  return false;
+}
+
 std::string resolve_allow_list() {
+  std::string allow;
   if (const char *env = std::getenv("GODOT_AUTOPILOT_ALLOW")) {
     if (*env)
-      return std::string(env);
+      allow = std::string(env);
   }
-  const std::string from_file = read_env_file_key("GODOT_AUTOPILOT_ALLOW");
-  if (!from_file.empty())
-    return from_file;
-  return "all";
+  if (allow.empty()) {
+    const std::string from_file = read_env_file_key("GODOT_AUTOPILOT_ALLOW");
+    if (!from_file.empty())
+      allow = from_file;
+  }
+  if (allow.empty())
+    allow = "all";
+  if (!allow_list_has(allow, "write"))
+    allow += ",write";
+  return allow;
 }
 
 int pick_free_port() {

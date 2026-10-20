@@ -176,7 +176,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "set_editor_selection",
       "Set the node selection in the edited scene to exactly the given paths. Use it to focus editor operations on specific nodes, e.g. before inspecting or modifying them; the previous selection is cleared first. Accepts an array of paths, and paths that cannot be resolved are skipped silently. Returns result 'ok'.",
-      "Editor", {"editor", "selection", "set"}, SideEffect::None, tool_flags::kNone,
+      "Editor", {"editor", "selection", "set"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kSetEditorSelectionParams, editor_ops::handle_set_selection}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_editor_edited_scene_root",
@@ -196,7 +196,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "reload_editor_scene",
       "Reload a scene from disk, replacing its in-memory state; reloads the current edited scene unless scene_path is provided. Use it to discard experimental edits and restore the saved version. Note that all unsaved changes are dropped without any confirmation, so call save_editor_scene first if the changes matter. Returns result 'ok'.",
-      "Editor", {"editor", "scene", "reload"}, SideEffect::None, tool_flags::kNone,
+      "Editor", {"editor", "scene", "reload"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kReloadEditorSceneParams, editor_ops::handle_reload_scene}));
   v.push_back(make_spec_tool(ToolSpec{
       "inspect_editor_resource",
@@ -206,22 +206,22 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "create_editor_undo_redo_action",
       "Start a new undo/redo action in the editor's undo history with the given name. Use it to group several operations so a single undo step reverts them all. Must be followed by add_editor_undo_redo_do or add_editor_undo_redo_undo calls and finally commit_editor_undo_redo. Returns result 'ok'.",
-      "Editor", {"editor", "undo", "start"}, SideEffect::None, tool_flags::kUndoable,
+      "Editor", {"editor", "undo", "start"}, SideEffect::ModifiesWindow, tool_flags::kMutating | tool_flags::kUndoable,
       kCreateEditorUndoRedoActionParams, editor_ops::handle_undo_redo_start}));
   v.push_back(make_spec_tool(ToolSpec{
       "commit_editor_undo_redo",
       "Commit the currently open undo/redo action so it appears in the editor's undo history as a single step. Use it to finalize a sequence started with create_editor_undo_redo_action and filled with add_editor_undo_redo_do or add_editor_undo_redo_undo calls; after committing, the action can no longer be extended. Returns result 'ok'.",
-      "Editor", {"editor", "undo", "commit"}, SideEffect::None, tool_flags::kNone,
+      "Editor", {"editor", "undo", "commit"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kCommitEditorUndoRedoParams, editor_ops::handle_undo_redo_commit}));
   v.push_back(make_spec_tool(ToolSpec{
       "add_editor_undo_redo_do",
       "Register a method call that runs when the undo/redo action is applied (the do step). Use it inside an action started with create_editor_undo_redo_action; target a node by node_path, name the method and pass an optional value argument. Pair it with add_editor_undo_redo_undo for the inverse, then finish with commit_editor_undo_redo. Returns result 'ok'.",
-      "Editor", {"editor", "undo", "do"}, SideEffect::None, tool_flags::kNone,
+      "Editor", {"editor", "undo", "do"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kAddEditorUndoRedoDoParams, editor_ops::handle_undo_redo_add_do}));
   v.push_back(make_spec_tool(ToolSpec{
       "add_editor_undo_redo_undo",
       "Register a method call that runs when the undo/redo action is reverted (the undo step). Use it to define the inverse of an operation added with add_editor_undo_redo_do; target a node by node_path, name the method and pass an optional value argument. Finish the action with commit_editor_undo_redo. Returns result 'ok'.",
-      "Editor", {"editor", "undo", "undo"}, SideEffect::None, tool_flags::kNone,
+      "Editor", {"editor", "undo", "undo"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kAddEditorUndoRedoUndoParams, editor_ops::handle_undo_redo_add_undo}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_editor_file_system_tree",
@@ -241,12 +241,12 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "play_editor_current_scene",
       "Launch the currently edited scene as a game in the editor. Use it to start testing gameplay; the scene should be saved first or playback may fail. Returns result 'ok' or 'already_playing' plus the is_playing flag. While the game runs, use Game and Debugger tools (get_game_status, capture_game_viewport, execute_game_script) and stop playback with stop_editor_playing.",
-      "Editor", {"editor", "play", "scene"}, SideEffect::None, tool_flags::kNone,
+      "Editor", {"editor", "play", "scene"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kPlayEditorCurrentSceneParams, editor_ops::handle_play_current_scene}));
   v.push_back(make_spec_tool(ToolSpec{
       "stop_editor_playing",
       "Stop the running game process started by play_editor_current_scene and return the editor to editing mode. Use it at the end of a play-testing session or before modifying the scene again. Returns result 'ok' even when no game is currently running.",
-      "Editor", {"editor", "stop", "playing"}, SideEffect::None, tool_flags::kNone,
+      "Editor", {"editor", "stop", "playing"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kStopEditorPlayingParams, editor_ops::handle_stop_playing}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_editor_file_system_status",
@@ -261,12 +261,12 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "create_editor_scene",
       "Create a new empty scene with a root node of the given type in the editor. Use it to start building a new level; type defaults to Node, name defaults to NewRoot, and close_current (default false) closes the current scene tab automatically when it has no unsaved changes. Only the current tab is closed: with multiple scene tabs open, repeat close_editor_scene until no scene is open, otherwise this call fails fast with the neighboring tab reported in editor_state instead of waiting. Returns result with path, type and closed_previous; errors when the current scene is unsaved or type is not a Node subclass.",
-      "Editor", {"editor", "scene", "new"}, SideEffect::None, tool_flags::kNone,
+      "Editor", {"editor", "scene", "new"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kCreateEditorSceneParams, editor_ops::handle_new_scene}));
   v.push_back(make_spec_tool(ToolSpec{
       "open_editor_scene",
       "Open an existing scene file, e.g. res://game.tscn, in the editor, replacing the currently edited scene. Use it to switch between scenes during editing, e.g. to continue work on another level. Errors when the current scene has unsaved changes, so call save_editor_scene first. Returns result 'ok'.",
-      "Editor", {"scene", "open"}, SideEffect::None, tool_flags::kNone,
+      "Editor", {"scene", "open"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kOpenEditorSceneParams, editor_ops::handle_open_scene}));
   v.push_back(make_spec_tool(ToolSpec{
       "save_editor_scene_as",
@@ -291,7 +291,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "close_editor_scene",
       "Close the currently edited scene tab and return the editor to an empty state when it was the last tab. Use it before opening or creating another scene, or when a scene is no longer needed. Only the current tab is closed: with multiple scene tabs open, call it repeatedly until no scene is open. Refuses to close when the scene has unsaved changes, so call save_editor_scene first. Returns result 'closed'.",
-      "Editor", {"editor", "close", "scene"}, SideEffect::None, tool_flags::kNone,
+      "Editor", {"editor", "close", "scene"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kCloseEditorSceneParams, editor_ops::handle_close_scene}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_editor_viewport_geometry",

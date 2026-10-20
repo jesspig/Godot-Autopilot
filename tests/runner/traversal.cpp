@@ -20,9 +20,9 @@ const char* kModeHeuristicSmoke = "heuristic_smoke";
 const char* kSideEffectNone = "none";
 
 constexpr size_t kBaselineEnumerated = 452;
-constexpr size_t kBaselineExcluded = 111;
-constexpr size_t kBaselineCandidates = 341;
-constexpr size_t kBaselineWarnings = 4;
+constexpr size_t kBaselineExcluded = 147;
+constexpr size_t kBaselineCandidates = 305;
+constexpr size_t kBaselineWarnings = 1;
 
 constexpr size_t kErrorDetailMax = 300;
 

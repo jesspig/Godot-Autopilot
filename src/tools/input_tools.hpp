@@ -105,12 +105,12 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "press_input_action",
       "Press an input action in the editor process by injecting a press event through the Input singleton. 'strength' sets the analog value and defaults to 1.0. A running game is a separate process and will not receive these events. Returns 'result' set to 'ok'.",
-      "Input", {"input", "action", "press"}, SideEffect::None, tool_flags::kNone,
+      "Input", {"input", "action", "press"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kPressInputActionParams, input_ops::handle_action_press}));
   v.push_back(make_spec_tool(ToolSpec{
       "release_input_action",
       "Release a previously pressed input action in the editor process. The action stays pressed until released, so pair this with press_input_action. Pressing or releasing an undefined action is harmless. A running game is a separate process and will not receive these events. Returns 'result' set to 'ok'.",
-      "Input", {"input", "action", "release"}, SideEffect::None, tool_flags::kNone,
+      "Input", {"input", "action", "release"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kReleaseInputActionParams, input_ops::handle_action_release}));
   v.push_back(make_spec_tool(ToolSpec{
       "is_input_action_pressed",
@@ -125,27 +125,27 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "press_input_key",
       "Inject a key press event into the editor process. 'key' accepts a single character A-Z or 0-9, or one of the named keys SPACE, ENTER, ESCAPE, SHIFT, CTRL, CONTROL, ALT, TAB, BACKSPACE, DELETE, LEFT, RIGHT, UP and DOWN; any other value returns 'invalid key'. A running game is a separate process and will not receive these events. Returns 'result' set to 'ok'.",
-      "Input", {"input", "key", "press"}, SideEffect::None, tool_flags::kNone,
+      "Input", {"input", "key", "press"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kPressInputKeyParams, input_ops::handle_key_press}));
   v.push_back(make_spec_tool(ToolSpec{
       "release_input_key",
       "Inject a key release event into the editor process, matching the restricted key set of press_input_key: a single character A-Z or 0-9, or SPACE, ENTER, ESCAPE, SHIFT, CTRL, CONTROL, ALT, TAB, BACKSPACE, DELETE, LEFT, RIGHT, UP and DOWN. A running game is a separate process and will not receive these events. Returns 'result' set to 'ok'.",
-      "Input", {"input", "key", "release"}, SideEffect::None, tool_flags::kNone,
+      "Input", {"input", "key", "release"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kReleaseInputKeyParams, input_ops::handle_key_release}));
   v.push_back(make_spec_tool(ToolSpec{
       "move_input_mouse",
       "Inject a mouse motion event into the editor process at the given position. 'position' is an object with numeric x and y fields, in pixels relative to the client area of the focused window — the editor main window while it has focus — so (0, 0) means that window's top-left corner, not a desktop/screen position and not the edited viewport (get_display_mouse_position reports screen coordinates instead). To drive editor docks and other UI, pass main-window client-area coordinates: warp_display_mouse to the target first, then inject, or estimate them from the window size. Optional 'relative' sets the movement delta since the last event and defaults to zero. A running game is a separate process and will not receive these events. Returns 'result' set to 'ok'.",
-      "Input", {"input", "mouse", "move"}, SideEffect::None, tool_flags::kNone,
+      "Input", {"input", "mouse", "move"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kMoveInputMouseParams, input_ops::handle_mouse_move}));
   v.push_back(make_spec_tool(ToolSpec{
       "press_input_mouse_button",
       "Inject a mouse button press into the editor process. 'button' accepts only left, right or middle. Optional 'position' sets where the press occurs, in pixels relative to the client area of the focused window (default (0, 0), that window's top-left corner — not a desktop/screen position); to click editor docks and UI, pass main-window client-area coordinates, e.g. warp_display_mouse to the target first, then inject. Many controls react to the press event itself, so the press usually takes effect immediately; release_input_mouse_button is optional but recommended to pair press and release. A running game is a separate process and will not receive these events. Returns 'result' set to 'ok'.",
-      "Input", {"input", "mouse", "press"}, SideEffect::None, tool_flags::kNone,
+      "Input", {"input", "mouse", "press"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kPressInputMouseButtonParams, input_ops::handle_mouse_button_press}));
   v.push_back(make_spec_tool(ToolSpec{
       "release_input_mouse_button",
       "Inject a mouse button release into the editor process. 'button' accepts only left, right or middle, matching press_input_mouse_button. Optional 'position' sets where the release occurs, in pixels relative to the client area of the focused window (default (0, 0), that window's top-left corner — not a desktop/screen position); use the same client-area coordinates as the matching press. Editor controls commonly act on the press event itself, so a release alone often has no effect; call it after press_input_mouse_button to keep press and release paired. A running game is a separate process and will not receive these events. Returns 'result' set to 'ok'.",
-      "Input", {"input", "mouse", "release"}, SideEffect::None, tool_flags::kNone,
+      "Input", {"input", "mouse", "release"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kReleaseInputMouseButtonParams, input_ops::handle_mouse_button_release}));
   v.push_back(make_spec_tool(ToolSpec{
       "click_input_mouse",
@@ -174,12 +174,12 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "start_input_gamepad_vibration",
       "Start vibration on a gamepad connected to the editor process. 'device' is the gamepad index and defaults to 0; 'weak' and 'strong' set the two motor magnitudes from 0.0 to 1.0 and default to 0.5. 'duration' is in seconds and defaults to 0, which vibrates indefinitely until stop_input_gamepad_vibration is called. A running game is a separate process and is not affected.",
-      "Input", {"input", "gamepad", "vibration"}, SideEffect::None, tool_flags::kNone,
+      "Input", {"input", "gamepad", "vibration"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kStartInputGamepadVibrationParams, input_ops::handle_gamepad_vibration_start}));
   v.push_back(make_spec_tool(ToolSpec{
       "stop_input_gamepad_vibration",
       "Stop vibration on a gamepad connected to the editor process, ending any vibration started with start_input_gamepad_vibration. 'device' is the gamepad index and defaults to 0. A running game is a separate process and is not affected. Returns 'result' set to 'ok'.",
-      "Input", {"input", "gamepad", "vibration"}, SideEffect::None, tool_flags::kNone,
+      "Input", {"input", "gamepad", "vibration"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kStopInputGamepadVibrationParams, input_ops::handle_gamepad_vibration_stop}));
   return v;
 }

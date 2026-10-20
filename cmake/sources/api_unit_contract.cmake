@@ -7,5 +7,8 @@
 set(GDA_UNIT_CONTRACT_SOURCES
     ${CMAKE_SOURCE_DIR}/src/tools/tool_execute.cpp
     ${CMAKE_SOURCE_DIR}/src/tools/argument_validator.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/api_envelope.cpp
     ${CMAKE_SOURCE_DIR}/tests/unit/tool_execute_test.cpp
-    ${CMAKE_SOURCE_DIR}/tests/unit/argument_validator_test.cpp)
+    ${CMAKE_SOURCE_DIR}/tests/unit/argument_validator_test.cpp
+    ${CMAKE_SOURCE_DIR}/tests/unit/api_envelope_test.cpp
+    ${CMAKE_SOURCE_DIR}/tests/unit/authorization_policy_test.cpp)
