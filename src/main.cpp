@@ -1,5 +1,7 @@
 #include <cstdlib>
+#include <exception>
 #include <functional>
+#include <new>
 #include <string>
 #include <typeinfo>
 #include <utility>
@@ -14,6 +16,7 @@
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/godot.hpp>
+#include <godot_cpp/variant/string.hpp>
 
 #include "core/command_queue.hpp"
 #include "core/export_guard.hpp"

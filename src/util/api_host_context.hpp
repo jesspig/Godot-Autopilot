@@ -3,6 +3,7 @@
 
 #include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
+#include <godot_cpp/variant/string.hpp>
 
 #include <string>
 

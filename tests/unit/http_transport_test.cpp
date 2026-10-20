@@ -6,8 +6,10 @@
 
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 using godot_autopilot::HttpRequest;

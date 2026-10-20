@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include <godot_cpp/classes/global_constants.hpp>
 #include <godot_cpp/classes/stream_peer_tcp.hpp>
 #include <godot_cpp/classes/tcp_server.hpp>
 #include <godot_cpp/variant/array.hpp>
