@@ -159,6 +159,23 @@ SessionDisposition evaluate_session_header(const std::string &session_id) {
   return SessionDisposition::kIgnore;
 }
 
+DispatchKind classify_dispatch(const mcp_wire::ParsedRequest &parsed) {
+  if (parsed.is_request) {
+    return DispatchKind::kRequest;
+  }
+  if (parsed.is_notification) {
+    return DispatchKind::kNotification;
+  }
+  return DispatchKind::kInvalid;
+}
+
+void build_accepted_response(HttpResponse &resp) {
+  resp.status_code = 202;
+  resp.status_text = "Accepted";
+  resp.headers.erase("Content-Type");
+  resp.body.clear();
+}
+
 std::string supported_protocol_versions_json() {
   std::string out = "[";
   bool first = true;
@@ -298,7 +315,8 @@ bool handle_post(const HttpRequest &req, HttpResponse &resp) {
   }
 
   const mcp_wire::ParsedRequest parsed = mcp_wire::parse_request(req.body);
-  if (!parsed.ok) {
+  const mcp_http::DispatchKind dispatch = mcp_http::classify_dispatch(parsed);
+  if (dispatch == mcp_http::DispatchKind::kInvalid) {
     fill_json_response(resp, 400, "Bad Request",
                        mcp_http::build_error_body(kParseErrorCode,
                                                   parsed.error));
@@ -323,8 +341,8 @@ bool handle_post(const HttpRequest &req, HttpResponse &resp) {
 
   resp.headers["mcp-protocol-version"] = negotiated_version_header(version);
 
-  if (!parsed.is_request) {
-    fill_json_response(resp, 202, "Accepted", "{}");
+  if (dispatch == mcp_http::DispatchKind::kNotification) {
+    mcp_http::build_accepted_response(resp);
     return true;
   }
 

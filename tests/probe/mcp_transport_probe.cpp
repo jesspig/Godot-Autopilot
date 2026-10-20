@@ -40,6 +40,17 @@ const char *kToolsListBody =
     R"({"jsonrpc":"2.0","id":2,"method":"tools/list","params":{)"
     R"("_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}})";
 
+const char *kToolsCallBody =
+    R"({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{)"
+    R"("name":"probe_echo","arguments":{},)"
+    R"("_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}})";
+
+const char *kDiscoverBody =
+    R"({"jsonrpc":"2.0","id":1,"method":"server/discover","params":{)"
+    R"("_meta":{"io.modelcontextprotocol/clientInfo":{"name":"gate-probe","version":"1.0"},)"
+    R"("io.modelcontextprotocol/clientCapabilities":{},)"
+    R"("io.modelcontextprotocol/protocolVersion":"2026-07-28"}}})";
+
 constexpr std::chrono::milliseconds kReceiveTimeout{10000};
 
 void register_probe_tool(mcp::McpServer &server) {
@@ -188,12 +199,29 @@ HttpRequest make_post_request(const std::string &body) {
 }
 
 int run_path_shim() {
+  const McpHttpShim shim;
+  bool ok = true;
+
   auto transport = godot_autopilot::godot_transport_reset();
   auto server = mcp::McpServer::Create(transport, probe_options());
   register_probe_tool(*server);
 
-  const McpHttpShim shim;
-  bool ok = true;
+  HttpResponse guard_initialize_response;
+  shim.handle(make_post_request(kInitializeBody), guard_initialize_response);
+  HttpResponse guard_list_response;
+  shim.handle(make_post_request(kToolsListBody), guard_list_response);
+  std::cout << "PATH_SHIM uninitialized tools/list status: "
+            << guard_list_response.status_code << std::endl;
+  std::cout << "PATH_SHIM uninitialized tools/list body: "
+            << guard_list_response.body << std::endl;
+  ok = ok && guard_list_response.status_code == 400 &&
+       guard_list_response.body.find("Server not initialized") !=
+           std::string::npos;
+  server->Close();
+
+  transport = godot_autopilot::godot_transport_reset();
+  server = mcp::McpServer::Create(transport, probe_options());
+  register_probe_tool(*server);
 
   HttpResponse initialize_response;
   shim.handle(make_post_request(kInitializeBody), initialize_response);
@@ -204,12 +232,30 @@ int run_path_shim() {
   ok = ok && initialize_response.status_code == 200 &&
        looks_like_response(initialize_response.body);
 
+  HttpResponse initialized_response;
+  shim.handle(make_post_request(kInitializedBody), initialized_response);
+  std::cout << "PATH_SHIM notifications/initialized status: "
+            << initialized_response.status_code << std::endl;
+  std::cout << "PATH_SHIM notifications/initialized body: ["
+            << initialized_response.body << "]" << std::endl;
+  ok = ok && initialized_response.status_code == 202 &&
+       initialized_response.body.empty();
+
   HttpResponse list_response;
   shim.handle(make_post_request(kToolsListBody), list_response);
   std::cout << "PATH_SHIM tools/list status: " << list_response.status_code
             << std::endl;
+  std::cout << "PATH_SHIM tools/list body: " << list_response.body << std::endl;
   ok = ok && list_response.status_code == 200 &&
        looks_like_response(list_response.body);
+
+  HttpResponse call_response;
+  shim.handle(make_post_request(kToolsCallBody), call_response);
+  std::cout << "PATH_SHIM tools/call status: " << call_response.status_code
+            << std::endl;
+  std::cout << "PATH_SHIM tools/call body: " << call_response.body << std::endl;
+  ok = ok && call_response.status_code == 200 &&
+       looks_like_response(call_response.body);
 
   HttpRequest bad_accept = make_post_request(kToolsListBody);
   bad_accept.headers["accept"] = "application/json";
@@ -248,6 +294,30 @@ int run_path_shim() {
             << std::endl;
   ok = ok && stream_response.status_code == 200 &&
        stream_response.body.find("event: endpoint") != std::string::npos;
+
+  server->Close();
+
+  transport = godot_autopilot::godot_transport_reset();
+  server = mcp::McpServer::Create(transport, probe_options());
+  register_probe_tool(*server);
+
+  HttpResponse discover_response;
+  shim.handle(make_post_request(kDiscoverBody), discover_response);
+  std::cout << "PATH_SHIM server/discover status: "
+            << discover_response.status_code << std::endl;
+  std::cout << "PATH_SHIM server/discover body: " << discover_response.body
+            << std::endl;
+  ok = ok && discover_response.status_code == 200 &&
+       discover_response.body.find("supportedVersions") != std::string::npos;
+
+  HttpResponse modern_list_response;
+  shim.handle(make_post_request(kToolsListBody), modern_list_response);
+  std::cout << "PATH_SHIM modern tools/list status: "
+            << modern_list_response.status_code << std::endl;
+  std::cout << "PATH_SHIM modern tools/list body: " << modern_list_response.body
+            << std::endl;
+  ok = ok && modern_list_response.status_code == 200 &&
+       looks_like_response(modern_list_response.body);
 
   std::cout << "PATH_SHIM result: " << (ok ? "PASS" : "FAIL") << std::endl;
   server->Close();
