@@ -21,7 +21,7 @@ resource:
 
 # REST 接口面（`/api`）
 
-> 审计日期：2026-10-21（随开放接口面落地批次首建——本批在**同一个监听端口**上新增 `/api` 前缀的 REST 端点集，与既有 `/mcp`（MCP 协议）并列；端点实现集中在 [`src/core/api_surface.cpp`](../../../src/core/api_surface.cpp)，认证在 [`src/core/api_auth.cpp`](../../../src/core/api_auth.cpp) 与 [`src/core/api_token.cpp`](../../../src/core/api_token.cpp)，错误信封归一在 [`src/core/api_envelope.cpp`](../../../src/core/api_envelope.cpp)，路由挂载在 [`src/core/api_server.cpp`](../../../src/core/api_server.cpp)；端口模型与实例登记见 [端口与实例登记](ports.md)，统一执行入口与授权三档见 [工具注册表](tools_registry.md)；本轮校订补齐三处接线事实——① 端点清单 7 条、分页窗口 500/2000、批量上限 256、工具名长度上限 128 四个常量补入正文；② 补「执行入口与接线现状」小节，说明 `api_surface` 的执行器槽位在生产路径上未注册、REST 实际经 `default_execute_tool` 派发，导出拦截与参数校验两阶段尚未接线；③ 状态码表补 429，并标注 413 的两条来源（传输层 `Content-Length` 拒收 vs 端点层 `payload_too_large`））。
+> 审计日期：2026-10-21（随开放接口面落地批次首建——本批在**同一个监听端口**上新增 `/api` 前缀的 REST 端点集，与既有 `/mcp`（MCP 协议）并列；端点实现集中在 [`src/core/api_surface.cpp`](../../../src/core/api_surface.cpp)，认证在 [`src/core/api_auth.cpp`](../../../src/core/api_auth.cpp) 与 [`src/core/api_token.cpp`](../../../src/core/api_token.cpp)，错误信封归一在 [`src/core/api_envelope.cpp`](../../../src/core/api_envelope.cpp)，路由挂载在 [`src/core/api_server.cpp`](../../../src/core/api_server.cpp)；端口模型与实例登记见 [端口与实例登记](ports.md)，统一执行入口与授权三档见 [工具注册表](tools_registry.md)；本轮校订补齐三处接线事实——① 端点清单 8 条、分页窗口 500/2000、批量上限 256、工具名长度上限 128 四个常量补入正文；② 补「执行入口与接线现状」小节，说明 `api_surface` 的执行器槽位在生产路径上未注册、REST 实际经 `default_execute_tool` 派发，导出拦截与参数校验两阶段尚未接线；③ 状态码表补 429，并标注 413 的两条来源（传输层 `Content-Length` 拒收 vs 端点层 `payload_too_large`））。
 > 覆盖范围：`src/core/api_surface.{hpp,cpp}`（端点与路由匹配）、`src/core/api_server.{hpp,cpp}`（路由注册）、`src/core/api_envelope.{hpp,cpp}`（错误信封与状态码映射）、`src/core/api_auth.{hpp,cpp}` 与 `src/core/api_token.{hpp,cpp}`（令牌签发与校验）、`src/core/http_transport.{hpp,cpp}` 与 [`src/core/http_parse.hpp`](../../../src/core/http_parse.hpp)（自建 HTTP 传输与查询串解析）。
 > 统计口径：端点数以 `api_surface::build_index_document()` 的端点清单为准（数值以运行时统计为准，见 [测试体系](../tests.md)「数值核算总表」）。
 
@@ -64,6 +64,7 @@ POST /api/tools/<name> → api_surface::handle_request → api_surface::execute_
 | POST | `/api/tools/<工具名>` | 需要 | **请求体直接就是参数对象**，调用该工具 |
 | POST | `/api/batch` | 需要 | 批量调用，body 为 `{"operations":[{"tool","args"}],"stop_on_error"}` |
 | GET | `/api/health` | **免认证** | 存活探针：只返回存活状态、版本、端口、进程号 |
+| GET | `/api/endpoints` | 需要 | 端点表：实例身份与本实例端点（`instance_id` / `version` / `pid` / `project_path` / `endpoints[]`），与 MCP 侧资源 `godot://endpoints` 共用同一张表（两处返回同一份文档） |
 | GET | `/api/openapi.json` | 需要 | OpenAPI 3.0.3 文档（`bearerAuth` 安全方案，`/api/health` 显式声明免安全要求） |
 
 **方法不支持**返回 405：**路由不存在**返回 404。工具名段会先做百分号解码，再校验字符集（仅允许字母、数字、下划线、连字符、点号，长度上限 **128**，即 `api_surface::kMaxToolNameLength`）；非法工具名一律按 404「未知路由」处理，不做参数回显。
