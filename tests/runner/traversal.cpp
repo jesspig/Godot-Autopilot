@@ -22,7 +22,7 @@ const char* kSideEffectNone = "none";
 constexpr size_t kBaselineEnumerated = 452;
 constexpr size_t kBaselineExcluded = 147;
 constexpr size_t kBaselineCandidates = 305;
-constexpr size_t kBaselineWarnings = 1;
+constexpr size_t kBaselineWarnings = 0;
 
 constexpr size_t kErrorDetailMax = 300;
 

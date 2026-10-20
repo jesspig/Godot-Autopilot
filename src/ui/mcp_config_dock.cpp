@@ -32,8 +32,11 @@ constexpr const char *kSkillsDir = "res://.agents/skills";
 constexpr const char *kSkillDirPrefix = "godot-autopilot-";
 
 godot::Color theme_color(const char *name, const godot::Color &fallback) {
-  godot::Ref<godot::Theme> theme =
-      godot::EditorInterface::get_singleton()->get_editor_theme();
+  auto *editor = godot::EditorInterface::get_singleton();
+  if (editor == nullptr) {
+    return fallback;
+  }
+  godot::Ref<godot::Theme> theme = editor->get_editor_theme();
   if (theme.is_valid() && theme->has_color(name, "Editor")) {
     return theme->get_color(name, "Editor");
   }
@@ -641,8 +644,11 @@ void McpConfigDock::_on_copy_api_address() {
 }
 
 std::string McpConfigDock::_rewrite_client_configs(int port) {
-  godot::String root =
-      godot::ProjectSettings::get_singleton()->globalize_path("res://");
+  auto *settings = godot::ProjectSettings::get_singleton();
+  if (settings == nullptr) {
+    return "the project settings are not available";
+  }
+  godot::String root = settings->globalize_path("res://");
   std::string rewritten;
   std::string manual;
   for (int index = 0; index < static_cast<int>(client_config_gen::ClientId::COUNT);
@@ -699,8 +705,13 @@ void McpConfigDock::_on_generate() {
       "config_generate",
       monitor::build_attrs({{"client", std::to_string(static_cast<int>(id))},
                             {"port", std::to_string(port)}}));
-  godot::String root =
-      godot::ProjectSettings::get_singleton()->globalize_path("res://");
+  auto *settings = godot::ProjectSettings::get_singleton();
+  if (settings == nullptr) {
+    _report("The project settings are not available",
+            theme_color("error_color", godot::Color(0.95f, 0.4f, 0.4f)));
+    return;
+  }
+  godot::String root = settings->globalize_path("res://");
   godot::String abs_path = root.path_join(godot::String(file_path(id)));
   const char *rel_path = file_path(id);
 
@@ -796,8 +807,13 @@ void McpConfigDock::_on_generate_skills() {
     remove_legacy_skill_dirs();
   }
 
-  godot::String root =
-      godot::ProjectSettings::get_singleton()->globalize_path("res://");
+  auto *settings = godot::ProjectSettings::get_singleton();
+  if (settings == nullptr) {
+    _report("The project settings are not available",
+            theme_color("error_color", godot::Color(0.95f, 0.4f, 0.4f)));
+    return;
+  }
+  godot::String root = settings->globalize_path("res://");
 
   int generated_skills = 0;
   int generated_references = 0;

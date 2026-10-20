@@ -69,7 +69,7 @@ const std::vector<ParamSpec> kHasResourceParams = {
 const std::vector<ParamSpec> kGetResourceTypesParams = {};
 
 const std::vector<ParamSpec> kGetResourceExtensionsParams = {
-    {"type", "string", "Resource class name to list extensions for, e.g. Texture2D, AudioStream; when omitted the loader returns extensions for all known types (contract gap: required in schema but optional in the implementation)", true},
+    {"type", "string", "Resource class name to list extensions for, e.g. Texture2D, AudioStream; optional — when omitted the loader returns extensions for all known types", false},
 };
 
 const std::vector<ParamSpec> kGetResourceDirFilesParams = {

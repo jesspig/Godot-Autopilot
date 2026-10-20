@@ -78,9 +78,17 @@ struct TransportState {
   uint64_t next_connection_id{1};
 };
 
-TransportState &transport_state() {
-  static TransportState state;
-  return state;
+TransportState &transport_state_never_destroyed() {
+  static TransportState *state = new TransportState();
+  return *state;
+}
+
+void transport_release_engine_server(TransportState &state) {
+  if (!state.server.is_valid()) {
+    return;
+  }
+  state.server->stop();
+  state.server.unref();
 }
 
 bool transport_host_is_loopback(const std::string &host) {
@@ -213,6 +221,16 @@ void transport_execute_job(const PendingJob &job, HttpResponse &response) {
   }
 }
 
+bool transport_channel_stopped(const std::shared_ptr<ConnectionChannel> &channel) {
+  std::lock_guard<std::mutex> lock(channel->mutex);
+  return channel->closed;
+}
+
+bool transport_channel_finished(const std::shared_ptr<ConnectionChannel> &channel) {
+  std::lock_guard<std::mutex> lock(channel->mutex);
+  return channel->finished;
+}
+
 void transport_worker_loop(const std::shared_ptr<ConnectionChannel> &channel) {
   while (true) {
     PendingJob job;
@@ -226,6 +244,9 @@ void transport_worker_loop(const std::shared_ptr<ConnectionChannel> &channel) {
       }
       job = std::move(channel->jobs.front());
       channel->jobs.pop_front();
+    }
+    if (transport_channel_stopped(channel)) {
+      return;
     }
     HttpResponse response;
     transport_execute_job(job, response);
@@ -269,9 +290,78 @@ void transport_wait_worker(const std::shared_ptr<ConnectionChannel> &channel,
                        [&channel] { return channel->finished; });
 }
 
+struct ParkedWorker {
+  std::thread thread;
+  std::shared_ptr<ConnectionChannel> channel;
+};
+
+std::vector<ParkedWorker> &parked_workers_never_destroyed() {
+  static auto *parked = new std::vector<ParkedWorker>();
+  return *parked;
+}
+
+void transport_park_worker(std::thread worker,
+                            const std::shared_ptr<ConnectionChannel> &channel) {
+  ParkedWorker entry;
+  entry.thread = std::move(worker);
+  entry.channel = channel;
+  parked_workers_never_destroyed().push_back(std::move(entry));
+}
+
+void transport_reap_parked_workers() {
+  std::vector<ParkedWorker> &parked = parked_workers_never_destroyed();
+  if (parked.empty()) {
+    return;
+  }
+  std::vector<ParkedWorker> pending;
+  pending.reserve(parked.size());
+  for (ParkedWorker &entry : parked) {
+    if (entry.thread.joinable() &&
+        transport_channel_finished(entry.channel)) {
+      entry.thread.join();
+      continue;
+    }
+    pending.push_back(std::move(entry));
+  }
+  parked.swap(pending);
+}
+
+void transport_join_worker(TransportConnection &connection) {
+  if (!connection.worker.joinable()) {
+    return;
+  }
+  if (transport_channel_finished(connection.channel)) {
+    connection.worker.join();
+    return;
+  }
+  transport_park_worker(std::move(connection.worker), connection.channel);
+}
+
+std::chrono::steady_clock::time_point transport_worker_deadline() {
+  return std::chrono::steady_clock::now() +
+         std::chrono::milliseconds(GDA_RESPONSE_GRACE_MS);
+}
+
+void transport_wait_parked_workers(
+    std::chrono::steady_clock::time_point deadline) {
+  std::vector<ParkedWorker> &parked = parked_workers_never_destroyed();
+  for (ParkedWorker &entry : parked) {
+    const std::chrono::steady_clock::time_point now =
+        std::chrono::steady_clock::now();
+    if (now >= deadline) {
+      break;
+    }
+    transport_wait_worker(
+        entry.channel,
+        std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now));
+  }
+  transport_reap_parked_workers();
+}
+
 void transport_retire_connections(
     std::vector<std::shared_ptr<TransportConnection>> &connections,
-    bool wait_for_workers) {
+    bool wait_for_workers,
+    std::chrono::steady_clock::time_point deadline) {
   for (const std::shared_ptr<TransportConnection> &connection : connections) {
     if (!connection) {
       continue;
@@ -282,9 +372,6 @@ void transport_retire_connections(
     }
     connection->channel->cv.notify_all();
   }
-  const std::chrono::steady_clock::time_point deadline =
-      std::chrono::steady_clock::now() +
-      std::chrono::milliseconds(GDA_RESPONSE_GRACE_MS);
   for (const std::shared_ptr<TransportConnection> &connection : connections) {
     if (!connection) {
       continue;
@@ -299,15 +386,14 @@ void transport_retire_connections(
                                                                   now));
       }
     }
-    if (connection->worker.joinable()) {
-      connection->worker.detach();
-    }
+    transport_join_worker(*connection);
     http_stream::release(std::to_string(connection->id));
     if (connection->peer.is_valid()) {
       connection->peer->disconnect_from_host();
     }
   }
   connections.clear();
+  transport_reap_parked_workers();
 }
 
 void transport_read(TransportConnection &connection) {
@@ -532,10 +618,10 @@ HttpTransport &http_transport_instance() {
   return transport;
 }
 
-HttpRouteTable &http_transport_route_table() { return transport_state().routes; }
+HttpRouteTable &http_transport_route_table() { return transport_state_never_destroyed().routes; }
 
 bool http_transport_is_listening() {
-  return transport_state().server.is_valid();
+  return transport_state_never_destroyed().server.is_valid();
 }
 
 bool http_transport_bind(uint16_t port, const std::string &host,
@@ -545,12 +631,10 @@ bool http_transport_bind(uint16_t port, const std::string &host,
     error = "listen address '" + host + "' is not a loopback address";
     return false;
   }
-  TransportState &state = transport_state();
-  if (state.server.is_valid()) {
-    state.server->stop();
-    state.server.unref();
-  }
-  transport_retire_connections(state.connections, true);
+  TransportState &state = transport_state_never_destroyed();
+  transport_release_engine_server(state);
+  transport_retire_connections(state.connections, true,
+                               transport_worker_deadline());
   state.bound_port = 0;
 
   godot::Ref<godot::TCPServer> server;
@@ -575,30 +659,30 @@ bool HttpTransport::listen(uint16_t port, const std::string &host) {
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
                             "HTTP transport listening on " + host + ":" +
-                                std::to_string(transport_state().bound_port));
+                                std::to_string(transport_state_never_destroyed().bound_port));
   return true;
 }
 
 void HttpTransport::stop() {
-  TransportState &state = transport_state();
-  transport_retire_connections(state.connections, true);
-  if (state.server.is_valid()) {
-    state.server->stop();
-    state.server.unref();
-  }
+  TransportState &state = transport_state_never_destroyed();
+  const std::chrono::steady_clock::time_point deadline =
+      transport_worker_deadline();
+  transport_retire_connections(state.connections, true, deadline);
+  transport_wait_parked_workers(deadline);
+  transport_release_engine_server(state);
   state.bound_port = 0;
 }
 
-uint16_t HttpTransport::bound_port() const { return transport_state().bound_port; }
+uint16_t HttpTransport::bound_port() const { return transport_state_never_destroyed().bound_port; }
 
 void HttpTransport::register_route(const std::string &method,
                                    const std::string &prefix,
                                    HttpRouteHandler handler) {
-  transport_state().routes.add(method, prefix, std::move(handler));
+  transport_state_never_destroyed().routes.add(method, prefix, std::move(handler));
 }
 
 void HttpTransport::pump() {
-  TransportState &state = transport_state();
+  TransportState &state = transport_state_never_destroyed();
   if (state.server.is_null()) {
     return;
   }
@@ -644,7 +728,7 @@ void HttpTransport::pump() {
     }
   }
   state.connections.swap(survivors);
-  transport_retire_connections(retired, false);
+  transport_retire_connections(retired, false, transport_worker_deadline());
 }
 
 } // namespace godot_autopilot

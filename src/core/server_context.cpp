@@ -459,8 +459,10 @@ void ServerContext::remove_instance_record() {
 }
 
 void ServerContext::stop() {
-  if (!running_ && !server_ && !transport_)
+  if (!running_ && !server_ && !transport_) {
+    http_transport_instance().stop();
     return;
+  }
   running_ = false;
 
   LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,

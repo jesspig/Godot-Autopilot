@@ -345,13 +345,13 @@ void GodotAutopilotPlugin::_process(double delta) {
 void GodotAutopilotPlugin::_exit_tree() {
   try {
     godot_autopilot::run_shutdown_hooks();
+    s_queue.close();
+    godot_autopilot::runtime_ops::set_editor_queue(nullptr);
     if (g_server_ctx) {
       g_server_ctx->stop();
       delete g_server_ctx;
       g_server_ctx = nullptr;
     }
-    s_queue.close();
-    godot_autopilot::runtime_ops::set_editor_queue(nullptr);
 
     if (tools_singleton) {
       auto *engine = godot::Engine::get_singleton();

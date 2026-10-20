@@ -17,8 +17,8 @@ namespace {
 
 const std::vector<ParamSpec> kCreateSceneNodeParams = {
     {"parent_path", "string", "Parent node path in the edited scene (e.g. 'Player' or 'Player/Weapon'); omit only while the scene has no root — required once the scene already has a root. The response includes scene_path and scene_unsaved so the caller can confirm which scene received the node", false},
-    {"name", "string", "Node name (string, default: NewNode)", true},
-    {"type", "string", "Node class type (string, default: Node). Must be a Node subclass, e.g. Node2D, Sprite2D — other classes error", true},
+    {"name", "string", "Node name (string, default: NewNode); optional — the node is named NewNode when the parameter is omitted", false},
+    {"type", "string", "Node class type (string, default: Node); optional — a Node is created when the parameter is omitted. Must be a Node subclass, e.g. Node2D, Sprite2D — other classes error", false},
     {"properties", "object", "Optional map of property names to values applied right after creation via the same conversion chain as property_set (object, e.g. {\"visible\": false, \"position\": {\"x\": 10, \"y\": 20}}); any failing property frees the new node and reports the failing name", false},
 };
 
