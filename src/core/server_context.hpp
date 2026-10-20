@@ -5,11 +5,11 @@
 #include <string>
 
 #include <mcp/server/McpServer.hpp>
-#include <mcp/transport/StreamableHttpServerTransport.hpp>
 #include <memory>
 
 #include "command_queue.hpp"
 #include "config.hpp"
+#include "core/godot_transport.hpp"
 #include "port_resolver.hpp"
 #include "project_store.hpp"
 
@@ -44,17 +44,23 @@ private:
   CommandQueue &queue_;
   std::unique_ptr<ToolCatalog> catalog_;
   std::unique_ptr<Bm25Index> bm25_index_;
-  std::shared_ptr<mcp::StreamableHttpServerTransport> transport_;
+  std::shared_ptr<GodotTransport> transport_;
   std::unique_ptr<mcp::McpServer> server_;
   int port_ = GDA_DEFAULT_PORT;
+  int requested_port_ = 0;
   std::string host_ = "127.0.0.1";
   bool running_ = false;
   std::string last_error_;
+  std::string instance_id_;
   PortAssignment port_assignment_;
   EndpointTable endpoints_;
 
   void register_tools();
-  int resolve_port();
+  bool bind_transport();
+  void write_instance_record();
+  void remove_instance_record();
+  static int resolve_explicit_port();
+  static int resolve_preferred_port();
   static std::string resolve_host();
 };
 

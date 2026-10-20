@@ -41,6 +41,7 @@ include(${CMAKE_SOURCE_DIR}/cmake/sources/api_unit_storage.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/sources/api_unit_transport.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/sources/api_unit_cli.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/sources/api_unit_docs.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/sources/api_probe.cmake)
 
 set(GDA_UNIT_BUSINESS_SOURCES
     ${GDA_UNIT_BUSINESS_SOURCES}

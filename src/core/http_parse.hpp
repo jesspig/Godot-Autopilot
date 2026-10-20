@@ -254,6 +254,28 @@ inline BodyDecision decide_body(size_t content_length) {
   return BodyDecision::kAccept;
 }
 
+inline const std::string *find_header(
+    const std::unordered_map<std::string, std::string> &headers,
+    const std::string &name) {
+  const std::string lowered = to_lower(name);
+  for (const auto &entry : headers) {
+    if (to_lower(entry.first) == lowered) {
+      return &entry.second;
+    }
+  }
+  return nullptr;
+}
+
+inline std::string header_value(
+    const std::unordered_map<std::string, std::string> &headers,
+    const std::string &name) {
+  const std::string *found = find_header(headers, name);
+  if (found == nullptr) {
+    return std::string();
+  }
+  return *found;
+}
+
 inline bool request_keeps_alive(const std::string &version,
                                 const HeaderBlock &headers) {
   const auto found = headers.headers.find("connection");

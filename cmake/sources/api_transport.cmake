@@ -8,5 +8,6 @@ set(GDA_API_TRANSPORT_SOURCES
     src/core/port_resolver.cpp
     src/core/http_route_table.cpp
     src/core/http_transport.cpp
+    src/core/http_stream_registry.cpp
     src/core/godot_transport.cpp
     src/core/mcp_http_shim.cpp)
