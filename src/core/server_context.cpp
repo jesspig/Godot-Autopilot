@@ -25,6 +25,10 @@
 #include <mcp/protocol/MessageFilter.hpp>
 #include <memory>
 
+#include "core/api_auth.hpp"
+#include "core/api_server.hpp"
+#include "core/api_surface.hpp"
+#include "core/api_token.hpp"
 #include "core/gda_home.hpp"
 #include "core/http_transport.hpp"
 #include "core/http_transport_ext.hpp"
@@ -308,6 +312,24 @@ bool ServerContext::start() {
     http_transport.register_route("GET", GDA_MCP_PATH, mcp_route);
     http_transport.register_route("DELETE", GDA_MCP_PATH, mcp_route);
 
+    const int bound_port = port_;
+    const int host_pid = util::api_host_process_id();
+    api_surface::register_runtime_info_provider(
+        [bound_port, host_pid]() {
+          api_surface::RuntimeInfo info;
+          info.version = GDA_VERSION;
+          info.port = bound_port;
+          info.pid = host_pid;
+          return info;
+        });
+
+    const ApiServer api_server;
+    if (!api_server.start(static_cast<uint16_t>(port_))) {
+      LogSystem::instance().log(
+          LogLevel::Warning, LogCategory::Transport,
+          "the REST API routes are not registered on the transport");
+    }
+
     running_ = true;
     write_instance_record();
 
@@ -361,6 +383,10 @@ void ServerContext::write_instance_record() {
   const std::string project_path = util::api_host_project_root();
   const int pid = util::api_host_process_id();
   const int64_t started_at = now_epoch_ms();
+  api_token::register_project_root_provider(
+      [project_path]() { return project_path; });
+  const ApiAuth auth;
+  const std::string issued_token = auth.issue_token();
   InstanceRecord record;
   record.instance_id = "gda-" + ProjectStore::project_path_hash(project_path) +
                         "-" + std::to_string(pid) + "-" +
@@ -368,11 +394,11 @@ void ServerContext::write_instance_record() {
   record.port = port_;
   record.pid = pid;
   record.project_path = project_path;
-  record.api_token = "";
+  record.api_token = issued_token;
   record.endpoints.mcp =
       EndpointEntry{host_, port_, GDA_MCP_PATH, "mcp", "none"};
   record.endpoints.api =
-      EndpointEntry{host_, port_, GDA_API_PATH, "http", "none"};
+      EndpointEntry{host_, port_, GDA_API_PATH, "http", "bearer"};
   record.gda_home = HomeResolver::gda_home();
   record.started_at = started_at;
   record.version = GDA_VERSION;

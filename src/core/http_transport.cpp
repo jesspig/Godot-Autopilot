@@ -532,6 +532,8 @@ HttpTransport &http_transport_instance() {
   return transport;
 }
 
+HttpRouteTable &http_transport_route_table() { return transport_state().routes; }
+
 bool http_transport_is_listening() {
   return transport_state().server.is_valid();
 }

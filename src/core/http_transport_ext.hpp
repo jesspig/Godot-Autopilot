@@ -29,6 +29,8 @@ inline const HttpPumpLimits &http_pump_limits() {
 
 HttpTransport &http_transport_instance();
 
+HttpRouteTable &http_transport_route_table();
+
 bool http_transport_is_listening();
 
 bool http_transport_bind(uint16_t port, const std::string &host,

@@ -10,4 +10,8 @@ set(GDA_API_TRANSPORT_SOURCES
     src/core/http_transport.cpp
     src/core/http_stream_registry.cpp
     src/core/godot_transport.cpp
-    src/core/mcp_http_shim.cpp)
+    src/core/mcp_http_shim.cpp
+    src/core/api_surface.cpp
+    src/core/api_server.cpp
+    src/core/api_auth.cpp
+    src/core/api_token.cpp)
