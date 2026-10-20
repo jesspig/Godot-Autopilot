@@ -43,6 +43,12 @@ static_assert(GDA_API_TOKEN_BYTES >= 16,
 constexpr int64_t GDA_HEALTHY_ACTIVITY_THRESHOLD_MS = 3000;
 constexpr int64_t GDA_DEFAULT_TIMEOUT_MS = 5000;
 constexpr int64_t GDA_MAX_TIMEOUT_MS = 30000;
+constexpr int64_t GDA_OS_PROCESS_MIN_TIMEOUT_MS = 100;
+constexpr int64_t GDA_OS_PROCESS_MAX_TIMEOUT_MS = 25000;
+static_assert(GDA_OS_PROCESS_MIN_TIMEOUT_MS > 0 &&
+                  GDA_OS_PROCESS_MAX_TIMEOUT_MS <= GDA_MAX_TIMEOUT_MS,
+              "the external process timeout bounds must stay inside the shared "
+              "timeout range");
 constexpr int64_t GDA_RESPONSE_GRACE_MS = 2000;
 constexpr int64_t GDA_MAX_GAME_OP_TIMEOUT_MS = 25000;
 constexpr int64_t GDA_TRANSPORT_TIMEOUT_MS = 30000;

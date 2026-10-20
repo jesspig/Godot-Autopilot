@@ -776,8 +776,14 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
     mcp::JsonValue handler_result = dispatch::call_handler(tool_name, tool_args);
 
     int64_t pending_id = 0;
-    if (runtime_ops::payload_is_pending(handler_result, &pending_id)) {
-      if (!await_async) {
+    const bool has_pending_marker =
+        runtime_ops::payload_is_pending(handler_result, &pending_id);
+    int64_t job_id = 0;
+    const bool is_game_job =
+        runtime_ops::payload_is_game_job(handler_result, &job_id);
+    const bool is_deferred_wait = handler_result.Find("__gda_wait") != nullptr;
+    if (is_game_job || is_deferred_wait || has_pending_marker) {
+      if (!await_async && (is_game_job || has_pending_marker)) {
         result_item["status"] = mcp::JsonValue("error");
         result_item["error"] = mcp::JsonValue(
             "async game op '" + tool_name +
@@ -799,13 +805,20 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
       }
       if (!can_wait_off_main_thread) {
         std::string discard_detail;
-        runtime_ops::discard_pending(pending_id, discard_detail);
+        if (has_pending_marker || is_game_job)
+          runtime_ops::discard_pending(pending_id, discard_detail);
         result_item["status"] = mcp::JsonValue("error");
         result_item["error"] = mcp::JsonValue(
             "await_async cannot wait on the editor main thread — invoke "
             "batch_execute directly (not through call_tool) so the wait runs "
             "on the transport thread");
         result_item["detail"] = mcp::JsonValue(discard_detail);
+        if (is_deferred_wait) {
+          const mcp::JsonValue released = dispatch::resolve_deferred_wait(
+              tool_name, std::move(handler_result));
+          if (released.Find("error") != nullptr)
+            result_item["detail"] = mcp::JsonValue(released.Dump());
+        }
         push_payload(result_item);
         results.PushBack(std::move(result_item));
         ++failed;
@@ -820,10 +833,15 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
       if (auto *timeout_p = handler_result.Find("timeout_ms");
           timeout_p && timeout_p->IsInt() && timeout_p->GetInt() > 0)
         wait_ms = timeout_p->GetInt();
-      mcp::JsonValue awaited =
-          runtime_ops::wait_pending_response(pending_id, wait_ms);
-      if (tool_name == "capture_game_viewport" && !awaited.Contains("error"))
-        awaited = runtime_ops::finalize_capture_response(awaited);
+      mcp::JsonValue awaited;
+      if (is_game_job || is_deferred_wait) {
+        awaited = dispatch::resolve_deferred_wait(tool_name,
+                                                  std::move(handler_result));
+      } else {
+        awaited = runtime_ops::wait_pending_response(pending_id, wait_ms);
+        if (tool_name == "capture_game_viewport" && !awaited.Contains("error"))
+          awaited = runtime_ops::finalize_capture_response(awaited);
+      }
       const bool awaited_error =
           awaited.IsObject() && awaited.Find("error") != nullptr;
       result_item["status"] = mcp::JsonValue(awaited_error ? "error" : "ok");

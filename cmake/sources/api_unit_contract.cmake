@@ -11,4 +11,5 @@ set(GDA_UNIT_CONTRACT_SOURCES
     ${CMAKE_SOURCE_DIR}/tests/unit/tool_execute_test.cpp
     ${CMAKE_SOURCE_DIR}/tests/unit/argument_validator_test.cpp
     ${CMAKE_SOURCE_DIR}/tests/unit/api_envelope_test.cpp
-    ${CMAKE_SOURCE_DIR}/tests/unit/authorization_policy_test.cpp)
+    ${CMAKE_SOURCE_DIR}/tests/unit/authorization_policy_test.cpp
+    ${CMAKE_SOURCE_DIR}/tests/unit/dispatch_semantics_test.cpp)

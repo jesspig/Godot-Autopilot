@@ -256,25 +256,7 @@ static mcp::JsonValue meta_call_tool_impl(mcp::JsonValue args) {
 }
 
 static mcp::JsonValue meta_call_tool_wait(const std::string& name, mcp::JsonValue result) {
-    auto* pending_p = result.Find("__gda_pending");
-    if (pending_p && pending_p->IsInt()) {
-        int64_t rid = pending_p->GetInt();
-        int64_t timeout = 5000;
-        if (auto* t = result.Find("timeout_ms")) {
-            if (t->IsInt() && t->GetInt() > 0) timeout = t->GetInt();
-        }
-        mcp::JsonValue final = runtime_ops::wait_pending_response(rid, timeout);
-        if (name == "capture_game_viewport" || (final.IsObject() && final.Contains("path"))) {
-            final = runtime_ops::finalize_capture_response(final);
-        }
-        result = std::move(final);
-    }
-    if (!result.IsObject()) {
-        mcp::JsonValue wrapped(mcp::JsonValue::object_tag);
-        wrapped["result"] = std::move(result);
-        result = std::move(wrapped);
-    }
-    return result;
+    return dispatch::resolve_deferred_wait(name, std::move(result));
 }
 
 void refresh_derived(const std::shared_ptr<ToolRegistry>& registry,

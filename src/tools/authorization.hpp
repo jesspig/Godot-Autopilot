@@ -22,13 +22,15 @@ enum class CapabilityTier { Read, Write, Danger };
 inline constexpr const char *kCapabilityProcess = "process";
 inline constexpr const char *kCapabilityCodeExecute = "code_execute";
 inline constexpr const char *kCapabilityGameRuntime = "game_runtime";
+inline constexpr const char *kCapabilityDestructive = "destructive";
 inline constexpr const char *kCapabilityUserTools = "user_tools";
 inline constexpr const char *kCapabilityRead = "read";
 inline constexpr const char *kCapabilityWrite = "write";
 
 inline constexpr const char *kKnownCapabilities[] = {
     kCapabilityProcess, kCapabilityCodeExecute, kCapabilityGameRuntime,
-    kCapabilityUserTools, kCapabilityRead, kCapabilityWrite};
+    kCapabilityDestructive, kCapabilityUserTools, kCapabilityRead,
+    kCapabilityWrite};
 
 inline AllowProvider &allow_provider() {
   static AllowProvider provider = nullptr;
