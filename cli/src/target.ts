@@ -2,8 +2,14 @@ import fs from "node:fs";
 import path from "node:path";
 import type { GlobalOptions } from "./args";
 import { CliError, ExitCode } from "./errors";
-import { gdaRoot, readProjectName, userDataBase } from "./platform";
+import {
+  findPluginRecordByProject,
+  type PluginInstanceRecord,
+} from "./instances";
+import { readProjectName, userDataBase } from "./platform";
 import { isAlive } from "./process";
+
+export { projectPathKey } from "./platform";
 
 export interface InstanceEntry {
   id: string;
@@ -21,16 +27,26 @@ export interface TargetContext {
   findLiveByProject(project: string): InstanceEntry | undefined;
 }
 
+export type TargetChain =
+  | "port"
+  | "id"
+  | "env"
+  | "cli-registry"
+  | "plugin-index"
+  | "legacy"
+  | "default";
+
 export interface ResolvedTarget {
   port: number;
   source: string;
+  chain: TargetChain;
   instance?: InstanceEntry;
+  pluginRecord?: PluginInstanceRecord;
 }
 
 export type TargetSelector = Pick<GlobalOptions, "portText" | "id" | "project">;
 
 const DEFAULT_PORT = 9527;
-const PLUGIN_INSTANCE_INDEX_FILE = "instances.json";
 
 function validPort(value: number | null | undefined): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 65535;
@@ -44,11 +60,6 @@ function parsePortText(text: string): number | null {
 
 function normalizePath(p: string): string {
   return path.resolve(p);
-}
-
-export function projectPathKey(p: string): string {
-  const resolved = path.resolve(p);
-  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
 }
 
 export function assertSingleSelector(opts: TargetSelector): void {
@@ -130,110 +141,44 @@ function portFromTraceOrConfig(startDir: string): { port: number; source: string
   return null;
 }
 
-interface PluginInstanceRecord {
-  port: number;
-  projectPath: string;
-}
-
-function readPluginInstanceRecords(): PluginInstanceRecord[] {
-  let raw: string;
-  try {
-    raw = fs.readFileSync(path.join(gdaRoot(), PLUGIN_INSTANCE_INDEX_FILE), "utf8");
-  } catch {
-    return [];
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return [];
-  }
-  if (typeof parsed !== "object" || parsed === null) return [];
-  const items = (parsed as { instances?: unknown }).instances;
-  if (!Array.isArray(items)) return [];
-  const records: PluginInstanceRecord[] = [];
-  for (const item of items) {
-    if (typeof item !== "object" || item === null) continue;
-    const doc = item as Record<string, unknown>;
-    const projectPath = stringField(doc, "project_path") ?? stringField(doc, "projectPath");
-    if (projectPath === undefined) continue;
-    const port = portField(doc);
-    if (port === null) continue;
-    records.push({ port, projectPath });
-  }
-  return records;
-}
-
-function stringField(doc: Record<string, unknown>, key: string): string | undefined {
-  const value = doc[key];
-  return typeof value === "string" && value !== "" ? value : undefined;
-}
-
-function portField(doc: Record<string, unknown>): number | null {
-  const direct = doc["port"];
-  if (typeof direct === "number") return validPort(direct) ? direct : null;
-  if (typeof direct === "string") return parsePortText(direct);
-  const endpoints = doc["endpoints"];
-  if (typeof endpoints === "object" && endpoints !== null) {
-    const table = endpoints as Record<string, unknown>;
-    for (const name of ["mcp", "api"]) {
-      const entry = table[name];
-      if (typeof entry !== "object" || entry === null) continue;
-      const value = (entry as Record<string, unknown>)["port"];
-      if (typeof value === "number" && validPort(value)) return value;
-    }
-  }
-  return null;
-}
-
-function portFromInstanceRegistry(projectPath: string): number | null {
-  const key = projectPathKey(projectPath);
-  for (const record of readPluginInstanceRecords()) {
-    if (projectPathKey(record.projectPath) === key) return record.port;
-  }
-  return null;
-}
-
 export function resolveTarget(opts: TargetSelector, ctx: TargetContext): ResolvedTarget {
   assertSingleSelector(opts);
+
+  if (opts.portText !== undefined) {
+    return { port: parseTargetPort(opts.portText), source: "cli", chain: "port" };
+  }
 
   if (opts.id !== undefined) {
     const entry = ctx.findById(opts.id);
     if (entry === undefined || !isAlive(entry.pid)) {
       throw new CliError(ExitCode.Transport, `unknown instance: ${opts.id} (run "gda list" to see running instances)`);
     }
-    return { port: entry.port, source: "id", instance: entry };
-  }
-
-  if (opts.portText !== undefined) {
-    return { port: parseTargetPort(opts.portText), source: "cli" };
-  }
-
-  if (opts.project !== undefined) {
-    const normalized = normalizePath(opts.project);
-    const entry = ctx.findLiveByProject(normalized);
-    if (entry !== undefined) {
-      return { port: entry.port, source: "project", instance: entry };
-    }
-    const registered = portFromInstanceRegistry(normalized);
-    if (registered !== null) return { port: registered, source: "registry" };
-    const found = portFromTraceOrConfig(normalized);
-    if (found !== null) return found;
-    return { port: DEFAULT_PORT, source: "default" };
+    return { port: entry.port, source: "id", chain: "id", instance: entry };
   }
 
   const envText = process.env.GODOT_AUTOPILOT_PORT;
   if (envText !== undefined && envText !== "") {
     const port = parsePortText(envText);
-    if (port !== null) return { port, source: "env" };
+    if (port !== null) return { port, source: "env", chain: "env" };
   }
-  const cwdEntry = ctx.findLiveByProject(process.cwd());
-  if (cwdEntry !== undefined) {
-    return { port: cwdEntry.port, source: "cwd", instance: cwdEntry };
+
+  const scoped = opts.project !== undefined;
+  const projectPath = scoped ? normalizePath(opts.project) : process.cwd();
+
+  const entry = ctx.findLiveByProject(projectPath);
+  if (entry !== undefined) {
+    return { port: entry.port, source: scoped ? "project" : "cwd", chain: "cli-registry", instance: entry };
   }
-  const cwdRegistered = portFromInstanceRegistry(process.cwd());
-  if (cwdRegistered !== null) return { port: cwdRegistered, source: "registry" };
-  const found = portFromTraceOrConfig(process.cwd());
-  if (found !== null) return found;
-  return { port: DEFAULT_PORT, source: "default" };
+
+  const record = findPluginRecordByProject(projectPath);
+  if (record !== undefined && record.port !== null) {
+    return { port: record.port, source: "registry", chain: "plugin-index", pluginRecord: record };
+  }
+
+  const found = portFromTraceOrConfig(projectPath);
+  if (found !== null) {
+    return { port: found.port, source: found.source, chain: "legacy" };
+  }
+
+  return { port: DEFAULT_PORT, source: "default", chain: "default" };
 }

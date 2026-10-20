@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import os from "node:os";
+import path from "node:path";
 
 const GDA_HOME_DIR_NAME = ".godot-autopilot";
 
@@ -33,6 +34,11 @@ export function gdaHome(): string {
 
 export function gdaRoot(): string {
   return joinPath(gdaHome(), GDA_HOME_DIR_NAME);
+}
+
+export function projectPathKey(p: string): string {
+  const resolved = path.resolve(p);
+  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
 }
 
 export function readProjectName(startDir: string): string | null {
