@@ -159,8 +159,9 @@ Three tools, three targets:
 - `capture_editor_viewport` — the default `target` `editor` grabs the editor
   2D viewport (falling back to the 3D viewport), so it works while you are
   still building a scene; `target` `game` captures the running game instead.
-  Add save=true on the editor target to also write the PNG under
-  user://godot_autopilot/captures/ and receive its path in the result; both
+  Add save=true on the editor target to also write the PNG into the plugin's
+  per-project capture folder (under the GDA home directory, not under the
+  Godot user data folder any more) and receive its path in the result; both
   targets keep only the 20 most recent capture files.
 - `capture_display_screen` — a whole physical screen by `screen` index, for
   desktop-level checks such as window placement; no running game required.

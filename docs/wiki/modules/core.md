@@ -1,19 +1,20 @@
 ---
 type: 模块文档
 title: 核心模块
-description: 命令队列、配置常量、统一埋点门面 monitor、性能采样 perf_sampler、日志与本地持久化、可重放 trace（schema v2）、脱敏策略、模式检测、资源缓存、脏状态跟踪、错误水印、导入就绪门控、服务器生命周期与插件配置
+description: 命令队列、配置常量、统一埋点门面 monitor、性能采样 perf_sampler、日志与本地持久化、可重放 trace（schema v2）、脱敏策略、模式检测、资源缓存、脏状态跟踪、错误水印、导入就绪门控、服务器生命周期、插件配置与数据存储布局（集中根与工程目录）
 tags:
   - 模块
   - 核心层
   - 线程模型
-timestamp: "2026-10-20T04:01:51+08:00"
+  - 存储布局
+timestamp: "2026-10-21T00:37:30+08:00"
 resource: src/core/
 ---
 
 # 核心模块（src/core/）
 
-> 审计日期：2026-10-20（10-20 随 `code_execute` 超时上限收敛批次同步——长阻塞派发预算收敛为**单值 29000ms**（`GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = GDA_DISPATCH_WAIT_MAX_MS`，删去「常量 30000 / 实际生效 29000」双值写法）；常量表补 `code_execute` 三个常量（`GDA_CODE_EXEC_MAX_TIMEOUT_MS = 27000`、`GDA_CODE_EXEC_BUDGET_MARGIN_MS = 2000`、`GDA_CODE_EXEC_TRANSPORT_MARGIN_MS = 2000`），`GDA_MAX_TIMEOUT_MS` 的用途描述改为「通用工具 `timeout_ms` 钳制上限」（不再与 `code_execute` 上限呼应）；环境变量条目补「该值同时决定 `code_execute` 的 `timeout_ms` 参数上界」；线程模型段补 `queue_unavailable` 错误码；10-20 随知识库事实描述页收敛批次同步——`ExportGuard` 段重写：导出标志由**文件作用域原子变量**改为**实例级** `ExportState`（每个 `ExportGuard` 实例各持一份），`is_exporting()` 遍历**实例注册表**（任一实例在导出期即返回 true），`_export_begin` 以 RAII `ExportState::Scope` 实现**异常安全复位**（作用域析构即 `end()`，`release()` 可显式解除武装）；`LogPersist` 段重写：截图**不再在 transport 线程落盘**——`store_trace_image` 只解码并入主线程图片缓冲（`enqueue_trace_image`），落盘统一在 `flush_on_main_thread` 末尾的 `flush_trace_images()`；两条 trace 写盘路径（`flush_on_main_thread` 的批量追加与 `write_trace_now` 的即时追加）**统一到同一条持锁通道** `append_trace_payload`（`std::ofstream` 以 `std::ios::app` 追加，取代原先不持锁的 Godot `FileAccess` + `seek_end` 追加）；新增 `dropped_trace_images` 计数（图片缓冲溢出丢最旧时累加，经 `health_summary()` 暴露）；`store_trace_image` 的 `bytes_written` 累加点移至 `flush_trace_images()` 写盘成功后；`main.cpp` 行号漂移修正（`GDExtensionEntryPoint` → `:319-392`、`_exit_tree` 收尾 flush → `:315`、`gda_cmdline_mode` → `:52-60`、`s_queue.open()` → `:113`）；线程模型段「非主线程时 `submit(...).get()` 同步等待」改为现行 `submit_tracked` + 预算 + 结构化超时（`dispatch.cpp:291-409`）；主线程派发预算补「长阻塞 29000 ms」一档（`GDA_DISPATCH_WAIT_LONG_BLOCKING_MS` = `GDA_DISPATCH_WAIT_MAX_MS`，常量 29000、经 `[1000, 29000]` 钳制，env `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS`）；`src/core/` 覆盖范围 18 个头 → 17 个头；`2026-09-29（09-29 随 B1–B7 修复批次同步——`CommandQueue` 容器改 `std::deque` 并新增 `submit_tracked`/`cancel(id)`/`last_drain_age_ms()`/`oldest_pending_age_ms()`/`Stats::cancelled` 与 drain 心跳；dispatch 新增主线程等待预算（`GDA_DISPATCH_WAIT_DEFAULT_MS=27000` / `GDA_DISPATCH_WAIT_HEALTH_MS=5000`、`kHealthProbe`/`kLongBlocking`、超时取消 + `main_thread_timeout`）；`LogPersist::write_trace_now` 线程安全直接追加；09-26 随 L2 测试床迁移同步——`Example/` 已移除，床改 `tests/testbed/`；2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-13 上午随资源 path 加载注册进 ResourceRegistry 同步；09-13 下午随收口批次同步 PluginConfig allow 键、授权门与 call_tool MCP 线程例外；09-13 17:50 随 B 组知识库审计同步——补正主线程排空点行号、移除已删除的 architecture.md 对照行；09-13 晚随 0.2.4 版知识库全量审计同步——补正 query_recent/query_from 消费方注释、SCENE/EDITOR 两级初始化描述、GDA_FORCE_HEADLESS 语义与 editor_readiness 消费方；09-14 随修复批次同步——PluginConfig 消费方增列 Allow game_runtime 复选框；09-16 随坐标换算批次同步——补 `editor_coords` 职责行与新增纯函数（此前职责表漏列该模块），基于当前工作树代码逐行核对（不依赖 git 历史）；09-18 随知识库一致性审计同步——`query_recent(50)` 消费方行号 470→527（以 `resource_handlers.cpp` 实测为准）、审计日期头补齐 09-16 改动的日期同步；09-19 随注释清理批同步——坐标换算引擎映射与缓存提示取舍入文档（源码整行注释删除）；09-20 代码-文档一致性审计——行号重核（`debugger_ops.cpp:683`→`:763`、`main.cpp:258-325`→`:291-357`、`main.cpp:46-54`→`:47-55`），其余复核一致；09-20 晚随可重放监控与双目录持久化批次同步——新增 `LogPersist`/`TraceRecorder`/`sanitize_policy` 三模块（cpp 9→12、头 12→15）、`LogSystem::log_detailed` 与 `LogEntry.detail`、PluginConfig `desensitize` 键、`_process` 先 flush 后 drain；09-20 深夜代码-文档一致性审计（本页二轮）——修正 `LogPersist` 消费方口径（`tool_invoke`/`dispatch` 为 `TraceRecorder` 事件记录 + `session_id` 回显，`enqueue_trace` 外部调用仅 `main.cpp` 的 `server_ready` 与 `init_session` 的 `session_start`）、脱敏开启时图片字段仍保留 `image_width`/`image_height`、`get_plugin_log` 增量分支过滤与响应字段差异、PluginConfig `save_*` 失败改记 `log_detailed`，并重核行号（`main.cpp:302-369`/`:49-57`、`resource_handlers.cpp:544`、`mcp_log_dock.cpp:241`、`server_context.cpp:95-103`）；09-21 随可重放监控与日志系统批次同步——新增 `monitor`/`monitor_env`/`perf_sampler` 三模块（cpp 12→15、头 15→18）、`TraceRecorder` 的 `TraceKind` 与 `TraceEvent` 新字段（jsonl schema v2）、`LogEntry` 关联字段与 `log_detailed` 6 参重载、`LogPersist` 健康计数与 `trace_dir`、`CommandQueue::stats()`，并登记 `GODOT_AUTOPILOT_PERF_INTERVAL_MS`/`GODOT_AUTOPILOT_REQUEST_TIMEOUT_MS`）；09-25 随项目级技能层落地同步——ServerContext 段补 09-21 协议埋点接线（`on_request` / `outgoing_filters`，以及 SDK `on_response` 不覆盖我方出站响应的原因）。
-> 覆盖范围：`src/core/` 下 15 个 cpp + 17 个头 + `version.hpp.in` 模板（`CommandQueue`、`error_watermark`、`config.hpp` 为 header-only，实际 18 业务组 + 版本）。注意：`CommandQueue` 为 header-only（仅 `command_queue.hpp`，无对应 `.cpp`），`error_watermark.hpp` 同为 header-only，`config.hpp` 为纯常量表，`version.hpp.in` 经 `configure_file` 生成 `version.hpp`。
+> 审计日期：2026-10-21（10-21 随开放接口面落地批次同步——插件数据从 `user://godot_autopilot/` 迁到**家目录集中根** `~/.godot-autopilot/`（Windows 为 `%USERPROFILE%\.godot-autopilot\`），集中根下放全局配置与全局实例索引，工程级数据放 `projects/<项目名>-<路径哈希前 8 位>/` 下按工程隔离；根目录按「显式覆写环境变量 → 平台环境变量 → 派生兜底 → 结果校验」四级解析；旧 `user://godot_autopilot/` **不自动搬迁**，配置项在新路径缺键时回退读取并注明来源，控制面板提供**复制式**导入入口；端口解析改为「环境变量 → 工程级配置偏好 → 自动分配」三级，自动分配候选序列为先 9527、其后 `20000 + (进程号 mod 10000)` 起连续到 29999 并回绕，**显式指定端口绑定失败不自动更换**；新增 [`src/core/gda_home.cpp`](../../../src/core/gda_home.cpp)、[`src/core/project_store.cpp`](../../../src/core/project_store.cpp)、[`src/core/storage_paths.cpp`](../../../src/core/storage_paths.cpp)、[`src/core/instance_registry.cpp`](../../../src/core/instance_registry.cpp)、[`src/core/legacy_store.cpp`](../../../src/core/legacy_store.cpp)、[`src/core/port_resolver.cpp`](../../../src/core/port_resolver.cpp) 六个编译单元；`src/core/` 覆盖范围 15→18 个 cpp；端口模型与实例登记的完整口径见 [端口与实例登记](ports.md)，REST 端点契约见 [REST 接口面](api.md)；本轮校订补三处实现事实——① 集中根第 2 级候选顺序（`HOME` 有值时先于 `USERPROFILE`）与解析失败时的 Warning 文案；② 遗留配置回退的选取规则（`LegacyStore::select_config_value`：新路径能解析且含该键即用它，新路径解析失败才退到旧路径）与「每键只记一次来源日志」；③ 补 `api_token` 文件的位置与 `GODOT_AUTOPILOT_API_TOKEN` 的覆盖关系，以及遗留导入的相对路径分类与面板禁用条件；10-20 随 `code_execute` 超时上限收敛批次同步——长阻塞派发预算收敛为**单值 29000ms**（`GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = GDA_DISPATCH_WAIT_MAX_MS`，删去「常量 30000 / 实际生效 29000」双值写法）；常量表补 `code_execute` 三个常量（`GDA_CODE_EXEC_MAX_TIMEOUT_MS = 27000`、`GDA_CODE_EXEC_BUDGET_MARGIN_MS = 2000`、`GDA_CODE_EXEC_TRANSPORT_MARGIN_MS = 2000`），`GDA_MAX_TIMEOUT_MS` 的用途描述改为「通用工具 `timeout_ms` 钳制上限」（不再与 `code_execute` 上限呼应）；环境变量条目补「该值同时决定 `code_execute` 的 `timeout_ms` 参数上界」；线程模型段补 `queue_unavailable` 错误码；10-20 随知识库事实描述页收敛批次同步——`ExportGuard` 段重写：导出标志由**文件作用域原子变量**改为**实例级** `ExportState`（每个 `ExportGuard` 实例各持一份），`is_exporting()` 遍历**实例注册表**（任一实例在导出期即返回 true），`_export_begin` 以 RAII `ExportState::Scope` 实现**异常安全复位**（作用域析构即 `end()`，`release()` 可显式解除武装）；`LogPersist` 段重写：截图**不再在 transport 线程落盘**——`store_trace_image` 只解码并入主线程图片缓冲（`enqueue_trace_image`），落盘统一在 `flush_on_main_thread` 末尾的 `flush_trace_images()`；两条 trace 写盘路径（`flush_on_main_thread` 的批量追加与 `write_trace_now` 的即时追加）**统一到同一条持锁通道** `append_trace_payload`（`std::ofstream` 以 `std::ios::app` 追加，取代原先不持锁的 Godot `FileAccess` + `seek_end` 追加）；新增 `dropped_trace_images` 计数（图片缓冲溢出丢最旧时累加，经 `health_summary()` 暴露）；`store_trace_image` 的 `bytes_written` 累加点移至 `flush_trace_images()` 写盘成功后；`main.cpp` 行号漂移修正（`GDExtensionEntryPoint` → `:319-392`、`_exit_tree` 收尾 flush → `:315`、`gda_cmdline_mode` → `:52-60`、`s_queue.open()` → `:113`）；线程模型段「非主线程时 `submit(...).get()` 同步等待」改为现行 `submit_tracked` + 预算 + 结构化超时（`dispatch.cpp:291-409`）；主线程派发预算补「长阻塞 29000 ms」一档（`GDA_DISPATCH_WAIT_LONG_BLOCKING_MS` = `GDA_DISPATCH_WAIT_MAX_MS`，常量 29000、经 `[1000, 29000]` 钳制，env `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS`）；`src/core/` 覆盖范围 18 个头 → 17 个头；`2026-09-29（09-29 随 B1–B7 修复批次同步——`CommandQueue` 容器改 `std::deque` 并新增 `submit_tracked`/`cancel(id)`/`last_drain_age_ms()`/`oldest_pending_age_ms()`/`Stats::cancelled` 与 drain 心跳；dispatch 新增主线程等待预算（`GDA_DISPATCH_WAIT_DEFAULT_MS=27000` / `GDA_DISPATCH_WAIT_HEALTH_MS=5000`、`kHealthProbe`/`kLongBlocking`、超时取消 + `main_thread_timeout`）；`LogPersist::write_trace_now` 线程安全直接追加；09-26 随 L2 测试床迁移同步——`Example/` 已移除，床改 `tests/testbed/`；2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随安全与并行硬化同步；09-13 上午随资源 path 加载注册进 ResourceRegistry 同步；09-13 下午随收口批次同步 PluginConfig allow 键、授权门与 call_tool MCP 线程例外；09-13 17:50 随 B 组知识库审计同步——补正主线程排空点行号、移除已删除的 architecture.md 对照行；09-13 晚随 0.2.4 版知识库全量审计同步——补正 query_recent/query_from 消费方注释、SCENE/EDITOR 两级初始化描述、GDA_FORCE_HEADLESS 语义与 editor_readiness 消费方；09-14 随修复批次同步——PluginConfig 消费方增列 Allow game_runtime 复选框；09-16 随坐标换算批次同步——补 `editor_coords` 职责行与新增纯函数（此前职责表漏列该模块），基于当前工作树代码逐行核对（不依赖 git 历史）；09-18 随知识库一致性审计同步——`query_recent(50)` 消费方行号 470→527（以 `resource_handlers.cpp` 实测为准）、审计日期头补齐 09-16 改动的日期同步；09-19 随注释清理批同步——坐标换算引擎映射与缓存提示取舍入文档（源码整行注释删除）；09-20 代码-文档一致性审计——行号重核（`debugger_ops.cpp:683`→`:763`、`main.cpp:258-325`→`:291-357`、`main.cpp:46-54`→`:47-55`），其余复核一致；09-20 晚随可重放监控与双目录持久化批次同步——新增 `LogPersist`/`TraceRecorder`/`sanitize_policy` 三模块（cpp 9→12、头 12→15）、`LogSystem::log_detailed` 与 `LogEntry.detail`、PluginConfig `desensitize` 键、`_process` 先 flush 后 drain；09-20 深夜代码-文档一致性审计（本页二轮）——修正 `LogPersist` 消费方口径（`tool_invoke`/`dispatch` 为 `TraceRecorder` 事件记录 + `session_id` 回显，`enqueue_trace` 外部调用仅 `main.cpp` 的 `server_ready` 与 `init_session` 的 `session_start`）、脱敏开启时图片字段仍保留 `image_width`/`image_height`、`get_plugin_log` 增量分支过滤与响应字段差异、PluginConfig `save_*` 失败改记 `log_detailed`，并重核行号（`main.cpp:302-369`/`:49-57`、`resource_handlers.cpp:544`、`mcp_log_dock.cpp:241`、`server_context.cpp:95-103`）；09-21 随可重放监控与日志系统批次同步——新增 `monitor`/`monitor_env`/`perf_sampler` 三模块（cpp 12→15、头 15→18）、`TraceRecorder` 的 `TraceKind` 与 `TraceEvent` 新字段（jsonl schema v2）、`LogEntry` 关联字段与 `log_detailed` 6 参重载、`LogPersist` 健康计数与 `trace_dir`、`CommandQueue::stats()`，并登记 `GODOT_AUTOPILOT_PERF_INTERVAL_MS`/`GODOT_AUTOPILOT_REQUEST_TIMEOUT_MS`）；09-25 随项目级技能层落地同步——ServerContext 段补 09-21 协议埋点接线（`on_request` / `outgoing_filters`，以及 SDK `on_response` 不覆盖我方出站响应的原因）。
+> 覆盖范围：`src/core/` 下 31 个 cpp + 37 个头 + `version.hpp.in` 模板（`CommandQueue`、`error_watermark`、`path_util` 为 header-only，实际 29 个业务组 + 版本）。注意：`CommandQueue` 为 header-only（仅 `command_queue.hpp`，无对应 `.cpp`），`error_watermark.hpp` 同为 header-only，`config.hpp` 为纯常量表，`version.hpp.in` 经 `configure_file` 生成 `version.hpp`；`path_util.hpp` 同为 header-only 的路径工具集（`join_path` / `parent_dir` / `path_basename` / `sanitize_path_component` / `normalize_path_separators` / `is_filesystem_root`）。
 
 ## 模块简介
 
@@ -27,7 +28,7 @@ resource: src/core/
 | 配置常量 | `config.hpp` | 端口、超时、缓冲区上限等编译期常量（GDA_ 前缀） | `server_context.cpp`、`runtime/game_bridge.cpp` 等 |
 | `ExportGuard` | `export_guard.cpp/hpp` | 导出期间置位**实例级**导出标志（每个 `ExportGuard` 实例各持一份 `ExportState`，`is_exporting()` 遍历实例注册表、任一实例在导出期即返回 true），供工具分发判定"导出中"（工具调用 / MCP 资源 / MCP 提示词三类入口共用该判定） | `dispatch::export_blocked_result`、`_enter_tree` 注册 |
 | `LogSystem` | `log_system.cpp/hpp` | 进程内环形日志（内存缓冲，含可选 `detail` 诊断行与 `trace_id`/`span_id` 关联字段），单例 | 全部模块、`McpLogDock`、log 类资源、`LogPersist`（增量落盘） |
-| `LogPersist` | `log_persist.cpp/hpp`（09-20 新增） | 日志/trace 双目录持久化：`user://godot_autopilot/logs/gda-<stamp>.log`（人类可读全量含 detail）与 `traces/trace-<stamp>.jsonl`（结构化事件）+ `traces/images/`（仅脱敏关闭时图片落盘）；两目录各保留最近 20 文件 / 50MB；`write_trace_now(line)`（09-29 新增）与 `flush_on_main_thread()` 的批量 trace 追加**统一到同一条持锁通道** `append_trace_payload()`（`std::ofstream` + `std::ios::app` 追加，取代原先不持锁的 Godot `FileAccess` + `seek_end` 追加），供 dispatch 超时等关键观测绕过缓冲区落盘；截图**不在 transport 线程落盘**——`store_trace_image` 只解码并入主线程图片缓冲（`enqueue_trace_image`），由 `flush_on_main_thread` 末尾的 `flush_trace_images()` 统一落盘，缓冲溢出丢最旧并累加 `dropped_trace_images`；09-21 起暴露健康计数（`dropped_log_lines`/`dropped_trace_lines`/`dropped_trace_images`/`bytes_written`/`flush_failures`/`rotations`/`pruned_files`）与 `health_summary()`/`trace_dir()`，溢出/写失败/rotate/prune 均发 `kind=persist_health` 事件 | `main.cpp`（`_enter_tree` 初始化、`_process`/`_exit_tree` flush）、`SpecTool::execute`（`session_id`/`store_trace_image`）、`tool_invoke`/`dispatch`（`TraceRecorder` 事件记录 + `session_id` 回显；dispatch 超时经 `write_trace_now` 直写）、`McpLogDock`（Open Traces 打开 `trace_dir()`） |
+| `LogPersist` | `log_persist.cpp/hpp`（09-20 新增） | 日志/trace 双目录持久化（10-21 起落在**工程级**存储目录 `<集中根>/projects/<项目名>-<哈希>/` 下）：`logs/gda-<stamp>.log`（人类可读全量含 detail）与 `traces/trace-<stamp>.jsonl`（结构化事件）+ `traces/images/`（仅脱敏关闭时图片落盘）；两目录各保留最近 20 文件 / 50MB；`write_trace_now(line)`（09-29 新增）与 `flush_on_main_thread()` 的批量 trace 追加**统一到同一条持锁通道** `append_trace_payload()`（`std::ofstream` + `std::ios::app` 追加，取代原先不持锁的 Godot `FileAccess` + `seek_end` 追加），供 dispatch 超时等关键观测绕过缓冲区落盘；截图**不在 transport 线程落盘**——`store_trace_image` 只解码并入主线程图片缓冲（`enqueue_trace_image`），由 `flush_on_main_thread` 末尾的 `flush_trace_images()` 统一落盘，缓冲溢出丢最旧并累加 `dropped_trace_images`；09-21 起暴露健康计数（`dropped_log_lines`/`dropped_trace_lines`/`dropped_trace_images`/`bytes_written`/`flush_failures`/`rotations`/`pruned_files`）与 `health_summary()`/`trace_dir()`，溢出/写失败/rotate/prune 均发 `kind=persist_health` 事件 | `main.cpp`（`_enter_tree` 初始化、`_process`/`_exit_tree` flush）、`SpecTool::execute`（`session_id`/`store_trace_image`）、`tool_invoke`/`dispatch`（`TraceRecorder` 事件记录 + `session_id` 回显；dispatch 超时经 `write_trace_now` 直写）、`McpLogDock`（Open Traces 打开 `trace_dir()`） |
 | `TraceRecorder` | `trace_recorder.cpp/hpp`（09-20 新增） | 进程内 trace 事件环形缓冲（容量 20000）：`record`/`query_recent`/`query_by_trace`/`query_by_request`/`query_since`/`next_seq`；09-21 起新增 `enum class TraceKind`（15 值）与 `trace_kind_name()`，`TraceEvent` 追加 `kind/name/request_id/correlation_id/phase/state/monotonic_ns/thread_id/attrs/error_type/stack/bytes`（`to_json_line` 在原键序之后追加，jsonl schema v2），敏感键剥离改为大小写不敏感通用集合；纯函数含 id 生成、参数脱敏、`sanitize_text`、`monotonic_now_ns`/`current_thread_id`、FNV-1a 哈希、base64 解码、JSON 行格式化 | `monitor`（统一写入）、`SpecTool::execute`、`dispatch`、`tool_invoke`、`LogPersist` |
 | `sanitize_policy` | `sanitize_policy.cpp/hpp`（09-20 新增，header 内含原子缓存） | 脱敏开关全局缓存：`enabled()`/`set_enabled()` 供热路径读取，`initialize()` 按 env > config > 默认 true 解析 | `main.cpp`（入口初始化）、`McpConfigDock`（复选框切换）、`SpecTool::execute`/`tool_invoke`/`LogPersist::store_trace_image` |
 | `monitor`（统一埋点门面） | `monitor.hpp/cpp`（09-21 新增，纯 std，可被 MCP SDK worker 线程调用） | 统一埋点入口：`emit/tool_call/lifecycle/data_flow/ui_action/security/state/error_event/perf` 写入便捷函数、`begin_request/end_request/note_protocol_error/note_notification/note_client/note_transport` 协议侧钩子、`RequestRegistry`（request_id→trace/span 关联表，上限 4096、FIFO 淘汰）、`RequestScope`/`push_request`/`pop_request`/`current_request_id`、`Counters`/`counters()`、`sanitize_field`/`json_escape`/`build_attrs`、`request_id_text(RequestId)`、`persist_health`、`LockProbe`（锁等待超过阈值才记录，否则零开销） | `tool_spec`/`dispatch`/`tool_invoke`、`server_context`、`main.cpp`、`autopilot_tools`、`runtime_ops`、`resource_handlers`/`debugger_resources`、`mcp_log_dock`/`mcp_config_dock` |
@@ -40,7 +41,13 @@ resource: src/core/
 | `error_watermark` | `error_watermark.hpp`（header-only） | 错误水印计数器：累积待消费错误数，供 MCP 响应附 `new_errors_since_last_call` doorbell | `register_all.cpp`（响应后处理）、`runtime_ops.cpp`（游戏 runtime_error 计数） |
 | `editor_readiness` | `editor_readiness.cpp/hpp` | 编辑器导入/扫描进行中检测与 retryable 软错误构造，reimport 类工具的门控 | `resource_ops`（reimport/save 类 handler） |
 | `ServerContext` | `server_context.cpp/hpp` | MCP 服务器组装、端口解析、启动/停止/重启、工具/资源/prompt 注册 | `main.cpp` 入口 |
-| `PluginConfig` | `plugin_config.cpp/hpp` | 插件自身配置持久化（`user://godot_autopilot/config.json`，当前含 port、show_time（Show timestamps 开关持久化，默认 true）、desensitize（脱敏开关持久化，默认 true）与 allow（能力授权列表，默认空=拒绝）） | `ServerContext` 端口解析（`load_port`）、`McpConfigDock` Apply（`save_port`）与 Allow code_execute 复选框（`load_allow`/`save_allow`）及 Desensitize data 复选框（`load_desensitize`/`save_desensitize`）、`McpLogDock` 时间前缀（`load_show_time`/`save_show_time`）、`authorization::capability_enabled`（经注册的 AllowProvider 每次调用读取）、`sanitize_policy::initialize`（环境变量未设置时） |
+| `PluginConfig` | `plugin_config.cpp/hpp` | 插件自身配置持久化：**工程级** `config.json`（端口偏好 `port`）与**全局级** `config.json`（`show_time` Show timestamps 开关持久化，默认 true；`desensitize` 脱敏开关持久化，默认 true；`allow` 能力授权列表，默认空=拒绝）；新路径缺键时**回退读旧 `user://godot_autopilot/config.json`** 并注明来源 | `ServerContext` 端口解析（`load_port`）、`McpConfigDock` Apply（`save_port`）与 Allow code_execute 复选框（`load_allow`/`save_allow`）及 Desensitize data 复选框（`load_desensitize`/`save_desensitize`）、`McpLogDock` 时间前缀（`load_show_time`/`save_show_time`）、`authorization::capability_enabled`（经注册的 AllowProvider 每次调用读取）、`sanitize_policy::initialize`（环境变量未设置时） |
+| `HomeResolver` | `gda_home.cpp/hpp`（10-21 新增） | 家目录**集中根**解析：显式覆写环境变量 `GODOT_AUTOPILOT_HOME` → 平台环境变量（Windows `USERPROFILE` / POSIX `HOME`）→ 派生兜底（Windows 由 `%APPDATA%` 上溯两级；POSIX 由数据目录 `XDG_DATA_HOME` 或 `$HOME/.local/share` 上溯两级）→ 结果校验（形状校验 + 必须是已存在目录，首个通过者胜出，全不通过则返回空串并记 Warning） | `ProjectStore::root_dir`、`ServerContext::write_instance_record`（写 `gda_home` 字段） |
+| `ProjectStore` | `project_store.cpp/hpp`（10-21 新增） | 存储布局解析：集中根目录名 `GDA_HOME_DIR_NAME`（`.godot-autopilot`）、工程目录名 `<工程目录名>-<路径 FNV-1a 哈希前 8 位>`（工程名经非法字符替换并截断 40 字符）、全局配置路径、工程级配置路径、全局实例索引路径、工程级实例目录 | `StoragePaths`、`InstanceRegistry`、`api_token`（令牌文件路径） |
+| `StoragePaths` | `storage_paths.cpp/hpp`（10-21 新增） | 语义化存储路径门面：全局配置、工程目录、工程配置、`logs/`、`traces/`、`captures/` 六个目录的绝对路径 | `LogPersist`（日志/轨迹落盘）、`capture_ops`（截图落盘）、`PluginConfig` |
+| `InstanceRegistry` | `instance_registry.cpp/hpp`（10-21 新增） | 实例登记：单实例记录读写删 + **全局索引重建**（遍历全部工程目录下的实例文件汇总写回 `<集中根>/instances.json`）；记录含 `instance_id`/`port`/`pid`/`project_path`/`api_token`/`endpoints`/`gda_home`/`started_at`/`version` | `ServerContext::write_instance_record` / `remove_instance_record`、CLI 侧发现链 |
+| `LegacyStore` | `legacy_store.cpp/hpp`（10-21 新增） | 遗留数据兼容：旧目录 `user://godot_autopilot` 定位、配置项**回退选取**（新路径缺键时取旧路径并标记来源）、按相对路径分类（全局配置 / 日志 / 轨迹 / 截图）、**复制式**导入规划与执行（不覆盖已存在目标、不删除源） | `PluginConfig`（回退读取）、`McpConfigDock`（导入入口） |
+| `PortResolver` | `port_resolver.cpp/hpp`（10-21 新增） | 端口分配：显式（环境变量）/ 配置偏好 / 自动分配三级判定 + 候选序列生成（先默认端口 9527，其后 `20000 + (进程号 mod 10000)` 起连续到 29999 并回绕） | `ServerContext::bind_transport` |
 | 版本宏 | `version.hpp.in`（configure_file 模板，生成 `<build>/generated/version.hpp`） | 定义 `GDA_VERSION` 字符串宏，取自根 `VERSION` 文件单一来源 | `server_context.cpp`（MCP `server_info`）、`register_all.cpp`（`system_status.version`）、`log_persist.cpp`（trace `session_start` 头的 `gda_version`） |
 
 ## 关键接口清单
@@ -89,14 +96,14 @@ resource: src/core/
 
 可重放的本地日志/事件持久化：常规写盘统一在主线程 flush 中完成（`write_trace_now` 是唯一的旁路，与主线程 flush 共用同一条持锁写盘通道）：
 
-- `init_session()` — 生成会话 id（`new_trace_id()`）与 UTC 时间戳 `%Y%m%d_%H%M%S`；递归创建 `user://godot_autopilot/logs` 与 `.../traces`；先 `rotate_on_init()` 修剪两目录（含 `traces/images/`，按前缀/后缀匹配文件，保留最近 `kMaxFiles = 20` 个且总量 ≤ `kMaxTotalBytes = 50 MiB`，`should_prune` 判定，按 mtime 从旧到新删），再入队一条 `{"type":"session_start","session_id","gda_version","stamp"}` trace 头；09-21 起 `init_session` 重置日志/轨迹游标（`last_log_serial_`/`last_trace_seq_`），rotate/prune 经 `note_rotation`/`note_pruned` 累加健康计数并发 `kind=persist_health` 事件
+- `init_session()` — 生成会话 id（`new_trace_id()`）与 UTC 时间戳 `%Y%m%d_%H%M%S`；递归创建工程级 `logs` 与 `traces` 目录（10-21 起经 `StoragePaths::log_dir()` / `trace_dir()` 定位到集中根下的工程目录，不再是 `user://godot_autopilot/`）；先 `rotate_on_init()` 修剪两目录（含 `traces/images/`，按前缀/后缀匹配文件，保留最近 `kMaxFiles = 20` 个且总量 ≤ `kMaxTotalBytes = 50 MiB`，`should_prune` 判定，按 mtime 从旧到新删），再入队一条 `{"type":"session_start","session_id","gda_version","stamp"}` trace 头；09-21 起 `init_session` 重置日志/轨迹游标（`last_log_serial_`/`last_trace_seq_`），rotate/prune 经 `note_rotation`/`note_pruned` 累加健康计数并发 `kind=persist_health` 事件
 - 增量拉取：`flush_on_main_thread()` 以 `last_log_serial_`（对 `LogSystem::next_index()`/`query_from`）与 `last_trace_seq_`（对 `TraceRecorder::next_seq()`/`query_since`）为游标，把新日志经 `format_human_line` 格式化为 `[wall_ms] [level] [category] summary | detail`（含 detail）经 `append_persist_file` 追加到 `gda-<stamp>.log`（Godot `FileAccess` + `seek_end`），把 trace 事件经 `to_json_line` 汇总后经 `append_trace_payload` 追加到 `trace-<stamp>.jsonl`（`std::ofstream` + `std::ios::app`，持 `mutex_`）；两条写入缓冲上限均为 `kBufferCap = 20000`（互斥保护，超限丢最旧）；09-21 起 flush 用 `LockProbe`（阈值 10ms，超阈值才记录）测量互斥锁等待，缓冲溢出丢最旧时累加 `dropped_log_lines`/`dropped_trace_lines`
 - `write_trace_now(const std::string&)`（09-29 新增）— 线程安全的即时追加：与 `flush_on_main_thread` 的批量追加**统一到同一条持锁通道** `append_trace_payload()`（`log_persist.cpp:361-375`）——持 `mutex_` 后以 `std::ofstream` + `std::ios::app` 追加到 `trace_os_path_`（`init_session` 主线程经 `ProjectSettings::globalize_path` 求得的 OS 路径）并 flush；成功累加 `bytes_written`，失败累加 `flush_failures` 并仅首次记 System Warning。供 dispatch 超时等关键观测绕过内存缓冲直接落盘
 - **trace 写盘单通道**：`flush_on_main_thread()` 的批量 trace 追加与 `write_trace_now()` 的即时追加都走 `append_trace_payload()`，不再有「一条持锁、一条走不持锁的 Godot `FileAccess` + `seek_end` 追加」的双通道
 - 写失败降级：`FileAccess` 以 `READ_WRITE` 打开失败时回退 `WRITE`（前者不创建新文件），仍失败或 `store_string` 失败时 `write_failed_` 置位——仅首次记一条 System 错误日志，本会话后续 flush 丢弃缓冲、不再重试；09-21 起每次失败累加 `flush_failures` 并发 `kind=persist_health` 事件
 - `store_trace_image(span_id, kind, base64_png)` — **不在 transport 线程落盘**：脱敏开启时直接返回空串（`image_ref` 为空，jsonl 内仍保留 `image_hash`/`image_bytes`/`image_width`/`image_height`）；否则仅 base64 解码、拼出 `traces/images/trace-<session>-<span>-<kind>.png` 的相对与绝对路径并入**主线程图片缓冲**（`enqueue_trace_image`），返回相对路径 `images/...` 作为 `image_ref`。真正写盘发生在主线程的 `flush_trace_images()` 内
 - `enqueue_trace_image(payload)` / `flush_trace_images()` — 图片缓冲（`image_buffer_`，上限 `kTraceImageBufferMaxEntries = 64` 条 / `kTraceImageBufferMaxBytes = 64 MiB`）溢出时**丢最旧**并累加 `dropped_trace_images`、记一条 System Warning；`flush_on_main_thread()` 末尾调 `flush_trace_images()`，经 Godot `FileAccess`（`WRITE`）逐张落盘，成功时累加 `bytes_written`（**`bytes_written` 的图片部分累加点在落盘处，不再在 `store_trace_image` 处**）
-- 健康计数（09-21 新增，10-20 增补 `dropped_trace_images`）：`dropped_log_lines()`/`dropped_trace_lines()`/`dropped_trace_images()`/`bytes_written()`/`flush_failures()`/`rotations()`/`pruned_files()` 访问器 + `health_summary()`（汇总文本，含 `dropped_trace_images`），随 `kind=persist_health` 事件一并落盘；`trace_dir()` 返回 `user://godot_autopilot/traces`（供 McpLogDock 「Open Traces」按钮使用）
+- 健康计数（09-21 新增，10-20 增补 `dropped_trace_images`）：`dropped_log_lines()`/`dropped_trace_lines()`/`dropped_trace_images()`/`bytes_written()`/`flush_failures()`/`rotations()`/`pruned_files()` 访问器 + `health_summary()`（汇总文本，含 `dropped_trace_images`），随 `kind=persist_health` 事件一并落盘；`trace_dir()` 返回工程级 `traces` 目录绝对路径（供 McpLogDock 「Open Traces」按钮使用）
 - 静态工具函数：`level_name`/`category_name`、`format_human_line`、`session_stamp_from_ticks`、`should_prune`（L1 `log_persist_test` 覆盖 8 项）
 
 ### TraceRecorder（单例，09-20 新增）
@@ -187,16 +194,74 @@ resource: src/core/
 
 ### PluginConfig（命名空间静态方法，非类实例）
 
-- `int load_port()` — 读 `user://godot_autopilot/config.json` 的 `port` 键；文件不存在/解析失败/非整数时返回 `-1`（表示未配置）
-- `bool save_port(int port)` — 写回 `{"port": N}`（先 `DirAccess::make_dir_recursive_absolute` 建目录，复用 `save_config_value` 合并写回保留其他键）；失败经 `save_config_value` 记 `log_detailed`（System 类别，detail 含 `path=`/`reason=`）并返回 false
-- `bool load_show_time()` — 读 `show_time` 键（`user://godot_autopilot/config.json` 的 `show_time`）；文件不存在/解析失败/非布尔时返回 `true`（默认开启，与配置面板 Show timestamps 开关一致）
-- `bool save_show_time(bool show)` — 写回 `{"show_time": bool}`（同经 `save_config_value` 合并写回）；失败经 `save_config_value` 记 `log_detailed`（System 类别，detail 含 `path=`/`reason=`）并返回 false
-- `bool load_desensitize()` — 读 `desensitize` 键（09-20 新增）；文件不存在/解析失败/非布尔时返回 `true`（脱敏默认开启）
-- `bool save_desensitize(bool value)` — 写回 `{"desensitize": bool}`（同经 `save_config_value` 合并写回）；失败经 `save_config_value` 记 `log_detailed`（System 类别，detail 含 `path=`/`reason=`）并返回 false
-- `std::string load_allow()` — 读 `allow` 键（逗号分隔能力列表）；文件不存在/解析失败/非字符串时返回空串
-- `bool save_allow(const std::string &allow)` — 写回 `{"allow": string}`（同经 `save_config_value` 合并写回）
+10-21 起配置读写**分流到两级文件**：端口偏好写**工程级** `config.json`，其余开关写**全局级** `config.json`；两级的读取都带旧路径回退。
+
+- `int load_port()` — 读**工程级** `config.json` 的 `port` 键（新路径 `StoragePaths::project_config_path()`）；新路径缺键时回退读旧 `user://godot_autopilot/config.json` 并记一条说明来源的日志；文件不存在/解析失败/非整数时返回 `-1`（表示未配置）
+- `bool save_port(int port)` — 写回工程级 `{"port": N}`（先 `DirAccess::make_dir_recursive_absolute` 建目录，复用 `save_config_value` 合并写回保留其他键）；失败经 `save_config_value` 记 `log_detailed`（System 类别，detail 含 `path=`/`reason=`）并返回 false
+- `bool load_show_time()` — 读**全局级** `config.json` 的 `show_time`（新路径缺键时同款回退）；文件不存在/解析失败/非布尔时返回 `true`（默认开启，与配置面板 Show timestamps 开关一致）
+- `bool save_show_time(bool show)` — 写回全局级 `{"show_time": bool}`（同经 `save_config_value` 合并写回）；失败经 `save_config_value` 记 `log_detailed`（System 类别，detail 含 `path=`/`reason=`）并返回 false
+- `bool load_desensitize()` — 读全局级 `desensitize` 键（09-20 新增；10-21 起同款回退）；文件不存在/解析失败/非布尔时返回 `true`（脱敏默认开启）
+- `bool save_desensitize(bool value)` — 写回全局级 `{"desensitize": bool}`（同经 `save_config_value` 合并写回）；失败经 `save_config_value` 记 `log_detailed`（System 类别，detail 含 `path=`/`reason=`）并返回 false
+- `std::string load_allow()` — 读全局级 `allow` 键（逗号分隔能力列表；10-21 起同款回退）；文件不存在/解析失败/非字符串时返回空串
+- `bool save_allow(const std::string &allow)` — 写回全局级 `{"allow": string}`（同经 `save_config_value` 合并写回）
 - **AllowProvider 桥接（09-13 下午起）**：`plugin_config.cpp` 的静态对象在构造时调用 `authorization::set_allow_provider(&PluginConfig::load_allow)`，使 `capability_enabled` 在无 `GODOT_AUTOPILOT_ALLOW` 环境变量时改读配置——每次调用实时读取，故配置改动下一次工具调用即生效
 - 消费方：`ServerContext::resolve_port()`（启动时 `load_port`）、`McpConfigDock::_on_apply_port()`（Apply 成功后 `save_port`）与 "Allow code_execute" / "Allow game_runtime" 复选框（`load_allow`/`save_allow`）及 "Desensitize data" 复选框（`load_desensitize`/`save_desensitize`，勾选同时经 `sanitize_policy::set_enabled` 立即生效）、`McpLogDock` 时间前缀开关（`load_show_time`/`save_show_time`，配置面板持久化）、`authorization`（能力门的 AllowProvider）、`sanitize_policy::initialize`（无 `GODOT_AUTOPILOT_DESENSITIZE` 时读取 `desensitize`）
+
+## 数据存储布局（集中根与工程目录，10-21 新增）
+
+插件数据从 `user://godot_autopilot/`（Godot 用户数据目录内）迁到**家目录集中根**。根目录名固定为 `.godot-autopilot`（常量 `GDA_HOME_DIR_NAME`）。
+
+### 集中根解析（四级来源）
+
+| 级 | 来源 | 平台 | 说明 |
+|---|---|---|---|
+| 1 | 显式覆写环境变量 `GODOT_AUTOPILOT_HOME` | 全平台 | 直接采用；形状不合法（非空、非文件系统根）时记 Warning 但仍返回该值 |
+| 2 | 平台环境变量 | Windows `USERPROFILE` / POSIX `HOME` | 首选的平台家目录（实现按 `HOME` → `USERPROFILE` 的顺序入候选，`HOME` 有值时先试它） |
+| 3 | 派生兜底 | Windows：`%APPDATA%` 上溯两级；POSIX：数据目录（`XDG_DATA_HOME`，未设则 `$HOME/.local/share`）上溯两级 | 家目录推不出来时的兜底 |
+| 4 | 结果校验 | 全平台 | 形状校验（非空、不是文件系统根）+ **必须是已存在目录**；按 1→3 顺序取**首个通过校验**的候选，全不通过则返回空串并记一条 Warning（`Unable to resolve the GDA home directory`） |
+
+> [!todo] 待补充
+>
+> - 第 1 级的覆写值只做**形状**校验、不做存在性校验（与 2/3 级不同），这是实现现状；是否改为统一校验待定。
+> - CLI 侧的家目录解析只有两级（`GODOT_AUTOPILOT_HOME` 覆写 → `os.homedir()`），**不做存在性校验**，与插件侧存在差异；差异清单见 [端口与实例登记](ports.md)「已知限制」。
+
+### 目录布局
+
+```
+<集中根>/                                  # 例：~/.godot-autopilot/（Windows: %USERPROFILE%\.godot-autopilot\）
+├── config.json                           # 全局配置（show_time / desensitize / allow）
+├── instances.json                        # 全局实例索引（所有在跑实例的快照）
+├── cli/                                  # CLI 自有状态目录（instances.json / instances.lock / logs/）
+│   └── ...
+└── projects/
+    └── <项目名>-<路径哈希前 8 位>/        # 工程级隔离目录
+        ├── config.json                   # 工程级配置（port 偏好）
+        ├── api_token                     # REST 令牌（32 字节随机值的十六进制）
+        ├── logs/                         # 人类可读日志 gda-<stamp>.log
+        ├── traces/                       # 结构化事件 trace-<stamp>.jsonl（+ images/）
+        ├── captures/                     # 截图 PNG
+        └── instances/
+            └── gda-<哈希>-<pid>-<启动毫秒>.json   # 单实例记录
+```
+
+- **工程目录名**：`<工程路径的目录名>-<归一化路径的 FNV-1a 十六进制摘要前 8 位>`；工程名经非法字符替换（`\/:*?"<>|` → `_`）并截断到 40 字符。**同名工程靠哈希区分**，两处同名工程不会互相覆盖。
+- **哈希稳定性**：对归一化路径（分隔符统一为 `/`）取 FNV-1a 摘要，故同一工程在任何平台、任何路径写法下都得到同一目录名。
+- **隔离粒度**：配置、日志、轨迹、截图、实例登记**全部按工程隔离**；只有全局配置与全局实例索引在集中根下共享。
+- **`api_token` 文件**：REST 令牌的落盘位置在**工程级**目录内（文件名 `api_token`，内容为 32 字节随机值的十六进制）；令牌同时写进实例登记，CLI 从全局索引读取。环境变量 `GODOT_AUTOPILOT_API_TOKEN` 一旦设置即完全覆盖文件，令牌文件不会被签发（也不需要）。
+
+### 遗留数据兼容
+
+旧目录 `user://godot_autopilot/` **不自动搬迁**——插件不删除、不搬走、不覆盖用户已有数据。三条兼容路径：
+
+| 场景 | 行为 |
+|---|---|
+| 配置项读取 | 新路径**缺该键**时回退读旧路径同键，并在日志中**注明来源**（含旧路径，每个键只记一次：`Plugin config value read from legacy path`）；新路径有该键则以新路径为准，旧值被忽略。回退选取由 `LegacyStore::select_config_value` 实现：新路径能解析且含该键即用它，新路径解析失败才退到旧路径 |
+| 数据文件（日志 / 轨迹 / 截图） | **不自动迁移**；只能通过控制面板的**复制式导入**入口显式导入 |
+| 控制面板导入 | 按钮 `Import Legacy Data (copy to new dir, old data kept)`——**只复制不覆盖**（目标已存在则跳过并计入 `skipped_existing`）、**不删除旧数据**、不支持的相对路径计入 `skipped_unsupported`；执行结果以摘要文本回显（复制数 / 跳过数 / 失败数） |
+
+导入的**相对路径分类**（`LegacyStore::classify_relative_path`）：`config.json` → 全局配置目录；`logs/` `traces/` `captures/` 下的文件 → 对应工程目录；其余相对路径归为不支持（`skipped_unsupported`）不复制。面板在启动时检测旧目录是否有内容，无内容时禁用导入按钮并提示 `No legacy data found at <path>`。
+
+不支持自动搬迁的理由：旧目录可能很大（日志与轨迹按会话累积），且用户可能仍在别的 Godot 版本里读它；静默搬运会同时打断两边。
 
 ## 线程模型
 
@@ -226,12 +291,14 @@ flowchart LR
 
 ## 环境变量与端口
 
-- `GODOT_AUTOPILOT_PORT`：`resolve_port()` 用 `std::getenv` 读取、`std::atoi` 转换（**无格式校验**）
-- 端口解析优先级：**环境变量 > `PluginConfig::load_port()`（user:// 持久化值，需 > 0）> `GDA_DEFAULT_PORT`（9527）**——环境变量优先保证测试/CI 场景不受面板配置影响
+- `GODOT_AUTOPILOT_PORT`：`ServerContext::resolve_explicit_port()` 用 `std::getenv` 读取、`std::atoi` 转换（**无格式校验**）
+- **端口解析优先级（10-21 起为三级）**：**环境变量 > 工程级配置偏好（`PluginConfig::load_port()`，需 > 0）> 自动分配**——环境变量优先保证测试/CI 场景不受面板配置影响；自动分配按候选序列顺延（先 9527，其后 `20000 + (进程号 mod 10000)` 起连续到 29999 并回绕），**显式指定的端口绑定失败时不自动更换**。控制面板 Apply 的运行期改端口（`kUserApplied`）优先级最高。完整口径见 [端口与实例登记](ports.md)
 - `GODOT_AUTOPILOT_HOST`：`resolve_host()` 用 `std::getenv` 读取，非空即生效；默认环回绑定 `127.0.0.1`，`ServerContext::start()` 拒绝非环回地址
 - 运行时改端口：`ServerContext::restart(uint16_t)`（配置面板 Apply 触发，成功后经 `PluginConfig::save_port` 持久化）
 - `GDA_FORCE_HEADLESS`：值为 `1` 时**禁用** cmdline 模式（强制建 UI/启服务器，语义与变量名相反；`main.cpp:52-60` 读取）
-- `GODOT_AUTOPILOT_DESENSITIZE`（09-20 新增）：脱敏开关的最高优先级来源，`0`/`false`/`off` 关闭、其余非空值开启；未设置时读 `user://godot_autopilot/config.json` 的 `desensitize` 键，再默认开启（`sanitize_policy::initialize`，仅在入口读取一次）
+- `GODOT_AUTOPILOT_HOME`（10-21 新增）：**家目录集中根的显式覆写**（指向家目录本身，根目录名 `.godot-autopilot` 由其拼出）；形状不合法时记 Warning。插件侧优先级最高，CLI 侧亦识别（但 CLI 只做两级解析，不做存在性校验）
+- `GODOT_AUTOPILOT_API_TOKEN`（10-21 新增）：REST 端点的 Bearer 令牌**外部注入入口**；一旦设置即完全覆盖令牌文件（既用于校验，也用于签发）
+- `GODOT_AUTOPILOT_DESENSITIZE`（09-20 新增）：脱敏开关的最高优先级来源，`0`/`false`/`off` 关闭、其余非空值开启；未设置时读**全局级** `config.json` 的 `desensitize` 键（10-21 起路径迁至集中根，新路径缺键时回退旧路径），再默认开启（`sanitize_policy::initialize`，仅在入口读取一次）
 - `GODOT_AUTOPILOT_PERF_INTERVAL_MS`（09-21 新增）：`perf_sampler` 采样周期毫秒数，默认 `5000`
 - `GODOT_AUTOPILOT_REQUEST_TIMEOUT_MS`（09-21 新增）：`perf_sampler` 请求超时看门狗阈值毫秒数，默认 `60000`
 - `GODOT_AUTOPILOT_DISPATCH_TIMEOUT_MS`（09-29 新增）：dispatch 主线程等待默认预算毫秒数，默认 `27000`（须低于传输硬上限 30000，保证超时错误能送达客户端）
@@ -244,7 +311,18 @@ flowchart LR
 
 | 常量 | 值 | 类型 | 主要用途 |
 |---|---|---|---|
-| `GDA_DEFAULT_PORT` | `9527` | `int` | MCP HTTP 默认端口 |
+| `GDA_DEFAULT_PORT` | `9527` | `int` | 默认监听端口（MCP 与 REST 共用） |
+| `GDA_PORT_CANDIDATE_BASE` | `20000` | `int` | 自动分配端口候选区间下界 |
+| `GDA_PORT_CANDIDATE_LIMIT` | `29999` | `int` | 自动分配端口候选区间上界（低于私有动态端口区间 32768） |
+| `GDA_PORT_PROBE_LIMIT` | `256` | `int` | 自动分配时最多探测的候选数（`static_assert` 不得超候选总数） |
+| `GDA_CONTROL_PORT_BASE` | `19900` | `int` | 控制面端口区间下界（`static_assert` 与自动分配区间不相交） |
+| `GDA_CONTROL_PORT_LIMIT` | `19999` | `int` | 控制面端口区间上界 |
+| `GDA_PRIVATE_PORT_BASE` | `32768` | `int` | 私有动态端口区间起点（自动分配区间必须在其下方） |
+| `GDA_MCP_PATH` | `"/mcp"` | `const char *` | MCP 协议端点路径（常量，不可配置） |
+| `GDA_API_PATH` | `"/api"` | `const char *` | REST 协议端点路径（常量，不可配置） |
+| `GDA_HOME_DIR_NAME` | `".godot-autopilot"` | `const char *` | 家目录集中根的目录名 |
+| `GDA_PROJECT_HASH_LENGTH` | `8` | `int` | 工程目录名中路径哈希的十六进制位数 |
+| `GDA_API_TOKEN_BYTES` | `32` | `int` | REST 令牌随机字节数（`static_assert` ≥ 16，即至少 128 bit 熵） |
 | `GDA_HEALTHY_ACTIVITY_THRESHOLD_MS` | `3000` | `int64_t` | `get_game_status` 健康判定阈值（`game_bridge.cpp`） |
 | `GDA_DEFAULT_TIMEOUT_MS` | `5000` | `int64_t` | 默认操作超时 |
 | `GDA_MAX_TIMEOUT_MS` | `30000` | `int64_t` | 通用超时上限（`gda_send` / `input_sequence` 等工具的 `timeout_ms` 钳制上限） |
@@ -281,7 +359,7 @@ flowchart LR
 | README.md / README.zh-CN.md（前提） | "Godot 4.7+"（`README.md:5,53` / `README.zh-CN.md:5,53`） | demo 工程为 4.7（`demo/*/project.godot`），AGENTS.md 亦写 4.7 | 一致 ✓ |
 | README.md / README.zh-CN.md（安装） | "服务端自动启动……无需启用开关"（`README.md:65` / `README.zh-CN.md:65`） | cmdline/`GDA_FORCE_HEADLESS` 模式下 UI 与服务器被禁用（`main.cpp`） | 存在例外，描述不完整 |
 | AGENTS.md（架构/端口段） | 端口 9527、`/mcp`、`GODOT_AUTOPILOT_PORT` 覆盖、日志类别五枚举 | 全部与代码一致 | 一致 ✓ |
-| README.md / README.zh-CN.md（安全段） | 回环监听 + 端口 9527 + `/mcp`（`README.md:65` / `README.zh-CN.md:65`） | 与 `server_context.cpp` 一致 | 一致 ✓ |
+| README.md / README.zh-CN.md（安全段） | 回环监听 + 端口 9527 + `/mcp`（`README.md:65` / `README.zh-CN.md:65`） | 环回与 `/mcp` 仍成立，但同端口新增了 `/api`（REST 面，需 Bearer 令牌），且端口可被自动分配到 20000–29999 | **描述不完整**（缺 REST 端点与自动分配端口） |
 | AGENTS.md | 日志类别 "仅此几个：System、Transport、Tools、Resources、Prompts" | `LogCategory` 枚举完全相同 | 一致 ✓ |
 
 ## 相关页面
@@ -289,3 +367,6 @@ flowchart LR
 - 入口：由 [../index.md](../index.md) 链接
 - 模块总览：[../overview.md](../overview.md)
 - 测试覆盖：[../tests.md](../tests.md)
+- 端口与实例登记：[ports.md](ports.md)
+- REST 接口面：[api.md](api.md)
+- 工具注册表（统一执行入口与授权三档）：[tools_registry.md](tools_registry.md)

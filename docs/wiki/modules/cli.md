@@ -1,14 +1,15 @@
 ---
 type: 模块文档
 title: CLI 载体（gda）
-description: Bun + TypeScript 源码直跑的 MCP 命令行载体：分发、命令参考、寻址链、登记表、生命周期、协议握手与已知限制
+description: Bun + TypeScript 源码直跑的 MCP / REST 命令行载体：分发、命令参考、七级寻址链、登记表与集中根位置、REST 令牌读取、生命周期、协议握手与已知限制
 tags:
   - 模块
   - CLI
   - Bun
   - TypeScript
   - MCP
-timestamp: "2026-10-20T02:55:00+08:00"
+  - REST
+timestamp: "2026-10-21T00:37:30+08:00"
 resource:
   - cli/
   - package.json
@@ -17,9 +18,9 @@ resource:
 
 # CLI 载体（`cli/`，命令 `gda`）
 
-> 审计日期：2026-10-20（10-20 随技能书调用阶梯收敛批次同步——技能书自带的脚本桥 `gda.mjs` 与 `references/script-access.md` 删除，调用阶梯由五级收敛为三级（原生 MCP → GDA CLI → 手动兜底），本载体成为唯一的脚本化调用通道；`bunx`、全局安装与独立二进制是同一载体的三种分发方式，合为阶梯第二级；10-20 随守卫覆盖范围措辞修正批次同步——`version_sync_guard` 已扩展为扫描 `skills/` 全部文本文件与根 `README*.md` 的每一处版本钉（另含 `VERSION`/`CLI_VERSION` 两个值源），本页与 [测试体系](../tests.md) 描述的守卫覆盖范围本轮按守卫脚本实况改正，固定处数的旧口径已删除，覆盖范围以守卫脚本为准；10-20 随 CLI 启动回滚修复批次同步——Windows 启动路径**不再**用 `cmd /c start "" /b` 蹦床 + `netstat` 端口反查 pid，改为直连 `spawn` 并置 `detached: true` 脱父，pid 由 `spawn` 直接返回（编辑器从未监听端口时端口反查必然失败，回滚拿不到 pid、失败后编辑器进程成为孤儿）；`isAlive` 改为解析 `tasklist /FO CSV` 的 pid 字段，**与系统语言无关**（旧实现按输出是否以 `INFO`/`消息` 开头判断，中文 Windows 实际输出「信息:」导致恒判存活，终止确认轮询超时并把已终止进程报成「无法终止」）；失败回滚的三种结果 `was terminated` / `had already exited` / `could not be terminated`（后者附可执行补救指令：Windows `taskkill /F /T /PID N`、POSIX `kill -9 N`）；引擎不可执行时报 `failed to launch the editor executable: ENOENT: …` 而非笼统的 failed to spawn；CLI TS 单测 126→132（9 个文件）；10-19 随 CLI 引擎定位收窄批次同步——`gda start` 不再读 `GODOT_PATH` 与 `<project>/.env`（前者仅 L2 引擎测试使用，生产环境不存在），可执行文件链收敛为 `--godot` > PATH，未命中即报错提示 `--godot`；新增 `cli/tests/process.test.ts` 3 项（TS 108→111、expect 301→310）；随 MCP 协议版本协商修正批次同步——`cli/src/mcp/client.ts` 与技能书 `gda.mjs` 脚本桥声明版本 `2025-03-26`→`2025-11-25`（SDK 旧世代当前版本，GDA 未钉 `ServerOptions::protocol_version` 时服务端对旧版声明原样尊重）；2026-10-19（随 CLI 跨平台修复批次同步——`userDataBase()` 新增 `GODOT_AUTOPILOT_USERDATA` 显式覆写（未设或空白走原生分支，既有解析语义不变）；握手状态由进程级单例改按目标 URL 键控（多目标进程各自握手）；新增 initialize 响应 `result.protocolVersion` 协商版本学习（仅已知五版本表内），后续 POST 按学习值携带 `MCP-Protocol-Version` 头（modern 声明学习值不发头，规避 stateless 传输 hold-open 长连接）；新增 `cli/tests/client_handshake.test.ts` 6 项，TS 单测 102→108 用例 / 6→7 文件；`test_cli_contract.py` mock initialize 响应同步 `2025-11-25`）；2026-10-18（随 CLI 载体落地批次同步——新增 `cli/`（Bun + TS 源码直跑，零运行时依赖）、根 `package.json`/`bun.lock`；双载体（CLI + `gda.mjs`）协议握手升级为标准 MCP `initialize` 流程（SDK 0.3.7 兼容）；真机验收修复两个缺陷（Windows 脱父、start 就绪探测直达标志）；测试稳定性修复（串行化 + Windows 清理时序）；`version_sync_guard`/`cli_contract`/`cli_unit` 三个新 ctest 点；详见 [changelog/2026-10-18-log.md](../changelog/2026-10-18-log.md)）
+> 审计日期：2026-10-21（10-21 随开放接口面落地批次同步——新增 **REST 调用族** `gda api list` / `gda api describe` / `gda api call` 与端点展示命令 `gda endpoints`；**寻址链由六级改为七级**（`--port` ＞ `--id` ＞ 环境变量 ＞ CLI 本地注册表 ＞ 插件全局实例索引 ＞ 旧路径回退 ＞ 默认 9527），每一级都记录来源（`source`）与链位（`chain`），`gda endpoints` 一次性打印端口/来源/链位/两个端点/存活结果；新增全局选项 `--query`（`api list` 关键字过滤）与 `--probe`（存活校验级别：`light` TCP / `strict` HTTP 探活）；**CLI state dir 迁到集中根下** `<集中根>/cli/`（`GODOT_AUTOPILOT_CLI_HOME` 仍可覆写），**插件全局实例索引**新增为第 5 级来源（`<集中根>/instances.json`），REST 令牌从该索引的 `api_token` 字段读取；集中根由 `GODOT_AUTOPILOT_HOME` 覆写、否则取 `os.homedir()`，其下固定目录名 `.godot-autopilot`；端口模型与登记结构的完整口径见 [端口与实例登记](ports.md)，REST 端点契约见 [REST 接口面](api.md)；本轮校订补三处事实——① 正文「寻址链」小节按 `src/target.ts` 的七级实现重写（旧正文仍是六级链，且 `--id` / `--port` 次序与实现相反），补 `source` / `chain` 两列与两级存活校验；② state dir 解析按 `src/registry.ts` 改正为 `GODOT_AUTOPILOT_CLI_HOME` > `<集中根>/cli/`（旧正文写的是 `%LOCALAPPDATA%` / `XDG_STATE_HOME`），并新增「集中根与两套注册表」小节写令牌读取方式；③ 全局选项表删去已移除的 `--quiet`、补 `--query` 与 `--probe`；10-20 随技能书调用阶梯收敛批次同步——技能书自带的脚本桥 `gda.mjs` 与 `references/script-access.md` 删除，调用阶梯由五级收敛为三级（原生 MCP → GDA CLI → 手动兜底），本载体成为唯一的脚本化调用通道；`bunx`、全局安装与独立二进制是同一载体的三种分发方式，合为阶梯第二级；10-20 随守卫覆盖范围措辞修正批次同步——`version_sync_guard` 已扩展为扫描 `skills/` 全部文本文件与根 `README*.md` 的每一处版本钉（另含 `VERSION`/`CLI_VERSION` 两个值源），本页与 [测试体系](../tests.md) 描述的守卫覆盖范围本轮按守卫脚本实况改正，固定处数的旧口径已删除，覆盖范围以守卫脚本为准；10-20 随 CLI 启动回滚修复批次同步——Windows 启动路径**不再**用 `cmd /c start "" /b` 蹦床 + `netstat` 端口反查 pid，改为直连 `spawn` 并置 `detached: true` 脱父，pid 由 `spawn` 直接返回（编辑器从未监听端口时端口反查必然失败，回滚拿不到 pid、失败后编辑器进程成为孤儿）；`isAlive` 改为解析 `tasklist /FO CSV` 的 pid 字段，**与系统语言无关**（旧实现按输出是否以 `INFO`/`消息` 开头判断，中文 Windows 实际输出「信息:」导致恒判存活，终止确认轮询超时并把已终止进程报成「无法终止」）；失败回滚的三种结果 `was terminated` / `had already exited` / `could not be terminated`（后者附可执行补救指令：Windows `taskkill /F /T /PID N`、POSIX `kill -9 N`）；引擎不可执行时报 `failed to launch the editor executable: ENOENT: …` 而非笼统的 failed to spawn；CLI TS 单测 126→132（9 个文件）；10-19 随 CLI 引擎定位收窄批次同步——`gda start` 不再读 `GODOT_PATH` 与 `<project>/.env`（前者仅 L2 引擎测试使用，生产环境不存在），可执行文件链收敛为 `--godot` > PATH，未命中即报错提示 `--godot`；新增 `cli/tests/process.test.ts` 3 项（TS 108→111、expect 301→310）；随 MCP 协议版本协商修正批次同步——`cli/src/mcp/client.ts` 与技能书 `gda.mjs` 脚本桥声明版本 `2025-03-26`→`2025-11-25`（SDK 旧世代当前版本，GDA 未钉 `ServerOptions::protocol_version` 时服务端对旧版声明原样尊重）；2026-10-19（随 CLI 跨平台修复批次同步——`userDataBase()` 新增 `GODOT_AUTOPILOT_USERDATA` 显式覆写（未设或空白走原生分支，既有解析语义不变）；握手状态由进程级单例改按目标 URL 键控（多目标进程各自握手）；新增 initialize 响应 `result.protocolVersion` 协商版本学习（仅已知五版本表内），后续 POST 按学习值携带 `MCP-Protocol-Version` 头（modern 声明学习值不发头，规避 stateless 传输 hold-open 长连接）；新增 `cli/tests/client_handshake.test.ts` 6 项，TS 单测 102→108 用例 / 6→7 文件；`test_cli_contract.py` mock initialize 响应同步 `2025-11-25`）；2026-10-18（随 CLI 载体落地批次同步——新增 `cli/`（Bun + TS 源码直跑，零运行时依赖）、根 `package.json`/`bun.lock`；双载体（CLI + `gda.mjs`）协议握手升级为标准 MCP `initialize` 流程（SDK 0.3.7 兼容）；真机验收修复两个缺陷（Windows 脱父、start 就绪探测直达标志）；测试稳定性修复（串行化 + Windows 清理时序）；`version_sync_guard`/`cli_contract`/`cli_unit` 三个新 ctest 点；详见 [changelog/2026-10-18-log.md](../changelog/2026-10-18-log.md)）
 
-> 覆盖范围：`cli/` 全部（`bin/gda.ts` 入口、`src/` 11 模块、`src/commands/` 10 命令、`src/mcp/client.ts` 协议客户端、`tests/` 9 测试文件）+ 根 [`package.json`](../../../package.json) 与 [`bun.lock`](../../../bun.lock)。CLI 是技能书调用阶梯的第二级（原生 MCP → **GDA CLI** → 手动兜底），定位与分发见下文。
+> 覆盖范围：`cli/` 全部（`bin/gda.ts` 入口、`src/` 12 个顶层 .ts + `src/api/client.ts`、`src/mcp/client.ts`、`src/commands/` 15 个 .ts 共 29 个 .ts、`tests/` 11 测试文件）+ 根 [`package.json`](../../../package.json) 与 [`bun.lock`](../../../bun.lock)。CLI 是技能书调用阶梯的第二级（原生 MCP → **GDA CLI** → 手动兜底），定位与分发见下文。
 
 ## 定位与分发
 
@@ -69,6 +70,22 @@ resource:
 | `stop` | 停止进程（默认优雅，`--force` 强杀） |
 | `logs` | 查看进程日志（state dir `logs/<id>.log`，默认末尾 50 行） |
 
+### REST 调用族（3 个 + 1 个端点展示，10-21 新增）
+
+这四个命令**不走 MCP 协议**，直连同端口的 `/api` 端点面（端点契约见 [REST 接口面](api.md)）。
+
+| 命令 | 映射到 REST | 说明 |
+|---|---|---|
+| `api list [query]` | `GET /api/tools` | 列工具；`--query` / `--category` / `--tags` 过滤（这三个选项只对本子命令有效） |
+| `api describe <tool>` | `GET /api/tools/<tool>` | 单工具详情（schema 与 `side_effect`） |
+| `api call <tool>` | `POST /api/tools/<tool>` | 调用工具；`--args` / `--args-file` 传参（**请求体就是参数对象**，无外层包装） |
+| `endpoints` | 存活探针（`GET /api`，严格级别） | 展示发现到的 MCP 与 REST 两个端点、端口来源、链位与存活结果 |
+
+- `api` 必须带子命令（`list` / `describe` / `call`），缺省或未知子命令报用法错误（退出码 3）。
+- `api call` 的 `--args` / `--args-file` 只对本子命令有效，传给其它子命令报用法错误。
+- **令牌来源**：从插件全局实例索引（`<集中根>/instances.json`）匹配到的记录里读 `api_token`；取不到时报传输错误 `no API token is available for port N (source …)`，并提示从实例登记的 `api_token` 字段读取。
+- **状态码 → 退出码映射**（[`src/api/client.ts`](../../../cli/src/api/client.ts) 的 `mapStatusToExitCode`）：2xx → 0；**400 / 404 / 405 / 409 / 422 → 3（用法错误）**；其余（401 / 403 / 413 / 429 / 5xx）→ 2（传输失败）。
+
 ### 全局选项（[`src/args.ts`](../../../cli/src/args.ts)）
 
 | 选项 | 类型 | 适用 | 说明 |
@@ -78,12 +95,11 @@ resource:
 | `--project <text>` | 字符串 | 调用族/start/stop | 工程路径 |
 | `--pretty` | 布尔 | 输出 | 缩进 2 空格 |
 | `--raw` | 布尔 | 输出 | 原始信封（图片 data 脱敏为 `<redacted N bytes>`） |
-| `--quiet` | 布尔 | 输出 | 静默模式 |
 | `--timeout <text>` | 字符串 | 调用族 | 调用超时秒数（默认 60） |
-| `--category <text>` | 字符串 | search | 按类别过滤 |
-| `--tags <text>` | 字符串 | search | 按标签过滤（逗号分隔） |
-| `--args <json>` | 字符串 | call | 工具参数（JSON 字符串） |
-| `--args-file <path>` | 字符串 | call | 工具参数（JSON 文件） |
+| `--category <text>` | 字符串 | search / api list | 按类别过滤 |
+| `--tags <text>` | 字符串 | search / api list | 按标签过滤（逗号分隔） |
+| `--args <json>` | 字符串 | call / api call | 工具参数（JSON 字符串） |
+| `--args-file <path>` | 字符串 | call / api call | 工具参数（JSON 文件） |
 | `--save-images <dir>` | 字符串 | 调用族 | 保存返回图片到目录 |
 | `--godot <path>` | 字符串 | start | 显式指定 Godot 可执行文件 |
 | `--wait <sec>` | 字符串 | start/stop | 就绪/停止等待秒数（0=不等待） |
@@ -92,7 +108,11 @@ resource:
 | `--play` | 布尔 | start | 就绪后播放当前场景 |
 | `--no-import` | 布尔 | start | 跳过启动时资源导入 |
 | `--force` | 布尔 | stop | 强制停止进程 |
+| `--query <text>` | 字符串 | api list | 关键字过滤（只对本子命令有效） |
+| `--probe <level>` | 字符串 | api / endpoints | 存活校验级别：`light`（默认，TCP）或 `strict`（HTTP 探活） |
 | `--help` / `--version` | 布尔 | — | 帮助 / 版本 |
+
+`--quiet` 已被移除，不在 `gda --help` 中；传入会报用法错误（退出码 3）。诊断本就只走 stderr，该开关没有价值。
 
 选项支持 `--opt=value` 与 `--opt value` 两种形式；`--` 之后全为位置参数。`--id`/`--port`/`--project` 互斥（同时指定报 `use only one of --id/--port/--project`）。
 
@@ -114,25 +134,40 @@ resource:
 
 ## 寻址链（[`src/target.ts`](../../../cli/src/target.ts)）
 
-`--id`/`--port`/`--project` 互斥。解析顺序：
+`--id`/`--port`/`--project` 互斥（同时指定报 `use only one of --id/--port/--project`）。解析是**七级优先链**，每一级都记录来源（`source`）与链位（`chain`）：
 
-| 优先级 | 来源 | 行为 |
-|---|---|---|
-| 1 | `--id` | registry 查找，须存活，否则报 `unknown instance` |
-| 2 | `--port` | 直接端口（1–65535，非法报用法错误） |
-| 3 | `--project` | registry 活实例 → trace(`server_ready`) → config.json → 9527 |
-| 4 | `GODOT_AUTOPILOT_PORT` env | 环境变量端口 |
-| 5 | cwd registry 活实例 | 当前工程已登记实例 |
-| 6 | trace/config | 当前工程 trace(`server_ready`) → config.json |
-| 7 | 默认 9527 | 兜底 |
+| 优先级 | 链位 `chain` | 来源 | `source` | 行为 |
+|---|---|---|---|---|
+| 1 | `port` | `--port` | `cli` | 直接端口（1–65535，非法报用法错误） |
+| 2 | `id` | `--id` | `id` | CLI 本地注册表按实例 ID 查找，**须进程存活**，否则报 `unknown instance` |
+| 3 | `env` | `GODOT_AUTOPILOT_PORT` 环境变量 | `env` | 环境变量端口 |
+| 4 | `cli-registry` | CLI 本地注册表 | `project` / `cwd` | 按工程路径（`--project` 或当前工作目录）找**存活**实例 |
+| 5 | `plugin-index` | 插件全局实例索引 | `registry` | 读 `<集中根>/instances.json`，按工程路径匹配（**不要求进程存活**） |
+| 6 | `legacy` | 旧路径回退 | `trace` / `config` | 旧 `user://godot_autopilot/` 下的 `server_ready` trace → `config.json` 取端口 |
+| 7 | `default` | 默认 | `default` | 9527 |
 
-即无显式选项时的环境链为 **env → cwd 登记 → trace → config → 9527**。
+无显式选项时的环境链为 **env → cwd 登记 → 插件全局索引 → trace → config → 9527**。
+
+**回溯**：`gda endpoints` 一次性打印命中的端口、`source`、`chain`、两个端点的完整视图（host / port / path / protocol / auth）与存活探针结果；`gda api` 在端点不可达时把「端口 + 来源 + 链位」写进错误信息。
+
+**存活校验两级**（[`src/probe.ts`](../../../cli/src/probe.ts)）：轻量（默认）只做 TCP 连接探测（800ms 超时），端口能连上即视为存活；严格在轻量之上再对端点 URL 发一次 HTTP GET，能应答才算存活（REST 面的 401 也算应答成功）。严格级别能识别「端口被非 HTTP 服务占用」的假阳性。
 
 **Godot userdata 目录解析**（trace/config 两级定位用，[`src/platform.ts`](../../../cli/src/platform.ts) `userDataBase()`）：`GODOT_AUTOPILOT_USERDATA` 显式覆写 > `%APPDATA%\Godot\app_userdata`（Windows）/ `~/Library/Application Support/Godot/app_userdata`（macOS）/ `~/.local/share/godot/app_userdata`（其他平台）。覆写变量供测试与非常规安装路径绕过平台推断，未设或为空白时走原生分支（既有解析语义不变）；其下再按 `<userdata>/<project_name>/godot_autopilot/` 读 `server_ready` trace 与 `config.json`。
 
+## 集中根与两套注册表
+
+**集中根解析**（[`src/platform.ts`](../../../cli/src/platform.ts) `gdaHome()` / `gdaRoot()`）：`GODOT_AUTOPILOT_HOME` 显式覆写 > `os.homedir()`，其下固定目录名 `.godot-autopilot`（`GDA_HOME_DIR_NAME`）。插件侧的解析是四级（另含平台环境变量与派生兜底，且候选必须是已存在目录），CLI 侧只有两级——差异见 [端口与实例登记](ports.md)「已知限制」。
+
+| 注册表 | 位置 | 记录者 | 用途 |
+|---|---|---|---|
+| CLI 本地注册表 | `<集中根>/cli/instances.json`（state dir 可由 `GODOT_AUTOPILOT_CLI_HOME` 覆写） | `gda start` | CLI 自己拉起的编辑器实例 |
+| 插件全局实例索引 | `<集中根>/instances.json` | 插件（编辑器进程内） | 所有在跑的插件实例，含端口、进程号与 REST 令牌 |
+
+**令牌读取方式**：`gda api` 先按寻址链解析目标，再从插件全局实例索引里按端口 / 工程路径匹配记录，取其 `api_token` 字段作为 `Authorization: Bearer <令牌>` 头；取不到时报传输错误 `no API token is available for port N (source …)`，并提示从实例登记的 `api_token` 字段读取（索引路径由 `pluginIndexPath()` 打印在提示里）。
+
 ## 登记表（[`src/registry.ts`](../../../cli/src/registry.ts)）
 
-**state dir 解析**：`GODOT_AUTOPILOT_CLI_HOME` > `%LOCALAPPDATA%\godot-autopilot`（Windows）/ `$XDG_STATE_HOME/godot-autopilot` > `$HOME/.local/state/godot-autopilot`（非 Windows）。无法确定时报错并提示设 `GODOT_AUTOPILOT_CLI_HOME`。
+**state dir 解析**：`GODOT_AUTOPILOT_CLI_HOME` 显式覆写 > `<集中根>/cli/`（即 `gdaRoot()` 下固定目录名 `cli`）。无法确定时报错并提示设 `GODOT_AUTOPILOT_CLI_HOME`。
 
 **`instances.json` schema**：
 
@@ -206,24 +241,30 @@ resource:
 2. **GDA CLI**（本载体；`bunx`、全局安装、独立二进制是同一载体的三种分发方式）
 3. **手动指南**（无 CLI 可用，[`manual-fallback.md`](../../../skills/godot-autopilot-tools/references/manual-fallback.md)）
 
+技能书另有一份 **REST 接口参考**（[`rest-api.md`](../../../skills/godot-autopilot-tools/references/rest-api.md)）：REST 面与 MCP 面共用同一端口，REST 需 Bearer 令牌且无会话握手，面向「不做 MCP 握手的客户端」。该参考只示范 Python 与 JavaScript 两段最小调用，不新增脚本化通道——脚本化调用仍只有 GDA CLI 一条。
+
 技能书钉版本 `github:jesspig/Godot-Autopilot#<VERSION>`；`version_sync_guard` 扫描 `skills/` 下全部文本文件与根 `README*.md`，断言其中每一处版本钉均与根 `VERSION` 同值（`VERSION` 与 `CLI_VERSION` 两个值源一并核对），非版本引用（如 `#develop`）只登记、不参与比对；覆盖范围以守卫脚本为准。
 
 ## 已知限制
 
 - **`bun pm pack` 要求 `package.json` 有 `version`**：bunx 从 git 安装不需要该字段，故 `package.json` 未加 `version`（保持与根 `VERSION` 单一来源一致）。
 - **`file:` 依赖 EPERM**：本机 `file:` 协议依赖有 EPERM 环境限制；git/tarball 路径（`github:...`）不受影响，故分发走 git 而非本地 pack。
+- **集中根解析比插件简单**：CLI 侧为「`GODOT_AUTOPILOT_HOME` 覆写 → `os.homedir()`」两级，插件侧另有平台环境变量与派生兜底、且候选必须是已存在目录；覆写或异常 HOME 环境下两者可能分叉。
+- **REST 令牌只在插件全局索引里**：CLI 本地注册表不含令牌，因此 `gda api` 在第 4 级命中（只有 CLI 登记的实例）而第 5 级索引不可读时拿不到令牌，会报 `no API token is available`。
 
 ## 测试
 
 | 层 | 位置 | 规模 | 说明 |
 |---|---|---|---|
-| TS 单测 | [`cli/tests/`](../../../cli/tests/) | 9 文件 132 用例（344 expect） | `bun test cli/tests`；args 4 / client_handshake 8 / client 17 / commands 40 / detach 1 / lifecycle 31 / process 8 / registry 8 / target 15 |
+| TS 单测 | [`cli/tests/`](../../../cli/tests/) | 11 文件 180 用例（481 expect） | `bun test cli/tests`；api_commands 41 / args 4 / client_handshake 8 / client 17 / commands 40 / detach 1 / lifecycle 31 / process 8 / registry 8 / root_dir 7 / target 15 |
 | ctest `cli_unit` | [`tests/scripts/run_cli_unit.py`](../../../tests/scripts/run_cli_unit.py) | 封装 `bun test` | bun 缺失时 SKIP 并 exit 0 |
 | ctest `cli_contract` | [`tests/scripts/test_cli_contract.py`](../../../tests/scripts/test_cli_contract.py) | CLI 载体 mock conformance | bun 驱动 gda CLI；bun 缺失时 SKIP |
 | ctest `version_sync_guard` | [`tests/guard/version_sync_guard.py`](../../../tests/guard/version_sync_guard.py) | 全部版本钉与 `VERSION` 同值 | 扫描 `skills/` 全部文本文件 + 根 `README*.md` 的每一处版本钉，另含 `VERSION` 与 `CLI_VERSION` 两个值源 |
 
 ## 相关页面
 
+- [REST 接口面](api.md) — `/api` 端点契约、Bearer 令牌与状态码
+- [端口与实例登记](ports.md) — 端口模型、实例登记结构与七级发现链
 - [支撑模块](support.md) — 技能书（9 册结构、渐进披露 references 与 MCP 资源注册）
 - [安全边界与并发契约](../security_contract.md) — CLI 安全包络（§3.4）
 - [测试体系](../tests.md) — ctest 注册点与 TS 单测计数
