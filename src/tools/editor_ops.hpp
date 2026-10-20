@@ -1,6 +1,7 @@
 #ifndef GODOT_AUTOPILOT_EDITOR_OPS_HPP
 #define GODOT_AUTOPILOT_EDITOR_OPS_HPP
 
+#include <cstdint>
 #include <mcp/JsonValue.hpp>
 
 namespace godot_autopilot {
@@ -31,6 +32,7 @@ mcp::JsonValue handle_save_scene_as(const mcp::JsonValue &args);
 mcp::JsonValue handle_verify_scene_saved(const mcp::JsonValue &args);
 mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args);
 mcp::JsonValue handle_dotnet_environment(const mcp::JsonValue &args);
+mcp::JsonValue wait_scene_switch(int64_t watch_id, int64_t timeout_ms);
 
 } // namespace editor_ops
 } // namespace godot_autopilot

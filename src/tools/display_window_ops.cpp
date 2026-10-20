@@ -84,11 +84,19 @@ JV handle_window_delete(const JV &args) {
   if (!wp || !wp->IsInt()) {
     return util::error_json("missing required parameter: window_id");
   }
+  const int64_t window_id = wp->GetInt();
+  if (window_id == 0) {
+    return util::error_detail(
+        "window_id 0 is the editor main window and cannot be deleted",
+        "delete_display_window",
+        "the window_id returned by create_display_window",
+        "sub-windows created with create_display_window have a non-zero id; "
+        "the editor main window (id 0) is never deleted by this tool");
+  }
   auto *ds = godot::DisplayServer::get_singleton();
   if (!ds) {
     return util::error_json("DisplayServer not available");
   }
-  int64_t window_id = wp->GetInt();
   uint64_t instance_id = ds->window_get_attached_instance_id(window_id);
   if (instance_id == 0) {
     return util::error_json("no window found with the given id");

@@ -6,6 +6,8 @@
 #include "core/sanitize_policy.hpp"
 #include "core/trace_recorder.hpp"
 #include "tools/dispatch.hpp"
+#include "tools/editor_ops.hpp"
+#include "tools/os_ops.hpp"
 #include "tools/register_all.hpp"
 #include "tools/runtime_ops.hpp"
 #include "tools/tool_invoke.hpp"
@@ -178,22 +180,21 @@ int64_t dispatch_wait_health_ms() {
   return value;
 }
 
-mcp::JsonValue queue_unavailable_result(const std::string &name,
-                                        const std::string &reason) {
+mcp::JsonValue internal_error_result(const std::string &name,
+                                     const std::string &reason) {
   mcp::JsonValue result(mcp::JsonValue::object_tag);
-  result["error"] = mcp::JsonValue(
-      "editor main thread queue unavailable for tool '" + name + "': " +
-      reason +
-      " — the editor may be shutting down or overloaded; retry after the "
-      "editor is responsive");
-  result["code"] = mcp::JsonValue("queue_unavailable");
-  result["retryable"] = mcp::JsonValue(true);
+  result["error"] =
+      mcp::JsonValue("tool '" + name + "' failed: " + reason);
+  result["code"] = mcp::JsonValue("internal_error");
+  result["retryable"] = mcp::JsonValue(false);
+  result["tool"] = mcp::JsonValue(name);
   return result;
 }
 
 std::string dispatch_timeout_message(const std::string &name,
                                      int64_t waited_ms, int64_t health_ms,
-                                     bool health, bool cancelled) {
+                                     bool health,
+                                     bool cancelled_before_execution) {
   std::string message;
   if (health) {
     message = "editor main thread did not process health probe '" + name +
@@ -204,39 +205,21 @@ std::string dispatch_timeout_message(const std::string &name,
   }
   message += " — the editor may be paused, blocked by a modal dialog, "
              "exporting, or busy; ";
-  if (cancelled) {
-    message += "the call was cancelled before execution";
+  if (cancelled_before_execution) {
+    message += "the task was cancelled before execution, so it did not run";
   } else {
     message +=
         "the main thread already picked the call up, so it may still execute";
   }
-  message += " (retry once the editor is responsive";
+  message +=
+      " (the call is cancelled — the side effect may still land in the "
+      "editor, so verify the editor state before issuing it again";
   if (!health) {
     message += "; ping/system_status use a shorter " +
                std::to_string(health_ms) + " ms health budget";
   }
   message += ")";
   return message;
-}
-
-mcp::JsonValue dispatch_timeout_result(const std::string &name,
-                                       int64_t waited_ms,
-                                       const CommandQueue::Stats &stats,
-                                       int64_t oldest_pending_ms,
-                                       int64_t last_drain_age_ms,
-                                       bool cancelled, bool health) {
-  mcp::JsonValue result(mcp::JsonValue::object_tag);
-  result["error"] = mcp::JsonValue(dispatch_timeout_message(
-      name, waited_ms, dispatch_wait_health_ms(), health, cancelled));
-  result["code"] = mcp::JsonValue("main_thread_timeout");
-  result["retryable"] = mcp::JsonValue(true);
-  result["tool"] = mcp::JsonValue(name);
-  result["waited_ms"] = mcp::JsonValue(waited_ms);
-  result["queue_depth"] = mcp::JsonValue(static_cast<int64_t>(stats.pending));
-  result["oldest_pending_ms"] = mcp::JsonValue(oldest_pending_ms);
-  result["last_drain_age_ms"] = mcp::JsonValue(last_drain_age_ms);
-  result["cancelled"] = mcp::JsonValue(cancelled);
-  return result;
 }
 
 void emit_dispatch_timeout_observation(const std::string &name,
@@ -269,6 +252,60 @@ void emit_dispatch_timeout_observation(const std::string &name,
 
 } // namespace
 
+mcp::JsonValue queue_unavailable_result(const std::string &name,
+                                        const std::string &reason) {
+  mcp::JsonValue result(mcp::JsonValue::object_tag);
+  result["error"] = mcp::JsonValue(
+      "editor main thread queue unavailable for tool '" + name + "': " +
+      reason +
+      " — the editor may be shutting down or overloaded; retry after the "
+      "editor is responsive");
+  result["code"] = mcp::JsonValue("queue_unavailable");
+  result["retryable"] = mcp::JsonValue(true);
+  return result;
+}
+
+mcp::JsonValue queue_unavailable_result(const std::string &name,
+                                        const std::string &reason,
+                                        const CommandQueue::Stats &stats,
+                                        int64_t oldest_pending_ms,
+                                        int64_t last_drain_age_ms,
+                                        int64_t waited_ms) {
+  mcp::JsonValue result = queue_unavailable_result(name, reason);
+  result["tool"] = mcp::JsonValue(name);
+  result["waited_ms"] = mcp::JsonValue(waited_ms);
+  result["queue_depth"] = mcp::JsonValue(static_cast<int64_t>(stats.pending));
+  result["queue_capacity"] =
+      mcp::JsonValue(static_cast<int64_t>(stats.capacity));
+  result["oldest_pending_ms"] = mcp::JsonValue(oldest_pending_ms);
+  result["last_drain_age_ms"] = mcp::JsonValue(last_drain_age_ms);
+  return result;
+}
+
+mcp::JsonValue dispatch_timeout_result(const std::string &name,
+                                       int64_t waited_ms,
+                                       const CommandQueue::Stats &stats,
+                                       int64_t oldest_pending_ms,
+                                       int64_t last_drain_age_ms,
+                                       bool cancelled_before_execution,
+                                       bool health) {
+  mcp::JsonValue result(mcp::JsonValue::object_tag);
+  result["error"] = mcp::JsonValue(dispatch_timeout_message(
+      name, waited_ms, dispatch_wait_health_ms(), health,
+      cancelled_before_execution));
+  result["code"] = mcp::JsonValue("main_thread_timeout");
+  result["retryable"] = mcp::JsonValue(false);
+  result["tool"] = mcp::JsonValue(name);
+  result["waited_ms"] = mcp::JsonValue(waited_ms);
+  result["queue_depth"] = mcp::JsonValue(static_cast<int64_t>(stats.pending));
+  result["oldest_pending_ms"] = mcp::JsonValue(oldest_pending_ms);
+  result["last_drain_age_ms"] = mcp::JsonValue(last_drain_age_ms);
+  result["cancelled"] = mcp::JsonValue(true);
+  result["cancelled_before_execution"] =
+      mcp::JsonValue(cancelled_before_execution);
+  return result;
+}
+
 void replace_handlers(HandlerMap handlers, HandlerMap meta_handlers) {
   std::lock_guard<std::mutex> lock(g_handlers_mutex);
   g_handlers = std::move(handlers);
@@ -298,32 +335,37 @@ int64_t main_thread_wait_budget_ms(uint32_t flags, int64_t default_ms,
 }
 
 std::string main_thread_timeout_message(const std::string &label,
-                                        int64_t waited_ms, bool cancelled) {
+                                        int64_t waited_ms,
+                                        bool cancelled_before_execution) {
   std::string message = "editor main thread did not process '" + label +
                         "' within " + std::to_string(waited_ms) + " ms";
   message += " — the editor may be paused, blocked by a modal dialog, "
              "exporting, or busy; ";
-  if (cancelled) {
-    message += "the call was cancelled before execution";
+  if (cancelled_before_execution) {
+    message += "the task was cancelled before execution, so it did not run";
   } else {
     message += "the main thread already picked the call up, so it may still "
                "execute";
   }
-  message += " (retry once the editor is responsive)";
+  message +=
+      " (the call is cancelled — the side effect may still land in the "
+      "editor, so verify the editor state before issuing it again)";
   return message;
 }
 
 mcp::JsonValue main_thread_timeout_result(const std::string &label,
                                           int64_t waited_ms,
-                                          bool cancelled) {
+                                          bool cancelled_before_execution) {
   mcp::JsonValue result(mcp::JsonValue::object_tag);
   result["error"] = mcp::JsonValue(
-      main_thread_timeout_message(label, waited_ms, cancelled));
+      main_thread_timeout_message(label, waited_ms, cancelled_before_execution));
   result["code"] = mcp::JsonValue("main_thread_timeout");
-  result["retryable"] = mcp::JsonValue(true);
+  result["retryable"] = mcp::JsonValue(false);
   result["target"] = mcp::JsonValue(label);
   result["waited_ms"] = mcp::JsonValue(waited_ms);
-  result["cancelled"] = mcp::JsonValue(cancelled);
+  result["cancelled"] = mcp::JsonValue(true);
+  result["cancelled_before_execution"] =
+      mcp::JsonValue(cancelled_before_execution);
   return result;
 }
 
@@ -358,11 +400,17 @@ mcp::JsonValue run_on_main_thread_with_budget(
     if (stats_before.capacity > 0 &&
         stats_before.pending >= stats_before.capacity) {
       return queue_unavailable_result(tool_name,
-                                      "the command queue is full");
+                                      "the command queue is full",
+                                      stats_before,
+                                      queue.oldest_pending_age_ms(),
+                                      queue.last_drain_age_ms(), 0);
     }
     if (queue.is_closed()) {
       return queue_unavailable_result(tool_name,
-                                      "the command queue is closed");
+                                      "the command queue is closed",
+                                      stats_before,
+                                      queue.oldest_pending_age_ms(),
+                                      queue.last_drain_age_ms(), 0);
     }
     submission = queue.submit_tracked(std::move(fn));
   } catch (const std::exception &ex) {
@@ -379,7 +427,20 @@ mcp::JsonValue run_on_main_thread_with_budget(
     return queue_unavailable_result(tool_name, "unknown queue failure");
   }
   if (status == std::future_status::ready) {
-    return submission.future.get();
+    try {
+      return submission.future.get();
+    } catch (const CommandQueue::Rejected &ex) {
+      return queue_unavailable_result(
+          tool_name, ex.what(), queue.stats(),
+          queue.oldest_pending_age_ms(), queue.last_drain_age_ms(),
+          std::chrono::duration_cast<std::chrono::milliseconds>(
+              std::chrono::steady_clock::now() - submit_time)
+              .count());
+    } catch (const std::exception &ex) {
+      return internal_error_result(tool_name, ex.what());
+    } catch (...) {
+      return internal_error_result(tool_name, "unexpected C++ exception");
+    }
   }
   bool cancelled = false;
   int64_t waited_ms = budget_ms;
@@ -403,6 +464,103 @@ mcp::JsonValue run_on_main_thread_with_budget(
   return dispatch_timeout_result(
       tool_name, waited_ms, stats, oldest_pending_ms, last_drain_age_ms,
       cancelled, (flags & tool_flags::kHealthProbe) != 0);
+}
+
+mcp::JsonValue run_main_thread_slice(CommandQueue &queue, const std::string &label,
+                                     std::function<mcp::JsonValue()> slice,
+                                     int64_t budget_ms) {
+  if (queue.is_main_thread()) {
+    return slice();
+  }
+  CommandQueue::TrackedSubmission<mcp::JsonValue> submission;
+  try {
+    submission = queue.submit_tracked(std::move(slice));
+  } catch (const std::exception &ex) {
+    return queue_unavailable_result(label, ex.what());
+  } catch (...) {
+    return queue_unavailable_result(label, "unknown queue failure");
+  }
+  std::future_status status = std::future_status::timeout;
+  try {
+    status = submission.future.wait_for(std::chrono::milliseconds(budget_ms));
+  } catch (const std::exception &ex) {
+    return queue_unavailable_result(label, ex.what());
+  } catch (...) {
+    return queue_unavailable_result(label, "unknown queue failure");
+  }
+  if (status != std::future_status::ready) {
+    queue.cancel(submission.id);
+    return main_thread_timeout_result(label, budget_ms, false);
+  }
+  try {
+    return submission.future.get();
+  } catch (const CommandQueue::Rejected &ex) {
+    return queue_unavailable_result(label, ex.what());
+  } catch (const std::exception &ex) {
+    return internal_error_result(label, ex.what());
+  } catch (...) {
+    return internal_error_result(label, "unexpected C++ exception");
+  }
+}
+
+mcp::JsonValue resolve_deferred_wait(const std::string &name,
+                                      mcp::JsonValue result) {
+  int64_t job_id = 0;
+  const bool is_game_job =
+      runtime_ops::payload_is_game_job(result, &job_id);
+  const mcp::JsonValue *wait_p = result.Find("__gda_wait");
+  const bool is_deferred_wait = wait_p && wait_p->IsObject();
+  auto *pending_p = result.Find("__gda_pending");
+  const bool is_pending_op = !is_game_job && pending_p && pending_p->IsInt();
+  if (!is_game_job && !is_deferred_wait && !is_pending_op) {
+    if (!result.IsObject()) {
+      mcp::JsonValue wrapped(mcp::JsonValue::object_tag);
+      wrapped["result"] = std::move(result);
+      result = std::move(wrapped);
+    }
+    return result;
+  }
+  int64_t timeout = GDA_DEFAULT_TIMEOUT_MS;
+  const mcp::JsonValue *timeout_source =
+      is_deferred_wait ? wait_p->Find("timeout_ms") : result.Find("timeout_ms");
+  if (timeout_source && timeout_source->IsInt() &&
+      timeout_source->GetInt() > 0) {
+    timeout = timeout_source->GetInt();
+  }
+  if (is_game_job) {
+    result = runtime_ops::wait_game_job(job_id, timeout);
+  } else if (is_deferred_wait) {
+    const mcp::JsonValue *kind_p = wait_p->Find("kind");
+    const mcp::JsonValue *id_p = wait_p->Find("id");
+    const std::string kind =
+        (kind_p && kind_p->IsString()) ? kind_p->GetString() : std::string();
+    const int64_t id = (id_p && id_p->IsInt()) ? id_p->GetInt() : 0;
+    if (kind == "os_process") {
+      result = os_ops::wait_os_process(id, timeout);
+    } else if (kind == "editor_scene_switch") {
+      result = editor_ops::wait_scene_switch(id, timeout);
+    } else {
+      mcp::JsonValue error(mcp::JsonValue::object_tag);
+      error["error"] = mcp::JsonValue("unknown deferred wait kind: " + kind);
+      error["code"] = mcp::JsonValue("internal_error");
+      error["retryable"] = mcp::JsonValue(false);
+      result = std::move(error);
+    }
+  } else {
+    const int64_t rid = pending_p->GetInt();
+    mcp::JsonValue awaited = runtime_ops::wait_pending_response(rid, timeout);
+    if (name == "capture_game_viewport" ||
+        (awaited.IsObject() && awaited.Contains("path"))) {
+      awaited = runtime_ops::finalize_capture_response(awaited);
+    }
+    result = std::move(awaited);
+  }
+  if (!result.IsObject()) {
+    mcp::JsonValue wrapped(mcp::JsonValue::object_tag);
+    wrapped["result"] = std::move(result);
+    result = std::move(wrapped);
+  }
+  return result;
 }
 
 mcp::JsonValue call_handler(const std::string &name,

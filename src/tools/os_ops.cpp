@@ -1,12 +1,24 @@
 #include "os_ops.hpp"
+#include "core/config.hpp"
 #include "core/log_system.hpp"
+#include "tools/dispatch.hpp"
+#include "tools/runtime_ops.hpp"
 #include "util/error_util.hpp"
 #include "util/variant_json.hpp"
+#include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/classes/time.hpp>
+#include <godot_cpp/variant/dictionary.hpp>
+#include <atomic>
+#include <chrono>
 #include <climits>
+#include <cstdint>
+#include <map>
+#include <memory>
+#include <mutex>
 #include <string>
+#include <vector>
 #ifdef GetObject
 #undef GetObject
 #endif
@@ -21,9 +33,9 @@ namespace {
 bool has_only_process_parameters(const JV &args, bool execute) {
   static constexpr const char *create_allowed[] = {"path", "arguments"};
   static constexpr const char *execute_allowed[] = {"path", "arguments",
-                                                    "output"};
+                                                    "output", "timeout_ms"};
   const auto *allowed = execute ? execute_allowed : create_allowed;
-  const size_t count = execute ? 3 : 2;
+  const size_t count = execute ? 4 : 2;
   if (!args.IsObject())
     return false;
   for (const auto &entry : args.GetObject()) {
@@ -40,14 +52,121 @@ bool has_only_process_parameters(const JV &args, bool execute) {
   return true;
 }
 
-godot::String join_psa(const godot::PackedStringArray &psa) {
-  godot::String result;
-  for (int i = 0; i < psa.size(); ++i) {
-    if (i > 0)
-      result += "\n";
-    result += psa[i];
+int64_t steady_now_ms() {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(
+             std::chrono::steady_clock::now().time_since_epoch())
+      .count();
+}
+
+constexpr uint64_t kProcessSliceReadBytes = 65536;
+constexpr int64_t kProcessKillBudgetMs = 2000;
+
+struct OsProcessState {
+  int64_t pid = 0;
+  godot::Ref<godot::FileAccess> stdout_pipe;
+  godot::Ref<godot::FileAccess> stderr_pipe;
+  std::string stdout_text;
+  std::string stderr_text;
+  bool capture_output = false;
+  int64_t started_ms = 0;
+};
+
+std::mutex g_process_mutex;
+std::map<int64_t, std::shared_ptr<OsProcessState>> g_process_states;
+std::atomic<int64_t> g_process_seq{1};
+
+void drain_pipe(const godot::Ref<godot::FileAccess> &pipe, std::string *out) {
+  if (pipe.is_null() || !pipe->is_open())
+    return;
+  uint64_t available = pipe->get_length();
+  if (available == 0)
+    return;
+  if (available > kProcessSliceReadBytes)
+    available = kProcessSliceReadBytes;
+  std::vector<uint8_t> buffer(static_cast<size_t>(available));
+  const uint64_t read = pipe->get_buffer(buffer.data(), available);
+  if (read == 0)
+    return;
+  out->append(reinterpret_cast<const char *>(buffer.data()),
+              static_cast<size_t>(read));
+}
+
+std::shared_ptr<OsProcessState> take_process_state(int64_t op_id) {
+  std::lock_guard<std::mutex> lock(g_process_mutex);
+  auto it = g_process_states.find(op_id);
+  if (it == g_process_states.end())
+    return nullptr;
+  return it->second;
+}
+
+JV advance_os_process(int64_t op_id) {
+  std::shared_ptr<OsProcessState> state = take_process_state(op_id);
+  if (!state) {
+    JV e(JV::object_tag);
+    e["error"] = JV("the external process wait state is gone");
+    return e;
   }
-  return result;
+  drain_pipe(state->stdout_pipe, &state->stdout_text);
+  drain_pipe(state->stderr_pipe, &state->stderr_text);
+  auto *os = godot::OS::get_singleton();
+  const int32_t exit_code =
+      os ? os->get_process_exit_code(static_cast<int32_t>(state->pid)) : -1;
+  if (exit_code == -1) {
+    JV r(JV::object_tag);
+    r["done"] = JV(false);
+    return r;
+  }
+  drain_pipe(state->stdout_pipe, &state->stdout_text);
+  drain_pipe(state->stderr_pipe, &state->stderr_text);
+  {
+    std::lock_guard<std::mutex> lock(g_process_mutex);
+    g_process_states.erase(op_id);
+  }
+  godot::Dictionary d;
+  d["exit_code"] = static_cast<int64_t>(exit_code);
+  d["stdout"] =
+      godot::String(state->capture_output ? state->stdout_text.c_str() : "");
+  d["stderr"] =
+      godot::String(state->capture_output ? state->stderr_text.c_str() : "");
+  JV r(JV::object_tag);
+  r["done"] = JV(true);
+  r["result"] = VariantJson::serialize(d);
+  return r;
+}
+
+JV kill_os_process(int64_t op_id) {
+  std::shared_ptr<OsProcessState> state = take_process_state(op_id);
+  if (!state) {
+    JV r(JV::object_tag);
+    r["killed"] = JV(false);
+    return r;
+  }
+  auto *os = godot::OS::get_singleton();
+  bool killed = false;
+  if (os) {
+    killed = os->kill(static_cast<int32_t>(state->pid)) == godot::Error::OK;
+  }
+  {
+    std::lock_guard<std::mutex> lock(g_process_mutex);
+    g_process_states.erase(op_id);
+  }
+  JV r(JV::object_tag);
+  r["killed"] = JV(killed);
+  return r;
+}
+
+JV os_process_timeout_result(int64_t pid, int64_t timeout_ms) {
+  JV e(JV::object_tag);
+  e["error"] = JV("the external process did not finish within " +
+                  std::to_string(timeout_ms) +
+                  " ms — it was terminated and the call is cancelled (not "
+                  "retryable)");
+  e["code"] = JV("main_thread_timeout");
+  e["retryable"] = JV(false);
+  e["cancelled"] = JV(true);
+  e["timeout_ms"] = JV(timeout_ms);
+  e["process_id"] = JV(pid);
+  return e;
 }
 
 } // namespace
@@ -61,6 +180,13 @@ JV handle_os_alert(const JV &args) {
     JV e(JV::object_tag);
     e["error"] = JV("missing required parameter: text");
     return e;
+  }
+
+  bool modal = false;
+  if (auto *modal_p = args.Find("modal")) {
+    if (!modal_p->IsBool())
+      return util::error_json("modal must be a boolean");
+    modal = modal_p->GetBool();
   }
 
   auto *os = godot::OS::get_singleton();
@@ -77,10 +203,29 @@ JV handle_os_alert(const JV &args) {
     title = title_p->GetString();
   }
 
+  if (!modal) {
+    JV r(JV::object_tag);
+    r["result"] = JV("ok");
+    r["shown"] = JV(false);
+    r["requires_confirmation"] = JV(true);
+    r["title"] = JV(title);
+    r["text"] = JV(text);
+    r["notice"] = JV(
+        "show_os_alert did not open a modal dialog: a modal alert blocks the "
+        "editor main thread until a human dismisses it, which freezes "
+        "unattended sessions. Re-run this tool with modal=true when a human "
+        "is watching the editor to actually display the alert.");
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                              "show_os_alert returned the confirmation notice "
+                              "without opening a modal dialog");
+    return r;
+  }
+
   os->alert(godot::String(text.c_str()), godot::String(title.c_str()));
 
   JV r(JV::object_tag);
   r["result"] = JV("ok");
+  r["shown"] = JV(true);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "show_os_alert completed");
   return r;
@@ -178,42 +323,102 @@ JV handle_os_execute(const JV &args) {
   if (output_p)
     capture_output = output_p->GetBool();
 
-  godot::Dictionary d;
-  if (capture_output) {
-    godot::Array output_arr;
-    output_arr.append(godot::PackedStringArray());
-    int32_t exit_code =
-        os->execute(godot::String(path.c_str()), ps_args, output_arr, true);
-
-    d["exit_code"] = static_cast<int64_t>(exit_code);
-
-    if (output_arr.size() > 0) {
-      godot::PackedStringArray out_lines = output_arr[0];
-      d["stdout"] = join_psa(out_lines);
-    } else {
-      d["stdout"] = godot::String();
-    }
-
-    if (output_arr.size() > 1) {
-      godot::PackedStringArray err_lines = output_arr[1];
-      d["stderr"] = join_psa(err_lines);
-    } else {
-      d["stderr"] = godot::String();
-    }
-  } else {
-    godot::Array empty_arr;
-    int32_t exit_code =
-        os->execute(godot::String(path.c_str()), ps_args, empty_arr, false);
-    d["exit_code"] = static_cast<int64_t>(exit_code);
-    d["stdout"] = godot::String();
-    d["stderr"] = godot::String();
+  int64_t timeout_ms = GDA_DEFAULT_TIMEOUT_MS;
+  if (auto *timeout_p = args.Find("timeout_ms")) {
+    if (!timeout_p->IsInt() ||
+        timeout_p->GetInt() < GDA_OS_PROCESS_MIN_TIMEOUT_MS ||
+        timeout_p->GetInt() > GDA_OS_PROCESS_MAX_TIMEOUT_MS)
+      return util::error_json(
+          "timeout_ms must be an integer between " +
+          std::to_string(GDA_OS_PROCESS_MIN_TIMEOUT_MS) + " and " +
+          std::to_string(GDA_OS_PROCESS_MAX_TIMEOUT_MS));
+    timeout_ms = timeout_p->GetInt();
   }
 
-  JV r(JV::object_tag);
-  r["result"] = VariantJson::serialize(d);
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "execute_os_process completed");
-  return r;
+  godot::Dictionary pipes = os->execute_with_pipe(
+      godot::String(path.c_str()), ps_args, false);
+  if (!pipes.has("pid")) {
+    return util::error_json("failed to start the external process: " + path);
+  }
+
+  auto state = std::make_shared<OsProcessState>();
+  state->pid = static_cast<int64_t>(pipes["pid"]);
+  state->capture_output = capture_output;
+  state->started_ms = steady_now_ms();
+  if (pipes.has("stdio"))
+    state->stdout_pipe = godot::Ref<godot::FileAccess>(pipes["stdio"]);
+  if (pipes.has("stderr"))
+    state->stderr_pipe = godot::Ref<godot::FileAccess>(pipes["stderr"]);
+
+  const int64_t op_id = g_process_seq.fetch_add(1);
+  {
+    std::lock_guard<std::mutex> lock(g_process_mutex);
+    g_process_states[op_id] = state;
+  }
+
+  JV wait(JV::object_tag);
+  wait["kind"] = JV("os_process");
+  wait["id"] = JV(op_id);
+  wait["timeout_ms"] = JV(timeout_ms);
+  JV marker(JV::object_tag);
+  marker["__gda_wait"] = std::move(wait);
+  LogSystem::instance().log_detailed(
+      LogLevel::Info, LogCategory::Tools,
+      "execute_os_process started a non-blocking external process",
+      "path=" + path + " process_id=" + std::to_string(state->pid) +
+          " timeout_ms=" + std::to_string(timeout_ms) +
+          " capture_output=" + (capture_output ? "true" : "false"));
+  return marker;
+}
+
+JV wait_os_process(int64_t op_id, int64_t timeout_ms) {
+  if (!runtime_ops::has_editor_queue()) {
+    return util::error_json(
+        "the editor main thread queue is unavailable — the external process "
+        "cannot be waited for");
+  }
+  CommandQueue &queue = get_editor_queue();
+  if (queue.is_main_thread()) {
+    kill_os_process(op_id);
+    return util::error_json(
+        "execute_os_process cannot wait for the external process on the editor "
+        "main thread — the process was terminated; call the tool through the "
+        "MCP channel so the wait runs on the transport thread");
+  }
+  const int64_t deadline_ms = steady_now_ms() + timeout_ms;
+  for (;;) {
+    const int64_t remaining_ms = deadline_ms - steady_now_ms();
+    if (remaining_ms <= 0)
+      break;
+    const JV slice = dispatch::run_main_thread_slice(
+        queue, "execute_os_process",
+        [op_id]() { return advance_os_process(op_id); }, remaining_ms);
+    if (slice.Find("error") != nullptr)
+      return slice;
+    const auto *done_p = slice.Find("done");
+    if (done_p && done_p->IsBool() && done_p->GetBool()) {
+      const auto *result_p = slice.Find("result");
+      if (result_p)
+        return *result_p;
+      return util::error_json(
+          "the external process finished without a readable result");
+    }
+  }
+  int64_t pid = 0;
+  {
+    std::shared_ptr<OsProcessState> state = take_process_state(op_id);
+    if (state)
+      pid = state->pid;
+  }
+  dispatch::run_main_thread_slice(
+      queue, "execute_os_process kill",
+      [op_id]() { return kill_os_process(op_id); }, kProcessKillBudgetMs);
+  LogSystem::instance().log_detailed(
+      LogLevel::Warning, LogCategory::Tools,
+      "execute_os_process timed out and terminated the external process",
+      "wait_id=" + std::to_string(op_id) + " timeout_ms=" +
+          std::to_string(timeout_ms));
+  return os_process_timeout_result(pid, timeout_ms);
 }
 
 JV handle_os_get_datetime(const JV &args) {

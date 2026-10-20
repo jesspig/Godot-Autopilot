@@ -61,6 +61,7 @@ std::mutex &game_jobs_mutex();
 
 void set_editor_queue(godot_autopilot::CommandQueue *q);
 bool has_editor_queue();
+bool on_editor_main_thread();
 
 mcp::JsonValue handle_game_status(const mcp::JsonValue &args);
 mcp::JsonValue handle_game_eval(const mcp::JsonValue &args);
@@ -97,6 +98,12 @@ void run_channel_self_check(int32_t p_session_id);
 void on_session_ready(int32_t session_id);
 
 mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms);
+
+bool wait_pending_completion(int64_t request_id, int64_t timeout_ms);
+
+mcp::JsonValue wait_game_job(int64_t job_id, int64_t timeout_ms);
+
+bool payload_is_game_job(const mcp::JsonValue &payload, int64_t *out_job_id);
 
 mcp::JsonValue start_pending_op(const std::string &op,
                                 const mcp::JsonValue &params,

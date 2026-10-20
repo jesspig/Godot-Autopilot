@@ -18,6 +18,13 @@
 namespace godot_autopilot {
 
 class CommandQueue {
+ public:
+  class Rejected : public std::runtime_error {
+  public:
+    explicit Rejected(const char *message) : std::runtime_error(message) {}
+  };
+
+ private:
   struct TaskBase {
     uint64_t task_id = 0;
     int64_t enqueued_ns = 0;
@@ -99,11 +106,11 @@ class CommandQueue {
     if (closed_) {
       rejected_closed_.fetch_add(1, std::memory_order_relaxed);
       task->reject(std::make_exception_ptr(
-          std::runtime_error("CommandQueue is closed; task was not submitted")));
+          Rejected("CommandQueue is closed; task was not submitted")));
     } else if (tasks_.size() >= capacity_) {
       rejected_full_.fetch_add(1, std::memory_order_relaxed);
       task->reject(std::make_exception_ptr(
-          std::runtime_error("CommandQueue is full; task was not submitted")));
+          Rejected("CommandQueue is full; task was not submitted")));
     } else {
       submitted_.fetch_add(1, std::memory_order_relaxed);
       tasks_.push_back(std::move(task));
@@ -165,7 +172,7 @@ class CommandQueue {
     }
 
     auto error = std::make_exception_ptr(
-        std::runtime_error("CommandQueue is closed; task was not executed"));
+        Rejected("CommandQueue is closed; task was not executed"));
     while (!pending.empty()) {
       pending.front()->reject(error);
       pending.pop_front();
