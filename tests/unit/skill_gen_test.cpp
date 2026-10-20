@@ -24,8 +24,8 @@ namespace {
 using namespace godot_autopilot::skill_gen;
 
 constexpr size_t kSkillCount = 9;
-constexpr size_t kSkillFileCount = 34;
-constexpr size_t kToolsReferenceCount = 5;
+constexpr size_t kSkillFileCount = 35;
+constexpr size_t kToolsReferenceCount = 6;
 const char *const kExpectedSkillNames[kSkillCount] = {
     "godot-autopilot",
     "godot-autopilot-tools",
