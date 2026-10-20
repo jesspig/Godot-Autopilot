@@ -26,6 +26,7 @@
 #include <memory>
 
 #include "core/api_auth.hpp"
+#include "core/api_endpoints.hpp"
 #include "core/api_server.hpp"
 #include "core/api_surface.hpp"
 #include "core/api_token.hpp"
@@ -34,6 +35,7 @@
 #include "core/http_transport_ext.hpp"
 #include "core/instance_registry.hpp"
 #include "core/mcp_http_shim.hpp"
+#include "tools/tool_execute.hpp"
 #include "util/api_host_context.hpp"
 
 namespace godot_autopilot {
@@ -41,6 +43,10 @@ namespace godot_autopilot {
 namespace {
 bool is_loopback_host(std::string_view host) {
   return host == "127.0.0.1" || host == "::1" || host == "[::1]";
+}
+
+void register_unified_tool_executor() {
+  tools::register_tool_executor(&tools::execute_tool_chain);
 }
 
 ServerContext *g_server_context_instance = nullptr;
@@ -127,6 +133,7 @@ bool ServerContext::bind_transport() {
     const std::vector<int> candidates = PortResolver::candidate_sequence(pid);
     int probed = 0;
     bool bound = false;
+    std::string avoided_reason;
     for (int candidate : candidates) {
       if (probed >= GDA_PORT_PROBE_LIMIT) {
         break;
@@ -137,14 +144,21 @@ bool ServerContext::bind_transport() {
         bound = true;
         break;
       }
+      if (avoided_reason.empty()) {
+        avoided_reason = error;
+      }
     }
     if (!bound) {
       last_error_ = "no free port candidate bound after " +
                     std::to_string(probed) + " probes: " + error;
       return false;
     }
-    assignment.note = assignment.note + "; bound port " +
-                      std::to_string(assignment.port);
+    assignment.note.clear();
+    if (!avoided_reason.empty()) {
+      assignment.note = "the preferred port " +
+                        std::to_string(GDA_DEFAULT_PORT) +
+                        " was avoided (" + avoided_reason + ")";
+    }
   } else {
     if (!http_transport_bind(static_cast<uint16_t>(assignment.port), host_,
                              error)) {
@@ -297,6 +311,7 @@ bool ServerContext::start() {
     LogSystem::instance().log(LogLevel::Debug, LogCategory::Transport,
                               "Registering tools/catalog/resources/prompts...");
 
+    register_unified_tool_executor();
     register_tools();
 
     LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
@@ -332,6 +347,7 @@ bool ServerContext::start() {
 
     running_ = true;
     write_instance_record();
+    register_endpoint_info_provider();
 
     LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
                               "MCP server started on " + host_ + ":" +
@@ -411,6 +427,25 @@ void ServerContext::write_instance_record() {
   instance_id_ = record.instance_id;
 }
 
+void ServerContext::register_endpoint_info_provider() {
+  const int bound_port = port_;
+  const std::string host = host_;
+  const std::string instance_id = instance_id_;
+  const int host_pid = util::api_host_process_id();
+  const std::string project_path = util::api_host_project_root();
+  api_endpoints::register_endpoint_info_provider(
+      [bound_port, host, instance_id, host_pid, project_path]() {
+        api_endpoints::EndpointInfo info;
+        info.instance_id = instance_id;
+        info.version = GDA_VERSION;
+        info.pid = host_pid;
+        info.project_path = project_path;
+        info.mcp = EndpointEntry{host, bound_port, GDA_MCP_PATH, "mcp", "none"};
+        info.api = EndpointEntry{host, bound_port, GDA_API_PATH, "http", "bearer"};
+        return info;
+      });
+}
+
 void ServerContext::remove_instance_record() {
   if (instance_id_.empty()) {
     return;
@@ -466,6 +501,26 @@ bool ServerContext::restart(uint16_t port) {
   requested_port_ = port;
   port_ = port;
   return start();
+}
+
+bool ServerContext::restart(const PortAssignment &assignment) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
+                            "MCP server restart requested on port " +
+                                std::to_string(assignment.port));
+  LogSystem::instance().log_detailed(
+      LogLevel::Info, LogCategory::Transport, "MCP server restart requested",
+      "port=" + std::to_string(assignment.port) +
+          " previous_port=" + std::to_string(port_));
+  stop();
+  requested_port_ = assignment.port;
+  port_ = assignment.port;
+  if (!start()) {
+    return false;
+  }
+  if (assignment.port > 0 && assignment.source != PortSource::kUserApplied) {
+    port_assignment_ = assignment;
+  }
+  return true;
 }
 
 int ServerContext::get_port() const { return port_; }

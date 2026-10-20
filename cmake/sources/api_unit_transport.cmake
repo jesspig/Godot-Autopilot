@@ -11,6 +11,7 @@ set(GDA_UNIT_TRANSPORT_SOURCES
     ${CMAKE_SOURCE_DIR}/src/core/godot_transport.cpp
     ${CMAKE_SOURCE_DIR}/src/core/mcp_http_shim.cpp
     ${CMAKE_SOURCE_DIR}/src/core/api_surface.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/api_endpoints.cpp
     ${CMAKE_SOURCE_DIR}/src/core/api_server_routes.cpp
     ${CMAKE_SOURCE_DIR}/src/core/api_auth.cpp
     ${CMAKE_SOURCE_DIR}/src/core/api_token.cpp
@@ -18,4 +19,6 @@ set(GDA_UNIT_TRANSPORT_SOURCES
     ${CMAKE_SOURCE_DIR}/tests/unit/mcp_http_shim_test.cpp
     ${CMAKE_SOURCE_DIR}/tests/unit/mcp_http_shim_dispatch_test.cpp
     ${CMAKE_SOURCE_DIR}/tests/unit/api_server_test.cpp
-    ${CMAKE_SOURCE_DIR}/tests/unit/api_auth_test.cpp)
+    ${CMAKE_SOURCE_DIR}/tests/unit/api_auth_test.cpp
+    ${CMAKE_SOURCE_DIR}/tests/unit/api_execute_chain_test.cpp
+    ${CMAKE_SOURCE_DIR}/tests/unit/api_endpoints_test.cpp)

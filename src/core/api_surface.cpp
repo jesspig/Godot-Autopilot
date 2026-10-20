@@ -13,13 +13,14 @@
 #include <version.hpp>
 
 #include "core/api_auth.hpp"
+#include "core/api_endpoints.hpp"
 #include "core/api_envelope.hpp"
 #include "core/command_queue.hpp"
 #include "core/http_parse.hpp"
-#include "tools/dispatch.hpp"
 #include "tools/register_all.hpp"
 #include "tools/runtime_ops.hpp"
 #include "tools/tool_base.hpp"
+#include "tools/tool_execute.hpp"
 #include "tools/tool_registry.hpp"
 
 namespace godot_autopilot {
@@ -31,6 +32,7 @@ constexpr const char *kApiPrefix = "/api";
 constexpr const char *kToolsSegment = "/tools";
 constexpr const char *kHealthSegment = "/health";
 constexpr const char *kBatchSegment = "/batch";
+constexpr const char *kEndpointsSegment = "/endpoints";
 constexpr const char *kOpenApiSegment = "/openapi.json";
 constexpr const char *kCodeUnauthorized = "unauthorized";
 constexpr const char *kCodeInvalidArgument = "invalid_argument";
@@ -215,7 +217,7 @@ mcp::JsonValue default_execute_tool(const std::string &name,
     result["code"] = mcp::JsonValue("internal_error");
     return result;
   }
-  return dispatch::call_handler(name, args);
+  return tools::execute_tool(name, args);
 }
 
 bool default_verify_token(
@@ -435,6 +437,15 @@ RouteMatch match_route(const std::string &method, const std::string &path) {
       return match;
     }
     match.kind = RouteKind::kOpenApi;
+    return match;
+  }
+  if (rest == kEndpointsSegment) {
+    if (upper_method != "GET") {
+      match.kind = RouteKind::kMethodNotAllowed;
+      match.error = "the route " + path + " only accepts GET";
+      return match;
+    }
+    match.kind = RouteKind::kEndpoints;
     return match;
   }
   if (rest == kToolsSegment) {
@@ -719,6 +730,7 @@ mcp::JsonValue build_index_document() {
       {"POST", "/api/tools/{tool}", "call one tool"},
       {"POST", "/api/batch", "call several tools in order"},
       {"GET", "/api/health", "read the liveness probe"},
+      {"GET", "/api/endpoints", "read the endpoint table"},
       {"GET", "/api/openapi.json", "read the OpenAPI document"},
   };
   for (const auto &entry : descriptions) {
@@ -767,6 +779,9 @@ mcp::JsonValue build_openapi_document() {
   health_operation["security"] = mcp::JsonValue(mcp::JsonValue::array_tag);
   health["get"] = std::move(health_operation);
   paths["/api/health"] = std::move(health);
+  mcp::JsonValue endpoints(mcp::JsonValue::object_tag);
+  endpoints["get"] = openapi_path("read the endpoint table", "meta");
+  paths["/api/endpoints"] = std::move(endpoints);
   paths["/api/openapi.json"] =
       openapi_path("read the OpenAPI document", "meta");
   mcp::JsonValue bearer(mcp::JsonValue::object_tag);
@@ -810,6 +825,8 @@ ApiReply handle_request(const std::string &method, const std::string &path,
       return ok_reply(build_health_document());
     case RouteKind::kOpenApi:
       return ok_reply(build_openapi_document());
+    case RouteKind::kEndpoints:
+      return ok_reply(api_endpoints::endpoint_document());
     case RouteKind::kTools: {
       ListQuery query;
       std::string error;

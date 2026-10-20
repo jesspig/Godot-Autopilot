@@ -3,6 +3,7 @@
 #include <string>
 
 #include <godot_cpp/classes/dir_access.hpp>
+#include <godot_cpp/classes/display_server.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/h_box_container.hpp>
@@ -60,6 +61,27 @@ godot::String read_file(const godot::String &path) {
   godot::String content = file->get_as_text();
   file->close();
   return content;
+}
+
+std::string port_source_label(PortSource source) {
+  switch (source) {
+    case PortSource::kEnvExplicit:
+      return "environment variable";
+    case PortSource::kConfigExplicit:
+      return "config preference";
+    case PortSource::kUserApplied:
+      return "applied from the panel";
+    case PortSource::kAutoAssigned:
+      return "auto-assigned";
+  }
+  return "unknown";
+}
+
+void append_path(std::string &list, const char *path) {
+  if (!list.empty()) {
+    list += ", ";
+  }
+  list += path;
 }
 
 void remove_dir_recursive(const godot::String &path) {
@@ -152,6 +174,23 @@ McpConfigDock::McpConfigDock() : port_spin(nullptr), apply_button(nullptr) {
   apply_button->connect("pressed",
                         callable_mp(this, &McpConfigDock::_on_apply_port));
   port_row->add_child(apply_button);
+
+  pin_port_button = memnew(godot::Button);
+  pin_port_button->set_text("Pin");
+  pin_port_button->set_tooltip_text(
+      "Write the port the server is actually listening on into the project "
+      "configuration so the next start prefers that port.");
+  pin_port_button->connect("pressed",
+                           callable_mp(this, &McpConfigDock::_on_pin_port));
+  port_row->add_child(pin_port_button);
+
+  copy_api_button = memnew(godot::Button);
+  copy_api_button->set_text("Copy API");
+  copy_api_button->set_tooltip_text(
+      "Copy the REST API address of the running server to the clipboard.");
+  copy_api_button->connect(
+      "pressed", callable_mp(this, &McpConfigDock::_on_copy_api_address));
+  port_row->add_child(copy_api_button);
 
   auto *time_row = memnew(godot::HBoxContainer);
   root->add_child(time_row);
@@ -381,9 +420,15 @@ void McpConfigDock::_on_allow_toggled(const char *capability,
 void McpConfigDock::set_server_context(ServerContext *ctx) {
   server_ctx = ctx;
   if (port_spin != nullptr) {
-    port_spin->set_value(ctx != nullptr ? ctx->get_port() : 9527);
+    port_spin->set_value(ctx != nullptr ? ctx->get_port() : GDA_DEFAULT_PORT);
   }
   apply_button->set_disabled(ctx == nullptr);
+  if (pin_port_button != nullptr) {
+    pin_port_button->set_disabled(ctx == nullptr);
+  }
+  if (copy_api_button != nullptr) {
+    copy_api_button->set_disabled(ctx == nullptr);
+  }
   _refresh_status();
 }
 
@@ -392,8 +437,14 @@ void McpConfigDock::_refresh_status() {
     return;
   }
   if (server_ctx != nullptr && server_ctx->is_running()) {
-    status_label->set_text("Running on port " +
-                           godot::String::num_int64(server_ctx->get_port()));
+    const PortAssignment &assignment = server_ctx->port_assignment();
+    std::string text = "Running on port " +
+                       std::to_string(server_ctx->get_port()) +
+                       " (source: " + port_source_label(assignment.source) + ")";
+    if (!assignment.note.empty()) {
+      text += "; " + assignment.note;
+    }
+    status_label->set_text(godot::String::utf8(text.c_str()));
     status_label->set_modulate(
         theme_color("success_color", godot::Color(0.4f, 0.9f, 0.4f)));
   } else {
@@ -510,16 +561,133 @@ void McpConfigDock::_on_apply_port() {
   int port = static_cast<int>(port_spin->get_value());
   monitor::ui_action("config_apply_port",
                      monitor::build_attrs({{"port", std::to_string(port)}}));
+  const int previous_port = server_ctx->get_port();
+  const PortAssignment previous_assignment = server_ctx->port_assignment();
   if (server_ctx->restart(static_cast<uint16_t>(port))) {
     PluginConfig::save_port(port);
     _refresh_status();
-    _report("Port applied: " + godot::String::num_int64(port),
+    const std::string client_update = _rewrite_client_configs(port);
+    godot::String message = "Port applied: " + godot::String::num_int64(port);
+    if (!client_update.empty()) {
+      message += "; " + godot::String::utf8(client_update.c_str());
+    }
+    _report(message, theme_color("success_color", godot::Color(0.4f, 0.9f, 0.4f)));
+    return;
+  }
+  const std::string failure = server_ctx->last_error();
+  const bool restored = server_ctx->restart(previous_assignment);
+  _refresh_status();
+  if (port_spin != nullptr) {
+    port_spin->set_value(server_ctx->get_port());
+  }
+  godot::String message =
+      "Restart failed: " + godot::String::utf8(failure.c_str());
+  if (restored) {
+    message += "; rolled back to port " +
+               godot::String::num_int64(previous_port);
+  } else {
+    message += "; the rollback to port " +
+               godot::String::num_int64(previous_port) + " failed: " +
+               godot::String::utf8(server_ctx->last_error().c_str());
+  }
+  _report(message, theme_color("error_color", godot::Color(0.95f, 0.4f, 0.4f)));
+}
+
+void McpConfigDock::_on_pin_port() {
+  if (server_ctx == nullptr) {
+    _report("Server not available", theme_color("error_color",
+                                                godot::Color(0.95f, 0.4f,
+                                                             0.4f)));
+    return;
+  }
+  const int port = server_ctx->get_port();
+  monitor::ui_action("config_pin_port",
+                     monitor::build_attrs({{"port", std::to_string(port)}}));
+  if (PluginConfig::save_port(port)) {
+    _report("Pinned port " + godot::String::num_int64(port) +
+                " in the project config; the next start prefers it",
             theme_color("success_color", godot::Color(0.4f, 0.9f, 0.4f)));
   } else {
-    _refresh_status();
-    _report("Restart failed: " + godot::String(server_ctx->last_error().c_str()),
-            theme_color("error_color", godot::Color(0.95f, 0.4f, 0.4f)));
+    _report("Failed to save the port preference", theme_color("error_color",
+                                                              godot::Color(
+                                                                  0.95f, 0.4f,
+                                                                  0.4f)));
   }
+  _refresh_status();
+}
+
+void McpConfigDock::_on_copy_api_address() {
+  if (server_ctx == nullptr) {
+    _report("Server not available", theme_color("error_color",
+                                                godot::Color(0.95f, 0.4f,
+                                                             0.4f)));
+    return;
+  }
+  const std::string address = "http://" + server_ctx->get_host() + ":" +
+                              std::to_string(server_ctx->get_port()) +
+                              GDA_API_PATH;
+  auto *display = godot::DisplayServer::get_singleton();
+  if (display == nullptr) {
+    _report("No display server; the API address was not copied",
+            theme_color("error_color", godot::Color(0.95f, 0.4f, 0.4f)));
+    return;
+  }
+  display->clipboard_set(godot::String::utf8(address.c_str()));
+  monitor::ui_action("config_copy_api_address",
+                     monitor::build_attrs({{"address", address}}));
+  _report("Copied " + godot::String::utf8(address.c_str()) +
+              " to the clipboard",
+          theme_color("success_color", godot::Color(0.4f, 0.9f, 0.4f)));
+}
+
+std::string McpConfigDock::_rewrite_client_configs(int port) {
+  godot::String root =
+      godot::ProjectSettings::get_singleton()->globalize_path("res://");
+  std::string rewritten;
+  std::string manual;
+  for (int index = 0; index < static_cast<int>(client_config_gen::ClientId::COUNT);
+       ++index) {
+    const auto id = static_cast<client_config_gen::ClientId>(index);
+    const char *rel_path = client_config_gen::file_path(id);
+    const godot::String abs_path = root.path_join(godot::String(rel_path));
+    if (!godot::FileAccess::file_exists(abs_path)) {
+      continue;
+    }
+    const std::string existing = read_file(abs_path).utf8().get_data();
+    if (client_config_gen::uses_toml(id)) {
+      const client_config_gen::TomlMergeResult result =
+          client_config_gen::merge_toml_config(id, port, existing);
+      if (result.status == client_config_gen::TomlMergeResult::Status::Merged &&
+          write_file(abs_path, result.content)) {
+        append_path(rewritten, rel_path);
+      } else {
+        append_path(manual, rel_path);
+      }
+      continue;
+    }
+    const client_config_gen::MergeResult result =
+        client_config_gen::merge_json_config(id, port, existing);
+    if (result.status == client_config_gen::MergeResult::Status::Merged &&
+        write_file(abs_path, result.content)) {
+      append_path(rewritten, rel_path);
+    } else {
+      append_path(manual, rel_path);
+    }
+  }
+  if (rewritten.empty() && manual.empty()) {
+    return "no generated client config was found in the project root";
+  }
+  std::string summary;
+  if (!rewritten.empty()) {
+    summary += "rewrote the port in " + rewritten;
+  }
+  if (!manual.empty()) {
+    if (!summary.empty()) {
+      summary += "; ";
+    }
+    summary += "update the port by hand in " + manual;
+  }
+  return summary;
 }
 
 void McpConfigDock::_on_generate() {

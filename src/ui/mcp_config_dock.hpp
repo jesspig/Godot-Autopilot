@@ -8,6 +8,7 @@
 #include <godot_cpp/classes/check_box.hpp>
 #include <godot_cpp/classes/spin_box.hpp>
 
+#include "../core/config.hpp"
 #include "../core/server_context.hpp"
 #include "../util/client_config_gen.hpp"
 #include "../util/skill_gen.hpp"
@@ -20,6 +21,8 @@ class McpConfigDock : public godot::EditorDock {
 
   godot::SpinBox *port_spin;
   godot::Button *apply_button;
+  godot::Button *pin_port_button;
+  godot::Button *copy_api_button;
   godot::Label *status_label;
   godot::OptionButton *client_select;
   godot::Button *generate_button;
@@ -49,6 +52,9 @@ public:
 
 private:
   void _on_apply_port();
+  void _on_pin_port();
+  void _on_copy_api_address();
+  std::string _rewrite_client_configs(int port);
   void _on_generate();
   void _on_generate_skills();
   bool has_existing_skills();
