@@ -195,6 +195,36 @@ export function assertCallFamilyUsage(command: string, opts: GlobalOptions): voi
   }
 }
 
+export function loadToolArguments(opts: GlobalOptions): Record<string, unknown> {
+  if (opts.argsJson !== undefined && opts.argsFile !== undefined) {
+    throw new CliError(ExitCode.Usage, "use only one of --args and --args-file.");
+  }
+  let args: unknown = {};
+  if (opts.argsJson !== undefined) {
+    try {
+      args = JSON.parse(opts.argsJson);
+    } catch {
+      throw new CliError(ExitCode.Usage, "--args is not valid JSON.");
+    }
+  } else if (opts.argsFile !== undefined) {
+    let text: string;
+    try {
+      text = fs.readFileSync(opts.argsFile, "utf8");
+    } catch {
+      throw new CliError(ExitCode.Usage, `cannot read --args-file: ${opts.argsFile}`);
+    }
+    try {
+      args = JSON.parse(text);
+    } catch {
+      throw new CliError(ExitCode.Usage, `--args-file does not contain valid JSON: ${opts.argsFile}`);
+    }
+  }
+  if (args === null || typeof args !== "object" || Array.isArray(args)) {
+    throw new CliError(ExitCode.Usage, "tool arguments must be a JSON object.");
+  }
+  return args as Record<string, unknown>;
+}
+
 export function callTimeoutSec(opts: GlobalOptions): number {
   if (opts.timeoutText === undefined) return DEFAULT_TIMEOUT_SEC;
   const n = Number(opts.timeoutText);
