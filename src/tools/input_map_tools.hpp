@@ -68,7 +68,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "add_input_map_action",
       "Add a new empty input action to the editor project InputMap. 'deadzone' defaults to 0.5. Only the action is created; no events are bound, so use add_input_map_action_event to attach keys or buttons afterwards. The change modifies the editor project InputMap and persists to project settings; a running game process will not see the change until it restarts. Returns 'result' set to 'ok'.",
-      "Input", {"input", "map"}, SideEffect::None, tool_flags::kNone,
+      "Input", {"input", "map"}, SideEffect::WritesConfig, tool_flags::kMutating,
       kAddInputMapActionParams, input_map_ops::handle_add_action}));
   v.push_back(make_spec_tool(ToolSpec{
       "add_input_map_action_event",
@@ -78,17 +78,17 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "erase_input_map_action_event",
       "Remove an input event from an action in the editor project InputMap. 'event_index' is the zero-based index of the event to delete within the action's event list; an out-of-range index returns an error. The change modifies the editor project InputMap and persists to project settings; a running game process will not see the change until it restarts. Returns 'result' set to 'ok'.",
-      "Input", {"input", "map"}, SideEffect::None, tool_flags::kNone,
+      "Input", {"input", "map"}, SideEffect::WritesConfig, tool_flags::kMutating,
       kEraseInputMapActionEventParams, input_map_ops::handle_action_erase_event}));
   v.push_back(make_spec_tool(ToolSpec{
       "set_input_map_action_deadzone",
       "Set the deadzone of an input action, the analog threshold below which input is ignored, in the range 0.0 to 1.0. The change modifies the editor project InputMap and persists to project settings; a running game process will not see the change until it restarts. Returns 'result' set to 'ok'.",
-      "Input", {"input", "map"}, SideEffect::None, tool_flags::kNone,
+      "Input", {"input", "map"}, SideEffect::WritesConfig, tool_flags::kMutating,
       kSetInputMapActionDeadzoneParams, input_map_ops::handle_action_set_deadzone}));
   v.push_back(make_spec_tool(ToolSpec{
       "erase_input_map_action",
       "Remove an input action from the editor project InputMap and clear its persisted project setting. The change modifies the editor project InputMap and persists to project settings; a running game process will not see the change until it restarts. Returns 'result' set to 'ok'.",
-      "Input", {"input", "map"}, SideEffect::None, tool_flags::kNone,
+      "Input", {"input", "map"}, SideEffect::WritesConfig, tool_flags::kMutating,
       kEraseInputMapActionParams, input_map_ops::handle_erase_action}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_input_map_actions",

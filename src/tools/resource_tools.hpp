@@ -270,17 +270,17 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "set_resource_uid",
       "Assign a UID to a resource file so it can be referenced as uid://<id>, the counterpart of get_resource_uid. uid is optional: when omitted a fresh UID is auto-generated. Triggers a filesystem reimport so the assignment persists. Returns the UID that was applied.",
-      "Resources", {"resource", "uid", "set"}, SideEffect::None, tool_flags::kNone,
+      "Resources", {"resource", "uid", "set"}, SideEffect::WritesFile, tool_flags::kMutating,
       kSetResourceUidParams, resource_ops::handle_set_uid}));
   v.push_back(make_spec_tool(ToolSpec{
       "remove_resource_file",
       "Delete a resource file from disk in a two-stage flow. Without force (default) it is a dry-run impact pre-check: a reverse-reference scan over every .tscn/.tres under res:// (path and uid tokens) returns would_delete plus dependents ({file, matched} objects) and a hint — nothing is deleted, even with zero dependents an explicit force=true is required. With force=true the file is preferentially moved to the OS trash (trashed=true; permanent=true when trash is unavailable or fails), its cached reference path is cleared, the .uid sidecar travels with it (sidecars_removed lists removed sidecar paths) and the editor file system is updated. Use rename_resource_file when you want to keep the file. Returns the Godot error code (0 = OK).",
-      "Resources", {"resource", "remove", "delete"}, SideEffect::None, tool_flags::kNone,
+      "Resources", {"resource", "remove", "delete"}, SideEffect::WritesFile, tool_flags::kMutating,
       kRemoveResourceFileParams, resource_ops::handle_remove}));
   v.push_back(make_spec_tool(ToolSpec{
       "rename_resource_file",
       "Rename or move a resource file. Accepts path and new_path, with from and to accepted as aliases. The .uid sidecar travels with the file (the .import sidecar of imported assets migrates alongside it when present), open scenes that equal the file or reference it are automatically saved before the disk rewrite and reloaded afterwards — their undo history resets — path= and uid= tokens in dependent .tscn/.tres files are rewritten, cached resource paths and the edited scene file path migrate, project.godot entries pointing at the old path (application/run/main_scene and autoload/* values, preserving the leading * singleton marker) are remapped and saved, and the editor file system is notified. Returns the Godot error code, updated_files, stale_references as {file, token} objects (token names the literal leftover reference; script_class tokens need scan_editor_file_system after a class_name rename to re-register global classes — see note), uid_preserved, remapped_settings, saved_scenes, reloaded_scenes, unsupported_binary_references ({file, reason} entries for binary resources such as .scn/.res/.csv/.translation that cannot be rewritten in place) and import_sidecar_warning when the .import move fails.",
-      "Resources", {"resource", "rename", "move"}, SideEffect::None, tool_flags::kNone,
+      "Resources", {"resource", "rename", "move"}, SideEffect::WritesFile, tool_flags::kMutating,
       kRenameResourceFileParams, resource_ops::handle_rename}));
   v.push_back(make_spec_tool(ToolSpec{
       "move_resource_file",
@@ -315,7 +315,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "reimport_resource_files",
       "Queue reimport of one or more files through the editor file system. Accepts files (array of paths) or a single path; editor only, calling it outside the editor returns an error. Reimport runs asynchronously, so the result confirms the queued count, not completion; poll the file system status to know when it finishes.",
-      "Resources", {"resource", "reimport"}, SideEffect::None, tool_flags::kNone,
+      "Resources", {"resource", "reimport"}, SideEffect::WritesFile, tool_flags::kMutating,
       kReimportResourceFilesParams, resource_ops::handle_reimport}));
   v.push_back(make_spec_tool(ToolSpec{
       "set_resource_import_options",

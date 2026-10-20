@@ -446,8 +446,11 @@ mcp::JsonValue build_exec_result(ExecContext &ctx) {
     r["error_details"] = mcp::JsonValue(error_details);
     mcp::JsonValue structured = extract_structured_error(ctx.new_error_text);
     if (structured.IsObject() && !structured.Empty()) {
+      structured["code"] = mcp::JsonValue("tool_error");
       r["structured_error"] = std::move(structured);
     }
+    r["error"] = mcp::JsonValue(error_details);
+    r["code"] = mcp::JsonValue("tool_error");
   }
   if (!ctx.temp_added) {
     r["note"] = mcp::JsonValue("temporary node was not added to any scene tree "
