@@ -11,4 +11,5 @@ set(GDA_UNIT_TRANSPORT_SOURCES
     ${CMAKE_SOURCE_DIR}/src/core/godot_transport.cpp
     ${CMAKE_SOURCE_DIR}/src/core/mcp_http_shim.cpp
     ${CMAKE_SOURCE_DIR}/tests/unit/http_transport_test.cpp
-    ${CMAKE_SOURCE_DIR}/tests/unit/mcp_http_shim_test.cpp)
+    ${CMAKE_SOURCE_DIR}/tests/unit/mcp_http_shim_test.cpp
+    ${CMAKE_SOURCE_DIR}/tests/unit/mcp_http_shim_dispatch_test.cpp)

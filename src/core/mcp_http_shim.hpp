@@ -3,6 +3,7 @@
 
 #include <string>
 
+#include "core/godot_transport.hpp"
 #include "core/http_transport.hpp"
 
 namespace godot_autopilot {
@@ -17,6 +18,12 @@ struct HeaderDecision {
 };
 
 enum class SessionDisposition { kIgnore, kReject };
+
+enum class DispatchKind { kRequest, kNotification, kInvalid };
+
+DispatchKind classify_dispatch(const mcp_wire::ParsedRequest &parsed);
+
+void build_accepted_response(HttpResponse &resp);
 
 bool media_type_accepted(const std::string &accept_header,
                           const std::string &media_type);
