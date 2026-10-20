@@ -31,6 +31,9 @@ class McpConfigDock : public godot::EditorDock {
   godot::CheckBox *allow_game_runtime_check = nullptr;
   godot::CheckBox *allow_user_tools_check = nullptr;
   godot::CheckBox *desensitize_check = nullptr;
+  godot::Label *legacy_notice_label = nullptr;
+  godot::Button *import_legacy_button = nullptr;
+  godot::Label *legacy_result_label = nullptr;
   McpLogDock *log_dock_ = nullptr;
 
   ServerContext *server_ctx = nullptr;
@@ -52,6 +55,8 @@ private:
   void remove_legacy_skill_dirs();
   void _refresh_status();
   void _refresh_generate_skills_button();
+  void _refresh_legacy_notice();
+  void _on_import_legacy();
   void _report(const godot::String &text, const godot::Color &color);
   void _on_show_time_toggled(bool checked);
   void _on_allow_code_execute_toggled(bool checked);

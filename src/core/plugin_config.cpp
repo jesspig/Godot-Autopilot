@@ -1,6 +1,8 @@
 #include "plugin_config.hpp"
 
 #include <exception>
+#include <mutex>
+#include <set>
 #include <string>
 #include <utility>
 
@@ -10,6 +12,7 @@
 #include <mcp/JsonValue.hpp>
 #include <mcp/McpError.hpp>
 
+#include "core/legacy_store.hpp"
 #include "core/path_util.hpp"
 #include "core/storage_paths.hpp"
 #include "log_system.hpp"
@@ -67,22 +70,56 @@ ConfigReadStatus read_config_object(const std::string &path,
   return ConfigReadStatus::kParseFailed;
 }
 
-bool find_config_value(const std::string &path, const char *key,
-                       mcp::JsonValue &out) {
-  mcp::JsonValue::Object doc;
+std::string read_config_text(const std::string &path) {
+  godot::Ref<godot::FileAccess> file =
+      godot::FileAccess::open(godot::String::utf8(path.c_str()),
+                              godot::FileAccess::READ);
+  if (file.is_null()) {
+    return std::string();
+  }
+  godot::String content = file->get_as_text();
+  file->close();
+  return std::string(content.utf8().get_data());
+}
+
+void note_legacy_config_source(const char *key) {
+  static std::mutex mutex;
+  static std::set<std::string> reported;
+  {
+    std::lock_guard<std::mutex> lock(mutex);
+    if (!reported.insert(key).second) {
+      return;
+    }
+  }
+  LogSystem::instance().log_detailed(
+      LogLevel::Info, LogCategory::System,
+      "Plugin config value read from legacy path",
+      std::string("key=") + key +
+          " path=" + LegacyStore::legacy_config_path() +
+          " note=save the value in the new location to stop reading the "
+          "legacy path");
+}
+
+bool find_config_value_with_legacy(const std::string &primary_path,
+                                   const char *key, mcp::JsonValue &out,
+                                   bool &from_legacy) {
+  from_legacy = false;
+  const std::string legacy_path = LegacyStore::legacy_config_path();
+  const std::string primary_text = read_config_text(primary_path);
+  const std::string legacy_text = read_config_text(legacy_path);
   std::string error;
-  if (read_config_object(path, doc, error) == ConfigReadStatus::kParseFailed) {
+  const bool found = LegacyStore::select_config_value(
+      primary_text, legacy_text, key, out, from_legacy, error);
+  if (!error.empty()) {
     LogSystem::instance().log_detailed(
-        LogLevel::Error, LogCategory::System, "Plugin config parse failed",
-        std::string("path=") + path + " reason=" + error);
-    return false;
+        LogLevel::Error, LogCategory::System, "Plugin config read failed",
+        std::string("key=") + key + " path=" + primary_path +
+            " legacy_path=" + legacy_path + " reason=" + error);
   }
-  const mcp::JsonValue document(std::move(doc));
-  const mcp::JsonValue *found = document.Find(key);
-  if (found == nullptr) {
-    return false;
+  if (!found || !from_legacy) {
+    return found;
   }
-  out = *found;
+  note_legacy_config_source(key);
   return true;
 }
 
@@ -149,7 +186,9 @@ int PluginConfig::load_port() {
     return -1;
   }
   mcp::JsonValue value;
-  if (!find_config_value(path, kPortKey, value) || !value.IsInt()) {
+  bool from_legacy = false;
+  if (!find_config_value_with_legacy(path, kPortKey, value, from_legacy) ||
+      !value.IsInt()) {
     return -1;
   }
   return static_cast<int>(value.GetInt());
@@ -169,7 +208,9 @@ bool PluginConfig::load_show_time() {
     return true;
   }
   mcp::JsonValue value;
-  if (!find_config_value(path, kShowTimeKey, value) || !value.IsBool()) {
+  bool from_legacy = false;
+  if (!find_config_value_with_legacy(path, kShowTimeKey, value, from_legacy) ||
+      !value.IsBool()) {
     return true;
   }
   return value.GetBool();
@@ -189,7 +230,10 @@ bool PluginConfig::load_desensitize() {
     return true;
   }
   mcp::JsonValue value;
-  if (!find_config_value(path, kDesensitizeKey, value) || !value.IsBool()) {
+  bool from_legacy = false;
+  if (!find_config_value_with_legacy(path, kDesensitizeKey, value,
+                                     from_legacy) ||
+      !value.IsBool()) {
     return true;
   }
   return value.GetBool();
@@ -209,7 +253,9 @@ std::string PluginConfig::load_allow() {
     return std::string();
   }
   mcp::JsonValue value;
-  if (!find_config_value(path, kAllowKey, value) || !value.IsString()) {
+  bool from_legacy = false;
+  if (!find_config_value_with_legacy(path, kAllowKey, value, from_legacy) ||
+      !value.IsString()) {
     return std::string();
   }
   return value.GetString();
