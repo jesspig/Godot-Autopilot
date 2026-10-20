@@ -13,10 +13,14 @@
 #include <godot_cpp/classes/v_box_container.hpp>
 #include <godot_cpp/core/class_db.hpp>
 
+#include "core/legacy_store.hpp"
 #include "core/monitor.hpp"
 #include "core/plugin_config.hpp"
+#include "core/project_store.hpp"
 #include "core/sanitize_policy.hpp"
+#include "core/storage_paths.hpp"
 #include "tools/authorization.hpp"
+#include "util/project_path.hpp"
 
 namespace godot_autopilot {
 
@@ -78,6 +82,41 @@ void remove_dir_recursive(const godot::String &path) {
   }
   dir->list_dir_end();
   godot::DirAccess::remove_absolute(path);
+}
+
+bool legacy_dir_has_content(const godot::String &path) {
+  godot::Ref<godot::DirAccess> dir = godot::DirAccess::open(path);
+  if (dir.is_null()) {
+    return false;
+  }
+  if (dir->list_dir_begin() != godot::OK) {
+    return false;
+  }
+  bool found = false;
+  godot::String entry = dir->get_next();
+  while (entry != godot::String()) {
+    if (entry != "." && entry != "..") {
+      found = true;
+      break;
+    }
+    entry = dir->get_next();
+  }
+  dir->list_dir_end();
+  return found;
+}
+
+std::string absolute_legacy_dir() {
+  auto *settings = godot::ProjectSettings::get_singleton();
+  if (settings == nullptr) {
+    return std::string();
+  }
+  const godot::String absolute = settings->globalize_path(
+      godot::String::utf8(LegacyStore::legacy_dir_path().c_str()));
+  return std::string(absolute.utf8().get_data());
+}
+
+std::string current_project_storage_dir() {
+  return StoragePaths::project_dir(util::current_project_root_path());
 }
 
 } // namespace
@@ -195,6 +234,31 @@ McpConfigDock::McpConfigDock() : port_spin(nullptr), apply_button(nullptr) {
   status_label = memnew(godot::Label);
   root->add_child(status_label);
 
+  auto *legacy_heading = memnew(godot::Label);
+  legacy_heading->set_text("Legacy Data");
+  root->add_child(legacy_heading);
+
+  legacy_notice_label = memnew(godot::Label);
+  legacy_notice_label->set_autowrap_mode(godot::TextServer::AUTOWRAP_WORD_SMART);
+  legacy_notice_label->set_modulate(theme_color("font_disabled_color",
+                                                 godot::Color(0.6f, 0.6f, 0.6f)));
+  root->add_child(legacy_notice_label);
+
+  import_legacy_button = memnew(godot::Button);
+  import_legacy_button->set_text(
+      "Import Legacy Data (copy to new dir, old data kept)");
+  import_legacy_button->set_tooltip_text(
+      "Copy legacy GDA data from the Godot user data directory into the new "
+      "storage layout. Files already present in the new location are kept and "
+      "reported as skipped. The legacy data is never deleted.");
+  import_legacy_button->connect(
+      "pressed", callable_mp(this, &McpConfigDock::_on_import_legacy));
+  root->add_child(import_legacy_button);
+
+  legacy_result_label = memnew(godot::Label);
+  legacy_result_label->set_autowrap_mode(godot::TextServer::AUTOWRAP_WORD_SMART);
+  root->add_child(legacy_result_label);
+
   auto *separator = memnew(godot::HSeparator);
   root->add_child(separator);
 
@@ -246,6 +310,7 @@ McpConfigDock::McpConfigDock() : port_spin(nullptr), apply_button(nullptr) {
   root->add_child(note_label);
 
   _refresh_status();
+  _refresh_legacy_notice();
 }
 
 void McpConfigDock::_bind_methods() {}
@@ -337,6 +402,80 @@ void McpConfigDock::_refresh_status() {
         theme_color("error_color", godot::Color(0.95f, 0.4f, 0.4f)));
   }
   _refresh_generate_skills_button();
+}
+
+void McpConfigDock::_refresh_legacy_notice() {
+  if (legacy_notice_label == nullptr || import_legacy_button == nullptr) {
+    return;
+  }
+  const std::string legacy_engine_path = LegacyStore::legacy_dir_path();
+  const godot::String legacy_path =
+      godot::String::utf8(legacy_engine_path.c_str());
+  if (!legacy_dir_has_content(legacy_path)) {
+    legacy_notice_label->set_text("No legacy data found at " + legacy_path);
+    import_legacy_button->set_disabled(true);
+    return;
+  }
+  const std::string absolute_legacy = absolute_legacy_dir();
+  const std::string root = ProjectStore::root_dir();
+  const std::string project_dir = current_project_storage_dir();
+  godot::String text = "Legacy data found at " +
+                       godot::String::utf8(absolute_legacy.c_str());
+  if (!root.empty()) {
+    text += ". New location: " + godot::String::utf8(root.c_str());
+  }
+  if (!project_dir.empty()) {
+    text += " (project: " + godot::String::utf8(project_dir.c_str()) + ")";
+  }
+  legacy_notice_label->set_text(text);
+  import_legacy_button->set_disabled(false);
+}
+
+void McpConfigDock::_on_import_legacy() {
+  const std::string legacy_dir = absolute_legacy_dir();
+  const std::string root = ProjectStore::root_dir();
+  const std::string project_dir = current_project_storage_dir();
+  if (legacy_dir.empty() || root.empty() || project_dir.empty()) {
+    monitor::ui_action("config_import_legacy",
+                       monitor::build_attrs({{"status", "unavailable"}}));
+    legacy_result_label->set_text(
+        "Import unavailable: the new GDA storage location is unresolved.");
+    legacy_result_label->set_modulate(
+        theme_color("error_color", godot::Color(0.95f, 0.4f, 0.4f)));
+    return;
+  }
+  const LegacyImportResult result =
+      LegacyStore::import_legacy_data(legacy_dir, root, project_dir);
+  if (result.legacy_dir_missing) {
+    monitor::ui_action("config_import_legacy",
+                       monitor::build_attrs({{"status", "missing"}}));
+    legacy_result_label->set_text(
+        "No legacy data to import at " +
+        godot::String::utf8(LegacyStore::legacy_dir_path().c_str()) + ".");
+    legacy_result_label->set_modulate(
+        theme_color("warning_color", godot::Color(0.95f, 0.8f, 0.4f)));
+    return;
+  }
+  monitor::ui_action(
+      "config_import_legacy",
+      monitor::build_attrs(
+          {{"copied", std::to_string(result.copied)},
+           {"skipped", std::to_string(result.skipped_existing +
+                                      result.skipped_unsupported)},
+           {"failed", std::to_string(result.failed)}}));
+  legacy_result_label->set_text(
+      godot::String::utf8(LegacyStore::format_import_summary(result).c_str()));
+  if (result.failed > 0) {
+    legacy_result_label->set_modulate(
+        theme_color("error_color", godot::Color(0.95f, 0.4f, 0.4f)));
+  } else if (result.skipped_existing > 0 || result.skipped_unsupported > 0) {
+    legacy_result_label->set_modulate(
+        theme_color("warning_color", godot::Color(0.95f, 0.8f, 0.4f)));
+  } else {
+    legacy_result_label->set_modulate(
+        theme_color("success_color", godot::Color(0.4f, 0.9f, 0.4f)));
+  }
+  _refresh_legacy_notice();
 }
 
 void McpConfigDock::_refresh_generate_skills_button() {

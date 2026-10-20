@@ -6,4 +6,6 @@
 # ====================================================================
 set(GDA_UNIT_STORAGE_SOURCES
     ${CMAKE_SOURCE_DIR}/src/core/storage_paths.cpp
-    ${CMAKE_SOURCE_DIR}/tests/unit/storage_layout_test.cpp)
+    ${CMAKE_SOURCE_DIR}/src/core/legacy_store.cpp
+    ${CMAKE_SOURCE_DIR}/tests/unit/storage_layout_test.cpp
+    ${CMAKE_SOURCE_DIR}/tests/unit/legacy_compat_test.cpp)

@@ -5,4 +5,5 @@
 # 不改根 CMakeLists.txt，避免多分支归并冲突。
 # ====================================================================
 set(GDA_API_STORAGE_SOURCES
-    src/core/storage_paths.cpp)
+    src/core/storage_paths.cpp
+    src/core/legacy_store.cpp)
