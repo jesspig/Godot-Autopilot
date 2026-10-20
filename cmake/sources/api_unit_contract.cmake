@@ -4,4 +4,8 @@
 # 由并行子任务分支「API 契约」独占维护：新增测试编译单元只登记到本文件，
 # 不改 tests/CMakeLists.txt，避免多分支归并冲突。
 # ====================================================================
-set(GDA_UNIT_CONTRACT_SOURCES)
+set(GDA_UNIT_CONTRACT_SOURCES
+    ${CMAKE_SOURCE_DIR}/src/tools/tool_execute.cpp
+    ${CMAKE_SOURCE_DIR}/src/tools/argument_validator.cpp
+    ${CMAKE_SOURCE_DIR}/tests/unit/tool_execute_test.cpp
+    ${CMAKE_SOURCE_DIR}/tests/unit/argument_validator_test.cpp)
