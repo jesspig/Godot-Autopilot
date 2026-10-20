@@ -74,6 +74,14 @@ class CommandQueue {
             .count());
   }
 
+  static int64_t elapsed_ms_since(
+      const std::chrono::steady_clock::time_point &start) {
+    return static_cast<int64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - start)
+            .count());
+  }
+
   static int64_t now_ns() {
     return static_cast<int64_t>(
         std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -119,7 +127,13 @@ class CommandQueue {
   template <typename Result> struct TrackedSubmission {
     uint64_t id = 0;
     std::future<Result> future;
+    bool timed_out = false;
+    int64_t waited_ms = 0;
+    bool cancelled = false;
   };
+
+  static constexpr const char *kTaskCancelledMessage =
+      "CommandQueue task cancelled before execution";
 
   explicit CommandQueue(size_t capacity = DEFAULT_CAPACITY) : capacity_(capacity) {
     if (capacity == 0) {
@@ -238,8 +252,41 @@ class CommandQueue {
     }
     cancelled_.fetch_add(1, std::memory_order_relaxed);
     removed->reject(std::make_exception_ptr(std::runtime_error(
-        "CommandQueue task cancelled before execution")));
+        kTaskCancelledMessage)));
     return true;
+  }
+
+  template <typename Fn>
+  auto submit_tracked_bounded(Fn &&fn, int64_t budget_ms)
+      -> TrackedSubmission<std::invoke_result_t<Fn>> {
+    using Result = std::invoke_result_t<Fn>;
+    TrackedSubmission<Result> out;
+    const auto start = std::chrono::steady_clock::now();
+    if (is_main_thread()) {
+      auto inline_task = std::make_unique<Task<Fn>>(std::forward<Fn>(fn));
+      std::future<Result> inline_future = inline_task->promise.get_future();
+      inline_task->execute();
+      out.future = std::move(inline_future);
+      out.waited_ms = elapsed_ms_since(start);
+      return out;
+    }
+    auto task = std::make_unique<Task<Fn>>(std::forward<Fn>(fn));
+    out.future = task->promise.get_future();
+    out.id = enqueue(std::move(task));
+    if (budget_ms <= 0) {
+      out.future.wait();
+      out.waited_ms = elapsed_ms_since(start);
+      return out;
+    }
+    if (out.future.wait_for(std::chrono::milliseconds(budget_ms)) ==
+        std::future_status::ready) {
+      out.waited_ms = elapsed_ms_since(start);
+      return out;
+    }
+    out.timed_out = true;
+    out.cancelled = cancel(out.id);
+    out.waited_ms = elapsed_ms_since(start);
+    return out;
   }
 
   template <typename Fn>

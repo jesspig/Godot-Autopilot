@@ -1,4 +1,5 @@
 
+#include "core/command_queue.hpp"
 #include "tools/code_exec_ops.hpp"
 #include "tools/dispatch.hpp"
 #include "tools/runtime_ops.hpp"
@@ -50,8 +51,11 @@ void register_basic_handlers(mcp::JsonValue *echo_seen, bool *echo_called) {
 
 class BatchRefsTest : public ::testing::Test {
 protected:
+  godot_autopilot::CommandQueue queue;
+
   void SetUp() override {
-    godot_autopilot::runtime_ops::set_editor_queue(nullptr);
+    queue.drain();
+    godot_autopilot::runtime_ops::set_editor_queue(&queue);
     godot_autopilot::dispatch::replace_handlers({}, {});
   }
 

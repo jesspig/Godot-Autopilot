@@ -142,13 +142,19 @@ add_test(NAME migration_guard
 add_test(NAME comment_guard
     COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/comment_guard.py")
 
-# ── ctest 注册: 版本号三处一致性守卫（零依赖，读源码断言，无需构建产物） ──
+# ── ctest 注册: 主线程契约守卫（零依赖，读源码断言 Godot API 直接调用）──
+# 扫描 src/ 下的 *.cpp/*.hpp：外线程文件里的 Godot API 调用默认违规，
+# 豁免表与线程上下文分类表以显式常量写在 guard/main_thread_guard.py 内。
+add_test(NAME main_thread_guard
+    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/main_thread_guard.py")
+
+# ── ctest 注册: 版本号一致性守卫（零依赖，读源码断言，全部版本钉与 VERSION 同值） ──
 add_test(NAME version_sync_guard
     COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/version_sync_guard.py")
 
-# ── ctest 注册: 双载体 CLI 契约 mock conformance（纯 stdlib + 自带 mock server）──
-# node 缺失时测试文件自行打印 SKIP 并 exit 0，ctest 视为通过；bun 缺失时
-# bun 子集（legacy 核心子集与新 CLI 组）打印 SKIP 且不 FAIL。
+# ── ctest 注册: CLI 契约 mock conformance（纯 stdlib + 自带 mock server）──
+# bun 缺失时测试文件自行打印 SKIP 并 exit 0，ctest 视为通过；
+# 有 bun 时由 bun 驱动 gda.ts 跑全部断言。
 add_test(NAME cli_contract
     COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_cli_contract.py")
 

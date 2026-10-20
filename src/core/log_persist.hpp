@@ -11,11 +11,19 @@
 
 namespace godot_autopilot {
 
+struct TraceImagePayload {
+  std::string relative_path;
+  std::string absolute_path;
+  std::string bytes;
+};
+
 class LogPersist {
 public:
   static constexpr std::size_t kBufferCap = 20000;
   static constexpr std::size_t kMaxFiles = 20;
   static constexpr uint64_t kMaxTotalBytes = 50ULL * 1024ULL * 1024ULL;
+  static constexpr std::size_t kTraceImageBufferMaxEntries = 64;
+  static constexpr uint64_t kTraceImageBufferMaxBytes = 64ULL * 1024ULL * 1024ULL;
 
   static LogPersist &instance();
 
@@ -32,6 +40,7 @@ public:
   std::string store_trace_image(const std::string &span_id,
                                 const std::string &kind,
                                 const std::string &base64_png);
+  void enqueue_trace_image(const TraceImagePayload &payload);
 
   std::string session_id();
   std::string log_path();
@@ -49,6 +58,10 @@ public:
   uint64_t rotations() const;
   uint64_t pruned_files() const;
 
+  std::size_t pending_trace_image_count();
+  uint64_t pending_trace_image_bytes();
+  uint64_t dropped_trace_images() const;
+
   static std::string level_name(LogLevel level);
   static std::string category_name(LogCategory category);
   static std::string format_human_line(int64_t wall_ms, const std::string &level,
@@ -61,9 +74,14 @@ public:
 private:
   LogPersist() = default;
 
+  bool append_trace_payload(const std::string &payload);
+  void flush_trace_images();
+
   std::mutex mutex_;
   std::vector<std::string> log_buffer_;
   std::vector<std::string> trace_buffer_;
+  std::vector<TraceImagePayload> image_buffer_;
+  uint64_t image_buffer_bytes_ = 0;
   std::string session_id_;
   std::string log_path_;
   std::string trace_path_;
@@ -74,6 +92,7 @@ private:
   bool trace_now_failure_reported_ = false;
   std::atomic<uint64_t> dropped_log_lines_{0};
   std::atomic<uint64_t> dropped_trace_lines_{0};
+  std::atomic<uint64_t> dropped_trace_images_{0};
   std::atomic<uint64_t> bytes_written_{0};
   std::atomic<uint64_t> flush_failures_{0};
   std::atomic<uint64_t> rotations_{0};

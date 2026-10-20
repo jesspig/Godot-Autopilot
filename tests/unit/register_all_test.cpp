@@ -10,6 +10,7 @@
 #include "core/command_queue.hpp"
 #include "tools/dispatch.hpp"
 #include "tools/register_all.hpp"
+#include "tools/runtime_ops.hpp"
 #include "tools/tool_catalog.hpp"
 #include "tools/tool_registry.hpp"
 #include "util/bm25_index.hpp"
@@ -67,9 +68,13 @@ struct RegisteredServerFixture : ::testing::Test {
     cops.client_info = mcp::Implementation{"GsdTestClient", "1.0.0"};
     cops.connect_mode = mcp::ConnectMode::Auto;
     client = mcp::McpClient::Create(pair.client, cops);
+
+    queue.drain();
+    godot_autopilot::runtime_ops::set_editor_queue(&queue);
   }
 
   void TearDown() override {
+    godot_autopilot::runtime_ops::set_editor_queue(nullptr);
     if (client)
       client->Close();
     if (server)
@@ -145,6 +150,35 @@ TEST_F(RegisteredServerFixture, SchemaStatisticsBaseline) {
   EXPECT_EQ(non_empty + empty, tools.size());
   EXPECT_GT(non_empty, empty);
   EXPECT_GT(empty, 0);
+}
+
+TEST_F(RegisteredServerFixture, ToolDetailSideEffectIsMachineReadable) {
+  mcp::JsonValue args(mcp::JsonValue::object_tag);
+  args["name"] = mcp::JsonValue("code_execute");
+  auto result = godot_autopilot::dispatch::call_handler("get_tool_detail", args);
+  const auto *tool = result.Find("tool");
+  ASSERT_NE(tool, nullptr);
+  ASSERT_TRUE(tool->IsObject());
+  const auto *side_effect = tool->Find("side_effect");
+  ASSERT_NE(side_effect, nullptr);
+  ASSERT_TRUE(side_effect->IsString());
+  EXPECT_EQ(side_effect->GetString(), "code_execute");
+}
+
+TEST_F(RegisteredServerFixture, EveryToolDetailReportsNonEmptySideEffect) {
+  const auto tools = catalog.get_all_tools();
+  ASSERT_GT(tools.size(), size_t{0});
+  for (const auto &tool : tools) {
+    mcp::JsonValue args(mcp::JsonValue::object_tag);
+    args["name"] = mcp::JsonValue(tool.name);
+    auto result = godot_autopilot::dispatch::call_handler("get_tool_detail", args);
+    const auto *info = result.Find("tool");
+    ASSERT_NE(info, nullptr) << tool.name;
+    const auto *side_effect = info->Find("side_effect");
+    ASSERT_NE(side_effect, nullptr) << tool.name;
+    ASSERT_TRUE(side_effect->IsString()) << tool.name;
+    EXPECT_FALSE(side_effect->GetString().empty()) << tool.name;
+  }
 }
 
 TEST_F(RegisteredServerFixture, SchemaSampledTools) {

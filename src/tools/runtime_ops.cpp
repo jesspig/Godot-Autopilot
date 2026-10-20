@@ -9,6 +9,7 @@
 #include "ready_policy.hpp"
 #include "tools/capture_ops.hpp"
 #include "tools/debugger_access.hpp"
+#include "tools/dispatch.hpp"
 #include "util/error_util.hpp"
 #include <algorithm>
 #include <atomic>
@@ -84,6 +85,10 @@ struct PendingRequest {
   int32_t session_count = 0;
   bool error_breaks_suppressed = false;
   bool awaiting_ready = false;
+};
+
+struct MainThreadTaskState {
+  JV result;
 };
 
 std::mutex g_pending_mtx;
@@ -185,6 +190,37 @@ void erase_pending(int64_t request_id,
     g_pending.erase(it);
 }
 
+std::shared_ptr<PendingRequest> create_pending_request(int64_t request_id,
+                                                       const std::string &op) {
+  auto pending = std::make_shared<PendingRequest>();
+  pending->op = op;
+  {
+    std::lock_guard<std::mutex> lock(g_pending_mtx);
+    g_pending[request_id] = pending;
+  }
+  return pending;
+}
+
+void abandon_pending_request(int64_t request_id,
+                             const std::shared_ptr<PendingRequest> &pending) {
+  bool release_error_breaks = false;
+  {
+    std::lock_guard<std::mutex> lock(pending->mtx);
+    if (pending->state == PendingRequest::State::Waiting)
+      pending->state = PendingRequest::State::Cancelled;
+    release_error_breaks = pending->error_breaks_suppressed;
+    pending->error_breaks_suppressed = false;
+  }
+  pending->cv.notify_all();
+  erase_pending(request_id, pending);
+  if (release_error_breaks)
+    restore_error_breaks();
+}
+
+bool is_eval_op(const std::string &op) {
+  return op == std::string(GDA_OP_EVAL) || op == std::string(GDA_OP_EVAL_ASSERT);
+}
+
 CommandQueue *current_editor_queue() {
   std::lock_guard<std::mutex> lock(g_editor_queue_mtx);
   return g_editor_queue;
@@ -217,19 +253,32 @@ void cancel_all_pending(const std::string &reason) {
 }
 
 JV send_request(int64_t request_id, const std::string &op, const JV &params,
-                bool suppress_error_breaks, bool wait_ready) {
-  if (!debugger_capture_initialized())
+                bool suppress_error_breaks, bool wait_ready,
+                const std::shared_ptr<PendingRequest> &pending) {
+  if (!debugger_capture_initialized()) {
+    erase_pending(request_id, pending);
     return error_json("debugger capture plugin not initialized");
+  }
 
-  if (suppress_error_breaks)
-    suppress_error_breaks_for_eval();
-
-  auto pending = std::make_shared<PendingRequest>();
-  pending->op = op;
-  pending->error_breaks_suppressed = suppress_error_breaks;
   {
-    std::lock_guard<std::mutex> lock(g_pending_mtx);
-    g_pending[request_id] = pending;
+    std::lock_guard<std::mutex> lock(pending->mtx);
+    if (pending->state != PendingRequest::State::Waiting)
+      return error_json("game request was abandoned before dispatch");
+  }
+
+  if (suppress_error_breaks) {
+    suppress_error_breaks_for_eval();
+    bool abandoned = false;
+    {
+      std::lock_guard<std::mutex> lock(pending->mtx);
+      abandoned = pending->state != PendingRequest::State::Waiting;
+      if (!abandoned)
+        pending->error_breaks_suppressed = true;
+    }
+    if (abandoned) {
+      restore_error_breaks();
+      return error_json("game request was abandoned before dispatch");
+    }
   }
 
   JV payload(JV::object_tag);
@@ -267,6 +316,7 @@ JV send_request(int64_t request_id, const std::string &op, const JV &params,
   int32_t session_count = 0;
   if (!debugger_broadcast_request(payload_text, &used_session_id,
                                   &session_count)) {
+    bool release_error_breaks = false;
     const ReadyDecision decision =
         decide_game_request(debugger_ready_session_count(),
                             debugger_active_session_count(), wait_ready);
@@ -292,10 +342,11 @@ JV send_request(int64_t request_id, const std::string &op, const JV &params,
     {
       std::lock_guard<std::mutex> lock(pending->mtx);
       pending->state = PendingRequest::State::Cancelled;
+      release_error_breaks = pending->error_breaks_suppressed;
       pending->error_breaks_suppressed = false;
     }
     erase_pending(request_id, pending);
-    if (suppress_error_breaks)
+    if (release_error_breaks)
       restore_error_breaks();
     if (decision == ReadyDecision::FailNotRunning) {
       return error_json("game not running: no game process is attached — start "
@@ -309,13 +360,98 @@ JV send_request(int64_t request_id, const std::string &op, const JV &params,
         "game project loads the godot-autopilot extension");
   }
 
-  pending->session_id = used_session_id;
-  pending->session_count = session_count;
+  {
+    std::lock_guard<std::mutex> lock(pending->mtx);
+    pending->session_id = used_session_id;
+    pending->session_count = session_count;
+  }
   record_sent_request(request_id, op);
 
   JV r(JV::object_tag);
   r["request_id"] = JV(request_id);
   r["result"] = JV("sent");
+  return r;
+}
+
+JV dispatch_game_request(int64_t request_id, const std::string &op,
+                         const JV &params, bool suppress_error_breaks,
+                         bool wait_ready) {
+  CommandQueue *queue = current_editor_queue();
+  if (!queue)
+    return error_json("editor command queue not initialized");
+  auto pending = create_pending_request(request_id, op);
+  auto state = std::make_shared<MainThreadTaskState>();
+  const std::string label = "game request \"" + op + "\"";
+  dispatch::BoundedWaitOutcome outcome = dispatch::run_bounded_on_main_thread(
+      *queue, label, state,
+      [state, pending, request_id, op, params, suppress_error_breaks,
+       wait_ready](MainThreadTaskState &st) {
+        st.result = send_request(request_id, op, params, suppress_error_breaks,
+                                  wait_ready, pending);
+      },
+      GDA_DISPATCH_WAIT_DEFAULT_MS);
+  if (outcome.timed_out) {
+    abandon_pending_request(request_id, pending);
+    return dispatch::main_thread_timeout_result(label, outcome.waited_ms,
+                                                outcome.cancelled);
+  }
+  if (!outcome.ok) {
+    abandon_pending_request(request_id, pending);
+    return error_json(outcome.error);
+  }
+  return state->result;
+}
+
+JV read_capture_file(const mcp::JsonValue &pending_result) {
+  std::string path = pending_result["path"].GetString();
+  godot::Ref<godot::FileAccess> file = godot::FileAccess::open(
+      godot::String(path.c_str()), godot::FileAccess::READ);
+  if (file.is_null() || !file->is_open()) {
+    return error_json("failed to read captured file: " + path);
+  }
+  uint64_t length = file->get_length();
+  godot::PackedByteArray bytes =
+      file->get_buffer(static_cast<int64_t>(length));
+  file->close();
+  if (bytes.size() <= 0) {
+    return error_json("captured file is empty: " + path);
+  }
+  if (static_cast<size_t>(bytes.size()) > GDA_CAPTURE_MAX_PNG_BYTES) {
+    JV error = error_json("captured PNG exceeds the capture limit of " +
+                          std::to_string(GDA_CAPTURE_MAX_PNG_BYTES) + " bytes");
+    JV details(JV::object_tag);
+    details["code"] = JV("capture_bytes_exceeded");
+    error["structured_error"] = std::move(details);
+    return error;
+  }
+  std::string b64 =
+      capture_ops::base64_encode(bytes.ptrw(), static_cast<size_t>(bytes.size()));
+  JV r(JV::object_tag);
+  r["data"] = JV(b64);
+  r["format"] = JV("png");
+  if (auto *w = pending_result.Find("width"))
+    r["width"] = *w;
+  if (auto *h = pending_result.Find("height"))
+    r["height"] = *h;
+  r["path"] = JV(path);
+  static constexpr const char *kCapturePassthroughFields[] = {
+      "region", "annotated", "elements", "source_width",
+      "source_height", "elements_truncated", "node_elements",
+      "node_truncated"};
+  for (const char *key : kCapturePassthroughFields) {
+    if (auto *value_p = pending_result.Find(key))
+      r[key] = *value_p;
+  }
+  if (r.Dump().size() > GDA_MAX_JSON_RESPONSE_BYTES) {
+    JV error = error_json("capture response exceeds the JSON response limit of " +
+                          std::to_string(GDA_MAX_JSON_RESPONSE_BYTES) + " bytes");
+    JV details(JV::object_tag);
+    details["code"] = JV("response_too_large");
+    error["structured_error"] = std::move(details);
+    return error;
+  }
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "capture_game_viewport completed");
   return r;
 }
 
@@ -581,6 +717,18 @@ mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms) {
     JV late_results = late_results_snapshot();
     if (late_results.IsArray() && !late_results.GetArray().empty())
       error["late_results"] = std::move(late_results);
+    if (!awaiting_ready && is_eval_op(op_name)) {
+      JV details(JV::object_tag);
+      details["code"] = JV("eval_timeout");
+      details["timeout_ms"] = JV(timeout_ms);
+      details["game_may_be_busy"] = JV(true);
+      details["note"] = JV(
+          "the game process may still be occupied: the editor stopped waiting "
+          "for the eval script, but a running GDScript call cannot be "
+          "interrupted — the game main thread resumes only after the script "
+          "returns");
+      error["structured_error"] = std::move(details);
+    }
     return error;
   }
   bool release_error_breaks = pending->error_breaks_suppressed;
@@ -730,26 +878,8 @@ mcp::JsonValue start_pending_op(const std::string &op,
                                 bool suppress_error_breaks,
                                 int64_t *out_request_id, bool wait_ready) {
   int64_t request_id = g_next_request_id.fetch_add(1);
-  JV result;
-  try {
-    if (!has_editor_queue())
-      return error_json("editor command queue not initialized");
-    if (get_editor_queue().is_main_thread()) {
-      result =
-          send_request(request_id, op, params, suppress_error_breaks, wait_ready);
-    } else {
-      result =
-          get_editor_queue()
-              .submit([&]() {
-                return send_request(request_id, op, params,
-                                    suppress_error_breaks, wait_ready);
-              })
-              .get();
-    }
-  } catch (const std::exception &ex) {
-    return error_json(std::string("failed to submit request to main thread: ") +
-                      ex.what());
-  }
+  JV result = dispatch_game_request(request_id, op, params, suppress_error_breaks,
+                                    wait_ready);
   if (result.Contains("error"))
     return result;
   if (out_request_id)
@@ -847,26 +977,8 @@ mcp::JsonValue handle_gda_send(const std::string &op,
                                const mcp::JsonValue &params, int64_t timeout_ms,
                                bool suppress_error_breaks, bool wait_ready) {
   int64_t request_id = g_next_request_id.fetch_add(1);
-  JV result;
-  try {
-    if (!has_editor_queue())
-      return error_json("editor command queue not initialized");
-    if (get_editor_queue().is_main_thread()) {
-      result =
-          send_request(request_id, op, params, suppress_error_breaks, wait_ready);
-    } else {
-      result =
-          get_editor_queue()
-              .submit([&]() {
-                return send_request(request_id, op, params,
-                                    suppress_error_breaks, wait_ready);
-              })
-              .get();
-    }
-  } catch (const std::exception &ex) {
-    return error_json(std::string("failed to submit request to main thread: ") +
-                      ex.what());
-  }
+  JV result = dispatch_game_request(request_id, op, params, suppress_error_breaks,
+                                    wait_ready);
   if (result.Contains("error"))
     return result;
   int64_t effective_timeout_ms = timeout_ms;
@@ -1008,70 +1120,24 @@ mcp::JsonValue finalize_capture_response(const mcp::JsonValue &pending_result) {
   if (!path_p || !path_p->IsString())
     return error_json("capture response missing path");
 
-  try {
-    if (!has_editor_queue())
-      return error_json("editor command queue not initialized");
-    return get_editor_queue()
-        .submit([pending_result]() -> JV {
-          std::string path = pending_result["path"].GetString();
-          godot::Ref<godot::FileAccess> file = godot::FileAccess::open(
-              godot::String(path.c_str()), godot::FileAccess::READ);
-          if (file.is_null() || !file->is_open()) {
-            return error_json("failed to read captured file: " + path);
-          }
-          uint64_t length = file->get_length();
-          godot::PackedByteArray bytes =
-              file->get_buffer(static_cast<int64_t>(length));
-          file->close();
-           if (bytes.size() <= 0) {
-             return error_json("captured file is empty: " + path);
-           }
-           if (static_cast<size_t>(bytes.size()) > GDA_CAPTURE_MAX_PNG_BYTES) {
-             JV error = error_json(
-                 "captured PNG exceeds the capture limit of " +
-                 std::to_string(GDA_CAPTURE_MAX_PNG_BYTES) + " bytes");
-             JV details(JV::object_tag);
-             details["code"] = JV("capture_bytes_exceeded");
-             error["structured_error"] = std::move(details);
-             return error;
-           }
-           std::string b64 = capture_ops::base64_encode(
-               bytes.ptrw(), static_cast<size_t>(bytes.size()));
-           JV r(JV::object_tag);
-          r["data"] = JV(b64);
-          r["format"] = JV("png");
-          if (auto *w = pending_result.Find("width"))
-            r["width"] = *w;
-           if (auto *h = pending_result.Find("height"))
-             r["height"] = *h;
-            r["path"] = JV(path);
-           static constexpr const char *kCapturePassthroughFields[] = {
-               "region", "annotated", "elements", "source_width",
-               "source_height", "elements_truncated", "node_elements",
-               "node_truncated"};
-           for (const char *key : kCapturePassthroughFields) {
-             if (auto *value_p = pending_result.Find(key))
-               r[key] = *value_p;
-           }
-           if (r.Dump().size() > GDA_MAX_JSON_RESPONSE_BYTES) {
-             JV error = error_json(
-                 "capture response exceeds the JSON response limit of " +
-                 std::to_string(GDA_MAX_JSON_RESPONSE_BYTES) + " bytes");
-             JV details(JV::object_tag);
-             details["code"] = JV("response_too_large");
-             error["structured_error"] = std::move(details);
-             return error;
-           }
-           LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                                    "capture_game_viewport completed");
-          return r;
-        })
-        .get();
-  } catch (const std::exception &ex) {
-    return error_json(
-        std::string("failed to read captured file on main thread: ") +
-        ex.what());
+  CommandQueue *queue = current_editor_queue();
+  if (!queue)
+    return error_json("editor command queue not initialized");
+  auto state = std::make_shared<MainThreadTaskState>();
+  dispatch::BoundedWaitOutcome outcome = dispatch::run_bounded_on_main_thread(
+      *queue, "capture file read", state,
+      [state, pending_result](MainThreadTaskState &st) {
+        st.result = read_capture_file(pending_result);
+      },
+      GDA_DISPATCH_WAIT_DEFAULT_MS);
+  if (outcome.timed_out) {
+    return dispatch::main_thread_timeout_result("capture file read",
+                                                outcome.waited_ms,
+                                                outcome.cancelled);
   }
+  if (!outcome.ok)
+    return error_json(outcome.error);
+  return state->result;
 }
 
 void handle_game_response(const std::string &json_str) {

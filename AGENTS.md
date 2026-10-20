@@ -8,20 +8,20 @@ Godot Autopilot（GDA）：进程内 GDExtension，把 Godot 编辑器经 MCP（
 
 - 构建部署：`uv run main.py build` + `uv run main.py deploy`（子命令：`build` / `deploy` / `package` / `clean` / `test` / `tui`；`deploy` 下 `--release` / `--demos <名称...>`，`package` 下 `--libs-dir <dir>`）
 - 手动构建：`cmake --preset debug && cmake --build --preset debug`
-- 快速验证：`ctest --preset debug -E "^gda_runner_"`（L1 + 两守卫，秒级）
+- 快速验证：`ctest --preset debug -E "^gda_runner_"`（L1 + 守卫，秒级）
 - CLI 单测：`bun test cli/tests`（Bun + TS，秒级）
 - 版本只改根 `VERSION`，随后重新 configure
 
 ## 每次在场的硬约束
 
-- **所有 Godot API 必须经 `CommandQueue` 在主线程执行**（`submit()` / `execute_sync()`）；直接调用必崩。
-- **新增 `.cpp` 要在两处登记**：根 `CMakeLists.txt` 的 `add_library()` 与 `tests/CMakeLists.txt` 的 `GDA_UNIT_BUSINESS_SOURCES`；漏后者只在 L1 链接期报错。
+- **所有 Godot API 必须经 `CommandQueue` 在主线程执行**（`submit()` / 带预算的等待入口）；直接调用必崩，`main_thread_guard` 在 ctest 阶段静态拦截，编译通过不算过。`execute_sync()` 已无调用点且是无界等待，不得新增调用。
+- **新增 `.cpp` 要在两处登记**：根 `CMakeLists.txt` 的 `add_library()` 与 `tests/CMakeLists.txt` 的 `GDA_UNIT_BUSINESS_SOURCES`（`src/tools/*_ops.cpp` 由 glob 自动纳入，只需登记非 `*_ops.cpp` 的源文件）。**漏登根 `CMakeLists.txt` 后果最重**：该编译单元不进插件产物，问题只在运行时暴露（L2 用例整体 ERROR，定位困难）；**漏登 `GDA_UNIT_BUSINESS_SOURCES` 仅在有 L1 用例引用其符号时才在 L1 链接期报错**，无引用时完全静默（等于没有覆盖）。详见 [.agents/skills/cpp-registration/SKILL.md](.agents/skills/cpp-registration/SKILL.md)。
 - **依赖是 `third_party/` 下的 git submodule**：构建前必须已检出（`git clone --recurse-submodules`，或 `git submodule update --init --recursive`），缺失则 configure 直接报错，不做网络回退。
 - **构建生成器双路径**：CMake 预设按 ninja 可用性自适应——有 ninja 用 `debug`/`release`，无则用 `debug-portable`/`release-portable`（共用 `build/{debug,release}`）；`main.py` 各子命令自动选路，手动 `cmake --preset` / `ctest --preset` 须自己补 `-portable` 后缀。见 [build.md](docs/wiki/build.md)「预设」。
 - **源码禁止注释**：除 `// namespace` 结尾标记外不得有 `//` 或 `/*…*/`，解释写进 wiki；`comment_guard` 在 ctest 阶段拦，编译通过不算过。
-- **默认安全姿态不可静默放宽**：仅绑环回、脱敏默认开、授权列表默认为空、导出期拒绝工具调用。
+- **默认安全姿态不可静默放宽**：仅绑环回、脱敏默认开、授权列表默认为空、导出期拒绝工具调用 / MCP 资源 / MCP 提示词三类入口。
 - **数值一律以运行时统计为准**，权威口径见 `docs/wiki/tests.md` 的数值核算总表；本页不记录计数。
-- **CLI 为 Bun+TS 源码直跑**：零运行时依赖、无构建步骤、不产出二进制；技能书钉 `#<VERSION>`（由 `version_sync_guard` 兜底）。
+- **CLI 为 Bun+TS 源码直跑**：零运行时依赖、无构建步骤；发布流程另产出各平台独立二进制（5 个目标 + `sha256sums.txt`）。技能书钉 `#<VERSION>`（由 `version_sync_guard` 兜底）。
 
 ## 三层文档分工
 

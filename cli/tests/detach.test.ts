@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { isAlive, stopForce } from "../src/process";
-import { killImage, killPid, removeDirWithRetry, waitDead, waitFor } from "./support/cleanup";
+import { imageNameOf, killImage, killPid, removeDirWithRetry, waitDead, waitFor } from "./support/cleanup";
 
 const RUN_TAG = `gda-detach-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -81,7 +81,6 @@ describe.serial("spawnEditor 脱父验证", () => {
         headless: true,
         godot: ${JSON.stringify(fakeGodotExe)},
         logPath: ${JSON.stringify(logPath)},
-        timeoutMs: 20000,
       });
       console.log("PID=" + result.pid);
       process.exit(0);
@@ -113,6 +112,10 @@ describe.serial("spawnEditor 脱父验证", () => {
     expect(match).not.toBeNull();
     const pid = parseInt(match![1], 10);
     editorPids.push(pid);
+
+    if (process.platform === "win32") {
+      expect(imageNameOf(pid)?.toLowerCase()).toBe(path.basename(fakeGodotExe!).toLowerCase());
+    }
 
     expect(await waitFor(() => isAlive(pid))).toBe(true);
 

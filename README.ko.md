@@ -5,7 +5,7 @@
 ![Godot](https://img.shields.io/badge/Godot-4.7%2B-478CBF?logo=godotengine&logoColor=white)
 ![플랫폼](https://img.shields.io/badge/platform-Windows%7CLinux%7CmacOS-lightgrey)
 [![프로토콜](https://img.shields.io/badge/MCP-Streamable_HTTP-blueviolet)](https://modelcontextprotocol.io/)
-![도구 수](https://img.shields.io/badge/tools-443%2B-brightgreen)
+![도구 수](https://img.shields.io/badge/tools-451%2B-brightgreen)
 
 > **AI 에이전트가 에디터 안에서 Godot 게임을 빌드하고 플레이테스트하며 디버깅합니다.**
 
@@ -23,7 +23,7 @@ Godot-Autopilot은 **Godot 에디터 내부**에서 플러그인으로 동작하
 
 ## 주요 기능
 
-**443개 이상의 도구**로 에디터부터 게임까지 전체 과정을 지원합니다(정확한 수는 버전마다 증가하므로 `search_tools`를 통해 에이전트에게 확인하도록 요청하십시오). 주요 기능:
+**451개 이상의 도구**로 에디터부터 게임까지 전체 과정을 지원합니다(정확한 수는 버전마다 증가하므로 `search_tools`를 통해 에이전트에게 확인하도록 요청하십시오). 주요 기능:
 
 - **씬 빌드** — 노드를 생성, 이름 변경, 이동, 삭제합니다. 속성을 읽고 쓰며, 시그널을 연결하고, GridMap으로 3D 블록 레벨을 구축합니다(예: `create_scene_node`, `property_set`, `signal_connect`, `scene_tree_items`; GridMap: `create_gridmap`, `set_gridmap_cell`, `fill_gridmap_box`).
 - **외관, 사운드 및 질감** — 메시와 머티리얼, 조명과 환경, 오디오 재생, 애니메이션과 트윈, UI 테마, 타일맵을 지원합니다(예: `create_animation`, `tween_editor_property`, `create_game_tween`, `play_audio_player`, `fill_tilemap_rect`).

@@ -24,10 +24,10 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
   }
   const target = resolveTarget(opts, TARGET_CONTEXT);
   const envelope = await callTool("search_tools", args, { port: target.port, timeoutSec: callTimeoutSec(opts), direct: true });
-  const { display, toolFailed } = extractPayload(envelope, {
+  const extracted = extractPayload(envelope, {
     saveImages: opts.saveImages,
     raw: opts.raw,
     projectResults: true,
   });
-  return emit(display, toolFailed, opts);
+  return emit(extracted, opts);
 }

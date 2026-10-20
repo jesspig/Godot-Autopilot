@@ -5,7 +5,7 @@
 ![Godot](https://img.shields.io/badge/Godot-4.7%2B-478CBF?logo=godotengine&logoColor=white)
 ![プラットフォーム](https://img.shields.io/badge/platform-Windows%7CLinux%7CmacOS-lightgrey)
 [![プロトコル](https://img.shields.io/badge/MCP-Streamable_HTTP-blueviolet)](https://modelcontextprotocol.io/)
-![ツール数](https://img.shields.io/badge/tools-443%2B-brightgreen)
+![ツール数](https://img.shields.io/badge/tools-451%2B-brightgreen)
 
 > **AIエージェントがGodotゲームのビルド、プレイテスト、デバッグをエディターの内部から行います。**
 
@@ -23,7 +23,7 @@ Godot-Autopilotは、プラグインとして**Godotエディター内部**に�
 
 ## できること
 
-**443以上**のツールでエディターからゲーム実行までの流れ全体をカバーしています（正確な数はバージョンごとに増えますので、`search_tools`でエージェントに確認してもらいます）。主な機能は次のとおりです：
+**451以上**のツールでエディターからゲーム実行までの流れ全体をカバーしています（正確な数はバージョンごとに増えますので、`search_tools`でエージェントに確認してもらいます）。主な機能は次のとおりです：
 
 - **シーンのビルド** — Nodeの作成、名前変更、移動、削除を行い、プロパティの読み書きやシグナルの接続、GridMapによる3Dブロックレベルの構築ができます（例：`create_scene_node`、`property_set`、`signal_connect`、`scene_tree_items`；GridMap：`create_gridmap`、`set_gridmap_cell`、`fill_gridmap_box`）。
 - **見た目・音・質感** — メッシュとマテリアル、ライトと環境、オーディオ再生、アニメーションとトゥイーン、UIテーマ、タイルマップを扱えます（例：`create_animation`、`tween_editor_property`、`create_game_tween`、`play_audio_player`、`fill_tilemap_rect`）。

@@ -24,10 +24,35 @@ export interface ImageReport {
 export interface ExtractedPayload {
   display: unknown;
   toolFailed: boolean;
+  failureMessage?: string;
+}
+
+interface RpcErrorInfo {
+  code: number | null;
+  message: string;
 }
 
 function utcStamp(): string {
   return new Date().toISOString().replace(/[-:.]/g, "");
+}
+
+function readRpcError(envelope: unknown): RpcErrorInfo | null {
+  if (envelope === null || typeof envelope !== "object") return null;
+  const raw = (envelope as { error?: unknown }).error;
+  if (raw === undefined || raw === null) return null;
+  if (typeof raw === "string") return { code: null, message: raw };
+  if (typeof raw !== "object" || Array.isArray(raw)) return { code: null, message: "" };
+  const record = raw as { code?: unknown; message?: unknown };
+  const code = typeof record.code === "number" ? record.code : null;
+  const message = typeof record.message === "string" ? record.message : "";
+  return { code, message };
+}
+
+function formatRpcError(info: RpcErrorInfo): string {
+  const text = info.message.trim();
+  const body = text === "" ? "the server returned a JSON-RPC error envelope" : text;
+  const code = info.code === null ? "" : ` (code ${info.code})`;
+  return `tool failure: ${body}${code}`;
 }
 
 function hasInnerError(payload: unknown): boolean {
@@ -69,6 +94,12 @@ function redactedEnvelope(envelope: unknown): unknown {
 }
 
 export function extractPayload(envelope: JsonRpcResponse, opts: ExtractOptions = {}): ExtractedPayload {
+  const rpcError = readRpcError(envelope);
+  if (rpcError !== null) {
+    const display = opts.raw === true ? redactedEnvelope(envelope) : { error: { code: rpcError.code, message: rpcError.message } };
+    return { display, toolFailed: true, failureMessage: formatRpcError(rpcError) };
+  }
+
   const result = (envelope as { result?: { content?: unknown; isError?: unknown } }).result;
   const content = result?.content;
   if (!Array.isArray(content) || content.length === 0) {
@@ -173,10 +204,10 @@ export function callTimeoutSec(opts: GlobalOptions): number {
   return n;
 }
 
-export function emit(display: unknown, toolFailed: boolean, opts: GlobalOptions): number {
-  process.stdout.write(`${renderJson(display, opts)}\n`);
-  if (toolFailed) {
-    err("tool-level failure reported in the business payload.");
+export function emit(extracted: ExtractedPayload, opts: GlobalOptions): number {
+  process.stdout.write(`${renderJson(extracted.display, opts)}\n`);
+  if (extracted.toolFailed) {
+    err(extracted.failureMessage ?? "tool-level failure reported in the business payload.");
     return ExitCode.ToolFailure;
   }
   return ExitCode.Success;

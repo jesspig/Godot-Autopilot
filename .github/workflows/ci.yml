@@ -85,6 +85,25 @@ jobs:
       - name: Build (Debug)
         run: python main.py build
 
+      # 打包完整性自检：单平台 CI 无法交叉编译，用本地产物复制成三平台库名
+      # 验证打包收集逻辑（三平台库齐备、6 个 C# 桥 .cs 入包、.pdb 不入包、
+      # gdextension 与包内文件一一对应）。
+      - name: Package integrity self-check
+        shell: bash
+        run: |
+          set -euo pipefail
+          native="$(find build -type f \( -name 'godot-autopilot.dll' -o -name 'libgodot-autopilot.so' -o -name 'libgodot-autopilot.dylib' \) | head -n1)"
+          if [ -z "$native" ]; then
+            echo "::error::no built platform library found under build/"
+            exit 1
+          fi
+          mkdir -p dist/pkg-libs
+          for name in godot-autopilot.dll libgodot-autopilot.so libgodot-autopilot.dylib; do
+            cp "$native" "dist/pkg-libs/$name"
+          done
+          python main.py package --libs-dir dist/pkg-libs
+          python scripts/test_package_integrity.py dist/godot-autopilot-*.zip
+
       - name: L1 unit tests
         run: ctest --preset debug -E "^gda_runner_" --output-on-failure
 

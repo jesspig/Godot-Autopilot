@@ -4,12 +4,12 @@ import { CliError, ExitCode } from "../errors";
 import { joinPath } from "../platform";
 import { stateDir, type InstanceEntry } from "../registry";
 
-export function readRawEntry(id: string): InstanceEntry | undefined {
+export function readRawEntries(): InstanceEntry[] {
   let raw: string;
   try {
     raw = fs.readFileSync(joinPath(stateDir(), "instances.json"), "utf8");
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
     throw error;
   }
   let parsed: unknown;
@@ -21,5 +21,9 @@ export function readRawEntry(id: string): InstanceEntry | undefined {
   if (typeof parsed !== "object" || parsed === null || !Array.isArray((parsed as { instances?: unknown }).instances)) {
     throw new CliError(ExitCode.Transport, "cannot parse instances.json");
   }
-  return (parsed as { instances: InstanceEntry[] }).instances.find((e) => e.id === id);
+  return (parsed as { instances: InstanceEntry[] }).instances;
+}
+
+export function readRawEntry(id: string): InstanceEntry | undefined {
+  return readRawEntries().find((e) => e.id === id);
 }

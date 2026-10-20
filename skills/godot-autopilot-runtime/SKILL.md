@@ -5,7 +5,7 @@ description: "Godot runtime and debugging guide: launch and stop the game, input
 
 # Runtime and Debugging with godot-autopilot
 
-Invocation: use the native MCP tools first; when that channel is down, follow the calling ladder in the godot-autopilot-tools skill (bunx gda CLI, the standalone gda binary, or the bundled script bridge); with neither available, work through its references/manual-fallback.md.
+Invocation: use the native MCP tools first; when that channel is down, follow the calling ladder in the godot-autopilot-tools skill (the gda CLI, via bunx, a global install, or the standalone gda binary); with no CLI available, work through its references/manual-fallback.md.
 
 This book covers the game process life cycle: launching and stopping the
 game, the `game_*` runtime channel, input injection, viewport capture and the
@@ -59,9 +59,10 @@ Every game call has a three-layer timeout budget: the host waits
 wait must stay below the HTTP transport's hard 30 s limit. Accepted
 `timeout_ms` for game ops is therefore capped at 25000 ms (some tools reject,
 some clamp, and the low-level sender clamps every request), while
-editor-only tools keep the 30000 ms maximum. Budget long work as a chain of
-shorter calls and poll with `get_game_status` instead of raising
-`timeout_ms`.
+editor-only tools keep a 30000 ms maximum (`code_execute` is the exception:
+its ceiling is whatever the server reports in the `code_execute` schema).
+Budget long work as a chain of shorter calls and poll with `get_game_status`
+instead of raising `timeout_ms`.
 
 ## Check liveness with get_game_status
 

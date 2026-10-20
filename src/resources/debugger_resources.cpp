@@ -1,10 +1,37 @@
 #include "resources/debugger_resources.hpp"
+#include "core/config.hpp"
+#include "core/export_guard.hpp"
 #include "core/log_system.hpp"
 #include "core/monitor.hpp"
 #include "tools/debugger_ops.hpp"
+#include "tools/dispatch.hpp"
 #include "tools/tool_invoke.hpp"
+#include <memory>
+#include <utility>
 
 namespace godot_autopilot {
+
+namespace {
+
+struct DebuggerTaskState {
+  std::string text;
+};
+
+template <typename Fn>
+dispatch::BoundedWaitOutcome run_debugger_task(
+    CommandQueue &queue, const std::string &uri,
+    const std::shared_ptr<DebuggerTaskState> &state, Fn task) {
+  dispatch::BoundedWaitOutcome outcome = dispatch::run_bounded_on_main_thread(
+      queue, uri, state, std::move(task), GDA_DISPATCH_WAIT_DEFAULT_MS);
+  if (!outcome.ok) {
+    monitor::error_event(outcome.timed_out ? "main_thread_timeout"
+                                            : "resource_read_failed",
+                         "resource", uri);
+  }
+  return outcome;
+}
+
+} // namespace
 
 void register_debugger_resources(mcp::McpServer &server, CommandQueue &queue) {
   using namespace debugger_ops;
@@ -29,16 +56,25 @@ void register_debugger_resources(mcp::McpServer &server, CommandQueue &queue) {
       ResourceOptions{}.Description(
           "Recent editor output log (print/printerr/script errors)"),
       [make_result, &queue](const std::string &uri) {
+        if (godot_autopilot::ExportGuard::is_exporting()) {
+          return make_result(uri, dispatch::export_blocked_error_text());
+        }
         const tools::TraceContext ctx = tools::capture_trace_context();
-        const std::string text = queue.execute_sync([ctx] {
-          tools::ScopedTraceContext restore(ctx);
-          return capture_get_log_text(200);
-        });
+        auto state = std::make_shared<DebuggerTaskState>();
+        dispatch::BoundedWaitOutcome outcome = run_debugger_task(
+            queue, uri, state,
+            [state, ctx](DebuggerTaskState &st) {
+              tools::ScopedTraceContext restore(ctx);
+              st.text = capture_get_log_text(200);
+            });
+        if (!outcome.ok) {
+          return make_result(uri, outcome.error);
+        }
         monitor::data_flow(
-            "resource_read", static_cast<int64_t>(text.size()),
+            "resource_read", static_cast<int64_t>(state->text.size()),
             monitor::build_attrs({{"uri", uri},
                                   {"request_id", monitor::current_request_id()}}));
-        return make_result(uri, text);
+        return make_result(uri, state->text);
       });
 
   monitor::lifecycle(
@@ -50,16 +86,25 @@ void register_debugger_resources(mcp::McpServer &server, CommandQueue &queue) {
       ResourceOptions{}.Description(
           "Runtime errors and warnings from the running game"),
       [make_result, &queue](const std::string &uri) {
+        if (godot_autopilot::ExportGuard::is_exporting()) {
+          return make_result(uri, dispatch::export_blocked_error_text());
+        }
         const tools::TraceContext ctx = tools::capture_trace_context();
-        const std::string text = queue.execute_sync([ctx] {
-          tools::ScopedTraceContext restore(ctx);
-          return capture_get_errors_text(50);
-        });
+        auto state = std::make_shared<DebuggerTaskState>();
+        dispatch::BoundedWaitOutcome outcome = run_debugger_task(
+            queue, uri, state,
+            [state, ctx](DebuggerTaskState &st) {
+              tools::ScopedTraceContext restore(ctx);
+              st.text = capture_get_errors_text(50);
+            });
+        if (!outcome.ok) {
+          return make_result(uri, outcome.error);
+        }
         monitor::data_flow(
-            "resource_read", static_cast<int64_t>(text.size()),
+            "resource_read", static_cast<int64_t>(state->text.size()),
             monitor::build_attrs({{"uri", uri},
                                   {"request_id", monitor::current_request_id()}}));
-        return make_result(uri, text);
+        return make_result(uri, state->text);
       });
 
   monitor::lifecycle(
@@ -70,20 +115,31 @@ void register_debugger_resources(mcp::McpServer &server, CommandQueue &queue) {
                           ResourceOptions{}.Description(
                               "Runtime print() output from the running game"),
                           [make_result, &queue](const std::string &uri) {
+                            if (godot_autopilot::ExportGuard::is_exporting()) {
+                              return make_result(
+                                  uri, dispatch::export_blocked_error_text());
+                            }
                             const tools::TraceContext ctx =
                                 tools::capture_trace_context();
-                            const std::string text = queue.execute_sync([ctx] {
-                              tools::ScopedTraceContext restore(ctx);
-                              return capture_get_game_output_text(200);
-                            });
+                            auto state = std::make_shared<DebuggerTaskState>();
+                            dispatch::BoundedWaitOutcome outcome =
+                                run_debugger_task(
+                                    queue, uri, state,
+                                    [state, ctx](DebuggerTaskState &st) {
+                                      tools::ScopedTraceContext restore(ctx);
+                                      st.text = capture_get_game_output_text(200);
+                                    });
+                            if (!outcome.ok) {
+                              return make_result(uri, outcome.error);
+                            }
                             monitor::data_flow(
                                 "resource_read",
-                                static_cast<int64_t>(text.size()),
+                                static_cast<int64_t>(state->text.size()),
                                 monitor::build_attrs(
                                     {{"uri", uri},
                                      {"request_id",
                                       monitor::current_request_id()}}));
-                            return make_result(uri, text);
+                            return make_result(uri, state->text);
                           });
 
   monitor::lifecycle(
@@ -95,16 +151,25 @@ void register_debugger_resources(mcp::McpServer &server, CommandQueue &queue) {
       ResourceOptions{}.Description(
           "Current stack trace when debugger is paused on a breakpoint"),
       [make_result, &queue](const std::string &uri) {
+        if (godot_autopilot::ExportGuard::is_exporting()) {
+          return make_result(uri, dispatch::export_blocked_error_text());
+        }
         const tools::TraceContext ctx = tools::capture_trace_context();
-        const std::string text = queue.execute_sync([ctx] {
-          tools::ScopedTraceContext restore(ctx);
-          return capture_get_stack_dump_text();
-        });
+        auto state = std::make_shared<DebuggerTaskState>();
+        dispatch::BoundedWaitOutcome outcome = run_debugger_task(
+            queue, uri, state,
+            [state, ctx](DebuggerTaskState &st) {
+              tools::ScopedTraceContext restore(ctx);
+              st.text = capture_get_stack_dump_text();
+            });
+        if (!outcome.ok) {
+          return make_result(uri, outcome.error);
+        }
         monitor::data_flow(
-            "resource_read", static_cast<int64_t>(text.size()),
+            "resource_read", static_cast<int64_t>(state->text.size()),
             monitor::build_attrs({{"uri", uri},
                                   {"request_id", monitor::current_request_id()}}));
-        return make_result(uri, text);
+        return make_result(uri, state->text);
       });
 
   monitor::lifecycle(
@@ -115,16 +180,25 @@ void register_debugger_resources(mcp::McpServer &server, CommandQueue &queue) {
       "debugger-scene-tree", "godot://debugger/scene-tree",
       ResourceOptions{}.Description("Remote scene tree of the running game"),
       [make_result, &queue](const std::string &uri) {
+        if (godot_autopilot::ExportGuard::is_exporting()) {
+          return make_result(uri, dispatch::export_blocked_error_text());
+        }
         const tools::TraceContext ctx = tools::capture_trace_context();
-        const std::string text = queue.execute_sync([ctx] {
-          tools::ScopedTraceContext restore(ctx);
-          return capture_get_scene_tree_text();
-        });
+        auto state = std::make_shared<DebuggerTaskState>();
+        dispatch::BoundedWaitOutcome outcome = run_debugger_task(
+            queue, uri, state,
+            [state, ctx](DebuggerTaskState &st) {
+              tools::ScopedTraceContext restore(ctx);
+              st.text = capture_get_scene_tree_text();
+            });
+        if (!outcome.ok) {
+          return make_result(uri, outcome.error);
+        }
         monitor::data_flow(
-            "resource_read", static_cast<int64_t>(text.size()),
+            "resource_read", static_cast<int64_t>(state->text.size()),
             monitor::build_attrs({{"uri", uri},
                                   {"request_id", monitor::current_request_id()}}));
-        return make_result(uri, text);
+        return make_result(uri, state->text);
       });
 
   monitor::lifecycle(
@@ -136,16 +210,25 @@ void register_debugger_resources(mcp::McpServer &server, CommandQueue &queue) {
       ResourceOptions{}.Description(
           "Latest performance monitor data from the running game"),
       [make_result, &queue](const std::string &uri) {
+        if (godot_autopilot::ExportGuard::is_exporting()) {
+          return make_result(uri, dispatch::export_blocked_error_text());
+        }
         const tools::TraceContext ctx = tools::capture_trace_context();
-        const std::string text = queue.execute_sync([ctx] {
-          tools::ScopedTraceContext restore(ctx);
-          return capture_get_monitors_text(5);
-        });
+        auto state = std::make_shared<DebuggerTaskState>();
+        dispatch::BoundedWaitOutcome outcome = run_debugger_task(
+            queue, uri, state,
+            [state, ctx](DebuggerTaskState &st) {
+              tools::ScopedTraceContext restore(ctx);
+              st.text = capture_get_monitors_text(5);
+            });
+        if (!outcome.ok) {
+          return make_result(uri, outcome.error);
+        }
         monitor::data_flow(
-            "resource_read", static_cast<int64_t>(text.size()),
+            "resource_read", static_cast<int64_t>(state->text.size()),
             monitor::build_attrs({{"uri", uri},
                                   {"request_id", monitor::current_request_id()}}));
-        return make_result(uri, text);
+        return make_result(uri, state->text);
       });
 
   monitor::lifecycle(
@@ -157,16 +240,25 @@ void register_debugger_resources(mcp::McpServer &server, CommandQueue &queue) {
       ResourceOptions{}.Description(
           "Current debugger session state (active/breaked/running)"),
       [make_result, &queue](const std::string &uri) {
+        if (godot_autopilot::ExportGuard::is_exporting()) {
+          return make_result(uri, dispatch::export_blocked_error_text());
+        }
         const tools::TraceContext ctx = tools::capture_trace_context();
-        const std::string text = queue.execute_sync([ctx] {
-          tools::ScopedTraceContext restore(ctx);
-          return capture_get_session_info_text();
-        });
+        auto state = std::make_shared<DebuggerTaskState>();
+        dispatch::BoundedWaitOutcome outcome = run_debugger_task(
+            queue, uri, state,
+            [state, ctx](DebuggerTaskState &st) {
+              tools::ScopedTraceContext restore(ctx);
+              st.text = capture_get_session_info_text();
+            });
+        if (!outcome.ok) {
+          return make_result(uri, outcome.error);
+        }
         monitor::data_flow(
-            "resource_read", static_cast<int64_t>(text.size()),
+            "resource_read", static_cast<int64_t>(state->text.size()),
             monitor::build_attrs({{"uri", uri},
                                   {"request_id", monitor::current_request_id()}}));
-        return make_result(uri, text);
+        return make_result(uri, state->text);
       });
 
   LogSystem::instance().log(LogLevel::Info, LogCategory::Resources,

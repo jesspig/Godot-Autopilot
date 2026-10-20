@@ -2,11 +2,43 @@
 
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <stdexcept>
 #include <thread>
 
 using godot_autopilot::CommandQueue;
+
+namespace {
+
+class QueueDrainer {
+ public:
+  explicit QueueDrainer(CommandQueue &queue) : queue_(queue) {
+    worker_ = std::thread([this] {
+      while (!stop_.load(std::memory_order_acquire)) {
+        queue_.drain();
+        std::this_thread::sleep_for(kPollInterval);
+      }
+    });
+  }
+
+  ~QueueDrainer() {
+    stop_.store(true, std::memory_order_release);
+    worker_.join();
+  }
+
+  QueueDrainer(const QueueDrainer &) = delete;
+  QueueDrainer &operator=(const QueueDrainer &) = delete;
+
+ private:
+  static constexpr std::chrono::milliseconds kPollInterval{1};
+  CommandQueue &queue_;
+  std::atomic<bool> stop_{false};
+  std::thread worker_;
+};
+
+} // namespace
 
 TEST(CommandQueueTest, SubmitDrainReturnsValuesInOrder) {
     CommandQueue q;
@@ -111,4 +143,74 @@ TEST(CommandQueueTest, LastDrainAgeAdvancesAfterDrain) {
     EXPECT_GE(q.last_drain_age_ms(), 0);
     std::this_thread::sleep_for(std::chrono::milliseconds(5));
     EXPECT_GE(q.last_drain_age_ms(), 1);
+}
+
+TEST(CommandQueueTest, BoundedSubmitCompletesWithinBudget) {
+    constexpr int64_t kBudgetMs = 1000;
+    CommandQueue q;
+    QueueDrainer drainer(q);
+    std::thread::id executed_on;
+    auto submission = q.submit_tracked_bounded(
+        [&executed_on] {
+          executed_on = std::this_thread::get_id();
+          return 42;
+        },
+        kBudgetMs);
+    EXPECT_FALSE(submission.timed_out);
+    EXPECT_FALSE(submission.cancelled);
+    EXPECT_GE(submission.waited_ms, 0);
+    EXPECT_LE(submission.waited_ms, kBudgetMs);
+    EXPECT_EQ(submission.future.get(), 42);
+    EXPECT_NE(executed_on, std::thread::id());
+    EXPECT_NE(executed_on, std::this_thread::get_id());
+}
+
+TEST(CommandQueueTest, BoundedSubmitOwnerThreadExecutesInline) {
+    constexpr int64_t kBudgetMs = 1000;
+    CommandQueue q;
+    q.drain();
+    ASSERT_TRUE(q.is_main_thread());
+    bool ran = false;
+    auto submission = q.submit_tracked_bounded(
+        [&ran] {
+          ran = true;
+          return 7;
+        },
+        kBudgetMs);
+    EXPECT_FALSE(submission.timed_out);
+    EXPECT_FALSE(submission.cancelled);
+    EXPECT_TRUE(ran);
+    EXPECT_GE(submission.waited_ms, 0);
+    EXPECT_LE(submission.waited_ms, kBudgetMs);
+    EXPECT_EQ(submission.future.get(), 7);
+    EXPECT_EQ(q.stats().pending, 0u);
+}
+
+TEST(CommandQueueTest, BoundedSubmitNonPositiveBudgetWaitsForCompletion) {
+    CommandQueue q;
+    QueueDrainer drainer(q);
+    auto submission = q.submit_tracked_bounded([] { return 5; }, 0);
+    EXPECT_FALSE(submission.timed_out);
+    EXPECT_FALSE(submission.cancelled);
+    EXPECT_GE(submission.waited_ms, 0);
+    EXPECT_EQ(submission.future.get(), 5);
+}
+
+TEST(CommandQueueTest, BoundedSubmitTimeoutCancelsPendingTask) {
+    CommandQueue q;
+    bool ran = false;
+    auto submission = q.submit_tracked_bounded([&ran] { ran = true; }, 50);
+    EXPECT_TRUE(submission.timed_out);
+    EXPECT_TRUE(submission.cancelled);
+    EXPECT_GE(submission.waited_ms, 0);
+    q.drain();
+    EXPECT_FALSE(ran);
+}
+
+TEST(CommandQueueTest, BoundedSubmitTimeoutIncrementsCancelledCounter) {
+    CommandQueue q;
+    const uint64_t cancelled_before = q.stats().cancelled;
+    auto submission = q.submit_tracked_bounded([] { return 7; }, 30);
+    EXPECT_TRUE(submission.timed_out);
+    EXPECT_EQ(q.stats().cancelled, cancelled_before + 1);
 }

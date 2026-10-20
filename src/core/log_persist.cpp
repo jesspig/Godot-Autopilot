@@ -209,6 +209,11 @@ void LogPersist::init_session() {
     last_log_serial_ = 0;
     last_trace_seq_ = 0;
   }
+  if (trace_os.empty()) {
+    LogSystem::instance().log(LogLevel::Error, LogCategory::System,
+                              "trace os path unavailable, trace mirroring "
+                              "disabled for this session");
+  }
   reported_dropped_logs_.store(dropped_log_lines_.load());
   reported_dropped_traces_.store(dropped_trace_lines_.load());
   rotate_on_init();
@@ -247,8 +252,11 @@ void LogPersist::flush_on_main_thread() {
     if (write_failed_) {
       std::vector<std::string> discarded_logs;
       std::vector<std::string> discarded_traces;
+      std::vector<TraceImagePayload> discarded_images;
       discarded_logs.swap(log_buffer_);
       discarded_traces.swap(trace_buffer_);
+      discarded_images.swap(image_buffer_);
+      image_buffer_bytes_ = 0;
       return;
     }
   }
@@ -331,12 +339,13 @@ void LogPersist::flush_on_main_thread() {
     for (const std::string &line : traces) {
       append_persist_line(payload, line);
     }
-    if (append_persist_file(trace_path, payload)) {
+    if (append_trace_payload(payload)) {
       bytes_written_.fetch_add(payload.size(), std::memory_order_relaxed);
     } else {
       note_persist_failure(trace_path);
     }
   }
+  flush_trace_images();
   const uint64_t dropped_logs = dropped_log_lines_.load(std::memory_order_relaxed);
   const uint64_t dropped_traces = dropped_trace_lines_.load(std::memory_order_relaxed);
   if (dropped_logs > reported_dropped_logs_.exchange(dropped_logs) ||
@@ -349,33 +358,116 @@ void LogPersist::flush_on_main_thread() {
   }
 }
 
-void LogPersist::write_trace_now(const std::string &line) {
-  try {
+bool LogPersist::append_trace_payload(const std::string &payload) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (trace_os_path_.empty()) {
+    return false;
+  }
+  std::ofstream out(std::filesystem::u8path(trace_os_path_),
+                    std::ios::app | std::ios::binary);
+  if (!out.is_open()) {
+    return false;
+  }
+  out.write(payload.data(), static_cast<std::streamsize>(payload.size()));
+  out.flush();
+  out.close();
+  return out.good();
+}
+
+void LogPersist::flush_trace_images() {
+  std::vector<TraceImagePayload> images;
+  {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (trace_os_path_.empty()) {
+    if (image_buffer_.empty()) {
       return;
     }
+    images.swap(image_buffer_);
+    image_buffer_bytes_ = 0;
+  }
+  const std::string dir = std::string(kTraceDir) + "/images";
+  godot::DirAccess::make_dir_recursive_absolute(godot::String::utf8(dir.c_str()));
+  for (const TraceImagePayload &image : images) {
+    godot::Ref<godot::FileAccess> file = godot::FileAccess::open(
+        godot::String::utf8(image.absolute_path.c_str()), godot::FileAccess::WRITE);
+    if (file.is_null()) {
+      LogSystem::instance().log_detailed(LogLevel::Error, LogCategory::System,
+                                         "trace image store failed",
+                                         image.absolute_path);
+      continue;
+    }
+    file->store_buffer(reinterpret_cast<const uint8_t *>(image.bytes.data()),
+                       static_cast<int64_t>(image.bytes.size()));
+    const godot::Error write_err = file->get_error();
+    file->close();
+    if (write_err != godot::OK) {
+      LogSystem::instance().log_detailed(LogLevel::Error, LogCategory::System,
+                                         "trace image store failed",
+                                         image.absolute_path);
+      continue;
+    }
+    bytes_written_.fetch_add(image.bytes.size(), std::memory_order_relaxed);
+  }
+}
+
+void LogPersist::write_trace_now(const std::string &line) {
+  try {
     std::string payload;
     append_persist_line(payload, line);
-    std::ofstream out(std::filesystem::u8path(trace_os_path_),
-                      std::ios::app | std::ios::binary);
-    if (out.is_open()) {
-      out.write(payload.data(), static_cast<std::streamsize>(payload.size()));
-      out.flush();
-      out.close();
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      if (trace_os_path_.empty()) {
+        return;
+      }
     }
-    if (out.good()) {
+    if (append_trace_payload(payload)) {
       bytes_written_.fetch_add(payload.size(), std::memory_order_relaxed);
       return;
     }
     flush_failures_.fetch_add(1, std::memory_order_relaxed);
-    if (!trace_now_failure_reported_) {
-      trace_now_failure_reported_ = true;
-      LogSystem::instance().log(
-          LogLevel::Warning, LogCategory::System,
-          "mirror trace write failed: " + trace_os_path_);
+    bool report = false;
+    std::string path;
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      path = trace_os_path_;
+      if (!trace_now_failure_reported_) {
+        trace_now_failure_reported_ = true;
+        report = true;
+      }
+    }
+    if (report) {
+      LogSystem::instance().log(LogLevel::Warning, LogCategory::System,
+                                "mirror trace write failed: " + path);
     }
   } catch (...) {
+  }
+}
+
+void LogPersist::enqueue_trace_image(const TraceImagePayload &payload) {
+  if (payload.absolute_path.empty() || payload.bytes.empty()) {
+    LogSystem::instance().log_detailed(LogLevel::Error, LogCategory::System,
+                                       "trace image payload rejected",
+                                       payload.absolute_path);
+    return;
+  }
+  bool dropped = false;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    while (!image_buffer_.empty() &&
+           (image_buffer_.size() >= kTraceImageBufferMaxEntries ||
+            image_buffer_bytes_ + payload.bytes.size() >
+                kTraceImageBufferMaxBytes)) {
+      image_buffer_bytes_ -= image_buffer_.front().bytes.size();
+      image_buffer_.erase(image_buffer_.begin());
+      dropped_trace_images_.fetch_add(1, std::memory_order_relaxed);
+      dropped = true;
+    }
+    image_buffer_bytes_ += payload.bytes.size();
+    image_buffer_.push_back(payload);
+  }
+  if (dropped) {
+    LogSystem::instance().log(LogLevel::Warning, LogCategory::System,
+                              "trace image buffer overflow, oldest pending "
+                              "image dropped");
   }
 }
 
@@ -400,25 +492,12 @@ std::string LogPersist::store_trace_image(const std::string &span_id,
   const std::string dir = std::string(kTraceDir) + "/images";
   const std::string name =
       "trace-" + session + "-" + span_id + "-" + kind + ".png";
-  const std::string path = dir + "/" + name;
-  godot::DirAccess::make_dir_recursive_absolute(godot::String::utf8(dir.c_str()));
-  godot::Ref<godot::FileAccess> file = godot::FileAccess::open(
-      godot::String::utf8(path.c_str()), godot::FileAccess::WRITE);
-  if (file.is_null()) {
-    LogSystem::instance().log_detailed(LogLevel::Error, LogCategory::System,
-                                       "trace image store failed", path);
-    return std::string();
-  }
-  file->store_buffer(reinterpret_cast<const uint8_t *>(decoded.data()),
-                     static_cast<int64_t>(decoded.size()));
-  const godot::Error write_err = file->get_error();
-  file->close();
-  if (write_err != godot::OK) {
-    LogSystem::instance().log_detailed(LogLevel::Error, LogCategory::System,
-                                       "trace image store failed", path);
-    return std::string();
-  }
-  return "images/" + name;
+  TraceImagePayload payload;
+  payload.relative_path = "images/" + name;
+  payload.absolute_path = dir + "/" + name;
+  payload.bytes = decoded;
+  enqueue_trace_image(payload);
+  return payload.relative_path;
 }
 
 void LogPersist::rotate_on_init() {
@@ -465,6 +544,20 @@ uint64_t LogPersist::pruned_files() const {
   return pruned_files_.load(std::memory_order_relaxed);
 }
 
+std::size_t LogPersist::pending_trace_image_count() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return image_buffer_.size();
+}
+
+uint64_t LogPersist::pending_trace_image_bytes() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return image_buffer_bytes_;
+}
+
+uint64_t LogPersist::dropped_trace_images() const {
+  return dropped_trace_images_.load(std::memory_order_relaxed);
+}
+
 std::string LogPersist::session_id() {
   std::lock_guard<std::mutex> lock(mutex_);
   return session_id_;
@@ -488,6 +581,7 @@ std::string LogPersist::health_summary() {
        {"trace_path", trace_path()},
        {"dropped_log_lines", std::to_string(dropped_log_lines())},
        {"dropped_trace_lines", std::to_string(dropped_trace_lines())},
+       {"dropped_trace_images", std::to_string(dropped_trace_images())},
        {"bytes_written", std::to_string(bytes_written())},
        {"flush_failures", std::to_string(flush_failures())},
        {"rotations", std::to_string(rotations())},
