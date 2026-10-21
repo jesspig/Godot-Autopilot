@@ -6,7 +6,7 @@ tags:
   - 构建
   - CMake
   - 部署
-timestamp: "2026-10-21T00:37:30+08:00"
+timestamp: "2026-10-21T20:08:37+08:00"
 resource:
   - CMakeLists.txt
   - CMakePresets.json
@@ -248,7 +248,7 @@ version 8，**6 个 configure 预设**（2 个 hidden 基座 + 4 个可直接 `-
 
 - **现象**：只跑 `ctest --preset debug-portable` 时**只注册了 40 个测试**，且三个非 gtest 用例直接报 `Test not available without configuration. (Missing "-C <config>"?)`。
 - **根因**：多配置生成器下 `gtest_discover_tests`（[`tests/CMakeLists.txt:91`](../../tests/CMakeLists.txt)）生成的**发现文件名带配置名**。实测 `build/debug/tests/` 下为 `gda_unit_tests_e3b0c442_Debug_tests.cmake`（另有 `_include.cmake` / `_discovery.cmake` 以及 Release / RelWithDebInfo / MinSizeRel 对应文件）；ctest 不带 `-C` 时不会 include 对应配置的发现文件，于是 gtest 用例整体缺席。
-- **对照实测**：`ctest --test-dir build/debug -N` → **40** 个（多配置生成器下缺 `-C` 的缺省表现）；`ctest --test-dir build/debug -C Debug -N` → **507** 个（460 个 L1 gtest + 41 个 L2 runner + 6 个守卫/脚本，与 [tests.md](./tests.md) 口径一致）。
+- **对照实测**：`ctest --test-dir build/debug -N` → **40** 个（多配置生成器下缺 `-C` 的缺省表现）；`ctest --test-dir build/debug -C Debug -N` → **781** 个（734 个 L1 gtest + 41 个 L2 runner + 6 个守卫/脚本，与 [tests.md](./tests.md) 口径一致）。
 - **修法**：在 [`CMakePresets.json`](../../CMakePresets.json) 的 build/test 预设上加 `configuration` 字段（`debug-portable` = `Debug`、`release-portable` = `Release`；Ninja 的两个预设不加）。CMake 会自动把它翻译成 `--config` / `-C`，因此 **`scripts/test_ops.py` 与 `main.py` 零改动**，`uv run main.py test` 在两类生成器下行为一致。
 - **注意**：这是「配置名」维度，与预设名正交 —— 手动执行 `ctest --preset debug-portable` 已自动带上 `-C Debug`；若绕过 preset 直接 `ctest --test-dir build/debug`，则须自己补 `-C Debug`。
 

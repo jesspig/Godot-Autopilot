@@ -6,13 +6,13 @@ tags:
   - 模块
   - 领域工具
   - B组
-timestamp: "2026-10-21T04:47:54+08:00"
+timestamp: "2026-10-21T20:08:37+08:00"
 resource: src/tools/
 ---
 
 # 工具实现模块 B（调试/显示/OS/运行时/渲染/资源/执行）
 
-> 10-21 数值同步批次增补：遍历排除数/候选数改为引用 [../tests.md](../tests.md)「数值核算总表」的遍历各行（最近一次 L2 实测：枚举 452 / 排除 147 / 候选 305 / 实测 558 步 / `empty_args` warnings 基线 0）；OS 类的副作用工具数 **8→11**（补 `copy_file`/`ensure_directory`/`create_csharp_script`，按集成分支 `os_tools.hpp` 逐条统计）。
+> 10-21 数值同步批次增补：遍历排除数/候选数改为引用 [../tests.md](../tests.md)「数值核算总表」的遍历各行（最近一次 L2 实测：枚举 452 / 排除 147 / 候选 305 / 实测 557 步 / `empty_args` warnings 基线 0）；OS 类的副作用工具数 **8→11**（补 `copy_file`/`ensure_directory`/`create_csharp_script`，按集成分支 `os_tools.hpp` 逐条统计）。
 
 > 09-18 CJK 传输链收敛批次增补（详见 `changelog/2026-09-18-log.md` 21:15 节）：`variant_json` 反序列化 10 处、`debugger_access` 广播/重载 2 处、`game_bridge_eval` 求值源码、`code_exec` 包装源码改 `String::utf8`；`runtime_ops` 错误整形透传游戏侧 `diagnosis`/`hint`（live 验证新发现，`method_not_found_on_node` 实测回传）。
 

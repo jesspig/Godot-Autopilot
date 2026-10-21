@@ -6,11 +6,13 @@ tags:
   - 模块
   - 领域工具
   - A组
-timestamp: "2026-10-21T04:47:54+08:00"
+timestamp: "2026-10-21T20:08:37+08:00"
 resource: src/tools/
 ---
 
 # 领域工具模块（src/tools/，A 组 16 模块）
+
+> 10-21 随 C# 程序集构建与 .NET 环境判定修复批次增补：`build_csharp_assembly` 的工程文件路径改经 `ProjectSettings.globalize_path` 换算为系统绝对路径后再交 dotnet（原样传 `res://` 会 MSB1009、构建不发生），返回体新增 `project_path`；`.NET` 环境判定改以**引擎是否注册 `CSharpScript` 类**为权威信号，Godot 4.x 未注册 `mono` / `dotnet` 特性标签（4.7.2 mono 实测两者皆 false），版本兜底为 4.4+ 用 `dotnet`、更早用 `mono`、版本未知取二者或。详见 [changelog/2026-10-21-log.md](../changelog/2026-10-21-log.md)。
 
 > 10-16 计数复核增补：本页 16 模块 221→222（+1：`editor_tools` 32→33 `dotnet_environment`）；全系统 451→459（域工具 443→451：本页 +1，B 组 +7 = `csharp` 新域 6 项 + `os` 侧 `create_csharp_script`；A 222 + B 229 = 451），验证证据见 [changelog/2026-10-16-log.md](../changelog/2026-10-16-log.md)。
 
@@ -364,7 +366,8 @@ resource: src/tools/
 - 文件系统树导出 `dir_to_json` 递归上限 `MAX_TREE_DEPTH=12`，截断时响应附 `max_depth: 12`（`dir_to_json` 的局部 truncated 返回值不直接进入响应）。
 - `set_editor_main_scene` 写 `application/run/main_scene` 并 `ProjectSettings::save()`；`set_editor_plugin_enabled`、`save_editor_scene` 等均声明 `side_effect != "none"` + `kMutating`，遍历自动排除。
 - `create_editor_undo_redo_action` 支持动作分组名称，`add_do`/`add_undo` 以 node_path + 方法 + 参数形式入栈。
-- **`build_csharp_assembly`（08-20 新增）**：在 res:// 根定位 `.csproj/.sln`（无则报非 C# 工程），经 `OS::create_process` 异步启动 `dotnet build --nologo <project>`（非阻塞，沿用 os_ops 模式，避免冻结编辑器），返回 `{project_file, command, started, pid, note}`；`started` 为假时附 `error` 说明 SDK 缺失。`note` 明示能力边界：GDExtension(C++) 无公共 API 触发编辑器内 C# 程序集热重载（该能力在引擎 `modules/mono` 内部），仅能在 CI/命令行式编译验证；编辑器内类/签名变更后的验证仍须用户在编辑器点 Build 或重启。声明 `side_effect=Process` + `kMutating`，遍历自动排除。
+- **`build_csharp_assembly`（08-20 新增）**：在 res:// 根定位 `.csproj/.sln`（无则报非 C# 工程），经 `OS::create_process` 异步启动 `dotnet build --nologo <project>`（非阻塞，沿用 os_ops 模式，避免冻结编辑器），返回 `{project_file, project_path, command, started, pid, note}`；`started` 为假时附 `error` 说明 SDK 缺失。**10-21 修复**：工程文件路径先经 `ProjectSettings.globalize_path` 换算为**系统绝对路径**再交给 dotnet——dotnet 无法解析 `res://` 路径，原样传递会报 MSB1009 且**构建不发生**；`command` 字段仍展示对 `res://` 文件的逻辑调用，`project_path` 是实际交给 dotnet 的绝对路径。`note` 明示能力边界：GDExtension(C++) 无公共 API 触发编辑器内 C# 程序集热重载（该能力在引擎 `modules/mono` 内部），仅能在 CI/命令行式编译验证；编辑器内类/签名变更后的验证仍须用户在编辑器点 Build 或重启。声明 `side_effect=Process` + `kMutating`，遍历自动排除。
+- **`.NET` 环境判定（10-21 改口径，[`src/util/dotnet_env.hpp`](../../../src/util/dotnet_env.hpp) 的 `dotnet_env::is_dotnet_environment`）**：判定是否为 .NET 编辑器的**权威信号是引擎是否注册了 `CSharpScript` 类**——.NET 模块装载即注册该类（`ClassDB.class_exists("CSharpScript")`）。**Godot 4.x 未注册 `mono` / `dotnet` 特性标签**（本机 4.7.2 mono 实测 `OS.has_feature("mono")` 与 `OS.has_feature("dotnet")` 皆为 false），因此特性名探测在多数版本下恒为 false，**不能作为主判据**。版本兜底规则：引擎版本 **4.4 及以上**用 `dotnet` 特性名、更早用 `mono`、**版本未知**取二者或（任一为真即判为 .NET 环境）；`probe_current()` 另行采集 `engine_version` / `mono_feature` / `dotnet_feature` 三项供诊断。`dotnet_environment` 工具返回的 `is_dotnet_editor` 与 `assembly_loaded` 均据此判定——`assembly_loaded` 反映 **.NET 模块已装载**而非项目程序集已加载。
 
 ## editor_ui_ops（5 工具，其中 4 只读）
 

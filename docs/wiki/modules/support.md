@@ -8,7 +8,7 @@ tags:
   - 资源
   - UI
   - 工具库
-timestamp: "2026-10-21T00:37:30+08:00"
+timestamp: "2026-10-21T20:08:37+08:00"
 resource:
   - src/prompts/
   - src/resources/
@@ -128,7 +128,7 @@ resource:
 `EditorDock` 子类，标题 "MCP Config"，默认停靠右侧槽（`DOCK_SLOT_RIGHT_UR`），可关闭：
 
 - **布局**：VBoxContainer = "MCP Server" 标题 + 端口行（Label + SpinBox 1–65535 + Apply 按钮）→ Show timestamps 复选框 → Allow code_execute 复选框（09-13 下午新增）→ Allow game_runtime 复选框（09-14 新增）→ Allow user tools 复选框 → **Allow write 复选框（10-21 新增）→ Allow destructive 复选框（10-21 新增）** → Desensitize data 复选框（09-20 新增）→ 运行状态 Label → 分隔线 → 客户端配置区（`OptionButton` 下拉选择 20 个客户端，label 含配置文件路径）→ Generate 按钮 → 技能生成区（Generate Skills / Update Skills 动态按钮）→ 结果 Label → 生效条件提示 Label
-- **Allow code_execute / Allow game_runtime / Allow user tools / Allow write / Allow destructive 复选框（09-13 下午新增 code_execute，09-14 新增 game_runtime，10-21 补 write 与 destructive）**：五个勾选框分别转发到共享槽函数 `_on_allow_toggled(capability, box, checked)`——勾选用 `authorization::allow_list_add` 追加能力（已生效或配置含 `all` 时保持原样），取消用 `allow_list_remove` 移除（先把 `all` 展开为全部已知能力再逐项删除，**取消一项不影响其它项**）；初值与操作后校准均用 `allow_list_contains` + `set_pressed_no_signal`（dock 私有的 `split_allow`/`join_allow` 与 `code_execute_allowed()` 已删除）。10-21 起 `write` 与 `destructive` 的初值取 `authorization::capability_enabled`（读**当前实际允许列表**，环境变量优先于配置），与 `user_tools` 一致。下次工具调用即生效（授权门每次实时读取配置），`GODOT_AUTOPILOT_ALLOW` 环境变量存在时优先于该配置（tooltip 已注明）。`process` 无 dock 开关，需环境变量或手改配置的 `allow` 键；拒绝响应的 `enable` 文案同样只对**有面板开关的五项**提及 dock（`authorization::capability_has_dock_toggle`）。完整口径见 [T0 安全边界](../security_contract.md) §3.1.1。
+- **Allow code_execute / Allow game_runtime / Allow user tools / Allow write / Allow destructive / Allow process 复选框（09-13 下午新增 code_execute，09-14 新增 game_runtime，10-21 补 write 与 destructive，并补 process）**：**六个**勾选框**按能力清单生成**（[`src/ui/authorization_switches.hpp`](../../../src/ui/authorization_switches.hpp) 的 `kSwitchLabels` 与 `src/tools/authorization.hpp` 的 `kDockToggleCapabilities`，面板遍历该清单建控件，控件与能力不再各写一份），分别转发到共享槽函数 `_on_allow_toggled(capability, box, checked)`——勾选用 `authorization::allow_list_add` 追加能力（已生效或配置含 `all` 时保持原样），取消用 `allow_list_remove` 移除（先把 `all` 展开为全部已知能力再逐项删除，**取消一项不影响其它项**）；初值与操作后校准均用 `allow_list_contains` + `set_pressed_no_signal`（dock 私有的 `split_allow`/`join_allow` 与 `code_execute_allowed()` 已删除）。10-21 起**全部开关的初值取 `authorization::capability_enabled`**（读**当前实际允许列表**，环境变量优先于配置），`write` / `destructive` / `process` 与 `user_tools` 口径一致。下次工具调用即生效（授权门每次实时读取配置），`GODOT_AUTOPILOT_ALLOW` 环境变量存在时优先于该配置（tooltip 已注明）。`process` 的开关文案额外说明「危险档：会运行外部程序与 OS 命令」。拒绝响应的 `enable` 文案同样只对**有面板开关的六项**提及 dock（`authorization::capability_has_dock_toggle`）。完整口径见 [T0 安全边界](../security_contract.md) §3.1.1。
 - **Desensitize data 复选框（09-20 新增）**：`_on_desensitize_toggled(checked)` → `PluginConfig::save_desensitize(checked)` + `sanitize_policy::set_enabled(checked)`；初值取 `PluginConfig::load_desensitize()`（默认 true）并同步写入全局缓存。影响参数 digest 与 trace 图片落盘（详见 [安全边界](../security_contract.md) §3.2）；`GODOT_AUTOPILOT_DESENSITIZE` 环境变量仅在启动初始化时优先于配置，运行期复选框仍直接改写全局缓存（重启后 env 再次生效）。
 - **技能生成（动态按钮）**：按钮文本按 `.agents/skills/` 下是否已存在 `godot-autopilot-` 前缀目录动态切换——无 → "Generate Skills"，有 → "Update Skills"；Update 点击先递归删除全部前缀匹配目录再整体重新生成（语义详见下文 skill_gen 小节）
 - **端口管理**：`set_server_context(ServerContext*)` 注入服务器（null 时禁用 Apply）；Apply → `ServerContext::restart(port)` → 成功后 `PluginConfig::save_port(port)` 持久化，并刷新面板内运行状态 Label（"Running on port N" / "Server offline"，主题色标注）

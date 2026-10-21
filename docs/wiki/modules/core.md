@@ -7,7 +7,7 @@ tags:
   - 核心层
   - 线程模型
   - 存储布局
-timestamp: "2026-10-21T00:37:30+08:00"
+timestamp: "2026-10-21T20:08:37+08:00"
 resource: src/core/
 ---
 
@@ -41,13 +41,16 @@ resource: src/core/
 | `error_watermark` | `error_watermark.hpp`（header-only） | 错误水印计数器：累积待消费错误数，供 MCP 响应附 `new_errors_since_last_call` doorbell | `register_all.cpp`（响应后处理）、`runtime_ops.cpp`（游戏 runtime_error 计数） |
 | `editor_readiness` | `editor_readiness.cpp/hpp` | 编辑器导入/扫描进行中检测与 retryable 软错误构造，reimport 类工具的门控 | `resource_ops`（reimport/save 类 handler） |
 | `ServerContext` | `server_context.cpp/hpp` | MCP 服务器组装、端口解析、启动/停止/重启、工具/资源/prompt 注册 | `main.cpp` 入口 |
-| `PluginConfig` | `plugin_config.cpp/hpp` | 插件自身配置持久化：**工程级** `config.json`（端口偏好 `port`）与**全局级** `config.json`（`show_time` Show timestamps 开关持久化，默认 true；`desensitize` 脱敏开关持久化，默认 true；`allow` 能力授权列表，默认空=拒绝）；新路径缺键时**回退读旧 `user://godot_autopilot/config.json`** 并注明来源 | `ServerContext` 端口解析（`load_port`）、`McpConfigDock` Apply（`save_port`）与 Allow code_execute / Allow game_runtime / Allow user tools / Allow write / Allow destructive 复选框（`load_allow`/`save_allow`）及 Desensitize data 复选框（`load_desensitize`/`save_desensitize`）、`McpLogDock` 时间前缀（`load_show_time`/`save_show_time`）、`authorization::capability_enabled`（经注册的 AllowProvider 每次调用读取）、`sanitize_policy::initialize`（环境变量未设置时） |
+| `PluginConfig` | `plugin_config.cpp/hpp` | 插件自身配置持久化：**工程级** `config.json`（端口偏好 `port`）与**全局级** `config.json`（`show_time` Show timestamps 开关持久化，默认 true；`desensitize` 脱敏开关持久化，默认 true；`allow` 能力授权列表，默认空=拒绝）；新路径缺键时**回退读旧 `user://godot_autopilot/config.json`** 并注明来源 | `ServerContext` 端口解析（`load_port`）、`McpConfigDock` Apply（`save_port`）与 Allow code_execute / Allow game_runtime / Allow user tools / Allow write / Allow destructive / Allow process 复选框（`load_allow`/`save_allow`，10-21 补 process）及 Desensitize data 复选框（`load_desensitize`/`save_desensitize`）、`McpLogDock` 时间前缀（`load_show_time`/`save_show_time`）、`authorization::capability_enabled`（经注册的 AllowProvider 每次调用读取）、`sanitize_policy::initialize`（环境变量未设置时） |
 | `HomeResolver` | `gda_home.cpp/hpp`（10-21 新增） | 家目录**集中根**解析：显式覆写环境变量 `GODOT_AUTOPILOT_HOME` → 平台环境变量（Windows `USERPROFILE` / POSIX `HOME`）→ 派生兜底（Windows 由 `%APPDATA%` 上溯两级；POSIX 由数据目录 `XDG_DATA_HOME` 或 `$HOME/.local/share` 上溯两级）→ 结果校验（形状校验 + 必须是已存在目录，首个通过者胜出，全不通过则返回空串并记 Warning） | `ProjectStore::root_dir`、`ServerContext::write_instance_record`（写 `gda_home` 字段） |
 | `ProjectStore` | `project_store.cpp/hpp`（10-21 新增） | 存储布局解析：集中根目录名 `GDA_HOME_DIR_NAME`（`.godot-autopilot`）、工程目录名 `<工程目录名>-<路径 FNV-1a 哈希前 8 位>`（工程名经非法字符替换并截断 40 字符）、全局配置路径、工程级配置路径、全局实例索引路径、工程级实例目录 | `StoragePaths`、`InstanceRegistry`、`api_token`（令牌文件路径） |
 | `StoragePaths` | `storage_paths.cpp/hpp`（10-21 新增） | 语义化存储路径门面：全局配置、工程目录、工程配置、`logs/`、`traces/`、`captures/` 六个目录的绝对路径 | `LogPersist`（日志/轨迹落盘）、`capture_ops`（截图落盘）、`PluginConfig` |
 | `InstanceRegistry` | `instance_registry.cpp/hpp`（10-21 新增） | 实例登记：单实例记录读写删 + **全局索引重建**（遍历全部工程目录下的实例文件汇总写回 `<集中根>/instances.json`）；记录含 `instance_id`/`port`/`pid`/`project_path`/`api_token`/`endpoints`/`gda_home`/`started_at`/`version` | `ServerContext::write_instance_record` / `remove_instance_record`、CLI 侧发现链 |
 | `LegacyStore` | `legacy_store.cpp/hpp`（10-21 新增） | 遗留数据兼容：旧目录 `user://godot_autopilot` 定位、配置项**回退选取**（新路径缺键时取旧路径并标记来源）、按相对路径分类（全局配置 / 日志 / 轨迹 / 截图）、**复制式**导入规划与执行（不覆盖已存在目标、不删除源） | `PluginConfig`（回退读取）、`McpConfigDock`（导入入口） |
 | `PortResolver` | `port_resolver.cpp/hpp`（10-21 新增） | 端口分配：显式（环境变量）/ 配置偏好 / 自动分配三级判定 + 候选序列生成（先默认端口 9527，其后 `20000 + (进程号 mod 10000)` 起连续到 29999 并回绕） | `ServerContext::bind_transport` |
+| `InstanceGuard` | `instance_guard.cpp/hpp`（10-21 新增） | 同工程实例守卫：启动前（**绑定端口之前**）判定「同一工程是否已有存活实例」——进程存活（Windows `OpenProcess` + `GetExitCodeProcess`，权限不足时保守判存活；POSIX `kill(pid, 0)`）与端口占用（临时套接字 `bind`，不设 `SO_REUSEADDR`）**两条同时成立**才算冲突；命中即拒绝启动（不监听端口、不写登记）并给出含端口/进程号与豁免开关 `GODOT_AUTOPILOT_ALLOW_MULTI_INSTANCE=1` 的提示（`conflict_message`，不含令牌等敏感信息）；工程路径比较忽略分隔符风格与尾斜杠，Windows 下忽略大小写 | `ServerContext` 启动前检查、`McpConfigDock` 状态区显示 `last_error_` |
+| `TransportLifecycle` | `transport_lifecycle.hpp`（header-only，10-21 新增） | 线程退出契约的纯逻辑判定：阶段先判完成再执行、停止标志阻断新任务、预算比较为独占、超预算 worker 在优雅关闭时挂起、终态关闭改为 join 而非挂起、只收割已完成的 worker、挂起容器收割后清空 | `http_transport.cpp`（连接工作线程的有界等待与卸载前收割） |
+| `PortRecovery` | `port_recovery.hpp`（header-only，10-21 新增） | 同工程残留登记的甄别与提示：同工程路径比较（忽略分隔符风格）、区分陈旧与存活记录、跳过当前进程自己的记录、生成不含令牌的残留提示 | `InstanceGuard` 绑定前的残留清理 |
 | 版本宏 | `version.hpp.in`（configure_file 模板，生成 `<build>/generated/version.hpp`） | 定义 `GDA_VERSION` 字符串宏，取自根 `VERSION` 文件单一来源 | `server_context.cpp`（MCP `server_info`）、`register_all.cpp`（`system_status.version`）、`log_persist.cpp`（trace `session_start` 头的 `gda_version`） |
 
 ## 关键接口清单
