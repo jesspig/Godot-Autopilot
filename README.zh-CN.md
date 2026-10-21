@@ -76,13 +76,13 @@ Godot-Autopilot 是一个住在 **Godot 编辑器内部**的插件型 [MCP](http
 用 `bunx` 单次执行（PowerShell 下需加引号，因为 `#` 会被当作注释）：
 
 ```
-bunx "github:jesspig/Godot-Autopilot#0.2.7" ping
+bunx "github:jesspig/Godot-Autopilot#0.3.0" ping
 ```
 
 或全局安装一次，之后直接用 `gda` 命令：
 
 ```
-bun install -g github:jesspig/Godot-Autopilot#0.2.7
+bun install -g github:jesspig/Godot-Autopilot#0.3.0
 gda ping
 ```
 
@@ -106,7 +106,7 @@ Project: <ABSOLUTE PATH TO YOUR GODOT PROJECT> (Godot 4.7+).
    not on PATH) and wait until http://127.0.0.1:9527/mcp answers.
 3. Verify the server from a shell. Try in this order, stop at the first that works, and tell me
    which one it was:
-   - bunx "github:jesspig/Godot-Autopilot#0.2.7" ping
+   - bunx "github:jesspig/Godot-Autopilot#0.3.0" ping
    - download the gda release asset for this OS and CPU from the same Releases page, verify it
      against sha256sums.txt, then run ./gda ping
 4. Connect my AI client: add
