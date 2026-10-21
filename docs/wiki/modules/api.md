@@ -21,7 +21,7 @@ resource:
 
 # REST 接口面（`/api`）
 
-> 审计日期：2026-10-21（随开放接口面落地批次首建——本批在**同一个监听端口**上新增 `/api` 前缀的 REST 端点集，与既有 `/mcp`（MCP 协议）并列；端点实现集中在 [`src/core/api_surface.cpp`](../../../src/core/api_surface.cpp)，认证在 [`src/core/api_auth.cpp`](../../../src/core/api_auth.cpp) 与 [`src/core/api_token.cpp`](../../../src/core/api_token.cpp)，错误信封归一在 [`src/core/api_envelope.cpp`](../../../src/core/api_envelope.cpp)，路由挂载在 [`src/core/api_server.cpp`](../../../src/core/api_server.cpp)；端口模型与实例登记见 [端口与实例登记](ports.md)，统一执行入口与授权三档见 [工具注册表](tools_registry.md)；本轮校订补齐三处接线事实——① 端点清单 8 条、分页窗口 500/2000、批量上限 256、工具名长度上限 128 四个常量补入正文；② 补「执行入口与接线现状」小节，说明 `api_surface` 的执行器槽位在生产路径上未注册、REST 实际经 `default_execute_tool` 派发，导出拦截与参数校验两阶段尚未接线；③ 状态码表补 429，并标注 413 的两条来源（传输层 `Content-Length` 拒收 vs 端点层 `payload_too_large`））。
+> 审计日期：2026-10-21（随开放接口面落地批次首建——本批在**同一个监听端口**上新增 `/api` 前缀的 REST 端点集，与既有 `/mcp`（MCP 协议）并列；端点实现集中在 [`src/core/api_surface.cpp`](../../../src/core/api_surface.cpp)，认证在 [`src/core/api_auth.cpp`](../../../src/core/api_auth.cpp) 与 [`src/core/api_token.cpp`](../../../src/core/api_token.cpp)，错误信封归一在 [`src/core/api_envelope.cpp`](../../../src/core/api_envelope.cpp)，路由挂载在 [`src/core/api_server.cpp`](../../../src/core/api_server.cpp)；端口模型与实例登记见 [端口与实例登记](ports.md)，统一执行入口与授权三档见 [工具注册表](tools_registry.md)；本轮校订补齐三处接线事实——① 端点清单 8 条、分页窗口 500/2000、批量上限 256、工具名长度上限 128 四个常量补入正文；② 补「执行入口与接线现状」小节，说明 `api_surface` 的执行器槽位在生产路径上未注册、REST 实际经 `default_execute_tool` 派发，导出拦截与参数校验两阶段尚未接线；③ 状态码表补 429，并标注 413 的两条来源（传输层 `Content-Length` 拒收 vs 端点层 `payload_too_large`））。10-22 校订：执行入口接线现状按代码核实更新——REST 面已接入统一执行入口六阶段全链（生产注册点在 `src/core/server_context.cpp` 的 `register_unified_tool_executor()`），已知限制中「统一执行入口尚未接入」一条已删除。
 > 覆盖范围：`src/core/api_surface.{hpp,cpp}`（端点与路由匹配）、`src/core/api_server.{hpp,cpp}`（路由注册）、`src/core/api_envelope.{hpp,cpp}`（错误信封与状态码映射）、`src/core/api_auth.{hpp,cpp}` 与 `src/core/api_token.{hpp,cpp}`（令牌签发与校验）、`src/core/http_transport.{hpp,cpp}` 与 [`src/core/http_parse.hpp`](../../../src/core/http_parse.hpp)（自建 HTTP 传输与查询串解析）。
 > 统计口径：端点数以 `api_surface::build_index_document()` 的端点清单为准（数值以运行时统计为准，见 [测试体系](../tests.md)「数值核算总表」）。
 
@@ -40,17 +40,17 @@ resource:
 
 ### 执行入口与接线现状
 
-REST 面的工具调用走 `api_surface::execute_tool(name, args)`。该函数有一个**独立的执行器槽位**（`api_surface::register_tool_executor`），槽位为空时回落到默认实现 `default_execute_tool`：先做「不得在编辑器主线程直接执行」的自检（命中即返回 `internal_error`），再经 `dispatch::call_handler` 派发。
+REST 面的工具调用走 `api_surface::execute_tool(name, args)`。该函数有一个**执行器槽位**（`api_surface::register_tool_executor`），槽位为空时回落到默认实现 `default_execute_tool`；默认实现调用统一执行入口 `tools::execute_tool(name, args)`（[`src/tools/tool_execute.cpp`](../../../src/tools/tool_execute.cpp) 的 `tools::execute_tool_chain`：导出拦截 → 工具存在 → 参数校验 → 授权 → 派发 → 信封）。
 
-统一执行入口 [`src/tools/tool_execute.cpp`](../../../src/tools/tool_execute.cpp) 的 `tools::execute_tool_chain`（导出拦截 → 工具存在 → 参数校验 → 授权 → 派发 → 信封）已实现并由 L1 `tool_execute_test` 覆盖，但它注册进的是 `tools::tool_executor_slot()`，**与 `api_surface` 的槽位不是同一个**；`api_surface::register_tool_executor` 在生产路径上目前没有调用点（只有 `api_server_test` 注入假实现）。因此当前 REST 请求的实际派发链路是：
+**生产注册点**：`src/core/server_context.cpp` 的 `register_unified_tool_executor()`，在 `start()` 内、`ApiServer::start()` 之前执行，把 `tools::execute_tool_chain` 注册进执行器槽位（见 `tools::register_tool_executor`）。因此 REST 请求的实际派发链路是：
 
 ```
 POST /api/tools/<name> → api_surface::handle_request → api_surface::execute_tool
-  → default_execute_tool → dispatch::call_handler → SpecTool::execute（能力门在此）
-  → ApiEnvelope::build（信封在 REST 层施加）
+  → tools::execute_tool → execute_tool_chain（六阶段：导出拦截 / 工具存在 / 参数校验 / 授权 / 派发 / 信封）
+  → dispatch::call_handler → SpecTool::execute
 ```
 
-导出拦截与参数校验两阶段在 REST 面上尚未接线（MCP 面的导出拦截在 7 个元工具回调入口，`SpecTool::execute` 内的能力门对两套面都生效）。阶段定义与判定口径见 [工具注册表](tools_registry.md)「统一执行入口」。
+导出拦截、参数校验、授权与信封四段在 REST 面上均已生效；MCP 面的差异（`call_tool` 走 `execute_tool_core` 派发接缝、不套用严格参数校验）见 [工具注册表](tools_registry.md)「统一执行入口」。
 
 ## 端点清单
 
@@ -81,7 +81,7 @@ POST /api/tools/<name> → api_surface::handle_request → api_surface::execute_
 
 - 空体或纯空白体等价于 `{}`（不传参数）。
 - 非法 JSON 或非对象顶层 → 400 `invalid_argument`。
-- **未知参数宽容**：参数校验器把请求体里 schema 未声明的键**不视为错误**——只记一条 Warning（`unknown parameters ignored: ...`）后忽略；缺必填参数或类型不符才返回 400。该校验器挂在统一执行入口上，接线现状见下「执行入口与接线现状」——REST 面上目前由各 handler 内部的 `Args` 取参器兜底，实际宽容口径以工具自身实现为准。
+- **未知参数宽容**：参数校验器把请求体里 schema 未声明的键**不视为错误**——只记一条 Warning（`unknown parameters ignored: ...`）后忽略；缺必填参数或类型不符才返回 400。该校验器挂在统一执行入口上且 REST 面已接线（见上「执行入口与接线现状」），因此宽容口径由校验器统一实施。
 
 ### 批量调用（`POST /api/batch`）
 
@@ -173,14 +173,13 @@ REST 面刻意做得比 MCP 面宽松，目的是让「不做 MCP 握手的客�
 
 1. **无会话、无握手**：REST 面不要求 `initialize`，不发 `notifications/initialized`，不维护会话状态。请求彼此独立，服务端不记住调用方。
 2. **请求体即参数**：工具参数对象就是请求体本身，不套 `arguments` 包装层（与 MCP 面的 `call_tool` 不同——后者是 `{name, arguments}` 双层结构）。
-3. **未知参数宽容**：参数校验器（[`src/tools/argument_validator.cpp`](../../../src/tools/argument_validator.cpp)）把未声明的键**不视为错误**——只记一条 Warning（`unknown parameters ignored: ...`）后忽略；缺必填参数或类型不符才返回 400。该校验器挂在统一执行入口上（接线现状见上），因此在 REST 面上目前由各 handler 内部的 `Args` 取参器兜底，宽容口径以工具自身实现为准。
+3. **未知参数宽容**：参数校验器（[`src/tools/argument_validator.cpp`](../../../src/tools/argument_validator.cpp)）把未声明的键**不视为错误**——只记一条 Warning（`unknown parameters ignored: ...`）后忽略；缺必填参数或类型不符才返回 400。该校验器挂在统一执行入口上且 REST 面已接线（见上「执行入口与接线现状」），宽容口径由校验器统一实施。
 4. **批量不因单项失败而改状态码**：批量恒 200，逐项成败看 `results[]`。
 5. **工具名宽松**：路径里的工具名允许百分号编码，且字符集比严格标识符宽（多一个点号）。
 6. **免认证的存活口**：只有 `/api/health` 免认证，且只回存活、版本、端口、进程号——不泄露任何工程内容。
 
 ## 已知限制
 
-- **统一执行入口尚未接入 REST 请求路径**：`tools::execute_tool_chain` 已实现（六阶段、含导出拦截与参数校验），但 `api_surface` 的执行器槽位在生产路径上没有注册点，REST 请求实际经 `default_execute_tool` → `dispatch::call_handler` 派发。因此**导出期对 REST 工具调用的拒绝尚未生效**，参数校验也仍由各 handler 内部的 `Args` 抛错兜底；授权门（`SpecTool::execute` 内）两套面都生效。接线口径见上「执行入口与接线现状」。
 - **只读探针不区分「活着」与「能干活」**：`/api/health` 只报告进程存活与绑定端口，不做主线程健康检查；编辑器主线程卡死时该端点仍会返回 200。
 - **REST 面没有流式与异步编排**：`code_execute` 之类长阻塞工具在 REST 面上同样受主线程等待预算约束，超时即 504，不提供 MCP 面的 `await_async` 语义。
 - **批量上限固定**：单批操作数上限 256，超出返回 400（常量见 [测试体系](../tests.md)「数值核算总表」）。

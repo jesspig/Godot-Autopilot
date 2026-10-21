@@ -25,11 +25,15 @@ const RUN_TAG = `gda-lifecycle-${Math.random().toString(36).slice(2, 8)}`;
 
 let tmp: string;
 let prevHome: string | undefined;
+let prevGdaHome: string | undefined;
 
 beforeEach(() => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), `${RUN_TAG}-`));
   prevHome = process.env.GODOT_AUTOPILOT_CLI_HOME;
+  prevGdaHome = process.env.GODOT_AUTOPILOT_HOME;
   process.env.GODOT_AUTOPILOT_CLI_HOME = tmp;
+  // 插件实例索引落在集中根下，隔离到临时目录，避免读到本机真实实例
+  process.env.GODOT_AUTOPILOT_HOME = tmp;
 });
 
 afterEach(async () => {
@@ -44,6 +48,11 @@ afterEach(async () => {
       delete process.env.GODOT_AUTOPILOT_CLI_HOME;
     } else {
       process.env.GODOT_AUTOPILOT_CLI_HOME = prevHome;
+    }
+    if (prevGdaHome === undefined) {
+      delete process.env.GODOT_AUTOPILOT_HOME;
+    } else {
+      process.env.GODOT_AUTOPILOT_HOME = prevGdaHome;
     }
   }
 }, HOOK_TIMEOUT_MS);
@@ -376,21 +385,63 @@ describe.serial("start", () => {
     expect(elapsed).toBeLessThan(START_READY_MAX_MS);
   }, TEST_TIMEOUT_MS);
 
-  test("幂等：同 project 二次 start 不重复启动", async () => {
+  test("同工程已有活跃实例时拒绝启动并给出端口、进程号与可操作提示", async () => {
     const projectDir = makeProjectDir();
     const first = await startFake({ projectDir, headless: true });
     expect(first.code).toBe(ExitCode.Success);
     const instances = await waitForInstances(1);
     expect(instances).toHaveLength(1);
-    expect(await reportWhen((r) => r.calls.filter((c) => c.name === "ping" && c.direct === true).length === 1)).toBe(true);
-    expect(readReport()!.calls.filter((c) => c.name === "ping" && c.direct === true)).toHaveLength(1);
+    const running = instances[0];
 
     const second = await startFake({ projectDir, headless: true, resetReport: false });
-    expect(second.code).toBe(ExitCode.Success);
-    const parsed = JSON.parse(second.stdout);
-    expect(parsed.id).toBe(instances[0].id);
+    expect(second.code).toBe(ExitCode.Transport);
+    expect(second.stderr).toContain("already has a live Godot Autopilot instance");
+    expect(second.stderr).toContain(`port ${running.port}`);
+    expect(second.stderr).toContain(`pid ${running.pid}`);
+    expect(second.stderr).toContain("gda stop --project");
+    expect(second.stderr).toContain("--port");
+    expect(second.stderr).toContain("GODOT_AUTOPILOT_ALLOW_MULTI_INSTANCE");
     expect((await waitForInstances(1))).toHaveLength(1);
-    expect(readReport()!.calls.filter((c) => c.name === "ping" && c.direct === true)).toHaveLength(1);
+  }, TEST_TIMEOUT_MS);
+
+  test("无活跃实例时正常启动且不给出冲突提示", async () => {
+    const projectDir = makeProjectDir();
+    const { code, stderr } = await startFake({ projectDir, headless: true });
+    expect(code).toBe(ExitCode.Success);
+    expect(stderr).not.toContain("already has a live Godot Autopilot instance");
+    const instances = await waitForInstances(1);
+    expect(instances).toHaveLength(1);
+  }, TEST_TIMEOUT_MS);
+
+  test("显式指定端口时按用户意图启动并给出冲突提示", async () => {
+    const projectDir = makeProjectDir();
+    const first = await startFake({ projectDir, headless: true });
+    expect(first.code).toBe(ExitCode.Success);
+    const running = (await waitForInstances(1))[0];
+
+    const second = await startFake({ projectDir, headless: true, portText: "9571", resetReport: false });
+    expect(second.code).toBe(ExitCode.Success);
+    expect(second.stderr).toContain("already has a live Godot Autopilot instance");
+    expect(second.stderr).toContain(`port ${running.port}`);
+    expect(second.stderr).toContain("starting on port 9571 anyway as requested");
+    expect(second.stderr).not.toContain("refusing to start");
+    const instances = await waitForInstances(2);
+    expect(instances).toHaveLength(2);
+    expect(instances.map((e) => e.port)).toContain(9571);
+  }, TEST_TIMEOUT_MS);
+
+  test("显式指定端口与既有实例同端口时提示端口已被占用", async () => {
+    const projectDir = makeProjectDir();
+    const first = await startFake({ projectDir, headless: true, portText: "9572" });
+    expect(first.code).toBe(ExitCode.Success);
+    const running = (await waitForInstances(1))[0];
+    expect(running.port).toBe(9572);
+
+    const second = await startFake({ projectDir, headless: true, portText: "9572", resetReport: false });
+    expect(second.stderr).toContain("already has a live Godot Autopilot instance");
+    expect(second.stderr).toContain("is the port that instance is already using");
+    expect(second.code).toBe(ExitCode.Transport);
+    expect((await waitForInstances(1))).toHaveLength(1);
   }, TEST_TIMEOUT_MS);
 
   test("默认执行 import 预步，--no-import 跳过", async () => {

@@ -8,8 +8,16 @@ import { callTool } from "../mcp/client";
 import { CliError, ExitCode } from "../errors";
 import { err } from "../output";
 import { joinPath } from "../platform";
+import {
+  detectActiveInstance,
+  describeInstance,
+  multiInstanceAllowed,
+  MULTI_INSTANCE_ENV,
+  resolveProbeLevel,
+  type ActiveInstance,
+} from "../preflight";
 import { isAlive, resolveGodotBin, spawnEditor, terminateProcess, terminationNote } from "../process";
-import { findLiveByProject, loadRegistry, saveRegistry, stateDir, type InstanceEntry } from "../registry";
+import { loadRegistry, saveRegistry, stateDir, type InstanceEntry } from "../registry";
 import { writeJson } from "./json-output";
 
 const PORT_RANGE_START = 9530;
@@ -38,18 +46,18 @@ export async function run(_positional: string[], opts: GlobalOptions): Promise<n
 
 async function start(opts: GlobalOptions): Promise<number> {
   const projectDir = path.resolve(opts.project ?? process.cwd());
+  const explicitPort = opts.portText !== undefined ? parseExplicitPort(opts.portText) : null;
 
-  const existing = findLiveByProject(projectDir);
-  if (existing !== undefined) {
-    writeJson({ ...instanceView(existing), live: true }, opts);
-    return ExitCode.Success;
+  const active = await detectActiveInstance(projectDir, resolveProbeLevel(opts.probe));
+  if (active !== undefined) {
+    assertStartAllowed(active, projectDir, explicitPort);
   }
 
   const waitSec = parseWaitSec(opts.waitText, DEFAULT_WAIT_SEC);
   const { bin } = resolveGodotBin({ explicit: opts.godot });
   await runImportStep(bin, projectDir, opts.noImport === true);
 
-  const port = opts.portText !== undefined ? parseExplicitPort(opts.portText) : await pickFreePort();
+  const port = explicitPort ?? await pickFreePort();
   const headless = opts.headless === true;
 
   const logsDir = joinPath(stateDir(), "logs");
@@ -120,6 +128,41 @@ function instanceView(e: InstanceEntry): Record<string, unknown> {
     startedAt: e.startedAt,
     live: isAlive(e.pid),
   };
+}
+
+const SECOND_EDITOR_RISK =
+  "; a second editor on the same project may die without any message because Godot loads the plugin through a shared temporary copy";
+
+function assertStartAllowed(
+  active: ActiveInstance,
+  projectDir: string,
+  explicitPort: number | null,
+): void {
+  const where = describeInstance(active);
+  if (explicitPort !== null) {
+    const samePort = active.port !== null && active.port === explicitPort;
+    err(
+      `warning: this project already has a live Godot Autopilot instance on ${where}` +
+        (samePort
+          ? `; the requested port ${explicitPort} is the port that instance is already using`
+          : `; starting on port ${explicitPort} anyway as requested`) +
+        SECOND_EDITOR_RISK,
+    );
+    return;
+  }
+  if (multiInstanceAllowed()) {
+    err(
+      `warning: this project already has a live Godot Autopilot instance on ${where}` +
+        `; starting anyway because ${MULTI_INSTANCE_ENV} is set` +
+        SECOND_EDITOR_RISK,
+    );
+    return;
+  }
+  throw new CliError(
+    ExitCode.Transport,
+    `refusing to start: this project already has a live Godot Autopilot instance on ${where}`,
+    `stop it first (gda stop --project ${projectDir}), or pass --port <port> to start on another port, or set ${MULTI_INSTANCE_ENV}=1 to allow a second instance`,
+  );
 }
 
 async function waitForReady(port: number, pid: number, waitSec: number, logPath: string): Promise<void> {

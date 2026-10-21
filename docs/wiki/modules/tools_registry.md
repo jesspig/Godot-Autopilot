@@ -7,7 +7,7 @@ tags:
   - 工具注册
   - ToolSpec
   - 授权
-timestamp: "2026-10-21T20:08:37+08:00"
+timestamp: "2026-10-22T03:59:53+08:00"
 resource: src/tools/
 ---
 
@@ -106,7 +106,7 @@ warnings 判定逻辑在 `tests/runner/traversal.cpp`（"schema 声明必填但�
 
 - 遍历经 `call_tool` 元工具代理，工具来源为**运行时** `search_tools` 空 query 枚举（`list_tool_names`，452 条 = 451 域 + `system_status`），跳过 7 个协议级元工具。
 - 每工具先 `get_tool_detail`（响应含 `side_effect`/`dynamic`/`mutating` 字段），`side_effect` 非空且**非 `"none"`**（判据见 `traversal.cpp` 的 `kSideEffectNone`：只读工具回显 `"none"`，不算有副作用）/ `mutating=true` / `dynamic=true` 任一命中即排除；动态工具（`dynamic=true`）在用户脚本注册期间才会出现，L2 无注册、该分支为防回归保留。
-- 排除后候选进入 `empty_args`（空参契约）与 `heuristic_smoke`（按 schema properties 类型生成启发值）两步骤（枚举口径上限 904 步 = 452×2，候选口径上限 610 = 候选数 × 2；精确排除数、候选数、步数与 warnings 以运行时 `03_tools_contract` 报告为准，当前值见 [测试体系](../tests.md)「数值核算总表」的遍历各行，本页不复制数值）。
+- 排除后候选进入 `empty_args`（空参契约）与 `heuristic_smoke`（按 schema properties 类型生成启发值）两步骤（枚举口径上限 904 步 = 452×2，候选口径上限 602 = 候选数 × 2；精确排除数、候选数、步数与 warnings 以运行时 `03_tools_contract` 报告为准，当前值见 [测试体系](../tests.md)「数值核算总表」的遍历各行，本页不复制数值）。
 - 新增副作用工具只需在 `ToolSpec` 填对应 `side_effect` + `kMutating`（可选 `kDynamic` 由动态注册自动置位），遍历自动排除，**无需手改** `tests/runner/traversal.cpp`。
 - **基线断言（2026-10-20 补充，2026-10-21 扩为五量）**：遍历结束后 `compare_baseline()`（`tests/runner/traversal.cpp:326-362`）把五项实际值与基线期望逐项比对，不符即记入 `baseline_diffs` 并把 `baseline_matched` 置 false——即「枚举 / 排除 / 候选 / warnings / 调用步数」五量中任一漂移都会被报出来，不能只靠看总数；五量的当前取值见 [测试体系](../tests.md)「数值核算总表」的遍历各行。
   - 基线期望默认取文件内常量（`:25-30`：`kBaselineEnumerated` / `kBaselineExcluded` / `kBaselineCandidates` / `kBaselineWarnings` / `kBaselineCallsEmptyArgs` / `kBaselineCallsHeuristicSmoke`），口径为**运行时统计**（`03_tools_contract` 实测）；可用环境变量 `GDA_TRAVERSAL_BASELINE_EMPTY_ARGS` / `GDA_TRAVERSAL_BASELINE_HEURISTIC_SMOKE` 临时覆盖（各 5 个逗号分隔的非负整数：`enumerated,excluded,candidates,warnings,calls`，格式非法直接抛错不兜底），用于不改代码重基线；覆盖生效时基线来源会写进失败信息。
@@ -127,16 +127,14 @@ warnings 判定逻辑在 `tests/runner/traversal.cpp`（"schema 声明必填但�
 
 [`src/tools/tool_execute.hpp`](../../../src/tools/tool_execute.hpp) / [`src/tools/tool_execute.cpp`](../../../src/tools/tool_execute.cpp) 的 `tools::execute_tool_chain(name, args)` 把「导出拦截 → 工具存在 → 参数校验 → 授权 → 派发 → 信封」六个阶段固化成一条链，并把每一段做成可替换的槽位（`register_export_guard` / `register_argument_validator` / `register_authorization_policy` / `register_envelope_builder`）。`tool_execute.cpp` 在静态初始化期把默认实现注册进这些槽位，因此调用 `tools::execute_tool(name, args)` 即走全链。
 
-> [!todo] 待接线
->
-> 这条链**尚未接入生产请求路径**。它注册进的是 `tools::tool_executor_slot()`，而 REST 面用的是 `api_surface` 自己的执行器槽位（`api_surface::register_tool_executor`），该槽位在生产路径上没有注册点（只有 `api_server_test` 注入假实现）；MCP 面的 `call_tool` 元工具走的是 `tools::execute_tool_core`（等价于 `dispatch::call_handler` 直派）。因此当前两套协议面的实际链路是：
+> **接线现状（10-22 核实）**：这条链**已在 REST 面接入生产请求路径**——`src/core/api_surface.cpp` 的 `default_execute_tool` 调用 `tools::execute_tool(name, args)`，生产注册点为 `src/core/server_context.cpp` 的 `register_unified_tool_executor()`（在 `start()` 内、`ApiServer::start()` 之前执行，把 `tools::execute_tool_chain` 注册进执行器槽位），因此注册在静态初始化期之外也确定生效。MCP 面的 `call_tool` 元工具**仍走** `tools::execute_tool_core`（等价于 `dispatch::call_handler` 直派），这是**有意保留的差异**：既有工具的参数声明不完整（部分工具声明类型与实际接受类型不符），若对 MCP 也套用严格参数校验会拒掉现网可用的调用。两套协议面的实际链路是：
 >
 > | 面 | 实际链路 | 导出拦截 | 参数校验 | 授权 | 信封 |
 > |---|---|---|---|---|---|
 > | MCP `call_tool` | `meta_call_tool_impl` → `execute_tool_core` → `dispatch::call_handler` → `SpecTool::execute` | 在 7 个元工具回调入口（`register_all.cpp`） | handler 内部 `Args` 抛错兜底 | `SpecTool::execute` 内 | 无（返回工具原始载荷） |
-> | REST `POST /api/tools/<name>` | `api_surface::execute_tool` → `default_execute_tool` → `dispatch::call_handler` → `SpecTool::execute` | **无** | handler 内部 `Args` 抛错兜底 | `SpecTool::execute` 内 | `ApiEnvelope::build`（REST 层施加） |
+> | REST `POST /api/tools/<name>` | `api_surface::execute_tool` → `tools::execute_tool` → `execute_tool_chain`（六段全链）→ `dispatch::call_handler` → `SpecTool::execute` | 全链 | 全链（未知参数宽容） | 全链 | 全链（`ApiEnvelope::build`） |
 >
-> 接线后六阶段的判定口径不变；差异只在「哪一段已经生效」。REST 面的接线现状另见 [REST 接口面](api.md)「执行入口与接线现状」。
+> 六阶段的判定口径不变；差异只在「哪一段已经生效」。REST 面的接线现状另见 [REST 接口面](api.md)「执行入口与接线现状」。
 
 ### 六个阶段
 
@@ -178,8 +176,6 @@ warnings 判定逻辑在 `tests/runner/traversal.cpp`（"schema 声明必填但�
 
   `read` 无需授权故无开关；`process` **已有面板开关**（10-21 补齐），不再只能经环境变量或手改配置的 `allow` 键开启。面板复选框**按能力清单生成**（`src/ui/authorization_switches.hpp` 的 `kSwitchLabels`），控件与能力不再各写一份；复选框的增删语义：勾选即 `allow_list_add`、取消即 `allow_list_remove`，**取消一项不影响其它项**（`allow_list_remove` 遇到 `all` 先展开为全部已知能力再逐项删除）；取消后回读配置校正复选框状态。初始勾选状态取自当前实际允许列表（`GODOT_AUTOPILOT_ALLOW` 环境变量优先于配置键）。完整口径见 [T0 安全边界与并发契约](../security_contract.md) §3.1 与 §3.1.1。
 
-> [!todo] 待补充
->
 > - **`write` 档默认拒绝是收紧方向的行为变更**：`writes_file` / `writes_config` / `shows_alert` / `modifies_window` 类工具此前**不需要任何能力**即可调用，10-21 起需要允许列表含 `write`（或 `all`）。既有客户端若不做适配，调用写类工具会收到 403 `authorization_required`。**版本说明与技能书已于 10-21 同步提示**（[changelog/2026-10-21-log.md](../changelog/2026-10-21-log.md) 与 `skills/godot-autopilot-tools/`）；面板开关亦已补齐（见上「面板可勾选的能力清单」），用户不必再改环境变量。10-22 起另有**授权兼容模式**（`legacy`）提供平滑升级路径，见 [T0 安全边界与并发契约](../security_contract.md) §3.1.3。
 > - `destructive` 档的判定标准已于 10-22 成型（见 [T0 安全边界与并发契约](../security_contract.md) §3.1.2），声明者由 1 个扩为 6 个：新增 `delete_scene_node`（原 `none`）、`remove_animation`（原 `none`）、`remove_animation_track`（原 `none`）、`remove_audio_bus_effect`（原 `none`）、`remove_debug_custom_monitor`（原 `modifies_window`）。**后续新增工具按该标准落档**，并由 L1 用例 `destructive_tier_guard_test` 防漂移。
 

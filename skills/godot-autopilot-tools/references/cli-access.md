@@ -25,7 +25,7 @@ Probe the machine before choosing: `bun --version`, then `node --version`.
 
 All three distributions are the same program: they speak the same MCP protocol, accept the same subcommands and share the same exit codes. Nothing in the calling protocol changes when you switch.
 
-**Caveat — the pinned tag does not ship the CLI.** The release tag this repository pins was cut before the `gda` CLI existed: that tag's tree has no `cli/` directory and no root `package.json`, so `bunx "github:jesspig/Godot-Autopilot#0.3.0"` cannot resolve a `gda` binary and fails on every attempt. Do not retry it. Use `bunx "github:jesspig/Godot-Autopilot#develop" <cmd>` instead — that branch does ship the CLI, but it is an unreleased moving target rather than a pinned version, so pin your own copy with `bun install -g` if you need a stable one. The versioned alternative is the standalone binary below, once a release actually ships the `gda` assets: check the release page for the asset and its `sha256sums.txt` before downloading, and use the `#develop` ref in the meantime.
+**Caveat — the pinned ref resolves only once its tag is published.** As of `0.3.0` the repository tree does ship the CLI: the root `package.json` exposes the `gda` binary as `cli/bin/gda.ts`, and `cli/` is part of the tree, so `bunx "github:jesspig/Godot-Autopilot#0.3.0"` resolves the `gda` binary as soon as the `0.3.0` tag exists on the remote. The older caveat — that the pinned tag was cut before the CLI existed, carried no `cli/` directory and no root `package.json`, and could never resolve — no longer applies to the current pin. What still applies is the publishing step: until the `0.3.0` tag and its release are out, that ref is not fetchable, so use `bunx "github:jesspig/Godot-Autopilot#develop" <cmd>` in the meantime (that branch does ship the CLI, but it is an unreleased moving target rather than a pinned version, so pin your own copy with `bun install -g` if you need a stable one). The versioned alternative is the standalone binary below: each release publishes the `gda` assets for five targets next to `addons.zip` with a `sha256sums.txt`, so check the release page for the asset and verify the checksum before downloading.
 
 ## Commands
 
@@ -158,7 +158,7 @@ Platform notes:
 - **Linux** — the plain `linux-x64` asset needs glibc; use `linux-x64-musl` on Alpine or musl-based images.
 - **Windows** — unzip and run `gda.exe`. An unsigned binary may trigger a SmartScreen prompt; that is expected.
 
-Prefer `bunx` over the binary whenever Bun exists: it needs no download. It is not version-pinned with the plugin until a release tag that ships the CLI exists, so the `develop` ref above moves under you — install your own copy with `bun install -g` when you need a stable CLI.
+Prefer `bunx` over the binary whenever Bun exists: it needs no download. It is pinned to the plugin version only once that version's tag is published, so the `develop` ref above moves under you — install your own copy with `bun install -g` when you need a stable CLI.
 
 ## Troubleshooting
 
@@ -170,7 +170,7 @@ Prefer `bunx` over the binary whenever Bun exists: it needs no download. It is n
 | Authorization denied (exit 1) | The tool's capability is not authorized | Enable it via the `GODOT_AUTOPILOT_ALLOW` environment variable plus engine restart, or the matching MCP Config dock checkbox effective on the next call; write-class tools need `write` |
 | No API token available (exit 2) | The plugin's instance registry has no record for that port | Run `gda endpoints` to find the port and its source; the token lives in the plugin instance registry, not in the CLI registry |
 | Empty or missing image output | Metadata-only default | Re-run with `--save-images DIR` and inspect the files on disk |
-| bunx cannot resolve the CLI | The pinned tag predates the CLI | Use the `#develop` ref or a global install; see the caveat above |
+| bunx cannot resolve the CLI | The pinned tag is not published yet (the tree does ship the CLI; the ref only resolves once the tag exists) | Use the `#develop` ref or a global install; see the caveat above |
 
 Tool-level failures (bad arguments, missing nodes) are not transport errors — they arrive as exit code 1 with an error key in the business payload. Handle them with the same error protocol as the native channel: read the watermark, diagnose from real output, confirm the fix by driving the watermark back to 0.
 
