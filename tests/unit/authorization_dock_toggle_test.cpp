@@ -27,7 +27,9 @@ class AuthorizationDockToggleTest : public ::testing::Test {
 protected:
   void SetUp() override {
     previous_provider_ = authorization::allow_provider();
+    previous_mode_provider_ = authorization::auth_mode_provider();
     authorization::set_allow_provider(&read_provider_state);
+    authorization::set_auth_mode_provider(nullptr);
     provider_state().clear();
     const char *current = std::getenv("GODOT_AUTOPILOT_ALLOW");
     if (current != nullptr) {
@@ -35,11 +37,19 @@ protected:
       had_previous_env_ = true;
     }
     set_allow_env(nullptr);
+    const char *current_mode = std::getenv(authorization::kEnvAuthMode);
+    if (current_mode != nullptr) {
+      previous_mode_env_ = current_mode;
+      had_previous_mode_env_ = true;
+    }
+    set_mode_env(nullptr);
   }
 
   void TearDown() override {
     set_allow_env(had_previous_env_ ? previous_env_.c_str() : nullptr);
+    set_mode_env(had_previous_mode_env_ ? previous_mode_env_.c_str() : nullptr);
     authorization::set_allow_provider(previous_provider_);
+    authorization::set_auth_mode_provider(previous_mode_provider_);
     provider_state().clear();
   }
 
@@ -55,9 +65,25 @@ protected:
 #endif
   }
 
+  static void set_mode_env(const char *value) {
+#ifdef _WIN32
+    _putenv_s(authorization::kEnvAuthMode, value != nullptr ? value : "");
+#else
+    if (value != nullptr) {
+      setenv(authorization::kEnvAuthMode, value, 1);
+    } else {
+      unsetenv(authorization::kEnvAuthMode);
+    }
+#endif
+  }
+
   godot_autopilot::authorization::AllowProvider previous_provider_ = nullptr;
+  godot_autopilot::authorization::AuthModeProvider previous_mode_provider_ =
+      nullptr;
   std::string previous_env_;
   bool had_previous_env_ = false;
+  std::string previous_mode_env_;
+  bool had_previous_mode_env_ = false;
 };
 
 bool is_known_capability(std::string_view capability) {

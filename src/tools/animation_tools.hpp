@@ -103,8 +103,8 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       kCreateAnimationParams, animation_ops::handle_create_animation}));
   v.push_back(make_spec_tool(ToolSpec{
       "remove_animation",
-      "Remove the animation named 'name' (required string) from the AnimationPlayer at 'player_path' (required string), searching all of its libraries. Errors if the animation does not exist. Returns 'removed' plus the owning 'library'.",
-      "Animation", {"animation", "delete"}, SideEffect::None, tool_flags::kNone | tool_flags::kSceneTarget,
+      "Remove the animation named 'name' (required string) from the AnimationPlayer at 'player_path' (required string), searching all of its libraries. Errors if the animation does not exist. Returns 'removed' plus the owning 'library'. This tool is classified as a destructive side effect because it destroys the animation object that already exists inside the host, including all of its tracks and keyframes, and no undo path is provided.",
+      "Animation", {"animation", "delete"}, SideEffect::Destructive, tool_flags::kNone | tool_flags::kSceneTarget,
       kRemoveAnimationParams, animation_ops::handle_remove_animation}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_animation_list",
@@ -123,8 +123,8 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       kInsertAnimationKeyframeParams, animation_ops::handle_insert_keyframe}));
   v.push_back(make_spec_tool(ToolSpec{
       "remove_animation_track",
-      "Remove the whole track 'track_index' (required int) from animation 'anim_name' on player 'player_path' (both required strings). Index must be within [0, track_count), otherwise an error is returned. Returns removed_track_index and removed_track_path.",
-      "Animation", {"animation", "track", "delete"}, SideEffect::None, tool_flags::kNone | tool_flags::kSceneTarget,
+      "Remove the whole track 'track_index' (required int) from animation 'anim_name' on player 'player_path' (both required strings). Index must be within [0, track_count), otherwise an error is returned. Returns removed_track_index and removed_track_path. This tool is classified as a destructive side effect because it destroys the track object that already exists inside the host, including all of its keyframes, and no undo path is provided.",
+      "Animation", {"animation", "track", "delete"}, SideEffect::Destructive, tool_flags::kNone | tool_flags::kSceneTarget,
       kRemoveAnimationTrackParams, animation_ops::handle_remove_track}));
   v.push_back(make_spec_tool(ToolSpec{
       "set_animation_track_bundle",

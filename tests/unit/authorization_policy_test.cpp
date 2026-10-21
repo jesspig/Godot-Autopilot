@@ -48,17 +48,25 @@ class AuthorizationPolicyTest : public ::testing::Test {
 protected:
   void SetUp() override {
     previous_provider_ = authorization::allow_provider();
+    previous_mode_provider_ = authorization::auth_mode_provider();
     authorization::set_allow_provider(nullptr);
+    authorization::set_auth_mode_provider(nullptr);
     env_.reset(new EnvScope("GODOT_AUTOPILOT_ALLOW", nullptr));
+    mode_env_.reset(new EnvScope(authorization::kEnvAuthMode, nullptr));
   }
 
   void TearDown() override {
     env_.reset();
+    mode_env_.reset();
     authorization::set_allow_provider(previous_provider_);
+    authorization::set_auth_mode_provider(previous_mode_provider_);
   }
 
   godot_autopilot::authorization::AllowProvider previous_provider_ = nullptr;
+  godot_autopilot::authorization::AuthModeProvider previous_mode_provider_ =
+      nullptr;
   std::unique_ptr<EnvScope> env_;
+  std::unique_ptr<EnvScope> mode_env_;
 };
 
 } // namespace

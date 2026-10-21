@@ -120,8 +120,8 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       kCreateSceneNodeParams, scene_ops::handle_create}));
   v.push_back(make_spec_tool(ToolSpec{
       "delete_scene_node",
-      "Delete a node from the edited scene by 'path'. Managed by the editor undo/redo history (action 'Delete Node <name>'): do removes the child and queue_frees it, undo re-adds it under the old parent with owner and sibling index restored — effective while the deferred free has not destroyed the node yet. Refuses to delete the scene root (close the scene first). Returns 'deleted' with 'undoable' true and an 'undo' info object (name, type, parent_path).",
-      "Scene", {"node", "delete"}, SideEffect::None, tool_flags::kNone | tool_flags::kSceneTarget | tool_flags::kUndoable,
+      "Delete a node from the edited scene by 'path'. Managed by the editor undo/redo history (action 'Delete Node <name>'): do removes the child and queue_frees it, undo re-adds it under the old parent with owner and sibling index restored — effective while the deferred free has not destroyed the node yet. Refuses to delete the scene root (close the scene first). Returns 'deleted' with 'undoable' true and an 'undo' info object (name, type, parent_path). This tool is classified as a destructive side effect because it destroys a scene entity that already exists in the host, and the editor undo stack is a session-only recovery path that is lost when the editor exits.",
+      "Scene", {"node", "delete"}, SideEffect::Destructive, tool_flags::kNone | tool_flags::kSceneTarget | tool_flags::kUndoable,
       kDeleteSceneNodeParams, scene_ops::handle_delete}));
   v.push_back(make_spec_tool(ToolSpec{
       "rename_scene_node",

@@ -34,6 +34,8 @@ class McpConfigDock : public godot::EditorDock {
 
   godot::CheckBox *show_time_check = nullptr;
   godot::CheckBox *desensitize_check = nullptr;
+  godot::OptionButton *auth_mode_select = nullptr;
+  godot::Label *auth_mode_status = nullptr;
   godot::Label *legacy_notice_label = nullptr;
   godot::Button *import_legacy_button = nullptr;
   godot::Label *legacy_result_label = nullptr;
@@ -70,6 +72,8 @@ private:
                               godot::CheckBox *box);
   void _on_allow_toggled(const char *capability, godot::CheckBox *box,
                          bool checked);
+  void _on_auth_mode_selected(int index);
+  void _refresh_auth_mode();
 };
 
 } // namespace godot_autopilot

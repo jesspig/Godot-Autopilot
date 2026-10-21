@@ -46,7 +46,7 @@ const char *const kManualWhitelist[] = {
     "godot_autopilot", "editor_readiness", "resource_ops", "record_error",
     "writes_file", "is_error",
     "already_playing", "physics_stalled", "node_count", "scan_truncated",
-    "just_pressed", "global_rect",
+    "just_pressed", "global_rect", "auth_mode", "authorization_mode",
     "check_equal", "make_current", "close_scene", "get_tile_data",
     "target_position", "sprite_frames", "custom_minimum_size", "motion_mode",
     "cone_twist", "generic_6dof", "axis_lock", "collision_exception",

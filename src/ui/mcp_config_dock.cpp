@@ -1,5 +1,6 @@
 #include "mcp_config_dock.hpp"
 
+#include <cstdlib>
 #include <stdexcept>
 #include <string>
 
@@ -208,6 +209,34 @@ McpConfigDock::McpConfigDock() : port_spin(nullptr), apply_button(nullptr) {
   time_row->add_child(show_time_check);
   show_time_check->connect("toggled", callable_mp(this, &McpConfigDock::_on_show_time_toggled));
 
+  auto *mode_row = memnew(godot::HBoxContainer);
+  root->add_child(mode_row);
+  auto *mode_label = memnew(godot::Label);
+  mode_label->set_text("Authorization mode:");
+  mode_row->add_child(mode_label);
+  auth_mode_select = memnew(godot::OptionButton);
+  auth_mode_select->add_item("Strict (default)", 0);
+  auth_mode_select->add_item("Compatibility (pre-0.3.0 write behavior)", 1);
+  auth_mode_select->set_tooltip_text(
+      "Strict denies write and dangerous tools unless they are listed in the "
+      "allow list. Compatibility allows the write tier without any "
+      "authorization, matching the pre-0.3.0 behavior; dangerous and "
+      "destructive tools still need an explicit allow entry. Read on the next "
+      "tool call, no restart needed. When the GODOT_AUTOPILOT_AUTH_MODE "
+      "environment variable is set it wins over this setting.");
+  mode_row->add_child(auth_mode_select);
+  const godot::Error mode_connected = auth_mode_select->connect(
+      "item_selected", callable_mp(this, &McpConfigDock::_on_auth_mode_selected));
+  if (mode_connected != godot::OK) {
+    throw std::runtime_error(
+        "failed to connect the authorization mode selector");
+  }
+  auth_mode_status = memnew(godot::Label);
+  auth_mode_status->set_autowrap_mode(godot::TextServer::AUTOWRAP_WORD_SMART);
+  auth_mode_status->set_modulate(theme_color("font_disabled_color",
+                                               godot::Color(0.6f, 0.6f, 0.6f)));
+  root->add_child(auth_mode_status);
+
   for (const char *capability : authorization::kDockToggleCapabilities) {
     const authorization_switches::SwitchLabel *spec =
         authorization_switches::find_switch_label(capability);
@@ -335,6 +364,7 @@ McpConfigDock::McpConfigDock() : port_spin(nullptr), apply_button(nullptr) {
 
   _refresh_status();
   _refresh_legacy_notice();
+  _refresh_auth_mode();
 }
 
 void McpConfigDock::_bind_methods() {}
@@ -377,6 +407,41 @@ void McpConfigDock::_on_allow_toggled(const char *capability,
       checked ? authorization::allow_list_add(allow, capability)
               : authorization::allow_list_remove(allow, capability));
   box->set_pressed_no_signal(authorization::capability_enabled(capability));
+}
+
+void McpConfigDock::_on_auth_mode_selected(int index) {
+  const char *mode = index == 1 ? authorization::kAuthModeLegacy
+                                 : authorization::kAuthModeStrict;
+  PluginConfig::save_auth_mode(mode);
+  monitor::ui_action("config_auth_mode_select",
+                     monitor::build_attrs({{"mode", std::string(mode)}}));
+  monitor::security("auth_mode_change",
+                    monitor::build_attrs({{"mode", std::string(mode)}}));
+  _refresh_auth_mode();
+}
+
+void McpConfigDock::_refresh_auth_mode() {
+  if (auth_mode_select == nullptr || auth_mode_status == nullptr) {
+    return;
+  }
+  const authorization::AuthMode mode = authorization::current_auth_mode();
+  auth_mode_select->select(mode == authorization::AuthMode::Legacy ? 1 : 0);
+  std::string text = std::string("Current authorization mode: ") +
+                     authorization::auth_mode_name(mode);
+  if (mode == authorization::AuthMode::Legacy) {
+    text +=
+        " (write tools are allowed without an allow-list entry; dangerous "
+        "and destructive tools still need one)";
+  } else {
+    text +=
+        " (write, dangerous and destructive tools need an allow-list entry)";
+  }
+  const char *env = std::getenv(authorization::kEnvAuthMode);
+  if (env != nullptr && *env != '\0') {
+    text += "; the " + std::string(authorization::kEnvAuthMode) +
+            " environment variable overrides this panel";
+  }
+  auth_mode_status->set_text(godot::String::utf8(text.c_str()));
 }
 
 void McpConfigDock::set_server_context(ServerContext *ctx) {

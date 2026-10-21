@@ -36,10 +36,13 @@ inline constexpr SwitchLabel kSwitchLabels[] = {
      "GODOT_AUTOPILOT_ALLOW environment variable is set it wins over this "
      "setting."},
     {authorization::kCapabilityDestructive, "Allow destructive:",
-     "Allow the destructive tier (irreversible operations that destroy what "
-     "already exists, such as deleting the main window): read on the next "
-     "tool call, no restart needed. When the GODOT_AUTOPILOT_ALLOW "
-     "environment variable is set it wins over this setting."},
+     "Allow the destructive tier: irreversible operations that destroy an "
+     "object or entity that already exists inside the editor host, such as "
+     "delete_scene_node, delete_display_window, remove_animation, "
+     "remove_animation_track, remove_audio_bus_effect and "
+     "remove_debug_custom_monitor. Read on the next tool call, no restart "
+     "needed. When the GODOT_AUTOPILOT_ALLOW environment variable is set it "
+     "wins over this setting."},
     {authorization::kCapabilityProcess, "Allow process:",
      "Allow the process tier (dangerous: runs external programs and OS "
      "commands such as create_os_process, execute_os_process and "

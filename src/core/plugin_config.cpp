@@ -26,6 +26,7 @@ constexpr const char *kPortKey = "port";
 constexpr const char *kShowTimeKey = "show_time";
 constexpr const char *kDesensitizeKey = "desensitize";
 constexpr const char *kAllowKey = "allow";
+constexpr const char *kAuthModeKey = authorization::kConfigAuthModeKey;
 } // namespace
 
 namespace {
@@ -173,6 +174,7 @@ namespace {
 struct AllowProviderRegistration {
   AllowProviderRegistration() {
     authorization::set_allow_provider(&PluginConfig::load_allow);
+    authorization::set_auth_mode_provider(&PluginConfig::load_auth_mode);
   }
 } g_allow_provider_registration;
 } // namespace
@@ -264,6 +266,29 @@ std::string PluginConfig::load_allow() {
 bool PluginConfig::save_allow(const std::string &allow) {
   return write_config_value(global_config_file_path(), kAllowKey,
                              mcp::JsonValue(allow));
+}
+
+std::string PluginConfig::load_auth_mode() {
+  const std::string path = global_config_file_path();
+  if (path.empty()) {
+    LogSystem::instance().log(
+        LogLevel::Error, LogCategory::System,
+        "Plugin config path unavailable for auth_mode lookup");
+    return std::string();
+  }
+  mcp::JsonValue value;
+  bool from_legacy = false;
+  if (!find_config_value_with_legacy(path, kAuthModeKey, value,
+                                      from_legacy) ||
+      !value.IsString()) {
+    return std::string();
+  }
+  return value.GetString();
+}
+
+bool PluginConfig::save_auth_mode(const std::string &mode) {
+  return write_config_value(global_config_file_path(), kAuthModeKey,
+                             mcp::JsonValue(mode));
 }
 
 } // namespace godot_autopilot

@@ -124,8 +124,8 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       kGetDebugMonitorsParams, debug_ops::handle_get_all_monitors}));
   v.push_back(make_spec_tool(ToolSpec{
       "remove_debug_custom_monitor",
-      "Remove a custom performance monitor registered via add_custom_monitor by its string id. Use it to clean up monitors no longer needed so they stop consuming per-frame overhead during game runs. Requires 'id' (string) matching the registered name; returns result 'ok' on success.",
-      "Debug", {"debug", "performance"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
+      "Remove a custom performance monitor registered via add_custom_monitor by its string id. Use it to clean up monitors no longer needed so they stop consuming per-frame overhead during game runs. Requires 'id' (string) matching the registered name; returns result 'ok' on success. This tool is classified as a destructive side effect because it unregisters and destroys the monitor object that already exists inside the host, and no undo path is provided.",
+      "Debug", {"debug", "performance"}, SideEffect::Destructive, tool_flags::kMutating,
       kRemoveDebugCustomMonitorParams, debug_ops::handle_remove_custom_monitor}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_debug_custom_monitor",

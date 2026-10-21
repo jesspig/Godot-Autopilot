@@ -18,6 +18,9 @@ public:
 
   static std::string load_allow();
   static bool save_allow(const std::string &allow);
+
+  static std::string load_auth_mode();
+  static bool save_auth_mode(const std::string &mode);
 };
 
 } // namespace godot_autopilot

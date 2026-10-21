@@ -31,7 +31,7 @@ resource:
 
 本页是 MCP 服务器进程内 GDExtension 的最小安全与并发契约。实现、评审和后续测试以本页条款为验收标准；代码事实见 [核心模块](modules/core.md) 与 [工具注册表](modules/tools_registry.md)。
 
-> 审计日期：2026-10-21（10-21 随 C# 程序集构建与 .NET 环境判定修复批次同步——§3.1 的**面板开关由五项扩为六项**（新增 `process`），开关控件改为按能力清单生成、初始状态统一按当前实际允许列表显示；10-21 随面板授权开关补齐批次同步——§3.1 的面板开关由三项扩为**五项**（新增 `write` 与 `destructive`），新增 §3.1.1「写类与破坏性默认拒绝」小节（三档定义、七个能力名、默认放行规则、开启方式，以及与 §4「导出期拒绝三类入口」的关系）；该批次 `process` 仍无面板开关，后由 10-21 补齐批次改为六项。10-21 随开放接口面落地批次同步——① §1 补两套协议面的信任模型差异（`/mcp` 仍无认证、`/api` 要 Bearer 令牌，认证不替代授权）；② §2 端口解析顺序由「环境变量 > 旧 config.json > 9527」改为「环境变量 > 工程级配置偏好 > 自动分配」，并写明显式端口绑定失败**不自动更换**；③ §3 风险表补 `destructive` 类，`side_effect` 枚举由八值改九值；④ §3.1 改写为**授权三档**（读档默认放行、写档**默认拒绝**、危险档需显式开启），能力名由四条扩为七条，配置路径改到集中根下并注明旧路径回退，**写档默认拒绝标为对外行为变更**；⑤ §3.2 配置路径同步；⑥ §3.3 补 REST 参考不是新脚本化通道的说明；⑦ §3.4 CLI state dir 路径改为 `<集中根>/cli/`；⑧ 新增 §3.5「REST 接口面的安全条款」（令牌来源与强度、常量时间比对、令牌文件权限、令牌不外泄、免认证面只有 health、认证不替代授权、环回约束不变、请求体上限、导出拦截未接线缺口）；⑨ §4 把 `main_thread_timeout` 的 `retryable` 由 true 改为 **false** 并说明副作用可能仍落地；⑩ §7 验收清单补 REST 认证、写档默认拒绝、超时不可重试、REST 导出接线四条。10-20 随 `code_execute` 超时上限收敛批次同步——长阻塞预算收敛为**单值 29000ms**（`GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = GDA_DISPATCH_WAIT_MAX_MS`，删去「回退常量 30000 / 实际生效 29000」双值写法与不存在的 `kDispatchWaitMaxMs` 符号引用）；§4 补记 `queue_unavailable` 结构化错误（字段 `error`/`code`/`retryable`）与 `code_execute` 的 `timeout_ms` 上界口径（`min(27000, 生效长阻塞预算)`）；10-20 随技能书调用阶梯收敛批次同步——技能书自带的脚本桥 `gda.mjs` 与 `references/script-access.md` 删除，§3.3 改写为「技能通道与手动兜底」：脚本化调用通道只剩 GDA CLI，脚本桥的安全包络条款并入 §3.4（环回绑定、退出码四态、`--godot` 引擎定位收敛、失败回滚不残留孤儿进程）；10-20 随执行预算与并发契约治理批次同步——① 修正两条与代码冲突的断言：§4「Godot `FileAccess` 仅在 flush 主线程路径调用」与「`call_tool` 编排回调不触碰 Godot API」均按修复后的事实重写；② §3 补记 `side_effect` 全量非空与能力门只按 `side_effect` 判定、§3.1 补记 `batch_execute` 纳入 `code_execute` 能力门（**对外行为变更**）；③ §4 补记长阻塞预算档、等待全预算化、`code_execute` 协作式执行期超时、`main_thread_guard` 静态守卫与 `ExportGuard` 实例级异常安全复位、导出期拒绝覆盖三类入口；④ 补记守卫的固有局限；⑤ §3.4 按本轮 CLI 启动路径修复改写「Windows 脱父」断言——`cmd /c start "" /b` 蹦床 + `netstat` 端口反查**已移除**，改为直连 `spawn` + `detached: true`、pid 取 `spawn` 返回值、存活判定改解析 `tasklist /FO CSV`，并补记启动失败回滚三态与可执行补救指令。详见 [changelog/2026-10-20-log.md](changelog/2026-10-20-log.md)；原记（2026-10-19）：随 CLI 引擎定位收窄批次同步——`gda start` 不再读 `GODOT_PATH` 与 `<project>/.env`（前者仅 L2 引擎测试使用，生产环境不存在），可执行文件链收敛为 `--godot` > PATH，未命中即报错提示 `--godot`；新增 `cli/tests/process.test.ts` 3 项（TS 108→111、expect 301→310）；原记（2026-10-18）：随 CLI 载体落地批次同步——§3.3 补记 SDK 0.3.7 握手升级与双载体修复，新增 §3.4 CLI 安全包络；详见 [changelog/2026-10-18-log.md](changelog/2026-10-18-log.md)）
+> 审计日期：2026-10-22（10-22 随**授权兼容模式与破坏类档位标准成型**批次同步——① 新增 §3.1.2「档位判定标准与破坏类边界」：四档（读 / 写 / 破坏 / 危险）的可判定标准、两条边界规则（删除磁盘文件归写类、销毁宿主内运行对象归破坏类）、「恢复途径」口径（编辑器会话内的 undo/redo 栈不算持久化恢复途径）、以及防漂移守卫与显式白名单机制；② 新增 §3.1.3「授权兼容模式（strict / legacy）」：两种模式的读写危险破坏行为对照、取值来源与优先级（环境变量 > 配置 `auth_mode` 键 > 默认严格）、非法取值回落并告警、唯一接入点（`tier_permits`）、实时读取不缓存、拒绝文案与面板下拉、风险边界；③ §3 风险表的 `destructive` 行改写为标准表述并列出 6 个声明者；④ §3.1.1 的破坏类说明与 `destructive` 能力行同步指向新标准。10-21 随 C# 程序集构建与 .NET 环境判定修复批次同步——§3.1 的**面板开关由五项扩为六项**（新增 `process`），开关控件改为按能力清单生成、初始状态统一按当前实际允许列表显示；10-21 随面板授权开关补齐批次同步——§3.1 的面板开关由三项扩为**五项**（新增 `write` 与 `destructive`），新增 §3.1.1「写类与破坏性默认拒绝」小节（三档定义、七个能力名、默认放行规则、开启方式，以及与 §4「导出期拒绝三类入口」的关系）；该批次 `process` 仍无面板开关，后由 10-21 补齐批次改为六项。10-21 随开放接口面落地批次同步——① §1 补两套协议面的信任模型差异（`/mcp` 仍无认证、`/api` 要 Bearer 令牌，认证不替代授权）；② §2 端口解析顺序由「环境变量 > 旧 config.json > 9527」改为「环境变量 > 工程级配置偏好 > 自动分配」，并写明显式端口绑定失败**不自动更换**；③ §3 风险表补 `destructive` 类，`side_effect` 枚举由八值改九值；④ §3.1 改写为**授权三档**（读档默认放行、写档**默认拒绝**、危险档需显式开启），能力名由四条扩为七条，配置路径改到集中根下并注明旧路径回退，**写档默认拒绝标为对外行为变更**；⑤ §3.2 配置路径同步；⑥ §3.3 补 REST 参考不是新脚本化通道的说明；⑦ §3.4 CLI state dir 路径改为 `<集中根>/cli/`；⑧ 新增 §3.5「REST 接口面的安全条款」（令牌来源与强度、常量时间比对、令牌文件权限、令牌不外泄、免认证面只有 health、认证不替代授权、环回约束不变、请求体上限、导出拦截未接线缺口）；⑨ §4 把 `main_thread_timeout` 的 `retryable` 由 true 改为 **false** 并说明副作用可能仍落地；⑩ §7 验收清单补 REST 认证、写档默认拒绝、超时不可重试、REST 导出接线四条。10-20 随 `code_execute` 超时上限收敛批次同步——长阻塞预算收敛为**单值 29000ms**（`GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = GDA_DISPATCH_WAIT_MAX_MS`，删去「回退常量 30000 / 实际生效 29000」双值写法与不存在的 `kDispatchWaitMaxMs` 符号引用）；§4 补记 `queue_unavailable` 结构化错误（字段 `error`/`code`/`retryable`）与 `code_execute` 的 `timeout_ms` 上界口径（`min(27000, 生效长阻塞预算)`）；10-20 随技能书调用阶梯收敛批次同步——技能书自带的脚本桥 `gda.mjs` 与 `references/script-access.md` 删除，§3.3 改写为「技能通道与手动兜底」：脚本化调用通道只剩 GDA CLI，脚本桥的安全包络条款并入 §3.4（环回绑定、退出码四态、`--godot` 引擎定位收敛、失败回滚不残留孤儿进程）；10-20 随执行预算与并发契约治理批次同步——① 修正两条与代码冲突的断言：§4「Godot `FileAccess` 仅在 flush 主线程路径调用」与「`call_tool` 编排回调不触碰 Godot API」均按修复后的事实重写；② §3 补记 `side_effect` 全量非空与能力门只按 `side_effect` 判定、§3.1 补记 `batch_execute` 纳入 `code_execute` 能力门（**对外行为变更**）；③ §4 补记长阻塞预算档、等待全预算化、`code_execute` 协作式执行期超时、`main_thread_guard` 静态守卫与 `ExportGuard` 实例级异常安全复位、导出期拒绝覆盖三类入口；④ 补记守卫的固有局限；⑤ §3.4 按本轮 CLI 启动路径修复改写「Windows 脱父」断言——`cmd /c start "" /b` 蹦床 + `netstat` 端口反查**已移除**，改为直连 `spawn` + `detached: true`、pid 取 `spawn` 返回值、存活判定改解析 `tasklist /FO CSV`，并补记启动失败回滚三态与可执行补救指令。详见 [changelog/2026-10-20-log.md](changelog/2026-10-20-log.md)；原记（2026-10-19）：随 CLI 引擎定位收窄批次同步——`gda start` 不再读 `GODOT_PATH` 与 `<project>/.env`（前者仅 L2 引擎测试使用，生产环境不存在），可执行文件链收敛为 `--godot` > PATH，未命中即报错提示 `--godot`；新增 `cli/tests/process.test.ts` 3 项（TS 108→111、expect 301→310）；原记（2026-10-18）：随 CLI 载体落地批次同步——§3.3 补记 SDK 0.3.7 握手升级与双载体修复，新增 §3.4 CLI 安全包络；详见 [changelog/2026-10-18-log.md](changelog/2026-10-18-log.md)）
 
 ## 1. 可信客户端模型
 
@@ -69,7 +69,7 @@ resource:
 | 进程与环境 | `process` | 视为最高风险；包括启动、终止、构建、打开 OS 路径和修改环境。 |
 | 任意脚本 | `code_execute`（`code_execute` / `batch_execute` / `execute_script` / 6 个 `csharp_*` 反射工具） | 最高风险处理；脚本可读写场景、资源、文件并调用方法，未标记的等价脚本执行能力同样按此处理。 |
 | 运行时变更 | `game_*` 输入、求值的 set/call、SceneTree 转发的 8 个 `*_scene_tree_*` 工具等 | 视为目标游戏状态变更；必须受超时、取消和响应关联约束；无运行中游戏时返回结构化错误，不落回编辑器树。 |
-| 破坏性操作 | `destructive`（10-21 新增；当前唯一声明者 `delete_display_window`） | 销毁既有对象的不可逆操作；与 `modifies_window` 同属危险档，需显式授权，且不得在无明确请求时触发。 |
+| 破坏性操作 | `destructive`（10-21 新增；10-22 档位标准成型，声明者由 1 个扩为 6 个：`delete_display_window` / `delete_scene_node` / `remove_animation` / `remove_animation_track` / `remove_audio_bus_effect` / `remove_debug_custom_monitor`） | **不可逆地销毁宿主内已存在的对象或实体**（判定标准与边界规则见 §3.1.2）；与 `modifies_window` 同属危险档，需显式授权，且不得在无明确请求时触发。 |
 
 只读工具也必须遵守路径、结果大小和主线程条款；“无副作用”不等于“无需限制”。
 
@@ -113,13 +113,51 @@ resource:
 | 危险（Danger） | `process` | `process` | **默认拒绝，需显式开启** | 允许列表加 `process`；面板勾选 "Allow process"（危险档，开关文案明示会运行外部程序与 OS 命令） |
 | 危险（Danger） | `code_execute` | `code_execute` | **默认拒绝，需显式开启** | 允许列表加 `code_execute`；面板勾选 "Allow code_execute" |
 | 危险（Danger） | `game_runtime` | `game_runtime` | **默认拒绝，需显式开启** | 允许列表加 `game_runtime`；面板勾选 "Allow game_runtime" |
-| 危险（Danger） | `destructive` | `destructive` | **默认拒绝，需显式开启** | 允许列表加 `destructive`；面板勾选 "Allow destructive" |
+| 危险（Danger） | `destructive` | `destructive` | **默认拒绝，需显式开启** | 允许列表加 `destructive`；面板勾选 "Allow destructive"（档位判定标准见 §3.1.2） |
 | 独立能力 | `user_tools` | 用户脚本动态工具（不由 `side_effect` 派生） | **默认拒绝，需显式开启** | 允许列表加 `user_tools`；面板勾选 "Allow user tools" |
 
-- **写类与破坏性默认拒绝（对外行为变更）**：写类工具（写文件、写工程/编辑器配置、弹用户可见提示、改窗口与注入输入）与破坏性工具（销毁既有对象的不可逆操作，当前唯一声明者 `delete_display_window`）此前**不需要任何能力**即可调用，10-21 起需要允许列表含 `write` / `destructive`（或 `all`）。既有客户端若不做适配，调用这些工具会收到 **403 `authorization_required`**——**MCP 面与 REST 面同样生效**。
+- **写类与破坏性默认拒绝（对外行为变更）**：写类工具（写文件、写工程/编辑器配置、弹用户可见提示、改窗口与注入输入）与破坏性工具（不可逆地销毁宿主内既有对象的操作，判定标准见 §3.1.2，当前声明者 6 个）此前**不需要任何能力**即可调用，10-21 起需要允许列表含 `write` / `destructive`（或 `all`）。既有客户端若不做适配，调用这些工具会收到 **403 `authorization_required`**——**MCP 面与 REST 面同样生效**。需要平滑升级的用户可显式切到**兼容模式**（§3.1.3）。
 - **三条开启路径**（语义不同，任选其一）：① 环境变量 `GODOT_AUTOPILOT_ALLOW=write`（逗号分隔，或 `all`），**须重启引擎**，且一旦设置即**完全覆盖**配置文件里的允许列表；② MCP Config 面板勾选 "Allow write" / "Allow destructive"，写入配置的 `allow` 键，**下一次工具调用立即生效、无需重启**（授权判定每次实时读取允许列表，不缓存）；③ 直接把 `write` / `destructive` 写进配置的 `allow` 键（手改配置）。三条路径**都只在本机环回的服务上生效**，不构成对外暴露授权。
 - **面板开关的增删语义**：勾选即 `allow_list_add`、取消即 `allow_list_remove`；**取消某一项不影响其它项**——`allow_list_remove` 遇到 `all` 会先把 `all` 展开成全部已知能力再逐项删除，因此「先全开再取消一项」的结果是其余能力保留、仅该能力被收回。取消后回读配置校正复选框状态，因此面板显示与配置内容始终一致。
 - **与 §4「导出期拒绝三类入口」的关系**：两者是**不同维度**的约束，互不替代。导出期拒绝按**引擎状态**拒绝——导出期间工具调用 / MCP 资源 / MCP 提示词三类入口一律拒绝（`code="export_in_progress"`，503）；本节的三档授权按**能力**拒绝——非导出期时，未在允许列表内的能力被拒（403 `authorization_required`）。判定顺序上**导出拦截在前、授权在后**（见 [工具注册表](modules/tools_registry.md)「统一执行入口」六阶段），故导出期内的写类调用先被导出拦截挡下，不进入授权门；反之，未授权的写类调用在非导出期只会拿到授权拒绝。**已知缺口**：导出拦截阶段尚未接入 REST 请求路径，REST 面的导出期拒绝当前不生效（见 §3.5 末条），但 REST 面的**授权门两套面都生效**。
+
+### 3.1.2 档位判定标准与破坏类边界（10-22 成型）
+
+三档七能力的分档**只按工具的实际行为判定**，不看工具名。新增工具必须按下表落档；判定口径固化在 [`src/tools/side_effect_policy.hpp`](../../../src/tools/side_effect_policy.hpp)（`kTierCriteria` 与两条边界常量），并由 L1 用例 `destructive_tier_guard_test` 逐工具复核。
+
+| 档位 | 判定标准 | 覆盖的 `side_effect` | 能力名 |
+|---|---|---|---|
+| **读**（Read） | 只读取，不改变任何外部状态 | `none` | `read` |
+| **写**（Write） | 产生**可恢复**的外部状态变更：写文件、写工程与编辑器配置、改窗口与显示、注入输入、改场景属性、保存资源等 | `writes_file` / `writes_config` / `shows_alert` / `modifies_window` | `write` |
+| **破坏**（Destructive） | **不可逆地销毁宿主内已存在的对象或实体**，且没有持久化的恢复途径：销毁窗口、场景实体、运行时实例、终止既有宿主对象等 | `destructive` | `destructive` |
+| **危险**（Danger） | 执行外部程序、执行脚本、驱动游戏进程等 | `process` / `code_execute` / `game_runtime` | `process` / `code_execute` / `game_runtime` |
+
+**两条边界规则**（判定时的第一道分流）：
+
+- **删除磁盘文件 / 目录归写类**——工程内容通常有版本控制兜底，删除可从版本库恢复，故 `remove_resource_file` / `move_os_file_to_trash` 归 `writes_file`（写类），不进破坏类。
+- **销毁宿主内运行对象归破坏类**——被销毁的实体活在编辑器宿主进程内，工程文件里没有可重新载入的副本，故 `delete_scene_node`（场景节点）、`remove_animation` / `remove_animation_track`（动画与轨道）、`remove_audio_bus_effect`（总线效果）、`remove_debug_custom_monitor`（自定义性能监视器）、`delete_display_window`（子窗口）归 `destructive`。
+
+**「恢复途径」的判定口径**：持久化的恢复途径（工程文件的版本控制副本、回收站、可重新写回的配置）算恢复途径；**编辑器会话内的 undo/redo 栈不算**——它随编辑器退出即失效，且 `delete_scene_node` 的撤销仅在「延迟释放尚未销毁节点」的窗口内有效，故该工具仍归破坏类。相比之下，只解除关系而不销毁实体的操作（`remove_group_node` 只解除分组、`detach_script_from_node` 只摘除脚本、`remove_physics_3d_body_collision_exception` 只删一条碰撞例外关系）不销毁实体，一律不进破坏类。
+
+**防漂移守卫**：L1 用例 `destructive_tier_guard_test` 扫描全部工具声明（取自运行时 registry，含元工具），凡**工具名或描述带删除 / 销毁 / 终止类语义**却未声明 `SideEffect::Destructive` 的，即判为可疑并列出工具名；确有正当理由的须在 `side_effect_policy.hpp` 的 `kDestructiveExemptions` 白名单里**显式登记并写明理由**（当前 9 条：配置与工程文件类删除、终止外部进程、只解除关系不销毁实体、游戏进程内的对象）。白名单条目若指向不存在的工具、或对应工具已不再带销毁语义，守卫同样失败。
+
+### 3.1.3 授权兼容模式（strict / legacy，10-22 新增）
+
+0.3.0 起写类默认拒绝（§3.1.1），既有 0.2.7 用户首次调用写类工具会收到 403 `authorization_required`。为给出一条**自选的**平滑升级路径，授权判定新增**模式开关**：
+
+| 模式 | 取值 | 读类 | 写类 | 危险类（`process` / `code_execute` / `game_runtime`） | 破坏类（`destructive`） |
+|---|---|---|---|---|---|
+| **严格**（默认） | `strict` | 放行 | **默认拒绝**，需允许列表含 `write` | 默认拒绝，需显式开启 | 默认拒绝，需显式开启 |
+| **兼容** | `legacy` | 放行 | **默认放行**（等同 0.2.7 行为，无需任何授权） | **仍默认拒绝**，需显式开启 | **仍默认拒绝**，需显式开启 |
+
+- **取值来源与优先级**：`GODOT_AUTOPILOT_AUTH_MODE` 环境变量（取值 `strict` / `legacy`）> 插件配置的 `auth_mode` 键（**全局级** `config.json`，与 `allow` 键同级）> **默认严格模式**。与 `GODOT_AUTOPILOT_ALLOW` 同一套优先级惯例：环境变量一旦设置即完全覆盖配置。
+- **非法取值回落**：环境变量或配置键的取值不是 `strict` / `legacy` 时**回落到严格模式**并记一条 Warning 日志（Tools 类别，同一非法值只记一次）——**不得静默放宽**。配置缺失、读取失败或取值非法都按严格模式处理。
+- **接入点唯一**：模式只在 `authorization::tier_permits` 的判定里体现（读类恒放行 → 严格模式按允许列表 → 兼容模式下写类放行、其余仍按允许列表）。调用点不零散加判断，避免出现两套真相。
+- **实时读取**：模式**每次工具调用实时读取，不缓存**；面板切换后**下一次调用即生效**，无需重启。
+- **拒绝文案**：拒绝响应新增机器可读字段 `authorization_mode`（`strict` / `legacy`）；严格模式下因写类被拒时，`enable` 字段追加可操作说明——「或把授权模式切到 `legacy`（`GODOT_AUTOPILOT_AUTH_MODE=legacy`，或在 MCP Config 面板选 "Compatibility"）以恢复 0.3.0 之前写类无需授权的行为」。兼容模式下被拒的仍是危险类 / 破坏类，提示文案照旧，不提兼容模式。
+- **面板开关**：MCP Config 面板新增「Authorization mode:」下拉（**Strict (default)** / **Compatibility (pre-0.3.0 write behavior)**）与一行当前模式说明（显示生效模式；环境变量存在时额外提示「环境变量覆盖本面板」）。切换即写配置的 `auth_mode` 键并立即生效。
+- **风险**：兼容模式**只放宽写类**——写文件、写工程与编辑器配置、改窗口与显示、注入输入在兼容模式下无需任何授权即可执行。危险类与破坏类在两种模式下都默认拒绝，因此兼容模式**不放宽**脚本执行、外部程序、进程终止与宿主内对象的销毁。用户在受控的本地开发环境里选择兼容模式是可接受的；在共享机器、多人共用的编辑器或任何非本机可信场景下**不应开启**。
+- **与既有开关的关系**：兼容模式不改允许列表本身——`write` 仍可显式加入允许列表（严格模式下照旧生效），`process` / `code_execute` / `game_runtime` / `destructive` / `user_tools` 的开启方式不变。
 
 ### 3.2 数据脱敏开关（09-20 引入）
 
@@ -214,6 +252,8 @@ REST 面（`/api`）与 MCP 面共用同一监听端口，但**认证要求不�
 - [ ] 每个高风险工具都能通过 `get_tool_detail.side_effect` 或本页补充规则识别；**任何**工具的 `side_effect` 都非空（无副作用者为字面量 `"none"`）；破坏性工具声明 `destructive`。
 - [ ] 能力门只按 `side_effect` 判定：改一个工具的 `side_effect` 即改变它受哪个能力门约束，不存在「按工具名特判」的旁路；**写档默认拒绝**（未授权时写类工具返回 403），危险档需显式开启。
 - [ ] 面板开关覆盖 `code_execute` / `game_runtime` / `user_tools` / `write` / `destructive` / `process` 六项：勾选与取消经允许列表增删，**取消一项不影响其它项**（`all` 先展开再逐项删），勾选后**下一次工具调用即生效、无需重启**；开关控件按能力清单生成，初始状态取当前实际允许列表。
+- [ ] 授权模式（§3.1.3）符合预期：默认 `strict` 下写类默认拒绝；显式 `legacy` 下写类默认放行而危险类与破坏类**仍**默认拒绝；非法取值回落 `strict` 并记 Warning；拒绝响应带 `authorization_mode` 字段；面板下拉切换后**下一次调用即生效**。
+- [ ] 破坏类落档符合 §3.1.2 标准：销毁宿主内既有对象的工具声明 `destructive`；删除磁盘文件 / 目录归写类；防漂移守卫对「带销毁语义却未声明 `destructive`」的工具失败并列出工具名，白名单豁免须显式登记且写明理由。
 - [ ] REST 面的受保护端点拒绝无令牌请求（401），令牌比对为常量时间，令牌文件权限已收紧（POSIX 0600 / Windows 记 Warning 说明继承 ACL），令牌不出现在日志与 trace 中。
 - [ ] HTTP 线程路径中没有直接 Godot API 调用；任务只由主线程 `drain()` 执行；trace 截图与 jsonl 落盘只在主线程发生。
 - [ ] 编辑器内不存在无界等待点：所有主线程等待都带预算（`execute_sync` 无调用点，`kLongBlocking` 有上限）；超时结果标 `retryable=false` 且带 `cancelled`，不得按可重试处理。

@@ -200,6 +200,8 @@ std::string resolve_allow_list() {
     allow = "all";
   if (!allow_list_has(allow, "write"))
     allow += ",write";
+  if (!allow_list_has(allow, "destructive"))
+    allow += ",destructive";
   return allow;
 }
 
