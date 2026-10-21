@@ -257,6 +257,41 @@ McpConfigDock::McpConfigDock() : port_spin(nullptr), apply_button(nullptr) {
   allow_user_tools_check->connect(
       "toggled", callable_mp(this, &McpConfigDock::_on_allow_user_tools_toggled));
 
+  auto *write_row = memnew(godot::HBoxContainer);
+  root->add_child(write_row);
+  auto *write_label = memnew(godot::Label);
+  write_label->set_text("Allow write:");
+  write_row->add_child(write_label);
+  allow_write_check = memnew(godot::CheckBox);
+  allow_write_check->set_pressed(authorization::capability_enabled("write"));
+  allow_write_check->set_tooltip_text(
+      "Allow the write tier (write files, write project or editor config, "
+      "show alerts, modify the editor window, inject mouse and keyboard "
+      "input): read on the next tool call, no restart needed. When the "
+      "GODOT_AUTOPILOT_ALLOW environment variable is set it wins over this "
+      "setting.");
+  write_row->add_child(allow_write_check);
+  allow_write_check->connect(
+      "toggled", callable_mp(this, &McpConfigDock::_on_allow_write_toggled));
+
+  auto *destructive_row = memnew(godot::HBoxContainer);
+  root->add_child(destructive_row);
+  auto *destructive_label = memnew(godot::Label);
+  destructive_label->set_text("Allow destructive:");
+  destructive_row->add_child(destructive_label);
+  allow_destructive_check = memnew(godot::CheckBox);
+  allow_destructive_check->set_pressed(
+      authorization::capability_enabled("destructive"));
+  allow_destructive_check->set_tooltip_text(
+      "Allow the destructive tier (irreversible operations that destroy what "
+      "already exists, such as deleting the main window): read on the next "
+      "tool call, no restart needed. When the GODOT_AUTOPILOT_ALLOW "
+      "environment variable is set it wins over this setting.");
+  destructive_row->add_child(allow_destructive_check);
+  allow_destructive_check->connect(
+      "toggled",
+      callable_mp(this, &McpConfigDock::_on_allow_destructive_toggled));
+
   auto *desensitize_row = memnew(godot::HBoxContainer);
   root->add_child(desensitize_row);
   auto *desensitize_label = memnew(godot::Label);
@@ -274,6 +309,7 @@ McpConfigDock::McpConfigDock() : port_spin(nullptr), apply_button(nullptr) {
       "toggled", callable_mp(this, &McpConfigDock::_on_desensitize_toggled));
 
   status_label = memnew(godot::Label);
+  status_label->set_autowrap_mode(godot::TextServer::AUTOWRAP_WORD_SMART);
   root->add_child(status_label);
 
   auto *legacy_heading = memnew(godot::Label);
@@ -400,6 +436,32 @@ void McpConfigDock::_on_allow_user_tools_toggled(bool checked) {
   _on_allow_toggled("user_tools", allow_user_tools_check, checked);
 }
 
+void McpConfigDock::_on_allow_write_toggled(bool checked) {
+  monitor::ui_action(
+      "config_allow_toggle",
+      monitor::build_attrs(
+          {{"capability", "write"}, {"enabled", checked ? "true" : "false"}}));
+  monitor::security(
+      "allow_change",
+      monitor::build_attrs(
+          {{"capability", "write"}, {"enabled", checked ? "true" : "false"}}));
+  _on_allow_toggled("write", allow_write_check, checked);
+}
+
+void McpConfigDock::_on_allow_destructive_toggled(bool checked) {
+  monitor::ui_action(
+      "config_allow_toggle",
+      monitor::build_attrs(
+          {{"capability", "destructive"},
+           {"enabled", checked ? "true" : "false"}}));
+  monitor::security(
+      "allow_change",
+      monitor::build_attrs(
+          {{"capability", "destructive"},
+           {"enabled", checked ? "true" : "false"}}));
+  _on_allow_toggled("destructive", allow_destructive_check, checked);
+}
+
 void McpConfigDock::_on_desensitize_toggled(bool checked) {
   PluginConfig::save_desensitize(checked);
   sanitize_policy::set_enabled(checked);
@@ -450,6 +512,11 @@ void McpConfigDock::_refresh_status() {
     status_label->set_text(godot::String::utf8(text.c_str()));
     status_label->set_modulate(
         theme_color("success_color", godot::Color(0.4f, 0.9f, 0.4f)));
+  } else if (server_ctx != nullptr && !server_ctx->last_error().empty()) {
+    status_label->set_text(
+        godot::String::utf8(server_ctx->last_error().c_str()));
+    status_label->set_modulate(
+        theme_color("error_color", godot::Color(0.95f, 0.4f, 0.4f)));
   } else {
     status_label->set_text("Server offline");
     status_label->set_modulate(

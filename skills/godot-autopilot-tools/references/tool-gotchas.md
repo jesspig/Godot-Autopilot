@@ -314,12 +314,13 @@ something that already exists. `user_tools` is a separate capability guarding
 user-registered dynamic tools. A denied call returns an error carrying
 authorization_required plus an `enable` field (and writes a warning to the
 plugin log); enable a capability by setting `GODOT_AUTOPILOT_ALLOW` to it (or
-to `all`) and restarting the engine, or - for `code_execute`, `game_runtime`
-and `user_tools` - by ticking "Allow code_execute", "Allow game_runtime" or
-"Allow user tools" in the plugin's MCP Config dock, which takes effect on the
-next call without a restart. The `write`, `process` and `destructive` gates keep
-no dock toggle: they need the environment variable and a restart. When the
-environment variable is set it wins over the config.
+to `all`) and restarting the engine, or by ticking "Allow code_execute",
+"Allow game_runtime", "Allow user tools", "Allow write" or "Allow
+destructive" in the plugin's MCP Config dock, which takes effect on the
+next call without a restart. Un-ticking a box removes only that capability
+and leaves the others alone, even when the allow list was `all`. The
+`process` gate keeps no dock toggle: it needs the environment variable and
+a restart. When the environment variable is set it wins over the config.
 
 `batch_execute` sits behind the same `code_execute` gate as `code_execute`
 itself, even when the batch only calls ordinary domain tools. A client that

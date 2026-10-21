@@ -60,7 +60,8 @@ inline bool allow_list_contains(const std::string &value,
 
 inline bool capability_has_dock_toggle(std::string_view capability) {
   return capability == kCapabilityCodeExecute ||
-         capability == kCapabilityGameRuntime || capability == kCapabilityUserTools;
+         capability == kCapabilityGameRuntime || capability == kCapabilityUserTools ||
+         capability == kCapabilityWrite || capability == kCapabilityDestructive;
 }
 
 inline std::string allow_list_add(std::string allow,

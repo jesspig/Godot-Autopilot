@@ -124,6 +124,7 @@ POST /api/tools/<name> → api_surface::handle_request → api_surface::execute_
 - 比对使用**常量时间**比较（`constant_time_equals`），长度不同直接判否。
 - 令牌文件权限：POSIX 平台写盘后 `chmod` 收紧为 `S_IRUSR | S_IWUSR`（0600）；Windows 无 POSIX 权限位，改为记一条 Warning，说明令牌文件**继承 GDA 集中根目录的 ACL**。
 - 令牌是**本机信任凭据**，不是对外暴露的凭据：它只配合环回绑定使用。REST 端点不要转发、不要代理、不要暴露到非环回地址。
+- **认证不替代授权**：令牌通过后仍要走授权门（见 [工具注册表](tools_registry.md)「授权三档」与 [T0 安全边界与并发契约](../security_contract.md) §3.1.1）。REST 调用同样受**三档授权**约束：读类工具默认放行，**写类工具（写文件、写配置、注入输入、改窗口）默认返回 403 `authorization_required`**，危险类工具（`process` / `code_execute` / `game_runtime` / `destructive`）同样默认拒绝且需显式开启。开启方式：设环境变量 `GODOT_AUTOPILOT_ALLOW=write`（逗号分隔，或 `all`）并重启引擎，或在插件 MCP Config 面板勾选 "Allow write" / "Allow destructive"（**下一次调用即生效，无需重启**），或在配置的 `allow` 键里加入 `write` / `destructive`。允许列表**不随请求传入**，请求体无法临时提权。
 
 ## 状态码
 
@@ -132,7 +133,7 @@ POST /api/tools/<name> → api_surface::handle_request → api_surface::execute_
 | 200 | 成功（含批量请求，子项失败不改状态码） |
 | 400 | 参数错误：请求体非 JSON 对象、缺 `operations`、`stop_on_error` 非布尔、`limit`/`offset` 非法、工具参数校验失败 |
 | 401 | 未认证：缺 Bearer 头、格式非 `Bearer <token>`、令牌不匹配 |
-| 403 | 授权拒绝：工具所需能力未在允许列表中（`authorization_required`） |
+| 403 | 授权拒绝：工具所需能力未在允许列表中（`authorization_required`）——**写类工具默认即命中此行**（需允许列表含 `write`），危险类工具同理 |
 | 404 | 工具或路由不存在：未知 `/api` 路径、未知工具名、非法工具名字符 |
 | 405 | 方法不支持：该路由不接受此 HTTP 方法 |
 | 409 | 冲突（`conflict` 码） |
