@@ -210,14 +210,19 @@ TEST(SecurityHardening, EnableMessageDockHintOnlyForToggleable) {
   EXPECT_NE(dock_enable->GetString().find("Allow game_runtime"),
             std::string::npos);
 
-  auto env_only = godot_autopilot::authorization::deny_if_unauthorized(
+  auto process_denied = godot_autopilot::authorization::deny_if_unauthorized(
       "create_os_process", SideEffect::Process);
-  ASSERT_FALSE(env_only.IsNull());
-  const mcp::JsonValue *env_enable = env_only.Find("enable");
-  ASSERT_NE(env_enable, nullptr);
-  EXPECT_EQ(env_enable->GetString().find("dock"), std::string::npos);
-  EXPECT_NE(env_enable->GetString().find("restart the engine"),
+  ASSERT_FALSE(process_denied.IsNull());
+  const mcp::JsonValue *process_enable = process_denied.Find("enable");
+  ASSERT_NE(process_enable, nullptr);
+  EXPECT_NE(process_enable->GetString().find("Allow process"),
             std::string::npos);
+  EXPECT_NE(process_enable->GetString().find("restart the engine"),
+            std::string::npos);
+
+  auto read_allowed = godot_autopilot::authorization::deny_if_unauthorized(
+      "get_game_status", SideEffect::None);
+  EXPECT_TRUE(read_allowed.IsNull());
 }
 
 TEST(SecurityHardening, ConfigConstantsSane) {

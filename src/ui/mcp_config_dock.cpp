@@ -1,5 +1,6 @@
 #include "mcp_config_dock.hpp"
 
+#include <stdexcept>
 #include <string>
 
 #include <godot_cpp/classes/dir_access.hpp>
@@ -21,6 +22,7 @@
 #include "core/sanitize_policy.hpp"
 #include "core/storage_paths.hpp"
 #include "tools/authorization.hpp"
+#include "ui/authorization_switches.hpp"
 #include "util/project_path.hpp"
 
 namespace godot_autopilot {
@@ -206,91 +208,35 @@ McpConfigDock::McpConfigDock() : port_spin(nullptr), apply_button(nullptr) {
   time_row->add_child(show_time_check);
   show_time_check->connect("toggled", callable_mp(this, &McpConfigDock::_on_show_time_toggled));
 
-  auto *allow_row = memnew(godot::HBoxContainer);
-  root->add_child(allow_row);
-  auto *allow_label = memnew(godot::Label);
-  allow_label->set_text("Allow code_execute:");
-  allow_row->add_child(allow_label);
-  allow_code_execute_check = memnew(godot::CheckBox);
-  allow_code_execute_check->set_pressed(authorization::allow_list_contains(
-      PluginConfig::load_allow(), "code_execute"));
-  allow_code_execute_check->set_tooltip_text(
-      "Allow code_execute (and the execute_script tool): read on the next "
-      "tool call, no restart needed. When the GODOT_AUTOPILOT_ALLOW "
-      "environment variable is set it wins over this setting.");
-  allow_row->add_child(allow_code_execute_check);
-  allow_code_execute_check->connect(
-      "toggled",
-      callable_mp(this, &McpConfigDock::_on_allow_code_execute_toggled));
-
-  auto *game_runtime_row = memnew(godot::HBoxContainer);
-  root->add_child(game_runtime_row);
-  auto *game_runtime_label = memnew(godot::Label);
-  game_runtime_label->set_text("Allow game_runtime:");
-  game_runtime_row->add_child(game_runtime_label);
-  allow_game_runtime_check = memnew(godot::CheckBox);
-  allow_game_runtime_check->set_pressed(authorization::allow_list_contains(
-      PluginConfig::load_allow(), "game_runtime"));
-  allow_game_runtime_check->set_tooltip_text(
-      "Allow game_runtime (and the game runtime tools): read on the next "
-      "tool call, no restart needed. When the GODOT_AUTOPILOT_ALLOW "
-      "environment variable is set it wins over this setting.");
-  game_runtime_row->add_child(allow_game_runtime_check);
-  allow_game_runtime_check->connect(
-      "toggled",
-      callable_mp(this, &McpConfigDock::_on_allow_game_runtime_toggled));
-
-  auto *user_tools_row = memnew(godot::HBoxContainer);
-  root->add_child(user_tools_row);
-  auto *user_tools_label = memnew(godot::Label);
-  user_tools_label->set_text("Allow user tools:");
-  user_tools_row->add_child(user_tools_label);
-  allow_user_tools_check = memnew(godot::CheckBox);
-  allow_user_tools_check->set_pressed(
-      authorization::capability_enabled("user_tools"));
-  allow_user_tools_check->set_tooltip_text(
-      "Allow user tools registered from scripts through the AutopilotTools "
-      "engine singleton; read on the next tool call, no restart needed. When "
-      "the GODOT_AUTOPILOT_ALLOW environment variable is set it wins over "
-      "this setting.");
-  user_tools_row->add_child(allow_user_tools_check);
-  allow_user_tools_check->connect(
-      "toggled", callable_mp(this, &McpConfigDock::_on_allow_user_tools_toggled));
-
-  auto *write_row = memnew(godot::HBoxContainer);
-  root->add_child(write_row);
-  auto *write_label = memnew(godot::Label);
-  write_label->set_text("Allow write:");
-  write_row->add_child(write_label);
-  allow_write_check = memnew(godot::CheckBox);
-  allow_write_check->set_pressed(authorization::capability_enabled("write"));
-  allow_write_check->set_tooltip_text(
-      "Allow the write tier (write files, write project or editor config, "
-      "show alerts, modify the editor window, inject mouse and keyboard "
-      "input): read on the next tool call, no restart needed. When the "
-      "GODOT_AUTOPILOT_ALLOW environment variable is set it wins over this "
-      "setting.");
-  write_row->add_child(allow_write_check);
-  allow_write_check->connect(
-      "toggled", callable_mp(this, &McpConfigDock::_on_allow_write_toggled));
-
-  auto *destructive_row = memnew(godot::HBoxContainer);
-  root->add_child(destructive_row);
-  auto *destructive_label = memnew(godot::Label);
-  destructive_label->set_text("Allow destructive:");
-  destructive_row->add_child(destructive_label);
-  allow_destructive_check = memnew(godot::CheckBox);
-  allow_destructive_check->set_pressed(
-      authorization::capability_enabled("destructive"));
-  allow_destructive_check->set_tooltip_text(
-      "Allow the destructive tier (irreversible operations that destroy what "
-      "already exists, such as deleting the main window): read on the next "
-      "tool call, no restart needed. When the GODOT_AUTOPILOT_ALLOW "
-      "environment variable is set it wins over this setting.");
-  destructive_row->add_child(allow_destructive_check);
-  allow_destructive_check->connect(
-      "toggled",
-      callable_mp(this, &McpConfigDock::_on_allow_destructive_toggled));
+  for (const char *capability : authorization::kDockToggleCapabilities) {
+    const authorization_switches::SwitchLabel *spec =
+        authorization_switches::find_switch_label(capability);
+    if (spec == nullptr) {
+      throw std::runtime_error(std::string("no panel switch label for capability ") +
+                                capability);
+    }
+    auto *allow_row = memnew(godot::HBoxContainer);
+    root->add_child(allow_row);
+    auto *allow_label = memnew(godot::Label);
+    allow_label->set_text(godot::String::utf8(
+        spec->label.data(), static_cast<int64_t>(spec->label.size())));
+    allow_row->add_child(allow_label);
+    auto *allow_check = memnew(godot::CheckBox);
+    allow_check->set_pressed(
+        authorization_switches::switch_initial_state(capability));
+    allow_check->set_tooltip_text(godot::String::utf8(
+        spec->tooltip.data(), static_cast<int64_t>(spec->tooltip.size())));
+    allow_row->add_child(allow_check);
+    const godot::Error connected = allow_check->connect(
+        "toggled",
+        callable_mp(this, &McpConfigDock::_on_allow_toggled_slot)
+            .bind(godot::String(capability), godot::Variant(allow_check)));
+    if (connected != godot::OK) {
+      throw std::runtime_error(
+          std::string("failed to connect the authorization switch for capability ") +
+          capability);
+    }
+  }
 
   auto *desensitize_row = memnew(godot::HBoxContainer);
   root->add_child(desensitize_row);
@@ -400,66 +346,18 @@ void McpConfigDock::_on_show_time_toggled(bool checked) {
   if (log_dock_) log_dock_->set_show_time(checked);
 }
 
-void McpConfigDock::_on_allow_code_execute_toggled(bool checked) {
+void McpConfigDock::_on_allow_toggled_slot(bool checked, godot::String capability,
+                                            godot::CheckBox *box) {
+  const std::string cap = capability.utf8().get_data();
   monitor::ui_action(
       "config_allow_toggle",
       monitor::build_attrs(
-          {{"capability", "code_execute"}, {"enabled", checked ? "true" : "false"}}));
+          {{"capability", cap}, {"enabled", checked ? "true" : "false"}}));
   monitor::security(
       "allow_change",
       monitor::build_attrs(
-          {{"capability", "code_execute"}, {"enabled", checked ? "true" : "false"}}));
-  _on_allow_toggled("code_execute", allow_code_execute_check, checked);
-}
-
-void McpConfigDock::_on_allow_game_runtime_toggled(bool checked) {
-  monitor::ui_action(
-      "config_allow_toggle",
-      monitor::build_attrs(
-          {{"capability", "game_runtime"}, {"enabled", checked ? "true" : "false"}}));
-  monitor::security(
-      "allow_change",
-      monitor::build_attrs(
-          {{"capability", "game_runtime"}, {"enabled", checked ? "true" : "false"}}));
-  _on_allow_toggled("game_runtime", allow_game_runtime_check, checked);
-}
-
-void McpConfigDock::_on_allow_user_tools_toggled(bool checked) {
-  monitor::ui_action(
-      "config_allow_toggle",
-      monitor::build_attrs(
-          {{"capability", "user_tools"}, {"enabled", checked ? "true" : "false"}}));
-  monitor::security(
-      "allow_change",
-      monitor::build_attrs(
-          {{"capability", "user_tools"}, {"enabled", checked ? "true" : "false"}}));
-  _on_allow_toggled("user_tools", allow_user_tools_check, checked);
-}
-
-void McpConfigDock::_on_allow_write_toggled(bool checked) {
-  monitor::ui_action(
-      "config_allow_toggle",
-      monitor::build_attrs(
-          {{"capability", "write"}, {"enabled", checked ? "true" : "false"}}));
-  monitor::security(
-      "allow_change",
-      monitor::build_attrs(
-          {{"capability", "write"}, {"enabled", checked ? "true" : "false"}}));
-  _on_allow_toggled("write", allow_write_check, checked);
-}
-
-void McpConfigDock::_on_allow_destructive_toggled(bool checked) {
-  monitor::ui_action(
-      "config_allow_toggle",
-      monitor::build_attrs(
-          {{"capability", "destructive"},
-           {"enabled", checked ? "true" : "false"}}));
-  monitor::security(
-      "allow_change",
-      monitor::build_attrs(
-          {{"capability", "destructive"},
-           {"enabled", checked ? "true" : "false"}}));
-  _on_allow_toggled("destructive", allow_destructive_check, checked);
+          {{"capability", cap}, {"enabled", checked ? "true" : "false"}}));
+  _on_allow_toggled(cap.c_str(), box, checked);
 }
 
 void McpConfigDock::_on_desensitize_toggled(bool checked) {
@@ -478,8 +376,7 @@ void McpConfigDock::_on_allow_toggled(const char *capability,
   PluginConfig::save_allow(
       checked ? authorization::allow_list_add(allow, capability)
               : authorization::allow_list_remove(allow, capability));
-  box->set_pressed_no_signal(authorization::allow_list_contains(
-      PluginConfig::load_allow(), capability));
+  box->set_pressed_no_signal(authorization::capability_enabled(capability));
 }
 
 void McpConfigDock::set_server_context(ServerContext *ctx) {

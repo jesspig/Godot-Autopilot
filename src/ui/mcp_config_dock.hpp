@@ -7,6 +7,9 @@
 #include <godot_cpp/classes/option_button.hpp>
 #include <godot_cpp/classes/check_box.hpp>
 #include <godot_cpp/classes/spin_box.hpp>
+#include <godot_cpp/variant/string.hpp>
+
+#include <string>
 
 #include "../core/config.hpp"
 #include "../core/server_context.hpp"
@@ -30,11 +33,6 @@ class McpConfigDock : public godot::EditorDock {
   godot::Label *result_label;
 
   godot::CheckBox *show_time_check = nullptr;
-  godot::CheckBox *allow_code_execute_check = nullptr;
-  godot::CheckBox *allow_game_runtime_check = nullptr;
-  godot::CheckBox *allow_user_tools_check = nullptr;
-  godot::CheckBox *allow_write_check = nullptr;
-  godot::CheckBox *allow_destructive_check = nullptr;
   godot::CheckBox *desensitize_check = nullptr;
   godot::Label *legacy_notice_label = nullptr;
   godot::Button *import_legacy_button = nullptr;
@@ -67,12 +65,9 @@ private:
   void _on_import_legacy();
   void _report(const godot::String &text, const godot::Color &color);
   void _on_show_time_toggled(bool checked);
-  void _on_allow_code_execute_toggled(bool checked);
-  void _on_allow_game_runtime_toggled(bool checked);
-  void _on_allow_user_tools_toggled(bool checked);
-  void _on_allow_write_toggled(bool checked);
-  void _on_allow_destructive_toggled(bool checked);
   void _on_desensitize_toggled(bool checked);
+  void _on_allow_toggled_slot(bool checked, godot::String capability,
+                              godot::CheckBox *box);
   void _on_allow_toggled(const char *capability, godot::CheckBox *box,
                          bool checked);
 };

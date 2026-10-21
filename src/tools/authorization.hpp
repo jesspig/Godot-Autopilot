@@ -32,6 +32,10 @@ inline constexpr const char *kKnownCapabilities[] = {
     kCapabilityDestructive, kCapabilityUserTools, kCapabilityRead,
     kCapabilityWrite};
 
+inline constexpr const char *kDockToggleCapabilities[] = {
+    kCapabilityCodeExecute, kCapabilityGameRuntime, kCapabilityUserTools,
+    kCapabilityWrite, kCapabilityDestructive, kCapabilityProcess};
+
 inline AllowProvider &allow_provider() {
   static AllowProvider provider = nullptr;
   return provider;
@@ -59,9 +63,11 @@ inline bool allow_list_contains(const std::string &value,
 }
 
 inline bool capability_has_dock_toggle(std::string_view capability) {
-  return capability == kCapabilityCodeExecute ||
-         capability == kCapabilityGameRuntime || capability == kCapabilityUserTools ||
-         capability == kCapabilityWrite || capability == kCapabilityDestructive;
+  for (const char *toggle : kDockToggleCapabilities) {
+    if (capability == toggle)
+      return true;
+  }
+  return false;
 }
 
 inline std::string allow_list_add(std::string allow,
