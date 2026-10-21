@@ -1,6 +1,6 @@
 {
   "name": "csharp_bridge",
-  "description": "C# 反射桥（B-T4）的 L2 边界：csharp_get_property / csharp_set_property / csharp_call_method / csharp_subscribe_event / csharp_unsubscribe_event 五域工具的编辑器侧参数校验（定位器互斥、必填成员名、runtime 取值、game-only 选项隔离、args 形态），以及 locator 缺失覆盖（memory 不存在名的四段式定位错误 + build_csharp_assembly 工程探测），仿 23_click_ui_coords.json 的无游戏 error 写法。链路：before_all 用 create_editor_scene 建未落盘场景 CSharpBridgeProbe＋create_resource{type:TestTypes, name:csharp_probe_item} 注册内存探针（真调步改用 memory 定位器直达 TestTypes 实例；标准编辑器无 .NET 时 create_resource 失败将导致 before_all fatal，本文件以 mono 为准）→ ① 参数校验 30 步全部在 handler 入口返回精确错误串，不触及桥单例（定位器缺失/互斥、property/method/event/method/value/token 缺失、token 类型与正数、allow_non_public 类型、runtime 非法值、unknown parameter、timeout_ms/wait_ready 在 runtime=editor 下被拒、object_id/object_id_str 类型错误、memory:// 命名空间误用、memory 缺失的四段式定位错误、args 非数组/超 16 上限、runtime=game 下 timeout_ms 越界与 wait_ready 类型错误）→ ② locator 缺失覆盖：memory 不存在名在定位阶段返回四段式 memory-not-found 全串（position 随工具变化；定位先于桥单例获取，故 mono/非 mono 双稳；unsubscribe 无定位器，改覆 wait_ready 在 editor 下被拒的校验缺口）；runtime=game 合法定位在无游戏时经运行时通道返回 game not running 全串（csharp 转发不附加 runtime_game_ops 的 degradation hint，故只断言 error 单键）；build_csharp_assembly 探测返回 result.project_file == res://testbed.csproj 与 command 全串（started/pid 取决于 dotnet 是否可用，不断言）→ ②b allow_non_public 真调两步（默认读 _secret 精确错、显式开读到 7；定位改用 before_all 注册的 memory:csharp_probe_item，需 mono 真调通过）→ ②c 私有写三步（set 默认写 _secret 精确错、显式开写 ok、同条件读回 42；定位改用 memory:csharp_probe_item，需 mono；unsubscribe 真调解绑需前后 token 串联、L2 步骤间无传值故解绑链路走人工验证——同 runtime=game 缺 game_runtime 时 FAIL 的既有惯例）→ ②d call_method 反射口径四步（固定元数 GetOffset[2] 读回 result.x=2/result.y=4、params 打包 JoinAll[a,b,c] 得 a|b|c、空尾 JoinAll[] 得空串、泛型风格名 GdaGenericProbe[1] 锁定 no-overload 全串；定位改用 memory:csharp_probe_item，需 mono 真调通过）→ ③ cleanup save_editor_scene_as 落盘 res://gda_tmp_csharp_bridge/probe_root.tscn → close_editor_scene → move_os_file_to_trash 回收目录（与 35_scene_tree_gate 同一收尾口径）。前置条件：csharp_* 五工具受 code_execute capability 授权门保护（SpecTool::execute 集中检查，handler 校验之前），runtime=game 步骤另需 game_runtime，build_csharp_assembly 需 process（GODOT_AUTOPILOT_ALLOW env 或 user://godot_autopilot/config.json 的 allow 字段，env 优先），缺失时对应步骤返回 authorization required 而 FAIL。双态声明（重要）：本文件以 mono（.NET 编辑器，桥已按 skills/godot-autopilot-csharp/references/csharp-bridge.md 注册单例）为准；before_all 用 create_resource{type:TestTypes} 注册内存探针，标准编辑器无 .NET 时该步失败即整体 fatal（C# 全局类不可实例化，见 src/tools/resource_ops.cpp:instantiate_resource_class），故 CI/标准编辑器下本文件不再逐项断言——参数校验与 locator 缺失两段本身不触桥、mono/非 mono 双稳。真调骨架（mono 验证）——csharp_get_property{memory:csharp_probe_item, property:ReadOnlyName} 取回 gda-probe、{property:Scores} 取回 Array、csharp_call_method{method:GetOffset, args:[2]} 取回 Vector2(2,4) 的序列化字典、csharp_subscribe_event{memory:csharp_probe_item, event:Pinged, target_path:CSharpBridgeProbe, method:_on_pinged} 取回 token 后调 RaisePinged(3) 在接收端观测到 3，csharp_unsubscribe_event{token:<subscribe 所得>} 解绑 ok、二次解绑报 unknown subscription token；allow_non_public 真调两步（同实例下 {property:_secret} 默认精确报 property '_secret' not found on TestTypes，{property:_secret, allow_non_public:true} 取回 7，csharp_set_property{property:_secret, value:42} 默认精确错 property '_secret' not found on TestTypes、{property:_secret, value:42, allow_non_public:true} 写 ok 后同条件读回 42）；测试床 TestTypes（tests/testbed/TestTypes.cs，[GlobalClass] Resource 派生、[Export] Array<int>、只读属性、返回 Vector2 struct 的方法、event Action<int>）与 testbed.csproj（net10 / PublishAot=false）即为该真调夹具，非 mono 下仅作 build 探测；成员 reflection 边界覆盖由 L1（csharp 桥单测）承担。",
+  "description": "C# 反射桥（B-T4）的 L2 边界：csharp_get_property / csharp_set_property / csharp_call_method / csharp_subscribe_event / csharp_unsubscribe_event 五域工具的编辑器侧参数校验（定位器互斥、必填成员名、runtime 取值、game-only 选项隔离、args 形态），以及 locator 缺失覆盖（memory 不存在名的四段式定位错误 + build_csharp_assembly 工程探测），仿 23_click_ui_coords.json 的无游戏 error 写法。链路：before_all 用 create_editor_scene 建未落盘场景 CSharpBridgeProbe＋create_resource{type:TestTypes, name:csharp_probe_item} 注册内存探针（真调步改用 memory 定位器直达 TestTypes 实例；create_resource 需要运行中的编辑器已加载含 TestTypes 的 .NET 程序集，本机 mono 4.7.2 在程序集未预建时该步必然失败，故按 soft_error 降级为软失败，依据见文末降级依据段）→ ① 参数校验 30 步全部在 handler 入口返回精确错误串，不触及桥单例（定位器缺失/互斥、property/method/event/method/value/token 缺失、token 类型与正数、allow_non_public 类型、runtime 非法值、unknown parameter、timeout_ms/wait_ready 在 runtime=editor 下被拒、object_id/object_id_str 类型错误、memory:// 命名空间误用、memory 缺失的四段式定位错误、args 非数组/超 16 上限、runtime=game 下 timeout_ms 越界与 wait_ready 类型错误）→ ② locator 缺失覆盖：memory 不存在名在定位阶段返回四段式 memory-not-found 全串（position 随工具变化；定位先于桥单例获取，故 mono/非 mono 双稳；unsubscribe 无定位器，改覆 wait_ready 在 editor 下被拒的校验缺口）；runtime=game 合法定位在无游戏时经运行时通道返回 game not running 全串（csharp 转发不附加 runtime_game_ops 的 degradation hint，故只断言 error 单键）；build_csharp_assembly 探测返回 result.project_file == res://testbed.csproj 与 command 全串（started/pid 取决于 dotnet 是否可用，不断言）→ ②b allow_non_public 真调两步（默认读 _secret 精确错、显式开读到 7；定位改用 before_all 注册的 memory:csharp_probe_item，需 mono 真调通过）→ ②c 私有写三步（set 默认写 _secret 精确错、显式开写 ok、同条件读回 42；定位改用 memory:csharp_probe_item，需 mono；unsubscribe 真调解绑需前后 token 串联、L2 步骤间无传值故解绑链路走人工验证——同 runtime=game 缺 game_runtime 时 FAIL 的既有惯例）→ ②d call_method 反射口径四步（固定元数 GetOffset[2] 读回 result.x=2/result.y=4、params 打包 JoinAll[a,b,c] 得 a|b|c、空尾 JoinAll[] 得空串、泛型风格名 GdaGenericProbe[1] 锁定 no-overload 全串；定位改用 memory:csharp_probe_item，需 mono 真调通过）→ ③ cleanup save_editor_scene_as 落盘 res://gda_tmp_csharp_bridge/probe_root.tscn → close_editor_scene → move_os_file_to_trash 回收目录（与 35_scene_tree_gate 同一收尾口径）。前置条件：csharp_* 五工具受 code_execute capability 授权门保护（SpecTool::execute 集中检查，handler 校验之前），runtime=game 步骤另需 game_runtime，build_csharp_assembly 需 process（GODOT_AUTOPILOT_ALLOW env 或 user://godot_autopilot/config.json 的 allow 字段，env 优先），缺失时对应步骤返回 authorization required 而 FAIL。双态声明（重要）：本文件以 mono（.NET 编辑器，桥已按 skills/godot-autopilot-csharp/references/csharp-bridge.md 注册单例）为准；before_all 用 create_resource{type:TestTypes} 注册内存探针，标准编辑器无 .NET 时该步失败即整体 fatal（C# 全局类不可实例化，见 src/tools/resource_ops.cpp:instantiate_resource_class），10-21 起该步与依赖它的 9 个真调步按 soft_error 降级为软失败（依据见文末降级依据段），故 CI/标准编辑器下本文件不再逐项断言——参数校验与 locator 缺失两段本身不触桥、mono/非 mono 双稳。真调骨架（mono 验证）——csharp_get_property{memory:csharp_probe_item, property:ReadOnlyName} 取回 gda-probe、{property:Scores} 取回 Array、csharp_call_method{method:GetOffset, args:[2]} 取回 Vector2(2,4) 的序列化字典、csharp_subscribe_event{memory:csharp_probe_item, event:Pinged, target_path:CSharpBridgeProbe, method:_on_pinged} 取回 token 后调 RaisePinged(3) 在接收端观测到 3，csharp_unsubscribe_event{token:<subscribe 所得>} 解绑 ok、二次解绑报 unknown subscription token；allow_non_public 真调两步（同实例下 {property:_secret} 默认精确报 property '_secret' not found on TestTypes，{property:_secret, allow_non_public:true} 取回 7，csharp_set_property{property:_secret, value:42} 默认精确错 property '_secret' not found on TestTypes、{property:_secret, value:42, allow_non_public:true} 写 ok 后同条件读回 42）；测试床 TestTypes（tests/testbed/TestTypes.cs，[GlobalClass] Resource 派生、[Export] Array<int>、只读属性、返回 Vector2 struct 的方法、event Action<int>）与 testbed.csproj（net10 / PublishAot=false）即为该真调夹具，非 mono 下仅作 build 探测；成员 reflection 边界覆盖由 L1（csharp 桥单测）承担。【降级依据 2026-10-21 / Godot 4.7.2.stable.mono.official（ed1daf0bf）】create_resource{type:TestTypes} 报 failed to resolve the base type of global class script: res://TestTypes.cs (script may be invalid or its language is unavailable)：源类由本用例 before_all 在编辑器运行中新建并交 build_csharp_assembly 编译，而 .NET 程序集须在编辑器启动时即被加载（GDExtension 无公共 API 触发 modules/mono 内部的热重载，见 docs/wiki/conventions.md 的 C# 程序集热重载条），故运行期新建的 C# 全局类在当次会话内不可实例化；叠加 build_csharp_assembly 把 res://testbed.csproj 原样交给 dotnet（dotnet 侧 MSB1009，exit_code=1，编译未发生），会话内更无程序集可用。此为 Godot .NET 程序集装载时序的上游边界，非 GDA 资源创建路径缺陷（src/tools/resource_ops.cpp:instantiate_resource_class 在本分支未改动，develop 分支同环境复跑同样失败）。处置：create_resource 步与依赖该探针的 9 个真调步各自声明 soft_error（前缀分别为 failed to resolve the base type of global class script: res://TestTypes.cs 与 memory resource 'csharp_probe_item' not found），命中前缀即记为软失败并继续，既不致命也不掩盖其它错误（文本不匹配的失败仍判硬失败）；30 步参数校验、7 步 locator 缺失与 cleanup 断言一字未改。恢复全绿的条件：编辑器启动前测试床 C# 程序集已含 TestTypes（实测先 dotnet build tests/testbed/testbed.csproj 产出 .godot/mono/temp/bin/Debug/GDA Testbed.dll，同用例 51 步全通过），即先在测试床执行 dotnet build 再跑本用例；或修好 build_csharp_assembly 的 res:// 路径解析，并由用户在编辑器点 Build 或重启编辑器加载新程序集。",
   "headless": true,
   "pipeline": {
     "on_failure": "continue",
@@ -28,7 +28,8 @@
       {
         "id": "csharp_before_probe_item",
         "tool": "create_resource",
-        "args": { "type": "TestTypes", "name": "csharp_probe_item" }
+        "args": { "type": "TestTypes", "name": "csharp_probe_item" },
+        "soft_error": "failed to resolve the base type of global class script: res://TestTypes.cs"
       }
     ],
     "stages": [
@@ -458,6 +459,7 @@
             "id": "get_private_default_denied",
             "tool": "csharp_get_property",
             "args": { "memory": "csharp_probe_item", "property": "_secret" },
+            "soft_error": "memory resource 'csharp_probe_item' not found",
             "expect": {
               "has_keys": ["error"],
               "field_checks": [
@@ -469,6 +471,7 @@
             "id": "get_private_allowed_reads_seven",
             "tool": "csharp_get_property",
             "args": { "memory": "csharp_probe_item", "property": "_secret", "allow_non_public": true },
+            "soft_error": "memory resource 'csharp_probe_item' not found",
             "expect": {
               "field_checks": [
                 { "key": "result", "value": 7 }
@@ -484,6 +487,7 @@
             "id": "set_private_default_denied",
             "tool": "csharp_set_property",
             "args": { "memory": "csharp_probe_item", "property": "_secret", "value": 42 },
+            "soft_error": "memory resource 'csharp_probe_item' not found",
             "expect": {
               "has_keys": ["error"],
               "field_checks": [
@@ -495,6 +499,7 @@
             "id": "set_private_allowed_writes_ok",
             "tool": "csharp_set_property",
             "args": { "memory": "csharp_probe_item", "property": "_secret", "value": 42, "allow_non_public": true },
+            "soft_error": "memory resource 'csharp_probe_item' not found",
             "expect": {
               "field_checks": [
                 { "key": "result", "value": "ok" }
@@ -505,6 +510,7 @@
             "id": "get_private_allowed_reads_back",
             "tool": "csharp_get_property",
             "args": { "memory": "csharp_probe_item", "property": "_secret", "allow_non_public": true },
+            "soft_error": "memory resource 'csharp_probe_item' not found",
             "expect": {
               "field_checks": [
                 { "key": "result", "value": 42 }
@@ -520,6 +526,7 @@
             "id": "call_fixed_arity_getoffset",
             "tool": "csharp_call_method",
             "args": { "memory": "csharp_probe_item", "method": "GetOffset", "args": [2] },
+            "soft_error": "memory resource 'csharp_probe_item' not found",
             "expect": {
               "field_checks": [
                 { "key": "result.x", "value": 2 },
@@ -531,6 +538,7 @@
             "id": "call_params_joinall_packed",
             "tool": "csharp_call_method",
             "args": { "memory": "csharp_probe_item", "method": "JoinAll", "args": ["a", "b", "c"] },
+            "soft_error": "memory resource 'csharp_probe_item' not found",
             "expect": {
               "field_checks": [
                 { "key": "result", "value": "a|b|c" }
@@ -541,6 +549,7 @@
             "id": "call_params_joinall_empty",
             "tool": "csharp_call_method",
             "args": { "memory": "csharp_probe_item", "method": "JoinAll", "args": [] },
+            "soft_error": "memory resource 'csharp_probe_item' not found",
             "expect": {
               "field_checks": [
                 { "key": "result", "value": "" }
@@ -551,6 +560,7 @@
             "id": "call_generic_definition_skipped",
             "tool": "csharp_call_method",
             "args": { "memory": "csharp_probe_item", "method": "GdaGenericProbe", "args": [1] },
+            "soft_error": "memory resource 'csharp_probe_item' not found",
             "expect": {
               "has_keys": ["error"],
               "field_checks": [

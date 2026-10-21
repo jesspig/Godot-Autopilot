@@ -15,6 +15,8 @@ struct StepResult {
     bool passed = false;
     std::string detail;
     double duration_ms = 0.0;
+    bool soft_failed = false;
+    std::string soft_reason;
 };
 
 struct TraversalSummary {

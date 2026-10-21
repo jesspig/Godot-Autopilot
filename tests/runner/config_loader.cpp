@@ -107,6 +107,10 @@ Step ParseToolStep(const mcp::JsonValue& v, const std::string& path) {
         RequireType(*expect, path + ".expect", "object");
         step.expect = ParseExpect(*expect, path + ".expect");
     }
+    if (const mcp::JsonValue* soft = v.Find("soft_error")) {
+        RequireType(*soft, path + ".soft_error", "string");
+        step.soft_error = soft->GetString();
+    }
     return step;
 }
 

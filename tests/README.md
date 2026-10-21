@@ -101,7 +101,7 @@ build\debug\tests\gda_test_runner.exe --file 01_scene
 
 每个文件的生命周期（`godot_process.cpp`）：随机空闲端口 → 首次 `--editor --import` 幂等同步执行（120s 超时，失败/超时不致命）→ 注入 `GODOT_AUTOPILOT_PORT` 后常驻启动 `--editor`（`--headless` 由用例决定）→ 就绪轮询（TCP 端口探测 + MCP initialize 握手）→ `before_all` → stages 步骤 → `after_all` → 停止（taskkill 软杀 → 5s 宽限 → TerminateProcess 兜底）。stdout/stderr 各接管道读线程持续消费（防 64KB 缓冲写满阻塞子进程），崩溃时截取最近 2000 字符日志。
 
-输出：控制台表格（文件名称 / 通过步骤数 / 耗时（<10s 显毫秒，否则显秒）/ 状态 PASS|FAIL|ERROR）+ JSON 报告 `report-YYYYmmdd_HHMMSS.json`（字段：`generated_at` / `total_files` / `passed_files` / `files[].{name,passed,duration_ms,fatal_error,steps[]}`）。
+输出：控制台表格（文件名称 / 通过步骤数 / 耗时（<10s 显毫秒，否则显秒）/ 状态 PASS|FAIL|ERROR）+ JSON 报告 `report-YYYYmmdd_HHMMSS.json`（字段：`generated_at` / `total_files` / `passed_files` / `files[].{name,passed,duration_ms,fatal_error,soft_failures,steps[]}`，其中 `steps[]` 含 `step_id` / `tool` / `passed` / `detail` / `soft_failed` / `soft_reason`）。控制台对软失败步骤以 `~` 行单独标注并给出软失败计数。
 
 ### 5.5 迁移守卫（migration_guard）
 
@@ -121,7 +121,7 @@ ctest 上除 L1/L2 外还有 6 个守卫与脚本项常驻（注册见 `tests/CM
 
 ## 6. JSON 用例 Schema（`tests/runner/config_loader.cpp` 冻结解析规则）
 
-以下规则 1-8 为解析器强制校验，任何违规抛 `runtime_error`，错误消息含字段路径（如 `pipeline.stages[0].steps[1].expect.field_checks[0].key`）：
+以下规则 1-9 为解析器强制校验，任何违规抛 `runtime_error`，错误消息含字段路径（如 `pipeline.stages[0].steps[1].expect.field_checks[0].key`）：
 
 1. **顶层**：必填 `name`（string）、`pipeline`（object）；`description` / `headless` 可选，`headless` 默认 `true`
 2. **`pipeline.on_failure`**：可选，默认 `"fail_fast"`，仅接受 `"fail_fast"`（失败即中止剩余步骤）| `"continue"`（失败继续）
@@ -131,6 +131,7 @@ ctest 上除 L1/L2 外还有 6 个守卫与脚本项常驻（注册见 `tests/CM
 6. **`expect`**：`has_keys` 为 string 数组；`field_checks` 每项 `key` 必填（支持点路径）、`value` 可选任意 JSON、`not_empty` 可选 bool
 7. **`args`**：值任意 JSON，嵌套原样保留
 8. 数值字段类型严格校验
+9. **`soft_error`**（步骤级，string，可选）：错误文本前缀。步骤失败且工具响应的 `error` 文本以该前缀开头时记为**软失败**（`soft_failed=true` + `soft_reason`），不置 `fatal_error`、不计入文件失败（`before_all` 软失败不中断流水线，`stages` 软失败不置整体失败）；错误文本不匹配的失败、期望不匹配、编辑器进程死亡等仍为硬失败。用于把「环境边界导致的必然失败」与真实回归区分开，当前仅 `38_csharp_bridge.json` 使用
 
 用例结构示例（节选自 `config/00_meta.json`）：
 

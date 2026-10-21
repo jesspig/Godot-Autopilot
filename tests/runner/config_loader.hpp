@@ -23,6 +23,7 @@ struct Step {
     StepExpect expect;
     std::string traverse_kind;
     std::string traverse_mode;
+    std::string soft_error;
 };
 
 struct TestCase {
