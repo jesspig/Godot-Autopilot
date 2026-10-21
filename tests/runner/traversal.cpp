@@ -7,10 +7,13 @@
 #include <algorithm>
 #include <cctype>
 #include <cstddef>
+#include <cstdlib>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -23,6 +26,14 @@ constexpr size_t kBaselineEnumerated = 452;
 constexpr size_t kBaselineExcluded = 147;
 constexpr size_t kBaselineCandidates = 305;
 constexpr size_t kBaselineWarnings = 0;
+constexpr size_t kBaselineCallsEmptyArgs = 305;
+constexpr size_t kBaselineCallsHeuristicSmoke = 251;
+
+constexpr char kBaselineEnvEmptyArgs[] = "GDA_TRAVERSAL_BASELINE_EMPTY_ARGS";
+constexpr char kBaselineEnvHeuristicSmoke[] =
+    "GDA_TRAVERSAL_BASELINE_HEURISTIC_SMOKE";
+constexpr char kBaselineFields[] = "enumerated,excluded,candidates,warnings,calls";
+constexpr char kBaselineFieldCount[] = "5";
 
 constexpr size_t kErrorDetailMax = 300;
 
@@ -38,6 +49,19 @@ const char* const kExpectedErrorMarkers[] = {
 const std::vector<std::string> kMetaToolNames = {
     "ping",      "search_tools",  "list_categories", "get_tool_detail",
     "call_tool", "batch_execute", "code_execute"};
+
+struct BaselineExpectation {
+    size_t enumerated = 0;
+    size_t excluded = 0;
+    size_t candidates = 0;
+    size_t warnings = 0;
+    size_t calls = 0;
+};
+
+struct BaselineSource {
+    BaselineExpectation expectation;
+    std::string description;
+};
 
 bool has_error_field(const mcp::JsonValue& j) {
     return j.IsObject() && j.Find("error") != nullptr;
@@ -55,6 +79,23 @@ std::string error_message_text(const mcp::JsonValue& resp) {
         return err->GetString();
     }
     return err->Dump();
+}
+
+bool denied_by_authorization(const mcp::JsonValue& resp) {
+    if (!resp.IsObject()) {
+        return false;
+    }
+    const auto* required = resp.Find("authorization_required");
+    if (required && required->IsString() && !required->GetString().empty()) {
+        return true;
+    }
+    const auto* code = resp.Find("code");
+    if (code && code->IsString() &&
+        code->GetString() == "authorization_required") {
+        return true;
+    }
+    return error_message_text(resp).find("authorization required") !=
+           std::string::npos;
 }
 
 std::string truncate_text(const std::string& text) {
@@ -180,9 +221,13 @@ void print_stats(const std::string& mode, const gda_test::TraversalStats& s,
               << " | 跳过(无 schema properties): " << skipped
               << " | 排除(副作用/可变/dynamic): " << s.excluded << "\n";
     std::cout << "  基线比对: " << (s.baseline_matched ? "一致" : "不一致")
-              << "\n";
+              << "（基线来源: " << s.baseline_source << "）\n";
+    std::cout << "  授权拒绝(authorization_required): " << s.denied << "\n";
     for (const auto& d : s.baseline_diffs) {
         std::cout << "  [基线差异] " << d << "\n";
+    }
+    if (!s.baseline_note.empty()) {
+        std::cout << "  [基线提示] " << s.baseline_note << "\n";
     }
     for (const auto& n : s.warnings) {
         std::cout << "  [schema 必填但空参未报错] " << n << "\n";
@@ -195,19 +240,103 @@ void print_stats(const std::string& mode, const gda_test::TraversalStats& s,
     }
 }
 
+std::vector<std::string> split_baseline_fields(const std::string& text) {
+    std::vector<std::string> out;
+    size_t begin = 0;
+    while (true) {
+        const size_t pos = text.find(',', begin);
+        if (pos == std::string::npos) {
+            out.push_back(text.substr(begin));
+            break;
+        }
+        out.push_back(text.substr(begin, pos - begin));
+        begin = pos + 1;
+    }
+    return out;
+}
+
+size_t parse_baseline_number(const std::string& field, const char* env_name) {
+    if (field.empty()) {
+        throw godot_autopilot::InvalidArgument(
+            "基线环境变量 " + std::string(env_name) +
+            " 含空字段（需 " + kBaselineFields + "）");
+    }
+    const size_t limit = std::numeric_limits<size_t>::max();
+    size_t value = 0;
+    for (const char c : field) {
+        if (c < '0' || c > '9') {
+            throw godot_autopilot::InvalidArgument(
+                "基线环境变量 " + std::string(env_name) + " 的字段 '" + field +
+                "' 不是非负整数（需 " + kBaselineFields + "）");
+        }
+        const size_t digit = static_cast<size_t>(c - '0');
+        if (value > (limit - digit) / 10) {
+            throw godot_autopilot::InvalidArgument(
+                "基线环境变量 " + std::string(env_name) + " 的字段 '" + field +
+                "' 超出可表示范围");
+        }
+        value = value * 10 + digit;
+    }
+    return value;
+}
+
+BaselineExpectation parse_baseline_env(const char* env_name,
+                                       const std::string& raw) {
+    const std::vector<std::string> fields = split_baseline_fields(raw);
+    if (fields.size() != 5) {
+        throw godot_autopilot::InvalidArgument(
+            "基线环境变量 " + std::string(env_name) + " 需要 " +
+            kBaselineFieldCount + " 个逗号分隔的非负整数（" + kBaselineFields +
+            "），实际得到 " + std::to_string(fields.size()) + " 个：'" + raw + "'");
+    }
+    BaselineExpectation out;
+    out.enumerated = parse_baseline_number(fields[0], env_name);
+    out.excluded = parse_baseline_number(fields[1], env_name);
+    out.candidates = parse_baseline_number(fields[2], env_name);
+    out.warnings = parse_baseline_number(fields[3], env_name);
+    out.calls = parse_baseline_number(fields[4], env_name);
+    return out;
+}
+
+BaselineSource resolve_baseline(const std::string& mode) {
+    const char* env_name = (mode == kModeEmptyArgs)
+                               ? kBaselineEnvEmptyArgs
+                               : kBaselineEnvHeuristicSmoke;
+    BaselineSource source;
+    const char* raw = std::getenv(env_name);
+    if (raw && *raw != '\0') {
+        source.expectation = parse_baseline_env(env_name, std::string(raw));
+        source.description = std::string("环境变量覆盖 ") + env_name + "='" +
+                             raw + "'";
+        return source;
+    }
+    source.expectation.enumerated = kBaselineEnumerated;
+    source.expectation.excluded = kBaselineExcluded;
+    source.expectation.candidates = kBaselineCandidates;
+    source.expectation.warnings = kBaselineWarnings;
+    source.expectation.calls = (mode == kModeEmptyArgs)
+                                   ? kBaselineCallsEmptyArgs
+                                   : kBaselineCallsHeuristicSmoke;
+    source.description =
+        "运行时统计口径（gda_runner_03_tools_contract 实测，基线常量见 "
+        "tests/runner/traversal.cpp）";
+    return source;
+}
+
 void compare_baseline(const std::string& mode, gda_test::TraversalStats& stats) {
+    const BaselineSource source = resolve_baseline(mode);
+    stats.baseline_source = source.description;
     struct BaselineItem {
         const char* name;
         size_t actual;
         size_t expected;
     };
-    const size_t expected_warnings =
-        (mode == kModeEmptyArgs) ? kBaselineWarnings : 0;
     const BaselineItem items[] = {
-        {"enumerated", stats.enumerated, kBaselineEnumerated},
-        {"excluded", stats.excluded, kBaselineExcluded},
-        {"candidates", stats.candidates, kBaselineCandidates},
-        {"warnings", stats.warnings.size(), expected_warnings},
+        {"enumerated", stats.enumerated, source.expectation.enumerated},
+        {"excluded", stats.excluded, source.expectation.excluded},
+        {"candidates", stats.candidates, source.expectation.candidates},
+        {"warnings", stats.warnings.size(), source.expectation.warnings},
+        {"calls", stats.total, source.expectation.calls},
     };
     for (const BaselineItem& item : items) {
         if (item.actual != item.expected) {
@@ -217,6 +346,19 @@ void compare_baseline(const std::string& mode, gda_test::TraversalStats& stats) 
         }
     }
     stats.baseline_matched = stats.baseline_diffs.empty();
+    if (stats.baseline_matched) {
+        return;
+    }
+    const std::string denied_hint =
+        stats.denied > 0
+            ? ("本次遍历有 " + std::to_string(stats.denied) +
+               " 次调用因授权被拒（所需能力未获授权，写类与破坏类默认被拒），"
+               "差异可能来自授权档位而非工具面，请以相同授权配置复跑确认"
+               "（GODOT_AUTOPILOT_ALLOW 需授予相应能力）")
+            : ("本次遍历无授权拒绝，差异来自工具面漂移（工具增删或 "
+               "side_effect/mutating/dynamic 标记变更），核对后按实测更新基线");
+    stats.baseline_note =
+        "基线来源：" + source.description + "；授权档位提示：" + denied_hint;
 }
 
 } // namespace
@@ -359,6 +501,9 @@ TraversalStats run_traversal(McpTestClient& client, const std::string& mode,
             if (errored) {
                 ++errors;
                 error_text = error_message_text(resp);
+                if (denied_by_authorization(resp)) {
+                    ++stats.denied;
+                }
                 if (error_text.find("missing required") != std::string::npos) {
                     ++missing_req;
                 }
@@ -418,6 +563,9 @@ TraversalStats run_traversal(McpTestClient& client, const std::string& mode,
             if (errored) {
                 ++errors;
                 error_text = error_message_text(resp);
+                if (denied_by_authorization(resp)) {
+                    ++stats.denied;
+                }
             } else {
                 ++results;
             }

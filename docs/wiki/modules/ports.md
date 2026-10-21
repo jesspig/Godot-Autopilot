@@ -138,7 +138,7 @@ resource:
 
 两条**同时成立**才算「确有实例在跑」。这样「上次运行残留的旧记录」（进程已退出、端口已释放）不会被误判成冲突；进程号被系统复用的情况则被端口占用这一条挡住。
 
-命中冲突时插件**拒绝启动**：不监听端口、不写实例登记，并在 `last_error_` 与日志里给出明确提示——已有实例的端口与进程号、关闭另一个编辑器的建议、以及豁免开关。提示同时出现在三处：日志（`LogSystem`，Error 级）、面板状态区（`McpConfigDock` 的状态行，未运行时显示 `last_error_`）、以及 `last_error_` 本身；提示里不含令牌等敏感信息。
+命中冲突时插件**拒绝启动**：不监听端口、不写实例登记，并在 `last_error_` 与日志里给出明确提示——已有实例的端口与进程号、关闭另一个编辑器的建议、以及豁免开关。提示同时出现在三处：日志（`LogSystem`，Error 级）、面板状态区（`McpConfigDock` 的状态行，未运行时显示 `last_error_`）、以及 `last_error_` 本身；提示里不含令牌等敏感信息。提示原文形如 `another Godot Autopilot instance is already running for this project on port 9527 (pid 12345); a second instance on the same project is refused because Godot loads the plugin through a shared temporary copy and the editor can die without any message; close the other editor for this project, or set GODOT_AUTOPILOT_ALLOW_MULTI_INSTANCE=1 to start it anyway on another port (GODOT_AUTOPILOT_PORT=<port>); the editor may still crash while the other instance is running`（生成点为 `src/core/instance_guard.cpp` 的 `conflict_message`）。
 
 检查发生在**写自己的实例登记之前**，且跳过与自身进程号相同的记录，因此不会把自己刚写的记录算成冲突。运行期改端口触发的 `restart()` 属于「改绑」而不是「新开实例」，不再重复该检查。
 
