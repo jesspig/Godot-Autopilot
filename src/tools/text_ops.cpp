@@ -2,6 +2,7 @@
 #include "core/editor_readiness.hpp"
 #include "core/config.hpp"
 #include "core/log_system.hpp"
+#include "util/dotnet_env.hpp"
 #include "util/error_util.hpp"
 #include "util/project_path.hpp"
 #include "util/resource_fs.hpp"
@@ -554,13 +555,9 @@ void probe_dotnet_editor_state(bool &is_dotnet_out,
                                bool &assembly_loaded_out) {
   is_dotnet_out = false;
   assembly_loaded_out = false;
-  auto *os = godot::OS::get_singleton();
-  if (os)
-    is_dotnet_out = os->has_feature(godot::String("mono"));
-  auto *cdbs = godot::ClassDBSingleton::get_singleton();
-  if (cdbs)
-    assembly_loaded_out =
-        cdbs->class_exists(godot::StringName("CSharpScript"));
+  dotnet_env::DotnetProbe probe = dotnet_env::probe_current();
+  is_dotnet_out = dotnet_env::is_dotnet_environment(probe);
+  assembly_loaded_out = probe.csharp_script_class;
 }
 
 bool csproj_covers_file(const std::string &project_file,
