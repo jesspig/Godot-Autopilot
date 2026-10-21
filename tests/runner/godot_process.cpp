@@ -31,6 +31,10 @@ constexpr auto kExitGraceSeconds = 5;
 constexpr auto kPollInterval = std::chrono::milliseconds(200);
 constexpr auto kConnectProbeTimeout = std::chrono::seconds(5);
 constexpr auto kIoTimeoutMs = 5000;
+constexpr int kMaxLaunchAttempts = 6;
+constexpr auto kExtensionCopyWaitMs = 180000;
+constexpr auto kExtensionCopyPollMs = 200;
+constexpr auto kProjectLockTimeoutMs = 1800000;
 
 class WsaGuard {
 public:
@@ -72,15 +76,131 @@ std::string read_env_file_key(const std::string &key) {
   return "";
 }
 
+bool path_is_directory(const std::string &path) {
+  const DWORD attrs = GetFileAttributesA(path.c_str());
+  return attrs != INVALID_FILE_ATTRIBUTES &&
+         (attrs & FILE_ATTRIBUTE_DIRECTORY) != 0;
+}
+
+bool path_is_file(const std::string &path) {
+  const DWORD attrs = GetFileAttributesA(path.c_str());
+  return attrs != INVALID_FILE_ATTRIBUTES &&
+         (attrs & FILE_ATTRIBUTE_DIRECTORY) == 0;
+}
+
+std::string godot_executable_in_directory(const std::string &dir) {
+  const std::string pattern = dir + "\\Godot*";
+  WIN32_FIND_DATAA entry{};
+  HANDLE handle = FindFirstFileA(pattern.c_str(), &entry);
+  if (handle == INVALID_HANDLE_VALUE) {
+    return std::string();
+  }
+  std::string fallback;
+  std::string found;
+  do {
+    if ((entry.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+      continue;
+    }
+    const std::string name = entry.cFileName;
+    if (name == "Godot.exe" || name == "Godot") {
+      found = dir + "\\" + name;
+      break;
+    }
+    if (fallback.empty() && name.rfind("Godot", 0) == 0 &&
+        name.size() > 4 &&
+        name.compare(name.size() - 4, 4, ".exe") == 0) {
+      fallback = dir + "\\" + name;
+    }
+  } while (FindNextFileA(handle, &entry));
+  FindClose(handle);
+  return found.empty() ? fallback : found;
+}
+
+std::string resolve_godot_executable(const std::string &configured) {
+  if (configured.empty()) {
+    return std::string();
+  }
+  if (path_is_file(configured)) {
+    return configured;
+  }
+  if (path_is_directory(configured)) {
+    return godot_executable_in_directory(configured);
+  }
+  return std::string();
+}
+
+std::string extension_copy_path(const std::string &project_path) {
+  if (project_path.empty()) {
+    return std::string();
+  }
+  return project_path + "\\addons\\godot-autopilot\\~godot-autopilot.dll";
+}
+
+bool extension_copy_is_released(const std::string &path) {
+  HANDLE handle = CreateFileA(path.c_str(), GENERIC_READ, 0, nullptr,
+                              OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (handle == INVALID_HANDLE_VALUE) {
+    const DWORD err = GetLastError();
+    return err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND;
+  }
+  CloseHandle(handle);
+  return true;
+}
+
+bool wait_for_extension_copy_release(const std::string &project_path,
+                                     DWORD timeout_ms) {
+  const std::string path = extension_copy_path(project_path);
+  const ULONGLONG deadline = GetTickCount64() + timeout_ms;
+  while (!extension_copy_is_released(path)) {
+    if (GetTickCount64() >= deadline) {
+      return false;
+    }
+    Sleep(kExtensionCopyPollMs);
+  }
+  return true;
+}
+
+std::string project_lock_name(const std::string &project_path) {
+  uint64_t hash = 1469598103934665603ULL;
+  for (unsigned char byte : project_path) {
+    hash ^= byte;
+    hash *= 1099511628211ULL;
+  }
+  return "Local\\GDA_L2_Project_" + std::to_string(hash);
+}
+
+bool allow_list_has(const std::string &allow, const std::string &capability) {
+  size_t begin = 0;
+  while (begin <= allow.size()) {
+    const size_t end = allow.find(',', begin);
+    const std::string entry =
+        allow.substr(begin, end == std::string::npos ? std::string::npos
+                                                      : end - begin);
+    if (entry == capability || entry == "all")
+      return true;
+    if (end == std::string::npos)
+      break;
+    begin = end + 1;
+  }
+  return false;
+}
+
 std::string resolve_allow_list() {
+  std::string allow;
   if (const char *env = std::getenv("GODOT_AUTOPILOT_ALLOW")) {
     if (*env)
-      return std::string(env);
+      allow = std::string(env);
   }
-  const std::string from_file = read_env_file_key("GODOT_AUTOPILOT_ALLOW");
-  if (!from_file.empty())
-    return from_file;
-  return "all";
+  if (allow.empty()) {
+    const std::string from_file = read_env_file_key("GODOT_AUTOPILOT_ALLOW");
+    if (!from_file.empty())
+      allow = from_file;
+  }
+  if (allow.empty())
+    allow = "all";
+  if (!allow_list_has(allow, "write"))
+    allow += ",write";
+  return allow;
 }
 
 int pick_free_port() {
@@ -292,6 +412,7 @@ struct GodotProcess::Impl {
   HANDLE process = nullptr;
   HANDLE stdout_read = nullptr;
   HANDLE stderr_read = nullptr;
+  HANDLE project_lock = nullptr;
   std::thread stdout_thread;
   std::thread stderr_thread;
   std::mutex log_mutex;
@@ -326,6 +447,44 @@ struct GodotProcess::Impl {
 };
 
 namespace {
+
+bool extension_copy_collision_detected(GodotProcess::Impl &impl) {
+  std::lock_guard<std::mutex> lock(impl.log_mutex);
+  return impl.stderr_buf.find("Error loading extension") != std::string::npos ||
+         impl.stderr_buf.find("Error copying library") != std::string::npos;
+}
+
+void clear_stderr_logs(GodotProcess::Impl &impl) {
+  std::lock_guard<std::mutex> lock(impl.log_mutex);
+  impl.stderr_buf.clear();
+}
+
+bool acquire_project_lock(GodotProcess::Impl &impl) {
+  if (impl.project_lock != nullptr) {
+    return true;
+  }
+  const std::string name = project_lock_name(impl.project_path);
+  HANDLE handle = CreateMutexA(nullptr, FALSE, name.c_str());
+  if (handle == nullptr) {
+    return false;
+  }
+  const DWORD waited = WaitForSingleObject(handle, kProjectLockTimeoutMs);
+  if (waited != WAIT_OBJECT_0 && waited != WAIT_ABANDONED) {
+    CloseHandle(handle);
+    return false;
+  }
+  impl.project_lock = handle;
+  return true;
+}
+
+void release_project_lock(GodotProcess::Impl &impl) {
+  if (impl.project_lock == nullptr) {
+    return;
+  }
+  ReleaseMutex(impl.project_lock);
+  CloseHandle(impl.project_lock);
+  impl.project_lock = nullptr;
+}
 
 void attach_process(GodotProcess::Impl &impl, PROCESS_INFORMATION &pi) {
   impl.process = pi.hProcess;
@@ -391,8 +550,13 @@ bool GodotProcess::start(std::chrono::seconds ready_timeout) {
     return false;
   }
 
+  if (!acquire_project_lock(*impl_)) {
+    impl_->last_error =
+        "无法获取测试床项目锁：另一个 Godot 实例正在使用同一测试床";
+    return false;
+  }
+
   const std::string headless_flag = impl_->headless ? "--headless " : "";
-  PROCESS_INFORMATION pi{};
 
   {
     const char *force_key = "GDA_FORCE_HEADLESS";
@@ -407,20 +571,40 @@ bool GodotProcess::start(std::chrono::seconds ready_timeout) {
     };
     SetEnvironmentVariableA(force_key, "1");
 
-    if (launch_process(build_godot_cmdline(impl_->godot_path,
-                                           impl_->project_path,
-                                           headless_flag + "--editor --import"),
-                       pi, impl_->stdout_read, impl_->stderr_read)) {
-      attach_process(*impl_, pi);
+    int import_attempt = 0;
+    while (import_attempt < kMaxLaunchAttempts) {
+      ++import_attempt;
+      PROCESS_INFORMATION import_pi{};
+      clear_stderr_logs(*impl_);
+      if (!launch_process(build_godot_cmdline(impl_->godot_path,
+                                              impl_->project_path,
+                                              headless_flag +
+                                                  "--editor --import"),
+                          import_pi, impl_->stdout_read, impl_->stderr_read)) {
+        append_log(*impl_, "[gda] 警告：启动 --import 进程失败（错误码 " +
+                               std::to_string(GetLastError()) +
+                               "），继续尝试\n");
+        break;
+      }
+      attach_process(*impl_, import_pi);
       if (WaitForSingleObject(impl_->process, kImportTimeoutMs) !=
           WAIT_OBJECT_0) {
         append_log(*impl_, "[gda] 警告：--import 未在 120s 内退出，继续尝试\n");
       }
       close_process(*impl_);
-    } else {
-      append_log(*impl_, "[gda] 警告：启动 --import 进程失败（错误码 " +
-                             std::to_string(GetLastError()) +
-                             "），继续尝试\n");
+      if (!extension_copy_collision_detected(*impl_)) {
+        break;
+      }
+      append_log(*impl_,
+                 "[gda] GDExtension 临时副本被其它编辑器占用，等待释放后重试 "
+                 "--import（" +
+                     std::to_string(import_attempt) + "/" +
+                     std::to_string(kMaxLaunchAttempts) + "）\n");
+      if (!wait_for_extension_copy_release(impl_->project_path,
+                                           kExtensionCopyWaitMs)) {
+        break;
+      }
+      SetEnvironmentVariableA(force_key, "1");
     }
     restore_force_env();
   }
@@ -463,31 +647,58 @@ bool GodotProcess::start(std::chrono::seconds ready_timeout) {
   };
   SetEnvironmentVariableA(force_key, "1");
 
-  if (!launch_process(build_godot_cmdline(impl_->godot_path,
-                                          impl_->project_path,
-                                          headless_flag + "--editor"),
-                      pi, impl_->stdout_read, impl_->stderr_read)) {
+  const auto deadline = std::chrono::steady_clock::now() + ready_timeout;
+  bool ready = false;
+  int attempt = 0;
+  while (attempt < kMaxLaunchAttempts) {
+    ++attempt;
+    PROCESS_INFORMATION editor_pi{};
+    clear_stderr_logs(*impl_);
+    if (!launch_process(build_godot_cmdline(impl_->godot_path,
+                                            impl_->project_path,
+                                            headless_flag + "--editor"),
+                        editor_pi, impl_->stdout_read, impl_->stderr_read)) {
+      restore_port_env();
+      restore_allow_env();
+      restore_force_env();
+      impl_->last_error =
+          "启动编辑器进程失败（错误码 " + std::to_string(GetLastError()) + "）";
+      return false;
+    }
+    attach_process(*impl_, editor_pi);
     restore_port_env();
     restore_allow_env();
     restore_force_env();
-    impl_->last_error =
-        "启动编辑器进程失败（错误码 " + std::to_string(GetLastError()) + "）";
-    return false;
-  }
-  attach_process(*impl_, pi);
-  restore_port_env();
-  restore_allow_env();
-  restore_force_env();
 
-  const auto deadline = std::chrono::steady_clock::now() + ready_timeout;
-  bool ready = false;
-  while (std::chrono::steady_clock::now() < deadline) {
-    if (tcp_port_open(impl_->port) &&
-        mcp_initialize_handshake(impl_->port)) {
-      ready = true;
+    while (std::chrono::steady_clock::now() < deadline) {
+      if (tcp_port_open(impl_->port) &&
+          mcp_initialize_handshake(impl_->port)) {
+        ready = true;
+        break;
+      }
+      if (WaitForSingleObject(impl_->process, 0) == WAIT_OBJECT_0) {
+        break;
+      }
+      std::this_thread::sleep_for(kPollInterval);
+    }
+    if (ready) {
       break;
     }
-    std::this_thread::sleep_for(kPollInterval);
+    close_process(*impl_);
+    if (!extension_copy_collision_detected(*impl_)) {
+      break;
+    }
+    append_log(*impl_,
+               "[gda] GDExtension 临时副本被其它编辑器占用，等待释放后重试（"
+                   + std::to_string(attempt) + "/" +
+                   std::to_string(kMaxLaunchAttempts) + "）\n");
+    if (!wait_for_extension_copy_release(impl_->project_path,
+                                         kExtensionCopyWaitMs)) {
+      break;
+    }
+    SetEnvironmentVariableA(port_key, std::to_string(impl_->port).c_str());
+    SetEnvironmentVariableA(allow_key, allow_value.c_str());
+    SetEnvironmentVariableA(force_key, "1");
   }
   if (!ready) {
     impl_->last_error = "MCP 服务器未在 " +
@@ -499,22 +710,24 @@ bool GodotProcess::start(std::chrono::seconds ready_timeout) {
 }
 
 void GodotProcess::stop() {
-  if (!impl_->process)
-    return;
-  if (WaitForSingleObject(impl_->process, 0) == WAIT_TIMEOUT) {
-    run_taskkill(GetProcessId(impl_->process));
-    if (WaitForSingleObject(impl_->process, kExitGraceSeconds * 1000) ==
-        WAIT_TIMEOUT) {
-      TerminateProcess(impl_->process, 1);
-      WaitForSingleObject(impl_->process, 5000);
-      append_log(*impl_,
-                 "[gda] 编辑器未正常退出，已强杀（TerminateProcess）\n");
+  if (impl_->process) {
+    if (WaitForSingleObject(impl_->process, 0) == WAIT_TIMEOUT) {
+      run_taskkill(GetProcessId(impl_->process));
+      if (WaitForSingleObject(impl_->process, kExitGraceSeconds * 1000) ==
+          WAIT_TIMEOUT) {
+        TerminateProcess(impl_->process, 1);
+        WaitForSingleObject(impl_->process, 5000);
+        append_log(*impl_,
+                   "[gda] 编辑器未正常退出，已强杀（TerminateProcess）\n");
+      }
     }
+    DWORD exit_code = 0;
+    GetExitCodeProcess(impl_->process, &exit_code);
+    append_log(*impl_,
+               "[gda] 编辑器退出码: " + std::to_string(exit_code) + "\n");
+    close_process(*impl_);
   }
-  DWORD exit_code = 0;
-  GetExitCodeProcess(impl_->process, &exit_code);
-  append_log(*impl_, "[gda] 编辑器退出码: " + std::to_string(exit_code) + "\n");
-  close_process(*impl_);
+  release_project_lock(*impl_);
 }
 
 bool GodotProcess::alive() const {
@@ -537,11 +750,17 @@ std::string GodotProcess::capture_logs() {
 std::string GodotProcess::last_error() const { return impl_->last_error; }
 
 std::string GodotProcess::resolve_godot_path() {
-  if (const char *env = std::getenv("GODOT_PATH")) {
-    if (*env)
-      return std::string(env);
+  const char *env = std::getenv("GODOT_PATH");
+  const std::string env_value =
+      (env != nullptr && *env != '\0') ? std::string(env) : std::string();
+  const std::string file_value = read_env_file_key("GODOT_PATH");
+  for (const std::string &candidate : {env_value, file_value}) {
+    const std::string resolved = resolve_godot_executable(candidate);
+    if (!resolved.empty()) {
+      return resolved;
+    }
   }
-  return read_env_file_key("GODOT_PATH");
+  return std::string();
 }
 
 #else

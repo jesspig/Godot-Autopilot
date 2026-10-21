@@ -18,7 +18,6 @@
 #include <godot_cpp/classes/h_box_container.hpp>
 #include <godot_cpp/classes/h_flow_container.hpp>
 #include <godot_cpp/classes/os.hpp>
-#include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/classes/theme.hpp>
 #include <godot_cpp/classes/v_box_container.hpp>
 #include <godot_cpp/core/class_db.hpp>
@@ -92,16 +91,25 @@ McpLogDock::McpLogDock() : log_system(&LogSystem::instance()) {
   open_logs_button->set_theme_type_variation("BottomPanelButton");
   open_logs_button->set_focus_mode(godot::Control::FOCUS_ACCESSIBILITY);
   open_logs_button->set_text("Open Logs");
-  open_logs_button->set_tooltip_text(
-      "Open the user://godot_autopilot/logs directory.");
+  std::string log_tooltip = "Open the GDA log directory.";
+  const std::string log_dir_path = LogPersist::instance().log_dir();
+  if (!log_dir_path.empty()) {
+    log_tooltip = "Open the GDA log directory: " + log_dir_path;
+  }
+  open_logs_button->set_tooltip_text(godot::String::utf8(log_tooltip.c_str()));
   bottom_hf->add_child(open_logs_button);
 
   open_traces_button = memnew(godot::Button);
   open_traces_button->set_theme_type_variation("BottomPanelButton");
   open_traces_button->set_focus_mode(godot::Control::FOCUS_ACCESSIBILITY);
   open_traces_button->set_text("Open Traces");
+  std::string trace_tooltip = "Open the GDA trace directory.";
+  const std::string trace_dir_path = LogPersist::instance().trace_dir();
+  if (!trace_dir_path.empty()) {
+    trace_tooltip = "Open the GDA trace directory: " + trace_dir_path;
+  }
   open_traces_button->set_tooltip_text(
-      "Open the user://godot_autopilot/traces directory.");
+      godot::String::utf8(trace_tooltip.c_str()));
   bottom_hf->add_child(open_traces_button);
 
   trace_button = memnew(godot::Button);
@@ -483,27 +491,29 @@ void McpLogDock::_on_detail_toggled(bool enabled) {
 
 void McpLogDock::_on_open_logs() {
   monitor::ui_action("log_open_dir", monitor::build_attrs({{"target", "logs"}}));
-  godot::String dir = godot::ProjectSettings::get_singleton()->globalize_path(
-      "user://godot_autopilot/logs");
+  const std::string dir = LogPersist::instance().log_dir();
   godot::OS *os = godot::OS::get_singleton();
-  godot::Error err =
-      os ? os->shell_open(dir) : godot::Error::ERR_UNAVAILABLE;
+  godot::Error err = godot::Error::ERR_UNAVAILABLE;
+  if (os && !dir.empty()) {
+    err = os->shell_open(godot::String::utf8(dir.c_str()));
+  }
   if (err != godot::Error::OK) {
     log_system->log(LogLevel::Error, LogCategory::System,
-                    "Open logs directory failed");
+                    "Open logs directory failed: " + dir);
   }
 }
 
 void McpLogDock::_on_open_traces() {
   monitor::ui_action("log_open_dir", monitor::build_attrs({{"target", "traces"}}));
-  godot::String dir = godot::ProjectSettings::get_singleton()->globalize_path(
-      godot::String(LogPersist::instance().trace_dir().c_str()));
+  const std::string dir = LogPersist::instance().trace_dir();
   godot::OS *os = godot::OS::get_singleton();
-  godot::Error err =
-      os ? os->shell_open(dir) : godot::Error::ERR_UNAVAILABLE;
+  godot::Error err = godot::Error::ERR_UNAVAILABLE;
+  if (os && !dir.empty()) {
+    err = os->shell_open(godot::String::utf8(dir.c_str()));
+  }
   if (err != godot::Error::OK) {
     log_system->log(LogLevel::Error, LogCategory::System,
-                    "Open traces directory failed");
+                    "Open traces directory failed: " + dir);
   }
 }
 

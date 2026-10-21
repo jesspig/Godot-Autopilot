@@ -9,6 +9,8 @@ import { run as list } from "./list";
 import { run as start } from "./start";
 import { run as stop } from "./stop";
 import { run as logs } from "./logs";
+import { run as api } from "./api";
+import { run as endpoints } from "./endpoints";
 
 export interface Command {
   run(positional: string[], opts: GlobalOptions): Promise<number>;
@@ -25,4 +27,6 @@ export const COMMANDS: Record<string, Command> = {
   start: { run: start },
   stop: { run: stop },
   logs: { run: logs },
+  api: { run: api },
+  endpoints: { run: endpoints },
 };

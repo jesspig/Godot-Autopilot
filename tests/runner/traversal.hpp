@@ -15,10 +15,13 @@ struct TraversalStats {
     size_t passed = 0;
     size_t failed = 0;
     size_t exempt_errors = 0;
+    size_t denied = 0;
     std::vector<std::string> excluded_names;
     std::vector<std::string> warnings;
     bool baseline_matched = false;
     std::vector<std::string> baseline_diffs;
+    std::string baseline_source;
+    std::string baseline_note;
 };
 
 TraversalStats run_traversal(McpTestClient& client, const std::string& mode,

@@ -22,6 +22,9 @@ const std::vector<SkillSpec> &skills() {
   return cached;
 }
 
+constexpr std::size_t kExpectedSkillCount = 9;
+constexpr std::size_t kExpectedSkillResourceCount = 45;
+
 const char *const kExpectedSkillNames[] = {
     "godot-autopilot",
     "godot-autopilot-tools",
@@ -94,7 +97,7 @@ TEST(SkillResourcesTest, RejectsInvalidUris) {
 
 TEST(SkillResourcesTest, BuildsCatalogFromEmbeddedSkills) {
   const std::vector<SkillSpec> &all = skills();
-  ASSERT_EQ(all.size(), 9u);
+  ASSERT_EQ(all.size(), kExpectedSkillCount);
 
   const std::vector<godot_autopilot::skill_resources::CatalogEntry> catalog =
       godot_autopilot::skill_resources::build_catalog(all);
@@ -114,7 +117,7 @@ TEST(SkillResourcesTest, BuildsCatalogFromEmbeddedSkills) {
     names.insert(catalog[i].name);
   }
 
-  EXPECT_EQ(names.size(), 9u);
+  EXPECT_EQ(names.size(), kExpectedSkillCount);
   for (const char *name : kExpectedSkillNames) {
     EXPECT_TRUE(names.count(name) == 1) << "missing skill: " << name;
   }
@@ -123,7 +126,7 @@ TEST(SkillResourcesTest, BuildsCatalogFromEmbeddedSkills) {
   for (const SkillSpec &spec : all) {
     resources += 1 + spec.files.size();
   }
-  EXPECT_EQ(resources, std::size_t{44})
+  EXPECT_EQ(resources, kExpectedSkillResourceCount)
       << "skill resources (1 catalog + one per volume + one per embedded file)";
 }
 

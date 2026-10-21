@@ -84,7 +84,7 @@ const std::vector<ParamSpec> kStartGameJobParams = {
 const std::vector<ParamSpec> kGetGameJobParams = {
     {"job_id", "integer", "Job id returned by start_game_job", true},
     {"cancel", "boolean", "Cancel the job instead of collecting it (default: false); an idempotent cancel reaches the game, the job record is dropped and the response reports status cancelled", false},
-    {"timeout_ms", "integer", "Poll wait in milliseconds (default: 0 = non-blocking poll that returns status pending immediately, maximum: 25000); with a positive value the call re-checks the job every few milliseconds until the result arrives, the job expires or the budget ends", false},
+    {"timeout_ms", "integer", "Poll wait in milliseconds (default: 0 = non-blocking poll that returns status pending immediately, maximum: 25000); with a positive value the call waits for the game's response without blocking the editor main thread — the wait runs on the transport thread until the result arrives, the job expires (timeout_ms of the job plus 2000 ms after start) or the budget ends, whichever comes first", false},
 };
 
 const std::vector<ParamSpec> kReloadGameScriptsParams = {
@@ -210,8 +210,8 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       kStartGameJobParams, runtime_ops::handle_game_job_start}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_game_job",
-      "Poll a game job previously submitted with start_game_job over the runtime debug channel: status pending means the result is not ready yet, done carries the game's response verbatim including its own error fields, expired means the job exceeded timeout_ms + 2000 ms after start and was dropped, cancelled means cancel=true tore the request down (an idempotent engine cancel is sent to the game). Collecting, expiring and cancelling each release the eval error-break suppression. timeout_ms (default 0 = non-blocking poll, max 25000) bounds an internal wait loop that re-checks the job every few milliseconds.",
-      "Game", {"game", "runtime", "job", "async", "poll", "debug"}, SideEffect::None, tool_flags::kNone,
+      "Poll a game job previously submitted with start_game_job over the runtime debug channel: status pending means the result is not ready yet, done carries the game's response verbatim including its own error fields, expired means the job exceeded timeout_ms + 2000 ms after start and was dropped, cancelled means cancel=true tore the request down (an idempotent engine cancel is sent to the game). Collecting, expiring and cancelling each release the eval error-break suppression. timeout_ms (default 0 = non-blocking poll, max 25000) bounds a wait that runs on the transport thread, so the editor main thread stays responsive while the game response is pending; the wait ends when the response arrives, when the job expires, or when the budget ends (status pending).",
+      "Game", {"game", "runtime", "job", "async", "poll", "debug"}, SideEffect::None, tool_flags::kLongBlocking,
       kGetGameJobParams, runtime_ops::handle_game_job_get}));
   v.push_back(make_spec_tool(ToolSpec{
       "reload_game_scripts",

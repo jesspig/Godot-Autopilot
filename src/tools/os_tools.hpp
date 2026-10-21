@@ -17,8 +17,9 @@ namespace os_tools {
 namespace {
 
 const std::vector<ParamSpec> kShowOsAlertParams = {
-    {"text", "string", "Message to display in the modal alert body; the call blocks the editor UI until the user confirms — avoid in unattended runs", true},
+    {"text", "string", "Message to show in the alert body; it is only displayed when modal=true, otherwise it is returned as part of the confirmation notice", true},
     {"title", "string", "Dialog window title (default: Alert!)", false},
+    {"modal", "boolean", "Actually open the modal dialog (default: false). With false the call returns a structured notice (shown=false, requires_confirmation=true) instead of a dialog, because a modal alert blocks the editor main thread until a human dismisses it and freezes unattended runs. Set true only when a human is watching the editor", false},
 };
 
 const std::vector<ParamSpec> kCreateOsProcessParams = {
@@ -29,7 +30,8 @@ const std::vector<ParamSpec> kCreateOsProcessParams = {
 const std::vector<ParamSpec> kExecuteOsProcessParams = {
     {"path", "string", "Executable to run (full path, or name resolved via PATH)", true},
     {"arguments", "array", "Command line arguments; non-string entries are ignored", true},
-    {"output", "boolean", "Capture stdout and stderr into the result (default: false); when false, output is discarded. The call blocks until the command exits", false},
+    {"output", "boolean", "Capture stdout and stderr into the result (default: false); when false, output is discarded. The process is started without blocking the editor and the call waits for it to exit without freezing the editor", false},
+    {"timeout_ms", "integer", "Deadline for the external process in milliseconds (default: 5000, min: 100, max: 25000); when the deadline passes the process is terminated and the call fails with code main_thread_timeout (cancelled, not retryable)", false},
 };
 
 const std::vector<ParamSpec> kGetOsDatetimeParams = {
@@ -119,7 +121,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.reserve(23);
   v.push_back(make_spec_tool(ToolSpec{
       "show_os_alert",
-      "Show a modal alert dialog with the given text and optional title. The call blocks the editor UI until the user dismisses the dialog, so avoid it in unattended or automated runs where it would hang. Requires 'text' (string); returns result 'ok' once dismissed.",
+      "Ask the editor to show an alert to the user. By default the call does NOT open a dialog: it returns a structured notice (shown=false, requires_confirmation=true) carrying the text and title and explaining that the alert needs human confirmation. A modal alert blocks the editor main thread until the user dismisses it, so unattended or automated runs would hang — only pass modal=true when a human is watching the editor. Requires 'text' (string); optional 'title' (default: Alert!) and 'modal' (boolean, default false). Returns result 'ok' plus shown.",
       "OS", {"os", "alert"}, SideEffect::ShowsAlert, tool_flags::kMutating,
       kShowOsAlertParams, os_ops::handle_os_alert}));
   v.push_back(make_spec_tool(ToolSpec{
@@ -129,7 +131,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       kCreateOsProcessParams, os_ops::handle_os_create_process}));
   v.push_back(make_spec_tool(ToolSpec{
       "execute_os_process",
-      "Run a command synchronously and wait until it exits, so the call may block for the full runtime of the command. Use it for short commands whose result is needed immediately. Returns exit_code, plus stdout and stderr (empty unless 'output' is true). Requires 'path' and 'arguments'; 'output' (bool, default false) enables capturing output instead of discarding it.",
+      "Run an external command and return its exit code, optionally with its stdout and stderr. The process is started without blocking the editor: the editor main thread stays responsive while the call waits for the command to finish on the transport thread, and the pipes are drained frame by frame. Use it for short commands whose result is needed immediately; for long-running or fire-and-forget programs use create_os_process instead. Optional 'timeout_ms' (default 5000, min 100, max 25000) bounds the wait: when the deadline passes the process is terminated and the call fails with code main_thread_timeout (cancelled, not retryable). Returns exit_code, plus stdout and stderr (empty unless 'output' is true). Requires 'path' and 'arguments'.",
       "OS", {"os", "execute"}, SideEffect::Process, tool_flags::kMutating,
       kExecuteOsProcessParams, os_ops::handle_os_execute}));
   v.push_back(make_spec_tool(ToolSpec{

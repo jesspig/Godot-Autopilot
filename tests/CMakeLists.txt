@@ -31,34 +31,27 @@ file(GLOB GDA_TOOLS_OPS_SOURCES CONFIGURE_DEPENDS
 #                           含 script_patch_ops.cpp 与 scene_spec_ops.cpp；
 #                           game_bridge_verify.cpp 为游戏侧运行时，
 #                           仅被 game_bridge.cpp 引用，不进 L1 业务源)
+#
+# 源清单聚合：基础业务源在 cmake/sources/gda_unit_sources.cmake，
+# 各并行分支的测试源在 cmake/sources/api_unit_*.cmake，
+# 两者在此汇入 GDA_UNIT_BUSINESS_SOURCES。
+include(${CMAKE_SOURCE_DIR}/cmake/sources/gda_unit_sources.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/sources/api_unit_contract.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/sources/api_unit_storage.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/sources/api_unit_transport.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/sources/api_unit_cli.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/sources/api_unit_docs.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/sources/api_unit_instance_guard.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/sources/api_probe.cmake)
+
 set(GDA_UNIT_BUSINESS_SOURCES
-    ${CMAKE_SOURCE_DIR}/src/core/log_system.cpp
-    ${CMAKE_SOURCE_DIR}/src/core/log_persist.cpp
-    ${CMAKE_SOURCE_DIR}/src/core/resource_registry.cpp
-    ${CMAKE_SOURCE_DIR}/src/core/scene_dirty_tracker.cpp
-    ${CMAKE_SOURCE_DIR}/src/core/export_guard.cpp
-    ${CMAKE_SOURCE_DIR}/src/core/editor_readiness.cpp
-    ${CMAKE_SOURCE_DIR}/src/core/editor_coords.cpp
-    ${CMAKE_SOURCE_DIR}/src/core/trace_recorder.cpp
-    ${CMAKE_SOURCE_DIR}/src/core/monitor.cpp
-    ${CMAKE_SOURCE_DIR}/src/util/bm25_index.cpp
-    ${CMAKE_SOURCE_DIR}/src/util/error_util.cpp
-    ${CMAKE_SOURCE_DIR}/src/util/readback_util.cpp
-    ${CMAKE_SOURCE_DIR}/src/util/scene_verify.cpp
-    ${CMAKE_SOURCE_DIR}/src/util/variant_json.cpp
-    ${CMAKE_SOURCE_DIR}/src/util/client_config_gen.cpp
-    ${CMAKE_SOURCE_DIR}/src/util/skill_gen.cpp
-    ${CMAKE_SOURCE_DIR}/src/util/skill_content_generated.cpp
-    ${CMAKE_SOURCE_DIR}/src/tools/tool_catalog.cpp
-    ${CMAKE_SOURCE_DIR}/src/tools/schema_builder.cpp
-    ${CMAKE_SOURCE_DIR}/src/tools/register_all.cpp
-    ${CMAKE_SOURCE_DIR}/src/tools/dispatch.cpp
-    ${CMAKE_SOURCE_DIR}/src/tools/debugger_access.cpp
-    ${CMAKE_SOURCE_DIR}/src/tools/editor_ui_actions.cpp
-    ${CMAKE_SOURCE_DIR}/src/tools/tool_args.cpp
-    ${CMAKE_SOURCE_DIR}/src/tools/tool_pipeline.cpp
-    ${CMAKE_SOURCE_DIR}/src/tools/tool_invoke.cpp
-    ${GDA_TOOLS_OPS_SOURCES})
+    ${GDA_UNIT_BUSINESS_SOURCES}
+    ${GDA_UNIT_CONTRACT_SOURCES}
+    ${GDA_UNIT_STORAGE_SOURCES}
+    ${GDA_UNIT_TRANSPORT_SOURCES}
+    ${GDA_UNIT_CLI_SOURCES}
+    ${GDA_UNIT_DOCS_SOURCES}
+    ${GDA_UNIT_INSTANCE_GUARD_SOURCES})
 
 # ====================================================================
 # gda_unit_tests — L1 纯单元测试 (不启动引擎, 不触碰 Godot API)
@@ -67,7 +60,9 @@ file(GLOB_RECURSE GDA_UNIT_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/unit/*.cpp")
 
 if(GDA_UNIT_SOURCES)
-    add_executable(gda_unit_tests ${GDA_UNIT_SOURCES} ${GDA_UNIT_BUSINESS_SOURCES})
+    set(GDA_UNIT_ALL_SOURCES ${GDA_UNIT_SOURCES} ${GDA_UNIT_BUSINESS_SOURCES})
+    list(REMOVE_DUPLICATES GDA_UNIT_ALL_SOURCES)
+    add_executable(gda_unit_tests ${GDA_UNIT_ALL_SOURCES})
 
     # skill 内容头 skill_content_embedded.h 由 cmake/skill_gen.cmake 构建期生成
     add_dependencies(gda_unit_tests gda_skill_embed_header)

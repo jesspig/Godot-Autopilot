@@ -10,8 +10,9 @@ Read this skill before using the godot-autopilot plugin: it is the required entr
 ## Prerequisites
 
 - The Godot editor must be open with the godot-autopilot plugin enabled. The MCP server starts automatically with the plugin and stops when the plugin is disabled or the editor closes.
-- The MCP endpoint is `http://127.0.0.1:9527/mcp` by default, but the port is configurable. Never assume 9527; see the godot-autopilot-tools skill (references/cli-access.md) for the port discovery order.
-- The server listens on the loopback interface only, with no authentication. It is meant for trusted local MCP clients on the same machine.
+- The MCP endpoint is `http://127.0.0.1:9527/mcp` by default, but the port is configurable and the editor moves off 9527 by itself when that port is already taken. Never assume 9527; see the godot-autopilot-tools skill (references/cli-access.md) for the port discovery order.
+- The server listens on the loopback interface only. The MCP face has no authentication - it is meant for trusted local MCP clients on the same machine. The same port also serves a plain-HTTP face under `/api` that asks for a bearer token; that token is a local credential and does not make the port safe to expose. Never forward, proxy or publish either endpoint.
+- The plugin's own data (configuration, logs, traces, captures) lives in a per-user folder in the home directory, not in the Godot user data folder any more. You rarely need this, but a path a tool reports may point there.
 
 ## What the server exposes
 
@@ -19,7 +20,7 @@ The MCP layer exposes the meta tools `ping`, `search_tools`, `list_categories`, 
 
 Every domain tool is executed through `call_tool` by passing the domain tool name and its arguments object. A few high-effect groups sit behind capability gates; the enable paths are in the godot-autopilot-tools skill.
 
-`batch_execute` is behind the `code_execute` capability, exactly like `code_execute` itself: a client that enabled only `process` or `game_runtime` cannot run a batch, and the operations never start. The four capability names and the enable paths are in the godot-autopilot-tools skill.
+`batch_execute` is behind the `code_execute` capability, exactly like `code_execute` itself: a client that enabled only `process` or `game_runtime` cannot run a batch, and the operations never start. Write-class tools are behind the `write` capability and are denied by default too. The capability names, the three tiers and the enable paths are in the godot-autopilot-tools skill.
 
 `code_execute` interrupts a script that outruns its `timeout_ms`. The accepted maximum is reported by the server in the `code_execute` schema - it follows the host's long-blocking dispatch budget and can be lowered per deployment, so read it from the schema instead of assuming a fixed number. The deadline is injected into the script, so a long loop really does stop instead of freezing the editor, and the call comes back as a timeout failure. Split long work into several calls, or raise `timeout_ms` up to the ceiling the schema reports.
 

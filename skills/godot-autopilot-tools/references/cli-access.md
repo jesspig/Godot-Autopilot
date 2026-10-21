@@ -49,11 +49,24 @@ Lifecycle family — these act on editor processes on the local machine:
 | `stop <id>` | Stop an instance gracefully; `--force` to kill. The instance can also be addressed with `--id`, `--port` or `--project` instead of the positional id |
 | `logs <id>` | Tail the instance log |
 
+REST family — these do not speak MCP; they call the plugin's plain-HTTP face on the same port:
+
+| Command | Meaning |
+|---|---|
+| `api list [query]` | List the registered tools through the REST face; `--query`, `--category` and `--tags` filter the result |
+| `api describe <tool>` | One tool's schema and side-effect marker, through the REST face |
+| `api call <tool>` | Call one tool through the REST face; `--args` or `--args-file` carry the argument object, which is the request body itself |
+| `endpoints` | Show the discovered MCP and REST endpoints, the port they came from, and whether the port is alive |
+
+The REST commands need a bearer token; the CLI reads it from the plugin's instance registry and attaches it. When no instance record is found the command fails with a transport error naming the port and its source, and points at the registry path. `--probe` picks the liveness check: `light` (a TCP connect, the default) or `strict` (TCP plus one HTTP request). The endpoint contract and the token sources are in references/rest-api.md.
+
 Follow the same discovery order as the native channel: `ping`, then `search` or `categories`, then `describe`, then `call`. Calling with an unknown name fails with a message telling you to search — never guess names.
 
 ## Global options
 
-`--port` (default 9527), `--id`, `--project`, `--pretty`, `--raw`, `--timeout`, `--category`, `--tags`, `--args`, `--args-file`, `--save-images`, `--godot`, `--headless`, `--play`, `--no-import`, `--wait`, `--force`, `--tail`, `--help`, `--version`.
+`--port` (default 9527), `--id`, `--project`, `--pretty`, `--raw`, `--timeout`, `--category`, `--tags`, `--args`, `--args-file`, `--save-images`, `--godot`, `--headless`, `--play`, `--no-import`, `--wait`, `--force`, `--tail`, `--query`, `--probe`, `--help`, `--version`.
+
+`--query` applies to the `api list` subcommand only and `--probe` to `api` and `endpoints`; passing either to another command is a usage error.
 
 `--quiet` was removed and is no longer recognized. Passing it now fails with exit code 3 and the message "unknown option: --quiet", and it is gone from `gda --help`. An older wrapper that still passes `--quiet` will start failing — drop the flag rather than working around it. Diagnostics already go to stderr on their own, so the flag bought nothing.
 
@@ -61,18 +74,19 @@ Follow the same discovery order as the native channel: `ping`, then `search` or 
 
 ## Port and target resolution
 
-Never assume the default port. The target is resolved in this order:
+Never assume the default port. The plugin may have moved off 9527 when that port was already taken: an editor that finds 9527 occupied picks the next free port in a fixed range instead. The target is resolved in seven steps, and each step records where the port came from:
 
 | Priority | Source | What to read |
 |---|---|---|
-| 1 | `--id` | The instance id in the registry; the instance must still be alive |
-| 2 | `--port` | The port you pass |
-| 3 | `--project` | A live instance registered for that project, then that project's server-ready trace and config.json, then the default |
-| 4 | `GODOT_AUTOPILOT_PORT` environment variable | The port it holds |
-| 5 | Current directory | A live instance registered for the current directory, then its server-ready trace and config.json |
-| 6 | Fallback | 9527 |
+| 1 | `--port` | The port you pass |
+| 2 | `--id` | The instance id in the registry; the instance must still be alive |
+| 3 | `GODOT_AUTOPILOT_PORT` environment variable | The port it holds |
+| 4 | CLI registry | A live instance registered for `--project`, or for the current directory |
+| 5 | Plugin instance registry | The plugin's own registry of running instances, matched by project path - this is where the REST token comes from too |
+| 6 | Project server-ready trace and config.json | The port recorded by the project under the Godot user data folder |
+| 7 | Fallback | 9527 |
 
-The trace and the config file live under the Godot user data folder of the project. Pass `--port` explicitly whenever you already know the editor was configured with a custom port.
+`gda endpoints` prints the resolved port together with the step it came from, both endpoint views and the liveness result - that is the quickest way to find out where a port came from. The trace and the config file live under the Godot user data folder of the project. Pass `--port` explicitly whenever you already know the editor was configured with a custom port.
 
 ## Passing arguments
 
@@ -150,10 +164,11 @@ Prefer `bunx` over the binary whenever Bun exists: it needs no download. It is n
 
 | Symptom | Meaning | Fix |
 |---|---|---|
-| Connection refused | Editor closed, plugin disabled, or wrong port | Open the editor with the plugin enabled; walk the resolution table top down; pass `--port` explicitly |
+| Connection refused | Editor closed, plugin disabled, or wrong port | Open the editor with the plugin enabled; run `gda endpoints` to see which port was resolved and where it came from; pass `--port` explicitly |
 | Timeout (exit 2) | Work unit too large for the wait budget | Split into smaller calls; `--timeout` only extends the client wait, server caps still apply |
 | Unknown tool name (exit 1) | Guessed or stale tool name | Discover exact names with `search` and confirm with `describe`; never invent names |
-| Authorization denied (exit 1) | `code_execute`, `game_runtime` or `user_tools` gate | Enable via the `GODOT_AUTOPILOT_ALLOW` environment variable plus engine restart, or the matching MCP Config dock checkbox effective on the next call |
+| Authorization denied (exit 1) | The tool's capability is not authorized | Enable it via the `GODOT_AUTOPILOT_ALLOW` environment variable plus engine restart, or the matching MCP Config dock checkbox effective on the next call; write-class tools need `write` |
+| No API token available (exit 2) | The plugin's instance registry has no record for that port | Run `gda endpoints` to find the port and its source; the token lives in the plugin instance registry, not in the CLI registry |
 | Empty or missing image output | Metadata-only default | Re-run with `--save-images DIR` and inspect the files on disk |
 | bunx cannot resolve the CLI | The pinned tag predates the CLI | Use the `#develop` ref or a global install; see the caveat above |
 
@@ -161,12 +176,13 @@ Tool-level failures (bad arguments, missing nodes) are not transport errors — 
 
 ## Hard rules
 
-- **Never hand-write HTTP requests** against the server from any tool. Every call goes through the MCP tools or `gda`.
-- **The server binds loopback only and has no authentication.** Never forward its port, never bind it to a public interface, never proxy it.
+- **Never hand-write HTTP requests** against the MCP endpoint from any tool. Every MCP call goes through the MCP tools or `gda`. The plugin's REST face has its own reference (references/rest-api.md) and is the one sanctioned place to speak plain HTTP directly.
+- **The server binds loopback only.** Never forward its port, never bind it to a public interface, never proxy it. The MCP face has no authentication, so the loopback binding is the only thing protecting it; the REST face asks for a bearer token, but that token is a local credential and does not make the port safe to expose.
 - **Verify a downloaded binary before executing it.** No checksum match, no run.
 - **Report what you actually observed.** Exit code 2 means the channel is down, not that the tool returned nothing; do not fabricate results.
 
 ## See also
 
 - godot-autopilot-tools — channel ladder, discovery protocol, error protocol and limits
+- references/rest-api.md — the plain-HTTP face: endpoints, token sources and status codes
 - references/manual-fallback.md — what to do when no CLI is available either

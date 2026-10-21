@@ -44,6 +44,7 @@
 #include "tools/runtime_ops.hpp"
 #include "tools/schema_builder.hpp"
 #include "tools/tool_base.hpp"
+#include "tools/tool_execute.hpp"
 #include "tools/tool_invoke.hpp"
 #include "tools/tool_registry.hpp"
 #include "util/mcp_image_content.hpp"
@@ -251,29 +252,11 @@ static mcp::JsonValue meta_call_tool_impl(mcp::JsonValue args) {
     }
 
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, name + " called via call_tool");
-    return dispatch::call_handler(name, tool_args);
+    return tools::execute_tool_core(name, tool_args);
 }
 
 static mcp::JsonValue meta_call_tool_wait(const std::string& name, mcp::JsonValue result) {
-    auto* pending_p = result.Find("__gda_pending");
-    if (pending_p && pending_p->IsInt()) {
-        int64_t rid = pending_p->GetInt();
-        int64_t timeout = 5000;
-        if (auto* t = result.Find("timeout_ms")) {
-            if (t->IsInt() && t->GetInt() > 0) timeout = t->GetInt();
-        }
-        mcp::JsonValue final = runtime_ops::wait_pending_response(rid, timeout);
-        if (name == "capture_game_viewport" || (final.IsObject() && final.Contains("path"))) {
-            final = runtime_ops::finalize_capture_response(final);
-        }
-        result = std::move(final);
-    }
-    if (!result.IsObject()) {
-        mcp::JsonValue wrapped(mcp::JsonValue::object_tag);
-        wrapped["result"] = std::move(result);
-        result = std::move(wrapped);
-    }
-    return result;
+    return dispatch::resolve_deferred_wait(name, std::move(result));
 }
 
 void refresh_derived(const std::shared_ptr<ToolRegistry>& registry,

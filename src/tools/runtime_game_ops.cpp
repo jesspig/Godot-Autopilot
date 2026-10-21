@@ -12,7 +12,6 @@
 #include <cstdint>
 #include <mutex>
 #include <string>
-#include <thread>
 #include <utility>
 #include <vector>
 #ifdef GetObject
@@ -882,83 +881,153 @@ mcp::JsonValue handle_game_job_get(const mcp::JsonValue &args) {
   }
 
   const int64_t deadline_ms = steady_game_now_ms() + wait_budget_ms;
-  for (;;) {
-    int64_t request_id = 0;
-    int64_t started_ms = 0;
-    int64_t job_timeout_ms = 0;
-    bool found = false;
-    {
-      std::lock_guard<std::mutex> lock(game_jobs_mutex());
-      auto &jobs = game_jobs().jobs;
-      auto it = jobs.find(job_id);
-      if (it != jobs.end()) {
-        found = true;
-        request_id = it->second.request_id;
-        started_ms = it->second.started_ms;
-        job_timeout_ms = it->second.timeout_ms;
-      }
+  int64_t request_id = 0;
+  int64_t started_ms = 0;
+  int64_t job_timeout_ms = 0;
+  bool found = false;
+  {
+    std::lock_guard<std::mutex> lock(game_jobs_mutex());
+    auto &jobs = game_jobs().jobs;
+    auto it = jobs.find(job_id);
+    if (it != jobs.end()) {
+      found = true;
+      request_id = it->second.request_id;
+      started_ms = it->second.started_ms;
+      job_timeout_ms = it->second.timeout_ms;
     }
-    if (!found) {
-      return util::error_detail(
-          "unknown or already collected game job: " + std::to_string(job_id),
-          "get_game_job",
-          "a job_id returned by start_game_job that is still tracked",
-          "re-check the start_game_job response for the correct job_id; jobs "
-          "are removed once collected or after they expire timeout_ms + 2000 "
-          "ms after start");
-    }
-    if (cancel) {
-      cancel_game_op_request(request_id);
-      erase_game_job(job_id);
-      std::string discard_detail;
-      discard_pending(request_id, discard_detail);
-      JV payload(JV::object_tag);
-      payload["status"] = JV("cancelled");
-      payload["job_id"] = JV(job_id);
-      payload["request_id"] = JV(request_id);
-      LogSystem::instance().log(
-          LogLevel::Info, LogCategory::Tools,
-          "get_game_job cancelled job " + std::to_string(job_id) +
-              " (request_id " + std::to_string(request_id) + ")");
-      return util::ok_result(std::move(payload));
-    }
-    JV response;
-    if (try_collect_response(request_id, response)) {
-      erase_game_job(job_id);
-      JV payload(JV::object_tag);
-      payload["status"] = JV("done");
-      payload["job_id"] = JV(job_id);
-      payload["result"] = std::move(response);
-      return util::ok_result(std::move(payload));
-    }
-    const int64_t now_ms = steady_game_now_ms();
-    if ((now_ms - started_ms) >
-        (job_timeout_ms + GameJobTable::kExpiryGraceMs)) {
-      erase_game_job(job_id);
-      std::string discard_detail;
-      discard_pending(request_id, discard_detail);
-      JV payload(JV::object_tag);
-      payload["status"] = JV("expired");
-      payload["job_id"] = JV(job_id);
-      payload["request_id"] = JV(request_id);
-      payload["timeout_ms"] = JV(job_timeout_ms);
-      LogSystem::instance().log_detailed(
-          LogLevel::Info, LogCategory::Tools,
-          "get_game_job dropped expired job " + std::to_string(job_id),
-          "job_id=" + std::to_string(job_id) +
-              " request_id=" + std::to_string(request_id) + " timeout_ms=" +
-              std::to_string(job_timeout_ms) + " elapsed_ms=" +
-              std::to_string(now_ms - started_ms));
-      return util::ok_result(std::move(payload));
-    }
-    if (wait_budget_ms <= 0 || now_ms >= deadline_ms) {
-      JV payload(JV::object_tag);
-      payload["status"] = JV("pending");
-      payload["job_id"] = JV(job_id);
-      return util::ok_result(std::move(payload));
-    }
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
+  if (!found) {
+    return util::error_detail(
+        "unknown or already collected game job: " + std::to_string(job_id),
+        "get_game_job",
+        "a job_id returned by start_game_job that is still tracked",
+        "re-check the start_game_job response for the correct job_id; jobs "
+        "are removed once collected or after they expire timeout_ms + 2000 "
+        "ms after start");
+  }
+  if (cancel) {
+    cancel_game_op_request(request_id);
+    erase_game_job(job_id);
+    std::string discard_detail;
+    discard_pending(request_id, discard_detail);
+    JV payload(JV::object_tag);
+    payload["status"] = JV("cancelled");
+    payload["job_id"] = JV(job_id);
+    payload["request_id"] = JV(request_id);
+    LogSystem::instance().log(
+        LogLevel::Info, LogCategory::Tools,
+        "get_game_job cancelled job " + std::to_string(job_id) +
+            " (request_id " + std::to_string(request_id) + ")");
+    return util::ok_result(std::move(payload));
+  }
+  JV response;
+  if (try_collect_response(request_id, response)) {
+    erase_game_job(job_id);
+    JV payload(JV::object_tag);
+    payload["status"] = JV("done");
+    payload["job_id"] = JV(job_id);
+    payload["result"] = std::move(response);
+    return util::ok_result(std::move(payload));
+  }
+  const int64_t now_ms = steady_game_now_ms();
+  const int64_t expiry_ms =
+      started_ms + job_timeout_ms + GameJobTable::kExpiryGraceMs;
+  if (now_ms > expiry_ms) {
+    erase_game_job(job_id);
+    std::string discard_detail;
+    discard_pending(request_id, discard_detail);
+    JV payload(JV::object_tag);
+    payload["status"] = JV("expired");
+    payload["job_id"] = JV(job_id);
+    payload["request_id"] = JV(request_id);
+    payload["timeout_ms"] = JV(job_timeout_ms);
+    LogSystem::instance().log_detailed(
+        LogLevel::Info, LogCategory::Tools,
+        "get_game_job dropped expired job " + std::to_string(job_id),
+        "job_id=" + std::to_string(job_id) +
+            " request_id=" + std::to_string(request_id) + " timeout_ms=" +
+            std::to_string(job_timeout_ms) + " elapsed_ms=" +
+            std::to_string(now_ms - started_ms));
+    return util::ok_result(std::move(payload));
+  }
+  if (wait_budget_ms <= 0 || now_ms >= deadline_ms) {
+    JV payload(JV::object_tag);
+    payload["status"] = JV("pending");
+    payload["job_id"] = JV(job_id);
+    return util::ok_result(std::move(payload));
+  }
+  const int64_t remaining_budget_ms = deadline_ms - now_ms;
+  const int64_t remaining_expiry_ms = expiry_ms - now_ms;
+  const int64_t wait_ms = remaining_expiry_ms < remaining_budget_ms
+                              ? remaining_expiry_ms
+                              : remaining_budget_ms;
+  JV marker(JV::object_tag);
+  marker["__gda_pending"] = JV(request_id);
+  marker["__gda_job"] = JV(job_id);
+  marker["timeout_ms"] = JV(wait_ms > 0 ? wait_ms : 1);
+  return marker;
+}
+
+mcp::JsonValue wait_game_job(int64_t job_id, int64_t timeout_ms) {
+  if (on_editor_main_thread()) {
+    return util::error_json(
+        "get_game_job cannot wait for the game response on the editor main "
+        "thread — call the tool through the MCP channel so the wait runs on "
+        "the transport thread");
+  }
+  int64_t request_id = 0;
+  int64_t started_ms = 0;
+  int64_t job_timeout_ms = 0;
+  bool found = false;
+  {
+    std::lock_guard<std::mutex> lock(game_jobs_mutex());
+    auto &jobs = game_jobs().jobs;
+    auto it = jobs.find(job_id);
+    if (it != jobs.end()) {
+      found = true;
+      request_id = it->second.request_id;
+      started_ms = it->second.started_ms;
+      job_timeout_ms = it->second.timeout_ms;
+    }
+  }
+  if (!found) {
+    return util::error_detail(
+        "unknown or already collected game job: " + std::to_string(job_id),
+        "get_game_job",
+        "a job_id returned by start_game_job that is still tracked",
+        "re-check the start_game_job response for the correct job_id; jobs "
+        "are removed once collected or after they expire timeout_ms + 2000 "
+        "ms after start");
+  }
+  if (timeout_ms > 0) {
+    wait_pending_completion(request_id, timeout_ms);
+  }
+  JV response;
+  if (try_collect_response(request_id, response)) {
+    erase_game_job(job_id);
+    JV payload(JV::object_tag);
+    payload["status"] = JV("done");
+    payload["job_id"] = JV(job_id);
+    payload["result"] = std::move(response);
+    return util::ok_result(std::move(payload));
+  }
+  const int64_t now_ms = steady_game_now_ms();
+  if ((now_ms - started_ms) >
+      (job_timeout_ms + GameJobTable::kExpiryGraceMs)) {
+    erase_game_job(job_id);
+    std::string discard_detail;
+    discard_pending(request_id, discard_detail);
+    JV payload(JV::object_tag);
+    payload["status"] = JV("expired");
+    payload["job_id"] = JV(job_id);
+    payload["request_id"] = JV(request_id);
+    payload["timeout_ms"] = JV(job_timeout_ms);
+    return util::ok_result(std::move(payload));
+  }
+  JV payload(JV::object_tag);
+  payload["status"] = JV("pending");
+  payload["job_id"] = JV(job_id);
+  return util::ok_result(std::move(payload));
 }
 
 namespace {

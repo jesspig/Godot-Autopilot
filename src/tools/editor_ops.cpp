@@ -7,6 +7,9 @@
 #include "core/log_system.hpp"
 #include "core/sanitize_policy.hpp"
 #include "core/scene_dirty_tracker.hpp"
+#include "tools/dispatch.hpp"
+#include "tools/runtime_ops.hpp"
+#include "util/dotnet_env.hpp"
 #include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/class_db_singleton.hpp>
@@ -32,9 +35,15 @@
 #include <godot_cpp/variant/string_name.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
 #include <algorithm>
+#include <atomic>
 #include <cctype>
+#include <chrono>
 #include <cstdio>
+#include <map>
+#include <memory>
+#include <mutex>
 #include <string>
+#include <vector>
 
 namespace godot_autopilot {
 namespace editor_ops {
@@ -421,6 +430,71 @@ void focus_main_screen_for_class(godot::EditorInterface *editor,
   } else if (cdbs->is_parent_class(class_name, godot::StringName("Node3D"))) {
     editor->set_main_screen_editor(godot::String("3D"));
   }
+}
+
+int64_t steady_now_ms() {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(
+             std::chrono::steady_clock::now().time_since_epoch())
+      .count();
+}
+
+struct SceneSwitchWatch {
+  godot::Node *node = nullptr;
+  std::string name;
+  std::string type;
+  bool closed_previous = false;
+  int64_t started_ms = 0;
+  int64_t deadline_ms = 0;
+};
+
+std::mutex g_scene_watch_mutex;
+std::map<int64_t, std::shared_ptr<SceneSwitchWatch>> g_scene_watches;
+std::atomic<int64_t> g_scene_watch_seq{1};
+
+mcp::JsonValue new_scene_success_result(godot::EditorInterface *editor,
+                                         const std::string &name,
+                                         const std::string &type,
+                                         bool closed_previous) {
+  scene_dirty_tracker::clear_scene_modified();
+  focus_main_screen_for_class(editor, godot::StringName(type.c_str()));
+  mcp::JsonValue inner(mcp::JsonValue::object_tag);
+  inner["path"] = mcp::JsonValue(name);
+  inner["type"] = mcp::JsonValue(type);
+  inner["closed_previous"] = mcp::JsonValue(closed_previous);
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["result"] = std::move(inner);
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "create_editor_scene completed");
+  return r;
+}
+
+mcp::JsonValue new_scene_timeout_result(godot::EditorInterface *editor,
+                                         godot::Node *node, int64_t waited_ms,
+                                         int64_t timeout_ms) {
+  const bool released = release_unclaimed_node(node, editor);
+  std::string message =
+      "scene switch did not take effect within " + std::to_string(waited_ms) +
+      " ms (create_editor_scene) — the new scene root was not observed after "
+      "add_root_node (neighbor-tab occupation is rejected before add and "
+      "never reaches this timeout; this timeout means the post-add switch "
+      "itself was not observed)";
+  if (released) {
+    message += "; the unclaimed node was released";
+  } else {
+    message +=
+        "; the node is still attached to the editor and was not released";
+  }
+  mcp::JsonValue e(mcp::JsonValue::object_tag);
+  e["error"] = mcp::JsonValue(message);
+  e["waited_ms"] = mcp::JsonValue(waited_ms);
+  e["timeout_ms"] = mcp::JsonValue(timeout_ms);
+  e["node_released"] = mcp::JsonValue(released);
+  e["editor_state"] = editor_scene_state_json(editor);
+  LogSystem::instance().log(
+      LogLevel::Error, LogCategory::Tools,
+      "create_editor_scene timed out after " + std::to_string(waited_ms) +
+          " ms");
+  return e;
 }
 
 } // namespace
@@ -1195,54 +1269,181 @@ mcp::JsonValue handle_new_scene(const mcp::JsonValue &args) {
 
   editor->add_root_node(node);
 
-  int64_t waited_ms = 0;
-  bool switched = false;
-  while (waited_ms < timeout_ms) {
-    if (editor->get_edited_scene_root() == node) {
-      switched = true;
-      break;
-    }
-    godot::OS::get_singleton()->delay_usec(GDA_NEW_SCENE_POLL_MS * 1000);
-    waited_ms += GDA_NEW_SCENE_POLL_MS;
+  if (editor->get_edited_scene_root() == node) {
+    return new_scene_success_result(editor, name, type, closed_previous);
   }
-  if (!switched) {
-    bool released = release_unclaimed_node(node, editor);
-    std::string message =
-        "scene switch did not take effect within " + std::to_string(waited_ms) +
-        " ms (create_editor_scene) — the new scene root was not observed after "
-        "add_root_node (neighbor-tab occupation is rejected before add and "
-        "never reaches this timeout; this timeout means the post-add switch "
-        "itself was not observed)";
-    if (released) {
-      message += "; the unclaimed node was released";
-    } else {
-      message += "; the node is still attached to the editor and was not released";
-    }
+
+  auto watch = std::make_shared<SceneSwitchWatch>();
+  watch->node = node;
+  watch->name = name;
+  watch->type = type;
+  watch->closed_previous = closed_previous;
+  watch->started_ms = steady_now_ms();
+  watch->deadline_ms = watch->started_ms + timeout_ms;
+  const int64_t watch_id = g_scene_watch_seq.fetch_add(1);
+  {
+    std::lock_guard<std::mutex> lock(g_scene_watch_mutex);
+    g_scene_watches[watch_id] = watch;
+  }
+  mcp::JsonValue wait_obj(mcp::JsonValue::object_tag);
+  wait_obj["kind"] = mcp::JsonValue("editor_scene_switch");
+  wait_obj["id"] = mcp::JsonValue(watch_id);
+  wait_obj["timeout_ms"] = mcp::JsonValue(static_cast<int64_t>(timeout_ms));
+  mcp::JsonValue marker(mcp::JsonValue::object_tag);
+  marker["__gda_wait"] = std::move(wait_obj);
+  LogSystem::instance().log_detailed(
+      LogLevel::Info, LogCategory::Tools,
+      "create_editor_scene handed the scene switch to the transport thread",
+      "watch_id=" + std::to_string(watch_id) + " timeout_ms=" +
+          std::to_string(timeout_ms));
+  return marker;
+}
+
+namespace {
+
+mcp::JsonValue advance_scene_switch(int64_t watch_id) {
+  std::shared_ptr<SceneSwitchWatch> watch;
+  {
+    std::lock_guard<std::mutex> lock(g_scene_watch_mutex);
+    auto it = g_scene_watches.find(watch_id);
+    if (it != g_scene_watches.end())
+      watch = it->second;
+  }
+  if (!watch) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue(message);
-    e["waited_ms"] = mcp::JsonValue(waited_ms);
-    e["timeout_ms"] = mcp::JsonValue(static_cast<int64_t>(timeout_ms));
-    e["node_released"] = mcp::JsonValue(released);
-    e["editor_state"] = editor_scene_state_json(editor);
-    LogSystem::instance().log(
-        LogLevel::Error, LogCategory::Tools,
-        "create_editor_scene timed out after " + std::to_string(waited_ms) + " ms");
+    e["error"] = mcp::JsonValue("the scene switch wait state is gone");
     return e;
   }
-
-  scene_dirty_tracker::clear_scene_modified();
-
-  focus_main_screen_for_class(editor, godot::StringName(type.c_str()));
-
-  mcp::JsonValue inner(mcp::JsonValue::object_tag);
-  inner["path"] = mcp::JsonValue(name);
-  inner["type"] = mcp::JsonValue(type);
-  inner["closed_previous"] = mcp::JsonValue(closed_previous);
+  auto *editor = godot::EditorInterface::get_singleton();
+  if (!editor) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue("EditorInterface not available");
+    return e;
+  }
+  const int64_t now_ms = steady_now_ms();
+  if (editor->get_edited_scene_root() == watch->node) {
+    {
+      std::lock_guard<std::mutex> lock(g_scene_watch_mutex);
+      g_scene_watches.erase(watch_id);
+    }
+    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    r["done"] = mcp::JsonValue(true);
+    r["result"] = new_scene_success_result(editor, watch->name, watch->type,
+                                           watch->closed_previous);
+    return r;
+  }
+  if (now_ms >= watch->deadline_ms) {
+    {
+      std::lock_guard<std::mutex> lock(g_scene_watch_mutex);
+      g_scene_watches.erase(watch_id);
+    }
+    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    r["done"] = mcp::JsonValue(true);
+    r["result"] = new_scene_timeout_result(editor, watch->node,
+                                           now_ms - watch->started_ms,
+                                           watch->deadline_ms -
+                                               watch->started_ms);
+    return r;
+  }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = std::move(inner);
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "create_editor_scene completed");
+  r["done"] = mcp::JsonValue(false);
   return r;
+}
+
+std::vector<std::string> collect_execute_output_lines(
+    const godot::Array &output) {
+  std::vector<std::string> lines;
+  for (int64_t i = 0; i < output.size(); ++i) {
+    godot::Variant element = output[i];
+    if (element.get_type() == godot::Variant::PACKED_STRING_ARRAY) {
+      godot::PackedStringArray packed = element;
+      for (int64_t j = 0; j < packed.size(); ++j)
+        lines.push_back(util::to_std(packed[j]));
+      continue;
+    }
+    if (element.get_type() != godot::Variant::STRING)
+      continue;
+    std::string blob = util::to_std(godot::String(element));
+    size_t start = 0;
+    while (start <= blob.size()) {
+      size_t end = blob.find('\n', start);
+      std::string line = end == std::string::npos
+                             ? blob.substr(start)
+                             : blob.substr(start, end - start);
+      if (!line.empty() && line.back() == '\r')
+        line.pop_back();
+      if (!line.empty())
+        lines.push_back(line);
+      if (end == std::string::npos)
+        break;
+      start = end + 1;
+    }
+  }
+  return lines;
+}
+
+} // namespace
+
+mcp::JsonValue wait_scene_switch(int64_t watch_id, int64_t timeout_ms) {
+  if (!runtime_ops::has_editor_queue()) {
+    return util::error_json(
+        "the editor main thread queue is unavailable — the scene switch "
+        "cannot be waited for");
+  }
+  CommandQueue &queue = get_editor_queue();
+  if (queue.is_main_thread()) {
+    std::shared_ptr<SceneSwitchWatch> watch;
+    {
+      std::lock_guard<std::mutex> lock(g_scene_watch_mutex);
+      auto it = g_scene_watches.find(watch_id);
+      if (it != g_scene_watches.end()) {
+        watch = it->second;
+        g_scene_watches.erase(it);
+      }
+    }
+    if (watch) {
+      auto *editor = godot::EditorInterface::get_singleton();
+      if (editor)
+        release_unclaimed_node(watch->node, editor);
+    }
+    return util::error_json(
+        "create_editor_scene cannot wait for the scene switch on the editor "
+        "main thread — call the tool through the MCP channel so the wait "
+        "runs on the transport thread");
+  }
+  const int64_t deadline_ms = steady_now_ms() + timeout_ms;
+  for (;;) {
+    const int64_t remaining_ms = deadline_ms - steady_now_ms();
+    if (remaining_ms <= 0)
+      break;
+    const mcp::JsonValue slice = dispatch::run_main_thread_slice(
+        queue, "create_editor_scene",
+        [watch_id]() { return advance_scene_switch(watch_id); },
+        remaining_ms);
+    if (slice.Find("error") != nullptr)
+      return slice;
+    const auto *done_p = slice.Find("done");
+    if (done_p && done_p->IsBool() && done_p->GetBool()) {
+      const auto *result_p = slice.Find("result");
+      if (result_p)
+        return *result_p;
+      return util::error_json(
+          "the scene switch finished without a readable result");
+    }
+  }
+  const mcp::JsonValue final_slice = dispatch::run_main_thread_slice(
+      queue, "create_editor_scene finalize",
+      [watch_id]() { return advance_scene_switch(watch_id); }, 2000);
+  if (final_slice.Find("error") == nullptr) {
+    const auto *done_p = final_slice.Find("done");
+    if (done_p && done_p->IsBool() && done_p->GetBool()) {
+      const auto *result_p = final_slice.Find("result");
+      if (result_p)
+        return *result_p;
+    }
+  }
+  return util::error_json(
+      "the editor main thread did not report the scene switch result in time");
 }
 
 mcp::JsonValue handle_open_scene(const mcp::JsonValue &args) {
@@ -1469,15 +1670,24 @@ mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args) {
   auto *os = godot::OS::get_singleton();
   if (!os)
     return util::error_json("OS singleton not available");
+  auto *settings = godot::ProjectSettings::get_singleton();
+  if (!settings)
+    return util::error_json("ProjectSettings singleton not available");
+  std::string project_path =
+      util::to_std(settings->globalize_path(godot::String(project_file.c_str())));
+  if (project_path.empty())
+    return util::error_json("无法把工程文件路径换算为系统绝对路径: " +
+                            project_file);
   std::string command = "dotnet build --nologo " + project_file;
   if (!wait) {
     godot::PackedStringArray argv;
     argv.append("build");
     argv.append("--nologo");
-    argv.append(godot::String(project_file.c_str()));
+    argv.append(godot::String(project_path.c_str()));
     int32_t pid = os->create_process("dotnet", argv);
     mcp::JsonValue inner(mcp::JsonValue::object_tag);
     inner["project_file"] = mcp::JsonValue(project_file);
+    inner["project_path"] = mcp::JsonValue(project_path);
     inner["command"] = mcp::JsonValue(command);
     inner["pid"] = mcp::JsonValue(static_cast<int64_t>(pid));
     inner["note"] = mcp::JsonValue(kNote);
@@ -1496,21 +1706,18 @@ mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args) {
   godot::PackedStringArray build_args;
   build_args.append("build");
   build_args.append("--nologo");
-  build_args.append(godot::String(project_file.c_str()));
+  build_args.append(godot::String(project_path.c_str()));
   godot::Array output;
   output.append(godot::PackedStringArray());
   int32_t exit_code =
       os->execute(godot::String("dotnet"), build_args, output, true);
+  std::vector<std::string> output_lines = collect_execute_output_lines(output);
   std::string combined;
-  for (int i = 0; i < output.size(); ++i) {
-    godot::PackedStringArray lines = output[i];
-    for (int j = 0; j < lines.size(); ++j) {
-      std::string line = util::to_std(lines[j]);
-      if (!combined.empty()) {
-        combined += "\n";
-      }
-      combined += line;
+  for (const std::string &line : output_lines) {
+    if (!combined.empty()) {
+      combined += "\n";
     }
+    combined += line;
   }
   mcp::JsonValue errors_arr(mcp::JsonValue::array_tag);
   const size_t kMaxErrors = 50;
@@ -1552,11 +1759,20 @@ mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args) {
   }
   mcp::JsonValue inner(mcp::JsonValue::object_tag);
   inner["project_file"] = mcp::JsonValue(project_file);
+  inner["project_path"] = mcp::JsonValue(project_path);
   inner["command"] = mcp::JsonValue(command);
   inner["exit_code"] = mcp::JsonValue(static_cast<int64_t>(exit_code));
   inner["success"] = mcp::JsonValue(exit_code == 0);
   inner["errors"] = std::move(errors_arr);
   inner["output_digest"] = mcp::JsonValue(digest);
+  inner["output_empty"] = mcp::JsonValue(combined.empty());
+  if (combined.empty()) {
+    inner["output_hint"] = mcp::JsonValue(
+        "dotnet 未产生任何可捕获输出：exit_code=" +
+        std::to_string(static_cast<int64_t>(exit_code)) +
+        "（-1 表示进程未能启动，常见于 dotnet 不在 PATH；0 且无输出说明构建"
+        "未产生日志）");
+  }
   if (output_truncated) {
     inner["output_truncated"] = mcp::JsonValue(true);
   }
@@ -1603,23 +1819,33 @@ mcp::JsonValue handle_dotnet_environment(const mcp::JsonValue &) {
   if (exit_code != 0)
     return util::error_json("启动 dotnet 失败（SDK 缺失或不在 PATH？），请确认已安装 .NET SDK 且 dotnet 命令可用");
   std::string dotnet_version;
-  if (output.size() > 0) {
-    godot::PackedStringArray out_lines = output[0];
-    if (out_lines.size() > 0)
-      dotnet_version = util::to_std(out_lines[0].strip_edges());
+  {
+    std::vector<std::string> version_lines = collect_execute_output_lines(output);
+    if (!version_lines.empty()) {
+      godot::String first = godot::String(version_lines.front().c_str());
+      dotnet_version = util::to_std(first.strip_edges());
+    }
   }
-  bool is_dotnet_editor = os->has_feature(godot::String("mono"));
-  bool assembly_loaded = false;
-  auto *cdbs = godot::ClassDBSingleton::get_singleton();
-  if (cdbs)
-    assembly_loaded = cdbs->class_exists(godot::StringName("CSharpScript"));
+  dotnet_env::DotnetProbe probe = dotnet_env::probe_current();
+  const bool is_dotnet_editor = dotnet_env::is_dotnet_environment(probe);
+  const bool assembly_loaded = probe.csharp_script_class;
   mcp::JsonValue inner(mcp::JsonValue::object_tag);
   inner["dotnet_available"] = mcp::JsonValue(true);
   inner["dotnet_version"] = mcp::JsonValue(dotnet_version);
   inner["project_file"] = mcp::JsonValue(project_file);
   inner["is_dotnet_editor"] = mcp::JsonValue(is_dotnet_editor);
   inner["assembly_loaded"] = mcp::JsonValue(assembly_loaded);
-  inner["hint"] = mcp::JsonValue("is_dotnet_editor 经 OS.has_feature(mono) 推测、assembly_loaded 经 CSharpScript 类存在性推测，均未在 .NET 编辑器下实测验证，后续需真机复核");
+  inner["engine_version"] = mcp::JsonValue(
+      std::to_string(probe.engine_major) + "." +
+      std::to_string(probe.engine_minor));
+  inner["mono_feature"] = mcp::JsonValue(probe.mono_feature);
+  inner["dotnet_feature"] = mcp::JsonValue(probe.dotnet_feature);
+  inner["hint"] = mcp::JsonValue(
+      "is_dotnet_editor 由 CSharpScript 类注册（Godot 4.x 的 .NET 模块装载时"
+      "注册该类）判定，并以 OS.has_feature(dotnet)（4.4+）或 OS.has_feature("
+      "mono)（4.4 之前）按引擎版本兜底；Godot 4.x 未注册 mono/dotnet 特性"
+      "标签，特性名探测在多数版本下恒为 false；assembly_loaded 同样源于 "
+      "CSharpScript 类存在性，反映 .NET 模块已装载而非项目程序集已加载");
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(inner);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,

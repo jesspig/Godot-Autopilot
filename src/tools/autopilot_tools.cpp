@@ -37,6 +37,7 @@
 #include "tools/tool_base.hpp"
 #include "tools/tool_invoke.hpp"
 #include "tools/tool_spec.hpp"
+#include "util/dotnet_env.hpp"
 #include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 
@@ -473,19 +474,16 @@ godot::Dictionary AutopilotTools::register_csharp_tool(
   }
   bool is_dotnet_editor = false;
   bool assembly_loaded = false;
-  if (godot::OS *os = godot::OS::get_singleton()) {
-    is_dotnet_editor = os->has_feature(godot::String("mono"));
-  }
-  if (godot::ClassDBSingleton *cdbs =
-          godot::ClassDBSingleton::get_singleton()) {
-    assembly_loaded = cdbs->class_exists(godot::StringName("CSharpScript"));
-  }
+  dotnet_env::DotnetProbe probe = dotnet_env::probe_current();
+  is_dotnet_editor = dotnet_env::is_dotnet_environment(probe);
+  assembly_loaded = probe.csharp_script_class;
   if (!is_dotnet_editor) {
     godot::Dictionary out = rescan_error(
         "register_csharp_tool: tool '" + name +
         "' not registered: editor is NOT a .NET build "
-        "(OS.has_feature mono is false), so C# callables cannot load in "
-        "this editor; open the project in the .NET editor build and retry");
+        "(CSharpScript class missing and no mono/dotnet feature reported), "
+        "so C# callables cannot load in this editor; open the project in the "
+        ".NET editor build and retry");
     out["tool_name"] = godot::String::utf8(name.c_str());
     out["handle"] = static_cast<int64_t>(-1);
     return out;

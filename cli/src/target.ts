@@ -2,8 +2,14 @@ import fs from "node:fs";
 import path from "node:path";
 import type { GlobalOptions } from "./args";
 import { CliError, ExitCode } from "./errors";
+import {
+  findPluginRecordByProject,
+  type PluginInstanceRecord,
+} from "./instances";
 import { readProjectName, userDataBase } from "./platform";
 import { isAlive } from "./process";
+
+export { projectPathKey } from "./platform";
 
 export interface InstanceEntry {
   id: string;
@@ -21,10 +27,21 @@ export interface TargetContext {
   findLiveByProject(project: string): InstanceEntry | undefined;
 }
 
+export type TargetChain =
+  | "port"
+  | "id"
+  | "env"
+  | "cli-registry"
+  | "plugin-index"
+  | "legacy"
+  | "default";
+
 export interface ResolvedTarget {
   port: number;
   source: string;
+  chain: TargetChain;
   instance?: InstanceEntry;
+  pluginRecord?: PluginInstanceRecord;
 }
 
 export type TargetSelector = Pick<GlobalOptions, "portText" | "id" | "project">;
@@ -43,11 +60,6 @@ function parsePortText(text: string): number | null {
 
 function normalizePath(p: string): string {
   return path.resolve(p);
-}
-
-export function projectPathKey(p: string): string {
-  const resolved = path.resolve(p);
-  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
 }
 
 export function assertSingleSelector(opts: TargetSelector): void {
@@ -132,39 +144,42 @@ function portFromTraceOrConfig(startDir: string): { port: number; source: string
 export function resolveTarget(opts: TargetSelector, ctx: TargetContext): ResolvedTarget {
   assertSingleSelector(opts);
 
+  if (opts.portText !== undefined) {
+    return { port: parseTargetPort(opts.portText), source: "cli", chain: "port" };
+  }
+
   if (opts.id !== undefined) {
     const entry = ctx.findById(opts.id);
     if (entry === undefined || !isAlive(entry.pid)) {
       throw new CliError(ExitCode.Transport, `unknown instance: ${opts.id} (run "gda list" to see running instances)`);
     }
-    return { port: entry.port, source: "id", instance: entry };
-  }
-
-  if (opts.portText !== undefined) {
-    return { port: parseTargetPort(opts.portText), source: "cli" };
-  }
-
-  if (opts.project !== undefined) {
-    const normalized = normalizePath(opts.project);
-    const entry = ctx.findLiveByProject(normalized);
-    if (entry !== undefined) {
-      return { port: entry.port, source: "project", instance: entry };
-    }
-    const found = portFromTraceOrConfig(normalized);
-    if (found !== null) return found;
-    return { port: DEFAULT_PORT, source: "default" };
+    return { port: entry.port, source: "id", chain: "id", instance: entry };
   }
 
   const envText = process.env.GODOT_AUTOPILOT_PORT;
   if (envText !== undefined && envText !== "") {
     const port = parsePortText(envText);
-    if (port !== null) return { port, source: "env" };
+    if (port !== null) return { port, source: "env", chain: "env" };
   }
-  const cwdEntry = ctx.findLiveByProject(process.cwd());
-  if (cwdEntry !== undefined) {
-    return { port: cwdEntry.port, source: "cwd", instance: cwdEntry };
+
+  const projectOption = opts.project;
+  const scoped = projectOption !== undefined;
+  const projectPath = scoped ? normalizePath(projectOption) : process.cwd();
+
+  const entry = ctx.findLiveByProject(projectPath);
+  if (entry !== undefined) {
+    return { port: entry.port, source: scoped ? "project" : "cwd", chain: "cli-registry", instance: entry };
   }
-  const found = portFromTraceOrConfig(process.cwd());
-  if (found !== null) return found;
-  return { port: DEFAULT_PORT, source: "default" };
+
+  const record = findPluginRecordByProject(projectPath);
+  if (record !== undefined && record.port !== null) {
+    return { port: record.port, source: "registry", chain: "plugin-index", pluginRecord: record };
+  }
+
+  const found = portFromTraceOrConfig(projectPath);
+  if (found !== null) {
+    return { port: found.port, source: found.source, chain: "legacy" };
+  }
+
+  return { port: DEFAULT_PORT, source: "default", chain: "default" };
 }

@@ -95,8 +95,18 @@ void print_console_report(const std::vector<FileResult>& results) {
                   << " | " << std::setw(5) << status_text(result) << '\n';
 
         size_t failed_count = 0;
+        size_t soft_count = 0;
         for (const auto& step : result.steps) {
             if (step.passed) {
+                continue;
+            }
+            if (step.soft_failed) {
+                ++soft_count;
+                if (soft_count > kMaxFailedDetailLines) {
+                    continue;
+                }
+                std::cout << "    ~ 步骤 " << step.step_id << " [" << step.tool
+                          << "] 软失败(已容忍): " << step.soft_reason << '\n';
                 continue;
             }
             ++failed_count;
@@ -109,6 +119,10 @@ void print_console_report(const std::vector<FileResult>& results) {
         if (failed_count > kMaxFailedDetailLines) {
             std::cout << "    … 共 " << failed_count << " 条失败步骤, 仅显示前 "
                       << kMaxFailedDetailLines << " 条\n";
+        }
+        if (soft_count > 0) {
+            std::cout << "    · 软失败 " << soft_count
+                      << " 步(错误前缀命中 soft_error, 已容忍, 不计入失败)\n";
         }
     }
 
@@ -147,6 +161,14 @@ std::string save_json_report(const std::vector<FileResult>& results, const std::
         file_obj["passed"] = mcp::JsonValue(result.passed);
         file_obj["duration_ms"] = mcp::JsonValue(result.duration_ms);
         file_obj["fatal_error"] = mcp::JsonValue(result.fatal_error);
+        size_t soft_failures = 0;
+        for (const auto& step : result.steps) {
+            if (step.soft_failed) {
+                ++soft_failures;
+            }
+        }
+        file_obj["soft_failures"] =
+            mcp::JsonValue(static_cast<int64_t>(soft_failures));
 
         mcp::JsonValue steps_array(mcp::JsonValue::array_tag);
         for (const auto& step : result.steps) {
@@ -155,6 +177,8 @@ std::string save_json_report(const std::vector<FileResult>& results, const std::
             step_obj["tool"] = mcp::JsonValue(step.tool);
             step_obj["passed"] = mcp::JsonValue(step.passed);
             step_obj["detail"] = mcp::JsonValue(step.detail);
+            step_obj["soft_failed"] = mcp::JsonValue(step.soft_failed);
+            step_obj["soft_reason"] = mcp::JsonValue(step.soft_reason);
             steps_array.PushBack(std::move(step_obj));
         }
         file_obj["steps"] = std::move(steps_array);

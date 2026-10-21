@@ -4,10 +4,12 @@
 #include "core/config.hpp"
 #include "core/editor_coords.hpp"
 #include "core/log_system.hpp"
+#include "core/storage_paths.hpp"
 #include "tools/editor_ui_ops.hpp"
 #include "tools/runtime_ops.hpp"
 #include "tools/scene_ops.hpp"
 #include "util/json_godot.hpp"
+#include "util/project_path.hpp"
 #include <algorithm>
 #include <cmath>
 #include <godot_cpp/classes/camera3d.hpp>
@@ -1108,7 +1110,17 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
 
   std::string saved_path;
   if (save) {
-    const godot::String capture_dir = "user://godot_autopilot/captures";
+    const std::string capture_dir_path =
+        StoragePaths::captures_dir(util::current_project_root_path());
+    if (capture_dir_path.empty()) {
+      return util::error_detail(
+          "capture storage path unavailable",
+          "capture_ops.cpp handle_capture_viewport",
+          "a resolvable GDA home directory",
+          "check that the home directory is writable");
+    }
+    const godot::String capture_dir =
+        godot::String::utf8(capture_dir_path.c_str());
     godot::DirAccess::make_dir_recursive_absolute(capture_dir);
     const godot::String capture_path =
         capture_dir + godot::String("/gda_capture_editor_") +
@@ -1120,8 +1132,8 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
     if (save_err != godot::OK) {
       return util::error_detail("failed to save editor capture",
                                 "capture_ops.cpp handle_capture_viewport",
-                                "writable user:// path",
-                                "check that the user:// directory is writable");
+                                "writable GDA home directory",
+                                "check that the home directory is writable");
     }
     prune_capture_files(capture_dir, 20);
     saved_path = util::to_std(capture_path);

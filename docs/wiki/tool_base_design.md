@@ -7,13 +7,13 @@ tags:
   - 工具架构
   - ToolSpec
   - 数据化
-timestamp: "2026-10-20T04:01:51+08:00"
+timestamp: "2026-10-21T04:47:54+08:00"
 resource: src/tools/
 ---
 
 # ToolSpec 工具数据层与执行管线（设计定稿 + 全量迁移）
 
-> **当前 API 面（2026-10-20 复核：注册共 33 域 451 工具 + `system_status` + 7 元，catalog 共 459）**
+> **当前 API 面（2026-10-21 复核：注册共 33 域 451 工具 + `system_status` + 7 元，catalog 共 459；`SideEffect` 9 值，授权三档七能力，`main_thread_timeout` 的 `retryable` 为 false）**
 > `tool_spec.hpp`：`ToolSpec` 数据记录（name/description/category/tags/side_effect/flags/params/handler/raw_schema）+ `ParamSpec`（= `schema::ParamDef`）+ `tool_flags` 位标志 + `SpecTool : ToolBase, ISideEffect` + `make_spec_tool`；schema 由 `params` 经 `schema::build_schema` 派生，`raw_schema` 非空时优先。`tool_flags` 现为 9 位（09-29 新增 `kHealthProbe` 健康探针短预算 / `kLongBlocking` 长阻塞预算）。
 > `dispatch.hpp/cpp`：跨线程调用统一入口 `run_on_main_thread_with_budget` + `main_thread_wait_budget_ms`（09-29；10-20 起改 4 参，新增 `long_blocking_ms`；默认 27000ms / 健康探针 5000ms / 长阻塞 29000ms（常量 `GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = GDA_DISPATCH_WAIT_MAX_MS`，env `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS` 可下调至 `[1000, 29000]`），超时取消 + `main_thread_timeout` 结构化错误）。
 > `tool_args.hpp/cpp`：`Args` 取参器 + `ToolArgError`（opt_/require_/get_ 系列 + `reject_unknown`，空值视为缺失）。
@@ -50,7 +50,7 @@ inline std::unique_ptr<ToolBase> make_spec_tool(ToolSpec spec);
 
 - `ParamSpec`/`schema::ParamDef` 四字段：`{name, type, description, required}`；`type` 为 JSON schema 类型字符串（`string`/`integer`/`number`/`boolean`/`object`/`array`）。
 - `tool_flags` 位标志（`tool_flags::kNone` + 9 个位）：`kMeta`（元工具归类）、`kDynamic`（用户脚本注册）、`kMutating`（改动状态，遍历排除依据）、`kObserve`（支持 `observe` 参数合并截图）、`kCaptureImage`（图片附件判定）、`kSceneTarget`（成功响应幂等补全场景路径）、`kUndoable`（纯标记）、`kHealthProbe`（09-29 新增，健康探针：`ping`/`system_status`，主线程等待用 5000ms 短预算）、`kLongBlocking`（09-29 新增，长阻塞：`code_execute`/`batch_execute`，主线程等待用长阻塞预算，常量 `GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = 29000ms`（= `GDA_DISPATCH_WAIT_MAX_MS`，env `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS` 可下调至 `[1000, 29000]`））。收编终态（2026-10-20 按 451 个 `ToolSpec` 块逐块统计，口径为「有多少个工具声明了该 flag」）：`kSceneTarget` 42 工具 / `kUndoable` 24 工具 / `kCaptureImage` 9 工具 / `kObserve` 7 工具 / `kMutating` 100 工具 / `kNone` 347 工具（详见下节 traits 小节）。
-- 域侧写法：`const std::vector<ParamSpec> kXxxParams = {...};` 参数表与工具名一一对应，`make_tools()` 中 `v.push_back(make_spec_tool(ToolSpec{name, description, category, {tags}, side_effect, flags, kXxxParams, handler}))`（`side_effect` 取 `SideEffect` 枚举 8 值，见 [安全边界与并发契约](security_contract.md)）。
+- 域侧写法：`const std::vector<ParamSpec> kXxxParams = {...};` 参数表与工具名一一对应，`make_tools()` 中 `v.push_back(make_spec_tool(ToolSpec{name, description, category, {tags}, side_effect, flags, kXxxParams, handler}))`（`side_effect` 取 `SideEffect` 枚举 9 值，见 [安全边界与并发契约](security_contract.md)）。
 
 ## SpecTool 与执行管线
 
@@ -68,11 +68,11 @@ class SpecTool : public ToolBase, public ISideEffect {
 
 `kObserve` 后处理自 2026-09-19 起统一由管线提供，Input 域 4 个合成输入工具（`click_input_mouse`/`scroll_input_mouse`/`drag_input_mouse`/`type_input_text`）与 Editor 域 2 个元素操作工具（`click_editor_element`/`type_editor_element_text`）已收编，`input_click_ops.cpp` 与 `editor_ui_actions.cpp` 中此前的重复实现已删除。
 
-### side_effect 与能力门（2026-10-20 修正）
+### side_effect 与能力门（2026-10-20 修正，2026-10-21 改授权三档）
 
-- **`side_effect_name` 回显口径**：`SideEffect` 8 值经 `tool_base.hpp:21-33` 的 `side_effect_name()` 映射为字符串——`none`/`writes_file`/`writes_config`/`shows_alert`/`modifies_window`/`process`/`code_execute`/`game_runtime`。**只读工具（`SideEffect::None`）回显为 `"none"`，不再回显空串**；`get_tool_detail` 响应里的 `side_effect` 字段即取自该函数（`register_all.cpp:195-199`），registry 查不到工具时兜底为 `"none"`。
+- **`side_effect_name` 回显口径**：`SideEffect` 9 值经 `tool_base.hpp` 的 `side_effect_name()` 映射为字符串——`none`/`writes_file`/`writes_config`/`shows_alert`/`modifies_window`/`process`/`code_execute`/`game_runtime`/`destructive`（10-21 新增 `Destructive`）。**只读工具（`SideEffect::None`）回显为 `"none"`，不再回显空串**；`get_tool_detail` 响应里的 `side_effect` 字段即取自该函数（`register_all.cpp:195-199`），registry 查不到工具时兜底为 `"none"`。
 - **`code_execute`/`batch_execute` 的 `side_effect` 现声明为 `SideEffect::CodeExecute`**（`register_all.cpp:504` / `:552`），回显 `"code_execute"`，与 `process`/`game_runtime` 同属需授权的能力。
-- **能力门映射不再按工具名特判**：`authorization::capability_for_tool(name, effect)`（`tool_base.hpp:63-73`）现**只按 `SideEffect` 判定**——`Process` → `process`、`CodeExecute` → `code_execute`、`GameRuntime` → `game_runtime`，其余返回 `nullptr`（不需授权）；`name` 形参已不再参与判定（函数体首行即 `(void)name;`）。因此新增工具只要声明对应的 `side_effect` 即自动进入能力门，无需再改授权表。
+- **能力门映射不再按工具名特判**：**10-21 起能力门由「能力名」升级为「三档」**——`authorization::tier_for_side_effect(effect)` 按 `SideEffect` 分档（读档 `none`→`Read` / 写档 `writes_file`/`writes_config`/`shows_alert`/`modifies_window`→`Write` / 危险档 `process`/`code_execute`/`game_runtime`/`destructive`→`Danger`），`authorization::capability_for_tool(name, effect)` 把档位映射成**七个能力名**（`read`/`write`/`process`/`code_execute`/`game_runtime`/`destructive`/`user_tools`），`authorization::tier_permits(capability, allow_list)` 决定放行：**读档默认放行；写档默认拒绝**（需允许列表含 `write` 或 `all`）；危险档默认拒绝且需显式开启对应能力名。`name` 形参不再参与判定（函数体首行即 `(void)name;`），新增工具只要声明对应的 `side_effect` 即自动进入对应档位，无需再改授权表。完整口径见 [T0 安全边界与并发契约](security_contract.md) §3.1。
 
 ## 线程路由与 dispatch 预算（09-29 新增）
 
@@ -84,7 +84,7 @@ class SpecTool : public ToolBase, public ISideEffect {
 
 **`code_execute` 的 `timeout_ms` 上界与派发预算同源（10-20 起）**：上界不是写死的字面量，而是由 `code_exec_ops::max_timeout_ms()`（`src/tools/code_exec_ops.cpp:464-470`）在运行期算出——取 `min(GDA_CODE_EXEC_MAX_TIMEOUT_MS = 27000, 生效长阻塞派发预算)`；生效派发预算默认 29000ms（`src/tools/dispatch.cpp:280-286`），故默认环境下上界为 **27000ms**；若 `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS` 把预算下调，上界随之下调。派发侧余量 2000ms（`GDA_CODE_EXEC_BUDGET_MARGIN_MS`，`src/core/config.hpp:46`）保证脚本 deadline 先于派发预算到期，传输侧余量 2000ms（`GDA_CODE_EXEC_TRANSPORT_MARGIN_MS`，`src/core/config.hpp:47`）保证结构化超时结果能在传输硬超时前回到客户端。该值有三处消费且都取自同一实现点：handler 的参数校验（`code_exec_ops.cpp:963-973`）、schema 的 `maximum`（`register_all.cpp:568-577`）、提示词的「最大 …ms」拼串（`prompt_tool_usage.cpp:504`）。
 
-等待超时：先 `CommandQueue::cancel(id)`（命中表示任务尚未执行、不会执行；未命中表示已被主线程取走），然后返回结构化错误——`error`（含 waited_ms/队列诊断与"retry、健康预算"提示）、`code="main_thread_timeout"`、`retryable=true`、`tool`、`waited_ms`、`queue_depth`、`oldest_pending_ms`、`last_drain_age_ms`、`cancelled`；`false` 与否来自 `cancel` 命中，并直写一条 `type=dispatch_timeout` trace（`LogPersist::write_trace_now`）与 Transport Warning。队列满/关闭时返回 `queue_unavailable`（不进入等待）。
+等待超时：先 `CommandQueue::cancel(id)`（命中表示任务尚未执行、不会执行；未命中表示已被主线程取走），然后返回结构化错误——`error`（含 waited_ms/队列诊断与"retry、健康预算"提示）、`code="main_thread_timeout"`、**`retryable=false`**（10-21 变更：调用已取消、副作用可能仍在主线程落地，不可盲目重试）、`tool`、`waited_ms`、`queue_depth`、`oldest_pending_ms`、`last_drain_age_ms`、`cancelled`、`cancelled_before_execution`；并直写一条 `type=dispatch_timeout` trace（`LogPersist::write_trace_now`）与 Transport Warning。队列满/关闭时返回 `queue_unavailable`（`code="queue_unavailable"`、`retryable=true`，属通道侧暂时不可用，重试安全；不进入等待）。
 
 **超时执行路径（2026-10-20 新增）**：`CommandQueue` 新增 `submit_tracked_bounded(Fn, budget_ms)`（`src/core/command_queue.hpp:260`），在提交侧即以预算轮询 future，超时自动 `cancel(id)` 并回填 `TrackedSubmission` 新增的 `timed_out`/`waited_ms`/`cancelled` 三个字段（原 `TrackedSubmission` 只有 `id` + `future`）；`dispatch::run_bounded_on_main_thread`（`src/tools/dispatch.hpp:45-64`）以此为底座，回填 `BoundedWaitOutcome{ok,timed_out,cancelled,waited_ms,error}`。编辑器内 GDScript 协作式超时时另走 `dispatch::exec_timeout_result(timeout_ms, execution_time_ms)`，返回 `code="exec_timeout"`（`code_execute` 的 `run_with_timeout` 命中超时后调用，`code_exec_ops.cpp:994-995`）；游戏侧 eval 超时统一为 `code="eval_timeout"`（编辑器侧等待超时与游戏侧协作式截止两处均产出该码，见 [入口与运行时](modules/entry_runtime.md)）。
 
@@ -139,9 +139,9 @@ L1 `dispatch_budget_test` 覆盖预算决策与队列不可用返回 **14 项**�
 | `unregister_tool(handle)` | 按 handle 移除，成功触发重建 |
 | `has_tool(name)` / `list_tools()` / `get_tool(name)` | 查询已注册工具（get_tool 含 name/description/category/tags/side_effect/params/handle） |
 | `call_tool(name, args)` | 直连 dispatch 调任意工具（自动回主线程） |
-| `is_enabled()` / `set_enabled(bool)` | 读写 `user_tools` capability（写 `user://godot_autopilot/config.json` 的 `allow` 字段） |
+| `is_enabled()` / `set_enabled(bool)` | 读写 `user_tools` capability（写集中根下的全局级 `config.json` 的 `allow` 字段） |
 
-- **definition 字段**：`name`（必填、非空）、`description`、`category`（默认 `User`）、`tags`、`side_effect`（注册方声明的**输入**字段：空串或省略即 `SideEffect::None`，其余取 `writes_file`/`writes_config`/`shows_alert`/`modifies_window`/`process`/`code_execute`/`game_runtime`；注意 `"none"` **不是**合法输入值，只读动态工具须留空）、`params`（`[{name, type, description, required}]`）。动态工具的 `side_effect` **回显**恒非空——只读工具回显 `"none"`（`autopilot_tools.cpp:613` 经 `side_effect_name`），输入侧的空串不会出现在回显里。
+- **definition 字段**：`name`（必填、非空）、`description`、`category`（默认 `User`）、`tags`、`side_effect`（注册方声明的**输入**字段：空串或省略即 `SideEffect::None`，其余取 `writes_file`/`writes_config`/`shows_alert`/`modifies_window`/`process`/`code_execute`/`game_runtime`/`destructive`；注意 `"none"` **不是**合法输入值，只读动态工具须留空）、`params`（`[{name, type, description, required}]`）。动态工具的 `side_effect` **回显**恒非空——只读工具回显 `"none"`（`autopilot_tools.cpp:613` 经 `side_effect_name`），输入侧的空串不会出现在回显里。
 - **存储与重建**：spec 存入 `dynamic_specs::store()`（`dynamic_spec_store.hpp`，互斥保护），`register_tool`/`unregister_tool` 成功后调 `refresh_dynamic_tools()` 重建 registry（动态 spec 带 `kDynamic` flag）；重名（已注册或与内置工具碰撞）拒绝注册。
 - **执行门**：注册与调用均要求 `user_tools` capability（env `GODOT_AUTOPILOT_ALLOW` 优先于配置 `allow`；dock 复选框 "Allow user tools"）。callable 目标对象被释放后调用报"目标已失效，请重新注册"。
 - **生命周期**：`AutopilotTools` 析构清空 spec store；编辑器中单例随插件加载注册。

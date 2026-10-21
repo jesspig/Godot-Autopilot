@@ -230,12 +230,22 @@ beforeAll(async () => {
 }, HOOK_TIMEOUT_MS);
 
 afterAll(async () => {
+  const prevCliHome = process.env.GODOT_AUTOPILOT_CLI_HOME;
+  const cleanupHome = fs.mkdtempSync(path.join(os.tmpdir(), `${RUN_TAG}-cleanup-`));
   try {
+    process.env.GODOT_AUTOPILOT_CLI_HOME = cleanupHome;
     await killAllRegistered();
     await killOrphanFakeGodot();
     await removeDirWithRetry(fakeGodotDir);
   } catch (error) {
     process.stderr.write(`[cleanup] afterAll failed: ${String(error)}\n`);
+  } finally {
+    if (prevCliHome === undefined) {
+      delete process.env.GODOT_AUTOPILOT_CLI_HOME;
+    } else {
+      process.env.GODOT_AUTOPILOT_CLI_HOME = prevCliHome;
+    }
+    await removeDirWithRetry(cleanupHome);
   }
 }, HOOK_TIMEOUT_MS);
 

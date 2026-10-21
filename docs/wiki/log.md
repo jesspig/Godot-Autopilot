@@ -1,6 +1,28 @@
 # 维护日志摘要
 
-> 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天（按有变更的日期段计，最新一段 2026-10-20，窗口 10-14 – 10-20；更早的批次留档在 changelog 目录，如 [2026-10-10-log.md](changelog/2026-10-10-log.md)）。
+> 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天（按有变更的日期段计，最新一段 2026-10-21，窗口 10-16 – 10-21；更早的批次留档在 changelog 目录，如 [2026-10-10-log.md](changelog/2026-10-10-log.md)）。
+
+## 2026-10-21
+
+- **插件控制面板补齐写类、破坏性与进程执行授权开关（行为变更的恢复路径补齐）**：控制面板此前只有三个授权复选框（"Allow code_execute" / "Allow game_runtime" / "Allow user tools"），**写类（`write`）与破坏性（`destructive`）没有开关**——被默认拒绝后只能改环境变量或手改配置才能恢复。新增 "Allow write" 与 "Allow destructive" 两个复选框（沿用既有 `allow_list_add` / `allow_list_remove` 模式），随后再补 **"Allow process"**（进程执行档），面板开关的能力清单由三项扩为**六项**（`capability_has_dock_toggle`），`read` 无需授权故无开关、`process` 不再只能经环境变量开启。开关控件改为按能力清单生成（[`src/ui/authorization_switches.hpp`](../../src/ui/authorization_switches.hpp)），初始勾选状态统一按**当前实际生效的允许列表**显示（`GODOT_AUTOPILOT_ALLOW` 环境变量优先于配置键），避免控件与能力漂移。**行为变更口径不变**：写类（写文件、写配置、注入输入、改窗口）与破坏性（删除主窗口等不可逆操作）**默认拒绝**，既有 MCP 与 REST 调用都会收到 403 `authorization_required`；开启方式为环境变量 `GODOT_AUTOPILOT_ALLOW=write`（须重启）、面板勾选（**下一次调用即生效**）或配置 `allow` 键加入 `write` / `destructive`。取消一项不影响其它项（`all` 先展开再逐项删）。契约见 [T0 安全边界与并发契约](security_contract.md) §3.1.1，详见 [2026-10-21-log.md](changelog/2026-10-21-log.md)。
+
+- **同工程实例守卫与线程卸载安全**：插件启动前检测**同工程**是否已有存活实例，占用同一端口时**拒绝启动**并给出可操作提示（既有实例的端口与进程号、关闭另一个编辑器的建议、豁免开关 `GODOT_AUTOPILOT_ALLOW_MULTI_INSTANCE=1`）；绑定时会清理同工程的残留登记。线程退出契约改为**卸载前收割**——挂起线程在卸载前一定已 join，停止后不再启动新任务，DLL 卸载时不会有本模块线程在跑。口径见 [端口与实例登记](modules/ports.md)。
+
+- **C# 程序集构建缺陷修复与 .NET 环境判定改口径**：`build_csharp_assembly` 原把 `res://` 工程文件路径原样交给 dotnet（dotnet 无法解析 `res://`，报 MSB1009、**构建不发生**），现经 `ProjectSettings.globalize_path` 换算为**系统绝对路径**后再调 dotnet，**无需手工预建程序集**即可让反射用例全绿（实测 56 步、0 软失败）。.NET 环境判定的**权威信号改为引擎是否注册了 `CSharpScript` 类**（.NET 模块装载即注册）；**Godot 4.x 未注册 `mono` / `dotnet` 特性标签**（本机 4.7.2 mono 实测两者皆为 false），版本兜底为 4.4 及以上用 `dotnet`、更早用 `mono`、版本未知取二者或。反射用例的**恢复全绿条件**：仅当编辑器为 .NET 版本且程序集构建成功时全绿，否则相关步骤按软失败计入。
+
+- **知识库数值同步（遍历基线）**：按最近一次 L2 实测（主代理在集成分支 `feature/api-surface` 上运行 `03_tools_contract`）更正 [测试体系](tests.md) 的遍历基线口径——枚举 452（不变）/ 排除 **111→147** / 候选 **341→305** / 实测步数 **625→557** / `empty_args` warnings 基线 **4→0**（该批次基线常量已同步至 `tests/runner/traversal.cpp:25-30`）；遍历基线随后**固化为可复跑断言**——枚举 / 排除 / 候选 / warnings / 调用步数五项逐项比对（`compare_baseline`），基线可由 `GDA_TRAVERSAL_BASELINE_EMPTY_ARGS` / `GDA_TRAVERSAL_BASELINE_HEURISTIC_SMOKE` 临时覆盖，失败信息含基线来源与授权提示；「排除工具清单」按 `side_effect` 分布重算（新增 `destructive` 类 1 项，`writes_file` 21→25、`writes_config` 10→18、`modifies_window` 20→43）；数值总表仍是全库唯一权威落点，其它页（工具注册表 / 工具域页 / 路线图 / 本摘要）改为引用不再复制口径。
+
+- **开放接口面落地**：插件在同一监听端口上新增 REST 风格的 `/api` 端点集（**8 条**：服务清单 `GET /api`、工具清单 `GET /api/tools`、工具详情 `GET /api/tools/{tool}`、工具调用 `POST /api/tools/{tool}`、批量 `POST /api/batch`、健康探针 `GET /api/health`、发现端点 `GET /api/endpoints`、OpenAPI `GET /api/openapi.json`），与既有 `/mcp` 并列。除健康探针外均需 Bearer 令牌（32 字节随机值的十六进制，来源优先 `GODOT_AUTOPILOT_API_TOKEN`）；错误信封归一为 `error` + `code`，状态码由码决定（401/400/404/403/503/504/500，其余 422）。**超时标记已取消且不可重试**（`main_thread_timeout` 的 `retryable` 由 true 改为 false），队列不可用仍返回 `queue_unavailable`。契约见 [REST 接口面](modules/api.md)。
+
+- **存储布局迁移 + 端口模型**：插件数据从 `user://godot_autopilot/` 迁到**家目录集中根** `~/.godot-autopilot/`（根下放全局配置与全局实例索引，工程级数据按工程隔离）；根目录四级解析（显式覆写 → 平台环境变量 → 派生兜底 → 结果校验）；旧数据**不自动搬迁**，配置项缺键时回退读旧路径并注明来源，控制面板提供**复制式**导入。端口解析改为「环境变量 → 工程级配置偏好 → 自动分配」，自动候选先试 9527、其后从 `20000 + (pid mod 10000)` 起顺延到 29999 并回绕，**显式指定端口绑定失败不自动更换**；实例登记落集中根并汇总出全局索引，CLI 寻址链改为七级。口径见 [端口与实例登记](modules/ports.md) 与 [核心模块](modules/core.md)。
+
+- **授权三档（对外行为变更）**：读类（`none`）默认放行；**写类（`writes_file`/`writes_config`/`shows_alert`/`modifies_window`）默认拒绝**，需允许列表含 `write`；危险类（`process`/`code_execute`/`game_runtime`/`destructive`）默认拒绝且需显式开启。能力名由四条扩为七条，新增 `destructive` 副作用类。既有客户端若不做适配，调用写类工具会收到 403 `authorization_required`。契约见 [T0 安全边界与并发契约](security_contract.md) §3.1 / §3.5。
+
+- **已知缺口（如实记录）**：统一执行入口 `tools::execute_tool_chain`（导出拦截 → 工具存在 → 参数校验 → 授权 → 派发 → 信封）已实现并由 L1 覆盖，但 `api_surface` 的执行器槽位在生产路径上无注册点、MCP `call_tool` 走 `execute_tool_core` 直派，故该链**尚未接入生产请求路径**——REST 面的导出期拒绝与参数校验当前不生效，授权门两套面都生效。
+
+- **知识库与技能书同步**：新增 [REST 接口面](modules/api.md) 与 [端口与实例登记](modules/ports.md) 两页；更新 [核心模块](modules/core.md)、[工具注册表](modules/tools_registry.md)、[CLI 载体](modules/cli.md)（寻址链由六级改七级、新增 `gda api list|describe|call` 与 `gda endpoints`、state dir 迁到集中根）、[T0 安全边界与并发契约](security_contract.md)（新增 §3.5 REST 安全条款）、[测试体系](tests.md)（数值核算总表补录本次新增项）、[页面索引](index.md)、[构建体系](build.md)、[项目总览](overview.md) 与 [支撑模块](modules/support.md)；技能书新增 REST 接口参考（Python / JavaScript 两段最小示例、令牌获取方式、状态码对照），调用阶梯加入 REST 通道，并修正过时说法（超时与队列不可用「均可重试」、导出拒绝「无机器可读码」、副作用类清单缺 `destructive`、能力名四条改七条、旧路径 `user://godot_autopilot/...` 作为当前路径的表述）。
+
+- **当前口径（2026-10-21，权威核算见 [测试体系](tests.md) 数值核算总表）**：域工具 **451**（27 类 / 33 个源模块）、catalog **459** = 451 域 + `system_status` + 7 元、MCP 可达 **458** = 7 元 + 451 域、schema 基线 **459** = 393 非空 + 66 空、遍历枚举 452 / 排除 **147** / 候选 **305** / 步数上限 904（`03_tools_contract` 实测 **557** 步、warnings 基线 **0**，最近一次 L2 实测）、L1 **734** 个 gtest（65 个 unit 文件）、L2 **41** 份用例、守卫与脚本 **6** 项、ctest 注册点 **781**（`ctest -N` 实测：734 + 41 + 6）、非 L2 口径 **740**、CLI TS 单测 **180**（11 个文件）、技能书 **9** 册 / 35 文件（9 `SKILL.md` + 26 references）、MCP skills 资源 **45**、`add_library` 收录 **113** 个 `.cpp`、REST 端点 **8** 条、REST 令牌 32 字节、请求体上限 4 MiB、授权 3 档 / 7 能力名（面板可勾选 **6** 项）、端口候选区间 20000–29999（探测上限 256）。
 
 ## 2026-10-20
 

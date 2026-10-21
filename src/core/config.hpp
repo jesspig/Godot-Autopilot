@@ -7,9 +7,48 @@
 namespace godot_autopilot {
 
 constexpr int GDA_DEFAULT_PORT = 9527;
+constexpr int GDA_PORT_CANDIDATE_BASE = 20000;
+constexpr int GDA_PORT_CANDIDATE_LIMIT = 29999;
+constexpr int GDA_PORT_PROBE_LIMIT = 256;
+constexpr int GDA_CONTROL_PORT_BASE = 19900;
+constexpr int GDA_CONTROL_PORT_LIMIT = 19999;
+constexpr int GDA_PRIVATE_PORT_BASE = 32768;
+constexpr const char *GDA_MCP_PATH = "/mcp";
+constexpr const char *GDA_API_PATH = "/api";
+constexpr const char *GDA_HOME_DIR_NAME = ".godot-autopilot";
+constexpr int GDA_PROJECT_HASH_LENGTH = 8;
+constexpr int GDA_API_TOKEN_BYTES = 32;
+static_assert(GDA_PORT_CANDIDATE_BASE <= GDA_PORT_CANDIDATE_LIMIT,
+              "the auto assigned port candidate floor must not exceed the "
+              "candidate ceiling");
+static_assert(GDA_CONTROL_PORT_BASE <= GDA_CONTROL_PORT_LIMIT,
+              "the control plane port floor must not exceed the control "
+              "plane port ceiling");
+static_assert(GDA_CONTROL_PORT_LIMIT < GDA_PORT_CANDIDATE_BASE,
+              "the auto assigned port candidate range must not overlap the "
+              "control plane port range");
+static_assert(GDA_PORT_CANDIDATE_LIMIT < GDA_PRIVATE_PORT_BASE,
+              "the auto assigned port candidate range must stay below the "
+              "private dynamic port range");
+static_assert(GDA_PORT_PROBE_LIMIT > 0 &&
+                  GDA_PORT_PROBE_LIMIT <=
+                      GDA_PORT_CANDIDATE_LIMIT - GDA_PORT_CANDIDATE_BASE + 1,
+              "the port probe limit must be positive and must not exceed the "
+              "auto assigned port candidate count");
+static_assert(GDA_PROJECT_HASH_LENGTH > 0 && GDA_PROJECT_HASH_LENGTH <= 16,
+              "the project path hash length must be positive and must fit the "
+              "hexadecimal digest width");
+static_assert(GDA_API_TOKEN_BYTES >= 16,
+              "the API token size must stay at least 128 bits of entropy");
 constexpr int64_t GDA_HEALTHY_ACTIVITY_THRESHOLD_MS = 3000;
 constexpr int64_t GDA_DEFAULT_TIMEOUT_MS = 5000;
 constexpr int64_t GDA_MAX_TIMEOUT_MS = 30000;
+constexpr int64_t GDA_OS_PROCESS_MIN_TIMEOUT_MS = 100;
+constexpr int64_t GDA_OS_PROCESS_MAX_TIMEOUT_MS = 25000;
+static_assert(GDA_OS_PROCESS_MIN_TIMEOUT_MS > 0 &&
+                  GDA_OS_PROCESS_MAX_TIMEOUT_MS <= GDA_MAX_TIMEOUT_MS,
+              "the external process timeout bounds must stay inside the shared "
+              "timeout range");
 constexpr int64_t GDA_RESPONSE_GRACE_MS = 2000;
 constexpr int64_t GDA_MAX_GAME_OP_TIMEOUT_MS = 25000;
 constexpr int64_t GDA_TRANSPORT_TIMEOUT_MS = 30000;

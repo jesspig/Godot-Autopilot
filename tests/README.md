@@ -35,7 +35,9 @@ $env:GODOT_PATH="C:\path\to\Godot.exe"
 
 若二者皆无，`gda_test_runner` 退出码 2（"未找到 Godot 可执行文件"）。L1 不受影响。
 
-另有 L2 授权前置：涉及任意脚本/游戏运行时的用例（如 `00_meta` 的 code_execute、`04_resources_scripts` 的 execute_script、`13_inline_subresource` 的 code_execute、`16_game_jobs` 的 start_game_job、`23`/`24` 的游戏侧路径、`37` 的 execute_game_script 需 `game_runtime`，`18`/`22`/`26`/`27`/`29`/`30`/`32`/`34`/`35`/`36`/`39`/`40`/`41` 需 `code_execute`；`35` 的 8 个 SceneTree 工具受 `game_runtime` 门保护，但未授权时也满足其 error 断言，两种授权态都应通过）需要 capability 授权——由 `GODOT_AUTOPILOT_ALLOW` 环境变量（如 `game_runtime`、`code_execute` 或 `all`）或 `user://godot_autopilot/config.json` 的 `allow` 字段提供，环境变量优先；缺失时相应用例被授权门拒绝而 FAIL。其中 `26_user_tools_code_mode` 与 `27_user_tools_rescan` 的用户工具注册/调用另受 `user_tools` 能力门保护：用例内 `AutopilotTools.set_enabled(true)` 写配置可自包含，但若 `GODOT_AUTOPILOT_ALLOW` 已设置且不含 `user_tools`/`all`，env 优先使 `set_enabled` 无效、用例失败（此时需在 env 中补 `user_tools` 或取消该 env）。
+另有 L2 授权前置：涉及任意脚本/游戏运行时的用例（如 `00_meta` 的 code_execute、`04_resources_scripts` 的 execute_script、`13_inline_subresource` 的 code_execute、`16_game_jobs` 的 start_game_job、`23`/`24` 的游戏侧路径、`37` 的 execute_game_script 需 `game_runtime`，`18`/`22`/`26`/`27`/`29`/`30`/`32`/`34`/`35`/`36`/`39`/`40`/`41` 需 `code_execute`；`35` 的 8 个 SceneTree 工具受 `game_runtime` 门保护，但未授权时也满足其 error 断言，两种授权态都应通过）需要 capability 授权——由 `GODOT_AUTOPILOT_ALLOW` 环境变量（如 `game_runtime`、`code_execute` 或 `all`）或集中根 `~/.godot-autopilot/config.json` 的 `allow` 字段提供，环境变量优先（旧 `user://godot_autopilot/config.json` 仍作回退读取）；缺失时相应用例被授权门拒绝而 FAIL。其中 `26_user_tools_code_mode` 与 `27_user_tools_rescan` 的用户工具注册/调用另受 `user_tools` 能力门保护：用例内 `AutopilotTools.set_enabled(true)` 写配置可自包含，但若 `GODOT_AUTOPILOT_ALLOW` 已设置且不含 `user_tools`/`all`，env 优先使 `set_enabled` 无效、用例失败（此时需在 env 中补 `user_tools` 或取消该 env）。
+
+**插件数据目录（集中根）与运行期路径的取法**：插件数据不再落在 Godot 用户数据目录 `user://godot_autopilot/`，而集中在用户家目录下的 `~/.godot-autopilot/`（家目录可用 `GODOT_AUTOPILOT_HOME` 覆盖）——全局配置 `~/.godot-autopilot/config.json`，工程级数据 `~/.godot-autopilot/projects/<项目名>-<工程路径哈希前8位>/`（其下 `logs/`、`traces/`、`captures/` 与工程级 `config.json`）；旧 `user://godot_autopilot/` 仍作回退读取源。这些绝对路径依赖家目录与工程路径，夹具里不能写死。插件在 `_enter_tree` 的 `LogPersist::init_session()` 里把本次会话实际使用的路径写入**进程环境变量**：`GODOT_AUTOPILOT_STORAGE_ROOT`（集中根）、`GODOT_AUTOPILOT_PROJECT_DIR`（工程目录）、`GODOT_AUTOPILOT_LOG_DIR`、`GODOT_AUTOPILOT_TRACE_DIR`。L2 用例的 `execute_script` 步骤经 `OS.get_environment()` 取这些变量定位运行期目录，并据此断言集中布局（`layout_ok`：工程目录位于 `<集中根>/projects/` 下，日志/轨迹目录位于工程目录的 `logs/`、`traces/` 子目录）。
 
 ## 4. 构建
 
@@ -99,7 +101,7 @@ build\debug\tests\gda_test_runner.exe --file 01_scene
 
 每个文件的生命周期（`godot_process.cpp`）：随机空闲端口 → 首次 `--editor --import` 幂等同步执行（120s 超时，失败/超时不致命）→ 注入 `GODOT_AUTOPILOT_PORT` 后常驻启动 `--editor`（`--headless` 由用例决定）→ 就绪轮询（TCP 端口探测 + MCP initialize 握手）→ `before_all` → stages 步骤 → `after_all` → 停止（taskkill 软杀 → 5s 宽限 → TerminateProcess 兜底）。stdout/stderr 各接管道读线程持续消费（防 64KB 缓冲写满阻塞子进程），崩溃时截取最近 2000 字符日志。
 
-输出：控制台表格（文件名称 / 通过步骤数 / 耗时（<10s 显毫秒，否则显秒）/ 状态 PASS|FAIL|ERROR）+ JSON 报告 `report-YYYYmmdd_HHMMSS.json`（字段：`generated_at` / `total_files` / `passed_files` / `files[].{name,passed,duration_ms,fatal_error,steps[]}`）。
+输出：控制台表格（文件名称 / 通过步骤数 / 耗时（<10s 显毫秒，否则显秒）/ 状态 PASS|FAIL|ERROR）+ JSON 报告 `report-YYYYmmdd_HHMMSS.json`（字段：`generated_at` / `total_files` / `passed_files` / `files[].{name,passed,duration_ms,fatal_error,soft_failures,steps[]}`，其中 `steps[]` 含 `step_id` / `tool` / `passed` / `detail` / `soft_failed` / `soft_reason`）。控制台对软失败步骤以 `~` 行单独标注并给出软失败计数。
 
 ### 5.5 迁移守卫（migration_guard）
 
@@ -119,7 +121,7 @@ ctest 上除 L1/L2 外还有 6 个守卫与脚本项常驻（注册见 `tests/CM
 
 ## 6. JSON 用例 Schema（`tests/runner/config_loader.cpp` 冻结解析规则）
 
-以下规则 1-8 为解析器强制校验，任何违规抛 `runtime_error`，错误消息含字段路径（如 `pipeline.stages[0].steps[1].expect.field_checks[0].key`）：
+以下规则 1-9 为解析器强制校验，任何违规抛 `runtime_error`，错误消息含字段路径（如 `pipeline.stages[0].steps[1].expect.field_checks[0].key`）：
 
 1. **顶层**：必填 `name`（string）、`pipeline`（object）；`description` / `headless` 可选，`headless` 默认 `true`
 2. **`pipeline.on_failure`**：可选，默认 `"fail_fast"`，仅接受 `"fail_fast"`（失败即中止剩余步骤）| `"continue"`（失败继续）
@@ -129,6 +131,7 @@ ctest 上除 L1/L2 外还有 6 个守卫与脚本项常驻（注册见 `tests/CM
 6. **`expect`**：`has_keys` 为 string 数组；`field_checks` 每项 `key` 必填（支持点路径）、`value` 可选任意 JSON、`not_empty` 可选 bool
 7. **`args`**：值任意 JSON，嵌套原样保留
 8. 数值字段类型严格校验
+9. **`soft_error`**（步骤级，string，可选）：错误文本前缀。步骤失败且工具响应的 `error` 文本以该前缀开头时记为**软失败**（`soft_failed=true` + `soft_reason`），不置 `fatal_error`、不计入文件失败（`before_all` 软失败不中断流水线，`stages` 软失败不置整体失败）；错误文本不匹配的失败、期望不匹配、编辑器进程死亡等仍为硬失败。用于把「环境边界导致的必然失败」与真实回归区分开，当前仅 `38_csharp_bridge.json` 使用
 
 用例结构示例（节选自 `config/00_meta.json`）：
 
@@ -235,7 +238,7 @@ ctest 上除 L1/L2 外还有 6 个守卫与脚本项常驻（注册见 `tests/CM
 | `13_inline_subresource.json` | 13_inline_subresource | 资源属性内联描述一步创建 `[sub_resource]`（`{"type": ..., "properties": {...}}`）：property_set 与 create_scene_node 的 properties 内联子资源、响应回显 inline_resources、嵌套与错误路径 |
 | `14_tilemap_rect.json` | tilemap_rect | `fill_tilemap_rect` 矩形铺砖：from/to 角点（含逆序）成功铺砖与擦除、alternative/layer 参数、>100000 格上限报错、单次 undo；fixture 经 create_tilemap_tileset + add_tilemap_atlas_source 构建 |
 | `15_scene_path.json` | 15_scene_path | 写工具（create_scene_node/delete_scene_node/property_set/rename_scene_node/attach_script_to_node）响应回显 `scene_path`/`scene_unsaved`：未保存场景误建防护与错误路径 |
-| `16_game_jobs.json` | game_jobs | `start_game_job` / `get_game_job` 的参数校验与 headless 运行时通道路径（op 仅 eval、job 表上限 16、过期宽限 2s）；**前置条件：需 `game_runtime` capability 授权**（`GODOT_AUTOPILOT_ALLOW` env 或 `user://godot_autopilot/config.json` 的 `allow` 字段，env 优先），未授权时用例 FAIL |
+| `16_game_jobs.json` | game_jobs | `start_game_job` / `get_game_job` 的参数校验与 headless 运行时通道路径（op 仅 eval、job 表上限 16、过期宽限 2s）；**前置条件：需 `game_runtime` capability 授权**（`GODOT_AUTOPILOT_ALLOW` env 或集中根 `~/.godot-autopilot/config.json` 的 `allow` 字段，env 优先），未授权时用例 FAIL |
 | `17_vision_assist.json` | vision_assist | 视觉辅助截图参数校验：`annotate_nodes`/`annotate_nodes_max` 范围、`diff_image` 前置条件（须配 `diff_against_last`）、`review_scene_visually` 参数校验与只读组合 |
 | `18_script_freshness.json` | script_freshness | 脚本取用口径回归：`create_script` 后 `cache_refreshed`、覆写探针版本后 `attach_script_to_node`/`execute_script`/`get_script_property {fresh:true}` 均取磁盘新版；需 `code_execute` 授权 |
 | `19_cjk_roundtrip.json` | cjk_roundtrip | CJK 文本落盘往返：含中文注释脚本 `create_script`（verified/readback/cache_refreshed）+ `read_file` 全量内容比对 + `find_in_files` 中文 query 命中；after_all 回收 `res://tests_tmp` |
@@ -247,8 +250,8 @@ ctest 上除 L1/L2 外还有 6 个守卫与脚本项常驻（注册见 `tests/CM
 | `26_user_tools_code_mode.json` | user_tools_code_mode | AutopilotTools 用户脚本工具端到端：`code_execute` 内注册 `user_echo_probe` → MCP `call_tool` 回显 → `search_tools`/`get_tool_detail` 标记 `dynamic=true` → code-mode 直连 → `unregister_tool` 后 not found；需 `code_execute` + `user_tools` 授权（见第 3 节） |
 | `27_user_tools_rescan.json` | user_tools_rescan | 目录扫描 rescan 端到端：`code_execute` 写 probe（`register_autopilot_tools(api)` 约定）→ `api.rescan` 注册非空 → MCP `call_tool` 回显 → 二次 rescan 幂等（`registered` 空、`failed` 存在）→ 清理；夹具目录 `res://gda_tmp_user_tools/`；需 `code_execute` + `user_tools` 授权（见第 3 节） |
 | `28_sprite_frames_animation.json` | sprite_frames_animation | `create_scene_node` 属性两轮应用回归：同传 `sprite_frames`+`animation`，断言 `applied_properties==["sprite_frames","animation"]` 且读回 `animation=="idle"` |
-| `29_trace_persistence.json` | trace_persistence | 日志/trace 双目录持久化端到端（09-20 新增）：`system_status` 热身 → `execute_script` 扫描 `user://godot_autopilot/traces` 最新 `trace-*.jsonl`（断言含 `session_start` 与 `server_ready` 启动标记、遍历全部 trace 文件断言不含 PNG base64 前缀）→ 扫描 `user://godot_autopilot/logs` 最新 `gda-*.log`（断言含启动日志行）；需 `code_execute` 授权（见第 3 节） |
-| `30_observability.json` | observability | 可重放监控与日志系统端到端（09-21 新增，3 stage）：`system_status` 断言 `tool_count`/`queue_depth` → `execute_script` 扫描 traces 最新 jsonl（断言含 `kind=lifecycle`/`snapshot`/`protocol_request` 与 schema v2 新字段）→ 扫描 logs 最新 `gda-*.log`（断言含 `trace=` 的 detail 行）；需 `code_execute` 授权（见第 3 节） |
+| `29_trace_persistence.json` | trace_persistence | 日志/trace 双目录持久化端到端（09-20 新增）：`system_status` 热身 → `execute_script` 经 `OS.get_environment` 取插件发布的运行期路径（`GODOT_AUTOPILOT_TRACE_DIR` 等，见第 3 节）并断言集中布局（`layout_ok`）→ 扫描最新 `trace-*.jsonl`（断言含 `session_start` 与 `server_ready` 启动标记、遍历全部 trace 文件断言不含 PNG base64 前缀）→ 同样方式取 `GODOT_AUTOPILOT_LOG_DIR` 并扫描最新 `gda-*.log`（断言含启动日志行）；需 `code_execute` 授权（见第 3 节） |
+| `30_observability.json` | observability | 可重放监控与日志系统端到端（09-21 新增，3 stage）：`system_status` 断言 `tool_count`/`queue_depth` → `execute_script` 经 `OS.get_environment` 取插件发布的运行期路径（`GODOT_AUTOPILOT_TRACE_DIR` 等，见第 3 节）并断言集中布局（`layout_ok`）→ 扫描 traces 最新 jsonl（断言含 `kind=lifecycle`/`snapshot`/`protocol_request` 与 schema v2 新字段）→ 同样方式取 `GODOT_AUTOPILOT_LOG_DIR` 并扫描 logs 最新 `gda-*.log`（断言含 `trace=` 的 detail 行）；需 `code_execute` 授权（见第 3 节） |
 | `31_theme_root.json` | 31_theme_root | B3 根目录路径回归：`create_theme_resource` 写 `res://` 根文件（断言 `result=ok`/`saved=true`/`verified=true`，修复前返回建目录失败）、`set_theme_font_size` 同路径落盘、`get_theme_info`/`has_resource` 回读，子目录版递归建目录，`create_script` 写根文件带 `verified`/`readback`/`cache_refreshed`；after_all 回收根文件与目录 |
 | `32_plane_inline.json` | 32_plane_inline | B2 dry_run 真校验：CollisionShape3D 内联 `WorldBoundaryShape3D.plane` 用四元形状（`x/y/z/d`）真实写入并 `code_execute` 读回 `shape.plane`；dry_run 负例（缺 `d`、零法线、未知内联类）与真实写入同精确文案，正例断言 `mode=dry_run`/`trial_node_count` 并证明零写入；需 `code_execute` 授权 |
 | `33_verified_inherit.json` | 33_verified_inherit | B4 实例继承节点核验口径：主场景实例化子场景后 `save_editor_scene_as` 断言 `nodes_match=true`/`inherited_nodes=1`，`verify_scene_saved` 断言 `match=true`/`memory_nodes=disk_nodes=2`/`inherited_paths` 精确列出实例内继承节点（继承节点分离计数、不再判 mismatch） |
@@ -259,7 +262,7 @@ ctest 上除 L1/L2 外还有 6 个守卫与脚本项常驻（注册见 `tests/CM
 | `38_csharp_bridge.json` | csharp_bridge | B-T4 C# 反射桥**六**域工具（csharp_get_property / csharp_call_method / csharp_subscribe_event / csharp_set_property / csharp_unsubscribe_event / csharp_list_members）编辑器侧参数校验（定位器互斥、必填成员名、runtime 取值、game-only 选项隔离、args 形态）+ 非 mono 精确跳过探针（bridge unavailable 全串 + build_csharp_assembly 工程探测）；需 `code_execute` + `game_runtime` + `process` 授权 |
 | `39_exec_budget.json` | exec_budget | 脚本执行预算与协作式超时：`code_execute` 跑 `while true: pass` 并置 `timeout_ms=300`，断言返回 `code == "exec_timeout"`；再跑 `timeout_ms=25000` 的正常脚本断言 `result` 存在且未超时；再跑越界 `timeout_ms=30001` 断言返回非空 `error`（越界值被参数校验拒绝，不进入脚本执行）；需 `code_execute` 授权 |
 | `40_contract_assert.json` | contract_assert | 工具契约强制断言：`call_tool` 包 `get_tool_detail(name=code_execute)`，断言 `tool.name == "code_execute"` 且 `tool.side_effect == "code_execute"`（副作用可读性）；再 `call_tool` 跑 `code_execute` 断言 `result` 存在；需 `code_execute` 授权 |
-| `41_thread_guard.json` | thread_guard | 主线程契约可观测面：`system_status` 断言 `running` 与 `main_thread.last_drain_age_ms` 非空 → `execute_script` 扫 `user://godot_autopilot/traces` 最新 `trace-*.jsonl`（断言含 `session_start`/`server_ready`、`broken_line_count == 0`、无 PNG base64 前缀、含 `call_tool` 事件）→ `execute_script` 扫 `user://godot_autopilot/logs` 最新 `gda-*.log` 断言含启动日志行；需 `code_execute` 授权 |
+| `41_thread_guard.json` | thread_guard | 主线程契约可观测面：`system_status` 断言 `running` 与 `main_thread.last_drain_age_ms` 非空 → `execute_script` 经 `OS.get_environment` 取插件发布的运行期路径（`GODOT_AUTOPILOT_TRACE_DIR` 等，见第 3 节）并断言集中布局（`layout_ok`）→ 扫 traces 最新 `trace-*.jsonl`（断言含 `session_start`/`server_ready`、`broken_line_count == 0`、无 PNG base64 前缀、含 `call_tool` 事件）→ 同样方式取 `GODOT_AUTOPILOT_LOG_DIR` 并扫 logs 最新 `gda-*.log` 断言含启动日志行；需 `code_execute` 授权 |
 
 ## 7. 遍历与排除清单（`tests/runner/traversal.cpp`）
 

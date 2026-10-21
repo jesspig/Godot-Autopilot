@@ -63,14 +63,45 @@ std::string traverse_tool_name(const std::string& mode) {
     return "<traverse:" + mode + ">";
 }
 
+std::string response_error_text(const std::string& response) {
+    if (response.empty()) {
+        return "";
+    }
+    try {
+        mcp::JsonValue parsed = mcp::JsonValue::Parse(response);
+        const mcp::JsonValue* err = parsed.Find("error");
+        if (err && err->IsString()) {
+            return err->GetString();
+        }
+    } catch (const std::exception&) {
+    }
+    return "";
+}
+
+void apply_soft_failure(const Step& step, const std::string& response,
+                         StepResult& result) {
+    if (result.passed || step.soft_error.empty()) {
+        return;
+    }
+    const std::string err = response_error_text(response);
+    if (err.empty() ||
+        err.compare(0, step.soft_error.size(), step.soft_error) != 0) {
+        return;
+    }
+    result.soft_failed = true;
+    result.soft_reason = err;
+    result.detail = "soft failure tolerated: " + err;
+}
+
 StepResult run_single_step(const Step& step, GodotProcess* proc,
                            McpTestClient& client, bool check_expect) {
     StepResult result;
     result.step_id = step.id.empty() ? step.tool : step.id;
     result.tool = step.tool;
     const auto step_start = std::chrono::steady_clock::now();
+    std::string response;
     try {
-        const std::string response =
+        response =
             client.call_tool("call_tool", call_tool_envelope(step).Dump());
         if (proc && !proc->alive()) {
             result.passed = false;
@@ -97,6 +128,7 @@ StepResult run_single_step(const Step& step, GodotProcess* proc,
         result.passed = false;
         result.detail = "unknown exception";
     }
+    apply_soft_failure(step, response, result);
     result.duration_ms = std::chrono::duration<double, std::milli>(
         std::chrono::steady_clock::now() - step_start).count();
     return result;
@@ -109,7 +141,7 @@ StepBatch exec_step(const Step& step, GodotProcess* proc, McpTestClient& client,
         batch.steps.push_back(run_single_step(step, proc, client, check_expect));
         if (proc && !proc->alive()) {
             batch.outcome = StepOutcome::crashed;
-        } else if (!batch.steps.back().passed) {
+        } else if (!batch.steps.back().passed && !batch.steps.back().soft_failed) {
             batch.outcome = StepOutcome::failed;
         }
         return batch;
@@ -139,6 +171,9 @@ StepBatch exec_step(const Step& step, GodotProcess* proc, McpTestClient& client,
             sr.passed = false;
             sr.detail = "遍历统计与基线不符: " +
                         join_strings(stats.baseline_diffs);
+            if (!stats.baseline_note.empty()) {
+                sr.detail += "；" + stats.baseline_note;
+            }
             batch.steps.push_back(std::move(sr));
         }
     } catch (const std::exception& e) {
@@ -153,7 +188,7 @@ StepBatch exec_step(const Step& step, GodotProcess* proc, McpTestClient& client,
         return batch;
     }
     for (const StepResult& sr : batch.steps) {
-        if (!sr.passed) {
+        if (!sr.passed && !sr.soft_failed) {
             batch.outcome = StepOutcome::failed;
             break;
         }
@@ -179,7 +214,7 @@ void merge_batch(FileResult& result, StepBatch& batch) {
 
 std::string before_all_error(const std::vector<StepResult>& steps) {
     for (auto it = steps.rbegin(); it != steps.rend(); ++it) {
-        if (!it->passed) {
+        if (!it->passed && !it->soft_failed) {
             return "before_all step '" + it->step_id + "' failed: " + it->detail;
         }
     }

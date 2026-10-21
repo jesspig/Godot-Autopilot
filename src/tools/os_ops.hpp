@@ -1,6 +1,7 @@
 #ifndef GODOT_AUTOPILOT_OS_OPS_HPP
 #define GODOT_AUTOPILOT_OS_OPS_HPP
 
+#include <cstdint>
 #include <mcp/JsonValue.hpp>
 
 namespace godot_autopilot {
@@ -21,6 +22,7 @@ mcp::JsonValue handle_os_kill(const mcp::JsonValue &args);
 mcp::JsonValue handle_os_move_to_trash(const mcp::JsonValue &args);
 mcp::JsonValue handle_os_set_environment(const mcp::JsonValue &args);
 mcp::JsonValue handle_os_shell_open(const mcp::JsonValue &args);
+mcp::JsonValue wait_os_process(int64_t wait_id, int64_t timeout_ms);
 
 } // namespace os_ops
 } // namespace godot_autopilot

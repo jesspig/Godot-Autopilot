@@ -172,16 +172,20 @@ TEST(SecurityHardening, CapabilityForToolMapping) {
   EXPECT_STREQ(authorization::capability_for_tool("code_execute", SideEffect::CodeExecute), "code_execute");
   EXPECT_STREQ(authorization::capability_for_tool("execute_script", SideEffect::CodeExecute), "code_execute");
   EXPECT_STREQ(authorization::capability_for_tool("execute_game_script", SideEffect::GameRuntime), "game_runtime");
-  EXPECT_EQ(authorization::capability_for_tool("code_execute", SideEffect::None), nullptr);
-  EXPECT_EQ(authorization::capability_for_tool("execute_script", SideEffect::None), nullptr);
-  EXPECT_EQ(authorization::capability_for_tool("execute_game_script", SideEffect::None), nullptr);
-  EXPECT_EQ(authorization::capability_for_tool("get_game_status", SideEffect::None), nullptr);
+  EXPECT_STREQ(authorization::capability_for_tool("code_execute", SideEffect::None), "read");
+  EXPECT_STREQ(authorization::capability_for_tool("execute_script", SideEffect::None), "read");
+  EXPECT_STREQ(authorization::capability_for_tool("execute_game_script", SideEffect::None), "read");
+  EXPECT_STREQ(authorization::capability_for_tool("get_game_status", SideEffect::None), "read");
+  EXPECT_STREQ(authorization::capability_for_tool("save_resource", SideEffect::WritesFile), "write");
+  EXPECT_STREQ(authorization::capability_for_tool("save_project_settings", SideEffect::WritesConfig), "write");
+  EXPECT_STREQ(authorization::capability_for_tool("show_display_dialog", SideEffect::ShowsAlert), "write");
+  EXPECT_STREQ(authorization::capability_for_tool("warp_display_mouse", SideEffect::ModifiesWindow), "write");
 }
 
 TEST(SecurityHardening, AllowListRemoveExpandsAll) {
   using godot_autopilot::authorization::allow_list_remove;
   EXPECT_EQ(allow_list_remove("all", "code_execute"),
-            "process,game_runtime,user_tools");
+            "process,game_runtime,destructive,user_tools,read,write");
   EXPECT_EQ(allow_list_remove("process,code_execute", "code_execute"),
             "process");
   EXPECT_EQ(allow_list_remove("process", "game_runtime"), "process");
@@ -206,14 +210,19 @@ TEST(SecurityHardening, EnableMessageDockHintOnlyForToggleable) {
   EXPECT_NE(dock_enable->GetString().find("Allow game_runtime"),
             std::string::npos);
 
-  auto env_only = godot_autopilot::authorization::deny_if_unauthorized(
+  auto process_denied = godot_autopilot::authorization::deny_if_unauthorized(
       "create_os_process", SideEffect::Process);
-  ASSERT_FALSE(env_only.IsNull());
-  const mcp::JsonValue *env_enable = env_only.Find("enable");
-  ASSERT_NE(env_enable, nullptr);
-  EXPECT_EQ(env_enable->GetString().find("dock"), std::string::npos);
-  EXPECT_NE(env_enable->GetString().find("restart the engine"),
+  ASSERT_FALSE(process_denied.IsNull());
+  const mcp::JsonValue *process_enable = process_denied.Find("enable");
+  ASSERT_NE(process_enable, nullptr);
+  EXPECT_NE(process_enable->GetString().find("Allow process"),
             std::string::npos);
+  EXPECT_NE(process_enable->GetString().find("restart the engine"),
+            std::string::npos);
+
+  auto read_allowed = godot_autopilot::authorization::deny_if_unauthorized(
+      "get_game_status", SideEffect::None);
+  EXPECT_TRUE(read_allowed.IsNull());
 }
 
 TEST(SecurityHardening, ConfigConstantsSane) {

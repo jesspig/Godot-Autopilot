@@ -2,7 +2,7 @@ import fs from "node:fs";
 
 import { CliError, ExitCode } from "./errors";
 import { isAlive } from "./process";
-import { joinPath } from "./platform";
+import { gdaRoot, joinPath } from "./platform";
 import { projectPathKey } from "./target";
 
 export interface InstanceEntry {
@@ -14,6 +14,9 @@ export interface InstanceEntry {
   headless: boolean;
   godot: string;
   log: string;
+  projectPath?: string;
+  instancePort?: number;
+  apiAvailable?: boolean;
 }
 
 export interface RegistryData {
@@ -24,20 +27,16 @@ export interface RegistryData {
 const LOCK_RETRY_INTERVAL_MS = 50;
 const LOCK_RETRY_TOTAL_MS = 2000;
 const LOCK_STALE_MS = 10000;
+const CLI_STATE_DIR_NAME = "cli";
 
 export function stateDir(): string {
   const override = process.env.GODOT_AUTOPILOT_CLI_HOME;
-  if (override) return override;
-  if (process.platform === "win32") {
-    const base = process.env.LOCALAPPDATA;
-    if (base) return joinPath(base, "godot-autopilot");
-  } else {
-    const xdg = process.env.XDG_STATE_HOME;
-    if (xdg) return joinPath(xdg, "godot-autopilot");
-    const home = process.env.HOME || process.env.USERPROFILE;
-    if (home) return joinPath(home, ".local", "state", "godot-autopilot");
+  if (override !== undefined && override.trim() !== "") return override;
+  try {
+    return joinPath(gdaRoot(), CLI_STATE_DIR_NAME);
+  } catch {
+    throw new CliError(ExitCode.Transport, "cannot determine the GDA home directory (set GODOT_AUTOPILOT_HOME)");
   }
-  throw new CliError(ExitCode.Transport, "cannot determine the CLI state directory (set GODOT_AUTOPILOT_CLI_HOME)");
 }
 
 function registryPath(): string {
@@ -112,6 +111,7 @@ export function loadRegistry(): RegistryData {
       throw new CliError(ExitCode.Transport, `cannot parse instances.json at ${p}`);
     }
     const data = parsed as RegistryData;
+    data.instances = data.instances.map(normalizeEntry);
     const alive = data.instances.filter((e) => isAlive(e.pid));
     if (alive.length !== data.instances.length) {
       data.instances = alive;
@@ -127,8 +127,18 @@ export function saveRegistry(data: RegistryData): void {
   });
 }
 
+export function normalizeEntry(entry: InstanceEntry): InstanceEntry {
+  return {
+    ...entry,
+    projectPath: entry.projectPath ?? entry.project,
+    instancePort: entry.instancePort ?? entry.port,
+    apiAvailable: entry.apiAvailable ?? false,
+  };
+}
+
 function writeRegistryAtomic(data: RegistryData): void {
   const p = registryPath();
+  fs.mkdirSync(stateDir(), { recursive: true });
   const tmp = `${p}.${process.pid}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
   fs.renameSync(tmp, p);

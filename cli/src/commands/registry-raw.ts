@@ -2,7 +2,7 @@ import fs from "node:fs";
 
 import { CliError, ExitCode } from "../errors";
 import { joinPath } from "../platform";
-import { stateDir, type InstanceEntry } from "../registry";
+import { stateDir, normalizeEntry, type InstanceEntry } from "../registry";
 
 export function readRawEntries(): InstanceEntry[] {
   let raw: string;
@@ -21,7 +21,7 @@ export function readRawEntries(): InstanceEntry[] {
   if (typeof parsed !== "object" || parsed === null || !Array.isArray((parsed as { instances?: unknown }).instances)) {
     throw new CliError(ExitCode.Transport, "cannot parse instances.json");
   }
-  return (parsed as { instances: InstanceEntry[] }).instances;
+  return (parsed as { instances: InstanceEntry[] }).instances.map(normalizeEntry);
 }
 
 export function readRawEntry(id: string): InstanceEntry | undefined {

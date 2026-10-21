@@ -824,6 +824,25 @@ mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms) {
   return error_json("unexpected game response (missing result)");
 }
 
+bool wait_pending_completion(int64_t request_id, int64_t timeout_ms) {
+  std::shared_ptr<PendingRequest> pending;
+  {
+    std::lock_guard<std::mutex> lock(g_pending_mtx);
+    auto it = g_pending.find(request_id);
+    if (it != g_pending.end())
+      pending = it->second;
+  }
+  if (!pending) {
+    return false;
+  }
+  std::unique_lock<std::mutex> lock(pending->mtx);
+  return pending->cv.wait_for(lock, std::chrono::milliseconds(timeout_ms),
+                              [&]() {
+                                return pending->state !=
+                                       PendingRequest::State::Waiting;
+                              });
+}
+
 bool payload_is_pending(const mcp::JsonValue &payload, int64_t *out_request_id) {
   if (!payload.IsObject())
     return false;
@@ -832,6 +851,17 @@ bool payload_is_pending(const mcp::JsonValue &payload, int64_t *out_request_id) 
     return false;
   if (out_request_id)
     *out_request_id = pending_id->GetInt();
+  return true;
+}
+
+bool payload_is_game_job(const mcp::JsonValue &payload, int64_t *out_job_id) {
+  if (!payload.IsObject())
+    return false;
+  auto *job_id = payload.Find("__gda_job");
+  if (!job_id || !job_id->IsInt())
+    return false;
+  if (out_job_id)
+    *out_job_id = job_id->GetInt();
   return true;
 }
 
@@ -940,6 +970,11 @@ void set_editor_queue(godot_autopilot::CommandQueue *q) {
 }
 
 bool has_editor_queue() { return current_editor_queue() != nullptr; }
+
+bool on_editor_main_thread() {
+  CommandQueue *queue = current_editor_queue();
+  return queue != nullptr && queue->is_main_thread();
+}
 
 void maybe_recover_break() {
   static std::unordered_map<int32_t, int> g_auto_continue_counts;

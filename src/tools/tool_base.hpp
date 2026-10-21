@@ -6,6 +6,7 @@
 #include <mcp/JsonValue.hpp>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -16,7 +17,7 @@
 namespace godot_autopilot {
 
 enum class SideEffect { None, WritesFile, WritesConfig, ShowsAlert, ModifiesWindow, Process,
-                        CodeExecute, GameRuntime };
+                        CodeExecute, GameRuntime, Destructive };
 
 inline const char* side_effect_name(SideEffect e) {
   switch (e) {
@@ -28,6 +29,7 @@ inline const char* side_effect_name(SideEffect e) {
     case SideEffect::Process: return "process";
     case SideEffect::CodeExecute: return "code_execute";
     case SideEffect::GameRuntime: return "game_runtime";
+    case SideEffect::Destructive: return "destructive";
   }
   return "none";
 }
@@ -60,16 +62,45 @@ inline SideEffect side_effect_of(const ToolBase &t) {
 }
 
 namespace authorization {
+inline CapabilityTier tier_for_side_effect(SideEffect effect) {
+  switch (effect) {
+    case SideEffect::Process:
+    case SideEffect::CodeExecute:
+    case SideEffect::GameRuntime:
+    case SideEffect::Destructive:
+      return CapabilityTier::Danger;
+    case SideEffect::WritesFile:
+    case SideEffect::WritesConfig:
+    case SideEffect::ShowsAlert:
+    case SideEffect::ModifiesWindow:
+      return CapabilityTier::Write;
+    case SideEffect::None:
+      break;
+  }
+  return CapabilityTier::Read;
+}
+
 inline const char *capability_for_tool(std::string_view name,
                                        SideEffect effect) {
   (void)name;
-  if (effect == SideEffect::Process)
-    return kCapabilityProcess;
-  if (effect == SideEffect::CodeExecute)
-    return kCapabilityCodeExecute;
-  if (effect == SideEffect::GameRuntime)
-    return kCapabilityGameRuntime;
-  return nullptr;
+  switch (effect) {
+    case SideEffect::Process:
+      return kCapabilityProcess;
+    case SideEffect::CodeExecute:
+      return kCapabilityCodeExecute;
+    case SideEffect::GameRuntime:
+      return kCapabilityGameRuntime;
+    case SideEffect::Destructive:
+      return kCapabilityDestructive;
+    case SideEffect::WritesFile:
+    case SideEffect::WritesConfig:
+    case SideEffect::ShowsAlert:
+    case SideEffect::ModifiesWindow:
+      return kCapabilityWrite;
+    case SideEffect::None:
+      break;
+  }
+  return kCapabilityRead;
 }
 } // namespace authorization
 
