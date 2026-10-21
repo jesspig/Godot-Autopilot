@@ -68,6 +68,7 @@ include(cmake/sources/api_contract.cmake)
 include(cmake/sources/api_storage.cmake)
 include(cmake/sources/api_transport.cmake)
 include(cmake/sources/api_cli.cmake)
+include(cmake/sources/api_instance_guard.cmake)
 
 add_library(godot-autopilot SHARED
     ${GDA_CORE_SOURCES}
@@ -75,7 +76,8 @@ add_library(godot-autopilot SHARED
     ${GDA_API_CONTRACT_SOURCES}
     ${GDA_API_STORAGE_SOURCES}
     ${GDA_API_TRANSPORT_SOURCES}
-    ${GDA_API_CLI_SOURCES})
+    ${GDA_API_CLI_SOURCES}
+    ${GDA_API_INSTANCE_GUARD_SOURCES})
 
 add_dependencies(godot-autopilot gda_skill_embed_header)
 

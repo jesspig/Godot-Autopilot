@@ -17,6 +17,7 @@
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/godot.hpp>
 #include <godot_cpp/variant/string.hpp>
+#include <godot_cpp/variant/utility_functions.hpp>
 
 #include "core/command_queue.hpp"
 #include "core/export_guard.hpp"
@@ -305,6 +306,9 @@ void GodotAutopilotPlugin::_enter_tree() {
       get_log_system().log(LogLevel::Error, LogCategory::Transport,
                            "MCP server start failed: " +
                                g_server_ctx->last_error());
+      godot::UtilityFunctions::print(
+          godot::String("[Godot Autopilot] MCP server start failed: ") +
+          godot::String::utf8(g_server_ctx->last_error().c_str()));
       godot_autopilot::monitor::error_event("server_start_failed", "server",
                                             g_server_ctx->last_error());
     }
@@ -351,6 +355,14 @@ void GodotAutopilotPlugin::_exit_tree() {
       g_server_ctx->stop();
       delete g_server_ctx;
       g_server_ctx = nullptr;
+    }
+
+    const size_t rejoined = godot_autopilot::http_transport_reap_parked_workers();
+    if (rejoined > 0) {
+      get_log_system().log(godot_autopilot::LogLevel::Info,
+                           godot_autopilot::LogCategory::Transport,
+                           "rejoined " + std::to_string(rejoined) +
+                               " parked transport worker thread(s)");
     }
 
     if (tools_singleton) {

@@ -31,6 +31,17 @@ inline std::string api_host_project_root() {
   return root;
 }
 
+inline bool api_host_process_alive(int pid) {
+  if (pid <= 0) {
+    return false;
+  }
+  auto *os = godot::OS::get_singleton();
+  if (!os) {
+    return false;
+  }
+  return os->is_process_running(pid);
+}
+
 } // namespace util
 } // namespace godot_autopilot
 

@@ -33,6 +33,7 @@
 #include "core/gda_home.hpp"
 #include "core/http_transport.hpp"
 #include "core/http_transport_ext.hpp"
+#include "core/instance_guard.hpp"
 #include "core/instance_registry.hpp"
 #include "core/mcp_http_shim.hpp"
 #include "tools/tool_execute.hpp"
@@ -175,6 +176,7 @@ bool ServerContext::bind_transport() {
 
 bool ServerContext::start() {
   const std::string endpoint = host_ + ":" + std::to_string(port_);
+  last_error_.clear();
   try {
     if (!is_loopback_host(host_)) {
       last_error_ = "refusing non-loopback listen address '" + host_ +
@@ -186,6 +188,22 @@ bool ServerContext::start() {
           "endpoint=" + endpoint + " msg=" + last_error_);
       monitor::error_event("server_start_failed", "server", last_error_);
       return false;
+    }
+
+    if (!instance_started_ && !InstanceGuard::multi_instance_allowed()) {
+      const InstanceConflict conflict = InstanceGuard::detect(
+          util::api_host_project_root(), util::api_host_process_id());
+      if (conflict.conflict) {
+        last_error_ = InstanceGuard::conflict_message(conflict);
+        LogSystem::instance().log(LogLevel::Error, LogCategory::Transport,
+                                  "MCP server start rejected: " + last_error_);
+        LogSystem::instance().log_detailed(
+            LogLevel::Error, LogCategory::Transport,
+            "MCP server start rejected", "endpoint=" + endpoint + " msg=" +
+                                            last_error_);
+        monitor::error_event("server_start_failed", "server", last_error_);
+        return false;
+      }
     }
 
     if (!bind_transport()) {
@@ -346,6 +364,7 @@ bool ServerContext::start() {
     }
 
     running_ = true;
+    instance_started_ = true;
     write_instance_record();
     register_endpoint_info_provider();
 

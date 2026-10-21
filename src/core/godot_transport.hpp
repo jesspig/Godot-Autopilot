@@ -54,10 +54,13 @@ private:
   struct PendingExchange {
     std::shared_ptr<std::promise<mcp::JsonRpcMessage>> promise;
     std::shared_future<mcp::JsonRpcMessage> future;
+    mcp::RequestId request_id;
   };
 
   std::mutex pending_mutex_;
   std::unordered_map<std::string, PendingExchange> pending_;
+
+  void fail_pending_exchanges();
 };
 
 std::shared_ptr<GodotTransport> godot_transport_instance();

@@ -26,7 +26,11 @@
 #include "core/http_parse.hpp"
 #include "core/http_stream_registry.hpp"
 #include "core/http_transport_ext.hpp"
+#include "core/instance_registry.hpp"
 #include "core/log_system.hpp"
+#include "core/port_recovery.hpp"
+#include "core/transport_lifecycle.hpp"
+#include "util/api_host_context.hpp"
 
 namespace godot_autopilot {
 
@@ -55,6 +59,7 @@ struct ConnectionChannel {
   std::deque<CompletedReply> replies;
   bool closed{false};
   bool finished{false};
+  bool executing{false};
 };
 
 struct TransportConnection {
@@ -221,14 +226,15 @@ void transport_execute_job(const PendingJob &job, HttpResponse &response) {
   }
 }
 
-bool transport_channel_stopped(const std::shared_ptr<ConnectionChannel> &channel) {
-  std::lock_guard<std::mutex> lock(channel->mutex);
-  return channel->closed;
-}
-
 bool transport_channel_finished(const std::shared_ptr<ConnectionChannel> &channel) {
   std::lock_guard<std::mutex> lock(channel->mutex);
   return channel->finished;
+}
+
+bool transport_channel_executing(
+    const std::shared_ptr<ConnectionChannel> &channel) {
+  std::lock_guard<std::mutex> lock(channel->mutex);
+  return channel->executing;
 }
 
 void transport_worker_loop(const std::shared_ptr<ConnectionChannel> &channel) {
@@ -245,13 +251,18 @@ void transport_worker_loop(const std::shared_ptr<ConnectionChannel> &channel) {
       job = std::move(channel->jobs.front());
       channel->jobs.pop_front();
     }
-    if (transport_channel_stopped(channel)) {
-      return;
+    {
+      std::lock_guard<std::mutex> lock(channel->mutex);
+      if (channel->closed) {
+        return;
+      }
+      channel->executing = true;
     }
     HttpResponse response;
     transport_execute_job(job, response);
     {
       std::lock_guard<std::mutex> lock(channel->mutex);
+      channel->executing = false;
       if (channel->closed) {
         return;
       }
@@ -316,9 +327,11 @@ void transport_reap_parked_workers() {
   std::vector<ParkedWorker> pending;
   pending.reserve(parked.size());
   for (ParkedWorker &entry : parked) {
-    if (entry.thread.joinable() &&
-        transport_channel_finished(entry.channel)) {
-      entry.thread.join();
+    const bool finished = transport_channel_finished(entry.channel);
+    if (transport_lifecycle::should_reap(finished)) {
+      if (entry.thread.joinable()) {
+        entry.thread.join();
+      }
       continue;
     }
     pending.push_back(std::move(entry));
@@ -356,6 +369,40 @@ void transport_wait_parked_workers(
         std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now));
   }
   transport_reap_parked_workers();
+}
+
+size_t transport_drain_parked_workers(
+    std::chrono::steady_clock::time_point deadline) {
+  std::vector<ParkedWorker> &parked = parked_workers_never_destroyed();
+  if (parked.empty()) {
+    return 0;
+  }
+  transport_wait_parked_workers(deadline);
+  size_t joined = 0;
+  size_t forced = 0;
+  size_t executing = 0;
+  for (ParkedWorker &entry : parked) {
+    if (!entry.thread.joinable()) {
+      continue;
+    }
+    if (!transport_channel_finished(entry.channel)) {
+      ++forced;
+      if (transport_channel_executing(entry.channel)) {
+        ++executing;
+      }
+    }
+    entry.thread.join();
+    ++joined;
+  }
+  parked.clear();
+  if (forced > 0) {
+    LogSystem::instance().log(
+        LogLevel::Warning, LogCategory::Transport,
+        "joined " + std::to_string(forced) +
+            " transport worker thread(s) that exceeded the shutdown budget (" +
+            std::to_string(executing) + " still inside a route handler)");
+  }
+  return joined;
 }
 
 void transport_retire_connections(
@@ -611,6 +658,39 @@ void transport_process(TransportState &state, TransportConnection &connection,
   }
 }
 
+port_recovery::RecoveryPlan &transport_residual_plan() {
+  static port_recovery::RecoveryPlan plan;
+  static bool analyzed = false;
+  if (analyzed) {
+    return plan;
+  }
+  analyzed = true;
+  const std::string project_path = util::api_host_project_root();
+  if (project_path.empty()) {
+    return plan;
+  }
+  const int current_pid = util::api_host_process_id();
+  plan = port_recovery::analyze(
+      InstanceRegistry::list_all(), project_path, current_pid,
+      [](int pid) { return util::api_host_process_alive(pid); });
+  for (const port_recovery::ResidualInstance &residual : plan.stale) {
+    if (!InstanceRegistry::remove(residual.instance_id)) {
+      continue;
+    }
+    LogSystem::instance().log(
+        LogLevel::Warning, LogCategory::Transport,
+        "removed the stale instance registration " + residual.instance_id +
+            " (pid " + std::to_string(residual.pid) + ", port " +
+            std::to_string(residual.port) + ")");
+  }
+  return plan;
+}
+
+std::string transport_residual_hint(int port) {
+  const port_recovery::RecoveryPlan &plan = transport_residual_plan();
+  return port_recovery::build_hint(plan, port);
+}
+
 } // namespace
 
 HttpTransport &http_transport_instance() {
@@ -622,6 +702,12 @@ HttpRouteTable &http_transport_route_table() { return transport_state_never_dest
 
 bool http_transport_is_listening() {
   return transport_state_never_destroyed().server.is_valid();
+}
+
+size_t http_transport_reap_parked_workers() {
+  const std::chrono::steady_clock::time_point deadline =
+      transport_worker_deadline();
+  return transport_drain_parked_workers(deadline);
 }
 
 bool http_transport_bind(uint16_t port, const std::string &host,
@@ -637,12 +723,18 @@ bool http_transport_bind(uint16_t port, const std::string &host,
                                transport_worker_deadline());
   state.bound_port = 0;
 
+  transport_residual_plan();
+
   godot::Ref<godot::TCPServer> server;
   server.instantiate();
   const godot::Error listen_error = server->listen(port, godot::String(host.c_str()));
   if (listen_error != godot::OK) {
     error = "listen failed on " + host + ":" + std::to_string(port) +
             " (error " + std::to_string(static_cast<int>(listen_error)) + ")";
+    const std::string hint = transport_residual_hint(static_cast<int>(port));
+    if (!hint.empty()) {
+      error += "; " + hint;
+    }
     return false;
   }
   state.server = server;

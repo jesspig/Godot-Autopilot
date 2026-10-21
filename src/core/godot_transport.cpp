@@ -5,6 +5,7 @@
 #include <string>
 #include <utility>
 #include <variant>
+#include <vector>
 
 #include <mcp/JsonValue.hpp>
 #include <mcp/ProtocolVersion.hpp>
@@ -111,11 +112,38 @@ GodotTransport::GodotTransport() = default;
 GodotTransport::~GodotTransport() = default;
 
 void GodotTransport::Close() {
+  fail_pending_exchanges();
   if (GetState() == mcp::TransportState::Disconnected) {
     return;
   }
   GetMessageChannel().Close();
   SetDisconnected();
+}
+
+void GodotTransport::fail_pending_exchanges() {
+  std::vector<PendingExchange> pending;
+  {
+    std::lock_guard<std::mutex> lock(pending_mutex_);
+    pending.reserve(pending_.size());
+    for (const auto &entry : pending_) {
+      pending.push_back(entry.second);
+    }
+    pending_.clear();
+  }
+  for (const PendingExchange &exchange : pending) {
+    if (!exchange.promise) {
+      continue;
+    }
+    mcp::JsonRpcErrorResponse failure;
+    failure.id = exchange.request_id;
+    failure.error.code = mcp::McpErrorCode::ConnectionClosed;
+    failure.error.message =
+        "the MCP transport closed before the request completed";
+    try {
+      exchange.promise->set_value(mcp::JsonRpcMessage(std::move(failure)));
+    } catch (const std::exception &) {
+    }
+  }
 }
 
 bool GodotTransport::IsStateless() const { return true; }
@@ -168,6 +196,9 @@ bool GodotTransport::submit(const mcp_wire::ParsedRequest &parsed,
       PendingExchange exchange;
       exchange.promise = std::move(promise);
       exchange.future = std::move(future);
+      if (const auto *request = mcp::AsRequest(parsed.message)) {
+        exchange.request_id = request->id;
+      }
       pending_.emplace(parsed.request_id, std::move(exchange));
     }
   }

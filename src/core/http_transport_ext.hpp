@@ -33,6 +33,8 @@ HttpRouteTable &http_transport_route_table();
 
 bool http_transport_is_listening();
 
+size_t http_transport_reap_parked_workers();
+
 bool http_transport_bind(uint16_t port, const std::string &host,
                          std::string &error);
 

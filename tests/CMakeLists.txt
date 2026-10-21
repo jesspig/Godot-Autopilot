@@ -41,6 +41,7 @@ include(${CMAKE_SOURCE_DIR}/cmake/sources/api_unit_storage.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/sources/api_unit_transport.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/sources/api_unit_cli.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/sources/api_unit_docs.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/sources/api_unit_instance_guard.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/sources/api_probe.cmake)
 
 set(GDA_UNIT_BUSINESS_SOURCES
@@ -49,7 +50,8 @@ set(GDA_UNIT_BUSINESS_SOURCES
     ${GDA_UNIT_STORAGE_SOURCES}
     ${GDA_UNIT_TRANSPORT_SOURCES}
     ${GDA_UNIT_CLI_SOURCES}
-    ${GDA_UNIT_DOCS_SOURCES})
+    ${GDA_UNIT_DOCS_SOURCES}
+    ${GDA_UNIT_INSTANCE_GUARD_SOURCES})
 
 # ====================================================================
 # gda_unit_tests — L1 纯单元测试 (不启动引擎, 不触碰 Godot API)

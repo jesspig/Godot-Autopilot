@@ -51,6 +51,7 @@ private:
   int requested_port_ = 0;
   std::string host_ = "127.0.0.1";
   bool running_ = false;
+  bool instance_started_ = false;
   std::string last_error_;
   std::string instance_id_;
   PortAssignment port_assignment_;
