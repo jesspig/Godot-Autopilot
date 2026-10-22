@@ -138,14 +138,14 @@ function findFreePort(): Promise<number> {
   });
 }
 
-function makeEntry(params: { project: string; port: number; pid: number; godot?: string }): InstanceEntry {
+function makeEntry(params: { project: string; port: number; pid: number; godot?: string; headless?: boolean }): InstanceEntry {
   return {
     id: `p${params.pid}`,
     project: params.project,
     port: params.port,
     pid: params.pid,
     startedAt: new Date().toISOString(),
-    headless: true,
+    headless: params.headless ?? true,
     godot: params.godot ?? fakeGodotExe!,
     log: path.join(tmp, `editor-${params.pid}.log`),
   };
@@ -210,7 +210,6 @@ describe.serial("restart", () => {
 
     const { code, stdout } = await captureStdout(() =>
       runRestart([`p${oldPid}`], {
-        force: process.platform === "win32",
         noImport: true,
         waitText: "10",
       }),
@@ -242,7 +241,7 @@ describe.serial("restart", () => {
     const projectDir = makeProjectDir();
     const port = await findFreePort();
     const pid = stubbornProcess();
-    writeEntry(makeEntry({ project: projectDir, port, pid }));
+    writeEntry(makeEntry({ project: projectDir, port, pid, headless: false }));
 
     const { code, stdout, stderr } = await captureStdout(() =>
       runRestart([`p${pid}`], { noImport: true, waitText: "1" }),

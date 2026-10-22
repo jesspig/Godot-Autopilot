@@ -46,8 +46,8 @@ Lifecycle and control family — these manage editor processes or the local cont
 |---|---|
 | `list` | List registered instances |
 | `start` | Launch an editor and wait until its server answers |
-| `stop <id>` | Stop an instance gracefully; `--force` to kill. The instance can also be addressed with `--id`, `--port` or `--project` instead of the positional id |
-| `restart <id>` | Stop the instance (graceful by default, `--force` to kill) and start it again on the same port, headless mode and Godot executable. Same addressing as `stop`. The stop phase waits a fixed 10 seconds and ignores `--wait`; if the process is still alive, no replacement is started |
+| `stop <id>` | Stop an instance. A headless instance has no window to receive a close request, so it is force-stopped directly and reports `method: "force"` — that is expected, not a fallback. A windowed instance is stopped gracefully; `--force` kills it. The instance can also be addressed with `--id`, `--port` or `--project` instead of the positional id |
+| `restart <id>` | Stop the instance and start it again on the same port, headless mode and Godot executable. Headless instances (and any instance with `--force`) are force-stopped; windowed instances stop gracefully. Same addressing as `stop`. The stop phase waits a fixed 10 seconds and ignores `--wait`; if a windowed process is still alive, no replacement is started and the registration is kept |
 | `serve` | Start the loopback control-plane proxy (default `127.0.0.1:9700`) that routes to one or several instances; see the control-plane section below |
 | `logs <id>` | Tail the instance log |
 
@@ -123,7 +123,7 @@ The `GODOT_PATH` environment variable is **not** read, and neither is a `.env` i
 `gda serve` starts a loopback-only proxy that gives one entry point to several editor instances. It is a pure proxy: it does not add tools, does not change any semantics and does not start or stop editors.
 
 - **Listen**: `127.0.0.1:9700` by default. `--port` changes the port; `--bind` accepts loopback addresses only (`127.0.0.1`, `::1`, `localhost`) and rejects anything else; `--timeout` sets the upstream wait (default 60 seconds).
-- **Routes**: `GET /control/health` needs no token. `GET /control/instances` lists live instances (never their tokens) and needs a token. `/i/<id|port>/api/...` and `/i/<id|port>/mcp` forward to the chosen instance. Plain `/api/...` and `/mcp` forward to the single live instance; with several live instances they return 409 `instance_ambiguous` with `candidates`, and with none they return 503 `no_active_instance`.
+- **Routes**: `GET /control/health` needs no token. `GET /control/instances` lists live instances (never their tokens) and needs a token. `/i/<ref>/api/...` and `/i/<ref>/mcp` forward to the chosen instance. `<ref>` accepts three forms, matched in this order: the plugin's `instance_id` (for example `gda-daa757f3-9672-1792697320437`), the CLI id `p<pid>` (for example `p9672`, exactly what `gda list` prints, matched by process id), then a numeric port (for example `9530`). Plain `/api/...` and `/mcp` forward to the single live instance; with several live instances they return 409 `instance_ambiguous` with `candidates`, and with none they return 503 `no_active_instance`.
 - **Auth**: send `Authorization: Bearer <token>`. The token is generated on first start at `<home>/.godot-autopilot/control.token` (64 hex characters, mode `0600`) and reused afterwards. `--no-auth` disables the check with a warning — every local process can then drive the editor.
 - **Forwarding**: the proxy drops the client's `Authorization` header, attaches the target instance's own token, and streams the response through unchanged (SSE included), adding `X-GDA-Instance` with the instance that served the call.
 - **Not for process control**: there are no HTTP start/stop endpoints by design; use `gda start` / `stop` / `restart` for that.

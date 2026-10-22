@@ -137,6 +137,12 @@ export function resolveInstanceByRef(
 ): PluginInstanceRecord | undefined {
   const matchedById = records.find((record) => record.instanceId !== "" && record.instanceId === ref);
   if (matchedById !== undefined) return matchedById;
+  const pidMatch = /^p(\d+)$/.exec(ref);
+  if (pidMatch !== null) {
+    const pid = Number(pidMatch[1]);
+    const matchedByPid = records.filter((record) => record.pid === pid);
+    return matchedByPid.find((record) => record.pid !== null && alive(record.pid)) ?? matchedByPid[0];
+  }
   if (!/^\d+$/.test(ref)) return undefined;
   const port = Number(ref);
   if (!Number.isInteger(port) || port < 1 || port > 65535) return undefined;

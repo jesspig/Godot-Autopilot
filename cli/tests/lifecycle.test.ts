@@ -601,7 +601,7 @@ describe.serial("stop", () => {
     // 本就不终止控制台进程），两平台均稳定落入优雅停止失败分支
     const runner = spawn(process.execPath, ["-e", "process.on('SIGTERM',()=>{});setTimeout(()=>{},20000)"], { stdio: "ignore" });
     try {
-      writeEntry(makeEntry({ id: `p${runner.pid}`, pid: runner.pid, project: makeProjectDir() }));
+      writeEntry(makeEntry({ id: `p${runner.pid}`, pid: runner.pid, project: makeProjectDir(), headless: false }));
       const { code, stderr, stdout } = await captureStdout(() => runStop([`p${runner.pid}`], { waitText: "1" }));
       expect(code).toBe(ExitCode.Transport);
       expect(stderr).toContain("--force");

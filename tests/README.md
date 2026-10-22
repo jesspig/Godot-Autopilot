@@ -117,7 +117,7 @@ ctest 上除 L1/L2 外还有 6 个守卫与脚本项常驻（注册见 `tests/CM
 - `main_thread_guard`（`tests/guard/main_thread_guard.py`）：主线程契约守卫，静态扫描 `src/` 下 `*.cpp/*.hpp` 里的 Godot API 直接调用。判定依据是「线程上下文分类」——每个源文件被显式归入主线程（`main`）/受管（`managed`）/外线程（`foreign`）三类，外线程文件里的 Godot API 调用默认违规，只有落在该文件显式登记的主线程作用域里才放行。退出码：0 = 无违规、1 = 有违规、2 = 文件读或解码失败。
 - `version_sync_guard`（`tests/guard/version_sync_guard.py`）：版本号一致性——扫描 `skills/` 下全部文本文件与根 `README*.md` 的每一处版本钉，均须与根 `VERSION` 同值，另含 `VERSION` 与 `CLI_VERSION` 两个值源；非版本引用（如 `#develop`）只登记、不参与比对。退出码：0 = 全部一致、1 = 存在版本漂移（逐条打印 `文件:行号 = 值 (标签)`）、2 = 关键文件缺钉 / 未知引用形态 / 文件读失败。覆盖范围以守卫脚本为准。
 - `cli_contract`（`tests/scripts/test_cli_contract.py`）：CLI 契约 mock conformance（bun 驱动 `gda.ts`）；PATH 无 `bun` 时打印 `SKIP` 并退出 0。
-- `cli_unit`（`tests/scripts/run_cli_unit.py`）：封装 `bun test cli/tests`（TS 单测 252 项 / 15 文件，Windows 跳过 2 项，实测 250 通过）；bun 缺失时打印 `SKIP` 并退出 0。
+- `cli_unit`（`tests/scripts/run_cli_unit.py`）：封装 `bun test cli/tests`（TS 单测 257 项 / 16 文件，Windows 跳过 2 项，实测 255 通过）；bun 缺失时打印 `SKIP` 并退出 0。
 
 ## 6. JSON 用例 Schema（`tests/runner/config_loader.cpp` 冻结解析规则）
 

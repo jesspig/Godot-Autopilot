@@ -25,10 +25,14 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
   }
 }
 
+export function stopMethod(force: boolean | undefined, headless: boolean): "force" | "graceful" {
+  return force === true || headless ? "force" : "graceful";
+}
+
 async function stop(positional: string[], opts: GlobalOptions): Promise<number> {
   const waitSec = parseWaitSec(opts.waitText, DEFAULT_STOP_WAIT_SEC);
   const entry = resolveTarget(positional, opts);
-  const method = opts.force === true ? "force" : "graceful";
+  const method = stopMethod(opts.force, entry.headless);
 
   if (isAlive(entry.pid)) {
     if (method === "force") {

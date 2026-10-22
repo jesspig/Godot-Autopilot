@@ -79,6 +79,18 @@ describe("实例寻址", () => {
     expect(resolveInstanceByRef([target], "p1", () => true)).toBe(target);
   });
 
+  test("按命令行实例标识的进程号匹配", () => {
+    const target = record({ instanceId: "gda-2a2f6e58-43210-1", pid: 43210 });
+    expect(resolveInstanceByRef([target], "p43210", () => true)).toBe(target);
+  });
+
+  test("进程号标识与端口号标识不互相干扰", () => {
+    const byPid = record({ instanceId: "gda-a", pid: 43210, port: 9530 });
+    const byPort = record({ instanceId: "gda-b", pid: 1234, port: 43210 });
+    expect(resolveInstanceByRef([byPid, byPort], "p43210", () => true)?.instanceId).toBe("gda-a");
+    expect(resolveInstanceByRef([byPid, byPort], "43210", () => true)?.instanceId).toBe("gda-b");
+  });
+
   test("同形时 id 优先于端口", () => {
     const byPort = record({ instanceId: "other", port: 9527 });
     const byId = record({ instanceId: "9527", port: 9600 });

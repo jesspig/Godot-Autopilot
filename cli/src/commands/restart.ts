@@ -9,6 +9,7 @@ import {
   DEFAULT_STOP_WAIT_SEC,
   removeFromRegistry,
   resolveTarget,
+  stopMethod,
   waitUntilDead,
 } from "./stop";
 
@@ -29,7 +30,7 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
 
 async function restart(positional: string[], opts: GlobalOptions): Promise<number> {
   const entry = resolveTarget(positional, opts, "restart");
-  const method = opts.force === true ? "force" : "graceful";
+  const method = stopMethod(opts.force, entry.headless);
 
   if (isAlive(entry.pid)) {
     if (method === "force") {
