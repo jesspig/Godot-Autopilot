@@ -6,13 +6,13 @@ tags:
   - 规划
   - 竞品对齐
   - 工具扩展
-timestamp: "2026-10-22T03:59:53+08:00"
+timestamp: "2026-10-23T02:39:34+08:00"
 resource: src/
 ---
 
 # 竞品对齐路线图
 
-> 记录 2026-08 功能分支 `feature/engine-aware-fs-and-tool-expansion` 的竞品对齐批次（P0/P1/P2 已交付）与后续 P3 方向，工具侧实现细节见 [工具注册表](../modules/tools_registry.md)，运行时协议见 [入口与运行时](../modules/entry_runtime.md)。**当前口径（2026-10-22）**：域工具 **451**（27 类 / 33 个源模块）、catalog 条目 459、MCP 可达 458、schema 基线 459 = 393 非空 + 66 空、遍历枚举 452 / 排除 151 / 候选 301、L1 **759** 个 gtest（67 个 unit 文件）、L2 **41** 份用例、守卫与脚本 6 项、**ctest 注册点 806**（759 + 41 + 6，`ctest -N` 实测）、技能书 9 册 / 35 文件、根 `CMakeLists.txt` 的 `add_library` 收录 **113** 个 `.cpp`；各项的权威核算口径见 [测试体系](../tests.md) 的数值核算总表。下列各节的批次内计数是**该批次交付当时的增量**，不代表当前值。
+> 记录 2026-08 功能分支 `feature/engine-aware-fs-and-tool-expansion` 的竞品对齐批次（P0/P1/P2 已交付）与后续 P3 方向，工具侧实现细节见 [工具注册表](../modules/tools_registry.md)，运行时协议见 [入口与运行时](../modules/entry_runtime.md)。**当前口径（2026-10-23）**：域工具 **451**（27 类 / 33 个源模块）、catalog 条目 459、MCP 可达 458、schema 基线 459 = 393 非空 + 66 空、遍历枚举 452 / 排除 151 / 候选 301、L1 **759** 个 gtest（67 个 unit 文件）、L2 **41** 份用例、守卫与脚本 6 项、**ctest 注册点 806**（759 + 41 + 6，`ctest -N` 实测）、CLI 命令 **14**、CLI TS 单测 **252** 项（15 个文件，Windows 跳过 2 项）、技能书 9 册 / 35 文件、根 `CMakeLists.txt` 的 `add_library` 收录 **113** 个 `.cpp`；各项的权威核算口径见 [测试体系](../tests.md) 的数值核算总表。下列各节的批次内计数是**该批次交付当时的增量**，不代表当前值。
 
 ## 竞品全景（一行定位速记）
 
@@ -122,6 +122,16 @@ resource: src/
 - **CLI 中危修复**：启动就绪探测失败终止进程并清理 pending 日志；登记表比较统一 `path.resolve` 且握手状态可失效；顶层 `error` 信封映射为工具失败；移除未实现的 `--quiet`；`stop` 支持 `--id` / `--port` 并复用统一选择器校验。
 - **知识库收敛**：安全契约页两条与代码冲突的断言（`FileAccess` 落盘线程、`call_tool` 是否写 trace）按修复后事实重写；退役整页指向已删除目录的示例工程页；本页补记 10-11 / 10-12 / 10-16 / 10-18 / 10-19 五个缺失批次。
 - 详见 [changelog/2026-10-20-log.md](../changelog/2026-10-20-log.md) 与 [T0 安全边界与并发契约](../security_contract.md)。
+
+## 已交付：控制面二期（0.3.0 内完成）
+
+控制面二期随提交 `4aeee67` 进入 CLI，命令总数 12→**14**；E-1a / E-1b / E-1c 三项均落地：
+
+- **E-1a `gda restart`**：定位规则与 `stop` 完全一致（位置参数 `<id>`，或 `--id` / `--port` / `--project` 三选一），只作用于 CLI 本地注册表里的实例；流程为「优雅停止（`--force` 才强杀）→ 固定等待 10 秒（**不受 `--wait` 影响**）→ 从注册表移除旧条目 → 按原端口 / 原 headless / 原 godot 路径重新拉起 → 输出 `previous` 与新实例视图」。停止阶段超时**不启动替代实例**，避免同一工程同时开两个编辑器（扩展加载期可能静默崩溃）。
+- **E-1b 多实例路由**：`/i/<实例 ID 或端口>/api[/…]` 与 `/i/<ref>/mcp` 精确转发；缺省 `/api/...` 与 `/mcp` 在唯一活跃实例时自动转发，多个活跃返回 **409 `instance_ambiguous`**（附 `candidates`），零个返回 **503 `no_active_instance`**；目标不可达 **503 `instance_unavailable`**，上游连接失败 **502 `upstream_unreachable`**，上游超时 **504 `upstream_timeout`**。
+- **E-1c 双面转发**：控制面默认 `127.0.0.1:9700`，`--bind` 只接受环回地址；`GET /control/health` 免认证，`GET /control/instances` 需 Bearer 且**不返回 `apiToken`**，其余路由全部需认证；令牌文件 `<集中根>/control.token`（32 字节随机值的十六进制、`0600`，已存在则复用）；转发时丢弃客户端 `Authorization` 与逐跳头并注入目标实例令牌，响应加 `X-GDA-Instance` 并边到边流式透传（MCP SSE 可直接穿过）。
+- **不做项（明确决定）**：不提供 HTTP 启停端点，控制面只做只读查询与转发；启停仍只在 CLI 侧（`start` / `stop` / `restart`）。理由是把本机进程控制暴露成 HTTP 端点，会让任何能访问该端口的客户端获得启停编辑器的能力，风险大于收益。
+- **验证与口径**：`bun test cli/tests` 实测 **250 pass / 2 skip / 0 fail**（252 项 / 15 文件，Windows 跳过 2 项，193→252）；路由与认证细节见 [CLI 载体](../modules/cli.md)「控制面（`gda serve`）」，端口分工见 [端口与实例登记](../modules/ports.md)「控制面端口」。
 
 ## 遗留：P3 待规划
 

@@ -95,7 +95,8 @@ const char *const kManualWhitelist[] = {
     "gda",
 
     "dynamic", "required", "type", "description", "error", "file", "args",
-    "name", "params", "tags", "category"};
+    "name", "params", "tags", "category", "instance_ambiguous",
+    "no_active_instance"};
 
 bool is_word_char(char c) {
   return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||

@@ -40,13 +40,15 @@ Calling family — meta tools are called directly, every domain tool goes throug
 | `describe <tool>` | Full schema and side-effect marker for one tool |
 | `call <tool>` | Execute one tool; arguments via `--args '<json>'` or `--args-file <path>` |
 
-Lifecycle family — these act on editor processes on the local machine:
+Lifecycle and control family — these manage editor processes or the local control plane:
 
 | Command | Meaning |
 |---|---|
 | `list` | List registered instances |
 | `start` | Launch an editor and wait until its server answers |
 | `stop <id>` | Stop an instance gracefully; `--force` to kill. The instance can also be addressed with `--id`, `--port` or `--project` instead of the positional id |
+| `restart <id>` | Stop the instance (graceful by default, `--force` to kill) and start it again on the same port, headless mode and Godot executable. Same addressing as `stop`. The stop phase waits a fixed 10 seconds and ignores `--wait`; if the process is still alive, no replacement is started |
+| `serve` | Start the loopback control-plane proxy (default `127.0.0.1:9700`) that routes to one or several instances; see the control-plane section below |
 | `logs <id>` | Tail the instance log |
 
 REST family — these do not speak MCP; they call the plugin's plain-HTTP face on the same port:
@@ -64,13 +66,13 @@ Follow the same discovery order as the native channel: `ping`, then `search` or 
 
 ## Global options
 
-`--port` (default 9527), `--id`, `--project`, `--pretty`, `--raw`, `--timeout`, `--category`, `--tags`, `--args`, `--args-file`, `--save-images`, `--godot`, `--headless`, `--play`, `--no-import`, `--wait`, `--force`, `--tail`, `--query`, `--probe`, `--help`, `--version`.
+`--port` (default 9527; 9700 for `serve`), `--id`, `--project`, `--pretty`, `--raw`, `--timeout`, `--category`, `--tags`, `--args`, `--args-file`, `--save-images`, `--godot`, `--headless`, `--play`, `--no-import`, `--wait`, `--force`, `--tail`, `--bind`, `--no-auth`, `--query`, `--probe`, `--help`, `--version`.
 
-`--query` applies to the `api list` subcommand only and `--probe` to `api` and `endpoints`; passing either to another command is a usage error.
+`--bind` and `--no-auth` apply to `serve` only; `--bind` takes a loopback address and `--no-auth` turns the control-plane token check off. `--query` applies to the `api list` subcommand only and `--probe` to `api` and `endpoints`; passing any of these to another command is a usage error.
 
 `--quiet` was removed and is no longer recognized. Passing it now fails with exit code 3 and the message "unknown option: --quiet", and it is gone from `gda --help`. An older wrapper that still passes `--quiet` will start failing — drop the flag rather than working around it. Diagnostics already go to stderr on their own, so the flag bought nothing.
 
-`--id`, `--port` and `--project` are mutually exclusive, and `stop` accepts a positional instance id as a fourth way to address an instance; passing a positional id together with any of the three options is a usage error. Every project path in that chain is normalized with `path.resolve` semantics, so the same relative `--project` (for example `../x`) now resolves to the same instance under `ping`, `stop` and `list` alike. Before, the three commands disagreed on the same input and could address different instances.
+`--id`, `--port` and `--project` are mutually exclusive, and `stop` and `restart` accept a positional instance id as a fourth way to address an instance; passing a positional id together with any of the three options is a usage error. Every project path in that chain is normalized with `path.resolve` semantics, so the same relative `--project` (for example `../x`) now resolves to the same instance under `ping`, `stop`, `restart` and `list` alike. Before, those commands disagreed on the same input and could address different instances.
 
 ## Port and target resolution
 
@@ -115,6 +117,16 @@ The `GODOT_PATH` environment variable is **not** read, and neither is a `.env` i
 
 - **A failed start is rolled back.** When the readiness probe fails, `start` terminates the editor process it launched and removes the pending log file, then reports the failure. A failed start therefore leaves no orphaned Godot process behind and no half-written log to clean up by hand.
 - **A restarted server is picked up again.** The handshake state is tracked per target URL, and a server restart invalidates it. When the server answers a request with the "session not initialized" rejection, the CLI re-handshakes once per URL per process and replays the request. The same CLI process therefore survives an editor restart instead of failing with an HTTP 400 or a -32600 error for the rest of its life.
+
+## Control plane (`gda serve`)
+
+`gda serve` starts a loopback-only proxy that gives one entry point to several editor instances. It is a pure proxy: it does not add tools, does not change any semantics and does not start or stop editors.
+
+- **Listen**: `127.0.0.1:9700` by default. `--port` changes the port; `--bind` accepts loopback addresses only (`127.0.0.1`, `::1`, `localhost`) and rejects anything else; `--timeout` sets the upstream wait (default 60 seconds).
+- **Routes**: `GET /control/health` needs no token. `GET /control/instances` lists live instances (never their tokens) and needs a token. `/i/<id|port>/api/...` and `/i/<id|port>/mcp` forward to the chosen instance. Plain `/api/...` and `/mcp` forward to the single live instance; with several live instances they return 409 `instance_ambiguous` with `candidates`, and with none they return 503 `no_active_instance`.
+- **Auth**: send `Authorization: Bearer <token>`. The token is generated on first start at `<home>/.godot-autopilot/control.token` (64 hex characters, mode `0600`) and reused afterwards. `--no-auth` disables the check with a warning — every local process can then drive the editor.
+- **Forwarding**: the proxy drops the client's `Authorization` header, attaches the target instance's own token, and streams the response through unchanged (SSE included), adding `X-GDA-Instance` with the instance that served the call.
+- **Not for process control**: there are no HTTP start/stop endpoints by design; use `gda start` / `stop` / `restart` for that.
 
 ## Exit codes
 
@@ -177,7 +189,7 @@ Tool-level failures (bad arguments, missing nodes) are not transport errors — 
 ## Hard rules
 
 - **Never hand-write HTTP requests** against the MCP endpoint from any tool. Every MCP call goes through the MCP tools or `gda`. The plugin's REST face has its own reference (references/rest-api.md) and is the one sanctioned place to speak plain HTTP directly.
-- **The server binds loopback only.** Never forward its port, never bind it to a public interface, never proxy it. The MCP face has no authentication, so the loopback binding is the only thing protecting it; the REST face asks for a bearer token, but that token is a local credential and does not make the port safe to expose.
+- **The server binds loopback only.** Never forward its port, never bind it to a public interface, never expose it through a proxy. `gda serve` is the only sanctioned local proxy and is itself loopback-only; it is not a way to reach the server from another machine. The MCP face has no authentication, so the loopback binding is the only thing protecting it; the REST face asks for a bearer token, but that token is a local credential and does not make the port safe to expose.
 - **Verify a downloaded binary before executing it.** No checksum match, no run.
 - **Report what you actually observed.** Exit code 2 means the channel is down, not that the tool returned nothing; do not fabricate results.
 

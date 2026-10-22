@@ -86,7 +86,7 @@ bun install -g github:jesspig/Godot-Autopilot#0.3.0
 gda ping
 ```
 
-命令族：**调用族** —— `ping` / `status` / `categories` / `search` / `describe` / `call`；**生命周期** —— `list` / `start` / `stop` / `logs`。
+命令族：**调用族** —— `ping` / `status` / `categories` / `search` / `describe` / `call`；**生命周期** —— `list` / `start` / `stop` / `restart` / `logs`；**控制面** —— `serve`。
 
 需要 **Bun**；机器上没有 Bun 或 Node 时，直接改用 Releases 页的 `gda` 独立可执行文件（完整参考见 [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md)）。
 

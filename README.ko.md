@@ -86,7 +86,7 @@ bun install -g github:jesspig/Godot-Autopilot#0.3.0
 gda ping
 ```
 
-명령 계열: **호출 계열** — `ping` / `status` / `categories` / `search` / `describe` / `call`；**수명 주기** — `list` / `start` / `stop` / `logs`.
+명령 계열: **호출 계열** — `ping` / `status` / `categories` / `search` / `describe` / `call`；**수명 주기** — `list` / `start` / `stop` / `restart` / `logs`；**제어면** — `serve`.
 
 **Bun**이 필요합니다. Bun도 Node도 없는 환경에서는 Releases의 `gda` 단일 실행 파일을 사용하세요 (전체 참조는 [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md)).
 
