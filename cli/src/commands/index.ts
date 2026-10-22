@@ -8,6 +8,8 @@ import { run as call } from "./call";
 import { run as list } from "./list";
 import { run as start } from "./start";
 import { run as stop } from "./stop";
+import { run as restart } from "./restart";
+import { run as serve } from "./serve";
 import { run as logs } from "./logs";
 import { run as api } from "./api";
 import { run as endpoints } from "./endpoints";
@@ -26,6 +28,8 @@ export const COMMANDS: Record<string, Command> = {
   list: { run: list },
   start: { run: start },
   stop: { run: stop },
+  restart: { run: restart },
+  serve: { run: serve },
   logs: { run: logs },
   api: { run: api },
   endpoints: { run: endpoints },

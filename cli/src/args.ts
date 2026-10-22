@@ -24,6 +24,8 @@ export interface GlobalOptions {
   force?: boolean;
   query?: string;
   probe?: string;
+  bind?: string;
+  noAuth?: boolean;
 }
 
 const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
@@ -41,6 +43,7 @@ const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
   "--tail": "tailText",
   "--query": "query",
   "--probe": "probe",
+  "--bind": "bind",
 };
 
 const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
@@ -52,6 +55,7 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--play": "play",
   "--no-import": "noImport",
   "--force": "force",
+  "--no-auth": "noAuth",
 };
 
 export function parseArgv(argv: string[]): { opts: GlobalOptions; positionals: string[] } {
@@ -118,6 +122,8 @@ Commands:
   list                List running Godot instances
   start               Start a Godot editor
   stop                Stop a Godot editor (<id> | --id | --port | --project)
+  restart             Restart a Godot editor with the same port and settings
+  serve               Run the local control-plane proxy (default 127.0.0.1:9700)
   logs                Show an instance log
   api list            List tools through the REST endpoint
   api describe <tool> Show one tool's schema through the REST endpoint
@@ -125,12 +131,12 @@ Commands:
   endpoints           Show the discovered MCP and REST endpoints
 
 Global options:
-  --port <text>       MCP server port (default 9527)
+  --port <text>       MCP server port (default 9527); serve port (default 9700)
   --id <text>         Target instance id from the registry
   --project <text>    Project directory
   --pretty            Pretty-print JSON output (2-space indent)
   --raw               Raw JSON envelope output
-  --timeout <text>    Call timeout in seconds
+  --timeout <text>    Call timeout in seconds (serve default 60)
   --category <text>   Filter search results by category
   --tags <text>       Filter search results by tags (comma separated)
   --args <json>       Tool arguments as a JSON string
@@ -139,9 +145,11 @@ Global options:
   --godot <path>      Explicit Godot executable (start)
   --headless          Start the editor headless (start)
   --play              Play the current scene once ready (start)
-  --no-import         Skip the asset import pre-step (start)
-  --wait <sec>        Readiness/stop wait in seconds, 0 = do not wait (start/stop)
-  --force             Force-stop the process (stop)
+  --no-import         Skip the asset import pre-step (start/restart)
+  --wait <sec>        Readiness/stop wait in seconds, 0 = do not wait (start/stop/restart)
+  --force             Force-stop the process (stop/restart)
+  --bind <addr>       Control-plane bind address, loopback only (serve; default 127.0.0.1)
+  --no-auth           Disable control-plane auth; any local process can call tools (serve)
   --tail <n>          Number of trailing log lines (logs)
   --query <text>      Keyword filter for the api list subcommand
   --probe <level>     Liveness probe level: light (default) or strict

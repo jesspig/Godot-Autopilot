@@ -7,7 +7,7 @@ import { assertSingleSelector, parseTargetPort } from "../target";
 import { readRawEntries, readRawEntry } from "./registry-raw";
 import { writeJson } from "./json-output";
 
-const DEFAULT_WAIT_SEC = 10;
+export const DEFAULT_STOP_WAIT_SEC = 10;
 const POLL_INTERVAL_MS = 100;
 
 export async function run(positional: string[], opts: GlobalOptions): Promise<number> {
@@ -26,7 +26,7 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
 }
 
 async function stop(positional: string[], opts: GlobalOptions): Promise<number> {
-  const waitSec = parseWaitSec(opts.waitText, DEFAULT_WAIT_SEC);
+  const waitSec = parseWaitSec(opts.waitText, DEFAULT_STOP_WAIT_SEC);
   const entry = resolveTarget(positional, opts);
   const method = opts.force === true ? "force" : "graceful";
 
@@ -52,7 +52,7 @@ async function stop(positional: string[], opts: GlobalOptions): Promise<number> 
   return ExitCode.Success;
 }
 
-function resolveTarget(positional: string[], opts: GlobalOptions): InstanceEntry {
+export function resolveTarget(positional: string[], opts: GlobalOptions, usageCommand = "stop"): InstanceEntry {
   const positionalId = positional[0];
   if (positionalId !== undefined) {
     if (opts.id !== undefined || opts.portText !== undefined || opts.project !== undefined) {
@@ -89,7 +89,7 @@ function resolveTarget(positional: string[], opts: GlobalOptions): InstanceEntry
 
   throw new CliError(
     ExitCode.Usage,
-    "usage: gda stop <id> [--force] [--wait <sec>] | gda stop (--id <id> | --port <port> | --project <dir>) [--force] [--wait <sec>]",
+    `usage: gda ${usageCommand} <id> [--force] [--wait <sec>] | gda ${usageCommand} (--id <id> | --port <port> | --project <dir>) [--force] [--wait <sec>]`,
   );
 }
 
@@ -106,13 +106,13 @@ function entryByPort(port: number): InstanceEntry | undefined {
   return entries.find((e) => isAlive(e.pid)) ?? entries[0];
 }
 
-function removeFromRegistry(id: string): void {
+export function removeFromRegistry(id: string): void {
   const data = loadRegistry();
   data.instances = data.instances.filter((e) => e.id !== id);
   saveRegistry(data);
 }
 
-async function waitUntilDead(pid: number, waitSec: number): Promise<boolean> {
+export async function waitUntilDead(pid: number, waitSec: number): Promise<boolean> {
   const deadline = Date.now() + waitSec * 1000;
   for (;;) {
     if (!isAlive(pid)) return true;

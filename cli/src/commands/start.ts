@@ -29,9 +29,14 @@ const PROBE_INTERVAL_MS = 500;
 const LOG_TAIL_LINES = 5;
 const LOG_TAIL_MAX_CHARS = 400;
 
+export interface StartRunOptions {
+  writeOutput?: boolean;
+}
+
 export async function run(_positional: string[], opts: GlobalOptions): Promise<number> {
   try {
-    return await start(opts);
+    await start(opts);
+    return ExitCode.Success;
   } catch (error) {
     if (error instanceof CliError) {
       err(error.message);
@@ -44,7 +49,7 @@ export async function run(_positional: string[], opts: GlobalOptions): Promise<n
   }
 }
 
-async function start(opts: GlobalOptions): Promise<number> {
+export async function start(opts: GlobalOptions, runOpts: StartRunOptions = {}): Promise<InstanceEntry> {
   const projectDir = path.resolve(opts.project ?? process.cwd());
   const explicitPort = opts.portText !== undefined ? parseExplicitPort(opts.portText) : null;
 
@@ -114,11 +119,11 @@ async function start(opts: GlobalOptions): Promise<number> {
     }
   }
 
-  writeJson(instanceView(entry), opts);
-  return ExitCode.Success;
+  if (runOpts.writeOutput !== false) writeJson(instanceView(entry), opts);
+  return entry;
 }
 
-function instanceView(e: InstanceEntry): Record<string, unknown> {
+export function instanceView(e: InstanceEntry): Record<string, unknown> {
   return {
     id: e.id,
     project: e.project,
