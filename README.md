@@ -126,7 +126,7 @@ The server only listens on your machine's loopback address (port from the plugin
 
 ## Asset attribution
 
-The 5 sample projects under `demo/` (2D/3D beginner tutorials, UI control gallery, viewport composition, networked Pong) come from the official [Godot demo projects](https://github.com/godotengine/godot-demo-projects); only their assets and clean project configurations are kept for testing. Copyright and licensing details live in each project's README and LICENSE files.
+The 5 sample projects under `demo/` (2D/3D beginner tutorials, UI control gallery, viewport composition, networked Pong) come from the official [Godot demo projects](https://github.com/godotengine/godot-demo-projects); only their assets and clean project configurations are kept for testing. The sixth project, `demo/pink_man_adventure`, is an in-repo example restored from the historical `Example/` demo project: its 173 PNG assets come from Pixel Frog's Pixel Adventure 1 (CC0 1.0), and its design documentation is original to this repository. Copyright and licensing details live in each project's README and LICENSE files.
 
 ## License
 

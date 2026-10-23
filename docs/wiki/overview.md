@@ -32,8 +32,8 @@ resource:
 Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **GDExtension 插件**形式**进程内加载到 Godot 编辑器**，在原生引擎 API 层面把 AI Agent 与 Godot 连接（场景树、物理服务器、渲染服务器、音频、导航、输入模拟、脚本执行等），而非模拟用户 UI 操作。
 
 - **进程内 GDExtension**：插件随编辑器启动而启动、随编辑器关闭而停止，无独立桥接进程（`src/main.cpp` 的 `GDExtensionEntryPoint` 注册 `GodotAutopilotPlugin`，`_enter_tree()` 中创建并启动 `ServerContext`）。
-- **产物名**：`godot-autopilot`（`.dll` / `.so` / `.dylib` + `.gdextension`），部署目录 `demo/*/addons/godot-autopilot/`（5 个官方示例工程）。
-- **附属工程**：`demo/` 下 5 个官方示例工程的素材与干净配置（脚本/场景未入库），`main.py build` 构建后部署插件到其中。
+- **产物名**：`godot-autopilot`（`.dll` / `.so` / `.dylib` + `.gdextension`），部署目录 `demo/*/addons/godot-autopilot/`（6 个示例工程：5 个官方 + 1 个自制）。
+- **附属工程**：`demo/` 下 6 个示例工程（5 个官方 + 1 个自制 `pink_man_adventure`）的素材与干净配置（脚本/场景未入库），`main.py build` 构建后部署插件到其中。
 
 ## 核心能力
 
@@ -151,7 +151,7 @@ godot-self-driving/
 ├── docs/                       # 本知识库（docs/wiki/，含 modules/、plans/、changelog/）
 ├── package.json                # CLI 包定义（name godot-autopilot-cli，bin gda → cli/bin/gda.ts，零运行时依赖）
 ├── bun.lock                    # CLI devDependency 锁（@types/bun + typescript）
-└── demo/                       # 官方 demo 合集（5 个工程：文档/素材/工程配置，插件部署目标之一）
+└── demo/                       # demo 合集（6 个工程：5 个官方 + 1 个自制，文档/素材/工程配置，插件部署目标之一）
 ```
 
 各子目录职责详见 [modules/](./modules/) 页面。

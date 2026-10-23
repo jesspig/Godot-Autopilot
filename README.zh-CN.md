@@ -126,7 +126,7 @@ leave code_execute and game_runtime disabled unless I ask for them.
 
 ## 素材声明
 
-`demo/` 下的 5 个示例项目（2D/3D 入门教程、UI 控件全览、视口复合、网络 Pong）来自官方 [Godot 演示合集](https://github.com/godotengine/godot-demo-projects)，仓库仅保留其素材与干净工程配置用于测试，版权与授权见各项目目录内的 README 与 LICENSE。
+`demo/` 下的 5 个示例项目（2D/3D 入门教程、UI 控件全览、视口复合、网络 Pong）来自官方 [Godot 演示合集](https://github.com/godotengine/godot-demo-projects)，仓库仅保留其素材与干净工程配置用于测试。第 6 个项目 `demo/pink_man_adventure` 是从历史 `Example/` 示例工程还原的仓库内示例：173 张 PNG 素材来自 Pixel Frog 的 Pixel Adventure 1（CC0 1.0），设计文档为本仓库原创。版权与授权见各项目目录内的 README 与 LICENSE。
 
 ## 许可证
 

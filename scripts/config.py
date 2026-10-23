@@ -53,6 +53,7 @@ DEMO_NAMES: tuple[str, ...] = (
     "gui_control_gallery",
     "viewport_gui_in_3d",
     "networking_multiplayer_pong",
+    "pink_man_adventure",
 )
 
 DEMO_DIRS: list[Path] = [PROJECT_ROOT / "demo" / name for name in DEMO_NAMES]

@@ -29,7 +29,7 @@ resource:
 |---|---|
 | `uv run main.py build` | Debug：配置 + 构建（不部署） |
 | `uv run main.py build --release` | Release 配置 + 构建（不部署、不清理） |
-| `uv run main.py deploy` | 部署 Debug 产物到 `demo/*/addons/godot-autopilot/`（5 个 demo）与 L2 测试床 `tests/testbed/addons/godot-autopilot/`（恒被部署，不受子集影响）；`--demos` **不传则部署全部 demo**，**传空**（`--demos` 后不跟任何名字）**则不部署任何 demo**（仅测试床照常刷新），`--demos 名称...` 只部署子集 |
+| `uv run main.py deploy` | 部署 Debug 产物到 `demo/*/addons/godot-autopilot/`（6 个 demo）与 L2 测试床 `tests/testbed/addons/godot-autopilot/`（恒被部署，不受子集影响）；`--demos` **不传则部署全部 demo**，**传空**（`--demos` 后不跟任何名字）**则不部署任何 demo**（仅测试床照常刷新），`--demos 名称...` 只部署子集 |
 | `uv run main.py deploy --release` | 先清理，再部署 Release 产物 |
 | `uv run main.py build --release --package` | 不再支持：构建与部署已拆分，按 `build --release` → `deploy --release` → `package` 分步执行 |
 | `uv run main.py package` | 仅打包已部署的 addons（不触发构建，未部署则报错退出）；包内含 6 个 C# 桥 `.cs`、**不含 `.pdb`** |
@@ -40,7 +40,7 @@ resource:
 | `uv run main.py tui` | 交互式构建控制台（rich + questionary，需终端；覆盖构建/打包/清理/状态查看，demo 复选） |
 | `cmake --preset debug && cmake --build --preset debug` | 手动构建（不部署）。预设名不带 `-portable` 后缀即**固定 Ninja**，须本机 PATH 有 ninja；无 ninja 时改用 `debug-portable` / `release-portable`，或直接用 `uv run main.py build` 由脚本自动选路（见「预设」小节） |
 
-约束：`build`/`deploy` 各自的 `--release` 与 `--debug` 互斥，同时指定报错退出（`main.py:22/39`）；`package` 的 `--libs-dir` 缺任一平台库即报错退出；`--demos` 名称不在 5 个 demo 内时报错退出并列出可选名。
+约束：`build`/`deploy` 各自的 `--release` 与 `--debug` 互斥，同时指定报错退出（`main.py:22/39`）；`package` 的 `--libs-dir` 缺任一平台库即报错退出；`--demos` 名称不在 6 个 demo 内时报错退出并列出可选名。
 
 ## 版本号单一来源（根 `VERSION` 文件）
 
@@ -63,7 +63,7 @@ resource:
 - `<工程>/.godot` — Godot 引擎缓存
 - `<工程>/addons/godot-autopilot/` — 旧部署产物
 
-`DEPLOY_TARGETS`（`scripts/config.py`）= 5 个 `demo/*` + L2 测试床 `tests/testbed`。清理刻意与部署同口径，否则会留下 demo 已是 Release 库、床仍是 Debug 库的幽灵态；代价是 `deploy --release` 后跑 L2 须先重新 `deploy`。
+`DEPLOY_TARGETS`（`scripts/config.py`）= 6 个 `demo/*` + L2 测试床 `tests/testbed`。清理刻意与部署同口径，否则会留下 demo 已是 Release 库、床仍是 Debug 库的幽灵态；代价是 `deploy --release` 后跑 L2 须先重新 `deploy`。
 
 ### 2. 配置 `_configure(preset)`（`scripts/cmake_ops.py`）
 
@@ -82,7 +82,7 @@ resource:
 
 ### 4. 部署 `_deploy(preset, demos)`（`scripts/deploy.py`）
 
-逐个工程循环（`--demos` 未指定即全部 5 个 demo；`--demos` 传空则一个 demo 都不部署），循环体末尾恒追加 L2 测试床 `tests/testbed`，因此 `--demos` 子集部署同样会刷新床的插件。库源目录取 [`scripts/config.py:artifact_dir(preset)`](../../scripts/config.py) 而非 `BUILD_DIR / preset` —— 多配置生成器的产物多一层配置名子目录（见「多配置生成器的产物路径」小节）：
+逐个工程循环（`--demos` 未指定即全部 6 个 demo；`--demos` 传空则一个 demo 都不部署），循环体末尾恒追加 L2 测试床 `tests/testbed`，因此 `--demos` 子集部署同样会刷新床的插件。库源目录取 [`scripts/config.py:artifact_dir(preset)`](../../scripts/config.py) 而非 `BUILD_DIR / preset` —— 多配置生成器的产物多一层配置名子目录（见「多配置生成器的产物路径」小节）：
 
 1. 创建部署目录，删除 Godot 热重载遗留的备份库（glob `~*`）；
 2. 生成 `godot-autopilot.gdextension`（见下节）；
@@ -142,7 +142,7 @@ macOS runner 为 ARM64，preset 设 `CMAKE_OSX_ARCHITECTURES=x86_64;arm64` 编�
 
 程序侧一律用 [`scripts/config.py:artifact_dir(preset)`](../../scripts/config.py) 取平台库源目录，不写死 `BUILD_DIR / preset`（见「scripts/ 模块职责」）。
 
-部署目录：`demo/*/addons/godot-autopilot/`（5 个 demo；打包与 CI artifact 取首个）与 `tests/testbed/addons/godot-autopilot/`（L2 测试床，不入库、不参与打包）；`main.py` 与 CI/Release 均使用仓库实际目录大小写，大小写敏感平台不会产生分叉目录。
+部署目录：`demo/*/addons/godot-autopilot/`（6 个 demo；打包与 CI artifact 取首个）与 `tests/testbed/addons/godot-autopilot/`（L2 测试床，不入库、不参与打包）；`main.py` 与 CI/Release 均使用仓库实际目录大小写，大小写敏感平台不会产生分叉目录。
 
 ## CMake 目标
 
