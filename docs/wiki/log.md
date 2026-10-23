@@ -4,6 +4,7 @@
 
 ## 2026-10-23
 
+- **示例工程还原**：把 2026-09-26 由 `6c50b99` 删除的 `Example/` 从父提交 `6c50b99^` 还原为 `demo/pink_man_adventure`，并登记为第 6 个 demo；工程名改为 `Pink Man Adventure`，清理历史测试残留段，素材 Pixel Adventure 1（Pixel Frog，CC0 1.0）与 11 篇设计文档入库。原 docs 的 `Example/` 路径与“测试床”措辞改为 `demo/pink_man_adventure/` 与“验收场地”；L2 自动化回归床仍为 `tests/testbed/`。详见 [changelog/2026-10-23-log.md](changelog/2026-10-23-log.md) 15:47 段。
 - **控制面二期落地后的文档同步**：`gda restart` / `gda serve`（提交 `4aeee67`）进入 CLI。`serve` 是**纯代理**，默认 `127.0.0.1:9700` 且只允许环回；路由含 `/control/health`（免认证）、`/control/instances`（需认证、不返回实例令牌）与 `/i/<插件实例 ID|p<pid>|port>/api|mcp` 精确转发（三种寻址按此优先级匹配，`gda list` 的 `p<pid>` 可直接使用），缺省 `/api`、`/mcp` 在唯一活跃实例时自动转发（多实例 409 `instance_ambiguous`、零个 503 `no_active_instance`）；令牌文件 `<集中根>/control.token`；响应边到边流式透传以保留 SSE。`restart` 定位规则同 `stop`，停止阶段固定等待 10 秒且不受 `--wait` 影响，超时不拉起替代实例（避免同工程双开）；`stop` / `restart` 对无窗口（headless）实例直接强制停止，有窗口实例保持优雅并保留超时提示。口径见 [CLI 载体](modules/cli.md) 与 [端口与实例登记](modules/ports.md)「控制面端口」。
 - **明确不做 HTTP 启停端点**：控制面只提供只读查询与转发，启停仍只在 CLI 侧（`start` / `stop` / `restart`）。理由是避免把本机进程控制暴露给任何能访问该端口的客户端。
 - **数值与页面同步**：CLI 命令 12→**14**、TS 单测 193→**257** 项（12→**16** 文件，Windows 跳过 2 项，实测 255 pass / 2 skip / 0 fail）；同步 [CLI 载体](modules/cli.md)、[端口与实例登记](modules/ports.md)、[测试体系](tests.md)、[项目总览](overview.md)、[构建体系](build.md)、[竞品对齐路线图](plans/roadmap.md)、`tests/README.md`、技能书与五语 README。
