@@ -78,6 +78,132 @@
         ]
       },
       {
+        "id": "runtime_connection_filtered",
+        "steps": [
+          {
+            "id": "integrity_timer_node",
+            "tool": "create_scene_node",
+            "args": { "name": "Ticker", "type": "Timer", "parent_path": "IntegrityRoot" },
+            "expect": {
+              "field_checks": [
+                { "key": "result.path", "value": "Ticker" }
+              ]
+            }
+          },
+          {
+            "id": "integrity_runtime_sink_node",
+            "tool": "create_scene_node",
+            "args": { "name": "RuntimeSink", "type": "Node", "parent_path": "IntegrityRoot" },
+            "expect": {
+              "field_checks": [
+                { "key": "result.path", "value": "RuntimeSink" }
+              ]
+            }
+          },
+          {
+            "id": "integrity_connect_runtime_only",
+            "tool": "signal_connect",
+            "args": {
+              "source_path": "Ticker",
+              "signal": "timeout",
+              "target_path": "RuntimeSink",
+              "method": "queue_free",
+              "persist": false
+            },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "connected" },
+                { "key": "persisted", "value": false }
+              ]
+            }
+          },
+          {
+            "id": "integrity_save_runtime_connection",
+            "tool": "save_editor_scene",
+            "args": {},
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "saved" }
+              ]
+            }
+          },
+          {
+            "id": "integrity_verify_runtime_connection_filtered",
+            "tool": "verify_scene_saved",
+            "args": {},
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "match" },
+                { "key": "match", "value": true },
+                { "key": "memory_nodes", "value": 3 },
+                { "key": "disk_nodes", "value": 3 },
+                { "key": "memory_connections", "value": 0 },
+                { "key": "disk_connections", "value": 0 },
+                { "key": "connections_match", "value": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "persistent_connection_counted",
+        "steps": [
+          {
+            "id": "integrity_saved_sink_node",
+            "tool": "create_scene_node",
+            "args": { "name": "SavedSink", "type": "Node", "parent_path": "IntegrityRoot" },
+            "expect": {
+              "field_checks": [
+                { "key": "result.path", "value": "SavedSink" }
+              ]
+            }
+          },
+          {
+            "id": "integrity_connect_persisted",
+            "tool": "signal_connect",
+            "args": {
+              "source_path": "Ticker",
+              "signal": "timeout",
+              "target_path": "SavedSink",
+              "method": "queue_free",
+              "persist": true
+            },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "connected" },
+                { "key": "persisted", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "integrity_save_persisted_connection",
+            "tool": "save_editor_scene",
+            "args": {},
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "saved" }
+              ]
+            }
+          },
+          {
+            "id": "integrity_verify_persistent_connection_counted",
+            "tool": "verify_scene_saved",
+            "args": {},
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "match" },
+                { "key": "match", "value": true },
+                { "key": "memory_nodes", "value": 4 },
+                { "key": "disk_nodes", "value": 4 },
+                { "key": "memory_connections", "value": 1 },
+                { "key": "disk_connections", "value": 1 },
+                { "key": "connections_match", "value": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
         "id": "cleanup",
         "steps": [
           {
