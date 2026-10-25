@@ -12,6 +12,8 @@ struct StepExpect {
         bool has_value = false;
         mcp::JsonValue value;
         bool not_empty = false;
+        bool has_not_contains = false;
+        std::string not_contains;
     };
     std::vector<FieldCheck> field_checks;
 };

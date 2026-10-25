@@ -34,6 +34,7 @@
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
+#include "util/console_encoding.hpp"
 #include <algorithm>
 #include <atomic>
 #include <cctype>
@@ -1358,12 +1359,13 @@ std::vector<std::string> collect_execute_output_lines(
     if (element.get_type() == godot::Variant::PACKED_STRING_ARRAY) {
       godot::PackedStringArray packed = element;
       for (int64_t j = 0; j < packed.size(); ++j)
-        lines.push_back(util::to_std(packed[j]));
+        lines.push_back(util::decode_console_output(util::to_std(packed[j])));
       continue;
     }
     if (element.get_type() != godot::Variant::STRING)
       continue;
-    std::string blob = util::to_std(godot::String(element));
+    std::string blob =
+        util::decode_console_output(util::to_std(godot::String(element)));
     size_t start = 0;
     while (start <= blob.size()) {
       size_t end = blob.find('\n', start);
@@ -1381,6 +1383,31 @@ std::vector<std::string> collect_execute_output_lines(
   }
   return lines;
 }
+
+constexpr const char *kDotnetUiLanguageEnvName = "DOTNET_CLI_UI_LANGUAGE";
+constexpr const char *kDotnetUiLanguageEnglish = "en";
+
+struct DotnetUiLanguageGuard {
+  godot::OS *os = nullptr;
+  godot::String variable;
+  godot::String previous_value;
+
+  explicit DotnetUiLanguageGuard(godot::OS *p_os)
+      : os(p_os), variable(kDotnetUiLanguageEnvName),
+        previous_value(os->get_environment(variable)) {
+    os->set_environment(variable, godot::String(kDotnetUiLanguageEnglish));
+  }
+
+  DotnetUiLanguageGuard(const DotnetUiLanguageGuard &) = delete;
+  DotnetUiLanguageGuard &operator=(const DotnetUiLanguageGuard &) = delete;
+
+  ~DotnetUiLanguageGuard() {
+    if (previous_value.is_empty())
+      os->unset_environment(variable);
+    else
+      os->set_environment(variable, previous_value);
+  }
+};
 
 } // namespace
 
@@ -1709,8 +1736,11 @@ mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args) {
   build_args.append(godot::String(project_path.c_str()));
   godot::Array output;
   output.append(godot::PackedStringArray());
-  int32_t exit_code =
-      os->execute(godot::String("dotnet"), build_args, output, true);
+  int32_t exit_code = 0;
+  {
+    DotnetUiLanguageGuard english_ui_language(os);
+    exit_code = os->execute(godot::String("dotnet"), build_args, output, true);
+  }
   std::vector<std::string> output_lines = collect_execute_output_lines(output);
   std::string combined;
   for (const std::string &line : output_lines) {
