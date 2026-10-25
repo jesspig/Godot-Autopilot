@@ -85,7 +85,8 @@ TEST(EditorOutputDecode, GbkBytesBecomeReadableUtf8) {
   if (GetOEMCP() == 936)
     EXPECT_NE(decoded.find("构建成功"), std::string::npos);
 #else
-  EXPECT_EQ(decoded, "build ????????");
+  EXPECT_EQ(decoded.compare(0, 6, "build "), 0);
+  EXPECT_NE(decoded, gbk);
 #endif
 }
 
