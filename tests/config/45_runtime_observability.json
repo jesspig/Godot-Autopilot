@@ -50,6 +50,7 @@
             },
             "expect": {
               "field_checks": [
+                { "key": "wrapped", "value": true },
                 { "key": "result", "value": 2 }
               ]
             }
@@ -85,6 +86,7 @@
             },
             "expect": {
               "field_checks": [
+                { "key": "wrapped", "value": true },
                 { "key": "value", "value": "triggered" },
                 { "key": "runtime_error", "value": true }
               ]
