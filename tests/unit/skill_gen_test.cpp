@@ -88,6 +88,12 @@ const char *const kManualWhitelist[] = {
     "use_multiple_threads", "writes_config", "z_index", "set_suspend",
     "hit_path", "hit_mismatch", "mouse_filter", "possibly_occluded",
     "get_physics_frames", "is_on_floor", "is_on_wall", "move_and_slide",
+    "assembly_loaded", "assembly_name", "converted_node_path",
+    "dotnet_available", "dotnet_version", "errors_truncated", "exit_code",
+    "game_running", "instrumentation_node_count", "next_seq", "output_digest",
+    "output_empty", "output_truncated", "project_file", "project_path",
+    "restart_required", "runtime_error", "target_framework", "csproj_ref_exists",
+    "engine_version", "is_dotnet_editor",
 
     "register_tool", "unregister_tool", "has_tool", "list_tools", "get_tool",
     "is_enabled", "set_enabled", "rescan", "register_autopilot_tools",
