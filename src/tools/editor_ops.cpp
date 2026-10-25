@@ -1720,6 +1720,9 @@ mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args) {
     inner["pid"] = mcp::JsonValue(static_cast<int64_t>(pid));
     inner["note"] = mcp::JsonValue(kNote);
     inner["started"] = mcp::JsonValue(pid > 0);
+    const auto *editor = godot::EditorInterface::get_singleton();
+    inner["game_running"] = mcp::JsonValue(
+        editor != nullptr && editor->is_playing_scene());
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = std::move(inner);
     if (pid <= 0) {
@@ -1794,6 +1797,11 @@ mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args) {
   inner["command"] = mcp::JsonValue(command);
   inner["exit_code"] = mcp::JsonValue(static_cast<int64_t>(exit_code));
   inner["success"] = mcp::JsonValue(exit_code == 0);
+  const auto *editor = godot::EditorInterface::get_singleton();
+  const bool game_running = editor != nullptr && editor->is_playing_scene();
+  inner["game_running"] = mcp::JsonValue(game_running);
+  if (game_running && exit_code == 0)
+    inner["restart_required"] = mcp::JsonValue(true);
   inner["errors"] = std::move(errors_arr);
   inner["output_digest"] = mcp::JsonValue(digest);
   inner["output_empty"] = mcp::JsonValue(combined.empty());
