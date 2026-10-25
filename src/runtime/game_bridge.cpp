@@ -5,6 +5,7 @@
 #include "core/log_system.hpp"
 #include "gda_protocol.hpp"
 #include "runtime/error_cursor.hpp"
+#include "runtime/game_node_count.hpp"
 #include "tools/authorization.hpp"
 #include "tools/capture_ops.hpp"
 #include "tools/editor_ui_ops.hpp"
@@ -263,7 +264,10 @@ JV op_status() {
   append_activity_fields(r);
   if (auto *tree = get_scene_tree()) {
     r["paused"] = JV(tree->is_paused());
-    r["node_count"] = JV(static_cast<int64_t>(tree->get_node_count()));
+    r["node_count"] = JV(node_count::user_node_count(tree));
+    const int64_t instrumentation = node_count::instrumentation_node_count(tree);
+    if (instrumentation > 0)
+      r["instrumentation_node_count"] = JV(instrumentation);
     godot::Node *current = tree->get_current_scene();
     if (current) {
       godot::String scene_path = current->get_scene_file_path();

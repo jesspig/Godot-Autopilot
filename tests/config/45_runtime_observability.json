@@ -127,6 +127,44 @@
             }
           }
         ]
+      },
+      {
+        "id": "instrumentation_node_count",
+        "steps": [
+          {
+            "id": "status_before_reserved_node",
+            "tool": "get_game_status",
+            "args": {},
+            "expect": {
+              "field_checks": [
+                { "key": "node_count", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "create_reserved_runtime_subtree",
+            "tool": "execute_game_script",
+            "args": {
+              "action": "script",
+              "source_code": "var holder := Node.new()\nholder.name = \"__gda_runtime\"\nfor i in range(2):\n    holder.add_child(Node.new())\nget_tree().root.add_child(holder)\nreturn get_tree().get_node_count()",
+              "timeout_ms": 7000
+            },
+            "expect": {
+              "field_checks": [{ "key": "result", "not_empty": true }]
+            }
+          },
+          {
+            "id": "status_excludes_reserved_subtree",
+            "tool": "get_game_status",
+            "args": {},
+            "expect": {
+              "field_checks": [
+                { "key": "node_count", "value": 3 },
+                { "key": "instrumentation_node_count", "value": 3 }
+              ]
+            }
+          }
+        ]
       }
     ],
     "after_all": [

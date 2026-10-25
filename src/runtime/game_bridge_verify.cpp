@@ -3,6 +3,7 @@
 #include "core/config.hpp"
 #include "core/log_system.hpp"
 #include "runtime/gda_protocol.hpp"
+#include "runtime/game_node_count.hpp"
 #include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #include <algorithm>
@@ -261,7 +262,10 @@ JV evidence_status() {
   r[GDA_FIELD_HEALTHY] = JV(true);
   if (auto *tree = get_scene_tree()) {
     r["paused"] = JV(tree->is_paused());
-    r["node_count"] = JV(static_cast<int64_t>(tree->get_node_count()));
+    r["node_count"] = JV(node_count::user_node_count(tree));
+    const int64_t instrumentation = node_count::instrumentation_node_count(tree);
+    if (instrumentation > 0)
+      r["instrumentation_node_count"] = JV(instrumentation);
     godot::Node *current = tree->get_current_scene();
     if (current) {
       godot::String scene_path = current->get_scene_file_path();
