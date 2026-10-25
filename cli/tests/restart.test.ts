@@ -189,14 +189,23 @@ async function captureStdout(fn: () => Promise<number>): Promise<{ code: number;
   }
 }
 
-function stubbornProcess(): number {
+async function stubbornProcess(): Promise<number> {
   const child = spawn(
     process.execPath,
-    ["-e", "process.on('SIGTERM',()=>{});setTimeout(()=>{},30000)"],
-    { stdio: "ignore" },
+    ["-e", "process.on('SIGTERM',()=>{});console.log('ready');setTimeout(()=>{},30000)"],
+    { stdio: ["ignore", "pipe", "ignore"] },
   );
   const pid = child.pid;
   if (pid === undefined) throw new Error("failed to spawn the stubborn helper");
+  await new Promise<void>((resolve, reject) => {
+    if (child.stdout === null) {
+      reject(new Error("stubborn helper stdout is unavailable"));
+      return;
+    }
+    child.stdout.once("data", () => resolve());
+    child.once("error", (error) => reject(error));
+    child.once("exit", (code) => reject(new Error(`stubborn helper exited early: ${code}`)));
+  });
   strayPids.push(pid);
   return pid;
 }
@@ -240,7 +249,7 @@ describe.serial("restart", () => {
   test("停止超时：不启动新实例并保留旧登记", async () => {
     const projectDir = makeProjectDir();
     const port = await findFreePort();
-    const pid = stubbornProcess();
+    const pid = await stubbornProcess();
     writeEntry(makeEntry({ project: projectDir, port, pid, headless: false }));
 
     const { code, stdout, stderr } = await captureStdout(() =>
@@ -277,7 +286,7 @@ describe.serial("restart", () => {
   test("--force 强杀忽略优雅信号的旧实例后重启", async () => {
     const projectDir = makeProjectDir();
     const port = await findFreePort();
-    const pid = stubbornProcess();
+    const pid = await stubbornProcess();
     writeEntry(makeEntry({ project: projectDir, port, pid }));
 
     const { code, stdout } = await captureStdout(() =>

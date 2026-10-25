@@ -23,6 +23,26 @@ const HOOK_TIMEOUT_MS = 60_000;
 
 const RUN_TAG = `gda-lifecycle-${Math.random().toString(36).slice(2, 8)}`;
 
+async function sigtermIgnoringPid(): Promise<number> {
+  const child = spawn(
+    process.execPath,
+    ["-e", "process.on('SIGTERM',()=>{});console.log('ready');setTimeout(()=>{},20000)"],
+    { stdio: ["ignore", "pipe", "ignore"] },
+  );
+  const pid = child.pid;
+  if (pid === undefined) throw new Error("failed to spawn the stop helper");
+  await new Promise<void>((resolve, reject) => {
+    if (child.stdout === null) {
+      reject(new Error("stop helper stdout is unavailable"));
+      return;
+    }
+    child.stdout.once("data", () => resolve());
+    child.once("error", (error) => reject(error));
+    child.once("exit", (code) => reject(new Error(`stop helper exited early: ${code}`)));
+  });
+  return pid;
+}
+
 async function deadPid(): Promise<number> {
   const child = spawn(process.execPath, ["-e", "process.exit(0)"], { stdio: "ignore" });
   const pid = child.pid;
@@ -613,7 +633,7 @@ describe.serial("stop", () => {
   test("优雅停止失败不静默升级，提示 --force 且保留登记", async () => {
     // 平台无关的「杀不掉」进程：POSIX 上显式忽略 SIGTERM（Windows 上 taskkill 无 /F
     // 本就不终止控制台进程），两平台均稳定落入优雅停止失败分支
-    const runner = spawn(process.execPath, ["-e", "process.on('SIGTERM',()=>{});setTimeout(()=>{},20000)"], { stdio: "ignore" });
+    const runner = { pid: await sigtermIgnoringPid() };
     try {
       writeEntry(makeEntry({ id: `p${runner.pid}`, pid: runner.pid, project: makeProjectDir(), headless: false }));
       const { code, stderr, stdout } = await captureStdout(() => runStop([`p${runner.pid}`], { waitText: "1" }));
@@ -702,12 +722,16 @@ describe.serial("stop", () => {
   }, TEST_TIMEOUT_MS);
 
   test("含 .. 的相对 --project 在寻址链与 stop 下解析到同一实例", async () => {
-    const runner = spawn(process.execPath, ["-e", "setTimeout(()=>{},20000)"], { stdio: "ignore" });
-    const pid = runner.pid;
     const projectDir = path.join(tmp, "proj", "nested");
     fs.mkdirSync(projectDir, { recursive: true });
+    const relative = path.relative(process.cwd(), projectDir);
+    if (path.isAbsolute(relative)) {
+      return;
+    }
+    const runner = spawn(process.execPath, ["-e", "setTimeout(()=>{},20000)"], { stdio: "ignore" });
+    const pid = runner.pid;
     writeEntry(makeEntry({ id: `p${pid}`, pid, port: 9605, project: path.resolve(projectDir) }));
-    const messy = `sub${path.sep}..${path.sep}${path.relative(process.cwd(), projectDir)}`;
+    const messy = `sub${path.sep}..${path.sep}${relative}`;
 
     const target = resolveTarget({ project: messy }, { findById, findLiveByProject });
     expect(target.source).toBe("project");
