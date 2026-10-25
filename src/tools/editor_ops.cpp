@@ -8,6 +8,7 @@
 #include "core/sanitize_policy.hpp"
 #include "core/scene_dirty_tracker.hpp"
 #include "tools/dispatch.hpp"
+#include "util/csharp_project_setup.hpp"
 #include "tools/runtime_ops.hpp"
 #include "util/dotnet_env.hpp"
 #include "util/error_util.hpp"
@@ -1693,7 +1694,7 @@ mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args) {
     da->list_dir_end();
   }
   if (project_file.empty())
-    return util::error_json("当前项目不是 C# 工程，未发现 .csproj/.sln");
+    return csharp_setup::missing_project_short_error();
   auto *os = godot::OS::get_singleton();
   if (!os)
     return util::error_json("OS singleton not available");
@@ -1835,8 +1836,6 @@ mcp::JsonValue handle_dotnet_environment(const mcp::JsonValue &) {
     }
     da->list_dir_end();
   }
-  if (project_file.empty())
-    return util::error_json("当前项目不是 C# 工程，未发现 .csproj/.sln");
   auto *os = godot::OS::get_singleton();
   if (!os)
     return util::error_json("OS singleton not available");
@@ -1856,6 +1855,8 @@ mcp::JsonValue handle_dotnet_environment(const mcp::JsonValue &) {
       dotnet_version = util::to_std(first.strip_edges());
     }
   }
+  if (project_file.empty())
+    return csharp_setup::missing_project_error(dotnet_version);
   dotnet_env::DotnetProbe probe = dotnet_env::probe_current();
   const bool is_dotnet_editor = dotnet_env::is_dotnet_environment(probe);
   const bool assembly_loaded = probe.csharp_script_class;

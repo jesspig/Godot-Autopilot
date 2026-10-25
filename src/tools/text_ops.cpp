@@ -2,6 +2,7 @@
 #include "core/editor_readiness.hpp"
 #include "core/config.hpp"
 #include "core/log_system.hpp"
+#include "util/csharp_project_setup.hpp"
 #include "util/dotnet_env.hpp"
 #include "util/error_util.hpp"
 #include "util/project_path.hpp"
@@ -784,8 +785,7 @@ JV handle_create_csharp_script(const JV &args) {
         "change the base to a Godot class, or declare and build a custom base first");
   std::string project_file;
   if (!find_csharp_project_file(project_file))
-    return util::error_json(
-        "当前项目不是 C# 工程，未发现 .csproj/.sln");
+    return csharp_setup::missing_project_short_error();
   bool sdk_style = false;
   bool ref_exists = csproj_covers_file(project_file, stem + ".cs", sdk_style);
   if (!ref_exists) {
