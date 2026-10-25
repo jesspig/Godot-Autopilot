@@ -146,11 +146,16 @@ function assertStartAllowed(
   const where = describeInstance(active);
   if (explicitPort !== null) {
     const samePort = active.port !== null && active.port === explicitPort;
+    if (samePort) {
+      throw new CliError(
+        ExitCode.Transport,
+        `refusing to start: this project already has a live Godot Autopilot instance on ${where}; the requested port ${explicitPort} is the port that instance is already using`,
+        `stop it first (gda stop --project ${projectDir}), or pass --port <another port>, or set ${MULTI_INSTANCE_ENV}=1 to allow a second instance`,
+      );
+    }
     err(
       `warning: this project already has a live Godot Autopilot instance on ${where}` +
-        (samePort
-          ? `; the requested port ${explicitPort} is the port that instance is already using`
-          : `; starting on port ${explicitPort} anyway as requested`) +
+        `; starting on port ${explicitPort} anyway as requested` +
         SECOND_EDITOR_RISK,
     );
     return;
