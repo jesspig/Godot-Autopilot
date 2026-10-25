@@ -121,17 +121,17 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "apply_theme_to_control",
       "Assign a .tres theme file to a Control node in the edited scene. Requires theme_path (the .tres to load) and control_path (node path inside the current scene). Only the in-memory scene changes — call save_editor_scene afterwards to persist the assignment. Returns ok with control_path and theme_path.",
-      "Theme", {"theme", "apply", "control"}, SideEffect::None, tool_flags::kNone | tool_flags::kSceneTarget,
+      "Theme", {"theme", "apply", "control"}, SideEffect::WritesScene, tool_flags::kNone | tool_flags::kSceneTarget,
       kApplyThemeToControlParams, theme_ops::handle_apply_theme_to_control}));
   v.push_back(make_spec_tool(ToolSpec{
       "set_control_anchor_preset",
       "Apply one of the 16 Control layout presets (LayoutPreset integer) to a node in the edited scene: top_left=0, top_right=1, bottom_left=2, bottom_right=3, center_left=4..center=8, left_wide=9, top_wide=10, right_wide=11, bottom_wide=12, vcenter_wide=13, hcenter_wide=14, full_rect=15. keep_offsets (default false) keeps the node's current offsets instead of recomputing them for the new anchors. Only the in-memory scene changes — call save_editor_scene to persist. Returns ok with the applied preset.",
-      "Theme", {"control", "anchor", "layout"}, SideEffect::None, tool_flags::kNone | tool_flags::kSceneTarget,
+      "Theme", {"control", "anchor", "layout"}, SideEffect::WritesScene, tool_flags::kNone | tool_flags::kSceneTarget,
       kSetControlAnchorPresetParams, theme_ops::handle_set_control_anchor_preset}));
   v.push_back(make_spec_tool(ToolSpec{
       "set_control_layout",
       "Set combined Control layout in the edited scene in one undo step. Optional preset applies a LayoutPreset first, then anchors, offsets, size flags, grow directions and custom minimum size are applied in fixed order. preset and anchors are mutually exclusive. Only the in-memory scene changes — call save_editor_scene to persist. Returns ok with the final anchors, offsets, size flags, grow and minimum size.",
-      "Theme", {"control", "layout"}, SideEffect::None, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
+      "Theme", {"control", "layout"}, SideEffect::WritesScene, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
       kSetControlLayoutParams, theme_ops::handle_set_control_layout}));
   v.push_back(make_spec_tool(ToolSpec{
       "set_theme_item_bundle",

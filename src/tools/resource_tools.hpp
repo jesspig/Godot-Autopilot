@@ -365,7 +365,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "assign_mesh_to_instance",
       "Assign a mesh to a MeshInstance2D or MeshInstance3D node in the edited scene. Requires node_path (scene-relative path such as 'Level/Enemy' or absolute '/root/Level/Enemy') and mesh_ref (memory://name string, bare registration name, res:// path, decimal object_id string, or locator object). Nodes of any other class are rejected with their actual class name. Returns ok with assigned, node_path, mesh_ref and class; a mesh without normals yields a shading warning. When the instance rejects the in-memory mesh, save it with save_resource first and assign the saved res:// path instead.",
-      "Resources", {"resource", "mesh", "assign", "instance"}, SideEffect::None, tool_flags::kMutating,
+      "Resources", {"resource", "mesh", "assign", "instance"}, SideEffect::WritesScene, tool_flags::kMutating,
       kAssignMeshToInstanceParams, resource_ops::handle_assign_mesh_to_instance}));
   return v;
 }

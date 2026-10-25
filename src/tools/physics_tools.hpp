@@ -576,7 +576,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "assign_collision_shape",
       "Assign a Shape resource to a CollisionShape node in the edited scene. Required 'node_path' is a CollisionShape2D or CollisionShape3D node; other node types fail with the actual class. Required 'shape_ref' is the shape to assign: an object_id integer from create_collision_shape, a res:// or memory:// string, or {\"path\": \"res://...\"} / {\"resource\": \"memory://...\"} / {\"object_id\": ...} / {\"object_id_str\": ...} / {\"name\": ...}. Memory:// resources are rejected because they are not persistent: save them first with save_resource to a res:// path and pass that path instead. The resource must match the node dimension: Shape2D for CollisionShape2D and Shape3D for CollisionShape3D, otherwise the actual class is reported. Only the in-memory scene changes, call save_editor_scene afterwards to persist. Returns ok with assigned, node_path, shape_class, object_id and undo info.",
-      "Physics", {"physics", "shape", "assign"}, SideEffect::None, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
+      "Physics", {"physics", "shape", "assign"}, SideEffect::WritesScene, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
       kAssignCollisionShapeParams, physics_ops::handle_collision_shape_assign}));
   return v;
 }

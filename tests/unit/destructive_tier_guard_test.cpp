@@ -159,6 +159,25 @@ TEST(DestructiveTierGuardTest, DestructiveToolsAreDeniedByDefault) {
   EXPECT_GT(destructive_count, 0);
 }
 
+TEST(DestructiveTierGuardTest, SceneWriteToolsAreDeniedByDefault) {
+  auto registry = ensure_registry();
+  int scene_write_count = 0;
+  for (const auto &tool : registry->all_any()) {
+    if (godot_autopilot::side_effect_of(*tool) != SideEffect::WritesScene) {
+      continue;
+    }
+    ++scene_write_count;
+    const mcp::JsonValue denied = authorization::deny_if_unauthorized(
+        tool->meta().name, SideEffect::WritesScene);
+    ASSERT_FALSE(denied.IsNull()) << tool->meta().name;
+    const mcp::JsonValue *required = denied.Find("authorization_required");
+    ASSERT_NE(required, nullptr) << tool->meta().name;
+    ASSERT_TRUE(required->IsString()) << tool->meta().name;
+    EXPECT_EQ(required->GetString(), "write") << tool->meta().name;
+  }
+  EXPECT_GT(scene_write_count, 0);
+}
+
 TEST(DestructiveTierGuardTest, ReviewedDestructiveToolsKeepTheirTier) {
   EXPECT_EQ(side_effect_of_tool("delete_display_window"), "destructive");
   EXPECT_EQ(side_effect_of_tool("delete_scene_node"), "destructive");
@@ -177,6 +196,13 @@ TEST(DestructiveTierGuardTest, ReviewedWriteAndDangerToolsKeepTheirTier) {
   EXPECT_EQ(side_effect_of_tool("execute_os_process"), "process");
   EXPECT_EQ(side_effect_of_tool("execute_script"), "code_execute");
   EXPECT_EQ(side_effect_of_tool("execute_game_script"), "game_runtime");
+  EXPECT_EQ(side_effect_of_tool("property_set"), "writes_scene");
+  EXPECT_EQ(side_effect_of_tool("set_properties_batch"), "writes_scene");
+  EXPECT_EQ(side_effect_of_tool("create_scene_node"), "writes_scene");
+  EXPECT_EQ(side_effect_of_tool("signal_connect"), "writes_scene");
+  EXPECT_EQ(side_effect_of_tool("set_tilemap_cell"), "writes_scene");
+  EXPECT_EQ(side_effect_of_tool("attach_script_to_node"), "writes_scene");
+  EXPECT_EQ(side_effect_of_tool("add_group_node"), "writes_scene");
 }
 
 TEST(DestructiveTierGuardTest, GuardFlagsUndeclaredDestructionTools) {
@@ -217,4 +243,5 @@ TEST(DestructiveTierGuardTest, TierCriteriaCoverEverySideEffect) {
             4u);
   EXPECT_FALSE(std::string(side_effect_policy::kBoundaryDiskDeletion).empty());
   EXPECT_FALSE(std::string(side_effect_policy::kBoundaryHostObject).empty());
+  EXPECT_FALSE(std::string(side_effect_policy::kBoundarySceneWrite).empty());
 }

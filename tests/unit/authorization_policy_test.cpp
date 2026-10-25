@@ -102,6 +102,18 @@ TEST_F(AuthorizationPolicyTest, WriteTierIsDeniedByDefault) {
   EXPECT_NE(enable->GetString().find("write"), std::string::npos);
 }
 
+TEST_F(AuthorizationPolicyTest, SceneWriteTierIsDeniedByDefault) {
+  const mcp::JsonValue denied = authorization::deny_if_unauthorized(
+      "property_set", SideEffect::WritesScene);
+  ASSERT_FALSE(denied.IsNull());
+  const mcp::JsonValue *required = denied.Find("authorization_required");
+  ASSERT_NE(required, nullptr);
+  ASSERT_TRUE(required->IsString());
+  EXPECT_EQ(required->GetString(), "write");
+  EXPECT_STREQ(godot_autopilot::side_effect_name(SideEffect::WritesScene),
+               "writes_scene");
+}
+
 TEST_F(AuthorizationPolicyTest, WriteTierIsAllowedWhenListed) {
   EnvScope scope("GODOT_AUTOPILOT_ALLOW", "write");
   const mcp::JsonValue denied = authorization::deny_if_unauthorized(
@@ -187,6 +199,9 @@ TEST_F(AuthorizationPolicyTest, CapabilityNameMapsToTier) {
   EXPECT_STREQ(authorization::capability_for_tool("warp_display_mouse",
                                                    SideEffect::ModifiesWindow),
                "write");
+  EXPECT_STREQ(authorization::capability_for_tool("property_set",
+                                                   SideEffect::WritesScene),
+               "write");
   EXPECT_STREQ(authorization::capability_for_tool("create_os_process",
                                                    SideEffect::Process),
                "process");
@@ -208,6 +223,8 @@ TEST_F(AuthorizationPolicyTest, SideEffectMapsToTier) {
   EXPECT_EQ(authorization::tier_for_side_effect(SideEffect::ShowsAlert),
             authorization::CapabilityTier::Write);
   EXPECT_EQ(authorization::tier_for_side_effect(SideEffect::ModifiesWindow),
+            authorization::CapabilityTier::Write);
+  EXPECT_EQ(authorization::tier_for_side_effect(SideEffect::WritesScene),
             authorization::CapabilityTier::Write);
   EXPECT_EQ(authorization::tier_for_side_effect(SideEffect::Process),
             authorization::CapabilityTier::Danger);
