@@ -97,6 +97,9 @@ Consequences:
 - Any query that matches by event — `is_action_just_pressed_by_event`
   (4.8), or game code comparing the originating event — will never match an
   API-forged press, since there is no event id to match.
+- Node input callbacks — `_input`, `_unhandled_input` and `_gui_input` —
+  never receive an API-forged action: there is no event to dispatch. Drive
+  UI and other event-driven code with `event` mode or a real `key` event.
 - Game code that inspects `Input.is_action_pressed` sees the forgery
   normally.
 - To simulate a real key (so that `_input`, `_gui_input`, event-based action
@@ -179,6 +182,11 @@ Rules verified in engine source:
 - The tree signals `physics_frame` and `process_frame` are emitted
   regardless of pause — code hooked to the signals still runs every tick;
   it is per-node callbacks that are filtered by the matrix above.
+- The engine-global physics frame counter (`Engine.get_physics_frames`, the
+  `physics_frame` reported by `get_game_status`) keeps incrementing while
+  the tree is paused. An advancing counter therefore does not prove that
+  gameplay is running or frozen; prove the pause with gameplay state — a
+  node's position or a gameplay-owned tick — instead of the counter alone.
 - `SceneTreeTimer` (from `create_timer`): the timer's `process_always` flag
   decides. It defaults to **true** — the default timer keeps counting while
   the tree is paused (it escapes the pause). Pass `process_always = false`

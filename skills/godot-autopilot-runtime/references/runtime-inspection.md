@@ -29,7 +29,14 @@ Control-derived node with:
 - `type` — class name,
 - `visible` — visibility including ancestors,
 - `text` — when the control has a text property,
-- `global_rect` — `position` and `size` in viewport coordinates.
+- `global_rect` — `position` and `size` in viewport coordinates,
+- `mouse_filter` — `STOP`, `PASS` or `IGNORE`,
+- `z_index` — draw order within its canvas.
+
+`mouse_filter` decides whether a control consumes, passes or ignores mouse
+events; a full-screen `PASS` control covers the controls below it for
+hit-testing even if it draws nothing. `z_index` explains draw/layer order;
+read it together with `mouse_filter` when interpreting an occlusion report.
 
 `max_elements` defaults to 100 (max 1000); `truncated: true` signals more
 elements remain — raise the cap or target a subtree via
@@ -40,6 +47,21 @@ here, pick targets, then drive them with `sequence_game_inputs` /
 `queue_game_input` using `global_rect` coordinates, or with
 `execute_game_script` using `path`. Re-enumerate after navigation — screens
 change under fixed coordinates.
+
+### UI change acceptance
+
+After any UI change, validate before clicking:
+
+1. Run `validate_game_ui_layout`. It reports zero-size, off-viewport and
+   possibly-occluded controls as triage items, and a
+   `possibly_occluded` item names the occluding control.
+2. Click the target with `click_game_ui_element`, not raw coordinates.
+3. Read `hit_path` (the control actually under the injected point) and
+   `hit_mismatch` (true when it differs from the requested target). A
+   mismatch is reported without failing the call by default; pass
+   `strict_hit: true` to make it an error. Cross-check the
+   `possibly_occluded` issue before retrying coordinates — a full-screen
+   `PASS` container swallows the click instead of passing it through.
 
 ## Liveness: get_game_status
 
@@ -67,7 +89,7 @@ Read the fields as combinations, not in isolation:
 | `healthy` false shortly after play | startup still in progress | wait a moment; game calls default to `wait_ready: true`, which queues the request and replays it once the game reports `gda:ready` instead of failing |
 | `healthy` false for good | the process is gone or wedged | `stop_editor_playing`, then `play_editor_current_scene` again |
 | empty scene with a sharp `node_count` drop | a failed reload left a half-dead process | do not debug it — stop and rerun |
-| `paused` true | tree paused; physics simulation stopped server-side; transient input states are lost | unpause with `set_scene_tree_pause` before input automation |
+| `paused` true | tree paused; physics simulation stopped server-side; transient input states are lost; `physics_frame` still advances because it is the engine-global counter, so it cannot prove the freeze on its own | unpause with `set_scene_tree_pause` before input automation; prove gameplay froze with a gameplay node's position or a gameplay-owned tick |
 
 Rule of thumb: never build automation on top of a half-dead process.
 Stopping and replaying is cheaper than diagnosing zombie state.
@@ -87,10 +109,17 @@ func _run():
     var player = get_node("/root/Main/Player")
     player.global_position = Vector2(100, 200)
     player.velocity = Vector2(120, -300)
+    player.move_and_slide()
     for i in range(30):
         await physics_frame
     return {"pos": player.global_position, "on_wall": player.is_on_wall()}
 ```
+
+`CharacterBody2D` refreshes `is_on_floor()` and `is_on_wall()` only inside
+`move_and_slide()`. Teleporting a body leaves the previous floor/wall flags
+in place, so call `move_and_slide()` once after the teleport (after setting
+`velocity`) before awaiting physics frames — otherwise a stale floor flag
+makes gravity and wall-slide checks read the old state.
 
 Drive inputs with `sequence_game_inputs` on explicit `at_frame` offsets
 instead of chained single presses, and watch a value evolve with
