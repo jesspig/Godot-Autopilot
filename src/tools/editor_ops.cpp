@@ -8,6 +8,7 @@
 #include "core/sanitize_policy.hpp"
 #include "core/scene_dirty_tracker.hpp"
 #include "tools/dispatch.hpp"
+#include "util/csharp_project_setup.hpp"
 #include "tools/runtime_ops.hpp"
 #include "util/dotnet_env.hpp"
 #include "util/error_util.hpp"
@@ -34,6 +35,7 @@
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
+#include "util/console_encoding.hpp"
 #include <algorithm>
 #include <atomic>
 #include <cctype>
@@ -1358,12 +1360,13 @@ std::vector<std::string> collect_execute_output_lines(
     if (element.get_type() == godot::Variant::PACKED_STRING_ARRAY) {
       godot::PackedStringArray packed = element;
       for (int64_t j = 0; j < packed.size(); ++j)
-        lines.push_back(util::to_std(packed[j]));
+        lines.push_back(util::decode_console_output(util::to_std(packed[j])));
       continue;
     }
     if (element.get_type() != godot::Variant::STRING)
       continue;
-    std::string blob = util::to_std(godot::String(element));
+    std::string blob =
+        util::decode_console_output(util::to_std(godot::String(element)));
     size_t start = 0;
     while (start <= blob.size()) {
       size_t end = blob.find('\n', start);
@@ -1381,6 +1384,31 @@ std::vector<std::string> collect_execute_output_lines(
   }
   return lines;
 }
+
+constexpr const char *kDotnetUiLanguageEnvName = "DOTNET_CLI_UI_LANGUAGE";
+constexpr const char *kDotnetUiLanguageEnglish = "en";
+
+struct DotnetUiLanguageGuard {
+  godot::OS *os = nullptr;
+  godot::String variable;
+  godot::String previous_value;
+
+  explicit DotnetUiLanguageGuard(godot::OS *p_os)
+      : os(p_os), variable(kDotnetUiLanguageEnvName),
+        previous_value(os->get_environment(variable)) {
+    os->set_environment(variable, godot::String(kDotnetUiLanguageEnglish));
+  }
+
+  DotnetUiLanguageGuard(const DotnetUiLanguageGuard &) = delete;
+  DotnetUiLanguageGuard &operator=(const DotnetUiLanguageGuard &) = delete;
+
+  ~DotnetUiLanguageGuard() {
+    if (previous_value.is_empty())
+      os->unset_environment(variable);
+    else
+      os->set_environment(variable, previous_value);
+  }
+};
 
 } // namespace
 
@@ -1666,7 +1694,7 @@ mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args) {
     da->list_dir_end();
   }
   if (project_file.empty())
-    return util::error_json("当前项目不是 C# 工程，未发现 .csproj/.sln");
+    return csharp_setup::missing_project_short_error();
   auto *os = godot::OS::get_singleton();
   if (!os)
     return util::error_json("OS singleton not available");
@@ -1692,6 +1720,9 @@ mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args) {
     inner["pid"] = mcp::JsonValue(static_cast<int64_t>(pid));
     inner["note"] = mcp::JsonValue(kNote);
     inner["started"] = mcp::JsonValue(pid > 0);
+    const auto *editor = godot::EditorInterface::get_singleton();
+    inner["game_running"] = mcp::JsonValue(
+        editor != nullptr && editor->is_playing_scene());
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = std::move(inner);
     if (pid <= 0) {
@@ -1709,8 +1740,11 @@ mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args) {
   build_args.append(godot::String(project_path.c_str()));
   godot::Array output;
   output.append(godot::PackedStringArray());
-  int32_t exit_code =
-      os->execute(godot::String("dotnet"), build_args, output, true);
+  int32_t exit_code = 0;
+  {
+    DotnetUiLanguageGuard english_ui_language(os);
+    exit_code = os->execute(godot::String("dotnet"), build_args, output, true);
+  }
   std::vector<std::string> output_lines = collect_execute_output_lines(output);
   std::string combined;
   for (const std::string &line : output_lines) {
@@ -1763,6 +1797,11 @@ mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args) {
   inner["command"] = mcp::JsonValue(command);
   inner["exit_code"] = mcp::JsonValue(static_cast<int64_t>(exit_code));
   inner["success"] = mcp::JsonValue(exit_code == 0);
+  const auto *editor = godot::EditorInterface::get_singleton();
+  const bool game_running = editor != nullptr && editor->is_playing_scene();
+  inner["game_running"] = mcp::JsonValue(game_running);
+  if (game_running && exit_code == 0)
+    inner["restart_required"] = mcp::JsonValue(true);
   inner["errors"] = std::move(errors_arr);
   inner["output_digest"] = mcp::JsonValue(digest);
   inner["output_empty"] = mcp::JsonValue(combined.empty());
@@ -1805,8 +1844,6 @@ mcp::JsonValue handle_dotnet_environment(const mcp::JsonValue &) {
     }
     da->list_dir_end();
   }
-  if (project_file.empty())
-    return util::error_json("当前项目不是 C# 工程，未发现 .csproj/.sln");
   auto *os = godot::OS::get_singleton();
   if (!os)
     return util::error_json("OS singleton not available");
@@ -1826,6 +1863,8 @@ mcp::JsonValue handle_dotnet_environment(const mcp::JsonValue &) {
       dotnet_version = util::to_std(first.strip_edges());
     }
   }
+  if (project_file.empty())
+    return csharp_setup::missing_project_error(dotnet_version);
   dotnet_env::DotnetProbe probe = dotnet_env::probe_current();
   const bool is_dotnet_editor = dotnet_env::is_dotnet_environment(probe);
   const bool assembly_loaded = probe.csharp_script_class;

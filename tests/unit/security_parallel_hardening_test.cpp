@@ -166,6 +166,33 @@ TEST(SecurityHardening, AuthorizationAllKeyword) {
   EXPECT_TRUE(godot_autopilot::authorization::capability_enabled("game_runtime"));
 }
 
+TEST(SecurityHardening, SceneWriteTierFollowsWriteCapability) {
+  using godot_autopilot::SideEffect;
+  EnvGuard mode("GODOT_AUTOPILOT_AUTH_MODE", "strict");
+  {
+    EnvGuard g("GODOT_AUTOPILOT_ALLOW", nullptr);
+    auto denied = godot_autopilot::authorization::deny_if_unauthorized(
+        "property_set", SideEffect::WritesScene);
+    ASSERT_FALSE(denied.IsNull());
+    const mcp::JsonValue *required = denied.Find("authorization_required");
+    ASSERT_NE(required, nullptr);
+    ASSERT_TRUE(required->IsString());
+    EXPECT_EQ(required->GetString(), "write");
+  }
+  {
+    EnvGuard g("GODOT_AUTOPILOT_ALLOW", "write");
+    EXPECT_TRUE(godot_autopilot::authorization::deny_if_unauthorized(
+                    "property_set", SideEffect::WritesScene)
+                    .IsNull());
+  }
+  {
+    EnvGuard g("GODOT_AUTOPILOT_ALLOW", "code_execute");
+    EXPECT_FALSE(godot_autopilot::authorization::deny_if_unauthorized(
+                     "create_scene_node", SideEffect::WritesScene)
+                     .IsNull());
+  }
+}
+
 TEST(SecurityHardening, CapabilityForToolMapping) {
   using namespace godot_autopilot;
   EXPECT_STREQ(authorization::capability_for_tool("create_os_process", SideEffect::Process), "process");
@@ -180,6 +207,8 @@ TEST(SecurityHardening, CapabilityForToolMapping) {
   EXPECT_STREQ(authorization::capability_for_tool("save_project_settings", SideEffect::WritesConfig), "write");
   EXPECT_STREQ(authorization::capability_for_tool("show_display_dialog", SideEffect::ShowsAlert), "write");
   EXPECT_STREQ(authorization::capability_for_tool("warp_display_mouse", SideEffect::ModifiesWindow), "write");
+  EXPECT_STREQ(authorization::capability_for_tool("property_set", SideEffect::WritesScene), "write");
+  EXPECT_STREQ(authorization::capability_for_tool("create_scene_node", SideEffect::WritesScene), "write");
 }
 
 TEST(SecurityHardening, AllowListRemoveExpandsAll) {

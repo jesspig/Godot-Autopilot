@@ -683,6 +683,21 @@ port_recovery::RecoveryPlan &transport_residual_plan() {
             " (pid " + std::to_string(residual.pid) + ", port " +
             std::to_string(residual.port) + ")");
   }
+  for (const InstanceRecord &record : InstanceRegistry::list_all()) {
+    if (record.pid == current_pid)
+      continue;
+    if (port_recovery::same_project_path(record.project_path, project_path))
+      continue;
+    if (util::api_host_process_alive(record.pid))
+      continue;
+    if (!InstanceRegistry::remove(record.instance_id))
+      continue;
+    LogSystem::instance().log(
+        LogLevel::Warning, LogCategory::Transport,
+        "removed the dead cross-project instance registration " +
+            record.instance_id + " (pid " + std::to_string(record.pid) +
+            ", port " + std::to_string(record.port) + ")");
+  }
   return plan;
 }
 

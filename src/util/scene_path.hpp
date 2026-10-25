@@ -6,6 +6,7 @@
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/variant/node_path.hpp>
+#include <godot_cpp/variant/packed_string_array.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <string>
 
@@ -85,8 +86,13 @@ inline EditedSceneInfo edited_scene_info() {
   if (!root)
     return info;
   info.has_scene = true;
-  info.scene_path = to_std(root->get_scene_file_path());
-  info.unsaved = info.scene_path.empty();
+  const godot::String scene_file_path = root->get_scene_file_path();
+  info.scene_path = to_std(scene_file_path);
+  if (scene_file_path.is_empty()) {
+    info.unsaved = true;
+    return info;
+  }
+  info.unsaved = editor->get_unsaved_scenes().has(scene_file_path);
   return info;
 }
 

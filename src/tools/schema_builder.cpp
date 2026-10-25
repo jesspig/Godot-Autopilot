@@ -31,7 +31,9 @@ mcp::JsonValue build_schema(const std::vector<ParamDef> &params) {
 
   for (const auto &p : params) {
     mcp::JsonValue prop(mcp::JsonValue::object_tag);
-    prop["type"] = mcp::JsonValue(p.type);
+    if (p.type != "json") {
+      prop["type"] = mcp::JsonValue(p.type);
+    }
     if (!p.description.empty()) {
       prop["description"] = mcp::JsonValue(p.description);
     }

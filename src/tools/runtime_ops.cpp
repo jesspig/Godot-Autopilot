@@ -5,6 +5,7 @@
 #include "core/error_watermark.hpp"
 #include "core/log_system.hpp"
 #include "core/monitor.hpp"
+#include "runtime/game_response_envelope.hpp"
 #include "runtime/gda_protocol.hpp"
 #include "ready_policy.hpp"
 #include "tools/capture_ops.hpp"
@@ -35,6 +36,7 @@
 namespace godot_autopilot {
 namespace runtime_ops {
 
+using godot_autopilot::runtime::response_envelope::carry_transport_fields;
 using godot_autopilot::util::error_json;
 using JV = mcp::JsonValue;
 
@@ -817,9 +819,9 @@ mcp::JsonValue wait_pending_response(int64_t request_id, int64_t timeout_ms) {
         merged["error_details"] = *ed;
       if (auto *se = response.Find("structured_error"))
         merged["structured_error"] = *se;
-      return merged;
+      return carry_transport_fields(response, std::move(merged));
     }
-    return result;
+    return carry_transport_fields(response, std::move(result));
   }
   return error_json("unexpected game response (missing result)");
 }

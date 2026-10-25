@@ -18,6 +18,8 @@ struct CSharpClassInfo {
 
 std::vector<CSharpClassInfo> parse_csharp_classes(const std::string &source);
 
+mcp::JsonValue script_load_diagnostics(bool loaded, bool instantiable);
+
 mcp::JsonValue handle_create_font(const mcp::JsonValue &args);
 mcp::JsonValue handle_create_shaped_text(const mcp::JsonValue &args);
 mcp::JsonValue handle_font_set_antialiasing(const mcp::JsonValue &args);

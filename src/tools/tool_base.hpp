@@ -17,7 +17,7 @@
 namespace godot_autopilot {
 
 enum class SideEffect { None, WritesFile, WritesConfig, ShowsAlert, ModifiesWindow, Process,
-                        CodeExecute, GameRuntime, Destructive };
+                        CodeExecute, GameRuntime, Destructive, WritesScene };
 
 inline const char* side_effect_name(SideEffect e) {
   switch (e) {
@@ -30,6 +30,7 @@ inline const char* side_effect_name(SideEffect e) {
     case SideEffect::CodeExecute: return "code_execute";
     case SideEffect::GameRuntime: return "game_runtime";
     case SideEffect::Destructive: return "destructive";
+    case SideEffect::WritesScene: return "writes_scene";
   }
   return "none";
 }
@@ -73,6 +74,7 @@ inline CapabilityTier tier_for_side_effect(SideEffect effect) {
     case SideEffect::WritesConfig:
     case SideEffect::ShowsAlert:
     case SideEffect::ModifiesWindow:
+    case SideEffect::WritesScene:
       return CapabilityTier::Write;
     case SideEffect::None:
       break;
@@ -96,6 +98,7 @@ inline const char *capability_for_tool(std::string_view name,
     case SideEffect::WritesConfig:
     case SideEffect::ShowsAlert:
     case SideEffect::ModifiesWindow:
+    case SideEffect::WritesScene:
       return kCapabilityWrite;
     case SideEffect::None:
       break;

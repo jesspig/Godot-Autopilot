@@ -4,6 +4,8 @@
 #include "core/editor_coords.hpp"
 #include "core/log_system.hpp"
 #include "gda_protocol.hpp"
+#include "runtime/error_cursor.hpp"
+#include "runtime/game_node_count.hpp"
 #include "tools/authorization.hpp"
 #include "tools/capture_ops.hpp"
 #include "tools/editor_ui_ops.hpp"
@@ -262,7 +264,10 @@ JV op_status() {
   append_activity_fields(r);
   if (auto *tree = get_scene_tree()) {
     r["paused"] = JV(tree->is_paused());
-    r["node_count"] = JV(static_cast<int64_t>(tree->get_node_count()));
+    r["node_count"] = JV(node_count::user_node_count(tree));
+    const int64_t instrumentation = node_count::instrumentation_node_count(tree);
+    if (instrumentation > 0)
+      r["instrumentation_node_count"] = JV(instrumentation);
     godot::Node *current = tree->get_current_scene();
     if (current) {
       godot::String scene_path = current->get_scene_file_path();
@@ -334,6 +339,8 @@ struct UiElement {
   std::string path;
   std::string type;
   std::string text;
+  std::string mouse_filter;
+  int32_t z_index = 0;
   bool has_text = false;
   bool visible = true;
   double x = 0.0;
@@ -341,6 +348,25 @@ struct UiElement {
   double w = 0.0;
   double h = 0.0;
 };
+
+const char *ui_mouse_filter_name(godot::Control::MouseFilter filter) {
+  switch (filter) {
+  case godot::Control::MOUSE_FILTER_PASS:
+    return "PASS";
+  case godot::Control::MOUSE_FILTER_IGNORE:
+    return "IGNORE";
+  default:
+    return "STOP";
+  }
+}
+
+bool ui_hit_matches_target(godot::Control *target, godot::Control *hovered) {
+  if (!target || !hovered)
+    return false;
+  if (target == hovered)
+    return true;
+  return target->is_ancestor_of(hovered);
+}
 
 void walk_ui_elements(godot::Node *node, int depth, int64_t max_elements,
                       std::vector<UiElement> &elements, bool &truncated) {
@@ -354,6 +380,8 @@ void walk_ui_elements(godot::Node *node, int depth, int64_t max_elements,
     UiElement element;
     element.path = util::to_std(godot::String(node->get_path()));
     element.type = util::to_std(godot::String(node->get_class()));
+    element.mouse_filter = ui_mouse_filter_name(ctrl->get_mouse_filter());
+    element.z_index = ctrl->get_z_index();
     element.visible = ctrl->is_visible_in_tree();
     godot::Variant text_value = ctrl->get("text");
     if (text_value.get_type() == godot::Variant::STRING) {
@@ -1246,6 +1274,12 @@ JV run_ui_click(const JV &click, const std::vector<UiElement> &elements,
   }
     if (want_path) match = find_ui_element(elements, path);
   }
+  bool strict_hit = false;
+  if (auto *strict_p = click.Find("strict_hit")) {
+    if (!strict_p->IsBool())
+      return error_result("ui_elements click strict_hit must be a boolean");
+    strict_hit = strict_p->GetBool();
+  }
   if (want_path && !match) {
     std::string message = "click target not found: " + path +
                           " (try text/text_index for a visible-text match; enumerated " +
@@ -1279,6 +1313,18 @@ JV run_ui_click(const JV &click, const std::vector<UiElement> &elements,
   if (!authorization::capability_enabled("game_runtime"))
     return authorization::deny_if_unauthorized("click_game_ui_element",
                                                SideEffect::GameRuntime);
+  {
+    JV motion(JV::object_tag);
+    motion["type"] = JV("mouse_motion");
+    JV position(JV::object_tag);
+    position["x"] = JV(static_cast<double>(window_center.x));
+    position["y"] = JV(static_cast<double>(window_center.y));
+    motion["position"] = std::move(position);
+    motion["mode"] = JV("event");
+    JV injected = op_input(motion, 0);
+    if (injected.Contains("error"))
+      return injected;
+  }
   const int rounds = double_click ? 2 : 1;
   const bool states[2] = {true, false};
   for (int round = 0; round < rounds; round++) {
@@ -1297,6 +1343,49 @@ JV run_ui_click(const JV &click, const std::vector<UiElement> &elements,
         return injected;
     }
   }
+  std::string hit_path;
+  bool hit_mismatch = false;
+  {
+    godot::Viewport *click_viewport = nullptr;
+    godot::Control *target_ctrl = nullptr;
+    if (godot::SceneTree *tree = get_scene_tree()) {
+      if (auto *ctrl = godot::Object::cast_to<godot::Control>(
+              resolve_game_node_suffixed(tree->get_root(), match->path))) {
+        target_ctrl = ctrl;
+        click_viewport = ctrl->get_viewport();
+      }
+      if (!click_viewport)
+        click_viewport =
+            godot::Object::cast_to<godot::Viewport>(tree->get_root());
+    }
+    godot::Control *hovered =
+        click_viewport ? click_viewport->gui_get_hovered_control() : nullptr;
+    if (hovered)
+      hit_path = util::to_std(godot::String(hovered->get_path()));
+    hit_mismatch =
+        target_ctrl && !ui_hit_matches_target(target_ctrl, hovered);
+  }
+  if (strict_hit && hit_mismatch) {
+    const std::string actual =
+        hit_path.empty() ? std::string("no hovered control") : hit_path;
+    JV body = error_result("click target not hit: expected " + match->path +
+                           " but the hovered control is " + actual);
+    JV details(JV::object_tag);
+    details["code"] = JV("click_occluded");
+    details["target_path"] = JV(match->path);
+    details["hit_path"] = JV(hit_path);
+    details["target_mouse_filter"] = JV(match->mouse_filter);
+    details["strict_hit"] = JV(true);
+    body["structured_error"] = std::move(details);
+    body["hit_path"] = JV(hit_path);
+    body["hit_mismatch"] = JV(true);
+    body["hint"] = JV(
+        "another visible Control is covering the target: run "
+        "validate_game_ui_layout to list possibly_occluded controls, inspect "
+        "get_game_ui_elements mouse_filter/z_index, or click the reported "
+        "hit_path instead; omit strict_hit to keep the click as a warning");
+    return body;
+  }
   JV clicked(JV::object_tag);
   clicked["ok"] = JV(true);
   clicked["path"] = JV(match->path);
@@ -1313,6 +1402,16 @@ JV run_ui_click(const JV &click, const std::vector<UiElement> &elements,
   window_position["y"] = JV(static_cast<double>(window_center.y));
   clicked["window_position"] = std::move(window_position);
   clicked["clicks"] = JV(static_cast<int64_t>(rounds));
+  clicked["hit_path"] = JV(hit_path);
+  clicked["hit_mismatch"] = JV(hit_mismatch);
+  if (hit_mismatch) {
+    const std::string actual =
+        hit_path.empty() ? std::string("no hovered control") : hit_path;
+    clicked["warning"] = JV(
+        "click may be occluded: the viewport hovered control is " + actual +
+        " instead of " + match->path +
+        " — pass strict_hit=true to fail on this mismatch");
+  }
   JV inner(JV::object_tag);
   inner["result"] = std::move(clicked);
   return ok_result(std::move(inner));
@@ -1343,6 +1442,8 @@ JV op_ui_elements(const JV &params) {
     item["path"] = JV(element.path);
     item["type"] = JV(element.type);
     item["visible"] = JV(element.visible);
+    item["mouse_filter"] = JV(element.mouse_filter);
+    item["z_index"] = JV(static_cast<int64_t>(element.z_index));
     if (element.has_text)
       item["text"] = JV(element.text);
     JV position(JV::object_tag);
@@ -1746,50 +1847,30 @@ JV op_capture(const JV &params, int64_t request_id) {
   return JV();
 }
 
-JV op_get_errors(const JV &params) {
-  int64_t limit = 50;
-  if (auto *l = params.Find("limit")) {
-    if (l->IsInt() && l->GetInt() > 0)
-      limit = l->GetInt();
-  }
-  bool grouped = false;
-  if (auto *g = params.Find("group")) {
-    if (!g->IsBool())
-      return error_result("get_errors group must be a boolean");
-    grouped = g->GetBool();
-  }
-  if (grouped)
-    return op_get_errors_grouped(limit);
-  JV arr(JV::array_tag);
-  {
-    std::lock_guard<std::mutex> lock(g_buffer_mtx);
-    size_t start = (static_cast<size_t>(limit) >= g_error_buffer.size())
-                       ? 0
-                       : g_error_buffer.size() - static_cast<size_t>(limit);
-    for (size_t i = start; i < g_error_buffer.size(); i++) {
-      const GameErrorEntry &e = g_error_buffer[i];
-      JV item(JV::object_tag);
-      char time_buf[16];
-      snprintf(time_buf, sizeof(time_buf), "%02d:%02d:%02d.%03d", e.hr, e.min,
-               e.sec, e.msec);
-      item["time"] = JV(std::string(time_buf));
-      item["file"] = JV(e.file);
-      item["func"] = JV(e.func);
-      item["line"] = JV(static_cast<int64_t>(e.line));
-      item["error"] = JV(e.error);
-      item["descr"] = JV(e.descr);
-      item["is_warning"] = JV(e.is_warning);
-      JV stack(JV::array_tag);
-      for (const std::string &f : e.stack)
-        stack.PushBack(JV(f));
-      item["stack"] = std::move(stack);
-      arr.PushBack(std::move(item));
-    }
-  }
-  return ok_result(std::move(arr));
+namespace {
+
+JV error_entry_json(const GameErrorEntry &e) {
+  JV item(JV::object_tag);
+  char time_buf[16];
+  snprintf(time_buf, sizeof(time_buf), "%02d:%02d:%02d.%03d", e.hr, e.min,
+           e.sec, e.msec);
+  item["time"] = JV(std::string(time_buf));
+  item["file"] = JV(e.file);
+  item["func"] = JV(e.func);
+  item["line"] = JV(static_cast<int64_t>(e.line));
+  item["error"] = JV(e.error);
+  item["descr"] = JV(e.descr);
+  item["is_warning"] = JV(e.is_warning);
+  item["seq"] = JV(static_cast<int64_t>(e.seq));
+  JV stack(JV::array_tag);
+  for (const std::string &f : e.stack)
+    stack.PushBack(JV(f));
+  item["stack"] = std::move(stack);
+  return item;
 }
 
-JV op_get_errors_grouped(int64_t group_limit) {
+JV collect_errors_grouped(int64_t group_limit, int64_t since_seq,
+                          bool has_since_seq) {
   struct Group {
     size_t count = 0;
     size_t first_index = 0;
@@ -1799,9 +1880,20 @@ JV op_get_errors_grouped(int64_t group_limit) {
   std::unordered_map<std::string, size_t> index_by_key;
   std::vector<Group> groups;
   std::vector<GameErrorEntry> snapshot;
+  int64_t current = 0;
   {
     std::lock_guard<std::mutex> lock(g_buffer_mtx);
-    snapshot = g_error_buffer;
+    current = static_cast<int64_t>(g_error_seq);
+    if (has_since_seq) {
+      for (const GameErrorEntry &e : g_error_buffer) {
+        if (error_cursor::error_seq_after(static_cast<int64_t>(e.seq),
+                                          since_seq)) {
+          snapshot.push_back(e);
+        }
+      }
+    } else {
+      snapshot = g_error_buffer;
+    }
   }
   for (size_t i = 0; i < snapshot.size(); i++) {
     const GameErrorEntry &e = snapshot[i];
@@ -1832,6 +1924,7 @@ JV op_get_errors_grouped(int64_t group_limit) {
       static_cast<size_t>(group_limit) < order.size())
     order.resize(static_cast<size_t>(group_limit));
   JV arr(JV::array_tag);
+  int64_t max_returned = 0;
   for (size_t gi : order) {
     const GameErrorEntry &sample = snapshot[groups[gi].sample];
     const GameErrorEntry &first = snapshot[groups[gi].first_index];
@@ -1852,6 +1945,10 @@ JV op_get_errors_grouped(int64_t group_limit) {
     item["error"] = JV(sample.error);
     item["descr"] = JV(sample.descr);
     item["is_warning"] = JV(sample.is_warning);
+    const int64_t group_last_seq = static_cast<int64_t>(last.seq);
+    item["last_seq"] = JV(group_last_seq);
+    if (group_last_seq > max_returned)
+      max_returned = group_last_seq;
     JV stack(JV::array_tag);
     for (size_t j = 0; j < sample.stack.size() && j < 8; j++)
       stack.PushBack(JV(sample.stack[j]));
@@ -1863,7 +1960,72 @@ JV op_get_errors_grouped(int64_t group_limit) {
   r["groups"] = std::move(arr);
   r["total_errors"] = JV(static_cast<int64_t>(snapshot.size()));
   r["total_groups"] = JV(static_cast<int64_t>(groups.size()));
+  r["next_seq"] = JV(error_cursor::next_error_seq(max_returned, current));
   return ok_result(std::move(r));
+}
+
+} // namespace
+
+JV op_get_errors(const JV &params) {
+  int64_t limit = 50;
+  if (auto *l = params.Find("limit")) {
+    if (l->IsInt() && l->GetInt() > 0)
+      limit = l->GetInt();
+  }
+  bool grouped = false;
+  if (auto *g = params.Find("group")) {
+    if (!g->IsBool())
+      return error_result("get_errors group must be a boolean");
+    grouped = g->GetBool();
+  }
+  int64_t since_seq = 0;
+  bool has_since_seq = false;
+  if (auto *s = params.Find("since_seq")) {
+    if (!s->IsInt())
+      return error_result("get_errors since_seq must be an integer");
+    since_seq = s->GetInt();
+    if (since_seq < 0)
+      return error_result(
+          "get_errors since_seq must be a non-negative integer");
+    has_since_seq = true;
+  }
+  if (grouped)
+    return collect_errors_grouped(limit, since_seq, has_since_seq);
+  JV arr(JV::array_tag);
+  int64_t max_returned = 0;
+  int64_t current = 0;
+  {
+    std::lock_guard<std::mutex> lock(g_buffer_mtx);
+    current = static_cast<int64_t>(g_error_seq);
+    if (has_since_seq) {
+      for (const GameErrorEntry &e : g_error_buffer) {
+        if (!error_cursor::error_seq_after(static_cast<int64_t>(e.seq),
+                                           since_seq)) {
+          continue;
+        }
+        arr.PushBack(error_entry_json(e));
+        max_returned = static_cast<int64_t>(e.seq);
+        if (static_cast<int64_t>(arr.Size()) >= limit)
+          break;
+      }
+    } else {
+      size_t start = (static_cast<size_t>(limit) >= g_error_buffer.size())
+                         ? 0
+                         : g_error_buffer.size() - static_cast<size_t>(limit);
+      for (size_t i = start; i < g_error_buffer.size(); i++) {
+        const GameErrorEntry &e = g_error_buffer[i];
+        arr.PushBack(error_entry_json(e));
+        max_returned = static_cast<int64_t>(e.seq);
+      }
+    }
+  }
+  JV body = ok_result(std::move(arr));
+  body["next_seq"] = JV(error_cursor::next_error_seq(max_returned, current));
+  return body;
+}
+
+JV op_get_errors_grouped(int64_t group_limit) {
+  return collect_errors_grouped(group_limit, 0, false);
 }
 
 void send_response(int64_t request_id, JV body) {

@@ -72,7 +72,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "tween_editor_property",
       "Preview a property tween on a node of the currently edited scene without running the game: pass path (node path in the edited scene) and property plus target_value (converted with the property_set chain) and duration (seconds, greater than 0). The tween is created straight on the editor SceneTree via SceneTree::create_tween and its int64 handle is kept in the editor-side TweenStore for the session; optional trans (0-10), ease (0-3) and loops (>= 0, 0 means infinite) shape the playback. Returns tween_id with scene_path and scene_unsaved so the caller can confirm which scene the preview node belongs to.",
-      "Game", {"game", "editor", "tween", "preview", "property"}, SideEffect::None, tool_flags::kMutating,
+      "Game", {"game", "editor", "tween", "preview", "property"}, SideEffect::WritesScene, tool_flags::kMutating,
       kTweenEditorPropertyParams, tween_ops::handle_tween_editor_property}));
   return v;
 }

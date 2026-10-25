@@ -20,8 +20,8 @@ inline constexpr TierCriterion kTierCriteria[] = {
      "reads state only, without changing any external state"},
     {"write", "write",
      "changes external state in a recoverable way: writes files, project or "
-     "editor config, windows and display, injected input, scene properties, "
-     "saved resources"},
+     "editor config, windows and display, injected input, scene node "
+     "structure and properties (writes_scene), saved resources"},
     {"destructive", "destructive",
      "irreversibly destroys an object or entity that already exists inside "
      "the host, with no durable recovery path"},
@@ -36,6 +36,13 @@ inline constexpr const char *kBoundaryDiskDeletion =
 inline constexpr const char *kBoundaryHostObject =
     "destroying an object that lives inside the host belongs to the "
     "destructive tier";
+
+inline constexpr const char *kBoundarySceneWrite =
+    "editing the in-memory scene (node structure, properties, groups, "
+    "attached scripts, animation, tilemap and gridmap data) belongs to the "
+    "write tier even before the scene is saved, because the unsaved state "
+    "feeds later runs, saves and exports; the editor undo stack is not a "
+    "durable recovery path";
 
 inline constexpr const char *kDestructiveNameKeywords[] = {
     "delete", "destroy", "remove",  "erase",  "kill",   "terminat",

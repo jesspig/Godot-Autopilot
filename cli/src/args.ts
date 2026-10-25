@@ -23,6 +23,8 @@ export interface GlobalOptions {
   noImport?: boolean;
   force?: boolean;
   query?: string;
+  limitText?: string;
+  offsetText?: string;
   probe?: string;
   bind?: string;
   noAuth?: boolean;
@@ -42,6 +44,8 @@ const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
   "--wait": "waitText",
   "--tail": "tailText",
   "--query": "query",
+  "--limit": "limitText",
+  "--offset": "offsetText",
   "--probe": "probe",
   "--bind": "bind",
 };
@@ -152,6 +156,8 @@ Global options:
   --no-auth           Disable control-plane auth; any local process can call tools (serve)
   --tail <n>          Number of trailing log lines (logs)
   --query <text>      Keyword filter for the api list subcommand
+  --limit <n>         Maximum tools returned by the api list subcommand (1-2000)
+  --offset <n>        Offset into the tool list for the api list subcommand
   --probe <level>     Liveness probe level: light (default) or strict
   --help              Show this help
   --version           Show the version

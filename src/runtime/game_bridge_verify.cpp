@@ -3,6 +3,7 @@
 #include "core/config.hpp"
 #include "core/log_system.hpp"
 #include "runtime/gda_protocol.hpp"
+#include "runtime/game_node_count.hpp"
 #include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #include <algorithm>
@@ -261,7 +262,10 @@ JV evidence_status() {
   r[GDA_FIELD_HEALTHY] = JV(true);
   if (auto *tree = get_scene_tree()) {
     r["paused"] = JV(tree->is_paused());
-    r["node_count"] = JV(static_cast<int64_t>(tree->get_node_count()));
+    r["node_count"] = JV(node_count::user_node_count(tree));
+    const int64_t instrumentation = node_count::instrumentation_node_count(tree);
+    if (instrumentation > 0)
+      r["instrumentation_node_count"] = JV(instrumentation);
     godot::Node *current = tree->get_current_scene();
     if (current) {
       godot::String scene_path = current->get_scene_file_path();
@@ -282,8 +286,33 @@ struct ValidateElement {
   double y = 0.0;
   double w = 0.0;
   double h = 0.0;
+  int mouse_filter = 0;
+  int32_t draw_z = 0;
   int order = 0;
 };
+
+const char *validate_mouse_filter_name(int filter) {
+  if (filter == static_cast<int>(godot::Control::MOUSE_FILTER_IGNORE))
+    return "IGNORE";
+  if (filter == static_cast<int>(godot::Control::MOUSE_FILTER_PASS))
+    return "PASS";
+  return "STOP";
+}
+
+int32_t effective_z_index(godot::CanvasItem *item) {
+  int32_t total = item->get_z_index();
+  godot::CanvasItem *child = item;
+  godot::Node *parent = item->get_parent();
+  while (parent && child->is_z_relative()) {
+    auto *parent_item = godot::Object::cast_to<godot::CanvasItem>(parent);
+    if (!parent_item)
+      break;
+    total += parent_item->get_z_index();
+    child = parent_item;
+    parent = parent->get_parent();
+  }
+  return total;
+}
 
 void walk_validate_elements(godot::Node *node, int depth, int64_t max_elements,
                             std::vector<ValidateElement> &elements,
@@ -298,6 +327,8 @@ void walk_validate_elements(godot::Node *node, int depth, int64_t max_elements,
     ValidateElement element;
     element.path = util::to_std(godot::String(node->get_path()));
     element.type = util::to_std(godot::String(node->get_class()));
+    element.mouse_filter = static_cast<int>(ctrl->get_mouse_filter());
+    element.draw_z = effective_z_index(ctrl);
     godot::Rect2 rect = ctrl->get_global_rect();
     element.x = rect.position.x;
     element.y = rect.position.y;
@@ -694,9 +725,12 @@ JV op_validate_ui_layout(const JV &params) {
 
   JV issues(JV::array_tag);
   bool issues_truncated = false;
+  int64_t possibly_occluded_count = 0;
   auto push_issue = [&](const char *kind, const char *severity,
                         const ValidateElement &element,
-                        const std::string &detail, const JV *extra = nullptr) {
+                        const std::string &detail, const JV *extra = nullptr,
+                        const std::string &occluder_path = std::string(),
+                        const std::string &occluder_filter = std::string()) {
     if (issues.Size() >= static_cast<int64_t>(kValidateIssuesMax)) {
       issues_truncated = true;
       return;
@@ -710,6 +744,12 @@ JV op_validate_ui_layout(const JV &params) {
     item["detail"] = JV(detail);
     if (extra)
       item["by"] = *extra;
+    if (!occluder_path.empty()) {
+      item["occluder_path"] = JV(occluder_path);
+      item["occluder_mouse_filter"] = JV(occluder_filter);
+    }
+    if (std::string(kind) == "possibly_occluded")
+      ++possibly_occluded_count;
     issues.PushBack(std::move(item));
   };
 
@@ -750,14 +790,25 @@ JV op_validate_ui_layout(const JV &params) {
     }
   }
 
-  for (size_t i = 0; i < visible.size(); i++) {
-    const ValidateElement &lower = visible[i].element;
+  std::vector<size_t> draw_order(visible.size());
+  for (size_t i = 0; i < draw_order.size(); i++)
+    draw_order[i] = i;
+  std::stable_sort(draw_order.begin(), draw_order.end(),
+                   [&](size_t a, size_t b) {
+                     return visible[a].element.draw_z <
+                            visible[b].element.draw_z;
+                   });
+  for (size_t oi = 0; oi < draw_order.size(); oi++) {
+    const ValidateElement &lower = visible[draw_order[oi]].element;
     if (lower.w <= 0.0 || lower.h <= 0.0)
       continue;
     const double area = lower.w * lower.h;
-    for (size_t j = i + 1; j < visible.size(); j++) {
-      const ValidateElement &upper = visible[j].element;
+    for (size_t oj = oi + 1; oj < draw_order.size(); oj++) {
+      const ValidateElement &upper = visible[draw_order[oj]].element;
       if (upper.w <= 0.0 || upper.h <= 0.0)
+        continue;
+      if (upper.mouse_filter ==
+          static_cast<int>(godot::Control::MOUSE_FILTER_IGNORE))
         continue;
       const double covered = intersect_area(lower.x, lower.y, lower.w, lower.h,
                                             upper.x, upper.y, upper.w, upper.h);
@@ -769,8 +820,11 @@ JV op_validate_ui_layout(const JV &params) {
                    "at least " + std::to_string(static_cast<int>(
                                         occlude_ratio * 100.0)) +
                        "% of the area is covered by a later visible control "
-                       "(draw-order heuristic, canvas_layer/z_index ignored)",
-                   &by);
+                       "(draw-order heuristic: effective z_index then "
+                       "document order, canvas_layer ignored; mouse_filter "
+                       "IGNORE controls are not occluders)",
+                   &by, upper.path,
+                   validate_mouse_filter_name(upper.mouse_filter));
         break;
       }
     }
@@ -781,11 +835,14 @@ JV op_validate_ui_layout(const JV &params) {
   r["checked"] = JV(static_cast<int64_t>(visible.size()));
   r["truncated"] = JV(truncated);
   r["skipped_invisible"] = JV(skipped_invisible);
+  r["possibly_occluded_count"] = JV(possibly_occluded_count);
   if (issues_truncated)
     r["issues_truncated"] = JV(true);
   r["note"] = JV("read-only heuristic scan without verdict; invisible and "
-                 "whitelisted controls are skipped, occlusion is a "
-                 "document-order approximation");
+                 "whitelisted controls are skipped, occlusion follows "
+                 "effective z_index then document order (canvas_layer "
+                 "ignored), and mouse_filter=IGNORE controls never count as "
+                 "occluders");
   return ok_result(std::move(r));
 }
 

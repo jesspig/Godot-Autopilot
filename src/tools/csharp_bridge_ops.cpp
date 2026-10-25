@@ -163,6 +163,14 @@ CSharpTarget resolve_locator(const JV &args, const std::string &prefix,
                                 tool);
       return out;
     }
+    if (res->is_class("Script")) {
+      out.error = util::error_detail(
+          "path '" + path_str + "' resolved to a Script resource, not a live object",
+          k_path, "a scene node path or object_id_str of a live instance",
+          "pass the node path (e.g. 'World/Player') or object_id_str; a .cs/.gd "
+          "path addresses the script resource, not its instances");
+      return out;
+    }
     out.ok = true;
     out.object = res.ptr();
     return out;

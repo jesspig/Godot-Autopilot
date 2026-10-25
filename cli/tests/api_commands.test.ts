@@ -440,6 +440,22 @@ describe("api 子命令", () => {
     expect(requests[0].url).toContain("category=scene");
   });
 
+  test("api list 透传分页参数", async () => {
+    const { port, requests } = serve(() => jsonResponse({ tools: [] }));
+    writeIndex({ instances: [pluginRecord({ port })] });
+    const cap = captureOutput();
+    const code = await apiRun(["list"], { portText: String(port), limitText: "5", offsetText: "10" });
+    cap.restore();
+    expect(code).toBe(ExitCode.Success);
+    expect(requests[0].url).toContain("limit=5");
+    expect(requests[0].url).toContain("offset=10");
+  });
+
+  test("api list 拒绝非法分页参数", async () => {
+    await expect(apiRun(["list"], { limitText: "0" })).rejects.toThrow("--limit");
+    await expect(apiRun(["list"], { offsetText: "abc" })).rejects.toThrow("--offset");
+  });
+
   test("api list 按关键字在本地过滤结果", async () => {
     const { port } = serve(() =>
       jsonResponse({

@@ -140,7 +140,7 @@ const std::vector<ParamSpec> kSetResourcePropertyParams = {
     {"name", "string", "Registration name of an in-memory resource (memory://name)", false},
     {"path", "string", "Resource path; loads the file from disk when no object_id or name matches", false},
     {"property", "string", "Property name to set, e.g. curve, texture; must exist on the resource", true},
-    {"value", "object", "Serialized JSON value; resource-typed properties accept {'path': 'res://xxx.tres'} or {'resource': 'memory://name'} references", true},
+    {"value", "json", "Serialized JSON value; resource-typed properties accept {'path': 'res://xxx.tres'} or {'resource': 'memory://name'} references", true},
     {"type_hint", "string", "Variant type hint for deserialization, e.g. Vector2, Color, int, float; auto-detected from the property metadata when omitted", false},
 };
 
@@ -365,7 +365,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "assign_mesh_to_instance",
       "Assign a mesh to a MeshInstance2D or MeshInstance3D node in the edited scene. Requires node_path (scene-relative path such as 'Level/Enemy' or absolute '/root/Level/Enemy') and mesh_ref (memory://name string, bare registration name, res:// path, decimal object_id string, or locator object). Nodes of any other class are rejected with their actual class name. Returns ok with assigned, node_path, mesh_ref and class; a mesh without normals yields a shading warning. When the instance rejects the in-memory mesh, save it with save_resource first and assign the saved res:// path instead.",
-      "Resources", {"resource", "mesh", "assign", "instance"}, SideEffect::None, tool_flags::kMutating,
+      "Resources", {"resource", "mesh", "assign", "instance"}, SideEffect::WritesScene, tool_flags::kMutating,
       kAssignMeshToInstanceParams, resource_ops::handle_assign_mesh_to_instance}));
   return v;
 }

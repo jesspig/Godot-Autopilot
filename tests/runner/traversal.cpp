@@ -23,11 +23,11 @@ const char* kModeHeuristicSmoke = "heuristic_smoke";
 const char* kSideEffectNone = "none";
 
 constexpr size_t kBaselineEnumerated = 452;
-constexpr size_t kBaselineExcluded = 151;
-constexpr size_t kBaselineCandidates = 301;
+constexpr size_t kBaselineExcluded = 177;
+constexpr size_t kBaselineCandidates = 275;
 constexpr size_t kBaselineWarnings = 0;
-constexpr size_t kBaselineCallsEmptyArgs = 301;
-constexpr size_t kBaselineCallsHeuristicSmoke = 247;
+constexpr size_t kBaselineCallsEmptyArgs = 275;
+constexpr size_t kBaselineCallsHeuristicSmoke = 221;
 
 constexpr char kBaselineEnvEmptyArgs[] = "GDA_TRAVERSAL_BASELINE_EMPTY_ARGS";
 constexpr char kBaselineEnvHeuristicSmoke[] =
@@ -44,7 +44,7 @@ const char* const kExpectedErrorMarkers[] = {
     "unsupported", "cannot",     "failed to",   "does not exist", "has no",
     "already",     "did not return a resource", "mutually exclusive",
     "must contain", "must have", "no object found",
-    "out of range", "unsaved changes"};
+    "out of range", "unsaved changes", "could not resolve 2D physics space"};
 
 const std::vector<std::string> kMetaToolNames = {
     "ping",      "search_tools",  "list_categories", "get_tool_detail",

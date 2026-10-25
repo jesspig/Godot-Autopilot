@@ -1,6 +1,6 @@
 ---
 name: godot-autopilot-csharp
-description: "Godot C#/.NET project guide: the dotnet build loop with build_csharp_assembly, reading compile and parse errors through get_debugger_log, running the game and confirming with get_debugger_errors plus the error watermark, C# [GlobalClass] resources via create_resource, [Export] node and typed-array conversion in property_set, attaching C# scripts, and the no-hot-reload and GDScript-visibility limits of .NET assembly state. Use when working in a C# Godot project."
+description: "Godot C#/.NET project guide: bootstrapping a csproj from a plain project, creating C# scripts with create_csharp_script, the dotnet_environment probe, the build_csharp_assembly wait loop with compiler output, reading diagnostics.instantiable, running the game and confirming with get_debugger_errors plus the error watermark, C# [GlobalClass] resources via create_resource, [Export] node and typed-array conversion in property_set, and the reflection bridge with csharp_get_property/call_method/subscribe_event. Use when working in a C# Godot project."
 ---
 
 # C# / .NET Workflows
@@ -9,110 +9,153 @@ Invocation: use the native MCP tools first; when that channel is down, follow th
 
 C# projects run on the editor's .NET assembly, which changes the workflow in
 three ways: a build step sits between editing and observing, C# declarations
-such as `[GlobalClass]` and `[Export]` reach Godot through the assembly, and
-nothing hot-reloads. This skill covers the C#-specific paths. The GDScript
-execution channels (`execute_script`, `call_script_node`, `execute_game_script`,
-`code_execute`) and the script lifecycle tools are not affected by .NET
-assembly state - use them for editor-side automation even in a C# project -
-and they are documented by `godot-autopilot-scripting`; its C# section is only
-a pointer back to this skill.
+such as `[GlobalClass]` and `[Export]` reach Godot through the assembly, and a
+running game never picks up a new assembly on its own. This skill covers the
+C#-specific paths. The GDScript execution channels (`execute_script`,
+`call_script_node`, `execute_game_script`, `code_execute`) are unaffected by
+.NET assembly state and are documented by `godot-autopilot-scripting`.
 
-## Prerequisite: the editor must have loaded the assembly
+## Bootstrap: from a plain project to a C# project
 
-- C# support is provided by the editor's .NET assembly. Global class
-  registration, C# script loading and GDScript-to-C# interop all require the
-  editor to have loaded a successfully built assembly.
-- `create_resource` instantiates C# `[GlobalClass]` resource classes by name
-  only once the editor has them registered; until then the call errors with
-  "not a known class" or "not instantiable".
-- The plugin cannot trigger the in-editor .NET assembly reload: that ability
-  lives inside the engine's Mono module and is not exposed to GDExtension.
-  After changing C# class or method signatures, the editor-side view (script
-  load, validation, GDScript interop) still needs the user to press Build in
-  the editor or to restart the editor.
+A C# project needs a `res://` root `.csproj` (or `.sln`) and a matching
+`[dotnet] project/assembly_name` in `project.godot`.
+
+1. Run `dotnet_environment`. On a plain project it returns an error carrying a
+   ready-to-write template:
+   `{path, content, target_framework, assembly_name}` plus a `hint`.
+2. Write the template with `write_file` (the content is a
+   `Godot.NET.Sdk/<engine-version>` project targeting the installed .NET SDK).
+3. Set `[dotnet] project/assembly_name` to the returned `assembly_name`.
+4. Re-run `dotnet_environment`; it should now report `project_file`,
+   `dotnet_available` and `dotnet_version`.
+
+`dotnet_environment.assembly_loaded` only says the .NET module is loaded in
+the editor; it does **not** mean the project assembly is loaded. Use
+`create_csharp_script.diagnostics.instantiable` or a runtime read-back to
+verify the project assembly.
 
 ## Creating and editing C# files
 
-There is no create-script tool for C#: `create_script` writes GDScript only.
-Use `write_file` for .cs content - res:// writes are engine-managed, and for
-script-like files (.gd, shaders, .cs) the response includes a `diagnostics`
-object reporting whether the written script still loads. When its ok is false
-the file on disk failed to load; read `get_debugger_log` for details instead
-of guessing. `copy_resource_file` duplicates an existing .cs when you want a
-starting point that already compiles.
+- `create_csharp_script` (`path`, `source_code`, optional `overwrite`) is the
+  preferred way to create a `.cs` file. Three gates fail with an actionable
+  patch instead of a silent ok: the file stem must equal the declared class
+  name, the class must be `partial` and derive from a ClassDB-known Godot base,
+  and the root `.csproj` must cover the file. It returns the file record plus
+  `verified`/`readback` and a `diagnostics` object.
+- `write_file` still works for `.cs`; it returns a `diagnostics` object for
+  script-like files but has no class-name or `partial` gates.
+- `patch_script` edits one anchored spot in an existing file and compiles
+  before writing; `copy_resource_file` duplicates a compiling `.cs` as a
+  starting point.
+- `create_script` writes GDScript only; do not use it for C#.
+
+### Diagnostics semantics
+
+`diagnostics.ok` means the `.cs` file loads as a script resource.
+`diagnostics.instantiable` means the class is present in the loaded assembly
+and `can_instantiate()` is true. A newly created class normally reports
+`ok=true, instantiable=false` until `build_csharp_assembly` succeeds; read
+`instantiable` before calling `new()` or attaching a script that must run in
+the editor.
 
 ## The C# development loop
 
-1. Edit the .cs file with `write_file` (new files are created the same way).
-2. Build with `build_csharp_assembly` (no parameters). It launches
-   `dotnet build --nologo <project>` as an async OS process on the res://
-   root .csproj/.sln; the response reports the project file, command, started
-   and pid, and the call errors when the project is not a C# project or
-   dotnet is unavailable. It is compile verification only: it does not stand
-   in for the editor's Build action and does not hot-reload the loaded
-   assembly.
-3. Read the build outcome. The tool returns as soon as the process starts and
-   does not stream the compiler output, so confirm through
-   `get_debugger_log` - the editor-process log buffer where C# compile and
-   parse errors are recorded - before running anything.
+1. Create or edit the `.cs` file (`create_csharp_script`, `write_file` or
+   `patch_script`).
+2. Build with `build_csharp_assembly` and prefer `wait=true`:
+   `{wait: true, timeout_ms?: 1..25000}` runs `dotnet build --nologo` in the
+   foreground and returns `BuildResult`:
+   `{project_file, project_path, command, exit_code, success, errors,
+   output_digest, output_empty, output_truncated?, errors_truncated?, note,
+   game_running, restart_required?}`. Without `wait` the call only starts the
+   process and returns `{pid, started, game_running}`.
+3. Read the result, not a guess: `success`, `errors` and `output_digest` are
+   the compiler verdict. `get_debugger_log` remains the place for editor-side
+   script errors that are not compiler output.
 4. Run the scene with `play_editor_current_scene` (save it first) and gate on
    `get_game_status`; a half-dead process is stopped and restarted, not
    debugged.
-5. Diagnose while it runs: `get_debugger_errors` for the structured error
-   list plus the one-shot `new_errors_since_last_call` watermark on your next
-   call. `get_game_log_entries` reads the on-disk game log when the debug
-   channel may have dropped messages.
+5. Diagnose while it runs: `get_debugger_errors` returns structured entries
+   with `seq`; pass `since_seq` and use the top-level `next_seq` to read only
+   new errors. `get_game_log_entries` reads the on-disk game log when the
+   debug channel may have dropped messages.
 6. Verify with a real observation: `capture_game_viewport` for the visible
-   result, or read values back with `property_get` / `get_script_property`.
-   Fix and repeat; the watermark confirms a fix produced no new errors.
-7. Remember the no-hot-reload rule: `reload_game_scripts` reloads GDScript
-   files only. A .cs change needs a fresh build, and the running game keeps
-   using the previous assembly until it is restarted - changes never reach a
-   live process on their own.
+   result, or read values back with `property_get` / `get_script_property` /
+   `csharp_get_property`.
+7. Fix and repeat.
 
-Because the build runs asynchronously and reports only the PID, give it time
-to finish writing the assembly before launching (or relaunching) the game;
-otherwise the new process still loads the old assembly.
+### The error watermark is not the script error list
+
+`new_errors_since_last_call` counts tool-response errors and game
+`runtime_error` payloads. It does **not** count compiler output or GDScript
+parse errors logged by the engine. Do not treat it as "the C# fix is clean";
+use `BuildResult.success` / `errors`, `get_debugger_log` (editor process) and
+`get_debugger_errors` with `since_seq` (running game).
+
+### Restart rules
+
+- Editor side: after a successful build, new classes can usually be
+  instantiated without restarting the editor; signature changes may still
+  require the editor's own Build action or a restart because GDExtension cannot
+  trigger the engine's .NET assembly reload.
+- Game side: a running process keeps the old assembly. `build_csharp_assembly`
+  reports `game_running` and, for a successful `wait=true` build, sets
+  `restart_required=true`; stop and relaunch the game before judging the new
+  code.
+- `reload_game_scripts` reloads GDScript files only.
+
+## [Export] properties and save timing
+
+`property_set` writes C# `[Export]` fields through the same JSON shapes as
+GDScript exports (full table in `godot-autopilot-scene-system`):
+
+- Node-typed fields accept a node path string; `converted_node_path` confirms
+  the conversion. An unresolvable path is an error, not a silent ok.
+- Typed arrays (`[Export] Node[]`, `Array[Resource]`) convert element by
+  element; node elements accept a path string or `{"__node_ref__": "..."}`,
+  resource elements accept a `res://` path or a `memory://` locator.
+- A rejected assignment (read-only property, setter that clears the value) is
+  reported as "value not applied"; the tool attempts to restore the old value
+  and reports whether the restore succeeded.
+- After an assembly-changing build the editor may re-instantiate script
+  scenes. Re-read the exported values before saving, then save and read the
+  `.tscn` back; do not assume a value written before the build survived it.
 
 ## C# resources and script attachment
 
-- `create_resource` accepts C# `[GlobalClass]` classes by name alongside
-  ClassDB classes and GDScript global classes. Pass `name` to register the
-  instance as a memory:// locator for later `set_resource_property` /
-  `save_resource` calls; abstract or invalid scripts are rejected.
-- `set_resource_property` addresses the instance by `name` or `object_id`
-  and uses the usual JSON value shapes, including `{"path": "res://..."}` for
-  resource-typed fields. `save_resource` writes it to disk; a memory://
-  resource must be saved before a node property can reference it.
-- `attach_script_to_node` attaches any resource the loader resolves as a
-  Script - including a C# script - and registers the change with the editor
-  undo history. Replacing a node's script does not migrate the old script's
-  exported values: stored references such as node_paths can be lost and must
-  be re-wired with `property_set` afterwards.
-
-## [Export] properties and the conversion rules
-
-`property_set` writes C# `[Export]` fields through the same JSON value shapes
-as GDScript exports (full table in `godot-autopilot-scene-system`):
-
-- Node-typed fields accept a node path string; the response reports
-  converted_node_path when that string was converted to a node reference.
-  An unresolvable path is an error, not a silent ok.
-- Typed arrays (`[Export] Node[]`, Array[Resource]) convert element by
-  element; node elements accept a path string or `{"__node_ref__": "..."}`,
-  resource elements accept a res:// path or a memory:// locator.
-- An assignment the engine does not actually apply (a C# property whose
-  setter clears it back to null, or a read-only / private-setter property) is
-  reported as an error "value not applied": the tool detects the rejected
-  read-back, attempts to restore the old value and says whether the restore
-  succeeded. Check the response instead of assuming the write landed.
-- C# properties without a getter are invisible to GDScript: reading one
-  returns null, which is easy to misread as a missing property. Validate
-  through readable exported fields rather than derived or write-only ones.
+- `create_resource` accepts C# `[GlobalClass]` classes by name once the class
+  is in the loaded assembly. Pass `name` to register a `memory://` locator;
+  abstract or invalid scripts are rejected.
+- `set_resource_property` addresses an instance by `name` or `object_id`;
+  `save_resource` writes it to disk before a node property can reference it.
+- `attach_script_to_node` attaches a C# script resource and registers one undo
+  step. Replacing a node's script does not migrate exported references; rewire
+  them with `property_set` afterwards.
 
 ## Reflection bridge: C# members that GDScript cannot see
 
-`property_get` and `execute_game_script` only reach members visible to GDScript: a C# property without a getter reads back null and non-public members do not resolve at all. For those, plus C# method overloads and C# events, use `csharp_get_property`, `csharp_call_method` and `csharp_subscribe_event` (`runtime` editor resolves in the editor process, game forwards through the running game). Endpoints, reflection limits, export-build caution and subscription token lifetime are documented in references/csharp-bridge.md.
+`property_get` and `execute_game_script` only reach members visible to
+GDScript. For C# getters, overloads and events use `csharp_list_members` to
+discover the member, then `csharp_get_property`, `csharp_set_property`,
+`csharp_call_method`, `csharp_subscribe_event` and `csharp_unsubscribe_event`
+with `runtime` editor (default) or game.
+
+- Editor side needs no manual singleton registration: the plugin loads and
+  instantiates `res://addons/godot-autopilot/GdaCSharpBridge.cs` when the
+  engine singleton is absent.
+- Game side requires a `GdaCSharpRuntime` node in the running scene; it creates
+  the `__gda_runtime` holder the tools locate. Only scene-path locators cross
+  into the game (`object_id`, `object_id_str` and `memory` are editor-process
+  handles).
+- A locator that resolves to a script resource (for example
+  `res://scripts/Player.cs`) is rejected with a precise error; pass a node path
+  or `object_id_str` of a live instance.
+- A running game's `__gda_runtime` holder is excluded from
+  `get_game_status.node_count` and reported separately as
+  `instrumentation_node_count`.
+
+Endpoints, reflection limits, export-build trimming and subscription token
+lifetime are documented in references/csharp-bridge.md.
 
 ## See also
 

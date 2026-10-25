@@ -11,6 +11,7 @@ using godot_autopilot::gdscript_wrap::WrapResult;
 using godot_autopilot::gdscript_wrap::WRAP_MODE_BARE;
 using godot_autopilot::gdscript_wrap::WRAP_MODE_EXPRESSION;
 using godot_autopilot::gdscript_wrap::WRAP_MODE_WHOLE_SCRIPT;
+using godot_autopilot::gdscript_wrap::defines_function_named;
 using godot_autopilot::gdscript_wrap::has_func_definition_statement;
 using godot_autopilot::gdscript_wrap::has_top_level_func_def;
 using godot_autopilot::gdscript_wrap::is_single_expression;
@@ -262,4 +263,51 @@ TEST(GdscriptWrapTest, StripExtendsLinesOnlyCommentsExtendsPrefix) {
   EXPECT_EQ(strip_extends_lines("extendsNode"), "extendsNode");
   EXPECT_EQ(strip_extends_lines("var extends_value = 1"),
             "var extends_value = 1");
+}
+
+TEST(GdscriptWrapTest, BareLoopIfReturnWrapsIntoRun) {
+  const std::string source =
+      "for i in range(2):\n    if i == 1:\n        return i";
+  WrapResult r = wrap_bare_body(source, "_run", "", false);
+  ASSERT_TRUE(r.ok);
+  EXPECT_EQ(r.mode, WRAP_MODE_BARE);
+  EXPECT_EQ(r.wrapped, "@tool\nextends Node\n\nfunc _run():\n"
+                       "    for i in range(2):\n"
+                       "        if i == 1:\n"
+                       "            return i\n");
+  EXPECT_EQ(find_line(r.wrapped, "func _run():"), r.header_lines + 1);
+  EXPECT_EQ(find_line(r.wrapped, "    for i in range(2):"),
+            r.header_lines + 2);
+  EXPECT_EQ(find_line(r.wrapped, "            return i"),
+            r.header_lines + 4);
+}
+
+TEST(GdscriptWrapTest, CompleteScriptWithRunIsNotWrapEligible) {
+  const std::string source = "extends Node\n\nfunc _run():\n    return 1";
+  EXPECT_TRUE(has_top_level_func_def(source));
+  EXPECT_TRUE(defines_function_named(source, "_run"));
+  WrapResult whole = wrap_whole_script(source, "_run");
+  ASSERT_TRUE(whole.ok);
+  EXPECT_EQ(whole.mode, WRAP_MODE_WHOLE_SCRIPT);
+  EXPECT_EQ(whole.wrapped, source);
+  WrapResult bare = wrap_bare_body(source, "_run", "", false);
+  EXPECT_FALSE(bare.ok);
+  EXPECT_EQ(bare.error, kFuncDefError);
+}
+
+TEST(GdscriptWrapTest, ClassBodyWithoutRunStaysWrapEligible) {
+  const std::string source =
+      "extends Node\n\nvar counter := 0\n\nsignal changed";
+  EXPECT_FALSE(has_top_level_func_def(source));
+  EXPECT_FALSE(defines_function_named(source, "_run"));
+  WrapResult r = wrap_bare_body(source, "_run", "", false);
+  ASSERT_TRUE(r.ok);
+  EXPECT_EQ(r.mode, WRAP_MODE_BARE);
+  EXPECT_EQ(r.wrapped, "@tool\nextends Node\n\nfunc _run():\n"
+                       "    # extends Node\n"
+                       "    \n"
+                       "    var counter := 0\n"
+                       "    \n"
+                       "    signal changed\n");
+  EXPECT_EQ(find_line(r.wrapped, "    signal changed"), r.header_lines + 6);
 }

@@ -83,6 +83,11 @@ StepExpect ParseExpect(const mcp::JsonValue& v, const std::string& path) {
                 RequireType(*ne, item_path + ".not_empty", "bool");
                 check.not_empty = ne->GetBool();
             }
+            if (const mcp::JsonValue* nc = arr[i].Find("not_contains")) {
+                RequireType(*nc, item_path + ".not_contains", "string");
+                check.has_not_contains = true;
+                check.not_contains = nc->GetString();
+            }
             exp.field_checks.push_back(std::move(check));
         }
     }

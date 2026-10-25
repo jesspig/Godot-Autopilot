@@ -2,6 +2,7 @@
 #include "core/editor_readiness.hpp"
 #include "core/config.hpp"
 #include "core/log_system.hpp"
+#include "util/csharp_project_setup.hpp"
 #include "util/dotnet_env.hpp"
 #include "util/error_util.hpp"
 #include "util/project_path.hpp"
@@ -17,6 +18,7 @@
 #include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
+#include <godot_cpp/classes/script.hpp>
 #include <godot_cpp/classes/text_server.hpp>
 #include <godot_cpp/classes/text_server_manager.hpp>
 #include <godot_cpp/variant/rid.hpp>
@@ -515,6 +517,14 @@ std::vector<CSharpClassInfo> parse_csharp_classes(const std::string &source) {
   return infos;
 }
 
+mcp::JsonValue script_load_diagnostics(bool loaded, bool instantiable) {
+  mcp::JsonValue diag(mcp::JsonValue::object_tag);
+  diag["ok"] = mcp::JsonValue(loaded);
+  if (loaded)
+    diag["instantiable"] = mcp::JsonValue(instantiable);
+  return diag;
+}
+
 namespace {
 
 std::string csharp_file_stem(const std::string &normalized_path) {
@@ -604,10 +614,9 @@ std::string csharp_not_loaded_hint(bool is_dotnet_editor) {
 
 JV build_script_diagnostics(const godot::String &gs_path,
                             const std::string &ext) {
-  JV diag(JV::object_tag);
   auto *loader = godot::ResourceLoader::get_singleton();
   if (!loader) {
-    diag["ok"] = JV(false);
+    JV diag = script_load_diagnostics(false, false);
     diag["hint"] =
         JV("ResourceLoader not available; open the file in the editor script "
            "panel to inspect errors");
@@ -616,10 +625,10 @@ JV build_script_diagnostics(const godot::String &gs_path,
   godot::Ref<godot::Resource> loaded =
       loader->load(gs_path, "Script", godot::ResourceLoader::CACHE_MODE_IGNORE);
   if (loaded.is_valid()) {
-    diag["ok"] = JV(true);
-    return diag;
+    auto *script = godot::Object::cast_to<godot::Script>(loaded.ptr());
+    return script_load_diagnostics(true, script && script->can_instantiate());
   }
-  diag["ok"] = JV(false);
+  JV diag = script_load_diagnostics(false, false);
   if (ext == "cs") {
     bool is_dotnet_editor = false;
     bool assembly_loaded = false;
@@ -776,8 +785,7 @@ JV handle_create_csharp_script(const JV &args) {
         "change the base to a Godot class, or declare and build a custom base first");
   std::string project_file;
   if (!find_csharp_project_file(project_file))
-    return util::error_json(
-        "当前项目不是 C# 工程，未发现 .csproj/.sln");
+    return csharp_setup::missing_project_short_error();
   bool sdk_style = false;
   bool ref_exists = csproj_covers_file(project_file, stem + ".cs", sdk_style);
   if (!ref_exists) {

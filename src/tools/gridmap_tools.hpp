@@ -56,7 +56,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "create_gridmap",
       "Create a GridMap node in the edited scene with the given cell size. Optional name (default GridMap), cell_size {x, y, z} in meters (default 1,1,1; every component must be > 0) and parent_path (omit to add at the scene root). Attach a MeshLibrary later with property_set, or build items with create_meshlibrary_item. Returns class, name, path and object_id.",
-      "TileMap", {"gridmap", "create"}, SideEffect::None, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
+      "TileMap", {"gridmap", "create"}, SideEffect::WritesScene, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
       kCreateGridmapParams, gridmap_ops::handle_create}));
   v.push_back(make_spec_tool(ToolSpec{
       "create_meshlibrary_item",
@@ -66,12 +66,12 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "set_gridmap_cell",
       "Set a single cell on a GridMap node. Requires node_path, position {x, y, z} and item; optional orientation 0-23 (default 0). The item must exist in the node's MeshLibrary (build it with create_meshlibrary_item). Passing item -1 clears the cell at the position instead (orientation is ignored then). Returns 'ok' and undo; use fill_gridmap_box for volumes.",
-      "TileMap", {"gridmap", "cell", "set"}, SideEffect::None, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
+      "TileMap", {"gridmap", "cell", "set"}, SideEffect::WritesScene, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
       kSetGridmapCellParams, gridmap_ops::handle_set_cell}));
   v.push_back(make_spec_tool(ToolSpec{
       "fill_gridmap_box",
       "Fill an axis-aligned cell box on a GridMap node in one call. Requires node_path plus from and to {x, y, z} corner cells (both inclusive; the corner order does not matter). Pass item and optional orientation 0-23 (default 0) to place one item in every cell, or erase=true to clear the box instead (item and orientation are then ignored). The box is capped at 100000 cells per call, so split bigger volumes into chunks. Implemented as a per-cell set_cell_item loop: it saves round trips and produces a single undo action, but does not make the fill itself faster. Returns set_count, from, to, size_x, size_y, size_z and undo.",
-      "TileMap", {"gridmap", "cell", "fill", "box"}, SideEffect::None, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
+      "TileMap", {"gridmap", "cell", "fill", "box"}, SideEffect::WritesScene, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
       kFillGridmapBoxParams, gridmap_ops::handle_fill_box}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_gridmap_used_cells",

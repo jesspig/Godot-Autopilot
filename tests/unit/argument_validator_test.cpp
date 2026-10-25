@@ -110,6 +110,31 @@ TEST(ArgumentValidatorTest, UnknownKeysAreToleratedAndReported) {
   EXPECT_EQ(outcome.unknown_keys[1], "other");
 }
 
+TEST(ArgumentValidatorTest, JsonParameterAcceptsEveryJsonShape) {
+  const std::vector<ParamSpec> params = {{"value", "json", "", false}};
+
+  const char *const accepted[] = {
+      R"({"value": "text"})",  R"({"value": 1.5})",    R"({"value": true})",
+      R"({"value": [1, 2]})",  R"({"value": {"a": 1}})", R"({"value": null})"};
+
+  for (const char *json : accepted) {
+    const ValidationOutcome outcome =
+        validate_params(params, mcp::JsonValue::Parse(json));
+    EXPECT_TRUE(outcome.passed()) << json;
+    EXPECT_TRUE(outcome.unknown_keys.empty()) << json;
+  }
+}
+
+TEST(ArgumentValidatorTest, JsonParameterPassesDeclaredTypeCheck) {
+  const std::vector<ParamSpec> params = {{"value", "json", "", true}};
+
+  const ValidationOutcome outcome = validate_params(
+      params, mcp::JsonValue::Parse(R"({"value": [{"nested": 1}]})"));
+
+  EXPECT_TRUE(outcome.passed());
+  EXPECT_TRUE(outcome.error.IsNull());
+}
+
 TEST(ArgumentValidatorTest, ValidArgumentsPassWithoutWarnings) {
   const std::vector<ParamSpec> params = full_params();
 
