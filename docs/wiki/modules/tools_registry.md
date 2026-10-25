@@ -40,7 +40,7 @@ flowchart TD
 ```
 
 - **数据记录（非宏/非真类）**：`ToolSpec{name, description, category, tags, side_effect, flags, params, handler, raw_schema}`；`flags` 为 `tool_flags` 位标志（`kMeta`/`kDynamic`/`kMutating`/`kObserve`/`kCaptureImage`/`kSceneTarget`/`kUndoable`/`kHealthProbe`/`kLongBlocking`，共 9 位）。`ToolRegistry::add()` 按 `flags & kMeta` 自动路由（meta_ vs 域表），不再依赖 `dynamic_cast`。
-- **side_effect 语义（2026-10-20 修正，2026-10-21 扩档）**：`SideEffect` 现为 **9 值**（新增 `Destructive`），经 `side_effect_name()` 回显为 `none`/`writes_file`/`writes_config`/`shows_alert`/`modifies_window`/`process`/`code_execute`/`game_runtime`/`destructive`——**只读工具回显 `"none"`**（原为空串）；`code_execute`/`batch_execute` 的 `side_effect` 声明为 `SideEffect::CodeExecute`（`register_all.cpp:504` / `:552`），回显 `code_execute`。能力门 `authorization::capability_for_tool(name, effect)` **不按工具名特判**，只按 `SideEffect` 映射到**三档七个能力名**（`read` / `write` / `process` / `code_execute` / `game_runtime` / `destructive` / `user_tools`）——**10-21 起写类不再「不需授权」**：`writes_file` / `writes_config` / `shows_alert` / `modifies_window` 归入 `write` 档、**默认拒绝**，需允许列表含 `write`（或 `all`）；读类（`none`）归 `read` 档、**默认放行**；`process` / `code_execute` / `game_runtime` / `destructive` 归危险档、**默认拒绝且需显式开启**。完整口径见下「统一执行入口」与 [T0 安全边界与并发契约](../security_contract.md) §3.1。
+- **side_effect 语义（2026-10-20 修正，2026-10-21 扩档）**：`SideEffect` 现为 **10 值**（在 `Destructive` 之外新增 `WritesScene`），经 `side_effect_name()` 回显为 `none`/`writes_file`/`writes_config`/`writes_scene`/`shows_alert`/`modifies_window`/`process`/`code_execute`/`game_runtime`/`destructive`——**只读工具回显 `"none"`**（原为空串）；`code_execute`/`batch_execute` 的 `side_effect` 声明为 `SideEffect::CodeExecute`（`register_all.cpp:504` / `:552`），回显 `code_execute`。能力门 `authorization::capability_for_tool(name, effect)` **不按工具名特判**，只按 `SideEffect` 映射到**三档七个能力名**（`read` / `write` / `process` / `code_execute` / `game_runtime` / `destructive` / `user_tools`）——**写类默认拒绝**：`writes_file` / `writes_config` / `writes_scene` / `shows_alert` / `modifies_window` 归入 `write` 档、**默认拒绝**，需允许列表含 `write`（或 `all`）；读类（`none`）归 `read` 档、**默认放行**；`process` / `code_execute` / `game_runtime` / `destructive` 归危险档、**默认拒绝且需显式开启**。`writes_scene` 表示可恢复地修改编辑场景的属性或节点结构（属性/变换、信号连接、分组、增删/重挂/实例化节点等），映射到 `write`；完整口径见下「统一执行入口」与 [T0 安全边界与并发契约](../security_contract.md) §3.1。
 - **schema 单一源**：`SpecTool` 构造时 `schema_ = raw_schema.IsObject() ? raw_schema : schema::build_schema(params)`；域工具 schema 全部从参数表派生，7 元工具中 `search_tools`/`batch_execute`/`code_execute` 因嵌套结构手写 JSON 存入 `raw_schema`，其余经 `build_schema`（含 `system_status`）。
 - **取参统一 `Args`**（`tool_args.hpp/cpp`）：`opt_*`/`require_*`/`get_*` + `reject_unknown()`；`null` 视为缺失，`integer` 接受整数值 double、拒绝小数与越界，`boolean` 严格。错误消息 "missing required parameter: X" / "invalid parameter: X must be a ..." 由 handler 抛出后经 dispatch 统一包装。
 - **生命周期**：`g_active_registry` 为 mutex 保护的 `shared_ptr<ToolRegistry>`；`register_all_tools`/`refresh_dynamic_tools` 每次先构建局部 registry，再经 `refresh_derived` 批量替换 catalog/index/dispatch；dispatch handler lambda 捕获 registry 并在调用时 `find` 取工具，旧请求持有的 registry 由共享所有权延长生命周期。
@@ -86,6 +86,7 @@ flowchart TD
 
 - 非空判定：`input_schema.properties` 存在且为非空对象；空 schema 仍保留空 `properties` 对象。
 - 全部 schema 由 `SpecTool` 构造期生成：域工具与 `system_status` 经 `schema::build_schema(params)`，`ping`/`list_categories`/`get_tool_detail`/`call_tool` 亦经 `build_schema`；`search_tools`/`batch_execute`/`code_execute` 手写 JSON 存 `raw_schema`（嵌套结构 `ParamDef` 不可表达）。schema_builder API 面为 `ParamDef`、`build_schema(initializer_list<ParamDef>)`、`build_schema(const std::vector<ParamDef>&)`、`add_required_flag`。
+- `ParamSpec` 的 `type` 支持 `string` / `number` / `integer` / `boolean` / `object` / `array` / `json`。`json` 表示接受任意 JSON 值（标量、数组、对象、null）：`schema::build_schema` 对该参数**不写 `type`**（只保留 `description`），`argument_validator` 跳过其类型检查，值是否合法由 handler 自行校验。它用于 `value` 一类任意 Variant 参数，避免 REST/CLI 把标量或数组误拒。
 - 非空/空数以运行时 `SchemaStatisticsBaseline` 观测为准（当前基线 459 = 393 + 66，不硬编码为通用常量）。
 
 ## 契约缺口表（遍历记 warnings，不 FAIL）
@@ -156,7 +157,7 @@ warnings 判定逻辑在 `tests/runner/traversal.cpp`（"schema 声明必填但�
 | 档位 | 覆盖的 `side_effect` | 能力名 | 默认 | 放行条件 |
 |---|---|---|---|---|
 | **读**（Read） | `none` | `read` | **默认放行** | `tier_permits` 对 `read` 直接返回 true，无需进允许列表 |
-| **写**（Write） | `writes_file` / `writes_config` / `shows_alert` / `modifies_window` | `write` | **默认拒绝** | 允许列表含 `write` 或 `all` |
+| **写**（Write） | `writes_file` / `writes_config` / `writes_scene` / `shows_alert` / `modifies_window` | `write` | **默认拒绝** | 允许列表含 `write` 或 `all` |
 | **危险**（Danger） | `process` / `code_execute` / `game_runtime` / `destructive` | `process` / `code_execute` / `game_runtime` / `destructive` | **默认拒绝，需显式开启** | 允许列表含对应能力名或 `all` |
 
 - **档位判定标准（10-22 成型）**：分档**只按工具的实际行为判定**，不看工具名——读类只读取；写类产生**可恢复**的外部状态变更；破坏类**不可逆地销毁宿主内已存在的对象或实体**且没有持久化恢复途径；危险类执行外部程序 / 脚本 / 驱动游戏进程。两条边界规则：**删除磁盘文件或目录归写类**（工程内容通常有版本控制兜底）、**销毁宿主内运行对象归破坏类**。标准固化在 [`src/tools/side_effect_policy.hpp`](../../../src/tools/side_effect_policy.hpp)，完整表述见 [T0 安全边界与并发契约](../security_contract.md) §3.1.2。

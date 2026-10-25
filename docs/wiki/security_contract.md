@@ -64,6 +64,7 @@ resource:
 |---|---|---|
 | 文件写入 | `writes_file` | 调用前确认路径在允许工程范围内；不得默认覆盖任意路径。 |
 | 配置写入 | `writes_config` | 视为持久化变更；调用方应明确知道目标文件和可逆性。 |
+| 场景写入 | `writes_scene` | 可恢复地修改编辑场景的属性或节点结构（属性/变换、信号连接、分组、增删/重挂/实例化节点等）；属**写档**，严格模式需 `write` 授权，legacy 兼容模式按写档放行。 |
 | 用户可见提示 | `shows_alert` | 视为会阻塞或打断用户的操作；禁止在无明确请求时批量触发。 |
 | 窗口/剪贴板/鼠标 | `modifies_window` | 视为影响编辑器或桌面状态的副作用；含编辑器 UI 元素点击/文本/快捷键注入与合成鼠标输入（09-15 扩展、09-16 增 `select_scene_tree_node`，共 20 个）。 |
 | 进程与环境 | `process` | 视为最高风险；包括启动、终止、构建、打开 OS 路径和修改环境。 |
@@ -92,7 +93,7 @@ resource:
   | 档位 | 覆盖的 `side_effect` | 能力名 | 默认 | 放行条件 |
   |---|---|---|---|---|
   | **读**（Read） | `none` | `read` | **默认放行** | `tier_permits` 对 `read` 直接返回 true，无需进允许列表 |
-  | **写**（Write） | `writes_file` / `writes_config` / `shows_alert` / `modifies_window` | `write` | **默认拒绝** | 允许列表含 `write` 或 `all` |
+  | **写**（Write） | `writes_file` / `writes_config` / `writes_scene` / `shows_alert` / `modifies_window` | `write` | **默认拒绝** | 允许列表含 `write` 或 `all` |
   | **危险**（Danger） | `process` / `code_execute` / `game_runtime` / `destructive` | `process` / `code_execute` / `game_runtime` / `destructive` | **默认拒绝，需显式开启** | 允许列表含对应能力名或 `all` |
 
   - **能力名全集**（`kKnownCapabilities`，7 项）：`read` / `write` / `process` / `code_execute` / `game_runtime` / `destructive` / `user_tools`。`user_tools` 是**独立于 `side_effect` 派生**的一条能力，由 `AutopilotTools`（用户脚本动态工具，`src/tools/autopilot_tools.cpp`）在注册与调用两侧检查——未授权时注册拒绝、调用返回 `user_tools` 授权错误。
@@ -109,7 +110,7 @@ resource:
 | 档位 | 能力名 | 覆盖的 `side_effect` | 默认 | 开启方式 |
 |---|---|---|---|---|
 | 读（Read） | `read` | `none` | **默认放行** | 无需开启 |
-| 写（Write） | `write` | `writes_file` / `writes_config` / `shows_alert` / `modifies_window` | **默认拒绝** | 允许列表加 `write`；面板勾选 "Allow write" |
+| 写（Write） | `write` | `writes_file` / `writes_config` / `writes_scene` / `shows_alert` / `modifies_window` | **默认拒绝** | 允许列表加 `write`；面板勾选 "Allow write" |
 | 危险（Danger） | `process` | `process` | **默认拒绝，需显式开启** | 允许列表加 `process`；面板勾选 "Allow process"（危险档，开关文案明示会运行外部程序与 OS 命令） |
 | 危险（Danger） | `code_execute` | `code_execute` | **默认拒绝，需显式开启** | 允许列表加 `code_execute`；面板勾选 "Allow code_execute" |
 | 危险（Danger） | `game_runtime` | `game_runtime` | **默认拒绝，需显式开启** | 允许列表加 `game_runtime`；面板勾选 "Allow game_runtime" |
@@ -117,6 +118,7 @@ resource:
 | 独立能力 | `user_tools` | 用户脚本动态工具（不由 `side_effect` 派生） | **默认拒绝，需显式开启** | 允许列表加 `user_tools`；面板勾选 "Allow user tools" |
 
 - **写类与破坏性默认拒绝（对外行为变更）**：写类工具（写文件、写工程/编辑器配置、弹用户可见提示、改窗口与注入输入）与破坏性工具（不可逆地销毁宿主内既有对象的操作，判定标准见 §3.1.2，当前声明者 6 个）此前**不需要任何能力**即可调用，10-21 起需要允许列表含 `write` / `destructive`（或 `all`）。既有客户端若不做适配，调用这些工具会收到 **403 `authorization_required`**——**MCP 面与 REST 面同样生效**。需要平滑升级的用户可显式切到**兼容模式**（§3.1.3）。
+- **场景写工具纳入写档（收紧方向的行为变更）**：修改编辑场景属性或节点结构（属性/变换、信号连接、分组、增删/重挂/实例化节点等）的工具统一声明 `writes_scene` 并映射到 `write`。这些工具此前多以 `none` 声明，严格模式下无需授权即可改场景；现在未授权 `write` 会收到 403 `authorization_required`。迁移方式：把 `write` 加入允许列表（或 `all`），或在升级窗口内显式切到 `legacy` 兼容模式（§3.1.3）；`legacy` 下写档（含 `writes_scene`）仍默认放行，危险档与破坏档不变。该变更只收紧授权，不改变工具本身的场景修改行为。
 - **三条开启路径**（语义不同，任选其一）：① 环境变量 `GODOT_AUTOPILOT_ALLOW=write`（逗号分隔，或 `all`），**须重启引擎**，且一旦设置即**完全覆盖**配置文件里的允许列表；② MCP Config 面板勾选 "Allow write" / "Allow destructive"，写入配置的 `allow` 键，**下一次工具调用立即生效、无需重启**（授权判定每次实时读取允许列表，不缓存）；③ 直接把 `write` / `destructive` 写进配置的 `allow` 键（手改配置）。三条路径**都只在本机环回的服务上生效**，不构成对外暴露授权。
 - **面板开关的增删语义**：勾选即 `allow_list_add`、取消即 `allow_list_remove`；**取消某一项不影响其它项**——`allow_list_remove` 遇到 `all` 会先把 `all` 展开成全部已知能力再逐项删除，因此「先全开再取消一项」的结果是其余能力保留、仅该能力被收回。取消后回读配置校正复选框状态，因此面板显示与配置内容始终一致。
 - **与 §4「导出期拒绝三类入口」的关系**：两者是**不同维度**的约束，互不替代。导出期拒绝按**引擎状态**拒绝——导出期间工具调用 / MCP 资源 / MCP 提示词三类入口一律拒绝（`code="export_in_progress"`，503）；本节的三档授权按**能力**拒绝——非导出期时，未在允许列表内的能力被拒（403 `authorization_required`）。判定顺序上**导出拦截在前、授权在后**（见 [工具注册表](modules/tools_registry.md)「统一执行入口」六阶段），故导出期内的写类调用先被导出拦截挡下，不进入授权门；反之，未授权的写类调用在非导出期只会拿到授权拒绝。**已知缺口**：导出拦截阶段尚未接入 REST 请求路径，REST 面的导出期拒绝当前不生效（见 §3.5 末条），但 REST 面的**授权门两套面都生效**。
@@ -128,7 +130,7 @@ resource:
 | 档位 | 判定标准 | 覆盖的 `side_effect` | 能力名 |
 |---|---|---|---|
 | **读**（Read） | 只读取，不改变任何外部状态 | `none` | `read` |
-| **写**（Write） | 产生**可恢复**的外部状态变更：写文件、写工程与编辑器配置、改窗口与显示、注入输入、改场景属性、保存资源等 | `writes_file` / `writes_config` / `shows_alert` / `modifies_window` | `write` |
+| **写**（Write） | 产生**可恢复**的外部状态变更：写文件、写工程与编辑器配置、改窗口与显示、注入输入、改场景属性/节点结构（含信号连接与分组）、保存资源等 | `writes_file` / `writes_config` / `writes_scene` / `shows_alert` / `modifies_window` | `write` |
 | **破坏**（Destructive） | **不可逆地销毁宿主内已存在的对象或实体**，且没有持久化的恢复途径：销毁窗口、场景实体、运行时实例、终止既有宿主对象等 | `destructive` | `destructive` |
 | **危险**（Danger） | 执行外部程序、执行脚本、驱动游戏进程等 | `process` / `code_execute` / `game_runtime` | `process` / `code_execute` / `game_runtime` |
 
@@ -156,8 +158,9 @@ resource:
 - **实时读取**：模式**每次工具调用实时读取，不缓存**；面板切换后**下一次调用即生效**，无需重启。
 - **拒绝文案**：拒绝响应新增机器可读字段 `authorization_mode`（`strict` / `legacy`）；严格模式下因写类被拒时，`enable` 字段追加可操作说明——「或把授权模式切到 `legacy`（`GODOT_AUTOPILOT_AUTH_MODE=legacy`，或在 MCP Config 面板选 "Compatibility"）以恢复 0.3.0 之前写类无需授权的行为」。兼容模式下被拒的仍是危险类 / 破坏类，提示文案照旧，不提兼容模式。
 - **面板开关**：MCP Config 面板新增「Authorization mode:」下拉（**Strict (default)** / **Compatibility (pre-0.3.0 write behavior)**）与一行当前模式说明（显示生效模式；环境变量存在时额外提示「环境变量覆盖本面板」）。切换即写配置的 `auth_mode` 键并立即生效。
-- **风险**：兼容模式**只放宽写类**——写文件、写工程与编辑器配置、改窗口与显示、注入输入在兼容模式下无需任何授权即可执行。危险类与破坏类在两种模式下都默认拒绝，因此兼容模式**不放宽**脚本执行、外部程序、进程终止与宿主内对象的销毁。用户在受控的本地开发环境里选择兼容模式是可接受的；在共享机器、多人共用的编辑器或任何非本机可信场景下**不应开启**。
+- **风险**：兼容模式**只放宽写类**——写文件、写工程与编辑器配置、改窗口与显示、注入输入、改场景属性/节点结构在兼容模式下无需任何授权即可执行。危险类与破坏类在两种模式下都默认拒绝，因此兼容模式**不放宽**脚本执行、外部程序、进程终止与宿主内对象的销毁。用户在受控的本地开发环境里选择兼容模式是可接受的；在共享机器、多人共用的编辑器或任何非本机可信场景下**不应开启**。
 - **与既有开关的关系**：兼容模式不改允许列表本身——`write` 仍可显式加入允许列表（严格模式下照旧生效），`process` / `code_execute` / `game_runtime` / `destructive` / `user_tools` 的开启方式不变。
+- **场景写工具在两模式下的差异**：`writes_scene` 属写档——严格模式下需要允许列表含 `write`，未授权返回 403 `authorization_required`；兼容模式下随写档默认放行。该差异是收紧方向的行为变更：依赖旧版「改场景无需授权」的客户端应在严格模式下显式加入 `write`，或临时切到 `legacy` 并在迁移完成后切回严格模式。
 
 ### 3.2 数据脱敏开关（09-20 引入）
 
@@ -251,6 +254,7 @@ REST 面（`/api`）与 MCP 面共用同一监听端口，但**认证要求不�
 - [ ] 默认启动日志和配置可证明监听为 `127.0.0.1`；非环回监听只能由显式配置触发。
 - [ ] 每个高风险工具都能通过 `get_tool_detail.side_effect` 或本页补充规则识别；**任何**工具的 `side_effect` 都非空（无副作用者为字面量 `"none"`）；破坏性工具声明 `destructive`。
 - [ ] 能力门只按 `side_effect` 判定：改一个工具的 `side_effect` 即改变它受哪个能力门约束，不存在「按工具名特判」的旁路；**写档默认拒绝**（未授权时写类工具返回 403），危险档需显式开启。
+- [ ] 场景写工具声明 `writes_scene` 并归写档：严格模式下未授权 `write` 返回 403，`legacy` 模式按写档放行。
 - [ ] 面板开关覆盖 `code_execute` / `game_runtime` / `user_tools` / `write` / `destructive` / `process` 六项：勾选与取消经允许列表增删，**取消一项不影响其它项**（`all` 先展开再逐项删），勾选后**下一次工具调用即生效、无需重启**；开关控件按能力清单生成，初始状态取当前实际允许列表。
 - [ ] 授权模式（§3.1.3）符合预期：默认 `strict` 下写类默认拒绝；显式 `legacy` 下写类默认放行而危险类与破坏类**仍**默认拒绝；非法取值回落 `strict` 并记 Warning；拒绝响应带 `authorization_mode` 字段；面板下拉切换后**下一次调用即生效**。
 - [ ] 破坏类落档符合 §3.1.2 标准：销毁宿主内既有对象的工具声明 `destructive`；删除磁盘文件 / 目录归写类；防漂移守卫对「带销毁语义却未声明 `destructive`」的工具失败并列出工具名，白名单豁免须显式登记且写明理由。
