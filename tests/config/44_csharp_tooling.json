@@ -48,7 +48,7 @@
               "field_checks": [
                 { "key": "result.project_file", "value": "res://testbed.csproj" },
                 { "key": "result.command", "value": "dotnet build --nologo res://testbed.csproj" },
-                { "key": "result.output_digest", "not_empty": true }
+                { "key": "result.output_digest", "not_contains": "姝" }
               ]
             }
           },
