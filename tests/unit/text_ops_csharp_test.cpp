@@ -9,6 +9,7 @@ namespace {
 
 using godot_autopilot::text_ops::CSharpClassInfo;
 using godot_autopilot::text_ops::parse_csharp_classes;
+using godot_autopilot::text_ops::script_load_diagnostics;
 
 CSharpClassInfo single_class(const std::string &source) {
   const std::vector<CSharpClassInfo> classes = parse_csharp_classes(source);
@@ -89,6 +90,39 @@ TEST(TextOpsCSharpParsing, MultipleClassesAreAllReturned) {
 TEST(TextOpsCSharpParsing, PartialDetectionNeedsModifierBeforeClass) {
   const CSharpClassInfo info = single_class("class Foo : Node {}");
   EXPECT_FALSE(info.is_partial);
+}
+
+TEST(TextOpsCSharpDiagnostics, LoadedButNotInstantiableKeepsOkTrue) {
+  const mcp::JsonValue diag = script_load_diagnostics(true, false);
+  const mcp::JsonValue *ok = diag.Find("ok");
+  ASSERT_NE(ok, nullptr);
+  ASSERT_TRUE(ok->IsBool());
+  EXPECT_TRUE(ok->GetBool());
+  const mcp::JsonValue *instantiable = diag.Find("instantiable");
+  ASSERT_NE(instantiable, nullptr);
+  ASSERT_TRUE(instantiable->IsBool());
+  EXPECT_FALSE(instantiable->GetBool());
+}
+
+TEST(TextOpsCSharpDiagnostics, LoadedAndInstantiableReportsBothTrue) {
+  const mcp::JsonValue diag = script_load_diagnostics(true, true);
+  const mcp::JsonValue *ok = diag.Find("ok");
+  ASSERT_NE(ok, nullptr);
+  ASSERT_TRUE(ok->IsBool());
+  EXPECT_TRUE(ok->GetBool());
+  const mcp::JsonValue *instantiable = diag.Find("instantiable");
+  ASSERT_NE(instantiable, nullptr);
+  ASSERT_TRUE(instantiable->IsBool());
+  EXPECT_TRUE(instantiable->GetBool());
+}
+
+TEST(TextOpsCSharpDiagnostics, LoadFailureOmitsInstantiable) {
+  const mcp::JsonValue diag = script_load_diagnostics(false, false);
+  const mcp::JsonValue *ok = diag.Find("ok");
+  ASSERT_NE(ok, nullptr);
+  ASSERT_TRUE(ok->IsBool());
+  EXPECT_FALSE(ok->GetBool());
+  EXPECT_EQ(diag.Find("instantiable"), nullptr);
 }
 
 } // namespace

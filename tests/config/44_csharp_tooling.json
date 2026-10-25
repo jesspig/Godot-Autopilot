@@ -1,0 +1,57 @@
+{
+  "name": "csharp_tooling",
+  "description": "C# 工具链的 L2 边界（headless，mono 优先）：T-06 让 create_csharp_script 的 diagnostics 区分「资源可加载」与「类可实例化」——diagnostics.ok 只表示 ResourceLoader 能加载该 .cs 资源，新增的 diagnostics.instantiable 来自 godot::Script::can_instantiate()，表示程序集里已有该类；两者不得互相覆盖，ok=true 时 instantiable=false 正是原假阳性的现场。T-07 让 build_csharp_assembly 的 OS.execute 输出逐字符串经过 console_encoding 的 UTF-8 严格校验＋系统代码页回退解码＋ACP 回环修复（非法字节在 Windows 上先按 GetOEMCP、失败回退 CP_ACP 转 UTF-8，再失败则把非法字节替换为 ?；输入本身是合法 UTF-8 时在 Windows 上再做 UTF-8→UTF-16→CP_ACP 字节的回环，仅当 ACP 字节仍为合法 UTF-8、不含默认替换字符、与原文不同、回环结果至少含一个 CJK 统一表意文字（U+4E00–U+9FFF）且原串至少含一个非 CJK 字符才采用，用于还原 Godot OS_Windows::execute 以 CP_ACP 预解码 dotnet UTF-8 输出造成的 姝ｅ湪 类乱码；正常中文 山水 的 GBK 回环字节 C9 BD CB AE 恰为合法 UTF-8（ɽˮ），因回环结果不含 CJK 而保持原样；合法中文回环后通常是 GBK 字节、不是合法 UTF-8，因此保持原样），并以 output_digest 不含已知乱码前缀 姝 作为回归哨兵。链路：before_all 写 res://testbed.csproj（Sdk 风格，含 CSharpToolingProbe.cs 的隐式 Compile）＋ create_csharp_script 落 res://CSharpToolingProbe.cs（[GlobalClass] Resource）→ ① script_diagnostics：再次 create_csharp_script{overwrite:true} 断言 result.verified、result.diagnostics.ok=true 且 result.diagnostics.instantiable 键存在（不断言取值：测试床程序集可能未预建、未热重载，instantiable 通常为 false；若编辑器在启动前已加载含该类的程序集也可能为 true）→ ② build_output：build_csharp_assembly{wait:true} 断言 result.project_file/res.command 契约与 result.output_digest 存在且不含已知 GBK 乱码前缀 姝；不依赖 exit_code/success（测试床 .csproj 交给 dotnet 可能 MSB1009，dotnet 缺失时 output_digest 为空，均只按存在性与乱码缺失判定；process 授权缺失时按 soft_error authorization required 记为软失败），随后再 create_csharp_script{overwrite:true} 断言 diagnostics.ok=true 且 instantiable 键仍存在，证明构建未加载程序集不会把 ok 改成 false → ③ cleanup move_os_file_to_trash 回收 res://CSharpToolingProbe.cs 与 res://testbed.csproj。双态声明（重要）：本文件以 mono/.NET 编辑器为准——标准编辑器无 C# 语言时 ResourceLoader 加载 .cs 失败，diagnostics 只含 ok=false 与 hint/is_dotnet_editor/assembly_loaded，不含 instantiable，① 与 ② 的 create 断言会硬失败；该场景与 38_csharp_bridge.json 的 mono 前置一致。② 的 build 步骤不断言构建成功：测试床 C# 程序集未预建时 build_csharp_assembly 仍返回 result（exit_code=1、output_digest 有内容），本文件只锁定 output_digest 字段存在与乱码缺失；若 dotnet 不在 PATH（exit_code=-1、output_empty=true），output_digest 为空串仍满足存在性断言，如需验证真实解码需在中文 Windows 且 dotnet 可用环境复跑。L1 覆盖：tests/unit/text_ops_csharp_test.cpp 断言 script_load_diagnostics 在 loaded=true/instantiable=false 时 ok=true 且字段存在，tests/unit/editor_output_decode_test.cpp 断言 UTF-8 中文原样通过、Windows 下把「正在」的 UTF-8 字节按系统 ACP 预解码（CP936 即 姝ｅ湪）后经 decode_console_output 回环还原（CP936 时断言中间串就是 姝ｅ湪；非 Windows 或 ACP 为 UTF-8 时 GTEST_SKIP）、Windows+CP936 下纯中文 山水 的 ACP 回环字节为合法 UTF-8 C9 BD CB AE（ɽˮ）时 decode_console_output 仍原样返回 山水（非 Windows 或 ACP 非 CP936 时 GTEST_SKIP）、非法与截断字节替换为 ? 不崩溃；真实 can_instantiate 值由本文件在 mono 环境覆盖。编码方向的边界（重要）：Godot 4.7.2 的 OS_Windows::execute 在 _append_to_pipe 里先用 MultiByteToWideChar(CP_ACP) 预解码管道字节，因此到达 GDA 的已是 godot::String；dotnet 在 CP936 主机上输出 UTF-8 时，String 内是「UTF-8 字节被按 ACP 解码」的合法 UTF-8 乱码（如 姝ｅ湪）。T-07 的 ACP 回环修复在解码入口做逆向还原：UTF-8→UTF-16→CP_ACP 字节，若 ACP 字节仍是合法 UTF-8、无不可映射字符、与原文不同、回环结果至少含一个 CJK 统一表意文字（U+4E00–U+9FFF）且原串至少含一个非 CJK 字符则采用（姝ｅ湪 回环得到 正在 的原始 UTF-8 字节）。该修复是启发式，并带纯中文守卫：合法中文回环后通常是 GBK 字节而非合法 UTF-8，故保持原样；正常纯中文 山水 的 GBK 字节 C9 BD CB AE 恰为合法 UTF-8（ɽˮ），但回环结果无 CJK 且原串无非 CJK 字符，因此保持原样（仅当回环结果是 CJK 且原串含非 CJK 字符时才修复）；若上游预解码已把非法 GBK 序列替换为 U+FFFD，原始字节不可逆，回环会因不可映射字符而放弃，姝 断言仍可能命中；真实 dotnet 输出仍需在中文 Windows 复验。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "before_all": [
+      {
+        "id": "csharp_tooling_ensure_csproj",
+        "tool": "write_file",
+        "args": { "path": "res://testbed.csproj", "content": "<Project Sdk=\"Godot.NET.Sdk/4.7.0\">\n  <PropertyGroup>\n    <TargetFramework>net10.0</TargetFramework>\n    <AssemblyName>GDA Testbed</AssemblyName>\n    <PublishAot>false</PublishAot>\n  </PropertyGroup>\n</Project>\n" }
+      },
+      {
+        "id": "csharp_tooling_ensure_probe",
+        "tool": "create_csharp_script",
+        "args": { "path": "res://CSharpToolingProbe.cs", "overwrite": true, "source_code": "using Godot;\n\n[GlobalClass]\npublic partial class CSharpToolingProbe : Resource\n{\n    public string ProbeName => \"gda-csharp-tooling\";\n}\n" }
+      }
+    ],
+    "stages": [
+      {
+        "id": "script_diagnostics",
+        "steps": [
+          {
+            "id": "csharp_tooling_create_probe_diagnostics",
+            "tool": "create_csharp_script",
+            "args": { "path": "res://CSharpToolingProbe.cs", "overwrite": true, "source_code": "using Godot;\n\n[GlobalClass]\npublic partial class CSharpToolingProbe : Resource\n{\n    public string ProbeName => \"gda-csharp-tooling\";\n}\n" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.verified", "value": true },
+                { "key": "result.diagnostics.ok", "value": true },
+                { "key": "result.diagnostics.instantiable", "not_empty": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "cleanup",
+        "steps": [
+          {
+            "id": "csharp_tooling_trash_probe",
+            "tool": "move_os_file_to_trash",
+            "args": { "path": "res://CSharpToolingProbe.cs" },
+            "expect": { "has_keys": ["result"] }
+          },
+          {
+            "id": "csharp_tooling_trash_csproj",
+            "tool": "move_os_file_to_trash",
+            "args": { "path": "res://testbed.csproj" },
+            "expect": { "has_keys": ["result"] }
+          }
+        ]
+      }
+    ]
+  }
+}

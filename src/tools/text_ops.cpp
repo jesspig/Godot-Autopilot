@@ -17,6 +17,7 @@
 #include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
+#include <godot_cpp/classes/script.hpp>
 #include <godot_cpp/classes/text_server.hpp>
 #include <godot_cpp/classes/text_server_manager.hpp>
 #include <godot_cpp/variant/rid.hpp>
@@ -515,6 +516,14 @@ std::vector<CSharpClassInfo> parse_csharp_classes(const std::string &source) {
   return infos;
 }
 
+mcp::JsonValue script_load_diagnostics(bool loaded, bool instantiable) {
+  mcp::JsonValue diag(mcp::JsonValue::object_tag);
+  diag["ok"] = mcp::JsonValue(loaded);
+  if (loaded)
+    diag["instantiable"] = mcp::JsonValue(instantiable);
+  return diag;
+}
+
 namespace {
 
 std::string csharp_file_stem(const std::string &normalized_path) {
@@ -604,10 +613,9 @@ std::string csharp_not_loaded_hint(bool is_dotnet_editor) {
 
 JV build_script_diagnostics(const godot::String &gs_path,
                             const std::string &ext) {
-  JV diag(JV::object_tag);
   auto *loader = godot::ResourceLoader::get_singleton();
   if (!loader) {
-    diag["ok"] = JV(false);
+    JV diag = script_load_diagnostics(false, false);
     diag["hint"] =
         JV("ResourceLoader not available; open the file in the editor script "
            "panel to inspect errors");
@@ -616,10 +624,10 @@ JV build_script_diagnostics(const godot::String &gs_path,
   godot::Ref<godot::Resource> loaded =
       loader->load(gs_path, "Script", godot::ResourceLoader::CACHE_MODE_IGNORE);
   if (loaded.is_valid()) {
-    diag["ok"] = JV(true);
-    return diag;
+    auto *script = godot::Object::cast_to<godot::Script>(loaded.ptr());
+    return script_load_diagnostics(true, script && script->can_instantiate());
   }
-  diag["ok"] = JV(false);
+  JV diag = script_load_diagnostics(false, false);
   if (ext == "cs") {
     bool is_dotnet_editor = false;
     bool assembly_loaded = false;
