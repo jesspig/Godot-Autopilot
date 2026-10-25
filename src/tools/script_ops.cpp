@@ -684,9 +684,11 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue &args) {
   godot::StringName prop_name(property.c_str());
   godot::Variant value = VariantJson::deserialize(*it_val, type_hint);
   node->set(prop_name, value);
+  scene_dirty_tracker::mark_scene_modified();
 
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
+  util::add_scene_info_fields(r, util::edited_scene_info());
   return r;
 }
 

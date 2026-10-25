@@ -204,6 +204,140 @@
         ]
       },
       {
+        "id": "direct_write_dirty_marks",
+        "steps": [
+          {
+            "id": "round3_save_before_noop",
+            "tool": "save_editor_scene",
+            "args": {},
+            "expect": { "field_checks": [{ "key": "result", "value": "saved" }] }
+          },
+          {
+            "id": "round3_connect_already_connected",
+            "tool": "signal_connect",
+            "args": {
+              "source_path": "Ticker",
+              "signal": "timeout",
+              "target_path": "SavedSink",
+              "method": "queue_free",
+              "persist": true
+            },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "already_connected" },
+                { "key": "scene_unsaved", "value": false }
+              ]
+            }
+          },
+          {
+            "id": "round3_disconnect_runtime_connection",
+            "tool": "signal_disconnect",
+            "args": {
+              "source_path": "Ticker",
+              "signal": "timeout",
+              "target_path": "RuntimeSink",
+              "method": "queue_free"
+            },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "disconnected" },
+                { "key": "scene_unsaved", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "round3_snapshot_after_disconnect",
+            "tool": "get_scene_snapshot",
+            "args": { "verify": false },
+            "expect": {
+              "field_checks": [{ "key": "result.scene_unsaved", "value": true }]
+            }
+          },
+          {
+            "id": "round3_save_after_disconnect",
+            "tool": "save_editor_scene",
+            "args": {},
+            "expect": { "field_checks": [{ "key": "result", "value": "saved" }] }
+          },
+          {
+            "id": "round3_set_script_property",
+            "tool": "set_script_property",
+            "args": { "node_path": "IntegrityRoot", "property": "z_index", "value": 9 },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "ok" },
+                { "key": "scene_unsaved", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "round3_snapshot_after_set_script_property",
+            "tool": "get_scene_snapshot",
+            "args": { "verify": false },
+            "expect": {
+              "field_checks": [{ "key": "result.scene_unsaved", "value": true }]
+            }
+          },
+          {
+            "id": "round3_save_after_set_script_property",
+            "tool": "save_editor_scene",
+            "args": {},
+            "expect": { "field_checks": [{ "key": "result", "value": "saved" }] }
+          },
+          {
+            "id": "round3_build_nodes_from_spec",
+            "tool": "build_nodes_from_spec",
+            "args": { "spec": { "type": "Node", "name": "SpecBuilt" } },
+            "expect": {
+              "field_checks": [
+                { "key": "result.mode", "value": "built" },
+                { "key": "result.node_count", "value": 1 },
+                { "key": "scene_unsaved", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "round3_snapshot_after_build_spec",
+            "tool": "get_scene_snapshot",
+            "args": { "verify": false },
+            "expect": {
+              "field_checks": [{ "key": "result.scene_unsaved", "value": true }]
+            }
+          },
+          {
+            "id": "round3_save_after_build_spec",
+            "tool": "save_editor_scene",
+            "args": {},
+            "expect": { "field_checks": [{ "key": "result", "value": "saved" }] }
+          },
+          {
+            "id": "round3_spawn_node_bundle",
+            "tool": "spawn_node_bundle",
+            "args": { "type": "Node", "name": "BundleNode" },
+            "expect": {
+              "field_checks": [
+                { "key": "result.path", "value": "BundleNode" },
+                { "key": "scene_unsaved", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "round3_snapshot_after_spawn_bundle",
+            "tool": "get_scene_snapshot",
+            "args": { "verify": false },
+            "expect": {
+              "field_checks": [{ "key": "result.scene_unsaved", "value": true }]
+            }
+          },
+          {
+            "id": "round3_save_after_spawn_bundle",
+            "tool": "save_editor_scene",
+            "args": {},
+            "expect": { "field_checks": [{ "key": "result", "value": "saved" }] }
+          }
+        ]
+      },
+      {
         "id": "cleanup",
         "steps": [
           {
