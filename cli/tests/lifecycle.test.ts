@@ -23,6 +23,18 @@ const HOOK_TIMEOUT_MS = 60_000;
 
 const RUN_TAG = `gda-lifecycle-${Math.random().toString(36).slice(2, 8)}`;
 
+async function deadPid(): Promise<number> {
+  const child = spawn(process.execPath, ["-e", "process.exit(0)"], { stdio: "ignore" });
+  const pid = child.pid;
+  if (pid === undefined) {
+    throw new Error("failed to spawn helper process for a dead pid");
+  }
+  await new Promise<void>((resolve) => {
+    child.once("exit", () => resolve());
+  });
+  return pid;
+}
+
 let tmp: string;
 let prevHome: string | undefined;
 let prevGdaHome: string | undefined;
@@ -313,9 +325,11 @@ describe.serial("list", () => {
 
   test("只输出存活实例并标注 live", async () => {
     const runner = spawn(process.execPath, ["-e", "setTimeout(()=>{},20000)"], { stdio: "ignore" });
+    const dead = await deadPid();
+    expect(isAlive(dead)).toBe(false);
     try {
       writeEntry(makeEntry({ id: `p${runner.pid}`, pid: runner.pid, project: path.join(tmp, "a") }));
-      writeEntry(makeEntry({ id: "pdead", pid: 999999, project: path.join(tmp, "b") }));
+      writeEntry(makeEntry({ id: "pdead", pid: dead, project: path.join(tmp, "b") }));
       const { code, stdout } = await captureStdout(() => runList([], {}));
       expect(code).toBe(ExitCode.Success);
       const parsed = JSON.parse(stdout);
