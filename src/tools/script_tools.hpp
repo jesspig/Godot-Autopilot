@@ -56,7 +56,7 @@ const std::vector<ParamSpec> kGetScriptPropertyParams = {
 const std::vector<ParamSpec> kSetScriptPropertyParams = {
     {"node_path", "string", "Node path in the edited scene", true},
     {"property", "string", "Property name", true},
-    {"value", "object", "Property value as JSON; the tool performs no type or read-only validation and creates no undo entry — use property_set for validated, undoable changes", true},
+    {"value", "json", "Property value as JSON; the tool performs no type or read-only validation and creates no undo entry — use property_set for validated, undoable changes", true},
 };
 
 const std::vector<ParamSpec> kCallScriptNodeParams = {

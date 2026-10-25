@@ -48,13 +48,13 @@ const std::vector<ParamSpec> kCommitEditorUndoRedoParams = {};
 const std::vector<ParamSpec> kAddEditorUndoRedoDoParams = {
     {"node_path", "string", "Path to the node whose method will be called on redo, e.g. 'Player' or '/root/Player'; resolved against the edited scene root", true},
     {"method", "string", "Name of the node method to call, e.g. 'set_position' or 'queue_free'", true},
-    {"value", "object", "Optional serialized JSON value passed as the single method argument; omit for methods without arguments", false},
+    {"value", "json", "Optional serialized JSON value passed as the single method argument; omit for methods without arguments", false},
 };
 
 const std::vector<ParamSpec> kAddEditorUndoRedoUndoParams = {
     {"node_path", "string", "Path to the node whose method will be called on undo, e.g. 'Player' or '/root/Player'; resolved against the edited scene root", true},
     {"method", "string", "Name of the node method to call for the inverse operation, e.g. 'set_position'", true},
-    {"value", "object", "Optional serialized JSON value passed as the single method argument; omit for methods without arguments", false},
+    {"value", "json", "Optional serialized JSON value passed as the single method argument; omit for methods without arguments", false},
 };
 
 const std::vector<ParamSpec> kGetEditorFileSystemTreeParams = {

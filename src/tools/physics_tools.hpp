@@ -73,7 +73,7 @@ const std::vector<ParamSpec> kApplyPhysics2dBodyImpulseParams = {
 const std::vector<ParamSpec> kSetPhysics2dBodyStateParams = {
     {"rid", "integer", "Required. RID of the 2D physics body, e.g. from create_physics_2d_body", true},
     {"state", "number", "Required. Body state enum index: 0=transform, 1=linear_vel, 2=angular_vel, 3=sleeping, 4=can_sleep", true},
-    {"value", "object", "Required. New state value matching the state: a transform object (origin/rotation/scale) for 0, a Vector2 object for 1 and 2, a boolean for 3 and 4", true},
+    {"value", "json", "Required. New state value matching the state: a transform object (origin/rotation/scale) for 0, a Vector2 object for 1 and 2, a boolean for 3 and 4", true},
 };
 
 const std::vector<ParamSpec> kGetPhysics2dBodyStateParams = {
@@ -166,7 +166,7 @@ const std::vector<ParamSpec> kApplyPhysics3dBodyImpulseParams = {
 const std::vector<ParamSpec> kSetPhysics3dBodyStateParams = {
     {"rid", "integer", "Required. RID of the 3D physics body, e.g. from create_physics_3d_body", true},
     {"state", "number", "Required. Body state enum index: 0=transform, 1=linear_vel, 2=angular_vel, 3=sleeping, 4=can_sleep", true},
-    {"value", "object", "Required. New state value matching the state: a transform object (basis/origin) for 0, a Vector3 object for 1 and 2, a boolean for 3 and 4", true},
+    {"value", "json", "Required. New state value matching the state: a transform object (basis/origin) for 0, a Vector3 object for 1 and 2, a boolean for 3 and 4", true},
 };
 
 const std::vector<ParamSpec> kGetPhysics3dBodyStateParams = {
@@ -266,7 +266,7 @@ const std::vector<ParamSpec> kSetPhysics3dBodyParamParams = {
 const std::vector<ParamSpec> kSetPhysics3dAreaParamParams = {
     {"rid", "integer", "Required. RID of the 3D physics area, e.g. from create_physics_3d_area", true},
     {"param", "number", "Required. Area parameter enum index: 0=gravity_override_mode, 1=gravity, 2=gravity_vector, 3=gravity_is_point, 4=gravity_point_unit_distance, 5=linear_damp_override_mode, 6=linear_damp, 7=angular_damp_override_mode, 8=angular_damp, 9=priority", true},
-    {"value", "object", "Required. Value matching the selected parameter: a number for scalar params (e.g. gravity, damp), a Vector3 object like {'x': 0, 'y': -9.8, 'z': 0} for vectors, or a boolean", true},
+    {"value", "json", "Required. Value matching the selected parameter: a number for scalar params (e.g. gravity, damp), a Vector3 object like {'x': 0, 'y': -9.8, 'z': 0} for vectors, or a boolean", true},
 };
 
 const std::vector<ParamSpec> kSetPhysics3dSpaceParamParams = {

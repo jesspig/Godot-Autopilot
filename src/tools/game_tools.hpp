@@ -63,7 +63,7 @@ const std::vector<ParamSpec> kExecuteGameScriptParams = {
     {"action", "string", "Action to run in the game process: 'script' (execute arbitrary GDScript), 'get_property', 'set_property' or 'call_method'", true},
     {"node_path", "string", "Node path for get_property/set_property/call_method (omit to use the current scene root)", false},
     {"property", "string", "Property name for get_property/set_property", false},
-    {"value", "object", "Value to set for set_property", false},
+    {"value", "json", "Value to set for set_property", false},
     {"method", "string", "Method name for call_method; await methods are awaited to completion (bounded by timeout_ms) and return their final result", false},
     {"args", "array", "Arguments for call_method", false},
     {"source_code", "string", "GDScript source for action='script' — a complete script defining func _run() (used as-is), or bare statements auto-wrapped into extends Node + func _run() (an explicit return is needed to produce a value)", false},

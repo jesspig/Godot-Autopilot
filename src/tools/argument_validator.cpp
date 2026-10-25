@@ -27,6 +27,9 @@ mcp::JsonValue invalid_argument_error(const std::string &message,
 
 void check_declared_type(const Args &parsed, const ParamSpec &param) {
   const std::string &type = param.type;
+  if (type == "json") {
+    return;
+  }
   if (type == "string") {
     parsed.opt_string(param.name);
     return;

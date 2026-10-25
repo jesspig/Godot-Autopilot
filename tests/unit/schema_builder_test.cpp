@@ -64,6 +64,21 @@ TEST(SchemaBuilderTest, BuildSchemaUnknownTypeDoesNotCrash) {
   EXPECT_TRUE(required_array_contains(schema, "weird"));
 }
 
+TEST(SchemaBuilderTest, BuildSchemaJsonTypeOmitsTypeField) {
+  auto schema = build_schema({
+      {"payload", "json", "any JSON value", true},
+      {"path", "string", "node path", true},
+  });
+  const mcp::JsonValue *props = schema.Find("properties");
+  ASSERT_NE(props, nullptr);
+  ASSERT_TRUE(props->IsObject());
+  const mcp::JsonValue &payload = props->At("payload");
+  EXPECT_EQ(payload.Find("type"), nullptr);
+  EXPECT_EQ(payload.At("description").GetString(), "any JSON value");
+  EXPECT_EQ(props->At("path").At("type").GetString(), "string");
+  EXPECT_TRUE(required_array_contains(schema, "payload"));
+}
+
 TEST(SchemaBuilderTest, AddRequiredFlagIsIdempotent) {
   mcp::JsonValue schema(mcp::JsonValue::object_tag);
   schema["properties"] = mcp::JsonValue(mcp::JsonValue::object_tag);

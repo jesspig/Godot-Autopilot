@@ -48,7 +48,7 @@ const std::vector<ParamSpec> kInsertAnimationKeyframeParams = {
     {"anim_name", "string", "Animation name containing the target track", true},
     {"track_index", "integer", "Index of the track within the animation, as returned by create_animation_track", true},
     {"time", "number", "Key time in seconds since animation start (number, >= 0)", true},
-    {"value", "object", "Key value as JSON, deserialized to a Variant (e.g. 1.5 or {\"x\":0,\"y\":1}); method tracks require an object like {\"method\":\"jump\",\"args\":[42]}", true},
+    {"value", "json", "Key value as JSON, deserialized to a Variant (e.g. 1.5 or {\"x\":0,\"y\":1}); method tracks require an object like {\"method\":\"jump\",\"args\":[42]}", true},
 };
 
 const std::vector<ParamSpec> kRemoveAnimationTrackParams = {

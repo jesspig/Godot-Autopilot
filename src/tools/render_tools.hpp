@@ -130,7 +130,7 @@ const std::vector<ParamSpec> kCreateRenderMaterialParams = {};
 const std::vector<ParamSpec> kSetRenderMaterialParamParams = {
     {"material_rid", "integer", "RID of the render material, from create_render_material", true},
     {"parameter", "string", "Material parameter name; example: 'albedo_color'", true},
-    {"value", "object", "Parameter value as JSON; plain numbers/strings/bools also work", true},
+    {"value", "json", "Parameter value as JSON; plain numbers/strings/bools also work", true},
     {"type_hint", "string", "Type hint (e.g. Vector2, Color, int, float)", false},
 };
 
@@ -303,7 +303,7 @@ const std::vector<ParamSpec> kSetRenderInstanceLayerMaskParams = {
 
 const std::vector<ParamSpec> kSetRenderShaderParameterGlobalParams = {
     {"name", "string", "Global shader parameter name; the shader must declare a matching parameter with the global keyword", true},
-    {"value", "object", "Parameter value as JSON; plain numbers/strings/bools also work", true},
+    {"value", "json", "Parameter value as JSON; plain numbers/strings/bools also work", true},
     {"type_hint", "string", "Type hint (e.g. Vector2, Color, int, float)", false},
 };
 

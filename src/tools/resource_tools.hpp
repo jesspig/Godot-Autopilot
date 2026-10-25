@@ -140,7 +140,7 @@ const std::vector<ParamSpec> kSetResourcePropertyParams = {
     {"name", "string", "Registration name of an in-memory resource (memory://name)", false},
     {"path", "string", "Resource path; loads the file from disk when no object_id or name matches", false},
     {"property", "string", "Property name to set, e.g. curve, texture; must exist on the resource", true},
-    {"value", "object", "Serialized JSON value; resource-typed properties accept {'path': 'res://xxx.tres'} or {'resource': 'memory://name'} references", true},
+    {"value", "json", "Serialized JSON value; resource-typed properties accept {'path': 'res://xxx.tres'} or {'resource': 'memory://name'} references", true},
     {"type_hint", "string", "Variant type hint for deserialization, e.g. Vector2, Color, int, float; auto-detected from the property metadata when omitted", false},
 };
 
