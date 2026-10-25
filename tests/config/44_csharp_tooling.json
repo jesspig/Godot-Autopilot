@@ -36,6 +36,38 @@
         ]
       },
       {
+        "id": "build_output",
+        "steps": [
+          {
+            "id": "csharp_tooling_build_assembly",
+            "tool": "build_csharp_assembly",
+            "args": { "wait": true },
+            "soft_error": "authorization required",
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.project_file", "value": "res://testbed.csproj" },
+                { "key": "result.command", "value": "dotnet build --nologo res://testbed.csproj" },
+                { "key": "result.output_digest", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "csharp_tooling_create_probe_after_build",
+            "tool": "create_csharp_script",
+            "args": { "path": "res://CSharpToolingProbe.cs", "overwrite": true, "source_code": "using Godot;\n\n[GlobalClass]\npublic partial class CSharpToolingProbe : Resource\n{\n    public string ProbeName => \"gda-csharp-tooling\";\n}\n" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.verified", "value": true },
+                { "key": "result.diagnostics.ok", "value": true },
+                { "key": "result.diagnostics.instantiable", "not_empty": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
         "id": "cleanup",
         "steps": [
           {
