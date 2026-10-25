@@ -1,0 +1,105 @@
+{
+  "name": "43_scene_integrity",
+  "description": "场景保存状态与保存校验回归（T-04/T-05）：create_editor_scene 建 IntegrityRoot(Node2D) 并 save_editor_scene_as 落盘 res://gda_tmp_scene_integrity/probe.tscn；get_scene_snapshot 只读确认 scene_unsaved=false → property_set 改 z_index 后响应与快照均报 scene_unsaved=true（真实脏标记来自 EditorInterface.get_unsaved_scenes，不再只看场景是否有路径）→ save_editor_scene 后快照回到 false。连接统计阶段建持久节点 Ticker(Timer)/RuntimeSink(Node)，以 persist=false 连接 timeout→queue_free，保存后 verify_scene_saved 必须 match=true 且 memory_connections=disk_connections=0（运行时连接不计入持久连接）→ 再建 SavedSink(Node) 以 persist=true 连接并保存，verify_scene_saved 仍 match=true 且 memory_connections=disk_connections=1（持久连接不被漏计）。cleanup 关闭场景并回收 res://gda_tmp_scene_integrity，无残留。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "before_all": [
+      {
+        "id": "integrity_create_scene",
+        "tool": "create_editor_scene",
+        "args": { "name": "IntegrityRoot", "type": "Node2D", "close_current": true }
+      },
+      {
+        "id": "integrity_save_scene_as",
+        "tool": "save_editor_scene_as",
+        "args": { "path": "res://gda_tmp_scene_integrity/probe.tscn" }
+      }
+    ],
+    "stages": [
+      {
+        "id": "dirty_flag",
+        "steps": [
+          {
+            "id": "integrity_snapshot_clean_after_save",
+            "tool": "get_scene_snapshot",
+            "args": { "verify": false },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.scene_path", "value": "res://gda_tmp_scene_integrity/probe.tscn" },
+                { "key": "result.scene_unsaved", "value": false }
+              ]
+            }
+          },
+          {
+            "id": "integrity_property_set_marks_dirty",
+            "tool": "property_set",
+            "args": { "path": "IntegrityRoot", "property": "z_index", "value": 7 },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "ok" },
+                { "key": "scene_path", "value": "res://gda_tmp_scene_integrity/probe.tscn" },
+                { "key": "scene_unsaved", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "integrity_snapshot_dirty_after_set",
+            "tool": "get_scene_snapshot",
+            "args": { "verify": false },
+            "expect": {
+              "field_checks": [
+                { "key": "result.scene_unsaved", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "integrity_save_dirty_scene",
+            "tool": "save_editor_scene",
+            "args": {},
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "saved" },
+                { "key": "path", "value": "res://gda_tmp_scene_integrity/probe.tscn" }
+              ]
+            }
+          },
+          {
+            "id": "integrity_snapshot_clean_after_resave",
+            "tool": "get_scene_snapshot",
+            "args": { "verify": false },
+            "expect": {
+              "field_checks": [
+                { "key": "result.scene_unsaved", "value": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "cleanup",
+        "steps": [
+          {
+            "id": "integrity_close_scene",
+            "tool": "close_editor_scene",
+            "args": {},
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "closed" }
+              ]
+            }
+          },
+          {
+            "id": "integrity_trash_dir",
+            "tool": "move_os_file_to_trash",
+            "args": { "path": "res://gda_tmp_scene_integrity" },
+            "expect": {
+              "has_keys": ["result"]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

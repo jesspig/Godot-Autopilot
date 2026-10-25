@@ -2080,8 +2080,8 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
     r["undoable"] = mcp::JsonValue(all_undoable);
     if (!all_undoable && !undo_skip.empty())
       r["undo_skip_reason"] = mcp::JsonValue(undo_skip);
-    util::add_scene_info_fields(r, util::edited_scene_info());
     scene_dirty_tracker::mark_scene_modified();
+    util::add_scene_info_fields(r, util::edited_scene_info());
     return r;
   }
   std::string prop_str = it_prop->GetString();
@@ -2237,6 +2237,7 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
   }
 
   add_camera2d_serialization_note(r, prop_str, node);
+  scene_dirty_tracker::mark_scene_modified();
   util::add_scene_info_fields(r, util::edited_scene_info());
 
   mcp::JsonValue undo_info(mcp::JsonValue::object_tag);
@@ -2272,7 +2273,6 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
   if (!undoable) {
     r["undo_skip_reason"] = mcp::JsonValue(undo_skip_reason);
   }
-  scene_dirty_tracker::mark_scene_modified();
   return r;
 }
 
@@ -2886,8 +2886,8 @@ mcp::JsonValue handle_set_batch(const mcp::JsonValue &args) {
   if (!undoable) {
     r["undo_skip_reason"] = mcp::JsonValue(undo_skip_reason);
   }
-  util::add_scene_info_fields(r, util::edited_scene_info());
   scene_dirty_tracker::mark_scene_modified();
+  util::add_scene_info_fields(r, util::edited_scene_info());
   return r;
 }
 
