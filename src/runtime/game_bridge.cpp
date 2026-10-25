@@ -335,6 +335,8 @@ struct UiElement {
   std::string path;
   std::string type;
   std::string text;
+  std::string mouse_filter;
+  int32_t z_index = 0;
   bool has_text = false;
   bool visible = true;
   double x = 0.0;
@@ -342,6 +344,25 @@ struct UiElement {
   double w = 0.0;
   double h = 0.0;
 };
+
+const char *ui_mouse_filter_name(godot::Control::MouseFilter filter) {
+  switch (filter) {
+  case godot::Control::MOUSE_FILTER_PASS:
+    return "PASS";
+  case godot::Control::MOUSE_FILTER_IGNORE:
+    return "IGNORE";
+  default:
+    return "STOP";
+  }
+}
+
+bool ui_hit_matches_target(godot::Control *target, godot::Control *hovered) {
+  if (!target || !hovered)
+    return false;
+  if (target == hovered)
+    return true;
+  return target->is_ancestor_of(hovered);
+}
 
 void walk_ui_elements(godot::Node *node, int depth, int64_t max_elements,
                       std::vector<UiElement> &elements, bool &truncated) {
@@ -355,6 +376,8 @@ void walk_ui_elements(godot::Node *node, int depth, int64_t max_elements,
     UiElement element;
     element.path = util::to_std(godot::String(node->get_path()));
     element.type = util::to_std(godot::String(node->get_class()));
+    element.mouse_filter = ui_mouse_filter_name(ctrl->get_mouse_filter());
+    element.z_index = ctrl->get_z_index();
     element.visible = ctrl->is_visible_in_tree();
     godot::Variant text_value = ctrl->get("text");
     if (text_value.get_type() == godot::Variant::STRING) {
@@ -1247,6 +1270,12 @@ JV run_ui_click(const JV &click, const std::vector<UiElement> &elements,
   }
     if (want_path) match = find_ui_element(elements, path);
   }
+  bool strict_hit = false;
+  if (auto *strict_p = click.Find("strict_hit")) {
+    if (!strict_p->IsBool())
+      return error_result("ui_elements click strict_hit must be a boolean");
+    strict_hit = strict_p->GetBool();
+  }
   if (want_path && !match) {
     std::string message = "click target not found: " + path +
                           " (try text/text_index for a visible-text match; enumerated " +
@@ -1280,6 +1309,18 @@ JV run_ui_click(const JV &click, const std::vector<UiElement> &elements,
   if (!authorization::capability_enabled("game_runtime"))
     return authorization::deny_if_unauthorized("click_game_ui_element",
                                                SideEffect::GameRuntime);
+  {
+    JV motion(JV::object_tag);
+    motion["type"] = JV("mouse_motion");
+    JV position(JV::object_tag);
+    position["x"] = JV(static_cast<double>(window_center.x));
+    position["y"] = JV(static_cast<double>(window_center.y));
+    motion["position"] = std::move(position);
+    motion["mode"] = JV("event");
+    JV injected = op_input(motion, 0);
+    if (injected.Contains("error"))
+      return injected;
+  }
   const int rounds = double_click ? 2 : 1;
   const bool states[2] = {true, false};
   for (int round = 0; round < rounds; round++) {
@@ -1298,6 +1339,49 @@ JV run_ui_click(const JV &click, const std::vector<UiElement> &elements,
         return injected;
     }
   }
+  std::string hit_path;
+  bool hit_mismatch = false;
+  {
+    godot::Viewport *click_viewport = nullptr;
+    godot::Control *target_ctrl = nullptr;
+    if (godot::SceneTree *tree = get_scene_tree()) {
+      if (auto *ctrl = godot::Object::cast_to<godot::Control>(
+              resolve_game_node_suffixed(tree->get_root(), match->path))) {
+        target_ctrl = ctrl;
+        click_viewport = ctrl->get_viewport();
+      }
+      if (!click_viewport)
+        click_viewport =
+            godot::Object::cast_to<godot::Viewport>(tree->get_root());
+    }
+    godot::Control *hovered =
+        click_viewport ? click_viewport->gui_get_hovered_control() : nullptr;
+    if (hovered)
+      hit_path = util::to_std(godot::String(hovered->get_path()));
+    hit_mismatch =
+        target_ctrl && !ui_hit_matches_target(target_ctrl, hovered);
+  }
+  if (strict_hit && hit_mismatch) {
+    const std::string actual =
+        hit_path.empty() ? std::string("no hovered control") : hit_path;
+    JV body = error_result("click target not hit: expected " + match->path +
+                           " but the hovered control is " + actual);
+    JV details(JV::object_tag);
+    details["code"] = JV("click_occluded");
+    details["target_path"] = JV(match->path);
+    details["hit_path"] = JV(hit_path);
+    details["target_mouse_filter"] = JV(match->mouse_filter);
+    details["strict_hit"] = JV(true);
+    body["structured_error"] = std::move(details);
+    body["hit_path"] = JV(hit_path);
+    body["hit_mismatch"] = JV(true);
+    body["hint"] = JV(
+        "another visible Control is covering the target: run "
+        "validate_game_ui_layout to list possibly_occluded controls, inspect "
+        "get_game_ui_elements mouse_filter/z_index, or click the reported "
+        "hit_path instead; omit strict_hit to keep the click as a warning");
+    return body;
+  }
   JV clicked(JV::object_tag);
   clicked["ok"] = JV(true);
   clicked["path"] = JV(match->path);
@@ -1314,6 +1398,16 @@ JV run_ui_click(const JV &click, const std::vector<UiElement> &elements,
   window_position["y"] = JV(static_cast<double>(window_center.y));
   clicked["window_position"] = std::move(window_position);
   clicked["clicks"] = JV(static_cast<int64_t>(rounds));
+  clicked["hit_path"] = JV(hit_path);
+  clicked["hit_mismatch"] = JV(hit_mismatch);
+  if (hit_mismatch) {
+    const std::string actual =
+        hit_path.empty() ? std::string("no hovered control") : hit_path;
+    clicked["warning"] = JV(
+        "click may be occluded: the viewport hovered control is " + actual +
+        " instead of " + match->path +
+        " — pass strict_hit=true to fail on this mismatch");
+  }
   JV inner(JV::object_tag);
   inner["result"] = std::move(clicked);
   return ok_result(std::move(inner));
@@ -1344,6 +1438,8 @@ JV op_ui_elements(const JV &params) {
     item["path"] = JV(element.path);
     item["type"] = JV(element.type);
     item["visible"] = JV(element.visible);
+    item["mouse_filter"] = JV(element.mouse_filter);
+    item["z_index"] = JV(static_cast<int64_t>(element.z_index));
     if (element.has_text)
       item["text"] = JV(element.text);
     JV position(JV::object_tag);
