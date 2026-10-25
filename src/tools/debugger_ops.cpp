@@ -828,11 +828,22 @@ mcp::JsonValue handle_debugger_get_errors(const mcp::JsonValue &args) {
       return util::error_json("invalid parameter: group must be a boolean");
     grouped = g->GetBool();
   }
+  int64_t since_seq = 0;
+  bool has_since_seq = false;
+  if (auto *s = args.Find("since_seq")) {
+    if (!s->IsInt() || s->GetInt() < 0)
+      return util::error_json(
+          "invalid parameter: since_seq must be a non-negative integer");
+    since_seq = s->GetInt();
+    has_since_seq = true;
+  }
   if (capture_session_active()) {
     mcp::JsonValue params(mcp::JsonValue::object_tag);
     params["limit"] = mcp::JsonValue(static_cast<int64_t>(limit));
     if (grouped)
       params["group"] = mcp::JsonValue(true);
+    if (has_since_seq)
+      params["since_seq"] = mcp::JsonValue(since_seq);
     return runtime_ops::handle_gda_send("get_errors", params, 5000);
   }
   if (grouped) {

@@ -269,40 +269,79 @@ std::string eval_missing_run_message() {
          "auto-wrapped";
 }
 
+struct EvalWrappedSource {
+  bool ok = false;
+  std::string source;
+  std::string display_source;
+  int offset = 0;
+  std::string error;
+};
+
+EvalWrappedSource eval_build_wrapped_source(const std::string &source,
+                                            const std::string &deadline_header,
+                                            const std::string &check) {
+  EvalWrappedSource out;
+  gdscript_wrap::WrapResult wrap =
+      gdscript_wrap::wrap_bare_body(source, "_run", deadline_header, false);
+  if (!wrap.ok) {
+    out.error = wrap.error;
+    return out;
+  }
+  out.offset = wrap.header_lines + 1;
+  out.display_source = wrap.wrapped;
+  out.source = gdscript_wrap::insert_entry_check(wrap.wrapped, "_run", check);
+  out.ok = true;
+  return out;
+}
+
+std::string eval_wrap_build_failure_message(const std::string &attempt1_error,
+                                            const std::string &wrap_error) {
+  return attempt1_error + "\nauto-wrap attempt failed: " + wrap_error + "\n" +
+         EVAL_BARE_STATEMENT_HINT;
+}
+
+std::string eval_wrap_compile_failure_message(
+    const std::string &attempt1_error, godot::Error wrapped_err,
+    const std::string &wrapped_delta_text, int wrapped_offset,
+    const std::string &wrapped_source) {
+  std::string message =
+      attempt1_error +
+      "\n[auto-wrap retry] wrapped as bare statements (extends Node + func "
+      "_run()) but compilation failed (ERR code " +
+      std::to_string(static_cast<int>(wrapped_err)) + ")";
+  if (!wrapped_delta_text.empty()) {
+    message += "\n" + gdscript_wrap::truncate_capture_text(
+                          gdscript_wrap::map_error_line_numbers(
+                              wrapped_delta_text, wrapped_offset));
+  }
+  message += "\nwrapped source:\n" + wrapped_source;
+  message += std::string("\n") + EVAL_BARE_STATEMENT_HINT;
+  return message;
+}
+
 bool eval_wrap_bare_retry(const godot::Ref<godot::GDScript> &script,
                           const std::string &source,
                           const std::string &attempt1_error,
                           int &wrapped_offset, std::string &error_out,
                           const std::string &deadline_header,
                           const std::string &check) {
-  gdscript_wrap::WrapResult wrap =
-      gdscript_wrap::wrap_bare_body(source, "_run", deadline_header, false);
-  if (!wrap.ok) {
-    error_out = attempt1_error + "\nauto-wrap attempt failed: " + wrap.error +
-                "\n" + EVAL_BARE_STATEMENT_HINT;
+  EvalWrappedSource wrapped =
+      eval_build_wrapped_source(source, deadline_header, check);
+  if (!wrapped.ok) {
+    error_out =
+        eval_wrap_build_failure_message(attempt1_error, wrapped.error);
     return false;
   }
-  wrapped_offset = wrap.header_lines + 1;
-  script->set_source_code(godot::String::utf8(
-      gdscript_wrap::insert_entry_check(wrap.wrapped, "_run", check).c_str()));
+  wrapped_offset = wrapped.offset;
+  script->set_source_code(godot::String::utf8(wrapped.source.c_str()));
   uint64_t wrapped_seq_before = current_error_seq();
   godot::Error wrapped_err = script->reload();
   if (wrapped_err == godot::OK)
     return true;
-  std::string message =
-      attempt1_error +
-      "\n[auto-wrap retry] wrapped as bare statements (extends Node + func "
-      "_run()) but compilation failed (ERR code " +
-      std::to_string(static_cast<int>(wrapped_err)) + ")";
   EvalErrorDelta wrapped_delta = eval_error_delta(wrapped_seq_before);
-  if (!wrapped_delta.text.empty()) {
-    message += "\n" + gdscript_wrap::truncate_capture_text(
-                          gdscript_wrap::map_error_line_numbers(
-                              wrapped_delta.text, wrapped_offset));
-  }
-  message += "\nwrapped source:\n" + wrap.wrapped;
-  message += std::string("\n") + EVAL_BARE_STATEMENT_HINT;
-  error_out = message;
+  error_out = eval_wrap_compile_failure_message(
+      attempt1_error, wrapped_err, wrapped_delta.text, wrapped.offset,
+      wrapped.display_source);
   return false;
 }
 
@@ -340,26 +379,57 @@ JV op_eval_script(const JV &params, int64_t request_id) {
 
   const std::string prepared_source =
       gdscript_wrap::insert_after_header(prepared, deadline_header);
-  script->set_source_code(godot::String::utf8(prepared_source.c_str()));
-  uint64_t compile_seq_before = current_error_seq();
-  godot::Error parse_err = script->reload();
-  std::string attempt1_error;
-  if (parse_err != godot::OK) {
-    attempt1_error = "GDScript compilation failed (ERR code " +
-                     std::to_string(static_cast<int>(parse_err)) + ")";
-    EvalErrorDelta compile_delta = eval_error_delta(compile_seq_before);
-    if (!compile_delta.text.empty()) {
-      attempt1_error += "\n" + truncate_error_text(compile_delta.text);
-    }
-  }
-
   const bool wrap_eligible = !gdscript_wrap::has_top_level_func_def(source);
   bool wrapped_attempt = false;
   int wrapped_offset = 0;
+  godot::Error parse_err = godot::OK;
+  std::string attempt1_error;
+  EvalWrappedSource pre_wrap;
+  godot::Error pre_wrap_err = godot::OK;
+  std::string pre_wrap_error_text;
+  bool pre_wrap_compile_failed = false;
 
-  if (parse_err != godot::OK) {
+  if (wrap_eligible) {
+    pre_wrap =
+        eval_build_wrapped_source(transform.source, deadline_header, check);
+    if (pre_wrap.ok) {
+      script->set_source_code(godot::String::utf8(pre_wrap.source.c_str()));
+      uint64_t wrapped_seq_before = current_error_seq();
+      pre_wrap_err = script->reload();
+      if (pre_wrap_err == godot::OK) {
+        wrapped_attempt = true;
+        wrapped_offset = pre_wrap.offset;
+      } else {
+        pre_wrap_compile_failed = true;
+        EvalErrorDelta pre_wrap_delta =
+            eval_error_delta(wrapped_seq_before);
+        pre_wrap_error_text = pre_wrap_delta.text;
+      }
+    }
+  }
+
+  if (!wrapped_attempt) {
+    script->set_source_code(godot::String::utf8(prepared_source.c_str()));
+    uint64_t compile_seq_before = current_error_seq();
+    parse_err = script->reload();
+    if (parse_err != godot::OK) {
+      attempt1_error = "GDScript compilation failed (ERR code " +
+                       std::to_string(static_cast<int>(parse_err)) + ")";
+      EvalErrorDelta compile_delta = eval_error_delta(compile_seq_before);
+      if (!compile_delta.text.empty()) {
+        attempt1_error += "\n" + truncate_error_text(compile_delta.text);
+      }
+    }
+  }
+
+  if (!wrapped_attempt && parse_err != godot::OK) {
     if (!wrap_eligible)
       return error_result(attempt1_error);
+    if (pre_wrap.ok) {
+      return error_result(eval_wrap_compile_failure_message(
+          attempt1_error, pre_wrap_err, pre_wrap_error_text, pre_wrap.offset,
+          pre_wrap.display_source));
+    }
     std::string wrap_error;
     if (!eval_wrap_bare_retry(script, transform.source, attempt1_error,
                               wrapped_offset, wrap_error, deadline_header,
@@ -418,6 +488,13 @@ JV op_eval_script(const JV &params, int64_t request_id) {
       parent->remove_child(temp_node);
       memdelete(temp_node);
       return error_result(eval_missing_run_message());
+    }
+    if (pre_wrap_compile_failed) {
+      parent->remove_child(temp_node);
+      memdelete(temp_node);
+      return error_result(eval_wrap_compile_failure_message(
+          EVAL_MISSING_RUN_ERROR, pre_wrap_err, pre_wrap_error_text,
+          pre_wrap.offset, pre_wrap.display_source));
     }
     temp_node->set_script(godot::Variant());
     std::string wrap_error;

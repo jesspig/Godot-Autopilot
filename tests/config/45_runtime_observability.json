@@ -1,0 +1,150 @@
+{
+  "name": "runtime_observability",
+  "description": "运行时可观测性（T-08 预包裹 + T-09 错误增量游标）的 L2 夹具：验证 execute_game_script 对裸语句先包裹再编译、成功调用不再留下 class-body parse error，并验证 get_debugger_errors 的 seq/next_seq 与 since_seq 过滤。链路：before_all 用 create_editor_scene 建 Node2D 场景 RuntimeProbe、create_scene_node 挂一个全屏 Control HUD（可选 UI 根，同时让游戏场景包含 Control 便于后续 UI 用例复用同一夹具形态）、save_editor_scene_as 落盘 res://gda_tmp_runtime/probe.tscn、open_editor_scene 打开该场景（保存后标签路径已注册，本次调用命中幂等分支返回 result=ok/already_open=true，不触碰 project.godot）、play_editor_current_scene 以当前编辑场景启动游戏（不改 application/run/main_scene；游戏工具默认 wait_ready=true，会在 gda:ready 前排队重放）。stages：① 裸语句含 for/if/return 的 execute_game_script 必须返回顶层 wrapped=true 且顶层 result=2（预包裹路径直接编译包裹源码，不再先编译裸语句；有顶层 func 的完整脚本路径不带 wrapped）；② 同一游戏进程内 get_debugger_errors{group:true, since_seq:0} 必须顶层 total_errors=0 且顶层 next_seq=0，证明成功调用没有留下任何 class-body parse error；③ 用 push_error(\"gda_controlled_error\") 触发一个受控错误（脚本继续返回 triggered，eval 仍成功），该步响应顶层带 wrapped=true、runtime_error=true 且顶层 value=triggered（runtime_error 路径没有 result 键，不断言 result），随后 get_debugger_errors{group:true, since_seq:0} 断言顶层 total_errors=1、total_groups=1 且顶层 next_seq=1（受控错误 seq=1，next_seq 直接暴露该 seq）；④ get_debugger_errors{since_seq:0, limit:10} 断言顶层 result 原始列表非空且顶层 next_seq=1（每条原始错误含 seq，但 L2 断言引擎不支持数组下标，逐条 seq 字段由 L1 游标纯函数用例与静态实现覆盖）；⑤ get_debugger_errors{group:true, since_seq:1} 断言顶层 total_errors=0 且顶层 next_seq=1，用固定下界证明排他过滤生效（seq 从 1 开始，且步骤②已证明此前错误缓冲为空，因此受控错误 seq=1；步骤间变量引用由 L1 覆盖，L2 只用固定 0/1）。响应形状口径（实测，断言按此写）：游戏回包由 editor 侧 runtime_ops::wait_pending_response 解包，分组形态下 grouped/groups/total_errors/total_groups/next_seq 都是响应顶层键（不在 result 下），未分组形态下原始列表留在顶层 result 数组里、顶层同级带 next_seq；execute_game_script 成功响应把脚本返回值本体放在顶层 result（标量即裸值，形状不变），裸语句被包裹时额外在顶层带 wrapped=true（与 new_errors_since_last_call 同为顶层传输字段，由 wait_pending_response 从游戏回包平级抬升，抬升白名单见 runtime/game_response_envelope.hpp），命中 runtime_error 的路径把返回值改挂在顶层 value 并附 runtime_error/error_details/structured_error。after_all：stop_editor_playing → close_editor_scene → move_os_file_to_trash res://gda_tmp_runtime 回收场景目录。前置条件：execute_game_script 受 game_runtime capability 授权门保护（GODOT_AUTOPILOT_ALLOW 含 game_runtime 或 all，或 user://godot_autopilot/config.json 的 allow 字段），缺失时 eval 步骤返回 authorization required 而 FAIL；游戏进程必须加载 godot-autopilot 扩展，否则 get_debugger_errors 走无会话空结果并带 note。无 project.godot 污染：全程不调用 set_editor_main_scene，application/run/main_scene 保持测试床原值，after_all 回收 res://gda_tmp_runtime 不影响任何持久化配置。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "continue",
+    "before_all": [
+      {
+        "id": "observability_create_scene",
+        "tool": "create_editor_scene",
+        "args": { "name": "RuntimeProbe", "type": "Node2D", "close_current": true }
+      },
+      {
+        "id": "observability_create_hud",
+        "tool": "create_scene_node",
+        "args": {
+          "name": "Hud",
+          "type": "Control",
+          "parent_path": "RuntimeProbe",
+          "properties": { "anchor_right": 1.0, "anchor_bottom": 1.0 }
+        }
+      },
+      {
+        "id": "observability_save_scene",
+        "tool": "save_editor_scene_as",
+        "args": { "path": "res://gda_tmp_runtime/probe.tscn" }
+      },
+      {
+        "id": "observability_open_scene",
+        "tool": "open_editor_scene",
+        "args": { "path": "res://gda_tmp_runtime/probe.tscn" }
+      },
+      {
+        "id": "observability_play",
+        "tool": "play_editor_current_scene",
+        "args": {}
+      }
+    ],
+    "stages": [
+      {
+        "id": "bare_statement_prewrap",
+        "steps": [
+          {
+            "id": "eval_bare_for_if_return",
+            "tool": "execute_game_script",
+            "args": {
+              "action": "script",
+              "source_code": "var total := 0\nfor i in range(3):\n    if i == 2:\n        return i\nreturn total",
+              "timeout_ms": 7000
+            },
+            "expect": {
+              "field_checks": [
+                { "key": "wrapped", "value": true },
+                { "key": "result", "value": 2 }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "no_parse_error_after_wrap",
+        "steps": [
+          {
+            "id": "errors_after_wrap_are_empty",
+            "tool": "get_debugger_errors",
+            "args": { "group": true, "since_seq": 0 },
+            "expect": {
+              "field_checks": [
+                { "key": "total_errors", "value": 0 },
+                { "key": "next_seq", "value": 0 }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "error_cursor_after_controlled_error",
+        "steps": [
+          {
+            "id": "trigger_controlled_error",
+            "tool": "execute_game_script",
+            "args": {
+              "action": "script",
+              "source_code": "push_error(\"gda_controlled_error\")\nreturn \"triggered\"",
+              "timeout_ms": 7000
+            },
+            "expect": {
+              "field_checks": [
+                { "key": "wrapped", "value": true },
+                { "key": "value", "value": "triggered" },
+                { "key": "runtime_error", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "grouped_errors_since_zero",
+            "tool": "get_debugger_errors",
+            "args": { "group": true, "since_seq": 0 },
+            "expect": {
+              "field_checks": [
+                { "key": "total_errors", "value": 1 },
+                { "key": "total_groups", "value": 1 },
+                { "key": "next_seq", "value": 1 }
+              ]
+            }
+          },
+          {
+            "id": "raw_errors_since_zero",
+            "tool": "get_debugger_errors",
+            "args": { "since_seq": 0, "limit": 10 },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "not_empty": true },
+                { "key": "next_seq", "value": 1 }
+              ]
+            }
+          },
+          {
+            "id": "grouped_errors_since_one_excludes_first",
+            "tool": "get_debugger_errors",
+            "args": { "group": true, "since_seq": 1 },
+            "expect": {
+              "field_checks": [
+                { "key": "total_errors", "value": 0 },
+                { "key": "next_seq", "value": 1 }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "after_all": [
+      {
+        "id": "observability_stop_playing",
+        "tool": "stop_editor_playing",
+        "args": {}
+      },
+      {
+        "id": "observability_close_scene",
+        "tool": "close_editor_scene",
+        "args": {}
+      },
+      {
+        "id": "observability_trash_dir",
+        "tool": "move_os_file_to_trash",
+        "args": { "path": "res://gda_tmp_runtime" }
+      }
+    ]
+  }
+}
