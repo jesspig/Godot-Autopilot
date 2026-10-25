@@ -55,6 +55,76 @@
             }
           }
         ]
+      },
+      {
+        "id": "no_parse_error_after_wrap",
+        "steps": [
+          {
+            "id": "errors_after_wrap_are_empty",
+            "tool": "get_debugger_errors",
+            "args": { "group": true, "since_seq": 0 },
+            "expect": {
+              "field_checks": [
+                { "key": "total_errors", "value": 0 },
+                { "key": "next_seq", "value": 0 }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "error_cursor_after_controlled_error",
+        "steps": [
+          {
+            "id": "trigger_controlled_error",
+            "tool": "execute_game_script",
+            "args": {
+              "action": "script",
+              "source_code": "push_error(\"gda_controlled_error\")\nreturn \"triggered\"",
+              "timeout_ms": 7000
+            },
+            "expect": {
+              "field_checks": [
+                { "key": "value", "value": "triggered" },
+                { "key": "runtime_error", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "grouped_errors_since_zero",
+            "tool": "get_debugger_errors",
+            "args": { "group": true, "since_seq": 0 },
+            "expect": {
+              "field_checks": [
+                { "key": "total_errors", "value": 1 },
+                { "key": "total_groups", "value": 1 },
+                { "key": "next_seq", "value": 1 }
+              ]
+            }
+          },
+          {
+            "id": "raw_errors_since_zero",
+            "tool": "get_debugger_errors",
+            "args": { "since_seq": 0, "limit": 10 },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "not_empty": true },
+                { "key": "next_seq", "value": 1 }
+              ]
+            }
+          },
+          {
+            "id": "grouped_errors_since_one_excludes_first",
+            "tool": "get_debugger_errors",
+            "args": { "group": true, "since_seq": 1 },
+            "expect": {
+              "field_checks": [
+                { "key": "total_errors", "value": 0 },
+                { "key": "next_seq", "value": 1 }
+              ]
+            }
+          }
+        ]
       }
     ],
     "after_all": [

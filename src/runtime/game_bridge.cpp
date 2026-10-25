@@ -4,6 +4,7 @@
 #include "core/editor_coords.hpp"
 #include "core/log_system.hpp"
 #include "gda_protocol.hpp"
+#include "runtime/error_cursor.hpp"
 #include "tools/authorization.hpp"
 #include "tools/capture_ops.hpp"
 #include "tools/editor_ui_ops.hpp"
@@ -1746,50 +1747,30 @@ JV op_capture(const JV &params, int64_t request_id) {
   return JV();
 }
 
-JV op_get_errors(const JV &params) {
-  int64_t limit = 50;
-  if (auto *l = params.Find("limit")) {
-    if (l->IsInt() && l->GetInt() > 0)
-      limit = l->GetInt();
-  }
-  bool grouped = false;
-  if (auto *g = params.Find("group")) {
-    if (!g->IsBool())
-      return error_result("get_errors group must be a boolean");
-    grouped = g->GetBool();
-  }
-  if (grouped)
-    return op_get_errors_grouped(limit);
-  JV arr(JV::array_tag);
-  {
-    std::lock_guard<std::mutex> lock(g_buffer_mtx);
-    size_t start = (static_cast<size_t>(limit) >= g_error_buffer.size())
-                       ? 0
-                       : g_error_buffer.size() - static_cast<size_t>(limit);
-    for (size_t i = start; i < g_error_buffer.size(); i++) {
-      const GameErrorEntry &e = g_error_buffer[i];
-      JV item(JV::object_tag);
-      char time_buf[16];
-      snprintf(time_buf, sizeof(time_buf), "%02d:%02d:%02d.%03d", e.hr, e.min,
-               e.sec, e.msec);
-      item["time"] = JV(std::string(time_buf));
-      item["file"] = JV(e.file);
-      item["func"] = JV(e.func);
-      item["line"] = JV(static_cast<int64_t>(e.line));
-      item["error"] = JV(e.error);
-      item["descr"] = JV(e.descr);
-      item["is_warning"] = JV(e.is_warning);
-      JV stack(JV::array_tag);
-      for (const std::string &f : e.stack)
-        stack.PushBack(JV(f));
-      item["stack"] = std::move(stack);
-      arr.PushBack(std::move(item));
-    }
-  }
-  return ok_result(std::move(arr));
+namespace {
+
+JV error_entry_json(const GameErrorEntry &e) {
+  JV item(JV::object_tag);
+  char time_buf[16];
+  snprintf(time_buf, sizeof(time_buf), "%02d:%02d:%02d.%03d", e.hr, e.min,
+           e.sec, e.msec);
+  item["time"] = JV(std::string(time_buf));
+  item["file"] = JV(e.file);
+  item["func"] = JV(e.func);
+  item["line"] = JV(static_cast<int64_t>(e.line));
+  item["error"] = JV(e.error);
+  item["descr"] = JV(e.descr);
+  item["is_warning"] = JV(e.is_warning);
+  item["seq"] = JV(static_cast<int64_t>(e.seq));
+  JV stack(JV::array_tag);
+  for (const std::string &f : e.stack)
+    stack.PushBack(JV(f));
+  item["stack"] = std::move(stack);
+  return item;
 }
 
-JV op_get_errors_grouped(int64_t group_limit) {
+JV collect_errors_grouped(int64_t group_limit, int64_t since_seq,
+                          bool has_since_seq) {
   struct Group {
     size_t count = 0;
     size_t first_index = 0;
@@ -1799,9 +1780,20 @@ JV op_get_errors_grouped(int64_t group_limit) {
   std::unordered_map<std::string, size_t> index_by_key;
   std::vector<Group> groups;
   std::vector<GameErrorEntry> snapshot;
+  int64_t current = 0;
   {
     std::lock_guard<std::mutex> lock(g_buffer_mtx);
-    snapshot = g_error_buffer;
+    current = static_cast<int64_t>(g_error_seq);
+    if (has_since_seq) {
+      for (const GameErrorEntry &e : g_error_buffer) {
+        if (error_cursor::error_seq_after(static_cast<int64_t>(e.seq),
+                                          since_seq)) {
+          snapshot.push_back(e);
+        }
+      }
+    } else {
+      snapshot = g_error_buffer;
+    }
   }
   for (size_t i = 0; i < snapshot.size(); i++) {
     const GameErrorEntry &e = snapshot[i];
@@ -1832,6 +1824,7 @@ JV op_get_errors_grouped(int64_t group_limit) {
       static_cast<size_t>(group_limit) < order.size())
     order.resize(static_cast<size_t>(group_limit));
   JV arr(JV::array_tag);
+  int64_t max_returned = 0;
   for (size_t gi : order) {
     const GameErrorEntry &sample = snapshot[groups[gi].sample];
     const GameErrorEntry &first = snapshot[groups[gi].first_index];
@@ -1852,6 +1845,10 @@ JV op_get_errors_grouped(int64_t group_limit) {
     item["error"] = JV(sample.error);
     item["descr"] = JV(sample.descr);
     item["is_warning"] = JV(sample.is_warning);
+    const int64_t group_last_seq = static_cast<int64_t>(last.seq);
+    item["last_seq"] = JV(group_last_seq);
+    if (group_last_seq > max_returned)
+      max_returned = group_last_seq;
     JV stack(JV::array_tag);
     for (size_t j = 0; j < sample.stack.size() && j < 8; j++)
       stack.PushBack(JV(sample.stack[j]));
@@ -1863,7 +1860,72 @@ JV op_get_errors_grouped(int64_t group_limit) {
   r["groups"] = std::move(arr);
   r["total_errors"] = JV(static_cast<int64_t>(snapshot.size()));
   r["total_groups"] = JV(static_cast<int64_t>(groups.size()));
+  r["next_seq"] = JV(error_cursor::next_error_seq(max_returned, current));
   return ok_result(std::move(r));
+}
+
+} // namespace
+
+JV op_get_errors(const JV &params) {
+  int64_t limit = 50;
+  if (auto *l = params.Find("limit")) {
+    if (l->IsInt() && l->GetInt() > 0)
+      limit = l->GetInt();
+  }
+  bool grouped = false;
+  if (auto *g = params.Find("group")) {
+    if (!g->IsBool())
+      return error_result("get_errors group must be a boolean");
+    grouped = g->GetBool();
+  }
+  int64_t since_seq = 0;
+  bool has_since_seq = false;
+  if (auto *s = params.Find("since_seq")) {
+    if (!s->IsInt())
+      return error_result("get_errors since_seq must be an integer");
+    since_seq = s->GetInt();
+    if (since_seq < 0)
+      return error_result(
+          "get_errors since_seq must be a non-negative integer");
+    has_since_seq = true;
+  }
+  if (grouped)
+    return collect_errors_grouped(limit, since_seq, has_since_seq);
+  JV arr(JV::array_tag);
+  int64_t max_returned = 0;
+  int64_t current = 0;
+  {
+    std::lock_guard<std::mutex> lock(g_buffer_mtx);
+    current = static_cast<int64_t>(g_error_seq);
+    if (has_since_seq) {
+      for (const GameErrorEntry &e : g_error_buffer) {
+        if (!error_cursor::error_seq_after(static_cast<int64_t>(e.seq),
+                                           since_seq)) {
+          continue;
+        }
+        arr.PushBack(error_entry_json(e));
+        max_returned = static_cast<int64_t>(e.seq);
+        if (static_cast<int64_t>(arr.Size()) >= limit)
+          break;
+      }
+    } else {
+      size_t start = (static_cast<size_t>(limit) >= g_error_buffer.size())
+                         ? 0
+                         : g_error_buffer.size() - static_cast<size_t>(limit);
+      for (size_t i = start; i < g_error_buffer.size(); i++) {
+        const GameErrorEntry &e = g_error_buffer[i];
+        arr.PushBack(error_entry_json(e));
+        max_returned = static_cast<int64_t>(e.seq);
+      }
+    }
+  }
+  JV body = ok_result(std::move(arr));
+  body["next_seq"] = JV(error_cursor::next_error_seq(max_returned, current));
+  return body;
+}
+
+JV op_get_errors_grouped(int64_t group_limit) {
+  return collect_errors_grouped(group_limit, 0, false);
 }
 
 void send_response(int64_t request_id, JV body) {
