@@ -86,6 +86,8 @@ const char *const kManualWhitelist[] = {
     "source_md5", "sub_resource", "tile_map_data", "tile_set", "to_uid_path",
     "track_insert_key", "tree_exited", "uid_cache", "unique_id",
     "use_multiple_threads", "writes_config", "z_index", "set_suspend",
+    "hit_path", "hit_mismatch", "mouse_filter", "possibly_occluded",
+    "get_physics_frames", "is_on_floor", "is_on_wall", "move_and_slide",
 
     "register_tool", "unregister_tool", "has_tool", "list_tools", "get_tool",
     "is_enabled", "set_enabled", "rescan", "register_autopilot_tools",

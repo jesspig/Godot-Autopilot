@@ -75,6 +75,12 @@ fields:
 - `physics_stalled` — `physics_frame` has not advanced while FPS is positive,
   i.e. a frozen physics loop.
 
+`physics_frame` is the engine-global physics frame counter: it keeps
+advancing while `paused` is true, so it cannot by itself prove that a pause
+froze gameplay. Prove the freeze with a gameplay-owned value instead — a
+game node's position, a tick counter owned by gameplay code, or a dedicated
+gameplay probe — and read it together with the `paused` field.
+
 A failed scene reload shows up as an empty scene with a sharp `node_count`
 drop. Do not debug a half-dead process: stop with `stop_editor_playing` and
 rerun `play_editor_current_scene`. Full scenario readings live in
@@ -105,7 +111,12 @@ debug channel into the game process).
   `action`; `mode` is `event` (default, parsed input event), `api`
   (immediate `Input.action_press`/`action_release`) or `hold` (event-style,
   held for `duration_ms`). Parameters outside the whitelist are rejected
-  with an error — a typo fails the call.
+  with an error — a typo fails the call. `api` only writes the action state:
+  it creates no `InputEvent` and dispatches none, so `_input`,
+  `_unhandled_input`, `_gui_input` and `is_action_just_pressed_by_event`
+  never see it. Use `event` mode (or a real `key` event) for UI and other
+  event-driven code; `api` suits only code that polls `Input` action state
+  (`is_action_pressed` / `is_action_just_pressed`).
 - `wait_game_input` waits until an action reaches a transient state
   (`just_pressed` default, `just_released` or `pressed`) in a physics frame,
   or `timeout_ms` elapses (default 2000, max 25000). Optional `inject` sends
@@ -239,8 +250,11 @@ under fixed coordinates.
 Control-derived node with:
 
 - `path` (absolute node path), `type` (class name), `visible` (including
-  ancestors), `text` (when present) and `global_rect` (`position` and
-  `size` in viewport coordinates).
+  ancestors), `text` (when present), `global_rect` (`position` and
+  `size` in viewport coordinates), `mouse_filter` (`STOP`/`PASS`/`IGNORE`)
+  and `z_index`. The last two are the hit-testing and draw-order facts: a
+  full-screen `PASS` control can swallow clicks meant for controls below
+  it, while `IGNORE` passes them through.
 
 `max_elements` defaults to 100 (max 1000); `truncated` set to true signals
 more elements remain — raise the cap or target a subtree via
@@ -249,7 +263,16 @@ automation: locate buttons and panels here, then drive them with
 `sequence_game_inputs` or `queue_game_input` using `global_rect`
 coordinates, or with `execute_game_script` using `path`.
 
-- `validate_game_ui_layout` scans the running game's Control tree for layout defects (zero-size visible controls, off-viewport controls, possibly-occluded controls) and reports each as a triage item with no automatic verdict. It complements `get_game_ui_elements` reconnaissance before click automation.
+- `validate_game_ui_layout` scans the running game's Control tree for layout defects (zero-size visible controls, off-viewport controls, possibly-occluded controls, naming the occluding control) and reports each as a triage item with no automatic verdict. It complements `get_game_ui_elements` reconnaissance before click automation.
+
+UI change acceptance: run `validate_game_ui_layout` first, then click with
+`click_game_ui_element` and check the hit result against the target.
+`click_game_ui_element` returns `hit_path` (the control actually under the
+injected point) and `hit_mismatch` (true when it is not the requested
+target); by default a mismatch is reported without failing the call, while
+`strict_hit: true` turns it into an error. A `hit_mismatch` together with a
+`possibly_occluded` issue is the signature of a full-screen `PASS`
+container eating the click.
 
 ## Pause, reload and run code in the game
 
@@ -259,7 +282,10 @@ coordinates, or with `execute_game_script` using `path`.
   mode (`INHERIT` resolves up the tree, the root is fixed `PAUSABLE`), and
   pausing also deactivates the physics servers — the simulation itself stops,
   not just node callbacks. Transient input states are lost while paused.
-  The full matrix is in `references/input-injection.md`.
+  `physics_frame` keeps advancing while paused because it is the engine-global
+  counter, so combine `paused` with a gameplay value (node position or a
+  gameplay-owned tick) when you need to prove that gameplay froze. The full
+  matrix is in `references/input-injection.md`.
 - `reload_scene_tree_current_scene` reloads the currently running scene from
   disk, recreating the scene root — script state, connections and runtime
   modifications reset to the saved file. Without a running scene it returns
