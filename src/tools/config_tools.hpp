@@ -21,7 +21,7 @@ const std::vector<ParamSpec> kGetProjectSettingsParams = {
 
 const std::vector<ParamSpec> kSetProjectSettingsParams = {
     {"name", "string", "Project setting name, e.g. application/config/name; must already exist or be added by this call", true},
-    {"value", "object", "Serialized JSON value; when a string, the engine keeps the existing setting's type if one is stored, e.g. 1920 for an int setting", true},
+    {"value", "json", "Serialized JSON value; when a string, the engine keeps the existing setting's type if one is stored, e.g. 1920 for an int setting", true},
 };
 
 const std::vector<ParamSpec> kHasProjectSettingsParams = {
@@ -52,7 +52,7 @@ const std::vector<ParamSpec> kGetEditorSettingsParams = {
 
 const std::vector<ParamSpec> kSetEditorSettingsParams = {
     {"name", "string", "Editor setting name to write, e.g. interface/theme/base_color", true},
-    {"value", "object", "Serialized JSON value to store; editor settings persist automatically", true},
+    {"value", "json", "Serialized JSON value to store; editor settings persist automatically", true},
 };
 
 const std::vector<ParamSpec> kHasEditorSettingsParams = {

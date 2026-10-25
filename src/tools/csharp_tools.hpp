@@ -60,7 +60,7 @@ const std::vector<ParamSpec> kCSharpSetPropertyParams = {
     {"memory", "string", "Memory resource name registered via create_resource (editor process only); mutually exclusive with object_id, object_id_str and path", false},
     {"path", "string", "Scene node path in the edited scene (editor) or the running game (runtime=game), or a res:// resource path (editor only). memory:// is rejected here — pass the bare name in memory instead", false},
     {"property", "string", "C# member name to write: engine property, C# property or field (indexers and read-only members are rejected by the bridge)", true},
-    {"value", "object", "New member value as JSON; editor values deserialize with full Variant fidelity, game values cross as JSON-native values only", true},
+    {"value", "json", "New member value as JSON; editor values deserialize with full Variant fidelity, game values cross as JSON-native values only", true},
     {"allow_non_public", "boolean", "Allow non-public C# members for this write (default false: only public engine properties, properties and fields resolve); when true the bridge also writes private and internal members, and the matching read path honors the same flag for reads", false},
     {"runtime", "string", "Target process: editor (default, resolve the locator in the editor and call the GdaCSharpBridge engine singleton) or game (forward to the game bridge over the runtime channel; only the scene-path locator form is accepted, needs a running .NET game with GdaCSharpRuntime)", false},
     {"timeout_ms", "integer", "Response timeout in milliseconds for runtime=game (default: 5000, max: 25000); rejected when runtime=editor", false},

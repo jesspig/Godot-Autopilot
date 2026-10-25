@@ -48,13 +48,13 @@ const std::vector<ParamSpec> kCommitEditorUndoRedoParams = {};
 const std::vector<ParamSpec> kAddEditorUndoRedoDoParams = {
     {"node_path", "string", "Path to the node whose method will be called on redo, e.g. 'Player' or '/root/Player'; resolved against the edited scene root", true},
     {"method", "string", "Name of the node method to call, e.g. 'set_position' or 'queue_free'", true},
-    {"value", "object", "Optional serialized JSON value passed as the single method argument; omit for methods without arguments", false},
+    {"value", "json", "Optional serialized JSON value passed as the single method argument; omit for methods without arguments", false},
 };
 
 const std::vector<ParamSpec> kAddEditorUndoRedoUndoParams = {
     {"node_path", "string", "Path to the node whose method will be called on undo, e.g. 'Player' or '/root/Player'; resolved against the edited scene root", true},
     {"method", "string", "Name of the node method to call for the inverse operation, e.g. 'set_position'", true},
-    {"value", "object", "Optional serialized JSON value passed as the single method argument; omit for methods without arguments", false},
+    {"value", "json", "Optional serialized JSON value passed as the single method argument; omit for methods without arguments", false},
 };
 
 const std::vector<ParamSpec> kGetEditorFileSystemTreeParams = {
@@ -280,7 +280,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       kVerifySceneSavedParams, editor_ops::handle_verify_scene_saved}));
   v.push_back(make_spec_tool(ToolSpec{
       "build_csharp_assembly",
-      "Trigger a C# project build with dotnet build --nologo on the res:// root .csproj/.sln. The engine path is globalized to an OS absolute path (ProjectSettings.globalize_path) before it reaches dotnet, because dotnet cannot resolve res:// paths. Intended for CI/command-line compile verification only: it does NOT rewind to an in-editor Build and does not hot-reload the loaded .NET assembly. By default (wait omitted or false) it launches via OS.create_process and returns immediately with result {project_file,project_path,command,pid,started,note}. With wait=true it runs synchronously via OS.execute and waits for the BuildResult {project_file,project_path,command,exit_code,success,errors,output_digest,output_empty}: project_file is the res:// project file, project_path the OS absolute path handed to dotnet, command the logical dotnet invocation on the res:// file, exit_code the dotnet exit code, success exit_code==0, errors lists output lines containing error (capped at 50 with errors_truncated), output_digest the combined stdout/stderr truncated to 4000 chars when desensitized else 64000 chars with output_truncated when cut, output_empty true when nothing was captured (output_hint then explains the exit code); timeout_ms declares the wait budget (1-25000, default 25000) validated to stay below the dispatch default 27000ms; errors when the project is not a C# project or dotnet is not available.",
+      "Trigger a C# project build with dotnet build --nologo on the res:// root .csproj/.sln. The engine path is globalized to an OS absolute path (ProjectSettings.globalize_path) before it reaches dotnet, because dotnet cannot resolve res:// paths. Intended for CI/command-line compile verification only: it does NOT rewind to an in-editor Build and does not hot-reload the loaded .NET assembly. By default (wait omitted or false) it launches via OS.create_process and returns immediately with result {project_file,project_path,command,pid,started,note}. With wait=true it runs synchronously via OS.execute, temporarily pinning DOTNET_CLI_UI_LANGUAGE=en for the child process and restoring the previous value afterwards so that output_digest carries ASCII English text instead of ACP-mangled localized output, and waits for the BuildResult {project_file,project_path,command,exit_code,success,errors,output_digest,output_empty}: project_file is the res:// project file, project_path the OS absolute path handed to dotnet, command the logical dotnet invocation on the res:// file, exit_code the dotnet exit code, success exit_code==0, errors lists output lines containing error (capped at 50 with errors_truncated), output_digest the combined stdout/stderr truncated to 4000 chars when desensitized else 64000 chars with output_truncated when cut, output_empty true when nothing was captured (output_hint then explains the exit code); timeout_ms declares the wait budget (1-25000, default 25000) validated to stay below the dispatch default 27000ms; errors when the project is not a C# project or dotnet is not available.",
       "Editor", {"build", "csharp", "dotnet"}, SideEffect::Process, tool_flags::kMutating,
       kBuildCsharpAssemblyParams, editor_ops::handle_build_csharp_assembly}));
   v.push_back(make_spec_tool(ToolSpec{

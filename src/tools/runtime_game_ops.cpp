@@ -555,7 +555,7 @@ mcp::JsonValue handle_click_game_ui_element(const mcp::JsonValue &args) {
   if (!args.IsObject())
     return error_json("click_game_ui_element parameters must be an object");
   static constexpr const char *allowed[] = {"path", "text", "text_index", "button_index",
-                                             "double_click", "max_elements",
+                                             "double_click", "strict_hit", "max_elements",
                                              "timeout_ms", "wait_ready"};
   std::string unknown;
   if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed), unknown))
@@ -596,6 +596,12 @@ mcp::JsonValue handle_click_game_ui_element(const mcp::JsonValue &args) {
       return error_json("double_click must be a boolean");
     double_click = double_p->GetBool();
   }
+  bool strict_hit = false;
+  if (auto *strict_p = args.Find("strict_hit")) {
+    if (!strict_p->IsBool())
+      return error_json("strict_hit must be a boolean");
+    strict_hit = strict_p->GetBool();
+  }
   int64_t max_elements = CLICK_MAX_ELEMENTS_LIMIT;
   if (auto *max_p = args.Find("max_elements")) {
     if (!max_p->IsInt() || max_p->GetInt() <= 0)
@@ -630,6 +636,7 @@ mcp::JsonValue handle_click_game_ui_element(const mcp::JsonValue &args) {
   }
   click["button_index"] = JV(button_index);
   click["double_click"] = JV(double_click);
+  click["strict_hit"] = JV(strict_hit);
   JV params(JV::object_tag);
   params["max_elements"] = JV(max_elements);
   params["click"] = std::move(click);

@@ -281,6 +281,150 @@ TEST_F(RegisteredServerFixture, Bm25IndexPopulatedAfterRegistration) {
   EXPECT_EQ(index.size(), catalog.size());
 }
 
+TEST_F(RegisteredServerFixture, JsonValueParametersOmitTypeInSchema) {
+  const char *const kJsonValueTools[] = {
+      "property_set",
+      "set_script_property",
+      "execute_game_script",
+      "csharp_set_property",
+      "set_project_settings",
+      "set_editor_settings",
+      "insert_animation_keyframe",
+      "set_physics_2d_body_state",
+      "set_physics_3d_body_state",
+      "set_physics_3d_area_param",
+      "set_render_material_param",
+      "set_render_shader_parameter_global",
+      "set_resource_property",
+      "add_editor_undo_redo_do",
+      "add_editor_undo_redo_undo"};
+  for (const char *name : kJsonValueTools) {
+    auto info = catalog.get_tool(name);
+    ASSERT_TRUE(info.has_value()) << name;
+    const auto *props = info->input_schema.Find("properties");
+    ASSERT_NE(props, nullptr) << name;
+    const auto *value = props->Find("value");
+    ASSERT_NE(value, nullptr) << name;
+    EXPECT_EQ(value->Find("type"), nullptr) << name;
+    EXPECT_NE(value->Find("description"), nullptr) << name;
+  }
+}
+
+TEST_F(RegisteredServerFixture, SceneWritingToolsDeclareWritesScene) {
+  const char *const kSceneWriters[] = {
+      "property_set",
+      "set_properties_batch",
+      "set_node_transform",
+      "create_scene_node",
+      "rename_scene_node",
+      "reparent_node",
+      "instantiate_scene",
+      "build_nodes_from_spec",
+      "spawn_node_bundle",
+      "signal_connect",
+      "signal_disconnect",
+      "attach_script_to_node",
+      "detach_script_from_node",
+      "add_group_node",
+      "remove_group_node",
+      "create_scene_animation_player",
+      "insert_animation_keyframe",
+      "create_tilemap",
+      "set_tilemap_cell",
+      "fill_tilemap_rect",
+      "create_gridmap",
+      "assign_collision_shape",
+      "apply_theme_to_control",
+      "set_control_layout",
+      "set_particles_params",
+      "assign_mesh_to_instance",
+      "tween_editor_property"};
+  for (const char *name : kSceneWriters) {
+    mcp::JsonValue args(mcp::JsonValue::object_tag);
+    args["name"] = mcp::JsonValue(name);
+    auto result = godot_autopilot::dispatch::call_handler("get_tool_detail", args);
+    const auto *tool = result.Find("tool");
+    ASSERT_NE(tool, nullptr) << name;
+    const auto *side_effect = tool->Find("side_effect");
+    ASSERT_NE(side_effect, nullptr) << name;
+    ASSERT_TRUE(side_effect->IsString()) << name;
+    EXPECT_EQ(side_effect->GetString(), "writes_scene") << name;
+  }
+}
+
+TEST_F(RegisteredServerFixture, ClickGameUiElementSchemaDeclaresStrictHit) {
+  auto info = catalog.get_tool("click_game_ui_element");
+  ASSERT_TRUE(info.has_value());
+  const auto *props = info->input_schema.Find("properties");
+  ASSERT_NE(props, nullptr);
+  ASSERT_TRUE(props->IsObject());
+  const auto *strict_hit = props->Find("strict_hit");
+  ASSERT_NE(strict_hit, nullptr);
+  ASSERT_TRUE(strict_hit->IsObject());
+  const auto *type = strict_hit->Find("type");
+  ASSERT_NE(type, nullptr);
+  ASSERT_TRUE(type->IsString());
+  EXPECT_EQ(type->GetString(), "boolean");
+  const auto *description = strict_hit->Find("description");
+  ASSERT_NE(description, nullptr);
+  ASSERT_TRUE(description->IsString());
+  EXPECT_NE(description->GetString().find("click_occluded"), std::string::npos);
+  const auto *required = info->input_schema.Find("required");
+  ASSERT_NE(required, nullptr);
+  ASSERT_TRUE(required->IsArray());
+  for (const auto &entry : required->GetArray()) {
+    if (entry.IsString()) {
+      EXPECT_NE(entry.GetString(), "strict_hit");
+    }
+  }
+}
+
+TEST_F(RegisteredServerFixture, GetGameUiElementsDescriptionDocumentsMouseFilterAndZIndex) {
+  auto info = catalog.get_tool("get_game_ui_elements");
+  ASSERT_TRUE(info.has_value());
+  EXPECT_NE(info->description.find("mouse_filter"), std::string::npos);
+  EXPECT_NE(info->description.find("IGNORE"), std::string::npos);
+  EXPECT_NE(info->description.find("z_index"), std::string::npos);
+}
+
+TEST_F(RegisteredServerFixture, ClickGameUiElementDescriptionDocumentsHitDiagnostics) {
+  auto info = catalog.get_tool("click_game_ui_element");
+  ASSERT_TRUE(info.has_value());
+  const char *const kExpected[] = {"hit_path",   "hit_mismatch", "warning",
+                                   "strict_hit", "mouse_motion", "click_occluded"};
+  for (const char *token : kExpected) {
+    EXPECT_NE(info->description.find(token), std::string::npos) << token;
+  }
+}
+
+TEST_F(RegisteredServerFixture, ValidateGameUiLayoutDescriptionDocumentsOccluderFields) {
+  auto info = catalog.get_tool("validate_game_ui_layout");
+  ASSERT_TRUE(info.has_value());
+  const char *const kExpected[] = {
+      "mouse_filter", "IGNORE", "effective z_index", "occluder_path",
+      "occluder_mouse_filter", "possibly_occluded_count"};
+  for (const char *token : kExpected) {
+    EXPECT_NE(info->description.find(token), std::string::npos) << token;
+  }
+  EXPECT_EQ(info->description.find("ignores canvas_layer/z_index"),
+            std::string::npos)
+      << "stale occlusion wording must be gone";
+  const auto *props = info->input_schema.Find("properties");
+  ASSERT_NE(props, nullptr);
+  const auto *ratio = props->Find("occlude_ratio");
+  ASSERT_NE(ratio, nullptr);
+  const auto *ratio_description = ratio->Find("description");
+  ASSERT_NE(ratio_description, nullptr);
+  ASSERT_TRUE(ratio_description->IsString());
+  EXPECT_NE(ratio_description->GetString().find("effective z_index"),
+            std::string::npos);
+  EXPECT_NE(ratio_description->GetString().find("mouse_filter"),
+            std::string::npos);
+  EXPECT_EQ(ratio_description->GetString().find(
+                "ignoring canvas_layer and z_index"),
+            std::string::npos);
+}
+
 TEST_F(RegisteredServerFixture, RegistryIsSingleSourceOfTools) {
   auto reg = godot_autopilot::get_active_registry();
 
