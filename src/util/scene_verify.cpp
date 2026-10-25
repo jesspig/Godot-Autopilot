@@ -66,6 +66,14 @@ void collect_paths_recursive(godot::Node *node, godot::Node *root,
 
 bool connection_source_is_persisted(const godot::Dictionary &connection,
                                     godot::Node *root) {
+  if (!connection.has("flags"))
+    return false;
+  const godot::Variant flags_value = connection["flags"];
+  if (flags_value.get_type() != godot::Variant::INT)
+    return false;
+  const int64_t flags = flags_value.operator int64_t();
+  if ((flags & static_cast<int64_t>(godot::Object::CONNECT_PERSIST)) == 0)
+    return false;
   const godot::Signal signal = connection["signal"].operator godot::Signal();
   if (signal.is_null())
     return false;

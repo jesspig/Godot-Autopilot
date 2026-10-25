@@ -1,6 +1,7 @@
 #include "script_ops.hpp"
 #include "../util/scene_path.hpp"
 #include "core/log_system.hpp"
+#include "core/scene_dirty_tracker.hpp"
 #include "tools/debugger_ops.hpp"
 #include "tools/scene_ops.hpp"
 #include "util/gdscript_wrap.hpp"
@@ -536,6 +537,7 @@ mcp::JsonValue handle_attach_to_node(const mcp::JsonValue &args) {
   r["result"] = mcp::JsonValue("script attached to " + node_path);
   bool instantiable = script->can_instantiate();
   r["instantiated"] = mcp::JsonValue(instantiable);
+  scene_dirty_tracker::mark_scene_modified();
   util::add_scene_info_fields(r, util::edited_scene_info());
   if (!instantiable) {
     r["note"] =
@@ -580,8 +582,10 @@ mcp::JsonValue handle_detach_from_node(const mcp::JsonValue &args) {
   } else {
     node->set_script(godot::Variant());
   }
+  scene_dirty_tracker::mark_scene_modified();
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("script detached from " + node_path);
+  util::add_scene_info_fields(r, util::edited_scene_info());
   return r;
 }
 
@@ -680,9 +684,11 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue &args) {
   godot::StringName prop_name(property.c_str());
   godot::Variant value = VariantJson::deserialize(*it_val, type_hint);
   node->set(prop_name, value);
+  scene_dirty_tracker::mark_scene_modified();
 
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
+  util::add_scene_info_fields(r, util::edited_scene_info());
   return r;
 }
 
