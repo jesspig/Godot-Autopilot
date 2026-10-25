@@ -40,6 +40,8 @@ interface ToolFilter {
   query?: string;
   category?: string;
   tags?: string[];
+  limit?: number;
+  offset?: number;
 }
 
 export async function run(positional: string[], opts: GlobalOptions): Promise<number> {
@@ -69,7 +71,13 @@ async function runList(positional: string[], opts: GlobalOptions): Promise<numbe
   }
   const query = resolveQuery(positional, opts);
   const tags = parseTags(opts.tagsText);
-  const filter: ToolFilter = { query, category: opts.category, tags };
+  const filter: ToolFilter = {
+    query,
+    category: opts.category,
+    tags,
+    limit: parsePageNumber("--limit", opts.limitText, 1, 2000),
+    offset: parsePageNumber("--offset", opts.offsetText, 0, 2147483647),
+  };
   const context = await prepareApiContext(opts);
   const suffix = `${API_TOOLS_SEGMENT}${buildQueryString(filter)}`;
   const response = await apiRequest("GET", suffix, undefined, requestOptions(context, opts));
@@ -107,6 +115,12 @@ function assertSubcommandOptions(sub: string, opts: GlobalOptions): void {
   if (sub !== "list" && opts.tagsText !== undefined) {
     throw new CliError(ExitCode.Usage, "--tags only applies to the api list subcommand.");
   }
+  if (sub !== "list" && opts.limitText !== undefined) {
+    throw new CliError(ExitCode.Usage, "--limit only applies to the api list subcommand.");
+  }
+  if (sub !== "list" && opts.offsetText !== undefined) {
+    throw new CliError(ExitCode.Usage, "--offset only applies to the api list subcommand.");
+  }
   if (sub !== "call" && (opts.argsJson !== undefined || opts.argsFile !== undefined)) {
     throw new CliError(ExitCode.Usage, "--args and --args-file only apply to the api call subcommand.");
   }
@@ -137,7 +151,27 @@ function buildQueryString(filter: ToolFilter): string {
   if (filter.query !== undefined) parts.push(`query=${encodeURIComponent(filter.query)}`);
   if (filter.category !== undefined) parts.push(`category=${encodeURIComponent(filter.category)}`);
   if (filter.tags !== undefined) parts.push(`tags=${encodeURIComponent(filter.tags.join(","))}`);
+  if (filter.limit !== undefined) parts.push(`limit=${filter.limit}`);
+  if (filter.offset !== undefined) parts.push(`offset=${filter.offset}`);
   return parts.length === 0 ? "" : `?${parts.join("&")}`;
+}
+
+function parsePageNumber(
+  flag: string,
+  text: string | undefined,
+  min: number,
+  max: number,
+): number | undefined {
+  if (text === undefined) return undefined;
+  const trimmed = text.trim();
+  if (!/^\d+$/.test(trimmed)) {
+    throw new CliError(ExitCode.Usage, `${flag} must be an integer between ${min} and ${max}.`);
+  }
+  const value = Number(trimmed);
+  if (!Number.isSafeInteger(value) || value < min || value > max) {
+    throw new CliError(ExitCode.Usage, `${flag} must be an integer between ${min} and ${max}.`);
+  }
+  return value;
 }
 
 async function prepareApiContext(opts: GlobalOptions): Promise<ApiContext> {
