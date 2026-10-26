@@ -345,7 +345,7 @@ resource:
 
 | 层 | 位置 | 规模 | 说明 |
 |---|---|---|---|
-| TS 单测 | [`cli/tests/`](../../../cli/tests/) | 16 文件 257 项（Windows 跳过 2 项，实测 255 通过；运行时 715 次 expect 调用） | `bun test cli/tests`；api_commands 41 / args 4 / client 17 / client_handshake 8 / commands 40 / detach 1 / lifecycle 34 / preflight 10 / process 8 / registry 8 / restart 4 / root_dir 7 / serve_auth 14（其中 2 项 Windows 跳过）/ serve_router 43 / stop_method 3 / target 15 |
+| TS 单测 | [`cli/tests/`](../../../cli/tests/) | 16 文件 259 项（257 pass + 2 skip，721 次 expect()） | `bun test cli/tests`；api_commands 43 / args 4 / client 17 / client_handshake 8 / commands 40 / detach 1 / lifecycle 34 / preflight 10 / process 8 / registry 8 / restart 4 / root_dir 7 / serve_auth 14（其中 2 项 Windows 跳过）/ serve_router 43 / stop_method 3 / target 15 |
 | ctest `cli_unit` | [`tests/scripts/run_cli_unit.py`](../../../tests/scripts/run_cli_unit.py) | 封装 `bun test` | bun 缺失时 SKIP 并 exit 0 |
 | ctest `cli_contract` | [`tests/scripts/test_cli_contract.py`](../../../tests/scripts/test_cli_contract.py) | CLI 载体 mock conformance | bun 驱动 gda CLI；bun 缺失时 SKIP |
 | ctest `version_sync_guard` | [`tests/guard/version_sync_guard.py`](../../../tests/guard/version_sync_guard.py) | 全部版本钉与 `VERSION` 同值 | 扫描 `skills/` 全部文本文件 + 根 `README*.md` 的每一处版本钉，另含 `VERSION` 与 `CLI_VERSION` 两个值源 |

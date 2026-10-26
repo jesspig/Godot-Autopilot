@@ -146,8 +146,8 @@ godot-self-driving/
 │   │                           #   skill_gen、skill_content_generated（构建期嵌入薄胶水）；共 25 个文件（8 cpp + 17 hpp）
 │   │                           #   header-only（10 个）：json_godot、rid_registry、scene_path、project_path、type_hint、gdscript_wrap、resource_fs、mcp_image_content、inline_resource_json、owned_exception
 ├── skills/                     # 插件技能书源（标准 Agent Skills 目录布局：9 册各一 SKILL.md + references/；共 35 个文件 = 9 个 SKILL.md + 26 个 references .md）
-├── cli/                        # CLI 载体（Bun + TS 源码直跑，零运行时依赖）：bin/gda.ts 入口 + src/ 35 个 .ts（含 src/mcp/ 协议客户端、src/api/ REST 客户端、src/serve/ 控制面 3 个、src/commands/ 17 个）+ tests/ 16 文件 257 项（Windows 跳过 2 项，实测 255 通过）
-├── tests/                      # L1 gda_unit_tests（759 个 gtest，67 文件）+ L2 gda_test_runner + config/*.json（41 份）+ testbed/（L2 测试床工程）+ guard/ 迁移守卫、注释守卫、主线程守卫、版本同步守卫 + scripts/ CLI 契约与单测 + probe/ 传输探针
+├── cli/                        # CLI 载体（Bun + TS 源码直跑，零运行时依赖）：bin/gda.ts 入口 + src/ 35 个 .ts（含 src/mcp/ 协议客户端、src/api/ REST 客户端、src/serve/ 控制面 3 个、src/commands/ 17 个）+ tests/ 16 文件 259 项（257 pass + 2 skip，721 次 expect() 运行时调用）
+├── tests/                      # L1 gda_unit_tests（821 个 gtest，70 文件）+ L2 gda_test_runner + config/*.json（46 份）+ testbed/（L2 测试床工程）+ guard/ 迁移守卫、注释守卫、主线程守卫、版本同步守卫 + scripts/ CLI 契约与单测 + probe/ 传输探针
 ├── docs/                       # 本知识库（docs/wiki/，含 modules/、plans/、changelog/）
 ├── package.json                # CLI 包定义（name godot-autopilot-cli，bin gda → cli/bin/gda.ts，零运行时依赖）
 ├── bun.lock                    # CLI devDependency 锁（@types/bun + typescript）
@@ -200,7 +200,7 @@ flowchart LR
 ## 文档一致性核查（速览）
 
 - 端口 9527、`/mcp`、`GODOT_AUTOPILOT_PORT`：`README.md`（英）/ `README.zh-CN.md`、AGENTS.md、代码三方一致 ✓
-- 工具总数：`README.md`（英）/ `README.zh-CN.md` 口径为 badge `tools-451+`（`README.md:8` / `README.zh-CN.md:8`）与“Over 451 tools”（`README.md:26`，域工具口径，数量随版本增长以 `search_tools` 查到的为准），与 wiki 实测的 **451 域工具**（以工具 category 字段统计为准）一致；wiki 另计 `system_status` 与 7 元工具，故 MCP 可达 **458** / catalog **459**；`ToolRegistry`/catalog 口径自洽（registry 459 = 451 域 + `system_status` + 7 元）✓
+- 工具总数：`README.md`（英）/ `README.zh-CN.md` 口径为 badge `tools-452+`（`README.md:8` / `README.zh-CN.md:8`）与“Over 452 tools”（`README.md:26`，451 域工具 + `system_status` 口径，数量随版本增长以 `search_tools` 查到的为准），与 wiki 实测的 **451 域工具 + `system_status` = 452**（域工具以工具 category 字段统计为准）一致；wiki 另计 7 元工具，故 MCP 可达 **458** / catalog **459**；`ToolRegistry`/catalog 口径自洽（registry 459 = 451 域 + `system_status` + 7 元）✓
 - CI：`.github/workflows/{ci,release}.yml`（develop 触发 CI、tag 双格式 `v*.*.*` / `[0-9]*.*.*` 触发 Release，另支持 `workflow_dispatch` 手动指定 tag），AGENTS.md 声称属实 ✓
 - 目标引擎 4.7：与 `demo/*/project.godot` 及 `tests/testbed/project.godot` 的 features 一致 ✓；README 前提已为“Godot 4.7+”（`README.md:5,53` / `README.zh-CN.md:5,53`，与 wiki 的 `compatibility_minimum` 4.7 口径一致）
 - 详细对照见 [modules/core.md](./modules/core.md) 的"不一致点"章节

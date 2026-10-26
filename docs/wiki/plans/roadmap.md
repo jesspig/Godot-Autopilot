@@ -12,7 +12,7 @@ resource: src/
 
 # 竞品对齐路线图
 
-> 记录 2026-08 功能分支 `feature/engine-aware-fs-and-tool-expansion` 的竞品对齐批次（P0/P1/P2 已交付）与后续 P3 方向，工具侧实现细节见 [工具注册表](../modules/tools_registry.md)，运行时协议见 [入口与运行时](../modules/entry_runtime.md)。**当前口径（2026-10-23）**：域工具 **451**（27 类 / 33 个源模块）、catalog 条目 459、MCP 可达 458、schema 基线 459 = 393 非空 + 66 空、遍历枚举 452 / 排除 151 / 候选 301、L1 **759** 个 gtest（67 个 unit 文件）、L2 **41** 份用例、守卫与脚本 6 项、**ctest 注册点 806**（759 + 41 + 6，`ctest -N` 实测）、CLI 命令 **14**、CLI TS 单测 **257** 项（16 个文件，Windows 跳过 2 项）、技能书 9 册 / 35 文件、根 `CMakeLists.txt` 的 `add_library` 收录 **113** 个 `.cpp`；各项的权威核算口径见 [测试体系](../tests.md) 的数值核算总表。下列各节的批次内计数是**该批次交付当时的增量**，不代表当前值。
+> 记录 2026-08 功能分支 `feature/engine-aware-fs-and-tool-expansion` 的竞品对齐批次（P0/P1/P2 已交付）与后续 P3 方向，工具侧实现细节见 [工具注册表](../modules/tools_registry.md)，运行时协议见 [入口与运行时](../modules/entry_runtime.md)。**当前口径**：以 [测试体系](../tests.md)「数值核算总表」为唯一权威（10-27 实测复核：ctest 注册点 873 / 非 L2 827 / L1 821 / L2 46）；本页各批次记录中的计数均为交付当时值，不代表当前值。
 
 ## 竞品全景（一行定位速记）
 
@@ -62,7 +62,7 @@ resource: src/
 
 ## 已交付：Computer Use grounding 增强（09-15）
 
-领域工具 366→**379**（净 +13；Editor 23→29、Input 11→15、Display 24→25、Scene 6→7、Game 9→10），MCP 可达 386 / catalog-index 387（**当前口径**：域工具 451 / catalog 459 / MCP 可达 458）：
+领域工具 366→**379**（净 +13；Editor 23→29、Input 11→15、Display 24→25、Scene 6→7、Game 9→10），MCP 可达 386 / catalog-index 387（当前口径见 [测试体系](../tests.md) 数值核算总表）：
 
 - **编辑器 UI 语义自动化**：`get_editor_ui_elements`（元素枚举：语义 path/类型/文本/客户区矩形）与 `hit_test_editor_point`（客户区点命中链）负责定位，`click_editor_element` / `type_editor_element_text` / `run_editor_shortcut` 执行动作；原始坐标回退 `click_input_mouse` / `scroll_input_mouse` / `drag_input_mouse` / `type_input_text`（合成点击/滚轮/拖拽/文本）
 - **坐标映射**：`get_editor_viewport_geometry`（截图像素↔客户区 `window = offset + image * scale`）、`get_scene_node_screen_rect`（编辑场景节点→客户区，2D/3D）、`get_display_window_rect`（窗口客户区矩形与屏幕几何）
@@ -72,7 +72,7 @@ resource: src/
 
 ## 已交付：失败修复批次（09-16，feature/failure-remediation）
 
-领域工具 379→**384**（净 +5；Editor 29→31、TileMap 7→8、Game 10→12），MCP 可达 391 / catalog-index 392；L1 172→229、L2 11→17 份、ctest 183→246（**当前口径**：域工具 451 / L1 458 / L2 41 份 / ctest 505）。行为变更（eval 编译错误结构化返回、game 工具超时预算链、batch_execute await_async、capture after_frames/when/scale、内联子资源、scene_path 回显、godot://skills 资源等 8 项）详见 [changelog/2026-09-16-log.md](../changelog/2026-09-16-log.md)：
+领域工具 379→**384**（净 +5；Editor 29→31、TileMap 7→8、Game 10→12），MCP 可达 391 / catalog-index 392；L1 172→229、L2 11→17 份、ctest 183→246（当前口径见 [测试体系](../tests.md) 数值核算总表）。行为变更（eval 编译错误结构化返回、game 工具超时预算链、batch_execute await_async、capture after_frames/when/scale、内联子资源、scene_path 回显、godot://skills 资源等 8 项）详见 [changelog/2026-09-16-log.md](../changelog/2026-09-16-log.md)：
 
 - **编辑器场景树**：`scene_tree_items`（Scene dock 行枚举）/ `select_scene_tree_node`（按 path 选中并联动 Inspector）
 - **瓦片地图**：`fill_tilemap_rect`（矩形铺砖/擦除，>100000 格报错、单次 undo）
