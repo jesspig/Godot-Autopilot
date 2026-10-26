@@ -6,12 +6,22 @@
 #include <memory>
 #include <string>
 
+#include "core/command_queue.hpp"
+#include "tools/runtime_ops.hpp"
 #include "tools/tool_base.hpp"
 
 namespace {
 
 using godot_autopilot::SideEffect;
 namespace authorization = godot_autopilot::authorization;
+
+int g_allow_provider_calls = 0;
+std::string g_allow_provider_value;
+
+std::string counting_allow_provider() {
+  ++g_allow_provider_calls;
+  return g_allow_provider_value;
+}
 
 class EnvScope {
 public:
@@ -51,6 +61,9 @@ protected:
     previous_mode_provider_ = authorization::auth_mode_provider();
     authorization::set_allow_provider(nullptr);
     authorization::set_auth_mode_provider(nullptr);
+    authorization::reset_config_snapshot();
+    g_allow_provider_calls = 0;
+    g_allow_provider_value.clear();
     env_.reset(new EnvScope("GODOT_AUTOPILOT_ALLOW", nullptr));
     mode_env_.reset(new EnvScope(authorization::kEnvAuthMode, nullptr));
   }
@@ -58,6 +71,8 @@ protected:
   void TearDown() override {
     env_.reset();
     mode_env_.reset();
+    godot_autopilot::runtime_ops::set_editor_queue(nullptr);
+    authorization::reset_config_snapshot();
     authorization::set_allow_provider(previous_provider_);
     authorization::set_auth_mode_provider(previous_mode_provider_);
   }
@@ -237,4 +252,68 @@ TEST_F(AuthorizationPolicyTest, SideEffectMapsToTier) {
 TEST_F(AuthorizationPolicyTest, UnknownCapabilityNameIsPermitted) {
   EXPECT_TRUE(authorization::tier_permits("", ""));
   EXPECT_TRUE(authorization::tier_permits("", "write"));
+}
+
+TEST_F(AuthorizationPolicyTest, NonMainThreadWithoutSnapshotFailsClosed) {
+  godot_autopilot::CommandQueue queue;
+  godot_autopilot::runtime_ops::set_editor_queue(&queue);
+  g_allow_provider_value = "write";
+  authorization::set_allow_provider(&counting_allow_provider);
+  EXPECT_FALSE(authorization::config_snapshot_ready());
+  EXPECT_EQ(authorization::current_allow_list(), std::string());
+  EXPECT_EQ(g_allow_provider_calls, 0);
+  EXPECT_FALSE(authorization::config_snapshot_ready());
+}
+
+TEST_F(AuthorizationPolicyTest, MainThreadPathReadsProviderAndPublishesSnapshot) {
+  godot_autopilot::CommandQueue queue;
+  queue.drain();
+  godot_autopilot::runtime_ops::set_editor_queue(&queue);
+  g_allow_provider_value = "write";
+  authorization::set_allow_provider(&counting_allow_provider);
+  EXPECT_EQ(authorization::current_allow_list(), std::string("write"));
+  EXPECT_EQ(g_allow_provider_calls, 1);
+  std::string snapshot;
+  ASSERT_TRUE(authorization::read_allow_snapshot(snapshot));
+  EXPECT_EQ(snapshot, std::string("write"));
+}
+
+TEST_F(AuthorizationPolicyTest, NonMainThreadReadsPublishedSnapshotOnly) {
+  godot_autopilot::CommandQueue queue;
+  queue.drain();
+  godot_autopilot::runtime_ops::set_editor_queue(&queue);
+  g_allow_provider_value = "write";
+  authorization::set_allow_provider(&counting_allow_provider);
+  EXPECT_EQ(authorization::current_allow_list(), std::string("write"));
+  EXPECT_EQ(g_allow_provider_calls, 1);
+  godot_autopilot::CommandQueue foreign_queue;
+  godot_autopilot::runtime_ops::set_editor_queue(&foreign_queue);
+  EXPECT_EQ(authorization::current_allow_list(), std::string("write"));
+  EXPECT_EQ(g_allow_provider_calls, 1);
+}
+
+TEST_F(AuthorizationPolicyTest, EnvironmentWinsOverSnapshotAndProvider) {
+  godot_autopilot::CommandQueue queue;
+  queue.drain();
+  godot_autopilot::runtime_ops::set_editor_queue(&queue);
+  g_allow_provider_value = "write";
+  authorization::set_allow_provider(&counting_allow_provider);
+  EXPECT_EQ(authorization::current_allow_list(), std::string("write"));
+  EXPECT_EQ(g_allow_provider_calls, 1);
+  EnvScope scope("GODOT_AUTOPILOT_ALLOW", "process");
+  EXPECT_EQ(authorization::current_allow_list(), std::string("process"));
+  EXPECT_EQ(g_allow_provider_calls, 1);
+  std::string snapshot;
+  ASSERT_TRUE(authorization::read_allow_snapshot(snapshot));
+  EXPECT_EQ(snapshot, std::string("write"));
+}
+
+TEST_F(AuthorizationPolicyTest, EnvironmentWinsWithoutSnapshotOnForeignThread) {
+  godot_autopilot::CommandQueue queue;
+  godot_autopilot::runtime_ops::set_editor_queue(&queue);
+  g_allow_provider_value = "write";
+  authorization::set_allow_provider(&counting_allow_provider);
+  EnvScope scope("GODOT_AUTOPILOT_ALLOW", "process");
+  EXPECT_EQ(authorization::current_allow_list(), std::string("process"));
+  EXPECT_EQ(g_allow_provider_calls, 0);
 }

@@ -1,9 +1,13 @@
 #include "plugin_config.hpp"
 
 #include <exception>
+#include <filesystem>
+#include <fstream>
 #include <mutex>
 #include <set>
+#include <sstream>
 #include <string>
+#include <system_error>
 #include <utility>
 
 #include <godot_cpp/classes/dir_access.hpp>
@@ -17,6 +21,7 @@
 #include "core/storage_paths.hpp"
 #include "log_system.hpp"
 #include "tools/authorization.hpp"
+#include "tools/runtime_ops.hpp"
 #include "util/project_path.hpp"
 
 namespace godot_autopilot {
@@ -168,6 +173,55 @@ bool write_config_value(const std::string &path, const char *key,
   return true;
 }
 
+std::string read_config_text_standalone(const std::string &path) {
+  if (path.empty()) {
+    return std::string();
+  }
+  const std::filesystem::path file_path = to_fs_path(path);
+  std::error_code error;
+  if (!std::filesystem::is_regular_file(file_path, error) || error) {
+    return std::string();
+  }
+  std::ifstream file(file_path, std::ios::binary);
+  if (!file) {
+    return std::string();
+  }
+  std::ostringstream buffer;
+  buffer << file.rdbuf();
+  return buffer.str();
+}
+
+bool read_startup_config_value(const char *key, std::string &out) {
+  const std::string primary_text =
+      read_config_text_standalone(global_config_file_path());
+  if (primary_text.empty()) {
+    return false;
+  }
+  mcp::JsonValue value;
+  bool from_legacy = false;
+  std::string error;
+  if (!LegacyStore::select_config_value(primary_text, std::string(), key, value,
+                                        from_legacy, error)) {
+    return false;
+  }
+  if (!value.IsString()) {
+    return false;
+  }
+  out = value.GetString();
+  return true;
+}
+
+void publish_startup_config_snapshot() {
+  std::string allow;
+  if (read_startup_config_value(kAllowKey, allow)) {
+    authorization::publish_allow_snapshot(allow);
+  }
+  std::string mode;
+  if (read_startup_config_value(kAuthModeKey, mode)) {
+    authorization::publish_auth_mode_snapshot(mode);
+  }
+}
+
 } // namespace
 
 namespace {
@@ -175,6 +229,7 @@ struct AllowProviderRegistration {
   AllowProviderRegistration() {
     authorization::set_allow_provider(&PluginConfig::load_allow);
     authorization::set_auth_mode_provider(&PluginConfig::load_auth_mode);
+    publish_startup_config_snapshot();
   }
 } g_allow_provider_registration;
 } // namespace
@@ -242,8 +297,12 @@ bool PluginConfig::load_desensitize() {
 }
 
 bool PluginConfig::save_desensitize(bool value) {
-  return write_config_value(global_config_file_path(), kDesensitizeKey,
-                             mcp::JsonValue(value));
+  if (!write_config_value(global_config_file_path(), kDesensitizeKey,
+                          mcp::JsonValue(value))) {
+    return false;
+  }
+  authorization::refresh_config_snapshot();
+  return true;
 }
 
 std::string PluginConfig::load_allow() {
@@ -264,8 +323,12 @@ std::string PluginConfig::load_allow() {
 }
 
 bool PluginConfig::save_allow(const std::string &allow) {
-  return write_config_value(global_config_file_path(), kAllowKey,
-                             mcp::JsonValue(allow));
+  if (!write_config_value(global_config_file_path(), kAllowKey,
+                          mcp::JsonValue(allow))) {
+    return false;
+  }
+  authorization::refresh_config_snapshot();
+  return true;
 }
 
 std::string PluginConfig::load_auth_mode() {
@@ -287,8 +350,12 @@ std::string PluginConfig::load_auth_mode() {
 }
 
 bool PluginConfig::save_auth_mode(const std::string &mode) {
-  return write_config_value(global_config_file_path(), kAuthModeKey,
-                             mcp::JsonValue(mode));
+  if (!write_config_value(global_config_file_path(), kAuthModeKey,
+                          mcp::JsonValue(mode))) {
+    return false;
+  }
+  authorization::refresh_config_snapshot();
+  return true;
 }
 
 } // namespace godot_autopilot
