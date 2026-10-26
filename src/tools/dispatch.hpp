@@ -35,6 +35,10 @@ mcp::JsonValue main_thread_timeout_result(const std::string &label,
                                           int64_t waited_ms,
                                           bool cancelled_before_execution);
 
+std::string dispatch_exception_message(const std::string &name,
+                                       const std::string &reason,
+                                       const mcp::JsonValue &args);
+
 mcp::JsonValue queue_unavailable_result(const std::string &name,
                                         const std::string &reason);
 
