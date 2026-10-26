@@ -43,7 +43,7 @@ JV handle_list_directory(const JV &args) {
     max_entries = static_cast<int>(mp->GetInt());
   if (max_entries < 1)
     max_entries = 1;
-  const auto checked = util::normalize_project_path(pp->GetString(), true);
+  const auto checked = util::normalize_project_path(pp->GetString(), true, true);
   if (!checked.valid())
     return util::error_detail("path rejected", "path", checked.error,
                               "list only inside the project namespaces");
@@ -97,7 +97,7 @@ JV handle_get_file_info(const JV &args) {
   auto *pp = args.Find("path");
   if (!pp || !pp->IsString())
     return util::error_json("missing required parameter: path");
-  const auto checked = util::normalize_project_path(pp->GetString(), true);
+  const auto checked = util::normalize_project_path(pp->GetString(), true, true);
   if (!checked.valid())
     return util::error_detail("path rejected", "path", checked.error,
                               "use a res:// or user:// project path");

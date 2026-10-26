@@ -4,6 +4,7 @@
 #include "tools/dispatch.hpp"
 #include "tools/runtime_ops.hpp"
 #include "util/error_util.hpp"
+#include "util/project_path.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/os.hpp>
@@ -67,6 +68,8 @@ struct OsProcessState {
   godot::Ref<godot::FileAccess> stderr_pipe;
   std::string stdout_text;
   std::string stderr_text;
+  bool stdout_truncated = false;
+  bool stderr_truncated = false;
   bool capture_output = false;
   int64_t started_ms = 0;
 };
@@ -75,7 +78,8 @@ std::mutex g_process_mutex;
 std::map<int64_t, std::shared_ptr<OsProcessState>> g_process_states;
 std::atomic<int64_t> g_process_seq{1};
 
-void drain_pipe(const godot::Ref<godot::FileAccess> &pipe, std::string *out) {
+void drain_pipe(const godot::Ref<godot::FileAccess> &pipe, std::string *out,
+                bool &truncated) {
   if (pipe.is_null() || !pipe->is_open())
     return;
   uint64_t available = pipe->get_length();
@@ -87,8 +91,18 @@ void drain_pipe(const godot::Ref<godot::FileAccess> &pipe, std::string *out) {
   const uint64_t read = pipe->get_buffer(buffer.data(), available);
   if (read == 0)
     return;
-  out->append(reinterpret_cast<const char *>(buffer.data()),
-              static_cast<size_t>(read));
+  if (out == nullptr)
+    return;
+  constexpr size_t limit = GDA_SCAN_MAX_FILE_BYTES;
+  if (out->size() + static_cast<size_t>(read) <= limit) {
+    out->append(reinterpret_cast<const char *>(buffer.data()),
+                static_cast<size_t>(read));
+    return;
+  }
+  const size_t room = limit > out->size() ? limit - out->size() : 0;
+  if (room > 0)
+    out->append(reinterpret_cast<const char *>(buffer.data()), room);
+  truncated = true;
 }
 
 std::shared_ptr<OsProcessState> take_process_state(int64_t op_id) {
@@ -106,8 +120,11 @@ JV advance_os_process(int64_t op_id) {
     e["error"] = JV("the external process wait state is gone");
     return e;
   }
-  drain_pipe(state->stdout_pipe, &state->stdout_text);
-  drain_pipe(state->stderr_pipe, &state->stderr_text);
+  const bool capture = state->capture_output;
+  drain_pipe(state->stdout_pipe, capture ? &state->stdout_text : nullptr,
+             state->stdout_truncated);
+  drain_pipe(state->stderr_pipe, capture ? &state->stderr_text : nullptr,
+             state->stderr_truncated);
   auto *os = godot::OS::get_singleton();
   const int32_t exit_code =
       os ? os->get_process_exit_code(static_cast<int32_t>(state->pid)) : -1;
@@ -116,8 +133,10 @@ JV advance_os_process(int64_t op_id) {
     r["done"] = JV(false);
     return r;
   }
-  drain_pipe(state->stdout_pipe, &state->stdout_text);
-  drain_pipe(state->stderr_pipe, &state->stderr_text);
+  drain_pipe(state->stdout_pipe, capture ? &state->stdout_text : nullptr,
+             state->stdout_truncated);
+  drain_pipe(state->stderr_pipe, capture ? &state->stderr_text : nullptr,
+             state->stderr_truncated);
   {
     std::lock_guard<std::mutex> lock(g_process_mutex);
     g_process_states.erase(op_id);
@@ -125,9 +144,12 @@ JV advance_os_process(int64_t op_id) {
   godot::Dictionary d;
   d["exit_code"] = static_cast<int64_t>(exit_code);
   d["stdout"] =
-      godot::String(state->capture_output ? state->stdout_text.c_str() : "");
+      godot::String(capture ? state->stdout_text.c_str() : "");
   d["stderr"] =
-      godot::String(state->capture_output ? state->stderr_text.c_str() : "");
+      godot::String(capture ? state->stderr_text.c_str() : "");
+  d["stdout_truncated"] = capture && state->stdout_truncated;
+  d["stderr_truncated"] = capture && state->stderr_truncated;
+  d["max_output_bytes"] = static_cast<int64_t>(GDA_SCAN_MAX_FILE_BYTES);
   JV r(JV::object_tag);
   r["done"] = JV(true);
   r["result"] = VariantJson::serialize(d);
@@ -652,11 +674,15 @@ JV handle_os_move_to_trash(const JV &args) {
   }
 
   std::string path = path_p->GetString();
-  godot::String os_path(path.c_str());
+  const util::ProjectPath checked =
+      util::normalize_project_path(path, true, false);
+  if (!checked.valid())
+    return util::error_detail("path rejected", "path", checked.error,
+                              "move only project files and user files to the "
+                              "trash; the namespace root is not trashable");
+  godot::String os_path(checked.value.c_str());
   if (auto *ps = godot::ProjectSettings::get_singleton()) {
-    if (os_path.begins_with("res://") || os_path.begins_with("user://")) {
-      os_path = ps->globalize_path(os_path);
-    }
+    os_path = ps->globalize_path(os_path);
   }
   godot::Error err = os->move_to_trash(os_path);
 

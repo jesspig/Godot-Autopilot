@@ -4,7 +4,9 @@
 #include "core/scene_dirty_tracker.hpp"
 #include "tools/debugger_ops.hpp"
 #include "tools/scene_ops.hpp"
+#include "util/error_util.hpp"
 #include "util/gdscript_wrap.hpp"
+#include "util/project_path.hpp"
 #include "util/resource_fs.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/dir_access.hpp>
@@ -345,6 +347,13 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
   }
   std::string path = it_path->GetString();
   std::string source_code = it_code->GetString();
+
+  const util::ProjectPath checked =
+      util::normalize_project_path(path, false, false);
+  if (!checked.valid())
+    return util::error_detail("path rejected", "path", checked.error,
+                              "write only inside the project root");
+  path = checked.value;
 
   bool overwrite = false;
   auto *it_overwrite = args.Find("overwrite");
