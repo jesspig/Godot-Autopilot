@@ -1,4 +1,5 @@
 #include "core/command_queue.hpp"
+#include "core/sanitize_policy.hpp"
 #include "tools/dispatch.hpp"
 #include "tools/tool_spec.hpp"
 
@@ -6,7 +7,10 @@
 
 #include <string>
 
+#include "util/console_encoding.hpp"
+
 using godot_autopilot::CommandQueue;
+using godot_autopilot::dispatch::dispatch_exception_message;
 using godot_autopilot::dispatch::dispatch_timeout_result;
 using godot_autopilot::dispatch::queue_unavailable_result;
 using godot_autopilot::dispatch::run_main_thread_slice;
@@ -18,6 +22,22 @@ namespace {
 mcp::JsonValue empty_payload() {
   return mcp::JsonValue(mcp::JsonValue::object_tag);
 }
+
+class SanitizePolicyGuard {
+public:
+  explicit SanitizePolicyGuard(bool enabled)
+      : previous_(godot_autopilot::sanitize_policy::enabled()) {
+    godot_autopilot::sanitize_policy::set_enabled(enabled);
+  }
+  ~SanitizePolicyGuard() {
+    godot_autopilot::sanitize_policy::set_enabled(previous_);
+  }
+  SanitizePolicyGuard(const SanitizePolicyGuard &) = delete;
+  SanitizePolicyGuard &operator=(const SanitizePolicyGuard &) = delete;
+
+private:
+  bool previous_;
+};
 
 } // namespace
 
@@ -149,4 +169,60 @@ TEST(DispatchSemanticsTest, MainThreadSliceRejectionBecomesStructuredError) {
   ASSERT_NE(result.Find("error"), nullptr);
   EXPECT_EQ(result["code"].GetString(), "queue_unavailable");
   EXPECT_TRUE(result["retryable"].GetBool());
+}
+
+TEST(DispatchSemanticsTest, MainThreadSliceTimeoutReportsRealCancelOutcome) {
+  CommandQueue queue;
+  bool slice_ran = false;
+  const int64_t budget_ms = 50;
+
+  const mcp::JsonValue result = run_main_thread_slice(
+      queue, "gda_probe",
+      [&slice_ran]() {
+        slice_ran = true;
+        return empty_payload();
+      },
+      budget_ms);
+
+  EXPECT_FALSE(slice_ran);
+  ASSERT_NE(result.Find("error"), nullptr);
+  EXPECT_EQ(result["code"].GetString(), "main_thread_timeout");
+  EXPECT_TRUE(result["cancelled"].GetBool());
+  ASSERT_NE(result.Find("cancelled_before_execution"), nullptr);
+  EXPECT_TRUE(result["cancelled_before_execution"].GetBool());
+  ASSERT_NE(result.Find("waited_ms"), nullptr);
+  EXPECT_LE(result["waited_ms"].GetInt(), budget_ms);
+  EXPECT_GE(result["waited_ms"].GetInt(), 0);
+}
+
+TEST(DispatchSemanticsTest, ExceptionMessageDropsSensitiveArgValues) {
+  SanitizePolicyGuard policy(true);
+  const std::string sentinel = "GDA_SENTINEL_4711";
+  mcp::JsonValue args(mcp::JsonValue::object_tag);
+  args["password"] = mcp::JsonValue(sentinel);
+  args["path"] = mcp::JsonValue("/tmp/visible.txt");
+
+  const std::string message =
+      dispatch_exception_message("gda_probe", "boom", args);
+
+  EXPECT_EQ(message.find(sentinel), std::string::npos);
+  EXPECT_NE(message.find("gda_probe"), std::string::npos);
+  EXPECT_NE(message.find("boom"), std::string::npos);
+  EXPECT_NE(message.find("/tmp/visible.txt"), std::string::npos);
+}
+
+TEST(DispatchSemanticsTest, ExceptionMessageKeepsTruncatedMultibyteArgsValid) {
+  std::string payload;
+  for (int i = 0; i < 200; ++i) {
+    payload += "\xE4\xB8\xAD";
+  }
+  mcp::JsonValue args(mcp::JsonValue::object_tag);
+  args["text"] = mcp::JsonValue(payload);
+
+  const std::string message =
+      dispatch_exception_message("gda_probe", "boom", args);
+
+  EXPECT_TRUE(godot_autopilot::util::is_valid_utf8(message));
+  EXPECT_NE(message.find("\xE4\xB8\xAD"), std::string::npos);
+  EXPECT_LT(message.size(), payload.size());
 }

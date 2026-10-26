@@ -14,6 +14,7 @@
 #include "tools/tool_spec.hpp"
 #include <mcp/Content.hpp>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <exception>
@@ -30,6 +31,29 @@ namespace {
 std::mutex g_handlers_mutex;
 HandlerMap g_handlers;
 HandlerMap g_meta_handlers;
+
+constexpr std::size_t kErrorArgsPreviewBytes = 256;
+constexpr std::size_t kTraceArgsTextBytes = 512;
+
+std::string truncate_utf8_prefix(const std::string &text,
+                                 std::size_t max_bytes) {
+  if (text.size() <= max_bytes) {
+    return text;
+  }
+  std::size_t cut = max_bytes;
+  while (cut > 0 &&
+         (static_cast<unsigned char>(text[cut]) & 0xC0) == 0x80) {
+    --cut;
+  }
+  return text.substr(0, cut);
+}
+
+std::string sanitized_args_preview(const mcp::JsonValue &args) {
+  const SanitizeResult sanitized =
+      TraceRecorder::sanitize_args(args.Dump(), sanitize_policy::enabled());
+  return mcp::JsonValue::SanitizeUtf8(
+      truncate_utf8_prefix(sanitized.text, kErrorArgsPreviewBytes));
+}
 
 void record_dispatch_exception(const std::string &name,
                                const mcp::JsonValue &args,
@@ -62,10 +86,8 @@ void record_dispatch_exception(const std::string &name,
   event.thread_id = TraceRecorder::current_thread_id();
   event.monotonic_ns = TraceRecorder::monotonic_now_ns();
   event.error_type = "internal";
-  std::string args_text = sanitized.text;
-  if (args_text.size() > 512) {
-    args_text.resize(512);
-  }
+  std::string args_text =
+      truncate_utf8_prefix(sanitized.text, kTraceArgsTextBytes);
   monitor::tool_call(
       std::move(event), LogLevel::Error,
       "call_tool " + name + " -> error internal",
@@ -112,24 +134,14 @@ mcp::JsonValue call_handler_impl(const std::string &name,
     try {
       result = handler(args);
     } catch (const std::exception &ex) {
-      std::string args_dump = args.Dump();
-      if (args_dump.size() > 256) {
-        args_dump.resize(256);
-      }
       result = mcp::JsonValue(mcp::JsonValue::object_tag);
-      result["error"] = mcp::JsonValue(
-          "internal error in tool '" + name + "': " + std::string(ex.what()) +
-          " (args: " + args_dump + ")");
+      result["error"] =
+          mcp::JsonValue(dispatch_exception_message(name, ex.what(), args));
       record_dispatch_exception(name, args, result);
     } catch (...) {
-      std::string args_dump = args.Dump();
-      if (args_dump.size() > 256) {
-        args_dump.resize(256);
-      }
       result = mcp::JsonValue(mcp::JsonValue::object_tag);
-      result["error"] = mcp::JsonValue("internal error in tool '" + name +
-                                       "': unexpected C++ exception (args: " +
-                                       args_dump + ")");
+      result["error"] = mcp::JsonValue(
+          dispatch_exception_message(name, "unexpected C++ exception", args));
       record_dispatch_exception(name, args, result);
     }
   } else {
@@ -251,6 +263,13 @@ void emit_dispatch_timeout_observation(const std::string &name,
 }
 
 } // namespace
+
+std::string dispatch_exception_message(const std::string &name,
+                                       const std::string &reason,
+                                       const mcp::JsonValue &args) {
+  return "internal error in tool '" + name + "': " + reason + " (args: " +
+         sanitized_args_preview(args) + ")";
+}
 
 mcp::JsonValue queue_unavailable_result(const std::string &name,
                                         const std::string &reason) {
@@ -472,6 +491,7 @@ mcp::JsonValue run_main_thread_slice(CommandQueue &queue, const std::string &lab
   if (queue.is_main_thread()) {
     return slice();
   }
+  const auto submit_time = std::chrono::steady_clock::now();
   CommandQueue::TrackedSubmission<mcp::JsonValue> submission;
   try {
     submission = queue.submit_tracked(std::move(slice));
@@ -489,8 +509,19 @@ mcp::JsonValue run_main_thread_slice(CommandQueue &queue, const std::string &lab
     return queue_unavailable_result(label, "unknown queue failure");
   }
   if (status != std::future_status::ready) {
-    queue.cancel(submission.id);
-    return main_thread_timeout_result(label, budget_ms, false);
+    bool cancelled = false;
+    int64_t waited_ms = budget_ms;
+    try {
+      cancelled = queue.cancel(submission.id);
+      const int64_t elapsed_ms =
+          std::chrono::duration_cast<std::chrono::milliseconds>(
+              std::chrono::steady_clock::now() - submit_time)
+              .count();
+      waited_ms = elapsed_ms < budget_ms ? elapsed_ms : budget_ms;
+    } catch (...) {
+      cancelled = false;
+    }
+    return main_thread_timeout_result(label, waited_ms, cancelled);
   }
   try {
     return submission.future.get();
