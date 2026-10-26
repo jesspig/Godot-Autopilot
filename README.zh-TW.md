@@ -5,7 +5,7 @@
 ![Godot版本](https://img.shields.io/badge/Godot-4.7%2B-478CBF?logo=godotengine&logoColor=white)
 ![支援平台](https://img.shields.io/badge/platform-Windows%7CLinux%7CmacOS-lightgrey)
 [![協議](https://img.shields.io/badge/MCP-Streamable_HTTP-blueviolet)](https://modelcontextprotocol.io/)
-![工具數](https://img.shields.io/badge/tools-451%2B-brightgreen)
+![工具數](https://img.shields.io/badge/tools-452%2B-brightgreen)
 
 > **讓 AI 代理在編輯器內幫你搭建場景、試玩與除錯。**
 
@@ -23,7 +23,7 @@ Godot-Autopilot 是一個住在 **Godot 編輯器內部**的外掛型 [MCP](http
 
 ## 能做什麼
 
-超過 **451 個工具**，涵蓋從編輯器到遊戲的完整閉環（數量隨版本增長，以代理透過 `search_tools` 查到的為準）。重點功能：
+超過 **452 個工具**，涵蓋從編輯器到遊戲的完整閉環（數量隨版本增長，以代理透過 `search_tools` 查到的為準）。重點功能：
 
 - **搭建場景**——建立、重新命名、移動、刪除節點；讀寫屬性；連接訊號；以 GridMap 搭建三維方塊地圖關卡（如 `create_scene_node`、`property_set`、`signal_connect`、`scene_tree_items`；GridMap：`create_gridmap`、`set_gridmap_cell`、`fill_gridmap_box`）。
 - **畫面、聲音與手感**——網格與材質、燈光與環境、音訊播放、動畫與補間、UI 主題、圖塊地圖（如 `create_animation`、`tween_editor_property`、`create_game_tween`、`play_audio_player`、`fill_tilemap_rect`）。
@@ -41,7 +41,7 @@ Godot-Autopilot 是一個住在 **Godot 編輯器內部**的外掛型 [MCP](http
 2. **執行**——單步操作用 `call_tool`，批次操作用 `batch_execute`。
 3. **驗證**——截圖查看結果，與上一次截圖比對，有問題就修，修完再確認。
 
-為了讓代理開箱即用，外掛內建 **9 冊技能書**（總覽、呼叫指南，以及場景、資源、腳本、執行階段、伺服器、內容、C# 分冊）與 **7 篇新手指南**（3D 場景、角色控制器、物理除錯、輸入映射、GUI 等）。在 **MCP Config** 面板按一下，即可將技能書產生到專案的 `.agents/skills/` 目錄。定位：MCP 是主要產品通道，技能書/腳本是體驗層——呼叫指南在 MCP 失效時改用腳本橋接（需 Node 18+ 或 Bun），無腳本執行環境時則提供手動指南。
+為了讓代理開箱即用，外掛內建 **9 冊技能書**（總覽、呼叫指南，以及場景、資源、腳本、執行階段、伺服器、內容、C# 分冊）與 **7 篇新手指南**（3D 場景、角色控制器、物理除錯、輸入映射、GUI 等）。在 **MCP Config** 面板按一下，即可將技能書產生到專案的 `.agents/skills/` 目錄。定位：MCP 是主要產品通道，技能書/腳本是體驗層——呼叫指南在 MCP 失效時改用 GDA CLI，無 CLI 時則提供手動指南。
 
 外掛隨附兩個編輯器面板：
 
@@ -86,7 +86,7 @@ bun install -g github:jesspig/Godot-Autopilot#0.3.0
 gda ping
 ```
 
-命令族：**呼叫族** —— `ping` / `status` / `categories` / `search` / `describe` / `call`；**生命週期** —— `list` / `start` / `stop` / `restart` / `logs`；**控制面** —— `serve`。
+命令族：**呼叫族** —— `ping` / `status` / `categories` / `search` / `describe` / `call`；**生命週期** —— `list` / `start` / `stop` / `restart` / `logs`；**控制面** —— `serve`；**REST 族** —— `api`（子命令 `list` / `describe` / `call`，不經 MCP 握手直接呼叫 REST）；`endpoints`（展示 MCP/REST 端點、連接埠來源與存活探針結果）。
 
 需要 **Bun**；機器上沒有 Bun 或 Node 時，直接改用 Releases 頁的 `gda` 獨立執行檔（完整參考見 [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md)）。
 
@@ -126,7 +126,7 @@ leave code_execute and game_runtime disabled unless I ask for them.
 
 ## 素材聲明
 
-`demo/` 下的 5 個範例專案（2D/3D 入門教學、UI 控制項展示、視埠合成、連線 Pong）來自官方 [Godot 演示合集](https://github.com/godotengine/godot-demo-projects)，倉庫僅保留其素材與乾淨工程設定供測試使用，版權與授權見各專案目錄內的 README 與 LICENSE。
+`demo/` 下的 5 個範例專案（2D/3D 入門教學、UI 控制項展示、視埠合成、連線 Pong）來自官方 [Godot 演示合集](https://github.com/godotengine/godot-demo-projects)，倉庫僅保留其素材與乾淨工程設定供測試使用。第 6 個專案 `demo/pink_man_adventure` 是從歷史 `Example/` 範例工程還原的倉庫內範例：173 張 PNG 素材來自 Pixel Frog 的 Pixel Adventure 1（CC0 1.0），設計文件為本倉庫原創。版權與授權見各專案目錄內的 README 與 LICENSE。
 
 ## 授權
 

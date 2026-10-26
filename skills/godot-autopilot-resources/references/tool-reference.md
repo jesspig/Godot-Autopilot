@@ -1,8 +1,8 @@
 # Resource Tool Reference
 
-The 27 resource domain tools plus the three text-file tools from the OS domain. Domain tools are invoked through `call_tool`; see the godot-autopilot skill for the protocol.
+The 34 resource domain tools plus the three text-file tools from the OS domain. Domain tools are invoked through `call_tool`; see the godot-autopilot skill for the protocol.
 
-## Resource domain (27 tools)
+## Resource domain (34 tools)
 
 | Tool | Purpose |
 |---|---|
@@ -33,6 +33,13 @@ The 27 resource domain tools plus the three text-file tools from the OS domain. 
 | `set_resource_import_options` | Set whitelisted `.import` `[params]` keys on an imported asset and queue a reimport; hand-writing `.import` files is deprecated. |
 | `set_resource_property` | Set a property on a resource located by `object_id`/`object_id_str`, `name` or `path`. |
 | `get_resource_property` | Read a property value from a located resource. |
+| `create_curve_resource` | Create an in-memory Curve2D or Curve3D registered under a memory name. |
+| `set_curve_points` | Replace all control points of an in-memory curve all-or-nothing. |
+| `get_curve_baked_points` | Read the baked polyline of an in-memory curve. |
+| `create_primitive_mesh` | Create an in-memory PrimitiveMesh of a given type registered under a memory name. |
+| `create_array_mesh` | Create an in-memory ArrayMesh triangle surface from vertices registered under a memory name. |
+| `set_mesh_surface_material` | Assign a Material to one surface of a mesh. |
+| `assign_mesh_to_instance` | Assign a mesh to a MeshInstance2D or MeshInstance3D node. |
 
 ## Text-file tools (OS domain)
 

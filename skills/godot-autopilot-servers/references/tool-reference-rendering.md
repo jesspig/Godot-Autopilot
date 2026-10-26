@@ -1,6 +1,6 @@
 # Rendering and Text Tool Reference
 
-Complete tool tables for the render (49 tools) and text (10 tools) domains.
+Complete tool tables for the render (52 tools) and text (10 tools) domains.
 Every name below is a registered tool name - pass it to `call_tool`. See
 `SKILL.md` in the parent folder for workflows and the RID mental model.
 
@@ -61,6 +61,9 @@ Every name below is a registered tool name - pass it to `call_tool`. See
 | `set_render_particles_emitting` | Emission on/off. |
 | `restart_render_particles` | Force a fresh emission cycle. |
 | `set_render_particles_lifetime` | Particle lifetime in seconds (default 1.0). |
+| `restart_particles` | Restart a particle node from the beginning even while emitting. |
+| `set_particles_params` | Set playback parameters on a particle node. |
+| `get_particles_state` | Read playback state of a particle node. |
 
 ## Environment post-effects
 

@@ -5,7 +5,7 @@
 ![Godot](https://img.shields.io/badge/Godot-4.7%2B-478CBF?logo=godotengine&logoColor=white)
 ![플랫폼](https://img.shields.io/badge/platform-Windows%7CLinux%7CmacOS-lightgrey)
 [![프로토콜](https://img.shields.io/badge/MCP-Streamable_HTTP-blueviolet)](https://modelcontextprotocol.io/)
-![도구 수](https://img.shields.io/badge/tools-451%2B-brightgreen)
+![도구 수](https://img.shields.io/badge/tools-452%2B-brightgreen)
 
 > **AI 에이전트가 에디터 안에서 Godot 게임을 빌드하고 플레이테스트하며 디버깅합니다.**
 
@@ -23,7 +23,7 @@ Godot-Autopilot은 **Godot 에디터 내부**에서 플러그인으로 동작하
 
 ## 주요 기능
 
-**451개 이상의 도구**로 에디터부터 게임까지 전체 과정을 지원합니다(정확한 수는 버전마다 증가하므로 `search_tools`를 통해 에이전트에게 확인하도록 요청하십시오). 주요 기능:
+**452개 이상의 도구**로 에디터부터 게임까지 전체 과정을 지원합니다(정확한 수는 버전마다 증가하므로 `search_tools`를 통해 에이전트에게 확인하도록 요청하십시오). 주요 기능:
 
 - **씬 빌드** — 노드를 생성, 이름 변경, 이동, 삭제합니다. 속성을 읽고 쓰며, 시그널을 연결하고, GridMap으로 3D 블록 레벨을 구축합니다(예: `create_scene_node`, `property_set`, `signal_connect`, `scene_tree_items`; GridMap: `create_gridmap`, `set_gridmap_cell`, `fill_gridmap_box`).
 - **외관, 사운드 및 질감** — 메시와 머티리얼, 조명과 환경, 오디오 재생, 애니메이션과 트윈, UI 테마, 타일맵을 지원합니다(예: `create_animation`, `tween_editor_property`, `create_game_tween`, `play_audio_player`, `fill_tilemap_rect`).
@@ -41,7 +41,7 @@ Godot-Autopilot은 **Godot 에디터 내부**에서 플러그인으로 동작하
 2. **실행** — 단일 단계에는 `call_tool`, 일괄 처리에는 `batch_execute`를 사용합니다.
 3. **검증** — 결과를 스크린샷으로 확인하고 이전 캡처와 비교한 뒤 수정하고 반복합니다.
 
-에이전트가 바로 원활하게 동작하도록 플러그인에 **스킬북 9권**(개요, 호출 가이드, 씬, 리소스, 스크립팅, 런타임, 서버, 콘텐츠, C# 편)과 **시작 가이드 7편**(3D 씬, 캐릭터 컨트롤러, 물리 디버깅, 입력 맵, GUI, …)을 포함합니다. **MCP Config** 패널에서 한 번 클릭하면 프로젝트의 `.agents/skills/`에 스킬이 생성됩니다. MCP를 주 제품 채널로 삼고 스킬/스크립트를 경험 계층으로 둡니다. 호출 가이드는 MCP가 중단될 경우 스크립트 브리지로 대체되며(Node 18+ 또는 Bun 필요), 스크립트 런타임이 없을 경우에는 수동 가이드로 대체됩니다.
+에이전트가 바로 원활하게 동작하도록 플러그인에 **스킬북 9권**(개요, 호출 가이드, 씬, 리소스, 스크립팅, 런타임, 서버, 콘텐츠, C# 편)과 **시작 가이드 7편**(3D 씬, 캐릭터 컨트롤러, 물리 디버깅, 입력 맵, GUI, …)을 포함합니다. **MCP Config** 패널에서 한 번 클릭하면 프로젝트의 `.agents/skills/`에 스킬이 생성됩니다. MCP를 주 제품 채널로 삼고 스킬/스크립트를 경험 계층으로 둡니다. 호출 가이드는 MCP가 중단될 경우 GDA CLI로 대체되며, CLI가 없을 경우에는 수동 가이드로 대체됩니다.
 
 플러그인에는 두 개의 에디터 패널이 포함됩니다.
 
@@ -86,7 +86,7 @@ bun install -g github:jesspig/Godot-Autopilot#0.3.0
 gda ping
 ```
 
-명령 계열: **호출 계열** — `ping` / `status` / `categories` / `search` / `describe` / `call`；**수명 주기** — `list` / `start` / `stop` / `restart` / `logs`；**제어면** — `serve`.
+명령 계열: **호출 계열** — `ping` / `status` / `categories` / `search` / `describe` / `call`；**수명 주기** — `list` / `start` / `stop` / `restart` / `logs`；**제어면** — `serve`；**REST 계열** — `api`(`list` / `describe` / `call` 하위 명령, MCP 핸드셰이크 없이 REST 직접 호출)；`endpoints`(MCP/REST 엔드포인트, 포트 출처, 활성 프로브 결과 출력).
 
 **Bun**이 필요합니다. Bun도 Node도 없는 환경에서는 Releases의 `gda` 단일 실행 파일을 사용하세요 (전체 참조는 [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md)).
 
@@ -126,7 +126,7 @@ leave code_execute and game_runtime disabled unless I ask for them.
 
 ## 에셋 출처 표기
 
-`demo/` 아래 5개 예제 프로젝트(2D/3D 입문 튜토리얼, UI 컨트롤 갤러리, 뷰포트 구성, 네트워크 퐁)는 공식 [Godot 데모 프로젝트](https://github.com/godotengine/godot-demo-projects)에서 가져왔으며, 테스트용으로 에셋과 정리된 프로젝트 설정만 유지합니다. 저작권과 라이선스 세부 정보는 각 프로젝트의 README와 LICENSE 파일에 있습니다.
+`demo/` 아래 5개 예제 프로젝트(2D/3D 입문 튜토리얼, UI 컨트롤 갤러리, 뷰포트 구성, 네트워크 퐁)는 공식 [Godot 데모 프로젝트](https://github.com/godotengine/godot-demo-projects)에서 가져왔으며, 테스트용으로 에셋과 정리된 프로젝트 설정만 유지합니다. 여섯 번째 프로젝트 `demo/pink_man_adventure`는 과거 `Example/` 데모 프로젝트에서 복원한 저장소 내 예제입니다. 173장의 PNG 에셋은 Pixel Frog의 Pixel Adventure 1(CC0 1.0)에서 가져왔으며, 설계 문서는 이 저장소의 오리지널입니다. 저작권과 라이선스 세부 정보는 각 프로젝트의 README와 LICENSE 파일에 있습니다.
 
 ## 라이선스
 

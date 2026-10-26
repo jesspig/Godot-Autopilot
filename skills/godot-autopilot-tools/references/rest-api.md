@@ -152,7 +152,7 @@ console.log(await call("POST", "/tools/create_scene_node", { type: "Node2D", nam
 A valid token proves who is calling; it does not grant anything. The capability gate still applies, and it is checked on every call:
 
 - **Read** tools — those whose side effect is `none` — are allowed by default.
-- **Write** tools — `writes_file`, `writes_config`, `shows_alert`, `modifies_window` — are **denied by default**. They need the `write` capability in the allow list.
+- **Write** tools — `writes_file`, `writes_config`, `shows_alert`, `modifies_window`, `writes_scene` — are **denied by default**. They need the `write` capability in the allow list.
 - **Danger** tools — `process`, `code_execute`, `game_runtime`, `destructive` — are denied by default and need their own capability.
 
 Enable a capability with the `GODOT_AUTOPILOT_ALLOW` environment variable (a comma-separated list, or `all`) and an engine restart, or with the matching checkbox in the plugin's MCP Config dock ("Allow code_execute", "Allow game_runtime", "Allow user tools", "Allow write", "Allow destructive"), which saves to the plugin config and takes effect on the next call with no restart. Un-ticking a box removes only that one capability. A denied call answers 403 and names the capability it needs — a write-class call answers 403 authorization_required unless `write` is allowed. This face cannot widen the allow list per request — there is no field in the body that does that.

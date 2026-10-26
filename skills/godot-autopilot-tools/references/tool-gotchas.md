@@ -301,10 +301,11 @@ Two editor states block otherwise valid calls. Both have a defined recovery:
 
 Before the traps: the capability gate now has three tiers. Read-only tools
 (class `none`) are allowed by default. Write tools - `writes_file`,
-`writes_config`, `shows_alert`, `modifies_window` - are denied by default and
-need the `write` capability, so a client that used to save a file or set a
-project setting without any allow-list entry now gets an authorization error
-unless `write` (or `all`) is allowed. Danger tools are denied by default and
+`writes_config`, `shows_alert`, `modifies_window`, `writes_scene` - are
+denied by default and need the `write` capability, so a client that used to
+save a file or set a project setting without any allow-list entry now gets
+an authorization error unless `write` (or `all`) is allowed. Danger tools
+are denied by default and
 need their own capability: `code_execute` covers `code_execute` and
 `execute_script`, `game_runtime` covers the game runtime tools
 (`execute_game_script`, `queue_game_input`, `wait_game_input`,
@@ -401,6 +402,10 @@ risk:
   dismissed. Never fire one in a batch or without an explicit user request.
 - `modifies_window` - moves, resizes, focuses or flashes windows; also
   clipboard, mouse cursor and screen state.
+- `writes_scene` - edits the in-memory scene (node structure, properties,
+  signals, animation, tilemap, gridmap and theme data) even before the scene
+  is saved; the unsaved state feeds later runs, saves and exports, so treat
+  it as durable rather than undo-only.
 - `process` - spawns or kills OS processes, opens paths with the default
   application and edits the environment. The highest-risk class: commands
   run outside the project's scope, so double-check every argument before

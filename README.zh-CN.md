@@ -5,7 +5,7 @@
 ![Godot版本](https://img.shields.io/badge/Godot-4.7%2B-478CBF?logo=godotengine&logoColor=white)
 ![支持平台](https://img.shields.io/badge/platform-Windows%7CLinux%7CmacOS-lightgrey)
 [![协议](https://img.shields.io/badge/MCP-Streamable_HTTP-blueviolet)](https://modelcontextprotocol.io/)
-![工具数](https://img.shields.io/badge/tools-451%2B-brightgreen)
+![工具数](https://img.shields.io/badge/tools-452%2B-brightgreen)
 
 > **让 AI 代理在编辑器里帮你搭场景、试玩和排错。**
 
@@ -23,7 +23,7 @@ Godot-Autopilot 是一个住在 **Godot 编辑器内部**的插件型 [MCP](http
 
 ## 能做什么
 
-**451+ 个工具**，覆盖从编辑器到游戏的完整闭环（数量随版本增长，以代理通过 `search_tools` 查到的为准）。举例：
+**452+ 个工具**，覆盖从编辑器到游戏的完整闭环（数量随版本增长，以代理通过 `search_tools` 查到的为准）。举例：
 
 - **搭场景**——创建、改名、移动、删除节点，读写属性，连接信号，三维块地图 GridMap 搭关卡（如 `create_scene_node`、`property_set`、`signal_connect`、`scene_tree_items`；GridMap：`create_gridmap`、`set_gridmap_cell`、`fill_gridmap_box`）。
 - **画面与声音**——网格材质、灯光环境、音频播放、动画与补间、UI 主题、瓦片地图（如 `create_animation`、`tween_editor_property`、`create_game_tween`、`play_audio_player`、`fill_tilemap_rect`）。
@@ -41,7 +41,7 @@ Godot-Autopilot 是一个住在 **Godot 编辑器内部**的插件型 [MCP](http
 2. **执行**——单步用 `call_tool`，批量用 `batch_execute`。
 3. **验证**——截图看结果，与上次截图对比，有问题就修，再确认。
 
-为了让代理开箱即用，插件内置 **9 册技能书**（总纲 + 调用专册 + 场景、资源、脚本、运行时、服务器、内容、C# 分册）与 **7 篇新手指南**（3D 场景、角色控制器、物理排错、输入映射、GUI 等）。在 **MCP Config** 面板点一下，就能把技能渲染到项目的 `.agents/skills/` 目录。定位：MCP 是主产品通道，skill/脚本是体验层——调用专册在 MCP 失效时给脚本桥（需 Node 18+ 或 Bun），无脚本运行时则出手动指南。
+为了让代理开箱即用，插件内置 **9 册技能书**（总纲 + 调用专册 + 场景、资源、脚本、运行时、服务器、内容、C# 分册）与 **7 篇新手指南**（3D 场景、角色控制器、物理排错、输入映射、GUI 等）。在 **MCP Config** 面板点一下，就能把技能渲染到项目的 `.agents/skills/` 目录。定位：MCP 是主产品通道，skill/脚本是体验层——调用专册在 MCP 失效时改用 GDA CLI，无 CLI 时则出手动指南。
 
 插件自带两个编辑器面板：
 
@@ -86,7 +86,7 @@ bun install -g github:jesspig/Godot-Autopilot#0.3.0
 gda ping
 ```
 
-命令族：**调用族** —— `ping` / `status` / `categories` / `search` / `describe` / `call`；**生命周期** —— `list` / `start` / `stop` / `restart` / `logs`；**控制面** —— `serve`。
+命令族：**调用族** —— `ping` / `status` / `categories` / `search` / `describe` / `call`；**生命周期** —— `list` / `start` / `stop` / `restart` / `logs`；**控制面** —— `serve`；**REST 族** —— `api`（子命令 `list` / `describe` / `call`，不经 MCP 握手直调 REST）；`endpoints`（展示 MCP/REST 端点、端口来源与存活探针结果）。
 
 需要 **Bun**；机器上没有 Bun 或 Node 时，直接改用 Releases 页的 `gda` 独立可执行文件（完整参考见 [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md)）。
 

@@ -5,7 +5,7 @@
 ![Godot](https://img.shields.io/badge/Godot-4.7%2B-478CBF?logo=godotengine&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-Windows%7CLinux%7CmacOS-lightgrey)
 [![Protocol](https://img.shields.io/badge/MCP-Streamable_HTTP-blueviolet)](https://modelcontextprotocol.io/)
-![Tools](https://img.shields.io/badge/tools-451%2B-brightgreen)
+![Tools](https://img.shields.io/badge/tools-452%2B-brightgreen)
 
 > **Let an AI agent build, playtest, and debug your Godot game — from inside the editor.**
 
@@ -23,7 +23,7 @@ AI controlling a game character in real time during end-to-end tests:
 
 ## What it can do
 
-Over **451 tools** covering the whole editor-to-game loop (the exact count grows with each version — ask the agent to check via `search_tools`). Highlights:
+Over **452 tools** covering the whole editor-to-game loop (the exact count grows with each version — ask the agent to check via `search_tools`). Highlights:
 
 - **Build scenes** — create, rename, move, and delete nodes; read and write properties; connect signals; build 3D block levels with GridMap (e.g. `create_scene_node`, `property_set`, `signal_connect`, `scene_tree_items`; GridMap: `create_gridmap`, `set_gridmap_cell`, `fill_gridmap_box`).
 - **Look, sound, and feel** — meshes and materials, lights and environments, audio playback, animations and tweens, UI themes, tilemaps (e.g. `create_animation`, `tween_editor_property`, `create_game_tween`, `play_audio_player`, `fill_tilemap_rect`).
@@ -41,7 +41,7 @@ You don't need to memorize tool names. The agent follows a simple loop:
 2. **Act** — `call_tool` for one step, `batch_execute` for a batch.
 3. **Verify** — screenshot the result, compare with the previous capture, fix, and repeat.
 
-To make agents good at this out of the box, the plugin ships **9 skill books** (an overview, a calling guide, plus scenes, resources, scripting, runtime, servers, content, and C# volumes) and **7 starter guides** (3D scene, character controller, physics debugging, input map, GUI, …). One click in the **MCP Config** panel renders the skills into your project's `.agents/skills/`. Positioning: MCP is the primary product channel and skills/scripts are the experience layer — the calling guide falls back to a script bridge when MCP is down (needs Node 18+ or Bun) and to a manual guide with no script runtime.
+To make agents good at this out of the box, the plugin ships **9 skill books** (an overview, a calling guide, plus scenes, resources, scripting, runtime, servers, content, and C# volumes) and **7 starter guides** (3D scene, character controller, physics debugging, input map, GUI, …). One click in the **MCP Config** panel renders the skills into your project's `.agents/skills/`. Positioning: MCP is the primary product channel and skills/scripts are the experience layer — the calling guide falls back to the GDA CLI when MCP is down, and to a manual guide with no CLI available.
 
 Two editor panels come with the plugin:
 
@@ -86,7 +86,7 @@ bun install -g github:jesspig/Godot-Autopilot#0.3.0
 gda ping
 ```
 
-Command families: **calling** — `ping` / `status` / `categories` / `search` / `describe` / `call`; **lifecycle** — `list` / `start` / `stop` / `restart` / `logs`; **control plane** — `serve`.
+Command families: **calling** — `ping` / `status` / `categories` / `search` / `describe` / `call`; **lifecycle** — `list` / `start` / `stop` / `restart` / `logs`; **control plane** — `serve`; **REST** — `api` (`list` / `describe` / `call` subcommands, direct REST without MCP handshake); `endpoints` (prints the MCP/REST endpoints, port source, and liveness probe result).
 
 Requires **Bun**; on a machine without Bun or Node, use the standalone `gda` binary from the Releases page instead (see [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md) for the full reference).
 
