@@ -24,7 +24,8 @@ inline std::string project_path_slashes(std::string path) {
   return path;
 }
 
-inline std::string project_path_lexical(const std::string &path) {
+inline std::string project_path_lexical(const std::string &path,
+                                        bool &escaped) {
   std::vector<std::string> parts;
   size_t start = 0;
   while (start <= path.size()) {
@@ -35,8 +36,10 @@ inline std::string project_path_lexical(const std::string &path) {
     } else if (part == "..") {
       if (!parts.empty() && parts.back() != "..")
         parts.pop_back();
-      else
+      else {
+        escaped = true;
         return {};
+      }
     } else {
       parts.push_back(part);
     }
@@ -80,8 +83,7 @@ inline bool project_path_equal_prefix(const std::string &path,
 }
 
 inline ProjectPath normalize_project_path(const std::string &raw,
-                                          bool allow_user,
-                                          bool allow_root = true) {
+                                          bool allow_user, bool allow_root) {
   const std::string input = project_path_slashes(raw);
   if (input.empty())
     return {{}, "path is empty"};
@@ -94,8 +96,10 @@ inline ProjectPath normalize_project_path(const std::string &raw,
         project_path_slashes(util::to_std(settings->globalize_path("res://")));
     while (absolute_root.size() > 1 && absolute_root.back() == '/')
       absolute_root.pop_back();
-    std::string absolute = project_path_lexical(input);
-    if (absolute.empty() || !project_path_equal_prefix(absolute, absolute_root))
+    bool absolute_escaped = false;
+    const std::string absolute = project_path_lexical(input, absolute_escaped);
+    if (absolute_escaped || absolute.empty() ||
+        !project_path_equal_prefix(absolute, absolute_root))
       return {{}, "absolute path is outside the project root"};
     std::string relative = absolute.substr(absolute_root.size());
     if (!relative.empty() && relative[0] == '/')
@@ -121,7 +125,10 @@ inline ProjectPath normalize_project_path(const std::string &raw,
     scheme = "res";
   }
 
-  const std::string clean = project_path_lexical(body);
+  bool escaped = false;
+  const std::string clean = project_path_lexical(body, escaped);
+  if (escaped)
+    return {{}, "path escapes the namespace root"};
   if (clean.empty() && !allow_root)
     return {{}, "path must name an item below the namespace root"};
   return {scheme + "://" + clean, {}};

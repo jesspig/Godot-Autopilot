@@ -112,29 +112,29 @@ TEST(SecurityHardening, QueueOpenWithPendingThrows) {
 }
 
 TEST(SecurityHardening, ProjectPathRejectsUnsupportedScheme) {
-  auto r = godot_autopilot::util::normalize_project_path("http://evil.com/file", true);
+  auto r = godot_autopilot::util::normalize_project_path("http://evil.com/file", true, false);
   EXPECT_FALSE(r.valid());
 }
 TEST(SecurityHardening, ProjectPathRejectsParentTraversal) {
-  auto r = godot_autopilot::util::normalize_project_path("res://../outside", false);
-  auto r2 = godot_autopilot::util::normalize_project_path("res://a/../b", false);
+  auto r = godot_autopilot::util::normalize_project_path("res://../outside", false, false);
+  auto r2 = godot_autopilot::util::normalize_project_path("res://a/../b", false, false);
   EXPECT_TRUE(r2.valid());
   EXPECT_EQ(r2.value, "res://b");
 }
 TEST(SecurityHardening, ProjectPathAcceptsResAndUser) {
-  auto r = godot_autopilot::util::normalize_project_path("res://folder/file.tscn", true);
+  auto r = godot_autopilot::util::normalize_project_path("res://folder/file.tscn", true, false);
   EXPECT_TRUE(r.valid());
   EXPECT_EQ(r.value, "res://folder/file.tscn");
-  auto r2 = godot_autopilot::util::normalize_project_path("user://save.dat", true);
+  auto r2 = godot_autopilot::util::normalize_project_path("user://save.dat", true, false);
   EXPECT_TRUE(r2.valid());
-  auto r3 = godot_autopilot::util::normalize_project_path("user://save.dat", false);
+  auto r3 = godot_autopilot::util::normalize_project_path("user://save.dat", false, false);
   EXPECT_FALSE(r3.valid());
 }
 TEST(SecurityHardening, ProjectPathRejectsAbsoluteOutsideRoot) {
-  auto r = godot_autopilot::util::normalize_project_path("res://a/../b", false);
+  auto r = godot_autopilot::util::normalize_project_path("res://a/../b", false, false);
   EXPECT_TRUE(r.valid());
   EXPECT_EQ(r.value, "res://b");
-  auto r2 = godot_autopilot::util::normalize_project_path("http://evil.com/file", true);
+  auto r2 = godot_autopilot::util::normalize_project_path("http://evil.com/file", true, false);
   EXPECT_FALSE(r2.valid());
 }
 
