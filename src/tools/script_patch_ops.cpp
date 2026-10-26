@@ -2,6 +2,7 @@
 
 #include "tools/script_ops.hpp"
 #include "util/error_util.hpp"
+#include "util/project_path.hpp"
 #include <godot_cpp/classes/editor_file_system.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/file_access.hpp>
@@ -152,6 +153,12 @@ mcp::JsonValue handle_patch(const mcp::JsonValue &args) {
                             "in replace mode)");
   }
   std::string path = it_path->GetString();
+  const util::ProjectPath checked =
+      util::normalize_project_path(path, false, false);
+  if (!checked.valid())
+    return util::error_detail("path rejected", "path", checked.error,
+                              "patch only inside the project root");
+  path = checked.value;
   std::string anchor = it_anchor->GetString();
   std::string replacement = it_replacement->GetString();
 

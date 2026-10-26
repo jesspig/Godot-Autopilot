@@ -6,6 +6,8 @@
 #include <memory>
 #include <string>
 
+#include "core/command_queue.hpp"
+#include "tools/runtime_ops.hpp"
 #include "tools/tool_base.hpp"
 
 namespace {
@@ -49,7 +51,12 @@ std::string &mode_state() {
   return value;
 }
 
-std::string read_mode_state() { return mode_state(); }
+int g_mode_provider_calls = 0;
+
+std::string read_mode_state() {
+  ++g_mode_provider_calls;
+  return mode_state();
+}
 
 class AuthorizationModeTest : public ::testing::Test {
 protected:
@@ -58,7 +65,9 @@ protected:
     previous_mode_provider_ = authorization::auth_mode_provider();
     authorization::set_allow_provider(nullptr);
     authorization::set_auth_mode_provider(nullptr);
+    authorization::reset_config_snapshot();
     mode_state().clear();
+    g_mode_provider_calls = 0;
     mode_env_.reset(new EnvScope(authorization::kEnvAuthMode, nullptr));
     allow_env_.reset(new EnvScope("GODOT_AUTOPILOT_ALLOW", nullptr));
   }
@@ -67,6 +76,8 @@ protected:
     mode_env_.reset();
     allow_env_.reset();
     mode_state().clear();
+    godot_autopilot::runtime_ops::set_editor_queue(nullptr);
+    authorization::reset_config_snapshot();
     authorization::set_allow_provider(previous_provider_);
     authorization::set_auth_mode_provider(previous_mode_provider_);
   }
@@ -222,4 +233,57 @@ TEST_F(AuthorizationModeTest, ReadTierStaysAllowedInEveryMode) {
   EXPECT_TRUE(authorization::deny_if_unauthorized("get_scene_tree",
                                                    SideEffect::None)
                   .IsNull());
+}
+
+TEST_F(AuthorizationModeTest, NonMainThreadWithoutSnapshotFallsBackToStrict) {
+  godot_autopilot::CommandQueue queue;
+  godot_autopilot::runtime_ops::set_editor_queue(&queue);
+  mode_state() = "legacy";
+  authorization::set_auth_mode_provider(&read_mode_state);
+  EXPECT_EQ(authorization::current_auth_mode(), authorization::AuthMode::Strict);
+  EXPECT_EQ(g_mode_provider_calls, 0);
+  EXPECT_FALSE(authorization::config_snapshot_ready());
+}
+
+TEST_F(AuthorizationModeTest, MainThreadPathReadsProviderAndPublishesSnapshot) {
+  godot_autopilot::CommandQueue queue;
+  queue.drain();
+  godot_autopilot::runtime_ops::set_editor_queue(&queue);
+  mode_state() = "legacy";
+  authorization::set_auth_mode_provider(&read_mode_state);
+  EXPECT_EQ(authorization::current_auth_mode(), authorization::AuthMode::Legacy);
+  EXPECT_EQ(g_mode_provider_calls, 1);
+  std::string snapshot;
+  ASSERT_TRUE(authorization::read_auth_mode_snapshot(snapshot));
+  EXPECT_EQ(snapshot, std::string("legacy"));
+}
+
+TEST_F(AuthorizationModeTest, NonMainThreadReadsPublishedSnapshotOnly) {
+  godot_autopilot::CommandQueue queue;
+  queue.drain();
+  godot_autopilot::runtime_ops::set_editor_queue(&queue);
+  mode_state() = "legacy";
+  authorization::set_auth_mode_provider(&read_mode_state);
+  EXPECT_EQ(authorization::current_auth_mode(), authorization::AuthMode::Legacy);
+  EXPECT_EQ(g_mode_provider_calls, 1);
+  godot_autopilot::CommandQueue foreign_queue;
+  godot_autopilot::runtime_ops::set_editor_queue(&foreign_queue);
+  EXPECT_EQ(authorization::current_auth_mode(), authorization::AuthMode::Legacy);
+  EXPECT_EQ(g_mode_provider_calls, 1);
+}
+
+TEST_F(AuthorizationModeTest, EnvironmentWinsOverSnapshotAndProvider) {
+  godot_autopilot::CommandQueue queue;
+  queue.drain();
+  godot_autopilot::runtime_ops::set_editor_queue(&queue);
+  mode_state() = "legacy";
+  authorization::set_auth_mode_provider(&read_mode_state);
+  EXPECT_EQ(authorization::current_auth_mode(), authorization::AuthMode::Legacy);
+  EXPECT_EQ(g_mode_provider_calls, 1);
+  EnvScope scope(authorization::kEnvAuthMode, "strict");
+  EXPECT_EQ(authorization::current_auth_mode(), authorization::AuthMode::Strict);
+  EXPECT_EQ(g_mode_provider_calls, 1);
+  std::string snapshot;
+  ASSERT_TRUE(authorization::read_auth_mode_snapshot(snapshot));
+  EXPECT_EQ(snapshot, std::string("legacy"));
 }

@@ -11,7 +11,9 @@
 
 #include <mcp/JsonValue.hpp>
 
+#include "core/command_queue.hpp"
 #include "core/log_system.hpp"
+#include "tools/runtime_ops.hpp"
 
 namespace godot_autopilot {
 enum class SideEffect;
@@ -64,6 +66,83 @@ inline void set_auth_mode_provider(AuthModeProvider provider) {
   auth_mode_provider() = provider;
 }
 
+inline constexpr const char *kEnvAllow = "GODOT_AUTOPILOT_ALLOW";
+
+inline bool may_read_config_directly() {
+  if (!runtime_ops::has_editor_queue())
+    return true;
+  return get_editor_queue().is_main_thread();
+}
+
+struct ConfigSnapshot {
+  std::string allow_list;
+  std::string auth_mode;
+  bool allow_ready = false;
+  bool auth_mode_ready = false;
+};
+
+inline std::mutex &snapshot_mutex() {
+  static std::mutex mutex;
+  return mutex;
+}
+
+inline ConfigSnapshot &snapshot_slot() {
+  static ConfigSnapshot snapshot;
+  return snapshot;
+}
+
+inline void publish_allow_snapshot(const std::string &allow_list) {
+  std::lock_guard<std::mutex> lock(snapshot_mutex());
+  ConfigSnapshot &snapshot = snapshot_slot();
+  snapshot.allow_list = allow_list;
+  snapshot.allow_ready = true;
+}
+
+inline void publish_auth_mode_snapshot(const std::string &auth_mode) {
+  std::lock_guard<std::mutex> lock(snapshot_mutex());
+  ConfigSnapshot &snapshot = snapshot_slot();
+  snapshot.auth_mode = auth_mode;
+  snapshot.auth_mode_ready = true;
+}
+
+inline bool read_allow_snapshot(std::string &out) {
+  std::lock_guard<std::mutex> lock(snapshot_mutex());
+  const ConfigSnapshot &snapshot = snapshot_slot();
+  if (!snapshot.allow_ready)
+    return false;
+  out = snapshot.allow_list;
+  return true;
+}
+
+inline bool read_auth_mode_snapshot(std::string &out) {
+  std::lock_guard<std::mutex> lock(snapshot_mutex());
+  const ConfigSnapshot &snapshot = snapshot_slot();
+  if (!snapshot.auth_mode_ready)
+    return false;
+  out = snapshot.auth_mode;
+  return true;
+}
+
+inline bool config_snapshot_ready() {
+  std::lock_guard<std::mutex> lock(snapshot_mutex());
+  const ConfigSnapshot &snapshot = snapshot_slot();
+  return snapshot.allow_ready && snapshot.auth_mode_ready;
+}
+
+inline void reset_config_snapshot() {
+  std::lock_guard<std::mutex> lock(snapshot_mutex());
+  snapshot_slot() = ConfigSnapshot();
+}
+
+inline void refresh_config_snapshot() {
+  const AllowProvider allow = allow_provider();
+  if (allow)
+    publish_allow_snapshot(allow());
+  const AuthModeProvider mode = auth_mode_provider();
+  if (mode)
+    publish_auth_mode_snapshot(mode());
+}
+
 inline bool parse_auth_mode(std::string_view raw, AuthMode &out) {
   if (raw == kAuthModeStrict) {
     out = AuthMode::Strict;
@@ -106,10 +185,16 @@ inline AuthMode current_auth_mode() {
     note_invalid_auth_mode(raw, kEnvAuthMode);
     return AuthMode::Strict;
   }
-  const AuthModeProvider provider = auth_mode_provider();
-  if (!provider)
+  std::string value;
+  if (may_read_config_directly()) {
+    const AuthModeProvider provider = auth_mode_provider();
+    if (!provider)
+      return AuthMode::Strict;
+    value = provider();
+    publish_auth_mode_snapshot(value);
+  } else if (!read_auth_mode_snapshot(value)) {
     return AuthMode::Strict;
-  const std::string value = provider();
+  }
   if (value.empty())
     return AuthMode::Strict;
   AuthMode mode = AuthMode::Strict;
@@ -185,13 +270,21 @@ inline std::string allow_list_remove(std::string allow,
 }
 
 inline std::string current_allow_list() {
-  const char *raw = std::getenv("GODOT_AUTOPILOT_ALLOW");
+  const char *raw = std::getenv(kEnvAllow);
   if (raw && *raw != '\0')
     return std::string(raw);
-  const AllowProvider provider = allow_provider();
-  if (!provider)
-    return std::string();
-  return provider();
+  if (may_read_config_directly()) {
+    const AllowProvider provider = allow_provider();
+    if (!provider)
+      return std::string();
+    const std::string value = provider();
+    publish_allow_snapshot(value);
+    return value;
+  }
+  std::string cached;
+  if (read_allow_snapshot(cached))
+    return cached;
+  return std::string();
 }
 
 inline bool capability_enabled(std::string_view capability) {

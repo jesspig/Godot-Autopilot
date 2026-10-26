@@ -209,6 +209,26 @@ TEST(DestructiveTierGuardTest, SceneWriteToolsAreDeniedByDefault) {
   EXPECT_GT(scene_write_count, 0);
 }
 
+TEST(DestructiveTierGuardTest, ProcessEnvironmentReadsAreDeniedByDefault) {
+  AllowEnvScope allow_scope;
+  const std::vector<std::string> names = {
+      "get_os_environment", "get_os_unique_id", "get_os_user_data_dir"};
+  for (const std::string &name : names) {
+    EXPECT_EQ(side_effect_of_tool(name), "process") << name;
+    const mcp::JsonValue denied =
+        authorization::deny_if_unauthorized(name, SideEffect::Process);
+    ASSERT_FALSE(denied.IsNull()) << name;
+    const mcp::JsonValue *code = denied.Find("code");
+    ASSERT_NE(code, nullptr) << name;
+    ASSERT_TRUE(code->IsString()) << name;
+    EXPECT_EQ(code->GetString(), "authorization_required") << name;
+    const mcp::JsonValue *required = denied.Find("authorization_required");
+    ASSERT_NE(required, nullptr) << name;
+    ASSERT_TRUE(required->IsString()) << name;
+    EXPECT_EQ(required->GetString(), "process") << name;
+  }
+}
+
 TEST(DestructiveTierGuardTest, ReviewedDestructiveToolsKeepTheirTier) {
   EXPECT_EQ(side_effect_of_tool("delete_display_window"), "destructive");
   EXPECT_EQ(side_effect_of_tool("delete_scene_node"), "destructive");
@@ -234,6 +254,9 @@ TEST(DestructiveTierGuardTest, ReviewedWriteAndDangerToolsKeepTheirTier) {
   EXPECT_EQ(side_effect_of_tool("set_tilemap_cell"), "writes_scene");
   EXPECT_EQ(side_effect_of_tool("attach_script_to_node"), "writes_scene");
   EXPECT_EQ(side_effect_of_tool("add_group_node"), "writes_scene");
+  EXPECT_EQ(side_effect_of_tool("get_os_environment"), "process");
+  EXPECT_EQ(side_effect_of_tool("get_os_unique_id"), "process");
+  EXPECT_EQ(side_effect_of_tool("get_os_user_data_dir"), "process");
 }
 
 TEST(DestructiveTierGuardTest, GuardFlagsUndeclaredDestructionTools) {

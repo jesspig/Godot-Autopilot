@@ -30,7 +30,7 @@ const std::vector<ParamSpec> kCreateOsProcessParams = {
 const std::vector<ParamSpec> kExecuteOsProcessParams = {
     {"path", "string", "Executable to run (full path, or name resolved via PATH)", true},
     {"arguments", "array", "Command line arguments; non-string entries are ignored", true},
-    {"output", "boolean", "Capture stdout and stderr into the result (default: false); when false, output is discarded. The process is started without blocking the editor and the call waits for it to exit without freezing the editor", false},
+    {"output", "boolean", "Capture stdout and stderr into the result (default: false); when false, output is discarded (the pipes are still drained, just not kept in memory). The process is started without blocking the editor and the call waits for it to exit without freezing the editor. Captured output is capped at 2 MiB per stream (GDA_SCAN_MAX_FILE_BYTES): collection stops at the cap and stdout_truncated / stderr_truncated report true alongside max_output_bytes", false},
     {"timeout_ms", "integer", "Deadline for the external process in milliseconds (default: 5000, min: 100, max: 25000); when the deadline passes the process is terminated and the call fails with code main_thread_timeout (cancelled, not retryable)", false},
 };
 
@@ -84,7 +84,7 @@ const std::vector<ParamSpec> kCreateCSharpScriptParams = {
 };
 
 const std::vector<ParamSpec> kReadFileParams = {
-    {"path", "string", "File path to read (absolute path, or res:// / user://-relative); plain file I/O with no editor resource tracking", true},
+    {"path", "string", "File path to read (res:// or user:// below the namespace root; an absolute path is accepted only inside the project root and is normalized to res://); plain file I/O with no editor resource tracking", true},
 };
 
 const std::vector<ParamSpec> kFindInFilesParams = {
@@ -131,7 +131,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       kCreateOsProcessParams, os_ops::handle_os_create_process}));
   v.push_back(make_spec_tool(ToolSpec{
       "execute_os_process",
-      "Run an external command and return its exit code, optionally with its stdout and stderr. The process is started without blocking the editor: the editor main thread stays responsive while the call waits for the command to finish on the transport thread, and the pipes are drained frame by frame. Use it for short commands whose result is needed immediately; for long-running or fire-and-forget programs use create_os_process instead. Optional 'timeout_ms' (default 5000, min 100, max 25000) bounds the wait: when the deadline passes the process is terminated and the call fails with code main_thread_timeout (cancelled, not retryable). Returns exit_code, plus stdout and stderr (empty unless 'output' is true). Requires 'path' and 'arguments'.",
+      "Run an external command and return its exit code, optionally with its stdout and stderr. The process is started without blocking the editor: the editor main thread stays responsive while the call waits for the command to finish on the transport thread, and the pipes are drained frame by frame. Use it for short commands whose result is needed immediately; for long-running or fire-and-forget programs use create_os_process instead. Optional 'timeout_ms' (default 5000, min 100, max 25000) bounds the wait: when the deadline passes the process is terminated and the call fails with code main_thread_timeout (cancelled, not retryable). Returns exit_code, plus stdout and stderr (empty unless 'output' is true); each captured stream is capped at 2 MiB and the result reports stdout_truncated / stderr_truncated with max_output_bytes when the cap was reached. Requires 'path' and 'arguments'.",
       "OS", {"os", "execute"}, SideEffect::Process, tool_flags::kMutating,
       kExecuteOsProcessParams, os_ops::handle_os_execute}));
   v.push_back(make_spec_tool(ToolSpec{
@@ -141,8 +141,8 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       kGetOsDatetimeParams, os_ops::handle_os_get_datetime}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_os_environment",
-      "Read an environment variable from the editor process environment. Use it to adapt behavior to configuration set outside the editor or to inspect configuration injected by the launch script. Returns the variable value as a string, or an empty string if it is not set. Requires 'variable' (string).",
-      "OS", {"os", "environment"}, SideEffect::None, tool_flags::kNone,
+      "Read an environment variable from the editor process environment. Use it to adapt behavior to configuration set outside the editor or to inspect configuration injected by the launch script. Returns the variable value as a string, or an empty string if it is not set. Requires 'variable' (string). The editor process environment inherits the launch shell and can carry cloud credentials or tokens, so the call is gated by the 'process' capability: without 'process' in the allow list (GODOT_AUTOPILOT_ALLOW=process) it is rejected with code authorization_required.",
+      "OS", {"os", "environment"}, SideEffect::Process, tool_flags::kNone,
       kGetOsEnvironmentParams, os_ops::handle_os_get_environment}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_os_locale",
@@ -161,8 +161,8 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       kGetOsSystemInfoParams, os_ops::handle_os_get_system_info}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_os_unique_id",
-      "Read the machine unique identifier string. Use it to distinguish machines or persist device-bound state across sessions. Returns the unique ID string, which is stable for the machine; takes no parameters. It is derived from hardware characteristics and should not be treated as a secret.",
-      "OS", {"os", "unique_id"}, SideEffect::None, tool_flags::kNone,
+      "Read the machine unique identifier string. Use it to distinguish machines or persist device-bound state across sessions. Returns the unique ID string, which is stable for the machine; takes no parameters. It is derived from hardware characteristics and identifies the machine uniquely, so the call is gated by the 'process' capability: without 'process' in the allow list (GODOT_AUTOPILOT_ALLOW=process) it is rejected with code authorization_required.",
+      "OS", {"os", "unique_id"}, SideEffect::Process, tool_flags::kNone,
       kGetOsUniqueIdParams, os_ops::handle_os_get_unique_id}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_os_unix_time",
@@ -171,8 +171,8 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       kGetOsUnixTimeParams, os_ops::handle_os_get_unix_time}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_os_user_data_dir",
-      "Read the user data directory path where the project stores persistent files. Use it to locate game logs (user://logs) or write user files from scripts. Returns an absolute path string; takes no parameters. The directory is platform-dependent and shared across project instances.",
-      "OS", {"os", "data_dir"}, SideEffect::None, tool_flags::kNone,
+      "Read the user data directory path where the project stores persistent files. Use it to locate game logs (user://logs) or write user files from scripts. Returns an absolute path string; takes no parameters. The directory is platform-dependent and shared across project instances. The path exposes the host layout of the editor process, so the call is gated by the 'process' capability: without 'process' in the allow list (GODOT_AUTOPILOT_ALLOW=process) it is rejected with code authorization_required.",
+      "OS", {"os", "data_dir"}, SideEffect::Process, tool_flags::kNone,
       kGetOsUserDataDirParams, os_ops::handle_os_get_user_data_dir}));
   v.push_back(make_spec_tool(ToolSpec{
       "kill_os_process",
@@ -181,7 +181,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       kKillOsProcessParams, os_ops::handle_os_kill}));
   v.push_back(make_spec_tool(ToolSpec{
       "move_os_file_to_trash",
-      "Move a file or folder to the system trash (recycle bin). Use it to delete files safely without permanent removal, leaving a recovery option. Supports res:// and user:// project paths (auto-globalized). Returns a Godot error code (0 means OK); requires 'path' (string). On systems without a trash, deletion may fail.",
+      "Move a file or folder to the system trash (recycle bin). Use it to delete files safely without permanent removal, leaving a recovery option. Accepts res:// and user:// paths below the namespace root (auto-globalized); an absolute path is accepted only inside the project root and is normalized to res://; a path that escapes the root, an unsupported scheme or a bare namespace root is rejected with a path-rejected error before the trash call. Returns a Godot error code (0 means OK); requires 'path' (string). On systems without a trash, deletion may fail.",
       "OS", {"os", "trash"}, SideEffect::WritesFile, tool_flags::kMutating,
       kMoveOsFileToTrashParams, os_ops::handle_os_move_to_trash}));
   v.push_back(make_spec_tool(ToolSpec{
@@ -206,7 +206,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       kCreateCSharpScriptParams, text_ops::handle_create_csharp_script}));
   v.push_back(make_spec_tool(ToolSpec{
       "read_file",
-      "Read a text file from disk (absolute path, or res:// / user://-relative) and return its full text content. This is the read-side counterpart of write_file: plain file I/O with no editor resource tracking. Requires 'path'. Returns result {'path', 'content'} on success; errors when the file cannot be opened.",
+      "Read a text file from disk (res:// or user:// below the namespace root; absolute paths only inside the project root) and return its full text content. This is the read-side counterpart of write_file: plain file I/O with no editor resource tracking. Requires 'path'. Returns result {'path', 'content', 'bytes', 'truncated', 'max_bytes'} on success — truncated is always false because an over-limit file is refused, never returned partly: a file larger than 2 MiB (GDA_SCAN_MAX_FILE_BYTES) fails with structured_error.code file_too_large carrying max_bytes and size_bytes, and a path outside the project namespaces fails with path rejected. Errors when the file cannot be opened.",
       "OS", {"file", "read"}, SideEffect::None, tool_flags::kNone,
       kReadFileParams, text_ops::handle_file_read}));
   v.push_back(make_spec_tool(ToolSpec{

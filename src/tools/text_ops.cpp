@@ -151,7 +151,8 @@ JV handle_font_set_data(const JV &args) {
   auto *dp = args.Find("data");
   if (!dp || !dp->IsString())
     return util::error_json("missing required parameter: data");
-  const auto checked = util::normalize_project_path(dp->GetString(), true);
+  const auto checked =
+      util::normalize_project_path(dp->GetString(), true, false);
   if (!checked.valid())
     return util::error_detail("path rejected", "data", checked.error,
                               "use a res:// or user:// project path");
@@ -657,8 +658,18 @@ JV handle_file_write(const JV &args) {
     return util::error_json("missing required parameter: content");
   std::string mode = "WRITE";
   auto *mp = args.Find("mode");
-  if (mp && mp->IsString())
+  if (mp && !mp->IsString())
+    return util::error_detail("invalid mode type", "mode",
+                              "'WRITE' or 'APPEND' (exact case)",
+                              "pass mode as one of the two accepted literals; "
+                              "no file was opened or written");
+  if (mp)
     mode = mp->GetString();
+  if (mode != "WRITE" && mode != "APPEND")
+    return util::error_detail("invalid mode: '" + mode + "'", "mode",
+                              "'WRITE' or 'APPEND' (exact case)",
+                              "use 'WRITE' to overwrite or 'APPEND' to append; "
+                              "no file was opened or written");
   godot::FileAccess::ModeFlags flag = godot::FileAccess::WRITE;
   if (mode == "APPEND")
     flag = godot::FileAccess::READ_WRITE;
@@ -673,7 +684,7 @@ JV handle_file_write(const JV &args) {
   if (file.is_null() && mode == "APPEND")
     file = godot::FileAccess::open(gs_path, godot::FileAccess::WRITE);
   if (file.is_null())
-    return util::error_json("failed to open file: " + pp->GetString());
+    return util::error_json("failed to open file: " + normalized_path);
   if (mode == "APPEND")
     file->seek_end();
   file->store_string(godot::String::utf8(cp->GetString().c_str()));
@@ -994,12 +1005,28 @@ JV handle_file_read(const JV &args) {
   auto file = godot::FileAccess::open(godot::String(checked.value.c_str()),
                                       godot::FileAccess::READ);
   if (file.is_null())
-    return util::error_json("failed to open file: " + pp->GetString());
+    return util::error_json("failed to open file: " + checked.value);
+  const int64_t length = file->get_length();
+  if (length < 0 || static_cast<size_t>(length) > GDA_SCAN_MAX_FILE_BYTES) {
+    file->close();
+    JV e = util::error_json("file is larger than the read limit of " +
+                            std::to_string(GDA_SCAN_MAX_FILE_BYTES) +
+                            " bytes; no content was returned");
+    JV details(JV::object_tag);
+    details["code"] = JV("file_too_large");
+    details["max_bytes"] = JV(static_cast<int64_t>(GDA_SCAN_MAX_FILE_BYTES));
+    details["size_bytes"] = JV(static_cast<int64_t>(length));
+    e["structured_error"] = std::move(details);
+    return e;
+  }
   std::string content = util::to_std(file->get_as_text());
   file->close();
   JV inner(JV::object_tag);
   inner["path"] = JV(checked.value);
   inner["content"] = JV(content);
+  inner["bytes"] = JV(static_cast<int64_t>(length));
+  inner["truncated"] = JV(false);
+  inner["max_bytes"] = JV(static_cast<int64_t>(GDA_SCAN_MAX_FILE_BYTES));
   JV r(JV::object_tag);
   r["result"] = std::move(inner);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -1020,7 +1047,7 @@ JV handle_find_in_files(const JV &args) {
   if (dp && dp->IsString())
     dir = dp->GetString();
 
-  const auto checked_dir = util::normalize_project_path(dir, true);
+  const auto checked_dir = util::normalize_project_path(dir, true, true);
   if (!checked_dir.valid())
     return util::error_detail("path rejected", "dir", checked_dir.error,
                               "search only inside the project namespaces");
