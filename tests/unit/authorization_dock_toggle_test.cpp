@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 
+#include "core/sanitize_policy.hpp"
 #include "tools/tool_base.hpp"
 #include "ui/authorization_switches.hpp"
 
@@ -15,6 +16,7 @@ namespace {
 using godot_autopilot::SideEffect;
 namespace authorization = godot_autopilot::authorization;
 namespace authorization_switches = godot_autopilot::authorization_switches;
+namespace sanitize_policy = godot_autopilot::sanitize_policy;
 
 std::string &provider_state() {
   static std::string value;
@@ -94,6 +96,40 @@ bool is_known_capability(std::string_view capability) {
   }
   return false;
 }
+
+class SanitizePolicyResolutionTest : public ::testing::Test {
+protected:
+  void SetUp() override {
+    previous_enabled_ = sanitize_policy::enabled();
+    const char *current = std::getenv(sanitize_policy::kEnvKey);
+    if (current != nullptr) {
+      previous_env_ = current;
+      had_previous_env_ = true;
+    }
+    set_desensitize_env(nullptr);
+  }
+
+  void TearDown() override {
+    set_desensitize_env(had_previous_env_ ? previous_env_.c_str() : nullptr);
+    sanitize_policy::set_enabled(previous_enabled_);
+  }
+
+  static void set_desensitize_env(const char *value) {
+#ifdef _WIN32
+    _putenv_s(sanitize_policy::kEnvKey, value != nullptr ? value : "");
+#else
+    if (value != nullptr) {
+      setenv(sanitize_policy::kEnvKey, value, 1);
+    } else {
+      unsetenv(sanitize_policy::kEnvKey);
+    }
+#endif
+  }
+
+  bool previous_enabled_ = true;
+  std::string previous_env_;
+  bool had_previous_env_ = false;
+};
 
 } // namespace
 
@@ -326,4 +362,70 @@ TEST_F(AuthorizationDockToggleTest, DeniedProcessNamesTheDockToggle) {
   ASSERT_TRUE(enable->IsString());
   EXPECT_NE(enable->GetString().find("Allow process"), std::string::npos);
   EXPECT_NE(enable->GetString().find("MCP Config dock"), std::string::npos);
+}
+
+TEST_F(SanitizePolicyResolutionTest, EnvDeclarationWinsOverTheConfigValue) {
+  EXPECT_TRUE(sanitize_policy::resolve_enabled("1", false));
+  EXPECT_TRUE(sanitize_policy::resolve_enabled("true", false));
+  EXPECT_TRUE(sanitize_policy::resolve_enabled("on", false));
+  EXPECT_TRUE(sanitize_policy::resolve_enabled("anything", false));
+}
+
+TEST_F(SanitizePolicyResolutionTest, ConfigValueAppliesWhenTheEnvIsNotDeclared) {
+  EXPECT_FALSE(sanitize_policy::resolve_enabled(nullptr, false));
+  EXPECT_TRUE(sanitize_policy::resolve_enabled(nullptr, true));
+  EXPECT_FALSE(sanitize_policy::resolve_enabled("", false));
+  EXPECT_TRUE(sanitize_policy::resolve_enabled("", true));
+}
+
+TEST_F(SanitizePolicyResolutionTest, DisabledEnvValuesTurnThePolicyOff) {
+  EXPECT_FALSE(sanitize_policy::resolve_enabled("0", true));
+  EXPECT_FALSE(sanitize_policy::resolve_enabled("false", true));
+  EXPECT_FALSE(sanitize_policy::resolve_enabled("off", true));
+}
+
+TEST_F(SanitizePolicyResolutionTest, EnvDeclaredReportsPresenceAndValue) {
+  EXPECT_FALSE(sanitize_policy::detail::env_declared(nullptr).has_value());
+  EXPECT_FALSE(sanitize_policy::detail::env_declared("").has_value());
+  ASSERT_TRUE(sanitize_policy::detail::env_declared("1").has_value());
+  EXPECT_TRUE(sanitize_policy::detail::env_declared("1").value());
+  ASSERT_TRUE(sanitize_policy::detail::env_declared("off").has_value());
+  EXPECT_FALSE(sanitize_policy::detail::env_declared("off").value());
+}
+
+TEST_F(SanitizePolicyResolutionTest, TheProcessEnvValueFeedsTheResolution) {
+  EXPECT_STREQ(sanitize_policy::kEnvKey, "GODOT_AUTOPILOT_DESENSITIZE");
+  set_desensitize_env("1");
+  EXPECT_TRUE(sanitize_policy::resolve_enabled(
+      std::getenv(sanitize_policy::kEnvKey), false));
+  set_desensitize_env("off");
+  EXPECT_FALSE(sanitize_policy::resolve_enabled(
+      std::getenv(sanitize_policy::kEnvKey), true));
+  set_desensitize_env(nullptr);
+  EXPECT_TRUE(sanitize_policy::resolve_enabled(
+      std::getenv(sanitize_policy::kEnvKey), true));
+  EXPECT_FALSE(sanitize_policy::resolve_enabled(
+      std::getenv(sanitize_policy::kEnvKey), false));
+}
+
+TEST_F(SanitizePolicyResolutionTest, ResolvingDoesNotChangeTheEffectivePolicy) {
+  sanitize_policy::set_enabled(false);
+  EXPECT_TRUE(sanitize_policy::resolve_enabled("1", false));
+  EXPECT_FALSE(sanitize_policy::enabled());
+  sanitize_policy::set_enabled(true);
+  EXPECT_FALSE(sanitize_policy::resolve_enabled("off", false));
+  EXPECT_TRUE(sanitize_policy::enabled());
+}
+
+TEST_F(SanitizePolicyResolutionTest, PanelInitialStateReadLeavesThePolicyUnchanged) {
+  sanitize_policy::set_enabled(true);
+  const bool enabled_before = sanitize_policy::enabled();
+  ASSERT_TRUE(enabled_before);
+  const bool panel_state = sanitize_policy::enabled();
+  EXPECT_EQ(panel_state, enabled_before);
+  EXPECT_EQ(sanitize_policy::enabled(), enabled_before);
+  sanitize_policy::set_enabled(false);
+  const bool disabled_before = sanitize_policy::enabled();
+  ASSERT_FALSE(disabled_before);
+  EXPECT_EQ(sanitize_policy::enabled(), disabled_before);
 }

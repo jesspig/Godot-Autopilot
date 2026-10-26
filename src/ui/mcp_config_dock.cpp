@@ -273,9 +273,7 @@ McpConfigDock::McpConfigDock() : port_spin(nullptr), apply_button(nullptr) {
   desensitize_label->set_text("Desensitize data:");
   desensitize_row->add_child(desensitize_label);
   desensitize_check = memnew(godot::CheckBox);
-  const bool desensitize = PluginConfig::load_desensitize();
-  desensitize_check->set_pressed(desensitize);
-  sanitize_policy::set_enabled(desensitize);
+  desensitize_check->set_pressed(sanitize_policy::enabled());
   desensitize_check->set_tooltip_text(
       "Strip sensitive key values from recorded data; read on the next "
       "tool call, no restart needed.");

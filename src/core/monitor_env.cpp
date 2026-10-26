@@ -72,7 +72,7 @@ void environment_snapshot() {
   event.name = "session_start";
   event.ok = true;
   event.state = "succeeded";
-  event.attrs = build_attrs({
+  event.attrs = sanitize_field(build_attrs({
       {"gda_version", GDA_VERSION},
       {"godot_version", godot_version},
       {"os_name", os_name},
@@ -87,7 +87,7 @@ void environment_snapshot() {
       {"show_time", PluginConfig::load_show_time() ? "true" : "false"},
       {"allow", PluginConfig::load_allow()},
       {"session_nonce", LogPersist::instance().session_id()},
-  });
+  }));
   emit(std::move(event));
 }
 
