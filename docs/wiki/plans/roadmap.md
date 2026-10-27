@@ -12,7 +12,7 @@ resource: src/
 
 # 竞品对齐路线图
 
-> 记录 2026-08 功能分支 `feature/engine-aware-fs-and-tool-expansion` 的竞品对齐批次（P0/P1/P2 已交付）与后续 P3 方向，工具侧实现细节见 [工具注册表](../modules/tools_registry.md)，运行时协议见 [入口与运行时](../modules/entry_runtime.md)。**当前口径**：以 [测试体系](../tests.md)「数值核算总表」为唯一权威（10-27 实测复核：ctest 注册点 873 / 非 L2 827 / L1 821 / L2 46）；本页各批次记录中的计数均为交付当时值，不代表当前值。
+> 记录 2026-08 功能分支 `feature/engine-aware-fs-and-tool-expansion` 的竞品对齐批次（P0/P1/P2 已交付）与后续 P3 方向，工具侧实现细节见 [工具注册表](../modules/tools_registry.md)，运行时协议见 [入口与运行时](../modules/entry_runtime.md)。**当前口径**：以 [测试体系](../tests.md)「数值核算总表」为唯一权威（10-28 收口实测：ctest 注册点 928 / 非 L2 881 / L1 871 / L2 47）；本页各批次记录中的计数均为交付当时值，不代表当前值。
 
 ## 竞品全景（一行定位速记）
 

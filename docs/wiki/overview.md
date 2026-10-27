@@ -146,8 +146,8 @@ godot-self-driving/
 │   │                           #   skill_gen、skill_content_generated（构建期嵌入薄胶水）；共 25 个文件（8 cpp + 17 hpp）
 │   │                           #   header-only（10 个）：json_godot、rid_registry、scene_path、project_path、type_hint、gdscript_wrap、resource_fs、mcp_image_content、inline_resource_json、owned_exception
 ├── skills/                     # 插件技能书源（标准 Agent Skills 目录布局：9 册各一 SKILL.md + references/；共 35 个文件 = 9 个 SKILL.md + 26 个 references .md）
-├── cli/                        # CLI 载体（Bun + TS 源码直跑，零运行时依赖）：bin/gda.ts 入口 + src/ 35 个 .ts（含 src/mcp/ 协议客户端、src/api/ REST 客户端、src/serve/ 控制面 3 个、src/commands/ 17 个）+ tests/ 16 文件 259 项（257 pass + 2 skip，721 次 expect() 运行时调用）
-├── tests/                      # L1 gda_unit_tests（821 个 gtest，70 文件）+ L2 gda_test_runner + config/*.json（46 份）+ testbed/（L2 测试床工程）+ guard/ 迁移守卫、注释守卫、主线程守卫、版本同步守卫 + scripts/ CLI 契约与单测 + probe/ 传输探针
+├── cli/                        # CLI 载体（Bun + TS 源码直跑，零运行时依赖）：bin/gda.ts 入口 + src/ 35 个 .ts（含 src/mcp/ 协议客户端、src/api/ REST 客户端、src/serve/ 控制面 3 个、src/commands/ 17 个）+ tests/ 17 文件 282 项（280 pass + 2 skip，786 次 expect() 运行时调用）
+├── tests/                      # L1 gda_unit_tests（871 个 gtest，74 文件）+ L2 gda_test_runner + config/*.json（47 份）+ testbed/（L2 测试床工程）+ guard/ 迁移守卫、注释守卫、主线程守卫、版本同步守卫、源清单守卫 + scripts/ CLI 契约与单测 + probe/ 传输探针
 ├── docs/                       # 本知识库（docs/wiki/，含 modules/、plans/、changelog/）
 ├── package.json                # CLI 包定义（name godot-autopilot-cli，bin gda → cli/bin/gda.ts，零运行时依赖）
 ├── bun.lock                    # CLI devDependency 锁（@types/bun + typescript）

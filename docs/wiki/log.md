@@ -1,6 +1,12 @@
 # 维护日志摘要
 
-> 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天（按有变更的日期段计，最新一段 2026-10-23，窗口 10-17 – 10-23；更早的批次留档在 changelog 目录，如 [2026-10-10-log.md](changelog/2026-10-10-log.md)）。
+> 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天（按有变更的日期段计，最新一段 2026-10-28，窗口 10-22 – 10-28；更早的批次留档在 changelog 目录，如 [2026-10-10-log.md](changelog/2026-10-10-log.md)）。
+
+## 2026-10-28
+
+- **审计修复 43 条全链路收口**：波次二（传输轮转公平性 / 流式收口 / 解析合规 / 复合键防串扰 / 失败改协议 error / batch 与 REST 对齐 / CI 加固 / `restart --wait` / 源清单守卫）与波次三（授权前置 requires 化 / 用例严格化 / 三守卫自测 / 遍历基线重校 182/270/218）归并 develop，全量 ctest **928/928**、CLI TS **282** 项全绿（280 pass + 2 skip，786 次 `expect()`）。
+- **测试口径定稿**：L1 **871**（74 个 unit 文件、14 个具名 fixture；新增四文件 18 项：`config_loader_strict_test` 8 / `http_stream_registry_test` 3 / `godot_transport_pending_test` 3 / `resource_error_mapping_test` 4）、L2 **47**（新增 `47_authorization_gate` 默认拒绝态回归）、守卫与脚本 **10**（新增 `source_manifest_guard` 与三个守卫自测项）、ctest 注册点 **928** = 871 + 47 + 10、非 L2 **881** = 871 + 10；遍历基线重校——排除 **182** = 175 + 7（`None` 仅 `kMutating` 曾记 2 系倒推凑数、无名单支撑，真值 7）、候选 **270**、`03_tools_contract` 实测 **489** 步（= 270 + 218 + 1）、候选口径上限 **540** = 270 × 2（枚举上限 904 不变）；并固化流程规则：**基线校准必须以当日新构建产物（build+deploy 后）的 `gda_runner_03` 实测为准**。权威核算见 [测试体系](tests.md) 数值核算总表。
+- **当前口径（2026-10-28，权威核算见 [测试体系](tests.md) 数值核算总表）**：域工具 **451**（27 类 / 33 个源模块）、catalog **459** = 451 域 + `system_status` + 7 元、MCP 可达 **458**、schema 基线 **459** = 393 非空 + 66 空、遍历枚举 452 / 排除 **182** / 候选 **270** / 步数上限 904（`03_tools_contract` 实测 **489** 步、warnings 基线 **0**）、L1 **871** 个 gtest（74 个 unit 文件、14 个具名 fixture）、L2 **47** 份用例、守卫与脚本 **10** 项、ctest 注册点 **928**、非 L2 口径 **881**、CLI TS 单测 **282** 项（17 个文件，Windows 跳过 2 项）、技能书 **9** 册 / 35 文件、MCP skills 资源 **45**、`add_library` 收录 **113** 个 `.cpp`、REST 端点 **8** 条。
 
 ## 2026-10-23
 
