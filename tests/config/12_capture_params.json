@@ -2,6 +2,7 @@
   "name": "capture_params",
   "description": "capture_editor_viewport / capture_game_viewport 新增参数的参数校验路径（headless）：after_frames 负数与非整数、when 用于 target=editor、scale 越界均在抵达抓拍逻辑前返回 error；capture_game_viewport 带合法 after_frames 但无游戏运行时返回运行时通道错误（error+hint，不挂起）。",
   "headless": true,
+  "requires": ["write"],
   "pipeline": {
     "on_failure": "continue",
     "stages": [

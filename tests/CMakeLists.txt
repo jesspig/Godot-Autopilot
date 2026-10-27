@@ -164,3 +164,18 @@ add_test(NAME cli_contract
 add_test(NAME cli_unit
     COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_cli_unit.py")
 set_tests_properties(cli_unit PROPERTIES TIMEOUT 300)
+
+# --- ctest: guard self-tests (built-in negative samples, --self-test mode) ---
+add_test(NAME migration_guard_self_test
+    COMMAND ${CMAKE_COMMAND}
+            -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+            -DSELF_TEST=ON
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/guard/migration_guard.cmake)
+set_tests_properties(migration_guard_self_test PROPERTIES
+    RESOURCE_LOCK migration_guard_self_test)
+
+add_test(NAME comment_guard_self_test
+    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/comment_guard.py" --self-test)
+
+add_test(NAME main_thread_guard_self_test
+    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/main_thread_guard.py" --self-test)

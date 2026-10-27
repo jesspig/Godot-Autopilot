@@ -16,10 +16,63 @@
 #   4. strict 追加: src/tools/*.hpp 与 *.cpp 不得含 tool_input_schema
 #      或 tools/tool_decl.hpp 引用。
 # 不依赖构建产物, configure 后可直接以 ctest 运行。
+#
+# 自测模式:
+#   cmake -DSOURCE_DIR=<仓库根> -DSELF_TEST=ON -P tests/guard/migration_guard.cmake
+#   以 ${CMAKE_BINARY_DIR}/test-output/migration_guard_self_test 为夹具根
+#   合成守卫清单与 *_tools.hpp 样本, 经 CMAKE_SCRIPT_MODE_FILE 三连自调用
+#   分别验证: 坏样本非零退出 / 清单引用不存在域非零退出 / 干净样本零退出
+#   且输出含 migration-guard OK。夹具全部位于构建目录, 不触碰真实源码。
 # ====================================================================
 
 if(NOT DEFINED SOURCE_DIR)
     message(FATAL_ERROR "[migration-guard] SOURCE_DIR: 未定义, 请通过 -DSOURCE_DIR=<仓库根> 传入")
+endif()
+
+# ── 自测模式: 合成夹具自证守卫行为, 断言失败即 FATAL_ERROR ──
+if(SELF_TEST)
+    set(gda_self_root "${CMAKE_BINARY_DIR}/test-output/migration_guard_self_test")
+    get_filename_component(gda_self_root "${gda_self_root}" ABSOLUTE)
+    set(gda_self_list "${gda_self_root}/tests/guard/migrated_domains.txt")
+    set(gda_self_good "${gda_self_root}/src/tools/good_tools.hpp")
+    set(gda_self_bad "${gda_self_root}/src/tools/bad2_tools.hpp")
+    file(MAKE_DIRECTORY "${gda_self_root}/tests/guard" "${gda_self_root}/src/tools")
+
+    # 场景一: strict 模式下 bad2_tools.hpp 残留旧宏, 期望非零退出
+    file(WRITE "${gda_self_list}" "good\nstrict\n")
+    file(WRITE "${gda_self_good}" "#pragma once\n")
+    file(WRITE "${gda_self_bad}" "#pragma once\n#define GDA_TOOL_CLASS Side\n")
+    execute_process(COMMAND "${CMAKE_COMMAND}" "-DSOURCE_DIR=${gda_self_root}" -P "${CMAKE_SCRIPT_MODE_FILE}"
+        RESULT_VARIABLE gda_self_rc OUTPUT_QUIET ERROR_QUIET)
+    if(gda_self_rc EQUAL 0)
+        message(FATAL_ERROR "[migration-guard] self-test FAIL: 非零退出/退出码 0 (残留旧宏样本未被拦截)")
+    endif()
+
+    # 场景二: 清单引用不存在的域 ghost, 期望非零退出
+    file(WRITE "${gda_self_list}" "good\nghost\n")
+    file(WRITE "${gda_self_good}" "#pragma once\n")
+    file(REMOVE "${gda_self_bad}")
+    execute_process(COMMAND "${CMAKE_COMMAND}" "-DSOURCE_DIR=${gda_self_root}" -P "${CMAKE_SCRIPT_MODE_FILE}"
+        RESULT_VARIABLE gda_self_rc OUTPUT_QUIET ERROR_QUIET)
+    if(gda_self_rc EQUAL 0)
+        message(FATAL_ERROR "[migration-guard] self-test FAIL: 非零退出/退出码 0 (清单引用不存在域未被拦截)")
+    endif()
+
+    # 场景三: 仅干净 good_tools.hpp + strict, 期望零退出且输出含 migration-guard OK
+    file(WRITE "${gda_self_list}" "good\nstrict\n")
+    file(WRITE "${gda_self_good}" "#pragma once\n")
+    execute_process(COMMAND "${CMAKE_COMMAND}" "-DSOURCE_DIR=${gda_self_root}" -P "${CMAKE_SCRIPT_MODE_FILE}"
+        RESULT_VARIABLE gda_self_rc
+        OUTPUT_VARIABLE gda_self_out ERROR_VARIABLE gda_self_err)
+    if(NOT gda_self_rc EQUAL 0)
+        message(FATAL_ERROR "[migration-guard] self-test FAIL: 退出码 0/退出码 ${gda_self_rc} (干净样本被误报)")
+    endif()
+    if(NOT "${gda_self_out}${gda_self_err}" MATCHES "migration-guard\] OK")
+        message(FATAL_ERROR "[migration-guard] self-test FAIL: 输出含 [migration-guard] OK/未命中 (干净样本输出异常)")
+    endif()
+
+    file(REMOVE_RECURSE "${gda_self_root}")
+    return()
 endif()
 
 set(GDA_GUARD_LIST "${SOURCE_DIR}/tests/guard/migrated_domains.txt")

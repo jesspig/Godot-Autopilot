@@ -2,6 +2,7 @@
   "name": "07_scene_tabs",
   "description": "场景脏状态闭环用例：create_editor_scene(close_current:true) 建未命名场景 TabA 并 save_editor_scene_as 落盘 tab_a.tscn，property_set 使其变为未保存 → open_editor_scene tab_b.tscn 被拒绝并提示 save_editor_scene 或 reload_editor_scene 丢弃改动 → reload_editor_scene(tab_a) 返回 reloaded/scene_path/observed:true 清脏 → 再次 open tab_b 成功且 get_scene_tree 显示 TabB。用 create+save_as 而非 open 预置场景，避免上一轮残留的编辑器标签布局恢复导致 open 撞上已打开场景。另覆盖 reload_editor_scene 对未打开场景报 'scene is not open'，以及 create_editor_scene timeout_ms 非整数/越界报错且不影响当前场景。fixture 位于 res://gda_tmp_tabs/，cleanup 阶段关闭场景并回收。幽灵标签分支（多标签共存时移动依赖）未覆盖：runner 没有打开第二个标签的步骤，无法制造陈旧标签状态，故放弃该分支。",
   "headless": true,
+  "requires": ["write"],
   "pipeline": {
     "on_failure": "continue",
     "stages": [

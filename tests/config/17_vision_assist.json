@@ -2,6 +2,7 @@
   "name": "vision_assist",
   "description": "视觉辅助链路参数校验（headless）：capture 双侧 annotate_nodes/annotate_nodes_max 形状与上限、diff_image 前置条件与目标约束、review_scene_visually 未知参数与字段校验。全部为抵达抓拍逻辑前的确定性 error 路径，不依赖渲染与游戏进程。",
   "headless": true,
+  "requires": ["write"],
   "pipeline": {
     "on_failure": "continue",
     "stages": [

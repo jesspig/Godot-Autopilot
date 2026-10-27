@@ -2,6 +2,7 @@
   "name": "meta_tools",
   "description": "迁移自 tests/integration/meta_tools_test.cpp 的 15 个用例：ping/search_tools/list_categories/get_tool_detail/call_tool/batch_execute/code_execute 元工具语义验证（全部无持久副作用）",
   "headless": true,
+  "requires": ["code_execute"],
   "pipeline": {
     "on_failure": "continue",
     "stages": [
