@@ -44,7 +44,7 @@ const char *const kManualWhitelist[] = {
     "timeout_ms", "auto_owner", "SceneRoot", "target", "retryable", "isError",
     "true", "false",
     "godot_autopilot", "editor_readiness", "resource_ops", "record_error",
-    "writes_file", "is_error",
+    "writes_file", "writes_scene", "is_error",
     "already_playing", "physics_stalled", "node_count", "scan_truncated",
     "just_pressed", "global_rect", "auth_mode", "authorization_mode",
     "check_equal", "make_current", "close_scene", "get_tile_data",
