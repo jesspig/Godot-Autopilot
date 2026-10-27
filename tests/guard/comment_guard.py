@@ -5,6 +5,9 @@
 字符字面量（含转义）后再判定；报告所有残留注释：整行/行内 //（// 后可选
 空白接 namespace 的结尾标记除外）与 /* ... */（含单行）。
 无违规打印 comment-guard OK 并退出 0，有违规退出 1，文件无法解码退出 2。
+--self-test 进入反例自测：直接以合成样本文本驱动 scan_text 断言判定与
+行号，样本同时充当词法器回归集；全部通过打印 comment-guard self-test OK
+并退出 0，任一失败向 stderr 打印 self-test FAIL 并退出 1。
 只用标准库。
 """
 
@@ -117,7 +120,43 @@ def collect_files():
     return sorted(found, key=lambda p: p.relative_to(ROOT).as_posix())
 
 
+def run_self_tests():
+    negative_cases = [
+        ("int x = 1; // trailing", 1),
+        ("/* block\nspan */", 1),
+        ("// full line", 1),
+    ]
+    for text, want_line in negative_cases:
+        hits = scan_text(text)
+        if len(hits) != 1:
+            print("self-test FAIL: 1 violation/" + str(len(hits)) + " hits: " + repr(text),
+                  file=sys.stderr)
+            return 1
+        if hits[0][0] != want_line:
+            print("self-test FAIL: line " + str(want_line) + "/line " + str(hits[0][0])
+                  + ": " + repr(text), file=sys.stderr)
+            return 1
+    positive_cases = [
+        "// namespace",
+        'const char* s = "// not a comment";',
+        "char c = '/';",
+        'R"(// raw)"',
+        'R"TAG(// x)TAG"',
+        'std::string url = "http://x";',
+    ]
+    for text in positive_cases:
+        hits = scan_text(text)
+        if hits:
+            print("self-test FAIL: no violation/" + str(len(hits)) + " hits: " + repr(text),
+                  file=sys.stderr)
+            return 1
+    print("comment-guard self-test OK")
+    return 0
+
+
 def main():
+    if len(sys.argv) == 2 and sys.argv[1] == "--self-test":
+        return run_self_tests()
     try:
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:

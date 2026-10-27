@@ -68,7 +68,7 @@ if(GDA_UNIT_SOURCES)
     add_dependencies(gda_unit_tests gda_skill_embed_header)
 
     target_include_directories(gda_unit_tests PRIVATE
-        ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
+        ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests ${CMAKE_BINARY_DIR}/generated)
     # mcp-client: register_all_test.cpp 使用 McpClient::Create/ListTools/Close
     # 做 ListTools 往返断言 (SDK 测试链接组合为 mcp-client + mcp-server)
     target_link_libraries(gda_unit_tests PRIVATE
@@ -131,17 +131,34 @@ add_test(NAME migration_guard
             -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
             -P ${CMAKE_CURRENT_SOURCE_DIR}/guard/migration_guard.cmake)
 
+# ── ctest 注册: 迁移守卫反例自测（SELF_TEST 夹具自证坏样本/坏清单/好样本三场景） ──
+add_test(NAME migration_guard_self_test
+    COMMAND ${CMAKE_COMMAND}
+            -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+            -DSELF_TEST=ON
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/guard/migration_guard.cmake)
+set_tests_properties(migration_guard_self_test PROPERTIES
+    RESOURCE_LOCK migration_guard_self_test)
+
 # ── ctest 注册: 注释守卫（零依赖，读源码断言，无需构建产物） ──
 # Python 解释器复用根 cmake/skill_gen.cmake 的 GDA_PYTHON_EXECUTABLE
 #（find_program NAMES py python python3，py 优先；WindowsApps 存根下裸 python3 不可用）
 add_test(NAME comment_guard
     COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/comment_guard.py")
 
+# ── ctest 注册: 注释守卫反例自测（--self-test，词法器回归集） ──
+add_test(NAME comment_guard_self_test
+    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/comment_guard.py" --self-test)
+
 # ── ctest 注册: 主线程契约守卫（零依赖，读源码断言 Godot API 直接调用）──
 # 扫描 src/ 下的 *.cpp/*.hpp：外线程文件里的 Godot API 调用默认违规，
 # 豁免表与线程上下文分类表以显式常量写在 guard/main_thread_guard.py 内。
 add_test(NAME main_thread_guard
     COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/main_thread_guard.py")
+
+# ── ctest 注册: 主线程契约守卫反例自测（--self-test，样本路径自愈式耦合规则表） ──
+add_test(NAME main_thread_guard_self_test
+    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/main_thread_guard.py" --self-test)
 
 # ── ctest 注册: 版本号一致性守卫（零依赖，读源码断言，全部版本钉与 VERSION 同值） ──
 add_test(NAME version_sync_guard
