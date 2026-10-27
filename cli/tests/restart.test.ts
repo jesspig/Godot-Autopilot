@@ -243,10 +243,10 @@ describe.serial("restart", () => {
     expect(instances[0].id).toBe(result.id);
     expect(instances[0].port).toBe(port);
     expect(instances[0].headless).toBe(true);
-    expect(instances[0].godot).toBe(fakeGodotExe);
+    expect(instances[0].godot).toBe(fakeGodotExe!);
   }, TEST_TIMEOUT_MS);
 
-  test("停止超时：不启动新实例并保留旧登记", async () => {
+  test("停止超时：--wait 的秒数同时约束停止阶段，超时后不启动新实例并保留旧登记", async () => {
     const projectDir = makeProjectDir();
     const port = await findFreePort();
     const pid = await stubbornProcess();
@@ -258,7 +258,7 @@ describe.serial("restart", () => {
 
     expect(code).toBe(ExitCode.Transport);
     expect(stdout.trim()).toBe("");
-    expect(stderr).toContain(`instance p${pid} (pid ${pid}) is still running after 10s`);
+    expect(stderr).toContain(`instance p${pid} (pid ${pid}) is still running after 1s`);
     expect(stderr).toContain("refusing to start a replacement");
     expect(isAlive(pid)).toBe(true);
     expect(loadRegistry().instances).toHaveLength(1);

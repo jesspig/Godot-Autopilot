@@ -125,7 +125,7 @@ export async function waitUntilDead(pid: number, waitSec: number): Promise<boole
   }
 }
 
-function parseWaitSec(text: string | undefined, fallback: number): number {
+export function parseWaitSec(text: string | undefined, fallback: number): number {
   if (text === undefined) return fallback;
   const n = Number(text);
   if (!Number.isFinite(n) || n < 0) {

@@ -12,6 +12,9 @@ on:
         required: true
         type: string
 
+permissions:
+  contents: read
+
 concurrency:
   group: release-${{ inputs.tag || github.ref }}
   cancel-in-progress: false
@@ -27,12 +30,14 @@ jobs:
           ref: ${{ inputs.tag || github.ref }}
 
       - name: Verify tag matches VERSION
+        env:
+          TAG_NAME: ${{ inputs.tag || github.ref_name }}
         run: |
           version="$(tr -d ' \t\r\n' < VERSION)"
-          tag="${{ inputs.tag || github.ref_name }}"
+          tag="${TAG_NAME}"
           tag="${tag#v}"
           if [ "${tag}" != "${version}" ]; then
-            echo "::error::Tag ${{ inputs.tag || github.ref_name }} does not match VERSION ${version} (v prefix optional)"
+            echo "::error::Tag ${TAG_NAME} does not match VERSION ${version} (v prefix optional)"
             exit 1
           fi
 
@@ -95,7 +100,14 @@ jobs:
           key: submodules-release-${{ runner.os }}-${{ steps.submodules.outputs.shas }}
 
       - name: Build (Release)
-        run: python main.py build --release
+        shell: bash
+        run: |
+          set -o pipefail
+          python main.py build --release 2>&1 | tee build-release.log
+          grep -E '\[gda\] LTO: (thin|LTCG|full)' build-release.log || {
+            echo "::error::Release build log has no LTO record (expected '[gda] LTO: thin|LTCG|full')"
+            exit 1
+          }
 
       - name: Deploy to demo projects
         run: python main.py deploy --release
@@ -160,6 +172,11 @@ jobs:
           mkdir -p dist
           out="dist/gda${{ matrix.ext }}"
           bun build cli/bin/gda.ts --compile --minify --target=${{ matrix.target }} --outfile "$out"
+          built="$("$out" --version | awk '{print $2}')"
+          if [ "${built}" != "${version}" ]; then
+            echo "::error::Built gda reports version '${built}' but VERSION is '${version}'"
+            exit 1
+          fi
 
       - name: Ad-hoc sign (macOS)
         if: startsWith(matrix.os, 'macos')

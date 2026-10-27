@@ -3,7 +3,7 @@
     "mcp": {
         "godot-autopilot": {
             "type": "remote",
-            "url": "http://localhost:9527/mcp",
+            "url": "http://127.0.0.1:9527/mcp",
             "enabled": true,
             "description": "连接到运行中的 Godot 编辑器实例（需先启动 Godot + 插件加载）"
         }

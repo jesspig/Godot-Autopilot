@@ -91,6 +91,7 @@ function sleepMs(ms: number): void {
 
 export function loadRegistry(): RegistryData {
   return withLock(() => {
+    removeOrphanTmpFiles();
     const p = registryPath();
     let raw: string;
     try {
@@ -142,6 +143,18 @@ function writeRegistryAtomic(data: RegistryData): void {
   const tmp = `${p}.${process.pid}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
   fs.renameSync(tmp, p);
+}
+
+const ORPHAN_TMP_PATTERN = /^instances\.json\.(\d+)\.tmp$/;
+
+function removeOrphanTmpFiles(): void {
+  const dir = stateDir();
+  for (const name of fs.readdirSync(dir)) {
+    const m = ORPHAN_TMP_PATTERN.exec(name);
+    if (m === null) continue;
+    if (isAlive(Number(m[1]))) continue;
+    fs.rmSync(joinPath(dir, name), { force: true });
+  }
 }
 
 export function findById(id: string): InstanceEntry | undefined {
