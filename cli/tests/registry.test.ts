@@ -15,6 +15,7 @@ import {
   withLock,
   type InstanceEntry,
 } from "../src/registry";
+import { readRawEntries } from "../src/commands/registry-raw";
 
 let tmp: string;
 let prevHome: string | undefined;
@@ -147,6 +148,54 @@ describe.serial("withLock 并发竞速", () => {
   });
 });
 
+describe.serial("孤儿 tmp 清理", () => {
+  test("loadRegistry 删除死 pid 的孤儿 tmp 文件并保留当前进程 pid 的 tmp", () => {
+    const orphan = path.join(tmp, "instances.json.999999.tmp");
+    const live = path.join(tmp, `instances.json.${process.pid}.tmp`);
+    fs.writeFileSync(orphan, "{}");
+    fs.writeFileSync(live, "{}");
+    loadRegistry();
+    expect(fs.existsSync(orphan)).toBe(false);
+    expect(fs.existsSync(live)).toBe(true);
+  });
+});
+
+describe.serial("readRawEntries 绕锁修复", () => {
+  test("子进程持锁期间 readRawEntries 等待锁释放后才返回", async () => {
+    const registryAbs = path.join(import.meta.dir, "..", "src", "registry.ts");
+    const rawAbs = path.join(import.meta.dir, "..", "src", "commands", "registry-raw.ts");
+    const child = spawn(process.execPath, ["-e", `
+      const { withLock } = await import(${JSON.stringify(registryAbs)});
+      const { readRawEntries } = await import(${JSON.stringify(rawAbs)});
+      const t0 = Date.now();
+      withLock(() => {
+        while (Date.now() - t0 < 600) {
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+        }
+        return "held";
+      });
+      const entries = readRawEntries();
+      console.log(JSON.stringify({ count: entries.length, ms: Date.now() - t0 }));
+    `], {
+      env: { ...process.env, GODOT_AUTOPILOT_CLI_HOME: tmp },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const out = await new Promise<string>((resolve, reject) => {
+      let buf = "";
+      child.stdout.on("data", (d) => {
+        buf += d.toString();
+      });
+      child.on("exit", (code) => {
+        if (code === 0) resolve(buf);
+        else reject(new Error(`子进程退出码 ${code}`));
+      });
+    });
+    const result = JSON.parse(out.trim());
+    expect(result.count).toBe(0);
+    expect(result.ms).toBeGreaterThanOrEqual(500);
+  });
+});
+
 describe.serial("findById", () => {
   test("命中与未命中", async () => {
     const pid = spawnLongRunner();
@@ -179,4 +228,31 @@ describe.serial("findLiveByProject", () => {
       await waitForDead(pid);
     }
   }, 30000);
+});
+
+describe.serial("锁偷取", () => {
+  test("死 pid 且 mtime 过旧的锁文件被等待超时后偷取成功", async () => {
+    const lock = path.join(tmp, "instances.lock");
+    fs.writeFileSync(lock, String(999999));
+    const stale = new Date(Date.now() - 60_000);
+    fs.utimesSync(lock, stale, stale);
+    const t0 = Date.now();
+    expect(withLock(() => "stolen")).toBe("stolen");
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(1900);
+  }, 15_000);
+
+  test("存活 pid 的新鲜锁等待超时后抛 registry lock busy", async () => {
+    const lock = path.join(tmp, "instances.lock");
+    fs.writeFileSync(lock, String(process.pid));
+    const t0 = Date.now();
+    try {
+      withLock(() => "never");
+      expect.unreachable();
+    } catch (e) {
+      expect(e).toBeInstanceOf(CliError);
+      expect((e as CliError).message).toBe("registry lock busy");
+    }
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(1900);
+    fs.rmSync(lock, { force: true });
+  }, 15_000);
 });
