@@ -2,6 +2,7 @@
   "name": "tool_contract",
   "description": "工具契约与授权加固的 L2 冒烟（T-01 json 参数类型 + T-02 writes_scene 写授权）。前置条件：GODOT_AUTOPILOT_ALLOW=all（或至少 write），否则 create_editor_scene（ModifiesWindow）与 create_scene_node / property_set（writes_scene）均被写授权门拒绝并返回 authorization_required 而 FAIL。链路：create_editor_scene 建 ToolContractRoot(Node2D) → create_scene_node 建 Hero(Node2D) → property_set 依次写入标量数字 z_index=7、布尔 visible=false、对象 position 与数组 metadata/gda_tool_contract=[1,2,3]（T-01 的 json 参数类型接受任意 JSON，标量与数组不再被 REST/CLI 的类型校验拒绝）→ property_get 逐项回读证明写入真实生效 → 写响应带 scene_path 与 scene_unsaved=true，证明落在编辑中的内存场景。场景不落盘、不创建工程文件，无残留。严格模式（GODOT_AUTOPILOT_AUTH_MODE=strict 且 allow 不含 write）下同一链路的 403 authorization_required 由主代理手工验证，不在本 JSON 断言。",
   "headless": true,
+  "requires": ["write"],
   "pipeline": {
     "on_failure": "fail_fast",
     "stages": [

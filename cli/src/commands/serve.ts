@@ -77,7 +77,7 @@ function reportToken(controlToken: ControlToken): void {
   );
 }
 
-function parseBind(text: string | undefined): string {
+export function parseBind(text: string | undefined): string {
   if (text === undefined) return "127.0.0.1";
   const value = text.trim();
   if (LOOPBACK_HOSTS.has(value.toLowerCase())) return value;
@@ -92,7 +92,7 @@ function displayHost(hostname: string): string {
   return hostname.includes(":") ? `[${hostname}]` : hostname;
 }
 
-function parseTimeoutSec(text: string | undefined): number {
+export function parseTimeoutSec(text: string | undefined): number {
   if (text === undefined) return DEFAULT_TIMEOUT_SEC;
   const n = Number(text);
   if (!Number.isFinite(n) || n <= 0) {

@@ -2,6 +2,9 @@
   "name": "exec_budget",
   "description": "执行预算与超时治理回归（headless）：验证 code_execute 的 timeout_ms 在脚本执行期生效，且参数上限与宿主派发预算同源。链路：① code_execute 传入死循环脚本 `while true: pass` 与 timeout_ms=300，包装脚本注入的截止时间检查点使循环在上限到达后退出，断言响应含 code 键且其值等于 exec_timeout（不挂死编辑器主线程）→ ② code_execute 传入立即返回的脚本与 timeout_ms=25000（取值低于 code_execute 的参数上限，该上限同源于长阻塞派发预算），断言 result 键存在（正常路径未被超时机制误伤）→ ③ code_execute 传入立即返回的脚本与越界 timeout_ms=30001（高于任何可能的参数上限），断言 error 键存在且非空（越界值被参数校验拒绝，不进入脚本执行）。on_failure=fail_fast：①若未返回 exec_timeout 说明超时机制失效，继续执行②会掩盖缺陷；③置于末尾，越界校验自身的失败不会掩盖①②的超时机制覆盖。需 code_execute 授权（GODOT_AUTOPILOT_ALLOW 或 user://godot_autopilot/config.json 的 allow 字段，env 优先）。",
   "headless": true,
+  "requires": [
+    "code_execute"
+  ],
   "pipeline": {
     "on_failure": "fail_fast",
     "stages": [
@@ -11,30 +14,52 @@
           {
             "id": "exec_infinite_loop_times_out",
             "tool": "code_execute",
-            "args": { "source_code": "while true: pass", "timeout_ms": 300 },
+            "args": {
+              "source_code": "while true: pass",
+              "timeout_ms": 300
+            },
             "expect": {
-              "has_keys": ["code"],
+              "has_keys": [
+                "code"
+              ],
               "field_checks": [
-                { "key": "code", "value": "exec_timeout" }
-              ]
+                {
+                  "key": "code",
+                  "value": "exec_timeout"
+                }
+              ],
+              "allow_error": true
             }
           },
           {
             "id": "exec_fast_script_returns_result",
             "tool": "code_execute",
-            "args": { "source_code": "return 21 * 2", "timeout_ms": 25000 },
+            "args": {
+              "source_code": "return 21 * 2",
+              "timeout_ms": 25000
+            },
             "expect": {
-              "has_keys": ["result"]
+              "has_keys": [
+                "result"
+              ]
             }
           },
           {
             "id": "exec_timeout_ms_out_of_range_rejected",
             "tool": "code_execute",
-            "args": { "source_code": "return 21 * 2", "timeout_ms": 30001 },
+            "args": {
+              "source_code": "return 21 * 2",
+              "timeout_ms": 30001
+            },
             "expect": {
-              "has_keys": ["error"],
+              "has_keys": [
+                "error"
+              ],
               "field_checks": [
-                { "key": "error", "not_empty": true }
+                {
+                  "key": "error",
+                  "not_empty": true
+                }
               ]
             }
           }

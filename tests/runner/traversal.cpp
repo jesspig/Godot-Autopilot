@@ -23,11 +23,11 @@ const char* kModeHeuristicSmoke = "heuristic_smoke";
 const char* kSideEffectNone = "none";
 
 constexpr size_t kBaselineEnumerated = 452;
-constexpr size_t kBaselineExcluded = 177;
-constexpr size_t kBaselineCandidates = 275;
+constexpr size_t kBaselineExcluded = 182;
+constexpr size_t kBaselineCandidates = 270;
 constexpr size_t kBaselineWarnings = 0;
-constexpr size_t kBaselineCallsEmptyArgs = 275;
-constexpr size_t kBaselineCallsHeuristicSmoke = 221;
+constexpr size_t kBaselineCallsEmptyArgs = 270;
+constexpr size_t kBaselineCallsHeuristicSmoke = 218;
 
 constexpr char kBaselineEnvEmptyArgs[] = "GDA_TRAVERSAL_BASELINE_EMPTY_ARGS";
 constexpr char kBaselineEnvHeuristicSmoke[] =

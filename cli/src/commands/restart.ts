@@ -7,6 +7,7 @@ import { writeJson } from "./json-output";
 import { instanceView, start } from "./start";
 import {
   DEFAULT_STOP_WAIT_SEC,
+  parseWaitSec,
   removeFromRegistry,
   resolveTarget,
   stopMethod,
@@ -29,6 +30,7 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
 }
 
 async function restart(positional: string[], opts: GlobalOptions): Promise<number> {
+  const stopWaitSec = parseWaitSec(opts.waitText, DEFAULT_STOP_WAIT_SEC);
   const entry = resolveTarget(positional, opts, "restart");
   const method = stopMethod(opts.force, entry.headless);
 
@@ -38,11 +40,11 @@ async function restart(positional: string[], opts: GlobalOptions): Promise<numbe
     } else {
       stopGraceful(entry.pid);
     }
-    const gone = await waitUntilDead(entry.pid, DEFAULT_STOP_WAIT_SEC);
+    const gone = await waitUntilDead(entry.pid, stopWaitSec);
     if (!gone) {
       throw new CliError(
         ExitCode.Transport,
-        `instance ${entry.id} (pid ${entry.pid}) is still running after ${DEFAULT_STOP_WAIT_SEC}s; refusing to start a replacement to avoid two editors on the same project`,
+        `instance ${entry.id} (pid ${entry.pid}) is still running after ${stopWaitSec}s; refusing to start a replacement to avoid two editors on the same project`,
         "retry with --force, or stop it manually before running gda restart again",
       );
     }

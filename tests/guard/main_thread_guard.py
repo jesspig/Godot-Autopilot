@@ -10,7 +10,13 @@ string，再剥离注释，最后才做标识符匹配，避免把字符串与�
 误判为真实调用。
 
 无违规打印 main-thread-guard OK 并退出 0，有违规退出 1，文件读/解码失败
-退出 2。可选参数是待扫描目录，缺省为仓库的 src/。只用标准库。
+退出 2。可选参数是待扫描目录，缺省为仓库的 src/。
+--self-test 进入反例自测：以合成文本直接驱动 scan_file 断言分类、豁免
+与词法剥离行为。自测样本路径 src/self_test/fixture.cpp 有意取规则表
+THREAD_CONTEXT_RULES 不可能匹配的路径（默认分类 foreign）；规则表若演进
+到覆盖该路径，自测首断言即报错（自愈式），届时须同步更换样本路径。
+全部通过打印 main-thread-guard self-test OK 并退出 0，任一失败向 stderr
+打印 self-test FAIL 并退出 1。只用标准库。
 """
 
 import fnmatch
@@ -509,7 +515,55 @@ def scan_file(rel_path, text):
     return violations
 
 
+def run_self_tests():
+    fixture_rel = "src/self_test/fixture.cpp"
+    context = _context_of(fixture_rel)
+    if context != CTX_FOREIGN:
+        print("self-test FAIL: foreign/" + context
+              + ": 样本路径被 THREAD_CONTEXT_RULES 覆盖, 请更换自测样本路径",
+              file=sys.stderr)
+        return 1
+    bad_in_function = ("namespace godot_autopilot {\n"
+                       "void f() { auto* e = godot::Engine::get_singleton(); }\n"
+                       "}")
+    hits = scan_file(fixture_rel, bad_in_function)
+    if not any(hit[4].split("::")[-1] == "f" for hit in hits):
+        scopes = str(sorted({hit[4] for hit in hits}))
+        print("self-test FAIL: 违规且函数链含 f/"
+              + str(len(hits)) + " 条, 函数链 " + scopes, file=sys.stderr)
+        return 1
+    bad_at_global_scope = "auto* o = godot::OS::get_singleton();"
+    hits = scan_file(fixture_rel, bad_at_global_scope)
+    if not hits:
+        print("self-test FAIL: >=1 violation/0 hits: 全局作用域 godot::OS 未报违规",
+              file=sys.stderr)
+        return 1
+    main_rel = "src/tools/self_test_fixture_tools.hpp"
+    hits = scan_file(main_rel, "auto* e = godot::Engine::get_singleton();")
+    if hits:
+        print("self-test FAIL: 0 violations/" + str(len(hits))
+              + " hits: main 分类文件不应报违规", file=sys.stderr)
+        return 1
+    allowed_rel = "src/core/log_persist.cpp"
+    allowed_text = ('void godot_autopilot::append_persist_file() '
+                    '{ godot::FileAccess::exists("x"); }')
+    hits = scan_file(allowed_rel, allowed_text)
+    if hits:
+        print("self-test FAIL: 0 violations/" + str(len(hits))
+              + " hits: 豁免作用域内调用不应报违规", file=sys.stderr)
+        return 1
+    hits = scan_file(fixture_rel, 'auto* s = "godot::Engine";')
+    if hits:
+        print("self-test FAIL: 0 violations/" + str(len(hits))
+              + " hits: 字符串字面量未被词法剥离", file=sys.stderr)
+        return 1
+    print("main-thread-guard self-test OK")
+    return 0
+
+
 def main():
+    if len(sys.argv) == 2 and sys.argv[1] == "--self-test":
+        return run_self_tests()
     try:
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:

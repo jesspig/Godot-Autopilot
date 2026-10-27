@@ -7,6 +7,7 @@
 namespace {
 
 using godot_autopilot::ApiEnvelope;
+using godot_autopilot::jsonrpc_code_for;
 
 mcp::JsonValue make_failure(const std::string &error_text) {
   mcp::JsonValue result(mcp::JsonValue::object_tag);
@@ -154,4 +155,39 @@ TEST(ApiEnvelopeTest, BuildKeepsExistingCodeWhenAlreadyPresent) {
   ASSERT_TRUE(code->IsString());
   EXPECT_EQ(code->GetString(), "queue_unavailable");
   EXPECT_EQ(envelope.status_for(code->GetString()), 503);
+}
+
+TEST(ApiEnvelopeTest, JsonRpcCodeForMapsValidationAndNotFound) {
+  EXPECT_EQ(jsonrpc_code_for("invalid_argument"), -32602);
+  EXPECT_EQ(jsonrpc_code_for("validation_error"), -32602);
+  EXPECT_EQ(jsonrpc_code_for("not_found"), -32602);
+  EXPECT_EQ(jsonrpc_code_for("tool_not_found"), -32602);
+}
+
+TEST(ApiEnvelopeTest, JsonRpcCodeForMethodNotAllowed) {
+  EXPECT_EQ(jsonrpc_code_for("method_not_allowed"), -32601);
+}
+
+TEST(ApiEnvelopeTest, JsonRpcCodeForDefaultsToServerDefinedRange) {
+  EXPECT_EQ(jsonrpc_code_for("tool_error"), -32000);
+  EXPECT_EQ(jsonrpc_code_for("unauthorized"), -32000);
+  EXPECT_EQ(jsonrpc_code_for(""), -32000);
+}
+
+TEST(ApiEnvelopeTest, BuildAddsRequestIdFromExplicitOverride) {
+  ApiEnvelope envelope;
+  const mcp::JsonValue built = envelope.build(make_failure("boom"), "gda_probe_tool",
+                                              "req-abc.123");
+  const mcp::JsonValue *request_id = built.Find("request_id");
+  ASSERT_NE(request_id, nullptr);
+  ASSERT_TRUE(request_id->IsString());
+  EXPECT_EQ(request_id->GetString(), "req-abc.123");
+  const mcp::JsonValue *jsonrpc_code = built.Find("jsonrpc_code");
+  ASSERT_NE(jsonrpc_code, nullptr);
+  ASSERT_TRUE(jsonrpc_code->IsInt());
+  EXPECT_EQ(jsonrpc_code->GetInt(), -32000);
+
+  const mcp::JsonValue success(mcp::JsonValue::object_tag);
+  const mcp::JsonValue unwrapped = envelope.build(success, "gda_probe_tool", "req-abc.123");
+  EXPECT_EQ(unwrapped.Find("request_id"), nullptr);
 }

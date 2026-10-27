@@ -3,6 +3,7 @@
 #include "util/owned_exception.hpp"
 
 #include <fstream>
+#include <initializer_list>
 #include <iterator>
 #include <sstream>
 #include <stdexcept>
@@ -13,6 +14,11 @@ namespace gda_test {
 using godot_autopilot::RuntimeError;
 
 namespace {
+
+constexpr const char *kKnownCapabilities[] = {
+    "process",   "code_execute", "game_runtime",
+    "destructive", "user_tools", "read",       "write",
+    "all"};
 
 [[noreturn]] void Fail(const std::string& path, const std::string& msg) {
     throw RuntimeError(path + ": " + msg);
@@ -29,11 +35,39 @@ std::string TypeName(const mcp::JsonValue& v) {
     return "unknown";
 }
 
+} // namespace
+
 void RequireType(const mcp::JsonValue& v, const std::string& path, const std::string& expected) {
     if (!v.IsObject() && expected == "object")  return Fail(path, "必须是 " + expected + "，实际是 " + TypeName(v));
     if (!v.IsArray() && expected == "array")    return Fail(path, "必须是 " + expected + "，实际是 " + TypeName(v));
     if (!v.IsString() && expected == "string")  return Fail(path, "必须是 " + expected + "，实际是 " + TypeName(v));
     if (!v.IsBool() && expected == "bool")      return Fail(path, "必须是 " + expected + "，实际是 " + TypeName(v));
+    if (expected != "object" && expected != "array" && expected != "string" && expected != "bool")
+        Fail(path, "未知类型校验: " + expected);
+}
+
+namespace {
+
+void RejectUnknown(const mcp::JsonValue& v, std::initializer_list<const char*> allowed,
+                   const std::string& path) {
+    if (!v.IsObject()) return;
+    for (const auto& entry : v.GetObject()) {
+        bool known = false;
+        for (const char* key : allowed) {
+            if (entry.first == key) {
+                known = true;
+                break;
+            }
+        }
+        if (!known) {
+            std::string list;
+            for (const char* key : allowed) {
+                if (!list.empty()) list += ", ";
+                list += key;
+            }
+            Fail(path, "未知字段 \"" + entry.first + "\"（允许: " + list + "）");
+        }
+    }
 }
 
 std::string ReadFile(const std::string& json_path) {
@@ -55,6 +89,11 @@ std::string ParseOptionalId(const mcp::JsonValue& v, const std::string& path) {
 
 StepExpect ParseExpect(const mcp::JsonValue& v, const std::string& path) {
     StepExpect exp;
+    RejectUnknown(v, {"has_keys", "field_checks", "allow_error"}, path);
+    if (const mcp::JsonValue* ae = v.Find("allow_error")) {
+        RequireType(*ae, path + ".allow_error", "bool");
+        exp.allow_error = ae->GetBool();
+    }
     if (const mcp::JsonValue* hk = v.Find("has_keys")) {
         RequireType(*hk, path + ".has_keys", "array");
         const mcp::JsonValue::Array& arr = hk->GetArray();
@@ -70,6 +109,8 @@ StepExpect ParseExpect(const mcp::JsonValue& v, const std::string& path) {
         for (size_t i = 0; i < arr.size(); ++i) {
             const std::string item_path = path + ".field_checks[" + std::to_string(i) + "]";
             RequireType(arr[i], item_path, "object");
+            RejectUnknown(arr[i], {"key", "value", "not_empty", "not_contains", "allow_error"},
+                          item_path);
             StepExpect::FieldCheck check;
             const mcp::JsonValue* key = arr[i].Find("key");
             if (!key) Fail(item_path, "缺少必填字段 key");
@@ -88,6 +129,10 @@ StepExpect ParseExpect(const mcp::JsonValue& v, const std::string& path) {
                 check.has_not_contains = true;
                 check.not_contains = nc->GetString();
             }
+            if (const mcp::JsonValue* ae = arr[i].Find("allow_error")) {
+                RequireType(*ae, item_path + ".allow_error", "bool");
+                exp.allow_error = exp.allow_error || ae->GetBool();
+            }
             exp.field_checks.push_back(std::move(check));
         }
     }
@@ -96,6 +141,7 @@ StepExpect ParseExpect(const mcp::JsonValue& v, const std::string& path) {
 
 Step ParseToolStep(const mcp::JsonValue& v, const std::string& path) {
     Step step;
+    RejectUnknown(v, {"tool", "traverse", "id", "args", "expect", "soft_error"}, path);
     const std::string id = ParseOptionalId(v, path);
     const mcp::JsonValue* tool = v.Find("tool");
     if (!tool) Fail(path, "缺少必填字段 tool");
@@ -111,6 +157,8 @@ Step ParseToolStep(const mcp::JsonValue& v, const std::string& path) {
     if (const mcp::JsonValue* expect = v.Find("expect")) {
         RequireType(*expect, path + ".expect", "object");
         step.expect = ParseExpect(*expect, path + ".expect");
+        if (step.expect.has_keys.empty() && step.expect.field_checks.empty())
+            Fail(path + ".expect", "空的 expect 无断言，删除该字段或补充 has_keys/field_checks");
     }
     if (const mcp::JsonValue* soft = v.Find("soft_error")) {
         RequireType(*soft, path + ".soft_error", "string");
@@ -186,6 +234,7 @@ TestCase load_test_case(const std::string& json_path) {
         throw RuntimeError(json_path + ": JSON 语法错误");
     }
     if (!root.IsObject()) Fail("", "顶层必须是 object");
+    RejectUnknown(root, {"name", "description", "headless", "pipeline", "requires"}, "");
 
     TestCase tc;
     const mcp::JsonValue* name = root.Find("name");
@@ -201,10 +250,33 @@ TestCase load_test_case(const std::string& json_path) {
         RequireType(*hl, "headless", "bool");
         tc.headless = hl->GetBool();
     }
+    if (const mcp::JsonValue* req = root.Find("requires")) {
+        RequireType(*req, "requires", "array");
+        const mcp::JsonValue::Array& caps = req->GetArray();
+        for (size_t i = 0; i < caps.size(); ++i) {
+            const std::string item_path = "requires[" + std::to_string(i) + "]";
+            RequireType(caps[i], item_path, "string");
+            const std::string& cap = caps[i].GetString();
+            if (cap.empty()) Fail(item_path, "requires 元素不能为空字符串");
+            bool known = false;
+            for (const char *k : kKnownCapabilities) {
+                if (cap == k) {
+                    known = true;
+                    break;
+                }
+            }
+            if (!known) Fail(item_path, "未知 capability: \"" + cap + "\"");
+            for (const std::string &prev : tc.requires) {
+                if (prev == cap) Fail(item_path, "requires 重复元素: \"" + cap + "\"");
+            }
+            tc.requires.push_back(cap);
+        }
+    }
 
     const mcp::JsonValue* pipe = root.Find("pipeline");
     if (!pipe) Fail("pipeline", "缺少必填字段");
     RequireType(*pipe, "pipeline", "object");
+    RejectUnknown(*pipe, {"on_failure", "before_all", "stages", "after_all"}, "pipeline");
 
     if (const mcp::JsonValue* of = pipe->Find("on_failure")) {
         RequireType(*of, "pipeline.on_failure", "string");
@@ -228,6 +300,7 @@ TestCase load_test_case(const std::string& json_path) {
             const std::string stage_path = "pipeline.stages[" + std::to_string(i) + "]";
             const mcp::JsonValue& stage = stage_list[i];
             RequireType(stage, stage_path, "object");
+            RejectUnknown(stage, {"id", "steps"}, stage_path);
             if (const mcp::JsonValue* sid = stage.Find("id")) {
                 RequireType(*sid, stage_path + ".id", "string");
             }

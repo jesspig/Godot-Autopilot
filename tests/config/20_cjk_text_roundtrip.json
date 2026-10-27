@@ -2,6 +2,7 @@
   "name": "20_cjk_text_roundtrip",
   "description": "零 C++ 的 L2 用例（20 号段，headless）：编辑器侧中文文本往返——property_set 写中文到 Label.text、property_get 读回断言逐字相等（String::utf8 链路回归）；另覆盖缺失属性/缺失节点的错误分支（仅断言 error 非空，不锁定文案）。收尾 save_editor_scene_as 落盘 res://tests_tmp/cjk_text_probe.tscn 后 close_editor_scene（未落盘场景 close 会被拒，故必须先落盘），after_all 回收 res://tests_tmp，无残留文件、无会话污染。",
   "headless": true,
+  "requires": ["write"],
   "pipeline": {
     "on_failure": "continue",
     "after_all": [

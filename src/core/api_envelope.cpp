@@ -91,7 +91,22 @@ std::string feature_code(const std::string &text) {
   return kCodeToolError;
 }
 
+constexpr int kJsonRpcInvalidParams = -32602;
+constexpr int kJsonRpcMethodNotAllowedCode = -32601;
+constexpr int kJsonRpcServerDefinedRange = -32000;
+
 } // namespace
+
+int jsonrpc_code_for(const std::string &code) {
+  if (code == "invalid_argument" || code == "validation_error" ||
+      code == "not_found" || code == "tool_not_found") {
+    return kJsonRpcInvalidParams;
+  }
+  if (code == "method_not_allowed") {
+    return kJsonRpcMethodNotAllowedCode;
+  }
+  return kJsonRpcServerDefinedRange;
+}
 
 std::string ApiEnvelope::normalize_code(const mcp::JsonValue &result) const {
   if (result.IsObject()) {
@@ -143,7 +158,8 @@ int ApiEnvelope::status_for(const std::string &code) const {
 }
 
 mcp::JsonValue ApiEnvelope::build(const mcp::JsonValue &result,
-                                  const std::string &tool_name) const {
+                                  const std::string &tool_name,
+                                  const std::string &request_id_override) const {
   if (!result.IsObject() || result.Find("error") == nullptr) {
     return result;
   }
@@ -154,7 +170,10 @@ mcp::JsonValue ApiEnvelope::build(const mcp::JsonValue &result,
   } else {
     envelope["error"] = mcp::JsonValue(error->Dump());
   }
-  envelope["code"] = mcp::JsonValue(normalize_code(result));
+  const std::string normalized = normalize_code(result);
+  envelope["code"] = mcp::JsonValue(normalized);
+  envelope["jsonrpc_code"] =
+      mcp::JsonValue(static_cast<int64_t>(jsonrpc_code_for(normalized)));
   const mcp::JsonValue *warnings = envelope.Find("warnings");
   if (!warnings || !warnings->IsArray()) {
     envelope["warnings"] = mcp::JsonValue(mcp::JsonValue::array_tag);
@@ -166,7 +185,10 @@ mcp::JsonValue ApiEnvelope::build(const mcp::JsonValue &result,
   if (!trace_id.empty()) {
     envelope["trace_id"] = mcp::JsonValue(trace_id);
   }
-  const std::string request_id = monitor::current_request_id();
+  std::string request_id = monitor::current_request_id();
+  if (request_id.empty()) {
+    request_id = request_id_override;
+  }
   if (!request_id.empty()) {
     envelope["request_id"] = mcp::JsonValue(request_id);
   }

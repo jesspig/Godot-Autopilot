@@ -54,6 +54,14 @@ resource:
 
 升版流程：只改 `VERSION` 文件内容即可（重新 configure 后生效）。
 
+### 版本与 LTO 的单一事实源与 CI 断言
+
+版本与 LTO 各只有一处决策点，CI 侧由断言兜底（均在 `.github/workflows/release.yml`）：
+
+- **版本**：唯一事实源为根 `VERSION` 文件（上表）。validate 作业校验 tag 与 `VERSION` 一致（`v` 前缀可选；`workflow_dispatch` 的 tag 输入经步骤级 `env: TAG_NAME` 间接取用，不直接内插进 `run:` 脚本，消解注入面）；cli 作业 `bun build --compile` 出二进制后立即执行 `gda --version`，把输出第二段与 `VERSION` 比对，不一致报 `::error` 并中止发布——防止二进制内嵌版本（`cli/src/version.ts` 的 `CLI_VERSION`，由 `version_sync_guard` 与 `VERSION` 对齐）漂移。
+- **LTO**：唯一决策点为 `cmake/Lto.cmake`（优先级 Clang ThinLTO > MSVC LTCG > GCC IPO；非 Release 静默跳过，见「cmake/ 模块职责」表）。CI 与本地同走 `main.py` 预设，构建口径一致；release 作业的 Release 构建把日志 `tee` 到 `build-release.log` 并 `grep -E '\[gda\] LTO: (thin|LTCG|full)'`，未命中报 `::error` 并失败——防止 Release 构建静默退化为无 LTO。Debug 侧不加 skipped 断言（非 Release 静默 return 无日志可断）。
+- **workflow 权限**：两 workflow 顶层声明 `permissions: contents: read`（最小权限基线），仅 release 的 package 作业按发布需要作业级覆盖为 `contents: write`。
+
 ## 构建流水线（main.py + scripts/）
 
 ### 1. 清理（`deploy --release` 顺带，或 `clean` 子命令）

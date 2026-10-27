@@ -42,6 +42,10 @@ bool expect_empty(const StepExpect& expect) {
     return expect.has_keys.empty() && expect.field_checks.empty();
 }
 
+bool response_has_top_level_error(const mcp::JsonValue& parsed) {
+    return parsed.IsObject() && parsed.Find("error") != nullptr;
+}
+
 std::string crash_log(GodotProcess* proc) {
     std::string logs = proc ? proc->capture_logs() : "";
     if (logs.size() > CRASH_LOG_LIMIT) {
@@ -110,6 +114,18 @@ StepResult run_single_step(const Step& step, GodotProcess* proc,
             try {
                 mcp::JsonValue parsed = mcp::JsonValue::Parse(response);
                 result.passed = check_expectations(parsed, step.expect, result.detail);
+                bool asserts_error = false;
+                for (const auto& check : step.expect.field_checks) {
+                    if (check.key == "error") {
+                        asserts_error = true;
+                    }
+                }
+                if (result.passed && !step.expect.allow_error &&
+                    !asserts_error && response_has_top_level_error(parsed)) {
+                    result.passed = false;
+                    result.detail =
+                        "unexpected top-level error field (set expect.allow_error=true to exempt)";
+                }
             } catch (const std::exception& e) {
                 result.passed = false;
                 result.detail = std::string("response not valid JSON: ") + e.what();

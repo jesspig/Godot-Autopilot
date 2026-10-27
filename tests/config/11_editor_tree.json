@@ -2,6 +2,7 @@
   "name": "editor_tree",
   "description": "编辑器场景树行枚举、按路径选中与检查器联动（headless，含选中副作用）。before_all 建 TreeRoot，挂 Alpha(Node2D)、Alpha/Beta(Node)、Gamma(Label)。断言：scene_tree_items 列出 4 行（场景根 + 3 个子节点），filter 对 path/name 做大小写不敏感子串匹配（alpha 命中 Alpha 与 Alpha/Beta 两行，Alpha/Beta 命中 1 行，no_such_row_xyz 命中 0 行），max_items=1 时 count=1 且 truncated=true；select_scene_tree_node 默认清空选择并选中，返回 ok/path/selected_count/inspected/tree_found 且 scene_tree_items(selected_only=true) 只返回 1 行，add=true 追加后 selected_count=2，inspect=false 时 inspected=false；focused 字段不在本文件断言：它仅在非 headless（真实编辑器窗口）下为 true，headless 下 Scene dock 的 Tree 不可见导致 scroll_to_item 不生效，实现返回 focused=false 是正确行为；节点不存在返回含 position/expected/action 的结构化错误，缺 path 参数返回 missing required parameter。每步独立断言，失败继续。风险：若 headless 下 Scene dock 的 Tree 控件不可用，scene_tree_items 会返回结构化 error（editor scene tree control not found，含 position/expected/action 字段），届时需把本文件第一步改为断言该 error 文本并按报告说明回退。",
   "headless": true,
+  "requires": ["write"],
   "pipeline": {
     "on_failure": "continue",
     "before_all": [

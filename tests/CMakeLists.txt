@@ -68,7 +68,7 @@ if(GDA_UNIT_SOURCES)
     add_dependencies(gda_unit_tests gda_skill_embed_header)
 
     target_include_directories(gda_unit_tests PRIVATE
-        ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
+        ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests ${CMAKE_BINARY_DIR}/generated)
     # mcp-client: register_all_test.cpp 使用 McpClient::Create/ListTools/Close
     # 做 ListTools 往返断言 (SDK 测试链接组合为 mcp-client + mcp-server)
     target_link_libraries(gda_unit_tests PRIVATE
@@ -147,6 +147,12 @@ add_test(NAME main_thread_guard
 add_test(NAME version_sync_guard
     COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/version_sync_guard.py")
 
+# ── ctest 注册: L1 源清单守卫（零依赖，读源码断言，无需构建产物） ──
+# 解析 cmake/sources/ 下插件清单 + src/tools/*_ops.cpp glob 断言并集 == src/ 全部 .cpp，
+# L1 清单引用的 src/ 源 ⊆ 插件并集；解析规则见 guard/source_manifest_guard.py 模块 docstring。
+add_test(NAME source_manifest_guard
+    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/source_manifest_guard.py")
+
 # ── ctest 注册: CLI 契约 mock conformance（纯 stdlib + 自带 mock server）──
 # bun 缺失时测试文件自行打印 SKIP 并 exit 0，ctest 视为通过；
 # 有 bun 时由 bun 驱动 gda.ts 跑全部断言。
@@ -158,3 +164,18 @@ add_test(NAME cli_contract
 add_test(NAME cli_unit
     COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_cli_unit.py")
 set_tests_properties(cli_unit PROPERTIES TIMEOUT 300)
+
+# --- ctest: guard self-tests (built-in negative samples, --self-test mode) ---
+add_test(NAME migration_guard_self_test
+    COMMAND ${CMAKE_COMMAND}
+            -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+            -DSELF_TEST=ON
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/guard/migration_guard.cmake)
+set_tests_properties(migration_guard_self_test PROPERTIES
+    RESOURCE_LOCK migration_guard_self_test)
+
+add_test(NAME comment_guard_self_test
+    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/comment_guard.py" --self-test)
+
+add_test(NAME main_thread_guard_self_test
+    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/main_thread_guard.py" --self-test)

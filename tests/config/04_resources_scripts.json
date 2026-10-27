@@ -2,6 +2,7 @@
   "name": "resources_scripts",
   "description": "资源/脚本类工具代表性配置驱动用例：execute_script 四种行为（单表达式自动 return、多行显式 return、语法错误、缺参报错）+ 资源只读查询（get_resource_extensions、has_resource）+ search_tools 检索验证脚本工具可发现。本轮新增：save_resource copy-on-write（按 path 加载→内存修改→存到 dest_path：断言 copy_on_write:true、source_path、源缓存实例 resource_path 不被改写，且 dest 落盘内存值；源文件未被写入内存修改由 reload 后读回磁盘值确认（源内存实例可能被编辑器文件系统扫描异步刷新，不再断言其保留））、reload_resource 重载缓存（replaced:true 后读回磁盘值；缺失文件报错）、duplicate_resource 带 name 注册后跨调用引用与改写、copy_resource_file 复制文件（存在性/类型校验）+ 缺失源与同路径报错。fixture 位于 res://gda_tmp_res_ops/，after_all 回收。",
   "headless": true,
+  "requires": ["write", "code_execute"],
   "pipeline": {
     "on_failure": "fail_fast",
     "after_all": [

@@ -35,7 +35,7 @@ $env:GODOT_PATH="C:\path\to\Godot.exe"
 
 若二者皆无，`gda_test_runner` 退出码 2（"未找到 Godot 可执行文件"）。L1 不受影响。
 
-另有 L2 授权前置：涉及任意脚本/游戏运行时的用例（如 `00_meta` 的 code_execute、`04_resources_scripts` 的 execute_script、`13_inline_subresource` 的 code_execute、`16_game_jobs` 的 start_game_job、`23`/`24` 的游戏侧路径、`37` 的 execute_game_script 需 `game_runtime`，`18`/`22`/`26`/`27`/`29`/`30`/`32`/`34`/`35`/`36`/`39`/`40`/`41` 需 `code_execute`，`42` 的场景写链路需 `write`，`44` 的 build_csharp_assembly 需 `process`（授权缺失按 `soft_error` 记软失败而非 FAIL），`45`/`46` 的游戏侧路径需 `game_runtime`；`35` 的 8 个 SceneTree 工具受 `game_runtime` 门保护，但未授权时也满足其 error 断言，两种授权态都应通过）需要 capability 授权——由 `GODOT_AUTOPILOT_ALLOW` 环境变量（如 `game_runtime`、`code_execute` 或 `all`）或集中根 `~/.godot-autopilot/config.json` 的 `allow` 字段提供，环境变量优先（旧 `user://godot_autopilot/config.json` 仍作回退读取）；缺失时相应用例被授权门拒绝而 FAIL。其中 `26_user_tools_code_mode` 与 `27_user_tools_rescan` 的用户工具注册/调用另受 `user_tools` 能力门保护：用例内 `AutopilotTools.set_enabled(true)` 写配置可自包含，但若 `GODOT_AUTOPILOT_ALLOW` 已设置且不含 `user_tools`/`all`，env 优先使 `set_enabled` 无效、用例失败（此时需在 env 中补 `user_tools` 或取消该 env）。
+另有 L2 授权前置：用例 JSON 顶层可选 `requires` 字段（capability string 数组）声明本用例需要的授权，执行器（`main.cpp` 的 `run_one_file`）把它逗号 join 后经 `GodotProcess::Options::allow_list` 注入子进程环境变量 `GODOT_AUTOPILOT_ALLOW`——每份用例独立注入，授权随用例声明走，不再依赖外部环境。解析规则（`config_loader.cpp`）：逐元素校验类型与非空、白名单 `{process, code_execute, game_runtime, destructive, user_tools, read, write, all}`（与 `src/tools/authorization.hpp` 的 `kKnownCapabilities` 同名同步）并拒绝重复元素，违规抛错、用例加载即失败。**空声明注入哨兵 `none`**：`current_allow_list()` 下环境变量非空必胜 `config.json` 的 `allow` 字段，`allow_list_contains("none", 任意)=false` 且 read 档恒放行，故未声明 requires 的用例处于默认拒绝态（仅 read 工具可用），并顺带屏蔽开发机 `config.json` 残留授权对 L2 的干扰；`47_authorization_gate` 即无 requires 声明，断言 write 档工具在该态下返回 `code=authorization_required` 的拒绝响应。`--no-auto` 模式下执行器不注入环境变量，requires 不生效（授权归外部 MCP 服务，仅对声明了 requires 的用例打一条 stderr 警告）。
 
 **插件数据目录（集中根）与运行期路径的取法**：插件数据不再落在 Godot 用户数据目录 `user://godot_autopilot/`，而集中在用户家目录下的 `~/.godot-autopilot/`（家目录可用 `GODOT_AUTOPILOT_HOME` 覆盖）——全局配置 `~/.godot-autopilot/config.json`，工程级数据 `~/.godot-autopilot/projects/<项目名>-<工程路径哈希前8位>/`（其下 `logs/`、`traces/`、`captures/` 与工程级 `config.json`）；旧 `user://godot_autopilot/` 仍作回退读取源。这些绝对路径依赖家目录与工程路径，夹具里不能写死。插件在 `_enter_tree` 的 `LogPersist::init_session()` 里把本次会话实际使用的路径写入**进程环境变量**：`GODOT_AUTOPILOT_STORAGE_ROOT`（集中根）、`GODOT_AUTOPILOT_PROJECT_DIR`（工程目录）、`GODOT_AUTOPILOT_LOG_DIR`、`GODOT_AUTOPILOT_TRACE_DIR`。L2 用例的 `execute_script` 步骤经 `OS.get_environment()` 取这些变量定位运行期目录，并据此断言集中布局（`layout_ok`：工程目录位于 `<集中根>/projects/` 下，日志/轨迹目录位于工程目录的 `logs/`、`traces/` 子目录）。
 
@@ -121,17 +121,18 @@ ctest 上除 L1/L2 外还有 6 个守卫与脚本项常驻（注册见 `tests/CM
 
 ## 6. JSON 用例 Schema（`tests/runner/config_loader.cpp` 冻结解析规则）
 
-以下规则 1-9 为解析器强制校验，任何违规抛 `runtime_error`，错误消息含字段路径（如 `pipeline.stages[0].steps[1].expect.field_checks[0].key`）：
+以下规则 1-10 为解析器强制校验，任何违规抛 `runtime_error`，错误消息含字段路径（如 `pipeline.stages[0].steps[1].expect.field_checks[0].key`）：
 
-1. **顶层**：必填 `name`（string）、`pipeline`（object）；`description` / `headless` 可选，`headless` 默认 `true`
+1. **顶层**：必填 `name`（string）、`pipeline`（object）；`description` / `headless` / `requires` 可选，`headless` 默认 `true`；`requires` 为 capability string 数组——白名单 `{process, code_execute, game_runtime, destructive, user_tools, read, write, all}`，逐元素校验非空与白名单、拒绝重复元素，违规抛 `runtime_error`；空缺时执行器注入哨兵 `GODOT_AUTOPILOT_ALLOW=none`（默认拒绝态，见第 3 节）
 2. **`pipeline.on_failure`**：可选，默认 `"fail_fast"`，仅接受 `"fail_fast"`（失败即中止剩余步骤）| `"continue"`（失败继续）
 3. **`pipeline.before_all` / `pipeline.after_all`**：steps 数组（可缺省），元素仅 `tool` 必填 + `args` 可选 + `id` 可选；**不支持 `traverse` 与 `expect`**（失败即整体 fatal_error，不判断言）
 4. **`pipeline.stages`**：数组（可缺省），每项 `id` 可选 + `steps` 必填；所有 stages 的 steps **平铺进执行序列并保留顺序**
 5. **步骤二选一**：`tool` 或 `traverse`（同含或缺省均报错）。`traverse` 步骤 `kind` 必填 `"domain_tools"`，`mode` 缺省 `"empty_args"`，仅接受 `"empty_args"` | `"heuristic_smoke"`（见第 7 节）
-6. **`expect`**：`has_keys` 为 string 数组；`field_checks` 每项 `key` 必填（支持点路径）、`value` 可选任意 JSON、`not_empty` 可选 bool
+6. **`expect`**：`has_keys` 为 string 数组；`field_checks` 每项 `key` 必填（支持点路径）、`value` 可选任意 JSON、`not_empty` 可选 bool、`not_contains` 可选 string；`expect` 层与 `field_checks` 元素均可选 `allow_error`（bool，见「断言语义」）；`expect` 存在时 `has_keys` 与 `field_checks` 至少其一非空（空 expect 无断言，拒绝）
 7. **`args`**：值任意 JSON，嵌套原样保留
 8. 数值字段类型严格校验
-9. **`soft_error`**（步骤级，string，可选）：错误文本前缀。步骤失败且工具响应的 `error` 文本以该前缀开头时记为**软失败**（`soft_failed=true` + `soft_reason`），不置 `fatal_error`、不计入文件失败（`before_all` 软失败不中断流水线，`stages` 软失败不置整体失败）；错误文本不匹配的失败、期望不匹配、编辑器进程死亡等仍为硬失败。用于把「环境边界导致的必然失败」与真实回归区分开，当前仅 `38_csharp_bridge.json` 使用
+9. **`soft_error`**（步骤级，string，可选）：错误文本前缀。步骤失败且工具响应的 `error` 文本以该前缀开头时记为**软失败**（`soft_failed=true` + `soft_reason`），不置 `fatal_error`、不计入文件失败（`before_all` 软失败不中断流水线，`stages` 软失败不置整体失败）；错误文本不匹配的失败、期望不匹配、编辑器进程死亡等仍为硬失败。用于把「环境边界导致的必然失败」与真实回归区分开，当前仅 `38_csharp_bridge.json`（10 步）与 `44_csharp_tooling.json`（1 步）使用
+10. **未知字段拒绝**：顶层（`name`/`description`/`headless`/`pipeline`/`requires`）、`pipeline`（`on_failure`/`before_all`/`stages`/`after_all`）、stage（`id`/`steps`）、步骤（`tool`/`traverse`/`id`/`args`/`expect`/`soft_error`）、`expect`（`has_keys`/`field_checks`/`allow_error`）、`field_checks` 元素（`key`/`value`/`not_empty`/`not_contains`/`allow_error`）六层均为封闭白名单，白名单外键即抛 `runtime_error`
 
 用例结构示例（节选自 `config/00_meta.json`）：
 
@@ -140,6 +141,7 @@ ctest 上除 L1/L2 外还有 6 个守卫与脚本项常驻（注册见 `tests/CM
   "name": "meta_tools",
   "description": "…",
   "headless": true,
+  "requires": ["code_execute"],
   "pipeline": {
     "on_failure": "continue",
     "stages": [
@@ -217,6 +219,7 @@ ctest 上除 L1/L2 外还有 6 个守卫与脚本项常驻（注册见 `tests/CM
 - **`value` 数值兼容**：int / double 相互比较（统一转 double 判等，如期望 `2` 匹配实际 `2.0`）；string / bool 精确比较；其他类型按序列化字符串比较
 - **`not_empty`**：string 非空；array/object `Size() > 0`；null 判空失败；其他标量视为非空
 - 断言执行于 C++ 执行器侧，对 `call_tool` 的响应 JSON 校验；无 `expect` 时仅检查工具调用未返回 `error`
+- **有 `expect` 的步骤在 `has_keys`/`field_checks` 通过后隐式断言响应顶层无 `error` 字段**，`allow_error=true` 豁免该断言（`expect` 层或 `field_checks` 元素级声明均可，为「部分成功 + 顶层 error」响应形状留通道）；`before_all`/`after_all` 不支持 `expect`，维持仅查调用未报错
 
 ### 用例文件（`tests/config/`，46 个）
 

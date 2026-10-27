@@ -23,6 +23,7 @@
 #include <godot_cpp/variant/string.hpp>
 
 #include "core/config.hpp"
+#include "core/godot_transport.hpp"
 #include "core/http_parse.hpp"
 #include "core/http_stream_registry.hpp"
 #include "core/http_transport_ext.hpp"
@@ -45,11 +46,13 @@ struct PendingJob {
   HttpResponse preset;
   bool use_preset{false};
   bool keep_alive{true};
+  bool is_head{false};
 };
 
 struct CompletedReply {
   HttpResponse response;
   bool keep_alive{true};
+  bool is_head{false};
 };
 
 struct ConnectionChannel {
@@ -69,7 +72,10 @@ struct TransportConnection {
   bool close_after_write{false};
   bool dead{false};
   bool streaming{false};
+  bool outbox_cap_warned{false};
   uint64_t id{0};
+  std::chrono::steady_clock::time_point last_activity{
+      std::chrono::steady_clock::now()};
   std::shared_ptr<ConnectionChannel> channel;
   std::shared_ptr<http_stream::Sink> sink;
   std::thread worker;
@@ -81,6 +87,7 @@ struct TransportState {
   std::vector<std::shared_ptr<TransportConnection>> connections;
   HttpRouteTable routes;
   uint64_t next_connection_id{1};
+  size_t next_service_index{0};
 };
 
 TransportState &transport_state_never_destroyed() {
@@ -155,7 +162,7 @@ std::string transport_chunk(const std::string &data) {
 }
 
 std::string transport_build_response(const HttpResponse &response,
-                                     bool keep_alive) {
+                                     bool keep_alive, bool omit_body) {
   std::string head = "HTTP/1.1 " + std::to_string(response.status_code) + " " +
                      response.status_text + "\r\n";
   std::string content_type =
@@ -175,6 +182,9 @@ std::string transport_build_response(const HttpResponse &response,
   }
   head += std::string("Connection: ") + (keep_alive ? "keep-alive" : "close") +
           "\r\n\r\n";
+  if (omit_body) {
+    return head;
+  }
   return head + response.body;
 }
 
@@ -269,6 +279,7 @@ void transport_worker_loop(const std::shared_ptr<ConnectionChannel> &channel) {
       CompletedReply reply;
       reply.response = std::move(response);
       reply.keep_alive = job.keep_alive;
+      reply.is_head = job.is_head;
       channel->replies.push_back(std::move(reply));
     }
   }
@@ -471,6 +482,7 @@ void transport_read(TransportConnection &connection) {
   }
   connection.inbox.append(reinterpret_cast<const char *>(chunk.ptr()),
                            static_cast<size_t>(chunk_size));
+  connection.last_activity = std::chrono::steady_clock::now();
 }
 
 void transport_enqueue_error_job(TransportConnection &connection,
@@ -516,6 +528,20 @@ void transport_dispatch(TransportState &state, TransportConnection &connection) 
       connection.inbox.clear();
       return;
     }
+    for (const auto &entry : headers.headers) {
+      if (http_parse::is_reserved_header_name(entry.first)) {
+        transport_enqueue_error_job(connection, 400, "Bad Request",
+                                    "reserved header namespace");
+        connection.inbox.clear();
+        return;
+      }
+    }
+    if (http_parse::has_transfer_encoding(headers)) {
+      transport_enqueue_error_job(connection, 400, "Bad Request",
+                                  "transfer-encoding is not accepted on requests");
+      connection.inbox.clear();
+      return;
+    }
     size_t content_length = 0;
     if (!http_parse::parse_content_length(headers, content_length)) {
       transport_enqueue_error_job(connection, 400, "Bad Request",
@@ -529,6 +555,21 @@ void transport_dispatch(TransportState &state, TransportConnection &connection) 
                                   "request body exceeds the accepted limit");
       connection.inbox.clear();
       return;
+    }
+    if (http_parse::head_with_body(request_line.method, content_length)) {
+      transport_enqueue_error_job(connection, 400, "Bad Request",
+                                  "HEAD request must not carry a body");
+      connection.inbox.clear();
+      return;
+    }
+    for (const auto &entry : request_line.query_params) {
+      if (!http_parse::query_param_name_is_valid(entry.first) ||
+          !http_parse::query_param_value_is_valid(entry.second)) {
+        transport_enqueue_error_job(connection, 400, "Bad Request",
+                                    "query parameter name/value is invalid");
+        connection.inbox.clear();
+        return;
+      }
     }
     if (connection.inbox.size() - body_start < content_length) {
       return;
@@ -545,12 +586,13 @@ void transport_dispatch(TransportState &state, TransportConnection &connection) 
       request.headers[std::string(http_parse::kQueryHeaderPrefix) + entry.first] =
           entry.second;
     }
-    request.headers[kConnectionIdHeader] = std::to_string(connection.id);
+    request.headers[http_parse::kConnectionIdHeader] = std::to_string(connection.id);
 
     PendingJob job;
     job.request = std::move(request);
     job.keep_alive =
         http_parse::request_keeps_alive(request_line.version, headers);
+    job.is_head = request_line.method == "HEAD";
     const bool keep_alive = job.keep_alive;
     const HttpRouteHandler *handler =
         state.routes.find(job.request.method, job.request.path);
@@ -579,7 +621,8 @@ void transport_collect_replies(TransportConnection &connection) {
       connection.outbox += transport_build_stream_response(reply.response);
       continue;
     }
-    connection.outbox += transport_build_response(reply.response, reply.keep_alive);
+    connection.outbox += transport_build_response(reply.response, reply.keep_alive,
+                                                   reply.is_head);
     if (!reply.keep_alive) {
       connection.close_after_write = true;
       break;
@@ -587,17 +630,64 @@ void transport_collect_replies(TransportConnection &connection) {
   }
 }
 
+void transport_warn_stream_backpressure(TransportConnection &connection) {
+  if (connection.outbox_cap_warned) {
+    return;
+  }
+  connection.outbox_cap_warned = true;
+  LogSystem::instance().log(
+      LogLevel::Warning, LogCategory::Transport,
+      "transport connection " + std::to_string(connection.id) +
+          " reached the outbound buffer limit; stream draining is paused");
+}
+
+void transport_warn_stream_drop(TransportConnection &connection, size_t bytes) {
+  LogSystem::instance().log(
+      LogLevel::Warning, LogCategory::Transport,
+      "transport connection " + std::to_string(connection.id) +
+          " dropped stream frame(s) of " + std::to_string(bytes) +
+          " bytes because the sink rejected them");
+}
+
 void transport_drain_stream(TransportConnection &connection) {
   if (!connection.streaming || !connection.sink) {
     return;
   }
+  const size_t cap = http_pump_limits().max_outbox_bytes_per_connection;
+  if (connection.outbox.size() >= cap) {
+    transport_warn_stream_backpressure(connection);
+    return;
+  }
   const std::vector<std::string> frames = connection.sink->drain();
-  for (const std::string &frame : frames) {
-    connection.outbox += transport_chunk(frame);
+  size_t held = 0;
+  for (size_t index = 0; index < frames.size(); ++index) {
+    if (connection.outbox.size() + frames[index].size() > cap) {
+      held = frames.size() - index;
+      for (size_t rest = index; rest < frames.size(); ++rest) {
+        if (!connection.sink->push(frames[rest])) {
+          transport_warn_stream_drop(connection, frames[rest].size());
+        }
+      }
+      break;
+    }
+    connection.outbox += transport_chunk(frames[index]);
+    connection.last_activity = std::chrono::steady_clock::now();
+  }
+  if (held > 0) {
+    transport_warn_stream_backpressure(connection);
+  } else {
+    connection.outbox_cap_warned = false;
+  }
+  if (connection.sink->closed() && !frames.empty()) {
+    connection.outbox += transport_chunk(mcp_wire::build_close_event_frame());
+    connection.outbox += transport_final_chunk();
+    connection.close_after_write = true;
+    connection.last_activity = std::chrono::steady_clock::now();
   }
 }
 
-void transport_flush(TransportConnection &connection, size_t &write_budget) {
+size_t transport_flush(TransportConnection &connection, size_t write_budget) {
+  size_t written_total = 0;
   while (!connection.outbox.empty() && write_budget > 0) {
     size_t chunk_size = connection.outbox.size();
     if (chunk_size > write_budget) {
@@ -611,51 +701,55 @@ void transport_flush(TransportConnection &connection, size_t &write_budget) {
       break;
     }
     const int64_t error = static_cast<int64_t>(result[0]);
-    const int64_t written = static_cast<int64_t>(result[1]);
+    const int64_t flushed = static_cast<int64_t>(result[1]);
     if (error == static_cast<int64_t>(godot::ERR_BUSY)) {
       break;
     }
     if (error != static_cast<int64_t>(godot::OK)) {
       connection.dead = true;
-      return;
+      return written_total;
     }
-    if (written <= 0) {
+    if (flushed <= 0) {
       break;
     }
-    size_t consumed = static_cast<size_t>(written);
+    size_t consumed = static_cast<size_t>(flushed);
     if (consumed > connection.outbox.size()) {
       consumed = connection.outbox.size();
     }
     connection.outbox.erase(0, consumed);
     write_budget -= consumed;
+    written_total += consumed;
+    connection.last_activity = std::chrono::steady_clock::now();
   }
+  return written_total;
 }
 
-void transport_process(TransportState &state, TransportConnection &connection,
-                       size_t &write_budget) {
+size_t transport_process(TransportState &state, TransportConnection &connection,
+                         size_t write_budget) {
   if (connection.peer.is_null()) {
     connection.dead = true;
-    return;
+    return 0;
   }
   connection.peer->poll();
   if (connection.peer->get_status() !=
       godot::StreamPeerSocket::STATUS_CONNECTED) {
     connection.dead = true;
-    return;
+    return 0;
   }
   transport_read(connection);
   if (connection.dead) {
-    return;
+    return 0;
   }
   if (!connection.streaming) {
     transport_dispatch(state, connection);
   }
   transport_collect_replies(connection);
   transport_drain_stream(connection);
-  transport_flush(connection, write_budget);
+  const size_t written = transport_flush(connection, write_budget);
   if (connection.outbox.empty() && connection.close_after_write) {
     connection.dead = true;
   }
+  return written;
 }
 
 port_recovery::RecoveryPlan &transport_residual_plan() {
@@ -814,20 +908,42 @@ void HttpTransport::pump() {
     state.connections.push_back(std::move(connection));
     ++accepted;
   }
+  const size_t count = state.connections.size();
+  const size_t slots = count < limits.max_connections_per_frame
+                           ? count
+                           : limits.max_connections_per_frame;
   size_t serviced = 0;
-  size_t write_budget = limits.max_write_bytes_per_frame;
-  for (size_t index = 0;
-       index < state.connections.size() &&
-       serviced < limits.max_connections_per_frame;
-       ++index) {
-    transport_process(state, *state.connections[index], write_budget);
+  size_t frame_budget = limits.max_write_bytes_per_frame;
+  for (size_t offset = 0;
+       offset < count && serviced < limits.max_connections_per_frame;
+       ++offset) {
+    const size_t index =
+        http_pump_service_index(state.next_service_index, offset, count);
+    const size_t connection_budget = http_pump_connection_write_budget(
+        frame_budget, slots, limits.max_write_bytes_per_frame);
+    const size_t written =
+        transport_process(state, *state.connections[index], connection_budget);
+    frame_budget -= std::min(written, frame_budget);
     ++serviced;
   }
+  const std::chrono::steady_clock::time_point now =
+      std::chrono::steady_clock::now();
+  const std::chrono::milliseconds idle_budget(GDA_TRANSPORT_IDLE_TIMEOUT_MS);
   std::vector<std::shared_ptr<TransportConnection>> survivors;
   std::vector<std::shared_ptr<TransportConnection>> retired;
   survivors.reserve(state.connections.size());
   for (const std::shared_ptr<TransportConnection> &connection :
        state.connections) {
+    if (!connection->dead &&
+        transport_idle_expired(connection->last_activity, now, idle_budget)) {
+      LogSystem::instance().log(
+          LogLevel::Info, LogCategory::Transport,
+          "closed idle transport connection " +
+              std::to_string(connection->id) + " after " +
+              std::to_string(GDA_TRANSPORT_IDLE_TIMEOUT_MS) +
+              " ms without activity");
+      connection->dead = true;
+    }
     if (connection->dead) {
       retired.push_back(connection);
     } else {
@@ -835,6 +951,10 @@ void HttpTransport::pump() {
     }
   }
   state.connections.swap(survivors);
+  state.next_service_index =
+      state.connections.empty()
+          ? 0
+          : (state.next_service_index + serviced) % state.connections.size();
   transport_retire_connections(retired, false, transport_worker_deadline());
 }
 

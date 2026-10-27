@@ -56,6 +56,7 @@ struct BatchOperation {
 struct BatchRequest {
   std::vector<BatchOperation> operations;
   bool stop_on_error{true};
+  bool rollback_on_error{false};
 };
 
 enum class RouteKind {
@@ -104,6 +105,7 @@ bool parse_list_query(const std::unordered_map<std::string, std::string> &params
                        ListQuery &out, std::string &error);
 bool parse_batch_request(const mcp::JsonValue &body, BatchRequest &out,
                           std::string &error);
+std::string sanitized_request_id(const std::string &raw);
 std::vector<ToolEntry> filter_tools(const std::vector<ToolEntry> &tools,
                                     const ListQuery &query);
 std::vector<ToolEntry> paginate_tools(const std::vector<ToolEntry> &tools,
@@ -112,7 +114,8 @@ mcp::JsonValue tool_entry_to_json(const ToolEntry &entry);
 mcp::JsonValue build_tool_list_response(const std::vector<ToolEntry> &filtered,
                                          size_t total, const ListQuery &query);
 mcp::JsonValue build_error_body(const std::string &code,
-                                 const std::string &message);
+                                 const std::string &message,
+                                 const std::string &request_id = {});
 int status_for_code(const std::string &code);
 std::string status_text_for(int status);
 mcp::JsonValue build_index_document();
