@@ -196,6 +196,10 @@ FileResult run_one_file(const fs::path &file, const CliOptions &opts,
   }
 
   if (opts.no_auto) {
+    if (!tc.requires.empty()) {
+      std::cerr << "[" << name << "] 警告: --no-auto 模式下 requires 不生效，"
+                   "授权由外部 MCP 服务决定" << std::endl;
+    }
     McpTestClient client(external_port);
     if (!client.connect(kExternalProbeTimeout)) {
       FileResult result = make_error_result(
@@ -212,7 +216,14 @@ FileResult run_one_file(const fs::path &file, const CliOptions &opts,
     return result;
   }
 
-  GodotProcess proc(GodotProcess::Options{godot_path, kProjectPath, 0, tc.headless});
+  std::string allow_list;
+  for (size_t i = 0; i < tc.requires.size(); ++i) {
+    if (i > 0) allow_list += ',';
+    allow_list += tc.requires[i];
+  }
+
+  GodotProcess proc(GodotProcess::Options{godot_path, kProjectPath, 0,
+                                          tc.headless, allow_list});
   if (!proc.start()) {
     FileResult result = make_error_result(
         name, elapsed_ms(), "Godot 启动失败: " + proc.last_error());

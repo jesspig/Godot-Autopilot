@@ -35,6 +35,7 @@ constexpr int kMaxLaunchAttempts = 6;
 constexpr auto kExtensionCopyWaitMs = 180000;
 constexpr auto kExtensionCopyPollMs = 200;
 constexpr auto kProjectLockTimeoutMs = 1800000;
+constexpr char kAllowSentinelNone[] = "none";
 
 class WsaGuard {
 public:
@@ -167,42 +168,6 @@ std::string project_lock_name(const std::string &project_path) {
     hash *= 1099511628211ULL;
   }
   return "Local\\GDA_L2_Project_" + std::to_string(hash);
-}
-
-bool allow_list_has(const std::string &allow, const std::string &capability) {
-  size_t begin = 0;
-  while (begin <= allow.size()) {
-    const size_t end = allow.find(',', begin);
-    const std::string entry =
-        allow.substr(begin, end == std::string::npos ? std::string::npos
-                                                      : end - begin);
-    if (entry == capability || entry == "all")
-      return true;
-    if (end == std::string::npos)
-      break;
-    begin = end + 1;
-  }
-  return false;
-}
-
-std::string resolve_allow_list() {
-  std::string allow;
-  if (const char *env = std::getenv("GODOT_AUTOPILOT_ALLOW")) {
-    if (*env)
-      allow = std::string(env);
-  }
-  if (allow.empty()) {
-    const std::string from_file = read_env_file_key("GODOT_AUTOPILOT_ALLOW");
-    if (!from_file.empty())
-      allow = from_file;
-  }
-  if (allow.empty())
-    allow = "all";
-  if (!allow_list_has(allow, "write"))
-    allow += ",write";
-  if (!allow_list_has(allow, "destructive"))
-    allow += ",destructive";
-  return allow;
 }
 
 int pick_free_port() {
@@ -410,6 +375,7 @@ struct GodotProcess::Impl {
   std::string godot_path;
   std::string project_path;
   bool headless = true;
+  std::string allow_list;
   int port = 0;
   HANDLE process = nullptr;
   HANDLE stdout_read = nullptr;
@@ -535,6 +501,7 @@ GodotProcess::GodotProcess(Options opts) : impl_(std::make_unique<Impl>()) {
   impl_->godot_path = opts.godot_path;
   impl_->project_path = opts.project_path;
   impl_->headless = opts.headless;
+  impl_->allow_list = opts.allow_list;
   impl_->port = opts.port;
 }
 
@@ -634,8 +601,9 @@ bool GodotProcess::start(std::chrono::seconds ready_timeout) {
     SetEnvironmentVariableA(allow_key,
                             had_allow ? allow_old_value.c_str() : nullptr);
   };
-  const std::string allow_value = resolve_allow_list();
-  SetEnvironmentVariableA(allow_key, allow_value.c_str());
+  SetEnvironmentVariableA(allow_key, impl_->allow_list.empty()
+                                         ? kAllowSentinelNone
+                                         : impl_->allow_list.c_str());
 
   const char *force_key = "GDA_FORCE_HEADLESS";
   char force_buf[64] = {0};
@@ -699,7 +667,9 @@ bool GodotProcess::start(std::chrono::seconds ready_timeout) {
       break;
     }
     SetEnvironmentVariableA(port_key, std::to_string(impl_->port).c_str());
-    SetEnvironmentVariableA(allow_key, allow_value.c_str());
+    SetEnvironmentVariableA(allow_key, impl_->allow_list.empty()
+                                           ? kAllowSentinelNone
+                                           : impl_->allow_list.c_str());
     SetEnvironmentVariableA(force_key, "1");
   }
   if (!ready) {

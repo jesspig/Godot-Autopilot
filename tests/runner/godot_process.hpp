@@ -14,6 +14,7 @@ public:
         std::string project_path;
         int port = 0;
         bool headless = true;
+        std::string allow_list;
     };
 
     explicit GodotProcess(Options opts);

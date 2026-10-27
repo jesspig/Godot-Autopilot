@@ -1,0 +1,29 @@
+{
+  "name": "authorization_gate",
+  "description": "授权门默认拒绝态回归（T-14 新增）。本用例顶层不声明 requires 字段，执行器按空声明注入哨兵 GODOT_AUTOPILOT_ALLOW=none（env 非空必胜集中根 config.json 的 allow 字段，read 档仍恒放行），因此 write 档的 create_scene_node 在授权门（SpecTool::execute 的 deny_if_unauthorized，先于 handler 参数校验）即被拒绝。断言结构化拒绝响应形状：error 非空且以 authorization required 开头、code=authorization_required、authorization_required=write（响应形状依据 src/tools/authorization.hpp 的 deny_if_unauthorized，error 文案按 38 号的精确全串惯例断言）。该用例补上「授权拒绝路径从未被真实执行」的缺口——此前 42_tool_contract 仅在严格模式下由主代理手工验证 403 authorization_required，未纳入自动断言。边界：--no-auto 模式下执行器不注入环境变量，默认拒绝前提不成立（授权归外部 MCP 服务），本用例仅经 runner 自管进程模式（默认）与 ctest 的 gda_runner_47_authorization_gate 生效；用例自身无持久副作用（拒绝响应不产生节点）。",
+  "headless": true,
+  "pipeline": {
+    "on_failure": "fail_fast",
+    "stages": [
+      {
+        "id": "write_denied_by_default",
+        "steps": [
+          {
+            "id": "create_scene_node_denied",
+            "tool": "create_scene_node",
+            "args": {},
+            "expect": {
+              "has_keys": ["error", "code", "authorization_required"],
+              "field_checks": [
+                { "key": "error", "not_empty": true },
+                { "key": "error", "value": "authorization required for 'create_scene_node'; set GODOT_AUTOPILOT_ALLOW to include 'write' for trusted local development" },
+                { "key": "code", "value": "authorization_required" },
+                { "key": "authorization_required", "value": "write" }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

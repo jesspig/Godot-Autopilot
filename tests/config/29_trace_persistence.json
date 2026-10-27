@@ -2,6 +2,7 @@
   "name": "trace_persistence",
   "description": "可重放监控批次端到端：落盘日志与 trace jsonl 的持久化验收（headless）。① system_status 热身（只读，证明服务器与调用链可用）；② execute_script 读取插件在 init_session 里写入进程环境的存储路径变量（GODOT_AUTOPILOT_STORAGE_ROOT / GODOT_AUTOPILOT_PROJECT_DIR / GODOT_AUTOPILOT_TRACE_DIR / GODOT_AUTOPILOT_LOG_DIR），先断言 trace 目录满足集中布局「<集中根>/projects/<项目名>-<路径哈希前8位>/traces」（layout_ok），再扫描其下的 trace-*.jsonl（按修改时间选最新会话文件，同秒并列时按文件名时间戳取新的——session stamp 为 %Y%m%d_%H%M%S，字典序即时间序），断言该文件同时包含 session_start 与 server_ready 两条启动标记；这两个 JSON 行在 _enter_tree 内 init_session()/ServerContext::start() 成功后立即入队，任何 MCP 调用都必须经 _process 的 s_queue.drain() 在 flush_on_main_thread() 之后执行，故首帧 flush 必已写入，不依赖后续帧时序；③ 同一脚本遍历全部 trace-*.jsonl 断言不含 PNG base64 前缀 iVBORw0KGgo（验收关键：图片只以 image_ref/image_hash 记录，永不内联 base64；sanitize 默认开启时 store_trace_image 直接返回空）；④ execute_script 以同样方式取日志目录，断言其满足「<集中根>/projects/<项目名>-<路径哈希前8位>/logs」布局，再扫描最新的 gda-*.log，断言包含启动日志行 'Godot Self-Driving plugin starting'。脚本内的标记字面量全部运行时拼接（'iVBORw0'+'KGgo'、'session'+'_start' 等），且返回结果的键名避开被搜索的字面量，避免脚本自身的 args_digest 被写入 jsonl 后污染后续扫描；不调用 capture_editor_viewport（headless 无视口渲染）。前置：execute_script 受 code_execute capability 授权门保护（GODOT_AUTOPILOT_ALLOW env 或集中根 config.json 的 allow 字段，env 优先；旧 user://godot_autopilot/config.json 仍作回退读取）。",
   "headless": true,
+  "requires": ["code_execute"],
   "pipeline": {
     "on_failure": "fail_fast",
     "stages": [
