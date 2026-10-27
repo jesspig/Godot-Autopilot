@@ -29,6 +29,7 @@ set(GDA_CORE_SOURCES
     src/core/project_store.cpp
     src/core/instance_registry.cpp
     src/resources/resource_handlers.cpp
+    src/resources/resource_error_mapping.cpp
     src/resources/debugger_resources.cpp
     src/prompts/prompt_handlers.cpp
     src/prompts/prompt_create_3d_scene.cpp
