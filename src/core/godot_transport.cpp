@@ -79,6 +79,10 @@ std::string build_event_frame(const std::string &event,
   return "event: " + event + "\ndata: " + escaped + "\n\n";
 }
 
+std::string build_close_event_frame() {
+  return "event: close\ndata: {}\n\n";
+}
+
 bool is_supported_protocol_version(const std::string &version) {
   if (version.empty()) {
     return true;

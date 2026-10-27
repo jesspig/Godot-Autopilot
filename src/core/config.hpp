@@ -52,6 +52,11 @@ static_assert(GDA_OS_PROCESS_MIN_TIMEOUT_MS > 0 &&
 constexpr int64_t GDA_RESPONSE_GRACE_MS = 2000;
 constexpr int64_t GDA_MAX_GAME_OP_TIMEOUT_MS = 25000;
 constexpr int64_t GDA_TRANSPORT_TIMEOUT_MS = 30000;
+constexpr int64_t GDA_TRANSPORT_IDLE_TIMEOUT_MS = 30000;
+static_assert(GDA_TRANSPORT_IDLE_TIMEOUT_MS > 0 &&
+                  GDA_TRANSPORT_IDLE_TIMEOUT_MS <= GDA_TRANSPORT_TIMEOUT_MS,
+              "the transport idle timeout must stay positive and within the "
+              "http transport timeout");
 constexpr int64_t GDA_DISPATCH_WAIT_MIN_MS = 1000;
 constexpr int64_t GDA_DISPATCH_WAIT_MAX_MS = 29000;
 constexpr int64_t GDA_DISPATCH_WAIT_DEFAULT_MS = 27000;

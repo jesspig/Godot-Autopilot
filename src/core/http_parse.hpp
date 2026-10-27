@@ -39,6 +39,11 @@ inline bool is_token_char(char c) {
          c == '+' || c == '*';
 }
 
+inline bool is_control_char(char c) {
+  const unsigned char raw = static_cast<unsigned char>(c);
+  return raw < 0x20 || raw == 0x7F;
+}
+
 inline std::string to_lower(const std::string &text) {
   std::string result = text;
   for (char &c : result) {
@@ -47,6 +52,35 @@ inline std::string to_lower(const std::string &text) {
     }
   }
   return result;
+}
+
+inline bool query_param_name_is_valid(const std::string &name) {
+  for (char c : name) {
+    if (!is_token_char(c)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+inline bool query_param_value_is_valid(const std::string &value) {
+  for (char c : value) {
+    if (is_control_char(c)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+inline bool is_reserved_header_name(const std::string &name) {
+  static const std::string kReservedPrefix = "x-gda-";
+  const std::string lowered = to_lower(name);
+  return lowered.size() >= kReservedPrefix.size() &&
+         lowered.compare(0, kReservedPrefix.size(), kReservedPrefix) == 0;
+}
+
+inline bool head_with_body(const std::string &method, size_t content_length) {
+  return method == "HEAD" && content_length != 0;
 }
 
 inline std::string trim(const std::string &text) {
@@ -191,6 +225,9 @@ inline bool parse_headers(const std::string &block, HeaderBlock &out) {
     size_t end = block.find('\n', cursor);
     if (end == std::string::npos) {
       end = block.size();
+    } else if (end == cursor || block[end - 1] != '\r') {
+      out.error = "bare LF in header block";
+      return false;
     }
     std::string line = block.substr(cursor, end - cursor);
     cursor = end + 1;
@@ -216,10 +253,37 @@ inline bool parse_headers(const std::string &block, HeaderBlock &out) {
         return false;
       }
     }
-    out.headers[to_lower(name)] = trim(line.substr(colon + 1));
+    const std::string value = trim(line.substr(colon + 1));
+    bool has_control = false;
+    for (char c : name) {
+      if (is_control_char(c)) {
+        has_control = true;
+      }
+    }
+    for (char c : value) {
+      if (is_control_char(c)) {
+        has_control = true;
+      }
+    }
+    if (has_control) {
+      out.error = "control character in header line";
+      return false;
+    }
+    const std::string lowered = to_lower(name);
+    if (lowered == "content-length" || lowered == "transfer-encoding") {
+      if (out.headers.find(lowered) != out.headers.end()) {
+        out.error = "duplicate " + lowered + " header";
+        return false;
+      }
+    }
+    out.headers[lowered] = value;
   }
   out.ok = true;
   return true;
+}
+
+inline bool has_transfer_encoding(const HeaderBlock &headers) {
+  return headers.headers.find("transfer-encoding") != headers.headers.end();
 }
 
 inline bool parse_content_length(const HeaderBlock &headers, size_t &out) {

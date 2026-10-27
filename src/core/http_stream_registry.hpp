@@ -12,9 +12,11 @@
 namespace godot_autopilot {
 namespace http_stream {
 
+constexpr size_t kSinkMaxBacklogBytes = 256 * 1024;
+
 class Sink {
 public:
-  void push(const std::string &frame);
+  bool push(const std::string &frame);
   std::vector<std::string> drain();
   void close();
   bool closed() const;
@@ -22,6 +24,7 @@ public:
 private:
   mutable std::mutex mutex_;
   std::deque<std::string> frames_;
+  size_t backlog_bytes_{0};
   bool closed_{false};
 };
 
