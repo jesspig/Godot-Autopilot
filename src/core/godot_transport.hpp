@@ -29,6 +29,7 @@ ParsedRequest parse_request(const std::string &body);
 std::string build_response_text(const mcp::JsonRpcMessage &message);
 std::string build_error_response_text(int code, const std::string &message);
 std::string build_event_frame(const std::string &event, const std::string &data);
+std::string build_close_event_frame();
 bool is_supported_protocol_version(const std::string &version);
 std::string request_id_key(const mcp::RequestId &id);
 

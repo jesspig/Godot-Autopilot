@@ -1,3 +1,5 @@
+#include "core/config.hpp"
+#include "core/godot_transport.hpp"
 #include "core/http_parse.hpp"
 #include "core/http_transport.hpp"
 #include "core/http_transport_ext.hpp"
@@ -6,6 +8,7 @@
 
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <cstddef>
 #include <set>
 #include <string>
@@ -234,6 +237,107 @@ TEST(HttpParseTest, ExposesQueryParamsToRouteHandlers) {
   EXPECT_EQ(godot_autopilot::http_request_query_string(request), "a=b");
 }
 
+TEST(HttpParseTest, RejectsTransferEncodingHeader) {
+  godot_autopilot::http_parse::HeaderBlock with_te;
+  ASSERT_TRUE(godot_autopilot::http_parse::parse_headers(
+      "Host: 127.0.0.1\r\nTransfer-Encoding: chunked", with_te));
+  EXPECT_TRUE(godot_autopilot::http_parse::has_transfer_encoding(with_te));
+  godot_autopilot::http_parse::HeaderBlock without_te;
+  ASSERT_TRUE(godot_autopilot::http_parse::parse_headers("Host: 127.0.0.1",
+                                                          without_te));
+  EXPECT_FALSE(godot_autopilot::http_parse::has_transfer_encoding(without_te));
+}
+
+TEST(HttpParseTest, RejectsDuplicateContentLength) {
+  godot_autopilot::http_parse::HeaderBlock same_value;
+  EXPECT_FALSE(godot_autopilot::http_parse::parse_headers(
+      "Content-Length: 5\r\nContent-Length: 5", same_value));
+  EXPECT_EQ(same_value.error, "duplicate content-length header");
+  godot_autopilot::http_parse::HeaderBlock mixed_case;
+  EXPECT_FALSE(godot_autopilot::http_parse::parse_headers(
+      "Content-Length: 3\r\ncontent-length: 3", mixed_case));
+  EXPECT_EQ(mixed_case.error, "duplicate content-length header");
+  godot_autopilot::http_parse::HeaderBlock different_value;
+  EXPECT_FALSE(godot_autopilot::http_parse::parse_headers(
+      "Content-Length: 3\r\nContent-Length: 5", different_value));
+  EXPECT_EQ(different_value.error, "duplicate content-length header");
+}
+
+TEST(HttpParseTest, RejectsDuplicateTransferEncoding) {
+  godot_autopilot::http_parse::HeaderBlock same_value;
+  EXPECT_FALSE(godot_autopilot::http_parse::parse_headers(
+      "Transfer-Encoding: chunked\r\nTransfer-Encoding: chunked", same_value));
+  EXPECT_EQ(same_value.error, "duplicate transfer-encoding header");
+  godot_autopilot::http_parse::HeaderBlock different_value;
+  EXPECT_FALSE(godot_autopilot::http_parse::parse_headers(
+      "Transfer-Encoding: chunked\r\nTransfer-Encoding: gzip", different_value));
+  EXPECT_EQ(different_value.error, "duplicate transfer-encoding header");
+}
+
+TEST(HttpParseTest, RejectsBareLfLineEnding) {
+  godot_autopilot::http_parse::HeaderBlock headers;
+  EXPECT_FALSE(godot_autopilot::http_parse::parse_headers("Host: x\n", headers));
+  EXPECT_EQ(headers.error, "bare LF in header block");
+}
+
+TEST(HttpParseTest, RejectsBareCrInHeaderValue) {
+  godot_autopilot::http_parse::HeaderBlock headers;
+  EXPECT_FALSE(godot_autopilot::http_parse::parse_headers(
+      std::string("X-A: a\rb\r\n"), headers));
+  EXPECT_EQ(headers.error, "control character in header line");
+}
+
+TEST(HttpParseTest, HeadRequestWithBodyRejected) {
+  EXPECT_TRUE(
+      godot_autopilot::http_parse::head_with_body("HEAD", 5));
+  EXPECT_FALSE(
+      godot_autopilot::http_parse::head_with_body("GET", 5));
+  EXPECT_FALSE(
+      godot_autopilot::http_parse::head_with_body("POST", 1));
+}
+
+TEST(HttpParseTest, HeadRequestWithoutBodyAccepted) {
+  EXPECT_FALSE(
+      godot_autopilot::http_parse::head_with_body("HEAD", 0));
+}
+
+TEST(HttpParseTest, RejectsReservedHeaderNamespace) {
+  EXPECT_TRUE(
+      godot_autopilot::http_parse::is_reserved_header_name("x-gda-anything"));
+  EXPECT_TRUE(
+      godot_autopilot::http_parse::is_reserved_header_name("X-GDA-Upper"));
+  EXPECT_TRUE(
+      godot_autopilot::http_parse::is_reserved_header_name("x-gda-query"));
+  EXPECT_FALSE(godot_autopilot::http_parse::is_reserved_header_name("host"));
+  EXPECT_FALSE(godot_autopilot::http_parse::is_reserved_header_name("x-gda"));
+  EXPECT_FALSE(godot_autopilot::http_parse::is_reserved_header_name(
+      "content-length"));
+}
+
+TEST(HttpParseTest, RejectsNonTokenQueryParamName) {
+  EXPECT_FALSE(
+      godot_autopilot::http_parse::query_param_name_is_valid("a b"));
+  EXPECT_FALSE(
+      godot_autopilot::http_parse::query_param_name_is_valid("a=b"));
+  EXPECT_FALSE(
+      godot_autopilot::http_parse::query_param_name_is_valid("a/b"));
+  EXPECT_TRUE(
+      godot_autopilot::http_parse::query_param_name_is_valid("abc_1.2+3*"));
+}
+
+TEST(HttpParseTest, RejectsControlCharInQueryValue) {
+  EXPECT_FALSE(
+      godot_autopilot::http_parse::query_param_value_is_valid(
+          std::string("a\x01")));
+  EXPECT_FALSE(
+      godot_autopilot::http_parse::query_param_value_is_valid(
+          std::string("a\rb")));
+  EXPECT_TRUE(
+      godot_autopilot::http_parse::query_param_value_is_valid("a b"));
+  EXPECT_TRUE(
+      godot_autopilot::http_parse::query_param_value_is_valid("ok"));
+}
+
 TEST(PortResolverTest, CandidateSequenceStartsWithDefaultPort) {
   const std::vector<int> sequence = PortResolver::candidate_sequence(4242);
   ASSERT_FALSE(sequence.empty());
@@ -289,4 +393,77 @@ TEST(PortResolverTest, AutoAssignmentUsesCandidateSequenceHead) {
   EXPECT_EQ(assignment.port, 9527);
   EXPECT_EQ(assignment.requested_port, 0);
   EXPECT_FALSE(assignment.note.empty());
+}
+
+TEST(HttpPumpLimitsTest, ServiceIndexWrapsAround) {
+  EXPECT_EQ(godot_autopilot::http_pump_service_index(7, 1, 8), 0u);
+  EXPECT_EQ(godot_autopilot::http_pump_service_index(6, 5, 8), 3u);
+  EXPECT_EQ(godot_autopilot::http_pump_service_index(0, 0, 8), 0u);
+}
+
+TEST(HttpPumpLimitsTest, ServiceIndexZeroCount) {
+  EXPECT_EQ(godot_autopilot::http_pump_service_index(3, 2, 0), 0u);
+}
+
+TEST(HttpPumpLimitsTest, ServiceIndexCoversAllSlots) {
+  const std::set<size_t> expected = {0, 1, 2, 3, 4};
+  std::set<size_t> seen;
+  for (size_t offset = 0; offset < 5; ++offset) {
+    const size_t index = godot_autopilot::http_pump_service_index(3, offset, 5);
+    EXPECT_LT(index, 5u);
+    seen.insert(index);
+  }
+  EXPECT_EQ(seen, expected);
+}
+
+TEST(HttpPumpLimitsTest, BudgetSplitsEvenly) {
+  EXPECT_EQ(
+      godot_autopilot::http_pump_connection_write_budget(262144, 8, 262144),
+      32768u);
+}
+
+TEST(HttpPumpLimitsTest, BudgetFloorAtOne) {
+  EXPECT_EQ(godot_autopilot::http_pump_connection_write_budget(
+                262144, 524288, 262144),
+            1u);
+  EXPECT_EQ(godot_autopilot::http_pump_connection_write_budget(3, 8, 262144),
+            3u);
+}
+
+TEST(HttpPumpLimitsTest, BudgetZeroCount) {
+  EXPECT_EQ(
+      godot_autopilot::http_pump_connection_write_budget(262144, 0, 262144),
+      0u);
+}
+
+TEST(HttpTransportStreamingTest, FinalChunkIsZeroLengthBlock) {
+  EXPECT_EQ(godot_autopilot::transport_final_chunk(), "0\r\n\r\n");
+  EXPECT_EQ(godot_autopilot::mcp_wire::build_close_event_frame(),
+            "event: close\ndata: {}\n\n");
+}
+
+TEST(HttpTransportIdleTest, IdleExpiredBeyondBudget) {
+  const std::chrono::steady_clock::time_point now =
+      std::chrono::steady_clock::now();
+  const std::chrono::steady_clock::time_point last =
+      now - std::chrono::milliseconds(31000);
+  EXPECT_TRUE(godot_autopilot::transport_idle_expired(
+      last, now,
+      std::chrono::milliseconds(
+          godot_autopilot::GDA_TRANSPORT_IDLE_TIMEOUT_MS)));
+}
+
+TEST(HttpTransportIdleTest, IdleNotExpiredWithRecentActivity) {
+  const std::chrono::steady_clock::time_point now =
+      std::chrono::steady_clock::now();
+  EXPECT_FALSE(godot_autopilot::transport_idle_expired(
+      now - std::chrono::milliseconds(1000), now,
+      std::chrono::milliseconds(
+          godot_autopilot::GDA_TRANSPORT_IDLE_TIMEOUT_MS)));
+  EXPECT_FALSE(godot_autopilot::transport_idle_expired(
+      now - std::chrono::milliseconds(
+                godot_autopilot::GDA_TRANSPORT_IDLE_TIMEOUT_MS),
+      now,
+      std::chrono::milliseconds(
+          godot_autopilot::GDA_TRANSPORT_IDLE_TIMEOUT_MS)));
 }

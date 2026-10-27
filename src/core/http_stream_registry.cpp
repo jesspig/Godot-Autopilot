@@ -3,6 +3,8 @@
 #include <utility>
 #include <vector>
 
+#include "core/log_system.hpp"
+
 namespace godot_autopilot {
 namespace http_stream {
 
@@ -20,12 +22,18 @@ std::unordered_map<std::string, std::shared_ptr<Sink>> &registry() {
 
 } // namespace
 
-void Sink::push(const std::string &frame) {
+bool Sink::push(const std::string &frame) {
   std::lock_guard<std::mutex> lock(mutex_);
   if (closed_) {
-    return;
+    return false;
+  }
+  if (backlog_bytes_ + frame.size() > kSinkMaxBacklogBytes) {
+    closed_ = true;
+    return false;
   }
   frames_.push_back(frame);
+  backlog_bytes_ += frame.size();
+  return true;
 }
 
 std::vector<std::string> Sink::drain() {
@@ -36,6 +44,7 @@ std::vector<std::string> Sink::drain() {
     drained.push_back(std::move(frames_.front()));
     frames_.pop_front();
   }
+  backlog_bytes_ = 0;
   return drained;
 }
 
@@ -43,6 +52,7 @@ void Sink::close() {
   std::lock_guard<std::mutex> lock(mutex_);
   closed_ = true;
   frames_.clear();
+  backlog_bytes_ = 0;
 }
 
 bool Sink::closed() const {
@@ -95,12 +105,23 @@ size_t broadcast(const std::string &frame) {
     }
   }
   size_t delivered = 0;
+  size_t rejected = 0;
   for (const std::shared_ptr<Sink> &sink : sinks) {
     if (!sink) {
       continue;
     }
-    sink->push(frame);
-    ++delivered;
+    if (sink->push(frame)) {
+      ++delivered;
+    } else {
+      ++rejected;
+    }
+  }
+  if (rejected > 0) {
+    LogSystem::instance().log(
+        LogLevel::Warning, LogCategory::Transport,
+        "rejected broadcast frame for " + std::to_string(rejected) +
+            " stream sink(s) over the backlog limit (" +
+            std::to_string(delivered) + " sink(s) accepted it)");
   }
   return delivered;
 }
