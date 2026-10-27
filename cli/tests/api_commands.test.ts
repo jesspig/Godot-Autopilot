@@ -17,7 +17,7 @@ import { probeEndpoint } from "../src/probe";
 import { findById, findLiveByProject, saveRegistry } from "../src/registry";
 import { resolveTarget, type TargetContext } from "../src/target";
 
-const servers: Bun.Server[] = [];
+const servers: ReturnType<typeof Bun.serve>[] = [];
 const TARGET_CONTEXT: TargetContext = { findById, findLiveByProject };
 
 let work: string;
@@ -114,7 +114,7 @@ function serve(
     },
   });
   servers.push(server);
-  return { port: server.port, requests };
+  return { port: server.port!, requests };
 }
 
 function jsonResponse(payload: unknown, status = 200): Response {

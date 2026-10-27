@@ -93,7 +93,7 @@ describe("detectActiveInstance", () => {
   test("插件实例索引的存活且端口可达记录被命中", async () => {
     const server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => new Response("x") });
     try {
-      const port = server.port;
+      const port = server.port!;
       writePluginIndex([pluginRecord(port, process.pid)]);
       const active = await detectActiveInstance(projectDir);
       expect(active).not.toBeUndefined();
@@ -113,7 +113,7 @@ describe("detectActiveInstance", () => {
   test("插件实例索引记录进程已死时忽略", async () => {
     const server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => new Response("x") });
     try {
-      writePluginIndex([pluginRecord(server.port, 999999)]);
+      writePluginIndex([pluginRecord(server.port!, 999999)]);
       expect(await detectActiveInstance(projectDir)).toBeUndefined();
     } finally {
       server.stop(true);
@@ -123,7 +123,7 @@ describe("detectActiveInstance", () => {
   test("其它工程的插件实例索引记录不被计入", async () => {
     const server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => new Response("x") });
     try {
-      const record = pluginRecord(server.port, process.pid);
+      const record = pluginRecord(server.port!, process.pid);
       record["project_path"] = path.join(tmp, "other-proj");
       writePluginIndex([record]);
       expect(await detectActiveInstance(projectDir)).toBeUndefined();

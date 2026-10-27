@@ -3,7 +3,7 @@ import { callTool } from "../src/mcp/client";
 import { CLI_VERSION } from "../src/version";
 import { CliError, ExitCode } from "../src/errors";
 
-const servers: Bun.Server[] = [];
+const servers: ReturnType<typeof Bun.serve>[] = [];
 
 afterEach(() => {
   while (servers.length > 0) {
@@ -14,7 +14,7 @@ afterEach(() => {
 function serve(handler: (req: Request) => Response | Promise<Response>): number {
   const server = Bun.serve({ port: 0, fetch: handler });
   servers.push(server);
-  return server.port;
+  return server.port!;
 }
 
 function sseResponse(payload: unknown, split = false): Response {
@@ -199,7 +199,7 @@ describe("callTool", () => {
 
   test("连不上服务", async () => {
     const server = Bun.serve({ port: 0, fetch: () => new Response("x") });
-    const port = server.port;
+    const port = server.port!;
     server.stop();
     const err = await catchError(callTool("x", {}, { port }));
     expect(err.code).toBe(ExitCode.Transport);

@@ -147,6 +147,12 @@ add_test(NAME main_thread_guard
 add_test(NAME version_sync_guard
     COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/version_sync_guard.py")
 
+# ── ctest 注册: L1 源清单守卫（零依赖，读源码断言，无需构建产物） ──
+# 解析 cmake/sources/ 下插件清单 + src/tools/*_ops.cpp glob 断言并集 == src/ 全部 .cpp，
+# L1 清单引用的 src/ 源 ⊆ 插件并集；解析规则见 guard/source_manifest_guard.py 模块 docstring。
+add_test(NAME source_manifest_guard
+    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/source_manifest_guard.py")
+
 # ── ctest 注册: CLI 契约 mock conformance（纯 stdlib + 自带 mock server）──
 # bun 缺失时测试文件自行打印 SKIP 并 exit 0，ctest 视为通过；
 # 有 bun 时由 bun 驱动 gda.ts 跑全部断言。

@@ -360,8 +360,8 @@ describe.serial("list", () => {
         expect(key in parsed[0]).toBe(true);
       }
     } finally {
-      stopForce(runner.pid);
-      await waitDead(runner.pid);
+      stopForce(runner.pid!);
+      await waitDead(runner.pid!);
     }
   });
 
@@ -374,8 +374,8 @@ describe.serial("list", () => {
       expect(stdout).toContain("\n  ");
       expect(stdout).toContain(`"id": "p${runner.pid}"`);
     } finally {
-      stopForce(runner.pid);
-      await waitDead(runner.pid);
+      stopForce(runner.pid!);
+      await waitDead(runner.pid!);
     }
   });
 });
@@ -395,7 +395,7 @@ describe.serial("start", () => {
     expect(entry.port).toBeLessThanOrEqual(9599);
     expect(entry.headless).toBe(true);
     expect(entry.project).toBe(path.resolve(projectDir));
-    expect(entry.godot).toBe(fakeGodotExe);
+    expect(entry.godot).toBe(fakeGodotExe!);
     expect(entry.log).toBe(path.join(stateDir(), "logs", `${entry.id}.log`));
     expect(fs.existsSync(entry.log)).toBe(true);
 
@@ -650,7 +650,7 @@ describe.serial("stop", () => {
 
   test("--force 终止进程并清理登记", async () => {
     const runner = spawn(process.execPath, ["-e", "setTimeout(()=>{},20000)"], { stdio: "ignore" });
-    const pid = runner.pid;
+    const pid = runner.pid!;
     writeEntry(makeEntry({ id: `p${pid}`, pid, project: makeProjectDir() }));
     const { code, stdout } = await captureStdout(() => runStop([`p${pid}`], { force: true }));
     expect(code).toBe(ExitCode.Success);
@@ -661,7 +661,7 @@ describe.serial("stop", () => {
 
   test("进程已死时直接清理登记", async () => {
     const runner = spawn(process.execPath, ["-e", "setTimeout(()=>{},20000)"], { stdio: "ignore" });
-    const pid = runner.pid;
+    const pid = runner.pid!;
     stopForce(pid);
     await waitDead(pid);
     writeEntry(makeEntry({ id: `p${pid}`, pid, project: makeProjectDir() }));
@@ -676,13 +676,13 @@ describe.serial("stop", () => {
     writeEntry(makeEntry({ id: `p${runner.pid}`, pid: runner.pid, project: path.resolve(projectDir) }));
     const { code } = await captureStdout(() => runStop([], { project: projectDir, force: true }));
     expect(code).toBe(ExitCode.Success);
-    expect(isAlive(runner.pid)).toBe(false);
+    expect(isAlive(runner.pid!)).toBe(false);
     expect(registeredInstances()).toHaveLength(0);
   }, TEST_TIMEOUT_MS);
 
   test("--id 终止登记实例并清理登记", async () => {
     const runner = spawn(process.execPath, ["-e", "setTimeout(()=>{},20000)"], { stdio: "ignore" });
-    const pid = runner.pid;
+    const pid = runner.pid!;
     writeEntry(makeEntry({ id: `p${pid}`, pid, port: 9601, project: makeProjectDir() }));
     const { code, stdout } = await captureStdout(() => runStop([], { id: `p${pid}`, force: true }));
     expect(code).toBe(ExitCode.Success);
@@ -693,7 +693,7 @@ describe.serial("stop", () => {
 
   test("--port 终止该端口上的登记实例", async () => {
     const runner = spawn(process.execPath, ["-e", "setTimeout(()=>{},20000)"], { stdio: "ignore" });
-    const pid = runner.pid;
+    const pid = runner.pid!;
     writeEntry(makeEntry({ id: `p${pid}`, pid, port: 9602, project: makeProjectDir() }));
     const { code, stdout } = await captureStdout(() => runStop([], { portText: "9602", force: true }));
     expect(code).toBe(ExitCode.Success);
@@ -729,7 +729,7 @@ describe.serial("stop", () => {
       return;
     }
     const runner = spawn(process.execPath, ["-e", "setTimeout(()=>{},20000)"], { stdio: "ignore" });
-    const pid = runner.pid;
+    const pid = runner.pid!;
     writeEntry(makeEntry({ id: `p${pid}`, pid, port: 9605, project: path.resolve(projectDir) }));
     const messy = `sub${path.sep}..${path.sep}${relative}`;
 
