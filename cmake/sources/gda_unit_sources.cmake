@@ -38,6 +38,7 @@ set(GDA_UNIT_BUSINESS_SOURCES
     ${CMAKE_SOURCE_DIR}/src/core/gda_home.cpp
     ${CMAKE_SOURCE_DIR}/src/core/project_store.cpp
     ${CMAKE_SOURCE_DIR}/src/core/instance_registry.cpp
+    ${CMAKE_SOURCE_DIR}/tests/runner/config_loader.cpp
     ${GDA_TOOLS_OPS_SOURCES})
 
 # API 基座自带的 L1 用例（tests/unit 下的 glob 已自动收集，此处显式登记
