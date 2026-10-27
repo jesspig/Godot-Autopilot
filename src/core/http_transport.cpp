@@ -586,7 +586,7 @@ void transport_dispatch(TransportState &state, TransportConnection &connection) 
       request.headers[std::string(http_parse::kQueryHeaderPrefix) + entry.first] =
           entry.second;
     }
-    request.headers[kConnectionIdHeader] = std::to_string(connection.id);
+    request.headers[http_parse::kConnectionIdHeader] = std::to_string(connection.id);
 
     PendingJob job;
     job.request = std::move(request);

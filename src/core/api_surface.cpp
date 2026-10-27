@@ -17,6 +17,9 @@
 #include "core/api_envelope.hpp"
 #include "core/command_queue.hpp"
 #include "core/http_parse.hpp"
+#include "core/http_transport_ext.hpp"
+#include "core/mcp_http_shim.hpp"
+#include "tools/code_exec_ops.hpp"
 #include "tools/register_all.hpp"
 #include "tools/runtime_ops.hpp"
 #include "tools/tool_base.hpp"
@@ -38,6 +41,9 @@ constexpr const char *kCodeUnauthorized = "unauthorized";
 constexpr const char *kCodeInvalidArgument = "invalid_argument";
 constexpr const char *kCodeNotFound = "not_found";
 constexpr const char *kCodeMethodNotAllowed = "method_not_allowed";
+constexpr const char *kCodeInvalidAccept = "invalid_accept";
+constexpr const char *kAcceptJsonMediaType = "application/json";
+constexpr size_t kMaxRequestIdLength = 128;
 
 std::string to_lower(const std::string &text) {
   std::string out = text;
@@ -241,11 +247,12 @@ ApiReply ok_reply(mcp::JsonValue body) {
 }
 
 ApiReply error_reply(int status, const std::string &code,
-                     const std::string &message) {
+                     const std::string &message,
+                     const std::string &request_id) {
   ApiReply reply;
   reply.status = status;
   reply.status_text = status_text_for(status);
-  reply.body = build_error_body(code, message);
+  reply.body = build_error_body(code, message, request_id);
   return reply;
 }
 
@@ -554,6 +561,14 @@ bool parse_batch_request(const mcp::JsonValue &body, BatchRequest &out,
     }
     out.stop_on_error = stop->GetBool();
   }
+  const mcp::JsonValue *rollback = body.Find("rollback_on_error");
+  if (rollback != nullptr) {
+    if (!rollback->IsBool()) {
+      error = "rollback_on_error must be a boolean";
+      return false;
+    }
+    out.rollback_on_error = rollback->GetBool();
+  }
   for (const mcp::JsonValue &item : operations->GetArray()) {
     if (!item.IsObject()) {
       error = "every operation must be a JSON object";
@@ -655,13 +670,28 @@ mcp::JsonValue build_tool_list_response(const std::vector<ToolEntry> &filtered,
   return body;
 }
 
+std::string sanitized_request_id(const std::string &raw) {
+  if (raw.empty() || raw.size() > kMaxRequestIdLength) {
+    return std::string();
+  }
+  for (const char c : raw) {
+    const bool alpha = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+    const bool digit = c >= '0' && c <= '9';
+    if (!alpha && !digit && c != '.' && c != '_' && c != ':' && c != '-') {
+      return std::string();
+    }
+  }
+  return raw;
+}
+
 mcp::JsonValue build_error_body(const std::string &code,
-                                 const std::string &message) {
+                                 const std::string &message,
+                                 const std::string &request_id) {
   mcp::JsonValue result(mcp::JsonValue::object_tag);
   result["error"] = mcp::JsonValue(message);
   result["code"] = mcp::JsonValue(code);
   const ApiEnvelope envelope;
-  return envelope.build(result, std::string());
+  return envelope.build(result, std::string(), request_id);
 }
 
 int status_for_code(const std::string &code) {
@@ -807,16 +837,25 @@ mcp::JsonValue build_openapi_document() {
 ApiReply handle_request(const std::string &method, const std::string &path,
                         const std::unordered_map<std::string, std::string> &headers,
                         const std::string &body) {
+  const std::string request_id = sanitized_request_id(
+      http_parse::header_value(headers, kRequestIdHeader));
   const RouteMatch route = match_route(method, path);
   if (route.kind == RouteKind::kNotFound) {
-    return error_reply(404, kCodeNotFound, route.error);
+    return error_reply(404, kCodeNotFound, route.error, request_id);
   }
   if (route.kind == RouteKind::kMethodNotAllowed) {
-    return error_reply(405, kCodeMethodNotAllowed, route.error);
+    return error_reply(405, kCodeMethodNotAllowed, route.error, request_id);
+  }
+  const std::string accept = http_parse::header_value(headers, "Accept");
+  if (!accept.empty() &&
+      !mcp_http::media_type_accepted(accept, kAcceptJsonMediaType)) {
+    return error_reply(406, kCodeInvalidAccept,
+                       "the client must accept application/json", request_id);
   }
   if (route.kind != RouteKind::kHealth && !verify_token(headers)) {
     return error_reply(401, kCodeUnauthorized,
-                       "a valid bearer token is required for this endpoint");
+                       "a valid bearer token is required for this endpoint",
+                       request_id);
   }
   switch (route.kind) {
     case RouteKind::kIndex:
@@ -831,7 +870,7 @@ ApiReply handle_request(const std::string &method, const std::string &path,
       ListQuery query;
       std::string error;
       if (!parse_list_query(query_params_from_headers(headers), query, error)) {
-        return error_reply(400, kCodeInvalidArgument, error);
+        return error_reply(400, kCodeInvalidArgument, error, request_id);
       }
       const std::vector<ToolEntry> all = list_tools();
       const std::vector<ToolEntry> filtered = filter_tools(all, query);
@@ -846,17 +885,18 @@ ApiReply handle_request(const std::string &method, const std::string &path,
         }
       }
       return error_reply(404, "tool_not_found",
-                         "tool not found: " + route.tool_name);
+                         "tool not found: " + route.tool_name, request_id);
     }
     case RouteKind::kToolCall: {
       mcp::JsonValue args;
       std::string error;
       if (!parse_body_object(body, args, error)) {
-        return error_reply(400, kCodeInvalidArgument, error);
+        return error_reply(400, kCodeInvalidArgument, error, request_id);
       }
       const mcp::JsonValue result = execute_tool(route.tool_name, args);
       const ApiEnvelope envelope;
-      const mcp::JsonValue wrapped = envelope.build(result, route.tool_name);
+      const mcp::JsonValue wrapped =
+          envelope.build(result, route.tool_name, request_id);
       if (result.IsObject() && result.Find("error") != nullptr) {
         const std::string code = envelope.normalize_code(result);
         ApiReply reply;
@@ -875,11 +915,19 @@ ApiReply handle_request(const std::string &method, const std::string &path,
       mcp::JsonValue parsed;
       std::string error;
       if (!parse_body_object(body, parsed, error)) {
-        return error_reply(400, kCodeInvalidArgument, error);
+        return error_reply(400, kCodeInvalidArgument, error, request_id);
       }
       BatchRequest request;
       if (!parse_batch_request(parsed, request, error)) {
-        return error_reply(400, kCodeInvalidArgument, error);
+        return error_reply(400, kCodeInvalidArgument, error, request_id);
+      }
+      godot::UndoRedo *history = nullptr;
+      uint64_t version_before = 0;
+      const bool rollback_enabled =
+          request.stop_on_error && request.rollback_on_error;
+      if (rollback_enabled) {
+        std::string undo_error;
+        code_exec_ops::batch_undo_snapshot(history, version_before, undo_error);
       }
       mcp::JsonValue results(mcp::JsonValue::array_tag);
       int64_t succeeded = 0;
@@ -926,6 +974,16 @@ ApiReply handle_request(const std::string &method, const std::string &path,
             std::to_string(request.operations.size()) +
             " (stop_on_error=true); the remaining operations were not "
             "executed. Set stop_on_error=false to run all operations.");
+        if (rollback_enabled) {
+          code_exec_ops::BatchUndoRollback rollback;
+          if (code_exec_ops::batch_rollback_undo(history, version_before,
+                                                 rollback)) {
+            reply_body["rolled_back"] =
+                mcp::JsonValue(rollback.rolled_back);
+            reply_body["rollback_partial"] = mcp::JsonValue(
+                rollback.rolled_back != rollback.actions_created);
+          }
+        }
       }
       return ok_reply(std::move(reply_body));
     }
@@ -933,7 +991,8 @@ ApiReply handle_request(const std::string &method, const std::string &path,
     case RouteKind::kMethodNotAllowed:
       break;
   }
-  return error_reply(404, kCodeNotFound, "unknown API route: " + path);
+  return error_reply(404, kCodeNotFound, "unknown API route: " + path,
+                     request_id);
 }
 
 } // namespace api_surface

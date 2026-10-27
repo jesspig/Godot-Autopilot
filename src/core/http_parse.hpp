@@ -13,6 +13,8 @@ constexpr size_t kMaxHeaderBlockBytes = 16 * 1024;
 constexpr size_t kMaxBodyBytes = 4 * 1024 * 1024;
 constexpr const char *kQueryRawHeader = "x-gda-query";
 constexpr const char *kQueryHeaderPrefix = "x-gda-query-";
+constexpr const char *kConnectionIdHeader = "x-gda-connection-id";
+constexpr const char *kUnattributedConnection = "unattributed";
 
 enum class BodyDecision { kAccept, kTooLarge, kMalformed };
 
@@ -338,6 +340,15 @@ inline std::string header_value(
     return std::string();
   }
   return *found;
+}
+
+inline std::string connection_id_of(
+    const std::unordered_map<std::string, std::string> &headers) {
+  const std::string value = header_value(headers, kConnectionIdHeader);
+  if (value.empty()) {
+    return std::string(kUnattributedConnection);
+  }
+  return value;
 }
 
 inline bool request_keeps_alive(const std::string &version,

@@ -529,6 +529,64 @@ TEST_F(ApiSurfaceTest, RejectsAMalformedBatchBody) {
   EXPECT_EQ(reply.status, 400);
 }
 
+TEST(ApiBatchTest, ParseBatchRequestAcceptsRollbackOnError) {
+  mcp::JsonValue body(mcp::JsonValue::object_tag);
+  mcp::JsonValue operations(mcp::JsonValue::array_tag);
+  mcp::JsonValue first(mcp::JsonValue::object_tag);
+  first["tool"] = mcp::JsonValue("scene_open");
+  operations.PushBack(std::move(first));
+  body["operations"] = std::move(operations);
+  body["rollback_on_error"] = mcp::JsonValue(true);
+
+  BatchRequest request;
+  std::string error;
+  ASSERT_TRUE(
+      godot_autopilot::api_surface::parse_batch_request(body, request, error));
+  EXPECT_TRUE(request.rollback_on_error);
+
+  body["rollback_on_error"] = mcp::JsonValue(false);
+  ASSERT_TRUE(
+      godot_autopilot::api_surface::parse_batch_request(body, request, error));
+  EXPECT_FALSE(request.rollback_on_error);
+
+  BatchRequest defaults;
+  EXPECT_FALSE(defaults.rollback_on_error);
+}
+
+TEST(ApiBatchTest, ParseBatchRequestRejectsNonBooleanRollbackOnError) {
+  mcp::JsonValue body(mcp::JsonValue::object_tag);
+  mcp::JsonValue operations(mcp::JsonValue::array_tag);
+  mcp::JsonValue first(mcp::JsonValue::object_tag);
+  first["tool"] = mcp::JsonValue("scene_open");
+  operations.PushBack(std::move(first));
+  body["operations"] = std::move(operations);
+  body["rollback_on_error"] = mcp::JsonValue("yes");
+
+  BatchRequest request;
+  std::string error;
+  EXPECT_FALSE(
+      godot_autopilot::api_surface::parse_batch_request(body, request, error));
+  EXPECT_EQ(error, "rollback_on_error must be a boolean");
+}
+
+TEST_F(ApiSurfaceTest, HandleRequestRejectsUnacceptableAccept) {
+  std::unordered_map<std::string, std::string> headers = bearer_headers(kToken);
+  headers["accept"] = "text/plain";
+  const ApiReply reply = godot_autopilot::api_surface::handle_request(
+      "GET", "/api/health", headers, "");
+  EXPECT_EQ(reply.status, 406);
+  const mcp::JsonValue *code = reply.body.Find("code");
+  ASSERT_NE(code, nullptr);
+  EXPECT_EQ(code->GetString(), "invalid_accept");
+
+  std::unordered_map<std::string, std::string> wildcard =
+      bearer_headers(kToken);
+  wildcard["accept"] = "*/*";
+  const ApiReply accepted = godot_autopilot::api_surface::handle_request(
+      "GET", "/api/health", wildcard, "");
+  EXPECT_EQ(accepted.status, 200);
+}
+
 TEST_F(ApiSurfaceTest, ServesTheOpenApiDocument) {
   const ApiReply reply = godot_autopilot::api_surface::handle_request(
       "GET", "/api/openapi.json", bearer_headers(kToken), "");

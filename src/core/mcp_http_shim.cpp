@@ -314,6 +314,8 @@ bool handle_post(const HttpRequest &req, HttpResponse &resp) {
     return false;
   }
 
+  const std::string connection_id = http_parse::connection_id_of(req.headers);
+
   const mcp_wire::ParsedRequest parsed = mcp_wire::parse_request(req.body);
   const mcp_http::DispatchKind dispatch = mcp_http::classify_dispatch(parsed);
   if (dispatch == mcp_http::DispatchKind::kInvalid) {
@@ -332,7 +334,7 @@ bool handle_post(const HttpRequest &req, HttpResponse &resp) {
   }
 
   std::string submit_error;
-  if (!transport->submit(parsed, submit_error)) {
+  if (!transport->submit(parsed, connection_id, submit_error)) {
     fill_json_response(resp, 503, "Service Unavailable",
                        mcp_http::build_error_body(kServerErrorCode,
                                                   submit_error));
@@ -347,7 +349,8 @@ bool handle_post(const HttpRequest &req, HttpResponse &resp) {
   }
 
   mcp::JsonRpcMessage message;
-  if (!transport->await_response(parsed.request_id, message, kDispatchTimeout)) {
+  if (!transport->await_response(connection_id, parsed.request_id, message,
+                                 kDispatchTimeout)) {
     fill_json_response(resp, 504, "Gateway Timeout",
                        mcp_http::build_error_body(
                            kServerErrorCode,
@@ -396,7 +399,7 @@ bool handle_get(const HttpRequest &req, HttpResponse &resp) {
   }
 
   const std::string connection_id =
-      http_parse::header_value(req.headers, kConnectionIdHeader);
+      http_parse::header_value(req.headers, http_parse::kConnectionIdHeader);
   if (connection_id.empty()) {
     fill_json_response(resp, 400, "Bad Request",
                        mcp_http::build_error_body(kParseErrorCode,

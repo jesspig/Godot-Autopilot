@@ -5,17 +5,25 @@
 
 #include "core/api_surface.hpp"
 #include "core/config.hpp"
+#include "core/http_parse.hpp"
+#include "core/http_transport_ext.hpp"
 
 namespace godot_autopilot {
 
 namespace {
 
 void api_route_handler(const HttpRequest &request, HttpResponse &response) {
+  const std::string request_id =
+      api_surface::sanitized_request_id(
+          http_parse::header_value(request.headers, kRequestIdHeader));
   const api_surface::ApiReply reply = api_surface::handle_request(
       request.method, request.path, request.headers, request.body);
   response.status_code = reply.status;
   response.status_text = reply.status_text;
   response.headers["Content-Type"] = "application/json";
+  if (!request_id.empty()) {
+    response.headers[kRequestIdHeader] = request_id;
+  }
   response.body = reply.body.Dump();
 }
 

@@ -212,6 +212,52 @@ TEST_F(RegisteredServerFixture, CatalogCoversServerTools) {
   }
 }
 
+TEST(ToolResultIsErrorTest, DetectsErrorField) {
+  mcp::JsonValue result(mcp::JsonValue::object_tag);
+  result["error"] = mcp::JsonValue("boom");
+  EXPECT_TRUE(godot_autopilot::tool_result_is_error(result));
+}
+
+TEST(ToolResultIsErrorTest, IgnoresPlainObjectWithoutError) {
+  mcp::JsonValue result(mcp::JsonValue::object_tag);
+  result["result"] = mcp::JsonValue("ok");
+  EXPECT_FALSE(godot_autopilot::tool_result_is_error(result));
+}
+
+TEST(ToolResultIsErrorTest, IgnoresNonObjectResult) {
+  EXPECT_FALSE(godot_autopilot::tool_result_is_error(mcp::JsonValue("text")));
+  EXPECT_FALSE(godot_autopilot::tool_result_is_error(mcp::JsonValue()));
+}
+
+TEST_F(RegisteredServerFixture, BatchExecuteSchemaDeclaresRollbackOnError) {
+  auto info = catalog.get_tool("batch_execute");
+  ASSERT_TRUE(info.has_value());
+  const auto *properties = info->input_schema.Find("properties");
+  ASSERT_NE(properties, nullptr);
+  const auto *rollback = properties->Find("rollback_on_error");
+  ASSERT_NE(rollback, nullptr);
+  ASSERT_TRUE(rollback->IsObject());
+  const auto *type = rollback->Find("type");
+  ASSERT_NE(type, nullptr);
+  ASSERT_TRUE(type->IsString());
+  EXPECT_EQ(type->GetString(), "boolean");
+  const auto *default_value = rollback->Find("default");
+  ASSERT_NE(default_value, nullptr);
+  ASSERT_TRUE(default_value->IsBool());
+  EXPECT_FALSE(default_value->GetBool());
+  const auto *description = rollback->Find("description");
+  ASSERT_NE(description, nullptr);
+  ASSERT_TRUE(description->IsString());
+  EXPECT_NE(description->GetString().find("rolled_back"), std::string::npos);
+  const auto *required = info->input_schema.Find("required");
+  ASSERT_NE(required, nullptr);
+  ASSERT_TRUE(required->IsArray());
+  for (const auto &entry : required->GetArray()) {
+    ASSERT_TRUE(entry.IsString());
+    EXPECT_NE(entry.GetString(), "rollback_on_error");
+  }
+}
+
 TEST_F(RegisteredServerFixture, CallHandlerUnknownToolReturnsError) {
   mcp::JsonValue args(mcp::JsonValue::object_tag);
   auto result = godot_autopilot::dispatch::call_handler("no_such_tool_xyz", args);

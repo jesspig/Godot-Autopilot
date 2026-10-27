@@ -13,6 +13,7 @@ set(GDA_UNIT_TRANSPORT_SOURCES
     ${CMAKE_SOURCE_DIR}/src/core/api_surface.cpp
     ${CMAKE_SOURCE_DIR}/src/core/api_endpoints.cpp
     ${CMAKE_SOURCE_DIR}/src/core/api_server_routes.cpp
+    ${CMAKE_SOURCE_DIR}/src/resources/resource_error_mapping.cpp
     ${CMAKE_SOURCE_DIR}/src/core/api_auth.cpp
     ${CMAKE_SOURCE_DIR}/src/core/api_token.cpp
     ${CMAKE_SOURCE_DIR}/tests/unit/http_transport_test.cpp

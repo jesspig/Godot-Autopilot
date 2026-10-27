@@ -220,6 +220,21 @@ TEST_F(BatchRefsTest, WrongStatusError) {
   EXPECT_NE(err_b.find("wrong status"), std::string::npos);
 }
 
+TEST_F(BatchRefsTest, RollbackOnErrorMustBeBoolean) {
+  register_basic_handlers(nullptr, nullptr);
+
+  const mcp::JsonValue result = handle_batch_execute(
+      mcp::JsonValue::Parse(R"({
+        "operations": [{"tool": "const_v1"}],
+        "rollback_on_error": "yes"
+      })"));
+
+  const mcp::JsonValue *error = result.Find("error");
+  ASSERT_NE(error, nullptr);
+  ASSERT_TRUE(error->IsString());
+  EXPECT_EQ(error->GetString(), "rollback_on_error must be a boolean");
+}
+
 TEST_F(BatchRefsTest, StopOnErrorRespected) {
   mcp::JsonValue seen_args;
   bool echo_called = false;

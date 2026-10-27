@@ -13,8 +13,8 @@
 
 namespace godot_autopilot {
 
-constexpr const char *kConnectionIdHeader = "x-gda-connection-id";
 constexpr const char *kStreamIdHeader = "x-gda-stream-id";
+constexpr const char *kRequestIdHeader = "x-gda-request-id";
 
 struct HttpPumpLimits {
   size_t max_accepts_per_frame{8};

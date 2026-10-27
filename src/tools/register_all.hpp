@@ -16,6 +16,8 @@ namespace godot_autopilot {
 void register_all_tools(mcp::McpServer &server, CommandQueue &queue,
                         ToolCatalog &catalog, Bm25Index &index, int port);
 
+bool tool_result_is_error(const mcp::JsonValue &result);
+
 void refresh_derived(const std::shared_ptr<ToolRegistry>& registry,
                      ToolCatalog& catalog, Bm25Index& index);
 

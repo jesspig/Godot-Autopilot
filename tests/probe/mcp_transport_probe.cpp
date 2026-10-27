@@ -143,16 +143,18 @@ int run_path_bc() {
   auto server = mcp::McpServer::Create(transport, probe_options());
   register_probe_tool(*server);
 
+  const std::string connection_id = "probe-bc";
+
   const ParsedRequest initialize = parse_request(kInitializeBody);
   std::string error;
-  if (!transport->submit(initialize, error)) {
+  if (!transport->submit(initialize, connection_id, error)) {
     std::cout << "PATH_BC initialize submit failed: " << error << std::endl;
     server->Close();
     return 1;
   }
   std::string initialize_text;
-  if (!transport->await_response(initialize.request_id, initialize_text,
-                                 kReceiveTimeout)) {
+  if (!transport->await_response(connection_id, initialize.request_id,
+                                 initialize_text, kReceiveTimeout)) {
     std::cout << "PATH_BC initialize timed out" << std::endl;
     server->Close();
     return 1;
@@ -160,21 +162,21 @@ int run_path_bc() {
   std::cout << "PATH_BC initialize response: " << initialize_text << std::endl;
 
   const ParsedRequest initialized = parse_request(kInitializedBody);
-  if (!transport->submit(initialized, error)) {
+  if (!transport->submit(initialized, connection_id, error)) {
     std::cout << "PATH_BC notification submit failed: " << error << std::endl;
     server->Close();
     return 1;
   }
 
   const ParsedRequest tools_list = parse_request(kToolsListBody);
-  if (!transport->submit(tools_list, error)) {
+  if (!transport->submit(tools_list, connection_id, error)) {
     std::cout << "PATH_BC tools/list submit failed: " << error << std::endl;
     server->Close();
     return 1;
   }
   std::string list_text;
-  if (!transport->await_response(tools_list.request_id, list_text,
-                                 kReceiveTimeout)) {
+  if (!transport->await_response(connection_id, tools_list.request_id,
+                                 list_text, kReceiveTimeout)) {
     std::cout << "PATH_BC tools/list timed out" << std::endl;
     server->Close();
     return 1;

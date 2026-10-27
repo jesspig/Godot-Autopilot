@@ -11,6 +11,7 @@
 #include "prompts/prompt_tool_usage.hpp"
 #include "tools/dispatch.hpp"
 #include <mcp/Content.hpp>
+#include <mcp/McpError.hpp>
 #include <memory>
 #include <string>
 #include <utility>
@@ -28,23 +29,24 @@ mcp::GetPromptResult make_result(const std::string &content) {
   return r;
 }
 
-mcp::GetPromptResult make_error_result(const std::string &message) {
-  mcp::GetPromptResult r = make_result(message);
-  r.description = message;
-  return r;
-}
-
 template <typename Fn>
 mcp::GetPromptResult run_prompt_task(CommandQueue &queue,
                                      const std::string &label, Fn task) {
   if (godot_autopilot::ExportGuard::is_exporting()) {
-    return make_error_result(dispatch::export_blocked_error_text());
+    throw mcp::McpError(mcp::McpErrorCode::HandlerError,
+                        dispatch::export_blocked_error_text());
   }
   auto state = std::make_shared<std::string>();
   dispatch::BoundedWaitOutcome outcome = dispatch::run_bounded_on_main_thread(
       queue, label, state, std::move(task), GDA_DISPATCH_WAIT_DEFAULT_MS);
+  if (outcome.timed_out) {
+    throw mcp::McpError(
+        mcp::McpErrorCode::RequestTimeout,
+        dispatch::main_thread_timeout_message(label, outcome.waited_ms,
+                                              outcome.cancelled));
+  }
   if (!outcome.ok) {
-    return make_error_result(outcome.error);
+    throw mcp::McpError(mcp::McpErrorCode::InternalError, outcome.error);
   }
   return make_result(*state);
 }
