@@ -7,10 +7,13 @@
 
 namespace godot_autopilot {
 
+int jsonrpc_code_for(const std::string &code);
+
 class ApiEnvelope {
 public:
   mcp::JsonValue build(const mcp::JsonValue &result,
-                       const std::string &tool_name) const;
+                       const std::string &tool_name,
+                       const std::string &request_id_override = {}) const;
   int status_for(const std::string &code) const;
   std::string normalize_code(const mcp::JsonValue &result) const;
 };

@@ -483,7 +483,7 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
 
     {
         ToolSpec spec{"batch_execute",
-                      "Execute multiple tools in batch. Each operation runs in sequence; if stop_on_error is true and any operation fails, remaining operations are skipped. Async game tools are refused unless await_async=true, in which case batch_execute waits for the game response and reports it under result.",
+                      "Execute multiple tools in batch. Each operation runs in sequence; if stop_on_error is true and any operation fails, remaining operations are skipped. Async game tools are refused unless await_async=true, in which case batch_execute waits for the game response and reports it under result. With stop_on_error=true and rollback_on_error=true the changes of already-executed operations are rolled back through the global undo history when the batch stops.",
                       "System", {"batch", "execute", "multi"}};
         spec.side_effect = SideEffect::CodeExecute;
         spec.flags = tool_flags::kMeta | tool_flags::kLongBlocking;
@@ -516,6 +516,16 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
         stop_prop["description"] = mcp::JsonValue("Stop on first error");
         stop_prop["default"] = mcp::JsonValue(true);
         props["stop_on_error"] = std::move(stop_prop);
+        mcp::JsonValue rollback_prop(mcp::JsonValue::object_tag);
+        rollback_prop["type"] = mcp::JsonValue("boolean");
+        rollback_prop["description"] = mcp::JsonValue(
+            "Only effective when stop_on_error is true; when the batch stops "
+            "on an error the changes of already-executed operations are rolled "
+            "back through the global undo history; the response carries "
+            "rolled_back and rollback_partial; changes that never entered the "
+            "global undo history are not rolled back");
+        rollback_prop["default"] = mcp::JsonValue(false);
+        props["rollback_on_error"] = std::move(rollback_prop);
         mcp::JsonValue await_prop(mcp::JsonValue::object_tag);
         await_prop["type"] = mcp::JsonValue("boolean");
         await_prop["description"] = mcp::JsonValue("Wait for async game ops instead of refusing them (default: false). With false an async game op is reported as an error telling you to use call_tool or await_async=true; with true batch_execute waits for the game response (bounded by the op's timeout_ms) and reports ok/error per response under result");
@@ -601,6 +611,10 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
     return registry;
 }
 
+bool tool_result_is_error(const mcp::JsonValue &result) {
+    return result.IsObject() && result.Find("error") != nullptr;
+}
+
 void refresh_dynamic_tools() {
     if (g_catalog == nullptr || g_index == nullptr)
         return;
@@ -674,7 +688,7 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
                     error_watermark::record_error(new_errors);
                 }
                 mcp::CallToolResult mcp_result;
-                if ((meta_name == "call_tool" || meta_name == "code_execute") && res.Find("error") != nullptr) {
+                if (tool_result_is_error(res)) {
                     mcp_result.is_error = true;
                 }
                 if (res.IsObject()) {

@@ -50,11 +50,6 @@ struct UndoHistorySnapshot {
   uint64_t version_before = 0;
 };
 
-struct UndoRollbackResult {
-  int64_t actions_created = 0;
-  int64_t rolled_back = 0;
-};
-
 struct TempNodeGuard {
   godot::Node *&node;
 
@@ -472,6 +467,72 @@ int max_timeout_ms() {
   return static_cast<int>(ceiling);
 }
 
+void batch_undo_snapshot(godot::UndoRedo *&history, uint64_t &version_before,
+                         std::string &error) {
+  history = nullptr;
+  version_before = 0;
+  error.clear();
+  if (!runtime_ops::has_editor_queue()) {
+    error = "editor command queue is unavailable";
+    return;
+  }
+  const tools::TraceContext ctx = tools::capture_trace_context();
+  auto state = std::make_shared<UndoHistorySnapshot>();
+  dispatch::BoundedWaitOutcome outcome =
+      dispatch::run_bounded_on_main_thread(
+          get_editor_queue(), "batch_execute undo snapshot", state,
+          [state, ctx](UndoHistorySnapshot &snapshot) {
+            tools::ScopedTraceContext restore(ctx);
+            auto *editor = godot::EditorInterface::get_singleton();
+            auto *manager = editor ? editor->get_editor_undo_redo() : nullptr;
+            snapshot.history =
+                manager
+                    ? manager->get_history_undo_redo(static_cast<int32_t>(
+                          godot::EditorUndoRedoManager::GLOBAL_HISTORY))
+                    : nullptr;
+            if (snapshot.history)
+              snapshot.version_before = snapshot.history->get_version();
+          },
+          GDA_DISPATCH_WAIT_DEFAULT_MS);
+  if (!outcome.ok) {
+    error = outcome.error;
+    return;
+  }
+  history = state->history;
+  version_before = state->version_before;
+}
+
+bool batch_rollback_undo(godot::UndoRedo *history, uint64_t version_before,
+                         BatchUndoRollback &rollback) {
+  rollback = BatchUndoRollback();
+  if (history == nullptr || !runtime_ops::has_editor_queue()) {
+    return false;
+  }
+  const tools::TraceContext ctx = tools::capture_trace_context();
+  auto state = std::make_shared<BatchUndoRollback>();
+  dispatch::BoundedWaitOutcome outcome =
+      dispatch::run_bounded_on_main_thread(
+          get_editor_queue(), "batch_execute undo rollback", state,
+          [state, history, version_before, ctx](BatchUndoRollback &result) {
+            tools::ScopedTraceContext restore(ctx);
+            result.actions_created =
+                static_cast<int64_t>(history->get_version() - version_before);
+            for (int64_t undo_index = 0;
+                 undo_index < result.actions_created; ++undo_index) {
+              if (!history->has_undo() || !history->undo())
+                break;
+              ++result.rolled_back;
+            }
+          },
+          GDA_DISPATCH_WAIT_DEFAULT_MS);
+  if (!outcome.ok) {
+    return false;
+  }
+  rollback.actions_created = state->actions_created;
+  rollback.rolled_back = state->rolled_back;
+  return true;
+}
+
 mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "batch_execute called");
@@ -515,28 +576,8 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
   godot::UndoRedo *history = nullptr;
   uint64_t version_before = 0;
   if (stop_on_error && rollback_on_error && runtime_ops::has_editor_queue()) {
-    const tools::TraceContext ctx = tools::capture_trace_context();
-    auto state = std::make_shared<UndoHistorySnapshot>();
-    dispatch::BoundedWaitOutcome outcome =
-        dispatch::run_bounded_on_main_thread(
-            get_editor_queue(), "batch_execute undo snapshot", state,
-            [state, ctx](UndoHistorySnapshot &snapshot) {
-              tools::ScopedTraceContext restore(ctx);
-              auto *editor = godot::EditorInterface::get_singleton();
-              auto *manager = editor ? editor->get_editor_undo_redo() : nullptr;
-              snapshot.history =
-                  manager
-                      ? manager->get_history_undo_redo(static_cast<int32_t>(
-                            godot::EditorUndoRedoManager::GLOBAL_HISTORY))
-                      : nullptr;
-              if (snapshot.history)
-                snapshot.version_before = snapshot.history->get_version();
-            },
-            GDA_DISPATCH_WAIT_DEFAULT_MS);
-    if (outcome.ok) {
-      history = state->history;
-      version_before = state->version_before;
-    }
+    std::string snapshot_error;
+    batch_undo_snapshot(history, version_before, snapshot_error);
   }
 
   mcp::JsonValue results(mcp::JsonValue::array_tag);
@@ -908,35 +949,12 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
                        " remaining operations were not executed. Set "
                        "stop_on_error=false to run all operations.");
     if (history && runtime_ops::has_editor_queue()) {
-      int64_t actions_created = 0;
-      int64_t rolled_back = 0;
-      const tools::TraceContext ctx = tools::capture_trace_context();
-      godot::UndoRedo *undo_history = history;
-      uint64_t base_version = version_before;
-      auto state = std::make_shared<UndoRollbackResult>();
-      dispatch::BoundedWaitOutcome outcome =
-          dispatch::run_bounded_on_main_thread(
-              get_editor_queue(), "batch_execute undo rollback", state,
-              [state, undo_history, base_version, ctx](
-                  UndoRollbackResult &rollback) {
-                tools::ScopedTraceContext restore(ctx);
-                rollback.actions_created = static_cast<int64_t>(
-                    undo_history->get_version() - base_version);
-                for (int64_t undo_index = 0;
-                     undo_index < rollback.actions_created; ++undo_index) {
-                  if (!undo_history->has_undo() || !undo_history->undo())
-                    break;
-                  ++rollback.rolled_back;
-                }
-              },
-              GDA_DISPATCH_WAIT_DEFAULT_MS);
-      if (outcome.ok) {
-        actions_created = state->actions_created;
-        rolled_back = state->rolled_back;
+      BatchUndoRollback rollback;
+      if (batch_rollback_undo(history, version_before, rollback)) {
+        r["rolled_back"] = mcp::JsonValue(rollback.rolled_back);
+        r["rollback_partial"] =
+            mcp::JsonValue(rollback.rolled_back != rollback.actions_created);
       }
-      r["rolled_back"] = mcp::JsonValue(rolled_back);
-      r["rollback_partial"] =
-          mcp::JsonValue(rolled_back != actions_created);
     }
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
