@@ -68,7 +68,7 @@ if(GDA_UNIT_SOURCES)
     add_dependencies(gda_unit_tests gda_skill_embed_header)
 
     target_include_directories(gda_unit_tests PRIVATE
-        ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
+        ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests ${CMAKE_BINARY_DIR}/generated)
     # mcp-client: register_all_test.cpp 使用 McpClient::Create/ListTools/Close
     # 做 ListTools 往返断言 (SDK 测试链接组合为 mcp-client + mcp-server)
     target_link_libraries(gda_unit_tests PRIVATE
