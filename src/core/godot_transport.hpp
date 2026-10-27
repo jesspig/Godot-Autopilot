@@ -31,6 +31,8 @@ std::string build_error_response_text(int code, const std::string &message);
 std::string build_event_frame(const std::string &event, const std::string &data);
 bool is_supported_protocol_version(const std::string &version);
 std::string request_id_key(const mcp::RequestId &id);
+std::string make_pending_key(const std::string &connection_id,
+                             const std::string &request_id);
 
 }
 
@@ -43,10 +45,14 @@ public:
   bool IsStateless() const override;
   void SendMessageAsync(mcp::JsonRpcMessage message) override;
 
-  bool submit(const mcp_wire::ParsedRequest &parsed, std::string &error);
-  bool await_response(const std::string &request_id, std::string &response_text,
+  bool submit(const mcp_wire::ParsedRequest &parsed,
+              const std::string &connection_id, std::string &error);
+  bool await_response(const std::string &connection_id,
+                      const std::string &request_id,
+                      std::string &response_text,
                       std::chrono::milliseconds timeout);
-  bool await_response(const std::string &request_id,
+  bool await_response(const std::string &connection_id,
+                      const std::string &request_id,
                       mcp::JsonRpcMessage &message,
                       std::chrono::milliseconds timeout);
 
@@ -55,11 +61,16 @@ private:
     std::shared_ptr<std::promise<mcp::JsonRpcMessage>> promise;
     std::shared_future<mcp::JsonRpcMessage> future;
     mcp::RequestId request_id;
+    std::string connection_id;
+    bool expired{false};
+    std::chrono::steady_clock::time_point expired_at{};
   };
 
   std::mutex pending_mutex_;
   std::unordered_map<std::string, PendingExchange> pending_;
+  std::unordered_map<std::string, std::string> id_index_;
 
+  void expire_stale_pending();
   void fail_pending_exchanges();
 };
 

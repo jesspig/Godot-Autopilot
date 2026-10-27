@@ -349,7 +349,7 @@ TEST(McpHttpShimTest, ServesEventStreamForGetRequest) {
   request.method = "GET";
   request.path = "/mcp";
   request.headers["accept"] = "text/event-stream";
-  request.headers[godot_autopilot::kConnectionIdHeader] = "unit-test-stream";
+  request.headers[godot_autopilot::http_parse::kConnectionIdHeader] = "unit-test-stream";
   HttpResponse response;
 
   EXPECT_TRUE(shim.handle(request, response));
@@ -357,4 +357,15 @@ TEST(McpHttpShimTest, ServesEventStreamForGetRequest) {
   EXPECT_EQ(response.headers.at("Content-Type"), "text/event-stream");
   EXPECT_EQ(response.body, "event: endpoint\ndata: /mcp\n\n");
   godot_autopilot::http_stream::release("unit-test-stream");
+}
+
+TEST(McpHttpShimTest, ConnectionIdOfFallsBackToUnattributed) {
+  HttpRequest request = make_post_request("{}");
+
+  EXPECT_EQ(godot_autopilot::http_parse::connection_id_of(request.headers),
+            std::string("unattributed"));
+
+  request.headers[godot_autopilot::http_parse::kConnectionIdHeader] = "conn-42";
+  EXPECT_EQ(godot_autopilot::http_parse::connection_id_of(request.headers),
+            "conn-42");
 }

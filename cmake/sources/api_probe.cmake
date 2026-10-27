@@ -8,6 +8,7 @@
 add_executable(gda_mcp_transport_probe
     ${CMAKE_SOURCE_DIR}/tests/probe/mcp_transport_probe.cpp
     ${CMAKE_SOURCE_DIR}/src/core/godot_transport.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/log_system.cpp
     ${CMAKE_SOURCE_DIR}/src/core/http_stream_registry.cpp
     ${CMAKE_SOURCE_DIR}/src/core/mcp_http_shim.cpp)
 
