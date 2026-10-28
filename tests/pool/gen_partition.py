@@ -7,7 +7,9 @@ files[].{name,passed,duration_ms,steps}）；files[].name 按 tests/config/*.jso
 行汇总）；同名基名取 generated_at 最新一份的 duration_ms；deny 池固定装载
 03_tools_contract/09_editor_ui/47_authorization_gate 三例，其余非 deny 用例按
 duration_ms 降序做 LPT 贪心装箱均衡装入 main-1..main-4，特例 38_csharp_bridge 固
-定排入 main-1 首位；写盘前按 tests/config/*.json 全集校验并集、无重复、allow 取值
+定排入 main-1 首位；顶层可选字段 isolated（缺省空数组）由既有 --out 文件读回并原样
+写出，其中用例不参与池装箱；写盘前按 tests/config/*.json 全集校验并集（pools 的
+cases ∪ isolated）、无重复、isolated 元素均属 config 全集且不落入任何池、allow 取值
 与池名集合，基名完全无报告时报 missing（含字段路径），违例抛出含字段路径的错误并
 以非零码退出。
 """
@@ -172,17 +174,35 @@ def load_case_durations(
     return case_durations, ignored
 
 
-def build_partition(case_durations: dict[str, int | float]) -> list[dict]:
+def load_previous_isolated(out_path: Path) -> list[str]:
+    if not out_path.is_file():
+        return []
+    try:
+        payload = json.loads(out_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{out_path}: invalid JSON: {exc}") from exc
+    root = require_mapping(payload, str(out_path))
+    isolated = root.get("isolated", [])
+    if not isinstance(isolated, list):
+        raise ValueError(
+            f"{out_path}.isolated: expected array, got {type(isolated).__name__}"
+        )
+    return isolated
+
+
+def build_partition(case_durations: dict[str, int | float],
+                    isolated: list[str] | tuple[str, ...] = ()) -> list[dict]:
     members: dict[str, list[str]] = {name: [] for name in MAIN_POOL_NAMES}
     loads: dict[str, int | float] = {name: 0 for name in MAIN_POOL_NAMES}
     if PINNED_CASE in case_durations:
         members[PINNED_POOL_NAME].append(PINNED_CASE)
         loads[PINNED_POOL_NAME] = case_durations[PINNED_CASE]
+    excluded = set(isolated)
     candidates = sorted(
         (
             (name, duration)
             for name, duration in case_durations.items()
-            if name not in DENY_CASES and name != PINNED_CASE
+            if name not in DENY_CASES and name != PINNED_CASE and name not in excluded
         ),
         key=lambda item: (-item[1], item[0]),
     )
@@ -198,7 +218,32 @@ def build_partition(case_durations: dict[str, int | float]) -> list[dict]:
     return pools
 
 
-def validate_partition(pools: list[dict], config_names: list[str]) -> None:
+def validate_isolated(isolated: object, config_names: list[str]) -> list[str]:
+    if not isinstance(isolated, (list, tuple)):
+        raise ValueError(
+            f"isolated: expected array of case names, got {type(isolated).__name__}"
+        )
+    config_set = set(config_names)
+    names: list[str] = []
+    seen: set[str] = set()
+    for position, case in enumerate(isolated):
+        if not isinstance(case, str) or not case:
+            raise ValueError(
+                f"isolated[{position}]: expected non-empty case name, got {case!r}"
+            )
+        if case in seen:
+            raise ValueError(f"isolated[{position}]: duplicate case {case!r}")
+        if case not in config_set:
+            raise ValueError(
+                f"isolated[{position}]: unknown case {case!r}, not in tests/config/*.json"
+            )
+        seen.add(case)
+        names.append(case)
+    return names
+
+
+def validate_partition(pools: list[dict], config_names: list[str],
+                       isolated: object = ()) -> None:
     pool_names = [pool["name"] for pool in pools]
     if len(set(pool_names)) != len(pool_names):
         raise ValueError(f"pools[*].name: duplicate pool names in {pool_names}")
@@ -232,13 +277,23 @@ def validate_partition(pools: list[dict], config_names: list[str]) -> None:
                     f"(already in pool {case_owner[case]!r})"
                 )
             case_owner[case] = pool["name"]
+    isolated_names = validate_isolated(isolated, config_names)
+    for position, case in enumerate(isolated_names):
+        owner = case_owner.get(case)
+        if owner is not None:
+            raise ValueError(
+                f"isolated[{position}]: case {case!r} is also pooled in {owner!r}; "
+                f"isolated cases must not appear in any pool"
+            )
     partition_set = set(case_owner)
+    isolated_set = set(isolated_names)
     config_set = set(config_names)
-    missing = sorted(config_set - partition_set)
-    extra = sorted(partition_set - config_set)
+    missing = sorted(config_set - partition_set - isolated_set)
+    extra = sorted((partition_set | isolated_set) - config_set)
     if missing or extra:
         raise ValueError(
-            f"pools[*].cases union vs tests/config/*.json: missing={missing} extra={extra}"
+            f"pools[*].cases + isolated union vs tests/config/*.json: "
+            f"missing={missing} extra={extra}"
         )
     first_main_case = pools[1]["cases"][0]
     if first_main_case != PINNED_CASE:
@@ -248,8 +303,13 @@ def validate_partition(pools: list[dict], config_names: list[str]) -> None:
         )
 
 
-def write_pools(out_path: Path, pools: list[dict]) -> None:
-    payload = {"version": POOL_VERSION, "mode": POOL_MODE, "pools": pools}
+def write_pools(out_path: Path, pools: list[dict], isolated: list[str]) -> None:
+    payload = {
+        "version": POOL_VERSION,
+        "mode": POOL_MODE,
+        "isolated": list(isolated),
+        "pools": pools,
+    }
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("w", encoding="utf-8", newline="\n") as handle:
         json.dump(payload, handle, ensure_ascii=False, indent=2)
@@ -269,16 +329,18 @@ def main(argv: list[str] | None = None) -> int:
                 f"{sorted(set(ignored))}",
                 file=sys.stderr,
             )
-        pools = build_partition(case_durations)
-        validate_partition(pools, config_names)
-        write_pools(Path(args.out), pools)
+        out_path = Path(args.out)
+        isolated = validate_isolated(load_previous_isolated(out_path), config_names)
+        pools = build_partition(case_durations, isolated)
+        validate_partition(pools, config_names, isolated)
+        write_pools(out_path, pools, isolated)
     except (OSError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     counts = {pool["name"]: len(pool["cases"]) for pool in pools}
     total = sum(counts[name] for name in POOL_NAMES)
     summary = ", ".join(f"{name}={counts[name]}" for name in POOL_NAMES)
-    print(f"partitioned {total} cases: {summary}")
+    print(f"partitioned {total} cases: {summary}, isolated={len(isolated)}")
     return 0
 
 

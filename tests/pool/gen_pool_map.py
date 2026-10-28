@@ -1,9 +1,12 @@
 """CMake 池路由映射生成器：从 pools.json 渲染 pool_map.cmake。
 
 读取 --pools 指定的 pools.json 单一事实源，校验 version/mode 与池名、用例的
-唯一性后，按 pools.json 顺序产出首行注释、GDA_POOL_MODE、GDA_POOL_NAMES
-（分号连接）以及每用例一条 set(GDA_POOL_<用例名大写且连字符转下划线>
-"<池名>") 语句，供 tests/CMakeLists.txt 在 configure 期 include 完成静态路由。
+唯一性（含顶层 isolated 元素不重复、不与任何池的 cases 相交）后，按 pools.json
+顺序产出首行注释、GDA_POOL_MODE、GDA_POOL_NAMES（分号连接）、
+GDA_POOL_ISOLATED（分号连接，缺省空串）以及每用例一条
+set(GDA_POOL_<用例名大写且连字符转下划线> "<池名>") 语句，供
+tests/CMakeLists.txt 在 configure 期 include 完成静态路由；isolated 用例不产出
+路由变量。
 """
 
 import argparse
@@ -16,6 +19,7 @@ EXPECTED_MODE = "pool"
 VARIABLE_PREFIX = "GDA_POOL_"
 MODE_VARIABLE = "GDA_POOL_MODE"
 NAMES_VARIABLE = "GDA_POOL_NAMES"
+ISOLATED_VARIABLE = "GDA_POOL_ISOLATED"
 HEADER_COMMENT = "# generated from pools.json - do not edit"
 
 
@@ -42,7 +46,9 @@ def cmake_variable_name(case: str) -> str:
     return VARIABLE_PREFIX + case.upper().replace("-", "_")
 
 
-def load_pool_assignment(pools_path: Path) -> tuple[list[str], dict[str, str], str]:
+def load_pool_assignment(
+    pools_path: Path,
+) -> tuple[list[str], dict[str, str], list[str], str]:
     try:
         payload = json.loads(pools_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
@@ -86,14 +92,39 @@ def load_pool_assignment(pools_path: Path) -> tuple[list[str], dict[str, str], s
                     f"(already mapped by pool {case_owner[case]!r})"
                 )
             case_owner[case] = name
-    return pool_names, case_owner, mode
+    isolated = root.get("isolated", [])
+    if not isinstance(isolated, list):
+        raise ValueError(
+            f"pools.json.isolated: expected array, got {type(isolated).__name__}"
+        )
+    isolated_cases: list[str] = []
+    for position, case in enumerate(isolated):
+        if not isinstance(case, str) or not case:
+            raise ValueError(
+                f"pools.json.isolated[{position}]: "
+                f"expected non-empty case name, got {case!r}"
+            )
+        if case in isolated_cases:
+            raise ValueError(
+                f"pools.json.isolated[{position}]: duplicate case {case!r}"
+            )
+        owner = case_owner.get(case)
+        if owner is not None:
+            raise ValueError(
+                f"pools.json.isolated[{position}]: case {case!r} is also routed to "
+                f"pool {owner!r}; isolated cases must not appear in any pool"
+            )
+        isolated_cases.append(case)
+    return pool_names, case_owner, isolated_cases, mode
 
 
-def render_pool_map(pool_names: list[str], case_owner: dict[str, str], mode: str) -> str:
+def render_pool_map(pool_names: list[str], case_owner: dict[str, str],
+                    isolated_cases: list[str], mode: str) -> str:
     lines = [
         HEADER_COMMENT,
         f'set({MODE_VARIABLE} "{mode}")',
         f'set({NAMES_VARIABLE} "{";".join(pool_names)}")',
+        f'set({ISOLATED_VARIABLE} "{";".join(isolated_cases)}")',
     ]
     lines.extend(
         f'set({cmake_variable_name(case)} "{pool}")' for case, pool in case_owner.items()
@@ -110,14 +141,19 @@ def write_pool_map(out_path: Path, text: str) -> None:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     try:
-        pool_names, case_owner, mode = load_pool_assignment(Path(args.pools))
-        write_pool_map(Path(args.out), render_pool_map(pool_names, case_owner, mode))
+        pool_names, case_owner, isolated_cases, mode = load_pool_assignment(
+            Path(args.pools)
+        )
+        write_pool_map(
+            Path(args.out),
+            render_pool_map(pool_names, case_owner, isolated_cases, mode),
+        )
     except (OSError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     print(
         f"wrote pool map: mode={mode}, pools={';'.join(pool_names)}, "
-        f"cases={len(case_owner)} -> {args.out}"
+        f"isolated={';'.join(isolated_cases)}, cases={len(case_owner)} -> {args.out}"
     )
     return 0
 

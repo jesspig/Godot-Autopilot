@@ -131,19 +131,110 @@ if(MSVC)
     target_link_options(gda_pool_ctl PRIVATE "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>")
 endif()
 
-# ── ctest 注册: 每份 config/*.json 一条 gda_runner_<name> 用例 ──
+# ── ctest 注册: L2 用例编排（pool=五池常驻+按池直连 / per-test=legacy 逐条启动）──
 # 用例文件在 configure 期经 GLOB 收集, config/ 目录新增 *.json 后重新 configure 即注册。
 file(GLOB GDA_TEST_CONFIGS CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/config/*.json")
 
-foreach(cfg ${GDA_TEST_CONFIGS})
-    get_filename_component(TEST_NAME "${cfg}" NAME_WE)
-    add_test(NAME gda_runner_${TEST_NAME}
-        COMMAND gda_test_runner --file ${TEST_NAME}
-                --report-dir ${CMAKE_CURRENT_BINARY_DIR}/output)
-    # 单文件含遍历约 2-4 分钟, 超时防挂死
-    set_tests_properties(gda_runner_${TEST_NAME} PROPERTIES TIMEOUT 600)
-endforeach()
+# 路由单一事实源: pool/pools.json 由 pool/gen_pool_map.py 在 configure 期渲染成
+# pool_map.cmake（GDA_POOL_MODE / GDA_POOL_NAMES / 每用例 GDA_POOL_<用例名大写且连字符转下划线>）。
+# include 后在注册期静态决定每条用例的 --pool，用例↔池的分区不在 CMake 里二次维护。
+set(GDA_POOL_POOLS_JSON "${CMAKE_CURRENT_SOURCE_DIR}/pool/pools.json")
+set(GDA_POOL_MAP_FILE "${CMAKE_CURRENT_BINARY_DIR}/pool_map.cmake")
+set(GDA_POOL_STATE_DIR "${CMAKE_CURRENT_BINARY_DIR}/pool/state")
+
+# 回滚开关: -DGDA_POOL_MODE=per-test 强制走 legacy（不受 pools.json 的 mode 影响）；
+# 留空则跟随 pools.json。恢复跟随: cmake -UGDA_POOL_MODE --preset <preset>。
+set(GDA_POOL_MODE "" CACHE STRING "L2 用例编排模式: 留空=跟随 pools.json, per-test=强制 legacy")
+set(GDA_POOL_MODE_OVERRIDE "${GDA_POOL_MODE}")
+
+if(EXISTS "${GDA_POOL_POOLS_JSON}")
+    execute_process(
+        COMMAND "${GDA_PYTHON_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/pool/gen_pool_map.py"
+                --pools "${GDA_POOL_POOLS_JSON}"
+                --out "${GDA_POOL_MAP_FILE}"
+        RESULT_VARIABLE GDA_POOL_MAP_RESULT
+        OUTPUT_VARIABLE GDA_POOL_MAP_STDOUT
+        ERROR_VARIABLE GDA_POOL_MAP_STDERR)
+    if(NOT GDA_POOL_MAP_RESULT EQUAL 0)
+        message(FATAL_ERROR
+            "[gda] 池路由映射生成失败 (退出码 ${GDA_POOL_MAP_RESULT}), 用例注册中止:\n"
+            "${GDA_POOL_MAP_STDERR}${GDA_POOL_MAP_STDOUT}")
+    endif()
+    include("${GDA_POOL_MAP_FILE}")
+    if(NOT GDA_POOL_MODE_OVERRIDE STREQUAL "")
+        set(GDA_POOL_MODE "${GDA_POOL_MODE_OVERRIDE}")
+        message(STATUS "[gda] L2 编排模式被 -DGDA_POOL_MODE 覆盖为 ${GDA_POOL_MODE}")
+    endif()
+    message(STATUS "[gda] L2 编排模式: ${GDA_POOL_MODE} (池: ${GDA_POOL_NAMES})")
+else()
+    set(GDA_POOL_MODE "per-test")
+    message(STATUS "[gda] 未找到 ${GDA_POOL_POOLS_JSON}, L2 用例退化为 per-test (legacy) 注册")
+endif()
+
+if(WIN32 AND GDA_POOL_MODE STREQUAL "pool")
+    # fixtures: 一次并发启动五池 → 池内用例按路由直连, isolated 用例逐例走 legacy → 停池
+    #（不跑用例时 ctest 不触发）。
+    add_test(NAME pool_setup
+        COMMAND gda_pool_ctl start --all --state-dir "${GDA_POOL_STATE_DIR}")
+    set_tests_properties(pool_setup PROPERTIES
+        FIXTURES_SETUP PoolSuite
+        TIMEOUT 300)
+
+    add_test(NAME pool_cleanup
+        COMMAND gda_pool_ctl stop --all --state-dir "${GDA_POOL_STATE_DIR}")
+    set_tests_properties(pool_cleanup PROPERTIES
+        FIXTURES_CLEANUP PoolSuite
+        TIMEOUT 300)
+
+    foreach(cfg ${GDA_TEST_CONFIGS})
+        get_filename_component(TEST_NAME "${cfg}" NAME_WE)
+        string(TOUPPER "${TEST_NAME}" POOL_VAR_SUFFIX)
+        string(REPLACE "-" "_" POOL_VAR_SUFFIX "${POOL_VAR_SUFFIX}")
+        set(POOL_VAR "GDA_POOL_${POOL_VAR_SUFFIX}")
+        # isolated 用例不参与池分区, 按 legacy 形态逐例注册: 不挂 PoolSuite fixture、不占池锁,
+        # 也不读 pool_map 的路由变量。
+        if(TEST_NAME IN_LIST GDA_POOL_ISOLATED)
+            add_test(NAME gda_runner_${TEST_NAME}
+                COMMAND gda_test_runner --file ${TEST_NAME}
+                        --report-dir ${CMAKE_CURRENT_BINARY_DIR}/output)
+            set_tests_properties(gda_runner_${TEST_NAME} PROPERTIES TIMEOUT 600)
+        else()
+            if(NOT DEFINED ${POOL_VAR} OR "${${POOL_VAR}}" STREQUAL "")
+                message(FATAL_ERROR
+                    "[gda] 池路由缺失: 用例 ${TEST_NAME} 在 ${GDA_POOL_MAP_FILE} 中找不到变量 "
+                    "${POOL_VAR}; 请检查 ${GDA_POOL_POOLS_JSON} 是否覆盖 config/*.json 全集")
+            endif()
+            add_test(NAME gda_runner_${TEST_NAME}
+                COMMAND gda_test_runner
+                        --pool ${${POOL_VAR}}
+                        --pool-state-dir "${GDA_POOL_STATE_DIR}"
+                        --file ${TEST_NAME}
+                        --report-dir ${CMAKE_CURRENT_BINARY_DIR}/output)
+            # 池模式省去逐例 Godot 启动, 单例仍可能触发一次自愈 restart, 超时与 legacy 对齐
+            # RESOURCE_LOCK 按路由池分组: ctest -j 下同池用例串行、跨池并行（并行度=池数, DR-04）
+            set_tests_properties(gda_runner_${TEST_NAME} PROPERTIES
+                FIXTURES_REQUIRED PoolSuite
+                TIMEOUT 600
+                RESOURCE_LOCK "pool_${${POOL_VAR}}")
+        endif()
+    endforeach()
+else()
+    # legacy 回滚路径: 每份 config 一条 --file 用例, 逐例自起 Godot, 无 fixtures。
+    # 非 Windows 平台无法跑 L2 池（pool_setup 必失败）, 一律降级到 legacy 单用例注册。
+    if(NOT WIN32)
+        message(STATUS "[gda] 非 Windows 平台：L2 按 legacy 单用例注册")
+    endif()
+    foreach(cfg ${GDA_TEST_CONFIGS})
+        get_filename_component(TEST_NAME "${cfg}" NAME_WE)
+        add_test(NAME gda_runner_${TEST_NAME}
+            COMMAND gda_test_runner --file ${TEST_NAME}
+                    --report-dir ${CMAKE_CURRENT_BINARY_DIR}/output)
+        # 单文件含遍历约 2-4 分钟, 超时防挂死
+        set_tests_properties(gda_runner_${TEST_NAME} PROPERTIES TIMEOUT 600)
+    endforeach()
+endif()
 
 # ── ctest 注册: 迁移守卫（零依赖，读源码断言，无需构建产物） ──
 add_test(NAME migration_guard

@@ -1,6 +1,9 @@
 {
   "version": 1,
   "mode": "pool",
+  "isolated": [
+    "45_runtime_observability"
+  ],
   "pools": [
     {
       "name": "deny",
@@ -43,7 +46,6 @@
       "name": "main-3",
       "allow": "all",
       "cases": [
-        "45_runtime_observability",
         "13_inline_subresource",
         "04_resources_scripts",
         "34_slash_property",
