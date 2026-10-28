@@ -55,22 +55,23 @@ POOL_BED_TEMPLATES: tuple[str, ...] = ("project.godot", ".gitignore", "assets")
 
 
 def materialize_pool_beds() -> list[Path]:
-    """目标池床缺失时仅从主床拷贝入库三件模板，返回本轮新建的床。"""
+    """确保池床模板与主床一致，缺失则建床；返回本轮新建的床。"""
     created: list[Path] = []
     for bed in POOL_BEDS:
-        if bed.exists():
-            continue
-        bed.mkdir(parents=True)
+        is_new = not bed.exists()
+        if is_new:
+            bed.mkdir(parents=True)
+            created.append(bed)
         for item in POOL_BED_TEMPLATES:
             source = TESTBED_DIR / item
             if not source.exists():
                 raise FileNotFoundError(f"物化模板缺失：{source}")
             if source.is_dir():
-                shutil.copytree(source, bed / item)
+                shutil.copytree(source, bed / item, dirs_exist_ok=True)
             else:
                 shutil.copy2(source, bed / item)
-        created.append(bed)
-        print(f"[POOL] 物化池床 {bed}", flush=True)
+        status = "物化池床" if is_new else "同步池床模板"
+        print(f"[POOL] {status} {bed}", flush=True)
     return created
 
 
