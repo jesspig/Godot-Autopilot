@@ -5,13 +5,14 @@ from pathlib import Path
 
 from .config import PROJECT_ROOT, resolve_preset
 
-L1_EXCLUDE_PATTERN = "^gda_runner_"
 L2_ONLY_PATTERN = "^gda_runner_"
 
 # 全量须两阶段：阶段 A 串行跑 L1 + 守卫 + CLI，-E 同时排除 L2 用例与池 fixtures；
 # 阶段 B 只跑 L2 池化 fixtures 与用例，按池并行。
 PHASE_A_EXCLUDE_PATTERN = "^gda_runner_|^pool_"
 PHASE_B_INCLUDE_PATTERN = "^gda_runner_|^pool_"
+
+L1_EXCLUDE_PATTERN = PHASE_A_EXCLUDE_PATTERN
 
 
 def _ctest(extra: list[str], preset: str = "debug", jobs: int = 0) -> int:

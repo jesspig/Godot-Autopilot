@@ -108,7 +108,7 @@ jobs:
           python scripts/test_package_integrity.py dist/godot-autopilot-*.zip
 
       - name: L1 unit tests
-        run: ctest --preset debug -E "^gda_runner_" --output-on-failure
+        run: ctest --preset debug -E "^gda_runner_|^pool_" --output-on-failure
 
   # 可执行文件冒烟：只验证 `bun build --compile` 在三平台都能产出并启动，不发布。
   # 发布产物由 release.yml 的 cli 作业构建（含 macOS ad-hoc 签名与校验和）。
