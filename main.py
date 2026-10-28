@@ -6,16 +6,17 @@ Usage:
     uv run main.py deploy [--release|--debug] [--demos 名称...]
     uv run main.py package [--libs-dir <dir>]
     uv run main.py clean
-    uv run main.py test [--l1 默认|--l2 [用例名]|--single <用例名>|--all] [--preset debug]
+    uv run main.py test [--l1 默认|--l2 [用例名]|--single <用例名>|--all|--legacy-l2] [--jobs N] [--preset debug]
     uv run main.py tui
 """
 
 import argparse
+import subprocess
 import sys
 from pathlib import Path
 
 from scripts import cmake_ops, clean_ops, deploy, package, test_ops
-from scripts.config import DEMO_NAMES, resolve_demos
+from scripts.config import BUILD_DIR, DEMO_NAMES, PROJECT_ROOT, resolve_demos
 
 
 def _cmd_build(args: argparse.Namespace) -> None:
@@ -50,7 +51,11 @@ def _cmd_deploy(args: argparse.Namespace) -> None:
     if args.release:
         clean_ops._clean()
 
-    print(f"\n[DEPLOY] Copying {preset} artifacts to demo/*/addons/ and tests/testbed/addons/...", flush=True)
+    print(
+        f"\n[DEPLOY] Copying {preset} artifacts to demo/*/addons/, "
+        f"tests/testbed/addons/ and tests/testbed_<池名>/addons/...",
+        flush=True,
+    )
     deploy._deploy(preset, demos)
 
     print(f"\n[DONE] Deploy complete.", flush=True)
@@ -61,18 +66,39 @@ def _cmd_package(args: argparse.Namespace) -> None:
     package._package_addon(args.libs_dir)
 
 
+def _stop_pool() -> None:
+    for preset in ("debug", "release"):
+        ctl = BUILD_DIR / preset / "tests" / "gda_pool_ctl.exe"
+        if not ctl.is_file():
+            print(f"[CLEAN] 跳过停池：{ctl} 不存在", flush=True)
+            continue
+        state_dir = BUILD_DIR / preset / "tests" / "pool" / "state"
+        cmd = [str(ctl), "stop", "--all", "--state-dir", str(state_dir)]
+        print(f"\n$ {' '.join(cmd)}", flush=True)
+        try:
+            code = subprocess.run(cmd, cwd=PROJECT_ROOT).returncode
+        except OSError as exc:
+            print(f"[WARN] 停池失败：{exc}（继续清理）", flush=True)
+            continue
+        if code != 0:
+            print(f"[WARN] 停池退出码 {code}（继续清理）", flush=True)
+
+
 def _cmd_clean(_args: argparse.Namespace) -> None:
+    _stop_pool()
     clean_ops._clean()
     print("[DONE] Clean complete.", flush=True)
 
 
 def _cmd_test(args: argparse.Namespace) -> None:
-    if args.single:
+    if args.legacy_l2:
+        code = test_ops.run_legacy_l2(args.preset)
+    elif args.single:
         code = test_ops.run_single(args.single, args.preset)
     elif args.all:
-        code = test_ops.run_all(args.preset)
+        code = test_ops.run_all(args.preset, args.jobs)
     elif args.l2 is not None:
-        code = test_ops.run_l2(args.l2, args.preset)
+        code = test_ops.run_l2(args.l2, args.preset, args.jobs)
     else:
         code = test_ops.run_l1(args.preset)
     if code != 0:
@@ -116,7 +142,18 @@ def main() -> None:
     p_test.add_argument("--preset", default="debug", choices=["debug", "release"], help="ctest 预设（默认 debug）")
     p_test.add_argument("--l2", nargs="?", const="", default=None, help="跑 L2（可附用例名单跑，如 --l2 gda_runner_01_scene）")
     p_test.add_argument("--single", default=None, help="单跑用例/守卫（如 --single migration_guard）")
-    p_test.add_argument("--all", action="store_true", help="全量 ctest（含 L2，约 12 分钟）")
+    p_test.add_argument("--all", action="store_true", help="全量 ctest（阶段 A 串行 + L2 池化并行，默认 -j 5）")
+    p_test.add_argument(
+        "--legacy-l2",
+        action="store_true",
+        help="强制 legacy 逐例启动跑 L2（configure 加 -DGDA_POOL_MODE=per-test，优先于 --all/--l2/--single）",
+    )
+    p_test.add_argument(
+        "--jobs",
+        type=int,
+        default=5,
+        help="L2 阶段并行度（默认 5）",
+    )
     p_test.set_defaults(func=_cmd_test)
 
     p_tui = sub.add_parser("tui", help="交互式构建控制台（需终端）")

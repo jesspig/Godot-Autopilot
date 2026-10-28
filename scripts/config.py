@@ -1,6 +1,8 @@
 """构建脚本共享常量：路径、示例项目列表、平台库映射。"""
 
+import json
 import shutil
+import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -60,8 +62,30 @@ DEMO_DIRS: list[Path] = [PROJECT_ROOT / "demo" / name for name in DEMO_NAMES]
 
 TESTBED_DIR = PROJECT_ROOT / "tests" / "testbed"
 
-# 插件写入的全部工程：demo 是交付物，testbed 只服务 L2 回归，不进 --demos 与打包
+# 插件写入的全部工程：demo 是交付物，testbed 只服务 L2 回归，不进 --demos 与打包；
+# 池床不在本表，由 POOL_BEDS 单列，deploy/clean 各自追加
 DEPLOY_TARGETS: list[Path] = [*DEMO_DIRS, TESTBED_DIR]
+
+POOL_MANIFEST = PROJECT_ROOT / "tests" / "pool" / "pools.json"
+
+
+def _pool_bed_names() -> list[str]:
+    """读 pools.json 的池名清单；清单缺失或 mode 非 pool 时告警并返回空表。"""
+    try:
+        payload = json.loads(POOL_MANIFEST.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        print(f"[WARN] {POOL_MANIFEST} 缺失，POOL_BEDS 为空", file=sys.stderr)
+        return []
+    mode = payload.get("mode")
+    if mode != "pool":
+        print(f"[WARN] {POOL_MANIFEST} mode={mode!r} 非 pool，POOL_BEDS 为空", file=sys.stderr)
+        return []
+    return [pool["name"] for pool in payload["pools"]]
+
+
+POOL_BEDS: list[Path] = [
+    PROJECT_ROOT / "tests" / f"testbed_{name}" for name in _pool_bed_names()
+]
 
 
 def _addon_dir(demo_dir: Path) -> Path:

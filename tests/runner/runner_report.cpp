@@ -15,6 +15,12 @@
 #include <utility>
 #include <vector>
 
+#ifdef _WIN32
+#include <process.h>
+#else
+#include <unistd.h>
+#endif
+
 namespace gda_test {
 
 using godot_autopilot::RuntimeError;
@@ -133,7 +139,13 @@ void print_console_report(const std::vector<FileResult>& results) {
 
 std::string save_json_report(const std::vector<FileResult>& results, const std::string& dir) {
     const std::string timestamp = local_timestamp();
-    const std::string file_path = dir + "/report-" + timestamp + ".json";
+#ifdef _WIN32
+    const int pid = static_cast<int>(_getpid());
+#else
+    const int pid = static_cast<int>(getpid());
+#endif
+    const std::string file_path =
+        dir + "/report-" + timestamp + "-" + std::to_string(pid) + ".json";
 
     std::error_code ec;
     std::filesystem::create_directories(dir, ec);

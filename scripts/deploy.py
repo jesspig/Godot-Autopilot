@@ -10,6 +10,7 @@ from .config import (
     DEMO_DIRS,
     PLATFORM_LIBS,
     PLATFORM_PDB,
+    POOL_BEDS,
     TESTBED_DIR,
     _addon_dir,
     artifact_dir,
@@ -50,6 +51,30 @@ def _generate_gdextension(addon_dir: Path) -> None:
     print(f"  godot-autopilot.gdextension  (generated)", flush=True)
 
 
+POOL_BED_TEMPLATES: tuple[str, ...] = ("project.godot", ".gitignore", "assets")
+
+
+def materialize_pool_beds() -> list[Path]:
+    """确保池床模板与主床一致，缺失则建床；返回本轮新建的床。"""
+    created: list[Path] = []
+    for bed in POOL_BEDS:
+        is_new = not bed.exists()
+        if is_new:
+            bed.mkdir(parents=True)
+            created.append(bed)
+        for item in POOL_BED_TEMPLATES:
+            source = TESTBED_DIR / item
+            if not source.exists():
+                raise FileNotFoundError(f"物化模板缺失：{source}")
+            if source.is_dir():
+                shutil.copytree(source, bed / item, dirs_exist_ok=True)
+            else:
+                shutil.copy2(source, bed / item)
+        status = "物化池床" if is_new else "同步池床模板"
+        print(f"[POOL] {status} {bed}", flush=True)
+    return created
+
+
 def _deploy(preset: str, demos: list[Path] | None = None) -> None:
     binary_dir = artifact_dir(preset)
     system = platform.system().lower()
@@ -57,7 +82,9 @@ def _deploy(preset: str, demos: list[Path] | None = None) -> None:
     if not lib_name:
         print(f"[ERROR] Unsupported platform: {system}", flush=True)
         sys.exit(1)
-    for project_dir in [*(DEMO_DIRS if demos is None else demos), TESTBED_DIR]:
+    materialize_pool_beds()
+    for project_dir in [*(DEMO_DIRS if demos is None else demos), TESTBED_DIR, *POOL_BEDS]:
+        print(f"[DEPLOY] {project_dir}", flush=True)
         addon_dir = _addon_dir(project_dir)
         addon_dir.mkdir(parents=True, exist_ok=True)
         # Remove any Godot hot-reload backup DLLs from previous runs to avoid loading errors

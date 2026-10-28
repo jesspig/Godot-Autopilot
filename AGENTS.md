@@ -9,6 +9,7 @@ Godot Autopilot（GDA）：进程内 GDExtension，把 Godot 编辑器经 MCP（
 - 构建部署：`uv run main.py build` + `uv run main.py deploy`（子命令：`build` / `deploy` / `package` / `clean` / `test` / `tui`；`deploy` 下 `--release` / `--demos <名称...>`，`package` 下 `--libs-dir <dir>`）
 - 手动构建：`cmake --preset debug && cmake --build --preset debug`
 - 快速验证：`ctest --preset debug -E "^gda_runner_"`（L1 + 守卫，秒级）
+- L2 池化：`uv run main.py test --all`（两阶段：阶段 A 串行跑 L1 + 守卫 + CLI，阶段 B 跑 L2 池化、默认 `-j 5`；`--legacy-l2` 回退 legacy 编排）
 - CLI 单测：`bun test cli/tests`（Bun + TS，秒级）
 - 版本只改根 `VERSION`，随后重新 configure
 
@@ -21,6 +22,7 @@ Godot Autopilot（GDA）：进程内 GDExtension，把 Godot 编辑器经 MCP（
 - **源码禁止注释**：除 `// namespace` 结尾标记外不得有 `//` 或 `/*…*/`，解释写进 wiki；`comment_guard` 在 ctest 阶段拦，编译通过不算过。
 - **默认安全姿态不可静默放宽**：仅绑环回、脱敏默认开、授权列表默认为空、导出期拒绝工具调用 / MCP 资源 / MCP 提示词三类入口。
 - **数值一律以运行时统计为准**，权威口径见 `docs/wiki/tests.md` 的数值核算总表；本页不记录计数。
+- **L2 池模式用例共享常驻编辑器会话**：新增用例须自清理场景与文件；累计态敏感用例（如调试器错误计数）加入 `tests/pool/pools.json` 的 `isolated`，不得依赖池复位清除会话级状态；池模式下用例的 `requires` 被忽略，授权由所在池的 `allow` 决定。
 - **CLI 为 Bun+TS 源码直跑**：零运行时依赖、无构建步骤；发布流程另产出各平台独立二进制（5 个目标 + `sha256sums.txt`）。技能书钉 `#<VERSION>`（由 `version_sync_guard` 兜底）。
 
 ## 三层文档分工
