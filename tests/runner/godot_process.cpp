@@ -290,16 +290,64 @@ bool create_pipe_pair(HANDLE &read_side, HANDLE &write_side) {
   return true;
 }
 
+class StdHandleInheritGuard {
+public:
+  StdHandleInheritGuard() {
+    const HANDLE probe[] = {GetStdHandle(STD_INPUT_HANDLE),
+                            GetStdHandle(STD_OUTPUT_HANDLE),
+                            GetStdHandle(STD_ERROR_HANDLE)};
+    for (HANDLE handle : probe) {
+      if (handle == nullptr || handle == INVALID_HANDLE_VALUE)
+        continue;
+      DWORD flags = 0;
+      if (!GetHandleInformation(handle, &flags))
+        continue;
+      if ((flags & HANDLE_FLAG_INHERIT) == 0)
+        continue;
+      if (!SetHandleInformation(handle, HANDLE_FLAG_INHERIT, 0))
+        continue;
+      handles_[count_++] = handle;
+    }
+  }
+
+  ~StdHandleInheritGuard() {
+    for (int i = 0; i < count_; ++i)
+      SetHandleInformation(handles_[i], HANDLE_FLAG_INHERIT,
+                           HANDLE_FLAG_INHERIT);
+  }
+
+  StdHandleInheritGuard(const StdHandleInheritGuard &) = delete;
+  StdHandleInheritGuard &operator=(const StdHandleInheritGuard &) = delete;
+
+private:
+  HANDLE handles_[3] = {nullptr, nullptr, nullptr};
+  int count_ = 0;
+};
+
 bool launch_process(const std::string &cmdline, PROCESS_INFORMATION &pi,
-                    HANDLE &stdout_read, HANDLE &stderr_read) {
+                    HANDLE &stdout_read, HANDLE &stderr_read,
+                    const std::string &console_log_path) {
   HANDLE stdout_write = nullptr;
   HANDLE stderr_write = nullptr;
-  if (!create_pipe_pair(stdout_read, stdout_write))
-    return false;
-  if (!create_pipe_pair(stderr_read, stderr_write)) {
-    CloseHandle(stdout_read);
+  if (console_log_path.empty()) {
+    if (!create_pipe_pair(stdout_read, stdout_write))
+      return false;
+    if (!create_pipe_pair(stderr_read, stderr_write)) {
+      CloseHandle(stdout_read);
+      stdout_read = nullptr;
+      return false;
+    }
+  } else {
+    SECURITY_ATTRIBUTES sa{sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
+    HANDLE console_log =
+        CreateFileA(console_log_path.c_str(), GENERIC_WRITE, FILE_SHARE_READ,
+                    &sa, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (console_log == INVALID_HANDLE_VALUE)
+      return false;
     stdout_read = nullptr;
-    return false;
+    stderr_read = nullptr;
+    stdout_write = console_log;
+    stderr_write = console_log;
   }
 
   std::vector<char> cmd(cmdline.begin(), cmdline.end());
@@ -308,6 +356,8 @@ bool launch_process(const std::string &cmdline, PROCESS_INFORMATION &pi,
   STARTUPINFOA si{};
   si.cb = sizeof(si);
   si.dwFlags = STARTF_USESTDHANDLES;
+
+  StdHandleInheritGuard inherit_guard;
 
   HANDLE stdin_handle = GetStdHandle(STD_INPUT_HANDLE);
   HANDLE stdin_fallback = INVALID_HANDLE_VALUE;
@@ -339,7 +389,8 @@ bool launch_process(const std::string &cmdline, PROCESS_INFORMATION &pi,
     CloseHandle(stdin_fallback);
 
   CloseHandle(stdout_write);
-  CloseHandle(stderr_write);
+  if (stderr_write != stdout_write)
+    CloseHandle(stderr_write);
   return ok != FALSE;
 }
 
@@ -376,6 +427,8 @@ struct GodotProcess::Impl {
   std::string project_path;
   bool headless = true;
   std::string allow_list;
+  bool run_import = true;
+  std::string console_log_path;
   int port = 0;
   HANDLE process = nullptr;
   HANDLE stdout_read = nullptr;
@@ -458,12 +511,16 @@ void attach_process(GodotProcess::Impl &impl, PROCESS_INFORMATION &pi) {
   impl.process = pi.hProcess;
   CloseHandle(pi.hThread);
   impl.running = true;
-  impl.stdout_thread =
-      std::thread(pipe_read_loop, impl.stdout_read, std::ref(impl.log_mutex),
-                  std::ref(impl.stdout_buf));
-  impl.stderr_thread =
-      std::thread(pipe_read_loop, impl.stderr_read, std::ref(impl.log_mutex),
-                  std::ref(impl.stderr_buf));
+  if (impl.stdout_read != nullptr) {
+    impl.stdout_thread =
+        std::thread(pipe_read_loop, impl.stdout_read, std::ref(impl.log_mutex),
+                    std::ref(impl.stdout_buf));
+  }
+  if (impl.stderr_read != nullptr) {
+    impl.stderr_thread =
+        std::thread(pipe_read_loop, impl.stderr_read, std::ref(impl.log_mutex),
+                    std::ref(impl.stderr_buf));
+  }
 }
 
 void close_process(GodotProcess::Impl &impl) {
@@ -502,6 +559,8 @@ GodotProcess::GodotProcess(Options opts) : impl_(std::make_unique<Impl>()) {
   impl_->project_path = opts.project_path;
   impl_->headless = opts.headless;
   impl_->allow_list = opts.allow_list;
+  impl_->run_import = opts.run_import;
+  impl_->console_log_path = opts.console_log_path;
   impl_->port = opts.port;
 }
 
@@ -527,7 +586,7 @@ bool GodotProcess::start(std::chrono::seconds ready_timeout) {
 
   const std::string headless_flag = impl_->headless ? "--headless " : "";
 
-  {
+  if (impl_->run_import) {
     const char *force_key = "GDA_FORCE_HEADLESS";
     char force_buf[64] = {0};
     const DWORD force_len =
@@ -549,7 +608,8 @@ bool GodotProcess::start(std::chrono::seconds ready_timeout) {
                                               impl_->project_path,
                                               headless_flag +
                                                   "--editor --import"),
-                          import_pi, impl_->stdout_read, impl_->stderr_read)) {
+                          import_pi, impl_->stdout_read, impl_->stderr_read,
+                          impl_->console_log_path)) {
         append_log(*impl_, "[gda] 警告：启动 --import 进程失败（错误码 " +
                                std::to_string(GetLastError()) +
                                "），继续尝试\n");
@@ -627,7 +687,8 @@ bool GodotProcess::start(std::chrono::seconds ready_timeout) {
     if (!launch_process(build_godot_cmdline(impl_->godot_path,
                                             impl_->project_path,
                                             headless_flag + "--editor"),
-                        editor_pi, impl_->stdout_read, impl_->stderr_read)) {
+                        editor_pi, impl_->stdout_read, impl_->stderr_read,
+                        impl_->console_log_path)) {
       restore_port_env();
       restore_allow_env();
       restore_force_env();
@@ -702,6 +763,31 @@ void GodotProcess::stop() {
   release_project_lock(*impl_);
 }
 
+void GodotProcess::detach() {
+  if (!impl_->running)
+    return;
+  if (impl_->stdout_read)
+    CancelIoEx(impl_->stdout_read, nullptr);
+  if (impl_->stderr_read)
+    CancelIoEx(impl_->stderr_read, nullptr);
+  if (impl_->stdout_thread.joinable())
+    impl_->stdout_thread.join();
+  if (impl_->stderr_thread.joinable())
+    impl_->stderr_thread.join();
+  if (impl_->stdout_read) {
+    CloseHandle(impl_->stdout_read);
+    impl_->stdout_read = nullptr;
+  }
+  if (impl_->stderr_read) {
+    CloseHandle(impl_->stderr_read);
+    impl_->stderr_read = nullptr;
+  }
+  CloseHandle(impl_->process);
+  release_project_lock(*impl_);
+  impl_->process = nullptr;
+  impl_->running = false;
+}
+
 bool GodotProcess::alive() const {
   if (!impl_->process)
     return false;
@@ -709,6 +795,12 @@ bool GodotProcess::alive() const {
 }
 
 int GodotProcess::port() const { return impl_->port; }
+
+long long GodotProcess::pid() const {
+  if (!impl_->process)
+    return 0;
+  return static_cast<long long>(GetProcessId(impl_->process));
+}
 
 std::string GodotProcess::capture_logs() {
   std::lock_guard<std::mutex> lock(impl_->log_mutex);
@@ -748,8 +840,10 @@ GodotProcess::~GodotProcess() = default;
 
 bool GodotProcess::start(std::chrono::seconds) { return false; }
 void GodotProcess::stop() {}
+void GodotProcess::detach() {}
 bool GodotProcess::alive() const { return false; }
 int GodotProcess::port() const { return 0; }
+long long GodotProcess::pid() const { return 0; }
 std::string GodotProcess::capture_logs() { return ""; }
 std::string GodotProcess::last_error() const { return impl_->last_error; }
 std::string GodotProcess::resolve_godot_path() { return ""; }
