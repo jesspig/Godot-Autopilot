@@ -8,7 +8,7 @@ Godot Autopilot（GDA）：进程内 GDExtension，把 Godot 编辑器经 MCP（
 
 - 构建部署：`uv run main.py build` + `uv run main.py deploy`（子命令：`build` / `deploy` / `package` / `clean` / `test` / `tui`；`deploy` 下 `--release` / `--demos <名称...>`，`package` 下 `--libs-dir <dir>`）
 - 手动构建：`cmake --preset debug && cmake --build --preset debug`
-- 快速验证：`ctest --preset debug -E "^gda_runner_"`（L1 + 守卫，秒级）
+- 快速验证：`ctest --preset debug -E "^gda_runner_|^pool_"`（L1 + 守卫 + CLI，秒级；排除 L2 用例与池 fixture，避免拉起池）
 - L2 池化：`uv run main.py test --all`（两阶段：阶段 A 串行跑 L1 + 守卫 + CLI，阶段 B 跑 L2 池化、默认 `-j 5`；`--legacy-l2` 回退 legacy 编排）
 - CLI 单测：`bun test cli/tests`（Bun + TS，秒级）
 - 版本只改根 `VERSION`，随后重新 configure
