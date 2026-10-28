@@ -189,6 +189,10 @@ std::string McpTestClient::call_tool(const std::string &name,
   }
 
   auto attempt = attempt_call_tool(*impl_->client, name, args);
+  if (!attempt.success && !tcp_port_open(impl_->port)) {
+    impl_->last_was_error = true;
+    return error_json(attempt.error);
+  }
   if (!attempt.success) {
     std::cout << "[mcp-client] retrying " << name
               << " after transport error: " << attempt.error << std::endl;
