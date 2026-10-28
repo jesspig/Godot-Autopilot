@@ -92,7 +92,9 @@ resource:
 
 先 `materialize_pool_beds()`（`scripts/deploy.py:57-75`，由 `_deploy` 入口无条件调用 `:85`）：**每次 deploy 都把主床 `tests/testbed/` 的三件入库模板 `project.godot` / `.gitignore` / `assets`（`POOL_BED_TEMPLATES`，`scripts/deploy.py:54`）同步到每张池床**——`project.godot` / `.gitignore` 直接覆盖，`assets` 以 `copytree(..., dirs_exist_ok=True)` 合并，模板缺失即抛错。因此**模板变更无需删床**：床目录不存在时同一次调用顺带建床（日志「物化池床」），已存在时只刷模板（日志「同步池床模板」）；床内 `.godot` 缓存与 `gda_tmp_*` 等临时产物不在这三件之内，保留不动。
 
-随后逐个工程循环（`--demos` 未指定即全部 6 个 demo；`--demos` 传空则一个 demo 都不部署），循环体末尾恒追加 L2 测试床 `tests/testbed` 与全部池床，因此 `--demos` 子集部署同样会刷新床与池床的插件；池床是生成产物（`.gitignore` 忽略 `tests/testbed_*/`），**不在 `--demos` 子集范围，也不参与打包**。池床与主床的编辑器均由 `GodotProcess` 拉起（L2 用例默认 `--headless`）并注入 `GDA_FORCE_HEADLESS=1`；该变量的语义见 [tests.md](./tests.md)「执行闭环」，本文不重复。库源目录取 [`scripts/config.py:artifact_dir(preset)`](../../scripts/config.py) 而非 `BUILD_DIR / preset` —— 多配置生成器的产物多一层配置名子目录（见「多配置生成器的产物路径」小节）：
+随后逐个工程循环（`--demos` 未指定即全部 6 个 demo；`--demos` 传空则一个 demo 都不部署），循环体末尾恒追加 L2 测试床 `tests/testbed` 与全部池床，因此 `--demos` 子集部署同样会刷新床与池床的插件；池床是生成产物（`.gitignore` 忽略 `tests/testbed_*/`），**不在 `--demos` 子集范围，也不参与打包**。池床与主床的编辑器均由 `GodotProcess` 拉起（L2 用例默认 `--headless`）并注入 `GDA_FORCE_HEADLESS=1`；该变量的语义见 [tests.md](./tests.md)「执行闭环」，本文不重复。
+
+池床物化后紧接 `warm_pool_bed_solutions(POOL_BEDS)`（`scripts/deploy.py:84-108`）：**把已构建床的 `.godot/mono` 复用给缺 `.NET` 程序集的池床**。供体按 `[tests/testbed, *POOL_BEDS]` 顺序取第一个命中 `.godot/mono/temp/bin/Debug/*.dll` 者；已有程序集打印「池床程序集已存在，跳过」，冷床则先删床内 `.godot/mono` 再从供体 `copytree`（日志「复用 C# 程序集 <供体> -> <池床>」），无供体只告警。原因：全新床没有 `testbed.csproj`，`godot --build-solutions` 会 exit 0 但静默空转（加 `--import` 也不生成 csproj），导致 L2 首跑时 `38_csharp_bridge`/`44_csharp_tooling` 触发 >120s 冷构建并撞 MCP 客户端 60s 超时；复用时程序集后实测 `44_csharp_tooling` 由 120s 超时失败降为 827ms 通过（2026-10-29）。库源目录取 [`scripts/config.py:artifact_dir(preset)`](../../scripts/config.py) 而非 `BUILD_DIR / preset` —— 多配置生成器的产物多一层配置名子目录（见「多配置生成器的产物路径」小节）：
 
 1. 创建部署目录，删除 Godot 热重载遗留的备份库（glob `~*`）；
 2. 生成 `godot-autopilot.gdextension`（见下节）；
