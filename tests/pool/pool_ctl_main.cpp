@@ -75,9 +75,10 @@ void print_usage(std::ostream &out) {
          " [--state-dir <目录>] [--restart]\n\n"
       << "子命令:\n"
       << "  start               启动池编辑器会话（床签名命中跳过 --import）\n"
-      << "  stop                停止池并清理状态文件（T-05 实现）\n"
+      << "  stop                停止池进程并删除状态文件；无状态或进程已退出"
+         "视为已停止\n"
       << "  status              枚举状态文件并报告各池存活状态\n"
-      << "  restart             重启池（T-05 实现）\n\n"
+      << "  restart             先停止再启动（等价于 start --restart）\n\n"
       << "参数:\n"
       << "  --pool <名>         只操作指定池（状态文件名去 .json 后缀）\n"
       << "  --all               操作全部池，与 --pool 互斥\n"
@@ -85,9 +86,9 @@ void print_usage(std::ostream &out) {
       << "）\n"
       << "  --restart           仅 start：先停现有会话再启动\n\n"
       << "退出码:\n"
-      << "  0  成功\n"
-      << "  1  --all 模式下存在启动失败的池\n"
-      << "  2  参数或环境错误\n";
+      << "  0  成功（stop 的已停止/残留状态清理同样为成功）\n"
+      << "  1  stop 失败（进程 15 秒内未退出），或 --all 模式下存在失败的池\n"
+      << "  2  参数或环境错误（restart 的停池失败同 start --restart）\n";
 }
 
 bool pool_name_is_valid(const std::string &name) {
@@ -313,9 +314,15 @@ struct PoolDef {
   std::vector<std::string> cases;
 };
 
+const std::vector<std::string> &all_pool_names() {
+  static const std::vector<std::string> names = {"deny", "main-1", "main-2",
+                                                 "main-3", "main-4"};
+  return names;
+}
+
 bool pool_name_known(const std::string &name) {
-  return name == "deny" || name == "main-1" || name == "main-2" ||
-         name == "main-3" || name == "main-4";
+  const std::vector<std::string> &names = all_pool_names();
+  return std::find(names.begin(), names.end(), name) != names.end();
 }
 
 std::string pool_allow_for(const std::string &name) {
@@ -626,30 +633,123 @@ fs::path pool_state_file(const std::string &state_dir, const std::string &name) 
   return fs::path(state_dir) / (name + ".json");
 }
 
+enum class StopOutcome {
+  kStopped,
+  kNoState,
+  kStaleState,
+  kInvalidState,
+  kFailed
+};
+
+struct StopResult {
+  StopOutcome outcome = StopOutcome::kFailed;
+  std::string error;
+  long long pid = 0;
+};
+
+bool remove_state_file(const fs::path &file, std::string &error) {
+  std::error_code ec;
+  fs::remove(file, ec);
+  if (ec) {
+    error = "无法删除状态文件: " + file.string();
+    return false;
+  }
+  return true;
+}
+
+StopResult stop_pool(const std::string &name, const std::string &state_dir) {
+  const fs::path file = pool_state_file(state_dir, name);
+  std::error_code ec;
+  const bool exists = fs::exists(file, ec);
+  if (ec) {
+    return StopResult{StopOutcome::kFailed,
+                      "无法检查状态文件: " + file.string()};
+  }
+  if (!exists) {
+    return StopResult{StopOutcome::kNoState};
+  }
+  PoolState state;
+  std::string error;
+  if (!read_pool_state(file, state, error)) {
+    const std::string invalid = error;
+    if (!remove_state_file(file, error)) {
+      return StopResult{StopOutcome::kFailed, error};
+    }
+    return StopResult{StopOutcome::kInvalidState, invalid};
+  }
+  if (!pid_alive(state.pid)) {
+    if (!remove_state_file(file, error)) {
+      return StopResult{StopOutcome::kFailed, error, state.pid};
+    }
+    return StopResult{StopOutcome::kStaleState, std::string(), state.pid};
+  }
+  if (!stop_pool_by_pid(state.pid, error)) {
+    return StopResult{StopOutcome::kFailed, error, state.pid};
+  }
+  if (!remove_state_file(file, error)) {
+    return StopResult{StopOutcome::kFailed, error, state.pid};
+  }
+  return StopResult{StopOutcome::kStopped, std::string(), state.pid};
+}
+
+int run_stop_one(const std::string &name, const CliOptions &opts) {
+  const StopResult stopped = stop_pool(name, opts.state_dir);
+  if (stopped.outcome == StopOutcome::kFailed) {
+    std::cerr << "错误: [" << name << "] " << stopped.error << std::endl;
+    return kExitFailed;
+  }
+  if (stopped.outcome == StopOutcome::kInvalidState) {
+    std::cerr << "警告: " << stopped.error << "，按残留状态清理" << std::endl;
+  }
+  std::cout << "[" << name << "] "
+            << (stopped.outcome == StopOutcome::kStopped ? "stopped"
+                                                         : "already stopped")
+            << std::endl;
+  return kExitOk;
+}
+
+int run_stop_all(const CliOptions &opts) {
+  int failed = 0;
+  for (const std::string &name : all_pool_names()) {
+    if (run_stop_one(name, opts) != kExitOk) {
+      ++failed;
+    }
+  }
+  if (failed > 0) {
+    std::cerr << "错误: " << failed << " 个池停止失败" << std::endl;
+    return kExitFailed;
+  }
+  return kExitOk;
+}
+
 int run_start_one(const std::string &name, const PoolDef &def,
                   const CliOptions &opts) {
   std::string error;
   const fs::path state_file = pool_state_file(opts.state_dir, name);
-  if (fs::exists(state_file)) {
+  if (opts.restart) {
+    const StopResult stopped = stop_pool(name, opts.state_dir);
+    if (stopped.outcome == StopOutcome::kFailed) {
+      std::cerr << "错误: [" << name << "] " << stopped.error << std::endl;
+      return kExitError;
+    }
+    if (stopped.outcome == StopOutcome::kStaleState) {
+      std::cerr << "警告: [" << name << "] 状态文件残留但 pid " << stopped.pid
+                << " 已退出，清理后重新启动" << std::endl;
+    } else if (stopped.outcome == StopOutcome::kInvalidState) {
+      std::cerr << "警告: " << stopped.error << "，按残留状态清理" << std::endl;
+    }
+  } else if (fs::exists(state_file)) {
     PoolState state;
     if (!read_pool_state(state_file, state, error)) {
       std::cerr << "警告: " << error << "，按残留状态清理" << std::endl;
       remove_file_quietly(state_file);
     } else if (pid_alive(state.pid)) {
-      if (opts.restart) {
-        if (!stop_pool_by_pid(state.pid, error)) {
-          std::cerr << "错误: [" << name << "] " << error << std::endl;
-          return kExitError;
-        }
-        remove_file_quietly(state_file);
-      } else {
-        std::cerr << "警告: [" << name << "] 池编辑器已在运行 (pid "
-                  << state.pid << ")，复用现有会话" << std::endl;
-        std::ostringstream out;
-        out << "[" << name << "] already running, reused";
-        std::cout << out.str() << std::endl;
-        return kExitOk;
-      }
+      std::cerr << "警告: [" << name << "] 池编辑器已在运行 (pid "
+                << state.pid << ")，复用现有会话" << std::endl;
+      std::ostringstream out;
+      out << "[" << name << "] already running, reused";
+      std::cout << out.str() << std::endl;
+      return kExitOk;
     } else {
       std::cerr << "警告: [" << name << "] 状态文件残留但 pid " << state.pid
                 << " 已退出，清理后重新启动" << std::endl;
@@ -852,31 +952,41 @@ int run_main(int argc, char **argv) {
     print_usage(std::cerr);
     return kExitError;
   }
-  if (opts.command == "start") {
-    if (!opts.has_pool && !opts.all) {
-      std::cerr << "错误: start 需要 --pool <名> 或 --all" << std::endl;
-      print_usage(std::cerr);
-      return kExitError;
-    }
+  const bool needs_target =
+      opts.command == "start" || opts.command == "stop" ||
+      opts.command == "restart";
+  if (needs_target && !opts.has_pool && !opts.all) {
+    std::cerr << "错误: " << opts.command << " 需要 --pool <名> 或 --all"
+              << std::endl;
+    print_usage(std::cerr);
+    return kExitError;
+  }
+  if (opts.command == "stop") {
     if (opts.all) {
-      return run_start_all(opts);
+      return run_stop_all(opts);
+    }
+    return run_stop_one(opts.pool, opts);
+  }
+  if (opts.command == "start" || opts.command == "restart") {
+    CliOptions start_opts = opts;
+    if (opts.command == "restart") {
+      start_opts.restart = true;
+    }
+    if (start_opts.all) {
+      return run_start_all(start_opts);
     }
     std::vector<PoolDef> defs;
     if (!load_pool_defs(default_pool_manifest(), defs, error)) {
       std::cerr << "错误: " << error << std::endl;
       return kExitError;
     }
-    const PoolDef *def = find_pool_def(defs, opts.pool);
+    const PoolDef *def = find_pool_def(defs, start_opts.pool);
     if (def == nullptr) {
-      std::cerr << "错误: 池定义中不存在池: " << opts.pool << "（"
+      std::cerr << "错误: 池定义中不存在池: " << start_opts.pool << "（"
                 << default_pool_manifest() << "）" << std::endl;
       return kExitError;
     }
-    return run_start_one(opts.pool, *def, opts);
-  }
-  if (opts.command == "stop" || opts.command == "restart") {
-    std::cerr << opts.command << " not implemented (T-05)" << std::endl;
-    return kExitError;
+    return run_start_one(start_opts.pool, *def, start_opts);
   }
   return run_status(opts);
 }
