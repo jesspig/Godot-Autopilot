@@ -36,6 +36,7 @@ import/
 
 # Tests
 tests/output/
+tests/testbed_*/
 
 # 本地会话产出的端到端测试报告（人工/会话文档，勿入库）
 report/
