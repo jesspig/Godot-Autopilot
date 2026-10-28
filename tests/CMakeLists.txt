@@ -111,6 +111,26 @@ if(MSVC)
     target_link_options(gda_test_runner PRIVATE "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>")
 endif()
 
+# ====================================================================
+# gda_pool_ctl — L2 池生命周期工具 (start/stop/status/restart; T-03 骨架)
+# ====================================================================
+add_executable(gda_pool_ctl
+    pool/pool_ctl_main.cpp
+    runner/godot_process.cpp
+    integration/mcp_test_client.cpp)
+
+target_include_directories(gda_pool_ctl PRIVATE
+    ${CMAKE_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(gda_pool_ctl PRIVATE PROJECT_ROOT="${CMAKE_SOURCE_DIR}")
+target_link_libraries(gda_pool_ctl PRIVATE
+    godot-cpp mcp-server mcp-http mcp-client)
+set_target_properties(gda_pool_ctl PROPERTIES
+    CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON
+    LINK_SEARCH_START_STATIC ON LINK_SEARCH_END_STATIC ON)
+if(MSVC)
+    target_link_options(gda_pool_ctl PRIVATE "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>")
+endif()
+
 # ── ctest 注册: 每份 config/*.json 一条 gda_runner_<name> 用例 ──
 # 用例文件在 configure 期经 GLOB 收集, config/ 目录新增 *.json 后重新 configure 即注册。
 file(GLOB GDA_TEST_CONFIGS CONFIGURE_DEPENDS
