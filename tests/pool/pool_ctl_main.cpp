@@ -36,7 +36,7 @@ constexpr int kExitFailed = 1;
 constexpr int kExitError = 2;
 constexpr auto kStatusProbeTimeout = std::chrono::seconds(5);
 constexpr auto kReadyTimeout = std::chrono::seconds(90);
-constexpr auto kStopGraceSeconds = std::chrono::seconds(10);
+constexpr auto kStopGraceSeconds = std::chrono::seconds(3);
 constexpr auto kStopForceSeconds = std::chrono::seconds(5);
 constexpr auto kStopPollInterval = std::chrono::milliseconds(200);
 constexpr char kAllowNone[] = "none";
@@ -87,7 +87,7 @@ void print_usage(std::ostream &out) {
       << "  --restart           仅 start：先停现有会话再启动\n\n"
       << "退出码:\n"
       << "  0  成功（stop 的已停止/残留状态清理同样为成功）\n"
-      << "  1  stop 失败（进程 15 秒内未退出），或 --all 模式下存在失败的池\n"
+      << "  1  stop 失败（进程 8 秒内未退出），或 --all 模式下存在失败的池\n"
       << "  2  参数或环境错误（restart 的停池失败同 start --restart）\n";
 }
 

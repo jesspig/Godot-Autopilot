@@ -235,6 +235,31 @@ bool read_pool_state(const fs::path &file, PoolState &state,
   return true;
 }
 
+enum class PoolProcessState { kAlive, kExited, kUnknown };
+
+#ifdef _WIN32
+PoolProcessState probe_pool_process(long long pid) {
+  const HANDLE handle =
+      OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, FALSE,
+                  static_cast<DWORD>(pid));
+  if (handle == nullptr) {
+    return GetLastError() == ERROR_INVALID_PARAMETER ? PoolProcessState::kExited
+                                                     : PoolProcessState::kUnknown;
+  }
+  const DWORD waited = WaitForSingleObject(handle, 0);
+  CloseHandle(handle);
+  if (waited == WAIT_OBJECT_0)
+    return PoolProcessState::kExited;
+  if (waited == WAIT_TIMEOUT)
+    return PoolProcessState::kAlive;
+  return PoolProcessState::kUnknown;
+}
+#else
+PoolProcessState probe_pool_process(long long) {
+  return PoolProcessState::kUnknown;
+}
+#endif
+
 long long epoch_ms() {
   return std::chrono::duration_cast<std::chrono::milliseconds>(
              std::chrono::system_clock::now().time_since_epoch())
@@ -299,6 +324,114 @@ bool restart_pool(const std::string &, const std::string &, std::string &error) 
   return false;
 }
 #endif
+
+bool restart_pool_and_reconnect(std::unique_ptr<McpTestClient> &client,
+                                const std::string &pool,
+                                const std::string &state_dir,
+                                const fs::path &state_file, int &pool_port,
+                                std::string &error) {
+  if (!restart_pool(pool, state_dir, error)) {
+    return false;
+  }
+  PoolState restarted;
+  std::string state_error;
+  if (!read_pool_state(state_file, restarted, state_error)) {
+    error = state_error;
+    return false;
+  }
+  pool_port = restarted.port;
+  std::unique_ptr<McpTestClient> reconnected =
+      std::make_unique<McpTestClient>(pool_port);
+  if (!reconnected->connect(kPoolConnectTimeout)) {
+    error = "池 MCP 服务自愈后仍未就绪（端口 " + std::to_string(pool_port) +
+            "）";
+    return false;
+  }
+  client = std::move(reconnected);
+  return true;
+}
+
+bool pool_tool_error(McpTestClient &client, const std::string &tool,
+                     const mcp::JsonValue *arguments, std::string &error) {
+  mcp::JsonValue envelope(mcp::JsonValue::object_tag);
+  envelope["name"] = mcp::JsonValue(tool);
+  if (arguments != nullptr) {
+    envelope["arguments"] = *arguments;
+  }
+  const std::string response = client.call_tool("call_tool", envelope.Dump());
+  try {
+    const mcp::JsonValue parsed = mcp::JsonValue::Parse(response);
+    if (!parsed.IsObject()) {
+      return false;
+    }
+    const mcp::JsonValue *err = parsed.Find("error");
+    if (err == nullptr) {
+      return false;
+    }
+    error = err->IsString() ? err->GetString() : err->Dump();
+    return true;
+  } catch (const std::exception &) {
+    error = "工具响应不是合法 JSON: " + response;
+    return true;
+  }
+}
+
+bool reset_pool_session(std::unique_ptr<McpTestClient> &client,
+                        const std::string &pool,
+                        const std::string &state_dir,
+                        const fs::path &state_file, int &pool_port,
+                        std::string &error) {
+  constexpr int kMaxResetAttempts = 8;
+  std::string cause;
+  const auto fallback = [&]() {
+    if (!restart_pool_and_reconnect(client, pool, state_dir, state_file,
+                                    pool_port, error)) {
+      if (!cause.empty()) {
+        error = cause + "；" + error;
+      }
+      return false;
+    }
+    return true;
+  };
+  for (int attempt = 0; attempt < kMaxResetAttempts; ++attempt) {
+    std::string snapshot_error;
+    if (!pool_tool_error(*client, "get_scene_snapshot", nullptr,
+                         snapshot_error)) {
+      std::string close_error;
+      if (!pool_tool_error(*client, "close_editor_scene", nullptr,
+                           close_error)) {
+        continue;
+      }
+      if (close_error.find("unsaved changes") == std::string::npos) {
+        cause = "close_editor_scene: " + close_error;
+        return fallback();
+      }
+      std::string reload_error;
+      if (!pool_tool_error(*client, "reload_editor_scene", nullptr,
+                           reload_error)) {
+        continue;
+      }
+      mcp::JsonValue save_args(mcp::JsonValue::object_tag);
+      save_args["path"] = mcp::JsonValue(
+          "res://gda_pool_scratch/reset_" + pool + ".tscn");
+      std::string save_error;
+      if (!pool_tool_error(*client, "save_editor_scene_as", &save_args,
+                           save_error)) {
+        continue;
+      }
+      cause = "reload_editor_scene: " + reload_error +
+              "；save_editor_scene_as: " + save_error;
+      return fallback();
+    }
+    if (snapshot_error.find("no scene currently open") != std::string::npos) {
+      return true;
+    }
+    cause = "get_scene_snapshot: " + snapshot_error;
+    return fallback();
+  }
+  cause = "8 次复位尝试后仍有打开的场景";
+  return fallback();
+}
 
 int resolve_external_port() {
   const char *raw = std::getenv(kPortEnvKey);
@@ -431,6 +564,36 @@ PoolRunOutcome run_one_file_pool(const fs::path &file, const CliOptions &opts,
     return outcome;
   };
 
+  std::unique_ptr<McpTestClient> client;
+  PoolState probed;
+  std::string probe_error;
+  if (read_pool_state(state_file, probed, probe_error) &&
+      probe_pool_process(probed.pid) == PoolProcessState::kExited) {
+    std::cerr << "[" << name << "] 池进程已退出（pid " << probed.pid
+              << "），跳过 MCP 连接直接自愈" << std::endl;
+    std::string restart_error;
+    if (!restart_pool_and_reconnect(client, opts.pool, opts.pool_state_dir,
+                                    state_file, pool_port, restart_error)) {
+      return fail("池自愈失败: " + restart_error);
+    }
+  } else {
+    client = std::make_unique<McpTestClient>(pool_port);
+    if (!client->connect(kPoolConnectTimeout)) {
+      std::cerr << "[" << name << "] 池 MCP 连接失败（端口 " << pool_port
+                << "），调用 gda_pool_ctl restart 自愈" << std::endl;
+      std::string restart_error;
+      if (!restart_pool_and_reconnect(client, opts.pool, opts.pool_state_dir,
+                                      state_file, pool_port, restart_error)) {
+        return fail("池自愈失败: " + restart_error);
+      }
+    }
+  }
+  std::string reset_error;
+  if (!reset_pool_session(client, opts.pool, opts.pool_state_dir, state_file,
+                          pool_port, reset_error)) {
+    return fail("池会话复位失败: " + reset_error);
+  }
+
   TestCase tc;
   try {
     tc = load_test_case(file.string());
@@ -454,30 +617,7 @@ PoolRunOutcome run_one_file_pool(const fs::path &file, const CliOptions &opts,
               << std::endl;
   }
 
-  McpTestClient client(pool_port);
-  std::unique_ptr<McpTestClient> healed;
-  if (!client.connect(kPoolConnectTimeout)) {
-    std::cerr << "[" << name << "] 池 MCP 连接失败（端口 " << pool_port
-              << "），调用 gda_pool_ctl restart 自愈" << std::endl;
-    std::string restart_error;
-    if (!restart_pool(opts.pool, opts.pool_state_dir, restart_error)) {
-      return fail("池自愈失败: " + restart_error);
-    }
-    int retry_port = pool_port;
-    PoolState restarted;
-    std::string state_error;
-    if (read_pool_state(state_file, restarted, state_error)) {
-      retry_port = restarted.port;
-      pool_port = retry_port;
-    }
-    healed = std::make_unique<McpTestClient>(retry_port);
-    if (!healed->connect(kPoolConnectTimeout)) {
-      return fail("池自愈后 MCP 服务仍未就绪（端口 " +
-                  std::to_string(retry_port) + "）");
-    }
-  }
-  McpTestClient *active = healed ? healed.get() : &client;
-  outcome.result = run_pipeline(tc, nullptr, active);
+  outcome.result = run_pipeline(tc, nullptr, client.get());
   std::cout << "[" << name << "] " << (outcome.result.passed ? "PASS" : "FAIL")
             << " (" << outcome.result.steps.size() << " steps, "
             << outcome.result.duration_ms << " ms)" << std::endl;
