@@ -1,6 +1,7 @@
 #include "core/mcp_http_shim.hpp"
 
 #include <chrono>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -14,6 +15,7 @@
 #include "core/http_parse.hpp"
 #include "core/http_stream_registry.hpp"
 #include "core/http_transport_ext.hpp"
+#include "core/log_system.hpp"
 
 namespace godot_autopilot {
 
@@ -250,6 +252,27 @@ constexpr int kServerErrorCode = -32000;
 constexpr int kMethodNotFoundCode = -32601;
 constexpr int kParseErrorCode = -32700;
 
+std::string display_request_id(const mcp::RequestId &id) {
+  if (std::holds_alternative<int64_t>(id)) {
+    return std::to_string(std::get<int64_t>(id));
+  }
+  return std::get<std::string>(id);
+}
+
+void log_http_error_path(const mcp_wire::ParsedRequest &parsed,
+                         const std::string &connection_id, int error_code,
+                         const std::string &message) {
+  ErrorPathEvent event;
+  if (const auto *request = mcp::AsRequest(parsed.message)) {
+    event.request_id = display_request_id(request->id);
+  }
+  event.method = parsed.method;
+  event.error_code = error_code;
+  event.connection_id = connection_id;
+  event.exception_type = classify_error_path_exception(message);
+  log_error_path(event);
+}
+
 void fill_json_response(HttpResponse &resp, int status_code,
                         const std::string &status_text, const std::string &body) {
   resp.status_code = status_code;
@@ -351,10 +374,13 @@ bool handle_post(const HttpRequest &req, HttpResponse &resp) {
   mcp::JsonRpcMessage message;
   if (!transport->await_response(connection_id, parsed.request_id, message,
                                  kDispatchTimeout)) {
+    const std::string timeout_message =
+        "mcp request timed out: " + parsed.method;
+    log_http_error_path(parsed, connection_id, kServerErrorCode,
+                        timeout_message);
     fill_json_response(resp, 504, "Gateway Timeout",
-                       mcp_http::build_error_body(
-                           kServerErrorCode,
-                           "mcp request timed out: " + parsed.method));
+                       mcp_http::build_error_body(kServerErrorCode,
+                                                  timeout_message));
     return false;
   }
 
