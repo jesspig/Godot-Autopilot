@@ -22,6 +22,67 @@ const TEST_TIMEOUT_MS = 60_000;
 const HOOK_TIMEOUT_MS = 60_000;
 
 const RUN_TAG = `gda-lifecycle-${Math.random().toString(36).slice(2, 8)}`;
+const TEST_TMPDIR_ENV = "GDA_TEST_TMPDIR";
+
+let testTmpRoot: string | undefined;
+
+function childWriteProbe(dir: string): string | null {
+  const probePath = path.join(dir, `${RUN_TAG}-child-write-probe.txt`);
+  const probe = spawnSync(
+    process.execPath,
+    ["-e", `require("node:fs").writeFileSync(${JSON.stringify(probePath)}, "ok")`],
+    { encoding: "utf8", timeout: 15_000 },
+  );
+  const output = `${probe.stdout ?? ""}${probe.stderr ?? ""}`.trim();
+  if (probe.error !== undefined) return `spawn failed: ${probe.error.message}`;
+  if (probe.status !== 0) {
+    return `child exited with ${probe.status ?? "unknown"}${output === "" ? "" : `: ${output}`}`;
+  }
+  let content: string;
+  try {
+    content = fs.readFileSync(probePath, "utf8");
+  } catch (error) {
+    return `probe file missing: ${String(error)}`;
+  } finally {
+    fs.rmSync(probePath, { force: true });
+  }
+  return content === "ok" ? null : `probe file has unexpected content: ${JSON.stringify(content)}`;
+}
+
+function writableTmpRoot(): string {
+  if (testTmpRoot !== undefined) return testTmpRoot;
+  const candidates = [
+    process.env[TEST_TMPDIR_ENV],
+    os.tmpdir(),
+    path.resolve(import.meta.dir, "..", "..", "build", "cli-test-tmp"),
+  ].filter((value): value is string => typeof value === "string" && value.length > 0);
+  const rejected: string[] = [];
+  for (const base of candidates) {
+    try {
+      fs.mkdirSync(base, { recursive: true });
+      const probeDir = fs.mkdtempSync(path.join(base, `${RUN_TAG}-tmp-probe-`));
+      const failure = childWriteProbe(probeDir);
+      fs.rmSync(probeDir, { recursive: true, force: true });
+      if (failure === null) {
+        testTmpRoot = base;
+        if (rejected.length > 0) {
+          process.stderr.write(`[temp] using ${base}; rejected: ${rejected.join("; ")}\n`);
+        }
+        return base;
+      }
+      rejected.push(`${base}: ${failure}`);
+    } catch (error) {
+      rejected.push(`${base}: ${String(error)}`);
+    }
+  }
+  throw new Error(
+    `no writable temp root for the CLI lifecycle tests (set ${TEST_TMPDIR_ENV}); tried: ${rejected.join("; ")}`,
+  );
+}
+
+function makeTempDir(prefix: string): string {
+  return fs.mkdtempSync(path.join(writableTmpRoot(), prefix));
+}
 
 async function sigtermIgnoringPid(): Promise<number> {
   const child = spawn(
@@ -60,7 +121,7 @@ let prevHome: string | undefined;
 let prevGdaHome: string | undefined;
 
 beforeEach(() => {
-  tmp = fs.mkdtempSync(path.join(os.tmpdir(), `${RUN_TAG}-`));
+  tmp = makeTempDir(`${RUN_TAG}-`);
   prevHome = process.env.GODOT_AUTOPILOT_CLI_HOME;
   prevGdaHome = process.env.GODOT_AUTOPILOT_HOME;
   process.env.GODOT_AUTOPILOT_CLI_HOME = tmp;
@@ -175,7 +236,13 @@ function loadReport() {
   try { return JSON.parse(fs.readFileSync(reportPath, "utf8")); } catch { return null; }
 }
 function saveReport(r) {
-  if (reportPath) fs.writeFileSync(reportPath, JSON.stringify(r, null, 2));
+  if (!reportPath) return;
+  try {
+    fs.writeFileSync(reportPath, JSON.stringify(r, null, 2));
+  } catch (error) {
+    console.error("[fake-godot] cannot write the report to " + reportPath + ": " + (error && error.stack ? error.stack : String(error)));
+    process.exit(1);
+  }
 }
 const argv = process.argv.slice(2);
 const noListen = process.env.GDA_FAKE_GODOT_NO_LISTEN === "1";
@@ -246,7 +313,7 @@ if (!noListen) {
 `;
 
 beforeAll(async () => {
-  fakeGodotDir = fs.mkdtempSync(path.join(os.tmpdir(), `${RUN_TAG}-fake-godot-`));
+  fakeGodotDir = makeTempDir(`${RUN_TAG}-fake-godot-`);
   const scriptPath = path.join(fakeGodotDir, `${RUN_TAG}.js`);
   fs.writeFileSync(scriptPath, FAKE_GODOT_SOURCE);
   const result = await Bun.build({
@@ -259,20 +326,53 @@ beforeAll(async () => {
     throw new Error(`fake godot build failed: ${result.logs.join("\n")}`);
   }
   fakeGodotExe = result.outputs[0].path;
+  if (!fs.existsSync(fakeGodotExe)) {
+    throw new Error(`fake godot executable missing after the build: ${fakeGodotExe}`);
+  }
   if (process.platform !== "win32") {
     fs.chmodSync(fakeGodotExe, 0o755);
   }
   fakeReportPath = path.join(fakeGodotDir, "report.json");
-  spawnSync(fakeGodotExe, ["--headless", "--import", "--path", fakeGodotDir], {
+  preflightFakeGodot();
+}, HOOK_TIMEOUT_MS);
+
+// 预检把「假编辑器能否启动并写出报告」的完整原因提前暴露：写不进去时抛出带完整
+// stdout/stderr 的错误，而不是让 14 个 start 用例各自收到一句被截断的日志尾。
+function preflightFakeGodot(): void {
+  const exe = fakeGodotExe;
+  if (exe === undefined) {
+    throw new Error("fake godot executable was not built");
+  }
+  fs.rmSync(fakeReportPath, { force: true });
+  const probe = spawnSync(exe, ["--headless", "--import", "--path", fakeGodotDir], {
     env: { ...process.env, GDA_FAKE_GODOT_REPORT: fakeReportPath },
-    stdio: "ignore",
+    encoding: "utf8",
     timeout: 30_000,
   });
-}, HOOK_TIMEOUT_MS);
+  const output = `${probe.stdout ?? ""}${probe.stderr ?? ""}`.trim();
+  const suffix = output === "" ? "" : `: ${output}`;
+  if (probe.error !== undefined) {
+    throw new Error(`fake godot preflight could not start ${exe}: ${probe.error.message}`);
+  }
+  if (probe.status !== 0) {
+    throw new Error(`fake godot preflight failed (exit ${probe.status ?? "unknown"})${suffix}`);
+  }
+  if (!fs.existsSync(fakeReportPath)) {
+    throw new Error(`fake godot preflight did not create the report file at ${fakeReportPath}${suffix}`);
+  }
+  try {
+    JSON.parse(fs.readFileSync(fakeReportPath, "utf8"));
+  } catch (error) {
+    throw new Error(
+      `fake godot preflight wrote an unreadable report at ${fakeReportPath}: ${String(error)}${suffix}`,
+    );
+  }
+  fs.rmSync(fakeReportPath, { force: true });
+}
 
 afterAll(async () => {
   const prevCliHome = process.env.GODOT_AUTOPILOT_CLI_HOME;
-  const cleanupHome = fs.mkdtempSync(path.join(os.tmpdir(), `${RUN_TAG}-cleanup-`));
+  const cleanupHome = makeTempDir(`${RUN_TAG}-cleanup-`);
   try {
     process.env.GODOT_AUTOPILOT_CLI_HOME = cleanupHome;
     await killAllRegistered();
@@ -546,8 +646,10 @@ describe.serial("start", () => {
 
       const report = readReport();
       expect(report).not.toBeNull();
-      expect(stderr).toContain(`the editor process (pid ${report!.pid})`);
-      expect(stderr).toContain("was terminated");
+      // 编辑器可能在探测窗口内自行退出，终态措辞有 was terminated 与 had already exited 两个分支
+      expect(stderr).toMatch(
+        new RegExp(`the editor process \\(pid ${report!.pid}\\) (was terminated|had already exited)`),
+      );
       expect(await waitFor(() => !isAlive(report!.pid), 5000)).toBe(true);
 
       const logsDir = path.join(stateDir(), "logs");
@@ -604,7 +706,7 @@ describe.serial("start", () => {
       pingFail: true,
     });
     expect(code).toBe(ExitCode.Transport);
-    expect(stderr).toContain("was terminated");
+    expect(stderr).toMatch(/the editor process \(pid \d+\) (was terminated|had already exited)/);
     expect(registeredInstances()).toHaveLength(0);
 
     const report = readReport();

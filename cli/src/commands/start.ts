@@ -231,8 +231,14 @@ function readLogTail(logPath: string): string {
   }
   const lines = text.split(/\r?\n/).filter((line) => line.trim() !== "");
   if (lines.length === 0) return "";
-  const tail = lines.slice(-LOG_TAIL_LINES).join(" | ");
-  return tail.length > LOG_TAIL_MAX_CHARS ? `${tail.slice(0, LOG_TAIL_MAX_CHARS)}...` : tail;
+  // 首行通常是异常本体（EACCES/ENOENT 的完整消息），栈帧在其后；首行必须完整保留，
+  // 否则定位时只剩栈而丢掉失败原因。其余行沿用既有条数与字符上限。
+  const head = lines[0];
+  const rest = lines.slice(1);
+  const tail = (rest.length <= LOG_TAIL_LINES - 1 ? rest : rest.slice(-(LOG_TAIL_LINES - 1))).join(" | ");
+  if (tail === "") return head;
+  const shortened = tail.length > LOG_TAIL_MAX_CHARS ? `${tail.slice(0, LOG_TAIL_MAX_CHARS)}...` : tail;
+  return `${head} | ${shortened}`;
 }
 
 async function runImportStep(bin: string, projectDir: string, skip: boolean): Promise<void> {
