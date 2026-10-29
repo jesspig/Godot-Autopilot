@@ -170,10 +170,12 @@
 | 关卡 | 水果 | 特效 |
 |---|---|---|
 | `level_01` | `Apple.png` | `Collected.png` |
-| `level_02` | `Bananas.png`、`Cherries.png` | `Collected.png` |
-| `level_03` | `Melon.png`、`Orange.png` | `Collected.png` |
+| `level_02` | `Apple.png`、`Bananas.png`、`Cherries.png` | `Collected.png` |
+| `level_03` | `Melon.png`、`Orange.png`、`Pineapple.png`、`Kiwi.png` | `Collected.png` |
 
-剩余 `Kiwi.png`、`Pineapple.png`、`Strawberry.png` 为备用，不进入三关布置。
+分关的水果种类与数量以 [../gdd/level-design.md](../gdd/level-design.md) 各关「关键坐标」表的 `fruit_*` 条目为权威；本节只做「关卡 → 素材文件」映射（含补齐 L2 的 Apple）。
+
+剩余 `Strawberry.png` 为备用，不进入三关布置。
 
 ### 菜单（出自 `Menu/`，界面见 [../gdd/ui-hud.md](../gdd/ui-hud.md)）
 
@@ -198,7 +200,7 @@
 | 起点/检查点动态 | `Start (Moving) (64x64).png`、`Checkpoint (Flag Out) (64x64).png`、`Checkpoint (Flag Idle)(64x64).png` | 出生与激活过渡（可选，静态图为必需底线） |
 | 场景过渡 | `Other/Transition.png` | 菜单与关卡切换过渡（可选） |
 
-各关背景主题（`Background/` 七色）分配见 [../gdd/level-design.md](../gdd/level-design.md)。
+各关背景主题（`Background/` 七色）的分配表见 [../gdd/level-design.md](../gdd/level-design.md)「三关背景分配」；本文件只登记素材事实（路径、尺寸与建议用途），不重复分配。
 
 ### 完整版资源集合
 
@@ -206,8 +208,8 @@
 |---|---|
 | 默认角色 | `Main Characters/Pink Man/` 下七张状态图 |
 | 地形 | `Terrain/Terrain (16x16).png` |
-| 背景 | `Background/Blue.png`（L1）+ 两关主题背景（分配见关卡设计） |
-| 水果 | `Items/Fruits/` 下 Apple/Bananas/Cherries/Melon/Orange + `Collected.png` |
+| 背景 | `Background/Blue.png`（L1）、`Background/Purple.png`（L2）、`Background/Green.png`（L3）；分配表见 [../gdd/level-design.md](../gdd/level-design.md)「三关背景分配」 |
+| 水果 | `Items/Fruits/` 下 Apple/Bananas/Cherries/Melon/Orange/Pineapple/Kiwi + `Collected.png` |
 | 问号箱 | `Items/Boxes/Box1/`、`Box2/`、`Box3/` |
 | 起点/检查点/终点 | `Items/Checkpoints/` 下 Start/Checkpoint/End（含 Pressed/Flag 系列） |
 | 静态危险 | `Traps/Spikes/Idle.png` |

@@ -22,6 +22,18 @@
 - 掉出世界的死亡检测覆盖世界下方；不得与终点或地面语义重叠。
 - 关卡 ID 为 `level_01` / `level_02` / `level_03`；通关当关终点即解锁下一关（解锁写盘规则见 [mechanics.md](./mechanics.md)）。
 
+## 三关背景分配
+
+| 关卡 | 背景文件 | 色系 |
+|---|---|---|
+| `level_01` | `Background/Blue.png` | 蓝 |
+| `level_02` | `Background/Purple.png` | 紫 |
+| `level_03` | `Background/Green.png` | 绿 |
+
+- 本表是三关背景主题的**唯一权威**；素材路径与图片尺寸属素材事实，见 [asset-catalog.md](../art/asset-catalog.md)「Background」。
+- 三关背景均按 64×64 平铺覆盖世界；平铺方式与「背景不得比前景更亮或更花」的要求见 [art-direction.md](../art/art-direction.md)「相机与背景」。
+- 首版（仅 `level_01`）只使用 `Background/Blue.png`；L2/L3 背景随完整版启用。
+
 ---
 
 ## 第一关 level_01（教学关）
@@ -199,6 +211,7 @@ flowchart LR
 - 坑洞（px 384–432）需助跑跳过； direct 走入掉落按死亡处理。
 - `saw_01` 轨道（y 180px）悬于 `ground_c` 上方，玩家需看准往复节奏从下方通过或跳过。
 - `checkpoint_01` 在圆锯段之后，`checkpoint_02` 在墙面段之后，重生落点均为安全地面。
+- 本关水果种类与数量以本节「关键坐标」表的 `fruit_*` 条目为权威：Apple（`fruit_apple_02`）、Banana（`fruit_banana_02`）、Cherry（`fruit_cherry_02`）；[asset-catalog.md](../art/asset-catalog.md) 的「水果」映射为从属素材映射（只给 PNG 路径），与本节冲突时以本节为准。
 
 ### 逐步验收路线
 
