@@ -22,11 +22,13 @@
 #include <godot_cpp/classes/editor_undo_redo_manager.hpp>
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/classes/object.hpp>
 #include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/resource_saver.hpp>
+#include <godot_cpp/classes/script.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/variant/array.hpp>
@@ -1640,6 +1642,61 @@ mcp::JsonValue handle_save_scene_as(const mcp::JsonValue &args) {
   return r;
 }
 
+namespace {
+
+mcp::JsonValue probe_editor_assembly(const std::string &probe_script) {
+  mcp::JsonValue probe(mcp::JsonValue::object_tag);
+  probe["path"] = mcp::JsonValue(probe_script);
+  const dotnet_env::DotnetProbe env = dotnet_env::probe_current();
+  const bool is_dotnet_editor = dotnet_env::is_dotnet_environment(env);
+  probe["is_dotnet_editor"] = mcp::JsonValue(is_dotnet_editor);
+  bool can_instantiate = false;
+  std::string base_class;
+  std::string state = "unavailable";
+  std::string hint;
+  if (!is_dotnet_editor) {
+    hint = "the editor is not a .NET build, so C# scripts cannot load here; "
+           "build and run the game with a .NET editor to use C# classes";
+  } else {
+    godot::ResourceLoader *loader = godot::ResourceLoader::get_singleton();
+    if (!loader) {
+      hint = "ResourceLoader not available";
+    } else {
+      godot::Ref<godot::Resource> loaded = loader->load(
+          godot::String::utf8(probe_script.c_str()), "Script",
+          godot::ResourceLoader::CACHE_MODE_IGNORE);
+      godot::Script *script =
+          loaded.is_valid()
+              ? godot::Object::cast_to<godot::Script>(loaded.ptr())
+              : nullptr;
+      if (!script) {
+        hint = "the script resource did not load in the editor; re-run "
+               "build_csharp_assembly and read get_debugger_log for C# errors";
+      } else {
+        can_instantiate = script->can_instantiate();
+        base_class =
+            util::to_std(godot::String(script->get_instance_base_type()));
+        state = "available";
+        if (!can_instantiate) {
+          hint = "the loaded editor assembly does not expose this class yet; "
+                 "click Build in the editor toolbar or restart the editor, "
+                 "then probe again";
+        }
+      }
+    }
+  }
+  probe["state"] = mcp::JsonValue(state);
+  probe["can_instantiate"] = mcp::JsonValue(can_instantiate);
+  probe["base_class"] = mcp::JsonValue(base_class);
+  if (!hint.empty())
+    probe["hint"] = mcp::JsonValue(hint);
+  if (state == "unavailable")
+    probe["unavailable"] = mcp::JsonValue(true);
+  return probe;
+}
+
+} // namespace
+
 mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "build_csharp_assembly called");
@@ -1647,12 +1704,17 @@ mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args) {
       "本工具仅等效触发 C# 项目编译，不等同于在编辑器中点击 Build 后的程序集热重载。"
       "GDExtension(C++) 无公共 API 触发编辑器内的 C# 程序集重载——该能力位于引擎 "
       "modules/mono 内部，非 GDExtension 可调用。适合 CI / 命令行式编译验证；若需编辑器内"
-      "类或签名变更后校验渲染，仍须用户在编辑器中点 Build 或重启编辑器。";
+      "类或签名变更后校验渲染，仍须用户在编辑器中点 Build 或重启编辑器。构建完成后返回 "
+      "next_action 与 restart_required（success=true 即为 true，与游戏是否在运行无关）；"
+      "传入 probe_script 会 load 该 .cs 并报告 editor_assembly_probe 的 can_instantiate，"
+      "用于判断编辑器已加载程序集是否已更新。";
   bool wait = false;
   int64_t timeout_ms = GDA_MAX_GAME_OP_TIMEOUT_MS;
+  std::string probe_script;
   if (args.IsObject()) {
     for (const auto &entry : args.GetObject()) {
-      if (entry.first != "wait" && entry.first != "timeout_ms") {
+      if (entry.first != "wait" && entry.first != "timeout_ms" &&
+          entry.first != "probe_script") {
         return util::error_json(
             "unknown parameter for build_csharp_assembly: " + entry.first);
       }
@@ -1678,6 +1740,20 @@ mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args) {
     timeout_ms = timeout_p->GetInt();
   }
   (void)timeout_ms;
+  auto *probe_p = args.Find("probe_script");
+  if (probe_p) {
+    if (!probe_p->IsString())
+      return util::error_json("probe_script must be a string");
+    probe_script = probe_p->GetString();
+    const bool res_prefix = probe_script.rfind("res://", 0) == 0;
+    const bool cs_suffix =
+        probe_script.size() > 8 &&
+        probe_script.compare(probe_script.size() - 3, 3, ".cs") == 0;
+    if (!res_prefix || !cs_suffix)
+      return util::error_json(
+          "probe_script must be a res:// path ending in .cs, e.g. "
+          "res://scripts/Player.cs");
+  }
   std::string project_file;
   godot::Ref<godot::DirAccess> da = godot::DirAccess::open("res://");
   if (!da.is_null()) {
@@ -1723,6 +1799,20 @@ mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args) {
     const auto *editor = godot::EditorInterface::get_singleton();
     inner["game_running"] = mcp::JsonValue(
         editor != nullptr && editor->is_playing_scene());
+    mcp::JsonValue next_action(mcp::JsonValue::array_tag);
+    next_action.PushBack(mcp::JsonValue(
+        "wait for the launch to finish, then call build_csharp_assembly again "
+        "with wait=true to read exit_code, success and errors"));
+    if (pid > 0) {
+      next_action.PushBack(mcp::JsonValue(
+          "after the build succeeds, restart the running game process and "
+          "click Build in the editor toolbar or restart the editor — the "
+          "loaded assemblies are not hot-reloaded"));
+    }
+    inner["next_action"] = std::move(next_action);
+    inner["restart_required"] = mcp::JsonValue(pid > 0);
+    if (!probe_script.empty())
+      inner["editor_assembly_probe"] = probe_editor_assembly(probe_script);
     mcp::JsonValue r(mcp::JsonValue::object_tag);
     r["result"] = std::move(inner);
     if (pid <= 0) {
@@ -1800,8 +1890,26 @@ mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args) {
   const auto *editor = godot::EditorInterface::get_singleton();
   const bool game_running = editor != nullptr && editor->is_playing_scene();
   inner["game_running"] = mcp::JsonValue(game_running);
-  if (game_running && exit_code == 0)
-    inner["restart_required"] = mcp::JsonValue(true);
+  inner["restart_required"] = mcp::JsonValue(exit_code == 0);
+  mcp::JsonValue next_action(mcp::JsonValue::array_tag);
+  if (exit_code == 0) {
+    next_action.PushBack(mcp::JsonValue(
+        "restart the running game process (stop_editor_playing, then "
+        "play_editor_current_scene) so it loads the rebuilt assembly"));
+    next_action.PushBack(mcp::JsonValue(
+        "click Build in the editor toolbar or restart the editor to load the "
+        "rebuilt assembly in the editor, then probe again with probe_script"));
+  } else {
+    next_action.PushBack(mcp::JsonValue(
+        "fix the C# compile errors listed in errors, then call "
+        "build_csharp_assembly again with wait=true"));
+    next_action.PushBack(mcp::JsonValue(
+        "when output_digest is empty, check dotnet_environment and "
+        "get_debugger_log for a missing SDK or project file"));
+  }
+  inner["next_action"] = std::move(next_action);
+  if (!probe_script.empty())
+    inner["editor_assembly_probe"] = probe_editor_assembly(probe_script);
   inner["errors"] = std::move(errors_arr);
   inner["output_digest"] = mcp::JsonValue(digest);
   inner["output_empty"] = mcp::JsonValue(combined.empty());
