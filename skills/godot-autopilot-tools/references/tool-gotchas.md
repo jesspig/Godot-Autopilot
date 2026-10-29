@@ -227,6 +227,47 @@ normal error breaks resume as soon as the request ends.
 
 Details: godot-autopilot-runtime.
 
+## Paused-tree UI clicks: verification checklist (conclusion pending T-33)
+
+Clicking controls while `SceneTree.paused` is true is the least reliable
+automation path observed so far, and the final verdict is still open: one
+paused pause-menu playthrough saw window-coordinate clicks miss, viewport
+coordinates land only sometimes and need a second click, while keyboard
+always worked. That is one observation on one demo, not a rule. Run the
+checklist below during the T-33 re-test and record the measured result
+instead of assuming either way.
+
+1. **Confirm the state and the target.** `get_game_status` must report
+   `paused: true`, the menu must be visible, and the target must appear in
+   `get_game_ui_elements` with its `path` and `mouse_filter` noted
+   (`IGNORE` controls never receive mouse buttons).
+2. **Click by path or text with `click_game_ui_element`.** It injects hover
+   motion plus the press/release pair and reports `hit_path` /
+   `hit_mismatch`; resolve a mismatch through `validate_game_ui_layout`
+   (`possibly_occluded`) or by clicking the reported `hit_path` — do not
+   simply repeat the same coordinates.
+3. **Watch the first click.** Read the game state back after the first click
+   (menu closed, mode changed, `button_pressed`). If it did not land, click
+   once more and record whether the second one did: "first click swallowed"
+   and "click never lands" are different observations.
+4. **Run the keyboard control.** Trigger the same action with a key event
+   (`queue_game_input` / `sequence_game_inputs`). Keyboard working while
+   the click fails isolates the fault to mouse injection; both failing points
+   at the paused UI logic. Keyboard is also the fallback while the mouse path
+   is unconfirmed.
+5. **Compare coordinate bases.** If you bypass the click tool and drive
+   `queue_game_input` yourself, use window pixels (the window_rect /
+   window_center fields from `get_game_ui_elements`) or
+   `coord_space: "viewport"`, and inject a `mouse_motion` first (see
+   `godot-autopilot-runtime/references/input-injection.md`).
+
+T-33 backfill template — replace the pending marker with measured values:
+
+```
+paused click: path=<...>, first_click_hit=<yes/no>, second_click_hit=<yes/no>,
+hit_path=<...>, keyboard_ok=<yes/no>, conclusion=<...>
+```
+
 ## Size limits
 
 These limits are enforced by the server. Truncation is always detectable -
