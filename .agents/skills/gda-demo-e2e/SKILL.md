@@ -69,13 +69,24 @@ description: "以 demo/<名称> 为场地，用 GDA 完成一轮端到端开发�
 
 ## 3. 前置检查
 
-1. 确认 `addons/godot-autopilot/` 已部署。缺失时在仓库根执行：
+1. 先在仓库根执行固定的 CLI 探针序列（只读，不修改配置；`gda` 指本仓库 CLI，见 `cli/bin/gda.ts`）：
+
+   | 顺序 | 命令 | 通过判据 |
+   |---|---|---|
+   | 1 | `gda status` | 退出码 0，返回 `running=true` |
+   | 2 | `gda call get_engine_version` | 退出码 0，返回引擎版本 |
+   | 3 | `gda call system_status`（连续两次） | 两次均退出码 0 |
+
+   任一探针失败时：记录命令、退出码（0 成功 / 1 工具失败 / 2 传输或环境失败 / 3 用法错误）与 `gda endpoints` 的输出（端口来源、MCP/API 地址与 `alive`），再按下列判据分流，不自行启动或重启 Godot：
+   - CLI 成功而后续 MCP 工具调用失败 → 客户端路径问题（客户端连接、协议或授权），GDA 本体可用；
+   - CLI 与客户端都失败且 `gda endpoints` 显示端口无监听 → 查 Windows 事件日志与 `%LOCALAPPDATA%\CrashDumps`，在报告中如实记录后再判断是否停止。
+2. 确认 `addons/godot-autopilot/` 已部署。缺失时在仓库根执行：
    - `uv run main.py build`
    - `uv run main.py deploy --demos <name>`
-2. 调用 `system_status`，要求 `running=true`。不可达时停止，说明需要打开 Godot 编辑器并启用插件；部署后仍不可达时请用户重新打开工程或启用插件。不自行启动或重启 Godot。
-3. 记录基线：开始时间、`system_status.version`、`get_engine_version`、`git rev-parse --short HEAD`。
-4. 用 `execute_script` 读取 `GODOT_AUTOPILOT_TRACE_DIR` 与 `GODOT_AUTOPILOT_LOG_DIR`。被授权门拒绝时，记录「轨迹不可得」及原因，继续执行，不推测。
-5. 以 `search_tools` 的返回确认工具名与参数，不凭记忆调用。
+3. 调用 `system_status`，要求 `running=true`。不可达时停止，说明需要打开 Godot 编辑器并启用插件；部署后仍不可达时请用户重新打开工程或启用插件。不自行启动或重启 Godot。
+4. 记录基线：开始时间、`system_status.version`、`get_engine_version`、`git rev-parse --short HEAD`。
+5. 用 `execute_script` 读取 `GODOT_AUTOPILOT_TRACE_DIR` 与 `GODOT_AUTOPILOT_LOG_DIR`。被授权门拒绝时，记录「轨迹不可得」及原因，继续执行，不推测。
+6. 以 `search_tools` 的返回确认工具名与参数，不凭记忆调用。
 
 ## 4. 执行
 
