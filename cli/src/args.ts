@@ -110,6 +110,15 @@ export function parseArgv(argv: string[]): { opts: GlobalOptions; positionals: s
   return { opts: opts as GlobalOptions, positionals };
 }
 
+export function parseProbePort(text: string): number {
+  const value = text.trim();
+  const port = /^\d+$/.test(value) ? Number(value) : Number.NaN;
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new CliError(ExitCode.Usage, `--probe for list must be a port in 1-65535, got: ${text}`);
+  }
+  return port;
+}
+
 export function usageText(): string {
   return `gda ${CLI_VERSION} — Godot Autopilot CLI
 
@@ -158,7 +167,7 @@ Global options:
   --query <text>      Keyword filter for the api list subcommand
   --limit <n>         Maximum tools returned by the api list subcommand (1-2000)
   --offset <n>        Offset into the tool list for the api list subcommand
-  --probe <level>     Liveness probe level: light (default) or strict
+  --probe <value>     Liveness level light/strict (api/endpoints/start); list: probed port 1-65535
   --help              Show this help
   --version           Show the version
 
