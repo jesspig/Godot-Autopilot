@@ -12,7 +12,7 @@ are the ones that matter for C# work; use `get_tool_detail` for the full schema.
 | `write_file` | Generic write (`path`, `content`, optional `mode`); `.cs` writes under `res://` return a `diagnostics` object but enforce no C# gates. |
 | `patch_script` | Patch one anchored spot (`path`, `anchor`, `replacement`, optional `mode`); compiles before writing and rolls back on failure. |
 | `copy_resource_file` | Byte-for-byte duplicate (`path`, `dest_path`); start a new `.cs` from one that already compiles. |
-| `build_csharp_assembly` | Build the root `.csproj`/`.sln`. `{wait: true, timeout_ms?: 1..25000}` returns `BuildResult {exit_code, success, errors, output_digest, output_empty, output_truncated?, errors_truncated?, game_running, restart_required?}`; without `wait` it returns `{pid, started, game_running}` only. |
+| `build_csharp_assembly` | Build the root `.csproj`/`.sln`. `{wait: true, timeout_ms?: 1..25000}` returns `BuildResult {exit_code, success, errors, output_digest, output_empty, output_truncated?, errors_truncated?, game_running, restart_required, next actions}`; without `wait` it returns `{pid, started, game_running, restart_required, next actions}`. `restart_required` is true once the build succeeds or is launched (nothing hot-reloads loaded assemblies). Optional `probe_script` (a `res://` `.cs` path) loads that script after the build without instantiating it and adds an editor assembly probe object (path, `is_dotnet_editor`, state, `can_instantiate`, base class, `hint`) — `can_instantiate: false` on an available probe means the editor still runs the old assembly (click Build or restart the editor). |
 | `get_debugger_log` | Read the editor-process log buffer (`limit`, default 50); editor-side C# compile and parse errors land here. |
 | `get_plugin_log` | Read the plugin's own log (`limit`, `level`, `category`, `filter`, `since_index`); authorization denials, timeout diagnostics, dropped game responses. |
 | `play_editor_current_scene` | Launch the edited scene as a game; save the scene first. |
@@ -29,7 +29,7 @@ are the ones that matter for C# work; use `get_tool_detail` for the full schema.
 | `reload_game_scripts` | Reload GDScript files in the running game (`paths`); it never reloads C# code. |
 | `stop_editor_playing` | Stop the game started by `play_editor_current_scene`. |
 | `capture_game_viewport` | Capture the running game as a base64 PNG (`timeout_ms`, optional `when`/`after_frames`). |
-| `csharp_list_members` | List C# members of a locator (`runtime` editor/game, optional filters). |
+| `csharp_list_members` | List C# members of a locator (`runtime` editor/game). Optional `kind` (`method`/`property`/`signal`/`all`, default all), `name_contains` (case-insensitive), `limit` (1-1000, **default 200**) and `offset` page the matched members across methods → properties → signals; with `runtime: "game"` filtering and paging run inside the game so inherited tables never cross the channel. Returns `{methods, properties, signals, counts: {methods, properties, signals, returned, total}, truncated}` — `truncated: true` means more matches remain after limit/offset. |
 | `csharp_get_property` / `csharp_set_property` | Read / write a C# property or field through the reflection bridge (`runtime` editor/game). |
 | `csharp_call_method` | Call a C# method; overloads match by argument count. |
 | `csharp_subscribe_event` / `csharp_unsubscribe_event` | Wire/unwire a receiver method to a C# event by subscription token. |
