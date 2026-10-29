@@ -404,7 +404,8 @@ JV dispatch_game_request(int64_t request_id, const std::string &op,
   return state->result;
 }
 
-JV read_capture_file(const mcp::JsonValue &pending_result) {
+JV read_capture_file(const mcp::JsonValue &pending_result,
+                     const mcp::JsonValue &options) {
   std::string path = pending_result["path"].GetString();
   godot::Ref<godot::FileAccess> file = godot::FileAccess::open(
       godot::String(path.c_str()), godot::FileAccess::READ);
@@ -439,10 +440,24 @@ JV read_capture_file(const mcp::JsonValue &pending_result) {
   static constexpr const char *kCapturePassthroughFields[] = {
       "region", "annotated", "elements", "source_width",
       "source_height", "elements_truncated", "node_elements",
-      "node_truncated"};
+      "node_truncated", "when_satisfied_frame", "captured_frame"};
   for (const char *key : kCapturePassthroughFields) {
     if (auto *value_p = pending_result.Find(key))
       r[key] = *value_p;
+  }
+  capture_ops::CaptureSaveOptions save_options;
+  if (auto *save_p = options.Find("save"); save_p && save_p->IsBool())
+    save_options.save = save_p->GetBool();
+  if (auto *dir_p = options.Find("save_dir");
+      dir_p && dir_p->IsString() && !dir_p->GetString().empty()) {
+    save_options.save_dir = dir_p->GetString();
+    save_options.save = true;
+  }
+  if (save_options.save) {
+    JV saved = capture_ops::save_capture_bytes(bytes, save_options);
+    if (saved.Contains("error"))
+      return saved;
+    r["saved_path"] = saved["saved_path"];
   }
   if (r.Dump().size() > GDA_MAX_JSON_RESPONSE_BYTES) {
     JV error = error_json("capture response exceeds the JSON response limit of " +
@@ -1148,7 +1163,8 @@ void on_session_ready(int32_t session_id) {
   }
 }
 
-mcp::JsonValue finalize_capture_response(const mcp::JsonValue &pending_result) {
+mcp::JsonValue finalize_capture_response(const mcp::JsonValue &pending_result,
+                                         const mcp::JsonValue &options) {
   if (pending_result.Contains("error"))
     return pending_result;
   if (!pending_result.IsObject())
@@ -1163,8 +1179,8 @@ mcp::JsonValue finalize_capture_response(const mcp::JsonValue &pending_result) {
   auto state = std::make_shared<MainThreadTaskState>();
   dispatch::BoundedWaitOutcome outcome = dispatch::run_bounded_on_main_thread(
       *queue, "capture file read", state,
-      [state, pending_result](MainThreadTaskState &st) {
-        st.result = read_capture_file(pending_result);
+      [state, pending_result, options](MainThreadTaskState &st) {
+        st.result = read_capture_file(pending_result, options);
       },
       GDA_DISPATCH_WAIT_DEFAULT_MS);
   if (outcome.timed_out) {

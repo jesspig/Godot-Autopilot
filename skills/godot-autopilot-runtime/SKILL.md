@@ -170,10 +170,15 @@ Three tools, three targets:
 - `capture_editor_viewport` — the default `target` `editor` grabs the editor
   2D viewport (falling back to the 3D viewport), so it works while you are
   still building a scene; `target` `game` captures the running game instead.
-  Add save=true on the editor target to also write the PNG into the plugin's
-  per-project capture folder (under the GDA home directory, not under the
-  Godot user data folder any more) and receive its path in the result; both
-  targets keep only the 20 most recent capture files.
+  `save=true` (or giving `save_dir`) applies to both targets: the PNG is
+  written into the GDA per-project capture folder by default (under the GDA
+  home directory, not the Godot user data folder), or into the given
+  `res://` directory inside the project root, and the result gains
+  `saved_path`; `save_dir` outside the project root / GDA captures folder is
+  rejected with `path rejected`. Saving requires the write capability; both
+  targets keep only the 20 most recent capture files. On the plain
+  `capture_game_viewport` the same `save`/`save_dir` parameters write a copy
+  after the editor reads the transport PNG back from the game.
 - `capture_display_screen` — a whole physical screen by `screen` index, for
   desktop-level checks such as window placement; no running game required.
 
@@ -198,6 +203,11 @@ decide when to shoot:
 - `when` — a GDScript expression evaluated once per rendered frame inside the
   game; the capture fires on the first frame where it is true. An empty
   string means no condition.
+
+The condition frame is reported as `when_satisfied_frame`; the image itself
+is read on the next rendered frame and reported as `captured_frame`
+(`captured_frame` > `when_satisfied_frame`), so the picture shows the state
+after the condition became true rather than the frame that evaluated it.
 
 Give both and the frame budget must be spent before the condition is even
 evaluated. `when` runs with the current scene as the base instance (the tree

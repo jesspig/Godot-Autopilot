@@ -54,6 +54,23 @@
         }
       },
       {
+        "id": "ui_create_hidden_label",
+        "tool": "create_scene_node",
+        "args": {
+          "name": "HiddenLabel",
+          "type": "Label",
+          "parent_path": "UiProbe",
+          "properties": {
+            "text": "Hidden",
+            "visible": false,
+            "offset_left": 10.0,
+            "offset_top": 10.0,
+            "offset_right": 110.0,
+            "offset_bottom": 40.0
+          }
+        }
+      },
+      {
         "id": "ui_save_scene",
         "tool": "save_editor_scene_as",
         "args": { "path": "res://gda_tmp_runtime/probe.tscn" }
@@ -83,6 +100,100 @@
                 { "key": "possibly_occluded_count", "value": 2 },
                 { "key": "issues", "not_empty": true },
                 { "key": "truncated", "value": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "save_validation",
+        "steps": [
+          {
+            "id": "game_save_dir_escape_rejected",
+            "tool": "capture_game_viewport",
+            "args": { "save_dir": "res://../gda_escape" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "path rejected: path escapes the namespace root" }
+              ]
+            }
+          },
+          {
+            "id": "game_save_wrong_type_rejected",
+            "tool": "capture_game_viewport",
+            "args": { "save": "true" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "invalid parameter: save must be a boolean" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "ui_filtering",
+        "steps": [
+          {
+            "id": "filter_text_play",
+            "tool": "get_game_ui_elements",
+            "args": { "filter": "play" },
+            "expect": {
+              "field_checks": [
+                { "key": "count", "value": 1 },
+                { "key": "truncated", "value": false }
+              ]
+            }
+          },
+          {
+            "id": "types_button_only",
+            "tool": "get_game_ui_elements",
+            "args": { "types": ["Button"] },
+            "expect": {
+              "field_checks": [
+                { "key": "count", "value": 1 }
+              ]
+            }
+          },
+          {
+            "id": "visible_only_skips_hidden",
+            "tool": "get_game_ui_elements",
+            "args": { "visible_only": true },
+            "expect": {
+              "field_checks": [
+                { "key": "count", "value": 3 }
+              ]
+            }
+          },
+          {
+            "id": "filter_hidden_label",
+            "tool": "get_game_ui_elements",
+            "args": { "filter": "hidden" },
+            "expect": {
+              "field_checks": [
+                { "key": "count", "value": 1 }
+              ]
+            }
+          },
+          {
+            "id": "types_label_only",
+            "tool": "get_game_ui_elements",
+            "args": { "types": ["Label"] },
+            "expect": {
+              "field_checks": [
+                { "key": "count", "value": 1 }
+              ]
+            }
+          },
+          {
+            "id": "truncated_after_filtering",
+            "tool": "get_game_ui_elements",
+            "args": { "types": ["Control", "Button", "CenterContainer", "Label"], "max_elements": 2 },
+            "expect": {
+              "field_checks": [
+                { "key": "count", "value": 2 },
+                { "key": "truncated", "value": true }
               ]
             }
           }
