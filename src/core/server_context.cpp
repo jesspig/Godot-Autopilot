@@ -31,6 +31,7 @@
 #include "core/api_surface.hpp"
 #include "core/api_token.hpp"
 #include "core/gda_home.hpp"
+#include "core/godot_transport.hpp"
 #include "core/http_transport.hpp"
 #include "core/http_transport_ext.hpp"
 #include "core/instance_guard.hpp"
@@ -295,8 +296,24 @@ bool ServerContext::start() {
                     static_cast<int64_t>(response->result.Dump().size()));
               } else if (const auto *error =
                              std::get_if<mcp::JsonRpcErrorResponse>(&message)) {
+                const std::string error_request_id =
+                    error->id ? monitor::request_id_text(*error->id)
+                              : std::string();
+                ErrorPathEvent path_event;
+                path_event.request_id = error_request_id;
+                path_event.error_code = static_cast<int>(error->error.code);
+                path_event.exception_type =
+                    classify_error_path_exception(error->error.message);
+                if (error->id) {
+                  const std::shared_ptr<GodotTransport> transport =
+                      godot_transport_instance();
+                  transport->pending_request_meta(
+                      mcp_wire::request_id_key(*error->id), path_event.method,
+                      path_event.connection_id);
+                }
+                log_error_path(path_event);
                 monitor::note_protocol_error(
-                    error->id ? monitor::request_id_text(*error->id) : std::string(),
+                    error_request_id,
                     static_cast<int64_t>(error->error.code),
                     error->error.message, 0);
               }
