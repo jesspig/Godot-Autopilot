@@ -1,6 +1,6 @@
 {
   "name": "csharp_bridge",
-  "description": "C# 反射桥（B-T4）的 L2 边界：csharp_get_property / csharp_set_property / csharp_call_method / csharp_subscribe_event / csharp_unsubscribe_event 五域工具的编辑器侧参数校验（定位器互斥、必填成员名、runtime 取值、game-only 选项隔离、args 形态），以及 locator 缺失覆盖（memory 不存在名的四段式定位错误 + build_csharp_assembly 工程探测），仿 23_click_ui_coords.json 的无游戏 error 写法。链路：before_all 用 create_editor_scene 建未落盘场景 CSharpBridgeProbe＋create_resource{type:TestTypes, name:csharp_probe_item} 注册内存探针（真调步改用 memory 定位器直达 TestTypes 实例；create_resource 需要运行中的编辑器已加载含 TestTypes 的 .NET 程序集，本机 mono 4.7.2 在程序集未预建时该步必然失败，故按 soft_error 降级为软失败，依据见文末降级依据段）→ ① 参数校验 30 步全部在 handler 入口返回精确错误串，不触及桥单例（定位器缺失/互斥、property/method/event/method/value/token 缺失、token 类型与正数、allow_non_public 类型、runtime 非法值、unknown parameter、timeout_ms/wait_ready 在 runtime=editor 下被拒、object_id/object_id_str 类型错误、memory:// 命名空间误用、memory 缺失的四段式定位错误、args 非数组/超 16 上限、runtime=game 下 timeout_ms 越界与 wait_ready 类型错误）→ ② locator 缺失覆盖：memory 不存在名在定位阶段返回四段式 memory-not-found 全串（position 随工具变化；定位先于桥单例获取，故 mono/非 mono 双稳；unsubscribe 无定位器，改覆 wait_ready 在 editor 下被拒的校验缺口）；runtime=game 合法定位在无游戏时经运行时通道返回 game not running 全串（csharp 转发不附加 runtime_game_ops 的 degradation hint，故只断言 error 单键）；build_csharp_assembly 探测返回 result.project_file == res://testbed.csproj 与 command 全串（started/pid 取决于 dotnet 是否可用，不断言）→ ②b allow_non_public 真调两步（默认读 _secret 精确错、显式开读到 7；定位改用 before_all 注册的 memory:csharp_probe_item，需 mono 真调通过）→ ②c 私有写三步（set 默认写 _secret 精确错、显式开写 ok、同条件读回 42；定位改用 memory:csharp_probe_item，需 mono；unsubscribe 真调解绑需前后 token 串联、L2 步骤间无传值故解绑链路走人工验证——同 runtime=game 缺 game_runtime 时 FAIL 的既有惯例）→ ②d call_method 反射口径四步（固定元数 GetOffset[2] 读回 result.x=2/result.y=4、params 打包 JoinAll[a,b,c] 得 a|b|c、空尾 JoinAll[] 得空串、泛型风格名 GdaGenericProbe[1] 锁定 no-overload 全串；定位改用 memory:csharp_probe_item，需 mono 真调通过）→ ③ cleanup save_editor_scene_as 落盘 res://gda_tmp_csharp_bridge/probe_root.tscn → close_editor_scene → move_os_file_to_trash 回收目录（与 35_scene_tree_gate 同一收尾口径）。前置条件：csharp_* 五工具受 code_execute capability 授权门保护（SpecTool::execute 集中检查，handler 校验之前），runtime=game 步骤另需 game_runtime，build_csharp_assembly 需 process（GODOT_AUTOPILOT_ALLOW env 或 user://godot_autopilot/config.json 的 allow 字段，env 优先），缺失时对应步骤返回 authorization required 而 FAIL。双态声明（重要）：本文件以 mono（.NET 编辑器，桥已按 skills/godot-autopilot-csharp/references/csharp-bridge.md 注册单例）为准；before_all 用 create_resource{type:TestTypes} 注册内存探针，标准编辑器无 .NET 时该步失败即整体 fatal（C# 全局类不可实例化，见 src/tools/resource_ops.cpp:instantiate_resource_class），10-21 起该步与依赖它的 9 个真调步按 soft_error 降级为软失败（依据见文末降级依据段），故 CI/标准编辑器下本文件不再逐项断言——参数校验与 locator 缺失两段本身不触桥、mono/非 mono 双稳。真调骨架（mono 验证）——csharp_get_property{memory:csharp_probe_item, property:ReadOnlyName} 取回 gda-probe、{property:Scores} 取回 Array、csharp_call_method{method:GetOffset, args:[2]} 取回 Vector2(2,4) 的序列化字典、csharp_subscribe_event{memory:csharp_probe_item, event:Pinged, target_path:CSharpBridgeProbe, method:_on_pinged} 取回 token 后调 RaisePinged(3) 在接收端观测到 3，csharp_unsubscribe_event{token:<subscribe 所得>} 解绑 ok、二次解绑报 unknown subscription token；allow_non_public 真调两步（同实例下 {property:_secret} 默认精确报 property '_secret' not found on TestTypes，{property:_secret, allow_non_public:true} 取回 7，csharp_set_property{property:_secret, value:42} 默认精确错 property '_secret' not found on TestTypes、{property:_secret, value:42, allow_non_public:true} 写 ok 后同条件读回 42）；测试床 TestTypes（tests/testbed/TestTypes.cs，[GlobalClass] Resource 派生、[Export] Array<int>、只读属性、返回 Vector2 struct 的方法、event Action<int>）与 testbed.csproj（net10 / PublishAot=false）即为该真调夹具，非 mono 下仅作 build 探测；成员 reflection 边界覆盖由 L1（csharp 桥单测）承担。【降级依据 2026-10-21 / Godot 4.7.2.stable.mono.official（ed1daf0bf）】create_resource{type:TestTypes} 报 failed to resolve the base type of global class script: res://TestTypes.cs (script may be invalid or its language is unavailable)：源类由本用例 before_all 在编辑器运行中新建并交 build_csharp_assembly 编译，而 .NET 程序集须在编辑器启动时即被加载（GDExtension 无公共 API 触发 modules/mono 内部的热重载，见 docs/wiki/conventions.md 的 C# 程序集热重载条），故运行期新建的 C# 全局类在当次会话内不可实例化；叠加 build_csharp_assembly 把 res://testbed.csproj 原样交给 dotnet（dotnet 侧 MSB1009，exit_code=1，编译未发生），会话内更无程序集可用。此为 Godot .NET 程序集装载时序的上游边界，非 GDA 资源创建路径缺陷（src/tools/resource_ops.cpp:instantiate_resource_class 在本分支未改动，develop 分支同环境复跑同样失败）。处置：create_resource 步与依赖该探针的 9 个真调步各自声明 soft_error（前缀分别为 failed to resolve the base type of global class script: res://TestTypes.cs 与 memory resource 'csharp_probe_item' not found），命中前缀即记为软失败并继续，既不致命也不掩盖其它错误（文本不匹配的失败仍判硬失败）；30 步参数校验、7 步 locator 缺失与 cleanup 断言一字未改。恢复全绿的条件：编辑器启动前测试床 C# 程序集已含 TestTypes（实测先 dotnet build tests/testbed/testbed.csproj 产出 .godot/mono/temp/bin/Debug/GDA Testbed.dll，同用例 51 步全通过），即先在测试床执行 dotnet build 再跑本用例；或修好 build_csharp_assembly 的 res:// 路径解析，并由用户在编辑器点 Build 或重启编辑器加载新程序集。",
+  "description": "C# 反射桥（B-T4）的 L2 边界：csharp_get_property / csharp_set_property / csharp_call_method / csharp_subscribe_event / csharp_unsubscribe_event 五域工具的编辑器侧参数校验（定位器互斥、必填成员名、runtime 取值、game-only 选项隔离、args 形态），以及 locator 缺失覆盖（memory 不存在名的四段式定位错误 + build_csharp_assembly 工程探测），仿 23_click_ui_coords.json 的无游戏 error 写法。链路：before_all 用 create_editor_scene 建未落盘场景 CSharpBridgeProbe＋create_resource{type:TestTypes, name:csharp_probe_item} 注册内存探针（真调步改用 memory 定位器直达 TestTypes 实例；create_resource 需要运行中的编辑器已加载含 TestTypes 的 .NET 程序集，本机 mono 4.7.2 在程序集未预建时该步必然失败，故按 soft_error 降级为软失败，依据见文末降级依据段）→ ① 参数校验 30 步全部在 handler 入口返回精确错误串，不触及桥单例（定位器缺失/互斥、property/method/event/method/value/token 缺失、token 类型与正数、allow_non_public 类型、runtime 非法值、unknown parameter、timeout_ms/wait_ready 在 runtime=editor 下被拒、object_id/object_id_str 类型错误、memory:// 命名空间误用、memory 缺失的四段式定位错误、args 非数组/超 16 上限、runtime=game 下 timeout_ms 越界与 wait_ready 类型错误）→ ② locator 缺失覆盖：memory 不存在名在定位阶段返回四段式 memory-not-found 全串（position 随工具变化；定位先于桥单例获取，故 mono/非 mono 双稳；unsubscribe 无定位器，改覆 wait_ready 在 editor 下被拒的校验缺口）；runtime=game 合法定位在无游戏时经运行时通道返回 game not running 全串（csharp 转发不附加 runtime_game_ops 的 degradation hint，故只断言 error 单键）；build_csharp_assembly 探测返回 result.project_file == res://testbed.csproj 与 command 全串（started/pid 取决于 dotnet 是否可用，不断言）→ ②b allow_non_public 真调两步（默认读 _secret 精确错、显式开读到 7；定位改用 before_all 注册的 memory:csharp_probe_item，需 mono 真调通过）→ ②c 私有写三步（set 默认写 _secret 精确错、显式开写 ok、同条件读回 42；定位改用 memory:csharp_probe_item，需 mono；unsubscribe 真调解绑需前后 token 串联、L2 步骤间无传值故解绑链路走人工验证——同 runtime=game 缺 game_runtime 时 FAIL 的既有惯例）→ ②d call_method 反射口径四步（固定元数 GetOffset[2] 读回 result.x=2/result.y=4、params 打包 JoinAll[a,b,c] 得 a|b|c、空尾 JoinAll[] 得空串、泛型风格名 GdaGenericProbe[1] 锁定 no-overload 全串；定位改用 memory:csharp_probe_item，需 mono 真调通过）→ ③ cleanup save_editor_scene_as 落盘 res://gda_tmp_csharp_bridge/probe_root.tscn → close_editor_scene → move_os_file_to_trash 回收目录（与 35_scene_tree_gate 同一收尾口径）。前置条件：csharp_* 五工具受 code_execute capability 授权门保护（SpecTool::execute 集中检查，handler 校验之前），runtime=game 步骤另需 game_runtime，build_csharp_assembly 需 process（GODOT_AUTOPILOT_ALLOW env 或 user://godot_autopilot/config.json 的 allow 字段，env 优先），缺失时对应步骤返回 authorization required 而 FAIL。双态声明（重要）：本文件以 mono（.NET 编辑器，桥已按 skills/godot-autopilot-csharp/references/csharp-bridge.md 注册单例）为准；before_all 用 create_resource{type:TestTypes} 注册内存探针，标准编辑器无 .NET 时该步失败即整体 fatal（C# 全局类不可实例化，见 src/tools/resource_ops.cpp:instantiate_resource_class），10-21 起该步与依赖它的 9 个真调步按 soft_error 降级为软失败（依据见文末降级依据段），故 CI/标准编辑器下本文件不再逐项断言——参数校验与 locator 缺失两段本身不触桥、mono/非 mono 双稳。真调骨架（mono 验证）——csharp_get_property{memory:csharp_probe_item, property:ReadOnlyName} 取回 gda-probe、{property:Scores} 取回 Array、csharp_call_method{method:GetOffset, args:[2]} 取回 Vector2(2,4) 的序列化字典、csharp_subscribe_event{memory:csharp_probe_item, event:Pinged, target_path:CSharpBridgeProbe, method:_on_pinged} 取回 token 后调 RaisePinged(3) 在接收端观测到 3，csharp_unsubscribe_event{token:<subscribe 所得>} 解绑 ok、二次解绑报 unknown subscription token；allow_non_public 真调两步（同实例下 {property:_secret} 默认精确报 property '_secret' not found on TestTypes，{property:_secret, allow_non_public:true} 取回 7，csharp_set_property{property:_secret, value:42} 默认精确错 property '_secret' not found on TestTypes、{property:_secret, value:42, allow_non_public:true} 写 ok 后同条件读回 42）；测试床 TestTypes（tests/testbed/TestTypes.cs，[GlobalClass] Resource 派生、[Export] Array<int>、只读属性、返回 Vector2 struct 的方法、event Action<int>）与 testbed.csproj（net10 / PublishAot=false）即为该真调夹具，非 mono 下仅作 build 探测；成员 reflection 边界覆盖由 L1（csharp 桥单测）承担。【降级依据 2026-10-21 / Godot 4.7.2.stable.mono.official（ed1daf0bf）】create_resource{type:TestTypes} 报 failed to resolve the base type of global class script: res://TestTypes.cs (script may be invalid or its language is unavailable)：源类由本用例 before_all 在编辑器运行中新建并交 build_csharp_assembly 编译，而 .NET 程序集须在编辑器启动时即被加载（GDExtension 无公共 API 触发 modules/mono 内部的热重载，见 docs/wiki/conventions.md 的 C# 程序集热重载条），故运行期新建的 C# 全局类在当次会话内不可实例化；叠加 build_csharp_assembly 把 res://testbed.csproj 原样交给 dotnet（dotnet 侧 MSB1009，exit_code=1，编译未发生），会话内更无程序集可用。此为 Godot .NET 程序集装载时序的上游边界，非 GDA 资源创建路径缺陷（src/tools/resource_ops.cpp:instantiate_resource_class 在本分支未改动，develop 分支同环境复跑同样失败）。处置：create_resource 步与依赖该探针的 9 个真调步各自声明 soft_error（前缀分别为 failed to resolve the base type of global class script: res://TestTypes.cs 与 memory resource 'csharp_probe_item' not found），命中前缀即记为软失败并继续，既不致命也不掩盖其它错误（文本不匹配的失败仍判硬失败）；30 步参数校验、7 步 locator 缺失与 cleanup 断言一字未改。恢复全绿的条件：编辑器启动前测试床 C# 程序集已含 TestTypes（实测先 dotnet build tests/testbed/testbed.csproj 产出 .godot/mono/temp/bin/Debug/GDA Testbed.dll，同用例 51 步全通过），即先在测试床执行 dotnet build 再跑本用例；或修好 build_csharp_assembly 的 res:// 路径解析，并由用户在编辑器点 Build 或重启编辑器加载新程序集。T-24/T-25 增补（支线 07 本轮）：list_members_filter 为纯编辑器侧（不需要 bridge / 不依赖 mono 程序集）的过滤分页验证：默认调用断言 result.counts.total/returned 与 result.truncated 存在且 methods 非空；kind=property+name_contains=visible 对 Node2D 精确命中 1 条（counts.properties=1 / counts.methods=0 / counts.signals=0 / counts.total=1 / counts.returned=1 / truncated=false）；kind=property+limit=2+offset=1 断言 counts.returned=2 且 truncated=true（属性总数大于 3）；offset=10000 断言 counts.returned=0 且 truncated=false；kind=method+limit=1 断言 counts.returned=1 且 properties/signals 计数为 0；kind=signal+limit=1000 断言 truncated=false；另加 8 步参数校验（kind 非法串/非字符串、limit 0/1001/字符串、offset 负数、name_contains 空串、未知参数）在进入 reflection 前返回精确错误。game_bridge_missing 验证缺桥错误载荷与可执行片段：save_editor_scene_as 落盘 CSharpBridgeProbe → play_editor_current_scene 启动游戏 → csharp_get_property{runtime:game} 断言缺桥错误含 error / suggested_action / execute_game_script.source_code（片段即 load res://addons/godot-autopilot/GdaCSharpRuntime.cs → new → add_child 到 /root，可直接交给 execute_game_script 执行）→ 用 execute_game_script 执行同源片段断言 ok/bridge_created/bridge_ready=true；该步在 .NET 程序集未含 GdaCSharpRuntime 时按 soft_error 前缀 failed to 记软失败（片段自身错误以该前缀开头）；cleanup 首步补 stop_editor_playing 保证游戏被停止。T-26（ensure_csharp_bridge 一键就绪）为条件任务：D-08 建议 B 档（只做错误片段），本阶段不实施自动注入执行路径，仅在计划分册 07 §5 登记状态机设计（S-17 至 S-21），验收-34 记 N/A。【L2 首次运行修复 2026-10-30】list_name_contains_visible 首跑失败（result.properties=[]）：根因是 before_all 的 create_editor_scene 未传 type，根节点默认是普通 Node——Godot 4.7 ClassDB 里 Node 链仅 14 个属性且不含 visible，过滤结果必然为空。修复：before_all 传 type=Node2D（create_editor_scene 支持 type，必须是 Node 子类）。依据 third_party/godot-cpp/gdextension/extension_api-4-7.json 的 ClassDB 表（Godot 4.7.2），Node2D→CanvasItem→Node→Object 链合计属性 42（Node2D 12 / CanvasItem 16 / Node 14 / Object 0）、方法 309（33/94/133/49）、信号 17（0/4/11/2）；属性名含 visible 的只有 visible 一条（visibility_layer 不含 visible 子串）。据此同步收紧断言：默认页 kind=all、limit=200 → returned=200 且 truncated=true（方法 309>200，页面全为方法）；kind=property+name_contains=visible → counts.properties=1 / counts.total=1 / counts.returned=1 / truncated=false；kind=property 总数 42>3（limit2+offset1 → returned=2、truncated=true）；offset=10000>42 → returned=0、truncated=false；kind=method 总数 309>1（limit1 → returned=1、truncated=true）；kind=signal 总数 17<1000 → truncated=false。属性/方法/信号表来自引擎 ClassDB，运行期 get_property_list/get_method_list/get_signal_list 同源；无脚本节点不含 script 属性，可见计数不受影响。",
   "headless": true,
   "requires": ["write", "code_execute", "process", "game_runtime"],
   "pipeline": {
@@ -24,7 +24,7 @@
       {
         "id": "csharp_before_scene",
         "tool": "create_editor_scene",
-        "args": { "name": "CSharpBridgeProbe" }
+        "args": { "type": "Node2D", "name": "CSharpBridgeProbe" }
       },
       {
         "id": "csharp_before_probe_item",
@@ -572,8 +572,241 @@
         ]
       },
       {
+        "id": "list_members_filter",
+        "steps": [
+          {
+            "id": "list_default_page",
+            "tool": "csharp_list_members",
+            "args": { "path": "CSharpBridgeProbe" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.methods", "not_empty": true },
+                { "key": "result.counts.total", "not_empty": true },
+                { "key": "result.counts.returned", "value": 200 },
+                { "key": "result.truncated", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "list_name_contains_visible",
+            "tool": "csharp_list_members",
+            "args": { "path": "CSharpBridgeProbe", "kind": "property", "name_contains": "visible" },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result.properties", "not_empty": true },
+                { "key": "result.counts.methods", "value": 0 },
+                { "key": "result.counts.properties", "value": 1 },
+                { "key": "result.counts.signals", "value": 0 },
+                { "key": "result.counts.total", "value": 1 },
+                { "key": "result.counts.returned", "value": 1 },
+                { "key": "result.truncated", "value": false }
+              ]
+            }
+          },
+          {
+            "id": "list_limit_offset_slice",
+            "tool": "csharp_list_members",
+            "args": { "path": "CSharpBridgeProbe", "kind": "property", "limit": 2, "offset": 1 },
+            "expect": {
+              "field_checks": [
+                { "key": "result.counts.methods", "value": 0 },
+                { "key": "result.counts.signals", "value": 0 },
+                { "key": "result.counts.returned", "value": 2 },
+                { "key": "result.truncated", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "list_offset_past_end",
+            "tool": "csharp_list_members",
+            "args": { "path": "CSharpBridgeProbe", "kind": "property", "limit": 5, "offset": 10000 },
+            "expect": {
+              "field_checks": [
+                { "key": "result.counts.returned", "value": 0 },
+                { "key": "result.truncated", "value": false }
+              ]
+            }
+          },
+          {
+            "id": "list_limit_one_method",
+            "tool": "csharp_list_members",
+            "args": { "path": "CSharpBridgeProbe", "kind": "method", "limit": 1 },
+            "expect": {
+              "field_checks": [
+                { "key": "result.counts.methods", "not_empty": true },
+                { "key": "result.counts.properties", "value": 0 },
+                { "key": "result.counts.signals", "value": 0 },
+                { "key": "result.counts.returned", "value": 1 },
+                { "key": "result.truncated", "value": true }
+              ]
+            }
+          },
+          {
+            "id": "list_large_limit_signal",
+            "tool": "csharp_list_members",
+            "args": { "path": "CSharpBridgeProbe", "kind": "signal", "limit": 1000 },
+            "expect": {
+              "field_checks": [
+                { "key": "result.counts.methods", "value": 0 },
+                { "key": "result.counts.properties", "value": 0 },
+                { "key": "result.truncated", "value": false }
+              ]
+            }
+          },
+          {
+            "id": "list_bad_kind",
+            "tool": "csharp_list_members",
+            "args": { "path": "CSharpBridgeProbe", "kind": "field" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "kind must be method|property|signal|all" }
+              ]
+            }
+          },
+          {
+            "id": "list_kind_type",
+            "tool": "csharp_list_members",
+            "args": { "path": "CSharpBridgeProbe", "kind": 1 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "kind must be a string (method|property|signal|all)" }
+              ]
+            }
+          },
+          {
+            "id": "list_limit_zero",
+            "tool": "csharp_list_members",
+            "args": { "path": "CSharpBridgeProbe", "limit": 0 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "limit must be an integer between 1 and 1000" }
+              ]
+            }
+          },
+          {
+            "id": "list_limit_over_max",
+            "tool": "csharp_list_members",
+            "args": { "path": "CSharpBridgeProbe", "limit": 1001 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "limit must be an integer between 1 and 1000" }
+              ]
+            }
+          },
+          {
+            "id": "list_limit_type",
+            "tool": "csharp_list_members",
+            "args": { "path": "CSharpBridgeProbe", "limit": "3" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "limit must be an integer between 1 and 1000" }
+              ]
+            }
+          },
+          {
+            "id": "list_offset_negative",
+            "tool": "csharp_list_members",
+            "args": { "path": "CSharpBridgeProbe", "offset": -1 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "offset must be a non-negative integer" }
+              ]
+            }
+          },
+          {
+            "id": "list_name_contains_empty",
+            "tool": "csharp_list_members",
+            "args": { "path": "CSharpBridgeProbe", "name_contains": "" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "name_contains must be a non-empty string" }
+              ]
+            }
+          },
+          {
+            "id": "list_unknown_param",
+            "tool": "csharp_list_members",
+            "args": { "path": "CSharpBridgeProbe", "bogus": 1 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "unknown parameter for csharp_list_members: bogus" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "game_bridge_missing",
+        "steps": [
+          {
+            "id": "bridge_save_scene",
+            "tool": "save_editor_scene_as",
+            "args": { "path": "res://gda_tmp_csharp_bridge/probe_root.tscn" },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": "saved" }
+              ]
+            }
+          },
+          {
+            "id": "bridge_play_scene",
+            "tool": "play_editor_current_scene",
+            "args": {},
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "bridge_missing_error_payload",
+            "tool": "csharp_get_property",
+            "args": { "path": "CSharpBridgeProbe", "property": "ReadOnlyName", "runtime": "game", "timeout_ms": 10000 },
+            "expect": {
+              "has_keys": ["error", "suggested_action", "execute_game_script"],
+              "field_checks": [
+                { "key": "error", "not_empty": true },
+                { "key": "suggested_action", "not_empty": true },
+                { "key": "execute_game_script.source_code", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "bridge_repair_snippet_creates_bridge",
+            "tool": "execute_game_script",
+            "args": { "action": "script", "timeout_ms": 10000, "source_code": "var __gda_bridge_script = load(\"res://addons/godot-autopilot/GdaCSharpRuntime.cs\")\nif __gda_bridge_script == null:\n    return {\"ok\": false, \"error\": \"failed to load res://addons/godot-autopilot/GdaCSharpRuntime.cs; deploy the addon and build the .NET assembly first\"}\nvar __gda_bridge_node = __gda_bridge_script.new()\nif __gda_bridge_node == null:\n    return {\"ok\": false, \"error\": \"failed to instantiate GdaCSharpRuntime; the running game assembly does not contain it yet — run build_csharp_assembly and restart the game\"}\n__gda_bridge_node.name = \"GdaCSharpRuntime\"\nget_tree().root.add_child(__gda_bridge_node)\nreturn {\"ok\": true, \"bridge_created\": true, \"bridge_ready\": get_tree().root.find_child(\"__gda_runtime\", true, false) != null}\n" },
+            "soft_error": "failed to ",
+            "expect": {
+              "has_keys": ["ok", "bridge_created", "bridge_ready"],
+              "field_checks": [
+                { "key": "ok", "value": true },
+                { "key": "bridge_created", "value": true },
+                { "key": "bridge_ready", "value": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
         "id": "cleanup",
         "steps": [
+          {
+            "id": "csharp_stop_playing",
+            "tool": "stop_editor_playing",
+            "args": {},
+            "expect": { "has_keys": ["result"] }
+          },
           {
             "id": "csharp_save_scene",
             "tool": "save_editor_scene_as",

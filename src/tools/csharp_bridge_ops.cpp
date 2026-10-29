@@ -24,6 +24,7 @@
 #include <godot_cpp/variant/variant.hpp>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace godot_autopilot {
 namespace csharp_bridge_ops {
@@ -37,6 +38,8 @@ constexpr const char *kBridgeScriptPath =
     "res://addons/godot-autopilot/GdaCSharpBridge.cs";
 constexpr const char *kBridgeHolderNode = "__gda_runtime";
 constexpr size_t kMaxCallArgs = 16;
+constexpr int64_t kMemberListDefaultLimit = 200;
+constexpr int64_t kMemberListMaxLimit = 1000;
 
 struct CSharpTarget {
   bool ok = false;
@@ -456,18 +459,52 @@ std::string gdscript_escape(const std::string &text) {
   return out;
 }
 
+std::string bridge_repair_source() {
+  std::string s;
+  s += "var __gda_bridge_script = "
+       "load(\"res://addons/godot-autopilot/GdaCSharpRuntime.cs\")\n";
+  s += "if __gda_bridge_script == null:\n";
+  s += "    return {\"ok\": false, \"error\": \"failed to load "
+       "res://addons/godot-autopilot/GdaCSharpRuntime.cs; deploy the addon and "
+       "build the .NET assembly first\"}\n";
+  s += "var __gda_bridge_node = __gda_bridge_script.new()\n";
+  s += "if __gda_bridge_node == null:\n";
+  s += "    return {\"ok\": false, \"error\": \"failed to instantiate "
+       "GdaCSharpRuntime; the running game assembly does not contain it yet — "
+       "run build_csharp_assembly and restart the game\"}\n";
+  s += "__gda_bridge_node.name = \"GdaCSharpRuntime\"\n";
+  s += "get_tree().root.add_child(__gda_bridge_node)\n";
+  s += "return {\"ok\": true, \"bridge_created\": true, \"bridge_ready\": "
+       "get_tree().root.find_child(\"" +
+       std::string(kBridgeHolderNode) + "\", true, false) != null}\n";
+  return s;
+}
+
+std::string emit_bridge_missing_return(const std::string &detail) {
+  std::string s;
+  s += "return {\"ok\": false, \"error\": \"csharp bridge not found in the "
+       "running game: " + detail + "\", \"suggested_action\": \"add the "
+       "GdaCSharpRuntime bridge to the running game by executing the "
+       "execute_game_script.source_code snippet (it loads "
+       "res://addons/godot-autopilot/GdaCSharpRuntime.cs and adds it to the "
+       "scene root), or add a GdaCSharpRuntime node to the game scene and "
+       "relaunch\", \"execute_game_script\": {\"source_code\": \"" +
+       gdscript_escape(bridge_repair_source()) + "\"}}\n";
+  return s;
+}
+
 std::string emit_bridge_header() {
   std::string s;
   s += "var __gda_holder = get_tree().root.find_child(\"" +
        std::string(kBridgeHolderNode) + "\", true, false)\n";
   s += "if __gda_holder == null:\n";
-  s += "    return {\"ok\": false, \"error\": \"csharp bridge not found in "
-       "the running game: no __gda_runtime node (add GdaCSharpRuntime to the "
-       "game scene and run a .NET game build)\"}\n";
+  s += "    " + emit_bridge_missing_return(
+      "no __gda_runtime node (add GdaCSharpRuntime to the game scene and run a "
+      ".NET game build)");
   s += "if not __gda_holder.has_meta(\"bridge\"):\n";
-  s += "    return {\"ok\": false, \"error\": \"csharp bridge not found in "
-       "the running game: __gda_runtime node has no bridge meta "
-       "(GdaCSharpRuntime._Ready did not run)\"}\n";
+  s += "    " + emit_bridge_missing_return(
+      "__gda_runtime node has no bridge meta (GdaCSharpRuntime._Ready did not "
+      "run)");
   s += "var __gda_bridge = __gda_holder.get_meta(\"bridge\")\n";
   return s;
 }
@@ -533,8 +570,139 @@ constexpr const char *kUnsubscribeAllowed[] = {
     "token", "runtime", "timeout_ms", "wait_ready"};
 
 constexpr const char *kListAllowed[] = {
-    "object_id", "object_id_str", "memory", "path", "runtime",
-    "timeout_ms",  "wait_ready"};
+    "object_id", "object_id_str", "memory", "path",     "kind",
+    "name_contains", "limit",    "offset", "runtime",  "timeout_ms",
+    "wait_ready"};
+
+std::string lowercase_ascii(std::string text) {
+  for (char &c : text) {
+    if (c >= 'A' && c <= 'Z')
+      c = static_cast<char>(c + ('a' - 'A'));
+  }
+  return text;
+}
+
+std::string csharp_member_name(const godot::Dictionary &item) {
+  if (!item.has("name"))
+    return "";
+  return util::to_std(item["name"].operator godot::String());
+}
+
+bool csharp_kind_included(const std::string &kind, const char *table) {
+  return kind == "all" || kind == table;
+}
+
+bool csharp_name_matches(const std::string &name_lower,
+                         const std::string &needle_lower) {
+  return needle_lower.empty() ||
+         name_lower.find(needle_lower) != std::string::npos;
+}
+
+JV serialize_member_page(const std::vector<godot::Dictionary> &page) {
+  JV arr(JV::array_tag);
+  for (const godot::Dictionary &item : page)
+    arr.PushBack(VariantJson::serialize(godot::Variant(item)));
+  return arr;
+}
+
+JV build_csharp_member_page(godot::Object *obj, const std::string &kind,
+                            const std::string &needle_lower, int64_t limit,
+                            int64_t offset) {
+  godot::TypedArray<godot::Dictionary> methods = obj->get_method_list();
+  godot::TypedArray<godot::Dictionary> props = obj->get_property_list();
+  godot::TypedArray<godot::Dictionary> signals = obj->get_signal_list();
+  godot::TypedArray<godot::Dictionary> *tables[3] = {&methods, &props, &signals};
+  const char *table_kinds[3] = {"method", "property", "signal"};
+  std::vector<godot::Dictionary> filtered[3];
+  for (int t = 0; t < 3; t++) {
+    if (!csharp_kind_included(kind, table_kinds[t]))
+      continue;
+    const int64_t count = tables[t]->size();
+    for (int64_t i = 0; i < count; i++) {
+      godot::Dictionary item = (*tables[t])[i];
+      if (csharp_name_matches(
+              lowercase_ascii(csharp_member_name(item)), needle_lower))
+        filtered[t].push_back(item);
+    }
+  }
+  const int64_t counts[3] = {static_cast<int64_t>(filtered[0].size()),
+                             static_cast<int64_t>(filtered[1].size()),
+                             static_cast<int64_t>(filtered[2].size())};
+  const int64_t total = counts[0] + counts[1] + counts[2];
+  std::vector<godot::Dictionary> pages[3];
+  int64_t cursor = 0;
+  int64_t returned = 0;
+  for (int t = 0; t < 3; t++) {
+    for (const godot::Dictionary &item : filtered[t]) {
+      if (cursor >= offset && returned < limit) {
+        pages[t].push_back(item);
+        ++returned;
+      }
+      ++cursor;
+    }
+  }
+  JV counts_json(JV::object_tag);
+  counts_json["methods"] = JV(counts[0]);
+  counts_json["properties"] = JV(counts[1]);
+  counts_json["signals"] = JV(counts[2]);
+  counts_json["returned"] = JV(returned);
+  counts_json["total"] = JV(total);
+  const bool truncated = offset < total && total > offset + returned;
+  JV members(JV::object_tag);
+  members["methods"] = serialize_member_page(pages[0]);
+  members["properties"] = serialize_member_page(pages[1]);
+  members["signals"] = serialize_member_page(pages[2]);
+  members["counts"] = std::move(counts_json);
+  members["truncated"] = JV(truncated);
+  return members;
+}
+
+std::string emit_list_filter_source(const std::string &kind,
+                                    const std::string &needle_lower,
+                                    int64_t limit, int64_t offset) {
+  auto append_filter = [](std::string &s, const char *list_fn,
+                          const char *out_var, const char *table_kind) {
+    s += "var " + std::string(out_var) + " = []\n";
+    s += "if __gda_kind == \"all\" or __gda_kind == \"" +
+         std::string(table_kind) + "\":\n";
+    s += "    for __gda_item in __gda_target." + std::string(list_fn) + "():\n";
+    s += "        if __gda_needle == \"\" or "
+         "String(__gda_item.get(\"name\", \"\")).to_lower().find("
+         "__gda_needle) != -1:\n";
+    s += "            " + std::string(out_var) + ".append(__gda_item)\n";
+  };
+  std::string s;
+  s += "var __gda_kind = \"" + gdscript_escape(kind) + "\"\n";
+  s += "var __gda_needle = \"" + gdscript_escape(needle_lower) + "\"\n";
+  s += "var __gda_limit = " + std::to_string(limit) + "\n";
+  s += "var __gda_offset = " + std::to_string(offset) + "\n";
+  append_filter(s, "get_method_list", "__gda_methods", "method");
+  append_filter(s, "get_property_list", "__gda_props", "property");
+  append_filter(s, "get_signal_list", "__gda_signals", "signal");
+  s += "var __gda_total = __gda_methods.size() + __gda_props.size() + "
+       "__gda_signals.size()\n";
+  s += "var __gda_cursor = 0\n";
+  s += "var __gda_returned = 0\n";
+  s += "var __gda_methods_page = []\n";
+  s += "var __gda_props_page = []\n";
+  s += "var __gda_signals_page = []\n";
+  s += "for __gda_pair in [[__gda_methods, __gda_methods_page], "
+       "[__gda_props, __gda_props_page], [__gda_signals, "
+       "__gda_signals_page]]:\n";
+  s += "    for __gda_item in __gda_pair[0]:\n";
+  s += "        if __gda_cursor >= __gda_offset and __gda_returned < "
+       "__gda_limit:\n";
+  s += "            __gda_pair[1].append(__gda_item)\n";
+  s += "            __gda_returned += 1\n";
+  s += "        __gda_cursor += 1\n";
+  s += "return {\"methods\": __gda_methods_page, \"properties\": "
+       "__gda_props_page, \"signals\": __gda_signals_page, \"counts\": "
+       "{\"methods\": __gda_methods.size(), \"properties\": "
+       "__gda_props.size(), \"signals\": __gda_signals.size(), "
+       "\"returned\": __gda_returned, \"total\": __gda_total}, "
+       "\"truncated\": __gda_total > __gda_offset + __gda_returned}\n";
+  return s;
+}
 
 } // namespace
 
@@ -959,6 +1127,41 @@ mcp::JsonValue handle_csharp_list(const mcp::JsonValue &args) {
   if (!parse_game_options(args, tool, is_game, timeout_ms, wait_ready, err)) {
     return err;
   }
+  std::string kind = "all";
+  if (const JV *kind_p = args.Find("kind")) {
+    if (!kind_p->IsString()) {
+      return util::error_json(
+          "kind must be a string (method|property|signal|all)");
+    }
+    kind = kind_p->GetString();
+    if (kind != "method" && kind != "property" && kind != "signal" &&
+        kind != "all") {
+      return util::error_json("kind must be method|property|signal|all");
+    }
+  }
+  std::string name_contains;
+  if (const JV *name_p = args.Find("name_contains")) {
+    if (!name_p->IsString() || name_p->GetString().empty()) {
+      return util::error_json("name_contains must be a non-empty string");
+    }
+    name_contains = lowercase_ascii(name_p->GetString());
+  }
+  int64_t limit = kMemberListDefaultLimit;
+  if (const JV *limit_p = args.Find("limit")) {
+    if (!limit_p->IsInt() || limit_p->GetInt() < 1 ||
+        limit_p->GetInt() > kMemberListMaxLimit) {
+      return util::error_json("limit must be an integer between 1 and " +
+                              std::to_string(kMemberListMaxLimit));
+    }
+    limit = limit_p->GetInt();
+  }
+  int64_t offset = 0;
+  if (const JV *offset_p = args.Find("offset")) {
+    if (!offset_p->IsInt() || offset_p->GetInt() < 0) {
+      return util::error_json("offset must be a non-negative integer");
+    }
+    offset = offset_p->GetInt();
+  }
   CSharpTarget target = resolve_locator(args, "", tool);
   if (!target.ok) {
     return target.error;
@@ -974,10 +1177,7 @@ mcp::JsonValue handle_csharp_list(const mcp::JsonValue &args) {
       return locator_err;
     }
     std::string source = emit_resolve_node("__gda_target", target.scene_path);
-    source += "var __gda_methods = __gda_target.get_method_list()\n";
-    source += "var __gda_props = __gda_target.get_property_list()\n";
-    source += "var __gda_signals = __gda_target.get_signal_list()\n";
-    source += "return {\"methods\": __gda_methods, \"properties\": __gda_props, \"signals\": __gda_signals}\n";
+    source += emit_list_filter_source(kind, name_contains, limit, offset);
     return forward_game_eval(source, timeout_ms, wait_ready);
   }
   if (!resolve_editor_object(target).IsNull()) {
@@ -987,30 +1187,9 @@ mcp::JsonValue handle_csharp_list(const mcp::JsonValue &args) {
   if (!obj) {
     return util::error_json("node not found: " + target.scene_path);
   }
-  godot::TypedArray<godot::Dictionary> methods = obj->get_method_list();
-  godot::TypedArray<godot::Dictionary> props = obj->get_property_list();
-  godot::TypedArray<godot::Dictionary> signals = obj->get_signal_list();
-  JV jmethods(JV::array_tag);
-  for (int64_t i = 0; i < methods.size(); i++) {
-    godot::Dictionary d = methods[i];
-    jmethods.PushBack(VariantJson::serialize(godot::Variant(d)));
-  }
-  JV jprops(JV::array_tag);
-  for (int64_t i = 0; i < props.size(); i++) {
-    godot::Dictionary d = props[i];
-    jprops.PushBack(VariantJson::serialize(godot::Variant(d)));
-  }
-  JV jsignals(JV::array_tag);
-  for (int64_t i = 0; i < signals.size(); i++) {
-    godot::Dictionary d = signals[i];
-    jsignals.PushBack(VariantJson::serialize(godot::Variant(d)));
-  }
-  JV members(JV::object_tag);
-  members["methods"] = std::move(jmethods);
-  members["properties"] = std::move(jprops);
-  members["signals"] = std::move(jsignals);
   JV lr(JV::object_tag);
-  lr["result"] = std::move(members);
+  lr["result"] = build_csharp_member_page(obj, kind, name_contains, limit,
+                                          offset);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "csharp_list_members completed");
   return lr;
