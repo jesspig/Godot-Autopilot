@@ -10,7 +10,7 @@ tags:
   - MCP
   - REST
   - 控制面
-timestamp: "2026-10-23T02:37:06+08:00"
+timestamp: "2026-10-30T04:17:36+08:00"
 resource:
   - cli/
   - package.json
@@ -19,9 +19,10 @@ resource:
 
 # CLI 载体（`cli/`，命令 `gda`）
 
+> 审计日期：2026-10-30（**10-30 随三轮 e2e 修复批次同步——`gda list` 合并插件实例索引并新增可选端口探测**：输出项新增 `source`（`cli`|`plugin`|`probe`）与统一 `live` 字段；CLI 登记按 `pid`/`port` 去重后并入插件全局实例索引中的存活记录（`source=plugin`，id 为插件 `instance_id`，`startedAt` 由 epoch ms 转 ISO）；`--probe <port>` 只探测指定端口（不做盲扫），命中追加 `source=probe` 条目；空列表提示改为「无 CLI/插件实例；加 `--probe <port>` 可探测指定端口」。CLI TS 单测 17→**18** 文件（新增 `list.test.ts` 13 项），运行期项数以 `bun test cli/tests` 实测为准）
 > 审计日期：2026-10-23（**10-23 随控制面文档同步批次同步**——命令总数 12→**14**：新增 [`restart`](../../../cli/src/commands/restart.ts) 与 [`serve`](../../../cli/src/commands/serve.ts)；`serve` 是**纯代理**（不复制工具语义），新增「控制面（`gda serve`）」与 `restart` 两小节，写全监听与绑定约束、路由表、认证与令牌文件、转发与流式透传、日志口径与已知限制；控制面端口 9700 与实例端口的分工见 [端口与实例登记](ports.md)「控制面端口」；CLI TS 单测 193→**257**（12→**16** 文件，Windows 跳过 2 项，实测 255 pass / 2 skip）；覆盖范围同步 `src/serve/` 3 个 .ts 与 `src/commands/` 17 个 .ts；**10-23 随真机冒烟缺陷修复校订**——控制面 `/i/<ref>` 寻址补全为插件 `instance_id` → CLI 标识 `p<pid>` → 端口三级（`gda list` 显示的 `p<pid>` 可直接用于 `/i/<ref>/...`），`stop` / `restart` 补「无窗口实例直接强制停止、有窗口实例保持优雅且超时提示 `--force` 并保留登记」的口径）2026-10-22（10-22 随本地收口批次同步——**`gda start` 新增同工程活跃实例预检**：启动编辑器**之前**先查该工程是否已有活跃实例，命中即**拒绝启动**并给出可操作提示（已有实例的端口与进程号、改用其它端口的办法、豁免开关）；用户显式指定 `--port` 时按用户意图继续启动，但仍给出冲突提示。预检复用了既有的三件能力：CLI 本地注册表（`src/registry.ts` 的 `findLiveByProject`）、插件全局实例索引（`src/instances.ts` 的容错读取）与两级存活校验（`src/probe.ts` 的轻量 TCP / 严格 HTTP）；新模块 [`src/preflight.ts`](../../../cli/src/preflight.ts) 承载判定与提示文案。**行为变更**：`gda start` 对同工程二次启动由「幂等返回既有实例」改为「拒绝并提示」。CLI TS 单测 180→**193**（11→**12** 文件，新增 `preflight.test.ts` 10 项）；技能书里「所钉 tag 早于 CLI 存在」的限制说明按事实改写——`0.3.0` 的树已含 `cli/` 与根 `package.json`（`bin` 映射 `gda`），发布作业也随 `addons.zip` 挂出 5 个目标的独立二进制，剩余限制只是「该 tag 尚未发布」）2026-10-21（10-21 随开放接口面落地批次同步——新增 **REST 调用族** `gda api list` / `gda api describe` / `gda api call` 与端点展示命令 `gda endpoints`；**寻址链由六级改为七级**（`--port` ＞ `--id` ＞ 环境变量 ＞ CLI 本地注册表 ＞ 插件全局实例索引 ＞ 旧路径回退 ＞ 默认 9527），每一级都记录来源（`source`）与链位（`chain`），`gda endpoints` 一次性打印端口/来源/链位/两个端点/存活结果；新增全局选项 `--query`（`api list` 关键字过滤）与 `--probe`（存活校验级别：`light` TCP / `strict` HTTP 探活）；**CLI state dir 迁到集中根下** `<集中根>/cli/`（`GODOT_AUTOPILOT_CLI_HOME` 仍可覆写），**插件全局实例索引**新增为第 5 级来源（`<集中根>/instances.json`），REST 令牌从该索引的 `api_token` 字段读取；集中根由 `GODOT_AUTOPILOT_HOME` 覆写、否则取 `os.homedir()`，其下固定目录名 `.godot-autopilot`；端口模型与登记结构的完整口径见 [端口与实例登记](ports.md)，REST 端点契约见 [REST 接口面](api.md)；本轮校订补三处事实——① 正文「寻址链」小节按 `src/target.ts` 的七级实现重写（旧正文仍是六级链，且 `--id` / `--port` 次序与实现相反），补 `source` / `chain` 两列与两级存活校验；② state dir 解析按 `src/registry.ts` 改正为 `GODOT_AUTOPILOT_CLI_HOME` > `<集中根>/cli/`（旧正文写的是 `%LOCALAPPDATA%` / `XDG_STATE_HOME`），并新增「集中根与两套注册表」小节写令牌读取方式；③ 全局选项表删去已移除的 `--quiet`、补 `--query` 与 `--probe`；10-20 随技能书调用阶梯收敛批次同步——技能书自带的脚本桥 `gda.mjs` 与 `references/script-access.md` 删除，调用阶梯由五级收敛为三级（原生 MCP → GDA CLI → 手动兜底），本载体成为唯一的脚本化调用通道；`bunx`、全局安装与独立二进制是同一载体的三种分发方式，合为阶梯第二级；10-20 随守卫覆盖范围措辞修正批次同步——`version_sync_guard` 已扩展为扫描 `skills/` 全部文本文件与根 `README*.md` 的每一处版本钉（另含 `VERSION`/`CLI_VERSION` 两个值源），本页与 [测试体系](../tests.md) 描述的守卫覆盖范围本轮按守卫脚本实况改正，固定处数的旧口径已删除，覆盖范围以守卫脚本为准；10-20 随 CLI 启动回滚修复批次同步——Windows 启动路径**不再**用 `cmd /c start "" /b` 蹦床 + `netstat` 端口反查 pid，改为直连 `spawn` 并置 `detached: true` 脱父，pid 由 `spawn` 直接返回（编辑器从未监听端口时端口反查必然失败，回滚拿不到 pid、失败后编辑器进程成为孤儿）；`isAlive` 改为解析 `tasklist /FO CSV` 的 pid 字段，**与系统语言无关**（旧实现按输出是否以 `INFO`/`消息` 开头判断，中文 Windows 实际输出「信息:」导致恒判存活，终止确认轮询超时并把已终止进程报成「无法终止」）；失败回滚的三种结果 `was terminated` / `had already exited` / `could not be terminated`（后者附可执行补救指令：Windows `taskkill /F /T /PID N`、POSIX `kill -9 N`）；引擎不可执行时报 `failed to launch the editor executable: ENOENT: …` 而非笼统的 failed to spawn；CLI TS 单测 126→132（9 个文件）；10-19 随 CLI 引擎定位收窄批次同步——`gda start` 不再读 `GODOT_PATH` 与 `<project>/.env`（前者仅 L2 引擎测试使用，生产环境不存在），可执行文件链收敛为 `--godot` > PATH，未命中即报错提示 `--godot`；新增 `cli/tests/process.test.ts` 3 项（TS 108→111、expect 301→310）；随 MCP 协议版本协商修正批次同步——`cli/src/mcp/client.ts` 与技能书 `gda.mjs` 脚本桥声明版本 `2025-03-26`→`2025-11-25`（SDK 旧世代当前版本，GDA 未钉 `ServerOptions::protocol_version` 时服务端对旧版声明原样尊重）；2026-10-19（随 CLI 跨平台修复批次同步——`userDataBase()` 新增 `GODOT_AUTOPILOT_USERDATA` 显式覆写（未设或空白走原生分支，既有解析语义不变）；握手状态由进程级单例改按目标 URL 键控（多目标进程各自握手）；新增 initialize 响应 `result.protocolVersion` 协商版本学习（仅已知五版本表内），后续 POST 按学习值携带 `MCP-Protocol-Version` 头（modern 声明学习值不发头，规避 stateless 传输 hold-open 长连接）；新增 `cli/tests/client_handshake.test.ts` 6 项，TS 单测 102→108 用例 / 6→7 文件；`test_cli_contract.py` mock initialize 响应同步 `2025-11-25`）；2026-10-18（随 CLI 载体落地批次同步——新增 `cli/`（Bun + TS 源码直跑，零运行时依赖）、根 `package.json`/`bun.lock`；双载体（CLI + `gda.mjs`）协议握手升级为标准 MCP `initialize` 流程（SDK 0.3.7 兼容）；真机验收修复两个缺陷（Windows 脱父、start 就绪探测直达标志）；测试稳定性修复（串行化 + Windows 清理时序）；`version_sync_guard`/`cli_contract`/`cli_unit` 三个新 ctest 点；详见 [changelog/2026-10-18-log.md](../changelog/2026-10-18-log.md)）
 
-> 覆盖范围：`cli/` 全部（`bin/gda.ts` 入口、`src/` 13 个顶层 .ts + `src/api/client.ts`、`src/mcp/client.ts`、`src/serve/` 3 个 .ts、`src/commands/` 17 个 .ts 共 35 个 .ts、`tests/` 16 测试文件）+ 根 [`package.json`](../../../package.json) 与 [`bun.lock`](../../../bun.lock)。CLI 是技能书调用阶梯的第二级（原生 MCP → **GDA CLI** → 手动兜底），定位与分发见下文。
+> 覆盖范围：`cli/` 全部（`bin/gda.ts` 入口、`src/` 13 个顶层 .ts + `src/api/client.ts`、`src/mcp/client.ts`、`src/serve/` 3 个 .ts、`src/commands/` 17 个 .ts 共 35 个 .ts、`tests/` 18 测试文件（10-30 新增 `list.test.ts`））+ 根 [`package.json`](../../../package.json) 与 [`bun.lock`](../../../bun.lock)。CLI 是技能书调用阶梯的第二级（原生 MCP → **GDA CLI** → 手动兜底），定位与分发见下文。
 
 ## 定位与分发
 
@@ -68,7 +69,7 @@ resource:
 
 | 命令 | 说明 |
 |---|---|
-| `list` | 列出已启动的 Godot 进程（registry 实例 + live 状态） |
+| `list` | 列出实例：CLI 登记 + 插件索引合并（`source`/`live`），可选 `--probe <port>` 追加指定端口探测结果 |
 | `start` | 启动 Godot 进程（启动前做同工程活跃实例预检、自动选端口、可选导入预步、就绪探测） |
 | `stop` | 停止进程（默认优雅；无窗口实例与 `--force` 直接强制） |
 | `restart` | 重启进程（定位规则同 `stop`；按窗口状态停止后按原端口 / headless / godot 路径重新拉起） |
@@ -116,7 +117,7 @@ resource:
 | `--bind <addr>` | 字符串 | serve | 控制面绑定地址，仅环回（`127.0.0.1` / `::1` / `localhost`；默认 `127.0.0.1`） |
 | `--no-auth` | 布尔 | serve | 关闭控制面认证（任何本机进程都可调用工具） |
 | `--query <text>` | 字符串 | api list | 关键字过滤（只对本子命令有效） |
-| `--probe <level>` | 字符串 | api / endpoints | 存活校验级别：`light`（默认，TCP）或 `strict`（HTTP 探活） |
+| `--probe <value>` | 字符串 | api / endpoints / start（level）；list（端口） | api/endpoints/start 为存活校验级别 `light`（默认，TCP）/`strict`（HTTP 探活）；`list` 下为端口号 1-65535（探测指定端口，不扫描） |
 | `--help` / `--version` | 布尔 | — | 帮助 / 版本 |
 
 `--quiet` 已被移除，不在 `gda --help` 中；传入会报用法错误（退出码 3）。诊断本就只走 stderr，该开关没有价值。
@@ -230,7 +231,7 @@ resource:
 
 ### restart（[`src/commands/restart.ts`](../../../cli/src/commands/restart.ts)）
 
-- **定位规则与 `stop` 完全一致**：位置参数 `<id>`，或 `--id` / `--port` / `--project` 三选一（同时给出报用法错误）。只作用于 **CLI 本地注册表**里的实例（`gda list` 可见的那些），不会去操作插件索引里不由 CLI 拉起的编辑器。
+- **定位规则与 `stop` 完全一致**：位置参数 `<id>`，或 `--id` / `--port` / `--project` 三选一（同时给出报用法错误）。只作用于 **CLI 本地注册表**里的实例（`gda list` 输出中 `source="cli"` 的那些），不会去操作插件索引里不由 CLI 拉起的编辑器（`source="plugin"` 条目只用于展示与寻址，不能 `stop`/`restart`）。
 - **流程**：① 定位条目；② 进程存活时先停止——按与 `stop` 相同的规则选择方法：**无窗口（`headless: true`）或显式 `--force` 直接强制停止**，有窗口实例默认优雅（Windows `taskkill /PID`、其他 `SIGTERM`）；③ **固定等待 10 秒**直到进程消失（该阶段**不受 `--wait` 影响**）；④ 从注册表移除旧条目；⑤ 以**原端口、原 headless、原 godot 路径**调用 `start`（`--wait` 在此阶段生效，默认 60 秒就绪超时；`--no-import` / `--play` / `--probe` 随本次调用传入）；⑥ 输出 `{ok: true, restarted: true, previous: {id, pid, port}, ...新实例视图}`。
 - **失败语义**：有窗口实例优雅停止后 10 秒仍未退出 → **不启动替代实例**，退出码 2，建议改用 `--force` 或手工停止，并保留登记。理由与插件侧同工程守卫一致——同一工程同时开两个编辑器可能静默崩溃（见 [端口与实例登记](ports.md)「同一工程的多实例：默认拒绝」）。启动阶段失败时，错误消息会追加「原实例已被停止」，便于判断当前已无实例在跑。
 - 目标实例本来就已退出时，跳停止与等待，直接按登记里的端口 / headless / godot 路径重新拉起。
@@ -238,7 +239,11 @@ resource:
 ### logs / list
 
 - `logs <id>`：读 state dir `logs/<id>.log`，输出末尾 `--tail` 行（默认 50）。
-- `list`：列 registry 全部实例（含 `live` 实时状态）。
+- `list`：输出**合并后的实例数组**，每项 `{id, source, project, port, pid, headless, startedAt, live}`（`pid` 在 `source=probe` 时为空）——
+  1. **CLI 本地注册表**条目（`source="cli"`）原样输出，`live` 由 `isAlive(pid)` 实时判定；
+  2. **插件全局实例索引**（`<集中根>/instances.json`）中 `pid` 与 `port` 均非空、进程存活、且未被 CLI 条目按 `pid`/`port` 占用的记录（`source="plugin"`，`id=instance_id`，`project=projectPath`，`startedAt` 由 epoch ms 转 ISO，`live=true`），按 `startedAt` 倒序；
+  3. `--probe <port>` 显式指定端口且轻量探针 TCP 可达时追加 `{id: "probe:<port>", source: "probe", project: "", pid: null, live: true}`；只探测该端口，**不做端口扫描**。
+- 空列表时：带 `--probe` 输出「probed port 无存活实例」提示；未带 `--probe` 输出「没有 CLI 启动或插件索引的实例，可加 `--probe <port>` 探测特定端口（不扫描）」，均以退出码 0 结束。
 
 ## 控制面（`gda serve`）
 
@@ -345,7 +350,7 @@ resource:
 
 | 层 | 位置 | 规模 | 说明 |
 |---|---|---|---|
-| TS 单测 | [`cli/tests/`](../../../cli/tests/) | 17 文件 282 项（280 pass + 2 skip，786 次 expect()） | `bun test cli/tests`；api_commands 43 / args 4 / client 17 / client_handshake 8 / commands 40 / detach 1 / lifecycle 34 / preflight 10 / process 8 / registry 12 / restart 4 / root_dir 7 / serve_auth 14（其中 2 项 Windows 跳过）/ serve_router 43 / serve_server 19 / stop_method 3 / target 15 |
+| TS 单测 | [`cli/tests/`](../../../cli/tests/) | 18 文件；`bun test cli/tests` 实测 296 项（294 pass / 2 skip，2026-10-30） | `bun test cli/tests`；静态计数：api_commands 43 / args 4 / client 17 / client_handshake 8 / commands 40 / detach 1 / lifecycle 34 / **list 13（10-30 新增）** / preflight 10 / process 8 / registry 12 / restart 4 / root_dir 7 / serve_auth 12 / serve_router 24 / serve_server 11 / stop_method 3 / target 15 |
 | ctest `cli_unit` | [`tests/scripts/run_cli_unit.py`](../../../tests/scripts/run_cli_unit.py) | 封装 `bun test` | bun 缺失时 SKIP 并 exit 0 |
 | ctest `cli_contract` | [`tests/scripts/test_cli_contract.py`](../../../tests/scripts/test_cli_contract.py) | CLI 载体 mock conformance | bun 驱动 gda CLI；bun 缺失时 SKIP |
 | ctest `version_sync_guard` | [`tests/guard/version_sync_guard.py`](../../../tests/guard/version_sync_guard.py) | 全部版本钉与 `VERSION` 同值 | 扫描 `skills/` 全部文本文件 + 根 `README*.md` 的每一处版本钉，另含 `VERSION` 与 `CLI_VERSION` 两个值源 |
