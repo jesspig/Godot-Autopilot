@@ -90,6 +90,7 @@ const std::vector<ParamSpec> kCreateEditorSceneParams = {
 
 const std::vector<ParamSpec> kOpenEditorSceneParams = {
     {"path", "string", "Path to the scene file to open, e.g. 'res://game.tscn'; errors when the current scene has unsaved changes", true},
+    {"reload_if_open", "boolean", "When the requested scene is already the edited scene, reload it from disk instead of short-circuiting (default: false); discards unsaved changes, so save first when needed", false},
 };
 
 const std::vector<ParamSpec> kSaveEditorSceneAsParams = {
@@ -266,7 +267,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       kCreateEditorSceneParams, editor_ops::handle_new_scene}));
   v.push_back(make_spec_tool(ToolSpec{
       "open_editor_scene",
-      "Open an existing scene file, e.g. res://game.tscn, in the editor, replacing the currently edited scene. Use it to switch between scenes during editing, e.g. to continue work on another level. Errors when the current scene has unsaved changes, so call save_editor_scene first. Returns result 'ok'.",
+      "Open an existing scene file, e.g. res://game.tscn, in the editor, replacing the currently edited scene. Use it to switch between scenes during editing, e.g. to continue work on another level. Errors when the current scene has unsaved changes, so call save_editor_scene first. Returns result 'ok'. When the requested scene is already the edited scene it short-circuits with result 'ok', already_open=true, hint and suggested_action: the editor does not reopen it, so anything changed on disk after it was opened (e.g. by scripts) is not refreshed; pass reload_if_open=true to reload it from disk instead, which returns reloaded=true, reload_observed and, when observed, scene_root and scene_root_type. That reload drops unsaved changes, so save_editor_scene first when they matter.",
       "Editor", {"scene", "open"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kOpenEditorSceneParams, editor_ops::handle_open_scene}));
   v.push_back(make_spec_tool(ToolSpec{

@@ -1486,6 +1486,13 @@ mcp::JsonValue handle_open_scene(const mcp::JsonValue &args) {
     return e;
   }
   std::string path = pp->GetString();
+  bool reload_if_open = false;
+  auto *reload_p = args.Find("reload_if_open");
+  if (reload_p) {
+    if (!reload_p->IsBool())
+      return util::error_json("reload_if_open must be a boolean");
+    reload_if_open = reload_p->GetBool();
+  }
   auto *editor = godot::EditorInterface::get_singleton();
   if (!editor) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -1506,10 +1513,42 @@ mcp::JsonValue handle_open_scene(const mcp::JsonValue &args) {
   if (old_root != nullptr && !path.empty()) {
     godot::String open_path = old_root->get_scene_file_path();
     if (!open_path.is_empty() && same_scene_path(requested_path, open_path)) {
+      if (reload_if_open) {
+        editor->reload_scene_from_path(requested_path);
+        auto *reloaded_root = editor->get_edited_scene_root();
+        const bool observed =
+            reloaded_root != nullptr &&
+            same_scene_path(reloaded_root->get_scene_file_path(),
+                            requested_path);
+        mcp::JsonValue r(mcp::JsonValue::object_tag);
+        r["result"] = mcp::JsonValue("ok");
+        r["path"] = mcp::JsonValue(path);
+        r["already_open"] = mcp::JsonValue(true);
+        r["reloaded"] = mcp::JsonValue(true);
+        r["reload_observed"] = mcp::JsonValue(observed);
+        if (observed) {
+          r["scene_root"] = mcp::JsonValue(
+              util::to_std(godot::String(reloaded_root->get_name())));
+          r["scene_root_type"] = mcp::JsonValue(
+              util::to_std(godot::String(reloaded_root->get_class())));
+        }
+        LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                                  "open_editor_scene reloaded already open: " +
+                                      path);
+        return r;
+      }
       mcp::JsonValue r(mcp::JsonValue::object_tag);
       r["result"] = mcp::JsonValue("ok");
       r["path"] = mcp::JsonValue(path);
       r["already_open"] = mcp::JsonValue(true);
+      r["hint"] = mcp::JsonValue(
+          "the requested scene is already the edited scene, so it was not "
+          "reopened and edits made by scripts since it was opened are not "
+          "refreshed");
+      r["suggested_action"] = mcp::JsonValue(
+          "call open_editor_scene with reload_if_open=true to reload this "
+          "scene from disk (discards unsaved changes), or close_editor_scene "
+          "then open_editor_scene");
       LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                                 "open_editor_scene already open: " + path);
       return r;
