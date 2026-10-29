@@ -19,11 +19,6 @@
         }
       },
       {
-        "id": "phase_save_run_args",
-        "tool": "save_project_settings",
-        "args": {}
-      },
-      {
         "id": "phase_create_scene",
         "tool": "create_editor_scene",
         "args": {
@@ -488,11 +483,6 @@
           "name": "editor/run/main_run_args",
           "value": "--headless"
         }
-      },
-      {
-        "id": "phase_restore_save",
-        "tool": "save_project_settings",
-        "args": {}
       },
       {
         "id": "phase_close_scene",
