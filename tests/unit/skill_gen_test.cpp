@@ -94,6 +94,7 @@ const char *const kManualWhitelist[] = {
     "output_empty", "output_truncated", "project_file", "project_path",
     "restart_required", "runtime_error", "target_framework", "csproj_ref_exists",
     "engine_version", "is_dotnet_editor",
+    "captured_frame", "saved_path", "when_satisfied_frame", "gda_capture_",
 
     "register_tool", "unregister_tool", "has_tool", "list_tools", "get_tool",
     "is_enabled", "set_enabled", "rescan", "register_autopilot_tools",

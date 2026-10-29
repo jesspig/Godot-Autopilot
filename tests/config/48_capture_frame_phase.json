@@ -1,0 +1,511 @@
+{
+  "name": "capture_frame_phase",
+  "description": "抓帧相位与截图落盘端到端（GUI，pools.json isolated 逐例 legacy 启动）：测试床 project.godot 的 editor/run/main_run_args 默认 --headless，headless 游戏进程无渲染输出，无法取图，故 before_all 临时清空该设置并 save_project_settings，让从 GUI 编辑器启动的游戏以真实渲染运行，after_all 恢复 --headless（before_all 失败时 after_all 仍执行，见 pipeline_executor）。链路：create_editor_scene CapturePhaseProbe + PhaseLabel → 保存 res://gda_tmp_capture_phase/probe.tscn → open + play → ① execute_game_script 等待 0.3s 计时器后把 PhaseLabel.text 改为 PROBE（帧相位用例的等待窗）→ ② capture_game_viewport{when:PhaseLabel.text==\"PROBE\"} 断言返回体含 when_satisfied_frame 与 captured_frame（两字段均为帧号，captured_frame 在满足帧的下一帧读取；L2 断言语法只有 value/not_empty/not_contains，无法直接断言 captured_frame>when_satisfied_frame，故此处锁字段存在与 data 非空，帧号序由 T-33 报告人工复核）→ ③ capture_game_viewport{after_frames:3} 同样断言两帧号字段 → ④ 连续 10 次 capture_game_viewport{save:true, save_dir:res://gda_tmp_capture_phase/captures} 断言每次 saved_path 非空，再用 list_directory 断言目录 total=10（命名 gda_capture_<yyyyMMdd-HHmmss>_<序号> 不撞名）→ ⑤ capture_editor_viewport{target:\"game\", save:true, save_dir:res://gda_tmp_capture_phase/captures_editor} 断言 saved_path 非空（修复 target=game 静默忽略 save），list_directory 断言 total=1。requires 需 write（save 能力门 + set_project_settings/save_project_settings）与 game_runtime（play/execute_game_script）。",
+  "headless": false,
+  "requires": [
+    "write",
+    "code_execute",
+    "game_runtime"
+  ],
+  "pipeline": {
+    "on_failure": "fail_fast",
+    "before_all": [
+      {
+        "id": "phase_clear_run_args",
+        "tool": "set_project_settings",
+        "args": {
+          "name": "editor/run/main_run_args",
+          "value": ""
+        }
+      },
+      {
+        "id": "phase_save_run_args",
+        "tool": "save_project_settings",
+        "args": {}
+      },
+      {
+        "id": "phase_create_scene",
+        "tool": "create_editor_scene",
+        "args": {
+          "name": "CapturePhaseProbe",
+          "close_current": true
+        }
+      },
+      {
+        "id": "phase_create_label",
+        "tool": "create_scene_node",
+        "args": {
+          "name": "PhaseLabel",
+          "type": "Label",
+          "parent_path": "CapturePhaseProbe",
+          "properties": {
+            "text": "IDLE",
+            "offset_left": 20,
+            "offset_top": 20,
+            "offset_right": 220,
+            "offset_bottom": 60
+          }
+        }
+      },
+      {
+        "id": "phase_save_scene",
+        "tool": "save_editor_scene_as",
+        "args": {
+          "path": "res://gda_tmp_capture_phase/probe.tscn"
+        }
+      },
+      {
+        "id": "phase_open_scene",
+        "tool": "open_editor_scene",
+        "args": {
+          "path": "res://gda_tmp_capture_phase/probe.tscn"
+        }
+      },
+      {
+        "id": "phase_play",
+        "tool": "play_editor_current_scene",
+        "args": {}
+      }
+    ],
+    "stages": [
+      {
+        "id": "frame_phase",
+        "steps": [
+          {
+            "id": "phase_arm_label",
+            "tool": "execute_game_script",
+            "args": {
+              "action": "script",
+              "source_code": "var label = get_node(\"/root/CapturePhaseProbe/PhaseLabel\")\nawait get_tree().create_timer(0.3).timeout\nlabel.text = \"PROBE\"\nreturn true",
+              "timeout_ms": 8000
+            },
+            "expect": {
+              "field_checks": [
+                {
+                  "key": "result",
+                  "value": true
+                }
+              ]
+            }
+          },
+          {
+            "id": "phase_capture_when",
+            "tool": "capture_game_viewport",
+            "args": {
+              "when": "get_node(\"/root/CapturePhaseProbe/PhaseLabel\").text == \"PROBE\"",
+              "timeout_ms": 8000
+            },
+            "expect": {
+              "has_keys": [
+                "data",
+                "path",
+                "when_satisfied_frame",
+                "captured_frame"
+              ],
+              "field_checks": [
+                {
+                  "key": "data",
+                  "not_empty": true
+                },
+                {
+                  "key": "when_satisfied_frame",
+                  "not_empty": true
+                },
+                {
+                  "key": "captured_frame",
+                  "not_empty": true
+                }
+              ]
+            }
+          },
+          {
+            "id": "phase_capture_after_frames",
+            "tool": "capture_game_viewport",
+            "args": {
+              "after_frames": 3,
+              "timeout_ms": 8000
+            },
+            "expect": {
+              "has_keys": [
+                "data",
+                "path",
+                "when_satisfied_frame",
+                "captured_frame"
+              ],
+              "field_checks": [
+                {
+                  "key": "data",
+                  "not_empty": true
+                },
+                {
+                  "key": "when_satisfied_frame",
+                  "not_empty": true
+                },
+                {
+                  "key": "captured_frame",
+                  "not_empty": true
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "capture_save",
+        "steps": [
+          {
+            "id": "capture_save_1",
+            "tool": "capture_game_viewport",
+            "args": {
+              "save": true,
+              "save_dir": "res://gda_tmp_capture_phase/captures",
+              "timeout_ms": 8000
+            },
+            "expect": {
+              "has_keys": [
+                "data",
+                "path",
+                "saved_path"
+              ],
+              "field_checks": [
+                {
+                  "key": "saved_path",
+                  "not_empty": true
+                },
+                {
+                  "key": "data",
+                  "not_empty": true
+                }
+              ]
+            }
+          },
+          {
+            "id": "capture_save_2",
+            "tool": "capture_game_viewport",
+            "args": {
+              "save": true,
+              "save_dir": "res://gda_tmp_capture_phase/captures",
+              "timeout_ms": 8000
+            },
+            "expect": {
+              "has_keys": [
+                "data",
+                "path",
+                "saved_path"
+              ],
+              "field_checks": [
+                {
+                  "key": "saved_path",
+                  "not_empty": true
+                },
+                {
+                  "key": "data",
+                  "not_empty": true
+                }
+              ]
+            }
+          },
+          {
+            "id": "capture_save_3",
+            "tool": "capture_game_viewport",
+            "args": {
+              "save": true,
+              "save_dir": "res://gda_tmp_capture_phase/captures",
+              "timeout_ms": 8000
+            },
+            "expect": {
+              "has_keys": [
+                "data",
+                "path",
+                "saved_path"
+              ],
+              "field_checks": [
+                {
+                  "key": "saved_path",
+                  "not_empty": true
+                },
+                {
+                  "key": "data",
+                  "not_empty": true
+                }
+              ]
+            }
+          },
+          {
+            "id": "capture_save_4",
+            "tool": "capture_game_viewport",
+            "args": {
+              "save": true,
+              "save_dir": "res://gda_tmp_capture_phase/captures",
+              "timeout_ms": 8000
+            },
+            "expect": {
+              "has_keys": [
+                "data",
+                "path",
+                "saved_path"
+              ],
+              "field_checks": [
+                {
+                  "key": "saved_path",
+                  "not_empty": true
+                },
+                {
+                  "key": "data",
+                  "not_empty": true
+                }
+              ]
+            }
+          },
+          {
+            "id": "capture_save_5",
+            "tool": "capture_game_viewport",
+            "args": {
+              "save": true,
+              "save_dir": "res://gda_tmp_capture_phase/captures",
+              "timeout_ms": 8000
+            },
+            "expect": {
+              "has_keys": [
+                "data",
+                "path",
+                "saved_path"
+              ],
+              "field_checks": [
+                {
+                  "key": "saved_path",
+                  "not_empty": true
+                },
+                {
+                  "key": "data",
+                  "not_empty": true
+                }
+              ]
+            }
+          },
+          {
+            "id": "capture_save_6",
+            "tool": "capture_game_viewport",
+            "args": {
+              "save": true,
+              "save_dir": "res://gda_tmp_capture_phase/captures",
+              "timeout_ms": 8000
+            },
+            "expect": {
+              "has_keys": [
+                "data",
+                "path",
+                "saved_path"
+              ],
+              "field_checks": [
+                {
+                  "key": "saved_path",
+                  "not_empty": true
+                },
+                {
+                  "key": "data",
+                  "not_empty": true
+                }
+              ]
+            }
+          },
+          {
+            "id": "capture_save_7",
+            "tool": "capture_game_viewport",
+            "args": {
+              "save": true,
+              "save_dir": "res://gda_tmp_capture_phase/captures",
+              "timeout_ms": 8000
+            },
+            "expect": {
+              "has_keys": [
+                "data",
+                "path",
+                "saved_path"
+              ],
+              "field_checks": [
+                {
+                  "key": "saved_path",
+                  "not_empty": true
+                },
+                {
+                  "key": "data",
+                  "not_empty": true
+                }
+              ]
+            }
+          },
+          {
+            "id": "capture_save_8",
+            "tool": "capture_game_viewport",
+            "args": {
+              "save": true,
+              "save_dir": "res://gda_tmp_capture_phase/captures",
+              "timeout_ms": 8000
+            },
+            "expect": {
+              "has_keys": [
+                "data",
+                "path",
+                "saved_path"
+              ],
+              "field_checks": [
+                {
+                  "key": "saved_path",
+                  "not_empty": true
+                },
+                {
+                  "key": "data",
+                  "not_empty": true
+                }
+              ]
+            }
+          },
+          {
+            "id": "capture_save_9",
+            "tool": "capture_game_viewport",
+            "args": {
+              "save": true,
+              "save_dir": "res://gda_tmp_capture_phase/captures",
+              "timeout_ms": 8000
+            },
+            "expect": {
+              "has_keys": [
+                "data",
+                "path",
+                "saved_path"
+              ],
+              "field_checks": [
+                {
+                  "key": "saved_path",
+                  "not_empty": true
+                },
+                {
+                  "key": "data",
+                  "not_empty": true
+                }
+              ]
+            }
+          },
+          {
+            "id": "capture_save_10",
+            "tool": "capture_game_viewport",
+            "args": {
+              "save": true,
+              "save_dir": "res://gda_tmp_capture_phase/captures",
+              "timeout_ms": 8000
+            },
+            "expect": {
+              "has_keys": [
+                "data",
+                "path",
+                "saved_path"
+              ],
+              "field_checks": [
+                {
+                  "key": "saved_path",
+                  "not_empty": true
+                },
+                {
+                  "key": "data",
+                  "not_empty": true
+                }
+              ]
+            }
+          },
+          {
+            "id": "capture_save_listing",
+            "tool": "list_directory",
+            "args": {
+              "path": "res://gda_tmp_capture_phase/captures"
+            },
+            "expect": {
+              "field_checks": [
+                {
+                  "key": "result.total",
+                  "value": 10
+                },
+                {
+                  "key": "result.truncated",
+                  "value": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "capture_editor_game_target_save",
+            "tool": "capture_editor_viewport",
+            "args": {
+              "target": "game",
+              "save": true,
+              "save_dir": "res://gda_tmp_capture_phase/captures_editor"
+            },
+            "expect": {
+              "has_keys": [
+                "data",
+                "saved_path"
+              ],
+              "field_checks": [
+                {
+                  "key": "saved_path",
+                  "not_empty": true
+                },
+                {
+                  "key": "data",
+                  "not_empty": true
+                }
+              ]
+            }
+          },
+          {
+            "id": "capture_editor_game_target_listing",
+            "tool": "list_directory",
+            "args": {
+              "path": "res://gda_tmp_capture_phase/captures_editor"
+            },
+            "expect": {
+              "field_checks": [
+                {
+                  "key": "result.total",
+                  "value": 1
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "after_all": [
+      {
+        "id": "phase_stop_playing",
+        "tool": "stop_editor_playing",
+        "args": {}
+      },
+      {
+        "id": "phase_restore_run_args",
+        "tool": "set_project_settings",
+        "args": {
+          "name": "editor/run/main_run_args",
+          "value": "--headless"
+        }
+      },
+      {
+        "id": "phase_restore_save",
+        "tool": "save_project_settings",
+        "args": {}
+      },
+      {
+        "id": "phase_close_scene",
+        "tool": "close_editor_scene",
+        "args": {}
+      },
+      {
+        "id": "phase_trash_dir",
+        "tool": "move_os_file_to_trash",
+        "args": {
+          "path": "res://gda_tmp_capture_phase"
+        }
+      }
+    ]
+  }
+}
