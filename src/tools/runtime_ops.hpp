@@ -119,7 +119,9 @@ bool payload_is_pending(const mcp::JsonValue &payload, int64_t *out_request_id);
 
 bool discard_pending(int64_t request_id, std::string &out_detail);
 
-mcp::JsonValue finalize_capture_response(const mcp::JsonValue &pending_result);
+mcp::JsonValue finalize_capture_response(
+    const mcp::JsonValue &pending_result,
+    const mcp::JsonValue &options = mcp::JsonValue());
 
 void handle_game_response(const std::string &json_str);
 

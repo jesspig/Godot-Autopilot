@@ -880,8 +880,11 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
                                                   std::move(handler_result));
       } else {
         awaited = runtime_ops::wait_pending_response(pending_id, wait_ms);
-        if (tool_name == "capture_game_viewport" && !awaited.Contains("error"))
-          awaited = runtime_ops::finalize_capture_response(awaited);
+        if (!awaited.Contains("error") &&
+            (tool_name == "capture_game_viewport" ||
+             awaited.IsObject() && awaited.Contains("path")))
+          awaited = runtime_ops::finalize_capture_response(awaited,
+                                                           handler_result);
       }
       const bool awaited_error =
           awaited.IsObject() && awaited.Find("error") != nullptr;
