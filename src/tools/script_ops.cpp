@@ -188,15 +188,22 @@ bool refresh_script_cache(const std::string &path, std::string &error_out) {
 }
 
 mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue &args) {
-  auto *it_expr = args.Find("expression");
-  if (!it_expr || !it_expr->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: expression");
-    return e;
-  }
-  std::string expression = it_expr->GetString();
+  const mcp::JsonValue *it_expr = args.Find("expression");
+  const mcp::JsonValue *it_source = args.Find("source_code");
+  if (it_expr != nullptr && it_source != nullptr)
+    return util::error_json(
+        "invalid parameter: pass only one of expression/source_code");
+  const mcp::JsonValue *chosen = it_expr != nullptr ? it_expr : it_source;
+  if (chosen == nullptr)
+    return util::error_json(
+        "missing required parameter: expression or source_code");
+  if (!chosen->IsString())
+    return util::error_json(
+        "invalid parameter: expression or source_code must be a string");
+  std::string expression = chosen->GetString();
   if (expression.empty())
-    return util::error_json("expression must not be empty");
+    return util::error_json(
+        "invalid parameter: expression or source_code must not be empty");
 
   std::string cleaned = gdscript_wrap::strip_extends_lines(expression);
 

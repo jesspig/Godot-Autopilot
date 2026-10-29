@@ -16,7 +16,8 @@ namespace script_tools {
 namespace {
 
 const std::vector<ParamSpec> kExecuteScriptParams = {
-    {"expression", "string", "GDScript expression or code to execute. Single expression auto-returns its value; multi-line code needs an explicit return. print() output appears in the output field, errors in the errors field. Runs synchronously in the editor process with no timeout — long code blocks the editor", true},
+    {"expression", "string", "GDScript expression or code to execute; a single expression auto-returns its value. Pass exactly one of expression or source_code (aliases — providing both is rejected)", false},
+    {"source_code", "string", "Alias of expression: GDScript code to execute in the editor process; a single expression auto-returns its value. Pass exactly one of expression or source_code (aliases — providing both is rejected)", false},
 };
 
 const std::vector<ParamSpec> kLoadScriptParams = {
@@ -80,7 +81,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.reserve(11);
   v.push_back(make_spec_tool(ToolSpec{
       "execute_script",
-      "Execute arbitrary GDScript synchronously in the editor process; single-expression input returns its value automatically, multi-line code needs an explicit return statement. print() output appears in the output field, errors in the errors field. Compilation errors include line mapping and the wrapped source. There is no timeout — long code blocks the editor. The environment exposes SceneRoot (edited scene root) for node access; for the running game process use execute_game_script instead.",
+      "Execute arbitrary GDScript synchronously in the editor process. Pass the code as either expression or source_code — they are aliases, pass exactly one; providing both is rejected with invalid parameter, and providing neither reports missing required parameter: expression or source_code. Single-expression input returns its value automatically, while multi-line code needs an explicit return statement; this auto-return is editor-side only — execute_game_script never auto-returns a single bare expression and needs an explicit return for a value. print() output appears in the output field, errors in the errors field. Compilation errors include line mapping and the wrapped source. There is no timeout — long code blocks the editor. The environment exposes SceneRoot (edited scene root) for node access; for the running game process use execute_game_script instead.",
       "Scripts", {"script", "execute", "gdscript"}, SideEffect::CodeExecute, tool_flags::kMutating,
       kExecuteScriptParams, script_ops::handle_execute_gdscript}));
   v.push_back(make_spec_tool(ToolSpec{
