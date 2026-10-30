@@ -1,12 +1,12 @@
-"""清理：各 demo 与 L2 测试床的引擎缓存与部署产物。"""
+"""清理：各 demo、L2 测试床与池床的引擎缓存与部署产物。"""
 
 import shutil
 
-from .config import DEPLOY_TARGETS, _addon_dir
+from .config import DEPLOY_TARGETS, POOL_BEDS, _addon_dir
 
 
 def _clean() -> None:
-    for project_dir in DEPLOY_TARGETS:
+    for project_dir in [*DEPLOY_TARGETS, *POOL_BEDS]:
         godot_cache = project_dir / ".godot"
         if godot_cache.exists():
             print(f"[CLEAN] Removing {godot_cache}...", flush=True)

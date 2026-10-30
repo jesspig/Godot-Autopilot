@@ -24,6 +24,18 @@ struct LogEntry {
   std::string span_id{};
 };
 
+struct ErrorPathEvent {
+  std::string request_id;
+  std::string method;
+  int error_code = 0;
+  std::string connection_id;
+  std::string exception_type;
+};
+
+std::string format_error_path_detail(const ErrorPathEvent &event);
+std::string classify_error_path_exception(const std::string &message);
+void log_error_path(const ErrorPathEvent &event);
+
 class LogSystem {
 public:
   static constexpr int MAX_ENTRIES = 10000;

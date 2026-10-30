@@ -15,12 +15,15 @@
 #include <algorithm>
 #include <cstdint>
 #include <functional>
+#include <limits>
+#include <memory>
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/editor_undo_redo_manager.hpp>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/gd_script.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
+#include <godot_cpp/classes/time.hpp>
 #include <godot_cpp/classes/undo_redo.hpp>
 #include <godot_cpp/classes/window.hpp>
 #include <godot_cpp/variant/string.hpp>
@@ -36,7 +39,16 @@ using namespace godot_autopilot;
 namespace {
 
 constexpr int CODE_EXEC_DEFAULT_TIMEOUT_MS = 5000;
-constexpr int CODE_EXEC_MAX_TIMEOUT_MS = 30000;
+static_assert(GDA_CODE_EXEC_MAX_TIMEOUT_MS <=
+                      static_cast<int64_t>(std::numeric_limits<int>::max()) &&
+                  GDA_DISPATCH_WAIT_MAX_MS <=
+                      static_cast<int64_t>(std::numeric_limits<int>::max()),
+              "the code_execute timeout ceiling must stay inside int range");
+
+struct UndoHistorySnapshot {
+  godot::UndoRedo *history = nullptr;
+  uint64_t version_before = 0;
+};
 
 struct TempNodeGuard {
   godot::Node *&node;
@@ -116,7 +128,34 @@ struct ExecContext {
   std::string new_output_text;
   bool temp_added = false;
   int auto_owner_set = 0;
+  bool timed_out = false;
+  int64_t execution_time_ms = 0;
 };
+
+int64_t count_lines(const std::string &text) {
+  int64_t lines = 0;
+  for (char current : text) {
+    if (current == '\n') {
+      ++lines;
+    }
+  }
+  return lines;
+}
+
+int64_t elapsed_ms_since(
+    const std::chrono::steady_clock::time_point &start) {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(
+             std::chrono::steady_clock::now() - start)
+      .count();
+}
+
+bool is_timeout_sentinel(const godot::Variant &value) {
+  if (value.get_type() != godot::Variant::STRING) {
+    return false;
+  }
+  return gdscript_wrap::is_timeout_sentinel_text(
+      util::to_std(value.operator godot::String()));
+}
 
 bool check_source_safety(ExecContext &ctx, std::string &error_out) {
   ctx.has_func_def =
@@ -145,27 +184,65 @@ bool check_source_safety(ExecContext &ctx, std::string &error_out) {
 }
 
 bool build_wrapped_source(ExecContext &ctx, std::string &error_out) {
+  godot::Time *time = godot::Time::get_singleton();
+  if (time == nullptr) {
+    error_out =
+        "Time singleton unavailable; cannot compute the execution deadline";
+    return false;
+  }
+  const int64_t deadline_ms =
+      static_cast<int64_t>(time->get_ticks_msec()) + ctx.timeout_ms;
+  const std::string check = gdscript_wrap::deadline_check_line();
   if (ctx.has_func_def) {
 
     std::string cleaned = gdscript_wrap::strip_extends_lines(ctx.source_code);
-    ctx.wrapped = "@tool\nextends Node\n\nvar SceneRoot := "
-                  "EditorInterface.get_edited_scene_root()\n\n" +
-                  cleaned + "\n";
+    gdscript_wrap::DeadlineTransform transform =
+        gdscript_wrap::inject_deadline_checks(cleaned);
+    if (!transform.ok) {
+      error_out = transform.error;
+      return false;
+    }
+    cleaned = transform.source;
+    const int64_t lines_before_entry =
+        static_cast<int64_t>(gdscript_wrap::split_lines(cleaned).size());
+    cleaned = gdscript_wrap::insert_entry_check(cleaned, ctx.func_name, check);
+    const int64_t entry_inserted =
+        static_cast<int64_t>(gdscript_wrap::split_lines(cleaned).size()) -
+        lines_before_entry;
+    const std::string header =
+        "@tool\nextends Node\n\nvar SceneRoot := "
+        "EditorInterface.get_edited_scene_root()\n\n" +
+        gdscript_wrap::deadline_declaration(deadline_ms) + "\n" +
+        gdscript_wrap::timeout_sentinel_declaration() + "\n\n";
+    ctx.wrapped = header + cleaned + "\n";
 
     if (!gdscript_wrap::defines_function_named(cleaned, ctx.func_name)) {
-      ctx.wrapped += "func " + ctx.func_name + "():\n    pass\n";
+      ctx.wrapped += "func " + ctx.func_name + "():\n    " + check + "\n";
     }
-    ctx.wrap_offset = 5;
+    ctx.wrap_offset =
+        static_cast<int>(count_lines(header) + entry_inserted);
   } else {
+    gdscript_wrap::DeadlineTransform transform =
+        gdscript_wrap::inject_deadline_checks(ctx.source_code);
+    if (!transform.ok) {
+      error_out = transform.error;
+      return false;
+    }
+    const std::string inject =
+        gdscript_wrap::deadline_declaration(deadline_ms) + "\n" +
+        gdscript_wrap::timeout_sentinel_declaration() + "\n" +
+        "var SceneRoot := EditorInterface.get_edited_scene_root()";
     gdscript_wrap::WrapResult wrap = gdscript_wrap::wrap_bare_body(
-        ctx.source_code, ctx.func_name,
-        "var SceneRoot := EditorInterface.get_edited_scene_root()", false);
+        transform.source, ctx.func_name, inject, false);
     if (!wrap.ok) {
       error_out = wrap.error;
       return false;
     }
-    ctx.wrapped = wrap.wrapped;
-    ctx.wrap_offset = wrap.header_lines + 1;
+    ctx.wrapped =
+        gdscript_wrap::insert_entry_check(wrap.wrapped, ctx.func_name, check);
+    const std::string header = "@tool\nextends Node\n\n" + inject + "\n" +
+                               "func " + ctx.func_name + "():\n";
+    ctx.wrap_offset = static_cast<int>(count_lines(header) + 1);
   }
   return true;
 }
@@ -263,7 +340,9 @@ bool run_with_timeout(ExecContext &ctx, std::string &error_out) {
 
     check_time();
     if (timeout_hit) {
-      error_out = "Execution timed out after " +
+      ctx.timed_out = true;
+      ctx.execution_time_ms = elapsed_ms_since(ctx.start_time);
+      error_out = "execution timed out after " +
                   std::to_string(ctx.timeout_ms) + " ms";
       return false;
     }
@@ -273,6 +352,14 @@ bool run_with_timeout(ExecContext &ctx, std::string &error_out) {
         godot_autopilot::debugger_ops::capture_new_error_text(log_before);
     ctx.new_output_text =
         godot_autopilot::debugger_ops::capture_new_output_text(log_before);
+    ctx.execution_time_ms = elapsed_ms_since(ctx.start_time);
+    if (is_timeout_sentinel(ctx.result) ||
+        ctx.execution_time_ms >= ctx.timeout_ms) {
+      ctx.timed_out = true;
+      error_out = "execution timed out after " +
+                  std::to_string(ctx.timeout_ms) + " ms";
+      return false;
+    }
   }
   return true;
 }
@@ -354,8 +441,11 @@ mcp::JsonValue build_exec_result(ExecContext &ctx) {
     r["error_details"] = mcp::JsonValue(error_details);
     mcp::JsonValue structured = extract_structured_error(ctx.new_error_text);
     if (structured.IsObject() && !structured.Empty()) {
+      structured["code"] = mcp::JsonValue("tool_error");
       r["structured_error"] = std::move(structured);
     }
+    r["error"] = mcp::JsonValue(error_details);
+    r["code"] = mcp::JsonValue("tool_error");
   }
   if (!ctx.temp_added) {
     r["note"] = mcp::JsonValue("temporary node was not added to any scene tree "
@@ -368,6 +458,80 @@ mcp::JsonValue build_exec_result(ExecContext &ctx) {
 
 namespace godot_autopilot {
 namespace code_exec_ops {
+
+int max_timeout_ms() {
+  const int64_t budget = dispatch::dispatch_wait_long_blocking_ms();
+  const int64_t ceiling = budget < GDA_CODE_EXEC_MAX_TIMEOUT_MS
+                               ? budget
+                               : GDA_CODE_EXEC_MAX_TIMEOUT_MS;
+  return static_cast<int>(ceiling);
+}
+
+void batch_undo_snapshot(godot::UndoRedo *&history, uint64_t &version_before,
+                         std::string &error) {
+  history = nullptr;
+  version_before = 0;
+  error.clear();
+  if (!runtime_ops::has_editor_queue()) {
+    error = "editor command queue is unavailable";
+    return;
+  }
+  const tools::TraceContext ctx = tools::capture_trace_context();
+  auto state = std::make_shared<UndoHistorySnapshot>();
+  dispatch::BoundedWaitOutcome outcome =
+      dispatch::run_bounded_on_main_thread(
+          get_editor_queue(), "batch_execute undo snapshot", state,
+          [state, ctx](UndoHistorySnapshot &snapshot) {
+            tools::ScopedTraceContext restore(ctx);
+            auto *editor = godot::EditorInterface::get_singleton();
+            auto *manager = editor ? editor->get_editor_undo_redo() : nullptr;
+            snapshot.history =
+                manager
+                    ? manager->get_history_undo_redo(static_cast<int32_t>(
+                          godot::EditorUndoRedoManager::GLOBAL_HISTORY))
+                    : nullptr;
+            if (snapshot.history)
+              snapshot.version_before = snapshot.history->get_version();
+          },
+          GDA_DISPATCH_WAIT_DEFAULT_MS);
+  if (!outcome.ok) {
+    error = outcome.error;
+    return;
+  }
+  history = state->history;
+  version_before = state->version_before;
+}
+
+bool batch_rollback_undo(godot::UndoRedo *history, uint64_t version_before,
+                         BatchUndoRollback &rollback) {
+  rollback = BatchUndoRollback();
+  if (history == nullptr || !runtime_ops::has_editor_queue()) {
+    return false;
+  }
+  const tools::TraceContext ctx = tools::capture_trace_context();
+  auto state = std::make_shared<BatchUndoRollback>();
+  dispatch::BoundedWaitOutcome outcome =
+      dispatch::run_bounded_on_main_thread(
+          get_editor_queue(), "batch_execute undo rollback", state,
+          [state, history, version_before, ctx](BatchUndoRollback &result) {
+            tools::ScopedTraceContext restore(ctx);
+            result.actions_created =
+                static_cast<int64_t>(history->get_version() - version_before);
+            for (int64_t undo_index = 0;
+                 undo_index < result.actions_created; ++undo_index) {
+              if (!history->has_undo() || !history->undo())
+                break;
+              ++result.rolled_back;
+            }
+          },
+          GDA_DISPATCH_WAIT_DEFAULT_MS);
+  if (!outcome.ok) {
+    return false;
+  }
+  rollback.actions_created = state->actions_created;
+  rollback.rolled_back = state->rolled_back;
+  return true;
+}
 
 mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -412,19 +576,8 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
   godot::UndoRedo *history = nullptr;
   uint64_t version_before = 0;
   if (stop_on_error && rollback_on_error && runtime_ops::has_editor_queue()) {
-    const tools::TraceContext ctx = tools::capture_trace_context();
-    get_editor_queue().execute_sync([&, ctx]() {
-      tools::ScopedTraceContext restore(ctx);
-      auto *editor = godot::EditorInterface::get_singleton();
-      auto *manager = editor ? editor->get_editor_undo_redo() : nullptr;
-      history =
-          manager
-              ? manager->get_history_undo_redo(static_cast<int32_t>(
-                    godot::EditorUndoRedoManager::GLOBAL_HISTORY))
-              : nullptr;
-      if (history)
-        version_before = history->get_version();
-    });
+    std::string snapshot_error;
+    batch_undo_snapshot(history, version_before, snapshot_error);
   }
 
   mcp::JsonValue results(mcp::JsonValue::array_tag);
@@ -664,8 +817,14 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
     mcp::JsonValue handler_result = dispatch::call_handler(tool_name, tool_args);
 
     int64_t pending_id = 0;
-    if (runtime_ops::payload_is_pending(handler_result, &pending_id)) {
-      if (!await_async) {
+    const bool has_pending_marker =
+        runtime_ops::payload_is_pending(handler_result, &pending_id);
+    int64_t job_id = 0;
+    const bool is_game_job =
+        runtime_ops::payload_is_game_job(handler_result, &job_id);
+    const bool is_deferred_wait = handler_result.Find("__gda_wait") != nullptr;
+    if (is_game_job || is_deferred_wait || has_pending_marker) {
+      if (!await_async && (is_game_job || has_pending_marker)) {
         result_item["status"] = mcp::JsonValue("error");
         result_item["error"] = mcp::JsonValue(
             "async game op '" + tool_name +
@@ -687,13 +846,20 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
       }
       if (!can_wait_off_main_thread) {
         std::string discard_detail;
-        runtime_ops::discard_pending(pending_id, discard_detail);
+        if (has_pending_marker || is_game_job)
+          runtime_ops::discard_pending(pending_id, discard_detail);
         result_item["status"] = mcp::JsonValue("error");
         result_item["error"] = mcp::JsonValue(
             "await_async cannot wait on the editor main thread — invoke "
             "batch_execute directly (not through call_tool) so the wait runs "
             "on the transport thread");
         result_item["detail"] = mcp::JsonValue(discard_detail);
+        if (is_deferred_wait) {
+          const mcp::JsonValue released = dispatch::resolve_deferred_wait(
+              tool_name, std::move(handler_result));
+          if (released.Find("error") != nullptr)
+            result_item["detail"] = mcp::JsonValue(released.Dump());
+        }
         push_payload(result_item);
         results.PushBack(std::move(result_item));
         ++failed;
@@ -708,10 +874,18 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
       if (auto *timeout_p = handler_result.Find("timeout_ms");
           timeout_p && timeout_p->IsInt() && timeout_p->GetInt() > 0)
         wait_ms = timeout_p->GetInt();
-      mcp::JsonValue awaited =
-          runtime_ops::wait_pending_response(pending_id, wait_ms);
-      if (tool_name == "capture_game_viewport" && !awaited.Contains("error"))
-        awaited = runtime_ops::finalize_capture_response(awaited);
+      mcp::JsonValue awaited;
+      if (is_game_job || is_deferred_wait) {
+        awaited = dispatch::resolve_deferred_wait(tool_name,
+                                                  std::move(handler_result));
+      } else {
+        awaited = runtime_ops::wait_pending_response(pending_id, wait_ms);
+        if (!awaited.Contains("error") &&
+            (tool_name == "capture_game_viewport" ||
+             awaited.IsObject() && awaited.Contains("path")))
+          awaited = runtime_ops::finalize_capture_response(awaited,
+                                                           handler_result);
+      }
       const bool awaited_error =
           awaited.IsObject() && awaited.Find("error") != nullptr;
       result_item["status"] = mcp::JsonValue(awaited_error ? "error" : "ok");
@@ -778,23 +952,12 @@ mcp::JsonValue handle_batch_execute(const mcp::JsonValue &args) {
                        " remaining operations were not executed. Set "
                        "stop_on_error=false to run all operations.");
     if (history && runtime_ops::has_editor_queue()) {
-      int64_t actions_created = 0;
-      int64_t rolled_back = 0;
-      const tools::TraceContext ctx = tools::capture_trace_context();
-      get_editor_queue().execute_sync([&, ctx]() {
-        tools::ScopedTraceContext restore(ctx);
-        actions_created =
-            static_cast<int64_t>(history->get_version() - version_before);
-        for (int64_t undo_index = 0; undo_index < actions_created;
-             ++undo_index) {
-          if (!history->has_undo() || !history->undo())
-            break;
-          ++rolled_back;
-        }
-      });
-      r["rolled_back"] = mcp::JsonValue(rolled_back);
-      r["rollback_partial"] =
-          mcp::JsonValue(rolled_back != actions_created);
+      BatchUndoRollback rollback;
+      if (batch_rollback_undo(history, version_before, rollback)) {
+        r["rolled_back"] = mcp::JsonValue(rollback.rolled_back);
+        r["rollback_partial"] =
+            mcp::JsonValue(rollback.rolled_back != rollback.actions_created);
+      }
     }
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -839,16 +1002,17 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue &args) {
     ctx.func_name = fn->GetString();
   }
 
+  const int max_timeout = max_timeout_ms();
   ctx.timeout_ms = CODE_EXEC_DEFAULT_TIMEOUT_MS;
   if (auto *tm = args.Find("timeout_ms")) {
-    if (!tm->IsInt() || tm->GetInt() <= 0 ||
-        tm->GetInt() > CODE_EXEC_MAX_TIMEOUT_MS)
-      return util::error_json("timeout_ms must be an integer between 1 and 30000");
+    if (!tm->IsInt() || tm->GetInt() <= 0 || tm->GetInt() > max_timeout)
+      return util::error_json("timeout_ms must be an integer between 1 and " +
+                               std::to_string(max_timeout));
     ctx.timeout_ms = static_cast<int>(tm->GetInt());
   }
   if (ctx.timeout_ms <= 0)
     ctx.timeout_ms = CODE_EXEC_DEFAULT_TIMEOUT_MS;
-  ctx.timeout_ms = std::min(ctx.timeout_ms, CODE_EXEC_MAX_TIMEOUT_MS);
+  ctx.timeout_ms = std::min(ctx.timeout_ms, max_timeout);
 
   ctx.auto_owner = true;
   if (auto *ao = args.Find("auto_owner")) {
@@ -866,8 +1030,14 @@ mcp::JsonValue handle_code_execute(const mcp::JsonValue &args) {
     return util::error_json(error_out);
   if (!compile_and_map_errors(ctx, error_out))
     return util::error_json(error_out);
-  if (!run_with_timeout(ctx, error_out))
+  if (!run_with_timeout(ctx, error_out)) {
+    if (ctx.timed_out) {
+      reconcile_leaked_children(ctx);
+      return dispatch::exec_timeout_result(ctx.timeout_ms,
+                                           ctx.execution_time_ms);
+    }
     return util::error_json(error_out);
+  }
   reconcile_leaked_children(ctx);
 
   mcp::JsonValue r = build_exec_result(ctx);

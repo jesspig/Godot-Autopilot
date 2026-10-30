@@ -21,6 +21,62 @@ bool contains_ci(const std::string &haystack, const std::string &needle) {
 
 } // namespace
 
+namespace {
+
+constexpr const char *kInternalErrorPrefix = "internal error: ";
+constexpr const char *kHandlerErrorPrefix = "handler error: ";
+constexpr const char *kNonStdExceptionPrefix = "internal error: non-std exception";
+
+bool starts_with(const std::string &text, const char *prefix) {
+  const std::string head(prefix);
+  return text.size() >= head.size() && text.compare(0, head.size(), head) == 0;
+}
+
+std::string quote_error_path_value(const std::string &value) {
+  std::string quoted;
+  quoted.reserve(value.size() + 2);
+  quoted.push_back('"');
+  for (char c : value) {
+    const unsigned char byte = static_cast<unsigned char>(c);
+    if (c == '"' || c == '\\') {
+      quoted.push_back('\\');
+      quoted.push_back(c);
+      continue;
+    }
+    quoted.push_back(byte < 0x20 || byte == 0x7F ? ' ' : c);
+  }
+  quoted.push_back('"');
+  return quoted;
+}
+
+} // namespace
+
+std::string format_error_path_detail(const ErrorPathEvent &event) {
+  std::string detail = "request_id=" + quote_error_path_value(event.request_id);
+  detail += " method=" + quote_error_path_value(event.method);
+  detail += " error_code=" + std::to_string(event.error_code);
+  detail += " connection_id=" + quote_error_path_value(event.connection_id);
+  detail += " exception_type=" + quote_error_path_value(event.exception_type);
+  return detail;
+}
+
+std::string classify_error_path_exception(const std::string &message) {
+  if (starts_with(message, kNonStdExceptionPrefix)) {
+    return "non_std_exception";
+  }
+  if (starts_with(message, kInternalErrorPrefix) ||
+      starts_with(message, kHandlerErrorPrefix)) {
+    return "std_exception";
+  }
+  return std::string();
+}
+
+void log_error_path(const ErrorPathEvent &event) {
+  LogSystem::instance().log_detailed(LogLevel::Error, LogCategory::Transport,
+                                     "MCP error path",
+                                     format_error_path_detail(event));
+}
+
 void LogSystem::log(LogLevel level, LogCategory category,
                     const std::string &message) {
   LogEntry entry;

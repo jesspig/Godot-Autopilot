@@ -1,6 +1,11 @@
 #include <cstdlib>
+#include <exception>
+#include <functional>
+#include <new>
 #include <string>
 #include <typeinfo>
+#include <utility>
+#include <vector>
 
 #include <godot_cpp/classes/display_server.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
@@ -11,14 +16,19 @@
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/godot.hpp>
+#include <godot_cpp/variant/string.hpp>
+#include <godot_cpp/variant/utility_functions.hpp>
 
 #include "core/command_queue.hpp"
 #include "core/export_guard.hpp"
+#include "core/gda_home.hpp"
+#include "core/http_transport_ext.hpp"
 #include "core/log_persist.hpp"
 #include "core/log_system.hpp"
 #include "core/mode_detector.hpp"
 #include "core/monitor.hpp"
 #include "core/perf_sampler.hpp"
+#include "core/plugin_hooks.hpp"
 #include "core/sanitize_policy.hpp"
 #include "core/scene_dirty_tracker.hpp"
 #include "core/server_context.hpp"
@@ -48,6 +58,77 @@ static void log_setup_failure(const char *step) {
 }
 
 static godot_autopilot::ServerContext *g_server_ctx = nullptr;
+
+namespace godot_autopilot {
+
+namespace {
+
+std::vector<std::function<void()>> &startup_hook_list() {
+  static std::vector<std::function<void()>> hooks;
+  return hooks;
+}
+
+std::vector<std::function<void()>> &shutdown_hook_list() {
+  static std::vector<std::function<void()>> hooks;
+  return hooks;
+}
+
+bool &startup_hooks_ran() {
+  static bool ran = false;
+  return ran;
+}
+
+void log_hook_failure(const char *phase, const std::exception &e) {
+  get_log_system().log(LogLevel::Error, LogCategory::System,
+                        std::string(phase) + " hook failed: " + e.what());
+}
+
+void log_hook_failure(const char *phase) {
+  get_log_system().log(LogLevel::Error, LogCategory::System,
+                        std::string(phase) + " hook failed: unknown exception");
+}
+
+} // namespace
+
+void register_startup_hook(std::function<void()> hook) {
+  startup_hook_list().push_back(std::move(hook));
+}
+
+void register_shutdown_hook(std::function<void()> hook) {
+  shutdown_hook_list().push_back(std::move(hook));
+}
+
+void run_startup_hooks() {
+  startup_hooks_ran() = true;
+  for (const std::function<void()> &hook : startup_hook_list()) {
+    try {
+      hook();
+    } catch (const std::exception &e) {
+      log_hook_failure("startup", e);
+    } catch (...) {
+      log_hook_failure("startup");
+    }
+  }
+}
+
+void run_shutdown_hooks() {
+  if (!startup_hooks_ran()) {
+    return;
+  }
+  startup_hooks_ran() = false;
+  const std::vector<std::function<void()>> &hooks = shutdown_hook_list();
+  for (auto cursor = hooks.rbegin(); cursor != hooks.rend(); ++cursor) {
+    try {
+      (*cursor)();
+    } catch (const std::exception &e) {
+      log_hook_failure("shutdown", e);
+    } catch (...) {
+      log_hook_failure("shutdown");
+    }
+  }
+}
+
+} // namespace godot_autopilot
 
 static bool gda_cmdline_mode() {
   if (const char *force_headless_env = std::getenv("GDA_FORCE_HEADLESS")) {
@@ -115,6 +196,13 @@ void GodotAutopilotPlugin::_enter_tree() {
   godot_autopilot::sanitize_policy::initialize();
   godot_autopilot::LogPersist::instance().init_session();
   godot_autopilot::monitor::environment_snapshot();
+  godot_autopilot::HomeResolver::set_data_dir_provider([]() {
+    auto *os = godot::OS::get_singleton();
+    if (!os) {
+      return std::string();
+    }
+    return std::string(os->get_data_dir().utf8().get_data());
+  });
   try {
     auto *engine = godot::Engine::get_singleton();
     if (!engine) {
@@ -218,6 +306,9 @@ void GodotAutopilotPlugin::_enter_tree() {
       get_log_system().log(LogLevel::Error, LogCategory::Transport,
                            "MCP server start failed: " +
                                g_server_ctx->last_error());
+      godot::UtilityFunctions::print(
+          godot::String("[Godot Autopilot] MCP server start failed: ") +
+          godot::String::utf8(g_server_ctx->last_error().c_str()));
       godot_autopilot::monitor::error_event("server_start_failed", "server",
                                             g_server_ctx->last_error());
     }
@@ -239,6 +330,8 @@ void GodotAutopilotPlugin::_enter_tree() {
   export_guard_.instantiate();
   add_export_plugin(export_guard_);
 
+  godot_autopilot::run_startup_hooks();
+
   get_log_system().log(LogLevel::Info, LogCategory::System, "Plugin ready");
   godot_autopilot::monitor::lifecycle("plugin_ready");
 }
@@ -247,6 +340,7 @@ void GodotAutopilotPlugin::_process(double delta) {
   godot_autopilot::perf_sampler::tick(delta);
   godot_autopilot::LogPersist::instance().flush_on_main_thread();
   s_queue.drain();
+  godot_autopilot::http_transport_instance().pump();
   if (log_dock) {
     log_dock->poll_new_entries();
   }
@@ -254,13 +348,22 @@ void GodotAutopilotPlugin::_process(double delta) {
 
 void GodotAutopilotPlugin::_exit_tree() {
   try {
+    godot_autopilot::run_shutdown_hooks();
+    s_queue.close();
+    godot_autopilot::runtime_ops::set_editor_queue(nullptr);
     if (g_server_ctx) {
       g_server_ctx->stop();
       delete g_server_ctx;
       g_server_ctx = nullptr;
     }
-    s_queue.close();
-    godot_autopilot::runtime_ops::set_editor_queue(nullptr);
+
+    const size_t rejoined = godot_autopilot::http_transport_reap_parked_workers();
+    if (rejoined > 0) {
+      get_log_system().log(godot_autopilot::LogLevel::Info,
+                           godot_autopilot::LogCategory::Transport,
+                           "rejoined " + std::to_string(rejoined) +
+                               " parked transport worker thread(s)");
+    }
 
     if (tools_singleton) {
       auto *engine = godot::Engine::get_singleton();

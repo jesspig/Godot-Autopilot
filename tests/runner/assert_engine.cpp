@@ -90,6 +90,17 @@ bool check_expectations(const mcp::JsonValue& response, const StepExpect& expect
             out_detail = "field '" + check.key + "' is empty: " + value->Dump();
             return false;
         }
+        if (check.has_not_contains) {
+            if (!value->IsString()) {
+                out_detail = "field '" + check.key + "' is not a string: " + value->Dump();
+                return false;
+            }
+            if (value->GetString().find(check.not_contains) != std::string::npos) {
+                out_detail = "field '" + check.key + "' contains forbidden substring '" +
+                             check.not_contains + "': " + value->Dump();
+                return false;
+            }
+        }
     }
     return true;
 }

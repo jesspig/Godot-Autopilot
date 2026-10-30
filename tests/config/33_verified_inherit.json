@@ -2,6 +2,7 @@
   "name": "33_verified_inherit",
   "description": "B4 场景保存核验口径修正：包含子场景实例的场景，实例内部继承节点（owner 非场景根、本不落盘）不再计入 memory/disk 对比，save_editor_scene_as 回执不再必然把这类场景判成 mismatch。链路：create_directory res://gda_tmp_verify_inherit → create_editor_scene InheritChild(Node3D) + create_scene_node ChildPart → save_editor_scene_as child.tscn（2/2 节点、nodes_match=true）→ create_editor_scene InheritMain(Node3D, close_current) → instantiate_scene child.tscn 为 ChildInstance（实例根 owner=InheritMain、内部 ChildPart 为继承节点）→ save_editor_scene_as main.tscn（nodes_match=true、connections_match=true、inherited_nodes=1，即回执把不落盘继承节点分离计数而非报 mismatch）→ verify_scene_saved（match=true、missing_paths=[]、memory_nodes=disk_nodes=2、inherited_nodes=1、inherited_connections=0、inherited_paths 精确列出 InheritMain/ChildInstance/ChildPart）→ cleanup 关闭场景并 move_os_file_to_trash 回收目录。断言引擎不支持数组下标与大于比较，空数组用 value=[] 精确比对、正例用精确计数（inherited_nodes=1）替代 >0。",
   "headless": true,
+  "requires": ["write"],
   "pipeline": {
     "on_failure": "continue",
     "stages": [

@@ -5,7 +5,7 @@ description: "Godot runtime and debugging guide: launch and stop the game, input
 
 # Runtime and Debugging with godot-autopilot
 
-Invocation: use the native MCP tools first; when that channel is down, use the script bridge `node .agents/skills/godot-autopilot-tools/scripts/gda_mcp.mjs` (Node 18+ or Bun); with neither installed, build a manual plan per `references/manual-fallback.md` of the godot-autopilot-tools skill.
+Invocation: use the native MCP tools first; when that channel is down, follow the calling ladder in the godot-autopilot-tools skill (the gda CLI, via bunx, a global install, or the standalone gda binary); with no CLI available, work through its references/manual-fallback.md.
 
 This book covers the game process life cycle: launching and stopping the
 game, the `game_*` runtime channel, input injection, viewport capture and the
@@ -59,9 +59,10 @@ Every game call has a three-layer timeout budget: the host waits
 wait must stay below the HTTP transport's hard 30 s limit. Accepted
 `timeout_ms` for game ops is therefore capped at 25000 ms (some tools reject,
 some clamp, and the low-level sender clamps every request), while
-editor-only tools keep the 30000 ms maximum. Budget long work as a chain of
-shorter calls and poll with `get_game_status` instead of raising
-`timeout_ms`.
+editor-only tools keep a 30000 ms maximum (`code_execute` is the exception:
+its ceiling is whatever the server reports in the `code_execute` schema).
+Budget long work as a chain of shorter calls and poll with `get_game_status`
+instead of raising `timeout_ms`.
 
 ## Check liveness with get_game_status
 
@@ -73,6 +74,12 @@ fields:
   `last_activity_ms`); read it together with `physics_stalled`.
 - `physics_stalled` — `physics_frame` has not advanced while FPS is positive,
   i.e. a frozen physics loop.
+
+`physics_frame` is the engine-global physics frame counter: it keeps
+advancing while `paused` is true, so it cannot by itself prove that a pause
+froze gameplay. Prove the freeze with a gameplay-owned value instead — a
+game node's position, a tick counter owned by gameplay code, or a dedicated
+gameplay probe — and read it together with the `paused` field.
 
 A failed scene reload shows up as an empty scene with a sharp `node_count`
 drop. Do not debug a half-dead process: stop with `stop_editor_playing` and
@@ -104,7 +111,12 @@ debug channel into the game process).
   `action`; `mode` is `event` (default, parsed input event), `api`
   (immediate `Input.action_press`/`action_release`) or `hold` (event-style,
   held for `duration_ms`). Parameters outside the whitelist are rejected
-  with an error — a typo fails the call.
+  with an error — a typo fails the call. `api` only writes the action state:
+  it creates no `InputEvent` and dispatches none, so `_input`,
+  `_unhandled_input`, `_gui_input` and `is_action_just_pressed_by_event`
+  never see it. Use `event` mode (or a real `key` event) for UI and other
+  event-driven code; `api` suits only code that polls `Input` action state
+  (`is_action_pressed` / `is_action_just_pressed`).
 - `wait_game_input` waits until an action reaches a transient state
   (`just_pressed` default, `just_released` or `pressed`) in a physics frame,
   or `timeout_ms` elapses (default 2000, max 25000). Optional `inject` sends
@@ -158,9 +170,15 @@ Three tools, three targets:
 - `capture_editor_viewport` — the default `target` `editor` grabs the editor
   2D viewport (falling back to the 3D viewport), so it works while you are
   still building a scene; `target` `game` captures the running game instead.
-  Add save=true on the editor target to also write the PNG under
-  user://godot_autopilot/captures/ and receive its path in the result; both
-  targets keep only the 20 most recent capture files.
+  `save=true` (or giving `save_dir`) applies to both targets: the PNG is
+  written into the GDA per-project capture folder by default (under the GDA
+  home directory, not the Godot user data folder), or into the given
+  `res://` directory inside the project root, and the result gains
+  `saved_path`; `save_dir` outside the project root / GDA captures folder is
+  rejected with `path rejected`. Saving requires the write capability; both
+  targets keep only the 20 most recent capture files. On the plain
+  `capture_game_viewport` the same `save`/`save_dir` parameters write a copy
+  after the editor reads the transport PNG back from the game.
 - `capture_display_screen` — a whole physical screen by `screen` index, for
   desktop-level checks such as window placement; no running game required.
 
@@ -185,6 +203,11 @@ decide when to shoot:
 - `when` — a GDScript expression evaluated once per rendered frame inside the
   game; the capture fires on the first frame where it is true. An empty
   string means no condition.
+
+The condition frame is reported as `when_satisfied_frame`; the image itself
+is read on the next rendered frame and reported as `captured_frame`
+(`captured_frame` > `when_satisfied_frame`), so the picture shows the state
+after the condition became true rather than the frame that evaluated it.
 
 Give both and the frame budget must be spent before the condition is even
 evaluated. `when` runs with the current scene as the base instance (the tree
@@ -237,8 +260,11 @@ under fixed coordinates.
 Control-derived node with:
 
 - `path` (absolute node path), `type` (class name), `visible` (including
-  ancestors), `text` (when present) and `global_rect` (`position` and
-  `size` in viewport coordinates).
+  ancestors), `text` (when present), `global_rect` (`position` and
+  `size` in viewport coordinates), `mouse_filter` (`STOP`/`PASS`/`IGNORE`)
+  and `z_index`. The last two are the hit-testing and draw-order facts: a
+  full-screen `PASS` control can swallow clicks meant for controls below
+  it, while `IGNORE` passes them through.
 
 `max_elements` defaults to 100 (max 1000); `truncated` set to true signals
 more elements remain — raise the cap or target a subtree via
@@ -247,7 +273,16 @@ automation: locate buttons and panels here, then drive them with
 `sequence_game_inputs` or `queue_game_input` using `global_rect`
 coordinates, or with `execute_game_script` using `path`.
 
-- `validate_game_ui_layout` scans the running game's Control tree for layout defects (zero-size visible controls, off-viewport controls, possibly-occluded controls) and reports each as a triage item with no automatic verdict. It complements `get_game_ui_elements` reconnaissance before click automation.
+- `validate_game_ui_layout` scans the running game's Control tree for layout defects (zero-size visible controls, off-viewport controls, possibly-occluded controls, naming the occluding control) and reports each as a triage item with no automatic verdict. It complements `get_game_ui_elements` reconnaissance before click automation.
+
+UI change acceptance: run `validate_game_ui_layout` first, then click with
+`click_game_ui_element` and check the hit result against the target.
+`click_game_ui_element` returns `hit_path` (the control actually under the
+injected point) and `hit_mismatch` (true when it is not the requested
+target); by default a mismatch is reported without failing the call, while
+`strict_hit: true` turns it into an error. A `hit_mismatch` together with a
+`possibly_occluded` issue is the signature of a full-screen `PASS`
+container eating the click.
 
 ## Pause, reload and run code in the game
 
@@ -257,7 +292,10 @@ coordinates, or with `execute_game_script` using `path`.
   mode (`INHERIT` resolves up the tree, the root is fixed `PAUSABLE`), and
   pausing also deactivates the physics servers — the simulation itself stops,
   not just node callbacks. Transient input states are lost while paused.
-  The full matrix is in `references/input-injection.md`.
+  `physics_frame` keeps advancing while paused because it is the engine-global
+  counter, so combine `paused` with a gameplay value (node position or a
+  gameplay-owned tick) when you need to prove that gameplay froze. The full
+  matrix is in `references/input-injection.md`.
 - `reload_scene_tree_current_scene` reloads the currently running scene from
   disk, recreating the scene root — script state, connections and runtime
   modifications reset to the saved file. Without a running scene it returns

@@ -1,7 +1,8 @@
 {
   "name": "resources_scripts",
-  "description": "资源/脚本类工具代表性配置驱动用例：execute_script 四种行为（单表达式自动 return、多行显式 return、语法错误、缺参报错）+ 资源只读查询（get_resource_extensions、has_resource）+ search_tools 检索验证脚本工具可发现。本轮新增：save_resource copy-on-write（按 path 加载→内存修改→存到 dest_path：断言 copy_on_write:true、source_path、源缓存实例 resource_path 不被改写，且 dest 落盘内存值；源文件未被写入内存修改由 reload 后读回磁盘值确认（源内存实例可能被编辑器文件系统扫描异步刷新，不再断言其保留））、reload_resource 重载缓存（replaced:true 后读回磁盘值；缺失文件报错）、duplicate_resource 带 name 注册后跨调用引用与改写、copy_resource_file 复制文件（存在性/类型校验）+ 缺失源与同路径报错。fixture 位于 res://gda_tmp_res_ops/，after_all 回收。",
+  "description": "资源/脚本类工具代表性配置驱动用例：execute_script 四种行为（单表达式自动 return、多行显式 return、语法错误、缺参报错）+ 资源只读查询（get_resource_extensions、has_resource）+ search_tools 检索验证脚本工具可发现。本轮新增：save_resource copy-on-write（按 path 加载→内存修改→存到 dest_path：断言 copy_on_write:true、source_path、源缓存实例 resource_path 不被改写，且 dest 落盘内存值；源文件未被写入内存修改由 reload 后读回磁盘值确认（源内存实例可能被编辑器文件系统扫描异步刷新，不再断言其保留））、reload_resource 重载缓存（replaced:true 后读回磁盘值；缺失文件报错）、duplicate_resource 带 name 注册后跨调用引用与改写、copy_resource_file 复制文件（存在性/类型校验）+ 缺失源与同路径报错。fixture 位于 res://gda_tmp_res_ops/，after_all 回收。本轮新增（write-and-param 支线）：execute_script 的 source_code 别名生效（单表达式与多行显式 return 各一条）、expression+source_code 双键冲突报错、双键全缺失报错；write_file 对坏 .gd 返回 ok=false + diagnostic_scope=compile + parse_error.line、对好 .gd 返回 ok=true + compilable=true、对 .gdshader 保持 diagnostic_scope=load + compilable=unknown、对 .cs 诚实标注 diagnostic_scope=resource_load + compilable=unknown + assembly_checked/is_dotnet_editor/hint，全部文件写在既有 res://gda_tmp_res_ops/ 夹具内由 after_all 回收。",
   "headless": true,
+  "requires": ["write", "code_execute"],
   "pipeline": {
     "on_failure": "fail_fast",
     "after_all": [
@@ -51,7 +52,37 @@
             "args": {},
             "expect": {
               "field_checks": [
-                { "key": "error", "value": "missing required parameter: expression" }
+                { "key": "error", "value": "missing required parameter: expression or source_code" }
+              ]
+            }
+          },
+          {
+            "id": "script_execute_source_code_alias",
+            "tool": "execute_script",
+            "args": { "source_code": "var x = 40\nreturn x + 2" },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": 42 }
+              ]
+            }
+          },
+          {
+            "id": "script_execute_source_code_single_expression",
+            "tool": "execute_script",
+            "args": { "source_code": "21 * 2" },
+            "expect": {
+              "field_checks": [
+                { "key": "result", "value": 42 }
+              ]
+            }
+          },
+          {
+            "id": "script_execute_both_parameters_conflict",
+            "tool": "execute_script",
+            "args": { "expression": "1 + 1", "source_code": "1 + 1" },
+            "expect": {
+              "field_checks": [
+                { "key": "error", "value": "invalid parameter: pass only one of expression/source_code" }
               ]
             }
           }
@@ -107,6 +138,83 @@
             "tool": "create_directory",
             "args": { "path": "res://gda_tmp_res_ops" },
             "expect": { "has_keys": ["created"] }
+          }
+        ]
+      },
+      {
+        "id": "write_diagnostics",
+        "steps": [
+          {
+            "id": "write_bad_gdscript_compile_failure",
+            "tool": "write_file",
+            "args": {
+              "path": "res://gda_tmp_res_ops/bad_script.gd",
+              "content": "extends Node\n\nfunc broken( -> void:\n\tpass\n"
+            },
+            "expect": {
+              "has_keys": ["result", "diagnostics"],
+              "field_checks": [
+                { "key": "result", "value": "ok" },
+                { "key": "diagnostics.ok", "value": false },
+                { "key": "diagnostics.diagnostic_scope", "value": "compile" },
+                { "key": "diagnostics.compilable", "value": "false" },
+                { "key": "diagnostics.parse_error.line", "not_empty": true },
+                { "key": "diagnostics.parse_error.message", "not_empty": true },
+                { "key": "diagnostics.hint", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "write_good_gdscript_compile_pass",
+            "tool": "write_file",
+            "args": {
+              "path": "res://gda_tmp_res_ops/good_script.gd",
+              "content": "extends Node\n\n@export var probe_value: int = 7\n"
+            },
+            "expect": {
+              "has_keys": ["result", "diagnostics"],
+              "field_checks": [
+                { "key": "result", "value": "ok" },
+                { "key": "diagnostics.ok", "value": true },
+                { "key": "diagnostics.diagnostic_scope", "value": "compile" },
+                { "key": "diagnostics.compilable", "value": "true" }
+              ]
+            }
+          },
+          {
+            "id": "write_gdshader_load_scope",
+            "tool": "write_file",
+            "args": {
+              "path": "res://gda_tmp_res_ops/probe_shader.gdshader",
+              "content": "shader_type canvas_item;\n\nvoid fragment() {\n\tCOLOR = vec4(1.0, 0.5, 0.25, 1.0);\n}\n"
+            },
+            "expect": {
+              "has_keys": ["result", "diagnostics"],
+              "field_checks": [
+                { "key": "result", "value": "ok" },
+                { "key": "diagnostics.diagnostic_scope", "value": "load" },
+                { "key": "diagnostics.compilable", "value": "unknown" }
+              ]
+            }
+          },
+          {
+            "id": "write_csharp_honest_diagnostics",
+            "tool": "write_file",
+            "args": {
+              "path": "res://gda_tmp_res_ops/probe_script.cs",
+              "content": "using Godot;\n\npublic partial class GdaProbe : Node\n{\n}\n"
+            },
+            "expect": {
+              "has_keys": ["result", "diagnostics"],
+              "field_checks": [
+                { "key": "result", "value": "ok" },
+                { "key": "diagnostics.diagnostic_scope", "value": "resource_load" },
+                { "key": "diagnostics.compilable", "value": "unknown" },
+                { "key": "diagnostics.assembly_checked", "not_empty": true },
+                { "key": "diagnostics.is_dotnet_editor", "not_empty": true },
+                { "key": "diagnostics.hint", "not_empty": true }
+              ]
+            }
           }
         ]
       },

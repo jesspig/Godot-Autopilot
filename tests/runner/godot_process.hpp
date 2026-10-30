@@ -14,6 +14,9 @@ public:
         std::string project_path;
         int port = 0;
         bool headless = true;
+        std::string allow_list;
+        bool run_import = true;
+        std::string console_log_path;
     };
 
     explicit GodotProcess(Options opts);
@@ -23,8 +26,11 @@ public:
 
     void stop();
 
+    void detach();
+
     bool alive() const;
     int port() const;
+    long long pid() const;
     std::string capture_logs();
     std::string last_error() const;
 

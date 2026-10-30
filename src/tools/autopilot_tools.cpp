@@ -14,8 +14,10 @@
 #include <utility>
 #include <vector>
 
+#include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
@@ -23,6 +25,7 @@
 #include <godot_cpp/variant/utility_functions.hpp>
 
 #include "core/command_queue.hpp"
+#include "core/config.hpp"
 #include "core/log_system.hpp"
 #include "core/monitor.hpp"
 #include "core/plugin_config.hpp"
@@ -34,6 +37,7 @@
 #include "tools/tool_base.hpp"
 #include "tools/tool_invoke.hpp"
 #include "tools/tool_spec.hpp"
+#include "util/dotnet_env.hpp"
 #include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 
@@ -152,19 +156,19 @@ mcp::JsonValue run_dynamic_handler(
   if (runtime_ops::has_editor_queue() &&
       !get_editor_queue().is_main_thread()) {
     const tools::TraceContext ctx = tools::capture_trace_context();
-    try {
-      return get_editor_queue().execute_sync(
-          [&target, &args, ctx] {
-            tools::ScopedTraceContext restore(ctx);
-            return invoke_dynamic_target(target, args);
-          });
-    } catch (const std::exception &e) {
-      return util::error_json(std::string("user tool dispatch failed: ") +
-                              e.what());
-    } catch (...) {
-      return util::error_json(
-          "user tool dispatch failed: unknown exception");
+    auto state = std::make_shared<mcp::JsonValue>();
+    dispatch::BoundedWaitOutcome outcome =
+        dispatch::run_bounded_on_main_thread(
+            get_editor_queue(), "user tool dispatch", state,
+            [target, args, ctx](mcp::JsonValue &result) {
+              tools::ScopedTraceContext restore(ctx);
+              result = invoke_dynamic_target(target, args);
+            },
+            GDA_DISPATCH_WAIT_DEFAULT_MS);
+    if (!outcome.ok) {
+      return util::error_json(outcome.error);
     }
+    return *state;
   }
   try {
     return invoke_dynamic_target(target, args);
@@ -449,6 +453,89 @@ int64_t AutopilotTools::register_tool(const godot::Dictionary &definition,
   return handle;
 }
 
+godot::Dictionary AutopilotTools::register_csharp_tool(
+    const godot::Dictionary &definition, const godot::Callable &callable) {
+  const std::string name = string_field(definition, "name", "");
+  if (!authorization::capability_enabled(kUserToolsCapability)) {
+    godot::Dictionary denied;
+    denied["error"] = godot::String::utf8(kUserToolsDisabledMessage);
+    denied["authorization_required"] =
+        godot::String::utf8(kUserToolsCapability);
+    denied["tool_name"] = godot::String::utf8(name.c_str());
+    denied["handle"] = static_cast<int64_t>(-1);
+    return denied;
+  }
+  if (name.empty()) {
+    godot::Dictionary out = rescan_error(
+        "register_csharp_tool: definition.name must be a non-empty string");
+    out["tool_name"] = godot::String::utf8(name.c_str());
+    out["handle"] = static_cast<int64_t>(-1);
+    return out;
+  }
+  bool is_dotnet_editor = false;
+  bool assembly_loaded = false;
+  dotnet_env::DotnetProbe probe = dotnet_env::probe_current();
+  is_dotnet_editor = dotnet_env::is_dotnet_environment(probe);
+  assembly_loaded = probe.csharp_script_class;
+  if (!is_dotnet_editor) {
+    godot::Dictionary out = rescan_error(
+        "register_csharp_tool: tool '" + name +
+        "' not registered: editor is NOT a .NET build "
+        "(CSharpScript class missing and no mono/dotnet feature reported), "
+        "so C# callables cannot load in this editor; open the project in the "
+        ".NET editor build and retry");
+    out["tool_name"] = godot::String::utf8(name.c_str());
+    out["handle"] = static_cast<int64_t>(-1);
+    return out;
+  }
+  if (!assembly_loaded) {
+    godot::Dictionary out = rescan_error(
+        "register_csharp_tool: tool '" + name +
+        "' not registered: C# assembly not loaded "
+        "(CSharpScript class missing); run build_csharp_assembly with "
+        "wait=true and confirm via get_debugger_log before registering");
+    out["tool_name"] = godot::String::utf8(name.c_str());
+    out["handle"] = static_cast<int64_t>(-1);
+    return out;
+  }
+  {
+    const std::set<std::string> existing = dynamic_tool_name_set();
+    if (existing.find(name) != existing.end()) {
+      godot::Dictionary out = rescan_error(
+          "register_csharp_tool: tool '" + name +
+          "' is already registered (idempotent reject; unregister first "
+          "or reuse handle)");
+      out["tool_name"] = godot::String::utf8(name.c_str());
+      out["handle"] = static_cast<int64_t>(-1);
+      return out;
+    }
+  }
+  if (auto registry = get_active_registry()) {
+    if (registry->find_any(name) != nullptr) {
+      godot::Dictionary out = rescan_error(
+          "register_csharp_tool: tool '" + name +
+          "' collides with a built-in MCP tool");
+      out["tool_name"] = godot::String::utf8(name.c_str());
+      out["handle"] = static_cast<int64_t>(-1);
+      return out;
+    }
+  }
+  const int64_t handle = register_tool(definition, callable);
+  if (handle <= 0) {
+    godot::Dictionary out = rescan_error(
+        "register_csharp_tool: registration rejected for tool '" + name +
+        "'; see editor log for register_tool reason");
+    out["tool_name"] = godot::String::utf8(name.c_str());
+    out["handle"] = static_cast<int64_t>(-1);
+    return out;
+  }
+  godot::Dictionary out;
+  out["tool_name"] = godot::String::utf8(name.c_str());
+  out["handle"] = handle;
+  out["call_result"] = get_tool(godot::String::utf8(name.c_str()));
+  return out;
+}
+
 bool AutopilotTools::unregister_tool(int64_t handle) {
   if (handle <= 0) {
     return false;
@@ -541,7 +628,7 @@ godot::Dictionary AutopilotTools::get_tool(const godot::String &name) const {
 godot::Dictionary AutopilotTools::call_tool(const godot::String &name,
                                             const godot::Dictionary &args) {
   const std::string tool_name = util::to_std(name);
-  auto invoke = [&tool_name, &args]() -> mcp::JsonValue {
+  auto invoke = [tool_name, args]() -> mcp::JsonValue {
     mcp::JsonValue json_args = VariantJson::serialize(godot::Variant(args));
     return dispatch::call_handler(tool_name, json_args);
   };
@@ -551,11 +638,20 @@ godot::Dictionary AutopilotTools::call_tool(const godot::String &name,
     if (runtime_ops::has_editor_queue() &&
         !get_editor_queue().is_main_thread()) {
       const tools::TraceContext ctx = tools::capture_trace_context();
-      result = get_editor_queue().execute_sync(
-          [&invoke, ctx] {
-            tools::ScopedTraceContext restore(ctx);
-            return invoke();
-          });
+      auto state = std::make_shared<mcp::JsonValue>();
+      dispatch::BoundedWaitOutcome outcome =
+          dispatch::run_bounded_on_main_thread(
+              get_editor_queue(), "call_tool " + tool_name, state,
+              [invoke, ctx](mcp::JsonValue &value) {
+                tools::ScopedTraceContext restore(ctx);
+                value = invoke();
+              },
+              GDA_DISPATCH_WAIT_DEFAULT_MS);
+      if (!outcome.ok) {
+        result = util::error_json(outcome.error);
+      } else {
+        result = *state;
+      }
     } else {
       result = invoke();
     }
@@ -607,18 +703,20 @@ godot::Dictionary AutopilotTools::rescan(const godot::String &directory) {
   if (runtime_ops::has_editor_queue() &&
       !get_editor_queue().is_main_thread()) {
     const tools::TraceContext ctx = tools::capture_trace_context();
-    try {
-      const godot::String dir_copy = directory;
-      return get_editor_queue().execute_sync(
-          [this, dir_copy, ctx] {
-            tools::ScopedTraceContext restore(ctx);
-            return rescan(dir_copy);
-          });
-    } catch (const std::exception &e) {
-      return rescan_error(std::string("rescan dispatch failed: ") + e.what());
-    } catch (...) {
-      return rescan_error("rescan dispatch failed: unknown exception");
+    const godot::String dir_copy = directory;
+    auto state = std::make_shared<godot::Dictionary>();
+    dispatch::BoundedWaitOutcome outcome =
+        dispatch::run_bounded_on_main_thread(
+            get_editor_queue(), "rescan", state,
+            [this, dir_copy, ctx](godot::Dictionary &value) {
+              tools::ScopedTraceContext restore(ctx);
+              value = rescan(dir_copy);
+            },
+            GDA_DISPATCH_WAIT_DEFAULT_MS);
+    if (!outcome.ok) {
+      return rescan_error(outcome.error);
     }
+    return *state;
   }
   const std::string dir = util::to_std(directory);
   if (dir.compare(0, 6, "res://") != 0 && dir.compare(0, 7, "user://") != 0) {
@@ -655,6 +753,9 @@ void AutopilotTools::_bind_methods() {
   godot::ClassDB::bind_method(
       godot::D_METHOD("register_tool", "definition", "callable"),
       &AutopilotTools::register_tool);
+  godot::ClassDB::bind_method(
+      godot::D_METHOD("register_csharp_tool", "definition", "callable"),
+      &AutopilotTools::register_csharp_tool);
   godot::ClassDB::bind_method(
       godot::D_METHOD("unregister_tool", "handle"),
       &AutopilotTools::unregister_tool);

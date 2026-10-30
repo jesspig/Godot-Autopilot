@@ -1,7 +1,8 @@
 {
   "name": "25_open_scene_idempotent",
-  "description": "open_editor_scene 幂等成功态用例：write_file 造 res://gda_tmp_open_idem/idem.tscn → 第一次 open_editor_scene 断言 result=ok（编辑器可能因上一轮标签布局恢复而已打开该场景并直接命中幂等分支，故此处不断言 already_open，避免跨轮污染导致误报）→ get_scene_tree 断言 result.name=IdemRoot 证明场景确实处于打开状态（旧实现以“root 指针是否变化”判定成败，此步即回归点：目标为当前场景时引擎 _set_current_scene 直接 return，root 不变而被误报 failed to open scene at … — edited scene did not change）→ 第二次 open_editor_scene 同路径断言 result=ok / path=请求路径 / already_open=true，即幂等调用返回成功而非错误 → open_editor_scene 传 res://scenes/__no_such_scene__.tscn 断言 has_keys=[error] 且 error 非空，保证幂等改动不会把无效路径静默成功化 → cleanup 关闭场景并回收 res://gda_tmp_open_idem。响应体为顶层字段：{result:\"ok\", path:\"<请求路径>\", already_open:bool}（点路径 result / path / already_open）。",
+  "description": "open_editor_scene 幂等成功态用例：write_file 造 res://gda_tmp_open_idem/idem.tscn → 第一次 open_editor_scene 断言 result=ok（编辑器可能因上一轮标签布局恢复而已打开该场景并直接命中幂等分支，故此处不断言 already_open，避免跨轮污染导致误报）→ get_scene_tree 断言 result.name=IdemRoot 证明场景确实处于打开状态（旧实现以“root 指针是否变化”判定成败，此步即回归点：目标为当前场景时引擎 _set_current_scene 直接 return，root 不变而被误报 failed to open scene at … — edited scene did not change）→ 第二次 open_editor_scene 同路径断言 result=ok / path=请求路径 / already_open=true，即幂等调用返回成功而非错误 → open_editor_scene 传 res://scenes/__no_such_scene__.tscn 断言 has_keys=[error] 且 error 非空，保证幂等改动不会把无效路径静默成功化 → cleanup 关闭场景并回收 res://gda_tmp_open_idem。响应体为顶层字段：{result:\"ok\", path:\"<请求路径>\", already_open:bool}（点路径 result / path / already_open）。T-23 增补（本轮）：already_open 分支新增 hint 与 suggested_action；改写磁盘 .tscn 追加一个子节点后 open_editor_scene{reload_if_open:true} 断言 already_open=true / reloaded=true / reload_observed=true，并用 verify_scene_saved 证明重载前 mismatch（memory_nodes=1 / disk_nodes=2）、重载后 match（memory_nodes=disk_nodes=2），即 reload_if_open 真从磁盘重建了场景树且与磁盘一致。",
   "headless": true,
+  "requires": ["write"],
   "pipeline": {
     "on_failure": "continue",
     "stages": [
@@ -58,11 +59,13 @@
             "tool": "open_editor_scene",
             "args": { "path": "res://gda_tmp_open_idem/idem.tscn" },
             "expect": {
-              "has_keys": ["result", "path", "already_open"],
+              "has_keys": ["result", "path", "already_open", "hint", "suggested_action"],
               "field_checks": [
                 { "key": "result", "value": "ok" },
                 { "key": "path", "value": "res://gda_tmp_open_idem/idem.tscn" },
-                { "key": "already_open", "value": true }
+                { "key": "already_open", "value": true },
+                { "key": "hint", "not_empty": true },
+                { "key": "suggested_action", "not_empty": true }
               ]
             }
           },
@@ -72,6 +75,67 @@
             "expect": {
               "field_checks": [
                 { "key": "result.name", "value": "IdemRoot" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "reload_if_open",
+        "steps": [
+          {
+            "id": "open_idem_rewrite_scene_on_disk",
+            "tool": "write_file",
+            "args": {
+              "path": "res://gda_tmp_open_idem/idem.tscn",
+              "content": "[gd_scene format=3]\n\n[node name=\"IdemRoot\" type=\"Node2D\"]\n\n[node name=\"AddedOnDisk\" type=\"Node2D\" parent=\".\"]\n"
+            },
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": "ok" }
+              ]
+            }
+          },
+          {
+            "id": "open_idem_verify_stale_memory",
+            "tool": "verify_scene_saved",
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": "mismatch" },
+                { "key": "match", "value": false },
+                { "key": "memory_nodes", "value": 1 },
+                { "key": "disk_nodes", "value": 2 }
+              ]
+            }
+          },
+          {
+            "id": "open_idem_reload_if_open",
+            "tool": "open_editor_scene",
+            "args": { "path": "res://gda_tmp_open_idem/idem.tscn", "reload_if_open": true },
+            "expect": {
+              "has_keys": ["result", "path", "already_open", "reloaded", "reload_observed"],
+              "field_checks": [
+                { "key": "result", "value": "ok" },
+                { "key": "path", "value": "res://gda_tmp_open_idem/idem.tscn" },
+                { "key": "already_open", "value": true },
+                { "key": "reloaded", "value": true },
+                { "key": "reload_observed", "value": true },
+                { "key": "scene_root", "value": "IdemRoot" }
+              ]
+            }
+          },
+          {
+            "id": "open_idem_verify_after_reload",
+            "tool": "verify_scene_saved",
+            "expect": {
+              "has_keys": ["result"],
+              "field_checks": [
+                { "key": "result", "value": "match" },
+                { "key": "match", "value": true },
+                { "key": "memory_nodes", "value": 2 },
+                { "key": "disk_nodes", "value": 2 }
               ]
             }
           }

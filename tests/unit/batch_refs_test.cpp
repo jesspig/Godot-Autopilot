@@ -1,4 +1,5 @@
 
+#include "core/command_queue.hpp"
 #include "tools/code_exec_ops.hpp"
 #include "tools/dispatch.hpp"
 #include "tools/runtime_ops.hpp"
@@ -50,8 +51,11 @@ void register_basic_handlers(mcp::JsonValue *echo_seen, bool *echo_called) {
 
 class BatchRefsTest : public ::testing::Test {
 protected:
+  godot_autopilot::CommandQueue queue;
+
   void SetUp() override {
-    godot_autopilot::runtime_ops::set_editor_queue(nullptr);
+    queue.drain();
+    godot_autopilot::runtime_ops::set_editor_queue(&queue);
     godot_autopilot::dispatch::replace_handlers({}, {});
   }
 
@@ -214,6 +218,21 @@ TEST_F(BatchRefsTest, WrongStatusError) {
   const std::string err_b = error_of((*results_b)[1]);
   EXPECT_NE(err_b.find("unresolvable reference"), std::string::npos);
   EXPECT_NE(err_b.find("wrong status"), std::string::npos);
+}
+
+TEST_F(BatchRefsTest, RollbackOnErrorMustBeBoolean) {
+  register_basic_handlers(nullptr, nullptr);
+
+  const mcp::JsonValue result = handle_batch_execute(
+      mcp::JsonValue::Parse(R"({
+        "operations": [{"tool": "const_v1"}],
+        "rollback_on_error": "yes"
+      })"));
+
+  const mcp::JsonValue *error = result.Find("error");
+  ASSERT_NE(error, nullptr);
+  ASSERT_TRUE(error->IsString());
+  EXPECT_EQ(error->GetString(), "rollback_on_error must be a boolean");
 }
 
 TEST_F(BatchRefsTest, StopOnErrorRespected) {

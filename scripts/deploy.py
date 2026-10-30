@@ -5,7 +5,31 @@ import shutil
 import sys
 from pathlib import Path
 
-from .config import DEMO_DIRS, PLATFORM_LIBS, PLATFORM_PDB, TESTBED_DIR, _addon_dir, artifact_dir
+from .config import (
+    BRIDGE_DIR,
+    DEMO_DIRS,
+    PLATFORM_LIBS,
+    PLATFORM_PDB,
+    POOL_BEDS,
+    TESTBED_DIR,
+    _addon_dir,
+    artifact_dir,
+)
+
+
+def _deploy_csharp_bridge(addon_dir: Path) -> None:
+    sources = sorted(BRIDGE_DIR.glob("*.cs"))
+    source_names = {src.name for src in sources}
+    for stale in sorted(addon_dir.glob("*.cs")):
+        if stale.name not in source_names:
+            stale.unlink()
+            print(f"  removed stale {stale.name}", flush=True)
+    for src in sources:
+        shutil.copy2(src, addon_dir / src.name)
+        size_kb = src.stat().st_size / 1024
+        print(f"  {src.name}  ({size_kb:.0f} KB)", flush=True)
+    if not sources:
+        print(f"[WARN] no bridge sources found in {BRIDGE_DIR}", flush=True)
 
 
 def _generate_gdextension(addon_dir: Path) -> None:
@@ -27,6 +51,63 @@ def _generate_gdextension(addon_dir: Path) -> None:
     print(f"  godot-autopilot.gdextension  (generated)", flush=True)
 
 
+POOL_BED_TEMPLATES: tuple[str, ...] = ("project.godot", ".gitignore", "assets")
+POOL_ASSEMBLY_GLOB = ".godot/mono/temp/bin/Debug/*.dll"
+
+
+def _has_pool_assemblies(project_dir: Path) -> bool:
+    """判定目录内是否已有 .NET 程序集产物。"""
+    return next(project_dir.glob(POOL_ASSEMBLY_GLOB), None) is not None
+
+
+def materialize_pool_beds() -> list[Path]:
+    """确保池床模板与主床一致，缺失则建床；返回本轮新建的床。"""
+    created: list[Path] = []
+    for bed in POOL_BEDS:
+        is_new = not bed.exists()
+        if is_new:
+            bed.mkdir(parents=True)
+            created.append(bed)
+        for item in POOL_BED_TEMPLATES:
+            source = TESTBED_DIR / item
+            if not source.exists():
+                raise FileNotFoundError(f"物化模板缺失：{source}")
+            if source.is_dir():
+                shutil.copytree(source, bed / item, dirs_exist_ok=True)
+            else:
+                shutil.copy2(source, bed / item)
+        status = "物化池床" if is_new else "同步池床模板"
+        print(f"[POOL] {status} {bed}", flush=True)
+    return created
+
+
+def warm_pool_bed_solutions(beds: list[Path]) -> None:
+    """复用已构建床的 .NET 程序集，把一次性冷构建从 L2 首跑前移到部署阶段。"""
+    donor: Path | None = None
+    for candidate in (TESTBED_DIR, *beds):
+        if _has_pool_assemblies(candidate):
+            donor = candidate
+            break
+    for bed in beds:
+        if _has_pool_assemblies(bed):
+            print(f"[WARM] 池床程序集已存在，跳过 {bed}", flush=True)
+            continue
+        if donor is None:
+            print(f"[WARM] 无可用程序集来源，{bed} 首次 L2 可能触发冷构建", flush=True)
+            continue
+        mono_source = donor / ".godot/mono"
+        mono_target = bed / ".godot/mono"
+        try:
+            if mono_target.exists():
+                shutil.rmtree(mono_target)
+            mono_target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(mono_source, mono_target)
+        except OSError as exc:
+            print(f"[WARM] 复用失败 {bed}: {exc}", flush=True)
+            continue
+        print(f"[WARM] 复用 C# 程序集 {donor} -> {bed}", flush=True)
+
+
 def _deploy(preset: str, demos: list[Path] | None = None) -> None:
     binary_dir = artifact_dir(preset)
     system = platform.system().lower()
@@ -34,12 +115,18 @@ def _deploy(preset: str, demos: list[Path] | None = None) -> None:
     if not lib_name:
         print(f"[ERROR] Unsupported platform: {system}", flush=True)
         sys.exit(1)
-    for project_dir in [*(demos or DEMO_DIRS), TESTBED_DIR]:
+    materialize_pool_beds()
+    warm_pool_bed_solutions(POOL_BEDS)
+    for project_dir in [*(DEMO_DIRS if demos is None else demos), TESTBED_DIR, *POOL_BEDS]:
+        print(f"[DEPLOY] {project_dir}", flush=True)
         addon_dir = _addon_dir(project_dir)
         addon_dir.mkdir(parents=True, exist_ok=True)
         # Remove any Godot hot-reload backup DLLs from previous runs to avoid loading errors
         for f in addon_dir.glob("~*"):
-            f.unlink(missing_ok=True)
+            try:
+                f.unlink(missing_ok=True)
+            except OSError as exc:
+                print(f"  [WARN] skip locked temp file {f.name}: {exc}", flush=True)
         _generate_gdextension(addon_dir)
         lib_src = binary_dir / lib_name
         if lib_src.exists():
@@ -54,6 +141,7 @@ def _deploy(preset: str, demos: list[Path] | None = None) -> None:
                 shutil.copy2(pdb_src, addon_dir / PLATFORM_PDB)
                 size_kb = pdb_src.stat().st_size / 1024
                 print(f"  {PLATFORM_PDB}  ({size_kb:.0f} KB)", flush=True)
+        _deploy_csharp_bridge(addon_dir)
         print(f"  -> {addon_dir}", flush=True)
         _validate_addon_integrity(addon_dir, project_dir)
 

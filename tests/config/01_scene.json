@@ -2,6 +2,7 @@
   "name": "01_scene",
   "description": "迁移自 tests/integration/scene_tools_test.cpp（SceneToolsTest，12 用例）。before_all 用 create_editor_scene 建干净根 Root。无法完全覆盖的语义：1) 用例1 '省略 parent_path 建根'：before_all 已建根，省略 parent_path 属双根错误（由步骤 create_second_root_fails 覆盖），本用例改用明确根路径 parent_path=Root 验证建节点与相对 path 断言；2) 用例4 '删除后树中消失'：delete_scene_node 为 queue_free 异步释放，JSON 框架无 sleep 机制（gtest 靠 sleep 500ms），改为断言返回 deleted 与 undo 存在；3) 用例8 children 数组内容精确断言：field_checks 不支持数组索引，退化为 children 非空 + 根字段精确断言；4) 用例10 的 '拒绝后场景仍在' 断言拆为独立步骤 scene_unchanged_after_refuse。",
   "headless": true,
+  "requires": ["write", "destructive"],
   "pipeline": {
     "on_failure": "fail_fast",
     "before_all": [

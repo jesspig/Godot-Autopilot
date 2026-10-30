@@ -16,6 +16,7 @@
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/classes/scene_tree_timer.hpp>
+#include <godot_cpp/classes/time.hpp>
 #include <godot_cpp/classes/window.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/godot.hpp>
@@ -32,6 +33,7 @@
 #include <godot_cpp/variant/vector3.hpp>
 #include <godot_cpp/variant/vector4.hpp>
 #include <mcp/JsonValue.hpp>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -151,6 +153,15 @@ public:
     }
     JV body = error_result("await timed out after " +
                            std::to_string(timeout_ms_) + " ms" + context);
+    JV details(JV::object_tag);
+    details["code"] = JV("eval_timeout");
+    details["timeout_ms"] = JV(timeout_ms_);
+    details["game_may_be_busy"] = JV(true);
+    details["note"] = JV(
+        "the game process may still be occupied: the host stopped waiting on "
+        "the eval script, but a running GDScript call cannot be interrupted — "
+        "the game main thread resumes only after the script returns");
+    body["structured_error"] = std::move(details);
     append_eval_runtime_errors(body, errors_since_seq_);
     send_response(request_id_, std::move(body));
     cleanup();
@@ -212,43 +223,125 @@ constexpr const char *EVAL_BARE_STATEMENT_HINT =
     "Node` + `func _run()`; provide a complete script defining `func _run()` "
     "if you need a persistent entry point";
 
+constexpr int64_t EVAL_DEFAULT_TIMEOUT_MS = 5000;
+
+int64_t eval_timeout_budget_ms(const JV &params) {
+  int64_t timeout_ms = EVAL_DEFAULT_TIMEOUT_MS;
+  if (auto *timeout_p = params.Find("timeout_ms")) {
+    if (timeout_p->IsInt() && timeout_p->GetInt() > 0) {
+      timeout_ms = timeout_p->GetInt();
+    }
+  }
+  if (timeout_ms > GDA_MAX_GAME_OP_TIMEOUT_MS) {
+    timeout_ms = GDA_MAX_GAME_OP_TIMEOUT_MS;
+  }
+  return timeout_ms;
+}
+
+JV eval_timeout_result(int64_t timeout_ms, int64_t elapsed_ms,
+                       const std::string &detail) {
+  JV body = error_result("eval script timed out after " +
+                          std::to_string(timeout_ms) + " ms" + detail);
+  JV details(JV::object_tag);
+  details["code"] = JV("eval_timeout");
+  details["timeout_ms"] = JV(timeout_ms);
+  details["execution_time_ms"] = JV(elapsed_ms);
+  details["game_may_be_busy"] = JV(true);
+  details["note"] = JV(
+      "the game process may still be occupied: the host stopped waiting on "
+      "the eval script, but a running GDScript call cannot be interrupted — "
+      "the game main thread resumes only after the script returns");
+  body["structured_error"] = std::move(details);
+  return body;
+}
+
+bool is_eval_timeout_sentinel(const godot::Variant &value) {
+  if (value.get_type() != godot::Variant::STRING) {
+    return false;
+  }
+  return gdscript_wrap::is_timeout_sentinel_text(
+      util::to_std(value.operator godot::String()));
+}
+
 std::string eval_missing_run_message() {
   return std::string(EVAL_MISSING_RUN_ERROR) +
          " — or pass bare statements (no top-level func) and they will be "
          "auto-wrapped";
 }
 
-bool eval_wrap_bare_retry(const godot::Ref<godot::GDScript> &script,
-                          const std::string &source,
-                          const std::string &attempt1_error,
-                          int &wrapped_offset, std::string &error_out) {
+struct EvalWrappedSource {
+  bool ok = false;
+  std::string source;
+  std::string display_source;
+  int offset = 0;
+  std::string error;
+};
+
+EvalWrappedSource eval_build_wrapped_source(const std::string &source,
+                                            const std::string &deadline_header,
+                                            const std::string &check) {
+  EvalWrappedSource out;
   gdscript_wrap::WrapResult wrap =
-      gdscript_wrap::wrap_bare_body(source, "_run", "", false);
+      gdscript_wrap::wrap_bare_body(source, "_run", deadline_header, false);
   if (!wrap.ok) {
-    error_out = attempt1_error + "\nauto-wrap attempt failed: " + wrap.error +
-                "\n" + EVAL_BARE_STATEMENT_HINT;
-    return false;
+    out.error = wrap.error;
+    return out;
   }
-  wrapped_offset = wrap.header_lines + 1;
-  script->set_source_code(godot::String::utf8(wrap.wrapped.c_str()));
-  uint64_t wrapped_seq_before = current_error_seq();
-  godot::Error wrapped_err = script->reload();
-  if (wrapped_err == godot::OK)
-    return true;
+  out.offset = wrap.header_lines + 1;
+  out.display_source = wrap.wrapped;
+  out.source = gdscript_wrap::insert_entry_check(wrap.wrapped, "_run", check);
+  out.ok = true;
+  return out;
+}
+
+std::string eval_wrap_build_failure_message(const std::string &attempt1_error,
+                                            const std::string &wrap_error) {
+  return attempt1_error + "\nauto-wrap attempt failed: " + wrap_error + "\n" +
+         EVAL_BARE_STATEMENT_HINT;
+}
+
+std::string eval_wrap_compile_failure_message(
+    const std::string &attempt1_error, godot::Error wrapped_err,
+    const std::string &wrapped_delta_text, int wrapped_offset,
+    const std::string &wrapped_source) {
   std::string message =
       attempt1_error +
       "\n[auto-wrap retry] wrapped as bare statements (extends Node + func "
       "_run()) but compilation failed (ERR code " +
       std::to_string(static_cast<int>(wrapped_err)) + ")";
-  EvalErrorDelta wrapped_delta = eval_error_delta(wrapped_seq_before);
-  if (!wrapped_delta.text.empty()) {
+  if (!wrapped_delta_text.empty()) {
     message += "\n" + gdscript_wrap::truncate_capture_text(
                           gdscript_wrap::map_error_line_numbers(
-                              wrapped_delta.text, wrapped_offset));
+                              wrapped_delta_text, wrapped_offset));
   }
-  message += "\nwrapped source:\n" + wrap.wrapped;
+  message += "\nwrapped source:\n" + wrapped_source;
   message += std::string("\n") + EVAL_BARE_STATEMENT_HINT;
-  error_out = message;
+  return message;
+}
+
+bool eval_wrap_bare_retry(const godot::Ref<godot::GDScript> &script,
+                          const std::string &source,
+                          const std::string &attempt1_error,
+                          int &wrapped_offset, std::string &error_out,
+                          const std::string &deadline_header,
+                          const std::string &check) {
+  EvalWrappedSource wrapped =
+      eval_build_wrapped_source(source, deadline_header, check);
+  if (!wrapped.ok) {
+    error_out =
+        eval_wrap_build_failure_message(attempt1_error, wrapped.error);
+    return false;
+  }
+  wrapped_offset = wrapped.offset;
+  script->set_source_code(godot::String::utf8(wrapped.source.c_str()));
+  uint64_t wrapped_seq_before = current_error_seq();
+  godot::Error wrapped_err = script->reload();
+  if (wrapped_err == godot::OK)
+    return true;
+  EvalErrorDelta wrapped_delta = eval_error_delta(wrapped_seq_before);
+  error_out = eval_wrap_compile_failure_message(
+      attempt1_error, wrapped_err, wrapped_delta.text, wrapped.offset,
+      wrapped.display_source);
   return false;
 }
 
@@ -259,34 +352,88 @@ JV op_eval_script(const JV &params, int64_t request_id) {
   }
   std::string source = code_p->GetString();
 
+  const int64_t timeout_ms = eval_timeout_budget_ms(params);
+  godot::Time *clock = godot::Time::get_singleton();
+  if (clock == nullptr) {
+    return error_result("Time singleton unavailable; cannot arm the eval deadline");
+  }
+  const int64_t start_ticks = static_cast<int64_t>(clock->get_ticks_msec());
+  const int64_t deadline_ms = start_ticks + timeout_ms;
+  const std::string deadline_header =
+      gdscript_wrap::deadline_declaration(deadline_ms) + "\n" +
+      gdscript_wrap::timeout_sentinel_declaration() + "\n";
+  const std::string check = gdscript_wrap::deadline_check_line();
+
+  gdscript_wrap::DeadlineTransform transform =
+      gdscript_wrap::inject_deadline_checks(source);
+  if (!transform.ok) {
+    return error_result(transform.error);
+  }
+  const std::string prepared =
+      gdscript_wrap::insert_entry_check(transform.source, "_run", check);
+
   godot::Ref<godot::GDScript> script;
   script.instantiate();
   if (script.is_null())
     return error_result("failed to create GDScript instance");
 
-  script->set_source_code(godot::String::utf8(source.c_str()));
-  uint64_t compile_seq_before = current_error_seq();
-  godot::Error parse_err = script->reload();
-  std::string attempt1_error;
-  if (parse_err != godot::OK) {
-    attempt1_error = "GDScript compilation failed (ERR code " +
-                     std::to_string(static_cast<int>(parse_err)) + ")";
-    EvalErrorDelta compile_delta = eval_error_delta(compile_seq_before);
-    if (!compile_delta.text.empty()) {
-      attempt1_error += "\n" + truncate_error_text(compile_delta.text);
-    }
-  }
-
+  const std::string prepared_source =
+      gdscript_wrap::insert_after_header(prepared, deadline_header);
   const bool wrap_eligible = !gdscript_wrap::has_top_level_func_def(source);
   bool wrapped_attempt = false;
   int wrapped_offset = 0;
+  godot::Error parse_err = godot::OK;
+  std::string attempt1_error;
+  EvalWrappedSource pre_wrap;
+  godot::Error pre_wrap_err = godot::OK;
+  std::string pre_wrap_error_text;
+  bool pre_wrap_compile_failed = false;
 
-  if (parse_err != godot::OK) {
+  if (wrap_eligible) {
+    pre_wrap =
+        eval_build_wrapped_source(transform.source, deadline_header, check);
+    if (pre_wrap.ok) {
+      script->set_source_code(godot::String::utf8(pre_wrap.source.c_str()));
+      uint64_t wrapped_seq_before = current_error_seq();
+      pre_wrap_err = script->reload();
+      if (pre_wrap_err == godot::OK) {
+        wrapped_attempt = true;
+        wrapped_offset = pre_wrap.offset;
+      } else {
+        pre_wrap_compile_failed = true;
+        EvalErrorDelta pre_wrap_delta =
+            eval_error_delta(wrapped_seq_before);
+        pre_wrap_error_text = pre_wrap_delta.text;
+      }
+    }
+  }
+
+  if (!wrapped_attempt) {
+    script->set_source_code(godot::String::utf8(prepared_source.c_str()));
+    uint64_t compile_seq_before = current_error_seq();
+    parse_err = script->reload();
+    if (parse_err != godot::OK) {
+      attempt1_error = "GDScript compilation failed (ERR code " +
+                       std::to_string(static_cast<int>(parse_err)) + ")";
+      EvalErrorDelta compile_delta = eval_error_delta(compile_seq_before);
+      if (!compile_delta.text.empty()) {
+        attempt1_error += "\n" + truncate_error_text(compile_delta.text);
+      }
+    }
+  }
+
+  if (!wrapped_attempt && parse_err != godot::OK) {
     if (!wrap_eligible)
       return error_result(attempt1_error);
+    if (pre_wrap.ok) {
+      return error_result(eval_wrap_compile_failure_message(
+          attempt1_error, pre_wrap_err, pre_wrap_error_text, pre_wrap.offset,
+          pre_wrap.display_source));
+    }
     std::string wrap_error;
-    if (!eval_wrap_bare_retry(script, source, attempt1_error, wrapped_offset,
-                              wrap_error)) {
+    if (!eval_wrap_bare_retry(script, transform.source, attempt1_error,
+                              wrapped_offset, wrap_error, deadline_header,
+                              check)) {
       return error_result(wrap_error);
     }
     wrapped_attempt = true;
@@ -305,12 +452,6 @@ JV op_eval_script(const JV &params, int64_t request_id) {
   if (persist && persist_name.empty()) {
     persist_name = "eval_" + std::to_string(request_id);
   }
-  int64_t await_timeout_ms = 5000;
-  if (auto *tp = params.Find("timeout_ms")) {
-    if (tp->IsInt() && tp->GetInt() > 0)
-      await_timeout_ms = tp->GetInt();
-  }
-
   godot::SceneTree *tree = get_scene_tree();
   if (!tree)
     return error_result("no scene tree");
@@ -348,10 +489,18 @@ JV op_eval_script(const JV &params, int64_t request_id) {
       memdelete(temp_node);
       return error_result(eval_missing_run_message());
     }
+    if (pre_wrap_compile_failed) {
+      parent->remove_child(temp_node);
+      memdelete(temp_node);
+      return error_result(eval_wrap_compile_failure_message(
+          EVAL_MISSING_RUN_ERROR, pre_wrap_err, pre_wrap_error_text,
+          pre_wrap.offset, pre_wrap.display_source));
+    }
     temp_node->set_script(godot::Variant());
     std::string wrap_error;
-    if (!eval_wrap_bare_retry(script, source, EVAL_MISSING_RUN_ERROR,
-                              wrapped_offset, wrap_error)) {
+    if (!eval_wrap_bare_retry(script, transform.source, EVAL_MISSING_RUN_ERROR,
+                              wrapped_offset, wrap_error, deadline_header,
+                              check)) {
       parent->remove_child(temp_node);
       memdelete(temp_node);
       return error_result(wrap_error);
@@ -366,7 +515,13 @@ JV op_eval_script(const JV &params, int64_t request_id) {
   }
 
   uint64_t run_seq_before = current_error_seq();
+  auto cancel_flag = std::make_shared<bool>(false);
+  register_cancel_handler(request_id, [cancel_flag]() { *cancel_flag = true; });
   godot::Variant result = temp_node->call(run_fn);
+  unregister_cancel_handler(request_id);
+
+  const int64_t elapsed_ms =
+      static_cast<int64_t>(clock->get_ticks_msec()) - start_ticks;
 
   godot::Object *state_obj = nullptr;
   if (result.get_type() == godot::Variant::OBJECT) {
@@ -379,11 +534,39 @@ JV op_eval_script(const JV &params, int64_t request_id) {
     std::string persist_path;
     if (persist)
       persist_path = "/root/__gda_runtime/" + persist_name;
+    const int64_t remaining_ms =
+        timeout_ms - elapsed_ms > 0 ? timeout_ms - elapsed_ms : 1;
     GameBridgeEvalAwaiter *awaiter = memnew(GameBridgeEvalAwaiter);
     awaiter->setup(request_id, godot::Ref<godot::RefCounted>(result), temp_node,
-                   parent, persist, persist_path, await_timeout_ms,
+                   parent, persist, persist_path, remaining_ms,
                    run_seq_before, wrapped_attempt);
     return JV();
+  }
+
+  if (*cancel_flag) {
+    if (!persist) {
+      parent->remove_child(temp_node);
+      memdelete(temp_node);
+    }
+    JV body = error_result(
+        "eval script was cancelled by the host before the script finished");
+    JV details(JV::object_tag);
+    details["code"] = JV("eval_cancelled");
+    details["cancelled"] = JV(true);
+    details["timeout_ms"] = JV(timeout_ms);
+    details["execution_time_ms"] = JV(elapsed_ms);
+    body["structured_error"] = std::move(details);
+    append_eval_runtime_errors(body, run_seq_before);
+    return body;
+  }
+  if (is_eval_timeout_sentinel(result) || elapsed_ms >= timeout_ms) {
+    if (!persist) {
+      parent->remove_child(temp_node);
+      memdelete(temp_node);
+    }
+    JV body = eval_timeout_result(timeout_ms, elapsed_ms, "");
+    append_eval_runtime_errors(body, run_seq_before);
+    return body;
   }
 
   if (!persist) {
@@ -976,6 +1159,9 @@ JV op_eval_call_method(const JV &params, int64_t request_id) {
   call_err.error = GDEXTENSION_CALL_OK;
   call_err.argument = 0;
   call_err.expected = 0;
+  godot::Time *call_clock = godot::Time::get_singleton();
+  const int64_t call_start_ticks =
+      call_clock ? static_cast<int64_t>(call_clock->get_ticks_msec()) : 0;
   bool done = false;
   bool tried_script_method = false;
   bool native_bind_found = false;
@@ -1009,6 +1195,19 @@ JV op_eval_call_method(const JV &params, int64_t request_id) {
     err["hint"] = JV(make_native_bind_probe_hint(method_name));
     append_eval_runtime_errors(err, call_seq_before);
     return err;
+  }
+
+  {
+    godot::Time *clock = godot::Time::get_singleton();
+    const int64_t budget_ms = eval_timeout_budget_ms(params);
+    const int64_t elapsed_ms =
+        clock ? static_cast<int64_t>(clock->get_ticks_msec()) - call_start_ticks
+              : 0;
+    if (clock && elapsed_ms >= budget_ms) {
+      JV body = eval_timeout_result(budget_ms, elapsed_ms, "");
+      append_eval_runtime_errors(body, call_seq_before);
+      return body;
+    }
   }
 
   godot::Object *state_obj = nullptr;

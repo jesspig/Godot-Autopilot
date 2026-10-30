@@ -2,6 +2,7 @@
   "name": "editor_input",
   "description": "编辑器输入与 UI 动作工具的参数校验路径（headless）：全部在注入 warp/事件之前返回 error，不产生真实点击、拖拽、滚轮或文本输入副作用。覆盖 click_input_mouse 缺 position、scroll_input_mouse 非法 direction、drag_input_mouse 缺 to、type_input_text 缺 text、click_editor_element 缺 path、run_editor_shortcut 未知键。",
   "headless": true,
+  "requires": ["write"],
   "pipeline": {
     "on_failure": "continue",
     "stages": [

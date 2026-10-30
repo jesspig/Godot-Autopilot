@@ -773,6 +773,7 @@ mcp::JsonValue handle_build_from_spec(const mcp::JsonValue &args) {
   }
 
   std::string result_path = spec_relative_path(first_top, scene_root);
+  scene_dirty_tracker::mark_scene_modified();
   const util::EditedSceneInfo scene_info_now = util::edited_scene_info();
   mcp::JsonValue inner(mcp::JsonValue::object_tag);
   inner["mode"] = mcp::JsonValue("built");
@@ -822,7 +823,6 @@ mcp::JsonValue handle_build_from_spec(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(inner);
   util::add_scene_info_fields(r, scene_info_now);
-  scene_dirty_tracker::mark_scene_modified();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "build_nodes_from_spec completed");
   return r;
@@ -1098,6 +1098,7 @@ mcp::JsonValue handle_spawn_bundle(const mcp::JsonValue &args) {
       bundle_node->set_owner(nullptr);
     }
   }
+  scene_dirty_tracker::mark_scene_modified();
   const util::EditedSceneInfo scene_info_now = util::edited_scene_info();
   mcp::JsonValue inner(mcp::JsonValue::object_tag);
   inner["path"] = mcp::JsonValue(bundle_path);
@@ -1114,7 +1115,6 @@ mcp::JsonValue handle_spawn_bundle(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(inner);
   util::add_scene_info_fields(r, scene_info_now);
-  scene_dirty_tracker::mark_scene_modified();
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "spawn_node_bundle completed");
   return r;

@@ -130,7 +130,7 @@ const std::vector<ParamSpec> kCreateRenderMaterialParams = {};
 const std::vector<ParamSpec> kSetRenderMaterialParamParams = {
     {"material_rid", "integer", "RID of the render material, from create_render_material", true},
     {"parameter", "string", "Material parameter name; example: 'albedo_color'", true},
-    {"value", "object", "Parameter value as JSON; plain numbers/strings/bools also work", true},
+    {"value", "json", "Parameter value as JSON; plain numbers/strings/bools also work", true},
     {"type_hint", "string", "Type hint (e.g. Vector2, Color, int, float)", false},
 };
 
@@ -303,7 +303,7 @@ const std::vector<ParamSpec> kSetRenderInstanceLayerMaskParams = {
 
 const std::vector<ParamSpec> kSetRenderShaderParameterGlobalParams = {
     {"name", "string", "Global shader parameter name; the shader must declare a matching parameter with the global keyword", true},
-    {"value", "object", "Parameter value as JSON; plain numbers/strings/bools also work", true},
+    {"value", "json", "Parameter value as JSON; plain numbers/strings/bools also work", true},
     {"type_hint", "string", "Type hint (e.g. Vector2, Color, int, float)", false},
 };
 
@@ -564,12 +564,12 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "restart_particles",
       "Restart a particle node in the edited scene from the beginning, even if it is currently emitting. Pass the node path of a GPUParticles2D, GPUParticles3D, CPUParticles2D or CPUParticles3D node. Unlike setting emitting alone, this forces a fresh emission cycle. Use it to replay bursts, e.g. explosions or one-shot effects. Returns 'ok'. Errors if the node is missing or is not a particle node.",
-      "Render", {"render", "particles", "restart"}, SideEffect::None, tool_flags::kMutating,
+      "Render", {"render", "particles", "restart"}, SideEffect::WritesScene, tool_flags::kMutating,
       kRestartParticlesParams, render_ops::handle_node_particles_restart}));
   v.push_back(make_spec_tool(ToolSpec{
       "set_particles_params",
       "Set playback parameters on a particle node in the edited scene. Pass the node path of a GPUParticles2D, GPUParticles3D, CPUParticles2D or CPUParticles3D node; all value parameters are optional and only the given ones are applied: emitting toggles emission, amount sets the particle count, lifetime sets seconds per particle, one_shot selects single-burst emission, speed_scale scales playback speed and explosiveness sets the burst ratio. Returns 'ok'. Errors if the node is missing, is not a particle node, or a value has the wrong type.",
-      "Render", {"render", "particles", "params"}, SideEffect::None, tool_flags::kMutating,
+      "Render", {"render", "particles", "params"}, SideEffect::WritesScene, tool_flags::kMutating,
       kSetParticlesParamsParams, render_ops::handle_node_particles_set_params}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_particles_state",

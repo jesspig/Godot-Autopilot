@@ -4,6 +4,7 @@
 #include "core/log_system.hpp"
 #include "runtime/gda_protocol.hpp"
 #include "tools/authorization.hpp"
+#include "tools/capture_ops.hpp"
 #include "tools/debugger_access.hpp"
 #include "tools/tool_base.hpp"
 #include "util/error_util.hpp"
@@ -12,7 +13,6 @@
 #include <cstdint>
 #include <mutex>
 #include <string>
-#include <thread>
 #include <utility>
 #include <vector>
 #ifdef GetObject
@@ -64,6 +64,7 @@ constexpr const char *INPUT_PARAM_WHITELIST[] = {
     "type",      "keycode",    "pressed",   "button_index", "position",
     "action",    "duration_ms", "mode",     "timeout_ms",   "direction",
     "amount",    "relative",   "click",     "double_click", "wait_ready",
+    "coord_space",
 };
 
 bool has_only_fields(const JV &value, const char *const *allowed,
@@ -343,6 +344,10 @@ mcp::JsonValue handle_game_input(const mcp::JsonValue &args) {
       (!mode->IsString() || (mode->GetString() != "event" &&
                              mode->GetString() != "api" && mode->GetString() != "hold")))
     return error_json("mode must be event|api|hold");
+  if (auto *space = args.Find("coord_space"); space &&
+      (!space->IsString() || (space->GetString() != "window" &&
+                              space->GetString() != "viewport")))
+    return error_json("coord_space must be window|viewport");
   if (auto *position = args.Find("position"); position && !position->IsObject())
     return error_json("position must be an object");
   if (auto *timeout = args.Find("timeout_ms"); timeout &&
@@ -366,6 +371,7 @@ mcp::JsonValue handle_game_input(const mcp::JsonValue &args) {
   copy_optional(args, params, "relative");
   copy_optional(args, params, "click");
   copy_optional(args, params, "double_click");
+  copy_optional(args, params, "coord_space");
 
   JV result =
       handle_gda_send("input", params, extract_timeout(args), false, wait_ready);
@@ -451,10 +457,14 @@ mcp::JsonValue handle_sequence_game_inputs(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "sequence_game_inputs called");
   static constexpr const char *allowed[] = {"inputs", "timeout_ms",
-                                             "wait_ready"};
+                                             "wait_ready", "coord_space"};
   std::string unknown;
   if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed), unknown))
     return error_json("unknown parameter for sequence_game_inputs: " + unknown);
+  if (auto *space = args.Find("coord_space"); space &&
+      (!space->IsString() || (space->GetString() != "window" &&
+                              space->GetString() != "viewport")))
+    return error_json("coord_space must be window|viewport");
   auto *inputs_p = args.Find("inputs");
   if (!inputs_p || !inputs_p->IsArray() || inputs_p->GetArray().empty()) {
     return error_json(
@@ -485,6 +495,10 @@ mcp::JsonValue handle_sequence_game_inputs(const mcp::JsonValue &args) {
     }
     if (frame_p->GetInt() > max_at_frame)
       max_at_frame = frame_p->GetInt();
+    if (auto *space = item.Find("coord_space"); space &&
+        (!space->IsString() || (space->GetString() != "window" &&
+                                space->GetString() != "viewport")))
+      return error_json("coord_space must be window|viewport");
   }
 
   int64_t timeout;
@@ -501,6 +515,7 @@ mcp::JsonValue handle_sequence_game_inputs(const mcp::JsonValue &args) {
   JV params(JV::object_tag);
   params["inputs"] = *inputs_p;
   params["timeout_ms"] = JV(timeout);
+  copy_optional(args, params, "coord_space");
 
   bool wait_ready = true;
   if (!extract_wait_ready(args, &wait_ready))
@@ -514,21 +529,46 @@ mcp::JsonValue handle_sequence_game_inputs(const mcp::JsonValue &args) {
 mcp::JsonValue handle_game_ui_elements(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_game_ui_elements called");
-  static constexpr const char *allowed[] = {"max_elements", "timeout_ms",
-                                             "wait_ready"};
+  static constexpr const char *allowed[] = {
+      "max_elements", "timeout_ms", "wait_ready", "filter", "types",
+      "visible_only"};
   std::string unknown;
   if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed), unknown))
     return error_json("unknown parameter for get_game_ui_elements: " + unknown);
   if (auto *max = args.Find("max_elements"); max &&
       (!max->IsInt() || max->GetInt() <= 0))
     return error_json("max_elements must be a positive integer");
+  if (auto *filter = args.Find("filter"); filter && !filter->IsString())
+    return error_json("filter must be a string");
+  if (auto *types = args.Find("types")) {
+    if (!types->IsArray() || types->GetArray().empty() ||
+        types->GetArray().size() > 32)
+      return error_json("types must be an array of 1-32 class names");
+    for (const auto &item : types->GetArray()) {
+      if (!item.IsString() || item.GetString().empty())
+        return error_json(
+            "types must be an array of 1-32 non-empty class names");
+    }
+  }
+  bool visible_only = false;
+  if (auto *visible = args.Find("visible_only")) {
+    if (!visible->IsBool())
+      return error_json("visible_only must be a boolean");
+    visible_only = visible->GetBool();
+  }
   bool wait_ready = true;
   if (!extract_wait_ready(args, &wait_ready))
     return error_json("wait_ready must be a boolean");
   JV params(JV::object_tag);
   copy_optional(args, params, "max_elements");
-  return handle_gda_send(std::string(GDA_OP_UI_ELEMENTS), params,
-                         extract_timeout(args), false, wait_ready);
+  copy_optional(args, params, "filter");
+  copy_optional(args, params, "types");
+  if (visible_only)
+    params["visible_only"] = JV(true);
+  JV result = handle_gda_send(std::string(GDA_OP_UI_ELEMENTS), params,
+                              extract_timeout(args), false, wait_ready);
+  append_runtime_degradation_hint(result);
+  return result;
 }
 
 mcp::JsonValue handle_click_game_ui_element(const mcp::JsonValue &args) {
@@ -539,7 +579,7 @@ mcp::JsonValue handle_click_game_ui_element(const mcp::JsonValue &args) {
   if (!args.IsObject())
     return error_json("click_game_ui_element parameters must be an object");
   static constexpr const char *allowed[] = {"path", "text", "text_index", "button_index",
-                                             "double_click", "max_elements",
+                                             "double_click", "strict_hit", "max_elements",
                                              "timeout_ms", "wait_ready"};
   std::string unknown;
   if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed), unknown))
@@ -580,6 +620,12 @@ mcp::JsonValue handle_click_game_ui_element(const mcp::JsonValue &args) {
       return error_json("double_click must be a boolean");
     double_click = double_p->GetBool();
   }
+  bool strict_hit = false;
+  if (auto *strict_p = args.Find("strict_hit")) {
+    if (!strict_p->IsBool())
+      return error_json("strict_hit must be a boolean");
+    strict_hit = strict_p->GetBool();
+  }
   int64_t max_elements = CLICK_MAX_ELEMENTS_LIMIT;
   if (auto *max_p = args.Find("max_elements")) {
     if (!max_p->IsInt() || max_p->GetInt() <= 0)
@@ -614,6 +660,7 @@ mcp::JsonValue handle_click_game_ui_element(const mcp::JsonValue &args) {
   }
   click["button_index"] = JV(button_index);
   click["double_click"] = JV(double_click);
+  click["strict_hit"] = JV(strict_hit);
   JV params(JV::object_tag);
   params["max_elements"] = JV(max_elements);
   params["click"] = std::move(click);
@@ -629,9 +676,10 @@ mcp::JsonValue handle_game_capture(const mcp::JsonValue &args) {
   if (!args.IsObject())
     return error_json("capture_game_viewport parameters must be an object");
   static constexpr const char *allowed[] = {
-      "timeout_ms", "region",  "max_dimension", "annotate",
-      "after_frames", "when",  "scale",         "annotate_nodes",
-      "annotate_nodes_max", "wait_ready"};
+      "timeout_ms", "region",   "max_dimension", "annotate",
+      "after_frames", "when",   "scale",         "annotate_nodes",
+      "annotate_nodes_max",     "wait_ready",    "save",
+      "save_dir"};
   std::string unknown;
   if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed), unknown))
     return error_json("unknown parameter for capture_game_viewport: " + unknown);
@@ -685,6 +733,17 @@ mcp::JsonValue handle_game_capture(const mcp::JsonValue &args) {
   if (auto *scale = args.Find("scale");
       scale && (!scale->IsInt() || scale->GetInt() < 1 || scale->GetInt() > 8))
     return error_json("scale must be an integer between 1 and 8");
+  capture_ops::CaptureSaveOptions save_options;
+  mcp::JsonValue save_error;
+  if (!capture_ops::read_capture_save_options(args, &save_options,
+                                              &save_error))
+    return save_error;
+  if (save_options.save) {
+    mcp::JsonValue denied = authorization::deny_if_unauthorized(
+        "capture_game_viewport", SideEffect::WritesFile);
+    if (!denied.IsNull())
+      return denied;
+  }
   bool wait_ready = true;
   if (!extract_wait_ready(args, &wait_ready))
     return error_json("wait_ready must be a boolean");
@@ -700,6 +759,8 @@ mcp::JsonValue handle_game_capture(const mcp::JsonValue &args) {
   const int64_t timeout_ms = extract_timeout(args);
   params["timeout_ms"] = JV(timeout_ms);
   JV result = handle_gda_send("capture", params, timeout_ms, false, wait_ready);
+  result = capture_ops::with_capture_save_options(std::move(result),
+                                                  save_options);
   append_runtime_degradation_hint(result);
   return result;
 }
@@ -865,83 +926,153 @@ mcp::JsonValue handle_game_job_get(const mcp::JsonValue &args) {
   }
 
   const int64_t deadline_ms = steady_game_now_ms() + wait_budget_ms;
-  for (;;) {
-    int64_t request_id = 0;
-    int64_t started_ms = 0;
-    int64_t job_timeout_ms = 0;
-    bool found = false;
-    {
-      std::lock_guard<std::mutex> lock(game_jobs_mutex());
-      auto &jobs = game_jobs().jobs;
-      auto it = jobs.find(job_id);
-      if (it != jobs.end()) {
-        found = true;
-        request_id = it->second.request_id;
-        started_ms = it->second.started_ms;
-        job_timeout_ms = it->second.timeout_ms;
-      }
+  int64_t request_id = 0;
+  int64_t started_ms = 0;
+  int64_t job_timeout_ms = 0;
+  bool found = false;
+  {
+    std::lock_guard<std::mutex> lock(game_jobs_mutex());
+    auto &jobs = game_jobs().jobs;
+    auto it = jobs.find(job_id);
+    if (it != jobs.end()) {
+      found = true;
+      request_id = it->second.request_id;
+      started_ms = it->second.started_ms;
+      job_timeout_ms = it->second.timeout_ms;
     }
-    if (!found) {
-      return util::error_detail(
-          "unknown or already collected game job: " + std::to_string(job_id),
-          "get_game_job",
-          "a job_id returned by start_game_job that is still tracked",
-          "re-check the start_game_job response for the correct job_id; jobs "
-          "are removed once collected or after they expire timeout_ms + 2000 "
-          "ms after start");
-    }
-    if (cancel) {
-      cancel_game_op_request(request_id);
-      erase_game_job(job_id);
-      std::string discard_detail;
-      discard_pending(request_id, discard_detail);
-      JV payload(JV::object_tag);
-      payload["status"] = JV("cancelled");
-      payload["job_id"] = JV(job_id);
-      payload["request_id"] = JV(request_id);
-      LogSystem::instance().log(
-          LogLevel::Info, LogCategory::Tools,
-          "get_game_job cancelled job " + std::to_string(job_id) +
-              " (request_id " + std::to_string(request_id) + ")");
-      return util::ok_result(std::move(payload));
-    }
-    JV response;
-    if (try_collect_response(request_id, response)) {
-      erase_game_job(job_id);
-      JV payload(JV::object_tag);
-      payload["status"] = JV("done");
-      payload["job_id"] = JV(job_id);
-      payload["result"] = std::move(response);
-      return util::ok_result(std::move(payload));
-    }
-    const int64_t now_ms = steady_game_now_ms();
-    if ((now_ms - started_ms) >
-        (job_timeout_ms + GameJobTable::kExpiryGraceMs)) {
-      erase_game_job(job_id);
-      std::string discard_detail;
-      discard_pending(request_id, discard_detail);
-      JV payload(JV::object_tag);
-      payload["status"] = JV("expired");
-      payload["job_id"] = JV(job_id);
-      payload["request_id"] = JV(request_id);
-      payload["timeout_ms"] = JV(job_timeout_ms);
-      LogSystem::instance().log_detailed(
-          LogLevel::Info, LogCategory::Tools,
-          "get_game_job dropped expired job " + std::to_string(job_id),
-          "job_id=" + std::to_string(job_id) +
-              " request_id=" + std::to_string(request_id) + " timeout_ms=" +
-              std::to_string(job_timeout_ms) + " elapsed_ms=" +
-              std::to_string(now_ms - started_ms));
-      return util::ok_result(std::move(payload));
-    }
-    if (wait_budget_ms <= 0 || now_ms >= deadline_ms) {
-      JV payload(JV::object_tag);
-      payload["status"] = JV("pending");
-      payload["job_id"] = JV(job_id);
-      return util::ok_result(std::move(payload));
-    }
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
+  if (!found) {
+    return util::error_detail(
+        "unknown or already collected game job: " + std::to_string(job_id),
+        "get_game_job",
+        "a job_id returned by start_game_job that is still tracked",
+        "re-check the start_game_job response for the correct job_id; jobs "
+        "are removed once collected or after they expire timeout_ms + 2000 "
+        "ms after start");
+  }
+  if (cancel) {
+    cancel_game_op_request(request_id);
+    erase_game_job(job_id);
+    std::string discard_detail;
+    discard_pending(request_id, discard_detail);
+    JV payload(JV::object_tag);
+    payload["status"] = JV("cancelled");
+    payload["job_id"] = JV(job_id);
+    payload["request_id"] = JV(request_id);
+    LogSystem::instance().log(
+        LogLevel::Info, LogCategory::Tools,
+        "get_game_job cancelled job " + std::to_string(job_id) +
+            " (request_id " + std::to_string(request_id) + ")");
+    return util::ok_result(std::move(payload));
+  }
+  JV response;
+  if (try_collect_response(request_id, response)) {
+    erase_game_job(job_id);
+    JV payload(JV::object_tag);
+    payload["status"] = JV("done");
+    payload["job_id"] = JV(job_id);
+    payload["result"] = std::move(response);
+    return util::ok_result(std::move(payload));
+  }
+  const int64_t now_ms = steady_game_now_ms();
+  const int64_t expiry_ms =
+      started_ms + job_timeout_ms + GameJobTable::kExpiryGraceMs;
+  if (now_ms > expiry_ms) {
+    erase_game_job(job_id);
+    std::string discard_detail;
+    discard_pending(request_id, discard_detail);
+    JV payload(JV::object_tag);
+    payload["status"] = JV("expired");
+    payload["job_id"] = JV(job_id);
+    payload["request_id"] = JV(request_id);
+    payload["timeout_ms"] = JV(job_timeout_ms);
+    LogSystem::instance().log_detailed(
+        LogLevel::Info, LogCategory::Tools,
+        "get_game_job dropped expired job " + std::to_string(job_id),
+        "job_id=" + std::to_string(job_id) +
+            " request_id=" + std::to_string(request_id) + " timeout_ms=" +
+            std::to_string(job_timeout_ms) + " elapsed_ms=" +
+            std::to_string(now_ms - started_ms));
+    return util::ok_result(std::move(payload));
+  }
+  if (wait_budget_ms <= 0 || now_ms >= deadline_ms) {
+    JV payload(JV::object_tag);
+    payload["status"] = JV("pending");
+    payload["job_id"] = JV(job_id);
+    return util::ok_result(std::move(payload));
+  }
+  const int64_t remaining_budget_ms = deadline_ms - now_ms;
+  const int64_t remaining_expiry_ms = expiry_ms - now_ms;
+  const int64_t wait_ms = remaining_expiry_ms < remaining_budget_ms
+                              ? remaining_expiry_ms
+                              : remaining_budget_ms;
+  JV marker(JV::object_tag);
+  marker["__gda_pending"] = JV(request_id);
+  marker["__gda_job"] = JV(job_id);
+  marker["timeout_ms"] = JV(wait_ms > 0 ? wait_ms : 1);
+  return marker;
+}
+
+mcp::JsonValue wait_game_job(int64_t job_id, int64_t timeout_ms) {
+  if (on_editor_main_thread()) {
+    return util::error_json(
+        "get_game_job cannot wait for the game response on the editor main "
+        "thread — call the tool through the MCP channel so the wait runs on "
+        "the transport thread");
+  }
+  int64_t request_id = 0;
+  int64_t started_ms = 0;
+  int64_t job_timeout_ms = 0;
+  bool found = false;
+  {
+    std::lock_guard<std::mutex> lock(game_jobs_mutex());
+    auto &jobs = game_jobs().jobs;
+    auto it = jobs.find(job_id);
+    if (it != jobs.end()) {
+      found = true;
+      request_id = it->second.request_id;
+      started_ms = it->second.started_ms;
+      job_timeout_ms = it->second.timeout_ms;
+    }
+  }
+  if (!found) {
+    return util::error_detail(
+        "unknown or already collected game job: " + std::to_string(job_id),
+        "get_game_job",
+        "a job_id returned by start_game_job that is still tracked",
+        "re-check the start_game_job response for the correct job_id; jobs "
+        "are removed once collected or after they expire timeout_ms + 2000 "
+        "ms after start");
+  }
+  if (timeout_ms > 0) {
+    wait_pending_completion(request_id, timeout_ms);
+  }
+  JV response;
+  if (try_collect_response(request_id, response)) {
+    erase_game_job(job_id);
+    JV payload(JV::object_tag);
+    payload["status"] = JV("done");
+    payload["job_id"] = JV(job_id);
+    payload["result"] = std::move(response);
+    return util::ok_result(std::move(payload));
+  }
+  const int64_t now_ms = steady_game_now_ms();
+  if ((now_ms - started_ms) >
+      (job_timeout_ms + GameJobTable::kExpiryGraceMs)) {
+    erase_game_job(job_id);
+    std::string discard_detail;
+    discard_pending(request_id, discard_detail);
+    JV payload(JV::object_tag);
+    payload["status"] = JV("expired");
+    payload["job_id"] = JV(job_id);
+    payload["request_id"] = JV(request_id);
+    payload["timeout_ms"] = JV(job_timeout_ms);
+    return util::ok_result(std::move(payload));
+  }
+  JV payload(JV::object_tag);
+  payload["status"] = JV("pending");
+  payload["job_id"] = JV(job_id);
+  return util::ok_result(std::move(payload));
 }
 
 namespace {

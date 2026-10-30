@@ -10,14 +10,19 @@ Read this skill before using the godot-autopilot plugin: it is the required entr
 ## Prerequisites
 
 - The Godot editor must be open with the godot-autopilot plugin enabled. The MCP server starts automatically with the plugin and stops when the plugin is disabled or the editor closes.
-- The MCP endpoint is `http://127.0.0.1:9527/mcp` by default, but the port is configurable. Never assume 9527; see the godot-autopilot-tools skill (references/script-access.md) for the port discovery order.
-- The server listens on the loopback interface only, with no authentication. It is meant for trusted local MCP clients on the same machine.
+- The MCP endpoint is `http://127.0.0.1:9527/mcp` by default, but the port is configurable and the editor moves off 9527 by itself when that port is already taken. Never assume 9527; see the godot-autopilot-tools skill (references/cli-access.md) for the port discovery order.
+- The server listens on the loopback interface only. The MCP face has no authentication - it is meant for trusted local MCP clients on the same machine. The same port also serves a plain-HTTP face under `/api` that asks for a bearer token; that token is a local credential and does not make the port safe to expose. Never forward, proxy or publish either endpoint.
+- The plugin's own data (configuration, logs, traces, captures) lives in a per-user folder in the home directory, not in the Godot user data folder any more. You rarely need this, but a path a tool reports may point there.
 
 ## What the server exposes
 
 The MCP layer exposes the meta tools `ping`, `search_tools`, `list_categories`, `get_tool_detail`, `call_tool`, `batch_execute` and `code_execute`.
 
 Every domain tool is executed through `call_tool` by passing the domain tool name and its arguments object. A few high-effect groups sit behind capability gates; the enable paths are in the godot-autopilot-tools skill.
+
+`batch_execute` is behind the `code_execute` capability, exactly like `code_execute` itself: a client that enabled only `process` or `game_runtime` cannot run a batch, and the operations never start. Write-class tools are behind the `write` capability and are denied by default too. The capability names, the three tiers and the enable paths are in the godot-autopilot-tools skill.
+
+`code_execute` interrupts a script that outruns its `timeout_ms`. The accepted maximum is reported by the server in the `code_execute` schema - it follows the host's long-blocking dispatch budget and can be lowered per deployment, so read it from the schema instead of assuming a fixed number. The deadline is injected into the script, so a long loop really does stop instead of freezing the editor, and the call comes back as a timeout failure. Split long work into several calls, or raise `timeout_ms` up to the ceiling the schema reports.
 
 ## Consult the engine documentation
 
@@ -139,11 +144,13 @@ references/development-workflow.md expands this into complete loops for UI and s
 
 ## If MCP tools are missing
 
-If your MCP client shows an empty tool list or calls fail right after the editor restarted, the server is usually fine and the client harness simply did not reconnect. Work down this ladder:
+Two situations land here. **No MCP client is configured** — the user installed the plugin in Godot but never wired a GDA server into your harness, so no GDA tools exist in your tool list; the plugin is fine and you can still drive it. **Or the client lost its tools** — the list shows GDA tools but they went empty or calls fail right after an editor restart, and reconnecting did not help.
 
-1. Native MCP tools - retry the connection first; this is the normal channel.
-2. Script bridge - run `node .agents/skills/godot-autopilot-tools/scripts/gda_mcp.mjs` (requires Node 18+ or Bun) to reach the same server without a working MCP client.
-3. Neither installed - fall back to a manual plan per `references/manual-fallback.md` of the godot-autopilot-tools skill.
+Probe the machine first (`bun --version`, then `node --version`), then work down this ladder:
+
+1. Native MCP Tools - retry the connection first; this is the normal channel.
+2. GDA CLI - drive the server from a shell with the `gda` command; it is the only scripted channel and speaks the same protocol, subcommands and exit codes as the native one. Pick the first distribution that works on the machine: `bunx "github:jesspig/Godot-Autopilot#0.3.0" <cmd>` (Bun present, nothing installed - try `--no-install` first for a warm-cache instant hit), `bun install -g` then plain `gda`, or the standalone `gda` release asset when no JavaScript runtime exists (verify it against the release's `sha256sums.txt` first). Calling commands: ping/status/categories/search/describe/call; lifecycle: list/start/stop/restart/logs; control plane: serve (loopback-only proxy that routes to one or several instances). See the godot-autopilot-tools skill for the full reference. Note on the pinned ref: as of `0.3.0` the tree does ship the CLI (root `package.json` exposes the `gda` bin, `cli/` is in the tree), so the pinned `bunx` command resolves once that tag is published - it is not fetchable before that, so use `bunx "github:jesspig/Godot-Autopilot#develop" <cmd>` until then (that branch does ship the CLI, but it is an unreleased moving target, not a pinned version), or the standalone `gda` release asset once a release ships it, or rung 3.
+3. No CLI and no download - fall back to a manual plan per `references/manual-fallback.md` of the godot-autopilot-tools skill.
 
 ## See also
 

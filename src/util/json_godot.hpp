@@ -57,14 +57,14 @@ inline godot::Color json_to_color(const mcp::JsonValue &j) {
 }
 
 inline mcp::JsonValue vec2_to_json(const godot::Vector2 &v) {
-  return mcp::JsonValue::FromObject(
-      {{"x", mcp::JsonValue(v.x)}, {"y", mcp::JsonValue(v.y)}});
+  return mcp::JsonValue(
+      mcp::JsonValue::Object{{"x", mcp::JsonValue(v.x)}, {"y", mcp::JsonValue(v.y)}});
 }
 
 inline mcp::JsonValue vec3_to_json(const godot::Vector3 &v) {
-  return mcp::JsonValue::FromObject({{"x", mcp::JsonValue(v.x)},
-                                     {"y", mcp::JsonValue(v.y)},
-                                     {"z", mcp::JsonValue(v.z)}});
+  return mcp::JsonValue(mcp::JsonValue::Object{{"x", mcp::JsonValue(v.x)},
+                                               {"y", mcp::JsonValue(v.y)},
+                                               {"z", mcp::JsonValue(v.z)}});
 }
 
 inline godot::RID rid_from_json(const mcp::JsonValue &j) {
@@ -72,8 +72,8 @@ inline godot::RID rid_from_json(const mcp::JsonValue &j) {
 }
 
 inline mcp::JsonValue rid_to_json(const godot::RID &rid) {
-  return mcp::JsonValue::FromObject(
-      {{"rid", mcp::JsonValue(static_cast<int64_t>(rid.get_id()))}});
+  return mcp::JsonValue(mcp::JsonValue::Object{
+      {"rid", mcp::JsonValue(static_cast<int64_t>(rid.get_id()))}});
 }
 
 } // namespace util

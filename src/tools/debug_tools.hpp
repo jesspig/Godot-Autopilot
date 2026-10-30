@@ -100,22 +100,22 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "set_debug_physics_fps",
       "Set the engine physics ticks per second (physics FPS) globally and immediately. Use it to slow down or speed up physics simulation for debugging; the change is not persisted, so restore 60 after debugging. Requires 'fps' (integer); returns result 'ok' on success.",
-      "Debug", {"debug", "physics", "fps", "set"}, SideEffect::None, tool_flags::kNone,
+      "Debug", {"debug", "physics", "fps", "set"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kSetDebugPhysicsFpsParams, debug_ops::handle_set_physics_fps}));
   v.push_back(make_spec_tool(ToolSpec{
       "set_debug_collision_visual",
       "Enable or disable collision shape visualization while the game runs from the editor. Requires 'enabled' (bool); the flag is written to project metadata, so it persists in project.godot until changed back. Returns result 'ok' on success. The shapes are drawn as wireframe overlays in the game viewport.",
-      "Debug", {"debug", "collision", "visualize"}, SideEffect::None, tool_flags::kNone,
+      "Debug", {"debug", "collision", "visualize"}, SideEffect::WritesConfig, tool_flags::kMutating,
       kSetDebugCollisionVisualParams, debug_ops::handle_collision_debug}));
   v.push_back(make_spec_tool(ToolSpec{
       "set_debug_navigation_visual",
       "Enable or disable navigation geometry visualization while the game runs from the editor. Requires 'enabled' (bool); the flag is written to project metadata, so it persists in project.godot until changed back. Returns result 'ok' on success. The polygons and connections are drawn as overlays in the game viewport.",
-      "Debug", {"debug", "navigation", "visualize"}, SideEffect::None, tool_flags::kNone,
+      "Debug", {"debug", "navigation", "visualize"}, SideEffect::WritesConfig, tool_flags::kMutating,
       kSetDebugNavigationVisualParams, debug_ops::handle_navigation_debug}));
   v.push_back(make_spec_tool(ToolSpec{
       "set_debug_performance_visual",
       "Enable or disable the performance debug overlay while the game runs from the editor. Requires 'enabled' (bool); the flag is written to project metadata, so it persists in project.godot until changed back. Returns result 'ok' on success. The overlay shows FPS and frame times in the game viewport.",
-      "Debug", {"debug", "performance", "overlay"}, SideEffect::None, tool_flags::kNone,
+      "Debug", {"debug", "performance", "overlay"}, SideEffect::WritesConfig, tool_flags::kMutating,
       kSetDebugPerformanceVisualParams, debug_ops::handle_performance_debug}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_debug_monitors",
@@ -124,8 +124,8 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       kGetDebugMonitorsParams, debug_ops::handle_get_all_monitors}));
   v.push_back(make_spec_tool(ToolSpec{
       "remove_debug_custom_monitor",
-      "Remove a custom performance monitor registered via add_custom_monitor by its string id. Use it to clean up monitors no longer needed so they stop consuming per-frame overhead during game runs. Requires 'id' (string) matching the registered name; returns result 'ok' on success.",
-      "Debug", {"debug", "performance"}, SideEffect::None, tool_flags::kNone,
+      "Remove a custom performance monitor registered via add_custom_monitor by its string id. Use it to clean up monitors no longer needed so they stop consuming per-frame overhead during game runs. Requires 'id' (string) matching the registered name; returns result 'ok' on success. This tool is classified as a destructive side effect because it unregisters and destroys the monitor object that already exists inside the host, and no undo path is provided.",
+      "Debug", {"debug", "performance"}, SideEffect::Destructive, tool_flags::kMutating,
       kRemoveDebugCustomMonitorParams, debug_ops::handle_remove_custom_monitor}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_debug_custom_monitor",

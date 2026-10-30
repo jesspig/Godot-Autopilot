@@ -1,62 +1,169 @@
 #include "plugin_config.hpp"
 
 #include <exception>
+#include <filesystem>
+#include <fstream>
+#include <mutex>
+#include <set>
+#include <sstream>
+#include <string>
+#include <system_error>
+#include <utility>
 
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/file_access.hpp>
 
 #include <mcp/JsonValue.hpp>
+#include <mcp/McpError.hpp>
 
+#include "core/legacy_store.hpp"
+#include "core/path_util.hpp"
+#include "core/storage_paths.hpp"
 #include "log_system.hpp"
 #include "tools/authorization.hpp"
+#include "tools/runtime_ops.hpp"
+#include "util/project_path.hpp"
 
 namespace godot_autopilot {
 
 namespace {
-constexpr const char *kConfigPath = "user://godot_autopilot/config.json";
-constexpr const char *kConfigDir = "user://godot_autopilot";
 constexpr const char *kPortKey = "port";
 constexpr const char *kShowTimeKey = "show_time";
 constexpr const char *kDesensitizeKey = "desensitize";
 constexpr const char *kAllowKey = "allow";
+constexpr const char *kAuthModeKey = authorization::kConfigAuthModeKey;
 } // namespace
 
 namespace {
-bool save_config_value(const char *key, const mcp::JsonValue &value) {
-  godot::DirAccess::make_dir_recursive_absolute(kConfigDir);
 
-  mcp::JsonValue::Object doc;
-  godot::Ref<godot::FileAccess> read =
-      godot::FileAccess::open(kConfigPath, godot::FileAccess::READ);
-  if (!read.is_null()) {
-    godot::String content = read->get_as_text();
-    read->close();
-    try {
-      mcp::JsonValue existing =
-          mcp::JsonValue::Parse(content.utf8().get_data());
-      if (existing.IsObject()) {
-        doc = std::move(existing.GetObject());
-      }
-    } catch (const std::exception &e) {
-      LogSystem::instance().log_detailed(
-          LogLevel::Error, LogCategory::System,
-          "Plugin config parse failed, overwriting",
-          std::string("path=") + kConfigPath + " reason=" + e.what());
-    } catch (...) {
-      LogSystem::instance().log_detailed(
-          LogLevel::Error, LogCategory::System,
-          "Plugin config parse failed, overwriting",
-          std::string("path=") + kConfigPath + " reason=unknown exception");
+enum class ConfigReadStatus { kOk, kMissing, kParseFailed };
+
+std::string global_config_file_path() {
+  return StoragePaths::global_config_path();
+}
+
+std::string project_config_file_path() {
+  return StoragePaths::project_config_path(util::current_project_root_path());
+}
+
+ConfigReadStatus read_config_object(const std::string &path,
+                                    mcp::JsonValue::Object &doc,
+                                    std::string &error) {
+  error.clear();
+  godot::Ref<godot::FileAccess> file =
+      godot::FileAccess::open(godot::String::utf8(path.c_str()),
+                              godot::FileAccess::READ);
+  if (file.is_null()) {
+    return ConfigReadStatus::kMissing;
+  }
+  godot::String content = file->get_as_text();
+  file->close();
+  try {
+    mcp::JsonValue parsed = mcp::JsonValue::Parse(content.utf8().get_data());
+    if (!parsed.IsObject()) {
+      error = "config root is not a JSON object";
+      return ConfigReadStatus::kParseFailed;
+    }
+    doc = std::move(parsed.GetObject());
+    return ConfigReadStatus::kOk;
+  } catch (const mcp::McpError &e) {
+    error = std::string(e.ErrorMessage());
+  } catch (const std::exception &e) {
+    error = e.what();
+  } catch (...) {
+    error = "unknown exception";
+  }
+  return ConfigReadStatus::kParseFailed;
+}
+
+std::string read_config_text(const std::string &path) {
+  godot::Ref<godot::FileAccess> file =
+      godot::FileAccess::open(godot::String::utf8(path.c_str()),
+                              godot::FileAccess::READ);
+  if (file.is_null()) {
+    return std::string();
+  }
+  godot::String content = file->get_as_text();
+  file->close();
+  return std::string(content.utf8().get_data());
+}
+
+void note_legacy_config_source(const char *key) {
+  static std::mutex mutex;
+  static std::set<std::string> reported;
+  {
+    std::lock_guard<std::mutex> lock(mutex);
+    if (!reported.insert(key).second) {
+      return;
     }
   }
+  LogSystem::instance().log_detailed(
+      LogLevel::Info, LogCategory::System,
+      "Plugin config value read from legacy path",
+      std::string("key=") + key +
+          " path=" + LegacyStore::legacy_config_path() +
+          " note=save the value in the new location to stop reading the "
+          "legacy path");
+}
 
+bool find_config_value_with_legacy(const std::string &primary_path,
+                                   const char *key, mcp::JsonValue &out,
+                                   bool &from_legacy) {
+  from_legacy = false;
+  const std::string legacy_path = LegacyStore::legacy_config_path();
+  const std::string primary_text = read_config_text(primary_path);
+  const std::string legacy_text = read_config_text(legacy_path);
+  std::string error;
+  const bool found = LegacyStore::select_config_value(
+      primary_text, legacy_text, key, out, from_legacy, error);
+  if (!error.empty()) {
+    LogSystem::instance().log_detailed(
+        LogLevel::Error, LogCategory::System, "Plugin config read failed",
+        std::string("key=") + key + " path=" + primary_path +
+            " legacy_path=" + legacy_path + " reason=" + error);
+  }
+  if (!found || !from_legacy) {
+    return found;
+  }
+  note_legacy_config_source(key);
+  return true;
+}
+
+bool write_config_value(const std::string &path, const char *key,
+                        const mcp::JsonValue &value) {
+  if (path.empty()) {
+    LogSystem::instance().log_detailed(
+        LogLevel::Error, LogCategory::System,
+        "Plugin config write rejected: storage path unavailable",
+        std::string("key=") + key);
+    return false;
+  }
+  const std::string dir = parent_dir(path, 1);
+  if (dir.empty() ||
+      godot::DirAccess::make_dir_recursive_absolute(
+          godot::String::utf8(dir.c_str())) != godot::OK) {
+    LogSystem::instance().log_detailed(
+        LogLevel::Error, LogCategory::System,
+        "Plugin config directory creation failed",
+        std::string("path=") + path);
+    return false;
+  }
+  mcp::JsonValue::Object doc;
+  std::string error;
+  if (read_config_object(path, doc, error) == ConfigReadStatus::kParseFailed) {
+    LogSystem::instance().log_detailed(
+        LogLevel::Error, LogCategory::System,
+        "Plugin config parse failed, overwriting",
+        std::string("path=") + path + " reason=" + error);
+  }
   doc[key] = value;
   godot::Ref<godot::FileAccess> file =
-      godot::FileAccess::open(kConfigPath, godot::FileAccess::WRITE);
+      godot::FileAccess::open(godot::String::utf8(path.c_str()),
+                              godot::FileAccess::WRITE);
   if (file.is_null()) {
     LogSystem::instance().log_detailed(
         LogLevel::Error, LogCategory::System, "Plugin config write failed",
-        std::string("path=") + kConfigPath +
+        std::string("path=") + path +
             " reason=FileAccess::open returned null");
     return false;
   }
@@ -65,131 +172,190 @@ bool save_config_value(const char *key, const mcp::JsonValue &value) {
   file->close();
   return true;
 }
+
+std::string read_config_text_standalone(const std::string &path) {
+  if (path.empty()) {
+    return std::string();
+  }
+  const std::filesystem::path file_path = to_fs_path(path);
+  std::error_code error;
+  if (!std::filesystem::is_regular_file(file_path, error) || error) {
+    return std::string();
+  }
+  std::ifstream file(file_path, std::ios::binary);
+  if (!file) {
+    return std::string();
+  }
+  std::ostringstream buffer;
+  buffer << file.rdbuf();
+  return buffer.str();
+}
+
+bool read_startup_config_value(const char *key, std::string &out) {
+  const std::string primary_text =
+      read_config_text_standalone(global_config_file_path());
+  if (primary_text.empty()) {
+    return false;
+  }
+  mcp::JsonValue value;
+  bool from_legacy = false;
+  std::string error;
+  if (!LegacyStore::select_config_value(primary_text, std::string(), key, value,
+                                        from_legacy, error)) {
+    return false;
+  }
+  if (!value.IsString()) {
+    return false;
+  }
+  out = value.GetString();
+  return true;
+}
+
+void publish_startup_config_snapshot() {
+  std::string allow;
+  if (read_startup_config_value(kAllowKey, allow)) {
+    authorization::publish_allow_snapshot(allow);
+  }
+  std::string mode;
+  if (read_startup_config_value(kAuthModeKey, mode)) {
+    authorization::publish_auth_mode_snapshot(mode);
+  }
+}
+
 } // namespace
 
 namespace {
 struct AllowProviderRegistration {
   AllowProviderRegistration() {
     authorization::set_allow_provider(&PluginConfig::load_allow);
+    authorization::set_auth_mode_provider(&PluginConfig::load_auth_mode);
+    publish_startup_config_snapshot();
   }
 } g_allow_provider_registration;
 } // namespace
 
 int PluginConfig::load_port() {
-  godot::Ref<godot::FileAccess> file =
-      godot::FileAccess::open(kConfigPath, godot::FileAccess::READ);
-  if (file.is_null()) {
+  const std::string path = project_config_file_path();
+  if (path.empty()) {
+    LogSystem::instance().log(
+        LogLevel::Error, LogCategory::System,
+        "Plugin config path unavailable for port lookup");
     return -1;
   }
-  godot::String content = file->get_as_text();
-  file->close();
-
-  mcp::JsonValue doc;
-  try {
-    doc = mcp::JsonValue::Parse(content.utf8().get_data());
-  } catch (...) {
-    LogSystem::instance().log(LogLevel::Error, LogCategory::System,
-                              "Plugin config parse failed: " +
-                                  std::string(kConfigPath));
+  mcp::JsonValue value;
+  bool from_legacy = false;
+  if (!find_config_value_with_legacy(path, kPortKey, value, from_legacy) ||
+      !value.IsInt()) {
     return -1;
   }
-  const auto *port = doc.Find(kPortKey);
-  if (port == nullptr || !port->IsInt()) {
-    return -1;
-  }
-  return static_cast<int>(port->GetInt());
+  return static_cast<int>(value.GetInt());
 }
 
 bool PluginConfig::save_port(int port) {
-  return save_config_value(kPortKey,
-                           mcp::JsonValue(static_cast<int64_t>(port)));
+  return write_config_value(project_config_file_path(), kPortKey,
+                             mcp::JsonValue(static_cast<int64_t>(port)));
 }
 
 bool PluginConfig::load_show_time() {
-  godot::Ref<godot::FileAccess> file =
-      godot::FileAccess::open(kConfigPath, godot::FileAccess::READ);
-  if (file.is_null()) {
+  const std::string path = global_config_file_path();
+  if (path.empty()) {
+    LogSystem::instance().log(
+        LogLevel::Error, LogCategory::System,
+        "Plugin config path unavailable for show_time lookup");
     return true;
   }
-  godot::String content = file->get_as_text();
-  file->close();
-
-  mcp::JsonValue doc;
-  try {
-    doc = mcp::JsonValue::Parse(content.utf8().get_data());
-  } catch (...) {
-    LogSystem::instance().log(LogLevel::Error, LogCategory::System,
-                              "Plugin config parse failed: " +
-                                  std::string(kConfigPath));
+  mcp::JsonValue value;
+  bool from_legacy = false;
+  if (!find_config_value_with_legacy(path, kShowTimeKey, value, from_legacy) ||
+      !value.IsBool()) {
     return true;
   }
-  const auto *show = doc.Find(kShowTimeKey);
-  if (show == nullptr || !show->IsBool()) {
-    return true;
-  }
-  return show->GetBool();
+  return value.GetBool();
 }
 
 bool PluginConfig::save_show_time(bool show) {
-  return save_config_value(kShowTimeKey, mcp::JsonValue(show));
+  return write_config_value(global_config_file_path(), kShowTimeKey,
+                             mcp::JsonValue(show));
 }
 
 bool PluginConfig::load_desensitize() {
-  godot::Ref<godot::FileAccess> file =
-      godot::FileAccess::open(kConfigPath, godot::FileAccess::READ);
-  if (file.is_null()) {
+  const std::string path = global_config_file_path();
+  if (path.empty()) {
+    LogSystem::instance().log(
+        LogLevel::Error, LogCategory::System,
+        "Plugin config path unavailable for desensitize lookup");
     return true;
   }
-  godot::String content = file->get_as_text();
-  file->close();
-
-  mcp::JsonValue doc;
-  try {
-    doc = mcp::JsonValue::Parse(content.utf8().get_data());
-  } catch (...) {
-    LogSystem::instance().log(LogLevel::Error, LogCategory::System,
-                              "Plugin config parse failed: " +
-                                  std::string(kConfigPath));
+  mcp::JsonValue value;
+  bool from_legacy = false;
+  if (!find_config_value_with_legacy(path, kDesensitizeKey, value,
+                                     from_legacy) ||
+      !value.IsBool()) {
     return true;
   }
-  const auto *desensitize = doc.Find(kDesensitizeKey);
-  if (desensitize == nullptr || !desensitize->IsBool()) {
-    return true;
-  }
-  return desensitize->GetBool();
+  return value.GetBool();
 }
 
 bool PluginConfig::save_desensitize(bool value) {
-  return save_config_value(kDesensitizeKey, mcp::JsonValue(value));
+  if (!write_config_value(global_config_file_path(), kDesensitizeKey,
+                          mcp::JsonValue(value))) {
+    return false;
+  }
+  authorization::refresh_config_snapshot();
+  return true;
 }
 
 std::string PluginConfig::load_allow() {
-  godot::Ref<godot::FileAccess> file =
-      godot::FileAccess::open(kConfigPath, godot::FileAccess::READ);
-  if (file.is_null()) {
+  const std::string path = global_config_file_path();
+  if (path.empty()) {
+    LogSystem::instance().log(
+        LogLevel::Error, LogCategory::System,
+        "Plugin config path unavailable for allow lookup");
     return std::string();
   }
-  godot::String content = file->get_as_text();
-  file->close();
-
-  mcp::JsonValue doc;
-  try {
-    doc = mcp::JsonValue::Parse(content.utf8().get_data());
-  } catch (...) {
-    LogSystem::instance().log(LogLevel::Error, LogCategory::System,
-                              "Plugin config parse failed: " +
-                                  std::string(kConfigPath));
+  mcp::JsonValue value;
+  bool from_legacy = false;
+  if (!find_config_value_with_legacy(path, kAllowKey, value, from_legacy) ||
+      !value.IsString()) {
     return std::string();
   }
-  const auto *allow = doc.Find(kAllowKey);
-  if (allow == nullptr || !allow->IsString()) {
-    return std::string();
-  }
-  return allow->GetString();
+  return value.GetString();
 }
 
 bool PluginConfig::save_allow(const std::string &allow) {
-  return save_config_value(kAllowKey, mcp::JsonValue(allow));
+  if (!write_config_value(global_config_file_path(), kAllowKey,
+                          mcp::JsonValue(allow))) {
+    return false;
+  }
+  authorization::refresh_config_snapshot();
+  return true;
+}
+
+std::string PluginConfig::load_auth_mode() {
+  const std::string path = global_config_file_path();
+  if (path.empty()) {
+    LogSystem::instance().log(
+        LogLevel::Error, LogCategory::System,
+        "Plugin config path unavailable for auth_mode lookup");
+    return std::string();
+  }
+  mcp::JsonValue value;
+  bool from_legacy = false;
+  if (!find_config_value_with_legacy(path, kAuthModeKey, value,
+                                      from_legacy) ||
+      !value.IsString()) {
+    return std::string();
+  }
+  return value.GetString();
+}
+
+bool PluginConfig::save_auth_mode(const std::string &mode) {
+  if (!write_config_value(global_config_file_path(), kAuthModeKey,
+                          mcp::JsonValue(mode))) {
+    return false;
+  }
+  authorization::refresh_config_snapshot();
+  return true;
 }
 
 } // namespace godot_autopilot

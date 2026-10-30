@@ -1,7 +1,8 @@
 {
   "name": "15_scene_path",
-  "description": "P3-2 验证：编辑器写工具回显目标场景路径（scene_path/scene_unsaved），用于发现未切换场景时的静默误建。链路：新建未保存场景 PathRoot → create_scene_node/rename_scene_node/property_set/delete_scene_node 的响应均带 scene_path=\"\" 与 scene_unsaved=true（尚未落盘）→ create_editor_scene close_current=true 因当前场景未保存被拒（复现 P3-2 触发条件），随后的 create_scene_node 仍写入旧场景，scene_path 为空即暴露真实目标 → save_editor_scene_as 落盘后再建节点，create_scene_node 的 result.scene_path 与顶层 scene_path 均为落盘路径且 scene_unsaved=false → property_set/attach_script_to_node/delete_scene_node 同样回显顶层字段 → 保存、关闭、清理临时目录。断言引擎不支持数组下标，全部用点路径精确比对。",
+  "description": "P3-2 验证：编辑器写工具回显目标场景路径（scene_path/scene_unsaved），用于发现未切换场景时的静默误建。scene_unsaved 为真实脏标记（EditorInterface.get_unsaved_scenes；写工具成功后 mark_scene_modified 经 mark_scene_as_unsaved 通知编辑器，且响应在标脏之后采样，不再等同于“场景是否有磁盘路径”），无文件路径的场景恒为 true。链路：新建未保存场景 PathRoot → create_scene_node/rename_scene_node/property_set/delete_scene_node 的响应均带 scene_path=\"\" 与 scene_unsaved=true（尚未落盘）→ create_editor_scene close_current=true 因当前场景未保存被拒（复现 P3-2 触发条件），随后的 create_scene_node 仍写入旧场景，scene_path 为空即暴露真实目标 → save_editor_scene_as 落盘后：create_scene_node、property_set、attach_script_to_node、delete_scene_node 均在响应前标脏；create_scene_node 的 result.scene_path 与顶层 scene_path 均为落盘路径且 result.scene_unsaved 与顶层 scene_unsaved 均为 true；property_set/attach_script_to_node/delete_scene_node 的顶层 scene_path 为落盘路径且 scene_unsaved=true → 保存、关闭、清理临时目录。断言引擎不支持数组下标，全部用点路径精确比对。",
   "headless": true,
+  "requires": ["write", "destructive"],
   "pipeline": {
     "on_failure": "continue",
     "stages": [
@@ -145,9 +146,9 @@
               "field_checks": [
                 { "key": "result.path", "value": "Late" },
                 { "key": "result.scene_path", "value": "res://gda_tmp_scene_path/scene_path_probe.tscn" },
-                { "key": "result.scene_unsaved", "value": false },
+                { "key": "result.scene_unsaved", "value": true },
                 { "key": "scene_path", "value": "res://gda_tmp_scene_path/scene_path_probe.tscn" },
-                { "key": "scene_unsaved", "value": false }
+                { "key": "scene_unsaved", "value": true }
               ]
             }
           },
@@ -164,7 +165,7 @@
               "field_checks": [
                 { "key": "result", "value": "ok" },
                 { "key": "scene_path", "value": "res://gda_tmp_scene_path/scene_path_probe.tscn" },
-                { "key": "scene_unsaved", "value": false }
+                { "key": "scene_unsaved", "value": true }
               ]
             }
           },
@@ -196,7 +197,7 @@
               "field_checks": [
                 { "key": "result", "value": "script attached to Late" },
                 { "key": "scene_path", "value": "res://gda_tmp_scene_path/scene_path_probe.tscn" },
-                { "key": "scene_unsaved", "value": false }
+                { "key": "scene_unsaved", "value": true }
               ]
             }
           },
@@ -209,7 +210,7 @@
               "field_checks": [
                 { "key": "result", "value": "deleted" },
                 { "key": "scene_path", "value": "res://gda_tmp_scene_path/scene_path_probe.tscn" },
-                { "key": "scene_unsaved", "value": false }
+                { "key": "scene_unsaved", "value": true }
               ]
             }
           }

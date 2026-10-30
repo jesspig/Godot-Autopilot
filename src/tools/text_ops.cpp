@@ -2,10 +2,15 @@
 #include "core/editor_readiness.hpp"
 #include "core/config.hpp"
 #include "core/log_system.hpp"
+#include "tools/script_ops.hpp"
+#include "util/csharp_project_setup.hpp"
+#include "util/dotnet_env.hpp"
 #include "util/error_util.hpp"
 #include "util/project_path.hpp"
+#include "util/resource_fs.hpp"
 #include "util/rid_registry.hpp"
 #include "util/variant_json.hpp"
+#include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/editor_file_system.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
@@ -14,11 +19,13 @@
 #include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
+#include <godot_cpp/classes/script.hpp>
 #include <godot_cpp/classes/text_server.hpp>
 #include <godot_cpp/classes/text_server_manager.hpp>
 #include <godot_cpp/variant/rid.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
 #include <godot_cpp/variant/vector2.hpp>
+#include <cctype>
 #include <set>
 #include <string>
 #include <vector>
@@ -146,7 +153,8 @@ JV handle_font_set_data(const JV &args) {
   auto *dp = args.Find("data");
   if (!dp || !dp->IsString())
     return util::error_json("missing required parameter: data");
-  const auto checked = util::normalize_project_path(dp->GetString(), true);
+  const auto checked =
+      util::normalize_project_path(dp->GetString(), true, false);
   if (!checked.valid())
     return util::error_detail("path rejected", "data", checked.error,
                               "use a res:// or user:// project path");
@@ -332,33 +340,377 @@ bool is_script_extension(const std::string &ext) {
   return kScriptExtensions.count(ext) > 0;
 }
 
+bool is_csharp_space(char c) {
+  return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+}
+
+bool is_csharp_ident(char c) {
+  return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+         (c >= '0' && c <= '9') || c == '_';
+}
+
+std::string identifier_tail(const std::string &name) {
+  size_t dot = name.find_last_of('.');
+  size_t colon = name.find_last_of(':');
+  size_t cut = dot;
+  if (cut == std::string::npos || (colon != std::string::npos && colon > cut))
+    cut = colon;
+  return cut == std::string::npos ? name : name.substr(cut + 1);
+}
+
+std::string code_without_strings_and_comments(const std::string &source) {
+  std::string out = source;
+  size_t i = 0;
+  const size_t n = source.size();
+  while (i < n) {
+    char c = source[i];
+    char next = i + 1 < n ? source[i + 1] : '\0';
+    if (c == '/' && next == '/') {
+      out[i] = ' ';
+      out[i + 1] = ' ';
+      i += 2;
+      while (i < n && source[i] != '\n') {
+        out[i] = ' ';
+        ++i;
+      }
+      continue;
+    }
+    if (c == '/' && next == '*') {
+      out[i] = ' ';
+      out[i + 1] = ' ';
+      i += 2;
+      while (i < n) {
+        if (source[i] == '*' && i + 1 < n && source[i + 1] == '/') {
+          out[i] = ' ';
+          out[i + 1] = ' ';
+          i += 2;
+          break;
+        }
+        if (source[i] != '\n')
+          out[i] = ' ';
+        ++i;
+      }
+      continue;
+    }
+    if (c == '"') {
+      bool verbatim = i > 0 && source[i - 1] == '@';
+      out[i] = ' ';
+      ++i;
+      while (i < n) {
+        if (source[i] == '\\' && !verbatim && i + 1 < n) {
+          out[i] = ' ';
+          out[i + 1] = ' ';
+          i += 2;
+          continue;
+        }
+        if (source[i] == '"') {
+          if (verbatim && i + 1 < n && source[i + 1] == '"') {
+            out[i] = ' ';
+            out[i + 1] = ' ';
+            i += 2;
+            continue;
+          }
+          out[i] = ' ';
+          ++i;
+          break;
+        }
+        if (source[i] != '\n')
+          out[i] = ' ';
+        ++i;
+      }
+      continue;
+    }
+    if (c == '\'') {
+      out[i] = ' ';
+      ++i;
+      while (i < n) {
+        if (source[i] == '\\' && i + 1 < n) {
+          out[i] = ' ';
+          out[i + 1] = ' ';
+          i += 2;
+          continue;
+        }
+        if (source[i] == '\'') {
+          out[i] = ' ';
+          ++i;
+          break;
+        }
+        if (source[i] == '\n')
+          break;
+        out[i] = ' ';
+        ++i;
+      }
+      continue;
+    }
+    ++i;
+  }
+  return out;
+}
+
+} // namespace
+
+std::vector<CSharpClassInfo> parse_csharp_classes(const std::string &source) {
+  std::vector<CSharpClassInfo> infos;
+  std::string code = code_without_strings_and_comments(source);
+  size_t pos = 0;
+  const size_t n = code.size();
+  while (pos < n) {
+    size_t k = code.find("class", pos);
+    if (k == std::string::npos)
+      break;
+    if ((k > 0 && is_csharp_ident(code[k - 1])) ||
+        (k + 5 < n && is_csharp_ident(code[k + 5]))) {
+      pos = k + 5;
+      continue;
+    }
+    size_t q = k;
+    while (q > 0 && is_csharp_space(code[q - 1]))
+      --q;
+    size_t e = q;
+    while (q > 0 && is_csharp_ident(code[q - 1]))
+      --q;
+    bool partial = code.substr(q, e - q) == "partial";
+    size_t m = k + 5;
+    while (m < n && is_csharp_space(code[m]))
+      ++m;
+    size_t ns = m;
+    while (m < n && is_csharp_ident(code[m]))
+      ++m;
+    if (m == ns) {
+      pos = k + 5;
+      continue;
+    }
+    CSharpClassInfo info;
+    info.found = true;
+    info.name = code.substr(ns, m - ns);
+    info.is_partial = partial;
+    size_t b = m;
+    while (b < n && is_csharp_space(code[b]))
+      ++b;
+    if (b < n && code[b] == '<') {
+      int depth = 0;
+      while (b < n) {
+        if (code[b] == '<')
+          ++depth;
+        else if (code[b] == '>') {
+          --depth;
+          if (depth == 0) {
+            ++b;
+            break;
+          }
+        }
+        ++b;
+      }
+    }
+    while (b < n && is_csharp_space(code[b]))
+      ++b;
+    if (b < n && code[b] == ':') {
+      ++b;
+      while (b < n && is_csharp_space(code[b]))
+        ++b;
+      size_t bs = b;
+      while (b < n &&
+             (is_csharp_ident(code[b]) || code[b] == '.' || code[b] == ':'))
+        ++b;
+      info.base = identifier_tail(code.substr(bs, b - bs));
+    }
+    infos.push_back(info);
+    pos = m;
+  }
+  return infos;
+}
+
+mcp::JsonValue script_load_diagnostics(bool loaded, bool instantiable) {
+  mcp::JsonValue diag(mcp::JsonValue::object_tag);
+  diag["ok"] = mcp::JsonValue(loaded);
+  if (loaded)
+    diag["instantiable"] = mcp::JsonValue(instantiable);
+  return diag;
+}
+
+namespace {
+
+std::string csharp_file_stem(const std::string &normalized_path) {
+  size_t slash = normalized_path.find_last_of('/');
+  std::string name = slash == std::string::npos
+                         ? normalized_path
+                         : normalized_path.substr(slash + 1);
+  size_t dot = name.rfind('.');
+  return dot == std::string::npos ? name : name.substr(0, dot);
+}
+
+bool find_csharp_project_file(std::string &project_file_out) {
+  project_file_out.clear();
+  std::string sln;
+  godot::Ref<godot::DirAccess> da = godot::DirAccess::open("res://");
+  if (da.is_null())
+    return false;
+  da->list_dir_begin();
+  godot::String entry = da->get_next();
+  while (entry != godot::String()) {
+    if (entry != "." && entry != ".." && !da->current_is_dir()) {
+      if (entry.ends_with(".csproj")) {
+        project_file_out = "res://" + util::to_std(entry);
+        break;
+      }
+      if (sln.empty() && entry.ends_with(".sln"))
+        sln = "res://" + util::to_std(entry);
+    }
+    entry = da->get_next();
+  }
+  da->list_dir_end();
+  if (project_file_out.empty())
+    project_file_out = sln;
+  return !project_file_out.empty();
+}
+
+void probe_dotnet_editor_state(bool &is_dotnet_out,
+                               bool &assembly_loaded_out) {
+  is_dotnet_out = false;
+  assembly_loaded_out = false;
+  dotnet_env::DotnetProbe probe = dotnet_env::probe_current();
+  is_dotnet_out = dotnet_env::is_dotnet_environment(probe);
+  assembly_loaded_out = probe.csharp_script_class;
+}
+
+bool csproj_covers_file(const std::string &project_file,
+                        const std::string &target_filename,
+                        bool &sdk_style_out) {
+  sdk_style_out = false;
+  std::string lower = project_file;
+  for (char &c : lower) {
+    if (c >= 'A' && c <= 'Z')
+      c = static_cast<char>(c + ('a' - 'A'));
+  }
+  if (lower.size() < 7 || lower.substr(lower.size() - 7) != ".csproj")
+    return true;
+  auto file = godot::FileAccess::open(
+      godot::String::utf8(project_file.c_str()), godot::FileAccess::READ);
+  if (file.is_null())
+    return false;
+  std::string content = util::to_std(file->get_as_text());
+  file->close();
+  sdk_style_out = content.find("Sdk=") != std::string::npos;
+  bool disables_glob = false;
+  size_t marker = content.find("EnableDefaultCompileItems");
+  if (marker != std::string::npos) {
+    size_t hit = content.find("false", marker);
+    disables_glob =
+        hit != std::string::npos && hit < marker + 120;
+  }
+  if (sdk_style_out && !disables_glob)
+    return true;
+  bool has_compile = content.find("Compile") != std::string::npos;
+  bool has_file = content.find(target_filename) != std::string::npos;
+  return has_compile && has_file;
+}
+
+std::string csharp_not_loaded_hint(bool is_dotnet_editor) {
+  std::string editor_state =
+      is_dotnet_editor
+          ? "the editor is a .NET build, so the script can load once the assembly contains it"
+          : "the editor is NOT a .NET build, so C# scripts cannot load in this editor at all";
+  return editor_state +
+         "; the C# assembly may not include this file yet, run build_csharp_assembly and wait for the build to finish before expecting the script to load" +
+         "; read get_debugger_log for the C# compile and parse errors instead of guessing";
+}
+
+int first_parse_error_line(const std::string &error_text) {
+  const std::string marker = ".gd:";
+  size_t search_from = 0;
+  while (search_from < error_text.size()) {
+    size_t marker_pos = error_text.find(marker, search_from);
+    if (marker_pos == std::string::npos)
+      return 0;
+    size_t digits_start = marker_pos + marker.size();
+    size_t digits_end = digits_start;
+    while (digits_end < error_text.size() &&
+           std::isdigit(static_cast<unsigned char>(error_text[digits_end])))
+      ++digits_end;
+    if (digits_end > digits_start)
+      return std::stoi(
+          error_text.substr(digits_start, digits_end - digits_start));
+    search_from = marker_pos + marker.size();
+  }
+  return 0;
+}
+
+JV gdscript_compile_diagnostics(const std::string &content,
+                                const godot::String &gs_path,
+                                godot::ResourceLoader *loader) {
+  std::string compile_error;
+  if (!script_ops::try_compile_source(content, util::to_std(gs_path),
+                                      compile_error)) {
+    JV diag = script_load_diagnostics(false, false);
+    diag["diagnostic_scope"] = JV("compile");
+    diag["compilable"] = JV("false");
+    JV parse_error(JV::object_tag);
+    parse_error["line"] = JV(first_parse_error_line(compile_error));
+    parse_error["message"] = JV(compile_error);
+    diag["parse_error"] = std::move(parse_error);
+    diag["hint"] =
+        JV("the written GDScript does not compile; the file stays on disk but "
+           "cannot be used until the reported parse_error line is fixed and "
+           "the file is written again");
+    return diag;
+  }
+  godot::Ref<godot::Resource> loaded =
+      loader->load(gs_path, "Script", godot::ResourceLoader::CACHE_MODE_IGNORE);
+  auto *script =
+      loaded.is_valid() ? godot::Object::cast_to<godot::Script>(loaded.ptr())
+                        : nullptr;
+  JV diag = script_load_diagnostics(true, script && script->can_instantiate());
+  diag["diagnostic_scope"] = JV("compile");
+  diag["compilable"] = JV("true");
+  return diag;
+}
+
 JV build_script_diagnostics(const godot::String &gs_path,
-                            const std::string &ext) {
-  JV diag(JV::object_tag);
+                            const std::string &ext,
+                            const std::string &content) {
   auto *loader = godot::ResourceLoader::get_singleton();
   if (!loader) {
-    diag["ok"] = JV(false);
+    JV diag = script_load_diagnostics(false, false);
+    diag["diagnostic_scope"] = JV("load");
+    diag["compilable"] = JV("unknown");
     diag["hint"] =
         JV("ResourceLoader not available; open the file in the editor script "
            "panel to inspect errors");
     return diag;
   }
+  if (ext == "gd")
+    return gdscript_compile_diagnostics(content, gs_path, loader);
   godot::Ref<godot::Resource> loaded =
       loader->load(gs_path, "Script", godot::ResourceLoader::CACHE_MODE_IGNORE);
+  JV diag = script_load_diagnostics(false, false);
   if (loaded.is_valid()) {
-    diag["ok"] = JV(true);
+    auto *script = godot::Object::cast_to<godot::Script>(loaded.ptr());
+    diag = script_load_diagnostics(true, script && script->can_instantiate());
+  }
+  if (ext == "cs") {
+    bool is_dotnet_editor = false;
+    bool assembly_loaded = false;
+    probe_dotnet_editor_state(is_dotnet_editor, assembly_loaded);
+    diag["diagnostic_scope"] = JV("resource_load");
+    diag["assembly_checked"] = JV(assembly_loaded);
+    diag["compilable"] = JV("unknown");
+    diag["is_dotnet_editor"] = JV(is_dotnet_editor);
+    diag["assembly_loaded"] = JV(assembly_loaded);
+    std::string cs_hint =
+        loaded.is_valid()
+            ? std::string("the C# resource loaded, but C# compiles out of "
+                          "band: run build_csharp_assembly after changing the "
+                          "file and read get_debugger_log for compiler errors")
+            : csharp_not_loaded_hint(is_dotnet_editor);
+    diag["hint"] = JV(cs_hint);
     return diag;
   }
-  diag["ok"] = JV(false);
-  if (ext == "cs") {
+  diag["diagnostic_scope"] = JV("load");
+  diag["compilable"] = JV("unknown");
+  if (!loaded.is_valid())
     diag["hint"] =
-        JV("the C# assembly may not be built yet; run a project build before "
-           "expecting this script to load");
-  } else {
-    diag["hint"] =
-        JV("the script failed to load after write (parse or compile error); "
-           "line-level details are only available in the editor script panel");
-  }
+        JV("the file failed to load after write (parse or compile error); "
+           "open it in the editor to inspect the reported errors");
   return diag;
 }
 
@@ -375,8 +727,18 @@ JV handle_file_write(const JV &args) {
     return util::error_json("missing required parameter: content");
   std::string mode = "WRITE";
   auto *mp = args.Find("mode");
-  if (mp && mp->IsString())
+  if (mp && !mp->IsString())
+    return util::error_detail("invalid mode type", "mode",
+                              "'WRITE' or 'APPEND' (exact case)",
+                              "pass mode as one of the two accepted literals; "
+                              "no file was opened or written");
+  if (mp)
     mode = mp->GetString();
+  if (mode != "WRITE" && mode != "APPEND")
+    return util::error_detail("invalid mode: '" + mode + "'", "mode",
+                              "'WRITE' or 'APPEND' (exact case)",
+                              "use 'WRITE' to overwrite or 'APPEND' to append; "
+                              "no file was opened or written");
   godot::FileAccess::ModeFlags flag = godot::FileAccess::WRITE;
   if (mode == "APPEND")
     flag = godot::FileAccess::READ_WRITE;
@@ -391,11 +753,19 @@ JV handle_file_write(const JV &args) {
   if (file.is_null() && mode == "APPEND")
     file = godot::FileAccess::open(gs_path, godot::FileAccess::WRITE);
   if (file.is_null())
-    return util::error_json("failed to open file: " + pp->GetString());
+    return util::error_json("failed to open file: " + normalized_path);
   if (mode == "APPEND")
     file->seek_end();
   file->store_string(godot::String::utf8(cp->GetString().c_str()));
   file->close();
+  std::string written_content = cp->GetString();
+  if (mode == "APPEND") {
+    auto full_file = godot::FileAccess::open(gs_path, godot::FileAccess::READ);
+    if (full_file.is_valid()) {
+      written_content = util::to_std(full_file->get_as_text());
+      full_file->close();
+    }
+  }
 
   JV r(JV::object_tag);
   r["result"] = JV("ok");
@@ -424,11 +794,162 @@ JV handle_file_write(const JV &args) {
         r["action"] = JV("update_file");
       }
       if (is_script_extension(ext))
-        r["diagnostics"] = build_script_diagnostics(gs_path, ext);
+        r["diagnostics"] = build_script_diagnostics(gs_path, ext,
+                                                     written_content);
     }
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "write_file completed");
+  return r;
+}
+
+JV handle_create_csharp_script(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "create_csharp_script called");
+  auto *pp = args.Find("path");
+  if (!pp || !pp->IsString())
+    return util::error_json("missing required parameter: path");
+  auto *sp = args.Find("source_code");
+  if (!sp || !sp->IsString())
+    return util::error_json("missing required parameter: source_code");
+  bool overwrite = false;
+  auto *op = args.Find("overwrite");
+  if (op && op->IsBool())
+    overwrite = op->GetBool();
+  std::string raw_path = pp->GetString();
+  std::string source_code = sp->GetString();
+  if (lowercase_extension_of(raw_path) != "cs")
+    return util::error_detail("path must name a C# file", "path",
+                              "a res:// path ending in .cs",
+                              "rename the path to end in .cs and retry");
+  const auto checked = util::normalize_project_path(raw_path, true, false);
+  if (!checked.valid())
+    return util::error_detail("path rejected", "path", checked.error,
+                              "write only inside the project namespaces");
+  const std::string normalized_path = checked.value;
+  if (normalized_path.rfind("user://", 0) == 0)
+    return util::error_detail(
+        "C# scripts must live under res://", "path",
+        "a res:// path so the project file can reference it",
+        "move the path under res:// and retry");
+  std::string stem = csharp_file_stem(normalized_path);
+  std::vector<CSharpClassInfo> classes = parse_csharp_classes(source_code);
+  if (classes.empty())
+    return util::error_detail(
+        "no C# class declaration found", "source_code",
+        "a declaration shaped like public partial class <Name> : <GodotBase>",
+        "add the class declaration and retry");
+  CSharpClassInfo info = classes.front();
+  for (const auto &cand : classes) {
+    if (cand.name == stem) {
+      info = cand;
+      break;
+    }
+  }
+  if (stem != info.name)
+    return util::error_detail(
+        "file name does not match class name", "path",
+        "file " + stem + ".cs must declare class " + stem,
+        "rename the file to " + info.name + ".cs or rename the class to " +
+            stem);
+  if (!info.is_partial)
+    return util::error_detail(
+        "C# script class must be partial", "source_code",
+        "partial class " + info.name,
+        "add the partial modifier to the class declaration and retry");
+  if (info.base.empty())
+    return util::error_detail(
+        "C# script class must derive from a Godot base class", "source_code",
+        "class " + info.name + " : <GodotBase>",
+        "add a colon plus a Godot base class to the declaration and retry");
+  bool base_known = false;
+  auto *cdbs = godot::ClassDBSingleton::get_singleton();
+  if (cdbs)
+    base_known =
+        cdbs->class_exists(godot::StringName(info.base.c_str()));
+  if (!base_known)
+    return util::error_detail(
+        "unknown Godot base class: " + info.base, "source_code",
+        "a ClassDB-known Godot class",
+        "change the base to a Godot class, or declare and build a custom base first");
+  std::string project_file;
+  if (!find_csharp_project_file(project_file))
+    return csharp_setup::missing_project_short_error();
+  bool sdk_style = false;
+  bool ref_exists = csproj_covers_file(project_file, stem + ".cs", sdk_style);
+  if (!ref_exists) {
+    std::string rel = normalized_path.substr(std::string("res://").size());
+    return util::error_detail(
+        "project file does not reference " + stem + ".cs", project_file,
+        ".csproj must list the file via Compile Include",
+        "add <Compile Include=\"" + rel + "\" /> to " + project_file +
+            " and retry");
+  }
+  bool file_exists_on_disk = godot::FileAccess::file_exists(
+      godot::String::utf8(normalized_path.c_str()));
+  if (!overwrite && file_exists_on_disk)
+    return util::error_json("file already exists: " + normalized_path +
+                            " — pass overwrite=true to replace it");
+  std::string dir_created;
+  std::string dir_error;
+  if (!resource_fs::ensure_parent_directory(normalized_path, dir_created,
+                                            dir_error))
+    return util::error_json(dir_error);
+  auto file = godot::FileAccess::open(
+      godot::String::utf8(normalized_path.c_str()), godot::FileAccess::WRITE);
+  if (file.is_null())
+    return util::error_json("failed to open file: " + normalized_path);
+  file->store_string(godot::String::utf8(source_code.c_str()));
+  file->close();
+  bool verified = false;
+  bool readback = false;
+  auto check = godot::FileAccess::open(
+      godot::String::utf8(normalized_path.c_str()), godot::FileAccess::READ);
+  if (check.is_valid() && check->is_open()) {
+    readback = true;
+    std::string back = util::to_std(check->get_as_text());
+    godot::Error read_err = check->get_error();
+    if ((read_err == godot::OK || read_err == godot::ERR_FILE_EOF) &&
+        back == source_code)
+      verified = true;
+    check->close();
+  }
+  if (!verified)
+    return util::error_json("write verification failed for " +
+                            normalized_path +
+                            " — retry or check file locks");
+  bool is_dotnet_editor = false;
+  bool assembly_loaded = false;
+  probe_dotnet_editor_state(is_dotnet_editor, assembly_loaded);
+  JV diag(JV::object_tag);
+  diag["ok"] = JV(true);
+  auto *engine = godot::Engine::get_singleton();
+  auto *editor = godot::EditorInterface::get_singleton();
+  if (editor && engine && engine->is_editor_hint()) {
+    auto *efs = editor->get_resource_filesystem();
+    if (efs) {
+      efs->update_file(godot::String::utf8(normalized_path.c_str()));
+      diag = build_script_diagnostics(
+          godot::String::utf8(normalized_path.c_str()), "cs", source_code);
+    }
+  }
+  JV inner(JV::object_tag);
+  inner["path"] = JV(normalized_path);
+  inner["class_name"] = JV(info.name);
+  inner["base_class"] = JV(info.base);
+  inner["is_partial"] = JV(info.is_partial);
+  inner["csproj_ref_exists"] = JV(ref_exists);
+  inner["project_file"] = JV(project_file);
+  inner["is_dotnet_editor"] = JV(is_dotnet_editor);
+  inner["assembly_loaded"] = JV(assembly_loaded);
+  inner["overwritten"] = JV(file_exists_on_disk);
+  inner["verified"] = JV(verified);
+  inner["readback"] = JV(readback);
+  inner["diagnostics"] = std::move(diag);
+  JV r(JV::object_tag);
+  r["result"] = std::move(inner);
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "create_csharp_script completed");
   return r;
 }
 
@@ -562,12 +1083,28 @@ JV handle_file_read(const JV &args) {
   auto file = godot::FileAccess::open(godot::String(checked.value.c_str()),
                                       godot::FileAccess::READ);
   if (file.is_null())
-    return util::error_json("failed to open file: " + pp->GetString());
+    return util::error_json("failed to open file: " + checked.value);
+  const int64_t length = file->get_length();
+  if (length < 0 || static_cast<size_t>(length) > GDA_SCAN_MAX_FILE_BYTES) {
+    file->close();
+    JV e = util::error_json("file is larger than the read limit of " +
+                            std::to_string(GDA_SCAN_MAX_FILE_BYTES) +
+                            " bytes; no content was returned");
+    JV details(JV::object_tag);
+    details["code"] = JV("file_too_large");
+    details["max_bytes"] = JV(static_cast<int64_t>(GDA_SCAN_MAX_FILE_BYTES));
+    details["size_bytes"] = JV(static_cast<int64_t>(length));
+    e["structured_error"] = std::move(details);
+    return e;
+  }
   std::string content = util::to_std(file->get_as_text());
   file->close();
   JV inner(JV::object_tag);
   inner["path"] = JV(checked.value);
   inner["content"] = JV(content);
+  inner["bytes"] = JV(static_cast<int64_t>(length));
+  inner["truncated"] = JV(false);
+  inner["max_bytes"] = JV(static_cast<int64_t>(GDA_SCAN_MAX_FILE_BYTES));
   JV r(JV::object_tag);
   r["result"] = std::move(inner);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -588,7 +1125,7 @@ JV handle_find_in_files(const JV &args) {
   if (dp && dp->IsString())
     dir = dp->GetString();
 
-  const auto checked_dir = util::normalize_project_path(dir, true);
+  const auto checked_dir = util::normalize_project_path(dir, true, true);
   if (!checked_dir.valid())
     return util::error_detail("path rejected", "dir", checked_dir.error,
                               "search only inside the project namespaces");

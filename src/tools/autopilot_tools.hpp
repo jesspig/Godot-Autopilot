@@ -21,6 +21,8 @@ public:
 
   int64_t register_tool(const godot::Dictionary &definition,
                         const godot::Callable &callable);
+  godot::Dictionary register_csharp_tool(const godot::Dictionary &definition,
+                                         const godot::Callable &callable);
   bool unregister_tool(int64_t handle);
   bool has_tool(const godot::String &name) const;
   godot::Array list_tools() const;

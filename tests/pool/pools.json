@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "mode": "pool",
+  "isolated": [
+    "45_runtime_observability",
+    "48_capture_frame_phase"
+  ],
+  "pools": [
+    {
+      "name": "deny",
+      "allow": "none",
+      "cases": [
+        "03_tools_contract",
+        "09_editor_ui",
+        "47_authorization_gate"
+      ]
+    },
+    {
+      "name": "main-1",
+      "allow": "all",
+      "cases": [
+        "38_csharp_bridge"
+      ]
+    },
+    {
+      "name": "main-2",
+      "allow": "all",
+      "cases": [
+        "44_csharp_tooling",
+        "46_ui_verification",
+        "00_meta",
+        "14_tilemap_rect",
+        "05_rename_references",
+        "33_verified_inherit",
+        "32_plane_inline",
+        "22_uid_guard",
+        "20_cjk_text_roundtrip",
+        "39_exec_budget",
+        "26_user_tools_code_mode",
+        "41_thread_guard",
+        "27_user_tools_rescan",
+        "37_game_ready_gate",
+        "40_contract_assert"
+      ]
+    },
+    {
+      "name": "main-3",
+      "allow": "all",
+      "cases": [
+        "13_inline_subresource",
+        "04_resources_scripts",
+        "34_slash_property",
+        "31_theme_root",
+        "11_editor_tree",
+        "36_stall_immunity",
+        "17_vision_assist",
+        "24_keycode_alias",
+        "25_open_scene_idempotent",
+        "23_click_ui_coords",
+        "42_tool_contract",
+        "10_editor_input",
+        "30_observability"
+      ]
+    },
+    {
+      "name": "main-4",
+      "allow": "all",
+      "cases": [
+        "06_move_references",
+        "02_property",
+        "43_scene_integrity",
+        "15_scene_path",
+        "07_scene_tabs",
+        "18_script_freshness",
+        "35_scene_tree_gate",
+        "01_scene",
+        "08_property_readback",
+        "28_sprite_frames_animation",
+        "19_cjk_roundtrip",
+        "16_game_jobs",
+        "12_capture_params",
+        "29_trace_persistence"
+      ]
+    }
+  ]
+}

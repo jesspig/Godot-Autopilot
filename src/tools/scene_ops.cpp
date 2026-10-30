@@ -459,6 +459,7 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
     result_path = scene_relative_path(obj, scene_root);
   }
 
+  scene_dirty_tracker::mark_scene_modified();
   const util::EditedSceneInfo scene_info = util::edited_scene_info();
 
   mcp::JsonValue r(mcp::JsonValue::object_tag);
@@ -490,7 +491,6 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
         "no edited scene root — scene_path is empty and the write target is "
         "unknown");
   }
-  scene_dirty_tracker::mark_scene_modified();
   return r;
 }
 
@@ -579,8 +579,8 @@ mcp::JsonValue handle_delete(const mcp::JsonValue &args) {
       mcp::JsonValue("recreate node " + node_name + " (" + node_type +
                      ") under " + parent_path + " (create_scene_node)");
   r["undo"] = std::move(undo_info);
-  util::add_scene_info_fields(r, util::edited_scene_info());
   scene_dirty_tracker::mark_scene_modified();
+  util::add_scene_info_fields(r, util::edited_scene_info());
   return r;
 }
 
@@ -655,8 +655,8 @@ mcp::JsonValue handle_rename(const mcp::JsonValue &args) {
   r["name"] = mcp::JsonValue(util::to_std(node->get_name()));
   r["path"] =
       mcp::JsonValue(scene_relative_path(node, scene_root));
-  util::add_scene_info_fields(r, util::edited_scene_info());
   scene_dirty_tracker::mark_scene_modified();
+  util::add_scene_info_fields(r, util::edited_scene_info());
   return r;
 }
 
@@ -818,6 +818,7 @@ mcp::JsonValue handle_reparent(const mcp::JsonValue &args) {
                   "and the new parent are both Node2D or both Node3D") +
       (transform_managed ? "" : " (ignored here)"));
   scene_dirty_tracker::mark_scene_modified();
+  util::add_scene_info_fields(r, util::edited_scene_info());
   return r;
 }
 
@@ -933,6 +934,7 @@ mcp::JsonValue handle_instance(const mcp::JsonValue &args) {
       std::to_string(persist_unresolved) + " unresolvable");
 
   scene_dirty_tracker::mark_scene_modified();
+  util::add_scene_info_fields(r, util::edited_scene_info());
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "instantiate_scene completed");
   return r;
@@ -1429,6 +1431,7 @@ mcp::JsonValue handle_create_path_node(const mcp::JsonValue &args) {
     editor->add_root_node(node);
   }
   auto *scene_root = editor->get_edited_scene_root();
+  scene_dirty_tracker::mark_scene_modified();
   const util::EditedSceneInfo scene_info = util::edited_scene_info();
   mcp::JsonValue inner(mcp::JsonValue::object_tag);
   inner["path"] = mcp::JsonValue(scene_relative_path(node, scene_root));
@@ -1441,7 +1444,6 @@ mcp::JsonValue handle_create_path_node(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(inner);
   util::add_scene_info_fields(r, scene_info);
-  scene_dirty_tracker::mark_scene_modified();
   return r;
 }
 
@@ -1510,8 +1512,8 @@ mcp::JsonValue handle_advance_path_follow(const mcp::JsonValue &args) {
     r["position"] =
         util::vec3_to_json(follow3d->get_global_position());
   }
-  util::add_scene_info_fields(r, util::edited_scene_info());
   scene_dirty_tracker::mark_scene_modified();
+  util::add_scene_info_fields(r, util::edited_scene_info());
   return r;
 }
 
@@ -1704,8 +1706,8 @@ mcp::JsonValue handle_focus_camera_on_node(const mcp::JsonValue &args) {
     r["behind"] = mcp::JsonValue(behind);
     r["margin"] = mcp::JsonValue(margin_value);
   }
-  util::add_scene_info_fields(r, util::edited_scene_info());
   scene_dirty_tracker::mark_scene_modified();
+  util::add_scene_info_fields(r, util::edited_scene_info());
   return r;
 }
 
@@ -2053,8 +2055,8 @@ mcp::JsonValue handle_set_camera_params(const mcp::JsonValue &args) {
     r["near"] = mcp::JsonValue(static_cast<double>(cam3d->get_near()));
     r["far"] = mcp::JsonValue(static_cast<double>(cam3d->get_far()));
   }
-  util::add_scene_info_fields(r, util::edited_scene_info());
   scene_dirty_tracker::mark_scene_modified();
+  util::add_scene_info_fields(r, util::edited_scene_info());
   return r;
 }
 

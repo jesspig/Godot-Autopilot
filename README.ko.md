@@ -5,7 +5,7 @@
 ![Godot](https://img.shields.io/badge/Godot-4.7%2B-478CBF?logo=godotengine&logoColor=white)
 ![플랫폼](https://img.shields.io/badge/platform-Windows%7CLinux%7CmacOS-lightgrey)
 [![프로토콜](https://img.shields.io/badge/MCP-Streamable_HTTP-blueviolet)](https://modelcontextprotocol.io/)
-![도구 수](https://img.shields.io/badge/tools-443%2B-brightgreen)
+![도구 수](https://img.shields.io/badge/tools-452%2B-brightgreen)
 
 > **AI 에이전트가 에디터 안에서 Godot 게임을 빌드하고 플레이테스트하며 디버깅합니다.**
 
@@ -23,7 +23,7 @@ Godot-Autopilot은 **Godot 에디터 내부**에서 플러그인으로 동작하
 
 ## 주요 기능
 
-**443개 이상의 도구**로 에디터부터 게임까지 전체 과정을 지원합니다(정확한 수는 버전마다 증가하므로 `search_tools`를 통해 에이전트에게 확인하도록 요청하십시오). 주요 기능:
+**452개 이상의 도구**로 에디터부터 게임까지 전체 과정을 지원합니다(정확한 수는 버전마다 증가하므로 `search_tools`를 통해 에이전트에게 확인하도록 요청하십시오). 주요 기능:
 
 - **씬 빌드** — 노드를 생성, 이름 변경, 이동, 삭제합니다. 속성을 읽고 쓰며, 시그널을 연결하고, GridMap으로 3D 블록 레벨을 구축합니다(예: `create_scene_node`, `property_set`, `signal_connect`, `scene_tree_items`; GridMap: `create_gridmap`, `set_gridmap_cell`, `fill_gridmap_box`).
 - **외관, 사운드 및 질감** — 메시와 머티리얼, 조명과 환경, 오디오 재생, 애니메이션과 트윈, UI 테마, 타일맵을 지원합니다(예: `create_animation`, `tween_editor_property`, `create_game_tween`, `play_audio_player`, `fill_tilemap_rect`).
@@ -41,7 +41,7 @@ Godot-Autopilot은 **Godot 에디터 내부**에서 플러그인으로 동작하
 2. **실행** — 단일 단계에는 `call_tool`, 일괄 처리에는 `batch_execute`를 사용합니다.
 3. **검증** — 결과를 스크린샷으로 확인하고 이전 캡처와 비교한 뒤 수정하고 반복합니다.
 
-에이전트가 바로 원활하게 동작하도록 플러그인에 **스킬북 9권**(개요, 호출 가이드, 씬, 리소스, 스크립팅, 런타임, 서버, 콘텐츠, C# 편)과 **시작 가이드 7편**(3D 씬, 캐릭터 컨트롤러, 물리 디버깅, 입력 맵, GUI, …)을 포함합니다. **MCP Config** 패널에서 한 번 클릭하면 프로젝트의 `.agents/skills/`에 스킬이 생성됩니다. MCP를 주 제품 채널로 삼고 스킬/스크립트를 경험 계층으로 둡니다. 호출 가이드는 MCP가 중단될 경우 스크립트 브리지로 대체되며(Node 18+ 또는 Bun 필요), 스크립트 런타임이 없을 경우에는 수동 가이드로 대체됩니다.
+에이전트가 바로 원활하게 동작하도록 플러그인에 **스킬북 9권**(개요, 호출 가이드, 씬, 리소스, 스크립팅, 런타임, 서버, 콘텐츠, C# 편)과 **시작 가이드 7편**(3D 씬, 캐릭터 컨트롤러, 물리 디버깅, 입력 맵, GUI, …)을 포함합니다. **MCP Config** 패널에서 한 번 클릭하면 프로젝트의 `.agents/skills/`에 스킬이 생성됩니다. MCP를 주 제품 채널로 삼고 스킬/스크립트를 경험 계층으로 둡니다. 호출 가이드는 MCP가 중단될 경우 GDA CLI로 대체되며, CLI가 없을 경우에는 수동 가이드로 대체됩니다.
 
 플러그인에는 두 개의 에디터 패널이 포함됩니다.
 
@@ -52,7 +52,7 @@ Godot-Autopilot은 **Godot 에디터 내부**에서 플러그인으로 동작하
 
 **Godot 4.7+**가 필요합니다.
 
-1. **플러그인 가져오기** — 프로젝트의 GitHub 릴리스 페이지([jesspig/Godot-Autopilot](https://github.com/jesspig/Godot-Autopilot))에서 `godot-autopilot-<version>.zip`을 다운로드한 뒤 `godot-autopilot/` 폴더를 프로젝트의 `addons/` 디렉터리에 복사합니다.
+1. **플러그인 가져오기** — 프로젝트의 GitHub 릴리스 페이지([jesspig/Godot-Autopilot](https://github.com/jesspig/Godot-Autopilot))에서 `addons.zip`을 다운로드한 뒤 `godot-autopilot/` 폴더를 프로젝트의 `addons/` 디렉터리에 복사합니다.
    ```
    your-project/
    └── addons/
@@ -69,13 +69,64 @@ Godot-Autopilot은 **Godot 에디터 내부**에서 플러그인으로 동작하
 
 소스에서 빌드하거나 기여하고 싶으십니까? [docs/wiki/](docs/wiki/)([index.md](docs/wiki/index.md)부터 시작하고 빌드는 [build.md](docs/wiki/build.md) 참조) 및 [tests/README.md](tests/README.md)를 참조하십시오.
 
+## 명령줄 접근
+
+채팅 클라이언트 대신 터미널에서 작업하고 싶으십니까? GDA CLI는 실행 중인 GDA 인스턴스를 셸에서 조작합니다. MCP 클라이언트 통합이 필요하지 않습니다. Bun + TypeScript로 작성되어 소스에서 바로 실행되며, **런타임 종속성이 없고** 빌드 단계도 없습니다.
+
+`bunx`로 한 번 실행합니다(PowerShell에서는 `#`가 주석이 되므로 따옴표가 필요합니다):
+
+```
+bunx "github:jesspig/Godot-Autopilot#0.3.0" ping
+```
+
+또는 한 번 전역 설치한 뒤 `gda` 명령을 사용합니다:
+
+```
+bun install -g github:jesspig/Godot-Autopilot#0.3.0
+gda ping
+```
+
+명령 계열: **호출 계열** — `ping` / `status` / `categories` / `search` / `describe` / `call`；**수명 주기** — `list` / `start` / `stop` / `restart` / `logs`；**제어면** — `serve`；**REST 계열** — `api`(`list` / `describe` / `call` 하위 명령, MCP 핸드셰이크 없이 REST 직접 호출)；`endpoints`(MCP/REST 엔드포인트, 포트 출처, 활성 프로브 결과 출력).
+
+**Bun**이 필요합니다. Bun도 Node도 없는 환경에서는 Releases의 `gda` 단일 실행 파일을 사용하세요 (전체 참조는 [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md)).
+
+## AI에게 설치를 맡기기
+
+위 단계를 직접 따라 하는 대신, 같은 머신에서 셸을 실행할 수 있는 코딩 에이전트에게 맡길 수 있습니다. 아래 블록을 복사하고 프로젝트의 절대 경로를 채워 보내세요:
+
+```text
+Set up Godot Autopilot (GDA) on this machine end to end, then prove it works.
+
+Project: <ABSOLUTE PATH TO YOUR GODOT PROJECT> (Godot 4.7+).
+
+1. Install the plugin: download addons.zip from
+   https://github.com/jesspig/Godot-Autopilot/releases/latest and extract it so that
+   <project>/addons/godot-autopilot/godot-autopilot.gdextension exists.
+2. Start the editor: run `godot --editor --path <project>` (ask me for the engine path if it is
+   not on PATH) and wait until http://127.0.0.1:9527/mcp answers.
+3. Verify the server from a shell. Try in this order, stop at the first that works, and tell me
+   which one it was:
+   - bunx "github:jesspig/Godot-Autopilot#0.3.0" ping
+   - download the gda release asset for this OS and CPU from the same Releases page, verify it
+     against sha256sums.txt, then run ./gda ping
+4. Connect my AI client: add
+   {"mcpServers":{"godot-autopilot":{"url":"http://127.0.0.1:9527/mcp"}}}
+   to its MCP configuration, or tell me to use the plugin's MCP Config panel instead.
+5. Summarize: which channel worked, every command you ran, and anything that failed.
+
+Rules: never hand-write HTTP requests against the port; never expose 9527 beyond loopback;
+leave code_execute and game_runtime disabled unless I ask for them.
+```
+
+클라이언트가 스킬을 지원한다면(Claude Code, Codex, Cursor 등) 이 저장소의 `skills/` 디렉터리도 함께 지정하세요. 에이전트가 추측하지 않고 전체 호출 프로토콜을 참조할 수 있습니다.
+
 ## 안전 참고 사항
 
 서버는 컴퓨터의 루프백 주소에서만 수신 대기하며(포트는 플러그인 설정값이며 기본값은 9527, 고정 경로는 `/mcp`), 로컬이 아닌 주소는 거부합니다. 스크립트 실행, 게임 제어, OS 프로세스 도구는 기본적으로 **거부**됩니다. 신뢰할 수 있는 로컬 프로젝트에서만 활성화하십시오. 자세한 내용: [docs/wiki/security_contract.md](docs/wiki/security_contract.md).
 
 ## 에셋 출처 표기
 
-`demo/` 아래 5개 예제 프로젝트(2D/3D 입문 튜토리얼, UI 컨트롤 갤러리, 뷰포트 구성, 네트워크 퐁)는 공식 [Godot 데모 프로젝트](https://github.com/godotengine/godot-demo-projects)에서 가져왔으며, 테스트용으로 에셋과 정리된 프로젝트 설정만 유지합니다. 저작권과 라이선스 세부 정보는 각 프로젝트의 README와 LICENSE 파일에 있습니다.
+`demo/` 아래 5개 예제 프로젝트(2D/3D 입문 튜토리얼, UI 컨트롤 갤러리, 뷰포트 구성, 네트워크 퐁)는 공식 [Godot 데모 프로젝트](https://github.com/godotengine/godot-demo-projects)에서 가져왔으며, 테스트용으로 에셋과 정리된 프로젝트 설정만 유지합니다. 여섯 번째 프로젝트 `demo/pink_man_adventure`는 과거 `Example/` 데모 프로젝트에서 복원한 저장소 내 예제입니다. 173장의 PNG 에셋은 Pixel Frog의 Pixel Adventure 1(CC0 1.0)에서 가져왔으며, 설계 문서는 이 저장소의 오리지널입니다. 저작권과 라이선스 세부 정보는 각 프로젝트의 README와 LICENSE 파일에 있습니다.
 
 ## 라이선스
 

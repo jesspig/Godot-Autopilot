@@ -5,7 +5,7 @@
 ![Godot](https://img.shields.io/badge/Godot-4.7%2B-478CBF?logo=godotengine&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-Windows%7CLinux%7CmacOS-lightgrey)
 [![Protocol](https://img.shields.io/badge/MCP-Streamable_HTTP-blueviolet)](https://modelcontextprotocol.io/)
-![Tools](https://img.shields.io/badge/tools-443%2B-brightgreen)
+![Tools](https://img.shields.io/badge/tools-452%2B-brightgreen)
 
 > **Let an AI agent build, playtest, and debug your Godot game — from inside the editor.**
 
@@ -23,7 +23,7 @@ AI controlling a game character in real time during end-to-end tests:
 
 ## What it can do
 
-Over **443 tools** covering the whole editor-to-game loop (the exact count grows with each version — ask the agent to check via `search_tools`). Highlights:
+Over **452 tools** covering the whole editor-to-game loop (the exact count grows with each version — ask the agent to check via `search_tools`). Highlights:
 
 - **Build scenes** — create, rename, move, and delete nodes; read and write properties; connect signals; build 3D block levels with GridMap (e.g. `create_scene_node`, `property_set`, `signal_connect`, `scene_tree_items`; GridMap: `create_gridmap`, `set_gridmap_cell`, `fill_gridmap_box`).
 - **Look, sound, and feel** — meshes and materials, lights and environments, audio playback, animations and tweens, UI themes, tilemaps (e.g. `create_animation`, `tween_editor_property`, `create_game_tween`, `play_audio_player`, `fill_tilemap_rect`).
@@ -41,7 +41,7 @@ You don't need to memorize tool names. The agent follows a simple loop:
 2. **Act** — `call_tool` for one step, `batch_execute` for a batch.
 3. **Verify** — screenshot the result, compare with the previous capture, fix, and repeat.
 
-To make agents good at this out of the box, the plugin ships **9 skill books** (an overview, a calling guide, plus scenes, resources, scripting, runtime, servers, content, and C# volumes) and **7 starter guides** (3D scene, character controller, physics debugging, input map, GUI, …). One click in the **MCP Config** panel renders the skills into your project's `.agents/skills/`. Positioning: MCP is the primary product channel and skills/scripts are the experience layer — the calling guide falls back to a script bridge when MCP is down (needs Node 18+ or Bun) and to a manual guide with no script runtime.
+To make agents good at this out of the box, the plugin ships **9 skill books** (an overview, a calling guide, plus scenes, resources, scripting, runtime, servers, content, and C# volumes) and **7 starter guides** (3D scene, character controller, physics debugging, input map, GUI, …). One click in the **MCP Config** panel renders the skills into your project's `.agents/skills/`. Positioning: MCP is the primary product channel and skills/scripts are the experience layer — the calling guide falls back to the GDA CLI when MCP is down, and to a manual guide with no CLI available.
 
 Two editor panels come with the plugin:
 
@@ -52,7 +52,7 @@ Two editor panels come with the plugin:
 
 Requires **Godot 4.7+**.
 
-1. **Get the plugin** — download `godot-autopilot-<version>.zip` from the project's GitHub Releases page ([jesspig/Godot-Autopilot](https://github.com/jesspig/Godot-Autopilot)) and copy the `godot-autopilot/` folder into your project's `addons/` directory:
+1. **Get the plugin** — download `addons.zip` from the project's GitHub Releases page ([jesspig/Godot-Autopilot](https://github.com/jesspig/Godot-Autopilot)) and copy the `godot-autopilot/` folder into your project's `addons/` directory:
    ```
    your-project/
    └── addons/
@@ -69,13 +69,64 @@ Requires **Godot 4.7+**.
 
 Want to build from source or contribute? See [docs/wiki/](docs/wiki/) (start at [index.md](docs/wiki/index.md), building at [build.md](docs/wiki/build.md)) and [tests/README.md](tests/README.md).
 
+## Command-line access
+
+Prefer a terminal to a chat client? The GDA CLI drives a running GDA instance from the shell — no MCP client integration needed. It is Bun + TypeScript, runs from source, and has **zero runtime dependencies** and no build step.
+
+Run it one-off with `bunx` (quoted on PowerShell, because `#` starts a comment):
+
+```
+bunx "github:jesspig/Godot-Autopilot#0.3.0" ping
+```
+
+Or install it globally once and use the `gda` command:
+
+```
+bun install -g github:jesspig/Godot-Autopilot#0.3.0
+gda ping
+```
+
+Command families: **calling** — `ping` / `status` / `categories` / `search` / `describe` / `call`; **lifecycle** — `list` / `start` / `stop` / `restart` / `logs`; **control plane** — `serve`; **REST** — `api` (`list` / `describe` / `call` subcommands, direct REST without MCP handshake); `endpoints` (prints the MCP/REST endpoints, port source, and liveness probe result).
+
+Requires **Bun**; on a machine without Bun or Node, use the standalone `gda` binary from the Releases page instead (see [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md) for the full reference).
+
+## Let an AI set it up for you
+
+Rather than following the steps above by hand, hand them to a coding agent that has shell access on the same machine. Copy the block below, fill in the absolute path of your project, and send it:
+
+```text
+Set up Godot Autopilot (GDA) on this machine end to end, then prove it works.
+
+Project: <ABSOLUTE PATH TO YOUR GODOT PROJECT> (Godot 4.7+).
+
+1. Install the plugin: download addons.zip from
+   https://github.com/jesspig/Godot-Autopilot/releases/latest and extract it so that
+   <project>/addons/godot-autopilot/godot-autopilot.gdextension exists.
+2. Start the editor: run `godot --editor --path <project>` (ask me for the engine path if it is
+   not on PATH) and wait until http://127.0.0.1:9527/mcp answers.
+3. Verify the server from a shell. Try in this order, stop at the first that works, and tell me
+   which one it was:
+   - bunx "github:jesspig/Godot-Autopilot#0.3.0" ping
+   - download the gda release asset for this OS and CPU from the same Releases page, verify it
+     against sha256sums.txt, then run ./gda ping
+4. Connect my AI client: add
+   {"mcpServers":{"godot-autopilot":{"url":"http://127.0.0.1:9527/mcp"}}}
+   to its MCP configuration, or tell me to use the plugin's MCP Config panel instead.
+5. Summarize: which channel worked, every command you ran, and anything that failed.
+
+Rules: never hand-write HTTP requests against the port; never expose 9527 beyond loopback;
+leave code_execute and game_runtime disabled unless I ask for them.
+```
+
+If your client supports skills (Claude Code, Codex, Cursor and others do), also point it at this repository's `skills/` directory so the agent gets the full calling protocol instead of improvising.
+
 ## Safety notes
 
 The server only listens on your machine's loopback address (port from the plugin settings, 9527 by default, fixed path `/mcp`) and refuses non-local addresses. Script execution, game control, and OS process tools are **denied by default** — enable them only in a local project you trust. Details: [docs/wiki/security_contract.md](docs/wiki/security_contract.md).
 
 ## Asset attribution
 
-The 5 sample projects under `demo/` (2D/3D beginner tutorials, UI control gallery, viewport composition, networked Pong) come from the official [Godot demo projects](https://github.com/godotengine/godot-demo-projects); only their assets and clean project configurations are kept for testing. Copyright and licensing details live in each project's README and LICENSE files.
+The 5 sample projects under `demo/` (2D/3D beginner tutorials, UI control gallery, viewport composition, networked Pong) come from the official [Godot demo projects](https://github.com/godotengine/godot-demo-projects); only their assets and clean project configurations are kept for testing. The sixth project, `demo/pink_man_adventure`, is an in-repo example restored from the historical `Example/` demo project: its 173 PNG assets come from Pixel Frog's Pixel Adventure 1 (CC0 1.0), and its design documentation is original to this repository. Copyright and licensing details live in each project's README and LICENSE files.
 
 ## License
 

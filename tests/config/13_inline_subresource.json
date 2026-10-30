@@ -2,6 +2,7 @@
   "name": "13_inline_subresource",
   "description": "P1-2 验证：节点子资源一步式创建入口（inline 描述 {\"type\": ..., \"properties\": {...}}）。链路：create_scene_node 的 properties 与 property_set 两条入口挂 CollisionShape2D.shape = RectangleShape2D(size 20x28) → property_get 读回 class/size → code_execute 复核 is RectangleShape2D 与 size == Vector2(20,28) → save_editor_scene_as 落盘 → read_file 证明文件可读（runner 断言引擎无子串匹配，故用 find_in_files 统计 sub_resource 命中文件数=1 作为落为 [sub_resource] 的文本证据）→ reload_editor_scene 后再次 property_get，证明子资源已持久化且未坏引用。嵌套：AtlasTexture 内嵌 AtlasTexture 成功（depth 2），5 层嵌套报 nesting limit 错误。负例：未知类名、非 Resource 类（Node2D）、抽象类（Shape2D）、properties 非对象。防误伤：导出 Dictionary 属性写入同形对象 {\"type\": \"enemy\", \"properties\": {...}} 仍按普通字典存值；{\"path\": \"res://...\"} 磁盘资源与 memory:// 拒绝文案（新增 inline 建议）各验证一条。",
   "headless": true,
+  "requires": ["write", "code_execute"],
   "pipeline": {
     "on_failure": "continue",
     "stages": [

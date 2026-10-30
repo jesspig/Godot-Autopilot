@@ -16,7 +16,8 @@ namespace script_tools {
 namespace {
 
 const std::vector<ParamSpec> kExecuteScriptParams = {
-    {"expression", "string", "GDScript expression or code to execute. Single expression auto-returns its value; multi-line code needs an explicit return. print() output appears in the output field, errors in the errors field. Runs synchronously in the editor process with no timeout — long code blocks the editor", true},
+    {"expression", "string", "GDScript expression or code to execute; a single expression auto-returns its value. Pass exactly one of expression or source_code (aliases — providing both is rejected)", false},
+    {"source_code", "string", "Alias of expression: GDScript code to execute in the editor process; a single expression auto-returns its value. Pass exactly one of expression or source_code (aliases — providing both is rejected)", false},
 };
 
 const std::vector<ParamSpec> kLoadScriptParams = {
@@ -56,7 +57,7 @@ const std::vector<ParamSpec> kGetScriptPropertyParams = {
 const std::vector<ParamSpec> kSetScriptPropertyParams = {
     {"node_path", "string", "Node path in the edited scene", true},
     {"property", "string", "Property name", true},
-    {"value", "object", "Property value as JSON; the tool performs no type or read-only validation and creates no undo entry — use property_set for validated, undoable changes", true},
+    {"value", "json", "Property value as JSON; the tool performs no type or read-only validation and creates no undo entry — use property_set for validated, undoable changes", true},
 };
 
 const std::vector<ParamSpec> kCallScriptNodeParams = {
@@ -80,7 +81,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.reserve(11);
   v.push_back(make_spec_tool(ToolSpec{
       "execute_script",
-      "Execute arbitrary GDScript synchronously in the editor process; single-expression input returns its value automatically, multi-line code needs an explicit return statement. print() output appears in the output field, errors in the errors field. Compilation errors include line mapping and the wrapped source. There is no timeout — long code blocks the editor. The environment exposes SceneRoot (edited scene root) for node access; for the running game process use execute_game_script instead.",
+      "Execute arbitrary GDScript synchronously in the editor process. Pass the code as either expression or source_code — they are aliases, pass exactly one; providing both is rejected with invalid parameter, and providing neither reports missing required parameter: expression or source_code. Single-expression input returns its value automatically, while multi-line code needs an explicit return statement; this auto-return is editor-side only — execute_game_script never auto-returns a single bare expression and needs an explicit return for a value. print() output appears in the output field, errors in the errors field. Compilation errors include line mapping and the wrapped source. There is no timeout — long code blocks the editor. The environment exposes SceneRoot (edited scene root) for node access; for the running game process use execute_game_script instead.",
       "Scripts", {"script", "execute", "gdscript"}, SideEffect::CodeExecute, tool_flags::kMutating,
       kExecuteScriptParams, script_ops::handle_execute_gdscript}));
   v.push_back(make_spec_tool(ToolSpec{
@@ -101,12 +102,12 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "attach_script_to_node",
       "Attach a Script resource (e.g. a .gd file or another Script) to a node in the edited scene, registered with the editor undo/redo. Requires node_path and script_path. The script is always re-read from disk (CACHE_MODE_IGNORE) before attaching, so a node never receives a stale cached instance after the file changed outside the editor. Returns 'script attached to <path>' plus instantiated. When the script lacks @tool it cannot be instantiated in the editor, so its methods only run once the game runs — call_script_node reports the same restriction. Replacing an existing script does not migrate exported references (node_paths may be left dangling) — rewire them after attaching.",
-      "Scripts", {"script", "attach", "node"}, SideEffect::None, tool_flags::kNone | tool_flags::kSceneTarget | tool_flags::kUndoable,
+      "Scripts", {"script", "attach", "node"}, SideEffect::WritesScene, tool_flags::kNone | tool_flags::kSceneTarget | tool_flags::kUndoable,
       kAttachScriptToNodeParams, script_ops::handle_attach_to_node}));
   v.push_back(make_spec_tool(ToolSpec{
       "detach_script_from_node",
       "Remove the script from a node in the edited scene, registered with the editor undo/redo. Requires node_path. Returns 'script detached from <path>'. The node keeps its other properties; attach a new script later with attach_script_to_node. Use it before re-attaching an updated script during iteration.",
-      "Scripts", {"script", "detach", "node"}, SideEffect::None, tool_flags::kNone | tool_flags::kUndoable,
+      "Scripts", {"script", "detach", "node"}, SideEffect::WritesScene, tool_flags::kNone | tool_flags::kUndoable,
       kDetachScriptFromNodeParams, script_ops::handle_detach_from_node}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_script_property",
@@ -116,7 +117,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "set_script_property",
       "Set a property directly on a node: a lightweight alternative to property_set with no undo entry and no type or read-only validation. Requires node_path, property and value; optional type_hint helps deserialize JSON into the right Variant type. Use property_set when undo support and validation matter; use this tool for quick in-memory tweaks that must not touch the undo stack.",
-      "Scripts", {"script", "property", "set"}, SideEffect::None, tool_flags::kNone,
+      "Scripts", {"script", "property", "set"}, SideEffect::WritesScene, tool_flags::kNone,
       kSetScriptPropertyParams, script_ops::handle_set_property}));
   v.push_back(make_spec_tool(ToolSpec{
       "call_script_node",

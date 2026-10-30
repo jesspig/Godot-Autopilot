@@ -48,7 +48,7 @@ const std::vector<ParamSpec> kSaveResourceParams = {
 };
 
 const std::vector<ParamSpec> kCreateResourceParams = {
-    {"type", "string", "Resource class to instantiate, e.g. Resource, Curve2D, PackedScene; accepts both engine classes from ClassDB and global script classes (GDScript class_name / C# [GlobalClass]); abstract or invalid scripts are rejected", true},
+    {"type", "string", "Resource class to instantiate, e.g. Resource, Curve2D, PackedScene; accepts both engine classes from ClassDB and global script classes (GDScript class_name / C# [GlobalClass]); abstract or invalid scripts are rejected; C# classes are gated by is_abstract plus a real new() probe because can_instantiate may misreport them", true},
     {"name", "string", "Registration name so later calls can reference the instance as memory://name and via the returned object_id; optional but recommended", false},
 };
 
@@ -69,7 +69,7 @@ const std::vector<ParamSpec> kHasResourceParams = {
 const std::vector<ParamSpec> kGetResourceTypesParams = {};
 
 const std::vector<ParamSpec> kGetResourceExtensionsParams = {
-    {"type", "string", "Resource class name to list extensions for, e.g. Texture2D, AudioStream; when omitted the loader returns extensions for all known types (contract gap: required in schema but optional in the implementation)", true},
+    {"type", "string", "Resource class name to list extensions for, e.g. Texture2D, AudioStream; optional — when omitted the loader returns extensions for all known types", false},
 };
 
 const std::vector<ParamSpec> kGetResourceDirFilesParams = {
@@ -140,7 +140,7 @@ const std::vector<ParamSpec> kSetResourcePropertyParams = {
     {"name", "string", "Registration name of an in-memory resource (memory://name)", false},
     {"path", "string", "Resource path; loads the file from disk when no object_id or name matches", false},
     {"property", "string", "Property name to set, e.g. curve, texture; must exist on the resource", true},
-    {"value", "object", "Serialized JSON value; resource-typed properties accept {'path': 'res://xxx.tres'} or {'resource': 'memory://name'} references", true},
+    {"value", "json", "Serialized JSON value; resource-typed properties accept {'path': 'res://xxx.tres'} or {'resource': 'memory://name'} references", true},
     {"type_hint", "string", "Variant type hint for deserialization, e.g. Vector2, Color, int, float; auto-detected from the property metadata when omitted", false},
 };
 
@@ -229,7 +229,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       kSaveResourceParams, resource_ops::handle_save}));
   v.push_back(make_spec_tool(ToolSpec{
       "create_resource",
-      "Instantiate a Resource subclass by class name (type) in memory. type accepts both engine classes from ClassDB and global script classes (GDScript class_name / C# [GlobalClass]); abstract or invalid scripts are rejected. Pass name to register the instance so later calls can reference it as memory://name. Returns the reference with object_id and object_id_str, which serve as locators for set_resource_property, get_resource_property and save_resource. Errors when type is not a known class or not an instantiable Resource subclass.",
+      "Instantiate a Resource subclass by class name (type) in memory. type accepts both engine classes from ClassDB and global script classes (GDScript class_name / C# [GlobalClass]); abstract or invalid scripts are rejected, and C# classes are gated by is_abstract plus a real new() probe because can_instantiate may misreport them. Pass name to register the instance so later calls can reference it as memory://name. Returns the reference with object_id and object_id_str, which serve as locators for set_resource_property, get_resource_property and save_resource. When the global class cache misses, .cs/.gd sources under res:// are scanned for a matching [GlobalClass]/class_name declaration (stopping after 500 files with guidance to open the editor) before reporting an unknown class. Errors when type is not a known class or not an instantiable Resource subclass.",
       "Resources", {"resource", "create"}, SideEffect::None, tool_flags::kNone,
       kCreateResourceParams, resource_ops::handle_create}));
   v.push_back(make_spec_tool(ToolSpec{
@@ -270,17 +270,17 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "set_resource_uid",
       "Assign a UID to a resource file so it can be referenced as uid://<id>, the counterpart of get_resource_uid. uid is optional: when omitted a fresh UID is auto-generated. Triggers a filesystem reimport so the assignment persists. Returns the UID that was applied.",
-      "Resources", {"resource", "uid", "set"}, SideEffect::None, tool_flags::kNone,
+      "Resources", {"resource", "uid", "set"}, SideEffect::WritesFile, tool_flags::kMutating,
       kSetResourceUidParams, resource_ops::handle_set_uid}));
   v.push_back(make_spec_tool(ToolSpec{
       "remove_resource_file",
       "Delete a resource file from disk in a two-stage flow. Without force (default) it is a dry-run impact pre-check: a reverse-reference scan over every .tscn/.tres under res:// (path and uid tokens) returns would_delete plus dependents ({file, matched} objects) and a hint — nothing is deleted, even with zero dependents an explicit force=true is required. With force=true the file is preferentially moved to the OS trash (trashed=true; permanent=true when trash is unavailable or fails), its cached reference path is cleared, the .uid sidecar travels with it (sidecars_removed lists removed sidecar paths) and the editor file system is updated. Use rename_resource_file when you want to keep the file. Returns the Godot error code (0 = OK).",
-      "Resources", {"resource", "remove", "delete"}, SideEffect::None, tool_flags::kNone,
+      "Resources", {"resource", "remove", "delete"}, SideEffect::WritesFile, tool_flags::kMutating,
       kRemoveResourceFileParams, resource_ops::handle_remove}));
   v.push_back(make_spec_tool(ToolSpec{
       "rename_resource_file",
       "Rename or move a resource file. Accepts path and new_path, with from and to accepted as aliases. The .uid sidecar travels with the file (the .import sidecar of imported assets migrates alongside it when present), open scenes that equal the file or reference it are automatically saved before the disk rewrite and reloaded afterwards — their undo history resets — path= and uid= tokens in dependent .tscn/.tres files are rewritten, cached resource paths and the edited scene file path migrate, project.godot entries pointing at the old path (application/run/main_scene and autoload/* values, preserving the leading * singleton marker) are remapped and saved, and the editor file system is notified. Returns the Godot error code, updated_files, stale_references as {file, token} objects (token names the literal leftover reference; script_class tokens need scan_editor_file_system after a class_name rename to re-register global classes — see note), uid_preserved, remapped_settings, saved_scenes, reloaded_scenes, unsupported_binary_references ({file, reason} entries for binary resources such as .scn/.res/.csv/.translation that cannot be rewritten in place) and import_sidecar_warning when the .import move fails.",
-      "Resources", {"resource", "rename", "move"}, SideEffect::None, tool_flags::kNone,
+      "Resources", {"resource", "rename", "move"}, SideEffect::WritesFile, tool_flags::kMutating,
       kRenameResourceFileParams, resource_ops::handle_rename}));
   v.push_back(make_spec_tool(ToolSpec{
       "move_resource_file",
@@ -315,7 +315,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "reimport_resource_files",
       "Queue reimport of one or more files through the editor file system. Accepts files (array of paths) or a single path; editor only, calling it outside the editor returns an error. Reimport runs asynchronously, so the result confirms the queued count, not completion; poll the file system status to know when it finishes.",
-      "Resources", {"resource", "reimport"}, SideEffect::None, tool_flags::kNone,
+      "Resources", {"resource", "reimport"}, SideEffect::WritesFile, tool_flags::kMutating,
       kReimportResourceFilesParams, resource_ops::handle_reimport}));
   v.push_back(make_spec_tool(ToolSpec{
       "set_resource_import_options",
@@ -365,7 +365,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "assign_mesh_to_instance",
       "Assign a mesh to a MeshInstance2D or MeshInstance3D node in the edited scene. Requires node_path (scene-relative path such as 'Level/Enemy' or absolute '/root/Level/Enemy') and mesh_ref (memory://name string, bare registration name, res:// path, decimal object_id string, or locator object). Nodes of any other class are rejected with their actual class name. Returns ok with assigned, node_path, mesh_ref and class; a mesh without normals yields a shading warning. When the instance rejects the in-memory mesh, save it with save_resource first and assign the saved res:// path instead.",
-      "Resources", {"resource", "mesh", "assign", "instance"}, SideEffect::None, tool_flags::kMutating,
+      "Resources", {"resource", "mesh", "assign", "instance"}, SideEffect::WritesScene, tool_flags::kMutating,
       kAssignMeshToInstanceParams, resource_ops::handle_assign_mesh_to_instance}));
   return v;
 }

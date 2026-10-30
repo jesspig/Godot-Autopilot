@@ -17,12 +17,17 @@ int64_t g_scene_root_instance_id = 0;
 } // namespace
 
 void mark_scene_modified() {
-  std::lock_guard<std::mutex> lock(g_mutex);
   auto *editor = godot::EditorInterface::get_singleton();
   auto *root = editor ? editor->get_edited_scene_root() : nullptr;
-  g_dirty = root != nullptr;
-  g_scene_root_instance_id =
-      root ? static_cast<int64_t>(root->get_instance_id()) : 0;
+  {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    g_dirty = root != nullptr;
+    g_scene_root_instance_id =
+        root ? static_cast<int64_t>(root->get_instance_id()) : 0;
+  }
+  if (editor && root) {
+    editor->mark_scene_as_unsaved();
+  }
 }
 
 void clear_scene_modified() {

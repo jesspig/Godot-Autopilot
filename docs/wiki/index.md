@@ -10,29 +10,27 @@
 | [build.md](build.md) | 构建/部署/打包流程、CMake 模块、产物清单、环境变量 | `CMakeLists.txt`、`cmake/`、`main.py`、`scripts/` |
 | [tests.md](tests.md) | L1/L2 测试体系、遍历排除清单、数值统计 | `tests/` |
 | [conventions.md](conventions.md) | 工程约定：命名、日志、错误模式、添加工具流程 | 全仓库 |
-| [security_contract.md](security_contract.md) | T0 安全边界与并发契约：可信客户端、监听、风险工具、主线程、生命周期与边界原则 | `src/core/`、`src/tools/`、`src/main.cpp` |
-| [example.md](example.md) | 原 Example 示例工程的历史记录（当前部署与打包目标见 build.md，L2 测试床见 tests.md） | 原 `Example/`，现由 `demo/` 承接 |
-| [tool_base_design.md](tool_base_design.md) | ToolSpec 工具数据层与执行管线：443 域工具全为 ToolSpec 数据记录、SpecTool 统一执行授权/后处理、dispatch 主线程等待预算、Args 取参器、用户脚本动态工具、迁移规则与守卫 | `tool_spec.hpp`、`tool_args.hpp`、`tool_pipeline.hpp`、`dynamic_spec_store.hpp`、`autopilot_tools.{hpp,cpp}`、32 个域 `*_tools.hpp`、`register_all.cpp` |
-| [modules/core.md](modules/core.md) | 核心层：线程模型、端口、统一埋点门面（monitor/monitor_env/perf_sampler）、日志与本地持久化（日志/trace 双目录、脱敏）、配置常量 | `src/core/` |
+| [security_contract.md](security_contract.md) | T0 安全边界与并发契约：MCP 可信客户端与 REST 令牌认证、监听、授权三档、风险工具、主线程、生命周期与边界原则 | `src/core/`、`src/tools/`、`src/main.cpp` |
+| [tool_base_design.md](tool_base_design.md) | ToolSpec 工具数据层与执行管线：451 域工具全为 ToolSpec 数据记录、SpecTool 统一执行授权/后处理、dispatch 主线程等待预算、Args 取参器、用户脚本动态工具、迁移规则与守卫 | `tool_spec.hpp`、`tool_args.hpp`、`tool_pipeline.hpp`、`dynamic_spec_store.hpp`、`autopilot_tools.{hpp,cpp}`、33 个域 `*_tools.hpp`、`register_all.cpp` |
+| [modules/core.md](modules/core.md) | 核心层：线程模型、端口、统一埋点门面（monitor/monitor_env/perf_sampler）、日志与本地持久化（日志/trace 双目录、脱敏）、配置常量、集中根与工程级存储布局、遗留数据兼容 | `src/core/` |
 | [modules/entry_runtime.md](modules/entry_runtime.md) | 插件入口与运行时桥接、gda 协议 | `src/main.cpp`、`src/runtime/` |
-| [modules/tools_registry.md](modules/tools_registry.md) | 工具注册管线、ToolSpec 派生、元工具与动态工具、schema 统计、契约缺口与遍历排除 | `src/tools/`（register_all/dispatch/tool_catalog/tool_spec/tool_args/tool_pipeline） |
-| [modules/tools_ops_a.md](modules/tools_ops_a.md) | 领域工具 A 组（场景/属性/输入/物理/导航/资源/脚本/配置/文档/编辑器 16 模块，221 工具） | `src/tools/*_ops.cpp` |
-| [modules/tools_ops_b.md](modules/tools_ops_b.md) | 领域工具 B 组（调试/显示/OS/运行时/音频/渲染/瓦片等 20 模块，222 工具；A 221 + B 222 = 443） | `src/tools/*_ops.cpp` |
+| [modules/api.md](modules/api.md) | REST 接口面：同端口 `/api` 端点契约、请求与响应形状、Bearer 令牌认证、状态码与错误信封归一、宽松设计与已知限制 | `src/core/api_surface.*`、`api_auth.*`、`api_token.*`、`api_server.*`、`api_envelope.*` |
+| [modules/ports.md](modules/ports.md) | 端口与实例登记：一个端口承载 MCP 与 REST 两个端点、端口解析优先级与候选序列、显式与自动分配的失败差异、实例登记结构与全局索引、CLI 发现链与两级存活校验、控制面端口与实例端口的分工 | `src/core/port_resolver.*`、`instance_registry.*`、`project_store.*`、`gda_home.*`、`cli/src/target.ts` |
+| [modules/tools_registry.md](modules/tools_registry.md) | 工具注册管线、统一执行入口（导出拦截→工具存在→参数校验→授权→派发→信封）、授权三档、ToolSpec 派生、元工具与动态工具、schema 统计、契约缺口与遍历排除 | `src/tools/`（register_all/dispatch/tool_catalog/tool_spec/tool_args/tool_pipeline/tool_execute/argument_validator/authorization） |
+| [modules/tools_ops_a.md](modules/tools_ops_a.md) | 领域工具 A 组（场景/属性/输入/物理/导航/资源/脚本/配置/文档/编辑器 16 模块，222 工具） | `src/tools/*_ops.cpp` |
+| [modules/tools_ops_b.md](modules/tools_ops_b.md) | 领域工具 B 组（调试/显示/OS/运行时/音频/渲染/C# 桥/瓦片等 20 模块，229 工具；A 222 + B 229 = 451） | `src/tools/*_ops.cpp` |
 | [modules/support.md](modules/support.md) | 提示词、MCP 资源、UI、工具库 | `src/prompts/`、`src/resources/`、`src/ui/`、`src/util/` |
+| [modules/cli.md](modules/cli.md) | CLI 载体（gda）：Bun + TS 源码直跑、命令参考、七级寻址链、两套注册表与集中根位置、REST 令牌读取、生命周期、控制面代理（`gda serve`）与重启、协议握手与已知限制 | `cli/`、`package.json`、`bun.lock` |
 | [plans/roadmap.md](plans/roadmap.md) | 竞品对齐路线图：竞品定位速览与 P0-P3 批次交付状态 | 全仓库 |
 | [.agents/skills/](../../.agents/skills/) | 项目级可执行技能：怎么做、何时停、做错的表现 | 全仓库流程与纪律 |
 
-## 关键数值速查（以运行时统计为准）
+## 关键数值速查
 
-- 工具注册总入口 `ToolRegistry`（单一来源）：**451 条目** = 443 域工具 + `system_status` + 7 元工具；域工具分 **27 类**（InputMap 并入 Input）与 **32 个源模块**（30 存量 + 新增 `gridmap`/`tween`，`file_dir` 挂 `os` 无独立域）；MCP 可达工具总数 **450** = 7 元 + 443 域
-- schema：**451 = 385 非空 + 66 空**（L1 `SchemaStatisticsBaseline` 精确断言）；`03_tools_contract` 遍历 warnings 以运行时报告为准（基线 4 条：`start_input_gamepad_vibration`、`stop_input_gamepad_vibration`、`get_resource_extensions`、`reimport_resource_files`，本轮新增 51 工具后的增量待运行时复核）
-- 遍历排除 **`side_effect`/`mutating` 工具**（运行时经 `search_tools` 空 query 枚举 444 条 = 443 域 + `system_status`，跳过 7 元后按 `side_effect`/`mutating`/`dynamic` 字段排除，进入空参+冒烟两步骤，上限 888 步；`dynamic` 分支为防回归保留；排除数与候选数以运行时 `03_tools_contract` 报告为准，旧基线 71 排除 / 322 候选已过时）；L1 单元测试 **391 个 gtest**（36 个 unit 文件 / 37 suites）+ 迁移守卫 + 注释守卫 + `skill_scripts`（`ctest -E "^gda_runner_"` 共 **394**）；L2 引擎用例 **37 个文件**（00-10 共 11 份 + 11-20 共 10 份 + 22-30 共 9 份 + 31_theme_root/32_plane_inline/33_verified_inherit/34_slash_property/35_scene_tree_gate/36_stall_immunity/37_game_ready_gate 共 7 份；21 号段空缺，99 号诊断用例已删）；ctest 注册点 **431**（391 + 2 守卫 + `skill_scripts` + 37 L2；09-29 `ctest -N` 实测，L2 需引擎环境与 `GODOT_AUTOPILOT_ALLOW`，26/27 号另需 `user_tools`，32/34/35/36 号需 `code_execute`，16/23/24/35/37 号需 `game_runtime`）
-- 工具命名规范：`<动词>_<类别>_<维度>_<对象>_<修饰>`（动词置首，如 create_scene_node、intersect_physics_2d_ray）
-- MCP 端口 **9527**（`/mcp`），`GODOT_AUTOPILOT_PORT` 可覆盖；产物名 `godot-autopilot`
+全套数值（工具总数、schema 基线、遍历枚举/排除/候选与步数、L1/L2 用例数、ctest 注册点、CLI 单测数等）的**唯一权威落点**是 [tests.md](tests.md) 的「数值核算总表」小节——本页不复制数值，避免两处并存漂移。
 
 ## 维护入口
 
-代码改动后：更新受影响页面 → 同步页头"审计日期"（带日期行的页面：overview / build / tests / example / modules/tools_registry / tools_ops_a / support / core；无日期头的页面不新增）→ 更新 frontmatter 的 `timestamp`（真实系统时间，ISO 8601）→ 重核数值 → 追加 `changelog/<YYYY-MM-DD>-log.md`（按小时记录，[log.md](log.md) 仅留最近 7 天）→ 按 [项目级技能](../../.agents/skills/) 的分工核对是否要同步技能（见下"三层文档分工"）→ 需要时才改 [AGENTS.md](../../AGENTS.md)。
+代码改动后：更新受影响页面 → 同步页头"审计日期"（带日期行的页面：overview / build / tests / security_contract / modules/tools_registry / modules/tools_ops_a / modules/support / modules/core / modules/cli；无日期头的页面不新增）→ 更新 frontmatter 的 `timestamp`（真实系统时间，ISO 8601）→ 重核数值（数值口径统一取 [tests.md](tests.md) 的"数值核算总表"，不另立口径）→ 追加 `changelog/<YYYY-MM-DD>-log.md`（按小时记录，[log.md](log.md) 仅留最近 7 天）→ 按 [项目级技能](../../.agents/skills/) 的分工核对是否要同步技能（见下"三层文档分工"）→ 需要时才改 [AGENTS.md](../../AGENTS.md)。
 
 ## 三层文档分工
 

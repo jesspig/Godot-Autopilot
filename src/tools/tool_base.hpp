@@ -6,6 +6,7 @@
 #include <mcp/JsonValue.hpp>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -16,11 +17,11 @@
 namespace godot_autopilot {
 
 enum class SideEffect { None, WritesFile, WritesConfig, ShowsAlert, ModifiesWindow, Process,
-                        CodeExecute, GameRuntime };
+                        CodeExecute, GameRuntime, Destructive, WritesScene };
 
 inline const char* side_effect_name(SideEffect e) {
   switch (e) {
-    case SideEffect::None: return "";
+    case SideEffect::None: return "none";
     case SideEffect::WritesFile: return "writes_file";
     case SideEffect::WritesConfig: return "writes_config";
     case SideEffect::ShowsAlert: return "shows_alert";
@@ -28,8 +29,10 @@ inline const char* side_effect_name(SideEffect e) {
     case SideEffect::Process: return "process";
     case SideEffect::CodeExecute: return "code_execute";
     case SideEffect::GameRuntime: return "game_runtime";
+    case SideEffect::Destructive: return "destructive";
+    case SideEffect::WritesScene: return "writes_scene";
   }
-  return "";
+  return "none";
 }
 
 struct ToolMeta {
@@ -60,16 +63,47 @@ inline SideEffect side_effect_of(const ToolBase &t) {
 }
 
 namespace authorization {
+inline CapabilityTier tier_for_side_effect(SideEffect effect) {
+  switch (effect) {
+    case SideEffect::Process:
+    case SideEffect::CodeExecute:
+    case SideEffect::GameRuntime:
+    case SideEffect::Destructive:
+      return CapabilityTier::Danger;
+    case SideEffect::WritesFile:
+    case SideEffect::WritesConfig:
+    case SideEffect::ShowsAlert:
+    case SideEffect::ModifiesWindow:
+    case SideEffect::WritesScene:
+      return CapabilityTier::Write;
+    case SideEffect::None:
+      break;
+  }
+  return CapabilityTier::Read;
+}
+
 inline const char *capability_for_tool(std::string_view name,
                                        SideEffect effect) {
-  if (effect == SideEffect::Process)
-    return "process";
-  if (effect == SideEffect::CodeExecute || name == "code_execute" ||
-      name == "execute_script")
-    return "code_execute";
-  if (effect == SideEffect::GameRuntime || name == "execute_game_script")
-    return "game_runtime";
-  return nullptr;
+  (void)name;
+  switch (effect) {
+    case SideEffect::Process:
+      return kCapabilityProcess;
+    case SideEffect::CodeExecute:
+      return kCapabilityCodeExecute;
+    case SideEffect::GameRuntime:
+      return kCapabilityGameRuntime;
+    case SideEffect::Destructive:
+      return kCapabilityDestructive;
+    case SideEffect::WritesFile:
+    case SideEffect::WritesConfig:
+    case SideEffect::ShowsAlert:
+    case SideEffect::ModifiesWindow:
+    case SideEffect::WritesScene:
+      return kCapabilityWrite;
+    case SideEffect::None:
+      break;
+  }
+  return kCapabilityRead;
 }
 } // namespace authorization
 

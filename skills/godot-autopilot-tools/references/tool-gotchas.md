@@ -162,9 +162,33 @@ explicitly and clamped by the tools that only read it; the low-level game
 sender also clamps every request. Either way the effective budget is at most
 25000 ms and the returned `timeout_ms` reports the clamped host wait. Longer
 work must be split into shorter calls or polled with `get_game_status`. The
-30000 ms maximum still applies to editor-only tools (code_execute,
-run_gdscript_tests, create_editor_scene and editor-target captures), which
-never round-trip through the game.
+30000 ms maximum still applies to the editor-only tools that keep a fixed
+cap (run_gdscript_tests, create_editor_scene and editor-target captures),
+which never round-trip through the game. `code_execute` is the exception:
+its ceiling follows the host's long-blocking dispatch budget, so the server
+reports the accepted maximum in the `code_execute` schema - read it there
+instead of assuming a number.
+
+## Timeout and dispatch error codes: what to do with each
+
+Failures that carry a machine-readable `code` are the ones to branch on. The
+`error` text is prose and gets reworded; the code is stable. Match on the
+code, not on the message.
+
+| Code | Raised when | Retryable | What to do |
+|---|---|---|---|
+| exec_timeout | a `code_execute` script outran its `timeout_ms` | no | The script was interrupted and the work it already did is not rolled back - read the state back before retrying. Split the script into smaller pieces, or raise `timeout_ms` (up to the maximum the `code_execute` schema reports). |
+| eval_timeout | a game-side `eval` script outlived the host wait (25000 ms), or the editor gave up waiting for the eval answer | not immediately | The game main thread may still be running that script - a running GDScript call cannot be interrupted. Wait for the game to become responsive (`get_game_status`) before sending more work, then retry. |
+| eval_cancelled | the eval request was torn down by a cancel handle | no | The request is gone and no answer will arrive. Re-issue it if the result is still needed. |
+| main_thread_timeout | the editor main thread did not process the tool inside its dispatch budget | no | The editor may be paused, blocked by a modal dialog, exporting or busy. The call was cancelled, but the work may still run in the editor afterwards - clear the blocker, read the state back, then decide whether to repeat the call. |
+| queue_unavailable | the editor main-thread queue was full or already closed | yes, later | The editor is shutting down or overloaded. Wait and retry; if it keeps failing, the editor is going down. |
+
+The two eval codes arrive nested under a structured_error object inside the
+tool payload; the other three come back as the top-level result of the call.
+The dispatch codes carry a `retryable` flag: it is false for main_thread_timeout
+and true for queue_unavailable, while exec_timeout also carries it false and
+the eval codes carry no flag at all, so treat a missing flag as "do not retry
+immediately".
 
 ## After a game timeout: engine continue and late results
 
@@ -203,6 +227,47 @@ normal error breaks resume as soon as the request ends.
 
 Details: godot-autopilot-runtime.
 
+## Paused-tree UI clicks: verification checklist (conclusion pending T-33)
+
+Clicking controls while `SceneTree.paused` is true is the least reliable
+automation path observed so far, and the final verdict is still open: one
+paused pause-menu playthrough saw window-coordinate clicks miss, viewport
+coordinates land only sometimes and need a second click, while keyboard
+always worked. That is one observation on one demo, not a rule. Run the
+checklist below during the T-33 re-test and record the measured result
+instead of assuming either way.
+
+1. **Confirm the state and the target.** `get_game_status` must report
+   `paused: true`, the menu must be visible, and the target must appear in
+   `get_game_ui_elements` with its `path` and `mouse_filter` noted
+   (`IGNORE` controls never receive mouse buttons).
+2. **Click by path or text with `click_game_ui_element`.** It injects hover
+   motion plus the press/release pair and reports `hit_path` /
+   `hit_mismatch`; resolve a mismatch through `validate_game_ui_layout`
+   (`possibly_occluded`) or by clicking the reported `hit_path` — do not
+   simply repeat the same coordinates.
+3. **Watch the first click.** Read the game state back after the first click
+   (menu closed, mode changed, `button_pressed`). If it did not land, click
+   once more and record whether the second one did: "first click swallowed"
+   and "click never lands" are different observations.
+4. **Run the keyboard control.** Trigger the same action with a key event
+   (`queue_game_input` / `sequence_game_inputs`). Keyboard working while
+   the click fails isolates the fault to mouse injection; both failing points
+   at the paused UI logic. Keyboard is also the fallback while the mouse path
+   is unconfirmed.
+5. **Compare coordinate bases.** If you bypass the click tool and drive
+   `queue_game_input` yourself, use window pixels (the window_rect /
+   window_center fields from `get_game_ui_elements`) or
+   `coord_space: "viewport"`, and inject a `mouse_motion` first (see
+   `godot-autopilot-runtime/references/input-injection.md`).
+
+T-33 backfill template — replace the pending marker with measured values:
+
+```
+paused click: path=<...>, first_click_hit=<yes/no>, second_click_hit=<yes/no>,
+hit_path=<...>, keyboard_ok=<yes/no>, conclusion=<...>
+```
+
 ## Size limits
 
 These limits are enforced by the server. Truncation is always detectable -
@@ -221,7 +286,7 @@ than silently dropping data.
 | Variant single string | 64 KiB | serialized Variant values |
 | Variant array elements | 10000 | arrays and packed arrays |
 | file scan | 10000 files, 2 MiB per file, 32 MiB total, depth 64 | resource/file scans |
-| default / max timeout | 5000 / 30000 ms | editor-only operations taking `timeout_ms` |
+| default / max timeout | 5000 / schema-reported max | editor-only operations taking `timeout_ms` (the `code_execute` ceiling is the one the schema reports) |
 | default / max timeout, game ops | 5000 / 25000 ms | game tools taking `timeout_ms` (host wait = `timeout_ms` + 2000 ms, below the 30 s transport) |
 
 For bulk work near any of these limits, prefer `code_execute` loops over
@@ -275,18 +340,35 @@ Two editor states block otherwise valid calls. Both have a defined recovery:
 
 ## code_execute traps
 
-Before the traps: both `code_execute` and `execute_script` are denied by
-default behind the `code_execute` authorization gate, and the game runtime
-tools (`execute_game_script`, `queue_game_input`, `wait_game_input`,
-`sequence_game_inputs`, `reload_game_scripts`) behind `game_runtime`. A denied
-call returns an error carrying authorization_required plus an `enable` field
-(and writes a warning to the plugin log); enable a capability by setting
-`GODOT_AUTOPILOT_ALLOW` to it (or to `all`) and restarting the engine, or -
-for `code_execute` and `game_runtime` - by ticking "Allow code_execute" or
-"Allow game_runtime" in the plugin's MCP Config dock, which takes effect on
-the next call without a restart. The process gate keeps no dock toggle: it
-needs the environment variable and a restart. When the environment variable
-is set it wins over the config.
+Before the traps: the capability gate now has three tiers. Read-only tools
+(class `none`) are allowed by default. Write tools - `writes_file`,
+`writes_config`, `shows_alert`, `modifies_window`, `writes_scene` - are
+denied by default and need the `write` capability, so a client that used to
+save a file or set a project setting without any allow-list entry now gets
+an authorization error unless `write` (or `all`) is allowed. Danger tools
+are denied by default and
+need their own capability: `code_execute` covers `code_execute` and
+`execute_script`, `game_runtime` covers the game runtime tools
+(`execute_game_script`, `queue_game_input`, `wait_game_input`,
+`sequence_game_inputs`, `reload_game_scripts`), `process` covers the process
+and environment tools, and `destructive` covers operations that destroy
+something that already exists. `user_tools` is a separate capability guarding
+user-registered dynamic tools. A denied call returns an error carrying
+authorization_required plus an `enable` field (and writes a warning to the
+plugin log); enable a capability by setting `GODOT_AUTOPILOT_ALLOW` to it (or
+to `all`) and restarting the engine, or by ticking "Allow code_execute",
+"Allow game_runtime", "Allow user tools", "Allow write" or "Allow
+destructive" in the plugin's MCP Config dock, which takes effect on the
+next call without a restart. Un-ticking a box removes only that capability
+and leaves the others alone, even when the allow list was `all`. The
+`process` gate keeps no dock toggle: it needs the environment variable and
+a restart. When the environment variable is set it wins over the config.
+
+`batch_execute` sits behind the same `code_execute` gate as `code_execute`
+itself, even when the batch only calls ordinary domain tools. A client that
+enabled `process` or `game_runtime` but not `code_execute` used to be able to
+run a batch and now gets an authorization_required error on the batch itself -
+the operations never run. Check the capability before reaching for a batch.
 
 `code_execute` wraps your source in a generated @tool Node script. Four traps:
 
@@ -312,6 +394,31 @@ is set it wins over the config.
 
 Details: godot-autopilot-scripting.
 
+## code_execute: the timeout now really fires
+
+`timeout_ms` used to be checked only once, before the script started, so a
+script with an endless loop inside kept the editor main thread busy forever -
+the editor froze and the call never came back. The deadline is now injected
+into the script itself: a check is placed at every function entry and inside
+loop bodies, and the script stops at the first check that runs after the
+deadline passes. The call then comes back as an exec_timeout failure.
+
+What that means for a caller:
+
+- A long loop is really interrupted now. Never write a script that assumes it
+  may run for minutes.
+- The interruption is cooperative - it can only fire where a check sits. A
+  single blocking engine call (one heavy expression, a long await) still runs
+  to completion, so keep the work between two checks short.
+- The work done before the interruption is not rolled back. Read the state
+  back before retrying.
+- The maximum accepted `timeout_ms` is the ceiling the `code_execute` schema
+  reports - the editor-side long-blocking budget decides it, so read it from
+  the schema instead of assuming a fixed number. To do more than that, split
+  the work into several calls.
+- A script that hits the deadline returns the exec_timeout code, not a plain
+  error, so it can be told apart from a compile or runtime failure.
+
 ## The GDA_FORCE_HEADLESS environment variable
 
 The name is inverted. Setting GDA_FORCE_HEADLESS=1 does not force headless
@@ -323,9 +430,10 @@ unset.
 
 ## Side effect classes
 
-`get_tool_detail` reports a `side_effect` marker for every tool that can act
-beyond reading editor state. Read it before calling anything you have not
-used before. The classes, in increasing order of risk:
+`get_tool_detail` reports a `side_effect` marker for every tool, and the
+marker is never empty: a tool that only reads reports `none`. Read it before
+calling anything you have not used before. The classes, in increasing order of
+risk:
 
 - `writes_file` - writes files under res:// or user://. Confirm the path
   stays inside the project before calling.
@@ -335,6 +443,10 @@ used before. The classes, in increasing order of risk:
   dismissed. Never fire one in a batch or without an explicit user request.
 - `modifies_window` - moves, resizes, focuses or flashes windows; also
   clipboard, mouse cursor and screen state.
+- `writes_scene` - edits the in-memory scene (node structure, properties,
+  signals, animation, tilemap, gridmap and theme data) even before the scene
+  is saved; the unsaved state feeds later runs, saves and exports, so treat
+  it as durable rather than undo-only.
 - `process` - spawns or kills OS processes, opens paths with the default
   application and edits the environment. The highest-risk class: commands
   run outside the project's scope, so double-check every argument before
@@ -343,6 +455,12 @@ used before. The classes, in increasing order of risk:
 Two cases deserve the same caution as `process`: the `code_execute` meta tool
 runs arbitrary GDScript in the editor process, and tools marked `game_runtime`
 change the running game's state. Treat both at the highest risk level.
+
+The two script-running meta tools, `code_execute` and `batch_execute`, both
+report `code_execute`. The authorization gate is derived from this marker
+alone - the server keeps no per-tool-name exception list - so a tool can start
+requiring a capability because its class changed, not because its name is
+special.
 
 ## See also
 

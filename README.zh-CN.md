@@ -5,7 +5,7 @@
 ![Godot版本](https://img.shields.io/badge/Godot-4.7%2B-478CBF?logo=godotengine&logoColor=white)
 ![支持平台](https://img.shields.io/badge/platform-Windows%7CLinux%7CmacOS-lightgrey)
 [![协议](https://img.shields.io/badge/MCP-Streamable_HTTP-blueviolet)](https://modelcontextprotocol.io/)
-![工具数](https://img.shields.io/badge/tools-443%2B-brightgreen)
+![工具数](https://img.shields.io/badge/tools-452%2B-brightgreen)
 
 > **让 AI 代理在编辑器里帮你搭场景、试玩和排错。**
 
@@ -23,7 +23,7 @@ Godot-Autopilot 是一个住在 **Godot 编辑器内部**的插件型 [MCP](http
 
 ## 能做什么
 
-**443+ 个工具**，覆盖从编辑器到游戏的完整闭环（数量随版本增长，以代理通过 `search_tools` 查到的为准）。举例：
+**452+ 个工具**，覆盖从编辑器到游戏的完整闭环（数量随版本增长，以代理通过 `search_tools` 查到的为准）。举例：
 
 - **搭场景**——创建、改名、移动、删除节点，读写属性，连接信号，三维块地图 GridMap 搭关卡（如 `create_scene_node`、`property_set`、`signal_connect`、`scene_tree_items`；GridMap：`create_gridmap`、`set_gridmap_cell`、`fill_gridmap_box`）。
 - **画面与声音**——网格材质、灯光环境、音频播放、动画与补间、UI 主题、瓦片地图（如 `create_animation`、`tween_editor_property`、`create_game_tween`、`play_audio_player`、`fill_tilemap_rect`）。
@@ -41,7 +41,7 @@ Godot-Autopilot 是一个住在 **Godot 编辑器内部**的插件型 [MCP](http
 2. **执行**——单步用 `call_tool`，批量用 `batch_execute`。
 3. **验证**——截图看结果，与上次截图对比，有问题就修，再确认。
 
-为了让代理开箱即用，插件内置 **9 册技能书**（总纲 + 调用专册 + 场景、资源、脚本、运行时、服务器、内容、C# 分册）与 **7 篇新手指南**（3D 场景、角色控制器、物理排错、输入映射、GUI 等）。在 **MCP Config** 面板点一下，就能把技能渲染到项目的 `.agents/skills/` 目录。定位：MCP 是主产品通道，skill/脚本是体验层——调用专册在 MCP 失效时给脚本桥（需 Node 18+ 或 Bun），无脚本运行时则出手动指南。
+为了让代理开箱即用，插件内置 **9 册技能书**（总纲 + 调用专册 + 场景、资源、脚本、运行时、服务器、内容、C# 分册）与 **7 篇新手指南**（3D 场景、角色控制器、物理排错、输入映射、GUI 等）。在 **MCP Config** 面板点一下，就能把技能渲染到项目的 `.agents/skills/` 目录。定位：MCP 是主产品通道，skill/脚本是体验层——调用专册在 MCP 失效时改用 GDA CLI，无 CLI 时则出手动指南。
 
 插件自带两个编辑器面板：
 
@@ -52,7 +52,7 @@ Godot-Autopilot 是一个住在 **Godot 编辑器内部**的插件型 [MCP](http
 
 需要 **Godot 4.7+**。
 
-1. **获取插件**——从项目 GitHub Releases 页（[jesspig/Godot-Autopilot](https://github.com/jesspig/Godot-Autopilot)）下载 `godot-autopilot-<version>.zip`，把其中的 `godot-autopilot/` 文件夹复制到你项目的 `addons/` 目录：
+1. **获取插件**——从项目 GitHub Releases 页（[jesspig/Godot-Autopilot](https://github.com/jesspig/Godot-Autopilot)）下载 `addons.zip`，把其中的 `godot-autopilot/` 文件夹复制到你项目的 `addons/` 目录：
    ```
    your-project/
    └── addons/
@@ -69,13 +69,64 @@ Godot-Autopilot 是一个住在 **Godot 编辑器内部**的插件型 [MCP](http
 
 想从源码构建或参与贡献？见 [docs/wiki/](docs/wiki/)（入口 [index.md](docs/wiki/index.md)，构建见 [build.md](docs/wiki/build.md)）与 [tests/README.md](tests/README.md)。
 
+## 命令行访问
+
+更想直接敲命令而不接 MCP 客户端？GDA CLI 让你在终端里驱动正在运行的 GDA 实例，无需集成 MCP 客户端。它基于 Bun + TypeScript，源码直跑，**零运行时依赖**、无构建步骤。
+
+用 `bunx` 单次执行（PowerShell 下需加引号，因为 `#` 会被当作注释）：
+
+```
+bunx "github:jesspig/Godot-Autopilot#0.3.0" ping
+```
+
+或全局安装一次，之后直接用 `gda` 命令：
+
+```
+bun install -g github:jesspig/Godot-Autopilot#0.3.0
+gda ping
+```
+
+命令族：**调用族** —— `ping` / `status` / `categories` / `search` / `describe` / `call`；**生命周期** —— `list` / `start` / `stop` / `restart` / `logs`；**控制面** —— `serve`；**REST 族** —— `api`（子命令 `list` / `describe` / `call`，不经 MCP 握手直调 REST）；`endpoints`（展示 MCP/REST 端点、端口来源与存活探针结果）。
+
+需要 **Bun**；机器上没有 Bun 或 Node 时，直接改用 Releases 页的 `gda` 独立可执行文件（完整参考见 [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md)）。
+
+## 让 AI 自己装好并验证
+
+不想照上面的步骤手动来？把下面这段直接交给能在这台机器上执行命令的编码代理，填上你项目的绝对路径即可：
+
+```text
+Set up Godot Autopilot (GDA) on this machine end to end, then prove it works.
+
+Project: <ABSOLUTE PATH TO YOUR GODOT PROJECT> (Godot 4.7+).
+
+1. Install the plugin: download addons.zip from
+   https://github.com/jesspig/Godot-Autopilot/releases/latest and extract it so that
+   <project>/addons/godot-autopilot/godot-autopilot.gdextension exists.
+2. Start the editor: run `godot --editor --path <project>` (ask me for the engine path if it is
+   not on PATH) and wait until http://127.0.0.1:9527/mcp answers.
+3. Verify the server from a shell. Try in this order, stop at the first that works, and tell me
+   which one it was:
+   - bunx "github:jesspig/Godot-Autopilot#0.3.0" ping
+   - download the gda release asset for this OS and CPU from the same Releases page, verify it
+     against sha256sums.txt, then run ./gda ping
+4. Connect my AI client: add
+   {"mcpServers":{"godot-autopilot":{"url":"http://127.0.0.1:9527/mcp"}}}
+   to its MCP configuration, or tell me to use the plugin's MCP Config panel instead.
+5. Summarize: which channel worked, every command you ran, and anything that failed.
+
+Rules: never hand-write HTTP requests against the port; never expose 9527 beyond loopback;
+leave code_execute and game_runtime disabled unless I ask for them.
+```
+
+如果你的客户端支持技能（Claude Code、Codex、Cursor 等都支持），再把本仓库的 `skills/` 目录指给它，代理就能拿到完整的调用协议，而不必自己摸索。
+
 ## 安全说明
 
 服务端只监听本机回环地址（端口取自插件配置，默认 9527，路径固定 `/mcp`），非本机地址拒绝启动。脚本执行、游戏控制、操作系统进程类工具**默认全部拒绝**——只在你信任的本地项目中开启。详见 [docs/wiki/security_contract.md](docs/wiki/security_contract.md)。
 
 ## 素材声明
 
-`demo/` 下的 5 个示例项目（2D/3D 入门教程、UI 控件全览、视口复合、网络 Pong）来自官方 [Godot 演示合集](https://github.com/godotengine/godot-demo-projects)，仓库仅保留其素材与干净工程配置用于测试，版权与授权见各项目目录内的 README 与 LICENSE。
+`demo/` 下的 5 个示例项目（2D/3D 入门教程、UI 控件全览、视口复合、网络 Pong）来自官方 [Godot 演示合集](https://github.com/godotengine/godot-demo-projects)，仓库仅保留其素材与干净工程配置用于测试。第 6 个项目 `demo/pink_man_adventure` 是从历史 `Example/` 示例工程还原的仓库内示例：173 张 PNG 素材来自 Pixel Frog 的 Pixel Adventure 1（CC0 1.0），设计文档为本仓库原创。版权与授权见各项目目录内的 README 与 LICENSE。
 
 ## 许可证
 

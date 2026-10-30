@@ -1,6 +1,6 @@
 # Physics and Navigation Tool Reference
 
-Complete tool tables for the physics (48 tools) and navigation (15 tools)
+Complete tool tables for the physics (51 tools) and navigation (15 tools)
 domains. Every name below is a registered tool name - pass it to `call_tool`.
 See `SKILL.md` in the parent folder for workflows and the RID mental model.
 
@@ -101,6 +101,9 @@ space_get_direct_state returned null error means the direct state was unavailabl
 |---|---|
 | `get_physics_node_rid` | RID of a `CollisionObject2D`/`CollisionObject3D` node in the edited scene, for the body tools. |
 | `get_debug_object_info` | Resolve an object id (e.g. a hit's `collider_id`) to class, name, node path or resource path. |
+| `set_physics_body_bundle` | Create a server physics body with shape and parameters, or configure the server body of a scene collision object. |
+| `create_collision_shape` | Create an in-memory Shape2D or Shape3D resource for a CollisionShape node. |
+| `assign_collision_shape` | Assign a Shape resource to a CollisionShape2D or CollisionShape3D node. |
 
 ## Navigation 2D
 

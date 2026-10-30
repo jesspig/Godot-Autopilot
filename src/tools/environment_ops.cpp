@@ -312,13 +312,13 @@ JV handle_environment_set_volumetric_fog(const JV &args) {
   auto *de = args.Find("density");
   density = static_cast<float>(util::json_number(de, density));
   JV albedo_col =
-      JV::FromObject({{"r", JV(1.0)}, {"g", JV(1.0)}, {"b", JV(1.0)}});
+      JV(JV::Object{{"r", JV(1.0)}, {"g", JV(1.0)}, {"b", JV(1.0)}});
   auto *al = args.Find("albedo");
   if (al && al->IsObject())
     albedo_col = *al;
   godot::Color albedo = util::json_to_color(albedo_col);
   JV emission_col =
-      JV::FromObject({{"r", JV(0.0)}, {"g", JV(0.0)}, {"b", JV(0.0)}});
+      JV(JV::Object{{"r", JV(0.0)}, {"g", JV(0.0)}, {"b", JV(0.0)}});
   auto *em = args.Find("emission");
   if (em && em->IsObject())
     emission_col = *em;

@@ -97,6 +97,9 @@ Consequences:
 - Any query that matches by event — `is_action_just_pressed_by_event`
   (4.8), or game code comparing the originating event — will never match an
   API-forged press, since there is no event id to match.
+- Node input callbacks — `_input`, `_unhandled_input` and `_gui_input` —
+  never receive an API-forged action: there is no event to dispatch. Drive
+  UI and other event-driven code with `event` mode or a real `key` event.
 - Game code that inspects `Input.is_action_pressed` sees the forgery
   normally.
 - To simulate a real key (so that `_input`, `_gui_input`, event-based action
@@ -179,6 +182,11 @@ Rules verified in engine source:
 - The tree signals `physics_frame` and `process_frame` are emitted
   regardless of pause — code hooked to the signals still runs every tick;
   it is per-node callbacks that are filtered by the matrix above.
+- The engine-global physics frame counter (`Engine.get_physics_frames`, the
+  `physics_frame` reported by `get_game_status`) keeps incrementing while
+  the tree is paused. An advancing counter therefore does not prove that
+  gameplay is running or frozen; prove the pause with gameplay state — a
+  node's position or a gameplay-owned tick — instead of the counter alone.
 - `SceneTreeTimer` (from `create_timer`): the timer's `process_always` flag
   decides. It defaults to **true** — the default timer keeps counting while
   the tree is paused (it escapes the pause). Pass `process_always = false`
@@ -227,6 +235,49 @@ Rules verified in engine source:
   {"kind": "action", "action": "jump", "at_frame": 15}
 ]}}
 ```
+
+### UI clicks: prefer click_game_ui_element
+
+`click_game_ui_element` is the preferred way to click a running-game
+`Control`. It resolves the target and injects through the same path as
+`queue_game_input`, so no manual hover or press/release pairing is needed:
+
+- **Resolve**: `path` from `get_game_ui_elements` (exact node path first,
+  otherwise a node path ending with `'/' + path`), or `text` / `text_index`
+  (visible text, exact match first then substring; `path` wins when both are
+  given). The annotate id from `capture_game_viewport` is a per-capture
+  sequence number, not a clickable path.
+- **Inject**: it converts the element's viewport-space `global_rect` centre to
+  window coordinates, injects a same-coordinate `mouse_motion` (mode `event`)
+  to refresh the game's hover state, then the mouse-button press/release pair
+  (two pairs when `double_click` is true).
+- **Verify**: the response carries `hit_path` — the control hovered after
+  injection, empty when nothing is hovered — and `hit_mismatch`, true when
+  that control is neither the resolved element nor one of its descendants
+  (normally an occluder). A mismatch succeeds with a `warning` by default;
+  `strict_hit: true` fails the call instead, with click_occluded reported
+  inside the structured error.
+- **Gate**: requires the `game_runtime` authorization capability.
+
+Raw window-coordinate clicks stay available, but you then own both the hover
+state and the coordinate basis:
+
+- `queue_game_input` does not refresh the game's hover state. Inject a
+  `mouse_motion` to the target point (mode `event`) before the
+  press/release pair so the hover/enter bookkeeping matches a real pointer
+  that moved there.
+- Positions are window pixels with top-left origin. `get_game_ui_elements`
+  returns `global_rect` in viewport coordinates and the matching window-space
+  rect/centre (window_rect / window_center) in window pixels — use the window
+  fields, or pass `coord_space: "viewport"` with the viewport values. Do not
+  feed `global_rect` numbers directly to `queue_game_input` as window
+  coordinates.
+- Pair the press and release (see "Mouse click pairing" below).
+
+When a click lands on the wrong control, `validate_game_ui_layout`
+(`possibly_occluded`) and the `mouse_filter`/`z_index` fields of
+`get_game_ui_elements` explain why; clicking the reported `hit_path` is
+usually the fix, not retrying the same coordinates.
 
 ### Mouse click pairing (BaseButton pitfall)
 

@@ -204,7 +204,8 @@ mcp::JsonValue invoke_tool(const std::string &name,
   }
   if (result.IsObject()) {
     const mcp::JsonValue *pending = result.Find("__gda_pending");
-    if (pending != nullptr && pending->IsInt()) {
+    const mcp::JsonValue *deferred = result.Find("__gda_wait");
+    if ((pending != nullptr && pending->IsInt()) || deferred != nullptr) {
       mcp::JsonValue rejected = util::error_json(
           "cannot invoke async tool '" + name +
           "' from within another tool on the main thread");

@@ -7,7 +7,11 @@
 #include <godot_cpp/classes/option_button.hpp>
 #include <godot_cpp/classes/check_box.hpp>
 #include <godot_cpp/classes/spin_box.hpp>
+#include <godot_cpp/variant/string.hpp>
 
+#include <string>
+
+#include "../core/config.hpp"
 #include "../core/server_context.hpp"
 #include "../util/client_config_gen.hpp"
 #include "../util/skill_gen.hpp"
@@ -20,6 +24,8 @@ class McpConfigDock : public godot::EditorDock {
 
   godot::SpinBox *port_spin;
   godot::Button *apply_button;
+  godot::Button *pin_port_button;
+  godot::Button *copy_api_button;
   godot::Label *status_label;
   godot::OptionButton *client_select;
   godot::Button *generate_button;
@@ -27,10 +33,12 @@ class McpConfigDock : public godot::EditorDock {
   godot::Label *result_label;
 
   godot::CheckBox *show_time_check = nullptr;
-  godot::CheckBox *allow_code_execute_check = nullptr;
-  godot::CheckBox *allow_game_runtime_check = nullptr;
-  godot::CheckBox *allow_user_tools_check = nullptr;
   godot::CheckBox *desensitize_check = nullptr;
+  godot::OptionButton *auth_mode_select = nullptr;
+  godot::Label *auth_mode_status = nullptr;
+  godot::Label *legacy_notice_label = nullptr;
+  godot::Button *import_legacy_button = nullptr;
+  godot::Label *legacy_result_label = nullptr;
   McpLogDock *log_dock_ = nullptr;
 
   ServerContext *server_ctx = nullptr;
@@ -46,20 +54,26 @@ public:
 
 private:
   void _on_apply_port();
+  void _on_pin_port();
+  void _on_copy_api_address();
+  std::string _rewrite_client_configs(int port);
   void _on_generate();
   void _on_generate_skills();
   bool has_existing_skills();
   void remove_legacy_skill_dirs();
   void _refresh_status();
   void _refresh_generate_skills_button();
+  void _refresh_legacy_notice();
+  void _on_import_legacy();
   void _report(const godot::String &text, const godot::Color &color);
   void _on_show_time_toggled(bool checked);
-  void _on_allow_code_execute_toggled(bool checked);
-  void _on_allow_game_runtime_toggled(bool checked);
-  void _on_allow_user_tools_toggled(bool checked);
   void _on_desensitize_toggled(bool checked);
+  void _on_allow_toggled_slot(bool checked, godot::String capability,
+                              godot::CheckBox *box);
   void _on_allow_toggled(const char *capability, godot::CheckBox *box,
                          bool checked);
+  void _on_auth_mode_selected(int index);
+  void _refresh_auth_mode();
 };
 
 } // namespace godot_autopilot

@@ -60,22 +60,22 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "create_tilemap",
       "Create a TileMap node in the edited scene and attach a default TileSet with the given tile size. Optional name (default TileMap), tile_size in pixels (default 16), format (cell quadrant size, default 16) and parent_path (omit to add at the scene root). Returns class, name, path and object_id.",
-      "TileMap", {"tilemap", "create"}, SideEffect::None, tool_flags::kNone | tool_flags::kSceneTarget,
+      "TileMap", {"tilemap", "create"}, SideEffect::WritesScene, tool_flags::kNone | tool_flags::kSceneTarget,
       kCreateTilemapParams, tilemap_ops::handle_create}));
   v.push_back(make_spec_tool(ToolSpec{
       "set_tilemap_cell",
       "Set a single cell on a TileMap or TileMapLayer node. Requires path, x, y; optional layer (default 0), source_id (default 0) and atlas_coords {x, y} place the tile. The source must exist in the node's TileSet (build it with create_tilemap_tileset + add_tilemap_atlas_source first). Passing source_id -1 clears the cell at x, y instead (atlas_coords is ignored then). Returns 'ok'; use set_tilemap_cells for batches.",
-      "TileMap", {"tilemap", "cell", "set"}, SideEffect::None, tool_flags::kNone | tool_flags::kSceneTarget,
+      "TileMap", {"tilemap", "cell", "set"}, SideEffect::WritesScene, tool_flags::kNone | tool_flags::kSceneTarget,
       kSetTilemapCellParams, tilemap_ops::handle_set_cell}));
   v.push_back(make_spec_tool(ToolSpec{
       "set_tilemap_cells",
       "Set multiple cells on a TileMap or TileMapLayer node in one call. Every entry must be an object with x, y and source_id (atlas_coords optional); an entry with source_id -1 clears the cell at x, y (atlas_coords is ignored for that entry). Invalid entries are skipped and reported via error plus warnings. Returns set_count and layer. There is no fixed entry cap, but keep batches reasonably sized because client-side request limits may apply; generate big layouts programmatically with execute_script or code_execute instead.",
-      "TileMap", {"tilemap", "cell", "set", "batch"}, SideEffect::None, tool_flags::kNone | tool_flags::kSceneTarget,
+      "TileMap", {"tilemap", "cell", "set", "batch"}, SideEffect::WritesScene, tool_flags::kNone | tool_flags::kSceneTarget,
       kSetTilemapCellsParams, tilemap_ops::handle_set_cells}));
   v.push_back(make_spec_tool(ToolSpec{
       "fill_tilemap_rect",
       "Fill an axis-aligned tile rectangle on a TileMap or TileMapLayer node in one call. Requires node_path plus from and to {x, y} corner cells (both inclusive; the corner order does not matter). Pass source_id and atlas_coords to place one tile in every cell, or erase=true to clear the rect instead (source_id and atlas_coords are then ignored). Optional alternative (default 0) and layer (default 0, TileMapLayer ignores it). The rect is capped at 100000 cells per call, so split bigger areas into chunks. Implemented as a per-cell set_cell/erase_cell loop: it saves a round trip and produces a single undo action, but does not make the fill itself faster. Returns set_count, from, to, width, height and undo.",
-      "TileMap", {"tilemap", "cell", "fill", "rect"}, SideEffect::None, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
+      "TileMap", {"tilemap", "cell", "fill", "rect"}, SideEffect::WritesScene, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
       kFillTilemapRectParams, tilemap_ops::handle_fill_rect}));
   v.push_back(make_spec_tool(ToolSpec{
       "create_tilemap_tileset",

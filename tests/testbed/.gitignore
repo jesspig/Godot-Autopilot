@@ -4,8 +4,19 @@
 !*/
 !.gitignore
 !project.godot
-!assets/
-!assets/**/
-!assets/**/*.png
+!*.png
+!*.jpg
+!*.jpeg
+!*.webp
+!*.ogg
+!*.wav
+!*.mp3
+!*.ttf
+!*.otf
+!*.woff
+!*.glb
+!*.gltf
+!*.blend
+!*.fbx
 
 .godot/

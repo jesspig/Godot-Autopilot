@@ -1,0 +1,240 @@
+{
+  "name": "ui_verification",
+  "description": "UI 命中校验与遮挡判断（T-10）的 L2 夹具：验证 get_game_ui_elements 暴露 mouse_filter/z_index、validate_game_ui_layout 把 mouse_filter=IGNORE 排除出 occluder 且按 z_index 排序、click_game_ui_element 注入后读取真实 hover 并返回 hit_path/hit_mismatch。链路：before_all 用 create_editor_scene 建 Control 根 UiProbe，set_properties_batch 把根锚定全屏（anchor_right/anchor_bottom=1.0）→ create_scene_node 建居中 Button TargetButton（120x40，中心 60/-60 与 20/-20 偏移）→ create_scene_node 在其后建全屏 CenterContainer Cover（mouse_filter=1 PASS，anchor_right/anchor_bottom=1.0），后添加的同级容器绘制在上层并覆盖按钮中心 → save_editor_scene_as 落盘 res://gda_tmp_runtime/probe.tscn → open_editor_scene 打开该场景（保存后标签路径已注册，命中幂等分支返回 result=ok/already_open=true，不写 project.godot）→ play_editor_current_scene 以当前编辑场景启动游戏（不改 application/run/main_scene）。stages：① validate_game_ui_layout 断言顶层 checked=3（根 UiProbe、TargetButton、Cover 三个可见 Control）与顶层 possibly_occluded_count=2（全屏 Cover 100% 覆盖根与按钮；该计数为 T-10 新增的标量汇总，L2 断言引擎不支持数组下标，逐条 issue 的 kind/occluder_path/occluder_mouse_filter 由静态实现与后续数组断言能力覆盖；无零尺寸/越界控件时顶层 issues 恰为这两条 possibly_occluded，实测每条为 kind=possibly_occluded、occluder_path=/root/UiProbe/Cover、occluder_mouse_filter=PASS）、顶层 issues 非空、顶层 truncated=false（同形态还有顶层 skipped_invisible 与 note）→ ② click_game_ui_element{path:UiProbe/TargetButton} 断言 result.ok=true（默认只警告不失败）、result.hit_mismatch=true、result.hit_path 精确为 /root/UiProbe/Cover、result.warning 非空、result.clicks=1；该步直接证明点击落在遮挡容器而不是按钮，也证明 hover 读取前已注入 mouse_motion（按钮事件本身不保证更新 Viewport 的 hover 状态）。响应形状口径（实测，断言按此写）：游戏回包由 editor 侧 runtime_ops::wait_pending_response 解包一层，validate_game_ui_layout 与 get_game_ui_elements 的负载对象/列表即响应本体——checked/possibly_occluded_count/issues/truncated/skipped_invisible/note 与 count/elements 都是响应顶层键，不在 result 下（elements 每条含 path/type/visible/mouse_filter/z_index/text（仅在有文本时出现）/global_rect{position,size}/window_rect{position,size}/window_center{x,y}/window_approx）；click_game_ui_element 的负载本身又嵌了一层 result（run_ui_click 返回 ok_result({result:{clicked…}})），故本用例那步仍以 result.* 断言，两种形态不要混用。可选 strict_hit=true 的错误分支由 B1 分支在 game_tools.hpp/runtime_game_ops.cpp 接入，本文件不传 strict_hit，避免跨分支依赖；strict 错误结构与 code=click_occluded 由静态实现与后续 L2 补充覆盖。IGNORE 排除分支未在本文件构造（会与 hit_mismatch 断言冲突），由静态实现保证；z_index 排序需构造不同 z 的重叠控件，留待扩展。after_all：stop_editor_playing → close_editor_scene → move_os_file_to_trash res://gda_tmp_runtime。前置条件：click_game_ui_element 受 game_runtime capability 授权门保护（GODOT_AUTOPILOT_ALLOW 含 game_runtime 或 all，或 user://godot_autopilot/config.json 的 allow 字段），缺失时点击步返回 authorization required 而 FAIL；validate_game_ui_layout/get_game_ui_elements 只读不需要授权，但要求游戏进程加载 godot-autopilot 扩展。无 project.godot 污染：全程不调用 set_editor_main_scene，application/run/main_scene 保持测试床原值，after_all 回收 res://gda_tmp_runtime 不影响任何持久化配置。",
+  "headless": true,
+  "requires": ["write", "game_runtime"],
+  "pipeline": {
+    "on_failure": "continue",
+    "before_all": [
+      {
+        "id": "ui_create_scene",
+        "tool": "create_editor_scene",
+        "args": { "name": "UiProbe", "type": "Control", "close_current": true }
+      },
+      {
+        "id": "ui_root_full_rect",
+        "tool": "set_properties_batch",
+        "args": {
+          "path": "UiProbe",
+          "properties": { "anchor_right": 1.0, "anchor_bottom": 1.0 }
+        }
+      },
+      {
+        "id": "ui_create_target_button",
+        "tool": "create_scene_node",
+        "args": {
+          "name": "TargetButton",
+          "type": "Button",
+          "parent_path": "UiProbe",
+          "properties": {
+            "text": "Play",
+            "anchor_left": 0.5,
+            "anchor_top": 0.5,
+            "anchor_right": 0.5,
+            "anchor_bottom": 0.5,
+            "offset_left": -60.0,
+            "offset_top": -20.0,
+            "offset_right": 60.0,
+            "offset_bottom": 20.0
+          }
+        }
+      },
+      {
+        "id": "ui_create_cover_container",
+        "tool": "create_scene_node",
+        "args": {
+          "name": "Cover",
+          "type": "CenterContainer",
+          "parent_path": "UiProbe",
+          "properties": {
+            "mouse_filter": 1,
+            "anchor_right": 1.0,
+            "anchor_bottom": 1.0
+          }
+        }
+      },
+      {
+        "id": "ui_create_hidden_label",
+        "tool": "create_scene_node",
+        "args": {
+          "name": "HiddenLabel",
+          "type": "Label",
+          "parent_path": "UiProbe",
+          "properties": {
+            "text": "Hidden",
+            "visible": false,
+            "offset_left": 10.0,
+            "offset_top": 10.0,
+            "offset_right": 110.0,
+            "offset_bottom": 40.0
+          }
+        }
+      },
+      {
+        "id": "ui_save_scene",
+        "tool": "save_editor_scene_as",
+        "args": { "path": "res://gda_tmp_runtime/probe.tscn" }
+      },
+      {
+        "id": "ui_open_scene",
+        "tool": "open_editor_scene",
+        "args": { "path": "res://gda_tmp_runtime/probe.tscn" }
+      },
+      {
+        "id": "ui_play",
+        "tool": "play_editor_current_scene",
+        "args": {}
+      }
+    ],
+    "stages": [
+      {
+        "id": "layout_validation",
+        "steps": [
+          {
+            "id": "validate_layout_reports_occlusion",
+            "tool": "validate_game_ui_layout",
+            "args": { "max_elements": 50 },
+            "expect": {
+              "field_checks": [
+                { "key": "checked", "value": 3 },
+                { "key": "possibly_occluded_count", "value": 2 },
+                { "key": "issues", "not_empty": true },
+                { "key": "truncated", "value": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "save_validation",
+        "steps": [
+          {
+            "id": "game_save_dir_escape_rejected",
+            "tool": "capture_game_viewport",
+            "args": { "save_dir": "res://../gda_escape" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "path rejected: path escapes the namespace root" }
+              ]
+            }
+          },
+          {
+            "id": "game_save_wrong_type_rejected",
+            "tool": "capture_game_viewport",
+            "args": { "save": "true" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "invalid parameter: save must be a boolean" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "ui_filtering",
+        "steps": [
+          {
+            "id": "filter_text_play",
+            "tool": "get_game_ui_elements",
+            "args": { "filter": "play" },
+            "expect": {
+              "field_checks": [
+                { "key": "count", "value": 1 },
+                { "key": "truncated", "value": false }
+              ]
+            }
+          },
+          {
+            "id": "types_button_only",
+            "tool": "get_game_ui_elements",
+            "args": { "types": ["Button"] },
+            "expect": {
+              "field_checks": [
+                { "key": "count", "value": 1 }
+              ]
+            }
+          },
+          {
+            "id": "visible_only_skips_hidden",
+            "tool": "get_game_ui_elements",
+            "args": { "visible_only": true },
+            "expect": {
+              "field_checks": [
+                { "key": "count", "value": 3 }
+              ]
+            }
+          },
+          {
+            "id": "filter_hidden_label",
+            "tool": "get_game_ui_elements",
+            "args": { "filter": "hidden" },
+            "expect": {
+              "field_checks": [
+                { "key": "count", "value": 1 }
+              ]
+            }
+          },
+          {
+            "id": "types_label_only",
+            "tool": "get_game_ui_elements",
+            "args": { "types": ["Label"] },
+            "expect": {
+              "field_checks": [
+                { "key": "count", "value": 1 }
+              ]
+            }
+          },
+          {
+            "id": "truncated_after_filtering",
+            "tool": "get_game_ui_elements",
+            "args": { "types": ["Control", "Button", "CenterContainer", "Label"], "max_elements": 2 },
+            "expect": {
+              "field_checks": [
+                { "key": "count", "value": 2 },
+                { "key": "truncated", "value": true }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "click_hit_verification",
+        "steps": [
+          {
+            "id": "click_covered_button_reports_cover",
+            "tool": "click_game_ui_element",
+            "args": { "path": "UiProbe/TargetButton" },
+            "expect": {
+              "field_checks": [
+                { "key": "result.ok", "value": true },
+                { "key": "result.hit_mismatch", "value": true },
+                { "key": "result.hit_path", "value": "/root/UiProbe/Cover" },
+                { "key": "result.warning", "not_empty": true },
+                { "key": "result.clicks", "value": 1 }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "after_all": [
+      {
+        "id": "ui_stop_playing",
+        "tool": "stop_editor_playing",
+        "args": {}
+      },
+      {
+        "id": "ui_close_scene",
+        "tool": "close_editor_scene",
+        "args": {}
+      },
+      {
+        "id": "ui_trash_dir",
+        "tool": "move_os_file_to_trash",
+        "args": { "path": "res://gda_tmp_runtime" }
+      }
+    ]
+  }
+}

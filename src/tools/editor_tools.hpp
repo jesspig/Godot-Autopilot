@@ -48,13 +48,13 @@ const std::vector<ParamSpec> kCommitEditorUndoRedoParams = {};
 const std::vector<ParamSpec> kAddEditorUndoRedoDoParams = {
     {"node_path", "string", "Path to the node whose method will be called on redo, e.g. 'Player' or '/root/Player'; resolved against the edited scene root", true},
     {"method", "string", "Name of the node method to call, e.g. 'set_position' or 'queue_free'", true},
-    {"value", "object", "Optional serialized JSON value passed as the single method argument; omit for methods without arguments", false},
+    {"value", "json", "Optional serialized JSON value passed as the single method argument; omit for methods without arguments", false},
 };
 
 const std::vector<ParamSpec> kAddEditorUndoRedoUndoParams = {
     {"node_path", "string", "Path to the node whose method will be called on undo, e.g. 'Player' or '/root/Player'; resolved against the edited scene root", true},
     {"method", "string", "Name of the node method to call for the inverse operation, e.g. 'set_position'", true},
-    {"value", "object", "Optional serialized JSON value passed as the single method argument; omit for methods without arguments", false},
+    {"value", "json", "Optional serialized JSON value passed as the single method argument; omit for methods without arguments", false},
 };
 
 const std::vector<ParamSpec> kGetEditorFileSystemTreeParams = {
@@ -90,6 +90,7 @@ const std::vector<ParamSpec> kCreateEditorSceneParams = {
 
 const std::vector<ParamSpec> kOpenEditorSceneParams = {
     {"path", "string", "Path to the scene file to open, e.g. 'res://game.tscn'; errors when the current scene has unsaved changes", true},
+    {"reload_if_open", "boolean", "When the requested scene is already the edited scene, reload it from disk instead of short-circuiting (default: false); discards unsaved changes, so save first when needed", false},
 };
 
 const std::vector<ParamSpec> kSaveEditorSceneAsParams = {
@@ -103,7 +104,13 @@ const std::vector<ParamSpec> kVerifySceneSavedParams = {
     {"include_hash", "boolean", "Attach FNV-1a content hashes of the memory tree and the on-disk file (memory_hash/disk_hash); off by default", false},
 };
 
-const std::vector<ParamSpec> kBuildCsharpAssemblyParams = {};
+const std::vector<ParamSpec> kBuildCsharpAssemblyParams = {
+    {"wait", "boolean", "When true run dotnet build synchronously via OS.execute and wait for the BuildResult with exit_code, success, errors and output_digest; when false or omitted launch via OS.create_process and return immediately with pid and started", false},
+    {"timeout_ms", "integer", "Declared wait budget in milliseconds for wait=true only, an integer between 1 and 25000 (default 25000); validated to stay below the dispatch default 27000ms and the transport timeout; rejected when wait is not true", false},
+    {"probe_script", "string", "Optional res:// path ending in .cs, e.g. 'res://scripts/Player.cs'; after the build the editor loads this C# script (no instantiation) and reports result.editor_assembly_probe {path,is_dotnet_editor,state,can_instantiate,base_class,hint}; state is 'available' when the script resource loads and 'unavailable' with unavailable=true when the editor is not a .NET build or the load fails (E-11)", false},
+};
+
+const std::vector<ParamSpec> kDotnetEnvironmentParams = {};
 
 const std::vector<ParamSpec> kCloseEditorSceneParams = {};
 
@@ -162,7 +169,7 @@ const std::vector<ParamSpec> kRunEditorShortcutParams = {
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(32);
+  v.reserve(33);
   v.push_back(make_spec_tool(ToolSpec{
       "get_editor_selection",
       "Retrieve the list of nodes currently selected in the edited scene. Use it to see which nodes the user has selected before operating on them with scene tools. Returns result as an array of objects, each with name, class and path fields relative to the scene root; an empty array means nothing is selected.",
@@ -171,7 +178,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "set_editor_selection",
       "Set the node selection in the edited scene to exactly the given paths. Use it to focus editor operations on specific nodes, e.g. before inspecting or modifying them; the previous selection is cleared first. Accepts an array of paths, and paths that cannot be resolved are skipped silently. Returns result 'ok'.",
-      "Editor", {"editor", "selection", "set"}, SideEffect::None, tool_flags::kNone,
+      "Editor", {"editor", "selection", "set"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kSetEditorSelectionParams, editor_ops::handle_set_selection}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_editor_edited_scene_root",
@@ -191,7 +198,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "reload_editor_scene",
       "Reload a scene from disk, replacing its in-memory state; reloads the current edited scene unless scene_path is provided. Use it to discard experimental edits and restore the saved version. Note that all unsaved changes are dropped without any confirmation, so call save_editor_scene first if the changes matter. Returns result 'ok'.",
-      "Editor", {"editor", "scene", "reload"}, SideEffect::None, tool_flags::kNone,
+      "Editor", {"editor", "scene", "reload"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kReloadEditorSceneParams, editor_ops::handle_reload_scene}));
   v.push_back(make_spec_tool(ToolSpec{
       "inspect_editor_resource",
@@ -201,22 +208,22 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "create_editor_undo_redo_action",
       "Start a new undo/redo action in the editor's undo history with the given name. Use it to group several operations so a single undo step reverts them all. Must be followed by add_editor_undo_redo_do or add_editor_undo_redo_undo calls and finally commit_editor_undo_redo. Returns result 'ok'.",
-      "Editor", {"editor", "undo", "start"}, SideEffect::None, tool_flags::kUndoable,
+      "Editor", {"editor", "undo", "start"}, SideEffect::ModifiesWindow, tool_flags::kMutating | tool_flags::kUndoable,
       kCreateEditorUndoRedoActionParams, editor_ops::handle_undo_redo_start}));
   v.push_back(make_spec_tool(ToolSpec{
       "commit_editor_undo_redo",
       "Commit the currently open undo/redo action so it appears in the editor's undo history as a single step. Use it to finalize a sequence started with create_editor_undo_redo_action and filled with add_editor_undo_redo_do or add_editor_undo_redo_undo calls; after committing, the action can no longer be extended. Returns result 'ok'.",
-      "Editor", {"editor", "undo", "commit"}, SideEffect::None, tool_flags::kNone,
+      "Editor", {"editor", "undo", "commit"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kCommitEditorUndoRedoParams, editor_ops::handle_undo_redo_commit}));
   v.push_back(make_spec_tool(ToolSpec{
       "add_editor_undo_redo_do",
       "Register a method call that runs when the undo/redo action is applied (the do step). Use it inside an action started with create_editor_undo_redo_action; target a node by node_path, name the method and pass an optional value argument. Pair it with add_editor_undo_redo_undo for the inverse, then finish with commit_editor_undo_redo. Returns result 'ok'.",
-      "Editor", {"editor", "undo", "do"}, SideEffect::None, tool_flags::kNone,
+      "Editor", {"editor", "undo", "do"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kAddEditorUndoRedoDoParams, editor_ops::handle_undo_redo_add_do}));
   v.push_back(make_spec_tool(ToolSpec{
       "add_editor_undo_redo_undo",
       "Register a method call that runs when the undo/redo action is reverted (the undo step). Use it to define the inverse of an operation added with add_editor_undo_redo_do; target a node by node_path, name the method and pass an optional value argument. Finish the action with commit_editor_undo_redo. Returns result 'ok'.",
-      "Editor", {"editor", "undo", "undo"}, SideEffect::None, tool_flags::kNone,
+      "Editor", {"editor", "undo", "undo"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kAddEditorUndoRedoUndoParams, editor_ops::handle_undo_redo_add_undo}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_editor_file_system_tree",
@@ -236,12 +243,12 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "play_editor_current_scene",
       "Launch the currently edited scene as a game in the editor. Use it to start testing gameplay; the scene should be saved first or playback may fail. Returns result 'ok' or 'already_playing' plus the is_playing flag. While the game runs, use Game and Debugger tools (get_game_status, capture_game_viewport, execute_game_script) and stop playback with stop_editor_playing.",
-      "Editor", {"editor", "play", "scene"}, SideEffect::None, tool_flags::kNone,
+      "Editor", {"editor", "play", "scene"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kPlayEditorCurrentSceneParams, editor_ops::handle_play_current_scene}));
   v.push_back(make_spec_tool(ToolSpec{
       "stop_editor_playing",
       "Stop the running game process started by play_editor_current_scene and return the editor to editing mode. Use it at the end of a play-testing session or before modifying the scene again. Returns result 'ok' even when no game is currently running.",
-      "Editor", {"editor", "stop", "playing"}, SideEffect::None, tool_flags::kNone,
+      "Editor", {"editor", "stop", "playing"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kStopEditorPlayingParams, editor_ops::handle_stop_playing}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_editor_file_system_status",
@@ -256,12 +263,12 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "create_editor_scene",
       "Create a new empty scene with a root node of the given type in the editor. Use it to start building a new level; type defaults to Node, name defaults to NewRoot, and close_current (default false) closes the current scene tab automatically when it has no unsaved changes. Only the current tab is closed: with multiple scene tabs open, repeat close_editor_scene until no scene is open, otherwise this call fails fast with the neighboring tab reported in editor_state instead of waiting. Returns result with path, type and closed_previous; errors when the current scene is unsaved or type is not a Node subclass.",
-      "Editor", {"editor", "scene", "new"}, SideEffect::None, tool_flags::kNone,
+      "Editor", {"editor", "scene", "new"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kCreateEditorSceneParams, editor_ops::handle_new_scene}));
   v.push_back(make_spec_tool(ToolSpec{
       "open_editor_scene",
-      "Open an existing scene file, e.g. res://game.tscn, in the editor, replacing the currently edited scene. Use it to switch between scenes during editing, e.g. to continue work on another level. Errors when the current scene has unsaved changes, so call save_editor_scene first. Returns result 'ok'.",
-      "Editor", {"scene", "open"}, SideEffect::None, tool_flags::kNone,
+      "Open an existing scene file, e.g. res://game.tscn, in the editor, replacing the currently edited scene. Use it to switch between scenes during editing, e.g. to continue work on another level. Errors when the current scene has unsaved changes, so call save_editor_scene first. Returns result 'ok'. When the requested scene is already the edited scene it short-circuits with result 'ok', already_open=true, hint and suggested_action: the editor does not reopen it, so anything changed on disk after it was opened (e.g. by scripts) is not refreshed; pass reload_if_open=true to reload it from disk instead, which returns reloaded=true, reload_observed and, when observed, scene_root and scene_root_type. That reload drops unsaved changes, so save_editor_scene first when they matter.",
+      "Editor", {"scene", "open"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kOpenEditorSceneParams, editor_ops::handle_open_scene}));
   v.push_back(make_spec_tool(ToolSpec{
       "save_editor_scene_as",
@@ -275,13 +282,18 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       kVerifySceneSavedParams, editor_ops::handle_verify_scene_saved}));
   v.push_back(make_spec_tool(ToolSpec{
       "build_csharp_assembly",
-      "Trigger a C# project build by launching 'dotnet build --nologo <project>' as an async OS process on the res:// root .csproj/.sln. Intended for CI/command-line compile verification only: it does NOT rewind to an in-editor Build and does not hot-reload the loaded .NET assembly. Returns result {'project_file','command','started','pid','note'}; errors when the project is not a C# project or dotnet is not available.",
+      "Trigger a C# project build with dotnet build --nologo on the res:// root .csproj/.sln. The engine path is globalized to an OS absolute path (ProjectSettings.globalize_path) before it reaches dotnet, because dotnet cannot resolve res:// paths. Intended for CI/command-line compile verification only: it does NOT rewind to an in-editor Build and does not hot-reload the loaded .NET assembly. By default (wait omitted or false) it launches via OS.create_process and returns immediately with result {project_file,project_path,command,pid,started,note}. With wait=true it runs synchronously via OS.execute, temporarily pinning DOTNET_CLI_UI_LANGUAGE=en for the child process and restoring the previous value afterwards so that output_digest carries ASCII English text instead of ACP-mangled localized output, and waits for the BuildResult {project_file,project_path,command,exit_code,success,errors,output_digest,output_empty}: project_file is the res:// project file, project_path the OS absolute path handed to dotnet, command the logical dotnet invocation on the res:// file, exit_code the dotnet exit code, success exit_code==0, errors lists output lines containing error (capped at 50 with errors_truncated), output_digest the combined stdout/stderr truncated to 4000 chars when desensitized else 64000 chars with output_truncated when cut, output_empty true when nothing was captured (output_hint then explains the exit code); timeout_ms declares the wait budget (1-25000, default 25000) validated to stay below the dispatch default 27000ms; errors when the project is not a C# project or dotnet is not available. Both shapes also return next_action (array of executable follow-up steps), restart_required (true when the build succeeded or was launched, independent of whether a game is running, because nothing hot-reloads the loaded assemblies) and game_running. With probe_script the response additionally carries editor_assembly_probe {path,is_dotnet_editor,state,can_instantiate,base_class,hint}: the editor loads the .cs resource without instantiating it, state is 'available' when it loads and 'unavailable' with unavailable=true when the editor is not a .NET build or the load fails; can_instantiate=false on an available probe means the editor still runs the old assembly, so click Build or restart the editor.",
       "Editor", {"build", "csharp", "dotnet"}, SideEffect::Process, tool_flags::kMutating,
       kBuildCsharpAssemblyParams, editor_ops::handle_build_csharp_assembly}));
   v.push_back(make_spec_tool(ToolSpec{
+      "dotnet_environment",
+      "Probe the .NET/C# environment of the current project without building anything. Use it before build_csharp_assembly or any C# workflow to learn whether the project is a C# project, whether the dotnet CLI is usable and which SDK version it reports, whether the editor itself is a .NET build, and whether the C# runtime looks loaded. Locates the res:// root .csproj/.sln exactly like build_csharp_assembly, runs 'dotnet --version' synchronously to capture the version string, and decides is_dotnet_editor from the CSharpScript class registration (registered when the .NET module loads) with a version-aware fallback to OS.has_feature(dotnet) on 4.4+ or OS.has_feature(mono) before 4.4 — Godot 4.x registers no mono/dotnet feature tag, so both probes report false. Returns result with dotnet_available, dotnet_version, project_file, is_dotnet_editor, assembly_loaded, engine_version, mono_feature, dotnet_feature and hint; errors when the project is not a C# project or dotnet is not available. On a missing project the error carries a ready-to-write template {path, content, target_framework, assembly_name} derived from the engine version and the installed .NET SDK.",
+      "Editor", {"dotnet", "csharp", "environment"}, SideEffect::Process, tool_flags::kNone,
+      kDotnetEnvironmentParams, editor_ops::handle_dotnet_environment}));
+  v.push_back(make_spec_tool(ToolSpec{
       "close_editor_scene",
       "Close the currently edited scene tab and return the editor to an empty state when it was the last tab. Use it before opening or creating another scene, or when a scene is no longer needed. Only the current tab is closed: with multiple scene tabs open, call it repeatedly until no scene is open. Refuses to close when the scene has unsaved changes, so call save_editor_scene first. Returns result 'closed'.",
-      "Editor", {"editor", "close", "scene"}, SideEffect::None, tool_flags::kNone,
+      "Editor", {"editor", "close", "scene"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
       kCloseEditorSceneParams, editor_ops::handle_close_scene}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_editor_viewport_geometry",

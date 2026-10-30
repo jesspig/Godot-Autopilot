@@ -2,6 +2,7 @@
   "name": "user_tools_code_mode",
   "description": "AutopilotTools 用户脚本工具 API（运行时经脚本注册的 MCP 动态工具）端到端：① code_execute 内注册 Callable 用户工具 user_echo_probe（category User、params value:string/required）→ ② MCP call_tool 调用返回 result.echo=hi → ③ search_tools 命中该工具、get_tool_detail 标记 tool.dynamic=true → ④ code_execute 内 api.call_tool 直连 code-mode（get_engine_version 与 user_echo_probe 各调一次）→ ⑤ get_tool 取 handle 后 unregister_tool 移除，has_tool=false → ⑥ 再调报 domain tool not found。前置条件：脚本步骤均经 code_execute，需要 code_execute capability（GODOT_AUTOPILOT_ALLOW env 或 user://godot_autopilot/config.json 的 allow 字段，env 优先）；用户工具的注册与执行额外受 user_tools capability 门保护，before_all 调 AutopilotTools.set_enabled(true) 写配置自包含——env 优先意味着若 GODOT_AUTOPILOT_ALLOW 已设置且不含 user_tools（也无 all），set_enabled 无效，用例在步骤 1 失败（此时需在 env 中补 user_tools 或取消该 env）。runner 的 before_all/after_all 不支持 expect：before_all 脚本自检 Engine.get_singleton 与 is_enabled，失败经步骤 1 断言暴露；after_all 兜底 unregister 全部动态工具并 set_enabled(false) 反向写回配置（用户原有的 user_tools 允许状态会被关闭）。全部 headless，无项目内文件/场景残留（仅 user://godot_autopilot/config.json 的 allow 字段被写入后再移除 user_tools）。",
   "headless": true,
+  "requires": ["code_execute", "user_tools"],
   "pipeline": {
     "on_failure": "continue",
     "before_all": [

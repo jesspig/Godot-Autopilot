@@ -167,8 +167,8 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       kAddAudioBusEffectParams, audio_ops::handle_effect_add}));
   v.push_back(make_spec_tool(ToolSpec{
       "remove_audio_bus_effect",
-      "Remove an audio effect from a bus using its zero-based index within the bus effect chain. An out-of-range 'effect_index' returns an error, and removing the last effect leaves the bus with a plain chain. Query the current chain with get_audio_bus_layout first. Returns 'result' set to 'ok'.",
-      "Audio", {"audio", "effect", "remove"}, SideEffect::None, tool_flags::kNone,
+      "Remove an audio effect from a bus using its zero-based index within the bus effect chain. An out-of-range 'effect_index' returns an error, and removing the last effect leaves the bus with a plain chain. Query the current chain with get_audio_bus_layout first. Returns 'result' set to 'ok'. This tool is classified as a destructive side effect because it destroys the effect object that already exists inside the host, and no undo path is provided.",
+      "Audio", {"audio", "effect", "remove"}, SideEffect::Destructive, tool_flags::kNone,
       kRemoveAudioBusEffectParams, audio_ops::handle_effect_remove}));
   v.push_back(make_spec_tool(ToolSpec{
       "play_audio_player",

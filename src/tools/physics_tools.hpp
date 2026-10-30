@@ -73,7 +73,7 @@ const std::vector<ParamSpec> kApplyPhysics2dBodyImpulseParams = {
 const std::vector<ParamSpec> kSetPhysics2dBodyStateParams = {
     {"rid", "integer", "Required. RID of the 2D physics body, e.g. from create_physics_2d_body", true},
     {"state", "number", "Required. Body state enum index: 0=transform, 1=linear_vel, 2=angular_vel, 3=sleeping, 4=can_sleep", true},
-    {"value", "object", "Required. New state value matching the state: a transform object (origin/rotation/scale) for 0, a Vector2 object for 1 and 2, a boolean for 3 and 4", true},
+    {"value", "json", "Required. New state value matching the state: a transform object (origin/rotation/scale) for 0, a Vector2 object for 1 and 2, a boolean for 3 and 4", true},
 };
 
 const std::vector<ParamSpec> kGetPhysics2dBodyStateParams = {
@@ -166,7 +166,7 @@ const std::vector<ParamSpec> kApplyPhysics3dBodyImpulseParams = {
 const std::vector<ParamSpec> kSetPhysics3dBodyStateParams = {
     {"rid", "integer", "Required. RID of the 3D physics body, e.g. from create_physics_3d_body", true},
     {"state", "number", "Required. Body state enum index: 0=transform, 1=linear_vel, 2=angular_vel, 3=sleeping, 4=can_sleep", true},
-    {"value", "object", "Required. New state value matching the state: a transform object (basis/origin) for 0, a Vector3 object for 1 and 2, a boolean for 3 and 4", true},
+    {"value", "json", "Required. New state value matching the state: a transform object (basis/origin) for 0, a Vector3 object for 1 and 2, a boolean for 3 and 4", true},
 };
 
 const std::vector<ParamSpec> kGetPhysics3dBodyStateParams = {
@@ -266,7 +266,7 @@ const std::vector<ParamSpec> kSetPhysics3dBodyParamParams = {
 const std::vector<ParamSpec> kSetPhysics3dAreaParamParams = {
     {"rid", "integer", "Required. RID of the 3D physics area, e.g. from create_physics_3d_area", true},
     {"param", "number", "Required. Area parameter enum index: 0=gravity_override_mode, 1=gravity, 2=gravity_vector, 3=gravity_is_point, 4=gravity_point_unit_distance, 5=linear_damp_override_mode, 6=linear_damp, 7=angular_damp_override_mode, 8=angular_damp, 9=priority", true},
-    {"value", "object", "Required. Value matching the selected parameter: a number for scalar params (e.g. gravity, damp), a Vector3 object like {'x': 0, 'y': -9.8, 'z': 0} for vectors, or a boolean", true},
+    {"value", "json", "Required. Value matching the selected parameter: a number for scalar params (e.g. gravity, damp), a Vector3 object like {'x': 0, 'y': -9.8, 'z': 0} for vectors, or a boolean", true},
 };
 
 const std::vector<ParamSpec> kSetPhysics3dSpaceParamParams = {
@@ -576,7 +576,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.push_back(make_spec_tool(ToolSpec{
       "assign_collision_shape",
       "Assign a Shape resource to a CollisionShape node in the edited scene. Required 'node_path' is a CollisionShape2D or CollisionShape3D node; other node types fail with the actual class. Required 'shape_ref' is the shape to assign: an object_id integer from create_collision_shape, a res:// or memory:// string, or {\"path\": \"res://...\"} / {\"resource\": \"memory://...\"} / {\"object_id\": ...} / {\"object_id_str\": ...} / {\"name\": ...}. Memory:// resources are rejected because they are not persistent: save them first with save_resource to a res:// path and pass that path instead. The resource must match the node dimension: Shape2D for CollisionShape2D and Shape3D for CollisionShape3D, otherwise the actual class is reported. Only the in-memory scene changes, call save_editor_scene afterwards to persist. Returns ok with assigned, node_path, shape_class, object_id and undo info.",
-      "Physics", {"physics", "shape", "assign"}, SideEffect::None, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
+      "Physics", {"physics", "shape", "assign"}, SideEffect::WritesScene, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
       kAssignCollisionShapeParams, physics_ops::handle_collision_shape_assign}));
   return v;
 }

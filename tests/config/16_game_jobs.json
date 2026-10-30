@@ -2,6 +2,7 @@
   "name": "game_jobs",
   "description": "start_game_job / get_game_job 的参数校验与 headless 运行时通道路径。前置条件：start_game_job 受 game_runtime capability 授权门保护，可由 GODOT_AUTOPILOT_ALLOW 环境变量或 user://godot_autopilot/config.json 的 allow 字段提供（env 优先于配置回落）；两者均未包含 game_runtime 时 start_game_job 三步返回 authorization required 错误；get_game_job 无授权门，无条件可断言。断言：start_game_job 缺 op 报 missing required parameter: op，op 非法值报 unsupported op，params 缺失报 missing required parameter: params；合法参数在无游戏时返回结构化 error+hint（证明抵达发送路径且不挂起）；get_game_job 缺 job_id 报 missing required parameter: job_id，未知 job_id 报含 position/expected/action 的四段式 unknown 错误，cancel 非布尔与 timeout_ms 越界各有类型错误。真实 job 生命周期（start → pending → done 的结果取回、expired 过期清理、cancel 取消与错误断点抑制释放）需要真实游戏进程，由 V3 复现验收覆盖，本文件不做断言。",
   "headless": true,
+  "requires": ["game_runtime"],
   "pipeline": {
     "on_failure": "continue",
     "stages": [

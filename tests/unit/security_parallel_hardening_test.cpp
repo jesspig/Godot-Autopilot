@@ -112,29 +112,29 @@ TEST(SecurityHardening, QueueOpenWithPendingThrows) {
 }
 
 TEST(SecurityHardening, ProjectPathRejectsUnsupportedScheme) {
-  auto r = godot_autopilot::util::normalize_project_path("http://evil.com/file", true);
+  auto r = godot_autopilot::util::normalize_project_path("http://evil.com/file", true, false);
   EXPECT_FALSE(r.valid());
 }
 TEST(SecurityHardening, ProjectPathRejectsParentTraversal) {
-  auto r = godot_autopilot::util::normalize_project_path("res://../outside", false);
-  auto r2 = godot_autopilot::util::normalize_project_path("res://a/../b", false);
+  auto r = godot_autopilot::util::normalize_project_path("res://../outside", false, false);
+  auto r2 = godot_autopilot::util::normalize_project_path("res://a/../b", false, false);
   EXPECT_TRUE(r2.valid());
   EXPECT_EQ(r2.value, "res://b");
 }
 TEST(SecurityHardening, ProjectPathAcceptsResAndUser) {
-  auto r = godot_autopilot::util::normalize_project_path("res://folder/file.tscn", true);
+  auto r = godot_autopilot::util::normalize_project_path("res://folder/file.tscn", true, false);
   EXPECT_TRUE(r.valid());
   EXPECT_EQ(r.value, "res://folder/file.tscn");
-  auto r2 = godot_autopilot::util::normalize_project_path("user://save.dat", true);
+  auto r2 = godot_autopilot::util::normalize_project_path("user://save.dat", true, false);
   EXPECT_TRUE(r2.valid());
-  auto r3 = godot_autopilot::util::normalize_project_path("user://save.dat", false);
+  auto r3 = godot_autopilot::util::normalize_project_path("user://save.dat", false, false);
   EXPECT_FALSE(r3.valid());
 }
 TEST(SecurityHardening, ProjectPathRejectsAbsoluteOutsideRoot) {
-  auto r = godot_autopilot::util::normalize_project_path("res://a/../b", false);
+  auto r = godot_autopilot::util::normalize_project_path("res://a/../b", false, false);
   EXPECT_TRUE(r.valid());
   EXPECT_EQ(r.value, "res://b");
-  auto r2 = godot_autopilot::util::normalize_project_path("http://evil.com/file", true);
+  auto r2 = godot_autopilot::util::normalize_project_path("http://evil.com/file", true, false);
   EXPECT_FALSE(r2.valid());
 }
 
@@ -166,19 +166,55 @@ TEST(SecurityHardening, AuthorizationAllKeyword) {
   EXPECT_TRUE(godot_autopilot::authorization::capability_enabled("game_runtime"));
 }
 
+TEST(SecurityHardening, SceneWriteTierFollowsWriteCapability) {
+  using godot_autopilot::SideEffect;
+  EnvGuard mode("GODOT_AUTOPILOT_AUTH_MODE", "strict");
+  {
+    EnvGuard g("GODOT_AUTOPILOT_ALLOW", nullptr);
+    auto denied = godot_autopilot::authorization::deny_if_unauthorized(
+        "property_set", SideEffect::WritesScene);
+    ASSERT_FALSE(denied.IsNull());
+    const mcp::JsonValue *required = denied.Find("authorization_required");
+    ASSERT_NE(required, nullptr);
+    ASSERT_TRUE(required->IsString());
+    EXPECT_EQ(required->GetString(), "write");
+  }
+  {
+    EnvGuard g("GODOT_AUTOPILOT_ALLOW", "write");
+    EXPECT_TRUE(godot_autopilot::authorization::deny_if_unauthorized(
+                    "property_set", SideEffect::WritesScene)
+                    .IsNull());
+  }
+  {
+    EnvGuard g("GODOT_AUTOPILOT_ALLOW", "code_execute");
+    EXPECT_FALSE(godot_autopilot::authorization::deny_if_unauthorized(
+                     "create_scene_node", SideEffect::WritesScene)
+                     .IsNull());
+  }
+}
+
 TEST(SecurityHardening, CapabilityForToolMapping) {
   using namespace godot_autopilot;
   EXPECT_STREQ(authorization::capability_for_tool("create_os_process", SideEffect::Process), "process");
-  EXPECT_STREQ(authorization::capability_for_tool("code_execute", SideEffect::None), "code_execute");
-  EXPECT_STREQ(authorization::capability_for_tool("execute_script", SideEffect::None), "code_execute");
-  EXPECT_STREQ(authorization::capability_for_tool("execute_game_script", SideEffect::None), "game_runtime");
-  EXPECT_EQ(authorization::capability_for_tool("get_game_status", SideEffect::None), nullptr);
+  EXPECT_STREQ(authorization::capability_for_tool("code_execute", SideEffect::CodeExecute), "code_execute");
+  EXPECT_STREQ(authorization::capability_for_tool("execute_script", SideEffect::CodeExecute), "code_execute");
+  EXPECT_STREQ(authorization::capability_for_tool("execute_game_script", SideEffect::GameRuntime), "game_runtime");
+  EXPECT_STREQ(authorization::capability_for_tool("code_execute", SideEffect::None), "read");
+  EXPECT_STREQ(authorization::capability_for_tool("execute_script", SideEffect::None), "read");
+  EXPECT_STREQ(authorization::capability_for_tool("execute_game_script", SideEffect::None), "read");
+  EXPECT_STREQ(authorization::capability_for_tool("get_game_status", SideEffect::None), "read");
+  EXPECT_STREQ(authorization::capability_for_tool("save_resource", SideEffect::WritesFile), "write");
+  EXPECT_STREQ(authorization::capability_for_tool("save_project_settings", SideEffect::WritesConfig), "write");
+  EXPECT_STREQ(authorization::capability_for_tool("show_display_dialog", SideEffect::ShowsAlert), "write");
+  EXPECT_STREQ(authorization::capability_for_tool("warp_display_mouse", SideEffect::ModifiesWindow), "write");
+  EXPECT_STREQ(authorization::capability_for_tool("property_set", SideEffect::WritesScene), "write");
+  EXPECT_STREQ(authorization::capability_for_tool("create_scene_node", SideEffect::WritesScene), "write");
 }
 
 TEST(SecurityHardening, AllowListRemoveExpandsAll) {
   using godot_autopilot::authorization::allow_list_remove;
   EXPECT_EQ(allow_list_remove("all", "code_execute"),
-            "process,game_runtime,user_tools");
+            "process,game_runtime,destructive,user_tools,read,write");
   EXPECT_EQ(allow_list_remove("process,code_execute", "code_execute"),
             "process");
   EXPECT_EQ(allow_list_remove("process", "game_runtime"), "process");
@@ -203,14 +239,19 @@ TEST(SecurityHardening, EnableMessageDockHintOnlyForToggleable) {
   EXPECT_NE(dock_enable->GetString().find("Allow game_runtime"),
             std::string::npos);
 
-  auto env_only = godot_autopilot::authorization::deny_if_unauthorized(
+  auto process_denied = godot_autopilot::authorization::deny_if_unauthorized(
       "create_os_process", SideEffect::Process);
-  ASSERT_FALSE(env_only.IsNull());
-  const mcp::JsonValue *env_enable = env_only.Find("enable");
-  ASSERT_NE(env_enable, nullptr);
-  EXPECT_EQ(env_enable->GetString().find("dock"), std::string::npos);
-  EXPECT_NE(env_enable->GetString().find("restart the engine"),
+  ASSERT_FALSE(process_denied.IsNull());
+  const mcp::JsonValue *process_enable = process_denied.Find("enable");
+  ASSERT_NE(process_enable, nullptr);
+  EXPECT_NE(process_enable->GetString().find("Allow process"),
             std::string::npos);
+  EXPECT_NE(process_enable->GetString().find("restart the engine"),
+            std::string::npos);
+
+  auto read_allowed = godot_autopilot::authorization::deny_if_unauthorized(
+      "get_game_status", SideEffect::None);
+  EXPECT_TRUE(read_allowed.IsNull());
 }
 
 TEST(SecurityHardening, ConfigConstantsSane) {

@@ -1,4 +1,6 @@
 #include "prompts/prompt_handlers.hpp"
+#include "core/config.hpp"
+#include "core/export_guard.hpp"
 #include "core/log_system.hpp"
 #include "prompts/prompt_create_3d_scene.hpp"
 #include "prompts/prompt_debug_physics.hpp"
@@ -7,8 +9,12 @@
 #include "prompts/prompt_setup_gui.hpp"
 #include "prompts/prompt_setup_input_map.hpp"
 #include "prompts/prompt_tool_usage.hpp"
+#include "tools/dispatch.hpp"
 #include <mcp/Content.hpp>
+#include <mcp/McpError.hpp>
+#include <memory>
 #include <string>
+#include <utility>
 
 namespace godot_autopilot {
 
@@ -23,6 +29,28 @@ mcp::GetPromptResult make_result(const std::string &content) {
   return r;
 }
 
+template <typename Fn>
+mcp::GetPromptResult run_prompt_task(CommandQueue &queue,
+                                     const std::string &label, Fn task) {
+  if (godot_autopilot::ExportGuard::is_exporting()) {
+    throw mcp::McpError(mcp::McpErrorCode::HandlerError,
+                        dispatch::export_blocked_error_text());
+  }
+  auto state = std::make_shared<std::string>();
+  dispatch::BoundedWaitOutcome outcome = dispatch::run_bounded_on_main_thread(
+      queue, label, state, std::move(task), GDA_DISPATCH_WAIT_DEFAULT_MS);
+  if (outcome.timed_out) {
+    throw mcp::McpError(
+        mcp::McpErrorCode::RequestTimeout,
+        dispatch::main_thread_timeout_message(label, outcome.waited_ms,
+                                              outcome.cancelled));
+  }
+  if (!outcome.ok) {
+    throw mcp::McpError(mcp::McpErrorCode::InternalError, outcome.error);
+  }
+  return make_result(*state);
+}
+
 } // namespace
 
 void register_all_prompts(mcp::McpServer &server, CommandQueue &queue) {
@@ -32,10 +60,9 @@ void register_all_prompts(mcp::McpServer &server, CommandQueue &queue) {
                                        "camera, lighting, and a test object"),
       [&queue](const std::string &,
                const std::optional<mcp::JsonValue> &) -> mcp::GetPromptResult {
-        std::string content;
-        queue.submit([&content]() { content = prompt_create_3d_scene(); })
-            .get();
-        return make_result(content);
+        return run_prompt_task(
+            queue, "prompt create-3d-scene",
+            [](std::string &content) { content = prompt_create_3d_scene(); });
       });
 
   server.RegisterPrompt(
@@ -45,10 +72,9 @@ void register_all_prompts(mcp::McpServer &server, CommandQueue &queue) {
           "collision, and movement script"),
       [&queue](const std::string &,
                const std::optional<mcp::JsonValue> &) -> mcp::GetPromptResult {
-        std::string content;
-        queue.submit([&content]() { content = prompt_setup_character(); })
-            .get();
-        return make_result(content);
+        return run_prompt_task(
+            queue, "prompt setup-character",
+            [](std::string &content) { content = prompt_setup_character(); });
       });
 
   server.RegisterPrompt(
@@ -58,9 +84,9 @@ void register_all_prompts(mcp::McpServer &server, CommandQueue &queue) {
           "casts, and performance monitors"),
       [&queue](const std::string &,
                const std::optional<mcp::JsonValue> &) -> mcp::GetPromptResult {
-        std::string content;
-        queue.submit([&content]() { content = prompt_debug_physics(); }).get();
-        return make_result(content);
+        return run_prompt_task(
+            queue, "prompt debug-physics",
+            [](std::string &content) { content = prompt_debug_physics(); });
       });
 
   server.RegisterPrompt(
@@ -69,10 +95,9 @@ void register_all_prompts(mcp::McpServer &server, CommandQueue &queue) {
           "Guide to configure input actions in Project Settings and test them"),
       [&queue](const std::string &,
                const std::optional<mcp::JsonValue> &) -> mcp::GetPromptResult {
-        std::string content;
-        queue.submit([&content]() { content = prompt_setup_input_map(); })
-            .get();
-        return make_result(content);
+        return run_prompt_task(
+            queue, "prompt setup-input-map",
+            [](std::string &content) { content = prompt_setup_input_map(); });
       });
 
   server.RegisterPrompt(
@@ -82,9 +107,9 @@ void register_all_prompts(mcp::McpServer &server, CommandQueue &queue) {
           "and labels"),
       [&queue](const std::string &,
                const std::optional<mcp::JsonValue> &) -> mcp::GetPromptResult {
-        std::string content;
-        queue.submit([&content]() { content = prompt_setup_gui(); }).get();
-        return make_result(content);
+        return run_prompt_task(
+            queue, "prompt setup-gui",
+            [](std::string &content) { content = prompt_setup_gui(); });
       });
 
   server.RegisterPrompt(
@@ -94,9 +119,9 @@ void register_all_prompts(mcp::McpServer &server, CommandQueue &queue) {
           "input/output and gotchas"),
       [&queue](const std::string &,
                const std::optional<mcp::JsonValue> &) -> mcp::GetPromptResult {
-        std::string content;
-        queue.submit([&content]() { content = prompt_tool_usage(); }).get();
-        return make_result(content);
+        return run_prompt_task(
+            queue, "prompt tool-usage",
+            [](std::string &content) { content = prompt_tool_usage(); });
       });
 
   server.RegisterPrompt(
@@ -106,10 +131,9 @@ void register_all_prompts(mcp::McpServer &server, CommandQueue &queue) {
           "mapping for property operations"),
       [&queue](const std::string &,
                const std::optional<mcp::JsonValue> &) -> mcp::GetPromptResult {
-        std::string content;
-        queue.submit([&content]() { content = prompt_keycode_reference(); })
-            .get();
-        return make_result(content);
+        return run_prompt_task(
+            queue, "prompt keycode-reference",
+            [](std::string &content) { content = prompt_keycode_reference(); });
       });
 
   LogSystem::instance().log(LogLevel::Info, LogCategory::Prompts,

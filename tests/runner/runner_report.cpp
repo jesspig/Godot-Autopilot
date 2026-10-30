@@ -1,5 +1,7 @@
 #include "runner_report.hpp"
 
+#include "util/owned_exception.hpp"
+
 #include <mcp/JsonValue.hpp>
 
 #include <cstdio>
@@ -13,7 +15,15 @@
 #include <utility>
 #include <vector>
 
+#ifdef _WIN32
+#include <process.h>
+#else
+#include <unistd.h>
+#endif
+
 namespace gda_test {
+
+using godot_autopilot::RuntimeError;
 
 namespace {
 
@@ -91,8 +101,18 @@ void print_console_report(const std::vector<FileResult>& results) {
                   << " | " << std::setw(5) << status_text(result) << '\n';
 
         size_t failed_count = 0;
+        size_t soft_count = 0;
         for (const auto& step : result.steps) {
             if (step.passed) {
+                continue;
+            }
+            if (step.soft_failed) {
+                ++soft_count;
+                if (soft_count > kMaxFailedDetailLines) {
+                    continue;
+                }
+                std::cout << "    ~ 步骤 " << step.step_id << " [" << step.tool
+                          << "] 软失败(已容忍): " << step.soft_reason << '\n';
                 continue;
             }
             ++failed_count;
@@ -106,6 +126,10 @@ void print_console_report(const std::vector<FileResult>& results) {
             std::cout << "    … 共 " << failed_count << " 条失败步骤, 仅显示前 "
                       << kMaxFailedDetailLines << " 条\n";
         }
+        if (soft_count > 0) {
+            std::cout << "    · 软失败 " << soft_count
+                      << " 步(错误前缀命中 soft_error, 已容忍, 不计入失败)\n";
+        }
     }
 
     const size_t failed_files = results.size() - passed_files;
@@ -115,12 +139,18 @@ void print_console_report(const std::vector<FileResult>& results) {
 
 std::string save_json_report(const std::vector<FileResult>& results, const std::string& dir) {
     const std::string timestamp = local_timestamp();
-    const std::string file_path = dir + "/report-" + timestamp + ".json";
+#ifdef _WIN32
+    const int pid = static_cast<int>(_getpid());
+#else
+    const int pid = static_cast<int>(getpid());
+#endif
+    const std::string file_path =
+        dir + "/report-" + timestamp + "-" + std::to_string(pid) + ".json";
 
     std::error_code ec;
     std::filesystem::create_directories(dir, ec);
     if (ec) {
-        throw std::runtime_error("创建报告目录失败(位置: " + dir + "): " + ec.message()
+        throw RuntimeError("创建报告目录失败(位置: " + dir + "): " + ec.message()
                                  + " (期望: 目录可创建)");
     }
 
@@ -143,6 +173,14 @@ std::string save_json_report(const std::vector<FileResult>& results, const std::
         file_obj["passed"] = mcp::JsonValue(result.passed);
         file_obj["duration_ms"] = mcp::JsonValue(result.duration_ms);
         file_obj["fatal_error"] = mcp::JsonValue(result.fatal_error);
+        size_t soft_failures = 0;
+        for (const auto& step : result.steps) {
+            if (step.soft_failed) {
+                ++soft_failures;
+            }
+        }
+        file_obj["soft_failures"] =
+            mcp::JsonValue(static_cast<int64_t>(soft_failures));
 
         mcp::JsonValue steps_array(mcp::JsonValue::array_tag);
         for (const auto& step : result.steps) {
@@ -151,6 +189,8 @@ std::string save_json_report(const std::vector<FileResult>& results, const std::
             step_obj["tool"] = mcp::JsonValue(step.tool);
             step_obj["passed"] = mcp::JsonValue(step.passed);
             step_obj["detail"] = mcp::JsonValue(step.detail);
+            step_obj["soft_failed"] = mcp::JsonValue(step.soft_failed);
+            step_obj["soft_reason"] = mcp::JsonValue(step.soft_reason);
             steps_array.PushBack(std::move(step_obj));
         }
         file_obj["steps"] = std::move(steps_array);
@@ -160,11 +200,11 @@ std::string save_json_report(const std::vector<FileResult>& results, const std::
 
     std::ofstream out(file_path);
     if (!out) {
-        throw std::runtime_error("无法打开报告文件(位置: " + file_path + "): (期望: 文件可写)");
+        throw RuntimeError("无法打开报告文件(位置: " + file_path + "): (期望: 文件可写)");
     }
     out << root.Dump(2) << '\n';
     if (!out) {
-        throw std::runtime_error("写入报告文件失败(位置: " + file_path + "): (期望: 文件可写)");
+        throw RuntimeError("写入报告文件失败(位置: " + file_path + "): (期望: 文件可写)");
     }
     return file_path;
 }

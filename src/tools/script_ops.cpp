@@ -1,9 +1,12 @@
 #include "script_ops.hpp"
 #include "../util/scene_path.hpp"
 #include "core/log_system.hpp"
+#include "core/scene_dirty_tracker.hpp"
 #include "tools/debugger_ops.hpp"
 #include "tools/scene_ops.hpp"
+#include "util/error_util.hpp"
 #include "util/gdscript_wrap.hpp"
+#include "util/project_path.hpp"
 #include "util/resource_fs.hpp"
 #include "util/variant_json.hpp"
 #include <godot_cpp/classes/dir_access.hpp>
@@ -185,15 +188,22 @@ bool refresh_script_cache(const std::string &path, std::string &error_out) {
 }
 
 mcp::JsonValue handle_execute_gdscript(const mcp::JsonValue &args) {
-  auto *it_expr = args.Find("expression");
-  if (!it_expr || !it_expr->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: expression");
-    return e;
-  }
-  std::string expression = it_expr->GetString();
+  const mcp::JsonValue *it_expr = args.Find("expression");
+  const mcp::JsonValue *it_source = args.Find("source_code");
+  if (it_expr != nullptr && it_source != nullptr)
+    return util::error_json(
+        "invalid parameter: pass only one of expression/source_code");
+  const mcp::JsonValue *chosen = it_expr != nullptr ? it_expr : it_source;
+  if (chosen == nullptr)
+    return util::error_json(
+        "missing required parameter: expression or source_code");
+  if (!chosen->IsString())
+    return util::error_json(
+        "invalid parameter: expression or source_code must be a string");
+  std::string expression = chosen->GetString();
   if (expression.empty())
-    return util::error_json("expression must not be empty");
+    return util::error_json(
+        "invalid parameter: expression or source_code must not be empty");
 
   std::string cleaned = gdscript_wrap::strip_extends_lines(expression);
 
@@ -344,6 +354,13 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
   }
   std::string path = it_path->GetString();
   std::string source_code = it_code->GetString();
+
+  const util::ProjectPath checked =
+      util::normalize_project_path(path, false, false);
+  if (!checked.valid())
+    return util::error_detail("path rejected", "path", checked.error,
+                              "write only inside the project root");
+  path = checked.value;
 
   bool overwrite = false;
   auto *it_overwrite = args.Find("overwrite");
@@ -536,6 +553,7 @@ mcp::JsonValue handle_attach_to_node(const mcp::JsonValue &args) {
   r["result"] = mcp::JsonValue("script attached to " + node_path);
   bool instantiable = script->can_instantiate();
   r["instantiated"] = mcp::JsonValue(instantiable);
+  scene_dirty_tracker::mark_scene_modified();
   util::add_scene_info_fields(r, util::edited_scene_info());
   if (!instantiable) {
     r["note"] =
@@ -580,8 +598,10 @@ mcp::JsonValue handle_detach_from_node(const mcp::JsonValue &args) {
   } else {
     node->set_script(godot::Variant());
   }
+  scene_dirty_tracker::mark_scene_modified();
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("script detached from " + node_path);
+  util::add_scene_info_fields(r, util::edited_scene_info());
   return r;
 }
 
@@ -680,9 +700,11 @@ mcp::JsonValue handle_set_property(const mcp::JsonValue &args) {
   godot::StringName prop_name(property.c_str());
   godot::Variant value = VariantJson::deserialize(*it_val, type_hint);
   node->set(prop_name, value);
+  scene_dirty_tracker::mark_scene_modified();
 
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = mcp::JsonValue("ok");
+  util::add_scene_info_fields(r, util::edited_scene_info());
   return r;
 }
 

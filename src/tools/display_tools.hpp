@@ -77,7 +77,7 @@ const std::vector<ParamSpec> kCreateDisplayWindowParams = {
 };
 
 const std::vector<ParamSpec> kDeleteDisplayWindowParams = {
-    {"window_id", "integer", "window_id as returned by create_display_window; errors when no window with this id exists", true},
+    {"window_id", "integer", "window_id as returned by create_display_window; errors when no window with this id exists, and window_id 0 (the editor main window) is refused", true},
 };
 
 const std::vector<ParamSpec> kGetDisplayWindowRectParams = {
@@ -207,8 +207,8 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       kCreateDisplayWindowParams, display_ops::handle_window_create}));
   v.push_back(make_spec_tool(ToolSpec{
       "delete_display_window",
-      "Close and free a sub-window previously created with create_display_window. Use it to clean up windows that are no longer needed. Takes window_id as returned by create_display_window; errors when no window with the given id exists. Returns result 'ok'; the window is freed at the end of the frame.",
-      "Display", {"display", "window"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
+      "Close and free a sub-window previously created with create_display_window. Use it to clean up windows that are no longer needed. Takes window_id as returned by create_display_window; errors when no window with the given id exists and refuses window_id 0, which is the editor main window and is never destroyed by this tool. The window is freed at the end of the frame. This tool is classified as a destructive side effect because it destroys an existing window.",
+      "Display", {"display", "window"}, SideEffect::Destructive, tool_flags::kMutating,
       kDeleteDisplayWindowParams, display_ops::handle_window_delete}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_display_window_rect",

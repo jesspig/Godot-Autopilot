@@ -1,7 +1,8 @@
 {
   "name": "capture_params",
-  "description": "capture_editor_viewport / capture_game_viewport 新增参数的参数校验路径（headless）：after_frames 负数与非整数、when 用于 target=editor、scale 越界均在抵达抓拍逻辑前返回 error；capture_game_viewport 带合法 after_frames 但无游戏运行时返回运行时通道错误（error+hint，不挂起）。",
+  "description": "capture_editor_viewport / capture_game_viewport 新增参数的参数校验路径（headless）：after_frames 负数与非整数、when 用于 target=editor、scale 越界均在抵达抓拍逻辑前返回 error；capture_game_viewport 带合法 after_frames 但无游戏运行时返回运行时通道错误（error+hint，不挂起）。本轮新增 save/save_dir 参数校验：类型错误、路径越权（../ 逃逸、user://、项目外绝对路径）均在抵达抓拍/运行时通道前返回精确 error（路径越权统一为 path rejected: <reason>）。",
   "headless": true,
+  "requires": ["write"],
   "pipeline": {
     "on_failure": "continue",
     "stages": [
@@ -82,6 +83,83 @@
               "has_keys": ["error", "hint"],
               "field_checks": [
                 { "key": "error", "not_empty": true }
+              ]
+            }
+          },
+          {
+            "id": "editor_save_wrong_type",
+            "tool": "capture_editor_viewport",
+            "args": { "save": "yes" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "invalid parameter: save must be a boolean" }
+              ]
+            }
+          },
+          {
+            "id": "editor_save_dir_wrong_type",
+            "tool": "capture_editor_viewport",
+            "args": { "save_dir": 5 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "invalid parameter: save_dir must be a string" }
+              ]
+            }
+          },
+          {
+            "id": "editor_save_dir_escape",
+            "tool": "capture_editor_viewport",
+            "args": { "save": true, "save_dir": "res://../gda_escape" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "path rejected: path escapes the namespace root" }
+              ]
+            }
+          },
+          {
+            "id": "editor_save_dir_user_scheme",
+            "tool": "capture_editor_viewport",
+            "args": { "save_dir": "user://captures" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "path rejected: user:// paths are not allowed for this operation" }
+              ]
+            }
+          },
+          {
+            "id": "editor_save_dir_outside_project",
+            "tool": "capture_editor_viewport",
+            "args": { "save_dir": "C:/Windows/Temp/gda_escape" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "path rejected: absolute path is outside the project root" }
+              ]
+            }
+          },
+          {
+            "id": "game_save_wrong_type",
+            "tool": "capture_game_viewport",
+            "args": { "save": 1 },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "invalid parameter: save must be a boolean" }
+              ]
+            }
+          },
+          {
+            "id": "game_save_dir_escape",
+            "tool": "capture_game_viewport",
+            "args": { "save_dir": "res://../gda_escape" },
+            "expect": {
+              "has_keys": ["error"],
+              "field_checks": [
+                { "key": "error", "value": "path rejected: path escapes the namespace root" }
               ]
             }
           }

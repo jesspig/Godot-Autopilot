@@ -1,6 +1,8 @@
 """构建脚本共享常量：路径、示例项目列表、平台库映射。"""
 
+import json
 import shutil
+import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -53,14 +55,37 @@ DEMO_NAMES: tuple[str, ...] = (
     "gui_control_gallery",
     "viewport_gui_in_3d",
     "networking_multiplayer_pong",
+    "pink_man_adventure",
 )
 
 DEMO_DIRS: list[Path] = [PROJECT_ROOT / "demo" / name for name in DEMO_NAMES]
 
 TESTBED_DIR = PROJECT_ROOT / "tests" / "testbed"
 
-# 插件写入的全部工程：demo 是交付物，testbed 只服务 L2 回归，不进 --demos 与打包
+# 插件写入的全部工程：demo 是交付物，testbed 只服务 L2 回归，不进 --demos 与打包；
+# 池床不在本表，由 POOL_BEDS 单列，deploy/clean 各自追加
 DEPLOY_TARGETS: list[Path] = [*DEMO_DIRS, TESTBED_DIR]
+
+POOL_MANIFEST = PROJECT_ROOT / "tests" / "pool" / "pools.json"
+
+
+def _pool_bed_names() -> list[str]:
+    """读 pools.json 的池名清单；清单缺失或 mode 非 pool 时告警并返回空表。"""
+    try:
+        payload = json.loads(POOL_MANIFEST.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        print(f"[WARN] {POOL_MANIFEST} 缺失，POOL_BEDS 为空", file=sys.stderr)
+        return []
+    mode = payload.get("mode")
+    if mode != "pool":
+        print(f"[WARN] {POOL_MANIFEST} mode={mode!r} 非 pool，POOL_BEDS 为空", file=sys.stderr)
+        return []
+    return [pool["name"] for pool in payload["pools"]]
+
+
+POOL_BEDS: list[Path] = [
+    PROJECT_ROOT / "tests" / f"testbed_{name}" for name in _pool_bed_names()
+]
 
 
 def _addon_dir(demo_dir: Path) -> Path:
@@ -75,11 +100,28 @@ PLATFORM_LIBS: dict[str, str] = {
 
 PLATFORM_PDB = "godot-autopilot.pdb"
 
+BRIDGE_DIR = PROJECT_ROOT / "csharp_bridge"
+
+# C# 桥源码清单：随插件包分发，缺任一即视为打包失败（Godot 侧按文件名加载）
+BRIDGE_SOURCES: tuple[str, ...] = (
+    "BridgeCall.cs",
+    "BridgeConvert.cs",
+    "BridgeEvents.cs",
+    "BridgeGetSet.cs",
+    "GdaCSharpBridge.cs",
+    "GdaCSharpRuntime.cs",
+)
+
 ADDON_VERSION = (PROJECT_ROOT / "VERSION").read_text(encoding="utf-8").strip()
 
 
 def resolve_demos(names: list[str] | None) -> list[Path]:
-    if not names:
+    """把 demo 名列表解析为工程目录。
+
+    None 表示未传 --demos，返回全部 demo；空列表表示显式传了空的 --demos
+    （`--demos` 后不跟名字），返回空列表，即不部署任何 demo。
+    """
+    if names is None:
         return list(DEMO_DIRS)
     known = {d.name: d for d in DEMO_DIRS}
     unknown = [n for n in names if n not in known]

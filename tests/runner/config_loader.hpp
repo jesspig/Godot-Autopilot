@@ -12,8 +12,11 @@ struct StepExpect {
         bool has_value = false;
         mcp::JsonValue value;
         bool not_empty = false;
+        bool has_not_contains = false;
+        std::string not_contains;
     };
     std::vector<FieldCheck> field_checks;
+    bool allow_error = false;
 };
 
 struct Step {
@@ -23,6 +26,7 @@ struct Step {
     StepExpect expect;
     std::string traverse_kind;
     std::string traverse_mode;
+    std::string soft_error;
 };
 
 struct TestCase {
@@ -30,11 +34,14 @@ struct TestCase {
     std::string description;
     bool headless = true;
     std::string on_failure;
+    std::vector<std::string> requires;
     std::vector<Step> before_all;
     std::vector<Step> steps;
     std::vector<Step> after_all;
 };
 
 TestCase load_test_case(const std::string& json_path);
+
+void RequireType(const mcp::JsonValue& v, const std::string& path, const std::string& expected);
 
 }

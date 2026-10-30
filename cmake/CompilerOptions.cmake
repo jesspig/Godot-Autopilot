@@ -19,6 +19,10 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
         add_compile_definitions(_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS)
         add_compile_definitions(_WIN32_WINNT=0x0A00)
+        # clang-cl 只有 Windows-Clang 的 Embedded 映射（CMake 未提供 ProgramDatabase 的
+        # clang 编译选项），Debug 由 Embedded CodeView 经链接器 /debug /pdb:<TARGET_PDB>
+        # 汇总为外部 godot-autopilot.pdb，deploy 再随 DLL 一并复制。
+        set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<$<CONFIG:Debug>:Embedded>" CACHE INTERNAL "")
         message(STATUS "[gda] clang-cl flags applied")
     else()
         add_compile_options(
@@ -52,7 +56,10 @@ elseif(MSVC)
         _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS
         _WIN32_WINNT=0x0A00
     )
-    set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT Embedded CACHE INTERNAL "")
+    # Debug 落外部程序数据库（/Zi + PDB）供崩溃符号化与 T-04 复现；Release
+    # 保持 Embedded（/Z7），不新增发布期符号产物。
+    set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT
+        "$<IF:$<CONFIG:Debug>,ProgramDatabase,Embedded>" CACHE INTERNAL "")
     message(STATUS "[gda] MSVC flags applied")
 
 # ── GNU GCC ──

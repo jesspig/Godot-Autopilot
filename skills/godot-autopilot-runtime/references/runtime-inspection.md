@@ -29,17 +29,67 @@ Control-derived node with:
 - `type` — class name,
 - `visible` — visibility including ancestors,
 - `text` — when the control has a text property,
-- `global_rect` — `position` and `size` in viewport coordinates.
+- `global_rect` — `position` and `size` in viewport coordinates,
+- `mouse_filter` — `STOP`, `PASS` or `IGNORE`,
+- `z_index` — draw order within its canvas.
 
-`max_elements` defaults to 100 (max 1000); `truncated: true` signals more
-elements remain — raise the cap or target a subtree via
-`execute_game_script`.
+`mouse_filter` decides whether a control consumes, passes or ignores mouse
+events; a full-screen `PASS` control covers the controls below it for
+hit-testing even if it draws nothing. `z_index` explains draw/layer order;
+read it together with `mouse_filter` when interpreting an occlusion report.
+
+Optional filters narrow the enumeration before `max_elements` counts:
+
+- `filter` — case-insensitive substring matched against each element's
+  `path`, `type` and `text` (omit or pass an empty string for no filter),
+- `types` — array of 1-32 exact class names (e.g. `Button`, `Label`),
+- `visible_only` — keep only elements visible in the tree (default false
+  keeps hidden controls too).
+
+`max_elements` defaults to 100 (max 1000) and caps the filtered matches;
+`truncated: true` signals more filtered matches remain — raise the cap or
+narrow the filters rather than filtering client-side.
 
 This is the reconnaissance step of every UI automation loop: enumerate
 here, pick targets, then drive them with `sequence_game_inputs` /
 `queue_game_input` using `global_rect` coordinates, or with
 `execute_game_script` using `path`. Re-enumerate after navigation — screens
 change under fixed coordinates.
+
+### UI change acceptance
+
+After any UI change, validate before clicking:
+
+1. Run `validate_game_ui_layout`. It reports zero-size, off-viewport and
+   possibly-occluded controls as triage items, and a
+   `possibly_occluded` item names the occluding control.
+2. Click the target with `click_game_ui_element`, not raw coordinates.
+3. Read `hit_path` (the control actually under the injected point) and
+   `hit_mismatch` (true when it differs from the requested target). A
+   mismatch is reported without failing the call by default; pass
+   `strict_hit: true` to make it an error. Cross-check the
+   `possibly_occluded` issue before retrying coordinates — a full-screen
+   `PASS` container swallows the click instead of passing it through.
+
+## Screenshots: frame phase and saving
+
+`capture_game_viewport` (and `capture_editor_viewport` with
+`target: game`) evaluates `when` once per rendered frame and waits out
+`after_frames` first. The response distinguishes two frames:
+`when_satisfied_frame` is the rendered frame where the condition first held,
+and `captured_frame` is the following rendered frame whose image was read —
+`captured_frame > when_satisfied_frame`, so the picture is the state after
+the condition became true, not the frame that evaluated it. Use the pair to
+prove the capture really landed after the trigger instead of trusting the
+picture alone.
+
+Saving works on both targets: pass `save: true` (default destination: the GDA
+per-project captures folder) or `save_dir` (a `res://` directory inside the
+project root; anything outside is rejected with `path rejected`). The result
+reports `saved_path` and the destination keeps only the 20 most recent
+`gda_capture_*` files. Saving needs the `write` capability; game-target saves
+copy the PNG the editor already read back over the runtime channel, so they
+also work when the game-side temporary file would otherwise be pruned.
 
 ## Liveness: get_game_status
 
@@ -67,7 +117,7 @@ Read the fields as combinations, not in isolation:
 | `healthy` false shortly after play | startup still in progress | wait a moment; game calls default to `wait_ready: true`, which queues the request and replays it once the game reports `gda:ready` instead of failing |
 | `healthy` false for good | the process is gone or wedged | `stop_editor_playing`, then `play_editor_current_scene` again |
 | empty scene with a sharp `node_count` drop | a failed reload left a half-dead process | do not debug it — stop and rerun |
-| `paused` true | tree paused; physics simulation stopped server-side; transient input states are lost | unpause with `set_scene_tree_pause` before input automation |
+| `paused` true | tree paused; physics simulation stopped server-side; transient input states are lost; `physics_frame` still advances because it is the engine-global counter, so it cannot prove the freeze on its own | unpause with `set_scene_tree_pause` before input automation; prove gameplay froze with a gameplay node's position or a gameplay-owned tick |
 
 Rule of thumb: never build automation on top of a half-dead process.
 Stopping and replaying is cheaper than diagnosing zombie state.
@@ -87,10 +137,17 @@ func _run():
     var player = get_node("/root/Main/Player")
     player.global_position = Vector2(100, 200)
     player.velocity = Vector2(120, -300)
+    player.move_and_slide()
     for i in range(30):
         await physics_frame
     return {"pos": player.global_position, "on_wall": player.is_on_wall()}
 ```
+
+`CharacterBody2D` refreshes `is_on_floor()` and `is_on_wall()` only inside
+`move_and_slide()`. Teleporting a body leaves the previous floor/wall flags
+in place, so call `move_and_slide()` once after the teleport (after setting
+`velocity`) before awaiting physics frames — otherwise a stale floor flag
+makes gravity and wall-slide checks read the old state.
 
 Drive inputs with `sequence_game_inputs` on explicit `at_frame` offsets
 instead of chained single presses, and watch a value evolve with
