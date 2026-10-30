@@ -38,9 +38,17 @@ events; a full-screen `PASS` control covers the controls below it for
 hit-testing even if it draws nothing. `z_index` explains draw/layer order;
 read it together with `mouse_filter` when interpreting an occlusion report.
 
-`max_elements` defaults to 100 (max 1000); `truncated: true` signals more
-elements remain — raise the cap or target a subtree via
-`execute_game_script`.
+Optional filters narrow the enumeration before `max_elements` counts:
+
+- `filter` — case-insensitive substring matched against each element's
+  `path`, `type` and `text` (omit or pass an empty string for no filter),
+- `types` — array of 1-32 exact class names (e.g. `Button`, `Label`),
+- `visible_only` — keep only elements visible in the tree (default false
+  keeps hidden controls too).
+
+`max_elements` defaults to 100 (max 1000) and caps the filtered matches;
+`truncated: true` signals more filtered matches remain — raise the cap or
+narrow the filters rather than filtering client-side.
 
 This is the reconnaissance step of every UI automation loop: enumerate
 here, pick targets, then drive them with `sequence_game_inputs` /
@@ -62,6 +70,26 @@ After any UI change, validate before clicking:
    `strict_hit: true` to make it an error. Cross-check the
    `possibly_occluded` issue before retrying coordinates — a full-screen
    `PASS` container swallows the click instead of passing it through.
+
+## Screenshots: frame phase and saving
+
+`capture_game_viewport` (and `capture_editor_viewport` with
+`target: game`) evaluates `when` once per rendered frame and waits out
+`after_frames` first. The response distinguishes two frames:
+`when_satisfied_frame` is the rendered frame where the condition first held,
+and `captured_frame` is the following rendered frame whose image was read —
+`captured_frame > when_satisfied_frame`, so the picture is the state after
+the condition became true, not the frame that evaluated it. Use the pair to
+prove the capture really landed after the trigger instead of trusting the
+picture alone.
+
+Saving works on both targets: pass `save: true` (default destination: the GDA
+per-project captures folder) or `save_dir` (a `res://` directory inside the
+project root; anything outside is rejected with `path rejected`). The result
+reports `saved_path` and the destination keeps only the 20 most recent
+`gda_capture_*` files. Saving needs the `write` capability; game-target saves
+copy the PNG the editor already read back over the runtime channel, so they
+also work when the game-side temporary file would otherwise be pruned.
 
 ## Liveness: get_game_status
 

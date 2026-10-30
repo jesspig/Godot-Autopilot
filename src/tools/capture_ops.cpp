@@ -11,6 +11,7 @@
 #include "util/json_godot.hpp"
 #include "util/project_path.hpp"
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <godot_cpp/classes/camera3d.hpp>
 #include <godot_cpp/classes/canvas_item.hpp>
@@ -22,6 +23,7 @@
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/node3d.hpp>
 #include <godot_cpp/classes/object.hpp>
+#include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/classes/sprite2d.hpp>
 #include <godot_cpp/classes/sub_viewport.hpp>
@@ -363,6 +365,215 @@ void prune_capture_files(const godot::String &dir_path, int keep) {
   }
 }
 
+namespace {
+
+std::string capture_save_dir_default() {
+  return StoragePaths::captures_dir(util::current_project_root_path());
+}
+
+bool path_is_inside_gda_captures(const std::string &path) {
+  const std::string captures_root = capture_save_dir_default();
+  if (captures_root.empty())
+    return false;
+  bool escaped = false;
+  const std::string lexical =
+      util::project_path_lexical(util::project_path_slashes(path), escaped);
+  if (escaped || lexical.empty())
+    return false;
+  return util::project_path_equal_prefix(
+      lexical, util::project_path_slashes(captures_root));
+}
+
+std::string capture_save_stamp() {
+  std::string date = "1970-01-01";
+  std::string clock = "00:00:00";
+  if (auto *time = godot::Time::get_singleton()) {
+    date = util::to_std(time->get_date_string_from_system());
+    clock = util::to_std(time->get_time_string_from_system());
+  }
+  std::string digits;
+  for (char c : date) {
+    if (c >= '0' && c <= '9')
+      digits += c;
+  }
+  std::string clock_digits;
+  for (char c : clock) {
+    if (c >= '0' && c <= '9')
+      clock_digits += c;
+  }
+  if (digits.size() != 8 || clock_digits.size() != 6)
+    return "19700101-000000";
+  return digits + "-" + clock_digits;
+}
+
+std::string next_capture_file_path(const std::string &absolute_dir) {
+  if (absolute_dir.empty())
+    return std::string();
+  godot::DirAccess::make_dir_recursive_absolute(
+      godot::String::utf8(absolute_dir.c_str()));
+  static std::atomic<uint64_t> sequence{0};
+  const std::string stamp = capture_save_stamp();
+  for (int attempt = 0; attempt < 10000; ++attempt) {
+    const uint64_t index = sequence.fetch_add(1) + 1;
+    const std::string name =
+        "gda_capture_" + stamp + "_" + std::to_string(index) + ".png";
+    const std::string path = absolute_dir + "/" + name;
+    if (!godot::FileAccess::file_exists(godot::String::utf8(path.c_str())))
+      return path;
+  }
+  return std::string();
+}
+
+mcp::JsonValue capture_save_failure(const std::string &path,
+                                    const std::string &reason) {
+  return util::error_json("failed to save capture to " + path + ": " + reason);
+}
+
+}  // namespace
+
+bool read_capture_save_options(const mcp::JsonValue &args,
+                               CaptureSaveOptions *out,
+                               mcp::JsonValue *error_out) {
+  out->save = false;
+  out->save_dir.clear();
+  *error_out = mcp::JsonValue();
+  if (auto *save_p = args.Find("save")) {
+    if (!save_p->IsBool()) {
+      *error_out = util::error_json("invalid parameter: save must be a boolean");
+      return false;
+    }
+    out->save = save_p->GetBool();
+  }
+  if (auto *dir_p = args.Find("save_dir")) {
+    if (!dir_p->IsString()) {
+      *error_out =
+          util::error_json("invalid parameter: save_dir must be a string");
+      return false;
+    }
+    const std::string requested = dir_p->GetString();
+    if (!requested.empty()) {
+      std::string resolved;
+      std::string reason;
+      if (!resolve_capture_save_dir(requested, &resolved, &reason)) {
+        *error_out = util::error_json("path rejected: " + reason);
+        return false;
+      }
+      out->save_dir = requested;
+      out->save = true;
+    }
+  }
+  return true;
+}
+
+bool resolve_capture_save_dir(const std::string &requested,
+                              std::string *absolute_out,
+                              std::string *error_out) {
+  absolute_out->clear();
+  error_out->clear();
+  if (requested.empty()) {
+    const std::string dir = capture_save_dir_default();
+    if (dir.empty()) {
+      *error_out = "GDA captures directory is unavailable";
+      return false;
+    }
+    *absolute_out = dir;
+    return true;
+  }
+  const std::string slashed = util::project_path_slashes(requested);
+  if (util::project_path_is_absolute(slashed)) {
+    bool escaped = false;
+    const std::string lexical = util::project_path_lexical(slashed, escaped);
+    if (!escaped && path_is_inside_gda_captures(lexical)) {
+      *absolute_out = lexical;
+      return true;
+    }
+  }
+  const util::ProjectPath checked =
+      util::normalize_project_path(requested, false, false);
+  if (!checked.valid()) {
+    *error_out = checked.error;
+    return false;
+  }
+  if (checked.value.rfind("res://", 0) != 0) {
+    *error_out = "save_dir must be a res:// path or the GDA captures directory";
+    return false;
+  }
+  auto *settings = godot::ProjectSettings::get_singleton();
+  if (!settings) {
+    *error_out = "ProjectSettings is not available";
+    return false;
+  }
+  *absolute_out = util::to_std(
+      settings->globalize_path(godot::String::utf8(checked.value.c_str())));
+  if (absolute_out->empty()) {
+    *error_out = "failed to resolve save_dir inside the project root";
+    return false;
+  }
+  return true;
+}
+
+mcp::JsonValue save_capture_image(const godot::Ref<godot::Image> &image,
+                                  const CaptureSaveOptions &options) {
+  if (image.is_null())
+    return util::error_json("capture image is empty");
+  std::string dir;
+  std::string reason;
+  if (!resolve_capture_save_dir(options.save_dir, &dir, &reason))
+    return util::error_json("path rejected: " + reason);
+  const std::string path = next_capture_file_path(dir);
+  if (path.empty())
+    return util::error_json("failed to allocate a capture file name in " + dir);
+  const godot::Error save_err =
+      image->save_png(godot::String::utf8(path.c_str()));
+  if (save_err != godot::OK)
+    return capture_save_failure(
+        path, "PNG write failed (error code " +
+                  std::to_string(static_cast<int>(save_err)) + ")");
+  prune_capture_files(godot::String::utf8(dir.c_str()), kCaptureKeepFiles);
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["saved_path"] = mcp::JsonValue(path);
+  return r;
+}
+
+mcp::JsonValue save_capture_bytes(const godot::PackedByteArray &bytes,
+                                  const CaptureSaveOptions &options) {
+  if (bytes.size() <= 0)
+    return util::error_json("capture PNG buffer is empty");
+  std::string dir;
+  std::string reason;
+  if (!resolve_capture_save_dir(options.save_dir, &dir, &reason))
+    return util::error_json("path rejected: " + reason);
+  const std::string path = next_capture_file_path(dir);
+  if (path.empty())
+    return util::error_json("failed to allocate a capture file name in " + dir);
+  godot::Ref<godot::FileAccess> file = godot::FileAccess::open(
+      godot::String::utf8(path.c_str()), godot::FileAccess::WRITE);
+  if (file.is_null())
+    return capture_save_failure(path, "destination file could not be opened");
+  file->store_buffer(bytes);
+  const godot::Error write_err = file->get_error();
+  file->close();
+  if (write_err != godot::OK)
+    return capture_save_failure(
+        path, "write failed (error code " +
+                  std::to_string(static_cast<int>(write_err)) + ")");
+  prune_capture_files(godot::String::utf8(dir.c_str()), kCaptureKeepFiles);
+  mcp::JsonValue r(mcp::JsonValue::object_tag);
+  r["saved_path"] = mcp::JsonValue(path);
+  return r;
+}
+
+mcp::JsonValue with_capture_save_options(mcp::JsonValue pending,
+                                         const CaptureSaveOptions &options) {
+  if (!options.save || !pending.IsObject() ||
+      pending.Find("__gda_pending") == nullptr)
+    return pending;
+  pending["save"] = mcp::JsonValue(true);
+  if (!options.save_dir.empty())
+    pending["save_dir"] = mcp::JsonValue(options.save_dir);
+  return pending;
+}
+
 mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "capture_editor_viewport called");
@@ -377,13 +588,10 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
     target = target_p->GetString();
   }
 
-  bool save = false;
-  if (auto *save_p = args.Find("save")) {
-    if (!save_p->IsBool()) {
-      return util::error_json("invalid parameter: save must be a boolean");
-    }
-    save = save_p->GetBool();
-  }
+  CaptureSaveOptions save_options;
+  mcp::JsonValue save_options_error;
+  if (!read_capture_save_options(args, &save_options, &save_options_error))
+    return save_options_error;
 
   bool annotate = false;
   if (auto *annotate_p = args.Find("annotate")) {
@@ -489,8 +697,9 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
       return util::error_json(
           "diff_image is only supported for target='editor'");
     }
-    return runtime_ops::handle_gda_send("capture", params, timeout_ms, false,
-                                        wait_ready);
+    mcp::JsonValue captured = runtime_ops::handle_gda_send(
+        "capture", params, timeout_ms, false, wait_ready);
+    return with_capture_save_options(std::move(captured), save_options);
   }
   if (target != "editor") {
     return util::error_detail("invalid target '" + target + "'",
@@ -1109,34 +1318,13 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
   }
 
   std::string saved_path;
-  if (save) {
-    const std::string capture_dir_path =
-        StoragePaths::captures_dir(util::current_project_root_path());
-    if (capture_dir_path.empty()) {
-      return util::error_detail(
-          "capture storage path unavailable",
-          "capture_ops.cpp handle_capture_viewport",
-          "a resolvable GDA home directory",
-          "check that the home directory is writable");
-    }
-    const godot::String capture_dir =
-        godot::String::utf8(capture_dir_path.c_str());
-    godot::DirAccess::make_dir_recursive_absolute(capture_dir);
-    const godot::String capture_path =
-        capture_dir + godot::String("/gda_capture_editor_") +
-        godot::String(std::to_string(
-                          godot::Time::get_singleton()->get_ticks_msec())
-                          .c_str()) +
-        godot::String(".png");
-    godot::Error save_err = img->save_png(capture_path);
-    if (save_err != godot::OK) {
-      return util::error_detail("failed to save editor capture",
-                                "capture_ops.cpp handle_capture_viewport",
-                                "writable GDA home directory",
-                                "check that the home directory is writable");
-    }
-    prune_capture_files(capture_dir, 20);
-    saved_path = util::to_std(capture_path);
+  if (save_options.save) {
+    mcp::JsonValue save_result = save_capture_image(img, save_options);
+    if (save_result.Contains("error"))
+      return save_result;
+    if (auto *path_p = save_result.Find("saved_path");
+        path_p && path_p->IsString())
+      saved_path = path_p->GetString();
   }
 
   std::string b64 =
@@ -1222,8 +1410,10 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
     if (node_truncated)
       inner["node_truncated"] = mcp::JsonValue(true);
   }
-  if (save)
+  if (!saved_path.empty()) {
     inner["path"] = mcp::JsonValue(saved_path);
+    inner["saved_path"] = mcp::JsonValue(saved_path);
+  }
   r["result"] = std::move(inner);
   if (r.Dump().size() > GDA_MAX_JSON_RESPONSE_BYTES)
     return capture_limit_error(
@@ -1255,7 +1445,7 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
           " space=" + space,
       "width=" + std::to_string(final_width) + " height=" +
           std::to_string(final_height) + " space=" + space +
-          " save=" + (save ? "true" : "false") +
+          " save=" + (save_options.save ? "true" : "false") +
           " annotate=" + (annotate ? "true" : "false"));
   return r;
 }

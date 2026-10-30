@@ -4,6 +4,7 @@
 #include "core/log_system.hpp"
 #include "runtime/gda_protocol.hpp"
 #include "tools/authorization.hpp"
+#include "tools/capture_ops.hpp"
 #include "tools/debugger_access.hpp"
 #include "tools/tool_base.hpp"
 #include "util/error_util.hpp"
@@ -528,19 +529,42 @@ mcp::JsonValue handle_sequence_game_inputs(const mcp::JsonValue &args) {
 mcp::JsonValue handle_game_ui_elements(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_game_ui_elements called");
-  static constexpr const char *allowed[] = {"max_elements", "timeout_ms",
-                                             "wait_ready"};
+  static constexpr const char *allowed[] = {
+      "max_elements", "timeout_ms", "wait_ready", "filter", "types",
+      "visible_only"};
   std::string unknown;
   if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed), unknown))
     return error_json("unknown parameter for get_game_ui_elements: " + unknown);
   if (auto *max = args.Find("max_elements"); max &&
       (!max->IsInt() || max->GetInt() <= 0))
     return error_json("max_elements must be a positive integer");
+  if (auto *filter = args.Find("filter"); filter && !filter->IsString())
+    return error_json("filter must be a string");
+  if (auto *types = args.Find("types")) {
+    if (!types->IsArray() || types->GetArray().empty() ||
+        types->GetArray().size() > 32)
+      return error_json("types must be an array of 1-32 class names");
+    for (const auto &item : types->GetArray()) {
+      if (!item.IsString() || item.GetString().empty())
+        return error_json(
+            "types must be an array of 1-32 non-empty class names");
+    }
+  }
+  bool visible_only = false;
+  if (auto *visible = args.Find("visible_only")) {
+    if (!visible->IsBool())
+      return error_json("visible_only must be a boolean");
+    visible_only = visible->GetBool();
+  }
   bool wait_ready = true;
   if (!extract_wait_ready(args, &wait_ready))
     return error_json("wait_ready must be a boolean");
   JV params(JV::object_tag);
   copy_optional(args, params, "max_elements");
+  copy_optional(args, params, "filter");
+  copy_optional(args, params, "types");
+  if (visible_only)
+    params["visible_only"] = JV(true);
   JV result = handle_gda_send(std::string(GDA_OP_UI_ELEMENTS), params,
                               extract_timeout(args), false, wait_ready);
   append_runtime_degradation_hint(result);
@@ -652,9 +676,10 @@ mcp::JsonValue handle_game_capture(const mcp::JsonValue &args) {
   if (!args.IsObject())
     return error_json("capture_game_viewport parameters must be an object");
   static constexpr const char *allowed[] = {
-      "timeout_ms", "region",  "max_dimension", "annotate",
-      "after_frames", "when",  "scale",         "annotate_nodes",
-      "annotate_nodes_max", "wait_ready"};
+      "timeout_ms", "region",   "max_dimension", "annotate",
+      "after_frames", "when",   "scale",         "annotate_nodes",
+      "annotate_nodes_max",     "wait_ready",    "save",
+      "save_dir"};
   std::string unknown;
   if (!has_only_fields(args, allowed, sizeof(allowed) / sizeof(*allowed), unknown))
     return error_json("unknown parameter for capture_game_viewport: " + unknown);
@@ -708,6 +733,17 @@ mcp::JsonValue handle_game_capture(const mcp::JsonValue &args) {
   if (auto *scale = args.Find("scale");
       scale && (!scale->IsInt() || scale->GetInt() < 1 || scale->GetInt() > 8))
     return error_json("scale must be an integer between 1 and 8");
+  capture_ops::CaptureSaveOptions save_options;
+  mcp::JsonValue save_error;
+  if (!capture_ops::read_capture_save_options(args, &save_options,
+                                              &save_error))
+    return save_error;
+  if (save_options.save) {
+    mcp::JsonValue denied = authorization::deny_if_unauthorized(
+        "capture_game_viewport", SideEffect::WritesFile);
+    if (!denied.IsNull())
+      return denied;
+  }
   bool wait_ready = true;
   if (!extract_wait_ready(args, &wait_ready))
     return error_json("wait_ready must be a boolean");
@@ -723,6 +759,8 @@ mcp::JsonValue handle_game_capture(const mcp::JsonValue &args) {
   const int64_t timeout_ms = extract_timeout(args);
   params["timeout_ms"] = JV(timeout_ms);
   JV result = handle_gda_send("capture", params, timeout_ms, false, wait_ready);
+  result = capture_ops::with_capture_save_options(std::move(result),
+                                                  save_options);
   append_runtime_degradation_hint(result);
   return result;
 }

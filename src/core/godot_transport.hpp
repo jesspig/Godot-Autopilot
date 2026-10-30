@@ -57,12 +57,17 @@ public:
                       mcp::JsonRpcMessage &message,
                       std::chrono::milliseconds timeout);
 
+  bool pending_request_meta(const std::string &request_key,
+                            std::string &method,
+                            std::string &connection_id);
+
 private:
   struct PendingExchange {
     std::shared_ptr<std::promise<mcp::JsonRpcMessage>> promise;
     std::shared_future<mcp::JsonRpcMessage> future;
     mcp::RequestId request_id;
     std::string connection_id;
+    std::string method;
     bool expired{false};
     std::chrono::steady_clock::time_point expired_at{};
   };

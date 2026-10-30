@@ -236,6 +236,49 @@ Rules verified in engine source:
 ]}}
 ```
 
+### UI clicks: prefer click_game_ui_element
+
+`click_game_ui_element` is the preferred way to click a running-game
+`Control`. It resolves the target and injects through the same path as
+`queue_game_input`, so no manual hover or press/release pairing is needed:
+
+- **Resolve**: `path` from `get_game_ui_elements` (exact node path first,
+  otherwise a node path ending with `'/' + path`), or `text` / `text_index`
+  (visible text, exact match first then substring; `path` wins when both are
+  given). The annotate id from `capture_game_viewport` is a per-capture
+  sequence number, not a clickable path.
+- **Inject**: it converts the element's viewport-space `global_rect` centre to
+  window coordinates, injects a same-coordinate `mouse_motion` (mode `event`)
+  to refresh the game's hover state, then the mouse-button press/release pair
+  (two pairs when `double_click` is true).
+- **Verify**: the response carries `hit_path` — the control hovered after
+  injection, empty when nothing is hovered — and `hit_mismatch`, true when
+  that control is neither the resolved element nor one of its descendants
+  (normally an occluder). A mismatch succeeds with a `warning` by default;
+  `strict_hit: true` fails the call instead, with click_occluded reported
+  inside the structured error.
+- **Gate**: requires the `game_runtime` authorization capability.
+
+Raw window-coordinate clicks stay available, but you then own both the hover
+state and the coordinate basis:
+
+- `queue_game_input` does not refresh the game's hover state. Inject a
+  `mouse_motion` to the target point (mode `event`) before the
+  press/release pair so the hover/enter bookkeeping matches a real pointer
+  that moved there.
+- Positions are window pixels with top-left origin. `get_game_ui_elements`
+  returns `global_rect` in viewport coordinates and the matching window-space
+  rect/centre (window_rect / window_center) in window pixels — use the window
+  fields, or pass `coord_space: "viewport"` with the viewport values. Do not
+  feed `global_rect` numbers directly to `queue_game_input` as window
+  coordinates.
+- Pair the press and release (see "Mouse click pairing" below).
+
+When a click lands on the wrong control, `validate_game_ui_layout`
+(`possibly_occluded`) and the `mouse_filter`/`z_index` fields of
+`get_game_ui_elements` explain why; clicking the reported `hit_path` is
+usually the fix, not retrying the same coordinates.
+
 ### Mouse click pairing (BaseButton pitfall)
 
 `BaseButton` uses `ACTION_MODE_BUTTON_RELEASE` by default: the `pressed`

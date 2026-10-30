@@ -222,6 +222,23 @@ void GodotTransport::SendMessageAsync(mcp::JsonRpcMessage message) {
   }
 }
 
+bool GodotTransport::pending_request_meta(const std::string &request_key,
+                                          std::string &method,
+                                          std::string &connection_id) {
+  std::lock_guard<std::mutex> lock(pending_mutex_);
+  const auto index = id_index_.find(request_key);
+  if (index == id_index_.end()) {
+    return false;
+  }
+  const auto entry = pending_.find(index->second);
+  if (entry == pending_.end()) {
+    return false;
+  }
+  method = entry->second.method;
+  connection_id = entry->second.connection_id;
+  return true;
+}
+
 bool GodotTransport::submit(const mcp_wire::ParsedRequest &parsed,
                             const std::string &connection_id,
                             std::string &error) {
@@ -250,6 +267,7 @@ bool GodotTransport::submit(const mcp_wire::ParsedRequest &parsed,
       PendingExchange exchange;
       exchange.promise = std::move(promise);
       exchange.future = std::move(future);
+      exchange.method = parsed.method;
       if (const auto *request = mcp::AsRequest(parsed.message)) {
         exchange.request_id = request->id;
       }

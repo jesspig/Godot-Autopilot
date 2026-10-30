@@ -579,10 +579,12 @@ mcp::JsonValue resolve_deferred_wait(const std::string &name,
     }
   } else {
     const int64_t rid = pending_p->GetInt();
+    mcp::JsonValue pending_options = result;
     mcp::JsonValue awaited = runtime_ops::wait_pending_response(rid, timeout);
     if (name == "capture_game_viewport" ||
         (awaited.IsObject() && awaited.Contains("path"))) {
-      awaited = runtime_ops::finalize_capture_response(awaited);
+      awaited =
+          runtime_ops::finalize_capture_response(awaited, pending_options);
     }
     result = std::move(awaited);
   }

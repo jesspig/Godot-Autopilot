@@ -2,6 +2,7 @@
 #include "core/editor_readiness.hpp"
 #include "core/config.hpp"
 #include "core/log_system.hpp"
+#include "tools/script_ops.hpp"
 #include "util/csharp_project_setup.hpp"
 #include "util/dotnet_env.hpp"
 #include "util/error_util.hpp"
@@ -24,6 +25,7 @@
 #include <godot_cpp/variant/rid.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
 #include <godot_cpp/variant/vector2.hpp>
+#include <cctype>
 #include <set>
 #include <string>
 #include <vector>
@@ -613,35 +615,102 @@ std::string csharp_not_loaded_hint(bool is_dotnet_editor) {
          "; read get_debugger_log for the C# compile and parse errors instead of guessing";
 }
 
+int first_parse_error_line(const std::string &error_text) {
+  const std::string marker = ".gd:";
+  size_t search_from = 0;
+  while (search_from < error_text.size()) {
+    size_t marker_pos = error_text.find(marker, search_from);
+    if (marker_pos == std::string::npos)
+      return 0;
+    size_t digits_start = marker_pos + marker.size();
+    size_t digits_end = digits_start;
+    while (digits_end < error_text.size() &&
+           std::isdigit(static_cast<unsigned char>(error_text[digits_end])))
+      ++digits_end;
+    if (digits_end > digits_start)
+      return std::stoi(
+          error_text.substr(digits_start, digits_end - digits_start));
+    search_from = marker_pos + marker.size();
+  }
+  return 0;
+}
+
+JV gdscript_compile_diagnostics(const std::string &content,
+                                const godot::String &gs_path,
+                                godot::ResourceLoader *loader) {
+  std::string compile_error;
+  if (!script_ops::try_compile_source(content, util::to_std(gs_path),
+                                      compile_error)) {
+    JV diag = script_load_diagnostics(false, false);
+    diag["diagnostic_scope"] = JV("compile");
+    diag["compilable"] = JV("false");
+    JV parse_error(JV::object_tag);
+    parse_error["line"] = JV(first_parse_error_line(compile_error));
+    parse_error["message"] = JV(compile_error);
+    diag["parse_error"] = std::move(parse_error);
+    diag["hint"] =
+        JV("the written GDScript does not compile; the file stays on disk but "
+           "cannot be used until the reported parse_error line is fixed and "
+           "the file is written again");
+    return diag;
+  }
+  godot::Ref<godot::Resource> loaded =
+      loader->load(gs_path, "Script", godot::ResourceLoader::CACHE_MODE_IGNORE);
+  auto *script =
+      loaded.is_valid() ? godot::Object::cast_to<godot::Script>(loaded.ptr())
+                        : nullptr;
+  JV diag = script_load_diagnostics(true, script && script->can_instantiate());
+  diag["diagnostic_scope"] = JV("compile");
+  diag["compilable"] = JV("true");
+  return diag;
+}
+
 JV build_script_diagnostics(const godot::String &gs_path,
-                            const std::string &ext) {
+                            const std::string &ext,
+                            const std::string &content) {
   auto *loader = godot::ResourceLoader::get_singleton();
   if (!loader) {
     JV diag = script_load_diagnostics(false, false);
+    diag["diagnostic_scope"] = JV("load");
+    diag["compilable"] = JV("unknown");
     diag["hint"] =
         JV("ResourceLoader not available; open the file in the editor script "
            "panel to inspect errors");
     return diag;
   }
+  if (ext == "gd")
+    return gdscript_compile_diagnostics(content, gs_path, loader);
   godot::Ref<godot::Resource> loaded =
       loader->load(gs_path, "Script", godot::ResourceLoader::CACHE_MODE_IGNORE);
+  JV diag = script_load_diagnostics(false, false);
   if (loaded.is_valid()) {
     auto *script = godot::Object::cast_to<godot::Script>(loaded.ptr());
-    return script_load_diagnostics(true, script && script->can_instantiate());
+    diag = script_load_diagnostics(true, script && script->can_instantiate());
   }
-  JV diag = script_load_diagnostics(false, false);
   if (ext == "cs") {
     bool is_dotnet_editor = false;
     bool assembly_loaded = false;
     probe_dotnet_editor_state(is_dotnet_editor, assembly_loaded);
-    diag["hint"] = JV(csharp_not_loaded_hint(is_dotnet_editor));
+    diag["diagnostic_scope"] = JV("resource_load");
+    diag["assembly_checked"] = JV(assembly_loaded);
+    diag["compilable"] = JV("unknown");
     diag["is_dotnet_editor"] = JV(is_dotnet_editor);
     diag["assembly_loaded"] = JV(assembly_loaded);
+    std::string cs_hint =
+        loaded.is_valid()
+            ? std::string("the C# resource loaded, but C# compiles out of "
+                          "band: run build_csharp_assembly after changing the "
+                          "file and read get_debugger_log for compiler errors")
+            : csharp_not_loaded_hint(is_dotnet_editor);
+    diag["hint"] = JV(cs_hint);
     return diag;
   }
-  diag["hint"] =
-      JV("the script failed to load after write (parse or compile error); "
-         "line-level details are only available in the editor script panel");
+  diag["diagnostic_scope"] = JV("load");
+  diag["compilable"] = JV("unknown");
+  if (!loaded.is_valid())
+    diag["hint"] =
+        JV("the file failed to load after write (parse or compile error); "
+           "open it in the editor to inspect the reported errors");
   return diag;
 }
 
@@ -689,6 +758,14 @@ JV handle_file_write(const JV &args) {
     file->seek_end();
   file->store_string(godot::String::utf8(cp->GetString().c_str()));
   file->close();
+  std::string written_content = cp->GetString();
+  if (mode == "APPEND") {
+    auto full_file = godot::FileAccess::open(gs_path, godot::FileAccess::READ);
+    if (full_file.is_valid()) {
+      written_content = util::to_std(full_file->get_as_text());
+      full_file->close();
+    }
+  }
 
   JV r(JV::object_tag);
   r["result"] = JV("ok");
@@ -717,7 +794,8 @@ JV handle_file_write(const JV &args) {
         r["action"] = JV("update_file");
       }
       if (is_script_extension(ext))
-        r["diagnostics"] = build_script_diagnostics(gs_path, ext);
+        r["diagnostics"] = build_script_diagnostics(gs_path, ext,
+                                                     written_content);
     }
   }
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
@@ -852,7 +930,7 @@ JV handle_create_csharp_script(const JV &args) {
     if (efs) {
       efs->update_file(godot::String::utf8(normalized_path.c_str()));
       diag = build_script_diagnostics(
-          godot::String::utf8(normalized_path.c_str()), "cs");
+          godot::String::utf8(normalized_path.c_str()), "cs", source_code);
     }
   }
   JV inner(JV::object_tag);

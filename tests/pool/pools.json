@@ -2,7 +2,8 @@
   "version": 1,
   "mode": "pool",
   "isolated": [
-    "45_runtime_observability"
+    "45_runtime_observability",
+    "48_capture_frame_phase"
   ],
   "pools": [
     {

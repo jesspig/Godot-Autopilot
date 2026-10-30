@@ -6,12 +6,13 @@ tags:
   - 模块
   - 领域工具
   - A组
-timestamp: "2026-10-21T20:08:37+08:00"
+timestamp: "2026-10-30T04:17:36+08:00"
 resource: src/tools/
 ---
 
 # 领域工具模块（src/tools/，A 组 16 模块）
 
+> 审计日期：2026-10-30（**10-30 随三轮 e2e 修复批次同步**——`open_editor_scene` 已打开场景时返回 `hint`/`suggested_action` 并新增 `reload_if_open`（重载返回 `reloaded`/`reload_observed`/`scene_root`/`scene_root_type`）；`build_csharp_assembly` 两种形态（异步启动 / `wait=true` 同步）均返回 `next_action`、`restart_required` 与 `game_running`，新增 `probe_script` 与 `editor_assembly_probe`；`execute_script` 的 `expression`/`source_code` 为互斥别名；C# 成员过滤分页见 B 组）
 > 10-21 随 C# 程序集构建与 .NET 环境判定修复批次增补：`build_csharp_assembly` 的工程文件路径改经 `ProjectSettings.globalize_path` 换算为系统绝对路径后再交 dotnet（原样传 `res://` 会 MSB1009、构建不发生），返回体新增 `project_path`；`.NET` 环境判定改以**引擎是否注册 `CSharpScript` 类**为权威信号，Godot 4.x 未注册 `mono` / `dotnet` 特性标签（4.7.2 mono 实测两者皆 false），版本兜底为 4.4+ 用 `dotnet`、更早用 `mono`、版本未知取二者或。详见 [changelog/2026-10-21-log.md](../changelog/2026-10-21-log.md)。
 
 > 10-16 计数复核增补：本页 16 模块 221→222（+1：`editor_tools` 32→33 `dotnet_environment`）；全系统 451→459（域工具 443→451：本页 +1，B 组 +7 = `csharp` 新域 6 项 + `os` 侧 `create_csharp_script`；A 222 + B 229 = 451），验证证据见 [changelog/2026-10-16-log.md](../changelog/2026-10-16-log.md)。
@@ -289,7 +290,7 @@ resource: src/tools/
 
 | 工具名 | 说明 |
 |---|---|
-| `execute_script` | 执行 GDScript（单表达式自动返回；单函数/裸语句统一包装并支持行号映射） |
+| `execute_script` | 执行 GDScript（`expression`/`source_code` 互斥别名；单表达式自动返回；单函数/裸语句统一包装并支持行号映射） |
 | `load_script` / `create_script` / `reload_script` | 脚本资源加载/创建/重载 |
 | `attach_script_to_node` / `detach_script_from_node` | 附加/分离 |
 | `get_script_property` / `set_script_property` / `call_script_node` | 属性与方法调用 |
@@ -298,6 +299,7 @@ resource: src/tools/
 关键实现事实：
 
 - `handle_execute_gdscript`（09-29 起包装与行映射统一到 `gdscript_wrap`）：`is_single_expression` 判定（无换行、非纯赋值、首词不在 18 个关键字黑名单如 if/for/func/return/var/await…）时自动把表达式值作为返回值（`wrap_bare_body` 的 `single_expression_auto_return=true`）；多行/裸语句需显式 `return`；单函数与裸语句模式共用同一包装层，编译/运行错误经 `gdscript_wrap::map_error_line_numbers` 按 `header_lines + 1` 回映射（09-29 起新增行映射）；输出经 `truncate_capture_text` 截断至 `MAX_CAPTURE_BYTES = 8192` 字节（常量与包装层定义于共享头 `util/gdscript_wrap.hpp`，与 code_exec_ops/游戏侧共用）。
+- **`expression` / `source_code` 别名与互斥（10-30 新增）**：两者为**互斥别名**，须恰好给一个——同时给出返回 `invalid parameter: pass only one of expression/source_code`，都缺失返回 `missing required parameter: expression or source_code`；旧键 `expression` 行为不变。编辑器侧单表达式自动返回；游戏侧 `execute_game_script` **不会**自动返回裸表达式，须显式 `return`（两个工具描述互指差异）。
 - 节点路径提示常量：执行节点挂在 `/root` 下而非编辑场景内，`NODE_NOT_FOUND_HINT`（`util/gdscript_wrap.hpp`）指导用 `SceneRoot.get_node(...)` 访问编辑场景节点。
 - `handle_reload`：默认从磁盘重读并重编译（见下 `fresh` 口径），`keep_state`（默认 false）透传给最终 `reload(keep_state)`——已有存活实例（节点已挂该脚本）时 `keep_state` 须为 true，否则返回 `ERR_ALREADY_IN_USE`；返回 Error 整数码（0=OK）。`invalidate_cached_resource`（仅摘除 ResourceCache 实例、不碰 GDScriptCache，REUSE 装载仍命中旧实例）已退为 `[[maybe_unused]]` 保留给「只摘除、不重读」场景，不再用于刷新路径。
 - 资源序列化 `serialize_resource` 返回 `class/path/object_id/object_id_str`（无 name）。
@@ -363,12 +365,13 @@ resource: src/tools/
 - **`save_editor_scene` 失败返回 `error` 字段**（含 error code 与路径，不再只回原始枚举值）；**`save_editor_scene_as` 成功返回 `{result:"saved"}`** 并附 `tab_path_registered`/`tab_rebuilt`——Godot 4.7 的 `EditorInterface::save_scene_as` 不更新编辑器内部标签路径，且 GDExtension 无页签登记 API（`Node::set_scene_file_path` 只改节点属性、不更新编辑器页签表，不得冒用），故路径未注册时 close+reopen 重建标签以保持路径一致（`tab_rebuilt` 为 reopen 后编辑根路径匹配结果），重建失败附 `warning`（09-13 起；09-17 纠正：P12 初版曾删除该 fallback，经 L2 实证为负载行为已恢复）。caveat：重建会关闭再打开场景，页签焦点可能变化，为正确性必要代价；L2 `07_scene_tabs`/`13_inline_subresource` 依赖此语义（无 reopen 时 `get_unsaved_scenes` 报空路径、`reload_editor_scene` 报 scene is not open）。
 - **`reload_editor_scene` 未打开的场景返回 error**（"scene is not open"）而非假成功；成功返回 `{result:"reloaded", scene_path, observed?}`（`observed:true` 表示已确认编辑根路径匹配）（09-13 起）。
 - **`open_editor_scene` 幂等成功（09-16 起）**：请求路径与当前场景路径经 `same_scene_path` 相等时直接返回成功 `{result:"ok", path:<请求路径>, already_open:true}`（引擎对已打开场景只切标签、root 指针不变，原先以指针变化判成败会误报 `failed to open scene`）；正常打开成功同样回显 `{result:"ok", path, already_open:false}`。25_open_scene_idempotent L2 覆盖（含无效路径仍报错的反例）。
+- **`open_editor_scene` 已打开场景的提示与 `reload_if_open`（10-30 新增）**：命中已打开同路径时仍返回 `already_open:true`，并附 `hint`（编辑器不会重开该场景，磁盘上的改动不会自动刷新）与 `suggested_action`；传 `reload_if_open=true` 时改为从磁盘重载，返回 `reloaded:true`、`reload_observed`，观测成功时附 `scene_root`/`scene_root_type`。重载会丢弃未保存修改，先 `save_editor_scene`。
 - **`open_editor_scene` 的 unsaved 错误补恢复指引**：除"先保存"外，提示可对列出的路径调 `reload_editor_scene` 丢弃改动后重试（09-13 起）。
 - `handle_play_current_scene`：`is_playing_scene()` 防重（返回 `already_playing`），play 后再次校验，失败报 `failed to start scene playback: no game process started`；与 `entry_runtime`（game bridge）配合（见 [../modules/entry_runtime.md](../modules/entry_runtime.md)）。
 - 文件系统树导出 `dir_to_json` 递归上限 `MAX_TREE_DEPTH=12`，截断时响应附 `max_depth: 12`（`dir_to_json` 的局部 truncated 返回值不直接进入响应）。
 - `set_editor_main_scene` 写 `application/run/main_scene` 并 `ProjectSettings::save()`；`set_editor_plugin_enabled`、`save_editor_scene` 等均声明 `side_effect != "none"` + `kMutating`，遍历自动排除。
 - `create_editor_undo_redo_action` 支持动作分组名称，`add_do`/`add_undo` 以 node_path + 方法 + 参数形式入栈。
-- **`build_csharp_assembly`（08-20 新增）**：在 res:// 根定位 `.csproj/.sln`（无则报非 C# 工程），经 `OS::create_process` 异步启动 `dotnet build --nologo <project>`（非阻塞，沿用 os_ops 模式，避免冻结编辑器），返回 `{project_file, project_path, command, started, pid, note}`；`started` 为假时附 `error` 说明 SDK 缺失。**10-21 修复**：工程文件路径先经 `ProjectSettings.globalize_path` 换算为**系统绝对路径**再交给 dotnet——dotnet 无法解析 `res://` 路径，原样传递会报 MSB1009 且**构建不发生**；`command` 字段仍展示对 `res://` 文件的逻辑调用，`project_path` 是实际交给 dotnet 的绝对路径。`note` 明示能力边界：GDExtension(C++) 无公共 API 触发编辑器内 C# 程序集热重载（该能力在引擎 `modules/mono` 内部），仅能在 CI/命令行式编译验证；编辑器内类/签名变更后的验证仍须用户在编辑器点 Build 或重启。**输出编码**：`OS.execute` 收集的构建输出按 **UTF-8 优先**解码——先校验 UTF-8，失败时回退系统代码页（中文 Windows 的 SDK/编译器提示不再乱码）。**10-25 起**：支持 `wait`/`timeout_ms` 前台构建并返回 `BuildResult`（`exit_code/success/errors/output_digest/output_empty/output_truncated/errors_truncated`）；阻塞式 `OS.execute` 期间临时钉 `DOTNET_CLI_UI_LANGUAGE=en` 并在结束后复原；响应新增 `game_running`，成功构建且游戏在跑时置 `restart_required=true`（运行中的游戏仍用旧程序集）；缺工程文件时错误携带可直接写入的 csproj 模板。声明 `side_effect=Process` + `kMutating`，遍历自动排除。
+- **`build_csharp_assembly`（08-20 新增）**：在 res:// 根定位 `.csproj/.sln`（无则报非 C# 工程），经 `OS::create_process` 异步启动 `dotnet build --nologo <project>`（非阻塞，沿用 os_ops 模式，避免冻结编辑器），返回 `{project_file, project_path, command, started, pid, note}`；`started` 为假时附 `error` 说明 SDK 缺失。**10-21 修复**：工程文件路径先经 `ProjectSettings.globalize_path` 换算为**系统绝对路径**再交给 dotnet——dotnet 无法解析 `res://` 路径，原样传递会报 MSB1009 且**构建不发生**；`command` 字段仍展示对 `res://` 文件的逻辑调用，`project_path` 是实际交给 dotnet 的绝对路径。`note` 明示能力边界：GDExtension(C++) 无公共 API 触发编辑器内 C# 程序集热重载（该能力在引擎 `modules/mono` 内部），仅能在 CI/命令行式编译验证；编辑器内类/签名变更后的验证仍须用户在编辑器点 Build 或重启。**输出编码**：`OS.execute` 收集的构建输出按 **UTF-8 优先**解码——先校验 UTF-8，失败时回退系统代码页（中文 Windows 的 SDK/编译器提示不再乱码）。**10-25 起**：支持 `wait`/`timeout_ms` 前台构建并返回 `BuildResult`（`exit_code/success/errors/output_digest/output_empty/output_truncated/errors_truncated`）；阻塞式 `OS.execute` 期间临时钉 `DOTNET_CLI_UI_LANGUAGE=en` 并在结束后复原；响应新增 `game_running`，成功构建且游戏在跑时置 `restart_required=true`（运行中的游戏仍用旧程序集）；缺工程文件时错误携带可直接写入的 csproj 模板。**10-30 新增**：无论默认异步启动（`started`/`pid`）还是 `wait=true` 同步（`BuildResult`），响应都附 `next_action`（可执行后续步骤数组）、`restart_required`（构建成功或已启动即 true，与是否有游戏在跑无关——没有热重载）与 `game_running`；可选 `probe_script`（`res://` 下 `.cs` 路径）在构建后由编辑器 `load` 该脚本而不实例化，响应加 `editor_assembly_probe {path,is_dotnet_editor,state,can_instantiate,base_class,hint}`：`state=available` 表示资源可加载，非 .NET 编辑器或加载失败为 `unavailable` + `unavailable=true`；`can_instantiate=false`（available 时）说明编辑器仍在用旧程序集，需点 Build 或重启编辑器。声明 `side_effect=Process` + `kMutating`，遍历自动排除。
 - **`.NET` 环境判定（10-21 改口径，[`src/util/dotnet_env.hpp`](../../../src/util/dotnet_env.hpp) 的 `dotnet_env::is_dotnet_environment`）**：判定是否为 .NET 编辑器的**权威信号是引擎是否注册了 `CSharpScript` 类**——.NET 模块装载即注册该类（`ClassDB.class_exists("CSharpScript")`）。**Godot 4.x 未注册 `mono` / `dotnet` 特性标签**（本机 4.7.2 mono 实测 `OS.has_feature("mono")` 与 `OS.has_feature("dotnet")` 皆为 false），因此特性名探测在多数版本下恒为 false，**不能作为主判据**。版本兜底规则：引擎版本 **4.4 及以上**用 `dotnet` 特性名、更早用 `mono`、**版本未知**取二者或（任一为真即判为 .NET 环境）；`probe_current()` 另行采集 `engine_version` / `mono_feature` / `dotnet_feature` 三项供诊断。`dotnet_environment` 工具返回的 `is_dotnet_editor` 与 `assembly_loaded` 均据此判定——`assembly_loaded` 反映 **.NET 模块已装载**而非项目程序集已加载。**10-25 起**：缺工程文件时错误返回 `template {path, content, target_framework, assembly_name}`，SDK 版本取引擎版本、TFM 取已安装 .NET SDK 主版本，供 `write_file` 直接写入。
 
 ## editor_ui_ops（5 工具，其中 4 只读）

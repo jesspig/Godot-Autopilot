@@ -44,7 +44,7 @@ Lifecycle and control family — these manage editor processes or the local cont
 
 | Command | Meaning |
 |---|---|
-| `list` | List registered instances |
+| `list` | List instances from both registries, merged: CLI-started entries (`source: "cli"`) plus live plugin-index instances (`source: "plugin"`, deduplicated by pid/port), each with `live`; add `--probe <port>` to append a `source: "probe"` entry for one explicitly probed port (no port scanning) |
 | `start` | Launch an editor and wait until its server answers |
 | `stop <id>` | Stop an instance. A headless instance has no window to receive a close request, so it is force-stopped directly and reports `method: "force"` — that is expected, not a fallback. A windowed instance is stopped gracefully; `--force` kills it. The instance can also be addressed with `--id`, `--port` or `--project` instead of the positional id |
 | `restart <id>` | Stop the instance and start it again on the same port, headless mode and Godot executable. Headless instances (and any instance with `--force`) are force-stopped; windowed instances stop gracefully. Same addressing as `stop`. The stop phase waits a fixed 10 seconds and ignores `--wait`; if a windowed process is still alive, no replacement is started and the registration is kept |
@@ -68,7 +68,7 @@ Follow the same discovery order as the native channel: `ping`, then `search` or 
 
 `--port` (default 9527; 9700 for `serve`), `--id`, `--project`, `--pretty`, `--raw`, `--timeout`, `--category`, `--tags`, `--args`, `--args-file`, `--save-images`, `--godot`, `--headless`, `--play`, `--no-import`, `--wait`, `--force`, `--tail`, `--bind`, `--no-auth`, `--query`, `--probe`, `--help`, `--version`.
 
-`--bind` and `--no-auth` apply to `serve` only; `--bind` takes a loopback address and `--no-auth` turns the control-plane token check off. `--query` applies to the `api list` subcommand only and `--probe` to `api` and `endpoints`; passing any of these to another command is a usage error.
+`--bind` and `--no-auth` apply to `serve` only; `--bind` takes a loopback address and `--no-auth` turns the control-plane token check off. `--query` applies to the `api list` subcommand only. `--probe` is overloaded: `light`/`strict` liveness level for `api`, `endpoints` and `start`, or a port number (1-65535) for `list` to probe exactly that port; passing it to another command is a usage error.
 
 `--quiet` was removed and is no longer recognized. Passing it now fails with exit code 3 and the message "unknown option: --quiet", and it is gone from `gda --help`. An older wrapper that still passes `--quiet` will start failing — drop the flag rather than working around it. Diagnostics already go to stderr on their own, so the flag bought nothing.
 

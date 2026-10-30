@@ -69,6 +69,26 @@ JV ok_result(JV result) {
   return r;
 }
 
+void attach_capture_frame_fields(JV &body, int64_t when_satisfied_frame,
+                                 int64_t captured_frame) {
+  if (!body.IsObject())
+    return;
+  const char *payload_keys[] = {"result", "data"};
+  bool attached = false;
+  for (const char *key : payload_keys) {
+    JV *payload = body.Find(key);
+    if (payload != nullptr && payload->IsObject()) {
+      (*payload)["when_satisfied_frame"] = JV(when_satisfied_frame);
+      (*payload)["captured_frame"] = JV(captured_frame);
+      attached = true;
+    }
+  }
+  if (!attached) {
+    body["when_satisfied_frame"] = JV(when_satisfied_frame);
+    body["captured_frame"] = JV(captured_frame);
+  }
+}
+
 godot::SceneTree *get_scene_tree() {
   auto *engine = godot::Engine::get_singleton();
   if (!engine)
@@ -360,6 +380,47 @@ const char *ui_mouse_filter_name(godot::Control::MouseFilter filter) {
   }
 }
 
+struct UiElementFilter {
+  bool has_filter = false;
+  std::string filter_lower;
+  std::vector<std::string> types;
+  bool visible_only = false;
+};
+
+std::string ui_lowercase(const std::string &text) {
+  std::string lowered = text;
+  for (char &c : lowered) {
+    if (c >= 'A' && c <= 'Z')
+      c = static_cast<char>(c - 'A' + 'a');
+  }
+  return lowered;
+}
+
+bool ui_element_matches_filter(const UiElement &element,
+                               const UiElementFilter &filter) {
+  if (filter.visible_only && !element.visible)
+    return false;
+  if (!filter.types.empty()) {
+    bool type_match = false;
+    for (const std::string &type : filter.types) {
+      if (element.type == type) {
+        type_match = true;
+        break;
+      }
+    }
+    if (!type_match)
+      return false;
+  }
+  if (filter.has_filter) {
+    std::string haystack = element.path + "\n" + element.type + "\n";
+    if (element.has_text)
+      haystack += element.text;
+    if (ui_lowercase(haystack).find(filter.filter_lower) == std::string::npos)
+      return false;
+  }
+  return true;
+}
+
 bool ui_hit_matches_target(godot::Control *target, godot::Control *hovered) {
   if (!target || !hovered)
     return false;
@@ -369,14 +430,11 @@ bool ui_hit_matches_target(godot::Control *target, godot::Control *hovered) {
 }
 
 void walk_ui_elements(godot::Node *node, int depth, int64_t max_elements,
+                      const UiElementFilter &filter,
                       std::vector<UiElement> &elements, bool &truncated) {
   if (truncated || depth > MAX_TREE_DEPTH)
     return;
   if (auto *ctrl = godot::Object::cast_to<godot::Control>(node)) {
-    if (static_cast<int64_t>(elements.size()) >= max_elements) {
-      truncated = true;
-      return;
-    }
     UiElement element;
     element.path = util::to_std(godot::String(node->get_path()));
     element.type = util::to_std(godot::String(node->get_class()));
@@ -393,22 +451,29 @@ void walk_ui_elements(godot::Node *node, int depth, int64_t max_elements,
     element.y = rect.position.y;
     element.w = rect.size.x;
     element.h = rect.size.y;
-    elements.push_back(std::move(element));
+    if (ui_element_matches_filter(element, filter)) {
+      if (static_cast<int64_t>(elements.size()) >= max_elements) {
+        truncated = true;
+        return;
+      }
+      elements.push_back(std::move(element));
+    }
   }
   int64_t child_count = node->get_child_count();
   for (int64_t i = 0; i < child_count; i++)
-    walk_ui_elements(node->get_child(i), depth + 1, max_elements, elements,
-                     truncated);
+    walk_ui_elements(node->get_child(i), depth + 1, max_elements, filter,
+                     elements, truncated);
 }
 
 std::vector<UiElement> collect_ui_elements(godot::Node *root,
                                            int64_t max_elements,
+                                           const UiElementFilter &filter,
                                            bool &truncated) {
   std::vector<UiElement> elements;
   truncated = false;
   if (!root)
     return elements;
-  walk_ui_elements(root, 0, max_elements, elements, truncated);
+  walk_ui_elements(root, 0, max_elements, filter, elements, truncated);
   return elements;
 }
 
@@ -842,8 +907,8 @@ JV capture_viewport_now(const CaptureRequest &request, int64_t request_id) {
   JV annotated_elements(JV::array_tag);
   if (request.annotate) {
     bool truncated = false;
-    const std::vector<UiElement> elements =
-        collect_ui_elements(root, GDA_UI_ELEMENTS_MAX, truncated);
+    const std::vector<UiElement> elements = collect_ui_elements(
+        root, GDA_UI_ELEMENTS_MAX, UiElementFilter(), truncated);
     const double scale_x =
         cropped_width > 0 ? static_cast<double>(final_width) / cropped_width
                           : 1.0;
@@ -973,16 +1038,27 @@ JV capture_viewport_now(const CaptureRequest &request, int64_t request_id) {
     draw_blue_annotations(image, node_marks);
   }
 
-  std::string path = util::to_std(godot::OS::get_singleton()->get_cache_dir()) +
-                     "/gda_capture_" + std::to_string(request_id) + ".png";
+  auto *os = godot::OS::get_singleton();
+  const std::string cache_dir =
+      os ? util::to_std(os->get_cache_dir()) : std::string();
+  const int64_t process_id =
+      os ? static_cast<int64_t>(os->get_process_id()) : 0;
+  const int64_t ticks_ms =
+      godot::Time::get_singleton()
+          ? static_cast<int64_t>(godot::Time::get_singleton()->get_ticks_msec())
+          : 0;
+  const std::string path =
+      cache_dir + "/gda_capture_session" + std::to_string(process_id) + "_" +
+      std::to_string(ticks_ms) + "_" + std::to_string(request_id) + ".png";
   godot::Error save_err = image->save_png(godot::String(path.c_str()));
   if (save_err != godot::OK) {
     return error_result("save_png failed (ERR code " +
                         std::to_string(static_cast<int>(save_err)) + ") at " +
                         path);
   }
-  capture_ops::prune_capture_files(godot::OS::get_singleton()->get_cache_dir(),
-                                   20);
+  capture_ops::prune_capture_files(
+      godot::OS::get_singleton()->get_cache_dir(),
+      capture_ops::kCaptureKeepFiles);
   JV r(JV::object_tag);
   r["path"] = JV(path);
   r["width"] = JV(static_cast<int64_t>(final_width));
@@ -1020,7 +1096,9 @@ class GameBridgeCaptureAwaiter : public godot::Node {
   uint64_t start_process_frames_ = 0;
   uint64_t start_ticks_ms_ = 0;
   int64_t frames_waited_ = 0;
+  int64_t when_satisfied_frame_ = -1;
   std::string when_error_;
+  bool deferred_ = false;
   bool finished_ = false;
 
 protected:
@@ -1056,6 +1134,15 @@ public:
     auto *engine = godot::Engine::get_singleton();
     const uint64_t current_frame =
         engine ? engine->get_process_frames() : start_process_frames_;
+    if (deferred_) {
+      JV body = capture_viewport_now(request_, request_id_);
+      if (body.IsObject() && body.Find("error") == nullptr) {
+        attach_capture_frame_fields(body, when_satisfied_frame_,
+                                    static_cast<int64_t>(current_frame));
+      }
+      finish(std::move(body));
+      return;
+    }
     frames_waited_ = static_cast<int64_t>(current_frame - start_process_frames_);
     bool satisfied = frames_waited_ >= request_.after_frames;
     if (satisfied && when_expr_.is_valid()) {
@@ -1074,7 +1161,8 @@ public:
       }
     }
     if (satisfied) {
-      finish(capture_viewport_now(request_, request_id_));
+      when_satisfied_frame_ = static_cast<int64_t>(current_frame);
+      deferred_ = true;
       return;
     }
     const uint64_t now_ms = godot::Time::get_singleton()
@@ -1425,6 +1513,21 @@ JV op_ui_elements(const JV &params) {
   }
   if (max_elements > GDA_UI_ELEMENTS_MAX)
     max_elements = GDA_UI_ELEMENTS_MAX;
+  UiElementFilter filter;
+  if (auto *filter_p = params.Find("filter"); filter_p && filter_p->IsString()) {
+    const std::string filter_text = filter_p->GetString();
+    filter.has_filter = !filter_text.empty();
+    filter.filter_lower = ui_lowercase(filter_text);
+  }
+  if (auto *types_p = params.Find("types"); types_p && types_p->IsArray()) {
+    for (const auto &item : types_p->GetArray()) {
+      if (item.IsString() && !item.GetString().empty())
+        filter.types.push_back(item.GetString());
+    }
+  }
+  if (auto *visible_p = params.Find("visible_only");
+      visible_p && visible_p->IsBool())
+    filter.visible_only = visible_p->GetBool();
   godot::SceneTree *tree = get_scene_tree();
   if (!tree)
     return error_result("no scene tree");
@@ -1433,7 +1536,7 @@ JV op_ui_elements(const JV &params) {
     return error_result("no root node");
   bool truncated = false;
   const std::vector<UiElement> elements =
-      collect_ui_elements(root, max_elements, truncated);
+      collect_ui_elements(root, max_elements, filter, truncated);
   if (auto *click_p = params.Find("click"))
     return run_ui_click(*click_p, elements, truncated);
   JV arr(JV::array_tag);
