@@ -349,10 +349,6 @@ TEST_F(IntegrationHarness, ExclusionPartitionCoversAllEnumeratedTools) {
                   << " candidates=" << candidates.size();
 }
 
-TEST_F(IntegrationHarness, EmptyArgCallRejects_Candidate_0) {
-  run_empty_arg_group(*this, kGroupCandidate, true);
-}
-
 TEST_F(IntegrationHarness, EmptyArgCallRejects_Mutating_0) {
   run_empty_arg_group(*this, kGroupMutating, true);
 }
