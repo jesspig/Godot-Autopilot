@@ -16,6 +16,8 @@ resource: src/tools/
 > 10-22 数值收口批次增补：遍历排除数/候选数随破坏类档位判定标准改判而变化，改为引用 [../tests.md](../tests.md)「数值核算总表」的遍历各行（该批次 L2 实测：枚举 452 / 排除 151 / 候选 301 / 实测 549 步 / `empty_args` warnings 基线 0；`modifies_window` 43→42、`destructive` 1→6）。
 >
 > 10-21 数值同步批次增补：遍历排除数/候选数改为引用 [../tests.md](../tests.md)「数值核算总表」的遍历各行（该批次 L2 实测：枚举 452 / 排除 147 / 候选 305 / 实测 557 步 / `empty_args` warnings 基线 0）；OS 类的副作用工具数 **8→11**（补 `copy_file`/`ensure_directory`/`create_csharp_script`，按集成分支 `os_tools.hpp` 逐条统计）。
+>
+> 2026-11-09 随测试体系重构批次增补：历史 L2 遍历与用例已随引擎轨删除，遍历各行已从 [../tests.md](../tests.md)「数值核算总表」移除（见其「历史口径迁移」）；本页行文中的 L2 用例名（如 `23_click_ui_coords`）均为历史指称，语义已由集成层 gtest（`tests/integration/`）蒸馏承接，引擎内行为落点见 [../engine-behavior-checklist.md](../engine-behavior-checklist.md)。
 
 > 09-18 CJK 传输链收敛批次增补（详见 `changelog/2026-09-18-log.md` 21:15 节）：`variant_json` 反序列化 10 处、`debugger_access` 广播/重载 2 处、`game_bridge_eval` 求值源码、`code_exec` 包装源码改 `String::utf8`；`runtime_ops` 错误整形透传游戏侧 `diagnosis`/`hint`（live 验证新发现，`method_not_found_on_node` 实测回传）。
 
@@ -349,7 +351,7 @@ resource: src/tools/
 
 ## 与 AGENTS.md 对照结果
 
-- **副作用/可变工具排除机制（运行时统计口径）**：工具在 `ToolSpec` 声明 `side_effect`（`ISideEffect` 暴露）与 `kMutating`；L2 遍历（`tests/runner/traversal.cpp`）运行时经 `search_tools` 枚举 452 条后按 `get_tool_detail` 的 `side_effect`/`mutating`/`dynamic` 字段排除，候选与排除数以运行时报告为准，当前值见 [../tests.md](../tests.md)「数值核算总表」的遍历各行（本页不复制数值）。旧分布（09-29，B 36 + A 35）仅作历史参考：B 组 36——display_tools 15、os_tools 8、theme_tools 5、game_tools 7、tilemap_tools 1（`fill_tilemap_rect`，`None`+`kMutating`）；A 组 35——editor 10 / input_map 2 / config 2 / resource 5 / script 3 / input_click_ops 4 / scene 1（`build_nodes_from_spec`）/ scene_tree 8。10-11 批次静态可见的新增排除至少含 `gridmap` 5（全 `None`+`kMutating`）、`tween` 3（2 游戏侧 `GameRuntime` + `tween_editor_property` 的 `kMutating`，`get_game_tween_list` 只读不排除）、其余 bundle/批量工具多带 `kMutating`；精确数取运行时 `03_tools_contract` 报告。
+- **副作用/可变工具排除机制（运行时统计口径）**：工具在 `ToolSpec` 声明 `side_effect`（`ISideEffect` 暴露）与 `kMutating`（历史 L2 遍历曾以 `tests/runner/traversal.cpp` 运行时枚举后按字段排除，该机制随引擎轨删除，见 [../tests.md](../tests.md)「历史口径迁移」）。旧分布（09-29，B 36 + A 35）仅作历史参考：B 组 36——display_tools 15、os_tools 8、theme_tools 5、game_tools 7、tilemap_tools 1（`fill_tilemap_rect`，`None`+`kMutating`）；A 组 35——editor 10 / input_map 2 / config 2 / resource 5 / script 3 / input_click_ops 4 / scene 1（`build_nodes_from_spec`）/ scene_tree 8。10-11 批次静态可见的新增排除至少含 `gridmap` 5（全 `None`+`kMutating`）、`tween` 3（2 游戏侧 `GameRuntime` + `tween_editor_property` 的 `kMutating`，`get_game_tween_list` 只读不排除）、其余 bundle/批量工具多带 `kMutating`；精确数取运行时 `03_tools_contract` 报告。
 - **不一致点**：
   1. AGENTS.md「添加工具需在 `<category>_ops.hpp` 声明」与实现不符：`environment_ops.cpp`（7 工具）、`display_window_ops.cpp`（10 工具）无独立 hpp，handler 声明分别复用 `render_ops.hpp`、`display_ops.hpp`；工具类声明则统一落在对应 `<域>_tools.hpp`（`render_tools.hpp`/`display_tools.hpp`）。另 `runtime_game_ops.cpp`（工具 19 个在 `game_tools.hpp`）与 `file_dir_ops.cpp`（工具 4 个挂 `os_tools.hpp`）的 handler 声明分别在 `runtime_ops.hpp` 与 `file_dir_ops.hpp`。
   2. `debugger_ops` 的 `get_debugger_*` 5 工具、`get_plugin_log` 与 `log_ops` 的 `get_game_log_entries` 覆盖四条不同日志来源（编辑器引擎日志 / 调试会话捕获 / 插件进程内 LogSystem / 游戏磁盘日志），AGENTS.md 未区分。
