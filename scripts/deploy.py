@@ -10,8 +10,6 @@ from .config import (
     DEMO_DIRS,
     PLATFORM_LIBS,
     PLATFORM_PDB,
-    POOL_BEDS,
-    TESTBED_DIR,
     _addon_dir,
     artifact_dir,
 )
@@ -51,63 +49,6 @@ def _generate_gdextension(addon_dir: Path) -> None:
     print(f"  godot-autopilot.gdextension  (generated)", flush=True)
 
 
-POOL_BED_TEMPLATES: tuple[str, ...] = ("project.godot", ".gitignore", "assets")
-POOL_ASSEMBLY_GLOB = ".godot/mono/temp/bin/Debug/*.dll"
-
-
-def _has_pool_assemblies(project_dir: Path) -> bool:
-    """判定目录内是否已有 .NET 程序集产物。"""
-    return next(project_dir.glob(POOL_ASSEMBLY_GLOB), None) is not None
-
-
-def materialize_pool_beds() -> list[Path]:
-    """确保池床模板与主床一致，缺失则建床；返回本轮新建的床。"""
-    created: list[Path] = []
-    for bed in POOL_BEDS:
-        is_new = not bed.exists()
-        if is_new:
-            bed.mkdir(parents=True)
-            created.append(bed)
-        for item in POOL_BED_TEMPLATES:
-            source = TESTBED_DIR / item
-            if not source.exists():
-                raise FileNotFoundError(f"物化模板缺失：{source}")
-            if source.is_dir():
-                shutil.copytree(source, bed / item, dirs_exist_ok=True)
-            else:
-                shutil.copy2(source, bed / item)
-        status = "物化池床" if is_new else "同步池床模板"
-        print(f"[POOL] {status} {bed}", flush=True)
-    return created
-
-
-def warm_pool_bed_solutions(beds: list[Path]) -> None:
-    """复用已构建床的 .NET 程序集，把一次性冷构建从 L2 首跑前移到部署阶段。"""
-    donor: Path | None = None
-    for candidate in (TESTBED_DIR, *beds):
-        if _has_pool_assemblies(candidate):
-            donor = candidate
-            break
-    for bed in beds:
-        if _has_pool_assemblies(bed):
-            print(f"[WARM] 池床程序集已存在，跳过 {bed}", flush=True)
-            continue
-        if donor is None:
-            print(f"[WARM] 无可用程序集来源，{bed} 首次 L2 可能触发冷构建", flush=True)
-            continue
-        mono_source = donor / ".godot/mono"
-        mono_target = bed / ".godot/mono"
-        try:
-            if mono_target.exists():
-                shutil.rmtree(mono_target)
-            mono_target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copytree(mono_source, mono_target)
-        except OSError as exc:
-            print(f"[WARM] 复用失败 {bed}: {exc}", flush=True)
-            continue
-        print(f"[WARM] 复用 C# 程序集 {donor} -> {bed}", flush=True)
-
-
 def _deploy(preset: str, demos: list[Path] | None = None) -> None:
     binary_dir = artifact_dir(preset)
     system = platform.system().lower()
@@ -115,9 +56,7 @@ def _deploy(preset: str, demos: list[Path] | None = None) -> None:
     if not lib_name:
         print(f"[ERROR] Unsupported platform: {system}", flush=True)
         sys.exit(1)
-    materialize_pool_beds()
-    warm_pool_bed_solutions(POOL_BEDS)
-    for project_dir in [*(DEMO_DIRS if demos is None else demos), TESTBED_DIR, *POOL_BEDS]:
+    for project_dir in (DEMO_DIRS if demos is None else demos):
         print(f"[DEPLOY] {project_dir}", flush=True)
         addon_dir = _addon_dir(project_dir)
         addon_dir.mkdir(parents=True, exist_ok=True)

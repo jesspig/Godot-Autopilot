@@ -153,30 +153,19 @@ def _action_test() -> None:
     kind = _ask(
         questionary.select(
             "测试范围",
-            choices=["L1 快筛", "L2 全量", "L2 单个", "单跑用例/守卫", "全量"],
+            choices=["全量默认门", "单跑用例/守卫"],
             style=TUI_STYLE,
         )
     )
     preset_name = _ask(questionary.select("测试预设", choices=["debug", "release"], style=TUI_STYLE))
-    if kind == "L1 快筛":
-        code = test_ops.run_l1(preset_name)
-    elif kind == "L2 全量":
-        console.print("[yellow]L2 全量约 12 分钟，需要 GODOT_PATH 指向引擎。[/yellow]")
-        code = test_ops.run_l2(None, preset_name)
-    elif kind == "L2 单个":
-        name = _ask(questionary.text("用例名（如 gda_runner_01_scene）：", style=TUI_STYLE))
-        if not name.strip():
-            console.print("[yellow]用例名为空，已取消。[/yellow]")
-            return
-        code = test_ops.run_l2(name.strip(), preset_name)
-    elif kind == "单跑用例/守卫":
+    if kind == "全量默认门":
+        code = test_ops.run_default(preset_name)
+    else:
         name = _ask(questionary.text("用例名（如 migration_guard）：", style=TUI_STYLE))
         if not name.strip():
             console.print("[yellow]用例名为空，已取消。[/yellow]")
             return
         code = test_ops.run_single(name.strip(), preset_name)
-    else:
-        code = test_ops.run_all(preset_name)
     console.print(Panel("测试通过" if code == 0 else f"测试失败（退出码 {code}）", style="green" if code == 0 else "red"))
 
 
