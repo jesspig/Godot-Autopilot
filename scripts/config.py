@@ -56,7 +56,7 @@ DEMO_NAMES: tuple[str, ...] = (
     "pink_man_adventure",
 )
 
-DEMO_DIRS: list[Path] = [PROJECT_ROOT / "demo" / name for name in DEMO_NAMES]
+DEMO_DIRS: list[Path] = [PROJECT_ROOT / "examples" / name for name in DEMO_NAMES]
 
 DEPLOY_TARGETS: list[Path] = DEMO_DIRS
 

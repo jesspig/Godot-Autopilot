@@ -29,7 +29,7 @@ resource:
 |---|---|
 | `uv run main.py build` | Debug：配置 + 构建（不部署） |
 | `uv run main.py build --release` | Release 配置 + 构建（不部署、不清理） |
-| `uv run main.py deploy` | 部署 Debug 产物到 `demo/*/addons/godot-autopilot/`（6 个 demo）；`--demos` **不传则部署全部 demo**，**传空**（`--demos` 后不跟任何名字）**则不部署任何 demo**，`--demos 名称...` 只部署子集 |
+| `uv run main.py deploy` | 部署 Debug 产物到 `examples/*/addons/godot-autopilot/`（6 个 demo）；`--demos` **不传则部署全部 demo**，**传空**（`--demos` 后不跟任何名字）**则不部署任何 demo**，`--demos 名称...` 只部署子集 |
 | `uv run main.py deploy --release` | 先清理，再部署 Release 产物 |
 | `uv run main.py build --release --package` | 不再支持：构建与部署已拆分，按 `build --release` → `deploy --release` → `package` 分步执行 |
 | `uv run main.py package` | 仅打包已部署的 addons（不触发构建，未部署则报错退出）；包内含 6 个 C# 桥 `.cs`、**不含 `.pdb`** |
@@ -71,7 +71,7 @@ resource:
 - `<工程>/.godot` — Godot 引擎缓存
 - `<工程>/addons/godot-autopilot/` — 旧部署产物
 
-`DEPLOY_TARGETS`（`scripts/config.py`）= 6 个 `demo/*`（`DEMO_DIRS`）。清理刻意与部署同口径，否则会留下 demo 已是 Release 库的幽灵态。
+`DEPLOY_TARGETS`（`scripts/config.py`）= 6 个 `examples/*`（`DEMO_DIRS`）。清理刻意与部署同口径，否则会留下 demo 已是 Release 库的幽灵态。
 
 ### 2. 配置 `_configure(preset)`（`scripts/cmake_ops.py`）
 
@@ -111,7 +111,7 @@ resource:
 | 分支 | 平台库来源 | 必需平台库 | 失败行为 |
 |---|---|---|---|
 | 传 `--libs-dir <dir>` | `<dir>` 递归收集三平台库 | 三平台齐全（`PLATFORM_LIBS` 全部值） | 缺任一平台库即报错退出（退出码 1） |
-| 不传（无参） | 已部署的首个 demo 目录 `demo/2d_dodge_the_creeps/addons/godot-autopilot/` | 仅当前平台的库（按 `platform.system()` 取 `PLATFORM_LIBS`） | 目录不存在 → 报错「Addons not deployed; run a build first」；平台不在 `PLATFORM_LIBS` → 报错「Unsupported platform」 |
+| 不传（无参） | 已部署的首个 examples 目录 `examples/2d_dodge_the_creeps/addons/godot-autopilot/` | 仅当前平台的库（按 `platform.system()` 取 `PLATFORM_LIBS`） | 目录不存在 → 报错「Addons not deployed; run a build first」；平台不在 `PLATFORM_LIBS` → 报错「Unsupported platform」 |
 
   两条路径产出同构内容：平台库 + C# 桥源码 + gdextension 描述文件，均不含 `.pdb`。
 - **打包完整性自检**：`scripts/test_package_integrity.py <zip>` 独立校验（解压后逐条核对：三平台库齐全、C# 桥 6 个源文件齐全、`.gdextension` 的 `[libraries]` 条目逐一有对应文件、且包内不含 `.pdb`）；全通过打印 `package-integrity OK` 并退出 0，缺项报错退出 1，参数错误退出 2。Release 作业在打包后、发布前跑这一步，失败即中止发布。
@@ -152,7 +152,7 @@ macOS runner 为 ARM64，preset 设 `CMAKE_OSX_ARCHITECTURES=x86_64;arm64` 编�
 
 程序侧一律用 [`scripts/config.py:artifact_dir(preset)`](../../scripts/config.py) 取平台库源目录，不写死 `BUILD_DIR / preset`（见「scripts/ 模块职责」）。
 
-部署目录：`demo/*/addons/godot-autopilot/`（6 个 demo；打包与 CI artifact 取首个，均不入库、不参与打包）；`main.py` 与 CI/Release 均使用仓库实际目录大小写，大小写敏感平台不会产生分叉目录。
+部署目录：`examples/*/addons/godot-autopilot/`（6 个 demo；打包与 CI artifact 取首个，均不入库、不参与打包）；`main.py` 与 CI/Release 均使用仓库实际目录大小写，大小写敏感平台不会产生分叉目录。
 
 ## CMake 目标
 

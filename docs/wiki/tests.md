@@ -30,7 +30,7 @@ resource: tests/
 
 **回归属性（第四层）**不是独立 ctest 目标，而是分布在单元 / 集成 / 脚本项内的基线断言组，钉住注册面、错误面、wire 形状与技能面，防止工具集与协议漂移；基线清单与更新 SOP 见「回归属性清单」。
 
-**Agent e2e**：依赖真实编辑器 / Godot 进程的行为验证（GDScript 编译执行、游戏进程通道、端到端 HTTP 往返、编辑器态错误文案）不再有仓库内引擎轨，移交 `gda-demo-e2e` 工作流执行、`gda-e2e-analysis` 分析闭环（根 `.agents/skills/`）；仓库测试基建（configure + build + ctest）不含任何 Godot 进程路径。
+**Agent e2e**：依赖真实编辑器 / Godot 进程的行为验证（GDScript 编译执行、游戏进程通道、端到端 HTTP 往返、编辑器态错误文案）不再有仓库内引擎轨，移交 `gda-e2e-testing` 工作流执行、`gda-e2e-analysis` 分析闭环（根 `.agents/skills/`）；仓库测试基建（configure + build + ctest）不含任何 Godot 进程路径。
 
 ## 构建与运行
 
@@ -226,7 +226,7 @@ uv run main.py test --single migration_guard   # 单跑（ctest -R）
 1. **栈上 godot 对象构造**：handler 在参数校验**前**构造含 `godot::Variant` / `godot::Ref<…>` 的栈对象 → 测试进程 SEH——本仓 godot-cpp 的 `Variant()`/`~Variant()` 无条件调用 gdextension 接口指针，测试进程 GDExtension 接口未初始化即空函数指针调用（实证：`handle_code_execute` 的 `ExecContext`，`.handoff/evidence/T-02/mapping.md` R-01-03）。
 2. **引擎单例**：`godot::<Class>::get_singleton()` 同为硬边界（`ProjectSettings`/`EditorInterface`/`InputMap` 等，生成 getter 走同一接口指针；`.handoff/evidence/T-04/mapping-12-16-17-39.md` R-04-01、`T-05/mapping-23-24-35-37-40.md` R-01-02）。凡依赖上述两条路径的断言不可迁集成层，已划回 e2e（对照表各 R-01 条目）。
 3. **运行期通道错误文案**：通道错误依赖编辑器插件实例（`DebugCapturePlugin::s_instance` 仅编辑器入口置位），进程内恒为 `debugger capture plugin not initialized`——凡以 `game not running: …` 等编辑器态精确全串为 expect 的断言不可迁（进程内无法复现该文案）；JSON 仅声明 error 非空的步骤可迁（进程内通道错误满足声明）。
-4. **HTTP socket 层**：传输栈绑定 Godot 引擎 `TCPServer`/`StreamPeerTCP`，进程内无法监听（判定记录 `.handoff/evidence/T-03/verdict.md`：degrade；FR-03 降级决议草案待用户确认）——集成层无真实 HTTP 监听试点，HTTP 解析/shim 头校验/路由的纯逻辑面由 L1 与集成层分担，端到端 HTTP 往返随 `gda-demo-e2e` 自然发生。
+4. **HTTP socket 层**：传输栈绑定 Godot 引擎 `TCPServer`/`StreamPeerTCP`，进程内无法监听（判定记录 `.handoff/evidence/T-03/verdict.md`：degrade；FR-03 降级决议草案待用户确认）——集成层无真实 HTTP 监听试点，HTTP 解析/shim 头校验/路由的纯逻辑面由 L1 与集成层分担，端到端 HTTP 往返随 `gda-e2e-testing` 自然发生。
 5. **`tests/runner/` 残留口径**：仅保留 `config_loader.{cpp,hpp}`（L1 业务源，`gda_unit_sources.cmake:41` 登记、`config_loader_strict_test` 8 项测之；偏离登记见 `.handoff/evidence/T-08/manifest.md`），其余 runner 文件已随引擎轨删除。
 
 ## 回归属性清单
@@ -309,7 +309,7 @@ uv run main.py test --single migration_guard   # 单跑（ctest -R）
 - **48 份 L2 用例表、JSON schema 冻结规则、断言语义、软失败语义**：用例语义已由集成层逐条蒸馏（对照表见 `.handoff/evidence/` 各 mapping，R-01 台账登记划回 e2e 的条目；合并定稿「A 类迁移对照表」与引擎行为验收清单见 [engine-behavior-checklist.md](engine-behavior-checklist.md)）；配置加载器以 `config_loader.{cpp,hpp}` 形式保留为 L1 业务源。
 - **全量遍历与排除工具清单**（`traversal.cpp`、预期错误豁免表、`side_effect` 逐档名单与历史事故、warnings 基线）：判定逻辑由集成层 toolface 契约承接（动态枚举 + 授权拒绝形态断言 + 计数观察值口径，见「回归属性清单」）；历史基线演变（枚举 452 / 排除 182 / 候选 270 / 489 步 / warnings 0 等）见 [changelog/2026-10-19-log.md](changelog/2026-10-19-log.md) 至 [changelog/2026-10-22-log.md](changelog/2026-10-22-log.md)；Example 污染事故（`set_editor_main_scene` / `save_editor_scene`）的原始记载见 [changelog/2026-09-18-log.md](changelog/2026-09-18-log.md) 与 git 历史（排除清单注释考古，提交 `ca1461c`）。
 - **已知引擎副作用、L2 环境漂移（编辑器场景恢复）、审计不一致点清单**：对象均为已删除的测试床与引擎轨，历史记载见 [changelog/2026-09-26-log.md](changelog/2026-09-26-log.md)、[changelog/2026-09-29-log.md](changelog/2026-09-29-log.md)。
-- **已知遗留（待跟进）**：mcp-cpp-sdk 客户端响应等待缺陷随测试客户端（`tests/integration/mcp_test_client.cpp`）删除而不再适用于测试轨，生产服务端不受影响；「编辑器进程的引擎错误不可经 MCP 观测」属产品能力边界，历史记载见本页 git 历史（2026-10-30 版「已知遗留」）与 `skills/godot-autopilot-runtime/references/debug-paths.md`；游戏侧双进程 e2e 覆盖缺口与编辑器 UI 动作自动化缺口移交 Agent e2e 闭环（`gda-demo-e2e` 工作流 + `gda-e2e-analysis` 分析闭环）。
+- **已知遗留（待跟进）**：mcp-cpp-sdk 客户端响应等待缺陷随测试客户端（`tests/integration/mcp_test_client.cpp`）删除而不再适用于测试轨，生产服务端不受影响；「编辑器进程的引擎错误不可经 MCP 观测」属产品能力边界，历史记载见本页 git 历史（2026-10-30 版「已知遗留」）与 `skills/godot-autopilot-runtime/references/debug-paths.md`；游戏侧双进程 e2e 覆盖缺口与编辑器 UI 动作自动化缺口移交 Agent e2e 闭环（`gda-e2e-testing` 工作流 + `gda-e2e-analysis` 分析闭环）。
 - **页头批次级数值演变（2026-08 至 2026-10-30 的 L1/L2/ctest 计数史）**：见本页 git 历史（2026-10-30 版页头）与 [changelog/2026-10-23-log.md](changelog/2026-10-23-log.md)（现有最新一篇，其余各日按文件名检索）。
 
 ## 相关页面

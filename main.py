@@ -50,7 +50,7 @@ def _cmd_deploy(args: argparse.Namespace) -> None:
     if args.release:
         clean_ops._clean()
 
-    print(f"\n[DEPLOY] Copying {preset} artifacts to demo/*/addons/...", flush=True)
+    print(f"\n[DEPLOY] Copying {preset} artifacts to examples/*/addons/...", flush=True)
     deploy._deploy(preset, demos)
 
     print(f"\n[DONE] Deploy complete.", flush=True)
@@ -90,14 +90,14 @@ def main() -> None:
     p_build.add_argument("--debug", action="store_true", help="Debug build (default)")
     p_build.set_defaults(func=_cmd_build)
 
-    p_deploy = sub.add_parser("deploy", help="部署已构建产物到 demo/")
+    p_deploy = sub.add_parser("deploy", help="部署已构建产物到 examples/")
     p_deploy.add_argument("--release", action="store_true", help="部署 Release 产物（先清理，default: Debug）")
     p_deploy.add_argument("--debug", action="store_true", help="部署 Debug 产物（默认）")
     p_deploy.add_argument(
         "--demos",
         nargs="*",
         default=None,
-        help=f"仅部署到指定 demo（可选：{', '.join(DEMO_NAMES)}）",
+        help=f"仅部署到指定 example 工程（可选：{', '.join(DEMO_NAMES)}）",
     )
     p_deploy.set_defaults(func=_cmd_deploy)
 

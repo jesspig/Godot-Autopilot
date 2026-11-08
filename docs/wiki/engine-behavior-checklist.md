@@ -1,7 +1,7 @@
 ---
 type: 验收清单
 title: 引擎行为验收清单
-description: 已删除 L2 引擎轨 48 份用例蒸馏出的引擎行为验收点（按工具域分组）、历史事故回归点与 A 类迁移对照表；验收执行走 gda-demo-e2e 技能
+description: 已删除 L2 引擎轨 48 份用例蒸馏出的引擎行为验收点（按工具域分组）、历史事故回归点与 A 类迁移对照表；验收执行走 gda-e2e-testing 技能
 tags:
   - 测试
   - 验收
@@ -13,7 +13,7 @@ resource: src/tools/
 
 # 引擎行为验收清单
 
-> **随工具面演进维护，数值不设硬口径。** 本页收录已删除的 L2 引擎轨（48 份 `tests/config/*.json`，提交 `c023a5c` 删除）蒸馏出的**引擎触达行为验收点**，供 Agent e2e 验收时对照。本页条目随工具面增删改同步演进；页内数值只作行为描述、不作断言钉，测试计数引用 [tests.md](tests.md)「数值核算总表」口径。**验收执行走 [gda-demo-e2e 技能](../../.agents/skills/gda-demo-e2e/SKILL.md)**（衔接说明见页尾，技能流程零改动）。
+> **随工具面演进维护，数值不设硬口径。** 本页收录已删除的 L2 引擎轨（48 份 `tests/config/*.json`，提交 `c023a5c` 删除）蒸馏出的**引擎触达行为验收点**，供 Agent e2e 验收时对照。本页条目随工具面增删改同步演进；页内数值只作行为描述、不作断言钉，测试计数引用 [tests.md](tests.md)「数值核算总表」口径。**验收执行走 [gda-e2e-testing 技能](../../.agents/skills/gda-e2e-testing/SKILL.md)**（衔接说明见页尾，技能流程零改动）。
 
 ## 用途与边界
 
@@ -217,9 +217,9 @@ resource: src/tools/
 
 > 附注：mcp-cpp-sdk 客户端响应等待缺陷属已删除测试客户端（`tests/runner`）的缺陷，生产服务端不受影响，不构成引擎行为验收点，此处仅存目（旧 tests.md「已知遗留」）。
 
-## 与 gda-demo-e2e 的衔接
+## 与 gda-e2e-testing 的衔接
 
-- 验收执行走 [gda-demo-e2e 技能](../../.agents/skills/gda-demo-e2e/SKILL.md)：以 `demo/<名称>` 为场地、按其任务书与验收清单推进，本页的域条目与回归点作为**验收时的行为对照面**（发现偏离即记入该技能产出的问题记录）。
+- 验收执行走 [gda-e2e-testing 技能](../../.agents/skills/gda-e2e-testing/SKILL.md)：以 `examples/<名称>` 为场地、按其任务书与验收清单推进，本页的域条目与回归点作为**验收时的行为对照面**（发现偏离即记入该技能产出的问题记录）。
 - 本页不改变该技能流程；分析闭环由 [gda-e2e-analysis 技能](../../.agents/skills/gda-e2e-analysis/SKILL.md) 承接。测试计数口径见 [tests.md](tests.md)「数值核算总表」。
 
 ## A 类迁移对照表
@@ -270,4 +270,4 @@ resource: src/tools/
 - [测试体系（tests.md）](tests.md)——集成层 109 项的套件覆盖清单、回归属性清单与数值核算总表
 - [工具注册表（modules/tools_registry.md）](modules/tools_registry.md)——授权三档、排除划分与遍历判定
 - [领域工具 A 组（modules/tools_ops_a.md）](modules/tools_ops_a.md) / [B 组（modules/tools_ops_b.md）](modules/tools_ops_b.md)——各域工具实现细节
-- [gda-demo-e2e 技能](../../.agents/skills/gda-demo-e2e/SKILL.md)——验收执行载体
+- [gda-e2e-testing 技能](../../.agents/skills/gda-e2e-testing/SKILL.md)——验收执行载体
