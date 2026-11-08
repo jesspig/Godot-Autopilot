@@ -374,7 +374,7 @@ flowchart LR
 | 文档 | 声称 | 代码事实 | 判定 |
 |---|---|---|---|
 | AGENTS.md（构建段） | 暗示每个模块有成对的 `.cpp/.hpp` 参与 `add_library()` | `command_queue.hpp` 无对应 `.cpp`，header-only，不进 CMake 源列表 | 文档未明说，审计时需注意 |
-| README.md / README.zh-CN.md（前提） | "Godot 4.7+"（`README.md:5,53` / `README.zh-CN.md:5,53`） | demo 工程为 4.7（`demo/*/project.godot`），AGENTS.md 亦写 4.7 | 一致 ✓ |
+| README.md / README.zh-CN.md（前提） | "Godot 4.7+"（`README.md:5,53` / `README.zh-CN.md:5,53`） | demo 工程为 4.7（`examples/*/project.godot`），AGENTS.md 亦写 4.7 | 一致 ✓ |
 | README.md / README.zh-CN.md（安装） | "服务端自动启动……无需启用开关"（`README.md:65` / `README.zh-CN.md:65`） | cmdline/`GDA_FORCE_HEADLESS` 模式下 UI 与服务器被禁用（`main.cpp`） | 存在例外，描述不完整 |
 | AGENTS.md（架构/端口段） | 端口 9527、`/mcp`、`GODOT_AUTOPILOT_PORT` 覆盖、日志类别五枚举 | 全部与代码一致 | 一致 ✓ |
 | README.md / README.zh-CN.md（安全段） | 回环监听 + 端口 9527 + `/mcp`（`README.md:65` / `README.zh-CN.md:65`） | 环回与 `/mcp` 仍成立，但同端口新增了 `/api`（REST 面，需 Bearer 令牌），且端口可被自动分配到 20000–29999 | **描述不完整**（缺 REST 端点与自动分配端口） |
