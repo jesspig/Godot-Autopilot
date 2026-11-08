@@ -94,9 +94,11 @@ file(GLOB GDA_INTEGRATION_TEST_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/integration/*_test.cpp")
 
 if(GDA_INTEGRATION_TEST_SOURCES)
+    set(GDA_INTEGRATION_BUSINESS_SOURCES ${GDA_UNIT_BUSINESS_SOURCES})
+    list(FILTER GDA_INTEGRATION_BUSINESS_SOURCES EXCLUDE REGEX "/tests/unit/")
     add_executable(gda_integration_tests
         ${GDA_INTEGRATION_TEST_SOURCES}
-        ${GDA_UNIT_BUSINESS_SOURCES})
+        ${GDA_INTEGRATION_BUSINESS_SOURCES})
 
     add_dependencies(gda_integration_tests gda_skill_embed_header)
 
