@@ -7,6 +7,7 @@
 #include <mcp/server/McpServer.hpp>
 #include <mcp/transport/InMemoryTransport.hpp>
 
+#include <cstdlib>
 #include <memory>
 #include <string>
 
@@ -47,6 +48,32 @@ class IntegrationHarness : public ::testing::Test {
   mcp::JsonValue call(const std::string &name, const mcp::JsonValue &args) {
     return godot_autopilot::dispatch::call_handler(name, args);
   }
+};
+
+class IntegrationHarnessWithAllow : public IntegrationHarness {
+ public:
+  explicit IntegrationHarnessWithAllow(const char *allow_value)
+      : allow_value_(allow_value) {}
+
+  void SetUp() override {
+    const char *previous = std::getenv(kEnvAllow);
+    had_previous_ = previous != nullptr;
+    if (had_previous_)
+      previous_ = previous;
+    _putenv_s(kEnvAllow, allow_value_);
+    IntegrationHarness::SetUp();
+  }
+
+  void TearDown() override {
+    _putenv_s(kEnvAllow, had_previous_ ? previous_.c_str() : "");
+    IntegrationHarness::TearDown();
+  }
+
+ private:
+  static constexpr const char *kEnvAllow = "GODOT_AUTOPILOT_ALLOW";
+  const char *allow_value_;
+  bool had_previous_ = false;
+  std::string previous_;
 };
 
 } // namespace gda_integration
