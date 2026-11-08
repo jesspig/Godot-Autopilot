@@ -73,7 +73,7 @@ def _collect_package_files(lib_dir: Path, addon_dir: Path, required_libs: list[s
 def _package_addon(libs_dir: Path | None = None) -> None:
     """把插件内容打包为 dist/godot-autopilot-<version>.zip。
 
-    libs_dir 非空时从该目录收集平台库（三平台必须齐备）；否则从已部署的 demo
+    libs_dir 非空时从该目录收集平台库（三平台必须齐备）；否则从已部署的 example 工程
     目录收集（本平台库必须就位）。两条路径产出同构内容：平台库 + C# 桥源码 +
     gdextension 描述文件，均不含 .pdb。
     """
