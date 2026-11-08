@@ -87,6 +87,39 @@ if(GDA_UNIT_SOURCES)
 endif()
 
 # ====================================================================
+# gda_integration_tests — 程序化集成测试 (进程内, 零引擎零项目绑定)
+# 源清单走 glob, 新增 integration/*_test.cpp 后重新 configure 即注册。
+# ====================================================================
+file(GLOB GDA_INTEGRATION_TEST_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/integration/*_test.cpp")
+
+if(GDA_INTEGRATION_TEST_SOURCES)
+    set(GDA_INTEGRATION_BUSINESS_SOURCES ${GDA_UNIT_BUSINESS_SOURCES})
+    list(FILTER GDA_INTEGRATION_BUSINESS_SOURCES EXCLUDE REGEX "/tests/unit/")
+    add_executable(gda_integration_tests
+        ${GDA_INTEGRATION_TEST_SOURCES}
+        ${GDA_INTEGRATION_BUSINESS_SOURCES})
+
+    add_dependencies(gda_integration_tests gda_skill_embed_header)
+
+    target_include_directories(gda_integration_tests PRIVATE
+        ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests ${CMAKE_BINARY_DIR}/generated)
+    target_link_libraries(gda_integration_tests PRIVATE
+        godot-cpp mcp-server mcp-http mcp-client GTest::gtest_main)
+    if(MSVC)
+        target_link_options(gda_integration_tests PRIVATE "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>")
+    endif()
+
+    set_target_properties(gda_integration_tests PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED ON
+        LINK_SEARCH_START_STATIC ON
+        LINK_SEARCH_END_STATIC ON)
+
+    gtest_discover_tests(gda_integration_tests)
+endif()
+
+# ====================================================================
 # gda_test_runner — L2 引擎驱动测试执行器 (自管 Godot 进程, 不做 gtest 发现)
 # ====================================================================
 add_executable(gda_test_runner
