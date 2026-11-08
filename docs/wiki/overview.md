@@ -19,7 +19,7 @@ resource:
 > 09-18 补记：`README_zh.md` 已删除（英文 `README.md` + 中文 `README.zh-CN.md`/`README.zh-TW.md`/`README.ja.md`/`README.ko.md` 四个译本；工具口径 badge `tools-443+` / "Over 443 tools"），本页事实来源与工具总数段已改引新版 README。
 > 09-20 代码-文档一致性审计：`register_all.cpp` 的 `call_tool` 描述字符串实测仍为旧口径"386 非元（385 域 + `system_status`）"，与 391 域实测不符（09-18"已修正"注记失实，系审计记录错误，源码并未改动），本轮已随源码修正为"392 非元（391 域 + `system_status`）"（`register_all.cpp:407`；仅描述文本，无行为影响，L1 无精确断言）。
 > 09-19 ToolSpec 数据化重构：391 域工具 + `system_status` + 7 元工具全量改为 `ToolSpec` 数据记录（`make_spec_tool`），删除 `GDA_TOOL_CLASS`/`fn_tool.hpp`/`meta_tools.hpp`/`IMetaTool`/8 个 `schema_*_ops.cpp`/`schema_fills.hpp`/`tool_input_schema`；新增 `tool_args`（取参器）、`tool_pipeline`（`kObserve` 截图后处理）、`dynamic_spec_store`/`autopilot_tools`（用户脚本动态工具 + `user_tools` 授权门）、`tests/guard/` 迁移守卫；MCP 恒 7 元、catalog 399 不变；L1 243→255、L2 26→27 份（新增 `26_user_tools_code_mode`）、`ctest -E "^gda_runner_"` 256 项；遍历改为运行时枚举 392 条后按 `side_effect`/`mutating`/`dynamic` 排除（330 个进入两步骤全过）。
-> 事实来源：根 `README.md` / `README.zh-CN.md` / `AGENTS.md`、`CMakeLists.txt`、`cmake/Dependencies.cmake`、`.gitmodules`、`third_party/`、`src/main.cpp`、`src/core/server_context.cpp`、`src/tools/tool_spec.hpp`、`src/tools/tool_registry.hpp`、`src/tools/*_tools.hpp`、`src/tools/dispatch.cpp`、`src/prompts/prompt_handlers.cpp`、`src/prompts/debugger_prompts.cpp`、`src/resources/resource_handlers.cpp`、`demo/*/project.godot`、`demo/*/docs/`、`tests/testbed/project.godot`。
+> 事实来源：根 `README.md` / `README.zh-CN.md` / `AGENTS.md`、`CMakeLists.txt`、`cmake/Dependencies.cmake`、`.gitmodules`、`third_party/`、`src/main.cpp`、`src/core/server_context.cpp`、`src/tools/tool_spec.hpp`、`src/tools/tool_registry.hpp`、`src/tools/*_tools.hpp`、`src/tools/dispatch.cpp`、`src/prompts/prompt_handlers.cpp`、`src/prompts/debugger_prompts.cpp`、`src/resources/resource_handlers.cpp`、`demo/*/project.godot`、`demo/*/docs/`。
 > 09-20 随 Release 触发修复同步一致性核查行——tag 触发改为双格式（`v*.*.*` / `[0-9]*.*.*`）+ `workflow_dispatch` 手动指定 tag；同日代码-文档一致性审计——`call_tool` 描述口径随源码修正为 392 非元（391 域 + `system_status`），tests 目录数 255/27→269/28。
 > 09-20 可重放监控与双目录持久化批次：新增 `src/core/` 的 LogPersist（日志/trace 双目录落盘与修剪）、TraceRecorder（结构化事件环形缓冲）、sanitize_policy（脱敏开关），`LogSystem` 增 `log_detailed`/`detail` 且 `filter_text` 兼匹配 detail；`SpecTool::execute`/`dispatch`/`tool_invoke` 埋点记录 trace（跨线程 span 上下文 + 排队等待）；McpLogDock 增 Detail 切换与 Open Logs、McpConfigDock 增 Desensitize data 复选框；`write_file` APPEND 首建回退修复。计数：L1 269→285（unit 31 文件）、L2 28→29（`29_trace_persistence`）、ctest 299→316；工具总数 399 不变。详见 [测试体系](tests.md) 与 [核心模块](modules/core.md)。
 > 09-20 晚依赖升级：godot-cpp 10.0.0-rc2→10.0.0-stable（commit `507ed9d`）；mcp-cpp-sdk 维持 0.3.4（commit `e2ed352`，依赖升级范围经复核收缩，configure 实测 `[mcp] SDK version: 0.3.4`）；`AGENTS.md` 与 wiki 三页（build/conventions/overview）同步。
@@ -116,7 +116,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 | JSON | mcp::JsonValue（SDK 内置，自研解析器） | mcp-cpp-sdk 内置（0.3.x 起移除 simdjson） |
 | 构建 | CMake 3.28+（`cmake_minimum_required(3.28...4.2)`）、C++17、生成器双路径预设（有 ninja 用 `debug`/`release`，无则 `debug-portable`/`release-portable`） | 根 `CMakeLists.txt`、`CMakePresets.json`、`scripts/config.py` |
 | 编译 | 优先 Clang/clang-cl 自动探测，MSVC/GCC 回退；sccache/ccache、LTO（ThinLTO/LTCG/IPO）、Unity 构建、作业池（仅 Ninja 注册）、按 ninja 可用性自动选预设 | `cmake/BuildOptimization.cmake`、`scripts/cmake_ops.py` 等 |
-| 测试 | googletest（`third_party/googletest` 子模块，tag `v1.15.2` / commit `b514bdc`，L1）；自研 `gda_test_runner` + `tests/config/*.json`（L2） | `tests/` |
+| 测试 | googletest（`third_party/googletest` 子模块，tag `v1.15.2` / commit `b514bdc`；单元 + 集成两层 gtest，程序化四层口径见 [tests.md](./tests.md)） | `tests/` |
 
 构建优化参数分两类：`GDA_COMPILE_JOBS`、`GDA_LINK_JOBS` 支持 CACHE（`-D`）与进程环境变量双通道；其余（`GDA_UNITY_BUILD`、`GDA_UNITY_BATCH_SIZE`、`GDA_MAX_COMPILE_MEM_MB`、`GDA_MAX_LINK_MEM_MB`、`GDA_UNITY_MEM_MB`）仅支持 `-D` CACHE 参数；`GDA_ARCH`、`GDA_IS_CI` 为探测结果变量，`GDA_CCACHE`/`GDA_SCCACHE` 为 `find_program` 探测结果（均非用户配置入口）。详见 [build.md](./build.md)。
 
@@ -147,7 +147,7 @@ godot-self-driving/
 │   │                           #   header-only（10 个）：json_godot、rid_registry、scene_path、project_path、type_hint、gdscript_wrap、resource_fs、mcp_image_content、inline_resource_json、owned_exception
 ├── skills/                     # 插件技能书源（标准 Agent Skills 目录布局：9 册各一 SKILL.md + references/；共 35 个文件 = 9 个 SKILL.md + 26 个 references .md）
 ├── cli/                        # CLI 载体（Bun + TS 源码直跑，零运行时依赖）：bin/gda.ts 入口 + src/ 35 个 .ts（含 src/mcp/ 协议客户端、src/api/ REST 客户端、src/serve/ 控制面 3 个、src/commands/ 17 个）+ tests/ 17 文件 282 项（280 pass + 2 skip，786 次 expect() 运行时调用）
-├── tests/                      # L1 gda_unit_tests（871 个 gtest，74 文件）+ L2 gda_test_runner + config/*.json（47 份）+ testbed/（L2 测试床工程）+ guard/ 迁移守卫、注释守卫、主线程守卫、版本同步守卫、源清单守卫 + scripts/ CLI 契约与单测 + probe/ 传输探针
+├── tests/                      # 单元 gda_unit_tests + 集成 gda_integration_tests（gtest，数值见 tests.md 数值核算总表）+ runner/（仅 config_loader）+ guard/ 迁移守卫、注释守卫、主线程守卫、版本同步守卫、源清单守卫 + scripts/ CLI 契约与单测 + probe/ 传输探针
 ├── docs/                       # 本知识库（docs/wiki/，含 modules/、plans/、changelog/）
 ├── package.json                # CLI 包定义（name godot-autopilot-cli，bin gda → cli/bin/gda.ts，零运行时依赖）
 ├── bun.lock                    # CLI devDependency 锁（@types/bun + typescript）
@@ -202,7 +202,7 @@ flowchart LR
 - 端口 9527、`/mcp`、`GODOT_AUTOPILOT_PORT`：`README.md`（英）/ `README.zh-CN.md`、AGENTS.md、代码三方一致 ✓
 - 工具总数：`README.md`（英）/ `README.zh-CN.md` 口径为 badge `tools-452+`（`README.md:8` / `README.zh-CN.md:8`）与“Over 452 tools”（`README.md:26`，451 域工具 + `system_status` 口径，数量随版本增长以 `search_tools` 查到的为准），与 wiki 实测的 **451 域工具 + `system_status` = 452**（域工具以工具 category 字段统计为准）一致；wiki 另计 7 元工具，故 MCP 可达 **458** / catalog **459**；`ToolRegistry`/catalog 口径自洽（registry 459 = 451 域 + `system_status` + 7 元）✓
 - CI：`.github/workflows/{ci,release}.yml`（develop 触发 CI、tag 双格式 `v*.*.*` / `[0-9]*.*.*` 触发 Release，另支持 `workflow_dispatch` 手动指定 tag），AGENTS.md 声称属实 ✓
-- 目标引擎 4.7：与 `demo/*/project.godot` 及 `tests/testbed/project.godot` 的 features 一致 ✓；README 前提已为“Godot 4.7+”（`README.md:5,53` / `README.zh-CN.md:5,53`，与 wiki 的 `compatibility_minimum` 4.7 口径一致）
+- 目标引擎 4.7：与 `demo/*/project.godot` 的 features 一致 ✓；README 前提已为“Godot 4.7+”（`README.md:5,53` / `README.zh-CN.md:5,53`，与 wiki 的 `compatibility_minimum` 4.7 口径一致）
 - 详细对照见 [modules/core.md](./modules/core.md) 的"不一致点"章节
 
 ## 相关页面

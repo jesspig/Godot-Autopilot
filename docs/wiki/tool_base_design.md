@@ -153,7 +153,7 @@ L1 `dispatch_budget_test` 覆盖预算决策与队列不可用返回 **14 项**�
 - **脚本约定**：实例须提供实例方法 `register_autopilot_tools(api)`，方法内调 `api.register_tool(definition, Callable(...))`；缺该方法的文件记 error 跳过；同名（含与内置工具碰撞）注册被拒绝，故二次 rescan 同一目录无新增 `registered`（幂等）。
 - **实例处置**：调用完成后无父节点的 `Node` 型实例会被释放（`memdelete`），非 `Node` 非 `RefCounted` 同样释放——仅 `RefCounted` 派生宿主安全（示例均用 `RefCounted`）。
 - **示例**：`samples/user-tools/echo_tool.gd`（GDScript）与 `echo_tool.cs`（C# 文档级示例：rescan 只扫描 `.gd`，C# 需编译后手动注册；`dotnet 10.0.302` 本机可用，但仓库无 .NET 编译验证环节，未经本仓库 CI 验证）。
-- **覆盖**：L2 `tests/config/27_user_tools_rescan.json` 端到端（写 probe → rescan 注册 → MCP 调用 → 二次 rescan 幂等 → 清理；需 `code_execute` + `user_tools` 授权，env 优先陷阱同 26 号）。
+- **覆盖**：历史 L2 用例 `27_user_tools_rescan.json`（2026-11 随引擎轨删除，语义蒸馏见 [engine-behavior-checklist.md](./engine-behavior-checklist.md) 域 12：写 probe → rescan 注册 → MCP 调用 → 二次 rescan 幂等 → 清理；需 `code_execute` + `user_tools` 授权）；现由 Agent e2e 在 demo 场地覆盖。
 
 ### C#（.NET 版编辑器）鸭子类型示例
 

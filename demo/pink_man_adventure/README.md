@@ -18,7 +18,7 @@ uv run main.py deploy --demos pink_man_adventure
 ## 说明
 
 - 本工程无主场景，打开编辑器后不直接运行游戏。
-- 自动化 L2 回归测试床在仓库的 `tests/testbed/`，本工程不参与 ctest。
+- 引擎行为端到端验收由 `gda-demo-e2e` Agent 工作流在本工程场地进行（历史 L2 自动化回归测试床已于 2026-11 删除），本工程不参与 ctest。
 - 本工程由历史提交 `6c50b99^` 的 `Example/` 还原而来，目录名与工程名已按项目命名。
 
 ## License
