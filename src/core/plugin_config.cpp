@@ -20,8 +20,8 @@
 #include "core/path_util.hpp"
 #include "core/storage/storage_paths.hpp"
 #include "core/observability/log_system.hpp"
-#include "tools/authorization.hpp"
-#include "tools/runtime_ops.hpp"
+#include "tools/base/authorization.hpp"
+#include "tools/base/runtime_ops.hpp"
 #include "util/project_path.hpp"
 
 namespace godot_autopilot {

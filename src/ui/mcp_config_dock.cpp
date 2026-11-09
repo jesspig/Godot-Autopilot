@@ -22,7 +22,7 @@
 #include "core/storage/project_store.hpp"
 #include "core/observability/sanitize_policy.hpp"
 #include "core/storage/storage_paths.hpp"
-#include "tools/authorization.hpp"
+#include "tools/base/authorization.hpp"
 #include "ui/authorization_switches.hpp"
 #include "util/project_path.hpp"
 

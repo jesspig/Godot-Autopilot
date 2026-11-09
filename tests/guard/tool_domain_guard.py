@@ -4,7 +4,7 @@
 判定规则：
   1. src/tools/<X>_tools.hpp 必须存在至少一个 src/tools/<X>_ops.cpp 或
      <X>_<子域>_ops.cpp（同一目录平铺，非递归）；
-  2. <X>_tools.hpp 中出现的每个 <ns>::handle_xxx 必须在某个 src/tools/*.cpp 中
+  2. <X>_tools.hpp 中出现的每个 <ns>::handle_xxx 必须在某个 src/tools/**/*.cpp 中
      以函数定义形式出现，防止声明存在而实现缺失的悬空引用。
 
 元工具模块（autopilot_tools.hpp 不承载域工具）登记在 META_MODULES 中豁免规则 1。
@@ -29,14 +29,13 @@ CALLBACK_DEF = re.compile(
 
 
 def ops_files_of(domain):
-    exact = TOOLS_DIR / (domain + "_ops.cpp")
+    exact_name = domain + "_ops.cpp"
     pattern = re.compile("^" + re.escape(domain) + r"_[a-z0-9_]+\.cpp$")
     found = []
-    if exact.is_file():
-        found.append(exact)
-    for path in sorted(TOOLS_DIR.glob("*.cpp")):
-        if pattern.match(path.name) is not None and path not in found:
-            found.append(path)
+    for path in sorted(TOOLS_DIR.rglob("*.cpp")):
+        if path.name == exact_name or pattern.match(path.name) is not None:
+            if path not in found:
+                found.append(path)
     return found
 
 
@@ -59,7 +58,7 @@ def check(domain, tools_text, ops_present, defined):
             + domain + "_*_ops.cpp）"
         )
     for name in sorted(callbacks_referenced(tools_text) - defined):
-        problems.append(domain + "_tools.hpp: 引用的 " + name + " 在任何 src/tools/*.cpp 中都没有定义")
+        problems.append(domain + "_tools.hpp: 引用的 " + name + " 在任何 src/tools/**/*.cpp 中都没有定义")
     return problems
 
 
@@ -90,7 +89,7 @@ def main():
 
     cpp_texts = []
     try:
-        for path in sorted(TOOLS_DIR.glob("*.cpp")):
+        for path in sorted(TOOLS_DIR.rglob("*.cpp")):
             cpp_texts.append(path.read_text(encoding="utf-8", errors="replace"))
     except OSError as exc:
         print("tool-domain-guard: 读取实现文件失败: " + str(exc), file=sys.stderr)
@@ -99,7 +98,7 @@ def main():
     defined = callbacks_defined(cpp_texts)
     problems = []
     domains = 0
-    for path in sorted(TOOLS_DIR.glob("*_tools.hpp")):
+    for path in sorted(TOOLS_DIR.rglob("*_tools.hpp")):
         matched = DOMAIN_FILE.match(path.name)
         if matched is None:
             continue

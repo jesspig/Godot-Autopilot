@@ -1,4 +1,4 @@
-#include "tools/text_ops.hpp"
+#include "tools/domains/text/text_ops.hpp"
 
 #include <gtest/gtest.h>
 

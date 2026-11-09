@@ -9,7 +9,7 @@
 #include "prompts/prompt_setup_gui.hpp"
 #include "prompts/prompt_setup_input_map.hpp"
 #include "prompts/prompt_tool_usage.hpp"
-#include "tools/dispatch.hpp"
+#include "tools/base/dispatch.hpp"
 #include <mcp/Content.hpp>
 #include <mcp/McpError.hpp>
 #include <memory>

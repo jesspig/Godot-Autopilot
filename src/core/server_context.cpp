@@ -7,9 +7,9 @@
 #include "prompts/prompt_handlers.hpp"
 #include "resources/debugger_resources.hpp"
 #include "resources/resource_handlers.hpp"
-#include "tools/register_all.hpp"
-#include "tools/dispatch.hpp"
-#include "tools/tool_catalog.hpp"
+#include "tools/base/register_all.hpp"
+#include "tools/base/dispatch.hpp"
+#include "tools/base/tool_catalog.hpp"
 #include "util/bm25_index.hpp"
 #include "core/observability/monitor.hpp"
 #include <cstdlib>
@@ -37,7 +37,7 @@
 #include "core/storage/instance_guard.hpp"
 #include "core/storage/instance_registry.hpp"
 #include "core/transport/mcp_http_shim.hpp"
-#include "tools/tool_execute.hpp"
+#include "tools/base/tool_execute.hpp"
 #include "util/api_host_context.hpp"
 
 namespace godot_autopilot {

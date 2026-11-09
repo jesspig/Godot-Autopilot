@@ -1,4 +1,4 @@
-#include "tools/authorization.hpp"
+#include "tools/base/authorization.hpp"
 
 #include <gtest/gtest.h>
 
@@ -7,8 +7,8 @@
 #include <string>
 
 #include "core/command_queue.hpp"
-#include "tools/runtime_ops.hpp"
-#include "tools/tool_base.hpp"
+#include "tools/base/runtime_ops.hpp"
+#include "tools/base/tool_base.hpp"
 
 namespace {
 

@@ -1,6 +1,6 @@
 #include "core/config.hpp"
-#include "tools/dispatch.hpp"
-#include "tools/tool_spec.hpp"
+#include "tools/base/dispatch.hpp"
+#include "tools/base/tool_spec.hpp"
 
 #include <gtest/gtest.h>
 

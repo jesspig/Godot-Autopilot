@@ -33,9 +33,9 @@
 #include "core/scene_dirty_tracker.hpp"
 #include "core/server_context.hpp"
 #include "runtime/game_bridge.hpp"
-#include "tools/autopilot_tools.hpp"
-#include "tools/debugger_ops.hpp"
-#include "tools/runtime_ops.hpp"
+#include "tools/base/autopilot_tools.hpp"
+#include "tools/domains/debugger/debugger_ops.hpp"
+#include "tools/base/runtime_ops.hpp"
 #include "ui/mcp_config_dock.hpp"
 #include "ui/mcp_log_dock.hpp"
 

@@ -16,7 +16,7 @@ resource:
   - src/core/transport/api_token.cpp
   - src/core/transport/api_server.cpp
   - src/core/transport/http_transport.cpp
-  - src/tools/tool_execute.cpp
+  - src/tools/base/tool_execute.cpp
 ---
 
 # REST 接口面（`/api`）
@@ -36,11 +36,11 @@ resource:
 
 **REST 是 MCP 的超集**：MCP 面上可达的工具（458 = 7 元 + 451 域）在 REST 面上同样可达，且 REST 额外直接暴露 `system_status` 与 7 个元工具，无需 `call_tool` 代理。因此「先 REST 发现、再 MCP 编排」是合法的组合用法。
 
-两套面共用同一监听端口与同一个 `CommandQueue`——所有 Godot API 仍只在主线程执行，REST 的工具调用同样经 [`src/tools/dispatch.cpp`](../../../src/tools/dispatch.cpp) 的带预算派发入口排队，不存在绕过主线程的第二条路径。
+两套面共用同一监听端口与同一个 `CommandQueue`——所有 Godot API 仍只在主线程执行，REST 的工具调用同样经 [`src/tools/base/dispatch.cpp`](../../../src/tools/base/dispatch.cpp) 的带预算派发入口排队，不存在绕过主线程的第二条路径。
 
 ### 执行入口与接线现状
 
-REST 面的工具调用走 `api_surface::execute_tool(name, args)`。该函数有一个**执行器槽位**（`api_surface::register_tool_executor`），槽位为空时回落到默认实现 `default_execute_tool`；默认实现调用统一执行入口 `tools::execute_tool(name, args)`（[`src/tools/tool_execute.cpp`](../../../src/tools/tool_execute.cpp) 的 `tools::execute_tool_chain`：导出拦截 → 工具存在 → 参数校验 → 授权 → 派发 → 信封）。
+REST 面的工具调用走 `api_surface::execute_tool(name, args)`。该函数有一个**执行器槽位**（`api_surface::register_tool_executor`），槽位为空时回落到默认实现 `default_execute_tool`；默认实现调用统一执行入口 `tools::execute_tool(name, args)`（[`src/tools/base/tool_execute.cpp`](../../../src/tools/base/tool_execute.cpp) 的 `tools::execute_tool_chain`：导出拦截 → 工具存在 → 参数校验 → 授权 → 派发 → 信封）。
 
 **生产注册点**：`src/core/server_context.cpp` 的 `register_unified_tool_executor()`，在 `start()` 内、`ApiServer::start()` 之前执行，把 `tools::execute_tool_chain` 注册进执行器槽位（见 `tools::register_tool_executor`）。因此 REST 请求的实际派发链路是：
 
@@ -173,7 +173,7 @@ REST 面刻意做得比 MCP 面宽松，目的是让「不做 MCP 握手的客�
 
 1. **无会话、无握手**：REST 面不要求 `initialize`，不发 `notifications/initialized`，不维护会话状态。请求彼此独立，服务端不记住调用方。
 2. **请求体即参数**：工具参数对象就是请求体本身，不套 `arguments` 包装层（与 MCP 面的 `call_tool` 不同——后者是 `{name, arguments}` 双层结构）。
-3. **未知参数宽容**：参数校验器（[`src/tools/argument_validator.cpp`](../../../src/tools/argument_validator.cpp)）把未声明的键**不视为错误**——只记一条 Warning（`unknown parameters ignored: ...`）后忽略；缺必填参数或类型不符才返回 400。该校验器挂在统一执行入口上且 REST 面已接线（见上「执行入口与接线现状」），宽容口径由校验器统一实施。
+3. **未知参数宽容**：参数校验器（[`src/tools/base/argument_validator.cpp`](../../../src/tools/base/argument_validator.cpp)）把未声明的键**不视为错误**——只记一条 Warning（`unknown parameters ignored: ...`）后忽略；缺必填参数或类型不符才返回 400。该校验器挂在统一执行入口上且 REST 面已接线（见上「执行入口与接线现状」），宽容口径由校验器统一实施。
 4. **批量不因单项失败而改状态码**：批量恒 200，逐项成败看 `results[]`。
 5. **工具名宽松**：路径里的工具名允许百分号编码，且字符集比严格标识符宽（多一个点号）。
 6. **免认证的存活口**：只有 `/api/health` 免认证，且只回存活、版本、端口、进程号——不泄露任何工程内容。

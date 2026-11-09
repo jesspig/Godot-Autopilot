@@ -29,9 +29,9 @@ resource: src/tools/
 
 > 09-20 可重放监控批次增补：`text_ops` 的 `write_file` `mode=APPEND` 在 `READ_WRITE` 打开失败时回退 `WRITE`（首次追加不再失败）；`game_ops`/`code_exec_ops`/`capture_ops` 的若干告警改 `log_detailed` 携带诊断 detail（游戏 job 过期/表满、batch 引用错误、截图完成参数），行为不变，详见 [核心模块](core.md) 的 LogSystem 小节。
 
-> 覆盖 `src/tools/` 下 26 个 `.cpp` handler 模块：debug_ops、debugger_ops、debugger_access、display_ops、display_window_ops、os_ops、os_file_dir_ops（10-11 新增，handler 挂 `os_tools`）、runtime_ops、game_ops、audio_ops、render_ops、render_environment_ops、text_ops、tilemap_ops、tileset_ops、gridmap_ops（10-11 新域）、spriteframes_ops、animation_ops、theme_ops、tween_ops（10-11 新域）、analyze_ops、test_ops、code_exec_ops、log_ops、capture_ops（另有 09-18 新增 `src/runtime/game_bridge_verify.cpp` 游戏侧验证辅助）、csharp_bridge_ops（10-12 新增，handler 挂 `csharp_bridge_tools`）；基础设施 `src/tools/ready_policy.hpp`（09-29 新增，游戏请求就绪决策纯函数）。（09-16 随坐标换算/键名统一/CJK 往返批次同步——text_ops 全链路 `String::utf8` + 诊断 IGNORE 装载、click_game_ui 窗口坐标与键名错误文案；09-17 随 T09+T12 文档同步批次更新输入释放 flush、click 文本选择/annotate 序号与改脚本工作流；09-18/09-19 工具数 385→391 / B 组 192→195，工具声明全量改为 `ToolSpec`；09-29 随工具语义与韧性批次同步——域工具按运行时核算 392（B 组 195）、全系统 400，SceneTree 八工具改经游戏通道 `scene_tree` op 转发（`GameRuntime`）、全部游戏通道工具新增 `wait_ready` 就绪排队与重放、`execute_game_script` 支持裸语句自动包装（`wrapped:true`）、`scene_verify` 改可落盘集合口径、theme 写后 `verified` 回读。）
+> 覆盖 `src/tools/` 下 26 个 `.cpp` handler 模块：debug_ops、debugger_ops、debugger_access、display_ops、display_window_ops、os_ops、os_file_dir_ops（10-11 新增，handler 挂 `os_tools`）、runtime_ops、game_ops、audio_ops、render_ops、render_environment_ops、text_ops、tilemap_ops、tileset_ops、gridmap_ops（10-11 新域）、spriteframes_ops、animation_ops、theme_ops、tween_ops（10-11 新域）、analyze_ops、test_ops、code_exec_ops、log_ops、capture_ops（另有 09-18 新增 `src/runtime/game_bridge_verify.cpp` 游戏侧验证辅助）、csharp_bridge_ops（10-12 新增，handler 挂 `csharp_bridge_tools`）；基础设施 `src/tools/base/ready_policy.hpp`（09-29 新增，游戏请求就绪决策纯函数）。（09-16 随坐标换算/键名统一/CJK 往返批次同步——text_ops 全链路 `String::utf8` + 诊断 IGNORE 装载、click_game_ui 窗口坐标与键名错误文案；09-17 随 T09+T12 文档同步批次更新输入释放 flush、click 文本选择/annotate 序号与改脚本工作流；09-18/09-19 工具数 385→391 / B 组 192→195，工具声明全量改为 `ToolSpec`；09-29 随工具语义与韧性批次同步——域工具按运行时核算 392（B 组 195）、全系统 400，SceneTree 八工具改经游戏通道 `scene_tree` op 转发（`GameRuntime`）、全部游戏通道工具新增 `wait_ready` 就绪排队与重放、`execute_game_script` 支持裸语句自动包装（`wrapped:true`）、`scene_verify` 改可落盘集合口径、theme 写后 `verified` 回读。）
 >
-> 工具总数（全系统）：**459**（`ToolRegistry`/catalog/index 口径）= **451 个领域工具**（33 个域 `*_tools.hpp` 的 `make_tools()`，每工具一份 `ToolSpec`，经 `register_all.cpp` 注册）+ `system_status` 1 + **7 个元工具**；schema 统计 393 非空 + 66 空，遍历候选与排除以运行时报告为准（旧基线 322 / 71 已过时，见 [../tests.md](../tests.md)）。本页 B 组占其中 **229 个领域工具**（A 组 222 + B 组 229 = 451）；`code_execute`/`batch_execute` 为元工具经 `server.RegisterTool()` 直连、`system_status` 单独注册。数量以 `src/tools/*_tools.hpp` 声明与 `ToolRegistry` 运行时注册为准。
+> 工具总数（全系统）：**459**（`ToolRegistry`/catalog/index 口径）= **451 个领域工具**（33 个域 `*_tools.hpp` 的 `make_tools()`，每工具一份 `ToolSpec`，经 `register_all.cpp` 注册）+ `system_status` 1 + **7 个元工具**；schema 统计 393 非空 + 66 空，遍历候选与排除以运行时报告为准（旧基线 322 / 71 已过时，见 [../tests.md](../tests.md)）。本页 B 组占其中 **229 个领域工具**（A 组 222 + B 组 229 = 451）；`code_execute`/`batch_execute` 为元工具经 `server.RegisterTool()` 直连、`system_status` 单独注册。数量以 `src/tools/domains/*/*_tools.hpp` 声明与 `ToolRegistry` 运行时注册为准。
 >
 > 相关页面：[工具注册表](../modules/tools_registry.md) · [运行时通道](../modules/entry_runtime.md)
 
@@ -220,7 +220,7 @@ resource: src/tools/
 
 ## gridmap_ops — 体素网格地图（5 工具，10-11 新域）
 
-- **职责**：编辑场景 `GridMap` 节点创建与体素填充，归 TileMap 类（`src/tools/gridmap_tools.hpp` + `src/tools/gridmap_ops.{hpp,cpp}`，经 `register_all.cpp` 注册）。
+- **职责**：编辑场景 `GridMap` 节点创建与体素填充，归 TileMap 类（`src/tools/domains/gridmap/gridmap_tools.hpp` + `src/tools/gridmap_ops.{hpp,cpp}`，经 `register_all.cpp` 注册）。
 - **代表工具**：`create_gridmap`、`create_meshlibrary_item`、`set_gridmap_cell`、`fill_gridmap_box`、`get_gridmap_used_cells`。
 - **关键事实**：
   - `create_gridmap` 建 GridMap 节点（可选 `cell_size {x,y,z}` 全分量 >0、`parent_path`），MeshLibrary 后续经 `property_set` 挂载或用 `create_meshlibrary_item` 构建条目后引用。
@@ -230,7 +230,7 @@ resource: src/tools/
 
 ## tween_ops — 补间动画（4 工具，10-11 新域）
 
-- **职责**：运行中游戏属性补间与编辑器侧预览，归 Game 类（`src/tools/tween_tools.hpp` + `src/tools/tween_ops.{hpp,cpp}`，经 `register_all.cpp` 注册）。
+- **职责**：运行中游戏属性补间与编辑器侧预览，归 Game 类（`src/tools/domains/tween/tween_tools.hpp` + `src/tools/tween_ops.{hpp,cpp}`，经 `register_all.cpp` 注册）。
 - **代表工具**：`create_game_tween`、`control_game_tween`、`get_game_tween_list`、`tween_editor_property`。
 - **关键事实**：
   - 游戏侧 3 工具经运行时调试通道（`wait_ready` 排队语义与 game 工具一致）：`create_game_tween` 需 `node_path`/`property`/`duration>0` + `target_value`（与 `execute_game_script` set_property 同转换链），返回游戏侧 tween 句柄；`control_game_tween` 按句柄 play/pause/stop/kill；`get_game_tween_list` 只读（`SideEffect::None` + `kNone`，不排除遍历）。
@@ -305,7 +305,7 @@ resource: src/tools/
   4. **执行** `run_with_timeout`：`memnew(Node)` + `set_script` 挂到 SceneTree 根（失败则挂编辑场景根），`TempNodeGuard` 确保析构回收；**协作式执行期超时**——wrapper 注入 `__gda_deadline_ms` 声明与循环检查点（`gdscript_wrap::inject_deadline_checks` + `insert_entry_check`，deadline 起算于 handler 入口之后的包装时刻），长循环在截止时刻退出并返回 `code="exec_timeout"`（`dispatch::exec_timeout_result`）。
   5. **结果回收** `reconcile_leaked_children`：执行后比对编辑场景根的子节点数，`auto_owner=true` 递归 `set_owner`（计入 auto_owner_set），false 则删除无主新子节点。
   - **SceneRoot 暴露**：wrapper 内 `var SceneRoot := EditorInterface.get_edited_scene_root()`；错误提示说明执行节点在 `/root` 下、须经 `SceneRoot.get_node("Child")` 访问编辑场景节点。
-  - **timeout_ms**：默认 5000；上界由 `code_exec_ops::max_timeout_ms()` 单一来源给出——取 `min(GDA_CODE_EXEC_MAX_TIMEOUT_MS = 27000, 生效长阻塞派发预算)`（`src/tools/code_exec_ops.cpp:464-470`），默认环境下为 **27000ms**；非正值回落默认，越界值直接报错而非静默接受。派发侧余量 2000ms（`GDA_CODE_EXEC_BUDGET_MARGIN_MS`）保证脚本 deadline 先于派发预算到期，传输侧余量 2000ms（`GDA_CODE_EXEC_TRANSPORT_MARGIN_MS`）保证结构化超时结果能在传输硬超时前回到客户端。该值同时写入 schema 的 `maximum`（`register_all.cpp:568-577`）与提示词（`prompt_tool_usage.cpp:504`）。
+  - **timeout_ms**：默认 5000；上界由 `code_exec_ops::max_timeout_ms()` 单一来源给出——取 `min(GDA_CODE_EXEC_MAX_TIMEOUT_MS = 27000, 生效长阻塞派发预算)`（`src/tools/base/code_exec_ops.cpp:464-470`），默认环境下为 **27000ms**；非正值回落默认，越界值直接报错而非静默接受。派发侧余量 2000ms（`GDA_CODE_EXEC_BUDGET_MARGIN_MS`）保证脚本 deadline 先于派发预算到期，传输侧余量 2000ms（`GDA_CODE_EXEC_TRANSPORT_MARGIN_MS`）保证结构化超时结果能在传输硬超时前回到客户端。该值同时写入 schema 的 `maximum`（`register_all.cpp:568-577`）与提示词（`prompt_tool_usage.cpp:504`）。
   - 返回字段：result（`VariantJson::serialize`）、execution_time_ms、auto_owner_set、wrapped_source、output（≤8192）、runtime_error/error_details/structured_error（首行解析 file/line/message）。
   - 结果为 Resource 时自动 `resource_registry::register_resource`（registered_resource 字段）。
   - **异步 game 工具的 pending 语义（09-14 起，09-16 扩展 await_async）**：`operations` 里异步 game 工具返回的中间态 `{"__gda_pending": id}` 经 `runtime_ops::payload_is_pending` 识别——`await_async=false`（默认）时该条报错并释放 pending（不再假报成功，游戏侧随后到达的响应按迟到响应处理）；`await_async=true` 时等待真实结果合并进该条（**必须直接调用 `batch_execute`**；经 `call_tool` 间接调用会在主线程兜底报错）。响应新增 `pending` 计数，`total` = succeeded + failed + pending，`skipped` 为 `stop_on_error` 截断后未执行数。

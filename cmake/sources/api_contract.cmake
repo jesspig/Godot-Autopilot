@@ -5,6 +5,6 @@
 # 不改根 CMakeLists.txt，避免多分支归并冲突。
 # ====================================================================
 set(GDA_API_CONTRACT_SOURCES
-    src/tools/tool_execute.cpp
-    src/tools/argument_validator.cpp
+    src/tools/base/tool_execute.cpp
+    src/tools/base/argument_validator.cpp
     src/core/transport/api_envelope.cpp)

@@ -5,7 +5,7 @@
 #include <string>
 
 #include "core/observability/monitor.hpp"
-#include "tools/tool_invoke.hpp"
+#include "tools/base/tool_invoke.hpp"
 
 namespace godot_autopilot {
 

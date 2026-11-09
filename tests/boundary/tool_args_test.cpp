@@ -1,6 +1,6 @@
 
-#include "tools/schema_builder.hpp"
-#include "tools/tool_args.hpp"
+#include "tools/base/schema_builder.hpp"
+#include "tools/base/tool_args.hpp"
 
 #include <gtest/gtest.h>
 

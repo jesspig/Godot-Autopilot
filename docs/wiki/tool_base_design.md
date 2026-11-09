@@ -82,11 +82,11 @@ class SpecTool : public ToolBase, public ISideEffect {
 - `kHealthProbe`（`ping`/`system_status`）→ 健康预算，默认 `GDA_DISPATCH_WAIT_HEALTH_MS = 5000ms`（env `GODOT_AUTOPILOT_HEALTH_TIMEOUT_MS`）；
 - 其余工具 → 默认预算 `GDA_DISPATCH_WAIT_DEFAULT_MS = 27000ms`（env `GODOT_AUTOPILOT_DISPATCH_TIMEOUT_MS`，`static_assert` 低于 `GDA_TRANSPORT_TIMEOUT_MS = 30000`，保证超时错误能送达客户端）。
 
-**`code_execute` 的 `timeout_ms` 上界与派发预算同源（10-20 起）**：上界不是写死的字面量，而是由 `code_exec_ops::max_timeout_ms()`（`src/tools/code_exec_ops.cpp:464-470`）在运行期算出——取 `min(GDA_CODE_EXEC_MAX_TIMEOUT_MS = 27000, 生效长阻塞派发预算)`；生效派发预算默认 29000ms（`src/tools/dispatch.cpp:280-286`），故默认环境下上界为 **27000ms**；若 `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS` 把预算下调，上界随之下调。派发侧余量 2000ms（`GDA_CODE_EXEC_BUDGET_MARGIN_MS`，`src/core/config.hpp:46`）保证脚本 deadline 先于派发预算到期，传输侧余量 2000ms（`GDA_CODE_EXEC_TRANSPORT_MARGIN_MS`，`src/core/config.hpp:47`）保证结构化超时结果能在传输硬超时前回到客户端。该值有三处消费且都取自同一实现点：handler 的参数校验（`code_exec_ops.cpp:963-973`）、schema 的 `maximum`（`register_all.cpp:568-577`）、提示词的「最大 …ms」拼串（`prompt_tool_usage.cpp:504`）。
+**`code_execute` 的 `timeout_ms` 上界与派发预算同源（10-20 起）**：上界不是写死的字面量，而是由 `code_exec_ops::max_timeout_ms()`（`src/tools/base/code_exec_ops.cpp:464-470`）在运行期算出——取 `min(GDA_CODE_EXEC_MAX_TIMEOUT_MS = 27000, 生效长阻塞派发预算)`；生效派发预算默认 29000ms（`src/tools/base/dispatch.cpp:280-286`），故默认环境下上界为 **27000ms**；若 `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS` 把预算下调，上界随之下调。派发侧余量 2000ms（`GDA_CODE_EXEC_BUDGET_MARGIN_MS`，`src/core/config.hpp:46`）保证脚本 deadline 先于派发预算到期，传输侧余量 2000ms（`GDA_CODE_EXEC_TRANSPORT_MARGIN_MS`，`src/core/config.hpp:47`）保证结构化超时结果能在传输硬超时前回到客户端。该值有三处消费且都取自同一实现点：handler 的参数校验（`code_exec_ops.cpp:963-973`）、schema 的 `maximum`（`register_all.cpp:568-577`）、提示词的「最大 …ms」拼串（`prompt_tool_usage.cpp:504`）。
 
 等待超时：先 `CommandQueue::cancel(id)`（命中表示任务尚未执行、不会执行；未命中表示已被主线程取走），然后返回结构化错误——`error`（含 waited_ms/队列诊断与"retry、健康预算"提示）、`code="main_thread_timeout"`、**`retryable=false`**（10-21 变更：调用已取消、副作用可能仍在主线程落地，不可盲目重试）、`tool`、`waited_ms`、`queue_depth`、`oldest_pending_ms`、`last_drain_age_ms`、`cancelled`、`cancelled_before_execution`；并直写一条 `type=dispatch_timeout` trace（`LogPersist::write_trace_now`）与 Transport Warning。队列满/关闭时返回 `queue_unavailable`（`code="queue_unavailable"`、`retryable=true`，属通道侧暂时不可用，重试安全；不进入等待）。
 
-**超时执行路径（2026-10-20 新增）**：`CommandQueue` 新增 `submit_tracked_bounded(Fn, budget_ms)`（`src/core/command_queue.hpp:260`），在提交侧即以预算轮询 future，超时自动 `cancel(id)` 并回填 `TrackedSubmission` 新增的 `timed_out`/`waited_ms`/`cancelled` 三个字段（原 `TrackedSubmission` 只有 `id` + `future`）；`dispatch::run_bounded_on_main_thread`（`src/tools/dispatch.hpp:45-64`）以此为底座，回填 `BoundedWaitOutcome{ok,timed_out,cancelled,waited_ms,error}`。编辑器内 GDScript 协作式超时时另走 `dispatch::exec_timeout_result(timeout_ms, execution_time_ms)`，返回 `code="exec_timeout"`（`code_execute` 的 `run_with_timeout` 命中超时后调用，`code_exec_ops.cpp:994-995`）；游戏侧 eval 超时统一为 `code="eval_timeout"`（编辑器侧等待超时与游戏侧协作式截止两处均产出该码，见 [入口与运行时](modules/entry_runtime.md)）。
+**超时执行路径（2026-10-20 新增）**：`CommandQueue` 新增 `submit_tracked_bounded(Fn, budget_ms)`（`src/core/command_queue.hpp:260`），在提交侧即以预算轮询 future，超时自动 `cancel(id)` 并回填 `TrackedSubmission` 新增的 `timed_out`/`waited_ms`/`cancelled` 三个字段（原 `TrackedSubmission` 只有 `id` + `future`）；`dispatch::run_bounded_on_main_thread`（`src/tools/base/dispatch.hpp:45-64`）以此为底座，回填 `BoundedWaitOutcome{ok,timed_out,cancelled,waited_ms,error}`。编辑器内 GDScript 协作式超时时另走 `dispatch::exec_timeout_result(timeout_ms, execution_time_ms)`，返回 `code="exec_timeout"`（`code_execute` 的 `run_with_timeout` 命中超时后调用，`code_exec_ops.cpp:994-995`）；游戏侧 eval 超时统一为 `code="eval_timeout"`（编辑器侧等待超时与游戏侧协作式截止两处均产出该码，见 [入口与运行时](modules/entry_runtime.md)）。
 
 单元测试 `dispatch_budget_test` 覆盖预算决策与队列不可用返回 **14 项**，另有 `dispatch_queue_unavailable_test` 覆盖无编辑器队列时的返回 **3 项**（均为 `tests/unit/` 下 `TEST` 宏逐行计数）。
 
@@ -107,7 +107,7 @@ class SpecTool : public ToolBase, public ISideEffect {
 - **`kCaptureImage`（9 工具，图片附件单一来源）**：`register_all.cpp` 的 `call_tool` 回调按 flag 判定——registry 已知工具含该 flag 时经 `util::try_attach_image_data` 附加截图 image content；仅未知工具名才走旧白名单 `is_image_capture_tool` 兜底（`util::try_attach_image_content`，`src/util/mcp_image_content.hpp`）。
 - **`kSceneTarget`（42 工具，成功响应幂等补全）**：见上节 `run_post` 第 3 步；仅补缺失的 `scene_path`/`scene_unsaved`，不做脏标记。
 - **`kUndoable`（24 工具，纯标记）**：各 handler 自管 undo，`run_post` 无动作。
-- 计数口径（2026-10-20 重算）：以 `src/tools/*_tools.hpp` 中每个 `make_spec_tool(ToolSpec{ ... })` **块**为单位，统计该块的 flags 表达式里是否出现该 flag——即「有多少个工具声明了该 flag」，不是 grep 文本出现次数。451 个域工具块逐块统计得：`kSceneTarget` 42 / `kUndoable` 24 / `kMutating` 100 / `kNone` 347 / `kCaptureImage` 9 / `kObserve` 7（`kMeta`/`kDynamic`/`kHealthProbe`/`kLongBlocking` 只出现在 7 个元工具与动态工具上，不在域工具块内）。运行时以 `get_tool_detail` 回显为准。
+- 计数口径（2026-10-20 重算）：以 `src/tools/domains/*/*_tools.hpp` 中每个 `make_spec_tool(ToolSpec{ ... })` **块**为单位，统计该块的 flags 表达式里是否出现该 flag——即「有多少个工具声明了该 flag」，不是 grep 文本出现次数。451 个域工具块逐块统计得：`kSceneTarget` 42 / `kUndoable` 24 / `kMutating` 100 / `kNone` 347 / `kCaptureImage` 9 / `kObserve` 7（`kMeta`/`kDynamic`/`kHealthProbe`/`kLongBlocking` 只出现在 7 个元工具与动态工具上，不在域工具块内）。运行时以 `get_tool_detail` 回显为准。
 
 - **线程契约**：handler 经 `dispatch::call_handler` →（非主线程时）`run_on_main_thread_with_budget`（09-29 起，含等待预算与超时取消，见上节）路由到 Godot 主线程执行；唯一例外是 `call_tool` 元工具的编排回调在 MCP 线程执行（等待游戏响应/截图定型，不触碰 Godot API），领域工具 handler 仍由 dispatch 路由回主线程。类内部不得另起线程触碰 Godot API。
 - 错误直接返回 `{"error": msg}` JSON 对象（构造用 `util::error_json`/`util::ok_result` 助手）。
@@ -123,7 +123,7 @@ class SpecTool : public ToolBase, public ISideEffect {
 
 语义要点：`null` 一律视为缺失；`integer` 接受整数值的 JSON double（拒绝小数、拒绝越界）；`boolean` 严格（`1`/`0` 报错）；`reject_unknown` 对非对象输入直接放行。单元测试 `tool_args_test.cpp` 覆盖 11 项。
 
-> **接入状态（2026-10-20 复核）**：`Args` 是**可用但未接线**的能力——`src/` 下除 `tool_args.cpp` 自身外，没有任何文件 include `tool_args.hpp`，33 个领域的 handler 全部走 `args.Find(...)` + `util::error_json(...)`（`src/tools/*.cpp` 中 `util::error_json` 实测 759 行、`util::ok_result` 46 行）。因此"取参统一 Args"只是收敛方向，不是现状；写新 handler 前先看所在域的邻居文件用哪种，避免同文件混用两种风格。真正的统一接入需要一次性改动全部 `*_ops.cpp` 并复跑 `03_tools_contract` 遍历。
+> **接入状态（2026-10-20 复核）**：`Args` 是**可用但未接线**的能力——`src/` 下除 `tool_args.cpp` 自身外，没有任何文件 include `tool_args.hpp`，33 个领域的 handler 全部走 `args.Find(...)` + `util::error_json(...)`（`src/tools/**/*.cpp` 中 `util::error_json` 实测 759 行、`util::ok_result` 46 行）。因此"取参统一 Args"只是收敛方向，不是现状；写新 handler 前先看所在域的邻居文件用哪种，避免同文件混用两种风格。真正的统一接入需要一次性改动全部 `*_ops.cpp` 并复跑 `03_tools_contract` 遍历。
 
 ## ToolRegistry 与注册派生
 
@@ -234,7 +234,7 @@ trace 相关扩展（09-20）：`invoke_tool` 在正常路径用 `SpanGuard(trac
 
 ## batch_execute 最小变量串联
 
-`batch_execute` 在 `src/tools/code_exec_ops.cpp` 内支持最小变量串联（无 schema 改动）：整字符串精确替换——`$prev`（上一操作的成功/失败载荷整体）、`$steps[N].result` / `$steps[N].error`（指定序号操作的成功/失败载荷，支持嵌套结构内替换；非整字符串的混写如 `"prefix $prev suffix"` 保持原样）。不可解析时该步骤记 error，前缀 `unresolvable reference`（首操作用 `$prev`、前向引用、状态错配如对失败操作取 `.result`、序号越界均属此类），走既有 `stop_on_error` 语义；无条件分支、无并行。单元测试 `tests/unit/batch_refs_test.cpp` 覆盖 6 项。
+`batch_execute` 在 `src/tools/base/code_exec_ops.cpp` 内支持最小变量串联（无 schema 改动）：整字符串精确替换——`$prev`（上一操作的成功/失败载荷整体）、`$steps[N].result` / `$steps[N].error`（指定序号操作的成功/失败载荷，支持嵌套结构内替换；非整字符串的混写如 `"prefix $prev suffix"` 保持原样）。不可解析时该步骤记 error，前缀 `unresolvable reference`（首操作用 `$prev`、前向引用、状态错配如对失败操作取 `.result`、序号越界均属此类），走既有 `stop_on_error` 语义；无条件分支、无并行。单元测试 `tests/unit/batch_refs_test.cpp` 覆盖 6 项。
 
 ## 迁移规则与守卫
 
@@ -245,7 +245,7 @@ trace 相关扩展（09-20）：`invoke_tool` 在正常路径用 `SpanGuard(trac
 - `tool_input_schema` / `build_schema_for` / `schema_fills.hpp` / `schema_*_ops.cpp`（schema 现从参数表派生）；
 - `tool_defs.def`（历史已删）。
 
-守卫位于 `tests/guard/`：`migration_guard.cmake` 读 `migrated_domains.txt`（30 个已迁移域 + `strict` 行；10-11 新增的 `gridmap`/`tween` 与之后的 `csharp` 为原生 ToolSpec 新域，不在迁移清单内，注册共 33 域）做零依赖源码断言——每个已迁移域 `src/tools/<域>_tools.hpp` 不含旧宏；strict 模式追加全域文件无旧宏、无 `schema_*_ops.cpp` 残留、全仓 `src/tools/*.hpp|*.cpp` 无 `tool_input_schema` / `tools/tool_decl.hpp` 引用。运行方式：`ctest --preset debug -R migration_guard`，或 `cmake -DSOURCE_DIR=<仓库根> -P tests/guard/migration_guard.cmake`（实测输出 `OK (domains: 30, strict: on)`，其中 domains 指迁移清单数，不是注册总数 33）。
+守卫位于 `tests/guard/`：`migration_guard.cmake` 读 `migrated_domains.txt`（30 个已迁移域 + `strict` 行；10-11 新增的 `gridmap`/`tween` 与之后的 `csharp` 为原生 ToolSpec 新域，不在迁移清单内，注册共 33 域）做零依赖源码断言——每个已迁移域 `src/tools/<域>_tools.hpp` 不含旧宏；strict 模式追加全域文件无旧宏、无 `schema_*_ops.cpp` 残留、全仓 `src/tools/**/*.hpp|*.cpp` 无 `tool_input_schema` / `tools/tool_decl.hpp` 引用。运行方式：`ctest --preset debug -R migration_guard`，或 `cmake -DSOURCE_DIR=<仓库根> -P tests/guard/migration_guard.cmake`（实测输出 `OK (domains: 30, strict: on)`，其中 domains 指迁移清单数，不是注册总数 33）。
 
 ## 迁移历史
 

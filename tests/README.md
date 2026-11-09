@@ -64,7 +64,7 @@ bun test cli/tests
 ## 5. 迁移守卫（migration_guard）
 
 - 位置：`tests/guard/migration_guard.cmake` + 清单 `tests/guard/migrated_domains.txt`（30 个域 + `strict` 行）。
-- 内容：零依赖读源码断言，`strict` 模式下禁止旧机制回退——已迁移域与全部 `src/tools/*_tools.hpp` 不得含旧宏 `GDA_TOOL_CLASS`/`GDA_TOOL_CLASS_SIDE`；不得残留 `src/tools/schema_*_ops.cpp`；`src/tools/*.hpp|*.cpp` 不得引用 `tool_input_schema` 或 `tools/tool_decl.hpp`。
+- 内容：零依赖读源码断言，`strict` 模式下禁止旧机制回退——已迁移域与全部 `src/tools/domains/*/*_tools.hpp` 不得含旧宏 `GDA_TOOL_CLASS`/`GDA_TOOL_CLASS_SIDE`；不得残留 `src/tools/schema_*_ops.cpp`；`src/tools/**/*.hpp|*.cpp` 不得引用 `tool_input_schema` 或 `tools/tool_decl.hpp`。
 - 运行：`ctest --preset debug -R migration_guard`（configure 后即可运行，不依赖构建产物），或直接 `cmake -DSOURCE_DIR=<仓库根> -P tests/guard/migration_guard.cmake`；实测输出 `OK (domains: 30, strict: on)`。
 
 ## 6. 其它源码守卫与脚本项

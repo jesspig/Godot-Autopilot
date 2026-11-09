@@ -18,8 +18,9 @@ include(GoogleTest)
 
 # 业务子集源码 (从仓库根引用; ops 实现文件经 make_tools() 被 register_all.cpp 引用, 链接必需)
 # resource_registry.cpp 被 code_exec_ops.cpp / resource_ops.cpp 引用 (grep 确认)
-file(GLOB GDA_TOOLS_OPS_SOURCES CONFIGURE_DEPENDS
-    "${CMAKE_SOURCE_DIR}/src/tools/*_ops.cpp")
+file(GLOB_RECURSE GDA_TOOLS_OPS_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_SOURCE_DIR}/src/tools/domains/*/*_ops.cpp"
+    "${CMAKE_SOURCE_DIR}/src/tools/base/*_ops.cpp")
 
 # 链接依赖 (grep 确认)：
 #   variant_json.cpp      — ops 大量调用 VariantJson::serialize/deserialize

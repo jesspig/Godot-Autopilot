@@ -243,7 +243,7 @@ version 8，**6 个 configure 预设**（2 个 hidden 基座 + 4 个可直接 `-
 
 上一批让「无 ninja 机器能 configure」之后，MSVC 路径的**首次全量编译**才暴露出第二个问题：
 
-- **现象**：`src/tools/runtime_ops.cpp(891,33): error C3493` 与 `tests/unit/tool_catalog_test.cpp(93,27): error C3493`。
+- **现象**：`src/tools/base/runtime_ops.cpp(891,33): error C3493` 与 `tests/unit/tool_catalog_test.cpp(93,27): error C3493`。
 - **根因**：MSVC **拒绝 lambda 经 `[&]` 隐式引用捕获局部 `const`/`constexpr` 变量**，clang（clang-cl）接受同一写法。典型形态是函数内 `constexpr size_t N = 256;` 配合 `std::thread([&s]{ ... s.size() > N ... })`；经最小复现逐条定位，属 MSVC 实现开关而非源码违规 —— 源码本身合法，只在两个编译器间行为不一致。
 - **修法**：[`cmake/CompilerOptions.cmake:48`](../../cmake/CompilerOptions.cmake) 的 MSVC 分支（`elseif(MSVC)`，即真正的 cl.exe；clang-cl 命中的是前面的 `if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")` 分支，不受影响）追加 `/Zc:lambda`。这是 MSVC 的 lambda 标准符合性开关，**CMake 默认不启用**。加上后**零源码改动**即可编译，并顺带拉齐了 clang 与 MSVC 的行为差异。
 

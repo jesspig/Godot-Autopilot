@@ -1,5 +1,5 @@
 
-#include "tools/input_map_ops.hpp"
+#include "tools/domains/input_map/input_map_ops.hpp"
 
 #include <gtest/gtest.h>
 

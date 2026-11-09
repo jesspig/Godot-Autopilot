@@ -15,7 +15,7 @@ Godot Autopilot（GDA）：进程内 GDExtension，把 Godot 编辑器经 MCP（
 ## 每次在场的硬约束
 
 - **所有 Godot API 必须经 `CommandQueue` 在主线程执行**（`submit()` / 带预算的等待入口）；直接调用必崩，`main_thread_guard` 在 ctest 阶段静态拦截，编译通过不算过。`execute_sync()` 已无调用点且是无界等待，不得新增调用。
-- **新增 `.cpp` 要在两处登记**：根 `CMakeLists.txt` 的 `add_library()` 与 `tests/CMakeLists.txt` 的 `GDA_UNIT_BUSINESS_SOURCES`（`src/tools/*_ops.cpp` 由 glob 自动纳入，只需登记非 `*_ops.cpp` 的源文件）。**漏登根 `CMakeLists.txt` 后果最重**：该编译单元不进插件产物，问题只在运行时暴露（插件加载后工具异常，定位困难）；**漏登 `GDA_UNIT_BUSINESS_SOURCES` 仅在有 L1/集成用例引用其符号时才在链接期报错**，无引用时完全静默（等于没有覆盖）。详见 [.agents/skills/cpp-registration/SKILL.md](.agents/skills/cpp-registration/SKILL.md)。
+- **新增 `.cpp` 要在两处登记**：根 `CMakeLists.txt` 的 `add_library()` 与 `tests/CMakeLists.txt` 的 `GDA_UNIT_BUSINESS_SOURCES`（`src/tools/domains/*/*_ops.cpp` 由 glob 自动纳入，只需登记非 `*_ops.cpp` 的源文件）。**漏登根 `CMakeLists.txt` 后果最重**：该编译单元不进插件产物，问题只在运行时暴露（插件加载后工具异常，定位困难）；**漏登 `GDA_UNIT_BUSINESS_SOURCES` 仅在有 L1/集成用例引用其符号时才在链接期报错**，无引用时完全静默（等于没有覆盖）。详见 [.agents/skills/cpp-registration/SKILL.md](.agents/skills/cpp-registration/SKILL.md)。
 - **依赖是 `third_party/` 下的 git submodule**：构建前必须已检出（`git clone --recurse-submodules`，或 `git submodule update --init --recursive`），缺失则 configure 直接报错，不做网络回退。
 - **构建生成器双路径**：CMake 预设按 ninja 可用性自适应——有 ninja 用 `debug`/`release`，无则用 `debug-portable`/`release-portable`（共用 `build/{debug,release}`）；`main.py` 各子命令自动选路，手动 `cmake --preset` / `ctest --preset` 须自己补 `-portable` 后缀。见 [build.md](docs/wiki/build.md)「预设」。
 - **源码禁止注释**：除 `// namespace` 结尾标记外不得有 `//` 或 `/*…*/`，解释写进 wiki；`comment_guard` 在 ctest 阶段拦，编译通过不算过。

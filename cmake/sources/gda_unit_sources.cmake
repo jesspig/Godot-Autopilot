@@ -26,15 +26,15 @@ set(GDA_UNIT_BUSINESS_SOURCES
     ${CMAKE_SOURCE_DIR}/src/util/client_config_gen.cpp
     ${CMAKE_SOURCE_DIR}/src/util/skill_gen.cpp
     ${CMAKE_SOURCE_DIR}/src/util/skill_content_generated.cpp
-    ${CMAKE_SOURCE_DIR}/src/tools/tool_catalog.cpp
-    ${CMAKE_SOURCE_DIR}/src/tools/schema_builder.cpp
-    ${CMAKE_SOURCE_DIR}/src/tools/register_all.cpp
-    ${CMAKE_SOURCE_DIR}/src/tools/dispatch.cpp
-    ${CMAKE_SOURCE_DIR}/src/tools/debugger_access.cpp
-    ${CMAKE_SOURCE_DIR}/src/tools/editor_ui_actions_ops.cpp
-    ${CMAKE_SOURCE_DIR}/src/tools/tool_args.cpp
-    ${CMAKE_SOURCE_DIR}/src/tools/tool_pipeline.cpp
-    ${CMAKE_SOURCE_DIR}/src/tools/tool_invoke.cpp
+    ${CMAKE_SOURCE_DIR}/src/tools/base/tool_catalog.cpp
+    ${CMAKE_SOURCE_DIR}/src/tools/base/schema_builder.cpp
+    ${CMAKE_SOURCE_DIR}/src/tools/base/register_all.cpp
+    ${CMAKE_SOURCE_DIR}/src/tools/base/dispatch.cpp
+    ${CMAKE_SOURCE_DIR}/src/tools/base/debugger_access.cpp
+    ${CMAKE_SOURCE_DIR}/src/tools/domains/editor/editor_ui_actions_ops.cpp
+    ${CMAKE_SOURCE_DIR}/src/tools/base/tool_args.cpp
+    ${CMAKE_SOURCE_DIR}/src/tools/base/tool_pipeline.cpp
+    ${CMAKE_SOURCE_DIR}/src/tools/base/tool_invoke.cpp
     ${CMAKE_SOURCE_DIR}/src/core/storage/gda_home.cpp
     ${CMAKE_SOURCE_DIR}/src/core/storage/project_store.cpp
     ${CMAKE_SOURCE_DIR}/src/core/storage/instance_registry.cpp

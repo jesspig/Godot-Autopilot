@@ -1,4 +1,4 @@
-#include "tools/dispatch.hpp"
+#include "tools/base/dispatch.hpp"
 #include "util/gdscript_wrap.hpp"
 
 #include <gtest/gtest.h>

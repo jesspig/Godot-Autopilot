@@ -19,12 +19,12 @@
 #include "core/transport/http_parse.hpp"
 #include "core/transport/http_transport_ext.hpp"
 #include "core/transport/mcp_http_shim.hpp"
-#include "tools/code_exec_ops.hpp"
-#include "tools/register_all.hpp"
-#include "tools/runtime_ops.hpp"
-#include "tools/tool_base.hpp"
-#include "tools/tool_execute.hpp"
-#include "tools/tool_registry.hpp"
+#include "tools/base/code_exec_ops.hpp"
+#include "tools/base/register_all.hpp"
+#include "tools/base/runtime_ops.hpp"
+#include "tools/base/tool_base.hpp"
+#include "tools/base/tool_execute.hpp"
+#include "tools/base/tool_registry.hpp"
 
 namespace godot_autopilot {
 namespace api_surface {

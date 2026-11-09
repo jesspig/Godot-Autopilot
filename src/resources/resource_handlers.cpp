@@ -6,8 +6,8 @@
 #include "core/observability/monitor.hpp"
 #include "resources/resource_error_mapping.hpp"
 #include "resources/skill_resources.hpp"
-#include "tools/dispatch.hpp"
-#include "tools/tool_invoke.hpp"
+#include "tools/base/dispatch.hpp"
+#include "tools/base/tool_invoke.hpp"
 #include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #include <mcp/McpError.hpp>

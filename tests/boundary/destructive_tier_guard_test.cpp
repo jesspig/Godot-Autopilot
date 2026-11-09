@@ -4,11 +4,11 @@
 #include <mcp/transport/InMemoryTransport.hpp>
 
 #include "core/command_queue.hpp"
-#include "tools/authorization.hpp"
-#include "tools/register_all.hpp"
-#include "tools/side_effect_policy.hpp"
-#include "tools/tool_base.hpp"
-#include "tools/tool_catalog.hpp"
+#include "tools/base/authorization.hpp"
+#include "tools/base/register_all.hpp"
+#include "tools/base/side_effect_policy.hpp"
+#include "tools/base/tool_base.hpp"
+#include "tools/base/tool_catalog.hpp"
 #include "util/bm25_index.hpp"
 
 #include <memory>
