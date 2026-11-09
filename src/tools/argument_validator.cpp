@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include <core/log_system.hpp>
+#include <core/observability/log_system.hpp>
 #include <tools/register_all.hpp>
 #include <tools/tool_args.hpp>
 #include <tools/tool_base.hpp>

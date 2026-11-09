@@ -1,10 +1,10 @@
 #include "core/config.hpp"
-#include "core/godot_transport.hpp"
-#include "core/http_parse.hpp"
-#include "core/http_transport.hpp"
-#include "core/http_transport_ext.hpp"
-#include "core/port_resolver.hpp"
-#include "core/port_resolver_ext.hpp"
+#include "core/transport/godot_transport.hpp"
+#include "core/transport/http_parse.hpp"
+#include "core/transport/http_transport.hpp"
+#include "core/transport/http_transport_ext.hpp"
+#include "core/transport/port_resolver.hpp"
+#include "core/transport/port_resolver_ext.hpp"
 
 #include <gtest/gtest.h>
 

@@ -26,8 +26,8 @@
 
 #include "core/command_queue.hpp"
 #include "core/config.hpp"
-#include "core/log_system.hpp"
-#include "core/monitor.hpp"
+#include "core/observability/log_system.hpp"
+#include "core/observability/monitor.hpp"
 #include "core/plugin_config.hpp"
 #include "tools/authorization.hpp"
 #include "tools/dispatch.hpp"

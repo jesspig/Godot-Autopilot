@@ -1,5 +1,5 @@
 #include "display_ops.hpp"
-#include "core/log_system.hpp"
+#include "core/observability/log_system.hpp"
 #include "util/error_util.hpp"
 #include <godot_cpp/classes/display_server.hpp>
 #include <godot_cpp/classes/window.hpp>

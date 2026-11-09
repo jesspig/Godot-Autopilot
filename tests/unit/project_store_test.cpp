@@ -1,4 +1,4 @@
-#include "core/project_store.hpp"
+#include "core/storage/project_store.hpp"
 
 #include <gtest/gtest.h>
 

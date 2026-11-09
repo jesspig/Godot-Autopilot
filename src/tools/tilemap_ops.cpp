@@ -1,5 +1,5 @@
 #include "tilemap_ops.hpp"
-#include "core/log_system.hpp"
+#include "core/observability/log_system.hpp"
 #include "core/scene_dirty_tracker.hpp"
 #include "resource_ops.hpp"
 #include "util/error_util.hpp"

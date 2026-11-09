@@ -1,5 +1,5 @@
 #include "input_ops.hpp"
-#include "core/log_system.hpp"
+#include "core/observability/log_system.hpp"
 #include <godot_cpp/classes/input.hpp>
 #include <godot_cpp/classes/input_event.hpp>
 #include <godot_cpp/classes/input_event_key.hpp>

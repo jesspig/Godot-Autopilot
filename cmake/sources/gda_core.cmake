@@ -11,8 +11,8 @@
 set(GDA_CORE_SOURCES
     src/main.cpp
     src/core/mode_detector.cpp
-    src/core/log_system.cpp
-    src/core/log_persist.cpp
+    src/core/observability/log_system.cpp
+    src/core/observability/log_persist.cpp
     src/core/resource_registry.cpp
     src/core/scene_dirty_tracker.cpp
     src/core/server_context.cpp
@@ -20,14 +20,14 @@ set(GDA_CORE_SOURCES
     src/core/export_guard.cpp
     src/core/editor_readiness.cpp
     src/core/editor_coords.cpp
-    src/core/trace_recorder.cpp
-    src/core/sanitize_policy.cpp
-    src/core/monitor.cpp
-    src/core/monitor_env.cpp
-    src/core/perf_sampler.cpp
-    src/core/gda_home.cpp
-    src/core/project_store.cpp
-    src/core/instance_registry.cpp
+    src/core/observability/trace_recorder.cpp
+    src/core/observability/sanitize_policy.cpp
+    src/core/observability/monitor.cpp
+    src/core/observability/monitor_env.cpp
+    src/core/observability/perf_sampler.cpp
+    src/core/storage/gda_home.cpp
+    src/core/storage/project_store.cpp
+    src/core/storage/instance_registry.cpp
     src/resources/resource_handlers.cpp
     src/resources/resource_error_mapping.cpp
     src/resources/debugger_resources.cpp

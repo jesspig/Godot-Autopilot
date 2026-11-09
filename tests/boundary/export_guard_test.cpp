@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-#include "core/trace_recorder.hpp"
+#include "core/observability/trace_recorder.hpp"
 
 using godot_autopilot::ExportGuard;
 using godot_autopilot::ExportState;

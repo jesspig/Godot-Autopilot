@@ -1,5 +1,5 @@
 #include "prompts/debugger_prompts.hpp"
-#include "core/log_system.hpp"
+#include "core/observability/log_system.hpp"
 #include <mcp/Content.hpp>
 
 namespace godot_autopilot {

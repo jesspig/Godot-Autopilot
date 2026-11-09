@@ -1,7 +1,7 @@
 #include "runtime_ops.hpp"
 
 #include "core/config.hpp"
-#include "core/log_system.hpp"
+#include "core/observability/log_system.hpp"
 #include "runtime/gda_protocol.hpp"
 #include "tools/authorization.hpp"
 #include "tools/capture_ops.hpp"

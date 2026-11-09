@@ -1,7 +1,7 @@
 #include "scene_ops.hpp"
 #include "../util/scene_path.hpp"
 #include "../util/scene_verify.hpp"
-#include "core/log_system.hpp"
+#include "core/observability/log_system.hpp"
 #include "core/scene_dirty_tracker.hpp"
 #include "property_ops.hpp"
 #include "resource_ops.hpp"

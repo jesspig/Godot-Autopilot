@@ -1,4 +1,4 @@
-#include "core/log_system.hpp"
+#include "core/observability/log_system.hpp"
 
 #include <gtest/gtest.h>
 

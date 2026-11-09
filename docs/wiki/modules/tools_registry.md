@@ -128,7 +128,7 @@ warnings 判定逻辑在 `tests/runner/traversal.cpp`（"schema 声明必填但�
 
 [`src/tools/tool_execute.hpp`](../../../src/tools/tool_execute.hpp) / [`src/tools/tool_execute.cpp`](../../../src/tools/tool_execute.cpp) 的 `tools::execute_tool_chain(name, args)` 把「导出拦截 → 工具存在 → 参数校验 → 授权 → 派发 → 信封」六个阶段固化成一条链，并把每一段做成可替换的槽位（`register_export_guard` / `register_argument_validator` / `register_authorization_policy` / `register_envelope_builder`）。`tool_execute.cpp` 在静态初始化期把默认实现注册进这些槽位，因此调用 `tools::execute_tool(name, args)` 即走全链。
 
-> **接线现状（10-22 核实）**：这条链**已在 REST 面接入生产请求路径**——`src/core/api_surface.cpp` 的 `default_execute_tool` 调用 `tools::execute_tool(name, args)`，生产注册点为 `src/core/server_context.cpp` 的 `register_unified_tool_executor()`（在 `start()` 内、`ApiServer::start()` 之前执行，把 `tools::execute_tool_chain` 注册进执行器槽位），因此注册在静态初始化期之外也确定生效。MCP 面的 `call_tool` 元工具**仍走** `tools::execute_tool_core`（等价于 `dispatch::call_handler` 直派），这是**有意保留的差异**：既有工具的参数声明不完整（部分工具声明类型与实际接受类型不符），若对 MCP 也套用严格参数校验会拒掉现网可用的调用。两套协议面的实际链路是：
+> **接线现状（10-22 核实）**：这条链**已在 REST 面接入生产请求路径**——`src/core/transport/api_surface.cpp` 的 `default_execute_tool` 调用 `tools::execute_tool(name, args)`，生产注册点为 `src/core/server_context.cpp` 的 `register_unified_tool_executor()`（在 `start()` 内、`ApiServer::start()` 之前执行，把 `tools::execute_tool_chain` 注册进执行器槽位），因此注册在静态初始化期之外也确定生效。MCP 面的 `call_tool` 元工具**仍走** `tools::execute_tool_core`（等价于 `dispatch::call_handler` 直派），这是**有意保留的差异**：既有工具的参数声明不完整（部分工具声明类型与实际接受类型不符），若对 MCP 也套用严格参数校验会拒掉现网可用的调用。两套协议面的实际链路是：
 >
 > | 面 | 实际链路 | 导出拦截 | 参数校验 | 授权 | 信封 |
 > |---|---|---|---|---|---|

@@ -1,7 +1,7 @@
 #include "text_ops.hpp"
 #include "core/editor_readiness.hpp"
 #include "core/config.hpp"
-#include "core/log_system.hpp"
+#include "core/observability/log_system.hpp"
 #include "tools/script_ops.hpp"
 #include "util/csharp_project_setup.hpp"
 #include "util/dotnet_env.hpp"

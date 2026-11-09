@@ -1,7 +1,7 @@
 #include "tileset_ops.hpp"
 #include "../util/error_util.hpp"
 #include "../util/json_godot.hpp"
-#include "core/log_system.hpp"
+#include "core/observability/log_system.hpp"
 #include "resource_ops.hpp"
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/file_access.hpp>

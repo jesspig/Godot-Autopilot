@@ -7,4 +7,4 @@
 set(GDA_API_CONTRACT_SOURCES
     src/tools/tool_execute.cpp
     src/tools/argument_validator.cpp
-    src/core/api_envelope.cpp)
+    src/core/transport/api_envelope.cpp)

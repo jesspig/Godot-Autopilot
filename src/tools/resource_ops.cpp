@@ -2,7 +2,7 @@
 #include "editor_ops.hpp"
 #include "core/config.hpp"
 #include "core/editor_readiness.hpp"
-#include "core/log_system.hpp"
+#include "core/observability/log_system.hpp"
 #include "core/resource_registry.hpp"
 #include "util/error_util.hpp"
 #include "util/readback_util.hpp"

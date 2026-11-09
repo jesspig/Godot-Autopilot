@@ -1,5 +1,5 @@
-#include "core/port_recovery.hpp"
-#include "core/transport_lifecycle.hpp"
+#include "core/transport/port_recovery.hpp"
+#include "core/transport/transport_lifecycle.hpp"
 
 #include <gtest/gtest.h>
 

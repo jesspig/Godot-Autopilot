@@ -1,6 +1,6 @@
 #include "tween_ops.hpp"
 #include "core/config.hpp"
-#include "core/log_system.hpp"
+#include "core/observability/log_system.hpp"
 #include "tools/authorization.hpp"
 #include "tools/runtime_ops.hpp"
 #include "tools/tool_base.hpp"

@@ -1,4 +1,4 @@
-#include "core/instance_registry.hpp"
+#include "core/storage/instance_registry.hpp"
 
 #include <gtest/gtest.h>
 

@@ -133,16 +133,16 @@ uv run main.py test --single migration_guard   # 单跑（ctest -R）
 | `api_endpoints_test.cpp` | 3 | 端点表纯逻辑（`src/core/api_endpoints.{hpp,cpp}`）：REST 路由 `GET /api/endpoints` 与 MCP 侧资源 `godot://endpoints` 共用同一份端点表文档（实例 id / 版本 / 进程号 / 工程路径 / 端点条目逐项一致）、缺令牌 401 `unauthorized`、端点路由登记与 `GET /api` 索引公示 |
 | `api_execute_chain_test.cpp` | 4 | REST 调用统一执行链纯逻辑（`src/core/api_surface.{hpp,cpp}` + `src/tools/tool_execute.{hpp,cpp}`）：导出期短路 503 `export_in_progress`、授权拒绝短路 403 `authorization_required`、未知工具 404 `tool_not_found`、缺令牌 401 |
 | `api_envelope_test.cpp` | 15 | 错误信封归一纯逻辑（`src/core/api_envelope.{hpp,cpp}`）：`normalize_code` 的取值优先级（顶层 `code` → `authorization_required` → `structured_error.code` → 文案特征推断）与 `status_for` 的码→状态码映射；信封追加 `code`/`warnings`/`tool`/`trace_id`/`request_id`；无 `error` 字段的结果不加信封 |
-| `api_auth_test.cpp` | 10 | REST 认证纯逻辑（`src/core/api_auth.cpp` + `src/core/api_token.cpp`）：Bearer 头解析（大小写、缺头、空令牌）、常量时间比较（相等/不等/长度不同/空串）、令牌来源优先级（环境变量覆盖令牌文件）、签发失败时的降级路径 |
+| `api_auth_test.cpp` | 10 | REST 认证纯逻辑（`src/core/transport/api_auth.cpp` + `src/core/transport/api_token.cpp`）：Bearer 头解析（大小写、缺头、空令牌）、常量时间比较（相等/不等/长度不同/空串）、令牌来源优先级（环境变量覆盖令牌文件）、签发失败时的降级路径 |
 | `authorization_dock_toggle_test.cpp` | 29 | 面板授权开关纯逻辑（`src/tools/authorization.hpp` + `src/ui/authorization_switches.hpp`）：`write` / `destructive` / `process` 属有面板开关的能力且开关集合恰为**六项**（`read` 无开关）、`process` 开关文案说明外部进程执行、勾选与取消后的允许列表内容（取消一项不影响其它项、`all` 先展开再逐项删）、允许列表每次调用实时读取不缓存且环境变量优先、拒绝文案对 `write` / `destructive` / `process` 给出面板指引 |
 | `http_transport_test.cpp` | 47 | 自建 HTTP 传输纯逻辑（`src/core/http_transport.{hpp,cpp}` + `http_parse.hpp`）：请求行/头块解析上限、查询串解析、`Content-Length` 与请求体上限（4 MiB → 413）、路由表匹配、百分号解码；传输轮转公平性与流式收口用例 |
 | `mcp_http_shim_test.cpp` | 36 | MCP HTTP 适配层纯逻辑（`src/core/mcp_http_shim.{hpp,cpp}`）：请求/响应与 MCP 消息的映射、SSE 与 JSON 双通道、错误帧转换 |
 | `mcp_http_shim_dispatch_test.cpp` | 8 | MCP 适配层与派发的接线纯逻辑：请求分类与派发入口的对应关系、初始化通知转发 |
-| `storage_layout_test.cpp` | 7 | 存储布局路径纯逻辑（`src/core/storage_paths.cpp` + `project_store.cpp`）：全局配置路径、工程目录名（名称替换 + 截断 + 路径哈希）、工程级配置路径、日志/轨迹/截图目录路径 |
-| `legacy_compat_test.cpp` | 15 | 遗留数据兼容纯逻辑（`src/core/legacy_store.cpp`）：旧目录定位、配置项回退选取（新路径优先、缺键回退、解析失败回退）、相对路径分类（全局配置/日志/轨迹/截图/不支持）、复制式导入规划与执行（不覆盖、不删源、跳过计数）、导入摘要文本 |
-| `gda_home_test.cpp` | 13 | 家目录集中根解析纯逻辑（`src/core/gda_home.cpp`）：四级来源的候选顺序、形状校验与存在性校验的差异、覆写值的直返语义、平台分支（Windows / POSIX） |
-| `project_store_test.cpp` | 8 | 存储根解析纯逻辑（`src/core/project_store.cpp`）：集中根目录名、工程目录名生成、路径哈希稳定性与截断、全局/工程配置与实例索引路径 |
-| `instance_registry_test.cpp` | 6 | 实例登记纯逻辑（`src/core/instance_registry.cpp`）：单实例记录读写、记录结构（端口/进程号/端点/令牌/版本）、全局索引重建与条目跳过 |
+| `storage_layout_test.cpp` | 7 | 存储布局路径纯逻辑（`src/core/storage/storage_paths.cpp` + `project_store.cpp`）：全局配置路径、工程目录名（名称替换 + 截断 + 路径哈希）、工程级配置路径、日志/轨迹/截图目录路径 |
+| `legacy_compat_test.cpp` | 15 | 遗留数据兼容纯逻辑（`src/core/storage/legacy_store.cpp`）：旧目录定位、配置项回退选取（新路径优先、缺键回退、解析失败回退）、相对路径分类（全局配置/日志/轨迹/截图/不支持）、复制式导入规划与执行（不覆盖、不删源、跳过计数）、导入摘要文本 |
+| `gda_home_test.cpp` | 13 | 家目录集中根解析纯逻辑（`src/core/storage/gda_home.cpp`）：四级来源的候选顺序、形状校验与存在性校验的差异、覆写值的直返语义、平台分支（Windows / POSIX） |
+| `project_store_test.cpp` | 8 | 存储根解析纯逻辑（`src/core/storage/project_store.cpp`）：集中根目录名、工程目录名生成、路径哈希稳定性与截断、全局/工程配置与实例索引路径 |
+| `instance_registry_test.cpp` | 6 | 实例登记纯逻辑（`src/core/storage/instance_registry.cpp`）：单实例记录读写、记录结构（端口/进程号/端点/令牌/版本）、全局索引重建与条目跳过 |
 | `dotnet_env_test.cpp` | 6 | .NET 环境判定纯逻辑（`src/util/dotnet_env.hpp`）：特性名版本切换（4.4 起 `dotnet` / 4.4 之前 `mono`）、`CSharpScript` 类注册即 .NET 构建（不受特性名影响）、4.4+ 只认 `dotnet` 特性名、4.4 之前只认 `mono` 特性名、版本未知取二者或、普通编辑器判否 |
 | `http_stream_registry_test.cpp` | 3 | HTTP 流式注册表纯逻辑（`src/core/http_stream_registry.{hpp,cpp}`）：Sink 帧数超上限拒绝写入、close 后不再接收帧、多连接广播的拒绝计数 |
 | `godot_transport_pending_test.cpp` | 3 | Godot 传输 pending 键纯逻辑（`src/core/godot_transport.{hpp,cpp}`）：复合键区分连接与请求 id、同输入键稳定（幂等）、int 与 string 请求 id 前后缀区分不串扰 |
@@ -278,7 +278,7 @@ uv run main.py test --single migration_guard   # 单跑（ctest -R）
 
 - `migration_guard`（`migration_guard.cmake` + `migrated_domains.txt`，30 域 + `strict`）：零依赖源码断言，防旧宏/`schema_*_ops.cpp`/`tool_input_schema` 回退；实测输出 `-- [migration-guard] OK (domains: 30, strict: on)`；迁移规则见 [ToolSpec 数据层与执行管线](tool_base_design.md)。
 - `comment_guard`（`comment_guard.py`）：递归扫描 `src/` 与 `tests/` 下 `*.cpp/*.hpp`（`SCAN_DIRS`，只认这两棵目录的 C++ 文件），除 `// namespace` 结尾标记外禁止任何 `//`/`/*…*/` 注释（正确处理字符串/字符字面量与 `R"TAG(…)TAG"` raw string）；无违规打印 `comment-guard OK` 并退出 0，违规退出 1，文件无法解码退出 2。
-- `main_thread_guard`（`main_thread_guard.py`）：**主线程契约守卫**，静态扫描 `src/` 下 `*.cpp/*.hpp` 里的 **Godot API 直接调用**。判定依据是「线程上下文分类」——每个源文件被显式归入主线程（`main`）、受管（`managed`）或外线程（`foreign`）三类（`THREAD_CONTEXT_RULES`），外线程文件里的 Godot API 调用默认违规，只有落在该文件显式登记的主线程作用域里才放行（`FOREIGN_MAIN_THREAD_SCOPES`，当前只登记 `src/core/log_persist.cpp` 的 6 个主线程作用域）。词法顺序：先剥离字符串字面量、字符字面量与 raw string，再剥离注释，最后做标识符匹配（`GODOT_API_PATTERNS` 覆盖 `godot::FileAccess` / `DirAccess` / `EditorInterface` / `Engine` / `SceneTree` / `ClassDB` / `ProjectSettings` / `Input` / `DisplayServer` / `OS` / `Performance` / `Resource` / `ResourceLoader` / `ResourceSaver` 等）。退出码：0 无违规（`main-thread-guard OK`）、1 有违规（逐行打印 `文件:行号: 片段`）、2 文件读或解码失败；可选参数为待扫描目录，缺省仓库 `src/`；只用标准库。
+- `main_thread_guard`（`main_thread_guard.py`）：**主线程契约守卫**，静态扫描 `src/` 下 `*.cpp/*.hpp` 里的 **Godot API 直接调用**。判定依据是「线程上下文分类」——每个源文件被显式归入主线程（`main`）、受管（`managed`）或外线程（`foreign`）三类（`THREAD_CONTEXT_RULES`），外线程文件里的 Godot API 调用默认违规，只有落在该文件显式登记的主线程作用域里才放行（`FOREIGN_MAIN_THREAD_SCOPES`，当前只登记 `src/core/observability/log_persist.cpp` 的 6 个主线程作用域）。词法顺序：先剥离字符串字面量、字符字面量与 raw string，再剥离注释，最后做标识符匹配（`GODOT_API_PATTERNS` 覆盖 `godot::FileAccess` / `DirAccess` / `EditorInterface` / `Engine` / `SceneTree` / `ClassDB` / `ProjectSettings` / `Input` / `DisplayServer` / `OS` / `Performance` / `Resource` / `ResourceLoader` / `ResourceSaver` 等）。退出码：0 无违规（`main-thread-guard OK`）、1 有违规（逐行打印 `文件:行号: 片段`）、2 文件读或解码失败；可选参数为待扫描目录，缺省仓库 `src/`；只用标准库。
 - `version_sync_guard`（`guard/version_sync_guard.py`）：版本号一致性——扫描 `skills/` 下全部文本文件与根 `README*.md`，每一处版本钉都必须与根 `VERSION` 同值，另含 `VERSION` 与 `CLI_VERSION` 两个值源；非版本引用（如 `#develop`）只登记、不参与比对。退出码：0 全部一致、1 存在版本漂移、2 关键文件缺钉 / 未知引用形态 / 文件读失败；覆盖范围以守卫脚本为准。
 - `source_manifest_guard`（`source_manifest_guard.py`）：**源清单守卫**——断言 测试源清单引用的 `src/` 源 ⊆ 插件源并集，防「漏登根 `CMakeLists.txt` / 清单文件导致编译单元不进产物」的静默缺失（解析规则见该脚本模块 docstring）。
 - 守卫自测三项：`migration_guard_self_test` / `comment_guard_self_test` / `main_thread_guard_self_test`——以注入违规样本的方式验证三个源码守卫自身能报出违规（守卫的守卫）；`migration_guard_self_test` 带 `RESOURCE_LOCK` 防与其他守卫并发。
@@ -308,11 +308,11 @@ uv run main.py test --single migration_guard   # 单跑（ctest -R）
 | add_library 源文件 | 115 个 `.cpp`（main 1 / core 34 / tools 54 / util 8 / prompts 9 / runtime 4 / resources 3 / ui 2） | 命令：`find src -name "*.cpp" | wc -l`（2026-11-09 实测 115）；根 `CMakeLists.txt` 经 `cmake/sources/*.cmake` 聚合 | 一致 |
 | 传输探针 | 1 个构建目标（`gda_mcp_transport_probe`），非 ctest、不计入 994 | `cmake/sources/api_probe.cmake`；诊断工具，验收阶段按需执行 | 一致 |
 | 客户端配置 | 20 个 | `src/util/client_config_gen.hpp` 的 `enum class ClientId` 20 个具名项（`COUNT` 为哨兵） | 一致 |
-| 端口 | 9527（默认）；自动分配候选区间 20000–29999，探测上限 256 | `src/core/config.hpp`：`GDA_DEFAULT_PORT = 9527`、`GDA_PORT_CANDIDATE_BASE/LIMIT = 20000/29999`、`GDA_PORT_PROBE_LIMIT = 256`、`GDA_CONTROL_PORT_BASE/LIMIT = 19900/19999`、`GDA_PRIVATE_PORT_BASE = 32768`（四条 `static_assert` 约束）；候选序列首项 9527，其后自 `20000 + (pid mod 10000)` 起连续递增并回绕（`src/core/port_resolver.cpp`）；显式指定绑定失败不自动更换 | 一致 |
-| REST 端点数 | 8 | `src/core/api_surface.cpp` 的 `build_index_document()` 端点清单 8 条 | 一致 |
-| REST 分页与批量上限 | 工具清单默认页 500 / 单页上限 2000 / 批量操作数上限 256 / 工具名长度上限 128 | `src/core/api_surface.hpp`：`kDefaultToolListLimit` / `kMaxToolListLimit` / `kMaxBatchOperations` / `kMaxToolNameLength` | 一致 |
+| 端口 | 9527（默认）；自动分配候选区间 20000–29999，探测上限 256 | `src/core/config.hpp`：`GDA_DEFAULT_PORT = 9527`、`GDA_PORT_CANDIDATE_BASE/LIMIT = 20000/29999`、`GDA_PORT_PROBE_LIMIT = 256`、`GDA_CONTROL_PORT_BASE/LIMIT = 19900/19999`、`GDA_PRIVATE_PORT_BASE = 32768`（四条 `static_assert` 约束）；候选序列首项 9527，其后自 `20000 + (pid mod 10000)` 起连续递增并回绕（`src/core/transport/port_resolver.cpp`）；显式指定绑定失败不自动更换 | 一致 |
+| REST 端点数 | 8 | `src/core/transport/api_surface.cpp` 的 `build_index_document()` 端点清单 8 条 | 一致 |
+| REST 分页与批量上限 | 工具清单默认页 500 / 单页上限 2000 / 批量操作数上限 256 / 工具名长度上限 128 | `src/core/transport/api_surface.hpp`：`kDefaultToolListLimit` / `kMaxToolListLimit` / `kMaxBatchOperations` / `kMaxToolNameLength` | 一致 |
 | REST 认证 | 令牌 32 字节随机值的十六进制（64 个小写十六进制字符）；除 `GET /api/health` 外全部端点需 Bearer 令牌 | `src/core/config.hpp` 的 `GDA_API_TOKEN_BYTES = 32`；`api_token.cpp` 的 `generate_token()`/`to_hex()`/`constant_time_equals()`；`api_auth.cpp` 的 `load_token()`（环境变量优先于令牌文件） | 一致 |
-| 请求体上限 | 4 MiB | `src/core/http_parse.hpp` 的 `kMaxBodyBytes`（超限由传输层直接 413） | 一致 |
+| 请求体上限 | 4 MiB | `src/core/transport/http_parse.hpp` 的 `kMaxBodyBytes`（超限由传输层直接 413） | 一致 |
 | 授权档位与能力名 | 3 档 / 7 个能力名 | `src/tools/tool_base.hpp` 的 `tier_for_side_effect()`（读档默认放行、写档与危险档默认拒绝）；`src/tools/authorization.hpp` 的 `kKnownCapabilities` 共 7 项 | 一致 |
 | 破坏类档位 | 6 个声明者 + 4 档判据 | `src/tools/side_effect_policy.hpp` 的 `kTierCriteria` 四档判据与两条边界规则、`kDestructiveExemptions` 9 条豁免白名单（每条带理由）；声明 `destructive` 的工具 6 个；单元测试 用例 `destructive_tier_guard_test` 防漂移 | 一致 |
 | 授权模式 | 2 档（`strict` / `legacy`） | `src/tools/authorization.hpp` 的 `AuthMode`、`parse_auth_mode()`；来源优先级环境变量 > 配置 `auth_mode` 键 > 默认严格，非法值回落严格并告警 | 一致 |

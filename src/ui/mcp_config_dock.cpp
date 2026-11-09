@@ -16,12 +16,12 @@
 #include <godot_cpp/classes/v_box_container.hpp>
 #include <godot_cpp/core/class_db.hpp>
 
-#include "core/legacy_store.hpp"
-#include "core/monitor.hpp"
+#include "core/storage/legacy_store.hpp"
+#include "core/observability/monitor.hpp"
 #include "core/plugin_config.hpp"
-#include "core/project_store.hpp"
-#include "core/sanitize_policy.hpp"
-#include "core/storage_paths.hpp"
+#include "core/storage/project_store.hpp"
+#include "core/observability/sanitize_policy.hpp"
+#include "core/storage/storage_paths.hpp"
 #include "tools/authorization.hpp"
 #include "ui/authorization_switches.hpp"
 #include "util/project_path.hpp"

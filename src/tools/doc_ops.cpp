@@ -1,5 +1,5 @@
 #include "doc_ops.hpp"
-#include "core/log_system.hpp"
+#include "core/observability/log_system.hpp"
 #include "util/error_util.hpp"
 #include <algorithm>
 #include <godot_cpp/classes/class_db_singleton.hpp>

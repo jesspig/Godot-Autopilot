@@ -1,4 +1,4 @@
-#include "core/trace_recorder.hpp"
+#include "core/observability/trace_recorder.hpp"
 
 #include <gtest/gtest.h>
 

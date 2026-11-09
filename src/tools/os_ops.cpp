@@ -1,6 +1,6 @@
 #include "os_ops.hpp"
 #include "core/config.hpp"
-#include "core/log_system.hpp"
+#include "core/observability/log_system.hpp"
 #include "tools/dispatch.hpp"
 #include "tools/runtime_ops.hpp"
 #include "util/error_util.hpp"

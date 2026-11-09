@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include <core/api_envelope.hpp>
+#include <core/transport/api_envelope.hpp>
 #include <tools/dispatch.hpp>
 #include <tools/register_all.hpp>
 #include <tools/tool_base.hpp>

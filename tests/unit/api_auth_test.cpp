@@ -1,6 +1,6 @@
-#include "core/api_auth.hpp"
-#include "core/api_surface.hpp"
-#include "core/api_token.hpp"
+#include "core/transport/api_auth.hpp"
+#include "core/transport/api_surface.hpp"
+#include "core/transport/api_token.hpp"
 
 #include <gtest/gtest.h>
 

@@ -1,4 +1,4 @@
-#include "core/http_stream_registry.hpp"
+#include "core/transport/http_stream_registry.hpp"
 
 #include <gtest/gtest.h>
 

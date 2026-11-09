@@ -1,7 +1,7 @@
 #include "csharp_bridge_ops.hpp"
 
 #include "core/config.hpp"
-#include "core/log_system.hpp"
+#include "core/observability/log_system.hpp"
 #include "core/resource_registry.hpp"
 #include "runtime/gda_protocol.hpp"
 #include "tools/authorization.hpp"

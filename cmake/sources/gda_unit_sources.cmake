@@ -9,15 +9,15 @@
 # api_unit_transport / api_unit_cli / api_unit_docs）。
 # ====================================================================
 set(GDA_UNIT_BUSINESS_SOURCES
-    ${CMAKE_SOURCE_DIR}/src/core/log_system.cpp
-    ${CMAKE_SOURCE_DIR}/src/core/log_persist.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/observability/log_system.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/observability/log_persist.cpp
     ${CMAKE_SOURCE_DIR}/src/core/resource_registry.cpp
     ${CMAKE_SOURCE_DIR}/src/core/scene_dirty_tracker.cpp
     ${CMAKE_SOURCE_DIR}/src/core/export_guard.cpp
     ${CMAKE_SOURCE_DIR}/src/core/editor_readiness.cpp
     ${CMAKE_SOURCE_DIR}/src/core/editor_coords.cpp
-    ${CMAKE_SOURCE_DIR}/src/core/trace_recorder.cpp
-    ${CMAKE_SOURCE_DIR}/src/core/monitor.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/observability/trace_recorder.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/observability/monitor.cpp
     ${CMAKE_SOURCE_DIR}/src/util/bm25_index.cpp
     ${CMAKE_SOURCE_DIR}/src/util/error_util.cpp
     ${CMAKE_SOURCE_DIR}/src/util/readback_util.cpp
@@ -35,9 +35,9 @@ set(GDA_UNIT_BUSINESS_SOURCES
     ${CMAKE_SOURCE_DIR}/src/tools/tool_args.cpp
     ${CMAKE_SOURCE_DIR}/src/tools/tool_pipeline.cpp
     ${CMAKE_SOURCE_DIR}/src/tools/tool_invoke.cpp
-    ${CMAKE_SOURCE_DIR}/src/core/gda_home.cpp
-    ${CMAKE_SOURCE_DIR}/src/core/project_store.cpp
-    ${CMAKE_SOURCE_DIR}/src/core/instance_registry.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/storage/gda_home.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/storage/project_store.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/storage/instance_registry.cpp
     ${CMAKE_SOURCE_DIR}/tests/runner/config_loader.cpp
     ${GDA_TOOLS_OPS_SOURCES})
 

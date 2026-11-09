@@ -5,5 +5,5 @@
 # 不改 tests/CMakeLists.txt，避免多分支归并冲突。
 # ====================================================================
 set(GDA_UNIT_INSTANCE_GUARD_SOURCES
-    ${CMAKE_SOURCE_DIR}/src/core/instance_guard.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/storage/instance_guard.cpp
     ${CMAKE_SOURCE_DIR}/tests/boundary/instance_guard_test.cpp)

@@ -1,7 +1,7 @@
 #include "scene_spec_ops.hpp"
 #include "tool_invoke.hpp"
 #include "../util/scene_path.hpp"
-#include "core/log_system.hpp"
+#include "core/observability/log_system.hpp"
 #include "core/scene_dirty_tracker.hpp"
 #include "property_ops.hpp"
 #include "resource_ops.hpp"

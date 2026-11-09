@@ -1,5 +1,5 @@
 #include "debugger_ops.hpp"
-#include "core/log_system.hpp"
+#include "core/observability/log_system.hpp"
 #include "debugger_access.hpp"
 #include "runtime/gda_protocol.hpp"
 #include "runtime_ops.hpp"

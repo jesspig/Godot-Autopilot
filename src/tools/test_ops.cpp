@@ -1,5 +1,5 @@
 #include "test_ops.hpp"
-#include "core/log_system.hpp"
+#include "core/observability/log_system.hpp"
 #include "tools/debugger_ops.hpp"
 #include "util/error_util.hpp"
 #include "util/gdscript_wrap.hpp"

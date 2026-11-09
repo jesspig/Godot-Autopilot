@@ -40,29 +40,29 @@ THREAD_CONTEXT_RULES = (
      "被 transport 线程的工具层直接包含。"),
     ("src/core/error_watermark.hpp", CTX_FOREIGN,
      "错误水位由 transport 线程累计。"),
-    ("src/core/log_persist.cpp", CTX_FOREIGN,
+    ("src/core/observability/log_persist.cpp", CTX_FOREIGN,
      "transport 线程经 SpecTool::execute 入队日志与轨迹并镜像写盘。"),
-    ("src/core/log_persist.hpp", CTX_FOREIGN,
+    ("src/core/observability/log_persist.hpp", CTX_FOREIGN,
      "transport 线程经 SpecTool::execute 入队日志与轨迹并镜像写盘。"),
-    ("src/core/log_system.cpp", CTX_FOREIGN,
+    ("src/core/observability/log_system.cpp", CTX_FOREIGN,
      "transport 线程直接写日志。"),
-    ("src/core/log_system.hpp", CTX_FOREIGN,
+    ("src/core/observability/log_system.hpp", CTX_FOREIGN,
      "transport 线程直接写日志。"),
-    ("src/core/monitor.cpp", CTX_FOREIGN,
+    ("src/core/observability/monitor.cpp", CTX_FOREIGN,
      "transport 线程直接上报监控事件。"),
-    ("src/core/monitor.hpp", CTX_FOREIGN,
+    ("src/core/observability/monitor.hpp", CTX_FOREIGN,
      "transport 线程直接上报监控事件。"),
-    ("src/core/sanitize_policy.cpp", CTX_FOREIGN,
+    ("src/core/observability/sanitize_policy.cpp", CTX_FOREIGN,
      "transport 线程读取脱敏开关。"),
-    ("src/core/sanitize_policy.hpp", CTX_FOREIGN,
+    ("src/core/observability/sanitize_policy.hpp", CTX_FOREIGN,
      "transport 线程读取脱敏开关。"),
     ("src/core/server_context.cpp", CTX_FOREIGN,
      "MCP 服务与端口解析发生在 transport 线程。"),
     ("src/core/server_context.hpp", CTX_FOREIGN,
      "MCP 服务与端口解析发生在 transport 线程。"),
-    ("src/core/trace_recorder.cpp", CTX_FOREIGN,
+    ("src/core/observability/trace_recorder.cpp", CTX_FOREIGN,
      "transport 线程直接记录轨迹事件。"),
-    ("src/core/trace_recorder.hpp", CTX_FOREIGN,
+    ("src/core/observability/trace_recorder.hpp", CTX_FOREIGN,
      "transport 线程直接记录轨迹事件。"),
     ("src/tools/authorization.hpp", CTX_FOREIGN,
      "能力判定由 transport 线程的元工具路径触发。"),
@@ -110,11 +110,11 @@ THREAD_CONTEXT_RULES = (
      "运行模式探测在主线程读取引擎单例。"),
     ("src/core/mode_detector.hpp", CTX_MAIN,
      "运行模式探测在主线程读取引擎单例。"),
-    ("src/core/monitor_env.cpp", CTX_MAIN,
+    ("src/core/observability/monitor_env.cpp", CTX_MAIN,
      "环境快照只在 _enter_tree 的主线程调用。"),
-    ("src/core/perf_sampler.cpp", CTX_MAIN,
+    ("src/core/observability/perf_sampler.cpp", CTX_MAIN,
      "性能采样由 _process 在主线程驱动。"),
-    ("src/core/perf_sampler.hpp", CTX_MAIN,
+    ("src/core/observability/perf_sampler.hpp", CTX_MAIN,
      "性能采样由 _process 在主线程驱动。"),
     ("src/core/plugin_config.cpp", CTX_MAIN,
      "配置读写由主线程触发：配置面板、启动快照与领域工具的授权判定。"),
@@ -185,7 +185,7 @@ THREAD_CONTEXT_RULES = (
 )
 
 FOREIGN_MAIN_THREAD_SCOPES = {
-    "src/core/log_persist.cpp": (
+    "src/core/observability/log_persist.cpp": (
         "godot_autopilot::LogPersist::init_session",
         "godot_autopilot::LogPersist::flush_on_main_thread",
         "godot_autopilot::LogPersist::flush_trace_images",
@@ -544,7 +544,7 @@ def run_self_tests():
         print("self-test FAIL: 0 violations/" + str(len(hits))
               + " hits: main 分类文件不应报违规", file=sys.stderr)
         return 1
-    allowed_rel = "src/core/log_persist.cpp"
+    allowed_rel = "src/core/observability/log_persist.cpp"
     allowed_text = ('void godot_autopilot::append_persist_file() '
                     '{ godot::FileAccess::exists("x"); }')
     hits = scan_file(allowed_rel, allowed_text)

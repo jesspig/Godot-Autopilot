@@ -1,7 +1,7 @@
 #include "code_exec_ops.hpp"
 #include "core/command_queue.hpp"
 #include "core/config.hpp"
-#include "core/log_system.hpp"
+#include "core/observability/log_system.hpp"
 #include "core/resource_registry.hpp"
 #include "tools/debugger_ops.hpp"
 #include "tools/dispatch.hpp"

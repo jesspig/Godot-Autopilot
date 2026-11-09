@@ -11,11 +11,11 @@
 
 #include <mcp/JsonValue.hpp>
 #include <core/command_queue.hpp>
-#include <core/log_persist.hpp>
-#include <core/log_system.hpp>
-#include <core/trace_recorder.hpp>
-#include "core/monitor.hpp"
-#include "core/sanitize_policy.hpp"
+#include <core/observability/log_persist.hpp>
+#include <core/observability/log_system.hpp>
+#include <core/observability/trace_recorder.hpp>
+#include "core/observability/monitor.hpp"
+#include "core/observability/sanitize_policy.hpp"
 #include <tools/runtime_ops.hpp>
 #include <tools/schema_builder.hpp>
 #include <tools/tool_base.hpp>

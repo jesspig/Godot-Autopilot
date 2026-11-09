@@ -1,6 +1,6 @@
 #include "script_ops.hpp"
 #include "../util/scene_path.hpp"
-#include "core/log_system.hpp"
+#include "core/observability/log_system.hpp"
 #include "core/scene_dirty_tracker.hpp"
 #include "tools/debugger_ops.hpp"
 #include "tools/scene_ops.hpp"

@@ -1,4 +1,4 @@
-#include "core/instance_guard.hpp"
+#include "core/storage/instance_guard.hpp"
 
 #include <gtest/gtest.h>
 

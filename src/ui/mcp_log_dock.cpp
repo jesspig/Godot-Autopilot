@@ -7,10 +7,10 @@
 #include <string>
 #include <unordered_map>
 
-#include "core/log_persist.hpp"
-#include "core/monitor.hpp"
+#include "core/observability/log_persist.hpp"
+#include "core/observability/monitor.hpp"
 #include "core/plugin_config.hpp"
-#include "core/trace_recorder.hpp"
+#include "core/observability/trace_recorder.hpp"
 
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/engine.hpp>

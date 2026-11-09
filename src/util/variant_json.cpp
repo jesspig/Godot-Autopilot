@@ -1,6 +1,6 @@
 #include "variant_json.hpp"
 #include "core/config.hpp"
-#include "core/log_system.hpp"
+#include "core/observability/log_system.hpp"
 #include "util/owned_exception.hpp"
 #include <cctype>
 #include <godot_cpp/classes/class_db_singleton.hpp>

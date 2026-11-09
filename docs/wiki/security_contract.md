@@ -11,16 +11,16 @@ timestamp: "2026-10-21T20:08:37+08:00"
 resource:
   - src/core/server_context.cpp
   - src/core/command_queue.hpp
-  - src/core/log_persist.hpp
-  - src/core/sanitize_policy.hpp
-  - src/core/monitor.hpp
-  - src/core/api_auth.cpp
-  - src/core/api_token.cpp
-  - src/core/api_surface.cpp
-  - src/core/api_envelope.cpp
-  - src/core/gda_home.cpp
-  - src/core/port_resolver.cpp
-  - src/core/instance_registry.cpp
+  - src/core/observability/log_persist.hpp
+  - src/core/observability/sanitize_policy.hpp
+  - src/core/observability/monitor.hpp
+  - src/core/transport/api_auth.cpp
+  - src/core/transport/api_token.cpp
+  - src/core/transport/api_surface.cpp
+  - src/core/transport/api_envelope.cpp
+  - src/core/storage/gda_home.cpp
+  - src/core/transport/port_resolver.cpp
+  - src/core/storage/instance_registry.cpp
   - src/tools/tool_base.hpp
   - src/tools/tool_spec.hpp
   - src/tools/authorization.hpp
@@ -229,7 +229,7 @@ REST 面（`/api`）与 MCP 面共用同一监听端口，但**认证要求不�
 - 主线程判定以队列首次 `drain()` 记录的线程为准；队列必须在插件正常生命周期内先完成主线程初始化，再处理依赖 Godot API 的任务。
 - **等待全预算化（10-20 起）**：编辑器内不再有无限等待点。`CommandQueue` 新增 `submit_tracked_bounded(fn, budget_ms)`（`src/core/command_queue.hpp:260-290`）——带预算的提交，预算耗尽时 `cancel(id)` 并置 `timed_out`/`cancelled`；`dispatch::run_bounded_on_main_thread()`（`src/tools/dispatch.hpp:45-68`）是上层统一包装，资源读取（`resource_handlers.cpp` 8 处 handler、`debugger_resources.cpp` 7 处 handler）、MCP 提示词（`prompt_handlers.cpp` 7 个提示词）、用户脚本动态工具（`autopilot_tools.cpp` 3 处）、`code_execute`/`batch_execute` 的主线程快照（`code_exec_ops.cpp` 2 处）与游戏通道（`runtime_ops.cpp` 2 处）均已改走该入口，超时返回结构化 `main_thread_timeout`（资源/提示词路径分别映射为 `main_thread_timeout` / `resource_read_failed` 错误码）。`CommandQueue::execute_sync()`（`src/core/command_queue.hpp:292-298`）的实现仍是 `submit(...).get()` 无界等待形态，但**在 `src/` 内已无任何调用点**（`grep -rn execute_sync src/` 只命中定义本身）——它是遗留入口，**新增代码不得再调用它**，否则会重新引入无界等待。
 - **协作式执行期超时（10-20 起）**：主线程等待预算只约束「排队等主线程」这一段，管不到「主线程上正在跑的长脚本」。`code_execute` 因此在包装脚本里注入截止时间常量 `__gda_deadline_ms` 与超时哨兵，并在循环体与入口函数注入检查点（`src/util/gdscript_wrap.hpp` 的 `deadline_declaration` / `deadline_check_line` / `deadline_break_line` / `deadline_loop_condition` / `inject_deadline_checks`），脚本自行在检查点退出；执行后按哨兵与实测耗时判定超时，返回结构化错误 `code="exec_timeout"`（`retryable=false`，含 `timeout_ms` / `execution_time_ms`，`src/tools/dispatch.cpp:333-343`）。游戏侧 eval 同理：宿主在 `eval_timeout_budget_ms()`（上限 `GDA_MAX_GAME_OP_TIMEOUT_MS` = 25000ms）内装配截止时间并注入检查点，超时返回 `structured_error.code="eval_timeout"`（附 `game_may_be_busy=true`——脚本无法被强行中断，游戏主线程要等脚本自己返回），被宿主取消时返回 `structured_error.code="eval_cancelled"`。协作式的边界要说清楚：**它依赖脚本执行到检查点**，不含 `await`、不返回的脚本无法被强制中止。
-- **主线程契约静态守卫（10-20 新增）**：`tests/guard/main_thread_guard.py` 扫描 `src/` 下全部 `*.cpp`/`*.hpp`，按「文件级线程归类 + 作用域级放行」判定：每个源文件被显式归入主线程（`main`）、受管（`managed`）或外线程（`foreign`）三类；外线程文件里的 Godot API 调用（`godot::FileAccess` / `DirAccess` / `EditorInterface` / `Engine` / `SceneTree` / `ClassDB` / `ProjectSettings` / `Input` / `DisplayServer` / `OS` / `Performance` / `Resource` / `ResourceLoader` / `ResourceSaver` 等）默认违规，只有落在该文件显式登记的主线程作用域里才放行（当前仅 `src/core/log_persist.cpp` 登记了 `init_session` / `flush_on_main_thread` / `flush_trace_images` / `rotate_on_init` / `append_persist_file` / `prune_persist_dir`）。词法层面先剥离字符串/字符/raw 字面量与注释再做标识符匹配，避免把字面量里的 API 名误判为调用。守卫在 ctest 阶段拦（`main_thread_guard` 用例），与 `comment_guard` 同级；退出码 0 = 无违规、1 = 存在违规、2 = 扫描输入不可读。
+- **主线程契约静态守卫（10-20 新增）**：`tests/guard/main_thread_guard.py` 扫描 `src/` 下全部 `*.cpp`/`*.hpp`，按「文件级线程归类 + 作用域级放行」判定：每个源文件被显式归入主线程（`main`）、受管（`managed`）或外线程（`foreign`）三类；外线程文件里的 Godot API 调用（`godot::FileAccess` / `DirAccess` / `EditorInterface` / `Engine` / `SceneTree` / `ClassDB` / `ProjectSettings` / `Input` / `DisplayServer` / `OS` / `Performance` / `Resource` / `ResourceLoader` / `ResourceSaver` 等）默认违规，只有落在该文件显式登记的主线程作用域里才放行（当前仅 `src/core/observability/log_persist.cpp` 登记了 `init_session` / `flush_on_main_thread` / `flush_trace_images` / `rotate_on_init` / `append_persist_file` / `prune_persist_dir`）。词法层面先剥离字符串/字符/raw 字面量与注释再做标识符匹配，避免把字面量里的 API 名误判为调用。守卫在 ctest 阶段拦（`main_thread_guard` 用例），与 `comment_guard` 同级；退出码 0 = 无违规、1 = 存在违规、2 = 扫描输入不可读。
 - **守卫的固有局限（如实记录，不得夸大）**：判定是**文件级线程归类 + 作用域级放行**，**不做跨函数数据流分析**。因此：① 一个函数若被登记为「主线程作用域」，其内部对 Godot API 的调用一律放行，不校验它被谁调用——**同一文件内「主线程函数」被「transport 线程函数」调用时，作用域级放行会放行前者**；② 外线程文件调用一个位于主线程分类文件里的辅助函数，不会被本守卫拦下（跨文件调用链不参与判定）；③ 守卫只认 `godot::` 限定名的 API 调用，经别名、`using` 改写或第三方封装绕过的调用不在覆盖范围。它是防回归的**最小静态网**，不是线程安全的证明；线程安全的最终保证仍是「所有 Godot API 经 `CommandQueue` 在主线程执行」这条人工契约与测试体系（历史 L2 行为测试已由集成层 gtest 与 Agent e2e 承接）。
 - **导出期拒绝（10-20 加固）**：`ExportGuard` 的导出标志改为**实例级**（`ExportState state_` 是 `ExportGuard` 的成员，`is_exporting()` 遍历已注册实例查各自的标志），不再是全局单例标志；`_export_begin` 用 RAII 的 `ExportState::Scope` 包裹，`Scope` 析构时复位，因此**导出回调抛异常也不会残留 true**（`_export_end` 仍显式复位）。导出期拒绝现覆盖三类入口：**工具调用**（`src/tools/tool_invoke.cpp:182` 的 `invoke_tool` 与 `src/tools/register_all.cpp:656` 的元工具注册回调）、**MCP 资源**（`src/resources/resource_handlers.cpp` 9 处 + `src/resources/debugger_resources.cpp` 7 处）、**MCP 提示词**（`src/prompts/prompt_handlers.cpp:40`）。拒绝响应统一为 `editor is exporting; retry after export completes`（`dispatch::export_blocked_error_text()`），**10-21 起该拒绝带机器可读 `code="export_in_progress"`**。引擎内证据边界：真实导出由引擎导出流程在编辑器主线程触发，MCP 通道无法可靠构造；历史 L2 用例 `41_thread_guard.json`（已随引擎轨删除）同样**不覆盖导出期拒绝**，该场景的引擎内证据缺口仍在。**REST 面的导出期拒绝当前尚未接线**（统一执行入口未接入 REST 请求路径），见 §3.5 末条。
 

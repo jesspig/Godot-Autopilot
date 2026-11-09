@@ -1,5 +1,5 @@
 #include "spriteframes_ops.hpp"
-#include "core/log_system.hpp"
+#include "core/observability/log_system.hpp"
 #include "resource_ops.hpp"
 #include "util/error_util.hpp"
 #include "util/json_godot.hpp"

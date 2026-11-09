@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 
-#include "monitor.hpp"
-#include "trace_recorder.hpp"
+#include "core/observability/monitor.hpp"
+#include "core/observability/trace_recorder.hpp"
 
 namespace godot_autopilot {
 

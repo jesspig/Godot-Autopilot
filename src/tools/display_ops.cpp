@@ -1,7 +1,7 @@
 #include "display_ops.hpp"
 #include "capture_ops.hpp"
 #include "core/config.hpp"
-#include "core/log_system.hpp"
+#include "core/observability/log_system.hpp"
 #include "util/error_util.hpp"
 #include "util/variant_json.hpp"
 #ifdef GetObject

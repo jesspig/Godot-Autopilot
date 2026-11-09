@@ -7,7 +7,7 @@
 #include <string>
 #include <string_view>
 
-#include "core/sanitize_policy.hpp"
+#include "core/observability/sanitize_policy.hpp"
 #include "tools/tool_base.hpp"
 #include "ui/authorization_switches.hpp"
 

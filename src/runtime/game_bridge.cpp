@@ -2,7 +2,7 @@
 
 #include "core/config.hpp"
 #include "core/editor_coords.hpp"
-#include "core/log_system.hpp"
+#include "core/observability/log_system.hpp"
 #include "gda_protocol.hpp"
 #include "runtime/error_cursor.hpp"
 #include "runtime/game_node_count.hpp"

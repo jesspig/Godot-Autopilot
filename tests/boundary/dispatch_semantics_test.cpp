@@ -1,5 +1,5 @@
 #include "core/command_queue.hpp"
-#include "core/sanitize_policy.hpp"
+#include "core/observability/sanitize_policy.hpp"
 #include "tools/dispatch.hpp"
 #include "tools/tool_spec.hpp"
 

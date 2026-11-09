@@ -1,6 +1,6 @@
 #include "log_ops.hpp"
 #include "../util/error_util.hpp"
-#include "core/log_system.hpp"
+#include "core/observability/log_system.hpp"
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/os.hpp>

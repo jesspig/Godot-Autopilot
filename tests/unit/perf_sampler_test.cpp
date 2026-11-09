@@ -1,4 +1,4 @@
-#include "core/perf_sampler.hpp"
+#include "core/observability/perf_sampler.hpp"
 
 #include <gtest/gtest.h>
 

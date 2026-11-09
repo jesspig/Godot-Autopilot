@@ -1,4 +1,4 @@
-#include "core/monitor.hpp"
+#include "core/observability/monitor.hpp"
 
 #include <gtest/gtest.h>
 

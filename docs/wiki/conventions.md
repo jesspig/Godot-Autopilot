@@ -80,7 +80,7 @@ resource: src/
 
 1. **命名**：`<主题>_guard`（`.py` 或 `.cmake`），落在 `tests/guard/`；`tests/CMakeLists.txt` 里的 ctest 名字与文件名一致（`add_test(NAME <主题>_guard COMMAND ...)`），便于 `ctest -R <主题>_guard` 单独跑。
 2. **豁免清单**：守卫若需豁免，**豁免必须显式登记在守卫文件自己的清单常量里**，不允许靠「文件不在扫描范围」或注释绕过。已登记的两处清单：
-   - `main_thread_guard.py` 的 `THREAD_CONTEXT_RULES`（逐文件标注 `main`/`managed`/`foreign` 三类线程上下文 + 判定理由）与 `FOREIGN_MAIN_THREAD_SCOPES`（外线程文件里允许触碰 Godot API 的主线程作用域白名单，当前仅 `src/core/log_persist.cpp` 的 6 个函数）；
+   - `main_thread_guard.py` 的 `THREAD_CONTEXT_RULES`（逐文件标注 `main`/`managed`/`foreign` 三类线程上下文 + 判定理由）与 `FOREIGN_MAIN_THREAD_SCOPES`（外线程文件里允许触碰 Godot API 的主线程作用域白名单，当前仅 `src/core/observability/log_persist.cpp` 的 6 个函数）；
    - `migration_guard.cmake` 的 `migrated_domains.txt`（已迁移域清单 + `strict` 行）。
 3. **零依赖**：守卫只允许用标准库或 CMake 自带能力，不引入第三方依赖、不启动引擎、不联网。
 4. **退出码约定**：0 = 通过（打印一行可辨识的 OK 文案），1 = 有违规（逐条打印 `文件:行号: 片段`），2 = 用法/环境错误（参数错误、文件读不到）。CI 靠退出码判定。

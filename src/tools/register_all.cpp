@@ -2,8 +2,8 @@
 #include "core/command_queue.hpp"
 #include "core/error_watermark.hpp"
 #include "core/export_guard.hpp"
-#include "core/log_system.hpp"
-#include "core/monitor.hpp"
+#include "core/observability/log_system.hpp"
+#include "core/observability/monitor.hpp"
 #include <version.hpp>
 #include "tools/code_exec_ops.hpp"
 #include "tools/dispatch.hpp"
