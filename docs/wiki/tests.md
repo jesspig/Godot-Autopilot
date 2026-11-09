@@ -201,23 +201,23 @@ uv run main.py test --single migration_guard   # 单跑（ctest -R）
 | 文件 | fixture（授权 env） | 数量 | 覆盖内容 |
 |---|---|---|---|
 | `harness_smoke_test.cpp` | `IntegrationHarness`（默认拒绝） | 1 | 冒烟：`search_tools` 空 query 枚举非空 |
-| `case_00_meta_test.cpp` | `MetaToolsSuite`（`code_execute`） | 12 | 7 元工具语义：ping / search_tools（关键词、分类、标签三查）/ list_categories / get_tool_detail（命中、缺失、缺参）/ call_tool（未知、缺参）/ batch_execute（成功、含失败）；code_execute 三步不迁（真实脚本执行，划回 e2e） |
-| `case_10_editor_input_test.cpp` | `EditorInputSuite`（`write`） | 6 | 编辑器输入/UI 动作参数校验错误串：click 缺 position、scroll 非法 direction、drag 缺 to、type 缺 text、click_editor_element 缺 path、run_editor_shortcut 未知键——全部在注入前返回 error，无副作用 |
-| `case_47_authorization_gate_test.cpp` | `AuthorizationGate`（`none`） | 1 | 授权门默认拒绝态：write 档 `create_scene_node` 在授权门（先于 handler 参数校验）被拒——结构化拒绝响应全串 + `code=authorization_required` + `authorization_required=write` |
-| `case_12_capture_params_test.cpp` | `CaptureParamsSuite`（`write`） | 13 | capture 参数校验：`after_frames` 负数/非整数、`when` 表达式错误码、`scale` 越界、`save`/`save_dir` 类型与 `res://../` 逃逸、`user://` 拒绝；工程外绝对路径一步不迁（`ProjectSettings::get_singleton()` 边界，见 R-04-01） |
-| `case_16_game_jobs_test.cpp` | `GameJobsSuite`（`game_runtime`） | 9 | `start_game_job`/`get_game_job` 参数校验：op 白名单、缺 params、timeout 上限 25000（`GDA_MAX_GAME_OP_TIMEOUT_MS`）、未知 job 四段式错误、cancel 类型；真实 job 生命周期划回 e2e |
-| `case_17_vision_assist_test.cpp` | `VisionAssistSuite`（`write`） | 21 | 视觉辅助参数校验：`annotate_nodes` 类型/空/越界、`diff_image` 组合、`review_*` 全参数负例；`diff_image requires diff_against_last` 一步不迁（`EditorInterface::get_singleton()` 边界，见 R-04-02） |
-| `case_23_click_ui_coords_test.cpp` | `ClickUiCoordsSuite`（`game_runtime`） | 11 | `click_game_ui_element` 缺参/越界/未知参数精确全串（含 em dash 四段式）、`queue_game_input`/`sequence_game_inputs` 的 `coord_space` 校验（先于通道）；无游戏通道三步不迁（编辑器态文案，见 R-01-01） |
-| `case_24_keycode_alias_test.cpp` | `KeycodeAliasSuite`（`game_runtime`） | 2 | `queue_game_input` 键名入参接受路径（error+hint 非空）；编辑器侧 `add_input_map_action(_event)` 九步不迁（`InputMap::get_singleton()` 边界，见 R-01-02；键名判决由 L1 `keycode_alias_test` 纯函数覆盖） |
-| `case_35_scene_tree_gate_test.cpp` | `SceneTreeGateDenied`（`none`）/ `SceneTreeGateAllowed`（`game_runtime`） | 16 | 8 个 SceneTree 工具 × 两态：授权拒绝（`authorization required` 全串）与运行期通道错误（进程内恒为 `debugger capture plugin not initialized`，非空断言满足 JSON 声明；辅助断言区分两态）；场景搭建与编辑器树回读五步不迁（真实引擎，见 R-01-03） |
-| `case_40_contract_assert_test.cpp` | `ContractAssertSuite`（`code_execute`） | 1 | `get_tool_detail` 契约：`code_execute` 的 `tool.side_effect` 序列化值 `"code_execute"`；执行步不迁（真实脚本执行，见 R-01-05） |
+| `meta_tools_test.cpp` | `MetaToolsSuite`（`code_execute`） | 12 | 7 元工具语义：ping / search_tools（关键词、分类、标签三查）/ list_categories / get_tool_detail（命中、缺失、缺参）/ call_tool（未知、缺参）/ batch_execute（成功、含失败）；code_execute 三步不迁（真实脚本执行，划回 e2e） |
+| `editor_input_validation_test.cpp` | `EditorInputSuite`（`write`） | 6 | 编辑器输入/UI 动作参数校验错误串：click 缺 position、scroll 非法 direction、drag 缺 to、type 缺 text、click_editor_element 缺 path、run_editor_shortcut 未知键——全部在注入前返回 error，无副作用 |
+| `authorization_gate_test.cpp` | `AuthorizationGate`（`none`） | 1 | 授权门默认拒绝态：write 档 `create_scene_node` 在授权门（先于 handler 参数校验）被拒——结构化拒绝响应全串 + `code=authorization_required` + `authorization_required=write` |
+| `capture_params_validation_test.cpp` | `CaptureParamsSuite`（`write`） | 13 | capture 参数校验：`after_frames` 负数/非整数、`when` 表达式错误码、`scale` 越界、`save`/`save_dir` 类型与 `res://../` 逃逸、`user://` 拒绝；工程外绝对路径一步不迁（`ProjectSettings::get_singleton()` 边界，见 R-04-01） |
+| `game_jobs_validation_test.cpp` | `GameJobsSuite`（`game_runtime`） | 9 | `start_game_job`/`get_game_job` 参数校验：op 白名单、缺 params、timeout 上限 25000（`GDA_MAX_GAME_OP_TIMEOUT_MS`）、未知 job 四段式错误、cancel 类型；真实 job 生命周期划回 e2e |
+| `vision_assist_validation_test.cpp` | `VisionAssistSuite`（`write`） | 21 | 视觉辅助参数校验：`annotate_nodes` 类型/空/越界、`diff_image` 组合、`review_*` 全参数负例；`diff_image requires diff_against_last` 一步不迁（`EditorInterface::get_singleton()` 边界，见 R-04-02） |
+| `click_ui_coords_validation_test.cpp` | `ClickUiCoordsSuite`（`game_runtime`） | 11 | `click_game_ui_element` 缺参/越界/未知参数精确全串（含 em dash 四段式）、`queue_game_input`/`sequence_game_inputs` 的 `coord_space` 校验（先于通道）；无游戏通道三步不迁（编辑器态文案，见 R-01-01） |
+| `queue_game_input_keycode_alias_test.cpp` | `KeycodeAliasSuite`（`game_runtime`） | 2 | `queue_game_input` 键名入参接受路径（error+hint 非空）；编辑器侧 `add_input_map_action(_event)` 九步不迁（`InputMap::get_singleton()` 边界，见 R-01-02；键名判决由 L1 `keycode_alias_test` 纯函数覆盖） |
+| `scene_tree_gate_test.cpp` | `SceneTreeGateDenied`（`none`）/ `SceneTreeGateAllowed`（`game_runtime`） | 16 | 8 个 SceneTree 工具 × 两态：授权拒绝（`authorization required` 全串）与运行期通道错误（进程内恒为 `debugger capture plugin not initialized`，非空断言满足 JSON 声明；辅助断言区分两态）；场景搭建与编辑器树回读五步不迁（真实引擎，见 R-01-03） |
+| `tool_detail_contract_test.cpp` | `ContractAssertSuite`（`code_execute`） | 1 | `get_tool_detail` 契约：`code_execute` 的 `tool.side_effect` 序列化值 `"code_execute"`；执行步不迁（真实脚本执行，见 R-01-05） |
 | `toolface_contract_test.cpp` | `IntegrationHarness`（默认拒绝） | 16 | 工具面动态枚举契约：契约 4 + 排除划分自洽 1 + 空参实调 11 组（见「回归属性清单」） |
 
 > 步骤级对照表（源 JSON expect ↔ gtest 断言 ↔ 等价结论）与 R-01 台账（引擎触达剔除记录）：`.handoff/evidence/T-02/mapping.md`（试点）、`T-04/mapping-12-16-17-39.md`、`T-05/mapping-23-24-35-37-40.md`、`T-06/mapping-toolface.md`。合并定稿「A 类迁移对照表」与引擎行为验收清单已落盘 wiki（[engine-behavior-checklist.md](engine-behavior-checklist.md) 的「A 类迁移对照表」小节，含已迁逐例对照与未迁用例划回 e2e 汇总），本页不复制对照表全文。
 
 ### 运行与排查
 
-- **ctest**：`ctest --preset debug -R <正则>`（正则匹配「套件.用例」名，如 `-R "MetaToolsSuite"`、`-R "case_12|CaptureParams"`）；`uv run main.py test --single <name>` 等价走 `ctest -R`。
+- **ctest**：`ctest --preset debug -R <正则>`（正则匹配「套件.用例」名，如 `-R "MetaToolsSuite"`、`-R "capture_params|CaptureParams"`）；`uv run main.py test --single <name>` 等价走 `ctest -R`。
 - **gtest 直跑**：`build\<preset>\tests\gda_integration_tests.exe`，配 `--gtest_filter=<Suite>.<Test>`（支持通配）与 `--gtest_list_tests` 枚举；单文件定位时先 `--gtest_filter=IntegrationHarness.*` 类推。
 - **排查**：进程内 SEH（0xc0000005）或挂死几乎必属「进程内边界」清单所列形态，先对照该节与 `.handoff/evidence/` 各 mapping 的 R-01 台账再定位；一组 TEST 崩溃不影响其他组（`gtest_discover_tests` 逐 TEST 独立进程）。
 
