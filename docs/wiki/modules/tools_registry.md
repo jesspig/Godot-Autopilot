@@ -63,7 +63,7 @@ flowchart TD
 
 | # | 声称（AGENTS.md） | 核算结果 | 结论 |
 |---|---|---|---|
-| 1 | 元工具 7 个：ping/search_tools/list_categories/get_tool_detail/call_tool/batch_execute/code_execute，均作为顶层工具提供 | 7 个经 registry `add()`（`kMeta` 自动入 meta_），统一在 `register_all.cpp` 循环 `server.RegisterTool`（描述/schema 取自 registry 工具）；名单由 `g_active_registry->all_meta()` 派生，与 `register_all_test.cpp` 的 `kMetaToolNames` 一致；L1 断言 `ListTools` 恰好 7 个 | **一致** |
+| 1 | 元工具 7 个：ping/search_tools/list_categories/get_tool_detail/call_tool/batch_execute/code_execute，均作为顶层工具提供 | 7 个经 registry `add()`（`kMeta` 自动入 meta_），统一在 `register_all.cpp` 循环 `server.RegisterTool`（描述/schema 取自 registry 工具）；名单由 `g_active_registry->all_meta()` 派生，与 `register_all_test.cpp` 的 `kMetaToolNames` 一致；单元测试 断言 `ListTools` 恰好 7 个 | **一致** |
 | 2 | 领域工具 451 个 | 33 个 `*_tools.hpp` 的 `make_tools()` 共 451 个 `SpecTool`（`GDA_TOOL_CLASS` 宏与真类已删）；registry `all()`=**452** = 451 + system_status | **一致** |
 | 3 | 工具总体 = 7 元 + 451 域 | registry `all_any()`=**459**（452 域/系统 + 7 元）；MCP 顶层 7 元工具，MCP 可达总数 458 | **一致** |
 | 4 | ToolCatalog 459 条 | 由 registry `all_any()` 逐一 `make_tool_info` 派生 459 = 451 域 + system_status + 7 元；原 `populate_default_tools`/meta 快照链路已删除，catalog 完全由 `replace_tools` 动态填充 | **一致**（单一来源派生，无独立填表） |
@@ -79,7 +79,7 @@ flowchart TD
 - 元工具处理器（09-21 起）用 `RequestContext::GetRequest().id` 建立 `monitor::RequestScope` 并经 `tools::RequestSpanGuard` 压入请求 span，使「协议请求 → call_tool → 域工具」trace 端到端关联（`request_id` 贯通）。
 - `system_status`（`SpecTool`，非元工具，经 `call_tool` 调用）09-21 起返回新增 `tool_count`（工具总数）与 `queue_depth`（`CommandQueue::stats().pending`）字段；09-29 起另返回 `main_thread` 对象（`last_drain_age_ms`/`queue_depth`/`queue_cancelled`/`queue_rejected_full`/`oldest_pending_ms`，见 [核心模块](core.md)）；工具总数 459。
 - `call_tool`/`code_execute` 的错误翻转在 RegisterTool 回调统一处理：结果 JSON 含 `error` 字段时置 `is_error = true`。
-- 图片附件按 `kCaptureImage` flag 判定（`register_all.cpp` 的 `call_tool` 回调）：registry 已知工具含该 flag 时经 `util::try_attach_image_data` 附加截图 image content，仅未知工具名才走旧白名单 `is_image_capture_tool` 兜底（`util::try_attach_image_content`）；L1 `tool_pipeline_traits_test.cpp` 覆盖附件判定纯逻辑 4 项（含无 flag 透传）。
+- 图片附件按 `kCaptureImage` flag 判定（`register_all.cpp` 的 `call_tool` 回调）：registry 已知工具含该 flag 时经 `util::try_attach_image_data` 附加截图 image content，仅未知工具名才走旧白名单 `is_image_capture_tool` 兜底（`util::try_attach_image_content`）；单元测试 `tool_pipeline_traits_test.cpp` 覆盖附件判定纯逻辑 4 项（含无 flag 透传）。
 - `call_tool` 对带 `__gda_pending` 的异步结果做等待与 `capture_game_viewport` 结果定型（`runtime_ops::wait_pending_response`）；`call_tool` 与 `batch_execute(await_async=true)` 的编排回调在 MCP 线程执行（不占用主线程消息泵），领域工具 handler 仍由 dispatch 路由回主线程。
 
 ## Schema 统计口径
@@ -238,7 +238,7 @@ warnings 判定逻辑在 `tests/runner/traversal.cpp`（"schema 声明必填但�
 2. **ToolCatalog 构成口径（已更新）**：现 459 = 451 域 + `system_status` + 7 元，全部由 registry `all_any()` 单一来源派生；原 343/332/5 默认 + 3 快照 + Auto 补录口径已废除。
 3. **g_handlers 口径（已更新）**：现由 registry `all()` 派生共 452（451 域 + system_status），不再手写。
 4. **旧宏与 schema 文件（已删除）**：`GDA_TOOL_CLASS`/`tool_decl.hpp`/`fn_tool.hpp`/`meta_tools.hpp`/`IMetaTool`/`tool_input_schema`/`schema_fills.hpp`/`schema_*_ops.cpp` 全仓零残留，由 `tests/guard/migration_guard.cmake` 的 strict 模式守护。
-5. **生命周期约束**：`g_active_registry` 为文件级静态 `shared_ptr`（程序存活期），register_all/refresh_dynamic_tools 每次重建内容；避免对局部 registry 的悬垂引用（L1 `RegistryIsSingleSourceOfTools` 断言护航）。
+5. **生命周期约束**：`g_active_registry` 为文件级静态 `shared_ptr`（程序存活期），register_all/refresh_dynamic_tools 每次重建内容；避免对局部 registry 的悬垂引用（单元测试 `RegistryIsSingleSourceOfTools` 断言护航）。
 
 ## 出站链接
 

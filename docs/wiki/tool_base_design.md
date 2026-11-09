@@ -88,7 +88,7 @@ class SpecTool : public ToolBase, public ISideEffect {
 
 **超时执行路径（2026-10-20 新增）**：`CommandQueue` 新增 `submit_tracked_bounded(Fn, budget_ms)`（`src/core/command_queue.hpp:260`），在提交侧即以预算轮询 future，超时自动 `cancel(id)` 并回填 `TrackedSubmission` 新增的 `timed_out`/`waited_ms`/`cancelled` 三个字段（原 `TrackedSubmission` 只有 `id` + `future`）；`dispatch::run_bounded_on_main_thread`（`src/tools/dispatch.hpp:45-64`）以此为底座，回填 `BoundedWaitOutcome{ok,timed_out,cancelled,waited_ms,error}`。编辑器内 GDScript 协作式超时时另走 `dispatch::exec_timeout_result(timeout_ms, execution_time_ms)`，返回 `code="exec_timeout"`（`code_execute` 的 `run_with_timeout` 命中超时后调用，`code_exec_ops.cpp:994-995`）；游戏侧 eval 超时统一为 `code="eval_timeout"`（编辑器侧等待超时与游戏侧协作式截止两处均产出该码，见 [入口与运行时](modules/entry_runtime.md)）。
 
-L1 `dispatch_budget_test` 覆盖预算决策与队列不可用返回 **14 项**，另有 `dispatch_queue_unavailable_test` 覆盖无编辑器队列时的返回 **3 项**（均为 `tests/unit/` 下 `TEST` 宏逐行计数）。
+单元测试 `dispatch_budget_test` 覆盖预算决策与队列不可用返回 **14 项**，另有 `dispatch_queue_unavailable_test` 覆盖无编辑器队列时的返回 **3 项**（均为 `tests/unit/` 下 `TEST` 宏逐行计数）。
 
 ## 执行埋点与可重放 trace（09-20 新增）
 
@@ -121,7 +121,7 @@ L1 `dispatch_budget_test` 覆盖预算决策与队列不可用返回 **14 项**�
 - `require_*` 缺失抛 `ToolArgError("missing required parameter: <name>")`；类型不符抛 `"invalid parameter: <name> must be a <type>"`；
 - `get_*` 带默认值；`reject_unknown()` 按参数表拒绝未知键（`"unknown parameter: <name>"`）。
 
-语义要点：`null` 一律视为缺失；`integer` 接受整数值的 JSON double（拒绝小数、拒绝越界）；`boolean` 严格（`1`/`0` 报错）；`reject_unknown` 对非对象输入直接放行。L1 `tool_args_test.cpp` 覆盖 11 项。
+语义要点：`null` 一律视为缺失；`integer` 接受整数值的 JSON double（拒绝小数、拒绝越界）；`boolean` 严格（`1`/`0` 报错）；`reject_unknown` 对非对象输入直接放行。单元测试 `tool_args_test.cpp` 覆盖 11 项。
 
 > **接入状态（2026-10-20 复核）**：`Args` 是**可用但未接线**的能力——`src/` 下除 `tool_args.cpp` 自身外，没有任何文件 include `tool_args.hpp`，33 个领域的 handler 全部走 `args.Find(...)` + `util::error_json(...)`（`src/tools/*.cpp` 中 `util::error_json` 实测 759 行、`util::ok_result` 46 行）。因此"取参统一 Args"只是收敛方向，不是现状；写新 handler 前先看所在域的邻居文件用哪种，避免同文件混用两种风格。真正的统一接入需要一次性改动全部 `*_ops.cpp` 并复跑 `03_tools_contract` 遍历。
 
@@ -228,13 +228,13 @@ public partial class UserToolBootstrap : Node
 
 ## 内部组合调用（tool_invoke）
 
-`src/tools/tool_invoke.{hpp,cpp}` 提供服务端正式的工具间组合通道，供 handler 内部调用其他工具而不经过 MCP 往返：`tools::invoke_tool(name, args)` 按序处理导出态拦截（`ExportGuard::is_exporting()`，直接返回固定 error）→ 深度守卫（线程局部计数超 `kMaxInvokeDepth = 8` 返回 `tool invoke depth exceeded (max 8)`）→ `dispatch::call_handler` → 异步 pending 嵌套拦截（含 `__gda_pending` 时拒绝在主线程内嵌套调用异步工具）。诊断函数 `invoke_depth()` 返回当前线程组合调用深度。L1 `tests/unit/tool_invoke_test.cpp` 覆盖 4 项（未知透传/成功透传/pending 拦截/深度守卫）；导出分支无公开 setter，L1 未覆盖，注释已声明（由代码审查覆盖）。
+`src/tools/tool_invoke.{hpp,cpp}` 提供服务端正式的工具间组合通道，供 handler 内部调用其他工具而不经过 MCP 往返：`tools::invoke_tool(name, args)` 按序处理导出态拦截（`ExportGuard::is_exporting()`，直接返回固定 error）→ 深度守卫（线程局部计数超 `kMaxInvokeDepth = 8` 返回 `tool invoke depth exceeded (max 8)`）→ `dispatch::call_handler` → 异步 pending 嵌套拦截（含 `__gda_pending` 时拒绝在主线程内嵌套调用异步工具）。诊断函数 `invoke_depth()` 返回当前线程组合调用深度。单元测试 `tests/unit/tool_invoke_test.cpp` 覆盖 4 项（未知透传/成功透传/pending 拦截/深度守卫）；导出分支无公开 setter，单元测试 未覆盖，注释已声明（由代码审查覆盖）。
 
 trace 相关扩展（09-20）：`invoke_tool` 在正常路径用 `SpanGuard(trace, span)` 压栈使嵌套调用继承父 span；三条拒绝路径（`export_blocked`/`depth_exceeded`/`async_nested`）也各记一条 `TraceEvent`+`log_detailed`。线程局部 span 栈经 `current_trace_id()`/`current_span_id()` 读取，跨线程时由 `capture_trace_context()`（HTTP 线程捕获取值）与 `ScopedTraceContext`（主线程执行前恢复，析构还原）传递——全仓共 22 处 `ScopedTraceContext` 恢复点（`grep -n ScopedTraceContext src/` 静态统计；`tool_invoke.hpp/cpp` 的 7 处为类型声明与构造/析构实现，不计入）：`resource_handlers.cpp` 8、`debugger_resources.cpp` 7、`autopilot_tools.cpp` 3（动态工具分发/call_tool/rescan）、`code_exec_ops.cpp` 2（batch_execute 的 undo 快照/回滚）、`register_all.cpp` 1（元工具 RegisterTool 回调）、`dispatch.cpp` 1（`call_handler`）；`set_queued_wait_ms()`/`take_queued_wait_ms()` 构成排队等待计时的接力——`dispatch::call_handler` 提交到 `run_on_main_thread_with_budget` 的**带预算等待路径**（`dispatch.cpp:427-438`，任务在主线程真正执行前按 `steady_clock` 写入已等待毫秒），由 `SpecTool::execute`（`tool_spec.hpp:178`）在入口一次性取走写入 trace 的 `queue_wait_ms`，`call_handler_impl`（`dispatch.cpp:144`）在 handler 返回前再取一次以清掉本线程残留值；`invoke_thread_label()` 依 `runtime_ops::has_editor_queue()` 与 `CommandQueue::is_main_thread()` 标注 `main`/`non-main`。09-21 起 `record_invoke_trace` 走 `monitor::tool_call`，新增 `RequestSpanGuard`（压入协议请求 span，与元工具 `RequestScope` 配合使域工具 span 嵌套在请求 span 下），`TraceContext` 增 `request_id`（`capture_trace_context`/`ScopedTraceContext` 一并保存恢复）。
 
 ## batch_execute 最小变量串联
 
-`batch_execute` 在 `src/tools/code_exec_ops.cpp` 内支持最小变量串联（无 schema 改动）：整字符串精确替换——`$prev`（上一操作的成功/失败载荷整体）、`$steps[N].result` / `$steps[N].error`（指定序号操作的成功/失败载荷，支持嵌套结构内替换；非整字符串的混写如 `"prefix $prev suffix"` 保持原样）。不可解析时该步骤记 error，前缀 `unresolvable reference`（首操作用 `$prev`、前向引用、状态错配如对失败操作取 `.result`、序号越界均属此类），走既有 `stop_on_error` 语义；无条件分支、无并行。L1 `tests/unit/batch_refs_test.cpp` 覆盖 6 项。
+`batch_execute` 在 `src/tools/code_exec_ops.cpp` 内支持最小变量串联（无 schema 改动）：整字符串精确替换——`$prev`（上一操作的成功/失败载荷整体）、`$steps[N].result` / `$steps[N].error`（指定序号操作的成功/失败载荷，支持嵌套结构内替换；非整字符串的混写如 `"prefix $prev suffix"` 保持原样）。不可解析时该步骤记 error，前缀 `unresolvable reference`（首操作用 `$prev`、前向引用、状态错配如对失败操作取 `.result`、序号越界均属此类），走既有 `stop_on_error` 语义；无条件分支、无并行。单元测试 `tests/unit/batch_refs_test.cpp` 覆盖 6 项。
 
 ## 迁移规则与守卫
 

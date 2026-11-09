@@ -160,7 +160,7 @@ resource:
 
 ### 2.5 就绪窗口与请求重放（工具侧，09-29）
 
-编辑器侧发送游戏请求（`runtime_ops.cpp`）时：已 ready 会话 → 直接广播；无活动会话（`debugger_active_session_count` 只计 `is_active()` 会话）→ 返回 `game not running: ...`；有活动会话但未 ready → `wait_ready`（游戏工具参数，默认 true；`game_tools.hpp`/`capture_tools.hpp` 的 `boolean` 可选参数）为真时把请求标记 `awaiting_ready` 排队并立即返回 `queued_for_ready:true`，`gda:ready` 到达后由 `on_session_ready` 逐个重放（广播失败则重新挂起、等下一次 ready）；`wait_ready=false` 立即返回 `game started but not ready: ...`。决策纯函数在 `src/tools/ready_policy.hpp`（`decide_game_request`：ready>0 → SendNow、active<=0 → FailNotRunning、否则 wait_ready ? QueueForReady : FailNotReady；L1 `ready_policy_test` 5 项）。
+编辑器侧发送游戏请求（`runtime_ops.cpp`）时：已 ready 会话 → 直接广播；无活动会话（`debugger_active_session_count` 只计 `is_active()` 会话）→ 返回 `game not running: ...`；有活动会话但未 ready → `wait_ready`（游戏工具参数，默认 true；`game_tools.hpp`/`capture_tools.hpp` 的 `boolean` 可选参数）为真时把请求标记 `awaiting_ready` 排队并立即返回 `queued_for_ready:true`，`gda:ready` 到达后由 `on_session_ready` 逐个重放（广播失败则重新挂起、等下一次 ready）；`wait_ready=false` 立即返回 `game started but not ready: ...`。决策纯函数在 `src/tools/ready_policy.hpp`（`decide_game_request`：ready>0 → SendNow、active<=0 → FailNotRunning、否则 wait_ready ? QueueForReady : FailNotReady；单元测试 `ready_policy_test` 5 项）。
 
 ## 3. 运行时桥接四文件职责
 

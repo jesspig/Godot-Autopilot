@@ -35,7 +35,7 @@ resource: src/core/
 | `monitor_env` | `monitor_env.cpp`（09-21 新增） | `environment_snapshot()`（**仅主线程**）——会话开始写 `kind=snapshot` 事件，含 gda_version/Godot 版本/OS 名与版本/处理器数/对象数/编辑器模式/场景路径与根节点/port/desensitize/show_time/allow/session_nonce | `main.cpp`（`_enter_tree`） |
 | `perf_sampler` | `perf_sampler.hpp/cpp`（09-21 新增） | 主线程周期采样（默认 5s，env `GODOT_AUTOPILOT_PERF_INTERVAL_MS`）写 `kind=perf` 事件（帧时间均值/最大、FPS、近似 `cpu_frame_time_ms`、内存、对象/节点数、队列深度/拒绝数/锁等待、吞吐/错误率/平均延迟）；并做请求超时看门狗（默认 60s，env `GODOT_AUTOPILOT_REQUEST_TIMEOUT_MS`，超时发 `kind=execution_state, state=timed_out`）；`set_queue(const CommandQueue*)` 由 `main.cpp` 注入以读队列统计 | `main.cpp`（`_enter_tree` 注入队列、`_process` 每帧 tick） |
 | `ModeDetector` | `mode_detector.cpp/hpp` | 运行时模式检测（编辑器/游戏/未知） | `_enter_tree` 启动日志 |
-| 坐标换算（`coords` 命名空间，纯函数） | `editor_coords.cpp/hpp` | 仿射/Rect/图像尺寸纯逻辑 + 画布空间→窗口客户区换算（09-16 新增 `viewport_point_to_window` / `viewport_rect_center_to_window`，`screen_transform×canvas` 复合，恒等原样返回；画布空间即 `Control::get_global_rect()`/`get_global_transform()` 所在空间，注入的 `InputEventMouseButton.position` 为窗口客户区坐标（引擎侧经 `get_final_transform()` 反变换）——`src/core/editor_coords.hpp:12-17`；10-11 起增逆换算 `window_point_to_viewport`（行列式绝对值 < 1e-9 回退输入原值，树内暂无游戏侧调用方，L1 `coords_inverse_test` 直测）） | 游戏侧 `run_ui_click` 注入坐标换算与 `get_game_ui_elements` 窗口字段（见[入口与运行时](entry_runtime.md)） |
+| 坐标换算（`coords` 命名空间，纯函数） | `editor_coords.cpp/hpp` | 仿射/Rect/图像尺寸纯逻辑 + 画布空间→窗口客户区换算（09-16 新增 `viewport_point_to_window` / `viewport_rect_center_to_window`，`screen_transform×canvas` 复合，恒等原样返回；画布空间即 `Control::get_global_rect()`/`get_global_transform()` 所在空间，注入的 `InputEventMouseButton.position` 为窗口客户区坐标（引擎侧经 `get_final_transform()` 反变换）——`src/core/editor_coords.hpp:12-17`；10-11 起增逆换算 `window_point_to_viewport`（行列式绝对值 < 1e-9 回退输入原值，树内暂无游戏侧调用方，单元测试 `coords_inverse_test` 直测）） | 游戏侧 `run_ui_click` 注入坐标换算与 `get_game_ui_elements` 窗口字段（见[入口与运行时](entry_runtime.md)） |
 | `ResourceRegistry` | `resource_registry.cpp/hpp` | 内存资源缓存（oid 键 + `name:` 前缀键），全局 mutex 保护 | 资源类工具 |
 | `SceneDirtyTracker` | `scene_dirty_tracker.cpp/hpp` | 记录"当前编辑场景是否被修改"及根节点实例 ID | `GodotAutopilotPlugin::_get_unsaved_status` |
 | `error_watermark` | `error_watermark.hpp`（header-only） | 错误水印计数器：累积待消费错误数，供 MCP 响应附 `new_errors_since_last_call` doorbell | `register_all.cpp`（响应后处理）、`runtime_ops.cpp`（游戏 runtime_error 计数） |
@@ -108,17 +108,17 @@ resource: src/core/
 - `store_trace_image(span_id, kind, base64_png)` — **不在 transport 线程落盘**：脱敏开启时直接返回空串（`image_ref` 为空，jsonl 内仍保留 `image_hash`/`image_bytes`/`image_width`/`image_height`）；否则仅 base64 解码、拼出 `traces/images/trace-<session>-<span>-<kind>.png` 的相对与绝对路径并入**主线程图片缓冲**（`enqueue_trace_image`），返回相对路径 `images/...` 作为 `image_ref`。真正写盘发生在主线程的 `flush_trace_images()` 内
 - `enqueue_trace_image(payload)` / `flush_trace_images()` — 图片缓冲（`image_buffer_`，上限 `kTraceImageBufferMaxEntries = 64` 条 / `kTraceImageBufferMaxBytes = 64 MiB`）溢出时**丢最旧**并累加 `dropped_trace_images`、记一条 System Warning；`flush_on_main_thread()` 末尾调 `flush_trace_images()`，经 Godot `FileAccess`（`WRITE`）逐张落盘，成功时累加 `bytes_written`（**`bytes_written` 的图片部分累加点在落盘处，不再在 `store_trace_image` 处**）
 - 健康计数（09-21 新增，10-20 增补 `dropped_trace_images`）：`dropped_log_lines()`/`dropped_trace_lines()`/`dropped_trace_images()`/`bytes_written()`/`flush_failures()`/`rotations()`/`pruned_files()` 访问器 + `health_summary()`（汇总文本，含 `dropped_trace_images`），随 `kind=persist_health` 事件一并落盘；`trace_dir()` 返回工程级 `traces` 目录绝对路径（供 McpLogDock 「Open Traces」按钮使用）
-- 静态工具函数：`level_name`/`category_name`、`format_human_line`、`session_stamp_from_ticks`、`should_prune`（L1 `log_persist_test` 覆盖 8 项）
+- 静态工具函数：`level_name`/`category_name`、`format_human_line`、`session_stamp_from_ticks`、`should_prune`（单元测试 `log_persist_test` 覆盖 8 项）
 
 ### TraceRecorder（单例，09-20 新增）
 
 工具调用事件的结构化记录（内存环形，`deque` + mutex，容量 `kCapacity = 20000`）：
 
-- `record(TraceEvent)` — 分配单调递增 `seq`（从 1 起）后入队，超容 `pop_front` 并返回 seq；`query_recent(limit)` 取尾部、`query_by_trace(id)`/`query_by_request(request_id)` 过滤、`query_since(since_seq, next_seq)` 供 `LogPersist` 增量拉取；`next_seq()`/`size()` 查询，`clear_for_test()` 供 L1 重置
+- `record(TraceEvent)` — 分配单调递增 `seq`（从 1 起）后入队，超容 `pop_front` 并返回 seq；`query_recent(limit)` 取尾部、`query_by_trace(id)`/`query_by_request(request_id)` 过滤、`query_since(since_seq, next_seq)` 供 `LogPersist` 增量拉取；`next_seq()`/`size()` 查询，`clear_for_test()` 供 单元测试 重置
 - `enum class TraceKind`（09-21 新增，15 值）：`tool_call`/`protocol_request`/`protocol_response`/`protocol_error`/`protocol_notification`/`lifecycle`/`data_flow`/`execution_state`/`concurrency`/`perf`/`snapshot`/`error`/`persist_health`/`ui_action`/`security`，配 `trace_kind_name()` 取名字符串
 - `TraceEvent` 字段：旧字段 `seq/trace_id/span_id/parent_span/session_id/tool/category/flags/side_effect/depth/thread/queue_wait_ms/duration_ms/wall_start_ms/wall_end_ms/auth/ok/error_code/args_digest/args_truncated/result_size/image_ref/image_bytes/image_hash/image_width/image_height`；09-21 追加 `kind/name/request_id/correlation_id/phase/state/monotonic_ns/thread_id/attrs/error_type/stack/bytes`（`to_json_line` 在原键序之后追加这些键，即 jsonl schema v2，旧键与旧序保留）
 - 纯函数：`new_trace_id()`/`new_span_id()`（`tr_*`/`sp_*` 前缀，毫秒时间戳 + 原子计数器）、`monotonic_now_ns()`（单调时钟纳秒）、`current_thread_id()`、`sanitize_args(dump, desensitize)`、`sanitize_text(text, desensitize)`（脱敏时把敏感键字符串值替换为 `<stripped len=N>`，上限 `kDesensitizedMaxChars = 4000` 字符；关闭时上限 `kRawMaxChars = 64000`，超限置 `truncated`；敏感键为大小写不敏感的通用集合——data/base64/script_content/token/secret/password/passwd/key/api_key/apikey/authorization/credential/cookie/session_token 及 `*_token`/`_key`/`_secret`/`_password` 后缀）、`fnv1a_hex`（图片哈希）、`decode_base64`、`to_json_line`（固定字段序 + JSON 转义）、`wall_now_ms`
-- L1 `trace_recorder_test` 覆盖 18 项（id/seq/查询/脱敏/截断/哈希/解码/JSON 行；09-21 增补 schema v2 新字段与 `TraceKind` 用例）
+- 单元测试 `trace_recorder_test` 覆盖 18 项（id/seq/查询/脱敏/截断/哈希/解码/JSON 行；09-21 增补 schema v2 新字段与 `TraceKind` 用例）
 
 ### sanitize_policy（命名空间函数，09-20 新增）
 

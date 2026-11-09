@@ -58,7 +58,7 @@ resource:
 
 工具风险必须可从 `get_tool_detail` 的 `side_effect` 字段识别；新增会产生同类影响的工具必须在 `ToolSpec` 声明对应 `side_effect`（如 `SideEffect::WritesFile`）并按需加 `tool_flags::kMutating`，不得依赖调用方自行猜测。
 
-**`side_effect` 恒非空（10-20 起）**：`side_effect_name()` 对 `SideEffect::None` 返回 `"none"`（此前返回空串），九个枚举值与兜底分支全部返回非空字符串，因此**任何**工具的 `side_effect` 都可被机器读取——「无副作用」表达为字面量 `"none"`，不再是「字段缺失或空串」这种二义状态。调用方判定规则因此简化为：读 `side_effect` 字符串，空值即表示契约缺口，不得用「空串=只读」反推。该不变量由两层测试锁定：L1 `register_all_test.cpp` 的 `EveryToolDetailReportsNonEmptySideEffect` 逐个工具经 `get_tool_detail` 断言非空（另有 `ToolDetailSideEffectIsMachineReadable` 断言 `code_execute` 精确等于 `code_execute`），集成层 `tool_detail_contract_test.cpp` 复验同一断言（历史 L2 用例 `40_contract_assert.json` 的语义蒸馏承接）。
+**`side_effect` 恒非空（10-20 起）**：`side_effect_name()` 对 `SideEffect::None` 返回 `"none"`（此前返回空串），九个枚举值与兜底分支全部返回非空字符串，因此**任何**工具的 `side_effect` 都可被机器读取——「无副作用」表达为字面量 `"none"`，不再是「字段缺失或空串」这种二义状态。调用方判定规则因此简化为：读 `side_effect` 字符串，空值即表示契约缺口，不得用「空串=只读」反推。该不变量由两层测试锁定：单元测试 `register_all_test.cpp` 的 `EveryToolDetailReportsNonEmptySideEffect` 逐个工具经 `get_tool_detail` 断言非空（另有 `ToolDetailSideEffectIsMachineReadable` 断言 `code_execute` 精确等于 `code_execute`），集成层 `tool_detail_contract_test.cpp` 复验同一断言（历史 L2 用例 `40_contract_assert.json` 的语义蒸馏承接）。
 
 | 风险类 | 机器可读标记/范围 | 处理要求 |
 |---|---|---|
@@ -125,7 +125,7 @@ resource:
 
 ### 3.1.2 档位判定标准与破坏类边界（10-22 成型）
 
-三档七能力的分档**只按工具的实际行为判定**，不看工具名。新增工具必须按下表落档；判定口径固化在 [`src/tools/side_effect_policy.hpp`](../../../src/tools/side_effect_policy.hpp)（`kTierCriteria` 与两条边界常量），并由 L1 用例 `destructive_tier_guard_test` 逐工具复核。
+三档七能力的分档**只按工具的实际行为判定**，不看工具名。新增工具必须按下表落档；判定口径固化在 [`src/tools/side_effect_policy.hpp`](../../../src/tools/side_effect_policy.hpp)（`kTierCriteria` 与两条边界常量），并由 单元测试 用例 `destructive_tier_guard_test` 逐工具复核。
 
 | 档位 | 判定标准 | 覆盖的 `side_effect` | 能力名 |
 |---|---|---|---|
@@ -141,7 +141,7 @@ resource:
 
 **「恢复途径」的判定口径**：持久化的恢复途径（工程文件的版本控制副本、回收站、可重新写回的配置）算恢复途径；**编辑器会话内的 undo/redo 栈不算**——它随编辑器退出即失效，且 `delete_scene_node` 的撤销仅在「延迟释放尚未销毁节点」的窗口内有效，故该工具仍归破坏类。相比之下，只解除关系而不销毁实体的操作（`remove_group_node` 只解除分组、`detach_script_from_node` 只摘除脚本、`remove_physics_3d_body_collision_exception` 只删一条碰撞例外关系）不销毁实体，一律不进破坏类。
 
-**防漂移守卫**：L1 用例 `destructive_tier_guard_test` 扫描全部工具声明（取自运行时 registry，含元工具），凡**工具名或描述带删除 / 销毁 / 终止类语义**却未声明 `SideEffect::Destructive` 的，即判为可疑并列出工具名；确有正当理由的须在 `side_effect_policy.hpp` 的 `kDestructiveExemptions` 白名单里**显式登记并写明理由**（当前 9 条：配置与工程文件类删除、终止外部进程、只解除关系不销毁实体、游戏进程内的对象）。白名单条目若指向不存在的工具、或对应工具已不再带销毁语义，守卫同样失败。
+**防漂移守卫**：单元测试 用例 `destructive_tier_guard_test` 扫描全部工具声明（取自运行时 registry，含元工具），凡**工具名或描述带删除 / 销毁 / 终止类语义**却未声明 `SideEffect::Destructive` 的，即判为可疑并列出工具名；确有正当理由的须在 `side_effect_policy.hpp` 的 `kDestructiveExemptions` 白名单里**显式登记并写明理由**（当前 9 条：配置与工程文件类删除、终止外部进程、只解除关系不销毁实体、游戏进程内的对象）。白名单条目若指向不存在的工具、或对应工具已不再带销毁语义，守卫同样失败。
 
 ### 3.1.3 授权兼容模式（strict / legacy，10-22 新增）
 
@@ -179,7 +179,7 @@ resource:
 - 目标固定为 `127.0.0.1` 字面量（`src/mcp/client.ts` 的 `HOST = "127.0.0.1"`），仅端口可调（1–65535）；无 URL 选项、无代理配置，代理环境变量被刻意忽略，保持环回直连。
 - 请求头仅 `Content-Type: application/json` 与 `Accept`，无代理配置、无认证头；响应内容只做 JSON 解析，永不求值或执行。
 - 写盘只有两处：`--save-images DIR` 内的解码图片（自生成文件名）与 CLI 自身的 state dir（实例登记表与日志，见 §3.4）；`--args-file` 只读 JSON，不写盘。
-- 技能文档禁手写 HTTP：技能文档的全部 .md 不得出现 `curl -` 与 `Invoke-WebRequest`（L1 逐文件断言），调用统一走 GDA CLI；无 CLI 可用则停止自动化、按 `manual-fallback.md` 出手动指南，不得编造请求。
+- 技能文档禁手写 HTTP：技能文档的全部 .md 不得出现 `curl -` 与 `Invoke-WebRequest`（单元测试 逐文件断言），调用统一走 GDA CLI；无 CLI 可用则停止自动化、按 `manual-fallback.md` 出手动指南，不得编造请求。
 - 握手：mcp-cpp-sdk 0.3.7 起严格要求完整 MCP 握手（`initialize` → `notifications/initialized`），旧懒握手只发 `notifications/initialized` 被拒 `-32600`；CLI 已升级为标准 `initialize` 流程（`840e648`），`test_cli_contract.py` 的 mock 服务器严格模拟该语义（未初始化时 `tools/call` 返回 400 + `-32600`）。
 - **REST 参考是接口说明，不是新的脚本化通道（10-21）**：技能书另有一份 REST 接口参考（`references/rest-api.md`），示范 Python 与 JavaScript 两段最小调用。它服务于「客户端只能发普通 HTTP、无法做 MCP 握手」的场景；能跑 CLI 的机器仍应走 GDA CLI。参考中不得出现 `curl -` 与 `Invoke-WebRequest`。
 - 本节不改变默认安全姿态：监听仍仅环回（§2）、高风险能力仍默认拒绝（§3.1）、脱敏仍默认开启（§3.2）。
