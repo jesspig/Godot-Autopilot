@@ -1,6 +1,7 @@
 #ifndef GODOT_AUTOPILOT_PROPERTY_OPS_HPP
 #define GODOT_AUTOPILOT_PROPERTY_OPS_HPP
 
+#include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/object.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/variant.hpp>
@@ -18,6 +19,8 @@ struct InlineResourceBuild {
   godot::Variant value;
   std::string type;
 };
+
+godot::Node *find_edited_scene_root();
 
 InlineResourceBuild
 build_inline_resource_value(const godot::Dictionary &prop_info,

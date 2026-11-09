@@ -70,6 +70,7 @@ set(GDA_CORE_SOURCES
     src/tools/domains/doc/doc_ops.cpp
     src/tools/domains/display/display_window_ops.cpp
     src/tools/domains/editor/editor_ops.cpp
+    src/tools/domains/editor/editor_csharp_ops.cpp
     src/tools/domains/group/group_ops.cpp
     src/tools/domains/input/input_ops.cpp
     src/tools/domains/input/input_click_ops.cpp
@@ -77,7 +78,9 @@ set(GDA_CORE_SOURCES
     src/tools/domains/editor/editor_ui_actions_ops.cpp
     src/tools/domains/nav/nav_ops.cpp
     src/tools/domains/physics/physics_ops.cpp
+    src/tools/domains/physics/physics_bundle_ops.cpp
     src/tools/domains/property/property_ops.cpp
+    src/tools/domains/property/property_signal_ops.cpp
     src/tools/base/register_all.cpp
     src/tools/base/dispatch.cpp
     src/tools/domains/analyze/analyze_ops.cpp
@@ -88,6 +91,7 @@ set(GDA_CORE_SOURCES
     src/tools/base/runtime_ops.cpp
     src/tools/domains/game/game_ops.cpp
     src/tools/domains/scene/scene_ops.cpp
+    src/tools/domains/scene/scene_camera_ops.cpp
     src/tools/domains/scene/scene_spec_ops.cpp
     src/tools/domains/script/script_ops.cpp
     src/tools/domains/script/script_patch_ops.cpp

@@ -6,6 +6,8 @@
 namespace godot_autopilot {
 namespace physics_ops {
 
+struct PhysicsRidDomain {};
+
 mcp::JsonValue handle_2d_space_get_direct_state(const mcp::JsonValue &args);
 mcp::JsonValue handle_2d_ray_cast(const mcp::JsonValue &args);
 mcp::JsonValue handle_2d_intersect_shape(const mcp::JsonValue &args);

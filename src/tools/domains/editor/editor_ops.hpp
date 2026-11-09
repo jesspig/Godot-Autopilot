@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <mcp/JsonValue.hpp>
+#include <string>
 
 namespace godot_autopilot {
 namespace editor_ops {
@@ -33,6 +34,8 @@ mcp::JsonValue handle_verify_scene_saved(const mcp::JsonValue &args);
 mcp::JsonValue handle_build_csharp_assembly(const mcp::JsonValue &args);
 mcp::JsonValue handle_dotnet_environment(const mcp::JsonValue &args);
 mcp::JsonValue wait_scene_switch(int64_t watch_id, int64_t timeout_ms);
+bool save_receipt_flag(const mcp::JsonValue &args, const char *name);
+std::string hash_hex(uint64_t value);
 
 } // namespace editor_ops
 } // namespace godot_autopilot
