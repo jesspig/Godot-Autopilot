@@ -12,7 +12,7 @@
 #include "tools/capture_tools.hpp"
 #include "tools/spriteframes_tools.hpp"
 #include "tools/config_tools.hpp"
-#include "tools/csharp_tools.hpp"
+#include "tools/csharp_bridge_tools.hpp"
 #include "tools/debug_tools.hpp"
 #include "tools/audio_tools.hpp"
 #include "tools/render_tools.hpp"
@@ -34,7 +34,7 @@
 #include "tools/doc_tools.hpp"
 #include "tools/game_tools.hpp"
 #include "tools/property_tools.hpp"
-#include "tools/system_tools.hpp"
+#include "tools/log_tools.hpp"
 #include "tools/animation_tools.hpp"
 #include "tools/theme_tools.hpp"
 #include "tools/test_tools.hpp"
@@ -370,7 +370,7 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
     add_domain_tools(capture_tools::make_tools);
     add_domain_tools(spriteframes_tools::make_tools);
     add_domain_tools(config_tools::make_tools);
-    add_domain_tools(csharp_tools::make_tools);
+    add_domain_tools(csharp_bridge_tools::make_tools);
     add_domain_tools(debug_tools::make_tools);
     add_domain_tools(audio_tools::make_tools);
     add_domain_tools(render_tools::make_tools);
@@ -392,7 +392,7 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
     add_domain_tools(doc_tools::make_tools);
     add_domain_tools(game_tools::make_tools);
     add_domain_tools(property_tools::make_tools);
-    add_domain_tools(system_tools::make_tools);
+    add_domain_tools(log_tools::make_tools);
     add_domain_tools(animation_tools::make_tools);
     add_domain_tools(theme_tools::make_tools);
     add_domain_tools(test_tools::make_tools);

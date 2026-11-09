@@ -31,7 +31,7 @@ set(GDA_UNIT_BUSINESS_SOURCES
     ${CMAKE_SOURCE_DIR}/src/tools/register_all.cpp
     ${CMAKE_SOURCE_DIR}/src/tools/dispatch.cpp
     ${CMAKE_SOURCE_DIR}/src/tools/debugger_access.cpp
-    ${CMAKE_SOURCE_DIR}/src/tools/editor_ui_actions.cpp
+    ${CMAKE_SOURCE_DIR}/src/tools/editor_ui_actions_ops.cpp
     ${CMAKE_SOURCE_DIR}/src/tools/tool_args.cpp
     ${CMAKE_SOURCE_DIR}/src/tools/tool_pipeline.cpp
     ${CMAKE_SOURCE_DIR}/src/tools/tool_invoke.cpp

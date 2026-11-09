@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "tools/editor_ops.hpp"
-#include "tools/editor_ui_actions.hpp"
+#include "tools/editor_ui_actions_ops.hpp"
 #include "tools/editor_ui_ops.hpp"
 #include <tools/tool_spec.hpp>
 

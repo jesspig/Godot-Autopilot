@@ -61,7 +61,7 @@ set(GDA_CORE_SOURCES
     src/tools/text_ops.cpp
     src/tools/tilemap_ops.cpp
     src/tools/tileset_ops.cpp
-    src/tools/file_dir_ops.cpp
+    src/tools/os_file_dir_ops.cpp
     src/tools/gridmap_ops.cpp
     src/tools/tween_ops.cpp
     src/tools/debug_ops.cpp
@@ -74,7 +74,7 @@ set(GDA_CORE_SOURCES
     src/tools/input_ops.cpp
     src/tools/input_click_ops.cpp
     src/tools/editor_ui_ops.cpp
-    src/tools/editor_ui_actions.cpp
+    src/tools/editor_ui_actions_ops.cpp
     src/tools/nav_ops.cpp
     src/tools/physics_ops.cpp
     src/tools/property_ops.cpp
@@ -83,10 +83,10 @@ set(GDA_CORE_SOURCES
     src/tools/analyze_ops.cpp
     src/tools/schema_builder.cpp
     src/tools/render_ops.cpp
-    src/tools/environment_ops.cpp
+    src/tools/render_environment_ops.cpp
     src/tools/resource_ops.cpp
     src/tools/runtime_ops.cpp
-    src/tools/runtime_game_ops.cpp
+    src/tools/game_ops.cpp
     src/tools/scene_ops.cpp
     src/tools/scene_spec_ops.cpp
     src/tools/script_ops.cpp

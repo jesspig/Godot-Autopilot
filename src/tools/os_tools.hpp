@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "tools/file_dir_ops.hpp"
+#include "tools/os_file_dir_ops.hpp"
 #include "tools/os_ops.hpp"
 #include "tools/text_ops.hpp"
 #include <tools/tool_spec.hpp>

@@ -1,5 +1,5 @@
-#ifndef GODOT_AUTOPILOT_SYSTEM_TOOLS_HPP
-#define GODOT_AUTOPILOT_SYSTEM_TOOLS_HPP
+#ifndef GODOT_AUTOPILOT_LOG_TOOLS_HPP
+#define GODOT_AUTOPILOT_LOG_TOOLS_HPP
 
 #include <mcp/JsonValue.hpp>
 #include <memory>
@@ -10,7 +10,7 @@
 #include <tools/tool_spec.hpp>
 
 namespace godot_autopilot {
-namespace system_tools {
+namespace log_tools {
 
 namespace {
 
@@ -32,7 +32,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   return v;
 }
 
-} // namespace system_tools
+} // namespace log_tools
 } // namespace godot_autopilot
 
 #endif

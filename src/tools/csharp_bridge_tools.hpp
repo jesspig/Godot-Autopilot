@@ -1,5 +1,5 @@
-#ifndef GODOT_AUTOPILOT_CSHARP_TOOLS_HPP
-#define GODOT_AUTOPILOT_CSHARP_TOOLS_HPP
+#ifndef GODOT_AUTOPILOT_CSHARP_BRIDGE_TOOLS_HPP
+#define GODOT_AUTOPILOT_CSHARP_BRIDGE_TOOLS_HPP
 
 #include <mcp/JsonValue.hpp>
 #include <memory>
@@ -10,7 +10,7 @@
 #include <tools/tool_spec.hpp>
 
 namespace godot_autopilot {
-namespace csharp_tools {
+namespace csharp_bridge_tools {
 
 namespace {
 
@@ -126,7 +126,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   return v;
 }
 
-} // namespace csharp_tools
+} // namespace csharp_bridge_tools
 } // namespace godot_autopilot
 
 #endif
