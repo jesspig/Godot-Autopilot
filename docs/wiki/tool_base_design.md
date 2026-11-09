@@ -23,6 +23,17 @@ resource: src/tools/
 > `tool_invoke.hpp/cpp`：工具间内部组合调用 `tools::invoke_tool` + `invoke_depth()`（深度上限 8）；09-20 起兼作 trace 上下文载体（`SpanGuard`/`capture_trace_context`/`ScopedTraceContext`/`queued_wait_ms`），每次 `SpecTool::execute` 记录一条 `TraceEvent`（缓冲 `TraceRecorder`，落盘 `LogPersist`，见 [核心模块](modules/core.md)）。09-21 起埋点统一经 `src/core/monitor.{hpp,cpp}` 门面（`monitor::tool_call` 等）单次写入，`TraceContext` 增 `request_id`，新增 `RequestSpanGuard` 承载协议请求 span（`RequestContext::GetRequest().id` 建立 `monitor::RequestScope`）。
 > 相关页面：[工具注册表](modules/tools_registry.md) · [工程约定](conventions.md) · [测试体系](tests.md) · [架构总览](overview.md)
 
+## 目录布局
+
+`src/tools/` 按职责分两级，域内文件同目录自包含：
+
+| 位置 | 内容 |
+|---|---|
+| `src/tools/base/` | 33 个文件：`ToolSpec`/参数/schema/注册/分发/鉴权/就绪策略等管线实现，外加元工具（`autopilot_tools`、`code_exec_ops`）与跨域共享件（`debugger_access`、`runtime_ops`） |
+| `src/tools/domains/<域>/` | 33 个域目录共 112 个文件：每个域一个目录，内含 `<域>_tools.hpp`（ToolSpec 规格）与 `<域>_ops.{hpp,cpp}`（handler 实现，大域可拆 `<域>_*_ops.cpp`） |
+
+增删文件的路径约定：新增域建 `domains/<域名>/` 并把 `<域名>_tools.hpp` 与实现放进去；只有跨域共享的管线件才放 `base/`。`tests/CMakeLists.txt` 与 `source_manifest_guard.py` 用递归 glob（`domains/*/*_ops.cpp` + `base/*_ops.cpp`）收集实现，域目录内的 `*_ops.cpp` 无需登记即纳入。
+
 ## 目标与约束
 
 - **一个工具 = 一份数据 + 一个 handler 函数**：元信息、参数表、副作用与路由标志收敛为 `ToolSpec` 值；行为集中在 `<域>_ops.cpp` 的 `handle_xxx`，不再为每个工具生成独立 C++ 子类。
