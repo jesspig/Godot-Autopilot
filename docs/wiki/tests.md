@@ -68,8 +68,8 @@ uv run main.py test --single migration_guard   # 单跑（ctest -R）
 | `tests/unit/` | 单元测试层（53 个 `*_test.cpp`，glob 自动收集，标签 `unit`） |
 | `tests/boundary/` | 边界测试层（22 个 `*_test.cpp`，参数校验 / 拒绝路径 / 预算超时 / 错误映射，标签 `boundary`） |
 | `tests/integration/` | 集成测试层（`harness.hpp` 夹具 + 12 个 `*_test.cpp`，标签 `integration`） |
-| `tests/runner/` | 仅 `config_loader.{cpp,hpp}`（单元与边界共用的业务源，runner 目录其余文件已随引擎轨删除；偏离登记见 `.handoff/evidence/T-08/manifest.md`） |
-| `tests/guard/` | 5 个源码守卫（`migration_guard.cmake` + 4 个 Python 脚本）与 `migrated_domains.txt` |
+| `tests/support/` | `config_loader.{cpp,hpp}`（单元与边界共用的测试支撑源；原 `tests/runner/` 目录其余文件已随引擎轨删除） |
+| `tests/guard/` | 6 个源码守卫（`migration_guard.cmake` + 5 个 Python 脚本）与 `migrated_domains.txt` |
 | `tests/scripts/` | `test_cli_contract.py` / `run_cli_unit.py`（CLI 两项脚本测试） |
 | `tests/probe/` | `mcp_transport_probe.cpp`（传输探针，非 ctest） |
 | `tests/CMakeLists.txt` | 三个 gtest 目标 + 10 条 `add_test`（守卫与脚本项） |

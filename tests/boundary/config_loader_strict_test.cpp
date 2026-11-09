@@ -4,7 +4,7 @@
 #include <fstream>
 #include <string>
 
-#include "runner/config_loader.hpp"
+#include "support/config_loader.hpp"
 #include "util/owned_exception.hpp"
 
 namespace {
