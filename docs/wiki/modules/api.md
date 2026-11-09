@@ -10,19 +10,19 @@ tags:
   - 错误信封
 timestamp: "2026-10-21T00:37:30+08:00"
 resource:
-  - src/core/api_surface.cpp
-  - src/core/api_envelope.cpp
-  - src/core/api_auth.cpp
-  - src/core/api_token.cpp
-  - src/core/api_server.cpp
-  - src/core/http_transport.cpp
-  - src/tools/tool_execute.cpp
+  - src/core/transport/api_surface.cpp
+  - src/core/transport/api_envelope.cpp
+  - src/core/transport/api_auth.cpp
+  - src/core/transport/api_token.cpp
+  - src/core/transport/api_server.cpp
+  - src/core/transport/http_transport.cpp
+  - src/tools/base/tool_execute.cpp
 ---
 
 # REST 接口面（`/api`）
 
-> 审计日期：2026-10-21（随开放接口面落地批次首建——本批在**同一个监听端口**上新增 `/api` 前缀的 REST 端点集，与既有 `/mcp`（MCP 协议）并列；端点实现集中在 [`src/core/api_surface.cpp`](../../../src/core/api_surface.cpp)，认证在 [`src/core/api_auth.cpp`](../../../src/core/api_auth.cpp) 与 [`src/core/api_token.cpp`](../../../src/core/api_token.cpp)，错误信封归一在 [`src/core/api_envelope.cpp`](../../../src/core/api_envelope.cpp)，路由挂载在 [`src/core/api_server.cpp`](../../../src/core/api_server.cpp)；端口模型与实例登记见 [端口与实例登记](ports.md)，统一执行入口与授权三档见 [工具注册表](tools_registry.md)；本轮校订补齐三处接线事实——① 端点清单 8 条、分页窗口 500/2000、批量上限 256、工具名长度上限 128 四个常量补入正文；② 补「执行入口与接线现状」小节，说明 `api_surface` 的执行器槽位在生产路径上未注册、REST 实际经 `default_execute_tool` 派发，导出拦截与参数校验两阶段尚未接线；③ 状态码表补 429，并标注 413 的两条来源（传输层 `Content-Length` 拒收 vs 端点层 `payload_too_large`））。10-22 校订：执行入口接线现状按代码核实更新——REST 面已接入统一执行入口六阶段全链（生产注册点在 `src/core/server_context.cpp` 的 `register_unified_tool_executor()`），已知限制中「统一执行入口尚未接入」一条已删除。
-> 覆盖范围：`src/core/api_surface.{hpp,cpp}`（端点与路由匹配）、`src/core/api_server.{hpp,cpp}`（路由注册）、`src/core/api_envelope.{hpp,cpp}`（错误信封与状态码映射）、`src/core/api_auth.{hpp,cpp}` 与 `src/core/api_token.{hpp,cpp}`（令牌签发与校验）、`src/core/http_transport.{hpp,cpp}` 与 [`src/core/http_parse.hpp`](../../../src/core/http_parse.hpp)（自建 HTTP 传输与查询串解析）。
+> 审计日期：2026-10-21（随开放接口面落地批次首建——本批在**同一个监听端口**上新增 `/api` 前缀的 REST 端点集，与既有 `/mcp`（MCP 协议）并列；端点实现集中在 [`src/core/transport/api_surface.cpp`](../../../src/core/transport/api_surface.cpp)，认证在 [`src/core/transport/api_auth.cpp`](../../../src/core/transport/api_auth.cpp) 与 [`src/core/transport/api_token.cpp`](../../../src/core/transport/api_token.cpp)，错误信封归一在 [`src/core/transport/api_envelope.cpp`](../../../src/core/transport/api_envelope.cpp)，路由挂载在 [`src/core/transport/api_server.cpp`](../../../src/core/transport/api_server.cpp)；端口模型与实例登记见 [端口与实例登记](ports.md)，统一执行入口与授权三档见 [工具注册表](tools_registry.md)；本轮校订补齐三处接线事实——① 端点清单 8 条、分页窗口 500/2000、批量上限 256、工具名长度上限 128 四个常量补入正文；② 补「执行入口与接线现状」小节，说明 `api_surface` 的执行器槽位在生产路径上未注册、REST 实际经 `default_execute_tool` 派发，导出拦截与参数校验两阶段尚未接线；③ 状态码表补 429，并标注 413 的两条来源（传输层 `Content-Length` 拒收 vs 端点层 `payload_too_large`））。10-22 校订：执行入口接线现状按代码核实更新——REST 面已接入统一执行入口六阶段全链（生产注册点在 `src/core/server_context.cpp` 的 `register_unified_tool_executor()`），已知限制中「统一执行入口尚未接入」一条已删除。
+> 覆盖范围：`src/core/api_surface.{hpp,cpp}`（端点与路由匹配）、`src/core/api_server.{hpp,cpp}`（路由注册）、`src/core/api_envelope.{hpp,cpp}`（错误信封与状态码映射）、`src/core/api_auth.{hpp,cpp}` 与 `src/core/api_token.{hpp,cpp}`（令牌签发与校验）、`src/core/http_transport.{hpp,cpp}` 与 [`src/core/transport/http_parse.hpp`](../../../src/core/transport/http_parse.hpp)（自建 HTTP 传输与查询串解析）。
 > 统计口径：端点数以 `api_surface::build_index_document()` 的端点清单为准（数值以运行时统计为准，见 [测试体系](../tests.md)「数值核算总表」）。
 
 ## 定位
@@ -36,11 +36,11 @@ resource:
 
 **REST 是 MCP 的超集**：MCP 面上可达的工具（458 = 7 元 + 451 域）在 REST 面上同样可达，且 REST 额外直接暴露 `system_status` 与 7 个元工具，无需 `call_tool` 代理。因此「先 REST 发现、再 MCP 编排」是合法的组合用法。
 
-两套面共用同一监听端口与同一个 `CommandQueue`——所有 Godot API 仍只在主线程执行，REST 的工具调用同样经 [`src/tools/dispatch.cpp`](../../../src/tools/dispatch.cpp) 的带预算派发入口排队，不存在绕过主线程的第二条路径。
+两套面共用同一监听端口与同一个 `CommandQueue`——所有 Godot API 仍只在主线程执行，REST 的工具调用同样经 [`src/tools/base/dispatch.cpp`](../../../src/tools/base/dispatch.cpp) 的带预算派发入口排队，不存在绕过主线程的第二条路径。
 
 ### 执行入口与接线现状
 
-REST 面的工具调用走 `api_surface::execute_tool(name, args)`。该函数有一个**执行器槽位**（`api_surface::register_tool_executor`），槽位为空时回落到默认实现 `default_execute_tool`；默认实现调用统一执行入口 `tools::execute_tool(name, args)`（[`src/tools/tool_execute.cpp`](../../../src/tools/tool_execute.cpp) 的 `tools::execute_tool_chain`：导出拦截 → 工具存在 → 参数校验 → 授权 → 派发 → 信封）。
+REST 面的工具调用走 `api_surface::execute_tool(name, args)`。该函数有一个**执行器槽位**（`api_surface::register_tool_executor`），槽位为空时回落到默认实现 `default_execute_tool`；默认实现调用统一执行入口 `tools::execute_tool(name, args)`（[`src/tools/base/tool_execute.cpp`](../../../src/tools/base/tool_execute.cpp) 的 `tools::execute_tool_chain`：导出拦截 → 工具存在 → 参数校验 → 授权 → 派发 → 信封）。
 
 **生产注册点**：`src/core/server_context.cpp` 的 `register_unified_tool_executor()`，在 `start()` 内、`ApiServer::start()` 之前执行，把 `tools::execute_tool_chain` 注册进执行器槽位（见 `tools::register_tool_executor`）。因此 REST 请求的实际派发链路是：
 
@@ -112,7 +112,7 @@ POST /api/tools/<name> → api_surface::handle_request → api_surface::execute_
 
 `limit` / `offset` 传非数字或负值 → 400 `invalid_argument`。响应体为 `{tools:[...], total, count, offset, limit}`，其中 `total` 是**过滤后**的总数（未分页），`count` 是本页条数。
 
-分页窗口的三个常量（[`src/core/api_surface.hpp`](../../../src/core/api_surface.hpp)）：默认页大小 **500**（`kDefaultToolListLimit`）、单页上限 **2000**（`kMaxToolListLimit`）、批量操作数上限 **256**（`kMaxBatchOperations`）。`limit=0` 按默认页大小处理，超过 2000 按 2000 截断。
+分页窗口的三个常量（[`src/core/transport/api_surface.hpp`](../../../src/core/transport/api_surface.hpp)）：默认页大小 **500**（`kDefaultToolListLimit`）、单页上限 **2000**（`kMaxToolListLimit`）、批量操作数上限 **256**（`kMaxBatchOperations`）。`limit=0` 按默认页大小处理，超过 2000 按 2000 截断。
 
 ## 认证
 
@@ -144,13 +144,13 @@ POST /api/tools/<name> → api_surface::handle_request → api_surface::execute_
 | 503 | 导出期（`export_in_progress`）或主线程队列不可用（`queue_unavailable`） |
 | 504 | 主线程超时（`main_thread_timeout`） |
 
-**归一规则**（[`src/core/api_envelope.cpp`](../../../src/core/api_envelope.cpp)）：状态码由错误**码**决定，不由文案决定。码的来源优先级为——工具结果顶层的 `code` 字段 → 顶层 `authorization_required` 字段 → `structured_error.code` → 由错误文案特征推断（`authorization required` / `authorization_required` → `authorization_required`；`unauthorized` 或 `not authorized` → `unauthorized`；`editor is exporting` / `export_in_progress` → `export_in_progress`；`main_thread_timeout` / `main thread timeout` / `main thread task failed` → `main_thread_timeout`；`queue_unavailable` → `queue_unavailable`；`invalid parameter` / `invalid argument` / `missing required parameter` / `missing required field` / `unknown parameter` → `invalid_argument`；`not found` 且含 `tool` → `tool_not_found`；`internal error` / `unexpected c++ exception` → `internal_error`；其余归 `tool_error` → 422）。
+**归一规则**（[`src/core/transport/api_envelope.cpp`](../../../src/core/transport/api_envelope.cpp)）：状态码由错误**码**决定，不由文案决定。码的来源优先级为——工具结果顶层的 `code` 字段 → 顶层 `authorization_required` 字段 → `structured_error.code` → 由错误文案特征推断（`authorization required` / `authorization_required` → `authorization_required`；`unauthorized` 或 `not authorized` → `unauthorized`；`editor is exporting` / `export_in_progress` → `export_in_progress`；`main_thread_timeout` / `main thread timeout` / `main thread task failed` → `main_thread_timeout`；`queue_unavailable` → `queue_unavailable`；`invalid parameter` / `invalid argument` / `missing required parameter` / `missing required field` / `unknown parameter` → `invalid_argument`；`not found` 且含 `tool` → `tool_not_found`；`internal error` / `unexpected c++ exception` → `internal_error`；其余归 `tool_error` → 422）。
 
 `405` / `409` / `413` / `429` / `404`（`not_found`）由端点层直接产生，优先于上面的归一表。
 
 > [!note] 413 的产生位置
 >
-> 413 有两条来源：传输层按 `Content-Length` 直接拒收（[`src/core/http_parse.hpp`](../../../src/core/http_parse.hpp) 的 `kMaxBodyBytes = 4 MiB`，此时响应体是传输层的纯文本，不是 REST 信封），以及端点层按 `payload_too_large` 码生成的信封。前者在请求进端点之前发生，客户端拿不到 `code` 字段。
+> 413 有两条来源：传输层按 `Content-Length` 直接拒收（[`src/core/transport/http_parse.hpp`](../../../src/core/transport/http_parse.hpp) 的 `kMaxBodyBytes = 4 MiB`，此时响应体是传输层的纯文本，不是 REST 信封），以及端点层按 `payload_too_large` 码生成的信封。前者在请求进端点之前发生，客户端拿不到 `code` 字段。
 
 ## 错误信封
 
@@ -173,7 +173,7 @@ REST 面刻意做得比 MCP 面宽松，目的是让「不做 MCP 握手的客�
 
 1. **无会话、无握手**：REST 面不要求 `initialize`，不发 `notifications/initialized`，不维护会话状态。请求彼此独立，服务端不记住调用方。
 2. **请求体即参数**：工具参数对象就是请求体本身，不套 `arguments` 包装层（与 MCP 面的 `call_tool` 不同——后者是 `{name, arguments}` 双层结构）。
-3. **未知参数宽容**：参数校验器（[`src/tools/argument_validator.cpp`](../../../src/tools/argument_validator.cpp)）把未声明的键**不视为错误**——只记一条 Warning（`unknown parameters ignored: ...`）后忽略；缺必填参数或类型不符才返回 400。该校验器挂在统一执行入口上且 REST 面已接线（见上「执行入口与接线现状」），宽容口径由校验器统一实施。
+3. **未知参数宽容**：参数校验器（[`src/tools/base/argument_validator.cpp`](../../../src/tools/base/argument_validator.cpp)）把未声明的键**不视为错误**——只记一条 Warning（`unknown parameters ignored: ...`）后忽略；缺必填参数或类型不符才返回 400。该校验器挂在统一执行入口上且 REST 面已接线（见上「执行入口与接线现状」），宽容口径由校验器统一实施。
 4. **批量不因单项失败而改状态码**：批量恒 200，逐项成败看 `results[]`。
 5. **工具名宽松**：路径里的工具名允许百分号编码，且字符集比严格标识符宽（多一个点号）。
 6. **免认证的存活口**：只有 `/api/health` 免认证，且只回存活、版本、端口、进程号——不泄露任何工程内容。

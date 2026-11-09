@@ -4,12 +4,13 @@
 
 ## 1. 概述
 
-程序化测试分四层，全部**零引擎、零项目绑定**——`ctest --preset debug` 全绿不产生任何 Godot 进程：
+程序化测试按**测试性质**分三层 + 守卫与脚本项，全部**零引擎、零项目绑定**——`ctest --preset debug` 全绿不产生任何 Godot 进程。三层各带 ctest 标签，可用 `ctest --preset debug -L <label>` 单独执行：
 
-- **单元层**（`gda_unit_tests`，gtest）：不启动引擎、不触碰 Godot API，验证核心逻辑、工具注册管线与 schema 基线。
-- **集成层**（`gda_integration_tests`，gtest）：进程内契约测试——注入 `CommandQueue`（owner 为测试线程）与处理器表，经 `dispatch::call_handler` inline 路径驱动元工具与域工具，断言错误全串与响应形状。夹具与覆盖清单见 [docs/wiki/tests.md](../docs/wiki/tests.md) 的「集成层」章节。
-- **回归属性**（跨载体）：各层基线断言承载——L1 schema 基线、工具面动态枚举契约、错误全串契约、CLI wire 形状、skill 白名单；清单与更新 SOP 见 wiki「回归属性清单」小节。
-- **守卫与脚本项**（ctest 常驻）：源码守卫（注释 / 主线程契约 / 版本同步 / 迁移 / 源清单）+ 3 个守卫自测 + 2 个 CLI 脚本项，全部零构建依赖（读源码断言）。
+- **单元层**（`gda_unit_tests`，标签 `unit`，53 文件 / 636 用例）：合法输入下的模块行为——纯逻辑、编解码、注册与查询，不触碰 Godot API。
+- **边界层**（`gda_boundary_tests`，标签 `boundary`，22 文件 / 239 用例）：非法与极端输入下的确定性行为——参数校验、错误映射、预算与超时、门控与守卫。
+- **集成层**（`gda_integration_tests`，标签 `integration`，12 文件 / 109 用例）：进程内契约测试——注入 `CommandQueue`（owner 为测试线程）与处理器表，经 `dispatch::call_handler` inline 路径驱动元工具与域工具，断言错误全串与响应形状。夹具与覆盖清单见 [docs/wiki/tests.md](../docs/wiki/tests.md) 的「集成层」章节。
+- **回归属性**（跨载体）：各层基线断言承载——schema 基线、工具面动态枚举契约、错误全串契约、CLI wire 形状、skill 白名单；清单与更新 SOP 见 wiki「回归属性清单」小节。
+- **守卫与脚本项**（ctest 常驻）：源码守卫（注释 / 主线程契约 / 版本同步 / 迁移 / 源清单 / 工具域）+ 4 个守卫自测 + 2 个 CLI 脚本项（标签 `guard` / `cli`），全部零构建依赖（读源码断言）。
 
 真实引擎行为的端到端验证**不在仓库基建内**：由 `gda-e2e-testing` Agent 工作流在 `examples/<名称>` 场地自然发生（工具调用随实际操作驱动），问题经 `gda-e2e-analysis` 闭环分析。历史 L2 引擎轨（`gda_test_runner` / `tests/config/*.json` / `tests/testbed/` / 池化编排）已于 2026-11 删除，语义蒸馏落点见 wiki「引擎行为验收清单」。
 
@@ -43,7 +44,7 @@ cmake --build --preset debug --target gda_unit_tests gda_integration_tests
 ## 4. 运行
 
 ```powershell
-# 全量默认门（L1 + 集成 + 守卫 + CLI，ctest 注册口径见 wiki 数值总表）
+# 全量默认门（单元 + 边界 + 集成 + 守卫 + CLI，ctest 注册口径见 wiki 数值总表）
 ctest --preset debug
 
 # 单跑（按用例名正则，如守卫或某个套件）
@@ -63,7 +64,7 @@ bun test cli/tests
 ## 5. 迁移守卫（migration_guard）
 
 - 位置：`tests/guard/migration_guard.cmake` + 清单 `tests/guard/migrated_domains.txt`（30 个域 + `strict` 行）。
-- 内容：零依赖读源码断言，`strict` 模式下禁止旧机制回退——已迁移域与全部 `src/tools/*_tools.hpp` 不得含旧宏 `GDA_TOOL_CLASS`/`GDA_TOOL_CLASS_SIDE`；不得残留 `src/tools/schema_*_ops.cpp`；`src/tools/*.hpp|*.cpp` 不得引用 `tool_input_schema` 或 `tools/tool_decl.hpp`。
+- 内容：零依赖读源码断言，`strict` 模式下禁止旧机制回退——已迁移域与全部 `src/tools/domains/*/*_tools.hpp` 不得含旧宏 `GDA_TOOL_CLASS`/`GDA_TOOL_CLASS_SIDE`；不得残留 `src/tools/schema_*_ops.cpp`；`src/tools/**/*.hpp|*.cpp` 不得引用 `tool_input_schema` 或 `tools/tool_decl.hpp`。
 - 运行：`ctest --preset debug -R migration_guard`（configure 后即可运行，不依赖构建产物），或直接 `cmake -DSOURCE_DIR=<仓库根> -P tests/guard/migration_guard.cmake`；实测输出 `OK (domains: 30, strict: on)`。
 
 ## 6. 其它源码守卫与脚本项

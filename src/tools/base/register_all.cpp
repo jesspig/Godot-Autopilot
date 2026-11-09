@@ -1,0 +1,747 @@
+#include "tools/base/register_all.hpp"
+#include "core/command_queue.hpp"
+#include "core/error_watermark.hpp"
+#include "core/export_guard.hpp"
+#include "core/observability/log_system.hpp"
+#include "core/observability/monitor.hpp"
+#include <version.hpp>
+#include "tools/base/code_exec_ops.hpp"
+#include "tools/base/dispatch.hpp"
+#include "tools/base/dynamic_spec_store.hpp"
+#include "tools/domains/group/group_tools.hpp"
+#include "tools/domains/capture/capture_tools.hpp"
+#include "tools/domains/spriteframes/spriteframes_tools.hpp"
+#include "tools/domains/config/config_tools.hpp"
+#include "tools/domains/csharp_bridge/csharp_bridge_tools.hpp"
+#include "tools/domains/debug/debug_tools.hpp"
+#include "tools/domains/audio/audio_tools.hpp"
+#include "tools/domains/render/render_tools.hpp"
+#include "tools/domains/display/display_tools.hpp"
+#include "tools/domains/editor/editor_tools.hpp"
+#include "tools/domains/input/input_tools.hpp"
+#include "tools/domains/os/os_tools.hpp"
+#include "tools/domains/physics/physics_tools.hpp"
+#include "tools/domains/scene/scene_tools.hpp"
+#include "tools/domains/scene_tree/scene_tree_tools.hpp"
+#include "tools/domains/resource/resource_tools.hpp"
+#include "tools/domains/script/script_tools.hpp"
+#include "tools/domains/nav/nav_tools.hpp"
+#include "tools/domains/text/text_tools.hpp"
+#include "tools/domains/tilemap/tilemap_tools.hpp"
+#include "tools/domains/tileset/tileset_tools.hpp"
+#include "tools/domains/input_map/input_map_tools.hpp"
+#include "tools/domains/debugger/debugger_tools.hpp"
+#include "tools/domains/doc/doc_tools.hpp"
+#include "tools/domains/game/game_tools.hpp"
+#include "tools/domains/property/property_tools.hpp"
+#include "tools/domains/log/log_tools.hpp"
+#include "tools/domains/animation/animation_tools.hpp"
+#include "tools/domains/theme/theme_tools.hpp"
+#include "tools/domains/test/test_tools.hpp"
+#include "tools/domains/analyze/analyze_tools.hpp"
+#include "tools/domains/gridmap/gridmap_tools.hpp"
+#include "tools/domains/tween/tween_tools.hpp"
+#include "tools/base/runtime_ops.hpp"
+#include "tools/base/schema_builder.hpp"
+#include "tools/base/tool_base.hpp"
+#include "tools/base/tool_execute.hpp"
+#include "tools/base/tool_invoke.hpp"
+#include "tools/base/tool_registry.hpp"
+#include "util/mcp_image_content.hpp"
+#include <mcp/Content.hpp>
+#include <mcp/JsonValue.hpp>
+#include <cstdint>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <utility>
+#ifdef GetObject
+#undef GetObject
+#endif
+
+
+namespace godot_autopilot {
+
+static std::shared_ptr<ToolRegistry> g_active_registry = std::make_shared<ToolRegistry>();
+static std::mutex g_active_registry_mutex;
+static ToolCatalog *g_catalog = nullptr;
+static Bm25Index *g_index = nullptr;
+static int g_port = 0;
+
+static mcp::JsonValue meta_ping_impl() {
+    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    r["result"] = mcp::JsonValue("pong");
+    return r;
+}
+
+static mcp::JsonValue meta_search_tools_impl(const mcp::JsonValue& args,
+                                             Bm25Index& index,
+                                             ToolCatalog& catalog) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "search_tools called");
+
+    std::string text;
+    if (auto* q = args.Find("query"); q && q->IsString()) {
+        text = q->GetString();
+    }
+
+    Bm25Index::SearchQuery query;
+    query.text = text;
+
+    bool has_category = false;
+    if (auto* cat = args.Find("category")) {
+        if (!cat->IsNull() && cat->IsString() && !cat->GetString().empty()) {
+            query.category = cat->GetString();
+            has_category = true;
+        }
+    }
+
+    bool has_tags = false;
+    if (auto* tags_val = args.Find("tags")) {
+        if (!tags_val->IsNull() && tags_val->IsArray()) {
+            std::vector<std::string> tags;
+            for (auto& t : tags_val->GetArray()) {
+                tags.push_back(t.GetString());
+            }
+            if (!tags.empty()) {
+                query.tags = std::move(tags);
+                has_tags = true;
+            }
+        }
+    }
+
+    if (text.empty() && !has_category && !has_tags) {
+        auto all = catalog.get_all_tools();
+        mcp::JsonValue j(mcp::JsonValue::object_tag);
+        mcp::JsonValue arr(mcp::JsonValue::array_tag);
+        for (auto& t : all) {
+            mcp::JsonValue item(mcp::JsonValue::object_tag);
+            item["name"] = mcp::JsonValue(t.name);
+            item["score"] = mcp::JsonValue(0.0);
+            arr.PushBack(std::move(item));
+        }
+        j["results"] = std::move(arr);
+        LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "search_tools completed");
+        return j;
+    }
+
+    auto results = index.search(query);
+
+    mcp::JsonValue j(mcp::JsonValue::object_tag);
+    mcp::JsonValue arr(mcp::JsonValue::array_tag);
+    for (auto& r : results) {
+        mcp::JsonValue item(mcp::JsonValue::object_tag);
+        item["name"] = mcp::JsonValue(r.name);
+        item["score"] = mcp::JsonValue(r.score);
+        arr.PushBack(std::move(item));
+    }
+    j["results"] = std::move(arr);
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "search_tools completed");
+    return j;
+}
+
+static mcp::JsonValue meta_list_categories_impl(ToolCatalog& catalog) {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "list_categories called");
+    auto cats = catalog.get_categories();
+    mcp::JsonValue j(mcp::JsonValue::object_tag);
+    mcp::JsonValue arr(mcp::JsonValue::array_tag);
+    for (auto& c : cats) {
+        mcp::JsonValue item(mcp::JsonValue::object_tag);
+        item["id"] = mcp::JsonValue(c);
+        item["name"] = mcp::JsonValue(c);
+        int count = 0;
+        for (const auto& t : catalog.get_all_tools()) {
+            if (t.category == c) {
+                ++count;
+            }
+        }
+        item["tool_count"] = mcp::JsonValue(static_cast<int64_t>(count));
+        arr.PushBack(std::move(item));
+    }
+    j["categories"] = std::move(arr);
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "list_categories completed");
+    return j;
+}
+
+static mcp::JsonValue meta_get_tool_detail_impl(
+    const mcp::JsonValue& args, ToolCatalog& catalog,
+    const std::shared_ptr<ToolRegistry>& registry) {
+    auto *name_p = args.Find("name");
+    if (!name_p || !name_p->IsString() || name_p->GetString().empty()) {
+        mcp::JsonValue err(mcp::JsonValue::object_tag);
+        err["error"] = mcp::JsonValue("missing required parameter: name");
+        return err;
+    }
+
+    std::string name = name_p->GetString();
+    auto info = catalog.get_tool(name);
+    if (!info) {
+        mcp::JsonValue err(mcp::JsonValue::object_tag);
+        err["error"] = mcp::JsonValue("tool not found: " + name);
+        return err;
+    }
+
+    mcp::JsonValue j(mcp::JsonValue::object_tag);
+    mcp::JsonValue t(mcp::JsonValue::object_tag);
+    t["name"] = mcp::JsonValue(info->name);
+    t["description"] = mcp::JsonValue(info->description);
+    t["category"] = mcp::JsonValue(info->category);
+    mcp::JsonValue tags(mcp::JsonValue::array_tag);
+    for (auto& tg : info->tags) {
+        tags.PushBack(mcp::JsonValue(tg));
+    }
+    t["tags"] = std::move(tags);
+    t["input_schema"] = info->input_schema;
+    const char* se = "none";
+    uint32_t flags = 0;
+    if (auto tool = registry->find_any(name)) {
+        se = ::godot_autopilot::side_effect_name(
+            ::godot_autopilot::side_effect_of(*tool));
+        flags = tool->tool_flags();
+    }
+    t["side_effect"] = mcp::JsonValue(se);
+    t["dynamic"] = mcp::JsonValue((flags & tool_flags::kDynamic) != 0);
+    t["mutating"] = mcp::JsonValue((flags & tool_flags::kMutating) != 0);
+    j["tool"] = std::move(t);
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "get_tool_detail completed");
+    return j;
+}
+
+static std::string received_keys_text(const mcp::JsonValue& args) {
+    if (!args.IsObject() || args.GetObject().empty()) {
+        return "(received no parameters)";
+    }
+    std::string text = "(received keys: ";
+    bool first = true;
+    for (const auto& entry : args.GetObject()) {
+        if (!first) {
+            text += ", ";
+        }
+        first = false;
+        text += entry.first;
+    }
+    text += ")";
+    return text;
+}
+
+static mcp::JsonValue meta_call_tool_impl(mcp::JsonValue args) {
+    auto *name_p = args.Find("name");
+    if (!name_p || !name_p->IsString() || name_p->GetString().empty()) {
+        LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "call_tool failed: missing name");
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("missing required parameter: name " + received_keys_text(args));
+        return e;
+    }
+
+    std::string name = name_p->GetString();
+    mcp::JsonValue tool_args = [&]{
+        if (auto* a = args.Find("arguments")) return std::move(*a);
+        return mcp::JsonValue(mcp::JsonValue::object_tag);
+    }();
+
+    if (auto *a = args.Find("arguments"); a && !a->IsObject()) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue("invalid parameter for call_tool '" + name + "': arguments must be an object " + received_keys_text(args));
+        return e;
+    }
+    for (const auto &entry : args.GetObject()) {
+        if (entry.first != "name" && entry.first != "arguments") {
+            mcp::JsonValue e(mcp::JsonValue::object_tag);
+            e["error"] = mcp::JsonValue("unknown parameter for call_tool '" + name + "': " + entry.first + " (expected only 'name' and 'arguments') " + received_keys_text(args));
+            return e;
+        }
+    }
+
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, name + " called via call_tool");
+    return tools::execute_tool_core(name, tool_args);
+}
+
+static mcp::JsonValue meta_call_tool_wait(const std::string& name, mcp::JsonValue result) {
+    return dispatch::resolve_deferred_wait(name, std::move(result));
+}
+
+void refresh_derived(const std::shared_ptr<ToolRegistry>& registry,
+                     ToolCatalog& catalog, Bm25Index& index) {
+    const auto derived_start = std::chrono::steady_clock::now();
+    std::vector<ToolInfo> catalog_tools;
+    std::vector<Bm25Index::Entry> index_entries;
+    for (const auto& t : registry->all_any()) {
+        catalog_tools.push_back(make_tool_info(*t));
+        index_entries.push_back({t->meta().name, t->meta().description,
+                                 t->meta().category, t->meta().tags});
+    }
+    catalog.replace_tools(std::move(catalog_tools));
+    index.replace_entries(index_entries);
+
+    dispatch::HandlerMap handlers;
+    dispatch::HandlerMap meta_handlers;
+    for (const auto& t : registry->all()) {
+        std::string name = t->meta().name;
+        handlers[name] = [name, registry](const mcp::JsonValue& a) -> mcp::JsonValue {
+            return registry->find(name)->execute(a);
+        };
+    }
+    for (const auto& t : registry->all_meta()) {
+        std::string name = t->meta().name;
+        meta_handlers[name] = [name, registry](const mcp::JsonValue& a) -> mcp::JsonValue {
+            return registry->find_meta(name)->execute(a);
+        };
+    }
+    dispatch::replace_handlers(std::move(handlers), std::move(meta_handlers));
+    {
+        std::lock_guard<std::mutex> lock(g_active_registry_mutex);
+        g_active_registry = registry;
+    }
+    const int64_t derived_duration_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - derived_start)
+            .count();
+    monitor::lifecycle(
+        "registry_refresh_derived",
+        monitor::build_attrs(
+            {{"tools", std::to_string(registry->all_any().size())},
+             {"handlers", std::to_string(registry->all().size())},
+             {"meta_handlers", std::to_string(registry->all_meta().size())},
+             {"duration_ms", std::to_string(derived_duration_ms)}}));
+}
+
+static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25Index& index, int port) {
+
+    auto registry = std::make_shared<ToolRegistry>();
+    const auto registry_start = std::chrono::steady_clock::now();
+
+    {
+        ToolSpec spec{"system_status", "Get server status info", "System", {"status", "info"}};
+        spec.side_effect = SideEffect::None;
+        spec.flags = tool_flags::kHealthProbe;
+        spec.handler = [port, registry, start = std::chrono::steady_clock::now()](const mcp::JsonValue&) -> mcp::JsonValue {
+            auto uptime = std::chrono::duration_cast<std::chrono::seconds>(
+                std::chrono::steady_clock::now() - start).count();
+            mcp::JsonValue status(mcp::JsonValue::object_tag);
+            status["version"] = mcp::JsonValue(GDA_VERSION);
+            status["port"] = mcp::JsonValue(static_cast<int64_t>(port));
+            status["uptime_seconds"] = mcp::JsonValue(static_cast<int64_t>(uptime));
+            status["running"] = mcp::JsonValue(true);
+            status["tool_count"] =
+                mcp::JsonValue(static_cast<int64_t>(registry->all_any().size()));
+            mcp::JsonValue main_thread(mcp::JsonValue::object_tag);
+            main_thread["last_drain_age_ms"] =
+                mcp::JsonValue(static_cast<int64_t>(-1));
+            main_thread["queue_depth"] = mcp::JsonValue(static_cast<int64_t>(0));
+            main_thread["queue_cancelled"] =
+                mcp::JsonValue(static_cast<int64_t>(0));
+            main_thread["queue_rejected_full"] =
+                mcp::JsonValue(static_cast<int64_t>(0));
+            main_thread["oldest_pending_ms"] =
+                mcp::JsonValue(static_cast<int64_t>(-1));
+            if (runtime_ops::has_editor_queue()) {
+                CommandQueue &queue = get_editor_queue();
+                const CommandQueue::Stats queue_stats = queue.stats();
+                status["queue_depth"] =
+                    mcp::JsonValue(static_cast<int64_t>(queue_stats.pending));
+                main_thread["last_drain_age_ms"] =
+                    mcp::JsonValue(queue.last_drain_age_ms());
+                main_thread["queue_depth"] =
+                    mcp::JsonValue(static_cast<int64_t>(queue_stats.pending));
+                main_thread["queue_cancelled"] =
+                    mcp::JsonValue(static_cast<int64_t>(queue_stats.cancelled));
+                main_thread["queue_rejected_full"] = mcp::JsonValue(
+                    static_cast<int64_t>(queue_stats.rejected_full));
+                main_thread["oldest_pending_ms"] =
+                    mcp::JsonValue(queue.oldest_pending_age_ms());
+            } else {
+                status["queue_depth"] = mcp::JsonValue(static_cast<int64_t>(0));
+            }
+            status["main_thread"] = std::move(main_thread);
+            mcp::JsonValue r(mcp::JsonValue::object_tag);
+            r["result"] = std::move(status);
+            return r;
+        };
+        spec.raw_schema = schema::build_schema({});
+        registry->add(make_spec_tool(std::move(spec)));
+    }
+
+    auto add_domain_tools = [&registry](auto& make_fn) {
+        for (auto& t : make_fn()) {
+            registry->add(std::move(t));
+        }
+    };
+
+    add_domain_tools(group_tools::make_tools);
+    add_domain_tools(capture_tools::make_tools);
+    add_domain_tools(spriteframes_tools::make_tools);
+    add_domain_tools(config_tools::make_tools);
+    add_domain_tools(csharp_bridge_tools::make_tools);
+    add_domain_tools(debug_tools::make_tools);
+    add_domain_tools(audio_tools::make_tools);
+    add_domain_tools(render_tools::make_tools);
+    add_domain_tools(display_tools::make_tools);
+    add_domain_tools(editor_tools::make_tools);
+    add_domain_tools(input_tools::make_tools);
+    add_domain_tools(os_tools::make_tools);
+    add_domain_tools(physics_tools::make_tools);
+    add_domain_tools(scene_tools::make_tools);
+    add_domain_tools(scene_tree_tools::make_tools);
+    add_domain_tools(resource_tools::make_tools);
+    add_domain_tools(script_tools::make_tools);
+    add_domain_tools(nav_tools::make_tools);
+    add_domain_tools(text_tools::make_tools);
+    add_domain_tools(tilemap_tools::make_tools);
+    add_domain_tools(tileset_tools::make_tools);
+    add_domain_tools(input_map_tools::make_tools);
+    add_domain_tools(debugger_tools::make_tools);
+    add_domain_tools(doc_tools::make_tools);
+    add_domain_tools(game_tools::make_tools);
+    add_domain_tools(property_tools::make_tools);
+    add_domain_tools(log_tools::make_tools);
+    add_domain_tools(animation_tools::make_tools);
+    add_domain_tools(theme_tools::make_tools);
+    add_domain_tools(test_tools::make_tools);
+    add_domain_tools(analyze_tools::make_tools);
+    add_domain_tools(gridmap_tools::make_tools);
+    add_domain_tools(tween_tools::make_tools);
+
+    {
+        ToolSpec spec{"ping", "Health check ping", "Meta", {"health", "ping"}};
+        spec.side_effect = SideEffect::None;
+        spec.flags = tool_flags::kMeta | tool_flags::kHealthProbe;
+        spec.handler = [](const mcp::JsonValue&) { return meta_ping_impl(); };
+        spec.raw_schema = schema::build_schema({});
+        registry->add(make_spec_tool(std::move(spec)));
+    }
+
+    {
+        ToolSpec spec{"search_tools", "Search available tools by query", "Meta", {"search", "discovery"}};
+        spec.side_effect = SideEffect::None;
+        spec.flags = tool_flags::kMeta;
+        spec.handler = [&index, &catalog](const mcp::JsonValue& args) { return meta_search_tools_impl(args, index, catalog); };
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue q_prop(mcp::JsonValue::object_tag);
+        q_prop["type"] = mcp::JsonValue("string");
+        q_prop["description"] = mcp::JsonValue("Search query; omit or pass an empty string to enumerate all tools");
+        props["query"] = std::move(q_prop);
+        mcp::JsonValue c_prop(mcp::JsonValue::object_tag);
+        c_prop["type"] = mcp::JsonValue("string");
+        c_prop["description"] = mcp::JsonValue("Filter by category");
+        props["category"] = std::move(c_prop);
+        mcp::JsonValue t_prop(mcp::JsonValue::object_tag);
+        t_prop["type"] = mcp::JsonValue("array");
+        mcp::JsonValue ti(mcp::JsonValue::object_tag);
+        ti["type"] = mcp::JsonValue("string");
+        t_prop["items"] = std::move(ti);
+        t_prop["description"] = mcp::JsonValue("Filter by tags");
+        props["tags"] = std::move(t_prop);
+        s["properties"] = std::move(props);
+        s["required"] = mcp::JsonValue(mcp::JsonValue::array_tag);
+        spec.raw_schema = std::move(s);
+        registry->add(make_spec_tool(std::move(spec)));
+    }
+
+    {
+        ToolSpec spec{"list_categories", "List all tool categories", "Meta", {"categories", "discovery"}};
+        spec.side_effect = SideEffect::None;
+        spec.flags = tool_flags::kMeta;
+        spec.handler = [&catalog](const mcp::JsonValue&) { return meta_list_categories_impl(catalog); };
+        spec.raw_schema = schema::build_schema({});
+        registry->add(make_spec_tool(std::move(spec)));
+    }
+
+    {
+        ToolSpec spec{"get_tool_detail", "Get complete schema for one tool", "Meta", {"detail", "schema"}};
+        spec.side_effect = SideEffect::None;
+        spec.flags = tool_flags::kMeta;
+        spec.handler = [&catalog](const mcp::JsonValue& args) {
+            return meta_get_tool_detail_impl(args, catalog, get_active_registry());
+        };
+        spec.raw_schema = schema::build_schema({
+            {"name", "string", "Tool name (e.g. ping, search_tools)", true},
+        });
+        registry->add(make_spec_tool(std::move(spec)));
+    }
+
+    {
+        ToolSpec spec{"call_tool",
+                      "Execute any tool by name. Use this to call all 452 non-meta tools (451 domain tools plus system_status).",
+                      "System", {"call", "dispatch", "proxy"}};
+        spec.side_effect = SideEffect::None;
+        spec.flags = tool_flags::kMeta;
+        spec.handler = [](const mcp::JsonValue& args) -> mcp::JsonValue {
+            std::string name = args.Find("name") != nullptr && args["name"].IsString() ? args["name"].GetString() : std::string();
+            mcp::JsonValue j = meta_call_tool_wait(name, meta_call_tool_impl(args));
+            if (!name.empty()) {
+                LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, name + " completed");
+            }
+            return j;
+        };
+        spec.raw_schema = schema::build_schema({
+            {"name", "string", "Tool name to execute", true},
+            {"arguments", "object", "Tool arguments as JSON object", false},
+        });
+        registry->add(make_spec_tool(std::move(spec)));
+    }
+
+    {
+        ToolSpec spec{"batch_execute",
+                      "Execute multiple tools in batch. Each operation runs in sequence; if stop_on_error is true and any operation fails, remaining operations are skipped. Async game tools are refused unless await_async=true, in which case batch_execute waits for the game response and reports it under result. With stop_on_error=true and rollback_on_error=true the changes of already-executed operations are rolled back through the global undo history when the batch stops.",
+                      "System", {"batch", "execute", "multi"}};
+        spec.side_effect = SideEffect::CodeExecute;
+        spec.flags = tool_flags::kMeta | tool_flags::kLongBlocking;
+        spec.handler = [](const mcp::JsonValue& a) { return code_exec_ops::handle_batch_execute(a); };
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue item(mcp::JsonValue::object_tag);
+        item["type"] = mcp::JsonValue("object");
+        mcp::JsonValue iprops(mcp::JsonValue::object_tag);
+        mcp::JsonValue tp(mcp::JsonValue::object_tag);
+        tp["type"] = mcp::JsonValue("string");
+        tp["description"] = mcp::JsonValue("Tool name to execute");
+        iprops["tool"] = std::move(tp);
+        mcp::JsonValue ap(mcp::JsonValue::object_tag);
+        ap["type"] = mcp::JsonValue("object");
+        ap["description"] = mcp::JsonValue("Tool arguments");
+        iprops["args"] = std::move(ap);
+        item["properties"] = std::move(iprops);
+        mcp::JsonValue ireq(mcp::JsonValue::array_tag);
+        ireq.PushBack(mcp::JsonValue("tool"));
+        item["required"] = std::move(ireq);
+        mcp::JsonValue ops_prop(mcp::JsonValue::object_tag);
+        ops_prop["type"] = mcp::JsonValue("array");
+        ops_prop["items"] = std::move(item);
+        ops_prop["description"] = mcp::JsonValue("Ordered list of operations to execute; each result carries status 'ok'/'error'. An async game op (execute_game_script, queue_game_input, wait_game_input, sequence_game_inputs, get_game_ui_elements, click_game_ui_element, capture_game_viewport, capture_editor_viewport with target='game') is refused with status 'error' unless await_async=true; its pending record is always released. Response counts: 'total' = executed operations (succeeded+failed), 'skipped' = operations not run after stop_on_error truncation");
+        props["operations"] = std::move(ops_prop);
+        mcp::JsonValue stop_prop(mcp::JsonValue::object_tag);
+        stop_prop["type"] = mcp::JsonValue("boolean");
+        stop_prop["description"] = mcp::JsonValue("Stop on first error");
+        stop_prop["default"] = mcp::JsonValue(true);
+        props["stop_on_error"] = std::move(stop_prop);
+        mcp::JsonValue rollback_prop(mcp::JsonValue::object_tag);
+        rollback_prop["type"] = mcp::JsonValue("boolean");
+        rollback_prop["description"] = mcp::JsonValue(
+            "Only effective when stop_on_error is true; when the batch stops "
+            "on an error the changes of already-executed operations are rolled "
+            "back through the global undo history; the response carries "
+            "rolled_back and rollback_partial; changes that never entered the "
+            "global undo history are not rolled back");
+        rollback_prop["default"] = mcp::JsonValue(false);
+        props["rollback_on_error"] = std::move(rollback_prop);
+        mcp::JsonValue await_prop(mcp::JsonValue::object_tag);
+        await_prop["type"] = mcp::JsonValue("boolean");
+        await_prop["description"] = mcp::JsonValue("Wait for async game ops instead of refusing them (default: false). With false an async game op is reported as an error telling you to use call_tool or await_async=true; with true batch_execute waits for the game response (bounded by the op's timeout_ms) and reports ok/error per response under result");
+        await_prop["default"] = mcp::JsonValue(false);
+        props["await_async"] = std::move(await_prop);
+        s["properties"] = std::move(props);
+        mcp::JsonValue req(mcp::JsonValue::array_tag);
+        req.PushBack(mcp::JsonValue("operations"));
+        s["required"] = std::move(req);
+        spec.raw_schema = std::move(s);
+        registry->add(make_spec_tool(std::move(spec)));
+    }
+
+    {
+        ToolSpec spec{"code_execute",
+                      "Execute arbitrary GDScript code. The source code is wrapped in a script that extends Node, compiled, attached to a temporary node, and executed. Returns the function result serialized as JSON. Without a line-start `func ` definition the source is inlined inside the entry-function body: write straight-line code ending in return. When any non-comment line starts with `func ` (leading spaces/tabs stripped; `#` and `//` comment lines ignored) the whole source is preserved verbatim and function_name (default _run) selects the entry point, with a `func <name>(): pass` stub appended when the named entry is missing. Detection needs `func ` with a trailing space: `func<TAB>name():` or `func(` do not switch modes and are rejected in single-function mode; mixing tab and space indentation is rejected. Execution environment exposes SceneRoot (the edited scene root node) for node access; see SceneRoot.get_node(\"Child\").",
+                      "System", {"code", "execute", "script", "gdscript"}};
+        spec.side_effect = SideEffect::CodeExecute;
+        spec.flags = tool_flags::kMeta | tool_flags::kLongBlocking;
+        spec.handler = [](const mcp::JsonValue& a) { return code_exec_ops::handle_code_execute(a); };
+        mcp::JsonValue s(mcp::JsonValue::object_tag);
+        s["type"] = mcp::JsonValue("object");
+        mcp::JsonValue props(mcp::JsonValue::object_tag);
+        mcp::JsonValue sc(mcp::JsonValue::object_tag);
+        sc["type"] = mcp::JsonValue("string");
+        sc["description"] = mcp::JsonValue("GDScript source code");
+        props["source_code"] = std::move(sc);
+        mcp::JsonValue fn(mcp::JsonValue::object_tag);
+        fn["type"] = mcp::JsonValue("string");
+        fn["description"] = mcp::JsonValue("Function name to call (default: _run)");
+        props["function_name"] = std::move(fn);
+        mcp::JsonValue tm(mcp::JsonValue::object_tag);
+        const int64_t code_exec_max_timeout_ms =
+            static_cast<int64_t>(code_exec_ops::max_timeout_ms());
+        const int64_t code_exec_default_timeout_ms =
+            code_exec_max_timeout_ms < 5000 ? code_exec_max_timeout_ms : 5000;
+        tm["type"] = mcp::JsonValue("integer");
+        tm["description"] = mcp::JsonValue(
+            "Execution timeout in milliseconds (max " +
+            std::to_string(code_exec_max_timeout_ms) + ")");
+        tm["default"] = mcp::JsonValue(code_exec_default_timeout_ms);
+        tm["maximum"] = mcp::JsonValue(code_exec_max_timeout_ms);
+        props["timeout_ms"] = std::move(tm);
+        mcp::JsonValue ao(mcp::JsonValue::object_tag);
+        ao["type"] = mcp::JsonValue("boolean");
+        ao["description"] = mcp::JsonValue("Automatically set owner on nodes created during execution so they are saved with the scene (default true)");
+        props["auto_owner"] = std::move(ao);
+        s["properties"] = std::move(props);
+        mcp::JsonValue req(mcp::JsonValue::array_tag);
+        req.PushBack(mcp::JsonValue("source_code"));
+        s["required"] = std::move(req);
+        spec.raw_schema = std::move(s);
+        registry->add(make_spec_tool(std::move(spec)));
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(dynamic_specs::mutex());
+        for (const auto& spec : dynamic_specs::store()) {
+            if (registry->find_any(spec.name) != nullptr) {
+                LogSystem::instance().log_detailed(
+                    LogLevel::Warning, LogCategory::Tools,
+                    "user tool '" + spec.name +
+                        "' skipped: name collides with a built-in MCP tool",
+                    "tool=" + spec.name +
+                        " params=" + std::to_string(spec.params.size()) +
+                        " reason=collision");
+                continue;
+            }
+            registry->add(make_spec_tool(spec));
+        }
+    }
+
+    const int64_t registry_duration_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - registry_start)
+            .count();
+    monitor::lifecycle(
+        "registry_build",
+        monitor::build_attrs(
+            {{"tools", std::to_string(registry->all_any().size())},
+             {"duration_ms", std::to_string(registry_duration_ms)}}));
+
+    return registry;
+}
+
+bool tool_result_is_error(const mcp::JsonValue &result) {
+    return result.IsObject() && result.Find("error") != nullptr;
+}
+
+void refresh_dynamic_tools() {
+    if (g_catalog == nullptr || g_index == nullptr)
+        return;
+    auto registry = build_registry(*g_catalog, *g_index, g_port);
+    refresh_derived(registry, *g_catalog, *g_index);
+    std::size_t dynamic_count = 0;
+    {
+        std::lock_guard<std::mutex> lock(dynamic_specs::mutex());
+        dynamic_count = dynamic_specs::store().size();
+    }
+    monitor::lifecycle(
+        "registry_refresh_dynamic",
+        monitor::build_attrs({{"dynamic_tools", std::to_string(dynamic_count)}}));
+}
+
+void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog& catalog, Bm25Index& index, int port) {
+
+    (void)queue;
+    g_catalog = &catalog;
+    g_index = &index;
+    g_port = port;
+    auto registry = build_registry(catalog, index, port);
+
+    for (const auto& meta_tool : registry->all_meta()) {
+        const std::string meta_name = meta_tool->meta().name;
+        mcp::ToolOptions opts;
+        opts.Description(meta_tool->meta().description).InputSchema(meta_tool->input_schema());
+        server.RegisterTool(meta_name, opts,
+            [meta_name, registry, &queue, meta_tool](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
+                const std::string gda_request_id =
+                    monitor::request_id_text(ctx.GetRequest().id);
+                monitor::RequestScope gda_request_scope(gda_request_id);
+                monitor::RequestRecord gda_request_record;
+                std::string gda_request_trace;
+                std::string gda_request_span;
+                if (!gda_request_id.empty() &&
+                    monitor::registry().get(gda_request_id, &gda_request_record)) {
+                    gda_request_trace = gda_request_record.trace_id;
+                    gda_request_span = gda_request_record.span_id;
+                }
+                tools::RequestSpanGuard gda_span_scope(gda_request_trace,
+                                                       gda_request_span);
+                if (godot_autopilot::ExportGuard::is_exporting()) {
+                    return dispatch::export_blocked_result();
+                }
+                mcp::JsonValue args = ctx.Params().arguments
+                    ? *ctx.Params().arguments : mcp::JsonValue(mcp::JsonValue::object_tag);
+                auto tool = registry->find_meta(meta_name);
+                bool run_on_transport_thread = meta_name == "call_tool";
+                if (meta_name == "batch_execute") {
+                    if (auto *await_async = args.Find("await_async");
+                        await_async && await_async->IsBool() &&
+                        await_async->GetBool())
+                        run_on_transport_thread = true;
+                }
+                mcp::JsonValue res;
+                if (run_on_transport_thread) {
+                    res = tool->execute(args);
+                } else {
+                    const tools::TraceContext trace_context =
+                        tools::capture_trace_context();
+                    res = dispatch::run_on_main_thread_with_budget(
+                        queue, meta_name, meta_tool->tool_flags(),
+                        [tool, args, trace_context] {
+                            tools::ScopedTraceContext restore(trace_context);
+                            return tool->execute(args);
+                        });
+                }
+                int64_t new_errors = error_watermark::count_response_errors(res);
+                if (new_errors > 0) {
+                    error_watermark::record_error(new_errors);
+                }
+                mcp::CallToolResult mcp_result;
+                if (tool_result_is_error(res)) {
+                    mcp_result.is_error = true;
+                }
+                if (res.IsObject()) {
+                    res["new_errors_since_last_call"] = mcp::JsonValue(error_watermark::consume_new_errors());
+                }
+                std::vector<mcp::ContentVariant> image_content;
+                if (meta_name == "call_tool") {
+                    if (auto *tool_name = args.Find("name");
+                        tool_name && tool_name->IsString()) {
+                        const std::string name = tool_name->GetString();
+                        bool known = false;
+                        if (auto registry = get_active_registry()) {
+                            if (auto tool = registry->find_any(name)) {
+                                known = true;
+                                if ((tool->tool_flags() &
+                                     tool_flags::kCaptureImage) != 0) {
+                                    util::try_attach_image_data(res,
+                                                                image_content);
+                                }
+                            }
+                        }
+                        if (!known) {
+                            util::try_attach_image_content(name, res,
+                                                           image_content);
+                        }
+                    }
+                }
+                mcp_result.content.push_back(mcp::TextContent{"text", res.Dump()});
+                for (auto &block : image_content) {
+                    mcp_result.content.push_back(std::move(block));
+                }
+                return mcp_result;
+            });
+    }
+
+    refresh_derived(registry, catalog, index);
+
+    auto count = catalog.size();
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+        std::to_string(count) + " tools registered via registry");
+    monitor::lifecycle(
+        "tools_registered",
+        monitor::build_attrs({{"count", std::to_string(count)}}));
+}
+
+std::shared_ptr<ToolRegistry> get_active_registry() {
+    std::lock_guard<std::mutex> lock(g_active_registry_mutex);
+    return g_active_registry;
+}
+
+void clear_active_registry() {
+    std::lock_guard<std::mutex> lock(g_active_registry_mutex);
+    g_active_registry = std::make_shared<ToolRegistry>();
+}
+
+}

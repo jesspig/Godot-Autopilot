@@ -1,4 +1,4 @@
-#include "tools/authorization.hpp"
+#include "tools/base/authorization.hpp"
 
 #include <gtest/gtest.h>
 
@@ -7,8 +7,8 @@
 #include <string>
 #include <string_view>
 
-#include "core/sanitize_policy.hpp"
-#include "tools/tool_base.hpp"
+#include "core/observability/sanitize_policy.hpp"
+#include "tools/base/tool_base.hpp"
 #include "ui/authorization_switches.hpp"
 
 namespace {

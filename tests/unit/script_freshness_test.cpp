@@ -1,5 +1,5 @@
 
-#include "tools/script_ops.hpp"
+#include "tools/domains/script/script_ops.hpp"
 
 #include <gtest/gtest.h>
 

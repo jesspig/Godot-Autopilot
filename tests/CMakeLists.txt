@@ -18,8 +18,9 @@ include(GoogleTest)
 
 # 业务子集源码 (从仓库根引用; ops 实现文件经 make_tools() 被 register_all.cpp 引用, 链接必需)
 # resource_registry.cpp 被 code_exec_ops.cpp / resource_ops.cpp 引用 (grep 确认)
-file(GLOB GDA_TOOLS_OPS_SOURCES CONFIGURE_DEPENDS
-    "${CMAKE_SOURCE_DIR}/src/tools/*_ops.cpp")
+file(GLOB_RECURSE GDA_TOOLS_OPS_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_SOURCE_DIR}/src/tools/domains/*/*_ops.cpp"
+    "${CMAKE_SOURCE_DIR}/src/tools/base/*_ops.cpp")
 
 # 链接依赖 (grep 确认)：
 #   variant_json.cpp      — ops 大量调用 VariantJson::serialize/deserialize
@@ -30,7 +31,7 @@ file(GLOB GDA_TOOLS_OPS_SOURCES CONFIGURE_DEPENDS
 #                           (tools/*_ops.cpp 由上方 GLOB 自动纳入，
 #                           含 script_patch_ops.cpp 与 scene_spec_ops.cpp；
 #                           game_bridge_verify.cpp 为游戏侧运行时，
-#                           仅被 game_bridge.cpp 引用，不进 L1 业务源)
+#                           仅被 game_bridge.cpp 引用，不进 单元与边界测试业务源)
 #
 # 源清单聚合：基础业务源在 cmake/sources/gda_unit_sources.cmake，
 # 各并行分支的测试源在 cmake/sources/api_unit_*.cmake，
@@ -54,7 +55,7 @@ set(GDA_UNIT_BUSINESS_SOURCES
     ${GDA_UNIT_INSTANCE_GUARD_SOURCES})
 
 # ====================================================================
-# gda_unit_tests — L1 纯单元测试 (不启动引擎, 不触碰 Godot API)
+# gda_unit_tests — 单元测试层 (不启动引擎, 不触碰 Godot API)
 # ====================================================================
 file(GLOB_RECURSE GDA_UNIT_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/unit/*.cpp")
@@ -62,6 +63,8 @@ file(GLOB_RECURSE GDA_UNIT_SOURCES CONFIGURE_DEPENDS
 if(GDA_UNIT_SOURCES)
     set(GDA_UNIT_ALL_SOURCES ${GDA_UNIT_SOURCES} ${GDA_UNIT_BUSINESS_SOURCES})
     list(REMOVE_DUPLICATES GDA_UNIT_ALL_SOURCES)
+    # 边界层用例经 api_unit_*.cmake 登记在业务源里，须从单元目标剔除避免重复注册
+    list(FILTER GDA_UNIT_ALL_SOURCES EXCLUDE REGEX "/tests/boundary/")
     add_executable(gda_unit_tests ${GDA_UNIT_ALL_SOURCES})
 
     # skill 内容头 skill_content_embedded.h 由 cmake/skill_gen.cmake 构建期生成
@@ -83,11 +86,45 @@ if(GDA_UNIT_SOURCES)
         LINK_SEARCH_START_STATIC ON
         LINK_SEARCH_END_STATIC ON)
 
-    gtest_discover_tests(gda_unit_tests)
+    gtest_discover_tests(gda_unit_tests PROPERTIES LABELS "unit")
 endif()
 
 # ====================================================================
-# gda_integration_tests — 程序化集成测试 (进程内, 零引擎零项目绑定)
+# gda_boundary_tests — 边界测试层 (参数校验 / 拒绝路径 / 预算与超时 / 错误映射)
+# 源清单走 glob, 新增 boundary/*_test.cpp 后重新 configure 即注册。
+# 与单元层共用业务源, 仅排除 tests/ 下的用例文件避免重复注册。
+# ====================================================================
+file(GLOB GDA_BOUNDARY_TEST_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/boundary/*_test.cpp")
+
+if(GDA_BOUNDARY_TEST_SOURCES)
+    set(GDA_BOUNDARY_BUSINESS_SOURCES ${GDA_UNIT_BUSINESS_SOURCES})
+    list(FILTER GDA_BOUNDARY_BUSINESS_SOURCES EXCLUDE REGEX "/tests/(unit|boundary)/")
+    add_executable(gda_boundary_tests
+        ${GDA_BOUNDARY_TEST_SOURCES}
+        ${GDA_BOUNDARY_BUSINESS_SOURCES})
+
+    add_dependencies(gda_boundary_tests gda_skill_embed_header)
+
+    target_include_directories(gda_boundary_tests PRIVATE
+        ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests ${CMAKE_BINARY_DIR}/generated)
+    target_link_libraries(gda_boundary_tests PRIVATE
+        godot-cpp mcp-server mcp-http mcp-client GTest::gtest_main)
+    if(MSVC)
+        target_link_options(gda_boundary_tests PRIVATE "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>")
+    endif()
+
+    set_target_properties(gda_boundary_tests PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED ON
+        LINK_SEARCH_START_STATIC ON
+        LINK_SEARCH_END_STATIC ON)
+
+    gtest_discover_tests(gda_boundary_tests PROPERTIES LABELS "boundary")
+endif()
+
+# ====================================================================
+# gda_integration_tests — 集成测试层 (进程内, 零引擎零项目绑定)
 # 源清单走 glob, 新增 integration/*_test.cpp 后重新 configure 即注册。
 # ====================================================================
 file(GLOB GDA_INTEGRATION_TEST_SOURCES CONFIGURE_DEPENDS
@@ -95,7 +132,7 @@ file(GLOB GDA_INTEGRATION_TEST_SOURCES CONFIGURE_DEPENDS
 
 if(GDA_INTEGRATION_TEST_SOURCES)
     set(GDA_INTEGRATION_BUSINESS_SOURCES ${GDA_UNIT_BUSINESS_SOURCES})
-    list(FILTER GDA_INTEGRATION_BUSINESS_SOURCES EXCLUDE REGEX "/tests/unit/")
+    list(FILTER GDA_INTEGRATION_BUSINESS_SOURCES EXCLUDE REGEX "/tests/(unit|boundary)/")
     add_executable(gda_integration_tests
         ${GDA_INTEGRATION_TEST_SOURCES}
         ${GDA_INTEGRATION_BUSINESS_SOURCES})
@@ -116,7 +153,7 @@ if(GDA_INTEGRATION_TEST_SOURCES)
         LINK_SEARCH_START_STATIC ON
         LINK_SEARCH_END_STATIC ON)
 
-    gtest_discover_tests(gda_integration_tests)
+    gtest_discover_tests(gda_integration_tests PROPERTIES LABELS "integration")
 endif()
 
 
@@ -142,11 +179,17 @@ add_test(NAME main_thread_guard
 add_test(NAME version_sync_guard
     COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/version_sync_guard.py")
 
-# ── ctest 注册: L1 源清单守卫（零依赖，读源码断言，无需构建产物） ──
+# ── ctest 注册: 测试源清单守卫（零依赖，读源码断言，无需构建产物） ──
 # 解析 cmake/sources/ 下插件清单 + src/tools/*_ops.cpp glob 断言并集 == src/ 全部 .cpp，
-# L1 清单引用的 src/ 源 ⊆ 插件并集；解析规则见 guard/source_manifest_guard.py 模块 docstring。
+# 测试源清单引用的 src/ 源 ⊆ 插件并集；解析规则见 guard/source_manifest_guard.py 模块 docstring。
 add_test(NAME source_manifest_guard
     COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/source_manifest_guard.py")
+
+# ── ctest 注册: 工具域守卫（零依赖，读源码断言域规格与实现同名前缀） ──
+# 断言 src/tools/<X>_tools.hpp 存在同前缀 <X>_ops.cpp / <X>_*_ops.cpp，
+# 且规格文件引用的每个 <ns>::handle_* 都有定义；豁免与判据见 guard/tool_domain_guard.py。
+add_test(NAME tool_domain_guard
+    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/tool_domain_guard.py")
 
 # ── ctest 注册: CLI 契约 mock conformance（纯 stdlib + 自带 mock server）──
 # bun 缺失时测试文件自行打印 SKIP 并 exit 0，ctest 视为通过；
@@ -174,3 +217,26 @@ add_test(NAME comment_guard_self_test
 
 add_test(NAME main_thread_guard_self_test
     COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/main_thread_guard.py" --self-test)
+
+add_test(NAME tool_domain_guard_self_test
+    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/tool_domain_guard.py" --self-test)
+
+# ====================================================================
+# ctest 层级标签：unit / boundary / integration 由 gtest_discover_tests 的
+# PROPERTIES LABELS 标注；此处补齐源码守卫（guard）与 CLI 脚本项（cli）。
+# 全量默认门仍是裸 ctest；分层执行用 ctest -L <label>。
+# ====================================================================
+set_tests_properties(
+    migration_guard
+    comment_guard
+    main_thread_guard
+    version_sync_guard
+    source_manifest_guard
+    tool_domain_guard
+    migration_guard_self_test
+    comment_guard_self_test
+    main_thread_guard_self_test
+    tool_domain_guard_self_test
+    PROPERTIES LABELS "guard")
+
+set_tests_properties(cli_contract cli_unit PROPERTIES LABELS "cli")

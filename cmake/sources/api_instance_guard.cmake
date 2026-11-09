@@ -8,4 +8,4 @@
 # 对应的分支清单，避免归并冲突。
 # ====================================================================
 set(GDA_API_INSTANCE_GUARD_SOURCES
-    src/core/instance_guard.cpp)
+    src/core/storage/instance_guard.cpp)

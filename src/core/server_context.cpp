@@ -1,17 +1,17 @@
 #include "server_context.hpp"
 #include "config.hpp"
-#include "log_system.hpp"
+#include "core/observability/log_system.hpp"
 #include "plugin_config.hpp"
 #include <version.hpp>
 #include "prompts/debugger_prompts.hpp"
 #include "prompts/prompt_handlers.hpp"
 #include "resources/debugger_resources.hpp"
 #include "resources/resource_handlers.hpp"
-#include "tools/register_all.hpp"
-#include "tools/dispatch.hpp"
-#include "tools/tool_catalog.hpp"
+#include "tools/base/register_all.hpp"
+#include "tools/base/dispatch.hpp"
+#include "tools/base/tool_catalog.hpp"
 #include "util/bm25_index.hpp"
-#include "monitor.hpp"
+#include "core/observability/monitor.hpp"
 #include <cstdlib>
 #include <chrono>
 #include <exception>
@@ -25,19 +25,19 @@
 #include <mcp/protocol/MessageFilter.hpp>
 #include <memory>
 
-#include "core/api_auth.hpp"
-#include "core/api_endpoints.hpp"
-#include "core/api_server.hpp"
-#include "core/api_surface.hpp"
-#include "core/api_token.hpp"
-#include "core/gda_home.hpp"
-#include "core/godot_transport.hpp"
-#include "core/http_transport.hpp"
-#include "core/http_transport_ext.hpp"
-#include "core/instance_guard.hpp"
-#include "core/instance_registry.hpp"
-#include "core/mcp_http_shim.hpp"
-#include "tools/tool_execute.hpp"
+#include "core/transport/api_auth.hpp"
+#include "core/transport/api_endpoints.hpp"
+#include "core/transport/api_server.hpp"
+#include "core/transport/api_surface.hpp"
+#include "core/transport/api_token.hpp"
+#include "core/storage/gda_home.hpp"
+#include "core/transport/godot_transport.hpp"
+#include "core/transport/http_transport.hpp"
+#include "core/transport/http_transport_ext.hpp"
+#include "core/storage/instance_guard.hpp"
+#include "core/storage/instance_registry.hpp"
+#include "core/transport/mcp_http_shim.hpp"
+#include "tools/base/tool_execute.hpp"
 #include "util/api_host_context.hpp"
 
 namespace godot_autopilot {

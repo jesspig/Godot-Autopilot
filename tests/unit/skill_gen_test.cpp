@@ -6,8 +6,8 @@
 #include <mcp/transport/InMemoryTransport.hpp>
 
 #include "core/command_queue.hpp"
-#include "tools/register_all.hpp"
-#include "tools/tool_catalog.hpp"
+#include "tools/base/register_all.hpp"
+#include "tools/base/tool_catalog.hpp"
 #include "util/bm25_index.hpp"
 #include "util/skill_gen.hpp"
 #include <version.hpp>

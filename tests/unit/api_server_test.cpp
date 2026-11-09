@@ -1,5 +1,5 @@
-#include "core/api_server.hpp"
-#include "core/api_surface.hpp"
+#include "core/transport/api_server.hpp"
+#include "core/transport/api_surface.hpp"
 
 #include <gtest/gtest.h>
 

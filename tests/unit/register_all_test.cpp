@@ -8,11 +8,11 @@
 #include <mcp/transport/InMemoryTransport.hpp>
 
 #include "core/command_queue.hpp"
-#include "tools/dispatch.hpp"
-#include "tools/register_all.hpp"
-#include "tools/runtime_ops.hpp"
-#include "tools/tool_catalog.hpp"
-#include "tools/tool_registry.hpp"
+#include "tools/base/dispatch.hpp"
+#include "tools/base/register_all.hpp"
+#include "tools/base/runtime_ops.hpp"
+#include "tools/base/tool_catalog.hpp"
+#include "tools/base/tool_registry.hpp"
 #include "util/bm25_index.hpp"
 
 #include <string>

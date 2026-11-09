@@ -1,4 +1,4 @@
-#include "tools/schema_builder.hpp"
+#include "tools/base/schema_builder.hpp"
 
 #include <gtest/gtest.h>
 

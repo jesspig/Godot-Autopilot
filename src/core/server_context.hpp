@@ -9,9 +9,9 @@
 
 #include "command_queue.hpp"
 #include "config.hpp"
-#include "core/godot_transport.hpp"
-#include "port_resolver.hpp"
-#include "project_store.hpp"
+#include "core/transport/godot_transport.hpp"
+#include "core/transport/port_resolver.hpp"
+#include "core/storage/project_store.hpp"
 
 namespace godot_autopilot {
 

@@ -1,4 +1,4 @@
-#include "core/legacy_store.hpp"
+#include "core/storage/legacy_store.hpp"
 
 #include <gtest/gtest.h>
 

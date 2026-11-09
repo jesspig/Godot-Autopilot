@@ -1,4 +1,4 @@
-#include "tools/log_ops.hpp"
+#include "tools/domains/log/log_ops.hpp"
 
 #include <gtest/gtest.h>
 

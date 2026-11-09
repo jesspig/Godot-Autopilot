@@ -1,5 +1,5 @@
-#include "core/log_persist.hpp"
-#include "core/sanitize_policy.hpp"
+#include "core/observability/log_persist.hpp"
+#include "core/observability/sanitize_policy.hpp"
 
 #include <gtest/gtest.h>
 

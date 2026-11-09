@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""L1 源清单守卫：断言插件源清单并集 == src/ 全部 .cpp，且 L1 清单引用的 src/ 源 ⊆ 插件并集。
+"""测试源清单守卫：断言插件源清单并集 == src/ 全部 .cpp，且 测试源清单引用的 src/ 源 ⊆ 插件并集。
 
 清单解析规则（cmake/sources/*.cmake）：
   - 先剥注释：每行删除首个 # 起的尾部；
@@ -7,7 +7,7 @@
   - `${CMAKE_SOURCE_DIR}/` 前缀替换为仓库根相对路径；含其它 `${...}` 变量引用的
     token 跳过（如 ${GDA_TOOLS_OPS_SOURCES}——两侧同源 glob，展开必然一致）。
 插件并集 = gda_core/api_core/api_contract/api_storage/api_transport/api_cli/
-  api_instance_guard 七份清单的 src/ 条目 ∪ src/tools/*_ops.cpp（非递归 glob，
+  api_instance_guard 七份清单的 src/ 条目 ∪ src/tools/domains/*/*_ops.cpp（非递归 glob，
   与 tests/CMakeLists.txt 的 file(GLOB GDA_TOOLS_OPS_SOURCES) 同模式）的实际文件；
   断言其 == src/ 下全部 .cpp（防漏登插件产物）。
 L1 并集 = gda_unit_sources/api_unit_contract/api_unit_storage/api_unit_transport/
@@ -82,8 +82,9 @@ def main():
         for token in parse_manifest_tokens(SOURCES_DIR / name):
             if token.startswith("src/"):
                 plugin_entries.add(token)
-    for path in sorted((ROOT / "src" / "tools").glob("*_ops.cpp")):
-        plugin_entries.add(rel_of(path))
+    for pattern in ("domains/*/*_ops.cpp", "base/*_ops.cpp"):
+        for path in sorted((ROOT / "src" / "tools").glob(pattern)):
+            plugin_entries.add(rel_of(path))
 
     src_actual = {rel_of(p) for p in (ROOT / "src").rglob("*.cpp")}
 

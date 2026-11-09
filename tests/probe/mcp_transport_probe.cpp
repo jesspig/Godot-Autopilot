@@ -3,8 +3,8 @@
 #include <mcp/server/McpServer.hpp>
 #include <mcp/transport/InMemoryTransport.hpp>
 
-#include "core/godot_transport.hpp"
-#include "core/mcp_http_shim.hpp"
+#include "core/transport/godot_transport.hpp"
+#include "core/transport/mcp_http_shim.hpp"
 
 #include <chrono>
 #include <cstdint>
