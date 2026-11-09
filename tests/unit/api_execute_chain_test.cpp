@@ -25,7 +25,7 @@ class RecordingTool : public ToolBase {
 public:
   explicit RecordingTool(const std::string &name) : name_(name) {
     meta_.name = name_;
-    meta_.description = "l1 rest chain stub";
+    meta_.description = "rest chain stub";
     meta_.category = "Test";
   }
 

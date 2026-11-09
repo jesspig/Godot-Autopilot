@@ -8,7 +8,7 @@ Godot Autopilot（GDA）：进程内 GDExtension，把 Godot 编辑器经 MCP（
 
 - 构建部署：`uv run main.py build` + `uv run main.py deploy`（子命令：`build` / `deploy` / `package` / `clean` / `test` / `tui`；`deploy` 下 `--release` / `--demos <名称...>`，`package` 下 `--libs-dir <dir>`）
 - 手动构建：`cmake --preset debug && cmake --build --preset debug`
-- 快速验证：`ctest --preset debug`（全量默认门：L1 + 集成 + 守卫 + CLI，零引擎依赖；`--single <用例名>` 单跑）
+- 快速验证：`ctest --preset debug`（全量默认门：单元 + 边界 + 集成 + 守卫 + CLI，零引擎依赖；`--single <用例名>` 单跑）
 - CLI 单测：`bun test cli/tests`（Bun + TS，秒级）
 - 版本只改根 `VERSION`，随后重新 configure
 
@@ -37,7 +37,7 @@ Godot Autopilot（GDA）：进程内 GDExtension，把 Godot 编辑器经 MCP（
 
 - `git status` 的大量 `M` 多为 CRLF 伪变更（仓库无 `.gitattributes`），核查一律以 `git diff HEAD` 为准。
 - 提交信息 `<type>(<scope>): <中文描述>`，scope 用中文功能域，按功能域拆分提交。
-- 多代理并行时子代理只写代码不编译，主代理统一 configure/build 再分批测（并行编译会锁）；L1 禁调已注册 handler。
+- 多代理并行时子代理只写代码不编译，主代理统一 configure/build 再分批测（并行编译会锁）；单元/边界测试禁调已注册 handler。
 - 面向 MCP 客户端的技能书（`godot-autopilot-*`）由 `skills/` 模板生成到当前打开工程的 `res://.agents/skills/`。
 
 ## 知识库入口

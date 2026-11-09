@@ -108,7 +108,7 @@ def main() -> None:
     p_clean = sub.add_parser("clean", help="清理各 demo 的 .godot 与 addons")
     p_clean.set_defaults(func=_cmd_clean)
 
-    p_test = sub.add_parser("test", help="跑全量默认门测试（L1 + 守卫 + CLI + 集成）")
+    p_test = sub.add_parser("test", help="跑全量默认门测试（单元 + 边界 + 集成 + 守卫 + CLI）")
     p_test.add_argument("--preset", default="debug", choices=["debug", "release"], help="ctest 预设（默认 debug）")
     p_test.add_argument("--single", default=None, help="单跑用例/守卫（如 --single migration_guard）")
     p_test.set_defaults(func=_cmd_test)

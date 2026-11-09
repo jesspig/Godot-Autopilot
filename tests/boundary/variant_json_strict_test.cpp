@@ -183,7 +183,7 @@ TEST(VariantJsonStrictTest, PlaneZeroNormalMessage) {
 
 TEST(VariantJsonStrictTest, PlaneAcceptsNormalShape) {
   if (!godot_runtime_bindings_available())
-    GTEST_SKIP() << "L1 test binary has no Godot runtime bindings";
+    GTEST_SKIP() << "test binary has no Godot runtime bindings";
   const godot::Plane plane =
       static_cast<godot::Plane>(strict_parse(
           R"({"normal":{"x":0,"y":1,"z":0},"d":-15})", "Plane"));
@@ -195,7 +195,7 @@ TEST(VariantJsonStrictTest, PlaneAcceptsNormalShape) {
 
 TEST(VariantJsonStrictTest, PlaneAcceptsComponentShape) {
   if (!godot_runtime_bindings_available())
-    GTEST_SKIP() << "L1 test binary has no Godot runtime bindings";
+    GTEST_SKIP() << "test binary has no Godot runtime bindings";
   const godot::Plane plane =
       static_cast<godot::Plane>(strict_parse(
           R"({"x":-1,"y":0,"z":0,"d":-15})", "Plane"));
@@ -207,7 +207,7 @@ TEST(VariantJsonStrictTest, PlaneAcceptsComponentShape) {
 
 TEST(VariantJsonStrictTest, PlaneAcceptsExplicitZeroDefault) {
   if (!godot_runtime_bindings_available())
-    GTEST_SKIP() << "L1 test binary has no Godot runtime bindings";
+    GTEST_SKIP() << "test binary has no Godot runtime bindings";
   const godot::Plane plane =
       static_cast<godot::Plane>(strict_parse(
           R"({"normal":{"x":0,"y":0,"z":0},"d":0})", "Plane"));
@@ -223,7 +223,7 @@ TEST(VariantJsonStrictTest, Vector3RejectsMissingZ) {
 
 TEST(VariantJsonStrictTest, Vector3AcceptsCompleteShape) {
   if (!godot_runtime_bindings_available())
-    GTEST_SKIP() << "L1 test binary has no Godot runtime bindings";
+    GTEST_SKIP() << "test binary has no Godot runtime bindings";
   const godot::Vector3 vec = static_cast<godot::Vector3>(
       strict_parse(R"({"x":1,"y":2,"z":3})", "Vector3"));
   EXPECT_DOUBLE_EQ(1.0, vec.x);
@@ -237,7 +237,7 @@ TEST(VariantJsonStrictTest, Vector3iRejectsMissingZ) {
 
 TEST(VariantJsonStrictTest, Vector3iAcceptsCompleteShape) {
   if (!godot_runtime_bindings_available())
-    GTEST_SKIP() << "L1 test binary has no Godot runtime bindings";
+    GTEST_SKIP() << "test binary has no Godot runtime bindings";
   const godot::Vector3i vec = static_cast<godot::Vector3i>(
       strict_parse(R"({"x":1,"y":2,"z":3})", "Vector3i"));
   EXPECT_EQ(1, vec.x);
@@ -252,7 +252,7 @@ TEST(VariantJsonStrictTest, Vector4RejectsMissingW) {
 
 TEST(VariantJsonStrictTest, Vector4AcceptsCompleteShape) {
   if (!godot_runtime_bindings_available())
-    GTEST_SKIP() << "L1 test binary has no Godot runtime bindings";
+    GTEST_SKIP() << "test binary has no Godot runtime bindings";
   const godot::Vector4 vec = static_cast<godot::Vector4>(
       strict_parse(R"({"x":1,"y":2,"z":3,"w":4})", "Vector4"));
   EXPECT_DOUBLE_EQ(1.0, vec.x);
@@ -268,7 +268,7 @@ TEST(VariantJsonStrictTest, Vector4iRejectsMissingW) {
 
 TEST(VariantJsonStrictTest, Vector4iAcceptsCompleteShape) {
   if (!godot_runtime_bindings_available())
-    GTEST_SKIP() << "L1 test binary has no Godot runtime bindings";
+    GTEST_SKIP() << "test binary has no Godot runtime bindings";
   const godot::Vector4i vec = static_cast<godot::Vector4i>(
       strict_parse(R"({"x":1,"y":2,"z":3,"w":4})", "Vector4i"));
   EXPECT_EQ(1, vec.x);
@@ -284,7 +284,7 @@ TEST(VariantJsonStrictTest, QuaternionRejectsMissingW) {
 
 TEST(VariantJsonStrictTest, QuaternionAcceptsCompleteShape) {
   if (!godot_runtime_bindings_available())
-    GTEST_SKIP() << "L1 test binary has no Godot runtime bindings";
+    GTEST_SKIP() << "test binary has no Godot runtime bindings";
   const godot::Quaternion quat = static_cast<godot::Quaternion>(
       strict_parse(R"({"x":0,"y":1,"z":0,"w":0})", "Quaternion"));
   EXPECT_DOUBLE_EQ(0.0, quat.x);
@@ -305,7 +305,7 @@ TEST(VariantJsonStrictTest, BasisRejectsTwoRows) {
 
 TEST(VariantJsonStrictTest, BasisAcceptsCompleteShape) {
   if (!godot_runtime_bindings_available())
-    GTEST_SKIP() << "L1 test binary has no Godot runtime bindings";
+    GTEST_SKIP() << "test binary has no Godot runtime bindings";
   const godot::Basis basis = static_cast<godot::Basis>(strict_parse(
       R"({"rows":[[1,0,0],[0,1,0],[0,0,1]]})", "Basis"));
   EXPECT_DOUBLE_EQ(1.0, basis.rows[1].y);
@@ -328,7 +328,7 @@ TEST(VariantJsonStrictTest, ProjectionRejectsShortColumn) {
 
 TEST(VariantJsonStrictTest, ProjectionAcceptsCompleteShape) {
   if (!godot_runtime_bindings_available())
-    GTEST_SKIP() << "L1 test binary has no Godot runtime bindings";
+    GTEST_SKIP() << "test binary has no Godot runtime bindings";
   const godot::Projection proj = static_cast<godot::Projection>(strict_parse(
       R"({"columns":[[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]})",
       "Projection"));
@@ -347,7 +347,7 @@ TEST(VariantJsonStrictTest, ColorRejectsNonNumericAlpha) {
 
 TEST(VariantJsonStrictTest, ColorAcceptsCompleteShape) {
   if (!godot_runtime_bindings_available())
-    GTEST_SKIP() << "L1 test binary has no Godot runtime bindings";
+    GTEST_SKIP() << "test binary has no Godot runtime bindings";
   const godot::Color color = static_cast<godot::Color>(strict_parse(
       R"({"r":1,"g":0.5,"b":0.25,"a":0.75})", "Color"));
   EXPECT_FLOAT_EQ(1.0f, color.r);
@@ -358,7 +358,7 @@ TEST(VariantJsonStrictTest, ColorAcceptsCompleteShape) {
 
 TEST(VariantJsonStrictTest, ColorAcceptsImplicitOpaqueAlpha) {
   if (!godot_runtime_bindings_available())
-    GTEST_SKIP() << "L1 test binary has no Godot runtime bindings";
+    GTEST_SKIP() << "test binary has no Godot runtime bindings";
   const godot::Color color = static_cast<godot::Color>(
       strict_parse(R"({"r":0,"g":0,"b":0})", "Color"));
   EXPECT_FLOAT_EQ(1.0f, color.a);

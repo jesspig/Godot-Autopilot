@@ -1,5 +1,5 @@
 # ====================================================================
-# API 基座 — L1 业务源清单（变量 GDA_UNIT_BUSINESS_SOURCES）
+# API 基座 — 单元与边界测试业务源清单（变量 GDA_UNIT_BUSINESS_SOURCES）
 #
 # 由 tests/CMakeLists.txt include 后展开进 gda_unit_tests 目标。
 # 路径为绝对路径（引用自仓库根）。
@@ -41,7 +41,7 @@ set(GDA_UNIT_BUSINESS_SOURCES
     ${CMAKE_SOURCE_DIR}/tests/runner/config_loader.cpp
     ${GDA_TOOLS_OPS_SOURCES})
 
-# API 基座自带的 L1 用例（tests/unit 下的 glob 已自动收集，此处显式登记
+# API 基座自带的 测试用例（tests/unit 下的 glob 已自动收集，此处显式登记
 # 便于评审核对；tests/CMakeLists.txt 汇入时去重，不会重复编译）。
 set(GDA_UNIT_API_BASE_TESTS
     ${CMAKE_SOURCE_DIR}/tests/unit/gda_home_test.cpp

@@ -43,7 +43,7 @@ cmake --build --preset debug --target gda_unit_tests gda_integration_tests
 ## 4. 运行
 
 ```powershell
-# 全量默认门（L1 + 集成 + 守卫 + CLI，ctest 注册口径见 wiki 数值总表）
+# 全量默认门（单元 + 边界 + 集成 + 守卫 + CLI，ctest 注册口径见 wiki 数值总表）
 ctest --preset debug
 
 # 单跑（按用例名正则，如守卫或某个套件）

@@ -20,7 +20,7 @@ class RecordingTool : public ToolBase {
 public:
   explicit RecordingTool(const std::string &name) : name_(name) {
     meta_.name = name_;
-    meta_.description = "l1 recording stub";
+    meta_.description = "recording stub";
     meta_.category = "Test";
   }
 
