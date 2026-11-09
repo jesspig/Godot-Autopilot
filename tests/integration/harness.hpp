@@ -60,12 +60,23 @@ class IntegrationHarnessWithAllow : public IntegrationHarness {
     had_previous_ = previous != nullptr;
     if (had_previous_)
       previous_ = previous;
+#ifdef _WIN32
     _putenv_s(kEnvAllow, allow_value_);
+#else
+    setenv(kEnvAllow, allow_value_, 1);
+#endif
     IntegrationHarness::SetUp();
   }
 
   void TearDown() override {
+#ifdef _WIN32
     _putenv_s(kEnvAllow, had_previous_ ? previous_.c_str() : "");
+#else
+    if (had_previous_)
+      setenv(kEnvAllow, previous_.c_str(), 1);
+    else
+      unsetenv(kEnvAllow);
+#endif
     IntegrationHarness::TearDown();
   }
 
