@@ -80,6 +80,7 @@ set(GDA_CORE_SOURCES
     src/tools/domains/physics/physics_ops.cpp
     src/tools/domains/physics/physics_bundle_ops.cpp
     src/tools/domains/property/property_ops.cpp
+    src/tools/domains/property/property_transform_ops.cpp
     src/tools/domains/property/property_signal_ops.cpp
     src/tools/base/register_all.cpp
     src/tools/base/dispatch.cpp
@@ -88,6 +89,7 @@ set(GDA_CORE_SOURCES
     src/tools/domains/render/render_ops.cpp
     src/tools/domains/render/render_environment_ops.cpp
     src/tools/domains/resource/resource_ops.cpp
+    src/tools/domains/resource/resource_property_import_ops.cpp
     src/tools/domains/resource/resource_curve_mesh_ops.cpp
     src/tools/base/runtime_ops.cpp
     src/tools/domains/game/game_ops.cpp
