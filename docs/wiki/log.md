@@ -4,6 +4,8 @@
 
 ## 2026-11-09
 
+- **仓库组织重构（`feature/repo-org-refactor` 分支，10 个提交，合并前停在本地）**：测试体系由「四层 + L1/L2 等级」改为**单元 / 边界 / 集成三层 + 守卫与 CLI**（新增 `tests/boundary/` 与 `gda_boundary_tests`，三层打 ctest 标签 `unit`/`boundary`/`integration`，注册点守恒 **996** = 636 + 239 + 109 + 10 + 2；CI 改分层作业并加注册点守恒断言）；`src/core` 按职责下放 `transport/` 29 + `observability/` 13 + `storage/` 12（根保留 22）；`src/tools` 拆 `base/` 33 + `domains/<域>/` 33 目录 112 文件，工具域 glob 改递归；5 个超 2000 行实现文件拆分（editor / scene / property / physics / resource）；`tests/runner` 并入 `tests/support`。守卫同步递归化——`tool_domain_guard` 曾因非递归 glob 在目录下放后**扫不到文件却仍报 OK**（假绿），已改 `rglob`。明细见 [changelog/2026-11-09-log.md](changelog/2026-11-09-log.md)。最终 `ctest` **996/996** 全绿，未推送、未合并。
+
 - **测试体系重构收口（L2 引擎轨删除 + 程序化四层落地 + 数值重基线）**：历史 L2 引擎轨（`gda_test_runner` / `gda_pool_ctl` / `tests/config` / `tests/testbed` / `tests/pool` 池化编排）整体删除（提交 `c023a5c`，脚本编排收敛 `bf31e8a` / `8997db9`），测试体系改为「程序化四层（单元 875 / 集成 109 / 守卫与脚本 10，ctest 注册总数 994）+ Agent e2e（`gda-e2e-testing` 工作流）」；48 份 L2 用例语义蒸馏入集成层 gtest，不可进程内复现的引擎触达断言划回 Agent e2e。数值权威与逐项证据见 [测试体系](tests.md) 2026-11-09 审计行与「历史口径迁移」；引擎行为验收清单与 A 类迁移对照见 [engine-behavior-checklist.md](engine-behavior-checklist.md)。本轮同批次完成 wiki 与技能引用的措辞收口（deploy/clean 目标收敛为仅 demo、产物清单与目录树重述、索引与授权面语义同步），不涉代码；文档改动只落本地工作树，`git add` / `git commit` 由主代理执行。
 
 ## 2026-10-28
