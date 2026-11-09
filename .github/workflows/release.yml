@@ -167,12 +167,20 @@ jobs:
 
       - name: Build gda binary
         shell: bash
+        env:
+          GDA_TARGET: ${{ matrix.target }}
+          GDA_EXT: ${{ matrix.ext }}
         run: |
           version="$(tr -d ' \t\r\n' < VERSION)"
           mkdir -p dist
-          out="dist/gda${{ matrix.ext }}"
-          bun build cli/bin/gda.ts --compile --minify --target=${{ matrix.target }} --outfile "$out"
-          built="$("$out" --version | awk '{print $2}')"
+          out="dist/gda${GDA_EXT}"
+          bun build cli/bin/gda.ts --compile --minify --target="${GDA_TARGET}" --outfile "$out"
+          chmod +x "$out" 2>/dev/null || true
+          if [[ "${GDA_TARGET}" == *musl* ]]; then
+            built="$(docker run --rm -v "${GITHUB_WORKSPACE}/dist:/dist:ro" alpine:3.20 sh -c 'apk add --no-cache libstdc++ >/dev/null 2>&1 && /dist/gda --version' | awk '{print $2}')"
+          else
+            built="$("$out" --version | awk '{print $2}')"
+          fi
           if [ "${built}" != "${version}" ]; then
             echo "::error::Built gda reports version '${built}' but VERSION is '${version}'"
             exit 1
@@ -186,10 +194,21 @@ jobs:
 
       - name: Verify binary runs
         shell: bash
+        env:
+          GDA_TARGET: ${{ matrix.target }}
+          GDA_EXT: ${{ matrix.ext }}
         run: |
-          chmod +x "dist/gda${{ matrix.ext }}" || true
-          "dist/gda${{ matrix.ext }}" --version
-          "dist/gda${{ matrix.ext }}" list
+          if [[ "${GDA_TARGET}" == *musl* ]]; then
+            docker run --rm -v "${GITHUB_WORKSPACE}/dist:/dist:ro" alpine:3.20 sh -c '
+              set -e
+              apk add --no-cache libstdc++ >/dev/null 2>&1
+              /dist/gda --version
+              /dist/gda list'
+          else
+            chmod +x "dist/gda${GDA_EXT}" || true
+            "dist/gda${GDA_EXT}" --version
+            "dist/gda${GDA_EXT}" list
+          fi
 
       - name: Package
         shell: bash
