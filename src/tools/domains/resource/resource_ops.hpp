@@ -3,12 +3,28 @@
 
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/variant/variant.hpp>
+#include <cstdint>
 #include <mcp/JsonValue.hpp>
 #include <string>
 
 namespace godot_autopilot {
 namespace resource_ops {
 
+inline constexpr const char kLoadFailSuffix[] =
+    " (file exists but failed to load — not imported or wrong type)";
+
+bool normalize_resource_path(const std::string &raw, std::string &out,
+                             std::string &error, bool allow_root = false);
+std::string describe_target(const mcp::JsonValue &args);
+bool load_resource_or_error(const std::string &path,
+                            godot::Ref<godot::Resource> &out_res,
+                            std::string &out_error,
+                            const std::string &type_hint = {},
+                            const char *load_fail_suffix = kLoadFailSuffix);
+godot::Ref<godot::Resource>
+resolve_resource(const mcp::JsonValue &args, bool &out_has_oid,
+                 int64_t &out_obj_id, std::string &out_error,
+                 std::string *out_warning = nullptr);
 godot::Ref<godot::Resource> resolve_memory_resource(const std::string &name);
 void register_memory_resource(const godot::Ref<godot::Resource> &res,
                               const std::string &name);

@@ -88,6 +88,7 @@ set(GDA_CORE_SOURCES
     src/tools/domains/render/render_ops.cpp
     src/tools/domains/render/render_environment_ops.cpp
     src/tools/domains/resource/resource_ops.cpp
+    src/tools/domains/resource/resource_curve_mesh_ops.cpp
     src/tools/base/runtime_ops.cpp
     src/tools/domains/game/game_ops.cpp
     src/tools/domains/scene/scene_ops.cpp
