@@ -35,7 +35,7 @@ resource: src/tools/
 | 7. 资源与引用事务 | resource_ops、theme_ops | 04、05、06、22、31（theme 落盘） |
 | 8. 脚本与 GDScript 执行 | script_ops、code_exec_ops | 04、18、19、31、39、26/27（宿主） |
 | 9. 瓦片地图 | tilemap_ops、tileset_ops | 14 |
-| 10. 游戏运行时通道 | runtime_ops、runtime_game_ops、scene_tree_ops、debugger_ops | 16、23、24（游戏侧）、35、37、45、46 |
+| 10. 游戏运行时通道 | runtime_ops、game_ops、scene_tree_ops、debugger_ops | 16、23、24（游戏侧）、35、37、45、46 |
 | 11. C# 与 .NET | csharp_bridge_ops、C# 工具链（text/file 域的 C# 工具） | 38、44 |
 | 12. 动态用户工具 | dynamic_spec_store（AutopilotTools 脚本 API） | 26、27 |
 | 13. 可观测性与主线程韧性 | monitor/trace/log 持久化、CommandQueue/dispatch | 29、30、36、41 |

@@ -148,6 +148,12 @@ add_test(NAME version_sync_guard
 add_test(NAME source_manifest_guard
     COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/source_manifest_guard.py")
 
+# ── ctest 注册: 工具域守卫（零依赖，读源码断言域规格与实现同名前缀） ──
+# 断言 src/tools/<X>_tools.hpp 存在同前缀 <X>_ops.cpp / <X>_*_ops.cpp，
+# 且规格文件引用的每个 <ns>::handle_* 都有定义；豁免与判据见 guard/tool_domain_guard.py。
+add_test(NAME tool_domain_guard
+    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/tool_domain_guard.py")
+
 # ── ctest 注册: CLI 契约 mock conformance（纯 stdlib + 自带 mock server）──
 # bun 缺失时测试文件自行打印 SKIP 并 exit 0，ctest 视为通过；
 # 有 bun 时由 bun 驱动 gda.ts 跑全部断言。
@@ -174,3 +180,6 @@ add_test(NAME comment_guard_self_test
 
 add_test(NAME main_thread_guard_self_test
     COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/main_thread_guard.py" --self-test)
+
+add_test(NAME tool_domain_guard_self_test
+    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/tool_domain_guard.py" --self-test)

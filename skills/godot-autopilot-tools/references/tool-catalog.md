@@ -480,7 +480,7 @@ All 451 domain tools of the godot-autopilot MCP server, grouped by their 33 sour
 - `set_script_property` - set a node property without undo entry or validation
 - `get_script_property_list` - list the declared variables of a GDScript file
 
-## Scripts - csharp_tools (6)
+## Scripts - csharp_bridge_tools (6)
 
 - `csharp_get_property` - read a C# member invisible to GDScript through the editor bridge singleton or the game bridge (runtime game)
 - `csharp_set_property` - write a C# member invisible to GDScript through the editor bridge singleton or the game bridge (runtime game), honors allow_non_public like the read path
@@ -499,7 +499,7 @@ All 451 domain tools of the godot-autopilot MCP server, grouped by their 33 sour
 
 - `system_status` - report server version, port, uptime, tool count and queue depth; call it through `call_tool` like any domain tool
 
-## System - system_tools (1)
+## System - log_tools (1)
 
 - `get_game_log_entries` - read the tail of the game's on-disk log file (works without a debug session); an optional case-sensitive substring filter keeps matching lines from the last 2000 and reports the match count
 
