@@ -58,7 +58,7 @@ resource:
 
 工具风险必须可从 `get_tool_detail` 的 `side_effect` 字段识别；新增会产生同类影响的工具必须在 `ToolSpec` 声明对应 `side_effect`（如 `SideEffect::WritesFile`）并按需加 `tool_flags::kMutating`，不得依赖调用方自行猜测。
 
-**`side_effect` 恒非空（10-20 起）**：`side_effect_name()` 对 `SideEffect::None` 返回 `"none"`（此前返回空串），九个枚举值与兜底分支全部返回非空字符串，因此**任何**工具的 `side_effect` 都可被机器读取——「无副作用」表达为字面量 `"none"`，不再是「字段缺失或空串」这种二义状态。调用方判定规则因此简化为：读 `side_effect` 字符串，空值即表示契约缺口，不得用「空串=只读」反推。该不变量由两层测试锁定：L1 `register_all_test.cpp` 的 `EveryToolDetailReportsNonEmptySideEffect` 逐个工具经 `get_tool_detail` 断言非空（另有 `ToolDetailSideEffectIsMachineReadable` 断言 `code_execute` 精确等于 `code_execute`），集成层 `case_40_contract_assert_test.cpp` 复验同一断言（历史 L2 用例 `40_contract_assert.json` 的语义蒸馏承接）。
+**`side_effect` 恒非空（10-20 起）**：`side_effect_name()` 对 `SideEffect::None` 返回 `"none"`（此前返回空串），九个枚举值与兜底分支全部返回非空字符串，因此**任何**工具的 `side_effect` 都可被机器读取——「无副作用」表达为字面量 `"none"`，不再是「字段缺失或空串」这种二义状态。调用方判定规则因此简化为：读 `side_effect` 字符串，空值即表示契约缺口，不得用「空串=只读」反推。该不变量由两层测试锁定：L1 `register_all_test.cpp` 的 `EveryToolDetailReportsNonEmptySideEffect` 逐个工具经 `get_tool_detail` 断言非空（另有 `ToolDetailSideEffectIsMachineReadable` 断言 `code_execute` 精确等于 `code_execute`），集成层 `tool_detail_contract_test.cpp` 复验同一断言（历史 L2 用例 `40_contract_assert.json` 的语义蒸馏承接）。
 
 | 风险类 | 机器可读标记/范围 | 处理要求 |
 |---|---|---|
