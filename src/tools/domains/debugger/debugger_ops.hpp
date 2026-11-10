@@ -67,11 +67,28 @@ public:
     return std::find(ready_session_ids_.begin(), ready_session_ids_.end(),
                      id) != ready_session_ids_.end();
   }
+  bool is_session_scene_ready(int32_t id) const {
+    std::lock_guard<std::mutex> lock(session_mtx_);
+    return std::find(scene_ready_session_ids_.begin(),
+                     scene_ready_session_ids_.end(),
+                     id) != scene_ready_session_ids_.end();
+  }
+  bool mark_session_scene_ready(int32_t id) {
+    std::lock_guard<std::mutex> lock(session_mtx_);
+    if (std::find(scene_ready_session_ids_.begin(),
+                  scene_ready_session_ids_.end(),
+                  id) != scene_ready_session_ids_.end()) {
+      return false;
+    }
+    scene_ready_session_ids_.push_back(id);
+    return true;
+  }
   void forget_ready_session(int32_t session_id);
 
 private:
   std::vector<int32_t> session_ids_;
   std::vector<int32_t> ready_session_ids_;
+  std::vector<int32_t> scene_ready_session_ids_;
   mutable std::mutex session_mtx_;
 };
 

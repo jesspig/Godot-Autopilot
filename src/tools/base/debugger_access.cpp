@@ -79,7 +79,17 @@ int32_t debugger_ready_session_count() {
 }
 
 int32_t debugger_scene_ready_session_count() {
-  return debugger_ready_session_count();
+  auto *plugin = debugger_ops::DebugCapturePlugin::get_instance();
+  if (!plugin)
+    return 0;
+  int32_t count = 0;
+  for (int32_t id : plugin->get_session_ids()) {
+    auto session = plugin->get_session(id);
+    if (session.is_valid() && session->is_active() &&
+        plugin->is_session_scene_ready(id))
+      ++count;
+  }
+  return count;
 }
 
 bool debugger_broadcast_engine_command(const godot::String &command,
