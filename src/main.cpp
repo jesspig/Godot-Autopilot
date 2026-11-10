@@ -20,6 +20,7 @@
 #include <godot_cpp/variant/utility_functions.hpp>
 
 #include "core/command_queue.hpp"
+#include "core/transport/ipc_transport.hpp"
 #include "core/export_guard.hpp"
 #include "core/storage/gda_home.hpp"
 #include "core/transport/http_transport_ext.hpp"
@@ -341,6 +342,7 @@ void GodotAutopilotPlugin::_process(double delta) {
   godot_autopilot::LogPersist::instance().flush_on_main_thread();
   s_queue.drain();
   godot_autopilot::http_transport_instance().pump();
+  godot_autopilot::ipc_transport::ipc_transport_instance().pump();
   if (log_dock) {
     log_dock->poll_new_entries();
   }

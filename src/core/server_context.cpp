@@ -34,6 +34,11 @@
 #include "core/transport/godot_transport.hpp"
 #include "core/transport/http_transport.hpp"
 #include "core/transport/http_transport_ext.hpp"
+#include "core/transport/ipc_endpoint.hpp"
+#include "core/transport/ipc_transport.hpp"
+#include "core/storage/project_store.hpp"
+#include <cstdlib>
+#include <filesystem>
 #include "core/storage/instance_guard.hpp"
 #include "core/storage/instance_registry.hpp"
 #include "core/transport/mcp_http_shim.hpp"
@@ -220,6 +225,41 @@ bool ServerContext::start() {
     LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
                               "MCP server initializing: host=" + host_ +
                                   " port=" + std::to_string(port_));
+
+    {
+      const std::string project_root = util::api_host_project_root();
+      std::string project_name;
+      const std::size_t slash = project_root.find_last_of("/\\");
+      if (slash != std::string::npos && slash + 1 < project_root.size()) {
+        project_name = project_root.substr(slash + 1);
+      }
+      const std::filesystem::path run_dir =
+          std::filesystem::path(ProjectStore::root_dir()) / "run";
+      std::filesystem::path fallback_dir = run_dir;
+#ifdef _WIN32
+      if (const char *local = std::getenv("LOCALAPPDATA");
+          local != nullptr && *local != '\0') {
+        fallback_dir = std::filesystem::path(local) / "gda";
+      }
+#endif
+      std::error_code ec;
+      std::filesystem::create_directories(run_dir, ec);
+      const std::string socket_path = ipc_endpoint::derive_socket_path(
+          project_name, project_root, run_dir.string(), fallback_dir.string());
+      std::filesystem::create_directories(
+          std::filesystem::path(socket_path).parent_path(), ec);
+      std::filesystem::remove(socket_path, ec);
+      std::string ipc_error;
+      if (ipc_transport::ipc_transport_instance().listen(socket_path,
+                                                         ipc_error)) {
+        LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
+                                  "IPC transport listening: " + socket_path);
+      } else {
+        LogSystem::instance().log(
+            LogLevel::Warning, LogCategory::Transport,
+            "IPC transport unavailable (TCP only): " + ipc_error);
+      }
+    }
 
     transport_ = godot_transport_reset();
 
@@ -495,6 +535,7 @@ void ServerContext::remove_instance_record() {
 }
 
 void ServerContext::stop() {
+  ipc_transport::ipc_transport_instance().stop();
   if (!running_ && !server_ && !transport_) {
     http_transport_instance().stop();
     return;

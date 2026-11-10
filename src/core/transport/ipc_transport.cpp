@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cerrno>
 #include <cstring>
+#include <filesystem>
+#include <system_error>
 
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
@@ -168,6 +170,10 @@ void IpcTransport::stop() {
   if (listen_handle_ != kInvalidSocket) {
     close_socket(listen_handle_);
     listen_handle_ = kInvalidSocket;
+  }
+  if (!bound_path_.empty()) {
+    std::error_code ec;
+    std::filesystem::remove(bound_path_, ec);
   }
   bound_path_.clear();
 }
