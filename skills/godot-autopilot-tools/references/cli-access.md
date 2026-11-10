@@ -38,6 +38,18 @@ Offline family — these work with no running instance and no MCP client:
 | `tools list` / `tools search <query>` / `tools describe <tool>` | Offline tool catalog from the cached `/api/tools` snapshot |
 | `projects` | List known Godot projects from the plugin and CLI registries |
 
+Example — no running instance and no MCP client required:
+
+```
+gda skills list
+[{"name":"godot-autopilot","path":".../skills/godot-autopilot","files":2}, ... 9 books]
+
+gda skills show godot-autopilot-tools
+---
+name: godot-autopilot-tools
+description: "Calling the GDA (godot-autopilot) plugin: ..."
+```
+
 Calling family — meta tools are called directly, every domain tool goes through `call_tool`:
 
 | Command | Meaning |
