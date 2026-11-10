@@ -2195,6 +2195,18 @@ void register_listener() {
     g_registered = true;
 
     {
+      bool scene_ready = false;
+      if (auto *main_loop = godot::Engine::get_singleton()->get_main_loop()) {
+        if (auto *tree = godot::Object::cast_to<godot::SceneTree>(main_loop)) {
+          scene_ready = tree->get_current_scene() != nullptr;
+        }
+      }
+      LogSystem::instance().log(
+          LogLevel::Info, LogCategory::System,
+          std::string("game bridge ready observation: scene_ready=") +
+              (scene_ready ? "true" : "false"));
+    }
+    {
       JV body(JV::object_tag);
       body[GDA_FIELD_READY] = JV(true);
       append_activity_fields(body);
