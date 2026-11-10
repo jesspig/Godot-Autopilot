@@ -244,7 +244,7 @@ uv run main.py test --single migration_guard   # 单跑（ctest -R）
 
 ### 进程内边界（硬边界）
 
-1. **栈上 godot 对象构造**：handler 在参数校验**前**构造含 `godot::Variant` / `godot::Ref<…>` 的栈对象 → 测试进程 SEH——本仓 godot-cpp 的 `Variant()`/`~Variant()` 无条件调用 gdextension 接口指针，测试进程 GDExtension 接口未初始化即空函数指针调用（实证：`handle_code_execute` 的 `ExecContext`，`.handoff/evidence/T-02/mapping.md` R-01-03）。
+1. **栈上 godot 对象构造**：handler 在参数校验**前**构造含 `godot::Variant` / `godot::Ref<…>` 的栈对象 → 测试进程 SEH——本仓 godot-cpp 的 `Variant()`/`~Variant()` 无条件调用 gdextension 接口指针，测试进程 GDExtension 接口未初始化即空函数指针调用（实证：`handle_code_execute` 的 `ExecContext`，`.handoff/evidence/T-02/mapping.md` R-01-03）。2026-11-10 起，`VariantJsonStrictTest.*Accepts*` 的 12 个用例按此边界从程序化测试中移除（由 e2e 覆盖）。
 2. **引擎单例**：`godot::<Class>::get_singleton()` 同为硬边界（`ProjectSettings`/`EditorInterface`/`InputMap` 等，生成 getter 走同一接口指针；`.handoff/evidence/T-04/mapping-12-16-17-39.md` R-04-01、`T-05/mapping-23-24-35-37-40.md` R-01-02）。凡依赖上述两条路径的断言不可迁集成层，已划回 e2e（对照表各 R-01 条目）。
 3. **运行期通道错误文案**：通道错误依赖编辑器插件实例（`DebugCapturePlugin::s_instance` 仅编辑器入口置位），进程内恒为 `debugger capture plugin not initialized`——凡以 `game not running: …` 等编辑器态精确全串为 expect 的断言不可迁（进程内无法复现该文案）；JSON 仅声明 error 非空的步骤可迁（进程内通道错误满足声明）。
 4. **HTTP socket 层**：传输栈绑定 Godot 引擎 `TCPServer`/`StreamPeerTCP`，进程内无法监听（判定记录 `.handoff/evidence/T-03/verdict.md`：degrade；FR-03 降级决议草案待用户确认）——集成层无真实 HTTP 监听试点，HTTP 解析/shim 头校验/路由的纯逻辑面由 单元测试 与集成层分担，端到端 HTTP 往返随 `gda-e2e-testing` 自然发生。
