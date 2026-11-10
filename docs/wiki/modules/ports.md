@@ -7,7 +7,7 @@ tags:
   - 端口
   - 实例登记
   - 发现链
-timestamp: "2026-10-23T02:39:34+08:00"
+timestamp: "2026-11-10T22:12:04+08:00"
 resource:
   - src/core/transport/port_resolver.cpp
   - src/core/transport/port_recovery.hpp
@@ -22,7 +22,7 @@ resource:
 
 # 端口与实例登记
 
-> 审计日期：2026-10-23（**10-23 随控制面文档同步批次增补「控制面端口」小节**——`gda serve` 默认监听 `127.0.0.1:9700`（`cli/src/commands/serve.ts` 的 `DEFAULT_CONTROL_PORT`），只允许环回绑定，端口独立于实例端口且不写实例登记；9700 与插件首选 9527、CLI `start` 自启 9530–9599、插件保留段 19900–19999 与自动分配区间 20000–29999 均不重叠）2026-10-22（**10-22 随本地收口批次增补「运行时边界」小节**——退出时若有未响应「队列关闭」的处理请求，收割会等它，最坏把退出拖到约 30 秒（崩溃换成慢退出）；进程被强杀时监听端口不立即释放、实例登记会残留，下次启动自动清理同工程残留登记并给出提示，但端口要等占用它的进程真正退出才彻底释放；并明确「同一工程不要同时打开两个编辑器」——第二个编辑器会在扩展加载阶段因 Godot 的扩展库临时副本被占用而可能静默崩溃，插件代码此时尚未运行、给不出提示，插件侧的同工程实例检测是第二道防线）2026-10-21（随开放接口面落地批次首建——本批把「端口」从单一 MCP 端口扩为**一个端口承载两个端点**（`/mcp` 与 `/api`），端口解析改为「环境变量 → 工程级配置偏好 → 自动分配」三级，自动分配有确定的候选序列；实例登记迁到集中根下的工程级目录并汇总出全局索引，供 CLI 发现链使用。实现见 [`src/core/transport/port_resolver.cpp`](../../../src/core/transport/port_resolver.cpp) 与 [`src/core/server_context.cpp`](../../../src/core/server_context.cpp)，登记见 [`src/core/storage/instance_registry.cpp`](../../../src/core/storage/instance_registry.cpp) 与 [`src/core/storage/project_store.cpp`](../../../src/core/storage/project_store.cpp)。本轮校订补三处接线事实：① 探测上限 256 含首选 9527 在内，失败信息形如 `no free port candidate bound after N probes: <原因>`；② CLI 本地注册表的 state dir 组成补 `instances.lock` 与 `logs/`；③ 令牌字段名改为不加反引号的自然表述，避免与代码内 `api_token` 字段混淆）。
+> 审计日期：2026-11-10（随 0.3.1 升版同步——实例登记示例 `version` 字段由 0.3.0 改为 **0.3.1**）2026-10-23（**10-23 随控制面文档同步批次增补「控制面端口」小节**——`gda serve` 默认监听 `127.0.0.1:9700`（`cli/src/commands/serve.ts` 的 `DEFAULT_CONTROL_PORT`），只允许环回绑定，端口独立于实例端口且不写实例登记；9700 与插件首选 9527、CLI `start` 自启 9530–9599、插件保留段 19900–19999 与自动分配区间 20000–29999 均不重叠）2026-10-22（**10-22 随本地收口批次增补「运行时边界」小节**——退出时若有未响应「队列关闭」的处理请求，收割会等它，最坏把退出拖到约 30 秒（崩溃换成慢退出）；进程被强杀时监听端口不立即释放、实例登记会残留，下次启动自动清理同工程残留登记并给出提示，但端口要等占用它的进程真正退出才彻底释放；并明确「同一工程不要同时打开两个编辑器」——第二个编辑器会在扩展加载阶段因 Godot 的扩展库临时副本被占用而可能静默崩溃，插件代码此时尚未运行、给不出提示，插件侧的同工程实例检测是第二道防线）2026-10-21（随开放接口面落地批次首建——本批把「端口」从单一 MCP 端口扩为**一个端口承载两个端点**（`/mcp` 与 `/api`），端口解析改为「环境变量 → 工程级配置偏好 → 自动分配」三级，自动分配有确定的候选序列；实例登记迁到集中根下的工程级目录并汇总出全局索引，供 CLI 发现链使用。实现见 [`src/core/transport/port_resolver.cpp`](../../../src/core/transport/port_resolver.cpp) 与 [`src/core/server_context.cpp`](../../../src/core/server_context.cpp)，登记见 [`src/core/storage/instance_registry.cpp`](../../../src/core/storage/instance_registry.cpp) 与 [`src/core/storage/project_store.cpp`](../../../src/core/storage/project_store.cpp)。本轮校订补三处接线事实：① 探测上限 256 含首选 9527 在内，失败信息形如 `no free port candidate bound after N probes: <原因>`；② CLI 本地注册表的 state dir 组成补 `instances.lock` 与 `logs/`；③ 令牌字段名改为不加反引号的自然表述，避免与代码内 `api_token` 字段混淆）。
 > 统计口径：端口号与候选区间以 [`src/core/config.hpp`](../../../src/core/config.hpp) 的常量为事实标准；数值以运行时统计为准，见 [测试体系](../tests.md)「数值核算总表」。
 
 ## 端口模型：一个端口，两个端点
@@ -108,7 +108,7 @@ resource:
   },
   "gda_home": "C:/Users/<user>",
   "started_at": 1760000000000,
-  "version": "0.3.0"
+  "version": "0.3.1"
 }
 ```
 
