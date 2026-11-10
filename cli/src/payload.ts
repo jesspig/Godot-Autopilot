@@ -55,12 +55,27 @@ function formatRpcError(info: RpcErrorInfo): string {
   return `tool failure: ${body}${code}`;
 }
 
+function hasFailureFields(record: Record<string, unknown>): boolean {
+  if ("error" in record) return true;
+  const structured = record.structured_error;
+  if (structured !== null && typeof structured === "object" && !Array.isArray(structured)) {
+    const code = (structured as Record<string, unknown>).code;
+    if (typeof code === "string" && code !== "") return true;
+  }
+  return record.runtime_error === true;
+}
+
 function hasInnerError(payload: unknown): boolean {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return false;
   const record = payload as Record<string, unknown>;
-  if ("error" in record) return true;
+  if (hasFailureFields(record)) return true;
   const innerResult = record.result !== undefined ? record.result : record.data;
-  if (innerResult && typeof innerResult === "object" && !Array.isArray(innerResult) && "error" in innerResult) {
+  if (
+    innerResult &&
+    typeof innerResult === "object" &&
+    !Array.isArray(innerResult) &&
+    hasFailureFields(innerResult as Record<string, unknown>)
+  ) {
     return true;
   }
   if (Array.isArray(record.results)) {
@@ -68,7 +83,8 @@ function hasInnerError(payload: unknown): boolean {
       (item) =>
         item !== null &&
         typeof item === "object" &&
-        (((item as Record<string, unknown>).status === "error") || "error" in item),
+        (((item as Record<string, unknown>).status === "error") ||
+          hasFailureFields(item as Record<string, unknown>)),
     );
   }
   return false;

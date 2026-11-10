@@ -360,6 +360,59 @@ describe("toolFailed", () => {
     expect(code).toBe(ExitCode.ToolFailure);
   });
 
+  test("载荷 runtime_error=true 导致 exit 1", async () => {
+    const { port } = recordingServer(() =>
+      sseResponse(
+        okEnvelope([textContent('{"result":{"value":null},"runtime_error":true,"error_details":"boom"}')]),
+      ),
+    );
+    const cap = captureOutput();
+    const code = await ping([], { portText: String(port) });
+    cap.restore();
+    expect(code).toBe(ExitCode.ToolFailure);
+    expect(cap.stderr()).toContain("tool-level failure");
+  });
+
+  test("载荷 structured_error.code 导致 exit 1", async () => {
+    const { port } = recordingServer(() =>
+      sseResponse(okEnvelope([textContent('{"structured_error":{"code":"when_timeout","timeout_ms":4000}}')])),
+    );
+    const cap = captureOutput();
+    const code = await ping([], { portText: String(port) });
+    cap.restore();
+    expect(code).toBe(ExitCode.ToolFailure);
+  });
+
+  test("载荷 structured_error 无 code 不判失败", async () => {
+    const { port } = recordingServer(() =>
+      sseResponse(okEnvelope([textContent('{"structured_error":{"action":"retry"},"result":{"value":1}}')])),
+    );
+    const cap = captureOutput();
+    const code = await ping([], { portText: String(port) });
+    cap.restore();
+    expect(code).toBe(ExitCode.Success);
+  });
+
+  test("runtime_error 非布尔 true 不判失败", async () => {
+    const { port } = recordingServer(() =>
+      sseResponse(okEnvelope([textContent('{"runtime_error":"true","result":{"value":1}}')])),
+    );
+    const cap = captureOutput();
+    const code = await ping([], { portText: String(port) });
+    cap.restore();
+    expect(code).toBe(ExitCode.Success);
+  });
+
+  test("正常载荷不判失败并 exit 0", async () => {
+    const { port } = recordingServer(() =>
+      sseResponse(okEnvelope([textContent('{"result":{"value":1}}')])),
+    );
+    const cap = captureOutput();
+    const code = await ping([], { portText: String(port) });
+    cap.restore();
+    expect(code).toBe(ExitCode.Success);
+  });
+
   test("JSON-RPC 顶层 error 信封导致 exit 1 并透出服务端消息", async () => {
     const { port } = recordingServer(() =>
       sseResponse({ jsonrpc: "2.0", id: 1, error: { code: -32602, message: "mock top-level error" } }),
