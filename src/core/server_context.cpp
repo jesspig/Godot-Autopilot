@@ -14,6 +14,7 @@
 #include "core/observability/monitor.hpp"
 #include <cstdlib>
 #include <chrono>
+#include <thread>
 #include <exception>
 #include <map>
 #include <string_view>
@@ -262,6 +263,40 @@ bool ServerContext::start() {
     }
 
     transport_ = godot_transport_reset();
+
+    ipc_transport::ipc_transport_instance().set_line_handler(
+        [transport = transport_](std::uint64_t connection_id,
+                                 const std::string &line) {
+          const std::string connection =
+              "ipc-" + std::to_string(connection_id);
+          const mcp_wire::ParsedRequest parsed = mcp_wire::parse_request(line);
+          if (!parsed.ok) {
+            ipc_transport::ipc_transport_instance().queue_line(
+                connection_id,
+                mcp_wire::build_error_response_text(-32700, parsed.error));
+            return;
+          }
+          std::string error;
+          if (!transport || !transport->submit(parsed, connection, error)) {
+            ipc_transport::ipc_transport_instance().queue_line(
+                connection_id,
+                mcp_wire::build_error_response_text(-32603, error));
+            return;
+          }
+          if (parsed.is_notification) {
+            return;
+          }
+          const std::string request_id = parsed.request_id;
+          std::thread([transport, connection, request_id, connection_id]() {
+            std::string response;
+            if (transport->await_response(
+                    connection, request_id, response,
+                    std::chrono::milliseconds(60000))) {
+              ipc_transport::ipc_transport_instance().queue_line(
+                  connection_id, std::move(response));
+            }
+          }).detach();
+        });
 
     mcp::ServerOptions opts;
     opts.server_info = mcp::Implementation{"godot-autopilot", GDA_VERSION};

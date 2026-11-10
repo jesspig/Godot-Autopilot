@@ -2,9 +2,12 @@
 
 #include <algorithm>
 #include <cerrno>
+#include <chrono>
 #include <cstring>
 #include <filesystem>
 #include <system_error>
+
+#include "core/transport/ipc_framing.hpp"
 
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
@@ -183,7 +186,40 @@ void IpcTransport::pump() {
     return;
   }
   accept_pending();
+  drain_outbox();
   service_connections();
+  flush_writes();
+}
+
+void IpcTransport::set_line_handler(LineHandler handler) {
+  line_handler_ = std::move(handler);
+}
+
+void IpcTransport::queue_line(std::uint64_t connection_id, std::string text) {
+  if (text.empty()) {
+    return;
+  }
+  if (text.back() != '\n') {
+    text.push_back('\n');
+  }
+  std::lock_guard<std::mutex> lock(outbox_mutex_);
+  outbox_.emplace_back(connection_id, std::move(text));
+}
+
+void IpcTransport::drain_outbox() {
+  std::vector<std::pair<std::uint64_t, std::string>> pending;
+  {
+    std::lock_guard<std::mutex> lock(outbox_mutex_);
+    pending.swap(outbox_);
+  }
+  for (auto &entry : pending) {
+    for (Connection &connection : connections_) {
+      if (connection.id == entry.first) {
+        connection.write_buffer += entry.second;
+        break;
+      }
+    }
+  }
 }
 
 void IpcTransport::accept_pending() {
@@ -244,6 +280,19 @@ void IpcTransport::service_connections() {
     }
     if (closed) {
       close_connection(connection);
+      continue;
+    }
+    const ipc_framing::ExtractedFrames frames =
+        ipc_framing::extract_frames(connection.buffer, kMaxIpcConnectionBuffer);
+    connection.buffer = frames.remainder;
+    if (frames.overflow) {
+      close_connection(connection);
+      continue;
+    }
+    for (const std::string &frame : frames.frames) {
+      if (line_handler_) {
+        line_handler_(connection.id, frame);
+      }
     }
   }
   const std::size_t before = connections_.size();
@@ -255,6 +304,28 @@ void IpcTransport::service_connections() {
       connections_.end());
   if (before > connections_.size()) {
     stats_.closed += static_cast<std::uint64_t>(before - connections_.size());
+  }
+}
+
+void IpcTransport::flush_writes() {
+  for (Connection &connection : connections_) {
+    std::size_t budget = 65536;
+    while (!connection.write_buffer.empty() && budget > 0) {
+      const std::size_t want =
+          std::min<std::size_t>(connection.write_buffer.size(), budget);
+      const int sent = ::send(to_native(connection.handle),
+                              connection.write_buffer.data(),
+                              static_cast<int>(want), 0);
+      if (sent <= 0) {
+        const int code = last_socket_error();
+        if (!error_is_would_block(code)) {
+          close_connection(connection);
+        }
+        break;
+      }
+      connection.write_buffer.erase(0, static_cast<std::size_t>(sent));
+      budget -= static_cast<std::size_t>(sent);
+    }
   }
 }
 

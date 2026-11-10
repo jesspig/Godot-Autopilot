@@ -3,7 +3,10 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
+#include <mutex>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace godot_autopilot {
@@ -45,15 +48,23 @@ public:
   std::size_t connection_count() const;
   const IpcConnectionStats &stats() const;
 
+  using LineHandler = std::function<void(std::uint64_t connection_id,
+                                         const std::string &line)>;
+  void set_line_handler(LineHandler handler);
+  void queue_line(std::uint64_t connection_id, std::string text);
+
 private:
   struct Connection {
     socket_handle handle{kInvalidSocket};
     std::uint64_t id{0};
     std::string buffer;
+    std::string write_buffer;
   };
 
   void accept_pending();
   void service_connections();
+  void drain_outbox();
+  void flush_writes();
   void close_connection(Connection &connection);
   void close_all();
 
@@ -62,6 +73,9 @@ private:
   std::vector<Connection> connections_;
   std::uint64_t next_connection_id_{1};
   IpcConnectionStats stats_;
+  LineHandler line_handler_;
+  std::mutex outbox_mutex_;
+  std::vector<std::pair<std::uint64_t, std::string>> outbox_;
 };
 
 IpcTransport &ipc_transport_instance();
