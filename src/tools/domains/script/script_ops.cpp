@@ -17,6 +17,7 @@
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/gd_script.hpp>
 #include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/resource_saver.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
@@ -61,6 +62,27 @@ std::string fnv1a64_hex(const std::string &bytes) {
   return out;
 }
 
+void collect_autoload_names(std::vector<std::string> &out) {
+  out.clear();
+  godot::ProjectSettings *settings = godot::ProjectSettings::get_singleton();
+  if (settings == nullptr) {
+    return;
+  }
+  const std::string prefix = "autoload/";
+  godot::TypedArray<godot::Dictionary> props = settings->get_property_list();
+  for (int64_t i = 0; i < props.size(); ++i) {
+    godot::Dictionary dict = props[i];
+    if (!dict.has("name")) {
+      continue;
+    }
+    const std::string setting = util::to_std(dict["name"].operator godot::String());
+    if (setting.size() > prefix.size() &&
+        setting.compare(0, prefix.size(), prefix) == 0) {
+      out.push_back(setting.substr(prefix.size()));
+    }
+  }
+}
+
 bool try_compile_source(const std::string &source_code,
                         const std::string &path_for_cache,
                         std::string &error_out) {
@@ -81,6 +103,10 @@ bool try_compile_source(const std::string &source_code,
         debugger_ops::capture_new_error_text(compile_log_before);
     if (!compile_err.empty()) {
       message += "\n" + gdscript_wrap::truncate_capture_text(compile_err);
+      std::vector<std::string> autoload_names;
+      collect_autoload_names(autoload_names);
+      message +=
+          gdscript_wrap::autoload_global_hint(compile_err, autoload_names);
     }
     error_out = message;
     return false;

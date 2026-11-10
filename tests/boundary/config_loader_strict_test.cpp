@@ -5,6 +5,7 @@
 #include <string>
 
 #include "support/config_loader.hpp"
+#include "support/test_temp.hpp"
 #include "util/owned_exception.hpp"
 
 namespace {
@@ -13,7 +14,7 @@ using godot_autopilot::RuntimeError;
 
 gda_test::TestCase load_case_with_requires(const std::string &requires_json) {
   namespace fs = std::filesystem;
-  const fs::path dir = fs::temp_directory_path() / "gda_config_loader_test";
+  const fs::path dir = gda_test::test_temp_root() / "gda_config_loader_test";
   fs::create_directories(dir);
   const fs::path file = dir / "requires_probe.json";
   {
@@ -29,7 +30,7 @@ gda_test::TestCase load_case_with_requires(const std::string &requires_json) {
 
 gda_test::TestCase load_case_text(const std::string &json) {
   namespace fs = std::filesystem;
-  const fs::path dir = fs::temp_directory_path() / "gda_config_loader_test";
+  const fs::path dir = gda_test::test_temp_root() / "gda_config_loader_test";
   fs::create_directories(dir);
   const fs::path file = dir / "strict_probe.json";
   {

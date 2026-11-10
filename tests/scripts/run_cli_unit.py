@@ -5,6 +5,7 @@ bun 缺失时打印 SKIP 并 exit 0（ctest 视为通过）；存在时以仓库
 执行 bun test cli/tests，stdout/stderr 与退出码原样透传。
 """
 
+import os
 import shutil
 import subprocess
 import sys
@@ -18,7 +19,8 @@ def main() -> int:
     if bun is None:
         print("SKIP: bun not found on PATH, cli unit tests skipped")
         return 0
-    proc = subprocess.run([bun, "test", "cli/tests"], cwd=ROOT)
+    env = {**os.environ, "GDA_TEST_TMPDIR": str(ROOT / "build" / "cli-test-tmp")}
+    proc = subprocess.run([bun, "test", "cli/tests"], cwd=ROOT, env=env)
     return proc.returncode
 
 

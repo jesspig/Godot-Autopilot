@@ -152,7 +152,7 @@ mcp::JsonValue call_handler_impl(const std::string &name,
                        " — use search_tools to discover available "
                        "tools");
   }
-  bool has_error = result.IsObject() && result.Find("error") != nullptr;
+  const bool has_error = !spec_detail::verdict_of(result).ok;
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
       "call_tool: " + name + " -> " + (has_error ? "error" : "ok"));
   tools::take_queued_wait_ms();
@@ -536,6 +536,9 @@ mcp::JsonValue run_main_thread_slice(CommandQueue &queue, const std::string &lab
 
 mcp::JsonValue resolve_deferred_wait(const std::string &name,
                                       mcp::JsonValue result) {
+  std::string deferred_trace_key;
+  const bool has_deferred_trace =
+      spec_detail::deferred_key_of(result, &deferred_trace_key);
   int64_t job_id = 0;
   const bool is_game_job =
       runtime_ops::payload_is_game_job(result, &job_id);
@@ -592,6 +595,9 @@ mcp::JsonValue resolve_deferred_wait(const std::string &name,
     mcp::JsonValue wrapped(mcp::JsonValue::object_tag);
     wrapped["result"] = std::move(result);
     result = std::move(wrapped);
+  }
+  if (has_deferred_trace) {
+    spec_detail::finish_deferred_trace(deferred_trace_key, result);
   }
   return result;
 }

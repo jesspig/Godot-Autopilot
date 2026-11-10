@@ -1,4 +1,5 @@
 #include "core/storage/instance_registry.hpp"
+#include "support/test_temp.hpp"
 
 #include <gtest/gtest.h>
 
@@ -116,7 +117,7 @@ TEST(InstanceRegistryTest, NonObjectDocumentFailsValidation) {
 
 TEST(InstanceRegistryTest, WriteListRemoveRoundTrip) {
   const std::filesystem::path base =
-      std::filesystem::temp_directory_path() / "gda_instance_registry_test";
+      gda_test::test_temp_root() / "gda_instance_registry_test";
   std::error_code ec;
   std::filesystem::remove_all(base, ec);
   ASSERT_TRUE(std::filesystem::create_directories(base, ec));

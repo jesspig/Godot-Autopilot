@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 
 import type { GlobalOptions } from "./args";
@@ -55,12 +56,27 @@ function formatRpcError(info: RpcErrorInfo): string {
   return `tool failure: ${body}${code}`;
 }
 
+function hasFailureFields(record: Record<string, unknown>): boolean {
+  if ("error" in record) return true;
+  const structured = record.structured_error;
+  if (structured !== null && typeof structured === "object" && !Array.isArray(structured)) {
+    const code = (structured as Record<string, unknown>).code;
+    if (typeof code === "string" && code !== "") return true;
+  }
+  return record.runtime_error === true;
+}
+
 function hasInnerError(payload: unknown): boolean {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return false;
   const record = payload as Record<string, unknown>;
-  if ("error" in record) return true;
+  if (hasFailureFields(record)) return true;
   const innerResult = record.result !== undefined ? record.result : record.data;
-  if (innerResult && typeof innerResult === "object" && !Array.isArray(innerResult) && "error" in innerResult) {
+  if (
+    innerResult &&
+    typeof innerResult === "object" &&
+    !Array.isArray(innerResult) &&
+    hasFailureFields(innerResult as Record<string, unknown>)
+  ) {
     return true;
   }
   if (Array.isArray(record.results)) {
@@ -68,7 +84,8 @@ function hasInnerError(payload: unknown): boolean {
       (item) =>
         item !== null &&
         typeof item === "object" &&
-        (((item as Record<string, unknown>).status === "error") || "error" in item),
+        (((item as Record<string, unknown>).status === "error") ||
+          hasFailureFields(item as Record<string, unknown>)),
     );
   }
   return false;
@@ -195,6 +212,15 @@ export function assertCallFamilyUsage(command: string, opts: GlobalOptions): voi
   }
 }
 
+function payloadDiagnostics(text: string): string {
+  const bytes = Buffer.byteLength(text, "utf8");
+  const digest = createHash("sha256").update(text, "utf8").digest("hex").slice(0, 8);
+  return `received ${bytes} bytes, sha256:${digest}, head:${text.slice(0, 40)}`;
+}
+
+const ARGS_FILE_SUGGESTION =
+  "pass the payload with --args-file PATH when it is longer than a few hundred bytes or contains dense escapes";
+
 export function loadToolArguments(opts: GlobalOptions): Record<string, unknown> {
   if (opts.argsJson !== undefined && opts.argsFile !== undefined) {
     throw new CliError(ExitCode.Usage, "use only one of --args and --args-file.");
@@ -204,7 +230,10 @@ export function loadToolArguments(opts: GlobalOptions): Record<string, unknown> 
     try {
       args = JSON.parse(opts.argsJson);
     } catch {
-      throw new CliError(ExitCode.Usage, "--args is not valid JSON.");
+      throw new CliError(
+        ExitCode.Usage,
+        `--args is not valid JSON (${payloadDiagnostics(opts.argsJson)}). ${ARGS_FILE_SUGGESTION}`,
+      );
     }
   } else if (opts.argsFile !== undefined) {
     let text: string;
@@ -216,7 +245,10 @@ export function loadToolArguments(opts: GlobalOptions): Record<string, unknown> 
     try {
       args = JSON.parse(text);
     } catch {
-      throw new CliError(ExitCode.Usage, `--args-file does not contain valid JSON: ${opts.argsFile}`);
+      throw new CliError(
+        ExitCode.Usage,
+        `--args-file does not contain valid JSON: ${opts.argsFile} (${payloadDiagnostics(text)}). ${ARGS_FILE_SUGGESTION}`,
+      );
     }
   }
   if (args === null || typeof args !== "object" || Array.isArray(args)) {
