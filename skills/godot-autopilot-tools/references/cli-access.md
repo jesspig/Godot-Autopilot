@@ -48,7 +48,14 @@ gda skills show godot-autopilot-tools
 ---
 name: godot-autopilot-tools
 description: "Calling the GDA (godot-autopilot) plugin: ..."
+
+gda tools list
+{"generated_at":"2026-11-10T07:00:00.000Z","version":"0.3.0","tools":[{"name":"create_scene_node",...}, ...]}
+
+gda tools search capture
+{"generated_at":"...","version":"0.3.0","tools":[{"name":"capture_editor_viewport",...}]}
 ```
+The `tools` family reads a catalog cached by the last successful `gda api list` (or a fresh `gda tools ... --refresh`), so it works with no running instance.
 
 Calling family — meta tools are called directly, every domain tool goes through `call_tool`:
 

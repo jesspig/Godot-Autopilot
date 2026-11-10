@@ -12,6 +12,7 @@ import {
   type ApiResponse,
 } from "../api/client";
 import { CliError, ExitCode } from "../errors";
+import { writeCatalog } from "../catalog";
 import {
   deriveEndpoint,
   endpointBaseUrl,
@@ -81,7 +82,27 @@ async function runList(positional: string[], opts: GlobalOptions): Promise<numbe
   const context = await prepareApiContext(opts);
   const suffix = `${API_TOOLS_SEGMENT}${buildQueryString(filter)}`;
   const response = await apiRequest("GET", suffix, undefined, requestOptions(context, opts));
+  if (mapStatusToExitCode(response.status) === ExitCode.Success && isEmptyFilter(filter)) {
+    const located = locateToolArray(response.body);
+    writeCatalog(located === null ? [] : located.items);
+  }
   return emitResponse(response, opts, applyFilter(response.body, filter));
+}
+
+export async function fetchAllTools(opts: GlobalOptions): Promise<unknown[]> {
+  const context = await prepareApiContext(opts);
+  const response = await apiRequest("GET", API_TOOLS_SEGMENT, undefined, requestOptions(context, opts));
+  const mapped = mapStatusToExitCode(response.status);
+  if (mapped !== ExitCode.Success) {
+    const detail = extractServerError(response.body, response.text);
+    throw new CliError(
+      mapped,
+      `HTTP ${response.status}${detail === null ? "" : `: ${detail}`}`,
+      statusAdvice(response.status),
+    );
+  }
+  const located = locateToolArray(response.body);
+  return located === null ? [] : located.items;
 }
 
 async function runDescribe(positional: string[], opts: GlobalOptions): Promise<number> {
@@ -146,8 +167,7 @@ function parseTags(text: string | undefined): string[] | undefined {
   return tags.length === 0 ? undefined : tags;
 }
 
-function buildQueryString(filter: ToolFilter): string {
-  const parts: string[] = [];
+function buildQueryString(filter: ToolFilter): string {  const parts: string[] = [];
   if (filter.query !== undefined) parts.push(`query=${encodeURIComponent(filter.query)}`);
   if (filter.category !== undefined) parts.push(`category=${encodeURIComponent(filter.category)}`);
   if (filter.tags !== undefined) parts.push(`tags=${encodeURIComponent(filter.tags.join(","))}`);
@@ -156,8 +176,17 @@ function buildQueryString(filter: ToolFilter): string {
   return parts.length === 0 ? "" : `?${parts.join("&")}`;
 }
 
-function parsePageNumber(
-  flag: string,
+function isEmptyFilter(filter: ToolFilter): boolean {
+  return (
+    filter.query === undefined &&
+    filter.category === undefined &&
+    filter.tags === undefined &&
+    filter.limit === undefined &&
+    filter.offset === undefined
+  );
+}
+
+function parsePageNumber(  flag: string,
   text: string | undefined,
   min: number,
   max: number,

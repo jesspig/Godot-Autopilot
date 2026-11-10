@@ -12,6 +12,7 @@ import { run as restart } from "./restart";
 import { run as serve } from "./serve";
 import { run as logs } from "./logs";
 import { run as skills } from "./skills";
+import { run as tools } from "./tools";
 import { run as api } from "./api";
 import { run as endpoints } from "./endpoints";
 
@@ -33,6 +34,7 @@ export const COMMANDS: Record<string, Command> = {
   serve: { run: serve },
   logs: { run: logs },
   skills: { run: skills },
+  tools: { run: tools },
   api: { run: api },
   endpoints: { run: endpoints },
 };
