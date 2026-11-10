@@ -19,7 +19,15 @@ def main() -> int:
     if bun is None:
         print("SKIP: bun not found on PATH, cli unit tests skipped")
         return 0
-    env = {**os.environ, "GDA_TEST_TMPDIR": str(ROOT / "build" / "cli-test-tmp")}
+    tmp = ROOT / "build" / "cli-test-tmp"
+    tmp.mkdir(parents=True, exist_ok=True)
+    env = {
+        **os.environ,
+        "GDA_TEST_TMPDIR": str(tmp),
+        "TMP": str(tmp),
+        "TEMP": str(tmp),
+        "TMPDIR": str(tmp),
+    }
     proc = subprocess.run([bun, "test", "cli/tests"], cwd=ROOT, env=env)
     return proc.returncode
 
