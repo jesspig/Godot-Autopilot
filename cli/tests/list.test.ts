@@ -181,6 +181,7 @@ describe("list 合并插件索引", () => {
       headless: false,
       startedAt: CLI_STARTED_AT,
       live: true,
+      liveDetail: { pid: true, endpoint: null },
     });
     expect(parsed[1]).toEqual({
       id: "gda-plugin-1",
@@ -188,9 +189,10 @@ describe("list 合并插件索引", () => {
       project: path.join(tmpHome, "plugin-project"),
       port: 9601,
       pid: runner,
-      headless: false,
-      startedAt: new Date(1700000000000).toISOString(),
+      headless: null,
+      startedAt: null,
       live: true,
+      liveDetail: { pid: true, endpoint: null },
     });
   });
 
@@ -223,7 +225,7 @@ describe("list 合并插件索引", () => {
     expect(parsed.every((entry) => entry.live === true)).toBe(true);
   });
 
-  test.skipIf(!deadPidDetectionAvailable)("过滤进程已死的插件条目", async () => {
+  test.skipIf(!deadPidDetectionAvailable)("进程已死的插件条目保留但 live=false", async () => {
     const older = spawnRunner();
     writePluginIndex([
       pluginRecord(9601, { pid: older, instance_id: "gda-alive", started_at: 1600000000000 }),
@@ -232,7 +234,10 @@ describe("list 合并插件索引", () => {
     const { code, stdout } = await listCaptured();
     expect(code).toBe(ExitCode.Success);
     const parsed = parseList(stdout);
-    expect(parsed.map((entry) => entry.id)).toEqual(["gda-alive"]);
+    expect(parsed.map((entry) => entry.id)).toEqual(["gda-dead", "gda-alive"]);
+    expect(parsed.find((entry) => entry.id === "gda-dead")?.live).toBe(false);
+    expect(parsed.find((entry) => entry.id === "gda-dead")?.liveDetail).toEqual({ pid: false, endpoint: null });
+    expect(parsed.find((entry) => entry.id === "gda-alive")?.live).toBe(true);
   });
 
   test("插件索引损坏时跳过且不影响 CLI 条目", async () => {
@@ -246,11 +251,43 @@ describe("list 合并插件索引", () => {
     expect(parsed[0].source).toBe("cli");
   });
 
-  test("缺端口或进程号的插件条目被跳过", async () => {
+  test("缺端口或进程号的插件条目保留且 port=null 可见", async () => {
     writePluginIndex([{ instance_id: "gda-incomplete", project_path: path.join(tmpHome, "x") }]);
     const { code, stdout } = await listCaptured();
     expect(code).toBe(ExitCode.Success);
-    expect(parseList(stdout)).toEqual([]);
+    const parsed = parseList(stdout);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].id).toBe("gda-incomplete");
+    expect(parsed[0].source).toBe("plugin");
+    expect(parsed[0].port).toBeNull();
+    expect(parsed[0].pid).toBeNull();
+    expect(parsed[0].live).toBe(false);
+    expect(parsed[0].liveDetail).toEqual({ pid: false, endpoint: null });
+  });
+
+  test("--stale 仅保留非存活条目", async () => {
+    const runner = spawnRunner();
+    saveRegistry({ version: 1, instances: [cliEntry()] });
+    writePluginIndex([pluginRecord(9602, { instance_id: "gda-dead" })]);
+    const { code, stdout } = await listCaptured({ stale: true });
+    expect(code).toBe(ExitCode.Success);
+    const parsed = parseList(stdout);
+    expect(parsed.map((entry) => entry.id)).toEqual(["gda-dead"]);
+    expect(parsed.every((entry) => entry.live === false)).toBe(true);
+    expect(isAlive(runner)).toBe(true);
+  });
+
+  test("--projects 按工程聚合", async () => {
+    const runner = spawnRunner();
+    saveRegistry({ version: 1, instances: [cliEntry()] });
+    writePluginIndex([pluginRecord(9601, { pid: runner, instance_id: "gda-plugin-1" })]);
+    const { code, stdout } = await listCaptured({ projectsView: true });
+    expect(code).toBe(ExitCode.Success);
+    const grouped = JSON.parse(stdout) as Array<{ project: string; entries: number; live: boolean; ports: number[] }>;
+    expect(grouped).toHaveLength(2);
+    const cliGroup = grouped.find((group) => group.project === path.join(tmpHome, "cli-project"));
+    expect(cliGroup?.entries).toBe(1);
+    expect(cliGroup?.ports).toEqual([9530]);
   });
 
   test("空索引提示可加 --probe 探测端口", async () => {
@@ -275,7 +312,8 @@ describe("list --probe 端口探测", () => {
       expect(parsed[0].port).toBe(port);
       expect(parsed[0].pid).toBeNull();
       expect(parsed[0].live).toBe(true);
-      expect(typeof parsed[0].startedAt).toBe("string");
+      expect(parsed[0].liveDetail).toEqual({ pid: false, endpoint: true });
+      expect(parsed[0].startedAt).toBeNull();
     } finally {
       await closeServer(server);
     }
@@ -325,6 +363,7 @@ describe("list 兼容性", () => {
       headless: entry.headless,
       startedAt: entry.startedAt,
       live: true,
+      liveDetail: { pid: true, endpoint: null },
     });
   });
 

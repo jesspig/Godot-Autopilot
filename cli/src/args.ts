@@ -30,6 +30,9 @@ export interface GlobalOptions {
   noAuth?: boolean;
   file?: string;
   refresh?: boolean;
+  all?: boolean;
+  projectsView?: boolean;
+  stale?: boolean;
 }
 
 const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
@@ -64,6 +67,9 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--force": "force",
   "--no-auth": "noAuth",
   "--refresh": "refresh",
+  "--all": "all",
+  "--projects": "projectsView",
+  "--stale": "stale",
 };
 
 export function parseArgv(argv: string[]): { opts: GlobalOptions; positionals: string[] } {
@@ -180,6 +186,9 @@ Global options:
   --probe <value>     Liveness level light/strict (api/endpoints/start); list: probed port 1-65535
   --file <rel>        Reference file to read with skills show (relative to the skill dir)
   --refresh           Refresh the offline tool catalog from a live /api/tools call
+  --all               list: include projects with no running instance
+  --projects          list: aggregate entries by project instead of per instance
+  --stale             list: keep only non-live entries
   --help              Show this help
   --version           Show the version
 
