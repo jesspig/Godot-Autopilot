@@ -321,6 +321,7 @@ JV send_request(int64_t request_id, const std::string &op, const JV &params,
     bool release_error_breaks = false;
     const ReadyDecision decision =
         decide_game_request(debugger_ready_session_count(),
+                            debugger_scene_ready_session_count(),
                             debugger_active_session_count(), wait_ready);
     if (decision == ReadyDecision::SendNow ||
         decision == ReadyDecision::QueueForReady) {

@@ -1642,6 +1642,22 @@ JV op_ui_elements(const JV &params) {
   return ok_result(std::move(r));
 }
 
+godot::SceneTree *g_ready_tree = nullptr;
+
+void send_ready_message(bool scene_ready) {
+  auto *dbg = godot::EngineDebugger::get_singleton();
+  if (dbg == nullptr) {
+    return;
+  }
+  JV body(JV::object_tag);
+  body[GDA_FIELD_READY] = JV(true);
+  body[GDA_FIELD_SCENE_READY] = JV(scene_ready);
+  append_activity_fields(body);
+  godot::Array payload;
+  payload.push_back(godot::String(body.Dump().c_str()));
+  dbg->send_message(gda_string(GDA_MSG_READY), payload);
+}
+
 class GameBridgeListener : public godot::RefCounted {
   GDCLASS(GameBridgeListener, godot::RefCounted)
 
@@ -1649,9 +1665,28 @@ protected:
   static void _bind_methods() {
     godot::ClassDB::bind_method(godot::D_METHOD("on_gda_message"),
                                 &GameBridgeListener::on_gda_message);
+    godot::ClassDB::bind_method(godot::D_METHOD("on_process_frame"),
+                                &GameBridgeListener::on_process_frame);
   }
 
 public:
+  bool scene_ready_sent_ = false;
+
+  void on_process_frame() {
+    if (scene_ready_sent_ || g_ready_tree == nullptr) {
+      return;
+    }
+    if (g_ready_tree->get_current_scene() == nullptr) {
+      return;
+    }
+    scene_ready_sent_ = true;
+    send_ready_message(true);
+    g_ready_tree->disconnect(
+        "process_frame",
+        godot::Callable(this, godot::StringName("on_process_frame")));
+    g_ready_tree = nullptr;
+  }
+
   bool on_gda_message(const godot::String &p_message,
                       const godot::Array &p_data) {
     (void)p_message;
@@ -2194,14 +2229,32 @@ void register_listener() {
     }
     g_registered = true;
 
-    {
-      JV body(JV::object_tag);
-      body[GDA_FIELD_READY] = JV(true);
-      append_activity_fields(body);
-      godot::Array payload;
-      payload.push_back(godot::String(body.Dump().c_str()));
-      dbg->send_message(gda_string(GDA_MSG_READY), payload);
+    bool scene_ready_now = false;
+    godot::SceneTree *tree = nullptr;
+    if (auto *main_loop = godot::Engine::get_singleton()->get_main_loop()) {
+      tree = godot::Object::cast_to<godot::SceneTree>(main_loop);
+      if (tree != nullptr) {
+        scene_ready_now = tree->get_current_scene() != nullptr;
+      }
     }
+    g_listener->scene_ready_sent_ = scene_ready_now;
+    send_ready_message(scene_ready_now);
+    if (!scene_ready_now) {
+      if (tree != nullptr) {
+        g_ready_tree = tree;
+        tree->connect(
+            "process_frame",
+            godot::Callable(g_listener.ptr(),
+                            godot::StringName("on_process_frame")));
+      } else {
+        send_ready_message(true);
+      }
+    }
+    LogSystem::instance().log(
+        LogLevel::Info, LogCategory::System,
+        std::string("game bridge ready sent (scene_ready=") +
+            (scene_ready_now ? "true" : "false") + ", deferred=" +
+            ((!scene_ready_now && tree != nullptr) ? "true" : "false") + ")");
     LogSystem::instance().log(
         LogLevel::Info, LogCategory::System,
         "Game bridge listener registered (gda message capture + game logger)");
@@ -2216,6 +2269,13 @@ void unregister_listener() {
   }
   if (auto *os = godot::OS::get_singleton()) {
     os->remove_logger(g_logger);
+  }
+  if (g_ready_tree != nullptr) {
+    g_ready_tree->disconnect(
+        "process_frame",
+        godot::Callable(g_listener.ptr(),
+                        godot::StringName("on_process_frame")));
+    g_ready_tree = nullptr;
   }
   g_logger.unref();
   g_listener.unref();

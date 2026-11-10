@@ -47,6 +47,7 @@ inline constexpr std::string_view GDA_FIELD_MATCHED_AT_PHYSICS_FRAME =
 inline constexpr std::string_view GDA_FIELD_LAST_ACTIVITY_MS =
     "last_activity_ms";
 inline constexpr std::string_view GDA_FIELD_READY = "ready";
+inline constexpr std::string_view GDA_FIELD_SCENE_READY = "scene_ready";
 inline constexpr std::string_view GDA_FIELD_HEALTHY = "healthy";
 
 inline constexpr std::string_view GDA_AUTO_CONTINUE_ENV = "GDA_AUTO_CONTINUE";

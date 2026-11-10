@@ -583,6 +583,10 @@ void DebugCapturePlugin::forget_ready_session(int32_t session_id) {
   ready_session_ids_.erase(std::remove(ready_session_ids_.begin(),
                                        ready_session_ids_.end(), session_id),
                            ready_session_ids_.end());
+  scene_ready_session_ids_.erase(
+      std::remove(scene_ready_session_ids_.begin(),
+                  scene_ready_session_ids_.end(), session_id),
+      scene_ready_session_ids_.end());
 }
 
 bool DebugCapturePlugin::_capture(const godot::String &p_message,
@@ -591,6 +595,18 @@ bool DebugCapturePlugin::_capture(const godot::String &p_message,
   std::string msg = p_message.utf8().ptr();
 
   if (msg == std::string(godot_autopilot::GDA_MSG_READY)) {
+    bool scene_ready = true;
+    if (p_data.size() >= 1) {
+      const std::string ready_text =
+          std::string(godot::String(p_data[0]).utf8().ptr());
+      const mcp::JsonValue ready_body = mcp::JsonValue::Parse(ready_text);
+      if (const mcp::JsonValue *flag =
+              ready_body.Find(godot_autopilot::GDA_FIELD_SCENE_READY)) {
+        if (flag->IsBool()) {
+          scene_ready = flag->GetBool();
+        }
+      }
+    }
     bool newly_ready = false;
     {
       std::lock_guard<std::mutex> lock(session_mtx_);
@@ -602,6 +618,8 @@ bool DebugCapturePlugin::_capture(const godot::String &p_message,
     }
     if (newly_ready) {
       godot_autopilot::runtime_ops::run_channel_self_check(p_session_id);
+    }
+    if (scene_ready && mark_session_scene_ready(p_session_id)) {
       godot_autopilot::runtime_ops::on_session_ready(p_session_id);
     }
     return true;
