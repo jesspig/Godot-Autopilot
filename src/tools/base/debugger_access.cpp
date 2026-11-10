@@ -78,6 +78,10 @@ int32_t debugger_ready_session_count() {
   return count;
 }
 
+int32_t debugger_scene_ready_session_count() {
+  return debugger_ready_session_count();
+}
+
 bool debugger_broadcast_engine_command(const godot::String &command,
                                        const godot::Array &data) {
   auto *plugin = debugger_ops::DebugCapturePlugin::get_instance();

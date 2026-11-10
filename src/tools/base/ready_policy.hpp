@@ -11,9 +11,10 @@ enum class ReadyDecision {
 };
 
 inline ReadyDecision decide_game_request(int ready_session_count,
+                                         int scene_ready_session_count,
                                          int active_session_count,
                                          bool wait_ready) {
-  if (ready_session_count > 0)
+  if (ready_session_count > 0 && scene_ready_session_count > 0)
     return ReadyDecision::SendNow;
   if (active_session_count <= 0)
     return ReadyDecision::FailNotRunning;
