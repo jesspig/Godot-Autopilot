@@ -37,6 +37,10 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 
 ## 核心能力
 
+### 调用通道（2026-11-10）
+
+插件在 TCP 端口之外额外监听一条 AF_UNIX `SOCK_STREAM` 本机通道（newline JSON-RPC，单帧 4 MiB），与 TCP `/mcp` 并存、绑定失败仅告警并降级；实例登记以 `endpoints.ipc = {path, protocol, framing, auth}` 表达端点（缺字段按无 IPC 处理）。CLI `gda call --socket <path>` 可直连该通道，失败默认回退端口通道。实现见 `src/core/transport/ipc_transport.cpp`、`ipc_framing.cpp`、`ipc_endpoint.cpp`。
+
 ### MCP 工具：可达 458 个 = 7 元工具 + 451 领域工具
 
 数值以 `src/tools/base/tool_spec.hpp`（`ToolSpec` 数据层）、`src/tools/base/tool_registry.hpp`（`ToolRegistry` 单一来源）与 `src/tools/domains/*/*_tools.hpp`（451 域工具的 `make_tools()`，每工具一份 `ToolSpec`）为准，catalog/index 459 条目由 `register_all.cpp` 从 registry 派生；`get_active_registry()` 暴露活跃 registry，数量随插件版本变化，运行时可经 `search_tools` 确认。工具名遵循 `<动词>_<类别>_<维度>_<对象>_<修饰>`（动词置首，snake_case）。

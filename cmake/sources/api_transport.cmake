@@ -16,4 +16,7 @@ set(GDA_API_TRANSPORT_SOURCES
     src/core/transport/api_server.cpp
     src/core/transport/api_server_routes.cpp
     src/core/transport/api_auth.cpp
-    src/core/transport/api_token.cpp)
+    src/core/transport/api_token.cpp
+    src/core/transport/ipc_endpoint.cpp
+    src/core/transport/ipc_transport.cpp
+    src/core/transport/ipc_framing.cpp)

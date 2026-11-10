@@ -92,6 +92,41 @@ mcp::JsonValue registry_endpoint_to_json(const EndpointEntry &entry) {
   return mcp::JsonValue(std::move(doc));
 }
 
+mcp::JsonValue registry_ipc_endpoint_to_json(const IpcEndpointEntry &entry) {
+  mcp::JsonValue::Object doc;
+  doc["path"] = entry.path;
+  doc["protocol"] = entry.protocol;
+  doc["framing"] = entry.framing;
+  doc["auth"] = entry.auth;
+  return mcp::JsonValue(std::move(doc));
+}
+
+bool read_registry_ipc_endpoint(const mcp::JsonValue &doc,
+                                IpcEndpointEntry &out) {
+  const mcp::JsonValue *path = doc.Find("path");
+  const mcp::JsonValue *protocol = doc.Find("protocol");
+  const mcp::JsonValue *framing = doc.Find("framing");
+  const mcp::JsonValue *auth = doc.Find("auth");
+  if (path == nullptr || !path->IsString() || path->GetString().empty()) {
+    return false;
+  }
+  if (protocol == nullptr || !protocol->IsString()) {
+    return false;
+  }
+  if (framing == nullptr || !framing->IsString()) {
+    return false;
+  }
+  if (auth == nullptr || !auth->IsString()) {
+    return false;
+  }
+  out.path = path->GetString();
+  out.protocol = protocol->GetString();
+  out.framing = framing->GetString();
+  out.auth = auth->GetString();
+  out.present = true;
+  return true;
+}
+
 std::vector<std::string> registry_instance_file_paths(const std::string &root) {
   std::vector<std::string> paths;
   const std::string projects_dir = join_path(root, kRegistryProjectsDirName);
@@ -136,6 +171,9 @@ mcp::JsonValue record_to_json(const InstanceRecord &record) {
   mcp::JsonValue::Object endpoints;
   endpoints["mcp"] = registry_endpoint_to_json(record.endpoints.mcp);
   endpoints["api"] = registry_endpoint_to_json(record.endpoints.api);
+  if (record.endpoints.ipc.present) {
+    endpoints["ipc"] = registry_ipc_endpoint_to_json(record.endpoints.ipc);
+  }
 
   mcp::JsonValue::Object doc;
   doc["instance_id"] = record.instance_id;
@@ -213,6 +251,15 @@ bool record_from_json(const mcp::JsonValue &doc, InstanceRecord &out) {
   }
   if (!read_registry_endpoint(*api_endpoint, parsed.endpoints.api)) {
     return false;
+  }
+  if (const mcp::JsonValue *ipc_endpoint = endpoints->Find("ipc");
+      ipc_endpoint != nullptr) {
+    if (!ipc_endpoint->IsObject()) {
+      return false;
+    }
+    if (!read_registry_ipc_endpoint(*ipc_endpoint, parsed.endpoints.ipc)) {
+      return false;
+    }
   }
   out = std::move(parsed);
   return true;

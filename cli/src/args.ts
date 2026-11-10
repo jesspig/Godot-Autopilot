@@ -33,6 +33,8 @@ export interface GlobalOptions {
   all?: boolean;
   projectsView?: boolean;
   stale?: boolean;
+  socketText?: string;
+  noFallback?: boolean;
 }
 
 const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
@@ -54,6 +56,7 @@ const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
   "--probe": "probe",
   "--bind": "bind",
   "--file": "file",
+  "--socket": "socketText",
 };
 
 const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
@@ -70,6 +73,7 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--all": "all",
   "--projects": "projectsView",
   "--stale": "stale",
+  "--no-fallback": "noFallback",
 };
 
 export function parseArgv(argv: string[]): { opts: GlobalOptions; positionals: string[] } {
@@ -189,6 +193,8 @@ Global options:
   --all               list: include projects with no running instance
   --projects          list: aggregate entries by project instead of per instance
   --stale             list: keep only non-live entries
+  --socket <path>     Connect through the plugin's local IPC socket
+  --no-fallback       Do not fall back to the port channel when IPC fails
   --help              Show this help
   --version           Show the version
 

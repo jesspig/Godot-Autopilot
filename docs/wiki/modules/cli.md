@@ -140,6 +140,12 @@ resource:
 - **载荷提取**：从 `result.content` 提取 text（`JSON.parse`）与 image（base64 字节数）；`--save-images DIR` 落盘 `gda_<stamp>_<n>.png`；`toolFailed` 判定（`result.isError` 或内层 `error` 字段）。
 - **请求体上限**：4 MiB（`MAX_BODY_BYTES`），超限报传输错误。
 
+### 离线族与 IPC 通道（2026-11-10 增补）
+
+- 离线族（无运行实例也可用）：`gda skills list|show [--file <rel>]` 列出/打印内置技能册；`gda tools list|search <q>|describe <name>` 读取 `/api/tools` 缓存目录（缓存由成功 `api list` 写入或 `--refresh` 刷新）；`gda projects` 按 `集中根/projects/*` 聚合工程（名/路径/hash/实例数/最后活动/存活）。
+- `gda list` 新增 `--all`（含未运行工程）、`--projects`（按工程聚合）、`--stale`（仅非存活）；条目的 `live` 保留布尔并新增 `liveDetail {pid, endpoint}` 两级。
+- IPC 通道：`--socket <path>` 使 `gda call` 直连插件本机 AF_UNIX 通道（newline JSON-RPC，先完成 initialize 握手）；连接失败默认在 stderr 提示并回退端口通道，`--no-fallback` 关闭回退（直接以传输错误退出码 2）。实现见 [`src/ipc/client.ts`](../../../cli/src/ipc/client.ts) 与 [`src/mcp/client.ts`](../../../cli/src/mcp/client.ts)。
+
 ## 寻址链（[`src/target.ts`](../../../cli/src/target.ts)）
 
 `--id`/`--port`/`--project` 互斥（同时指定报 `use only one of --id/--port/--project`）。解析是**七级优先链**，每一级都记录来源（`source`）与链位（`chain`）：
