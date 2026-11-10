@@ -142,6 +142,7 @@ Commands:
   tools list          List the cached tool catalog (offline)
   tools search <query> Search the cached tool catalog
   tools describe <name> Show one cached tool's schema
+  projects            List known Godot projects (offline)
   start               Start a Godot editor
   stop                Stop a Godot editor (<id> | --id | --port | --project)
   restart             Restart a Godot editor with the same port and settings
