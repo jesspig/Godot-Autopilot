@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { gdaRoot, projectPathKey } from "./platform";
-import { isAlive } from "./process";
+import { cachedEndpointAlive } from "./probe";
 
 export const PLUGIN_INDEX_FILE = "instances.json";
 export const DEFAULT_HOST = "127.0.0.1";
@@ -89,8 +89,11 @@ export function findPluginRecordByPort(port: number): PluginInstanceRecord | und
 
 function pickPreferred(records: PluginInstanceRecord[]): PluginInstanceRecord | undefined {
   if (records.length === 0) return undefined;
-  const alive = records.filter((r) => r.pid !== null && isAlive(r.pid));
-  const pool = alive.length > 0 ? alive : records;
+  const endpointAlive = records.filter((record) => {
+    const port = record.port ?? record.mcpEndpoint?.port ?? record.apiEndpoint?.port ?? null;
+    return port !== null && cachedEndpointAlive(port) === true;
+  });
+  const pool = endpointAlive.length > 0 ? endpointAlive : records;
   return pool.reduce((best, current) => (current.startedAt > best.startedAt ? current : best));
 }
 
