@@ -5,7 +5,9 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -168,6 +170,67 @@ inline std::vector<ImageHit> collect_trace_images(const mcp::JsonValue &result) 
   return hits;
 }
 
+struct DeferredTrace {
+  TraceEvent event;
+};
+
+constexpr std::size_t kDeferredTraceCap = 256;
+
+inline std::mutex &deferred_trace_mutex() {
+  static std::mutex mutex;
+  return mutex;
+}
+
+inline std::unordered_map<std::string, DeferredTrace> &deferred_traces() {
+  static std::unordered_map<std::string, DeferredTrace> traces;
+  return traces;
+}
+
+inline bool deferred_key_of(const mcp::JsonValue &result, std::string *key) {
+  if (!result.IsObject()) {
+    return false;
+  }
+  if (const mcp::JsonValue *pending = result.Find("__gda_pending");
+      pending != nullptr && pending->IsInt()) {
+    *key = "pending:" + std::to_string(pending->GetInt());
+    return true;
+  }
+  const mcp::JsonValue *wait = result.Find("__gda_wait");
+  if (wait != nullptr && wait->IsObject()) {
+    const std::string kind = string_field(*wait, "kind");
+    const mcp::JsonValue *id = wait->Find("id");
+    const std::string id_text =
+        (id != nullptr && id->IsInt())
+            ? std::to_string(id->GetInt())
+            : (id != nullptr && id->IsString() ? id->GetString()
+                                               : std::string());
+    *key = "wait:" + kind + ":" + id_text;
+    return true;
+  }
+  return false;
+}
+
+inline void stash_deferred_trace(const std::string &key, DeferredTrace record) {
+  std::lock_guard<std::mutex> lock(deferred_trace_mutex());
+  std::unordered_map<std::string, DeferredTrace> &traces = deferred_traces();
+  if (traces.size() >= kDeferredTraceCap) {
+    traces.erase(traces.begin());
+  }
+  traces[key] = std::move(record);
+}
+
+inline bool take_deferred_trace(const std::string &key, DeferredTrace *record) {
+  std::lock_guard<std::mutex> lock(deferred_trace_mutex());
+  std::unordered_map<std::string, DeferredTrace> &traces = deferred_traces();
+  auto it = traces.find(key);
+  if (it == traces.end()) {
+    return false;
+  }
+  *record = std::move(it->second);
+  traces.erase(it);
+  return true;
+}
+
 inline std::string error_text_of(const mcp::JsonValue &result) {
   if (const mcp::JsonValue *error = result.Find("error");
       error != nullptr && error->IsString()) {
@@ -204,6 +267,27 @@ inline void emit_tool_call(TraceEvent event, int64_t duration_ms,
                               (event.ok ? "ok " : "error ") +
                               std::to_string(duration_ms) + "ms";
   monitor::tool_call(std::move(event), level, summary, detail);
+}
+
+inline bool finish_deferred_trace(const std::string &key,
+                                  const mcp::JsonValue &final_result) {
+  DeferredTrace record;
+  if (!take_deferred_trace(key, &record)) {
+    return false;
+  }
+  const ToolVerdict verdict = verdict_of(final_result);
+  record.event.ok = verdict.ok;
+  record.event.error_code = verdict.error_code;
+  record.event.wall_end_ms = TraceRecorder::wall_now_ms();
+  const int64_t duration_ms =
+      record.event.wall_end_ms - record.event.wall_start_ms;
+  record.event.duration_ms = duration_ms;
+  record.event.result_size = static_cast<int64_t>(final_result.Dump().size());
+  const std::string error_text =
+      verdict.ok ? std::string() : error_text_of(final_result);
+  emit_tool_call(std::move(record.event), duration_ms, error_text, std::string(),
+                 bool_field(final_result, "retryable"));
+  return true;
 }
 
 } // namespace spec_detail
@@ -357,6 +441,13 @@ inline mcp::JsonValue SpecTool::execute(const mcp::JsonValue &args) {
   event.request_id = monitor::current_request_id();
   event.thread_id = TraceRecorder::current_thread_id();
   event.monotonic_ns = TraceRecorder::monotonic_now_ns();
+  std::string deferred_key;
+  if (spec_detail::deferred_key_of(result, &deferred_key)) {
+    spec_detail::DeferredTrace deferred;
+    deferred.event = std::move(event);
+    spec_detail::stash_deferred_trace(deferred_key, std::move(deferred));
+    return result;
+  }
   spec_detail::emit_tool_call(std::move(event), duration_ms, err_text,
                               image_detail, retryable);
   return result;

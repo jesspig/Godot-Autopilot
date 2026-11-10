@@ -93,3 +93,37 @@ TEST(ToolVerdictTest, NonObjectResultIsSuccess) {
   EXPECT_TRUE(v.ok);
   EXPECT_TRUE(v.error_code.empty());
 }
+
+TEST(ToolVerdictTest, DeferredMarkerIsDetectedByPendingId) {
+  std::string key;
+  const bool deferred = godot_autopilot::spec_detail::deferred_key_of(
+      parse(R"({"__gda_pending":7,"timeout_ms":8020})"), &key);
+  EXPECT_TRUE(deferred);
+  EXPECT_EQ(key, "pending:7");
+}
+
+TEST(ToolVerdictTest, DeferredMarkerIsDetectedByWaitKindAndId) {
+  std::string key;
+  const bool deferred = godot_autopilot::spec_detail::deferred_key_of(
+      parse(R"({"__gda_wait":{"kind":"os_process","id":12,"timeout_ms":5000}})"),
+      &key);
+  EXPECT_TRUE(deferred);
+  EXPECT_EQ(key, "wait:os_process:12");
+}
+
+TEST(ToolVerdictTest, PlainResultHasNoDeferredKey) {
+  std::string key;
+  EXPECT_FALSE(godot_autopilot::spec_detail::deferred_key_of(
+      parse(R"({"result":{"ok":true}})"), &key));
+}
+
+TEST(ToolVerdictTest, DeferredTraceStashAndTakeRoundTrip) {
+  godot_autopilot::spec_detail::DeferredTrace record;
+  record.event.tool = "execute_game_script";
+  record.event.ok = true;
+  godot_autopilot::spec_detail::stash_deferred_trace("pending:99", record);
+  godot_autopilot::spec_detail::DeferredTrace taken;
+  EXPECT_TRUE(godot_autopilot::spec_detail::take_deferred_trace("pending:99", &taken));
+  EXPECT_EQ(taken.event.tool, "execute_game_script");
+  EXPECT_FALSE(godot_autopilot::spec_detail::take_deferred_trace("pending:99", &taken));
+}
