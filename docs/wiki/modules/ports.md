@@ -198,6 +198,15 @@ CLI 的目标解析是一条**七级优先链**，每一级都记录来源（`so
 - **多实例靠路径而非端口**：控制面只占一个端口，实例寻址走 `/i/<ref>/...`，`ref` 可为插件实例标识（`gda-...`）、命令行实例标识（`p<pid>`，即 `gda list` 显示的值）或纯数字端口，匹配优先级依次为插件标识 → `p<pid>` → 端口；缺省 `/api` 与 `/mcp` 在唯一活跃实例时自动转发。路由与认证细节见 [CLI 载体](cli.md)「控制面（`gda serve`）」。
 - **插件侧保留段 19900–19999**：`src/core/config.hpp` 的 `GDA_CONTROL_PORT_BASE` / `GDA_CONTROL_PORT_LIMIT` 定义该区间，并由 `static_assert` 保证其低于自动分配起点 20000、互不相交；CLI 控制面默认 9700 落在该保留段之外，两者不会互抢端口。该常量目前只出现在常量定义与断言中（无其它引用点）。
 
+## 本机 IPC 通道（2026-11-10）
+
+插件在 TCP 端口之外额外监听一条 **AF_UNIX `SOCK_STREAM`** 本机通道，与 TCP `/mcp` 并存；绑定失败只记 Warning 并降级为「仅 TCP」，不影响端口通道。实现见 [`src/core/transport/ipc_transport.cpp`](../../../src/core/transport/ipc_transport.cpp)、[`ipc_framing.cpp`](../../../src/core/transport/ipc_framing.cpp)、[`ipc_endpoint.cpp`](../../../src/core/transport/ipc_endpoint.cpp)。
+
+- **socket 路径**（IF-03）：`<集中根>/run/<工程名清洗>-<路径哈希 8 位>.sock`；路径超过 99 字符时退到 Windows 的 `%LOCALAPPDATA%\gda\<hash8>.sock`（POSIX 沿用 run 目录）。启动前删除残留文件；「存在但连不上」视为残留。
+- **实例登记**（IF-02）：`endpoints.ipc = {path, protocol:"uds", framing:"ndjson", auth:"filesystem"}`，仅在监听成功时写入；旧记录缺该字段按「无 IPC」处理，不报格式错误。
+- **帧语义**（IF-01）：newline-delimited JSON-RPC，单帧上限 4 MiB；主线程 `_process` 每帧驱动 `pump()`（accept/read/写回各有预算），请求经 `GodotTransport::submit` 进入既有处理链，响应由工作线程等待后就绪、回主线程写回，慢请求不在 pump 内等待。
+- **连接生命周期**：关闭时先停 accept 再收割连接并删除 socket 文件。
+
 ## 已知限制
 
 - **端口是全局资源，多实例必然分散**：多个编辑器同时开着时，除了第一个占用 9527 的实例，其余走候选序列落在 20000–29999。客户端若假定 9527，必须先发现再连接。
