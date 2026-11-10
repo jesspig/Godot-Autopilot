@@ -181,7 +181,7 @@ describe("list 合并插件索引", () => {
       headless: false,
       startedAt: CLI_STARTED_AT,
       live: true,
-      liveDetail: { pid: true, endpoint: null },
+      liveDetail: { pid: true, endpoint: false },
     });
     expect(parsed[1]).toEqual({
       id: "gda-plugin-1",
@@ -192,7 +192,7 @@ describe("list 合并插件索引", () => {
       headless: null,
       startedAt: null,
       live: true,
-      liveDetail: { pid: true, endpoint: null },
+      liveDetail: { pid: true, endpoint: false },
     });
   });
 
@@ -236,7 +236,7 @@ describe("list 合并插件索引", () => {
     const parsed = parseList(stdout);
     expect(parsed.map((entry) => entry.id)).toEqual(["gda-dead", "gda-alive"]);
     expect(parsed.find((entry) => entry.id === "gda-dead")?.live).toBe(false);
-    expect(parsed.find((entry) => entry.id === "gda-dead")?.liveDetail).toEqual({ pid: false, endpoint: null });
+    expect(parsed.find((entry) => entry.id === "gda-dead")?.liveDetail).toEqual({ pid: false, endpoint: false });
     expect(parsed.find((entry) => entry.id === "gda-alive")?.live).toBe(true);
   });
 
@@ -363,7 +363,7 @@ describe("list 兼容性", () => {
       headless: entry.headless,
       startedAt: entry.startedAt,
       live: true,
-      liveDetail: { pid: true, endpoint: null },
+      liveDetail: { pid: true, endpoint: false },
     });
   });
 

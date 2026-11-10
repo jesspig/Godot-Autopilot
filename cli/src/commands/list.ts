@@ -6,7 +6,7 @@ import {
   readPluginInstanceIndex,
 } from "../instances";
 import { err } from "../output";
-import { probeEndpoint } from "../probe";
+import { endpointAlive, probeEndpoint } from "../probe";
 import { isAlive } from "../process";
 import { listProjects } from "../projects";
 import { loadRegistry, type InstanceEntry } from "../registry";
@@ -44,6 +44,7 @@ export async function run(_positional: string[], opts: GlobalOptions): Promise<n
   const pluginEntries = pluginListEntries(cliEntries);
   const probeEntries = await probeListEntries(probePort);
   let entries = [...cliEntries, ...pluginEntries, ...probeEntries];
+  await fillEndpointLiveness(entries);
   if (opts.stale === true) {
     entries = entries.filter((entry) => !entry.live);
   }
@@ -139,6 +140,19 @@ async function probeListEntries(port: number | null): Promise<ListEntry[]> {
       liveDetail: { pid: false, endpoint: true },
     },
   ];
+}
+
+async function fillEndpointLiveness(entries: ListEntry[]): Promise<void> {
+  await Promise.all(
+    entries.map(async (entry) => {
+      if (entry.port === null || entry.source === "probe") {
+        return;
+      }
+      const alive = await endpointAlive(entry.port);
+      entry.liveDetail = { pid: entry.liveDetail.pid, endpoint: alive };
+      entry.live = entry.liveDetail.pid || alive;
+    }),
+  );
 }
 
 function withIdleProjects(entries: ListEntry[]): ListEntry[] {
