@@ -60,3 +60,5 @@ node_modules/
 .trae/
 .qoder/
 .workbuddy/
+# test temp dirs
+gda_test_tmp/

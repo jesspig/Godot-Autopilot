@@ -229,6 +229,20 @@ TEST(ToolResultIsErrorTest, IgnoresNonObjectResult) {
   EXPECT_FALSE(godot_autopilot::tool_result_is_error(mcp::JsonValue()));
 }
 
+TEST(ToolResultIsErrorTest, DetectsStructuredErrorCode) {
+  mcp::JsonValue result(mcp::JsonValue::object_tag);
+  mcp::JsonValue structured(mcp::JsonValue::object_tag);
+  structured["code"] = mcp::JsonValue("when_timeout");
+  result["structured_error"] = std::move(structured);
+  EXPECT_TRUE(godot_autopilot::tool_result_is_error(result));
+}
+
+TEST(ToolResultIsErrorTest, DetectsRuntimeErrorFlag) {
+  mcp::JsonValue result(mcp::JsonValue::object_tag);
+  result["runtime_error"] = mcp::JsonValue(true);
+  EXPECT_TRUE(godot_autopilot::tool_result_is_error(result));
+}
+
 TEST_F(RegisteredServerFixture, BatchExecuteSchemaDeclaresRollbackOnError) {
   auto info = catalog.get_tool("batch_execute");
   ASSERT_TRUE(info.has_value());
