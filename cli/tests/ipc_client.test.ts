@@ -192,7 +192,7 @@ describe("ipc session and socket channel", () => {
     const cap = captureOutput();
     let caught: unknown;
     try {
-      await runCall(["ping"], { socketText: socketPath });
+      await runCall(["ping"], { socketText: socketPath, portText: "1" });
     } catch (error) {
       caught = error;
     } finally {
