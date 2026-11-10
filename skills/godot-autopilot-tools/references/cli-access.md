@@ -25,7 +25,7 @@ Probe the machine before choosing: `bun --version`, then `node --version`.
 
 All three distributions are the same program: they speak the same MCP protocol, accept the same subcommands and share the same exit codes. Nothing in the calling protocol changes when you switch.
 
-**Caveat — the pinned ref resolves only once its tag is published.** As of `0.3.0` the repository tree does ship the CLI: the root `package.json` exposes the `gda` binary as `cli/bin/gda.ts`, and `cli/` is part of the tree, so `bunx "github:jesspig/Godot-Autopilot#0.3.0"` resolves the `gda` binary as soon as the `0.3.0` tag exists on the remote. The older caveat — that the pinned tag was cut before the CLI existed, carried no `cli/` directory and no root `package.json`, and could never resolve — no longer applies to the current pin. What still applies is the publishing step: until the `0.3.0` tag and its release are out, that ref is not fetchable, so use `bunx "github:jesspig/Godot-Autopilot#develop" <cmd>` in the meantime (that branch does ship the CLI, but it is an unreleased moving target rather than a pinned version, so pin your own copy with `bun install -g` if you need a stable one). The versioned alternative is the standalone binary below: each release publishes the `gda` assets for five targets next to `addons.zip` with a `sha256sums.txt`, so check the release page for the asset and verify the checksum before downloading.
+**Caveat — the pinned ref resolves only once its tag is published.** As of `0.3.1` the repository tree does ship the CLI: the root `package.json` exposes the `gda` binary as `cli/bin/gda.ts`, and `cli/` is part of the tree, so `bunx "github:jesspig/Godot-Autopilot#0.3.1"` resolves the `gda` binary as soon as the `0.3.1` tag exists on the remote. The older caveat — that the pinned tag was cut before the CLI existed, carried no `cli/` directory and no root `package.json`, and could never resolve — no longer applies to the current pin. What still applies is the publishing step: until the `0.3.1` tag and its release are out, that ref is not fetchable, so use `bunx "github:jesspig/Godot-Autopilot#develop" <cmd>` in the meantime (that branch does ship the CLI, but it is an unreleased moving target rather than a pinned version, so pin your own copy with `bun install -g` if you need a stable one). The versioned alternative is the standalone binary below: each release publishes the `gda` assets for five targets next to `addons.zip` with a `sha256sums.txt`, so check the release page for the asset and verify the checksum before downloading.
 
 ## Commands
 
@@ -50,10 +50,10 @@ name: godot-autopilot-tools
 description: "Calling the GDA (godot-autopilot) plugin: ..."
 
 gda tools list
-{"generated_at":"2026-11-10T07:00:00.000Z","version":"0.3.0","tools":[{"name":"create_scene_node",...}, ...]}
+{"generated_at":"2026-11-10T07:00:00.000Z","version":"0.3.1","tools":[{"name":"create_scene_node",...}, ...]}
 
 gda tools search capture
-{"generated_at":"...","version":"0.3.0","tools":[{"name":"capture_editor_viewport",...}]}
+{"generated_at":"...","version":"0.3.1","tools":[{"name":"capture_editor_viewport",...}]}
 ```
 The `tools` family reads a catalog cached by the last successful `gda api list` (or a fresh `gda tools ... --refresh`), so it works with no running instance.
 
