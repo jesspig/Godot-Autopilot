@@ -82,6 +82,7 @@ resource:
 3. 首次失败 → 先保留现场、输出诊断，再决定是否重试：
    - **现场**：把 `CMakeCache.txt`、`CMakeFiles/CMakeConfigureLog.yaml`、`configure.log` 复制到 `build/<preset>.failed-<ts>/`（时间戳 `yyyyMMdd-HHmmss`，同秒冲突追加 `-1`/`-2`），并写 `diagnostics.log`；现场目录创建或 diagnostics.log 写失败时按 E-04 打印 stderr 且保持退出码非 0；
    - **诊断段**：打印 `[DIAGNOSE] CMake configure failed`，含 `cmake --version`、`resolve_preset()` 结果、缓存中的 `CMAKE_C_COMPILER`/`CMAKE_RC_COMPILER`（存在时）、`TMP`/`TEMP` 与 `tempfile.gettempdir()`、NamedTemporaryFile 写探针结果，以及建议（无 ninja 时改用 portable 预设 / 显式 `-DCMAKE_RC_COMPILER=<rc.exe|llvm-rc.exe>` / TMP-TEMP 指向可写目录）；
+- **Windows 临时目录兜底**：构建子进程（cmake / ninja / llvm-rc / 编译器）的 `TMP`/`TEMP`/`TMPDIR` 固定指向 `build/tmp`（`scripts/cmake_ops.py` 的 `_subprocess_env()`）。当环境禁止向用户临时目录写文件时（典型症状：`llvm-rc` 报 `Unable to create temp file: permission denied`，configure 失败），固定到工程内目录可规避；`main.py clean` 会随 `build/` 一并清理。
    - **重试收窄**：仅当 `cached_generator()` 与本次期望**仍不一致**时才 `_purge()`（删除该目录内除 `_deps/` 外的全部文件与目录，目录递归删除、文件 unlink）并重试一次；生成器未变时打印 `[AUTO-CLEAN] Skipped: configure failure reason unchanged (原因未变，跳过无意义重试).` 并直接以非 0 退出（不再对同一原因重复重试）；
 4. 依赖源码在 `third_party/` 子模块（不在 `build/` 下），因此清空 `build/<preset>/` 不会丢依赖；子模块二进制目录 `build/<preset>/_sub/` 会被一并删除并在下一次 configure 重建。脚本仍跳过名为 `_deps` 的条目（FetchContent 时代的残留目录名，保留无害）。
 
