@@ -28,6 +28,76 @@ inline std::string truncate_capture_text(const std::string &text) {
   return text;
 }
 
+inline std::vector<std::string> undeclared_identifiers(
+    const std::string &captured_errors) {
+  std::vector<std::string> names;
+  const std::string head = "Identifier ";
+  const std::string tail = " not declared in the current scope";
+  size_t pos = 0;
+  while ((pos = captured_errors.find(head, pos)) != std::string::npos) {
+    const size_t name_start = pos + head.size();
+    const size_t tail_at = captured_errors.find(tail, name_start);
+    if (tail_at == std::string::npos) {
+      break;
+    }
+    std::string name =
+        captured_errors.substr(name_start, tail_at - name_start);
+    while (!name.empty() &&
+           (name.front() == ' ' || name.front() == '"' || name.front() == '\'')) {
+      name.erase(name.begin());
+    }
+    while (!name.empty() &&
+           (name.back() == ' ' || name.back() == '"' || name.back() == '\'' ||
+            name.back() == '.')) {
+      name.pop_back();
+    }
+    if (!name.empty()) {
+      names.push_back(std::move(name));
+    }
+    pos = tail_at + tail.size();
+  }
+  return names;
+}
+
+inline std::string autoload_global_hint(
+    const std::string &captured_errors,
+    const std::vector<std::string> &autoload_names) {
+  if (captured_errors.empty() || autoload_names.empty()) {
+    return std::string();
+  }
+  std::string hint;
+  std::vector<std::string> reported;
+  for (const std::string &name : undeclared_identifiers(captured_errors)) {
+    bool registered = false;
+    for (const std::string &autoload : autoload_names) {
+      if (name == autoload) {
+        registered = true;
+        break;
+      }
+    }
+    if (!registered) {
+      continue;
+    }
+    bool already = false;
+    for (const std::string &prior : reported) {
+      if (prior == name) {
+        already = true;
+        break;
+      }
+    }
+    if (already) {
+      continue;
+    }
+    reported.push_back(name);
+    hint += "\n[hint] '" + name +
+            "' is registered in ProjectSettings as an autoload but the current "
+            "editor session has not refreshed the autoload global table; use "
+            "get_node(\"/root/" +
+            name + "\") instead";
+  }
+  return hint;
+}
+
 inline std::string strip_extends_lines(const std::string &code) {
   std::string result;
   std::istringstream stream(code);
