@@ -47,6 +47,7 @@
 #include "tools/base/tool_execute.hpp"
 #include "tools/base/tool_invoke.hpp"
 #include "tools/base/tool_registry.hpp"
+#include "tools/base/tool_spec.hpp"
 #include "util/mcp_image_content.hpp"
 #include <mcp/Content.hpp>
 #include <mcp/JsonValue.hpp>
@@ -612,7 +613,7 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
 }
 
 bool tool_result_is_error(const mcp::JsonValue &result) {
-    return result.IsObject() && result.Find("error") != nullptr;
+    return !spec_detail::verdict_of(result).ok;
 }
 
 void refresh_dynamic_tools() {

@@ -56,17 +56,54 @@ constexpr int64_t kSlowToolMs = 2000;
 constexpr std::size_t kArgsDetailMax = 512;
 constexpr std::size_t kErrDetailMax = 256;
 
-inline std::string error_code_of(const mcp::JsonValue &result) {
-  if (const mcp::JsonValue *structured = result.Find("structured_error")) {
-    if (structured->IsObject()) {
-      if (const mcp::JsonValue *code = structured->Find("code")) {
-        if (code->IsString()) {
-          return code->GetString();
-        }
-      }
-    }
+inline std::string string_field(const mcp::JsonValue &object,
+                                 const char *key) {
+  const mcp::JsonValue *value = object.Find(key);
+  if (value == nullptr || !value->IsString()) {
+    return std::string();
   }
-  return "error";
+  return value->GetString();
+}
+
+inline bool bool_field(const mcp::JsonValue &object, const char *key) {
+  const mcp::JsonValue *value = object.Find(key);
+  return value != nullptr && value->IsBool() && value->GetBool();
+}
+
+struct ToolVerdict {
+  bool ok = true;
+  std::string error_code;
+};
+
+inline ToolVerdict verdict_of(const mcp::JsonValue &result) {
+  ToolVerdict verdict;
+  if (!result.IsObject()) {
+    return verdict;
+  }
+  const mcp::JsonValue *structured = result.Find("structured_error");
+  const std::string structured_code =
+      structured != nullptr && structured->IsObject()
+          ? string_field(*structured, "code")
+          : std::string();
+  if (result.Find("error") != nullptr) {
+    verdict.ok = false;
+    const std::string top_code = string_field(result, "code");
+    verdict.error_code = !top_code.empty()
+                             ? top_code
+                             : (!structured_code.empty() ? structured_code
+                                                         : std::string("error"));
+    return verdict;
+  }
+  if (!structured_code.empty()) {
+    verdict.ok = false;
+    verdict.error_code = structured_code;
+    return verdict;
+  }
+  if (bool_field(result, "runtime_error")) {
+    verdict.ok = false;
+    verdict.error_code = "runtime_error";
+  }
+  return verdict;
 }
 
 inline std::string truncated_text(const std::string &text, std::size_t max) {
@@ -129,6 +166,44 @@ inline std::vector<ImageHit> collect_trace_images(const mcp::JsonValue &result) 
     append_image_hit(hits, *scope, "diff_image_data", "diff");
   }
   return hits;
+}
+
+inline std::string error_text_of(const mcp::JsonValue &result) {
+  if (const mcp::JsonValue *error = result.Find("error");
+      error != nullptr && error->IsString()) {
+    return truncated_text(error->GetString(), kErrDetailMax);
+  }
+  if (const mcp::JsonValue *details = result.Find("error_details");
+      details != nullptr && details->IsString()) {
+    return truncated_text(details->GetString(), kErrDetailMax);
+  }
+  return std::string();
+}
+
+inline void emit_tool_call(TraceEvent event, int64_t duration_ms,
+                           const std::string &error_text,
+                           const std::string &image_detail, bool retryable) {
+  const bool slow = duration_ms > kSlowToolMs;
+  std::string detail = "trace=" + event.trace_id + " span=" + event.span_id +
+                       " parent=" + event.parent_span + " depth=" +
+                       std::to_string(event.depth) + " queue=" +
+                       std::to_string(event.queue_wait_ms) + "ms dur=" +
+                       std::to_string(duration_ms) + "ms auth=ok err=" +
+                       error_text + " args=" +
+                       truncated_text(event.args_digest, kArgsDetailMax);
+  if (slow) {
+    detail += " slow_tool=true";
+  }
+  if (retryable) {
+    detail += " retryable=true";
+  }
+  detail += image_detail;
+  const LogLevel level =
+      (!event.ok || slow) ? LogLevel::Warning : LogLevel::Debug;
+  const std::string summary = "call_tool " + event.name + " -> " +
+                              (event.ok ? "ok " : "error ") +
+                              std::to_string(duration_ms) + "ms";
+  monitor::tool_call(std::move(event), level, summary, detail);
 }
 
 } // namespace spec_detail
@@ -231,24 +306,12 @@ inline mcp::JsonValue SpecTool::execute(const mcp::JsonValue &args) {
       std::chrono::duration_cast<std::chrono::milliseconds>(
           std::chrono::steady_clock::now() - steady_start)
           .count();
-  const bool ok =
-      !(result.IsObject() && result.Find("error") != nullptr);
-  const std::string error_code =
-      ok ? std::string() : spec_detail::error_code_of(result);
-  std::string err_text;
-  if (!ok) {
-    if (const mcp::JsonValue *err = result.Find("error")) {
-      if (err->IsString()) {
-        err_text = spec_detail::truncated_text(err->GetString(),
-                                               spec_detail::kErrDetailMax);
-      }
-    }
-  }
-  bool retryable = false;
-  if (const mcp::JsonValue *retryable_flag = result.Find("retryable")) {
-    retryable = retryable_flag->IsBool() && retryable_flag->GetBool();
-  }
-  const bool slow = duration_ms > spec_detail::kSlowToolMs;
+  const spec_detail::ToolVerdict verdict = spec_detail::verdict_of(result);
+  const bool ok = verdict.ok;
+  const std::string &error_code = verdict.error_code;
+  const std::string err_text =
+      ok ? std::string() : spec_detail::error_text_of(result);
+  const bool retryable = spec_detail::bool_field(result, "retryable");
   TraceEvent event;
   event.trace_id = trace_id;
   event.span_id = span_id;
@@ -294,28 +357,8 @@ inline mcp::JsonValue SpecTool::execute(const mcp::JsonValue &args) {
   event.request_id = monitor::current_request_id();
   event.thread_id = TraceRecorder::current_thread_id();
   event.monotonic_ns = TraceRecorder::monotonic_now_ns();
-  std::string detail = "trace=" + trace_id + " span=" + span_id + " parent=" +
-                       parent_span + " depth=" + std::to_string(depth) +
-                       " queue=" + std::to_string(queue_wait) + "ms dur=" +
-                       std::to_string(duration_ms) + "ms auth=ok err=" +
-                       err_text + " args=" +
-                       spec_detail::truncated_text(
-                           sanitized.text, spec_detail::kArgsDetailMax);
-  if (slow) {
-    detail += " slow_tool=true";
-  }
-  if (retryable) {
-    detail += " retryable=true";
-  }
-  detail += image_detail;
-  LogLevel level = LogLevel::Debug;
-  if (!ok || slow) {
-    level = LogLevel::Warning;
-  }
-  const std::string summary = "call_tool " + spec_.name + " -> " +
-                              (ok ? "ok " : "error ") +
-                              std::to_string(duration_ms) + "ms";
-  monitor::tool_call(std::move(event), level, summary, detail);
+  spec_detail::emit_tool_call(std::move(event), duration_ms, err_text,
+                              image_detail, retryable);
   return result;
 }
 

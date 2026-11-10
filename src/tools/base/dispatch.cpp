@@ -152,7 +152,7 @@ mcp::JsonValue call_handler_impl(const std::string &name,
                        " — use search_tools to discover available "
                        "tools");
   }
-  bool has_error = result.IsObject() && result.Find("error") != nullptr;
+  const bool has_error = !spec_detail::verdict_of(result).ok;
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
       "call_tool: " + name + " -> " + (has_error ? "error" : "ok"));
   tools::take_queued_wait_ms();
