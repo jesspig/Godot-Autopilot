@@ -486,6 +486,26 @@ describe("用法错误", () => {
     expect(e.code).toBe(ExitCode.Usage);
   });
 
+  test("call --args 非法 JSON 诊断含字节数摘要与 --args-file 提示", async () => {
+    const payload = '{"a":';
+    const e = await catchCliError(call(["ping"], { argsJson: payload }));
+    expect(e.code).toBe(ExitCode.Usage);
+    expect(e.message).toContain(`received ${Buffer.byteLength(payload, "utf8")} bytes`);
+    expect(e.message).toMatch(/sha256:[0-9a-f]{8}/);
+    expect(e.message).toContain("head:");
+    expect(e.message).toContain("--args-file");
+  });
+
+  test("call --args-file 非法 JSON 诊断含字节数与 --args-file 提示", async () => {
+    const file = path.join(os.tmpdir(), `gda-args-bad-${process.pid}-${Date.now()}.json`);
+    fs.writeFileSync(file, '{"a":');
+    const e = await catchCliError(call(["ping"], { argsFile: file }));
+    fs.rmSync(file, { force: true });
+    expect(e.code).toBe(ExitCode.Usage);
+    expect(e.message).toContain("received 5 bytes");
+    expect(e.message).toContain("--args-file PATH");
+  });
+
   test("call --args 非对象 exit 3", async () => {
     const e = await catchCliError(call(["ping"], { argsJson: "[1,2]" }));
     expect(e.code).toBe(ExitCode.Usage);

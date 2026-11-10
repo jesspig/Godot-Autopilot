@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 
 import type { GlobalOptions } from "./args";
@@ -211,6 +212,15 @@ export function assertCallFamilyUsage(command: string, opts: GlobalOptions): voi
   }
 }
 
+function payloadDiagnostics(text: string): string {
+  const bytes = Buffer.byteLength(text, "utf8");
+  const digest = createHash("sha256").update(text, "utf8").digest("hex").slice(0, 8);
+  return `received ${bytes} bytes, sha256:${digest}, head:${text.slice(0, 40)}`;
+}
+
+const ARGS_FILE_SUGGESTION =
+  "pass the payload with --args-file PATH when it is longer than a few hundred bytes or contains dense escapes";
+
 export function loadToolArguments(opts: GlobalOptions): Record<string, unknown> {
   if (opts.argsJson !== undefined && opts.argsFile !== undefined) {
     throw new CliError(ExitCode.Usage, "use only one of --args and --args-file.");
@@ -220,7 +230,10 @@ export function loadToolArguments(opts: GlobalOptions): Record<string, unknown> 
     try {
       args = JSON.parse(opts.argsJson);
     } catch {
-      throw new CliError(ExitCode.Usage, "--args is not valid JSON.");
+      throw new CliError(
+        ExitCode.Usage,
+        `--args is not valid JSON (${payloadDiagnostics(opts.argsJson)}). ${ARGS_FILE_SUGGESTION}`,
+      );
     }
   } else if (opts.argsFile !== undefined) {
     let text: string;
@@ -232,7 +245,10 @@ export function loadToolArguments(opts: GlobalOptions): Record<string, unknown> 
     try {
       args = JSON.parse(text);
     } catch {
-      throw new CliError(ExitCode.Usage, `--args-file does not contain valid JSON: ${opts.argsFile}`);
+      throw new CliError(
+        ExitCode.Usage,
+        `--args-file does not contain valid JSON: ${opts.argsFile} (${payloadDiagnostics(text)}). ${ARGS_FILE_SUGGESTION}`,
+      );
     }
   }
   if (args === null || typeof args !== "object" || Array.isArray(args)) {
