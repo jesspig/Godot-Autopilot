@@ -14,6 +14,33 @@ DIAGNOSTIC_PROBE_BYTES = b"gda-temp-probe\n"
 CONFIGURE_TAIL_LINES = 40
 
 
+def _raw_temp_writable() -> bool:
+    """探测 TMP/TEMP 直接指向的目录是否可写。
+
+    Windows 工具链（llvm-rc 等）按 TMP/TEMP 取临时目录；若环境禁止写该目录，
+    仅看 tempfile.gettempdir() 会因回退到当前目录而误判为可写。
+    """
+    for key in ("TMP", "TEMP"):
+        value = os.environ.get(key)
+        if not value:
+            continue
+        probe_path = Path(value) / f"gda-temp-probe-{os.getpid()}.tmp"
+        try:
+            probe_path.write_bytes(DIAGNOSTIC_PROBE_BYTES)
+            probe_path.unlink()
+            return True
+        except OSError:
+            continue
+    return False
+
+
+def _redirect_temp_to_build(env: dict[str, str]) -> None:
+    build_tmp = BUILD_DIR / "tmp"
+    build_tmp.mkdir(parents=True, exist_ok=True)
+    for key in ("TMP", "TEMP", "TMPDIR"):
+        env[key] = str(build_tmp)
+
+
 def _subprocess_env() -> dict[str, str]:
     """把当前解释器所在目录前置到子进程 PATH。
 
@@ -23,6 +50,8 @@ def _subprocess_env() -> dict[str, str]:
     """
     env = os.environ.copy()
     env["PATH"] = str(Path(sys.executable).parent) + os.pathsep + env.get("PATH", "")
+    if os.name == "nt":
+        _redirect_temp_to_build(env)
     return env
 
 
@@ -250,6 +279,7 @@ def _diagnose_configure_failure(preset: str) -> None:
         f"  TEMP={os.environ.get('TEMP', '<unset>')}",
         f"  tempfile.gettempdir()={tempfile.gettempdir()}",
         f"  temp write probe: {temp_detail}",
+        f"  raw TMP/TEMP probe: {'OK' if _raw_temp_writable() else 'FAILED (build/tmp fallback active)'}",
         f"  CMAKE_C_COMPILER={_cache_entry(cache, 'CMAKE_C_COMPILER') or '<unset>'}",
         f"  CMAKE_RC_COMPILER={_cache_entry(cache, 'CMAKE_RC_COMPILER') or '<unset>'}",
         f"  CMakeCache.txt={'present' if cache.is_file() else 'missing'}",
