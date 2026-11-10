@@ -29,7 +29,7 @@ godot::Key parse_key_name(const std::string &key_str) {
     char c = key_str[0];
     if (c >= 'a' && c <= 'z')
       c -= 32;
-    if ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+    if (c >= 0x20 && c <= 0x7E) {
       return static_cast<godot::Key>(c);
     }
   }
