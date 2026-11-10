@@ -28,6 +28,8 @@ export interface GlobalOptions {
   probe?: string;
   bind?: string;
   noAuth?: boolean;
+  file?: string;
+  refresh?: boolean;
 }
 
 const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
@@ -48,6 +50,7 @@ const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
   "--offset": "offsetText",
   "--probe": "probe",
   "--bind": "bind",
+  "--file": "file",
 };
 
 const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
@@ -60,6 +63,7 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--no-import": "noImport",
   "--force": "force",
   "--no-auth": "noAuth",
+  "--refresh": "refresh",
 };
 
 export function parseArgv(argv: string[]): { opts: GlobalOptions; positionals: string[] } {
@@ -133,6 +137,11 @@ Commands:
   describe <tool>     Show one tool's schema and side effects
   call <tool>         Call a tool
   list                List running Godot instances
+  skills list         List the bundled skill books (offline)
+  skills show <name>  Print one skill book's SKILL.md; --file <rel> reads a reference
+  tools list          List the cached tool catalog (offline)
+  tools search <query> Search the cached tool catalog
+  tools describe <name> Show one cached tool's schema
   start               Start a Godot editor
   stop                Stop a Godot editor (<id> | --id | --port | --project)
   restart             Restart a Godot editor with the same port and settings
@@ -168,6 +177,8 @@ Global options:
   --limit <n>         Maximum tools returned by the api list subcommand (1-2000)
   --offset <n>        Offset into the tool list for the api list subcommand
   --probe <value>     Liveness level light/strict (api/endpoints/start); list: probed port 1-65535
+  --file <rel>        Reference file to read with skills show (relative to the skill dir)
+  --refresh           Refresh the offline tool catalog from a live /api/tools call
   --help              Show this help
   --version           Show the version
 
