@@ -114,6 +114,8 @@ bool inject_key_ex(godot::Key key, bool pressed, bool ctrl, bool shift,
   return true;
 }
 
+} // namespace
+
 godot::Key parse_function_key(const std::string &key_lower) {
   if (key_lower.size() < 2 || key_lower.size() > 3 || key_lower[0] != 'f')
     return godot::KEY_NONE;
@@ -126,8 +128,6 @@ godot::Key parse_function_key(const std::string &key_lower) {
     return godot::KEY_NONE;
   return static_cast<godot::Key>(godot::KEY_F1 + (index - 1));
 }
-
-} // namespace
 
 mcp::JsonValue handle_click_editor_element(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
