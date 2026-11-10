@@ -8,11 +8,11 @@
 #include <mcp/transport/InMemoryTransport.hpp>
 
 #include "core/command_queue.hpp"
-#include "tools/dispatch.hpp"
-#include "tools/register_all.hpp"
-#include "tools/runtime_ops.hpp"
-#include "tools/tool_catalog.hpp"
-#include "tools/tool_registry.hpp"
+#include "tools/base/dispatch.hpp"
+#include "tools/base/register_all.hpp"
+#include "tools/base/runtime_ops.hpp"
+#include "tools/base/tool_catalog.hpp"
+#include "tools/base/tool_registry.hpp"
 #include "util/bm25_index.hpp"
 
 #include <string>
@@ -227,6 +227,20 @@ TEST(ToolResultIsErrorTest, IgnoresPlainObjectWithoutError) {
 TEST(ToolResultIsErrorTest, IgnoresNonObjectResult) {
   EXPECT_FALSE(godot_autopilot::tool_result_is_error(mcp::JsonValue("text")));
   EXPECT_FALSE(godot_autopilot::tool_result_is_error(mcp::JsonValue()));
+}
+
+TEST(ToolResultIsErrorTest, DetectsStructuredErrorCode) {
+  mcp::JsonValue result(mcp::JsonValue::object_tag);
+  mcp::JsonValue structured(mcp::JsonValue::object_tag);
+  structured["code"] = mcp::JsonValue("when_timeout");
+  result["structured_error"] = std::move(structured);
+  EXPECT_TRUE(godot_autopilot::tool_result_is_error(result));
+}
+
+TEST(ToolResultIsErrorTest, DetectsRuntimeErrorFlag) {
+  mcp::JsonValue result(mcp::JsonValue::object_tag);
+  result["runtime_error"] = mcp::JsonValue(true);
+  EXPECT_TRUE(godot_autopilot::tool_result_is_error(result));
 }
 
 TEST_F(RegisteredServerFixture, BatchExecuteSchemaDeclaresRollbackOnError) {

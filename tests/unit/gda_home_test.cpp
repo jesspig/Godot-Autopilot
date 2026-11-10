@@ -1,4 +1,4 @@
-#include "core/gda_home.hpp"
+#include "core/storage/gda_home.hpp"
 #include "core/path_util.hpp"
 
 #include <gtest/gtest.h>

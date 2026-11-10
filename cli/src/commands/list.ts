@@ -6,22 +6,36 @@ import {
   readPluginInstanceIndex,
 } from "../instances";
 import { err } from "../output";
-import { probeEndpoint } from "../probe";
+import { endpointAlive, probeEndpoint } from "../probe";
 import { isAlive } from "../process";
+import { listProjects } from "../projects";
 import { loadRegistry, type InstanceEntry } from "../registry";
 import { writeJson } from "./json-output";
 
-type ListSource = "cli" | "plugin" | "probe";
+type ListSource = "cli" | "plugin" | "probe" | "project";
+
+interface LiveDetail {
+  pid: boolean;
+  endpoint: boolean | null;
+}
 
 interface ListEntry {
   id: string;
   source: ListSource;
   project: string;
-  port: number;
+  port: number | null;
   pid: number | null;
-  headless: boolean;
-  startedAt: string;
+  headless: boolean | null;
+  startedAt: string | null;
   live: boolean;
+  liveDetail: LiveDetail;
+}
+
+interface ProjectAggregate {
+  project: string;
+  entries: number;
+  live: boolean;
+  ports: number[];
 }
 
 export async function run(_positional: string[], opts: GlobalOptions): Promise<number> {
@@ -29,15 +43,27 @@ export async function run(_positional: string[], opts: GlobalOptions): Promise<n
   const cliEntries = loadRegistry().instances.map(cliEntry);
   const pluginEntries = pluginListEntries(cliEntries);
   const probeEntries = await probeListEntries(probePort);
-  const instances = [...cliEntries, ...pluginEntries, ...probeEntries];
-  writeJson(instances, opts);
-  if (instances.length === 0) {
+  let entries = [...cliEntries, ...pluginEntries, ...probeEntries];
+  await fillEndpointLiveness(entries);
+  if (opts.stale === true) {
+    entries = entries.filter((entry) => !entry.live);
+  }
+  if (opts.all === true) {
+    entries = withIdleProjects(entries);
+  }
+  if (opts.projectsView === true) {
+    writeJson(aggregateByProject(entries), opts);
+    return ExitCode.Success;
+  }
+  writeJson(entries, opts);
+  if (entries.length === 0) {
     reportEmpty(opts);
   }
   return ExitCode.Success;
 }
 
 function cliEntry(entry: InstanceEntry): ListEntry {
+  const alive = isAlive(entry.pid);
   return {
     id: entry.id,
     source: "cli",
@@ -46,7 +72,8 @@ function cliEntry(entry: InstanceEntry): ListEntry {
     pid: entry.pid,
     headless: entry.headless,
     startedAt: entry.startedAt,
-    live: isAlive(entry.pid),
+    live: alive,
+    liveDetail: { pid: alive, endpoint: null },
   };
 }
 
@@ -57,30 +84,35 @@ function pluginListEntries(cliEntries: ListEntry[]): ListEntry[] {
     if (entry.pid !== null) {
       knownPids.add(entry.pid);
     }
-    knownPorts.add(entry.port);
+    if (entry.port !== null) {
+      knownPorts.add(entry.port);
+    }
   }
   const records = readPluginInstanceIndex().sort((a, b) => b.startedAt - a.startedAt);
   const entries: ListEntry[] = [];
   for (const record of records) {
-    const port = record.port;
     const pid = record.pid;
-    if (port === null || pid === null || !isAlive(pid)) {
+    const port = record.port;
+    if ((pid !== null && knownPids.has(pid)) || (port !== null && knownPorts.has(port))) {
       continue;
     }
-    if (knownPids.has(pid) || knownPorts.has(port)) {
-      continue;
+    if (pid !== null) {
+      knownPids.add(pid);
     }
-    knownPids.add(pid);
-    knownPorts.add(port);
+    if (port !== null) {
+      knownPorts.add(port);
+    }
+    const alive = pid !== null && isAlive(pid);
     entries.push({
       id: record.instanceId,
       source: "plugin",
       project: record.projectPath,
       port,
       pid,
-      headless: false,
-      startedAt: isoFromEpochMs(record.startedAt),
-      live: true,
+      headless: null,
+      startedAt: null,
+      live: alive,
+      liveDetail: { pid: alive, endpoint: null },
     });
   }
   return entries;
@@ -102,16 +134,62 @@ async function probeListEntries(port: number | null): Promise<ListEntry[]> {
       project: "",
       port,
       pid: null,
-      headless: false,
-      startedAt: new Date().toISOString(),
+      headless: null,
+      startedAt: null,
       live: true,
+      liveDetail: { pid: false, endpoint: true },
     },
   ];
 }
 
-function isoFromEpochMs(value: number): string {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "" : date.toISOString();
+async function fillEndpointLiveness(entries: ListEntry[]): Promise<void> {
+  await Promise.all(
+    entries.map(async (entry) => {
+      if (entry.port === null || entry.source === "probe") {
+        return;
+      }
+      const alive = await endpointAlive(entry.port);
+      entry.liveDetail = { pid: entry.liveDetail.pid, endpoint: alive };
+      entry.live = entry.liveDetail.pid || alive;
+    }),
+  );
+}
+
+function withIdleProjects(entries: ListEntry[]): ListEntry[] {
+  const covered = new Set(entries.map((entry) => entry.project).filter((value) => value !== ""));
+  const extras: ListEntry[] = [];
+  for (const project of listProjects()) {
+    if (project.path === "" || covered.has(project.path) || project.live) {
+      continue;
+    }
+    extras.push({
+      id: `project:${project.hash}`,
+      source: "project",
+      project: project.path,
+      port: null,
+      pid: null,
+      headless: null,
+      startedAt: project.lastActive === "" ? null : project.lastActive,
+      live: false,
+      liveDetail: { pid: false, endpoint: null },
+    });
+  }
+  return [...entries, ...extras];
+}
+
+function aggregateByProject(entries: ListEntry[]): ProjectAggregate[] {
+  const groups = new Map<string, ProjectAggregate>();
+  for (const entry of entries) {
+    const key = entry.project === "" ? "(unknown)" : entry.project;
+    const group = groups.get(key) ?? { project: key, entries: 0, live: false, ports: [] };
+    group.entries += 1;
+    group.live = group.live || entry.live;
+    if (entry.port !== null && !group.ports.includes(entry.port)) {
+      group.ports.push(entry.port);
+    }
+    groups.set(key, group);
+  }
+  return [...groups.values()].sort((a, b) => a.project.localeCompare(b.project));
 }
 
 function reportEmpty(opts: GlobalOptions): void {

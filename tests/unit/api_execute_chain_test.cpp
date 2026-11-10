@@ -1,5 +1,5 @@
-#include "core/api_surface.hpp"
-#include "tools/tool_execute.hpp"
+#include "core/transport/api_surface.hpp"
+#include "tools/base/tool_execute.hpp"
 
 #include <gtest/gtest.h>
 
@@ -8,9 +8,9 @@
 #include <unordered_map>
 #include <utility>
 
-#include "tools/register_all.hpp"
-#include "tools/tool_base.hpp"
-#include "tools/tool_registry.hpp"
+#include "tools/base/register_all.hpp"
+#include "tools/base/tool_base.hpp"
+#include "tools/base/tool_registry.hpp"
 
 namespace {
 
@@ -25,7 +25,7 @@ class RecordingTool : public ToolBase {
 public:
   explicit RecordingTool(const std::string &name) : name_(name) {
     meta_.name = name_;
-    meta_.description = "l1 rest chain stub";
+    meta_.description = "rest chain stub";
     meta_.category = "Test";
   }
 

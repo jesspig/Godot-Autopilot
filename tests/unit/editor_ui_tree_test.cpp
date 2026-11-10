@@ -1,4 +1,4 @@
-#include "tools/editor_ui_ops.hpp"
+#include "tools/domains/editor/editor_ui_ops.hpp"
 
 #include <gtest/gtest.h>
 

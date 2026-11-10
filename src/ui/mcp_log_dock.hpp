@@ -12,7 +12,7 @@
 #include <godot_cpp/classes/rich_text_label.hpp>
 #include <godot_cpp/variant/variant.hpp>
 
-#include "../core/log_system.hpp"
+#include "../core/observability/log_system.hpp"
 
 namespace godot_autopilot {
 

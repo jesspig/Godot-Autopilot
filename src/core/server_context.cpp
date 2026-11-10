@@ -1,19 +1,20 @@
 #include "server_context.hpp"
 #include "config.hpp"
-#include "log_system.hpp"
+#include "core/observability/log_system.hpp"
 #include "plugin_config.hpp"
 #include <version.hpp>
 #include "prompts/debugger_prompts.hpp"
 #include "prompts/prompt_handlers.hpp"
 #include "resources/debugger_resources.hpp"
 #include "resources/resource_handlers.hpp"
-#include "tools/register_all.hpp"
-#include "tools/dispatch.hpp"
-#include "tools/tool_catalog.hpp"
+#include "tools/base/register_all.hpp"
+#include "tools/base/dispatch.hpp"
+#include "tools/base/tool_catalog.hpp"
 #include "util/bm25_index.hpp"
-#include "monitor.hpp"
+#include "core/observability/monitor.hpp"
 #include <cstdlib>
 #include <chrono>
+#include <thread>
 #include <exception>
 #include <map>
 #include <string_view>
@@ -25,19 +26,24 @@
 #include <mcp/protocol/MessageFilter.hpp>
 #include <memory>
 
-#include "core/api_auth.hpp"
-#include "core/api_endpoints.hpp"
-#include "core/api_server.hpp"
-#include "core/api_surface.hpp"
-#include "core/api_token.hpp"
-#include "core/gda_home.hpp"
-#include "core/godot_transport.hpp"
-#include "core/http_transport.hpp"
-#include "core/http_transport_ext.hpp"
-#include "core/instance_guard.hpp"
-#include "core/instance_registry.hpp"
-#include "core/mcp_http_shim.hpp"
-#include "tools/tool_execute.hpp"
+#include "core/transport/api_auth.hpp"
+#include "core/transport/api_endpoints.hpp"
+#include "core/transport/api_server.hpp"
+#include "core/transport/api_surface.hpp"
+#include "core/transport/api_token.hpp"
+#include "core/storage/gda_home.hpp"
+#include "core/transport/godot_transport.hpp"
+#include "core/transport/http_transport.hpp"
+#include "core/transport/http_transport_ext.hpp"
+#include "core/transport/ipc_endpoint.hpp"
+#include "core/transport/ipc_transport.hpp"
+#include "core/storage/project_store.hpp"
+#include <cstdlib>
+#include <filesystem>
+#include "core/storage/instance_guard.hpp"
+#include "core/storage/instance_registry.hpp"
+#include "core/transport/mcp_http_shim.hpp"
+#include "tools/base/tool_execute.hpp"
 #include "util/api_host_context.hpp"
 
 namespace godot_autopilot {
@@ -221,7 +227,76 @@ bool ServerContext::start() {
                               "MCP server initializing: host=" + host_ +
                                   " port=" + std::to_string(port_));
 
+    {
+      const std::string project_root = util::api_host_project_root();
+      std::string project_name;
+      const std::size_t slash = project_root.find_last_of("/\\");
+      if (slash != std::string::npos && slash + 1 < project_root.size()) {
+        project_name = project_root.substr(slash + 1);
+      }
+      const std::filesystem::path run_dir =
+          std::filesystem::path(ProjectStore::root_dir()) / "run";
+      std::filesystem::path fallback_dir = run_dir;
+#ifdef _WIN32
+      if (const char *local = std::getenv("LOCALAPPDATA");
+          local != nullptr && *local != '\0') {
+        fallback_dir = std::filesystem::path(local) / "gda";
+      }
+#endif
+      std::error_code ec;
+      std::filesystem::create_directories(run_dir, ec);
+      const std::string socket_path = ipc_endpoint::derive_socket_path(
+          project_name, project_root, run_dir.string(), fallback_dir.string());
+      std::filesystem::create_directories(
+          std::filesystem::path(socket_path).parent_path(), ec);
+      std::filesystem::remove(socket_path, ec);
+      std::string ipc_error;
+      if (ipc_transport::ipc_transport_instance().listen(socket_path,
+                                                         ipc_error)) {
+        LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
+                                  "IPC transport listening: " + socket_path);
+      } else {
+        LogSystem::instance().log(
+            LogLevel::Warning, LogCategory::Transport,
+            "IPC transport unavailable (TCP only): " + ipc_error);
+      }
+    }
+
     transport_ = godot_transport_reset();
+
+    ipc_transport::ipc_transport_instance().set_line_handler(
+        [transport = transport_](std::uint64_t connection_id,
+                                 const std::string &line) {
+          const std::string connection =
+              "ipc-" + std::to_string(connection_id);
+          const mcp_wire::ParsedRequest parsed = mcp_wire::parse_request(line);
+          if (!parsed.ok) {
+            ipc_transport::ipc_transport_instance().queue_line(
+                connection_id,
+                mcp_wire::build_error_response_text(-32700, parsed.error));
+            return;
+          }
+          std::string error;
+          if (!transport || !transport->submit(parsed, connection, error)) {
+            ipc_transport::ipc_transport_instance().queue_line(
+                connection_id,
+                mcp_wire::build_error_response_text(-32603, error));
+            return;
+          }
+          if (parsed.is_notification) {
+            return;
+          }
+          const std::string request_id = parsed.request_id;
+          std::thread([transport, connection, request_id, connection_id]() {
+            std::string response;
+            if (transport->await_response(
+                    connection, request_id, response,
+                    std::chrono::milliseconds(60000))) {
+              ipc_transport::ipc_transport_instance().queue_line(
+                  connection_id, std::move(response));
+            }
+          }).detach();
+        });
 
     mcp::ServerOptions opts;
     opts.server_info = mcp::Implementation{"godot-autopilot", GDA_VERSION};
@@ -451,6 +526,11 @@ void ServerContext::write_instance_record() {
       EndpointEntry{host_, port_, GDA_MCP_PATH, "mcp", "none"};
   record.endpoints.api =
       EndpointEntry{host_, port_, GDA_API_PATH, "http", "bearer"};
+  if (ipc_transport::ipc_transport_instance().is_listening()) {
+    record.endpoints.ipc.path =
+        ipc_transport::ipc_transport_instance().bound_path();
+    record.endpoints.ipc.present = true;
+  }
   record.gda_home = HomeResolver::gda_home();
   record.started_at = started_at;
   record.version = GDA_VERSION;
@@ -495,6 +575,7 @@ void ServerContext::remove_instance_record() {
 }
 
 void ServerContext::stop() {
+  ipc_transport::ipc_transport_instance().stop();
   if (!running_ && !server_ && !transport_) {
     http_transport_instance().stop();
     return;

@@ -1,5 +1,5 @@
-#include "tools/tool_registry.hpp"
-#include "tools/tool_spec.hpp"
+#include "tools/base/tool_registry.hpp"
+#include "tools/base/tool_spec.hpp"
 
 #include <gtest/gtest.h>
 

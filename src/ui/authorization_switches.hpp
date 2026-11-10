@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <string_view>
 
-#include "tools/authorization.hpp"
+#include "tools/base/authorization.hpp"
 
 namespace godot_autopilot {
 namespace authorization_switches {

@@ -18,8 +18,9 @@ include(GoogleTest)
 
 # 业务子集源码 (从仓库根引用; ops 实现文件经 make_tools() 被 register_all.cpp 引用, 链接必需)
 # resource_registry.cpp 被 code_exec_ops.cpp / resource_ops.cpp 引用 (grep 确认)
-file(GLOB GDA_TOOLS_OPS_SOURCES CONFIGURE_DEPENDS
-    "${CMAKE_SOURCE_DIR}/src/tools/*_ops.cpp")
+file(GLOB_RECURSE GDA_TOOLS_OPS_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_SOURCE_DIR}/src/tools/domains/*/*_ops.cpp"
+    "${CMAKE_SOURCE_DIR}/src/tools/base/*_ops.cpp")
 
 # 链接依赖 (grep 确认)：
 #   variant_json.cpp      — ops 大量调用 VariantJson::serialize/deserialize
@@ -30,7 +31,7 @@ file(GLOB GDA_TOOLS_OPS_SOURCES CONFIGURE_DEPENDS
 #                           (tools/*_ops.cpp 由上方 GLOB 自动纳入，
 #                           含 script_patch_ops.cpp 与 scene_spec_ops.cpp；
 #                           game_bridge_verify.cpp 为游戏侧运行时，
-#                           仅被 game_bridge.cpp 引用，不进 L1 业务源)
+#                           仅被 game_bridge.cpp 引用，不进 单元与边界测试业务源)
 #
 # 源清单聚合：基础业务源在 cmake/sources/gda_unit_sources.cmake，
 # 各并行分支的测试源在 cmake/sources/api_unit_*.cmake，
@@ -54,7 +55,7 @@ set(GDA_UNIT_BUSINESS_SOURCES
     ${GDA_UNIT_INSTANCE_GUARD_SOURCES})
 
 # ====================================================================
-# gda_unit_tests — L1 纯单元测试 (不启动引擎, 不触碰 Godot API)
+# gda_unit_tests — 单元测试层 (不启动引擎, 不触碰 Godot API)
 # ====================================================================
 file(GLOB_RECURSE GDA_UNIT_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/unit/*.cpp")
@@ -62,6 +63,8 @@ file(GLOB_RECURSE GDA_UNIT_SOURCES CONFIGURE_DEPENDS
 if(GDA_UNIT_SOURCES)
     set(GDA_UNIT_ALL_SOURCES ${GDA_UNIT_SOURCES} ${GDA_UNIT_BUSINESS_SOURCES})
     list(REMOVE_DUPLICATES GDA_UNIT_ALL_SOURCES)
+    # 边界层用例经 api_unit_*.cmake 登记在业务源里，须从单元目标剔除避免重复注册
+    list(FILTER GDA_UNIT_ALL_SOURCES EXCLUDE REGEX "/tests/boundary/")
     add_executable(gda_unit_tests ${GDA_UNIT_ALL_SOURCES})
 
     # skill 内容头 skill_content_embedded.h 由 cmake/skill_gen.cmake 构建期生成
@@ -83,158 +86,76 @@ if(GDA_UNIT_SOURCES)
         LINK_SEARCH_START_STATIC ON
         LINK_SEARCH_END_STATIC ON)
 
-    gtest_discover_tests(gda_unit_tests)
+    gtest_discover_tests(gda_unit_tests PROPERTIES LABELS "unit")
 endif()
 
 # ====================================================================
-# gda_test_runner — L2 引擎驱动测试执行器 (自管 Godot 进程, 不做 gtest 发现)
+# gda_boundary_tests — 边界测试层 (参数校验 / 拒绝路径 / 预算与超时 / 错误映射)
+# 源清单走 glob, 新增 boundary/*_test.cpp 后重新 configure 即注册。
+# 与单元层共用业务源, 仅排除 tests/ 下的用例文件避免重复注册。
 # ====================================================================
-add_executable(gda_test_runner
-    runner/main.cpp
-    runner/godot_process.cpp
-    runner/config_loader.cpp
-    runner/assert_engine.cpp
-    runner/pipeline_executor.cpp
-    runner/traversal.cpp
-    runner/runner_report.cpp
-    integration/mcp_test_client.cpp)
+file(GLOB GDA_BOUNDARY_TEST_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/boundary/*_test.cpp")
 
-target_include_directories(gda_test_runner PRIVATE
-    ${CMAKE_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR})
-target_compile_definitions(gda_test_runner PRIVATE PROJECT_ROOT="${CMAKE_SOURCE_DIR}")
-target_link_libraries(gda_test_runner PRIVATE
-    godot-cpp mcp-server mcp-http mcp-client)
-set_target_properties(gda_test_runner PROPERTIES
-    CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON
-    LINK_SEARCH_START_STATIC ON LINK_SEARCH_END_STATIC ON)
-if(MSVC)
-    target_link_options(gda_test_runner PRIVATE "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>")
-endif()
+if(GDA_BOUNDARY_TEST_SOURCES)
+    set(GDA_BOUNDARY_BUSINESS_SOURCES ${GDA_UNIT_BUSINESS_SOURCES})
+    list(FILTER GDA_BOUNDARY_BUSINESS_SOURCES EXCLUDE REGEX "/tests/(unit|boundary)/")
+    add_executable(gda_boundary_tests
+        ${GDA_BOUNDARY_TEST_SOURCES}
+        ${GDA_BOUNDARY_BUSINESS_SOURCES})
 
-# ====================================================================
-# gda_pool_ctl — L2 池生命周期工具 (start/stop/status/restart; T-03 骨架)
-# ====================================================================
-add_executable(gda_pool_ctl
-    pool/pool_ctl_main.cpp
-    runner/godot_process.cpp
-    integration/mcp_test_client.cpp)
+    add_dependencies(gda_boundary_tests gda_skill_embed_header)
 
-target_include_directories(gda_pool_ctl PRIVATE
-    ${CMAKE_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR})
-target_compile_definitions(gda_pool_ctl PRIVATE PROJECT_ROOT="${CMAKE_SOURCE_DIR}")
-target_link_libraries(gda_pool_ctl PRIVATE
-    godot-cpp mcp-server mcp-http mcp-client)
-set_target_properties(gda_pool_ctl PROPERTIES
-    CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON
-    LINK_SEARCH_START_STATIC ON LINK_SEARCH_END_STATIC ON)
-if(MSVC)
-    target_link_options(gda_pool_ctl PRIVATE "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>")
-endif()
-
-# ── ctest 注册: L2 用例编排（pool=五池常驻+按池直连 / per-test=legacy 逐条启动）──
-# 用例文件在 configure 期经 GLOB 收集, config/ 目录新增 *.json 后重新 configure 即注册。
-file(GLOB GDA_TEST_CONFIGS CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/config/*.json")
-
-# 路由单一事实源: pool/pools.json 由 pool/gen_pool_map.py 在 configure 期渲染成
-# pool_map.cmake（GDA_POOL_MODE / GDA_POOL_NAMES / 每用例 GDA_POOL_<用例名大写且连字符转下划线>）。
-# include 后在注册期静态决定每条用例的 --pool，用例↔池的分区不在 CMake 里二次维护。
-set(GDA_POOL_POOLS_JSON "${CMAKE_CURRENT_SOURCE_DIR}/pool/pools.json")
-set(GDA_POOL_MAP_FILE "${CMAKE_CURRENT_BINARY_DIR}/pool_map.cmake")
-set(GDA_POOL_STATE_DIR "${CMAKE_CURRENT_BINARY_DIR}/pool/state")
-
-# 回滚开关: -DGDA_POOL_MODE=per-test 强制走 legacy（不受 pools.json 的 mode 影响）；
-# 留空则跟随 pools.json。恢复跟随: cmake -UGDA_POOL_MODE --preset <preset>。
-set(GDA_POOL_MODE "" CACHE STRING "L2 用例编排模式: 留空=跟随 pools.json, per-test=强制 legacy")
-set(GDA_POOL_MODE_OVERRIDE "${GDA_POOL_MODE}")
-
-if(EXISTS "${GDA_POOL_POOLS_JSON}")
-    execute_process(
-        COMMAND "${GDA_PYTHON_EXECUTABLE}"
-                "${CMAKE_CURRENT_SOURCE_DIR}/pool/gen_pool_map.py"
-                --pools "${GDA_POOL_POOLS_JSON}"
-                --out "${GDA_POOL_MAP_FILE}"
-        RESULT_VARIABLE GDA_POOL_MAP_RESULT
-        OUTPUT_VARIABLE GDA_POOL_MAP_STDOUT
-        ERROR_VARIABLE GDA_POOL_MAP_STDERR)
-    if(NOT GDA_POOL_MAP_RESULT EQUAL 0)
-        message(FATAL_ERROR
-            "[gda] 池路由映射生成失败 (退出码 ${GDA_POOL_MAP_RESULT}), 用例注册中止:\n"
-            "${GDA_POOL_MAP_STDERR}${GDA_POOL_MAP_STDOUT}")
+    target_include_directories(gda_boundary_tests PRIVATE
+        ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests ${CMAKE_BINARY_DIR}/generated)
+    target_link_libraries(gda_boundary_tests PRIVATE
+        godot-cpp mcp-server mcp-http mcp-client GTest::gtest_main)
+    if(MSVC)
+        target_link_options(gda_boundary_tests PRIVATE "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>")
     endif()
-    include("${GDA_POOL_MAP_FILE}")
-    if(NOT GDA_POOL_MODE_OVERRIDE STREQUAL "")
-        set(GDA_POOL_MODE "${GDA_POOL_MODE_OVERRIDE}")
-        message(STATUS "[gda] L2 编排模式被 -DGDA_POOL_MODE 覆盖为 ${GDA_POOL_MODE}")
-    endif()
-    message(STATUS "[gda] L2 编排模式: ${GDA_POOL_MODE} (池: ${GDA_POOL_NAMES})")
-else()
-    set(GDA_POOL_MODE "per-test")
-    message(STATUS "[gda] 未找到 ${GDA_POOL_POOLS_JSON}, L2 用例退化为 per-test (legacy) 注册")
+
+    set_target_properties(gda_boundary_tests PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED ON
+        LINK_SEARCH_START_STATIC ON
+        LINK_SEARCH_END_STATIC ON)
+
+    gtest_discover_tests(gda_boundary_tests PROPERTIES LABELS "boundary")
 endif()
 
-if(WIN32 AND GDA_POOL_MODE STREQUAL "pool")
-    # fixtures: 一次并发启动五池 → 池内用例按路由直连, isolated 用例逐例走 legacy → 停池
-    #（不跑用例时 ctest 不触发）。
-    add_test(NAME pool_setup
-        COMMAND gda_pool_ctl start --all --state-dir "${GDA_POOL_STATE_DIR}")
-    set_tests_properties(pool_setup PROPERTIES
-        FIXTURES_SETUP PoolSuite
-        TIMEOUT 300)
+# ====================================================================
+# gda_integration_tests — 集成测试层 (进程内, 零引擎零项目绑定)
+# 源清单走 glob, 新增 integration/*_test.cpp 后重新 configure 即注册。
+# ====================================================================
+file(GLOB GDA_INTEGRATION_TEST_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/integration/*_test.cpp")
 
-    add_test(NAME pool_cleanup
-        COMMAND gda_pool_ctl stop --all --state-dir "${GDA_POOL_STATE_DIR}")
-    set_tests_properties(pool_cleanup PROPERTIES
-        FIXTURES_CLEANUP PoolSuite
-        TIMEOUT 300)
+if(GDA_INTEGRATION_TEST_SOURCES)
+    set(GDA_INTEGRATION_BUSINESS_SOURCES ${GDA_UNIT_BUSINESS_SOURCES})
+    list(FILTER GDA_INTEGRATION_BUSINESS_SOURCES EXCLUDE REGEX "/tests/(unit|boundary)/")
+    add_executable(gda_integration_tests
+        ${GDA_INTEGRATION_TEST_SOURCES}
+        ${GDA_INTEGRATION_BUSINESS_SOURCES})
 
-    foreach(cfg ${GDA_TEST_CONFIGS})
-        get_filename_component(TEST_NAME "${cfg}" NAME_WE)
-        string(TOUPPER "${TEST_NAME}" POOL_VAR_SUFFIX)
-        string(REPLACE "-" "_" POOL_VAR_SUFFIX "${POOL_VAR_SUFFIX}")
-        set(POOL_VAR "GDA_POOL_${POOL_VAR_SUFFIX}")
-        # isolated 用例不参与池分区, 按 legacy 形态逐例注册: 不挂 PoolSuite fixture、不占池锁,
-        # 也不读 pool_map 的路由变量。
-        if(TEST_NAME IN_LIST GDA_POOL_ISOLATED)
-            add_test(NAME gda_runner_${TEST_NAME}
-                COMMAND gda_test_runner --file ${TEST_NAME}
-                        --report-dir ${CMAKE_CURRENT_BINARY_DIR}/output)
-            set_tests_properties(gda_runner_${TEST_NAME} PROPERTIES TIMEOUT 600)
-        else()
-            if(NOT DEFINED ${POOL_VAR} OR "${${POOL_VAR}}" STREQUAL "")
-                message(FATAL_ERROR
-                    "[gda] 池路由缺失: 用例 ${TEST_NAME} 在 ${GDA_POOL_MAP_FILE} 中找不到变量 "
-                    "${POOL_VAR}; 请检查 ${GDA_POOL_POOLS_JSON} 是否覆盖 config/*.json 全集")
-            endif()
-            add_test(NAME gda_runner_${TEST_NAME}
-                COMMAND gda_test_runner
-                        --pool ${${POOL_VAR}}
-                        --pool-state-dir "${GDA_POOL_STATE_DIR}"
-                        --file ${TEST_NAME}
-                        --report-dir ${CMAKE_CURRENT_BINARY_DIR}/output)
-            # 池模式省去逐例 Godot 启动, 单例仍可能触发一次自愈 restart, 超时与 legacy 对齐
-            # RESOURCE_LOCK 按路由池分组: ctest -j 下同池用例串行、跨池并行（并行度=池数, DR-04）
-            set_tests_properties(gda_runner_${TEST_NAME} PROPERTIES
-                FIXTURES_REQUIRED PoolSuite
-                TIMEOUT 600
-                RESOURCE_LOCK "pool_${${POOL_VAR}}")
-        endif()
-    endforeach()
-else()
-    # legacy 回滚路径: 每份 config 一条 --file 用例, 逐例自起 Godot, 无 fixtures。
-    # 非 Windows 平台无法跑 L2 池（pool_setup 必失败）, 一律降级到 legacy 单用例注册。
-    if(NOT WIN32)
-        message(STATUS "[gda] 非 Windows 平台：L2 按 legacy 单用例注册")
+    add_dependencies(gda_integration_tests gda_skill_embed_header)
+
+    target_include_directories(gda_integration_tests PRIVATE
+        ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests ${CMAKE_BINARY_DIR}/generated)
+    target_link_libraries(gda_integration_tests PRIVATE
+        godot-cpp mcp-server mcp-http mcp-client GTest::gtest_main)
+    if(MSVC)
+        target_link_options(gda_integration_tests PRIVATE "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>")
     endif()
-    foreach(cfg ${GDA_TEST_CONFIGS})
-        get_filename_component(TEST_NAME "${cfg}" NAME_WE)
-        add_test(NAME gda_runner_${TEST_NAME}
-            COMMAND gda_test_runner --file ${TEST_NAME}
-                    --report-dir ${CMAKE_CURRENT_BINARY_DIR}/output)
-        # 单文件含遍历约 2-4 分钟, 超时防挂死
-        set_tests_properties(gda_runner_${TEST_NAME} PROPERTIES TIMEOUT 600)
-    endforeach()
+
+    set_target_properties(gda_integration_tests PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED ON
+        LINK_SEARCH_START_STATIC ON
+        LINK_SEARCH_END_STATIC ON)
+
+    gtest_discover_tests(gda_integration_tests PROPERTIES LABELS "integration")
 endif()
+
 
 # ── ctest 注册: 迁移守卫（零依赖，读源码断言，无需构建产物） ──
 add_test(NAME migration_guard
@@ -258,11 +179,17 @@ add_test(NAME main_thread_guard
 add_test(NAME version_sync_guard
     COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/version_sync_guard.py")
 
-# ── ctest 注册: L1 源清单守卫（零依赖，读源码断言，无需构建产物） ──
+# ── ctest 注册: 测试源清单守卫（零依赖，读源码断言，无需构建产物） ──
 # 解析 cmake/sources/ 下插件清单 + src/tools/*_ops.cpp glob 断言并集 == src/ 全部 .cpp，
-# L1 清单引用的 src/ 源 ⊆ 插件并集；解析规则见 guard/source_manifest_guard.py 模块 docstring。
+# 测试源清单引用的 src/ 源 ⊆ 插件并集；解析规则见 guard/source_manifest_guard.py 模块 docstring。
 add_test(NAME source_manifest_guard
     COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/source_manifest_guard.py")
+
+# ── ctest 注册: 工具域守卫（零依赖，读源码断言域规格与实现同名前缀） ──
+# 断言 src/tools/<X>_tools.hpp 存在同前缀 <X>_ops.cpp / <X>_*_ops.cpp，
+# 且规格文件引用的每个 <ns>::handle_* 都有定义；豁免与判据见 guard/tool_domain_guard.py。
+add_test(NAME tool_domain_guard
+    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/tool_domain_guard.py")
 
 # ── ctest 注册: CLI 契约 mock conformance（纯 stdlib + 自带 mock server）──
 # bun 缺失时测试文件自行打印 SKIP 并 exit 0，ctest 视为通过；
@@ -290,3 +217,26 @@ add_test(NAME comment_guard_self_test
 
 add_test(NAME main_thread_guard_self_test
     COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/main_thread_guard.py" --self-test)
+
+add_test(NAME tool_domain_guard_self_test
+    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/tool_domain_guard.py" --self-test)
+
+# ====================================================================
+# ctest 层级标签：unit / boundary / integration 由 gtest_discover_tests 的
+# PROPERTIES LABELS 标注；此处补齐源码守卫（guard）与 CLI 脚本项（cli）。
+# 全量默认门仍是裸 ctest；分层执行用 ctest -L <label>。
+# ====================================================================
+set_tests_properties(
+    migration_guard
+    comment_guard
+    main_thread_guard
+    version_sync_guard
+    source_manifest_guard
+    tool_domain_guard
+    migration_guard_self_test
+    comment_guard_self_test
+    main_thread_guard_self_test
+    tool_domain_guard_self_test
+    PROPERTIES LABELS "guard")
+
+set_tests_properties(cli_contract cli_unit PROPERTIES LABELS "cli")

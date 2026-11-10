@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { gdaRoot, projectPathKey } from "./platform";
-import { isAlive } from "./process";
+import { cachedEndpointAlive } from "./probe";
 
 export const PLUGIN_INDEX_FILE = "instances.json";
 export const DEFAULT_HOST = "127.0.0.1";
@@ -29,8 +29,16 @@ export interface PluginInstanceRecord {
   apiToken: string;
   mcpEndpoint: EndpointEntry | null;
   apiEndpoint: EndpointEntry | null;
+  ipcEndpoint: IpcEndpointRecord | null;
   startedAt: number;
   version: string;
+}
+
+export interface IpcEndpointRecord {
+  path: string;
+  protocol: string;
+  framing: string;
+  auth: string;
 }
 
 export type EndpointKind = "mcp" | "api";
@@ -89,8 +97,11 @@ export function findPluginRecordByPort(port: number): PluginInstanceRecord | und
 
 function pickPreferred(records: PluginInstanceRecord[]): PluginInstanceRecord | undefined {
   if (records.length === 0) return undefined;
-  const alive = records.filter((r) => r.pid !== null && isAlive(r.pid));
-  const pool = alive.length > 0 ? alive : records;
+  const endpointAlive = records.filter((record) => {
+    const port = record.port ?? record.mcpEndpoint?.port ?? record.apiEndpoint?.port ?? null;
+    return port !== null && cachedEndpointAlive(port) === true;
+  });
+  const pool = endpointAlive.length > 0 ? endpointAlive : records;
   return pool.reduce((best, current) => (current.startedAt > best.startedAt ? current : best));
 }
 
@@ -122,8 +133,21 @@ function parseRecord(item: unknown): PluginInstanceRecord | null {
     apiToken: readString(doc, ["api_token", "apiToken", "token"]) ?? "",
     mcpEndpoint: buildEndpoint(endpoints["mcp"], mcpPort, DEFAULT_MCP_PATH, MCP_PROTOCOL, MCP_AUTH),
     apiEndpoint: buildEndpoint(endpoints["api"], apiPort, DEFAULT_API_PATH, HTTP_PROTOCOL, API_AUTH),
+    ipcEndpoint: parseIpcEndpoint(endpoints["ipc"]),
     startedAt: readNumber(doc, ["started_at", "startedAt"]) ?? 0,
     version: readString(doc, ["version"]) ?? "",
+  };
+}
+
+function parseIpcEndpoint(raw: unknown): IpcEndpointRecord | null {
+  const doc = readObject(raw);
+  const path = readString(doc, ["path"]);
+  if (path === undefined) return null;
+  return {
+    path,
+    protocol: readString(doc, ["protocol"]) ?? "uds",
+    framing: readString(doc, ["framing"]) ?? "ndjson",
+    auth: readString(doc, ["auth"]) ?? "filesystem",
   };
 }
 

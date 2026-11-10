@@ -1,17 +1,17 @@
 # The GDA CLI
 
-Companion reference of the godot-autopilot-tools volume: how to reach the server from a shell when the native MCP channel is unavailable — through `bunx`, through a globally installed `gda`, or through a self-contained binary that needs no JavaScript runtime at all.
+Companion reference of the godot-autopilot-tools volume: how to reach the server from a shell — the first-class `gda` channel — through `bunx`, through a globally installed `gda`, or through a self-contained binary that needs no JavaScript runtime at all.
 
-The GDA CLI is the only scripted calling channel. Every call goes through the harness MCP tools or this command; nothing else is sanctioned.
+The GDA CLI is the first-class and only scripted calling channel. Every call goes through this command or, when your harness lists them, the native MCP tools; nothing else is sanctioned.
 
 ## When this channel applies
 
-Enter here when either holds:
+The CLI is the default channel: enter here whenever a shell works, whether or not the harness lists native MCP tools. Two situations in particular bring you here:
 
-- **No MCP client is configured.** The user installed the plugin in Godot and the project contains `addons/godot-autopilot`, but the harness has no GDA MCP server wired up, so no GDA tools appear in your tool list. This is the common case for a first contact: the plugin is running, the agent simply has no native channel.
+- **No MCP client is configured.** The user installed the plugin in Godot and the project contains `addons/godot-autopilot`, but the harness has no GDA MCP server wired up, so no GDA tools appear in your tool list.
 - **The client lost its tools.** The tool list went empty or calls fail right after an editor restart and reconnecting did not help.
 
-If the native MCP tools are present and working, use them instead — this reference is a fallback, not a preference.
+When both a shell and native MCP tools are available, the CLI remains the first-class surface; the native tools are the compatibility face.
 
 ## Which distribution to use
 
@@ -25,9 +25,37 @@ Probe the machine before choosing: `bun --version`, then `node --version`.
 
 All three distributions are the same program: they speak the same MCP protocol, accept the same subcommands and share the same exit codes. Nothing in the calling protocol changes when you switch.
 
-**Caveat — the pinned ref resolves only once its tag is published.** As of `0.3.0` the repository tree does ship the CLI: the root `package.json` exposes the `gda` binary as `cli/bin/gda.ts`, and `cli/` is part of the tree, so `bunx "github:jesspig/Godot-Autopilot#0.3.0"` resolves the `gda` binary as soon as the `0.3.0` tag exists on the remote. The older caveat — that the pinned tag was cut before the CLI existed, carried no `cli/` directory and no root `package.json`, and could never resolve — no longer applies to the current pin. What still applies is the publishing step: until the `0.3.0` tag and its release are out, that ref is not fetchable, so use `bunx "github:jesspig/Godot-Autopilot#develop" <cmd>` in the meantime (that branch does ship the CLI, but it is an unreleased moving target rather than a pinned version, so pin your own copy with `bun install -g` if you need a stable one). The versioned alternative is the standalone binary below: each release publishes the `gda` assets for five targets next to `addons.zip` with a `sha256sums.txt`, so check the release page for the asset and verify the checksum before downloading.
+**Caveat — the pinned ref resolves only once its tag is published.** As of `0.3.1` the repository tree does ship the CLI: the root `package.json` exposes the `gda` binary as `cli/bin/gda.ts`, and `cli/` is part of the tree, so `bunx "github:jesspig/Godot-Autopilot#0.3.1"` resolves the `gda` binary as soon as the `0.3.1` tag exists on the remote. The older caveat — that the pinned tag was cut before the CLI existed, carried no `cli/` directory and no root `package.json`, and could never resolve — no longer applies to the current pin. What still applies is the publishing step: until the `0.3.1` tag and its release are out, that ref is not fetchable, so use `bunx "github:jesspig/Godot-Autopilot#develop" <cmd>` in the meantime (that branch does ship the CLI, but it is an unreleased moving target rather than a pinned version, so pin your own copy with `bun install -g` if you need a stable one). The versioned alternative is the standalone binary below: each release publishes the `gda` assets for five targets next to `addons.zip` with a `sha256sums.txt`, so check the release page for the asset and verify the checksum before downloading.
 
 ## Commands
+
+Offline family — these work with no running instance and no MCP client:
+
+| Command | Meaning |
+|---|---|
+| `skills list` | List the bundled skill books with their paths and file counts |
+| `skills show <name>` | Print one skill book's SKILL.md; `--file <rel>` reads a reference file instead |
+| `tools list` / `tools search <query>` / `tools describe <tool>` | Offline tool catalog from the cached `/api/tools` snapshot |
+| `projects` | List known Godot projects from the plugin and CLI registries |
+
+Example — no running instance and no MCP client required:
+
+```
+gda skills list
+[{"name":"godot-autopilot","path":".../skills/godot-autopilot","files":2}, ... 9 books]
+
+gda skills show godot-autopilot-tools
+---
+name: godot-autopilot-tools
+description: "Calling the GDA (godot-autopilot) plugin: ..."
+
+gda tools list
+{"generated_at":"2026-11-10T07:00:00.000Z","version":"0.3.1","tools":[{"name":"create_scene_node",...}, ...]}
+
+gda tools search capture
+{"generated_at":"...","version":"0.3.1","tools":[{"name":"capture_editor_viewport",...}]}
+```
+The `tools` family reads a catalog cached by the last successful `gda api list` (or a fresh `gda tools ... --refresh`), so it works with no running instance.
 
 Calling family — meta tools are called directly, every domain tool goes through `call_tool`:
 

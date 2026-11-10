@@ -20,22 +20,23 @@
 #include <godot_cpp/variant/utility_functions.hpp>
 
 #include "core/command_queue.hpp"
+#include "core/transport/ipc_transport.hpp"
 #include "core/export_guard.hpp"
-#include "core/gda_home.hpp"
-#include "core/http_transport_ext.hpp"
-#include "core/log_persist.hpp"
-#include "core/log_system.hpp"
+#include "core/storage/gda_home.hpp"
+#include "core/transport/http_transport_ext.hpp"
+#include "core/observability/log_persist.hpp"
+#include "core/observability/log_system.hpp"
 #include "core/mode_detector.hpp"
-#include "core/monitor.hpp"
-#include "core/perf_sampler.hpp"
+#include "core/observability/monitor.hpp"
+#include "core/observability/perf_sampler.hpp"
 #include "core/plugin_hooks.hpp"
-#include "core/sanitize_policy.hpp"
+#include "core/observability/sanitize_policy.hpp"
 #include "core/scene_dirty_tracker.hpp"
 #include "core/server_context.hpp"
 #include "runtime/game_bridge.hpp"
-#include "tools/autopilot_tools.hpp"
-#include "tools/debugger_ops.hpp"
-#include "tools/runtime_ops.hpp"
+#include "tools/base/autopilot_tools.hpp"
+#include "tools/domains/debugger/debugger_ops.hpp"
+#include "tools/base/runtime_ops.hpp"
 #include "ui/mcp_config_dock.hpp"
 #include "ui/mcp_log_dock.hpp"
 
@@ -341,6 +342,7 @@ void GodotAutopilotPlugin::_process(double delta) {
   godot_autopilot::LogPersist::instance().flush_on_main_thread();
   s_queue.drain();
   godot_autopilot::http_transport_instance().pump();
+  godot_autopilot::ipc_transport::ipc_transport_instance().pump();
   if (log_dock) {
     log_dock->poll_new_entries();
   }

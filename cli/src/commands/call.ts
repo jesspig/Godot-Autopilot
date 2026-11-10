@@ -1,6 +1,7 @@
 import type { GlobalOptions } from "../args";
 import { CliError, ExitCode } from "../errors";
 import { callTool, META_DIRECT_TOOLS } from "../mcp/client";
+import { err } from "../output";
 import { assertCallFamilyUsage, callTimeoutSec, emit, extractPayload, loadToolArguments } from "../payload";
 import { findById, findLiveByProject } from "../registry";
 import { resolveTarget, type TargetContext } from "../target";
@@ -14,10 +15,28 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
   }
   const tool = positional[0];
   const args = loadToolArguments(opts);
+  const timeoutSec = callTimeoutSec(opts);
+  if (opts.socketText !== undefined) {
+    try {
+      const envelope = await callTool(tool, args, {
+        port: 0,
+        timeoutSec,
+        direct: META_DIRECT_TOOLS.has(tool),
+        socketPath: opts.socketText,
+      });
+      const extracted = extractPayload(envelope, { saveImages: opts.saveImages, raw: opts.raw });
+      return emit(extracted, opts);
+    } catch (error) {
+      if (!(error instanceof CliError) || error.code !== ExitCode.Transport || opts.noFallback === true) {
+        throw error;
+      }
+      err(`IPC channel unavailable (${error.message}); falling back to the port channel.`);
+    }
+  }
   const target = resolveTarget(opts, TARGET_CONTEXT);
   const envelope = await callTool(tool, args, {
     port: target.port,
-    timeoutSec: callTimeoutSec(opts),
+    timeoutSec,
     direct: META_DIRECT_TOOLS.has(tool),
   });
   const extracted = extractPayload(envelope, { saveImages: opts.saveImages, raw: opts.raw });

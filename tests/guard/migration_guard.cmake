@@ -34,9 +34,11 @@ if(SELF_TEST)
     set(gda_self_root "${CMAKE_BINARY_DIR}/test-output/migration_guard_self_test")
     get_filename_component(gda_self_root "${gda_self_root}" ABSOLUTE)
     set(gda_self_list "${gda_self_root}/tests/guard/migrated_domains.txt")
-    set(gda_self_good "${gda_self_root}/src/tools/good_tools.hpp")
-    set(gda_self_bad "${gda_self_root}/src/tools/bad2_tools.hpp")
-    file(MAKE_DIRECTORY "${gda_self_root}/tests/guard" "${gda_self_root}/src/tools")
+    set(gda_self_good "${gda_self_root}/src/tools/domains/good/good_tools.hpp")
+    set(gda_self_bad "${gda_self_root}/src/tools/domains/bad2/bad2_tools.hpp")
+    file(MAKE_DIRECTORY "${gda_self_root}/tests/guard"
+        "${gda_self_root}/src/tools/domains/good"
+        "${gda_self_root}/src/tools/domains/bad2")
 
     # 场景一: strict 模式下 bad2_tools.hpp 残留旧宏, 期望非零退出
     file(WRITE "${gda_self_list}" "good\nstrict\n")
@@ -104,7 +106,7 @@ endforeach()
 
 # ── 已迁移域: 头文件存在且不含旧宏 ──
 foreach(gda_guard_domain ${gda_guard_domains})
-    set(gda_guard_rel "src/tools/${gda_guard_domain}_tools.hpp")
+    set(gda_guard_rel "src/tools/domains/${gda_guard_domain}/${gda_guard_domain}_tools.hpp")
     set(gda_guard_abs "${SOURCE_DIR}/${gda_guard_rel}")
     if(NOT EXISTS "${gda_guard_abs}")
         message(FATAL_ERROR "[migration-guard] ${gda_guard_rel}: 文件不存在（域清单条目无效）")
@@ -120,7 +122,7 @@ endforeach()
 set(gda_guard_violations "")
 if(gda_guard_strict)
     # 1) 全部 *_tools.hpp 不得含旧宏
-    file(GLOB gda_guard_headers "${SOURCE_DIR}/src/tools/*_tools.hpp")
+    file(GLOB_RECURSE gda_guard_headers "${SOURCE_DIR}/src/tools/*_tools.hpp")
     foreach(gda_guard_header ${gda_guard_headers})
         file(READ "${gda_guard_header}" gda_guard_content)
         string(FIND "${gda_guard_content}" "GDA_TOOL_CLASS" gda_guard_pos)
@@ -131,14 +133,14 @@ if(gda_guard_strict)
     endforeach()
 
     # 2) 旧的 schema_*_ops.cpp 不得残留
-    file(GLOB gda_guard_legacy_sources "${SOURCE_DIR}/src/tools/schema_*_ops.cpp")
+    file(GLOB_RECURSE gda_guard_legacy_sources "${SOURCE_DIR}/src/tools/schema_*_ops.cpp")
     foreach(gda_guard_legacy ${gda_guard_legacy_sources})
         file(RELATIVE_PATH gda_guard_rel "${SOURCE_DIR}" "${gda_guard_legacy}")
         string(APPEND gda_guard_violations "[migration-guard] ${gda_guard_rel}: strict 模式禁止残留 schema 文件\n")
     endforeach()
 
     # 3) 不得引用 tool_input_schema 或 tools/tool_decl.hpp
-    file(GLOB gda_guard_sources "${SOURCE_DIR}/src/tools/*.hpp" "${SOURCE_DIR}/src/tools/*.cpp")
+    file(GLOB_RECURSE gda_guard_sources "${SOURCE_DIR}/src/tools/*.hpp" "${SOURCE_DIR}/src/tools/*.cpp")
     foreach(gda_guard_source ${gda_guard_sources})
         file(READ "${gda_guard_source}" gda_guard_content)
         string(FIND "${gda_guard_content}" "tool_input_schema" gda_guard_pos_schema)

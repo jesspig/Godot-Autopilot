@@ -1,8 +1,8 @@
 
 #include "core/command_queue.hpp"
-#include "tools/code_exec_ops.hpp"
-#include "tools/dispatch.hpp"
-#include "tools/runtime_ops.hpp"
+#include "tools/base/code_exec_ops.hpp"
+#include "tools/base/dispatch.hpp"
+#include "tools/base/runtime_ops.hpp"
 
 #include <gtest/gtest.h>
 

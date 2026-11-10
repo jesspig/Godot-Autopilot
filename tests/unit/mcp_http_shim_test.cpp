@@ -1,7 +1,7 @@
-#include "core/godot_transport.hpp"
-#include "core/http_stream_registry.hpp"
-#include "core/http_transport_ext.hpp"
-#include "core/mcp_http_shim.hpp"
+#include "core/transport/godot_transport.hpp"
+#include "core/transport/http_stream_registry.hpp"
+#include "core/transport/http_transport_ext.hpp"
+#include "core/transport/mcp_http_shim.hpp"
 
 #include <gtest/gtest.h>
 

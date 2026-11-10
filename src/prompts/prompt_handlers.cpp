@@ -1,7 +1,7 @@
 #include "prompts/prompt_handlers.hpp"
 #include "core/config.hpp"
 #include "core/export_guard.hpp"
-#include "core/log_system.hpp"
+#include "core/observability/log_system.hpp"
 #include "prompts/prompt_create_3d_scene.hpp"
 #include "prompts/prompt_debug_physics.hpp"
 #include "prompts/prompt_keycode_reference.hpp"
@@ -9,7 +9,7 @@
 #include "prompts/prompt_setup_gui.hpp"
 #include "prompts/prompt_setup_input_map.hpp"
 #include "prompts/prompt_tool_usage.hpp"
-#include "tools/dispatch.hpp"
+#include "tools/base/dispatch.hpp"
 #include <mcp/Content.hpp>
 #include <mcp/McpError.hpp>
 #include <memory>

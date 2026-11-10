@@ -109,7 +109,7 @@ jobs:
             exit 1
           }
 
-      - name: Deploy to demo projects
+      - name: Deploy to example projects
         run: python main.py deploy --release
 
       - name: Upload platform library
@@ -117,9 +117,9 @@ jobs:
         with:
           name: gdext-${{ runner.os }}
           path: |
-            demo/2d_dodge_the_creeps/addons/godot-autopilot/godot-autopilot.dll
-            demo/2d_dodge_the_creeps/addons/godot-autopilot/libgodot-autopilot.so
-            demo/2d_dodge_the_creeps/addons/godot-autopilot/libgodot-autopilot.dylib
+            examples/2d_dodge_the_creeps/addons/godot-autopilot/godot-autopilot.dll
+            examples/2d_dodge_the_creeps/addons/godot-autopilot/libgodot-autopilot.so
+            examples/2d_dodge_the_creeps/addons/godot-autopilot/libgodot-autopilot.dylib
           if-no-files-found: error
 
   # gda CLI 独立可执行文件：单个自包含二进制（内嵌 Bun 运行时），供没装 Bun / Node 的用户
@@ -167,12 +167,20 @@ jobs:
 
       - name: Build gda binary
         shell: bash
+        env:
+          GDA_TARGET: ${{ matrix.target }}
+          GDA_EXT: ${{ matrix.ext }}
         run: |
           version="$(tr -d ' \t\r\n' < VERSION)"
           mkdir -p dist
-          out="dist/gda${{ matrix.ext }}"
-          bun build cli/bin/gda.ts --compile --minify --target=${{ matrix.target }} --outfile "$out"
-          built="$("$out" --version | awk '{print $2}')"
+          out="dist/gda${GDA_EXT}"
+          bun build cli/bin/gda.ts --compile --minify --target="${GDA_TARGET}" --outfile "$out"
+          chmod +x "$out" 2>/dev/null || true
+          if [[ "${GDA_TARGET}" == *musl* ]]; then
+            built="$(docker run --rm -v "${GITHUB_WORKSPACE}/dist:/dist:ro" alpine:3.20 sh -c 'apk add --no-cache libstdc++ >/dev/null 2>&1 && /dist/gda --version' | awk '{print $2}')"
+          else
+            built="$("$out" --version | awk '{print $2}')"
+          fi
           if [ "${built}" != "${version}" ]; then
             echo "::error::Built gda reports version '${built}' but VERSION is '${version}'"
             exit 1
@@ -186,10 +194,21 @@ jobs:
 
       - name: Verify binary runs
         shell: bash
+        env:
+          GDA_TARGET: ${{ matrix.target }}
+          GDA_EXT: ${{ matrix.ext }}
         run: |
-          chmod +x "dist/gda${{ matrix.ext }}" || true
-          "dist/gda${{ matrix.ext }}" --version
-          "dist/gda${{ matrix.ext }}" list
+          if [[ "${GDA_TARGET}" == *musl* ]]; then
+            docker run --rm -v "${GITHUB_WORKSPACE}/dist:/dist:ro" alpine:3.20 sh -c '
+              set -e
+              apk add --no-cache libstdc++ >/dev/null 2>&1
+              /dist/gda --version
+              /dist/gda list'
+          else
+            chmod +x "dist/gda${GDA_EXT}" || true
+            "dist/gda${GDA_EXT}" --version
+            "dist/gda${GDA_EXT}" list
+          fi
 
       - name: Package
         shell: bash

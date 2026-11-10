@@ -1,7 +1,7 @@
 #include "game_bridge.hpp"
 
 #include "core/config.hpp"
-#include "core/log_system.hpp"
+#include "core/observability/log_system.hpp"
 #include "runtime/gda_protocol.hpp"
 #include "runtime/game_node_count.hpp"
 #include "util/error_util.hpp"

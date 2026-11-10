@@ -107,8 +107,31 @@ jobs:
           python main.py package --libs-dir dist/pkg-libs
           python scripts/test_package_integrity.py dist/godot-autopilot-*.zip
 
-      - name: L1 unit tests
-        run: ctest --preset debug -E "^gda_runner_|^pool_" --output-on-failure
+      # 分层执行：守卫（零依赖秒级）→ 单元 → 边界 → 集成 → CLI。
+      # 分层只为失败时能一眼定位到层；全量默认门 = 这五层之和。
+      - name: Guards
+        run: ctest --preset debug -L guard --output-on-failure
+
+      - name: Unit and boundary tests
+        run: ctest --preset debug -L "unit|boundary" --output-on-failure
+
+      - name: Integration tests
+        run: ctest --preset debug -L integration --output-on-failure
+
+      - name: CLI tests
+        run: ctest --preset debug -L cli --output-on-failure
+
+      # 注册点守恒：任一层筛不出用例或被静默丢弃时在此暴露
+      - name: Test inventory guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          total="$(ctest --preset debug -N | sed -n 's/^Total Tests: //p')"
+          if [ -z "$total" ] || [ "$total" -lt 900 ]; then
+            echo "::error::ctest inventory dropped to ${total:-<none>} (expected >= 900)"
+            exit 1
+          fi
+          echo "ctest inventory: $total"
 
   # 可执行文件冒烟：只验证 `bun build --compile` 在三平台都能产出并启动，不发布。
   # 发布产物由 release.yml 的 cli 作业构建（含 macOS ad-hoc 签名与校验和）。

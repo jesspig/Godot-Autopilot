@@ -2,7 +2,7 @@
 
 Companion reference of the godot-autopilot-tools volume: the plain-HTTP face of the plugin, for clients that cannot speak the MCP protocol.
 
-The plugin listens on **one** port and serves two faces on it. The MCP face is the primary one and the one this volume's ladder prefers. The REST face is the alternative for a client that can only issue ordinary HTTP requests — no MCP handshake, no session, no JSON-RPC framing.
+The plugin listens on **one** port and serves two faces on it. The `gda` CLI is the first-class calling surface; the MCP face is the compatibility channel for harnesses that list native tools. The REST face is the alternative for a client that can only issue ordinary HTTP requests — no MCP handshake, no session, no JSON-RPC framing.
 
 This is an **interface reference**, not a new scripted channel. The only scripted calling channel remains the `gda` CLI (see references/cli-access.md). The two snippets below show the shape of a REST call; when a shell is available, prefer `gda api`.
 

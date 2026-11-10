@@ -1,6 +1,7 @@
-#include "core/api_auth.hpp"
-#include "core/api_surface.hpp"
-#include "core/api_token.hpp"
+#include "core/transport/api_auth.hpp"
+#include "core/transport/api_surface.hpp"
+#include "core/transport/api_token.hpp"
+#include "support/test_temp.hpp"
 
 #include <gtest/gtest.h>
 
@@ -21,7 +22,7 @@ namespace {
 std::string make_temp_dir(const std::string &name) {
   static std::atomic<int> counter{0};
   const std::filesystem::path path =
-      std::filesystem::temp_directory_path() /
+      gda_test::test_temp_root() /
       ("gda_api_auth_" + name + "_" +
        std::to_string(counter.fetch_add(1)));
   std::error_code ec;

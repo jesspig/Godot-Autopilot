@@ -130,7 +130,7 @@ description: "读取 report/ 最新一轮端到端测试报告，对失败项做
 - 向后兼容：现有 API、工具 schema、返回结构与用户可见行为是否保持不变。
 - 最小必要变更：列出拟修改文件、函数与行号范围。
 - 可回滚：保留变更文件清单与完整 diff。
-- 新增测试：补充 L1、L2、CLI 或守卫用例。
+- 新增测试：补充单元、集成、CLI 或守卫用例。
 
 ## 8. 实施与验证
 
@@ -147,7 +147,7 @@ description: "读取 report/ 最新一轮端到端测试报告，对失败项做
 6. 候选实施后，在同一条件下 probe；只在目标失败被修复且未引入回归时采纳，否则回退基线。把当前实现始终留在候选集中。
 7. 按最小验证集测试，完成后统一全面验收：
    - `uv run main.py build`
-   - `ctest --preset debug -E "^gda_runner_"`（L1 + 守卫）
+   - `ctest --preset debug -L "guard|unit|boundary"`（守卫 + 单元 + 边界，秒级）
    - 涉及 CLI 时 `bun test cli/tests`
    - 涉及引擎内行为时 `ctest --preset debug -R "^gda_runner_"`（需要 `GODOT_PATH`）
 8. 不重跑整轮端到端测试；需要复现失败时只做最小复现，并在报告中标注。把改变工具行为的项列入「待下一轮端到端验证」。

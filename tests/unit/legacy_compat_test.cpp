@@ -1,4 +1,5 @@
-#include "core/legacy_store.hpp"
+#include "core/storage/legacy_store.hpp"
+#include "support/test_temp.hpp"
 
 #include <gtest/gtest.h>
 
@@ -26,7 +27,7 @@ const char *kLegacyJson =
     "{\"port\": 9527, \"allow\": \"code_execute\", \"show_time\": false}";
 
 std::filesystem::path test_root() {
-  return std::filesystem::temp_directory_path() / "gda_legacy_compat_test";
+  return gda_test::test_temp_root() / "gda_legacy_compat_test";
 }
 
 void write_text_file(const std::filesystem::path &path,

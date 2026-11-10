@@ -27,7 +27,7 @@ resource:
 这四组文件不直接产生领域工具，而是为 MCP 服务器与编辑器体验提供支撑：
 
 - **Prompts**：向 MCP 客户端暴露 12 个 prompt 模板（7 通用 + 5 调试），全部经 `server.RegisterPrompt` 注册。
-- **Resources**：暴露 15 个引擎/调试侧 MCP resource URI（8 引擎侧 + 7 调试捕获侧）+ **45 个 skills 资源**，全部为 `godot://` 前缀；09-16 起新增 skills 资源组（`godot://skills` 目录、`godot://skills/<name>`、`godot://skills/<name>/<file>`，按 9 册 35 个 .md 动态注册 = 1 目录 + 9 单册 + 35 单文件 = 45 个资源，技能经协议层可发现可读；单文件 MIME 按扩展名——`.md` 为 `text/markdown`、目录清单为 `application/json`（`.mjs` 的 `text/javascript` 映射在 `skill_resources.hpp` 中保留，当前无技能使用该扩展名），L1 `ScriptMimeType` 覆盖）。
+- **Resources**：暴露 15 个引擎/调试侧 MCP resource URI（8 引擎侧 + 7 调试捕获侧）+ **45 个 skills 资源**，全部为 `godot://` 前缀；09-16 起新增 skills 资源组（`godot://skills` 目录、`godot://skills/<name>`、`godot://skills/<name>/<file>`，按 9 册 35 个 .md 动态注册 = 1 目录 + 9 单册 + 35 单文件 = 45 个资源，技能经协议层可发现可读；单文件 MIME 按扩展名——`.md` 为 `text/markdown`、目录清单为 `application/json`（`.mjs` 的 `text/javascript` 映射在 `skill_resources.hpp` 中保留，当前无技能使用该扩展名），单元测试 `ScriptMimeType` 覆盖）。
 - **UI**：底部日志面板（`McpLogDock`）、右侧配置面板（`McpConfigDock`），消费 `LogSystem` 与服务器生命周期。
 - **Util**：与工具层共享的纯工具件——Variant↔JSON 互转、BM25 检索、错误 JSON 构造、写后读回校验、场景路径解析、JSON 数值/几何/RID 辅助、进程内 RID 注册表、类型提示推断、GDScript 包装流水线、MCP 图像内容交付、客户端 MCP 配置生成、Agent Skills 文档生成。
 
@@ -128,7 +128,7 @@ resource:
 `EditorDock` 子类，标题 "MCP Config"，默认停靠右侧槽（`DOCK_SLOT_RIGHT_UR`），可关闭：
 
 - **布局**：VBoxContainer = "MCP Server" 标题 + 端口行（Label + SpinBox 1–65535 + Apply 按钮）→ Show timestamps 复选框 → Allow code_execute 复选框（09-13 下午新增）→ Allow game_runtime 复选框（09-14 新增）→ Allow user tools 复选框 → **Allow write 复选框（10-21 新增）→ Allow destructive 复选框（10-21 新增）** → Desensitize data 复选框（09-20 新增）→ 运行状态 Label → 分隔线 → 客户端配置区（`OptionButton` 下拉选择 20 个客户端，label 含配置文件路径）→ Generate 按钮 → 技能生成区（Generate Skills / Update Skills 动态按钮）→ 结果 Label → 生效条件提示 Label
-- **Allow code_execute / Allow game_runtime / Allow user tools / Allow write / Allow destructive / Allow process 复选框（09-13 下午新增 code_execute，09-14 新增 game_runtime，10-21 补 write 与 destructive，并补 process）**：**六个**勾选框**按能力清单生成**（[`src/ui/authorization_switches.hpp`](../../../src/ui/authorization_switches.hpp) 的 `kSwitchLabels` 与 `src/tools/authorization.hpp` 的 `kDockToggleCapabilities`，面板遍历该清单建控件，控件与能力不再各写一份），分别转发到共享槽函数 `_on_allow_toggled(capability, box, checked)`——勾选用 `authorization::allow_list_add` 追加能力（已生效或配置含 `all` 时保持原样），取消用 `allow_list_remove` 移除（先把 `all` 展开为全部已知能力再逐项删除，**取消一项不影响其它项**）；初值与操作后校准均用 `allow_list_contains` + `set_pressed_no_signal`（dock 私有的 `split_allow`/`join_allow` 与 `code_execute_allowed()` 已删除）。10-21 起**全部开关的初值取 `authorization::capability_enabled`**（读**当前实际允许列表**，环境变量优先于配置），`write` / `destructive` / `process` 与 `user_tools` 口径一致。下次工具调用即生效（授权门每次实时读取配置），`GODOT_AUTOPILOT_ALLOW` 环境变量存在时优先于该配置（tooltip 已注明）。`process` 的开关文案额外说明「危险档：会运行外部程序与 OS 命令」。拒绝响应的 `enable` 文案同样只对**有面板开关的六项**提及 dock（`authorization::capability_has_dock_toggle`）。完整口径见 [T0 安全边界](../security_contract.md) §3.1.1。
+- **Allow code_execute / Allow game_runtime / Allow user tools / Allow write / Allow destructive / Allow process 复选框（09-13 下午新增 code_execute，09-14 新增 game_runtime，10-21 补 write 与 destructive，并补 process）**：**六个**勾选框**按能力清单生成**（[`src/ui/authorization_switches.hpp`](../../../src/ui/authorization_switches.hpp) 的 `kSwitchLabels` 与 `src/tools/base/authorization.hpp` 的 `kDockToggleCapabilities`，面板遍历该清单建控件，控件与能力不再各写一份），分别转发到共享槽函数 `_on_allow_toggled(capability, box, checked)`——勾选用 `authorization::allow_list_add` 追加能力（已生效或配置含 `all` 时保持原样），取消用 `allow_list_remove` 移除（先把 `all` 展开为全部已知能力再逐项删除，**取消一项不影响其它项**）；初值与操作后校准均用 `allow_list_contains` + `set_pressed_no_signal`（dock 私有的 `split_allow`/`join_allow` 与 `code_execute_allowed()` 已删除）。10-21 起**全部开关的初值取 `authorization::capability_enabled`**（读**当前实际允许列表**，环境变量优先于配置），`write` / `destructive` / `process` 与 `user_tools` 口径一致。下次工具调用即生效（授权门每次实时读取配置），`GODOT_AUTOPILOT_ALLOW` 环境变量存在时优先于该配置（tooltip 已注明）。`process` 的开关文案额外说明「危险档：会运行外部程序与 OS 命令」。拒绝响应的 `enable` 文案同样只对**有面板开关的六项**提及 dock（`authorization::capability_has_dock_toggle`）。完整口径见 [T0 安全边界](../security_contract.md) §3.1.1。
 - **Desensitize data 复选框（09-20 新增）**：`_on_desensitize_toggled(checked)` → `PluginConfig::save_desensitize(checked)` + `sanitize_policy::set_enabled(checked)`；初值取 `PluginConfig::load_desensitize()`（默认 true）并同步写入全局缓存。影响参数 digest 与 trace 图片落盘（详见 [安全边界](../security_contract.md) §3.2）；`GODOT_AUTOPILOT_DESENSITIZE` 环境变量仅在启动初始化时优先于配置，运行期复选框仍直接改写全局缓存（重启后 env 再次生效）。
 - **技能生成（动态按钮）**：按钮文本按 `.agents/skills/` 下是否已存在 `godot-autopilot-` 前缀目录动态切换——无 → "Generate Skills"，有 → "Update Skills"；Update 点击先递归删除全部前缀匹配目录再整体重新生成（语义详见下文 skill_gen 小节）
 - **端口管理**：`set_server_context(ServerContext*)` 注入服务器（null 时禁用 Apply）；Apply → `ServerContext::restart(port)` → 成功后 `PluginConfig::save_port(port)` 持久化，并刷新面板内运行状态 Label（"Running on port N" / "Server offline"，主题色标注）
@@ -138,7 +138,7 @@ resource:
 
 ### client_config_gen（`src/util/client_config_gen.cpp/hpp`，命名空间 `godot_autopilot::client_config_gen`）
 
-纯函数生成器（**仅依赖 std + `mcp::JsonValue`，无 Godot API**，L1 可测）：
+纯函数生成器（**仅依赖 std + `mcp::JsonValue`，无 Godot API**，单元测试 可测）：
 
 | 客户端 | 文件路径 | 顶层键 | 条目字段 |
 |---|---|---|---|
@@ -173,12 +173,12 @@ resource:
 
 ### skill_gen（`src/util/skill_gen.cpp/hpp` + `skill_content_generated.cpp` + `skills/`，命名空间 `godot_autopilot::skill_gen`，09-08 新增；09-10 由 19 册重构为 7 册；09-13 增补 C# 专册与开发闭环，共 8 册；09-25 新增调用专册，共 9 册；09-29 模板源改为标准目录布局并删除 registry.json）
 
-"一键生成 Agent Skills"：把 9 册英文 Agent Skills（符合 agentskills.io 规范）写入项目根 `.agents/skills/`，供外部编码代理加载。与 `client_config_gen` 同为 UI 面板消费的纯函数生成器（**仅依赖 std，无 Godot API**，L1 可测）：
+"一键生成 Agent Skills"：把 9 册英文 Agent Skills（符合 agentskills.io 规范）写入项目根 `.agents/skills/`，供外部编码代理加载。与 `client_config_gen` 同为 UI 面板消费的纯函数生成器（**仅依赖 std，无 Godot API**，单元测试 可测）：
 
 - **结构（09-10 七册化，09-13 增补至八册，09-25 增补至九册）**：原 19 册合并为 7 册——1 册插件总纲 `godot-autopilot` + 6 册引擎指南（`godot-autopilot-{scene-system,resources,scripting,runtime,servers,content}`）；09-13 新增 1 册 C# 专册 `godot-autopilot-csharp`（C# 编译循环、`[GlobalClass]` 资源、`[Export]` 属性、无热重载限制）；09-25 新增 1 册调用专册 `godot-autopilot-tools`（调用协议/工具目录/用户工具/手动兜底，见下文 9 册清单）。渲染后每册均带 `references/` 子文档（渐进披露，细节由子文档承载，合计 25 个 references；模板源目录即标准布局，`<name>/SKILL.md` + `<name>/references/*.md`，description 存于各册 SKILL.md frontmatter）。09-25 起 `http-fallback`（curl 手写 HTTP 模式）废弃，由 `cli-access`（CLI 通道）与 `manual-fallback`（无 CLI 时的手动指南）取代；总纲册 references 随之收缩为仅 `development-workflow`（`tool-catalog`/`tool-gotchas` 移入调用专册）。调用阶梯的落点分两类：调用专册 `godot-autopilot-tools` 与总纲册 `godot-autopilot` 各带三级 Invocation 声明正文（原生 MCP 优先 → GDA CLI → 手动指南；前者为权威定义，后者引用它）；其余 7 册引擎指南在正文首段各带一行 Invocation 指向（原生 MCP 优先 → 调用专册的 GDA CLI → 手动兜底），不重复展开三级全文。**全部 84 条 Godot 4.8.0-dev 源码研究发现织入引擎六册**（撤销三历史、RID 不级联、暂停矩阵、`just_pressed` 双计数器、调试三道闸门、uid 优先于 path、导航双缓冲、`set_cell` 静默清格等），行内以 "4.7+"/"4.8" 简注标注适用版本；09-15 随工具目录 379 更新 4 册模板（`autopilot.md`、`autopilot--tool-catalog.md`、`autopilot--development-workflow.md`、`runtime--input-injection.md`）——工具数 379、编辑器 UI 自动化闭环（枚举/命中→点击/输入→复验）、编辑器与游戏侧点击/快捷键、wheel/mouse_motion 与原始坐标回退
 - **内容承载（09-08 外置化，09-13 随册数同步，09-25 随脚本通道同步，09-29 改标准目录布局，10-20 随脚本桥删除，10-21 随 REST 接口参考新增）**：正文不再由 7 个 `skill_content_*.cpp`（已删除）手写，外置为 `skills/`（35 个文件——9 册各一 `SKILL.md`（name/description 存 frontmatter）+ 26 个 `references/*.md`，聚合顺序为目录名字序）+ `tools/embed_skills.py`（纯 stdlib）构建期嵌入——生成头 `skill_content_embedded.h` 入 `build/<preset>/generated/`（gitignore 覆盖），**内容变更不再触碰 C++**。构建期 5 项校验：恰 `SKILL_COUNT = 9` 个子目录（常量）、name 规则唯一且与目录名一致、description ≤1024、SKILL.md 首项 + 非首项仅允许 `references/*.md` 或 `scripts/` 直属 `.mjs`、孤儿文件（失败非零退出）；定界符 `gda_s` 碰撞自动避让；`cmake/skill_gen.cmake` 中解释器探测先 `find_package(Python3 QUIET COMPONENTS Interpreter)`（会真正执行解释器做验证，故不会命中 WindowsApps 的 python 存根，也能识别 `python3.12` 这类版本化文件名），未命中才回退 `find_program(NAMES py python python3)`，两者皆无才 FATAL_ERROR；另有 configure 期 `--version` 自检。`scripts/cmake_ops.py` 的 `_subprocess_env()` 把 `Path(sys.executable).parent` 前置到子进程 PATH，`uv run main.py build` 下即 `.venv/Scripts`，从而不依赖系统 PATH 顺序
 - **API**：`SkillSpec{name, description, files}`；`skill_gen.hpp` 的 7 个 make_* 声明收敛为 1 个 `make_embedded_skills()`，`all_skills()` 改为其转发（顺序为目录名字序）；`skill_file_path()` 拼生成路径；`render_skill_md()` 渲染 YAML frontmatter——`name`/`description`（值含 ": " 时加引号）/`metadata{author: godot-autopilot, version: "<GDA_VERSION>"}`（version 由 configure_file 注入，与 `server_info` 同源）
-- **生成路径**：`<res://>/.agents/skills/<name>/SKILL.md`；`name` 小写连字符且与目录一致、description ≤1024；9 册全部带 `references/` 子文件（工程内实际生成验证待 E2E，仓库侧验证落在 L2 测试床 `tests/testbed/`）
+- **生成路径**：`<res://>/.agents/skills/<name>/SKILL.md`；`name` 小写连字符且与目录一致、description ≤1024；9 册全部带 `references/` 子文件（工程内实际生成验证由 Agent e2e 在 demo 场地覆盖；历史 L2 测试床 `tests/testbed/` 已删除）
 - **UI 入口（09-10 动态化）**：McpConfigDock 面板按钮文本动态切换（见上文 McpConfigDock 小节），槽函数 `_on_generate_skills()`：先 `has_existing_skills()` 探测——有既有 `godot-autopilot-` 前缀目录则经 `remove_legacy_skill_dirs()`（`remove_dir_recursive` 后序遍历 + `DirAccess::remove`）整体删除后重建，旧 19 册在用户项目中随之自动退役；随后 `DirAccess::make_dir_recursive_absolute` 建目录并复用 `write_file` 写入；成功文案动态计数 "Generated/Updated N skills in .agents/skills/ (M supporting files)"（M 为 references 与脚本合并计数，09-25 前文案为 "M reference files"），失败列相对路径
 - **覆盖写策略**：写入与清理均限于自有 `godot-autopilot-` 前缀命名空间，不触碰 `.agents/skills/` 下其他内容
 - **9 册清单**（name 与吸收来源）：
@@ -191,7 +191,7 @@ resource:
   - `godot-autopilot-servers`——服务器层 RID 工具：RenderingServer/PhysicsServer/NavigationServer 语义与静默失败、物理 tick 次序、导航同步槽，吸收原 physics-navigation + rendering-text
   - `godot-autopilot-content`——内容管线：TileMap/TileSet、AnimationPlayer/Tree、音频总线与播放、Control 主题与布局及各域静默失败，吸收原 tilemap + animation + audio + ui-theming + spriteframes
   - `godot-autopilot-csharp`（09-13 新增）——C#/.NET 项目指南：`build_csharp_assembly` 编译循环、经 `get_debugger_log` 读编译/解析错误、运行确认（`get_debugger_errors` + 错误水印）、`[GlobalClass]` 资源经 `create_resource`、`[Export]` 节点与 typed-array 的 `property_set` 转换、附加 C# 脚本，以及 .NET 程序集无热重载、GDScript 不可见等限制（references：tool-reference）
-- **测试**：`tests/unit/skill_gen_test.cpp` 9 用例（SkillGenTest 7 个 TEST + SkillRegistryFixture 2 个 TEST_F）——9 册完整性与名单精确比对（`AllNineSkillsPresent`）、name 规范 `^[a-z0-9]+(-[a-z0-9]+)*$` 且与目录一致、description ≤1024、文件布局无 PLACEHOLDER、frontmatter 渲染、通道契约（`ScriptChannelContract`：调用专册须含 `references/manual-fallback.md`、每册 SKILL.md 必提 `godot-autopilot-tools` 与 `manual-fallback`、调用专册另提 `bunx`、全部 .md 禁 `curl -` 与 `Invoke-WebRequest`）、工具名回验（对照运行时 catalog∪schema 参数名∪176 项白名单，注册管线见 [tools_registry.md](tools_registry.md)）、目录反向覆盖（`ToolCatalogCoverage`：`tool-catalog.md` 须含 registry 全部非元工具名）、每册 ≥1 references 断言（`EverySkillDeclaresReferences`，files≥2 且非首项允许 `references/` 或 `scripts/`）；8 册化后用例数保持 7 项，09-25 脚本通道批次增至 9 项（L1 总数见 [tests.md](../tests.md)）；CLI mock 一致性由 ctest `cli_contract`（`tests/scripts/test_cli_contract.py`，驱动 gda CLI 的 mock 契约，无 bun 则 SKIP）与 `cli_unit`（`tests/scripts/run_cli_unit.py`，包装 `bun test cli/tests`）覆盖
+- **测试**：`tests/unit/skill_gen_test.cpp` 9 用例（SkillGenTest 7 个 TEST + SkillRegistryFixture 2 个 TEST_F）——9 册完整性与名单精确比对（`AllNineSkillsPresent`）、name 规范 `^[a-z0-9]+(-[a-z0-9]+)*$` 且与目录一致、description ≤1024、文件布局无 PLACEHOLDER、frontmatter 渲染、通道契约（`ScriptChannelContract`：调用专册须含 `references/manual-fallback.md`、每册 SKILL.md 必提 `godot-autopilot-tools` 与 `manual-fallback`、调用专册另提 `bunx`、全部 .md 禁 `curl -` 与 `Invoke-WebRequest`）、工具名回验（对照运行时 catalog∪schema 参数名∪176 项白名单，注册管线见 [tools_registry.md](tools_registry.md)）、目录反向覆盖（`ToolCatalogCoverage`：`tool-catalog.md` 须含 registry 全部非元工具名）、每册 ≥1 references 断言（`EverySkillDeclaresReferences`，files≥2 且非首项允许 `references/` 或 `scripts/`）；8 册化后用例数保持 7 项，09-25 脚本通道批次增至 9 项（单元测试 总数见 [tests.md](../tests.md)）；CLI mock 一致性由 ctest `cli_contract`（`tests/scripts/test_cli_contract.py`，驱动 gda CLI 的 mock 契约，无 bun 则 SKIP）与 `cli_unit`（`tests/scripts/run_cli_unit.py`，包装 `bun test cli/tests`）覆盖
 - **构建接线**：`cmake/skill_gen.cmake` 经 `add_custom_command` 生成嵌入头 + `add_custom_target(gda_skill_embed_header)`；根 `CMakeLists.txt` add_library 与 `tests/CMakeLists.txt` GDA_UNIT_BUSINESS_SOURCES 的 skill 源各为 2 个（`src/util/skill_gen.cpp` + `src/util/skill_content_generated.cpp` 薄胶水：`embedded::all()` → `SkillSpec`），并各 `add_dependencies(... gda_skill_embed_header)`；`skills/` 下 .md 为数据文件，不进 add_library
 
 ## Util
@@ -354,7 +354,7 @@ MCP 截图交付的纯逻辑件（仅依赖 `mcp::JsonValue`/`mcp::ContentVarian
 - `is_image_capture_tool(name)`：截图工具白名单 `capture_editor_viewport`/`capture_game_viewport`/`capture_display_screen`。
 - `try_attach_image_content(tool_name, result_json, content_out, reason?)`：命中白名单且响应中顶层或 `result` 下的 `data` 为非空字符串、`format` 缺省或为 `"png"` 时，把 base64 转成 `mcp::ImageContent{"image", base64, "image/png"}` 推入 `content_out`，并把 JSON 中 `data` 改写为 `"<attached-as-image-content>"`、加 `image_attached:true`；不满足条件返回 false（可选回填 `reason`）。
 
-消费方：`register_all.cpp` 的 `call_tool` 回调——仅元工具 `call_tool` 直调截图工具时附加 image content 块，`batch_execute`/`code_execute` 内不附加（JSON 保留完整 base64）。L1 覆盖 `tests/unit/mcp_image_content_test.cpp`。
+消费方：`register_all.cpp` 的 `call_tool` 回调——仅元工具 `call_tool` 直调截图工具时附加 image content 块，`batch_execute`/`code_execute` 内不附加（JSON 保留完整 base64）。单元测试 覆盖 `tests/unit/mcp_image_content_test.cpp`。
 
 ### inline_resource_json.hpp（header-only，命名空间 `godot_autopilot::util::inline_resource`）
 
@@ -374,7 +374,7 @@ MCP 截图交付的纯逻辑件（仅依赖 `mcp::JsonValue`/`mcp::ContentVarian
 
 存在原因：MSVC STL 的 `runtime_error(const std::string&)` 只把 `c_str()` 转交 `exception(const char*, int)`，后者原样保存指针、不做拷贝，消息临时量在 throw 完整表达式结束即销毁、`what()` 随之野悬（libstdc++/libc++ 会拷贝消息，故仅 Windows 复现）。用本类型抛动态消息，既有 `catch (const std::runtime_error&)` 捕获点与 `EXPECT_THROW(..., std::runtime_error)` 断言无需改动。详见 [工程约定](../conventions.md)「错误模式」。
 
-### L1 单测意图备忘（core/util/tool_invoke 注释清理批，2026-09-19）
+### 单元测试 单测意图备忘（core/util/tool_invoke 注释清理批，2026-09-19）
 
 以下口径原以源码整行注释形式存在，随"不写注释"约定移入此处；测试文件本批仅删除注释行，逻辑与断言未动（`git diff` 无新增行）：
 
@@ -382,7 +382,7 @@ MCP 截图交付的纯逻辑件（仅依赖 `mcp::JsonValue`/`mcp::ContentVarian
 - 脚本新鲜度数值契约（`script_freshness_test.cpp`）：godot-cpp 缺省 `CacheMode = 1`（REUSE，命中缓存直接返回旧实例、不读盘），从磁盘刷新必须显式传 `0`（IGNORE）；只读工具 `fresh` 参数只认字面 `true`，缺省保持 REUSE 语义
 - UID 写选择（`uid_guard_test.cpp`）：按 ResourceUID 表成员决定——已在表中的 id 更新、表外 id 注册（对应 `add_id`/`set_id` 选择）
 - 变量串联（`batch_refs_test.cpp`）：`$prev`、`$steps[N].result`/`$steps[N].error` 整字符串精确替换，错误前缀 `unresolvable reference`
-- 组合调用（`tool_invoke_test.cpp`）：最大嵌套深度 8（`src/tools/tool_invoke.hpp:10`，超限直接返回 error），异步 pending 工具不可在工具内调用；导出分支无公开 setter，L1 不覆盖，由代码审查覆盖
+- 组合调用（`tool_invoke_test.cpp`）：最大嵌套深度 8（`src/tools/base/tool_invoke.hpp:10`，超限直接返回 error），异步 pending 工具不可在工具内调用；导出分支无公开 setter，单元测试 不覆盖，由代码审查覆盖
 
 ## 与现有文档的不一致点
 

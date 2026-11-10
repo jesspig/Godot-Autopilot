@@ -12,7 +12,7 @@ description: 新增、删除、移动 C++ 编译单元时做 CMake 双登记与�
 1. 判定是否为 header-only：仅 `.hpp` 变更时跳过登记，转步骤 4。
 2. 新增 `.cpp` 时同批修改两处：
    - 根 `CMakeLists.txt` 的 `add_library()` 源表。
-   - `tests/CMakeLists.txt` 的 `GDA_UNIT_BUSINESS_SOURCES`（`src/tools/*_ops.cpp` 由 glob 自动纳入，不逐个登记）。
+   - `tests/CMakeLists.txt` 的 `GDA_UNIT_BUSINESS_SOURCES`（`src/tools/domains/*/*_ops.cpp` 由 glob 自动纳入，不逐个登记）。
 3. 检查旧宏残留：头文件禁 `GDA_TOOL_CLASS`，禁新增 `schema_*_ops.cpp` 与 `tool_decl.hpp` 引用。
 4. 检查注释：`src/`、`tests/` 下 `*.cpp/*.hpp` 禁 `//`（仅 `// namespace` 结尾放行）与 `/*…*/`。
 5. 子代理只写代码不编译；主代理统一 configure 与 build，再分批测。
@@ -24,7 +24,7 @@ description: 新增、删除、移动 C++ 编译单元时做 CMake 双登记与�
 
 ## 非目标
 
-- 不跑 L2 引擎用例；不写 Wiki 解释，解释进 Wiki 对应页。
+- 不跑引擎内用例（引擎行为验收由 Agent e2e 承接）；不写 Wiki 解释，解释进 Wiki 对应页。
 - 不把易漂移计数写入入口文档。
 
 ## 验证

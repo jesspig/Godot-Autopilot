@@ -1,13 +1,13 @@
 # Manual Fallback for Godot Autopilot Calls
 
-Companion reference of the godot-autopilot-tools volume: what to do when no automated channel exists. Native MCP tools are down, no GDA CLI can run either, and the client cannot speak plain HTTP either — hand the work to the user with precise editor instructions instead of reaching for workarounds.
+Companion reference of the godot-autopilot-tools volume: what to do when no automated channel exists. No GDA CLI can run, no native MCP client is available, and the client cannot speak plain HTTP either — hand the work to the user with precise editor instructions instead of reaching for workarounds.
 
 ## Trigger criteria
 
 Enter this mode only when at least one holds:
 
-- No working MCP client, no usable GDA CLI (no Bun to run it, no way to fetch the standalone binary), and no client able to issue plain HTTP requests.
-- The harness has no shell at all, so neither the native channel nor the CLI can run.
+- No usable GDA CLI (no Bun to run it, no way to fetch the standalone binary), no working native MCP client, and no client able to issue plain HTTP requests.
+- The harness has no shell at all, so neither the CLI nor the native channel can run.
 - The user explicitly asks for manual steps.
 
 If any automated channel works, leave this mode immediately and use it — manual steps are a last resort, not a preference.
@@ -57,8 +57,8 @@ State these up front in the handoff so the user can calibrate expectations:
 
 Close every handoff with the shortest applicable path back to an automated channel:
 
-1. Restore the native channel. In the editor, open the plugin MCP Config dock and use the Generate button: it writes a project-level MCP configuration for the client in use (twenty clients covered). Restart or reconnect the client harness afterwards — a lost tool list right after an editor restart is a harness reconnect problem, not a server problem.
-2. Restore the CLI. Install Bun and run the `gda` command (through `bunx` or a global install), or fetch the standalone binary, then use it per references/cli-access.md. No client reconfiguration needed.
+1. Restore the CLI. Install Bun and run the `gda` command (through `bunx` or a global install), or fetch the standalone binary, then use it per references/cli-access.md. No client reconfiguration needed — the CLI is the first-class channel.
+2. Restore the native MCP channel. In the editor, open the plugin MCP Config dock and use the Generate button: it writes a project-level MCP configuration for the client in use (twenty clients covered). Restart or reconnect the client harness afterwards — a lost tool list right after an editor restart is a harness reconnect problem, not a server problem.
 3. Clear authorization denials on the way back. Script execution needs the `code_execute` capability, game-runtime tools need `game_runtime`, user-registered dynamic tools need `user_tools`, write-class tools need `write`, and destructive tools need `destructive`. Each can be enabled via the `GODOT_AUTOPILOT_ALLOW` environment variable plus an engine restart, or via the matching MCP Config dock checkbox ("Allow code_execute", "Allow game_runtime", "Allow user tools", "Allow write", "Allow destructive"), which takes effect on the next tool call. Un-ticking a box removes only that capability. When the environment variable is set it wins over the dock setting.
 
 ## See also

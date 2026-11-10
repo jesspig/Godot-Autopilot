@@ -1,5 +1,6 @@
 import { CLI_VERSION } from "../version";
 import { CliError, ExitCode } from "../errors";
+import { IpcSession } from "../ipc/client";
 
 export interface JsonRpcResponse {
   id: number;
@@ -11,6 +12,7 @@ export interface CallToolOptions {
   port: number;
   timeoutSec?: number;
   direct?: boolean;
+  socketPath?: string;
 }
 
 export const META_DIRECT_TOOLS: ReadonlySet<string> = new Set([
@@ -252,6 +254,9 @@ export async function callTool(
   opts: CallToolOptions,
 ): Promise<JsonRpcResponse> {
   const timeoutMs = (opts.timeoutSec ?? DEFAULT_TIMEOUT_SEC) * 1000;
+  if (opts.socketPath !== undefined) {
+    return await callToolOverIpc(name, args, opts.socketPath, timeoutMs, opts.direct === true);
+  }
   const url = `http://${HOST}:${opts.port}/mcp`;
 
   let id = nextRequestId++;
@@ -289,4 +294,24 @@ export async function callTool(
     throw new CliError(ExitCode.Transport, "could not parse the plain-JSON response.");
   }
   return extracted.envelope as JsonRpcResponse;
+}
+
+async function callToolOverIpc(
+  name: string,
+  args: Record<string, unknown>,
+  socketPath: string,
+  timeoutMs: number,
+  direct: boolean,
+): Promise<JsonRpcResponse> {
+  const session = new IpcSession(socketPath, timeoutMs);
+  try {
+    await session.open();
+    await session.request(JSON.parse(makeInitializeEnvelope()) as Record<string, unknown>);
+    session.notify({ jsonrpc: "2.0", method: HANDSHAKE_METHOD });
+    const id = nextRequestId++;
+    const envelope = JSON.parse(makeCallEnvelope(id, name, args, direct)) as Record<string, unknown>;
+    return await session.request(envelope);
+  } finally {
+    session.close();
+  }
 }

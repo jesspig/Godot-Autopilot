@@ -1,5 +1,5 @@
-#include "core/godot_transport.hpp"
-#include "core/mcp_http_shim.hpp"
+#include "core/transport/godot_transport.hpp"
+#include "core/transport/mcp_http_shim.hpp"
 
 #include <gtest/gtest.h>
 

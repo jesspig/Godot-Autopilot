@@ -55,3 +55,38 @@ export async function probeEndpoint(
   if (level === "light") return true;
   return await probeHttp(target.url, "GET", timeoutMs);
 }
+
+export const ENDPOINT_ALIVE_TTL_MS = 5000;
+export const ENDPOINT_ALIVE_TIMEOUT_MS = 300;
+
+interface AliveCacheEntry {
+  alive: boolean;
+  at: number;
+}
+
+const aliveCache = new Map<number, AliveCacheEntry>();
+
+export async function endpointAlive(
+  port: number,
+  timeoutMs: number = ENDPOINT_ALIVE_TIMEOUT_MS,
+): Promise<boolean> {
+  const cached = aliveCache.get(port);
+  if (cached !== undefined && Date.now() - cached.at < ENDPOINT_ALIVE_TTL_MS) {
+    return cached.alive;
+  }
+  const alive = await probeTcp("127.0.0.1", port, timeoutMs);
+  aliveCache.set(port, { alive, at: Date.now() });
+  return alive;
+}
+
+export function cachedEndpointAlive(port: number): boolean | null {
+  const cached = aliveCache.get(port);
+  if (cached === undefined || Date.now() - cached.at >= ENDPOINT_ALIVE_TTL_MS) {
+    return null;
+  }
+  return cached.alive;
+}
+
+export function primeEndpointAlive(port: number, alive: boolean): void {
+  aliveCache.set(port, { alive, at: Date.now() });
+}

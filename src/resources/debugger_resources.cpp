@@ -1,11 +1,11 @@
 #include "resources/debugger_resources.hpp"
 #include "core/config.hpp"
 #include "core/export_guard.hpp"
-#include "core/log_system.hpp"
-#include "core/monitor.hpp"
-#include "tools/debugger_ops.hpp"
-#include "tools/dispatch.hpp"
-#include "tools/tool_invoke.hpp"
+#include "core/observability/log_system.hpp"
+#include "core/observability/monitor.hpp"
+#include "tools/domains/debugger/debugger_ops.hpp"
+#include "tools/base/dispatch.hpp"
+#include "tools/base/tool_invoke.hpp"
 #include <memory>
 #include <utility>
 

@@ -1,8 +1,8 @@
 #include "core/command_queue.hpp"
 #include "core/config.hpp"
-#include "core/log_system.hpp"
-#include "tools/authorization.hpp"
-#include "tools/tool_base.hpp"
+#include "core/observability/log_system.hpp"
+#include "tools/base/authorization.hpp"
+#include "tools/base/tool_base.hpp"
 #include "util/project_path.hpp"
 #include "util/variant_json.hpp"
 

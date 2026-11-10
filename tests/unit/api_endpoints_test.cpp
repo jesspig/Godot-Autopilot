@@ -1,5 +1,5 @@
-#include "core/api_endpoints.hpp"
-#include "core/api_surface.hpp"
+#include "core/transport/api_endpoints.hpp"
+#include "core/transport/api_surface.hpp"
 
 #include <gtest/gtest.h>
 
@@ -8,7 +8,7 @@
 #include <string>
 #include <unordered_map>
 
-#include "core/project_store.hpp"
+#include "core/storage/project_store.hpp"
 
 namespace {
 

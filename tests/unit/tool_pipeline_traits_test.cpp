@@ -1,5 +1,5 @@
-#include "tools/tool_pipeline.hpp"
-#include "tools/tool_spec.hpp"
+#include "tools/base/tool_pipeline.hpp"
+#include "tools/base/tool_spec.hpp"
 #include "util/mcp_image_content.hpp"
 
 #include <gtest/gtest.h>

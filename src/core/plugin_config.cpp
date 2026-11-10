@@ -16,12 +16,12 @@
 #include <mcp/JsonValue.hpp>
 #include <mcp/McpError.hpp>
 
-#include "core/legacy_store.hpp"
+#include "core/storage/legacy_store.hpp"
 #include "core/path_util.hpp"
-#include "core/storage_paths.hpp"
-#include "log_system.hpp"
-#include "tools/authorization.hpp"
-#include "tools/runtime_ops.hpp"
+#include "core/storage/storage_paths.hpp"
+#include "core/observability/log_system.hpp"
+#include "tools/base/authorization.hpp"
+#include "tools/base/runtime_ops.hpp"
 #include "util/project_path.hpp"
 
 namespace godot_autopilot {

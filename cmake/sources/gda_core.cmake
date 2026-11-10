@@ -11,8 +11,8 @@
 set(GDA_CORE_SOURCES
     src/main.cpp
     src/core/mode_detector.cpp
-    src/core/log_system.cpp
-    src/core/log_persist.cpp
+    src/core/observability/log_system.cpp
+    src/core/observability/log_persist.cpp
     src/core/resource_registry.cpp
     src/core/scene_dirty_tracker.cpp
     src/core/server_context.cpp
@@ -20,14 +20,14 @@ set(GDA_CORE_SOURCES
     src/core/export_guard.cpp
     src/core/editor_readiness.cpp
     src/core/editor_coords.cpp
-    src/core/trace_recorder.cpp
-    src/core/sanitize_policy.cpp
-    src/core/monitor.cpp
-    src/core/monitor_env.cpp
-    src/core/perf_sampler.cpp
-    src/core/gda_home.cpp
-    src/core/project_store.cpp
-    src/core/instance_registry.cpp
+    src/core/observability/trace_recorder.cpp
+    src/core/observability/sanitize_policy.cpp
+    src/core/observability/monitor.cpp
+    src/core/observability/monitor_env.cpp
+    src/core/observability/perf_sampler.cpp
+    src/core/storage/gda_home.cpp
+    src/core/storage/project_store.cpp
+    src/core/storage/instance_registry.cpp
     src/resources/resource_handlers.cpp
     src/resources/resource_error_mapping.cpp
     src/resources/debugger_resources.cpp
@@ -44,58 +44,65 @@ set(GDA_CORE_SOURCES
     src/runtime/game_bridge_input.cpp
     src/runtime/game_bridge_eval.cpp
     src/runtime/game_bridge_verify.cpp
-    src/tools/animation_ops.cpp
-    src/tools/audio_ops.cpp
-    src/tools/autopilot_tools.cpp
-    src/tools/capture_ops.cpp
-    src/tools/code_exec_ops.cpp
-    src/tools/config_ops.cpp
-    src/tools/csharp_bridge_ops.cpp
-    src/tools/display_ops.cpp
-    src/tools/input_map_ops.cpp
-    src/tools/log_ops.cpp
-    src/tools/os_ops.cpp
-    src/tools/scene_tree_ops.cpp
-    src/tools/theme_ops.cpp
-    src/tools/test_ops.cpp
-    src/tools/text_ops.cpp
-    src/tools/tilemap_ops.cpp
-    src/tools/tileset_ops.cpp
-    src/tools/file_dir_ops.cpp
-    src/tools/gridmap_ops.cpp
-    src/tools/tween_ops.cpp
-    src/tools/debug_ops.cpp
-    src/tools/debugger_ops.cpp
-    src/tools/debugger_access.cpp
-    src/tools/doc_ops.cpp
-    src/tools/display_window_ops.cpp
-    src/tools/editor_ops.cpp
-    src/tools/group_ops.cpp
-    src/tools/input_ops.cpp
-    src/tools/input_click_ops.cpp
-    src/tools/editor_ui_ops.cpp
-    src/tools/editor_ui_actions.cpp
-    src/tools/nav_ops.cpp
-    src/tools/physics_ops.cpp
-    src/tools/property_ops.cpp
-    src/tools/register_all.cpp
-    src/tools/dispatch.cpp
-    src/tools/analyze_ops.cpp
-    src/tools/schema_builder.cpp
-    src/tools/render_ops.cpp
-    src/tools/environment_ops.cpp
-    src/tools/resource_ops.cpp
-    src/tools/runtime_ops.cpp
-    src/tools/runtime_game_ops.cpp
-    src/tools/scene_ops.cpp
-    src/tools/scene_spec_ops.cpp
-    src/tools/script_ops.cpp
-    src/tools/script_patch_ops.cpp
-    src/tools/spriteframes_ops.cpp
-    src/tools/tool_catalog.cpp
-    src/tools/tool_args.cpp
-    src/tools/tool_pipeline.cpp
-    src/tools/tool_invoke.cpp
+    src/tools/domains/animation/animation_ops.cpp
+    src/tools/domains/audio/audio_ops.cpp
+    src/tools/base/autopilot_tools.cpp
+    src/tools/domains/capture/capture_ops.cpp
+    src/tools/base/code_exec_ops.cpp
+    src/tools/domains/config/config_ops.cpp
+    src/tools/domains/csharp_bridge/csharp_bridge_ops.cpp
+    src/tools/domains/display/display_ops.cpp
+    src/tools/domains/input_map/input_map_ops.cpp
+    src/tools/domains/log/log_ops.cpp
+    src/tools/domains/os/os_ops.cpp
+    src/tools/domains/scene_tree/scene_tree_ops.cpp
+    src/tools/domains/theme/theme_ops.cpp
+    src/tools/domains/test/test_ops.cpp
+    src/tools/domains/text/text_ops.cpp
+    src/tools/domains/tilemap/tilemap_ops.cpp
+    src/tools/domains/tileset/tileset_ops.cpp
+    src/tools/domains/os/os_file_dir_ops.cpp
+    src/tools/domains/gridmap/gridmap_ops.cpp
+    src/tools/domains/tween/tween_ops.cpp
+    src/tools/domains/debug/debug_ops.cpp
+    src/tools/domains/debugger/debugger_ops.cpp
+    src/tools/base/debugger_access.cpp
+    src/tools/domains/doc/doc_ops.cpp
+    src/tools/domains/display/display_window_ops.cpp
+    src/tools/domains/editor/editor_ops.cpp
+    src/tools/domains/editor/editor_csharp_ops.cpp
+    src/tools/domains/group/group_ops.cpp
+    src/tools/domains/input/input_ops.cpp
+    src/tools/domains/input/input_click_ops.cpp
+    src/tools/domains/editor/editor_ui_ops.cpp
+    src/tools/domains/editor/editor_ui_actions_ops.cpp
+    src/tools/domains/nav/nav_ops.cpp
+    src/tools/domains/physics/physics_ops.cpp
+    src/tools/domains/physics/physics_bundle_ops.cpp
+    src/tools/domains/property/property_ops.cpp
+    src/tools/domains/property/property_transform_ops.cpp
+    src/tools/domains/property/property_signal_ops.cpp
+    src/tools/base/register_all.cpp
+    src/tools/base/dispatch.cpp
+    src/tools/domains/analyze/analyze_ops.cpp
+    src/tools/base/schema_builder.cpp
+    src/tools/domains/render/render_ops.cpp
+    src/tools/domains/render/render_environment_ops.cpp
+    src/tools/domains/resource/resource_ops.cpp
+    src/tools/domains/resource/resource_property_import_ops.cpp
+    src/tools/domains/resource/resource_curve_mesh_ops.cpp
+    src/tools/base/runtime_ops.cpp
+    src/tools/domains/game/game_ops.cpp
+    src/tools/domains/scene/scene_ops.cpp
+    src/tools/domains/scene/scene_camera_ops.cpp
+    src/tools/domains/scene/scene_spec_ops.cpp
+    src/tools/domains/script/script_ops.cpp
+    src/tools/domains/script/script_patch_ops.cpp
+    src/tools/domains/spriteframes/spriteframes_ops.cpp
+    src/tools/base/tool_catalog.cpp
+    src/tools/base/tool_args.cpp
+    src/tools/base/tool_pipeline.cpp
+    src/tools/base/tool_invoke.cpp
     src/util/bm25_index.cpp
     src/util/variant_json.cpp
     src/util/client_config_gen.cpp

@@ -8,7 +8,8 @@
 |---|---|---|
 | [overview.md](overview.md) | 项目定位、整体架构、技术栈、目录结构、命名体系 | 全仓库 |
 | [build.md](build.md) | 构建/部署/打包流程、CMake 模块、产物清单、环境变量 | `CMakeLists.txt`、`cmake/`、`main.py`、`scripts/` |
-| [tests.md](tests.md) | L1/L2 测试体系、遍历排除清单、数值统计 | `tests/` |
+| [tests.md](tests.md) | 测试体系（程序化四层 + Agent e2e）、数值统计 | `tests/` |
+| [engine-behavior-checklist.md](engine-behavior-checklist.md) | 引擎行为验收清单：D-01 蒸馏落点、A 类迁移对照表、e2e 抽查建议 | — |
 | [conventions.md](conventions.md) | 工程约定：命名、日志、错误模式、添加工具流程 | 全仓库 |
 | [security_contract.md](security_contract.md) | T0 安全边界与并发契约：MCP 可信客户端与 REST 令牌认证、监听、授权三档、风险工具、主线程、生命周期与边界原则 | `src/core/`、`src/tools/`、`src/main.cpp` |
 | [tool_base_design.md](tool_base_design.md) | ToolSpec 工具数据层与执行管线：451 域工具全为 ToolSpec 数据记录、SpecTool 统一执行授权/后处理、dispatch 主线程等待预算、Args 取参器、用户脚本动态工具、迁移规则与守卫 | `tool_spec.hpp`、`tool_args.hpp`、`tool_pipeline.hpp`、`dynamic_spec_store.hpp`、`autopilot_tools.{hpp,cpp}`、33 个域 `*_tools.hpp`、`register_all.cpp` |
@@ -17,8 +18,8 @@
 | [modules/api.md](modules/api.md) | REST 接口面：同端口 `/api` 端点契约、请求与响应形状、Bearer 令牌认证、状态码与错误信封归一、宽松设计与已知限制 | `src/core/api_surface.*`、`api_auth.*`、`api_token.*`、`api_server.*`、`api_envelope.*` |
 | [modules/ports.md](modules/ports.md) | 端口与实例登记：一个端口承载 MCP 与 REST 两个端点、端口解析优先级与候选序列、显式与自动分配的失败差异、实例登记结构与全局索引、CLI 发现链与两级存活校验、控制面端口与实例端口的分工 | `src/core/port_resolver.*`、`instance_registry.*`、`project_store.*`、`gda_home.*`、`cli/src/target.ts` |
 | [modules/tools_registry.md](modules/tools_registry.md) | 工具注册管线、统一执行入口（导出拦截→工具存在→参数校验→授权→派发→信封）、授权三档、ToolSpec 派生、元工具与动态工具、schema 统计、契约缺口与遍历排除 | `src/tools/`（register_all/dispatch/tool_catalog/tool_spec/tool_args/tool_pipeline/tool_execute/argument_validator/authorization） |
-| [modules/tools_ops_a.md](modules/tools_ops_a.md) | 领域工具 A 组（场景/属性/输入/物理/导航/资源/脚本/配置/文档/编辑器 16 模块，222 工具） | `src/tools/*_ops.cpp` |
-| [modules/tools_ops_b.md](modules/tools_ops_b.md) | 领域工具 B 组（调试/显示/OS/运行时/音频/渲染/C# 桥/瓦片等 20 模块，229 工具；A 222 + B 229 = 451） | `src/tools/*_ops.cpp` |
+| [modules/tools_ops_a.md](modules/tools_ops_a.md) | 领域工具 A 组（场景/属性/输入/物理/导航/资源/脚本/配置/文档/编辑器 16 模块，222 工具） | `src/tools/domains/*/*_ops.cpp` |
+| [modules/tools_ops_b.md](modules/tools_ops_b.md) | 领域工具 B 组（调试/显示/OS/运行时/音频/渲染/C# 桥/瓦片等 20 模块，229 工具；A 222 + B 229 = 451） | `src/tools/domains/*/*_ops.cpp` |
 | [modules/support.md](modules/support.md) | 提示词、MCP 资源、UI、工具库 | `src/prompts/`、`src/resources/`、`src/ui/`、`src/util/` |
 | [modules/cli.md](modules/cli.md) | CLI 载体（gda）：Bun + TS 源码直跑、命令参考、七级寻址链、两套注册表与集中根位置、REST 令牌读取、生命周期、控制面代理（`gda serve`）与重启、协议握手与已知限制 | `cli/`、`package.json`、`bun.lock` |
 | [plans/roadmap.md](plans/roadmap.md) | 竞品对齐路线图：竞品定位速览与 P0-P3 批次交付状态 | 全仓库 |
@@ -26,7 +27,7 @@
 
 ## 关键数值速查
 
-全套数值（工具总数、schema 基线、遍历枚举/排除/候选与步数、L1/L2 用例数、ctest 注册点、CLI 单测数等）的**唯一权威落点**是 [tests.md](tests.md) 的「数值核算总表」小节——本页不复制数值，避免两处并存漂移。
+全套数值（工具总数、schema 基线、单元/集成用例数、ctest 注册点、CLI 单测数等）的**唯一权威落点**是 [tests.md](tests.md) 的「数值核算总表」小节——本页不复制数值，避免两处并存漂移。
 
 ## 维护入口
 
@@ -43,7 +44,7 @@
 | 做法 | 根 `.agents/skills/*/SKILL.md` | **可执行指南**：流程步骤、决策判据、边界与反例、检查清单 | 易漂移的数值（改为指向 wiki 页）、一次性事实 |
 
 - 维护时机与本项目一致：完成功能 / 交付指南 / 提交前。**知识库自我迭代时必须顺带核对受影响的项目级技能**——事实变了而技能里的步骤或判据失效，属于本层未同步，比 wiki 漏更危险（技能会被当作行动依据）。
-- 技能与交付给 MCP 客户端的技能书不是一回事：后者以标准 Agent Skills 目录布局存于 `skills/`、由 skill_gen 构建期嵌入并渲染到当前打开工程的 `res://.agents/skills/godot-autopilot*`（仓库内即 `tests/testbed/.agents/skills/`），教的是"怎么用这套工具"；前者存于 `.agents/skills/`、教的是"怎么改这个仓库"，两者按目录隔离，互不删除。
+- 技能与交付给 MCP 客户端的技能书不是一回事：后者以标准 Agent Skills 目录布局存于 `skills/`、由 skill_gen 构建期嵌入并渲染到当前打开工程的 `res://.agents/skills/godot-autopilot*`，教的是"怎么用这套工具"；前者存于 `.agents/skills/`、教的是"怎么改这个仓库"，两者按目录隔离，互不删除。
 - 归属不确定时按此判据：不写下来 agent 会做错动作 → 技能；写下来只是让人知道现状 → wiki；两者都不需要、但每次会话都要遵守 → `AGENTS.md`。
 
 ## 编写规则

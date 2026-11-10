@@ -58,7 +58,7 @@ resource: src/
 
 ## 已交付：Agent Skills 生成
 
-- **skill_gen 一键生成 Agent Skills**（2026-09-08 交付首版 7 册，09-13 扩至 8 册，09-25 随技能脚本通道落地增至 **9 册**（`skills/` 36 文件 = 9 份 `SKILL.md` + 26 份 references + 1 个 `mjs` 桥），10-19 随独立二进制分发再扩为五级调用阶梯，10-20 随技能书自带的脚本桥删除收敛为**三级**（原生 MCP → GDA CLI → 手动兜底，`bunx`、全局安装与独立二进制合为 GDA CLI 一档的三种分发方式；`skills/` 36→**34** 文件 = 9 份 `SKILL.md` + 25 份 references）；生成器 + UI 按钮 + 7 用例 L1）：写入项目根 `.agents/skills/`，覆盖写仅限自有命名空间
+- **skill_gen 一键生成 Agent Skills**（2026-09-08 交付首版 7 册，09-13 扩至 8 册，09-25 随技能脚本通道落地增至 **9 册**（`skills/` 36 文件 = 9 份 `SKILL.md` + 26 份 references + 1 个 `mjs` 桥），10-19 随独立二进制分发再扩为五级调用阶梯，10-20 随技能书自带的脚本桥删除收敛为**三级**（原生 MCP → GDA CLI → 手动兜底，`bunx`、全局安装与独立二进制合为 GDA CLI 一档的三种分发方式；`skills/` 36→**34** 文件 = 9 份 `SKILL.md` + 25 份 references）；生成器 + UI 按钮 + 7 用例 单元测试）：写入项目根 `.agents/skills/`，覆盖写仅限自有命名空间
 
 ## 已交付：Computer Use grounding 增强（09-15）
 
@@ -72,7 +72,7 @@ resource: src/
 
 ## 已交付：失败修复批次（09-16，feature/failure-remediation）
 
-领域工具 379→**384**（净 +5；Editor 29→31、TileMap 7→8、Game 10→12），MCP 可达 391 / catalog-index 392；L1 172→229、L2 11→17 份、ctest 183→246（当前口径见 [测试体系](../tests.md) 数值核算总表）。行为变更（eval 编译错误结构化返回、game 工具超时预算链、batch_execute await_async、capture after_frames/when/scale、内联子资源、scene_path 回显、godot://skills 资源等 8 项）详见 [changelog/2026-09-16-log.md](../changelog/2026-09-16-log.md)：
+领域工具 379→**384**（净 +5；Editor 29→31、TileMap 7→8、Game 10→12），MCP 可达 391 / catalog-index 392；单元测试 172→229、L2 11→17 份、ctest 183→246（当前口径见 [测试体系](../tests.md) 数值核算总表）。行为变更（eval 编译错误结构化返回、game 工具超时预算链、batch_execute await_async、capture after_frames/when/scale、内联子资源、scene_path 回显、godot://skills 资源等 8 项）详见 [changelog/2026-09-16-log.md](../changelog/2026-09-16-log.md)：
 
 - **编辑器场景树**：`scene_tree_items`（Scene dock 行枚举）/ `select_scene_tree_node`（按 path 选中并联动 Inspector）
 - **瓦片地图**：`fill_tilemap_rect`（矩形铺砖/擦除，>100000 格报错、单次 undo）
@@ -116,7 +116,7 @@ resource: src/
 ## 已交付：执行预算与契约治理（10-20）
 
 - **执行预算与超时治理**：`kLongBlocking` 由「无限等待」改为长阻塞预算档（常量 `GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = GDA_DISPATCH_WAIT_MAX_MS` = 29000，env `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS` 可下调至 `[1000, 29000]`）；`code_execute` 的 `timeout_ms` 上界取 `min(27000, 生效长阻塞派发预算)`（`code_exec_ops::max_timeout_ms()` 单一来源，schema `maximum` 与提示词同源）；`CommandQueue::execute_sync` 在 `src/` 内已无调用点，资源 / 提示词 / 动态工具 / 游戏通道的等待全部改走带预算的 `submit_tracked_bounded`；新增 `code_execute` 协作式执行期超时（`code="exec_timeout"`）与游戏侧 eval 超时 / 取消（`eval_timeout` / `eval_cancelled`）；无编辑器队列时返回 `queue_unavailable` 结构化错误。
-- **工具契约强制**：`code_execute` 与 `batch_execute` 的 `side_effect` 由 `None` 改为 `CodeExecute`——**`batch_execute` 由此受 `code_execute` 能力门保护，属对外行为变更**；能力门判定去掉工具名特判，只按 `side_effect` 统一判定；`side_effect_name(None)` 由空串改为 `"none"`，任何工具的 `side_effect` 都非空（L1 + L2 双层断言锁定）。
+- **工具契约强制**：`code_execute` 与 `batch_execute` 的 `side_effect` 由 `None` 改为 `CodeExecute`——**`batch_execute` 由此受 `code_execute` 能力门保护，属对外行为变更**；能力门判定去掉工具名特判，只按 `side_effect` 统一判定；`side_effect_name(None)` 由空串改为 `"none"`，任何工具的 `side_effect` 都非空（单元测试 + L2 双层断言锁定）。
 - **主线程契约守卫**：新增 `tests/guard/main_thread_guard.py` 并注册 ctest 用例；trace 截图落盘与轨迹写盘统一到主线程持锁通道；`ExportGuard` 改实例级标志并补齐异常安全复位，导出期拒绝覆盖工具调用 / MCP 资源 / MCP 提示词三类入口。
 - **发布产物完整性**：新增 `scripts/test_package_integrity.py`（三平台库 / C# 桥源码 / gdextension 条目 / 无 `.pdb`）并接入 CI 构建后与发布前；`addons.zip` 纳入 C# 桥源码并统一两条打包路径口径。
 - **CLI 中危修复**：启动就绪探测失败终止进程并清理 pending 日志；登记表比较统一 `path.resolve` 且握手状态可失效；顶层 `error` 信封映射为工具失败；移除未实现的 `--quiet`；`stop` 支持 `--id` / `--port` 并复用统一选择器校验。
