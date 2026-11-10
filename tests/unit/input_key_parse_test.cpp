@@ -2,12 +2,17 @@
 
 #include <godot_cpp/classes/global_constants.hpp>
 #include <string>
+#include <tools/domains/editor/editor_ui_actions_ops.hpp>
 #include <tools/domains/input/input_click_ops.hpp>
 
 namespace {
 
 godot::Key key_of(const std::string &name) {
   return godot_autopilot::input_click_ops::parse_key_name(name);
+}
+
+godot::Key function_key_of(const std::string &name) {
+  return godot_autopilot::editor_ui_actions::parse_function_key(name);
 }
 
 } // namespace
@@ -42,8 +47,23 @@ TEST(InputKeyParseTest, LettersDigitsAndNamedKeysUnchanged) {
   EXPECT_EQ(key_of("escape"), godot::KEY_ESCAPE);
 }
 
+TEST(InputKeyParseTest, FunctionKeysParseF1ToF12) {
+  EXPECT_EQ(function_key_of("f1"), godot::KEY_F1);
+  EXPECT_EQ(function_key_of("f5"), godot::KEY_F5);
+  EXPECT_EQ(function_key_of("f12"), godot::KEY_F12);
+}
+
+TEST(InputKeyParseTest, FunctionKeysRejectOutOfRangeAndMalformed) {
+  EXPECT_EQ(function_key_of("f0"), godot::KEY_NONE);
+  EXPECT_EQ(function_key_of("f13"), godot::KEY_NONE);
+  EXPECT_EQ(function_key_of("fx"), godot::KEY_NONE);
+  EXPECT_EQ(function_key_of("f"), godot::KEY_NONE);
+  EXPECT_EQ(key_of("f5"), godot::KEY_NONE);
+}
+
 TEST(InputKeyParseTest, CtrlMinusMainKeyResolves) {
   EXPECT_EQ(key_of("-"), godot::KEY_MINUS);
+  EXPECT_EQ(function_key_of("-"), godot::KEY_NONE);
 }
 
 TEST(InputKeyParseTest, UnknownNamedKeyStillNone) {
