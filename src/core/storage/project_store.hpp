@@ -13,9 +13,18 @@ struct EndpointEntry {
   std::string auth;
 };
 
+struct IpcEndpointEntry {
+  std::string path;
+  std::string protocol{"uds"};
+  std::string framing{"ndjson"};
+  std::string auth{"filesystem"};
+  bool present{false};
+};
+
 struct EndpointTable {
   EndpointEntry mcp;
   EndpointEntry api;
+  IpcEndpointEntry ipc;
 };
 
 class ProjectStore {

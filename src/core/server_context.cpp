@@ -491,6 +491,11 @@ void ServerContext::write_instance_record() {
       EndpointEntry{host_, port_, GDA_MCP_PATH, "mcp", "none"};
   record.endpoints.api =
       EndpointEntry{host_, port_, GDA_API_PATH, "http", "bearer"};
+  if (ipc_transport::ipc_transport_instance().is_listening()) {
+    record.endpoints.ipc.path =
+        ipc_transport::ipc_transport_instance().bound_path();
+    record.endpoints.ipc.present = true;
+  }
   record.gda_home = HomeResolver::gda_home();
   record.started_at = started_at;
   record.version = GDA_VERSION;

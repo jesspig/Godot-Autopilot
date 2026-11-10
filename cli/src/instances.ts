@@ -29,8 +29,16 @@ export interface PluginInstanceRecord {
   apiToken: string;
   mcpEndpoint: EndpointEntry | null;
   apiEndpoint: EndpointEntry | null;
+  ipcEndpoint: IpcEndpointRecord | null;
   startedAt: number;
   version: string;
+}
+
+export interface IpcEndpointRecord {
+  path: string;
+  protocol: string;
+  framing: string;
+  auth: string;
 }
 
 export type EndpointKind = "mcp" | "api";
@@ -125,8 +133,21 @@ function parseRecord(item: unknown): PluginInstanceRecord | null {
     apiToken: readString(doc, ["api_token", "apiToken", "token"]) ?? "",
     mcpEndpoint: buildEndpoint(endpoints["mcp"], mcpPort, DEFAULT_MCP_PATH, MCP_PROTOCOL, MCP_AUTH),
     apiEndpoint: buildEndpoint(endpoints["api"], apiPort, DEFAULT_API_PATH, HTTP_PROTOCOL, API_AUTH),
+    ipcEndpoint: parseIpcEndpoint(endpoints["ipc"]),
     startedAt: readNumber(doc, ["started_at", "startedAt"]) ?? 0,
     version: readString(doc, ["version"]) ?? "",
+  };
+}
+
+function parseIpcEndpoint(raw: unknown): IpcEndpointRecord | null {
+  const doc = readObject(raw);
+  const path = readString(doc, ["path"]);
+  if (path === undefined) return null;
+  return {
+    path,
+    protocol: readString(doc, ["protocol"]) ?? "uds",
+    framing: readString(doc, ["framing"]) ?? "ndjson",
+    auth: readString(doc, ["auth"]) ?? "filesystem",
   };
 }
 

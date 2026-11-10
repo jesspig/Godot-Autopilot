@@ -115,6 +115,41 @@ TEST(InstanceRegistryTest, NonObjectDocumentFailsValidation) {
       mcp::JsonValue(mcp::JsonValue::Array()), parsed));
 }
 
+TEST(InstanceRegistryTest, RecordWithIpcEndpointRoundTrips) {
+  InstanceRecord original = sample_record();
+  original.endpoints.ipc.path = "C:/gda/run/sample-1234abcd.sock";
+  original.endpoints.ipc.protocol = "uds";
+  original.endpoints.ipc.framing = "ndjson";
+  original.endpoints.ipc.auth = "filesystem";
+  original.endpoints.ipc.present = true;
+  const mcp::JsonValue doc = godot_autopilot::record_to_json(original);
+  InstanceRecord parsed;
+  ASSERT_TRUE(godot_autopilot::record_from_json(doc, parsed));
+  EXPECT_TRUE(parsed.endpoints.ipc.present);
+  EXPECT_EQ(parsed.endpoints.ipc.path, "C:/gda/run/sample-1234abcd.sock");
+  EXPECT_EQ(parsed.endpoints.ipc.protocol, "uds");
+  EXPECT_EQ(parsed.endpoints.ipc.framing, "ndjson");
+  EXPECT_EQ(parsed.endpoints.ipc.auth, "filesystem");
+}
+
+TEST(InstanceRegistryTest, MissingIpcEndpointIsBackwardCompatible) {
+  const InstanceRecord original = sample_record();
+  const mcp::JsonValue doc = godot_autopilot::record_to_json(original);
+  InstanceRecord parsed;
+  ASSERT_TRUE(godot_autopilot::record_from_json(doc, parsed));
+  EXPECT_FALSE(parsed.endpoints.ipc.present);
+}
+
+TEST(InstanceRegistryTest, InvalidIpcEndpointFailsValidation) {
+  const InstanceRecord original = sample_record();
+  mcp::JsonValue doc = godot_autopilot::record_to_json(original);
+  mcp::JsonValue::Object bad;
+  bad["path"] = 5;
+  doc["endpoints"]["ipc"] = mcp::JsonValue(std::move(bad));
+  InstanceRecord parsed;
+  EXPECT_FALSE(godot_autopilot::record_from_json(doc, parsed));
+}
+
 TEST(InstanceRegistryTest, WriteListRemoveRoundTrip) {
   const std::filesystem::path base =
       gda_test::test_temp_root() / "gda_instance_registry_test";
