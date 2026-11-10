@@ -26,6 +26,7 @@ function record(overrides: Partial<PluginInstanceRecord> = {}): PluginInstanceRe
     apiToken: TOKEN,
     mcpEndpoint: { host: "127.0.0.1", port, path: "/mcp", protocol: "mcp", auth: "none" },
     apiEndpoint: { host: "127.0.0.1", port, path: "/api", protocol: "http", auth: "bearer" },
+    ipcEndpoint: null,
     startedAt: 1,
     version: "0.3.0",
     ...overrides,
