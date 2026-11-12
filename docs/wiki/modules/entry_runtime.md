@@ -12,6 +12,8 @@ resource:
   - src/runtime/
 ---
 
+> **0.3.2**：编辑器级只注册 `McpLogDock`；`McpConfigDock` 已删除。启动不再签发 API token、不再启动 REST `ApiServer`、不再写 `endpoints.api`。
+
 # 模块：入口与运行时桥接（entry_runtime）
 
 > 09-18 E2E 优化批次增补（详见 `changelog/2026-09-18-log.md` 19:30 节）：`call_method` native 失败路径附加 `diagnosis` + `hint`（`game_bridge_eval.cpp:534 eval_bind_suspected_cause` / `:553 make_native_bind_diagnosis`，成功路径零改动）；新增 `gda_protocol.hpp` 4 个 op（`eval_assert`/`sample`/`collect_evidence`/`validate_ui_layout`）与 `game_bridge_verify.cpp`（采样 awaiter + 校验类注册）。
