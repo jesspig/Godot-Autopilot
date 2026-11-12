@@ -153,6 +153,30 @@ export function readZip(archivePath: string): ZipArchiveEntry[] {
   if (directoryOffset === 0xffffffff) throw new Error("zip64 archives are not supported");
   const entries: ZipArchiveEntry[] = [];
   let cursor = directoryOffset;
+  if (buffer.readUInt32LE(cursor) !== 0x02014b50) {
+    let found = -1;
+    for (let candidate = 0; candidate + 46 <= end; candidate += 1) {
+      if (buffer.readUInt32LE(candidate) !== 0x02014b50) continue;
+      let probe = candidate;
+      let valid = true;
+      for (let index = 0; index < count; index += 1) {
+        if (probe + 46 > end || buffer.readUInt32LE(probe) !== 0x02014b50) {
+          valid = false;
+          break;
+        }
+        const nameLength = buffer.readUInt16LE(probe + 28);
+        const extraLength = buffer.readUInt16LE(probe + 30);
+        const commentLength = buffer.readUInt16LE(probe + 32);
+        probe += 46 + nameLength + extraLength + commentLength;
+      }
+      if (valid && probe <= end) {
+        found = candidate;
+        break;
+      }
+    }
+    if (found < 0) throw new Error("broken central directory");
+    cursor = found;
+  }
   for (let index = 0; index < count; index += 1) {
     if (buffer.readUInt32LE(cursor) !== 0x02014b50) throw new Error("broken central directory");
     const method = buffer.readUInt16LE(cursor + 10);
