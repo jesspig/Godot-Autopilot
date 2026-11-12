@@ -28,9 +28,6 @@ export interface GlobalOptions {
   play?: boolean;
   noImport?: boolean;
   force?: boolean;
-  query?: string;
-  limitText?: string;
-  offsetText?: string;
   probe?: string;
   file?: string;
   refresh?: boolean;
@@ -59,9 +56,6 @@ const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
   "--godot": "godot",
   "--wait": "waitText",
   "--tail": "tailText",
-  "--query": "query",
-  "--limit": "limitText",
-  "--offset": "offsetText",
   "--probe": "probe",
   "--file": "file",
   "--socket": "socketText",
@@ -175,10 +169,6 @@ Commands:
   stop                Stop a Godot editor (<id> | --id | --port | --project)
   restart             Restart a Godot editor with the same port and settings
   logs                Show an instance log
-  api list            List tools through the REST endpoint
-  api describe <tool> Show one tool's schema through the REST endpoint
-  api call <tool>     Call a tool through the REST endpoint
-  endpoints           Show the discovered MCP and REST endpoints
   cache list          List cache manifests
   cache info          Show cache root, entry count, and size
   cache clear         Remove old cache entries (requires --force)
@@ -209,12 +199,9 @@ Global options:
   --wait <sec>        Readiness/stop wait in seconds, 0 = do not wait (start/stop/restart)
   --force             Force-stop the process (stop/restart)
   --tail <n>          Number of trailing log lines (logs)
-  --query <text>      Keyword filter for the api list subcommand
-  --limit <n>         Maximum tools returned by the api list subcommand (1-2000)
-  --offset <n>        Offset into the tool list for the api list subcommand
-  --probe <value>     Liveness level light/strict (api/endpoints/start); list: probed port 1-65535
+  --probe <value>     Liveness level light/strict (start); list: probed port 1-65535
   --file <rel>        Reference file to read with skills show (relative to the skill dir)
-  --refresh           Refresh the offline tool catalog from a live /api/tools call
+  --refresh           Refresh the offline tool catalog from MCP tools/list
   --all               list: include projects with no running instance
   --projects          list: aggregate entries by project instead of per instance
   --stale             list: keep only non-live entries

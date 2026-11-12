@@ -53,7 +53,7 @@ async function detectLivePluginInstance(
     if (record.projectPath === "") continue;
     if (projectPathKey(record.projectPath) !== key) continue;
     if (record.pid === null || !isAlive(record.pid)) continue;
-    const endpoint = record.apiEndpoint ?? record.mcpEndpoint;
+    const endpoint = record.mcpEndpoint;
     if (endpoint === null) continue;
     const alive = await probeEndpoint(
       { host: endpoint.host, port: endpoint.port, url: endpointBaseUrl(endpoint) },

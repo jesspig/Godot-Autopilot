@@ -252,6 +252,33 @@ function serverMessage(text: string): string {
   return serverMsg;
 }
 
+export async function listTools(
+  port: number,
+  timeoutSec: number = DEFAULT_TIMEOUT_SEC,
+): Promise<unknown[]> {
+  const url = `http://${HOST}:${port}/mcp`;
+  const timeoutMs = timeoutSec * 1000;
+  const state = handshakeStateFor(url);
+  if (!state.done) {
+    await performHandshake(url, timeoutMs);
+  }
+  const id = nextRequestId++;
+  const res = await postJson(
+    url,
+    JSON.stringify({ jsonrpc: "2.0", id, method: "tools/list", params: {} }),
+    timeoutMs,
+  );
+  if (res.status < 200 || res.status >= 300) {
+    throw new CliError(ExitCode.Transport, `tools/list failed with HTTP ${res.status}.`);
+  }
+  const extracted = extractEnvelope(res);
+  if (extracted.kind !== "envelope") {
+    throw new CliError(ExitCode.Transport, "could not parse the tools/list response.");
+  }
+  const result = (extracted.envelope as { result?: { tools?: unknown } }).result;
+  return Array.isArray(result?.tools) ? result.tools : [];
+}
+
 export async function callTool(
   name: string,
   args: Record<string, unknown>,

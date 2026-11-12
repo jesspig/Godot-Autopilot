@@ -7,11 +7,8 @@ import { cachedEndpointAlive } from "./probe";
 export const PLUGIN_INDEX_FILE = "instances.json";
 export const DEFAULT_HOST = "127.0.0.1";
 export const DEFAULT_MCP_PATH = "/mcp";
-export const DEFAULT_API_PATH = "/api";
 export const MCP_PROTOCOL = "mcp";
-export const HTTP_PROTOCOL = "http";
 export const MCP_AUTH = "none";
-export const API_AUTH = "bearer";
 
 export interface EndpointEntry {
   host: string;
@@ -26,9 +23,7 @@ export interface PluginInstanceRecord {
   port: number | null;
   pid: number | null;
   projectPath: string;
-  apiToken: string;
   mcpEndpoint: EndpointEntry | null;
-  apiEndpoint: EndpointEntry | null;
   ipcEndpoint: IpcEndpointRecord | null;
   startedAt: number;
   version: string;
@@ -48,17 +43,12 @@ export interface IpcEndpointRecord {
   version: number;
 }
 
-export type EndpointKind = "mcp" | "api";
-
 export function pluginIndexPath(): string {
   return path.join(gdaRoot(), PLUGIN_INDEX_FILE);
 }
 
-export function deriveEndpoint(port: number, kind: EndpointKind): EndpointEntry {
-  if (kind === "mcp") {
-    return { host: DEFAULT_HOST, port, path: DEFAULT_MCP_PATH, protocol: MCP_PROTOCOL, auth: MCP_AUTH };
-  }
-  return { host: DEFAULT_HOST, port, path: DEFAULT_API_PATH, protocol: HTTP_PROTOCOL, auth: API_AUTH };
+export function deriveEndpoint(port: number): EndpointEntry {
+  return { host: DEFAULT_HOST, port, path: DEFAULT_MCP_PATH, protocol: MCP_PROTOCOL, auth: MCP_AUTH };
 }
 
 export function endpointBaseUrl(endpoint: EndpointEntry): string {
@@ -97,7 +87,7 @@ export function findPluginRecordByProject(projectPath: string): PluginInstanceRe
 
 export function findPluginRecordByPort(port: number): PluginInstanceRecord | undefined {
   const matched = readPluginInstanceIndex().filter(
-    (r) => r.port === port || r.mcpEndpoint?.port === port || r.apiEndpoint?.port === port,
+    (r) => r.port === port || r.mcpEndpoint?.port === port,
   );
   return pickPreferred(matched);
 }
@@ -105,7 +95,7 @@ export function findPluginRecordByPort(port: number): PluginInstanceRecord | und
 function pickPreferred(records: PluginInstanceRecord[]): PluginInstanceRecord | undefined {
   if (records.length === 0) return undefined;
   const endpointAlive = records.filter((record) => {
-    const port = record.port ?? record.mcpEndpoint?.port ?? record.apiEndpoint?.port ?? null;
+    const port = record.port ?? record.mcpEndpoint?.port ?? null;
     return port !== null && cachedEndpointAlive(port) === true;
   });
   const pool = endpointAlive.length > 0 ? endpointAlive : records;
@@ -128,18 +118,14 @@ function parseRecord(item: unknown): PluginInstanceRecord | null {
   const doc = item as Record<string, unknown>;
   const endpoints = readObject(doc["endpoints"]);
   const declaredMcpPort = readEndpointPort(endpoints["mcp"]);
-  const declaredApiPort = readEndpointPort(endpoints["api"]);
-  const sharedPort = declaredMcpPort ?? declaredApiPort ?? readPort(doc);
+  const sharedPort = declaredMcpPort ?? readPort(doc);
   const mcpPort = declaredMcpPort ?? sharedPort;
-  const apiPort = declaredApiPort ?? sharedPort;
   return {
     instanceId: readString(doc, ["instance_id", "instanceId", "id"]) ?? "",
     port: sharedPort,
     pid: readNumber(doc, ["pid"]),
     projectPath: readString(doc, ["project_path", "projectPath", "project"]) ?? "",
-    apiToken: readString(doc, ["api_token", "apiToken", "token"]) ?? "",
     mcpEndpoint: buildEndpoint(endpoints["mcp"], mcpPort, DEFAULT_MCP_PATH, MCP_PROTOCOL, MCP_AUTH),
-    apiEndpoint: buildEndpoint(endpoints["api"], apiPort, DEFAULT_API_PATH, HTTP_PROTOCOL, API_AUTH),
     ipcEndpoint: parseIpcEndpoint(endpoints["ipc"]),
     startedAt: readNumber(doc, ["started_at", "startedAt"]) ?? 0,
     version: readString(doc, ["version"]) ?? "",

@@ -39,7 +39,6 @@ InstanceRecord sample_record() {
   record.port = 9527;
   record.pid = 4242;
   record.project_path = "C:/projects/Demo";
-  record.api_token = "token-abc";
   record.endpoints.mcp.host = "127.0.0.1";
   record.endpoints.mcp.port = 9527;
   record.endpoints.mcp.path = "/mcp";
@@ -69,7 +68,6 @@ TEST(InstanceRegistryTest, RecordRoundTripsThroughJson) {
   EXPECT_EQ(parsed.port, original.port);
   EXPECT_EQ(parsed.pid, original.pid);
   EXPECT_EQ(parsed.project_path, original.project_path);
-  EXPECT_EQ(parsed.api_token, original.api_token);
   EXPECT_EQ(parsed.gda_home, original.gda_home);
   EXPECT_EQ(parsed.started_at, original.started_at);
   EXPECT_EQ(parsed.version, original.version);

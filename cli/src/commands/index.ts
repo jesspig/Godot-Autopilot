@@ -14,8 +14,6 @@ import { run as logs } from "./logs";
 import { run as skills } from "./skills";
 import { run as tools } from "./tools";
 import { run as projects } from "./projects";
-import { run as api } from "./api";
-import { run as endpoints } from "./endpoints";
 import { run as cache } from "./cache";
 import { run as install } from "./install";
 import { run as update } from "./update";
@@ -40,8 +38,6 @@ export const COMMANDS: Record<string, Command> = {
   skills: { run: skills },
   tools: { run: tools },
   projects: { run: projects },
-  api: { run: api },
-  endpoints: { run: endpoints },
   cache: { run: cache },
   install: { run: install },
   update: { run: update },

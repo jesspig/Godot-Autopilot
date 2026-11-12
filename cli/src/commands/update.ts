@@ -25,7 +25,7 @@ function item(artifact: UpdateItemResult["artifact"], ok: boolean, error: string
 
 export async function run(positional: string[], opts: GlobalOptions): Promise<number> {
   const target = parseTarget(positional[0]);
-  if (opts.category === "check" || opts.query === "check") {
+  if (opts.category === "check") {
     throw new CliError(ExitCode.Usage, "use --check instead of a positional check");
   }
   if (opts.check === true) {
