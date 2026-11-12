@@ -15,7 +15,7 @@
         {
             "name": "debug",
             "displayName": "Debug (Ninja)",
-            "description": "检测到 ninja 时使用（scripts/config.py:resolve_preset 自动选择）",
+            "description": "检测到 ninja 时使用（devtools/lib/config.ts:resolvePreset 自动选择）",
             "inherits": "base-debug",
             "generator": "Ninja"
         },
@@ -39,7 +39,7 @@
         {
             "name": "release",
             "displayName": "Release (Ninja)",
-            "description": "检测到 ninja 时使用（scripts/config.py:resolve_preset 自动选择）",
+            "description": "检测到 ninja 时使用（devtools/lib/config.ts:resolvePreset 自动选择）",
             "inherits": "base-release",
             "generator": "Ninja"
         },

@@ -36,7 +36,7 @@ resource:
 | bun install -g（人类文档） | `bun install -g github:jesspig/Godot-Autopilot#<VERSION>` | 全局安装后直接用 `gda <cmd>` |
 | 独立二进制（无需任何 JS 运行时） | 从 GitHub Release 下载 `gda-<version>-<platform>.zip`（Windows）或 `.tar.gz`（其余），对照 `sha256sums.txt` 校验后直接运行 | 阶梯第二级的独立二进制分发；目标五个：`windows-x64` / `linux-x64` / `linux-x64-musl` / `macos-arm64` / `macos-x64`；macOS 产物为 ad-hoc 签名（非公证） |
 
-**不进 addon 包**：CLI 独立于 GDExtension 插件（`godot-autopilot.dll` 等），不参与 `main.py build`/`deploy`/`package`，不进 `addons.zip`；独立二进制作为**单独的 release 资产**与 `addons.zip` 并列发布（`release.yml` 的 `cli` 作业，5 个目标；`ci.yml` 另有 `cli-bins` 作业做三平台冒烟）。**已发布的 release 尚未带上这些资产**：最新一次发布（`0.2.7`，2026-10-11）早于 `cli` 作业接入发布流程，只含 `addons.zip`；二进制资产与 `sha256sums.txt` 自下一次发布起随 `addons.zip` 一并挂出。
+**不进 addon 包**：CLI 独立于 GDExtension 插件（`godot-autopilot.dll` 等），不参与 `gda-dev-tools build`/`deploy`/`package`，不进 `addons.zip`；独立二进制作为**单独的 release 资产**与 `addons.zip` 并列发布（`release.yml` 的 `cli` 作业，5 个目标；`ci.yml` 另有 `cli-bins` 作业做三平台冒烟）。**已发布的 release 尚未带上这些资产**：最新一次发布（`0.2.7`，2026-10-11）早于 `cli` 作业接入发布流程，只含 `addons.zip`；二进制资产与 `sha256sums.txt` 自下一次发布起随 `addons.zip` 一并挂出。
 
 **输出语言**：CLI 面向国际用户，全部用户可见文本（帮助、错误消息、suggestion、退出码说明）均为英文；源码内注释不受此约束。
 

@@ -16,6 +16,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  no-python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.x"
+
+      # 开发链只允许 Bun + CMake + 编译器；本作业不安装 Python。
+      - name: No-Python guard
+        run: bun tests/guard/no_python_guard.ts
+
   build:
     strategy:
       fail-fast: false

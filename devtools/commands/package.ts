@@ -113,7 +113,7 @@ function packageAddon(libsDir: string | null): void {
   } else {
     const deployedDir = addonDir(DEMO_DIRS[0]);
     if (!fs.existsSync(deployedDir)) {
-      throw new Error("Addons not deployed; run a build first (e.g. uv run main.py build)");
+      throw new Error("Addons not deployed; run a build first (e.g. bun run gda-dev-tools build)");
     }
     libDir = deployedDir;
     const libName = hostPlatformLib();

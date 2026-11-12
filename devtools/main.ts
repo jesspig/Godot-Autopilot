@@ -5,6 +5,7 @@ import { runDeploy, type DeployOptions } from "./commands/deploy";
 import { runPackage } from "./commands/package";
 import { runPackageCheck } from "./commands/package-check";
 import { runTests, type TestOptions } from "./commands/test";
+import { runTui } from "./tui";
 
 const USAGE = [
   "Usage: bun run gda-dev-tools <command> [options]",
@@ -16,6 +17,7 @@ const USAGE = [
   "  package                  [--libs-dir <dir>]",
   "  package-check <zip>",
   "  test                     [--preset debug|release] [--single <用例名>]",
+  "  tui",
 ].join("\n");
 
 class UsageError extends Error {}
@@ -127,6 +129,9 @@ export async function main(argv: string[]): Promise<number> {
         return runPackageCheck(rest[0]);
       case "test":
         return runTests(parseTest(rest));
+      case "tui":
+        expectNoArgs("tui", rest);
+        return runTui();
       default:
         throw new UsageError(`unknown command: ${command}`);
     }

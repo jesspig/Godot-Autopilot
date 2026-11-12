@@ -2,7 +2,6 @@
 build/
 out/
 cmake-build-*/
-__pycache__/
 
 # IDE
 .idea/

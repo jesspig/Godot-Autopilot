@@ -171,17 +171,15 @@ add_test(NAME migration_guard
             -P ${CMAKE_CURRENT_SOURCE_DIR}/guard/migration_guard.cmake)
 
 # ── ctest 注册: 注释守卫（零依赖，读源码断言，无需构建产物） ──
-<<<<<<< HEAD
-if(NOT GDA_PYTHON_EXECUTABLE)
-    find_program(GDA_PYTHON_EXECUTABLE NAMES python python3 py)
-endif()
-if(NOT GDA_PYTHON_EXECUTABLE AND EXISTS "${CMAKE_SOURCE_DIR}/.venv/Scripts/python.exe")
-    set(GDA_PYTHON_EXECUTABLE "${CMAKE_SOURCE_DIR}/.venv/Scripts/python.exe")
-endif()
-=======
->>>>>>> feature/devtools-guards
 add_test(NAME comment_guard
     COMMAND "${GDA_BUN_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/comment_guard.ts")
+
+# ── ctest 注册: 无 Python 守卫（Bun 直跑；扫描 Python 文件与旧入口命令）──
+add_test(NAME no_python_guard
+    COMMAND "${GDA_BUN_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/no_python_guard.ts"
+            --root "${CMAKE_SOURCE_DIR}")
+add_test(NAME no_python_guard_self_test
+    COMMAND "${GDA_BUN_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/no_python_guard.ts" --self-test)
 
 # ── ctest 注册: 主线程契约守卫（零依赖，读源码断言 Godot API 直接调用）──
 # 扫描 src/ 下的 *.cpp/*.hpp：外线程文件里的 Godot API 调用默认违规，
@@ -273,12 +271,14 @@ add_test(NAME tool_domain_guard_self_test
 set_tests_properties(
     migration_guard
     comment_guard
+    no_python_guard
     main_thread_guard
     version_sync_guard
     source_manifest_guard
     tool_domain_guard
     migration_guard_self_test
     comment_guard_self_test
+    no_python_guard_self_test
     main_thread_guard_self_test
     tool_domain_guard_self_test
     PROPERTIES LABELS "guard")
