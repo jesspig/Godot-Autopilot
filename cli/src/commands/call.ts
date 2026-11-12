@@ -98,5 +98,3 @@ function recordCliCall(
     attempt: 1,
   });
 }
-
-function recordCliCall(
