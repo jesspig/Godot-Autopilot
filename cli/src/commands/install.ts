@@ -3,12 +3,13 @@ import os from "node:os";
 import path from "node:path";
 
 import type { GlobalOptions } from "../args";
-import { extractZip, readTree, writeTree, downloadToFile } from "../archive";
+import { extractZip, readTree, writeTree } from "../archive";
 import { cacheRoot, cacheAssetPath, selectLatest, verifyManifest } from "../cache";
 import { CliError, ExitCode } from "../errors";
 import { readPluginInstanceIndex } from "../instances";
 import { isAlive, stopForce } from "../process";
 import { builtinSkillsFiles, builtinSkillsVersion } from "../skills";
+import { downloadAsset } from "../source";
 import { CLI_VERSION } from "../version";
 import { start } from "./start";
 import { writeJson } from "./json-output";
@@ -24,7 +25,7 @@ function parseSource(text: string | undefined): Source {
 }
 
 function skillsArchiveUrl(lang: string): string {
-  return `https://github.com/jesspig/Godot-Autopilot/releases/download/v${CLI_VERSION}/skills-${lang}.zip`;
+  return `skills-${lang}.zip`;
 }
 
 function normalizeSkillFiles(files: Record<string, string>): Record<string, string> {
@@ -41,10 +42,9 @@ function normalizeSkillFiles(files: Record<string, string>): Record<string, stri
 async function onlineSkills(lang: string): Promise<Record<string, string>> {
   const temp = fs.mkdtempSync(path.join(cacheRoot(), "skills-online-"));
   try {
-    const zip = path.join(temp, "skills.zip");
-    await downloadToFile(skillsArchiveUrl(lang), zip);
+    const downloaded = await downloadAsset(skillsArchiveUrl(lang), CLI_VERSION, temp);
     const dest = path.join(temp, "unpacked");
-    extractZip(zip, dest);
+    extractZip(downloaded.path, dest);
     return normalizeSkillFiles(readTree(dest));
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
@@ -136,10 +136,6 @@ async function installSkills(opts: GlobalOptions): Promise<number> {
   return ExitCode.Success;
 }
 
-function pluginArchiveUrl(): string {
-  return `https://github.com/jesspig/Godot-Autopilot/releases/download/v${CLI_VERSION}/addons.zip`;
-}
-
 async function installPlugin(opts: GlobalOptions): Promise<number> {
   const source = parseSource(opts.sourceText);
   const project = path.resolve(opts.project ?? process.cwd());
@@ -153,12 +149,12 @@ async function installPlugin(opts: GlobalOptions): Promise<number> {
   const temp = fs.mkdtempSync(path.join(cacheRoot(), "plugin-install-"));
   try {
     let zip: string | undefined;
-    let origin: Source = source;
+    let origin: string = source;
     if (source === "online" || source === "auto") {
       try {
-        zip = path.join(temp, "addons.zip");
-        await downloadToFile(pluginArchiveUrl(), zip);
-        origin = "online";
+        const downloaded = await downloadAsset("addons.zip", CLI_VERSION, temp);
+        zip = downloaded.path;
+        origin = downloaded.source;
       } catch (error) {
         if (source === "online") throw error;
         zip = undefined;
