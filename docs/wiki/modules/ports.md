@@ -7,7 +7,7 @@ tags:
   - 端口
   - 实例登记
   - 发现链
-timestamp: "2026-11-13T01:30:00+08:00"
+timestamp: "2026-11-13T02:40:00+08:00"
 resource:
   - src/core/transport/port_resolver.cpp
   - src/core/transport/port_recovery.hpp
@@ -201,14 +201,16 @@ CLI 的目标解析是一条**七级优先链**，每一级都记录来源（`so
 - **多实例靠路径而非端口**：控制面只占一个端口，实例寻址走 `/i/<ref>/...`，`ref` 可为插件实例标识（`gda-...`）、命令行实例标识（`p<pid>`，即 `gda list` 显示的值）或纯数字端口，匹配优先级依次为插件标识 → `p<pid>` → 端口；缺省 `/api` 与 `/mcp` 在唯一活跃实例时自动转发。路由与认证细节见 [CLI 载体](cli.md)「控制面（`gda serve`）」。
 - **插件侧保留段 19900–19999**：`src/core/config.hpp` 的 `GDA_CONTROL_PORT_BASE` / `GDA_CONTROL_PORT_LIMIT` 定义该区间，并由 `static_assert` 保证其低于自动分配起点 20000、互不相交；CLI 控制面默认 9700 落在该保留段之外，两者不会互抢端口。该常量目前只出现在常量定义与断言中（无其它引用点）。
 
-## 本机 IPC 通道（2026-11-10）
+## 本机 IPC 通道（2026-11-13 T-03）
 
-插件在 TCP 端口之外额外监听一条 **AF_UNIX `SOCK_STREAM`** 本机通道，与 TCP `/mcp` 并存；绑定失败只记 Warning 并降级为「仅 TCP」，不影响端口通道。实现见 [`src/core/transport/ipc_transport.cpp`](../../../src/core/transport/ipc_transport.cpp)、[`ipc_framing.cpp`](../../../src/core/transport/ipc_framing.cpp)、[`ipc_endpoint.cpp`](../../../src/core/transport/ipc_endpoint.cpp)。
+插件在 HTTP 端口之外额外监听一条本机 IPC 通道；绑定失败只记 Warning 并降级为「仅 HTTP」，不影响端口通道。实现见 [`src/core/transport/ipc_transport.cpp`](../../../src/core/transport/ipc_transport.cpp)、[`ipc_framing.cpp`](../../../src/core/transport/ipc_framing.cpp)、[`ipc_endpoint.cpp`](../../../src/core/transport/ipc_endpoint.cpp)。
 
-- **socket 路径**（IF-03）：`<集中根>/run/<工程名清洗>-<路径哈希 8 位>.sock`；路径超过 99 字符时退到 Windows 的 `%LOCALAPPDATA%\gda\<hash8>.sock`（POSIX 沿用 run 目录）。启动前删除残留文件；「存在但连不上」视为残留。
-- **实例登记**（IF-02）：`endpoints.ipc = {path, protocol:"uds", framing:"ndjson", auth:"filesystem"}`，仅在监听成功时写入；旧记录缺该字段按「无 IPC」处理，不报格式错误。
-- **帧语义**（IF-01）：newline-delimited JSON-RPC，单帧上限 4 MiB；主线程 `_process` 每帧驱动 `pump()`（accept/read/写回各有预算），请求经 `GodotTransport::submit` 进入既有处理链，响应由工作线程等待后就绪、回主线程写回，慢请求不在 pump 内等待。
-- **连接生命周期**：关闭时先停 accept 再收割连接并删除 socket 文件。
+- **后端**：Windows 使用 loopback TCP（`127.0.0.1` + 随机端口，`kind=tcp`）；POSIX 使用 AF_UNIX（`<集中根>/run/<工程名清洗>-<路径哈希 8 位>.sock`，`kind=unix`）。命名管道作为后续可选后端，当前未进入生产路径。
+- **实例登记**：`endpoints.ipc = {kind, path|name|host+port, token, protocol:"mcp-jsonrpc", framing:"length-prefixed-json", auth:"token", version:1}`，仅在监听成功时写入；旧记录缺该字段按「无 IPC」处理。
+- **帧语义**：4 字节大端长度 + UTF-8 JSON，单帧上限 4 MiB；`pump()` 每帧有 accept/read/写回预算。
+- **令牌**：每个实例启动时生成随机令牌，只写实例索引；首帧必须是 `initialize` 且 `params._meta.gda_token` 匹配，否则返回 `-32001 IPC token rejected` 并关闭。令牌不写日志、不写 trace。
+- **边界**：最大连接 8、在途请求 16、请求超时 60 秒、空闲 10 分钟关闭；超限返回 `-32003 too many in-flight IPC requests`。
+- **回退**：CLI IPC 失败时回退 HTTP；`--no-fallback` 可禁止回退。
 
 ## 已知限制
 

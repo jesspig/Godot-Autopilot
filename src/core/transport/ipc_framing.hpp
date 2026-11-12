@@ -20,6 +20,12 @@ ExtractedFrames extract_frames(
     const std::string &buffer,
     std::size_t max_frame_bytes = kMaxFrameBytes);
 
+ExtractedFrames extract_length_prefixed(
+    const std::string &buffer,
+    std::size_t max_frame_bytes = kMaxFrameBytes);
+
+std::string encode_length_prefixed(const std::string &payload);
+
 } // namespace ipc_framing
 } // namespace godot_autopilot
 

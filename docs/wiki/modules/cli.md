@@ -144,7 +144,7 @@ resource:
 
 - 离线族（无运行实例也可用）：`gda skills list|show [--file <rel>]` 列出/打印内置技能册；`gda tools list|search <q>|describe <name>` 读取 `/api/tools` 缓存目录（缓存由成功 `api list` 写入或 `--refresh` 刷新）；`gda projects` 按 `集中根/projects/*` 聚合工程（名/路径/hash/实例数/最后活动/存活）。
 - `gda list` 新增 `--all`（含未运行工程）、`--projects`（按工程聚合）、`--stale`（仅非存活）；条目的 `live` 保留布尔并新增 `liveDetail {pid, endpoint}` 两级。
-- IPC 通道：`--socket <path>` 使 `gda call` 直连插件本机 AF_UNIX 通道（newline JSON-RPC，先完成 initialize 握手）；连接失败默认在 stderr 提示并回退端口通道，`--no-fallback` 关闭回退（直接以传输错误退出码 2）。实现见 [`src/ipc/client.ts`](../../../cli/src/ipc/client.ts) 与 [`src/mcp/client.ts`](../../../cli/src/mcp/client.ts)。
+- IPC 通道（2026-11-13 T-03）：`--socket <path>` 或实例索引的 `endpoints.ipc` 使 `gda call` 直连插件本机通道；帧为 4 字节大端长度前缀 + JSON（单帧 4 MiB），首帧 `initialize` 必须在 `params._meta.gda_token` 带令牌；Windows 走 loopback TCP，POSIX 走 AF_UNIX。连接失败默认回退端口通道，`--no-fallback` 关闭回退（直接以传输错误退出码 2）。实现见 [`src/ipc/client.ts`](../../../cli/src/ipc/client.ts) 与 [`src/mcp/client.ts`](../../../cli/src/mcp/client.ts)。
 
 ## 寻址链（[`src/target.ts`](../../../cli/src/target.ts)）
 

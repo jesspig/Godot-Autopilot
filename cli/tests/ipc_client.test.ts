@@ -24,6 +24,32 @@ function captureOutput(): { stderr(): string; restore(): void } {
   };
 }
 
+function encodeFrame(value: unknown): Buffer {
+  const payload = Buffer.from(JSON.stringify(value), "utf8");
+  const header = Buffer.alloc(4);
+  header.writeUInt32BE(payload.length, 0);
+  return Buffer.concat([header, payload]);
+}
+
+function frameServer(handler: (message: any, socket: net.Socket) => void): (socket: net.Socket) => void {
+  return (socket) => {
+    let buffer = Buffer.alloc(0);
+    socket.on("data", (chunk: Buffer) => {
+      buffer = Buffer.concat([buffer, chunk]);
+      while (buffer.length >= 4) {
+        const size = buffer.readUInt32BE(0);
+        if (buffer.length < 4 + size) return;
+        const text = buffer.subarray(4, 4 + size).toString("utf8");
+        buffer = buffer.subarray(4 + size);
+        try {
+          handler(JSON.parse(text), socket);
+        } catch {
+        }
+      }
+    });
+  };
+}
+
 const SOCKET_NAME = "i17a.sock";
 
 const activeSockets: net.Socket[] = [];
@@ -56,17 +82,13 @@ afterEach(() => {
 });
 
 describe("ipc client", () => {
-  test("单行 JSON-RPC 请求-响应往返", async () => {
-    const server = await listenLoopback(socketPath, (socket) => {
-      let buffer = "";
-      socket.on("data", (chunk) => {
-        buffer += chunk.toString("utf8");
-        const newline = buffer.indexOf("\n");
-        if (newline === -1) return;
-        const request = JSON.parse(buffer.slice(0, newline));
-        socket.write(`${JSON.stringify({ id: request.id, result: { tools: [] } })}\n`);
-      });
-    });
+  test("长度前缀 JSON-RPC 请求-响应往返", async () => {
+    const server = await listenLoopback(
+      socketPath,
+      frameServer((request, socket) => {
+        socket.write(encodeFrame({ id: request.id, result: { tools: [] } }));
+      }),
+    );
     try {
       const response = await requestOverIpc({ path: socketPath, timeoutMs: 2000 }, { jsonrpc: "2.0", id: 1, method: "tools/list" });
       expect(response.id).toBe(1);
@@ -89,8 +111,12 @@ describe("ipc client", () => {
   });
 
   test("非法 JSON 帧映射为传输错误", async () => {
+    const payload = Buffer.from("{not-json}", "utf8");
+    const header = Buffer.alloc(4);
+    header.writeUInt32BE(payload.length, 0);
+    const invalid = Buffer.concat([header, payload]);
     const server = await listenLoopback(socketPath, (socket) => {
-      socket.on("data", () => socket.write("{not-json}\n"));
+      socket.on("data", () => socket.write(invalid));
     });
     try {
       let caught: unknown;
@@ -143,26 +169,14 @@ describe("ipc client", () => {
   });
 });
 function respondServer(): (socket: net.Socket) => void {
-  return (socket) => {
-    let buffer = "";
-    socket.on("data", (chunk) => {
-      buffer += chunk.toString("utf8");
-      let newline = buffer.indexOf("\n");
-      while (newline !== -1) {
-        const line = buffer.slice(0, newline);
-        buffer = buffer.slice(newline + 1);
-        newline = buffer.indexOf("\n");
-        if (line.trim() === "") continue;
-        const message = JSON.parse(line) as { id?: number; method?: string };
-        if (message.id === undefined) continue;
-        const result =
-          message.method === "initialize"
-            ? { protocolVersion: "2025-11-25", capabilities: {}, serverInfo: { name: "mock", version: "1" } }
-            : { content: [{ type: "text", text: "{}" }] };
-        socket.write(`${JSON.stringify({ jsonrpc: "2.0", id: message.id, result })}\n`);
-      }
-    });
-  };
+  return frameServer((message, socket) => {
+    if (message.id === undefined) return;
+    const result =
+      message.method === "initialize"
+        ? { protocolVersion: "2025-11-25", capabilities: {}, serverInfo: { name: "mock", version: "1" } }
+        : { content: [{ type: "text", text: "{}" }] };
+    socket.write(encodeFrame({ jsonrpc: "2.0", id: message.id, result }));
+  });
 }
 
 describe("ipc session and socket channel", () => {

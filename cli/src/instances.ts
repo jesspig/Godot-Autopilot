@@ -35,10 +35,16 @@ export interface PluginInstanceRecord {
 }
 
 export interface IpcEndpointRecord {
+  kind: "unix" | "tcp" | "pipe";
   path: string;
+  name: string;
+  host: string;
+  port: number | null;
+  token: string;
   protocol: string;
   framing: string;
   auth: string;
+  version: number;
 }
 
 export type EndpointKind = "mcp" | "api";
@@ -141,13 +147,33 @@ function parseRecord(item: unknown): PluginInstanceRecord | null {
 
 function parseIpcEndpoint(raw: unknown): IpcEndpointRecord | null {
   const doc = readObject(raw);
-  const path = readString(doc, ["path"]);
-  if (path === undefined) return null;
+  const kindText = readString(doc, ["kind"]);
+  const path = readString(doc, ["path"]) ?? "";
+  const host = readString(doc, ["host"]) ?? "";
+  const name = readString(doc, ["name"]) ?? "";
+  const port = readPort(doc);
+  const kind: "unix" | "tcp" | "pipe" =
+    kindText === "tcp" || kindText === "pipe"
+      ? kindText
+      : path !== ""
+        ? "unix"
+        : port !== null
+          ? "tcp"
+          : "unix";
+  if (kind === "unix" && path === "") return null;
+  if (kind === "tcp" && (host === "" || port === null)) return null;
+  if (kind === "pipe" && name === "") return null;
   return {
+    kind,
     path,
-    protocol: readString(doc, ["protocol"]) ?? "uds",
-    framing: readString(doc, ["framing"]) ?? "ndjson",
-    auth: readString(doc, ["auth"]) ?? "filesystem",
+    name,
+    host,
+    port,
+    token: readString(doc, ["token", "auth_token"]) ?? "",
+    protocol: readString(doc, ["protocol"]) ?? "mcp-jsonrpc",
+    framing: readString(doc, ["framing"]) ?? "length-prefixed-json",
+    auth: readString(doc, ["auth"]) ?? "token",
+    version: readNumber(doc, ["version"]) ?? 1,
   };
 }
 

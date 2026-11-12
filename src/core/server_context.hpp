@@ -54,6 +54,7 @@ private:
   bool instance_started_ = false;
   std::string last_error_;
   std::string instance_id_;
+  std::string ipc_token_;
   PortAssignment port_assignment_;
   EndpointTable endpoints_;
 

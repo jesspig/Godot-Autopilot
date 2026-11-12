@@ -119,19 +119,42 @@ TEST(InstanceRegistryTest, NonObjectDocumentFailsValidation) {
 
 TEST(InstanceRegistryTest, RecordWithIpcEndpointRoundTrips) {
   InstanceRecord original = sample_record();
+  original.endpoints.ipc.kind = "unix";
   original.endpoints.ipc.path = "C:/gda/run/sample-1234abcd.sock";
-  original.endpoints.ipc.protocol = "uds";
-  original.endpoints.ipc.framing = "ndjson";
-  original.endpoints.ipc.auth = "filesystem";
+  original.endpoints.ipc.token = "ipc-token";
+  original.endpoints.ipc.protocol = "mcp-jsonrpc";
+  original.endpoints.ipc.framing = "length-prefixed-json";
+  original.endpoints.ipc.auth = "token";
+  original.endpoints.ipc.version = 1;
   original.endpoints.ipc.present = true;
   const mcp::JsonValue doc = godot_autopilot::record_to_json(original);
   InstanceRecord parsed;
   ASSERT_TRUE(godot_autopilot::record_from_json(doc, parsed));
   EXPECT_TRUE(parsed.endpoints.ipc.present);
+  EXPECT_EQ(parsed.endpoints.ipc.kind, "unix");
   EXPECT_EQ(parsed.endpoints.ipc.path, "C:/gda/run/sample-1234abcd.sock");
-  EXPECT_EQ(parsed.endpoints.ipc.protocol, "uds");
-  EXPECT_EQ(parsed.endpoints.ipc.framing, "ndjson");
-  EXPECT_EQ(parsed.endpoints.ipc.auth, "filesystem");
+  EXPECT_EQ(parsed.endpoints.ipc.token, "ipc-token");
+  EXPECT_EQ(parsed.endpoints.ipc.protocol, "mcp-jsonrpc");
+  EXPECT_EQ(parsed.endpoints.ipc.framing, "length-prefixed-json");
+  EXPECT_EQ(parsed.endpoints.ipc.auth, "token");
+  EXPECT_EQ(parsed.endpoints.ipc.version, 1);
+}
+
+TEST(InstanceRegistryTest, TcpIpcEndpointRoundTrips) {
+  InstanceRecord original = sample_record();
+  original.endpoints.ipc.kind = "tcp";
+  original.endpoints.ipc.host = "127.0.0.1";
+  original.endpoints.ipc.port = 21437;
+  original.endpoints.ipc.token = "tcp-token";
+  original.endpoints.ipc.present = true;
+  const mcp::JsonValue doc = godot_autopilot::record_to_json(original);
+  InstanceRecord parsed;
+  ASSERT_TRUE(godot_autopilot::record_from_json(doc, parsed));
+  EXPECT_TRUE(parsed.endpoints.ipc.present);
+  EXPECT_EQ(parsed.endpoints.ipc.kind, "tcp");
+  EXPECT_EQ(parsed.endpoints.ipc.host, "127.0.0.1");
+  EXPECT_EQ(parsed.endpoints.ipc.port, 21437);
+  EXPECT_EQ(parsed.endpoints.ipc.token, "tcp-token");
 }
 
 TEST(InstanceRegistryTest, MissingIpcEndpointIsBackwardCompatible) {

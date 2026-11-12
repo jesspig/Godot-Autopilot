@@ -14,10 +14,16 @@ struct EndpointEntry {
 };
 
 struct IpcEndpointEntry {
+  std::string kind{"unix"};
   std::string path;
-  std::string protocol{"uds"};
-  std::string framing{"ndjson"};
-  std::string auth{"filesystem"};
+  std::string name;
+  std::string host;
+  int port{0};
+  std::string token;
+  std::string protocol{"mcp-jsonrpc"};
+  std::string framing{"length-prefixed-json"};
+  std::string auth{"token"};
+  int version{1};
   bool present{false};
 };
 

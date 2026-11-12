@@ -260,6 +260,27 @@ bool ServerContext::start() {
                                   " port=" + std::to_string(port_));
 
     {
+      ipc_token_ = api_token::generate_token();
+      if (ipc_token_.empty()) {
+        LogSystem::instance().log(LogLevel::Error, LogCategory::Transport,
+                                  "IPC token generation failed; IPC will be "
+                                  "disabled");
+      }
+#ifdef _WIN32
+      std::string ipc_error;
+      if (ipc_transport::ipc_transport_instance().listen_tcp(
+              "127.0.0.1", 0, ipc_token_, ipc_error)) {
+        LogSystem::instance().log(
+            LogLevel::Info, LogCategory::Transport,
+            "IPC transport listening on tcp 127.0.0.1:" +
+                std::to_string(
+                    ipc_transport::ipc_transport_instance().port()));
+      } else {
+        LogSystem::instance().log(
+            LogLevel::Warning, LogCategory::Transport,
+            "IPC transport unavailable (HTTP only): " + ipc_error);
+      }
+#else
       const std::string project_root = util::api_host_project_root();
       std::string project_name;
       const std::size_t slash = project_root.find_last_of("/\\");
@@ -268,13 +289,7 @@ bool ServerContext::start() {
       }
       const std::filesystem::path run_dir =
           std::filesystem::path(ProjectStore::root_dir()) / "run";
-      std::filesystem::path fallback_dir = run_dir;
-#ifdef _WIN32
-      if (const char *local = std::getenv("LOCALAPPDATA");
-          local != nullptr && *local != '\0') {
-        fallback_dir = std::filesystem::path(local) / "gda";
-      }
-#endif
+      const std::filesystem::path fallback_dir = run_dir;
       std::error_code ec;
       std::filesystem::create_directories(run_dir, ec);
       const std::string socket_path = ipc_endpoint::derive_socket_path(
@@ -283,15 +298,16 @@ bool ServerContext::start() {
           std::filesystem::path(socket_path).parent_path(), ec);
       std::filesystem::remove(socket_path, ec);
       std::string ipc_error;
-      if (ipc_transport::ipc_transport_instance().listen(socket_path,
-                                                         ipc_error)) {
+      if (ipc_transport::ipc_transport_instance().listen_unix(
+              socket_path, ipc_token_, ipc_error)) {
         LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
                                   "IPC transport listening: " + socket_path);
       } else {
         LogSystem::instance().log(
             LogLevel::Warning, LogCategory::Transport,
-            "IPC transport unavailable (TCP only): " + ipc_error);
+            "IPC transport unavailable (HTTP only): " + ipc_error);
       }
+#endif
     }
 
     transport_ = godot_transport_reset();
@@ -299,23 +315,32 @@ bool ServerContext::start() {
     ipc_transport::ipc_transport_instance().set_line_handler(
         [transport = transport_](std::uint64_t connection_id,
                                  const std::string &line) {
+          auto &ipc = ipc_transport::ipc_transport_instance();
+          if (!ipc.acquire_in_flight()) {
+            ipc.queue_line(connection_id,
+                           mcp_wire::build_error_response_text(
+                               -32003, "too many in-flight IPC requests"));
+            return;
+          }
           const std::string connection =
               "ipc-" + std::to_string(connection_id);
           const mcp_wire::ParsedRequest parsed = mcp_wire::parse_request(line);
           if (!parsed.ok) {
-            ipc_transport::ipc_transport_instance().queue_line(
-                connection_id,
-                mcp_wire::build_error_response_text(-32700, parsed.error));
+            ipc.queue_line(connection_id,
+                           mcp_wire::build_error_response_text(-32700,
+                                                               parsed.error));
+            ipc.release_in_flight();
             return;
           }
           std::string error;
           if (!transport || !transport->submit(parsed, connection, error)) {
-            ipc_transport::ipc_transport_instance().queue_line(
-                connection_id,
-                mcp_wire::build_error_response_text(-32603, error));
+            ipc.queue_line(connection_id,
+                           mcp_wire::build_error_response_text(-32603, error));
+            ipc.release_in_flight();
             return;
           }
           if (parsed.is_notification) {
+            ipc.release_in_flight();
             return;
           }
           const std::string request_id = parsed.request_id;
@@ -327,6 +352,7 @@ bool ServerContext::start() {
               ipc_transport::ipc_transport_instance().queue_line(
                   connection_id, std::move(response));
             }
+            ipc_transport::ipc_transport_instance().release_in_flight();
           }).detach();
         });
 
@@ -559,8 +585,16 @@ void ServerContext::write_instance_record() {
   record.endpoints.api =
       EndpointEntry{host_, port_, GDA_API_PATH, "http", "bearer"};
   if (ipc_transport::ipc_transport_instance().is_listening()) {
-    record.endpoints.ipc.path =
-        ipc_transport::ipc_transport_instance().bound_path();
+    auto &ipc = ipc_transport::ipc_transport_instance();
+    record.endpoints.ipc.kind = ipc.kind();
+    record.endpoints.ipc.path = ipc.bound_path();
+    record.endpoints.ipc.host = ipc.host();
+    record.endpoints.ipc.port = ipc.port();
+    record.endpoints.ipc.token = ipc_token_;
+    record.endpoints.ipc.protocol = "mcp-jsonrpc";
+    record.endpoints.ipc.framing = "length-prefixed-json";
+    record.endpoints.ipc.auth = "token";
+    record.endpoints.ipc.version = 1;
     record.endpoints.ipc.present = true;
   }
   record.gda_home = HomeResolver::gda_home();
