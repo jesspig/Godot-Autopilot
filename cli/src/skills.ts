@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import builtinSkills from "../assets/skills.json";
+
 import { CliError, ExitCode } from "./errors";
 
 export interface SkillSummary {
@@ -11,7 +13,15 @@ export interface SkillSummary {
 
 export interface SkillsRoot {
   path: string;
-  source: "repo" | "project";
+  source: "repo" | "project" | "builtin";
+}
+
+export function builtinSkillsFiles(): Record<string, string> {
+  return builtinSkills.files as Record<string, string>;
+}
+
+export function builtinSkillsVersion(): string {
+  return builtinSkills.version;
 }
 
 function countFiles(dir: string): number {
@@ -36,13 +46,26 @@ export function resolveSkillsRoot(): SkillsRoot {
       return candidate;
     }
   }
-  throw new CliError(
-    ExitCode.Transport,
-    "no skills directory found (the repository skills/ and this project's .agents/skills/ are both missing)",
-  );
+  return { path: "builtin", source: "builtin" };
 }
 
 export function listSkills(root: SkillsRoot): SkillSummary[] {
+  if (root.source === "builtin") {
+    const names = new Set<string>();
+    for (const file of Object.keys(builtinSkills.files)) {
+      const [name, ...rest] = file.split("/");
+      if (name !== undefined && rest.length === 1 && rest[0] === "SKILL.md") {
+        names.add(name);
+      }
+    }
+    return [...names]
+      .sort((a, b) => a.localeCompare(b))
+      .map((name) => ({
+        name,
+        path: `builtin:${name}`,
+        files: Object.keys(builtinSkills.files).filter((file) => file.startsWith(`${name}/`)).length,
+      }));
+  }
   const books: SkillSummary[] = [];
   for (const entry of fs.readdirSync(root.path, { withFileTypes: true })) {
     if (!entry.isDirectory()) {
@@ -61,6 +84,19 @@ export function listSkills(root: SkillsRoot): SkillSummary[] {
 export function readSkillFile(root: SkillsRoot, name: string, relative?: string): string {
   if (!/^[A-Za-z0-9._-]+$/.test(name)) {
     throw new CliError(ExitCode.Usage, `invalid skill name: ${name}`);
+  }
+  if (root.source === "builtin") {
+    const target = relative === undefined ? "SKILL.md" : relative;
+    const normalized = path.posix.normalize(target);
+    if (normalized.startsWith("..") || path.posix.isAbsolute(normalized)) {
+      throw new CliError(ExitCode.Usage, `--file must stay inside the skill directory: ${relative}`);
+    }
+    const key = `${name}/${normalized}`;
+    const content = (builtinSkills.files as Record<string, string>)[key];
+    if (content === undefined) {
+      throw new CliError(ExitCode.Usage, `skill file not found: ${name}/${target}`);
+    }
+    return content;
   }
   const bookDir = path.join(root.path, name);
   if (!fs.existsSync(bookDir) || !fs.statSync(bookDir).isDirectory()) {

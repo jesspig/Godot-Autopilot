@@ -10,6 +10,11 @@ export interface GlobalOptions {
   timeoutText?: string;
   category?: string;
   tagsText?: string;
+  artifactText?: string;
+  pathText?: string;
+  sourceText?: string;
+  zh?: boolean;
+  check?: boolean;
   argsJson?: string;
   argsFile?: string;
   saveImages?: string;
@@ -46,6 +51,9 @@ const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
   "--timeout": "timeoutText",
   "--category": "category",
   "--tags": "tagsText",
+  "--artifact": "artifactText",
+  "--path": "pathText",
+  "--source": "sourceText",
   "--args": "argsJson",
   "--args-file": "argsFile",
   "--save-images": "saveImages",
@@ -78,6 +86,8 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--stale": "stale",
   "--no-fallback": "noFallback",
   "--json": "json",
+  "--zh": "zh",
+  "--check": "check",
 };
 
 export function parseArgv(argv: string[]): { opts: GlobalOptions; positionals: string[] } {
@@ -172,6 +182,12 @@ Commands:
   api describe <tool> Show one tool's schema through the REST endpoint
   api call <tool>     Call a tool through the REST endpoint
   endpoints           Show the discovered MCP and REST endpoints
+  cache list          List cache manifests
+  cache info          Show cache root, entry count, and size
+  cache clear         Remove old cache entries (requires --force)
+  install skills      Install skill books to ~/.agents/skills
+  install plugin      Install the Godot addon into a project
+  update <target>     Update cli, skills, plugin, or all (--check for status)
 
 Global options:
   --port <text>       MCP server port for connection only (never a listen port)
@@ -182,6 +198,10 @@ Global options:
   --timeout <text>    Call timeout in seconds
   --category <text>   Filter search results by category
   --tags <text>       Filter search results by tags (comma separated)
+  --artifact <name>   Cache artifact: cli, plugin, skills, or catalog
+  --path <dir>        Install target directory (install skills)
+  --source <mode>     auto (default), online, cache, or builtin
+  --zh                Install the Chinese skills archive
   --args <json>       Tool arguments as a JSON string
   --args-file <path>  Tool arguments from a JSON file
   --save-images <dir> Write returned images to a local directory

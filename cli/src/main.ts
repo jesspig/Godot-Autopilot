@@ -2,6 +2,7 @@ import { parseArgv, usageText } from "./args";
 import { COMMANDS } from "./commands/index";
 import { CliError, ExitCode } from "./errors";
 import { err } from "./output";
+import { applyUpdate } from "./update";
 import { CLI_VERSION } from "./version";
 
 function reportCliError(error: CliError): number {
@@ -13,6 +14,9 @@ function reportCliError(error: CliError): number {
 }
 
 export async function main(argv: string[]): Promise<number> {
+  if (argv[0] === "--apply-update") {
+    return applyUpdate(argv.slice(1));
+  }
   let parsed: ReturnType<typeof parseArgv>;
   try {
     parsed = parseArgv(argv);
