@@ -6,11 +6,19 @@
 
 namespace godot_autopilot {
 
-enum class PortSource { kEnvExplicit, kConfigExplicit, kUserApplied, kAutoAssigned };
+enum class PortSource {
+  kEnvExplicit,
+  kConfigExplicit,
+  kUserApplied,
+  kFirstRandom,
+  kAutoReassigned
+};
+
+const char *port_source_name(PortSource source);
 
 struct PortAssignment {
   int port{0};
-  PortSource source{PortSource::kAutoAssigned};
+  PortSource source{PortSource::kFirstRandom};
   std::string note;
   int requested_port{0};
 };

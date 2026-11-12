@@ -35,6 +35,8 @@ export interface GlobalOptions {
   stale?: boolean;
   socketText?: string;
   noFallback?: boolean;
+  transportText?: string;
+  json?: boolean;
 }
 
 const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
@@ -57,6 +59,7 @@ const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
   "--bind": "bind",
   "--file": "file",
   "--socket": "socketText",
+  "--transport": "transportText",
 };
 
 const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
@@ -74,6 +77,7 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--projects": "projectsView",
   "--stale": "stale",
   "--no-fallback": "noFallback",
+  "--json": "json",
 };
 
 export function parseArgv(argv: string[]): { opts: GlobalOptions; positionals: string[] } {
@@ -133,6 +137,12 @@ export function parseProbePort(text: string): number {
   return port;
 }
 
+export function parseTransport(text: string | undefined): "auto" | "ipc" | "http" {
+  if (text === undefined) return "auto";
+  if (text === "auto" || text === "ipc" || text === "http") return text;
+  throw new CliError(ExitCode.Usage, `--transport must be auto, ipc, or http, got: ${text}`);
+}
+
 export function usageText(): string {
   return `gda ${CLI_VERSION} — Godot Autopilot CLI
 
@@ -164,12 +174,12 @@ Commands:
   endpoints           Show the discovered MCP and REST endpoints
 
 Global options:
-  --port <text>       MCP server port (default 9527); serve port (default 9700)
+  --port <text>       MCP server port for connection only (never a listen port)
   --id <text>         Target instance id from the registry
   --project <text>    Project directory
   --pretty            Pretty-print JSON output (2-space indent)
   --raw               Raw JSON envelope output
-  --timeout <text>    Call timeout in seconds (serve default 60)
+  --timeout <text>    Call timeout in seconds
   --category <text>   Filter search results by category
   --tags <text>       Filter search results by tags (comma separated)
   --args <json>       Tool arguments as a JSON string
@@ -181,8 +191,6 @@ Global options:
   --no-import         Skip the asset import pre-step (start/restart)
   --wait <sec>        Readiness/stop wait in seconds, 0 = do not wait (start/stop/restart)
   --force             Force-stop the process (stop/restart)
-  --bind <addr>       Control-plane bind address, loopback only (serve; default 127.0.0.1)
-  --no-auth           Disable control-plane auth; any local process can call tools (serve)
   --tail <n>          Number of trailing log lines (logs)
   --query <text>      Keyword filter for the api list subcommand
   --limit <n>         Maximum tools returned by the api list subcommand (1-2000)
@@ -194,7 +202,9 @@ Global options:
   --projects          list: aggregate entries by project instead of per instance
   --stale             list: keep only non-live entries
   --socket <path>     Connect through the plugin's local IPC socket
-  --no-fallback       Do not fall back to the port channel when IPC fails
+  --transport <mode>  auto (default), ipc, or http
+  --no-fallback       Do not fall back to HTTP when IPC fails
+  --json              JSON output (default for most commands)
   --help              Show this help
   --version           Show the version
 

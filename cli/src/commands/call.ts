@@ -1,4 +1,5 @@
 import type { GlobalOptions } from "../args";
+import { parseTransport } from "../args";
 import { CliError, ExitCode } from "../errors";
 import { callTool, META_DIRECT_TOOLS } from "../mcp/client";
 import { err } from "../output";
@@ -16,13 +17,19 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
   const tool = positional[0];
   const args = loadToolArguments(opts);
   const timeoutSec = callTimeoutSec(opts);
+  const transport = parseTransport(opts.transportText);
   if (opts.socketText !== undefined) {
     try {
       const envelope = await callTool(tool, args, {
         port: 0,
         timeoutSec,
         direct: META_DIRECT_TOOLS.has(tool),
-        socketPath: opts.socketText,
+        ipcEndpoint: {
+          path: opts.socketText,
+          token: process.env.GODOT_AUTOPILOT_IPC_TOKEN ?? "",
+        },
+        transport: "ipc",
+        noFallback: opts.noFallback,
       });
       const extracted = extractPayload(envelope, { saveImages: opts.saveImages, raw: opts.raw });
       return emit(extracted, opts);
@@ -38,6 +45,9 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
     port: target.port,
     timeoutSec,
     direct: META_DIRECT_TOOLS.has(tool),
+    ipcEndpoint: target.ipcEndpoint,
+    transport,
+    noFallback: opts.noFallback,
   });
   const extracted = extractPayload(envelope, { saveImages: opts.saveImages, raw: opts.raw });
   return emit(extracted, opts);

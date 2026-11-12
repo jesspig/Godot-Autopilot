@@ -4,7 +4,6 @@
 namespace godot_autopilot {
 
 int port_auto_candidate_count();
-int port_auto_candidate_start(int pid);
 
 } // namespace godot_autopilot
 

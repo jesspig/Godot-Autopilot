@@ -1,13 +1,13 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import net from "node:net";
 import path from "node:path";
 
 import type { GlobalOptions } from "../args";
 import { callTool } from "../mcp/client";
 import { CliError, ExitCode } from "../errors";
 import { err } from "../output";
-import { joinPath } from "../platform";
+import { joinPath, projectPathKey } from "../platform";
+import { readPluginInstanceIndex, type PluginInstanceRecord } from "../instances";
 import {
   detectActiveInstance,
   describeInstance,
@@ -20,12 +20,10 @@ import { isAlive, resolveGodotBin, spawnEditor, terminateProcess, terminationNot
 import { loadRegistry, saveRegistry, stateDir, type InstanceEntry } from "../registry";
 import { writeJson } from "./json-output";
 
-const PORT_RANGE_START = 9530;
-const PORT_RANGE_END = 9599;
 const DEFAULT_WAIT_SEC = 60;
 const IMPORT_TIMEOUT_MS = 120_000;
-const PROBE_TIMEOUT_SEC = 5;
-const PROBE_INTERVAL_MS = 500;
+const READY_POLL_INTERVAL_MS = 500;
+const PLAY_TIMEOUT_SEC = 5;
 const LOG_TAIL_LINES = 5;
 const LOG_TAIL_MAX_CHARS = 400;
 
@@ -51,36 +49,41 @@ export async function run(_positional: string[], opts: GlobalOptions): Promise<n
 
 export async function start(opts: GlobalOptions, runOpts: StartRunOptions = {}): Promise<InstanceEntry> {
   const projectDir = path.resolve(opts.project ?? process.cwd());
-  const explicitPort = opts.portText !== undefined ? parseExplicitPort(opts.portText) : null;
+  if (opts.portText !== undefined) {
+    throw new CliError(
+      ExitCode.Usage,
+      "gda start no longer selects or injects a port; the plugin owns the MCP port.",
+      "Remove --port. Use --port only on connection commands such as gda call/status.",
+    );
+  }
 
   const active = await detectActiveInstance(projectDir, resolveProbeLevel(opts.probe));
   if (active !== undefined) {
-    assertStartAllowed(active, projectDir, explicitPort);
+    assertStartAllowed(active, projectDir);
   }
 
   const waitSec = parseWaitSec(opts.waitText, DEFAULT_WAIT_SEC);
   const { bin } = resolveGodotBin({ explicit: opts.godot });
   await runImportStep(bin, projectDir, opts.noImport === true);
 
-  const port = explicitPort ?? await pickFreePort();
   const headless = opts.headless === true;
-
   const logsDir = joinPath(stateDir(), "logs");
   fs.mkdirSync(logsDir, { recursive: true });
-  const pendingLogPath = joinPath(logsDir, `.pending-${port}-${Date.now()}.log`);
+  const pendingLogPath = joinPath(logsDir, `.pending-${Date.now()}.log`);
 
   let pid: number;
   try {
-    pid = (await spawnEditor({ projectDir, port, headless, godot: bin, logPath: pendingLogPath })).pid;
+    pid = (await spawnEditor({ projectDir, headless, godot: bin, logPath: pendingLogPath })).pid;
   } catch (error) {
     fs.rmSync(pendingLogPath, { force: true });
     throw error;
   }
 
   const id = `p${pid}`;
+  let record: PluginInstanceRecord | undefined;
   if (waitSec > 0) {
     try {
-      await waitForReady(port, pid, waitSec, pendingLogPath);
+      record = await waitForPluginRecord(projectDir, pid, waitSec, pendingLogPath);
     } catch (error) {
       throw await rollbackFailedStart(error, pid, pendingLogPath);
     }
@@ -93,6 +96,7 @@ export async function start(opts: GlobalOptions, runOpts: StartRunOptions = {}):
     finalLogPath = pendingLogPath;
   }
 
+  const port = record?.port ?? 0;
   const entry: InstanceEntry = {
     id,
     project: projectDir,
@@ -113,7 +117,7 @@ export async function start(opts: GlobalOptions, runOpts: StartRunOptions = {}):
 
   if (opts.play === true) {
     try {
-      await callTool("play_editor_current_scene", {}, { port: entry.port, timeoutSec: PROBE_TIMEOUT_SEC });
+      await callTool("play_editor_current_scene", {}, { port: entry.port, timeoutSec: PLAY_TIMEOUT_SEC });
     } catch (error) {
       err(`play request failed (non-fatal): ${(error as Error).message}`);
     }
@@ -138,28 +142,8 @@ export function instanceView(e: InstanceEntry): Record<string, unknown> {
 const SECOND_EDITOR_RISK =
   "; a second editor on the same project may die without any message because Godot loads the plugin through a shared temporary copy";
 
-function assertStartAllowed(
-  active: ActiveInstance,
-  projectDir: string,
-  explicitPort: number | null,
-): void {
+function assertStartAllowed(active: ActiveInstance, projectDir: string): void {
   const where = describeInstance(active);
-  if (explicitPort !== null) {
-    const samePort = active.port !== null && active.port === explicitPort;
-    if (samePort) {
-      throw new CliError(
-        ExitCode.Transport,
-        `refusing to start: this project already has a live Godot Autopilot instance on ${where}; the requested port ${explicitPort} is the port that instance is already using`,
-        `stop it first (gda stop --project ${projectDir}), or pass --port <another port>, or set ${MULTI_INSTANCE_ENV}=1 to allow a second instance`,
-      );
-    }
-    err(
-      `warning: this project already has a live Godot Autopilot instance on ${where}` +
-        `; starting on port ${explicitPort} anyway as requested` +
-        SECOND_EDITOR_RISK,
-    );
-    return;
-  }
   if (multiInstanceAllowed()) {
     err(
       `warning: this project already has a live Godot Autopilot instance on ${where}` +
@@ -171,33 +155,40 @@ function assertStartAllowed(
   throw new CliError(
     ExitCode.Transport,
     `refusing to start: this project already has a live Godot Autopilot instance on ${where}`,
-    `stop it first (gda stop --project ${projectDir}), or pass --port <port> to start on another port, or set ${MULTI_INSTANCE_ENV}=1 to allow a second instance`,
+    `stop it first (gda stop --project ${projectDir}), or set ${MULTI_INSTANCE_ENV}=1 to allow a second instance`,
   );
 }
 
-async function waitForReady(port: number, pid: number, waitSec: number, logPath: string): Promise<void> {
+async function waitForPluginRecord(
+  projectDir: string,
+  pid: number,
+  waitSec: number,
+  logPath: string,
+): Promise<PluginInstanceRecord> {
   const deadline = Date.now() + waitSec * 1000;
+  const key = projectPathKey(projectDir);
   for (;;) {
     if (!isAlive(pid)) {
       throw new CliError(
         ExitCode.Transport,
-        `editor process exited before becoming ready${logTailSuffix(logPath)}`,
+        `editor process exited before the plugin registered an instance${logTailSuffix(logPath)}`,
         "check the editor log and the Godot binary",
       );
     }
-    try {
-      await callTool("ping", {}, { port, timeoutSec: PROBE_TIMEOUT_SEC, direct: true });
-      return;
-    } catch {
-      if (Date.now() >= deadline) {
-        throw new CliError(
-          ExitCode.Transport,
-          `editor not ready within ${waitSec}s on port ${port}${logTailSuffix(logPath)}`,
-          "raise --wait, or check that the Godot Autopilot plugin is enabled",
-        );
-      }
-      await new Promise((resolve) => setTimeout(resolve, PROBE_INTERVAL_MS));
+    const record = readPluginInstanceIndex().find(
+      (entry) => entry.pid === pid && projectPathKey(entry.projectPath) === key,
+    );
+    if (record !== undefined) {
+      return record;
     }
+    if (Date.now() >= deadline) {
+      throw new CliError(
+        ExitCode.Transport,
+        `the plugin did not register an instance within ${waitSec}s${logTailSuffix(logPath)}`,
+        "raise --wait, or check that the Godot Autopilot plugin is enabled and its MCP server started",
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, READY_POLL_INTERVAL_MS));
   }
 }
 
@@ -254,40 +245,6 @@ async function runImportStep(bin: string, projectDir: string, skip: boolean): Pr
   } catch (error) {
     err(`editor import step error (non-fatal): ${(error as Error).message}`);
   }
-}
-
-async function pickFreePort(): Promise<number> {
-  for (let candidate = PORT_RANGE_START; candidate <= PORT_RANGE_END; candidate += 1) {
-    if (await isPortFree(candidate)) return candidate;
-  }
-  throw new CliError(
-    ExitCode.Transport,
-    `no free port in ${PORT_RANGE_START}-${PORT_RANGE_END}`,
-    "pass --port to choose a specific port",
-  );
-}
-
-function isPortFree(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const server = net.createServer();
-    server.once("error", () => resolve(false));
-    server.once("listening", () => {
-      server.close(() => resolve(true));
-    });
-    server.listen(port, "127.0.0.1");
-  });
-}
-
-function parseExplicitPort(text: string): number {
-  const trimmed = text.trim();
-  if (!/^\d+$/.test(trimmed)) {
-    throw new CliError(ExitCode.Usage, `--port must be an integer in 1-65535, got: ${text}`);
-  }
-  const n = Number(trimmed);
-  if (n < 1 || n > 65535) {
-    throw new CliError(ExitCode.Usage, `--port must be an integer in 1-65535, got: ${text}`);
-  }
-  return n;
 }
 
 function parseWaitSec(text: string | undefined, fallback: number): number {

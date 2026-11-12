@@ -1,6 +1,6 @@
 import { CLI_VERSION } from "../version";
 import { CliError, ExitCode } from "../errors";
-import { IpcSession } from "../ipc/client";
+import { IpcSession, type IpcEndpoint } from "../ipc/client";
 
 export interface JsonRpcResponse {
   id: number;
@@ -13,6 +13,10 @@ export interface CallToolOptions {
   timeoutSec?: number;
   direct?: boolean;
   socketPath?: string;
+  ipcEndpoint?: IpcEndpoint;
+  noFallback?: boolean;
+  transport?: "auto" | "ipc" | "http";
+  transportSink?: (transport: "ipc" | "http") => void;
 }
 
 export const META_DIRECT_TOOLS: ReadonlySet<string> = new Set([
@@ -254,8 +258,38 @@ export async function callTool(
   opts: CallToolOptions,
 ): Promise<JsonRpcResponse> {
   const timeoutMs = (opts.timeoutSec ?? DEFAULT_TIMEOUT_SEC) * 1000;
-  if (opts.socketPath !== undefined) {
-    return await callToolOverIpc(name, args, opts.socketPath, timeoutMs, opts.direct === true);
+  const transportMode = opts.transport ?? "auto";
+  const ipcEndpoint =
+    opts.ipcEndpoint ?? (opts.socketPath !== undefined ? { path: opts.socketPath } : undefined);
+  if (transportMode !== "http" && ipcEndpoint !== undefined) {
+    try {
+      const response = await callToolOverIpc(
+        name,
+        args,
+        ipcEndpoint,
+        timeoutMs,
+        opts.direct === true,
+      );
+      const tokenFailure = response.error?.code === -32001 || response.error?.code === -32002;
+      if (!tokenFailure) {
+        opts.transportSink?.("ipc");
+        return response;
+      }
+      if (transportMode === "ipc" || opts.noFallback === true) {
+        return response;
+      }
+    } catch (error) {
+      if (transportMode === "ipc" || opts.noFallback === true) {
+        throw error;
+      }
+    }
+  }
+  if (transportMode === "ipc") {
+    throw new CliError(
+      ExitCode.Transport,
+      "IPC transport was requested but no usable IPC endpoint is available.",
+      "Run 'gda status --json' to inspect the instance endpoint, or use --transport http.",
+    );
   }
   const url = `http://${HOST}:${opts.port}/mcp`;
 
@@ -293,20 +327,30 @@ export async function callTool(
   if (extracted.kind === "bad-json") {
     throw new CliError(ExitCode.Transport, "could not parse the plain-JSON response.");
   }
+  opts.transportSink?.("http");
   return extracted.envelope as JsonRpcResponse;
 }
 
 async function callToolOverIpc(
   name: string,
   args: Record<string, unknown>,
-  socketPath: string,
+  endpoint: IpcEndpoint,
   timeoutMs: number,
   direct: boolean,
 ): Promise<JsonRpcResponse> {
-  const session = new IpcSession(socketPath, timeoutMs);
+  const session = new IpcSession(endpoint, timeoutMs);
   try {
     await session.open();
-    await session.request(JSON.parse(makeInitializeEnvelope()) as Record<string, unknown>);
+    const init = JSON.parse(makeInitializeEnvelope()) as Record<string, unknown>;
+    const params = (init.params ?? {}) as Record<string, unknown>;
+    if (endpoint.token !== undefined && endpoint.token !== "") {
+      params._meta = { gda_token: endpoint.token };
+      init.params = params;
+    }
+    const initResponse = await session.request(init);
+    if (initResponse.error !== undefined) {
+      return initResponse;
+    }
     session.notify({ jsonrpc: "2.0", method: HANDSHAKE_METHOD });
     const id = nextRequestId++;
     const envelope = JSON.parse(makeCallEnvelope(id, name, args, direct)) as Record<string, unknown>;

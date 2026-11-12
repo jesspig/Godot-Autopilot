@@ -135,37 +135,29 @@ describe("resolveTarget", () => {
     expect(t.instance?.id).toBe("a");
   });
 
-  test("--project 未命中走 trace", () => {
+  test("--project 未命中不再走 trace", () => {
     const projDir = writeProject(path.join(work, "proj"), "TestProj");
     writeTrace(1234);
-    const t = resolveTarget({ project: projDir }, mockCtx([]));
-    expect(t.port).toBe(1234);
-    expect(t.source).toBe("trace");
+    expect(() => resolveTarget({ project: projDir }, mockCtx([]))).toThrow(/no running Godot Autopilot instance/);
   });
 
-  test("--project 未命中且 trace 缺失走 config", () => {
+  test("--project 未命中不再走 config", () => {
     const projDir = writeProject(path.join(work, "proj"), "TestProj");
     writeConfig(5678);
-    const t = resolveTarget({ project: projDir }, mockCtx([]));
-    expect(t.port).toBe(5678);
-    expect(t.source).toBe("config");
+    expect(() => resolveTarget({ project: projDir }, mockCtx([]))).toThrow(/no running Godot Autopilot instance/);
   });
 
-  test("--project 未命中且 trace/config 均缺失回落默认", () => {
+  test("--project 未命中且 trace/config 均缺失时报错而非 9527", () => {
     const projDir = writeProject(path.join(work, "proj"), "TestProj");
-    const t = resolveTarget({ project: projDir }, mockCtx([]));
-    expect(t.port).toBe(9527);
-    expect(t.source).toBe("default");
+    expect(() => resolveTarget({ project: projDir }, mockCtx([]))).toThrow(/no running Godot Autopilot instance/);
   });
 
-  test("--project 从子目录向上找到 project.godot", () => {
+  test("--project 从子目录向上找到 project.godot 但仍需实例", () => {
     const projDir = writeProject(path.join(work, "proj"), "TestProj");
     const deep = path.join(projDir, "deep", "sub");
     fs.mkdirSync(deep, { recursive: true });
     writeTrace(2345);
-    const t = resolveTarget({ project: deep }, mockCtx([]));
-    expect(t.port).toBe(2345);
-    expect(t.source).toBe("trace");
+    expect(() => resolveTarget({ project: deep }, mockCtx([]))).toThrow(/no running Godot Autopilot instance/);
   });
 
   test("环境变量端口优先于 cwd 登记与默认", () => {
@@ -190,9 +182,7 @@ describe("resolveTarget", () => {
     expect(t.source).toBe("cwd");
   });
 
-  test("无显式 flag 且全部缺失回落默认 9527", () => {
-    const t = resolveTarget({}, mockCtx([]));
-    expect(t.port).toBe(9527);
-    expect(t.source).toBe("default");
+  test("无显式 flag 且全部缺失时报错而非 9527", () => {
+    expect(() => resolveTarget({}, mockCtx([]))).toThrow(/no running Godot Autopilot instance/);
   });
 });

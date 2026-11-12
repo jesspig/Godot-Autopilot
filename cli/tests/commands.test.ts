@@ -108,7 +108,12 @@ describe("请求形状", () => {
     cap.restore();
     expect(code).toBe(ExitCode.Success);
     expect(requests[0].params).toEqual({ name: "call_tool", arguments: { name: "system_status", arguments: {} } });
-    expect(cap.stdout()).toBe('{"status":"ready"}\n');
+    const statusJson = JSON.parse(cap.stdout()) as Record<string, unknown>;
+    expect(statusJson.schema_version).toBe(1);
+    expect(statusJson.ok).toBe(true);
+    expect(statusJson.port).toBe(port);
+    expect(statusJson.mcp_url).toBe(`http://127.0.0.1:${port}/mcp`);
+    expect(statusJson.transport).toBe("http");
   });
 
   test("categories 直达 list_categories", async () => {
