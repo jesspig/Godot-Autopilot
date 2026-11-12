@@ -44,7 +44,7 @@ const char *const kManualWhitelist[] = {
     "timeout_ms", "auto_owner", "SceneRoot", "target", "retryable", "isError",
     "true", "false",
     "godot_autopilot", "editor_readiness", "resource_ops", "record_error",
-    "writes_file", "writes_scene", "is_error",
+    "writes_file", "writes_scene", "is_error", "confirm_required",
     "already_playing", "physics_stalled", "node_count", "scan_truncated",
     "just_pressed", "global_rect", "auth_mode", "authorization_mode",
     "check_equal", "make_current", "close_scene", "get_tile_data",
@@ -430,8 +430,9 @@ TEST_F(SkillRegistryFixture, ToolNamesExistInRegistry) {
 }
 
 TEST_F(SkillRegistryFixture, SkillBooksDescribeDiscovery) {
+  const std::vector<SkillSpec> all = all_skills();
   const SkillSpec *tools_skill = nullptr;
-  for (const SkillSpec &spec : all_skills()) {
+  for (const SkillSpec &spec : all) {
     if (spec.name == "godot-autopilot-tools") {
       tools_skill = &spec;
     }

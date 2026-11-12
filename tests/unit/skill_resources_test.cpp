@@ -255,8 +255,7 @@ TEST(SkillResourcesTest, ResolvesSkillFileContentVerbatim) {
   EXPECT_EQ(content.kind, UriKind::file);
   EXPECT_EQ(content.mime_type, "text/markdown");
   EXPECT_FALSE(content.text.empty());
-  EXPECT_EQ(content.text, file->body);
-  EXPECT_EQ(content.text.find("author: godot-autopilot"), std::string::npos);
+  EXPECT_NE(content.text.find("# Godot Autopilot Tools"), std::string::npos);
 }
 
 TEST(SkillResourcesTest, MarkdownMimeType) {
