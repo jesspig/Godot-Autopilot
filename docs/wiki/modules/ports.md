@@ -1,13 +1,13 @@
 ---
 type: 模块文档
 title: 端口与实例登记
-description: 单一监听端口承载 MCP 与 REST 两个端点、端口解析优先级与候选序列、显式与自动分配的失败差异、实例登记结构与全局索引、CLI 侧发现链与回溯、控制面端口与实例端口的分工、异常退出后的端口与登记自愈、传输层工作线程的退出契约
+description: 单一监听端口承载 MCP 与 REST 两个端点、端口解析优先级与随机候选序列、首次持久化与冲突重随机、实例登记结构与全局索引、CLI 侧发现链与回溯、控制面端口与实例端口的分工、异常退出后的端口与登记自愈、传输层工作线程的退出契约
 tags:
   - 模块
   - 端口
   - 实例登记
   - 发现链
-timestamp: "2026-11-10T22:12:04+08:00"
+timestamp: "2026-11-13T01:30:00+08:00"
 resource:
   - src/core/transport/port_resolver.cpp
   - src/core/transport/port_recovery.hpp
@@ -22,7 +22,7 @@ resource:
 
 # 端口与实例登记
 
-> 审计日期：2026-11-10（随 0.3.1 升版同步——实例登记示例 `version` 字段由 0.3.0 改为 **0.3.1**）2026-10-23（**10-23 随控制面文档同步批次增补「控制面端口」小节**——`gda serve` 默认监听 `127.0.0.1:9700`（`cli/src/commands/serve.ts` 的 `DEFAULT_CONTROL_PORT`），只允许环回绑定，端口独立于实例端口且不写实例登记；9700 与插件首选 9527、CLI `start` 自启 9530–9599、插件保留段 19900–19999 与自动分配区间 20000–29999 均不重叠）2026-10-22（**10-22 随本地收口批次增补「运行时边界」小节**——退出时若有未响应「队列关闭」的处理请求，收割会等它，最坏把退出拖到约 30 秒（崩溃换成慢退出）；进程被强杀时监听端口不立即释放、实例登记会残留，下次启动自动清理同工程残留登记并给出提示，但端口要等占用它的进程真正退出才彻底释放；并明确「同一工程不要同时打开两个编辑器」——第二个编辑器会在扩展加载阶段因 Godot 的扩展库临时副本被占用而可能静默崩溃，插件代码此时尚未运行、给不出提示，插件侧的同工程实例检测是第二道防线）2026-10-21（随开放接口面落地批次首建——本批把「端口」从单一 MCP 端口扩为**一个端口承载两个端点**（`/mcp` 与 `/api`），端口解析改为「环境变量 → 工程级配置偏好 → 自动分配」三级，自动分配有确定的候选序列；实例登记迁到集中根下的工程级目录并汇总出全局索引，供 CLI 发现链使用。实现见 [`src/core/transport/port_resolver.cpp`](../../../src/core/transport/port_resolver.cpp) 与 [`src/core/server_context.cpp`](../../../src/core/server_context.cpp)，登记见 [`src/core/storage/instance_registry.cpp`](../../../src/core/storage/instance_registry.cpp) 与 [`src/core/storage/project_store.cpp`](../../../src/core/storage/project_store.cpp)。本轮校订补三处接线事实：① 探测上限 256 含首选 9527 在内，失败信息形如 `no free port candidate bound after N probes: <原因>`；② CLI 本地注册表的 state dir 组成补 `instances.lock` 与 `logs/`；③ 令牌字段名改为不加反引号的自然表述，避免与代码内 `api_token` 字段混淆）。
+> 审计日期：2026-11-13（**T-04 端口随机化**——删除 9527 首选；首次启动在 20000–29999 随机绑定并写入工程级 `config.json`；重启复用；持久化端口绑定失败时自动重随机并标记 `port_source=auto_reassigned`；实例登记新增 `port_source` 字段。端口解析与候选序列以 [`src/core/transport/port_resolver.cpp`](../../../src/core/transport/port_resolver.cpp) 为准）2026-11-10（随 0.3.1 升版同步——实例登记示例 `version` 字段由 0.3.0 改为 **0.3.1**）2026-10-23（**10-23 随控制面文档同步批次增补「控制面端口」小节**——`gda serve` 默认监听 `127.0.0.1:9700`（`cli/src/commands/serve.ts` 的 `DEFAULT_CONTROL_PORT`），只允许环回绑定，端口独立于实例端口且不写实例登记；9700 与插件首选 9527、CLI `start` 自启 9530–9599、插件保留段 19900–19999 与自动分配区间 20000–29999 均不重叠）2026-10-22（**10-22 随本地收口批次增补「运行时边界」小节**——退出时若有未响应「队列关闭」的处理请求，收割会等它，最坏把退出拖到约 30 秒（崩溃换成慢退出）；进程被强杀时监听端口不立即释放、实例登记会残留，下次启动自动清理同工程残留登记并给出提示，但端口要等占用它的进程真正退出才彻底释放；并明确「同一工程不要同时打开两个编辑器」——第二个编辑器会在扩展加载阶段因 Godot 的扩展库临时副本被占用而可能静默崩溃，插件代码此时尚未运行、给不出提示，插件侧的同工程实例检测是第二道防线）2026-10-21（随开放接口面落地批次首建——本批把「端口」从单一 MCP 端口扩为**一个端口承载两个端点**（`/mcp` 与 `/api`），端口解析改为「环境变量 → 工程级配置偏好 → 自动分配」三级，自动分配有确定的候选序列；实例登记迁到集中根下的工程级目录并汇总出全局索引，供 CLI 发现链使用。实现见 [`src/core/transport/port_resolver.cpp`](../../../src/core/transport/port_resolver.cpp) 与 [`src/core/server_context.cpp`](../../../src/core/server_context.cpp)，登记见 [`src/core/storage/instance_registry.cpp`](../../../src/core/storage/instance_registry.cpp) 与 [`src/core/storage/project_store.cpp`](../../../src/core/storage/project_store.cpp)。本轮校订补三处接线事实：① 探测上限 256 含首选 9527 在内，失败信息形如 `no free port candidate bound after N probes: <原因>`；② CLI 本地注册表的 state dir 组成补 `instances.lock` 与 `logs/`；③ 令牌字段名改为不加反引号的自然表述，避免与代码内 `api_token` 字段混淆）。
 > 统计口径：端口号与候选区间以 [`src/core/config.hpp`](../../../src/core/config.hpp) 的常量为事实标准；数值以运行时统计为准，见 [测试体系](../tests.md)「数值核算总表」。
 
 ## 端口模型：一个端口，两个端点
@@ -44,25 +44,25 @@ resource:
 | 优先级 | 来源 | `PortSource` | 说明 |
 |---|---|---|---|
 | 1 | 环境变量 `GODOT_AUTOPILOT_PORT` | `kEnvExplicit` | 测试与 CI 场景的显式指定；`resolve_explicit_port()` 读取后经 `atoi` 转换 |
-| 2 | 工程级配置偏好（`config.json` 的 `port` 键） | `kConfigExplicit` | 控制面板「Apply」写入工程级配置；`PluginConfig::load_port()` 读取，需 > 0 |
-| 3 | 自动分配 | `kAutoAssigned` | 前两级都没有时启用候选序列顺延 |
+| 2 | 工程级配置偏好（`config.json` 的 `port` 键） | `kConfigExplicit` | 首次随机绑定、面板 Apply 或 `gda port set` 写入；`PluginConfig::load_port()` 读取，需 > 0 |
+| 3 | 随机分配 | `kFirstRandom` | 前两级都没有时，在 20000–29999 随机选起点并顺延 |
+| 4 | 冲突重随机 | `kAutoReassigned` | 持久化端口绑定失败时自动重随机并覆盖配置；显式环境变量不触发 |
 
-另有一条**运行期改端口**的通道：控制面板 Apply 触发的 `ServerContext::restart(port)`，其 `requested_port_ > 0` 走 `kUserApplied` 分支——**优先级高于上面三级**，直接绑定该端口（绑定失败即报错，不顺延）。
+另有一条**运行期改端口**的通道：控制面板 Apply 触发的 `ServerContext::restart(port)`，其 `requested_port_ > 0` 走 `kUserApplied` 分支——**优先级高于上面四级**，直接绑定该端口（绑定失败即报错，不顺延），成功后写回配置。
 
-**环境变量优先于配置**，保证 CI/测试场景不受控制面板的持久化值影响。
+**环境变量优先于配置**，保证 CI/测试场景不受控制面板的持久化值影响；环境变量不写回配置。
 
-## 自动分配的候选序列
+## 自动分配的随机候选序列
 
-`PortResolver::candidate_sequence(pid)` 生成的顺序是：
+`PortResolver::candidate_sequence(pid)` 生成的是 `[20000, 29999]` 共 10000 个候选的**随机排列**：
 
-1. **先试默认端口 9527**（`GDA_DEFAULT_PORT`）；
-2. 随后从 `20000 + (进程号 mod 10000)` 起，**连续递增到 29999 并回绕**（候选区间 `[GDA_PORT_CANDIDATE_BASE, GDA_PORT_CANDIDATE_LIMIT]` = `[20000, 29999]`，共 10000 个）。
-
-举例：进程号 12345 → `20000 + (12345 mod 10000)` = 22345，序列为 `9527, 22345, 22346, …, 29999, 20000, 20001, …`。
+1. 不再优先尝试 9527；
+2. 候选区间 `[GDA_PORT_CANDIDATE_BASE, GDA_PORT_CANDIDATE_LIMIT]` = `[20000, 29999]`；
+3. 以 `random_device` + 进程号作为种子打乱，首次绑定取序列头部。
 
 - 候选区间上界 29999 **低于**私有动态端口区间起点 32768（`GDA_PRIVATE_PORT_BASE`），由 `static_assert` 约束；控制面端口区间 `[19900, 19999]` 与自动分配区间不相交，同样由 `static_assert` 保证。
-- 实际探测时**最多探 256 个候选**（`GDA_PORT_PROBE_LIMIT`，含首选的 9527 在内）；探完仍未绑定成功即启动失败，错误信息带实际探测次数与最后一次失败原因（`no free port candidate bound after N probes: <原因>`）。
-- 回绕保证「每个进程都从自己的偏移处开始」，避免多实例总是挤在候选序列头部。
+- 实际探测时**最多探 256 个候选**（`GDA_PORT_PROBE_LIMIT`）；探完仍未绑定成功即启动失败，错误信息带实际探测次数与最后一次失败原因（`no free port candidate bound after N probes: <原因>`）。
+- 随机排列保证多实例不会总是挤在候选序列头部；同一进程两次启动也会得到不同的起点。
 
 ## 显式与自动的失败差异
 
@@ -70,10 +70,11 @@ resource:
 
 | 场景 | 行为 |
 |---|---|
-| 显式（环境变量 / 配置偏好 / 面板 Apply） | 只尝试该**一个**端口；绑定失败即启动失败，错误信息形如 `the requested port N is unavailable: <原因>`。**不顺延、不换端口**——用户手动改，避免「配置了 9527 却连到了别处」这种难以察觉的错位 |
-| 自动分配 | 按候选序列顺延到下一个可用端口，并把实际绑定到的端口写回分配说明（`auto assigned: preferred 9527, fallback candidates 20000-29999; bound port N`） |
+| 显式环境变量 / 面板 Apply | 只尝试该**一个**端口；绑定失败即启动失败，错误信息形如 `the requested port N is unavailable: <原因>`。**不顺延、不换端口**——用户手动改，避免「配置了 9527 却连到了别处」这种难以察觉的错位 |
+| 首次随机 | 按随机候选序列顺延到第一个可用端口，绑定成功后写回工程级配置，`port_source=first_random` |
+| 持久化端口冲突 | 先尝试持久化端口；失败则记 Warning、自动重随机、覆盖配置，`port_source=auto_reassigned` |
 
-端口冲突因此有两种完全不同的可观测表现：显式冲突表现为**启动失败并报端口不可用**；自动冲突表现为**静默换端口**——所以「客户端连不上」时，先确认实例登记里记录的端口，而不是假定仍是 9527。
+端口冲突因此有三种可观测表现：显式冲突表现为**启动失败并报端口不可用**；首次随机表现为**写入新端口**；持久化冲突表现为**静默换端口 + `auto_reassigned` 标记**——所以「客户端连不上」时，先确认实例登记里的 `port` 与 `port_source`，而不是假定仍是 9527。
 
 ## 实例登记
 
@@ -98,17 +99,18 @@ resource:
 ```json
 {
   "instance_id": "gda-1a2b3c4d-12345-1760000000000",
-  "port": 9527,
+  "port": 21437,
   "pid": 12345,
   "project_path": "C:/path/to/project",
   "api_token": "<64 位十六进制令牌>",
   "endpoints": {
-    "mcp": {"host": "127.0.0.1", "port": 9527, "path": "/mcp", "protocol": "mcp", "auth": "none"},
-    "api": {"host": "127.0.0.1", "port": 9527, "path": "/api", "protocol": "http", "auth": "bearer"}
+    "mcp": {"host": "127.0.0.1", "port": 21437, "path": "/mcp", "protocol": "mcp", "auth": "none"},
+    "api": {"host": "127.0.0.1", "port": 21437, "path": "/api", "protocol": "http", "auth": "bearer"}
   },
   "gda_home": "C:/Users/<user>",
   "started_at": 1760000000000,
-  "version": "0.3.1"
+  "version": "0.3.2",
+  "port_source": "persisted"
 }
 ```
 
@@ -117,6 +119,7 @@ resource:
 - `port` 与 `endpoints.*.port` 是**同一个端口**——两个端点不各自占端口。
 - `endpoints.mcp.auth` 为 `"none"`（MCP 面仍无认证，沿用可信客户端模型），`endpoints.api.auth` 为 `"bearer"`（REST 面要求令牌）。
 - `api_token` 是 REST 面的 Bearer 令牌；令牌文件也在工程级目录内，签发来源优先级为环境变量 `GODOT_AUTOPILOT_API_TOKEN` 优先。
+- `port_source` 取 `env`、`persisted`、`first_random`、`auto_reassigned`，用于说明本次端口来自哪一级；旧记录缺该字段时按空串处理。
 - `gda_home` 记录本次实例解析出的集中根，便于排查「多用户 / 多 HOME」造成的分叉。
 
 ### 全局索引结构
@@ -209,7 +212,7 @@ CLI 的目标解析是一条**七级优先链**，每一级都记录来源（`so
 
 ## 已知限制
 
-- **端口是全局资源，多实例必然分散**：多个编辑器同时开着时，除了第一个占用 9527 的实例，其余走候选序列落在 20000–29999。客户端若假定 9527，必须先发现再连接。
+- **端口是全局资源，多实例必然分散**：多个编辑器同时开着时，每个实例从 20000–29999 随机取端口，客户端必须先读实例登记再连接，不能假定 9527。
 - **全局索引是快照**：实例登记的写入失败（目录不可写、磁盘满）会让该实例对 CLI 不可见，但**不影响 REST 端点本身**——插件照常监听，CLI 只是找不到它。
 - **令牌只在实例登记里**：没有第二个可读位置（不写环境变量、不写工程文件），因此丢了实例登记就等于丢了令牌，需重启插件实例重新签发。
 - **旧路径回退只取端口**：第 6 级仅从旧 `user://godot_autopilot/` 读 `server_ready` trace 或 `config.json` 中的端口，不迁移数据本身；数据迁移是控制面板的复制式导入，见 [核心模块](core.md)。

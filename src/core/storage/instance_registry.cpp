@@ -185,6 +185,7 @@ mcp::JsonValue record_to_json(const InstanceRecord &record) {
   doc["gda_home"] = record.gda_home;
   doc["started_at"] = static_cast<int64_t>(record.started_at);
   doc["version"] = record.version;
+  doc["port_source"] = record.port_source;
   return mcp::JsonValue(std::move(doc));
 }
 
@@ -201,6 +202,7 @@ bool record_from_json(const mcp::JsonValue &doc, InstanceRecord &out) {
   const mcp::JsonValue *gda_home = doc.Find("gda_home");
   const mcp::JsonValue *started_at = doc.Find("started_at");
   const mcp::JsonValue *version = doc.Find("version");
+  const mcp::JsonValue *port_source = doc.Find("port_source");
   if (instance_id == nullptr || !instance_id->IsString()) {
     return false;
   }
@@ -246,6 +248,9 @@ bool record_from_json(const mcp::JsonValue &doc, InstanceRecord &out) {
   parsed.gda_home = gda_home->GetString();
   parsed.started_at = started_at->GetInt();
   parsed.version = version->GetString();
+  if (port_source != nullptr && port_source->IsString()) {
+    parsed.port_source = port_source->GetString();
+  }
   if (!read_registry_endpoint(*mcp_endpoint, parsed.endpoints.mcp)) {
     return false;
   }

@@ -53,6 +53,7 @@ InstanceRecord sample_record() {
   record.gda_home = "C:/gda/home/.godot-autopilot";
   record.started_at = 1700000000;
   record.version = "0.1.0";
+  record.port_source = "first_random";
   return record;
 }
 
@@ -72,6 +73,7 @@ TEST(InstanceRegistryTest, RecordRoundTripsThroughJson) {
   EXPECT_EQ(parsed.gda_home, original.gda_home);
   EXPECT_EQ(parsed.started_at, original.started_at);
   EXPECT_EQ(parsed.version, original.version);
+  EXPECT_EQ(parsed.port_source, original.port_source);
   EXPECT_EQ(parsed.endpoints.mcp.host, original.endpoints.mcp.host);
   EXPECT_EQ(parsed.endpoints.mcp.port, original.endpoints.mcp.port);
   EXPECT_EQ(parsed.endpoints.mcp.path, original.endpoints.mcp.path);

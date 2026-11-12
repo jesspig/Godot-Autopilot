@@ -47,7 +47,7 @@ private:
   std::unique_ptr<Bm25Index> bm25_index_;
   std::shared_ptr<GodotTransport> transport_;
   std::unique_ptr<mcp::McpServer> server_;
-  int port_ = GDA_DEFAULT_PORT;
+  int port_ = 0;
   int requested_port_ = 0;
   std::string host_ = "127.0.0.1";
   bool running_ = false;

@@ -102,9 +102,7 @@ ServerContext::ServerContext(CommandQueue &queue)
       bm25_index_(std::make_unique<Bm25Index>()) {
   const int explicit_port = resolve_explicit_port();
   const int preferred_port = resolve_preferred_port();
-  port_ = explicit_port > 0
-              ? explicit_port
-              : (preferred_port > 0 ? preferred_port : GDA_DEFAULT_PORT);
+  port_ = explicit_port > 0 ? explicit_port : preferred_port;
   host_ = resolve_host();
   g_server_context_instance = this;
   LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
@@ -136,8 +134,37 @@ bool ServerContext::bind_transport() {
   } else {
     assignment = PortResolver::resolve(explicit_port, preferred_port, pid);
   }
+
   std::string error;
-  if (assignment.source == PortSource::kAutoAssigned) {
+  const bool explicit_request =
+      requested_port_ > 0 || explicit_port > 0;
+  auto bind_exact = [&](int port) {
+    return http_transport_bind(static_cast<uint16_t>(port), host_, error);
+  };
+
+  if (explicit_request) {
+    if (!bind_exact(assignment.port)) {
+      last_error_ = "the requested port " + std::to_string(assignment.port) +
+                    " is unavailable: " + error;
+      return false;
+    }
+  } else if (preferred_port > 0 && bind_exact(preferred_port)) {
+    assignment.port = preferred_port;
+    assignment.source = PortSource::kConfigExplicit;
+  } else {
+    if (preferred_port > 0) {
+      const std::string avoided = error;
+      assignment.source = PortSource::kAutoReassigned;
+      assignment.note = "the persisted port " + std::to_string(preferred_port) +
+                        " was unavailable (" + avoided + ")";
+      LogSystem::instance().log(
+          LogLevel::Warning, LogCategory::Transport,
+          "Persisted MCP port " + std::to_string(preferred_port) +
+              " is unavailable; reassigning a random port");
+    } else {
+      assignment.source = PortSource::kFirstRandom;
+      assignment.note = "first random port assignment";
+    }
     const std::vector<int> candidates = PortResolver::candidate_sequence(pid);
     int probed = 0;
     bool bound = false;
@@ -147,7 +174,7 @@ bool ServerContext::bind_transport() {
         break;
       }
       ++probed;
-      if (http_transport_bind(static_cast<uint16_t>(candidate), host_, error)) {
+      if (bind_exact(candidate)) {
         assignment.port = candidate;
         bound = true;
         break;
@@ -161,28 +188,31 @@ bool ServerContext::bind_transport() {
                     std::to_string(probed) + " probes: " + error;
       return false;
     }
-    assignment.note.clear();
     if (!avoided_reason.empty()) {
-      assignment.note = "the preferred port " +
-                        std::to_string(GDA_DEFAULT_PORT) +
-                        " was avoided (" + avoided_reason + ")";
+      assignment.note += "; first bind error: " + avoided_reason;
     }
-  } else {
-    if (!http_transport_bind(static_cast<uint16_t>(assignment.port), host_,
-                             error)) {
-      last_error_ = "the requested port " + std::to_string(assignment.port) +
-                    " is unavailable: " + error;
-      return false;
+    if (!PluginConfig::save_port(assignment.port)) {
+      LogSystem::instance().log(
+          LogLevel::Warning, LogCategory::System,
+          "Failed to persist MCP port " + std::to_string(assignment.port));
     }
   }
+
   port_ = assignment.port;
   port_assignment_ = assignment;
   requested_port_ = 0;
+  if (assignment.source == PortSource::kUserApplied) {
+    if (!PluginConfig::save_port(port_)) {
+      LogSystem::instance().log(
+          LogLevel::Warning, LogCategory::System,
+          "Failed to persist MCP port " + std::to_string(port_));
+    }
+  }
   return true;
 }
 
 bool ServerContext::start() {
-  const std::string endpoint = host_ + ":" + std::to_string(port_);
+  std::string endpoint = host_ + ":" + std::to_string(port_);
   last_error_.clear();
   try {
     if (!is_loopback_host(host_)) {
@@ -222,6 +252,8 @@ bool ServerContext::start() {
       monitor::error_event("server_start_failed", "server", last_error_);
       return false;
     }
+
+    endpoint = host_ + ":" + std::to_string(port_);
 
     LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
                               "MCP server initializing: host=" + host_ +
@@ -534,6 +566,7 @@ void ServerContext::write_instance_record() {
   record.gda_home = HomeResolver::gda_home();
   record.started_at = started_at;
   record.version = GDA_VERSION;
+  record.port_source = port_source_name(port_assignment_.source);
   if (!InstanceRegistry::write(record)) {
     LogSystem::instance().log(LogLevel::Error, LogCategory::System,
                               "Instance registry write failed for port " +
