@@ -171,15 +171,6 @@ add_test(NAME migration_guard
             -P ${CMAKE_CURRENT_SOURCE_DIR}/guard/migration_guard.cmake)
 
 # ── ctest 注册: 注释守卫（零依赖，读源码断言，无需构建产物） ──
-<<<<<<< HEAD
-if(NOT GDA_PYTHON_EXECUTABLE)
-    find_program(GDA_PYTHON_EXECUTABLE NAMES python python3 py)
-endif()
-if(NOT GDA_PYTHON_EXECUTABLE AND EXISTS "${CMAKE_SOURCE_DIR}/.venv/Scripts/python.exe")
-    set(GDA_PYTHON_EXECUTABLE "${CMAKE_SOURCE_DIR}/.venv/Scripts/python.exe")
-endif()
-=======
->>>>>>> feature/devtools-guards
 add_test(NAME comment_guard
     COMMAND "${GDA_BUN_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/comment_guard.ts")
 
