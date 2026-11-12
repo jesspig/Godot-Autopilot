@@ -179,6 +179,56 @@ function respondServer(): (socket: net.Socket) => void {
   });
 }
 
+describe("transport fallback", () => {
+  test("IPC 不可达时 auto 回退 HTTP", async () => {
+    const server = Bun.serve({
+      port: 0,
+      hostname: "127.0.0.1",
+      fetch: async (req) => {
+        const body = (await req.json()) as { id?: number; method?: string };
+        if (body.method === "notifications/initialized") {
+          return new Response("{}", { status: 200 });
+        }
+        const result =
+          body.method === "initialize"
+            ? { protocolVersion: "2025-11-25", capabilities: {}, serverInfo: { name: "mock", version: "1" } }
+            : { content: [{ type: "text", text: "{}" }] };
+        return Response.json({ jsonrpc: "2.0", id: body.id ?? 1, result });
+      },
+    });
+    const seen: string[] = [];
+    try {
+      const response = await callTool("ping", {}, {
+        port: server.port ?? 0,
+        timeoutSec: 5,
+        ipcEndpoint: { kind: "tcp", host: "127.0.0.1", port: 1, token: "bad" },
+        transport: "auto",
+        transportSink: (transport) => seen.push(transport),
+      });
+      expect(response.error).toBeUndefined();
+      expect(seen).toEqual(["http"]);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("--transport ipc 且 --no-fallback 时直接失败", async () => {
+    let caught: unknown;
+    try {
+      await callTool("ping", {}, {
+        port: 1,
+        timeoutSec: 2,
+        ipcEndpoint: { kind: "tcp", host: "127.0.0.1", port: 1, token: "bad" },
+        transport: "ipc",
+        noFallback: true,
+      });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(CliError);
+    expect((caught as CliError).code).toBe(ExitCode.Transport);
+  });
+});
 describe("ipc session and socket channel", () => {
   test("callTool 经 IPC 完成握手与调用", async () => {
     const server = await listenLoopback(socketPath, respondServer());
