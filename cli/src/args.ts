@@ -14,6 +14,7 @@ export interface GlobalOptions {
   pathText?: string;
   sourceText?: string;
   zh?: boolean;
+  check?: boolean;
   argsJson?: string;
   argsFile?: string;
   saveImages?: string;
@@ -86,6 +87,7 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--no-fallback": "noFallback",
   "--json": "json",
   "--zh": "zh",
+  "--check": "check",
 };
 
 export function parseArgv(argv: string[]): { opts: GlobalOptions; positionals: string[] } {
@@ -185,6 +187,7 @@ Commands:
   cache clear         Remove old cache entries (requires --force)
   install skills      Install skill books to ~/.agents/skills
   install plugin      Install the Godot addon into a project
+  update <target>     Update cli, skills, plugin, or all (--check for status)
 
 Global options:
   --port <text>       MCP server port for connection only (never a listen port)
