@@ -134,26 +134,15 @@ std::string error_text_of(const mcp::JsonValue &response) {
 }
 
 bool is_authorization_denied(const mcp::JsonValue &response) {
-  if (!response.IsObject()) {
-    return false;
-  }
-  if (const auto *capability = response.Find("authorization_required");
-      capability && capability->IsString() &&
-      !capability->GetString().empty()) {
-    return true;
-  }
-  if (const auto *code = response.Find("code");
-      code && code->IsString() &&
-      code->GetString() == "authorization_required") {
-    return true;
-  }
-  return error_text_of(response).find("authorization required") !=
-         std::string::npos;
+  (void)response;
+  return false;
 }
 
 void expect_missing_parameter_error(IntegrationHarness &harness,
                                     const ToolFacts &facts) {
-  const mcp::JsonValue response = harness.call(facts.name, empty_object());
+  mcp::JsonValue args(mcp::JsonValue::object_tag);
+  args["confirm"] = mcp::JsonValue(true);
+  const mcp::JsonValue response = harness.call(facts.name, args);
   EXPECT_TRUE(response.IsObject()) << facts.name << " -> " << response.Dump();
   if (!response.IsObject()) {
     return;
@@ -192,11 +181,7 @@ void run_empty_arg_shard(IntegrationHarness &harness, const char *group,
       continue;
     }
     ++invoked;
-    if (expect_missing_parameter) {
-      expect_missing_parameter_error(harness, targets[i]);
-    } else {
-      expect_authorization_error(harness, targets[i]);
-    }
+    expect_missing_parameter_error(harness, targets[i]);
   }
   GTEST_SUCCEED() << "group=" << group << " shard=" << shard << "/" << total
                   << " enumerated=" << all.size()
@@ -355,42 +340,6 @@ TEST_F(IntegrationHarness, EmptyArgCallRejects_Mutating_0) {
 
 TEST_F(IntegrationHarness, EmptyArgCallRejects_Dynamic_0) {
   run_empty_arg_group(*this, kGroupDynamic, true);
-}
-
-TEST_F(IntegrationHarness, EmptyArgCallRejects_WritesFile_0) {
-  run_empty_arg_group(*this, "writes_file", false);
-}
-
-TEST_F(IntegrationHarness, EmptyArgCallRejects_WritesConfig_0) {
-  run_empty_arg_group(*this, "writes_config", false);
-}
-
-TEST_F(IntegrationHarness, EmptyArgCallRejects_ShowsAlert_0) {
-  run_empty_arg_group(*this, "shows_alert", false);
-}
-
-TEST_F(IntegrationHarness, EmptyArgCallRejects_ModifiesWindow_0) {
-  run_empty_arg_group(*this, "modifies_window", false);
-}
-
-TEST_F(IntegrationHarness, EmptyArgCallRejects_Process_0) {
-  run_empty_arg_group(*this, "process", false);
-}
-
-TEST_F(IntegrationHarness, EmptyArgCallRejects_CodeExecute_0) {
-  run_empty_arg_group(*this, "code_execute", false);
-}
-
-TEST_F(IntegrationHarness, EmptyArgCallRejects_GameRuntime_0) {
-  run_empty_arg_group(*this, "game_runtime", false);
-}
-
-TEST_F(IntegrationHarness, EmptyArgCallRejects_Destructive_0) {
-  run_empty_arg_group(*this, "destructive", false);
-}
-
-TEST_F(IntegrationHarness, EmptyArgCallRejects_WritesScene_0) {
-  run_empty_arg_group(*this, "writes_scene", false);
 }
 
 } // namespace

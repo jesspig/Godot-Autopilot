@@ -19,6 +19,12 @@ mcp::JsonValue make_args() {
   return mcp::JsonValue(mcp::JsonValue::object_tag);
 }
 
+mcp::JsonValue start_args() {
+  mcp::JsonValue args = make_args();
+  args["confirm"] = mcp::JsonValue(true);
+  return args;
+}
+
 void assert_exact_error(const mcp::JsonValue &result,
                         const std::string &expected) {
   const auto *v = result.Find("error");
@@ -28,13 +34,13 @@ void assert_exact_error(const mcp::JsonValue &result,
 }
 
 TEST_F(GameJobsSuite, StartGameJobMissingOp) {
-  mcp::JsonValue result = call("start_game_job", make_args());
+  mcp::JsonValue result = call("start_game_job", start_args());
   assert_exact_error(
       result, "missing required parameter: op (currently only \"eval\")");
 }
 
 TEST_F(GameJobsSuite, StartGameJobUnsupportedOp) {
-  mcp::JsonValue args = make_args();
+  mcp::JsonValue args = start_args();
   args["op"] = mcp::JsonValue("status");
   args["params"] = make_args();
   mcp::JsonValue result = call("start_game_job", args);
@@ -44,7 +50,7 @@ TEST_F(GameJobsSuite, StartGameJobUnsupportedOp) {
 }
 
 TEST_F(GameJobsSuite, StartGameJobMissingParams) {
-  mcp::JsonValue args = make_args();
+  mcp::JsonValue args = start_args();
   args["op"] = mcp::JsonValue("eval");
   mcp::JsonValue result = call("start_game_job", args);
   assert_exact_error(
@@ -54,7 +60,7 @@ TEST_F(GameJobsSuite, StartGameJobMissingParams) {
 }
 
 TEST_F(GameJobsSuite, StartGameJobTimeoutOutOfRange) {
-  mcp::JsonValue args = make_args();
+  mcp::JsonValue args = start_args();
   args["op"] = mcp::JsonValue("eval");
   mcp::JsonValue params = make_args();
   params["action"] = mcp::JsonValue("script");
@@ -67,7 +73,7 @@ TEST_F(GameJobsSuite, StartGameJobTimeoutOutOfRange) {
 }
 
 TEST_F(GameJobsSuite, StartGameJobValidArgsNoGameReturnsRuntimeError) {
-  mcp::JsonValue args = make_args();
+  mcp::JsonValue args = start_args();
   args["op"] = mcp::JsonValue("eval");
   mcp::JsonValue params = make_args();
   params["action"] = mcp::JsonValue("script");
