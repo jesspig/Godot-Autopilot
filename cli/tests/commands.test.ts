@@ -42,6 +42,12 @@ function recordingServer(handler: (req: CapturedRequest) => Response | Promise<R
   const requests: CapturedRequest[] = [];
   const port = serve(async (req) => {
     const body = (await req.json()) as CapturedRequest;
+    const params = body.params as Record<string, unknown> | undefined;
+    if (params !== undefined && typeof params === "object" && params !== null) {
+      const rest: Record<string, unknown> = { ...params };
+      delete rest._meta;
+      body.params = rest;
+    }
     requests.push(body);
     return handler(body);
   });
