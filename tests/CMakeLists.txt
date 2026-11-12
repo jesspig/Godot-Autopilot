@@ -16,6 +16,13 @@ endif()
 
 include(GoogleTest)
 
+# 源码守卫与 CLI 契约测试统一由 Bun 执行；测试配置阶段缺失 Bun 即失败，
+# 避免守卫静默跳过造成假绿。
+find_program(GDA_BUN_EXECUTABLE NAMES bun bun.exe)
+if(NOT GDA_BUN_EXECUTABLE)
+    message(FATAL_ERROR "[gda] 未找到 Bun。源码守卫与 CLI 契约测试均由 Bun 执行；请安装 Bun 并确保 bun 在 PATH。")
+endif()
+
 # 业务子集源码 (从仓库根引用; ops 实现文件经 make_tools() 被 register_all.cpp 引用, 链接必需)
 # resource_registry.cpp 被 code_exec_ops.cpp / resource_ops.cpp 引用 (grep 确认)
 file(GLOB_RECURSE GDA_TOOLS_OPS_SOURCES CONFIGURE_DEPENDS
@@ -164,42 +171,46 @@ add_test(NAME migration_guard
             -P ${CMAKE_CURRENT_SOURCE_DIR}/guard/migration_guard.cmake)
 
 # ── ctest 注册: 注释守卫（零依赖，读源码断言，无需构建产物） ──
+<<<<<<< HEAD
 if(NOT GDA_PYTHON_EXECUTABLE)
     find_program(GDA_PYTHON_EXECUTABLE NAMES python python3 py)
 endif()
 if(NOT GDA_PYTHON_EXECUTABLE AND EXISTS "${CMAKE_SOURCE_DIR}/.venv/Scripts/python.exe")
     set(GDA_PYTHON_EXECUTABLE "${CMAKE_SOURCE_DIR}/.venv/Scripts/python.exe")
 endif()
+=======
+>>>>>>> feature/devtools-guards
 add_test(NAME comment_guard
-    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/comment_guard.py")
+    COMMAND "${GDA_BUN_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/comment_guard.ts")
 
 # ── ctest 注册: 主线程契约守卫（零依赖，读源码断言 Godot API 直接调用）──
 # 扫描 src/ 下的 *.cpp/*.hpp：外线程文件里的 Godot API 调用默认违规，
-# 豁免表与线程上下文分类表以显式常量写在 guard/main_thread_guard.py 内。
+# 豁免表与线程上下文分类表以显式常量写在 guard/main_thread_guard.ts 内。
 add_test(NAME main_thread_guard
-    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/main_thread_guard.py")
+    COMMAND "${GDA_BUN_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/main_thread_guard.ts")
 
 # ── ctest 注册: 版本号一致性守卫（零依赖，读源码断言，全部版本钉与 VERSION 同值） ──
 add_test(NAME version_sync_guard
-    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/version_sync_guard.py")
+    COMMAND "${GDA_BUN_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/version_sync_guard.ts")
 
 # ── ctest 注册: 测试源清单守卫（零依赖，读源码断言，无需构建产物） ──
 # 解析 cmake/sources/ 下插件清单 + src/tools/*_ops.cpp glob 断言并集 == src/ 全部 .cpp，
-# 测试源清单引用的 src/ 源 ⊆ 插件并集；解析规则见 guard/source_manifest_guard.py 模块 docstring。
+# 测试源清单引用的 src/ 源 ⊆ 插件并集；解析规则见 guard/source_manifest_guard.ts。
 add_test(NAME source_manifest_guard
-    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/source_manifest_guard.py")
+    COMMAND "${GDA_BUN_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/source_manifest_guard.ts")
 
 # ── ctest 注册: 工具域守卫（零依赖，读源码断言域规格与实现同名前缀） ──
 # 断言 src/tools/<X>_tools.hpp 存在同前缀 <X>_ops.cpp / <X>_*_ops.cpp，
-# 且规格文件引用的每个 <ns>::handle_* 都有定义；豁免与判据见 guard/tool_domain_guard.py。
+# 且规格文件引用的每个 <ns>::handle_* 都有定义；豁免与判据见 guard/tool_domain_guard.ts。
 add_test(NAME tool_domain_guard
-    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/tool_domain_guard.py")
+    COMMAND "${GDA_BUN_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/tool_domain_guard.ts")
 
-# ── ctest 注册: CLI 契约 mock conformance（纯 stdlib + 自带 mock server）──
-# bun 缺失时测试文件自行打印 SKIP 并 exit 0，ctest 视为通过；
-# 有 bun 时由 bun 驱动 gda.ts 跑全部断言。
+# ── ctest 注册: CLI 契约 mock conformance（Bun 驱动 gda.ts 与进程内 mock server）──
 add_test(NAME cli_contract
-    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_cli_contract.py")
+    COMMAND "${GDA_BUN_EXECUTABLE}" test cli/tests/contract.test.ts)
+set_tests_properties(cli_contract PROPERTIES
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    TIMEOUT 300)
 
 # ── ctest 注册: skills 契约守卫（Bun 直跑；失败输出文件:行号）──
 # 校验 EN/ZH 10 册 parity、旧关键词、gda 命令/参数与 status 字段契约；
@@ -246,13 +257,13 @@ set_tests_properties(migration_guard_self_test PROPERTIES
     RESOURCE_LOCK migration_guard_self_test)
 
 add_test(NAME comment_guard_self_test
-    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/comment_guard.py" --self-test)
+    COMMAND "${GDA_BUN_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/comment_guard.ts" --self-test)
 
 add_test(NAME main_thread_guard_self_test
-    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/main_thread_guard.py" --self-test)
+    COMMAND "${GDA_BUN_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/main_thread_guard.ts" --self-test)
 
 add_test(NAME tool_domain_guard_self_test
-    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/tool_domain_guard.py" --self-test)
+    COMMAND "${GDA_BUN_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/tool_domain_guard.ts" --self-test)
 
 # ====================================================================
 # ctest 层级标签：unit / boundary / integration 由 gtest_discover_tests 的
