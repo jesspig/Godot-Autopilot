@@ -204,13 +204,13 @@ function parsePageNumber(  flag: string,
 }
 
 async function prepareApiContext(opts: GlobalOptions): Promise<ApiContext> {
+  const level = parseProbeLevel(opts.probe);
   const target = resolveTarget(opts, TARGET_CONTEXT);
   const record =
     target.pluginRecord ??
     findPluginRecordByPort(target.port) ??
     findPluginRecordByProject(opts.project !== undefined ? path.resolve(opts.project) : process.cwd());
   const endpoint = record?.apiEndpoint ?? deriveEndpoint(target.port, "api");
-  const level = parseProbeLevel(opts.probe);
   await ensureReachable({ endpoint, token: undefined, target, record }, level);
   const token = record !== undefined && record.apiToken !== "" ? record.apiToken : undefined;
   if (token === undefined && endpoint.auth !== "none") {
@@ -238,10 +238,7 @@ async function ensureReachable(context: ApiContext, level: ProbeLevel): Promise<
 }
 
 function discoverySuggestion(target: ResolvedTarget): string {
-  if (target.chain === "default") {
-    return `No instance was discovered (tried: env, cli-registry, plugin-index, legacy, default ${target.port}); pass --port or GODOT_AUTOPILOT_PORT.`;
-  }
-  return "Open the editor with the plugin enabled, or pass --port with the fixed port of the instance.";
+  return `No instance was discovered for ${target.mcpUrl}; open the editor with the plugin enabled, run 'gda list', or pass --port with the fixed port of the instance.`;
 }
 
 function requestOptions(context: ApiContext, opts: GlobalOptions): ApiRequestOptions {

@@ -115,7 +115,6 @@ describe("spawnEditor", () => {
     await expect(
       spawnEditor({
         projectDir: dir,
-        port: 9599,
         headless: true,
         godot: missing,
         logPath: path.join(dir, "editor.log"),

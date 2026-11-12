@@ -32,6 +32,7 @@ export interface PluginInstanceRecord {
   ipcEndpoint: IpcEndpointRecord | null;
   startedAt: number;
   version: string;
+  portSource?: string;
 }
 
 export interface IpcEndpointRecord {
@@ -142,6 +143,7 @@ function parseRecord(item: unknown): PluginInstanceRecord | null {
     ipcEndpoint: parseIpcEndpoint(endpoints["ipc"]),
     startedAt: readNumber(doc, ["started_at", "startedAt"]) ?? 0,
     version: readString(doc, ["version"]) ?? "",
+    portSource: readString(doc, ["port_source", "portSource"]) ?? "",
   };
 }
 

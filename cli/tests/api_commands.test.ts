@@ -281,12 +281,12 @@ describe("发现链", () => {
     writeIndex({ instances: [pluginRecord({ port: 9633 })] });
     const t = resolveTarget({}, TARGET_CONTEXT);
     expect(t.port).toBe(9633);
-    expect(t.source).toBe("registry");
+    expect(t.source).toBe("cwd");
     expect(t.chain).toBe("plugin-index");
     expect(t.pluginRecord?.instanceId).toBe("i1");
   });
 
-  test("旧路径回退链保留 trace 命中", () => {
+  test("旧 trace 不再作为端口回退", () => {
     const projectDir = path.join(work, "legacy-proj");
     fs.mkdirSync(projectDir, { recursive: true });
     fs.writeFileSync(path.join(projectDir, "project.godot"), '[application]\nconfig/name = "LegacyProj"\n');
@@ -296,17 +296,11 @@ describe("发现链", () => {
       path.join(traceDir, "trace-20240101.jsonl"),
       '{"type":"server_ready","port":1234,"ts":"2024-01-01T00:00:00Z"}\n',
     );
-    const t = resolveTarget({ project: projectDir }, TARGET_CONTEXT);
-    expect(t.port).toBe(1234);
-    expect(t.source).toBe("trace");
-    expect(t.chain).toBe("legacy");
+    expect(() => resolveTarget({ project: projectDir }, TARGET_CONTEXT)).toThrow(/no running Godot Autopilot instance/);
   });
 
-  test("全部缺失回落默认端口", () => {
-    const t = resolveTarget({}, TARGET_CONTEXT);
-    expect(t.port).toBe(9527);
-    expect(t.source).toBe("default");
-    expect(t.chain).toBe("default");
+  test("全部缺失时不再回落 9527", () => {
+    expect(() => resolveTarget({}, TARGET_CONTEXT)).toThrow(/no running Godot Autopilot instance/);
   });
 });
 

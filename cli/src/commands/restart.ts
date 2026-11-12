@@ -58,7 +58,6 @@ async function restart(positional: string[], opts: GlobalOptions): Promise<numbe
       {
         ...opts,
         project: entry.project,
-        portText: String(entry.port),
         godot: entry.godot,
         headless: entry.headless,
       },
