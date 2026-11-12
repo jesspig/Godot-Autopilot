@@ -20,6 +20,7 @@
 #include "core/observability/sanitize_policy.hpp"
 #include <tools/base/runtime_ops.hpp>
 #include <tools/base/schema_builder.hpp>
+#include <tools/base/confirmation.hpp>
 #include <tools/base/tool_base.hpp>
 #include <tools/base/tool_invoke.hpp>
 
@@ -341,6 +342,10 @@ inline mcp::JsonValue SpecTool::execute(const mcp::JsonValue &args) {
       TraceRecorder::sanitize_args(args.Dump(), sanitize_policy::enabled());
   mcp::JsonValue denied =
       authorization::deny_if_unauthorized(spec_.name, spec_.side_effect);
+  if (confirmation::required_for(spec_.side_effect) &&
+      !confirmation::provided(args)) {
+    return confirmation::error(spec_.name, spec_.side_effect);
+  }
   if (!denied.IsNull()) {
     const char *capability =
         authorization::capability_for_tool(spec_.name, spec_.side_effect);
@@ -384,8 +389,18 @@ inline mcp::JsonValue SpecTool::execute(const mcp::JsonValue &args) {
                        denied_summary, denied_detail);
     return denied;
   }
-  mcp::JsonValue result = spec_.handler(args);
-  result = pipeline::run_post(spec_, args, std::move(result));
+  mcp::JsonValue call_args = args;
+  if (confirmation::required_for(spec_.side_effect) && args.IsObject()) {
+    mcp::JsonValue clean(mcp::JsonValue::object_tag);
+    for (const auto &entry : args.GetObject()) {
+      if (entry.first != "confirm") {
+        clean[entry.first] = entry.second;
+      }
+    }
+    call_args = std::move(clean);
+  }
+  mcp::JsonValue result = spec_.handler(call_args);
+  result = pipeline::run_post(spec_, call_args, std::move(result));
   const int64_t duration_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(
           std::chrono::steady_clock::now() - steady_start)

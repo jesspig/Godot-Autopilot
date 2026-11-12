@@ -15,6 +15,7 @@ export interface GlobalOptions {
   sourceText?: string;
   zh?: boolean;
   check?: boolean;
+  confirm?: boolean;
   argsJson?: string;
   argsFile?: string;
   saveImages?: string;
@@ -88,6 +89,7 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--json": "json",
   "--zh": "zh",
   "--check": "check",
+  "--confirm": "confirm",
 };
 
 export function parseArgv(argv: string[]): { opts: GlobalOptions; positionals: string[] } {
@@ -225,6 +227,7 @@ Global options:
   --transport <mode>  auto (default), ipc, or http
   --no-fallback       Do not fall back to HTTP when IPC fails
   --json              JSON output (default for most commands)
+  --confirm           Confirm a high-risk tool call
   --help              Show this help
   --version           Show the version
 

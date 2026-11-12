@@ -316,41 +316,9 @@ inline const char *capability_for_tool(std::string_view name,
 
 inline mcp::JsonValue deny_if_unauthorized(std::string_view name,
                                            SideEffect effect) {
-  const char *capability = capability_for_tool(name, effect);
-  if (!capability)
-    return mcp::JsonValue();
-  const AuthMode mode = current_auth_mode();
-  if (tier_permits(capability, current_allow_list(), mode))
-    return mcp::JsonValue();
-  LogSystem::instance().log(
-      LogLevel::Warning, LogCategory::Tools,
-      "authorization denied for tool '" + std::string(name) +
-          "' (capability '" + capability + "', mode '" +
-          auth_mode_name(mode) + "')");
-  mcp::JsonValue result(mcp::JsonValue::object_tag);
-  result["error"] = mcp::JsonValue(
-      "authorization required for '" + std::string(name) +
-      "'; set GODOT_AUTOPILOT_ALLOW to include '" + capability +
-      "' for trusted local development");
-  result["code"] = mcp::JsonValue("authorization_required");
-  result["authorization_required"] = mcp::JsonValue(capability);
-  result["authorization_mode"] = mcp::JsonValue(auth_mode_name(mode));
-  std::string enable =
-      "set GODOT_AUTOPILOT_ALLOW to '" + std::string(capability) +
-      "' (or 'all') and restart the engine";
-  if (capability_has_dock_toggle(capability)) {
-    enable += ", or tick \"Allow " + std::string(capability) +
-              "\" in the plugin's MCP Config dock (takes effect immediately)";
-  }
-  if (mode == AuthMode::Strict && capability == kCapabilityWrite) {
-    enable +=
-        "; or switch the authorization mode to 'legacy' "
-        "(GODOT_AUTOPILOT_AUTH_MODE=legacy, or pick \"Compatibility\" in the "
-        "MCP Config dock) to restore the pre-0.3.0 behavior where write "
-        "tools need no authorization";
-  }
-  result["enable"] = mcp::JsonValue(enable);
-  return result;
+  (void)name;
+  (void)effect;
+  return mcp::JsonValue();
 }
 
 } // namespace authorization

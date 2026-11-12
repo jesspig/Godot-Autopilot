@@ -173,6 +173,18 @@ describe("请求形状", () => {
     expect(requests[0].params).toEqual({ name: "call_tool", arguments: { name: "move_agent", arguments: { x: 1 } } });
   });
 
+  test("call --confirm 将 confirm 写入工具参数", async () => {
+    const { port, requests } = recordingServer(() => sseResponse(okEnvelope([textContent("{}")])));
+    const cap = captureOutput();
+    const code = await call(["delete_scene_node"], { portText: String(port), confirm: true });
+    cap.restore();
+    expect(code).toBe(ExitCode.Success);
+    expect(requests[0].params).toEqual({
+      name: "call_tool",
+      arguments: { name: "delete_scene_node", arguments: { confirm: true } },
+    });
+  });
+
   test("call 默认 args 为 {}", async () => {
     const { port, requests } = recordingServer(() => sseResponse(okEnvelope([textContent("{}")])));
     const cap = captureOutput();
