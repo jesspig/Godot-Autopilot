@@ -4,7 +4,6 @@
 #include <mcp/transport/InMemoryTransport.hpp>
 
 #include "core/command_queue.hpp"
-#include "tools/base/authorization.hpp"
 #include "tools/base/register_all.hpp"
 #include "tools/base/side_effect_policy.hpp"
 #include "tools/base/tool_base.hpp"
@@ -19,36 +18,7 @@
 namespace {
 
 using godot_autopilot::SideEffect;
-namespace authorization = godot_autopilot::authorization;
 namespace side_effect_policy = godot_autopilot::side_effect_policy;
-
-class AllowEnvScope {
-public:
-  AllowEnvScope() {
-    const char *saved = std::getenv("GODOT_AUTOPILOT_ALLOW");
-    if (saved != nullptr)
-      saved_ = saved;
-#ifdef _WIN32
-    _putenv_s("GODOT_AUTOPILOT_ALLOW", "__no_capabilities__");
-#else
-    setenv("GODOT_AUTOPILOT_ALLOW", "__no_capabilities__", 1);
-#endif
-  }
-
-  ~AllowEnvScope() {
-#ifdef _WIN32
-    _putenv_s("GODOT_AUTOPILOT_ALLOW", saved_.c_str());
-#else
-    if (saved_.empty())
-      unsetenv("GODOT_AUTOPILOT_ALLOW");
-    else
-      setenv("GODOT_AUTOPILOT_ALLOW", saved_.c_str(), 1);
-#endif
-  }
-
-private:
-  std::string saved_;
-};
 
 std::unique_ptr<mcp::McpServer> &server_handle() {
   static std::unique_ptr<mcp::McpServer> server;

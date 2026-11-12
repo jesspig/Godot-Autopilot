@@ -6,7 +6,6 @@
 #include "gda_protocol.hpp"
 #include "runtime/error_cursor.hpp"
 #include "runtime/game_node_count.hpp"
-#include "tools/base/authorization.hpp"
 #include "tools/domains/capture/capture_ops.hpp"
 #include "tools/domains/editor/editor_ui_ops.hpp"
 #include "tools/base/tool_base.hpp"
@@ -1398,9 +1397,6 @@ JV run_ui_click(const JV &click, const std::vector<UiElement> &elements,
   }
   const godot::Vector2 window_center = coords::viewport_rect_center_to_window(
       screen_transform, godot::Rect2(match->x, match->y, match->w, match->h));
-  if (!authorization::capability_enabled("game_runtime"))
-    return authorization::deny_if_unauthorized("click_game_ui_element",
-                                               SideEffect::GameRuntime);
   {
     JV motion(JV::object_tag);
     motion["type"] = JV("mouse_motion");
@@ -1730,10 +1726,7 @@ public:
       body = op_cancel(params);
     } else if (op == GDA_OP_EVAL || op == GDA_OP_INPUT ||
                op == GDA_OP_INPUT_WAIT || op == GDA_OP_INPUT_SEQUENCE) {
-      if (!authorization::capability_enabled("game_runtime")) {
-        body = authorization::deny_if_unauthorized(
-            "game_runtime", SideEffect::GameRuntime);
-      } else if (op == GDA_OP_EVAL) {
+      if (op == GDA_OP_EVAL) {
         body = op_eval(params, request_id);
       } else if (op == GDA_OP_INPUT) {
         body = op_input(params, request_id);
@@ -1749,12 +1742,7 @@ public:
     } else if (op == GDA_OP_CAPTURE) {
       body = op_capture(params, request_id);
     } else if (op == GDA_OP_EVAL_ASSERT) {
-      if (!authorization::capability_enabled("game_runtime")) {
-        body = authorization::deny_if_unauthorized("game_runtime",
-                                                   SideEffect::GameRuntime);
-      } else {
-        body = op_eval_with_assert(params, request_id);
-      }
+      body = op_eval_with_assert(params, request_id);
     } else if (op == GDA_OP_SAMPLE) {
       body = op_sample_property(params, request_id);
     } else if (op == GDA_OP_COLLECT_EVIDENCE) {
@@ -1768,12 +1756,7 @@ public:
     } else if (op == GDA_OP_GET_TREE) {
       body = op_get_tree();
     } else if (op == GDA_OP_SCENE_TREE) {
-      if (!authorization::capability_enabled("game_runtime")) {
-        body = authorization::deny_if_unauthorized("game_runtime",
-                                                   SideEffect::GameRuntime);
-      } else {
-        body = op_scene_tree(params);
-      }
+      body = op_scene_tree(params);
     } else {
       body = error_result("unknown op: " + op);
     }

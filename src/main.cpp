@@ -37,7 +37,6 @@
 #include "tools/base/autopilot_tools.hpp"
 #include "tools/domains/debugger/debugger_ops.hpp"
 #include "tools/base/runtime_ops.hpp"
-#include "ui/mcp_config_dock.hpp"
 #include "ui/mcp_log_dock.hpp"
 
 static godot_autopilot::LogSystem &get_log_system() {
@@ -151,7 +150,6 @@ class GodotAutopilotPlugin : public godot::EditorPlugin {
   GDCLASS(GodotAutopilotPlugin, godot::EditorPlugin)
 
   godot_autopilot::McpLogDock *log_dock;
-  godot_autopilot::McpConfigDock *config_dock;
   godot_autopilot::AutopilotTools *tools_singleton;
   godot::Ref<godot_autopilot::debugger_ops::OutputCaptureLogger>
       output_logger_;
@@ -165,7 +163,7 @@ protected:
 
 public:
   GodotAutopilotPlugin()
-      : log_dock(nullptr), config_dock(nullptr), tools_singleton(nullptr) {}
+      : log_dock(nullptr), tools_singleton(nullptr) {}
 
   void _enter_tree() override;
   void _exit_tree() override;
@@ -315,19 +313,6 @@ void GodotAutopilotPlugin::_enter_tree() {
     }
   }
 
-  try {
-    config_dock = memnew(godot_autopilot::McpConfigDock);
-    config_dock->set_server_context(g_server_ctx);
-    config_dock->set_log_dock(log_dock);
-    add_dock(config_dock);
-    get_log_system().log(LogLevel::Debug, LogCategory::System,
-                         "Right config dock registered");
-  } catch (const std::exception &e) {
-    log_setup_failure("config dock", e);
-  } catch (...) {
-    log_setup_failure("config dock");
-  }
-
   export_guard_.instantiate();
   add_export_plugin(export_guard_);
 
@@ -399,11 +384,6 @@ void GodotAutopilotPlugin::_exit_tree() {
       memdelete(log_dock);
       log_dock = nullptr;
     }
-    if (config_dock) {
-      remove_dock(config_dock);
-      memdelete(config_dock);
-      config_dock = nullptr;
-    }
     get_log_system().log(godot_autopilot::LogLevel::Info,
                          godot_autopilot::LogCategory::System,
                          "Editor plugin exited");
@@ -449,7 +429,6 @@ GDExtensionEntryPoint(GDExtensionInterfaceGetProcAddress p_get_proc_address,
         godot_autopilot::debugger_ops::register_classes();
 
         godot::ClassDB::register_class<godot_autopilot::McpLogDock>();
-        godot::ClassDB::register_class<godot_autopilot::McpConfigDock>();
         godot::ClassDB::register_class<godot_autopilot::AutopilotTools>();
         godot::ClassDB::register_class<godot_autopilot::ExportGuard>();
         godot::ClassDB::register_class<GodotAutopilotPlugin>();

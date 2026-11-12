@@ -4,7 +4,6 @@
 #include "core/observability/log_system.hpp"
 #include "core/resource_registry.hpp"
 #include "runtime/gda_protocol.hpp"
-#include "tools/base/authorization.hpp"
 #include "tools/base/runtime_ops.hpp"
 #include "tools/base/tool_base.hpp"
 #include "util/error_util.hpp"
@@ -742,11 +741,6 @@ mcp::JsonValue handle_csharp_get(const mcp::JsonValue &args) {
     return target.error;
   }
   if (is_game) {
-    JV denied = authorization::deny_if_unauthorized(
-        "csharp_get_property", SideEffect::GameRuntime);
-    if (!denied.IsNull()) {
-      return denied;
-    }
     JV locator_err = require_game_scene_path(target, tool);
     if (!locator_err.IsNull()) {
       return locator_err;
@@ -821,11 +815,6 @@ mcp::JsonValue handle_csharp_set(const mcp::JsonValue &args) {
     return target.error;
   }
   if (is_game) {
-    JV denied = authorization::deny_if_unauthorized(
-        "csharp_set_property", SideEffect::GameRuntime);
-    if (!denied.IsNull()) {
-      return denied;
-    }
     JV locator_err = require_game_scene_path(target, tool);
     if (!locator_err.IsNull()) {
       return locator_err;
@@ -896,11 +885,6 @@ mcp::JsonValue handle_csharp_call(const mcp::JsonValue &args) {
     return target.error;
   }
   if (is_game) {
-    JV denied = authorization::deny_if_unauthorized(
-        "csharp_call_method", SideEffect::GameRuntime);
-    if (!denied.IsNull()) {
-      return denied;
-    }
     JV locator_err = require_game_scene_path(target, tool);
     if (!locator_err.IsNull()) {
       return locator_err;
@@ -983,11 +967,6 @@ mcp::JsonValue handle_csharp_subscribe(const mcp::JsonValue &args) {
     return sink.error;
   }
   if (is_game) {
-    JV denied = authorization::deny_if_unauthorized(
-        "csharp_subscribe_event", SideEffect::GameRuntime);
-    if (!denied.IsNull()) {
-      return denied;
-    }
     JV source_err = require_game_scene_path(source, tool);
     if (!source_err.IsNull()) {
       return source_err;
@@ -1081,11 +1060,6 @@ mcp::JsonValue handle_csharp_unsubscribe(const mcp::JsonValue &args) {
         "token must be a positive integer subscription token");
   }
   if (is_game) {
-    JV denied = authorization::deny_if_unauthorized(
-        "csharp_unsubscribe_event", SideEffect::GameRuntime);
-    if (!denied.IsNull()) {
-      return denied;
-    }
     std::string source = emit_bridge_header();
     source += "return __gda_bridge.unsubscribe(" + std::to_string(token) +
               ")\n";
@@ -1167,11 +1141,6 @@ mcp::JsonValue handle_csharp_list(const mcp::JsonValue &args) {
     return target.error;
   }
   if (is_game) {
-    JV denied = authorization::deny_if_unauthorized(
-        "csharp_list_members", SideEffect::GameRuntime);
-    if (!denied.IsNull()) {
-      return denied;
-    }
     JV locator_err = require_game_scene_path(target, tool);
     if (!locator_err.IsNull()) {
       return locator_err;

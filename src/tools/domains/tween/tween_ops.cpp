@@ -1,7 +1,6 @@
 #include "tools/domains/tween/tween_ops.hpp"
 #include "core/config.hpp"
 #include "core/observability/log_system.hpp"
-#include "tools/base/authorization.hpp"
 #include "tools/base/runtime_ops.hpp"
 #include "tools/base/tool_base.hpp"
 #include "util/error_util.hpp"
@@ -155,10 +154,6 @@ bool check_tween_shape_params(const JV &args, JV &error) {
 } // namespace
 
 JV handle_create_game_tween(const JV &args) {
-  JV denied = authorization::deny_if_unauthorized(
-      "create_game_tween", SideEffect::GameRuntime);
-  if (!denied.IsNull())
-    return denied;
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "create_game_tween called");
   if (!args.IsObject())
@@ -214,10 +209,6 @@ JV handle_create_game_tween(const JV &args) {
 }
 
 JV handle_control_game_tween(const JV &args) {
-  JV denied = authorization::deny_if_unauthorized(
-      "control_game_tween", SideEffect::GameRuntime);
-  if (!denied.IsNull())
-    return denied;
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "control_game_tween called");
   if (!args.IsObject())

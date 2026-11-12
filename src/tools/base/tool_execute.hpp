@@ -20,8 +20,6 @@ using ArgumentValidatorFn =
     std::function<mcp::JsonValue(const std::string &name,
                                  const mcp::JsonValue &args)>;
 
-using AuthorizationFn = std::function<mcp::JsonValue(const std::string &name)>;
-
 using EnvelopeFn = std::function<mcp::JsonValue(const std::string &name,
                                                 const mcp::JsonValue &result)>;
 
@@ -64,23 +62,6 @@ inline mcp::JsonValue run_argument_validator(const std::string &name,
     return mcp::JsonValue();
   }
   return validator(name, args);
-}
-
-inline AuthorizationFn &authorization_policy_slot() {
-  static AuthorizationFn policy;
-  return policy;
-}
-
-inline void register_authorization_policy(AuthorizationFn fn) {
-  authorization_policy_slot() = std::move(fn);
-}
-
-inline mcp::JsonValue run_authorization_policy(const std::string &name) {
-  AuthorizationFn &policy = authorization_policy_slot();
-  if (!policy) {
-    return mcp::JsonValue();
-  }
-  return policy(name);
 }
 
 inline EnvelopeFn &envelope_builder_slot() {
