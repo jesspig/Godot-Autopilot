@@ -1,0 +1,9 @@
+build/
+ipc_spike_server
+ipc_spike_server.exe
+server-*.log
+server-*.err.log
+client-*.json
+client-*.err.log
+run-windows.log
+run-linux.log
