@@ -15,6 +15,7 @@ export interface GlobalOptions {
   sourceText?: string;
   zh?: boolean;
   check?: boolean;
+  confirm?: boolean;
   argsJson?: string;
   argsFile?: string;
   saveImages?: string;
@@ -27,12 +28,7 @@ export interface GlobalOptions {
   play?: boolean;
   noImport?: boolean;
   force?: boolean;
-  query?: string;
-  limitText?: string;
-  offsetText?: string;
   probe?: string;
-  bind?: string;
-  noAuth?: boolean;
   file?: string;
   refresh?: boolean;
   all?: boolean;
@@ -60,11 +56,7 @@ const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
   "--godot": "godot",
   "--wait": "waitText",
   "--tail": "tailText",
-  "--query": "query",
-  "--limit": "limitText",
-  "--offset": "offsetText",
   "--probe": "probe",
-  "--bind": "bind",
   "--file": "file",
   "--socket": "socketText",
   "--transport": "transportText",
@@ -79,7 +71,6 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--play": "play",
   "--no-import": "noImport",
   "--force": "force",
-  "--no-auth": "noAuth",
   "--refresh": "refresh",
   "--all": "all",
   "--projects": "projectsView",
@@ -88,6 +79,7 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--json": "json",
   "--zh": "zh",
   "--check": "check",
+  "--confirm": "confirm",
 };
 
 export function parseArgv(argv: string[]): { opts: GlobalOptions; positionals: string[] } {
@@ -176,12 +168,7 @@ Commands:
   start               Start a Godot editor
   stop                Stop a Godot editor (<id> | --id | --port | --project)
   restart             Restart a Godot editor with the same port and settings
-  serve               Run the local control-plane proxy (default 127.0.0.1:9700)
   logs                Show an instance log
-  api list            List tools through the REST endpoint
-  api describe <tool> Show one tool's schema through the REST endpoint
-  api call <tool>     Call a tool through the REST endpoint
-  endpoints           Show the discovered MCP and REST endpoints
   cache list          List cache manifests
   cache info          Show cache root, entry count, and size
   cache clear         Remove old cache entries (requires --force)
@@ -212,12 +199,9 @@ Global options:
   --wait <sec>        Readiness/stop wait in seconds, 0 = do not wait (start/stop/restart)
   --force             Force-stop the process (stop/restart)
   --tail <n>          Number of trailing log lines (logs)
-  --query <text>      Keyword filter for the api list subcommand
-  --limit <n>         Maximum tools returned by the api list subcommand (1-2000)
-  --offset <n>        Offset into the tool list for the api list subcommand
-  --probe <value>     Liveness level light/strict (api/endpoints/start); list: probed port 1-65535
+  --probe <value>     Liveness level light/strict (start); list: probed port 1-65535
   --file <rel>        Reference file to read with skills show (relative to the skill dir)
-  --refresh           Refresh the offline tool catalog from a live /api/tools call
+  --refresh           Refresh the offline tool catalog from MCP tools/list
   --all               list: include projects with no running instance
   --projects          list: aggregate entries by project instead of per instance
   --stale             list: keep only non-live entries
@@ -225,6 +209,7 @@ Global options:
   --transport <mode>  auto (default), ipc, or http
   --no-fallback       Do not fall back to HTTP when IPC fails
   --json              JSON output (default for most commands)
+  --confirm           Confirm a high-risk tool call
   --help              Show this help
   --version           Show the version
 

@@ -12,7 +12,6 @@
 
 #include <tools/base/schema_builder.hpp>
 #include <util/error_util.hpp>
-#include "tools/base/authorization.hpp"
 
 namespace godot_autopilot {
 
@@ -61,51 +60,6 @@ inline SideEffect side_effect_of(const ToolBase &t) {
   const auto *side = dynamic_cast<const ISideEffect *>(&t);
   return side ? side->side_effects() : SideEffect::None;
 }
-
-namespace authorization {
-inline CapabilityTier tier_for_side_effect(SideEffect effect) {
-  switch (effect) {
-    case SideEffect::Process:
-    case SideEffect::CodeExecute:
-    case SideEffect::GameRuntime:
-    case SideEffect::Destructive:
-      return CapabilityTier::Danger;
-    case SideEffect::WritesFile:
-    case SideEffect::WritesConfig:
-    case SideEffect::ShowsAlert:
-    case SideEffect::ModifiesWindow:
-    case SideEffect::WritesScene:
-      return CapabilityTier::Write;
-    case SideEffect::None:
-      break;
-  }
-  return CapabilityTier::Read;
-}
-
-inline const char *capability_for_tool(std::string_view name,
-                                       SideEffect effect) {
-  (void)name;
-  switch (effect) {
-    case SideEffect::Process:
-      return kCapabilityProcess;
-    case SideEffect::CodeExecute:
-      return kCapabilityCodeExecute;
-    case SideEffect::GameRuntime:
-      return kCapabilityGameRuntime;
-    case SideEffect::Destructive:
-      return kCapabilityDestructive;
-    case SideEffect::WritesFile:
-    case SideEffect::WritesConfig:
-    case SideEffect::ShowsAlert:
-    case SideEffect::ModifiesWindow:
-    case SideEffect::WritesScene:
-      return kCapabilityWrite;
-    case SideEffect::None:
-      break;
-  }
-  return kCapabilityRead;
-}
-} // namespace authorization
 
 } // namespace godot_autopilot
 

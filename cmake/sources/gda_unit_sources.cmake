@@ -23,7 +23,6 @@ set(GDA_UNIT_BUSINESS_SOURCES
     ${CMAKE_SOURCE_DIR}/src/util/readback_util.cpp
     ${CMAKE_SOURCE_DIR}/src/util/scene_verify.cpp
     ${CMAKE_SOURCE_DIR}/src/util/variant_json.cpp
-    ${CMAKE_SOURCE_DIR}/src/util/client_config_gen.cpp
     ${CMAKE_SOURCE_DIR}/src/util/skill_gen.cpp
     ${CMAKE_SOURCE_DIR}/src/util/skill_content_generated.cpp
     ${CMAKE_SOURCE_DIR}/src/tools/base/tool_catalog.cpp

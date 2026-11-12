@@ -62,7 +62,6 @@ private:
   bool bind_transport();
   void write_instance_record();
   void remove_instance_record();
-  void register_endpoint_info_provider();
   static int resolve_explicit_port();
   static int resolve_preferred_port();
   static std::string resolve_host();

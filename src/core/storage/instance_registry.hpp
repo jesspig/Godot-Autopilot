@@ -16,7 +16,6 @@ struct InstanceRecord {
   int port{0};
   int pid{0};
   std::string project_path;
-  std::string api_token;
   EndpointTable endpoints;
   std::string gda_home;
   int64_t started_at{0};

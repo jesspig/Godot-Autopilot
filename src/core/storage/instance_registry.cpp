@@ -210,7 +210,9 @@ std::vector<std::string> registry_instance_file_paths(const std::string &root) {
 mcp::JsonValue record_to_json(const InstanceRecord &record) {
   mcp::JsonValue::Object endpoints;
   endpoints["mcp"] = registry_endpoint_to_json(record.endpoints.mcp);
-  endpoints["api"] = registry_endpoint_to_json(record.endpoints.api);
+  if (!record.endpoints.api.path.empty()) {
+    endpoints["api"] = registry_endpoint_to_json(record.endpoints.api);
+  }
   if (record.endpoints.ipc.present) {
     endpoints["ipc"] = registry_ipc_endpoint_to_json(record.endpoints.ipc);
   }
@@ -220,7 +222,6 @@ mcp::JsonValue record_to_json(const InstanceRecord &record) {
   doc["port"] = static_cast<int64_t>(record.port);
   doc["pid"] = static_cast<int64_t>(record.pid);
   doc["project_path"] = record.project_path;
-  doc["api_token"] = record.api_token;
   doc["endpoints"] = mcp::JsonValue(std::move(endpoints));
   doc["gda_home"] = record.gda_home;
   doc["started_at"] = static_cast<int64_t>(record.started_at);
@@ -237,7 +238,6 @@ bool record_from_json(const mcp::JsonValue &doc, InstanceRecord &out) {
   const mcp::JsonValue *port = doc.Find("port");
   const mcp::JsonValue *pid = doc.Find("pid");
   const mcp::JsonValue *project_path = doc.Find("project_path");
-  const mcp::JsonValue *api_token = doc.Find("api_token");
   const mcp::JsonValue *endpoints = doc.Find("endpoints");
   const mcp::JsonValue *gda_home = doc.Find("gda_home");
   const mcp::JsonValue *started_at = doc.Find("started_at");
@@ -253,9 +253,6 @@ bool record_from_json(const mcp::JsonValue &doc, InstanceRecord &out) {
     return false;
   }
   if (project_path == nullptr || !project_path->IsString()) {
-    return false;
-  }
-  if (api_token == nullptr || !api_token->IsString()) {
     return false;
   }
   if (endpoints == nullptr || !endpoints->IsObject()) {
@@ -275,7 +272,7 @@ bool record_from_json(const mcp::JsonValue &doc, InstanceRecord &out) {
   if (mcp_endpoint == nullptr || !mcp_endpoint->IsObject()) {
     return false;
   }
-  if (api_endpoint == nullptr || !api_endpoint->IsObject()) {
+  if (api_endpoint != nullptr && !api_endpoint->IsObject()) {
     return false;
   }
 
@@ -284,7 +281,6 @@ bool record_from_json(const mcp::JsonValue &doc, InstanceRecord &out) {
   parsed.port = static_cast<int>(port->GetInt());
   parsed.pid = static_cast<int>(pid->GetInt());
   parsed.project_path = project_path->GetString();
-  parsed.api_token = api_token->GetString();
   parsed.gda_home = gda_home->GetString();
   parsed.started_at = started_at->GetInt();
   parsed.version = version->GetString();
@@ -294,7 +290,7 @@ bool record_from_json(const mcp::JsonValue &doc, InstanceRecord &out) {
   if (!read_registry_endpoint(*mcp_endpoint, parsed.endpoints.mcp)) {
     return false;
   }
-  if (!read_registry_endpoint(*api_endpoint, parsed.endpoints.api)) {
+  if (api_endpoint != nullptr && !read_registry_endpoint(*api_endpoint, parsed.endpoints.api)) {
     return false;
   }
   if (const mcp::JsonValue *ipc_endpoint = endpoints->Find("ipc");

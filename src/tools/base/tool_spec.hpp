@@ -20,6 +20,7 @@
 #include "core/observability/sanitize_policy.hpp"
 #include <tools/base/runtime_ops.hpp>
 #include <tools/base/schema_builder.hpp>
+#include <tools/base/confirmation.hpp>
 #include <tools/base/tool_base.hpp>
 #include <tools/base/tool_invoke.hpp>
 
@@ -339,53 +340,22 @@ inline mcp::JsonValue SpecTool::execute(const mcp::JsonValue &args) {
   const int depth = tools::invoke_depth();
   const SanitizeResult sanitized =
       TraceRecorder::sanitize_args(args.Dump(), sanitize_policy::enabled());
-  mcp::JsonValue denied =
-      authorization::deny_if_unauthorized(spec_.name, spec_.side_effect);
-  if (!denied.IsNull()) {
-    const char *capability =
-        authorization::capability_for_tool(spec_.name, spec_.side_effect);
-    const std::string denied_error =
-        std::string("denied:") + (capability ? capability : "unknown");
-    TraceEvent denied_event;
-    denied_event.trace_id = trace_id;
-    denied_event.span_id = span_id;
-    denied_event.parent_span = parent_span;
-    denied_event.session_id = LogPersist::instance().session_id();
-    denied_event.tool = spec_.name;
-    denied_event.category = spec_.category;
-    denied_event.flags = spec_.flags;
-    denied_event.side_effect = static_cast<int>(spec_.side_effect);
-    denied_event.depth = depth;
-    denied_event.thread = thread;
-    denied_event.queue_wait_ms = queue_wait;
-    denied_event.duration_ms = 0;
-    denied_event.wall_start_ms = wall_start;
-    denied_event.wall_end_ms = TraceRecorder::wall_now_ms();
-    denied_event.auth = "denied";
-    denied_event.ok = false;
-    denied_event.error_code = "denied";
-    denied_event.args_digest = sanitized.text;
-    denied_event.args_truncated = sanitized.truncated;
-    denied_event.result_size = static_cast<int64_t>(denied.Dump().size());
-    denied_event.name = spec_.name;
-    denied_event.request_id = monitor::current_request_id();
-    denied_event.thread_id = TraceRecorder::current_thread_id();
-    denied_event.monotonic_ns = TraceRecorder::monotonic_now_ns();
-    const std::string denied_summary =
-        "call_tool " + spec_.name + " -> error 0ms";
-    const std::string denied_detail =
-        "trace=" + trace_id + " span=" + span_id + " parent=" + parent_span +
-        " depth=" + std::to_string(depth) + " queue=" +
-        std::to_string(queue_wait) + "ms dur=0ms auth=denied err=" +
-        denied_error + " args=" +
-        spec_detail::truncated_text(sanitized.text,
-                                    spec_detail::kArgsDetailMax);
-    monitor::tool_call(std::move(denied_event), LogLevel::Warning,
-                       denied_summary, denied_detail);
-    return denied;
+  if (confirmation::required_for(spec_.side_effect) &&
+      !confirmation::provided(args)) {
+    return confirmation::error(spec_.name, spec_.side_effect);
   }
-  mcp::JsonValue result = spec_.handler(args);
-  result = pipeline::run_post(spec_, args, std::move(result));
+  mcp::JsonValue call_args = args;
+  if (confirmation::required_for(spec_.side_effect) && args.IsObject()) {
+    mcp::JsonValue clean(mcp::JsonValue::object_tag);
+    for (const auto &entry : args.GetObject()) {
+      if (entry.first != "confirm") {
+        clean[entry.first] = entry.second;
+      }
+    }
+    call_args = std::move(clean);
+  }
+  mcp::JsonValue result = spec_.handler(call_args);
+  result = pipeline::run_post(spec_, call_args, std::move(result));
   const int64_t duration_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(
           std::chrono::steady_clock::now() - steady_start)

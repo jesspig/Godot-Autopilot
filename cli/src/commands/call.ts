@@ -16,6 +16,9 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
   }
   const tool = positional[0];
   const args = loadToolArguments(opts);
+  if (opts.confirm === true) {
+    args.confirm = true;
+  }
   const timeoutSec = callTimeoutSec(opts);
   const transport = parseTransport(opts.transportText);
   if (opts.socketText !== undefined) {

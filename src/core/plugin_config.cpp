@@ -20,8 +20,6 @@
 #include "core/path_util.hpp"
 #include "core/storage/storage_paths.hpp"
 #include "core/observability/log_system.hpp"
-#include "tools/base/authorization.hpp"
-#include "tools/base/runtime_ops.hpp"
 #include "util/project_path.hpp"
 
 namespace godot_autopilot {
@@ -30,8 +28,6 @@ namespace {
 constexpr const char *kPortKey = "port";
 constexpr const char *kShowTimeKey = "show_time";
 constexpr const char *kDesensitizeKey = "desensitize";
-constexpr const char *kAllowKey = "allow";
-constexpr const char *kAuthModeKey = authorization::kConfigAuthModeKey;
 } // namespace
 
 namespace {
@@ -173,65 +169,6 @@ bool write_config_value(const std::string &path, const char *key,
   return true;
 }
 
-std::string read_config_text_standalone(const std::string &path) {
-  if (path.empty()) {
-    return std::string();
-  }
-  const std::filesystem::path file_path = to_fs_path(path);
-  std::error_code error;
-  if (!std::filesystem::is_regular_file(file_path, error) || error) {
-    return std::string();
-  }
-  std::ifstream file(file_path, std::ios::binary);
-  if (!file) {
-    return std::string();
-  }
-  std::ostringstream buffer;
-  buffer << file.rdbuf();
-  return buffer.str();
-}
-
-bool read_startup_config_value(const char *key, std::string &out) {
-  const std::string primary_text =
-      read_config_text_standalone(global_config_file_path());
-  if (primary_text.empty()) {
-    return false;
-  }
-  mcp::JsonValue value;
-  bool from_legacy = false;
-  std::string error;
-  if (!LegacyStore::select_config_value(primary_text, std::string(), key, value,
-                                        from_legacy, error)) {
-    return false;
-  }
-  if (!value.IsString()) {
-    return false;
-  }
-  out = value.GetString();
-  return true;
-}
-
-void publish_startup_config_snapshot() {
-  std::string allow;
-  if (read_startup_config_value(kAllowKey, allow)) {
-    authorization::publish_allow_snapshot(allow);
-  }
-  std::string mode;
-  if (read_startup_config_value(kAuthModeKey, mode)) {
-    authorization::publish_auth_mode_snapshot(mode);
-  }
-}
-
-} // namespace
-
-namespace {
-struct AllowProviderRegistration {
-  AllowProviderRegistration() {
-    authorization::set_allow_provider(&PluginConfig::load_allow);
-    authorization::set_auth_mode_provider(&PluginConfig::load_auth_mode);
-    publish_startup_config_snapshot();
-  }
-} g_allow_provider_registration;
 } // namespace
 
 int PluginConfig::load_port() {
@@ -297,65 +234,8 @@ bool PluginConfig::load_desensitize() {
 }
 
 bool PluginConfig::save_desensitize(bool value) {
-  if (!write_config_value(global_config_file_path(), kDesensitizeKey,
-                          mcp::JsonValue(value))) {
-    return false;
-  }
-  authorization::refresh_config_snapshot();
-  return true;
-}
-
-std::string PluginConfig::load_allow() {
-  const std::string path = global_config_file_path();
-  if (path.empty()) {
-    LogSystem::instance().log(
-        LogLevel::Error, LogCategory::System,
-        "Plugin config path unavailable for allow lookup");
-    return std::string();
-  }
-  mcp::JsonValue value;
-  bool from_legacy = false;
-  if (!find_config_value_with_legacy(path, kAllowKey, value, from_legacy) ||
-      !value.IsString()) {
-    return std::string();
-  }
-  return value.GetString();
-}
-
-bool PluginConfig::save_allow(const std::string &allow) {
-  if (!write_config_value(global_config_file_path(), kAllowKey,
-                          mcp::JsonValue(allow))) {
-    return false;
-  }
-  authorization::refresh_config_snapshot();
-  return true;
-}
-
-std::string PluginConfig::load_auth_mode() {
-  const std::string path = global_config_file_path();
-  if (path.empty()) {
-    LogSystem::instance().log(
-        LogLevel::Error, LogCategory::System,
-        "Plugin config path unavailable for auth_mode lookup");
-    return std::string();
-  }
-  mcp::JsonValue value;
-  bool from_legacy = false;
-  if (!find_config_value_with_legacy(path, kAuthModeKey, value,
-                                      from_legacy) ||
-      !value.IsString()) {
-    return std::string();
-  }
-  return value.GetString();
-}
-
-bool PluginConfig::save_auth_mode(const std::string &mode) {
-  if (!write_config_value(global_config_file_path(), kAuthModeKey,
-                          mcp::JsonValue(mode))) {
-    return false;
-  }
-  authorization::refresh_config_snapshot();
-  return true;
+  return write_config_value(global_config_file_path(), kDesensitizeKey,
+                            mcp::JsonValue(value));
 }
 
 } // namespace godot_autopilot

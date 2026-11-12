@@ -85,7 +85,6 @@ void environment_snapshot() {
       {"port", std::to_string(PluginConfig::load_port())},
       {"desensitize", sanitize_policy::enabled() ? "true" : "false"},
       {"show_time", PluginConfig::load_show_time() ? "true" : "false"},
-      {"allow", PluginConfig::load_allow()},
       {"session_nonce", LogPersist::instance().session_id()},
   }));
   emit(std::move(event));

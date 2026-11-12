@@ -59,7 +59,6 @@ protected:
   void SetUp() override {
     previous_executor_ = tools::tool_executor_slot();
     previous_validator_ = tools::argument_validator_slot();
-    previous_authorization_ = tools::authorization_policy_slot();
     previous_envelope_ = tools::envelope_builder_slot();
     previous_export_guard_ = tools::export_guard_slot();
     tools::register_export_guard([]() { return false; });
@@ -67,8 +66,6 @@ protected:
         [](const std::string &, const mcp::JsonValue &) {
           return empty_result();
         });
-    tools::register_authorization_policy(
-        [](const std::string &) { return empty_result(); });
     tools::register_envelope_builder(
         [](const std::string &, const mcp::JsonValue &result) { return result; });
   }
@@ -76,7 +73,6 @@ protected:
   void TearDown() override {
     tools::register_tool_executor(previous_executor_);
     tools::register_argument_validator(previous_validator_);
-    tools::register_authorization_policy(previous_authorization_);
     tools::register_envelope_builder(previous_envelope_);
     tools::register_export_guard(previous_export_guard_);
     godot_autopilot::clear_active_registry();
@@ -91,7 +87,6 @@ protected:
 
   tools::ToolExecutorFn previous_executor_;
   tools::ArgumentValidatorFn previous_validator_;
-  tools::AuthorizationFn previous_authorization_;
   tools::EnvelopeFn previous_envelope_;
   tools::ExportGuardFn previous_export_guard_;
 };
@@ -152,29 +147,6 @@ TEST_F(ToolExecuteTest, ValidationFailureShortCircuitsBeforeDispatch) {
   ASSERT_NE(code, nullptr);
   ASSERT_TRUE(code->IsString());
   EXPECT_EQ(code->GetString(), "invalid_argument");
-  EXPECT_FALSE(tool->executed);
-}
-
-TEST_F(ToolExecuteTest, AuthorizationDenialShortCircuitsBeforeDispatch) {
-  RecordingTool *tool = register_recording_tool("gda_authorization_probe_tool");
-  const mcp::JsonValue injected =
-      make_error_object("authorization required for 'gda_authorization_probe_tool'",
-                         "authorization_denied");
-  tools::register_authorization_policy(
-      [injected](const std::string &) { return injected; });
-
-  const mcp::JsonValue result = tools::execute_tool(
-      "gda_authorization_probe_tool", mcp::JsonValue::Parse("{}"));
-
-  const mcp::JsonValue *error = result.Find("error");
-  ASSERT_NE(error, nullptr);
-  ASSERT_TRUE(error->IsString());
-  EXPECT_EQ(error->GetString(),
-            "authorization required for 'gda_authorization_probe_tool'");
-  const mcp::JsonValue *code = result.Find("code");
-  ASSERT_NE(code, nullptr);
-  ASSERT_TRUE(code->IsString());
-  EXPECT_EQ(code->GetString(), "authorization_denied");
   EXPECT_FALSE(tool->executed);
 }
 

@@ -28,8 +28,6 @@
 #include "core/config.hpp"
 #include "core/observability/log_system.hpp"
 #include "core/observability/monitor.hpp"
-#include "core/plugin_config.hpp"
-#include "tools/base/authorization.hpp"
 #include "tools/base/dispatch.hpp"
 #include "tools/base/dynamic_spec_store.hpp"
 #include "tools/base/register_all.hpp"
@@ -44,18 +42,6 @@
 namespace godot_autopilot {
 
 namespace {
-
-constexpr const char *kUserToolsCapability = "user_tools";
-constexpr const char *kUserToolsDisabledMessage =
-    "user tools disabled; enable 'user_tools' via GODOT_AUTOPILOT_ALLOW (or "
-    "'all'), the MCP Config dock toggle, or AutopilotTools.set_enabled(true)";
-
-mcp::JsonValue user_tools_disabled_error() {
-  mcp::JsonValue e(mcp::JsonValue::object_tag);
-  e["error"] = mcp::JsonValue(kUserToolsDisabledMessage);
-  e["authorization_required"] = mcp::JsonValue(kUserToolsCapability);
-  return e;
-}
 
 std::vector<int64_t> &handle_store() {
   static std::vector<int64_t> handles;
@@ -119,9 +105,6 @@ int64_t reject_registration(const std::string &message) {
 
 mcp::JsonValue invoke_dynamic_target(
     const std::shared_ptr<DynamicTarget> &target, const mcp::JsonValue &args) {
-  if (!authorization::capability_enabled(kUserToolsCapability)) {
-    return user_tools_disabled_error();
-  }
   if (!target->callable.is_valid() || target->callable.get_object() == nullptr) {
     return util::error_json("user tool '" + target->name +
                             "' is no longer valid: its target object was "
@@ -339,10 +322,6 @@ AutopilotTools::~AutopilotTools() {
 
 int64_t AutopilotTools::register_tool(const godot::Dictionary &definition,
                                       const godot::Callable &callable) {
-  if (!authorization::capability_enabled(kUserToolsCapability)) {
-    return reject_registration(kUserToolsDisabledMessage);
-  }
-
   const std::string name = string_field(definition, "name", "");
   if (name.empty()) {
     return reject_registration(
@@ -456,15 +435,6 @@ int64_t AutopilotTools::register_tool(const godot::Dictionary &definition,
 godot::Dictionary AutopilotTools::register_csharp_tool(
     const godot::Dictionary &definition, const godot::Callable &callable) {
   const std::string name = string_field(definition, "name", "");
-  if (!authorization::capability_enabled(kUserToolsCapability)) {
-    godot::Dictionary denied;
-    denied["error"] = godot::String::utf8(kUserToolsDisabledMessage);
-    denied["authorization_required"] =
-        godot::String::utf8(kUserToolsCapability);
-    denied["tool_name"] = godot::String::utf8(name.c_str());
-    denied["handle"] = static_cast<int64_t>(-1);
-    return denied;
-  }
   if (name.empty()) {
     godot::Dictionary out = rescan_error(
         "register_csharp_tool: definition.name must be a non-empty string");
@@ -671,35 +641,17 @@ godot::Dictionary AutopilotTools::call_tool(const godot::String &name,
 }
 
 bool AutopilotTools::is_enabled() const {
-  return authorization::capability_enabled(kUserToolsCapability);
+  return true;
 }
 
 void AutopilotTools::set_enabled(bool enabled) {
-  const std::string allow = PluginConfig::load_allow();
-  const std::string updated =
-      enabled ? authorization::allow_list_add(allow, kUserToolsCapability)
-              : authorization::allow_list_remove(allow, kUserToolsCapability);
-  PluginConfig::save_allow(updated);
   LogSystem::instance().log_detailed(
       LogLevel::Info, LogCategory::Tools,
       enabled ? "user tools enabled" : "user tools disabled",
-      "enabled=" + std::string(enabled ? "true" : "false") +
-          " allow=" + (updated.empty() ? "(none)" : updated));
-  monitor::lifecycle(
-      "user_tool_set_enabled",
-      monitor::build_attrs(
-          {{"tool", std::string(kUserToolsCapability)},
-           {"enabled", std::string(enabled ? "true" : "false")}}));
+      "enabled=" + std::string(enabled ? "true" : "false"));
 }
 
 godot::Dictionary AutopilotTools::rescan(const godot::String &directory) {
-  if (!authorization::capability_enabled(kUserToolsCapability)) {
-    godot::Dictionary denied;
-    denied["error"] = godot::String::utf8(kUserToolsDisabledMessage);
-    denied["authorization_required"] =
-        godot::String::utf8(kUserToolsCapability);
-    return denied;
-  }
   if (runtime_ops::has_editor_queue() &&
       !get_editor_queue().is_main_thread()) {
     const tools::TraceContext ctx = tools::capture_trace_context();

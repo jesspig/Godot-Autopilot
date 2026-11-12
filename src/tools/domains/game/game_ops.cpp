@@ -3,7 +3,6 @@
 #include "core/config.hpp"
 #include "core/observability/log_system.hpp"
 #include "runtime/gda_protocol.hpp"
-#include "tools/base/authorization.hpp"
 #include "tools/domains/capture/capture_ops.hpp"
 #include "tools/base/debugger_access.hpp"
 #include "tools/base/tool_base.hpp"
@@ -220,10 +219,6 @@ mcp::JsonValue handle_game_status(const mcp::JsonValue &args) {
 }
 
 mcp::JsonValue handle_game_eval(const mcp::JsonValue &args) {
-  JV denied = authorization::deny_if_unauthorized(
-      "execute_game_script", SideEffect::GameRuntime);
-  if (!denied.IsNull())
-    return denied;
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "execute_game_script called");
   if (!args.IsObject())
@@ -301,10 +296,6 @@ mcp::JsonValue handle_game_eval(const mcp::JsonValue &args) {
 }
 
 mcp::JsonValue handle_game_input(const mcp::JsonValue &args) {
-  JV denied = authorization::deny_if_unauthorized(
-      "queue_game_input", SideEffect::GameRuntime);
-  if (!denied.IsNull())
-    return denied;
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "queue_game_input called");
   if (!args.IsObject())
@@ -380,10 +371,6 @@ mcp::JsonValue handle_game_input(const mcp::JsonValue &args) {
 }
 
 mcp::JsonValue handle_game_input_wait(const mcp::JsonValue &args) {
-  JV denied = authorization::deny_if_unauthorized(
-      "wait_game_input", SideEffect::GameRuntime);
-  if (!denied.IsNull())
-    return denied;
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "wait_game_input called");
   static constexpr const char *allowed[] = {"action", "state", "inject",
@@ -450,10 +437,6 @@ mcp::JsonValue handle_game_input_status(const mcp::JsonValue &args) {
 }
 
 mcp::JsonValue handle_sequence_game_inputs(const mcp::JsonValue &args) {
-  JV denied = authorization::deny_if_unauthorized(
-      "sequence_game_inputs", SideEffect::GameRuntime);
-  if (!denied.IsNull())
-    return denied;
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "sequence_game_inputs called");
   static constexpr const char *allowed[] = {"inputs", "timeout_ms",
@@ -572,10 +555,6 @@ mcp::JsonValue handle_game_ui_elements(const mcp::JsonValue &args) {
 }
 
 mcp::JsonValue handle_click_game_ui_element(const mcp::JsonValue &args) {
-  JV denied = authorization::deny_if_unauthorized(
-      "click_game_ui_element", SideEffect::GameRuntime);
-  if (!denied.IsNull())
-    return denied;
   if (!args.IsObject())
     return error_json("click_game_ui_element parameters must be an object");
   static constexpr const char *allowed[] = {"path", "text", "text_index", "button_index",
@@ -738,12 +717,6 @@ mcp::JsonValue handle_game_capture(const mcp::JsonValue &args) {
   if (!capture_ops::read_capture_save_options(args, &save_options,
                                               &save_error))
     return save_error;
-  if (save_options.save) {
-    mcp::JsonValue denied = authorization::deny_if_unauthorized(
-        "capture_game_viewport", SideEffect::WritesFile);
-    if (!denied.IsNull())
-      return denied;
-  }
   bool wait_ready = true;
   if (!extract_wait_ready(args, &wait_ready))
     return error_json("wait_ready must be a boolean");
@@ -766,10 +739,6 @@ mcp::JsonValue handle_game_capture(const mcp::JsonValue &args) {
 }
 
 mcp::JsonValue handle_game_reload_scripts(const mcp::JsonValue &args) {
-  JV denied = authorization::deny_if_unauthorized(
-      "reload_game_scripts", SideEffect::GameRuntime);
-  if (!denied.IsNull())
-    return denied;
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "reload_game_scripts called");
   static constexpr const char *allowed[] = {"paths"};
@@ -808,10 +777,6 @@ mcp::JsonValue handle_game_reload_scripts(const mcp::JsonValue &args) {
 }
 
 mcp::JsonValue handle_game_job_start(const mcp::JsonValue &args) {
-  JV denied = authorization::deny_if_unauthorized(
-      "start_game_job", SideEffect::GameRuntime);
-  if (!denied.IsNull())
-    return denied;
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "start_game_job called");
   if (!args.IsObject())
@@ -1285,10 +1250,6 @@ mcp::JsonValue handle_get_game_locale(const mcp::JsonValue &args) {
 }
 
 mcp::JsonValue handle_set_game_locale(const mcp::JsonValue &args) {
-  JV denied = authorization::deny_if_unauthorized(
-      "set_game_locale", SideEffect::GameRuntime);
-  if (!denied.IsNull())
-    return denied;
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_game_locale called");
   if (!args.IsObject())

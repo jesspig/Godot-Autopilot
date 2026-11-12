@@ -105,11 +105,9 @@ set(GDA_CORE_SOURCES
     src/tools/base/tool_invoke.cpp
     src/util/bm25_index.cpp
     src/util/variant_json.cpp
-    src/util/client_config_gen.cpp
     src/util/skill_gen.cpp
     src/util/skill_content_generated.cpp
     src/util/error_util.cpp
     src/util/readback_util.cpp
     src/util/scene_verify.cpp
-    src/ui/mcp_log_dock.cpp
-    src/ui/mcp_config_dock.cpp)
+    src/ui/mcp_log_dock.cpp)
