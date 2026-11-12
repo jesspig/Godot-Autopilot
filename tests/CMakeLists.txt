@@ -164,8 +164,12 @@ add_test(NAME migration_guard
             -P ${CMAKE_CURRENT_SOURCE_DIR}/guard/migration_guard.cmake)
 
 # ── ctest 注册: 注释守卫（零依赖，读源码断言，无需构建产物） ──
-# Python 解释器复用根 cmake/skill_gen.cmake 的 GDA_PYTHON_EXECUTABLE
-#（find_program NAMES py python python3，py 优先；WindowsApps 存根下裸 python3 不可用）
+if(NOT GDA_PYTHON_EXECUTABLE)
+    find_program(GDA_PYTHON_EXECUTABLE NAMES python python3 py)
+endif()
+if(NOT GDA_PYTHON_EXECUTABLE AND EXISTS "${CMAKE_SOURCE_DIR}/.venv/Scripts/python.exe")
+    set(GDA_PYTHON_EXECUTABLE "${CMAKE_SOURCE_DIR}/.venv/Scripts/python.exe")
+endif()
 add_test(NAME comment_guard
     COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/comment_guard.py")
 
