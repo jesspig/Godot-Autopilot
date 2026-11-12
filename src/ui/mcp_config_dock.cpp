@@ -77,8 +77,10 @@ std::string port_source_label(PortSource source) {
       return "config preference";
     case PortSource::kUserApplied:
       return "applied from the panel";
-    case PortSource::kAutoAssigned:
-      return "auto-assigned";
+    case PortSource::kFirstRandom:
+      return "first random";
+    case PortSource::kAutoReassigned:
+      return "auto-reassigned";
   }
   return "unknown";
 }
