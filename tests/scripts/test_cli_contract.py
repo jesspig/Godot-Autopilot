@@ -143,7 +143,9 @@ class MockHandler(http.server.BaseHTTPRequestHandler):
         arguments = params.get("arguments", {}) if isinstance(params.get("arguments"), dict) else {}
         req_id = body.get("id")
         if name == "call_tool" and isinstance(arguments, dict):
-            type(self).last_wrapped_params = params
+            type(self).last_wrapped_params = {
+                key: value for key, value in params.items() if key != "_meta"
+            }
             self._route_wrapped(req_id, arguments.get("name"), arguments.get("arguments", {}))
         else:
             type(self).last_direct_name = name
@@ -265,10 +267,17 @@ def run_cli_cases(bctx, port):
 
     r = cli_run("status")
     check("cli-status/exit", r.returncode == 0, f"exit={r.returncode} stderr={r.stderr[-500:]}")
+    status_body = json.loads(r.stdout)
     check(
         "cli-status/body",
-        json.loads(r.stdout) == {"ok": True, "engine": "mock", "status": "ready"},
+        status_body.get("ok") is True
+        and status_body.get("server") == {"ok": True, "engine": "mock", "status": "ready"},
         r.stdout[-500:],
+    )
+    check(
+        "cli-status/mcp-url",
+        status_body.get("mcp_url") == f"http://127.0.0.1:{port}/mcp",
+        repr(status_body.get("mcp_url")),
     )
     check(
         "cli-status/wrapped",
