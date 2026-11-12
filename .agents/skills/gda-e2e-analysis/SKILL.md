@@ -146,7 +146,7 @@ description: "读取 report/ 最新一轮端到端测试报告，对失败项做
    - 不破坏现有 API、测试与用户可见行为。
 6. 候选实施后，在同一条件下 probe；只在目标失败被修复且未引入回归时采纳，否则回退基线。把当前实现始终留在候选集中。
 7. 按最小验证集测试，完成后统一全面验收：
-   - `uv run main.py build`
+   - `bun run gda-dev-tools build`
    - `ctest --preset debug -L "guard|unit|boundary"`（守卫 + 单元 + 边界，秒级）
    - 涉及 CLI 时 `bun test cli/tests`
    - 涉及引擎内行为时 `ctest --preset debug -R "^gda_runner_"`（需要 `GODOT_PATH`）

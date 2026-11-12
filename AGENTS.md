@@ -6,8 +6,8 @@ Godot Autopilot（GDA）：进程内 GDExtension，把 Godot 编辑器经 MCP（
 
 ## 命令
 
-- 构建部署：`uv run main.py build` + `uv run main.py deploy`（子命令：`build` / `deploy` / `package` / `clean` / `test` / `tui`；`deploy` 下 `--release` / `--demos <名称...>`，`package` 下 `--libs-dir <dir>`）
-- Devtools（Bun/TS）：`bun run gda-dev-tools <build|deploy|clean|package|package-check|test>`；`uv run main.py build` 已转发到该入口，其余子命令在迁移收口前仍走 Python
+- 构建部署：`bun run gda-dev-tools build` + `bun run gda-dev-tools deploy`（子命令：`build` / `deploy` / `package` / `package-check` / `clean` / `test` / `tui`；`deploy` 下 `--release` / `--demos <名称...>`，`package` 下 `--libs-dir <dir>`；`tui` 需交互式终端，非 TTY 退出 2）
+- Devtools（Bun/TS）：全部开发命令统一走 `bun run gda-dev-tools <子命令>`；Python 入口已删除，`no_python_guard` 守卫拦截 `*.py` / `uv run` / `python main.py` / CMake Python 查找回退
 - 手动构建：`cmake --preset debug && cmake --build --preset debug`
 - 快速验证：`ctest --preset debug`（全量默认门：单元 + 边界 + 集成 + 守卫 + CLI，零引擎依赖；`--single <用例名>` 单跑）
 - CLI 单测：`bun test cli/tests`（Bun + TS，秒级）
@@ -18,7 +18,7 @@ Godot Autopilot（GDA）：进程内 GDExtension，把 Godot 编辑器经 MCP（
 - **所有 Godot API 必须经 `CommandQueue` 在主线程执行**（`submit()` / 带预算的等待入口）；直接调用必崩，`main_thread_guard` 在 ctest 阶段静态拦截，编译通过不算过。`execute_sync()` 已无调用点且是无界等待，不得新增调用。
 - **新增 `.cpp` 要在两处登记**：根 `CMakeLists.txt` 的 `add_library()` 与 `tests/CMakeLists.txt` 的 `GDA_UNIT_BUSINESS_SOURCES`（`src/tools/domains/*/*_ops.cpp` 由 glob 自动纳入，只需登记非 `*_ops.cpp` 的源文件）。**漏登根 `CMakeLists.txt` 后果最重**：该编译单元不进插件产物，问题只在运行时暴露（插件加载后工具异常，定位困难）；**漏登 `GDA_UNIT_BUSINESS_SOURCES` 仅在有 L1/集成用例引用其符号时才在链接期报错**，无引用时完全静默（等于没有覆盖）。详见 [.agents/skills/cpp-registration/SKILL.md](.agents/skills/cpp-registration/SKILL.md)。
 - **依赖是 `third_party/` 下的 git submodule**：构建前必须已检出（`git clone --recurse-submodules`，或 `git submodule update --init --recursive`），缺失则 configure 直接报错，不做网络回退。
-- **构建生成器双路径**：CMake 预设按 ninja 可用性自适应——有 ninja 用 `debug`/`release`，无则用 `debug-portable`/`release-portable`（共用 `build/{debug,release}`）；`main.py` 各子命令自动选路，手动 `cmake --preset` / `ctest --preset` 须自己补 `-portable` 后缀。见 [build.md](docs/wiki/build.md)「预设」。
+- **构建生成器双路径**：CMake 预设按 ninja 可用性自适应——有 ninja 用 `debug`/`release`，无则用 `debug-portable`/`release-portable`（共用 `build/{debug,release}`）；`bun run gda-dev-tools` 各子命令自动选路，手动 `cmake --preset` / `ctest --preset` 须自己补 `-portable` 后缀。见 [build.md](docs/wiki/build.md)「预设」。
 - **源码禁止注释**：除 `// namespace` 结尾标记外不得有 `//` 或 `/*…*/`，解释写进 wiki；`comment_guard` 在 ctest 阶段拦，编译通过不算过。
 - **默认安全姿态不可静默放宽**：仅绑环回、脱敏默认开、高风险工具需 `confirm`、导出期拒绝工具调用 / MCP 资源 / MCP 提示词三类入口。
 - **数值一律以运行时统计为准**，权威口径见 `docs/wiki/tests.md` 的数值核算总表；本页不记录计数。

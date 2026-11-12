@@ -65,10 +65,8 @@ jobs:
         with:
           bun-version: "1.4.x"
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.4.x"
+      - name: No-Python guard
+        run: bun tests/guard/no_python_guard.ts
 
       - name: Install Ninja
         uses: seanmiddleditch/gha-setup-ninja@v5
