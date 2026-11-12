@@ -16,6 +16,14 @@ export interface SkillsRoot {
   source: "repo" | "project" | "builtin";
 }
 
+export function builtinSkillsFiles(): Record<string, string> {
+  return builtinSkills.files as Record<string, string>;
+}
+
+export function builtinSkillsVersion(): string {
+  return builtinSkills.version;
+}
+
 function countFiles(dir: string): number {
   let total = 0;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
