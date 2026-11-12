@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Godot-Autopilot 构建入口。
 
+build 子命令转发到 Bun/TS 入口（devtools/main.ts）；其余子命令在迁移收口前保留 Python 实现。
+
 Usage:
     uv run main.py build [--release|--debug]
     uv run main.py deploy [--release|--debug] [--demos 名称...]
@@ -11,28 +13,37 @@ Usage:
 """
 
 import argparse
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
-from scripts import cmake_ops, clean_ops, deploy, package, test_ops
+from scripts import clean_ops, deploy, package, test_ops
 from scripts.config import DEMO_NAMES, resolve_demos
 
 
+def _run_devtools(args: list[str]) -> int:
+    bun = shutil.which("bun")
+    if bun is None:
+        print(
+            "[ERROR] bun not found on PATH; install Bun 1.4+ to run gda-dev-tools",
+            file=sys.stderr,
+            flush=True,
+        )
+        return 1
+    return subprocess.run(
+        [bun, "devtools/main.ts", *args],
+        cwd=Path(__file__).resolve().parent,
+    ).returncode
+
+
 def _cmd_build(args: argparse.Namespace) -> None:
-    if args.release and args.debug:
-        print("[ERROR] Cannot specify both --release and --debug", flush=True)
-        sys.exit(1)
-
-    preset = "release" if args.release else "debug"
-    config = "Release" if args.release else "Debug"
-
-    print(f"[BUILD] Config={config}", flush=True)
-    if not cmake_ops._configure(preset):
-        sys.exit(1)
-    if not cmake_ops._build(preset):
-        sys.exit(1)
-
-    print(f"\n[DONE] Build complete.", flush=True)
+    flags: list[str] = []
+    if args.release:
+        flags.append("--release")
+    if args.debug:
+        flags.append("--debug")
+    sys.exit(_run_devtools(["build", *flags]))
 
 
 def _cmd_deploy(args: argparse.Namespace) -> None:

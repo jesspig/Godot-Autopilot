@@ -130,8 +130,9 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 godot-self-driving/
 ├── CMakeLists.txt              # add_library(godot-autopilot SHARED ...)，新 .cpp 必须登记
 ├── CMakePresets.json           # 6 个 configure 预设：base-debug/base-release（hidden 基座）+ debug/release（Ninja）+ debug-portable/release-portable（平台默认生成器）
-├── main.py                     # 构建入口（build/package/clean/tui 子命令）
-├── scripts/                    # 构建模块：config/cmake_ops/deploy/package/clean_ops/tui
+├── main.py                     # 构建入口（build 转发到 devtools；其余子命令保留 Python）
+├── devtools/                   # 开发链 Bun/TS 实现：main.ts + lib/{config,cmake,gdextension,zip}.ts + commands/{build,deploy,clean,package,package-check,test}.ts
+├── scripts/                    # 构建模块（Python 副本）：config/cmake_ops/deploy/package/clean_ops/tui
 ├── cmake/                      # 构建模块：Dependencies / BuildOptimization / Lto / Cache / CompilerOptions / Platform / skill_gen
 ├── tools/                      # 构建辅助脚本：embed_skills.py（经 cmake/skill_gen.cmake 调用，构建期嵌入 skill 内容）
 ├── third_party/                # git submodule 依赖：godot-cpp / mcp-cpp-sdk / googletest（版本由 gitlink commit 锁定，见 .gitmodules）
@@ -153,7 +154,7 @@ godot-self-driving/
 ├── cli/                        # CLI 载体（Bun + TS 源码直跑，零运行时依赖）：bin/gda.ts 入口 + src/ 35 个 .ts（含 src/mcp/ 协议客户端、src/api/ REST 客户端、src/serve/ 控制面 3 个、src/commands/ 17 个）+ tests/ 17 文件 282 项（280 pass + 2 skip，786 次 expect() 运行时调用）
 ├── tests/                      # 单元 gda_unit_tests + 集成 gda_integration_tests（gtest，数值见 tests.md 数值核算总表）+ runner/（仅 config_loader）+ guard/ 迁移守卫、注释守卫、主线程守卫、版本同步守卫、源清单守卫 + scripts/ CLI 契约与单测 + probe/ 传输探针
 ├── docs/                       # 本知识库（docs/wiki/，含 modules/、plans/、changelog/）
-├── package.json                # CLI 包定义（name godot-autopilot-cli，bin gda → cli/bin/gda.ts，零运行时依赖）
+├── package.json                # CLI 包定义（name godot-autopilot-cli，bin gda → cli/bin/gda.ts，scripts.gda-dev-tools → devtools/main.ts，零运行时依赖）
 ├── bun.lock                    # CLI devDependency 锁（@types/bun + typescript）
 └── examples/                   # examples 合集（6 个工程：5 个官方 + 1 个自制，文档/素材/工程配置，插件部署目标之一）
 ```

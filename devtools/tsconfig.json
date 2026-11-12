@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "target": "ESNext",
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "types": ["bun"]
+  },
+  "include": ["**/*.ts"]
+}
