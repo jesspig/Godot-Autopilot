@@ -7,6 +7,7 @@
 
 using godot_autopilot::SanitizeResult;
 using godot_autopilot::TraceEvent;
+using godot_autopilot::TraceKind;
 using godot_autopilot::TraceRecorder;
 
 TEST(TraceRecorderTest, NewIdsAreUniqueAndPrefixed) {
@@ -265,4 +266,36 @@ TEST(TraceRecorderTest, SanitizeTextTruncatesAndAppendsMarker) {
     EXPECT_EQ(cut.rfind("...[truncated]"),
               cut.size() - std::string("...[truncated]").size());
     EXPECT_EQ(TraceRecorder::sanitize_text("tiny", 10), "tiny");
+}
+
+TEST(TraceRecorderTest, SerializesV4FieldsAndKeepsLegacyKeys) {
+    TraceEvent event;
+    event.trace_id = "trace-1";
+    event.span_id = "span-1";
+    event.tool = "create_scene_node";
+    event.kind = TraceKind::ToolCall;
+    event.ok = true;
+    event.schema_version = 4;
+    event.event_id = "event-1";
+    event.source = "plugin";
+    event.transport = "ipc";
+    event.dispatch_wait_ms = 3;
+    event.exec_ms = 7;
+    event.serialize_ms = 1;
+    event.confirm = true;
+    event.attempt = 1;
+    event.args_hash = "ah";
+    event.result_hash = "rh";
+    const std::string line = TraceRecorder::to_json_line(event);
+    EXPECT_NE(line.find("\"trace_id\":\"trace-1\""), std::string::npos);
+    EXPECT_NE(line.find("\"schema_version\":4"), std::string::npos);
+    EXPECT_NE(line.find("\"event_id\":\"event-1\""), std::string::npos);
+    EXPECT_NE(line.find("\"source\":\"plugin\""), std::string::npos);
+    EXPECT_NE(line.find("\"transport\":\"ipc\""), std::string::npos);
+    EXPECT_NE(line.find("\"dispatch_wait_ms\":3"), std::string::npos);
+    EXPECT_NE(line.find("\"exec_ms\":7"), std::string::npos);
+    EXPECT_NE(line.find("\"serialize_ms\":1"), std::string::npos);
+    EXPECT_NE(line.find("\"confirm\":true"), std::string::npos);
+    EXPECT_NE(line.find("\"args_hash\":\"ah\""), std::string::npos);
+    EXPECT_NE(line.find("\"result_hash\":\"rh\""), std::string::npos);
 }
