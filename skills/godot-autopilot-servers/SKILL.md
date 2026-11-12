@@ -5,7 +5,7 @@ description: "Godot server-layer RID tools guide: RenderingServer, PhysicsServer
 
 # Godot Server RID Tools
 
-Invocation: use the native MCP tools first; when that channel is down, follow the calling ladder in the godot-autopilot-tools skill (the gda CLI, via bunx, a global install, or the standalone gda binary); with no CLI available, work through its references/manual-fallback.md.
+Invocation: discover with `gda tools search` and `gda tools describe`, then call with `gda call`; the native MCP tools (`search_tools`, `get_tool_detail`, `call_tool`) are the compatibility path. Protocol details live in `godot-autopilot-tools`.
 
 godot-autopilot exposes the engine's server layer directly: `RenderingServer`,
 `TextServer`, `PhysicsServer2D`, `PhysicsServer3D`, `NavigationServer2D` and
@@ -229,6 +229,10 @@ origin offset; `set_render_canvas_item_visible` is a hard on/off, not a toggle.
 {"name": "intersect_physics_2d_ray", "arguments": {"from": {"x": 0, "y": 0}, "to": {"x": 100, "y": 200}}}
 ```
 
+```bash
+gda call intersect_physics_2d_ray --args '{"from": {"x": 0, "y": 0}, "to": {"x": 100, "y": 200}}'
+```
+
 Navigation setup and path query (run such sequences in order with `batch_execute`):
 
 ```json
@@ -301,5 +305,3 @@ Navigation setup and path query (run such sequences in order with `batch_execute
 - `godot-autopilot-scene-system` - building and editing the scene nodes these RID tools bridge to.
 - `godot-autopilot-resources` - saving shape resources as `.tres` for `CollisionShape` assignment.
 - `godot-autopilot-scripting` - `code_execute` usage for the external-RID setups.
-- `references/tool-reference-physics-nav.md` - the full physics + navigation tool tables.
-- `references/tool-reference-rendering.md` - the full render + text tool tables.

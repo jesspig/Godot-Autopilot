@@ -5,17 +5,11 @@ description: "Godot scene system operations guide: scene lifecycle, node create/
 
 # Godot Scene System
 
-Invocation: use the native MCP tools first; when that channel is down, follow the calling ladder in the godot-autopilot-tools skill (the gda CLI, via bunx, a global install, or the standalone gda binary); with no CLI available, work through its references/manual-fallback.md.
+Invocation: discover with `gda tools search` and `gda tools describe`, then call with `gda call`; the native MCP tools (`search_tools`, `get_tool_detail`, `call_tool`) are the compatibility path. Protocol details live in `godot-autopilot-tools`.
 
 godot-autopilot tools for creating, restructuring, saving and inspecting scenes
 in the Godot editor, plus the property read/write and signal wiring that turn a
-node tree into a working scene. Node paths resolve against the edited scene
-root; the accepted path forms and their error text are listed under Gotchas.
-
-Deep dives live in this skill's references: `references/property-json-shapes.md`
-(JSON value shapes, Godot 3 to 4 renames, serialization rules),
-`references/undo-history.md` (the editor undo history model) and
-`references/scene-format-tokens.md` (the .tscn file format).
+node tree into a working scene. Node paths resolve against the edited scene root; the accepted path forms and their error text are listed under Gotchas. The property value shapes, the Godot 3 to 4 rename table and the serialization rules are summarized in the properties section below.
 
 ## Scene lifecycle
 
@@ -195,9 +189,9 @@ value when it can and says so in the error.
 
 - Every successful set registers with the editor undo stack so Ctrl-Z reverts it (the response reports undoable:true). Exception: when the old or new value is an Object reference, no action is recorded and the response reports undoable:false with a skip reason.
 - Node-typed properties — engine hint `NodeType` (34), which includes C# `[Export]` node fields — accept a node path string; it is converted to a node reference automatically and the response reports converted_node_path. An unresolvable path is an error, not a silent ok.
-- Array properties convert elements one by one: node elements take a path string or `{"__node_ref__": "..."}`, resource elements take a `res://...` or `memory://...` string, `{"path": "res://..."}` or `{"resource": "memory://..."}`, and `null` leaves a slot empty. Passing a non-array value for an array property is an error instead of silently clearing it, and elements the tool cannot express safely are errors too. See `references/property-json-shapes.md`.
-- Dictionary properties take a JSON object; a non-object value errors instead of writing an empty dict. SpriteFrames `animations` accepts either the engine array form or a dict mapping names to `{frames, speed, loop}` (frames as texture refs or `{texture, duration}` objects), assembled into the engine array of `{name, frames, speed, loop}` dicts with per-item validation; sub-resource errors name the real resource path, not the host node. See `references/property-json-shapes.md`.
-- Resource-typed properties also accept an inline resource description: `{"type": "RectangleShape2D", "properties": {"size": {"x": 20, "y": 28}}}` creates a pathless sub-resource in one step. It is written into the scene file as a `sub_resource` when the scene is saved, the response echoes it in inline_resources, and nesting is limited to 4 levels. See `references/property-json-shapes.md`.
+- Array properties convert elements one by one: node elements take a path string or `{"__node_ref__": "..."}`, resource elements take a `res://...` or `memory://...` string, `{"path": "res://..."}` or `{"resource": "memory://..."}`, and `null` leaves a slot empty. Passing a non-array value for an array property is an error instead of silently clearing it, and elements the tool cannot express safely are errors too.
+- Dictionary properties take a JSON object; a non-object value errors instead of writing an empty dict. SpriteFrames `animations` accepts either the engine array form or a dict mapping names to `{frames, speed, loop}` (frames as texture refs or `{texture, duration}` objects), assembled into the engine array of `{name, frames, speed, loop}` dicts with per-item validation; sub-resource errors name the real resource path, not the host node.
+- Resource-typed properties also accept an inline resource description: `{"type": "RectangleShape2D", "properties": {"size": {"x": 20, "y": 28}}}` creates a pathless sub-resource in one step. It is written into the scene file as a `sub_resource` when the scene is saved, the response echoes it in inline_resources, and nesting is limited to 4 levels.
 - Assigning a string to an int property silently converts to 0 and reports ok. After any set with an unusual value shape, read back with `property_get` to confirm what actually landed.
 
 ```json
@@ -206,9 +200,25 @@ value when it can and says so in the error.
 {"name": "property_set", "arguments": {"path": "Hero", "property": "sprite_frames.animations", "value": {"idle": {"frames": [{"texture": "res://icon.svg"}], "speed": 5.0, "loop": true}}}}
 ```
 
-JSON value shapes for all Godot types, the Godot 3 to 4 renamed-property
-table, default-value serialization rules, the inline sub-resource shape and the
-memory:// restriction are in `references/property-json-shapes.md`.
+JSON value shapes for the common Godot types:
+
+| Godot type | JSON shape |
+|---|---|
+| Vector2 | `{"x": 1, "y": 2}` |
+| Vector3 / Vector3i | `{"x": 1, "y": 2, "z": 3}`; all three components required |
+| Vector4 / Quaternion | `{"x": 0, "y": 0, "z": 0, "w": 1}`; all four components required |
+| Color | `{"r": 1, "g": 0.5, "b": 0.25, "a": 1}`; `a` defaults to 1 |
+| Rect2 / Rect2i | `{"position": {"x": 0, "y": 0}, "size": {"w": 64, "h": 32}}` |
+| AABB | `{"position": {"x": 0, "y": 0, "z": 0}, "size": {"w": 64, "h": 32, "d": 16}}` |
+| Transform2D | `{"columns": [[1, 0], [0, 1], [x, y]]}` |
+| Transform3D | `{"basis": {"rows": [[1, 0, 0], [0, 1, 0], [0, 0, 1]]}, "origin": {"x": 0, "y": 0, "z": 0}}` |
+| Basis / Projection | `{"rows": [[...]]}` / `{"columns": [[...]]}` |
+| Resource | `{"path": "res://icon.svg"}` or `{"resource": "memory://name"}` |
+| Inline sub-resource | `{"type": "RectangleShape2D", "properties": {"size": {"x": 20, "y": 28}}}` |
+| Node reference | node path string; inside an array `{"__node_ref__": "Path/To/Node"}` |
+| PackedByteArray | a plain JSON number array |
+
+Size and transform rules: Rect2/AABB `size` requires `w`/`h` (and `d` for AABB); `x`/`y`/`z` are aliases, and conflicting aliases error. Transform2D reads `columns` only. Transform3D requires `basis.rows`; `origin` defaults to zero. Vector3/Vector4/Quaternion require every component. A RID reads back as `{"id": 42}`, but JSON is not converted back into a RID; pass the integer handle. Default-valued properties are omitted from the saved file, so a missing line means "matches the default", not data loss. The Godot 3 to 4 rename table (check it before inventing a name): `frames`→`sprite_frames`, `cast_to`→`target_position`, `rect_position`→`position`, `rect_global_position`→`global_position`, `rect_size`→`size`, `rect_min_size`→`custom_minimum_size`, `rect_rotation`→`rotation`, `rect_scale`→`scale`, `rect_pivot_offset`→`pivot_offset`, `translation`→`position`.
 
 ## Signals
 
@@ -238,8 +248,7 @@ history, so a single Ctrl-Z reverts it. The engine model behind this:
 - An action that recorded no operations is discarded on commit. When an action is undone or redone, operations whose target object was freed meanwhile are skipped silently.
 - Executing an operation on a Resource marks it dirty; undoing does not make it clean again. Per-history saved versions decide the unsaved state, and actions carry a `mark_unsaved` flag that keeps a history unsaved even after the action is undone.
 
-Routing table, redo-invalidation rules, the 800 ms merge window and its
-undo-loss caveat: `references/undo-history.md`.
+Actions route by their target object: nodes of the edited scene and built-in sub-resources land in that scene's history; everything else lands in the global history. Each open scene tab has its own history, and committing an action clears the other redo stacks. An action with no operations is discarded on commit; operations whose target was freed are skipped silently when undone or redone. Executing an operation on a Resource marks it dirty; undoing does not make it clean again. A per-history saved version decides the unsaved state, and an action marked `mark_unsaved` keeps its history unsaved even after undo.
 
 ## Workflow checklist
 
@@ -263,10 +272,10 @@ undo-loss caveat: `references/undo-history.md`.
 - Opening a scene very early during editor startup is deferred until initialization finishes; the scene appears shortly after instead of failing.
 - Opening an already-open scene only switches to its tab and does not re-read the file from disk. To pick up external changes call `reload_editor_scene`, which also clears that scene's undo history.
 - When a script a scene depends on is updated, the editor may silently re-pack and re-instantiate the open scene and clear its undo history — undoable-only changes vanish without an error message.
-- Saving re-packs the scene and silently drops: nodes whose owner is not the saved scene root, connections without CONNECT_PERSIST, properties equal to the node's computed default value unless pinned, and instanced-subscene nodes with no local property or group changes (details in `references/scene-format-tokens.md`).
+- Saving re-packs the scene and silently drops: nodes whose owner is not the saved scene root, connections without CONNECT_PERSIST, properties equal to the node's computed default value unless pinned, and instanced-subscene nodes with no local property or group changes.
 - Saving a scene cascades to every dirty resource edited alongside it; dirty flags are cleared before writing and PackedScene resources are skipped.
 - Every scene write tool (`create_scene_node`, `delete_scene_node`, `rename_scene_node`, `property_set`, `attach_script_to_node`) reports scene_path and scene_unsaved in its response: scene_path is the edited scene's file path on disk, empty until the scene is saved (scene_unsaved is then true). When a scene switch silently fails — for example `create_editor_scene` refused because the current scene is unsaved — a following write lands in the still-open scene; read scene_path to notice the wrong target instead of a quietly misplaced node.
-- Property lines equal to the default value are omitted from the saved file — a missing line means "matches the default", not data loss (`references/property-json-shapes.md`).
+- Property lines equal to the default value are omitted from the saved file — a missing line means "matches the default", not data loss.
 - 4.7+: tree order is parent before child on enter, `_ready` fires child before parent, and exit is child before parent — a node cannot rely on a sibling being ready inside `_enter_tree`.
 
 ## See also
@@ -274,6 +283,3 @@ undo-loss caveat: `references/undo-history.md`.
 - godot-autopilot-resources — the `.tscn`/`.tres` files behind scenes, rename/move with reference rewriting
 - godot-autopilot-scripting — `code_execute` for programmatic scene edits
 - godot-autopilot-runtime — running the game and inspecting it live
-- references/property-json-shapes.md — JSON value shapes and property renames
-- references/undo-history.md — histories, merges and unsaved tracking
-- references/scene-format-tokens.md — .tscn sections, tokens and uid resolution

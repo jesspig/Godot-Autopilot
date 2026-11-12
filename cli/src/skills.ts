@@ -5,6 +5,8 @@ import builtinSkills from "../assets/skills.json";
 
 import { CliError, ExitCode } from "./errors";
 
+export type SkillLanguage = "en" | "zh";
+
 export interface SkillSummary {
   name: string;
   path: string;
@@ -16,12 +18,24 @@ export interface SkillsRoot {
   source: "repo" | "project" | "builtin";
 }
 
-export function builtinSkillsFiles(): Record<string, string> {
-  return builtinSkills.files as Record<string, string>;
+interface BuiltinSkillsAsset {
+  version: string;
+  files: Record<string, string>;
+  files_zh?: Record<string, string>;
+}
+
+const asset = builtinSkills as BuiltinSkillsAsset;
+
+export function builtinSkillsFiles(lang: SkillLanguage = "en"): Record<string, string> {
+  const files = lang === "zh" ? asset.files_zh : asset.files;
+  if (files === undefined) {
+    throw new CliError(ExitCode.Transport, `the builtin skills archive has no ${lang} content (version ${asset.version}).`);
+  }
+  return files;
 }
 
 export function builtinSkillsVersion(): string {
-  return builtinSkills.version;
+  return asset.version;
 }
 
 function countFiles(dir: string): number {
@@ -36,9 +50,10 @@ function countFiles(dir: string): number {
   return total;
 }
 
-export function resolveSkillsRoot(): SkillsRoot {
+export function resolveSkillsRoot(lang: SkillLanguage = "en"): SkillsRoot {
+  const repoDir = lang === "zh" ? "skills-zh" : "skills";
   const candidates: SkillsRoot[] = [
-    { path: path.resolve(import.meta.dir, "..", "..", "skills"), source: "repo" },
+    { path: path.resolve(import.meta.dir, "..", "..", repoDir), source: "repo" },
     { path: path.join(process.cwd(), ".agents", "skills"), source: "project" },
   ];
   for (const candidate of candidates) {
@@ -49,10 +64,11 @@ export function resolveSkillsRoot(): SkillsRoot {
   return { path: "builtin", source: "builtin" };
 }
 
-export function listSkills(root: SkillsRoot): SkillSummary[] {
+export function listSkills(root: SkillsRoot, lang: SkillLanguage = "en"): SkillSummary[] {
   if (root.source === "builtin") {
+    const files = builtinSkillsFiles(lang);
     const names = new Set<string>();
-    for (const file of Object.keys(builtinSkills.files)) {
+    for (const file of Object.keys(files)) {
       const [name, ...rest] = file.split("/");
       if (name !== undefined && rest.length === 1 && rest[0] === "SKILL.md") {
         names.add(name);
@@ -63,7 +79,7 @@ export function listSkills(root: SkillsRoot): SkillSummary[] {
       .map((name) => ({
         name,
         path: `builtin:${name}`,
-        files: Object.keys(builtinSkills.files).filter((file) => file.startsWith(`${name}/`)).length,
+        files: Object.keys(files).filter((file) => file.startsWith(`${name}/`)).length,
       }));
   }
   const books: SkillSummary[] = [];
@@ -81,7 +97,12 @@ export function listSkills(root: SkillsRoot): SkillSummary[] {
   return books;
 }
 
-export function readSkillFile(root: SkillsRoot, name: string, relative?: string): string {
+export function readSkillFile(
+  root: SkillsRoot,
+  name: string,
+  relative?: string,
+  lang: SkillLanguage = "en",
+): string {
   if (!/^[A-Za-z0-9._-]+$/.test(name)) {
     throw new CliError(ExitCode.Usage, `invalid skill name: ${name}`);
   }
@@ -92,7 +113,7 @@ export function readSkillFile(root: SkillsRoot, name: string, relative?: string)
       throw new CliError(ExitCode.Usage, `--file must stay inside the skill directory: ${relative}`);
     }
     const key = `${name}/${normalized}`;
-    const content = (builtinSkills.files as Record<string, string>)[key];
+    const content = builtinSkillsFiles(lang)[key];
     if (content === undefined) {
       throw new CliError(ExitCode.Usage, `skill file not found: ${name}/${target}`);
     }

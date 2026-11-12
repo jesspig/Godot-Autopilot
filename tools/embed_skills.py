@@ -11,7 +11,7 @@ import re
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
 
-SKILL_COUNT = 9
+SKILL_COUNT = 10
 # 与 skills/ 下的子目录数保持同步
 NAME_PATTERN = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 MAX_NAME_LEN = 64

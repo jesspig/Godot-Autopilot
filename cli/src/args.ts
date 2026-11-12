@@ -13,6 +13,7 @@ export interface GlobalOptions {
   artifactText?: string;
   pathText?: string;
   sourceText?: string;
+  offline?: boolean;
   zh?: boolean;
   check?: boolean;
   confirm?: boolean;
@@ -77,6 +78,7 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--stale": "stale",
   "--no-fallback": "noFallback",
   "--json": "json",
+  "--offline": "offline",
   "--zh": "zh",
   "--check": "check",
   "--confirm": "confirm",
@@ -159,8 +161,8 @@ Commands:
   describe <tool>     Show one tool's schema and side effects
   call <tool>         Call a tool
   list                List running Godot instances
-  skills list         List the bundled skill books (offline)
-  skills show <name>  Print one skill book's SKILL.md; --file <rel> reads a reference
+  skills list         List the bundled skill books (offline, --zh for Chinese)
+  skills show <name>  Print one skill book's SKILL.md; --file <rel> reads an auxiliary file
   tools list          List the cached tool catalog (offline)
   tools search <query> Search the cached tool catalog
   tools describe <name> Show one cached tool's schema
@@ -188,7 +190,8 @@ Global options:
   --artifact <name>   Cache artifact: cli, plugin, skills, or catalog
   --path <dir>        Install target directory (install skills)
   --source <mode>     auto (default), online, cache, or builtin
-  --zh                Install the Chinese skills archive
+  --offline           Never touch the network; use cache, then builtin
+  --zh                Use the Chinese skills archive (install, skills list/show)
   --args <json>       Tool arguments as a JSON string
   --args-file <path>  Tool arguments from a JSON file
   --save-images <dir> Write returned images to a local directory

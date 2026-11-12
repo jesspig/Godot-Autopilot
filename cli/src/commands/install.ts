@@ -8,13 +8,13 @@ import { cacheRoot, cacheAssetPath, selectLatest, verifyManifest } from "../cach
 import { CliError, ExitCode } from "../errors";
 import { readPluginInstanceIndex } from "../instances";
 import { isAlive, stopForce } from "../process";
-import { builtinSkillsFiles, builtinSkillsVersion } from "../skills";
+import { builtinSkillsFiles, builtinSkillsVersion, type SkillLanguage } from "../skills";
 import { downloadAsset } from "../source";
 import { CLI_VERSION } from "../version";
 import { start } from "./start";
 import { writeJson } from "./json-output";
 
-type Source = "auto" | "online" | "cache" | "builtin";
+type Source = "auto" | "online" | "cache" | "builtin" | "offline";
 
 function parseSource(text: string | undefined): Source {
   if (text === undefined) return "auto";
@@ -70,19 +70,21 @@ function cacheSkills(lang: string): Record<string, string> {
   }
 }
 
-function builtinSkills(lang: string): Record<string, string> {
-  if (lang !== "en") {
+function builtinSkills(lang: SkillLanguage): Record<string, string> {
+  try {
+    return builtinSkillsFiles(lang);
+  } catch (error) {
     throw new CliError(
       ExitCode.Transport,
-      `the builtin skills archive only contains English content (version ${builtinSkillsVersion()}).`,
+      `the builtin skills archive has no ${lang} content (version ${builtinSkillsVersion()}).`,
+      "Use --source online or --source cache for this language.",
     );
   }
-  return builtinSkillsFiles();
 }
 
 async function installSkills(opts: GlobalOptions): Promise<number> {
-  const source = parseSource(opts.sourceText);
-  const lang = opts.zh === true ? "zh" : "en";
+  const source = opts.offline === true ? "offline" : parseSource(opts.sourceText);
+  const lang: SkillLanguage = opts.zh === true ? "zh" : "en";
   const target = opts.pathText !== undefined
     ? path.resolve(opts.pathText)
     : path.join(os.homedir(), ".agents", "skills");
@@ -104,7 +106,7 @@ async function installSkills(opts: GlobalOptions): Promise<number> {
   if (source === "online" || source === "auto") {
     await tryOnline();
   }
-  if (files === undefined && (source === "cache" || source === "auto")) {
+  if (files === undefined && (source === "cache" || source === "auto" || source === "offline")) {
     try {
       files = cacheSkills(lang);
       origin = "cache";
@@ -112,7 +114,7 @@ async function installSkills(opts: GlobalOptions): Promise<number> {
       if (source === "cache") throw error;
     }
   }
-  if (files === undefined && (source === "builtin" || source === "auto")) {
+  if (files === undefined && (source === "builtin" || source === "auto" || source === "offline")) {
     files = builtinSkills(lang);
     origin = "builtin";
   }
@@ -137,7 +139,7 @@ async function installSkills(opts: GlobalOptions): Promise<number> {
 }
 
 async function installPlugin(opts: GlobalOptions): Promise<number> {
-  const source = parseSource(opts.sourceText);
+  const source = opts.offline === true ? "cache" : parseSource(opts.sourceText);
   const project = path.resolve(opts.project ?? process.cwd());
   const target = path.join(project, "addons", "godot-autopilot");
   const running = readPluginInstanceIndex().filter(

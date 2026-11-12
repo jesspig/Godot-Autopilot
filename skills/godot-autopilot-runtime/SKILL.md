@@ -5,14 +5,13 @@ description: "Godot runtime and debugging guide: launch and stop the game, input
 
 # Runtime and Debugging with godot-autopilot
 
-Invocation: use the native MCP tools first; when that channel is down, follow the calling ladder in the godot-autopilot-tools skill (the gda CLI, via bunx, a global install, or the standalone gda binary); with no CLI available, work through its references/manual-fallback.md.
+Invocation: discover with `gda tools search` and `gda tools describe`, then call with `gda call`; the native MCP tools (`search_tools`, `get_tool_detail`, `call_tool`) are the compatibility path. Protocol details live in `godot-autopilot-tools`.
 
 This book covers the game process life cycle: launching and stopping the
 game, the `game_*` runtime channel, input injection, viewport capture and the
 visual verification loop, UI reconnaissance, the four log and error paths,
-the error watermark confirmation loop and inline GDScript tests. Deep dives
-live in `references/input-injection.md`, `references/debug-paths.md` and
-`references/runtime-inspection.md`.
+the error watermark confirmation loop and inline GDScript tests. The timing,
+log-path and inspection details are covered below.
 
 ## Start and stop the game
 
@@ -83,8 +82,8 @@ gameplay probe — and read it together with the `paused` field.
 
 A failed scene reload shows up as an empty scene with a sharp `node_count`
 drop. Do not debug a half-dead process: stop with `stop_editor_playing` and
-rerun `play_editor_current_scene`. Full scenario readings live in
-`references/runtime-inspection.md`.
+rerun `play_editor_current_scene`. A live scene with a plausible `node_count`
+but no gameplay progress is a hang, not a reload failure.
 
 ## The editor and the game are two processes
 
@@ -152,8 +151,8 @@ an inject-then-read round trip lands on the same frame, because injected
 events dispatch at the next frame start.
 
 Full semantics — buffering and flush points, `api` mode forgery versus real
-key events, action matching and per-device state — are in
-`references/input-injection.md`.
+key events, action matching and per-device state — follow from the same rule:
+the event belongs to the next frame, not to the current one.
 
 ## Screenshots and visual verification
 
@@ -228,9 +227,8 @@ The forensics pattern is act first, then condition, then capture:
 
 Always gate text conditions on visibility: hiding a label does not reset
 its text, so a text-only condition stays true forever once the text was
-set. The full deterministic-verification recipe (single-script
-teleport-await-read, no cross-call timing) is in
-references/runtime-inspection.md.
+set. Gate text conditions on visibility, and put the teleport, await and read
+in one script so no cross-call timing is involved.
 
 Both parameters exist on `capture_game_viewport` and on
 `capture_editor_viewport` with `target` `game`. The editor target rejects them:
@@ -294,8 +292,7 @@ container eating the click.
   not just node callbacks. Transient input states are lost while paused.
   `physics_frame` keeps advancing while paused because it is the engine-global
   counter, so combine `paused` with a gameplay value (node position or a
-  gameplay-owned tick) when you need to prove that gameplay froze. The full
-  matrix is in `references/input-injection.md`.
+  gameplay-owned tick) when you need to prove that gameplay froze.
 - `reload_scene_tree_current_scene` reloads the currently running scene from
   disk, recreating the scene root — script state, connections and runtime
   modifications reset to the saved file. Without a running scene it returns
@@ -320,7 +317,7 @@ container eating the click.
 | Editor engine log | `get_debugger_log` | engine log buffer of the editor process: script errors and messages routed through the engine logger | no — always contains data |
 | Debugger session capture | `get_debugger_errors`, `get_debugger_output`, `get_debugger_scene_tree` | with an active debug session: the running game over the runtime channel; without one: an empty result plus a `note` — no editor-side fallback | live game data needs a session |
 | On-disk game log | `get_game_log_entries` | tail window of the game process log file `user://logs/godot.log` | the log file must exist — start the game once with `play_editor_current_scene` |
-| Plugin LogSystem | `get_plugin_log` | the plugin's own in-process diagnostic buffer (authorization denials, timeout bookkeeping, dropped late game responses) — not routed through any engine logger | no — always available |
+| Plugin LogSystem | `get_plugin_log` | the plugin's own in-process diagnostic buffer (confirmation denials, timeout bookkeeping, dropped late game responses) — not routed through any engine logger | no — always available |
 
 - `get_debugger_log` (optional `limit`, default 50) reads the editor engine
   log — script errors and `print` output from the editor process. It never
@@ -330,7 +327,7 @@ container eating the click.
   `category`, `filter`, `since_index`) reads the plugin's own in-process
   diagnostics and returns the entries array with a count and next_index.
   Unlike `get_debugger_log` it does not read the engine log buffer; this is
-  where authorization denials, timeout bookkeeping and dropped late game
+  where confirmation denials, timeout bookkeeping and dropped late game
   responses appear.
 - `get_debugger_errors` (optional `limit`, default 20) returns, with an
   active session, a structured list under `result` with `time`, `file`,
@@ -381,8 +378,7 @@ startup errors never surface), error/warning floods are silently discarded
 for up to a second, and a message-queue overflow drops messages wholesale.
 A watermark of 0 therefore means "nothing recorded since last call", not
 "nothing happened": for error-storm code paths, cross-check with
-`get_game_log_entries`, which bypasses all three gates. Details in
-`references/debug-paths.md`.
+`get_game_log_entries`, which bypasses all three gates.
 
 ## Close the loop with inline GDScript tests
 
@@ -449,17 +445,12 @@ When the game stops at a debugger breakpoint, `get_debugger_session_info`
 reports the session as breaked. By default the plugin automatically continues
 breaked sessions so `game_*` calls keep working: auto-resume is controlled by
 the `GDA_AUTO_CONTINUE` environment variable (`0` or `false` disables it),
-with at most 3 auto-continues per session. What a breakpoint does to the game
-process is in `references/debug-paths.md`.
+with at most 3 auto-continues per session. A breakpoint pauses the game process
+until the auto-continue or a manual continue; `game_*` calls blocked behind it
+time out rather than returning stale state.
 
 ## See also
 
-- `references/input-injection.md` — frame-accurate injection, action
-  matching, per-device state and the full pause matrix.
-- `references/debug-paths.md` — the four log paths, protocol drop gates and
-  breakpoint semantics.
-- `references/runtime-inspection.md` — reading liveness, UI and scene state
-  of the running game.
 - `godot-autopilot-scripting` — the four script execution channels,
   including `execute_game_script`.
 - `godot-autopilot-tools` — tool discovery protocol, watermark details and
