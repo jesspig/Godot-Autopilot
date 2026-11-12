@@ -37,6 +37,9 @@ export interface GlobalOptions {
   socketText?: string;
   noFallback?: boolean;
   transportText?: string;
+  formatText?: string;
+  slowText?: string;
+  limitText?: string;
   json?: boolean;
 }
 
@@ -60,6 +63,9 @@ const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
   "--file": "file",
   "--socket": "socketText",
   "--transport": "transportText",
+  "--format": "formatText",
+  "--slow": "slowText",
+  "--limit": "limitText",
 };
 
 const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
@@ -172,6 +178,12 @@ Commands:
   cache list          List cache manifests
   cache info          Show cache root, entry count, and size
   cache clear         Remove old cache entries (requires --force)
+  trace list          List recent trace events (plugin + CLI)
+  trace show <id>     Show all events with one trace id
+  trace summary       Summarize latency, failures, retries, and top tools
+  trace slow          List calls slower than --slow <ms> (default 1000)
+  trace failures      List failed tool calls
+  trace export        Export traces as jsonl or otlp (--format)
   install skills      Install skill books to ~/.agents/skills
   install plugin      Install the Godot addon into a project
   update <target>     Update cli, skills, plugin, or all (--check for status)

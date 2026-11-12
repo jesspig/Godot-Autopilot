@@ -6,6 +6,7 @@ import { err } from "../output";
 import { assertCallFamilyUsage, callTimeoutSec, emit, extractPayload, loadToolArguments } from "../payload";
 import { findById, findLiveByProject } from "../registry";
 import { resolveTarget, type TargetContext } from "../target";
+import { appendCliTrace, makeTraceparent, newSpanId, newTraceId } from "../trace";
 
 const TARGET_CONTEXT: TargetContext = { findById, findLiveByProject };
 
@@ -21,6 +22,9 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
   }
   const timeoutSec = callTimeoutSec(opts);
   const transport = parseTransport(opts.transportText);
+  const traceId = newTraceId();
+  const traceparent = makeTraceparent(traceId);
+  const startedAt = Date.now();
   if (opts.socketText !== undefined) {
     try {
       const envelope = await callTool(tool, args, {
@@ -33,7 +37,9 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
         },
         transport: "ipc",
         noFallback: opts.noFallback,
+        traceparent,
       });
+      recordCliCall(traceId, tool, envelope, startedAt, "ipc");
       const extracted = extractPayload(envelope, { saveImages: opts.saveImages, raw: opts.raw });
       return emit(extracted, opts);
     } catch (error) {
@@ -51,7 +57,48 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
     ipcEndpoint: target.ipcEndpoint,
     transport,
     noFallback: opts.noFallback,
+    traceparent,
   });
+  recordCliCall(traceId, tool, envelope, startedAt, resolveTransportName(target.ipcEndpoint, transport));
   const extracted = extractPayload(envelope, { saveImages: opts.saveImages, raw: opts.raw });
   return emit(extracted, opts);
+}
+
+function recordCliCall(
+  traceId: string,
+  tool: string,
+  envelope: { error?: { code?: number; message?: string }; result?: unknown },
+  startedAt: number,
+  transport: string,
+): void {
+  const result = envelope.result as { error?: unknown } | undefined;
+  const errorCode =
+    envelope.error !== undefined
+      ? String(envelope.error.code ?? "rpc_error")
+      : result?.error !== undefined
+        ? "tool_error"
+        : "";
+  const finishedAt = Date.now();
+  appendCliTrace({
+    trace_id: traceId,
+    span_id: newSpanId(),
+    event_id: newSpanId(),
+    kind: "tool_call",
+    tool,
+    ok: errorCode === "",
+    error_code: errorCode,
+    duration_ms: finishedAt - startedAt,
+    wall_start_ms: startedAt,
+    wall_end_ms: finishedAt,
+    transport,
+    attempt: 1,
+  });
+}
+
+function resolveTransportName(
+  ipcEndpoint: unknown,
+  requested: "auto" | "ipc" | "http",
+): string {
+  if (requested !== "auto") return requested;
+  return ipcEndpoint === undefined ? "http" : "auto";
 }

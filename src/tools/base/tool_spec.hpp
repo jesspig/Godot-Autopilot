@@ -386,7 +386,16 @@ inline mcp::JsonValue SpecTool::execute(const mcp::JsonValue &args) {
   event.error_code = error_code;
   event.args_digest = sanitized.text;
   event.args_truncated = sanitized.truncated;
-  event.result_size = static_cast<int64_t>(result.Dump().size());
+  const int64_t serialize_start_ns = TraceRecorder::monotonic_now_ns();
+  const std::string result_dump = result.Dump();
+  event.serialize_ms =
+      (TraceRecorder::monotonic_now_ns() - serialize_start_ns) / 1000000;
+  event.result_size = static_cast<int64_t>(result_dump.size());
+  event.result_hash = TraceRecorder::fnv1a_hex(result_dump);
+  event.args_hash = TraceRecorder::fnv1a_hex(sanitized.text);
+  event.dispatch_wait_ms = queue_wait;
+  event.exec_ms = duration_ms;
+  event.confirm = confirmation::provided(args);
   const std::vector<spec_detail::ImageHit> images =
       spec_detail::collect_trace_images(result);
   std::string image_detail;

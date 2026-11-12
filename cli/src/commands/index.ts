@@ -17,6 +17,7 @@ import { run as projects } from "./projects";
 import { run as cache } from "./cache";
 import { run as install } from "./install";
 import { run as update } from "./update";
+import { run as trace } from "./trace";
 
 export interface Command {
   run(positional: string[], opts: GlobalOptions): Promise<number>;
@@ -41,4 +42,5 @@ export const COMMANDS: Record<string, Command> = {
   cache: { run: cache },
   install: { run: install },
   update: { run: update },
+  trace: { run: trace },
 };

@@ -17,6 +17,7 @@ export interface CallToolOptions {
   noFallback?: boolean;
   transport?: "auto" | "ipc" | "http";
   transportSink?: (transport: "ipc" | "http") => void;
+  traceparent?: string;
 }
 
 export const META_DIRECT_TOOLS: ReadonlySet<string> = new Set([
@@ -93,10 +94,19 @@ interface RawResponse {
   text: string;
 }
 
-function makeCallEnvelope(id: number, name: string, args: Record<string, unknown>, direct: boolean): string {
-  const params = direct
+function makeCallEnvelope(
+  id: number,
+  name: string,
+  args: Record<string, unknown>,
+  direct: boolean,
+  traceparent?: string,
+): string {
+  const params: Record<string, unknown> = direct
     ? { name, arguments: args }
     : { name: "call_tool", arguments: { name, arguments: args } };
+  if (traceparent !== undefined && traceparent !== "") {
+    params._meta = { traceparent };
+  }
   return JSON.stringify({
     jsonrpc: "2.0",
     id,
@@ -296,6 +306,7 @@ export async function callTool(
         ipcEndpoint,
         timeoutMs,
         opts.direct === true,
+        opts.traceparent,
       );
       const tokenFailure = response.error?.code === -32001 || response.error?.code === -32002;
       if (!tokenFailure) {
@@ -321,7 +332,7 @@ export async function callTool(
   const url = `http://${HOST}:${opts.port}/mcp`;
 
   let id = nextRequestId++;
-  const body = makeCallEnvelope(id, name, args, opts.direct === true);
+  const body = makeCallEnvelope(id, name, args, opts.direct === true, opts.traceparent);
   const bodyBytes = Buffer.byteLength(body, "utf8");
   if (bodyBytes > MAX_BODY_BYTES) {
     throw new CliError(ExitCode.Transport, `request body exceeds 4 MiB (${bodyBytes} bytes).`);
@@ -340,7 +351,7 @@ export async function callTool(
       }
       await performHandshake(url, timeoutMs);
       id = nextRequestId++;
-      res = await postJson(url, makeCallEnvelope(id, name, args, opts.direct === true), timeoutMs);
+      res = await postJson(url, makeCallEnvelope(id, name, args, opts.direct === true, opts.traceparent), timeoutMs);
       extracted = extractEnvelope(res);
     }
   }
@@ -364,14 +375,22 @@ async function callToolOverIpc(
   endpoint: IpcEndpoint,
   timeoutMs: number,
   direct: boolean,
+  traceparent?: string,
 ): Promise<JsonRpcResponse> {
   const session = new IpcSession(endpoint, timeoutMs);
   try {
     await session.open();
     const init = JSON.parse(makeInitializeEnvelope()) as Record<string, unknown>;
     const params = (init.params ?? {}) as Record<string, unknown>;
+    const meta: Record<string, string> = {};
     if (endpoint.token !== undefined && endpoint.token !== "") {
-      params._meta = { gda_token: endpoint.token };
+      meta.gda_token = endpoint.token;
+    }
+    if (traceparent !== undefined && traceparent !== "") {
+      meta.traceparent = traceparent;
+    }
+    if (Object.keys(meta).length > 0) {
+      params._meta = meta;
       init.params = params;
     }
     const initResponse = await session.request(init);
@@ -380,7 +399,7 @@ async function callToolOverIpc(
     }
     session.notify({ jsonrpc: "2.0", method: HANDSHAKE_METHOD });
     const id = nextRequestId++;
-    const envelope = JSON.parse(makeCallEnvelope(id, name, args, direct)) as Record<string, unknown>;
+    const envelope = JSON.parse(makeCallEnvelope(id, name, args, direct, traceparent)) as Record<string, unknown>;
     return await session.request(envelope);
   } finally {
     session.close();
