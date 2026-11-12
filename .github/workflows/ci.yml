@@ -27,18 +27,11 @@ jobs:
 
     env:
       SCCACHE_GHA_ENABLED: "true"
-      # Windows runner 控制台为 cp1252，保证 Python 子进程（含 embed_skills.py）以 UTF-8 输出
-      PYTHONUTF8: "1"
 
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: true
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
