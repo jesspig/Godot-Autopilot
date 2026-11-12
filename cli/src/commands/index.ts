@@ -17,6 +17,7 @@ import { run as projects } from "./projects";
 import { run as api } from "./api";
 import { run as endpoints } from "./endpoints";
 import { run as cache } from "./cache";
+import { run as install } from "./install";
 
 export interface Command {
   run(positional: string[], opts: GlobalOptions): Promise<number>;
@@ -41,4 +42,5 @@ export const COMMANDS: Record<string, Command> = {
   api: { run: api },
   endpoints: { run: endpoints },
   cache: { run: cache },
+  install: { run: install },
 };
