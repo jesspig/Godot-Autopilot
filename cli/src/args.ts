@@ -32,8 +32,6 @@ export interface GlobalOptions {
   limitText?: string;
   offsetText?: string;
   probe?: string;
-  bind?: string;
-  noAuth?: boolean;
   file?: string;
   refresh?: boolean;
   all?: boolean;
@@ -65,7 +63,6 @@ const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
   "--limit": "limitText",
   "--offset": "offsetText",
   "--probe": "probe",
-  "--bind": "bind",
   "--file": "file",
   "--socket": "socketText",
   "--transport": "transportText",
@@ -80,7 +77,6 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--play": "play",
   "--no-import": "noImport",
   "--force": "force",
-  "--no-auth": "noAuth",
   "--refresh": "refresh",
   "--all": "all",
   "--projects": "projectsView",
@@ -178,7 +174,6 @@ Commands:
   start               Start a Godot editor
   stop                Stop a Godot editor (<id> | --id | --port | --project)
   restart             Restart a Godot editor with the same port and settings
-  serve               Run the local control-plane proxy (default 127.0.0.1:9700)
   logs                Show an instance log
   api list            List tools through the REST endpoint
   api describe <tool> Show one tool's schema through the REST endpoint
