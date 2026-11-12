@@ -5,6 +5,7 @@
     "moduleResolution": "bundler",
     "target": "ESNext",
     "noEmit": true,
+    "resolveJsonModule": true,
     "types": ["bun"]
   },
   "include": ["src", "tests", "bin"]
