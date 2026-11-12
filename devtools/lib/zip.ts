@@ -96,6 +96,7 @@ export function writeZip(archivePath: string, entries: ZipSourceEntry[]): void {
   }
 
   const centralDirectory = Buffer.concat(centralParts);
+  const localDirectory = Buffer.concat(localParts);
   const end = Buffer.alloc(22);
   end.writeUInt32LE(0x06054b50, 0);
   end.writeUInt16LE(0, 4);
@@ -103,10 +104,10 @@ export function writeZip(archivePath: string, entries: ZipSourceEntry[]): void {
   end.writeUInt16LE(entries.length, 8);
   end.writeUInt16LE(entries.length, 10);
   end.writeUInt32LE(centralDirectory.length, 12);
-  end.writeUInt32LE(offset, 16);
+  end.writeUInt32LE(localDirectory.length, 16);
   end.writeUInt16LE(0, 18);
 
-  fs.writeFileSync(archivePath, Buffer.concat([...localParts, centralDirectory, end]));
+  fs.writeFileSync(archivePath, Buffer.concat([localDirectory, centralDirectory, end]));
 }
 
 function findEndOfCentralDirectory(buffer: Buffer): number {
