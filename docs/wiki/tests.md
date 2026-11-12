@@ -54,9 +54,13 @@ build\debug\tests\gda_integration_tests.exe --gtest_filter=MetaToolsSuite.*
 # main.py 封装
 uv run main.py test                 # 全量默认门（ctest --preset <resolved>，无过滤）
 uv run main.py test --single migration_guard   # 单跑（ctest -R）
+
+# devtools 封装（Bun/TS，行为同上）
+bun run gda-dev-tools test
+bun run gda-dev-tools test --single migration_guard
 ```
 
-上列 `debug` / `release` 预设**固定 Ninja 生成器**，本机 PATH 无 ninja 时须换成 `debug-portable` / `release-portable`（无 ninja 回退路径见 [build.md](./build.md)「预设」）。走 `uv run main.py build` / `uv run main.py test` 则由 `scripts/config.py:resolve_preset()` 自动选路，`--preset` 选项仍只有 `debug` / `release` 两个。四个 preset 共用同一 `binaryDir`，测试目标与可执行文件位置均为 `build/debug/` 或 `build/release/`，不受生成器选择影响。
+上列 `debug` / `release` 预设**固定 Ninja 生成器**，本机 PATH 无 ninja 时须换成 `debug-portable` / `release-portable`（无 ninja 回退路径见 [build.md](./build.md)「预设」）。走 `uv run main.py build` / `uv run main.py test` 或 `bun run gda-dev-tools test` 则由 `resolve_preset()`（Python `scripts/config.py` / TS `devtools/lib/config.ts`）自动选路，`--preset` 选项仍只有 `debug` / `release` 两个。四个 preset 共用同一 `binaryDir`，测试目标与可执行文件位置均为 `build/debug/` 或 `build/release/`，不受生成器选择影响。
 
 - **依赖**：googletest 为 `third_party/googletest` 子模块（tag `v1.15.2`，commit `b514bdc898e2951020cbdca1304b75f5950d1f59`），随仓库检出（`git clone --recurse-submodules` 或 `git submodule update --init --recursive`），由 `tests/CMakeLists.txt:9-15` 复用 `gda_require_submodule` + `add_subdirectory` 引入，缺失即 configure 报错、不做网络回退；godot-cpp 与 mcp-cpp-sdk 同为子模块，单元与集成目标均链接（集成目标另链接 `mcp-http`，`tests/CMakeLists.txt:107-108`）。**不需要 Godot 可执行文件、不需要 `.env` / `GODOT_PATH`、不需要 `uv run main.py deploy`**——仓库测试链路无任何引擎拉起路径。
 - **测试侧构建目标**：`gda_unit_tests` / `gda_boundary_tests` / `gda_integration_tests`（ctest 常驻，分别打 `unit` / `boundary` / `integration` 标签）与 `gda_mcp_transport_probe`（`tests/probe/mcp_transport_probe.cpp`，传输自检程序，**不注册为 ctest 用例**、不计入 994，由主代理验收阶段按需执行）。
@@ -70,7 +74,7 @@ uv run main.py test --single migration_guard   # 单跑（ctest -R）
 | `tests/integration/` | 集成测试层（`harness.hpp` 夹具 + 12 个 `*_test.cpp`，标签 `integration`） |
 | `tests/support/` | `config_loader.{cpp,hpp}`（单元与边界共用的测试支撑源；原 `tests/runner/` 目录其余文件已随引擎轨删除） |
 | `tests/guard/` | 6 个源码守卫（`migration_guard.cmake` + 5 个 Python 脚本）与 `migrated_domains.txt` |
-| `tests/scripts/` | `test_cli_contract.py` / `run_cli_unit.py`（CLI 两项脚本测试） |
+| `tests/scripts/` | `test_cli_contract.py`（CLI 契约；`cli_unit` 已改由 `tests/CMakeLists.txt` 直接调 `bun test cli/tests`，不再经过 Python wrapper） |
 | `tests/probe/` | `mcp_transport_probe.cpp`（传输探针，非 ctest） |
 | `tests/CMakeLists.txt` | 三个 gtest 目标 + 10 条 `add_test`（守卫与脚本项） |
 | `tests/README.md` | 使用说明（数值一律以本页为准） |
@@ -283,7 +287,7 @@ uv run main.py test --single migration_guard   # 单跑（ctest -R）
 - `source_manifest_guard`（`source_manifest_guard.py`）：**源清单守卫**——断言 测试源清单引用的 `src/` 源 ⊆ 插件源并集，防「漏登根 `CMakeLists.txt` / 清单文件导致编译单元不进产物」的静默缺失（解析规则见该脚本模块 docstring）。
 - 守卫自测三项：`migration_guard_self_test` / `comment_guard_self_test` / `main_thread_guard_self_test`——以注入违规样本的方式验证三个源码守卫自身能报出违规（守卫的守卫）；`migration_guard_self_test` 带 `RESOURCE_LOCK` 防与其他守卫并发。
 - `cli_contract`（`tests/scripts/test_cli_contract.py`）：CLI 契约 mock conformance，详见「回归属性清单」的 CLI wire 形状行；纯 stdlib，仓库内不写盘（图片落 `tempfile`）。
-- `cli_unit`（`tests/scripts/run_cli_unit.py`）：封装 `bun test cli/tests`（cwd 为仓库根，TIMEOUT 300）；bun 缺失时打印 `SKIP` 并 exit 0（`cli_contract` 同此 SKIP 语义）。TS 用例 18 文件 296 项（2026-10-30 实测 294 pass / 2 skip / 0 fail；文件清单见「数值核算总表」CLI 行；参数化循环在运行期展开，运行期项数以 `bun test cli/tests` 实测为准）。
+- `cli_unit`（`tests/CMakeLists.txt` 直接执行 `bun test cli/tests`，cwd 为仓库根，TIMEOUT 300）：`cmake -E env` 注入 `GDA_TEST_TMPDIR` 与 `TMP`/`TEMP`/`TMPDIR`；PATH 无 bun 时注册 `cmake -E echo` 的 SKIP 用例并 exit 0（`cli_contract` 同此 SKIP 语义）。TS 用例 18 文件 296 项（2026-10-30 实测 294 pass / 2 skip / 0 fail；文件清单见「数值核算总表」CLI 行；参数化循环在运行期展开，运行期项数以 `bun test cli/tests` 实测为准）。
 - 上述 10 项与两层 gtest 目标合为默认门：`ctest --preset debug`（或 `uv run main.py test`）**无过滤全跑**——引擎轨删除后不再需要 `-E "^gda_runner_|^pool_"` 之类的排除模式。
 
 ## 数值核算总表

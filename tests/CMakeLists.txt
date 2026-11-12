@@ -198,9 +198,22 @@ add_test(NAME cli_contract
     COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_cli_contract.py")
 
 # ── ctest 注册: 新 CLI TS 单测（bun test cli/tests，cwd 为仓库根）──
-# bun 缺失时测试文件自行打印 SKIP 并 exit 0，ctest 视为通过。
-add_test(NAME cli_unit
-    COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_cli_unit.py")
+# bun 缺失时以 cmake -E echo 打印 SKIP 并 exit 0，ctest 视为通过。
+find_program(GDA_BUN_EXECUTABLE NAMES bun)
+if(GDA_BUN_EXECUTABLE)
+    file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/cli-test-tmp")
+    add_test(NAME cli_unit
+        COMMAND ${CMAKE_COMMAND} -E env
+                "GDA_TEST_TMPDIR=${CMAKE_BINARY_DIR}/cli-test-tmp"
+                "TMP=${CMAKE_BINARY_DIR}/cli-test-tmp"
+                "TEMP=${CMAKE_BINARY_DIR}/cli-test-tmp"
+                "TMPDIR=${CMAKE_BINARY_DIR}/cli-test-tmp"
+                "${GDA_BUN_EXECUTABLE}" test cli/tests)
+    set_tests_properties(cli_unit PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+else()
+    add_test(NAME cli_unit
+        COMMAND ${CMAKE_COMMAND} -E echo "SKIP: bun not found on PATH, cli unit tests skipped")
+endif()
 set_tests_properties(cli_unit PROPERTIES TIMEOUT 300)
 
 # --- ctest: guard self-tests (built-in negative samples, --self-test mode) ---

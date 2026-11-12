@@ -357,7 +357,7 @@ resource:
 | 层 | 位置 | 规模 | 说明 |
 |---|---|---|---|
 | TS 单测 | [`cli/tests/`](../../../cli/tests/) | 18 文件；`bun test cli/tests` 实测 296 项（294 pass / 2 skip，2026-10-30） | `bun test cli/tests`；静态计数：api_commands 43 / args 4 / client 17 / client_handshake 8 / commands 40 / detach 1 / lifecycle 34 / **list 13（10-30 新增）** / preflight 10 / process 8 / registry 12 / restart 4 / root_dir 7 / serve_auth 12 / serve_router 24 / serve_server 11 / stop_method 3 / target 15 |
-| ctest `cli_unit` | [`tests/scripts/run_cli_unit.py`](../../../tests/scripts/run_cli_unit.py) | 封装 `bun test` | bun 缺失时 SKIP 并 exit 0 |
+| ctest `cli_unit` | [`tests/CMakeLists.txt`](../../../tests/CMakeLists.txt) | 直接执行 `bun test cli/tests` | bun 缺失时由 CMake 注册 SKIP 并 exit 0 |
 | ctest `cli_contract` | [`tests/scripts/test_cli_contract.py`](../../../tests/scripts/test_cli_contract.py) | CLI 载体 mock conformance | bun 驱动 gda CLI；bun 缺失时 SKIP |
 | ctest `version_sync_guard` | [`tests/guard/version_sync_guard.py`](../../../tests/guard/version_sync_guard.py) | 全部版本钉与 `VERSION` 同值 | 扫描 `skills/` 全部文本文件 + 根 `README*.md` 的每一处版本钉，另含 `VERSION` 与 `CLI_VERSION` 两个值源 |
 

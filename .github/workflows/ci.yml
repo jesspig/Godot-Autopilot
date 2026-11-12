@@ -86,7 +86,7 @@ jobs:
           key: submodules-debug-${{ runner.os }}-${{ steps.submodules.outputs.shas }}
 
       - name: Build (Debug)
-        run: python main.py build
+        run: bun run gda-dev-tools build
 
       # 打包完整性自检：单平台 CI 无法交叉编译，用本地产物复制成三平台库名
       # 验证打包收集逻辑（三平台库齐备、6 个 C# 桥 .cs 入包、.pdb 不入包、
@@ -104,8 +104,8 @@ jobs:
           for name in godot-autopilot.dll libgodot-autopilot.so libgodot-autopilot.dylib; do
             cp "$native" "dist/pkg-libs/$name"
           done
-          python main.py package --libs-dir dist/pkg-libs
-          python scripts/test_package_integrity.py dist/godot-autopilot-*.zip
+          bun run gda-dev-tools package --libs-dir dist/pkg-libs
+          bun run gda-dev-tools package-check dist/godot-autopilot-*.zip
 
       # 分层执行：守卫（零依赖秒级）→ 单元 → 边界 → 集成 → CLI。
       # 分层只为失败时能一眼定位到层；全量默认门 = 这五层之和。
