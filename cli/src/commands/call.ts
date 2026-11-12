@@ -50,6 +50,7 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
     }
   }
   const target = resolveTarget(opts, TARGET_CONTEXT);
+  let usedTransport = transport;
   const envelope = await callTool(tool, args, {
     port: target.port,
     timeoutSec,
@@ -58,8 +59,11 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
     transport,
     noFallback: opts.noFallback,
     traceparent,
+    transportSink: (actual) => {
+      usedTransport = actual;
+    },
   });
-  recordCliCall(traceId, tool, envelope, startedAt, resolveTransportName(target.ipcEndpoint, transport));
+  recordCliCall(traceId, tool, envelope, startedAt, usedTransport);
   const extracted = extractPayload(envelope, { saveImages: opts.saveImages, raw: opts.raw });
   return emit(extracted, opts);
 }
@@ -95,10 +99,4 @@ function recordCliCall(
   });
 }
 
-function resolveTransportName(
-  ipcEndpoint: unknown,
-  requested: "auto" | "ipc" | "http",
-): string {
-  if (requested !== "auto") return requested;
-  return ipcEndpoint === undefined ? "http" : "auto";
-}
+function recordCliCall(
