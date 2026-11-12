@@ -15,6 +15,8 @@ export interface CallToolOptions {
   socketPath?: string;
   ipcEndpoint?: IpcEndpoint;
   noFallback?: boolean;
+  transport?: "auto" | "ipc" | "http";
+  transportSink?: (transport: "ipc" | "http") => void;
 }
 
 export const META_DIRECT_TOOLS: ReadonlySet<string> = new Set([
@@ -256,16 +258,38 @@ export async function callTool(
   opts: CallToolOptions,
 ): Promise<JsonRpcResponse> {
   const timeoutMs = (opts.timeoutSec ?? DEFAULT_TIMEOUT_SEC) * 1000;
+  const transportMode = opts.transport ?? "auto";
   const ipcEndpoint =
     opts.ipcEndpoint ?? (opts.socketPath !== undefined ? { path: opts.socketPath } : undefined);
-  if (ipcEndpoint !== undefined) {
+  if (transportMode !== "http" && ipcEndpoint !== undefined) {
     try {
-      return await callToolOverIpc(name, args, ipcEndpoint, timeoutMs, opts.direct === true);
+      const response = await callToolOverIpc(
+        name,
+        args,
+        ipcEndpoint,
+        timeoutMs,
+        opts.direct === true,
+      );
+      const tokenFailure = response.error?.code === -32001 || response.error?.code === -32002;
+      if (!tokenFailure) {
+        opts.transportSink?.("ipc");
+        return response;
+      }
+      if (transportMode === "ipc" || opts.noFallback === true) {
+        return response;
+      }
     } catch (error) {
-      if (opts.noFallback === true) {
+      if (transportMode === "ipc" || opts.noFallback === true) {
         throw error;
       }
     }
+  }
+  if (transportMode === "ipc") {
+    throw new CliError(
+      ExitCode.Transport,
+      "IPC transport was requested but no usable IPC endpoint is available.",
+      "Run 'gda status --json' to inspect the instance endpoint, or use --transport http.",
+    );
   }
   const url = `http://${HOST}:${opts.port}/mcp`;
 
@@ -303,6 +327,7 @@ export async function callTool(
   if (extracted.kind === "bad-json") {
     throw new CliError(ExitCode.Transport, "could not parse the plain-JSON response.");
   }
+  opts.transportSink?.("http");
   return extracted.envelope as JsonRpcResponse;
 }
 
