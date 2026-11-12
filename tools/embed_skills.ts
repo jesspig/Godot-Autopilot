@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-const SKILL_COUNT = 9;
+const SKILL_COUNT = 10;
 const NAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const MAX_NAME_LEN = 64;
 const MAX_DESCRIPTION_LEN = 1024;
