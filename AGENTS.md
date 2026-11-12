@@ -22,7 +22,7 @@ Godot Autopilot（GDA）：进程内 GDExtension，把 Godot 编辑器经 MCP（
 - **源码禁止注释**：除 `// namespace` 结尾标记外不得有 `//` 或 `/*…*/`，解释写进 wiki；`comment_guard` 在 ctest 阶段拦，编译通过不算过。
 - **默认安全姿态不可静默放宽**：仅绑环回、脱敏默认开、高风险工具需 `confirm`、导出期拒绝工具调用 / MCP 资源 / MCP 提示词三类入口。
 - **数值一律以运行时统计为准**，权威口径见 `docs/wiki/tests.md` 的数值核算总表；本页不记录计数。
-- **CLI 为 Bun+TS 源码直跑**：零运行时依赖、无构建步骤；发布流程另产出各平台独立二进制（5 个目标 + `sha256sums.txt`）。技能书钉 `#<VERSION>`（由 `version_sync_guard` 兜底）。
+- **CLI 为 Bun+TS 源码直跑**：零运行时依赖、无构建步骤；发布流程另产出各平台独立二进制（5 个目标 + `sha256sums.txt`）。技能书 10 册 EN/ZH 自包含、不含版本钉（`version_sync_guard` 反向守卫，`skills_guard` 校验 EN/ZH parity 与 CLI 契约）。
 
 ## 三层文档分工
 

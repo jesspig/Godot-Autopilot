@@ -197,6 +197,22 @@ add_test(NAME tool_domain_guard
 add_test(NAME cli_contract
     COMMAND "${GDA_PYTHON_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_cli_contract.py")
 
+# ── ctest 注册: skills 契约守卫（Bun 直跑；失败输出文件:行号）──
+# 校验 EN/ZH 10 册 parity、旧关键词、gda 命令/参数与 status 字段契约；
+# 与 cli_unit 里的 skills_contract.test.ts 共享同一实现。
+find_program(GDA_BUN_EXECUTABLE NAMES bun)
+if(GDA_BUN_EXECUTABLE)
+    add_test(NAME skills_guard
+        COMMAND "${GDA_BUN_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/skills_guard.ts"
+                --root "${CMAKE_SOURCE_DIR}")
+    add_test(NAME skills_guard_self_test
+        COMMAND "${GDA_BUN_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/skills_guard.ts"
+                --root "${CMAKE_SOURCE_DIR}" --self-test)
+    set_tests_properties(skills_guard skills_guard_self_test PROPERTIES LABELS "guard")
+else()
+    message(STATUS "[gda] bun not found; skills_guard runs through cli_unit (bun test cli/tests)")
+endif()
+
 # ── ctest 注册: 新 CLI TS 单测（bun test cli/tests，cwd 为仓库根）──
 # bun 缺失时以 cmake -E echo 打印 SKIP 并 exit 0，ctest 视为通过。
 find_program(GDA_BUN_EXECUTABLE NAMES bun)

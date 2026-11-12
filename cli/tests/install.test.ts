@@ -31,9 +31,27 @@ describe("install skills", () => {
     });
     expect(code).toBe(0);
     const dirs = fs.readdirSync(target, { withFileTypes: true }).filter((entry) => entry.isDirectory());
-    expect(dirs.length).toBe(9);
+    expect(dirs.length).toBe(10);
     expect(fs.existsSync(path.join(target, "godot-autopilot", "SKILL.md"))).toBe(true);
     expect(fs.existsSync(path.join(target, "godot-autopilot-tools", "SKILL.md"))).toBe(true);
+    expect(fs.existsSync(path.join(target, "godot-autopilot-setup", "SKILL.md"))).toBe(true);
+  });
+
+  test("zh 内置源与 --offline 写入中文 10 册", async () => {
+    const target = path.join(tmp, "skills-zh");
+    const code = await runInstall(["skills"], {
+      zh: true,
+      offline: true,
+      pathText: target,
+      force: true,
+    });
+    expect(code).toBe(0);
+    const dirs = fs.readdirSync(target, { withFileTypes: true }).filter((entry) => entry.isDirectory());
+    expect(dirs.length).toBe(10);
+    expect(fs.existsSync(path.join(target, "godot-autopilot-setup", "SKILL.md"))).toBe(true);
+    expect(fs.readFileSync(path.join(target, "godot-autopilot-setup", "SKILL.md"), "utf8")).toContain(
+      "Godot Autopilot 安装与连接",
+    );
   });
 
   test("已存在且内容不同时未传 force 报错", async () => {
