@@ -21,6 +21,7 @@ struct InstanceRecord {
   std::string gda_home;
   int64_t started_at{0};
   std::string version;
+  std::string port_source;
 };
 
 mcp::JsonValue record_to_json(const InstanceRecord &record);

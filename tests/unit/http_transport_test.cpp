@@ -338,37 +338,27 @@ TEST(HttpParseTest, RejectsControlCharInQueryValue) {
       godot_autopilot::http_parse::query_param_value_is_valid("ok"));
 }
 
-TEST(PortResolverTest, CandidateSequenceStartsWithDefaultPort) {
-  const std::vector<int> sequence = PortResolver::candidate_sequence(4242);
-  ASSERT_FALSE(sequence.empty());
-  EXPECT_EQ(sequence.front(), 9527);
-}
-
-TEST(PortResolverTest, CandidateSequenceStartsAtPidDerivedPort) {
-  const int pid = 12345;
-  const std::vector<int> sequence = PortResolver::candidate_sequence(pid);
-  ASSERT_GE(sequence.size(), 2u);
-  EXPECT_EQ(sequence[1], kCandidateBase + (pid % 10000));
-  EXPECT_EQ(godot_autopilot::port_auto_candidate_start(pid),
-            kCandidateBase + (pid % 10000));
-}
-
-TEST(PortResolverTest, CandidateSequenceCoversWholeRange) {
+TEST(PortResolverTest, CandidateSequenceCoversWholeRandomRange) {
   const std::vector<int> sequence = PortResolver::candidate_sequence(7);
-  EXPECT_EQ(sequence.size(), static_cast<size_t>(candidate_count()) + 1);
-  const std::set<int> unique(sequence.begin() + 1, sequence.end());
+  EXPECT_EQ(sequence.size(), static_cast<size_t>(candidate_count()));
+  const std::set<int> unique(sequence.begin(), sequence.end());
   EXPECT_EQ(unique.size(), static_cast<size_t>(candidate_count()));
-  for (size_t index = 1; index < sequence.size(); ++index) {
-    EXPECT_GE(sequence[index], kCandidateBase);
-    EXPECT_LE(sequence[index], kCandidateLimit);
+  for (int candidate : sequence) {
+    EXPECT_GE(candidate, kCandidateBase);
+    EXPECT_LE(candidate, kCandidateLimit);
   }
 }
 
-TEST(PortResolverTest, CandidateSequenceWrapsAroundLimit) {
-  const std::vector<int> sequence = PortResolver::candidate_sequence(9999);
-  ASSERT_GE(sequence.size(), 3u);
-  EXPECT_EQ(sequence[1], kCandidateLimit);
-  EXPECT_EQ(sequence[2], kCandidateBase);
+TEST(PortResolverTest, CandidateSequenceDoesNotStartWithLegacyDefault) {
+  bool any_default = false;
+  for (int attempt = 0; attempt < 8; ++attempt) {
+    const std::vector<int> sequence = PortResolver::candidate_sequence(42);
+    ASSERT_FALSE(sequence.empty());
+    if (sequence.front() == 9527) {
+      any_default = true;
+    }
+  }
+  EXPECT_FALSE(any_default);
 }
 
 TEST(PortResolverTest, ExplicitPortWinsOverPreferredPort) {
@@ -379,7 +369,7 @@ TEST(PortResolverTest, ExplicitPortWinsOverPreferredPort) {
   EXPECT_TRUE(assignment.note.empty());
 }
 
-TEST(PortResolverTest, PreferredPortWinsOverAutoAssignment) {
+TEST(PortResolverTest, PreferredPortWinsOverRandomAssignment) {
   const PortAssignment assignment = PortResolver::resolve(0, 5678, 42);
   EXPECT_EQ(assignment.source, PortSource::kConfigExplicit);
   EXPECT_EQ(assignment.port, 5678);
@@ -387,12 +377,26 @@ TEST(PortResolverTest, PreferredPortWinsOverAutoAssignment) {
   EXPECT_TRUE(assignment.note.empty());
 }
 
-TEST(PortResolverTest, AutoAssignmentUsesCandidateSequenceHead) {
+TEST(PortResolverTest, AutoAssignmentUsesRandomCandidate) {
   const PortAssignment assignment = PortResolver::resolve(0, 0, 42);
-  EXPECT_EQ(assignment.source, PortSource::kAutoAssigned);
-  EXPECT_EQ(assignment.port, 9527);
+  EXPECT_EQ(assignment.source, PortSource::kFirstRandom);
+  EXPECT_GE(assignment.port, kCandidateBase);
+  EXPECT_LE(assignment.port, kCandidateLimit);
   EXPECT_EQ(assignment.requested_port, 0);
   EXPECT_FALSE(assignment.note.empty());
+}
+
+TEST(PortResolverTest, PortSourceNamesMatchContract) {
+  EXPECT_STREQ(godot_autopilot::port_source_name(PortSource::kEnvExplicit),
+               "env");
+  EXPECT_STREQ(godot_autopilot::port_source_name(PortSource::kConfigExplicit),
+               "persisted");
+  EXPECT_STREQ(godot_autopilot::port_source_name(PortSource::kUserApplied),
+               "persisted");
+  EXPECT_STREQ(godot_autopilot::port_source_name(PortSource::kFirstRandom),
+               "first_random");
+  EXPECT_STREQ(godot_autopilot::port_source_name(PortSource::kAutoReassigned),
+               "auto_reassigned");
 }
 
 TEST(HttpPumpLimitsTest, ServiceIndexWrapsAround) {
