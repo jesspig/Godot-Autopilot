@@ -97,7 +97,7 @@ flowchart TD
 - Tasks：`enable_tasks_extension=true` + `FileTaskStore(<gda_home>/tasks/tasks.jsonl)`；`call_tool` 以 `Task/Optional` 注册，支持 `tasks/get|update|cancel`，不支持任务的客户端同步退化。
 - Progress：`batch_execute` 在请求带 progress token 时发送开始/结束两条 `notifications/progress`（当前不逐 operation 上报）。
 - MRTR：full 直接工具在客户端声明 elicitation 且未带 `confirm` 时返回 `input_required`；`accept` 注入 `confirm=true`，`decline/cancel` 不执行。`call_tool` 仍走 `confirmation_required`。
-- Skills：`enable_skills_extension=true`，10 册技能以 `godot://skills/<name>/SKILL.md` 注册为 `mcp::Skill`（resources=dynamic）；旧 `godot://skills/...` 资源保留。
+- Skills：`enable_skills_extension=true`，10 册技能以 `godot://skills/<name>/SKILL.md` 注册为 `mcp::Skill`（resources=dynamic）；旧 `godot://skills/...` 资源保留。Skills 是 2026 协议能力：客户端必须先发 `server/discover`（不要用 `initialize`）再把 `MCP-Protocol-Version: 2026-07-28` 与 `params._meta` 带到 `skills/list|get`；`initialize` 仍按 2025-11-25 协商，供旧客户端使用。live 验证 `skills/list` 返回 10 册、`skills/get` 与旧资源读取均可用。
 - `gda status --json` 的 `mcp` 块暴露协议版本、capabilities 与 serverInfo，脚本可先判断扩展再选命令。
 
 ## Schema 统计口径
