@@ -108,7 +108,7 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
   let envelope = await callTool(tool, args, {
     port: target.port,
     timeoutSec,
-    direct: META_DIRECT_TOOLS.has(tool),
+    direct: opts.direct === true || META_DIRECT_TOOLS.has(tool),
     ipcEndpoint: target.ipcEndpoint,
     transport,
     noFallback: opts.noFallback,
@@ -148,7 +148,7 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
     envelope = await callTool(tool, args, {
       port: target.port,
       timeoutSec,
-      direct: META_DIRECT_TOOLS.has(tool),
+      direct: opts.direct === true || META_DIRECT_TOOLS.has(tool),
       ipcEndpoint: target.ipcEndpoint,
       transport,
       noFallback: opts.noFallback,
