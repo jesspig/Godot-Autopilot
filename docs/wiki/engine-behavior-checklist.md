@@ -45,7 +45,7 @@ resource: src/tools/
 ## 域 1：元工具与工具面契约
 
 - ping 返回 pong（`00_meta.json`）。
-- search_tools：空 query 枚举 catalog 全量、每项含 name 与 score；关键词、分类、标签三查均返回非空 results（`00_meta.json`、`03_tools_contract.json` 工具面契约）。
+- search_tools：空 query 默认最多 20 条、每项含 name 与 score；`limit:0` 才枚举 catalog 全量；关键词、分类、标签三查均返回非空 results（`00_meta.json`、`03_tools_contract.json` 工具面契约）。
 - list_categories 返回非空 categories（`00_meta.json`）。
 - get_tool_detail：命中返回 `tool.*` 形状且 `input_schema` 为对象；未知名返回 `tool not found`；缺 name 报 `missing required parameter`（`00_meta.json`）。对运行时枚举的全部工具，`side_effect`/`mutating`/`dynamic` 字段存在且类型可读（`03_tools_contract.json`，集成层 toolface 契约承接）。
 - `side_effect` 序列化为枚举名、机器可读：`code_execute` 工具的 detail 返回 `tool.side_effect == "code_execute"`（`40_contract_assert.json`）。
