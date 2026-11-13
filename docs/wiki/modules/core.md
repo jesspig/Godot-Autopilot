@@ -11,7 +11,7 @@ timestamp: "2026-10-30T04:17:36+08:00"
 resource: src/core/
 ---
 
-> **0.3.2**：trace 升至 v4（`schema_version`/`event_id`/`source`/`transport`/延迟拆分/`confirm`/args/result hash）；REST、API token 与 `PluginConfig` 的 `allow`/`auth_mode` 已移除。
+> **0.3.2**：trace 升至 v4（`schema_version`/`event_id`/`source`/`transport`/延迟拆分/`confirm`/args/result hash）；REST、API token 与 `PluginConfig` 的 `allow`/`auth_mode` 已移除。正文中 `McpConfigDock`、`allow`/`auth_mode` 与面板 Apply 相关消费方描述为 0.3.2 前历史口径。
 
 # 核心模块（src/core/）
 
@@ -50,7 +50,7 @@ resource: src/core/
 | `StoragePaths` | `storage_paths.cpp/hpp`（10-21 新增） | 语义化存储路径门面：全局配置、工程目录、工程配置、`logs/`、`traces/`、`captures/` 六个目录的绝对路径 | `LogPersist`（日志/轨迹落盘）、`capture_ops`（截图落盘）、`PluginConfig` |
 | `InstanceRegistry` | `instance_registry.cpp/hpp`（10-21 新增） | 实例登记：单实例记录读写删 + **全局索引重建**（遍历全部工程目录下的实例文件汇总写回 `<集中根>/instances.json`）；记录含 `instance_id`/`port`/`pid`/`project_path`/`api_token`/`endpoints`/`gda_home`/`started_at`/`version` | `ServerContext::write_instance_record` / `remove_instance_record`、CLI 侧发现链 |
 | `LegacyStore` | `legacy_store.cpp/hpp`（10-21 新增） | 遗留数据兼容：旧目录 `user://godot_autopilot` 定位、配置项**回退选取**（新路径缺键时取旧路径并标记来源）、按相对路径分类（全局配置 / 日志 / 轨迹 / 截图）、**复制式**导入规划与执行（不覆盖已存在目标、不删除源） | `PluginConfig`（回退读取）、`McpConfigDock`（导入入口） |
-| `PortResolver` | `port_resolver.cpp/hpp`（10-21 新增） | 端口分配：显式（环境变量）/ 配置偏好 / 自动分配三级判定 + 候选序列生成（先默认端口 9527，其后 `20000 + (进程号 mod 10000)` 起连续到 29999 并回绕） | `ServerContext::bind_transport` |
+| `PortResolver` | `port_resolver.cpp/hpp`（10-21 新增） | 端口分配：显式（环境变量）/ 配置偏好 / 自动分配三级判定 + `[20000, 29999]` 随机候选序列（0.3.2 起不优先 9527） | `ServerContext::bind_transport` |
 | `InstanceGuard` | `instance_guard.cpp/hpp`（10-21 新增） | 同工程实例守卫：启动前（**绑定端口之前**）判定「同一工程是否已有存活实例」——进程存活（Windows `OpenProcess` + `GetExitCodeProcess`，权限不足时保守判存活；POSIX `kill(pid, 0)`）与端口占用（临时套接字 `bind`，不设 `SO_REUSEADDR`）**两条同时成立**才算冲突；命中即拒绝启动（不监听端口、不写登记）并给出含端口/进程号与豁免开关 `GODOT_AUTOPILOT_ALLOW_MULTI_INSTANCE=1` 的提示（`conflict_message`，不含令牌等敏感信息）；工程路径比较忽略分隔符风格与尾斜杠，Windows 下忽略大小写 | `ServerContext` 启动前检查、`McpConfigDock` 状态区显示 `last_error_` |
 | `TransportLifecycle` | `transport_lifecycle.hpp`（header-only，10-21 新增） | 线程退出契约的纯逻辑判定：阶段先判完成再执行、停止标志阻断新任务、预算比较为独占、超预算 worker 在优雅关闭时挂起、终态关闭改为 join 而非挂起、只收割已完成的 worker、挂起容器收割后清空 | `http_transport.cpp`（连接工作线程的有界等待与卸载前收割） |
 | `PortRecovery` | `port_recovery.hpp`（header-only，10-21 新增） | 同工程残留登记的甄别与提示：同工程路径比较（忽略分隔符风格）、区分陈旧与存活记录、跳过当前进程自己的记录、生成不含令牌的残留提示 | `InstanceGuard` 绑定前的残留清理 |
@@ -312,9 +312,9 @@ flowchart LR
 ## 环境变量与端口
 
 - `GODOT_AUTOPILOT_PORT`：`ServerContext::resolve_explicit_port()` 用 `std::getenv` 读取、`std::atoi` 转换（**无格式校验**）
-- **端口解析优先级（10-21 起为三级）**：**环境变量 > 工程级配置偏好（`PluginConfig::load_port()`，需 > 0）> 自动分配**——环境变量优先保证测试/CI 场景不受面板配置影响；自动分配按候选序列顺延（先 9527，其后 `20000 + (进程号 mod 10000)` 起连续到 29999 并回绕），**显式指定的端口绑定失败时不自动更换**。控制面板 Apply 的运行期改端口（`kUserApplied`）优先级最高。完整口径见 [端口与实例登记](ports.md)
+- **端口解析优先级（0.3.2 起）**：**环境变量 > 工程级配置偏好（`PluginConfig::load_port()`，需 > 0）> 自动分配**——自动分配在 `[20000, 29999]` 的随机候选序列中取首个可用端口，**不优先 9527**；**显式指定的端口绑定失败时不自动更换**。控制面板 Apply 已移除，无运行期改端口 UI。完整口径见 [端口与实例登记](ports.md)
 - `GODOT_AUTOPILOT_HOST`：`resolve_host()` 用 `std::getenv` 读取，非空即生效；默认环回绑定 `127.0.0.1`，`ServerContext::start()` 拒绝非环回地址
-- 运行时改端口：`ServerContext::restart(uint16_t)`（配置面板 Apply 触发，成功后经 `PluginConfig::save_port` 持久化）
+- 运行时改端口：`ServerContext::restart(uint16_t)` 仍在实现中，但 0.3.2 起配置面板 Apply 已删除，无 UI 调用点
 - `GDA_FORCE_HEADLESS`：值为 `1` 时**禁用** cmdline 模式（强制建 UI/启服务器，语义与变量名相反；`main.cpp:52-60` 读取）
 - `GODOT_AUTOPILOT_HOME`（10-21 新增）：**家目录集中根的显式覆写**（指向家目录本身，根目录名 `.godot-autopilot` 由其拼出）；形状不合法时记 Warning。插件侧优先级最高，CLI 侧亦识别（但 CLI 只做两级解析，不做存在性校验）
 - `GODOT_AUTOPILOT_API_TOKEN`（10-21 新增）：REST 端点的 Bearer 令牌**外部注入入口**；一旦设置即完全覆盖令牌文件（既用于校验，也用于签发）
@@ -332,7 +332,7 @@ flowchart LR
 
 | 常量 | 值 | 类型 | 主要用途 |
 |---|---|---|---|
-| `GDA_DEFAULT_PORT` | `9527` | `int` | 默认监听端口（MCP 与 REST 共用） |
+| `GDA_DEFAULT_PORT` | `9527` | `int` | 保留常量；0.3.2 起不再优先，自动分配走 20000–29999 随机序列 |
 | `GDA_PORT_CANDIDATE_BASE` | `20000` | `int` | 自动分配端口候选区间下界 |
 | `GDA_PORT_CANDIDATE_LIMIT` | `29999` | `int` | 自动分配端口候选区间上界（低于私有动态端口区间 32768） |
 | `GDA_PORT_PROBE_LIMIT` | `256` | `int` | 自动分配时最多探测的候选数（`static_assert` 不得超候选总数） |
@@ -379,8 +379,8 @@ flowchart LR
 | AGENTS.md（构建段） | 暗示每个模块有成对的 `.cpp/.hpp` 参与 `add_library()` | `command_queue.hpp` 无对应 `.cpp`，header-only，不进 CMake 源列表 | 文档未明说，审计时需注意 |
 | README.md / README.zh-CN.md（前提） | "Godot 4.7+"（`README.md:5,53` / `README.zh-CN.md:5,53`） | demo 工程为 4.7（`examples/*/project.godot`），AGENTS.md 亦写 4.7 | 一致 ✓ |
 | README.md / README.zh-CN.md（安装） | "服务端自动启动……无需启用开关"（`README.md:65` / `README.zh-CN.md:65`） | cmdline/`GDA_FORCE_HEADLESS` 模式下 UI 与服务器被禁用（`main.cpp`） | 存在例外，描述不完整 |
-| AGENTS.md（架构/端口段） | 端口 9527、`/mcp`、`GODOT_AUTOPILOT_PORT` 覆盖、日志类别五枚举 | 全部与代码一致 | 一致 ✓ |
-| README.md / README.zh-CN.md（安全段） | 回环监听 + 端口 9527 + `/mcp`（`README.md:65` / `README.zh-CN.md:65`） | 环回与 `/mcp` 仍成立，但同端口新增了 `/api`（REST 面，需 Bearer 令牌），且端口可被自动分配到 20000–29999 | **描述不完整**（缺 REST 端点与自动分配端口） |
+| AGENTS.md（架构/端口段） | 端口自动分配（20000–29999，按工程持久化）、`/mcp`、`GODOT_AUTOPILOT_PORT` 覆盖、日志类别五枚举 | 全部与代码一致 | 一致 ✓ |
+| README.md / README.zh-CN.md（安全段） | 回环监听 + 端口自动分配（20000–29999）+ `/mcp` + 高风险工具 `confirm` | 与代码一致 | 一致 ✓ |
 | AGENTS.md | 日志类别 "仅此几个：System、Transport、Tools、Resources、Prompts" | `LogCategory` 枚举完全相同 | 一致 ✓ |
 
 ## 相关页面

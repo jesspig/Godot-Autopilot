@@ -44,20 +44,17 @@ resource:
 - 审计仍记录工具、side_effect、结果与错误；确认状态进入 trace 事件。
 ## 1. 可信客户端模型
 
-- 默认模型是“同一用户账户下、同一台机器上的受信 MCP 客户端”。默认监听 `127.0.0.1:9527/mcp`，这不是身份认证；能够连接本机端口的其他本地进程也视为可调用方。
+- 默认模型是“同一用户账户下、同一台机器上的受信 MCP 客户端”。默认监听 `127.0.0.1:<port>/mcp`（端口由插件首次启动在 20000–29999 随机分配并持久化），这不是身份认证；能够连接本机端口的其他本地进程也视为可调用方。
 - 服务器不应把客户端名称、版本或 MCP 初始化信息当作认证凭据。日志中的客户端信息只用于诊断，不改变授权边界。
 - 暴露给非环回地址等价于把编辑器控制权暴露给网络可达方；在没有认证、授权和加密层时不得作为安全的远程部署方式。
-- **两套协议面的信任模型不同**（10-21 起）：同一端口上并存 `/mcp`（MCP）与 `/api`（REST）。
-  - **`/mcp` 仍无认证**——沿用「环回 + 可信客户端」模型不变。
-  - **`/api` 要求 Bearer 令牌**：除 `/api/health` 外所有端点都要 `Authorization: Bearer <令牌>`，缺失或不匹配即 401。这是**纵深防御**，不是把 REST 面变成可对外暴露的服务——令牌只配合环回绑定使用，仍禁止把端口转发、代理或暴露到非环回地址。
-  - REST 面的令牌**不替代**授权门：认证解决「谁在调用」，授权（§3.1）解决「能做什么」，两者都过才放行。
+- **0.3.2 起只有 `/mcp` 一个协议面**：REST `/api`、API token 与 Bearer 认证已移除；`/mcp` 沿用「环回 + 可信客户端」模型，无应用层认证。高风险工具改由 `confirm=true` 控制（§3）。
 
 ## 2. 监听要求
 
 - 默认必须绑定环回地址 `127.0.0.1`；`GODOT_AUTOPILOT_HOST` 是显式覆盖入口，不得静默改变默认值。
 - 截至 2026-09-02 实现，非环回地址在 `ServerContext::start()` 直接拒绝启动并返回 `refusing non-loopback listen address` 错误，不会进入工具注册或传输启动；该策略避免无认证远程控制面。后续如需支持远程，需先提供应用层认证并显式允许。
 - `GODOT_AUTOPILOT_HOST=0.0.0.0` 表示监听所有接口，只能作为明确的运维选择；文档、配置界面和诊断日志必须让该风险可见，当前实现会拒绝该值。
-- 端口解析顺序（10-21 起改为三级）：**环境变量 `GODOT_AUTOPILOT_PORT` ＞ 工程级配置偏好（集中根下工程目录的 `config.json` 的 `port` 键）＞ 自动分配**。自动分配先试默认端口 9527，冲突则从 `20000 + (进程号 mod 10000)` 起顺延到 29999 并回绕。**显式指定端口（环境变量 / 配置偏好 / 面板 Apply）绑定失败时不自动更换**，直接启动失败并报 `the requested port N is unavailable: <原因>`；只有自动分配才顺延。监听地址与端点为独立配置，端点固定为 `/mcp` 与 `/api`，端口是唯一可配项。端口模型与候选序列见 [端口与实例登记](modules/ports.md)。
+- 端口解析顺序：**环境变量 `GODOT_AUTOPILOT_PORT` ＞ 工程级配置偏好（集中根下工程目录的 `config.json` 的 `port` 键）＞ 自动分配**。自动分配在 `20000–29999` 的随机候选序列中取首个可用端口。**显式指定端口（环境变量 / 配置偏好）绑定失败时不自动更换**，直接启动失败并报 `the requested port N is unavailable: <原因>`；只有自动分配才顺延。监听地址与端点为独立配置，端点固定为 `/mcp`，端口是唯一可配项。端口模型与候选序列见 [端口与实例登记](modules/ports.md)。
 - 环回约束是**两层**，缺一不可，改任一层都要重新验证：
   - **绑定层**（本项目）：`ServerContext::start()` 用 `is_loopback_host()` 判定 `127.0.0.1`/`::1`/`[::1]`，其余值拒绝启动（`src/core/server_context.cpp:28-29`、`:75-76`）。
   - **请求层**（依赖）：mcp-cpp-sdk 在 HTTP 层校验请求 `Host` 头，默认白名单仅 `localhost`/`127.0.0.1`/`::1`（`Impl::IsLocalhostHost`），不匹配即拒绝；仅当构造 HTTP 服务时显式传入 `allowed_hosts` 才会改用自定义白名单，本项目未设置该选项。当前锁定版本见 `third_party/mcp-cpp-sdk` 子模块（tag `0.3.8`，commit `d79f9b16ffe512282a62b9bd6c786d0887ee6963`，由 `.gitmodules` 与 gitlink 确定）。
@@ -91,7 +88,9 @@ resource:
 
 09-29 E2E 韧性批次：8 个 SceneTree 工具（`set_scene_tree_pause`、`is_scene_tree_paused`、`reload_scene_tree_current_scene`、`set_scene_tree_debug_collisions_hint`、`call_scene_tree_group`、`notify_scene_tree_group`、`get_scene_tree_nodes_in_group`、`create_scene_tree_timer`）由操作编辑器树改为经游戏通道 `scene_tree` op 转发到运行中游戏进程，全部标记 `SideEffect::GameRuntime`（`game_runtime` 授权面 +8，含只读的 `is_scene_tree_paused`/`get_scene_tree_nodes_in_group`）；无游戏进程时返回结构化错误，编辑器树不再被这些工具触碰。本批未放宽任何默认安全姿态（授权仍默认拒绝、脱敏仍默认开启、监听仍仅环回）。
 
-### 3.1 能力授权门（09-02 引入，09-13 扩展，10-20 收敛为纯 `side_effect` 判定，10-21 扩为三档）
+### 3.1 能力授权门（09-02 引入，09-13 扩展，10-20 收敛为纯 `side_effect` 判定，10-21 扩为三档；**0.3.2 已移除**）
+
+> **0.3.2 起本节授权门（`allow` / `GODOT_AUTOPILOT_ALLOW` / `auth_mode` / 面板开关）已全部删除**，高风险工具改由 `confirm=true` 控制；以下 §3.1.1–§3.1.3 保留为历史契约，不再对应当前实现。
 
 高风险能力除 `side_effect` 标记外还受调用级授权门约束，检查发生在**每次工具调用**（无缓存）：
 

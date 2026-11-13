@@ -304,20 +304,18 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 | 集成 | 109（12 个 `*_test.cpp`） | 命令：`grep -cE "^TEST(_F)?\(" tests/integration/*_test.cpp`（2026-11-09 实测 109 = 冒烟 1 + MetaToolsSuite 12 + EditorInputSuite 6 + AuthorizationGate 1 + 校验类 43 + 通道契约 30 + 工具面 16）；分支 gtest 实测：试点 20/20（`.handoff/evidence/T-02/mapping.md`）、63 = 20 + 43（`T-04/gtest-output.txt`）、50 = 20 + 30（`T-05/gtest-output.txt`）、36 = 20 + 16（`T-06/gtest-output.txt`） | 一致 |
 | 守卫与脚本项 | 以 `ctest -N` 为准（2026-11-13 新增 `no_python_guard` 与自测两条，本页未重跑） | 命令：`grep -c "^add_test(" tests/CMakeLists.txt`；证据：`tests/CMakeLists.txt` 的 `add_test` 注册 | 待复核 |
 | ctest 注册总数 | 996 = 636 + 239 + 109 + 10 + 2（单元 + 边界 + 集成 + 守卫 + CLI） | 命令：`ctest --preset debug -N`；证据：`.handoff/evidence/T-08/ctest-N-after.txt`（`Total Tests: 994`，`gda_runner_*`/`pool_*` 零命中）；全量 ctest **100% tests passed out of 994**（`.handoff/evidence/T-08/manifest.md`） | 实测已复核 |
-| CLI TS 单测 | 18 个文件 / 296 项（294 pass + 2 skip + 0 fail，2026-10-30 实测口径） | 命令：`bun test cli/tests`；静态：`cli/tests/*.test.ts` 18 个文件（api_commands / args / client / client_handshake / commands / detach / lifecycle / list / preflight / process / registry / restart / root_dir / serve_auth / serve_router / serve_server / stop_method / target）；参数化循环在运行期展开，运行期项数以实测为准 | 一致 |
+| CLI TS 单测 | 25 个文件 / 255 项（237 pass + 18 skip + 0 fail，2026-11-13 实测口径） | 命令：`bun test cli/tests`；静态：`cli/tests/*.test.ts` 25 个文件；参数化循环在运行期展开，运行期项数以实测为准 | 一致 |
 | 技能书 | EN 嵌入 10 册 / 10 文件；EN+ZH 源共 20 文件（各 10 SKILL.md） | 命令：`find skills skills-zh -type f | wc -l`（当前 20）；各 10 个册目录 | 一致 |
 | MCP skills 资源 | 21（1 目录 + 10 单册 + 10 单文件） | `register_skill_resources` 按 `skills/` 内嵌文件动态注册 | 一致 |
 | add_library 源文件 | 115 个 `.cpp`（main 1 / core 34 / tools 54 / util 8 / prompts 9 / runtime 4 / resources 3 / ui 2） | 命令：`find src -name "*.cpp" | wc -l`（2026-11-09 实测 115）；根 `CMakeLists.txt` 经 `cmake/sources/*.cmake` 聚合 | 一致 |
 | 传输探针 | 1 个构建目标（`gda_mcp_transport_probe`），非 ctest、不计入 994 | `cmake/sources/api_probe.cmake`；诊断工具，验收阶段按需执行 | 一致 |
 | 客户端配置 | 20 个 | `src/util/client_config_gen.hpp` 的 `enum class ClientId` 20 个具名项（`COUNT` 为哨兵） | 一致 |
-| 端口 | 9527（默认）；自动分配候选区间 20000–29999，探测上限 256 | `src/core/config.hpp`：`GDA_DEFAULT_PORT = 9527`、`GDA_PORT_CANDIDATE_BASE/LIMIT = 20000/29999`、`GDA_PORT_PROBE_LIMIT = 256`、`GDA_CONTROL_PORT_BASE/LIMIT = 19900/19999`、`GDA_PRIVATE_PORT_BASE = 32768`（四条 `static_assert` 约束）；候选序列首项 9527，其后自 `20000 + (pid mod 10000)` 起连续递增并回绕（`src/core/transport/port_resolver.cpp`）；显式指定绑定失败不自动更换 | 一致 |
-| REST 端点数 | 8 | `src/core/transport/api_surface.cpp` 的 `build_index_document()` 端点清单 8 条 | 一致 |
-| REST 分页与批量上限 | 工具清单默认页 500 / 单页上限 2000 / 批量操作数上限 256 / 工具名长度上限 128 | `src/core/transport/api_surface.hpp`：`kDefaultToolListLimit` / `kMaxToolListLimit` / `kMaxBatchOperations` / `kMaxToolNameLength` | 一致 |
-| REST 认证 | 令牌 32 字节随机值的十六进制（64 个小写十六进制字符）；除 `GET /api/health` 外全部端点需 Bearer 令牌 | `src/core/config.hpp` 的 `GDA_API_TOKEN_BYTES = 32`；`api_token.cpp` 的 `generate_token()`/`to_hex()`/`constant_time_equals()`；`api_auth.cpp` 的 `load_token()`（环境变量优先于令牌文件） | 一致 |
+| 端口 | 无默认端口；首次在 20000–29999 随机分配并持久化，探测上限 256 | `src/core/config.hpp`：`GDA_PORT_CANDIDATE_BASE/LIMIT = 20000/29999`、`GDA_PORT_PROBE_LIMIT = 256`、`GDA_CONTROL_PORT_BASE/LIMIT = 19900/19999`、`GDA_PRIVATE_PORT_BASE = 32768`（四条 `static_assert` 约束）；候选序列为 `[20000, 29999]` 随机排列（`src/core/transport/port_resolver.cpp`）；显式指定绑定失败不自动更换 | 一致 |
+| REST 端点数 | 0（0.3.2 已移除） | `src/core/transport/api_surface.cpp` 仍留在构建中但入口无调用点，属待清理死代码 | 已移除 |
 | 请求体上限 | 4 MiB | `src/core/transport/http_parse.hpp` 的 `kMaxBodyBytes`（超限由传输层直接 413） | 一致 |
-| 授权档位与能力名 | 3 档 / 7 个能力名 | `src/tools/base/tool_base.hpp` 的 `tier_for_side_effect()`（读档默认放行、写档与危险档默认拒绝）；`src/tools/base/authorization.hpp` 的 `kKnownCapabilities` 共 7 项 | 一致 |
-| 破坏类档位 | 6 个声明者 + 4 档判据 | `src/tools/base/side_effect_policy.hpp` 的 `kTierCriteria` 四档判据与两条边界规则、`kDestructiveExemptions` 9 条豁免白名单（每条带理由）；声明 `destructive` 的工具 6 个；单元测试 用例 `destructive_tier_guard_test` 防漂移 | 一致 |
-| 授权模式 | 2 档（`strict` / `legacy`） | `src/tools/base/authorization.hpp` 的 `AuthMode`、`parse_auth_mode()`；来源优先级环境变量 > 配置 `auth_mode` 键 > 默认严格，非法值回落严格并告警 | 一致 |
+| 授权档位与能力名 | 0（0.3.2 已移除授权门） | `authorization.hpp` 与 `GODOT_AUTOPILOT_ALLOW` 已删除；高风险工具改由 `confirm=true` 控制 | 已移除 |
+| 破坏类档位 | 6 个声明者 + 4 档判据 | `src/tools/base/side_effect_policy.hpp` 的 `kTierCriteria` 四档判据与两条边界规则、`kDestructiveExemptions` 9 条豁免白名单（每条带理由）；声明 `destructive` 的工具 6 个；0.3.2 起判据保留但不再驱动授权门，高风险工具由 `confirm` 控制；单元测试 用例 `destructive_tier_guard_test` 防漂移 | 判据保留 |
+| 授权模式 | 0（0.3.2 已移除） | `AuthMode` / `GODOT_AUTOPILOT_AUTH_MODE` 已删除 | 已移除 |
 | 面板可勾选能力 | 6 项（`read` 无开关） | `src/tools/base/authorization.hpp` 的 `kDockToggleCapabilities`；面板控件由 `src/ui/authorization_switches.hpp` 的 `kSwitchLabels` 生成；单元测试断言见 `authorization_dock_toggle_test` | 一致 |
 | 主线程预算 | 默认 27000 ms / 健康探针 5000 ms / 长阻塞 29000 ms | `src/core/config.hpp:16-20`（常量即生效值）；预算选择逻辑 `src/tools/base/dispatch.cpp:288-298`；长阻塞预算经 `env_int_clamped` 钳制在 `[1000, 29000]`，未设 `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS` 时生效 29000 ms | 一致 |
 | `code_execute` 超时上界 | 静态 27000 ms，实际生效 = `min(27000, 生效长阻塞派发预算)` | `src/core/config.hpp:45` `GDA_CODE_EXEC_MAX_TIMEOUT_MS = 27000`；唯一实现点 `code_exec_ops.cpp:464-470` 的 `max_timeout_ms()`；派发侧余量 2000 ms、传输侧余量 2000 ms，由 `config.hpp:48-62` 三条 `static_assert` 约束 | 一致 |
