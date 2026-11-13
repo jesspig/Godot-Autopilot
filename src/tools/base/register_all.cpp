@@ -726,6 +726,12 @@ static void register_surface_tool(
     if (effect == SideEffect::Process || effect == SideEffect::GameRuntime) {
         opts.open_world_hint = true;
     }
+    if (tool_name == "call_tool") {
+        mcp::ToolExecution execution;
+        execution.mode = mcp::ToolExecutionMode::Task;
+        execution.task_support = mcp::TaskSupport::Optional;
+        opts.execution = execution;
+    }
     server.RegisterTool(
         tool_name, opts,
         [tool_name, registry, &queue, surface_tool](
@@ -750,6 +756,99 @@ static void register_surface_tool(
             mcp::JsonValue args = ctx.Params().arguments
                 ? *ctx.Params().arguments
                 : mcp::JsonValue(mcp::JsonValue::object_tag);
+            if (tool_name != "call_tool") {
+                const SideEffect effect = side_effect_of(*surface_tool);
+                if (confirmation::required_for(effect) &&
+                    !confirmation::provided(args)) {
+                    bool elicitation = false;
+                    if (auto capabilities =
+                            ctx.Server().GetClientCapabilities()) {
+                        elicitation = capabilities->elicitation.has_value();
+                    }
+                    if (elicitation) {
+                        auto* responses = ctx.Params().input_responses
+                            ? &*ctx.Params().input_responses
+                            : nullptr;
+                        if (responses != nullptr && responses->IsObject()) {
+                            auto* confirm = responses->Find("confirm");
+                            if (confirm != nullptr && confirm->IsObject()) {
+                                auto* action = confirm->Find("action");
+                                if (action != nullptr && action->IsString() &&
+                                    action->GetString() == "accept") {
+                                    args["confirm"] = mcp::JsonValue(true);
+                                } else {
+                                    mcp::CallToolResult declined;
+                                    declined.is_error = true;
+                                    declined.content.push_back(mcp::TextContent{
+                                        "text",
+                                        "confirmation declined: the tool was not executed"});
+                                    return declined;
+                                }
+                            }
+                        } else {
+                            mcp::CallToolResult required;
+                            required.input_required = mcp::InputRequiredResult{};
+                            mcp::InputRequest request;
+                            request.method = "elicitation/create";
+                            mcp::JsonValue params(
+                                mcp::JsonValue::object_tag);
+                            params["mode"] = mcp::JsonValue("form");
+                            params["message"] = mcp::JsonValue(
+                                "This tool has a " +
+                                std::string(side_effect_name(effect)) +
+                                " side effect. Confirm to continue.");
+                            mcp::JsonValue schema(
+                                mcp::JsonValue::object_tag);
+                            schema["type"] = mcp::JsonValue("object");
+                            mcp::JsonValue properties(
+                                mcp::JsonValue::object_tag);
+                            mcp::JsonValue confirm_property(
+                                mcp::JsonValue::object_tag);
+                            confirm_property["type"] =
+                                mcp::JsonValue("boolean");
+                            confirm_property["description"] = mcp::JsonValue(
+                                "Confirm the high-risk tool call");
+                            properties["confirm"] =
+                                std::move(confirm_property);
+                            schema["properties"] = std::move(properties);
+                            mcp::JsonValue required_fields(
+                                mcp::JsonValue::array_tag);
+                            required_fields.PushBack(
+                                mcp::JsonValue("confirm"));
+                            schema["required"] =
+                                std::move(required_fields);
+                            params["requestedSchema"] = std::move(schema);
+                            request.params = std::move(params);
+                            required.input_required->input_requests["confirm"] =
+                                std::move(request);
+                            return required;
+                        }
+                    }
+                }
+            }
+            std::optional<mcp::ProgressToken> progress_token;
+            int64_t progress_total = 0;
+            if (tool_name == "batch_execute" && ctx.Params().meta &&
+                ctx.Params().meta->progress_token.has_value()) {
+                progress_token = ctx.Params().meta->progress_token;
+                if (auto* operations = args.Find("operations");
+                    operations && operations->IsArray()) {
+                    progress_total =
+                        static_cast<int64_t>(operations->GetArray().size());
+                }
+            }
+            const auto send_progress =
+                [&ctx, &progress_token, progress_total](
+                    double progress, const std::string& message) {
+                    if (!progress_token.has_value()) return;
+                    try {
+                        ctx.Server().SendProgress(
+                            *progress_token, progress,
+                            static_cast<double>(progress_total), message);
+                    } catch (...) {
+                    }
+                };
+            send_progress(0.0, "batch_execute started");
             bool run_on_transport_thread = tool_name == "call_tool";
             if (tool_name == "batch_execute") {
                 if (auto* await_async = args.Find("await_async");
@@ -774,6 +873,10 @@ static void register_surface_tool(
             int64_t new_errors = error_watermark::count_response_errors(res);
             if (new_errors > 0) {
                 error_watermark::record_error(new_errors);
+            }
+            if (progress_token.has_value()) {
+                send_progress(static_cast<double>(progress_total),
+                              "batch_execute completed");
             }
             mcp::CallToolResult mcp_result;
             if (tool_result_is_error(res)) {

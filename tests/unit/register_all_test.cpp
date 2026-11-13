@@ -3,8 +3,10 @@
 
 #include <gtest/gtest.h>
 
+#include <mcp/Capabilities.hpp>
 #include <mcp/McpError.hpp>
 #include <mcp/Methods.hpp>
+#include <mcp/storage/FileTaskStore.hpp>
 #include <mcp/client/McpClient.hpp>
 #include <mcp/protocol/McpSessionHandler.hpp>
 #include <mcp/protocol/WireCodec.hpp>
@@ -13,6 +15,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <filesystem>
 
 #include "core/command_queue.hpp"
 #include "tools/base/dispatch.hpp"
@@ -442,6 +445,56 @@ TEST(RegisterAllSurfaceTest, FullSurfaceSendsListChangedOnDynamicRefresh) {
 
   session->Close();
   full_server->Close();
+}
+
+TEST(RegisterAllSurfaceTest, TasksExtensionIsAdvertisedAndCallToolIsTaskOptional) {
+  auto pair = mcp::InMemoryTransport::CreatePair();
+  const std::filesystem::path task_path =
+      std::filesystem::temp_directory_path() /
+      "gda_tasks_test_register_all.jsonl";
+  std::filesystem::remove(task_path);
+  mcp::ServerOptions task_options;
+  task_options.enable_tasks_extension = true;
+  task_options.task_store = std::make_shared<mcp::FileTaskStore>(task_path);
+  auto task_server = mcp::McpServer::Create(pair.server, task_options);
+
+  godot_autopilot::CommandQueue task_queue;
+  godot_autopilot::ToolCatalog task_catalog;
+  godot_autopilot::Bm25Index task_index;
+  godot_autopilot::register_all_tools(*task_server, task_queue, task_catalog,
+                                      task_index, 9532);
+
+  std::thread task_thread([&task_server] { task_server->Run(); });
+
+  mcp::ClientOptions cops;
+  cops.client_info = mcp::Implementation{"GsdTaskClient", "1.0.0"};
+  cops.connect_mode = mcp::ConnectMode::Auto;
+  cops.enable_tasks_extension = true;
+  auto task_client = mcp::McpClient::Create(pair.client, cops);
+
+  const mcp::ServerCapabilities capabilities =
+      task_client->GetServerCapabilities();
+  ASSERT_TRUE(capabilities.extensions.has_value());
+  const auto tasks_extension =
+      capabilities.extensions->find(std::string(mcp::kTasksExtensionId));
+  EXPECT_NE(tasks_extension, capabilities.extensions->end());
+
+  auto tools = task_client->ListToolsAll();
+  bool found_call_tool = false;
+  for (const auto &tool : tools.tools) {
+    if (tool.name != "call_tool") continue;
+    found_call_tool = true;
+    ASSERT_TRUE(tool.execution.has_value());
+    EXPECT_EQ(tool.execution->mode, mcp::ToolExecutionMode::Task);
+    ASSERT_TRUE(tool.execution->task_support.has_value());
+    EXPECT_EQ(*tool.execution->task_support, mcp::TaskSupport::Optional);
+  }
+  EXPECT_TRUE(found_call_tool);
+
+  task_client->Close();
+  task_server->Close();
+  if (task_thread.joinable()) task_thread.join();
+  std::filesystem::remove(task_path);
 }
 
 TEST_F(RegisteredServerFixture, Bm25IndexPopulatedAfterRegistration) {

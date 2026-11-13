@@ -300,6 +300,15 @@ int register_skill_resources(mcp::McpServer &server) {
   ++registered;
 
   for (const skill_gen::SkillSpec &spec : embedded_skills()) {
+    mcp::Skill skill;
+    skill.uri = "godot://skills/" + spec.name + "/SKILL.md";
+    mcp::JsonValue frontmatter(mcp::JsonValue::object_tag);
+    frontmatter["name"] = mcp::JsonValue(spec.name);
+    frontmatter["description"] = mcp::JsonValue(spec.description);
+    skill.frontmatter = std::move(frontmatter);
+    skill.resources = std::string("dynamic");
+    server.RegisterSkill(std::move(skill));
+
     const std::string skill_uri = "godot://skills/" + spec.name;
     server.RegisterResource("skill-" + spec.name, skill_uri,
                             mcp::ResourceOptions{}
