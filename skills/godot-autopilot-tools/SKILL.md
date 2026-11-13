@@ -53,7 +53,7 @@ Run `gda --help` for the current text; the table below is the stable shape.
 | `gda resources watch <uri>` | Poll a resource and print changes (`--interval` seconds). |
 | `gda prompts list` | List MCP prompt templates. |
 | `gda prompts get <name>` | Render a prompt with `--args '<json>'`; `--json` keeps messages. |
-| `gda call <tool> --async` | Run as an MCP task when supported; prints `task_id` and records it locally. |
+| `gda call <tool> --async` | Run as an MCP task when supported; prints the task id and records it locally. |
 | `gda tasks list|get|wait|cancel|clean` | Manage locally recorded tasks; `wait`/`cancel` use `tasks/get|cancel`. |
 | `gda projects` | List known Godot projects offline. |
 | `gda cache list` | List cache manifests. |
@@ -148,7 +148,7 @@ you explicitly need the full enumeration. `gda status --json` exposes an `mcp`
 block with protocol version and capabilities; check it before relying on tasks,
 resources, prompts or full mode. Long calls can use `gda call --async` plus
 `gda tasks wait`; progress goes to stderr with `--progress`. If a full-surface
-tool returns `input_required`, TTY prompts accept/decline; non-TTY scripts pass
+tool returns input_required, TTY prompts accept/decline; non-TTY scripts pass
 `--input '{"confirm":{"action":"accept"}}'`, while `--confirm` remains the
 `call_tool` fallback.
 

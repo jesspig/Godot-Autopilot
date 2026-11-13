@@ -133,7 +133,7 @@ gda call create_scene_node --args '{"parent_path": "Root", "name": "Player", "ty
 全量枚举时才传 `limit: 0`。`gda status --json` 的 `mcp` 块给出协议版本与
 capabilities；依赖 tasks/resources/prompts/full 前先检查。长调用可用
 `gda call --async` 加 `gda tasks wait`；`--progress` 把进度写到 stderr。
-full 直接工具返回 `input_required` 时，TTY 会提示接受/拒绝；非 TTY 脚本传
+full 直接工具返回 input_required 时，TTY 会提示接受/拒绝；非 TTY 脚本传
 `--input '{"confirm":{"action":"accept"}}'`；`--confirm` 仍是 `call_tool` 的回退。
 
 ## 观测资源与提示词
