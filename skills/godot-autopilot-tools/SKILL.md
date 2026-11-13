@@ -1,141 +1,261 @@
 ---
 name: godot-autopilot-tools
-description: "Calling the GDA (godot-autopilot) plugin: the invocation ladder (the gda CLI, native MCP tools, the plain-HTTP REST face, manual fallback), search-first tool discovery, meta-tool semantics including batch_execute/code_execute and the three-tier capability gates, the error protocol and error watermark, limits, the full domain tool catalog, dynamic user tools, and the manual fallback guide for machines without a usable CLI. Load this skill for calling-protocol facts."
+description: "CLI-first calling reference for Godot Autopilot: the gda command and flag surface, target discovery through the plugin instance registry, gda tools search/describe plus gda call, native MCP tools as the compatibility face, confirmation and MCP annotations for high-risk side effects, the error watermark protocol and error codes, batch_execute/code_execute semantics, response limits, and dynamic user tools. Use for calling-protocol facts."
 ---
 
 # Godot Autopilot Tools
 
-This volume is the cross-domain calling knowledge for the godot-autopilot plugin: the channel ladder, the discovery protocol, meta-tool semantics, the error protocol and the limits. The skill books and the `gda` CLI are the first-class calling surface; the native MCP tools are the compatibility face for harnesses that list them. Whichever channel you use, the same rules hold: discover every tool name with `search_tools` and never guess one; call every domain tool through `call_tool`; read the `new_errors_since_last_call` watermark after every call.
-
-This volume carries no domain knowledge. Scene and property work, resources and files, GDScript, runtime and debugging, server RID tools, content pipelines and C# each have their own volume (see See also). Come here to learn how to reach any of them; go there to learn what to do once you arrive.
+This volume is the cross-domain calling knowledge for GDA: the channel ladder,
+the CLI surface, discovery, confirmation, the error protocol and the limits. It
+carries no domain knowledge; scene, resource, scripting, runtime, server,
+content and C# facts live in their own volumes.
 
 ## Channel ladder
 
-Four channels, in preference order. The `gda` CLI is the first-class channel; the native MCP tools are the compatibility face for harnesses that already list them. Drop to the next rung only when the current one is unavailable.
+1. **GDA CLI.** Whenever a shell works, use `gda`. It is the first-class
+   interface: it discovers the plugin's port from the instance registry, prefers
+   the local IPC endpoint, falls back to HTTP, and prints JSON. It works on
+   Windows, macOS and Linux, and its exit codes separate tool failures from
+   transport failures.
+2. **Native MCP tools.** When the harness lists the GDA tools, use them
+   directly. They are the compatibility face: full schemas, structured errors
+   and image content. The semantics are identical; only the transport differs.
+3. **Manual editor instructions.** When neither a shell nor an MCP client is
+   available, hand the user precise editor steps and ask them to report the
+   result. Do not fabricate tool output.
 
-Probe before choosing a rung: `bun --version`, then `node --version`. Take the first rung whose precondition holds, and never jump to the manual guide while a shell still works.
+There is no HTTP API to call by hand and no proxy command. Every call goes
+through `gda` or the harness MCP tools.
 
-1. GDA CLI. Whenever a shell works, drive the server with the `gda` command. It is the first-class scripted channel: it speaks the same MCP protocol, accepts the same subcommands and shares the same exit codes as the native channel. Pick the first distribution that works on the machine:
-   - **bunx** (Bun present, nothing installed): run `bunx --no-install "github:jesspig/Godot-Autopilot#0.3.1" <cmd>` first (instant when the bunx cache is warm; a fast failure otherwise); if not cached, `bunx "github:jesspig/Godot-Autopilot#0.3.1" <cmd>` downloads once. Quotes are required on PowerShell because `#` starts a comment.
-   - **global install** (Bun, used repeatedly): `bun install -g` once, then run plain `gda <cmd>`.
-   - **standalone binary** (no JavaScript runtime at all): download the `gda` release asset for the user's OS and CPU, verify it against the release's `sha256sums.txt`, and run it exactly like the CLI. No runtime needed; one download per version. Asset names, checksum verification and per-platform caveats (macOS quarantine, musl, SmartScreen) are in references/cli-access.md.
-   Calling commands: ping/status/categories/search/describe/call; offline surfaces: skills/tools/projects; lifecycle: list/start/stop/restart/logs; control plane: serve (loopback-only proxy that routes to one or several instances); REST family: api list/api describe/api call/endpoints. Run `<prefix> --help` for the full reference; stdout is compact JSON, diagnostics go to stderr. Note on the pinned ref: as of `0.3.1` the tree does ship the CLI (root `package.json` exposes the `gda` bin, `cli/` is in the tree), so the pinned `bunx` command resolves once that tag is published — until then it is not fetchable and use `bunx "github:jesspig/Godot-Autopilot#develop" <cmd>` instead (that branch does ship the CLI, but it is an unreleased moving target, not a pinned version), or the standalone `gda` release asset once a release ships it (asset names and checksum verification in references/cli-access.md), or drop to rung 4.
-2. Native MCP tools. When the client harness lists the GDA tools, use them directly: `ping`, `search_tools`, `list_categories`, `get_tool_detail`, `call_tool`, `batch_execute`, `code_execute`. This is the compatibility face for harnesses that were wired to the MCP endpoint: full schemas, structured errors and image content, but no offline surface when the harness cannot see the server.
-3. REST face. The plugin serves a plain-HTTP API on the same port as the MCP endpoint, under the `/api` prefix. It needs no MCP handshake and no session, so a client that can only send ordinary HTTP can still reach every registered tool. It is **not** a scripted channel: it is the interface for an HTTP-only client. Its endpoints are `GET /api` (service and endpoint list), `GET /api/tools` (filtered, paged tool list), `GET /api/tools/<tool>` (one tool's schema), `POST /api/tools/<tool>` (call one tool — the request body is the argument object itself), `POST /api/batch` (ordered operations), `GET /api/health` (the only endpoint that needs no token) and `GET /api/openapi.json`. Every endpoint except the health probe requires an `Authorization: Bearer <token>` header; the token is in the plugin's instance registry and the `gda api` subcommands read it for you. Read references/rest-api.md for the endpoint contract, the token sources, the status-code table and two minimal snippets (Python and JavaScript). Prefer rung 1 whenever a shell exists — the CLI resolves the port and the token for you.
-4. Manual guide. When there is neither a usable CLI, nor a native MCP client, nor an HTTP-capable client, hand the user step-by-step editor instructions per references/manual-fallback.md.
+## The `gda` command surface
 
-Never hand-write HTTP requests against the MCP endpoint in any channel: no raw requests, no ad-hoc scripts against `/mcp`. Every MCP call goes through the harness MCP tools or the gda CLI. The one sanctioned exception is the REST face in rung 3, which has its own reference and its own examples.
+Run `gda --help` for the current text; the table below is the stable shape.
+
+| Command | Purpose |
+|---|---|
+| `gda ping` | Check connectivity to the MCP server. |
+| `gda status` | Show server status, project, port, transport and `mcp_url`. |
+| `gda categories` | List tool categories. |
+| `gda search <query>` | Search tools through the live server. |
+| `gda describe <tool>` | Show one live tool's schema and `side_effect`. |
+| `gda call <tool>` | Call one tool. |
+| `gda list` | List known Godot instances and projects. |
+| `gda start` | Launch a Godot editor and wait for it. |
+| `gda stop` | Stop an editor by id, port or project. |
+| `gda restart` | Restart an editor with the same settings. |
+| `gda logs` | Show an instance log. |
+| `gda skills list` | List installed skill books. |
+| `gda skills show <name>` | Print one book; `--file <rel>` reads an auxiliary file. |
+| `gda tools list` | List the cached offline tool catalog. |
+| `gda tools search <query>` | Search the cached catalog. |
+| `gda tools describe <name>` | Show one cached tool's schema. |
+| `gda projects` | List known Godot projects offline. |
+| `gda cache list` | List cache manifests. |
+| `gda cache info` | Show cache root, entry count and size. |
+| `gda cache clear` | Remove old entries; requires `--force`. |
+| `gda install skills` | Install skill books to `~/.agents/skills`. |
+| `gda install plugin` | Install the addon into a project. |
+| `gda update <target>` | Update `cli`, `skills`, `plugin` or `all`; `--check` reports only. |
+
+Global options that matter on most calls:
+
+- Target selection: `--port <n>` (connection override only), `--id <id>`,
+  `--project <dir>`, `--socket <path>`, `--transport auto|ipc|http`,
+  `--no-fallback`.
+- Input: `--args <json>`, `--args-file <path>`, `--confirm`, `--timeout <sec>`.
+- Discovery filters: `--category <name>`, `--tags <a,b>`, `--refresh`.
+- Output: `--json`, `--pretty`, `--raw`, `--save-images <dir>`.
+- Lifecycle: `--godot <path>`, `--headless`, `--play`, `--no-import`,
+  `--wait <sec>`, `--force`, `--tail <n>`, `--probe <light|strict>`.
+- Install and update: `--path <dir>`, `--source auto|online|cache|builtin`,
+  `--offline`, `--zh`, `--all`, `--check`.
+
+`--port` is a connection override, never a listen port. The plugin owns the
+port. `--offline` skips the network and uses the cache or the builtin skills
+archive. `--zh` selects the Chinese skills archive. `--force` is required for
+destructive cache clears and overwrites.
+
+Exit codes:
+
+| Code | Meaning |
+|---|---|
+| 0 | Success. |
+| 1 | The tool ran and returned a failure envelope. |
+| 2 | Transport or environment failure: no instance, endpoint down, timeout. |
+| 3 | Usage error: unknown command, flag or malformed arguments. |
+
+Stdout is JSON; diagnostics go to stderr. Exit 2 means the channel is down, not
+that the tool returned nothing. Never report a fabricated result after exit 2.
+
+## Target discovery
+
+The CLI resolves the target in this order: explicit `--socket`/`--port`, the
+instance index by `--id`, the live instance matching `--project` or the current
+directory, and the persisted plugin record. The port comes from the plugin, not
+from a default. `gda status --json` shows the resolved values: `port`,
+`port_source`, `mcp_url`, `transport`, `ipc_kind`, `plugin_version`,
+`toolset_hash`.
+
+If resolution fails, the error names the reason. Run `gda list --all` to see
+known projects, then `gda start --project <dir>` or open the editor. Do not
+guess a port and do not reuse one from an earlier session.
 
 ## Discovery protocol — search first, never guess
 
-Tool names are snake_case with the verb first, but segment counts vary, so guessing is unreliable. Always discover:
+1. `gda ping` confirms the server responds.
+2. `gda tools search <query>` searches the cached catalog by name,
+   description, category and tags. Use `--category` or `--tags` to narrow.
+3. `gda tools describe <name>` prints the schema, description and
+   `side_effect` marker. Read it before the first write.
+4. `gda call <name> --args '<json>'` executes. Use `--args-file` for large
+   payloads.
+5. `gda tools list --refresh` refreshes the catalog from a live instance when a
+   tool is missing from the cache.
 
-1. `ping` to confirm the server responds.
-2. `search_tools` with a `query` (optionally filtered by `category` or `tags`), or `list_categories` to browse by domain.
-3. `get_tool_detail` with the exact `name` to read the input schema, description and side-effect marker before calling anything that writes files or config.
-4. `call_tool` with `name` and `arguments` to execute. The seven meta tools are called directly at the MCP layer; every domain tool goes through `call_tool`.
+`gda search` and `gda describe` are the live equivalents; they require a
+running instance and should be used when the cached catalog may be stale.
 
-Calling `call_tool` with an unknown name fails with a message telling you to use `search_tools`. Use it instead of improvising similar names.
+Search by the object first, then by the operation: "tilemap cell",
+"animation track", "import sidecar". Add a verb only when the object is too
+broad. Rerun with synonyms before concluding that a tool is missing: tile/cell,
+sprite/texture, log/output, delete/remove/erase, create/add/new. Never invent a
+plausible name; an unknown tool fails and tells you to search.
 
-```json
-{"name": "create_scene_node", "arguments": {"type": "Node2D", "name": "Player", "parent_path": "Root/Actors"}}
+Example:
+
+```bash
+gda tools describe create_scene_node
+gda call create_scene_node --args '{"parent_path": "Root", "name": "Player", "type": "CharacterBody2D", "properties": {"position": {"x": 0, "y": -10}}}'
 ```
 
-### Search techniques
+## Native MCP tools
 
-`search_tools` ranks candidates over tool names, descriptions, categories and tags, so the words you send shape the order you get back:
+When the harness lists GDA tools, the meta tools are `ping`, `search_tools`,
+`list_categories`, `get_tool_detail`, `call_tool`, `batch_execute` and
+`code_execute`. Every domain tool goes through `call_tool` with `name` and
+`arguments`; `call_tool` also accepts a top-level `confirm` boolean. Use
+`search_tools` / `get_tool_detail` exactly as you would use `gda tools search` /
+`gda tools describe`.
 
-- Search by the object first, then by the operation: "tilemap cell" finds the cell tools, "animation track" finds the track tools. Add a verb only when the object query is too broad.
-- Describe, do not name. While you do not know the real tool name, describe the outcome ("connect a signal from a button") instead of guessing a plausible-looking name.
-- Rerun with synonyms before concluding a tool is missing: tile/cell, sprite/texture, log/output, delete/remove/erase, create/add/new.
-- Narrow with filters: pass `category` for a single domain or `tags` for required tags, and browse `list_categories` when you only know the domain.
-- Read `get_tool_detail` for the candidate schema and side-effect marker before the first write.
-- When a query still comes back empty, browse the tool catalog reference in the godot-autopilot volume (every domain tool grouped by source module) before inventing anything. The exact tool set is whatever `search_tools` returns — never assert a count from memory.
+## Confirmation and annotations
 
-## Meta-tool semantics
+High-risk side effects require explicit confirmation. The server returns
+`{"code": "confirmation_required", "confirm_required": true, "side_effect":
+"...", "hint": "..."}` before executing. Review the tool description and the
+target, then retry with `--confirm` (CLI) or `confirm: true` (MCP). The classes
+that require confirmation are:
 
-- `call_tool` executes one tool: pass the domain tool name as `name` and its inputs as `arguments`. Meta tools themselves (`ping`, `search_tools`, `list_categories`, `get_tool_detail`, `batch_execute`, `code_execute`) are called directly, not through `call_tool`. Server status is a domain tool: reach `system_status` through `call_tool`.
-- `batch_execute` orchestrates existing tools: an ordered `operations` list (at most 256 items) run in sequence, with `stop_on_error` (default true) and optional `rollback_on_error`. Each operation takes only `tool` (required) and `args` (optional object, defaults to `{}`); the `call_tool`-style `name`/`arguments` keys are not accepted there. Result counts: `total` = executed operations (`succeeded` + `failed` + `pending`), `skipped` = operations never run after an early stop, and `total` + `skipped` always equals the length of `operations`; failed items carry their message under `error`. Choose it for deterministic sequences such as "set these five properties, then save". Async game tools inside a plain batch are refused with status error (the pending record is released, so `pending` counts 0) — call those tools one at a time via `call_tool` when you need their response, or pass `await_async: true` and invoke `batch_execute` directly.
-- `code_execute` runs GDScript in the editor: the source is wrapped in a script extending Node, and the edited scene root is exposed as SceneRoot. Without a line-start `func ` definition the code is inlined inside a single entry-function body — write straight-line code ending in return. When any non-comment line starts with `func ` (leading whitespace stripped, comment lines ignored) the whole source is preserved verbatim and `function_name` (default `_run`) selects the entry point. The detector needs `func ` with a trailing space. `timeout_ms` defaults to 5000 and is capped at the maximum the server reports in the `code_execute` schema - that ceiling follows the host's long-blocking dispatch budget and can be lowered per deployment, so read it from the schema rather than assuming a fixed number; `auto_owner` defaults to true so created nodes are saved with the scene. The timeout is enforced while the script runs, not only before it — a long loop is interrupted when the deadline passes, and the call comes back as an exec_timeout failure instead of freezing the editor. Details in the gotchas reference.
-- `side_effect` is the risk marker `get_tool_detail` reports, and it is never empty: a tool that only reads reports `none`. The classes are `none`, `writes_file`, `writes_config`, `shows_alert`, `modifies_window`, `process`, `code_execute`, `game_runtime`, `destructive` and `writes_scene`. The two script-running meta tools, `code_execute` and `batch_execute`, both report `code_execute`. The authorization gate is derived from that marker alone — the server keeps no per-tool-name exception list — so a tool can start requiring a capability because its class changed, not because its name is special.
-- Decision rule: expressible as a handful of existing tool calls — use `batch_execute`. Needs loops, math or conditions (laying out hundreds of tiles, bulk renames, computed values) — use `code_execute`. Very large payloads also favor `code_execute` to avoid huge JSON arguments.
-- Authorization gates, checked on every call, in three tiers. The gate follows the tool's `side_effect` class. **Read** tools (class `none`) are allowed by default. **Write** tools (`writes_file`, `writes_config`, `shows_alert`, `modifies_window`, `writes_scene`) are **denied by default** and need the `write` capability. **Danger** tools are denied by default and need their own capability: `process`, `code_execute`, `game_runtime`, `destructive`. `user_tools` is a seventh capability, independent of the class, guarding user-registered dynamic tools. The full capability list is `read`, `write`, `process`, `code_execute`, `game_runtime`, `destructive` and `user_tools`.
-  - Concretely: `code_execute` and `execute_script` need the `code_execute` capability, and so does `batch_execute` — a batch is gated as a whole, so a client that enabled only `process` or `game_runtime` can no longer run a batch of ordinary domain tools and gets an authorization_required error instead. The tools that reach the running game (`execute_game_script`, `queue_game_input`, `wait_game_input`, `sequence_game_inputs`, `reload_game_scripts`) need the `game_runtime` capability. User-registered dynamic tools (see References and extension points) need the `user_tools` capability. Scene-writing tools — node/property/signal/animation/tilemap/gridmap/theme write tools — report `writes_scene` and need the same `write` capability.
-  - **A write-class tool now needs `write`.** Before this change a write-class tool needed no capability at all. If your calls start failing with an authorization error on a file or config write, that is the cause: add `write` to the allow list. Do not work around it by switching to a different tool. Destructive tools — the ones that irreversibly destroy an object that already exists inside the editor host, such as `delete_scene_node`, `delete_display_window`, `remove_animation`, `remove_animation_track`, `remove_audio_bus_effect` and `remove_debug_custom_monitor` — need the `destructive` capability and are denied by default too. Deleting a file or a directory on disk stays in the write class, because project content is usually recoverable from version control.
-  - **Compatibility mode for pre-0.3.0 setups.** The plugin also has an authorization mode switch. `strict` (the default) denies write-class tools until `write` is allowed. `legacy` allows the whole write class with no allow-list entry — the pre-0.3.0 behavior — while danger and destructive tools still need their own capability. Set `GODOT_AUTOPILOT_AUTH_MODE=legacy` (or `strict`) in the environment, put `"auth_mode": "legacy"` in the plugin config, or pick "Compatibility" in the MCP Config dock's "Authorization mode" dropdown; the dock takes effect on the next tool call with no restart, and the environment variable wins over the config. An invalid value falls back to `strict` and logs a warning. Every denial carries an `authorization_mode` field, so a client can tell which mode produced it. Prefer `strict` plus an explicit `write` allow-list entry whenever the caller can set one up.
-  - Enable a capability either by setting the `GODOT_AUTOPILOT_ALLOW` environment variable to the capability name (or `all`) and restarting the engine, or by ticking the matching checkbox ("Allow code_execute", "Allow game_runtime", "Allow user tools", "Allow write", "Allow destructive") in the plugin MCP Config dock, which saves to the plugin config and takes effect on the next tool call with no restart. Un-ticking a box removes only that one capability and leaves the others alone, even when the allow list was `all`. `process` has no dock checkbox — it needs the environment variable and a restart. When `GODOT_AUTOPILOT_ALLOW` is set it wins over the config, so do not rely on the dock checkbox while the variable is present.
+- `destructive`: irreversibly removes an object that already exists in the
+  editor, such as a node, animation, audio bus effect or display window.
+- `process`: starts, stops or otherwise controls an OS process.
+- `code_execute`: runs arbitrary GDScript in the editor (`code_execute`,
+  `batch_execute`, `execute_script`).
+- `game_runtime`: reaches into the running game (`execute_game_script`,
+  `queue_game_input`, `reload_game_scripts`).
 
-## Error protocol
+File, config and scene writes (`writes_file`, `writes_config`, `writes_scene`,
+`shows_alert`, `modifies_window`) do not require confirmation, but they still
+change content. Read the target back after every write. MCP clients also
+receive tool annotations; treat a destructive or runtime annotation as a
+stop-and-review signal.
 
-Every tool failure is returned as a JSON object with an `error` key. For `call_tool` and `code_execute`, a top-level `error` also sets the MCP-level error flag on the response.
+Do not work around a confirmation error by choosing another tool with the same
+effect. Do not batch a high-risk call to hide it from review.
 
-In addition, every meta-tool response carries a top-level integer watermark field counting new errors recorded since your previous call, including errors the call itself just produced. A failed call reports at least its own error. The semantics:
+## `batch_execute` and `code_execute`
 
-- It is one-shot: the value is consumed when you read it and the counter resets. Never skip reading it, even when the call succeeded.
-- Errors printed by a running game are recorded too.
-- After every write call (`property_set`, `create_scene_node`, `write_file`, `save_resource`, scene, script or config edit), read the watermark before issuing the next call. A non-zero value means new errors were recorded — stop, pull the real log lines, fix or explain them, then continue.
+- `batch_execute` runs an ordered `operations` list (at most 256) in sequence.
+  Each operation takes `tool` and optional `args`; `stop_on_error` defaults to
+  true and `rollback_on_error` is optional. Use it for deterministic sequences
+  such as "set these five properties, then save". A batch containing async game
+  tools is refused unless you pass `await_async` and call the batch directly.
+- `code_execute` runs GDScript in the editor. Without a line-start `func ` it
+  inlines the source in one entry function; with a `func ` line it preserves
+  the source and uses `function_name` (default `_run`). `timeout_ms` defaults to
+  5000 and is capped by the schema; the deadline is enforced while the script
+  runs. Use it for loops, math and computed values that a batch cannot express.
+- Decision rule: a handful of existing calls → `batch_execute`; loops, math,
+  conditions or very large payloads → `code_execute`.
 
-Soft (retryable) errors: while the editor is importing or scanning resources, affected calls return a structured error with a retryable flag set to true and a suggested `retry_after_ms` wait:
+## Error protocol and watermark
 
-```json
-{"error": "editor is currently importing/scanning resources; retry shortly", "retryable": true, "retry_after_ms": 500}
-```
+Every tool failure is a JSON object with an `error` key. Some carry a stable
+`code`; branch on the code, not on the prose message. Every meta-tool response
+also carries `new_errors_since_last_call`, an integer counting new errors since
+your previous call, including errors the call itself produced.
 
-Wait at least the suggested interval, then retry the same call.
+- The watermark is one-shot: reading it resets the counter. Never skip it, even
+  on success.
+- Errors printed by a running game count too.
+- After every write, read the watermark before the next call. A non-zero value
+  means stop, pull the real log lines, fix or explain them, then continue.
 
-Export lockout: while the editor is exporting the project, all tool calls are rejected with an "editor is exporting" error. Wait for the export to finish instead of retrying in a tight loop. That rejection carries a machine-readable code as well as the message, so branch on the code when you can.
+Soft, retryable errors carry `retryable: true` and `retry_after_ms` while the
+editor is importing or scanning resources. Wait at least the suggested interval
+and retry the same call. During project export, all tool calls are rejected;
+wait for the export to finish instead of retrying in a tight loop.
 
-### Error codes
-
-Some failures carry a machine-readable `code` field next to the `error` text. Branch on the code, not on the message: the messages are prose and get reworded, the codes are stable. The codes you can receive:
+Stable error codes:
 
 | Code | Raised when | Retry? |
 |---|---|---|
-| exec_timeout | a `code_execute` script outran its `timeout_ms` | no — the script was interrupted; split the work or raise `timeout_ms` |
-| eval_timeout | a game-side `eval` script outlived the 25000 ms host wait, or the editor gave up waiting for the eval answer | not immediately — the game may still be running that script |
-| eval_cancelled | the eval request was torn down by a cancel handle | no — re-issue it if the result is still needed |
-| main_thread_timeout | the editor main thread did not process the tool inside its dispatch budget | **no** — the call was cancelled and the side effect may still land; read the editor state first |
-| queue_unavailable | the editor main-thread queue was full or already closed | yes, later — the editor may be shutting down |
+| `exec_timeout` | A `code_execute` script outran `timeout_ms`. | No; split the work or raise the timeout within the schema cap. |
+| `eval_timeout` | A game-side eval outlived the host wait. | Not immediately; the game may still be running it. |
+| `eval_cancelled` | A game-side eval was torn down by a cancel handle. | No; re-issue if the result is still needed. |
+| `main_thread_timeout` | The editor main thread did not process the call in its budget. | No; the call was cancelled but the side effect may still land. Read state first. |
+| `queue_unavailable` | The editor main-thread queue was full or closing. | Yes, later. |
+| `confirmation_required` | A high-risk tool was called without confirmation. | Only after reviewing the target; retry with `--confirm`. |
 
-The two eval codes arrive nested under a structured_error object inside the tool payload; the other three come back as the top-level result of the call. The dispatch codes carry a `retryable` flag: it is **false** for main_thread_timeout and **true** for queue_unavailable, while exec_timeout also carries it false and the eval codes carry no flag at all — treat a missing flag as "do not retry immediately". A main-thread timeout means the call was abandoned: the editor may still run the work afterwards, so read the state back before repeating it. main_thread_timeout also reports how long it waited, and on the dispatch path the queue depth and the age of the oldest pending call; exec_timeout reports the measured execution time next to the `timeout_ms` it exceeded. A failure with no code is a plain tool error: read its error text.
+A failure with no code is a plain tool error: read its text. A
+`main_thread_timeout` reports how long it waited and may report queue depth;
+`exec_timeout` reports the measured execution time next to the exceeded limit.
 
-### Confirming a fix with the error watermark
-
-Use the watermark as the closing step of every fix instead of assuming a fix worked:
-
-1. A call fails, or the watermark reports new errors.
-2. Diagnose and fix the cause.
-3. Re-run the failing call. A success with the watermark at 0 confirms the fix produced no new errors.
-4. A non-zero value means new errors were recorded since your previous call — errors printed by the running game count too. Read them with `get_debugger_errors` or `get_debugger_log`, fix again, then make any meta-tool call (even `ping`) until the watermark comes back 0.
-
-## Observing while working
-
-Never chain write operations blind. After a write, confirm with a read-back (`property_get`, `get_scene_tree`, `get_resource_property`), a screenshot (`capture_editor_viewport`, `capture_game_viewport`) or output (`get_debugger_log`; with a running game `get_debugger_errors` and `get_debugger_output`, on-disk fallback `get_game_log_entries`). When the problem is inside the plugin itself (authorization denials, timeouts, dropped responses), read `get_plugin_log`. Prefer observed output over assuming a call did what its name suggests; `ok` only means the call went through.
+Confirm a fix with the watermark: reproduce the failure, diagnose, fix, rerun
+the failing call, and make meta calls until the watermark returns 0. Zero after
+a successful call is the closing evidence that the fix produced no new errors.
 
 ## Limits
 
-- Default operation timeout is 5000 ms. The maximum accepted timeout is the value the tool schema reports as its maximum: for editor-only operations it follows the host's long-blocking dispatch budget and can be lowered per deployment, so read it from the schema instead of assuming a fixed number. Game operations cap `timeout_ms` at 25000 ms, keeping the host wait plus a grace interval below the transport limit.
-- Editor-side calls are handed to the editor main thread under a wait budget with three tiers: 27000 ms for ordinary tools, 5000 ms for the health probes (`ping` and `system_status`), and 29000 ms for the long-blocking meta tools (`code_execute` and `batch_execute`). The long-blocking tier used to wait forever; it is bounded now, so a long task can still end with a main_thread_timeout instead of hanging forever, but it will end. The three tiers can be overridden with the `GODOT_AUTOPILOT_DISPATCH_TIMEOUT_MS`, `GODOT_AUTOPILOT_HEALTH_TIMEOUT_MS` and `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS` environment variables, each clamped to 1000-29000 ms.
-- JSON responses are capped at 4 MiB. Large results are truncated with detectable fields (such as a truncated flag) rather than silently dropped — check them before trusting completeness.
-- `batch_execute` accepts at most 256 operations per call.
-- At most 8 concurrent in-flight requests. Exceeding the limit fails fast — reduce parallelism instead of retrying blindly.
-- On the REST face the tool list is paged (500 per page by default, 2000 maximum), a batch accepts at most 256 operations, a tool name is at most 128 characters, and a request body over 4 MiB is refused with 413 before it reaches the tool.
+- Default operation timeout is 5000 ms. The maximum is the value the tool schema
+  reports; editor dispatch budgets can be lowered per deployment, so read the
+  schema rather than assuming a fixed number. Game operations cap `timeout_ms`
+  at 25000 ms.
+- Editor calls run under a wait budget with three tiers: ordinary tools,
+  health probes (`ping`, `system_status`, 5000 ms) and long-blocking meta tools
+  (`code_execute`, `batch_execute`). A long task can end with
+  `main_thread_timeout` instead of hanging forever.
+- JSON responses are capped at 4 MiB and truncation is detectable; check the
+  truncation fields before trusting completeness.
+- `batch_execute` accepts at most 256 operations.
+- At most 8 concurrent in-flight requests; exceeding the limit fails fast.
+- A tool name is at most 128 characters.
 
-## References and extension points
+## Dynamic user tools
 
-- references/cli-access.md — the GDA CLI, the only scripted channel: which distribution to pick when no MCP client is configured, every command and global option (including the REST family `api list` / `api describe` / `api call` / `endpoints`), the seven-step port and target resolution chain, engine resolution for `start`, exit codes, the output contract, image handling, release asset names, checksum verification and per-platform caveats. Read it before running `gda` or downloading a binary.
-- references/rest-api.md — the plain-HTTP face on the same port, for a client that cannot do an MCP handshake: the endpoint list, the request and response shapes, where the bearer token comes from, the status-code table, and minimal Python and JavaScript snippets. Read it only when the MCP channel and the CLI are both unavailable and the client can still send HTTP requests.
-- references/manual-fallback.md — the manual guide: trigger criteria, hard rules, the handoff template and recovery steps. Read it when neither the MCP channel nor any CLI is available.
-- The tool catalog, tool gotchas and development-workflow references live in the godot-autopilot volume; this volume does not duplicate them. When a `search_tools` query comes back empty, browse the catalog there; when a call behaves surprisingly, check the gotchas there.
-- User-defined dynamic tools (the `user_tools` mechanism): project scripts can register extra domain tools that then surface through the same discovery protocol and the same `call_tool` path, marked as dynamic. Registration and calls both sit behind the `user_tools` capability (environment variable wins over config; "Allow user tools" dock checkbox; see Meta-tool semantics). The directory-scan convention defaults to res://addons/godot-autopilot-tools, and the plugin ships samples under its user-tools sample directory. For writing or debugging such tools, load the godot-autopilot-scripting volume.
+Project scripts can register extra domain tools through the `user_tools`
+mechanism. They surface through the same discovery protocol and the same
+`gda call` / `call_tool` path, marked as dynamic. The directory-scan convention
+defaults to `res://addons/godot-autopilot-tools`, and the plugin ships samples
+under its user-tools sample directory. Registration and calls use the same
+confirmation rules as built-in tools.
+
+## Manual fallback
+
+When neither the CLI nor an MCP client is available, give the user a short,
+checkable sequence: open the project, enable the plugin, perform the action in
+the editor, then report the exact node path, property value or log line. Ask for
+one observation at a time and never invent a screenshot, log line or watermark.
+Restoring the CLI is the preferred recovery: install the standalone `gda`
+binary, then continue normally.
 
 ## See also
 
-- godot-autopilot — connection prerequisites, usage overview and the shared references (tool catalog, gotchas, development workflow)
-- godot-autopilot-scene-system — scene lifecycle, nodes, properties, signals
-- godot-autopilot-resources — resource and file operations, rename and move
-- godot-autopilot-scripting — GDScript execution channels and user-defined tools
-- godot-autopilot-runtime — running the game, input injection, debugging
-- godot-autopilot-servers — RenderingServer, PhysicsServer and NavigationServer RID tools
-- godot-autopilot-content — tilemap, animation, audio, UI theming
-- godot-autopilot-csharp — C#/.NET projects, assembly build loop and script interop
+- `godot-autopilot-setup` - installation, first connection, MCP configuration.
+- `godot-autopilot` - connection model, routing, observation loop.
+- `godot-autopilot-scene-system` - scenes, properties, signals, undo.
+- `godot-autopilot-resources` - resources, imports, rename and move.
+- `godot-autopilot-scripting` - GDScript execution channels.
+- `godot-autopilot-runtime` - game process, input, logs, debugger.
+- `godot-autopilot-servers` - server RID tools.
+- `godot-autopilot-content` - tilemap, animation, audio, UI.
+- `godot-autopilot-csharp` - C# build loop and interop.

@@ -53,8 +53,6 @@ jobs:
 
     env:
       SCCACHE_GHA_ENABLED: "true"
-      # Windows runner 控制台为 cp1252，保证 Python 子进程（含 embed_skills.py）以 UTF-8 输出
-      PYTHONUTF8: "1"
 
     steps:
       - uses: actions/checkout@v4
@@ -62,10 +60,13 @@ jobs:
           ref: ${{ inputs.tag || github.ref }}
           submodules: true
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          python-version: "3.12"
+          bun-version: "1.4.x"
+
+      - name: No-Python guard
+        run: bun tests/guard/no_python_guard.ts
 
       - name: Install Ninja
         uses: seanmiddleditch/gha-setup-ninja@v5
@@ -103,14 +104,14 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          python main.py build --release 2>&1 | tee build-release.log
+          bun run gda-dev-tools build --release 2>&1 | tee build-release.log
           grep -E '\[gda\] LTO: (thin|LTCG|full)' build-release.log || {
             echo "::error::Release build log has no LTO record (expected '[gda] LTO: thin|LTCG|full')"
             exit 1
           }
 
       - name: Deploy to example projects
-        run: python main.py deploy --release
+        run: bun run gda-dev-tools deploy --release
 
       - name: Upload platform library
         uses: actions/upload-artifact@v4
@@ -240,9 +241,15 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.tag || github.ref }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.x"
 
       - name: Download platform libraries
         uses: actions/download-artifact@v4
@@ -259,11 +266,11 @@ jobs:
           merge-multiple: true
 
       - name: Package addons.zip
-        run: python main.py package --libs-dir dist
+        run: bun run gda-dev-tools package --libs-dir dist
 
       # 自检失败即中止发布：残缺包不得挂到 GitHub Release
       - name: Verify package integrity
-        run: python scripts/test_package_integrity.py dist/godot-autopilot-*.zip
+        run: bun run gda-dev-tools package-check dist/godot-autopilot-*.zip
 
       - name: Stage addons.zip
         run: mv dist/godot-autopilot-*.zip addons.zip

@@ -16,7 +16,9 @@ class ClickUiCoordsSuite : public IntegrationHarnessWithAllow {
 };
 
 mcp::JsonValue make_args() {
-  return mcp::JsonValue(mcp::JsonValue::object_tag);
+  mcp::JsonValue args(mcp::JsonValue::object_tag);
+  args["confirm"] = mcp::JsonValue(true);
+  return args;
 }
 
 void assert_exact_error(const mcp::JsonValue &result,

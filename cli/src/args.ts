@@ -10,6 +10,13 @@ export interface GlobalOptions {
   timeoutText?: string;
   category?: string;
   tagsText?: string;
+  artifactText?: string;
+  pathText?: string;
+  sourceText?: string;
+  offline?: boolean;
+  zh?: boolean;
+  check?: boolean;
+  confirm?: boolean;
   argsJson?: string;
   argsFile?: string;
   saveImages?: string;
@@ -22,12 +29,7 @@ export interface GlobalOptions {
   play?: boolean;
   noImport?: boolean;
   force?: boolean;
-  query?: string;
-  limitText?: string;
-  offsetText?: string;
   probe?: string;
-  bind?: string;
-  noAuth?: boolean;
   file?: string;
   refresh?: boolean;
   all?: boolean;
@@ -35,6 +37,11 @@ export interface GlobalOptions {
   stale?: boolean;
   socketText?: string;
   noFallback?: boolean;
+  transportText?: string;
+  formatText?: string;
+  slowText?: string;
+  limitText?: string;
+  json?: boolean;
 }
 
 const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
@@ -44,19 +51,22 @@ const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
   "--timeout": "timeoutText",
   "--category": "category",
   "--tags": "tagsText",
+  "--artifact": "artifactText",
+  "--path": "pathText",
+  "--source": "sourceText",
   "--args": "argsJson",
   "--args-file": "argsFile",
   "--save-images": "saveImages",
   "--godot": "godot",
   "--wait": "waitText",
   "--tail": "tailText",
-  "--query": "query",
-  "--limit": "limitText",
-  "--offset": "offsetText",
   "--probe": "probe",
-  "--bind": "bind",
   "--file": "file",
   "--socket": "socketText",
+  "--transport": "transportText",
+  "--format": "formatText",
+  "--slow": "slowText",
+  "--limit": "limitText",
 };
 
 const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
@@ -68,12 +78,16 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--play": "play",
   "--no-import": "noImport",
   "--force": "force",
-  "--no-auth": "noAuth",
   "--refresh": "refresh",
   "--all": "all",
   "--projects": "projectsView",
   "--stale": "stale",
   "--no-fallback": "noFallback",
+  "--json": "json",
+  "--offline": "offline",
+  "--zh": "zh",
+  "--check": "check",
+  "--confirm": "confirm",
 };
 
 export function parseArgv(argv: string[]): { opts: GlobalOptions; positionals: string[] } {
@@ -133,6 +147,12 @@ export function parseProbePort(text: string): number {
   return port;
 }
 
+export function parseTransport(text: string | undefined): "auto" | "ipc" | "http" {
+  if (text === undefined) return "auto";
+  if (text === "auto" || text === "ipc" || text === "http") return text;
+  throw new CliError(ExitCode.Usage, `--transport must be auto, ipc, or http, got: ${text}`);
+}
+
 export function usageText(): string {
   return `gda ${CLI_VERSION} — Godot Autopilot CLI
 
@@ -147,8 +167,8 @@ Commands:
   describe <tool>     Show one tool's schema and side effects
   call <tool>         Call a tool
   list                List running Godot instances
-  skills list         List the bundled skill books (offline)
-  skills show <name>  Print one skill book's SKILL.md; --file <rel> reads a reference
+  skills list         List the bundled skill books (offline, --zh for Chinese)
+  skills show <name>  Print one skill book's SKILL.md; --file <rel> reads an auxiliary file
   tools list          List the cached tool catalog (offline)
   tools search <query> Search the cached tool catalog
   tools describe <name> Show one cached tool's schema
@@ -156,22 +176,34 @@ Commands:
   start               Start a Godot editor
   stop                Stop a Godot editor (<id> | --id | --port | --project)
   restart             Restart a Godot editor with the same port and settings
-  serve               Run the local control-plane proxy (default 127.0.0.1:9700)
   logs                Show an instance log
-  api list            List tools through the REST endpoint
-  api describe <tool> Show one tool's schema through the REST endpoint
-  api call <tool>     Call a tool through the REST endpoint
-  endpoints           Show the discovered MCP and REST endpoints
+  cache list          List cache manifests
+  cache info          Show cache root, entry count, and size
+  cache clear         Remove old cache entries (requires --force)
+  trace list          List recent trace events (plugin + CLI)
+  trace show <id>     Show all events with one trace id
+  trace summary       Summarize latency, failures, retries, and top tools
+  trace slow          List calls slower than --slow <ms> (default 1000)
+  trace failures      List failed tool calls
+  trace export        Export traces as jsonl or otlp (--format)
+  install skills      Install skill books to ~/.agents/skills
+  install plugin      Install the Godot addon into a project
+  update <target>     Update cli, skills, plugin, or all (--check for status)
 
 Global options:
-  --port <text>       MCP server port (default 9527); serve port (default 9700)
+  --port <text>       MCP server port for connection only (never a listen port)
   --id <text>         Target instance id from the registry
   --project <text>    Project directory
   --pretty            Pretty-print JSON output (2-space indent)
   --raw               Raw JSON envelope output
-  --timeout <text>    Call timeout in seconds (serve default 60)
+  --timeout <text>    Call timeout in seconds
   --category <text>   Filter search results by category
   --tags <text>       Filter search results by tags (comma separated)
+  --artifact <name>   Cache artifact: cli, plugin, skills, or catalog
+  --path <dir>        Install target directory (install skills)
+  --source <mode>     auto (default), online, cache, or builtin
+  --offline           Never touch the network; use cache, then builtin
+  --zh                Use the Chinese skills archive (install, skills list/show)
   --args <json>       Tool arguments as a JSON string
   --args-file <path>  Tool arguments from a JSON file
   --save-images <dir> Write returned images to a local directory
@@ -181,20 +213,18 @@ Global options:
   --no-import         Skip the asset import pre-step (start/restart)
   --wait <sec>        Readiness/stop wait in seconds, 0 = do not wait (start/stop/restart)
   --force             Force-stop the process (stop/restart)
-  --bind <addr>       Control-plane bind address, loopback only (serve; default 127.0.0.1)
-  --no-auth           Disable control-plane auth; any local process can call tools (serve)
   --tail <n>          Number of trailing log lines (logs)
-  --query <text>      Keyword filter for the api list subcommand
-  --limit <n>         Maximum tools returned by the api list subcommand (1-2000)
-  --offset <n>        Offset into the tool list for the api list subcommand
-  --probe <value>     Liveness level light/strict (api/endpoints/start); list: probed port 1-65535
+  --probe <value>     Liveness level light/strict (start); list: probed port 1-65535
   --file <rel>        Reference file to read with skills show (relative to the skill dir)
-  --refresh           Refresh the offline tool catalog from a live /api/tools call
+  --refresh           Refresh the offline tool catalog from MCP tools/list
   --all               list: include projects with no running instance
   --projects          list: aggregate entries by project instead of per instance
   --stale             list: keep only non-live entries
   --socket <path>     Connect through the plugin's local IPC socket
-  --no-fallback       Do not fall back to the port channel when IPC fails
+  --transport <mode>  auto (default), ipc, or http
+  --no-fallback       Do not fall back to HTTP when IPC fails
+  --json              JSON output (default for most commands)
+  --confirm           Confirm a high-risk tool call
   --help              Show this help
   --version           Show the version
 

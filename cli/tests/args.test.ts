@@ -29,6 +29,12 @@ describe("全局选项", () => {
     expect(opts.raw).toBe(true);
   });
 
+  test("--offline 与 --zh 被识别", () => {
+    const { opts } = parseArgv(["--offline", "--zh", "install", "skills"]);
+    expect(opts.offline).toBe(true);
+    expect(opts.zh).toBe(true);
+  });
+
   test("寻址三选项 --id/--port/--project 仍被识别", () => {
     const { opts } = parseArgv(["--id", "p1", "ping"]);
     expect(opts.id).toBe("p1");

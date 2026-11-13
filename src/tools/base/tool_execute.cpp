@@ -38,14 +38,6 @@ std::shared_ptr<ToolBase> find_registered_tool(const std::string &name) {
   return registry->find_any(name);
 }
 
-mcp::JsonValue default_authorization_policy(const std::string &name) {
-  std::shared_ptr<ToolBase> tool = find_registered_tool(name);
-  if (!tool) {
-    return mcp::JsonValue();
-  }
-  return authorization::deny_if_unauthorized(name, side_effect_of(*tool));
-}
-
 mcp::JsonValue default_envelope_builder(const std::string &name,
                                         const mcp::JsonValue &result) {
   ApiEnvelope envelope;
@@ -71,10 +63,6 @@ mcp::JsonValue execute_tool_chain(const std::string &name,
   if (!invalid.IsNull()) {
     return invalid;
   }
-  mcp::JsonValue denied = run_authorization_policy(name);
-  if (!denied.IsNull()) {
-    return denied;
-  }
   mcp::JsonValue result = execute_tool_core(name, args);
   return run_envelope_builder(name, result);
 }
@@ -86,14 +74,6 @@ struct ToolExecutorRegistration {
 };
 
 const ToolExecutorRegistration g_tool_executor_registration;
-
-struct AuthorizationPolicyRegistration {
-  AuthorizationPolicyRegistration() {
-    register_authorization_policy(&default_authorization_policy);
-  }
-};
-
-const AuthorizationPolicyRegistration g_authorization_policy_registration;
 
 struct EnvelopeBuilderRegistration {
   EnvelopeBuilderRegistration() {

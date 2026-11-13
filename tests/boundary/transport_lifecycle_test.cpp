@@ -28,14 +28,12 @@ namespace {
 constexpr int64_t kGraceBudgetMs = 2000;
 
 InstanceRecord make_record(const std::string &instance_id, int port, int pid,
-                            const std::string &project_path,
-                            const std::string &token) {
+                            const std::string &project_path) {
   InstanceRecord record;
   record.instance_id = instance_id;
   record.port = port;
   record.pid = pid;
   record.project_path = project_path;
-  record.api_token = token;
   return record;
 }
 
@@ -132,8 +130,8 @@ TEST(PortRecoveryTest, SameProjectPathIgnoresSeparatorStyle) {
 
 TEST(PortRecoveryTest, KeepsOnlyRecordsOfTheSameProject) {
   const std::vector<InstanceRecord> records = {
-      make_record("gda-a", 9527, 111, "C:/proj", "token-a"),
-      make_record("gda-b", 9528, 222, "C:/other", "token-b"),
+      make_record("gda-a", 9527, 111, "C:/proj"),
+      make_record("gda-b", 9528, 222, "C:/other"),
   };
   const RecoveryPlan plan = godot_autopilot::port_recovery::analyze(
       records, "C:/proj", 999, [](int) { return false; });
@@ -144,8 +142,8 @@ TEST(PortRecoveryTest, KeepsOnlyRecordsOfTheSameProject) {
 
 TEST(PortRecoveryTest, SplitsStaleAndLiveRegistrations) {
   const std::vector<InstanceRecord> records = {
-      make_record("gda-dead", 9527, 111, "C:/proj", "token-dead"),
-      make_record("gda-live", 9528, 222, "C:/proj", "token-live"),
+      make_record("gda-dead", 9527, 111, "C:/proj"),
+      make_record("gda-live", 9528, 222, "C:/proj"),
   };
   const RecoveryPlan plan = godot_autopilot::port_recovery::analyze(
       records, "C:/proj", 999, [](int pid) { return pid == 222; });
@@ -158,7 +156,7 @@ TEST(PortRecoveryTest, SplitsStaleAndLiveRegistrations) {
 
 TEST(PortRecoveryTest, SkipsTheCurrentProcessRecord) {
   const std::vector<InstanceRecord> records = {
-      make_record("gda-self", 9527, 999, "C:/proj", "token-self"),
+      make_record("gda-self", 9527, 999, "C:/proj"),
   };
   const RecoveryPlan plan = godot_autopilot::port_recovery::analyze(
       records, "C:/proj", 999, [](int) { return true; });
@@ -173,8 +171,8 @@ TEST(PortRecoveryTest, HintStaysEmptyWithoutResidualRecords) {
 
 TEST(PortRecoveryTest, HintNamesResidualRecordsWithoutLeakingTokens) {
   const std::vector<InstanceRecord> records = {
-      make_record("gda-dead", 9527, 111, "C:/proj", "super-secret-token"),
-      make_record("gda-live", 9528, 222, "C:/proj", "another-secret-token"),
+      make_record("gda-dead", 9527, 111, "C:/proj"),
+      make_record("gda-live", 9528, 222, "C:/proj"),
   };
   const RecoveryPlan plan = godot_autopilot::port_recovery::analyze(
       records, "C:/proj", 999, [](int pid) { return pid == 222; });

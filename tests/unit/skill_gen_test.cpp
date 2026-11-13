@@ -23,11 +23,11 @@ namespace {
 
 using namespace godot_autopilot::skill_gen;
 
-constexpr size_t kSkillCount = 9;
-constexpr size_t kSkillFileCount = 35;
-constexpr size_t kToolsReferenceCount = 6;
+constexpr size_t kSkillCount = 10;
+constexpr size_t kSkillFileCount = 10;
 const char *const kExpectedSkillNames[kSkillCount] = {
     "godot-autopilot",
+    "godot-autopilot-setup",
     "godot-autopilot-tools",
     "godot-autopilot-scene-system",
     "godot-autopilot-resources",
@@ -44,7 +44,7 @@ const char *const kManualWhitelist[] = {
     "timeout_ms", "auto_owner", "SceneRoot", "target", "retryable", "isError",
     "true", "false",
     "godot_autopilot", "editor_readiness", "resource_ops", "record_error",
-    "writes_file", "writes_scene", "is_error",
+    "writes_file", "writes_scene", "is_error", "confirm_required",
     "already_playing", "physics_stalled", "node_count", "scan_truncated",
     "just_pressed", "global_rect", "auth_mode", "authorization_mode",
     "check_equal", "make_current", "close_scene", "get_tile_data",
@@ -102,6 +102,24 @@ const char *const kManualWhitelist[] = {
     "failed", "errors", "directory", "enabled",
 
     "gda",
+
+    "mcp_url", "port_source", "toolset_hash", "plugin_version", "cli_version",
+    "protocol_version", "ipc_kind", "instance_id", "schema_version",
+    "confirmation_required", "converted_node_path", "scene_path",
+    "scene_unsaved", "node_released", "applied_properties",
+    "property_warnings", "inline_resources", "converted_node_paths",
+    "failed_property", "when_satisfied_frame", "after_frames",
+    "max_dimension", "args_file", "await_async", "target_path",
+    "new_parent_path", "keep_world_position", "only_script_variables",
+    "property_filter", "dry_run", "diagnostic_scope", "parse_error",
+    "assembly_checked", "gda_runtime", "global_position", "enter_tree",
+    "exit_tree", "physics_process", "unhandled_input", "gui_input",
+    "static_init", "node_ref", "pivot_offset", "sub_resource",
+    "add_render_canvas_item", "eval_cancelled", "eval_timeout",
+    "exec_timeout", "main_thread_timeout", "queue_unavailable",
+    "get_node_or_null", "rect_global_position", "rect_min_size",
+    "rect_pivot_offset", "rect_position", "rect_rotation", "rect_scale",
+    "rect_size",
 
     "dynamic", "required", "type", "description", "error", "file", "args",
     "name", "params", "tags", "category", "instance_ambiguous",
@@ -276,7 +294,7 @@ protected:
   }
 };
 
-TEST(SkillGenTest, AllNineSkillsPresent) {
+TEST(SkillGenTest, AllTenSkillsPresent) {
   const std::vector<SkillSpec> skills = all_skills();
   ASSERT_EQ(skills.size(), kSkillCount);
 
@@ -411,66 +429,36 @@ TEST_F(SkillRegistryFixture, ToolNamesExistInRegistry) {
   }
 }
 
-TEST_F(SkillRegistryFixture, ToolCatalogCoverage) {
-  const std::vector<SkillSpec> skills = all_skills();
+TEST_F(SkillRegistryFixture, SkillBooksDescribeDiscovery) {
+  const std::vector<SkillSpec> all = all_skills();
   const SkillSpec *tools_skill = nullptr;
-  for (const SkillSpec &spec : skills) {
+  for (const SkillSpec &spec : all) {
     if (spec.name == "godot-autopilot-tools") {
       tools_skill = &spec;
     }
   }
   ASSERT_NE(tools_skill, nullptr);
-  const SkillFile *catalog_file = nullptr;
-  for (const SkillFile &file : tools_skill->files) {
-    if (file.relative_path == "references/tool-catalog.md") {
-      catalog_file = &file;
-    }
-  }
-  ASSERT_NE(catalog_file, nullptr);
-
-  const std::set<std::string> meta_tools = {
-      "ping", "search_tools", "list_categories", "get_tool_detail",
-      "call_tool", "batch_execute", "code_execute"};
-  for (const godot_autopilot::ToolInfo &tool :
-       registry_catalog().get_all_tools()) {
-    if (meta_tools.count(tool.name) > 0) {
-      continue;
-    }
-    EXPECT_NE(catalog_file->body.find("`" + tool.name + "`"),
-              std::string::npos)
-        << "missing tool in tool-catalog.md: " << tool.name;
-  }
+  ASSERT_FALSE(tools_skill->files.empty());
+  const std::string &body = tools_skill->files[0].body;
+  EXPECT_NE(body.find("gda tools search"), std::string::npos);
+  EXPECT_NE(body.find("gda tools describe"), std::string::npos);
+  EXPECT_NE(body.find("gda call"), std::string::npos);
+  EXPECT_NE(body.find("confirmation_required"), std::string::npos);
+  EXPECT_NE(body.find("new_errors_since_last_call"), std::string::npos);
 }
 
 TEST(SkillGenTest, CliChannelContract) {
   const std::vector<SkillSpec> skills = all_skills();
-  const SkillSpec *tools_skill = nullptr;
-  for (const SkillSpec &spec : skills) {
-    if (spec.name == "godot-autopilot-tools") {
-      tools_skill = &spec;
-    }
-  }
-  ASSERT_NE(tools_skill, nullptr);
-  const SkillFile *fallback_file = nullptr;
-  for (const SkillFile &file : tools_skill->files) {
-    if (file.relative_path == "references/manual-fallback.md") {
-      fallback_file = &file;
-    }
-  }
-  ASSERT_NE(fallback_file, nullptr);
-  EXPECT_FALSE(fallback_file->body.empty());
-
   for (const SkillSpec &spec : skills) {
     ASSERT_FALSE(spec.files.empty()) << spec.name;
-    EXPECT_NE(spec.files[0].body.find("godot-autopilot-tools"), std::string::npos)
-        << spec.name << ": SKILL.md must mention godot-autopilot-tools";
-    EXPECT_NE(spec.files[0].body.find("manual-fallback"), std::string::npos)
-        << spec.name << ": SKILL.md must mention manual-fallback";
+    const std::string &body = spec.files[0].body;
+    EXPECT_NE(body.find("godot-autopilot"), std::string::npos)
+        << spec.name << ": SKILL.md must mention the godot-autopilot book family";
     if (spec.name == "godot-autopilot-tools") {
-      EXPECT_TRUE(contains_ci_token(spec.files[0].body, "gda"))
+      EXPECT_TRUE(contains_ci_token(body, "gda"))
           << spec.name << ": SKILL.md must mention the gda CLI channel";
-      EXPECT_TRUE(contains_ci_token(spec.files[0].body, "bunx"))
-          << spec.name << ": SKILL.md must mention bunx";
+      EXPECT_NE(body.find("gda tools search"), std::string::npos);
+      EXPECT_NE(body.find("gda call"), std::string::npos);
     }
     for (const SkillFile &file : spec.files) {
       if (!ends_with(file.relative_path, ".md")) {
@@ -479,6 +467,16 @@ TEST(SkillGenTest, CliChannelContract) {
       EXPECT_EQ(file.body.find("curl -"), std::string::npos)
           << spec.name << "/" << file.relative_path;
       EXPECT_EQ(file.body.find("Invoke-WebRequest"), std::string::npos)
+          << spec.name << "/" << file.relative_path;
+      EXPECT_EQ(file.body.find("bunx"), std::string::npos)
+          << spec.name << "/" << file.relative_path;
+      EXPECT_EQ(file.body.find("9527"), std::string::npos)
+          << spec.name << "/" << file.relative_path;
+      EXPECT_EQ(file.body.find("gda serve"), std::string::npos)
+          << spec.name << "/" << file.relative_path;
+      EXPECT_EQ(file.body.find("gda api"), std::string::npos)
+          << spec.name << "/" << file.relative_path;
+      EXPECT_EQ(file.body.find("Allow write"), std::string::npos)
           << spec.name << "/" << file.relative_path;
     }
   }
@@ -489,7 +487,6 @@ TEST(SkillGenTest, SkillBooksCarryNoScriptBridge) {
   for (const SkillSpec &spec : all_skills()) {
     EXPECT_EQ(spec.description.find("gda.mjs"), std::string::npos)
         << spec.name << ": description must not mention the retired script bridge";
-    size_t reference_files = 0;
     for (const SkillFile &file : spec.files) {
       ++total_files;
       EXPECT_FALSE(ends_with(file.relative_path, ".mjs"))
@@ -498,29 +495,17 @@ TEST(SkillGenTest, SkillBooksCarryNoScriptBridge) {
       EXPECT_EQ(file.body.find("gda.mjs"), std::string::npos)
           << spec.name << "/" << file.relative_path
           << ": skill books must not mention the retired script bridge";
-      if (starts_with(file.relative_path, "references/")) {
-        ++reference_files;
-      }
-    }
-    if (spec.name == "godot-autopilot-tools") {
-      EXPECT_EQ(reference_files, kToolsReferenceCount)
-          << spec.name << ": reference file count";
     }
   }
   EXPECT_EQ(total_files, kSkillFileCount) << "embedded skill file count";
 }
 
-TEST(SkillGenTest, EverySkillDeclaresReferences) {
+TEST(SkillGenTest, EverySkillHasSkillMd) {
   for (const SkillSpec &spec : all_skills()) {
-    ASSERT_GE(spec.files.size(), size_t{2})
-        << spec.name << " must declare at least one references/ file";
+    ASSERT_EQ(spec.files.size(), size_t{1})
+        << spec.name << " must ship exactly one self-contained SKILL.md";
     EXPECT_EQ(spec.files[0].relative_path, "SKILL.md")
         << "files[0] must be SKILL.md: " << spec.name;
-    for (size_t i = 1; i < spec.files.size(); ++i) {
-      EXPECT_TRUE(is_skill_aux_path(spec.files[i].relative_path))
-          << spec.name << ": file path must start with 'references/' or 'scripts/': "
-          << spec.files[i].relative_path;
-    }
   }
 }
 

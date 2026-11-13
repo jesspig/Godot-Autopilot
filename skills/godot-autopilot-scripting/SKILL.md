@@ -5,9 +5,9 @@ description: "Godot GDScript guide: script lifecycle, the four execution channel
 
 # GDScript Workflows
 
-Invocation: use the native MCP tools first; when that channel is down, follow the calling ladder in the godot-autopilot-tools skill (the gda CLI, via bunx, a global install, or the standalone gda binary); with no CLI available, work through its references/manual-fallback.md.
+Invocation: discover with `gda tools search` and `gda tools describe`, then call with `gda call`; the native MCP tools (`search_tools`, `get_tool_detail`, `call_tool`) are the compatibility path. Protocol details live in `godot-autopilot-tools`.
 
-Creating, attaching, editing and reloading GDScript through godot-autopilot, and the safety differences between the four execution channels plus the code_execute meta tool. Engine-level execution gotchas (placeholder instances, static initializers, editor-vs-game semantics, frame ordering) are summarized here and covered in depth in `references/execution-gotchas.md`.
+Creating, attaching, editing and reloading GDScript through godot-autopilot, and the safety differences between the four execution channels plus the code_execute meta tool. Engine-level execution gotchas (placeholder instances, static initializers, editor-vs-game semantics, frame ordering) are covered below.
 
 ## Script lifecycle
 
@@ -28,8 +28,6 @@ The single most common cause of "my script did nothing" reports:
 - The gate is `can_instantiate = valid && !abstract && (tool || scripting_enabled)`: only scripts marked `@tool` (or failing compilation or abstract-ness checks) are instantiable in the editor.
 - Symptoms: `get_script_property` with `script_path` keeps returning the declared defaults; editor-side mutations you expected from the script never appear; `call_script_node` is rejected for non-`@tool` scripts.
 - Fix: add `@tool` as the first line, then `reload_script` - or run the game and use the game channel.
-
-Details in `references/execution-gotchas.md`.
 
 ## Four execution channels
 
@@ -91,7 +89,7 @@ Anything touching many objects - filling tile cells, rewriting hundreds of prope
 
 ## Editor vs game process semantics
 
-`is_editor_hint()` is `true` for the whole editor process - including `@tool` scripts and editor plugins - and `false` for the entire F5-launched game subprocess. Two frequent knock-on effects: `Input.set_custom_mouse_cursor()` is a no-op when called in the editor process, and editor-only (API_EDITOR) classes error when instantiated in the running game. Branch on `is_editor_hint()` early in `@tool` code that must behave differently per process. Full cross-process details: `references/execution-gotchas.md`.
+`is_editor_hint()` is `true` for the whole editor process - including `@tool` scripts and editor plugins - and `false` for the entire F5-launched game subprocess. Two frequent knock-on effects: `Input.set_custom_mouse_cursor()` is a no-op when called in the editor process, and editor-only (API_EDITOR) classes error when instantiated in the running game. Branch on `is_editor_hint()` early in `@tool` code that must behave differently per process.
 
 ## Tree entry and exit order
 
@@ -103,7 +101,7 @@ For any subtree added to or removed from the scene tree, callbacks fire in a fix
 
 The `tree_exited` signal fires once after the whole branch has been cut from the tree, not per node during removal. In a `@tool` script the same order applies to editor-side tree changes.
 
-Assembly recipe (stage required children before the parent enters the tree, or get_node_or_null guards): `references/execution-gotchas.md`.
+Assembly recipe: stage required children before the parent enters the tree, or resolve lazily with `get_node_or_null` guards.
 
 ## C# limitations
 

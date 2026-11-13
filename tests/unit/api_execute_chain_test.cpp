@@ -70,7 +70,6 @@ protected:
   void SetUp() override {
     previous_executor_ = tools::tool_executor_slot();
     previous_validator_ = tools::argument_validator_slot();
-    previous_authorization_ = tools::authorization_policy_slot();
     previous_envelope_ = tools::envelope_builder_slot();
     previous_export_guard_ = tools::export_guard_slot();
     tools::register_tool_executor(&tools::execute_tool_chain);
@@ -79,8 +78,6 @@ protected:
         [](const std::string &, const mcp::JsonValue &) {
           return empty_result();
         });
-    tools::register_authorization_policy(
-        [](const std::string &) { return empty_result(); });
     tools::register_envelope_builder(
         [](const std::string &, const mcp::JsonValue &result) { return result; });
     godot_autopilot::api_surface::register_token_verifier(
@@ -94,7 +91,6 @@ protected:
   void TearDown() override {
     tools::register_tool_executor(previous_executor_);
     tools::register_argument_validator(previous_validator_);
-    tools::register_authorization_policy(previous_authorization_);
     tools::register_envelope_builder(previous_envelope_);
     tools::register_export_guard(previous_export_guard_);
     godot_autopilot::api_surface::register_token_verifier(nullptr);
@@ -115,7 +111,6 @@ protected:
 
   tools::ToolExecutorFn previous_executor_;
   tools::ArgumentValidatorFn previous_validator_;
-  tools::AuthorizationFn previous_authorization_;
   tools::EnvelopeFn previous_envelope_;
   tools::ExportGuardFn previous_export_guard_;
 };
@@ -133,24 +128,6 @@ TEST_F(RestExecuteChainTest, ExportInProgressShortCircuitsTheRestCall) {
   ASSERT_TRUE(code->IsString());
   EXPECT_EQ(code->GetString(), "export_in_progress");
   EXPECT_EQ(reply.status, 503);
-  EXPECT_FALSE(tool->executed);
-}
-
-TEST_F(RestExecuteChainTest, AuthorizationDenialShortCircuitsTheRestCall) {
-  RecordingTool *tool = register_recording_tool("gda_rest_auth_probe_tool");
-  const mcp::JsonValue injected = make_error_object(
-      "authorization required for 'gda_rest_auth_probe_tool'",
-      "authorization_required");
-  tools::register_authorization_policy(
-      [injected](const std::string &) { return injected; });
-
-  const ApiReply reply = call_tool("gda_rest_auth_probe_tool");
-
-  const mcp::JsonValue *code = reply.body.Find("code");
-  ASSERT_NE(code, nullptr);
-  ASSERT_TRUE(code->IsString());
-  EXPECT_EQ(code->GetString(), "authorization_required");
-  EXPECT_EQ(reply.status, 403);
   EXPECT_FALSE(tool->executed);
 }
 

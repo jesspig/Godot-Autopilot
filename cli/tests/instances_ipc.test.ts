@@ -58,28 +58,66 @@ describe("instances ipc endpoint", () => {
     expect(records[0].port).toBe(9601);
   });
 
-  test("新记录解析 ipc 端点字段", () => {
+  test("新记录解析 unix ipc 端点字段", () => {
     const record = baseRecord();
     (record.endpoints as Record<string, unknown>).ipc = {
+      kind: "unix",
       path: "C:/gda/run/sample-1234abcd.sock",
-      protocol: "uds",
-      framing: "ndjson",
-      auth: "filesystem",
+      token: "ipc-token",
+      protocol: "mcp-jsonrpc",
+      framing: "length-prefixed-json",
+      auth: "token",
+      version: 1,
     };
     writeIndex([record]);
     const records = readPluginInstanceIndex();
     expect(records).toHaveLength(1);
     expect(records[0].ipcEndpoint).toEqual({
+      kind: "unix",
       path: "C:/gda/run/sample-1234abcd.sock",
-      protocol: "uds",
-      framing: "ndjson",
-      auth: "filesystem",
+      name: "",
+      host: "",
+      port: null,
+      token: "ipc-token",
+      protocol: "mcp-jsonrpc",
+      framing: "length-prefixed-json",
+      auth: "token",
+      version: 1,
     });
   });
 
-  test("ipc 缺 path 时按无 IPC 处理", () => {
+  test("新记录解析 tcp ipc 端点字段", () => {
     const record = baseRecord();
-    (record.endpoints as Record<string, unknown>).ipc = { protocol: "uds" };
+    (record.endpoints as Record<string, unknown>).ipc = {
+      kind: "tcp",
+      host: "127.0.0.1",
+      port: 21437,
+      token: "tcp-token",
+      protocol: "mcp-jsonrpc",
+      framing: "length-prefixed-json",
+      auth: "token",
+      version: 1,
+    };
+    writeIndex([record]);
+    const records = readPluginInstanceIndex();
+    expect(records).toHaveLength(1);
+    expect(records[0].ipcEndpoint).toEqual({
+      kind: "tcp",
+      path: "",
+      name: "",
+      host: "127.0.0.1",
+      port: 21437,
+      token: "tcp-token",
+      protocol: "mcp-jsonrpc",
+      framing: "length-prefixed-json",
+      auth: "token",
+      version: 1,
+    });
+  });
+
+  test("ipc 缺 path/tcp 地址时按无 IPC 处理", () => {
+    const record = baseRecord();
+    (record.endpoints as Record<string, unknown>).ipc = { protocol: "mcp-jsonrpc" };
     writeIndex([record]);
     const records = readPluginInstanceIndex();
     expect(records).toHaveLength(1);

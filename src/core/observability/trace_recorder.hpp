@@ -70,6 +70,21 @@ struct TraceEvent {
   std::string error_type;
   std::string stack;
   int64_t bytes = 0;
+
+  int schema_version = 4;
+  std::string event_id;
+  std::string source;
+  std::string transport;
+  std::string port_source;
+  std::string cache_source;
+  int64_t dispatch_wait_ms = 0;
+  int64_t exec_ms = 0;
+  int64_t serialize_ms = 0;
+  bool confirm = false;
+  std::string retry_of;
+  int attempt = 0;
+  std::string args_hash;
+  std::string result_hash;
 };
 
 struct SanitizeResult {

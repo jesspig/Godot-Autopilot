@@ -19,6 +19,8 @@ resource:
   - src/tools/base/tool_execute.cpp
 ---
 
+> **0.3.2 已移除**：REST `/api`、API token、`gda api`/`gda endpoints` 与 `endpoints.api` 不再存在；CLI 为纯客户端，统一走 IPC/MCP。本页仅作历史对照。
+
 # REST 接口面（`/api`）
 
 > 审计日期：2026-10-21（随开放接口面落地批次首建——本批在**同一个监听端口**上新增 `/api` 前缀的 REST 端点集，与既有 `/mcp`（MCP 协议）并列；端点实现集中在 [`src/core/transport/api_surface.cpp`](../../../src/core/transport/api_surface.cpp)，认证在 [`src/core/transport/api_auth.cpp`](../../../src/core/transport/api_auth.cpp) 与 [`src/core/transport/api_token.cpp`](../../../src/core/transport/api_token.cpp)，错误信封归一在 [`src/core/transport/api_envelope.cpp`](../../../src/core/transport/api_envelope.cpp)，路由挂载在 [`src/core/transport/api_server.cpp`](../../../src/core/transport/api_server.cpp)；端口模型与实例登记见 [端口与实例登记](ports.md)，统一执行入口与授权三档见 [工具注册表](tools_registry.md)；本轮校订补齐三处接线事实——① 端点清单 8 条、分页窗口 500/2000、批量上限 256、工具名长度上限 128 四个常量补入正文；② 补「执行入口与接线现状」小节，说明 `api_surface` 的执行器槽位在生产路径上未注册、REST 实际经 `default_execute_tool` 派发，导出拦截与参数校验两阶段尚未接线；③ 状态码表补 429，并标注 413 的两条来源（传输层 `Content-Length` 拒收 vs 端点层 `payload_too_large`））。10-22 校订：执行入口接线现状按代码核实更新——REST 面已接入统一执行入口六阶段全链（生产注册点在 `src/core/server_context.cpp` 的 `register_unified_tool_executor()`），已知限制中「统一执行入口尚未接入」一条已删除。

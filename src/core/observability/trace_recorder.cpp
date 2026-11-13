@@ -456,6 +456,20 @@ std::string TraceRecorder::to_json_line(const TraceEvent &event) {
   append_string_field(out, "error_type", event.error_type, false);
   append_string_field(out, "stack", event.stack, false);
   append_int_field(out, "bytes", event.bytes, false);
+  append_int_field(out, "schema_version", static_cast<int64_t>(event.schema_version), false);
+  append_string_field(out, "event_id", event.event_id, false);
+  append_string_field(out, "source", event.source, false);
+  append_string_field(out, "transport", event.transport, false);
+  append_string_field(out, "port_source", event.port_source, false);
+  append_string_field(out, "cache_source", event.cache_source, false);
+  append_int_field(out, "dispatch_wait_ms", event.dispatch_wait_ms, false);
+  append_int_field(out, "exec_ms", event.exec_ms, false);
+  append_int_field(out, "serialize_ms", event.serialize_ms, false);
+  append_bool_field(out, "confirm", event.confirm, false);
+  append_string_field(out, "retry_of", event.retry_of, false);
+  append_int_field(out, "attempt", static_cast<int64_t>(event.attempt), false);
+  append_string_field(out, "args_hash", event.args_hash, false);
+  append_string_field(out, "result_hash", event.result_hash, false);
   out += '}';
   return out;
 }

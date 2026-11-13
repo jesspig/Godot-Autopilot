@@ -41,11 +41,10 @@ Godot-Autopilot 是一个住在 **Godot 编辑器内部**的插件型 [MCP](http
 2. **执行**——单步用 `call_tool`，批量用 `batch_execute`。
 3. **验证**——截图看结果，与上次截图对比，有问题就修，再确认。
 
-为了让代理开箱即用，插件内置 **9 册技能书**（总纲 + 调用专册 + 场景、资源、脚本、运行时、服务器、内容、C# 分册）与 **7 篇新手指南**（3D 场景、角色控制器、物理排错、输入映射、GUI 等）。在 **MCP Config** 面板点一下，就能把技能渲染到项目的 `.agents/skills/` 目录。定位：MCP 是主产品通道，skill/脚本是体验层——调用专册在 MCP 失效时改用 GDA CLI，无 CLI 时则出手动指南。
+为了让代理开箱即用，插件自带 **10 册自包含技能书**（总纲，以及场景、资源、脚本、运行时、服务器、内容、C#、安装、工具分册）。用 `gda install skills` 安装（加 `--zh` 使用中文）；代理随后按调用协议执行，而不是自己摸索。定位：MCP 是主产品通道，技能是体验层——调用指南在 MCP 失效时改用 GDA CLI。
 
-插件自带两个编辑器面板：
+插件自带一个编辑器面板：
 
-- **MCP Config**——服务器状态与端口、一键生成客户端配置、高风险能力开关、技能生成。
 - **Log**——仅显示插件日志，支持级别/分类过滤与搜索，方便定位失败调用。
 
 ## 快速开始
@@ -62,9 +61,9 @@ Godot-Autopilot 是一个住在 **Godot 编辑器内部**的插件型 [MCP](http
            ├── libgodot-autopilot.dylib (macOS)
            └── godot-autopilot.gdextension
    ```
-2. **打开项目**——服务端自动启动，监听插件配置的端口（默认 `http://127.0.0.1:9527/mcp`），无需启用开关。
-3. **连接 AI 客户端**——在编辑器的 **MCP Config** 面板选客户端并点击 **Generate**。支持 20 个客户端，包括 Claude Code、Codex、Cursor、OpenCode、Copilot 等；客户端如有提示请批准生成的配置文件。
-4. **解锁高级能力（可选）**——脚本执行（`code_execute`）与游戏控制（`game_runtime`）默认关闭，需要时在面板勾选。
+2. **打开项目**——服务端自动启动，首次启动时绑定一个空闲的环回端口（按工程持久化，取自 `20000–29999`）。无需启用开关。
+3. **连接 AI 客户端**——运行 `gda status --json`，把其中的 `mcp_url` 加进客户端的 MCP 配置（也可以把 URL 交给代理，让它生成配置）。支持 20 个客户端，包括 Claude Code、Codex、Cursor、OpenCode、Copilot 等。
+4. **确认高风险调用（可选）**——带 `destructive`、`process`、`code_execute`、`game_runtime` 副作用的工具需要 `confirm=true`；没有全局白名单。
 5. **提需求**——比如“创建一个能跑能跳的玩家角色，试玩一下并修掉看着不对的地方”。
 
 想从源码构建或参与贡献？见 [docs/wiki/](docs/wiki/)（入口 [index.md](docs/wiki/index.md)，构建见 [build.md](docs/wiki/build.md)）与 [tests/README.md](tests/README.md)。
@@ -76,17 +75,17 @@ Godot-Autopilot 是一个住在 **Godot 编辑器内部**的插件型 [MCP](http
 用 `bunx` 单次执行（PowerShell 下需加引号，因为 `#` 会被当作注释）：
 
 ```
-bunx "github:jesspig/Godot-Autopilot#0.3.1" ping
+bunx "github:jesspig/Godot-Autopilot#0.3.2" ping
 ```
 
 或全局安装一次，之后直接用 `gda` 命令：
 
 ```
-bun install -g github:jesspig/Godot-Autopilot#0.3.1
+bun install -g github:jesspig/Godot-Autopilot#0.3.2
 gda ping
 ```
 
-命令族：**调用族** —— `ping` / `status` / `categories` / `search` / `describe` / `call`；**生命周期** —— `list` / `start` / `stop` / `restart` / `logs`；**控制面** —— `serve`；**REST 族** —— `api`（子命令 `list` / `describe` / `call`，不经 MCP 握手直调 REST）；`endpoints`（展示 MCP/REST 端点、端口来源与存活探针结果）。
+命令族：**调用族** —— `ping` / `status` / `categories` / `search` / `describe` / `call`；**生命周期** —— `list` / `start` / `stop` / `restart` / `logs`；**离线与资产族** —— `skills` / `tools` / `projects` / `cache` / `install` / `update` / `trace`。
 
 需要 **Bun**；机器上没有 Bun 或 Node 时，直接改用 Releases 页的 `gda` 独立可执行文件（完整参考见 [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md)）。
 
@@ -103,26 +102,26 @@ Project: <ABSOLUTE PATH TO YOUR GODOT PROJECT> (Godot 4.7+).
    https://github.com/jesspig/Godot-Autopilot/releases/latest and extract it so that
    <project>/addons/godot-autopilot/godot-autopilot.gdextension exists.
 2. Start the editor: run `godot --editor --path <project>` (ask me for the engine path if it is
-   not on PATH) and wait until http://127.0.0.1:9527/mcp answers.
+   not on PATH) and wait until the `mcp_url` from `gda status --json` answers.
 3. Verify the server from a shell. Try in this order, stop at the first that works, and tell me
    which one it was:
-   - bunx "github:jesspig/Godot-Autopilot#0.3.1" ping
+   - bunx "github:jesspig/Godot-Autopilot#0.3.2" ping
    - download the gda release asset for this OS and CPU from the same Releases page, verify it
      against sha256sums.txt, then run ./gda ping
 4. Connect my AI client: add
-   {"mcpServers":{"godot-autopilot":{"url":"http://127.0.0.1:9527/mcp"}}}
-   to its MCP configuration, or tell me to use the plugin's MCP Config panel instead.
+   {"mcpServers":{"godot-autopilot":{"url":"<mcp_url from gda status --json>"}}}
+   to its MCP configuration (or hand the URL to your agent and ask it to generate the config).
 5. Summarize: which channel worked, every command you ran, and anything that failed.
 
-Rules: never hand-write HTTP requests against the port; never expose 9527 beyond loopback;
-leave code_execute and game_runtime disabled unless I ask for them.
+Rules: never hand-write HTTP requests against the port; never expose the GDA port beyond loopback;
+leave high-risk tools (code_execute, game_runtime, destructive, process) unconfirmed unless I ask for them.
 ```
 
-如果你的客户端支持技能（Claude Code、Codex、Cursor 等都支持），再把本仓库的 `skills/` 目录指给它，代理就能拿到完整的调用协议，而不必自己摸索。
+如果你的客户端支持技能（Claude Code、Codex、Cursor 等都支持），运行 `gda install skills`，代理就能拿到完整的调用协议，而不必自己摸索。
 
 ## 安全说明
 
-服务端只监听本机回环地址（端口取自插件配置，默认 9527，路径固定 `/mcp`），非本机地址拒绝启动。脚本执行、游戏控制、操作系统进程类工具**默认全部拒绝**——只在你信任的本地项目中开启。详见 [docs/wiki/security_contract.md](docs/wiki/security_contract.md)。
+服务端只监听本机回环地址（端口由插件按工程选择，路径固定 `/mcp`），非本机地址一律拒绝。高风险工具（`destructive`、`process`、`code_execute`、`game_runtime`）需要 `confirm=true`，没有全局白名单。详见 [docs/wiki/security_contract.md](docs/wiki/security_contract.md)。
 
 ## 素材声明
 

@@ -5,7 +5,7 @@ description: "Godot resource and file operations guide: load, save, create and d
 
 # Resource and File Operations
 
-Invocation: use the native MCP tools first; when that channel is down, follow the calling ladder in the godot-autopilot-tools skill (the gda CLI, via bunx, a global install, or the standalone gda binary); with no CLI available, work through its references/manual-fallback.md.
+Invocation: discover with `gda tools search` and `gda tools describe`, then call with `gda call`; the native MCP tools (`search_tools`, `get_tool_detail`, `call_tool`) are the compatibility path. Protocol details live in `godot-autopilot-tools`.
 
 Working with .tres/.tscn files, .import sidecars, UIDs and the res:// layout through the resource domain tools plus three text-file tools (`write_file`, `read_file`, `find_in_files`). Every tool is invoked through `call_tool`; see the godot-autopilot-tools skill for the discovery protocol.
 
@@ -72,6 +72,10 @@ Reload behavior in the engine: the dependency rewrite rewrites each affected fil
 
 `move_resource_file` keeps the file name and takes `new_directory` inside res:// (absolute like res://assets/sfx or relative like assets/sfx; trailing slashes are trimmed; user:// is rejected). When `path` is a directory, every file moves recursively preserving the sub-folder layout, empty source folders are left behind, and a file system scan runs afterwards. The directory walk skips .import and .uid sidecars and moves each main file through its own reference-rewriting transaction, which migrates the file's sidecars (they follow their owners) and rewrites the references pointing at it - a directory move is a sequence of per-file transactions whose reports are aggregated. After a file moves or is force-deleted, any open scene tab still pointing at its old path is closed automatically and listed in closed_tabs; a tab that is the currently edited scene is left open and reported in closed_tabs_warning instead.
 
+```bash
+gda call rename_resource_file --args '{"from": "res://old.tres", "to": "res://new.tres"}'
+```
+
 Read the structured report instead of assuming success. `rename_resource_file` returns updated_files (per-file change counts), stale_references ({file, token} leftovers that could not be rewritten), uid_preserved, remapped_settings, saved_scenes, reloaded_scenes, unsupported_binary_references (binary resources such as .scn/.res/.csv/.translation cannot be rewritten in place), closed_tabs when a stale scene tab was closed, and import_sidecar_warning when a .import move failed. `move_resource_file` returns moved ({from, to, updated_files, uid_preserved}), failed, plus the aggregated stale_references, unsupported_binary_references, saved_scenes, reloaded_scenes, closed_tabs, closed_tabs_warning and import_sidecar_warnings.
 
 A script_class token in stale_references means a global class_name changed: run `scan_editor_file_system` afterwards so the class re-registers.
@@ -104,7 +108,7 @@ To discard a whole directory, `move_os_file_to_trash` (OS domain) trashes a res:
 - `set_resource_uid` triggers a filesystem reimport so the assignment persists.
 - `scan_editor_file_system` rescans the project - run it after a class_name rename that left script_class tokens, or after out-of-band file changes; directory moves trigger one automatically.
 
-Scan gating in brief: the editor file system is a state machine (idle, scanning, processing changes, importing). A scan request issued while a scan or change pass is already running is silently ignored - not queued, not errored. The first scan of an editor session runs on the main thread; later scans run on a low-priority background thread, and their filesystem_changed notification is deferred onto the main loop. `get_editor_file_system_status` is the readiness gate: its response carries only scanning (bool) and progress (float) - there is no is_importing or doing_first_scan field, and progress is not a gate; poll until scanning is false. The full state machine, import ordering and sidecar rules are in `references/import-and-sidecars.md`.
+Scan gating in brief: the editor file system is a state machine (idle, scanning, processing changes, importing). A scan request issued while a scan or change pass is already running is silently ignored - not queued, not errored. The first scan of an editor session runs on the main thread; later scans run on a low-priority background thread, and their filesystem_changed notification is deferred onto the main loop. `get_editor_file_system_status` is the readiness gate: its response carries only scanning (bool) and progress (float) - there is no is_importing or doing_first_scan field, and progress is not a gate; poll until scanning is false. A scan request that lands during another scan is dropped, not queued; use the soft-error retry loop instead of fire-and-forget scans.
 
 ## Editor readiness soft errors
 
@@ -137,5 +141,3 @@ Wait for retry_after_ms, then retry the same call.
 - godot-autopilot-tools - the discovery protocol and the tool gotcha catalog
 - godot-autopilot-scene-system - scene lifecycle (open scenes are saved and reloaded by rename/move) and assigning resources to node properties (memory:// is rejected)
 - godot-autopilot-content - the memory:// TileSet and SpriteFrames that must be saved before they can be assigned
-- references/import-and-sidecars.md - the import pipeline, hand-writing .import files, sidecar rules, duplicate UIDs and the scan state machine
-- references/tool-reference.md - the full resource and text-file tool tables

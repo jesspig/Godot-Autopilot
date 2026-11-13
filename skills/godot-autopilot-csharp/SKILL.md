@@ -5,7 +5,7 @@ description: "Godot C#/.NET project guide: bootstrapping a csproj from a plain p
 
 # C# / .NET Workflows
 
-Invocation: use the native MCP tools first; when that channel is down, follow the calling ladder in the godot-autopilot-tools skill (the gda CLI, via bunx, a global install, or the standalone gda binary); with no CLI available, work through its references/manual-fallback.md.
+Invocation: discover with `gda tools search` and `gda tools describe`, then call with `gda call`; the native MCP tools (`search_tools`, `get_tool_detail`, `call_tool`) are the compatibility path. Protocol details live in `godot-autopilot-tools`.
 
 C# projects run on the editor's .NET assembly, which changes the workflow in
 three ways: a build step sits between editing and observing, C# declarations
@@ -154,15 +154,16 @@ with `runtime` editor (default) or game.
   `get_game_status.node_count` and reported separately as
   `instrumentation_node_count`.
 
-Endpoints, reflection limits, export-build trimming and subscription token
-lifetime are documented in references/csharp-bridge.md.
+Reflection endpoints, export-build trimming and subscription token lifetime
+follow the same rule: edit, build the assembly, read the debugger log, then
+query the live instance.
 
 ## See also
 
 - `godot-autopilot-scripting` - the GDScript execution channels, unaffected
   by .NET assembly state.
 - `godot-autopilot-scene-system` - node CRUD, property JSON shapes and the
-  C# notes in its property reference.
+  C# property notes.
 - `godot-autopilot-resources` - the create/save/duplicate flows behind
   `create_resource`.
 - `godot-autopilot-runtime` - launching the game, debug channel semantics

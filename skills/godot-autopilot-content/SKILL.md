@@ -5,15 +5,14 @@ description: "Godot content pipeline guide: TileMap and TileSet, AnimationPlayer
 
 # Godot Content Pipeline
 
-Invocation: use the native MCP tools first; when that channel is down, follow the calling ladder in the godot-autopilot-tools skill (the gda CLI, via bunx, a global install, or the standalone gda binary); with no CLI available, work through its references/manual-fallback.md.
+Invocation: discover with `gda tools search` and `gda tools describe`, then call with `gda call`; the native MCP tools (`search_tools`, `get_tool_detail`, `call_tool`) are the compatibility path. Protocol details live in `godot-autopilot-tools`.
 
 Four content domains via godot-autopilot: TileMap and TileSet levels,
 AnimationPlayer and AnimationTree animation, audio buses and playback, and
-Control theming and layout. Each section below is the condensed workflow plus
-that domain's top gotchas; the `references/` files carry the full tool
-payloads and the source-verified silent-failure details. Scene tools act on
-the scene open in the Godot editor; audio bus tools act on the editor
-process (a running game keeps its own device and layout).
+Control theming and layout. Each section below carries the workflow and that
+domain's top gotchas, including the source-verified silent-failure details.
+Scene tools act on the scene open in the Godot editor; audio bus tools act on
+the editor process (a running game keeps its own device and layout).
 
 ## TileMap and TileSet
 
@@ -195,8 +194,8 @@ node path, type, visibility, optional text and global rectangle per Control
 (`max_elements` default 100 / hard cap 1000, truncated responses are flagged;
 `timeout_ms` default 5000 / max 25000). Use the rectangles to aim
 `queue_game_input` - the game channel details are in the runtime skill.
-The full-window root recipe (preset, zero-offset readback, grow-both
-centering) is in references/ui-theme-details.md.
+The full-window root recipe is: set the preset to full rect, read the offsets
+back to confirm zero, then grow both axes for centering.
 
 HUD-theme feedback is often short-lived (a toast that lives 2 s, a death
 overlay that blinks for 0.7 s), so screenshotting it needs a condition rather
@@ -223,15 +222,7 @@ Top gotchas (details in the reference):
 
 ## See also
 
-- [TileMap and TileSet details](references/tilemap-details.md) - full
-  payloads, serialization bounds, alternative-tile bits, silent failures.
-- [Animation details](references/animation-details.md) - track/keyframe
-  semantics, travel and AUTO transition rules, SpriteFrames payloads.
-- [Audio details](references/audio-details.md) - bus naming and send
-  routing, bypass vs mute CPU costs, polyphony stealing.
-- [UI theme details](references/ui-theme-details.md) - preset enums, the
-  persistence model, the theme lookup chain.
-- godot-autopilot-scene-system - node lifecycle, `property_set` JSON value
+- `godot-autopilot-scene-system` - node lifecycle, `property_set` JSON value
   shapes, the property rename table.
 - godot-autopilot-resources - `save_resource`, the texture import pipeline
   and .tres path rules.

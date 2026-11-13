@@ -42,6 +42,12 @@ function recordingServer(handler: (req: CapturedRequest) => Response | Promise<R
   const requests: CapturedRequest[] = [];
   const port = serve(async (req) => {
     const body = (await req.json()) as CapturedRequest;
+    const params = body.params as Record<string, unknown> | undefined;
+    if (params !== undefined && typeof params === "object" && params !== null) {
+      const rest: Record<string, unknown> = { ...params };
+      delete rest._meta;
+      body.params = rest;
+    }
     requests.push(body);
     return handler(body);
   });
@@ -108,7 +114,12 @@ describe("请求形状", () => {
     cap.restore();
     expect(code).toBe(ExitCode.Success);
     expect(requests[0].params).toEqual({ name: "call_tool", arguments: { name: "system_status", arguments: {} } });
-    expect(cap.stdout()).toBe('{"status":"ready"}\n');
+    const statusJson = JSON.parse(cap.stdout()) as Record<string, unknown>;
+    expect(statusJson.schema_version).toBe(1);
+    expect(statusJson.ok).toBe(true);
+    expect(statusJson.port).toBe(port);
+    expect(statusJson.mcp_url).toBe(`http://127.0.0.1:${port}/mcp`);
+    expect(statusJson.transport).toBe("http");
   });
 
   test("categories 直达 list_categories", async () => {
@@ -166,6 +177,18 @@ describe("请求形状", () => {
     cap.restore();
     expect(code).toBe(ExitCode.Success);
     expect(requests[0].params).toEqual({ name: "call_tool", arguments: { name: "move_agent", arguments: { x: 1 } } });
+  });
+
+  test("call --confirm 将 confirm 写入工具参数", async () => {
+    const { port, requests } = recordingServer(() => sseResponse(okEnvelope([textContent("{}")])));
+    const cap = captureOutput();
+    const code = await call(["delete_scene_node"], { portText: String(port), confirm: true });
+    cap.restore();
+    expect(code).toBe(ExitCode.Success);
+    expect(requests[0].params).toEqual({
+      name: "call_tool",
+      arguments: { name: "delete_scene_node", arguments: { confirm: true } },
+    });
   });
 
   test("call 默认 args 为 {}", async () => {

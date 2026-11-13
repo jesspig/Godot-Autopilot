@@ -8,6 +8,7 @@
 #include "core/observability/sanitize_policy.hpp"
 #include "core/observability/trace_recorder.hpp"
 #include "tools/base/dispatch.hpp"
+#include "tools/base/confirmation.hpp"
 #include "tools/base/runtime_ops.hpp"
 #include "util/error_util.hpp"
 
@@ -65,7 +66,11 @@ void record_invoke_trace(const std::string &name, const mcp::JsonValue &args,
   event.error_code = error_code;
   event.args_digest = sanitized.text;
   event.args_truncated = sanitized.truncated;
-  event.result_size = static_cast<int64_t>(result.Dump().size());
+  event.args_hash = TraceRecorder::fnv1a_hex(sanitized.text);
+  const std::string invoke_result_dump = result.Dump();
+  event.result_hash = TraceRecorder::fnv1a_hex(invoke_result_dump);
+  event.confirm = confirmation::provided(args);
+  event.result_size = static_cast<int64_t>(invoke_result_dump.size());
   event.name = name;
   event.thread_id = TraceRecorder::current_thread_id();
   event.monotonic_ns = TraceRecorder::monotonic_now_ns();

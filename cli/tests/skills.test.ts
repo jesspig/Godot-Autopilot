@@ -38,12 +38,12 @@ async function runCaptured(positional: string[], opts: GlobalOptions) {
 }
 
 describe("skills", () => {
-  test("list 离线列出 9 册并带路径与文件数", async () => {
+  test("list 离线列出 10 册并带路径与文件数", async () => {
     const result = await runCaptured(["list"], {});
     expect(result.code).toBe(ExitCode.Success);
     const books = JSON.parse(result.stdout) as Array<{ name: string; path: string; files: number }>;
     expect(Array.isArray(books)).toBe(true);
-    expect(books.length).toBe(9);
+    expect(books.length).toBe(10);
     for (const book of books) {
       expect(typeof book.name).toBe("string");
       expect(book.name.startsWith("godot-autopilot")).toBe(true);
@@ -52,18 +52,32 @@ describe("skills", () => {
     }
   });
 
+  test("--zh 列出中文 10 册", async () => {
+    const result = await runCaptured(["list"], { zh: true });
+    expect(result.code).toBe(ExitCode.Success);
+    const books = JSON.parse(result.stdout) as Array<{ name: string; path: string; files: number }>;
+    expect(books.length).toBe(10);
+    expect(books.some((book) => book.name === "godot-autopilot-setup")).toBe(true);
+  });
+
   test("show 输出 SKILL.md 正文", async () => {
     const result = await runCaptured(["show", "godot-autopilot-tools"], {});
     expect(result.code).toBe(ExitCode.Success);
     expect(result.stdout).toContain("# Godot Autopilot Tools");
   });
 
-  test("show --file 读取引用文件", async () => {
+  test("show --file 读取副册文件", async () => {
     const result = await runCaptured(["show", "godot-autopilot-tools"], {
-      file: "references/cli-access.md",
+      file: "SKILL.md",
     });
     expect(result.code).toBe(ExitCode.Success);
-    expect(result.stdout).toContain("# The GDA CLI");
+    expect(result.stdout).toContain("# Godot Autopilot Tools");
+  });
+
+  test("--zh show 输出中文正文", async () => {
+    const result = await runCaptured(["show", "godot-autopilot-setup"], { zh: true });
+    expect(result.code).toBe(ExitCode.Success);
+    expect(result.stdout).toContain("# Godot Autopilot 安装与连接");
   });
 
   test("未知册名报用法错误", async () => {

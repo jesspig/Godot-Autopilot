@@ -24,6 +24,32 @@ function captureOutput(): { stderr(): string; restore(): void } {
   };
 }
 
+function encodeFrame(value: unknown): Buffer {
+  const payload = Buffer.from(JSON.stringify(value), "utf8");
+  const header = Buffer.alloc(4);
+  header.writeUInt32BE(payload.length, 0);
+  return Buffer.concat([header, payload]);
+}
+
+function frameServer(handler: (message: any, socket: net.Socket) => void): (socket: net.Socket) => void {
+  return (socket) => {
+    let buffer = Buffer.alloc(0);
+    socket.on("data", (chunk: Buffer) => {
+      buffer = Buffer.concat([buffer, chunk]);
+      while (buffer.length >= 4) {
+        const size = buffer.readUInt32BE(0);
+        if (buffer.length < 4 + size) return;
+        const text = buffer.subarray(4, 4 + size).toString("utf8");
+        buffer = buffer.subarray(4 + size);
+        try {
+          handler(JSON.parse(text), socket);
+        } catch {
+        }
+      }
+    });
+  };
+}
+
 const SOCKET_NAME = "i17a.sock";
 
 const activeSockets: net.Socket[] = [];
@@ -56,17 +82,13 @@ afterEach(() => {
 });
 
 describe("ipc client", () => {
-  test("单行 JSON-RPC 请求-响应往返", async () => {
-    const server = await listenLoopback(socketPath, (socket) => {
-      let buffer = "";
-      socket.on("data", (chunk) => {
-        buffer += chunk.toString("utf8");
-        const newline = buffer.indexOf("\n");
-        if (newline === -1) return;
-        const request = JSON.parse(buffer.slice(0, newline));
-        socket.write(`${JSON.stringify({ id: request.id, result: { tools: [] } })}\n`);
-      });
-    });
+  test("长度前缀 JSON-RPC 请求-响应往返", async () => {
+    const server = await listenLoopback(
+      socketPath,
+      frameServer((request, socket) => {
+        socket.write(encodeFrame({ id: request.id, result: { tools: [] } }));
+      }),
+    );
     try {
       const response = await requestOverIpc({ path: socketPath, timeoutMs: 2000 }, { jsonrpc: "2.0", id: 1, method: "tools/list" });
       expect(response.id).toBe(1);
@@ -89,8 +111,12 @@ describe("ipc client", () => {
   });
 
   test("非法 JSON 帧映射为传输错误", async () => {
+    const payload = Buffer.from("{not-json}", "utf8");
+    const header = Buffer.alloc(4);
+    header.writeUInt32BE(payload.length, 0);
+    const invalid = Buffer.concat([header, payload]);
     const server = await listenLoopback(socketPath, (socket) => {
-      socket.on("data", () => socket.write("{not-json}\n"));
+      socket.on("data", () => socket.write(invalid));
     });
     try {
       let caught: unknown;
@@ -143,28 +169,66 @@ describe("ipc client", () => {
   });
 });
 function respondServer(): (socket: net.Socket) => void {
-  return (socket) => {
-    let buffer = "";
-    socket.on("data", (chunk) => {
-      buffer += chunk.toString("utf8");
-      let newline = buffer.indexOf("\n");
-      while (newline !== -1) {
-        const line = buffer.slice(0, newline);
-        buffer = buffer.slice(newline + 1);
-        newline = buffer.indexOf("\n");
-        if (line.trim() === "") continue;
-        const message = JSON.parse(line) as { id?: number; method?: string };
-        if (message.id === undefined) continue;
-        const result =
-          message.method === "initialize"
-            ? { protocolVersion: "2025-11-25", capabilities: {}, serverInfo: { name: "mock", version: "1" } }
-            : { content: [{ type: "text", text: "{}" }] };
-        socket.write(`${JSON.stringify({ jsonrpc: "2.0", id: message.id, result })}\n`);
-      }
-    });
-  };
+  return frameServer((message, socket) => {
+    if (message.id === undefined) return;
+    const result =
+      message.method === "initialize"
+        ? { protocolVersion: "2025-11-25", capabilities: {}, serverInfo: { name: "mock", version: "1" } }
+        : { content: [{ type: "text", text: "{}" }] };
+    socket.write(encodeFrame({ jsonrpc: "2.0", id: message.id, result }));
+  });
 }
 
+describe("transport fallback", () => {
+  test("IPC 不可达时 auto 回退 HTTP", async () => {
+    const server = Bun.serve({
+      port: 0,
+      hostname: "127.0.0.1",
+      fetch: async (req) => {
+        const body = (await req.json()) as { id?: number; method?: string };
+        if (body.method === "notifications/initialized") {
+          return new Response("{}", { status: 200 });
+        }
+        const result =
+          body.method === "initialize"
+            ? { protocolVersion: "2025-11-25", capabilities: {}, serverInfo: { name: "mock", version: "1" } }
+            : { content: [{ type: "text", text: "{}" }] };
+        return Response.json({ jsonrpc: "2.0", id: body.id ?? 1, result });
+      },
+    });
+    const seen: string[] = [];
+    try {
+      const response = await callTool("ping", {}, {
+        port: server.port ?? 0,
+        timeoutSec: 5,
+        ipcEndpoint: { kind: "tcp", host: "127.0.0.1", port: 1, token: "bad" },
+        transport: "auto",
+        transportSink: (transport) => seen.push(transport),
+      });
+      expect(response.error).toBeUndefined();
+      expect(seen).toEqual(["http"]);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("--transport ipc 且 --no-fallback 时直接失败", async () => {
+    let caught: unknown;
+    try {
+      await callTool("ping", {}, {
+        port: 1,
+        timeoutSec: 2,
+        ipcEndpoint: { kind: "tcp", host: "127.0.0.1", port: 1, token: "bad" },
+        transport: "ipc",
+        noFallback: true,
+      });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(CliError);
+    expect((caught as CliError).code).toBe(ExitCode.Transport);
+  });
+});
 describe("ipc session and socket channel", () => {
   test("callTool 经 IPC 完成握手与调用", async () => {
     const server = await listenLoopback(socketPath, respondServer());

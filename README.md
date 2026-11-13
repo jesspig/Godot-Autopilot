@@ -41,11 +41,10 @@ You don't need to memorize tool names. The agent follows a simple loop:
 2. **Act** — `call_tool` for one step, `batch_execute` for a batch.
 3. **Verify** — screenshot the result, compare with the previous capture, fix, and repeat.
 
-To make agents good at this out of the box, the plugin ships **9 skill books** (an overview, a calling guide, plus scenes, resources, scripting, runtime, servers, content, and C# volumes) and **7 starter guides** (3D scene, character controller, physics debugging, input map, GUI, …). One click in the **MCP Config** panel renders the skills into your project's `.agents/skills/`. Positioning: MCP is the primary product channel and skills/scripts are the experience layer — the calling guide falls back to the GDA CLI when MCP is down, and to a manual guide with no CLI available.
+To make agents good at this out of the box, the plugin ships **10 self-contained skill books** (an overview, plus scenes, resources, scripting, runtime, servers, content, C#, setup, and tools volumes). Install them with `gda install skills` (add `--zh` for Chinese); the agent then follows the calling protocol instead of improvising. Positioning: MCP is the primary product channel and skills are the experience layer — the calling guide falls back to the GDA CLI when MCP is down.
 
-Two editor panels come with the plugin:
+One editor panel comes with the plugin:
 
-- **MCP Config** — server status and port, one-click client configuration, capability switches, skill generation.
 - **Log** — plugin-only log with level/category filters and search, so misbehaving calls are easy to trace.
 
 ## Getting started
@@ -62,9 +61,9 @@ Requires **Godot 4.7+**.
            ├── libgodot-autopilot.dylib (macOS)
            └── godot-autopilot.gdextension
    ```
-2. **Open your project** — the server starts automatically on the port from the plugin settings (default `http://127.0.0.1:9527/mcp`). No enable toggle needed.
-3. **Connect your AI client** — in the editor's **MCP Config** panel, pick your client and click **Generate**. 20 clients are supported, including Claude Code, Codex, Cursor, OpenCode, and Copilot. Approve the generated config file in the client if it asks.
-4. **Unlock powerful capabilities (optional)** — script execution (`code_execute`) and game control (`game_runtime`) are off by default; tick them in the panel when you need them.
+2. **Open your project** — the server starts automatically and binds a free loopback port on first launch (persisted per project, chosen from `20000–29999`). No enable toggle needed.
+3. **Connect your AI client** — run `gda status --json` and add its `mcp_url` to your client's MCP configuration (or hand the URL to your agent and ask it to generate the config). 20 clients are supported, including Claude Code, Codex, Cursor, OpenCode, and Copilot.
+4. **Confirm high-risk calls (optional)** — tools with `destructive`, `process`, `code_execute`, or `game_runtime` side effects require `confirm=true`; there is no global allow list.
 5. **Ask for something** — e.g. “create a player character that can run and jump, then playtest it and fix what looks wrong.”
 
 Want to build from source or contribute? See [docs/wiki/](docs/wiki/) (start at [index.md](docs/wiki/index.md), building at [build.md](docs/wiki/build.md)) and [tests/README.md](tests/README.md).
@@ -76,17 +75,17 @@ Prefer a terminal to a chat client? The GDA CLI drives a running GDA instance fr
 Run it one-off with `bunx` (quoted on PowerShell, because `#` starts a comment):
 
 ```
-bunx "github:jesspig/Godot-Autopilot#0.3.1" ping
+bunx "github:jesspig/Godot-Autopilot#0.3.2" ping
 ```
 
 Or install it globally once and use the `gda` command:
 
 ```
-bun install -g github:jesspig/Godot-Autopilot#0.3.1
+bun install -g github:jesspig/Godot-Autopilot#0.3.2
 gda ping
 ```
 
-Command families: **calling** — `ping` / `status` / `categories` / `search` / `describe` / `call`; **lifecycle** — `list` / `start` / `stop` / `restart` / `logs`; **control plane** — `serve`; **REST** — `api` (`list` / `describe` / `call` subcommands, direct REST without MCP handshake); `endpoints` (prints the MCP/REST endpoints, port source, and liveness probe result).
+Command families: **calling** — `ping` / `status` / `categories` / `search` / `describe` / `call`; **lifecycle** — `list` / `start` / `stop` / `restart` / `logs`; **offline and assets** — `skills` / `tools` / `projects` / `cache` / `install` / `update` / `trace`.
 
 Requires **Bun**; on a machine without Bun or Node, use the standalone `gda` binary from the Releases page instead (see [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md) for the full reference).
 
@@ -103,26 +102,26 @@ Project: <ABSOLUTE PATH TO YOUR GODOT PROJECT> (Godot 4.7+).
    https://github.com/jesspig/Godot-Autopilot/releases/latest and extract it so that
    <project>/addons/godot-autopilot/godot-autopilot.gdextension exists.
 2. Start the editor: run `godot --editor --path <project>` (ask me for the engine path if it is
-   not on PATH) and wait until http://127.0.0.1:9527/mcp answers.
+   not on PATH) and wait until the `mcp_url` from `gda status --json` answers.
 3. Verify the server from a shell. Try in this order, stop at the first that works, and tell me
    which one it was:
-   - bunx "github:jesspig/Godot-Autopilot#0.3.1" ping
+   - bunx "github:jesspig/Godot-Autopilot#0.3.2" ping
    - download the gda release asset for this OS and CPU from the same Releases page, verify it
      against sha256sums.txt, then run ./gda ping
 4. Connect my AI client: add
-   {"mcpServers":{"godot-autopilot":{"url":"http://127.0.0.1:9527/mcp"}}}
-   to its MCP configuration, or tell me to use the plugin's MCP Config panel instead.
+   {"mcpServers":{"godot-autopilot":{"url":"<mcp_url from gda status --json>"}}}
+   to its MCP configuration (or hand the URL to your agent and ask it to generate the config).
 5. Summarize: which channel worked, every command you ran, and anything that failed.
 
-Rules: never hand-write HTTP requests against the port; never expose 9527 beyond loopback;
-leave code_execute and game_runtime disabled unless I ask for them.
+Rules: never hand-write HTTP requests against the port; never expose the GDA port beyond loopback;
+leave high-risk tools (code_execute, game_runtime, destructive, process) unconfirmed unless I ask for them.
 ```
 
-If your client supports skills (Claude Code, Codex, Cursor and others do), also point it at this repository's `skills/` directory so the agent gets the full calling protocol instead of improvising.
+If your client supports skills (Claude Code, Codex, Cursor and others do), run `gda install skills` so the agent gets the full calling protocol instead of improvising.
 
 ## Safety notes
 
-The server only listens on your machine's loopback address (port from the plugin settings, 9527 by default, fixed path `/mcp`) and refuses non-local addresses. Script execution, game control, and OS process tools are **denied by default** — enable them only in a local project you trust. Details: [docs/wiki/security_contract.md](docs/wiki/security_contract.md).
+The server only listens on your machine's loopback address (a per-project port chosen by the plugin, fixed path `/mcp`) and refuses non-local addresses. High-risk tools (`destructive`, `process`, `code_execute`, `game_runtime`) require `confirm=true` — there is no global allow list. Details: [docs/wiki/security_contract.md](docs/wiki/security_contract.md).
 
 ## Asset attribution
 

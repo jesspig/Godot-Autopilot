@@ -245,11 +245,17 @@ static mcp::JsonValue meta_call_tool_impl(mcp::JsonValue args) {
         return e;
     }
     for (const auto &entry : args.GetObject()) {
-        if (entry.first != "name" && entry.first != "arguments") {
+        if (entry.first != "name" && entry.first != "arguments" &&
+            entry.first != "confirm") {
             mcp::JsonValue e(mcp::JsonValue::object_tag);
-            e["error"] = mcp::JsonValue("unknown parameter for call_tool '" + name + "': " + entry.first + " (expected only 'name' and 'arguments') " + received_keys_text(args));
+            e["error"] = mcp::JsonValue("unknown parameter for call_tool '" + name + "': " + entry.first + " (expected only 'name', 'arguments' and 'confirm') " + received_keys_text(args));
             return e;
         }
+    }
+    if (const auto *confirm = args.Find("confirm");
+        confirm != nullptr && confirm->IsBool() && confirm->GetBool() &&
+        tool_args.IsObject() && tool_args.Find("confirm") == nullptr) {
+        tool_args["confirm"] = mcp::JsonValue(true);
     }
 
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, name + " called via call_tool");
@@ -478,6 +484,7 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
         spec.raw_schema = schema::build_schema({
             {"name", "string", "Tool name to execute", true},
             {"arguments", "object", "Tool arguments as JSON object", false},
+            {"confirm", "boolean", "Confirm high-risk execution after review", false},
         });
         registry->add(make_spec_tool(std::move(spec)));
     }
@@ -532,6 +539,11 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
         await_prop["description"] = mcp::JsonValue("Wait for async game ops instead of refusing them (default: false). With false an async game op is reported as an error telling you to use call_tool or await_async=true; with true batch_execute waits for the game response (bounded by the op's timeout_ms) and reports ok/error per response under result");
         await_prop["default"] = mcp::JsonValue(false);
         props["await_async"] = std::move(await_prop);
+        mcp::JsonValue confirm_prop(mcp::JsonValue::object_tag);
+        confirm_prop["type"] = mcp::JsonValue("boolean");
+        confirm_prop["description"] = mcp::JsonValue(
+            "Confirm high-risk batch execution after reviewing the operations");
+        props["confirm"] = std::move(confirm_prop);
         s["properties"] = std::move(props);
         mcp::JsonValue req(mcp::JsonValue::array_tag);
         req.PushBack(mcp::JsonValue("operations"));
@@ -574,6 +586,11 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
         ao["type"] = mcp::JsonValue("boolean");
         ao["description"] = mcp::JsonValue("Automatically set owner on nodes created during execution so they are saved with the scene (default true)");
         props["auto_owner"] = std::move(ao);
+        mcp::JsonValue confirm_prop(mcp::JsonValue::object_tag);
+        confirm_prop["type"] = mcp::JsonValue("boolean");
+        confirm_prop["description"] = mcp::JsonValue(
+            "Confirm arbitrary code execution after reviewing the source");
+        props["confirm"] = std::move(confirm_prop);
         s["properties"] = std::move(props);
         mcp::JsonValue req(mcp::JsonValue::array_tag);
         req.PushBack(mcp::JsonValue("source_code"));
@@ -643,6 +660,16 @@ void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog
         const std::string meta_name = meta_tool->meta().name;
         mcp::ToolOptions opts;
         opts.Description(meta_tool->meta().description).InputSchema(meta_tool->input_schema());
+        const SideEffect effect = side_effect_of(*meta_tool);
+        if (effect == SideEffect::None) {
+            opts.read_only_hint = true;
+        }
+        if (effect == SideEffect::Destructive) {
+            opts.destructive = true;
+        }
+        if (effect == SideEffect::Process || effect == SideEffect::GameRuntime) {
+            opts.open_world_hint = true;
+        }
         server.RegisterTool(meta_name, opts,
             [meta_name, registry, &queue, meta_tool](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
                 const std::string gda_request_id =

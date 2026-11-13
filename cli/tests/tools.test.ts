@@ -55,13 +55,16 @@ const SAMPLE_TOOLS = [
 
 let tmpHome: string;
 let prevHome: string | undefined;
+let prevGdaHome: string | undefined;
 
 beforeEach(() => {
   const base = process.env.GDA_TEST_TMPDIR ?? path.join(process.cwd(), "build", "cli-test-tmp");
   fs.mkdirSync(base, { recursive: true });
   tmpHome = fs.mkdtempSync(path.join(base, "gda-tools-test-"));
   prevHome = process.env.GODOT_AUTOPILOT_CLI_HOME;
+  prevGdaHome = process.env.GODOT_AUTOPILOT_HOME;
   process.env.GODOT_AUTOPILOT_CLI_HOME = tmpHome;
+  process.env.GODOT_AUTOPILOT_HOME = tmpHome;
 });
 
 afterEach(() => {
@@ -69,6 +72,11 @@ afterEach(() => {
     delete process.env.GODOT_AUTOPILOT_CLI_HOME;
   } else {
     process.env.GODOT_AUTOPILOT_CLI_HOME = prevHome;
+  }
+  if (prevGdaHome === undefined) {
+    delete process.env.GODOT_AUTOPILOT_HOME;
+  } else {
+    process.env.GODOT_AUTOPILOT_HOME = prevGdaHome;
   }
   fs.rmSync(tmpHome, { recursive: true, force: true });
 });
@@ -113,16 +121,13 @@ describe("tools (offline catalog)", () => {
     expect(tool.input_schema).toEqual({ type: "object" });
   });
 
-  test("缓存缺失报传输错误并提示刷新", async () => {
-    let caught: unknown;
-    try {
-      await runCaptured(["list"], {});
-    } catch (error) {
-      caught = error;
-    }
-    expect(caught).toBeInstanceOf(CliError);
-    expect((caught as CliError).code).toBe(ExitCode.Transport);
-    expect((caught as CliError).message).toContain("--refresh");
+  test("缓存缺失时回退内置 catalog", async () => {
+    fs.rmSync(catalogPath(), { force: true });
+    const result = await runCaptured(["list"], {});
+    expect(result.code).toBe(ExitCode.Success);
+    const catalog = JSON.parse(result.stdout) as { generated_at: string; tools: unknown[] };
+    expect(catalog.generated_at).toBe("builtin");
+    expect(catalog.tools.length).toBeGreaterThan(0);
   });
 
   test("describe 未知工具报用法错误", async () => {

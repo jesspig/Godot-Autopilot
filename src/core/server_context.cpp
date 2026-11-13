@@ -26,10 +26,6 @@
 #include <mcp/protocol/MessageFilter.hpp>
 #include <memory>
 
-#include "core/transport/api_auth.hpp"
-#include "core/transport/api_endpoints.hpp"
-#include "core/transport/api_server.hpp"
-#include "core/transport/api_surface.hpp"
 #include "core/transport/api_token.hpp"
 #include "core/storage/gda_home.hpp"
 #include "core/transport/godot_transport.hpp"
@@ -102,9 +98,7 @@ ServerContext::ServerContext(CommandQueue &queue)
       bm25_index_(std::make_unique<Bm25Index>()) {
   const int explicit_port = resolve_explicit_port();
   const int preferred_port = resolve_preferred_port();
-  port_ = explicit_port > 0
-              ? explicit_port
-              : (preferred_port > 0 ? preferred_port : GDA_DEFAULT_PORT);
+  port_ = explicit_port > 0 ? explicit_port : preferred_port;
   host_ = resolve_host();
   g_server_context_instance = this;
   LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
@@ -136,8 +130,37 @@ bool ServerContext::bind_transport() {
   } else {
     assignment = PortResolver::resolve(explicit_port, preferred_port, pid);
   }
+
   std::string error;
-  if (assignment.source == PortSource::kAutoAssigned) {
+  const bool explicit_request =
+      requested_port_ > 0 || explicit_port > 0;
+  auto bind_exact = [&](int port) {
+    return http_transport_bind(static_cast<uint16_t>(port), host_, error);
+  };
+
+  if (explicit_request) {
+    if (!bind_exact(assignment.port)) {
+      last_error_ = "the requested port " + std::to_string(assignment.port) +
+                    " is unavailable: " + error;
+      return false;
+    }
+  } else if (preferred_port > 0 && bind_exact(preferred_port)) {
+    assignment.port = preferred_port;
+    assignment.source = PortSource::kConfigExplicit;
+  } else {
+    if (preferred_port > 0) {
+      const std::string avoided = error;
+      assignment.source = PortSource::kAutoReassigned;
+      assignment.note = "the persisted port " + std::to_string(preferred_port) +
+                        " was unavailable (" + avoided + ")";
+      LogSystem::instance().log(
+          LogLevel::Warning, LogCategory::Transport,
+          "Persisted MCP port " + std::to_string(preferred_port) +
+              " is unavailable; reassigning a random port");
+    } else {
+      assignment.source = PortSource::kFirstRandom;
+      assignment.note = "first random port assignment";
+    }
     const std::vector<int> candidates = PortResolver::candidate_sequence(pid);
     int probed = 0;
     bool bound = false;
@@ -147,7 +170,7 @@ bool ServerContext::bind_transport() {
         break;
       }
       ++probed;
-      if (http_transport_bind(static_cast<uint16_t>(candidate), host_, error)) {
+      if (bind_exact(candidate)) {
         assignment.port = candidate;
         bound = true;
         break;
@@ -161,28 +184,31 @@ bool ServerContext::bind_transport() {
                     std::to_string(probed) + " probes: " + error;
       return false;
     }
-    assignment.note.clear();
     if (!avoided_reason.empty()) {
-      assignment.note = "the preferred port " +
-                        std::to_string(GDA_DEFAULT_PORT) +
-                        " was avoided (" + avoided_reason + ")";
+      assignment.note += "; first bind error: " + avoided_reason;
     }
-  } else {
-    if (!http_transport_bind(static_cast<uint16_t>(assignment.port), host_,
-                             error)) {
-      last_error_ = "the requested port " + std::to_string(assignment.port) +
-                    " is unavailable: " + error;
-      return false;
+    if (!PluginConfig::save_port(assignment.port)) {
+      LogSystem::instance().log(
+          LogLevel::Warning, LogCategory::System,
+          "Failed to persist MCP port " + std::to_string(assignment.port));
     }
   }
+
   port_ = assignment.port;
   port_assignment_ = assignment;
   requested_port_ = 0;
+  if (assignment.source == PortSource::kUserApplied) {
+    if (!PluginConfig::save_port(port_)) {
+      LogSystem::instance().log(
+          LogLevel::Warning, LogCategory::System,
+          "Failed to persist MCP port " + std::to_string(port_));
+    }
+  }
   return true;
 }
 
 bool ServerContext::start() {
-  const std::string endpoint = host_ + ":" + std::to_string(port_);
+  std::string endpoint = host_ + ":" + std::to_string(port_);
   last_error_.clear();
   try {
     if (!is_loopback_host(host_)) {
@@ -223,11 +249,34 @@ bool ServerContext::start() {
       return false;
     }
 
+    endpoint = host_ + ":" + std::to_string(port_);
+
     LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
                               "MCP server initializing: host=" + host_ +
                                   " port=" + std::to_string(port_));
 
     {
+      ipc_token_ = api_token::generate_token();
+      if (ipc_token_.empty()) {
+        LogSystem::instance().log(LogLevel::Error, LogCategory::Transport,
+                                  "IPC token generation failed; IPC will be "
+                                  "disabled");
+      }
+#ifdef _WIN32
+      std::string ipc_error;
+      if (ipc_transport::ipc_transport_instance().listen_tcp(
+              "127.0.0.1", 0, ipc_token_, ipc_error)) {
+        LogSystem::instance().log(
+            LogLevel::Info, LogCategory::Transport,
+            "IPC transport listening on tcp 127.0.0.1:" +
+                std::to_string(
+                    ipc_transport::ipc_transport_instance().port()));
+      } else {
+        LogSystem::instance().log(
+            LogLevel::Warning, LogCategory::Transport,
+            "IPC transport unavailable (HTTP only): " + ipc_error);
+      }
+#else
       const std::string project_root = util::api_host_project_root();
       std::string project_name;
       const std::size_t slash = project_root.find_last_of("/\\");
@@ -236,13 +285,7 @@ bool ServerContext::start() {
       }
       const std::filesystem::path run_dir =
           std::filesystem::path(ProjectStore::root_dir()) / "run";
-      std::filesystem::path fallback_dir = run_dir;
-#ifdef _WIN32
-      if (const char *local = std::getenv("LOCALAPPDATA");
-          local != nullptr && *local != '\0') {
-        fallback_dir = std::filesystem::path(local) / "gda";
-      }
-#endif
+      const std::filesystem::path fallback_dir = run_dir;
       std::error_code ec;
       std::filesystem::create_directories(run_dir, ec);
       const std::string socket_path = ipc_endpoint::derive_socket_path(
@@ -251,15 +294,16 @@ bool ServerContext::start() {
           std::filesystem::path(socket_path).parent_path(), ec);
       std::filesystem::remove(socket_path, ec);
       std::string ipc_error;
-      if (ipc_transport::ipc_transport_instance().listen(socket_path,
-                                                         ipc_error)) {
+      if (ipc_transport::ipc_transport_instance().listen_unix(
+              socket_path, ipc_token_, ipc_error)) {
         LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
                                   "IPC transport listening: " + socket_path);
       } else {
         LogSystem::instance().log(
             LogLevel::Warning, LogCategory::Transport,
-            "IPC transport unavailable (TCP only): " + ipc_error);
+            "IPC transport unavailable (HTTP only): " + ipc_error);
       }
+#endif
     }
 
     transport_ = godot_transport_reset();
@@ -267,23 +311,32 @@ bool ServerContext::start() {
     ipc_transport::ipc_transport_instance().set_line_handler(
         [transport = transport_](std::uint64_t connection_id,
                                  const std::string &line) {
+          auto &ipc = ipc_transport::ipc_transport_instance();
+          if (!ipc.acquire_in_flight()) {
+            ipc.queue_line(connection_id,
+                           mcp_wire::build_error_response_text(
+                               -32003, "too many in-flight IPC requests"));
+            return;
+          }
           const std::string connection =
               "ipc-" + std::to_string(connection_id);
           const mcp_wire::ParsedRequest parsed = mcp_wire::parse_request(line);
           if (!parsed.ok) {
-            ipc_transport::ipc_transport_instance().queue_line(
-                connection_id,
-                mcp_wire::build_error_response_text(-32700, parsed.error));
+            ipc.queue_line(connection_id,
+                           mcp_wire::build_error_response_text(-32700,
+                                                               parsed.error));
+            ipc.release_in_flight();
             return;
           }
           std::string error;
           if (!transport || !transport->submit(parsed, connection, error)) {
-            ipc_transport::ipc_transport_instance().queue_line(
-                connection_id,
-                mcp_wire::build_error_response_text(-32603, error));
+            ipc.queue_line(connection_id,
+                           mcp_wire::build_error_response_text(-32603, error));
+            ipc.release_in_flight();
             return;
           }
           if (parsed.is_notification) {
+            ipc.release_in_flight();
             return;
           }
           const std::string request_id = parsed.request_id;
@@ -295,6 +348,7 @@ bool ServerContext::start() {
               ipc_transport::ipc_transport_instance().queue_line(
                   connection_id, std::move(response));
             }
+            ipc_transport::ipc_transport_instance().release_in_flight();
           }).detach();
         });
 
@@ -437,28 +491,9 @@ bool ServerContext::start() {
     http_transport.register_route("GET", GDA_MCP_PATH, mcp_route);
     http_transport.register_route("DELETE", GDA_MCP_PATH, mcp_route);
 
-    const int bound_port = port_;
-    const int host_pid = util::api_host_process_id();
-    api_surface::register_runtime_info_provider(
-        [bound_port, host_pid]() {
-          api_surface::RuntimeInfo info;
-          info.version = GDA_VERSION;
-          info.port = bound_port;
-          info.pid = host_pid;
-          return info;
-        });
-
-    const ApiServer api_server;
-    if (!api_server.start(static_cast<uint16_t>(port_))) {
-      LogSystem::instance().log(
-          LogLevel::Warning, LogCategory::Transport,
-          "the REST API routes are not registered on the transport");
-    }
-
     running_ = true;
     instance_started_ = true;
     write_instance_record();
-    register_endpoint_info_provider();
 
     LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
                               "MCP server started on " + host_ + ":" +
@@ -510,10 +545,6 @@ void ServerContext::write_instance_record() {
   const std::string project_path = util::api_host_project_root();
   const int pid = util::api_host_process_id();
   const int64_t started_at = now_epoch_ms();
-  api_token::register_project_root_provider(
-      [project_path]() { return project_path; });
-  const ApiAuth auth;
-  const std::string issued_token = auth.issue_token();
   InstanceRecord record;
   record.instance_id = "gda-" + ProjectStore::project_path_hash(project_path) +
                         "-" + std::to_string(pid) + "-" +
@@ -521,19 +552,25 @@ void ServerContext::write_instance_record() {
   record.port = port_;
   record.pid = pid;
   record.project_path = project_path;
-  record.api_token = issued_token;
   record.endpoints.mcp =
       EndpointEntry{host_, port_, GDA_MCP_PATH, "mcp", "none"};
-  record.endpoints.api =
-      EndpointEntry{host_, port_, GDA_API_PATH, "http", "bearer"};
   if (ipc_transport::ipc_transport_instance().is_listening()) {
-    record.endpoints.ipc.path =
-        ipc_transport::ipc_transport_instance().bound_path();
+    auto &ipc = ipc_transport::ipc_transport_instance();
+    record.endpoints.ipc.kind = ipc.kind();
+    record.endpoints.ipc.path = ipc.bound_path();
+    record.endpoints.ipc.host = ipc.host();
+    record.endpoints.ipc.port = ipc.port();
+    record.endpoints.ipc.token = ipc_token_;
+    record.endpoints.ipc.protocol = "mcp-jsonrpc";
+    record.endpoints.ipc.framing = "length-prefixed-json";
+    record.endpoints.ipc.auth = "token";
+    record.endpoints.ipc.version = 1;
     record.endpoints.ipc.present = true;
   }
   record.gda_home = HomeResolver::gda_home();
   record.started_at = started_at;
   record.version = GDA_VERSION;
+  record.port_source = port_source_name(port_assignment_.source);
   if (!InstanceRegistry::write(record)) {
     LogSystem::instance().log(LogLevel::Error, LogCategory::System,
                               "Instance registry write failed for port " +
@@ -541,25 +578,6 @@ void ServerContext::write_instance_record() {
     return;
   }
   instance_id_ = record.instance_id;
-}
-
-void ServerContext::register_endpoint_info_provider() {
-  const int bound_port = port_;
-  const std::string host = host_;
-  const std::string instance_id = instance_id_;
-  const int host_pid = util::api_host_process_id();
-  const std::string project_path = util::api_host_project_root();
-  api_endpoints::register_endpoint_info_provider(
-      [bound_port, host, instance_id, host_pid, project_path]() {
-        api_endpoints::EndpointInfo info;
-        info.instance_id = instance_id;
-        info.version = GDA_VERSION;
-        info.pid = host_pid;
-        info.project_path = project_path;
-        info.mcp = EndpointEntry{host, bound_port, GDA_MCP_PATH, "mcp", "none"};
-        info.api = EndpointEntry{host, bound_port, GDA_API_PATH, "http", "bearer"};
-        return info;
-      });
 }
 
 void ServerContext::remove_instance_record() {

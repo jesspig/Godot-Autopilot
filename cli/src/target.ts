@@ -1,12 +1,13 @@
-import fs from "node:fs";
 import path from "node:path";
+
 import type { GlobalOptions } from "./args";
 import { CliError, ExitCode } from "./errors";
 import {
+  findPluginRecordByPort,
   findPluginRecordByProject,
   type PluginInstanceRecord,
 } from "./instances";
-import { readProjectName, userDataBase } from "./platform";
+import type { IpcEndpoint } from "./ipc/client";
 import { isAlive } from "./process";
 
 export { projectPathKey } from "./platform";
@@ -27,14 +28,7 @@ export interface TargetContext {
   findLiveByProject(project: string): InstanceEntry | undefined;
 }
 
-export type TargetChain =
-  | "port"
-  | "id"
-  | "env"
-  | "cli-registry"
-  | "plugin-index"
-  | "legacy"
-  | "default";
+export type TargetChain = "port" | "id" | "env" | "cli-registry" | "plugin-index";
 
 export interface ResolvedTarget {
   port: number;
@@ -42,11 +36,14 @@ export interface ResolvedTarget {
   chain: TargetChain;
   instance?: InstanceEntry;
   pluginRecord?: PluginInstanceRecord;
+  ipcEndpoint?: IpcEndpoint;
+  mcpUrl: string;
+  transport: "ipc" | "http";
+  portSource: string;
+  pluginVersion: string;
 }
 
 export type TargetSelector = Pick<GlobalOptions, "portText" | "id" | "project">;
-
-const DEFAULT_PORT = 9527;
 
 function validPort(value: number | null | undefined): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 65535;
@@ -77,75 +74,47 @@ export function parseTargetPort(text: string): number {
   return port;
 }
 
-function portFromLatestTrace(godotAutopilotDir: string): number | null {
-  const tracesDir = path.join(godotAutopilotDir, "traces");
-  let entries: string[];
-  try {
-    entries = fs.readdirSync(tracesDir);
-  } catch {
-    return null;
-  }
-  let best: { full: string; mtime: number } | null = null;
-  for (const name of entries) {
-    if (!name.startsWith("trace-") || !name.endsWith(".jsonl")) continue;
-    const full = path.join(tracesDir, name);
-    try {
-      const mtime = fs.statSync(full).mtimeMs;
-      if (best === null || mtime > best.mtime) best = { full, mtime };
-    } catch {
-    }
-  }
-  if (best === null) return null;
-  try {
-    const lines = fs.readFileSync(best.full, "utf8").split(/\r?\n/);
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const line = lines[i].trim();
-      if (!line.includes('"type":"server_ready"') && !line.includes('"type": "server_ready"')) continue;
-      try {
-        const obj = JSON.parse(line) as { type?: unknown; port?: unknown };
-        if (obj && obj.type === "server_ready") {
-          const port = typeof obj.port === "number" ? obj.port : parsePortText(String(obj.port ?? ""));
-          if (validPort(port)) return port;
-        }
-      } catch {
-      }
-    }
-  } catch {
-    return null;
-  }
-  return null;
+function endpointFor(record: PluginInstanceRecord): IpcEndpoint | undefined {
+  const ipc = record.ipcEndpoint;
+  if (ipc === null) return undefined;
+  return {
+    kind: ipc.kind,
+    path: ipc.path,
+    name: ipc.name,
+    host: ipc.host,
+    port: ipc.port ?? 0,
+    token: ipc.token,
+    framing: ipc.framing,
+  };
 }
 
-function portFromConfigFile(godotAutopilotDir: string): number | null {
-  try {
-    const obj = JSON.parse(fs.readFileSync(path.join(godotAutopilotDir, "config.json"), "utf8")) as { port?: unknown };
-    const port = typeof obj?.port === "number" ? obj.port : parsePortText(String(obj?.port ?? ""));
-    return validPort(port) ? port : null;
-  } catch {
-    return null;
-  }
-}
-
-function portFromTraceOrConfig(startDir: string): { port: number; source: string } | null {
-  const projectName = readProjectName(startDir);
-  if (projectName) {
-    const base = userDataBase();
-    if (base) {
-      const dir = path.join(base, projectName, "godot_autopilot");
-      const tracePort = portFromLatestTrace(dir);
-      if (tracePort !== null) return { port: tracePort, source: "trace" };
-      const configPort = portFromConfigFile(dir);
-      if (configPort !== null) return { port: configPort, source: "config" };
-    }
-  }
-  return null;
+function resolved(
+  port: number,
+  source: string,
+  chain: TargetChain,
+  record?: PluginInstanceRecord,
+  instance?: InstanceEntry,
+): ResolvedTarget {
+  const ipcEndpoint = record !== undefined ? endpointFor(record) : undefined;
+  return {
+    port,
+    source,
+    chain,
+    ...(instance !== undefined ? { instance } : {}),
+    ...(record !== undefined ? { pluginRecord: record } : {}),
+    ...(ipcEndpoint !== undefined ? { ipcEndpoint } : {}),
+    mcpUrl: `http://127.0.0.1:${port}/mcp`,
+    transport: ipcEndpoint !== undefined ? "ipc" : "http",
+    portSource: record?.portSource ?? "",
+    pluginVersion: record?.version ?? "",
+  };
 }
 
 export function resolveTarget(opts: TargetSelector, ctx: TargetContext): ResolvedTarget {
   assertSingleSelector(opts);
 
   if (opts.portText !== undefined) {
-    return { port: parseTargetPort(opts.portText), source: "cli", chain: "port" };
+    return resolved(parseTargetPort(opts.portText), "cli", "port");
   }
 
   if (opts.id !== undefined) {
@@ -153,33 +122,35 @@ export function resolveTarget(opts: TargetSelector, ctx: TargetContext): Resolve
     if (entry === undefined || !isAlive(entry.pid)) {
       throw new CliError(ExitCode.Transport, `unknown instance: ${opts.id} (run "gda list" to see running instances)`);
     }
-    return { port: entry.port, source: "id", chain: "id", instance: entry };
+    const record = findPluginRecordByPort(entry.port);
+    return resolved(entry.port, "id", "id", record, entry);
   }
 
   const envText = process.env.GODOT_AUTOPILOT_PORT;
   if (envText !== undefined && envText !== "") {
     const port = parsePortText(envText);
-    if (port !== null) return { port, source: "env", chain: "env" };
+    if (port !== null) {
+      return resolved(port, "env", "env", findPluginRecordByPort(port));
+    }
   }
 
   const projectOption = opts.project;
   const scoped = projectOption !== undefined;
   const projectPath = scoped ? normalizePath(projectOption) : process.cwd();
 
-  const entry = ctx.findLiveByProject(projectPath);
-  if (entry !== undefined) {
-    return { port: entry.port, source: scoped ? "project" : "cwd", chain: "cli-registry", instance: entry };
-  }
-
   const record = findPluginRecordByProject(projectPath);
   if (record !== undefined && record.port !== null) {
-    return { port: record.port, source: "registry", chain: "plugin-index", pluginRecord: record };
+    return resolved(record.port, scoped ? "project" : "cwd", "plugin-index", record);
   }
 
-  const found = portFromTraceOrConfig(projectPath);
-  if (found !== null) {
-    return { port: found.port, source: found.source, chain: "legacy" };
+  const entry = ctx.findLiveByProject(projectPath);
+  if (entry !== undefined) {
+    return resolved(entry.port, scoped ? "project" : "cwd", "cli-registry", undefined, entry);
   }
 
-  return { port: DEFAULT_PORT, source: "default", chain: "default" };
+  throw new CliError(
+    ExitCode.Transport,
+    `no running Godot Autopilot instance for ${projectPath}`,
+    "open the editor with the plugin enabled, or run 'gda start' and then 'gda list' to confirm the instance.",
+  );
 }

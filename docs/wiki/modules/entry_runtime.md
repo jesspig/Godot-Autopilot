@@ -12,6 +12,8 @@ resource:
   - src/runtime/
 ---
 
+> **0.3.2**：编辑器级只注册 `McpLogDock`；`McpConfigDock` 已删除。启动不再签发 API token、不再启动 REST `ApiServer`、不再写 `endpoints.api`。
+
 # 模块：入口与运行时桥接（entry_runtime）
 
 > 09-18 E2E 优化批次增补（详见 `changelog/2026-09-18-log.md` 19:30 节）：`call_method` native 失败路径附加 `diagnosis` + `hint`（`game_bridge_eval.cpp:534 eval_bind_suspected_cause` / `:553 make_native_bind_diagnosis`，成功路径零改动）；新增 `gda_protocol.hpp` 4 个 op（`eval_assert`/`sample`/`collect_evidence`/`validate_ui_layout`）与 `game_bridge_verify.cpp`（采样 awaiter + 校验类注册）。
@@ -43,7 +45,7 @@ resource:
 按模块级别分派：
 
 - **SCENE 级别**：仅当 `!Engine::is_editor_hint()`（即运行游戏的非编辑器进程）时调用 `runtime::game_bridge::register_listener()`。编辑器进程在此级别不注册桥接监听。并记 `scene_level_initialized` lifecycle 事件。
-- **EDITOR 级别**：先 `debugger_ops::register_classes()`，然后依次 `ClassDB::register_class` 注册 **5 个**类：`McpLogDock`、`McpConfigDock`、`AutopilotTools`、`ExportGuard`、`GodotAutopilotPlugin`，最后 `EditorPlugins::add_by_type<GodotAutopilotPlugin>()` 把插件类型注册进编辑器。并记 `editor_level_initialized` lifecycle 事件。
+- **EDITOR 级别**：先 `debugger_ops::register_classes()`，然后依次 `ClassDB::register_class` 注册 **4 个**类：`McpLogDock`、`AutopilotTools`、`ExportGuard`、`GodotAutopilotPlugin`，最后 `EditorPlugins::add_by_type<GodotAutopilotPlugin>()` 把插件类型注册进编辑器。并记 `editor_level_initialized` lifecycle 事件。
 
 ### 1.3 模块终止（register_terminator）
 
@@ -55,7 +57,7 @@ resource:
 `GDCLASS(GodotAutopilotPlugin, godot::EditorPlugin)`，`_bind_methods()` 为空。成员：
 
 - 静态 `CommandQueue s_queue`，经 `queue()` 静态访问器暴露；`_process` 中 `s_queue.drain()` 即 AGENTS.md 所述"主线程排空"的实现点。
-- UI 成员：`McpLogDock *log_dock`、`McpConfigDock *config_dock`；`Ref<OutputCaptureLogger>`、`Ref<DebugCapturePlugin>`、`Ref<ExportGuard>`。
+- UI 成员：`McpLogDock *log_dock`（`McpConfigDock *config_dock` 已于 0.3.2 删除）；`Ref<OutputCaptureLogger>`、`Ref<DebugCapturePlugin>`、`Ref<ExportGuard>`。
 - 覆写方法：`_enter_tree` / `_exit_tree` / `_process` / `_get_unsaved_status`。
 
 `_enter_tree()` 顺序（关键 UI/捕获步骤各自独立 try/catch，失败不中断后续；队列/脱敏/持久化初始化、ServerContext 创建与 export_guard 未包裹）：
@@ -65,8 +67,7 @@ resource:
 3. 创建 `McpLogDock`（标题 "GDA Log"）`add_dock`。
 4. `debugger_ops::create_output_logger()` 经 `OS::add_logger` 注册；`debugger_ops::create_debug_plugin()` 经 `add_debugger_plugin` 注册。
 5. `new (std::nothrow) ServerContext(queue())` 并 `start()`；成功发 `server_ready` lifecycle（记 Transport 日志含端口，并追加 `{"type":"server_ready","host","port"}` trace），失败发 `error_event` 并记 `last_error()`。
-6. 创建 `McpConfigDock` 并 `set_server_context`（面板内显示运行端口/离线状态）`add_dock`。
-7. `export_guard_.instantiate()` + `add_export_plugin`，日志 "Plugin ready"（并记 `plugin_ready` lifecycle）。
+6. `export_guard_.instantiate()` + `add_export_plugin`，日志 "Plugin ready"（并记 `plugin_ready` lifecycle）。
 
 `_exit_tree()` 逆序清理：停并删 `g_server_ctx` → 移除 ExportGuard → 移除 debugger plugin → `OS::remove_logger` → 移除并 memdelete 停靠面板，整体包 try/catch；并记 `plugin_exit_tree` lifecycle；末尾 `LogPersist::instance().flush_on_main_thread()` 收尾写入剩余缓冲（`main.cpp:315`）。
 

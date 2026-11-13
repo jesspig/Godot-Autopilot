@@ -1,7 +1,8 @@
 import fs from "node:fs";
 
-import { joinPath } from "./platform";
-import { stateDir } from "./registry";
+import builtinCatalog from "../assets/catalog.json";
+
+import { gdaRoot, joinPath } from "./platform";
 import { CLI_VERSION } from "./version";
 
 export interface CatalogTool {
@@ -22,7 +23,7 @@ export interface ToolCatalog {
 const SAFE_FIELDS = ["category", "tags", "side_effect", "description", "input_schema"] as const;
 
 export function catalogPath(): string {
-  return joinPath(stateDir(), "catalog.json");
+  return joinPath(gdaRoot(), "cache", "catalog", `${CLI_VERSION}.json`);
 }
 
 function sanitizeTool(item: unknown): CatalogTool | null {
@@ -49,17 +50,26 @@ export function writeCatalog(items: unknown[]): ToolCatalog {
     version: CLI_VERSION,
     tools,
   };
-  fs.mkdirSync(stateDir(), { recursive: true });
+  fs.mkdirSync(joinPath(gdaRoot(), "cache", "catalog"), { recursive: true });
   fs.writeFileSync(catalogPath(), `${JSON.stringify(catalog, null, 2)}\n`, "utf8");
   return catalog;
+}
+
+export function builtinToolCatalog(): ToolCatalog {
+  return {
+    generated_at: "builtin",
+    version: CLI_VERSION,
+    tools: builtinCatalog.tools as CatalogTool[],
+  };
 }
 
 export function readCatalog(): ToolCatalog | null {
   try {
     const parsed = JSON.parse(fs.readFileSync(catalogPath(), "utf8")) as ToolCatalog;
-    if (!Array.isArray(parsed.tools)) return null;
-    return parsed;
+    if (Array.isArray(parsed.tools) && parsed.tools.length > 0) {
+      return parsed;
+    }
   } catch {
-    return null;
   }
+  return builtinToolCatalog();
 }

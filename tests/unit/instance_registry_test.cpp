@@ -39,7 +39,6 @@ InstanceRecord sample_record() {
   record.port = 9527;
   record.pid = 4242;
   record.project_path = "C:/projects/Demo";
-  record.api_token = "token-abc";
   record.endpoints.mcp.host = "127.0.0.1";
   record.endpoints.mcp.port = 9527;
   record.endpoints.mcp.path = "/mcp";
@@ -53,6 +52,7 @@ InstanceRecord sample_record() {
   record.gda_home = "C:/gda/home/.godot-autopilot";
   record.started_at = 1700000000;
   record.version = "0.1.0";
+  record.port_source = "first_random";
   return record;
 }
 
@@ -68,10 +68,10 @@ TEST(InstanceRegistryTest, RecordRoundTripsThroughJson) {
   EXPECT_EQ(parsed.port, original.port);
   EXPECT_EQ(parsed.pid, original.pid);
   EXPECT_EQ(parsed.project_path, original.project_path);
-  EXPECT_EQ(parsed.api_token, original.api_token);
   EXPECT_EQ(parsed.gda_home, original.gda_home);
   EXPECT_EQ(parsed.started_at, original.started_at);
   EXPECT_EQ(parsed.version, original.version);
+  EXPECT_EQ(parsed.port_source, original.port_source);
   EXPECT_EQ(parsed.endpoints.mcp.host, original.endpoints.mcp.host);
   EXPECT_EQ(parsed.endpoints.mcp.port, original.endpoints.mcp.port);
   EXPECT_EQ(parsed.endpoints.mcp.path, original.endpoints.mcp.path);
@@ -117,19 +117,42 @@ TEST(InstanceRegistryTest, NonObjectDocumentFailsValidation) {
 
 TEST(InstanceRegistryTest, RecordWithIpcEndpointRoundTrips) {
   InstanceRecord original = sample_record();
+  original.endpoints.ipc.kind = "unix";
   original.endpoints.ipc.path = "C:/gda/run/sample-1234abcd.sock";
-  original.endpoints.ipc.protocol = "uds";
-  original.endpoints.ipc.framing = "ndjson";
-  original.endpoints.ipc.auth = "filesystem";
+  original.endpoints.ipc.token = "ipc-token";
+  original.endpoints.ipc.protocol = "mcp-jsonrpc";
+  original.endpoints.ipc.framing = "length-prefixed-json";
+  original.endpoints.ipc.auth = "token";
+  original.endpoints.ipc.version = 1;
   original.endpoints.ipc.present = true;
   const mcp::JsonValue doc = godot_autopilot::record_to_json(original);
   InstanceRecord parsed;
   ASSERT_TRUE(godot_autopilot::record_from_json(doc, parsed));
   EXPECT_TRUE(parsed.endpoints.ipc.present);
+  EXPECT_EQ(parsed.endpoints.ipc.kind, "unix");
   EXPECT_EQ(parsed.endpoints.ipc.path, "C:/gda/run/sample-1234abcd.sock");
-  EXPECT_EQ(parsed.endpoints.ipc.protocol, "uds");
-  EXPECT_EQ(parsed.endpoints.ipc.framing, "ndjson");
-  EXPECT_EQ(parsed.endpoints.ipc.auth, "filesystem");
+  EXPECT_EQ(parsed.endpoints.ipc.token, "ipc-token");
+  EXPECT_EQ(parsed.endpoints.ipc.protocol, "mcp-jsonrpc");
+  EXPECT_EQ(parsed.endpoints.ipc.framing, "length-prefixed-json");
+  EXPECT_EQ(parsed.endpoints.ipc.auth, "token");
+  EXPECT_EQ(parsed.endpoints.ipc.version, 1);
+}
+
+TEST(InstanceRegistryTest, TcpIpcEndpointRoundTrips) {
+  InstanceRecord original = sample_record();
+  original.endpoints.ipc.kind = "tcp";
+  original.endpoints.ipc.host = "127.0.0.1";
+  original.endpoints.ipc.port = 21437;
+  original.endpoints.ipc.token = "tcp-token";
+  original.endpoints.ipc.present = true;
+  const mcp::JsonValue doc = godot_autopilot::record_to_json(original);
+  InstanceRecord parsed;
+  ASSERT_TRUE(godot_autopilot::record_from_json(doc, parsed));
+  EXPECT_TRUE(parsed.endpoints.ipc.present);
+  EXPECT_EQ(parsed.endpoints.ipc.kind, "tcp");
+  EXPECT_EQ(parsed.endpoints.ipc.host, "127.0.0.1");
+  EXPECT_EQ(parsed.endpoints.ipc.port, 21437);
+  EXPECT_EQ(parsed.endpoints.ipc.token, "tcp-token");
 }
 
 TEST(InstanceRegistryTest, MissingIpcEndpointIsBackwardCompatible) {

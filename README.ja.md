@@ -41,11 +41,10 @@ Godot-Autopilotは、プラグインとして**Godotエディター内部**に�
 2. **実行** — 単発の手順は`call_tool`、一括処理は`batch_execute`で実行します。
 3. **検証** — 結果をスクリーンショットで撮影し、前回の撮影結果と比較して修正し、繰り返します。
 
-エージェントが最初から使いこなせるように、プラグインには**スキルブック（9冊）**（概要編、呼び出しガイド編、さらにシーン編・リソース編・スクリプト編・ランタイム編・サーバー編・コンテンツ編・C#編）と**スターターガイド（7本）**（3Dシーン、キャラクターコントローラー、物理デバッグ、入力マップ、GUIなど）が付属します。**MCP Config**パネルでワンクリックすると、プロジェクトの`.agents/skills/`にスキルが生成されます。位置づけとして、MCPが主要な製品チャネルであり、スキル／スクリプトは体験層です。呼び出しガイドは、MCPが停止した場合はGDA CLIに切り替わり、CLIがない場合は手順書に切り替わります。
+エージェントが最初から使いこなせるように、プラグインには**自己完結したスキルブック（10冊）**（概要編、さらにシーン編・リソース編・スクリプト編・ランタイム編・サーバー編・コンテンツ編・C#編・セットアップ編・ツール編）が付属します。インストールは`gda install skills`で行います（中国語は`--zh`を追加）。以降、エージェントは推測せずに呼び出しプロトコルに従って操作します。位置づけとして、MCPが主要な製品チャネルであり、スキルは体験層です。呼び出しガイドは、MCPが停止した場合はGDA CLIに切り替わります。
 
-プラグインには2つのエディターパネルが付属します：
+プラグインには1つのエディターパネルが付属します：
 
-- **MCP Config** — サーバーの状態とポート、ワンクリックでのクライアント設定、機能スイッチ、スキル生成を行います。
 - **Log** — プラグイン専用ログをレベル／カテゴリーフィルターと検索付きで表示しますので、異常な呼び出しを追跡しやすくなります。
 
 ## はじめに
@@ -62,9 +61,9 @@ Godot-Autopilotは、プラグインとして**Godotエディター内部**に�
             ├── libgodot-autopilot.dylib (macOS)
             └── godot-autopilot.gdextension
     ```
-2. **プロジェクトを開きます** — プラグイン設定のポートでサーバーが自動的に起動します（既定値は`http://127.0.0.1:9527/mcp`）。有効化スイッチは不要です。
-3. **AIクライアントを接続します** — エディターの**MCP Config**パネルでクライアントを選び、**Generate**をクリックします。Claude Code、Codex、Cursor、OpenCode、Copilotを含む20のクライアントに対応しています。確認を求められたら、生成された設定ファイルをクライアント側で承認します。
-4. **強力な機能を有効化します（任意）** — スクリプト実行（`code_execute`）とゲーム制御（`game_runtime`）は既定で無効です。必要なときにパネルでチェックを入れます。
+2. **プロジェクトを開きます** — サーバーが自動的に起動し、初回起動時に空きループバックポートを1つバインドします（プロジェクトごとに永続化され、`20000–29999`から選択）。有効化スイッチは不要です。
+3. **AIクライアントを接続します** — `gda status --json`を実行し、その`mcp_url`をクライアントのMCP設定に追加します（URLをエージェントに渡して設定を生成させることもできます）。Claude Code、Codex、Cursor、OpenCode、Copilotを含む20のクライアントに対応しています。
+4. **高リスクな呼び出しを確認します（任意）** — `destructive`、`process`、`code_execute`、`game_runtime`の副作用を持つツールは`confirm=true`が必要です。グローバルな許可リストはありません。
 5. **お願いしてみます** — 例：「走ってジャンプできるプレイヤーキャラクターを作って、プレイテストして変なところを直して」。
 
 ソースからビルドしたり貢献したりしたい場合は、[docs/wiki/](docs/wiki/)（まずは[index.md](docs/wiki/index.md)、ビルドは[build.md](docs/wiki/build.md)）と[tests/README.md](tests/README.md)をご覧ください。
@@ -76,17 +75,17 @@ Godot-Autopilotは、プラグインとして**Godotエディター内部**に�
 `bunx` でその場実行します（PowerShell では `#` がコメント開始になるため引用符が必要です）：
 
 ```
-bunx "github:jesspig/Godot-Autopilot#0.3.1" ping
+bunx "github:jesspig/Godot-Autopilot#0.3.2" ping
 ```
 
 または一度グローバルインストールして、`gda` コマンドを使います：
 
 ```
-bun install -g github:jesspig/Godot-Autopilot#0.3.1
+bun install -g github:jesspig/Godot-Autopilot#0.3.2
 gda ping
 ```
 
-コマンドファミリー：**呼び出し系** — `ping` / `status` / `categories` / `search` / `describe` / `call`；**ライフサイクル** — `list` / `start` / `stop` / `restart` / `logs`；**コントロールプレーン** — `serve`；**REST系** — `api`（サブコマンド `list` / `describe` / `call`、MCPハンドシェイクを経由せずRESTを直接呼び出し）；`endpoints`（MCP/RESTエンドポイント、ポートの取得元、生存プローブの結果を表示）。
+コマンドファミリー：**呼び出し系** — `ping` / `status` / `categories` / `search` / `describe` / `call`；**ライフサイクル** — `list` / `start` / `stop` / `restart` / `logs`；**オフラインとアセット系** — `skills` / `tools` / `projects` / `cache` / `install` / `update` / `trace`。
 
 **Bun** が必要です。Bun も Node も無い環境では、Releases の `gda` 単体バイナリを使ってください（詳細は [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md)）。
 
@@ -103,26 +102,26 @@ Project: <ABSOLUTE PATH TO YOUR GODOT PROJECT> (Godot 4.7+).
    https://github.com/jesspig/Godot-Autopilot/releases/latest and extract it so that
    <project>/addons/godot-autopilot/godot-autopilot.gdextension exists.
 2. Start the editor: run `godot --editor --path <project>` (ask me for the engine path if it is
-   not on PATH) and wait until http://127.0.0.1:9527/mcp answers.
+   not on PATH) and wait until the `mcp_url` from `gda status --json` answers.
 3. Verify the server from a shell. Try in this order, stop at the first that works, and tell me
    which one it was:
-   - bunx "github:jesspig/Godot-Autopilot#0.3.1" ping
+   - bunx "github:jesspig/Godot-Autopilot#0.3.2" ping
    - download the gda release asset for this OS and CPU from the same Releases page, verify it
      against sha256sums.txt, then run ./gda ping
 4. Connect my AI client: add
-   {"mcpServers":{"godot-autopilot":{"url":"http://127.0.0.1:9527/mcp"}}}
-   to its MCP configuration, or tell me to use the plugin's MCP Config panel instead.
+   {"mcpServers":{"godot-autopilot":{"url":"<mcp_url from gda status --json>"}}}
+   to its MCP configuration (or hand the URL to your agent and ask it to generate the config).
 5. Summarize: which channel worked, every command you ran, and anything that failed.
 
-Rules: never hand-write HTTP requests against the port; never expose 9527 beyond loopback;
-leave code_execute and game_runtime disabled unless I ask for them.
+Rules: never hand-write HTTP requests against the port; never expose the GDA port beyond loopback;
+leave high-risk tools (code_execute, game_runtime, destructive, process) unconfirmed unless I ask for them.
 ```
 
-クライアントがスキルに対応している場合（Claude Code、Codex、Cursor など）は、このリポジトリの `skills/` ディレクトリも指定してください。エージェントが推測せずに完全な呼び出しプロトコルを参照できます。
+クライアントがスキルに対応している場合（Claude Code、Codex、Cursor など）は、`gda install skills`を実行してください。エージェントが推測せずに完全な呼び出しプロトコルを参照できます。
 
 ## 安全上の注意
 
-サーバーはお使いのマシンのループバックアドレス上でのみ待ち受けます（プラグイン設定のポート、既定では9527、パスは`/mcp`固定）。ローカル外のアドレスは拒否します。スクリプト実行、ゲーム制御、OSプロセスのツールは**既定で拒否**されます。信頼できるローカルプロジェクトでのみ有効化します。詳細は[docs/wiki/security_contract.md](docs/wiki/security_contract.md)をご覧ください。
+サーバーはお使いのマシンのループバックアドレス上でのみ待ち受けます（ポートはプラグインがプロジェクトごとに選択し、パスは`/mcp`固定）。ローカル外のアドレスは拒否します。高リスクなツール（`destructive`、`process`、`code_execute`、`game_runtime`）は`confirm=true`が必要です。グローバルな許可リストはありません。詳細は[docs/wiki/security_contract.md](docs/wiki/security_contract.md)をご覧ください。
 
 ## アセットの帰属
 

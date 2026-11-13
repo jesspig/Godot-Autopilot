@@ -7,6 +7,8 @@
 #include <filesystem>
 #include <system_error>
 
+#include <mcp/JsonValue.hpp>
+
 #include "core/transport/ipc_framing.hpp"
 
 #ifdef _WIN32
@@ -17,7 +19,9 @@
 #include <ws2tcpip.h>
 #include <afunix.h>
 #else
+#include <arpa/inet.h>
 #include <fcntl.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -113,6 +117,38 @@ bool fill_address(const std::string &socket_path, sockaddr_un &address,
   return true;
 }
 
+bool fill_tcp_address(const std::string &host, int port, sockaddr_in &address,
+                      std::string &error) {
+  std::memset(&address, 0, sizeof(address));
+  address.sin_family = AF_INET;
+  address.sin_port = htons(static_cast<std::uint16_t>(port));
+  if (host.empty() || host == "127.0.0.1") {
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    return true;
+  }
+  if (host == "::1" || host == "localhost") {
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    return true;
+  }
+  error = "IPC TCP listen only accepts loopback hosts";
+  return false;
+}
+
+std::string error_frame(const std::string &id_text, int code,
+                        const std::string &message) {
+  return "{\"jsonrpc\":\"2.0\",\"id\":" + id_text +
+         ",\"error\":{\"code\":" + std::to_string(code) +
+         ",\"message\":\"" + message + "\"}}";
+}
+
+std::string request_id_text(const mcp::JsonValue &doc) {
+  const mcp::JsonValue *id = doc.Find("id");
+  if (id != nullptr && id->IsInt()) {
+    return std::to_string(id->GetInt());
+  }
+  return "null";
+}
+
 } // namespace
 
 IpcTransport::~IpcTransport() { stop(); }
@@ -123,6 +159,27 @@ bool IpcTransport::is_listening() const {
 
 const std::string &IpcTransport::bound_path() const { return bound_path_; }
 
+const std::string &IpcTransport::kind() const { return kind_; }
+
+const std::string &IpcTransport::host() const { return host_; }
+
+int IpcTransport::port() const { return bound_port_; }
+
+bool IpcTransport::acquire_in_flight() {
+  std::size_t current = in_flight_.load(std::memory_order_relaxed);
+  while (current < kMaxIpcInFlight) {
+    if (in_flight_.compare_exchange_weak(current, current + 1,
+                                         std::memory_order_acq_rel)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void IpcTransport::release_in_flight() {
+  in_flight_.fetch_sub(1, std::memory_order_acq_rel);
+}
+
 std::size_t IpcTransport::connection_count() const {
   return connections_.size();
 }
@@ -130,6 +187,11 @@ std::size_t IpcTransport::connection_count() const {
 const IpcConnectionStats &IpcTransport::stats() const { return stats_; }
 
 bool IpcTransport::listen(const std::string &socket_path, std::string &error) {
+  return listen_unix(socket_path, std::string(), error);
+}
+
+bool IpcTransport::listen_unix(const std::string &socket_path,
+                               const std::string &token, std::string &error) {
   if (is_listening()) {
     error = "ipc transport is already listening";
     return false;
@@ -165,6 +227,66 @@ bool IpcTransport::listen(const std::string &socket_path, std::string &error) {
   }
   listen_handle_ = handle;
   bound_path_ = socket_path;
+  kind_ = "unix";
+  host_.clear();
+  bound_port_ = 0;
+  token_ = token;
+  return true;
+}
+
+bool IpcTransport::listen_tcp(const std::string &host, int requested_port,
+                              const std::string &token, std::string &error) {
+  if (is_listening()) {
+    error = "ipc transport is already listening";
+    return false;
+  }
+  if (!ensure_sockets(error)) {
+    return false;
+  }
+  sockaddr_in address;
+  if (!fill_tcp_address(host, requested_port, address, error)) {
+    return false;
+  }
+  const socket_handle handle =
+      static_cast<socket_handle>(::socket(AF_INET, SOCK_STREAM, 0));
+  if (handle == kInvalidSocket) {
+    error = "socket() failed (" + std::to_string(last_socket_error()) + ")";
+    return false;
+  }
+  int reuse = 1;
+  ::setsockopt(to_native(handle), SOL_SOCKET, SO_REUSEADDR,
+               reinterpret_cast<const char *>(&reuse), sizeof(reuse));
+  if (!set_nonblocking(handle)) {
+    close_socket(handle);
+    error = "failed to switch the socket to non-blocking mode";
+    return false;
+  }
+  if (::bind(to_native(handle), reinterpret_cast<sockaddr *>(&address),
+             static_cast<native_socket_len>(sizeof(address))) != 0) {
+    close_socket(handle);
+    error = "bind() failed (" + std::to_string(last_socket_error()) + ")";
+    return false;
+  }
+  if (::listen(to_native(handle), SOMAXCONN) != 0) {
+    close_socket(handle);
+    error = "listen() failed (" + std::to_string(last_socket_error()) + ")";
+    return false;
+  }
+  sockaddr_in bound{};
+  native_socket_len bound_len = static_cast<native_socket_len>(sizeof(bound));
+  if (getsockname(to_native(handle), reinterpret_cast<sockaddr *>(&bound),
+                  &bound_len) != 0) {
+    close_socket(handle);
+    error = "getsockname() failed (" + std::to_string(last_socket_error()) +
+            ")";
+    return false;
+  }
+  listen_handle_ = handle;
+  bound_path_.clear();
+  kind_ = "tcp";
+  host_ = "127.0.0.1";
+  bound_port_ = ntohs(bound.sin_port);
+  token_ = token;
   return true;
 }
 
@@ -179,6 +301,10 @@ void IpcTransport::stop() {
     std::filesystem::remove(bound_path_, ec);
   }
   bound_path_.clear();
+  kind_.clear();
+  host_.clear();
+  bound_port_ = 0;
+  token_.clear();
 }
 
 void IpcTransport::pump() {
@@ -188,6 +314,7 @@ void IpcTransport::pump() {
   accept_pending();
   drain_outbox();
   service_connections();
+  drain_outbox();
   flush_writes();
 }
 
@@ -199,11 +326,56 @@ void IpcTransport::queue_line(std::uint64_t connection_id, std::string text) {
   if (text.empty()) {
     return;
   }
-  if (text.back() != '\n') {
-    text.push_back('\n');
-  }
+  std::string frame = ipc_framing::encode_length_prefixed(text);
   std::lock_guard<std::mutex> lock(outbox_mutex_);
-  outbox_.emplace_back(connection_id, std::move(text));
+  outbox_.emplace_back(connection_id, std::move(frame));
+}
+
+bool IpcTransport::authenticate(std::uint64_t connection_id,
+                                const std::string &frame) {
+  if (token_.empty()) {
+    return true;
+  }
+  mcp::JsonValue doc;
+  try {
+    doc = mcp::JsonValue::Parse(frame);
+  } catch (...) {
+    return false;
+  }
+  if (!doc.IsObject()) {
+    return false;
+  }
+  const std::string id_text = request_id_text(doc);
+  const mcp::JsonValue *method = doc.Find("method");
+  if (method == nullptr || !method->IsString() ||
+      method->GetString() != "initialize") {
+    queue_line(connection_id,
+               error_frame(id_text, -32002, "IPC initialize required"));
+    return false;
+  }
+  const mcp::JsonValue *params = doc.Find("params");
+  std::string presented;
+  if (params != nullptr && params->IsObject()) {
+    const mcp::JsonValue *meta = params->Find("_meta");
+    if (meta != nullptr && meta->IsObject()) {
+      const mcp::JsonValue *token = meta->Find("gda_token");
+      if (token != nullptr && token->IsString()) {
+        presented = token->GetString();
+      }
+    }
+    if (presented.empty()) {
+      const mcp::JsonValue *token = params->Find("gda_token");
+      if (token != nullptr && token->IsString()) {
+        presented = token->GetString();
+      }
+    }
+  }
+  if (presented != token_) {
+    queue_line(connection_id,
+               error_frame(id_text, -32001, "IPC token rejected"));
+    return false;
+  }
+  return true;
 }
 
 void IpcTransport::drain_outbox() {
@@ -226,7 +398,7 @@ void IpcTransport::accept_pending() {
   std::size_t accepted = 0;
   while (accepted < kMaxIpcAcceptsPerFrame &&
          connections_.size() < kMaxIpcConnections) {
-    sockaddr_un peer;
+    sockaddr_storage peer;
     native_socket_len peer_len = static_cast<native_socket_len>(sizeof(peer));
     const socket_handle handle = static_cast<socket_handle>(::accept(
         to_native(listen_handle_), reinterpret_cast<sockaddr *>(&peer),
@@ -242,6 +414,8 @@ void IpcTransport::accept_pending() {
     Connection connection;
     connection.handle = handle;
     connection.id = next_connection_id_++;
+    connection.last_activity = std::chrono::steady_clock::now();
+    connection.authenticated = token_.empty();
     connections_.push_back(std::move(connection));
     stats_.accepted += 1;
     ++accepted;
@@ -249,7 +423,15 @@ void IpcTransport::accept_pending() {
 }
 
 void IpcTransport::service_connections() {
+  const auto now = std::chrono::steady_clock::now();
   for (Connection &connection : connections_) {
+    if (connection.handle == kInvalidSocket) {
+      continue;
+    }
+    if (now - connection.last_activity > kIpcIdleTimeout) {
+      close_connection(connection);
+      continue;
+    }
     char buffer[4096];
     std::size_t read_budget = kMaxIpcReadPerConnectionPerFrame;
     bool closed = false;
@@ -264,6 +446,7 @@ void IpcTransport::service_connections() {
                                      : 0;
         connection.buffer.append(
             buffer, std::min<std::size_t>(static_cast<std::size_t>(got), room));
+        connection.last_activity = now;
         stats_.bytes_read += static_cast<std::uint64_t>(got);
         read_budget -= static_cast<std::size_t>(got);
         continue;
@@ -283,13 +466,21 @@ void IpcTransport::service_connections() {
       continue;
     }
     const ipc_framing::ExtractedFrames frames =
-        ipc_framing::extract_frames(connection.buffer, kMaxIpcConnectionBuffer);
+        ipc_framing::extract_length_prefixed(connection.buffer,
+                                             kMaxIpcConnectionBuffer);
     connection.buffer = frames.remainder;
     if (frames.overflow) {
       close_connection(connection);
       continue;
     }
     for (const std::string &frame : frames.frames) {
+      if (!connection.authenticated) {
+        if (!authenticate(connection.id, frame)) {
+          connection.close_after_flush = true;
+          break;
+        }
+        connection.authenticated = true;
+      }
       if (line_handler_) {
         line_handler_(connection.id, frame);
       }
@@ -309,6 +500,9 @@ void IpcTransport::service_connections() {
 
 void IpcTransport::flush_writes() {
   for (Connection &connection : connections_) {
+    if (connection.handle == kInvalidSocket) {
+      continue;
+    }
     std::size_t budget = 65536;
     while (!connection.write_buffer.empty() && budget > 0) {
       const std::size_t want =
@@ -325,6 +519,9 @@ void IpcTransport::flush_writes() {
       }
       connection.write_buffer.erase(0, static_cast<std::size_t>(sent));
       budget -= static_cast<std::size_t>(sent);
+    }
+    if (connection.close_after_flush && connection.write_buffer.empty()) {
+      close_connection(connection);
     }
   }
 }

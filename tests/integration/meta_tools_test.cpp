@@ -143,6 +143,7 @@ TEST_F(MetaToolsSuite, CallToolMissingNameReportsMissingParameter) {
 
 TEST_F(MetaToolsSuite, BatchExecuteAllSuccessCountsTwo) {
   mcp::JsonValue args = make_args();
+  args["confirm"] = mcp::JsonValue(true);
   mcp::JsonValue operations(mcp::JsonValue::array_tag);
   mcp::JsonValue op_ping = make_args();
   op_ping["tool"] = mcp::JsonValue("ping");
@@ -170,6 +171,7 @@ TEST_F(MetaToolsSuite, BatchExecuteAllSuccessCountsTwo) {
 
 TEST_F(MetaToolsSuite, BatchExecuteUnknownToolFailsOne) {
   mcp::JsonValue args = make_args();
+  args["confirm"] = mcp::JsonValue(true);
   mcp::JsonValue operations(mcp::JsonValue::array_tag);
   mcp::JsonValue op_unknown = make_args();
   op_unknown["tool"] = mcp::JsonValue("no_such_tool_xyz");

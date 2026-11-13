@@ -1,11 +1,16 @@
 import type { GlobalOptions } from "../args";
 import { readCatalog, writeCatalog, type CatalogTool, type ToolCatalog } from "../catalog";
 import { CliError, ExitCode } from "../errors";
-import { fetchAllTools } from "./api";
+import { listTools } from "../mcp/client";
+import { callTimeoutSec } from "../payload";
+import { findById, findLiveByProject } from "../registry";
+import { resolveTarget, type TargetContext } from "../target";
 import { writeJson } from "./json-output";
 
+const TARGET_CONTEXT: TargetContext = { findById, findLiveByProject };
+
 const REFRESH_HINT =
-  "run 'gda api list' once against a live instance to cache the catalog, or pass --refresh";
+  "run 'gda tools list --refresh' against a live instance, or install the builtin catalog";
 
 export async function run(positional: string[], opts: GlobalOptions): Promise<number> {
   const sub = positional[0];
@@ -14,7 +19,8 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
   }
   let catalog: ToolCatalog | null = readCatalog();
   if (opts.refresh === true) {
-    catalog = writeCatalog(await fetchAllTools(opts));
+    const target = resolveTarget(opts, TARGET_CONTEXT);
+    catalog = writeCatalog(await listTools(target.port, callTimeoutSec(opts)));
   }
   if (catalog === null) {
     throw new CliError(ExitCode.Transport, `no offline tool catalog is cached; ${REFRESH_HINT}`);

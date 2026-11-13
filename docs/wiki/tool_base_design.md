@@ -11,6 +11,8 @@ timestamp: "2026-10-21T04:47:54+08:00"
 resource: src/tools/
 ---
 
+> **0.3.2**：授权三档、allow-list 与 `AUTH_MODE` 已移除；`SpecTool` 执行链不再有授权阶段，只对高风险 `side_effect` 要求 `arguments.confirm=true`。
+
 # ToolSpec 工具数据层与执行管线（设计定稿 + 全量迁移）
 
 > **当前 API 面（2026-10-21 复核：注册共 33 域 451 工具 + `system_status` + 7 元，catalog 共 459；`SideEffect` 9 值，授权三档七能力，`main_thread_timeout` 的 `retryable` 为 false）**

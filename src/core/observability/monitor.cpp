@@ -59,6 +59,15 @@ std::string parse_traceparent_trace_id(const std::string &traceparent) {
 }
 
 void fill_defaults(TraceEvent &event) {
+  if (event.event_id.empty()) {
+    event.event_id = TraceRecorder::new_span_id();
+  }
+  if (event.source.empty()) {
+    event.source = "plugin";
+  }
+  if (event.attempt == 0) {
+    event.attempt = 1;
+  }
   if (event.session_id.empty()) {
     event.session_id = LogPersist::instance().session_id();
   }

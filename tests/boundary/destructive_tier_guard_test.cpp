@@ -4,7 +4,6 @@
 #include <mcp/transport/InMemoryTransport.hpp>
 
 #include "core/command_queue.hpp"
-#include "tools/base/authorization.hpp"
 #include "tools/base/register_all.hpp"
 #include "tools/base/side_effect_policy.hpp"
 #include "tools/base/tool_base.hpp"
@@ -19,36 +18,7 @@
 namespace {
 
 using godot_autopilot::SideEffect;
-namespace authorization = godot_autopilot::authorization;
 namespace side_effect_policy = godot_autopilot::side_effect_policy;
-
-class AllowEnvScope {
-public:
-  AllowEnvScope() {
-    const char *saved = std::getenv("GODOT_AUTOPILOT_ALLOW");
-    if (saved != nullptr)
-      saved_ = saved;
-#ifdef _WIN32
-    _putenv_s("GODOT_AUTOPILOT_ALLOW", "__no_capabilities__");
-#else
-    setenv("GODOT_AUTOPILOT_ALLOW", "__no_capabilities__", 1);
-#endif
-  }
-
-  ~AllowEnvScope() {
-#ifdef _WIN32
-    _putenv_s("GODOT_AUTOPILOT_ALLOW", saved_.c_str());
-#else
-    if (saved_.empty())
-      unsetenv("GODOT_AUTOPILOT_ALLOW");
-    else
-      setenv("GODOT_AUTOPILOT_ALLOW", saved_.c_str(), 1);
-#endif
-  }
-
-private:
-  std::string saved_;
-};
 
 std::unique_ptr<mcp::McpServer> &server_handle() {
   static std::unique_ptr<mcp::McpServer> server;
@@ -166,8 +136,7 @@ TEST(DestructiveTierGuardTest, ExemptedToolsPassTheGuard) {
   }
 }
 
-TEST(DestructiveTierGuardTest, DestructiveToolsAreDeniedByDefault) {
-  AllowEnvScope allow_scope;
+TEST(DestructiveTierGuardTest, DestructiveToolsKeepDestructiveTier) {
   auto registry = ensure_registry();
   int destructive_count = 0;
   for (const auto &tool : registry->all_any()) {
@@ -175,22 +144,13 @@ TEST(DestructiveTierGuardTest, DestructiveToolsAreDeniedByDefault) {
       continue;
     }
     ++destructive_count;
-    EXPECT_FALSE(authorization::tier_permits(authorization::kCapabilityDestructive,
-                                             ""))
+    EXPECT_EQ(side_effect_of_tool(tool->meta().name), "destructive")
         << tool->meta().name;
-    const mcp::JsonValue denied = authorization::deny_if_unauthorized(
-        tool->meta().name, SideEffect::Destructive);
-    ASSERT_FALSE(denied.IsNull()) << tool->meta().name;
-    const mcp::JsonValue *required = denied.Find("authorization_required");
-    ASSERT_NE(required, nullptr) << tool->meta().name;
-    ASSERT_TRUE(required->IsString()) << tool->meta().name;
-    EXPECT_EQ(required->GetString(), "destructive") << tool->meta().name;
   }
   EXPECT_GT(destructive_count, 0);
 }
 
-TEST(DestructiveTierGuardTest, SceneWriteToolsAreDeniedByDefault) {
-  AllowEnvScope allow_scope;
+TEST(DestructiveTierGuardTest, SceneWriteToolsKeepWriteTier) {
   auto registry = ensure_registry();
   int scene_write_count = 0;
   for (const auto &tool : registry->all_any()) {
@@ -198,37 +158,19 @@ TEST(DestructiveTierGuardTest, SceneWriteToolsAreDeniedByDefault) {
       continue;
     }
     ++scene_write_count;
-    const mcp::JsonValue denied = authorization::deny_if_unauthorized(
-        tool->meta().name, SideEffect::WritesScene);
-    ASSERT_FALSE(denied.IsNull()) << tool->meta().name;
-    const mcp::JsonValue *required = denied.Find("authorization_required");
-    ASSERT_NE(required, nullptr) << tool->meta().name;
-    ASSERT_TRUE(required->IsString()) << tool->meta().name;
-    EXPECT_EQ(required->GetString(), "write") << tool->meta().name;
+    EXPECT_EQ(side_effect_of_tool(tool->meta().name), "writes_scene")
+        << tool->meta().name;
   }
   EXPECT_GT(scene_write_count, 0);
 }
 
-TEST(DestructiveTierGuardTest, ProcessEnvironmentReadsAreDeniedByDefault) {
-  AllowEnvScope allow_scope;
+TEST(DestructiveTierGuardTest, ProcessEnvironmentReadsKeepProcessTier) {
   const std::vector<std::string> names = {
-      "get_os_environment", "get_os_unique_id", "get_os_user_data_dir"};
+      "get_os_environment", "get_os_user_data_dir"};
   for (const std::string &name : names) {
     EXPECT_EQ(side_effect_of_tool(name), "process") << name;
-    const mcp::JsonValue denied =
-        authorization::deny_if_unauthorized(name, SideEffect::Process);
-    ASSERT_FALSE(denied.IsNull()) << name;
-    const mcp::JsonValue *code = denied.Find("code");
-    ASSERT_NE(code, nullptr) << name;
-    ASSERT_TRUE(code->IsString()) << name;
-    EXPECT_EQ(code->GetString(), "authorization_required") << name;
-    const mcp::JsonValue *required = denied.Find("authorization_required");
-    ASSERT_NE(required, nullptr) << name;
-    ASSERT_TRUE(required->IsString()) << name;
-    EXPECT_EQ(required->GetString(), "process") << name;
   }
 }
-
 TEST(DestructiveTierGuardTest, ReviewedDestructiveToolsKeepTheirTier) {
   EXPECT_EQ(side_effect_of_tool("delete_display_window"), "destructive");
   EXPECT_EQ(side_effect_of_tool("delete_scene_node"), "destructive");

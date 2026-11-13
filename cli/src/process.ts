@@ -65,14 +65,13 @@ function searchPath(): string | null {
   return null;
 }
 
-export async function spawnEditor(opts: { projectDir: string; port: number; headless: boolean; godot: string; logPath: string }): Promise<{ pid: number }> {
+export async function spawnEditor(opts: { projectDir: string; headless: boolean; godot: string; logPath: string }): Promise<{ pid: number }> {
   const args = opts.headless
     ? [opts.godot, "--headless", "--editor", "--path", resolvePath(opts.projectDir)]
     : [opts.godot, "--editor", "--path", resolvePath(opts.projectDir)];
   const logFd = fs.openSync(resolvePath(opts.logPath), "a");
   const env = {
     ...process.env,
-    GODOT_AUTOPILOT_PORT: String(opts.port),
     ...(opts.headless ? { GDA_FORCE_HEADLESS: "1" } : {}),
   };
   try {

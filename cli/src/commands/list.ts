@@ -122,7 +122,7 @@ async function probeListEntries(port: number | null): Promise<ListEntry[]> {
   if (port === null) {
     return [];
   }
-  const endpoint = deriveEndpoint(port, "mcp");
+  const endpoint = deriveEndpoint(port);
   const target = { host: endpoint.host, port: endpoint.port, url: endpointBaseUrl(endpoint) };
   if (!(await probeEndpoint(target, "light"))) {
     return [];
