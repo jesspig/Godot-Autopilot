@@ -77,9 +77,9 @@ description: "以 examples/<名称> 为场地，用 GDA 完成一轮端到端开
    | 2 | `gda call get_engine_version` | 退出码 0，返回引擎版本 |
    | 3 | `gda call system_status`（连续两次） | 两次均退出码 0 |
 
-   任一探针失败时：记录命令、退出码（0 成功 / 1 工具失败 / 2 传输或环境失败 / 3 用法错误）与 `gda endpoints` 的输出（端口来源、MCP/API 地址与 `alive`），再按下列判据分流，不自行启动或重启 Godot：
+   任一探针失败时：记录命令、退出码（0 成功 / 1 工具失败 / 2 传输或环境失败 / 3 用法错误）与 `gda status --json` / `gda list` 的输出（实例、端口、`mcp_url` 与 `live`），再按下列判据分流，不自行启动或重启 Godot：
    - CLI 成功而后续 MCP 工具调用失败 → 客户端路径问题（客户端连接、协议或授权），GDA 本体可用；
-   - CLI 与客户端都失败且 `gda endpoints` 显示端口无监听 → 查 Windows 事件日志与 `%LOCALAPPDATA%\CrashDumps`，在报告中如实记录后再判断是否停止。
+   - CLI 与客户端都失败且 `gda status --json` / `gda list` 显示端口无监听 → 查 Windows 事件日志与 `%LOCALAPPDATA%\CrashDumps`，在报告中如实记录后再判断是否停止。
 2. 确认 `addons/godot-autopilot/` 已部署。缺失时在仓库根执行：
    - `bun run gda-dev-tools build`
    - `bun run gda-dev-tools deploy --demos <name>`

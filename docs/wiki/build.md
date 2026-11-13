@@ -124,7 +124,7 @@ resource:
 
 | job | 内容 |
 |---|---|
-| validate | 校验 tag 与根 `VERSION` 一致（`v` 前缀可选：`v0.3.1` / `0.3.1` ↔ `0.3.1`，版本号以根 `VERSION` 为准，当前 0.3.1），不一致 fail |
+| validate | 校验 tag 与根 `VERSION` 一致（`v` 前缀可选：`v0.3.2` / `0.3.2` ↔ `0.3.2`，版本号以根 `VERSION` 为准，当前 0.3.2），不一致 fail |
 | build | 同 CI 环境（Ninja/sccache/msvc-dev-cmd，ninja 由 `seanmiddleditch/gha-setup-ninja@v5` 提供，故 `resolvePreset` 恒选 `release`；checkout 带 `submodules: true`，缓存同 CI 改为 `key: submodules-release-${{ runner.os }}-${{ steps.submodules.outputs.shas }}`），Release 构建后按精确文件名上传各平台库 artifact（天然排除 pdb） |
 | cli | 5 个目标的 `bun build --compile` 独立二进制（`windows-x64` / `linux-x64` / `linux-x64-musl` / `macos-arm64` / `macos-x64`），macOS 产物 ad-hoc 签名（`codesign --force --sign -`），各自打 zip/tar.gz 后上传 artifact；二进制名带根 `VERSION` |
 | package | 下载全部 artifact → `bun run gda-dev-tools package --libs-dir dist` 合并 → **跑 `bun run gda-dev-tools package-check dist/godot-autopilot-*.zip` 自检（失败即中止发布）** → 重命名为 `addons.zip` → 收集 `cli-dist/` 下二进制并生成 `sha256sums.txt` → softprops/action-gh-release 一并发布（`addons.zip` + `gda-<version>-<platform>.*` + 校验和） |

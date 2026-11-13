@@ -1,7 +1,7 @@
 ---
 type: 模块文档
 title: 工具注册表
-description: ToolSpec 数据化注册管线、统一执行入口（导出拦截→工具存在→参数校验→授权→派发→信封）、授权三档、registry 派生（catalog/BM25/dispatch）、元工具与动态工具、schema 统计口径与遍历排除机制
+description: ToolSpec 数据化注册管线、统一执行入口（导出拦截→工具存在→参数校验→派发→信封）、高风险 confirm、registry 派生（catalog/BM25/dispatch）、元工具与动态工具、schema 统计口径与遍历排除机制
 tags:
   - 模块
   - 工具注册
@@ -47,7 +47,7 @@ flowchart TD
 - **取参统一 `Args`**（`tool_args.hpp/cpp`）：`opt_*`/`require_*`/`get_*` + `reject_unknown()`；`null` 视为缺失，`integer` 接受整数值 double、拒绝小数与越界，`boolean` 严格。错误消息 "missing required parameter: X" / "invalid parameter: X must be a ..." 由 handler 抛出后经 dispatch 统一包装。
 - **生命周期**：`g_active_registry` 为 mutex 保护的 `shared_ptr<ToolRegistry>`；`register_all_tools`/`refresh_dynamic_tools` 每次先构建局部 registry，再经 `refresh_derived` 批量替换 catalog/index/dispatch；dispatch handler lambda 捕获 registry 并在调用时 `find` 取工具，旧请求持有的 registry 由共享所有权延长生命周期。
 - **埋点 lifecycle（09-21 新增）**：`register_all_tools`/`refresh_derived`/`refresh_dynamic_tools`/`server.RegisterTool` 批量注册处分别发 `monitor::lifecycle`（`registry_build`/`registry_refresh_derived`/`registry_refresh_dynamic`/`tools_registered`），随 trace jsonl 落盘以还原注册管线时序。
-- **动态工具**：`AutopilotTools`（`autopilot_tools.cpp`）注册的用户工具 spec 存 `dynamic_spec_store.hpp` 的 store()（互斥保护），注册/注销后调 `refresh_dynamic_tools()` 全量重建；工具带 `kDynamic`；重名/与内置碰撞拒绝（`log_detailed` 记 `reason=<message>`）。注册/注销/开关均走 `log_detailed`：注册成功 detail 含 `tool=<name> handle=<n> params=<n> tags=<n> category=<cat>`，注销记 `tool=<name> handle=<n>`，`set_enabled` 记 `enabled=<bool> allow=<list|(none)>`。执行受 `user_tools` capability 门（env `GODOT_AUTOPILOT_ALLOW` 优先于配置 `allow`）。目录批量注册入口 `rescan(directory)`（默认 `res://addons/godot-autopilot-tools`；门禁/marshal/前缀校验/256 文件/深度 8/逐文件错误隔离，返回 scanned/registered/failed/errors）；约定、示例与 L2 `27_user_tools_rescan` 见 [ToolSpec 数据层与执行管线](../tool_base_design.md)的目录扫描小节。
+- **动态工具**：`AutopilotTools`（`autopilot_tools.cpp`）注册的用户工具 spec 存 `dynamic_spec_store.hpp` 的 store()（互斥保护），注册/注销后调 `refresh_dynamic_tools()` 全量重建；工具带 `kDynamic`；重名/与内置碰撞拒绝（`log_detailed` 记 `reason=<message>`）。注册/注销/开关均走 `log_detailed`：注册成功 detail 含 `tool=<name> handle=<n> params=<n> tags=<n> category=<cat>`，注销记 `tool=<name> handle=<n>`，`set_enabled` 记 `enabled=<bool> allow=<list|(none)>`。0.3.2 起不再有 `user_tools` capability 门；高风险工具由 `confirm=true` 控制。目录批量注册入口 `rescan(directory)`（默认 `res://addons/godot-autopilot-tools`；门禁/marshal/前缀校验/256 文件/深度 8/逐文件错误隔离，返回 scanned/registered/failed/errors）；约定、示例与 L2 `27_user_tools_rescan` 见 [ToolSpec 数据层与执行管线](../tool_base_design.md)的目录扫描小节。
 - **分类边界**：`get_debug_object_info`（handler `physics_ops::handle_resolve_object`）归 `physics_tools` 但 Category "Debug"；`read_file/find_in_files/write_file`（handler `text_ops`）归 `os_tools`；Scene Tree 类工具 Category 均为 "Scene"、按 handler 分 `scene_tools`/`scene_tree_tools`；InputMap 工具 Category "Input"、归 `input_map_tools`。09-29 起 `scene_tree_tools` 的 8 个工具为游戏进程转发（`SideEffect::GameRuntime` + `GDA_OP_SCENE_TREE`），不再操作编辑器树。
 
 ## 三层结构
@@ -128,7 +128,7 @@ warnings 判定逻辑在 `tests/runner/traversal.cpp`（"schema 声明必填但�
 
 ## 统一执行入口（10-21 新增，`tool_execute`）
 
-[`src/tools/base/tool_execute.hpp`](../../../src/tools/base/tool_execute.hpp) / [`src/tools/base/tool_execute.cpp`](../../../src/tools/base/tool_execute.cpp) 的 `tools::execute_tool_chain(name, args)` 把「导出拦截 → 工具存在 → 参数校验 → 授权 → 派发 → 信封」六个阶段固化成一条链，并把每一段做成可替换的槽位（`register_export_guard` / `register_argument_validator` / `register_authorization_policy` / `register_envelope_builder`）。`tool_execute.cpp` 在静态初始化期把默认实现注册进这些槽位，因此调用 `tools::execute_tool(name, args)` 即走全链。
+[`src/tools/base/tool_execute.hpp`](../../../src/tools/base/tool_execute.hpp) / [`src/tools/base/tool_execute.cpp`](../../../src/tools/base/tool_execute.cpp) 的 `tools::execute_tool_chain(name, args)` 把「导出拦截 → 工具存在 → 参数校验 → 派发 → 信封」五个阶段固化成一条链，并把每一段做成可替换的槽位（`register_export_guard` / `register_argument_validator` / `register_envelope_builder`）。0.3.2 起授权阶段已删除。`tool_execute.cpp` 在静态初始化期把默认实现注册进这些槽位，因此调用 `tools::execute_tool(name, args)` 即走全链。
 
 > **接线现状（10-22 核实）**：这条链**已在 REST 面接入生产请求路径**——`src/core/transport/api_surface.cpp` 的 `default_execute_tool` 调用 `tools::execute_tool(name, args)`，生产注册点为 `src/core/server_context.cpp` 的 `register_unified_tool_executor()`（在 `start()` 内、`ApiServer::start()` 之前执行，把 `tools::execute_tool_chain` 注册进执行器槽位），因此注册在静态初始化期之外也确定生效。MCP 面的 `call_tool` 元工具**仍走** `tools::execute_tool_core`（等价于 `dispatch::call_handler` 直派），这是**有意保留的差异**：既有工具的参数声明不完整（部分工具声明类型与实际接受类型不符），若对 MCP 也套用严格参数校验会拒掉现网可用的调用。两套协议面的实际链路是：
 >
@@ -150,9 +150,11 @@ warnings 判定逻辑在 `tests/runner/traversal.cpp`（"schema 声明必填但�
 | 5 | **派发** | 工具自身的返回 | `dispatch::call_handler(name, args)`——非主线程时经带预算的主线程派发入口排队执行 |
 | 6 | **信封** | 同工具结果，追加 `code` / `warnings` / `tool` / `trace_id` / `request_id` | `ApiEnvelope::build(result, tool_name)`；只对**含 `error` 字段**的结果加信封，成功结果原样返回 |
 
-顺序是**安全优先**：导出拦截在最前，授权在派发之前——两者都不依赖工具是否被真正执行，因此「拒绝」永远不会留下副作用。
+顺序是**安全优先**：导出拦截在最前，且不依赖工具是否被真正执行，因此「拒绝」永远不会留下副作用。0.3.2 起授权阶段已删除，高风险工具改由 `confirm=true` 在执行前拦截。
 
-### 授权三档（10-21 起）
+### 授权三档（10-21 起；0.3.2 已移除，以下为历史口径）
+
+> 0.3.2 起 allow-list / `GODOT_AUTOPILOT_ALLOW` / `auth_mode` / 面板开关全部删除，高风险工具只由 `confirm=true` 控制；本节保留为历史契约。
 
 `authorization::tier_for_side_effect()` 按 `SideEffect` 把工具分三档，`capability_for_tool()` 把档位映射成能力名：
 

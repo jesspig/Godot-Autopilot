@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Godot Autopilot（GDA）：进程内 GDExtension，把 Godot 编辑器经 MCP（`127.0.0.1:9527/mcp`）暴露给 AI 客户端。C++17 + godot-cpp + mcp-cpp-sdk，工具经 `ToolSpec` 数据化注册。
+Godot Autopilot（GDA）：进程内 GDExtension，把 Godot 编辑器经 MCP（`127.0.0.1:<port>/mcp`，端口由插件首次启动在 20000–29999 随机分配并持久化）暴露给 AI 客户端。C++17 + godot-cpp + mcp-cpp-sdk，工具经 `ToolSpec` 数据化注册。
 
 本页是最小上下文入口；项目事实与文档规则见 `docs/wiki/index.md`。
 

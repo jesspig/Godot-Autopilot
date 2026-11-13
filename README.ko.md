@@ -41,11 +41,10 @@ Godot-Autopilot은 **Godot 에디터 내부**에서 플러그인으로 동작하
 2. **실행** — 단일 단계에는 `call_tool`, 일괄 처리에는 `batch_execute`를 사용합니다.
 3. **검증** — 결과를 스크린샷으로 확인하고 이전 캡처와 비교한 뒤 수정하고 반복합니다.
 
-에이전트가 바로 원활하게 동작하도록 플러그인에 **스킬북 9권**(개요, 호출 가이드, 씬, 리소스, 스크립팅, 런타임, 서버, 콘텐츠, C# 편)과 **시작 가이드 7편**(3D 씬, 캐릭터 컨트롤러, 물리 디버깅, 입력 맵, GUI, …)을 포함합니다. **MCP Config** 패널에서 한 번 클릭하면 프로젝트의 `.agents/skills/`에 스킬이 생성됩니다. MCP를 주 제품 채널로 삼고 스킬/스크립트를 경험 계층으로 둡니다. 호출 가이드는 MCP가 중단될 경우 GDA CLI로 대체되며, CLI가 없을 경우에는 수동 가이드로 대체됩니다.
+에이전트가 바로 원활하게 동작하도록 플러그인에는 **자체 완결형 스킬북 10권**(개요, 그리고 씬, 리소스, 스크립팅, 런타임, 서버, 콘텐츠, C#, 설치, 도구 편)이 포함됩니다. `gda install skills`로 설치하며(중국어는 `--zh` 추가), 이후 에이전트는 추측 대신 호출 프로토콜을 따릅니다. MCP를 주 제품 채널로 삼고 스킬을 경험 계층으로 둡니다. 호출 가이드는 MCP가 중단될 경우 GDA CLI로 대체됩니다.
 
-플러그인에는 두 개의 에디터 패널이 포함됩니다.
+플러그인에는 하나의 에디터 패널이 포함됩니다.
 
-- **MCP Config** — 서버 상태와 포트, 한 번의 클릭으로 끝나는 클라이언트 설정, 기능 스위치, 스킬 생성을 지원합니다.
 - **Log** — 레벨/분류 필터와 검색 기능을 갖춘 플러그인 전용 로그이므로 비정상 호출을 쉽게 추적합니다.
 
 ## 시작하기
@@ -62,9 +61,9 @@ Godot-Autopilot은 **Godot 에디터 내부**에서 플러그인으로 동작하
            ├── libgodot-autopilot.dylib (macOS)
            └── godot-autopilot.gdextension
    ```
-2. **프로젝트 열기** — 플러그인 설정의 포트(기본값 `http://127.0.0.1:9527/mcp`)에서 서버가 자동으로 시작됩니다. 별도의 활성화 스위치는 필요하지 않습니다.
-3. **AI 클라이언트 연결** — 에디터의 **MCP Config** 패널에서 클라이언트를 선택하고 **Generate**를 클릭합니다. Claude Code, Codex, Cursor, OpenCode, Copilot을 포함한 20개 클라이언트를 지원합니다. 클라이언트가 요청하면 생성된 설정 파일을 승인합니다.
-4. **강력한 기능 잠금 해제(선택 사항)** — 스크립트 실행(`code_execute`)과 게임 제어(`game_runtime`)는 기본적으로 꺼져 있습니다. 필요할 때 패널에서 선택합니다.
+2. **프로젝트 열기** — 서버가 자동으로 시작되며, 최초 실행 시 빈 루프백 포트를 하나 바인딩합니다(프로젝트별로 유지되며 `20000–29999`에서 선택). 별도의 활성화 스위치는 필요하지 않습니다.
+3. **AI 클라이언트 연결** — `gda status --json`을 실행하고 그 `mcp_url`을 클라이언트의 MCP 설정에 추가합니다(URL을 에이전트에게 넘겨 설정을 생성하게 해도 됩니다). Claude Code, Codex, Cursor, OpenCode, Copilot을 포함한 20개 클라이언트를 지원합니다.
+4. **고위험 호출 확인(선택 사항)** — `destructive`, `process`, `code_execute`, `game_runtime` 부작용이 있는 도구는 `confirm=true`가 필요합니다. 전역 허용 목록은 없습니다.
 5. **요청하기** — 예: "달리고 점프할 수 있는 플레이어 캐릭터를 만들고, 플레이테스트한 뒤 어색한 부분을 수정하십시오."
 
 소스에서 빌드하거나 기여하고 싶으십니까? [docs/wiki/](docs/wiki/)([index.md](docs/wiki/index.md)부터 시작하고 빌드는 [build.md](docs/wiki/build.md) 참조) 및 [tests/README.md](tests/README.md)를 참조하십시오.
@@ -86,7 +85,7 @@ bun install -g github:jesspig/Godot-Autopilot#0.3.2
 gda ping
 ```
 
-명령 계열: **호출 계열** — `ping` / `status` / `categories` / `search` / `describe` / `call`；**수명 주기** — `list` / `start` / `stop` / `restart` / `logs`；**제어면** — `serve`；**REST 계열** — `api`(`list` / `describe` / `call` 하위 명령, MCP 핸드셰이크 없이 REST 직접 호출)；`endpoints`(MCP/REST 엔드포인트, 포트 출처, 활성 프로브 결과 출력).
+명령 계열: **호출 계열** — `ping` / `status` / `categories` / `search` / `describe` / `call`；**수명 주기** — `list` / `start` / `stop` / `restart` / `logs`；**오프라인 및 에셋 계열** — `skills` / `tools` / `projects` / `cache` / `install` / `update` / `trace`.
 
 **Bun**이 필요합니다. Bun도 Node도 없는 환경에서는 Releases의 `gda` 단일 실행 파일을 사용하세요 (전체 참조는 [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md)).
 
@@ -103,26 +102,26 @@ Project: <ABSOLUTE PATH TO YOUR GODOT PROJECT> (Godot 4.7+).
    https://github.com/jesspig/Godot-Autopilot/releases/latest and extract it so that
    <project>/addons/godot-autopilot/godot-autopilot.gdextension exists.
 2. Start the editor: run `godot --editor --path <project>` (ask me for the engine path if it is
-   not on PATH) and wait until http://127.0.0.1:9527/mcp answers.
+   not on PATH) and wait until the `mcp_url` from `gda status --json` answers.
 3. Verify the server from a shell. Try in this order, stop at the first that works, and tell me
    which one it was:
    - bunx "github:jesspig/Godot-Autopilot#0.3.2" ping
    - download the gda release asset for this OS and CPU from the same Releases page, verify it
      against sha256sums.txt, then run ./gda ping
 4. Connect my AI client: add
-   {"mcpServers":{"godot-autopilot":{"url":"http://127.0.0.1:9527/mcp"}}}
-   to its MCP configuration, or tell me to use the plugin's MCP Config panel instead.
+   {"mcpServers":{"godot-autopilot":{"url":"<mcp_url from gda status --json>"}}}
+   to its MCP configuration (or hand the URL to your agent and ask it to generate the config).
 5. Summarize: which channel worked, every command you ran, and anything that failed.
 
-Rules: never hand-write HTTP requests against the port; never expose 9527 beyond loopback;
-leave code_execute and game_runtime disabled unless I ask for them.
+Rules: never hand-write HTTP requests against the port; never expose the GDA port beyond loopback;
+leave high-risk tools (code_execute, game_runtime, destructive, process) unconfirmed unless I ask for them.
 ```
 
-클라이언트가 스킬을 지원한다면(Claude Code, Codex, Cursor 등) 이 저장소의 `skills/` 디렉터리도 함께 지정하세요. 에이전트가 추측하지 않고 전체 호출 프로토콜을 참조할 수 있습니다.
+클라이언트가 스킬을 지원한다면(Claude Code, Codex, Cursor 등) `gda install skills`를 실행하세요. 에이전트가 추측하지 않고 전체 호출 프로토콜을 참조할 수 있습니다.
 
 ## 안전 참고 사항
 
-서버는 컴퓨터의 루프백 주소에서만 수신 대기하며(포트는 플러그인 설정값이며 기본값은 9527, 고정 경로는 `/mcp`), 로컬이 아닌 주소는 거부합니다. 스크립트 실행, 게임 제어, OS 프로세스 도구는 기본적으로 **거부**됩니다. 신뢰할 수 있는 로컬 프로젝트에서만 활성화하십시오. 자세한 내용: [docs/wiki/security_contract.md](docs/wiki/security_contract.md).
+서버는 컴퓨터의 루프백 주소에서만 수신 대기하며(포트는 플러그인이 프로젝트별로 선택하고 고정 경로는 `/mcp`), 로컬이 아닌 주소는 거부합니다. 고위험 도구(`destructive`, `process`, `code_execute`, `game_runtime`)는 `confirm=true`가 필요하며, 전역 허용 목록은 없습니다. 자세한 내용: [docs/wiki/security_contract.md](docs/wiki/security_contract.md).
 
 ## 에셋 출처 표기
 

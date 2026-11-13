@@ -1,6 +1,6 @@
 {
   "generated_at": "2026-11-12T20:06:19.687Z",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "tools": [
     {
       "name": "add_animation_machine_state",

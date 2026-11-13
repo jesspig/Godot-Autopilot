@@ -13,7 +13,7 @@ bun run gda-dev-tools build
 bun run gda-dev-tools deploy --demos pink_man_adventure
 ```
 
-用 Godot 打开本目录，插件位于 `addons/godot-autopilot/`，MCP 端点默认 `127.0.0.1:9527/mcp`。
+用 Godot 打开本目录，插件位于 `addons/godot-autopilot/`；MCP 端口由插件首次启动在 20000–29999 随机分配并持久化，用 `gda status --json` 读取 `mcp_url`。
 
 ## 说明
 
