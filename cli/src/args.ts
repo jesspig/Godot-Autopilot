@@ -45,6 +45,7 @@ export interface GlobalOptions {
   templates?: boolean;
   async?: boolean;
   progress?: boolean;
+  inputText?: string;
   json?: boolean;
 }
 
@@ -73,6 +74,7 @@ const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
   "--limit": "limitText",
   "--save": "saveText",
   "--interval": "intervalText",
+  "--input": "inputText",
 };
 
 const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
@@ -246,6 +248,7 @@ Global options:
   --confirm           Confirm a high-risk tool call
   --async             call: run as an MCP task when the server supports it
   --progress          call: print progress notifications to stderr
+  --input <json>      call: inputResponses for MRTR input_required
   --help              Show this help
   --version           Show the version
 

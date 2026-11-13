@@ -25,6 +25,7 @@ export interface CallToolOptions {
   transportSink?: (transport: "ipc" | "http") => void;
   traceparent?: string;
   progressSink?: (progress: RequestProgress) => void;
+  inputResponses?: Record<string, unknown>;
 }
 
 export const META_DIRECT_TOOLS: ReadonlySet<string> = new Set([
@@ -353,6 +354,9 @@ export async function request(
   const ipcEndpoint =
     opts.ipcEndpoint ?? (opts.socketPath !== undefined ? { path: opts.socketPath } : undefined);
   const requestParams: Record<string, unknown> = { ...params };
+  if (opts.inputResponses !== undefined) {
+    requestParams.input_responses = opts.inputResponses;
+  }
   if (opts.traceparent !== undefined && opts.traceparent !== "") {
     const meta = requestParams._meta;
     requestParams._meta = {

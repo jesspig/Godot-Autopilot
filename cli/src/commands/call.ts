@@ -1,3 +1,5 @@
+import * as readline from "node:readline/promises";
+
 import type { GlobalOptions } from "../args";
 import { parseTransport } from "../args";
 import { CliError, ExitCode } from "../errors";
@@ -103,7 +105,7 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
   }
   const target = resolveTarget(opts, TARGET_CONTEXT);
   let usedTransport = transport;
-  const envelope = await callTool(tool, args, {
+  let envelope = await callTool(tool, args, {
     port: target.port,
     timeoutSec,
     direct: META_DIRECT_TOOLS.has(tool),
@@ -116,6 +118,47 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
       usedTransport = actual;
     },
   });
+  const inputRequired = envelope.result !== null &&
+    typeof envelope.result === "object" &&
+    !Array.isArray(envelope.result) &&
+    (envelope.result as { input_required?: unknown }).input_required !== undefined;
+  if (inputRequired) {
+    let inputResponses: Record<string, unknown> | null = null;
+    if (opts.inputText !== undefined) {
+      try {
+        inputResponses = JSON.parse(opts.inputText) as Record<string, unknown>;
+      } catch {
+        throw new CliError(ExitCode.Usage, "--input is not valid JSON");
+      }
+    } else if (process.stdin.isTTY) {
+      const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
+      const answer = await rl.question("This tool requires confirmation. Accept? [y/N] ");
+      rl.close();
+      if (!/^y(es)?$/i.test(answer.trim())) {
+        err("confirmation declined; the tool was not executed");
+        return ExitCode.ToolFailure;
+      }
+      inputResponses = { confirm: { action: "accept" } };
+    } else {
+      err(`input_required: ${JSON.stringify((envelope.result as { input_required?: unknown }).input_required)}`);
+      err("re-run with --confirm, or pass --input '<json>' with inputResponses");
+      return ExitCode.Usage;
+    }
+    envelope = await callTool(tool, args, {
+      port: target.port,
+      timeoutSec,
+      direct: META_DIRECT_TOOLS.has(tool),
+      ipcEndpoint: target.ipcEndpoint,
+      transport,
+      noFallback: opts.noFallback,
+      traceparent,
+      progressSink,
+      inputResponses,
+      transportSink: (actual) => {
+        usedTransport = actual;
+      },
+    });
+  }
   recordCliCall(traceId, tool, envelope, startedAt, usedTransport);
   const asyncCode = finishAsync(envelope, tool, args, target, opts);
   if (asyncCode !== null) return asyncCode;

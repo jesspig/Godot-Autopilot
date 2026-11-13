@@ -89,6 +89,42 @@ describe("handshake capabilities", () => {
     expect(payload.mcp.server_info).toEqual({ name: "gda", version: "0.3.3" });
   });
 
+  test("input_required 无 --input 时退出 3 并提示", async () => {
+    const port = start((body) => {
+      if (body.method === "initialize") return sse({ protocolVersion: "2025-11-25", capabilities: {} });
+      if (body.method === "notifications/initialized") return new Response(null, { status: 202 });
+      return sse({ input_required: { input_requests: { confirm: { method: "elicitation/create", params: {} } } } });
+    });
+    const cap = capture();
+    const code = await call(["do_risky_thing"], { portText: String(port) });
+    cap.restore();
+    expect(code).toBe(ExitCode.Usage);
+    expect(cap.stderr()).toContain("--input");
+    expect(cap.stdout()).toBe("");
+  });
+
+  test("input_required 带 --input 时重试", async () => {
+    let calls = 0;
+    const port = start((body) => {
+      if (body.method === "initialize") return sse({ protocolVersion: "2025-11-25", capabilities: {} });
+      if (body.method === "notifications/initialized") return new Response(null, { status: 202 });
+      calls += 1;
+      if (calls === 1) {
+        return sse({ input_required: { input_requests: { confirm: { method: "elicitation/create", params: {} } } } });
+      }
+      return sse({ content: [{ type: "text", text: JSON.stringify({ ok: true }) }] });
+    });
+    const cap = capture();
+    const code = await call(["do_risky_thing"], {
+      portText: String(port),
+      inputText: '{"confirm":{"action":"accept"}}',
+    });
+    cap.restore();
+    expect(code).toBe(ExitCode.Success);
+    expect(calls).toBe(2);
+    expect(JSON.parse(cap.stdout())).toEqual({ ok: true });
+  });
+
   test("call --progress 写 stderr，stdout 保持 JSON", async () => {
     const port = start((body) => {
       if (body.method === "initialize") return sse({ protocolVersion: "2025-11-25", capabilities: {} });
