@@ -13,6 +13,8 @@ import { run as restart } from "./restart";
 import { run as logs } from "./logs";
 import { run as skills } from "./skills";
 import { run as tools } from "./tools";
+import { run as resources } from "./resources";
+import { run as prompts } from "./prompts";
 import { run as projects } from "./projects";
 import { run as cache } from "./cache";
 import { run as install } from "./install";
@@ -38,6 +40,8 @@ export const COMMANDS: Record<string, Command> = {
   logs: { run: logs },
   skills: { run: skills },
   tools: { run: tools },
+  resources: { run: resources },
+  prompts: { run: prompts },
   projects: { run: projects },
   cache: { run: cache },
   install: { run: install },
