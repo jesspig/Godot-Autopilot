@@ -48,6 +48,8 @@ description: "Godot Autopilot 的 CLI-first 调用参考：gda 命令与参数�
 | `gda resources watch <uri>` | 轮询资源并输出变化（`--interval` 秒）。 |
 | `gda prompts list` | 列出 MCP 提示词模板。 |
 | `gda prompts get <name>` | 用 `--args '<json>'` 渲染提示词；`--json` 保留 messages。 |
+| `gda call <tool> --async` | 服务端支持时按 MCP Task 执行，输出 task_id 并写本地索引。 |
+| `gda tasks list|get|wait|cancel|clean` | 管理本地任务；wait/cancel 走 tasks/get|cancel。 |
 | `gda projects` | 离线列出已知 Godot 工程。 |
 | `gda cache list` | 列出缓存 manifest。 |
 | `gda cache info` | 显示缓存根、条目数与大小。 |
@@ -128,7 +130,11 @@ gda call create_scene_node --args '{"parent_path": "Root", "name": "Player", "ty
 通过 `call_tool` 的 `name` 与 `arguments` 执行；`call_tool` 还接受顶层
 `confirm` 布尔值。`search_tools` / `get_tool_detail` 的用法与
 `gda search` / `gda describe` 相同。`search_tools` 默认最多 20 条；只有确需
-全量枚举时才传 `limit: 0`。
+全量枚举时才传 `limit: 0`。`gda status --json` 的 `mcp` 块给出协议版本与
+capabilities；依赖 tasks/resources/prompts/full 前先检查。长调用可用
+`gda call --async` 加 `gda tasks wait`；`--progress` 把进度写到 stderr。
+full 直接工具返回 `input_required` 时，TTY 会提示接受/拒绝；非 TTY 脚本传
+`--input '{"confirm":{"action":"accept"}}'`；`--confirm` 仍是 `call_tool` 的回退。
 
 ## 观测资源与提示词
 

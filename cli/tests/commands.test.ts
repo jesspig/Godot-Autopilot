@@ -113,7 +113,8 @@ describe("请求形状", () => {
     const code = await status([], { portText: String(port) });
     cap.restore();
     expect(code).toBe(ExitCode.Success);
-    expect(requests[0].params).toEqual({ name: "call_tool", arguments: { name: "system_status", arguments: {} } });
+    const toolCall = requests.find((request) => request.method === "tools/call");
+    expect(toolCall?.params).toEqual({ name: "call_tool", arguments: { name: "system_status", arguments: {} } });
     const statusJson = JSON.parse(cap.stdout()) as Record<string, unknown>;
     expect(statusJson.schema_version).toBe(1);
     expect(statusJson.ok).toBe(true);

@@ -15,6 +15,7 @@ import { run as skills } from "./skills";
 import { run as tools } from "./tools";
 import { run as resources } from "./resources";
 import { run as prompts } from "./prompts";
+import { run as tasks } from "./tasks";
 import { run as projects } from "./projects";
 import { run as cache } from "./cache";
 import { run as install } from "./install";
@@ -42,6 +43,7 @@ export const COMMANDS: Record<string, Command> = {
   tools: { run: tools },
   resources: { run: resources },
   prompts: { run: prompts },
+  tasks: { run: tasks },
   projects: { run: projects },
   cache: { run: cache },
   install: { run: install },

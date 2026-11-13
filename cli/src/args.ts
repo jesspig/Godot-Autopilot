@@ -43,6 +43,9 @@ export interface GlobalOptions {
   saveText?: string;
   intervalText?: string;
   templates?: boolean;
+  async?: boolean;
+  progress?: boolean;
+  inputText?: string;
   json?: boolean;
 }
 
@@ -71,6 +74,7 @@ const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
   "--limit": "limitText",
   "--save": "saveText",
   "--interval": "intervalText",
+  "--input": "inputText",
 };
 
 const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
@@ -88,6 +92,8 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--no-fallback": "noFallback",
   "--json": "json",
   "--templates": "templates",
+  "--async": "async",
+  "--progress": "progress",
   "--offline": "offline",
   "--zh": "zh",
   "--check": "check",
@@ -180,6 +186,11 @@ Commands:
   resources watch <uri> Poll a resource and print changes (--interval sec)
   prompts list        List MCP prompt templates
   prompts get <name>  Render one prompt (--args JSON)
+  tasks list          List locally recorded MCP tasks
+  tasks get <id>      Get one task
+  tasks wait <id>     Wait for a task to finish (--timeout)
+  tasks cancel <id>   Cancel a task
+  tasks clean         Remove terminal tasks from the local index
   projects            List known Godot projects (offline)
   start               Start a Godot editor
   stop                Stop a Godot editor (<id> | --id | --port | --project)
@@ -235,6 +246,9 @@ Global options:
   --no-fallback       Do not fall back to HTTP when IPC fails
   --json              JSON output (default for most commands)
   --confirm           Confirm a high-risk tool call
+  --async             call: run as an MCP task when the server supports it
+  --progress          call: print progress notifications to stderr
+  --input <json>      call: inputResponses for MRTR input_required
   --help              Show this help
   --version           Show the version
 
