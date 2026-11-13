@@ -64,7 +64,7 @@ export function collectTree(root: string): Tree {
       if (entry.isDirectory()) {
         walk(full, relative);
       } else if (entry.isFile()) {
-        files[relative] = fs.readFileSync(full, "utf8");
+        files[relative] = fs.readFileSync(full, "utf8").replace(/\r\n/g, "\n");
       }
     }
   };

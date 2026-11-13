@@ -27,7 +27,7 @@ function walk(root: string, prefix = ""): SkillFile[] {
     if (entry.isDirectory()) {
       files.push(...walk(full, relative));
     } else if (entry.isFile() && entry.name.endsWith(".md")) {
-      files.push({ relative, content: fs.readFileSync(full, "utf8") });
+      files.push({ relative, content: fs.readFileSync(full, "utf8").replace(/\r\n/g, "\n") });
     }
   }
   return files;
