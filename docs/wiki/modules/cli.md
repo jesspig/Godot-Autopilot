@@ -110,6 +110,7 @@ resource:
 | `--interval <sec>` | 字符串 | resources watch | 轮询间隔，默认 1 秒 |
 | `--async` | 布尔 | call | 服务端支持时以 MCP Task 执行，返回 task_id |
 | `--progress` | 布尔 | call | 进度通知写 stderr，stdout 保持 JSON |
+| `--input <json>` | 字符串 | call | MRTR `input_required` 的 inputResponses；非 TTY 无该参数退出 3 |
 | `--godot <path>` | 字符串 | start | 显式指定 Godot 可执行文件 |
 | `--wait <sec>` | 字符串 | start/stop/restart | 就绪/停止等待秒数（0=不等待）；`restart` 的停止阶段固定 10 秒，不受该选项影响 |
 | `--tail <n>` | 字符串 | logs | 日志末尾行数（默认 50） |

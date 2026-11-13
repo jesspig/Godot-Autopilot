@@ -147,7 +147,10 @@ When the harness lists GDA tools, the meta tools are `ping`, `search_tools`,
 you explicitly need the full enumeration. `gda status --json` exposes an `mcp`
 block with protocol version and capabilities; check it before relying on tasks,
 resources, prompts or full mode. Long calls can use `gda call --async` plus
-`gda tasks wait`; progress goes to stderr with `--progress`.
+`gda tasks wait`; progress goes to stderr with `--progress`. If a full-surface
+tool returns `input_required`, TTY prompts accept/decline; non-TTY scripts pass
+`--input '{"confirm":{"action":"accept"}}'`, while `--confirm` remains the
+`call_tool` fallback.
 
 ## Observe resources and prompts
 
