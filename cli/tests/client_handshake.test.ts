@@ -98,7 +98,7 @@ describe("callTool 协议版本协商", () => {
     expect(res.result).toEqual({ content: [{ type: "text", text: "{}" }] });
     expect(seen[0].params).toEqual({
       protocolVersion: "2025-11-25",
-      capabilities: {},
+      capabilities: { elicitation: {} },
       clientInfo: { name: "gda-cli", version: CLI_VERSION },
     });
   });
