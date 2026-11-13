@@ -19,7 +19,7 @@ resource: tests/
 
 测试由根 `CMakeLists.txt` 的 `GDA_ENABLE_TESTS` 引入（`CMakeLists.txt:100`）。该开关已固化在 `CMakePresets.json` 的 `base-debug`/`base-release` 基座（cacheVariables 默认 `ON`），并经 `inherits` 下发给全部 4 个可执行 configure 预设（`debug`/`debug-portable`/`release`/`release-portable`），**清理/重建 `build/` 后重新配置（`bun run gda-dev-tools build` 或 `cmake --preset debug`）自动恢复测试目标，无需手动传参**；直接以裸 `cmake`（不带 preset）配置时仍为默认 OFF。
 
-**三层 + 守卫与脚本项**（全部零引擎、零 Godot 进程；2026-11-14 T-21 删除 REST 时代测试后实测 **864 = 568 + 190 + 88 + 16 + 2**，其中守卫含 `atomgit_release_guard`）：
+**三层 + 守卫与脚本项**（全部零引擎、零 Godot 进程；2026-11-14 T-21 删除 REST 时代测试后实测 **863 = 568 + 190 + 88 + 15 + 2**，其中守卫含 `atomgit_release_guard`）：
 
 | 层 | ctest 载体 | 数量 | 标签 | 判定方式 | 验证对象 |
 |---|---|---|---|---|---|
