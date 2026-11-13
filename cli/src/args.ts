@@ -76,7 +76,6 @@ const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
   "--save": "saveText",
   "--interval": "intervalText",
   "--input": "inputText",
-  "--direct": "direct",
 };
 
 const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
@@ -96,6 +95,7 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--templates": "templates",
   "--async": "async",
   "--progress": "progress",
+  "--direct": "direct",
   "--offline": "offline",
   "--zh": "zh",
   "--check": "check",
