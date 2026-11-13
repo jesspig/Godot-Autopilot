@@ -1,0 +1,43 @@
+name: Sync to AtomGit
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - "v*.*.*"
+      - "[0-9]*.*.*"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atomgit-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push master and tags to AtomGit
+        env:
+          ATOMGIT_TOKEN: ${{ secrets.ATOMGIT_TOKEN }}
+          ATOMGIT_REPO: ${{ vars.ATOMGIT_REPO }}
+        run: |
+          if [ -z "$ATOMGIT_TOKEN" ] || [ -z "$ATOMGIT_REPO" ]; then
+            echo "AtomGit credentials are not configured; skipping sync."
+            exit 0
+          fi
+          git config user.name "gda-atomgit-sync"
+          git config user.email "gda-atomgit-sync@users.noreply.github.com"
+          git remote add atomgit "https://oauth2:${ATOMGIT_TOKEN}@atomgit.com/${ATOMGIT_REPO}.git"
+          git push --force atomgit HEAD:master
+          git push --force atomgit --tags

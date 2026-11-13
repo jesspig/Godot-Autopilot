@@ -129,12 +129,13 @@ resource:
 | cli | 5 个目标的 `bun build --compile` 独立二进制（`windows-x64` / `linux-x64` / `linux-x64-musl` / `macos-arm64` / `macos-x64`），macOS 产物 ad-hoc 签名（`codesign --force --sign -`），各自打 zip/tar.gz 后上传 artifact；二进制名带根 `VERSION` |
 | package | 下载全部 artifact → `bun run gda-dev-tools package --libs-dir dist` 合并 → **跑 `bun run gda-dev-tools package-check dist/godot-autopilot-*.zip` 自检（失败即中止发布）** → 重命名为 `addons.zip` → 收集 `cli-dist/` 下二进制并生成 `sha256sums.txt` → softprops/action-gh-release 一并发布（`addons.zip` + `gda-<version>-<platform>.*` + 校验和）→ **Mirror to AtomGit**（凭据缺失时显式 skip）；同一资产集同时出现在 GitHub Release 与 AtomGit Release |
 
-### AtomGit Actions 与 Release 镜像
+### AtomGit 发布与源码同步
 
-- AtomGit 原生 CI：`.gitcode/workflows/ci.yml`，push/PR 到 `develop`/`main` 触发，在 AtomGit 托管 Ubuntu runner（`[ubuntu-latest, x64, medium]`）上安装 Bun/Ninja、初始化子模块，跑 no-python guard、Debug 构建、全量 ctest、CLI 测试与 typecheck。托管 runner 只有 Linux，不声明 Windows/macOS 覆盖。
-- Release 镜像：`tools/mirror_atomgit.ts` 是唯一实现（原 `scripts/mirror_atomgit.sh` 已删除）。它使用 AtomGit OpenAPI v5：创建/查找 Release、为每个资产取 `upload_url`、PUT 上传、同名旧附件先删除。`--dry-run` 离线校验 8 个资产（addons.zip、5 个 CLI 包、sha256sums.txt）并打印 SHA-256。
-- 凭据：GitHub 仓库 secrets `ATOMGIT_TOKEN`、vars `ATOMGIT_REPO`。缺失时 release workflow 打印 skip 并以成功退出，不阻塞 GitHub Release。
-- 安装脚本的 AtomGit 下载路径由 `GDA_ATOMGIT_BASE` 控制；镜像后的资产名与 GitHub Release 一致。
+- **AtomGit 上重新构建发布**：`.gitcode/workflows/release.yml`，tag push（`v*.*.*` / `[0-9]*.*.*`）或手动指定 tag 触发。在 AtomGit 托管 Ubuntu runner 上用 Bun 交叉编译 5 个 CLI 目标（`windows-x64` / `linux-x64` / `linux-x64-musl` / `macos-arm64` / `macos-x64`），生成 `sha256sums.txt`，再经 `tools/publish_atomgit.ts` 调 AtomGit OpenAPI v5 创建 Release、取 `upload_url`、PUT 上传。资产是 AtomGit 自己构建的产物，不是从 GitHub Release 镜像。
+- **平台边界**：AtomGit 托管 runner 只有 Linux，Release 只发布 CLI 二进制；编辑器插件 `addons.zip` 需要 Windows/macOS 库，仍由 GitHub Release 提供。AtomGit 不发布 `addons.zip`，避免给出跨平台残缺包。
+- **凭据**：workflow 使用 AtomGit 自动注入的 `ATOMGIT_TOKEN` / `ATOMGIT_REPOSITORY` / `ATOMGIT_API_URL`，无需在 GitHub 配置。`tools/publish_atomgit.ts` 也可本地用 `GDA_ATOMGIT_TOKEN` / `GDA_ATOMGIT_REPO` 手动发布。
+- **源码自动同步**：`.github/workflows/atomgit-sync.yml` 在 push `master` 与 tag 时把提交和 tag 推到 AtomGit，解决 AtomGit 仅自动同步 `main`、而本仓库使用 `master` 的问题。需要 GitHub secrets `ATOMGIT_TOKEN` 与 vars `ATOMGIT_REPO`；缺失时显式 skip。
+- 安装脚本的 AtomGit 下载路径由 `GDA_ATOMGIT_BASE` 控制；AtomGit Release 的 CLI 资产名与 GitHub 一致。
 
 macOS runner 为 ARM64，preset 设 `CMAKE_OSX_ARCHITECTURES=x86_64;arm64` 编译 universal 双架构（仅 Apple 平台生效），gdextension 对应条目为 `macos.{debug,release}.universal`。
 

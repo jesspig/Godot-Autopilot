@@ -8,9 +8,22 @@ interface Options {
   repo: string;
   api: string;
   token: string;
+  assets: string[];
   notes: string;
   dryRun: boolean;
 }
+
+const DEFAULT_CLI_ASSETS = (tag: string): string[] => {
+  const version = tag.replace(/^v/, "");
+  return [
+    `gda-${version}-windows-x64.zip`,
+    `gda-${version}-linux-x64.tar.gz`,
+    `gda-${version}-linux-x64-musl.tar.gz`,
+    `gda-${version}-macos-arm64.tar.gz`,
+    `gda-${version}-macos-x64.tar.gz`,
+    "sha256sums.txt",
+  ];
+};
 
 function parseArgs(argv: string[]): Options {
   const env = process.env;
@@ -20,6 +33,7 @@ function parseArgs(argv: string[]): Options {
     repo: env.GDA_ATOMGIT_REPO ?? env.ATOMGIT_REPOSITORY ?? "",
     api: env.GDA_ATOMGIT_API ?? "https://api.atomgit.com/api/v5",
     token: env.GDA_ATOMGIT_TOKEN ?? env.ATOMGIT_TOKEN ?? "",
+    assets: [],
     notes: "",
     dryRun: false,
   };
@@ -35,30 +49,21 @@ function parseArgs(argv: string[]): Options {
     else if (token === "--tag") options.tag = next();
     else if (token === "--repo") options.repo = next();
     else if (token === "--api") options.api = next();
+    else if (token === "--assets") options.assets = next().split(",").map((item) => item.trim()).filter((item) => item !== "");
     else if (token === "--notes") options.notes = next();
     else if (token === "--dry-run") options.dryRun = true;
     else if (token === "--help" || token === "-h") {
-      console.log("usage: bun tools/mirror_atomgit.ts --dir dist --tag 0.3.3 --repo owner/repo [--dry-run]");
+      console.log("usage: bun tools/publish_atomgit.ts --dir dist --tag 0.3.3 [--assets a.zip,b.tar.gz] [--dry-run]");
       process.exit(0);
     } else throw new Error(`unknown option: ${token}`);
+  }
+  if (options.tag !== "" && options.assets.length === 0) {
+    options.assets = DEFAULT_CLI_ASSETS(options.tag);
   }
   return options;
 }
 
-function assetNames(tag: string): string[] {
-  const version = tag.replace(/^v/, "");
-  return [
-    "addons.zip",
-    `gda-${version}-windows-x64.zip`,
-    `gda-${version}-linux-x64.tar.gz`,
-    `gda-${version}-linux-x64-musl.tar.gz`,
-    `gda-${version}-macos-arm64.tar.gz`,
-    `gda-${version}-macos-x64.tar.gz`,
-    "sha256sums.txt",
-  ];
-}
-
-function sha256(filePath: string): string {
+function hashFile(filePath: string): string {
   return createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
 }
 
@@ -82,7 +87,7 @@ async function ensureRelease(options: Options, version: string): Promise<void> {
     body: JSON.stringify({
       tag_name: options.tag,
       name: `Godot Autopilot ${version}`,
-      body: options.notes === "" ? `AtomGit mirror of Godot Autopilot ${version}` : fs.readFileSync(options.notes, "utf8"),
+      body: options.notes === "" ? `Godot Autopilot ${version} (AtomGit build)` : fs.readFileSync(options.notes, "utf8"),
     }),
   });
   if (create.status >= 200 && create.status < 300) return;
@@ -143,24 +148,22 @@ async function upload(options: Options, filePath: string, name: string): Promise
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
   if (options.tag === "") throw new Error("--tag is required");
-  const version = options.tag.replace(/^v/, "");
   if (!fs.existsSync(options.dir)) throw new Error(`asset directory not found: ${options.dir}`);
-  const names = assetNames(options.tag);
-  const missing = names.filter((name) => !fs.existsSync(path.join(options.dir, name)));
+  const missing = options.assets.filter((name) => !fs.existsSync(path.join(options.dir, name)));
   if (missing.length > 0) throw new Error(`missing assets: ${missing.join(", ")}`);
-  for (const name of names) {
-    console.log(`${sha256(path.join(options.dir, name))}  ${name}`);
+  for (const name of options.assets) {
+    console.log(`${hashFile(path.join(options.dir, name))}  ${name}`);
   }
   if (options.dryRun) {
-    console.log(`dry-run: ${names.length} assets for ${options.repo || "<repo>"} tag ${options.tag}`);
+    console.log(`dry-run: ${options.assets.length} assets for ${options.repo || "<repo>"} tag ${options.tag}`);
     return;
   }
   if (options.repo === "" || options.token === "") {
     throw new Error("GDA_ATOMGIT_REPO and GDA_ATOMGIT_TOKEN (or ATOMGIT_TOKEN) are required for upload");
   }
-  await ensureRelease(options, version);
+  await ensureRelease(options, options.tag.replace(/^v/, ""));
   for (const asset of await existingAssets(options)) {
-    if (!names.includes(asset.name)) continue;
+    if (!options.assets.includes(asset.name)) continue;
     const query = `access_token=${encodeURIComponent(options.token)}`;
     const removed = await requestJson(
       `${options.api}/repos/${options.repo}/releases/${encodeURIComponent(options.tag)}/attach_files/${encodeURIComponent(String(asset.id))}?${query}`,
@@ -170,14 +173,14 @@ async function main(): Promise<void> {
       throw new Error(`cannot replace existing asset ${asset.name}: ${removed.status}`);
     }
   }
-  for (const name of names) {
+  for (const name of options.assets) {
     await upload(options, path.join(options.dir, name), name);
     console.log(`uploaded ${name}`);
   }
-  console.log(`mirrored ${names.length} assets to AtomGit ${options.repo} (${options.tag})`);
+  console.log(`published ${options.assets.length} assets to AtomGit ${options.repo} (${options.tag})`);
 }
 
 main().catch((error: unknown) => {
-  console.error(`atomgit mirror failed: ${(error as Error)?.message ?? String(error)}`);
+  console.error(`atomgit publish failed: ${(error as Error)?.message ?? String(error)}`);
   process.exit(1);
 });

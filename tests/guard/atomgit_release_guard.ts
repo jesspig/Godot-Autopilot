@@ -9,26 +9,41 @@ function fail(message: string): never {
   process.exit(1);
 }
 
-const releasePath = path.join(root, ".github", "workflows", "release.yml");
-const toolPath = path.join(root, "tools", "mirror_atomgit.ts");
-for (const file of [releasePath, toolPath]) {
+const releasePath = path.join(root, ".gitcode", "workflows", "release.yml");
+const syncPath = path.join(root, ".github", "workflows", "atomgit-sync.yml");
+const toolPath = path.join(root, "tools", "publish_atomgit.ts");
+for (const file of [releasePath, syncPath, toolPath]) {
   if (!fs.existsSync(file)) fail(`missing ${file}`);
 }
 
 const release = fs.readFileSync(releasePath, "utf8");
-for (const needle of ["Mirror to AtomGit", "GDA_ATOMGIT_TOKEN", "GDA_ATOMGIT_REPO", "tools/mirror_atomgit.ts"]) {
+for (const needle of [
+  "push:",
+  "tags:",
+  "bun-windows-x64",
+  "bun-linux-x64",
+  "bun-linux-x64-musl",
+  "bun-darwin-arm64",
+  "bun-darwin-x64",
+  "tools/publish_atomgit.ts",
+  "ATOMGIT_REPOSITORY",
+]) {
   if (!release.includes(needle)) fail(`release workflow is missing ${needle}`);
 }
 
+const sync = fs.readFileSync(syncPath, "utf8");
+for (const needle of ["branches:", "master", "ATOMGIT_TOKEN", "ATOMGIT_REPO", "HEAD:master", "--tags"]) {
+  if (!sync.includes(needle)) fail(`sync workflow is missing ${needle}`);
+}
+
 const tool = fs.readFileSync(toolPath, "utf8");
-for (const needle of ["upload_url", "access_token", "method: \"PUT\"", "attach_files", "addons.zip", "sha256sums.txt"]) {
-  if (!tool.includes(needle)) fail(`mirror tool is missing ${needle}`);
+for (const needle of ["upload_url", "access_token", "method: \"PUT\"", "attach_files", "sha256sums.txt"]) {
+  if (!tool.includes(needle)) fail(`publish tool is missing ${needle}`);
 }
 
 const tag = "0.3.3";
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "gda-atomgit-"));
 const assets = [
-  "addons.zip",
   `gda-${tag}-windows-x64.zip`,
   `gda-${tag}-linux-x64.tar.gz`,
   `gda-${tag}-linux-x64-musl.tar.gz`,
@@ -49,7 +64,7 @@ try {
   for (const name of assets) {
     if (!output.includes(name)) fail(`dry-run output is missing ${name}`);
   }
-  if (!output.includes("dry-run: 7 assets")) fail("dry-run did not report 7 assets");
+  if (!output.includes("dry-run: 6 assets")) fail("dry-run did not report 6 assets");
 } finally {
   fs.rmSync(dir, { recursive: true, force: true });
 }
