@@ -7,13 +7,13 @@ tags:
   - 单元测试
   - 集成
   - 守卫
-timestamp: "2026-11-13T06:18:01+08:00"
+timestamp: "2026-11-13T23:15:35+08:00"
 resource: tests/
 ---
 
 # 测试体系（tests/）
 
-> 审计日期：2026-11-09（**随测试体系四层化重构逐项重基线**——L2 引擎轨（`gda_test_runner` / `gda_pool_ctl` / `tests/config` / `tests/testbed` / `tests/pool`）整体删除（提交 `c023a5c`，2026-11-09），口径由「L1/L2 双层」改为「程序化四层（单元 / 集成 / 回归属性 / 守卫）+ Agent e2e」；本轮实测：单元测试 **875** 不变（75 文件）、集成层 **109**（12 文件）、守卫与脚本项 **10**、ctest 注册总数 **994 = 875 + 109 + 10**（`ctest -N` 实测，证据 `.handoff/evidence/T-08/ctest-N-after.txt`），同提交独立 worktree 全量 ctest **100% 通过**（`.handoff/evidence/T-08/manifest.md`）；CLI TS 单测 **296** 项 / 18 文件不变；脚本编排收敛为默认门语义（提交 `bf31e8a` / `8997db9`）。被删章节的历史结论以一行迁移说明指回 changelog 或 git 历史，见「历史口径迁移」）
+> 审计日期：2026-11-13（T-01 依赖升级：`register_all_test.cpp` 的重注册用例改按 SDK 0.3.11 语义断言「同 server 重注册抛 `McpError`」，数量不变；完整数值重基线与总表更新由 T-02 执行）2026-11-09（**随测试体系四层化重构逐项重基线**——L2 引擎轨（`gda_test_runner` / `gda_pool_ctl` / `tests/config` / `tests/testbed` / `tests/pool`）整体删除（提交 `c023a5c`，2026-11-09），口径由「L1/L2 双层」改为「程序化四层（单元 / 集成 / 回归属性 / 守卫）+ Agent e2e」；本轮实测：单元测试 **875** 不变（75 文件）、集成层 **109**（12 文件）、守卫与脚本项 **10**、ctest 注册总数 **994 = 875 + 109 + 10**（`ctest -N` 实测，证据 `.handoff/evidence/T-08/ctest-N-after.txt`），同提交独立 worktree 全量 ctest **100% 通过**（`.handoff/evidence/T-08/manifest.md`）；CLI TS 单测 **296** 项 / 18 文件不变；脚本编排收敛为默认门语义（提交 `bf31e8a` / `8997db9`）。被删章节的历史结论以一行迁移说明指回 changelog 或 git 历史，见「历史口径迁移」）
 
 ## 架构总览
 
@@ -93,7 +93,7 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 | 文件 | 数量 | 主题 |
 |---|---|---|
 | `bm25_index_test.cpp` | 20 | BM25 检索：命中排序、分类/标签过滤、空查询、上限截断 |
-| `register_all_test.cpp` | 26 | 注册管线：7 元工具 ListTools 往返、catalog 覆盖、schema 基线、未知工具错误、幂等重注册、双服务器一致性；`tool.side_effect` 可读性断言与「全量工具详情 `side_effect` 非空」断言 |
+| `register_all_test.cpp` | 26 | 注册管线：7 元工具 ListTools 往返、catalog 覆盖、schema 基线、未知工具错误、同 server 重注册拒绝（SDK 0.3.11 语义）、双服务器一致性；`tool.side_effect` 可读性断言与「全量工具详情 `side_effect` 非空」断言 |
 | `client_config_gen_test.cpp` | 20 | 20 客户端配置文件渲染（URL/type/enabled/顶层键/ZCode 双层嵌套/Crush `$schema`/共享 `.mcp.json` 三客户端同构/Reasonix `[[plugins]]`）、JSON 合并三态（新建/保留其他键/非法）、TOML 追加与跳过（Codex 形态与 Reasonix 形态） |
 | `command_queue_test.cpp` | 16 | 跨线程 submit/drain、异常经 future 传播、主线程记录；`submit_tracked`/`cancel`（命中/已执行/未知 id）与 drain 心跳 `last_drain_age_ms`；带预算 submit 在预算内完成、超时取消待执行任务、取消计数递增，owner 线程内联执行、预算非正时仍等完成 |
 | `tool_catalog_test.cpp` | 6 | ToolCatalog：add/get、重复覆盖、并发安全 |
