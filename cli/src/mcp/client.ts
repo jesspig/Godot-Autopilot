@@ -396,7 +396,7 @@ export async function request(
     opts.ipcEndpoint ?? (opts.socketPath !== undefined ? { path: opts.socketPath } : undefined);
   const requestParams: Record<string, unknown> = { ...params };
   if (opts.inputResponses !== undefined) {
-    requestParams.input_responses = opts.inputResponses;
+    requestParams.inputResponses = opts.inputResponses;
   }
   if (opts.traceparent !== undefined && opts.traceparent !== "") {
     const meta = requestParams._meta;
