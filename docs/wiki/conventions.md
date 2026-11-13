@@ -108,4 +108,4 @@ gda 聚焦「编辑器内的引擎操作」，以下能力**明确不做**，避
 ## 其他
 
 - CI/Release 工作流见 [build.md](./build.md)「CI 与 Release」；CI 跑 ctest 默认门（程序化四层全量），引擎内行为验收由 Agent e2e 承担（历史 L2 引擎用例已随引擎轨删除）
-- 依赖版本固定：godot-cpp `10.0.0-stable`（commit `507ed9d`）、mcp-cpp-sdk `0.3.8`（commit `d79f9b1`），二者与 googletest `v1.15.2`（commit `b514bdc`）均为 `third_party/` 下的 git submodule，版本由 gitlink 锁定的 commit 唯一确定，检出方式为 `git clone --recurse-submodules` 或 `git submodule update --init --recursive`（另以 `GODOTCPP_API_VERSION "4.7"` FORCE 锁定目标 API，OpenSSL 集成由 `MCP_WITH_OPENSSL "OFF"` 显式关闭，见 [build.md](./build.md)）
+- 依赖版本固定：godot-cpp `10.0.0-stable`（commit `507ed9d`）、mcp-cpp-sdk `0.3.11`（commit `93e18ef`），二者与 googletest `v1.15.2`（commit `b514bdc`）均为 `third_party/` 下的 git submodule，版本由 gitlink 锁定的 commit 唯一确定，检出方式为 `git clone --recurse-submodules` 或 `git submodule update --init --recursive`（另以 `GODOTCPP_API_VERSION "4.7"` FORCE 锁定目标 API，OpenSSL 集成由 `MCP_WITH_OPENSSL "OFF"` 显式关闭，见 [build.md](./build.md)）

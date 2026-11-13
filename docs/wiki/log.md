@@ -1,6 +1,10 @@
 # 维护日志摘要
 
-> 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天（按有变更的日期段计，最新一段 2026-11-09；更早的批次留档在 changelog 目录，如 [2026-10-10-log.md](changelog/2026-10-10-log.md)）。
+> 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天（按有变更的日期段计，最新一段 2026-11-13；更早的批次留档在 changelog 目录，如 [2026-10-10-log.md](changelog/2026-10-10-log.md)）。
+
+## 2026-11-13
+
+- **0.3.3 T-01 依赖升级（`feature/dependency-upgrade`，本地未推送）**：mcp-cpp-sdk `0.3.8/d79f9b1` → `0.3.11/93e18ef`，configure 实测 `[mcp] SDK version: 0.3.11` 与 OpenSSL `OFF`；版本 pin 同步 build/conventions/overview/security_contract。0.3.11 收紧同名工具注册（抛 `McpError`），GDA 生产路径每次重启新建 server，不依赖同 server 重注册，单元测试改为断言拒绝语义。验证：Debug 构建成功、ctest **930/930**、CLI **255 项（237 pass / 18 skip / 0 fail）**、typecheck 通过。明细见 [changelog/2026-11-13-log.md](changelog/2026-11-13-log.md)。
 
 ## 2026-11-09
 

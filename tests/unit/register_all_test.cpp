@@ -3,6 +3,7 @@
 
 #include <gtest/gtest.h>
 
+#include <mcp/McpError.hpp>
 #include <mcp/client/McpClient.hpp>
 #include <mcp/server/McpServer.hpp>
 #include <mcp/transport/InMemoryTransport.hpp>
@@ -299,8 +300,10 @@ TEST_F(RegisteredServerFixture, CallHandlerOversizedArgsKeepsFixedError) {
       << "error message must not echo back oversized arguments";
 }
 
-TEST_F(RegisteredServerFixture, ReRegisterIsIdempotentForServerAndCatalog) {
-  godot_autopilot::register_all_tools(*server, queue, catalog, index, 9527);
+TEST_F(RegisteredServerFixture, ReRegisterOnSameServerRejectsDuplicateTools) {
+  EXPECT_THROW(
+      godot_autopilot::register_all_tools(*server, queue, catalog, index, 9527),
+      mcp::McpError);
 
   auto result = client->ListTools();
   EXPECT_EQ(result.tools.size(), kMetaToolCount);
