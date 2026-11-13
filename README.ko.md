@@ -75,13 +75,13 @@ Godot-Autopilot은 **Godot 에디터 내부**에서 플러그인으로 동작하
 `bunx`로 한 번 실행합니다(PowerShell에서는 `#`가 주석이 되므로 따옴표가 필요합니다):
 
 ```
-bunx "github:jesspig/Godot-Autopilot#0.3.2" ping
+bunx "github:jesspig/Godot-Autopilot#0.3.3" ping
 ```
 
 또는 한 번 전역 설치한 뒤 `gda` 명령을 사용합니다:
 
 ```
-bun install -g github:jesspig/Godot-Autopilot#0.3.2
+bun install -g github:jesspig/Godot-Autopilot#0.3.3
 gda ping
 ```
 
@@ -105,7 +105,7 @@ Project: <ABSOLUTE PATH TO YOUR GODOT PROJECT> (Godot 4.7+).
    not on PATH) and wait until the `mcp_url` from `gda status --json` answers.
 3. Verify the server from a shell. Try in this order, stop at the first that works, and tell me
    which one it was:
-   - bunx "github:jesspig/Godot-Autopilot#0.3.2" ping
+   - bunx "github:jesspig/Godot-Autopilot#0.3.3" ping
    - download the gda release asset for this OS and CPU from the same Releases page, verify it
      against sha256sums.txt, then run ./gda ping
 4. Connect my AI client: add
