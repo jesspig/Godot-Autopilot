@@ -93,7 +93,7 @@ const THREAD_CONTEXT_RULES: ReadonlyArray<readonly [string, Context, string]> = 
   ["src/tools/*_ops.hpp", CTX_MAIN, "领域工具头文件，实现随同名 _ops.cpp 同线程。"],
   ["src/tools/*_tools.hpp", CTX_MAIN, "工具描述头文件，只保存静态描述数据。"],
   ["src/prompts/*", CTX_MAIN, "prompt 构造体经 CommandQueue 提交到主线程执行。"],
-  ["src/resources/*", CTX_MAIN, "资源读取体经 CommandQueue::execute_sync 提交到主线程执行。"],
+  ["src/resources/*", CTX_MAIN, "资源读取体经 CommandQueue 主线程预算提交执行。"],
   ["src/ui/*", CTX_MAIN, "编辑器 UI 控件只在主线程构造与回调。"],
   ["src/util/*", CTX_MAIN, "工具层纯转换与文件辅助，只被主线程上的 handler 调用。"],
 ];

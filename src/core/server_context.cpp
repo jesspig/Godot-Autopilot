@@ -41,7 +41,6 @@
 #include "core/storage/instance_guard.hpp"
 #include "core/storage/instance_registry.hpp"
 #include "core/transport/mcp_http_shim.hpp"
-#include "tools/base/tool_execute.hpp"
 #include "util/api_host_context.hpp"
 
 namespace godot_autopilot {
@@ -49,10 +48,6 @@ namespace godot_autopilot {
 namespace {
 bool is_loopback_host(std::string_view host) {
   return host == "127.0.0.1" || host == "::1" || host == "[::1]";
-}
-
-void register_unified_tool_executor() {
-  tools::register_tool_executor(&tools::execute_tool_chain);
 }
 
 ServerContext *g_server_context_instance = nullptr;
@@ -494,7 +489,6 @@ bool ServerContext::start() {
     LogSystem::instance().log(LogLevel::Debug, LogCategory::Transport,
                               "Registering tools/catalog/resources/prompts...");
 
-    register_unified_tool_executor();
     register_tools();
 
     LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
