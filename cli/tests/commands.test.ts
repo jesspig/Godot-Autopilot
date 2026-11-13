@@ -156,6 +156,15 @@ describe("请求形状", () => {
     expect(JSON.parse(cap.stdout())).toEqual({ categories: [{ id: "Scene" }] });
   });
 
+  test("call --direct 直调 full 工具", async () => {
+    const { port, requests } = recordingServer(() => sseResponse(okEnvelope([textContent("{}")])));
+    const cap = captureOutput();
+    const code = await call(["delete_scene_node"], { portText: String(port), direct: true });
+    cap.restore();
+    expect(code).toBe(ExitCode.Success);
+    expect(requests[0].params).toEqual({ name: "delete_scene_node", arguments: {} });
+  });
+
   test("describe 直达 get_tool_detail", async () => {
     const { port, requests } = recordingServer(() => sseResponse(okEnvelope([textContent('{"name":"move_agent"}')])));
     const cap = captureOutput();
