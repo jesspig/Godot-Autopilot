@@ -1,7 +1,7 @@
 import { parseTransport, type GlobalOptions } from "../args";
 import { CLI_VERSION } from "../version";
 import { CliError, ExitCode } from "../errors";
-import { callTool } from "../mcp/client";
+import { callTool, ensureConnection, getHandshakeInfo } from "../mcp/client";
 import { assertCallFamilyUsage, callTimeoutSec, extractPayload } from "../payload";
 import { findById, findLiveByProject } from "../registry";
 import { resolveTarget, type ResolvedTarget, type TargetContext } from "../target";
@@ -47,6 +47,7 @@ function buildStatus(
     plugin_version: pluginVersion,
     cli_version: CLI_VERSION,
     protocol_version: "1",
+    mcp: getHandshakeInfo(target.port),
     port: target.port,
     port_source: target.portSource,
     mcp_url: target.mcpUrl,
@@ -63,6 +64,9 @@ export async function run(_positional: string[], opts: GlobalOptions): Promise<n
   try {
     const target = resolveTarget(opts, TARGET_CONTEXT);
     let actualTransport: "ipc" | "http" = target.transport;
+    if (transportMode !== "ipc") {
+      await ensureConnection(target.port, callTimeoutSec(opts));
+    }
     const envelope = await callTool("system_status", {}, {
       port: target.port,
       timeoutSec: callTimeoutSec(opts),

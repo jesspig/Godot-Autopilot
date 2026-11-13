@@ -8,6 +8,12 @@ export interface JsonRpcResponse {
   error?: { code: number; message?: string };
 }
 
+export interface RequestProgress {
+  progress: number;
+  total?: number;
+  message?: string;
+}
+
 export interface CallToolOptions {
   port: number;
   timeoutSec?: number;
@@ -18,6 +24,7 @@ export interface CallToolOptions {
   transport?: "auto" | "ipc" | "http";
   transportSink?: (transport: "ipc" | "http") => void;
   traceparent?: string;
+  progressSink?: (progress: RequestProgress) => void;
 }
 
 export const META_DIRECT_TOOLS: ReadonlySet<string> = new Set([
@@ -77,7 +84,26 @@ interface HandshakeState {
   rehandshakes: number;
 }
 
+export interface HandshakeInfo {
+  protocol_version: string;
+  capabilities: unknown;
+  server_info: unknown;
+}
+
 const handshakeStates = new Map<string, HandshakeState>();
+const handshakeInfos = new Map<string, HandshakeInfo>();
+
+export function getHandshakeInfo(port: number): HandshakeInfo | null {
+  return handshakeInfos.get(`http://${HOST}:${port}/mcp`) ?? null;
+}
+
+export async function ensureConnection(port: number, timeoutSec = DEFAULT_TIMEOUT_SEC): Promise<void> {
+  const url = `http://${HOST}:${port}/mcp`;
+  const state = handshakeStateFor(url);
+  if (!state.done) {
+    await performHandshake(url, timeoutSec * 1000);
+  }
+}
 
 function handshakeStateFor(url: string): HandshakeState {
   let state = handshakeStates.get(url);
@@ -111,14 +137,21 @@ function isModernProtocolVersion(version: string): boolean {
   return version >= MODERN_PROTOCOL_VERSION;
 }
 
-function learnNegotiatedVersion(res: RawResponse, state: HandshakeState): void {
+function learnNegotiatedVersion(res: RawResponse, state: HandshakeState, url: string): void {
   const extracted = extractEnvelope(res);
   if (extracted.kind !== "envelope") return;
-  const envelope = extracted.envelope as { result?: { protocolVersion?: unknown } };
+  const envelope = extracted.envelope as {
+    result?: { protocolVersion?: unknown; capabilities?: unknown; serverInfo?: unknown };
+  };
   const version = envelope.result?.protocolVersion;
   if (typeof version === "string" && KNOWN_PROTOCOL_VERSIONS.includes(version)) {
     state.version = version;
   }
+  handshakeInfos.set(url, {
+    protocol_version: typeof version === "string" ? version : (state.version ?? ""),
+    capabilities: envelope.result?.capabilities ?? {},
+    server_info: envelope.result?.serverInfo ?? {},
+  });
 }
 
 function requestHeaders(url: string): Record<string, string> {
@@ -139,7 +172,7 @@ async function performHandshake(url: string, timeoutMs: number): Promise<void> {
   if (initRes.status < 200 || initRes.status >= 300) {
     throw new CliError(ExitCode.Transport, `initialize failed with HTTP ${initRes.status}.`);
   }
-  learnNegotiatedVersion(initRes, state);
+  learnNegotiatedVersion(initRes, state, url);
   const ackRes = await postJson(url, JSON.stringify({ jsonrpc: "2.0", method: HANDSHAKE_METHOD }), timeoutMs);
   if (ackRes.status < 200 || ackRes.status >= 300) {
     throw new CliError(ExitCode.Transport, `handshake failed with HTTP ${ackRes.status}.`);
@@ -174,21 +207,26 @@ async function postJson(url: string, body: string, timeoutMs: number): Promise<R
   return { status: res.status, contentType: res.headers.get("content-type") || "", text };
 }
 
-function parseSseEnvelope(text: string): unknown | null | undefined {
-  const chunks: string[] = [];
-  for (const line of text.split(/\r?\n/)) {
-    if (line.startsWith("data:")) {
-      let value = line.slice("data:".length);
-      if (value.startsWith(" ")) value = value.slice(1);
-      chunks.push(value);
+function parseSseEnvelopes(text: string): unknown[] | null | undefined {
+  const frames: unknown[] = [];
+  for (const block of text.split(/\r?\n\r?\n/)) {
+    const chunks: string[] = [];
+    for (const line of block.split(/\r?\n/)) {
+      if (line.startsWith("data:")) {
+        let value = line.slice("data:".length);
+        if (value.startsWith(" ")) value = value.slice(1);
+        chunks.push(value);
+      }
+    }
+    if (chunks.length === 0) continue;
+    try {
+      frames.push(JSON.parse(chunks.join("\n")));
+    } catch {
+      return undefined;
     }
   }
-  if (chunks.length === 0) return null;
-  try {
-    return JSON.parse(chunks.join("\n"));
-  } catch {
-    return undefined;
-  }
+  if (frames.length === 0) return null;
+  return frames;
 }
 
 type Extracted =
@@ -197,12 +235,38 @@ type Extracted =
   | { kind: "bad-sse" }
   | { kind: "bad-json" };
 
-function extractEnvelope(res: RawResponse): Extracted {
+function extractEnvelope(
+  res: RawResponse,
+  progressSink?: (progress: RequestProgress) => void,
+): Extracted {
   if (res.contentType.includes("text/event-stream")) {
-    const envelope = parseSseEnvelope(res.text);
-    if (envelope === null) return { kind: "no-data" };
-    if (envelope === undefined) return { kind: "bad-sse" };
-    return { kind: "envelope", envelope };
+    const frames = parseSseEnvelopes(res.text);
+    if (frames === null) return { kind: "no-data" };
+    if (frames === undefined) return { kind: "bad-sse" };
+    let finalEnvelope: unknown = undefined;
+    for (const frame of frames) {
+      if (frame === null || typeof frame !== "object" || Array.isArray(frame)) continue;
+      const record = frame as { method?: unknown; params?: unknown; result?: unknown; error?: unknown };
+      if (record.method === "notifications/progress" && progressSink !== undefined) {
+        const params = record.params;
+        if (params !== null && typeof params === "object" && !Array.isArray(params)) {
+          const progress = params as { progress?: unknown; total?: unknown; message?: unknown };
+          if (typeof progress.progress === "number") {
+            progressSink({
+              progress: progress.progress,
+              total: typeof progress.total === "number" ? progress.total : undefined,
+              message: typeof progress.message === "string" ? progress.message : undefined,
+            });
+          }
+        }
+        continue;
+      }
+      if (record.result !== undefined || record.error !== undefined) {
+        finalEnvelope = frame;
+      }
+    }
+    if (finalEnvelope === undefined) return { kind: "no-data" };
+    return { kind: "envelope", envelope: finalEnvelope };
   }
   try {
     return { kind: "envelope", envelope: JSON.parse(res.text) };
@@ -332,7 +396,7 @@ export async function request(
   }
 
   let res = await postJson(url, body, timeoutMs);
-  let extracted = extractEnvelope(res);
+  let extracted = extractEnvelope(res, opts.progressSink);
   const state = handshakeStateFor(url);
   if (handshakeRequired(res, extracted)) {
     const expired = state.done;
@@ -345,7 +409,7 @@ export async function request(
       await performHandshake(url, timeoutMs);
       id = nextRequestId++;
       res = await postJson(url, makeBody(id), timeoutMs);
-      extracted = extractEnvelope(res);
+      extracted = extractEnvelope(res, opts.progressSink);
     }
   }
 
