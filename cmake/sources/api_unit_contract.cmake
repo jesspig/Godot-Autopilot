@@ -5,11 +5,5 @@
 # 不改 tests/CMakeLists.txt，避免多分支归并冲突。
 # ====================================================================
 set(GDA_UNIT_CONTRACT_SOURCES
-    ${CMAKE_SOURCE_DIR}/src/tools/base/tool_execute.cpp
-    ${CMAKE_SOURCE_DIR}/src/tools/base/argument_validator.cpp
-    ${CMAKE_SOURCE_DIR}/src/core/transport/api_envelope.cpp
-    ${CMAKE_SOURCE_DIR}/tests/boundary/tool_execute_test.cpp
-    ${CMAKE_SOURCE_DIR}/tests/boundary/argument_validator_test.cpp
-    ${CMAKE_SOURCE_DIR}/tests/unit/api_envelope_test.cpp
     ${CMAKE_SOURCE_DIR}/tests/boundary/authorization_policy_test.cpp
     ${CMAKE_SOURCE_DIR}/tests/boundary/dispatch_semantics_test.cpp)

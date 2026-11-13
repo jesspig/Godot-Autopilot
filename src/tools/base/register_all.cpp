@@ -44,7 +44,6 @@
 #include "tools/base/runtime_ops.hpp"
 #include "tools/base/schema_builder.hpp"
 #include "tools/base/tool_base.hpp"
-#include "tools/base/tool_execute.hpp"
 #include "tools/base/tool_invoke.hpp"
 #include "tools/base/tool_registry.hpp"
 #include "tools/base/tool_spec.hpp"
@@ -281,7 +280,7 @@ static mcp::JsonValue meta_call_tool_impl(mcp::JsonValue args) {
     }
 
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, name + " called via call_tool");
-    return tools::execute_tool_core(name, tool_args);
+    return dispatch::call_handler(name, tool_args);
 }
 
 static mcp::JsonValue meta_call_tool_wait(const std::string& name, mcp::JsonValue result) {
