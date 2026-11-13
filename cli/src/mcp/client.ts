@@ -457,14 +457,12 @@ export async function request(
       extracted = extractEnvelope(res, opts.progressSink);
     }
   }
-  if (!state.done && extracted.kind === "envelope") {
-    const error = (extracted.envelope as { error?: { message?: unknown } } | null)?.error;
-    if (typeof error?.message === "string" && error.message.includes("Server not initialized")) {
-      await performHandshake(url, timeoutMs);
-      id = nextRequestId++;
-      res = await postJson(url, makeBody(id), timeoutMs);
-      extracted = extractEnvelope(res, opts.progressSink);
-    }
+  if (!state.done && extracted.kind === "envelope" &&
+      (extracted.envelope as { error?: unknown } | null)?.error !== undefined) {
+    await performHandshake(url, timeoutMs);
+    id = nextRequestId++;
+    res = await postJson(url, makeBody(id), timeoutMs);
+    extracted = extractEnvelope(res, opts.progressSink);
   }
 
   if (res.status < 200 || res.status >= 300) {
