@@ -151,14 +151,14 @@ gda skills list
 ## 7. 首次端到端检查
 
 ```bash
-gda tools search "scene"
-gda tools describe create_scene_node
+gda search "scene"
+gda describe create_scene_node
 gda call ping
 gda call system_status
 ```
 
-`gda tools search` 读取缓存目录，没有编辑器也能用。`gda tools describe` 在首次
-写入前显示输入 schema 与 `side_effect` 标记。`gda call` 对实时编辑器执行并
+`gda search` 查询实时实例，需要运行中的编辑器。`gda describe` 在首次写入前
+显示输入 schema 与 `side_effect` 标记。`gda call` 对实时编辑器执行并
 输出结果 JSON。每次响应都读 `new_errors_since_last_call` 水位；为 0 表示没有
 记录到新的引擎错误。
 

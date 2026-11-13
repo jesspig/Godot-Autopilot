@@ -13,7 +13,7 @@ resource: tests/
 
 # 测试体系（tests/）
 
-> 审计日期：2026-11-13（T-01 依赖升级：`register_all_test.cpp` 的重注册用例改按 SDK 0.3.11 语义断言「同 server 重注册抛 `McpError`」，数量不变；完整数值重基线与总表更新由 T-02 执行）2026-11-09（**随测试体系四层化重构逐项重基线**——L2 引擎轨（`gda_test_runner` / `gda_pool_ctl` / `tests/config` / `tests/testbed` / `tests/pool`）整体删除（提交 `c023a5c`，2026-11-09），口径由「L1/L2 双层」改为「程序化四层（单元 / 集成 / 回归属性 / 守卫）+ Agent e2e」；本轮实测：单元测试 **875** 不变（75 文件）、集成层 **109**（12 文件）、守卫与脚本项 **10**、ctest 注册总数 **994 = 875 + 109 + 10**（`ctest -N` 实测，证据 `.handoff/evidence/T-08/ctest-N-after.txt`），同提交独立 worktree 全量 ctest **100% 通过**（`.handoff/evidence/T-08/manifest.md`）；CLI TS 单测 **296** 项 / 18 文件不变；脚本编排收敛为默认门语义（提交 `bf31e8a` / `8997db9`）。被删章节的历史结论以一行迁移说明指回 changelog 或 git 历史，见「历史口径迁移」）
+> 审计日期：2026-11-14（T-03：search_tools 新增 limit 的 5 组集成用例；T-06：技能书发现契约断言改为 gda search/describe/tools list；注册点 935）2026-11-13（T-01 依赖升级：`register_all_test.cpp` 的重注册用例改按 SDK 0.3.11 语义断言「同 server 重注册抛 `McpError`」，数量不变；完整数值重基线与总表更新由 T-02 执行）2026-11-09（**随测试体系四层化重构逐项重基线**——L2 引擎轨（`gda_test_runner` / `gda_pool_ctl` / `tests/config` / `tests/testbed` / `tests/pool`）整体删除（提交 `c023a5c`，2026-11-09），口径由「L1/L2 双层」改为「程序化四层（单元 / 集成 / 回归属性 / 守卫）+ Agent e2e」；本轮实测：单元测试 **875** 不变（75 文件）、集成层 **109**（12 文件）、守卫与脚本项 **10**、ctest 注册总数 **994 = 875 + 109 + 10**（`ctest -N` 实测，证据 `.handoff/evidence/T-08/ctest-N-after.txt`），同提交独立 worktree 全量 ctest **100% 通过**（`.handoff/evidence/T-08/manifest.md`）；CLI TS 单测 **296** 项 / 18 文件不变；脚本编排收敛为默认门语义（提交 `bf31e8a` / `8997db9`）。被删章节的历史结论以一行迁移说明指回 changelog 或 git 历史，见「历史口径迁移」）
 
 ## 架构总览
 
@@ -161,10 +161,10 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 | `SkillNamesFollowSpecRules` | name 匹配 `^[a-z0-9]+(-[a-z0-9]+)*$`、≤64 字符、路径 `.agents/skills/<name>/SKILL.md` |
 | `DescriptionsValid` | description 非空、≤1024 字符 |
 | `FilesLayout` | `files[0]` 必为 SKILL.md，其余须 `references/` 或 `scripts/` 前缀（`scripts/` 仅直属 `.mjs`）；body 非空、无 PLACEHOLDER 残留 |
-| `CliChannelContract` | CLI-first 通道契约：全部 SKILL.md 禁 `bunx`/`9527`/`gda serve`/`gda api`/`Allow write`/`curl -`/`Invoke-WebRequest`；调用专册须含 `gda tools search`、`gda tools describe`、`gda call` 与 `confirmation_required` |
+| `CliChannelContract` | CLI-first 通道契约：全部 SKILL.md 禁 `bunx`/`9527`/`gda serve`/`gda api`/`Allow write`/`curl -`/`Invoke-WebRequest`；调用专册须含 `gda search`、`gda describe`、`gda tools list`、`gda call` 与 `confirmation_required` |
 | `RenderedFrontmatterWellFormed` | 渲染产物 frontmatter 完整：name/author/`version`（取 `GDA_VERSION`）/description 含 `: ` 必加引号/`metadata:` 与收尾 `---` |
 | `SkillRegistryFixture.ToolNamesExistInRegistry` | 工具名回验（机制见下） |
-| `SkillRegistryFixture.SkillBooksDescribeDiscovery` | CLI-first 发现契约：`godot-autopilot-tools` 正文须含 `gda tools search`、`gda tools describe`、`gda call`、`confirmation_required` 与 `new_errors_since_last_call`，防技能书退回旧调用阶梯 |
+| `SkillRegistryFixture.SkillBooksDescribeDiscovery` | CLI-first 发现契约：`godot-autopilot-tools` 正文须含 `gda search`、`gda describe`、`gda tools list`、`gda call`、`confirmation_required` 与 `new_errors_since_last_call`，防技能书退回旧调用阶梯 |
 | `EverySkillHasSkillMd` | 每册恰 1 个自包含 `SKILL.md`（files.size() == 1，files[0] 必为 `SKILL.md`） |
 
 **工具名回验机制**：`SkillRegistryFixture` 照抄 `register_all_test.cpp` 的服务端构造方式（`register_all_tools` 填充 catalog，仅注册不调用任何 handler），允许集 = 运行时 catalog 全部工具名 ∪ 各工具 `input_schema.properties` 参数名 ∪ 253 项手动白名单（`kManualWhitelist`，`skill_gen_test.cpp:40-109` 逐项统计，均为明确非工具名的词：Godot API 方法、Godot 属性名、内部机制/返回字段、枚举值等）；随后提取各册正文反引号包裹的全小写含下划线词逐一比对（``` 围栏代码块整体跳过），未命中即 FAIL。保证技能文档中出现的工具名/参数名与运行时注册始终一致。

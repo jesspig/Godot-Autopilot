@@ -5,7 +5,7 @@ description: "Godot C#/.NET 工程指南：从普通工程生成 csproj、用 cr
 
 # C# / .NET 工作流
 
-调用方式：用 `gda tools search` 与 `gda tools describe` 发现，再用 `gda call`
+调用方式：用 `gda search` 与 `gda describe` 发现，再用 `gda call`
 调用；原生 MCP 工具（`search_tools`、`get_tool_detail`、`call_tool`）是兼容
 路径。协议细节见 `godot-autopilot-tools`。
 

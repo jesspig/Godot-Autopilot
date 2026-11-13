@@ -4,9 +4,58 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import type { GlobalOptions } from "../src/args";
-import { catalogPath, readCatalog, writeCatalog } from "../src/catalog";
 import { run as runTools } from "../src/commands/tools";
 import { CliError, ExitCode } from "../src/errors";
+
+const servers: ReturnType<typeof Bun.serve>[] = [];
+
+afterEach(() => {
+  while (servers.length > 0) {
+    servers.pop()!.stop();
+  }
+});
+
+function serve(handler: (req: Request) => Response | Promise<Response>): number {
+  const server = Bun.serve({ port: 0, fetch: handler });
+  servers.push(server);
+  return server.port!;
+}
+
+function sseResponse(payload: unknown): Response {
+  return new Response(`event: message\ndata: ${JSON.stringify(payload)}\n\n`, {
+    headers: { "content-type": "text/event-stream" },
+  });
+}
+
+interface CapturedRequest {
+  method: string;
+  params: unknown;
+}
+
+function recordingServer(handler: (req: CapturedRequest) => Response | Promise<Response>) {
+  const requests: CapturedRequest[] = [];
+  const port = serve(async (req) => {
+    const body = (await req.json()) as CapturedRequest;
+    const params = body.params as Record<string, unknown> | undefined;
+    if (params !== undefined && typeof params === "object" && params !== null) {
+      const rest: Record<string, unknown> = { ...params };
+      delete rest._meta;
+      body.params = rest;
+    }
+    requests.push(body);
+    return handler(body);
+  });
+  return { port, requests };
+}
+
+function searchEnvelope(names: string[]): unknown {
+  const results = names.map((name, index) => ({ name, score: names.length - index }));
+  return {
+    jsonrpc: "2.0",
+    id: 1,
+    result: { content: [{ type: "text", text: JSON.stringify({ results }) }] },
+  };
+}
 
 function captureOutput(): { stdout(): string; restore(): void } {
   const origOut = process.stdout.write;
@@ -32,26 +81,6 @@ async function runCaptured(positional: string[], opts: GlobalOptions) {
     cap.restore();
   }
 }
-
-const SAMPLE_TOOLS = [
-  {
-    name: "create_scene_node",
-    category: "scene",
-    tags: ["node", "create"],
-    side_effect: "write",
-    description: "Create a node in the edited scene",
-    input_schema: { type: "object" },
-    api_token: "should-not-be-cached",
-  },
-  {
-    name: "capture_editor_viewport",
-    category: "capture",
-    tags: ["image"],
-    side_effect: "none",
-    description: "Capture the editor viewport",
-    input_schema: { type: "object" },
-  },
-];
 
 let tmpHome: string;
 let prevHome: string | undefined;
@@ -81,64 +110,60 @@ afterEach(() => {
   fs.rmSync(tmpHome, { recursive: true, force: true });
 });
 
-describe("tools (offline catalog)", () => {
-  test("list 读取缓存并输出工具", async () => {
-    writeCatalog(SAMPLE_TOOLS);
-    const result = await runCaptured(["list"], {});
+describe("tools list (live)", () => {
+  test("list 请求全量并过滤 5 个协议工具", async () => {
+    const { port, requests } = recordingServer(() =>
+      sseResponse(searchEnvelope(["create_scene_node", "ping", "batch_execute", "call_tool", "code_execute"])),
+    );
+    const result = await runCaptured(["list"], { portText: String(port) });
     expect(result.code).toBe(ExitCode.Success);
-    const catalog = JSON.parse(result.stdout) as { tools: Array<{ name: string }> };
-    expect(catalog.tools.map((tool) => tool.name)).toEqual([
-      "create_scene_node",
-      "capture_editor_viewport",
-    ]);
-    expect(typeof (catalog as { generated_at?: unknown }).generated_at).toBe("string");
-    expect(typeof (catalog as { version?: unknown }).version).toBe("string");
+    expect(requests[0].params).toEqual({
+      name: "search_tools",
+      arguments: { limit: 0 },
+    });
+    expect(JSON.parse(result.stdout)).toEqual({
+      tools: ["create_scene_node", "batch_execute", "code_execute"],
+      total: 3,
+    });
   });
 
-  test("缓存不含 api_token 等敏感字段", () => {
-    writeCatalog(SAMPLE_TOOLS);
-    const catalog = readCatalog();
-    expect(catalog).not.toBeNull();
-    expect(JSON.stringify(catalog)).not.toContain("api_token");
-    expect(JSON.stringify(catalog)).not.toContain("should-not-be-cached");
-    expect(fs.existsSync(catalogPath())).toBe(true);
-  });
-
-  test("search 按名称描述类别标签过滤", async () => {
-    writeCatalog(SAMPLE_TOOLS);
-    const result = await runCaptured(["search", "capture"], {});
+  test("list 传 category 与 tags", async () => {
+    const { port, requests } = recordingServer(() =>
+      sseResponse(searchEnvelope(["create_scene_node"])),
+    );
+    const result = await runCaptured(["list"], {
+      portText: String(port),
+      category: "Scene",
+      tagsText: "node, ,create",
+    });
     expect(result.code).toBe(ExitCode.Success);
-    const catalog = JSON.parse(result.stdout) as { tools: Array<{ name: string }> };
-    expect(catalog.tools.map((tool) => tool.name)).toEqual(["capture_editor_viewport"]);
+    expect(requests[0].params).toEqual({
+      name: "search_tools",
+      arguments: { limit: 0, category: "Scene", tags: ["node", "create"] },
+    });
   });
 
-  test("describe 输出单个工具 schema", async () => {
-    writeCatalog(SAMPLE_TOOLS);
-    const result = await runCaptured(["describe", "create_scene_node"], {});
-    expect(result.code).toBe(ExitCode.Success);
-    const tool = JSON.parse(result.stdout) as { name: string; input_schema?: unknown };
-    expect(tool.name).toBe("create_scene_node");
-    expect(tool.input_schema).toEqual({ type: "object" });
-  });
-
-  test("缓存缺失时回退内置 catalog", async () => {
-    fs.rmSync(catalogPath(), { force: true });
-    const result = await runCaptured(["list"], {});
-    expect(result.code).toBe(ExitCode.Success);
-    const catalog = JSON.parse(result.stdout) as { generated_at: string; tools: unknown[] };
-    expect(catalog.generated_at).toBe("builtin");
-    expect(catalog.tools.length).toBeGreaterThan(0);
-  });
-
-  test("describe 未知工具报用法错误", async () => {
-    writeCatalog(SAMPLE_TOOLS);
+  test("tools search/describe 已删除", async () => {
     let caught: unknown;
     try {
-      await runCaptured(["describe", "no_such_tool"], {});
+      await runTools(["search", "spawn"], {});
     } catch (error) {
       caught = error;
     }
     expect(caught).toBeInstanceOf(CliError);
     expect((caught as CliError).code).toBe(ExitCode.Usage);
+    expect((caught as CliError).message).toContain("unknown tools subcommand: search");
+  });
+
+  test("无 live 实例时报 live 错误而非离线 catalog", async () => {
+    let caught: unknown;
+    try {
+      await runTools(["list"], {});
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(CliError);
+    expect((caught as CliError).message).not.toContain("offline");
+    expect((caught as CliError).message).not.toContain("catalog");
   });
 });

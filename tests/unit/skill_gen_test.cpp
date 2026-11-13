@@ -440,8 +440,9 @@ TEST_F(SkillRegistryFixture, SkillBooksDescribeDiscovery) {
   ASSERT_NE(tools_skill, nullptr);
   ASSERT_FALSE(tools_skill->files.empty());
   const std::string &body = tools_skill->files[0].body;
-  EXPECT_NE(body.find("gda tools search"), std::string::npos);
-  EXPECT_NE(body.find("gda tools describe"), std::string::npos);
+  EXPECT_NE(body.find("gda search"), std::string::npos);
+  EXPECT_NE(body.find("gda describe"), std::string::npos);
+  EXPECT_NE(body.find("gda tools list"), std::string::npos);
   EXPECT_NE(body.find("gda call"), std::string::npos);
   EXPECT_NE(body.find("confirmation_required"), std::string::npos);
   EXPECT_NE(body.find("new_errors_since_last_call"), std::string::npos);
@@ -457,7 +458,7 @@ TEST(SkillGenTest, CliChannelContract) {
     if (spec.name == "godot-autopilot-tools") {
       EXPECT_TRUE(contains_ci_token(body, "gda"))
           << spec.name << ": SKILL.md must mention the gda CLI channel";
-      EXPECT_NE(body.find("gda tools search"), std::string::npos);
+      EXPECT_NE(body.find("gda tools list"), std::string::npos);
       EXPECT_NE(body.find("gda call"), std::string::npos);
     }
     for (const SkillFile &file : spec.files) {

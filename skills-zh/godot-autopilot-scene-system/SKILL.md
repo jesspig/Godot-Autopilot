@@ -5,7 +5,7 @@ description: "Godot 场景系统操作指南：场景生命周期、节点创建
 
 # Godot 场景系统
 
-调用方式：用 `gda tools search` 与 `gda tools describe` 发现，再用 `gda call`
+调用方式：用 `gda search` 与 `gda describe` 发现，再用 `gda call`
 调用；原生 MCP 工具（`search_tools`、`get_tool_detail`、`call_tool`）是兼容
 路径。协议细节见 `godot-autopilot-tools`。
 
@@ -264,7 +264,7 @@ description: "Godot 场景系统操作指南：场景生命周期、节点创建
 
 ## 工作流清单
 
-1. 用 `gda tools search` 与 `gda tools describe` 确认工具名与 schema，禁止猜。
+1. 用 `gda search` 与 `gda describe` 确认工具名与 schema，禁止猜。
 2. 确认已打开场景：新建用 `create_editor_scene`，已有文件用
    `open_editor_scene`；未保存场景先保存。
 3. 创建根节点——只在没有根时省略 `parent_path`。

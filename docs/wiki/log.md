@@ -2,6 +2,10 @@
 
 > 详细记录见 `changelog/<YYYY-MM-DD>-log.md`，每条记录 `<YYYY-MM-DD-HH>` 精确到小时；本摘要仅保留最近 7 天（按有变更的日期段计，最新一段 2026-11-13；更早的批次留档在 changelog 目录，如 [2026-10-10-log.md](changelog/2026-10-10-log.md)）。
 
+## 2026-11-14
+
+- **0.3.3 ST-02 工具发现（`feature/tool-index`，本地未推送）**：`search_tools` 新增 `limit`（默认 20、0 全量、负值报错），遍历/契约测试显式全量；CLI 删除离线 catalog 与 `--refresh`，`gda tools list` 走 live `search_tools {limit:0}` 并过滤 5 个 MCP 协议工具，`gda search` 无 query 改出分类、有 query 输出 `{results}`；EN/ZH 技能书与内置资产同步。验证：ctest **935/935**、CLI **251 项（233 pass / 18 skip / 0 fail）**、typecheck 与 skills_guard 通过。明细见 [changelog/2026-11-14-log.md](changelog/2026-11-14-log.md)。
+
 ## 2026-11-13
 
 - **0.3.3 T-01 依赖升级（`feature/dependency-upgrade`，本地未推送）**：mcp-cpp-sdk `0.3.8/d79f9b1` → `0.3.11/93e18ef`，configure 实测 `[mcp] SDK version: 0.3.11` 与 OpenSSL `OFF`；版本 pin 同步 build/conventions/overview/security_contract。0.3.11 收紧同名工具注册（抛 `McpError`），GDA 生产路径每次重启新建 server，不依赖同 server 重注册，单元测试改为断言拒绝语义。验证：Debug 构建成功、ctest **930/930**、CLI **255 项（237 pass / 18 skip / 0 fail）**、typecheck 通过。明细见 [changelog/2026-11-13-log.md](changelog/2026-11-13-log.md)。

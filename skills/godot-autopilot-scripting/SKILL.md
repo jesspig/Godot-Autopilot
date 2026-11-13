@@ -5,7 +5,7 @@ description: "Godot GDScript guide: script lifecycle, the four execution channel
 
 # GDScript Workflows
 
-Invocation: discover with `gda tools search` and `gda tools describe`, then call with `gda call`; the native MCP tools (`search_tools`, `get_tool_detail`, `call_tool`) are the compatibility path. Protocol details live in `godot-autopilot-tools`.
+Invocation: discover with `gda search` and `gda describe`, then call with `gda call`; the native MCP tools (`search_tools`, `get_tool_detail`, `call_tool`) are the compatibility path. Protocol details live in `godot-autopilot-tools`.
 
 Creating, attaching, editing and reloading GDScript through godot-autopilot, and the safety differences between the four execution channels plus the code_execute meta tool. Engine-level execution gotchas (placeholder instances, static initializers, editor-vs-game semantics, frame ordering) are covered below.
 

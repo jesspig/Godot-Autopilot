@@ -5,7 +5,7 @@ description: "Godot C#/.NET project guide: bootstrapping a csproj from a plain p
 
 # C# / .NET Workflows
 
-Invocation: discover with `gda tools search` and `gda tools describe`, then call with `gda call`; the native MCP tools (`search_tools`, `get_tool_detail`, `call_tool`) are the compatibility path. Protocol details live in `godot-autopilot-tools`.
+Invocation: discover with `gda search` and `gda describe`, then call with `gda call`; the native MCP tools (`search_tools`, `get_tool_detail`, `call_tool`) are the compatibility path. Protocol details live in `godot-autopilot-tools`.
 
 C# projects run on the editor's .NET assembly, which changes the workflow in
 three ways: a build step sits between editing and observing, C# declarations

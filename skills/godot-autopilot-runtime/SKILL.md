@@ -5,7 +5,7 @@ description: "Godot runtime and debugging guide: launch and stop the game, input
 
 # Runtime and Debugging with godot-autopilot
 
-Invocation: discover with `gda tools search` and `gda tools describe`, then call with `gda call`; the native MCP tools (`search_tools`, `get_tool_detail`, `call_tool`) are the compatibility path. Protocol details live in `godot-autopilot-tools`.
+Invocation: discover with `gda search` and `gda describe`, then call with `gda call`; the native MCP tools (`search_tools`, `get_tool_detail`, `call_tool`) are the compatibility path. Protocol details live in `godot-autopilot-tools`.
 
 This book covers the game process life cycle: launching and stopping the
 game, the `game_*` runtime channel, input injection, viewport capture and the

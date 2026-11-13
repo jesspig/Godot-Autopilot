@@ -35,7 +35,9 @@ mcp::JsonValue empty_object() {
 }
 
 mcp::JsonValue call_search_all(IntegrationHarness &harness) {
-  return harness.call("search_tools", empty_object());
+  mcp::JsonValue args = empty_object();
+  args["limit"] = mcp::JsonValue(static_cast<int64_t>(0));
+  return harness.call("search_tools", args);
 }
 
 mcp::JsonValue call_tool_detail(IntegrationHarness &harness,

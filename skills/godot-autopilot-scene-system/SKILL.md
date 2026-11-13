@@ -5,7 +5,7 @@ description: "Godot scene system operations guide: scene lifecycle, node create/
 
 # Godot Scene System
 
-Invocation: discover with `gda tools search` and `gda tools describe`, then call with `gda call`; the native MCP tools (`search_tools`, `get_tool_detail`, `call_tool`) are the compatibility path. Protocol details live in `godot-autopilot-tools`.
+Invocation: discover with `gda search` and `gda describe`, then call with `gda call`; the native MCP tools (`search_tools`, `get_tool_detail`, `call_tool`) are the compatibility path. Protocol details live in `godot-autopilot-tools`.
 
 godot-autopilot tools for creating, restructuring, saving and inspecting scenes
 in the Godot editor, plus the property read/write and signal wiring that turn a

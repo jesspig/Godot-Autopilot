@@ -1,6 +1,6 @@
 ---
 name: godot-autopilot
-description: "在 Godot 工程中使用 GDA（godot-autopilot）插件的入口：先读安装册，通过 gda status --json 与 mcp_url 连接，用 gda tools search/describe 发现工具、用 gda call 调用，观察编辑器与游戏状态，遵守 confirm 协议，并执行变更-观察-验证循环。适用于安装完成后的所有 godot-autopilot 工作。"
+description: "在 Godot 工程中使用 GDA（godot-autopilot）插件的入口：先读安装册，通过 gda status --json 与 mcp_url 连接，用实时 gda search/describe/tools list 发现工具、用 gda call 调用，观察编辑器与游戏状态，遵守 confirm 协议，并执行变更-观察-验证循环。适用于安装完成后的所有 godot-autopilot 工作。"
 ---
 
 # Godot Autopilot
@@ -30,19 +30,21 @@ description: "在 Godot 工程中使用 GDA（godot-autopilot）插件的入口�
 步骤：
 
 ```bash
-gda tools search "tilemap cell"
-gda tools describe set_tilemap_cells
+gda search "tilemap cell"
+gda describe set_tilemap_cells
 gda call set_tilemap_cells --args '{"path": "Level", "cells": []}'
 ```
 
-1. `gda tools search <query>` 按名称、描述、分类与标签搜索缓存目录，不需要
-   编辑器运行。
-2. `gda tools describe <name>` 打印 schema 与 `side_effect` 标记。首次调用前
-   必读，不要推断参数名。
+1. `gda search <query>` 通过实时服务器按名称、描述、分类与标签搜索，默认最多
+   返回 20 条。
+2. `gda describe <name>` 打印 schema 与 `side_effect` 标记。首次调用前必读，
+   不要推断参数名。
 3. `gda call <name> --args '<json>'`（或 `--args-file <path>`）对实时编辑器
    执行一个工具。
-4. `gda search` 与 `gda describe` 是走 MCP 服务器的实时变体，需要运行中的
-   实例。
+4. 需要全量清单而非关键词搜索时，用 `gda tools list` 列出全部直接工具。
+
+发现只有实时通道：没有离线目录。没有实例时用
+`gda start --project <dir>` 启动编辑器。
 
 先按对象搜索（"tilemap cell"、"animation track"、"import sidecar"），结果太
 宽时再加动词。下结论说工具不存在前，用同义词重试：tile/cell、sprite/texture、
@@ -77,7 +79,7 @@ MCP 层有七个元工具：`ping`、`search_tools`、`list_categories`、
 ## 任务路由
 
 先把任务归约到对象与意图，再发现对应工具族。下表给出代表性工具；当前名称与
-schema 一律用 `gda tools search` 与 `gda tools describe` 确认。
+schema 一律用 `gda search` 与 `gda describe` 确认。
 
 ### 读取与检查
 

@@ -1,6 +1,6 @@
 ---
 name: godot-autopilot-tools
-description: "CLI-first calling reference for Godot Autopilot: the gda command and flag surface, target discovery through the plugin instance registry, gda tools search/describe plus gda call, native MCP tools as the compatibility face, confirmation and MCP annotations for high-risk side effects, the error watermark protocol and error codes, batch_execute/code_execute semantics, response limits, and dynamic user tools. Use for calling-protocol facts."
+description: "CLI-first calling reference for Godot Autopilot: the gda command and flag surface, target discovery through the plugin instance registry, live gda search/describe/tools list plus gda call, native MCP tools as the compatibility face, confirmation and MCP annotations for high-risk side effects, the error watermark protocol and error codes, batch_execute/code_execute semantics, response limits, and dynamic user tools. Use for calling-protocol facts."
 ---
 
 # Godot Autopilot Tools
@@ -46,9 +46,7 @@ Run `gda --help` for the current text; the table below is the stable shape.
 | `gda logs` | Show an instance log. |
 | `gda skills list` | List installed skill books. |
 | `gda skills show <name>` | Print one book; `--file <rel>` reads an auxiliary file. |
-| `gda tools list` | List the cached offline tool catalog. |
-| `gda tools search <query>` | Search the cached catalog. |
-| `gda tools describe <name>` | Show one cached tool's schema. |
+| `gda tools list` | List all direct tools from a live instance; `--category`/`--tags` narrow it. |
 | `gda projects` | List known Godot projects offline. |
 | `gda cache list` | List cache manifests. |
 | `gda cache info` | Show cache root, entry count and size. |
@@ -63,7 +61,7 @@ Global options that matter on most calls:
   `--project <dir>`, `--socket <path>`, `--transport auto|ipc|http`,
   `--no-fallback`.
 - Input: `--args <json>`, `--args-file <path>`, `--confirm`, `--timeout <sec>`.
-- Discovery filters: `--category <name>`, `--tags <a,b>`, `--refresh`.
+- Discovery filters: `--category <name>`, `--tags <a,b>` (`gda search` and `gda tools list`).
 - Output: `--json`, `--pretty`, `--raw`, `--save-images <dir>`.
 - Lifecycle: `--godot <path>`, `--headless`, `--play`, `--no-import`,
   `--wait <sec>`, `--force`, `--tail <n>`, `--probe <light|strict>`.
@@ -103,17 +101,19 @@ guess a port and do not reuse one from an earlier session.
 ## Discovery protocol — search first, never guess
 
 1. `gda ping` confirms the server responds.
-2. `gda tools search <query>` searches the cached catalog by name,
-   description, category and tags. Use `--category` or `--tags` to narrow.
-3. `gda tools describe <name>` prints the schema, description and
-   `side_effect` marker. Read it before the first write.
+2. `gda search <query>` searches the live server by name, description, category
+   and tags. Use `--category` or `--tags` to narrow; the server returns at most
+   20 results by default.
+3. `gda describe <name>` prints the schema, description and `side_effect`
+   marker. Read it before the first write.
 4. `gda call <name> --args '<json>'` executes. Use `--args-file` for large
    payloads.
-5. `gda tools list --refresh` refreshes the catalog from a live instance when a
-   tool is missing from the cache.
+5. `gda tools list` prints every directly callable tool as `{tools, total}`,
+   excluding the five MCP protocol tools. Use it for a full inventory, not for
+   keyword search.
 
-`gda search` and `gda describe` are the live equivalents; they require a
-running instance and should be used when the cached catalog may be stale.
+Discovery is live-only: the CLI keeps no offline tool catalog.
+Without a running instance, start one with `gda start --project <dir>`.
 
 Search by the object first, then by the operation: "tilemap cell",
 "animation track", "import sidecar". Add a verb only when the object is too
@@ -124,7 +124,7 @@ plausible name; an unknown tool fails and tells you to search.
 Example:
 
 ```bash
-gda tools describe create_scene_node
+gda describe create_scene_node
 gda call create_scene_node --args '{"parent_path": "Root", "name": "Player", "type": "CharacterBody2D", "properties": {"position": {"x": 0, "y": -10}}}'
 ```
 
@@ -134,8 +134,9 @@ When the harness lists GDA tools, the meta tools are `ping`, `search_tools`,
 `list_categories`, `get_tool_detail`, `call_tool`, `batch_execute` and
 `code_execute`. Every domain tool goes through `call_tool` with `name` and
 `arguments`; `call_tool` also accepts a top-level `confirm` boolean. Use
-`search_tools` / `get_tool_detail` exactly as you would use `gda tools search` /
-`gda tools describe`.
+`search_tools` / `get_tool_detail` exactly as you would use `gda search` /
+`gda describe`. `search_tools` defaults to 20 results; pass `limit: 0` only when
+you explicitly need the full enumeration.
 
 ## Confirmation and annotations
 

@@ -51,7 +51,9 @@
 #include "util/mcp_image_content.hpp"
 #include <mcp/Content.hpp>
 #include <mcp/JsonValue.hpp>
+#include <algorithm>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -85,6 +87,16 @@ static mcp::JsonValue meta_search_tools_impl(const mcp::JsonValue& args,
         text = q->GetString();
     }
 
+    int64_t limit = 20;
+    if (auto* limit_p = args.Find("limit"); limit_p && !limit_p->IsNull()) {
+        if (!limit_p->IsInt() || limit_p->GetInt() < 0) {
+            mcp::JsonValue error(mcp::JsonValue::object_tag);
+            error["error"] = mcp::JsonValue("invalid parameter: limit must be a non-negative integer");
+            return error;
+        }
+        limit = limit_p->GetInt();
+    }
+
     Bm25Index::SearchQuery query;
     query.text = text;
 
@@ -112,11 +124,15 @@ static mcp::JsonValue meta_search_tools_impl(const mcp::JsonValue& args,
 
     if (text.empty() && !has_category && !has_tags) {
         auto all = catalog.get_all_tools();
+        std::size_t count = all.size();
+        if (limit > 0 && static_cast<int64_t>(count) > limit) {
+            count = static_cast<std::size_t>(limit);
+        }
         mcp::JsonValue j(mcp::JsonValue::object_tag);
         mcp::JsonValue arr(mcp::JsonValue::array_tag);
-        for (auto& t : all) {
+        for (std::size_t i = 0; i < count; ++i) {
             mcp::JsonValue item(mcp::JsonValue::object_tag);
-            item["name"] = mcp::JsonValue(t.name);
+            item["name"] = mcp::JsonValue(all[i].name);
             item["score"] = mcp::JsonValue(0.0);
             arr.PushBack(std::move(item));
         }
@@ -125,6 +141,9 @@ static mcp::JsonValue meta_search_tools_impl(const mcp::JsonValue& args,
         return j;
     }
 
+    query.max_results = limit == 0
+        ? std::numeric_limits<int>::max()
+        : static_cast<int>(std::min<int64_t>(limit, std::numeric_limits<int>::max()));
     auto results = index.search(query);
 
     mcp::JsonValue j(mcp::JsonValue::object_tag);
@@ -428,6 +447,12 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
         q_prop["type"] = mcp::JsonValue("string");
         q_prop["description"] = mcp::JsonValue("Search query; omit or pass an empty string to enumerate all tools");
         props["query"] = std::move(q_prop);
+        mcp::JsonValue l_prop(mcp::JsonValue::object_tag);
+        l_prop["type"] = mcp::JsonValue("integer");
+        l_prop["description"] = mcp::JsonValue("Maximum number of results; 0 returns all tools");
+        l_prop["default"] = mcp::JsonValue(static_cast<int64_t>(20));
+        l_prop["minimum"] = mcp::JsonValue(static_cast<int64_t>(0));
+        props["limit"] = std::move(l_prop);
         mcp::JsonValue c_prop(mcp::JsonValue::object_tag);
         c_prop["type"] = mcp::JsonValue("string");
         c_prop["description"] = mcp::JsonValue("Filter by category");

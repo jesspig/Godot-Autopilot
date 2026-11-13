@@ -2,6 +2,8 @@
 
 #include <mcp/JsonValue.hpp>
 
+#include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <string>
 
@@ -18,6 +20,14 @@ class MetaToolsSuite : public IntegrationHarnessWithAllow {
 
 mcp::JsonValue make_args() {
   return mcp::JsonValue(mcp::JsonValue::object_tag);
+}
+
+std::size_t results_count(const mcp::JsonValue &result) {
+  const auto *results = result.Find("results");
+  if (results == nullptr || !results->IsArray()) {
+    return 0;
+  }
+  return results->GetArray().size();
 }
 
 TEST_F(MetaToolsSuite, PingReturnsPong) {
@@ -60,6 +70,59 @@ TEST_F(MetaToolsSuite, SearchToolsTagNodeReturnsNonEmptyResults) {
   ASSERT_NE(v, nullptr) << result.Dump();
   ASSERT_TRUE(v->IsArray()) << result.Dump();
   EXPECT_FALSE(v->GetArray().empty());
+}
+
+TEST_F(MetaToolsSuite, SearchToolsDefaultsToTwentyResults) {
+  mcp::JsonValue result = call("search_tools", make_args());
+  EXPECT_EQ(results_count(result), static_cast<std::size_t>(20)) << result.Dump();
+}
+
+TEST_F(MetaToolsSuite, SearchToolsLimitTenReturnsTenResults) {
+  mcp::JsonValue args = make_args();
+  args["limit"] = mcp::JsonValue(static_cast<int64_t>(10));
+  mcp::JsonValue result = call("search_tools", args);
+  EXPECT_EQ(results_count(result), static_cast<std::size_t>(10)) << result.Dump();
+}
+
+TEST_F(MetaToolsSuite, SearchToolsLimitZeroReturnsAllTools) {
+  mcp::JsonValue categories = call("list_categories", make_args());
+  const auto *category_list = categories.Find("categories");
+  ASSERT_NE(category_list, nullptr) << categories.Dump();
+  ASSERT_TRUE(category_list->IsArray()) << categories.Dump();
+  std::size_t total = 0;
+  for (const auto &category : category_list->GetArray()) {
+    const auto *count = category.Find("tool_count");
+    ASSERT_NE(count, nullptr) << category.Dump();
+    ASSERT_TRUE(count->IsInt()) << category.Dump();
+    total += static_cast<std::size_t>(count->GetInt());
+  }
+
+  mcp::JsonValue args = make_args();
+  args["limit"] = mcp::JsonValue(static_cast<int64_t>(0));
+  mcp::JsonValue result = call("search_tools", args);
+  EXPECT_EQ(results_count(result), total) << result.Dump();
+  EXPECT_GT(total, static_cast<std::size_t>(20));
+}
+
+TEST_F(MetaToolsSuite, SearchToolsNegativeLimitReturnsInvalidParameter) {
+  mcp::JsonValue args = make_args();
+  args["limit"] = mcp::JsonValue(static_cast<int64_t>(-1));
+  mcp::JsonValue result = call("search_tools", args);
+  const auto *error = result.Find("error");
+  ASSERT_NE(error, nullptr) << result.Dump();
+  ASSERT_TRUE(error->IsString()) << result.Dump();
+  EXPECT_EQ(error->GetString(),
+            "invalid parameter: limit must be a non-negative integer");
+  EXPECT_EQ(result.Find("results"), nullptr) << result.Dump();
+}
+
+TEST_F(MetaToolsSuite, SearchToolsCategoryHonorsLimit) {
+  mcp::JsonValue args = make_args();
+  args["category"] = mcp::JsonValue("Scene");
+  args["limit"] = mcp::JsonValue(static_cast<int64_t>(5));
+  mcp::JsonValue result = call("search_tools", args);
+  EXPECT_LE(results_count(result), static_cast<std::size_t>(5)) << result.Dump();
+  EXPECT_GT(results_count(result), static_cast<std::size_t>(0)) << result.Dump();
 }
 
 TEST_F(MetaToolsSuite, ListCategoriesReturnsNonEmptyCategories) {

@@ -1,6 +1,6 @@
 ---
 name: godot-autopilot
-description: "Entry point for using the GDA (godot-autopilot) plugin in a Godot project: read setup first, connect through gda status --json and mcp_url, discover tools with gda tools search and describe, call them with gda call, observe the editor and game, respect the confirm protocol, and follow the change-observe-verify loop. Use for any godot-autopilot work after installation."
+description: "Entry point for using the GDA (godot-autopilot) plugin in a Godot project: read setup first, connect through gda status --json and mcp_url, discover tools with live gda search/describe/tools list, call them with gda call, observe the editor and game, respect the confirm protocol, and follow the change-observe-verify loop. Use for any godot-autopilot work after installation."
 ---
 
 # Godot Autopilot
@@ -38,19 +38,22 @@ Tool names are snake_case and usually verb-first, but segment counts vary and
 names change as the toolset grows. Discovery is mandatory:
 
 ```bash
-gda tools search "tilemap cell"
-gda tools describe set_tilemap_cells
+gda search "tilemap cell"
+gda describe set_tilemap_cells
 gda call set_tilemap_cells --args '{"path": "Level", "cells": []}'
 ```
 
-1. `gda tools search <query>` searches the cached catalog by name,
-   description, category and tags. It works with no editor running.
-2. `gda tools describe <name>` prints the schema and the `side_effect` marker.
-   Read the schema before the first call; never infer parameter names.
+1. `gda search <query>` searches the live server by name, description, category
+   and tags; it returns at most 20 results by default.
+2. `gda describe <name>` prints the schema and the `side_effect` marker. Read
+   the schema before the first call; never infer parameter names.
 3. `gda call <name> --args '<json>'` (or `--args-file <path>`) executes one
    tool against the live editor.
-4. `gda search` and `gda describe` are the live variants that go through the
-   MCP server instead of the cached catalog. They need a running instance.
+4. `gda tools list` prints every directly callable tool when you need the full
+   inventory instead of a keyword search.
+
+Discovery is live-only; there is no offline catalog. Start an
+editor with `gda start --project <dir>` when no instance is running.
 
 Search by the object first ("tilemap cell", "animation track", "import
 sidecar"), then add a verb only when the result is too broad. Rerun with
@@ -96,7 +99,7 @@ running editor, so it matches the exact engine build in use.
 
 Reduce the task to its object and intent, then discover the family. The rows
 below name representative tools; confirm the current names and schemas with
-`gda tools search` and `gda tools describe`.
+`gda search` and `gda describe`.
 
 ### Read and inspect
 
