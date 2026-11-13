@@ -363,11 +363,14 @@ bool ServerContext::start() {
     }
     opts.enable_tasks_extension = true;
     opts.enable_skills_extension = true;
-    opts.task_store =
-        std::make_shared<mcp::FileTaskStore>(task_dir / "tasks.jsonl");
+    const std::string task_run_stamp = std::to_string(
+        std::chrono::system_clock::now().time_since_epoch().count());
+    const std::filesystem::path task_path =
+        task_dir / ("tasks-" + task_run_stamp + ".jsonl");
+    opts.task_store = std::make_shared<mcp::FileTaskStore>(task_path);
     monitor::lifecycle(
         "tasks_enabled",
-        monitor::build_attrs({{"path", (task_dir / "tasks.jsonl").string()}}));
+        monitor::build_attrs({{"path", task_path.string()}}));
     const mcp::CacheHint immediate_expiry_hint{int64_t{0}, "private"};
     opts.cache_hints = std::map<std::string, mcp::CacheHint, std::less<>>{
         {"server/discover", immediate_expiry_hint},
