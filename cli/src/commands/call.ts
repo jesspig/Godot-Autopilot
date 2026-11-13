@@ -122,10 +122,15 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
       usedTransport = actual;
     },
   });
-  const inputRequired = envelope.result !== null &&
+  const inputRequiredResult = envelope.result !== null &&
     typeof envelope.result === "object" &&
-    !Array.isArray(envelope.result) &&
-    (envelope.result as { input_required?: unknown }).input_required !== undefined;
+    !Array.isArray(envelope.result)
+    ? (envelope.result as { input_required?: unknown; inputRequests?: unknown; resultType?: unknown })
+    : null;
+  const inputRequired = inputRequiredResult !== null &&
+    (inputRequiredResult.input_required !== undefined ||
+      inputRequiredResult.inputRequests !== undefined ||
+      inputRequiredResult.resultType === "input_required");
   if (inputRequired) {
     let inputResponses: Record<string, unknown> | null = null;
     if (opts.inputText !== undefined) {
