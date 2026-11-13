@@ -5,7 +5,7 @@ description: "Godot server-layer RID tools guide: RenderingServer, PhysicsServer
 
 # Godot Server RID Tools
 
-Invocation: discover with `gda tools search` and `gda tools describe`, then call with `gda call`; the native MCP tools (`search_tools`, `get_tool_detail`, `call_tool`) are the compatibility path. Protocol details live in `godot-autopilot-tools`.
+Invocation: discover with `gda search` and `gda describe`, then call with `gda call`; the native MCP tools (`search_tools`, `get_tool_detail`, `call_tool`) are the compatibility path. Protocol details live in `godot-autopilot-tools`.
 
 godot-autopilot exposes the engine's server layer directly: `RenderingServer`,
 `TextServer`, `PhysicsServer2D`, `PhysicsServer3D`, `NavigationServer2D` and

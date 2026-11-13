@@ -5,7 +5,7 @@ description: "Godot 内容管线指南：TileMap 与 TileSet、AnimationPlayer �
 
 # Godot 内容管线
 
-调用方式：用 `gda tools search` 与 `gda tools describe` 发现，再用 `gda call`
+调用方式：用 `gda search` 与 `gda describe` 发现，再用 `gda call`
 调用；原生 MCP 工具（`search_tools`、`get_tool_detail`、`call_tool`）是兼容
 路径。协议细节见 `godot-autopilot-tools`。
 

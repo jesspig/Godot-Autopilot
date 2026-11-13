@@ -5,7 +5,7 @@ description: "Godot 服务器层 RID 工具指南：RenderingServer、PhysicsSer
 
 # Godot 服务器 RID 工具
 
-调用方式：用 `gda tools search` 与 `gda tools describe` 发现，再用 `gda call`
+调用方式：用 `gda search` 与 `gda describe` 发现，再用 `gda call`
 调用；原生 MCP 工具（`search_tools`、`get_tool_detail`、`call_tool`）是兼容
 路径。协议细节见 `godot-autopilot-tools`。
 
@@ -121,8 +121,8 @@ godot-autopilot 直接暴露引擎服务器层：`RenderingServer`、`TextServer
 物理查询：
 
 ```bash
-gda tools search "physics 3d ray"
-gda tools describe intersect_physics_3d_ray
+gda search "physics 3d ray"
+gda describe intersect_physics_3d_ray
 gda call intersect_physics_3d_ray --args '{"space_rid": 1, "from": {"x": 0, "y": 1, "z": 0}, "to": {"x": 0, "y": -1, "z": 0}}'
 ```
 

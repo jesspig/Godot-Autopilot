@@ -1,6 +1,6 @@
 ---
 name: godot-autopilot-tools
-description: "Godot Autopilot 的 CLI-first 调用参考：gda 命令与参数面、通过插件实例索引发现目标、gda tools search/describe 与 gda call、作为兼容面的原生 MCP 工具、高风险副作用的 confirm 与 MCP annotations、错误水位协议与错误码、batch_execute/code_execute 语义、响应限制，以及动态用户工具。适用于查询调用协议事实。"
+description: "Godot Autopilot 的 CLI-first 调用参考：gda 命令与参数面、通过插件实例索引发现目标、实时 gda search/describe/tools list 与 gda call、作为兼容面的原生 MCP 工具、高风险副作用的 confirm 与 MCP annotations、错误水位协议与错误码、batch_execute/code_execute 语义、响应限制，以及动态用户工具。适用于查询调用协议事实。"
 ---
 
 # Godot Autopilot 调用协议
@@ -41,9 +41,7 @@ description: "Godot Autopilot 的 CLI-first 调用参考：gda 命令与参数�
 | `gda logs` | 显示实例日志。 |
 | `gda skills list` | 列出已安装技能书。 |
 | `gda skills show <name>` | 打印一册；`--file <rel>` 读取附属文件。 |
-| `gda tools list` | 列出缓存的离线工具目录。 |
-| `gda tools search <query>` | 搜索缓存目录。 |
-| `gda tools describe <name>` | 显示一个缓存工具的 schema。 |
+| `gda tools list` | 列出实时实例的全部直接工具；`--category`/`--tags` 可缩小范围。 |
 | `gda projects` | 离线列出已知 Godot 工程。 |
 | `gda cache list` | 列出缓存 manifest。 |
 | `gda cache info` | 显示缓存根、条目数与大小。 |
@@ -57,7 +55,7 @@ description: "Godot Autopilot 的 CLI-first 调用参考：gda 命令与参数�
 - 目标选择：`--port <n>`（仅连接覆盖）、`--id <id>`、`--project <dir>`、
   `--socket <path>`、`--transport auto|ipc|http`、`--no-fallback`。
 - 输入：`--args <json>`、`--args-file <path>`、`--confirm`、`--timeout <sec>`。
-- 发现过滤：`--category <name>`、`--tags <a,b>`、`--refresh`。
+- 发现过滤：`--category <name>`、`--tags <a,b>`（用于 `gda search` 与 `gda tools list`）。
 - 输出：`--json`、`--pretty`、`--raw`、`--save-images <dir>`。
 - 生命周期：`--godot <path>`、`--headless`、`--play`、`--no-import`、
   `--wait <sec>`、`--force`、`--tail <n>`、`--probe <light|strict>`。
@@ -94,15 +92,16 @@ CLI 按以下顺序解析目标：显式 `--socket`/`--port`、按 `--id` 查实
 ## 发现协议——先搜索，禁止猜
 
 1. `gda ping` 确认服务器响应。
-2. `gda tools search <query>` 按名称、描述、分类与标签搜索缓存目录；用
-   `--category` 或 `--tags` 缩小范围。
-3. `gda tools describe <name>` 打印 schema、描述与 `side_effect` 标记。首次
-   写入前必读。
+2. `gda search <query>` 通过实时服务器按名称、描述、分类与标签搜索；用
+   `--category` 或 `--tags` 缩小范围。服务端默认最多返回 20 条。
+3. `gda describe <name>` 打印 schema、描述与 `side_effect` 标记。首次写入前
+   必读。
 4. `gda call <name> --args '<json>'` 执行；大参数用 `--args-file`。
-5. 缓存缺少某个工具时，用 `gda tools list --refresh` 从实时实例刷新目录。
+5. `gda tools list` 以 `{tools, total}` 列出全部可直接调用的工具，排除 5 个
+   MCP 协议工具。它用于全量清单，不用于关键词搜索。
 
-`gda search` 与 `gda describe` 是实时等价命令，需要运行中的实例；缓存可能
-过期时使用它们。
+发现只有实时通道：CLI 不保留离线工具目录。没有运行中的
+实例时，用 `gda start --project <dir>` 启动。
 
 先按对象搜索，再按操作搜索："tilemap cell"、"animation track"、
 "import sidecar"。对象太宽时才加动词。下结论说工具不存在前，用同义词重试：
@@ -112,7 +111,7 @@ tile/cell、sprite/texture、log/output、delete/remove/erase、create/add/new�
 示例：
 
 ```bash
-gda tools describe create_scene_node
+gda describe create_scene_node
 gda call create_scene_node --args '{"parent_path": "Root", "name": "Player", "type": "CharacterBody2D", "properties": {"position": {"x": 0, "y": -10}}}'
 ```
 
@@ -122,7 +121,8 @@ gda call create_scene_node --args '{"parent_path": "Root", "name": "Player", "ty
 `get_tool_detail`、`call_tool`、`batch_execute`、`code_execute`。所有领域工具
 通过 `call_tool` 的 `name` 与 `arguments` 执行；`call_tool` 还接受顶层
 `confirm` 布尔值。`search_tools` / `get_tool_detail` 的用法与
-`gda tools search` / `gda tools describe` 相同。
+`gda search` / `gda describe` 相同。`search_tools` 默认最多 20 条；只有确需
+全量枚举时才传 `limit: 0`。
 
 ## 确认与 annotations
 

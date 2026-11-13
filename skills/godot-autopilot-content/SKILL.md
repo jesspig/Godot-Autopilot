@@ -5,7 +5,7 @@ description: "Godot content pipeline guide: TileMap and TileSet, AnimationPlayer
 
 # Godot Content Pipeline
 
-Invocation: discover with `gda tools search` and `gda tools describe`, then call with `gda call`; the native MCP tools (`search_tools`, `get_tool_detail`, `call_tool`) are the compatibility path. Protocol details live in `godot-autopilot-tools`.
+Invocation: discover with `gda search` and `gda describe`, then call with `gda call`; the native MCP tools (`search_tools`, `get_tool_detail`, `call_tool`) are the compatibility path. Protocol details live in `godot-autopilot-tools`.
 
 Four content domains via godot-autopilot: TileMap and TileSet levels,
 AnimationPlayer and AnimationTree animation, audio buses and playback, and
