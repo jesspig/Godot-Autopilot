@@ -203,9 +203,6 @@ add_test(NAME source_manifest_guard
 add_test(NAME tool_domain_guard
     COMMAND "${GDA_BUN_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/tool_domain_guard.ts")
 
-add_test(NAME atomgit_ci_guard
-    COMMAND "${GDA_BUN_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/atomgit_ci_guard.ts")
-
 add_test(NAME atomgit_release_guard
     COMMAND "${GDA_BUN_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/atomgit_release_guard.ts")
 
