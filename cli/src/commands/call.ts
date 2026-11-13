@@ -114,6 +114,7 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
     noFallback: opts.noFallback,
     traceparent,
     progressSink,
+    keepTask: opts.async === true,
     transportSink: (actual) => {
       usedTransport = actual;
     },
@@ -154,6 +155,7 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
       traceparent,
       progressSink,
       inputResponses,
+      keepTask: opts.async === true,
       transportSink: (actual) => {
         usedTransport = actual;
       },

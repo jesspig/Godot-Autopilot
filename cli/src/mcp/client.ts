@@ -26,6 +26,7 @@ export interface CallToolOptions {
   traceparent?: string;
   progressSink?: (progress: RequestProgress) => void;
   inputResponses?: Record<string, unknown>;
+  keepTask?: boolean;
 }
 
 export const META_DIRECT_TOOLS: ReadonlySet<string> = new Set([
@@ -341,7 +342,47 @@ export async function callTool(
   const params: Record<string, unknown> = opts.direct === true
     ? { name, arguments: args }
     : { name: "call_tool", arguments: { name, arguments: args } };
-  return request("tools/call", params, opts);
+  const response = await request("tools/call", params, opts);
+  if (opts.keepTask === true) return response;
+  const result = response.result;
+  if (result === null || typeof result !== "object" || Array.isArray(result)) return response;
+  const record = result as { resultType?: unknown; taskId?: unknown; status?: unknown };
+  const taskId = typeof record.taskId === "string" ? record.taskId : "";
+  if (record.resultType !== "task" && taskId === "") return response;
+  return await waitForTask(response, taskId, opts);
+}
+
+async function waitForTask(
+  initial: JsonRpcResponse,
+  taskId: string,
+  opts: CallToolOptions,
+): Promise<JsonRpcResponse> {
+  if (taskId === "") {
+    return { id: initial.id, error: { code: -32000, message: "task result is missing taskId" } };
+  }
+  const timeoutMs = (opts.timeoutSec ?? DEFAULT_TIMEOUT_SEC) * 1000;
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const polled = await request("tasks/get", { taskId }, { ...opts, keepTask: true });
+    if (polled.error !== undefined) return polled;
+    const result = polled.result;
+    if (result === null || typeof result !== "object" || Array.isArray(result)) {
+      return { id: initial.id, error: { code: -32000, message: "invalid tasks/get result" } };
+    }
+    const task = result as { status?: unknown; result?: unknown; error?: unknown; statusMessage?: unknown };
+    const status = typeof task.status === "string" ? task.status : "";
+    if (status === "completed") {
+      return { id: initial.id, result: task.result ?? { content: [] } };
+    }
+    if (status === "failed" || status === "cancelled") {
+      const message = typeof task.statusMessage === "string" ? task.statusMessage : `task ${status}`;
+      return { id: initial.id, error: { code: -32000, message } };
+    }
+    if (Date.now() >= deadline) {
+      return { id: initial.id, error: { code: -32000, message: `task ${taskId} timed out` } };
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
 }
 
 export async function request(
