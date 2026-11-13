@@ -1,6 +1,18 @@
 import fs from "node:fs";
 import path from "node:path";
-import { createInterface } from "node:readline/promises";
+import {
+  cancel,
+  confirm as promptConfirm,
+  intro,
+  isCancel,
+  log,
+  multiselect,
+  note,
+  outro,
+  path as promptPath,
+  select,
+  text as promptText,
+} from "@clack/prompts";
 
 import { runBuild } from "./commands/build";
 import { runClean } from "./commands/clean";
@@ -9,22 +21,18 @@ import { runPackage } from "./commands/package";
 import { runTests } from "./commands/test";
 import { DEPLOY_TARGETS, DEMO_NAMES, PLATFORM_LIBS, addonDir, hostPlatform } from "./lib/config";
 
-const ANSI = {
-  reset: "\u001b[0m",
-  bold: "\u001b[1m",
-  dim: "\u001b[2m",
-  red: "\u001b[31m",
-  green: "\u001b[32m",
-  yellow: "\u001b[33m",
-  cyan: "\u001b[36m",
-};
-
 const MENU_ACTIONS = ["构建", "部署", "打包", "清理", "跑测试", "查看部署状态", "退出"] as const;
 type MenuAction = (typeof MENU_ACTIONS)[number];
 
-type Prompt = ReturnType<typeof createInterface>;
-
 class Cancelled extends Error {}
+
+function unwrap<T>(value: T): Exclude<T, symbol> {
+  if (isCancel(value)) {
+    cancel("已取消");
+    throw new Cancelled();
+  }
+  return value as Exclude<T, symbol>;
+}
 
 function wideCodePoint(code: number): boolean {
   return (
@@ -49,83 +57,6 @@ function displayWidth(text: string): number {
 
 function pad(text: string, width: number): string {
   return text + " ".repeat(Math.max(0, width - displayWidth(text)));
-}
-
-function banner(text: string, tone: "info" | "ok" | "warn" | "error" = "info"): void {
-  const color =
-    tone === "ok" ? ANSI.green : tone === "warn" ? ANSI.yellow : tone === "error" ? ANSI.red : ANSI.cyan;
-  const width = displayWidth(text) + 2;
-  console.log(`${color}┌${"─".repeat(width)}┐`);
-  console.log(`│ ${text} │`);
-  console.log(`└${"─".repeat(width)}┘${ANSI.reset}`);
-}
-
-async function ask(rl: Prompt, message: string): Promise<string> {
-  try {
-    return (await rl.question(message)).trim();
-  } catch {
-    throw new Cancelled();
-  }
-}
-
-async function select(rl: Prompt, title: string, choices: readonly string[]): Promise<string> {
-  console.log(`\n${ANSI.bold}${title}${ANSI.reset}`);
-  choices.forEach((choice, index) => {
-    console.log(`  ${ANSI.cyan}${index + 1}${ANSI.reset}) ${choice}`);
-  });
-  for (;;) {
-    const raw = await ask(rl, `选择 [1-${choices.length}]（默认 1）: `);
-    if (raw === "") return choices[0];
-    const index = Number(raw);
-    if (Number.isInteger(index) && index >= 1 && index <= choices.length) return choices[index - 1];
-    console.log(`${ANSI.yellow}无效输入：${raw}${ANSI.reset}`);
-  }
-}
-
-async function multiSelect(
-  rl: Prompt,
-  title: string,
-  choices: readonly string[],
-  defaults: readonly boolean[],
-): Promise<string[]> {
-  console.log(`\n${ANSI.bold}${title}${ANSI.reset}`);
-  choices.forEach((choice, index) => {
-    console.log(`  ${ANSI.cyan}${index + 1}${ANSI.reset}) [${defaults[index] ? "x" : " "}] ${choice}`);
-  });
-  console.log(`${ANSI.dim}输入序号（空格分隔，回车采用默认；输入 none 表示全不选）${ANSI.reset}`);
-  for (;;) {
-    const raw = await ask(rl, "选择: ");
-    if (raw === "") return choices.filter((_, index) => defaults[index]);
-    if (raw.toLowerCase() === "none") return [];
-    const picked = new Set<number>();
-    let valid = true;
-    for (const token of raw.split(/[\s,]+/).filter((item) => item !== "")) {
-      const index = Number(token);
-      if (!Number.isInteger(index) || index < 1 || index > choices.length) {
-        console.log(`${ANSI.yellow}无效序号：${token}${ANSI.reset}`);
-        valid = false;
-        break;
-      }
-      picked.add(index - 1);
-    }
-    if (!valid) continue;
-    if (picked.size === 0) return [];
-    return choices.filter((_, index) => picked.has(index));
-  }
-}
-
-async function confirm(rl: Prompt, title: string, defaultValue: boolean): Promise<boolean> {
-  const hint = defaultValue ? "Y/n" : "y/N";
-  const raw = (await ask(rl, `${title} [${hint}]: `)).toLowerCase();
-  if (raw === "") return defaultValue;
-  if (raw === "y" || raw === "yes") return true;
-  if (raw === "n" || raw === "no") return false;
-  console.log(`${ANSI.yellow}无效输入：${raw}${ANSI.reset}`);
-  return confirm(rl, title, defaultValue);
-}
-
-async function text(rl: Prompt, title: string): Promise<string> {
-  return ask(rl, `${title}: `);
 }
 
 function formatMtime(target: string): string {
@@ -170,32 +101,53 @@ function renderStatusTable(): string {
 }
 
 function printStatus(): void {
-  console.log(`\n${ANSI.bold}插件部署状态${ANSI.reset}`);
-  console.log(renderStatusTable());
+  note(renderStatusTable(), "插件部署状态");
 }
 
-async function actionBuild(rl: Prompt): Promise<void> {
-  const presetName = await select(rl, "构建类型", ["Debug", "Release"]);
-  banner(`构建 ${presetName}`);
+async function choosePreset(message: string): Promise<"Debug" | "Release"> {
+  return unwrap(
+    await select<"Debug" | "Release">({
+      message,
+      options: [
+        { value: "Debug", label: "Debug", hint: "开发迭代" },
+        { value: "Release", label: "Release", hint: "发布产物" },
+      ],
+    }),
+  );
+}
+
+async function actionBuild(): Promise<void> {
+  const presetName = await choosePreset("构建类型");
+  log.step(`构建 ${presetName}`);
   const code = await runBuild({ release: presetName === "Release", debug: presetName === "Debug" });
-  if (code === 0) banner(`构建完成（${presetName}）`, "ok");
-  else banner(`构建失败（退出码 ${code}）`, "error");
+  if (code === 0) note(`构建完成（${presetName}）`, "构建");
+  else note(`构建失败（退出码 ${code}）`, "构建");
 }
 
-async function actionDeploy(rl: Prompt): Promise<void> {
-  const presetName = await select(rl, "部署哪一版产物", ["Debug", "Release"]);
-  const names = await multiSelect(
-    rl,
-    "部署目标（空格多选，回车部署全部）",
-    DEMO_NAMES,
-    DEMO_NAMES.map(() => true),
+async function actionDeploy(): Promise<void> {
+  const presetName = await choosePreset("部署哪一版产物");
+  const names = unwrap(
+    await multiselect<string>({
+      message: "部署目标（空格多选，回车确认）",
+      options: DEMO_NAMES.map((name) => ({ value: name, label: name })),
+      initialValues: [...DEMO_NAMES],
+      required: false,
+    }),
   );
   if (names.length === 0) {
-    banner("未选择任何 demo，已取消", "warn");
+    log.warn("未选择任何 demo，已取消");
     return;
   }
-  if (presetName === "Release" && !(await confirm(rl, "Release 部署前会清理各 demo 的 .godot 与 addons，继续？", false))) {
-    banner("已取消", "warn");
+  if (
+    presetName === "Release" &&
+    !unwrap(
+      await promptConfirm({
+        message: "Release 部署前会清理各 demo 的 .godot 与 addons，继续？",
+        initialValue: false,
+      }),
+    )
+  ) {
+    log.warn("已取消");
     return;
   }
   const code = await runDeploy({
@@ -204,91 +156,142 @@ async function actionDeploy(rl: Prompt): Promise<void> {
     demos: names,
   });
   if (code === 0) {
-    banner(`部署完成（${presetName}，${names.length} 个 demo）`, "ok");
+    note(`部署完成（${presetName}，${names.length} 个 demo）`, "部署");
     printStatus();
   } else {
-    banner(`部署失败（退出码 ${code}）`, "error");
+    note(`部署失败（退出码 ${code}）`, "部署");
   }
 }
 
-async function actionPackage(rl: Prompt): Promise<void> {
-  const useLibs = await confirm(rl, "是否从三平台库目录收集后再打包？", false);
+async function actionPackage(): Promise<void> {
+  const useLibs = unwrap(
+    await promptConfirm({
+      message: "是否从三平台库目录收集后再打包？",
+      initialValue: false,
+    }),
+  );
   let libsDir: string | null = null;
   if (useLibs) {
-    const raw = await text(rl, "三平台库目录");
+    const raw = unwrap(
+      await promptPath({
+        message: "三平台库目录",
+        directory: true,
+        initialValue: ".",
+      }),
+    ).trim();
     if (raw === "") {
-      banner("未输入目录，已取消", "warn");
+      log.warn("未输入目录，已取消");
       return;
     }
     if (!fs.existsSync(raw) || !fs.statSync(raw).isDirectory()) {
-      banner(`目录不存在：${raw}`, "error");
+      log.error(`目录不存在：${raw}`);
       return;
     }
     libsDir = raw;
   }
   const code = runPackage(libsDir);
-  if (code === 0) banner("打包完成", "ok");
-  else banner(`打包失败（退出码 ${code}）`, "error");
+  if (code === 0) note("打包完成", "打包");
+  else note(`打包失败（退出码 ${code}）`, "打包");
 }
 
-async function actionClean(rl: Prompt): Promise<void> {
-  if (!(await confirm(rl, "清理全部 demo 的 .godot 与 addons？", false))) {
-    banner("已取消", "warn");
+async function actionClean(): Promise<void> {
+  if (
+    !unwrap(
+      await promptConfirm({
+        message: "清理全部 demo 的 .godot 与 addons？",
+        initialValue: false,
+      }),
+    )
+  ) {
+    log.warn("已取消");
     return;
   }
   const code = runClean();
-  if (code === 0) banner("清理完成", "ok");
-  else banner(`清理失败（退出码 ${code}）`, "error");
+  if (code === 0) note("清理完成", "清理");
+  else note(`清理失败（退出码 ${code}）`, "清理");
 }
 
-async function actionTest(rl: Prompt): Promise<void> {
-  const scope = await select(rl, "测试范围", ["全量默认门", "单跑用例/守卫"]);
-  const preset = await select(rl, "测试预设", ["debug", "release"]);
+async function actionTest(): Promise<void> {
+  const scope = unwrap(
+    await select<"all" | "single">({
+      message: "测试范围",
+      options: [
+        { value: "all", label: "全量默认门", hint: "单元 + 边界 + 集成 + 守卫 + CLI" },
+        { value: "single", label: "单跑用例/守卫", hint: "按名称过滤" },
+      ],
+    }),
+  );
+  const preset = unwrap(
+    await select<"debug" | "release">({
+      message: "测试预设",
+      options: [
+        { value: "debug", label: "debug" },
+        { value: "release", label: "release" },
+      ],
+    }),
+  );
   let single: string | null = null;
-  if (scope === "单跑用例/守卫") {
-    const name = await text(rl, "用例名（如 migration_guard）");
+  if (scope === "single") {
+    const name = unwrap(
+      await promptText({
+        message: "用例名（如 migration_guard）",
+        placeholder: "migration_guard",
+      }),
+    ).trim();
     if (name === "") {
-      banner("用例名为空，已取消", "warn");
+      log.warn("用例名为空，已取消");
       return;
     }
     single = name;
   }
   const code = runTests({ preset, single });
-  if (code === 0) banner("测试通过", "ok");
-  else banner(`测试失败（退出码 ${code}）`, "error");
+  if (code === 0) note("测试通过", "测试");
+  else note(`测试失败（退出码 ${code}）`, "测试");
+}
+
+async function runAction(action: MenuAction): Promise<void> {
+  if (action === "构建") await actionBuild();
+  else if (action === "部署") await actionDeploy();
+  else if (action === "打包") await actionPackage();
+  else if (action === "清理") await actionClean();
+  else if (action === "跑测试") await actionTest();
+  else printStatus();
 }
 
 export async function runTui(): Promise<number> {
-  if (process.stdin.isTTY !== true) {
-    console.error(
-      `${ANSI.red}tui 需要交互式终端，请在终端中运行；无终端环境请改用 ` +
-        `bun run gda-dev-tools build / package / clean 等命令。${ANSI.reset}`,
-    );
+  if (process.stdin.isTTY !== true || process.stdout.isTTY !== true) {
+    console.error("tui 需要交互式终端，请在终端中运行；无终端环境请改用 bun run gda-dev-tools <子命令>。");
     return 2;
   }
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  rl.on("SIGINT", () => {
-    rl.close();
-  });
-  try {
-    banner("Godot-Autopilot 构建控制台");
-    for (;;) {
-      const action = (await select(rl, "选择操作", MENU_ACTIONS)) as MenuAction;
-      if (action === "退出") return 0;
-      if (action === "构建") await actionBuild(rl);
-      else if (action === "部署") await actionDeploy(rl);
-      else if (action === "打包") await actionPackage(rl);
-      else if (action === "清理") await actionClean(rl);
-      else if (action === "跑测试") await actionTest(rl);
-      else printStatus();
+  intro("Godot-Autopilot 构建控制台");
+  for (;;) {
+    let action: MenuAction;
+    try {
+      action = unwrap(
+        await select<MenuAction>({
+          message: "选择操作",
+          options: MENU_ACTIONS.map((value) => ({ value, label: value })),
+        }),
+      );
+    } catch (error) {
+      if (error instanceof Cancelled) {
+        outro("已退出");
+        return 0;
+      }
+      throw error;
     }
-  } catch (error) {
-    if (error instanceof Cancelled) {
-      console.log(`\n${ANSI.yellow}已取消。${ANSI.reset}`);
+    if (action === "退出") {
+      outro("已退出");
       return 0;
     }
-    throw error;
-  } finally {
-    rl.close();
+    try {
+      await runAction(action);
+    } catch (error) {
+      if (error instanceof Cancelled) {
+        log.warn("已取消，返回主菜单");
+        continue;
+      }
+      throw error;
+    }
   }
 }
