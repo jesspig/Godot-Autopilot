@@ -19,13 +19,13 @@ resource: tests/
 
 测试由根 `CMakeLists.txt` 的 `GDA_ENABLE_TESTS` 引入（`CMakeLists.txt:100`）。该开关已固化在 `CMakePresets.json` 的 `base-debug`/`base-release` 基座（cacheVariables 默认 `ON`），并经 `inherits` 下发给全部 4 个可执行 configure 预设（`debug`/`debug-portable`/`release`/`release-portable`），**清理/重建 `build/` 后重新配置（`bun run gda-dev-tools build` 或 `cmake --preset debug`）自动恢复测试目标，无需手动传参**；直接以裸 `cmake`（不带 preset）配置时仍为默认 OFF。
 
-**三层 + 守卫与脚本项**（全部零引擎、零 Godot 进程；注册总数以 `ctest --preset debug -N` 实测为准——2026-11-13 新增 `no_python_guard` 与自测两条，本页未重跑）：
+**三层 + 守卫与脚本项**（全部零引擎、零 Godot 进程；2026-11-14 T-21 删除 REST 时代测试后实测 **864 = 568 + 190 + 88 + 16 + 2**，其中守卫含 `atomgit_ci_guard` / `atomgit_release_guard`）：
 
 | 层 | ctest 载体 | 数量 | 标签 | 判定方式 | 验证对象 |
 |---|---|---|---|---|---|
-| 单元 | `gda_unit_tests`（gtest，`gtest_discover_tests` 逐条注册） | 636（53 文件） | `unit` | gtest 断言 | 合法输入下的模块行为：纯逻辑、编解码、注册与查询 |
-| 边界 | `gda_boundary_tests`（gtest，同上） | 239（22 文件） | `boundary` | gtest 断言 | 非法 / 极端输入与拒绝路径：参数校验、错误映射、预算超时、门控守卫 |
-| 集成 | `gda_integration_tests`（gtest，同上） | 109（12 文件） | `integration` | gtest 断言 | 进程内 inline 派发的 handler 契约（参数校验 / 授权门 / 错误串 / 注册面），零引擎零项目绑定 |
+| 单元 | `gda_unit_tests`（gtest，`gtest_discover_tests` 逐条注册） | 568（48 文件） | `unit` | gtest 断言 | 合法输入下的模块行为：纯逻辑、编解码、注册与查询 |
+| 边界 | `gda_boundary_tests`（gtest，同上） | 190（20 文件） | `boundary` | gtest 断言 | 非法 / 极端输入与拒绝路径：参数校验、错误映射、预算超时、门控守卫 |
+| 集成 | `gda_integration_tests`（gtest，同上） | 88（12 文件） | `integration` | gtest 断言 | 进程内 inline 派发的 handler 契约（参数校验 / 授权门 / 错误串 / 注册面），零引擎零项目绑定 |
 | 守卫与脚本项 | `tests/CMakeLists.txt` 的 `add_test`（含 `no_python_guard`、源码守卫、守卫自测、`cli_contract` / `cli_unit`） | 以 `ctest -N` 为准 | `guard` / `cli` | 脚本退出码 | 源码纪律、无 Python 回退与 CLI wire 形状 |
 | 合计 | `ctest -N` | 以实测为准 | — | — | — |
 

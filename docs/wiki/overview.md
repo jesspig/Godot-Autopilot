@@ -131,7 +131,7 @@ godot-self-driving/
 ├── CMakeLists.txt              # add_library(godot-autopilot SHARED ...)，新 .cpp 必须登记
 ├── CMakePresets.json           # 6 个 configure 预设：base-debug/base-release（hidden 基座）+ debug/release（Ninja）+ debug-portable/release-portable（平台默认生成器）
 ├── devtools/                   # 开发链 Bun/TS 实现：main.ts + tui.ts + lib/{config,cmake,gdextension,zip}.ts + commands/{build,deploy,clean,package,package-check,test}.ts
-├── scripts/                    # 仅发布辅助脚本：install.ps1 / install.sh / mirror_atomgit.sh
+├── scripts/                    # 仅发布辅助脚本：install.ps1 / install.sh
 ├── cmake/                      # 构建模块：Dependencies / BuildOptimization / Lto / Cache / CompilerOptions / Platform / skill_gen
 ├── tools/                      # 构建辅助脚本：embed_skills.ts（经 cmake/skill_gen.cmake 调用，构建期嵌入 skill 内容）
 ├── third_party/                # git submodule 依赖：godot-cpp / mcp-cpp-sdk / googletest（版本由 gitlink commit 锁定，见 .gitmodules）

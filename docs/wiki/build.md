@@ -124,10 +124,17 @@ resource:
 
 | job | 内容 |
 |---|---|
-| validate | 校验 tag 与根 `VERSION` 一致（`v` 前缀可选：`v0.3.2` / `0.3.2` ↔ `0.3.2`，版本号以根 `VERSION` 为准，当前 0.3.2），不一致 fail |
+| validate | 校验 tag 与根 `VERSION` 一致（`v` 前缀可选：`v0.3.3` / `0.3.3` ↔ `0.3.3`，版本号以根 `VERSION` 为准，当前 0.3.3），不一致 fail |
 | build | 同 CI 环境（Ninja/sccache/msvc-dev-cmd，ninja 由 `seanmiddleditch/gha-setup-ninja@v5` 提供，故 `resolvePreset` 恒选 `release`；checkout 带 `submodules: true`，缓存同 CI 改为 `key: submodules-release-${{ runner.os }}-${{ steps.submodules.outputs.shas }}`），Release 构建后按精确文件名上传各平台库 artifact（天然排除 pdb） |
 | cli | 5 个目标的 `bun build --compile` 独立二进制（`windows-x64` / `linux-x64` / `linux-x64-musl` / `macos-arm64` / `macos-x64`），macOS 产物 ad-hoc 签名（`codesign --force --sign -`），各自打 zip/tar.gz 后上传 artifact；二进制名带根 `VERSION` |
-| package | 下载全部 artifact → `bun run gda-dev-tools package --libs-dir dist` 合并 → **跑 `bun run gda-dev-tools package-check dist/godot-autopilot-*.zip` 自检（失败即中止发布）** → 重命名为 `addons.zip` → 收集 `cli-dist/` 下二进制并生成 `sha256sums.txt` → softprops/action-gh-release 一并发布（`addons.zip` + `gda-<version>-<platform>.*` + 校验和） |
+| package | 下载全部 artifact → `bun run gda-dev-tools package --libs-dir dist` 合并 → **跑 `bun run gda-dev-tools package-check dist/godot-autopilot-*.zip` 自检（失败即中止发布）** → 重命名为 `addons.zip` → 收集 `cli-dist/` 下二进制并生成 `sha256sums.txt` → softprops/action-gh-release 一并发布（`addons.zip` + `gda-<version>-<platform>.*` + 校验和）→ **Mirror to AtomGit**（凭据缺失时显式 skip）；同一资产集同时出现在 GitHub Release 与 AtomGit Release |
+
+### AtomGit Actions 与 Release 镜像
+
+- AtomGit 原生 CI：`.gitcode/workflows/ci.yml`，push/PR 到 `develop`/`main` 触发，在 AtomGit 托管 Ubuntu runner（`[ubuntu-latest, x64, medium]`）上安装 Bun/Ninja、初始化子模块，跑 no-python guard、Debug 构建、全量 ctest、CLI 测试与 typecheck。托管 runner 只有 Linux，不声明 Windows/macOS 覆盖。
+- Release 镜像：`tools/mirror_atomgit.ts` 是唯一实现（原 `scripts/mirror_atomgit.sh` 已删除）。它使用 AtomGit OpenAPI v5：创建/查找 Release、为每个资产取 `upload_url`、PUT 上传、同名旧附件先删除。`--dry-run` 离线校验 8 个资产（addons.zip、5 个 CLI 包、sha256sums.txt）并打印 SHA-256。
+- 凭据：GitHub 仓库 secrets `ATOMGIT_TOKEN`、vars `ATOMGIT_REPO`。缺失时 release workflow 打印 skip 并以成功退出，不阻塞 GitHub Release。
+- 安装脚本的 AtomGit 下载路径由 `GDA_ATOMGIT_BASE` 控制；镜像后的资产名与 GitHub Release 一致。
 
 macOS runner 为 ARM64，preset 设 `CMAKE_OSX_ARCHITECTURES=x86_64;arm64` 编译 universal 双架构（仅 Apple 平台生效），gdextension 对应条目为 `macos.{debug,release}.universal`。
 

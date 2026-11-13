@@ -289,3 +289,18 @@ jobs:
             addons.zip
             cli-dist/gda-*
             cli-dist/sha256sums.txt
+
+      - name: Mirror to AtomGit
+        env:
+          GDA_ATOMGIT_TOKEN: ${{ secrets.ATOMGIT_TOKEN }}
+          GDA_ATOMGIT_REPO: ${{ vars.ATOMGIT_REPO }}
+          TAG_NAME: ${{ inputs.tag || github.ref_name }}
+        run: |
+          if [ -z "$GDA_ATOMGIT_TOKEN" ] || [ -z "$GDA_ATOMGIT_REPO" ]; then
+            echo "AtomGit credentials are not configured; skipping mirror."
+            exit 0
+          fi
+          mkdir -p atomgit-dist
+          cp addons.zip atomgit-dist/
+          cp cli-dist/* atomgit-dist/
+          bun tools/mirror_atomgit.ts --dir atomgit-dist --tag "$TAG_NAME"
