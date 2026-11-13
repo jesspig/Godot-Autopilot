@@ -8,6 +8,7 @@
     "build:skills-asset": "bun cli/scripts/build-skills-asset.ts"
   },
   "devDependencies": {
+    "@clack/prompts": "^1.9.0",
     "typescript": "^5.6.0",
     "@types/bun": "latest"
   }
