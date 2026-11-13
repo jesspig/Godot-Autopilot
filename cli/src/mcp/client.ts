@@ -129,7 +129,7 @@ function makeInitializeEnvelope(): string {
     method: "initialize",
     params: {
       protocolVersion: PROTOCOL_VERSION,
-      capabilities: {},
+      capabilities: { elicitation: {} },
       clientInfo: { name: CLIENT_NAME, version: CLI_VERSION },
     },
   });
