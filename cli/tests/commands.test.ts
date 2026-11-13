@@ -162,7 +162,8 @@ describe("请求形状", () => {
     const code = await call(["delete_scene_node"], { portText: String(port), direct: true });
     cap.restore();
     expect(code).toBe(ExitCode.Success);
-    expect(requests[0].params).toEqual({ name: "delete_scene_node", arguments: {} });
+    const toolCall = requests.find((request) => request.method === "tools/call");
+    expect(toolCall?.params).toEqual({ name: "delete_scene_node", arguments: {} });
   });
 
   test("describe 直达 get_tool_detail", async () => {

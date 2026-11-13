@@ -3,7 +3,7 @@ import * as readline from "node:readline/promises";
 import type { GlobalOptions } from "../args";
 import { parseTransport } from "../args";
 import { CliError, ExitCode } from "../errors";
-import { callTool, META_DIRECT_TOOLS } from "../mcp/client";
+import { callTool, ensureConnection, META_DIRECT_TOOLS } from "../mcp/client";
 import { err } from "../output";
 import { assertCallFamilyUsage, callTimeoutSec, emit, extractPayload, loadToolArguments } from "../payload";
 import { findById, findLiveByProject } from "../registry";
@@ -104,6 +104,9 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
     }
   }
   const target = resolveTarget(opts, TARGET_CONTEXT);
+  if (opts.direct === true) {
+    await ensureConnection(target.port, timeoutSec);
+  }
   let usedTransport = transport;
   let envelope = await callTool(tool, args, {
     port: target.port,
