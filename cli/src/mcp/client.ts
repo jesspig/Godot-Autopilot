@@ -457,7 +457,8 @@ export async function request(
       extracted = extractEnvelope(res, opts.progressSink);
     }
   }
-  if (!state.done && extracted.kind === "envelope" &&
+  if (!state.done && res.status >= 200 && res.status < 300 &&
+      extracted.kind === "envelope" &&
       (extracted.envelope as { error?: unknown } | null)?.error !== undefined) {
     await performHandshake(url, timeoutMs);
     id = nextRequestId++;
