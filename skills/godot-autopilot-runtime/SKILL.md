@@ -85,6 +85,15 @@ drop. Do not debug a half-dead process: stop with `stop_editor_playing` and
 rerun `play_editor_current_scene`. A live scene with a plausible `node_count`
 but no gameplay progress is a hang, not a reload failure.
 
+## Observe the runtime from the CLI
+
+`gda resources read` exposes editor and debugger state without a tool call:
+`godot://editor/output-log` for the editor console, `godot://debugger/output`
+and `godot://debugger/errors` for runtime output and errors,
+`godot://debugger/scene-tree` for the debugger scene tree, and
+`godot://debugger/monitors` for monitors. Use `--json` for the exact contents
+and `--save` for blobs. `gda logs <id>` remains the editor process log.
+
 ## The editor and the game are two processes
 
 A running game is a separate OS process from the editor. Anything you do to

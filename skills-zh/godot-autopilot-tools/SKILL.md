@@ -42,6 +42,12 @@ description: "Godot Autopilot 的 CLI-first 调用参考：gda 命令与参数�
 | `gda skills list` | 列出已安装技能书。 |
 | `gda skills show <name>` | 打印一册；`--file <rel>` 读取附属文件。 |
 | `gda tools list` | 列出实时实例的全部直接工具；`--category`/`--tags` 可缩小范围。 |
+| `gda resources list` | 列出 MCP 资源；`--templates` 同时列出模板。 |
+| `gda resources templates` | 列出 MCP 资源模板。 |
+| `gda resources read <uri>` | 读取资源；支持 `--json`、`--raw`、`--save <dir>`。 |
+| `gda resources watch <uri>` | 轮询资源并输出变化（`--interval` 秒）。 |
+| `gda prompts list` | 列出 MCP 提示词模板。 |
+| `gda prompts get <name>` | 用 `--args '<json>'` 渲染提示词；`--json` 保留 messages。 |
 | `gda projects` | 离线列出已知 Godot 工程。 |
 | `gda cache list` | 列出缓存 manifest。 |
 | `gda cache info` | 显示缓存根、条目数与大小。 |
@@ -123,6 +129,29 @@ gda call create_scene_node --args '{"parent_path": "Root", "name": "Player", "ty
 `confirm` 布尔值。`search_tools` / `get_tool_detail` 的用法与
 `gda search` / `gda describe` 相同。`search_tools` 默认最多 20 条；只有确需
 全量枚举时才传 `limit: 0`。
+
+## 观测资源与提示词
+
+`gda resources read` 不调用工具即可读取编辑器与调试器状态：
+
+- `godot://editor/output-log` — 编辑器控制台输出。
+- `godot://debugger/output` — 调试器输出。
+- `godot://debugger/errors` — 调试器错误集合。
+- `godot://debugger/session`、`godot://debugger/stack-dump`、
+  `godot://debugger/scene-tree`、`godot://debugger/monitors` — 会话、栈、
+  场景树与监视器。
+- `godot://log/recent` — 最近的结构化日志。
+
+```bash
+gda resources read godot://editor/output-log
+gda resources read godot://debugger/errors --json
+gda resources read godot://debugger/scene-tree --save ./out
+```
+
+文本直出，JSON 美化，blob 默认只打印大小摘要；`--save <dir>` 才落盘。
+`gda logs <id>` 是实例进程日志，不是编辑器/调试器资源。当前 URI 以
+`gda resources list` 为准。`gda prompts list` / `gda prompts get <name>`
+列出并渲染已注册提示词；只打印，不执行。
 
 ## MCP 工具面与宿主侧工具搜索
 

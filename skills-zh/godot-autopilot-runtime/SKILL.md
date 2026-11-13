@@ -43,6 +43,14 @@ GDScript 测试。时序、日志路径与检查细节在下文说明。
 `play_editor_current_scene`。存活但 `node_count` 正常、玩法不推进，是卡死，
 不是重载失败。
 
+## 用 CLI 观测运行时
+
+`gda resources read` 不调用工具即可读取编辑器与调试器状态：
+`godot://editor/output-log`（编辑器控制台）、`godot://debugger/output` 与
+`godot://debugger/errors`（运行输出与错误）、`godot://debugger/scene-tree`
+（调试器场景树）、`godot://debugger/monitors`（监视器）。`--json` 看完整内容，
+`--save` 落盘 blob；`gda logs <id>` 仍是编辑器进程日志。
+
 ## 编辑器与游戏是两个进程
 
 运行中的游戏是独立 OS 进程。对编辑器进程做的一切不会到达游戏：

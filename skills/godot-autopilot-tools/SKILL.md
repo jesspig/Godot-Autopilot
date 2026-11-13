@@ -47,6 +47,12 @@ Run `gda --help` for the current text; the table below is the stable shape.
 | `gda skills list` | List installed skill books. |
 | `gda skills show <name>` | Print one book; `--file <rel>` reads an auxiliary file. |
 | `gda tools list` | List all direct tools from a live instance; `--category`/`--tags` narrow it. |
+| `gda resources list` | List MCP resources; `--templates` also lists templates. |
+| `gda resources templates` | List MCP resource templates. |
+| `gda resources read <uri>` | Read a resource; `--json`, `--raw`, `--save <dir>`. |
+| `gda resources watch <uri>` | Poll a resource and print changes (`--interval` seconds). |
+| `gda prompts list` | List MCP prompt templates. |
+| `gda prompts get <name>` | Render a prompt with `--args '<json>'`; `--json` keeps messages. |
 | `gda projects` | List known Godot projects offline. |
 | `gda cache list` | List cache manifests. |
 | `gda cache info` | Show cache root, entry count and size. |
@@ -137,6 +143,30 @@ When the harness lists GDA tools, the meta tools are `ping`, `search_tools`,
 `search_tools` / `get_tool_detail` exactly as you would use `gda search` /
 `gda describe`. `search_tools` defaults to 20 results; pass `limit: 0` only when
 you explicitly need the full enumeration.
+
+## Observe resources and prompts
+
+`gda resources read` reads editor and debugger state without calling a tool:
+
+- `godot://editor/output-log` — editor console output.
+- `godot://debugger/output` — debugger output.
+- `godot://debugger/errors` — collected debugger errors.
+- `godot://debugger/session`, `godot://debugger/stack-dump`,
+  `godot://debugger/scene-tree`, `godot://debugger/monitors` — session,
+  stacks, scene tree and monitors.
+- `godot://log/recent` — recent structured log entries.
+
+```bash
+gda resources read godot://editor/output-log
+gda resources read godot://debugger/errors --json
+gda resources read godot://debugger/scene-tree --save ./out
+```
+
+Text is printed directly; JSON is pretty-printed; blobs print a size summary
+unless `--save <dir>` writes them. `gda logs <id>` is the instance process log,
+not an editor/debugger resource. `gda resources list` is the authority for the
+current URIs. `gda prompts list` / `gda prompts get <name>` list and render the
+registered prompt templates; prompts are printed, never executed.
 
 ## MCP surface and host tool search
 
