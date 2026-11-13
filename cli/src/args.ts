@@ -40,6 +40,9 @@ export interface GlobalOptions {
   formatText?: string;
   slowText?: string;
   limitText?: string;
+  saveText?: string;
+  intervalText?: string;
+  templates?: boolean;
   json?: boolean;
 }
 
@@ -66,6 +69,8 @@ const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
   "--format": "formatText",
   "--slow": "slowText",
   "--limit": "limitText",
+  "--save": "saveText",
+  "--interval": "intervalText",
 };
 
 const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
@@ -82,6 +87,7 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--stale": "stale",
   "--no-fallback": "noFallback",
   "--json": "json",
+  "--templates": "templates",
   "--offline": "offline",
   "--zh": "zh",
   "--check": "check",
@@ -168,6 +174,12 @@ Commands:
   skills list         List the bundled skill books (offline, --zh for Chinese)
   skills show <name>  Print one skill book's SKILL.md; --file <rel> reads an auxiliary file
   tools list          List all direct tools from a live instance (--category/--tags)
+  resources list      List MCP resources (--templates)
+  resources templates List MCP resource templates
+  resources read <uri> Read one resource (--json/--raw/--save <dir>)
+  resources watch <uri> Poll a resource and print changes (--interval sec)
+  prompts list        List MCP prompt templates
+  prompts get <name>  Render one prompt (--args JSON)
   projects            List known Godot projects (offline)
   start               Start a Godot editor
   stop                Stop a Godot editor (<id> | --id | --port | --project)
@@ -203,6 +215,9 @@ Global options:
   --args <json>       Tool arguments as a JSON string
   --args-file <path>  Tool arguments from a JSON file
   --save-images <dir> Write returned images to a local directory
+  --save <dir>        Write resource blobs to a directory
+  --templates         resources list: include resource templates
+  --interval <sec>    resources watch polling interval (default 1)
   --godot <path>      Explicit Godot executable (start)
   --headless          Start the editor headless (start)
   --play              Play the current scene once ready (start)
