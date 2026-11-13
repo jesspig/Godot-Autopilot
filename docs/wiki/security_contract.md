@@ -1,7 +1,7 @@
 ---
 type: 安全与并发契约
 title: T0 安全边界与并发契约
-description: MCP 可信客户端与 REST 令牌认证、监听范围、授权三档、工具风险、Godot 主线程、队列生命周期、路径与响应大小的可执行约束
+description: MCP 可信客户端、监听范围、授权三档、工具风险、Godot 主线程、队列生命周期、路径与响应大小的可执行约束
 tags:
   - 安全
   - 并发
@@ -14,10 +14,7 @@ resource:
   - src/core/observability/log_persist.hpp
   - src/core/observability/sanitize_policy.hpp
   - src/core/observability/monitor.hpp
-  - src/core/transport/api_auth.cpp
   - src/core/transport/api_token.cpp
-  - src/core/transport/api_surface.cpp
-  - src/core/transport/api_envelope.cpp
   - src/core/storage/gda_home.cpp
   - src/core/transport/port_resolver.cpp
   - src/core/storage/instance_registry.cpp
@@ -195,7 +192,6 @@ resource:
 - 写盘只有两处：`--save-images DIR` 内的解码图片（自生成文件名）与 CLI 自身的 state dir（实例登记表与日志，见 §3.4）；`--args-file` 只读 JSON，不写盘。
 - 技能文档禁手写 HTTP：技能文档的全部 .md 不得出现 `curl -` 与 `Invoke-WebRequest`（单元测试 逐文件断言），调用统一走 GDA CLI；无 CLI 可用则停止自动化、按 `manual-fallback.md` 出手动指南，不得编造请求。
 - 握手：mcp-cpp-sdk 0.3.7 起严格要求完整 MCP 握手（`initialize` → `notifications/initialized`），旧懒握手只发 `notifications/initialized` 被拒 `-32600`；CLI 已升级为标准 `initialize` 流程（`840e648`），`test_cli_contract.py` 的 mock 服务器严格模拟该语义（未初始化时 `tools/call` 返回 400 + `-32600`）。
-- **REST 参考是接口说明，不是新的脚本化通道（10-21）**：技能书另有一份 REST 接口参考（`references/rest-api.md`），示范 Python 与 JavaScript 两段最小调用。它服务于「客户端只能发普通 HTTP、无法做 MCP 握手」的场景；能跑 CLI 的机器仍应走 GDA CLI。参考中不得出现 `curl -` 与 `Invoke-WebRequest`。
 - 本节不改变默认安全姿态：监听仍仅环回（§2）、高风险能力仍默认拒绝（§3.1）、脱敏仍默认开启（§3.2）。
 
 ### 3.4 CLI 安全包络（2026-10-18 新增）
@@ -212,21 +208,6 @@ gda CLI（Bun + TS 源码直跑，详见 [CLI 载体](modules/cli.md)）是技�
 - **生命周期动作约束**：`start` 只启动 Godot 可执行文件链（`--godot` > PATH）指向的编辑器进程，注入 `GODOT_AUTOPILOT_PORT` 环境变量；**引擎定位只此一条链**——**不读 `GODOT_PATH`**（该变量历史上仅服务已删除的 L2 引擎测试，与生产无关，避免把测试引擎路径带入生产启动），**也不读 `<project>/.env`**；`stop` 默认优雅（`taskkill /PID` / `SIGTERM`），失败只报告并提示 `--force`，**强杀必须显式 `--force`**（`taskkill /F /T /PID` / `SIGKILL`），不静默升级。
 - **不收集个人信息**：CLI 不读取工程内容、不上报任何遥测；唯一本地状态是实例登记表（id/project/port/pid/startedAt/headless/godot/log），且只存本机路径与 pid。
 - 不改变默认安全姿态：监听仍仅环回（§2）、高风险能力仍默认拒绝（§3.1）、脱敏仍默认开启（§3.2）；CLI 自身不绕过 MCP 授权门（仍经 `call_tool` 受 `code_execute`/`game_runtime`/`user_tools` 门约束）。
-
-### 3.5 REST 接口面的安全条款（10-21 新增）
-
-REST 面（`/api`）与 MCP 面共用同一监听端口，但**认证要求不同**。条款如下：
-
-- **令牌来源与强度**：令牌是 **32 字节随机值的十六进制**（64 个小写十六进制字符，由 `std::random_device` 填充后逐字节转十六进制，熵 ≥ 256 位）。来源优先级：`GODOT_AUTOPILOT_API_TOKEN` 环境变量 ＞ 工程级令牌文件 `<集中根>/projects/<工程目录>/api_token`。**环境变量一旦设置即完全覆盖文件**，此时既不签发新令牌也不写文件。
-- **签发时机**：插件成功绑定端口后随实例登记一起签发（`ServerContext::write_instance_record` → `ApiAuth::issue_token`），并写入实例登记的 `api_token` 字段，供 CLI 读取。令牌文件写入失败或路径未解析时记一条 Error 日志，**REST 端点保持未认证状态**（令牌为空即所有受保护端点返回 401）。
-- **比对方式**：`ApiAuth::verify` → `api_token::constant_time_equals`，逐字节异或累积后统一比较，**长度不同直接判否**；令牌为空一律判否。
-- **令牌文件权限**：POSIX 平台写盘后 `chmod` 收紧为 `S_IRUSR | S_IWUSR`（0600），失败记一条 Warning；Windows 无 POSIX 权限位，改为记一条 Warning，明确说明令牌文件**继承 GDA 集中根目录的 ACL**。令牌文件内容是明文，任何能读该目录的进程都能取到令牌——它只配合同机环回使用。
-- **令牌不外泄**：令牌只落在实例登记与工程级令牌文件两处，**不写环境变量、不写工程文件、不进日志**；`trace_recorder` 的敏感键集合已含 `token` / `*_token` 后缀，脱敏开启时 `api_token` 会被剥离。
-- **免认证面只有一个**：`GET /api/health` 免认证，且只返回存活状态、服务名、版本、端口与进程号——**不泄露任何工程内容**。其余端点（含 `GET /api/openapi.json`）都要令牌。
-- **认证不替代授权**：令牌通过后仍要走 §3.1 的能力门；未授权的工具返回 403（`authorization_required`），而不是 401。
-- **环回约束不变**：REST 端点与 MCP 端点挂在同一个环回监听上，非环回地址在 `ServerContext::start()` 被拒绝；REST 请求层同样受传输层的 Host 校验约束。**不得转发、代理或把该端口暴露到非环回地址**——令牌只防「误连」，不构成远程部署方案。
-- **请求体上限**：传输层按 `Content-Length` 拒绝超过 4 MiB 的请求体（413），防止用超大请求体耗尽编辑器内存。
-- **已知缺口（10-21）**：统一执行入口 `tools::execute_tool_chain` 的**导出拦截阶段尚未接入 REST 请求路径**（`api_surface` 的执行器槽位在生产路径上无注册点），因此**导出期对 REST 工具调用的拒绝当前不生效**；导出期的 MCP 侧三类入口拒绝仍完整有效（见 §4 末条）。该缺口须在接线后复核，详见 [REST 接口面](modules/api.md)「已知限制」。
 
 ## 4. Godot API 与线程
 
@@ -272,12 +253,12 @@ REST 面（`/api`）与 MCP 面共用同一监听端口，但**认证要求不�
 - [ ] 面板开关覆盖 `code_execute` / `game_runtime` / `user_tools` / `write` / `destructive` / `process` 六项：勾选与取消经允许列表增删，**取消一项不影响其它项**（`all` 先展开再逐项删），勾选后**下一次工具调用即生效、无需重启**；开关控件按能力清单生成，初始状态取当前实际允许列表。
 - [ ] 授权模式（§3.1.3）符合预期：默认 `strict` 下写类默认拒绝；显式 `legacy` 下写类默认放行而危险类与破坏类**仍**默认拒绝；非法取值回落 `strict` 并记 Warning；拒绝响应带 `authorization_mode` 字段；面板下拉切换后**下一次调用即生效**。
 - [ ] 破坏类落档符合 §3.1.2 标准：销毁宿主内既有对象的工具声明 `destructive`；删除磁盘文件 / 目录归写类；防漂移守卫对「带销毁语义却未声明 `destructive`」的工具失败并列出工具名，白名单豁免须显式登记且写明理由。
-- [ ] REST 面的受保护端点拒绝无令牌请求（401），令牌比对为常量时间，令牌文件权限已收紧（POSIX 0600 / Windows 记 Warning 说明继承 ACL），令牌不出现在日志与 trace 中。
+
 - [ ] HTTP 线程路径中没有直接 Godot API 调用；任务只由主线程 `drain()` 执行；trace 截图与 jsonl 落盘只在主线程发生。
 - [ ] 编辑器内不存在无界等待点：所有主线程等待都带预算（`execute_sync` 无调用点，`kLongBlocking` 有上限）；超时结果标 `retryable=false` 且带 `cancelled`，不得按可重试处理。
 - [ ] 主线程停摆时工具调用快速失败并返回可诊断的结构化错误（`main_thread_timeout` + 队列深度/心跳/取消标记），默认安全姿态未被放宽。
 - [ ] 长脚本有执行期兜底：`code_execute` 超时返回 `exec_timeout`，游戏侧 eval 超时/取消返回 `eval_timeout` / `eval_cancelled`。
-- [ ] 导出期三类入口（工具调用 / MCP 资源 / MCP 提示词）均被拒绝；导出回调异常后标志已复位；**REST 面的导出期拒绝已接线**（当前未接线，见 §3.5）。
+- [ ] 导出期三类入口（工具调用 / MCP 资源 / MCP 提示词）均被拒绝；导出回调异常后标志已复位。
 - [ ] stop/restart 的请求接入、队列任务、future、异步响应和对象释放顺序有可观察且不悬挂的结果。
 - [ ] 路径边界、遍历/输入上限和响应截断行为均可被调用方检测。
 - [ ] 本地日志/trace 落盘符合边界约定：两目录保留上限生效；默认脱敏开启时 jsonl 不含内联 base64，`args_digest` 已剥离敏感字段；关闭脱敏仅由显式配置触发。
@@ -288,7 +269,6 @@ REST 面（`/api`）与 MCP 面共用同一监听端口，但**认证要求不�
 
 - [核心模块](modules/core.md)
 - [工具注册表](modules/tools_registry.md)
-- [REST 接口面](modules/api.md)（§3.5 的契约细节）
 - [端口与实例登记](modules/ports.md)（端口解析与实例登记）
 - [入口与运行时桥接](modules/entry_runtime.md)
 - [CLI 载体](modules/cli.md)
