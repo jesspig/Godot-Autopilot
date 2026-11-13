@@ -53,6 +53,8 @@ Run `gda --help` for the current text; the table below is the stable shape.
 | `gda resources watch <uri>` | Poll a resource and print changes (`--interval` seconds). |
 | `gda prompts list` | List MCP prompt templates. |
 | `gda prompts get <name>` | Render a prompt with `--args '<json>'`; `--json` keeps messages. |
+| `gda call <tool> --async` | Run as an MCP task when supported; prints `task_id` and records it locally. |
+| `gda tasks list|get|wait|cancel|clean` | Manage locally recorded tasks; `wait`/`cancel` use `tasks/get|cancel`. |
 | `gda projects` | List known Godot projects offline. |
 | `gda cache list` | List cache manifests. |
 | `gda cache info` | Show cache root, entry count and size. |
@@ -142,7 +144,10 @@ When the harness lists GDA tools, the meta tools are `ping`, `search_tools`,
 `arguments`; `call_tool` also accepts a top-level `confirm` boolean. Use
 `search_tools` / `get_tool_detail` exactly as you would use `gda search` /
 `gda describe`. `search_tools` defaults to 20 results; pass `limit: 0` only when
-you explicitly need the full enumeration.
+you explicitly need the full enumeration. `gda status --json` exposes an `mcp`
+block with protocol version and capabilities; check it before relying on tasks,
+resources, prompts or full mode. Long calls can use `gda call --async` plus
+`gda tasks wait`; progress goes to stderr with `--progress`.
 
 ## Observe resources and prompts
 
