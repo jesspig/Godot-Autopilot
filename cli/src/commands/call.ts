@@ -149,7 +149,7 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
       }
       inputResponses = { confirm: { action: "accept" } };
     } else {
-      err(`input_required: ${JSON.stringify((envelope.result as { input_required?: unknown }).input_required)}`);
+      err(`input_required: ${JSON.stringify(envelope.result)}`);
       err("re-run with --confirm, or pass --input '<json>' with inputResponses");
       return ExitCode.Usage;
     }
