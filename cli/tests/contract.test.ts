@@ -78,7 +78,7 @@ function routeDirect(reqId: unknown, name: unknown, args: Record<string, unknown
         id: reqId,
         result: {
           content: [
-            { type: "text", text: JSON.stringify({ result: { results: SEARCH_RESULTS } }) },
+            { type: "text", text: JSON.stringify({ results: SEARCH_RESULTS }) },
           ],
         },
       },
@@ -365,7 +365,7 @@ describe("CLI MCP contract", () => {
     async () => {
       const result = await cliRun(["search", "q"]);
       checkStatus(result, 0);
-      expect(parseJson(result.stdout)).toEqual(SEARCH_RESULTS);
+      expect(parseJson(result.stdout)).toEqual({ results: SEARCH_RESULTS });
       expect(state.lastDirectName).toBe("search_tools");
     },
     TEST_TIMEOUT_MS,
@@ -376,7 +376,7 @@ describe("CLI MCP contract", () => {
     async () => {
       const result = await cliRun(["search", "mock", "--category", "mock-cat", "--tags", "a,b"]);
       checkStatus(result, 0);
-      expect(parseJson(result.stdout)).toEqual(SEARCH_RESULTS);
+      expect(parseJson(result.stdout)).toEqual({ results: SEARCH_RESULTS });
       const seen = state.lastSearchArgs as Record<string, unknown> | undefined;
       expect(seen?.category).toBe("mock-cat");
       expect(seen?.tags).toEqual(["a", "b"]);

@@ -31,7 +31,6 @@ export interface GlobalOptions {
   force?: boolean;
   probe?: string;
   file?: string;
-  refresh?: boolean;
   all?: boolean;
   projectsView?: boolean;
   stale?: boolean;
@@ -78,7 +77,6 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--play": "play",
   "--no-import": "noImport",
   "--force": "force",
-  "--refresh": "refresh",
   "--all": "all",
   "--projects": "projectsView",
   "--stale": "stale",
@@ -169,9 +167,7 @@ Commands:
   list                List running Godot instances
   skills list         List the bundled skill books (offline, --zh for Chinese)
   skills show <name>  Print one skill book's SKILL.md; --file <rel> reads an auxiliary file
-  tools list          List the cached tool catalog (offline)
-  tools search <query> Search the cached tool catalog
-  tools describe <name> Show one cached tool's schema
+  tools list          List all direct tools from a live instance (--category/--tags)
   projects            List known Godot projects (offline)
   start               Start a Godot editor
   stop                Stop a Godot editor (<id> | --id | --port | --project)
@@ -197,9 +193,9 @@ Global options:
   --pretty            Pretty-print JSON output (2-space indent)
   --raw               Raw JSON envelope output
   --timeout <text>    Call timeout in seconds
-  --category <text>   Filter search results by category
-  --tags <text>       Filter search results by tags (comma separated)
-  --artifact <name>   Cache artifact: cli, plugin, skills, or catalog
+  --category <text>   Filter tools list/search results by category
+  --tags <text>       Filter tools list/search results by tags (comma separated)
+  --artifact <name>   Cache artifact: cli, plugin, or skills
   --path <dir>        Install target directory (install skills)
   --source <mode>     auto (default), online, cache, or builtin
   --offline           Never touch the network; use cache, then builtin
@@ -216,7 +212,6 @@ Global options:
   --tail <n>          Number of trailing log lines (logs)
   --probe <value>     Liveness level light/strict (start); list: probed port 1-65535
   --file <rel>        Reference file to read with skills show (relative to the skill dir)
-  --refresh           Refresh the offline tool catalog from MCP tools/list
   --all               list: include projects with no running instance
   --projects          list: aggregate entries by project instead of per instance
   --stale             list: keep only non-live entries

@@ -1,70 +1,63 @@
 import type { GlobalOptions } from "../args";
-import { readCatalog, writeCatalog, type CatalogTool, type ToolCatalog } from "../catalog";
+import { filterProtocolToolNames } from "../discovery";
 import { CliError, ExitCode } from "../errors";
-import { listTools } from "../mcp/client";
-import { callTimeoutSec } from "../payload";
+import { callTool } from "../mcp/client";
+import { assertCallFamilyUsage, callTimeoutSec, emit, extractPayload } from "../payload";
 import { findById, findLiveByProject } from "../registry";
 import { resolveTarget, type TargetContext } from "../target";
 import { writeJson } from "./json-output";
 
 const TARGET_CONTEXT: TargetContext = { findById, findLiveByProject };
 
-const REFRESH_HINT =
-  "run 'gda tools list --refresh' against a live instance, or install the builtin catalog";
+function tagsFrom(opts: GlobalOptions): string[] {
+  if (opts.tagsText === undefined) return [];
+  return opts.tagsText
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter((tag) => tag.length > 0);
+}
+
+function toolNames(payload: unknown): string[] {
+  if (payload === null || typeof payload !== "object" || Array.isArray(payload)) return [];
+  const results = (payload as { results?: unknown }).results;
+  if (!Array.isArray(results)) return [];
+  const names: string[] = [];
+  for (const item of results) {
+    if (item === null || typeof item !== "object" || Array.isArray(item)) continue;
+    const name = (item as { name?: unknown }).name;
+    if (typeof name === "string" && name !== "") names.push(name);
+  }
+  return names;
+}
 
 export async function run(positional: string[], opts: GlobalOptions): Promise<number> {
+  assertCallFamilyUsage("tools", opts);
   const sub = positional[0];
   if (sub === undefined) {
-    throw new CliError(ExitCode.Usage, "tools requires a subcommand: list | search <query> | describe <name>");
+    throw new CliError(ExitCode.Usage, "tools requires a subcommand: list");
   }
-  let catalog: ToolCatalog | null = readCatalog();
-  if (opts.refresh === true) {
-    const target = resolveTarget(opts, TARGET_CONTEXT);
-    catalog = writeCatalog(await listTools(target.port, callTimeoutSec(opts)));
+  if (sub !== "list") {
+    throw new CliError(ExitCode.Usage, `unknown tools subcommand: ${sub} (expected list)`);
   }
-  if (catalog === null) {
-    throw new CliError(ExitCode.Transport, `no offline tool catalog is cached; ${REFRESH_HINT}`);
+  if (positional.length > 1) {
+    throw new CliError(ExitCode.Usage, "tools list takes no positional arguments.");
   }
-  if (sub === "list") {
-    writeJson(catalog, opts);
-    return ExitCode.Success;
-  }
-  if (sub === "search") {
-    const query = positional[1];
-    if (query === undefined) {
-      throw new CliError(ExitCode.Usage, "tools search requires a query");
-    }
-    writeJson({ ...catalog, tools: searchTools(catalog.tools, query) }, opts);
-    return ExitCode.Success;
-  }
-  if (sub === "describe") {
-    const name = positional[1];
-    if (name === undefined) {
-      throw new CliError(ExitCode.Usage, "tools describe requires a tool name");
-    }
-    const tool = catalog.tools.find((entry) => entry.name === name);
-    if (tool === undefined) {
-      throw new CliError(
-        ExitCode.Usage,
-        `tool not found in the cached catalog: ${name} (run 'gda tools list' or pass --refresh)`,
-      );
-    }
-    writeJson(tool, opts);
-    return ExitCode.Success;
-  }
-  throw new CliError(ExitCode.Usage, `unknown tools subcommand: ${sub} (expected list, search or describe)`);
-}
 
-function searchTools(tools: CatalogTool[], query: string): CatalogTool[] {
-  const needle = query.trim().toLowerCase();
-  if (needle === "") return tools;
-  return tools.filter((tool) => haystack(tool).includes(needle));
-}
+  const args: Record<string, unknown> = { limit: 0 };
+  if (opts.category !== undefined) args.category = opts.category;
+  const tags = tagsFrom(opts);
+  if (tags.length > 0) args.tags = tags;
 
-function haystack(tool: CatalogTool): string {
-  const parts = [tool.name];
-  if (typeof tool.description === "string") parts.push(tool.description);
-  if (typeof tool.category === "string") parts.push(tool.category);
-  if (Array.isArray(tool.tags)) parts.push(tool.tags.map((tag) => String(tag)).join(" "));
-  return parts.join(" ").toLowerCase();
+  const target = resolveTarget(opts, TARGET_CONTEXT);
+  const envelope = await callTool("search_tools", args, {
+    port: target.port,
+    timeoutSec: callTimeoutSec(opts),
+    direct: true,
+  });
+  const extracted = extractPayload(envelope, { saveImages: opts.saveImages, raw: opts.raw });
+  if (extracted.toolFailed) return emit(extracted, opts);
+
+  const tools = filterProtocolToolNames(toolNames(extracted.display));
+  writeJson({ tools, total: tools.length }, opts);
+  return ExitCode.Success;
 }
