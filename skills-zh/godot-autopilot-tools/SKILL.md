@@ -124,6 +124,19 @@ gda call create_scene_node --args '{"parent_path": "Root", "name": "Player", "ty
 `gda search` / `gda describe` 相同。`search_tools` 默认最多 20 条；只有确需
 全量枚举时才传 `limit: 0`。
 
+## MCP 工具面与宿主侧工具搜索
+
+- 默认 MCP 面为 `meta`：恰好 7 个元工具。除非宿主能自行 defer 或搜索工具，
+  否则保持默认。
+- 启动编辑器前设置 `GODOT_AUTOPILOT_TOOL_SURFACE=full`，可把全部 459 个工具
+  暴露为顶层工具；`tools/list` 按 100 条分页，宿主必须处理 `nextCursor`，
+  或使用会自动翻页的客户端。
+- 只对支持 tool search / defer loading 的本地宿主开启 `full`（例如 Claude
+  Code 的 `ENABLE_TOOL_SEARCH=auto` 或 `true`）。直接加载全部定义的宿主会被
+  459 个工具占用大量上下文。
+- 云端 Anthropic API 无法访问仅绑环回的服务；`full` 只适用于本地宿主。
+  两个面的日志、确认与脱敏行为一致。
+
 ## 确认与 annotations
 
 高风险副作用需要显式确认。服务器在执行前返回

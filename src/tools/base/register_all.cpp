@@ -53,6 +53,7 @@
 #include <mcp/JsonValue.hpp>
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 #include <limits>
 #include <memory>
 #include <mutex>
@@ -70,6 +71,8 @@ static std::mutex g_active_registry_mutex;
 static ToolCatalog *g_catalog = nullptr;
 static Bm25Index *g_index = nullptr;
 static int g_port = 0;
+static mcp::McpServer *g_surface_server = nullptr;
+static ToolSurface g_tool_surface = ToolSurface::Meta;
 
 static mcp::JsonValue meta_ping_impl() {
     mcp::JsonValue r(mcp::JsonValue::object_tag);
@@ -654,6 +657,24 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
     return registry;
 }
 
+ToolSurface resolve_tool_surface() {
+    const char *raw = std::getenv("GODOT_AUTOPILOT_TOOL_SURFACE");
+    if (raw == nullptr || *raw == '\0') {
+        return ToolSurface::Meta;
+    }
+    const std::string value(raw);
+    if (value == "full") {
+        return ToolSurface::Full;
+    }
+    if (value != "meta") {
+        LogSystem::instance().log(
+            LogLevel::Warning, LogCategory::Tools,
+            "unknown GODOT_AUTOPILOT_TOOL_SURFACE '" + value +
+                "'; falling back to meta");
+    }
+    return ToolSurface::Meta;
+}
+
 bool tool_result_is_error(const mcp::JsonValue &result) {
     return !spec_detail::verdict_of(result).ok;
 }
@@ -671,110 +692,145 @@ void refresh_dynamic_tools() {
     monitor::lifecycle(
         "registry_refresh_dynamic",
         monitor::build_attrs({{"dynamic_tools", std::to_string(dynamic_count)}}));
+    if (g_tool_surface == ToolSurface::Full && g_surface_server != nullptr) {
+        try {
+            g_surface_server->SendToolListChanged();
+        } catch (const std::exception &error) {
+            LogSystem::instance().log(
+                LogLevel::Warning, LogCategory::Tools,
+                "failed to send tools/list_changed: " +
+                    std::string(error.what()));
+        } catch (...) {
+            LogSystem::instance().log(
+                LogLevel::Warning, LogCategory::Tools,
+                "failed to send tools/list_changed");
+        }
+    }
 }
 
-void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog& catalog, Bm25Index& index, int port) {
+static void register_surface_tool(
+    mcp::McpServer& server, CommandQueue& queue,
+    const std::shared_ptr<ToolRegistry>& registry,
+    const std::shared_ptr<ToolBase>& surface_tool) {
+    const std::string tool_name = surface_tool->meta().name;
+    mcp::ToolOptions opts;
+    opts.Description(surface_tool->meta().description)
+        .InputSchema(surface_tool->input_schema());
+    const SideEffect effect = side_effect_of(*surface_tool);
+    if (effect == SideEffect::None) {
+        opts.read_only_hint = true;
+    }
+    if (effect == SideEffect::Destructive) {
+        opts.destructive = true;
+    }
+    if (effect == SideEffect::Process || effect == SideEffect::GameRuntime) {
+        opts.open_world_hint = true;
+    }
+    server.RegisterTool(
+        tool_name, opts,
+        [tool_name, registry, &queue, surface_tool](
+            const mcp::RequestContext<mcp::CallToolRequestParams>& ctx)
+            -> mcp::CallToolResult {
+            const std::string gda_request_id =
+                monitor::request_id_text(ctx.GetRequest().id);
+            monitor::RequestScope gda_request_scope(gda_request_id);
+            monitor::RequestRecord gda_request_record;
+            std::string gda_request_trace;
+            std::string gda_request_span;
+            if (!gda_request_id.empty() &&
+                monitor::registry().get(gda_request_id, &gda_request_record)) {
+                gda_request_trace = gda_request_record.trace_id;
+                gda_request_span = gda_request_record.span_id;
+            }
+            tools::RequestSpanGuard gda_span_scope(gda_request_trace,
+                                                   gda_request_span);
+            if (godot_autopilot::ExportGuard::is_exporting()) {
+                return dispatch::export_blocked_result();
+            }
+            mcp::JsonValue args = ctx.Params().arguments
+                ? *ctx.Params().arguments
+                : mcp::JsonValue(mcp::JsonValue::object_tag);
+            bool run_on_transport_thread = tool_name == "call_tool";
+            if (tool_name == "batch_execute") {
+                if (auto* await_async = args.Find("await_async");
+                    await_async && await_async->IsBool() &&
+                    await_async->GetBool()) {
+                    run_on_transport_thread = true;
+                }
+            }
+            mcp::JsonValue res;
+            if (run_on_transport_thread) {
+                res = surface_tool->execute(args);
+            } else {
+                const tools::TraceContext trace_context =
+                    tools::capture_trace_context();
+                res = dispatch::run_on_main_thread_with_budget(
+                    queue, tool_name, surface_tool->tool_flags(),
+                    [surface_tool, args, trace_context] {
+                        tools::ScopedTraceContext restore(trace_context);
+                        return surface_tool->execute(args);
+                    });
+            }
+            int64_t new_errors = error_watermark::count_response_errors(res);
+            if (new_errors > 0) {
+                error_watermark::record_error(new_errors);
+            }
+            mcp::CallToolResult mcp_result;
+            if (tool_result_is_error(res)) {
+                mcp_result.is_error = true;
+            }
+            if (res.IsObject()) {
+                res["new_errors_since_last_call"] =
+                    mcp::JsonValue(error_watermark::consume_new_errors());
+            }
+            std::vector<mcp::ContentVariant> image_content;
+            if (tool_name == "call_tool") {
+                if (auto* target_name = args.Find("name");
+                    target_name && target_name->IsString()) {
+                    const std::string name = target_name->GetString();
+                    bool known = false;
+                    if (auto active = get_active_registry()) {
+                        if (auto target = active->find_any(name)) {
+                            known = true;
+                            if ((target->tool_flags() &
+                                 tool_flags::kCaptureImage) != 0) {
+                                util::try_attach_image_data(res,
+                                                            image_content);
+                            }
+                        }
+                    }
+                    if (!known) {
+                        util::try_attach_image_content(name, res,
+                                                       image_content);
+                    }
+                }
+            } else if ((surface_tool->tool_flags() &
+                        tool_flags::kCaptureImage) != 0) {
+                util::try_attach_image_data(res, image_content);
+            }
+            mcp_result.content.push_back(mcp::TextContent{"text", res.Dump()});
+            for (auto& block : image_content) {
+                mcp_result.content.push_back(std::move(block));
+            }
+            return mcp_result;
+        });
+}
+
+void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog& catalog, Bm25Index& index, int port, ToolSurface surface) {
 
     (void)queue;
     g_catalog = &catalog;
     g_index = &index;
     g_port = port;
+    g_surface_server = &server;
+    g_tool_surface = surface;
     auto registry = build_registry(catalog, index, port);
 
-    for (const auto& meta_tool : registry->all_meta()) {
-        const std::string meta_name = meta_tool->meta().name;
-        mcp::ToolOptions opts;
-        opts.Description(meta_tool->meta().description).InputSchema(meta_tool->input_schema());
-        const SideEffect effect = side_effect_of(*meta_tool);
-        if (effect == SideEffect::None) {
-            opts.read_only_hint = true;
-        }
-        if (effect == SideEffect::Destructive) {
-            opts.destructive = true;
-        }
-        if (effect == SideEffect::Process || effect == SideEffect::GameRuntime) {
-            opts.open_world_hint = true;
-        }
-        server.RegisterTool(meta_name, opts,
-            [meta_name, registry, &queue, meta_tool](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
-                const std::string gda_request_id =
-                    monitor::request_id_text(ctx.GetRequest().id);
-                monitor::RequestScope gda_request_scope(gda_request_id);
-                monitor::RequestRecord gda_request_record;
-                std::string gda_request_trace;
-                std::string gda_request_span;
-                if (!gda_request_id.empty() &&
-                    monitor::registry().get(gda_request_id, &gda_request_record)) {
-                    gda_request_trace = gda_request_record.trace_id;
-                    gda_request_span = gda_request_record.span_id;
-                }
-                tools::RequestSpanGuard gda_span_scope(gda_request_trace,
-                                                       gda_request_span);
-                if (godot_autopilot::ExportGuard::is_exporting()) {
-                    return dispatch::export_blocked_result();
-                }
-                mcp::JsonValue args = ctx.Params().arguments
-                    ? *ctx.Params().arguments : mcp::JsonValue(mcp::JsonValue::object_tag);
-                auto tool = registry->find_meta(meta_name);
-                bool run_on_transport_thread = meta_name == "call_tool";
-                if (meta_name == "batch_execute") {
-                    if (auto *await_async = args.Find("await_async");
-                        await_async && await_async->IsBool() &&
-                        await_async->GetBool())
-                        run_on_transport_thread = true;
-                }
-                mcp::JsonValue res;
-                if (run_on_transport_thread) {
-                    res = tool->execute(args);
-                } else {
-                    const tools::TraceContext trace_context =
-                        tools::capture_trace_context();
-                    res = dispatch::run_on_main_thread_with_budget(
-                        queue, meta_name, meta_tool->tool_flags(),
-                        [tool, args, trace_context] {
-                            tools::ScopedTraceContext restore(trace_context);
-                            return tool->execute(args);
-                        });
-                }
-                int64_t new_errors = error_watermark::count_response_errors(res);
-                if (new_errors > 0) {
-                    error_watermark::record_error(new_errors);
-                }
-                mcp::CallToolResult mcp_result;
-                if (tool_result_is_error(res)) {
-                    mcp_result.is_error = true;
-                }
-                if (res.IsObject()) {
-                    res["new_errors_since_last_call"] = mcp::JsonValue(error_watermark::consume_new_errors());
-                }
-                std::vector<mcp::ContentVariant> image_content;
-                if (meta_name == "call_tool") {
-                    if (auto *tool_name = args.Find("name");
-                        tool_name && tool_name->IsString()) {
-                        const std::string name = tool_name->GetString();
-                        bool known = false;
-                        if (auto registry = get_active_registry()) {
-                            if (auto tool = registry->find_any(name)) {
-                                known = true;
-                                if ((tool->tool_flags() &
-                                     tool_flags::kCaptureImage) != 0) {
-                                    util::try_attach_image_data(res,
-                                                                image_content);
-                                }
-                            }
-                        }
-                        if (!known) {
-                            util::try_attach_image_content(name, res,
-                                                           image_content);
-                        }
-                    }
-                }
-                mcp_result.content.push_back(mcp::TextContent{"text", res.Dump()});
-                for (auto &block : image_content) {
-                    mcp_result.content.push_back(std::move(block));
-                }
-                return mcp_result;
-            });
+    const std::vector<std::shared_ptr<ToolBase>> surfaced =
+        surface == ToolSurface::Full ? registry->all_any()
+                                     : registry->all_meta();
+    for (const auto& surface_tool : surfaced) {
+        register_surface_tool(server, queue, registry, surface_tool);
     }
 
     refresh_derived(registry, catalog, index);
@@ -795,6 +851,10 @@ std::shared_ptr<ToolRegistry> get_active_registry() {
 void clear_active_registry() {
     std::lock_guard<std::mutex> lock(g_active_registry_mutex);
     g_active_registry = std::make_shared<ToolRegistry>();
+    g_catalog = nullptr;
+    g_index = nullptr;
+    g_surface_server = nullptr;
+    g_tool_surface = ToolSurface::Meta;
 }
 
 }

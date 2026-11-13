@@ -354,6 +354,7 @@ bool ServerContext::start() {
 
     mcp::ServerOptions opts;
     opts.server_info = mcp::Implementation{"godot-autopilot", GDA_VERSION};
+    opts.enable_progressive_discovery = true;
     const mcp::CacheHint immediate_expiry_hint{int64_t{0}, "private"};
     opts.cache_hints = std::map<std::string, mcp::CacheHint, std::less<>>{
         {"server/discover", immediate_expiry_hint},
@@ -681,7 +682,13 @@ void ServerContext::set_endpoints(const EndpointTable &endpoints) {
 }
 
 void ServerContext::register_tools() {
-  register_all_tools(*server_, queue_, *catalog_, *bm25_index_, port_);
+  const ToolSurface surface = resolve_tool_surface();
+  register_all_tools(*server_, queue_, *catalog_, *bm25_index_, port_,
+                     surface);
+  monitor::lifecycle(
+      "tool_surface",
+      monitor::build_attrs(
+          {{"surface", surface == ToolSurface::Full ? "full" : "meta"}}));
   register_all_resources(*server_, queue_);
   register_all_prompts(*server_, queue_);
   register_debugger_resources(*server_, queue_);

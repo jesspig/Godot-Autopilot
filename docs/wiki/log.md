@@ -4,6 +4,8 @@
 
 ## 2026-11-14
 
+- **0.3.3 ST-03 MCP 完整工具面（`feature/host-tool-surface`，本地未推送）**：新增 `GODOT_AUTOPILOT_TOOL_SURFACE=meta|full`（默认 meta 7 元，full 459 个顶层工具，100 条/页 5 页）；meta/full 共用注册回调，confirm/导出拦截/错误水位/图片附件/主线程派发一致；full 下动态工具注册/注销发送 `notifications/tools/list_changed`。文档与技能书补充宿主 tool search 配置与云端不适用说明。T-10 条件实验未执行，保持现状。
+
 - **0.3.3 ST-02 工具发现（`feature/tool-index`，本地未推送）**：`search_tools` 新增 `limit`（默认 20、0 全量、负值报错），遍历/契约测试显式全量；CLI 删除离线 catalog 与 `--refresh`，`gda tools list` 走 live `search_tools {limit:0}` 并过滤 5 个 MCP 协议工具，`gda search` 无 query 改出分类、有 query 输出 `{results}`；EN/ZH 技能书与内置资产同步。验证：ctest **935/935**、CLI **251 项（233 pass / 18 skip / 0 fail）**、typecheck 与 skills_guard 通过。明细见 [changelog/2026-11-14-log.md](changelog/2026-11-14-log.md)。
 
 ## 2026-11-13

@@ -138,6 +138,19 @@ When the harness lists GDA tools, the meta tools are `ping`, `search_tools`,
 `gda describe`. `search_tools` defaults to 20 results; pass `limit: 0` only when
 you explicitly need the full enumeration.
 
+## MCP surface and host tool search
+
+- Default MCP surface is `meta`: exactly 7 meta tools. Keep it unless the host
+  can defer or search tools itself.
+- Set `GODOT_AUTOPILOT_TOOL_SURFACE=full` before starting the editor to expose
+  all 459 tools at the top level. `tools/list` then pages at 100 tools; the host
+  must follow `nextCursor` or use a client that aggregates pages.
+- Enable `full` only for local hosts with tool search / defer loading (for
+  example Claude Code with `ENABLE_TOOL_SEARCH=auto` or `true`). A host that
+  loads every definition will spend a large context budget on 459 tools.
+- Cloud Anthropic APIs cannot reach a loopback-only server; `full` is for local
+  hosts. Logging, confirmation and redaction behave the same in both surfaces.
+
 ## Confirmation and annotations
 
 High-risk side effects require explicit confirmation. The server returns
