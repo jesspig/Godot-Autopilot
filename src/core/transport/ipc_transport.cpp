@@ -19,7 +19,9 @@
 #include <ws2tcpip.h>
 #include <afunix.h>
 #else
+#include <arpa/inet.h>
 #include <fcntl.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
