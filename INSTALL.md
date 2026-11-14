@@ -81,7 +81,7 @@ Use the one-click script by default:
 
 Pass the project path explicitly even if the script could auto-detect it. This makes the result deterministic.
 
-If the one-click script fails because of network, checksum, or an older release, fall back to **Option B — Manual install from GitHub Releases**. If the user asked to build from source or needs a custom build, use **Option C**.
+If the one-click script fails because of network or checksum, fall back to **Option B — Manual install from GitHub Releases**. Releases before 0.3.3 are not supported for plugin install; upgrade or use **Option C**. If the user asked to build from source or needs a custom build, use **Option C**.
 
 ### Step 5 — Verify before reporting
 
@@ -108,7 +108,7 @@ Include:
 - Skill scope and skill directory, or “skipped”.
 - `mcp_url` from `gda status --json`.
 - Every command that failed, with its exit code.
-- Any remaining risk (for example, an older release without `addons.zip` in its checksum file).
+- Any remaining risk (for example, the release predates 0.3.3 and cannot install the plugin).
 
 ---
 
@@ -175,8 +175,8 @@ PowerShell uses the same names with `-Version`, `-Prefix`, `-Archive`, `-Project
 
 ### Version compatibility
 
-- The one-click plugin install uses the release's `sha256sums.txt`. Releases from 0.3.3 onward include `addons.zip` in that file.
-- On 0.3.2 and older, `sha256sums.txt` only covers the CLI binaries. Use the manual `addons.zip` path below for the plugin.
+- The plugin path requires **0.3.3 or newer**. That release includes `addons.zip` in `sha256sums.txt` and writes a standard ZIP that Windows `Expand-Archive`, bsdtar, and `unzip` can open.
+- On 0.3.2 and older, `sha256sums.txt` only covers the CLI binaries and the `addons.zip` archive was produced by the old packager. Those releases are not supported for plugin install; upgrade to 0.3.3+ or build from source.
 - The script tries both `v<version>` and `<version>` tag forms, so releases tagged either way work.
 
 ---
@@ -216,7 +216,9 @@ grep "gda-<version>-macos-arm64.tar.gz" sha256sums.txt | shasum -a 256 -c -
 ```powershell
 # Windows PowerShell
 $asset = "gda-<version>-windows-x64.zip"
-$expected = (Select-String -Path sha256sums.txt -Pattern ([regex]::Escape($asset))).Line.Split()[0]
+$line = (Select-String -Path sha256sums.txt -Pattern ([regex]::Escape($asset)) | Select-Object -First 1)
+if (-not $line) { throw "$asset is not listed in sha256sums.txt" }
+$expected = $line.Line.Split()[0]
 $actual = (Get-FileHash $asset -Algorithm SHA256).Hash.ToLower()
 if ($expected -ne $actual) { throw "checksum mismatch: $asset" }
 ```
@@ -260,7 +262,7 @@ gda install plugin --project "<project>"
 
 This writes `<project>/addons/godot-autopilot`, stops a running editor for that project, and restarts it when one was running.
 
-For releases that do not list `addons.zip` in `sha256sums.txt` (0.3.2 and older), download and extract the plugin archive manually:
+To install the plugin without `gda install plugin`, download `addons.zip` from a 0.3.3+ release and extract it manually:
 
 ```bash
 # macOS / Linux
@@ -380,6 +382,8 @@ Or build a standalone binary:
 bun build cli/bin/gda.ts --compile --minify --outfile dist/gda
 ./dist/gda --version
 ```
+
+On Windows the compiled file is `dist\gda.exe`; run `dist\gda.exe --version`.
 
 ### C4 — Verify the source build
 
@@ -504,10 +508,10 @@ For manual upgrades, replace the CLI binary and re-run `gda install plugin --pro
 | `gda: command not found` | `gda --version` | Use the full path `~/.godot-autopilot/bin/gda`, or add that directory to `PATH` and open a new shell. |
 | Download fails with 404 | Release tag and asset name | Use the one-click script or `releases/latest`; the script tries both `v<version>` and `<version>` tags. |
 | `checksum mismatch` | Downloaded archive and `sha256sums.txt` | Delete the cached archive and retry. Do not bypass the mismatch. |
-| `addons.zip is not listed in sha256sums.txt` | Release version | Releases 0.3.2 and older do not checksum `addons.zip`; extract `addons.zip` manually. |
+| `addons.zip is not listed in sha256sums.txt` | Release version | Releases 0.3.2 and older are not supported for plugin install; upgrade to 0.3.3+ or build from source. |
 | `no running Godot Autopilot instance` | Editor is open and graphical | Open the project in a graphical editor, or run `gda start --project "<project>"` without `--headless`. |
 | Plugin missing | `addons/godot-autopilot/godot-autopilot.gdextension` | Re-run `gda install plugin --project "<project>"`, or extract `addons.zip` manually. |
-| Plugin not loaded | Godot editor plugins list | Enable Godot Autopilot in Project Settings > Plugins and restart the editor. |
+| GDExtension load error | Godot output panel and the library file name | Confirm the library matches the OS/CPU, clear the macOS quarantine attribute, and re-extract `addons.zip`. |
 | `godot: command not found` | `godot --version` | Pass the editor path with `gda start --godot <path> --project "<project>"`. |
 | macOS refuses to run `gda` | Quarantine attribute | Verify the checksum first, then `xattr -d com.apple.quarantine ~/.godot-autopilot/bin/gda`. |
 | Windows SmartScreen warning | Zone identifier on the ZIP | Unblock the ZIP before extracting. |
