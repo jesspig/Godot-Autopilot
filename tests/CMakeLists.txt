@@ -203,6 +203,9 @@ add_test(NAME source_manifest_guard
 add_test(NAME tool_domain_guard
     COMMAND "${GDA_BUN_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/tool_domain_guard.ts")
 
+add_test(NAME install_docs_guard
+    COMMAND "${GDA_BUN_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/guard/install_docs_guard.ts")
+
 # ── ctest 注册: CLI 契约 mock conformance（Bun 驱动 gda.ts 与进程内 mock server）──
 add_test(NAME cli_contract
     COMMAND "${GDA_BUN_EXECUTABLE}" test cli/tests/contract.test.ts)
@@ -276,6 +279,7 @@ set_tests_properties(
     version_sync_guard
     source_manifest_guard
     tool_domain_guard
+    install_docs_guard
     migration_guard_self_test
     comment_guard_self_test
     no_python_guard_self_test
