@@ -8,7 +8,6 @@ param(
 
 $ErrorActionPreference = "Stop"
 $GithubBase = if ($env:GDA_GITHUB_BASE) { $env:GDA_GITHUB_BASE.TrimEnd("/") } else { "https://github.com/jesspig/Godot-Autopilot/releases" }
-$AtomGitBase = if ($env:GDA_ATOMGIT_BASE) { $env:GDA_ATOMGIT_BASE.TrimEnd("/") } else { "" }
 
 function Get-Platform {
   $arch = $env:PROCESSOR_ARCHITECTURE
@@ -58,7 +57,6 @@ if ($Archive -ne "") {
   Assert-Checksum $assetPath $archiveSums
 } else {
   $urls = @("$GithubBase/download/v$Version/$asset")
-  if ($AtomGitBase -ne "") { $urls += "$AtomGitBase/download/v$Version/$asset" }
   $downloaded = $false
   foreach ($url in $urls) {
     try {

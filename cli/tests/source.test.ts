@@ -7,21 +7,17 @@ import { downloadAsset } from "../src/source";
 
 let tmp: string;
 let previousGithub: string | undefined;
-let previousAtomgit: string | undefined;
 
 beforeEach(() => {
   const base = process.env.GDA_TEST_TMPDIR ?? path.join(process.cwd(), "build", "cli-test-tmp");
   fs.mkdirSync(base, { recursive: true });
   tmp = fs.mkdtempSync(path.join(base, "gda-source-"));
   previousGithub = process.env.GDA_GITHUB_BASE;
-  previousAtomgit = process.env.GDA_ATOMGIT_BASE;
 });
 
 afterEach(() => {
   if (previousGithub === undefined) delete process.env.GDA_GITHUB_BASE;
   else process.env.GDA_GITHUB_BASE = previousGithub;
-  if (previousAtomgit === undefined) delete process.env.GDA_ATOMGIT_BASE;
-  else process.env.GDA_ATOMGIT_BASE = previousAtomgit;
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
@@ -45,24 +41,17 @@ function startServer(body: Buffer, digest: string): { server: ReturnType<typeof 
   return { server, base: `http://127.0.0.1:${server.port}` };
 }
 
-describe("asset source fallback", () => {
-  test("GitHub 404 时回退 AtomGit 并校验", async () => {
+describe("asset source", () => {
+  test("从 GitHub 下载并校验", async () => {
     const body = Buffer.from("asset-bytes");
     const digest = createHash("sha256").update(body).digest("hex");
-    const failing = Bun.serve({
-      port: 0,
-      hostname: "127.0.0.1",
-      fetch: () => new Response("not found", { status: 404 }),
-    });
     const good = startServer(body, digest);
-    process.env.GDA_GITHUB_BASE = `http://127.0.0.1:${failing.port}`;
-    process.env.GDA_ATOMGIT_BASE = good.base;
+    process.env.GDA_GITHUB_BASE = good.base;
     try {
       const downloaded = await downloadAsset("gda-0.3.2-windows-x64.zip", "0.3.2", tmp);
-      expect(downloaded.source).toBe("atomgit");
+      expect(downloaded.source).toBe("github");
       expect(fs.readFileSync(downloaded.path, "utf8")).toBe("asset-bytes");
     } finally {
-      failing.stop(true);
       good.server.stop(true);
     }
   });
@@ -71,7 +60,6 @@ describe("asset source fallback", () => {
     const body = Buffer.from("asset-bytes");
     const good = startServer(body, "0".repeat(64));
     process.env.GDA_GITHUB_BASE = good.base;
-    delete process.env.GDA_ATOMGIT_BASE;
     try {
       await expect(downloadAsset("gda-0.3.2-windows-x64.zip", "0.3.2", tmp)).rejects.toThrow(/checksum mismatch/);
     } finally {

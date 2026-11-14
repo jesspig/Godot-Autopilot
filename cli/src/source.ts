@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { CliError, ExitCode } from "./errors";
 
-export type AssetSourceName = "github" | "atomgit";
+export type AssetSourceName = "github";
 
 export interface AssetSource {
   name: AssetSourceName;
@@ -19,14 +19,7 @@ export interface DownloadedAsset {
 const DEFAULT_GITHUB_BASE = "https://github.com/jesspig/Godot-Autopilot/releases";
 
 export function assetSources(): AssetSource[] {
-  const sources: AssetSource[] = [
-    { name: "github", base: process.env.GDA_GITHUB_BASE ?? DEFAULT_GITHUB_BASE },
-  ];
-  const atomgit = process.env.GDA_ATOMGIT_BASE;
-  if (atomgit !== undefined && atomgit.trim() !== "") {
-    sources.push({ name: "atomgit", base: atomgit.trim() });
-  }
-  return sources;
+  return [{ name: "github", base: process.env.GDA_GITHUB_BASE ?? DEFAULT_GITHUB_BASE }];
 }
 
 export function assetUrl(base: string, version: string, asset: string): string {
@@ -99,6 +92,6 @@ export async function downloadAsset(
   throw new CliError(
     ExitCode.Transport,
     `no source could provide ${asset} v${version}: ${failures.join("; ")}`,
-    "Pass --archive with a local release asset, or set GDA_ATOMGIT_BASE.",
+    "Pass --archive with a local release asset, or check the network and release tag.",
   );
 }

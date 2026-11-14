@@ -7,7 +7,6 @@ ARCHIVE=""
 NO_PATH=0
 DRY_RUN=0
 GITHUB_BASE="${GDA_GITHUB_BASE:-https://github.com/jesspig/Godot-Autopilot/releases}"
-ATOMGIT_BASE="${GDA_ATOMGIT_BASE:-}"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -124,9 +123,6 @@ if [ -n "$ARCHIVE" ]; then
 else
   SUMS_URL="${GITHUB_BASE}/download/v${VERSION}/SHA256SUMS"
   ASSET_URLS=("${GITHUB_BASE}/download/v${VERSION}/${ASSET}")
-  if [ -n "$ATOMGIT_BASE" ]; then
-    ASSET_URLS+=("${ATOMGIT_BASE%/}/download/v${VERSION}/${ASSET}")
-  fi
   LAST_ERROR=""
   for url in "${ASSET_URLS[@]}"; do
     if fetch "$url" "$CACHE_DIR/$ASSET"; then
@@ -137,7 +133,7 @@ else
   done
   if [ -n "$LAST_ERROR" ]; then
     printf 'download failed: %s\n' "$LAST_ERROR" >&2
-    printf 'use --archive with a local release asset, or set GDA_ATOMGIT_BASE\n' >&2
+    printf 'use --archive with a local release asset, or check the network and release tag\n' >&2
     exit 1
   fi
   if fetch "$SUMS_URL" "$CACHE_DIR/SHA256SUMS" 2>/dev/null; then
