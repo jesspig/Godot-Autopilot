@@ -60,7 +60,7 @@ function collectScanFiles(): Array<[string, string]> {
     rootEntries = [];
   }
   for (const entry of rootEntries) {
-    if (entry.isFile() && /^README.*\.md$/.test(entry.name)) {
+    if (entry.isFile() && /^(README|INSTALL).*\.md$/.test(entry.name)) {
       files.set(entry.name, path.join(ROOT, entry.name));
     }
   }

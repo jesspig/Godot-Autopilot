@@ -12,7 +12,7 @@ export interface UpdateItemResult {
   artifact: "skills" | "plugin" | "cli";
   from: string;
   to: string;
-  source: "github" | "atomgit" | "cache" | "builtin" | "archive";
+  source: "github" | "cache" | "builtin" | "archive";
   ok: boolean;
   action: "updated" | "skipped" | "rolled_back" | "failed";
   error: string;

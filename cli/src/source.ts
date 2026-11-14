@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { CliError, ExitCode } from "./errors";
 
-export type AssetSourceName = "github" | "atomgit";
+export type AssetSourceName = "github";
 
 export interface AssetSource {
   name: AssetSourceName;
@@ -17,20 +17,20 @@ export interface DownloadedAsset {
 }
 
 const DEFAULT_GITHUB_BASE = "https://github.com/jesspig/Godot-Autopilot/releases";
+const SUMS_FILE = "sha256sums.txt";
 
 export function assetSources(): AssetSource[] {
-  const sources: AssetSource[] = [
-    { name: "github", base: process.env.GDA_GITHUB_BASE ?? DEFAULT_GITHUB_BASE },
-  ];
-  const atomgit = process.env.GDA_ATOMGIT_BASE;
-  if (atomgit !== undefined && atomgit.trim() !== "") {
-    sources.push({ name: "atomgit", base: atomgit.trim() });
-  }
-  return sources;
+  return [{ name: "github", base: process.env.GDA_GITHUB_BASE ?? DEFAULT_GITHUB_BASE }];
 }
 
-export function assetUrl(base: string, version: string, asset: string): string {
-  return `${base.replace(/\/+$/, "")}/download/v${version}/${asset}`;
+export function assetTags(version: string): string[] {
+  const normalized = version.trim().replace(/^v/, "");
+  if (normalized === "") return [];
+  return [`v${normalized}`, normalized];
+}
+
+export function assetUrl(base: string, tag: string, asset: string): string {
+  return `${base.replace(/\/+$/, "")}/download/${tag}/${asset}`;
 }
 
 function sha256(filePath: string): string {
@@ -78,27 +78,35 @@ export async function downloadAsset(
   timeoutMs = 60_000,
 ): Promise<DownloadedAsset> {
   const failures: string[] = [];
+  const tags = assetTags(version);
+  if (tags.length === 0) {
+    throw new CliError(ExitCode.Usage, "a release version is required to download an asset");
+  }
   for (const source of assetSources()) {
-    const target = path.join(destDir, asset);
-    try {
-      await downloadFile(assetUrl(source.base, version, asset), target, timeoutMs);
-      const sumsText = await fetchText(assetUrl(source.base, version, "SHA256SUMS"), timeoutMs);
-      const expected = expectedDigest(sumsText, asset);
-      if (expected === null) {
-        throw new Error(`${asset} is not listed in SHA256SUMS`);
+    for (const tag of tags) {
+      const target = path.join(destDir, asset);
+      try {
+        await downloadFile(assetUrl(source.base, tag, asset), target, timeoutMs);
+        const sumsText = await fetchText(assetUrl(source.base, tag, SUMS_FILE), timeoutMs);
+        const expected = expectedDigest(sumsText, asset);
+        if (expected === null) {
+          throw new Error(`${asset} is not listed in ${SUMS_FILE}`);
+        }
+        if (sha256(target) !== expected) {
+          throw new Error(`checksum mismatch for ${asset}`);
+        }
+        return { path: target, source: source.name };
+      } catch (error) {
+        fs.rmSync(target, { force: true });
+        failures.push(
+          `${source.name}@${tag}: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
-      if (sha256(target) !== expected) {
-        throw new Error(`checksum mismatch for ${asset}`);
-      }
-      return { path: target, source: source.name };
-    } catch (error) {
-      fs.rmSync(target, { force: true });
-      failures.push(`${source.name}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
   throw new CliError(
     ExitCode.Transport,
     `no source could provide ${asset} v${version}: ${failures.join("; ")}`,
-    "Pass --archive with a local release asset, or set GDA_ATOMGIT_BASE.",
+    "Pass --archive with a local release asset, or check the network and release tag.",
   );
 }

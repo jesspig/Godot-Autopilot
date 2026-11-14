@@ -3,7 +3,7 @@ import fs from "node:fs";
 import { BRIDGE_SOURCES, PLATFORM_LIBS } from "../lib/config";
 import { errorMessage } from "../lib/cmake";
 import { GDEXTENSION_NAME, librariesEntries } from "../lib/gdextension";
-import { readZip, type ZipArchiveEntry } from "../lib/zip";
+import { readZip, validateZipLayout, type ZipArchiveEntry } from "../lib/zip";
 
 const ADDON_SUBPATH = "addons/godot-autopilot";
 const RES_PREFIX = "res://";
@@ -64,6 +64,11 @@ function collectProblems(entries: ZipArchiveEntry[]): string[] {
 export function runPackageCheck(zipPath: string): number {
   if (!fs.existsSync(zipPath) || !fs.statSync(zipPath).isFile()) {
     console.log(`[ERROR] zip not found: ${zipPath}`);
+    return 1;
+  }
+  const layoutProblem = validateZipLayout(zipPath);
+  if (layoutProblem !== null) {
+    console.log(`[ERROR] invalid zip layout: ${layoutProblem}`);
     return 1;
   }
   let entries: ZipArchiveEntry[];
