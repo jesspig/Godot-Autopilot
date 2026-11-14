@@ -20,6 +20,8 @@ const release = fs.readFileSync(releasePath, "utf8");
 for (const needle of [
   "push:",
   "tags:",
+  "permissions:",
+  "repository: write",
   "bun-windows-x64",
   "bun-linux-x64",
   "bun-linux-x64-musl",
@@ -27,8 +29,13 @@ for (const needle of [
   "bun-darwin-x64",
   "tools/publish_atomgit.ts",
   "ATOMGIT_REPOSITORY",
+  "ATOMGIT_REF#refs/tags/",
+  "https://api.gitcode.com/api/v5",
 ]) {
   if (!release.includes(needle)) fail(`release workflow is missing ${needle}`);
+}
+for (const forbidden of ["ATOMGIT_REF_NAME", "ATOMGIT_API_URL"]) {
+  if (release.includes(forbidden)) fail(`release workflow uses undocumented variable ${forbidden}`);
 }
 
 const sync = fs.readFileSync(syncPath, "utf8");
