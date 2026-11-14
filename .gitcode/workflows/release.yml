@@ -12,6 +12,9 @@ on:
         required: true
         type: string
 
+permissions:
+  repository: write
+
 stages:
   release:
     name: Build and publish
@@ -34,7 +37,11 @@ stages:
             run: bun install --frozen-lockfile
           - name: Validate version
             run: |
-              tag="${INPUT_TAG:-$ATOMGIT_REF_NAME}"
+              if [ -n "$INPUT_TAG" ]; then
+                tag="$INPUT_TAG"
+              else
+                tag="${ATOMGIT_REF#refs/tags/}"
+              fi
               tag="${tag#v}"
               version="$(tr -d ' \t\r\n' < VERSION)"
               if [ "$tag" != "$version" ]; then
@@ -61,6 +68,10 @@ stages:
               cat dist/sha256sums.txt
           - name: Publish AtomGit Release
             run: |
-              tag="${INPUT_TAG:-$ATOMGIT_REF_NAME}"
+              if [ -n "$INPUT_TAG" ]; then
+                tag="$INPUT_TAG"
+              else
+                tag="${ATOMGIT_REF#refs/tags/}"
+              fi
               bun tools/publish_atomgit.ts --dir dist --tag "$tag" \
-                --repo "$ATOMGIT_REPOSITORY" --api "$ATOMGIT_API_URL/api/v5"
+                --repo "$ATOMGIT_REPOSITORY" --api "https://api.gitcode.com/api/v5"
