@@ -19,6 +19,11 @@ usage() {
   printf 'usage: install.sh [--version V] [--prefix DIR] [--archive PATH] [--project DIR]\n'
   printf '                  [--skills | --skills-project] [--zh] [--no-path] [--no-plugin]\n'
   printf '                  [--skip-checksum] [--dry-run]\n'
+  printf '\n'
+  printf '  --project DIR       Godot project root (contains project.godot); auto-detected from cwd\n'
+  printf '  --skills            install skill books globally to ~/.agents/skills\n'
+  printf '  --skills-project    install skill books into <project>/.agents/skills\n'
+  printf '  --zh                use Chinese skill books (requires --skills or --skills-project)\n'
 }
 
 fail() {
@@ -165,7 +170,8 @@ detect_platform() {
   esac
 }
 
-read -r PLATFORM EXT <<<"$(detect_platform)"
+PLATFORM_INFO="$(detect_platform)" || exit 2
+read -r PLATFORM EXT <<<"$PLATFORM_INFO"
 ASSET="gda-${VERSION}-${PLATFORM}.${EXT}"
 CACHE_DIR="${HOME}/.godot-autopilot/cache/cli/${VERSION}/${PLATFORM}"
 
@@ -248,16 +254,18 @@ fi
 if [ "$DRY_RUN" -eq 1 ]; then
   ZH_SUFFIX=""
   if [ "$ZH" -eq 1 ]; then ZH_SUFFIX=" --zh"; fi
-  printf '[dry-run] install gda %s to %s\n' "$VERSION" "$PREFIX"
+  TARGET_LABEL="$PREFIX/gda"
+  if [ "$EXT" = "zip" ]; then TARGET_LABEL="$PREFIX/gda.exe"; fi
+  printf '[dry-run] install gda %s to %s\n' "$VERSION" "$TARGET_LABEL"
   if [ -n "$PROJECT" ] && [ "$NO_PLUGIN" -eq 0 ]; then
-    printf '[dry-run] %s install plugin --project %s\n' "$PREFIX/gda" "$PROJECT"
+    printf '[dry-run] %s install plugin --project %s\n' "$TARGET_LABEL" "$PROJECT"
   else
     printf '[dry-run] plugin skipped\n'
   fi
   if [ "$SKILLS_MODE" = "global" ]; then
-    printf '[dry-run] %s install skills --force%s\n' "$PREFIX/gda" "$ZH_SUFFIX"
+    printf '[dry-run] %s install skills --force%s\n' "$TARGET_LABEL" "$ZH_SUFFIX"
   elif [ "$SKILLS_MODE" = "project" ]; then
-    printf '[dry-run] %s install skills --path %s --force%s\n' "$PREFIX/gda" "$PROJECT/.agents/skills" "$ZH_SUFFIX"
+    printf '[dry-run] %s install skills --path %s --force%s\n' "$TARGET_LABEL" "$PROJECT/.agents/skills" "$ZH_SUFFIX"
   else
     printf '[dry-run] skills skipped\n'
   fi
@@ -284,7 +292,10 @@ if [ -z "$BIN" ]; then
 fi
 
 run mkdir -p "$PREFIX"
-TARGET="$PREFIX/gda"
+case "$EXT" in
+  zip) TARGET="$PREFIX/gda.exe" ;;
+  *) TARGET="$PREFIX/gda" ;;
+esac
 TMP="${TARGET}.new-$$"
 run cp "$BIN" "$TMP"
 run chmod +x "$TMP"

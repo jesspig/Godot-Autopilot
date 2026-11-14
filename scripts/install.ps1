@@ -160,16 +160,17 @@ if ($Archive -ne "") {
   if ($DryRun) {
     Write-Output "[dry-run] Invoke-WebRequest $sumsUrl"
   } else {
+    $sumsReady = $false
     try {
       Invoke-WebRequest -Uri $sumsUrl -OutFile $sumsPath -UseBasicParsing -TimeoutSec 30
-      Assert-Checksum $assetPath $sumsPath
+      $sumsReady = $true
     } catch {
-      if ($SkipChecksum) {
-        Write-Warning "checksum unavailable; skipping checksum"
-      } else {
+      if (-not $SkipChecksum) {
         throw "cannot download $sumsUrl; pass -SkipChecksum to install without verification"
       }
+      Write-Warning "checksum unavailable; skipping checksum"
     }
+    if ($sumsReady) { Assert-Checksum $assetPath $sumsPath }
   }
 }
 
