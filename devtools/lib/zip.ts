@@ -105,7 +105,7 @@ export function writeZip(archivePath: string, entries: ZipSourceEntry[]): void {
   end.writeUInt16LE(entries.length, 10);
   end.writeUInt32LE(centralDirectory.length, 12);
   end.writeUInt32LE(localDirectory.length, 16);
-  end.writeUInt16LE(0, 18);
+  end.writeUInt16LE(0, 20);
 
   fs.writeFileSync(archivePath, Buffer.concat([localDirectory, centralDirectory, end]));
 }
@@ -142,6 +142,22 @@ function readEntryData(
   if (data.length !== uncompressedSize) throw new Error(`size mismatch for ${name}`);
   if (crc32(data) !== checksum) throw new Error(`crc mismatch for ${name}`);
   return data;
+}
+
+export function validateZipLayout(archivePath: string): string | null {
+  const buffer = fs.readFileSync(archivePath);
+  const end = findEndOfCentralDirectory(buffer);
+  if (end < 0) return "end of central directory not found";
+  const count = buffer.readUInt16LE(end + 10);
+  const centralSize = buffer.readUInt32LE(end + 12);
+  const centralOffset = buffer.readUInt32LE(end + 16);
+  if (centralOffset + centralSize !== end) {
+    return `central directory range ${centralOffset}+${centralSize} does not end at ${end}`;
+  }
+  if (count > 0 && buffer.readUInt32LE(centralOffset) !== 0x02014b50) {
+    return "central directory signature mismatch";
+  }
+  return null;
 }
 
 export function readZip(archivePath: string): ZipArchiveEntry[] {
