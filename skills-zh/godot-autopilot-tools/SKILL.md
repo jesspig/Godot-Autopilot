@@ -1,6 +1,6 @@
 ---
 name: godot-autopilot-tools
-description: "Godot Autopilot 的 CLI-first 调用参考：gda 命令与参数面、通过插件实例索引发现目标、gda tools search/describe 与 gda call、作为兼容面的原生 MCP 工具、高风险副作用的 confirm 与 MCP annotations、错误水位协议与错误码、batch_execute/code_execute 语义、响应限制，以及动态用户工具。适用于查询调用协议事实。"
+description: "Godot Autopilot 的 CLI-first 调用参考：gda 命令与参数面、通过插件实例索引发现目标、实时 gda search/describe/tools list 与 gda call、作为兼容面的原生 MCP 工具、高风险副作用的 confirm 与 MCP annotations、错误水位协议与错误码、batch_execute/code_execute 语义、响应限制，以及动态用户工具。适用于查询调用协议事实。"
 ---
 
 # Godot Autopilot 调用协议
@@ -41,9 +41,15 @@ description: "Godot Autopilot 的 CLI-first 调用参考：gda 命令与参数�
 | `gda logs` | 显示实例日志。 |
 | `gda skills list` | 列出已安装技能书。 |
 | `gda skills show <name>` | 打印一册；`--file <rel>` 读取附属文件。 |
-| `gda tools list` | 列出缓存的离线工具目录。 |
-| `gda tools search <query>` | 搜索缓存目录。 |
-| `gda tools describe <name>` | 显示一个缓存工具的 schema。 |
+| `gda tools list` | 列出实时实例的全部直接工具；`--category`/`--tags` 可缩小范围。 |
+| `gda resources list` | 列出 MCP 资源；`--templates` 同时列出模板。 |
+| `gda resources templates` | 列出 MCP 资源模板。 |
+| `gda resources read <uri>` | 读取资源；支持 `--json`、`--raw`、`--save <dir>`。 |
+| `gda resources watch <uri>` | 轮询资源并输出变化（`--interval` 秒）。 |
+| `gda prompts list` | 列出 MCP 提示词模板。 |
+| `gda prompts get <name>` | 用 `--args '<json>'` 渲染提示词；`--json` 保留 messages。 |
+| `gda call <tool> --async` | 服务端支持时按 MCP Task 执行，输出 task_id 并写本地索引。 |
+| `gda tasks list|get|wait|cancel|clean` | 管理本地任务；wait/cancel 走 tasks/get|cancel。 |
 | `gda projects` | 离线列出已知 Godot 工程。 |
 | `gda cache list` | 列出缓存 manifest。 |
 | `gda cache info` | 显示缓存根、条目数与大小。 |
@@ -57,7 +63,7 @@ description: "Godot Autopilot 的 CLI-first 调用参考：gda 命令与参数�
 - 目标选择：`--port <n>`（仅连接覆盖）、`--id <id>`、`--project <dir>`、
   `--socket <path>`、`--transport auto|ipc|http`、`--no-fallback`。
 - 输入：`--args <json>`、`--args-file <path>`、`--confirm`、`--timeout <sec>`。
-- 发现过滤：`--category <name>`、`--tags <a,b>`、`--refresh`。
+- 发现过滤：`--category <name>`、`--tags <a,b>`（用于 `gda search` 与 `gda tools list`）。
 - 输出：`--json`、`--pretty`、`--raw`、`--save-images <dir>`。
 - 生命周期：`--godot <path>`、`--headless`、`--play`、`--no-import`、
   `--wait <sec>`、`--force`、`--tail <n>`、`--probe <light|strict>`。
@@ -94,15 +100,16 @@ CLI 按以下顺序解析目标：显式 `--socket`/`--port`、按 `--id` 查实
 ## 发现协议——先搜索，禁止猜
 
 1. `gda ping` 确认服务器响应。
-2. `gda tools search <query>` 按名称、描述、分类与标签搜索缓存目录；用
-   `--category` 或 `--tags` 缩小范围。
-3. `gda tools describe <name>` 打印 schema、描述与 `side_effect` 标记。首次
-   写入前必读。
+2. `gda search <query>` 通过实时服务器按名称、描述、分类与标签搜索；用
+   `--category` 或 `--tags` 缩小范围。服务端默认最多返回 20 条。
+3. `gda describe <name>` 打印 schema、描述与 `side_effect` 标记。首次写入前
+   必读。
 4. `gda call <name> --args '<json>'` 执行；大参数用 `--args-file`。
-5. 缓存缺少某个工具时，用 `gda tools list --refresh` 从实时实例刷新目录。
+5. `gda tools list` 以 `{tools, total}` 列出全部可直接调用的工具，排除 5 个
+   MCP 协议工具。它用于全量清单，不用于关键词搜索。
 
-`gda search` 与 `gda describe` 是实时等价命令，需要运行中的实例；缓存可能
-过期时使用它们。
+发现只有实时通道：CLI 不保留离线工具目录。没有运行中的
+实例时，用 `gda start --project <dir>` 启动。
 
 先按对象搜索，再按操作搜索："tilemap cell"、"animation track"、
 "import sidecar"。对象太宽时才加动词。下结论说工具不存在前，用同义词重试：
@@ -112,7 +119,7 @@ tile/cell、sprite/texture、log/output、delete/remove/erase、create/add/new�
 示例：
 
 ```bash
-gda tools describe create_scene_node
+gda describe create_scene_node
 gda call create_scene_node --args '{"parent_path": "Root", "name": "Player", "type": "CharacterBody2D", "properties": {"position": {"x": 0, "y": -10}}}'
 ```
 
@@ -122,7 +129,48 @@ gda call create_scene_node --args '{"parent_path": "Root", "name": "Player", "ty
 `get_tool_detail`、`call_tool`、`batch_execute`、`code_execute`。所有领域工具
 通过 `call_tool` 的 `name` 与 `arguments` 执行；`call_tool` 还接受顶层
 `confirm` 布尔值。`search_tools` / `get_tool_detail` 的用法与
-`gda tools search` / `gda tools describe` 相同。
+`gda search` / `gda describe` 相同。`search_tools` 默认最多 20 条；只有确需
+全量枚举时才传 `limit: 0`。`gda status --json` 的 `mcp` 块给出协议版本与
+capabilities；依赖 tasks/resources/prompts/full 前先检查。长调用可用
+`gda call --async` 加 `gda tasks wait`；`--progress` 把进度写到 stderr。
+full 直接工具返回 input_required 时，TTY 会提示接受/拒绝；非 TTY 脚本传
+`--input '{"confirm":{"action":"accept"}}'`；`--confirm` 仍是 `call_tool` 的回退。
+
+## 观测资源与提示词
+
+`gda resources read` 不调用工具即可读取编辑器与调试器状态：
+
+- `godot://editor/output-log` — 编辑器控制台输出。
+- `godot://debugger/output` — 调试器输出。
+- `godot://debugger/errors` — 调试器错误集合。
+- `godot://debugger/session`、`godot://debugger/stack-dump`、
+  `godot://debugger/scene-tree`、`godot://debugger/monitors` — 会话、栈、
+  场景树与监视器。
+- `godot://log/recent` — 最近的结构化日志。
+
+```bash
+gda resources read godot://editor/output-log
+gda resources read godot://debugger/errors --json
+gda resources read godot://debugger/scene-tree --save ./out
+```
+
+文本直出，JSON 美化，blob 默认只打印大小摘要；`--save <dir>` 才落盘。
+`gda logs <id>` 是实例进程日志，不是编辑器/调试器资源。当前 URI 以
+`gda resources list` 为准。`gda prompts list` / `gda prompts get <name>`
+列出并渲染已注册提示词；只打印，不执行。
+
+## MCP 工具面与宿主侧工具搜索
+
+- 默认 MCP 面为 `meta`：恰好 7 个元工具。除非宿主能自行 defer 或搜索工具，
+  否则保持默认。
+- 启动编辑器前设置 `GODOT_AUTOPILOT_TOOL_SURFACE=full`，可把全部 459 个工具
+  暴露为顶层工具；`tools/list` 按 100 条分页，宿主必须处理 `nextCursor`，
+  或使用会自动翻页的客户端。
+- 只对支持 tool search / defer loading 的本地宿主开启 `full`（例如 Claude
+  Code 的 `ENABLE_TOOL_SEARCH=auto` 或 `true`）。直接加载全部定义的宿主会被
+  459 个工具占用大量上下文。
+- 云端 Anthropic API 无法访问仅绑环回的服务；`full` 只适用于本地宿主。
+  两个面的日志、确认与脱敏行为一致。
 
 ## 确认与 annotations
 

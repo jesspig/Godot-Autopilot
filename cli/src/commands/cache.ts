@@ -3,7 +3,7 @@ import { cleanCache, cacheInfo, listManifests, type CacheArtifact } from "../cac
 import { CliError, ExitCode } from "../errors";
 import { writeJson } from "./json-output";
 
-const ARTIFACTS: readonly CacheArtifact[] = ["cli", "plugin", "skills", "catalog"];
+const ARTIFACTS: readonly CacheArtifact[] = ["cli", "plugin", "skills"];
 
 function artifactFilter(opts: GlobalOptions): CacheArtifact | null {
   if (opts.artifactText === undefined) return null;

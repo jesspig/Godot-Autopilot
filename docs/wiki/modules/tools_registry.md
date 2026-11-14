@@ -7,7 +7,7 @@ tags:
   - 工具注册
   - ToolSpec
   - 授权
-timestamp: "2026-10-22T03:59:53+08:00"
+timestamp: "2026-11-14T01:08:47+08:00"
 resource: src/tools/
 ---
 
@@ -15,9 +15,9 @@ resource: src/tools/
 
 # 工具注册表（src/tools/ 注册管线）
 
-> 审计日期：2026-10-22（**10-22 随授权兼容模式与破坏类档位标准成型批次同步**——① 「授权三档」一节补**档位判定标准**（读 / 写 / 破坏 / 危险四档的可判定口径、两条边界规则：删除磁盘文件归写类、销毁宿主内运行对象归破坏类）与**授权兼容模式**（`strict` / `legacy`，取值来源 `GODOT_AUTOPILOT_AUTH_MODE` > 配置 `auth_mode` 键 > 默认严格，非法值回落并告警，兼容模式下写类默认放行而危险类与破坏类仍默认拒绝）；② `destructive` 档声明者由 1 个扩为 6 个（新增 `delete_scene_node` / `remove_animation` / `remove_animation_track` / `remove_audio_bus_effect` / `remove_debug_custom_monitor`），判定标准固化在 `src/tools/base/side_effect_policy.hpp` 并由 L1 用例 `destructive_tier_guard_test` 防漂移（可疑工具须显式登记白名单并写明理由）；③ 「面板可勾选的能力清单」与待补充清单同步更新）10-21 随 C# 程序集构建与 .NET 环境判定修复批次同步——「授权三档」一节的**面板开关由五项扩为六项**（新增 `process`，进程执行档不再只能经环境变量开启），开关控件改为按能力清单生成（`src/ui/authorization_switches.hpp`），初始状态统一按当前实际允许列表显示；**10-21 随面板授权开关补齐批次同步**——「授权三档」一节的**面板开关由三项扩为五项**（新增 `write` 与 `destructive`），补「面板可勾选的能力清单」表（复选框 ↔ 能力名 ↔ 覆盖工具类 ↔ 勾选后效果）、取消一项不影响其它项的增删语义、该批次 `process` 仍无面板开关的说明（后由 10-21 补齐批次改为六项）；**10-21 随数值同步批次更正**——本页不再复制遍历基线的排除数/候选数/步数/warnings 口径，一律改为引用 [测试体系](../tests.md)「数值核算总表」的遍历各行（最近一次 L2 实测：枚举 452 / 排除 147 / 候选 305 / `03_tools_contract` 实测 557 步 / `empty_args` warnings 基线 0）；「契约缺口表」中 `empty_args` 的 warnings 基线由 4 条改为 **0**（历史 4 条已修复，保留为历史说明）；10-21 随开放接口面落地批次同步——新增**统一执行入口** [`src/tools/base/tool_execute.hpp`](../../../src/tools/base/tool_execute.hpp) / [`src/tools/base/tool_execute.cpp`](../../../src/tools/base/tool_execute.cpp)（导出拦截 → 工具存在 → 参数校验 → 授权 → 派发 → 信封六阶段），六阶段已实现并由 L1 `tool_execute_test` 覆盖，但**尚未接入生产请求路径**（`api_surface` 的执行器槽位在生产路径上无注册点，MCP `call_tool` 走 `execute_tool_core` 直派）——两套面逐段生效差异见下「统一执行入口」；新增 [`src/tools/base/argument_validator.hpp`](../../../src/tools/base/argument_validator.hpp) / [`src/tools/base/argument_validator.cpp`](../../../src/tools/base/argument_validator.cpp) 参数校验器（**未知参数宽容**，只记 Warning 不拒绝）；**授权由「能力门」升级为三档**：读类默认放行、写类默认拒绝、危险类（`process` / `code_execute` / `game_runtime` / `destructive`）默认拒绝且需显式开启；`SideEffect` 增 `Destructive` 值（9 值）；`main_thread_timeout` 的 `retryable` 由 true 改为 **false**（调用已取消、副作用可能仍落地，不可盲目重试）；导出期拒绝**新增机器可读 `code="export_in_progress"`**；错误码归一（`ApiEnvelope::normalize_code` / `status_for`）与完整 HTTP 状态码表见 [REST 接口面](api.md)；端口模型见 [端口与实例登记](ports.md)；10-20 随 `code_execute` 超时上限收敛批次同步——长阻塞派发预算收敛为**单值 29000ms**（`GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = GDA_DISPATCH_WAIT_MAX_MS`，删去「常量 30000 / 实际生效 29000」双值写法）；预算条目补 `queue_unavailable` 错误码（`error`/`code`/`retryable`）与 `code_execute` 的 `timeout_ms` 上界口径（取 `min(27000, 生效长阻塞预算)`）；10-20 随知识库事实描述页收敛批次同步——类别分布表经复核**逐项正确**（27 类求和 451），保持不变；`kLongBlocking` 语义由「返回 0 = 无限等待」更正为**长阻塞预算**（常量 `GDA_DISPATCH_WAIT_LONG_BLOCKING_MS` = 29000 ms，env `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS` 可下调至 `[1000, 29000]`），`main_thread_wait_budget_ms` 由 3 参改 **4 参**（新增 `long_blocking_ms`）；`code_execute`/`batch_execute` 的 `side_effect` 现为 `SideEffect::CodeExecute`（回显 `code_execute`）；只读工具的 `side_effect` 回显由空串改为 **`"none"`**；能力门映射不再按工具名特判，只按 `SideEffect` 判定；遍历契约补「基线断言 + 工具错误判失败」两条：枚举/排除/候选/warnings 四项与 `tests/runner/traversal.cpp:22-25` 的基线常量逐项比对，不符即记 baseline diff；工具返回的错误若不含 `structured_error` 且消息不含豁免表任一标记即判 FAIL，豁免表为 `tests/runner/traversal.cpp:29-38` 的 `kExpectedErrorMarkers`）；2026-10-16（本轮随 text_ops C# 类解析修复与计数复核同步——域工具 448→451（+3：`csharp_bridge_tools` 5→6 `csharp_list_members`、`os_tools` 22→23 `create_csharp_script`、`editor_tools` 32→33 `dotnet_environment`），全系统 456→459（452 非元 + 7 元），schema 基线 456=390+66 → 459=393+66（L1 `register_all_test.cpp:142-144` 断言），`register_all.cpp` 的 `call_tool` 描述行同步为“452 非元（451 域 + system_status）”；L1 435（unit 41 文件）、L2 38、ctest 注册点 476；`parse_csharp_classes` 基类解析修复与验证证据见 [changelog/2026-10-16-log.md](../changelog/2026-10-16-log.md)）；2026-10-12（10-12 随 C# 桥补完批次同步——域工具 446→448（新增 csharp_set_property/csharp_unsubscribe_event，csharp_bridge_tools 3→5），全系统 454→456（449 非元 + 7 元），schema 基线 454=388+66 → 456=390+66（L1 register_all_test.cpp:142-144 已同步断言），register_all.cpp 的 call_tool 描述行已修正为“449 非元（448 域 + system_status）”；10-11 随 C# 反射桥批次同步——域工具 443→446（新增 csharp_get_property/csharp_call_method/csharp_subscribe_event，新域文件 csharp_bridge_tools.hpp，域模块 32→33；build_csharp_assembly 早先已随 editor 域计入），全系统 451→454（447 非元 + 7 元），schema 基线 451=385+66 → 454=388+66（L1 register_all_test.cpp:142-144 已同步断言），register_all.cpp 的 call_tool 描述行已修正为“447 非元（446 域 + system_status)”（此前遗留闭环）；10-11 随批量工具扩充批次同步——域工具 392→443（+51：animation +1、audio +4、config +4、os +4（`os_file_dir_ops` 新实现挂 `os_tools`）、game +4、input_map +1、physics +3、property +2、render +3、resource +7、scene +7、theme +2、新域 `gridmap` 5、`tween` 4；源模块 30→32，全系统 400→451，schema 基线 400=338+62 → 451=385+66；遍历枚举 393→444，排除与候选以运行时 `03_tools_contract` 报告为准，旧基线 71/322 已过时）；09-29 随 B1–B7 修复批次同步——工具 399→400（域工具 392，新增 `remove_resource_file`）；8 个 SceneTree 工具改经 `GDA_OP_SCENE_TREE` 转发到游戏进程并声明 `SideEffect::GameRuntime`，遍历排除 62→71、候选 330→322；schema 基线 400 = 338 非空 + 62 空；dispatch 新增 flags `kHealthProbe`/`kLongBlocking` 与主线程等待预算（默认 27000ms、健康探针 5000ms；超时取消 + `main_thread_timeout` 结构化错误）；2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随 T0 安全边界与并发契约同步；09-13 上午随反馈修复批次同步工具数 365/372/373、Resources 26、SIDE 排除 49；09-13 下午随收口批次同步工具数 366/373/374 与 get_plugin_log；09-13 17:50 随 B 组知识库审计同步——修正契约缺口行号引用、schema 基线行号与元工具 schema 口径；09-13 晚随 0.2.4 版知识库全量审计同步——补正 populate_default_tools 存留状态与命名首段动词的 5 个既有例外；09-15 随 Computer Use grounding 批次同步工具数 379/386/387、非 SIDE 322 / SIDE 57、类别分布与遍历 warnings 实测 4 条；09-16 随失败修复批次同步工具数 384/391/392、非 SIDE 324 / SIDE 60；09-16 随视觉辅助批次同步工具数 385/392/393、Capture 1→2；09-18 随 E2E 优化批次同步工具数 391/398/399 与新增 6 工具；09-19 随 ToolSpec 数据化重构整体重写——全量工具改为 `ToolSpec` 数据记录（不再有宏/真类），删除 `tool_decl.hpp`/`fn_tool.hpp`/`meta_tools.hpp`/`IMetaTool` 与 8 个 `schema_*_ops.cpp`/`schema_fills.hpp`，新增 `tool_args`/`tool_pipeline`/`dynamic_spec_store`/`autopilot_tools` 与 `tests/guard/` 迁移守卫；catalog 399、MCP 恒 7、遍历改为运行时枚举 392 条后按 `side_effect`/`mutating`/`dynamic` 排除，实测 330 个进入两步骤；09-19 收尾第二轮随 traits/invoke/rescan/batch 同步图片附件 flag 判定与 rescan 入口；09-20 晚随可重放监控批次同步——dispatch 分发层补 trace 上下文跨线程传递/排队等待测量与未捕获异常埋点，用户工具碰撞拒绝改 `log_detailed`）；09-21 随可重放监控与日志系统批次同步——元工具处理器用 `RequestContext::GetRequest().id` 建立 `monitor::RequestScope` + `tools::RequestSpanGuard` 端到端关联，新增 `registry_build`/`registry_refresh_derived`/`registry_refresh_dynamic`/`tools_registered` lifecycle 事件，`system_status` 返回新增 `tool_count`/`queue_depth`）。
-> 覆盖范围：`register_all.cpp/hpp`、`dispatch.cpp/hpp`、`tool_catalog.cpp/hpp`、`schema_builder.cpp/hpp`、`tool_spec.hpp`、`tool_args.cpp/hpp`、`tool_pipeline.cpp/hpp`、`tool_base.hpp`、`tool_registry.hpp`、`dynamic_spec_store.hpp`、`autopilot_tools.cpp/hpp`、`tool_execute.cpp/hpp`（10-21 新增：统一执行入口）、`argument_validator.cpp/hpp`（10-21 新增：参数校验器）、33 个域 `*_tools.hpp`，对照 `tests/runner/traversal.cpp`、`tests/unit/register_all_test.cpp`、`tests/unit/tool_registry_test.cpp`、`tests/unit/tool_execute_test.cpp`、`tests/unit/argument_validator_test.cpp`、`tests/unit/authorization_policy_test.cpp`、`tests/guard/`、`tests/config/03_tools_contract.json` 与仓库根 `AGENTS.md` 工具段。
-> 相关页面：[ToolSpec 数据层与执行管线](../tool_base_design.md) · [测试体系](../tests.md) · [REST 接口面](api.md) · [端口与实例登记](ports.md) · [工具实现 A 组](../modules/tools_ops_a.md) · [工具实现 B 组](../modules/tools_ops_b.md) · [入口与运行时](../modules/entry_runtime.md) · [架构总览](../overview.md)
+> 审计日期：2026-11-14（T-15/T-17/T-18/T-19/T-20：Tasks/Progress/MRTR/Skills 与 status 能力块）2026-11-14（T-07/T-08：新增 MCP meta/full 工具面、progressive discovery 分页与动态工具 list_changed；默认仍 7 元）（T-03：`search_tools` 新增 `limit`，默认 20、`0` 全量、负值报 `invalid parameter`；遍历/契约测试显式 `limit:0`）2026-10-22（**10-22 随授权兼容模式与破坏类档位标准成型批次同步**——① 「授权三档」一节补**档位判定标准**（读 / 写 / 破坏 / 危险四档的可判定口径、两条边界规则：删除磁盘文件归写类、销毁宿主内运行对象归破坏类）与**授权兼容模式**（`strict` / `legacy`，取值来源 `GODOT_AUTOPILOT_AUTH_MODE` > 配置 `auth_mode` 键 > 默认严格，非法值回落并告警，兼容模式下写类默认放行而危险类与破坏类仍默认拒绝）；② `destructive` 档声明者由 1 个扩为 6 个（新增 `delete_scene_node` / `remove_animation` / `remove_animation_track` / `remove_audio_bus_effect` / `remove_debug_custom_monitor`），判定标准固化在 `src/tools/base/side_effect_policy.hpp` 并由 L1 用例 `destructive_tier_guard_test` 防漂移（可疑工具须显式登记白名单并写明理由）；③ 「面板可勾选的能力清单」与待补充清单同步更新）10-21 随 C# 程序集构建与 .NET 环境判定修复批次同步——「授权三档」一节的**面板开关由五项扩为六项**（新增 `process`，进程执行档不再只能经环境变量开启），开关控件改为按能力清单生成（`src/ui/authorization_switches.hpp`），初始状态统一按当前实际允许列表显示；**10-21 随面板授权开关补齐批次同步**——「授权三档」一节的**面板开关由三项扩为五项**（新增 `write` 与 `destructive`），补「面板可勾选的能力清单」表（复选框 ↔ 能力名 ↔ 覆盖工具类 ↔ 勾选后效果）、取消一项不影响其它项的增删语义、该批次 `process` 仍无面板开关的说明（后由 10-21 补齐批次改为六项）；**10-21 随数值同步批次更正**——本页不再复制遍历基线的排除数/候选数/步数/warnings 口径，一律改为引用 [测试体系](../tests.md)「数值核算总表」的遍历各行（最近一次 L2 实测：枚举 452 / 排除 147 / 候选 305 / `03_tools_contract` 实测 557 步 / `empty_args` warnings 基线 0）；「契约缺口表」中 `empty_args` 的 warnings 基线由 4 条改为 **0**（历史 4 条已修复，保留为历史说明）；10-21 随开放接口面落地批次同步——新增**统一执行入口** `src/tools/base/tool_execute.hpp` / `src/tools/base/tool_execute.cpp`（0.3.2 已删除）（导出拦截 → 工具存在 → 参数校验 → 授权 → 派发 → 信封六阶段），六阶段已实现并由 L1 `tool_execute_test` 覆盖，但**尚未接入生产请求路径**（`api_surface` 的执行器槽位在生产路径上无注册点，MCP `call_tool` 走 `execute_tool_core` 直派）——两套面逐段生效差异见下「统一执行入口」；新增 `src/tools/base/argument_validator.hpp` / `src/tools/base/argument_validator.cpp`（0.3.2 已删除）参数校验器（**未知参数宽容**，只记 Warning 不拒绝）；**授权由「能力门」升级为三档**：读类默认放行、写类默认拒绝、危险类（`process` / `code_execute` / `game_runtime` / `destructive`）默认拒绝且需显式开启；`SideEffect` 增 `Destructive` 值（9 值）；`main_thread_timeout` 的 `retryable` 由 true 改为 **false**（调用已取消、副作用可能仍落地，不可盲目重试）；导出期拒绝**新增机器可读 `code="export_in_progress"`**；错误码归一（`ApiEnvelope::normalize_code` / `status_for`）与完整 HTTP 状态码表已随 0.3.2 移除；端口模型见 [端口与实例登记](ports.md)；10-20 随 `code_execute` 超时上限收敛批次同步——长阻塞派发预算收敛为**单值 29000ms**（`GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = GDA_DISPATCH_WAIT_MAX_MS`，删去「常量 30000 / 实际生效 29000」双值写法）；预算条目补 `queue_unavailable` 错误码（`error`/`code`/`retryable`）与 `code_execute` 的 `timeout_ms` 上界口径（取 `min(27000, 生效长阻塞预算)`）；10-20 随知识库事实描述页收敛批次同步——类别分布表经复核**逐项正确**（27 类求和 451），保持不变；`kLongBlocking` 语义由「返回 0 = 无限等待」更正为**长阻塞预算**（常量 `GDA_DISPATCH_WAIT_LONG_BLOCKING_MS` = 29000 ms，env `GODOT_AUTOPILOT_LONG_BLOCKING_TIMEOUT_MS` 可下调至 `[1000, 29000]`），`main_thread_wait_budget_ms` 由 3 参改 **4 参**（新增 `long_blocking_ms`）；`code_execute`/`batch_execute` 的 `side_effect` 现为 `SideEffect::CodeExecute`（回显 `code_execute`）；只读工具的 `side_effect` 回显由空串改为 **`"none"`**；能力门映射不再按工具名特判，只按 `SideEffect` 判定；遍历契约补「基线断言 + 工具错误判失败」两条：枚举/排除/候选/warnings 四项与 `tests/runner/traversal.cpp:22-25` 的基线常量逐项比对，不符即记 baseline diff；工具返回的错误若不含 `structured_error` 且消息不含豁免表任一标记即判 FAIL，豁免表为 `tests/runner/traversal.cpp:29-38` 的 `kExpectedErrorMarkers`）；2026-10-16（本轮随 text_ops C# 类解析修复与计数复核同步——域工具 448→451（+3：`csharp_bridge_tools` 5→6 `csharp_list_members`、`os_tools` 22→23 `create_csharp_script`、`editor_tools` 32→33 `dotnet_environment`），全系统 456→459（452 非元 + 7 元），schema 基线 456=390+66 → 459=393+66（L1 `register_all_test.cpp:142-144` 断言），`register_all.cpp` 的 `call_tool` 描述行同步为“452 非元（451 域 + system_status）”；L1 435（unit 41 文件）、L2 38、ctest 注册点 476；`parse_csharp_classes` 基类解析修复与验证证据见 [changelog/2026-10-16-log.md](../changelog/2026-10-16-log.md)）；2026-10-12（10-12 随 C# 桥补完批次同步——域工具 446→448（新增 csharp_set_property/csharp_unsubscribe_event，csharp_bridge_tools 3→5），全系统 454→456（449 非元 + 7 元），schema 基线 454=388+66 → 456=390+66（L1 register_all_test.cpp:142-144 已同步断言），register_all.cpp 的 call_tool 描述行已修正为“449 非元（448 域 + system_status）”；10-11 随 C# 反射桥批次同步——域工具 443→446（新增 csharp_get_property/csharp_call_method/csharp_subscribe_event，新域文件 csharp_bridge_tools.hpp，域模块 32→33；build_csharp_assembly 早先已随 editor 域计入），全系统 451→454（447 非元 + 7 元），schema 基线 451=385+66 → 454=388+66（L1 register_all_test.cpp:142-144 已同步断言），register_all.cpp 的 call_tool 描述行已修正为“447 非元（446 域 + system_status)”（此前遗留闭环）；10-11 随批量工具扩充批次同步——域工具 392→443（+51：animation +1、audio +4、config +4、os +4（`os_file_dir_ops` 新实现挂 `os_tools`）、game +4、input_map +1、physics +3、property +2、render +3、resource +7、scene +7、theme +2、新域 `gridmap` 5、`tween` 4；源模块 30→32，全系统 400→451，schema 基线 400=338+62 → 451=385+66；遍历枚举 393→444，排除与候选以运行时 `03_tools_contract` 报告为准，旧基线 71/322 已过时）；09-29 随 B1–B7 修复批次同步——工具 399→400（域工具 392，新增 `remove_resource_file`）；8 个 SceneTree 工具改经 `GDA_OP_SCENE_TREE` 转发到游戏进程并声明 `SideEffect::GameRuntime`，遍历排除 62→71、候选 330→322；schema 基线 400 = 338 非空 + 62 空；dispatch 新增 flags `kHealthProbe`/`kLongBlocking` 与主线程等待预算（默认 27000ms、健康探针 5000ms；超时取消 + `main_thread_timeout` 结构化错误）；2026-08-29 随 0.2.2 版本与全量审计同步；09-02 随 T0 安全边界与并发契约同步；09-13 上午随反馈修复批次同步工具数 365/372/373、Resources 26、SIDE 排除 49；09-13 下午随收口批次同步工具数 366/373/374 与 get_plugin_log；09-13 17:50 随 B 组知识库审计同步——修正契约缺口行号引用、schema 基线行号与元工具 schema 口径；09-13 晚随 0.2.4 版知识库全量审计同步——补正 populate_default_tools 存留状态与命名首段动词的 5 个既有例外；09-15 随 Computer Use grounding 批次同步工具数 379/386/387、非 SIDE 322 / SIDE 57、类别分布与遍历 warnings 实测 4 条；09-16 随失败修复批次同步工具数 384/391/392、非 SIDE 324 / SIDE 60；09-16 随视觉辅助批次同步工具数 385/392/393、Capture 1→2；09-18 随 E2E 优化批次同步工具数 391/398/399 与新增 6 工具；09-19 随 ToolSpec 数据化重构整体重写——全量工具改为 `ToolSpec` 数据记录（不再有宏/真类），删除 `tool_decl.hpp`/`fn_tool.hpp`/`meta_tools.hpp`/`IMetaTool` 与 8 个 `schema_*_ops.cpp`/`schema_fills.hpp`，新增 `tool_args`/`tool_pipeline`/`dynamic_spec_store`/`autopilot_tools` 与 `tests/guard/` 迁移守卫；catalog 399、MCP 恒 7、遍历改为运行时枚举 392 条后按 `side_effect`/`mutating`/`dynamic` 排除，实测 330 个进入两步骤；09-19 收尾第二轮随 traits/invoke/rescan/batch 同步图片附件 flag 判定与 rescan 入口；09-20 晚随可重放监控批次同步——dispatch 分发层补 trace 上下文跨线程传递/排队等待测量与未捕获异常埋点，用户工具碰撞拒绝改 `log_detailed`）；09-21 随可重放监控与日志系统批次同步——元工具处理器用 `RequestContext::GetRequest().id` 建立 `monitor::RequestScope` + `tools::RequestSpanGuard` 端到端关联，新增 `registry_build`/`registry_refresh_derived`/`registry_refresh_dynamic`/`tools_registered` lifecycle 事件，`system_status` 返回新增 `tool_count`/`queue_depth`）。
+> 覆盖范围：`register_all.cpp/hpp`、`dispatch.cpp/hpp`、`tool_catalog.cpp/hpp`、`schema_builder.cpp/hpp`、`tool_spec.hpp`、`tool_args.cpp/hpp`、`tool_pipeline.cpp/hpp`、`tool_base.hpp`、`tool_registry.hpp`、`dynamic_spec_store.hpp`、`autopilot_tools.cpp/hpp`、`side_effect_policy.hpp`、`confirmation.hpp`、33 个域 `*_tools.hpp`，对照 `tests/unit/register_all_test.cpp`、`tests/unit/tool_registry_test.cpp`、`tests/unit/confirmation_test.cpp`、`tests/unit/tool_verdict_test.cpp`、`tests/guard/` 与仓库根 `AGENTS.md` 工具段。
+> 相关页面：[ToolSpec 数据层与执行管线](../tool_base_design.md) · [测试体系](../tests.md) · [端口与实例登记](ports.md) · [工具实现 A 组](../modules/tools_ops_a.md) · [工具实现 B 组](../modules/tools_ops_b.md) · [入口与运行时](../modules/entry_runtime.md) · [架构总览](../overview.md)
 
 ## 注册管线流程（ToolRegistry 单一来源 + 全量 ToolSpec，自 2026-09-19）
 
@@ -59,7 +59,15 @@ flowchart TD
 | 分发层 | `dispatch::g_handlers`+`g_meta_handlers`（派生） | **459** | 452 域/系统 + 7 元 |
 | 目录层 | `ToolCatalog`（派生） | **459** | 451 域 + system_status + 7 元 |
 
-领域工具不注册进 MCP 工具列表，只能经 `call_tool` 元工具代理调用；`ToolCatalog` 459 = 451 域工具 + `system_status` + 7 元工具（`refresh_derived` 对 `all_any()` 逐一 `make_tool_info` 派生，`dynamic`/`mutating` 字段来自 `tool_flags`）。MCP 工具总数 = 7 元（不变）；经 `call_tool` 代理可达 458（7 元 + 451 域）。
+默认 `meta` 面下领域工具不注册进 MCP 工具列表，只能经 `call_tool` 元工具代理调用；`ToolCatalog` 459 = 451 域工具 + `system_status` + 7 元工具（`refresh_derived` 对 `all_any()` 逐一 `make_tool_info` 派生，`dynamic`/`mutating` 字段来自 `tool_flags`）。MCP 顶层工具总数默认 7；经 `call_tool` 代理可达 458（7 元 + 451 域）。`GODOT_AUTOPILOT_TOOL_SURFACE=full` 时改为注册 `all_any()` 全部 459 个顶层工具。
+
+## MCP 工具面（meta / full）
+
+- `GODOT_AUTOPILOT_TOOL_SURFACE`：`meta`（默认）只注册 7 个元工具；`full` 注册 registry 的 `all_any()` 全部 459 个；非法值回退 `meta` 并写 Warning。解析在 `register_all.cpp` 的 `resolve_tool_surface()`，`ServerContext::register_tools()` 记录 `tool_surface` lifecycle。
+- 两种面共用同一个 `register_surface_tool()` 回调：导出拦截、trace context、错误水位、`is_error`、`kCaptureImage` 图片附件、`call_tool` 编排线程规则全部一致；full 不绕过 `confirm`、主线程派发或环回绑定。
+- `ServerOptions::enable_progressive_discovery=true`：`tools/list` 按 100 条/页分页，full 为 5 页（100/100/100/100/59），meta 为 1 页；客户端必须处理 `nextCursor`。`ListToolsAll()` 自动翻页。
+- 风险：full 会让无宿主侧 tool search 的客户端一次性加载 459 个定义（约数百 KB），只应对支持 tool search / defer loading 的本地宿主开启；云端 Anthropic API 需要可达 URL，GDA 仅绑环回，不直接适用。
+- 动态用户工具注册/注销后，full 面发送 `notifications/tools/list_changed`；meta 面不发送（7 元工具不随动态工具变化）。
 
 ## 数值核算总表（与 AGENTS.md 逐项对比）
 
@@ -84,11 +92,20 @@ flowchart TD
 - 图片附件按 `kCaptureImage` flag 判定（`register_all.cpp` 的 `call_tool` 回调）：registry 已知工具含该 flag 时经 `util::try_attach_image_data` 附加截图 image content，仅未知工具名才走旧白名单 `is_image_capture_tool` 兜底（`util::try_attach_image_content`）；单元测试 `tool_pipeline_traits_test.cpp` 覆盖附件判定纯逻辑 4 项（含无 flag 透传）。
 - `call_tool` 对带 `__gda_pending` 的异步结果做等待与 `capture_game_viewport` 结果定型（`runtime_ops::wait_pending_response`）；`call_tool` 与 `batch_execute(await_async=true)` 的编排回调在 MCP 线程执行（不占用主线程消息泵），领域工具 handler 仍由 dispatch 路由回主线程。
 
+## Tasks、Progress、MRTR 与 Skills
+
+- Tasks：`enable_tasks_extension=true` + `FileTaskStore(<gda_home>/tasks/tasks.jsonl)`；`call_tool` 以 `Task/Optional` 注册，支持 `tasks/get|update|cancel`，不支持任务的客户端同步退化。
+- Progress：`batch_execute` 在请求带 progress token 时发送开始/结束两条 `notifications/progress`（当前不逐 operation 上报）。
+- MRTR：full 直接工具在客户端声明 elicitation 且未带 `confirm` 时返回 `input_required`；`accept` 注入 `confirm=true`，`decline/cancel` 不执行。`call_tool` 仍走 `confirmation_required`。
+- Skills：`enable_skills_extension=true`，10 册技能以 `godot://skills/<name>/SKILL.md` 注册为 `mcp::Skill`（resources=dynamic）；旧 `godot://skills/...` 资源保留。Skills 是 2026 协议能力：客户端必须先发 `server/discover`（不要用 `initialize`）再把 `MCP-Protocol-Version: 2026-07-28` 与 `params._meta` 带到 `skills/list|get`；`initialize` 仍按 2025-11-25 协商，供旧客户端使用。live 验证 `skills/list` 返回 10 册、`skills/get` 与旧资源读取均可用。
+- `gda status --json` 的 `mcp` 块暴露协议版本、capabilities 与 serverInfo，脚本可先判断扩展再选命令。
+
 ## Schema 统计口径
 
 - 非空判定：`input_schema.properties` 存在且为非空对象；空 schema 仍保留空 `properties` 对象。
 - 全部 schema 由 `SpecTool` 构造期生成：域工具与 `system_status` 经 `schema::build_schema(params)`，`ping`/`list_categories`/`get_tool_detail`/`call_tool` 亦经 `build_schema`；`search_tools`/`batch_execute`/`code_execute` 手写 JSON 存 `raw_schema`（嵌套结构 `ParamDef` 不可表达）。schema_builder API 面为 `ParamDef`、`build_schema(initializer_list<ParamDef>)`、`build_schema(const std::vector<ParamDef>&)`、`add_required_flag`。
-- `ParamSpec` 的 `type` 支持 `string` / `number` / `integer` / `boolean` / `object` / `array` / `json`。`json` 表示接受任意 JSON 值（标量、数组、对象、null）：`schema::build_schema` 对该参数**不写 `type`**（只保留 `description`），`argument_validator` 跳过其类型检查，值是否合法由 handler 自行校验。它用于 `value` 一类任意 Variant 参数，避免 REST/CLI 把标量或数组误拒。
+- `search_tools` 的 `limit`：默认 **20**（空 query 与 BM25 结果都受限），`limit:0` 返回全量，负值或非整数返回 `invalid parameter: limit must be a non-negative integer`；遍历/契约测试必须显式传 `limit:0`。
+- `ParamSpec` 的 `type` 支持 `string` / `number` / `integer` / `boolean` / `object` / `array` / `json`。`json` 表示接受任意 JSON 值（标量、数组、对象、null）：`schema::build_schema` 对该参数**不写 `type`**（只保留 `description`），值是否合法由 handler 自行校验。它用于 `value` 一类任意 Variant 参数。
 - 非空/空数以运行时 `SchemaStatisticsBaseline` 观测为准（当前基线 459 = 393 + 66，不硬编码为通用常量）。
 
 ## 契约缺口表（遍历记 warnings，不 FAIL）
@@ -107,7 +124,7 @@ warnings 判定逻辑在 `tests/runner/traversal.cpp`（"schema 声明必填但�
 
 ## 遍历排除机制（flags 驱动）
 
-- 遍历经 `call_tool` 元工具代理，工具来源为**运行时** `search_tools` 空 query 枚举（`list_tool_names`，452 条 = 451 域 + `system_status`），跳过 7 个协议级元工具。
+- 遍历经 `call_tool` 元工具代理，工具来源为**运行时** `search_tools` 空 query + `limit:0` 枚举（`list_tool_names`，452 条 = 451 域 + `system_status`），跳过 7 个协议级元工具。
 - 每工具先 `get_tool_detail`（响应含 `side_effect`/`dynamic`/`mutating` 字段），`side_effect` 非空且**非 `"none"`**（判据见 `traversal.cpp` 的 `kSideEffectNone`：只读工具回显 `"none"`，不算有副作用）/ `mutating=true` / `dynamic=true` 任一命中即排除；动态工具（`dynamic=true`）在用户脚本注册期间才会出现，L2 无注册、该分支为防回归保留。
 - 排除后候选进入 `empty_args`（空参契约）与 `heuristic_smoke`（按 schema properties 类型生成启发值）两步骤（枚举口径上限 904 步 = 452×2，候选口径上限 602 = 候选数 × 2；精确排除数、候选数、步数与 warnings 以运行时 `03_tools_contract` 报告为准，当前值见 [测试体系](../tests.md)「数值核算总表」的遍历各行，本页不复制数值）。
 - 新增副作用工具只需在 `ToolSpec` 填对应 `side_effect` + `kMutating`（可选 `kDynamic` 由动态注册自动置位），遍历自动排除，**无需手改** `tests/runner/traversal.cpp`。
@@ -128,18 +145,13 @@ warnings 判定逻辑在 `tests/runner/traversal.cpp`（"schema 声明必填但�
 
 ## 统一执行入口（10-21 新增，`tool_execute`）
 
-[`src/tools/base/tool_execute.hpp`](../../../src/tools/base/tool_execute.hpp) / [`src/tools/base/tool_execute.cpp`](../../../src/tools/base/tool_execute.cpp) 的 `tools::execute_tool_chain(name, args)` 把「导出拦截 → 工具存在 → 参数校验 → 派发 → 信封」五个阶段固化成一条链，并把每一段做成可替换的槽位（`register_export_guard` / `register_argument_validator` / `register_envelope_builder`）。0.3.2 起授权阶段已删除。`tool_execute.cpp` 在静态初始化期把默认实现注册进这些槽位，因此调用 `tools::execute_tool(name, args)` 即走全链。
+`src/tools/base/tool_execute.hpp` / `src/tools/base/tool_execute.cpp`（0.3.2 已删除）的 `tools::execute_tool_chain(name, args)` 把「导出拦截 → 工具存在 → 参数校验 → 派发 → 信封」五个阶段固化成一条链，并把每一段做成可替换的槽位（`register_export_guard` / `register_argument_validator` / `register_envelope_builder`）。0.3.2 起授权阶段已删除。`tool_execute.cpp` 在静态初始化期把默认实现注册进这些槽位，因此调用 `tools::execute_tool(name, args)` 即走全链。
 
-> **接线现状（10-22 核实）**：这条链**已在 REST 面接入生产请求路径**——`src/core/transport/api_surface.cpp` 的 `default_execute_tool` 调用 `tools::execute_tool(name, args)`，生产注册点为 `src/core/server_context.cpp` 的 `register_unified_tool_executor()`（在 `start()` 内、`ApiServer::start()` 之前执行，把 `tools::execute_tool_chain` 注册进执行器槽位），因此注册在静态初始化期之外也确定生效。MCP 面的 `call_tool` 元工具**仍走** `tools::execute_tool_core`（等价于 `dispatch::call_handler` 直派），这是**有意保留的差异**：既有工具的参数声明不完整（部分工具声明类型与实际接受类型不符），若对 MCP 也套用严格参数校验会拒掉现网可用的调用。两套协议面的实际链路是：
->
-> | 面 | 实际链路 | 导出拦截 | 参数校验 | 授权 | 信封 |
-> |---|---|---|---|---|---|
-> | MCP `call_tool` | `meta_call_tool_impl` → `execute_tool_core` → `dispatch::call_handler` → `SpecTool::execute` | 在 7 个元工具回调入口（`register_all.cpp`） | handler 内部 `Args` 抛错兜底 | `SpecTool::execute` 内 | 无（返回工具原始载荷） |
-> | REST `POST /api/tools/<name>` | `api_surface::execute_tool` → `tools::execute_tool` → `execute_tool_chain`（六段全链）→ `dispatch::call_handler` → `SpecTool::execute` | 全链 | 全链（未知参数宽容） | 全链 | 全链（`ApiEnvelope::build`） |
->
-> 六阶段的判定口径不变；差异只在「哪一段已经生效」。REST 面的接线现状另见 [REST 接口面](api.md)「执行入口与接线现状」。
+> **接线现状（2026-11-14 核实）**：0.3.2 已随 REST 面移除 `tool_execute` / `argument_validator` / `api_surface` / `api_envelope` 等编译单元，`tools::execute_tool` 与执行器槽位在生产路径上无调用点。MCP 面的 `call_tool` 元工具走 `dispatch::call_handler` 直派（`SpecTool::execute`）：导出拦截在 7 个元工具回调入口（`register_all.cpp`），参数校验在 handler 内的 `Args` 抛错兜底，高风险工具由 `confirm=true` 在执行前拦截。原 REST `POST /api/tools/<name>` 的六段全链仅存于 0.3.1 及更早版本与 git 历史。
 
-### 六个阶段
+### 六个阶段（历史口径，0.3.2 已移除）
+
+> 下表描述 0.3.1 及更早版本的全链；0.3.2 起 MCP 面只保留导出拦截、工具存在与派发，授权与信封阶段随 REST 面删除。
 
 | 序 | 阶段 | 命中时返回 | 说明 |
 |---|---|---|---|
@@ -184,9 +196,9 @@ warnings 判定逻辑在 `tests/runner/traversal.cpp`（"schema 声明必填但�
 > - **`write` 档默认拒绝是收紧方向的行为变更**：`writes_file` / `writes_config` / `shows_alert` / `modifies_window` 类工具此前**不需要任何能力**即可调用，10-21 起需要允许列表含 `write`（或 `all`）。既有客户端若不做适配，调用写类工具会收到 403 `authorization_required`。**版本说明与技能书已于 10-21 同步提示**（[changelog/2026-10-21-log.md](../changelog/2026-10-21-log.md) 与 `skills/godot-autopilot-tools/`）；面板开关亦已补齐（见上「面板可勾选的能力清单」），用户不必再改环境变量。10-22 起另有**授权兼容模式**（`legacy`）提供平滑升级路径，见 [T0 安全边界与并发契约](../security_contract.md) §3.1.3。
 > - `destructive` 档的判定标准已于 10-22 成型（见 [T0 安全边界与并发契约](../security_contract.md) §3.1.2），声明者由 1 个扩为 6 个：新增 `delete_scene_node`（原 `none`）、`remove_animation`（原 `none`）、`remove_animation_track`（原 `none`）、`remove_audio_bus_effect`（原 `none`）、`remove_debug_custom_monitor`（原 `modifies_window`）。**后续新增工具按该标准落档**，并由 L1 用例 `destructive_tier_guard_test` 防漂移。
 
-### 参数校验的宽容规则
+### 参数校验的宽容规则（历史口径，0.3.2 已移除）
 
-[`src/tools/base/argument_validator.cpp`](../../../src/tools/base/argument_validator.cpp) 的 `validate_tool_args_for_dispatch`：
+> 原实现 `src/tools/base/argument_validator.cpp`（已删除）的 `validate_tool_args_for_dispatch`；下表保留当时的判定口径。
 
 | 情形 | 处理 |
 |---|---|
@@ -195,18 +207,18 @@ warnings 判定逻辑在 `tests/runner/traversal.cpp`（"schema 声明必填但�
 | **未声明的键** | **不拒绝**——收集后记一条 Tools 类别 Warning（`unknown parameters ignored: a, b`）并忽略 |
 | 工具未注册 / 非 `SpecTool` | 跳过校验（不产生错误） |
 
-宽容的理由：REST 面的调用方常常是把同一份参数对象同时喂给多个工具，带上一两个无关键是常态；严格拒绝会让「多传一个键」直接打断调用链。代价是多传的键被静默丢弃——因此校验器**必须**留下 Warning，否则调用方无从察觉自己的键没生效。
+宽容的理由：历史 REST 面的调用方常常是把同一份参数对象同时喂给多个工具，带上一两个无关键是常态；严格拒绝会让「多传一个键」直接打断调用链。代价是多传的键被静默丢弃——因此校验器**必须**留下 Warning，否则调用方无从察觉自己的键没生效。
 
-### 错误码归一
+### 错误码归一（历史口径，0.3.2 已移除）
 
-`ApiEnvelope::normalize_code()` 把工具结果归一到稳定的机器可读码，取值优先级：
+> 原实现 `ApiEnvelope::normalize_code()` 已随 REST 面删除；MCP 错误只保留工具载荷内的 `error`/`code` 与 JSON-RPC 错误码。以下为历史取值优先级。
 
 1. 工具结果顶层的 `code` 字段（非空字符串）；
 2. 顶层 `authorization_required` 字段（映射为 `authorization_required`）；
 3. `structured_error.code`；
 4. 都不命中时，按 `error` 文案特征推断（`authorization required` → `authorization_required`；`unauthorized` → `unauthorized`；`editor is exporting` → `export_in_progress`；`main_thread_timeout` / `main thread timeout` / `main thread task failed` → `main_thread_timeout`；`queue_unavailable` → `queue_unavailable`；`invalid parameter` / `invalid argument` / `missing required parameter` / `missing required field` / `unknown parameter` → `invalid_argument`；`not found` 且含 `tool` → `tool_not_found`；`internal error` / `unexpected c++ exception` → `internal_error`；其余 → `tool_error`）。
 
-`ApiEnvelope::status_for()` 再把码映射为 HTTP 状态：401 / 400 / 404 / 403 / 503 / 503 / 504 / 500，其余（`tool_error`）→ **422**。完整状态码表见 [REST 接口面](api.md)。
+REST 面已移除；MCP 错误只保留工具载荷内的 `error`/`code` 与 JSON-RPC 错误码，不再映射 HTTP 状态。
 
 ## 命名约定抽查
 
@@ -248,7 +260,6 @@ warnings 判定逻辑在 `tests/runner/traversal.cpp`（"schema 声明必填但�
 
 - [ToolSpec 数据层与执行管线](../tool_base_design.md)
 - [测试体系](../tests.md)
-- [REST 接口面](api.md)
 - [端口与实例登记](ports.md)
 - [工具实现 A 组](../modules/tools_ops_a.md)
 - [工具实现 B 组](../modules/tools_ops_b.md)

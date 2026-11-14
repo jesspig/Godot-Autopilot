@@ -5,7 +5,7 @@ description: "Godot 运行时与调试指南：启动和停止游戏、帧精确
 
 # 运行时与调试
 
-调用方式：用 `gda tools search` 与 `gda tools describe` 发现，再用 `gda call`
+调用方式：用 `gda search` 与 `gda describe` 发现，再用 `gda call`
 调用；原生 MCP 工具（`search_tools`、`get_tool_detail`、`call_tool`）是兼容
 路径。协议细节见 `godot-autopilot-tools`。
 
@@ -42,6 +42,14 @@ GDScript 测试。时序、日志路径与检查细节在下文说明。
 与 `node_count` 骤降。不要调试半死进程：`stop_editor_playing` 后重新
 `play_editor_current_scene`。存活但 `node_count` 正常、玩法不推进，是卡死，
 不是重载失败。
+
+## 用 CLI 观测运行时
+
+`gda resources read` 不调用工具即可读取编辑器与调试器状态：
+`godot://editor/output-log`（编辑器控制台）、`godot://debugger/output` 与
+`godot://debugger/errors`（运行输出与错误）、`godot://debugger/scene-tree`
+（调试器场景树）、`godot://debugger/monitors`（监视器）。`--json` 看完整内容，
+`--save` 落盘 blob；`gda logs <id>` 仍是编辑器进程日志。
 
 ## 编辑器与游戏是两个进程
 

@@ -1,9 +1,9 @@
-# Godot-Autopilot
+# Godot Autopilot
 
 [![许可证](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![构建状态](https://github.com/jesspig/Godot-Autopilot/actions/workflows/ci.yml/badge.svg)](https://github.com/jesspig/Godot-Autopilot/actions)
 ![Godot版本](https://img.shields.io/badge/Godot-4.7%2B-478CBF?logo=godotengine&logoColor=white)
-![支持平台](https://img.shields.io/badge/platform-Windows%7CLinux%7CmacOS-lightgrey)
+![支持平台](https://img.shields.io/badge/platform-Windows%7CLinux%7CMacOS-lightgrey)
 [![协议](https://img.shields.io/badge/MCP-Streamable_HTTP-blueviolet)](https://modelcontextprotocol.io/)
 ![工具数](https://img.shields.io/badge/tools-452%2B-brightgreen)
 
@@ -11,9 +11,9 @@
 
 [English](README.md) | **简体中文** | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md)
 
-Godot-Autopilot 是一个住在 **Godot 编辑器内部**的插件型 [MCP](https://modelcontextprotocol.io/) 服务端。装好之后，你的 AI 编程助手（Claude Code、Cursor、Codex、OpenCode 等）就能像你一样操作项目：搭场景、调属性、运行游戏、点按钮、截图、看日志——然后根据看到的结果继续迭代。
+Godot Autopilot（GDA）是一个住在 **Godot 编辑器内部**的插件型 [MCP](https://modelcontextprotocol.io/) 服务端。装好之后，你的 AI 编程助手（Claude Code、Cursor、Codex、OpenCode 等）就能像你一样操作项目：搭场景、调属性、运行游戏、点按钮、截图、看日志——然后根据看到的结果继续迭代。
 
-不需要桥接进程，也不用把报错复制粘贴到聊天框。打开项目时服务端自动启动，关闭项目时自动停止。
+不需要桥接进程，也不用把报错复制粘贴到聊天框。图形界面编辑器打开项目时服务端自动启动，关闭项目时自动停止。
 
 ## 端到端演示
 
@@ -33,6 +33,60 @@ Godot-Autopilot 是一个住在 **Godot 编辑器内部**的插件型 [MCP](http
 - **项目与知识**——读写、搜索、复制项目文件与目录，查看项目设置，离线查询引擎内置 API 文档（如 `read_file`、`find_in_files`、`list_directory`、`copy_file`、`get_project_settings`、`get_docs_class`）。
 - **试玩与视觉验证**——运行当前场景，注入定时输入序列，给编辑器和游戏截图并对比前后差异（如 `play_editor_current_scene`、`queue_game_input`、`capture_editor_viewport`、`capture_game_viewport`、`review_scene_visually`）。
 
+## 快速开始
+
+需要 **Godot 4.7+**，并使用图形界面编辑器。
+
+1. **安装**——在 Godot 工程根目录运行一键脚本；手动安装与源码构建见 [INSTALL.md](INSTALL.md)。
+   - macOS/Linux：
+     ```bash
+     curl -fsSL https://raw.githubusercontent.com/jesspig/Godot-Autopilot/master/scripts/install.sh \
+       | bash -s -- --project "$PWD" --skills
+     ```
+   - Windows PowerShell：
+     ```powershell
+     & ([scriptblock]::Create((irm https://raw.githubusercontent.com/jesspig/Godot-Autopilot/master/scripts/install.ps1))) `
+       -Project (Get-Location).Path -Skills
+     ```
+   脚本会安装 `gda` CLI、识别 `project.godot`、安装插件，并按需安装技能书。
+2. **打开项目**——图形界面编辑器会自动启动服务端，首次启动时绑定一个空闲的环回端口（按工程持久化，取自 `20000–29999`）。无头/命令行编辑器模式不会启动服务端。
+3. **连接 AI 客户端**——运行 `gda status --json`，把其中的 `mcp_url` 加进客户端的 MCP 配置（也可以把 URL 交给代理，让它生成配置）。任何支持 Streamable HTTP 的 MCP 客户端都可以连接；示例包括 Claude Code、Codex、Cursor、OpenCode、Copilot。
+4. **提需求**——比如“创建一个能跑能跳的玩家角色，试玩一下并修掉看着不对的地方”。
+
+高风险工具（`destructive`、`process`、`code_execute`、`game_runtime`）需要 `confirm=true`；没有全局白名单。
+
+## 让 AI 代理安装
+
+把下面这句交给能在这台机器上执行命令的代理：
+
+```text
+阅读 https://github.com/jesspig/Godot-Autopilot/blob/master/INSTALL.md 并安装。
+```
+
+代理会定位 Godot 工程、安装 CLI 与插件、询问技能书装全局还是项目内、用 `gda status --json` 验证连接，并汇报 MCP URL。完整的代理规则见 [INSTALL.md](INSTALL.md)。
+
+## 技能书
+
+插件自带 **10 册自包含技能书**（总纲，以及场景、资源、脚本、运行时、服务器、内容、C#、安装、工具分册）。只选一种作用域安装：
+
+```bash
+# 全局：所有 Godot 工程共享
+gda install skills
+
+# 项目级：跟随当前工程
+gda install skills --path "<project>/.agents/skills"
+
+# 中文版
+gda install skills --zh
+gda install skills --path "<project>/.agents/skills" --zh
+```
+
+默认目标是 `~/.agents/skills`。客户端不读取该目录时，可用 `--path <客户端技能目录>`。技能书让代理按调用协议执行，而不是自己摸索。定位：MCP 是主产品通道，技能是体验层；调用指南在 MCP 失效时改用 GDA CLI。
+
+插件自带一个编辑器面板：
+
+- **Log**——仅显示插件日志，支持级别/分类过滤与搜索，方便定位失败调用。
+
 ## 代理的使用方式
 
 你不需要记住工具名。代理按这个循环工作：
@@ -41,47 +95,20 @@ Godot-Autopilot 是一个住在 **Godot 编辑器内部**的插件型 [MCP](http
 2. **执行**——单步用 `call_tool`，批量用 `batch_execute`。
 3. **验证**——截图看结果，与上次截图对比，有问题就修，再确认。
 
-为了让代理开箱即用，插件自带 **10 册自包含技能书**（总纲，以及场景、资源、脚本、运行时、服务器、内容、C#、安装、工具分册）。用 `gda install skills` 安装（加 `--zh` 使用中文）；代理随后按调用协议执行，而不是自己摸索。定位：MCP 是主产品通道，技能是体验层——调用指南在 MCP 失效时改用 GDA CLI。
-
-插件自带一个编辑器面板：
-
-- **Log**——仅显示插件日志，支持级别/分类过滤与搜索，方便定位失败调用。
-
-## 快速开始
-
-需要 **Godot 4.7+**。
-
-1. **获取插件**——从项目 GitHub Releases 页（[jesspig/Godot-Autopilot](https://github.com/jesspig/Godot-Autopilot)）下载 `addons.zip`，把其中的 `godot-autopilot/` 文件夹复制到你项目的 `addons/` 目录：
-   ```
-   your-project/
-   └── addons/
-       └── godot-autopilot/
-           ├── godot-autopilot.dll      (Windows)
-           ├── libgodot-autopilot.so    (Linux)
-           ├── libgodot-autopilot.dylib (macOS)
-           └── godot-autopilot.gdextension
-   ```
-2. **打开项目**——服务端自动启动，首次启动时绑定一个空闲的环回端口（按工程持久化，取自 `20000–29999`）。无需启用开关。
-3. **连接 AI 客户端**——运行 `gda status --json`，把其中的 `mcp_url` 加进客户端的 MCP 配置（也可以把 URL 交给代理，让它生成配置）。支持 20 个客户端，包括 Claude Code、Codex、Cursor、OpenCode、Copilot 等。
-4. **确认高风险调用（可选）**——带 `destructive`、`process`、`code_execute`、`game_runtime` 副作用的工具需要 `confirm=true`；没有全局白名单。
-5. **提需求**——比如“创建一个能跑能跳的玩家角色，试玩一下并修掉看着不对的地方”。
-
-想从源码构建或参与贡献？见 [docs/wiki/](docs/wiki/)（入口 [index.md](docs/wiki/index.md)，构建见 [build.md](docs/wiki/build.md)）与 [tests/README.md](tests/README.md)。
-
 ## 命令行访问
 
 更想直接敲命令而不接 MCP 客户端？GDA CLI 让你在终端里驱动正在运行的 GDA 实例，无需集成 MCP 客户端。它基于 Bun + TypeScript，源码直跑，**零运行时依赖**、无构建步骤。
 
 用 `bunx` 单次执行（PowerShell 下需加引号，因为 `#` 会被当作注释）：
 
-```
-bunx "github:jesspig/Godot-Autopilot#0.3.2" ping
+```bash
+bunx "github:jesspig/Godot-Autopilot#0.3.3" ping
 ```
 
 或全局安装一次，之后直接用 `gda` 命令：
 
-```
-bun install -g github:jesspig/Godot-Autopilot#0.3.2
+```bash
+bun install -g github:jesspig/Godot-Autopilot#0.3.3
 gda ping
 ```
 
@@ -89,43 +116,21 @@ gda ping
 
 需要 **Bun**；机器上没有 Bun 或 Node 时，直接改用 Releases 页的 `gda` 独立可执行文件（完整参考见 [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md)）。
 
-## 让 AI 自己装好并验证
-
-不想照上面的步骤手动来？把下面这段直接交给能在这台机器上执行命令的编码代理，填上你项目的绝对路径即可：
-
-```text
-Set up Godot Autopilot (GDA) on this machine end to end, then prove it works.
-
-Project: <ABSOLUTE PATH TO YOUR GODOT PROJECT> (Godot 4.7+).
-
-1. Install the plugin: download addons.zip from
-   https://github.com/jesspig/Godot-Autopilot/releases/latest and extract it so that
-   <project>/addons/godot-autopilot/godot-autopilot.gdextension exists.
-2. Start the editor: run `godot --editor --path <project>` (ask me for the engine path if it is
-   not on PATH) and wait until the `mcp_url` from `gda status --json` answers.
-3. Verify the server from a shell. Try in this order, stop at the first that works, and tell me
-   which one it was:
-   - bunx "github:jesspig/Godot-Autopilot#0.3.2" ping
-   - download the gda release asset for this OS and CPU from the same Releases page, verify it
-     against sha256sums.txt, then run ./gda ping
-4. Connect my AI client: add
-   {"mcpServers":{"godot-autopilot":{"url":"<mcp_url from gda status --json>"}}}
-   to its MCP configuration (or hand the URL to your agent and ask it to generate the config).
-5. Summarize: which channel worked, every command you ran, and anything that failed.
-
-Rules: never hand-write HTTP requests against the port; never expose the GDA port beyond loopback;
-leave high-risk tools (code_execute, game_runtime, destructive, process) unconfirmed unless I ask for them.
-```
-
-如果你的客户端支持技能（Claude Code、Codex、Cursor 等都支持），运行 `gda install skills`，代理就能拿到完整的调用协议，而不必自己摸索。
-
 ## 安全说明
 
 服务端只监听本机回环地址（端口由插件按工程选择，路径固定 `/mcp`），非本机地址一律拒绝。高风险工具（`destructive`、`process`、`code_execute`、`game_runtime`）需要 `confirm=true`，没有全局白名单。详见 [docs/wiki/security_contract.md](docs/wiki/security_contract.md)。
 
+## 文档
+
+- [INSTALL.md](INSTALL.md)——一键脚本、Release 手动安装、源码构建与代理安装说明。
+- [docs/wiki/index.md](docs/wiki/index.md)——项目知识库：架构、模块、测试与约定。
+- [docs/wiki/build.md](docs/wiki/build.md)——构建、部署与打包。
+- [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md)——完整 CLI 参考。
+- [tests/README.md](tests/README.md)——测试布局与命令。
+
 ## 素材声明
 
-`demo/` 下的 5 个示例项目（2D/3D 入门教程、UI 控件全览、视口复合、网络 Pong）来自官方 [Godot 演示合集](https://github.com/godotengine/godot-demo-projects)，仓库仅保留其素材与干净工程配置用于测试。第 6 个项目 `demo/pink_man_adventure` 是从历史 `Example/` 示例工程还原的仓库内示例：173 张 PNG 素材来自 Pixel Frog 的 Pixel Adventure 1（CC0 1.0），设计文档为本仓库原创。版权与授权见各项目目录内的 README 与 LICENSE。
+`examples/` 下的 5 个示例项目（2D/3D 入门教程、UI 控件全览、视口复合、网络 Pong）来自官方 [Godot 演示合集](https://github.com/godotengine/godot-demo-projects)，仓库仅保留其素材与干净工程配置用于测试。第 6 个项目 `examples/pink_man_adventure` 是从历史 `Example/` 示例工程还原的仓库内示例：173 张 PNG 素材来自 Pixel Frog 的 Pixel Adventure 1（CC0 1.0），设计文档为本仓库原创。版权与授权见各项目目录内的 README 与 LICENSE。
 
 ## 许可证
 

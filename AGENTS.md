@@ -39,7 +39,7 @@ Godot Autopilot（GDA）：进程内 GDExtension，把 Godot 编辑器经 MCP（
 - `git status` 的大量 `M` 多为 CRLF 伪变更（仓库无 `.gitattributes`），核查一律以 `git diff HEAD` 为准。
 - 提交信息 `<type>(<scope>): <中文描述>`，scope 用中文功能域，按功能域拆分提交。
 - 多代理并行时子代理只写代码不编译，主代理统一 configure/build 再分批测（并行编译会锁）；单元/边界测试禁调已注册 handler。
-- 面向 MCP 客户端的技能书（`godot-autopilot-*`）由 `skills/` 模板生成到当前打开工程的 `res://.agents/skills/`。
+- 面向 MCP 客户端的技能书（`godot-autopilot-*`）在构建期由 `skills/` 模板嵌入并经 MCP 资源暴露；磁盘安装由 `gda install skills [--path]` 完成（默认 `~/.agents/skills`，项目级为 `<project>/.agents/skills`）。
 
 ## 知识库入口
 

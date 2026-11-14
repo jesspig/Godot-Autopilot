@@ -13,8 +13,13 @@
 
 namespace godot_autopilot {
 
+enum class ToolSurface { Meta, Full };
+
+ToolSurface resolve_tool_surface();
+
 void register_all_tools(mcp::McpServer &server, CommandQueue &queue,
-                        ToolCatalog &catalog, Bm25Index &index, int port);
+                        ToolCatalog &catalog, Bm25Index &index, int port,
+                        ToolSurface surface = ToolSurface::Meta);
 
 bool tool_result_is_error(const mcp::JsonValue &result);
 

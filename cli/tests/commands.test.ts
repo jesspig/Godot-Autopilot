@@ -113,7 +113,8 @@ describe("请求形状", () => {
     const code = await status([], { portText: String(port) });
     cap.restore();
     expect(code).toBe(ExitCode.Success);
-    expect(requests[0].params).toEqual({ name: "call_tool", arguments: { name: "system_status", arguments: {} } });
+    const toolCall = requests.find((request) => request.method === "tools/call");
+    expect(toolCall?.params).toEqual({ name: "call_tool", arguments: { name: "system_status", arguments: {} } });
     const statusJson = JSON.parse(cap.stdout()) as Record<string, unknown>;
     expect(statusJson.schema_version).toBe(1);
     expect(statusJson.ok).toBe(true);
@@ -143,13 +144,26 @@ describe("请求形状", () => {
     });
   });
 
-  test("search 无 query 时 args 不含 query 键", async () => {
-    const { port, requests } = recordingServer(() => sseResponse(okEnvelope([textContent('{"results":[]}')])));
+  test("search 无 query 时改用 list_categories", async () => {
+    const { port, requests } = recordingServer(() =>
+      sseResponse(okEnvelope([textContent('{"categories":[{"id":"Scene"}]}')])),
+    );
     const cap = captureOutput();
     const code = await search([], { portText: String(port) });
     cap.restore();
     expect(code).toBe(ExitCode.Success);
-    expect(requests[0].params).toEqual({ name: "search_tools", arguments: {} });
+    expect(requests[0].params).toEqual({ name: "list_categories", arguments: {} });
+    expect(JSON.parse(cap.stdout())).toEqual({ categories: [{ id: "Scene" }] });
+  });
+
+  test("call --direct 直调 full 工具", async () => {
+    const { port, requests } = recordingServer(() => sseResponse(okEnvelope([textContent("{}")])));
+    const cap = captureOutput();
+    const code = await call(["delete_scene_node"], { portText: String(port), direct: true });
+    cap.restore();
+    expect(code).toBe(ExitCode.Success);
+    const toolCall = requests.find((request) => request.method === "tools/call");
+    expect(toolCall?.params).toEqual({ name: "delete_scene_node", arguments: {} });
   });
 
   test("describe 直达 get_tool_detail", async () => {
@@ -312,37 +326,26 @@ describe("载荷提取", () => {
 });
 
 describe("search 投影", () => {
-  test("从 display.results 取数组", async () => {
+  test("query 输出 results 并只保留 name/score", async () => {
     const { port } = recordingServer(() =>
-      sseResponse(okEnvelope([textContent(JSON.stringify({ results: [{ name: "move_agent", score: 0.9, extra: 1 }] }))])),
+      sseResponse(
+        okEnvelope([
+          textContent(
+            JSON.stringify({
+              results: [
+                { name: "move_agent", score: 0.9, extra: 1 },
+                { name: "ping", score: 0.1 },
+              ],
+            }),
+          ),
+        ]),
+      ),
     );
     const cap = captureOutput();
     const code = await search(["spawn"], { portText: String(port) });
     cap.restore();
     expect(code).toBe(ExitCode.Success);
-    expect(cap.stdout()).toBe(JSON.stringify([{ name: "move_agent", score: 0.9, extra: 1 }]) + "\n");
-  });
-
-  test("从 display.result.results 取数组", async () => {
-    const { port } = recordingServer(() =>
-      sseResponse(okEnvelope([textContent(JSON.stringify({ result: { results: [{ name: "a", score: 1 }] } }))])),
-    );
-    const cap = captureOutput();
-    const code = await search([], { portText: String(port) });
-    cap.restore();
-    expect(code).toBe(ExitCode.Success);
-    expect(cap.stdout()).toBe(JSON.stringify([{ name: "a", score: 1 }]) + "\n");
-  });
-
-  test("从 display.data.results 取数组", async () => {
-    const { port } = recordingServer(() =>
-      sseResponse(okEnvelope([textContent(JSON.stringify({ data: { results: [{ name: "b", score: 2 }] } }))])),
-    );
-    const cap = captureOutput();
-    const code = await search([], { portText: String(port) });
-    cap.restore();
-    expect(code).toBe(ExitCode.Success);
-    expect(cap.stdout()).toBe(JSON.stringify([{ name: "b", score: 2 }]) + "\n");
+    expect(cap.stdout()).toBe(JSON.stringify({ results: [{ name: "move_agent", score: 0.9 }] }) + "\n");
   });
 });
 

@@ -136,8 +136,10 @@ jobs:
         run: |
           set -euo pipefail
           total="$(ctest --preset debug -N | sed -n 's/^Total Tests: //p')"
-          if [ -z "$total" ] || [ "$total" -lt 900 ]; then
-            echo "::error::ctest inventory dropped to ${total:-<none>} (expected >= 900)"
+          # 0.3.3 死代码清理后基线为 864；有意增删用例时同步更新此值。
+          min_total=864
+          if [ -z "$total" ] || [ "$total" -lt "$min_total" ]; then
+            echo "::error::ctest inventory dropped to ${total:-<none>} (expected >= ${min_total})"
             exit 1
           fi
           echo "ctest inventory: $total"

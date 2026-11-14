@@ -277,9 +277,9 @@ jobs:
 
       - name: Checksums
         run: |
-          cd cli-dist
-          sha256sum gda-* > sha256sums.txt
-          cat sha256sums.txt
+          ( cd cli-dist && sha256sum gda-* ) > cli-dist/sha256sums.txt
+          sha256sum addons.zip >> cli-dist/sha256sums.txt
+          cat cli-dist/sha256sums.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

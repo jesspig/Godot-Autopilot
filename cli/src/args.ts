@@ -31,7 +31,6 @@ export interface GlobalOptions {
   force?: boolean;
   probe?: string;
   file?: string;
-  refresh?: boolean;
   all?: boolean;
   projectsView?: boolean;
   stale?: boolean;
@@ -41,6 +40,13 @@ export interface GlobalOptions {
   formatText?: string;
   slowText?: string;
   limitText?: string;
+  saveText?: string;
+  intervalText?: string;
+  templates?: boolean;
+  async?: boolean;
+  progress?: boolean;
+  inputText?: string;
+  direct?: boolean;
   json?: boolean;
 }
 
@@ -67,6 +73,9 @@ const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
   "--format": "formatText",
   "--slow": "slowText",
   "--limit": "limitText",
+  "--save": "saveText",
+  "--interval": "intervalText",
+  "--input": "inputText",
 };
 
 const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
@@ -78,12 +87,15 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--play": "play",
   "--no-import": "noImport",
   "--force": "force",
-  "--refresh": "refresh",
   "--all": "all",
   "--projects": "projectsView",
   "--stale": "stale",
   "--no-fallback": "noFallback",
   "--json": "json",
+  "--templates": "templates",
+  "--async": "async",
+  "--progress": "progress",
+  "--direct": "direct",
   "--offline": "offline",
   "--zh": "zh",
   "--check": "check",
@@ -169,9 +181,18 @@ Commands:
   list                List running Godot instances
   skills list         List the bundled skill books (offline, --zh for Chinese)
   skills show <name>  Print one skill book's SKILL.md; --file <rel> reads an auxiliary file
-  tools list          List the cached tool catalog (offline)
-  tools search <query> Search the cached tool catalog
-  tools describe <name> Show one cached tool's schema
+  tools list          List all direct tools from a live instance (--category/--tags)
+  resources list      List MCP resources (--templates)
+  resources templates List MCP resource templates
+  resources read <uri> Read one resource (--json/--raw/--save <dir>)
+  resources watch <uri> Poll a resource and print changes (--interval sec)
+  prompts list        List MCP prompt templates
+  prompts get <name>  Render one prompt (--args JSON)
+  tasks list          List locally recorded MCP tasks
+  tasks get <id>      Get one task
+  tasks wait <id>     Wait for a task to finish (--timeout)
+  tasks cancel <id>   Cancel a task
+  tasks clean         Remove terminal tasks from the local index
   projects            List known Godot projects (offline)
   start               Start a Godot editor
   stop                Stop a Godot editor (<id> | --id | --port | --project)
@@ -197,9 +218,9 @@ Global options:
   --pretty            Pretty-print JSON output (2-space indent)
   --raw               Raw JSON envelope output
   --timeout <text>    Call timeout in seconds
-  --category <text>   Filter search results by category
-  --tags <text>       Filter search results by tags (comma separated)
-  --artifact <name>   Cache artifact: cli, plugin, skills, or catalog
+  --category <text>   Filter tools list/search results by category
+  --tags <text>       Filter tools list/search results by tags (comma separated)
+  --artifact <name>   Cache artifact: cli, plugin, or skills
   --path <dir>        Install target directory (install skills)
   --source <mode>     auto (default), online, cache, or builtin
   --offline           Never touch the network; use cache, then builtin
@@ -207,6 +228,9 @@ Global options:
   --args <json>       Tool arguments as a JSON string
   --args-file <path>  Tool arguments from a JSON file
   --save-images <dir> Write returned images to a local directory
+  --save <dir>        Write resource blobs to a directory
+  --templates         resources list: include resource templates
+  --interval <sec>    resources watch polling interval (default 1)
   --godot <path>      Explicit Godot executable (start)
   --headless          Start the editor headless (start)
   --play              Play the current scene once ready (start)
@@ -216,7 +240,6 @@ Global options:
   --tail <n>          Number of trailing log lines (logs)
   --probe <value>     Liveness level light/strict (start); list: probed port 1-65535
   --file <rel>        Reference file to read with skills show (relative to the skill dir)
-  --refresh           Refresh the offline tool catalog from MCP tools/list
   --all               list: include projects with no running instance
   --projects          list: aggregate entries by project instead of per instance
   --stale             list: keep only non-live entries
@@ -225,6 +248,10 @@ Global options:
   --no-fallback       Do not fall back to HTTP when IPC fails
   --json              JSON output (default for most commands)
   --confirm           Confirm a high-risk tool call
+  --async             call: run as an MCP task when the server supports it
+  --progress          call: print progress notifications to stderr
+  --input <json>      call: inputResponses for MRTR input_required
+  --direct            call: invoke a full-surface tool at the top level
   --help              Show this help
   --version           Show the version
 

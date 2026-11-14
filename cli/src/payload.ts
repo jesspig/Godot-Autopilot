@@ -204,8 +204,8 @@ export function extractPayload(envelope: JsonRpcResponse, opts: ExtractOptions =
 }
 
 export function assertCallFamilyUsage(command: string, opts: GlobalOptions): void {
-  if (command !== "search" && (opts.category !== undefined || opts.tagsText !== undefined)) {
-    throw new CliError(ExitCode.Usage, "--category and --tags only apply to the search command.");
+  if (command !== "search" && command !== "tools" && (opts.category !== undefined || opts.tagsText !== undefined)) {
+    throw new CliError(ExitCode.Usage, "--category and --tags apply to the search and tools list commands.");
   }
   if (command !== "call" && (opts.argsJson !== undefined || opts.argsFile !== undefined)) {
     throw new CliError(ExitCode.Usage, "--args and --args-file only apply to the call command.");

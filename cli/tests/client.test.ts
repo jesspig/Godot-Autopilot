@@ -140,7 +140,7 @@ describe("callTool", () => {
     expect(calls.map((c) => c.method)).toEqual(["tools/call", "initialize", "notifications/initialized", "tools/call"]);
     expect(calls[1].params).toEqual({
       protocolVersion: "2025-11-25",
-      capabilities: {},
+      capabilities: { elicitation: {} },
       clientInfo: { name: "gda-cli", version: CLI_VERSION },
     });
     expect(calls[3].id).toBeGreaterThan(calls[0].id!);

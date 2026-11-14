@@ -44,14 +44,16 @@
 #include "tools/base/runtime_ops.hpp"
 #include "tools/base/schema_builder.hpp"
 #include "tools/base/tool_base.hpp"
-#include "tools/base/tool_execute.hpp"
 #include "tools/base/tool_invoke.hpp"
 #include "tools/base/tool_registry.hpp"
 #include "tools/base/tool_spec.hpp"
 #include "util/mcp_image_content.hpp"
 #include <mcp/Content.hpp>
 #include <mcp/JsonValue.hpp>
+#include <algorithm>
 #include <cstdint>
+#include <cstdlib>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -68,6 +70,8 @@ static std::mutex g_active_registry_mutex;
 static ToolCatalog *g_catalog = nullptr;
 static Bm25Index *g_index = nullptr;
 static int g_port = 0;
+static mcp::McpServer *g_surface_server = nullptr;
+static ToolSurface g_tool_surface = ToolSurface::Meta;
 
 static mcp::JsonValue meta_ping_impl() {
     mcp::JsonValue r(mcp::JsonValue::object_tag);
@@ -83,6 +87,16 @@ static mcp::JsonValue meta_search_tools_impl(const mcp::JsonValue& args,
     std::string text;
     if (auto* q = args.Find("query"); q && q->IsString()) {
         text = q->GetString();
+    }
+
+    int64_t limit = 20;
+    if (auto* limit_p = args.Find("limit"); limit_p && !limit_p->IsNull()) {
+        if (!limit_p->IsInt() || limit_p->GetInt() < 0) {
+            mcp::JsonValue error(mcp::JsonValue::object_tag);
+            error["error"] = mcp::JsonValue("invalid parameter: limit must be a non-negative integer");
+            return error;
+        }
+        limit = limit_p->GetInt();
     }
 
     Bm25Index::SearchQuery query;
@@ -112,11 +126,15 @@ static mcp::JsonValue meta_search_tools_impl(const mcp::JsonValue& args,
 
     if (text.empty() && !has_category && !has_tags) {
         auto all = catalog.get_all_tools();
+        std::size_t count = all.size();
+        if (limit > 0 && static_cast<int64_t>(count) > limit) {
+            count = static_cast<std::size_t>(limit);
+        }
         mcp::JsonValue j(mcp::JsonValue::object_tag);
         mcp::JsonValue arr(mcp::JsonValue::array_tag);
-        for (auto& t : all) {
+        for (std::size_t i = 0; i < count; ++i) {
             mcp::JsonValue item(mcp::JsonValue::object_tag);
-            item["name"] = mcp::JsonValue(t.name);
+            item["name"] = mcp::JsonValue(all[i].name);
             item["score"] = mcp::JsonValue(0.0);
             arr.PushBack(std::move(item));
         }
@@ -125,6 +143,9 @@ static mcp::JsonValue meta_search_tools_impl(const mcp::JsonValue& args,
         return j;
     }
 
+    query.max_results = limit == 0
+        ? std::numeric_limits<int>::max()
+        : static_cast<int>(std::min<int64_t>(limit, std::numeric_limits<int>::max()));
     auto results = index.search(query);
 
     mcp::JsonValue j(mcp::JsonValue::object_tag);
@@ -259,7 +280,7 @@ static mcp::JsonValue meta_call_tool_impl(mcp::JsonValue args) {
     }
 
     LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, name + " called via call_tool");
-    return tools::execute_tool_core(name, tool_args);
+    return dispatch::call_handler(name, tool_args);
 }
 
 static mcp::JsonValue meta_call_tool_wait(const std::string& name, mcp::JsonValue result) {
@@ -428,6 +449,12 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
         q_prop["type"] = mcp::JsonValue("string");
         q_prop["description"] = mcp::JsonValue("Search query; omit or pass an empty string to enumerate all tools");
         props["query"] = std::move(q_prop);
+        mcp::JsonValue l_prop(mcp::JsonValue::object_tag);
+        l_prop["type"] = mcp::JsonValue("integer");
+        l_prop["description"] = mcp::JsonValue("Maximum number of results; 0 returns all tools");
+        l_prop["default"] = mcp::JsonValue(static_cast<int64_t>(20));
+        l_prop["minimum"] = mcp::JsonValue(static_cast<int64_t>(0));
+        props["limit"] = std::move(l_prop);
         mcp::JsonValue c_prop(mcp::JsonValue::object_tag);
         c_prop["type"] = mcp::JsonValue("string");
         c_prop["description"] = mcp::JsonValue("Filter by category");
@@ -629,6 +656,24 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
     return registry;
 }
 
+ToolSurface resolve_tool_surface() {
+    const char *raw = std::getenv("GODOT_AUTOPILOT_TOOL_SURFACE");
+    if (raw == nullptr || *raw == '\0') {
+        return ToolSurface::Meta;
+    }
+    const std::string value(raw);
+    if (value == "full") {
+        return ToolSurface::Full;
+    }
+    if (value != "meta") {
+        LogSystem::instance().log(
+            LogLevel::Warning, LogCategory::Tools,
+            "unknown GODOT_AUTOPILOT_TOOL_SURFACE '" + value +
+                "'; falling back to meta");
+    }
+    return ToolSurface::Meta;
+}
+
 bool tool_result_is_error(const mcp::JsonValue &result) {
     return !spec_detail::verdict_of(result).ok;
 }
@@ -646,110 +691,248 @@ void refresh_dynamic_tools() {
     monitor::lifecycle(
         "registry_refresh_dynamic",
         monitor::build_attrs({{"dynamic_tools", std::to_string(dynamic_count)}}));
+    if (g_tool_surface == ToolSurface::Full && g_surface_server != nullptr) {
+        try {
+            g_surface_server->SendToolListChanged();
+        } catch (const std::exception &error) {
+            LogSystem::instance().log(
+                LogLevel::Warning, LogCategory::Tools,
+                "failed to send tools/list_changed: " +
+                    std::string(error.what()));
+        } catch (...) {
+            LogSystem::instance().log(
+                LogLevel::Warning, LogCategory::Tools,
+                "failed to send tools/list_changed");
+        }
+    }
 }
 
-void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog& catalog, Bm25Index& index, int port) {
+static void register_surface_tool(
+    mcp::McpServer& server, CommandQueue& queue,
+    const std::shared_ptr<ToolRegistry>& registry,
+    const std::shared_ptr<ToolBase>& surface_tool) {
+    const std::string tool_name = surface_tool->meta().name;
+    mcp::ToolOptions opts;
+    opts.Description(surface_tool->meta().description)
+        .InputSchema(surface_tool->input_schema());
+    const SideEffect effect = side_effect_of(*surface_tool);
+    if (effect == SideEffect::None) {
+        opts.read_only_hint = true;
+    }
+    if (effect == SideEffect::Destructive) {
+        opts.destructive = true;
+    }
+    if (effect == SideEffect::Process || effect == SideEffect::GameRuntime) {
+        opts.open_world_hint = true;
+    }
+    if (tool_name == "call_tool") {
+        mcp::ToolExecution execution;
+        execution.mode = mcp::ToolExecutionMode::Task;
+        execution.task_support = mcp::TaskSupport::Optional;
+        opts.execution = execution;
+    }
+    server.RegisterTool(
+        tool_name, opts,
+        [tool_name, registry, &queue, surface_tool](
+            const mcp::RequestContext<mcp::CallToolRequestParams>& ctx)
+            -> mcp::CallToolResult {
+            const std::string gda_request_id =
+                monitor::request_id_text(ctx.GetRequest().id);
+            monitor::RequestScope gda_request_scope(gda_request_id);
+            monitor::RequestRecord gda_request_record;
+            std::string gda_request_trace;
+            std::string gda_request_span;
+            if (!gda_request_id.empty() &&
+                monitor::registry().get(gda_request_id, &gda_request_record)) {
+                gda_request_trace = gda_request_record.trace_id;
+                gda_request_span = gda_request_record.span_id;
+            }
+            tools::RequestSpanGuard gda_span_scope(gda_request_trace,
+                                                   gda_request_span);
+            if (godot_autopilot::ExportGuard::is_exporting()) {
+                return dispatch::export_blocked_result();
+            }
+            mcp::JsonValue args = ctx.Params().arguments
+                ? *ctx.Params().arguments
+                : mcp::JsonValue(mcp::JsonValue::object_tag);
+            if (tool_name != "call_tool") {
+                const SideEffect effect = side_effect_of(*surface_tool);
+                if (confirmation::required_for(effect) &&
+                    !confirmation::provided(args)) {
+                    bool elicitation = false;
+                    if (auto capabilities =
+                            ctx.Server().GetClientCapabilities()) {
+                        elicitation = capabilities->elicitation.has_value();
+                    }
+                    if (elicitation) {
+                        auto* responses = ctx.Params().input_responses
+                            ? &*ctx.Params().input_responses
+                            : nullptr;
+                        if (responses != nullptr && responses->IsObject()) {
+                            auto* confirm = responses->Find("confirm");
+                            if (confirm != nullptr && confirm->IsObject()) {
+                                auto* action = confirm->Find("action");
+                                if (action != nullptr && action->IsString() &&
+                                    action->GetString() == "accept") {
+                                    args["confirm"] = mcp::JsonValue(true);
+                                } else {
+                                    mcp::CallToolResult declined;
+                                    declined.is_error = true;
+                                    declined.content.push_back(mcp::TextContent{
+                                        "text",
+                                        "confirmation declined: the tool was not executed"});
+                                    return declined;
+                                }
+                            }
+                        } else {
+                            mcp::CallToolResult required;
+                            required.input_required = mcp::InputRequiredResult{};
+                            mcp::InputRequest request;
+                            request.method = "elicitation/create";
+                            mcp::JsonValue params(
+                                mcp::JsonValue::object_tag);
+                            params["mode"] = mcp::JsonValue("form");
+                            params["message"] = mcp::JsonValue(
+                                "This tool has a " +
+                                std::string(side_effect_name(effect)) +
+                                " side effect. Confirm to continue.");
+                            mcp::JsonValue schema(
+                                mcp::JsonValue::object_tag);
+                            schema["type"] = mcp::JsonValue("object");
+                            mcp::JsonValue properties(
+                                mcp::JsonValue::object_tag);
+                            mcp::JsonValue confirm_property(
+                                mcp::JsonValue::object_tag);
+                            confirm_property["type"] =
+                                mcp::JsonValue("boolean");
+                            confirm_property["description"] = mcp::JsonValue(
+                                "Confirm the high-risk tool call");
+                            properties["confirm"] =
+                                std::move(confirm_property);
+                            schema["properties"] = std::move(properties);
+                            mcp::JsonValue required_fields(
+                                mcp::JsonValue::array_tag);
+                            required_fields.PushBack(
+                                mcp::JsonValue("confirm"));
+                            schema["required"] =
+                                std::move(required_fields);
+                            params["requestedSchema"] = std::move(schema);
+                            request.params = std::move(params);
+                            required.input_required->input_requests["confirm"] =
+                                std::move(request);
+                            return required;
+                        }
+                    }
+                }
+            }
+            std::optional<mcp::ProgressToken> progress_token;
+            int64_t progress_total = 0;
+            if (tool_name == "batch_execute" && ctx.Params().meta &&
+                ctx.Params().meta->progress_token.has_value()) {
+                progress_token = ctx.Params().meta->progress_token;
+                if (auto* operations = args.Find("operations");
+                    operations && operations->IsArray()) {
+                    progress_total =
+                        static_cast<int64_t>(operations->GetArray().size());
+                }
+            }
+            const auto send_progress =
+                [&ctx, &progress_token, progress_total](
+                    double progress, const std::string& message) {
+                    if (!progress_token.has_value()) return;
+                    try {
+                        ctx.Server().SendProgress(
+                            *progress_token, progress,
+                            static_cast<double>(progress_total), message);
+                    } catch (...) {
+                    }
+                };
+            send_progress(0.0, "batch_execute started");
+            bool run_on_transport_thread = tool_name == "call_tool";
+            if (tool_name == "batch_execute") {
+                if (auto* await_async = args.Find("await_async");
+                    await_async && await_async->IsBool() &&
+                    await_async->GetBool()) {
+                    run_on_transport_thread = true;
+                }
+            }
+            mcp::JsonValue res;
+            if (run_on_transport_thread) {
+                res = surface_tool->execute(args);
+            } else {
+                const tools::TraceContext trace_context =
+                    tools::capture_trace_context();
+                res = dispatch::run_on_main_thread_with_budget(
+                    queue, tool_name, surface_tool->tool_flags(),
+                    [surface_tool, args, trace_context] {
+                        tools::ScopedTraceContext restore(trace_context);
+                        return surface_tool->execute(args);
+                    });
+            }
+            int64_t new_errors = error_watermark::count_response_errors(res);
+            if (new_errors > 0) {
+                error_watermark::record_error(new_errors);
+            }
+            if (progress_token.has_value()) {
+                send_progress(static_cast<double>(progress_total),
+                              "batch_execute completed");
+            }
+            mcp::CallToolResult mcp_result;
+            if (tool_result_is_error(res)) {
+                mcp_result.is_error = true;
+            }
+            if (res.IsObject()) {
+                res["new_errors_since_last_call"] =
+                    mcp::JsonValue(error_watermark::consume_new_errors());
+            }
+            std::vector<mcp::ContentVariant> image_content;
+            if (tool_name == "call_tool") {
+                if (auto* target_name = args.Find("name");
+                    target_name && target_name->IsString()) {
+                    const std::string name = target_name->GetString();
+                    bool known = false;
+                    if (auto active = get_active_registry()) {
+                        if (auto target = active->find_any(name)) {
+                            known = true;
+                            if ((target->tool_flags() &
+                                 tool_flags::kCaptureImage) != 0) {
+                                util::try_attach_image_data(res,
+                                                            image_content);
+                            }
+                        }
+                    }
+                    if (!known) {
+                        util::try_attach_image_content(name, res,
+                                                       image_content);
+                    }
+                }
+            } else if ((surface_tool->tool_flags() &
+                        tool_flags::kCaptureImage) != 0) {
+                util::try_attach_image_data(res, image_content);
+            }
+            mcp_result.content.push_back(mcp::TextContent{"text", res.Dump()});
+            for (auto& block : image_content) {
+                mcp_result.content.push_back(std::move(block));
+            }
+            return mcp_result;
+        });
+}
+
+void register_all_tools(mcp::McpServer& server, CommandQueue& queue, ToolCatalog& catalog, Bm25Index& index, int port, ToolSurface surface) {
 
     (void)queue;
     g_catalog = &catalog;
     g_index = &index;
     g_port = port;
+    g_surface_server = &server;
+    g_tool_surface = surface;
     auto registry = build_registry(catalog, index, port);
 
-    for (const auto& meta_tool : registry->all_meta()) {
-        const std::string meta_name = meta_tool->meta().name;
-        mcp::ToolOptions opts;
-        opts.Description(meta_tool->meta().description).InputSchema(meta_tool->input_schema());
-        const SideEffect effect = side_effect_of(*meta_tool);
-        if (effect == SideEffect::None) {
-            opts.read_only_hint = true;
-        }
-        if (effect == SideEffect::Destructive) {
-            opts.destructive = true;
-        }
-        if (effect == SideEffect::Process || effect == SideEffect::GameRuntime) {
-            opts.open_world_hint = true;
-        }
-        server.RegisterTool(meta_name, opts,
-            [meta_name, registry, &queue, meta_tool](const mcp::RequestContext<mcp::CallToolRequestParams>& ctx) -> mcp::CallToolResult {
-                const std::string gda_request_id =
-                    monitor::request_id_text(ctx.GetRequest().id);
-                monitor::RequestScope gda_request_scope(gda_request_id);
-                monitor::RequestRecord gda_request_record;
-                std::string gda_request_trace;
-                std::string gda_request_span;
-                if (!gda_request_id.empty() &&
-                    monitor::registry().get(gda_request_id, &gda_request_record)) {
-                    gda_request_trace = gda_request_record.trace_id;
-                    gda_request_span = gda_request_record.span_id;
-                }
-                tools::RequestSpanGuard gda_span_scope(gda_request_trace,
-                                                       gda_request_span);
-                if (godot_autopilot::ExportGuard::is_exporting()) {
-                    return dispatch::export_blocked_result();
-                }
-                mcp::JsonValue args = ctx.Params().arguments
-                    ? *ctx.Params().arguments : mcp::JsonValue(mcp::JsonValue::object_tag);
-                auto tool = registry->find_meta(meta_name);
-                bool run_on_transport_thread = meta_name == "call_tool";
-                if (meta_name == "batch_execute") {
-                    if (auto *await_async = args.Find("await_async");
-                        await_async && await_async->IsBool() &&
-                        await_async->GetBool())
-                        run_on_transport_thread = true;
-                }
-                mcp::JsonValue res;
-                if (run_on_transport_thread) {
-                    res = tool->execute(args);
-                } else {
-                    const tools::TraceContext trace_context =
-                        tools::capture_trace_context();
-                    res = dispatch::run_on_main_thread_with_budget(
-                        queue, meta_name, meta_tool->tool_flags(),
-                        [tool, args, trace_context] {
-                            tools::ScopedTraceContext restore(trace_context);
-                            return tool->execute(args);
-                        });
-                }
-                int64_t new_errors = error_watermark::count_response_errors(res);
-                if (new_errors > 0) {
-                    error_watermark::record_error(new_errors);
-                }
-                mcp::CallToolResult mcp_result;
-                if (tool_result_is_error(res)) {
-                    mcp_result.is_error = true;
-                }
-                if (res.IsObject()) {
-                    res["new_errors_since_last_call"] = mcp::JsonValue(error_watermark::consume_new_errors());
-                }
-                std::vector<mcp::ContentVariant> image_content;
-                if (meta_name == "call_tool") {
-                    if (auto *tool_name = args.Find("name");
-                        tool_name && tool_name->IsString()) {
-                        const std::string name = tool_name->GetString();
-                        bool known = false;
-                        if (auto registry = get_active_registry()) {
-                            if (auto tool = registry->find_any(name)) {
-                                known = true;
-                                if ((tool->tool_flags() &
-                                     tool_flags::kCaptureImage) != 0) {
-                                    util::try_attach_image_data(res,
-                                                                image_content);
-                                }
-                            }
-                        }
-                        if (!known) {
-                            util::try_attach_image_content(name, res,
-                                                           image_content);
-                        }
-                    }
-                }
-                mcp_result.content.push_back(mcp::TextContent{"text", res.Dump()});
-                for (auto &block : image_content) {
-                    mcp_result.content.push_back(std::move(block));
-                }
-                return mcp_result;
-            });
+    const std::vector<std::shared_ptr<ToolBase>> surfaced =
+        surface == ToolSurface::Full ? registry->all_any()
+                                     : registry->all_meta();
+    for (const auto& surface_tool : surfaced) {
+        register_surface_tool(server, queue, registry, surface_tool);
     }
 
     refresh_derived(registry, catalog, index);
@@ -770,6 +953,10 @@ std::shared_ptr<ToolRegistry> get_active_registry() {
 void clear_active_registry() {
     std::lock_guard<std::mutex> lock(g_active_registry_mutex);
     g_active_registry = std::make_shared<ToolRegistry>();
+    g_catalog = nullptr;
+    g_index = nullptr;
+    g_surface_server = nullptr;
+    g_tool_surface = ToolSurface::Meta;
 }
 
 }

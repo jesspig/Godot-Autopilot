@@ -5,7 +5,7 @@ description: "Godot runtime and debugging guide: launch and stop the game, input
 
 # Runtime and Debugging with godot-autopilot
 
-Invocation: discover with `gda tools search` and `gda tools describe`, then call with `gda call`; the native MCP tools (`search_tools`, `get_tool_detail`, `call_tool`) are the compatibility path. Protocol details live in `godot-autopilot-tools`.
+Invocation: discover with `gda search` and `gda describe`, then call with `gda call`; the native MCP tools (`search_tools`, `get_tool_detail`, `call_tool`) are the compatibility path. Protocol details live in `godot-autopilot-tools`.
 
 This book covers the game process life cycle: launching and stopping the
 game, the `game_*` runtime channel, input injection, viewport capture and the
@@ -84,6 +84,15 @@ A failed scene reload shows up as an empty scene with a sharp `node_count`
 drop. Do not debug a half-dead process: stop with `stop_editor_playing` and
 rerun `play_editor_current_scene`. A live scene with a plausible `node_count`
 but no gameplay progress is a hang, not a reload failure.
+
+## Observe the runtime from the CLI
+
+`gda resources read` exposes editor and debugger state without a tool call:
+`godot://editor/output-log` for the editor console, `godot://debugger/output`
+and `godot://debugger/errors` for runtime output and errors,
+`godot://debugger/scene-tree` for the debugger scene tree, and
+`godot://debugger/monitors` for monitors. Use `--json` for the exact contents
+and `--save` for blobs. `gda logs <id>` remains the editor process log.
 
 ## The editor and the game are two processes
 

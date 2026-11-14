@@ -23,10 +23,12 @@
 #include <mcp/Content.hpp>
 #include <mcp/JsonRpc.hpp>
 #include <mcp/server/ServerOptions.hpp>
+#include <mcp/storage/FileTaskStore.hpp>
 #include <mcp/protocol/MessageFilter.hpp>
 #include <memory>
 
 #include "core/transport/api_token.hpp"
+#include "core/path_util.hpp"
 #include "core/storage/gda_home.hpp"
 #include "core/transport/godot_transport.hpp"
 #include "core/transport/http_transport.hpp"
@@ -39,7 +41,6 @@
 #include "core/storage/instance_guard.hpp"
 #include "core/storage/instance_registry.hpp"
 #include "core/transport/mcp_http_shim.hpp"
-#include "tools/base/tool_execute.hpp"
 #include "util/api_host_context.hpp"
 
 namespace godot_autopilot {
@@ -47,10 +48,6 @@ namespace godot_autopilot {
 namespace {
 bool is_loopback_host(std::string_view host) {
   return host == "127.0.0.1" || host == "::1" || host == "[::1]";
-}
-
-void register_unified_tool_executor() {
-  tools::register_tool_executor(&tools::execute_tool_chain);
 }
 
 ServerContext *g_server_context_instance = nullptr;
@@ -354,6 +351,26 @@ bool ServerContext::start() {
 
     mcp::ServerOptions opts;
     opts.server_info = mcp::Implementation{"godot-autopilot", GDA_VERSION};
+    opts.enable_progressive_discovery = true;
+    const std::filesystem::path task_dir =
+        to_fs_path(HomeResolver::gda_home()) / "tasks";
+    std::error_code task_dir_error;
+    std::filesystem::create_directories(task_dir, task_dir_error);
+    if (task_dir_error) {
+      LogSystem::instance().log(
+          LogLevel::Warning, LogCategory::Tools,
+          "cannot create task directory: " + task_dir_error.message());
+    }
+    opts.enable_tasks_extension = true;
+    opts.enable_skills_extension = true;
+    const std::string task_run_stamp = std::to_string(
+        std::chrono::system_clock::now().time_since_epoch().count());
+    const std::filesystem::path task_path =
+        task_dir / ("tasks-" + task_run_stamp + ".jsonl");
+    opts.task_store = std::make_shared<mcp::FileTaskStore>(task_path);
+    monitor::lifecycle(
+        "tasks_enabled",
+        monitor::build_attrs({{"path", task_path.string()}}));
     const mcp::CacheHint immediate_expiry_hint{int64_t{0}, "private"};
     opts.cache_hints = std::map<std::string, mcp::CacheHint, std::less<>>{
         {"server/discover", immediate_expiry_hint},
@@ -475,7 +492,6 @@ bool ServerContext::start() {
     LogSystem::instance().log(LogLevel::Debug, LogCategory::Transport,
                               "Registering tools/catalog/resources/prompts...");
 
-    register_unified_tool_executor();
     register_tools();
 
     LogSystem::instance().log(LogLevel::Info, LogCategory::Transport,
@@ -681,7 +697,13 @@ void ServerContext::set_endpoints(const EndpointTable &endpoints) {
 }
 
 void ServerContext::register_tools() {
-  register_all_tools(*server_, queue_, *catalog_, *bm25_index_, port_);
+  const ToolSurface surface = resolve_tool_surface();
+  register_all_tools(*server_, queue_, *catalog_, *bm25_index_, port_,
+                     surface);
+  monitor::lifecycle(
+      "tool_surface",
+      monitor::build_attrs(
+          {{"surface", surface == ToolSurface::Full ? "full" : "meta"}}));
   register_all_resources(*server_, queue_);
   register_all_prompts(*server_, queue_);
   register_debugger_resources(*server_, queue_);

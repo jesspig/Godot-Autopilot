@@ -1,37 +1,39 @@
 ---
 type: 安全与并发契约
 title: T0 安全边界与并发契约
-description: MCP 可信客户端与 REST 令牌认证、监听范围、授权三档、工具风险、Godot 主线程、队列生命周期、路径与响应大小的可执行约束
+description: MCP 可信客户端、监听范围、授权三档、工具风险、Godot 主线程、队列生命周期、路径与响应大小的可执行约束
 tags:
   - 安全
   - 并发
   - 契约
   - 认证
-timestamp: "2026-10-21T20:08:37+08:00"
+timestamp: "2026-11-14T01:08:47+08:00"
 resource:
   - src/core/server_context.cpp
   - src/core/command_queue.hpp
   - src/core/observability/log_persist.hpp
   - src/core/observability/sanitize_policy.hpp
   - src/core/observability/monitor.hpp
-  - src/core/transport/api_auth.cpp
   - src/core/transport/api_token.cpp
-  - src/core/transport/api_surface.cpp
-  - src/core/transport/api_envelope.cpp
   - src/core/storage/gda_home.cpp
   - src/core/transport/port_resolver.cpp
   - src/core/storage/instance_registry.cpp
   - src/tools/base/tool_base.hpp
   - src/tools/base/tool_spec.hpp
-  - src/tools/base/authorization.hpp
-  - src/tools/base/tool_execute.cpp
+
 ---
 
 # T0 安全边界与并发契约
 
 本页是 MCP 服务器进程内 GDExtension 的最小安全与并发契约。实现、评审和后续测试以本页条款为验收标准；代码事实见 [核心模块](modules/core.md) 与 [工具注册表](modules/tools_registry.md)。
 
-> 审计日期：2026-10-22（10-22 随**授权兼容模式与破坏类档位标准成型**批次同步——① 新增 §3.1.2「档位判定标准与破坏类边界」：四档（读 / 写 / 破坏 / 危险）的可判定标准、两条边界规则（删除磁盘文件归写类、销毁宿主内运行对象归破坏类）、「恢复途径」口径（编辑器会话内的 undo/redo 栈不算持久化恢复途径）、以及防漂移守卫与显式白名单机制；② 新增 §3.1.3「授权兼容模式（strict / legacy）」：两种模式的读写危险破坏行为对照、取值来源与优先级（环境变量 > 配置 `auth_mode` 键 > 默认严格）、非法取值回落并告警、唯一接入点（`tier_permits`）、实时读取不缓存、拒绝文案与面板下拉、风险边界；③ §3 风险表的 `destructive` 行改写为标准表述并列出 6 个声明者；④ §3.1.1 的破坏类说明与 `destructive` 能力行同步指向新标准。10-21 随 C# 程序集构建与 .NET 环境判定修复批次同步——§3.1 的**面板开关由五项扩为六项**（新增 `process`），开关控件改为按能力清单生成、初始状态统一按当前实际允许列表显示；10-21 随面板授权开关补齐批次同步——§3.1 的面板开关由三项扩为**五项**（新增 `write` 与 `destructive`），新增 §3.1.1「写类与破坏性默认拒绝」小节（三档定义、七个能力名、默认放行规则、开启方式，以及与 §4「导出期拒绝三类入口」的关系）；该批次 `process` 仍无面板开关，后由 10-21 补齐批次改为六项。10-21 随开放接口面落地批次同步——① §1 补两套协议面的信任模型差异（`/mcp` 仍无认证、`/api` 要 Bearer 令牌，认证不替代授权）；② §2 端口解析顺序由「环境变量 > 旧 config.json > 9527」改为「环境变量 > 工程级配置偏好 > 自动分配」，并写明显式端口绑定失败**不自动更换**；③ §3 风险表补 `destructive` 类，`side_effect` 枚举由八值改九值；④ §3.1 改写为**授权三档**（读档默认放行、写档**默认拒绝**、危险档需显式开启），能力名由四条扩为七条，配置路径改到集中根下并注明旧路径回退，**写档默认拒绝标为对外行为变更**；⑤ §3.2 配置路径同步；⑥ §3.3 补 REST 参考不是新脚本化通道的说明；⑦ §3.4 CLI state dir 路径改为 `<集中根>/cli/`；⑧ 新增 §3.5「REST 接口面的安全条款」（令牌来源与强度、常量时间比对、令牌文件权限、令牌不外泄、免认证面只有 health、认证不替代授权、环回约束不变、请求体上限、导出拦截未接线缺口）；⑨ §4 把 `main_thread_timeout` 的 `retryable` 由 true 改为 **false** 并说明副作用可能仍落地；⑩ §7 验收清单补 REST 认证、写档默认拒绝、超时不可重试、REST 导出接线四条。10-20 随 `code_execute` 超时上限收敛批次同步——长阻塞预算收敛为**单值 29000ms**（`GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = GDA_DISPATCH_WAIT_MAX_MS`，删去「回退常量 30000 / 实际生效 29000」双值写法与不存在的 `kDispatchWaitMaxMs` 符号引用）；§4 补记 `queue_unavailable` 结构化错误（字段 `error`/`code`/`retryable`）与 `code_execute` 的 `timeout_ms` 上界口径（`min(27000, 生效长阻塞预算)`）；10-20 随技能书调用阶梯收敛批次同步——技能书自带的脚本桥 `gda.mjs` 与 `references/script-access.md` 删除，§3.3 改写为「技能通道与手动兜底」：脚本化调用通道只剩 GDA CLI，脚本桥的安全包络条款并入 §3.4（环回绑定、退出码四态、`--godot` 引擎定位收敛、失败回滚不残留孤儿进程）；10-20 随执行预算与并发契约治理批次同步——① 修正两条与代码冲突的断言：§4「Godot `FileAccess` 仅在 flush 主线程路径调用」与「`call_tool` 编排回调不触碰 Godot API」均按修复后的事实重写；② §3 补记 `side_effect` 全量非空与能力门只按 `side_effect` 判定、§3.1 补记 `batch_execute` 纳入 `code_execute` 能力门（**对外行为变更**）；③ §4 补记长阻塞预算档、等待全预算化、`code_execute` 协作式执行期超时、`main_thread_guard` 静态守卫与 `ExportGuard` 实例级异常安全复位、导出期拒绝覆盖三类入口；④ 补记守卫的固有局限；⑤ §3.4 按本轮 CLI 启动路径修复改写「Windows 脱父」断言——`cmd /c start "" /b` 蹦床 + `netstat` 端口反查**已移除**，改为直连 `spawn` + `detached: true`、pid 取 `spawn` 返回值、存活判定改解析 `tasklist /FO CSV`，并补记启动失败回滚三态与可执行补救指令。详见 [changelog/2026-10-20-log.md](changelog/2026-10-20-log.md)；原记（2026-10-19）：随 CLI 引擎定位收窄批次同步——`gda start` 不再读 `GODOT_PATH` 与 `<project>/.env`（前者仅 L2 引擎测试使用，生产环境不存在），可执行文件链收敛为 `--godot` > PATH，未命中即报错提示 `--godot`；新增 `cli/tests/process.test.ts` 3 项（TS 108→111、expect 301→310）；原记（2026-10-18）：随 CLI 载体落地批次同步——§3.3 补记 SDK 0.3.7 握手升级与双载体修复，新增 §3.4 CLI 安全包络；详见 [changelog/2026-10-18-log.md](changelog/2026-10-18-log.md)）
+> 审计日期：2026-11-14（T-07：full 工具面不改变导出拦截/confirm/环回/主线程派发边界）2026-11-13（T-01 依赖升级：请求层依赖 mcp-cpp-sdk tag `0.3.8`→`0.3.11`、commit `d79f9b1`→`93e18ef`，安全条款未变）（10-22 随**授权兼容模式与破坏类档位标准成型**批次同步——① 新增 §3.1.2「档位判定标准与破坏类边界」：四档（读 / 写 / 破坏 / 危险）的可判定标准、两条边界规则（删除磁盘文件归写类、销毁宿主内运行对象归破坏类）、「恢复途径」口径（编辑器会话内的 undo/redo 栈不算持久化恢复途径）、以及防漂移守卫与显式白名单机制；② 新增 §3.1.3「授权兼容模式（strict / legacy）」：两种模式的读写危险破坏行为对照、取值来源与优先级（环境变量 > 配置 `auth_mode` 键 > 默认严格）、非法取值回落并告警、唯一接入点（`tier_permits`）、实时读取不缓存、拒绝文案与面板下拉、风险边界；③ §3 风险表的 `destructive` 行改写为标准表述并列出 6 个声明者；④ §3.1.1 的破坏类说明与 `destructive` 能力行同步指向新标准。10-21 随 C# 程序集构建与 .NET 环境判定修复批次同步——§3.1 的**面板开关由五项扩为六项**（新增 `process`），开关控件改为按能力清单生成、初始状态统一按当前实际允许列表显示；10-21 随面板授权开关补齐批次同步——§3.1 的面板开关由三项扩为**五项**（新增 `write` 与 `destructive`），新增 §3.1.1「写类与破坏性默认拒绝」小节（三档定义、七个能力名、默认放行规则、开启方式，以及与 §4「导出期拒绝三类入口」的关系）；该批次 `process` 仍无面板开关，后由 10-21 补齐批次改为六项。10-21 随开放接口面落地批次同步——① §1 补两套协议面的信任模型差异（`/mcp` 仍无认证、`/api` 要 Bearer 令牌，认证不替代授权）；② §2 端口解析顺序由「环境变量 > 旧 config.json > 9527」改为「环境变量 > 工程级配置偏好 > 自动分配」，并写明显式端口绑定失败**不自动更换**；③ §3 风险表补 `destructive` 类，`side_effect` 枚举由八值改九值；④ §3.1 改写为**授权三档**（读档默认放行、写档**默认拒绝**、危险档需显式开启），能力名由四条扩为七条，配置路径改到集中根下并注明旧路径回退，**写档默认拒绝标为对外行为变更**；⑤ §3.2 配置路径同步；⑥ §3.3 补 REST 参考不是新脚本化通道的说明；⑦ §3.4 CLI state dir 路径改为 `<集中根>/cli/`；⑧ 新增 §3.5「REST 接口面的安全条款」（令牌来源与强度、常量时间比对、令牌文件权限、令牌不外泄、免认证面只有 health、认证不替代授权、环回约束不变、请求体上限、导出拦截未接线缺口）；⑨ §4 把 `main_thread_timeout` 的 `retryable` 由 true 改为 **false** 并说明副作用可能仍落地；⑩ §7 验收清单补 REST 认证、写档默认拒绝、超时不可重试、REST 导出接线四条。10-20 随 `code_execute` 超时上限收敛批次同步——长阻塞预算收敛为**单值 29000ms**（`GDA_DISPATCH_WAIT_LONG_BLOCKING_MS = GDA_DISPATCH_WAIT_MAX_MS`，删去「回退常量 30000 / 实际生效 29000」双值写法与不存在的 `kDispatchWaitMaxMs` 符号引用）；§4 补记 `queue_unavailable` 结构化错误（字段 `error`/`code`/`retryable`）与 `code_execute` 的 `timeout_ms` 上界口径（`min(27000, 生效长阻塞预算)`）；10-20 随技能书调用阶梯收敛批次同步——技能书自带的脚本桥 `gda.mjs` 与 `references/script-access.md` 删除，§3.3 改写为「技能通道与手动兜底」：脚本化调用通道只剩 GDA CLI，脚本桥的安全包络条款并入 §3.4（环回绑定、退出码四态、`--godot` 引擎定位收敛、失败回滚不残留孤儿进程）；10-20 随执行预算与并发契约治理批次同步——① 修正两条与代码冲突的断言：§4「Godot `FileAccess` 仅在 flush 主线程路径调用」与「`call_tool` 编排回调不触碰 Godot API」均按修复后的事实重写；② §3 补记 `side_effect` 全量非空与能力门只按 `side_effect` 判定、§3.1 补记 `batch_execute` 纳入 `code_execute` 能力门（**对外行为变更**）；③ §4 补记长阻塞预算档、等待全预算化、`code_execute` 协作式执行期超时、`main_thread_guard` 静态守卫与 `ExportGuard` 实例级异常安全复位、导出期拒绝覆盖三类入口；④ 补记守卫的固有局限；⑤ §3.4 按本轮 CLI 启动路径修复改写「Windows 脱父」断言——`cmd /c start "" /b` 蹦床 + `netstat` 端口反查**已移除**，改为直连 `spawn` + `detached: true`、pid 取 `spawn` 返回值、存活判定改解析 `tasklist /FO CSV`，并补记启动失败回滚三态与可执行补救指令。详见 [changelog/2026-10-20-log.md](changelog/2026-10-20-log.md)；原记（2026-10-19）：随 CLI 引擎定位收窄批次同步——`gda start` 不再读 `GODOT_PATH` 与 `<project>/.env`（前者仅 L2 引擎测试使用，生产环境不存在），可执行文件链收敛为 `--godot` > PATH，未命中即报错提示 `--godot`；新增 `cli/tests/process.test.ts` 3 项（TS 108→111、expect 301→310）；原记（2026-10-18）：随 CLI 载体落地批次同步——§3.3 补记 SDK 0.3.7 握手升级与双载体修复，新增 §3.4 CLI 安全包络；详见 [changelog/2026-10-18-log.md](changelog/2026-10-18-log.md)）
+
+## 0. 0.3.3 full 工具面安全边界（2026-11-14 T-07）
+
+- `GODOT_AUTOPILOT_TOOL_SURFACE=full` 只改变 `tools/list` 的暴露面，不改变安全姿态：导出期拒绝、`confirm`、参数校验、trace 脱敏、环回绑定、主线程派发全部继续生效。
+- full 下每个域工具走与 `call_tool` 相同的注册回调与 dispatch 预算，不新增线程、不绕过 `ExportGuard`。
+- 上下文风险由宿主承担：不支持 tool search / defer loading 的客户端不要开 full；服务端不提供按客户端自动降级。
 
 ## 0. 0.3.2 安全面变更（2026-11-13 T-15/T-17/T-18）
 
@@ -57,7 +59,7 @@ resource:
 - 端口解析顺序：**环境变量 `GODOT_AUTOPILOT_PORT` ＞ 工程级配置偏好（集中根下工程目录的 `config.json` 的 `port` 键）＞ 自动分配**。自动分配在 `20000–29999` 的随机候选序列中取首个可用端口。**显式指定端口（环境变量 / 配置偏好）绑定失败时不自动更换**，直接启动失败并报 `the requested port N is unavailable: <原因>`；只有自动分配才顺延。监听地址与端点为独立配置，端点固定为 `/mcp`，端口是唯一可配项。端口模型与候选序列见 [端口与实例登记](modules/ports.md)。
 - 环回约束是**两层**，缺一不可，改任一层都要重新验证：
   - **绑定层**（本项目）：`ServerContext::start()` 用 `is_loopback_host()` 判定 `127.0.0.1`/`::1`/`[::1]`，其余值拒绝启动（`src/core/server_context.cpp:28-29`、`:75-76`）。
-  - **请求层**（依赖）：mcp-cpp-sdk 在 HTTP 层校验请求 `Host` 头，默认白名单仅 `localhost`/`127.0.0.1`/`::1`（`Impl::IsLocalhostHost`），不匹配即拒绝；仅当构造 HTTP 服务时显式传入 `allowed_hosts` 才会改用自定义白名单，本项目未设置该选项。当前锁定版本见 `third_party/mcp-cpp-sdk` 子模块（tag `0.3.8`，commit `d79f9b16ffe512282a62b9bd6c786d0887ee6963`，由 `.gitmodules` 与 gitlink 确定）。
+  - **请求层**（依赖）：mcp-cpp-sdk 在 HTTP 层校验请求 `Host` 头，默认白名单仅 `localhost`/`127.0.0.1`/`::1`（`Impl::IsLocalhostHost`），不匹配即拒绝；仅当构造 HTTP 服务时显式传入 `allowed_hosts` 才会改用自定义白名单，本项目未设置该选项。当前锁定版本见 `third_party/mcp-cpp-sdk` 子模块（tag `0.3.11`，commit `93e18ef8bf9766754a5320b167389e094c28cca7`，由 `.gitmodules` 与 gitlink 确定）。
   - 因此“把绑定地址放宽”并不能让非环回 Host 的请求可用；反向的 DNS 重绑定（用本机主机名或局域网 IP 访问）由请求层拦下。历史上 2026-08-28 的 changelog 曾把 `GODOT_AUTOPILOT_HOST` 描述为“可覆盖为 `0.0.0.0`”，该表述已被现行拒绝行为取代。
 
 ## 3. 高风险工具分类
@@ -70,23 +72,23 @@ resource:
 |---|---|---|
 | 文件写入 | `writes_file` | 调用前确认路径在允许工程范围内；不得默认覆盖任意路径。 |
 | 配置写入 | `writes_config` | 视为持久化变更；调用方应明确知道目标文件和可逆性。 |
-| 场景写入 | `writes_scene` | 可恢复地修改编辑场景的属性或节点结构（属性/变换、信号连接、分组、增删/重挂/实例化节点等）；属**写档**，严格模式需 `write` 授权，legacy 兼容模式按写档放行。 |
+| 场景写入 | `writes_scene` | 可恢复地修改编辑场景的属性或节点结构（属性/变换、信号连接、分组、增删/重挂/实例化节点等）；属**写档**。 |
 | 用户可见提示 | `shows_alert` | 视为会阻塞或打断用户的操作；禁止在无明确请求时批量触发。 |
 | 窗口/剪贴板/鼠标 | `modifies_window` | 视为影响编辑器或桌面状态的副作用；含编辑器 UI 元素点击/文本/快捷键注入与合成鼠标输入（09-15 扩展、09-16 增 `select_scene_tree_node`，共 20 个）。 |
 | 进程与环境 | `process` | 视为最高风险；包括启动、终止、构建、打开 OS 路径和修改环境。 |
 | 任意脚本 | `code_execute`（`code_execute` / `batch_execute` / `execute_script` / 6 个 `csharp_*` 反射工具） | 最高风险处理；脚本可读写场景、资源、文件并调用方法，未标记的等价脚本执行能力同样按此处理。 |
 | 运行时变更 | `game_*` 输入、求值的 set/call、SceneTree 转发的 8 个 `*_scene_tree_*` 工具等 | 视为目标游戏状态变更；必须受超时、取消和响应关联约束；无运行中游戏时返回结构化错误，不落回编辑器树。 |
-| 破坏性操作 | `destructive`（10-21 新增；10-22 档位标准成型，声明者由 1 个扩为 6 个：`delete_display_window` / `delete_scene_node` / `remove_animation` / `remove_animation_track` / `remove_audio_bus_effect` / `remove_debug_custom_monitor`） | **不可逆地销毁宿主内已存在的对象或实体**（判定标准与边界规则见 §3.1.2）；与 `modifies_window` 同属危险档，需显式授权，且不得在无明确请求时触发。 |
+| 破坏性操作 | `destructive`（10-21 新增；10-22 档位标准成型，声明者由 1 个扩为 6 个：`delete_display_window` / `delete_scene_node` / `remove_animation` / `remove_animation_track` / `remove_audio_bus_effect` / `remove_debug_custom_monitor`） | **不可逆地销毁宿主内已存在的对象或实体**（判定标准与边界规则见 §3.1.2）；与 `modifies_window` 同属危险档，不得在无明确请求时触发。 |
 
 只读工具也必须遵守路径、结果大小和主线程条款；“无副作用”不等于“无需限制”。
 
-**10-20 元工具副作用声明修正（对外行为变更）**：`code_execute` 与 `batch_execute` 两个元工具此前声明 `SideEffect::None`，现均声明 `SideEffect::CodeExecute`（`src/tools/base/register_all.cpp:504`、`:552`）。二者的实际行为本就是执行任意脚本/批量编排任意工具，声明与行为此前不一致。修正后 `batch_execute` **自身也受 `code_execute` 能力门保护**（此前它无任何能力门）；后果是**只授权了 `process` / `game_runtime` 而未授权 `code_execute` 的客户端无法使用 `batch_execute`**——这是收紧方向的行为变更，需要 `batch_execute` 的客户端须同步把 `code_execute` 加入授权列表。`code_execute` 本身此前已受能力门保护，声明修正只是把“按工具名特判”换成“按 `side_effect` 统一判定”，对外表现不变。
+**10-20 元工具副作用声明修正（对外行为变更）**：`code_execute` 与 `batch_execute` 两个元工具此前声明 `SideEffect::None`，现均声明 `SideEffect::CodeExecute`（`src/tools/base/register_all.cpp:504`、`:552`）。二者的实际行为本就是执行任意脚本/批量编排任意工具，声明与行为此前不一致。修正后 `batch_execute` **当时也受 `code_execute` 能力门保护**（此前它无任何能力门；该能力门已于 0.3.2 移除）；历史后果是只授权 `process` / `game_runtime` 而未授权 `code_execute` 的客户端无法使用 `batch_execute`。`code_execute` 本身此前已受能力门保护，声明修正只是把“按工具名特判”换成“按 `side_effect` 统一判定”，对外表现不变。
 
 近期新增工具的分级（09-13）：`copy_resource_file` 注册为 `SideEffect::WritesFile` + `tool_flags::kMutating`（可覆盖已存在的 `dest_path`，属写文件类，须先确认路径在工程范围内）；`reload_resource` 未声明 `SideEffect`（仅以 `ResourceLoader CACHE_MODE_REPLACE` 刷新编辑器资源缓存，不写盘），其余约束仍按只读工具处理。
 
 09-15 新增 13 个工具的分级：7 个编辑器 UI/输入工具（`click_editor_element`、`type_editor_element_text`、`run_editor_shortcut`、`click_input_mouse`、`scroll_input_mouse`、`drag_input_mouse`、`type_input_text`）标记 `ModifiesWindow`（`modifies_window` 清单 12→19，会移动物理光标并注入桌面输入）；游戏侧 `click_game_ui_element` 标记 `GameRuntime`（`game_runtime` 清单 5→6）；其余 5 个只读查询工具（`get_display_window_rect`、`get_scene_node_screen_rect`、`get_editor_viewport_geometry`、`get_editor_ui_elements`、`hit_test_editor_point`）不标副作用，仍按只读工具的路径/大小/主线程条款处理。本批未新增授权能力门（`ModifiesWindow` 不在 `code_execute`/`game_runtime`/`process` 能力集）。
 
-09-29 E2E 韧性批次：8 个 SceneTree 工具（`set_scene_tree_pause`、`is_scene_tree_paused`、`reload_scene_tree_current_scene`、`set_scene_tree_debug_collisions_hint`、`call_scene_tree_group`、`notify_scene_tree_group`、`get_scene_tree_nodes_in_group`、`create_scene_tree_timer`）由操作编辑器树改为经游戏通道 `scene_tree` op 转发到运行中游戏进程，全部标记 `SideEffect::GameRuntime`（`game_runtime` 授权面 +8，含只读的 `is_scene_tree_paused`/`get_scene_tree_nodes_in_group`）；无游戏进程时返回结构化错误，编辑器树不再被这些工具触碰。本批未放宽任何默认安全姿态（授权仍默认拒绝、脱敏仍默认开启、监听仍仅环回）。
+09-29 E2E 韧性批次：8 个 SceneTree 工具（`set_scene_tree_pause`、`is_scene_tree_paused`、`reload_scene_tree_current_scene`、`set_scene_tree_debug_collisions_hint`、`call_scene_tree_group`、`notify_scene_tree_group`、`get_scene_tree_nodes_in_group`、`create_scene_tree_timer`）由操作编辑器树改为经游戏通道 `scene_tree` op 转发到运行中游戏进程，全部标记 `SideEffect::GameRuntime`（`game_runtime` 授权面 +8，含只读的 `is_scene_tree_paused`/`get_scene_tree_nodes_in_group`）；无游戏进程时返回结构化错误，编辑器树不再被这些工具触碰。本批未放宽任何默认安全姿态（0.3.2 前授权仍默认拒绝、脱敏仍默认开启、监听仍仅环回）。
 
 ### 3.1 能力授权门（09-02 引入，09-13 扩展，10-20 收敛为纯 `side_effect` 判定，10-21 扩为三档；**0.3.2 已移除**）
 
@@ -106,12 +108,12 @@ resource:
 
   - **能力名全集**（`kKnownCapabilities`，7 项）：`read` / `write` / `process` / `code_execute` / `game_runtime` / `destructive` / `user_tools`。`user_tools` 是**独立于 `side_effect` 派生**的一条能力，由 `AutopilotTools`（用户脚本动态工具，`src/tools/base/autopilot_tools.cpp`）在注册与调用两侧检查——未授权时注册拒绝、调用返回 `user_tools` 授权错误。
   - **面板开关**覆盖 `code_execute` / `game_runtime` / `user_tools` / `write` / `destructive` / `process` 六项（`capability_has_dock_toggle`）。**`read` 没有面板开关**（读档无需授权）；`process` 的开关于 10-21 补齐，不再只能经环境变量或手改配置的 `allow` 键开启。
-- **写档默认拒绝是收紧方向的行为变更（10-21）**：`writes_file` / `writes_config` / `shows_alert` / `modifies_window` 类工具此前**不需要任何能力**即可调用，10-21 起需要允许列表含 `write`（或 `all`）。既有客户端若不做适配，调用写类工具会收到 403 `authorization_required`。**该变更必须写进版本说明与技能书**——技能书侧的同步见 [REST 接口面](modules/api.md) 与调用专册。
+- **写档默认拒绝是收紧方向的行为变更（10-21）**：`writes_file` / `writes_config` / `shows_alert` / `modifies_window` 类工具此前**不需要任何能力**即可调用，10-21 起需要允许列表含 `write`（或 `all`）。既有客户端若不做适配，调用写类工具会收到 403 `authorization_required`。**该变更必须写进版本说明与技能书**——技能书侧的同步见 `skills/godot-autopilot-tools/` 调用专册。
 - 拒绝响应含 `error`、`code`（`authorization_required`）、`authorization_required`（能力名）与 `enable`（启用指引）四个字段，并写 Warning 日志（Tools 类，可经 `get_plugin_log` 读取）。
 - 启用入口：环境变量（须重启引擎）或配置 `allow` 键；MCP Config 面板的 "Allow code_execute"、"Allow game_runtime"、"Allow user tools"、"Allow write"、"Allow destructive" 与 "Allow process" 复选框分别管理对应能力（复选框**按能力清单生成**，见 `src/ui/authorization_switches.hpp`；初始状态统一取当前实际允许列表，环境变量优先于配置），勾选/取消经 `authorization::allow_list_add`/`allow_list_remove`（`add` 对已生效项含 `all` 保持原样；`remove` 先把 `all` 展开为全部已知能力再逐项删除），写入配置后下一次调用生效、无需重启。拒绝响应的 `enable` 文案对**有面板开关的六个能力**提及 dock（`capability_has_dock_toggle`），其余仅给环境变量 + 重启指引。
 - 拒绝可审计（09-20 起）：授权门命中时除返回结构化拒绝与 Warning 日志外，另记录一条 `TraceEvent`（`auth="denied"`、`error_code="denied"`、`duration_ms=0`，含工具名/类别/副作用/flags），随 trace jsonl 落盘，供事后区分"未授权被拒"与"handler 业务错误"；09-21 起 McpConfigDock 的 allow 变更另发 `monitor::security` 事件（与脱敏变更同口径）。
 
-### 3.1.1 写类与破坏性默认拒绝（10-21 补齐面板开关）
+### 3.1.1 写类与破坏性默认拒绝（历史口径，0.3.2 已移除）
 
 授权判定按**三档**执行，七个能力名与默认放行规则如下。判定函数是 `authorization::tier_permits`，**每次工具调用实时读取允许列表（不缓存）**：
 
@@ -131,9 +133,9 @@ resource:
 - **面板开关的增删语义**：勾选即 `allow_list_add`、取消即 `allow_list_remove`；**取消某一项不影响其它项**——`allow_list_remove` 遇到 `all` 会先把 `all` 展开成全部已知能力再逐项删除，因此「先全开再取消一项」的结果是其余能力保留、仅该能力被收回。取消后回读配置校正复选框状态，因此面板显示与配置内容始终一致。
 - **与 §4「导出期拒绝三类入口」的关系**：两者是**不同维度**的约束，互不替代。导出期拒绝按**引擎状态**拒绝——导出期间工具调用 / MCP 资源 / MCP 提示词三类入口一律拒绝（`code="export_in_progress"`，503）；本节的三档授权按**能力**拒绝——非导出期时，未在允许列表内的能力被拒（403 `authorization_required`）。判定顺序上**导出拦截在前、授权在后**（见 [工具注册表](modules/tools_registry.md)「统一执行入口」六阶段），故导出期内的写类调用先被导出拦截挡下，不进入授权门；反之，未授权的写类调用在非导出期只会拿到授权拒绝。**已知缺口**：导出拦截阶段尚未接入 REST 请求路径，REST 面的导出期拒绝当前不生效（见 §3.5 末条），但 REST 面的**授权门两套面都生效**。
 
-### 3.1.2 档位判定标准与破坏类边界（10-22 成型）
+### 3.1.2 档位判定标准与破坏类边界（10-22 成型；授权门 0.3.2 已移除）
 
-三档七能力的分档**只按工具的实际行为判定**，不看工具名。新增工具必须按下表落档；判定口径固化在 [`src/tools/base/side_effect_policy.hpp`](../../../src/tools/base/side_effect_policy.hpp)（`kTierCriteria` 与两条边界常量），并由 单元测试 用例 `destructive_tier_guard_test` 逐工具复核。
+三档七能力的分档**只按工具的实际行为判定**，不看工具名。新增工具必须按下表落档；判定口径固化在 [`src/tools/base/side_effect_policy.hpp`](../../src/tools/base/side_effect_policy.hpp)（`kTierCriteria` 与两条边界常量），并由 单元测试 用例 `destructive_tier_guard_test` 逐工具复核。
 
 | 档位 | 判定标准 | 覆盖的 `side_effect` | 能力名 |
 |---|---|---|---|
@@ -151,7 +153,7 @@ resource:
 
 **防漂移守卫**：单元测试 用例 `destructive_tier_guard_test` 扫描全部工具声明（取自运行时 registry，含元工具），凡**工具名或描述带删除 / 销毁 / 终止类语义**却未声明 `SideEffect::Destructive` 的，即判为可疑并列出工具名；确有正当理由的须在 `side_effect_policy.hpp` 的 `kDestructiveExemptions` 白名单里**显式登记并写明理由**（当前 9 条：配置与工程文件类删除、终止外部进程、只解除关系不销毁实体、游戏进程内的对象）。白名单条目若指向不存在的工具、或对应工具已不再带销毁语义，守卫同样失败。
 
-### 3.1.3 授权兼容模式（strict / legacy，10-22 新增）
+### 3.1.3 授权兼容模式（strict / legacy，10-22 新增；0.3.2 已移除）
 
 0.3.0 起写类默认拒绝（§3.1.1），既有 0.2.7 用户首次调用写类工具会收到 403 `authorization_required`。为给出一条**自选的**平滑升级路径，授权判定新增**模式开关**：
 
@@ -189,7 +191,6 @@ resource:
 - 写盘只有两处：`--save-images DIR` 内的解码图片（自生成文件名）与 CLI 自身的 state dir（实例登记表与日志，见 §3.4）；`--args-file` 只读 JSON，不写盘。
 - 技能文档禁手写 HTTP：技能文档的全部 .md 不得出现 `curl -` 与 `Invoke-WebRequest`（单元测试 逐文件断言），调用统一走 GDA CLI；无 CLI 可用则停止自动化、按 `manual-fallback.md` 出手动指南，不得编造请求。
 - 握手：mcp-cpp-sdk 0.3.7 起严格要求完整 MCP 握手（`initialize` → `notifications/initialized`），旧懒握手只发 `notifications/initialized` 被拒 `-32600`；CLI 已升级为标准 `initialize` 流程（`840e648`），`test_cli_contract.py` 的 mock 服务器严格模拟该语义（未初始化时 `tools/call` 返回 400 + `-32600`）。
-- **REST 参考是接口说明，不是新的脚本化通道（10-21）**：技能书另有一份 REST 接口参考（`references/rest-api.md`），示范 Python 与 JavaScript 两段最小调用。它服务于「客户端只能发普通 HTTP、无法做 MCP 握手」的场景；能跑 CLI 的机器仍应走 GDA CLI。参考中不得出现 `curl -` 与 `Invoke-WebRequest`。
 - 本节不改变默认安全姿态：监听仍仅环回（§2）、高风险能力仍默认拒绝（§3.1）、脱敏仍默认开启（§3.2）。
 
 ### 3.4 CLI 安全包络（2026-10-18 新增）
@@ -206,21 +207,6 @@ gda CLI（Bun + TS 源码直跑，详见 [CLI 载体](modules/cli.md)）是技�
 - **生命周期动作约束**：`start` 只启动 Godot 可执行文件链（`--godot` > PATH）指向的编辑器进程，注入 `GODOT_AUTOPILOT_PORT` 环境变量；**引擎定位只此一条链**——**不读 `GODOT_PATH`**（该变量历史上仅服务已删除的 L2 引擎测试，与生产无关，避免把测试引擎路径带入生产启动），**也不读 `<project>/.env`**；`stop` 默认优雅（`taskkill /PID` / `SIGTERM`），失败只报告并提示 `--force`，**强杀必须显式 `--force`**（`taskkill /F /T /PID` / `SIGKILL`），不静默升级。
 - **不收集个人信息**：CLI 不读取工程内容、不上报任何遥测；唯一本地状态是实例登记表（id/project/port/pid/startedAt/headless/godot/log），且只存本机路径与 pid。
 - 不改变默认安全姿态：监听仍仅环回（§2）、高风险能力仍默认拒绝（§3.1）、脱敏仍默认开启（§3.2）；CLI 自身不绕过 MCP 授权门（仍经 `call_tool` 受 `code_execute`/`game_runtime`/`user_tools` 门约束）。
-
-### 3.5 REST 接口面的安全条款（10-21 新增）
-
-REST 面（`/api`）与 MCP 面共用同一监听端口，但**认证要求不同**。条款如下：
-
-- **令牌来源与强度**：令牌是 **32 字节随机值的十六进制**（64 个小写十六进制字符，由 `std::random_device` 填充后逐字节转十六进制，熵 ≥ 256 位）。来源优先级：`GODOT_AUTOPILOT_API_TOKEN` 环境变量 ＞ 工程级令牌文件 `<集中根>/projects/<工程目录>/api_token`。**环境变量一旦设置即完全覆盖文件**，此时既不签发新令牌也不写文件。
-- **签发时机**：插件成功绑定端口后随实例登记一起签发（`ServerContext::write_instance_record` → `ApiAuth::issue_token`），并写入实例登记的 `api_token` 字段，供 CLI 读取。令牌文件写入失败或路径未解析时记一条 Error 日志，**REST 端点保持未认证状态**（令牌为空即所有受保护端点返回 401）。
-- **比对方式**：`ApiAuth::verify` → `api_token::constant_time_equals`，逐字节异或累积后统一比较，**长度不同直接判否**；令牌为空一律判否。
-- **令牌文件权限**：POSIX 平台写盘后 `chmod` 收紧为 `S_IRUSR | S_IWUSR`（0600），失败记一条 Warning；Windows 无 POSIX 权限位，改为记一条 Warning，明确说明令牌文件**继承 GDA 集中根目录的 ACL**。令牌文件内容是明文，任何能读该目录的进程都能取到令牌——它只配合同机环回使用。
-- **令牌不外泄**：令牌只落在实例登记与工程级令牌文件两处，**不写环境变量、不写工程文件、不进日志**；`trace_recorder` 的敏感键集合已含 `token` / `*_token` 后缀，脱敏开启时 `api_token` 会被剥离。
-- **免认证面只有一个**：`GET /api/health` 免认证，且只返回存活状态、服务名、版本、端口与进程号——**不泄露任何工程内容**。其余端点（含 `GET /api/openapi.json`）都要令牌。
-- **认证不替代授权**：令牌通过后仍要走 §3.1 的能力门；未授权的工具返回 403（`authorization_required`），而不是 401。
-- **环回约束不变**：REST 端点与 MCP 端点挂在同一个环回监听上，非环回地址在 `ServerContext::start()` 被拒绝；REST 请求层同样受传输层的 Host 校验约束。**不得转发、代理或把该端口暴露到非环回地址**——令牌只防「误连」，不构成远程部署方案。
-- **请求体上限**：传输层按 `Content-Length` 拒绝超过 4 MiB 的请求体（413），防止用超大请求体耗尽编辑器内存。
-- **已知缺口（10-21）**：统一执行入口 `tools::execute_tool_chain` 的**导出拦截阶段尚未接入 REST 请求路径**（`api_surface` 的执行器槽位在生产路径上无注册点），因此**导出期对 REST 工具调用的拒绝当前不生效**；导出期的 MCP 侧三类入口拒绝仍完整有效（见 §4 末条）。该缺口须在接线后复核，详见 [REST 接口面](modules/api.md)「已知限制」。
 
 ## 4. Godot API 与线程
 
@@ -266,12 +252,12 @@ REST 面（`/api`）与 MCP 面共用同一监听端口，但**认证要求不�
 - [ ] 面板开关覆盖 `code_execute` / `game_runtime` / `user_tools` / `write` / `destructive` / `process` 六项：勾选与取消经允许列表增删，**取消一项不影响其它项**（`all` 先展开再逐项删），勾选后**下一次工具调用即生效、无需重启**；开关控件按能力清单生成，初始状态取当前实际允许列表。
 - [ ] 授权模式（§3.1.3）符合预期：默认 `strict` 下写类默认拒绝；显式 `legacy` 下写类默认放行而危险类与破坏类**仍**默认拒绝；非法取值回落 `strict` 并记 Warning；拒绝响应带 `authorization_mode` 字段；面板下拉切换后**下一次调用即生效**。
 - [ ] 破坏类落档符合 §3.1.2 标准：销毁宿主内既有对象的工具声明 `destructive`；删除磁盘文件 / 目录归写类；防漂移守卫对「带销毁语义却未声明 `destructive`」的工具失败并列出工具名，白名单豁免须显式登记且写明理由。
-- [ ] REST 面的受保护端点拒绝无令牌请求（401），令牌比对为常量时间，令牌文件权限已收紧（POSIX 0600 / Windows 记 Warning 说明继承 ACL），令牌不出现在日志与 trace 中。
+
 - [ ] HTTP 线程路径中没有直接 Godot API 调用；任务只由主线程 `drain()` 执行；trace 截图与 jsonl 落盘只在主线程发生。
 - [ ] 编辑器内不存在无界等待点：所有主线程等待都带预算（`execute_sync` 无调用点，`kLongBlocking` 有上限）；超时结果标 `retryable=false` 且带 `cancelled`，不得按可重试处理。
 - [ ] 主线程停摆时工具调用快速失败并返回可诊断的结构化错误（`main_thread_timeout` + 队列深度/心跳/取消标记），默认安全姿态未被放宽。
 - [ ] 长脚本有执行期兜底：`code_execute` 超时返回 `exec_timeout`，游戏侧 eval 超时/取消返回 `eval_timeout` / `eval_cancelled`。
-- [ ] 导出期三类入口（工具调用 / MCP 资源 / MCP 提示词）均被拒绝；导出回调异常后标志已复位；**REST 面的导出期拒绝已接线**（当前未接线，见 §3.5）。
+- [ ] 导出期三类入口（工具调用 / MCP 资源 / MCP 提示词）均被拒绝；导出回调异常后标志已复位。
 - [ ] stop/restart 的请求接入、队列任务、future、异步响应和对象释放顺序有可观察且不悬挂的结果。
 - [ ] 路径边界、遍历/输入上限和响应截断行为均可被调用方检测。
 - [ ] 本地日志/trace 落盘符合边界约定：两目录保留上限生效；默认脱敏开启时 jsonl 不含内联 base64，`args_digest` 已剥离敏感字段；关闭脱敏仅由显式配置触发。
@@ -282,7 +268,6 @@ REST 面（`/api`）与 MCP 面共用同一监听端口，但**认证要求不�
 
 - [核心模块](modules/core.md)
 - [工具注册表](modules/tools_registry.md)
-- [REST 接口面](modules/api.md)（§3.5 的契约细节）
 - [端口与实例登记](modules/ports.md)（端口解析与实例登记）
 - [入口与运行时桥接](modules/entry_runtime.md)
 - [CLI 载体](modules/cli.md)

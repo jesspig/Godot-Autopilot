@@ -5,7 +5,7 @@ description: "Godot resource and file operations guide: load, save, create and d
 
 # Resource and File Operations
 
-Invocation: discover with `gda tools search` and `gda tools describe`, then call with `gda call`; the native MCP tools (`search_tools`, `get_tool_detail`, `call_tool`) are the compatibility path. Protocol details live in `godot-autopilot-tools`.
+Invocation: discover with `gda search` and `gda describe`, then call with `gda call`; the native MCP tools (`search_tools`, `get_tool_detail`, `call_tool`) are the compatibility path. Protocol details live in `godot-autopilot-tools`.
 
 Working with .tres/.tscn files, .import sidecars, UIDs and the res:// layout through the resource domain tools plus three text-file tools (`write_file`, `read_file`, `find_in_files`). Every tool is invoked through `call_tool`; see the godot-autopilot-tools skill for the discovery protocol.
 

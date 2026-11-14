@@ -3,12 +3,23 @@
 
 #include <gtest/gtest.h>
 
+#include <mcp/Capabilities.hpp>
+#include <mcp/McpError.hpp>
+#include <mcp/Methods.hpp>
+#include <mcp/storage/FileTaskStore.hpp>
 #include <mcp/client/McpClient.hpp>
+#include <mcp/protocol/McpSessionHandler.hpp>
+#include <mcp/protocol/WireCodec.hpp>
 #include <mcp/server/McpServer.hpp>
 #include <mcp/transport/InMemoryTransport.hpp>
 
+#include <atomic>
+#include <chrono>
+#include <filesystem>
+
 #include "core/command_queue.hpp"
 #include "tools/base/dispatch.hpp"
+#include "tools/base/dynamic_spec_store.hpp"
 #include "tools/base/register_all.hpp"
 #include "tools/base/runtime_ops.hpp"
 #include "tools/base/tool_catalog.hpp"
@@ -299,8 +310,10 @@ TEST_F(RegisteredServerFixture, CallHandlerOversizedArgsKeepsFixedError) {
       << "error message must not echo back oversized arguments";
 }
 
-TEST_F(RegisteredServerFixture, ReRegisterIsIdempotentForServerAndCatalog) {
-  godot_autopilot::register_all_tools(*server, queue, catalog, index, 9527);
+TEST_F(RegisteredServerFixture, ReRegisterOnSameServerRejectsDuplicateTools) {
+  EXPECT_THROW(
+      godot_autopilot::register_all_tools(*server, queue, catalog, index, 9527),
+      mcp::McpError);
 
   auto result = client->ListTools();
   EXPECT_EQ(result.tools.size(), kMetaToolCount);
@@ -335,6 +348,153 @@ TEST_F(RegisteredServerFixture, TwoIndependentServersRegisterIdentically) {
   server2->Close();
   if (thread2.joinable())
     thread2.join();
+}
+
+TEST(RegisterAllSurfaceTest, FullSurfaceRegistersAllToolsAcrossPages) {
+  auto pair = mcp::InMemoryTransport::CreatePair();
+  mcp::ServerOptions full_options;
+  full_options.enable_progressive_discovery = true;
+  auto full_server = mcp::McpServer::Create(pair.server, full_options);
+
+  godot_autopilot::CommandQueue full_queue;
+  godot_autopilot::ToolCatalog full_catalog;
+  godot_autopilot::Bm25Index full_index;
+  godot_autopilot::register_all_tools(
+      *full_server, full_queue, full_catalog, full_index, 9530,
+      godot_autopilot::ToolSurface::Full);
+
+  std::thread full_thread([&full_server] { full_server->Run(); });
+
+  mcp::ClientOptions cops;
+  cops.client_info = mcp::Implementation{"GsdFullSurfaceClient", "1.0.0"};
+  cops.connect_mode = mcp::ConnectMode::Auto;
+  auto full_client = mcp::McpClient::Create(pair.client, cops);
+
+  auto all_tools = full_client->ListToolsAll();
+  EXPECT_EQ(all_tools.tools.size(), full_catalog.size());
+  EXPECT_GT(full_catalog.size(), static_cast<size_t>(7));
+
+  mcp::JsonValue params(mcp::JsonValue::object_tag);
+  mcp::JsonValue first_json =
+      full_client->SendRequest("tools/list", params).get();
+  const auto *first_tools = first_json.Find("tools");
+  ASSERT_NE(first_tools, nullptr) << first_json.Dump();
+  ASSERT_TRUE(first_tools->IsArray()) << first_json.Dump();
+  EXPECT_EQ(first_tools->GetArray().size(), static_cast<size_t>(100));
+  const auto *next_cursor = first_json.Find("nextCursor");
+  ASSERT_NE(next_cursor, nullptr) << first_json.Dump();
+  EXPECT_TRUE(next_cursor->IsString()) << first_json.Dump();
+
+  bool has_scene_node = false;
+  for (const auto &tool : all_tools.tools) {
+    if (tool.name == "create_scene_node") {
+      has_scene_node = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(has_scene_node);
+
+  full_client->Close();
+  full_server->Close();
+  if (full_thread.joinable()) full_thread.join();
+}
+
+TEST(RegisterAllSurfaceTest, FullSurfaceSendsListChangedOnDynamicRefresh) {
+  auto pair = mcp::InMemoryTransport::CreatePair();
+  mcp::ServerOptions full_options;
+  full_options.enable_progressive_discovery = true;
+  auto full_server = mcp::McpServer::Create(pair.server, full_options);
+
+  godot_autopilot::CommandQueue full_queue;
+  godot_autopilot::ToolCatalog full_catalog;
+  godot_autopilot::Bm25Index full_index;
+  godot_autopilot::register_all_tools(
+      *full_server, full_queue, full_catalog, full_index, 9531,
+      godot_autopilot::ToolSurface::Full);
+
+  auto session = std::make_shared<mcp::McpSessionHandler>(
+      std::move(pair.client), mcp::MakeWireCodec("2025-03-26"));
+  session->Start();
+
+  auto received = std::make_shared<std::promise<void>>();
+  auto received_future = received->get_future();
+  session->SetNotificationHandler(
+      mcp::notifications::kToolListChanged,
+      [received](const mcp::JsonRpcNotification &) { received->set_value(); });
+
+  {
+    std::lock_guard<std::mutex> lock(godot_autopilot::dynamic_specs::mutex());
+    godot_autopilot::ToolSpec spec{
+        "gda_test_dynamic_tool", "Dynamic test tool", "Testing", {"dynamic"}};
+    spec.side_effect = godot_autopilot::SideEffect::None;
+    spec.handler = [](const mcp::JsonValue &) {
+      return mcp::JsonValue(mcp::JsonValue::object_tag);
+    };
+    godot_autopilot::dynamic_specs::store().push_back(std::move(spec));
+  }
+  godot_autopilot::refresh_dynamic_tools();
+
+  EXPECT_EQ(received_future.wait_for(std::chrono::seconds(3)),
+            std::future_status::ready);
+
+  {
+    std::lock_guard<std::mutex> lock(godot_autopilot::dynamic_specs::mutex());
+    godot_autopilot::dynamic_specs::store().clear();
+  }
+  godot_autopilot::refresh_dynamic_tools();
+
+  session->Close();
+  full_server->Close();
+}
+
+TEST(RegisterAllSurfaceTest, TasksExtensionIsAdvertisedAndCallToolIsTaskOptional) {
+  auto pair = mcp::InMemoryTransport::CreatePair();
+  const std::filesystem::path task_path =
+      std::filesystem::temp_directory_path() /
+      "gda_tasks_test_register_all.jsonl";
+  std::filesystem::remove(task_path);
+  mcp::ServerOptions task_options;
+  task_options.enable_tasks_extension = true;
+  task_options.task_store = std::make_shared<mcp::FileTaskStore>(task_path);
+  auto task_server = mcp::McpServer::Create(pair.server, task_options);
+
+  godot_autopilot::CommandQueue task_queue;
+  godot_autopilot::ToolCatalog task_catalog;
+  godot_autopilot::Bm25Index task_index;
+  godot_autopilot::register_all_tools(*task_server, task_queue, task_catalog,
+                                      task_index, 9532);
+
+  std::thread task_thread([&task_server] { task_server->Run(); });
+
+  mcp::ClientOptions cops;
+  cops.client_info = mcp::Implementation{"GsdTaskClient", "1.0.0"};
+  cops.connect_mode = mcp::ConnectMode::Auto;
+  cops.enable_tasks_extension = true;
+  auto task_client = mcp::McpClient::Create(pair.client, cops);
+
+  const mcp::ServerCapabilities capabilities =
+      task_client->GetServerCapabilities();
+  ASSERT_TRUE(capabilities.extensions.has_value());
+  const auto tasks_extension =
+      capabilities.extensions->find(std::string(mcp::kTasksExtensionId));
+  EXPECT_NE(tasks_extension, capabilities.extensions->end());
+
+  auto tools = task_client->ListToolsAll();
+  bool found_call_tool = false;
+  for (const auto &tool : tools.tools) {
+    if (tool.name != "call_tool") continue;
+    found_call_tool = true;
+    ASSERT_TRUE(tool.execution.has_value());
+    EXPECT_EQ(tool.execution->mode, mcp::ToolExecutionMode::Task);
+    ASSERT_TRUE(tool.execution->task_support.has_value());
+    EXPECT_EQ(*tool.execution->task_support, mcp::TaskSupport::Optional);
+  }
+  EXPECT_TRUE(found_call_tool);
+
+  task_client->Close();
+  task_server->Close();
+  if (task_thread.joinable()) task_thread.join();
+  std::filesystem::remove(task_path);
 }
 
 TEST_F(RegisteredServerFixture, Bm25IndexPopulatedAfterRegistration) {

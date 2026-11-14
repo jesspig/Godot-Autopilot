@@ -37,7 +37,7 @@ set(GODOTCPP_API_VERSION "4.7" CACHE STRING "The Godot API version to target" FO
 add_subdirectory("${GDA_THIRD_PARTY_DIR}/godot-cpp" "${GDA_SUBMODULE_BIN_DIR}/godot-cpp")
 
 # ====================================================================
-# mcp-cpp-sdk — MCP 协议 C++ SDK (0.3.8 / d79f9b1)
+# mcp-cpp-sdk — MCP 协议 C++ SDK (0.3.11 / 93e18ef)
 # ====================================================================
 gda_require_submodule(mcp-cpp-sdk)
 # OpenSSL/TLS 为可选依赖，启用与否由 SDK 的 MCP_WITH_OPENSSL 三态开关（AUTO/ON/OFF）决定；

@@ -5,8 +5,8 @@ import path from "node:path";
 import { CliError, ExitCode } from "./errors";
 import { gdaRoot, joinPath } from "./platform";
 
-export type CacheArtifact = "cli" | "plugin" | "skills" | "catalog";
-export type CacheSource = "github" | "atomgit" | "builtin";
+export type CacheArtifact = "cli" | "plugin" | "skills";
+export type CacheSource = "github" | "builtin";
 
 export interface CacheManifest {
   artifact: CacheArtifact;
@@ -49,8 +49,6 @@ export function cacheAssetPath(manifest: CacheManifest): string {
       return joinPath(root, "plugin", manifest.version, manifest.asset);
     case "skills":
       return joinPath(root, "skills", manifest.lang, manifest.version, manifest.asset);
-    case "catalog":
-      return joinPath(root, "catalog", `${manifest.version}.json`);
   }
 }
 
@@ -114,9 +112,9 @@ function parseManifest(raw: unknown): CacheManifest | null {
   const lang = doc.lang;
   const fetchedAt = doc.fetched_at;
   const builtin = doc.builtin;
-  if (!["cli", "plugin", "skills", "catalog"].includes(String(artifact))) return null;
+  if (!["cli", "plugin", "skills"].includes(String(artifact))) return null;
   if (typeof version !== "string" || version === "") return null;
-  if (!["github", "atomgit", "builtin"].includes(String(source))) return null;
+  if (!["github", "builtin"].includes(String(source))) return null;
   if (typeof asset !== "string" || asset === "") return null;
   if (typeof sha256 !== "string" || !/^[0-9a-f]{64}$/i.test(sha256)) return null;
   if (typeof size !== "number" || size < 0) return null;

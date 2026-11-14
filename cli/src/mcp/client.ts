@@ -8,6 +8,12 @@ export interface JsonRpcResponse {
   error?: { code: number; message?: string };
 }
 
+export interface RequestProgress {
+  progress: number;
+  total?: number;
+  message?: string;
+}
+
 export interface CallToolOptions {
   port: number;
   timeoutSec?: number;
@@ -18,6 +24,9 @@ export interface CallToolOptions {
   transport?: "auto" | "ipc" | "http";
   transportSink?: (transport: "ipc" | "http") => void;
   traceparent?: string;
+  progressSink?: (progress: RequestProgress) => void;
+  inputResponses?: Record<string, unknown>;
+  keepTask?: boolean;
 }
 
 export const META_DIRECT_TOOLS: ReadonlySet<string> = new Set([
@@ -77,7 +86,26 @@ interface HandshakeState {
   rehandshakes: number;
 }
 
+export interface HandshakeInfo {
+  protocol_version: string;
+  capabilities: unknown;
+  server_info: unknown;
+}
+
 const handshakeStates = new Map<string, HandshakeState>();
+const handshakeInfos = new Map<string, HandshakeInfo>();
+
+export function getHandshakeInfo(port: number): HandshakeInfo | null {
+  return handshakeInfos.get(`http://${HOST}:${port}/mcp`) ?? null;
+}
+
+export async function ensureConnection(port: number, timeoutSec = DEFAULT_TIMEOUT_SEC): Promise<void> {
+  const url = `http://${HOST}:${port}/mcp`;
+  const state = handshakeStateFor(url);
+  if (!state.done) {
+    await performHandshake(url, timeoutSec * 1000);
+  }
+}
 
 function handshakeStateFor(url: string): HandshakeState {
   let state = handshakeStates.get(url);
@@ -94,27 +122,6 @@ interface RawResponse {
   text: string;
 }
 
-function makeCallEnvelope(
-  id: number,
-  name: string,
-  args: Record<string, unknown>,
-  direct: boolean,
-  traceparent?: string,
-): string {
-  const params: Record<string, unknown> = direct
-    ? { name, arguments: args }
-    : { name: "call_tool", arguments: { name, arguments: args } };
-  if (traceparent !== undefined && traceparent !== "") {
-    params._meta = { traceparent };
-  }
-  return JSON.stringify({
-    jsonrpc: "2.0",
-    id,
-    method: "tools/call",
-    params,
-  });
-}
-
 function makeInitializeEnvelope(): string {
   return JSON.stringify({
     jsonrpc: "2.0",
@@ -122,7 +129,7 @@ function makeInitializeEnvelope(): string {
     method: "initialize",
     params: {
       protocolVersion: PROTOCOL_VERSION,
-      capabilities: {},
+      capabilities: { elicitation: {} },
       clientInfo: { name: CLIENT_NAME, version: CLI_VERSION },
     },
   });
@@ -132,14 +139,21 @@ function isModernProtocolVersion(version: string): boolean {
   return version >= MODERN_PROTOCOL_VERSION;
 }
 
-function learnNegotiatedVersion(res: RawResponse, state: HandshakeState): void {
+function learnNegotiatedVersion(res: RawResponse, state: HandshakeState, url: string): void {
   const extracted = extractEnvelope(res);
   if (extracted.kind !== "envelope") return;
-  const envelope = extracted.envelope as { result?: { protocolVersion?: unknown } };
+  const envelope = extracted.envelope as {
+    result?: { protocolVersion?: unknown; capabilities?: unknown; serverInfo?: unknown };
+  };
   const version = envelope.result?.protocolVersion;
   if (typeof version === "string" && KNOWN_PROTOCOL_VERSIONS.includes(version)) {
     state.version = version;
   }
+  handshakeInfos.set(url, {
+    protocol_version: typeof version === "string" ? version : (state.version ?? ""),
+    capabilities: envelope.result?.capabilities ?? {},
+    server_info: envelope.result?.serverInfo ?? {},
+  });
 }
 
 function requestHeaders(url: string): Record<string, string> {
@@ -160,7 +174,7 @@ async function performHandshake(url: string, timeoutMs: number): Promise<void> {
   if (initRes.status < 200 || initRes.status >= 300) {
     throw new CliError(ExitCode.Transport, `initialize failed with HTTP ${initRes.status}.`);
   }
-  learnNegotiatedVersion(initRes, state);
+  learnNegotiatedVersion(initRes, state, url);
   const ackRes = await postJson(url, JSON.stringify({ jsonrpc: "2.0", method: HANDSHAKE_METHOD }), timeoutMs);
   if (ackRes.status < 200 || ackRes.status >= 300) {
     throw new CliError(ExitCode.Transport, `handshake failed with HTTP ${ackRes.status}.`);
@@ -195,21 +209,26 @@ async function postJson(url: string, body: string, timeoutMs: number): Promise<R
   return { status: res.status, contentType: res.headers.get("content-type") || "", text };
 }
 
-function parseSseEnvelope(text: string): unknown | null | undefined {
-  const chunks: string[] = [];
-  for (const line of text.split(/\r?\n/)) {
-    if (line.startsWith("data:")) {
-      let value = line.slice("data:".length);
-      if (value.startsWith(" ")) value = value.slice(1);
-      chunks.push(value);
+function parseSseEnvelopes(text: string): unknown[] | null | undefined {
+  const frames: unknown[] = [];
+  for (const block of text.split(/\r?\n\r?\n/)) {
+    const chunks: string[] = [];
+    for (const line of block.split(/\r?\n/)) {
+      if (line.startsWith("data:")) {
+        let value = line.slice("data:".length);
+        if (value.startsWith(" ")) value = value.slice(1);
+        chunks.push(value);
+      }
+    }
+    if (chunks.length === 0) continue;
+    try {
+      frames.push(JSON.parse(chunks.join("\n")));
+    } catch {
+      return undefined;
     }
   }
-  if (chunks.length === 0) return null;
-  try {
-    return JSON.parse(chunks.join("\n"));
-  } catch {
-    return undefined;
-  }
+  if (frames.length === 0) return null;
+  return frames;
 }
 
 type Extracted =
@@ -218,12 +237,38 @@ type Extracted =
   | { kind: "bad-sse" }
   | { kind: "bad-json" };
 
-function extractEnvelope(res: RawResponse): Extracted {
+function extractEnvelope(
+  res: RawResponse,
+  progressSink?: (progress: RequestProgress) => void,
+): Extracted {
   if (res.contentType.includes("text/event-stream")) {
-    const envelope = parseSseEnvelope(res.text);
-    if (envelope === null) return { kind: "no-data" };
-    if (envelope === undefined) return { kind: "bad-sse" };
-    return { kind: "envelope", envelope };
+    const frames = parseSseEnvelopes(res.text);
+    if (frames === null) return { kind: "no-data" };
+    if (frames === undefined) return { kind: "bad-sse" };
+    let finalEnvelope: unknown = undefined;
+    for (const frame of frames) {
+      if (frame === null || typeof frame !== "object" || Array.isArray(frame)) continue;
+      const record = frame as { method?: unknown; params?: unknown; result?: unknown; error?: unknown };
+      if (record.method === "notifications/progress" && progressSink !== undefined) {
+        const params = record.params;
+        if (params !== null && typeof params === "object" && !Array.isArray(params)) {
+          const progress = params as { progress?: unknown; total?: unknown; message?: unknown };
+          if (typeof progress.progress === "number") {
+            progressSink({
+              progress: progress.progress,
+              total: typeof progress.total === "number" ? progress.total : undefined,
+              message: typeof progress.message === "string" ? progress.message : undefined,
+            });
+          }
+        }
+        continue;
+      }
+      if (record.result !== undefined || record.error !== undefined) {
+        finalEnvelope = frame;
+      }
+    }
+    if (finalEnvelope === undefined) return { kind: "no-data" };
+    return { kind: "envelope", envelope: finalEnvelope };
   }
   try {
     return { kind: "envelope", envelope: JSON.parse(res.text) };
@@ -294,20 +339,75 @@ export async function callTool(
   args: Record<string, unknown>,
   opts: CallToolOptions,
 ): Promise<JsonRpcResponse> {
+  const params: Record<string, unknown> = opts.direct === true
+    ? { name, arguments: args }
+    : { name: "call_tool", arguments: { name, arguments: args } };
+  const response = await request("tools/call", params, opts);
+  if (opts.keepTask === true) return response;
+  const result = response.result;
+  if (result === null || typeof result !== "object" || Array.isArray(result)) return response;
+  const record = result as { resultType?: unknown; taskId?: unknown; status?: unknown };
+  const taskId = typeof record.taskId === "string" ? record.taskId : "";
+  if (record.resultType !== "task" && taskId === "") return response;
+  return await waitForTask(response, taskId, opts);
+}
+
+async function waitForTask(
+  initial: JsonRpcResponse,
+  taskId: string,
+  opts: CallToolOptions,
+): Promise<JsonRpcResponse> {
+  if (taskId === "") {
+    return { id: initial.id, error: { code: -32000, message: "task result is missing taskId" } };
+  }
+  const timeoutMs = (opts.timeoutSec ?? DEFAULT_TIMEOUT_SEC) * 1000;
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const polled = await request("tasks/get", { taskId }, { ...opts, keepTask: true });
+    if (polled.error !== undefined) return polled;
+    const result = polled.result;
+    if (result === null || typeof result !== "object" || Array.isArray(result)) {
+      return { id: initial.id, error: { code: -32000, message: "invalid tasks/get result" } };
+    }
+    const task = result as { status?: unknown; result?: unknown; error?: unknown; statusMessage?: unknown };
+    const status = typeof task.status === "string" ? task.status : "";
+    if (status === "completed") {
+      return { id: initial.id, result: task.result ?? { content: [] } };
+    }
+    if (status === "failed" || status === "cancelled") {
+      const message = typeof task.statusMessage === "string" ? task.statusMessage : `task ${status}`;
+      return { id: initial.id, error: { code: -32000, message } };
+    }
+    if (Date.now() >= deadline) {
+      return { id: initial.id, error: { code: -32000, message: `task ${taskId} timed out` } };
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+}
+
+export async function request(
+  method: string,
+  params: Record<string, unknown>,
+  opts: CallToolOptions,
+): Promise<JsonRpcResponse> {
   const timeoutMs = (opts.timeoutSec ?? DEFAULT_TIMEOUT_SEC) * 1000;
   const transportMode = opts.transport ?? "auto";
   const ipcEndpoint =
     opts.ipcEndpoint ?? (opts.socketPath !== undefined ? { path: opts.socketPath } : undefined);
+  const requestParams: Record<string, unknown> = { ...params };
+  if (opts.inputResponses !== undefined) {
+    requestParams.inputResponses = opts.inputResponses;
+  }
+  if (opts.traceparent !== undefined && opts.traceparent !== "") {
+    const meta = requestParams._meta;
+    requestParams._meta = {
+      ...(meta !== null && typeof meta === "object" && !Array.isArray(meta) ? meta : {}),
+      traceparent: opts.traceparent,
+    };
+  }
   if (transportMode !== "http" && ipcEndpoint !== undefined) {
     try {
-      const response = await callToolOverIpc(
-        name,
-        args,
-        ipcEndpoint,
-        timeoutMs,
-        opts.direct === true,
-        opts.traceparent,
-      );
+      const response = await requestOverIpc(method, requestParams, ipcEndpoint, timeoutMs);
       const tokenFailure = response.error?.code === -32001 || response.error?.code === -32002;
       if (!tokenFailure) {
         opts.transportSink?.("ipc");
@@ -331,15 +431,17 @@ export async function callTool(
   }
   const url = `http://${HOST}:${opts.port}/mcp`;
 
+  const makeBody = (id: number): string =>
+    JSON.stringify({ jsonrpc: "2.0", id, method, params: requestParams });
   let id = nextRequestId++;
-  const body = makeCallEnvelope(id, name, args, opts.direct === true, opts.traceparent);
+  const body = makeBody(id);
   const bodyBytes = Buffer.byteLength(body, "utf8");
   if (bodyBytes > MAX_BODY_BYTES) {
     throw new CliError(ExitCode.Transport, `request body exceeds 4 MiB (${bodyBytes} bytes).`);
   }
 
   let res = await postJson(url, body, timeoutMs);
-  let extracted = extractEnvelope(res);
+  let extracted = extractEnvelope(res, opts.progressSink);
   const state = handshakeStateFor(url);
   if (handshakeRequired(res, extracted)) {
     const expired = state.done;
@@ -351,9 +453,17 @@ export async function callTool(
       }
       await performHandshake(url, timeoutMs);
       id = nextRequestId++;
-      res = await postJson(url, makeCallEnvelope(id, name, args, opts.direct === true, opts.traceparent), timeoutMs);
-      extracted = extractEnvelope(res);
+      res = await postJson(url, makeBody(id), timeoutMs);
+      extracted = extractEnvelope(res, opts.progressSink);
     }
+  }
+  if (!state.done && res.status >= 200 && res.status < 300 &&
+      extracted.kind === "envelope" &&
+      (extracted.envelope as { error?: unknown } | null)?.error !== undefined) {
+    await performHandshake(url, timeoutMs);
+    id = nextRequestId++;
+    res = await postJson(url, makeBody(id), timeoutMs);
+    extracted = extractEnvelope(res, opts.progressSink);
   }
 
   if (res.status < 200 || res.status >= 300) {
@@ -369,29 +479,24 @@ export async function callTool(
   return extracted.envelope as JsonRpcResponse;
 }
 
-async function callToolOverIpc(
-  name: string,
-  args: Record<string, unknown>,
+async function requestOverIpc(
+  method: string,
+  params: Record<string, unknown>,
   endpoint: IpcEndpoint,
   timeoutMs: number,
-  direct: boolean,
-  traceparent?: string,
 ): Promise<JsonRpcResponse> {
   const session = new IpcSession(endpoint, timeoutMs);
   try {
     await session.open();
     const init = JSON.parse(makeInitializeEnvelope()) as Record<string, unknown>;
-    const params = (init.params ?? {}) as Record<string, unknown>;
+    const initParams = (init.params ?? {}) as Record<string, unknown>;
     const meta: Record<string, string> = {};
     if (endpoint.token !== undefined && endpoint.token !== "") {
       meta.gda_token = endpoint.token;
     }
-    if (traceparent !== undefined && traceparent !== "") {
-      meta.traceparent = traceparent;
-    }
     if (Object.keys(meta).length > 0) {
-      params._meta = meta;
-      init.params = params;
+      initParams._meta = meta;
+      init.params = initParams;
     }
     const initResponse = await session.request(init);
     if (initResponse.error !== undefined) {
@@ -399,8 +504,7 @@ async function callToolOverIpc(
     }
     session.notify({ jsonrpc: "2.0", method: HANDSHAKE_METHOD });
     const id = nextRequestId++;
-    const envelope = JSON.parse(makeCallEnvelope(id, name, args, direct, traceparent)) as Record<string, unknown>;
-    return await session.request(envelope);
+    return await session.request({ jsonrpc: "2.0", id, method, params });
   } finally {
     session.close();
   }

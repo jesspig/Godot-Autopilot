@@ -296,14 +296,6 @@ class CommandQueue {
     return out;
   }
 
-  template <typename Fn>
-  auto execute_sync(Fn &&fn) -> std::invoke_result_t<Fn> {
-    if (is_main_thread()) {
-      return std::forward<Fn>(fn)();
-    }
-    return submit(std::forward<Fn>(fn)).get();
-  }
-
   bool drain() {
     last_drain_ns_.store(now_ns(), std::memory_order_relaxed);
     std::deque<std::unique_ptr<TaskBase>> batch;

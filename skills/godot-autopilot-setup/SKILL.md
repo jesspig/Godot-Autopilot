@@ -169,15 +169,15 @@ use.
 ## 7. First end-to-end check
 
 ```bash
-gda tools search "scene"
-gda tools describe create_scene_node
+gda search "scene"
+gda describe create_scene_node
 gda call ping
 gda call system_status
 ```
 
-`gda tools search` reads the cached catalog and works even with no editor.
-`gda tools describe` shows the input schema and `side_effect` marker before the
-first write. `gda call` executes against the live editor and prints the result
+`gda search` queries the live instance and needs a running editor.
+`gda describe` shows the input schema and `side_effect` marker before the first
+write. `gda call` executes against the live editor and prints the result
 JSON. Read the `new_errors_since_last_call` watermark in every response; zero
 means no new engine errors were recorded.
 

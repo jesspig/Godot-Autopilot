@@ -1,14 +1,60 @@
+import * as readline from "node:readline/promises";
+
 import type { GlobalOptions } from "../args";
 import { parseTransport } from "../args";
 import { CliError, ExitCode } from "../errors";
-import { callTool, META_DIRECT_TOOLS } from "../mcp/client";
+import { callTool, ensureConnection, META_DIRECT_TOOLS } from "../mcp/client";
 import { err } from "../output";
 import { assertCallFamilyUsage, callTimeoutSec, emit, extractPayload, loadToolArguments } from "../payload";
 import { findById, findLiveByProject } from "../registry";
-import { resolveTarget, type TargetContext } from "../target";
+import { resolveTarget, type TargetContext, type ResolvedTarget } from "../target";
+import { argsHash, recordTask } from "../tasks-index";
 import { appendCliTrace, makeTraceparent, newSpanId, newTraceId } from "../trace";
+import { writeJson } from "./json-output";
 
 const TARGET_CONTEXT: TargetContext = { findById, findLiveByProject };
+
+function finishAsync(
+  envelope: { result?: unknown },
+  tool: string,
+  args: Record<string, unknown>,
+  target: ResolvedTarget,
+  opts: GlobalOptions,
+): number | null {
+  if (opts.async !== true) return null;
+  const result = envelope.result;
+  if (result === null || typeof result !== "object" || Array.isArray(result)) return null;
+  const record = result as { taskId?: unknown; task_id?: unknown; status?: unknown; resultType?: unknown };
+  const taskId = typeof record.taskId === "string"
+    ? record.taskId
+    : typeof record.task_id === "string" ? record.task_id : "";
+  const isTask = taskId !== "" || record.resultType === "task";
+  if (!isTask) {
+    err("server executed synchronously: this client or tool does not support MCP tasks");
+    return null;
+  }
+  if (taskId === "") {
+    throw new CliError(ExitCode.ToolFailure, "server returned a task result without a task id");
+  }
+  recordTask({
+    task_id: taskId,
+    tool,
+    args_hash: argsHash(args),
+    started_at: new Date().toISOString(),
+    port: target.port,
+    instance_id: target.instance?.id ?? target.pluginRecord?.instanceId ?? "",
+    status: typeof record.status === "string" ? record.status : "working",
+  });
+  writeJson(
+    {
+      task_id: taskId,
+      status: typeof record.status === "string" ? record.status : "working",
+      tool,
+    },
+    opts,
+  );
+  return ExitCode.Success;
+}
 
 export async function run(positional: string[], opts: GlobalOptions): Promise<number> {
   assertCallFamilyUsage("call", opts);
@@ -22,6 +68,13 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
   }
   const timeoutSec = callTimeoutSec(opts);
   const transport = parseTransport(opts.transportText);
+  const progressSink = opts.progress === true
+    ? (progress: { progress: number; total?: number; message?: string }) => {
+        const total = progress.total === undefined ? "?" : String(progress.total);
+        const message = progress.message === undefined ? "" : ` ${progress.message}`;
+        err(`progress ${progress.progress}/${total}${message}`);
+      }
+    : undefined;
   const traceId = newTraceId();
   const traceparent = makeTraceparent(traceId);
   const startedAt = Date.now();
@@ -38,6 +91,7 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
         transport: "ipc",
         noFallback: opts.noFallback,
         traceparent,
+        progressSink,
       });
       recordCliCall(traceId, tool, envelope, startedAt, "ipc");
       const extracted = extractPayload(envelope, { saveImages: opts.saveImages, raw: opts.raw });
@@ -50,20 +104,74 @@ export async function run(positional: string[], opts: GlobalOptions): Promise<nu
     }
   }
   const target = resolveTarget(opts, TARGET_CONTEXT);
+  if (opts.direct === true) {
+    await ensureConnection(target.port, timeoutSec);
+  }
   let usedTransport = transport;
-  const envelope = await callTool(tool, args, {
+  let envelope = await callTool(tool, args, {
     port: target.port,
     timeoutSec,
-    direct: META_DIRECT_TOOLS.has(tool),
+    direct: opts.direct === true || META_DIRECT_TOOLS.has(tool),
     ipcEndpoint: target.ipcEndpoint,
     transport,
     noFallback: opts.noFallback,
     traceparent,
+    progressSink,
+    keepTask: opts.async === true,
     transportSink: (actual) => {
       usedTransport = actual;
     },
   });
+  const inputRequiredResult = envelope.result !== null &&
+    typeof envelope.result === "object" &&
+    !Array.isArray(envelope.result)
+    ? (envelope.result as { input_required?: unknown; inputRequests?: unknown; resultType?: unknown })
+    : null;
+  const inputRequired = inputRequiredResult !== null &&
+    (inputRequiredResult.input_required !== undefined ||
+      inputRequiredResult.inputRequests !== undefined ||
+      inputRequiredResult.resultType === "input_required");
+  if (inputRequired) {
+    let inputResponses: Record<string, unknown> | null = null;
+    if (opts.inputText !== undefined) {
+      try {
+        inputResponses = JSON.parse(opts.inputText) as Record<string, unknown>;
+      } catch {
+        throw new CliError(ExitCode.Usage, "--input is not valid JSON");
+      }
+    } else if (process.stdin.isTTY) {
+      const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
+      const answer = await rl.question("This tool requires confirmation. Accept? [y/N] ");
+      rl.close();
+      if (!/^y(es)?$/i.test(answer.trim())) {
+        err("confirmation declined; the tool was not executed");
+        return ExitCode.ToolFailure;
+      }
+      inputResponses = { confirm: { action: "accept" } };
+    } else {
+      err(`input_required: ${JSON.stringify(envelope.result)}`);
+      err("re-run with --confirm, or pass --input '<json>' with inputResponses");
+      return ExitCode.Usage;
+    }
+    envelope = await callTool(tool, args, {
+      port: target.port,
+      timeoutSec,
+      direct: opts.direct === true || META_DIRECT_TOOLS.has(tool),
+      ipcEndpoint: target.ipcEndpoint,
+      transport,
+      noFallback: opts.noFallback,
+      traceparent,
+      progressSink,
+      inputResponses,
+      keepTask: opts.async === true,
+      transportSink: (actual) => {
+        usedTransport = actual;
+      },
+    });
+  }
   recordCliCall(traceId, tool, envelope, startedAt, usedTransport);
+  const asyncCode = finishAsync(envelope, tool, args, target, opts);
+  if (asyncCode !== null) return asyncCode;
   const extracted = extractPayload(envelope, { saveImages: opts.saveImages, raw: opts.raw });
   return emit(extracted, opts);
 }
