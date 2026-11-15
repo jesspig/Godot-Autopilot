@@ -22,20 +22,11 @@ const std::vector<SkillSpec> &skills() {
   return cached;
 }
 
-constexpr std::size_t kExpectedSkillCount = 10;
-constexpr std::size_t kExpectedSkillResourceCount = 21;
+constexpr std::size_t kExpectedSkillCount = 1;
+constexpr std::size_t kExpectedSkillResourceCount = 12;
 
 const char *const kExpectedSkillNames[] = {
-    "godot-autopilot",
-    "godot-autopilot-setup",
-    "godot-autopilot-tools",
-    "godot-autopilot-scene-system",
-    "godot-autopilot-resources",
-    "godot-autopilot-scripting",
-    "godot-autopilot-runtime",
-    "godot-autopilot-servers",
-    "godot-autopilot-content",
-    "godot-autopilot-csharp"};
+    "godot-autopilot"};
 
 } // namespace
 
@@ -61,10 +52,10 @@ TEST(SkillResourcesTest, ParsesSkillUri) {
 
 TEST(SkillResourcesTest, ParsesFileUri) {
   const ParsedUri single = godot_autopilot::skill_resources::parse_uri(
-      "godot://skills/godot-autopilot-tools/SKILL.md");
+      "godot://skills/godot-autopilot/references/tools.md");
   EXPECT_EQ(single.kind, UriKind::file);
-  EXPECT_EQ(single.name, "godot-autopilot-tools");
-  EXPECT_EQ(single.file, "SKILL.md");
+  EXPECT_EQ(single.name, "godot-autopilot");
+  EXPECT_EQ(single.file, "references/tools.md");
 
   const ParsedUri nested = godot_autopilot::skill_resources::parse_uri(
       "godot://skills/demo/a/b/c.md");
@@ -183,10 +174,10 @@ TEST(SkillResourcesTest, ResolvesKnownAndUnknownTargets) {
 
   const godot_autopilot::skill_resources::ResolvedUri reference =
       godot_autopilot::skill_resources::resolve_uri(
-          all, "godot://skills/godot-autopilot-tools/SKILL.md");
+          all, "godot://skills/godot-autopilot/references/tools.md");
   ASSERT_NE(reference.skill, nullptr);
   ASSERT_NE(reference.file, nullptr);
-  EXPECT_EQ(reference.file->relative_path, "SKILL.md");
+  EXPECT_EQ(reference.file->relative_path, "references/tools.md");
 
   const godot_autopilot::skill_resources::ResolvedUri unknown_skill =
       godot_autopilot::skill_resources::resolve_uri(all,
@@ -242,20 +233,21 @@ TEST(SkillResourcesTest, ResolvesSkillMarkdownContent) {
 TEST(SkillResourcesTest, ResolvesSkillFileContentVerbatim) {
   const std::vector<SkillSpec> &all = skills();
   const SkillSpec *spec = godot_autopilot::skill_resources::find_skill(
-      all, "godot-autopilot-tools");
+      all, "godot-autopilot");
   ASSERT_NE(spec, nullptr);
   const SkillFile *file = godot_autopilot::skill_resources::find_file(
-      *spec, "SKILL.md");
+      *spec, "references/tools.md");
   ASSERT_NE(file, nullptr);
 
   const ContentResult content =
       godot_autopilot::skill_resources::resolve_content(
-          all, "godot://skills/godot-autopilot-tools/SKILL.md");
+          all, "godot://skills/godot-autopilot/references/tools.md");
   EXPECT_TRUE(content.error.empty());
   EXPECT_EQ(content.kind, UriKind::file);
   EXPECT_EQ(content.mime_type, "text/markdown");
   EXPECT_FALSE(content.text.empty());
-  EXPECT_NE(content.text.find("# Godot Autopilot Tools"), std::string::npos);
+  EXPECT_NE(content.text.find("# Calling Protocol and Docs CLI"),
+            std::string::npos);
 }
 
 TEST(SkillResourcesTest, MarkdownMimeType) {
@@ -263,7 +255,7 @@ TEST(SkillResourcesTest, MarkdownMimeType) {
 
   const ContentResult reference =
       godot_autopilot::skill_resources::resolve_content(
-          all, "godot://skills/godot-autopilot-tools/SKILL.md");
+          all, "godot://skills/godot-autopilot/references/tools.md");
   EXPECT_TRUE(reference.error.empty());
   EXPECT_EQ(reference.kind, UriKind::file);
   EXPECT_EQ(reference.mime_type, "text/markdown");

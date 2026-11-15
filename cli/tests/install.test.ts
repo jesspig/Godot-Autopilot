@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { usageText, type GlobalOptions } from "../src/args";
 import { run as runInstall } from "../src/commands/install";
+import { builtinRetiredSkills } from "../src/skills";
 
 let tmp: string;
 let previousHome: string | undefined;
@@ -47,8 +48,18 @@ async function runCaptured(positional: string[], opts: GlobalOptions) {
   }
 }
 
+function createRetiredDirs(target: string): string[] {
+  const names = builtinRetiredSkills();
+  for (const name of names) {
+    const dir = path.join(target, name);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "SKILL.md"), `# ${name}\n`, "utf8");
+  }
+  return names;
+}
+
 describe("install skills", () => {
-  test("builtin 源写入完整 skills 树", async () => {
+  test("builtin 源写入入口卡与 references", async () => {
     const target = path.join(tmp, "skills");
     const code = await runInstall(["skills"], {
       sourceText: "builtin",
@@ -57,13 +68,12 @@ describe("install skills", () => {
     });
     expect(code).toBe(0);
     const dirs = fs.readdirSync(target, { withFileTypes: true }).filter((entry) => entry.isDirectory());
-    expect(dirs.length).toBe(10);
+    expect(dirs.length).toBe(1);
     expect(fs.existsSync(path.join(target, "godot-autopilot", "SKILL.md"))).toBe(true);
-    expect(fs.existsSync(path.join(target, "godot-autopilot-tools", "SKILL.md"))).toBe(true);
-    expect(fs.existsSync(path.join(target, "godot-autopilot-setup", "SKILL.md"))).toBe(true);
+    expect(fs.existsSync(path.join(target, "godot-autopilot", "references", "tools.md"))).toBe(true);
   });
 
-  test("zh 内置源与 --offline 写入中文 10 册", async () => {
+  test("zh 内置源与 --offline 写入中文入口与参考", async () => {
     const target = path.join(tmp, "skills-zh");
     const code = await runInstall(["skills"], {
       zh: true,
@@ -73,10 +83,10 @@ describe("install skills", () => {
     });
     expect(code).toBe(0);
     const dirs = fs.readdirSync(target, { withFileTypes: true }).filter((entry) => entry.isDirectory());
-    expect(dirs.length).toBe(10);
-    expect(fs.existsSync(path.join(target, "godot-autopilot-setup", "SKILL.md"))).toBe(true);
-    expect(fs.readFileSync(path.join(target, "godot-autopilot-setup", "SKILL.md"), "utf8")).toContain(
-      "Godot Autopilot 安装与连接",
+    expect(dirs.length).toBe(1);
+    expect(fs.existsSync(path.join(target, "godot-autopilot", "references", "setup.md"))).toBe(true);
+    expect(fs.readFileSync(path.join(target, "godot-autopilot", "references", "setup.md"), "utf8")).toContain(
+      "# 安装与连接",
     );
   });
 
@@ -96,6 +106,7 @@ describe("install skills", () => {
 
   test("未加 --prune 只报告 stale，不删除退役目录", async () => {
     const target = path.join(tmp, "skills");
+    const retired = createRetiredDirs(target);
     const result = await runCaptured(["skills"], {
       sourceText: "builtin",
       pathText: target,
@@ -103,7 +114,7 @@ describe("install skills", () => {
     });
     const payload = JSON.parse(result.stdout) as { stale: string[]; removed: string[] };
     expect(result.code).toBe(0);
-    expect(payload.stale.length).toBe(9);
+    expect(payload.stale).toEqual(retired);
     expect(payload.removed).toEqual([]);
     for (const name of payload.stale) {
       expect(fs.existsSync(path.join(target, name, "SKILL.md"))).toBe(true);
@@ -112,6 +123,7 @@ describe("install skills", () => {
 
   test("--prune 删除退役目录并保留自建目录", async () => {
     const target = path.join(tmp, "skills");
+    const retired = createRetiredDirs(target);
     fs.mkdirSync(path.join(target, "my-notes"), { recursive: true });
     const result = await runCaptured(["skills"], {
       sourceText: "builtin",
@@ -121,7 +133,8 @@ describe("install skills", () => {
     });
     const payload = JSON.parse(result.stdout) as { stale: string[]; removed: string[] };
     expect(result.code).toBe(0);
-    expect(payload.removed.length).toBe(9);
+    expect(payload.stale).toEqual(retired);
+    expect(payload.removed).toEqual(retired);
     expect(fs.existsSync(path.join(target, "my-notes"))).toBe(true);
     expect(fs.existsSync(path.join(target, "godot-autopilot", "SKILL.md"))).toBe(true);
     for (const name of payload.removed) {
@@ -131,7 +144,7 @@ describe("install skills", () => {
     expect(dirs.length).toBe(2);
   });
 
-  test("目标不存在时 --prune 正常创建并报告删除项", async () => {
+  test("目标不存在时 --prune 正常创建且没有 stale", async () => {
     const target = path.join(tmp, "new-skills");
     const result = await runCaptured(["skills"], {
       sourceText: "builtin",
@@ -141,8 +154,8 @@ describe("install skills", () => {
     });
     const payload = JSON.parse(result.stdout) as { stale: string[]; removed: string[] };
     expect(result.code).toBe(0);
-    expect(payload.stale.length).toBe(9);
-    expect(payload.removed.length).toBe(9);
+    expect(payload.stale).toEqual([]);
+    expect(payload.removed).toEqual([]);
     expect(fs.existsSync(path.join(target, "godot-autopilot", "SKILL.md"))).toBe(true);
   });
 

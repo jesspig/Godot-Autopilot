@@ -25,15 +25,6 @@ interface WhitelistEntry {
 
 const BOOKS = [
   "godot-autopilot",
-  "godot-autopilot-content",
-  "godot-autopilot-csharp",
-  "godot-autopilot-resources",
-  "godot-autopilot-runtime",
-  "godot-autopilot-scene-system",
-  "godot-autopilot-scripting",
-  "godot-autopilot-servers",
-  "godot-autopilot-setup",
-  "godot-autopilot-tools",
 ];
 
 const BANNED: Array<{ rule: string; pattern: RegExp; message: string }> = [
@@ -412,16 +403,17 @@ function sampleTree(overrides: Record<string, string>): Tree {
 function runSelfTest(contract: Contract): void {
   const failures: string[] = [];
   const en = sampleTree({
-    "godot-autopilot/SKILL.md": "---\nname: godot-autopilot\ndescription: \"sample\"\n---\n\nbunx 9527 gda serve gda api Allow write REST authorization MCP Config dock\n0.3.1\ngda nope\n```json\n{\"mcp_url\": \"x\", \"wrong_field\": 1}\n```\n",
+    "godot-autopilot/SKILL.md": "---\nname: godot-autopilot\ndescription: \"sample\"\n---\n\n# godot-autopilot\n",
+    "godot-autopilot/references/bad.md": "bunx 9527 gda serve gda api Allow write REST authorization MCP Config dock\n0.3.1\ngda nope\n```json\n{\"mcp_url\": \"x\", \"wrong_field\": 1}\n```\n",
     "godot-autopilot-bad/SKILL.md": "---\nname: bad\ndescription: \"bad\"\n---\n\n# bad\n",
   });
-  delete en["godot-autopilot-setup/SKILL.md"];
+  delete en["godot-autopilot/SKILL.md"];
   const zh = sampleTree({
     "godot-autopilot/OTHER.md": "---\nname: godot-autopilot\ndescription: \"sample\"\n---\n",
   });
   const violations = checkAll(en, zh, contract);
   const rules = new Set(violations.map((violation) => violation.rule));
-  for (const expected of ["unknown-book", "bunx", "port-9527", "gda-serve", "gda-api", "allow-write", "authorization-gate", "config-panel", "rest-api", "version-pin", "version-number", "unknown-command", "unknown-status-field", "unexpected-file", "missing-book"]) {
+  for (const expected of ["unknown-book", "bunx", "port-9527", "gda-serve", "gda-api", "allow-write", "authorization-gate", "config-panel", "rest-api", "version-pin", "version-number", "unknown-command", "unknown-status-field", "unexpected-file", "missing-skill"]) {
     if (!rules.has(expected)) {
       failures.push(`self-test did not detect ${expected}`);
     }
