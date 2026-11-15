@@ -56,6 +56,17 @@ void ToolCatalog::replace_aliases(
   aliases_ = std::move(aliases);
 }
 
+std::vector<std::string> ToolCatalog::alias_names() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  std::vector<std::string> result;
+  result.reserve(aliases_.size());
+  for (const auto &[name, _] : aliases_) {
+    result.push_back(name);
+  }
+  std::sort(result.begin(), result.end());
+  return result;
+}
+
 std::vector<std::string> ToolCatalog::get_categories() const {
   std::lock_guard<std::mutex> lock(mutex_);
   std::vector<std::string> result;

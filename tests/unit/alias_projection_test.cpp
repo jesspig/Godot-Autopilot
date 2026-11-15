@@ -8,6 +8,8 @@
 
 #include "tools/base/tool_spec.hpp"
 #include "tools/domains/audio/audio_tools.hpp"
+#include "tools/domains/capture/capture_tools.hpp"
+#include "tools/domains/scene/scene_tools.hpp"
 #include "tools/domains/debug/debug_tools.hpp"
 #include "tools/domains/doc/doc_tools.hpp"
 #include "tools/domains/gridmap/gridmap_tools.hpp"
@@ -370,6 +372,120 @@ TEST(AliasProjectionTest, ResourceScriptPropertyAliasesProjectLegacyShapes) {
   batch_input["properties"] = std::move(batch_properties);
   const mcp::JsonValue batch_args = apply_alias_args(*batch, batch_input);
   EXPECT_TRUE(batch_args["atomic"].GetBool());
+}
+
+TEST(AliasProjectionTest, SceneAndCaptureAliasesProjectLegacyShapes) {
+  const auto scene_tools = godot_autopilot::scene_tools::make_tools();
+  const ToolAlias *snapshot =
+      find_alias(scene_tools, "get_scene_tree", "get_scene_snapshot");
+  ASSERT_NE(snapshot, nullptr);
+  const mcp::JsonValue snapshot_args =
+      apply_alias_args(*snapshot, object());
+  EXPECT_TRUE(snapshot_args["verify"].GetBool());
+
+  mcp::JsonValue explicit_verify = object();
+  explicit_verify["verify"] = mcp::JsonValue(false);
+  const mcp::JsonValue kept_verify =
+      apply_alias_args(*snapshot, explicit_verify);
+  EXPECT_FALSE(kept_verify["verify"].GetBool());
+
+  const ToolAlias *rect = find_alias(
+      scene_tools, "get_scene_tree", "get_scene_node_screen_rect");
+  ASSERT_NE(rect, nullptr);
+  ASSERT_NE(rect->validate_args, nullptr);
+  const mcp::JsonValue empty_paths = rect->validate_args(object());
+  EXPECT_EQ(error_text(empty_paths),
+            "missing required parameter: paths (array)");
+  mcp::JsonValue bad_paths = object();
+  mcp::JsonValue empty_array(mcp::JsonValue::array_tag);
+  bad_paths["paths"] = std::move(empty_array);
+  EXPECT_EQ(error_text(rect->validate_args(bad_paths)),
+            "parameter 'paths' must contain between 1 and 50 entries");
+
+  mcp::JsonValue rect_input = object();
+  mcp::JsonValue paths(mcp::JsonValue::array_tag);
+  paths.PushBack(mcp::JsonValue("Player"));
+  rect_input["paths"] = std::move(paths);
+  rect_input["viewport"] = mcp::JsonValue("2d");
+  const mcp::JsonValue rect_args = apply_alias_args(*rect, rect_input);
+  EXPECT_TRUE(rect_args["paths"].IsArray());
+  EXPECT_EQ(string_field(rect_args, "viewport"), "2d");
+
+  mcp::JsonValue rect_canonical = object();
+  mcp::JsonValue rect_inner = object();
+  rect_inner["tree"] = object();
+  mcp::JsonValue nodes = object();
+  mcp::JsonValue items(mcp::JsonValue::array_tag);
+  items.PushBack(object());
+  nodes["items"] = std::move(items);
+  nodes["viewport"] = mcp::JsonValue("2d");
+  rect_inner["nodes"] = std::move(nodes);
+  rect_canonical["result"] = std::move(rect_inner);
+  const mcp::JsonValue rect_projected =
+      apply_alias_result(*rect, rect_canonical);
+  const mcp::JsonValue *rect_result = rect_projected.Find("result");
+  ASSERT_NE(rect_result, nullptr);
+  ASSERT_TRUE(rect_result->IsObject());
+  EXPECT_EQ(string_field(*rect_result, "viewport"), "2d");
+  EXPECT_EQ((*rect_result)["items"].Size(), 1u);
+
+  mcp::JsonValue nodes_error_canonical = object();
+  mcp::JsonValue nodes_error_inner = object();
+  nodes_error_inner["nodes_error"] = mcp::JsonValue("lookup failed");
+  nodes_error_canonical["result"] = std::move(nodes_error_inner);
+  EXPECT_EQ(error_text(apply_alias_result(*rect, nodes_error_canonical)),
+            "lookup failed");
+
+  const ToolAlias *verify =
+      find_alias(scene_tools, "get_scene_tree", "verify_scene_saved");
+  ASSERT_NE(verify, nullptr);
+  const mcp::JsonValue verify_args =
+      apply_alias_args(*verify, object());
+  EXPECT_TRUE(verify_args["verify"].GetBool());
+
+  mcp::JsonValue verify_canonical = object();
+  mcp::JsonValue verify_inner = object();
+  mcp::JsonValue verify_summary = object();
+  verify_summary["available"] = mcp::JsonValue(true);
+  verify_summary["match"] = mcp::JsonValue(true);
+  verify_summary["path"] = mcp::JsonValue("res://main.tscn");
+  verify_summary["memory_nodes"] = mcp::JsonValue(static_cast<int64_t>(3));
+  verify_summary["disk_nodes"] = mcp::JsonValue(static_cast<int64_t>(3));
+  verify_summary["memory_hash"] = mcp::JsonValue("00ff");
+  verify_inner["verify"] = std::move(verify_summary);
+  verify_canonical["result"] = std::move(verify_inner);
+  const mcp::JsonValue verify_projected =
+      apply_alias_result(*verify, verify_canonical);
+  EXPECT_EQ(string_field(verify_projected, "result"), "match");
+  EXPECT_EQ(string_field(verify_projected, "memory_hash"), "00ff");
+
+  mcp::JsonValue unavailable_canonical = object();
+  mcp::JsonValue unavailable_inner = object();
+  mcp::JsonValue unavailable = object();
+  unavailable["available"] = mcp::JsonValue(false);
+  unavailable["error"] = mcp::JsonValue("scene file is unavailable");
+  unavailable_inner["verify"] = std::move(unavailable);
+  unavailable_canonical["result"] = std::move(unavailable_inner);
+  EXPECT_EQ(error_text(apply_alias_result(*verify, unavailable_canonical)),
+            "scene file is unavailable");
+
+  const auto capture_tools = godot_autopilot::capture_tools::make_tools();
+  const ToolAlias *capture = find_alias(
+      capture_tools, "capture_editor_viewport", "capture_game_viewport");
+  ASSERT_NE(capture, nullptr);
+  ASSERT_NE(capture->validate_args, nullptr);
+  const mcp::JsonValue capture_args =
+      apply_alias_args(*capture, object());
+  EXPECT_EQ(string_field(capture_args, "target"), "game");
+  mcp::JsonValue bad_nodes = object();
+  mcp::JsonValue bad_nodes_array(mcp::JsonValue::array_tag);
+  bad_nodes["annotate_nodes"] = std::move(bad_nodes_array);
+  EXPECT_EQ(error_text(capture->validate_args(bad_nodes)),
+            "annotate_nodes must be an array of 1-50 strings");
+  mcp::JsonValue unknown = object();
+  unknown["bogus"] = mcp::JsonValue(true);
+  EXPECT_EQ(error_text(capture->validate_args(unknown)),
+            "unknown parameter for capture_game_viewport: bogus");
 }
 
 } // namespace

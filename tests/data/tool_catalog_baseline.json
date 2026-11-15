@@ -4,9 +4,9 @@
     "domains": "src/tools/domains/*/*_tools.hpp",
     "register_all": "src/tools/base/register_all.cpp"
   },
-  "catalog_total": 433,
-  "domain_total": 425,
-  "meta_total": 7,
+  "catalog_total": 427,
+  "domain_total": 421,
+  "meta_total": 5,
   "system_total": 1,
   "domain_count": 33,
   "by_domain": {
@@ -20,8 +20,8 @@
     "Debugger": 6,
     "Display": 25,
     "Docs": 2,
-    "Editor": 33,
-    "Game": 19,
+    "Editor": 32,
+    "Game": 18,
     "GridMap": 4,
     "Group": 3,
     "Input": 15,
@@ -33,7 +33,7 @@
     "Properties": 6,
     "Render": 52,
     "Resources": 32,
-    "Scene": 15,
+    "Scene": 13,
     "SceneTree": 8,
     "Scripts": 10,
     "SpriteFrames": 3,
@@ -55,8 +55,8 @@
     "Debugger": 6,
     "Display": 25,
     "Docs": 2,
-    "Editor": 33,
-    "Game": 23,
+    "Editor": 32,
+    "Game": 22,
     "TileMap": 11,
     "Group": 3,
     "Input": 20,
@@ -67,12 +67,12 @@
     "Properties": 6,
     "Render": 52,
     "Resources": 32,
-    "Scene": 23,
+    "Scene": 21,
     "SpriteFrames": 3,
     "Testing": 2,
     "Text": 10,
     "Theme": 5,
-    "Meta": 4
+    "Meta": 2
   },
   "domain_by_category": {
     "Analysis": 3,
@@ -85,8 +85,8 @@
     "Debugger": 6,
     "Display": 25,
     "Docs": 2,
-    "Editor": 33,
-    "Game": 23,
+    "Editor": 32,
+    "Game": 22,
     "TileMap": 11,
     "Group": 3,
     "Input": 20,
@@ -97,14 +97,14 @@
     "Properties": 6,
     "Render": 52,
     "Resources": 32,
-    "Scene": 23,
+    "Scene": 21,
     "SpriteFrames": 3,
     "Testing": 2,
     "Text": 10,
     "Theme": 5
   },
   "by_side_effect": {
-    "None": 268,
+    "None": 262,
     "WritesScene": 39,
     "Destructive": 6,
     "WritesFile": 22,
@@ -116,7 +116,7 @@
     "GameRuntime": 18
   },
   "domain_by_side_effect": {
-    "None": 262,
+    "None": 258,
     "WritesScene": 39,
     "Destructive": 6,
     "WritesFile": 22,
@@ -128,10 +128,11 @@
     "GameRuntime": 18
   },
   "strict_redundant_count": 32,
-  "alias_count": 26,
+  "alias_count": 32,
   "alias_names": [
     "add_input_map_action",
     "add_input_map_action_event",
+    "capture_game_viewport",
     "get_audio_bus_count",
     "get_audio_bus_name",
     "get_audio_device_inputs",
@@ -143,10 +144,14 @@
     "get_debug_object_count",
     "get_docs_method",
     "get_docs_property",
+    "get_scene_node_screen_rect",
+    "get_scene_snapshot",
     "has_input_map_action",
     "has_resource_dependency",
+    "list_categories",
     "load_script",
     "move_resource_file",
+    "ping",
     "set_control_anchor_preset",
     "set_gridmap_cell",
     "set_input_map_action_deadzone",
@@ -155,10 +160,11 @@
     "set_theme_constant",
     "set_theme_font_size",
     "set_theme_stylebox_flat",
-    "set_tilemap_cell"
+    "set_tilemap_cell",
+    "verify_scene_saved"
   ],
-  "schema_non_empty": 377,
-  "schema_empty": 56,
+  "schema_non_empty": 373,
+  "schema_empty": 54,
   "tool_names": [
     "validate_scene_file",
     "find_unused_resources",
@@ -283,7 +289,6 @@
     "create_editor_scene",
     "open_editor_scene",
     "save_editor_scene_as",
-    "verify_scene_saved",
     "build_csharp_assembly",
     "dotnet_environment",
     "close_editor_scene",
@@ -304,7 +309,6 @@
     "get_game_job",
     "reload_game_scripts",
     "queue_game_input",
-    "capture_game_viewport",
     "wait_game_input",
     "get_game_input_status",
     "sequence_game_inputs",
@@ -527,9 +531,7 @@
     "reparent_node",
     "get_scene_tree",
     "instantiate_scene",
-    "get_scene_node_screen_rect",
     "build_nodes_from_spec",
-    "get_scene_snapshot",
     "spawn_node_bundle",
     "create_path_node",
     "advance_path_follow",
@@ -586,9 +588,7 @@
     "get_game_tween_list",
     "tween_editor_property",
     "system_status",
-    "ping",
     "search_tools",
-    "list_categories",
     "get_tool_detail",
     "call_tool",
     "batch_execute",
@@ -1036,7 +1036,7 @@
       ],
       "param_count": 16,
       "source": "src/tools/domains/capture/capture_tools.hpp",
-      "line": 57
+      "line": 66
     },
     {
       "name": "review_scene_visually",
@@ -1048,7 +1048,7 @@
       ],
       "param_count": 13,
       "source": "src/tools/domains/capture/capture_tools.hpp",
-      "line": 62
+      "line": 75
     },
     {
       "name": "get_project_settings",
@@ -1840,7 +1840,7 @@
       ],
       "param_count": 0,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 173
+      "line": 169
     },
     {
       "name": "set_editor_selection",
@@ -1852,7 +1852,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 178
+      "line": 174
     },
     {
       "name": "get_editor_edited_scene_root",
@@ -1864,7 +1864,7 @@
       ],
       "param_count": 0,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 183
+      "line": 179
     },
     {
       "name": "save_editor_scene",
@@ -1876,7 +1876,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 188
+      "line": 184
     },
     {
       "name": "save_editor_scenes",
@@ -1888,7 +1888,7 @@
       ],
       "param_count": 0,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 193
+      "line": 189
     },
     {
       "name": "reload_editor_scene",
@@ -1900,7 +1900,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 198
+      "line": 194
     },
     {
       "name": "inspect_editor_resource",
@@ -1912,7 +1912,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 203
+      "line": 199
     },
     {
       "name": "create_editor_undo_redo_action",
@@ -1925,7 +1925,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 208
+      "line": 204
     },
     {
       "name": "commit_editor_undo_redo",
@@ -1937,7 +1937,7 @@
       ],
       "param_count": 0,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 213
+      "line": 209
     },
     {
       "name": "add_editor_undo_redo_do",
@@ -1949,7 +1949,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 218
+      "line": 214
     },
     {
       "name": "add_editor_undo_redo_undo",
@@ -1961,7 +1961,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 223
+      "line": 219
     },
     {
       "name": "get_editor_file_system_tree",
@@ -1973,7 +1973,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 228
+      "line": 224
     },
     {
       "name": "scan_editor_file_system",
@@ -1985,7 +1985,7 @@
       ],
       "param_count": 0,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 233
+      "line": 229
     },
     {
       "name": "set_editor_main_scene",
@@ -1997,7 +1997,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 238
+      "line": 234
     },
     {
       "name": "play_editor_current_scene",
@@ -2009,7 +2009,7 @@
       ],
       "param_count": 0,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 243
+      "line": 239
     },
     {
       "name": "stop_editor_playing",
@@ -2021,7 +2021,7 @@
       ],
       "param_count": 0,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 248
+      "line": 244
     },
     {
       "name": "get_editor_file_system_status",
@@ -2033,7 +2033,7 @@
       ],
       "param_count": 0,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 253
+      "line": 249
     },
     {
       "name": "set_editor_plugin_enabled",
@@ -2045,7 +2045,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 258
+      "line": 254
     },
     {
       "name": "create_editor_scene",
@@ -2057,7 +2057,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 263
+      "line": 259
     },
     {
       "name": "open_editor_scene",
@@ -2069,7 +2069,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 268
+      "line": 264
     },
     {
       "name": "save_editor_scene_as",
@@ -2081,19 +2081,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 273
-    },
-    {
-      "name": "verify_scene_saved",
-      "category": "Editor",
-      "domain": "Editor",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 278
+      "line": 269
     },
     {
       "name": "build_csharp_assembly",
@@ -2105,7 +2093,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 283
+      "line": 274
     },
     {
       "name": "dotnet_environment",
@@ -2117,7 +2105,7 @@
       ],
       "param_count": 0,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 288
+      "line": 279
     },
     {
       "name": "close_editor_scene",
@@ -2129,7 +2117,7 @@
       ],
       "param_count": 0,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 293
+      "line": 284
     },
     {
       "name": "get_editor_viewport_geometry",
@@ -2141,7 +2129,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 298
+      "line": 289
     },
     {
       "name": "get_editor_ui_elements",
@@ -2153,7 +2141,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 303
+      "line": 294
     },
     {
       "name": "hit_test_editor_point",
@@ -2165,7 +2153,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 308
+      "line": 299
     },
     {
       "name": "scene_tree_items",
@@ -2177,7 +2165,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 313
+      "line": 304
     },
     {
       "name": "select_scene_tree_node",
@@ -2189,7 +2177,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 318
+      "line": 309
     },
     {
       "name": "click_editor_element",
@@ -2203,7 +2191,7 @@
       ],
       "param_count": 5,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 323
+      "line": 314
     },
     {
       "name": "type_editor_element_text",
@@ -2217,7 +2205,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 329
+      "line": 320
     },
     {
       "name": "run_editor_shortcut",
@@ -2229,7 +2217,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 336
+      "line": 327
     },
     {
       "name": "sample_game_property",
@@ -2241,7 +2229,7 @@
       ],
       "param_count": 6,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 187
+      "line": 173
     },
     {
       "name": "collect_game_evidence",
@@ -2253,7 +2241,7 @@
       ],
       "param_count": 9,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 192
+      "line": 178
     },
     {
       "name": "validate_game_ui_layout",
@@ -2265,7 +2253,7 @@
       ],
       "param_count": 8,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 197
+      "line": 183
     },
     {
       "name": "get_game_status",
@@ -2277,7 +2265,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 202
+      "line": 188
     },
     {
       "name": "execute_game_script",
@@ -2289,7 +2277,7 @@
       ],
       "param_count": 12,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 207
+      "line": 193
     },
     {
       "name": "start_game_job",
@@ -2301,7 +2289,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 212
+      "line": 198
     },
     {
       "name": "get_game_job",
@@ -2313,7 +2301,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 217
+      "line": 203
     },
     {
       "name": "reload_game_scripts",
@@ -2325,7 +2313,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 222
+      "line": 208
     },
     {
       "name": "queue_game_input",
@@ -2337,20 +2325,7 @@
       ],
       "param_count": 16,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 227
-    },
-    {
-      "name": "capture_game_viewport",
-      "category": "Game",
-      "domain": "Game",
-      "side_effect": "None",
-      "flags": [
-        "kNone",
-        "kCaptureImage"
-      ],
-      "param_count": 12,
-      "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 232
+      "line": 213
     },
     {
       "name": "wait_game_input",
@@ -2362,7 +2337,7 @@
       ],
       "param_count": 5,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 237
+      "line": 218
     },
     {
       "name": "get_game_input_status",
@@ -2374,7 +2349,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 242
+      "line": 223
     },
     {
       "name": "sequence_game_inputs",
@@ -2386,7 +2361,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 247
+      "line": 228
     },
     {
       "name": "get_game_ui_elements",
@@ -2398,7 +2373,7 @@
       ],
       "param_count": 6,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 252
+      "line": 233
     },
     {
       "name": "click_game_ui_element",
@@ -2410,7 +2385,7 @@
       ],
       "param_count": 9,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 257
+      "line": 238
     },
     {
       "name": "get_game_locale",
@@ -2422,7 +2397,7 @@
       ],
       "param_count": 0,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 262
+      "line": 243
     },
     {
       "name": "set_game_locale",
@@ -2434,7 +2409,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 267
+      "line": 248
     },
     {
       "name": "get_translation_list",
@@ -2446,7 +2421,7 @@
       ],
       "param_count": 0,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 272
+      "line": 253
     },
     {
       "name": "translate_text",
@@ -2458,7 +2433,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 277
+      "line": 258
     },
     {
       "name": "create_gridmap",
@@ -4984,7 +4959,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 116
+      "line": 257
     },
     {
       "name": "delete_scene_node",
@@ -4998,7 +4973,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 121
+      "line": 262
     },
     {
       "name": "rename_scene_node",
@@ -5012,7 +4987,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 126
+      "line": 267
     },
     {
       "name": "reparent_node",
@@ -5026,7 +5001,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 131
+      "line": 272
     },
     {
       "name": "get_scene_tree",
@@ -5034,11 +5009,11 @@
       "domain": "Scene",
       "side_effect": "None",
       "flags": [
-        "kNone"
+        "kObserve"
       ],
-      "param_count": 2,
+      "param_count": 8,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 136
+      "line": 277
     },
     {
       "name": "instantiate_scene",
@@ -5051,19 +5026,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 141
-    },
-    {
-      "name": "get_scene_node_screen_rect",
-      "category": "Scene",
-      "domain": "Scene",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 146
+      "line": 292
     },
     {
       "name": "build_nodes_from_spec",
@@ -5076,19 +5039,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 151
-    },
-    {
-      "name": "get_scene_snapshot",
-      "category": "Scene",
-      "domain": "Scene",
-      "side_effect": "None",
-      "flags": [
-        "kObserve"
-      ],
-      "param_count": 5,
-      "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 156
+      "line": 297
     },
     {
       "name": "spawn_node_bundle",
@@ -5102,7 +5053,7 @@
       ],
       "param_count": 10,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 161
+      "line": 302
     },
     {
       "name": "create_path_node",
@@ -5115,7 +5066,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 166
+      "line": 307
     },
     {
       "name": "advance_path_follow",
@@ -5128,7 +5079,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 171
+      "line": 312
     },
     {
       "name": "focus_camera_on_node",
@@ -5142,7 +5093,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 176
+      "line": 317
     },
     {
       "name": "set_camera_params",
@@ -5156,7 +5107,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 181
+      "line": 322
     },
     {
       "name": "get_camera_view_rect",
@@ -5168,7 +5119,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 186
+      "line": 327
     },
     {
       "name": "call_scene_tree_group",
@@ -5771,19 +5722,6 @@
   ],
   "meta_tools": [
     {
-      "name": "ping",
-      "category": "Meta",
-      "domain": "Meta",
-      "side_effect": "None",
-      "flags": [
-        "kMeta",
-        "kHealthProbe"
-      ],
-      "param_count": null,
-      "source": "src/tools/base/register_all.cpp",
-      "line": 466
-    },
-    {
       "name": "search_tools",
       "category": "Meta",
       "domain": "Meta",
@@ -5793,19 +5731,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 475
-    },
-    {
-      "name": "list_categories",
-      "category": "Meta",
-      "domain": "Meta",
-      "side_effect": "None",
-      "flags": [
-        "kMeta"
-      ],
-      "param_count": null,
-      "source": "src/tools/base/register_all.cpp",
-      "line": 510
+      "line": 481
     },
     {
       "name": "get_tool_detail",
@@ -5817,7 +5743,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 519
+      "line": 530
     },
     {
       "name": "call_tool",
@@ -5829,7 +5755,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 532
+      "line": 543
     },
     {
       "name": "batch_execute",
@@ -5842,7 +5768,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 554
+      "line": 565
     },
     {
       "name": "code_execute",
@@ -5855,7 +5781,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 617
+      "line": 628
     }
   ],
   "system_tools": [
@@ -5869,7 +5795,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 375
+      "line": 382
     }
   ],
   "side_effect_review": [

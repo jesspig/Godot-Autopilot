@@ -124,12 +124,6 @@ constexpr const char *RUNTIME_DEGRADATION_HINT =
     "viewport (capture_editor_viewport); inspect get_plugin_log for the "
     "plugin-side timeout diagnostics.";
 
-void append_runtime_degradation_hint(JV &result) {
-  if (!result.IsObject() || !result.Contains("error"))
-    return;
-  result["hint"] = JV(RUNTIME_DEGRADATION_HINT);
-}
-
 int64_t steady_game_now_ms() {
   return std::chrono::duration_cast<std::chrono::milliseconds>(
              std::chrono::steady_clock::now().time_since_epoch())
@@ -200,6 +194,12 @@ bool is_valid_game_locale(const std::string &locale) {
 }
 
 } // namespace
+
+void append_runtime_degradation_hint(mcp::JsonValue &result) {
+  if (!result.IsObject() || !result.Contains("error"))
+    return;
+  result["hint"] = mcp::JsonValue(RUNTIME_DEGRADATION_HINT);
+}
 
 mcp::JsonValue handle_game_status(const mcp::JsonValue &args) {
   if (!args.IsObject())

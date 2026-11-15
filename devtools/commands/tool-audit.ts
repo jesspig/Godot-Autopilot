@@ -297,6 +297,8 @@ const META_TOOLS_WITH_PARAMS = new Set([
   "code_execute",
 ]);
 
+const PREVIOUS_META_TOOLS = new Set(["ping", "list_categories"]);
+
 const PRUNE_ROWS: PruneRow[] = [
   {
     old_tool: "get_audio_device_inputs",
@@ -967,8 +969,8 @@ function buildAudit() {
   if (duplicateNames.length > 0) {
     throw new Error(`duplicate tool names: ${[...new Set(duplicateNames)].join(", ")}`);
   }
-  if (meta.length !== 7) {
-    throw new Error(`expected 7 meta tools, found ${meta.length}`);
+  if (meta.length !== 5) {
+    throw new Error(`expected 5 meta tools, found ${meta.length}`);
   }
   if (system.length !== 1) {
     throw new Error(`expected 1 system tool, found ${system.length}`);
@@ -994,7 +996,10 @@ function buildAudit() {
   const known = new Set(names);
   const previousMatrixTools = loadPreviousMatrixTools();
   const missingPrune = PRUNE_ROWS.filter(
-    (row) => !known.has(row.old_tool) && !previousMatrixTools.has(row.old_tool),
+    (row) =>
+      !known.has(row.old_tool) &&
+      !previousMatrixTools.has(row.old_tool) &&
+      !PREVIOUS_META_TOOLS.has(row.old_tool),
   );
   if (missingPrune.length > 0) {
     throw new Error(`prune rows reference unknown tools: ${missingPrune.map((row) => row.old_tool).join(", ")}`);

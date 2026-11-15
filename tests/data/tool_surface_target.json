@@ -1,19 +1,19 @@
 {
   "schema": 1,
   "source": "src/tools/domains/*/*_tools.hpp",
-  "catalog_current": 433,
+  "catalog_current": 427,
   "catalog_target": 270,
   "catalog_expected": 269,
   "catalog_target_range": [
     250,
     300
   ],
-  "domain_current_total": 425,
+  "domain_current_total": 421,
   "domain_target_total": 257,
   "planned_domain_target_total": 258,
   "net_new_total": 6,
   "strict_prune_count": 32,
-  "meta_current": 7,
+  "meta_current": 5,
   "meta_target": 5,
   "system_current": 1,
   "system_target": 1,
@@ -145,7 +145,7 @@
     },
     {
       "name": "Editor",
-      "current": 33,
+      "current": 32,
       "target": 24,
       "plan_target": 24,
       "merge_groups": [
@@ -168,7 +168,7 @@
     },
     {
       "name": "Game",
-      "current": 19,
+      "current": 18,
       "target": 13,
       "plan_target": 13,
       "merge_groups": [
@@ -333,7 +333,7 @@
     },
     {
       "name": "Scene",
-      "current": 15,
+      "current": 13,
       "target": 9,
       "plan_target": 9,
       "merge_groups": [
