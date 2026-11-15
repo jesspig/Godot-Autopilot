@@ -55,6 +55,7 @@ export interface GlobalOptions {
   engine?: string;
   classFilter?: string;
   full?: boolean;
+  prune?: boolean;
 }
 
 const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
@@ -114,6 +115,7 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--check": "check",
   "--confirm": "confirm",
   "--full": "full",
+  "--prune": "prune",
 };
 
 export function parseArgv(argv: string[]): { opts: GlobalOptions; positionals: string[] } {
@@ -227,7 +229,7 @@ Commands:
   trace slow          List calls slower than --slow <ms> (default 1000)
   trace failures      List failed tool calls
   trace export        Export traces as jsonl or otlp (--format)
-  install skills      Install skill books to ~/.agents/skills
+  install skills      Install skill books to ~/.agents/skills (--prune removes retired books)
   install plugin      Install the Godot addon into a project
   update <target>     Update cli, skills, plugin, or all (--check for status)
 
@@ -279,6 +281,7 @@ Global options:
   --class <name>      docs search: restrict results to one class
   --engine <x.y>      docs clear: remove one cache bucket (stable uses x.y)
   --full              docs class: include every section
+  --prune             install skills: remove retired skill directories
   --help              Show this help
   --version           Show the version
 
