@@ -154,6 +154,7 @@ export function plainText(value: string): string {
   return value
     .replace(/\[\/?(?:code|codeblock|i|b|u|br)\]/g, " ")
     .replace(/\[(?:param|method|member|signal|constant|enum|theme_item)\s+([^\]]+)\]/g, "$1")
+    .replace(/\[([A-Za-z_@][A-Za-z0-9_@.]*)\]/g, "$1")
     .replace(/\[[^\]]*\]/g, "")
     .replace(/\s+/g, " ")
     .trim();
