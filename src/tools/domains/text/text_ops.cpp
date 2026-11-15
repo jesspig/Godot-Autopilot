@@ -307,6 +307,69 @@ JV handle_shaped_text_get_size(const JV &args) {
   return r;
 }
 
+JV handle_font(const JV &args) {
+  auto *ap = args.Find("action");
+  if (!ap || !ap->IsString()) {
+    return util::error_json("missing required parameter: action");
+  }
+  const std::string action = ap->GetString();
+  if (action == "create") {
+    return handle_create_font(args);
+  }
+  if (action == "set_data") {
+    return handle_font_set_data(args);
+  }
+  if (action == "set_antialiasing") {
+    return handle_font_set_antialiasing(args);
+  }
+  if (action == "set_hinting") {
+    return handle_font_set_hinting(args);
+  }
+  if (action == "system_path") {
+    return handle_get_system_font_path(args);
+  }
+  return util::error_json(
+      "unknown action '" + action +
+      "': expected create, set_data, set_antialiasing, set_hinting or "
+      "system_path");
+}
+
+JV handle_shaped_text(const JV &args) {
+  auto *ap = args.Find("action");
+  if (!ap || !ap->IsString()) {
+    return util::error_json("missing required parameter: action");
+  }
+  const std::string action = ap->GetString();
+  if (action == "create") {
+    return handle_create_shaped_text(args);
+  }
+  if (action == "add_string") {
+    return handle_shaped_text_add_string(args);
+  }
+  if (action == "get_size") {
+    return handle_shaped_text_get_size(args);
+  }
+  return util::error_json("unknown action '" + action +
+                          "': expected create, add_string or get_size");
+}
+
+JV handle_text_query(const JV &args) {
+  auto *ap = args.Find("action");
+  if (!ap || !ap->IsString()) {
+    return util::error_json("missing required parameter: action");
+  }
+  const std::string action = ap->GetString();
+  if (action == "has_feature") {
+    return handle_has_feature(args);
+  }
+  if (action == "locale_right_to_left") {
+    return handle_is_locale_right_to_left(args);
+  }
+  return util::error_json(
+      "unknown action '" + action +
+      "': expected has_feature or locale_right_to_left");
+}
+
 namespace {
 
 std::string lowercase_extension_of(const std::string &path) {

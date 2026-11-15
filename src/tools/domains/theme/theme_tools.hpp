@@ -14,45 +14,42 @@ namespace theme_tools {
 
 namespace {
 
-const std::vector<ParamSpec> kCreateThemeResourceParams = {
-    {"path", "string", "Destination .tres path inside res:// (res:// only, user:// rejected), e.g. 'res://themes/main.tres'; missing directories are created and an existing file is never overwritten", true},
-    {"base_type", "string", "Base type stored as resource metadata for reference, e.g. 'Control'; Godot themes carry no global base type", false},
-};
-
 const std::vector<ParamSpec> kGetThemeInfoParams = {
     {"path", "string", "Path of a saved .tres theme file to inspect", true},
 };
 
-const std::vector<ParamSpec> kApplyThemeToControlParams = {
-    {"theme_path", "string", "Path of the .tres theme file to assign", true},
-    {"control_path", "string", "Path of the Control node in the edited scene receiving the theme; only the in-memory scene changes — call save_editor_scene afterwards to persist", true},
+const std::vector<ParamSpec> kUpdateThemeParams = {
+    {"path", "string", "Destination or existing .tres theme path inside res:// (res:// only, user:// rejected), e.g. 'res://themes/main.tres'", true},
+    {"base_type", "string", "Only with action=create: base type stored as resource metadata for reference, e.g. 'Control'; Godot themes carry no global base type", false},
+    {"colors", "object", "Only with action=bundle: color items as object mapping theme_type to {varname: color} objects, e.g. {'Button': {'font_color': '#ff0000'}}; each color accepts a hex string like '#rrggbb' or '#rrggbbaa' or an object {r,g,b,a} with floats in 0..1", false},
+    {"constants", "object", "Only with action=bundle: constant items as object mapping theme_type to {varname: integer} objects, e.g. {'Button': {'separation': 4}}", false},
+    {"font_sizes", "object", "Only with action=bundle: font size items as object mapping theme_type to {varname: integer} objects, e.g. {'Label': {'font_size': 16}}", false},
+    {"styleboxes", "object", "Only with action=bundle: stylebox items as object mapping theme_type to {varname: stylebox} objects, e.g. {'Button': {'normal': {'bg_color': '#202020'}}}; each stylebox holds optional bg_color and border_color (hex string or {r,g,b,a}), border_width {left,top,right,bottom}, corner_radius {top_left,top_right,bottom_right,bottom_left} and content_margin {left,top,right,bottom} — every field is optional, and border_width/content_margin also accept a single number applied to all sides", false},
 };
 
-const std::vector<ParamSpec> kSetControlLayoutParams = {
-    {"path", "string", "Path of the Control node in the edited scene; only the in-memory scene changes — call save_editor_scene to persist", true},
-    {"preset", "integer", "Control LayoutPreset integer 0..15, same numbering as set_control_anchor_preset: top_left=0, top_right=1, bottom_left=2, bottom_right=3, center_left=4, center_top=5, center_right=6, center_bottom=7, center=8, left_wide=9, top_wide=10, right_wide=11, bottom_wide=12, vcenter_wide=13, hcenter_wide=14, full_rect=15; mutually exclusive with anchors", false},
-    {"keep_offsets", "boolean", "Keep current offsets when applying preset (boolean, default false); only used with preset", false},
-    {"anchors", "object", "Anchor overrides as object with optional left, top, right, bottom floats; mutually exclusive with preset; partial objects apply only the given sides", false},
-    {"offsets", "object", "Offset overrides as object with optional left, top, right, bottom numbers in pixels; applied after preset and anchors; partial objects apply only the given sides", false},
-    {"size_flags_h", "integer", "Horizontal size flags integer to assign", false},
-    {"size_flags_v", "integer", "Vertical size flags integer to assign", false},
-    {"grow_h", "integer", "Horizontal grow direction integer to assign", false},
-    {"grow_v", "integer", "Vertical grow direction integer to assign", false},
-    {"min_size", "object", "Custom minimum size as object with optional x, y numbers; partial objects keep the other axis", false},
+const std::vector<ParamSpec> kUpdateControlLayoutParams = {
+    {"theme_path", "string", "Only with action=apply: path of the .tres theme file to assign", false},
+    {"control_path", "string", "Only with action=apply: path of the Control node in the edited scene receiving the theme; only the in-memory scene changes — call save_editor_scene afterwards to persist", false},
+    {"path", "string", "Only with action=layout: path of the Control node in the edited scene; only the in-memory scene changes — call save_editor_scene to persist", false},
+    {"preset", "integer", "Only with action=layout: Control LayoutPreset integer 0..15, same numbering as set_control_anchor_preset: top_left=0, top_right=1, bottom_left=2, bottom_right=3, center_left=4, center_top=5, center_right=6, center_bottom=7, center=8, left_wide=9, top_wide=10, right_wide=11, bottom_wide=12, vcenter_wide=13, hcenter_wide=14, full_rect=15; mutually exclusive with anchors", false},
+    {"keep_offsets", "boolean", "Only with action=layout: keep current offsets when applying preset (boolean, default false); only used with preset", false},
+    {"anchors", "object", "Only with action=layout: anchor overrides as object with optional left, top, right, bottom floats; mutually exclusive with preset; partial objects apply only the given sides", false},
+    {"offsets", "object", "Only with action=layout: offset overrides as object with optional left, top, right, bottom numbers in pixels; applied after preset and anchors; partial objects apply only the given sides", false},
+    {"size_flags_h", "integer", "Only with action=layout: horizontal size flags integer to assign", false},
+    {"size_flags_v", "integer", "Only with action=layout: vertical size flags integer to assign", false},
+    {"grow_h", "integer", "Only with action=layout: horizontal grow direction integer to assign", false},
+    {"grow_v", "integer", "Only with action=layout: vertical grow direction integer to assign", false},
+    {"min_size", "object", "Only with action=layout: custom minimum size as object with optional x, y numbers; partial objects keep the other axis", false},
 };
 
-const std::vector<ParamSpec> kSetThemeItemBundleParams = {
-    {"path", "string", "Path of a saved .tres theme file created with create_theme_resource, e.g. 'res://themes/main.tres'", true},
-    {"colors", "object", "Color items as object mapping theme_type to {varname: color} objects, e.g. {'Button': {'font_color': '#ff0000'}}; each color accepts a hex string like '#rrggbb' or '#rrggbbaa' or an object {r,g,b,a} with floats in 0..1", false},
-    {"constants", "object", "Constant items as object mapping theme_type to {varname: integer} objects, e.g. {'Button': {'separation': 4}}", false},
-    {"font_sizes", "object", "Font size items as object mapping theme_type to {varname: integer} objects, e.g. {'Label': {'font_size': 16}}", false},
-    {"styleboxes", "object", "Stylebox items as object mapping theme_type to {varname: stylebox} objects, e.g. {'Button': {'normal': {'bg_color': '#202020'}}}; each stylebox holds optional bg_color and border_color (hex string or {r,g,b,a}), border_width {left,top,right,bottom}, corner_radius {top_left,top_right,bottom_right,bottom_left} and content_margin {left,top,right,bottom} — every field is optional, and border_width/content_margin also accept a single number applied to all sides", false},
-};
+const std::vector<std::string> kUpdateThemeActions = {"create", "bundle"};
+const std::vector<std::string> kUpdateControlLayoutActions = {"apply", "layout"};
 
 inline mcp::JsonValue theme_item_bundle_args(const mcp::JsonValue &args,
                                              const char *kind,
                                              const char *value_field) {
   mcp::JsonValue out(mcp::JsonValue::object_tag);
+  out["action"] = mcp::JsonValue("bundle");
   const mcp::JsonValue *path = args.Find("path");
   if (path != nullptr) {
     out["path"] = *path;
@@ -132,8 +129,66 @@ inline mcp::JsonValue project_theme_item_result(
   return out;
 }
 
+inline mcp::JsonValue create_theme_args(const mcp::JsonValue &args) {
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  out["action"] = mcp::JsonValue("create");
+  const mcp::JsonValue *path = args.Find("path");
+  if (path != nullptr) {
+    out["path"] = *path;
+  }
+  const mcp::JsonValue *base_type = args.Find("base_type");
+  if (base_type != nullptr) {
+    out["base_type"] = *base_type;
+  }
+  return out;
+}
+
+inline mcp::JsonValue theme_bundle_args(const mcp::JsonValue &args) {
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  out["action"] = mcp::JsonValue("bundle");
+  const char *keys[] = {"path", "colors", "constants", "font_sizes",
+                        "styleboxes"};
+  for (const char *key : keys) {
+    const mcp::JsonValue *value = args.Find(key);
+    if (value != nullptr) {
+      out[key] = *value;
+    }
+  }
+  return out;
+}
+
+inline mcp::JsonValue apply_theme_args(const mcp::JsonValue &args) {
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  out["action"] = mcp::JsonValue("apply");
+  const char *keys[] = {"theme_path", "control_path"};
+  for (const char *key : keys) {
+    const mcp::JsonValue *value = args.Find(key);
+    if (value != nullptr) {
+      out[key] = *value;
+    }
+  }
+  return out;
+}
+
+inline mcp::JsonValue layout_args(const mcp::JsonValue &args) {
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  out["action"] = mcp::JsonValue("layout");
+  const char *keys[] = {"path",     "preset",      "keep_offsets",
+                        "anchors",  "offsets",     "size_flags_h",
+                        "size_flags_v", "grow_h",   "grow_v",
+                        "min_size"};
+  for (const char *key : keys) {
+    const mcp::JsonValue *value = args.Find(key);
+    if (value != nullptr) {
+      out[key] = *value;
+    }
+  }
+  return out;
+}
+
 inline mcp::JsonValue control_anchor_args(const mcp::JsonValue &args) {
   mcp::JsonValue out(mcp::JsonValue::object_tag);
+  out["action"] = mcp::JsonValue("layout");
   const mcp::JsonValue *control_path = args.Find("control_path");
   if (control_path != nullptr) {
     out["path"] = *control_path;
@@ -200,41 +255,33 @@ inline mcp::JsonValue project_control_anchor_result(
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(5);
-  v.push_back(make_spec_tool(ToolSpec{
-      "create_theme_resource",
-      "Create an empty Theme resource on disk at path (a res:// .tres path — res:// only; user:// rejected). Missing directories are created and the editor file system is refreshed after saving; an existing file is never overwritten. Optional base_type (e.g. Control) is stored as resource metadata for reference — Godot themes carry no global base type, so actual items are added with set_theme_color, set_theme_constant, set_theme_font_size and set_theme_stylebox_flat. Returns ok with the saved path.",
-      "Theme", {"theme", "create"}, SideEffect::WritesFile, tool_flags::kMutating,
-      kCreateThemeResourceParams, theme_ops::handle_create_theme_resource}));
+  v.reserve(3);
   v.push_back(make_spec_tool(ToolSpec{
       "get_theme_info",
-      "Inspect a saved .tres theme: lists every theme type it defines and the item names registered under each type, grouped into colors, constants, font_sizes and styleboxes. Use it before the set_theme_* tools to discover valid theme_type/varname pairs. Requires path. Returns path, type_count and the types array.",
+      "Inspect a saved .tres theme: lists every theme type it defines and the item names registered under each type, grouped into colors, constants, font_sizes and styleboxes. Use it before update_theme action=bundle to discover valid theme_type/varname pairs. Requires path. Returns path, type_count and the types array.",
       "Theme", {"theme", "inspect"}, SideEffect::None, tool_flags::kNone,
       kGetThemeInfoParams, theme_ops::handle_get_theme_info}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "apply_theme_to_control",
-      "Assign a .tres theme file to a Control node in the edited scene. Requires theme_path (the .tres to load) and control_path (node path inside the current scene). Only the in-memory scene changes — call save_editor_scene afterwards to persist the assignment. Returns ok with control_path and theme_path.",
-      "Theme", {"theme", "apply", "control"}, SideEffect::WritesScene, tool_flags::kNone | tool_flags::kSceneTarget,
-      kApplyThemeToControlParams, theme_ops::handle_apply_theme_to_control}));
   v.push_back(make_spec_tool(with_aliases(ToolSpec{
-      "set_control_layout",
-      "Set combined Control layout in the edited scene in one undo step. Optional preset applies a LayoutPreset first, then anchors, offsets, size flags, grow directions and custom minimum size are applied in fixed order. preset and anchors are mutually exclusive. Only the in-memory scene changes — call save_editor_scene to persist. Returns ok with the final anchors, offsets, size flags, grow and minimum size.",
-      "Theme", {"control", "layout"}, SideEffect::WritesScene, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
-      kSetControlLayoutParams, theme_ops::handle_set_control_layout},
+      "update_theme",
+      "Create or update a Theme resource on disk (WritesFile, no confirmation). action selects the operation: 'create' writes a new empty Theme at path (res:// .tres only; user:// rejected; missing directories are created and an existing file is never overwritten) and optionally stores base_type as resource metadata; 'bundle' loads the theme at path, applies every requested item from colors, constants, font_sizes and styleboxes (mapping theme_type to {varname: value}), then saves back once with a reload verification. Colors accept hex strings like \"#rrggbb\" or \"#rrggbbaa\" or objects {r,g,b,a} with floats in 0..1; constants and font_sizes take integers; styleboxes take StyleBoxFlat definitions with the same fields as the former set_theme_stylebox_flat. Use get_theme_info to discover valid type and name pairs. Example: {\"action\": \"create\", \"path\": \"res://themes/main.tres\"} or {\"action\": \"bundle\", \"path\": \"res://themes/main.tres\", \"colors\": {\"Button\": {\"font_color\": \"#ff0000\"}}}.",
+      "Theme", {"theme", "create", "bundle", "color", "constant", "font_size", "stylebox"},
+      SideEffect::WritesFile, tool_flags::kMutating,
+      kUpdateThemeParams, theme_ops::handle_update_theme,
+      schema::build_action_schema(
+          kUpdateThemeActions, kUpdateThemeParams,
+          "create: write a new empty theme resource at path; bundle: apply colors, constants, font_sizes and styleboxes to an existing theme and save once"),
+      {},
+      {"update_theme action=create path=res://themes/main.tres",
+       "update_theme action=bundle path=res://themes/main.tres colors={\"Button\":{\"font_color\":\"#ff0000\"}}"}},
       {
           ToolAlias{
-              "set_control_anchor_preset", "set_control_layout",
-              control_anchor_args, {}, "0.4.0", "0.6.0",
-              validate_control_anchor_args, project_control_anchor_result},
-      })));
-  v.push_back(make_spec_tool(with_aliases(ToolSpec{
-      "set_theme_item_bundle",
-      "Set many theme items on a saved .tres theme in one save. Requires path plus at least one of colors, constants, font_sizes or styleboxes, each mapping theme_type to {varname: value} objects. Colors accept hex strings like \"#rrggbb\" or \"#rrggbbaa\" or objects {r,g,b,a} with floats in 0..1; constants and font_sizes take integers; styleboxes take StyleBoxFlat definitions with the same fields as the former set_theme_stylebox_flat. The theme is loaded, all items are modified in memory and saved back to disk once with a reload verification. Use get_theme_info to discover valid type and name pairs. Returns ok with per-kind applied counts plus saved and verified.",
-      "Theme", {"theme", "bundle"}, SideEffect::WritesFile, tool_flags::kMutating,
-      kSetThemeItemBundleParams, theme_ops::handle_set_theme_item_bundle},
-      {
+              "create_theme_resource", "update_theme",
+              create_theme_args, {}, "0.4.0", "0.6.0"},
           ToolAlias{
-              "set_theme_color", "set_theme_item_bundle",
+              "set_theme_item_bundle", "update_theme",
+              theme_bundle_args, {}, "0.4.0", "0.6.0"},
+          ToolAlias{
+              "set_theme_color", "update_theme",
               [](const mcp::JsonValue &args) {
                 return theme_item_bundle_args(args, "colors", "color");
               },
@@ -246,7 +293,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
               },
               project_theme_item_result},
           ToolAlias{
-              "set_theme_constant", "set_theme_item_bundle",
+              "set_theme_constant", "update_theme",
               [](const mcp::JsonValue &args) {
                 return theme_item_bundle_args(args, "constants", "constant");
               },
@@ -258,7 +305,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
               },
               project_theme_item_result},
           ToolAlias{
-              "set_theme_font_size", "set_theme_item_bundle",
+              "set_theme_font_size", "update_theme",
               [](const mcp::JsonValue &args) {
                 return theme_item_bundle_args(args, "font_sizes", "font_size");
               },
@@ -270,7 +317,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
               },
               project_theme_item_result},
           ToolAlias{
-              "set_theme_stylebox_flat", "set_theme_item_bundle",
+              "set_theme_stylebox_flat", "update_theme",
               [](const mcp::JsonValue &args) {
                 return theme_item_bundle_args(args, "styleboxes", "stylebox");
               },
@@ -283,6 +330,30 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
                     "corner_radius, content_margin)");
               },
               project_theme_item_result},
+      })));
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
+      "update_control_layout",
+      "Change a Control node in the edited scene in one undo step (WritesScene, no confirmation). action selects the operation: 'apply' requires theme_path and control_path and assigns that .tres theme to the Control — only the in-memory scene changes, call save_editor_scene afterwards; 'layout' requires path (the Control node) and applies an optional preset (LayoutPreset integer 0..15) first, then anchors, offsets, size flags, grow directions and custom minimum size in fixed order — preset and anchors are mutually exclusive, and only the in-memory scene changes, call save_editor_scene to persist. Example: {\"action\": \"apply\", \"theme_path\": \"res://themes/main.tres\", \"control_path\": \"UI/Panel\"} or {\"action\": \"layout\", \"path\": \"UI/Panel\", \"preset\": 8}.",
+      "Theme", {"control", "layout", "anchor", "theme", "apply"},
+      SideEffect::WritesScene, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
+      kUpdateControlLayoutParams, theme_ops::handle_update_control_layout,
+      schema::build_action_schema(
+          kUpdateControlLayoutActions, kUpdateControlLayoutParams,
+          "apply: assign a .tres theme to a Control node; layout: apply preset, anchors, offsets, size flags, grow and minimum size to a Control node"),
+      {},
+      {"update_control_layout action=apply theme_path=res://themes/main.tres control_path=UI/Panel",
+       "update_control_layout action=layout path=UI/Panel preset=8"}},
+      {
+          ToolAlias{
+              "apply_theme_to_control", "update_control_layout",
+              apply_theme_args, {}, "0.4.0", "0.6.0"},
+          ToolAlias{
+              "set_control_layout", "update_control_layout",
+              layout_args, {}, "0.4.0", "0.6.0"},
+          ToolAlias{
+              "set_control_anchor_preset", "update_control_layout",
+              control_anchor_args, {}, "0.4.0", "0.6.0",
+              validate_control_anchor_args, project_control_anchor_result},
       })));
   return v;
 }

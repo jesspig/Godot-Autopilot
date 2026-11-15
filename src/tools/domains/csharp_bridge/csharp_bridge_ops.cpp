@@ -1164,5 +1164,43 @@ mcp::JsonValue handle_csharp_list(const mcp::JsonValue &args) {
   return lr;
 }
 
+mcp::JsonValue handle_csharp_member(const mcp::JsonValue &args) {
+  auto *ap = args.Find("action");
+  if (!ap || !ap->IsString()) {
+    return util::error_json("missing required parameter: action");
+  }
+  const std::string action = ap->GetString();
+  if (action == "get") {
+    return handle_csharp_get(args);
+  }
+  if (action == "set") {
+    return handle_csharp_set(args);
+  }
+  if (action == "call") {
+    return handle_csharp_call(args);
+  }
+  if (action == "list") {
+    return handle_csharp_list(args);
+  }
+  return util::error_json("unknown action '" + action +
+                          "': expected get, set, call or list");
+}
+
+mcp::JsonValue handle_csharp_event(const mcp::JsonValue &args) {
+  auto *ap = args.Find("action");
+  if (!ap || !ap->IsString()) {
+    return util::error_json("missing required parameter: action");
+  }
+  const std::string action = ap->GetString();
+  if (action == "subscribe") {
+    return handle_csharp_subscribe(args);
+  }
+  if (action == "unsubscribe") {
+    return handle_csharp_unsubscribe(args);
+  }
+  return util::error_json("unknown action '" + action +
+                          "': expected subscribe or unsubscribe");
+}
+
 } // namespace csharp_bridge_ops
 } // namespace godot_autopilot
