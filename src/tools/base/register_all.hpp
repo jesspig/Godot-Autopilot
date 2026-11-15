@@ -23,6 +23,9 @@ void register_all_tools(mcp::McpServer &server, CommandQueue &queue,
 
 bool tool_result_is_error(const mcp::JsonValue &result);
 
+mcp::JsonValue tool_detail_for(const std::string &name, ToolCatalog &catalog,
+                               const std::shared_ptr<ToolRegistry> &registry);
+
 void refresh_derived(const std::shared_ptr<ToolRegistry>& registry,
                      ToolCatalog& catalog, Bm25Index& index);
 

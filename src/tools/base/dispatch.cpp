@@ -20,6 +20,7 @@
 #include <exception>
 #include <future>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -113,18 +114,48 @@ std::string received_keys_suffix(const mcp::JsonValue &args) {
   return text;
 }
 
+bool has_deferred_marker(const mcp::JsonValue &result) {
+  if (!result.IsObject()) {
+    return false;
+  }
+  return result.Find("__gda_pending") != nullptr ||
+         result.Find("__gda_wait") != nullptr ||
+         result.Find("__gda_job") != nullptr;
+}
+
+void log_alias_hit(const ToolAlias &alias) {
+  LogSystem::instance().log(
+      LogLevel::Warning, LogCategory::Tools,
+      "tool alias '" + alias.name + "' resolved to '" + alias.canonical + "'");
+}
+
+std::optional<ToolAlias> resolve_tool_alias(const std::string &name) {
+  auto registry = get_active_registry();
+  if (!registry) {
+    return std::nullopt;
+  }
+  return registry->resolve_alias(name);
+}
+
 mcp::JsonValue call_handler_impl(const std::string &name,
                                  const mcp::JsonValue &args) {
   mcp::JsonValue result(mcp::JsonValue::object_tag);
+  std::optional<ToolAlias> alias;
+  if (auto registry = get_active_registry()) {
+    alias = registry->resolve_alias(name);
+  }
+  const std::string lookup_name = alias ? alias->canonical : name;
+  const mcp::JsonValue call_args =
+      alias ? apply_alias_args(*alias, args) : args;
   HandlerFn handler;
   {
     monitor::LockProbe probe("dispatch_handlers_lock", 5.0);
     std::lock_guard<std::mutex> lock(g_handlers_mutex);
-    auto it = g_handlers.find(name);
+    auto it = g_handlers.find(lookup_name);
     if (it != g_handlers.end()) {
       handler = it->second;
     } else {
-      auto meta_it = g_meta_handlers.find(name);
+      auto meta_it = g_meta_handlers.find(lookup_name);
       if (meta_it != g_meta_handlers.end()) {
         handler = meta_it->second;
       }
@@ -132,25 +163,33 @@ mcp::JsonValue call_handler_impl(const std::string &name,
   }
   if (handler) {
     try {
-      result = handler(args);
+      result = handler(call_args);
     } catch (const std::exception &ex) {
       result = mcp::JsonValue(mcp::JsonValue::object_tag);
       result["error"] =
-          mcp::JsonValue(dispatch_exception_message(name, ex.what(), args));
-      record_dispatch_exception(name, args, result);
+          mcp::JsonValue(dispatch_exception_message(name, ex.what(), call_args));
+      record_dispatch_exception(name, call_args, result);
     } catch (...) {
       result = mcp::JsonValue(mcp::JsonValue::object_tag);
       result["error"] = mcp::JsonValue(
-          dispatch_exception_message(name, "unexpected C++ exception", args));
-      record_dispatch_exception(name, args, result);
+          dispatch_exception_message(name, "unexpected C++ exception", call_args));
+      record_dispatch_exception(name, call_args, result);
     }
   } else {
     result = mcp::JsonValue(mcp::JsonValue::object_tag);
     result["error"] =
-        mcp::JsonValue("domain tool '" + name +
+        mcp::JsonValue("domain tool '" + lookup_name +
                        "' not found" + received_keys_suffix(args) +
                        " — use search_tools to discover available "
                        "tools");
+  }
+  if (alias) {
+    log_alias_hit(*alias);
+    if (has_deferred_marker(result)) {
+      result = annotate_alias_result(*alias, std::move(result));
+    } else {
+      result = apply_alias_result(*alias, std::move(result));
+    }
   }
   const bool has_error = !spec_detail::verdict_of(result).ok;
   LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
@@ -599,6 +638,9 @@ mcp::JsonValue resolve_deferred_wait(const std::string &name,
   if (has_deferred_trace) {
     spec_detail::finish_deferred_trace(deferred_trace_key, result);
   }
+  if (auto alias = resolve_tool_alias(name)) {
+    result = apply_alias_result(*alias, std::move(result));
+  }
   return result;
 }
 
@@ -617,6 +659,10 @@ mcp::JsonValue call_handler(const std::string &name,
   if (auto registry = get_active_registry()) {
     if (auto tool = registry->find_any(name)) {
       flags = tool->tool_flags();
+    } else if (auto alias = registry->resolve_alias(name)) {
+      if (auto tool = registry->find_any(alias->canonical)) {
+        flags = tool->tool_flags();
+      }
     }
   }
   const auto submit_time = std::chrono::steady_clock::now();

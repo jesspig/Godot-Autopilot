@@ -51,5 +51,27 @@ mcp::JsonValue build_schema(std::initializer_list<ParamDef> params) {
   return build_schema(std::vector<ParamDef>(params));
 }
 
+mcp::JsonValue build_action_schema(const std::vector<std::string> &actions,
+                                   const std::vector<ParamDef> &params,
+                                   const std::string &description) {
+  mcp::JsonValue schema = build_schema(params);
+  mcp::JsonValue action(mcp::JsonValue::object_tag);
+  action["type"] = mcp::JsonValue("string");
+  if (!description.empty()) {
+    action["description"] = mcp::JsonValue(description);
+  }
+  mcp::JsonValue values(mcp::JsonValue::array_tag);
+  for (const auto &value : actions) {
+    values.PushBack(mcp::JsonValue(value));
+  }
+  action["enum"] = std::move(values);
+  auto *properties = schema.Find("properties");
+  if (properties != nullptr && properties->IsObject()) {
+    (*properties)["action"] = std::move(action);
+  }
+  add_required_flag(schema, "action");
+  return schema;
+}
+
 } // namespace schema
 } // namespace godot_autopilot

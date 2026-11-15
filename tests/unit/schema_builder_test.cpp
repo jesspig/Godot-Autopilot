@@ -5,6 +5,7 @@
 #include <string>
 
 using godot_autopilot::schema::add_required_flag;
+using godot_autopilot::schema::build_action_schema;
 using godot_autopilot::schema::build_schema;
 using godot_autopilot::schema::ParamDef;
 
@@ -77,6 +78,23 @@ TEST(SchemaBuilderTest, BuildSchemaJsonTypeOmitsTypeField) {
   EXPECT_EQ(payload.At("description").GetString(), "any JSON value");
   EXPECT_EQ(props->At("path").At("type").GetString(), "string");
   EXPECT_TRUE(required_array_contains(schema, "payload"));
+}
+
+TEST(SchemaBuilderTest, BuildActionSchemaAddsEnumAndRequiredAction) {
+  auto schema = build_action_schema(
+      {"get", "set"}, {{"path", "string", "node path", true}});
+  const mcp::JsonValue *props = schema.Find("properties");
+  ASSERT_NE(props, nullptr);
+  const mcp::JsonValue &action = props->At("action");
+  EXPECT_EQ(action.At("type").GetString(), "string");
+  const mcp::JsonValue *values = action.Find("enum");
+  ASSERT_NE(values, nullptr);
+  ASSERT_TRUE(values->IsArray());
+  ASSERT_EQ(values->Size(), 2u);
+  EXPECT_EQ((*values)[0].GetString(), "get");
+  EXPECT_EQ((*values)[1].GetString(), "set");
+  EXPECT_TRUE(required_array_contains(schema, "action"));
+  EXPECT_TRUE(required_array_contains(schema, "path"));
 }
 
 TEST(SchemaBuilderTest, AddRequiredFlagIsIdempotent) {

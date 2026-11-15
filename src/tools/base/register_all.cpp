@@ -184,21 +184,22 @@ static mcp::JsonValue meta_list_categories_impl(ToolCatalog& catalog) {
     return j;
 }
 
-static mcp::JsonValue meta_get_tool_detail_impl(
-    const mcp::JsonValue& args, ToolCatalog& catalog,
-    const std::shared_ptr<ToolRegistry>& registry) {
-    auto *name_p = args.Find("name");
-    if (!name_p || !name_p->IsString() || name_p->GetString().empty()) {
-        mcp::JsonValue err(mcp::JsonValue::object_tag);
+mcp::JsonValue tool_detail_for(const std::string &name, ToolCatalog &catalog,
+                               const std::shared_ptr<ToolRegistry> &registry) {
+    mcp::JsonValue err(mcp::JsonValue::object_tag);
+    if (name.empty()) {
         err["error"] = mcp::JsonValue("missing required parameter: name");
         return err;
     }
 
-    std::string name = name_p->GetString();
-    auto info = catalog.get_tool(name);
+    std::optional<ToolAlias> alias;
+    if (registry) {
+        alias = registry->resolve_alias(name);
+    }
+    const std::string canonical = alias ? alias->canonical : name;
+    auto info = catalog.get_tool(canonical);
     if (!info) {
-        mcp::JsonValue err(mcp::JsonValue::object_tag);
-        err["error"] = mcp::JsonValue("tool not found: " + name);
+        err["error"] = mcp::JsonValue("tool not found: " + canonical);
         return err;
     }
 
@@ -213,19 +214,51 @@ static mcp::JsonValue meta_get_tool_detail_impl(
     }
     t["tags"] = std::move(tags);
     t["input_schema"] = info->input_schema;
+    mcp::JsonValue examples(mcp::JsonValue::array_tag);
+    for (const auto &example : info->examples) {
+        examples.PushBack(mcp::JsonValue(example));
+    }
+    t["examples"] = std::move(examples);
     const char* se = "none";
     uint32_t flags = 0;
-    if (auto tool = registry->find_any(name)) {
-        se = ::godot_autopilot::side_effect_name(
-            ::godot_autopilot::side_effect_of(*tool));
-        flags = tool->tool_flags();
+    if (registry) {
+        if (auto tool = registry->find_any(canonical)) {
+            se = ::godot_autopilot::side_effect_name(
+                ::godot_autopilot::side_effect_of(*tool));
+            flags = tool->tool_flags();
+        }
     }
     t["side_effect"] = mcp::JsonValue(se);
     t["dynamic"] = mcp::JsonValue((flags & tool_flags::kDynamic) != 0);
     t["mutating"] = mcp::JsonValue((flags & tool_flags::kMutating) != 0);
+    if (alias) {
+        j["deprecated_alias"] = mcp::JsonValue(name);
+        j["canonical_name"] = mcp::JsonValue(canonical);
+        j["alias_removal_version"] = mcp::JsonValue(alias->removal_version);
+        if (!alias->deprecated_since.empty()) {
+            j["deprecated_since"] = mcp::JsonValue(alias->deprecated_since);
+        }
+        t["canonical_name"] = mcp::JsonValue(canonical);
+        LogSystem::instance().log(
+            LogLevel::Warning, LogCategory::Tools,
+            "tool alias '" + name + "' resolved to '" + canonical + "'");
+    }
     j["tool"] = std::move(t);
-    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "get_tool_detail completed");
     return j;
+}
+
+static mcp::JsonValue meta_get_tool_detail_impl(
+    const mcp::JsonValue& args, ToolCatalog& catalog,
+    const std::shared_ptr<ToolRegistry>& registry) {
+    const auto *name_p = args.Find("name");
+    const std::string name =
+        name_p != nullptr && name_p->IsString() ? name_p->GetString() : std::string();
+    mcp::JsonValue result = tool_detail_for(name, catalog, registry);
+    if (result.Find("error") == nullptr) {
+        LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                                  "get_tool_detail completed");
+    }
+    return result;
 }
 
 static std::string received_keys_text(const mcp::JsonValue& args) {
@@ -298,6 +331,7 @@ void refresh_derived(const std::shared_ptr<ToolRegistry>& registry,
                                  t->meta().category, t->meta().tags});
     }
     catalog.replace_tools(std::move(catalog_tools));
+    catalog.replace_aliases(registry->alias_map());
     index.replace_entries(index_entries);
 
     dispatch::HandlerMap handlers;

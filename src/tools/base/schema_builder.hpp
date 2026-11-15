@@ -22,6 +22,10 @@ mcp::JsonValue build_schema(std::initializer_list<ParamDef> params);
 
 mcp::JsonValue build_schema(const std::vector<ParamDef> &params);
 
+mcp::JsonValue build_action_schema(const std::vector<std::string> &actions,
+                                   const std::vector<ParamDef> &params,
+                                   const std::string &description = "");
+
 } // namespace schema
 } // namespace godot_autopilot
 

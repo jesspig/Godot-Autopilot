@@ -24,6 +24,7 @@
 #include "tools/base/runtime_ops.hpp"
 #include "tools/base/tool_catalog.hpp"
 #include "tools/base/tool_registry.hpp"
+#include "support/tool_catalog_baseline.hpp"
 #include "util/bm25_index.hpp"
 
 #include <string>
@@ -155,9 +156,11 @@ TEST_F(RegisteredServerFixture, SchemaStatisticsBaseline) {
       ++empty;
     }
   }
-  EXPECT_EQ(tools.size(), 459);
-  EXPECT_EQ(non_empty, 393);
-  EXPECT_EQ(empty, 66);
+  const gda_test::ToolCatalogBaseline &baseline =
+      gda_test::load_tool_catalog_baseline();
+  EXPECT_EQ(tools.size(), baseline.expected_catalog_total);
+  EXPECT_EQ(non_empty, baseline.expected_non_empty);
+  EXPECT_EQ(empty, baseline.expected_empty);
   EXPECT_EQ(non_empty + empty, tools.size());
   EXPECT_GT(non_empty, empty);
   EXPECT_GT(empty, 0);
