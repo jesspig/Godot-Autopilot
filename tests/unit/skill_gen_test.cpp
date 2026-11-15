@@ -114,7 +114,15 @@ const char *const kManualWhitelist[] = {
 
     "dynamic", "required", "type", "description", "error", "file", "args",
     "name", "params", "tags", "category", "instance_ambiguous",
-    "no_active_instance"};
+    "no_active_instance",
+
+    "already_connected", "apply_physics_", "closed_tabs", "closed_tabs_warning",
+    "create_physics_", "csharp_", "engine_managed", "execution_time_ms",
+    "extension_api", "get_physics_", "main_scene", "not_connected",
+    "registered_resource", "reloaded_scenes", "saved_scenes", "script_class",
+    "set_physics_", "stale_references", "uid_preserved",
+    "unsupported_binary_references", "update_file", "updated_files",
+    "when_timeout", "would_delete", "wrapped_source"};
 
 bool is_word_char(char c) {
   return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
@@ -444,8 +452,8 @@ TEST(SkillGenTest, CliChannelContract) {
   for (const SkillSpec &spec : skills) {
     ASSERT_FALSE(spec.files.empty()) << spec.name;
     const std::string &body = spec.files[0].body;
-    EXPECT_NE(body.find("godot-autopilot"), std::string::npos)
-        << spec.name << ": SKILL.md must mention the godot-autopilot book family";
+    EXPECT_NE(body.find("Godot Autopilot"), std::string::npos)
+        << spec.name << ": SKILL.md must mention the Godot Autopilot entry";
     if (spec.name == "godot-autopilot") {
       EXPECT_TRUE(contains_ci_token(body, "gda"))
           << spec.name << ": SKILL.md must mention the gda CLI channel";
