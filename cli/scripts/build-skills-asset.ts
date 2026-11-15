@@ -15,15 +15,6 @@ const RETIRED_SKILLS = [
 
 const BOOKS = [
   "godot-autopilot",
-  "godot-autopilot-content",
-  "godot-autopilot-csharp",
-  "godot-autopilot-resources",
-  "godot-autopilot-runtime",
-  "godot-autopilot-scene-system",
-  "godot-autopilot-scripting",
-  "godot-autopilot-servers",
-  "godot-autopilot-setup",
-  "godot-autopilot-tools",
 ];
 
 interface SkillFile {
