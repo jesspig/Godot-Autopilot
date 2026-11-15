@@ -293,6 +293,44 @@ mcp::JsonValue handle_bus_get_layout(const mcp::JsonValue &args) {
   if (!server) {
     return util::error_json("AudioServer not available");
   }
+  std::string action = "layout";
+  if (const auto *action_p = args.Find("action")) {
+    if (!action_p->IsString()) {
+      return util::error_json(
+          "invalid parameter: action must be layout, count or name");
+    }
+    action = action_p->GetString();
+  }
+  if (action == "count") {
+    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    r["result"] =
+        mcp::JsonValue(static_cast<int64_t>(server->get_bus_count()));
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                              "get_audio_bus_layout completed");
+    return r;
+  }
+  if (action == "name") {
+    const auto *index_p = args.Find("bus_index");
+    if (!index_p || !index_p->IsInt()) {
+      return util::error_json("missing required parameter: bus_index");
+    }
+    const int index = static_cast<int>(index_p->GetInt());
+    const int count = server->get_bus_count();
+    if (index < 0 || index >= count) {
+      return util::error_json("audio bus not found at index: " +
+                              std::to_string(index));
+    }
+    mcp::JsonValue r(mcp::JsonValue::object_tag);
+    r["result"] = mcp::JsonValue(util::to_std(server->get_bus_name(index)));
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                              "get_audio_bus_layout completed");
+    return r;
+  }
+  if (action != "layout") {
+    return util::error_json(
+        "unknown action '" + action +
+        "' for get_audio_bus_layout (expected layout, count, name)");
+  }
   auto layout = server->generate_bus_layout();
   auto serialized = VariantJson::serialize(layout);
   mcp::JsonValue r(mcp::JsonValue::object_tag);
@@ -322,45 +360,6 @@ mcp::JsonValue handle_bus_set_layout(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_bus_layout completed");
   return util::ok_result(mcp::JsonValue("ok"));
-}
-
-mcp::JsonValue handle_bus_get_count(const mcp::JsonValue &args) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "get_audio_bus_count called");
-  auto *server = godot::AudioServer::get_singleton();
-  if (!server) {
-    return util::error_json("AudioServer not available");
-  }
-  int count = server->get_bus_count();
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue(static_cast<int64_t>(count));
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "get_audio_bus_count completed");
-  return r;
-}
-
-mcp::JsonValue handle_bus_get_name(const mcp::JsonValue &args) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "get_audio_bus_name called");
-  auto *server = godot::AudioServer::get_singleton();
-  if (!server) {
-    return util::error_json("AudioServer not available");
-  }
-  auto *bi = args.Find("bus_index");
-  if (!bi || !bi->IsInt()) {
-    return util::error_json("missing required parameter: bus_index");
-  }
-  int idx = bi->GetInt();
-  int count = server->get_bus_count();
-  if (idx < 0 || idx >= count) {
-    return util::error_json("audio bus not found at index: " + std::to_string(idx));
-  }
-  godot::String name = server->get_bus_name(idx);
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue(util::to_std(name));
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "get_audio_bus_name completed");
-  return r;
 }
 
 mcp::JsonValue handle_bus_set_volume(const mcp::JsonValue &args) {
@@ -782,25 +781,6 @@ mcp::JsonValue handle_set_output_device(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "set_audio_device_output completed");
   return util::ok_result(mcp::JsonValue("ok"));
-}
-
-mcp::JsonValue handle_get_input_device_list(const mcp::JsonValue &) {
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "get_audio_device_inputs called");
-  auto *server = godot::AudioServer::get_singleton();
-  if (!server) {
-    return util::error_json("AudioServer not available");
-  }
-  auto devices = server->get_input_device_list();
-  mcp::JsonValue arr(mcp::JsonValue::array_tag);
-  for (int i = 0; i < devices.size(); i++) {
-    arr.PushBack(mcp::JsonValue(util::to_std(devices[i])));
-  }
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = std::move(arr);
-  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "get_audio_device_inputs completed");
-  return r;
 }
 
 mcp::JsonValue handle_set_input_device(const mcp::JsonValue &args) {

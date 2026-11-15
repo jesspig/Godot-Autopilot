@@ -115,9 +115,9 @@ std::string prompt_debug_physics() {
 {
   "name": "call_tool",
   "arguments": {
-    "name": "get_debug_monitor",
+    "name": "get_debug_monitors",
     "arguments": {
-      "monitor": "physics_3d_active_objects"
+      "ids": [20]
     }
   }
 }
@@ -128,7 +128,7 @@ std::string prompt_debug_physics() {
 - 射线投射的 `from` 和 `to` 是世界坐标
 - 碰撞掩码（collision_mask）基于层的 2^N 位运算
 - 调试可视化在编辑器场景运行时才生效
-- 使用 `get_debug_monitor_catalog` 查看所有可用的性能监控项)gda";
+- 使用 `get_debug_monitors` 的 `catalog: true` 查看所有可用的性能监控项)gda";
 }
 
 } // namespace godot_autopilot

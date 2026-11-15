@@ -8,6 +8,7 @@
   "strict_prune_count": 32,
   "domain_mapped_count": 30,
   "domain_kept_count": 421,
+  "domain_missing_count": 0,
   "meta_mapped_count": 2,
   "meta_kept_count": 6,
   "mapped_count": 32,

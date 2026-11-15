@@ -47,7 +47,8 @@ set(GDA_UNIT_API_BASE_TESTS
     ${CMAKE_SOURCE_DIR}/tests/unit/gda_home_test.cpp
     ${CMAKE_SOURCE_DIR}/tests/unit/project_store_test.cpp
     ${CMAKE_SOURCE_DIR}/tests/unit/instance_registry_test.cpp
-    ${CMAKE_SOURCE_DIR}/tests/unit/alias_resolution_test.cpp)
+    ${CMAKE_SOURCE_DIR}/tests/unit/alias_resolution_test.cpp
+    ${CMAKE_SOURCE_DIR}/tests/unit/alias_projection_test.cpp)
 
 set(GDA_UNIT_BUSINESS_SOURCES
     ${GDA_UNIT_BUSINESS_SOURCES}

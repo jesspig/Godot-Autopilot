@@ -144,9 +144,14 @@ mcp::JsonValue call_handler_impl(const std::string &name,
   if (auto registry = get_active_registry()) {
     alias = registry->resolve_alias(name);
   }
+  mcp::JsonValue alias_error;
+  if (alias && alias->validate_args) {
+    alias_error = alias->validate_args(args);
+  }
+  const bool has_alias_error = alias && !alias_error.IsNull();
   const std::string lookup_name = alias ? alias->canonical : name;
   const mcp::JsonValue call_args =
-      alias ? apply_alias_args(*alias, args) : args;
+      alias && !has_alias_error ? apply_alias_args(*alias, args) : args;
   HandlerFn handler;
   {
     monitor::LockProbe probe("dispatch_handlers_lock", 5.0);
@@ -161,7 +166,9 @@ mcp::JsonValue call_handler_impl(const std::string &name,
       }
     }
   }
-  if (handler) {
+  if (has_alias_error) {
+    result = std::move(alias_error);
+  } else if (handler) {
     try {
       result = handler(call_args);
     } catch (const std::exception &ex) {
