@@ -6,6 +6,9 @@
 namespace godot_autopilot {
 namespace input_map_ops {
 
+mcp::JsonValue handle_get_input_map(const mcp::JsonValue &args);
+mcp::JsonValue handle_set_input_map_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_erase_input_map(const mcp::JsonValue &args);
 mcp::JsonValue handle_action_add_event(const mcp::JsonValue &args);
 mcp::JsonValue handle_action_erase_event(const mcp::JsonValue &args);
 mcp::JsonValue handle_action_set_deadzone(const mcp::JsonValue &args);

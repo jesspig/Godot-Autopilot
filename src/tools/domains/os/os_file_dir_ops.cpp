@@ -1,5 +1,7 @@
 #include "tools/domains/os/os_file_dir_ops.hpp"
 #include "core/observability/log_system.hpp"
+#include "tools/domains/os/os_ops.hpp"
+#include "tools/domains/text/text_ops.hpp"
 #include "util/error_util.hpp"
 #include "util/project_path.hpp"
 #include "util/resource_fs.hpp"
@@ -219,6 +221,93 @@ JV handle_ensure_directory(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "ensure_directory completed");
   return r;
+}
+
+namespace {
+
+JV file_action_error(const std::string &message) {
+  JV error(JV::object_tag);
+  error["error"] = JV(message);
+  return error;
+}
+
+bool read_file_action(const JV &args, std::string &out, JV &error) {
+  const JV *action = args.Find("action");
+  if (action == nullptr) {
+    error = file_action_error("missing required parameter: action");
+    return false;
+  }
+  if (!action->IsString()) {
+    error = file_action_error("invalid parameter: action must be a string");
+    return false;
+  }
+  out = action->GetString();
+  return true;
+}
+
+JV strip_file_action(const JV &args) {
+  JV out = args.IsObject() ? args : JV(JV::object_tag);
+  out.GetObject().erase("action");
+  return out;
+}
+
+} // namespace
+
+JV handle_os_file_text(const JV &args) {
+  std::string action;
+  JV error;
+  if (!read_file_action(args, action, error)) {
+    return error;
+  }
+  if (action == "read") {
+    return text_ops::handle_file_read(strip_file_action(args));
+  }
+  if (action == "find") {
+    return text_ops::handle_find_in_files(strip_file_action(args));
+  }
+  return file_action_error(
+      "unknown action '" + action +
+      "' for os_file_text (expected read, find)");
+}
+
+JV handle_os_file_write(const JV &args) {
+  std::string action;
+  JV error;
+  if (!read_file_action(args, action, error)) {
+    return error;
+  }
+  if (action == "write") {
+    return text_ops::handle_file_write(strip_file_action(args));
+  }
+  if (action == "copy") {
+    return handle_copy_file_generic(strip_file_action(args));
+  }
+  if (action == "ensure") {
+    return handle_ensure_directory(strip_file_action(args));
+  }
+  if (action == "trash") {
+    return os_ops::handle_os_move_to_trash(strip_file_action(args));
+  }
+  return file_action_error(
+      "unknown action '" + action +
+      "' for os_file_write (expected write, copy, ensure, trash)");
+}
+
+JV handle_os_file_manager(const JV &args) {
+  std::string action;
+  JV error;
+  if (!read_file_action(args, action, error)) {
+    return error;
+  }
+  if (action == "list") {
+    return handle_list_directory(strip_file_action(args));
+  }
+  if (action == "info") {
+    return handle_get_file_info(strip_file_action(args));
+  }
+  return file_action_error(
+      "unknown action '" + action +
+      "' for os_file_manager (expected list, info)");
 }
 
 } // namespace file_dir_ops
