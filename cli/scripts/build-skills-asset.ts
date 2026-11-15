@@ -1,6 +1,18 @@
 import fs from "node:fs";
 import path from "node:path";
 
+const RETIRED_SKILLS = [
+  "godot-autopilot-content",
+  "godot-autopilot-csharp",
+  "godot-autopilot-resources",
+  "godot-autopilot-runtime",
+  "godot-autopilot-scene-system",
+  "godot-autopilot-scripting",
+  "godot-autopilot-servers",
+  "godot-autopilot-setup",
+  "godot-autopilot-tools",
+];
+
 const BOOKS = [
   "godot-autopilot",
   "godot-autopilot-content",
@@ -145,6 +157,7 @@ const output = {
   version,
   files: en,
   files_zh: zh,
+  retired: RETIRED_SKILLS,
 };
 const target = path.join(root, "cli", "assets", "skills.json");
 fs.writeFileSync(target, `${JSON.stringify(output, null, 2)}\n`, "utf8");
