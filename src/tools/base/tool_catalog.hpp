@@ -19,6 +19,7 @@ struct ToolInfo {
   mcp::JsonValue input_schema;
   bool dynamic = false;
   bool mutating = false;
+  std::vector<std::string> examples;
 };
 
 class ToolCatalog {

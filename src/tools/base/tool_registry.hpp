@@ -22,6 +22,9 @@ inline ToolInfo make_tool_info(const ToolBase& t) {
   ToolInfo info{m.name, m.description, m.category, m.tags, t.input_schema()};
   info.dynamic = (flags & tool_flags::kDynamic) != 0;
   info.mutating = (flags & tool_flags::kMutating) != 0;
+  if (const auto *spec_tool = dynamic_cast<const SpecTool *>(&t)) {
+    info.examples = spec_tool->spec().examples;
+  }
   return info;
 }
 

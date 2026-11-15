@@ -61,6 +61,7 @@ struct ToolSpec {
   std::function<mcp::JsonValue(const mcp::JsonValue &)> handler;
   mcp::JsonValue raw_schema;
   std::vector<ToolAlias> aliases;
+  std::vector<std::string> examples;
 };
 
 namespace spec_detail {

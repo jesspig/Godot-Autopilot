@@ -214,6 +214,11 @@ mcp::JsonValue tool_detail_for(const std::string &name, ToolCatalog &catalog,
     }
     t["tags"] = std::move(tags);
     t["input_schema"] = info->input_schema;
+    mcp::JsonValue examples(mcp::JsonValue::array_tag);
+    for (const auto &example : info->examples) {
+        examples.PushBack(mcp::JsonValue(example));
+    }
+    t["examples"] = std::move(examples);
     const char* se = "none";
     uint32_t flags = 0;
     if (registry) {

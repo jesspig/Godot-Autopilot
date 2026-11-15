@@ -7,7 +7,7 @@ tags:
   - 单元测试
   - 集成
   - 守卫
-timestamp: "2026-11-14T15:09:44+08:00"
+timestamp: "2026-11-16T04:49:31+08:00"
 resource: tests/
 ---
 
@@ -146,9 +146,9 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 | `godot_transport_pending_test.cpp` | 3 | Godot 传输 pending 键纯逻辑（`src/core/godot_transport.{hpp,cpp}`）：复合键区分连接与请求 id、同输入键稳定（幂等）、int 与 string 请求 id 前后缀区分不串扰 |
 | **合计** | **568** | |
 
-**链接来源**（`tests/CMakeLists.txt` 的 `GDA_UNIT_BUSINESS_SOURCES`，源清单经 `cmake/sources/` 下清单聚合：`gda_unit_sources.cmake` 29 个业务源（含 `tests/support/config_loader.cpp`——tests/ 侧唯一业务源）+ 3 个登记的测试文件本体 + 1 组 `GDA_TOOLS_OPS_SOURCES` glob；`api_unit_transport.cmake` 10 个业务源 + 5 个测试本体；`api_unit_contract.cmake` 1 个测试本体；`api_unit_storage.cmake` 2 个业务源 + 2 个测试本体；`api_unit_instance_guard.cmake` 1 个业务源 + 1 个测试本体；`api_unit_cli.cmake` / `api_unit_docs.cmake` 现无登记项。合计显式业务源 42 + 1 组 glob、测试本体 12 个）：`src/core/` 的 `log_system`、`log_persist`、`resource_registry`、`scene_dirty_tracker`、`export_guard`、`editor_readiness`、`editor_coords`、`trace_recorder`、`monitor`、`gda_home`、`project_store`、`instance_registry`、`storage_paths`、`legacy_store`、`instance_guard`；`src/util/` 的 `bm25_index`、`error_util`、`readback_util`、`scene_verify`、`variant_json`、`skill_gen`、`skill_content_generated`（构建期嵌入薄胶水）；`src/tools/` 的 `tool_catalog`、`schema_builder`、`register_all`、`dispatch`、`debugger_access`、`editor_ui_actions`、`tool_args`、`tool_pipeline`、`tool_invoke`；传输面的 `src/core/port_resolver`、`http_route_table`、`http_stream_registry`、`godot_transport`、`mcp_http_shim`、`api_token`、`ipc_endpoint`、`ipc_transport`、`ipc_framing`；`src/resources/resource_error_mapping`；`src/tools/domains/*/*_ops.cpp`（glob，`register_all.cpp` 引用全部 `handle_xxx` 符号故必须链接）。`gdscript_wrap`/`ready_policy` 等 header-only 头由对应测试直接 include，无需源登记。
+**链接来源**（`tests/CMakeLists.txt` 的 `GDA_UNIT_BUSINESS_SOURCES`，源清单经 `cmake/sources/` 下清单聚合：`gda_unit_sources.cmake` 30 个业务源（含 `tests/support/config_loader.cpp` 与 `tests/support/tool_catalog_baseline.cpp`）+ 4 个登记的测试文件本体 + 1 组 `GDA_TOOLS_OPS_SOURCES` glob；`api_unit_transport.cmake` 10 个业务源 + 5 个测试本体；`api_unit_contract.cmake` 2 个测试本体；`api_unit_storage.cmake` 2 个业务源 + 2 个测试本体；`api_unit_instance_guard.cmake` 1 个业务源 + 1 个测试本体；`api_unit_cli.cmake` / `api_unit_docs.cmake` 现无登记项。合计显式业务源 43 + 1 组 glob、测试本体 14 个）：`src/core/` 的 `log_system`、`log_persist`、`resource_registry`、`scene_dirty_tracker`、`export_guard`、`editor_readiness`、`editor_coords`、`trace_recorder`、`monitor`、`gda_home`、`project_store`、`instance_registry`、`storage_paths`、`legacy_store`、`instance_guard`；`src/util/` 的 `bm25_index`、`error_util`、`readback_util`、`scene_verify`、`variant_json`、`skill_gen`、`skill_content_generated`（构建期嵌入薄胶水）；`src/tools/` 的 `tool_catalog`、`schema_builder`、`register_all`、`dispatch`、`debugger_access`、`editor_ui_actions`、`tool_args`、`tool_pipeline`、`tool_invoke`；传输面的 `src/core/port_resolver`、`http_route_table`、`http_stream_registry`、`godot_transport`、`mcp_http_shim`、`api_token`、`ipc_endpoint`、`ipc_transport`、`ipc_framing`；`src/resources/resource_error_mapping`；`src/tools/domains/*/*_ops.cpp`（glob，`register_all.cpp` 引用全部 `handle_xxx` 符号故必须链接）。`gdscript_wrap`/`ready_policy` 等 header-only 头由对应测试直接 include，无需源登记。
 
-**约束**：单元测试禁止调用任何已注册工具 handler（无引擎时 godot-cpp 接口指针为 nullptr 会崩溃；handler 契约由集成层在受控边界内覆盖，见「集成层」）；`register_all_test` 仅测注册/分发/未知工具错误路径。`SchemaStatisticsBaseline`（`register_all_test.cpp:147`）为运行时统计：当前基线断言 `tools.size()==459`（catalog 459 = 451 域 + `system_status` + 7 元）= 非空 393 + 空 66（`:158-160` 三条硬断言；随工具集变化，以运行时统计为准）。`sanitize_policy.cpp` 未列入 单元与边界测试业务源——`enabled()`/`set_enabled()` 为 header 内联原子缓存（单元测试 经 `TraceRecorder::sanitize_args(text, bool)` 直接传参断言脱敏口径），`initialize()` 仅由入口调用、不参与 单元测试 链接。`monitor.cpp` 显式列入 单元与边界测试业务源（`monitor_test` 覆盖）；`monitor_env.cpp` 仅主线程调用、`perf_sampler.cpp` 依赖引擎 tick，二者不进 单元测试。
+**约束**：单元测试禁止调用任何已注册工具 handler（无引擎时 godot-cpp 接口指针为 nullptr 会崩溃；handler 契约由集成层在受控边界内覆盖，见「集成层」）；`register_all_test` 仅测注册/分发/未知工具错误路径。`SchemaStatisticsBaseline`（`register_all_test.cpp`）为运行时统计：期望值由 `tests/support/tool_catalog_baseline.cpp` 读取 `tests/data/tool_catalog_baseline.json` 的 `catalog_total`、`schema_non_empty`、`schema_empty`，测试源码不再硬编码计数；工具集变化时用 `bun run gda-dev-tools audit-tools --baseline` 更新 JSON。`sanitize_policy.cpp` 未列入 单元与边界测试业务源——`enabled()`/`set_enabled()` 为 header 内联原子缓存（单元测试 经 `TraceRecorder::sanitize_args(text, bool)` 直接传参断言脱敏口径），`initialize()` 仅由入口调用、不参与 单元测试 链接。`monitor.cpp` 显式列入 单元与边界测试业务源（`monitor_test` 覆盖）；`monitor_env.cpp` 仅主线程调用、`perf_sampler.cpp` 依赖引擎 tick，二者不进 单元测试。
 
 ### skill_gen 技能生成器测试（`skill_gen_test.cpp`）
 
@@ -249,7 +249,7 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 
 | 基线 | 载体 | 当前值 | 断言内容 |
 |---|---|---|---|
-| 单元测试 schema 基线 | `register_all_test.cpp` 的 `SchemaStatisticsBaseline` | 459 = 393 非空 + 66 空 | `tools.size()==459` / `non_empty==393` / `empty==66` 三条硬断言（`register_all_test.cpp:147-149`） |
+| 单元测试 schema 基线 | `register_all_test.cpp` 的 `SchemaStatisticsBaseline` | 由 `tests/data/tool_catalog_baseline.json` 提供 | `tools.size()` / `non_empty` / `empty` 分别与 JSON 的 `catalog_total` / `schema_non_empty` / `schema_empty` 一致（读取器 `tests/support/tool_catalog_baseline.cpp`） |
 | 工具面动态枚举契约 | `toolface_contract_test.cpp`（集成层） | 全动态（无硬编码工具名单） | ① detail 契约：对运行时枚举的全部工具逐一断言响应为对象、`tool.name` 与枚举名一致、`input_schema` 为对象、`side_effect`/`mutating`/`dynamic` 存在且类型可读；② 排除划分自洽：候选∩排除=∅、计数和与全覆盖三重复算；③ 空参实调 11 组（`side_effect` 9 档位 + `mutating` + `dynamic`）：档位组断言授权拒绝三形态（error 含 `authorization required`、`code=authorization_required`、`authorization_required=<capability>`），Mutating/Dynamic 组断言缺参语义。枚举/排除/候选计数为观察值（`GTEST_SUCCEED` 输出），**不作断言钉**；未知名 detail 返回 `tool not found`（合成探针名） |
 | 错误全串契约 | `tests/integration/case_*_test.cpp` 各套件（集成层） | 逐字等价（错误串与 handler 源码字符串字面量一致，含 em dash 与引号转义） | 各 case TEST 对错误串的逐字断言；步骤级对照表在 `.handoff/evidence/` 各 mapping |
 | CLI wire 形状 | `cli_contract`（脚本项） | — | 进程内 mock MCP 服务器（严格握手：`initialize` 200 SSE、`notifications/initialized` 202、未初始化 `tools/call` 400 + `-32600`）驱动 gda CLI，断言 stdout JSON、退出码（0 成功 / 1 工具错 / 2 传输错 / 3 用法错）、直连 vs `call_tool` 包装 wire、`--save-images` 落盘；PATH 无 `bun` 时 SKIP 退出 0 |
@@ -259,7 +259,7 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 
 | 变更 | 动作 | 改后必跑 |
 |---|---|---|
-| 新增 / 删除 / 改参域工具 | 同步 schema 基线三条硬断言为新值；toolface 契约与 skill 回验无需改（动态枚举 / 运行时 catalog 驱动）；技能书用发现契约（`SkillBooksDescribeDiscovery`）而非静态工具目录 | `ctest -R "SchemaStatisticsBaseline|SkillRegistryFixture"`，收口跑 `bun run gda-dev-tools test` |
+| 新增 / 删除 / 改参域工具 | 运行 `bun run gda-dev-tools audit-tools --baseline` 更新 `tests/data/tool_catalog_baseline.json`；测试源码不再改硬断言；toolface 契约与 skill 回验无需改（动态枚举 / 运行时 catalog 驱动）；技能书用发现契约（`SkillBooksDescribeDiscovery`）而非静态工具目录 | `ctest -R "SchemaStatisticsBaseline|SkillRegistryFixture"`，收口跑 `bun run gda-dev-tools test` |
 | 新增 `SideEffect` 档位枚举值 | toolface 契约新增对应档位分组 TEST（9 档位名单来自枚举运行时值全集，非名单硬编码） | `ctest -R "EmptyArgCallRejects"` |
 | 改任何域工具错误文案 | 先查 `.handoff/evidence/` 各 mapping 对照表定位钉住该串的 case TEST，同步修改断言 | `ctest -R "case_"`（或对应套件） |
 | 改 CLI 协议 / 握手 / 输出形状 | 同步 `cli/tests/contract.test.ts` 的 mock server 断言 | `ctest -R cli_contract` |
@@ -292,9 +292,9 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 |---|---|---|---|
 | 域工具 | 451（33 个域） | 命令：逐文件统计 `src/tools/domains/*/*_tools.hpp` 的 `make_spec_tool(`——33 个域头（34 个匹配文件中 `autopilot_tools.hpp` 不含工具）合计 450 处 + `property_tools.hpp:102` 的 `make_set_node_transform_spec()` 特例 1 处 = 451；`src/` 与 develop 零差异（`.handoff/evidence/T-09/src-diff-empty.txt`） | 一致 |
 | 工具类别 | 27 | 451 条 `ToolSpec` 聚合初始化的第 3 个字段（category）去重后 27 个取值 | 一致 |
-| catalog 条目 | 459 = 451 域 + `system_status` + 7 元 | 命令：构建后 `ctest -R SchemaStatisticsBaseline`；源码：`register_all.cpp:329` 单独注册 `system_status`，`ToolRegistry::all()` = 452、`all_meta()` = 7、`all_any()` = 459；单元测试 硬断言 `register_all_test.cpp:147` | 一致 |
-| MCP 可达工具 | 458 = 7 元 + 451 域 | MCP 顶层只注册 7 个元工具（单元测试断言 `register_all_test.cpp:84-86`：`ListTools` 恰 7 个），域工具只能经 `call_tool` 元工具代理调用；`system_status` 只计入 catalog 459 | 一致 |
-| schema 基线 | 459 = 393 非空 + 66 空 | 单元测试三条硬断言 `register_all_test.cpp:147-149`；命令：构建后 `ctest -R SchemaStatisticsBaseline` | 一致 |
+| catalog 条目 | 以 `tests/data/tool_catalog_baseline.json` 的 `catalog_total` 为准 | 命令：`bun run gda-dev-tools audit-tools --json`；源码：`register_all.cpp` 单独注册 `system_status`，catalog 由 `registry->all_any()` 派生；单元测试读取同一 JSON 并断言 | 一致 |
+| MCP 可达工具 | 以 baseline JSON 的 `meta_total` + `domain_total` 为准 | MCP 顶层只注册元工具（单元测试断言 `ListTools` 数量与 `kMetaToolNames` 一致），域工具只能经 `call_tool` 元工具代理调用；`system_status` 只计入 catalog | 一致 |
+| schema 基线 | 以 baseline JSON 的 `schema_non_empty` + `schema_empty` 为准 | 单元测试 `SchemaStatisticsBaseline` 读取 `tests/support/tool_catalog_baseline.cpp`；命令：构建后 `ctest -R SchemaStatisticsBaseline` | 一致 |
 | 单元 | 568（52 个 unit 文件） | 命令：`ctest --preset debug -N -L unit`（2026-11-14 实测 568）；源码口径 `grep -cE "^TEST(_F)?\(" tests/unit/*.cpp` | 一致 |
 | 边界 | 190（19 个 boundary 文件） | 命令：`ctest --preset debug -N -L boundary`（实测 190）；源码口径 `grep -cE "^TEST(_F)?\(" tests/boundary/*.cpp` | 一致 |
 | 集成 | 88（10 个 `*_test.cpp`） | 命令：`grep -cE "^TEST(_F)?\(" tests/integration/*_test.cpp`（2026-11-14 实测 88） | 一致 |

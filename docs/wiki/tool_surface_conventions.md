@@ -7,7 +7,7 @@ tags:
   - 别名
   - 弃用
   - ToolSpec
-timestamp: "2026-11-16T04:31:38+08:00"
+timestamp: "2026-11-16T04:49:31+08:00"
 resource: src/tools/base/tool_spec.hpp
 ---
 
@@ -29,6 +29,15 @@ resource: src/tools/base/tool_spec.hpp
 | `removal_version` | string | 计划移除版本；至少保留两个 minor 版本 |
 
 `ToolSpec.aliases` 承载别名列表，由 `SpecTool` 构造时随工具进入 [tool_registry.hpp](../../src/tools/base/tool_registry.hpp) 的 `aliases_`。
+
+## action 工具规范
+
+- 单工具用 `action` 字符串枚举区分动作；`action` 必填，枚举值在 schema 中列出，单个工具最多 8 个 action。
+- action 专用字段放在顶层可选参数，由 handler 按 action 做必填校验；错误统一为 `missing required parameter for action '{action}': {name}`。
+- 公共定位字段（如 `path`、`node_path`）可作为全局必填；action 专用字段在 schema 中保持可选，避免跨 action 误报。
+- 合并只在同一 `SideEffect` 档内进行；Read 工具不因合并触发 `confirm`，Destructive/GameRuntime 仍由 canonical 工具统一确认。
+- 工具描述必须枚举 action 与至少一个示例；`ToolSpec.examples` 存示例字符串，经 `ToolInfo` 透传到 `get_tool_detail` 的 `tool.examples`。
+- schema 辅助见 [schema_builder.hpp](../../src/tools/base/schema_builder.hpp) 的 `build_action_schema`：生成 `action` enum 与必填标记，同时保留现有 `ParamDef` / `build_schema` 兼容。
 
 ## 调用链
 

@@ -75,6 +75,7 @@ protected:
           result["echo"] = args;
           return result;
         });
+    echo.examples.push_back("{\"old_key\":\"value\"}");
     echo.aliases.push_back(make_alias("old_echo_name", "alias_target_echo"));
 
     ToolAlias param = make_alias("old_echo_param", "alias_target_echo");
@@ -279,6 +280,11 @@ TEST_F(AliasResolutionTest, ToolDetailReportsAliasMetadata) {
   ASSERT_NE(tool, nullptr);
   EXPECT_EQ(string_field(*tool, "name"), "alias_target_echo");
   EXPECT_EQ(string_field(*tool, "side_effect"), "none");
+  const mcp::JsonValue *examples = tool->Find("examples");
+  ASSERT_NE(examples, nullptr);
+  ASSERT_TRUE(examples->IsArray());
+  ASSERT_EQ(examples->Size(), 1u);
+  EXPECT_EQ((*examples)[0].GetString(), "{\"old_key\":\"value\"}");
 }
 
 } // namespace

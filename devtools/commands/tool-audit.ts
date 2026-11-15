@@ -289,6 +289,14 @@ const HOT_NAMES = [
   "call_tool",
 ];
 
+const META_TOOLS_WITH_PARAMS = new Set([
+  "search_tools",
+  "get_tool_detail",
+  "call_tool",
+  "batch_execute",
+  "code_execute",
+]);
+
 const PRUNE_ROWS: PruneRow[] = [
   {
     old_tool: "get_audio_device_inputs",
@@ -952,6 +960,17 @@ function buildAudit() {
   if (system.length !== 1) {
     throw new Error(`expected 1 system tool, found ${system.length}`);
   }
+  const knownMetaNames = new Set(meta.map((tool) => tool.name));
+  const missingMetaSchemas = [...META_TOOLS_WITH_PARAMS].filter(
+    (name) => !knownMetaNames.has(name),
+  );
+  if (missingMetaSchemas.length > 0) {
+    throw new Error(`meta schema set references missing tools: ${missingMetaSchemas.join(", ")}`);
+  }
+  const domainWithParams = domainTools.filter((tool) => (tool.param_count ?? 0) > 0).length;
+  const systemWithParams = system.filter((tool) => (tool.param_count ?? 0) > 0).length;
+  const metaWithParams = meta.filter((tool) => META_TOOLS_WITH_PARAMS.has(tool.name)).length;
+  const schemaNonEmpty = domainWithParams + systemWithParams + metaWithParams;
   const duplicateAliases = aliasNames.filter(
     (name, index) => aliasNames.indexOf(name) !== index,
   );
@@ -994,6 +1013,8 @@ function buildAudit() {
     strict_redundant_count: PRUNE_ROWS.length,
     alias_count: aliasNames.length,
     alias_names: [...aliasNames].sort(),
+    schema_non_empty: schemaNonEmpty,
+    schema_empty: allTools.length - schemaNonEmpty,
     tool_names: names,
     tools: domainTools,
     meta_tools: meta,
@@ -1109,7 +1130,7 @@ function printSummary(audit: ReturnType<typeof buildAudit>, matrixRows: number):
     `[AUDIT] catalog=${audit.catalog_total} domain=${audit.domain_total} meta=${audit.meta_total} system=${audit.system_total}`,
   );
   console.log(
-    `[AUDIT] domains=${audit.domain_count} aliases=${audit.alias_count} strict_redundant=${audit.strict_redundant_count} matrix_rows=${matrixRows}`,
+    `[AUDIT] domains=${audit.domain_count} aliases=${audit.alias_count} schema_non_empty=${audit.schema_non_empty} schema_empty=${audit.schema_empty} strict_redundant=${audit.strict_redundant_count} matrix_rows=${matrixRows}`,
   );
   console.log(`[AUDIT] baseline=${relativeToRoot(BASELINE_PATH)}`);
   console.log(`[AUDIT] target=${relativeToRoot(TARGET_PATH)}`);

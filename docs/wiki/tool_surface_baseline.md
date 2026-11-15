@@ -6,7 +6,7 @@ tags:
   - 工具面
   - 基线
   - 审计
-timestamp: "2026-11-16T04:23:58+08:00"
+timestamp: "2026-11-16T04:49:31+08:00"
 resource: devtools/commands/tool-audit.ts
 ---
 
@@ -33,6 +33,8 @@ resource: devtools/commands/tool-audit.ts
 | 域文件数 | 33 | `domain_count` |
 | 严格冗余候选 | 32 | `strict_redundant_count` |
 | 生产别名 | 0 | `alias_count` |
+| schema 非空 | 393 | `schema_non_empty` |
+| schema 空 | 66 | `schema_empty` |
 | 能力矩阵域行 | 451 | `capability_matrix.rows` |
 | 能力矩阵系统/元行 | 8 | `capability_matrix.meta_rows` |
 

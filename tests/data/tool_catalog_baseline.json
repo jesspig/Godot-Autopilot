@@ -130,6 +130,8 @@
   "strict_redundant_count": 32,
   "alias_count": 0,
   "alias_names": [],
+  "schema_non_empty": 393,
+  "schema_empty": 66,
   "tool_names": [
     "validate_scene_file",
     "find_unused_resources",
@@ -6096,7 +6098,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 461
+      "line": 466
     },
     {
       "name": "search_tools",
@@ -6108,7 +6110,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 470
+      "line": 475
     },
     {
       "name": "list_categories",
@@ -6120,7 +6122,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 505
+      "line": 510
     },
     {
       "name": "get_tool_detail",
@@ -6132,7 +6134,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 514
+      "line": 519
     },
     {
       "name": "call_tool",
@@ -6144,7 +6146,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 527
+      "line": 532
     },
     {
       "name": "batch_execute",
@@ -6157,7 +6159,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 549
+      "line": 554
     },
     {
       "name": "code_execute",
@@ -6170,7 +6172,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 612
+      "line": 617
     }
   ],
   "system_tools": [
@@ -6184,7 +6186,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 370
+      "line": 375
     }
   ],
   "side_effect_review": [
