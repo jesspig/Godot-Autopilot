@@ -26,7 +26,10 @@ function walk(root: string, prefix = ""): SkillFile[] {
     const relative = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
     if (entry.isDirectory()) {
       files.push(...walk(full, relative));
-    } else if (entry.isFile() && entry.name.endsWith(".md")) {
+    } else if (entry.isFile()) {
+      if (!entry.name.endsWith(".md")) {
+        throw new Error(`${relative}: only markdown files are allowed`);
+      }
       files.push({ relative, content: fs.readFileSync(full, "utf8").replace(/\r\n/g, "\n") });
     }
   }
@@ -103,7 +106,14 @@ function validateTree(tree: Record<string, string>, label: string): void {
       if (parsed.name !== book) {
         throw new Error(`${label}/${relative}: name ${parsed.name} does not match directory ${book}`);
       }
-    } else if (parts.length < 2 || !parts[1]?.endsWith(".md")) {
+    } else if (
+      parts.length === 3 &&
+      parts[1] === "references" &&
+      parts[2] !== undefined &&
+      parts[2].endsWith(".md")
+    ) {
+      continue;
+    } else {
       throw new Error(`${label}: unexpected file ${relative}`);
     }
   }
