@@ -18,24 +18,9 @@ const std::vector<ParamSpec> kSaveInputMapParams = {
     {"actions", "array", "Optional whitelist of action names to persist; when omitted, actions prefixed with 'ui_' or containing '/' are skipped", false},
 };
 
-const std::vector<ParamSpec> kAddInputMapActionParams = {
-    {"action", "string", "Action name identifier, e.g. 'mario_jump' or 'move_left'; a programmatic identifier, not a display name", true},
-    {"deadzone", "number", "Deadzone 0.0 to 1.0, the analog threshold below which input is ignored (default: 0.5)", false},
-};
-
-const std::vector<ParamSpec> kAddInputMapActionEventParams = {
-    {"action", "string", "Action name identifier to bind the event to, e.g. 'mario_jump'", true},
-    {"event", "object", "Input event object with a concrete 'class' field, e.g. 'InputEventKey' with 'keycode' 65; keycode and physical_keycode accept numeric key codes or KEY_* names like 'KEY_A'", true},
-};
-
 const std::vector<ParamSpec> kEraseInputMapActionEventParams = {
     {"action", "string", "Action name identifier whose event to remove, e.g. 'mario_jump'", true},
     {"event_index", "integer", "Zero-based index of the event to remove within the action's event list", true},
-};
-
-const std::vector<ParamSpec> kSetInputMapActionDeadzoneParams = {
-    {"action", "string", "Action name identifier to set the deadzone for, e.g. 'mario_jump'", true},
-    {"deadzone", "number", "Deadzone 0.0 to 1.0, the analog threshold below which input is ignored", true},
 };
 
 const std::vector<ParamSpec> kEraseInputMapActionParams = {
@@ -49,62 +34,160 @@ const std::vector<ParamSpec> kSetInputMapActionBundleParams = {
     {"persist", "boolean", "Whether to write ProjectSettings input/<action> and save to disk (default: false); false only modifies the editor InputMap at runtime", false},
 };
 
-const std::vector<ParamSpec> kGetInputMapActionsParams = {};
-
-const std::vector<ParamSpec> kHasInputMapActionParams = {
-    {"action", "string", "Action name identifier to check for existence, e.g. 'ui_accept'", true},
+const std::vector<ParamSpec> kGetInputMapActionsParams = {
+    {"action", "string", "Optional action name to check; when present returns [action] if it exists or [] otherwise", false},
 };
+
+inline mcp::JsonValue input_map_add_args(const mcp::JsonValue &args) {
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  const mcp::JsonValue *action = args.Find("action");
+  if (action != nullptr) out["action"] = *action;
+  const mcp::JsonValue *deadzone = args.Find("deadzone");
+  out["deadzone"] = deadzone != nullptr ? *deadzone : mcp::JsonValue(0.5);
+  out["persist"] = mcp::JsonValue(true);
+  return out;
+}
+
+inline mcp::JsonValue input_map_event_args(const mcp::JsonValue &args) {
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  const mcp::JsonValue *action = args.Find("action");
+  if (action != nullptr) out["action"] = *action;
+  mcp::JsonValue events(mcp::JsonValue::array_tag);
+  const mcp::JsonValue *event = args.Find("event");
+  if (event != nullptr) events.PushBack(*event);
+  out["events"] = std::move(events);
+  out["persist"] = mcp::JsonValue(true);
+  return out;
+}
+
+inline mcp::JsonValue input_map_deadzone_args(const mcp::JsonValue &args) {
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  const mcp::JsonValue *action = args.Find("action");
+  const mcp::JsonValue *deadzone = args.Find("deadzone");
+  if (action != nullptr) out["action"] = *action;
+  if (deadzone != nullptr) out["deadzone"] = *deadzone;
+  out["persist"] = mcp::JsonValue(true);
+  return out;
+}
+
+inline mcp::JsonValue input_map_has_args(const mcp::JsonValue &args) {
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  const mcp::JsonValue *action = args.Find("action");
+  if (action != nullptr) out["action"] = *action;
+  return out;
+}
+
+inline mcp::JsonValue validate_input_map_action(
+    const mcp::JsonValue &args, const char *missing_message) {
+  const mcp::JsonValue *action = args.Find("action");
+  if (action == nullptr || !action->IsString()) {
+    mcp::JsonValue error(mcp::JsonValue::object_tag);
+    error["error"] = mcp::JsonValue(missing_message);
+    return error;
+  }
+  return mcp::JsonValue();
+}
+
+inline mcp::JsonValue validate_input_map_event(const mcp::JsonValue &args) {
+  const mcp::JsonValue *event = args.Find("event");
+  mcp::JsonValue action_error =
+      validate_input_map_action(args, "missing required parameter: action");
+  if (!action_error.IsNull()) return action_error;
+  if (event == nullptr || !event->IsObject()) {
+    mcp::JsonValue error(mcp::JsonValue::object_tag);
+    error["error"] = mcp::JsonValue("missing required parameter: event");
+    return error;
+  }
+  return mcp::JsonValue();
+}
+
+inline mcp::JsonValue validate_input_map_deadzone(
+    const mcp::JsonValue &args) {
+  mcp::JsonValue action_error =
+      validate_input_map_action(args, "missing required parameter: action");
+  if (!action_error.IsNull()) return action_error;
+  const mcp::JsonValue *deadzone = args.Find("deadzone");
+  if (deadzone == nullptr || !deadzone->IsNumber()) {
+    mcp::JsonValue error(mcp::JsonValue::object_tag);
+    error["error"] = mcp::JsonValue("missing required parameter: deadzone");
+    return error;
+  }
+  return mcp::JsonValue();
+}
+
+inline mcp::JsonValue project_input_map_ok(const mcp::JsonValue &) {
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  out["result"] = mcp::JsonValue("ok");
+  return out;
+}
+
+inline mcp::JsonValue project_input_map_has(const mcp::JsonValue &result) {
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  const mcp::JsonValue *inner = result.Find("result");
+  bool found = false;
+  if (inner != nullptr && inner->IsArray() && inner->Size() > 0) {
+    found = true;
+  }
+  out["result"] = mcp::JsonValue(found);
+  return out;
+}
 
 } // namespace
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(9);
+  v.reserve(5);
   v.push_back(make_spec_tool(ToolSpec{
       "save_input_map",
       "Write the current editor InputMap into ProjectSettings and save it to disk. Optional 'actions' restricts persistence to the listed action names; when omitted, actions prefixed with 'ui_' or containing '/' are skipped. Returns 'result' set to 'persisted', plus 'actions_persisted', 'readback_verified', 'skipped' and 'save_error' fields. The running game loads persisted actions at startup; the editor does not reload them until restart.",
       "Input", {"input", "map", "persist", "save"}, SideEffect::WritesConfig, tool_flags::kMutating,
       kSaveInputMapParams, input_map_ops::handle_persist}));
   v.push_back(make_spec_tool(ToolSpec{
-      "add_input_map_action",
-      "Add a new empty input action to the editor project InputMap. 'deadzone' defaults to 0.5. Only the action is created; no events are bound, so use add_input_map_action_event to attach keys or buttons afterwards. The change modifies the editor project InputMap and persists to project settings; a running game process will not see the change until it restarts. Returns 'result' set to 'ok'.",
-      "Input", {"input", "map"}, SideEffect::WritesConfig, tool_flags::kMutating,
-      kAddInputMapActionParams, input_map_ops::handle_add_action}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "add_input_map_action_event",
-      "Bind an input event to an action in the editor project InputMap. 'event' must be an object with a concrete 'class' field, for example InputEventKey with 'keycode' 65, or a KEY_* name string. The change modifies the editor project InputMap and persists to project settings; a running game process will not see the change until it restarts. Returns 'result' set to 'ok'.",
-      "Input", {"input", "map"}, SideEffect::WritesConfig, tool_flags::kMutating,
-      kAddInputMapActionEventParams, input_map_ops::handle_action_add_event}));
-  v.push_back(make_spec_tool(ToolSpec{
       "erase_input_map_action_event",
       "Remove an input event from an action in the editor project InputMap. 'event_index' is the zero-based index of the event to delete within the action's event list; an out-of-range index returns an error. The change modifies the editor project InputMap and persists to project settings; a running game process will not see the change until it restarts. Returns 'result' set to 'ok'.",
       "Input", {"input", "map"}, SideEffect::WritesConfig, tool_flags::kMutating,
       kEraseInputMapActionEventParams, input_map_ops::handle_action_erase_event}));
   v.push_back(make_spec_tool(ToolSpec{
-      "set_input_map_action_deadzone",
-      "Set the deadzone of an input action, the analog threshold below which input is ignored, in the range 0.0 to 1.0. The change modifies the editor project InputMap and persists to project settings; a running game process will not see the change until it restarts. Returns 'result' set to 'ok'.",
-      "Input", {"input", "map"}, SideEffect::WritesConfig, tool_flags::kMutating,
-      kSetInputMapActionDeadzoneParams, input_map_ops::handle_action_set_deadzone}));
-  v.push_back(make_spec_tool(ToolSpec{
       "erase_input_map_action",
       "Remove an input action from the editor project InputMap and clear its persisted project setting. The change modifies the editor project InputMap and persists to project settings; a running game process will not see the change until it restarts. Returns 'result' set to 'ok'.",
       "Input", {"input", "map"}, SideEffect::WritesConfig, tool_flags::kMutating,
       kEraseInputMapActionParams, input_map_ops::handle_erase_action}));
-  v.push_back(make_spec_tool(ToolSpec{
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
       "get_input_map_actions",
-      "Get all input action names from the editor project InputMap, including built-in 'ui_*' actions. A running game process has its own InputMap loaded at startup, so this reflects only the editor project state. Returns an array of action name strings in 'result'.",
+      "Get input action names from the editor project InputMap, including built-in 'ui_*' actions. Optional 'action' checks one name and returns [action] when it exists or [] otherwise. A running game process has its own InputMap loaded at startup, so this reflects only the editor project state. Returns an array of action name strings in 'result'.",
       "Input", {"input", "map"}, SideEffect::None, tool_flags::kNone,
-      kGetInputMapActionsParams, input_map_ops::handle_get_actions}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "has_input_map_action",
-      "Check whether an input action exists in the editor project InputMap. Use it to decide whether add_input_map_action is needed before binding events. A running game process has its own InputMap loaded at startup, so this reflects only the editor project state. Returns a boolean in 'result'.",
-      "Input", {"input", "map"}, SideEffect::None, tool_flags::kNone,
-      kHasInputMapActionParams, input_map_ops::handle_has_action}));
-  v.push_back(make_spec_tool(ToolSpec{
+      kGetInputMapActionsParams, input_map_ops::handle_get_actions},
+      {
+          ToolAlias{
+              "has_input_map_action", "get_input_map_actions",
+              input_map_has_args, project_input_map_has, "0.4.0", "0.6.0",
+              [](const mcp::JsonValue &args) {
+                return validate_input_map_action(
+                    args, "missing required parameter: action");
+              }},
+      })));
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
       "set_input_map_action_bundle",
-      "Ensure an input action exists and apply deadzone plus events in one call in the editor project InputMap. 'action' is required; 'events' optionally appends each event object with the same 'class' plus keycode/physical_keycode KEY_* handling as add_input_map_action_event and unknown key names are rejected; 'deadzone' optionally sets the analog threshold (0.5 for a new action, existing value kept when omitted). Dual persistence: persist=false (default) only modifies the editor InputMap at runtime (effective SideEffect None, runtime-smokeable with action alone); persist=true additionally writes ProjectSettings input/<action> and saves to disk (effective SideEffect WritesConfig). A running game process will not see the change until it restarts. Returns 'result' set to 'ok' plus 'persisted'.",
+      "Ensure an input action exists and apply deadzone plus events in one call in the editor project InputMap. 'action' is required; 'events' optionally appends each event object with a concrete 'class' plus keycode/physical_keycode KEY_* handling; 'deadzone' optionally sets the analog threshold (0.5 for a new action, existing value kept when omitted). Dual persistence: persist=false (default) only modifies the editor InputMap at runtime; persist=true additionally writes ProjectSettings input/<action> and saves to disk. A running game process will not see the change until it restarts. Returns 'result' set to 'ok' plus 'persisted'.",
       "Input", {"input", "map"}, SideEffect::WritesConfig, tool_flags::kMutating,
-      kSetInputMapActionBundleParams, input_map_ops::handle_set_action_bundle}));
+      kSetInputMapActionBundleParams, input_map_ops::handle_set_action_bundle},
+      {
+          ToolAlias{
+              "add_input_map_action", "set_input_map_action_bundle",
+              input_map_add_args, project_input_map_ok, "0.4.0", "0.6.0",
+              [](const mcp::JsonValue &args) {
+                return validate_input_map_action(
+                    args, "missing required parameter: action");
+              }},
+          ToolAlias{
+              "add_input_map_action_event", "set_input_map_action_bundle",
+              input_map_event_args, project_input_map_ok, "0.4.0", "0.6.0",
+              validate_input_map_event},
+          ToolAlias{
+              "set_input_map_action_deadzone", "set_input_map_action_bundle",
+              input_map_deadzone_args, project_input_map_ok, "0.4.0", "0.6.0",
+              validate_input_map_deadzone},
+      })));
   return v;
 }
 

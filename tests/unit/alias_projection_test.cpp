@@ -10,6 +10,12 @@
 #include "tools/domains/audio/audio_tools.hpp"
 #include "tools/domains/debug/debug_tools.hpp"
 #include "tools/domains/doc/doc_tools.hpp"
+#include "tools/domains/gridmap/gridmap_tools.hpp"
+#include "tools/domains/input_map/input_map_tools.hpp"
+#include "tools/domains/property/property_tools.hpp"
+#include "tools/domains/resource/resource_tools.hpp"
+#include "tools/domains/theme/theme_tools.hpp"
+#include "tools/domains/tilemap/tilemap_tools.hpp"
 
 namespace {
 
@@ -41,6 +47,12 @@ const ToolAlias *find_alias(
     }
   }
   return nullptr;
+}
+
+std::string string_field(const mcp::JsonValue &value, const char *key) {
+  const mcp::JsonValue *found = value.Find(key);
+  return found != nullptr && found->IsString() ? found->GetString()
+                                               : std::string();
 }
 
 std::string error_text(const mcp::JsonValue &value) {
@@ -213,6 +225,151 @@ TEST(AliasProjectionTest, DocsAliasesProjectLegacyShapes) {
   const mcp::JsonValue *property_output = property_projected.Find("result");
   ASSERT_NE(property_output, nullptr);
   EXPECT_EQ((*property_output)["name"].GetString(), "position");
+}
+
+TEST(AliasProjectionTest, ThemeAliasesProjectLegacyShapes) {
+  const auto tools = godot_autopilot::theme_tools::make_tools();
+  const ToolAlias *color = find_alias(
+      tools, "set_theme_item_bundle", "set_theme_color");
+  ASSERT_NE(color, nullptr);
+  mcp::JsonValue color_input = object();
+  color_input["path"] = mcp::JsonValue("res://theme.tres");
+  color_input["theme_type"] = mcp::JsonValue("Button");
+  color_input["varname"] = mcp::JsonValue("font_color");
+  color_input["color"] = mcp::JsonValue("#ffffff");
+  const mcp::JsonValue color_args = apply_alias_args(*color, color_input);
+  const mcp::JsonValue *colors = color_args.Find("colors");
+  ASSERT_NE(colors, nullptr);
+  const mcp::JsonValue *button = colors->Find("Button");
+  ASSERT_NE(button, nullptr);
+  EXPECT_EQ((*button)["font_color"].GetString(), "#ffffff");
+
+  mcp::JsonValue color_result = object();
+  color_result["path"] = mcp::JsonValue("res://theme.tres");
+  color_result["saved"] = mcp::JsonValue(true);
+  color_result["verified"] = mcp::JsonValue(true);
+  const mcp::JsonValue projected =
+      apply_alias_result(*color, color_result, color_input);
+  EXPECT_EQ(string_field(projected, "theme_type"), "Button");
+  EXPECT_EQ(string_field(projected, "varname"), "font_color");
+  EXPECT_TRUE(projected["saved"].GetBool());
+
+  const ToolAlias *anchor = find_alias(
+      tools, "set_control_layout", "set_control_anchor_preset");
+  ASSERT_NE(anchor, nullptr);
+  mcp::JsonValue anchor_input = object();
+  anchor_input["control_path"] = mcp::JsonValue("HUD");
+  anchor_input["preset"] = mcp::JsonValue(static_cast<int64_t>(8));
+  const mcp::JsonValue anchor_args = apply_alias_args(*anchor, anchor_input);
+  EXPECT_EQ(string_field(anchor_args, "path"), "HUD");
+  const mcp::JsonValue anchor_projected = apply_alias_result(
+      *anchor, mcp::JsonValue(mcp::JsonValue::object_tag), anchor_input);
+  EXPECT_EQ(string_field(anchor_projected, "control_path"), "HUD");
+  EXPECT_EQ(anchor_projected["preset"].GetInt(), 8);
+}
+
+TEST(AliasProjectionTest, TileGridAliasesProjectLegacyShapes) {
+  const auto tilemap = godot_autopilot::tilemap_tools::make_tools();
+  const ToolAlias *cell =
+      find_alias(tilemap, "set_tilemap_cells", "set_tilemap_cell");
+  ASSERT_NE(cell, nullptr);
+  mcp::JsonValue cell_input = object();
+  cell_input["path"] = mcp::JsonValue("TileMap");
+  cell_input["x"] = mcp::JsonValue(static_cast<int64_t>(1));
+  cell_input["y"] = mcp::JsonValue(static_cast<int64_t>(2));
+  const mcp::JsonValue cell_args = apply_alias_args(*cell, cell_input);
+  EXPECT_EQ(string_field(cell_args, "node_path"), "TileMap");
+  const mcp::JsonValue *cells = cell_args.Find("cells");
+  ASSERT_NE(cells, nullptr);
+  ASSERT_EQ(cells->Size(), 1u);
+  EXPECT_EQ((*cells)[0]["source_id"].GetInt(), 0);
+  const mcp::JsonValue projected =
+      apply_alias_result(*cell, mcp::JsonValue(mcp::JsonValue::object_tag));
+  EXPECT_EQ(string_field(projected, "result"), "ok");
+
+  const auto gridmap = godot_autopilot::gridmap_tools::make_tools();
+  const ToolAlias *grid_cell =
+      find_alias(gridmap, "fill_gridmap_box", "set_gridmap_cell");
+  ASSERT_NE(grid_cell, nullptr);
+  mcp::JsonValue grid_input = object();
+  grid_input["node_path"] = mcp::JsonValue("GridMap");
+  mcp::JsonValue position = object();
+  position["x"] = mcp::JsonValue(static_cast<int64_t>(1));
+  position["y"] = mcp::JsonValue(static_cast<int64_t>(2));
+  position["z"] = mcp::JsonValue(static_cast<int64_t>(3));
+  grid_input["position"] = position;
+  grid_input["item"] = mcp::JsonValue(static_cast<int64_t>(-1));
+  const mcp::JsonValue grid_args = apply_alias_args(*grid_cell, grid_input);
+  EXPECT_TRUE(grid_args["erase"].GetBool());
+  EXPECT_EQ(grid_args["from"]["x"].GetInt(), 1);
+}
+
+TEST(AliasProjectionTest, InputMapAliasesProjectLegacyShapes) {
+  const auto tools = godot_autopilot::input_map_tools::make_tools();
+  const ToolAlias *add = find_alias(
+      tools, "set_input_map_action_bundle", "add_input_map_action");
+  ASSERT_NE(add, nullptr);
+  mcp::JsonValue add_input = object();
+  add_input["action"] = mcp::JsonValue("jump");
+  const mcp::JsonValue add_args = apply_alias_args(*add, add_input);
+  EXPECT_TRUE(add_args["persist"].GetBool());
+  EXPECT_DOUBLE_EQ(add_args["deadzone"].GetDouble(), 0.5);
+
+  const ToolAlias *has = find_alias(
+      tools, "get_input_map_actions", "has_input_map_action");
+  ASSERT_NE(has, nullptr);
+  mcp::JsonValue has_result = object();
+  mcp::JsonValue names(mcp::JsonValue::array_tag);
+  names.PushBack(mcp::JsonValue("jump"));
+  has_result["result"] = std::move(names);
+  const mcp::JsonValue projected = apply_alias_result(*has, has_result);
+  EXPECT_TRUE(projected["result"].GetBool());
+}
+
+TEST(AliasProjectionTest, ResourceScriptPropertyAliasesProjectLegacyShapes) {
+  const auto resources = godot_autopilot::resource_tools::make_tools();
+  const ToolAlias *dependency = find_alias(
+      resources, "get_resource_dependencies", "has_resource_dependency");
+  ASSERT_NE(dependency, nullptr);
+  mcp::JsonValue dependency_input = object();
+  dependency_input["path"] = mcp::JsonValue("res://a.tscn");
+  dependency_input["dependency"] = mcp::JsonValue("res://b.tres");
+  const mcp::JsonValue dependency_args =
+      apply_alias_args(*dependency, dependency_input);
+  mcp::JsonValue dependency_result = object();
+  mcp::JsonValue dependencies(mcp::JsonValue::array_tag);
+  dependencies.PushBack(mcp::JsonValue("res://b.tres"));
+  dependency_result["result"] = std::move(dependencies);
+  const mcp::JsonValue dependency_projected = apply_alias_result(
+      *dependency, dependency_result, dependency_input);
+  EXPECT_TRUE(dependency_projected["result"].GetBool());
+
+  const ToolAlias *move =
+      find_alias(resources, "rename_resource_file", "move_resource_file");
+  ASSERT_NE(move, nullptr);
+
+  const ToolAlias *load_script =
+      find_alias(resources, "load_resource", "load_script");
+  ASSERT_NE(load_script, nullptr);
+  mcp::JsonValue script_input = object();
+  script_input["path"] = mcp::JsonValue("res://player.gd");
+  script_input["fresh"] = mcp::JsonValue(true);
+  const mcp::JsonValue script_args =
+      apply_alias_args(*load_script, script_input);
+  EXPECT_EQ(string_field(script_args, "type_hint"), "Script");
+  EXPECT_EQ(string_field(script_args, "cache_mode"), "ignore");
+
+  const auto properties = godot_autopilot::property_tools::make_tools();
+  const ToolAlias *batch =
+      find_alias(properties, "property_set", "set_properties_batch");
+  ASSERT_NE(batch, nullptr);
+  mcp::JsonValue batch_input = object();
+  batch_input["path"] = mcp::JsonValue("Player");
+  mcp::JsonValue batch_properties = object();
+  batch_properties["visible"] = mcp::JsonValue(false);
+  batch_input["properties"] = std::move(batch_properties);
+  const mcp::JsonValue batch_args = apply_alias_args(*batch, batch_input);
+  EXPECT_TRUE(batch_args["atomic"].GetBool());
 }
 
 } // namespace

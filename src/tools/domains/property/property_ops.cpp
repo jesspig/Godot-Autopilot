@@ -1815,6 +1815,7 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
   auto *it_val = args.Find("value");
   auto *it_batch = args.Find("properties");
   auto *it_hint_early = args.Find("type_hint");
+  auto *it_atomic_early = args.Find("atomic");
   if (!it_path || !it_path->IsString()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
     e["error"] = mcp::JsonValue("missing required parameter: path");
@@ -1835,6 +1836,20 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
     e["error"] = mcp::JsonValue(
         "type_hint cannot be used with properties — omit it to infer each property type");
     return e;
+  }
+  if (it_atomic_early != nullptr) {
+    if (!it_atomic_early->IsBool()) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue("invalid parameter: atomic must be a boolean");
+      return e;
+    }
+    if (!has_batch) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue(
+          "atomic can only be used with the properties batch form");
+      return e;
+    }
+    return handle_set_batch(args);
   }
   if (!has_batch) {
     if (!it_prop || !it_prop->IsString()) {
@@ -1861,7 +1876,8 @@ mcp::JsonValue handle_set(const mcp::JsonValue &args) {
   } else {
     if (args.IsObject()) {
       for (const auto &entry : args.GetObject()) {
-        if (entry.first != "path" && entry.first != "properties") {
+        if (entry.first != "path" && entry.first != "properties" &&
+            entry.first != "atomic") {
           mcp::JsonValue e(mcp::JsonValue::object_tag);
           e["error"] = mcp::JsonValue("unknown parameter for property_set: " +
                                       entry.first);

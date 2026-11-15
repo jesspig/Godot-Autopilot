@@ -4,8 +4,8 @@
     "domains": "src/tools/domains/*/*_tools.hpp",
     "register_all": "src/tools/base/register_all.cpp"
   },
-  "catalog_total": 448,
-  "domain_total": 440,
+  "catalog_total": 433,
+  "domain_total": 425,
   "meta_total": 7,
   "system_total": 1,
   "domain_count": 33,
@@ -22,25 +22,25 @@
     "Docs": 2,
     "Editor": 33,
     "Game": 19,
-    "GridMap": 5,
+    "GridMap": 4,
     "Group": 3,
     "Input": 15,
-    "InputMap": 9,
+    "InputMap": 5,
     "Log": 1,
     "Nav": 15,
     "OS": 23,
     "Physics": 51,
-    "Properties": 7,
+    "Properties": 6,
     "Render": 52,
-    "Resources": 34,
+    "Resources": 32,
     "Scene": 15,
     "SceneTree": 8,
-    "Scripts": 11,
+    "Scripts": 10,
     "SpriteFrames": 3,
     "Testing": 2,
     "Text": 10,
-    "Theme": 10,
-    "TileMap": 5,
+    "Theme": 5,
+    "TileMap": 4,
     "Tileset": 3,
     "Tween": 4
   },
@@ -50,28 +50,28 @@
     "Audio": 21,
     "Capture": 2,
     "Config": 17,
-    "Scripts": 18,
+    "Scripts": 17,
     "Debug": 10,
     "Debugger": 6,
     "Display": 25,
     "Docs": 2,
     "Editor": 33,
     "Game": 23,
-    "TileMap": 13,
+    "TileMap": 11,
     "Group": 3,
-    "Input": 24,
+    "Input": 20,
     "System": 5,
     "Navigation": 15,
     "OS": 22,
     "Physics": 50,
-    "Properties": 7,
+    "Properties": 6,
     "Render": 52,
-    "Resources": 34,
+    "Resources": 32,
     "Scene": 23,
     "SpriteFrames": 3,
     "Testing": 2,
     "Text": 10,
-    "Theme": 10,
+    "Theme": 5,
     "Meta": 4
   },
   "domain_by_category": {
@@ -80,35 +80,35 @@
     "Audio": 21,
     "Capture": 2,
     "Config": 17,
-    "Scripts": 18,
+    "Scripts": 17,
     "Debug": 10,
     "Debugger": 6,
     "Display": 25,
     "Docs": 2,
     "Editor": 33,
     "Game": 23,
-    "TileMap": 13,
+    "TileMap": 11,
     "Group": 3,
-    "Input": 24,
+    "Input": 20,
     "System": 1,
     "Navigation": 15,
     "OS": 22,
     "Physics": 50,
-    "Properties": 7,
+    "Properties": 6,
     "Render": 52,
-    "Resources": 34,
+    "Resources": 32,
     "Scene": 23,
     "SpriteFrames": 3,
     "Testing": 2,
     "Text": 10,
-    "Theme": 10
+    "Theme": 5
   },
   "by_side_effect": {
-    "None": 271,
-    "WritesScene": 43,
+    "None": 268,
+    "WritesScene": 39,
     "Destructive": 6,
-    "WritesFile": 27,
-    "WritesConfig": 18,
+    "WritesFile": 22,
+    "WritesConfig": 15,
     "ModifiesWindow": 42,
     "CodeExecute": 9,
     "ShowsAlert": 4,
@@ -116,11 +116,11 @@
     "GameRuntime": 18
   },
   "domain_by_side_effect": {
-    "None": 265,
-    "WritesScene": 43,
+    "None": 262,
+    "WritesScene": 39,
     "Destructive": 6,
-    "WritesFile": 27,
-    "WritesConfig": 18,
+    "WritesFile": 22,
+    "WritesConfig": 15,
     "ModifiesWindow": 42,
     "CodeExecute": 7,
     "ShowsAlert": 4,
@@ -128,8 +128,10 @@
     "GameRuntime": 18
   },
   "strict_redundant_count": 32,
-  "alias_count": 11,
+  "alias_count": 26,
   "alias_names": [
+    "add_input_map_action",
+    "add_input_map_action_event",
     "get_audio_bus_count",
     "get_audio_bus_name",
     "get_audio_device_inputs",
@@ -140,10 +142,23 @@
     "get_debug_node_count",
     "get_debug_object_count",
     "get_docs_method",
-    "get_docs_property"
+    "get_docs_property",
+    "has_input_map_action",
+    "has_resource_dependency",
+    "load_script",
+    "move_resource_file",
+    "set_control_anchor_preset",
+    "set_gridmap_cell",
+    "set_input_map_action_deadzone",
+    "set_properties_batch",
+    "set_theme_color",
+    "set_theme_constant",
+    "set_theme_font_size",
+    "set_theme_stylebox_flat",
+    "set_tilemap_cell"
   ],
-  "schema_non_empty": 391,
-  "schema_empty": 57,
+  "schema_non_empty": 377,
+  "schema_empty": 56,
   "tool_names": [
     "validate_scene_file",
     "find_unused_resources",
@@ -301,7 +316,6 @@
     "translate_text",
     "create_gridmap",
     "create_meshlibrary_item",
-    "set_gridmap_cell",
     "fill_gridmap_box",
     "get_gridmap_used_cells",
     "add_group_node",
@@ -323,13 +337,9 @@
     "start_input_gamepad_vibration",
     "stop_input_gamepad_vibration",
     "save_input_map",
-    "add_input_map_action",
-    "add_input_map_action_event",
     "erase_input_map_action_event",
-    "set_input_map_action_deadzone",
     "erase_input_map_action",
     "get_input_map_actions",
-    "has_input_map_action",
     "set_input_map_action_bundle",
     "get_game_log_entries",
     "create_nav_2d_map",
@@ -426,7 +436,6 @@
     "property_get_list",
     "signal_connect",
     "signal_disconnect",
-    "set_properties_batch",
     "set_node_transform",
     "create_render_canvas_item",
     "add_render_canvas_item_rect",
@@ -497,11 +506,9 @@
     "set_resource_uid",
     "remove_resource_file",
     "rename_resource_file",
-    "move_resource_file",
     "copy_resource_file",
     "create_directory",
     "get_resource_dependencies",
-    "has_resource_dependency",
     "get_resource_references",
     "reimport_resource_files",
     "set_resource_import_options",
@@ -538,7 +545,6 @@
     "set_scene_tree_debug_collisions_hint",
     "set_scene_tree_pause",
     "execute_script",
-    "load_script",
     "create_script",
     "patch_script",
     "attach_script_to_node",
@@ -564,17 +570,11 @@
     "add_shaped_text_string",
     "get_shaped_text_size",
     "create_theme_resource",
-    "set_theme_color",
-    "set_theme_constant",
-    "set_theme_font_size",
-    "set_theme_stylebox_flat",
     "get_theme_info",
     "apply_theme_to_control",
-    "set_control_anchor_preset",
     "set_control_layout",
     "set_theme_item_bundle",
     "create_tilemap",
-    "set_tilemap_cell",
     "set_tilemap_cells",
     "fill_tilemap_rect",
     "create_tilemap_tileset",
@@ -2472,7 +2472,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/gridmap/gridmap_tools.hpp",
-      "line": 56
+      "line": 115
     },
     {
       "name": "create_meshlibrary_item",
@@ -2486,21 +2486,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/gridmap/gridmap_tools.hpp",
-      "line": 61
-    },
-    {
-      "name": "set_gridmap_cell",
-      "category": "TileMap",
-      "domain": "GridMap",
-      "side_effect": "WritesScene",
-      "flags": [
-        "kMutating",
-        "kSceneTarget",
-        "kUndoable"
-      ],
-      "param_count": 4,
-      "source": "src/tools/domains/gridmap/gridmap_tools.hpp",
-      "line": 66
+      "line": 120
     },
     {
       "name": "fill_gridmap_box",
@@ -2514,7 +2500,7 @@
       ],
       "param_count": 6,
       "source": "src/tools/domains/gridmap/gridmap_tools.hpp",
-      "line": 71
+      "line": 125
     },
     {
       "name": "get_gridmap_used_cells",
@@ -2528,7 +2514,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/gridmap/gridmap_tools.hpp",
-      "line": 76
+      "line": 136
     },
     {
       "name": "add_group_node",
@@ -2768,31 +2754,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/input_map/input_map_tools.hpp",
-      "line": 63
-    },
-    {
-      "name": "add_input_map_action",
-      "category": "Input",
-      "domain": "InputMap",
-      "side_effect": "WritesConfig",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/input_map/input_map_tools.hpp",
-      "line": 68
-    },
-    {
-      "name": "add_input_map_action_event",
-      "category": "Input",
-      "domain": "InputMap",
-      "side_effect": "WritesConfig",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/input_map/input_map_tools.hpp",
-      "line": 73
+      "line": 140
     },
     {
       "name": "erase_input_map_action_event",
@@ -2804,19 +2766,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/input_map/input_map_tools.hpp",
-      "line": 78
-    },
-    {
-      "name": "set_input_map_action_deadzone",
-      "category": "Input",
-      "domain": "InputMap",
-      "side_effect": "WritesConfig",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/input_map/input_map_tools.hpp",
-      "line": 83
+      "line": 145
     },
     {
       "name": "erase_input_map_action",
@@ -2828,7 +2778,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/input_map/input_map_tools.hpp",
-      "line": 88
+      "line": 150
     },
     {
       "name": "get_input_map_actions",
@@ -2838,21 +2788,9 @@
       "flags": [
         "kNone"
       ],
-      "param_count": 0,
-      "source": "src/tools/domains/input_map/input_map_tools.hpp",
-      "line": 93
-    },
-    {
-      "name": "has_input_map_action",
-      "category": "Input",
-      "domain": "InputMap",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
       "param_count": 1,
       "source": "src/tools/domains/input_map/input_map_tools.hpp",
-      "line": 98
+      "line": 155
     },
     {
       "name": "set_input_map_action_bundle",
@@ -2864,7 +2802,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/input_map/input_map_tools.hpp",
-      "line": 103
+      "line": 169
     },
     {
       "name": "get_game_log_entries",
@@ -3961,7 +3899,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/property/property_tools.hpp",
-      "line": 72
+      "line": 102
     },
     {
       "name": "property_set",
@@ -3973,9 +3911,9 @@
         "kSceneTarget",
         "kUndoable"
       ],
-      "param_count": 5,
+      "param_count": 6,
       "source": "src/tools/domains/property/property_tools.hpp",
-      "line": 77
+      "line": 107
     },
     {
       "name": "property_get_list",
@@ -3987,7 +3925,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/property/property_tools.hpp",
-      "line": 82
+      "line": 118
     },
     {
       "name": "signal_connect",
@@ -3999,7 +3937,7 @@
       ],
       "param_count": 5,
       "source": "src/tools/domains/property/property_tools.hpp",
-      "line": 87
+      "line": 123
     },
     {
       "name": "signal_disconnect",
@@ -4011,21 +3949,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/property/property_tools.hpp",
-      "line": 92
-    },
-    {
-      "name": "set_properties_batch",
-      "category": "Properties",
-      "domain": "Properties",
-      "side_effect": "WritesScene",
-      "flags": [
-        "kMutating",
-        "kSceneTarget",
-        "kUndoable"
-      ],
-      "param_count": 3,
-      "source": "src/tools/domains/property/property_tools.hpp",
-      "line": 97
+      "line": 128
     },
     {
       "name": "set_node_transform",
@@ -4039,7 +3963,7 @@
       ],
       "param_count": 5,
       "source": "src/tools/domains/property/property_tools.hpp",
-      "line": 107
+      "line": 138
     },
     {
       "name": "create_render_canvas_item",
@@ -4673,9 +4597,9 @@
       "flags": [
         "kNone"
       ],
-      "param_count": 2,
+      "param_count": 3,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 200
+      "line": 268
     },
     {
       "name": "reload_resource",
@@ -4687,7 +4611,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 205
+      "line": 279
     },
     {
       "name": "load_resource_threaded",
@@ -4699,7 +4623,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 210
+      "line": 284
     },
     {
       "name": "get_resource_load_threaded_status",
@@ -4711,7 +4635,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 215
+      "line": 289
     },
     {
       "name": "get_resource_load_threaded",
@@ -4723,7 +4647,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 220
+      "line": 294
     },
     {
       "name": "save_resource",
@@ -4735,7 +4659,7 @@
       ],
       "param_count": 7,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 225
+      "line": 299
     },
     {
       "name": "create_resource",
@@ -4747,7 +4671,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 230
+      "line": 304
     },
     {
       "name": "duplicate_resource",
@@ -4759,7 +4683,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 235
+      "line": 309
     },
     {
       "name": "get_resource_type",
@@ -4771,7 +4695,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 240
+      "line": 314
     },
     {
       "name": "has_resource",
@@ -4783,7 +4707,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 245
+      "line": 319
     },
     {
       "name": "get_resource_types",
@@ -4795,7 +4719,7 @@
       ],
       "param_count": 0,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 250
+      "line": 324
     },
     {
       "name": "get_resource_extensions",
@@ -4807,7 +4731,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 255
+      "line": 329
     },
     {
       "name": "get_resource_dir_files",
@@ -4819,7 +4743,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 260
+      "line": 334
     },
     {
       "name": "get_resource_uid",
@@ -4831,7 +4755,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 265
+      "line": 339
     },
     {
       "name": "set_resource_uid",
@@ -4843,7 +4767,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 270
+      "line": 344
     },
     {
       "name": "remove_resource_file",
@@ -4855,7 +4779,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 275
+      "line": 349
     },
     {
       "name": "rename_resource_file",
@@ -4865,21 +4789,9 @@
       "flags": [
         "kMutating"
       ],
-      "param_count": 2,
+      "param_count": 3,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 280
-    },
-    {
-      "name": "move_resource_file",
-      "category": "Resources",
-      "domain": "Resources",
-      "side_effect": "WritesFile",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 285
+      "line": 354
     },
     {
       "name": "copy_resource_file",
@@ -4891,7 +4803,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 290
+      "line": 364
     },
     {
       "name": "create_directory",
@@ -4903,7 +4815,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 295
+      "line": 369
     },
     {
       "name": "get_resource_dependencies",
@@ -4913,21 +4825,9 @@
       "flags": [
         "kNone"
       ],
-      "param_count": 1,
-      "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 300
-    },
-    {
-      "name": "has_resource_dependency",
-      "category": "Resources",
-      "domain": "Resources",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
       "param_count": 2,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 305
+      "line": 374
     },
     {
       "name": "get_resource_references",
@@ -4939,7 +4839,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 310
+      "line": 385
     },
     {
       "name": "reimport_resource_files",
@@ -4951,7 +4851,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 315
+      "line": 390
     },
     {
       "name": "set_resource_import_options",
@@ -4963,7 +4863,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 320
+      "line": 395
     },
     {
       "name": "set_resource_property",
@@ -4975,7 +4875,7 @@
       ],
       "param_count": 7,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 325
+      "line": 400
     },
     {
       "name": "get_resource_property",
@@ -4987,7 +4887,7 @@
       ],
       "param_count": 6,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 330
+      "line": 405
     },
     {
       "name": "create_curve_resource",
@@ -4999,7 +4899,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 335
+      "line": 410
     },
     {
       "name": "set_curve_points",
@@ -5011,7 +4911,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 340
+      "line": 415
     },
     {
       "name": "get_curve_baked_points",
@@ -5023,7 +4923,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 345
+      "line": 420
     },
     {
       "name": "create_primitive_mesh",
@@ -5035,7 +4935,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 350
+      "line": 425
     },
     {
       "name": "create_array_mesh",
@@ -5047,7 +4947,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 355
+      "line": 430
     },
     {
       "name": "set_mesh_surface_material",
@@ -5059,7 +4959,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 360
+      "line": 435
     },
     {
       "name": "assign_mesh_to_instance",
@@ -5071,7 +4971,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 365
+      "line": 440
     },
     {
       "name": "create_scene_node",
@@ -5376,19 +5276,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 82
-    },
-    {
-      "name": "load_script",
-      "category": "Scripts",
-      "domain": "Scripts",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 87
+      "line": 78
     },
     {
       "name": "create_script",
@@ -5400,7 +5288,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 92
+      "line": 83
     },
     {
       "name": "patch_script",
@@ -5412,7 +5300,7 @@
       ],
       "param_count": 6,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 97
+      "line": 88
     },
     {
       "name": "attach_script_to_node",
@@ -5426,7 +5314,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 102
+      "line": 93
     },
     {
       "name": "detach_script_from_node",
@@ -5439,7 +5327,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 107
+      "line": 98
     },
     {
       "name": "get_script_property",
@@ -5451,7 +5339,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 112
+      "line": 103
     },
     {
       "name": "set_script_property",
@@ -5463,7 +5351,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 117
+      "line": 108
     },
     {
       "name": "call_script_node",
@@ -5475,7 +5363,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 122
+      "line": 113
     },
     {
       "name": "reload_script",
@@ -5487,7 +5375,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 127
+      "line": 118
     },
     {
       "name": "get_script_property_list",
@@ -5499,7 +5387,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 132
+      "line": 123
     },
     {
       "name": "create_spriteframes",
@@ -5691,55 +5579,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/theme/theme_tools.hpp",
-      "line": 91
-    },
-    {
-      "name": "set_theme_color",
-      "category": "Theme",
-      "domain": "Theme",
-      "side_effect": "WritesFile",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 4,
-      "source": "src/tools/domains/theme/theme_tools.hpp",
-      "line": 96
-    },
-    {
-      "name": "set_theme_constant",
-      "category": "Theme",
-      "domain": "Theme",
-      "side_effect": "WritesFile",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 4,
-      "source": "src/tools/domains/theme/theme_tools.hpp",
-      "line": 101
-    },
-    {
-      "name": "set_theme_font_size",
-      "category": "Theme",
-      "domain": "Theme",
-      "side_effect": "WritesFile",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 4,
-      "source": "src/tools/domains/theme/theme_tools.hpp",
-      "line": 106
-    },
-    {
-      "name": "set_theme_stylebox_flat",
-      "category": "Theme",
-      "domain": "Theme",
-      "side_effect": "WritesFile",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 4,
-      "source": "src/tools/domains/theme/theme_tools.hpp",
-      "line": 111
+      "line": 204
     },
     {
       "name": "get_theme_info",
@@ -5751,7 +5591,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/theme/theme_tools.hpp",
-      "line": 116
+      "line": 209
     },
     {
       "name": "apply_theme_to_control",
@@ -5764,20 +5604,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/theme/theme_tools.hpp",
-      "line": 121
-    },
-    {
-      "name": "set_control_anchor_preset",
-      "category": "Theme",
-      "domain": "Theme",
-      "side_effect": "WritesScene",
-      "flags": [
-        "kNone",
-        "kSceneTarget"
-      ],
-      "param_count": 3,
-      "source": "src/tools/domains/theme/theme_tools.hpp",
-      "line": 126
+      "line": 214
     },
     {
       "name": "set_control_layout",
@@ -5791,7 +5618,7 @@
       ],
       "param_count": 10,
       "source": "src/tools/domains/theme/theme_tools.hpp",
-      "line": 131
+      "line": 219
     },
     {
       "name": "set_theme_item_bundle",
@@ -5803,7 +5630,7 @@
       ],
       "param_count": 5,
       "source": "src/tools/domains/theme/theme_tools.hpp",
-      "line": 136
+      "line": 230
     },
     {
       "name": "create_tilemap",
@@ -5816,20 +5643,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/tilemap/tilemap_tools.hpp",
-      "line": 60
-    },
-    {
-      "name": "set_tilemap_cell",
-      "category": "TileMap",
-      "domain": "TileMap",
-      "side_effect": "WritesScene",
-      "flags": [
-        "kNone",
-        "kSceneTarget"
-      ],
-      "param_count": 6,
-      "source": "src/tools/domains/tilemap/tilemap_tools.hpp",
-      "line": 65
+      "line": 118
     },
     {
       "name": "set_tilemap_cells",
@@ -5840,9 +5654,9 @@
         "kNone",
         "kSceneTarget"
       ],
-      "param_count": 3,
+      "param_count": 9,
       "source": "src/tools/domains/tilemap/tilemap_tools.hpp",
-      "line": 70
+      "line": 123
     },
     {
       "name": "fill_tilemap_rect",
@@ -5856,7 +5670,7 @@
       ],
       "param_count": 8,
       "source": "src/tools/domains/tilemap/tilemap_tools.hpp",
-      "line": 75
+      "line": 134
     },
     {
       "name": "create_tilemap_tileset",
@@ -5868,7 +5682,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/tilemap/tilemap_tools.hpp",
-      "line": 80
+      "line": 139
     },
     {
       "name": "add_tilemap_atlas_source",
@@ -6099,7 +5913,7 @@
       "domain": "Resources",
       "side_effect": "None",
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 235
+      "line": 309
     },
     {
       "name": "run_gdscript_tests",

@@ -49,6 +49,8 @@ struct ToolAlias {
   std::string deprecated_since;
   std::string removal_version;
   std::function<mcp::JsonValue(const mcp::JsonValue &)> validate_args;
+  std::function<mcp::JsonValue(const mcp::JsonValue &, const mcp::JsonValue &)>
+      project_result_with_args;
 };
 
 struct ToolSpec {
@@ -483,6 +485,17 @@ inline mcp::JsonValue annotate_alias_result(const ToolAlias &alias,
 inline mcp::JsonValue apply_alias_result(const ToolAlias &alias,
                                          mcp::JsonValue result) {
   if (alias.project_result) {
+    result = alias.project_result(result);
+  }
+  return annotate_alias_result(alias, std::move(result));
+}
+
+inline mcp::JsonValue apply_alias_result(const ToolAlias &alias,
+                                         mcp::JsonValue result,
+                                         const mcp::JsonValue &args) {
+  if (alias.project_result_with_args) {
+    result = alias.project_result_with_args(result, args);
+  } else if (alias.project_result) {
     result = alias.project_result(result);
   }
   return annotate_alias_result(alias, std::move(result));

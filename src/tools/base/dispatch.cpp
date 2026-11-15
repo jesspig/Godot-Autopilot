@@ -195,7 +195,7 @@ mcp::JsonValue call_handler_impl(const std::string &name,
     if (has_deferred_marker(result)) {
       result = annotate_alias_result(*alias, std::move(result));
     } else {
-      result = apply_alias_result(*alias, std::move(result));
+      result = apply_alias_result(*alias, std::move(result), args);
     }
   }
   const bool has_error = !spec_detail::verdict_of(result).ok;

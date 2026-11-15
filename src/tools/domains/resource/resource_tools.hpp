@@ -16,7 +16,8 @@ namespace {
 
 const std::vector<ParamSpec> kLoadResourceParams = {
     {"path", "string", "Resource file path to load, e.g. res://my_resource.tres", true},
-    {"type_hint", "string", "Expected resource class to guide loading, e.g. PackedScene, Texture2D; default: none", false},
+    {"type_hint", "string", "Expected resource class to guide loading, e.g. PackedScene, Texture2D, Script; default: none", false},
+    {"cache_mode", "string", "Optional loader cache mode: 'reuse' (default), 'replace' or 'ignore'; ignore re-reads the file from disk instead of returning the cached instance", false},
 };
 
 const std::vector<ParamSpec> kReloadResourceParams = {
@@ -92,12 +93,8 @@ const std::vector<ParamSpec> kRemoveResourceFileParams = {
 
 const std::vector<ParamSpec> kRenameResourceFileParams = {
     {"path", "string", "Current resource path, e.g. res://old_name.tres; 'from' is accepted as an alias", true},
-    {"new_path", "string", "New resource path, e.g. res://new_name.tres; 'to' is accepted as an alias", true},
-};
-
-const std::vector<ParamSpec> kMoveResourceFileParams = {
-    {"path", "string", "Existing res:// file or directory to move, e.g. res://sfx/jump.wav; directories move recursively preserving the sub-folder layout with *.uid sidecars following their owners", true},
-    {"new_directory", "string", "Destination directory inside res:// (absolute like res://assets/sfx or relative like assets/sfx); trailing slashes are trimmed, user:// is rejected", true},
+    {"new_path", "string", "New resource path, e.g. res://new_name.tres; 'to' is accepted as an alias; optional when new_directory is used", false},
+    {"new_directory", "string", "Optional destination directory inside res:// for a move that keeps the file or directory name; directories move recursively", false},
 };
 
 const std::vector<ParamSpec> kCopyResourceFileParams = {
@@ -111,11 +108,7 @@ const std::vector<ParamSpec> kCreateDirectoryParams = {
 
 const std::vector<ParamSpec> kGetResourceDependenciesParams = {
     {"path", "string", "Resource file path whose dependencies to list, e.g. res://scene.tscn", true},
-};
-
-const std::vector<ParamSpec> kHasResourceDependencyParams = {
-    {"path", "string", "Resource file path to inspect, e.g. res://scene.tscn", true},
-    {"dependency", "string", "Dependency file path to search for in the resource's dependency list, e.g. res://icon.svg", true},
+    {"dependency", "string", "Optional dependency path to filter for; when present only that exact dependency is returned if found", false},
 };
 
 const std::vector<ParamSpec> kGetResourceReferencesParams = {
@@ -192,16 +185,97 @@ const std::vector<ParamSpec> kAssignMeshToInstanceParams = {
     {"mesh_ref", "object", "Mesh locator: memory://name string, bare registration name, res:// path, decimal object_id string, or {name|path|object_id|resource} object", true},
 };
 
+inline mcp::JsonValue dependency_check_args(const mcp::JsonValue &args) {
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  const mcp::JsonValue *path = args.Find("path");
+  const mcp::JsonValue *dependency = args.Find("dependency");
+  if (path != nullptr) out["path"] = *path;
+  if (dependency != nullptr) out["dependency"] = *dependency;
+  return out;
+}
+
+inline mcp::JsonValue validate_dependency_check(
+    const mcp::JsonValue &args) {
+  const mcp::JsonValue *path = args.Find("path");
+  const mcp::JsonValue *dependency = args.Find("dependency");
+  if (path == nullptr || !path->IsString()) {
+    mcp::JsonValue error(mcp::JsonValue::object_tag);
+    error["error"] = mcp::JsonValue("missing required parameter: path");
+    return error;
+  }
+  if (dependency == nullptr || !dependency->IsString()) {
+    mcp::JsonValue error(mcp::JsonValue::object_tag);
+    error["error"] = mcp::JsonValue("missing required parameter: dependency");
+    return error;
+  }
+  return mcp::JsonValue();
+}
+
+inline mcp::JsonValue project_dependency_has(
+    const mcp::JsonValue &result, const mcp::JsonValue &args) {
+  const mcp::JsonValue *dependency = args.Find("dependency");
+  bool found = false;
+  const mcp::JsonValue *inner = result.Find("result");
+  if (dependency != nullptr && inner != nullptr && inner->IsArray()) {
+    for (const auto &item : inner->GetArray()) {
+      if (item.IsString() && item.GetString() == dependency->GetString()) {
+        found = true;
+        break;
+      }
+    }
+  }
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  out["result"] = mcp::JsonValue(found);
+  return out;
+}
+
+inline mcp::JsonValue load_script_args(const mcp::JsonValue &args) {
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  const mcp::JsonValue *path = args.Find("path");
+  if (path != nullptr) out["path"] = *path;
+  out["type_hint"] = mcp::JsonValue("Script");
+  bool fresh = false;
+  const mcp::JsonValue *fresh_p = args.Find("fresh");
+  if (fresh_p != nullptr && fresh_p->IsBool()) {
+    fresh = fresh_p->GetBool();
+  }
+  out["cache_mode"] = mcp::JsonValue(fresh ? "ignore" : "reuse");
+  return out;
+}
+
+inline mcp::JsonValue validate_load_script(const mcp::JsonValue &args) {
+  const mcp::JsonValue *path = args.Find("path");
+  const mcp::JsonValue *fresh = args.Find("fresh");
+  if (path == nullptr || !path->IsString()) {
+    mcp::JsonValue error(mcp::JsonValue::object_tag);
+    error["error"] = mcp::JsonValue("missing required parameter: path");
+    return error;
+  }
+  if (fresh != nullptr && !fresh->IsBool()) {
+    mcp::JsonValue error(mcp::JsonValue::object_tag);
+    error["error"] =
+        mcp::JsonValue("invalid parameter: fresh must be a boolean");
+    return error;
+  }
+  return mcp::JsonValue();
+}
+
 } // namespace
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(34);
-  v.push_back(make_spec_tool(ToolSpec{
+  v.reserve(31);
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
       "load_resource",
-      "Load a resource file from disk into memory. Use it to bring a .tres or .tscn file into the editor for inspection or modification, with an optional type_hint to guide loading. Returns the resource reference with class, path, object_id and object_id_str, which set_resource_property and get_resource_property accept as locators. Errors when the file is missing or fails to load.",
+      "Load a resource file from disk into memory. Use it to bring a .tres or .tscn file into the editor for inspection or modification, with an optional type_hint to guide loading and cache_mode to reuse, replace or ignore the loader cache. Returns the resource reference with class, path, object_id, object_id_str and name, which set_resource_property and get_resource_property accept as locators. Errors when the file is missing or fails to load.",
       "Resources", {"resource", "load"}, SideEffect::None, tool_flags::kNone,
-      kLoadResourceParams, resource_ops::handle_load}));
+      kLoadResourceParams, resource_ops::handle_load},
+      {
+          ToolAlias{
+              "load_script", "load_resource",
+              load_script_args, {}, "0.4.0", "0.6.0",
+              validate_load_script},
+      })));
   v.push_back(make_spec_tool(ToolSpec{
       "reload_resource",
       "Force-reload a resource file from disk, replacing the editor's cached instance via ResourceLoader CACHE_MODE_REPLACE. Use it after the file changed on disk outside the editor so later reads observe the on-disk contents instead of a stale cached instance. Returns result (reloaded), path and replaced (true when the cached instance was swapped for a freshly loaded one). Errors when the path is outside res:// or the file cannot be loaded.",
@@ -277,16 +351,16 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       "Delete a resource file from disk in a two-stage flow. Without force (default) it is a dry-run impact pre-check: a reverse-reference scan over every .tscn/.tres under res:// (path and uid tokens) returns would_delete plus dependents ({file, matched} objects) and a hint — nothing is deleted, even with zero dependents an explicit force=true is required. With force=true the file is preferentially moved to the OS trash (trashed=true; permanent=true when trash is unavailable or fails), its cached reference path is cleared, the .uid sidecar travels with it (sidecars_removed lists removed sidecar paths) and the editor file system is updated. Use rename_resource_file when you want to keep the file. Returns the Godot error code (0 = OK).",
       "Resources", {"resource", "remove", "delete"}, SideEffect::WritesFile, tool_flags::kMutating,
       kRemoveResourceFileParams, resource_ops::handle_remove}));
-  v.push_back(make_spec_tool(ToolSpec{
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
       "rename_resource_file",
-      "Rename or move a resource file. Accepts path and new_path, with from and to accepted as aliases. The .uid sidecar travels with the file (the .import sidecar of imported assets migrates alongside it when present), open scenes that equal the file or reference it are automatically saved before the disk rewrite and reloaded afterwards — their undo history resets — path= and uid= tokens in dependent .tscn/.tres files are rewritten, cached resource paths and the edited scene file path migrate, project.godot entries pointing at the old path (application/run/main_scene and autoload/* values, preserving the leading * singleton marker) are remapped and saved, and the editor file system is notified. Returns the Godot error code, updated_files, stale_references as {file, token} objects (token names the literal leftover reference; script_class tokens need scan_editor_file_system after a class_name rename to re-register global classes — see note), uid_preserved, remapped_settings, saved_scenes, reloaded_scenes, unsupported_binary_references ({file, reason} entries for binary resources such as .scn/.res/.csv/.translation that cannot be rewritten in place) and import_sidecar_warning when the .import move fails.",
+      "Rename or move a resource file or directory. Accepts path plus new_path (or from/to), or path plus new_directory to keep the file or directory name. The .uid sidecar travels with the file (.import sidecars migrate too), open scenes that equal or reference the target are saved and reloaded, path= and uid= tokens in dependent .tscn/.tres files are rewritten, project.godot entries are remapped, and the editor file system is notified. Directory moves follow the same transaction pipeline and move every file recursively. Returns updated_files, stale_references, uid_preserved, remapped_settings, saved_scenes, reloaded_scenes, unsupported_binary_references and import_sidecar_warning; move-by-directory additionally returns moved and failed arrays.",
       "Resources", {"resource", "rename", "move"}, SideEffect::WritesFile, tool_flags::kMutating,
-      kRenameResourceFileParams, resource_ops::handle_rename}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "move_resource_file",
-      "Move a file to another directory inside res:// while keeping its file name, through the same engine-aware transaction pipeline as rename_resource_file: the .uid sidecar travels with the file (.import sidecars migrate too), open scenes that equal the moved file or reference it are automatically saved before the rewrite and reloaded afterwards — their undo history resets — path= and uid= tokens in dependent .tscn/.tres files are rewritten, project.godot entries pointing at the old path (main_scene and autoload/*, preserving the leading * marker) are remapped and saved, cached resource paths and the edited scene file path migrate, and the editor file system is notified per rewritten file. Parameters: path (an existing res:// file or directory) and new_directory (destination directory inside res://, absolute like res://assets/sfx or relative like assets/sfx; trailing slashes are trimmed; user:// is rejected). When path is a directory, every file under it moves recursively preserving the sub-folder layout, *.uid files follow their owners, empty source folders are left behind, and an editor file system scan runs afterwards. Returns moved (array of {from, to, updated_files, uid_preserved}), failed (array of {from, error}), aggregated stale_references as {file, token} objects whose token names the literal leftover reference (script_class tokens require scan_editor_file_system to re-register renamed global classes; see note on each transaction), aggregated unsupported_binary_references ({file, reason} for binary resources such as .scn/.res/.csv/.translation that cannot be rewritten in place), aggregated saved_scenes and reloaded_scenes (scenes saved before each rewrite and reloaded afterwards) and import_sidecar_warnings (array present only when some .import sidecar move failed). Errors when the source does not exist, new_directory targets user://, or a directory move points into its own sub-folder.",
-      "Resources", {"resource", "move", "directory"}, SideEffect::WritesFile, tool_flags::kMutating,
-      kMoveResourceFileParams, resource_ops::handle_move}));
+      kRenameResourceFileParams, resource_ops::handle_rename},
+      {
+          ToolAlias{
+              "move_resource_file", "rename_resource_file",
+              {}, {}, "0.4.0", "0.6.0"},
+      })));
   v.push_back(make_spec_tool(ToolSpec{
       "copy_resource_file",
       "Copy a file to dest_path inside res://. Both path (an existing res:// file) and dest_path are required; missing parent directories of dest_path are created recursively and an existing dest_path is overwritten. The copy is byte-for-byte: .import and .uid sidecars are not copied, imported assets need a reimport and a duplicated uid in the copied text resource may be reassigned by the editor scan. The editor file system is notified for dest_path and a scan runs afterwards. Returns result (copied), from and to. Use rename_resource_file/move_resource_file when you want to keep the file or remap references.",
@@ -297,16 +371,17 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       "Create a directory inside the project, including any missing parent directories. path accepts a res:// absolute path (res://assets/audio) or a relative one (assets/audio); user:// is rejected. Idempotent: when the directory already exists the call succeeds and reports already_existed=true instead of failing. A newly created directory triggers an editor file system scan so subsequent resource operations see it immediately. Returns created (the normalized res:// path) and already_existed; errors when the directory cannot be created (invalid path or permission failure).",
       "Resources", {"resource", "directory", "create"}, SideEffect::WritesFile, tool_flags::kMutating,
       kCreateDirectoryParams, resource_ops::handle_create_directory}));
-  v.push_back(make_spec_tool(ToolSpec{
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
       "get_resource_dependencies",
-      "List the dependencies of a resource file, i.e. the external files it references (textures, scenes, scripts). Use it to audit what a resource needs before moving or deleting files. Returns an array of res:// paths; use has_resource_dependency for a targeted single check.",
+      "List the dependencies of a resource file, i.e. the external files it references (textures, scenes, scripts). Use it to audit what a resource needs before moving or deleting files. Optional dependency filters for one exact path. Returns an array of res:// paths in 'result'.",
       "Resources", {"resource", "dependencies", "list"}, SideEffect::None, tool_flags::kNone,
-      kGetResourceDependenciesParams, resource_ops::handle_get_dependencies}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "has_resource_dependency",
-      "Check whether a resource file depends on a specific other file. Requires path (the resource to inspect) and dependency (the path to search for in its dependency list). Useful before deleting or moving a file to see who still references it. Returns a boolean result.",
-      "Resources", {"resource", "dependency", "check"}, SideEffect::None, tool_flags::kNone,
-      kHasResourceDependencyParams, resource_ops::handle_has_dependency}));
+      kGetResourceDependenciesParams, resource_ops::handle_get_dependencies},
+      {
+          ToolAlias{
+              "has_resource_dependency", "get_resource_dependencies",
+              dependency_check_args, {}, "0.4.0", "0.6.0",
+              validate_dependency_check, project_dependency_has},
+      })));
   v.push_back(make_spec_tool(ToolSpec{
       "get_resource_references",
       "Reverse-reference lookup: find which .tscn/.tres files reference a given resource. Provide one of path, uid or class_name (at least one is required — supplying none returns an error). Scans every text resource under res:// and returns {result: [{file, matched: [...]}, ...]}, where matched lists the hit reference kinds (path, uid, script_class). This is the reverse direction of get_resource_dependencies: instead of asking what a resource references, it asks who references it. Useful before moving or deleting a file.",

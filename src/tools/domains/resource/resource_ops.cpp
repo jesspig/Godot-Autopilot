@@ -655,6 +655,30 @@ mcp::JsonValue handle_load(const mcp::JsonValue &args) {
   if (th && th->IsString())
     type_hint = th->GetString();
 
+  godot::ResourceLoader::CacheMode cache_mode =
+      godot::ResourceLoader::CACHE_MODE_REUSE;
+  if (auto *cache_p = args.Find("cache_mode")) {
+    if (!cache_p->IsString()) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] =
+          mcp::JsonValue("invalid parameter: cache_mode must be a string");
+      return e;
+    }
+    const std::string mode = cache_p->GetString();
+    if (mode == "reuse") {
+      cache_mode = godot::ResourceLoader::CACHE_MODE_REUSE;
+    } else if (mode == "replace") {
+      cache_mode = godot::ResourceLoader::CACHE_MODE_REPLACE;
+    } else if (mode == "ignore") {
+      cache_mode = godot::ResourceLoader::CACHE_MODE_IGNORE;
+    } else {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue(
+          "invalid parameter: cache_mode must be reuse, replace or ignore");
+      return e;
+    }
+  }
+
   auto *loader = godot::ResourceLoader::get_singleton();
   if (!loader) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -664,7 +688,8 @@ mcp::JsonValue handle_load(const mcp::JsonValue &args) {
 
   godot::Ref<godot::Resource> res;
   std::string load_err;
-  if (!load_resource_or_error(normalized_path, res, load_err, type_hint)) {
+  if (!load_resource_or_error(normalized_path, res, load_err, type_hint,
+                              nullptr, cache_mode)) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
     e["error"] = mcp::JsonValue(load_err);
     return e;
@@ -2183,6 +2208,16 @@ mcp::JsonValue apply_path_rewrite_transaction(const std::string &from_raw,
 }
 
 mcp::JsonValue handle_rename(const mcp::JsonValue &args) {
+  auto *it_directory = args.Find("new_directory");
+  if (it_directory != nullptr) {
+    if (!it_directory->IsString()) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] = mcp::JsonValue(
+          "invalid parameter: new_directory must be a string");
+      return e;
+    }
+    return handle_move(args);
+  }
   auto *it_from = args.Find("path");
   if ((!it_from || !it_from->IsString()) && args.Contains("from")) {
     it_from = args.Find("from");
@@ -2693,9 +2728,31 @@ mcp::JsonValue handle_get_dependencies(const mcp::JsonValue &args) {
 
   godot::PackedStringArray deps =
       loader->get_dependencies(godot::String(path.c_str()));
+  std::string dependency_filter;
+  if (auto *dependency_p = args.Find("dependency")) {
+    if (!dependency_p->IsString()) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] =
+          mcp::JsonValue("invalid parameter: dependency must be a string");
+      return e;
+    }
+    std::string normalized_dependency;
+    std::string dependency_error;
+    if (!normalize_resource_path(dependency_p->GetString(),
+                                 normalized_dependency, dependency_error)) {
+      return util::error_detail("path rejected", "dependency",
+                                dependency_error,
+                                "use a res:// project resource path");
+    }
+    dependency_filter = normalized_dependency;
+  }
   mcp::JsonValue arr(mcp::JsonValue::array_tag);
   for (int i = 0; i < deps.size(); i++) {
-    arr.PushBack(mcp::JsonValue(util::to_std(deps[i])));
+    const std::string dependency = util::to_std(deps[i]);
+    if (!dependency_filter.empty() && dependency != dependency_filter) {
+      continue;
+    }
+    arr.PushBack(mcp::JsonValue(dependency));
   }
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(arr);
@@ -2784,11 +2841,11 @@ std::string describe_target(const mcp::JsonValue &args) {
   return "no identifier provided";
 }
 
-bool load_resource_or_error(const std::string &path,
-                            godot::Ref<godot::Resource> &out_res,
-                            std::string &out_error,
-                            const std::string &type_hint,
-                            const char *load_fail_suffix) {
+bool load_resource_or_error(
+    const std::string &path, godot::Ref<godot::Resource> &out_res,
+    std::string &out_error, const std::string &type_hint,
+    const char *load_fail_suffix,
+    godot::ResourceLoader::CacheMode cache_mode) {
   std::string normalized_path;
   if (!normalize_resource_path(path, normalized_path, out_error))
     return false;
@@ -2799,7 +2856,7 @@ bool load_resource_or_error(const std::string &path,
   }
   auto *loader = godot::ResourceLoader::get_singleton();
   out_res = loader ? loader->load(godot::String(normalized_path.c_str()),
-                                  godot::String(type_hint.c_str()))
+                                  godot::String(type_hint.c_str()), cache_mode)
                    : godot::Ref<godot::Resource>();
   if (out_res.is_null()) {
     out_error =
