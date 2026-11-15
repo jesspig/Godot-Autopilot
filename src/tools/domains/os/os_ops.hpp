@@ -7,6 +7,11 @@
 namespace godot_autopilot {
 namespace os_ops {
 
+mcp::JsonValue handle_os_process(const mcp::JsonValue &args);
+mcp::JsonValue handle_os_environment(const mcp::JsonValue &args);
+mcp::JsonValue handle_os_time(const mcp::JsonValue &args);
+mcp::JsonValue handle_os_system_info(const mcp::JsonValue &args);
+mcp::JsonValue handle_os_has_environment(const mcp::JsonValue &args);
 mcp::JsonValue handle_os_alert(const mcp::JsonValue &args);
 mcp::JsonValue handle_os_create_process(const mcp::JsonValue &args);
 mcp::JsonValue handle_os_execute(const mcp::JsonValue &args);

@@ -1,5 +1,6 @@
 #include "tools/domains/input/input_click_ops.hpp"
 #include "core/observability/log_system.hpp"
+#include "tools/domains/input/input_ops.hpp"
 #include "util/error_util.hpp"
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/display_server.hpp>
@@ -497,6 +498,82 @@ mcp::JsonValue handle_type_text(const mcp::JsonValue &args) {
   inner["ok"] = mcp::JsonValue(true);
   inner["length"] = mcp::JsonValue(text_str.length());
   return util::ok_result(std::move(inner));
+}
+
+namespace {
+
+mcp::JsonValue mouse_action_error(const std::string &message) {
+  mcp::JsonValue error(mcp::JsonValue::object_tag);
+  error["error"] = mcp::JsonValue(message);
+  return error;
+}
+
+bool read_mouse_action(const mcp::JsonValue &args, std::string &out,
+                       mcp::JsonValue &error) {
+  const mcp::JsonValue *action = args.Find("action");
+  if (action == nullptr) {
+    error = mouse_action_error("missing required parameter: action");
+    return false;
+  }
+  if (!action->IsString()) {
+    error = mouse_action_error("invalid parameter: action must be a string");
+    return false;
+  }
+  out = action->GetString();
+  return true;
+}
+
+mcp::JsonValue strip_mouse_action(const mcp::JsonValue &args) {
+  mcp::JsonValue out = args.IsObject()
+                           ? args
+                           : mcp::JsonValue(mcp::JsonValue::object_tag);
+  out.GetObject().erase("action");
+  return out;
+}
+
+} // namespace
+
+mcp::JsonValue handle_input_mouse(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!read_mouse_action(args, action, error)) {
+    return error;
+  }
+  const mcp::JsonValue legacy = strip_mouse_action(args);
+  if (action == "move") {
+    return input_ops::handle_mouse_move(legacy);
+  }
+  if (action == "press") {
+    return input_ops::handle_mouse_button_press(legacy);
+  }
+  if (action == "release") {
+    return input_ops::handle_mouse_button_release(legacy);
+  }
+  if (action == "click") {
+    return handle_click_mouse(legacy);
+  }
+  if (action == "scroll") {
+    return handle_scroll_mouse(legacy);
+  }
+  if (action == "drag") {
+    return handle_drag_mouse(legacy);
+  }
+  return mouse_action_error(
+      "unknown action '" + action +
+      "' for input_mouse (expected move, press, release, click, scroll, drag)");
+}
+
+mcp::JsonValue handle_input_text(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!read_mouse_action(args, action, error)) {
+    return error;
+  }
+  if (action != "type") {
+    return mouse_action_error(
+        "unknown action '" + action + "' for input_text (expected type)");
+  }
+  return handle_type_text(strip_mouse_action(args));
 }
 
 } // namespace input_click_ops

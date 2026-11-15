@@ -6,6 +6,10 @@
 namespace godot_autopilot {
 namespace input_ops {
 
+mcp::JsonValue handle_get_input_state(const mcp::JsonValue &args);
+mcp::JsonValue handle_input_action(const mcp::JsonValue &args);
+mcp::JsonValue handle_input_key(const mcp::JsonValue &args);
+mcp::JsonValue handle_input_gamepad(const mcp::JsonValue &args);
 mcp::JsonValue handle_action_press(const mcp::JsonValue &args);
 mcp::JsonValue handle_action_release(const mcp::JsonValue &args);
 mcp::JsonValue handle_is_action_pressed(const mcp::JsonValue &args);
