@@ -67,7 +67,7 @@ Godot Autopilot（GDA）是一個以插件形式**常駐於 Godot 編輯器內�
 
 ## 技能書
 
-外掛內建 **10 冊自包含技能書**（總覽，以及場景、資源、腳本、執行階段、伺服器、內容、C#、安裝與工具分冊）。擇一作用域安裝：
+外掛內建 **1 張入口技能卡與 9 篇 references**（安裝、工具、場景、腳本、資源、執行階段、內容、C#、伺服器）。擇一作用域安裝：
 
 ```bash
 # 全域：所有 Godot 專案共用
@@ -79,9 +79,12 @@ gda install skills --path "<project>/.agents/skills"
 # 中文版
 gda install skills --zh
 gda install skills --path "<project>/.agents/skills" --zh
+
+# 清理舊版本遺留的退役分冊目錄
+gda install skills --prune
 ```
 
-預設目標是 `~/.agents/skills`。若客戶端不讀取該目錄，可改用 `--path <client-skills-dir>`。技能書會教導呼叫協定，而不是讓代理自行摸索。定位：MCP 是主要產品通道，技能書是體驗層；當 MCP 無法使用時，呼叫指南會改走 GDA CLI。
+預設目標是 `~/.agents/skills`。若客戶端不讀取該目錄，可改用 `--path <client-skills-dir>`。`--prune` 會刪除舊安裝中的退役技能目錄；未指定時僅報告。入口卡會教導呼叫協定，並路由到相符的 reference，而不是讓代理自行摸索。定位：MCP 是主要產品通道，技能書是體驗層；當 MCP 無法使用時，呼叫指南會改走 GDA CLI。
 
 外掛隨附一個編輯器面板：
 

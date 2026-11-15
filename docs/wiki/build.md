@@ -171,7 +171,7 @@ macOS runner 为 ARM64，preset 设 `CMAKE_OSX_ARCHITECTURES=x86_64;arm64` 编�
 
 - **源清单聚合机制（10-21 引入）**：`add_library` 的源清单不再直接写在根 `CMakeLists.txt` 里，而是拆到 `cmake/sources/` 下的若干清单文件，由根 `CMakeLists.txt` 依次 `include` 后拼成目标源列表——`gda_core.cmake`（基础业务源）、`api_core.cmake` / `api_contract.cmake` / `api_storage.cmake` / `api_transport.cmake` / `api_cli.cmake`（各并行分支独占维护的新增编译单元；0.3.2 移除 REST 面后多数清单已清空，文件保留以维持登记位）；`tests/CMakeLists.txt` 侧对应 `gda_unit_sources.cmake` 与 `api_unit_*.cmake`。目的是让并行开发同一插件的多个分支各自登记新增 `.cpp`，避免在同一文件里产生归并冲突。`cmake/sources/api_probe.cmake` 另定义一个可运行的传输探针目标 `gda_mcp_transport_probe`（**不注册为 ctest 用例**，由验收阶段按需执行）。
 
-- **skill 内容嵌入头**：10 册技能正文存于仓库根 `skills/` 标准目录（10 个自包含 `SKILL.md`，**不进 add_library**），`cmake/skill_gen.cmake` 在构建期经 `tools/embed_skills.ts`（Bun 执行）生成 `build/<preset>/generated/skill_content_embedded.h`（gitignore 覆盖）；`add_dependencies(godot-autopilot gda_skill_embed_header)` 保证生成先于编译；
+- **skill 内容嵌入头**：技能正文存于仓库根 `skills/` 标准目录（1 张入口卡 + 9 篇 references，共 10 个 .md，**不进 add_library**），`cmake/skill_gen.cmake` 在构建期经 `tools/embed_skills.ts`（Bun 执行）生成 `build/<preset>/generated/skill_content_embedded.h`（gitignore 覆盖）；`add_dependencies(godot-autopilot gda_skill_embed_header)` 保证生成先于编译；
 - 私有头文件目录：`${CMAKE_SOURCE_DIR}/src`；
 - 链接库（PRIVATE）：`godot-cpp`、`mcp-server`、`mcp-http`（后两者来自 mcp-cpp-sdk）；
 - MSVC（含 clang-cl）额外 `target_link_options "/WHOLEARCHIVE:$<TARGET_FILE:godot-cpp>"`（`CMakeLists.txt:94`）—— 强制导出 godot-cpp 全部符号，防止 GDExtension 入口符号被链接器裁剪；
