@@ -586,6 +586,10 @@ mcp::JsonValue handle_run_gdscript_tests(const mcp::JsonValue &args) {
                             "run_gdscript_tests called");
 
   auto *tests = args.Find("tests");
+  if ((!tests || !tests->IsArray()) &&
+      (args.Find("directory") != nullptr || args.Find("pattern") != nullptr)) {
+    return handle_run_gdscript_test_files(args);
+  }
   if (!tests || !tests->IsArray()) {
     return util::error_json(
         "missing required parameter: tests (array of {\"name\": string, "

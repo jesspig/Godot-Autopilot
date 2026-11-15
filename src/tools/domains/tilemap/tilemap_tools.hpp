@@ -33,17 +33,6 @@ const std::vector<ParamSpec> kSetTilemapCellsParams = {
     {"layer", "integer", "Tile layer index (default: 0); TileMapLayer nodes ignore it", false},
 };
 
-const std::vector<ParamSpec> kFillTilemapRectParams = {
-    {"node_path", "string", "Path to the TileMap or TileMapLayer node", true},
-    {"from", "object", "Inclusive first corner cell {x, y}; the two corners are normalized internally, so from/to order does not matter", true},
-    {"to", "object", "Inclusive opposite corner cell {x, y}", true},
-    {"source_id", "integer", "TileSet source ID placed in every cell; required and must be >= 0 unless erase is true", false},
-    {"atlas_coords", "object", "Atlas coords {x, y} placed in every cell; both must be >= 0 and is required unless erase is true", false},
-    {"alternative", "integer", "Alternative tile id placed in every cell (default: 0; must be >= 0)", false},
-    {"erase", "boolean", "Clear every cell in the rect instead of placing tiles; source_id and atlas_coords are ignored (default: false)", false},
-    {"layer", "integer", "Tile layer index (default: 0); TileMapLayer nodes ignore it", false},
-};
-
 const std::vector<ParamSpec> kCreateTilemapTilesetParams = {
     {"name", "string", "Resource name used as the memory:// reference for later tools (default: TileSet)", false},
     {"tile_size", "integer", "Base tile size in pixels (default: 16)", false},
@@ -122,23 +111,50 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       kCreateTilemapParams, tilemap_ops::handle_create}));
   v.push_back(make_spec_tool(with_aliases(ToolSpec{
       "set_tilemap_cells",
-      "Set cells on a TileMap or TileMapLayer node in one call. Pass 'cells' for an explicit array, or 'from' and 'to' for an inclusive rect; the rect form supports source_id/atlas_coords/alternative and erase=true. An entry or rect with source_id -1 / erase clears cells. Invalid cell entries are skipped and reported via error plus warnings. Keep batches reasonably sized; generate big layouts programmatically with execute_script or code_execute. Returns set_count and layer for the cells form, or rect metadata for the from/to form.",
-      "TileMap", {"tilemap", "cell", "set", "batch"}, SideEffect::WritesScene, tool_flags::kNone | tool_flags::kSceneTarget,
-      kSetTilemapCellsParams, tilemap_ops::handle_set_cells},
+      "Set cells on a TileMap or TileMapLayer node in one call, in three forms. Single or batch: pass 'cells', an array of explicit cells. Rect: pass 'from' and 'to' inclusive corner cells (order does not matter) plus source_id/atlas_coords/alternative, or erase=true to clear the rect; the rect is capped at 100000 cells per call, so split bigger areas into chunks. Single cell: a cells array with one entry. An entry or rect with source_id -1 / erase clears cells. Invalid cell entries are skipped and reported via error plus warnings. Keep batches reasonably sized; generate big layouts programmatically with execute_script or code_execute. Returns set_count and layer for the cells form, or the rect metadata (set_count, from, to, width, height, undo) for the from/to form. Example: {\"node_path\": \"TileMap\", \"cells\": [{\"x\": 0, \"y\": 0, \"source_id\": 0, \"atlas_coords\": {\"x\": 0, \"y\": 0}}]} or {\"node_path\": \"TileMap\", \"from\": {\"x\": 0, \"y\": 0}, \"to\": {\"x\": 9, \"y\": 9}, \"source_id\": 0, \"atlas_coords\": {\"x\": 0, \"y\": 0}}.",
+      "TileMap", {"tilemap", "cell", "set", "batch", "fill", "rect", "single"},
+      SideEffect::WritesScene, tool_flags::kNone | tool_flags::kSceneTarget,
+      kSetTilemapCellsParams, tilemap_ops::handle_set_cells,
+      {},
+      {},
+      {"{\"node_path\": \"TileMap\", \"cells\": [{\"x\": 0, \"y\": 0, \"source_id\": 0}]}",
+       "{\"node_path\": \"TileMap\", \"from\": {\"x\": 0, \"y\": 0}, \"to\": {\"x\": 9, \"y\": 9}, \"source_id\": 0, \"atlas_coords\": {\"x\": 0, \"y\": 0}}"}},
       {
           ToolAlias{
               "set_tilemap_cell", "set_tilemap_cells",
               tilemap_cell_args, project_tilemap_cell_result, "0.4.0", "0.6.0",
               validate_tilemap_cell_args},
+          ToolAlias{
+              "fill_tilemap_rect", "set_tilemap_cells",
+              {}, {}, "0.4.0", "0.6.0",
+              [](const mcp::JsonValue &args) {
+                const mcp::JsonValue *path = args.Find("node_path");
+                const mcp::JsonValue *from = args.Find("from");
+                const mcp::JsonValue *to = args.Find("to");
+                if (path == nullptr || !path->IsString()) {
+                  mcp::JsonValue error(mcp::JsonValue::object_tag);
+                  error["error"] = mcp::JsonValue(
+                      "missing required parameter: node_path");
+                  return error;
+                }
+                if (from == nullptr || !from->IsObject()) {
+                  mcp::JsonValue error(mcp::JsonValue::object_tag);
+                  error["error"] =
+                      mcp::JsonValue("missing required parameter: from");
+                  return error;
+                }
+                if (to == nullptr || !to->IsObject()) {
+                  mcp::JsonValue error(mcp::JsonValue::object_tag);
+                  error["error"] =
+                      mcp::JsonValue("missing required parameter: to");
+                  return error;
+                }
+                return mcp::JsonValue();
+              }},
       })));
   v.push_back(make_spec_tool(ToolSpec{
-      "fill_tilemap_rect",
-      "Fill an axis-aligned tile rectangle on a TileMap or TileMapLayer node in one call. Requires node_path plus from and to {x, y} corner cells (both inclusive; the corner order does not matter). Pass source_id and atlas_coords to place one tile in every cell, or erase=true to clear the rect instead (source_id and atlas_coords are then ignored). Optional alternative (default 0) and layer (default 0, TileMapLayer ignores it). The rect is capped at 100000 cells per call, so split bigger areas into chunks. Implemented as a per-cell set_cell/erase_cell loop: it saves a round trip and produces a single undo action, but does not make the fill itself faster. Returns set_count, from, to, width, height and undo.",
-      "TileMap", {"tilemap", "cell", "fill", "rect"}, SideEffect::WritesScene, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
-      kFillTilemapRectParams, tilemap_ops::handle_fill_rect}));
-  v.push_back(make_spec_tool(ToolSpec{
       "create_tilemap_tileset",
-      "Create a TileSet resource in memory and register it as memory://<name>; nothing is written to disk. Optional name (default TileSet) and tile_size in pixels (default 16). add_tilemap_atlas_source, add_tilemap_physics_layer and set_tilemap_tile_collision reference it by name. Returns class, name, path and object_id.",
+      "Create a TileSet resource in memory and register it as memory://<name>; nothing is written to disk. Optional name (default TileSet) and tile_size in pixels (default 16). update_tileset (actions add_atlas_source, add_physics_layer, set_tile_collision) references it by name. Returns class, name, path and object_id.",
       "TileMap", {"tileset", "create"}, SideEffect::None, tool_flags::kNone,
       kCreateTilemapTilesetParams, tilemap_ops::handle_tileset_create}));
   return v;

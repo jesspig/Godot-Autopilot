@@ -934,6 +934,63 @@ mcp::JsonValue handle_debugger_get_session_info(const mcp::JsonValue &) {
   return r;
 }
 
+mcp::JsonValue handle_debugger_stream(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "get_debugger_stream called");
+  auto *ap = args.Find("action");
+  if (!ap || !ap->IsString()) {
+    return util::error_json("missing required parameter: action");
+  }
+  const std::string action = ap->GetString();
+  std::string source;
+  if (auto *sp = args.Find("source")) {
+    if (!sp->IsString()) {
+      return util::error_json("invalid parameter: source must be a string");
+    }
+    source = sp->GetString();
+  }
+  if (!source.empty() && source != "editor" && source != "game" &&
+      source != "plugin") {
+    return util::error_json(
+        "invalid source '" + source +
+        "': expected editor, game or plugin");
+  }
+  if (action == "log") {
+    if (source == "plugin") {
+      return handle_plugin_log_get(args);
+    }
+    if (source == "game") {
+      return handle_debugger_get_output(args);
+    }
+    return handle_output_get_log(args);
+  }
+  if (action == "output") {
+    if (source == "plugin" || source == "editor") {
+      return util::error_json(
+          "source '" + source +
+          "' is not available for action 'output': use action 'log' with "
+          "source 'editor' for the editor engine log, or source 'plugin' for "
+          "the plugin LogSystem buffer");
+    }
+    return handle_debugger_get_output(args);
+  }
+  if (action == "errors") {
+    if (source == "plugin" || source == "editor") {
+      return util::error_json(
+          "source '" + source +
+          "' is not available for action 'errors': use action 'log' with "
+          "source 'editor' for the editor engine log, or source 'plugin' for "
+          "the plugin LogSystem buffer");
+    }
+    return handle_debugger_get_errors(args);
+  }
+  if (action == "session") {
+    return handle_debugger_get_session_info(args);
+  }
+  return util::error_json("unknown action '" + action +
+                          "': expected log, output, errors or session");
+}
+
 void register_classes() {
   godot::ClassDB::register_class<OutputCaptureLogger>();
   godot::ClassDB::register_class<DebugCapturePlugin>();

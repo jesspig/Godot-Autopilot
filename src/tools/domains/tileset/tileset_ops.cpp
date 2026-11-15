@@ -362,5 +362,25 @@ JV handle_set_tile_collision(const JV &args) {
   return r;
 }
 
+mcp::JsonValue handle_update_tileset(const mcp::JsonValue &args) {
+  auto *ap = args.Find("action");
+  if (!ap || !ap->IsString()) {
+    return util::error_json("missing required parameter: action");
+  }
+  const std::string action = ap->GetString();
+  if (action == "add_atlas_source") {
+    return handle_add_atlas_source(args);
+  }
+  if (action == "add_physics_layer") {
+    return handle_add_physics_layer(args);
+  }
+  if (action == "set_tile_collision") {
+    return handle_set_tile_collision(args);
+  }
+  return util::error_json(
+      "unknown action '" + action +
+      "': expected add_atlas_source, add_physics_layer or set_tile_collision");
+}
+
 } // namespace tileset_ops
 } // namespace godot_autopilot

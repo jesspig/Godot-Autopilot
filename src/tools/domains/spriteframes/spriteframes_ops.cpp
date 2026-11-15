@@ -226,5 +226,24 @@ JV handle_add_frame(const JV &args) {
   return r;
 }
 
+mcp::JsonValue handle_update_spriteframes(const mcp::JsonValue &args) {
+  auto *ap = args.Find("action");
+  if (!ap || !ap->IsString()) {
+    return util::error_json("missing required parameter: action");
+  }
+  const std::string action = ap->GetString();
+  if (action == "create") {
+    return handle_create(args);
+  }
+  if (action == "add_animation") {
+    return handle_add_animation(args);
+  }
+  if (action == "add_frame") {
+    return handle_add_frame(args);
+  }
+  return util::error_json("unknown action '" + action +
+                          "': expected create, add_animation or add_frame");
+}
+
 } // namespace spriteframes_ops
 } // namespace godot_autopilot

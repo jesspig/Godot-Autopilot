@@ -14,110 +14,161 @@ namespace text_tools {
 
 namespace {
 
-const std::vector<ParamSpec> kCreateTextFontParams = {};
-
-const std::vector<ParamSpec> kCreateShapedTextParams = {
-    {"direction", "integer", "Text layout direction: 0=auto, 1=ltr, 2=rtl (default: 0)", false},
-    {"orientation", "integer", "Text orientation: 0=horizontal, 1=vertical (default: 0)", false},
+const std::vector<ParamSpec> kFontParams = {
+    {"font_rid", "integer", "Only with action=set_data, action=set_antialiasing or action=set_hinting: RID id returned by action=create", false},
+    {"data", "string", "Only with action=set_data: path to a font file (.ttf, .otf, .woff2); action=system_path returns a usable path", false},
+    {"antialiasing", "integer", "Only with action=set_antialiasing: font antialiasing mode: 0=none, 1=gray, 2=grayscale, 3=subpixel", false},
+    {"hinting", "integer", "Only with action=set_hinting: font hinting mode: 0=none, 1=light, 2=normal", false},
+    {"font_name", "string", "Only with action=system_path: system font name (e.g. 'Arial', 'Segoe UI', 'Noto Sans')", false},
+    {"weight", "integer", "Only with action=system_path: font weight, 100-900 (default: 400)", false},
+    {"stretch", "integer", "Only with action=system_path: font stretch percentage (default: 100)", false},
+    {"italic", "boolean", "Only with action=system_path: request italic variant (default: false)", false},
 };
 
-const std::vector<ParamSpec> kSetTextFontAntialiasingParams = {
-    {"font_rid", "integer", "RID id returned by create_text_font", true},
-    {"antialiasing", "integer", "Font antialiasing mode: 0=none, 1=gray, 2=grayscale, 3=subpixel", true},
+const std::vector<ParamSpec> kShapedTextParams = {
+    {"direction", "integer", "Only with action=create: text layout direction 0=auto, 1=ltr, 2=rtl (default: 0)", false},
+    {"orientation", "integer", "Only with action=create: text orientation 0=horizontal, 1=vertical (default: 0)", false},
+    {"shaped_rid", "integer", "Only with action=add_string or action=get_size: RID id returned by action=create", false},
+    {"text", "string", "Only with action=add_string: text string to add (may contain Unicode)", false},
+    {"font_rid", "integer", "Only with action=add_string: RID id returned by font action=create (configured with action=set_data first)", false},
+    {"size", "integer", "Only with action=add_string: font size in pixels", false},
+    {"language", "string", "Only with action=add_string: language code (e.g. 'en', 'ar') to improve shaping; omit for auto detection", false},
 };
 
-const std::vector<ParamSpec> kSetTextFontDataParams = {
-    {"font_rid", "integer", "RID id returned by create_text_font", true},
-    {"data", "string", "Path to a font file (.ttf, .otf, .woff2); get_text_font_system_path returns a usable path", true},
+const std::vector<ParamSpec> kTextQueryParams = {
+    {"feature", "integer", "Only with action=has_feature: TextServer feature flag (TextServer.Feature enum: 1=simple_layout, 2=bidi_layout, 4=shaped, 8=kerning, 16=ligatures, 32=font_lcd_subpixel, 64=font_autohinter, 128=font_subpixel_positioning, 256=font_system, 512=font_variable, 1024=context_sensitive_cleartype, 2048=fast_path, 4096=shaping_fallback, 8192=unicode_security, 16384=has_rid)", false},
+    {"locale", "string", "Only with action=locale_right_to_left: BCP-47 locale code (e.g. 'ar', 'he', 'fa' for RTL; 'en', 'de' for LTR)", false},
 };
 
-const std::vector<ParamSpec> kSetTextFontHintingParams = {
-    {"font_rid", "integer", "RID id returned by create_text_font", true},
-    {"hinting", "integer", "Font hinting mode: 0=none, 1=light, 2=normal", true},
-};
+const std::vector<std::string> kFontActions = {
+    "create", "set_data", "set_antialiasing", "set_hinting", "system_path"};
+const std::vector<std::string> kShapedTextActions = {
+    "create", "add_string", "get_size"};
+const std::vector<std::string> kTextQueryActions = {
+    "has_feature", "locale_right_to_left"};
 
-const std::vector<ParamSpec> kGetTextFontSystemPathParams = {
-    {"font_name", "string", "System font name (e.g. 'Arial', 'Segoe UI', 'Noto Sans')", true},
-    {"weight", "integer", "Font weight, 100-900 (default: 400)", false},
-    {"stretch", "integer", "Font stretch percentage (default: 100)", false},
-    {"italic", "boolean", "Request italic variant (default: false)", false},
-};
-
-const std::vector<ParamSpec> kHasTextFeatureParams = {
-    {"feature", "integer", "TextServer feature flag (TextServer.Feature enum: 1=simple_layout, 2=bidi_layout, 4=shaped, 8=kerning, 16=ligatures, 32=font_lcd_subpixel, 64=font_autohinter, 128=font_subpixel_positioning, 256=font_system, 512=font_variable, 1024=context_sensitive_cleartype, 2048=fast_path, 4096=shaping_fallback, 8192=unicode_security, 16384=has_rid)", true},
-};
-
-const std::vector<ParamSpec> kIsTextLocaleRightToLeftParams = {
-    {"locale", "string", "BCP-47 locale code (e.g. 'ar', 'he', 'fa' for RTL; 'en', 'de' for LTR)", true},
-};
-
-const std::vector<ParamSpec> kAddShapedTextStringParams = {
-    {"shaped_rid", "integer", "RID id returned by create_shaped_text", true},
-    {"text", "string", "Text string to add (may contain Unicode)", true},
-    {"font_rid", "integer", "RID id returned by create_text_font (configured with set_text_font_data first)", true},
-    {"size", "integer", "Font size in pixels", true},
-    {"language", "string", "Language code (e.g. 'en', 'ar') to improve shaping; omit for auto detection", false},
-};
-
-const std::vector<ParamSpec> kGetShapedTextSizeParams = {
-    {"shaped_rid", "integer", "RID id returned by create_shaped_text", true},
-};
+inline mcp::JsonValue text_action_args(const mcp::JsonValue &args,
+                                       const char *action) {
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  out["action"] = mcp::JsonValue(action);
+  if (!args.IsObject()) {
+    return out;
+  }
+  for (const auto &entry : args.GetObject()) {
+    if (entry.first != "action" && entry.first != "confirm") {
+      out[entry.first] = entry.second;
+    }
+  }
+  return out;
+}
 
 } // namespace
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(10);
-  v.push_back(make_spec_tool(ToolSpec{
-      "create_text_font",
-      "Create a font object in the TextServer and return its RID id as 'result'. Use it before the other text tools: the id is passed as font_rid to set_text_font_data, set_text_font_antialiasing, set_text_font_hinting and add_shaped_text_string. Every font tool requires a valid font_rid obtained here. Errors if the TextServer is unavailable.",
-      "Text", {"text", "font"}, SideEffect::None, tool_flags::kNone,
-      kCreateTextFontParams, text_ops::handle_create_font}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "create_shaped_text",
-      "Create a shaped text object in the TextServer and return its RID id as 'result'. Optional 'direction' (0=auto, 1=ltr, 2=rtl) and 'orientation' (0=horizontal, 1=vertical) select layout behavior, both default to auto/horizontal. Pass the id as shaped_rid to add_shaped_text_string to add text, then to get_shaped_text_size for the measured size. Errors if the TextServer is unavailable.",
-      "Text", {"text", "shaped"}, SideEffect::None, tool_flags::kNone,
-      kCreateShapedTextParams, text_ops::handle_create_shaped_text}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_text_font_antialiasing",
-      "Set the antialiasing mode of a font created by create_text_font. Requires font_rid (the RID id returned by create_text_font) and antialiasing (0=none, 1=gray, 2=grayscale, 3=subpixel). Call after set_text_font_data so the mode applies to the loaded font. Use 0 for pixel-art fonts. Returns 'ok'.",
-      "Text", {"text", "font"}, SideEffect::None, tool_flags::kNone,
-      kSetTextFontAntialiasingParams, text_ops::handle_font_set_antialiasing}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_text_font_data",
-      "Load a font file and assign its bytes to a font created by create_text_font. 'data' is a path to a font file (.ttf, .otf, .woff2); get_text_font_system_path returns an absolute path that can be passed here directly. Requires font_rid from create_text_font. Returns 'ok'; errors when the file cannot be read.",
-      "Text", {"text", "font"}, SideEffect::None, tool_flags::kNone,
-      kSetTextFontDataParams, text_ops::handle_font_set_data}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_text_font_hinting",
-      "Set the hinting mode of a font created by create_text_font. Requires font_rid (the RID id returned by create_text_font) and hinting (0=none, 1=light, 2=normal). Apply after set_text_font_data so the setting affects the loaded font. Light hinting is the typical default for UI text. Returns 'ok'.",
-      "Text", {"text", "font"}, SideEffect::None, tool_flags::kNone,
-      kSetTextFontHintingParams, text_ops::handle_font_set_hinting}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "get_text_font_system_path",
-      "Resolve a system-installed font to an absolute file path. Requires font_name; optional weight (default 400), stretch (default 100) and italic refine the match. The returned path can be used directly as the 'data' argument of set_text_font_data. Returns the path as 'result'.",
-      "Text", {"text", "font"}, SideEffect::None, tool_flags::kNone,
-      kGetTextFontSystemPathParams, text_ops::handle_get_system_font_path}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "has_text_feature",
-      "Check whether the active TextServer supports a layout or shaping feature. Requires feature, a TextServer.Feature enum value (1=simple_layout, 2=bidi_layout, 4=shaped, 8=kerning, 16=ligatures, and more listed in the schema). Returns true or false as 'result'. Query it before relying on a feature such as shaped text or ligatures.",
-      "Text", {"text", "feature"}, SideEffect::None, tool_flags::kNone,
-      kHasTextFeatureParams, text_ops::handle_has_feature}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "is_text_locale_right_to_left",
-      "Check whether a locale uses right-to-left text direction. Requires a BCP-47 locale code (e.g. 'ar', 'he', 'en'); returns true or false as 'result'. A false result means left-to-right. Use it to pick text alignment or font variants before shaping text for that locale.",
-      "Text", {"text", "locale"}, SideEffect::None, tool_flags::kNone,
-      kIsTextLocaleRightToLeftParams, text_ops::handle_is_locale_right_to_left}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "add_shaped_text_string",
-      "Add a text string to a shaped text object created by create_shaped_text. Requires shaped_rid (the RID id from create_shaped_text), text, font_rid (the RID id of a font configured with set_text_font_data) and size in pixels; optional language code improves shaping. Returns true on success as 'result'; run get_shaped_text_size afterwards to measure.",
-      "Text", {"text", "shaped"}, SideEffect::None, tool_flags::kNone,
-      kAddShapedTextStringParams, text_ops::handle_shaped_text_add_string}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "get_shaped_text_size",
-      "Measure the rendered size of a shaped text object after adding strings with add_shaped_text_string. Requires shaped_rid (the RID id from create_shaped_text). Returns {x, y} pixel dimensions as 'result'. Call it only after add_shaped_text_string, otherwise the reported size is zero. Use it to size labels before adding them.",
-      "Text", {"text", "shaped"}, SideEffect::None, tool_flags::kNone,
-      kGetShapedTextSizeParams, text_ops::handle_shaped_text_get_size}));
+  v.reserve(3);
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
+      "font",
+      "Create and configure TextServer font objects in one tool. action selects the operation: 'create' returns a font RID id as result and must run first, every other action requires that id as font_rid; 'set_data' loads a font file (.ttf, .otf, .woff2) from data and assigns its bytes (action=system_path returns a path usable here); 'set_antialiasing' sets antialiasing 0=none, 1=gray, 2=grayscale, 3=subpixel (use 0 for pixel-art fonts); 'set_hinting' sets hinting 0=none, 1=light, 2=normal (apply after set_data); 'system_path' resolves a system-installed font to an absolute file path with optional weight (default 400), stretch (default 100) and italic. Returns the RID id, the resolved path, or 'ok' depending on the action. Example: {\"action\": \"create\"} then {\"action\": \"set_data\", \"font_rid\": 1, \"data\": \"res://fonts/ui.ttf\"}.",
+      "Text", {"text", "font", "rid", "antialiasing", "hinting"},
+      SideEffect::None, tool_flags::kNone,
+      kFontParams, text_ops::handle_font,
+      schema::build_action_schema(
+          kFontActions, kFontParams,
+          "create: new TextServer font, returns the RID id; set_data: load a font file into a font; set_antialiasing: set the antialiasing mode; set_hinting: set the hinting mode; system_path: resolve a system font name to a file path"),
+      {},
+      {"font action=create",
+       "font action=system_path font_name=Arial"}},
+      {
+          ToolAlias{
+              "create_text_font", "font",
+              [](const mcp::JsonValue &args) {
+                return text_action_args(args, "create");
+              },
+              {}, "0.4.0", "0.6.0"},
+          ToolAlias{
+              "set_text_font_data", "font",
+              [](const mcp::JsonValue &args) {
+                return text_action_args(args, "set_data");
+              },
+              {}, "0.4.0", "0.6.0"},
+          ToolAlias{
+              "set_text_font_antialiasing", "font",
+              [](const mcp::JsonValue &args) {
+                return text_action_args(args, "set_antialiasing");
+              },
+              {}, "0.4.0", "0.6.0"},
+          ToolAlias{
+              "set_text_font_hinting", "font",
+              [](const mcp::JsonValue &args) {
+                return text_action_args(args, "set_hinting");
+              },
+              {}, "0.4.0", "0.6.0"},
+          ToolAlias{
+              "get_text_font_system_path", "font",
+              [](const mcp::JsonValue &args) {
+                return text_action_args(args, "system_path");
+              },
+              {}, "0.4.0", "0.6.0"},
+      })));
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
+      "shaped_text",
+      "Create and measure shaped text objects in one tool. action selects the operation: 'create' returns a shaped text RID id as result, with optional direction (0=auto, 1=ltr, 2=rtl) and orientation (0=horizontal, 1=vertical); 'add_string' adds a text string to that shaped text (requires shaped_rid, text, font_rid from font action=create configured with action=set_data, and size in pixels; optional language improves shaping) and returns true on success; 'get_size' measures the rendered size of the shaped text as {x, y} pixels and is only meaningful after add_string. Errors when the TextServer is unavailable. Example: {\"action\": \"create\", \"direction\": 1} then {\"action\": \"get_size\", \"shaped_rid\": 1}.",
+      "Text", {"text", "shaped", "rid", "measure", "size"},
+      SideEffect::None, tool_flags::kNone,
+      kShapedTextParams, text_ops::handle_shaped_text,
+      schema::build_action_schema(
+          kShapedTextActions, kShapedTextParams,
+          "create: new shaped text object, returns the RID id; add_string: add a string with a font and size; get_size: measure the rendered size"),
+      {},
+      {"shaped_text action=create direction=1",
+       "shaped_text action=get_size shaped_rid=1"}},
+      {
+          ToolAlias{
+              "create_shaped_text", "shaped_text",
+              [](const mcp::JsonValue &args) {
+                return text_action_args(args, "create");
+              },
+              {}, "0.4.0", "0.6.0"},
+          ToolAlias{
+              "add_shaped_text_string", "shaped_text",
+              [](const mcp::JsonValue &args) {
+                return text_action_args(args, "add_string");
+              },
+              {}, "0.4.0", "0.6.0"},
+          ToolAlias{
+              "get_shaped_text_size", "shaped_text",
+              [](const mcp::JsonValue &args) {
+                return text_action_args(args, "get_size");
+              },
+              {}, "0.4.0", "0.6.0"},
+      })));
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
+      "text_query",
+      "Query the active TextServer in one tool. action selects the question: 'has_feature' checks whether a layout or shaping feature is supported and requires feature, a TextServer.Feature enum value (1=simple_layout, 2=bidi_layout, 4=shaped, 8=kerning, 16=ligatures, and more listed in the schema); 'locale_right_to_left' checks whether a locale uses right-to-left text direction and requires a BCP-47 locale code (e.g. 'ar', 'he', 'en'). Both return true or false as result. Example: {\"action\": \"has_feature\", \"feature\": 4} or {\"action\": \"locale_right_to_left\", \"locale\": \"ar\"}.",
+      "Text", {"text", "feature", "locale", "query"},
+      SideEffect::None, tool_flags::kNone,
+      kTextQueryParams, text_ops::handle_text_query,
+      schema::build_action_schema(
+          kTextQueryActions, kTextQueryParams,
+          "has_feature: whether the TextServer supports a feature flag; locale_right_to_left: whether a locale is right-to-left"),
+      {},
+      {"text_query action=has_feature feature=4",
+       "text_query action=locale_right_to_left locale=ar"}},
+      {
+          ToolAlias{
+              "has_text_feature", "text_query",
+              [](const mcp::JsonValue &args) {
+                return text_action_args(args, "has_feature");
+              },
+              {}, "0.4.0", "0.6.0"},
+          ToolAlias{
+              "is_text_locale_right_to_left", "text_query",
+              [](const mcp::JsonValue &args) {
+                return text_action_args(args, "locale_right_to_left");
+              },
+              {}, "0.4.0", "0.6.0"},
+      })));
   return v;
 }
 

@@ -20,6 +20,10 @@ struct MonitorInfo {
   const char *type;
 };
 
+constexpr int64_t kMonitorMemoryStatic = 4;
+constexpr int64_t kMonitorObjectCount = 7;
+constexpr int64_t kMonitorNodeCount = 9;
+
 static const MonitorInfo s_monitors[] = {
     {"time/fps", "time"},
     {"time/process", "time"},
@@ -453,6 +457,90 @@ mcp::JsonValue handle_get_custom_monitor(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_debug_custom_monitor completed");
   return r;
+}
+
+mcp::JsonValue handle_get_info(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "get_debug_info called");
+  auto *ap = args.Find("action");
+  if (!ap || !ap->IsString()) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue("missing required parameter: action");
+    return e;
+  }
+  const std::string action = ap->GetString();
+  if (action == "monitors") {
+    return handle_get_all_monitors(args);
+  }
+  if (action == "catalog") {
+    mcp::JsonValue call_args(mcp::JsonValue::object_tag);
+    call_args["catalog"] = mcp::JsonValue(true);
+    return handle_get_all_monitors(call_args);
+  }
+  if (action == "custom") {
+    const mcp::JsonValue *id = args.Find("id");
+    if (id != nullptr && id->IsString()) {
+      return handle_get_custom_monitor(args);
+    }
+    mcp::JsonValue call_args(mcp::JsonValue::object_tag);
+    call_args["include_custom"] = mcp::JsonValue(true);
+    return handle_get_all_monitors(call_args);
+  }
+  int64_t monitor_id = -1;
+  if (action == "object") {
+    monitor_id = kMonitorObjectCount;
+  } else if (action == "node") {
+    monitor_id = kMonitorNodeCount;
+  } else if (action == "memory") {
+    monitor_id = kMonitorMemoryStatic;
+  } else {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue(
+        "unknown action '" + action +
+        "': expected monitors, catalog, custom, object, node or memory");
+    return e;
+  }
+  mcp::JsonValue call_args(mcp::JsonValue::object_tag);
+  mcp::JsonValue ids(mcp::JsonValue::array_tag);
+  ids.PushBack(mcp::JsonValue(monitor_id));
+  call_args["ids"] = std::move(ids);
+  mcp::JsonValue monitors = handle_get_all_monitors(call_args);
+  const mcp::JsonValue *arr = monitors.Find("result");
+  if (arr != nullptr && arr->IsArray() && arr->Size() > 0) {
+    const mcp::JsonValue *value = (*arr)[0].Find("value");
+    if (value != nullptr) {
+      mcp::JsonValue r(mcp::JsonValue::object_tag);
+      r["result"] = *value;
+      return r;
+    }
+  }
+  return monitors;
+}
+
+mcp::JsonValue handle_set_visuals(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "set_debug_visuals called");
+  auto *ap = args.Find("action");
+  if (!ap || !ap->IsString()) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue("missing required parameter: action");
+    return e;
+  }
+  const std::string action = ap->GetString();
+  if (action == "collision") {
+    return handle_collision_debug(args);
+  }
+  if (action == "navigation") {
+    return handle_navigation_debug(args);
+  }
+  if (action == "performance") {
+    return handle_performance_debug(args);
+  }
+  mcp::JsonValue e(mcp::JsonValue::object_tag);
+  e["error"] = mcp::JsonValue(
+      "unknown action '" + action +
+      "': expected collision, navigation or performance");
+  return e;
 }
 
 } // namespace debug_ops

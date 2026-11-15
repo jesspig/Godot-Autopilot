@@ -424,6 +424,24 @@ const VariantBuiltin *find_variant_builtin(const std::string &name) {
 mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_docs_class called");
+  if (const mcp::JsonValue *query = args.Find("query")) {
+    if (!query->IsString()) {
+      mcp::JsonValue e(mcp::JsonValue::object_tag);
+      e["error"] =
+          mcp::JsonValue("invalid parameter: query must be a string");
+      return e;
+    }
+    if (const mcp::JsonValue *conflict = args.Find("class")) {
+      if (conflict != nullptr && conflict->IsString()) {
+        mcp::JsonValue e(mcp::JsonValue::object_tag);
+        e["error"] = mcp::JsonValue(
+            "class and query are mutually exclusive: pass class to read one "
+            "class or query to search class names");
+        return e;
+      }
+    }
+    return handle_search(args);
+  }
   auto *np = args.Find("class");
   if (!np || !np->IsString()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -718,7 +736,7 @@ mcp::JsonValue handle_get_class(const mcp::JsonValue &args) {
 
 mcp::JsonValue handle_search(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "find_docs_class called");
+                            "get_docs_class query called");
   auto *qp = args.Find("query");
   if (!qp || !qp->IsString()) {
     mcp::JsonValue e(mcp::JsonValue::object_tag);
@@ -757,7 +775,7 @@ mcp::JsonValue handle_search(const mcp::JsonValue &args) {
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(results_arr);
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
-                            "find_docs_class completed");
+                            "get_docs_class query completed");
   return r;
 }
 
