@@ -91,7 +91,7 @@ Godot-Autopilot 是一个 **MCP（Model Context Protocol）服务器**，以 **G
 
 `src/resources/debugger_resources.cpp` 另注册 7 个调试器资源：`godot://editor/output-log`、`godot://debugger/errors`、`godot://debugger/output`、`godot://debugger/stack-dump`、`godot://debugger/scene-tree`、`godot://debugger/monitors`、`godot://debugger/session`。
 
-09-16 批起新增 skills 资源组（`register_skill_resources`，`src/resources/skill_resources.hpp` 提供 URI 解析）：`godot://skills`（目录，JSON 目录清单）、`godot://skills/<name>`（每册 SKILL.md）、`godot://skills/<name>/<file>`（册内文件）——0.3.2 起为 10 册自包含技能书（每册仅 `SKILL.md`、无 references），共 21 个资源（1 目录 + 10 单册 + 10 单文件），技能经 MCP 协议层可发现可读。
+09-16 批起新增 skills 资源组（`register_skill_resources`，`src/resources/skill_resources.hpp` 提供 URI 解析）：`godot://skills`（目录，JSON 目录清单）、`godot://skills/<name>`（入口卡 SKILL.md）、`godot://skills/<name>/<file>`（参考文件）——本轮起为 1 张入口卡 + 9 篇 references，共 12 个资源（1 目录 + 1 技能 + 10 文件），技能经 MCP 协议层可发现可读。
 
 ### 运行时桥接（game_* 工具）
 
@@ -145,15 +145,15 @@ godot-self-driving/
 │   ├── tools/                  # 领域工具：52 个 .cpp（*_ops + register_all/dispatch/tool_args/tool_pipeline/...）、
 │   │                           #   33 个域 _tools.hpp（451 条 ToolSpec）+ tool_spec.hpp / tool_registry.hpp / dynamic_spec_store.hpp /
 │   │                           #   ready_policy.hpp（游戏通道就绪决策，header-only）/ autopilot_tools.{hpp,cpp}（用户脚本动态工具 API）
-│   ├── resources/              # MCP Resources：resource_handlers + debugger_resources + skill_resources（skills 资源组，21 个资源）
+│   ├── resources/              # MCP Resources：resource_handlers + debugger_resources + skill_resources（skills 资源组，12 个资源）
 │   ├── prompts/                # 提示词模板：12 个（prompt_handlers 7 通用 + debugger_prompts 5 调试）
 │   ├── runtime/                # 游戏运行时桥接：game_bridge(±input/eval/verify) + gda_protocol.hpp
 │   ├── ui/                     # 编辑器 UI：mcp_log_dock（0.3.2 删除 mcp_config_dock）
 │   └── util/                   # 通用编译单元：variant_json、bm25_index、error_util、readback_util、scene_verify、
 │   │                           #   skill_gen、skill_content_generated（构建期嵌入薄胶水）；共 27 个文件（7 cpp + 20 hpp）
 │   │                           #   header-only（10 个）：json_godot、rid_registry、scene_path、project_path、type_hint、gdscript_wrap、resource_fs、mcp_image_content、inline_resource_json、owned_exception
-├── skills/                     # 插件技能书源（10 册各一 SKILL.md，自包含、无 references；共 10 个 .md）
-├── cli/                        # CLI 载体（Bun + TS 源码直跑，零运行时依赖）：bin/gda.ts 入口 + src/ 44 个 .ts（含 src/mcp/ 协议客户端、src/ipc/ 本机通道、src/commands/ 21 个）+ tests/ 25 文件 255 项（237 pass + 18 skip）
+├── skills/                     # 插件技能卡源（1 张入口卡 + 9 篇 references；共 10 个 .md）
+├── cli/                        # CLI 载体（Bun + TS 源码直跑，零运行时依赖）：bin/gda.ts 入口 + src/ 54 个 .ts（含 src/mcp/ 协议客户端、src/ipc/ 本机通道、src/commands/ 22 个）+ tests/ 36 个 .ts（34 个测试文件运行 324 项：301 pass + 23 skip）
 ├── tests/                      # 单元/边界/集成 gtest 目标 + support/ 夹具 + guard/ 源码守卫（含 no_python_guard）+ probe/ 传输探针（数值见 tests.md 数值核算总表）
 ├── docs/                       # 本知识库（docs/wiki/，含 modules/、plans/、changelog/）
 ├── package.json                # CLI 包定义（name godot-autopilot-cli，bin gda → cli/bin/gda.ts，scripts.gda-dev-tools → devtools/main.ts，零运行时依赖）

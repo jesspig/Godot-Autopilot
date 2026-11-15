@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import type { GlobalOptions } from "../src/args";
 import { run as runSkills } from "../src/commands/skills";
 import { CliError, ExitCode } from "../src/errors";
+import { builtinRetiredSkills, normalizeRetiredSkills } from "../src/skills";
 
 function captureOutput(): { stdout(): string; stderr(): string; restore(): void } {
   const origOut = process.stdout.write;
@@ -37,13 +38,29 @@ async function runCaptured(positional: string[], opts: GlobalOptions) {
   }
 }
 
+describe("retired skills", () => {
+  test("内置退役清单为 9 个领域册且不含入口", () => {
+    const retired = builtinRetiredSkills();
+    expect(retired.length).toBe(9);
+    expect(retired).not.toContain("godot-autopilot");
+    expect(retired).toContain("godot-autopilot-tools");
+    expect(retired).toEqual([...retired].sort((a, b) => a.localeCompare(b)));
+  });
+
+  test("旧 asset 缺少 retired 或含非法名时安全归一", () => {
+    expect(normalizeRetiredSkills(undefined)).toEqual([]);
+    expect(normalizeRetiredSkills("x")).toEqual([]);
+    expect(normalizeRetiredSkills(["b", "a", "a", "../x", 1])).toEqual(["a", "b"]);
+  });
+});
+
 describe("skills", () => {
-  test("list 离线列出 10 册并带路径与文件数", async () => {
+  test("list 离线列出 1 张入口技能卡并带路径与文件数", async () => {
     const result = await runCaptured(["list"], {});
     expect(result.code).toBe(ExitCode.Success);
     const books = JSON.parse(result.stdout) as Array<{ name: string; path: string; files: number }>;
     expect(Array.isArray(books)).toBe(true);
-    expect(books.length).toBe(10);
+    expect(books.length).toBe(1);
     for (const book of books) {
       expect(typeof book.name).toBe("string");
       expect(book.name.startsWith("godot-autopilot")).toBe(true);
@@ -52,32 +69,32 @@ describe("skills", () => {
     }
   });
 
-  test("--zh 列出中文 10 册", async () => {
+  test("--zh 列出中文入口卡", async () => {
     const result = await runCaptured(["list"], { zh: true });
     expect(result.code).toBe(ExitCode.Success);
     const books = JSON.parse(result.stdout) as Array<{ name: string; path: string; files: number }>;
-    expect(books.length).toBe(10);
-    expect(books.some((book) => book.name === "godot-autopilot-setup")).toBe(true);
+    expect(books.length).toBe(1);
+    expect(books[0]?.name).toBe("godot-autopilot");
   });
 
   test("show 输出 SKILL.md 正文", async () => {
-    const result = await runCaptured(["show", "godot-autopilot-tools"], {});
+    const result = await runCaptured(["show", "godot-autopilot"], {});
     expect(result.code).toBe(ExitCode.Success);
-    expect(result.stdout).toContain("# Godot Autopilot Tools");
+    expect(result.stdout).toContain("# Godot Autopilot");
   });
 
-  test("show --file 读取副册文件", async () => {
-    const result = await runCaptured(["show", "godot-autopilot-tools"], {
-      file: "SKILL.md",
+  test("show --file 读取 references 文件", async () => {
+    const result = await runCaptured(["show", "godot-autopilot"], {
+      file: "references/tools.md",
     });
     expect(result.code).toBe(ExitCode.Success);
-    expect(result.stdout).toContain("# Godot Autopilot Tools");
+    expect(result.stdout).toContain("# Calling Protocol and Docs CLI");
   });
 
   test("--zh show 输出中文正文", async () => {
-    const result = await runCaptured(["show", "godot-autopilot-setup"], { zh: true });
+    const result = await runCaptured(["show", "godot-autopilot"], { zh: true });
     expect(result.code).toBe(ExitCode.Success);
-    expect(result.stdout).toContain("# Godot Autopilot 安装与连接");
+    expect(result.stdout).toContain("# Godot Autopilot");
   });
 
   test("未知册名报用法错误", async () => {
@@ -94,7 +111,7 @@ describe("skills", () => {
   test("--file 逃出技能目录被拒", async () => {
     let caught: unknown;
     try {
-      await runCaptured(["show", "godot-autopilot-tools"], { file: "../../README.md" });
+      await runCaptured(["show", "godot-autopilot"], { file: "../../README.md" });
     } catch (error) {
       caught = error;
     }

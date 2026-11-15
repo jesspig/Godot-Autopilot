@@ -11,6 +11,7 @@ import { run as stop } from "./stop";
 import { run as restart } from "./restart";
 
 import { run as logs } from "./logs";
+import { run as docs } from "./docs";
 import { run as skills } from "./skills";
 import { run as tools } from "./tools";
 import { run as resources } from "./resources";
@@ -46,6 +47,7 @@ export const COMMANDS: Record<string, Command> = {
   tasks: { run: tasks },
   projects: { run: projects },
   cache: { run: cache },
+  docs: { run: docs },
   install: { run: install },
   update: { run: update },
   trace: { run: trace },

@@ -8,7 +8,7 @@ import { cacheRoot, cacheAssetPath, selectLatest, verifyManifest } from "../cach
 import { CliError, ExitCode } from "../errors";
 import { readPluginInstanceIndex } from "../instances";
 import { isAlive, stopForce } from "../process";
-import { builtinSkillsFiles, builtinSkillsVersion, type SkillLanguage } from "../skills";
+import { builtinRetiredSkills, builtinSkillsFiles, builtinSkillsVersion, type SkillLanguage } from "../skills";
 import { downloadAsset } from "../source";
 import { CLI_VERSION } from "../version";
 import { start } from "./start";
@@ -122,6 +122,21 @@ async function installSkills(opts: GlobalOptions): Promise<number> {
     throw new CliError(ExitCode.Transport, "no skills source is available (online, cache, builtin).");
   }
   writeTree(target, files, opts.force === true);
+  const retired = builtinRetiredSkills();
+  const existing = new Set(
+    fs
+      .readdirSync(target, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name),
+  );
+  const stale = retired.filter((name) => existing.has(name));
+  const removed: string[] = [];
+  if (opts.prune === true) {
+    for (const name of stale) {
+      fs.rmSync(path.join(target, name), { recursive: true, force: true });
+      removed.push(name);
+    }
+  }
   writeJson(
     {
       ok: true,
@@ -132,6 +147,8 @@ async function installSkills(opts: GlobalOptions): Promise<number> {
       target,
       files: Object.keys(files).length,
       skills: [...new Set(Object.keys(files).map((file) => file.split("/")[0]))].sort(),
+      stale,
+      removed,
     },
     opts,
   );

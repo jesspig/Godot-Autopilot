@@ -21,7 +21,9 @@ resource:
 > 2026-11-10（随 0.3.1 升版同步——当前版本声明由 0.3.0 改为 **0.3.1**）2026-10-30（**10-30 随三轮 e2e 修复批次同步——`gda list` 合并插件实例索引并新增可选端口探测**：输出项新增 `source`（`cli`|`plugin`|`probe`）与统一 `live` 字段；CLI 登记按 `pid`/`port` 去重后并入插件全局实例索引中的存活记录（`source=plugin`，id 为插件 `instance_id`，`startedAt` 由 epoch ms 转 ISO）；`--probe <port>` 只探测指定端口（不做盲扫），命中追加 `source=probe` 条目；空列表提示改为「无 CLI/插件实例；加 `--probe <port>` 可探测指定端口」。CLI TS 单测 17→**18** 文件（新增 `list.test.ts` 13 项），运行期项数以 `bun test cli/tests` 实测为准）
 > 审计日期：2026-11-14（安装链路：Release tag 双格式、`sha256sums.txt`、`addons.zip` 校验、安装脚本 `--project`/`--skills`/`--skills-project`）2026-11-14（T-16/T-20：新增 tasks 命令面、--async/--progress 与 status 的 mcp 能力块）2026-11-14（T-04/T-05/T-06：工具发现改为 live——删除离线 catalog 与 `--refresh`，`tools list` 输出 `{tools,total}` 并过滤 5 个协议工具，`search` 无 query 改走 `list_categories`、有 query 输出 `{results}`；`--category`/`--tags` 同时适用 tools list；技能书与内置资产同步）2026-11-13（随 0.3.2 升版同步——移除 `gda serve` / `gda api` / `gda endpoints` 控制面与 REST 章节、REST 令牌说明；命令数以 `cli/src/commands/index.ts` 的 21 个顶层命令为准（2026-11-14 新增 resources/prompts/tasks）；寻址链按 `src/target.ts` 改为五级；`gda start` 不再选择或注入端口；TS 单测实测 25 文件 255 项）2026-10-23（**10-23 随控制面文档同步批次同步**——命令总数 12→**14**：新增 `restart` 与 `serve`（后者已随 0.3.2 移除）；`serve` 是**纯代理**（不复制工具语义），新增「控制面（`gda serve`）」与 `restart` 两小节，写全监听与绑定约束、路由表、认证与令牌文件、转发与流式透传、日志口径与已知限制；控制面端口 9700 与实例端口的分工见 [端口与实例登记](ports.md)「控制面端口」；CLI TS 单测 193→**257**（12→**16** 文件，Windows 跳过 2 项，实测 255 pass / 2 skip）；覆盖范围同步 `src/serve/` 3 个 .ts 与 `src/commands/` 17 个 .ts；**10-23 随真机冒烟缺陷修复校订**——控制面 `/i/<ref>` 寻址补全为插件 `instance_id` → CLI 标识 `p<pid>` → 端口三级（`gda list` 显示的 `p<pid>` 可直接用于 `/i/<ref>/...`），`stop` / `restart` 补「无窗口实例直接强制停止、有窗口实例保持优雅且超时提示 `--force` 并保留登记」的口径）2026-10-22（10-22 随本地收口批次同步——**`gda start` 新增同工程活跃实例预检**：启动编辑器**之前**先查该工程是否已有活跃实例，命中即**拒绝启动**并给出可操作提示（已有实例的端口与进程号、改用其它端口的办法、豁免开关）；用户显式指定 `--port` 时按用户意图继续启动，但仍给出冲突提示。预检复用了既有的三件能力：CLI 本地注册表（`src/registry.ts` 的 `findLiveByProject`）、插件全局实例索引（`src/instances.ts` 的容错读取）与两级存活校验（`src/probe.ts` 的轻量 TCP / 严格 HTTP）；新模块 [`src/preflight.ts`](../../../cli/src/preflight.ts) 承载判定与提示文案。**行为变更**：`gda start` 对同工程二次启动由「幂等返回既有实例」改为「拒绝并提示」。CLI TS 单测 180→**193**（11→**12** 文件，新增 `preflight.test.ts` 10 项）；技能书里「所钉 tag 早于 CLI 存在」的限制说明按事实改写——`0.3.0` 的树已含 `cli/` 与根 `package.json`（`bin` 映射 `gda`），发布作业也随 `addons.zip` 挂出 5 个目标的独立二进制，剩余限制只是「该 tag 尚未发布」）2026-10-21（10-21 随开放接口面落地批次同步——新增 **REST 调用族** `gda api list` / `gda api describe` / `gda api call` 与端点展示命令 `gda endpoints`；**寻址链由六级改为七级**（`--port` ＞ `--id` ＞ 环境变量 ＞ CLI 本地注册表 ＞ 插件全局实例索引 ＞ 旧路径回退 ＞ 默认 9527），每一级都记录来源（`source`）与链位（`chain`），`gda endpoints` 一次性打印端口/来源/链位/两个端点/存活结果；新增全局选项 `--query`（`api list` 关键字过滤）与 `--probe`（存活校验级别：`light` TCP / `strict` HTTP 探活）；**CLI state dir 迁到集中根下** `<集中根>/cli/`（`GODOT_AUTOPILOT_CLI_HOME` 仍可覆写），**插件全局实例索引**新增为第 5 级来源（`<集中根>/instances.json`），REST 令牌从该索引的 `api_token` 字段读取；集中根由 `GODOT_AUTOPILOT_HOME` 覆写、否则取 `os.homedir()`，其下固定目录名 `.godot-autopilot`；端口模型与登记结构的完整口径见 [端口与实例登记](ports.md)，REST 端点契约已随 0.3.2 移除；本轮校订补三处事实——① 正文「寻址链」小节按 `src/target.ts` 的七级实现重写（旧正文仍是六级链，且 `--id` / `--port` 次序与实现相反），补 `source` / `chain` 两列与两级存活校验；② state dir 解析按 `src/registry.ts` 改正为 `GODOT_AUTOPILOT_CLI_HOME` > `<集中根>/cli/`（旧正文写的是 `%LOCALAPPDATA%` / `XDG_STATE_HOME`），并新增「集中根与两套注册表」小节写令牌读取方式；③ 全局选项表删去已移除的 `--quiet`、补 `--query` 与 `--probe`；10-20 随技能书调用阶梯收敛批次同步——技能书自带的脚本桥 `gda.mjs` 与 `references/script-access.md` 删除，调用阶梯由五级收敛为三级（原生 MCP → GDA CLI → 手动兜底），本载体成为唯一的脚本化调用通道；`bunx`、全局安装与独立二进制是同一载体的三种分发方式，合为阶梯第二级；10-20 随守卫覆盖范围措辞修正批次同步——`version_sync_guard` 已扩展为扫描 `skills/` 全部文本文件与根 `README*.md` 的每一处版本钉（另含 `VERSION`/`CLI_VERSION` 两个值源），本页与 [测试体系](../tests.md) 描述的守卫覆盖范围本轮按守卫脚本实况改正，固定处数的旧口径已删除，覆盖范围以守卫脚本为准；10-20 随 CLI 启动回滚修复批次同步——Windows 启动路径**不再**用 `cmd /c start "" /b` 蹦床 + `netstat` 端口反查 pid，改为直连 `spawn` 并置 `detached: true` 脱父，pid 由 `spawn` 直接返回（编辑器从未监听端口时端口反查必然失败，回滚拿不到 pid、失败后编辑器进程成为孤儿）；`isAlive` 改为解析 `tasklist /FO CSV` 的 pid 字段，**与系统语言无关**（旧实现按输出是否以 `INFO`/`消息` 开头判断，中文 Windows 实际输出「信息:」导致恒判存活，终止确认轮询超时并把已终止进程报成「无法终止」）；失败回滚的三种结果 `was terminated` / `had already exited` / `could not be terminated`（后者附可执行补救指令：Windows `taskkill /F /T /PID N`、POSIX `kill -9 N`）；引擎不可执行时报 `failed to launch the editor executable: ENOENT: …` 而非笼统的 failed to spawn；CLI TS 单测 126→132（9 个文件）；10-19 随 CLI 引擎定位收窄批次同步——`gda start` 不再读 `GODOT_PATH` 与 `<project>/.env`（前者仅 L2 引擎测试使用，生产环境不存在），可执行文件链收敛为 `--godot` > PATH，未命中即报错提示 `--godot`；新增 `cli/tests/process.test.ts` 3 项（TS 108→111、expect 301→310）；随 MCP 协议版本协商修正批次同步——`cli/src/mcp/client.ts` 与技能书 `gda.mjs` 脚本桥声明版本 `2025-03-26`→`2025-11-25`（SDK 旧世代当前版本，GDA 未钉 `ServerOptions::protocol_version` 时服务端对旧版声明原样尊重）；2026-10-19（随 CLI 跨平台修复批次同步——`userDataBase()` 新增 `GODOT_AUTOPILOT_USERDATA` 显式覆写（未设或空白走原生分支，既有解析语义不变）；握手状态由进程级单例改按目标 URL 键控（多目标进程各自握手）；新增 initialize 响应 `result.protocolVersion` 协商版本学习（仅已知五版本表内），后续 POST 按学习值携带 `MCP-Protocol-Version` 头（modern 声明学习值不发头，规避 stateless 传输 hold-open 长连接）；新增 `cli/tests/client_handshake.test.ts` 6 项，TS 单测 102→108 用例 / 6→7 文件；`test_cli_contract.py` mock initialize 响应同步 `2025-11-25`）；2026-10-18（随 CLI 载体落地批次同步——新增 `cli/`（Bun + TS 源码直跑，零运行时依赖）、根 `package.json`/`bun.lock`；双载体（CLI + `gda.mjs`）协议握手升级为标准 MCP `initialize` 流程（SDK 0.3.7 兼容）；真机验收修复两个缺陷（Windows 脱父、start 就绪探测直达标志）；测试稳定性修复（串行化 + Windows 清理时序）；`version_sync_guard`/`cli_contract`/`cli_unit` 三个新 ctest 点；详见 [changelog/2026-10-18-log.md](../changelog/2026-10-18-log.md)）
 
-> 覆盖范围：`cli/` 全部（`bin/gda.ts` 入口、`src/` 44 个 .ts（含 `src/mcp/` 协议客户端、`src/ipc/` 本机通道、`src/commands/` 21 个）、`tests/` 25 个测试文件）+ 根 [`package.json`](../../../package.json) 与 [`bun.lock`](../../../bun.lock)。CLI 是技能书调用阶梯的第二级（原生 MCP → **GDA CLI** → 手动兜底），定位与分发见下文。
+> 2026-11-16（本轮，未升版：新增 `gda docs` 离线引擎文档组 6 个子命令；技能资源收敛为 1 张入口卡 + 9 篇 references，MCP 资源 21→12；新增 docs/prune 系列全局选项。命令数以 `cli/src/commands/index.ts` 的 22 个顶层命令为准；CLI 源码 54 个 .ts、测试 36 个 .ts，运行期项数以 `bun test cli/tests` 实测为准。）
+>
+> 覆盖范围：`cli/` 全部（`bin/gda.ts` 入口、`src/` 54 个 .ts（含 `src/mcp/` 协议客户端、`src/ipc/` 本机通道、`src/commands/` 22 个）、`tests/` 36 个测试文件）+ 根 [`package.json`](../../../package.json) 与 [`bun.lock`](../../../bun.lock)。CLI 是技能书调用阶梯的第二级（原生 MCP → **GDA CLI** → 手动兜底），定位与分发见下文。
 
 ## 定位与分发
 
@@ -51,7 +53,7 @@ resource:
 
 ## 命令参考
 
-`gda --help` 共列 **18** 个顶层命令：调用族 6、生命周期 5、离线与资产族 7（`skills` / `tools` / `projects` / `cache` / `install` / `update` / `trace`）。下表按族分组。
+`gda --help` 共列 **22** 个顶层命令：调用族 6、生命周期 5、资产与查询族 10、文档族 1（`docs`，6 个子命令）。下表按族分组。
 
 ### 调用族（6 个，经 MCP 协议）
 
@@ -74,20 +76,31 @@ resource:
 | `restart` | 重启进程（定位规则同 `stop`；按窗口状态停止后按原端口 / headless / godot 路径重新拉起） |
 | `logs` | 查看进程日志（state dir `logs/<id>.log`，默认末尾 50 行） |
 
-### 资产与查询族（9 个）
+### 资产与查询族（10 个）
 
 | 命令 | 说明 |
 |---|---|
-| `skills list|show` | 列出/打印内置技能册（`--zh` 中文；`show --file <rel>` 读附文件） |
+| `skills list|show` | 列出/打印 1 张入口技能卡与 9 篇 references（`--zh` 中文；`show --file <rel>` 读参考文件） |
 | `tools list` | 通过运行实例的 `search_tools {limit:0}` 列出全部直接工具，过滤 5 个 MCP 协议工具，输出 `{tools, total}`；`--category`/`--tags` 可过滤 |
 | `resources list|templates|read|watch` | 通用 MCP `resources/*`：list 可带 `--templates`；read 默认文本直出/JSON pretty/blob 摘要，`--save <dir>` 落盘，`--json` 脱敏 base64，`--raw` 原始信封；watch 轮询 `--interval` 秒 |
 | `prompts list|get` | 通用 MCP `prompts/*`：list 输出 `{prompts}`；get 用 `--args` 传字符串参数，默认按 `[role] text` 渲染，`--json` 保留 messages |
 | `tasks list|get|wait|cancel|clean` | 本地任务索引 `<gda-root>/tasks/`；`call --async` 创建并记录，wait 状态变化写 stderr，终态结果写 stdout |
 | `projects` | 列出已知工程（`<集中根>/projects/*`） |
 | `cache list|info|clear` | 缓存清单/大小/清理（`clear` 需 `--force`） |
-| `install skills|plugin` | 安装技能册到 `~/.agents/skills`（`--path` 可装项目级目录），或把插件装进工程 |
+| `install skills|plugin` | 安装入口卡与 references 到 `~/.agents/skills`（`--path` 可装项目级目录，`--prune` 清理退役目录），或把插件装进工程 |
 | `update <cli|skills|plugin|all>` | 更新资产，`--check` 只检查状态 |
 | `trace list|show|summary|slow|failures|export` | Trace v4 查询与导出 |
+
+### 文档族（1 个，6 个子命令）
+
+| 命令 | 说明 |
+|---|---|
+| `docs sync` | 总是从本机 Godot 导出 `extension_api.json` 到缓存 |
+| `docs status` | 只读显示项目 pin、解析引擎、缓存状态与桶列表 |
+| `docs search <query>` | 搜索类、成员与全局符号（`--kind`/`--class`/`--limit`） |
+| `docs class <name>` | 类摘要与分区（`--section`/`--member`/`--full`） |
+| `docs member <class> <name>` | 按名称解析成员（`--kind`） |
+| `docs clear` | 删除缓存桶（`--engine <x.y>` 或 `--all --force`） |
 
 ### 全局选项（[`src/args.ts`](../../../cli/src/args.ts)）
 
@@ -119,7 +132,15 @@ resource:
 | `--no-import` | 布尔 | start/restart | 跳过启动时资源导入 |
 | `--force` | 布尔 | stop/restart/cache clear | 强制停止进程 / 确认缓存清理 |
 | `--probe <value>` | 字符串 | start（level）；list（端口） | start 为存活校验级别 `light`（默认，TCP）/`strict`（HTTP 探活）；`list` 下为端口号 1-65535（探测指定端口，不扫描） |
-| `--file <rel>` | 字符串 | skills show | 读取技能册附文件（相对技能目录） |
+| `--file <rel>` | 字符串 | skills show | 读取技能附文件（相对技能目录） |
+| `--docs-file <path>` | 字符串 | docs 查询 | 读取外部 `extension_api.json`，绕过缓存与导出 |
+| `--section <name>` | 字符串 | docs class | `brief`/`description`/`methods`/`properties`/`signals`/`enums`/`constants`/`operators`/`constructors`/`all` |
+| `--member <text>` | 字符串 | docs class | 按名称或签名过滤成员 |
+| `--kind <kind>` | 字符串 | docs search/member | `class`/`method`/`property`/`signal`/`enum`/`constant`/`utility` |
+| `--class <name>` | 字符串 | docs search | 限定类 |
+| `--engine <x.y>` | 字符串 | docs clear | 删除指定缓存桶（stable 用 `x.y`，预发布用 `x.y-status`） |
+| `--full` | 布尔 | docs class | 等价 `--section all` |
+| `--prune` | 布尔 | install skills | 删除退役技能目录 |
 | `--artifact <name>` | 字符串 | cache | 缓存资产：`cli` / `plugin` / `skills` |
 | `--path <dir>` | 字符串 | install skills | 安装目标目录 |
 | `--source <mode>` | 字符串 | install/update | `auto`（默认）/ `online` / `cache` / `builtin` |
@@ -154,12 +175,29 @@ resource:
 
 ### 离线与资产命令（2026-11-13 更新）
 
-- 离线族（无运行实例也可用）：`gda skills list|show [--file <rel>] [--zh]` 列出/打印内置技能册；`gda projects` 按 `<集中根>/projects/*` 聚合工程（名/路径/hash/实例数/最后活动/存活）。
+- 离线族（无运行实例也可用）：`gda skills list|show [--file <rel>] [--zh]` 列出/打印 1 张入口技能卡与 9 篇 references；`gda projects` 按 `<集中根>/projects/*` 聚合工程（名/路径/hash/实例数/最后活动/存活）。
 - 工具发现（live，2026-11-14 T-04/T-05）：`gda tools list [--category] [--tags]` 输出 `{tools: string[], total}`；`gda search [query]` 无 query 输出 `{categories}`、有 query 输出 `{results: [{name, score}]}`（服务端默认 20 条）。CLI 不再保留离线 catalog，也没有 `gda tools search|describe` 或 `--refresh`。
-- 资产安装与更新：`gda install skills [--zh] [--offline] [--path <dir>]` 安装 10 册技能书；`gda install plugin` 把插件装进工程；`gda update <cli|skills|plugin|all> [--check]`。
+- 资产安装与更新：`gda install skills [--zh] [--offline] [--path <dir>] [--prune]` 安装 1 张入口卡与 9 篇 references（`--prune` 清理退役目录）；`gda install plugin` 把插件装进工程；`gda update <cli|skills|plugin|all> [--check]`。
 - 缓存：`gda cache list|info|clear`（`clear` 需 `--force`），`--artifact` 过滤 cli/plugin/skills 三类资产。
 - `gda list` 支持 `--all`（含未运行工程）、`--projects`（按工程聚合）、`--stale`（仅非存活）；条目的 `live` 保留布尔并新增 `liveDetail {pid, endpoint}` 两级。
 - IPC 通道（2026-11-13 T-03）：`--socket <path>` 或实例索引的 `endpoints.ipc` 使 `gda call` 直连插件本机通道；帧为 4 字节大端长度前缀 + JSON（单帧 4 MiB），首帧 `initialize` 必须在 `params._meta.gda_token` 带令牌；Windows 走 loopback TCP，POSIX 走 AF_UNIX。连接失败默认回退端口通道，`--no-fallback` 关闭回退（直接以传输错误退出码 2）。实现见 [`src/ipc/client.ts`](../../../cli/src/ipc/client.ts) 与 [`src/mcp/client.ts`](../../../cli/src/mcp/client.ts)。
+
+## 离线引擎文档（`gda docs`）
+
+数据源与缓存：
+
+- 后端是 `godot --headless --dump-extension-api-with-docs`，产物含官方 docstring；不联网。
+- 缓存位于 `<gdaRoot>/docs/<key>/extension_api.json` 与 `meta.json`。`key` 对 stable 为 `x.y`，对预发布为 `x.y-<status>`（如 `4.8-dev`、`4.8-rc1`）；同一 minor 的 patch 覆盖同一桶。
+- 解析顺序：`--godot` ＞ live 实例的 `godot` 二进制 ＞ `project.godot` 的 `config/features` ＞ 最新缓存 ＞ PATH。
+- 新鲜度：有完整版本时按 `x.y.z` + status 比对；只有项目 pin 时按 `x.y` 复用（`verified=false`）。缓存缺失或不一致时，查询路径自动导出一次。
+- 导出失败（无二进制、构建无文档、超时）退出码 2，不回退旧缓存；`--docs-file <path>` 绕过缓存与导出。
+
+命令行为：
+
+- `sync` 总是导出；`status` 只读；`search`/`class`/`member` 在查询前执行 `ensureDocs()`；`clear` 按桶清理。
+- `search` 默认 20 条、上限 200；`class` 默认只给 brief/description/counts，`--section`/`--member`/`--full` 展开；`member` 自动判定 method/property/signal/enum/constant/utility。
+- 查询输出为单个 JSON：`engine{key,resolved,generated_by,source,verified}`、`cache{status,path,synced_at,generated_by,verified}`、`results|class|matches` 与 `total`。
+- `cache.status` 为 `fresh`/`auto-exported`/`external`；`engine.source` 为 `explicit`/`live`/`project`/`newest-cache`/`path`。
 
 ## 寻址链（[`src/target.ts`](../../../cli/src/target.ts)）
 
@@ -286,7 +324,7 @@ resource:
 2. **GDA CLI**（本载体；`bunx`、全局安装、独立二进制是同一载体的三种分发方式）
 3. **手动兜底**（无 CLI 可用时，按 `gda --help` 与日志手工操作）
 
-技能书为 10 册 CLI-first EN/ZH 自包含版本，不再附带 `references/` 目录或 REST 参考；`gda install skills [--zh]` 安装到 `~/.agents/skills`，`--path <dir>` 可装到项目级目录（如 `<project>/.agents/skills`），`gda skills list|show` 读取内置副本。
+技能结构为 1 张入口卡 + 9 篇 references（CLI-first EN/ZH 自包含）；`gda install skills [--zh] [--prune]` 安装到 `~/.agents/skills`，`--path <dir>` 可装到项目级目录（如 `<project>/.agents/skills`），`gda skills list|show` 读取内置副本。
 
 `version_sync_guard` 扫描 `skills/` 下全部文本文件与根 `README*.md` / `INSTALL*.md`，断言其中每一处版本钉均与根 `VERSION` 同值（`VERSION` 与 `CLI_VERSION` 两个值源一并核对），非版本引用（如 `#develop`）只登记、不参与比对；覆盖范围以守卫脚本为准。
 
@@ -308,7 +346,7 @@ resource:
 ## 相关页面
 
 - [端口与实例登记](ports.md) — 端口模型、实例登记结构与五级发现链
-- [支撑模块](support.md) — 技能书（10 册自包含与 MCP 资源注册）
+- [支撑模块](support.md) — 技能卡与 references（1 + 9，MCP 资源 12）
 - [安全边界与并发契约](../security_contract.md) — CLI 安全包络（§3.4）
 - [测试体系](../tests.md) — ctest 注册点与 TS 单测计数
 - [项目总览](../overview.md) — 目录树中的 `cli/`

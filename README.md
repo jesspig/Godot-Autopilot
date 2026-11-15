@@ -67,7 +67,7 @@ The agent will locate the Godot project, install the CLI and plugin, ask whether
 
 ## Skill books
 
-The plugin ships **10 self-contained skill books** (an overview, plus scenes, resources, scripting, runtime, servers, content, C#, setup, and tools volumes). Install one scope:
+The plugin ships **1 entry skill card plus 9 references** (setup, tools, scenes, scripting, resources, runtime, content, C#, and servers). Install one scope:
 
 ```bash
 # Global: shared by all Godot projects
@@ -79,9 +79,12 @@ gda install skills --path "<project>/.agents/skills"
 # Chinese editions
 gda install skills --zh
 gda install skills --path "<project>/.agents/skills" --zh
+
+# Remove retired book directories from an older install
+gda install skills --prune
 ```
 
-The default target is `~/.agents/skills`. Clients that do not read that directory can use `--path <client-skills-dir>`. The skill books teach the calling protocol instead of leaving the agent to improvise. Positioning: MCP is the primary product channel; skills are the experience layer, and the calling guide falls back to the GDA CLI when MCP is down.
+The default target is `~/.agents/skills`. Clients that do not read that directory can use `--path <client-skills-dir>`. `--prune` removes retired skill directories from an older install; without it the command only reports them. The skill card teaches the calling protocol and routes to the matching reference instead of leaving the agent to improvise. Positioning: MCP is the primary product channel; skills are the experience layer, and the calling guide falls back to the GDA CLI when MCP is down.
 
 One editor panel comes with the plugin:
 

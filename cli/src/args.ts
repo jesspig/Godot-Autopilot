@@ -48,6 +48,14 @@ export interface GlobalOptions {
   inputText?: string;
   direct?: boolean;
   json?: boolean;
+  docsFile?: string;
+  section?: string;
+  member?: string;
+  kind?: string;
+  engine?: string;
+  classFilter?: string;
+  full?: boolean;
+  prune?: boolean;
 }
 
 const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
@@ -76,6 +84,12 @@ const STRING_FLAGS: Record<string, keyof GlobalOptions> = {
   "--save": "saveText",
   "--interval": "intervalText",
   "--input": "inputText",
+  "--docs-file": "docsFile",
+  "--section": "section",
+  "--member": "member",
+  "--kind": "kind",
+  "--engine": "engine",
+  "--class": "classFilter",
 };
 
 const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
@@ -100,6 +114,8 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalOptions> = {
   "--zh": "zh",
   "--check": "check",
   "--confirm": "confirm",
+  "--full": "full",
+  "--prune": "prune",
 };
 
 export function parseArgv(argv: string[]): { opts: GlobalOptions; positionals: string[] } {
@@ -179,6 +195,12 @@ Commands:
   describe <tool>     Show one tool's schema and side effects
   call <tool>         Call a tool
   list                List running Godot instances
+  docs sync           Export engine docs into the local cache (always)
+  docs status         Show the resolved engine, project pin, and cache state
+  docs search <query> Search classes, members, and global utilities
+  docs class <name>   Show one class (--section/--member/--full)
+  docs member <class> <name> Show one member by name (--kind)
+  docs clear          Remove cached docs (--engine <x.y> or --all --force)
   skills list         List the bundled skill books (offline, --zh for Chinese)
   skills show <name>  Print one skill book's SKILL.md; --file <rel> reads an auxiliary file
   tools list          List all direct tools from a live instance (--category/--tags)
@@ -207,7 +229,7 @@ Commands:
   trace slow          List calls slower than --slow <ms> (default 1000)
   trace failures      List failed tool calls
   trace export        Export traces as jsonl or otlp (--format)
-  install skills      Install skill books to ~/.agents/skills
+  install skills      Install skill books to ~/.agents/skills (--prune removes retired books)
   install plugin      Install the Godot addon into a project
   update <target>     Update cli, skills, plugin, or all (--check for status)
 
@@ -252,6 +274,14 @@ Global options:
   --progress          call: print progress notifications to stderr
   --input <json>      call: inputResponses for MRTR input_required
   --direct            call: invoke a full-surface tool at the top level
+  --docs-file <path>  Read an external extension_api.json (bypasses the cache)
+  --section <name>    docs class: brief, description, methods, properties, signals, enums, constants, operators, constructors, or all
+  --member <text>     docs class: filter members by name or signature
+  --kind <kind>       docs search/member: class, method, property, signal, enum, constant, or utility
+  --class <name>      docs search: restrict results to one class
+  --engine <x.y>      docs clear: remove one cache bucket (stable uses x.y)
+  --full              docs class: include every section
+  --prune             install skills: remove retired skill directories
   --help              Show this help
   --version           Show the version
 

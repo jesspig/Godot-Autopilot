@@ -22,6 +22,7 @@ interface BuiltinSkillsAsset {
   version: string;
   files: Record<string, string>;
   files_zh?: Record<string, string>;
+  retired?: string[];
 }
 
 const asset = builtinSkills as BuiltinSkillsAsset;
@@ -36,6 +37,18 @@ export function builtinSkillsFiles(lang: SkillLanguage = "en"): Record<string, s
 
 export function builtinSkillsVersion(): string {
   return asset.version;
+}
+
+export function normalizeRetiredSkills(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const names = value.filter(
+    (name): name is string => typeof name === "string" && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(name),
+  );
+  return [...new Set(names)].sort((a, b) => a.localeCompare(b));
+}
+
+export function builtinRetiredSkills(): string[] {
+  return normalizeRetiredSkills(asset.retired);
 }
 
 function countFiles(dir: string): number {

@@ -103,7 +103,7 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 | `schema_builder_test.cpp` | 5 | schema 构造形状、required 位置、未知类型不崩溃 |
 | `runtime_ops_test.cpp` | 12 | 编辑器队列注入往返、`payload_is_pending` 识别（非对象/非整数拒绝）、`discard_pending` 未命中返回 false |
 | `security_parallel_hardening_test.cpp` | 13 | 安全与并行硬化：队列关闭/满/线程校验/零容量/打开态拒绝、工程路径 scheme 与穿越拒绝、配置常量、Variant 字符串与数组截断、日志并发查询稳定性 |
-| `skill_gen_test.cpp` | 10 | 技能生成器：10 册清单（含 setup）、name/description 规范、自包含 SKILL.md 布局、frontmatter 渲染、CLI-first 发现契约（`SkillBooksDescribeDiscovery` / `CliChannelContract`）、脚本桥防复活守卫（`SkillBooksCarryNoScriptBridge`）、反引号词回验（详见下节） |
+| `skill_gen_test.cpp` | 10 | 技能生成器：入口卡清单、name/description 规范、SKILL.md + references 布局、frontmatter 渲染、CLI-first 发现契约（`SkillBooksDescribeDiscovery` / `CliChannelContract`）、脚本桥防复活守卫（`SkillBooksCarryNoScriptBridge`）、反引号词回验（详见下节） |
 | `mcp_image_content_test.cpp` | 11 | 截图 MCP image content（header-only `src/util/mcp_image_content.hpp`）：3 个 capture_* 白名单、顶层/嵌套 data 提取与优先级、data 替换为 `<attached-as-image-content>`、非白名单/非对象/缺 data/非 png 不注入 |
 | `log_ops_test.cpp` | 4 | 游戏日志过滤（`log_ops::filter_log_lines`）：空 filter 返回全部、子串命中、保留末尾 limit 条、limit ≤0 返回全部命中 |
 | `editor_coords_test.cpp` | 15 | 编辑器坐标纯逻辑（`src/core/editor_coords.hpp/cpp`）：`fit_within` 缩放、`scale_size` 缩放链、截图 `diff_sample` 采样比较与 bbox |
@@ -152,11 +152,11 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 
 ### skill_gen 技能生成器测试（`skill_gen_test.cpp`）
 
-生成器 `src/util/skill_gen.cpp`；10 册正文存于仓库根 `skills/` 标准目录（10 个自包含 `SKILL.md`，name/description 存 frontmatter；聚合顺序为目录名字序），经 `tools/embed_skills.py` 构建期嵌入为生成头 `skill_content_embedded.h`（入 `build/<preset>/generated/`，gitignore 覆盖），渲染目标 `.agents/skills/<name>/SKILL.md`。纯 C++ 不触碰 Godot API，单元测试 可跑无需引擎。10 个用例：
+生成器 `src/util/skill_gen.cpp`；1 张入口卡 + 9 篇 references 存于仓库根 `skills/` 标准目录（共 10 个 .md，name/description 存 frontmatter；聚合顺序为目录名字序），经 `tools/embed_skills.ts` 构建期嵌入为生成头 `skill_content_embedded.h`（入 `build/<preset>/generated/`，gitignore 覆盖），渲染目标 `.agents/skills/<name>/SKILL.md`。纯 C++ 不触碰 Godot API，单元测试 可跑无需引擎。10 个用例：
 
 | 用例 | 内容 |
 |---|---|
-| `AllTenSkillsPresent` | 10 册 name 定稿清单逐一核对（数量 = 10，双向集合比对：多出与缺失均 FAIL） |
+| `AllSkillsPresent` | 入口卡 name 定稿清单核对（数量 = 1，双向集合比对：多出与缺失均 FAIL） |
 | `SkillNamesFollowSpecRules` | name 匹配 `^[a-z0-9]+(-[a-z0-9]+)*$`、≤64 字符、路径 `.agents/skills/<name>/SKILL.md` |
 | `DescriptionsValid` | description 非空、≤1024 字符 |
 | `FilesLayout` | `files[0]` 必为 SKILL.md，其余须 `references/` 或 `scripts/` 前缀（`scripts/` 仅直属 `.mjs`）；body 非空、无 PLACEHOLDER 残留 |
@@ -277,7 +277,7 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 - `source_manifest_guard`（`source_manifest_guard.ts`）：**源清单守卫**——断言 测试源清单引用的 `src/` 源 ⊆ 插件源并集，防「漏登根 `CMakeLists.txt` / 清单文件导致编译单元不进产物」的静默缺失（解析规则见该脚本模块 docstring）。
 - `install_docs_guard`（`install_docs_guard.ts`）：**安装文档守卫**——断言 `INSTALL.md` 含中文速览、Agent 流程、三条安装路径、MCP 连接、校验与排错入口，且引用两个安装脚本、`--project` / `--skills` / `--skills-project`、全局与项目技能目录、`project.godot`、`mcp_url`、`sha256sums.txt`；同时断言两个安装脚本具备最新版解析、工程识别与技能作用域参数，且不含 AtomGit 残留。
 - `zip_layout_guard`（`zip_layout_guard.ts`）：**ZIP 布局守卫**——用大于 64 KiB 的随机载荷调用 `writeZip`，断言 `validateZipLayout` 接受合法 EOCD/中央目录偏移且 `readZip` 能读回原文；随后篡改 EOCD 中央目录偏移，断言校验器拒绝。防 `writeZip` 把 EOCD 中央目录偏移写坏导致标准解压器（Windows `Expand-Archive` / bsdtar）拒绝发布包。
-- `skills_guard`（`guard/skills_guard.ts`，Bun 可用时注册；不可用时由 `cli_unit` 的 `bun test cli/tests` 覆盖同一实现）：扫描 `skills/` 与 `skills-zh/` 全部文本，失败逐条输出 `文件:行号: [规则] 说明`。规则包括旧版本钉、`bunx`、`9527`、`gda serve`、`gda api`、`Allow write`、REST、配置面板与 allow-list；提取 `gda` 命令与参数并对照 `cli/src/commands/index.ts`、`cli/src/args.ts`；校验 `gda status --json` 示例字段来自 `cli/src/commands/status.ts`；校验 EN/ZH 相对路径、frontmatter 与 10 册数量一致。
+- `skills_guard`（`guard/skills_guard.ts`，Bun 可用时注册；不可用时由 `cli_unit` 的 `bun test cli/tests` 覆盖同一实现）：扫描 `skills/` 与 `skills-zh/` 全部文本，失败逐条输出 `文件:行号: [规则] 说明`。规则包括旧版本钉、`bunx`、`9527`、`gda serve`、`gda api`、`Allow write`、REST、配置面板与 allow-list；提取 `gda` 命令与参数并对照 `cli/src/commands/index.ts`、`cli/src/args.ts`；校验 `gda status --json` 示例字段来自 `cli/src/commands/status.ts`；校验 EN/ZH 相对路径、frontmatter 与 10 个文件数量一致。
 - `skills_guard_self_test`（同一脚本 `--self-test`）：注入未知册、旧关键词、未知命令、未知 status 字段、多文件与缺册反例，验证护栏本身能报错；Bun 可用时与 `skills_guard` 一起注册。
 - 守卫自测项：`migration_guard_self_test` / `comment_guard_self_test` / `no_python_guard_self_test` / `main_thread_guard_self_test` / `tool_domain_guard_self_test` / `skills_guard_self_test`——以注入违规样本的方式验证源码/技能守卫自身能报出违规（守卫的守卫）；`migration_guard_self_test` 带 `RESOURCE_LOCK` 防与其他守卫并发。
 - `cli_contract`（`cli/tests/contract.test.ts`）：CLI 契约 mock conformance，详见「回归属性清单」的 CLI wire 形状行；仓库内不写盘（图片落临时目录）。
@@ -300,9 +300,9 @@ bun run gda-dev-tools test --single migration_guard   # 单跑（ctest -R）
 | 集成 | 88（10 个 `*_test.cpp`） | 命令：`grep -cE "^TEST(_F)?\(" tests/integration/*_test.cpp`（2026-11-14 实测 88） | 一致 |
 | 守卫与脚本项 | 16（含 `install_docs_guard` / `zip_layout_guard`、`cli_contract` / `cli_unit`） | 命令：`ctest --preset debug -N -L guard` 与 `ctest --preset debug -N -L cli`；证据：`tests/CMakeLists.txt` 的 `add_test` 注册 | 一致 |
 | ctest 注册总数 | 864 = 568 + 190 + 88 + 16 + 2（单元 + 边界 + 集成 + 守卫 + CLI） | 命令：`ctest --preset debug -N`（`Total Tests: 864`）；全量 ctest 通过 | 一致 |
-| CLI TS 单测 | 30 个文件 / 275 项（252 pass + 23 skip + 0 fail，2026-11-14 实测口径） | 命令：`bun test cli/tests`；静态：`cli/tests/*.test.ts` 30 个文件；参数化循环在运行期展开，运行期项数以实测为准 | 一致 |
-| 技能书 | EN 嵌入 10 册 / 10 文件；EN+ZH 源共 20 文件（各 10 SKILL.md） | 命令：`find skills skills-zh -type f | wc -l`（当前 20）；各 10 个册目录 | 一致 |
-| MCP skills 资源 | 21（1 目录 + 10 单册 + 10 单文件） | `register_skill_resources` 按 `skills/` 内嵌文件动态注册 | 一致 |
+| CLI TS 单测 | 34 个测试文件 / 324 项（301 pass + 23 skip + 0 fail，2026-11-16 实测口径） | 命令：`bun test cli/tests`；静态：`cli/tests/*.test.ts`；参数化循环在运行期展开，运行期项数以实测为准 | 一致 |
+| 技能卡 | EN 10 文件；EN+ZH 源共 20 文件（各 1 张入口卡 SKILL.md + 9 篇 references） | 命令：`find skills skills-zh -type f | wc -l`（当前 20）；各 1 个技能目录 | 一致 |
+| MCP skills 资源 | 12（1 目录 + 1 技能 + 10 文件） | `register_skill_resources` 按 `skills/` 内嵌文件动态注册 | 一致 |
 | add_library 源文件 | 115 个 `.cpp`（main 1 / core 31 / tools 59 / util 7 / prompts 9 / runtime 4 / resources 3 / ui 1） | 命令：`find src -name "*.cpp" | wc -l`（2026-11-09 实测 115）；根 `CMakeLists.txt` 经 `cmake/sources/*.cmake` 聚合 | 一致 |
 | 传输探针 | 1 个构建目标（`gda_mcp_transport_probe`），非 ctest、不计入 864 | `cmake/sources/api_probe.cmake`；诊断工具，验收阶段按需执行 | 一致 |
 | 客户端配置 | 0（0.3.2 已移除） | `client_config_gen` 已删除；MCP 客户端由 Agent 按 `mcp_url` 生成配置 | 已移除 |

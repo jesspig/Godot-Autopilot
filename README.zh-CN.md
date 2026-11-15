@@ -67,7 +67,7 @@ Godot Autopilot（GDA）是一个住在 **Godot 编辑器内部**的插件型 [M
 
 ## 技能书
 
-插件自带 **10 册自包含技能书**（总纲，以及场景、资源、脚本、运行时、服务器、内容、C#、安装、工具分册）。只选一种作用域安装：
+插件自带 **1 张入口技能卡与 9 篇 references**（安装、工具、场景、脚本、资源、运行时、内容、C#、服务器）。只选一种作用域安装：
 
 ```bash
 # 全局：所有 Godot 工程共享
@@ -79,9 +79,12 @@ gda install skills --path "<project>/.agents/skills"
 # 中文版
 gda install skills --zh
 gda install skills --path "<project>/.agents/skills" --zh
+
+# 清理旧版本遗留的退役分册目录
+gda install skills --prune
 ```
 
-默认目标是 `~/.agents/skills`。客户端不读取该目录时，可用 `--path <客户端技能目录>`。技能书让代理按调用协议执行，而不是自己摸索。定位：MCP 是主产品通道，技能是体验层；调用指南在 MCP 失效时改用 GDA CLI。
+默认目标是 `~/.agents/skills`。客户端不读取该目录时，可用 `--path <客户端技能目录>`。`--prune` 删除旧安装中的退役技能目录；不加时只报告。入口卡教代理按调用协议执行，并路由到匹配的 reference，而不是自己摸索。定位：MCP 是主产品通道，技能是体验层；调用指南在 MCP 失效时改用 GDA CLI。
 
 插件自带一个编辑器面板：
 

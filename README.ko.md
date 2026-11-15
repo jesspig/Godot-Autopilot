@@ -67,7 +67,7 @@ Read https://github.com/jesspig/Godot-Autopilot/blob/master/INSTALL.md and insta
 
 ## 스킬북
 
-플러그인에는 **자체 완결형 스킬북 10권**(개요, 그리고 씬, 리소스, 스크립팅, 런타임, 서버, 콘텐츠, C#, 설정, 도구 편)이 포함됩니다. 범위를 하나 골라 설치하세요:
+플러그인에는 **진입 스킬 카드 1장과 references 9편**(설치, 도구, 씬, 스크립팅, 리소스, 런타임, 콘텐츠, C#, 서버)이 포함됩니다. 범위를 하나 골라 설치하세요:
 
 ```bash
 # Global: shared by all Godot projects
@@ -79,9 +79,12 @@ gda install skills --path "<project>/.agents/skills"
 # Chinese editions
 gda install skills --zh
 gda install skills --path "<project>/.agents/skills" --zh
+
+# Remove retired book directories from an older install
+gda install skills --prune
 ```
 
-기본 대상은 `~/.agents/skills`입니다. 해당 디렉터리를 읽지 않는 클라이언트는 `--path <client-skills-dir>`를 사용할 수 있습니다. 스킬북은 에이전트가 즉흥적으로 처리하지 않도록 호출 프로토콜을 가르칩니다. 포지셔닝: MCP가 주 제품 채널이고, 스킬은 경험 계층이며, 호출 가이드는 MCP가 중단되었을 때 GDA CLI로 대체됩니다.
+기본 대상은 `~/.agents/skills`입니다. 해당 디렉터리를 읽지 않는 클라이언트는 `--path <client-skills-dir>`를 사용할 수 있습니다. `--prune`은 이전 설치에 남은 은퇴 스킬 디렉터리를 삭제합니다. 지정하지 않으면 보고만 합니다. 진입 카드는 에이전트가 즉흥적으로 처리하지 않도록 호출 프로토콜을 가르치고 알맞은 reference로 안내합니다. 포지셔닝: MCP가 주 제품 채널이고, 스킬은 경험 계층이며, 호출 가이드는 MCP가 중단되었을 때 GDA CLI로 대체됩니다.
 
 플러그인에는 에디터 패널이 하나 포함됩니다:
 

@@ -20,6 +20,7 @@
 | [modules/tools_ops_a.md](modules/tools_ops_a.md) | 领域工具 A 组（场景/属性/输入/物理/导航/资源/脚本/配置/文档/编辑器 16 模块，222 工具） | `src/tools/domains/*/*_ops.cpp` |
 | [modules/tools_ops_b.md](modules/tools_ops_b.md) | 领域工具 B 组（调试/显示/OS/运行时/音频/渲染/C# 桥/瓦片等 20 模块，229 工具；A 222 + B 229 = 451） | `src/tools/domains/*/*_ops.cpp` |
 | [modules/support.md](modules/support.md) | 提示词、MCP 资源、UI、工具库 | `src/prompts/`、`src/resources/`、`src/ui/`、`src/util/` |
+| [modules/skills.md](modules/skills.md) | 技能卡与 references：目录结构、词数预算、构建管线、guard 规则、MCP 资源 12、安装与 `--prune` | `skills/`、`skills-zh/`、`cli/scripts/build-skills-asset.ts`、`tools/embed_skills.ts`、`tests/guard/skills_guard.ts` |
 | [modules/cli.md](modules/cli.md) | CLI 载体（gda）：Bun + TS 源码直跑、命令参考、五级寻址链、两套注册表与集中根位置、IPC 通道、生命周期与重启、协议握手与已知限制 | `cli/`、`package.json`、`bun.lock` |
 | [plans/roadmap.md](plans/roadmap.md) | 竞品对齐路线图：竞品定位速览与 P0-P3 批次交付状态 | 全仓库 |
 | [.agents/skills/](../../.agents/skills/) | 项目级可执行技能：怎么做、何时停、做错的表现 | 全仓库流程与纪律 |
@@ -30,7 +31,7 @@
 
 ## 维护入口
 
-代码改动后：更新受影响页面 → 同步页头"审计日期"（带日期行的页面：overview / build / tests / security_contract / modules/tools_registry / modules/tools_ops_a / modules/support / modules/core / modules/cli；无日期头的页面不新增）→ 更新 frontmatter 的 `timestamp`（真实系统时间，ISO 8601）→ 重核数值（数值口径统一取 [tests.md](tests.md) 的"数值核算总表"，不另立口径）→ 追加 `changelog/<YYYY-MM-DD>-log.md`（按小时记录，[log.md](log.md) 仅留最近 7 天）→ 按 [项目级技能](../../.agents/skills/) 的分工核对是否要同步技能（见下"三层文档分工"）→ 需要时才改 [AGENTS.md](../../AGENTS.md)。
+代码改动后：更新受影响页面 → 同步页头"审计日期"（带日期行的页面：overview / build / tests / security_contract / modules/tools_registry / modules/tools_ops_a / modules/support / modules/skills / modules/core / modules/cli；无日期头的页面不新增）→ 更新 frontmatter 的 `timestamp`（真实系统时间，ISO 8601）→ 重核数值（数值口径统一取 [tests.md](tests.md) 的"数值核算总表"，不另立口径）→ 追加 `changelog/<YYYY-MM-DD>-log.md`（按小时记录，[log.md](log.md) 仅留最近 7 天）→ 按 [项目级技能](../../.agents/skills/) 的分工核对是否要同步技能（见下"三层文档分工"）→ 需要时才改 [AGENTS.md](../../AGENTS.md)。
 
 ## 三层文档分工
 
