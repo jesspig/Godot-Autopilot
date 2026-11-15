@@ -67,7 +67,7 @@ Read https://github.com/jesspig/Godot-Autopilot/blob/master/INSTALL.md and insta
 
 ## スキルブック
 
-プラグインには **10冊の自己完結したスキルブック**（概要編に加え、シーン編・リソース編・スクリプティング編・ランタイム編・サーバー編・コンテンツ編・C#編・セットアップ編・ツール編）が付属しています。次のいずれか1つのスコープでインストールします：
+プラグインには **1 枚の入口スキルカードと 9 篇の references**（セットアップ、ツール、シーン、スクリプティング、リソース、ランタイム、コンテンツ、C#、サーバー）が付属しています。次のいずれか1つのスコープでインストールします：
 
 ```bash
 # Global: shared by all Godot projects
@@ -79,9 +79,12 @@ gda install skills --path "<project>/.agents/skills"
 # Chinese editions
 gda install skills --zh
 gda install skills --path "<project>/.agents/skills" --zh
+
+# Remove retired book directories from an older install
+gda install skills --prune
 ```
 
-デフォルトのインストール先は `~/.agents/skills` です。このディレクトリーを読み込まないクライアントでは、`--path <client-skills-dir>` を使用できます。スキルブックは、エージェントを場当たり的な操作に任せず、呼び出しプロトコルを教えます。位置づけとして、MCP は主要な製品チャネルであり、スキルは体験レイヤーです。呼び出しガイドは、MCP が停止している場合に GDA CLI へフォールバックします。
+デフォルトのインストール先は `~/.agents/skills` です。このディレクトリーを読み込まないクライアントでは、`--path <client-skills-dir>` を使用できます。`--prune` は古いインストールに残る退役スキルディレクトリーを削除します。指定しない場合は報告のみです。入口カードは、エージェントを場当たり的な操作に任せず、呼び出しプロトコルを教え、適切な reference へ振り分けます。位置づけとして、MCP は主要な製品チャネルであり、スキルは体験レイヤーです。呼び出しガイドは、MCP が停止している場合に GDA CLI へフォールバックします。
 
 プラグインにはエディターパネルが1つ付属しています：
 

@@ -22,7 +22,7 @@ Godot Autopilot（GDA）：进程内 GDExtension，把 Godot 编辑器经 MCP（
 - **源码禁止注释**：除 `// namespace` 结尾标记外不得有 `//` 或 `/*…*/`，解释写进 wiki；`comment_guard` 在 ctest 阶段拦，编译通过不算过。
 - **默认安全姿态不可静默放宽**：仅绑环回、脱敏默认开、高风险工具需 `confirm`、导出期拒绝工具调用 / MCP 资源 / MCP 提示词三类入口。
 - **数值一律以运行时统计为准**，权威口径见 `docs/wiki/tests.md` 的数值核算总表；本页不记录计数。
-- **CLI 为 Bun+TS 源码直跑**：零运行时依赖、无构建步骤；发布流程另产出各平台独立二进制（5 个目标 + `sha256sums.txt`）。技能书 10 册 EN/ZH 自包含、不含版本钉（`version_sync_guard` 反向守卫，`skills_guard` 校验 EN/ZH parity 与 CLI 契约）。
+- **CLI 为 Bun+TS 源码直跑**：零运行时依赖、无构建步骤；发布流程另产出各平台独立二进制（5 个目标 + `sha256sums.txt`）。技能书为 1 张入口卡 + 9 篇 references，EN/ZH 自包含、不含版本钉（`version_sync_guard` 反向守卫，`skills_guard` 校验 EN/ZH parity 与 CLI 契约）。
 
 ## 三层文档分工
 
@@ -39,7 +39,7 @@ Godot Autopilot（GDA）：进程内 GDExtension，把 Godot 编辑器经 MCP（
 - `git status` 的大量 `M` 多为 CRLF 伪变更（仓库无 `.gitattributes`），核查一律以 `git diff HEAD` 为准。
 - 提交信息 `<type>(<scope>): <中文描述>`，scope 用中文功能域，按功能域拆分提交。
 - 多代理并行时子代理只写代码不编译，主代理统一 configure/build 再分批测（并行编译会锁）；单元/边界测试禁调已注册 handler。
-- 面向 MCP 客户端的技能书（`godot-autopilot-*`）在构建期由 `skills/` 模板嵌入并经 MCP 资源暴露；磁盘安装由 `gda install skills [--path]` 完成（默认 `~/.agents/skills`，项目级为 `<project>/.agents/skills`）。
+- 面向 MCP 客户端的技能卡与 references（`godot-autopilot`）在构建期由 `skills/` 模板嵌入并经 MCP 资源暴露；磁盘安装由 `gda install skills [--path] [--prune]` 完成（默认 `~/.agents/skills`，项目级为 `<project>/.agents/skills`）。
 
 ## 知识库入口
 
