@@ -8,6 +8,7 @@ namespace tween_ops {
 
 mcp::JsonValue handle_create_game_tween(const mcp::JsonValue &args);
 mcp::JsonValue handle_control_game_tween(const mcp::JsonValue &args);
+mcp::JsonValue handle_game_tween_bundle(const mcp::JsonValue &args);
 mcp::JsonValue handle_get_game_tween_list(const mcp::JsonValue &args);
 mcp::JsonValue handle_tween_editor_property(const mcp::JsonValue &args);
 
