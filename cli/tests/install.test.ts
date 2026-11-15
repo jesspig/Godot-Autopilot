@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
 
+import { usageText, type GlobalOptions } from "../src/args";
 import { run as runInstall } from "../src/commands/install";
 
 let tmp: string;
@@ -20,6 +21,31 @@ afterEach(() => {
   else process.env.GODOT_AUTOPILOT_HOME = previousHome;
   fs.rmSync(tmp, { recursive: true, force: true });
 });
+
+function captureOutput(): { stdout(): string; restore(): void } {
+  const orig = process.stdout.write;
+  let out = "";
+  process.stdout.write = ((chunk: unknown) => {
+    out += String(chunk);
+    return true;
+  }) as typeof process.stdout.write;
+  return {
+    stdout: () => out,
+    restore: () => {
+      process.stdout.write = orig;
+    },
+  };
+}
+
+async function runCaptured(positional: string[], opts: GlobalOptions) {
+  const cap = captureOutput();
+  try {
+    const code = await runInstall(positional, opts);
+    return { code, stdout: cap.stdout() };
+  } finally {
+    cap.restore();
+  }
+}
 
 describe("install skills", () => {
   test("builtin 源写入完整 skills 树", async () => {
@@ -66,5 +92,61 @@ describe("install skills", () => {
       caught = error;
     }
     expect(caught).toBeDefined();
+  });
+
+  test("未加 --prune 只报告 stale，不删除退役目录", async () => {
+    const target = path.join(tmp, "skills");
+    const result = await runCaptured(["skills"], {
+      sourceText: "builtin",
+      pathText: target,
+      force: true,
+    });
+    const payload = JSON.parse(result.stdout) as { stale: string[]; removed: string[] };
+    expect(result.code).toBe(0);
+    expect(payload.stale.length).toBe(9);
+    expect(payload.removed).toEqual([]);
+    for (const name of payload.stale) {
+      expect(fs.existsSync(path.join(target, name, "SKILL.md"))).toBe(true);
+    }
+  });
+
+  test("--prune 删除退役目录并保留自建目录", async () => {
+    const target = path.join(tmp, "skills");
+    fs.mkdirSync(path.join(target, "my-notes"), { recursive: true });
+    const result = await runCaptured(["skills"], {
+      sourceText: "builtin",
+      pathText: target,
+      force: true,
+      prune: true,
+    });
+    const payload = JSON.parse(result.stdout) as { stale: string[]; removed: string[] };
+    expect(result.code).toBe(0);
+    expect(payload.removed.length).toBe(9);
+    expect(fs.existsSync(path.join(target, "my-notes"))).toBe(true);
+    expect(fs.existsSync(path.join(target, "godot-autopilot", "SKILL.md"))).toBe(true);
+    for (const name of payload.removed) {
+      expect(fs.existsSync(path.join(target, name))).toBe(false);
+    }
+    const dirs = fs.readdirSync(target, { withFileTypes: true }).filter((entry) => entry.isDirectory());
+    expect(dirs.length).toBe(2);
+  });
+
+  test("目标不存在时 --prune 正常创建并报告删除项", async () => {
+    const target = path.join(tmp, "new-skills");
+    const result = await runCaptured(["skills"], {
+      sourceText: "builtin",
+      pathText: target,
+      force: true,
+      prune: true,
+    });
+    const payload = JSON.parse(result.stdout) as { stale: string[]; removed: string[] };
+    expect(result.code).toBe(0);
+    expect(payload.stale.length).toBe(9);
+    expect(payload.removed.length).toBe(9);
+    expect(fs.existsSync(path.join(target, "godot-autopilot", "SKILL.md"))).toBe(true);
+  });
+
+  test("--help 列出 --prune", () => {
+    expect(usageText()).toContain("--prune");
   });
 });
