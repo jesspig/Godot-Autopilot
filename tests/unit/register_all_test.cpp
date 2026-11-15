@@ -148,19 +148,24 @@ TEST_F(RegisteredServerFixture, CatalogEntriesWellFormed) {
 TEST_F(RegisteredServerFixture, SchemaStatisticsBaseline) {
   size_t non_empty = 0;
   size_t empty = 0;
+  std::string empty_names;
   const auto tools = catalog.get_all_tools();
   for (const auto &tool : tools) {
     if (has_schema_params(tool.input_schema)) {
       ++non_empty;
     } else {
       ++empty;
+      if (!empty_names.empty()) {
+        empty_names += ", ";
+      }
+      empty_names += tool.name;
     }
   }
   const gda_test::ToolCatalogBaseline &baseline =
       gda_test::load_tool_catalog_baseline();
   EXPECT_EQ(tools.size(), baseline.expected_catalog_total);
   EXPECT_EQ(non_empty, baseline.expected_non_empty);
-  EXPECT_EQ(empty, baseline.expected_empty);
+  EXPECT_EQ(empty, baseline.expected_empty) << empty_names;
   EXPECT_EQ(non_empty + empty, tools.size());
   EXPECT_GT(non_empty, empty);
   EXPECT_GT(empty, 0);
@@ -199,11 +204,11 @@ TEST_F(RegisteredServerFixture, SchemaSampledTools) {
   const char *const kNonEmpty[] = {
       "property_get",          "intersect_physics_2d_ray",
       "execute_script",        "call_scene_tree_group",
-      "set_tilemap_cell",      "queue_game_input",
+      "set_tilemap_cells",     "game_input",
       "get_scene_tree",        "batch_execute",
       "call_tool",             "code_execute",
       "search_tools",          "get_tool_detail"};
-  const char *const kEmpty[] = {"get_engine_version",
+  const char *const kEmpty[] = {"get_os_unique_id",
                                 "create_physics_2d_body", "system_status"};
   for (const char *name : kNonEmpty) {
     auto info = catalog.get_tool(name);

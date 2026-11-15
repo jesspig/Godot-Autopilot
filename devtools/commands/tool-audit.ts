@@ -16,6 +16,7 @@ type ToolRecord = {
   side_effect: string;
   flags: string[];
   param_count: number | null;
+  has_action_schema?: boolean;
   source: string;
   line: number;
 };
@@ -795,8 +796,17 @@ function parseParamCounts(text: string): Map<string, number> {
   return counts;
 }
 
-function parseAliasNames(text: string): string[] {
-  const names: string[] = [];
+type AliasMapping = { name: string; canonical: string; action: string };
+
+function aliasActionOf(text: string): string {
+  const helper = text.match(/_with_action\([^,]+,\s*"([^"]+)"\)/);
+  if (helper) return helper[1];
+  const assignment = text.match(/\["action"\]\s*=\s*mcp::JsonValue\("([^"]+)"\)/);
+  return assignment ? assignment[1] : "";
+}
+
+function parseAliasMappings(text: string): AliasMapping[] {
+  const mappings: AliasMapping[] = [];
   let searchFrom = 0;
   while (true) {
     const index = text.indexOf("ToolAlias{", searchFrom);
@@ -805,15 +815,29 @@ function parseAliasNames(text: string): string[] {
     const end = findBlockEnd(text, open);
     const fields = splitTopLevel(text.slice(open + 1, end));
     if (fields.length >= 2) {
-      const parsed = parseStringLiterals(fields[0]);
-      if (parsed.length === 0) {
-        throw new Error(`ToolAlias at offset ${index} has no string name`);
+      const names = parseStringLiterals(fields[0]);
+      const canonicals = parseStringLiterals(fields[1]);
+      if (names.length === 0 || canonicals.length === 0) {
+        throw new Error(`ToolAlias at offset ${index} has no string name/canonical`);
       }
-      names.push(parsed[0]);
+      mappings.push({
+        name: names[0],
+        canonical: canonicals[0],
+        action: fields.length >= 3 ? aliasActionOf(fields[2]) : "",
+      });
     }
     searchFrom = end + 1;
   }
-  return names;
+  for (const match of text.matchAll(
+    /[A-Za-z_]\w*_alias\s*\(\s*"([^"]+)"\s*,\s*"([^"]+)"(?:\s*,\s*"([^"]+)")?/g,
+  )) {
+    mappings.push({
+      name: match[1],
+      canonical: match[2],
+      action: match[3] ?? "",
+    });
+  }
+  return mappings;
 }
 
 function parseToolSpecs(
@@ -860,6 +884,11 @@ function parseToolSpecs(
       side_effect: sideEffectMatch ? sideEffectMatch[1] : "None",
       flags: parseFlags(fields[5]),
       param_count: paramCount,
+      has_action_schema:
+        /[A-Za-z_]\w*_action_spec\(\s*$/.test(
+          text.slice(Math.max(0, index - 160), index),
+        ) ||
+        fields.some((field) => field.includes("build_action_schema(")),
       source,
       line,
     });
@@ -948,7 +977,7 @@ function buildAudit() {
 
   const domainTools: ToolRecord[] = [];
   const domainOrder: string[] = [];
-  const aliasNames: string[] = [];
+  const aliasMappings: AliasMapping[] = [];
   for (const dir of dirs) {
     const file = path.join(DOMAINS_DIR, dir, `${dir}_tools.hpp`);
     const source = relativeToRoot(file);
@@ -957,11 +986,15 @@ function buildAudit() {
     const records = parseToolSpecs(text, source, DOMAIN_LABELS[dir], paramCounts);
     domainOrder.push(DOMAIN_LABELS[dir]);
     domainTools.push(...records);
-    aliasNames.push(...parseAliasNames(text));
+    aliasMappings.push(...parseAliasMappings(text));
   }
 
   const registerText = fs.readFileSync(REGISTER_ALL, "utf8");
-  aliasNames.push(...parseAliasNames(registerText));
+  aliasMappings.push(...parseAliasMappings(registerText));
+  const uniqueAliasMappings = [
+    ...new Map(aliasMappings.map((mapping) => [mapping.name, mapping])).values(),
+  ];
+  const aliasNames = uniqueAliasMappings.map((mapping) => mapping.name);
   const { meta, system } = parseSystemSpecs(registerText);
   const allTools = [...domainTools, ...system, ...meta];
   const names = allTools.map((tool) => tool.name);
@@ -982,8 +1015,10 @@ function buildAudit() {
   if (missingMetaSchemas.length > 0) {
     throw new Error(`meta schema set references missing tools: ${missingMetaSchemas.join(", ")}`);
   }
-  const domainWithParams = domainTools.filter((tool) => (tool.param_count ?? 0) > 0).length;
-  const systemWithParams = system.filter((tool) => (tool.param_count ?? 0) > 0).length;
+  const schemaCount = (tool: ToolRecord) =>
+    (tool.param_count ?? 0) > 0 || tool.has_action_schema === true;
+  const domainWithParams = domainTools.filter(schemaCount).length;
+  const systemWithParams = system.filter(schemaCount).length;
   const metaWithParams = meta.filter((tool) => META_TOOLS_WITH_PARAMS.has(tool.name)).length;
   const schemaNonEmpty = domainWithParams + systemWithParams + metaWithParams;
   const duplicateAliases = aliasNames.filter(
@@ -1034,6 +1069,9 @@ function buildAudit() {
     strict_redundant_count: PRUNE_ROWS.length,
     alias_count: aliasNames.length,
     alias_names: [...aliasNames].sort(),
+    alias_mappings: [...uniqueAliasMappings].sort((a, b) =>
+      a.name.localeCompare(b.name),
+    ),
     schema_non_empty: schemaNonEmpty,
     schema_empty: allTools.length - schemaNonEmpty,
     tool_names: names,
@@ -1118,6 +1156,9 @@ type MatrixRow = {
 
 function buildCapabilityMatrix(audit: ReturnType<typeof buildAudit>) {
   const pruneByTool = new Map(PRUNE_ROWS.map((row) => [row.old_tool, row]));
+  const aliasByTool = new Map(
+    audit.alias_mappings.map((mapping) => [mapping.name, mapping]),
+  );
   const toRow = (tool: ToolRecord): MatrixRow => {
     const prune = pruneByTool.get(tool.name);
     return {
@@ -1150,22 +1191,24 @@ function buildCapabilityMatrix(audit: ReturnType<typeof buildAudit>) {
           return toRow(current);
         }
         const prune = pruneByTool.get(previousRow.old_tool);
+        const alias = aliasByTool.get(previousRow.old_tool);
         return {
           old_tool: previousRow.old_tool,
           domain: previousRow.domain,
           category: previousRow.category,
           side_effect: previousRow.side_effect,
-          new_tool: prune?.new_tool ?? previousRow.new_tool,
-          action: prune?.action ?? previousRow.action,
-          alias: prune !== undefined || previousRow.alias,
-          status: prune
+          new_tool: prune?.new_tool ?? alias?.canonical ?? previousRow.new_tool,
+          action: prune?.action ?? alias?.action ?? previousRow.action,
+          alias: prune !== undefined || alias !== undefined || previousRow.alias,
+          status: prune || alias
             ? "mapped"
             : previousRow.status === "mapped"
               ? "mapped"
               : "missing",
-          arg_adapt: prune?.arg_adapt ?? previousRow.arg_adapt,
+          arg_adapt: prune?.arg_adapt ?? (alias ? "alias" : previousRow.arg_adapt),
           result_projection:
-            prune?.result_projection ?? previousRow.result_projection,
+            prune?.result_projection ??
+            (alias ? "alias" : previousRow.result_projection),
         };
       })
     : audit.tools.map(toRow);

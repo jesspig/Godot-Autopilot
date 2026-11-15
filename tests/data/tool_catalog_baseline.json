@@ -4,31 +4,31 @@
     "domains": "src/tools/domains/*/*_tools.hpp",
     "register_all": "src/tools/base/register_all.cpp"
   },
-  "catalog_total": 427,
-  "domain_total": 421,
+  "catalog_total": 308,
+  "domain_total": 302,
   "meta_total": 5,
   "system_total": 1,
   "domain_count": 33,
   "by_domain": {
     "Analysis": 3,
     "Animation": 11,
-    "Audio": 21,
+    "Audio": 5,
     "Capture": 2,
-    "Config": 17,
-    "C#": 6,
-    "Debug": 9,
-    "Debugger": 6,
-    "Display": 25,
-    "Docs": 2,
-    "Editor": 32,
-    "Game": 18,
+    "Config": 8,
+    "C#": 2,
+    "Debug": 6,
+    "Debugger": 3,
+    "Display": 8,
+    "Docs": 1,
+    "Editor": 12,
+    "Game": 9,
     "GridMap": 4,
     "Group": 3,
-    "Input": 15,
-    "InputMap": 5,
+    "Input": 6,
+    "InputMap": 4,
     "Log": 1,
     "Nav": 15,
-    "OS": 23,
+    "OS": 12,
     "Physics": 51,
     "Properties": 6,
     "Render": 52,
@@ -36,135 +36,1359 @@
     "Scene": 13,
     "SceneTree": 8,
     "Scripts": 10,
-    "SpriteFrames": 3,
-    "Testing": 2,
-    "Text": 10,
-    "Theme": 5,
-    "TileMap": 4,
-    "Tileset": 3,
-    "Tween": 4
+    "SpriteFrames": 1,
+    "Testing": 1,
+    "Text": 3,
+    "Theme": 3,
+    "TileMap": 3,
+    "Tileset": 1,
+    "Tween": 3
   },
   "by_category": {
     "Analysis": 3,
     "Animation": 11,
-    "Audio": 21,
+    "Audio": 5,
     "Capture": 2,
-    "Config": 17,
-    "Scripts": 17,
-    "Debug": 10,
-    "Debugger": 6,
-    "Display": 25,
-    "Docs": 2,
-    "Editor": 32,
-    "Game": 22,
-    "TileMap": 11,
+    "Config": 8,
+    "Scripts": 13,
+    "Debug": 7,
+    "Debugger": 3,
+    "Display": 8,
+    "Docs": 1,
+    "Editor": 12,
+    "Game": 12,
+    "TileMap": 8,
     "Group": 3,
-    "Input": 20,
+    "Input": 10,
     "System": 5,
     "Navigation": 15,
-    "OS": 22,
+    "OS": 11,
     "Physics": 50,
     "Properties": 6,
     "Render": 52,
     "Resources": 32,
     "Scene": 21,
-    "SpriteFrames": 3,
-    "Testing": 2,
-    "Text": 10,
-    "Theme": 5,
+    "SpriteFrames": 1,
+    "Testing": 1,
+    "Text": 3,
+    "Theme": 3,
     "Meta": 2
   },
   "domain_by_category": {
     "Analysis": 3,
     "Animation": 11,
-    "Audio": 21,
+    "Audio": 5,
     "Capture": 2,
-    "Config": 17,
-    "Scripts": 17,
-    "Debug": 10,
-    "Debugger": 6,
-    "Display": 25,
-    "Docs": 2,
-    "Editor": 32,
-    "Game": 22,
-    "TileMap": 11,
+    "Config": 8,
+    "Scripts": 13,
+    "Debug": 7,
+    "Debugger": 3,
+    "Display": 8,
+    "Docs": 1,
+    "Editor": 12,
+    "Game": 12,
+    "TileMap": 8,
     "Group": 3,
-    "Input": 20,
+    "Input": 10,
     "System": 1,
     "Navigation": 15,
-    "OS": 22,
+    "OS": 11,
     "Physics": 50,
     "Properties": 6,
     "Render": 52,
     "Resources": 32,
     "Scene": 21,
-    "SpriteFrames": 3,
-    "Testing": 2,
-    "Text": 10,
-    "Theme": 5
+    "SpriteFrames": 1,
+    "Testing": 1,
+    "Text": 3,
+    "Theme": 3
   },
   "by_side_effect": {
-    "None": 262,
-    "WritesScene": 39,
+    "None": 198,
+    "WritesScene": 37,
     "Destructive": 6,
-    "WritesFile": 22,
-    "WritesConfig": 15,
-    "ModifiesWindow": 42,
-    "CodeExecute": 9,
-    "ShowsAlert": 4,
-    "Process": 10,
-    "GameRuntime": 18
+    "WritesFile": 16,
+    "WritesConfig": 8,
+    "ModifiesWindow": 14,
+    "CodeExecute": 5,
+    "ShowsAlert": 3,
+    "Process": 7,
+    "GameRuntime": 14
   },
   "domain_by_side_effect": {
-    "None": 258,
-    "WritesScene": 39,
+    "None": 194,
+    "WritesScene": 37,
     "Destructive": 6,
-    "WritesFile": 22,
-    "WritesConfig": 15,
-    "ModifiesWindow": 42,
-    "CodeExecute": 7,
-    "ShowsAlert": 4,
-    "Process": 10,
-    "GameRuntime": 18
+    "WritesFile": 16,
+    "WritesConfig": 8,
+    "ModifiesWindow": 14,
+    "CodeExecute": 3,
+    "ShowsAlert": 3,
+    "Process": 7,
+    "GameRuntime": 14
   },
   "strict_redundant_count": 32,
-  "alias_count": 32,
+  "alias_count": 209,
   "alias_names": [
+    "add_audio_bus_effect",
+    "add_autoload",
+    "add_editor_undo_redo_do",
+    "add_editor_undo_redo_undo",
     "add_input_map_action",
     "add_input_map_action_event",
+    "add_shaped_text_string",
+    "add_spriteframes_animation",
+    "add_spriteframes_frame",
+    "add_tilemap_atlas_source",
+    "add_tilemap_physics_layer",
+    "apply_theme_to_control",
     "capture_game_viewport",
+    "click_editor_element",
+    "click_input_mouse",
+    "close_editor_scene",
+    "collect_game_evidence",
+    "commit_editor_undo_redo",
+    "control_game_tween",
+    "copy_file",
+    "create_audiostream_wav",
+    "create_display_window",
+    "create_editor_scene",
+    "create_editor_undo_redo_action",
+    "create_game_tween",
+    "create_os_process",
+    "create_shaped_text",
+    "create_spriteframes",
+    "create_text_font",
+    "create_theme_resource",
+    "csharp_call_method",
+    "csharp_get_property",
+    "csharp_list_members",
+    "csharp_set_property",
+    "csharp_subscribe_event",
+    "csharp_unsubscribe_event",
+    "drag_input_mouse",
+    "ensure_directory",
+    "erase_input_map_action",
+    "erase_input_map_action_event",
+    "execute_game_script",
+    "execute_os_process",
+    "fill_gridmap_box",
+    "fill_tilemap_rect",
+    "find_docs_class",
+    "find_in_files",
     "get_audio_bus_count",
+    "get_audio_bus_layout",
     "get_audio_bus_name",
     "get_audio_device_inputs",
+    "get_audio_device_outputs",
+    "get_audio_input_devices",
+    "get_audio_player_playback_position",
+    "get_autoload_list",
+    "get_debug_custom_monitor",
     "get_debug_custom_monitor_names",
     "get_debug_memory_usage",
     "get_debug_monitor",
     "get_debug_monitor_catalog",
+    "get_debug_monitors",
     "get_debug_node_count",
     "get_debug_object_count",
+    "get_debugger_errors",
+    "get_debugger_log",
+    "get_debugger_output",
+    "get_debugger_session_info",
+    "get_display_clipboard",
+    "get_display_mouse_position",
+    "get_display_screen_count",
+    "get_display_screen_dpi",
+    "get_display_screen_position",
+    "get_display_screen_refresh_rate",
+    "get_display_screen_size",
+    "get_display_tts_voices",
+    "get_display_window_rect",
     "get_docs_method",
     "get_docs_property",
+    "get_editor_edited_scene_root",
+    "get_editor_file_system_status",
+    "get_editor_file_system_tree",
+    "get_editor_selection",
+    "get_editor_ui_elements",
+    "get_editor_viewport_geometry",
+    "get_engine_fps",
+    "get_engine_frames_drawn",
+    "get_engine_time_scale",
+    "get_engine_version",
+    "get_file_info",
+    "get_game_input_status",
+    "get_game_job",
+    "get_game_locale",
+    "get_game_status",
+    "get_game_ui_elements",
+    "get_input_map_actions",
+    "get_os_datetime",
+    "get_os_environment",
+    "get_os_locale",
+    "get_os_system_fonts",
+    "get_os_system_info",
+    "get_os_unix_time",
     "get_scene_node_screen_rect",
     "get_scene_snapshot",
+    "get_shaped_text_size",
+    "get_text_font_system_path",
+    "get_translation_list",
+    "has_editor_settings",
     "has_input_map_action",
+    "has_project_settings",
     "has_resource_dependency",
+    "has_text_feature",
+    "hit_test_editor_point",
+    "is_input_action_just_pressed",
+    "is_input_action_pressed",
+    "is_text_locale_right_to_left",
+    "kill_os_process",
     "list_categories",
+    "list_directory",
     "load_script",
+    "move_autoload",
+    "move_display_window_to_foreground",
+    "move_input_mouse",
+    "move_os_file_to_trash",
     "move_resource_file",
+    "open_editor_scene",
     "ping",
+    "play_audio_player",
+    "play_editor_current_scene",
+    "press_input_action",
+    "press_input_key",
+    "press_input_mouse_button",
+    "queue_game_input",
+    "read_file",
+    "release_input_action",
+    "release_input_key",
+    "release_input_mouse_button",
+    "reload_editor_scene",
+    "remove_autoload",
+    "request_display_window_attention",
+    "run_editor_shortcut",
+    "run_gdscript_test_files",
+    "sample_game_property",
+    "save_editor_scene_as",
+    "save_editor_scenes",
+    "save_project_settings",
+    "scan_editor_file_system",
+    "scene_tree_items",
+    "scroll_input_mouse",
+    "seek_audio_player",
+    "select_scene_tree_node",
+    "sequence_game_inputs",
+    "set_audio_bus_bypass_effects",
+    "set_audio_bus_layout",
+    "set_audio_bus_mute",
+    "set_audio_bus_solo",
+    "set_audio_bus_volume_db",
+    "set_audio_device_input",
+    "set_audio_device_output",
+    "set_audio_player_pitch_scale",
+    "set_audio_player_volume_db",
     "set_control_anchor_preset",
+    "set_control_layout",
+    "set_debug_collision_visual",
+    "set_debug_navigation_visual",
+    "set_debug_performance_visual",
+    "set_display_mouse_mode",
+    "set_display_window_flag",
+    "set_display_window_mode",
+    "set_display_window_position",
+    "set_display_window_size",
+    "set_display_window_title",
+    "set_editor_main_scene",
+    "set_editor_plugin_enabled",
+    "set_editor_selection",
+    "set_editor_settings",
+    "set_engine_max_fps",
+    "set_engine_time_scale",
     "set_gridmap_cell",
+    "set_input_map_action_bundle",
     "set_input_map_action_deadzone",
+    "set_os_environment",
+    "set_project_settings",
     "set_properties_batch",
+    "set_text_font_antialiasing",
+    "set_text_font_data",
+    "set_text_font_hinting",
     "set_theme_color",
     "set_theme_constant",
     "set_theme_font_size",
+    "set_theme_item_bundle",
     "set_theme_stylebox_flat",
     "set_tilemap_cell",
-    "verify_scene_saved"
+    "set_tilemap_tile_collision",
+    "speak_display_tts",
+    "start_audio_input_capture",
+    "start_game_job",
+    "start_input_gamepad_vibration",
+    "stop_audio_input_capture",
+    "stop_audio_player",
+    "stop_display_tts",
+    "stop_editor_playing",
+    "stop_input_gamepad_vibration",
+    "translate_text",
+    "type_editor_element_text",
+    "type_input_text",
+    "validate_game_ui_layout",
+    "verify_scene_saved",
+    "wait_game_input",
+    "warp_display_mouse",
+    "write_file"
   ],
-  "schema_non_empty": 373,
-  "schema_empty": 54,
+  "alias_mappings": [
+    {
+      "name": "add_audio_bus_effect",
+      "canonical": "audio_bus",
+      "action": "add_effect"
+    },
+    {
+      "name": "add_autoload",
+      "canonical": "update_autoloads",
+      "action": "add"
+    },
+    {
+      "name": "add_editor_undo_redo_do",
+      "canonical": "editor_undo",
+      "action": ""
+    },
+    {
+      "name": "add_editor_undo_redo_undo",
+      "canonical": "editor_undo",
+      "action": ""
+    },
+    {
+      "name": "add_input_map_action",
+      "canonical": "set_input_map_action",
+      "action": "set"
+    },
+    {
+      "name": "add_input_map_action_event",
+      "canonical": "set_input_map_action",
+      "action": "set"
+    },
+    {
+      "name": "add_shaped_text_string",
+      "canonical": "shaped_text",
+      "action": ""
+    },
+    {
+      "name": "add_spriteframes_animation",
+      "canonical": "update_spriteframes",
+      "action": ""
+    },
+    {
+      "name": "add_spriteframes_frame",
+      "canonical": "update_spriteframes",
+      "action": ""
+    },
+    {
+      "name": "add_tilemap_atlas_source",
+      "canonical": "update_tileset",
+      "action": ""
+    },
+    {
+      "name": "add_tilemap_physics_layer",
+      "canonical": "update_tileset",
+      "action": ""
+    },
+    {
+      "name": "apply_theme_to_control",
+      "canonical": "update_control_layout",
+      "action": ""
+    },
+    {
+      "name": "capture_game_viewport",
+      "canonical": "capture_editor_viewport",
+      "action": ""
+    },
+    {
+      "name": "click_editor_element",
+      "canonical": "editor_ui_action",
+      "action": ""
+    },
+    {
+      "name": "click_input_mouse",
+      "canonical": "input_mouse",
+      "action": "click"
+    },
+    {
+      "name": "close_editor_scene",
+      "canonical": "editor_scene_control",
+      "action": ""
+    },
+    {
+      "name": "collect_game_evidence",
+      "canonical": "get_game_evidence",
+      "action": ""
+    },
+    {
+      "name": "commit_editor_undo_redo",
+      "canonical": "editor_undo",
+      "action": ""
+    },
+    {
+      "name": "control_game_tween",
+      "canonical": "game_tween",
+      "action": ""
+    },
+    {
+      "name": "copy_file",
+      "canonical": "os_file_write",
+      "action": "copy"
+    },
+    {
+      "name": "create_audiostream_wav",
+      "canonical": "audio_capture",
+      "action": "create_wav"
+    },
+    {
+      "name": "create_display_window",
+      "canonical": "display_window",
+      "action": ""
+    },
+    {
+      "name": "create_editor_scene",
+      "canonical": "editor_scene_control",
+      "action": ""
+    },
+    {
+      "name": "create_editor_undo_redo_action",
+      "canonical": "editor_undo",
+      "action": ""
+    },
+    {
+      "name": "create_game_tween",
+      "canonical": "game_tween",
+      "action": ""
+    },
+    {
+      "name": "create_os_process",
+      "canonical": "os_process",
+      "action": "create"
+    },
+    {
+      "name": "create_shaped_text",
+      "canonical": "shaped_text",
+      "action": ""
+    },
+    {
+      "name": "create_spriteframes",
+      "canonical": "update_spriteframes",
+      "action": ""
+    },
+    {
+      "name": "create_text_font",
+      "canonical": "font",
+      "action": ""
+    },
+    {
+      "name": "create_theme_resource",
+      "canonical": "update_theme",
+      "action": ""
+    },
+    {
+      "name": "csharp_call_method",
+      "canonical": "csharp_member",
+      "action": ""
+    },
+    {
+      "name": "csharp_get_property",
+      "canonical": "csharp_member",
+      "action": ""
+    },
+    {
+      "name": "csharp_list_members",
+      "canonical": "csharp_member",
+      "action": ""
+    },
+    {
+      "name": "csharp_set_property",
+      "canonical": "csharp_member",
+      "action": ""
+    },
+    {
+      "name": "csharp_subscribe_event",
+      "canonical": "csharp_event",
+      "action": ""
+    },
+    {
+      "name": "csharp_unsubscribe_event",
+      "canonical": "csharp_event",
+      "action": ""
+    },
+    {
+      "name": "drag_input_mouse",
+      "canonical": "input_mouse",
+      "action": "drag"
+    },
+    {
+      "name": "ensure_directory",
+      "canonical": "os_file_write",
+      "action": "ensure"
+    },
+    {
+      "name": "erase_input_map_action",
+      "canonical": "erase_input_map",
+      "action": "action"
+    },
+    {
+      "name": "erase_input_map_action_event",
+      "canonical": "erase_input_map",
+      "action": "event"
+    },
+    {
+      "name": "execute_game_script",
+      "canonical": "game_script",
+      "action": ""
+    },
+    {
+      "name": "execute_os_process",
+      "canonical": "os_process",
+      "action": "execute"
+    },
+    {
+      "name": "fill_gridmap_box",
+      "canonical": "set_gridmap_cells",
+      "action": ""
+    },
+    {
+      "name": "fill_tilemap_rect",
+      "canonical": "set_tilemap_cells",
+      "action": ""
+    },
+    {
+      "name": "find_docs_class",
+      "canonical": "get_docs_class",
+      "action": ""
+    },
+    {
+      "name": "find_in_files",
+      "canonical": "os_file_text",
+      "action": "find"
+    },
+    {
+      "name": "get_audio_bus_count",
+      "canonical": "audio_bus",
+      "action": "get_info"
+    },
+    {
+      "name": "get_audio_bus_layout",
+      "canonical": "audio_bus",
+      "action": "get_layout"
+    },
+    {
+      "name": "get_audio_bus_name",
+      "canonical": "audio_bus",
+      "action": "get_info"
+    },
+    {
+      "name": "get_audio_device_inputs",
+      "canonical": "audio_device",
+      "action": "list_inputs"
+    },
+    {
+      "name": "get_audio_device_outputs",
+      "canonical": "audio_device",
+      "action": "list_outputs"
+    },
+    {
+      "name": "get_audio_input_devices",
+      "canonical": "audio_device",
+      "action": "list_inputs"
+    },
+    {
+      "name": "get_audio_player_playback_position",
+      "canonical": "audio_player",
+      "action": "get_position"
+    },
+    {
+      "name": "get_autoload_list",
+      "canonical": "get_autoloads",
+      "action": "list"
+    },
+    {
+      "name": "get_debug_custom_monitor",
+      "canonical": "get_debug_info",
+      "action": "custom"
+    },
+    {
+      "name": "get_debug_custom_monitor_names",
+      "canonical": "get_debug_info",
+      "action": "custom"
+    },
+    {
+      "name": "get_debug_memory_usage",
+      "canonical": "get_debug_info",
+      "action": "memory"
+    },
+    {
+      "name": "get_debug_monitor",
+      "canonical": "get_debug_info",
+      "action": "monitors"
+    },
+    {
+      "name": "get_debug_monitor_catalog",
+      "canonical": "get_debug_info",
+      "action": "catalog"
+    },
+    {
+      "name": "get_debug_monitors",
+      "canonical": "get_debug_info",
+      "action": ""
+    },
+    {
+      "name": "get_debug_node_count",
+      "canonical": "get_debug_info",
+      "action": "node"
+    },
+    {
+      "name": "get_debug_object_count",
+      "canonical": "get_debug_info",
+      "action": "object"
+    },
+    {
+      "name": "get_debugger_errors",
+      "canonical": "get_debugger_stream",
+      "action": ""
+    },
+    {
+      "name": "get_debugger_log",
+      "canonical": "get_debugger_stream",
+      "action": ""
+    },
+    {
+      "name": "get_debugger_output",
+      "canonical": "get_debugger_stream",
+      "action": ""
+    },
+    {
+      "name": "get_debugger_session_info",
+      "canonical": "get_debugger_stream",
+      "action": ""
+    },
+    {
+      "name": "get_display_clipboard",
+      "canonical": "get_display_info",
+      "action": ""
+    },
+    {
+      "name": "get_display_mouse_position",
+      "canonical": "get_display_info",
+      "action": ""
+    },
+    {
+      "name": "get_display_screen_count",
+      "canonical": "get_display_info",
+      "action": ""
+    },
+    {
+      "name": "get_display_screen_dpi",
+      "canonical": "get_display_info",
+      "action": ""
+    },
+    {
+      "name": "get_display_screen_position",
+      "canonical": "get_display_info",
+      "action": ""
+    },
+    {
+      "name": "get_display_screen_refresh_rate",
+      "canonical": "get_display_info",
+      "action": ""
+    },
+    {
+      "name": "get_display_screen_size",
+      "canonical": "get_display_info",
+      "action": ""
+    },
+    {
+      "name": "get_display_tts_voices",
+      "canonical": "get_display_info",
+      "action": ""
+    },
+    {
+      "name": "get_display_window_rect",
+      "canonical": "get_display_info",
+      "action": ""
+    },
+    {
+      "name": "get_docs_method",
+      "canonical": "get_docs_class",
+      "action": ""
+    },
+    {
+      "name": "get_docs_property",
+      "canonical": "get_docs_class",
+      "action": ""
+    },
+    {
+      "name": "get_editor_edited_scene_root",
+      "canonical": "get_editor_state",
+      "action": ""
+    },
+    {
+      "name": "get_editor_file_system_status",
+      "canonical": "get_editor_files",
+      "action": ""
+    },
+    {
+      "name": "get_editor_file_system_tree",
+      "canonical": "get_editor_files",
+      "action": ""
+    },
+    {
+      "name": "get_editor_selection",
+      "canonical": "get_editor_state",
+      "action": ""
+    },
+    {
+      "name": "get_editor_ui_elements",
+      "canonical": "get_editor_ui",
+      "action": ""
+    },
+    {
+      "name": "get_editor_viewport_geometry",
+      "canonical": "get_editor_ui",
+      "action": ""
+    },
+    {
+      "name": "get_engine_fps",
+      "canonical": "get_engine_state",
+      "action": "fps"
+    },
+    {
+      "name": "get_engine_frames_drawn",
+      "canonical": "get_engine_state",
+      "action": "frames_drawn"
+    },
+    {
+      "name": "get_engine_time_scale",
+      "canonical": "get_engine_state",
+      "action": "time_scale"
+    },
+    {
+      "name": "get_engine_version",
+      "canonical": "get_engine_state",
+      "action": "version"
+    },
+    {
+      "name": "get_file_info",
+      "canonical": "os_file_manager",
+      "action": "info"
+    },
+    {
+      "name": "get_game_input_status",
+      "canonical": "get_game_state",
+      "action": ""
+    },
+    {
+      "name": "get_game_job",
+      "canonical": "get_game_state",
+      "action": ""
+    },
+    {
+      "name": "get_game_locale",
+      "canonical": "get_game_localization",
+      "action": ""
+    },
+    {
+      "name": "get_game_status",
+      "canonical": "get_game_state",
+      "action": ""
+    },
+    {
+      "name": "get_game_ui_elements",
+      "canonical": "get_game_ui",
+      "action": ""
+    },
+    {
+      "name": "get_input_map_actions",
+      "canonical": "get_input_map",
+      "action": "list"
+    },
+    {
+      "name": "get_os_datetime",
+      "canonical": "os_time",
+      "action": "datetime"
+    },
+    {
+      "name": "get_os_environment",
+      "canonical": "os_environment",
+      "action": "get"
+    },
+    {
+      "name": "get_os_locale",
+      "canonical": "os_system_info",
+      "action": "locale"
+    },
+    {
+      "name": "get_os_system_fonts",
+      "canonical": "os_system_info",
+      "action": "fonts"
+    },
+    {
+      "name": "get_os_system_info",
+      "canonical": "os_system_info",
+      "action": "info"
+    },
+    {
+      "name": "get_os_unix_time",
+      "canonical": "os_time",
+      "action": "unix_time"
+    },
+    {
+      "name": "get_scene_node_screen_rect",
+      "canonical": "get_scene_tree",
+      "action": ""
+    },
+    {
+      "name": "get_scene_snapshot",
+      "canonical": "get_scene_tree",
+      "action": ""
+    },
+    {
+      "name": "get_shaped_text_size",
+      "canonical": "shaped_text",
+      "action": ""
+    },
+    {
+      "name": "get_text_font_system_path",
+      "canonical": "font",
+      "action": ""
+    },
+    {
+      "name": "get_translation_list",
+      "canonical": "get_game_localization",
+      "action": ""
+    },
+    {
+      "name": "has_editor_settings",
+      "canonical": "get_editor_settings",
+      "action": "has"
+    },
+    {
+      "name": "has_input_map_action",
+      "canonical": "get_input_map",
+      "action": "has"
+    },
+    {
+      "name": "has_project_settings",
+      "canonical": "get_project_settings",
+      "action": "has"
+    },
+    {
+      "name": "has_resource_dependency",
+      "canonical": "get_resource_dependencies",
+      "action": ""
+    },
+    {
+      "name": "has_text_feature",
+      "canonical": "text_query",
+      "action": ""
+    },
+    {
+      "name": "hit_test_editor_point",
+      "canonical": "get_editor_ui",
+      "action": ""
+    },
+    {
+      "name": "is_input_action_just_pressed",
+      "canonical": "get_input_state",
+      "action": "action_just_pressed"
+    },
+    {
+      "name": "is_input_action_pressed",
+      "canonical": "get_input_state",
+      "action": "action_pressed"
+    },
+    {
+      "name": "is_text_locale_right_to_left",
+      "canonical": "text_query",
+      "action": ""
+    },
+    {
+      "name": "kill_os_process",
+      "canonical": "os_process",
+      "action": "kill"
+    },
+    {
+      "name": "list_categories",
+      "canonical": "search_tools",
+      "action": ""
+    },
+    {
+      "name": "list_directory",
+      "canonical": "os_file_manager",
+      "action": "list"
+    },
+    {
+      "name": "load_script",
+      "canonical": "load_resource",
+      "action": ""
+    },
+    {
+      "name": "move_autoload",
+      "canonical": "update_autoloads",
+      "action": "move"
+    },
+    {
+      "name": "move_display_window_to_foreground",
+      "canonical": "display_window",
+      "action": ""
+    },
+    {
+      "name": "move_input_mouse",
+      "canonical": "input_mouse",
+      "action": "move"
+    },
+    {
+      "name": "move_os_file_to_trash",
+      "canonical": "os_file_write",
+      "action": "trash"
+    },
+    {
+      "name": "move_resource_file",
+      "canonical": "rename_resource_file",
+      "action": ""
+    },
+    {
+      "name": "open_editor_scene",
+      "canonical": "editor_scene_control",
+      "action": ""
+    },
+    {
+      "name": "ping",
+      "canonical": "system_status",
+      "action": ""
+    },
+    {
+      "name": "play_audio_player",
+      "canonical": "audio_player",
+      "action": "play"
+    },
+    {
+      "name": "play_editor_current_scene",
+      "canonical": "editor_scene_control",
+      "action": ""
+    },
+    {
+      "name": "press_input_action",
+      "canonical": "input_action",
+      "action": "press"
+    },
+    {
+      "name": "press_input_key",
+      "canonical": "input_key",
+      "action": "press"
+    },
+    {
+      "name": "press_input_mouse_button",
+      "canonical": "input_mouse",
+      "action": "press"
+    },
+    {
+      "name": "queue_game_input",
+      "canonical": "game_input",
+      "action": ""
+    },
+    {
+      "name": "read_file",
+      "canonical": "os_file_text",
+      "action": "read"
+    },
+    {
+      "name": "release_input_action",
+      "canonical": "input_action",
+      "action": "release"
+    },
+    {
+      "name": "release_input_key",
+      "canonical": "input_key",
+      "action": "release"
+    },
+    {
+      "name": "release_input_mouse_button",
+      "canonical": "input_mouse",
+      "action": "release"
+    },
+    {
+      "name": "reload_editor_scene",
+      "canonical": "editor_scene_control",
+      "action": ""
+    },
+    {
+      "name": "remove_autoload",
+      "canonical": "update_autoloads",
+      "action": "remove"
+    },
+    {
+      "name": "request_display_window_attention",
+      "canonical": "display_window",
+      "action": ""
+    },
+    {
+      "name": "run_editor_shortcut",
+      "canonical": "editor_ui_action",
+      "action": ""
+    },
+    {
+      "name": "run_gdscript_test_files",
+      "canonical": "run_gdscript_tests",
+      "action": ""
+    },
+    {
+      "name": "sample_game_property",
+      "canonical": "get_game_evidence",
+      "action": ""
+    },
+    {
+      "name": "save_editor_scene_as",
+      "canonical": "save_editor_scene",
+      "action": ""
+    },
+    {
+      "name": "save_editor_scenes",
+      "canonical": "save_editor_scene",
+      "action": ""
+    },
+    {
+      "name": "save_project_settings",
+      "canonical": "update_project_settings",
+      "action": "save"
+    },
+    {
+      "name": "scan_editor_file_system",
+      "canonical": "get_editor_files",
+      "action": ""
+    },
+    {
+      "name": "scene_tree_items",
+      "canonical": "get_editor_ui",
+      "action": ""
+    },
+    {
+      "name": "scroll_input_mouse",
+      "canonical": "input_mouse",
+      "action": "scroll"
+    },
+    {
+      "name": "seek_audio_player",
+      "canonical": "audio_player",
+      "action": "seek"
+    },
+    {
+      "name": "select_scene_tree_node",
+      "canonical": "editor_selection_set",
+      "action": ""
+    },
+    {
+      "name": "sequence_game_inputs",
+      "canonical": "game_input",
+      "action": ""
+    },
+    {
+      "name": "set_audio_bus_bypass_effects",
+      "canonical": "audio_bus",
+      "action": "set_bypass"
+    },
+    {
+      "name": "set_audio_bus_layout",
+      "canonical": "audio_bus",
+      "action": "set_layout"
+    },
+    {
+      "name": "set_audio_bus_mute",
+      "canonical": "audio_bus",
+      "action": "set_mute"
+    },
+    {
+      "name": "set_audio_bus_solo",
+      "canonical": "audio_bus",
+      "action": "set_solo"
+    },
+    {
+      "name": "set_audio_bus_volume_db",
+      "canonical": "audio_bus",
+      "action": "set_volume"
+    },
+    {
+      "name": "set_audio_device_input",
+      "canonical": "audio_device",
+      "action": "set_input"
+    },
+    {
+      "name": "set_audio_device_output",
+      "canonical": "audio_device",
+      "action": "set_output"
+    },
+    {
+      "name": "set_audio_player_pitch_scale",
+      "canonical": "audio_player",
+      "action": "set_pitch"
+    },
+    {
+      "name": "set_audio_player_volume_db",
+      "canonical": "audio_player",
+      "action": "set_volume"
+    },
+    {
+      "name": "set_control_anchor_preset",
+      "canonical": "update_control_layout",
+      "action": ""
+    },
+    {
+      "name": "set_control_layout",
+      "canonical": "update_control_layout",
+      "action": ""
+    },
+    {
+      "name": "set_debug_collision_visual",
+      "canonical": "set_debug_visuals",
+      "action": ""
+    },
+    {
+      "name": "set_debug_navigation_visual",
+      "canonical": "set_debug_visuals",
+      "action": ""
+    },
+    {
+      "name": "set_debug_performance_visual",
+      "canonical": "set_debug_visuals",
+      "action": ""
+    },
+    {
+      "name": "set_display_mouse_mode",
+      "canonical": "display_mouse",
+      "action": ""
+    },
+    {
+      "name": "set_display_window_flag",
+      "canonical": "display_window",
+      "action": ""
+    },
+    {
+      "name": "set_display_window_mode",
+      "canonical": "display_window",
+      "action": ""
+    },
+    {
+      "name": "set_display_window_position",
+      "canonical": "display_window",
+      "action": ""
+    },
+    {
+      "name": "set_display_window_size",
+      "canonical": "display_window",
+      "action": ""
+    },
+    {
+      "name": "set_display_window_title",
+      "canonical": "display_window",
+      "action": ""
+    },
+    {
+      "name": "set_editor_main_scene",
+      "canonical": "editor_config",
+      "action": ""
+    },
+    {
+      "name": "set_editor_plugin_enabled",
+      "canonical": "editor_config",
+      "action": ""
+    },
+    {
+      "name": "set_editor_selection",
+      "canonical": "editor_selection_set",
+      "action": ""
+    },
+    {
+      "name": "set_editor_settings",
+      "canonical": "update_editor_settings",
+      "action": "set"
+    },
+    {
+      "name": "set_engine_max_fps",
+      "canonical": "update_engine_state",
+      "action": "max_fps"
+    },
+    {
+      "name": "set_engine_time_scale",
+      "canonical": "update_engine_state",
+      "action": "time_scale"
+    },
+    {
+      "name": "set_gridmap_cell",
+      "canonical": "set_gridmap_cells",
+      "action": ""
+    },
+    {
+      "name": "set_input_map_action_bundle",
+      "canonical": "set_input_map_action",
+      "action": "set"
+    },
+    {
+      "name": "set_input_map_action_deadzone",
+      "canonical": "set_input_map_action",
+      "action": "set"
+    },
+    {
+      "name": "set_os_environment",
+      "canonical": "os_environment",
+      "action": "set"
+    },
+    {
+      "name": "set_project_settings",
+      "canonical": "update_project_settings",
+      "action": "set"
+    },
+    {
+      "name": "set_properties_batch",
+      "canonical": "property_set",
+      "action": ""
+    },
+    {
+      "name": "set_text_font_antialiasing",
+      "canonical": "font",
+      "action": ""
+    },
+    {
+      "name": "set_text_font_data",
+      "canonical": "font",
+      "action": ""
+    },
+    {
+      "name": "set_text_font_hinting",
+      "canonical": "font",
+      "action": ""
+    },
+    {
+      "name": "set_theme_color",
+      "canonical": "update_theme",
+      "action": ""
+    },
+    {
+      "name": "set_theme_constant",
+      "canonical": "update_theme",
+      "action": ""
+    },
+    {
+      "name": "set_theme_font_size",
+      "canonical": "update_theme",
+      "action": ""
+    },
+    {
+      "name": "set_theme_item_bundle",
+      "canonical": "update_theme",
+      "action": ""
+    },
+    {
+      "name": "set_theme_stylebox_flat",
+      "canonical": "update_theme",
+      "action": ""
+    },
+    {
+      "name": "set_tilemap_cell",
+      "canonical": "set_tilemap_cells",
+      "action": ""
+    },
+    {
+      "name": "set_tilemap_tile_collision",
+      "canonical": "update_tileset",
+      "action": ""
+    },
+    {
+      "name": "speak_display_tts",
+      "canonical": "display_tts",
+      "action": ""
+    },
+    {
+      "name": "start_audio_input_capture",
+      "canonical": "audio_capture",
+      "action": "start"
+    },
+    {
+      "name": "start_game_job",
+      "canonical": "game_script",
+      "action": ""
+    },
+    {
+      "name": "start_input_gamepad_vibration",
+      "canonical": "input_gamepad",
+      "action": "start_vibration"
+    },
+    {
+      "name": "stop_audio_input_capture",
+      "canonical": "audio_capture",
+      "action": "stop"
+    },
+    {
+      "name": "stop_audio_player",
+      "canonical": "audio_player",
+      "action": "stop"
+    },
+    {
+      "name": "stop_display_tts",
+      "canonical": "display_tts",
+      "action": ""
+    },
+    {
+      "name": "stop_editor_playing",
+      "canonical": "editor_scene_control",
+      "action": ""
+    },
+    {
+      "name": "stop_input_gamepad_vibration",
+      "canonical": "input_gamepad",
+      "action": "stop_vibration"
+    },
+    {
+      "name": "translate_text",
+      "canonical": "get_game_localization",
+      "action": ""
+    },
+    {
+      "name": "type_editor_element_text",
+      "canonical": "editor_ui_action",
+      "action": ""
+    },
+    {
+      "name": "type_input_text",
+      "canonical": "input_text",
+      "action": "type"
+    },
+    {
+      "name": "validate_game_ui_layout",
+      "canonical": "get_game_evidence",
+      "action": ""
+    },
+    {
+      "name": "verify_scene_saved",
+      "canonical": "get_scene_tree",
+      "action": ""
+    },
+    {
+      "name": "wait_game_input",
+      "canonical": "game_input",
+      "action": ""
+    },
+    {
+      "name": "warp_display_mouse",
+      "canonical": "display_mouse",
+      "action": ""
+    },
+    {
+      "name": "write_file",
+      "canonical": "os_file_write",
+      "action": "write"
+    }
+  ],
+  "schema_non_empty": 284,
+  "schema_empty": 24,
   "tool_names": [
     "validate_scene_file",
     "find_unused_resources",
@@ -180,171 +1404,79 @@
     "create_scene_animation_tree",
     "add_animation_machine_state",
     "connect_animation_states",
-    "get_audio_bus_layout",
-    "set_audio_bus_layout",
-    "set_audio_bus_volume_db",
-    "set_audio_bus_mute",
-    "set_audio_bus_bypass_effects",
-    "add_audio_bus_effect",
+    "audio_bus",
+    "audio_player",
+    "audio_device",
+    "audio_capture",
     "remove_audio_bus_effect",
-    "play_audio_player",
-    "stop_audio_player",
-    "set_audio_player_volume_db",
-    "set_audio_player_pitch_scale",
-    "get_audio_player_playback_position",
-    "seek_audio_player",
-    "set_audio_bus_solo",
-    "get_audio_device_outputs",
-    "set_audio_device_output",
-    "set_audio_device_input",
-    "start_audio_input_capture",
-    "stop_audio_input_capture",
-    "create_audiostream_wav",
-    "get_audio_input_devices",
     "capture_editor_viewport",
     "review_scene_visually",
     "get_project_settings",
-    "set_project_settings",
-    "has_project_settings",
-    "save_project_settings",
-    "get_engine_version",
-    "get_engine_fps",
-    "get_engine_frames_drawn",
-    "set_engine_time_scale",
-    "get_engine_time_scale",
-    "set_engine_max_fps",
+    "update_project_settings",
     "get_editor_settings",
-    "set_editor_settings",
-    "has_editor_settings",
-    "get_autoload_list",
-    "add_autoload",
-    "remove_autoload",
-    "move_autoload",
-    "csharp_get_property",
-    "csharp_call_method",
-    "csharp_subscribe_event",
-    "csharp_set_property",
-    "csharp_unsubscribe_event",
-    "csharp_list_members",
+    "update_editor_settings",
+    "get_engine_state",
+    "update_engine_state",
+    "get_autoloads",
+    "update_autoloads",
+    "csharp_member",
+    "csharp_event",
     "print_debug_log",
     "get_debug_stack",
     "set_debug_physics_fps",
-    "set_debug_collision_visual",
-    "set_debug_navigation_visual",
-    "set_debug_performance_visual",
-    "get_debug_monitors",
+    "set_debug_visuals",
+    "get_debug_info",
     "remove_debug_custom_monitor",
-    "get_debug_custom_monitor",
-    "get_debugger_log",
+    "get_debugger_stream",
     "get_plugin_log",
-    "get_debugger_errors",
-    "get_debugger_output",
     "get_debugger_scene_tree",
-    "get_debugger_session_info",
-    "get_display_clipboard",
+    "get_display_info",
     "set_display_clipboard",
     "show_display_dialog",
-    "get_display_mouse_position",
-    "set_display_mouse_mode",
-    "warp_display_mouse",
     "capture_display_screen",
-    "get_display_screen_count",
-    "get_display_screen_dpi",
-    "get_display_screen_position",
-    "get_display_screen_refresh_rate",
-    "get_display_screen_size",
-    "get_display_tts_voices",
-    "speak_display_tts",
-    "stop_display_tts",
-    "create_display_window",
+    "display_window",
+    "display_mouse",
+    "display_tts",
     "delete_display_window",
-    "get_display_window_rect",
-    "move_display_window_to_foreground",
-    "request_display_window_attention",
-    "set_display_window_flag",
-    "set_display_window_mode",
-    "set_display_window_position",
-    "set_display_window_size",
-    "set_display_window_title",
     "get_docs_class",
-    "find_docs_class",
-    "get_editor_selection",
-    "set_editor_selection",
-    "get_editor_edited_scene_root",
+    "get_editor_state",
+    "get_editor_ui",
+    "get_editor_files",
+    "editor_scene_control",
     "save_editor_scene",
-    "save_editor_scenes",
-    "reload_editor_scene",
+    "editor_selection_set",
+    "editor_undo",
+    "editor_ui_action",
+    "editor_config",
     "inspect_editor_resource",
-    "create_editor_undo_redo_action",
-    "commit_editor_undo_redo",
-    "add_editor_undo_redo_do",
-    "add_editor_undo_redo_undo",
-    "get_editor_file_system_tree",
-    "scan_editor_file_system",
-    "set_editor_main_scene",
-    "play_editor_current_scene",
-    "stop_editor_playing",
-    "get_editor_file_system_status",
-    "set_editor_plugin_enabled",
-    "create_editor_scene",
-    "open_editor_scene",
-    "save_editor_scene_as",
     "build_csharp_assembly",
     "dotnet_environment",
-    "close_editor_scene",
-    "get_editor_viewport_geometry",
-    "get_editor_ui_elements",
-    "hit_test_editor_point",
-    "scene_tree_items",
-    "select_scene_tree_node",
-    "click_editor_element",
-    "type_editor_element_text",
-    "run_editor_shortcut",
-    "sample_game_property",
-    "collect_game_evidence",
-    "validate_game_ui_layout",
-    "get_game_status",
-    "execute_game_script",
-    "start_game_job",
-    "get_game_job",
-    "reload_game_scripts",
-    "queue_game_input",
-    "wait_game_input",
-    "get_game_input_status",
-    "sequence_game_inputs",
-    "get_game_ui_elements",
+    "get_game_state",
+    "get_game_ui",
+    "get_game_evidence",
+    "game_script",
+    "game_input",
     "click_game_ui_element",
-    "get_game_locale",
+    "reload_game_scripts",
     "set_game_locale",
-    "get_translation_list",
-    "translate_text",
+    "get_game_localization",
     "create_gridmap",
     "create_meshlibrary_item",
-    "fill_gridmap_box",
+    "set_gridmap_cells",
     "get_gridmap_used_cells",
     "add_group_node",
     "remove_group_node",
     "has_group_node",
-    "press_input_action",
-    "release_input_action",
-    "is_input_action_pressed",
-    "is_input_action_just_pressed",
-    "press_input_key",
-    "release_input_key",
-    "move_input_mouse",
-    "press_input_mouse_button",
-    "release_input_mouse_button",
-    "click_input_mouse",
-    "scroll_input_mouse",
-    "drag_input_mouse",
-    "type_input_text",
-    "start_input_gamepad_vibration",
-    "stop_input_gamepad_vibration",
+    "get_input_state",
+    "input_action",
+    "input_key",
+    "input_mouse",
+    "input_text",
+    "input_gamepad",
+    "get_input_map",
+    "set_input_map_action",
+    "erase_input_map",
     "save_input_map",
-    "erase_input_map_action_event",
-    "erase_input_map_action",
-    "get_input_map_actions",
-    "set_input_map_action_bundle",
     "get_game_log_entries",
     "create_nav_2d_map",
     "create_nav_2d_region",
@@ -361,29 +1493,18 @@
     "set_nav_3d_agent_velocity",
     "get_nav_3d_agent_state",
     "create_nav_3d_obstacle",
-    "show_os_alert",
-    "create_os_process",
-    "execute_os_process",
-    "get_os_datetime",
-    "get_os_environment",
-    "get_os_locale",
-    "get_os_system_fonts",
-    "get_os_system_info",
+    "os_process",
+    "os_environment",
+    "os_time",
+    "os_system_info",
     "get_os_unique_id",
-    "get_os_unix_time",
     "get_os_user_data_dir",
-    "kill_os_process",
-    "move_os_file_to_trash",
-    "set_os_environment",
-    "open_os_path",
-    "write_file",
+    "os_file_text",
+    "os_file_write",
+    "os_file_manager",
     "create_csharp_script",
-    "read_file",
-    "find_in_files",
-    "list_directory",
-    "get_file_info",
-    "copy_file",
-    "ensure_directory",
+    "open_os_path",
+    "show_os_alert",
     "get_physics_2d_space_direct_state",
     "intersect_physics_2d_ray",
     "intersect_physics_2d_shape",
@@ -556,35 +1677,19 @@
     "call_script_node",
     "reload_script",
     "get_script_property_list",
-    "create_spriteframes",
-    "add_spriteframes_animation",
-    "add_spriteframes_frame",
+    "update_spriteframes",
     "run_gdscript_tests",
-    "run_gdscript_test_files",
-    "create_text_font",
-    "create_shaped_text",
-    "set_text_font_antialiasing",
-    "set_text_font_data",
-    "set_text_font_hinting",
-    "get_text_font_system_path",
-    "has_text_feature",
-    "is_text_locale_right_to_left",
-    "add_shaped_text_string",
-    "get_shaped_text_size",
-    "create_theme_resource",
+    "font",
+    "shaped_text",
+    "text_query",
     "get_theme_info",
-    "apply_theme_to_control",
-    "set_control_layout",
-    "set_theme_item_bundle",
+    "update_theme",
+    "update_control_layout",
     "create_tilemap",
     "set_tilemap_cells",
-    "fill_tilemap_rect",
     "create_tilemap_tileset",
-    "add_tilemap_atlas_source",
-    "add_tilemap_physics_layer",
-    "set_tilemap_tile_collision",
-    "create_game_tween",
-    "control_game_tween",
+    "update_tileset",
+    "game_tween",
     "get_game_tween_list",
     "tween_editor_property",
     "system_status",
@@ -604,6 +1709,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/analyze/analyze_tools.hpp",
       "line": 36
     },
@@ -616,6 +1722,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/analyze/analyze_tools.hpp",
       "line": 41
     },
@@ -628,6 +1735,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/analyze/analyze_tools.hpp",
       "line": 46
     },
@@ -641,6 +1749,7 @@
         "kSceneTarget"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/animation/animation_tools.hpp",
       "line": 94
     },
@@ -654,6 +1763,7 @@
         "kSceneTarget"
       ],
       "param_count": 4,
+      "has_action_schema": false,
       "source": "src/tools/domains/animation/animation_tools.hpp",
       "line": 99
     },
@@ -667,6 +1777,7 @@
         "kSceneTarget"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/animation/animation_tools.hpp",
       "line": 104
     },
@@ -679,6 +1790,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/animation/animation_tools.hpp",
       "line": 109
     },
@@ -692,6 +1804,7 @@
         "kSceneTarget"
       ],
       "param_count": 5,
+      "has_action_schema": false,
       "source": "src/tools/domains/animation/animation_tools.hpp",
       "line": 114
     },
@@ -705,6 +1818,7 @@
         "kSceneTarget"
       ],
       "param_count": 5,
+      "has_action_schema": false,
       "source": "src/tools/domains/animation/animation_tools.hpp",
       "line": 119
     },
@@ -718,6 +1832,7 @@
         "kSceneTarget"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/animation/animation_tools.hpp",
       "line": 124
     },
@@ -732,6 +1847,7 @@
         "kUndoable"
       ],
       "param_count": 7,
+      "has_action_schema": false,
       "source": "src/tools/domains/animation/animation_tools.hpp",
       "line": 129
     },
@@ -745,6 +1861,7 @@
         "kSceneTarget"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/animation/animation_tools.hpp",
       "line": 134
     },
@@ -758,6 +1875,7 @@
         "kSceneTarget"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/animation/animation_tools.hpp",
       "line": 139
     },
@@ -771,23 +1889,38 @@
         "kSceneTarget"
       ],
       "param_count": 4,
+      "has_action_schema": false,
       "source": "src/tools/domains/animation/animation_tools.hpp",
       "line": 144
     },
     {
-      "name": "get_audio_bus_layout",
+      "name": "audio_bus",
       "category": "Audio",
       "domain": "Audio",
       "side_effect": "None",
       "flags": [
         "kNone"
       ],
-      "param_count": 2,
+      "param_count": 8,
+      "has_action_schema": true,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 123
+      "line": 243
     },
     {
-      "name": "set_audio_bus_layout",
+      "name": "audio_player",
+      "category": "Audio",
+      "domain": "Audio",
+      "side_effect": "None",
+      "flags": [
+        "kNone"
+      ],
+      "param_count": 6,
+      "has_action_schema": true,
+      "source": "src/tools/domains/audio/audio_tools.hpp",
+      "line": 312
+    },
+    {
+      "name": "audio_device",
       "category": "Audio",
       "domain": "Audio",
       "side_effect": "None",
@@ -795,56 +1928,22 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": true,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 150
+      "line": 345
     },
     {
-      "name": "set_audio_bus_volume_db",
+      "name": "audio_capture",
       "category": "Audio",
       "domain": "Audio",
       "side_effect": "None",
       "flags": [
         "kNone"
       ],
-      "param_count": 2,
+      "param_count": 7,
+      "has_action_schema": true,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 155
-    },
-    {
-      "name": "set_audio_bus_mute",
-      "category": "Audio",
-      "domain": "Audio",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 160
-    },
-    {
-      "name": "set_audio_bus_bypass_effects",
-      "category": "Audio",
-      "domain": "Audio",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 165
-    },
-    {
-      "name": "add_audio_bus_effect",
-      "category": "Audio",
-      "domain": "Audio",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 3,
-      "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 170
+      "line": 378
     },
     {
       "name": "remove_audio_bus_effect",
@@ -855,176 +1954,9 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 175
-    },
-    {
-      "name": "play_audio_player",
-      "category": "Audio",
-      "domain": "Audio",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 3,
-      "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 180
-    },
-    {
-      "name": "stop_audio_player",
-      "category": "Audio",
-      "domain": "Audio",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 185
-    },
-    {
-      "name": "set_audio_player_volume_db",
-      "category": "Audio",
-      "domain": "Audio",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 190
-    },
-    {
-      "name": "set_audio_player_pitch_scale",
-      "category": "Audio",
-      "domain": "Audio",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 195
-    },
-    {
-      "name": "get_audio_player_playback_position",
-      "category": "Audio",
-      "domain": "Audio",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 200
-    },
-    {
-      "name": "seek_audio_player",
-      "category": "Audio",
-      "domain": "Audio",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 205
-    },
-    {
-      "name": "set_audio_bus_solo",
-      "category": "Audio",
-      "domain": "Audio",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 210
-    },
-    {
-      "name": "get_audio_device_outputs",
-      "category": "Audio",
-      "domain": "Audio",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 215
-    },
-    {
-      "name": "set_audio_device_output",
-      "category": "Audio",
-      "domain": "Audio",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 220
-    },
-    {
-      "name": "set_audio_device_input",
-      "category": "Audio",
-      "domain": "Audio",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 225
-    },
-    {
-      "name": "start_audio_input_capture",
-      "category": "Audio",
-      "domain": "Audio",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 230
-    },
-    {
-      "name": "stop_audio_input_capture",
-      "category": "Audio",
-      "domain": "Audio",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 5,
-      "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 235
-    },
-    {
-      "name": "create_audiostream_wav",
-      "category": "Audio",
-      "domain": "Audio",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 5,
-      "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 240
-    },
-    {
-      "name": "get_audio_input_devices",
-      "category": "Audio",
-      "domain": "Audio",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 245
+      "line": 399
     },
     {
       "name": "capture_editor_viewport",
@@ -1035,8 +1967,9 @@
         "kCaptureImage"
       ],
       "param_count": 16,
+      "has_action_schema": false,
       "source": "src/tools/domains/capture/capture_tools.hpp",
-      "line": 66
+      "line": 178
     },
     {
       "name": "review_scene_visually",
@@ -1047,8 +1980,9 @@
         "kNone"
       ],
       "param_count": 13,
+      "has_action_schema": false,
       "source": "src/tools/domains/capture/capture_tools.hpp",
-      "line": 75
+      "line": 188
     },
     {
       "name": "get_project_settings",
@@ -1059,11 +1993,12 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": true,
       "source": "src/tools/domains/config/config_tools.hpp",
-      "line": 84
+      "line": 156
     },
     {
-      "name": "set_project_settings",
+      "name": "update_project_settings",
       "category": "Config",
       "domain": "Config",
       "side_effect": "WritesConfig",
@@ -1071,104 +2006,9 @@
         "kMutating"
       ],
       "param_count": 2,
+      "has_action_schema": true,
       "source": "src/tools/domains/config/config_tools.hpp",
-      "line": 89
-    },
-    {
-      "name": "has_project_settings",
-      "category": "Config",
-      "domain": "Config",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/config/config_tools.hpp",
-      "line": 94
-    },
-    {
-      "name": "save_project_settings",
-      "category": "Config",
-      "domain": "Config",
-      "side_effect": "WritesConfig",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/config/config_tools.hpp",
-      "line": 99
-    },
-    {
-      "name": "get_engine_version",
-      "category": "Config",
-      "domain": "Config",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/config/config_tools.hpp",
-      "line": 104
-    },
-    {
-      "name": "get_engine_fps",
-      "category": "Config",
-      "domain": "Config",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/config/config_tools.hpp",
-      "line": 109
-    },
-    {
-      "name": "get_engine_frames_drawn",
-      "category": "Config",
-      "domain": "Config",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/config/config_tools.hpp",
-      "line": 114
-    },
-    {
-      "name": "set_engine_time_scale",
-      "category": "Config",
-      "domain": "Config",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/config/config_tools.hpp",
-      "line": 119
-    },
-    {
-      "name": "get_engine_time_scale",
-      "category": "Config",
-      "domain": "Config",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/config/config_tools.hpp",
-      "line": 124
-    },
-    {
-      "name": "set_engine_max_fps",
-      "category": "Config",
-      "domain": "Config",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/config/config_tools.hpp",
-      "line": 129
+      "line": 178
     },
     {
       "name": "get_editor_settings",
@@ -1179,11 +2019,12 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": true,
       "source": "src/tools/domains/config/config_tools.hpp",
-      "line": 134
+      "line": 199
     },
     {
-      "name": "set_editor_settings",
+      "name": "update_editor_settings",
       "category": "Config",
       "domain": "Config",
       "side_effect": "WritesConfig",
@@ -1191,23 +2032,12 @@
         "kMutating"
       ],
       "param_count": 2,
+      "has_action_schema": true,
       "source": "src/tools/domains/config/config_tools.hpp",
-      "line": 139
+      "line": 221
     },
     {
-      "name": "has_editor_settings",
-      "category": "Config",
-      "domain": "Config",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/config/config_tools.hpp",
-      "line": 144
-    },
-    {
-      "name": "get_autoload_list",
+      "name": "get_engine_state",
       "category": "Config",
       "domain": "Config",
       "side_effect": "None",
@@ -1215,116 +2045,74 @@
         "kNone"
       ],
       "param_count": 0,
+      "has_action_schema": true,
       "source": "src/tools/domains/config/config_tools.hpp",
-      "line": 149
+      "line": 239
     },
     {
-      "name": "add_autoload",
+      "name": "update_engine_state",
       "category": "Config",
       "domain": "Config",
-      "side_effect": "WritesConfig",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 3,
-      "source": "src/tools/domains/config/config_tools.hpp",
-      "line": 154
-    },
-    {
-      "name": "remove_autoload",
-      "category": "Config",
-      "domain": "Config",
-      "side_effect": "WritesConfig",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/config/config_tools.hpp",
-      "line": 159
-    },
-    {
-      "name": "move_autoload",
-      "category": "Config",
-      "domain": "Config",
-      "side_effect": "WritesConfig",
+      "side_effect": "ModifiesWindow",
       "flags": [
         "kMutating"
       ],
       "param_count": 2,
+      "has_action_schema": true,
       "source": "src/tools/domains/config/config_tools.hpp",
-      "line": 164
+      "line": 265
     },
     {
-      "name": "csharp_get_property",
-      "category": "Scripts",
-      "domain": "C#",
-      "side_effect": "CodeExecute",
+      "name": "get_autoloads",
+      "category": "Config",
+      "domain": "Config",
+      "side_effect": "None",
       "flags": [
         "kNone"
       ],
-      "param_count": 9,
-      "source": "src/tools/domains/csharp_bridge/csharp_bridge_tools.hpp",
-      "line": 96
+      "param_count": 0,
+      "has_action_schema": true,
+      "source": "src/tools/domains/config/config_tools.hpp",
+      "line": 286
     },
     {
-      "name": "csharp_call_method",
-      "category": "Scripts",
-      "domain": "C#",
-      "side_effect": "CodeExecute",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 9,
-      "source": "src/tools/domains/csharp_bridge/csharp_bridge_tools.hpp",
-      "line": 101
-    },
-    {
-      "name": "csharp_subscribe_event",
-      "category": "Scripts",
-      "domain": "C#",
-      "side_effect": "CodeExecute",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 13,
-      "source": "src/tools/domains/csharp_bridge/csharp_bridge_tools.hpp",
-      "line": 106
-    },
-    {
-      "name": "csharp_set_property",
-      "category": "Scripts",
-      "domain": "C#",
-      "side_effect": "CodeExecute",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 10,
-      "source": "src/tools/domains/csharp_bridge/csharp_bridge_tools.hpp",
-      "line": 111
-    },
-    {
-      "name": "csharp_unsubscribe_event",
-      "category": "Scripts",
-      "domain": "C#",
-      "side_effect": "CodeExecute",
+      "name": "update_autoloads",
+      "category": "Config",
+      "domain": "Config",
+      "side_effect": "WritesConfig",
       "flags": [
         "kMutating"
       ],
       "param_count": 4,
-      "source": "src/tools/domains/csharp_bridge/csharp_bridge_tools.hpp",
-      "line": 116
+      "has_action_schema": true,
+      "source": "src/tools/domains/config/config_tools.hpp",
+      "line": 302
     },
     {
-      "name": "csharp_list_members",
+      "name": "csharp_member",
       "category": "Scripts",
       "domain": "C#",
       "side_effect": "CodeExecute",
       "flags": [
-        "kNone"
+        "kMutating"
       ],
-      "param_count": 11,
+      "param_count": 16,
+      "has_action_schema": true,
       "source": "src/tools/domains/csharp_bridge/csharp_bridge_tools.hpp",
-      "line": 121
+      "line": 78
+    },
+    {
+      "name": "csharp_event",
+      "category": "Scripts",
+      "domain": "C#",
+      "side_effect": "CodeExecute",
+      "flags": [
+        "kMutating"
+      ],
+      "param_count": 14,
+      "has_action_schema": true,
+      "source": "src/tools/domains/csharp_bridge/csharp_bridge_tools.hpp",
+      "line": 116
     },
     {
       "name": "print_debug_log",
@@ -1335,8 +2123,9 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/debug/debug_tools.hpp",
-      "line": 102
+      "line": 117
     },
     {
       "name": "get_debug_stack",
@@ -1347,8 +2136,9 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/debug/debug_tools.hpp",
-      "line": 107
+      "line": 122
     },
     {
       "name": "set_debug_physics_fps",
@@ -1359,47 +2149,25 @@
         "kMutating"
       ],
       "param_count": 1,
-      "source": "src/tools/domains/debug/debug_tools.hpp",
-      "line": 112
-    },
-    {
-      "name": "set_debug_collision_visual",
-      "category": "Debug",
-      "domain": "Debug",
-      "side_effect": "WritesConfig",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/debug/debug_tools.hpp",
-      "line": 117
-    },
-    {
-      "name": "set_debug_navigation_visual",
-      "category": "Debug",
-      "domain": "Debug",
-      "side_effect": "WritesConfig",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/debug/debug_tools.hpp",
-      "line": 122
-    },
-    {
-      "name": "set_debug_performance_visual",
-      "category": "Debug",
-      "domain": "Debug",
-      "side_effect": "WritesConfig",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/debug/debug_tools.hpp",
       "line": 127
     },
     {
-      "name": "get_debug_monitors",
+      "name": "set_debug_visuals",
+      "category": "Debug",
+      "domain": "Debug",
+      "side_effect": "WritesConfig",
+      "flags": [
+        "kMutating"
+      ],
+      "param_count": 1,
+      "has_action_schema": true,
+      "source": "src/tools/domains/debug/debug_tools.hpp",
+      "line": 132
+    },
+    {
+      "name": "get_debug_info",
       "category": "Debug",
       "domain": "Debug",
       "side_effect": "None",
@@ -1407,8 +2175,9 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": true,
       "source": "src/tools/domains/debug/debug_tools.hpp",
-      "line": 132
+      "line": 164
     },
     {
       "name": "remove_debug_custom_monitor",
@@ -1419,32 +2188,22 @@
         "kMutating"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/debug/debug_tools.hpp",
-      "line": 196
+      "line": 268
     },
     {
-      "name": "get_debug_custom_monitor",
-      "category": "Debug",
-      "domain": "Debug",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/debug/debug_tools.hpp",
-      "line": 201
-    },
-    {
-      "name": "get_debugger_log",
+      "name": "get_debugger_stream",
       "category": "Debugger",
       "domain": "Debugger",
       "side_effect": "None",
       "flags": [
         "kNone"
       ],
-      "param_count": 1,
+      "param_count": 8,
+      "has_action_schema": true,
       "source": "src/tools/domains/debugger/debugger_tools.hpp",
-      "line": 47
+      "line": 62
     },
     {
       "name": "get_plugin_log",
@@ -1455,32 +2214,9 @@
         "kNone"
       ],
       "param_count": 5,
+      "has_action_schema": false,
       "source": "src/tools/domains/debugger/debugger_tools.hpp",
-      "line": 52
-    },
-    {
-      "name": "get_debugger_errors",
-      "category": "Debugger",
-      "domain": "Debugger",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/debugger/debugger_tools.hpp",
-      "line": 57
-    },
-    {
-      "name": "get_debugger_output",
-      "category": "Debugger",
-      "domain": "Debugger",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/debugger/debugger_tools.hpp",
-      "line": 62
+      "line": 101
     },
     {
       "name": "get_debugger_scene_tree",
@@ -1491,32 +2227,22 @@
         "kNone"
       ],
       "param_count": 0,
+      "has_action_schema": false,
       "source": "src/tools/domains/debugger/debugger_tools.hpp",
-      "line": 67
+      "line": 110
     },
     {
-      "name": "get_debugger_session_info",
-      "category": "Debugger",
-      "domain": "Debugger",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/debugger/debugger_tools.hpp",
-      "line": 72
-    },
-    {
-      "name": "get_display_clipboard",
+      "name": "get_display_info",
       "category": "Display",
       "domain": "Display",
       "side_effect": "None",
       "flags": [
         "kNone"
       ],
-      "param_count": 0,
+      "param_count": 2,
+      "has_action_schema": true,
       "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 128
+      "line": 149
     },
     {
       "name": "set_display_clipboard",
@@ -1527,8 +2253,9 @@
         "kMutating"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 133
+      "line": 229
     },
     {
       "name": "show_display_dialog",
@@ -1539,44 +2266,9 @@
         "kMutating"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 138
-    },
-    {
-      "name": "get_display_mouse_position",
-      "category": "Display",
-      "domain": "Display",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 143
-    },
-    {
-      "name": "set_display_mouse_mode",
-      "category": "Display",
-      "domain": "Display",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 148
-    },
-    {
-      "name": "warp_display_mouse",
-      "category": "Display",
-      "domain": "Display",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 153
+      "line": 236
     },
     {
       "name": "capture_display_screen",
@@ -1587,83 +2279,38 @@
         "kCaptureImage"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 158
+      "line": 243
     },
     {
-      "name": "get_display_screen_count",
+      "name": "display_window",
       "category": "Display",
       "domain": "Display",
-      "side_effect": "None",
+      "side_effect": "ModifiesWindow",
       "flags": [
-        "kNone"
+        "kMutating"
       ],
-      "param_count": 0,
+      "param_count": 10,
+      "has_action_schema": true,
       "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 163
+      "line": 250
     },
     {
-      "name": "get_display_screen_dpi",
+      "name": "display_mouse",
       "category": "Display",
       "domain": "Display",
-      "side_effect": "None",
+      "side_effect": "ModifiesWindow",
       "flags": [
-        "kNone"
+        "kMutating"
       ],
-      "param_count": 1,
+      "param_count": 3,
+      "has_action_schema": true,
       "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 168
+      "line": 314
     },
     {
-      "name": "get_display_screen_position",
-      "category": "Display",
-      "domain": "Display",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 173
-    },
-    {
-      "name": "get_display_screen_refresh_rate",
-      "category": "Display",
-      "domain": "Display",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 178
-    },
-    {
-      "name": "get_display_screen_size",
-      "category": "Display",
-      "domain": "Display",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 183
-    },
-    {
-      "name": "get_display_tts_voices",
-      "category": "Display",
-      "domain": "Display",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 188
-    },
-    {
-      "name": "speak_display_tts",
+      "name": "display_tts",
       "category": "Display",
       "domain": "Display",
       "side_effect": "ShowsAlert",
@@ -1671,32 +2318,9 @@
         "kMutating"
       ],
       "param_count": 5,
+      "has_action_schema": true,
       "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 193
-    },
-    {
-      "name": "stop_display_tts",
-      "category": "Display",
-      "domain": "Display",
-      "side_effect": "ShowsAlert",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 198
-    },
-    {
-      "name": "create_display_window",
-      "category": "Display",
-      "domain": "Display",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 203
+      "line": 340
     },
     {
       "name": "delete_display_window",
@@ -1707,104 +2331,9 @@
         "kMutating"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 208
-    },
-    {
-      "name": "get_display_window_rect",
-      "category": "Display",
-      "domain": "Display",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 213
-    },
-    {
-      "name": "move_display_window_to_foreground",
-      "category": "Display",
-      "domain": "Display",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 218
-    },
-    {
-      "name": "request_display_window_attention",
-      "category": "Display",
-      "domain": "Display",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 223
-    },
-    {
-      "name": "set_display_window_flag",
-      "category": "Display",
-      "domain": "Display",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 3,
-      "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 228
-    },
-    {
-      "name": "set_display_window_mode",
-      "category": "Display",
-      "domain": "Display",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 233
-    },
-    {
-      "name": "set_display_window_position",
-      "category": "Display",
-      "domain": "Display",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 3,
-      "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 238
-    },
-    {
-      "name": "set_display_window_size",
-      "category": "Display",
-      "domain": "Display",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 3,
-      "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 243
-    },
-    {
-      "name": "set_display_window_title",
-      "category": "Display",
-      "domain": "Display",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 248
+      "line": 367
     },
     {
       "name": "get_docs_class",
@@ -1814,24 +2343,13 @@
       "flags": [
         "kNone"
       ],
-      "param_count": 4,
+      "param_count": 5,
+      "has_action_schema": false,
       "source": "src/tools/domains/doc/doc_tools.hpp",
-      "line": 33
+      "line": 39
     },
     {
-      "name": "find_docs_class",
-      "category": "Docs",
-      "domain": "Docs",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/doc/doc_tools.hpp",
-      "line": 132
-    },
-    {
-      "name": "get_editor_selection",
+      "name": "get_editor_state",
       "category": "Editor",
       "domain": "Editor",
       "side_effect": "None",
@@ -1839,32 +2357,48 @@
         "kNone"
       ],
       "param_count": 0,
+      "has_action_schema": true,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 169
+      "line": 166
     },
     {
-      "name": "set_editor_selection",
+      "name": "get_editor_ui",
+      "category": "Editor",
+      "domain": "Editor",
+      "side_effect": "None",
+      "flags": [
+        "kNone"
+      ],
+      "param_count": 13,
+      "has_action_schema": true,
+      "source": "src/tools/domains/editor/editor_tools.hpp",
+      "line": 186
+    },
+    {
+      "name": "get_editor_files",
+      "category": "Editor",
+      "domain": "Editor",
+      "side_effect": "None",
+      "flags": [
+        "kNone"
+      ],
+      "param_count": 4,
+      "has_action_schema": true,
+      "source": "src/tools/domains/editor/editor_tools.hpp",
+      "line": 217
+    },
+    {
+      "name": "editor_scene_control",
       "category": "Editor",
       "domain": "Editor",
       "side_effect": "ModifiesWindow",
       "flags": [
         "kMutating"
       ],
-      "param_count": 1,
+      "param_count": 7,
+      "has_action_schema": true,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 174
-    },
-    {
-      "name": "get_editor_edited_scene_root",
-      "category": "Editor",
-      "domain": "Editor",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 179
+      "line": 243
     },
     {
       "name": "save_editor_scene",
@@ -1874,33 +2408,65 @@
       "flags": [
         "kMutating"
       ],
-      "param_count": 2,
+      "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 184
+      "line": 285
     },
     {
-      "name": "save_editor_scenes",
-      "category": "Editor",
-      "domain": "Editor",
-      "side_effect": "WritesFile",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 189
-    },
-    {
-      "name": "reload_editor_scene",
+      "name": "editor_selection_set",
       "category": "Editor",
       "domain": "Editor",
       "side_effect": "ModifiesWindow",
       "flags": [
         "kMutating"
       ],
-      "param_count": 1,
+      "param_count": 5,
+      "has_action_schema": true,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 194
+      "line": 307
+    },
+    {
+      "name": "editor_undo",
+      "category": "Editor",
+      "domain": "Editor",
+      "side_effect": "ModifiesWindow",
+      "flags": [
+        "kMutating",
+        "kUndoable"
+      ],
+      "param_count": 5,
+      "has_action_schema": true,
+      "source": "src/tools/domains/editor/editor_tools.hpp",
+      "line": 329
+    },
+    {
+      "name": "editor_ui_action",
+      "category": "Editor",
+      "domain": "Editor",
+      "side_effect": "ModifiesWindow",
+      "flags": [
+        "kMutating",
+        "kObserve",
+        "kCaptureImage"
+      ],
+      "param_count": 8,
+      "has_action_schema": true,
+      "source": "src/tools/domains/editor/editor_tools.hpp",
+      "line": 360
+    },
+    {
+      "name": "editor_config",
+      "category": "Editor",
+      "domain": "Editor",
+      "side_effect": "WritesConfig",
+      "flags": [
+        "kMutating"
+      ],
+      "param_count": 3,
+      "has_action_schema": true,
+      "source": "src/tools/domains/editor/editor_tools.hpp",
+      "line": 388
     },
     {
       "name": "inspect_editor_resource",
@@ -1911,177 +2477,9 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 199
-    },
-    {
-      "name": "create_editor_undo_redo_action",
-      "category": "Editor",
-      "domain": "Editor",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating",
-        "kUndoable"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 204
-    },
-    {
-      "name": "commit_editor_undo_redo",
-      "category": "Editor",
-      "domain": "Editor",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 209
-    },
-    {
-      "name": "add_editor_undo_redo_do",
-      "category": "Editor",
-      "domain": "Editor",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 3,
-      "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 214
-    },
-    {
-      "name": "add_editor_undo_redo_undo",
-      "category": "Editor",
-      "domain": "Editor",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 3,
-      "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 219
-    },
-    {
-      "name": "get_editor_file_system_tree",
-      "category": "Editor",
-      "domain": "Editor",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 4,
-      "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 224
-    },
-    {
-      "name": "scan_editor_file_system",
-      "category": "Editor",
-      "domain": "Editor",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 229
-    },
-    {
-      "name": "set_editor_main_scene",
-      "category": "Editor",
-      "domain": "Editor",
-      "side_effect": "WritesConfig",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 234
-    },
-    {
-      "name": "play_editor_current_scene",
-      "category": "Editor",
-      "domain": "Editor",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 239
-    },
-    {
-      "name": "stop_editor_playing",
-      "category": "Editor",
-      "domain": "Editor",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 244
-    },
-    {
-      "name": "get_editor_file_system_status",
-      "category": "Editor",
-      "domain": "Editor",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 249
-    },
-    {
-      "name": "set_editor_plugin_enabled",
-      "category": "Editor",
-      "domain": "Editor",
-      "side_effect": "WritesConfig",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 254
-    },
-    {
-      "name": "create_editor_scene",
-      "category": "Editor",
-      "domain": "Editor",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 4,
-      "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 259
-    },
-    {
-      "name": "open_editor_scene",
-      "category": "Editor",
-      "domain": "Editor",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 264
-    },
-    {
-      "name": "save_editor_scene_as",
-      "category": "Editor",
-      "domain": "Editor",
-      "side_effect": "WritesFile",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 3,
-      "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 269
+      "line": 409
     },
     {
       "name": "build_csharp_assembly",
@@ -2092,8 +2490,9 @@
         "kMutating"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 274
+      "line": 414
     },
     {
       "name": "dotnet_environment",
@@ -2104,267 +2503,25 @@
         "kNone"
       ],
       "param_count": 0,
+      "has_action_schema": false,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 279
+      "line": 419
     },
     {
-      "name": "close_editor_scene",
-      "category": "Editor",
-      "domain": "Editor",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 284
-    },
-    {
-      "name": "get_editor_viewport_geometry",
-      "category": "Editor",
-      "domain": "Editor",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 289
-    },
-    {
-      "name": "get_editor_ui_elements",
-      "category": "Editor",
-      "domain": "Editor",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 4,
-      "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 294
-    },
-    {
-      "name": "hit_test_editor_point",
-      "category": "Editor",
-      "domain": "Editor",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 4,
-      "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 299
-    },
-    {
-      "name": "scene_tree_items",
-      "category": "Editor",
-      "domain": "Editor",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 3,
-      "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 304
-    },
-    {
-      "name": "select_scene_tree_node",
-      "category": "Editor",
-      "domain": "Editor",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 4,
-      "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 309
-    },
-    {
-      "name": "click_editor_element",
-      "category": "Editor",
-      "domain": "Editor",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating",
-        "kObserve",
-        "kCaptureImage"
-      ],
-      "param_count": 5,
-      "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 314
-    },
-    {
-      "name": "type_editor_element_text",
-      "category": "Editor",
-      "domain": "Editor",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating",
-        "kObserve",
-        "kCaptureImage"
-      ],
-      "param_count": 4,
-      "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 320
-    },
-    {
-      "name": "run_editor_shortcut",
-      "category": "Editor",
-      "domain": "Editor",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 327
-    },
-    {
-      "name": "sample_game_property",
-      "category": "Game",
-      "domain": "Game",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 6,
-      "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 173
-    },
-    {
-      "name": "collect_game_evidence",
-      "category": "Game",
-      "domain": "Game",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 9,
-      "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 178
-    },
-    {
-      "name": "validate_game_ui_layout",
-      "category": "Game",
-      "domain": "Game",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 8,
-      "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 183
-    },
-    {
-      "name": "get_game_status",
-      "category": "Game",
-      "domain": "Game",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 188
-    },
-    {
-      "name": "execute_game_script",
-      "category": "Game",
-      "domain": "Game",
-      "side_effect": "GameRuntime",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 12,
-      "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 193
-    },
-    {
-      "name": "start_game_job",
-      "category": "Game",
-      "domain": "Game",
-      "side_effect": "GameRuntime",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 4,
-      "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 198
-    },
-    {
-      "name": "get_game_job",
+      "name": "get_game_state",
       "category": "Game",
       "domain": "Game",
       "side_effect": "None",
       "flags": [
         "kLongBlocking"
       ],
-      "param_count": 3,
-      "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 203
-    },
-    {
-      "name": "reload_game_scripts",
-      "category": "Game",
-      "domain": "Game",
-      "side_effect": "GameRuntime",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 208
-    },
-    {
-      "name": "queue_game_input",
-      "category": "Game",
-      "domain": "Game",
-      "side_effect": "GameRuntime",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 16,
-      "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 213
-    },
-    {
-      "name": "wait_game_input",
-      "category": "Game",
-      "domain": "Game",
-      "side_effect": "GameRuntime",
-      "flags": [
-        "kMutating"
-      ],
       "param_count": 5,
+      "has_action_schema": true,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 218
+      "line": 182
     },
     {
-      "name": "get_game_input_status",
-      "category": "Game",
-      "domain": "Game",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 3,
-      "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 223
-    },
-    {
-      "name": "sequence_game_inputs",
-      "category": "Game",
-      "domain": "Game",
-      "side_effect": "GameRuntime",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 4,
-      "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 228
-    },
-    {
-      "name": "get_game_ui_elements",
+      "name": "get_game_ui",
       "category": "Game",
       "domain": "Game",
       "side_effect": "None",
@@ -2372,8 +2529,48 @@
         "kNone"
       ],
       "param_count": 6,
+      "has_action_schema": true,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 233
+      "line": 209
+    },
+    {
+      "name": "get_game_evidence",
+      "category": "Game",
+      "domain": "Game",
+      "side_effect": "None",
+      "flags": [
+        "kNone"
+      ],
+      "param_count": 19,
+      "has_action_schema": true,
+      "source": "src/tools/domains/game/game_tools.hpp",
+      "line": 224
+    },
+    {
+      "name": "game_script",
+      "category": "Game",
+      "domain": "Game",
+      "side_effect": "GameRuntime",
+      "flags": [
+        "kMutating"
+      ],
+      "param_count": 14,
+      "has_action_schema": true,
+      "source": "src/tools/domains/game/game_tools.hpp",
+      "line": 251
+    },
+    {
+      "name": "game_input",
+      "category": "Game",
+      "domain": "Game",
+      "side_effect": "GameRuntime",
+      "flags": [
+        "kMutating"
+      ],
+      "param_count": 19,
+      "has_action_schema": true,
+      "source": "src/tools/domains/game/game_tools.hpp",
+      "line": 273
     },
     {
       "name": "click_game_ui_element",
@@ -2384,20 +2581,22 @@
         "kMutating"
       ],
       "param_count": 9,
+      "has_action_schema": false,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 238
+      "line": 301
     },
     {
-      "name": "get_game_locale",
+      "name": "reload_game_scripts",
       "category": "Game",
       "domain": "Game",
-      "side_effect": "None",
+      "side_effect": "GameRuntime",
       "flags": [
-        "kNone"
+        "kMutating"
       ],
-      "param_count": 0,
+      "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 243
+      "line": 306
     },
     {
       "name": "set_game_locale",
@@ -2408,23 +2607,12 @@
         "kMutating"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 248
+      "line": 311
     },
     {
-      "name": "get_translation_list",
-      "category": "Game",
-      "domain": "Game",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 253
-    },
-    {
-      "name": "translate_text",
+      "name": "get_game_localization",
       "category": "Game",
       "domain": "Game",
       "side_effect": "None",
@@ -2432,8 +2620,9 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": true,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 258
+      "line": 316
     },
     {
       "name": "create_gridmap",
@@ -2446,6 +2635,7 @@
         "kUndoable"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/gridmap/gridmap_tools.hpp",
       "line": 115
     },
@@ -2460,11 +2650,12 @@
         "kUndoable"
       ],
       "param_count": 4,
+      "has_action_schema": false,
       "source": "src/tools/domains/gridmap/gridmap_tools.hpp",
       "line": 120
     },
     {
-      "name": "fill_gridmap_box",
+      "name": "set_gridmap_cells",
       "category": "TileMap",
       "domain": "GridMap",
       "side_effect": "WritesScene",
@@ -2474,6 +2665,7 @@
         "kUndoable"
       ],
       "param_count": 6,
+      "has_action_schema": false,
       "source": "src/tools/domains/gridmap/gridmap_tools.hpp",
       "line": 125
     },
@@ -2488,8 +2680,9 @@
         "kUndoable"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/gridmap/gridmap_tools.hpp",
-      "line": 136
+      "line": 168
     },
     {
       "name": "add_group_node",
@@ -2502,6 +2695,7 @@
         "kUndoable"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/group/group_tools.hpp",
       "line": 37
     },
@@ -2516,6 +2710,7 @@
         "kUndoable"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/group/group_tools.hpp",
       "line": 42
     },
@@ -2528,35 +2723,12 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/group/group_tools.hpp",
       "line": 47
     },
     {
-      "name": "press_input_action",
-      "category": "Input",
-      "domain": "Input",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/input/input_tools.hpp",
-      "line": 105
-    },
-    {
-      "name": "release_input_action",
-      "category": "Input",
-      "domain": "Input",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/input/input_tools.hpp",
-      "line": 110
-    },
-    {
-      "name": "is_input_action_pressed",
+      "name": "get_input_state",
       "category": "Input",
       "domain": "Input",
       "side_effect": "None",
@@ -2564,47 +2736,12 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": true,
       "source": "src/tools/domains/input/input_tools.hpp",
-      "line": 115
+      "line": 136
     },
     {
-      "name": "is_input_action_just_pressed",
-      "category": "Input",
-      "domain": "Input",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/input/input_tools.hpp",
-      "line": 120
-    },
-    {
-      "name": "press_input_key",
-      "category": "Input",
-      "domain": "Input",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/input/input_tools.hpp",
-      "line": 125
-    },
-    {
-      "name": "release_input_key",
-      "category": "Input",
-      "domain": "Input",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/input/input_tools.hpp",
-      "line": 130
-    },
-    {
-      "name": "move_input_mouse",
+      "name": "input_action",
       "category": "Input",
       "domain": "Input",
       "side_effect": "ModifiesWindow",
@@ -2612,35 +2749,25 @@
         "kMutating"
       ],
       "param_count": 2,
+      "has_action_schema": true,
       "source": "src/tools/domains/input/input_tools.hpp",
-      "line": 135
+      "line": 167
     },
     {
-      "name": "press_input_mouse_button",
+      "name": "input_key",
       "category": "Input",
       "domain": "Input",
       "side_effect": "ModifiesWindow",
       "flags": [
         "kMutating"
       ],
-      "param_count": 2,
+      "param_count": 1,
+      "has_action_schema": true,
       "source": "src/tools/domains/input/input_tools.hpp",
-      "line": 140
+      "line": 196
     },
     {
-      "name": "release_input_mouse_button",
-      "category": "Input",
-      "domain": "Input",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/input/input_tools.hpp",
-      "line": 145
-    },
-    {
-      "name": "click_input_mouse",
+      "name": "input_mouse",
       "category": "Input",
       "domain": "Input",
       "side_effect": "ModifiesWindow",
@@ -2649,40 +2776,13 @@
         "kObserve",
         "kCaptureImage"
       ],
-      "param_count": 5,
+      "param_count": 11,
+      "has_action_schema": true,
       "source": "src/tools/domains/input/input_tools.hpp",
-      "line": 150
+      "line": 215
     },
     {
-      "name": "scroll_input_mouse",
-      "category": "Input",
-      "domain": "Input",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating",
-        "kObserve",
-        "kCaptureImage"
-      ],
-      "param_count": 5,
-      "source": "src/tools/domains/input/input_tools.hpp",
-      "line": 156
-    },
-    {
-      "name": "drag_input_mouse",
-      "category": "Input",
-      "domain": "Input",
-      "side_effect": "ModifiesWindow",
-      "flags": [
-        "kMutating",
-        "kObserve",
-        "kCaptureImage"
-      ],
-      "param_count": 6,
-      "source": "src/tools/domains/input/input_tools.hpp",
-      "line": 162
-    },
-    {
-      "name": "type_input_text",
+      "name": "input_text",
       "category": "Input",
       "domain": "Input",
       "side_effect": "ModifiesWindow",
@@ -2692,11 +2792,12 @@
         "kCaptureImage"
       ],
       "param_count": 3,
+      "has_action_schema": true,
       "source": "src/tools/domains/input/input_tools.hpp",
-      "line": 168
+      "line": 245
     },
     {
-      "name": "start_input_gamepad_vibration",
+      "name": "input_gamepad",
       "category": "Input",
       "domain": "Input",
       "side_effect": "ModifiesWindow",
@@ -2704,20 +2805,48 @@
         "kMutating"
       ],
       "param_count": 4,
+      "has_action_schema": true,
       "source": "src/tools/domains/input/input_tools.hpp",
-      "line": 174
+      "line": 262
     },
     {
-      "name": "stop_input_gamepad_vibration",
+      "name": "get_input_map",
       "category": "Input",
-      "domain": "Input",
-      "side_effect": "ModifiesWindow",
+      "domain": "InputMap",
+      "side_effect": "None",
+      "flags": [
+        "kNone"
+      ],
+      "param_count": 1,
+      "has_action_schema": true,
+      "source": "src/tools/domains/input_map/input_map_tools.hpp",
+      "line": 259
+    },
+    {
+      "name": "set_input_map_action",
+      "category": "Input",
+      "domain": "InputMap",
+      "side_effect": "WritesConfig",
       "flags": [
         "kMutating"
       ],
-      "param_count": 1,
-      "source": "src/tools/domains/input/input_tools.hpp",
-      "line": 179
+      "param_count": 4,
+      "has_action_schema": true,
+      "source": "src/tools/domains/input_map/input_map_tools.hpp",
+      "line": 307
+    },
+    {
+      "name": "erase_input_map",
+      "category": "Input",
+      "domain": "InputMap",
+      "side_effect": "WritesConfig",
+      "flags": [
+        "kMutating"
+      ],
+      "param_count": 2,
+      "has_action_schema": true,
+      "source": "src/tools/domains/input_map/input_map_tools.hpp",
+      "line": 360
     },
     {
       "name": "save_input_map",
@@ -2728,56 +2857,9 @@
         "kMutating"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/input_map/input_map_tools.hpp",
-      "line": 140
-    },
-    {
-      "name": "erase_input_map_action_event",
-      "category": "Input",
-      "domain": "InputMap",
-      "side_effect": "WritesConfig",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/input_map/input_map_tools.hpp",
-      "line": 145
-    },
-    {
-      "name": "erase_input_map_action",
-      "category": "Input",
-      "domain": "InputMap",
-      "side_effect": "WritesConfig",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/input_map/input_map_tools.hpp",
-      "line": 150
-    },
-    {
-      "name": "get_input_map_actions",
-      "category": "Input",
-      "domain": "InputMap",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/input_map/input_map_tools.hpp",
-      "line": 155
-    },
-    {
-      "name": "set_input_map_action_bundle",
-      "category": "Input",
-      "domain": "InputMap",
-      "side_effect": "WritesConfig",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 4,
-      "source": "src/tools/domains/input_map/input_map_tools.hpp",
-      "line": 169
+      "line": 390
     },
     {
       "name": "get_game_log_entries",
@@ -2788,6 +2870,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/log/log_tools.hpp",
       "line": 27
     },
@@ -2800,6 +2883,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/nav/nav_tools.hpp",
       "line": 116
     },
@@ -2812,6 +2896,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/nav/nav_tools.hpp",
       "line": 121
     },
@@ -2824,6 +2909,7 @@
         "kNone"
       ],
       "param_count": 5,
+      "has_action_schema": false,
       "source": "src/tools/domains/nav/nav_tools.hpp",
       "line": 126
     },
@@ -2836,6 +2922,7 @@
         "kNone"
       ],
       "param_count": 5,
+      "has_action_schema": false,
       "source": "src/tools/domains/nav/nav_tools.hpp",
       "line": 131
     },
@@ -2848,6 +2935,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/nav/nav_tools.hpp",
       "line": 136
     },
@@ -2860,6 +2948,7 @@
         "kNone"
       ],
       "param_count": 4,
+      "has_action_schema": false,
       "source": "src/tools/domains/nav/nav_tools.hpp",
       "line": 141
     },
@@ -2872,6 +2961,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/nav/nav_tools.hpp",
       "line": 146
     },
@@ -2884,6 +2974,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/nav/nav_tools.hpp",
       "line": 151
     },
@@ -2896,6 +2987,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/nav/nav_tools.hpp",
       "line": 156
     },
@@ -2908,6 +3000,7 @@
         "kNone"
       ],
       "param_count": 5,
+      "has_action_schema": false,
       "source": "src/tools/domains/nav/nav_tools.hpp",
       "line": 161
     },
@@ -2920,6 +3013,7 @@
         "kNone"
       ],
       "param_count": 4,
+      "has_action_schema": false,
       "source": "src/tools/domains/nav/nav_tools.hpp",
       "line": 166
     },
@@ -2932,6 +3026,7 @@
         "kNone"
       ],
       "param_count": 6,
+      "has_action_schema": false,
       "source": "src/tools/domains/nav/nav_tools.hpp",
       "line": 171
     },
@@ -2944,6 +3039,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/nav/nav_tools.hpp",
       "line": 176
     },
@@ -2956,6 +3052,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/nav/nav_tools.hpp",
       "line": 181
     },
@@ -2968,23 +3065,25 @@
         "kNone"
       ],
       "param_count": 4,
+      "has_action_schema": false,
       "source": "src/tools/domains/nav/nav_tools.hpp",
       "line": 186
     },
     {
-      "name": "show_os_alert",
+      "name": "os_process",
       "category": "OS",
       "domain": "OS",
-      "side_effect": "ShowsAlert",
+      "side_effect": "Process",
       "flags": [
         "kMutating"
       ],
-      "param_count": 3,
+      "param_count": 5,
+      "has_action_schema": true,
       "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 122
+      "line": 143
     },
     {
-      "name": "create_os_process",
+      "name": "os_environment",
       "category": "OS",
       "domain": "OS",
       "side_effect": "Process",
@@ -2992,23 +3091,12 @@
         "kMutating"
       ],
       "param_count": 2,
+      "has_action_schema": true,
       "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 127
+      "line": 164
     },
     {
-      "name": "execute_os_process",
-      "category": "OS",
-      "domain": "OS",
-      "side_effect": "Process",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 4,
-      "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 132
-    },
-    {
-      "name": "get_os_datetime",
+      "name": "os_time",
       "category": "OS",
       "domain": "OS",
       "side_effect": "None",
@@ -3016,23 +3104,12 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": true,
       "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 137
+      "line": 184
     },
     {
-      "name": "get_os_environment",
-      "category": "OS",
-      "domain": "OS",
-      "side_effect": "Process",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 142
-    },
-    {
-      "name": "get_os_locale",
+      "name": "os_system_info",
       "category": "OS",
       "domain": "OS",
       "side_effect": "None",
@@ -3040,32 +3117,9 @@
         "kNone"
       ],
       "param_count": 0,
+      "has_action_schema": true,
       "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 147
-    },
-    {
-      "name": "get_os_system_fonts",
-      "category": "OS",
-      "domain": "OS",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 152
-    },
-    {
-      "name": "get_os_system_info",
-      "category": "OS",
-      "domain": "OS",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 157
+      "line": 203
     },
     {
       "name": "get_os_unique_id",
@@ -3076,20 +3130,9 @@
         "kNone"
       ],
       "param_count": 0,
+      "has_action_schema": false,
       "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 162
-    },
-    {
-      "name": "get_os_unix_time",
-      "category": "OS",
-      "domain": "OS",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 167
+      "line": 222
     },
     {
       "name": "get_os_user_data_dir",
@@ -3100,68 +3143,48 @@
         "kNone"
       ],
       "param_count": 0,
+      "has_action_schema": false,
       "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 172
+      "line": 227
     },
     {
-      "name": "kill_os_process",
+      "name": "os_file_text",
       "category": "OS",
       "domain": "OS",
-      "side_effect": "Process",
+      "side_effect": "None",
       "flags": [
-        "kMutating"
+        "kNone"
       ],
-      "param_count": 1,
+      "param_count": 6,
+      "has_action_schema": true,
       "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 177
+      "line": 234
     },
     {
-      "name": "move_os_file_to_trash",
+      "name": "os_file_write",
       "category": "OS",
       "domain": "OS",
       "side_effect": "WritesFile",
       "flags": [
         "kMutating"
       ],
-      "param_count": 1,
+      "param_count": 4,
+      "has_action_schema": true,
       "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 182
+      "line": 253
     },
     {
-      "name": "set_os_environment",
+      "name": "os_file_manager",
       "category": "OS",
       "domain": "OS",
-      "side_effect": "Process",
+      "side_effect": "None",
       "flags": [
-        "kMutating"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 187
-    },
-    {
-      "name": "open_os_path",
-      "category": "OS",
-      "domain": "OS",
-      "side_effect": "Process",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 192
-    },
-    {
-      "name": "write_file",
-      "category": "OS",
-      "domain": "OS",
-      "side_effect": "WritesFile",
-      "flags": [
-        "kMutating"
+        "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": true,
       "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 197
+      "line": 277
     },
     {
       "name": "create_csharp_script",
@@ -3172,80 +3195,35 @@
         "kMutating"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 202
+      "line": 294
     },
     {
-      "name": "read_file",
+      "name": "open_os_path",
       "category": "OS",
       "domain": "OS",
-      "side_effect": "None",
+      "side_effect": "Process",
       "flags": [
-        "kNone"
+        "kMutating"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 207
+      "line": 299
     },
     {
-      "name": "find_in_files",
+      "name": "show_os_alert",
       "category": "OS",
       "domain": "OS",
-      "side_effect": "None",
+      "side_effect": "ShowsAlert",
       "flags": [
-        "kNone"
-      ],
-      "param_count": 5,
-      "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 212
-    },
-    {
-      "name": "list_directory",
-      "category": "OS",
-      "domain": "OS",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
+        "kMutating"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 217
-    },
-    {
-      "name": "get_file_info",
-      "category": "OS",
-      "domain": "OS",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 222
-    },
-    {
-      "name": "copy_file",
-      "category": "OS",
-      "domain": "OS",
-      "side_effect": "WritesFile",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 227
-    },
-    {
-      "name": "ensure_directory",
-      "category": "OS",
-      "domain": "OS",
-      "side_effect": "WritesFile",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 232
+      "line": 304
     },
     {
       "name": "get_physics_2d_space_direct_state",
@@ -3256,6 +3234,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 326
     },
@@ -3268,6 +3247,7 @@
         "kNone"
       ],
       "param_count": 8,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 331
     },
@@ -3280,6 +3260,7 @@
         "kNone"
       ],
       "param_count": 9,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 336
     },
@@ -3292,6 +3273,7 @@
         "kNone"
       ],
       "param_count": 7,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 341
     },
@@ -3304,6 +3286,7 @@
         "kNone"
       ],
       "param_count": 0,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 346
     },
@@ -3316,6 +3299,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 351
     },
@@ -3328,6 +3312,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 356
     },
@@ -3340,6 +3325,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 361
     },
@@ -3352,6 +3338,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 366
     },
@@ -3364,6 +3351,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 371
     },
@@ -3376,6 +3364,7 @@
         "kNone"
       ],
       "param_count": 8,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 376
     },
@@ -3388,6 +3377,7 @@
         "kNone"
       ],
       "param_count": 0,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 381
     },
@@ -3400,6 +3390,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 386
     },
@@ -3412,6 +3403,7 @@
         "kNone"
       ],
       "param_count": 0,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 391
     },
@@ -3424,6 +3416,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 396
     },
@@ -3436,6 +3429,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 401
     },
@@ -3448,6 +3442,7 @@
         "kNone"
       ],
       "param_count": 9,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 406
     },
@@ -3460,6 +3455,7 @@
         "kNone"
       ],
       "param_count": 9,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 411
     },
@@ -3472,6 +3468,7 @@
         "kNone"
       ],
       "param_count": 7,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 416
     },
@@ -3484,6 +3481,7 @@
         "kNone"
       ],
       "param_count": 0,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 421
     },
@@ -3496,6 +3494,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 426
     },
@@ -3508,6 +3507,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 431
     },
@@ -3520,6 +3520,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 436
     },
@@ -3532,6 +3533,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 441
     },
@@ -3544,6 +3546,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 446
     },
@@ -3556,6 +3559,7 @@
         "kNone"
       ],
       "param_count": 9,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 451
     },
@@ -3568,6 +3572,7 @@
         "kNone"
       ],
       "param_count": 0,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 456
     },
@@ -3580,6 +3585,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 461
     },
@@ -3592,6 +3598,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 466
     },
@@ -3604,6 +3611,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 471
     },
@@ -3616,6 +3624,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 476
     },
@@ -3628,6 +3637,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 481
     },
@@ -3640,6 +3650,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 486
     },
@@ -3652,6 +3663,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 491
     },
@@ -3664,6 +3676,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 496
     },
@@ -3676,6 +3689,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 501
     },
@@ -3688,6 +3702,7 @@
         "kNone"
       ],
       "param_count": 0,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 506
     },
@@ -3700,6 +3715,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 511
     },
@@ -3712,6 +3728,7 @@
         "kNone"
       ],
       "param_count": 0,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 516
     },
@@ -3724,6 +3741,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 521
     },
@@ -3736,6 +3754,7 @@
         "kNone"
       ],
       "param_count": 4,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 526
     },
@@ -3748,6 +3767,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 531
     },
@@ -3760,6 +3780,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 536
     },
@@ -3772,6 +3793,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 541
     },
@@ -3784,6 +3806,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 546
     },
@@ -3796,6 +3819,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 551
     },
@@ -3808,6 +3832,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 556
     },
@@ -3820,6 +3845,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 561
     },
@@ -3833,6 +3859,7 @@
         "kSceneTarget"
       ],
       "param_count": 11,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 566
     },
@@ -3847,6 +3874,7 @@
         "kUndoable"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 571
     },
@@ -3861,6 +3889,7 @@
         "kUndoable"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 576
     },
@@ -3873,6 +3902,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/property/property_tools.hpp",
       "line": 102
     },
@@ -3887,6 +3917,7 @@
         "kUndoable"
       ],
       "param_count": 6,
+      "has_action_schema": false,
       "source": "src/tools/domains/property/property_tools.hpp",
       "line": 107
     },
@@ -3899,6 +3930,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/property/property_tools.hpp",
       "line": 118
     },
@@ -3911,6 +3943,7 @@
         "kNone"
       ],
       "param_count": 5,
+      "has_action_schema": false,
       "source": "src/tools/domains/property/property_tools.hpp",
       "line": 123
     },
@@ -3923,6 +3956,7 @@
         "kNone"
       ],
       "param_count": 4,
+      "has_action_schema": false,
       "source": "src/tools/domains/property/property_tools.hpp",
       "line": 128
     },
@@ -3937,6 +3971,7 @@
         "kUndoable"
       ],
       "param_count": 5,
+      "has_action_schema": false,
       "source": "src/tools/domains/property/property_tools.hpp",
       "line": 138
     },
@@ -3949,6 +3984,7 @@
         "kNone"
       ],
       "param_count": 0,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 319
     },
@@ -3961,6 +3997,7 @@
         "kNone"
       ],
       "param_count": 4,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 324
     },
@@ -3973,6 +4010,7 @@
         "kNone"
       ],
       "param_count": 5,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 329
     },
@@ -3985,6 +4023,7 @@
         "kNone"
       ],
       "param_count": 6,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 334
     },
@@ -3997,6 +4036,7 @@
         "kNone"
       ],
       "param_count": 6,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 339
     },
@@ -4009,6 +4049,7 @@
         "kNone"
       ],
       "param_count": 5,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 344
     },
@@ -4021,6 +4062,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 349
     },
@@ -4033,6 +4075,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 354
     },
@@ -4045,6 +4088,7 @@
         "kNone"
       ],
       "param_count": 0,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 359
     },
@@ -4057,6 +4101,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 364
     },
@@ -4069,6 +4114,7 @@
         "kNone"
       ],
       "param_count": 0,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 369
     },
@@ -4081,6 +4127,7 @@
         "kNone"
       ],
       "param_count": 4,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 374
     },
@@ -4093,6 +4140,7 @@
         "kNone"
       ],
       "param_count": 4,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 379
     },
@@ -4105,6 +4153,7 @@
         "kNone"
       ],
       "param_count": 4,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 384
     },
@@ -4117,6 +4166,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 389
     },
@@ -4129,6 +4179,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 394
     },
@@ -4141,6 +4192,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 399
     },
@@ -4153,6 +4205,7 @@
         "kNone"
       ],
       "param_count": 0,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 404
     },
@@ -4165,6 +4218,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 409
     },
@@ -4177,6 +4231,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 414
     },
@@ -4189,6 +4244,7 @@
         "kNone"
       ],
       "param_count": 0,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 419
     },
@@ -4201,6 +4257,7 @@
         "kNone"
       ],
       "param_count": 4,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 424
     },
@@ -4213,6 +4270,7 @@
         "kNone"
       ],
       "param_count": 0,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 429
     },
@@ -4225,6 +4283,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 434
     },
@@ -4237,6 +4296,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 439
     },
@@ -4249,6 +4309,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 444
     },
@@ -4261,6 +4322,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 449
     },
@@ -4273,6 +4335,7 @@
         "kNone"
       ],
       "param_count": 4,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 454
     },
@@ -4285,6 +4348,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 459
     },
@@ -4297,6 +4361,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 464
     },
@@ -4309,6 +4374,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 469
     },
@@ -4321,6 +4387,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 474
     },
@@ -4333,6 +4400,7 @@
         "kNone"
       ],
       "param_count": 12,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 479
     },
@@ -4345,6 +4413,7 @@
         "kNone"
       ],
       "param_count": 6,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 484
     },
@@ -4357,6 +4426,7 @@
         "kNone"
       ],
       "param_count": 4,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 489
     },
@@ -4369,6 +4439,7 @@
         "kNone"
       ],
       "param_count": 11,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 494
     },
@@ -4381,6 +4452,7 @@
         "kNone"
       ],
       "param_count": 14,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 499
     },
@@ -4393,6 +4465,7 @@
         "kNone"
       ],
       "param_count": 0,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 504
     },
@@ -4405,6 +4478,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 509
     },
@@ -4417,6 +4491,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 514
     },
@@ -4429,6 +4504,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 519
     },
@@ -4441,6 +4517,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 524
     },
@@ -4453,6 +4530,7 @@
         "kNone"
       ],
       "param_count": 0,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 529
     },
@@ -4465,6 +4543,7 @@
         "kNone"
       ],
       "param_count": 0,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 534
     },
@@ -4477,6 +4556,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 539
     },
@@ -4489,6 +4569,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 544
     },
@@ -4501,6 +4582,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 549
     },
@@ -4513,6 +4595,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 554
     },
@@ -4525,6 +4608,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 559
     },
@@ -4537,6 +4621,7 @@
         "kMutating"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 564
     },
@@ -4549,6 +4634,7 @@
         "kMutating"
       ],
       "param_count": 7,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 569
     },
@@ -4561,6 +4647,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 574
     },
@@ -4573,6 +4660,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 268
     },
@@ -4585,6 +4673,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 279
     },
@@ -4597,6 +4686,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 284
     },
@@ -4609,6 +4699,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 289
     },
@@ -4621,6 +4712,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 294
     },
@@ -4633,6 +4725,7 @@
         "kMutating"
       ],
       "param_count": 7,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 299
     },
@@ -4645,6 +4738,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 304
     },
@@ -4657,6 +4751,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 309
     },
@@ -4669,6 +4764,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 314
     },
@@ -4681,6 +4777,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 319
     },
@@ -4693,6 +4790,7 @@
         "kNone"
       ],
       "param_count": 0,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 324
     },
@@ -4705,6 +4803,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 329
     },
@@ -4717,6 +4816,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 334
     },
@@ -4729,6 +4829,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 339
     },
@@ -4741,6 +4842,7 @@
         "kMutating"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 344
     },
@@ -4753,6 +4855,7 @@
         "kMutating"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 349
     },
@@ -4765,6 +4868,7 @@
         "kMutating"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 354
     },
@@ -4777,6 +4881,7 @@
         "kMutating"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 364
     },
@@ -4789,6 +4894,7 @@
         "kMutating"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 369
     },
@@ -4801,6 +4907,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 374
     },
@@ -4813,6 +4920,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 385
     },
@@ -4825,6 +4933,7 @@
         "kMutating"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 390
     },
@@ -4837,6 +4946,7 @@
         "kMutating"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 395
     },
@@ -4849,6 +4959,7 @@
         "kNone"
       ],
       "param_count": 7,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 400
     },
@@ -4861,6 +4972,7 @@
         "kNone"
       ],
       "param_count": 6,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 405
     },
@@ -4873,6 +4985,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 410
     },
@@ -4885,6 +4998,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 415
     },
@@ -4897,6 +5011,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 420
     },
@@ -4909,6 +5024,7 @@
         "kMutating"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 425
     },
@@ -4921,6 +5037,7 @@
         "kMutating"
       ],
       "param_count": 4,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 430
     },
@@ -4933,6 +5050,7 @@
         "kMutating"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 435
     },
@@ -4945,6 +5063,7 @@
         "kMutating"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 440
     },
@@ -4958,6 +5077,7 @@
         "kSceneTarget"
       ],
       "param_count": 4,
+      "has_action_schema": false,
       "source": "src/tools/domains/scene/scene_tools.hpp",
       "line": 257
     },
@@ -4972,6 +5092,7 @@
         "kUndoable"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/scene/scene_tools.hpp",
       "line": 262
     },
@@ -4986,6 +5107,7 @@
         "kUndoable"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/scene/scene_tools.hpp",
       "line": 267
     },
@@ -5000,6 +5122,7 @@
         "kUndoable"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/scene/scene_tools.hpp",
       "line": 272
     },
@@ -5012,6 +5135,7 @@
         "kObserve"
       ],
       "param_count": 8,
+      "has_action_schema": false,
       "source": "src/tools/domains/scene/scene_tools.hpp",
       "line": 277
     },
@@ -5025,6 +5149,7 @@
         "kSceneTarget"
       ],
       "param_count": 4,
+      "has_action_schema": false,
       "source": "src/tools/domains/scene/scene_tools.hpp",
       "line": 292
     },
@@ -5038,6 +5163,7 @@
         "kSceneTarget"
       ],
       "param_count": 4,
+      "has_action_schema": false,
       "source": "src/tools/domains/scene/scene_tools.hpp",
       "line": 297
     },
@@ -5052,6 +5178,7 @@
         "kUndoable"
       ],
       "param_count": 10,
+      "has_action_schema": false,
       "source": "src/tools/domains/scene/scene_tools.hpp",
       "line": 302
     },
@@ -5065,6 +5192,7 @@
         "kSceneTarget"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/scene/scene_tools.hpp",
       "line": 307
     },
@@ -5078,6 +5206,7 @@
         "kSceneTarget"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/scene/scene_tools.hpp",
       "line": 312
     },
@@ -5092,6 +5221,7 @@
         "kUndoable"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/scene/scene_tools.hpp",
       "line": 317
     },
@@ -5106,6 +5236,7 @@
         "kUndoable"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/scene/scene_tools.hpp",
       "line": 322
     },
@@ -5118,6 +5249,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/scene/scene_tools.hpp",
       "line": 327
     },
@@ -5130,6 +5262,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/scene_tree/scene_tree_tools.hpp",
       "line": 55
     },
@@ -5142,6 +5275,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/scene_tree/scene_tree_tools.hpp",
       "line": 60
     },
@@ -5154,6 +5288,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/scene_tree/scene_tree_tools.hpp",
       "line": 65
     },
@@ -5166,6 +5301,7 @@
         "kNone"
       ],
       "param_count": 0,
+      "has_action_schema": false,
       "source": "src/tools/domains/scene_tree/scene_tree_tools.hpp",
       "line": 70
     },
@@ -5178,6 +5314,7 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/scene_tree/scene_tree_tools.hpp",
       "line": 75
     },
@@ -5190,6 +5327,7 @@
         "kNone"
       ],
       "param_count": 0,
+      "has_action_schema": false,
       "source": "src/tools/domains/scene_tree/scene_tree_tools.hpp",
       "line": 80
     },
@@ -5202,6 +5340,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/scene_tree/scene_tree_tools.hpp",
       "line": 85
     },
@@ -5214,6 +5353,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/scene_tree/scene_tree_tools.hpp",
       "line": 90
     },
@@ -5226,6 +5366,7 @@
         "kMutating"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/script/script_tools.hpp",
       "line": 78
     },
@@ -5238,6 +5379,7 @@
         "kMutating"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/script/script_tools.hpp",
       "line": 83
     },
@@ -5250,6 +5392,7 @@
         "kMutating"
       ],
       "param_count": 6,
+      "has_action_schema": false,
       "source": "src/tools/domains/script/script_tools.hpp",
       "line": 88
     },
@@ -5264,6 +5407,7 @@
         "kUndoable"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/script/script_tools.hpp",
       "line": 93
     },
@@ -5277,6 +5421,7 @@
         "kUndoable"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/script/script_tools.hpp",
       "line": 98
     },
@@ -5289,6 +5434,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/script/script_tools.hpp",
       "line": 103
     },
@@ -5301,6 +5447,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/script/script_tools.hpp",
       "line": 108
     },
@@ -5313,6 +5460,7 @@
         "kNone"
       ],
       "param_count": 3,
+      "has_action_schema": false,
       "source": "src/tools/domains/script/script_tools.hpp",
       "line": 113
     },
@@ -5325,6 +5473,7 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/script/script_tools.hpp",
       "line": 118
     },
@@ -5337,44 +5486,22 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/script/script_tools.hpp",
       "line": 123
     },
     {
-      "name": "create_spriteframes",
+      "name": "update_spriteframes",
       "category": "SpriteFrames",
       "domain": "SpriteFrames",
       "side_effect": "None",
       "flags": [
         "kNone"
       ],
-      "param_count": 2,
+      "param_count": 9,
+      "has_action_schema": true,
       "source": "src/tools/domains/spriteframes/spriteframes_tools.hpp",
-      "line": 43
-    },
-    {
-      "name": "add_spriteframes_animation",
-      "category": "SpriteFrames",
-      "domain": "SpriteFrames",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 4,
-      "source": "src/tools/domains/spriteframes/spriteframes_tools.hpp",
-      "line": 48
-    },
-    {
-      "name": "add_spriteframes_frame",
-      "category": "SpriteFrames",
-      "domain": "SpriteFrames",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 6,
-      "source": "src/tools/domains/spriteframes/spriteframes_tools.hpp",
-      "line": 53
+      "line": 52
     },
     {
       "name": "run_gdscript_tests",
@@ -5384,153 +5511,49 @@
       "flags": [
         "kNone"
       ],
-      "param_count": 2,
-      "source": "src/tools/domains/test/test_tools.hpp",
-      "line": 33
-    },
-    {
-      "name": "run_gdscript_test_files",
-      "category": "Testing",
-      "domain": "Testing",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 3,
-      "source": "src/tools/domains/test/test_tools.hpp",
-      "line": 38
-    },
-    {
-      "name": "create_text_font",
-      "category": "Text",
-      "domain": "Text",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/text/text_tools.hpp",
-      "line": 71
-    },
-    {
-      "name": "create_shaped_text",
-      "category": "Text",
-      "domain": "Text",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/text/text_tools.hpp",
-      "line": 76
-    },
-    {
-      "name": "set_text_font_antialiasing",
-      "category": "Text",
-      "domain": "Text",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/text/text_tools.hpp",
-      "line": 81
-    },
-    {
-      "name": "set_text_font_data",
-      "category": "Text",
-      "domain": "Text",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/text/text_tools.hpp",
-      "line": 86
-    },
-    {
-      "name": "set_text_font_hinting",
-      "category": "Text",
-      "domain": "Text",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/text/text_tools.hpp",
-      "line": 91
-    },
-    {
-      "name": "get_text_font_system_path",
-      "category": "Text",
-      "domain": "Text",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
       "param_count": 4,
-      "source": "src/tools/domains/text/text_tools.hpp",
-      "line": 96
+      "has_action_schema": false,
+      "source": "src/tools/domains/test/test_tools.hpp",
+      "line": 46
     },
     {
-      "name": "has_text_feature",
+      "name": "font",
       "category": "Text",
       "domain": "Text",
       "side_effect": "None",
       "flags": [
         "kNone"
       ],
-      "param_count": 1,
+      "param_count": 8,
+      "has_action_schema": true,
       "source": "src/tools/domains/text/text_tools.hpp",
-      "line": 101
+      "line": 70
     },
     {
-      "name": "is_text_locale_right_to_left",
+      "name": "shaped_text",
       "category": "Text",
       "domain": "Text",
       "side_effect": "None",
       "flags": [
         "kNone"
       ],
-      "param_count": 1,
+      "param_count": 7,
+      "has_action_schema": true,
       "source": "src/tools/domains/text/text_tools.hpp",
-      "line": 106
+      "line": 114
     },
     {
-      "name": "add_shaped_text_string",
+      "name": "text_query",
       "category": "Text",
       "domain": "Text",
       "side_effect": "None",
       "flags": [
         "kNone"
-      ],
-      "param_count": 5,
-      "source": "src/tools/domains/text/text_tools.hpp",
-      "line": 111
-    },
-    {
-      "name": "get_shaped_text_size",
-      "category": "Text",
-      "domain": "Text",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/text/text_tools.hpp",
-      "line": 116
-    },
-    {
-      "name": "create_theme_resource",
-      "category": "Theme",
-      "domain": "Theme",
-      "side_effect": "WritesFile",
-      "flags": [
-        "kMutating"
       ],
       "param_count": 2,
-      "source": "src/tools/domains/theme/theme_tools.hpp",
-      "line": 204
+      "has_action_schema": true,
+      "source": "src/tools/domains/text/text_tools.hpp",
+      "line": 146
     },
     {
       "name": "get_theme_info",
@@ -5541,24 +5564,25 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": false,
       "source": "src/tools/domains/theme/theme_tools.hpp",
-      "line": 209
+      "line": 259
     },
     {
-      "name": "apply_theme_to_control",
+      "name": "update_theme",
       "category": "Theme",
       "domain": "Theme",
-      "side_effect": "WritesScene",
+      "side_effect": "WritesFile",
       "flags": [
-        "kNone",
-        "kSceneTarget"
+        "kMutating"
       ],
-      "param_count": 2,
+      "param_count": 6,
+      "has_action_schema": true,
       "source": "src/tools/domains/theme/theme_tools.hpp",
-      "line": 214
+      "line": 264
     },
     {
-      "name": "set_control_layout",
+      "name": "update_control_layout",
       "category": "Theme",
       "domain": "Theme",
       "side_effect": "WritesScene",
@@ -5567,21 +5591,10 @@
         "kSceneTarget",
         "kUndoable"
       ],
-      "param_count": 10,
+      "param_count": 12,
+      "has_action_schema": true,
       "source": "src/tools/domains/theme/theme_tools.hpp",
-      "line": 219
-    },
-    {
-      "name": "set_theme_item_bundle",
-      "category": "Theme",
-      "domain": "Theme",
-      "side_effect": "WritesFile",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 5,
-      "source": "src/tools/domains/theme/theme_tools.hpp",
-      "line": 230
+      "line": 334
     },
     {
       "name": "create_tilemap",
@@ -5593,8 +5606,9 @@
         "kSceneTarget"
       ],
       "param_count": 4,
+      "has_action_schema": false,
       "source": "src/tools/domains/tilemap/tilemap_tools.hpp",
-      "line": 118
+      "line": 107
     },
     {
       "name": "set_tilemap_cells",
@@ -5606,22 +5620,9 @@
         "kSceneTarget"
       ],
       "param_count": 9,
+      "has_action_schema": false,
       "source": "src/tools/domains/tilemap/tilemap_tools.hpp",
-      "line": 123
-    },
-    {
-      "name": "fill_tilemap_rect",
-      "category": "TileMap",
-      "domain": "TileMap",
-      "side_effect": "WritesScene",
-      "flags": [
-        "kMutating",
-        "kSceneTarget",
-        "kUndoable"
-      ],
-      "param_count": 8,
-      "source": "src/tools/domains/tilemap/tilemap_tools.hpp",
-      "line": 134
+      "line": 112
     },
     {
       "name": "create_tilemap_tileset",
@@ -5632,68 +5633,35 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/tilemap/tilemap_tools.hpp",
-      "line": 139
+      "line": 155
     },
     {
-      "name": "add_tilemap_atlas_source",
+      "name": "update_tileset",
       "category": "TileMap",
       "domain": "Tileset",
       "side_effect": "None",
       "flags": [
         "kNone"
       ],
-      "param_count": 6,
+      "param_count": 12,
+      "has_action_schema": true,
       "source": "src/tools/domains/tileset/tileset_tools.hpp",
-      "line": 46
+      "line": 55
     },
     {
-      "name": "add_tilemap_physics_layer",
-      "category": "TileMap",
-      "domain": "Tileset",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 4,
-      "source": "src/tools/domains/tileset/tileset_tools.hpp",
-      "line": 51
-    },
-    {
-      "name": "set_tilemap_tile_collision",
-      "category": "TileMap",
-      "domain": "Tileset",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 5,
-      "source": "src/tools/domains/tileset/tileset_tools.hpp",
-      "line": 56
-    },
-    {
-      "name": "create_game_tween",
+      "name": "game_tween",
       "category": "Game",
       "domain": "Tween",
       "side_effect": "GameRuntime",
       "flags": [
         "kMutating"
       ],
-      "param_count": 10,
+      "param_count": 12,
+      "has_action_schema": true,
       "source": "src/tools/domains/tween/tween_tools.hpp",
-      "line": 57
-    },
-    {
-      "name": "control_game_tween",
-      "category": "Game",
-      "domain": "Tween",
-      "side_effect": "GameRuntime",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 4,
-      "source": "src/tools/domains/tween/tween_tools.hpp",
-      "line": 62
+      "line": 82
     },
     {
       "name": "get_game_tween_list",
@@ -5704,8 +5672,9 @@
         "kNone"
       ],
       "param_count": 2,
+      "has_action_schema": false,
       "source": "src/tools/domains/tween/tween_tools.hpp",
-      "line": 67
+      "line": 104
     },
     {
       "name": "tween_editor_property",
@@ -5716,8 +5685,9 @@
         "kMutating"
       ],
       "param_count": 7,
+      "has_action_schema": false,
       "source": "src/tools/domains/tween/tween_tools.hpp",
-      "line": 72
+      "line": 109
     }
   ],
   "meta_tools": [
@@ -5800,27 +5770,6 @@
   ],
   "side_effect_review": [
     {
-      "name": "play_audio_player",
-      "domain": "Audio",
-      "side_effect": "None",
-      "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 180
-    },
-    {
-      "name": "stop_audio_player",
-      "domain": "Audio",
-      "side_effect": "None",
-      "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 185
-    },
-    {
-      "name": "stop_audio_input_capture",
-      "domain": "Audio",
-      "side_effect": "None",
-      "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 235
-    },
-    {
       "name": "remove_physics_3d_body_collision_exception",
       "domain": "Physics",
       "side_effect": "None",
@@ -5846,14 +5795,7 @@
       "domain": "Testing",
       "side_effect": "None",
       "source": "src/tools/domains/test/test_tools.hpp",
-      "line": 33
-    },
-    {
-      "name": "run_gdscript_test_files",
-      "domain": "Testing",
-      "side_effect": "None",
-      "source": "src/tools/domains/test/test_tools.hpp",
-      "line": 38
+      "line": 46
     }
   ]
 }

@@ -80,7 +80,7 @@ std::string side_effect_of_tool(const std::string &name) {
 
 TEST(DestructiveTierGuardTest, EveryToolIsDeclared) {
   const auto all = declarations();
-  EXPECT_GT(all.size(), 400u);
+  EXPECT_GT(all.size(), 300u);
 }
 
 TEST(DestructiveTierGuardTest, DestructionShapedToolsAreDestructiveOrExempted) {
@@ -166,7 +166,7 @@ TEST(DestructiveTierGuardTest, SceneWriteToolsKeepWriteTier) {
 
 TEST(DestructiveTierGuardTest, ProcessEnvironmentReadsKeepProcessTier) {
   const std::vector<std::string> names = {
-      "get_os_environment", "get_os_user_data_dir"};
+      "os_environment", "get_os_user_data_dir"};
   for (const std::string &name : names) {
     EXPECT_EQ(side_effect_of_tool(name), "process") << name;
   }
@@ -182,13 +182,12 @@ TEST(DestructiveTierGuardTest, ReviewedDestructiveToolsKeepTheirTier) {
 
 TEST(DestructiveTierGuardTest, ReviewedWriteAndDangerToolsKeepTheirTier) {
   EXPECT_EQ(side_effect_of_tool("remove_resource_file"), "writes_file");
-  EXPECT_EQ(side_effect_of_tool("move_os_file_to_trash"), "writes_file");
-  EXPECT_EQ(side_effect_of_tool("erase_input_map_action"), "writes_config");
-  EXPECT_EQ(side_effect_of_tool("remove_autoload"), "writes_config");
-  EXPECT_EQ(side_effect_of_tool("kill_os_process"), "process");
-  EXPECT_EQ(side_effect_of_tool("execute_os_process"), "process");
+  EXPECT_EQ(side_effect_of_tool("os_file_write"), "writes_file");
+  EXPECT_EQ(side_effect_of_tool("erase_input_map"), "writes_config");
+  EXPECT_EQ(side_effect_of_tool("update_autoloads"), "writes_config");
+  EXPECT_EQ(side_effect_of_tool("os_process"), "process");
   EXPECT_EQ(side_effect_of_tool("execute_script"), "code_execute");
-  EXPECT_EQ(side_effect_of_tool("execute_game_script"), "game_runtime");
+  EXPECT_EQ(side_effect_of_tool("game_script"), "game_runtime");
   EXPECT_EQ(side_effect_of_tool("property_set"), "writes_scene");
   EXPECT_EQ(side_effect_of_tool("spawn_node_bundle"), "writes_scene");
   EXPECT_EQ(side_effect_of_tool("create_scene_node"), "writes_scene");
@@ -196,7 +195,7 @@ TEST(DestructiveTierGuardTest, ReviewedWriteAndDangerToolsKeepTheirTier) {
   EXPECT_EQ(side_effect_of_tool("set_tilemap_cells"), "writes_scene");
   EXPECT_EQ(side_effect_of_tool("attach_script_to_node"), "writes_scene");
   EXPECT_EQ(side_effect_of_tool("add_group_node"), "writes_scene");
-  EXPECT_EQ(side_effect_of_tool("get_os_environment"), "process");
+  EXPECT_EQ(side_effect_of_tool("os_environment"), "process");
   EXPECT_EQ(side_effect_of_tool("get_os_unique_id"), "process");
   EXPECT_EQ(side_effect_of_tool("get_os_user_data_dir"), "process");
 }
