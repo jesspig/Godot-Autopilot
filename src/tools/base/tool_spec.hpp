@@ -41,6 +41,15 @@ constexpr uint32_t kHealthProbe = 1u << 7;
 constexpr uint32_t kLongBlocking = 1u << 8;
 } // namespace tool_flags
 
+struct ToolAlias {
+  std::string name;
+  std::string canonical;
+  std::function<mcp::JsonValue(const mcp::JsonValue &)> adapt_args;
+  std::function<mcp::JsonValue(const mcp::JsonValue &)> project_result;
+  std::string deprecated_since;
+  std::string removal_version;
+};
+
 struct ToolSpec {
   std::string name;
   std::string description;
@@ -51,6 +60,7 @@ struct ToolSpec {
   std::vector<ParamSpec> params;
   std::function<mcp::JsonValue(const mcp::JsonValue &)> handler;
   mcp::JsonValue raw_schema;
+  std::vector<ToolAlias> aliases;
 };
 
 namespace spec_detail {
@@ -439,6 +449,42 @@ inline SideEffect SpecTool::side_effects() const { return spec_.side_effect; }
 inline uint32_t SpecTool::tool_flags() const { return spec_.flags; }
 
 inline const ToolSpec &SpecTool::spec() const { return spec_; }
+
+inline mcp::JsonValue apply_alias_args(const ToolAlias &alias,
+                                       const mcp::JsonValue &args) {
+  mcp::JsonValue adapted = alias.adapt_args ? alias.adapt_args(args) : args;
+  if (args.IsObject() && adapted.IsObject()) {
+    const mcp::JsonValue *confirm = args.Find("confirm");
+    if (confirm != nullptr && adapted.Find("confirm") == nullptr) {
+      adapted["confirm"] = *confirm;
+    }
+  }
+  return adapted;
+}
+
+inline mcp::JsonValue annotate_alias_result(const ToolAlias &alias,
+                                            mcp::JsonValue result) {
+  if (!result.IsObject()) {
+    mcp::JsonValue wrapped(mcp::JsonValue::object_tag);
+    wrapped["result"] = std::move(result);
+    result = std::move(wrapped);
+  }
+  result["deprecated_alias"] = mcp::JsonValue(alias.name);
+  result["canonical_name"] = mcp::JsonValue(alias.canonical);
+  result["alias_removal_version"] = mcp::JsonValue(alias.removal_version);
+  if (!alias.deprecated_since.empty()) {
+    result["deprecated_since"] = mcp::JsonValue(alias.deprecated_since);
+  }
+  return result;
+}
+
+inline mcp::JsonValue apply_alias_result(const ToolAlias &alias,
+                                         mcp::JsonValue result) {
+  if (alias.project_result) {
+    result = alias.project_result(result);
+  }
+  return annotate_alias_result(alias, std::move(result));
+}
 
 inline std::unique_ptr<ToolBase> make_spec_tool(ToolSpec spec) {
   return std::make_unique<SpecTool>(std::move(spec));

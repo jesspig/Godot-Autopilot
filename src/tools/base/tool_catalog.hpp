@@ -27,6 +27,7 @@ public:
   std::optional<ToolInfo> get_tool(const std::string &name) const;
   std::vector<ToolInfo> get_all_tools() const;
   void replace_tools(std::vector<ToolInfo> tools);
+  void replace_aliases(std::unordered_map<std::string, std::string> aliases);
   std::vector<std::string> get_categories() const;
   size_t size() const;
 
@@ -35,6 +36,7 @@ public:
 private:
   mutable std::mutex mutex_;
   std::unordered_map<std::string, ToolInfo> tools_;
+  std::unordered_map<std::string, std::string> aliases_;
 };
 
 } // namespace godot_autopilot

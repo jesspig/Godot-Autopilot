@@ -32,6 +32,7 @@ resource: devtools/commands/tool-audit.ts
 | `system_status` | 1 | `system_total` |
 | 域文件数 | 33 | `domain_count` |
 | 严格冗余候选 | 32 | `strict_redundant_count` |
+| 生产别名 | 0 | `alias_count` |
 | 能力矩阵域行 | 451 | `capability_matrix.rows` |
 | 能力矩阵系统/元行 | 8 | `capability_matrix.meta_rows` |
 

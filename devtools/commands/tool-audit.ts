@@ -785,6 +785,27 @@ function parseParamCounts(text: string): Map<string, number> {
   return counts;
 }
 
+function parseAliasNames(text: string): string[] {
+  const names: string[] = [];
+  let searchFrom = 0;
+  while (true) {
+    const index = text.indexOf("ToolAlias{", searchFrom);
+    if (index < 0) break;
+    const open = index + "ToolAlias".length;
+    const end = findBlockEnd(text, open);
+    const fields = splitTopLevel(text.slice(open + 1, end));
+    if (fields.length >= 2) {
+      const parsed = parseStringLiterals(fields[0]);
+      if (parsed.length === 0) {
+        throw new Error(`ToolAlias at offset ${index} has no string name`);
+      }
+      names.push(parsed[0]);
+    }
+    searchFrom = end + 1;
+  }
+  return names;
+}
+
 function parseToolSpecs(
   text: string,
   source: string,
@@ -901,6 +922,7 @@ function buildAudit() {
 
   const domainTools: ToolRecord[] = [];
   const domainOrder: string[] = [];
+  const aliasNames: string[] = [];
   for (const dir of dirs) {
     const file = path.join(DOMAINS_DIR, dir, `${dir}_tools.hpp`);
     const source = relativeToRoot(file);
@@ -909,9 +931,11 @@ function buildAudit() {
     const records = parseToolSpecs(text, source, DOMAIN_LABELS[dir], paramCounts);
     domainOrder.push(DOMAIN_LABELS[dir]);
     domainTools.push(...records);
+    aliasNames.push(...parseAliasNames(text));
   }
 
   const registerText = fs.readFileSync(REGISTER_ALL, "utf8");
+  aliasNames.push(...parseAliasNames(registerText));
   const { meta, system } = parseSystemSpecs(registerText);
   const allTools = [...domainTools, ...system, ...meta];
   const names = allTools.map((tool) => tool.name);
@@ -927,6 +951,12 @@ function buildAudit() {
   }
   if (system.length !== 1) {
     throw new Error(`expected 1 system tool, found ${system.length}`);
+  }
+  const duplicateAliases = aliasNames.filter(
+    (name, index) => aliasNames.indexOf(name) !== index,
+  );
+  if (duplicateAliases.length > 0) {
+    throw new Error(`duplicate aliases: ${[...new Set(duplicateAliases)].join(", ")}`);
   }
 
   const known = new Set(names);
@@ -962,6 +992,8 @@ function buildAudit() {
     by_side_effect: countValues(allTools.map((tool) => tool.side_effect)),
     domain_by_side_effect: countValues(domainTools.map((tool) => tool.side_effect)),
     strict_redundant_count: PRUNE_ROWS.length,
+    alias_count: aliasNames.length,
+    alias_names: [...aliasNames].sort(),
     tool_names: names,
     tools: domainTools,
     meta_tools: meta,
@@ -1077,7 +1109,7 @@ function printSummary(audit: ReturnType<typeof buildAudit>, matrixRows: number):
     `[AUDIT] catalog=${audit.catalog_total} domain=${audit.domain_total} meta=${audit.meta_total} system=${audit.system_total}`,
   );
   console.log(
-    `[AUDIT] domains=${audit.domain_count} strict_redundant=${audit.strict_redundant_count} matrix_rows=${matrixRows}`,
+    `[AUDIT] domains=${audit.domain_count} aliases=${audit.alias_count} strict_redundant=${audit.strict_redundant_count} matrix_rows=${matrixRows}`,
   );
   console.log(`[AUDIT] baseline=${relativeToRoot(BASELINE_PATH)}`);
   console.log(`[AUDIT] target=${relativeToRoot(TARGET_PATH)}`);
