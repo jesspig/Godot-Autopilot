@@ -353,5 +353,35 @@ JV handle_tween_editor_property(const JV &args) {
   return r;
 }
 
+JV handle_game_tween_bundle(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "game_tween called");
+  if (!args.IsObject()) {
+    return util::error_json("game_tween parameters must be an object");
+  }
+  auto *action_p = args.Find("action");
+  const std::string action =
+      (action_p && action_p->IsString()) ? action_p->GetString() : std::string();
+  if (action.empty()) {
+    return util::error_json(
+        "missing required parameter: action (create|control)");
+  }
+  JV forwarded(JV::object_tag);
+  forwarded = args;
+  forwarded.GetObject().erase("action");
+  if (action == "create") {
+    return handle_create_game_tween(forwarded);
+  }
+  if (action == "control") {
+    if (auto *tween_action = args.Find("tween_action");
+        tween_action != nullptr && tween_action->IsString()) {
+      forwarded["action"] = *tween_action;
+    }
+    forwarded.GetObject().erase("tween_action");
+    return handle_control_game_tween(forwarded);
+  }
+  return util::error_json("invalid action: expected create|control");
+}
+
 } // namespace tween_ops
 } // namespace godot_autopilot

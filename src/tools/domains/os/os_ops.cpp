@@ -758,5 +758,128 @@ JV handle_os_shell_open(const JV &args) {
   return r;
 }
 
+namespace {
+
+mcp::JsonValue os_action_error(const std::string &message) {
+  JV error(JV::object_tag);
+  error["error"] = JV(message);
+  return error;
+}
+
+bool read_os_action(const JV &args, std::string &out, JV &error) {
+  const JV *action = args.Find("action");
+  if (action == nullptr) {
+    error = os_action_error("missing required parameter: action");
+    return false;
+  }
+  if (!action->IsString()) {
+    error = os_action_error("invalid parameter: action must be a string");
+    return false;
+  }
+  out = action->GetString();
+  return true;
+}
+
+JV strip_os_action(const JV &args) {
+  JV out = args.IsObject() ? args : JV(JV::object_tag);
+  out.GetObject().erase("action");
+  return out;
+}
+
+} // namespace
+
+JV handle_os_has_environment(const JV &args) {
+  const JV *variable = args.Find("variable");
+  if (variable == nullptr || !variable->IsString()) {
+    return os_action_error("missing required parameter: variable");
+  }
+  auto *os = godot::OS::get_singleton();
+  if (!os) {
+    return os_action_error("OS singleton not available");
+  }
+  const bool has = os->has_environment(
+      godot::String(variable->GetString().c_str()));
+  JV r(JV::object_tag);
+  r["result"] = JV(has);
+  return r;
+}
+
+JV handle_os_process(const JV &args) {
+  std::string action;
+  JV error;
+  if (!read_os_action(args, action, error)) {
+    return error;
+  }
+  if (action == "create") {
+    return handle_os_create_process(strip_os_action(args));
+  }
+  if (action == "execute") {
+    return handle_os_execute(strip_os_action(args));
+  }
+  if (action == "kill") {
+    return handle_os_kill(strip_os_action(args));
+  }
+  return os_action_error(
+      "unknown action '" + action +
+      "' for os_process (expected create, execute, kill)");
+}
+
+JV handle_os_environment(const JV &args) {
+  std::string action;
+  JV error;
+  if (!read_os_action(args, action, error)) {
+    return error;
+  }
+  if (action == "get") {
+    return handle_os_get_environment(strip_os_action(args));
+  }
+  if (action == "set") {
+    return handle_os_set_environment(strip_os_action(args));
+  }
+  if (action == "has") {
+    return handle_os_has_environment(strip_os_action(args));
+  }
+  return os_action_error(
+      "unknown action '" + action +
+      "' for os_environment (expected get, set, has)");
+}
+
+JV handle_os_time(const JV &args) {
+  std::string action;
+  JV error;
+  if (!read_os_action(args, action, error)) {
+    return error;
+  }
+  if (action == "datetime") {
+    return handle_os_get_datetime(strip_os_action(args));
+  }
+  if (action == "unix_time") {
+    return handle_os_get_unix_time(strip_os_action(args));
+  }
+  return os_action_error(
+      "unknown action '" + action +
+      "' for os_time (expected datetime, unix_time)");
+}
+
+JV handle_os_system_info(const JV &args) {
+  std::string action;
+  JV error;
+  if (!read_os_action(args, action, error)) {
+    return error;
+  }
+  if (action == "info") {
+    return handle_os_get_system_info(strip_os_action(args));
+  }
+  if (action == "locale") {
+    return handle_os_get_locale(strip_os_action(args));
+  }
+  if (action == "fonts") {
+    return handle_os_get_system_fonts(strip_os_action(args));
+  }
+  return os_action_error(
+      "unknown action '" + action +
+      "' for os_system_info (expected info, locale, fonts)");
+}
+
 } // namespace os_ops
 } // namespace godot_autopilot

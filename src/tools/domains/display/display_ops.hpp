@@ -31,6 +31,10 @@ mcp::JsonValue handle_window_set_mode(const mcp::JsonValue &args);
 mcp::JsonValue handle_window_set_position(const mcp::JsonValue &args);
 mcp::JsonValue handle_window_set_size(const mcp::JsonValue &args);
 mcp::JsonValue handle_window_set_title(const mcp::JsonValue &args);
+mcp::JsonValue handle_info_get(const mcp::JsonValue &args);
+mcp::JsonValue handle_window_control(const mcp::JsonValue &args);
+mcp::JsonValue handle_mouse_control(const mcp::JsonValue &args);
+mcp::JsonValue handle_tts_control(const mcp::JsonValue &args);
 
 } // namespace display_ops
 } // namespace godot_autopilot

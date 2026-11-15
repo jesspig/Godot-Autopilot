@@ -15,25 +15,31 @@ namespace doc_tools {
 namespace {
 
 const std::vector<ParamSpec> kGetDocsClassParams = {
-    {"class", "string", "Godot class name (e.g. 'Node2D', 'TileMap') or builtin Variant type name (e.g. 'Vector2', 'Color', 'Rect2', 'StringName'); builtin types return value_kind/variant_type/json_shape plus a curated methods/constants subset", true},
+    {"class", "string", "Godot class name (e.g. 'Node2D', 'TileMap') or builtin Variant type name (e.g. 'Vector2', 'Color', 'Rect2', 'StringName'); builtin types return value_kind/variant_type/json_shape plus a curated methods/constants subset. Required unless query is given; class and query are mutually exclusive", false},
+    {"query", "string", "Search mode: when set, class is not read and the name is matched case-insensitively as a substring against every registered class name (e.g. 'node' matches Node, Node2D, SceneTree); returns up to 50 matches with name, parent and api_type instead of one class signature", false},
     {"section", "string", "Optional comma-separated subset of sections to return: methods, properties, signals, enums, constants (default: all). Use it to shrink huge classes", false},
     {"member", "string", "Optional member name filter within the returned sections; case-insensitive substring by default, or exact case-sensitive match when 'exact' is true (default: empty = no filter)", false},
     {"exact", "boolean", "When true, 'member' must match the member name exactly; when false (default) it is a case-insensitive substring filter", false},
 };
 
-const std::vector<ParamSpec> kFindDocsClassParams = {
-    {"query", "string", "Search text matched case-insensitively against class names (e.g. 'node' matches Node, Node2D, SceneTree); returns up to 50 matches", true},
-};
+inline mcp::JsonValue find_docs_args(const mcp::JsonValue &args) {
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  const mcp::JsonValue *query = args.Find("query");
+  if (query != nullptr) {
+    out["query"] = *query;
+  }
+  return out;
+}
 
 } // namespace
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(2);
+  v.reserve(1);
   v.push_back(make_spec_tool(with_aliases(ToolSpec{
       "get_docs_class",
-      "Get a Godot class's reflected signature info from ClassDB (no docstrings, unlike the official documentation): parent_class, api_type, can_instantiate, methods, properties, signals, enums and constants. Requires the class name. Builtin Variant type names (Vector2, Color, Rect2, StringName and the rest of the Variant codec coverage) are accepted too and return value_kind/variant_type/json_shape with a curated methods/constants subset. Errors when the class does not exist. Optional section (comma-separated methods/properties/signals/enums/constants), member (case-insensitive substring by default) and exact (case-sensitive exact member match) narrow the output for huge classes. Combine with find_docs_class to locate classes first.",
-      "Docs", {"docs", "class", "get"}, SideEffect::None, tool_flags::kNone,
+      "Get a Godot class's reflected signature info from ClassDB (no docstrings, unlike the official documentation), or search class names when query is given. Two modes: (1) class mode (default) requires class and returns parent_class, api_type, can_instantiate, methods, properties, signals, enums and constants; builtin Variant type names (Vector2, Color, Rect2, StringName and the rest of the Variant codec coverage) are accepted too and return value_kind/variant_type/json_shape with a curated methods/constants subset; errors when the class does not exist. Optional section (comma-separated methods/properties/signals/enums/constants), member (case-insensitive substring by default) and exact (case-sensitive exact member match) narrow the output for huge classes. (2) query mode requires query, ignores class and returns up to 50 classes whose names contain the query case-insensitively, each with name, parent and api_type — use it first to confirm an exact class name, then call again with class. class and query are mutually exclusive. Example: {\"query\": \"node\"} or {\"class\": \"Node2D\", \"section\": \"methods\", \"member\": \"position\"}.",
+      "Docs", {"docs", "class", "get", "search"}, SideEffect::None, tool_flags::kNone,
       kGetDocsClassParams, doc_ops::handle_get_class},
       {
           ToolAlias{
@@ -128,12 +134,20 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
                 }
                 return mcp::JsonValue();
               }},
+          ToolAlias{
+              "find_docs_class", "get_docs_class",
+              find_docs_args, {}, "0.4.0", "0.6.0",
+              [](const mcp::JsonValue &args) {
+                const mcp::JsonValue *query = args.Find("query");
+                if (query == nullptr || !query->IsString()) {
+                  mcp::JsonValue error(mcp::JsonValue::object_tag);
+                  error["error"] =
+                      mcp::JsonValue("missing required parameter: query");
+                  return error;
+                }
+                return mcp::JsonValue();
+              }},
       })));
-  v.push_back(make_spec_tool(ToolSpec{
-      "find_docs_class",
-      "Search all registered Godot classes by case-insensitive substring match on the name. Requires query; returns up to 50 matching classes with name, parent and api_type. Use it before get_docs_class to confirm the exact class name or to discover related classes.",
-      "Docs", {"docs", "search", "class"}, SideEffect::None, tool_flags::kNone,
-      kFindDocsClassParams, doc_ops::handle_search}));
   return v;
 }
 

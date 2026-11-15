@@ -15,6 +15,8 @@ mcp::JsonValue handle_performance_debug(const mcp::JsonValue &args);
 mcp::JsonValue handle_get_all_monitors(const mcp::JsonValue &args);
 mcp::JsonValue handle_remove_custom_monitor(const mcp::JsonValue &args);
 mcp::JsonValue handle_get_custom_monitor(const mcp::JsonValue &args);
+mcp::JsonValue handle_get_info(const mcp::JsonValue &args);
+mcp::JsonValue handle_set_visuals(const mcp::JsonValue &args);
 
 } // namespace debug_ops
 } // namespace godot_autopilot

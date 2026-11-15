@@ -104,6 +104,7 @@ mcp::JsonValue handle_hit_test_editor_point(const mcp::JsonValue &args);
 mcp::JsonValue handle_get_editor_viewport_geometry(const mcp::JsonValue &args);
 mcp::JsonValue handle_scene_tree_items(const mcp::JsonValue &args);
 mcp::JsonValue handle_select_scene_tree_node(const mcp::JsonValue &args);
+mcp::JsonValue handle_editor_ui(const mcp::JsonValue &args);
 
 } // namespace editor_ui_ops
 } // namespace godot_autopilot

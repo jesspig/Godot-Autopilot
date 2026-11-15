@@ -333,5 +333,32 @@ mcp::JsonValue handle_run_editor_shortcut(const mcp::JsonValue &args) {
   return util::ok_result(std::move(inner));
 }
 
+mcp::JsonValue handle_editor_ui_action(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
+                            "editor_ui_action called");
+  auto *action_p = args.Find("action");
+  const std::string action =
+      (action_p && action_p->IsString()) ? action_p->GetString() : std::string();
+  if (action.empty()) {
+    mcp::JsonValue error(mcp::JsonValue::object_tag);
+    error["error"] =
+        mcp::JsonValue("missing required parameter: action (click|type|shortcut)");
+    return error;
+  }
+  if (action == "click") {
+    return handle_click_editor_element(args);
+  }
+  if (action == "type") {
+    return handle_type_editor_element_text(args);
+  }
+  if (action == "shortcut") {
+    return handle_run_editor_shortcut(args);
+  }
+  mcp::JsonValue error(mcp::JsonValue::object_tag);
+  error["error"] =
+      mcp::JsonValue("invalid action: expected click|type|shortcut");
+  return error;
+}
+
 } // namespace editor_ui_actions
 } // namespace godot_autopilot

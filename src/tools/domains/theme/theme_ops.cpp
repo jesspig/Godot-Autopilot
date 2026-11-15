@@ -1267,5 +1267,37 @@ mcp::JsonValue handle_set_theme_item_bundle(const mcp::JsonValue &args) {
   return r;
 }
 
+mcp::JsonValue handle_update_theme(const mcp::JsonValue &args) {
+  auto *ap = args.Find("action");
+  if (!ap || !ap->IsString()) {
+    return util::error_json("missing required parameter: action");
+  }
+  const std::string action = ap->GetString();
+  if (action == "create") {
+    return handle_create_theme_resource(args);
+  }
+  if (action == "bundle") {
+    return handle_set_theme_item_bundle(args);
+  }
+  return util::error_json("unknown action '" + action +
+                          "': expected create or bundle");
+}
+
+mcp::JsonValue handle_update_control_layout(const mcp::JsonValue &args) {
+  auto *ap = args.Find("action");
+  if (!ap || !ap->IsString()) {
+    return util::error_json("missing required parameter: action");
+  }
+  const std::string action = ap->GetString();
+  if (action == "apply") {
+    return handle_apply_theme_to_control(args);
+  }
+  if (action == "layout") {
+    return handle_set_control_layout(args);
+  }
+  return util::error_json("unknown action '" + action +
+                          "': expected apply or layout");
+}
+
 } // namespace theme_ops
 } // namespace godot_autopilot

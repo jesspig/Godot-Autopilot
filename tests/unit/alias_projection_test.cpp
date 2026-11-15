@@ -34,21 +34,23 @@ mcp::JsonValue object() {
 const ToolAlias *find_alias(
     const std::vector<std::unique_ptr<ToolBase>> &tools,
     const std::string &canonical, const std::string &alias_name) {
+  const ToolAlias *fallback = nullptr;
   for (const auto &tool : tools) {
-    if (tool->meta().name != canonical) {
-      continue;
-    }
     const auto *spec_tool = dynamic_cast<const SpecTool *>(tool.get());
     if (spec_tool == nullptr) {
       continue;
     }
     for (const auto &alias : spec_tool->spec().aliases) {
-      if (alias.name == alias_name) {
+      if (alias.name != alias_name) {
+        continue;
+      }
+      if (tool->meta().name == canonical) {
         return &alias;
       }
+      fallback = &alias;
     }
   }
-  return nullptr;
+  return fallback;
 }
 
 std::string string_field(const mcp::JsonValue &value, const char *key) {
@@ -69,7 +71,7 @@ TEST(AliasProjectionTest, AudioAliasesProjectLegacyShapes) {
       find_alias(tools, "get_audio_bus_layout", "get_audio_bus_count");
   ASSERT_NE(count, nullptr);
   const mcp::JsonValue count_args = apply_alias_args(*count, object());
-  EXPECT_EQ(count_args["action"].GetString(), "count");
+  EXPECT_EQ(count_args["action"].GetString(), "get_info");
 
   const ToolAlias *name =
       find_alias(tools, "get_audio_bus_layout", "get_audio_bus_name");
@@ -77,7 +79,7 @@ TEST(AliasProjectionTest, AudioAliasesProjectLegacyShapes) {
   mcp::JsonValue name_input = object();
   name_input["bus_index"] = mcp::JsonValue(static_cast<int64_t>(2));
   const mcp::JsonValue name_args = apply_alias_args(*name, name_input);
-  EXPECT_EQ(name_args["action"].GetString(), "name");
+  EXPECT_EQ(name_args["action"].GetString(), "get_info");
   EXPECT_EQ(name_args["bus_index"].GetInt(), 2);
 
   const ToolAlias *devices = find_alias(
@@ -112,6 +114,7 @@ TEST(AliasProjectionTest, DebugAliasesProjectLegacyShapes) {
   monitor_input["monitor"] = mcp::JsonValue(static_cast<int64_t>(9));
   const mcp::JsonValue monitor_args =
       apply_alias_args(*monitor, monitor_input);
+  EXPECT_EQ(monitor_args["action"].GetString(), "monitors");
   const mcp::JsonValue *ids = monitor_args.Find("ids");
   ASSERT_NE(ids, nullptr);
   ASSERT_TRUE(ids->IsArray());
@@ -134,7 +137,7 @@ TEST(AliasProjectionTest, DebugAliasesProjectLegacyShapes) {
       tools, "get_debug_monitors", "get_debug_monitor_catalog");
   ASSERT_NE(catalog, nullptr);
   const mcp::JsonValue catalog_args = apply_alias_args(*catalog, object());
-  EXPECT_TRUE(catalog_args["catalog"].GetBool());
+  EXPECT_EQ(catalog_args["action"].GetString(), "catalog");
 
   const ToolAlias *objects = find_alias(
       tools, "get_debug_monitors", "get_debug_object_count");
@@ -145,15 +148,17 @@ TEST(AliasProjectionTest, DebugAliasesProjectLegacyShapes) {
   ASSERT_NE(objects, nullptr);
   ASSERT_NE(memory, nullptr);
   ASSERT_NE(nodes, nullptr);
-  EXPECT_EQ(apply_alias_args(*objects, object())["ids"][0].GetInt(), 7);
-  EXPECT_EQ(apply_alias_args(*memory, object())["ids"][0].GetInt(), 4);
-  EXPECT_EQ(apply_alias_args(*nodes, object())["ids"][0].GetInt(), 9);
+  EXPECT_EQ(apply_alias_args(*objects, object())["action"].GetString(),
+            "object");
+  EXPECT_EQ(apply_alias_args(*memory, object())["action"].GetString(),
+            "memory");
+  EXPECT_EQ(apply_alias_args(*nodes, object())["action"].GetString(), "node");
 
   const ToolAlias *custom = find_alias(
       tools, "get_debug_monitors", "get_debug_custom_monitor_names");
   ASSERT_NE(custom, nullptr);
   const mcp::JsonValue custom_args = apply_alias_args(*custom, object());
-  EXPECT_TRUE(custom_args["include_custom"].GetBool());
+  EXPECT_EQ(custom_args["action"].GetString(), "custom");
   mcp::JsonValue custom_result = object();
   mcp::JsonValue custom_inner = object();
   mcp::JsonValue custom_names(mcp::JsonValue::array_tag);

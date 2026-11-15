@@ -1,6 +1,7 @@
 #ifndef GODOT_AUTOPILOT_DISPLAY_TOOLS_HPP
 #define GODOT_AUTOPILOT_DISPLAY_TOOLS_HPP
 
+#include <initializer_list>
 #include <mcp/JsonValue.hpp>
 #include <memory>
 #include <string>
@@ -14,7 +15,10 @@ namespace display_tools {
 
 namespace {
 
-const std::vector<ParamSpec> kGetDisplayClipboardParams = {};
+const std::vector<ParamSpec> kGetDisplayInfoParams = {
+    {"screen", "integer", "Only with action=screens: restrict the screens array to this screen index (default: every screen); the returned entry keeps its index field", false},
+    {"window_id", "integer", "Only with action=window: window id to query (default: 0 = main window); negative ids return an error", false},
+};
 
 const std::vector<ParamSpec> kSetDisplayClipboardParams = {
     {"text", "string", "Text to write into the system clipboard, replacing its current contents", true},
@@ -26,230 +30,347 @@ const std::vector<ParamSpec> kShowDisplayDialogParams = {
     {"buttons", "array", "Array of button label strings, one button per entry, e.g. ['OK', 'Cancel']; note the dialog is fire-and-forget, so the clicked button is not reported back", true},
 };
 
-const std::vector<ParamSpec> kGetDisplayMousePositionParams = {};
-
-const std::vector<ParamSpec> kSetDisplayMouseModeParams = {
-    {"mode", "integer", "Cursor behavior: 0=visible, 1=hidden, 2=captured (pointer locked to the window, used for FPS controls), 3=confined, 4=confined_hidden; values outside 0-4 return an error", true},
-};
-
-const std::vector<ParamSpec> kWarpDisplayMouseParams = {
-    {"x", "integer", "Mouse X position in pixels relative to the client area of the focused window (not screen coordinates), e.g. 640", true},
-    {"y", "integer", "Mouse Y position in pixels relative to the client area of the focused window (not screen coordinates), e.g. 360", true},
-};
-
 const std::vector<ParamSpec> kCaptureDisplayScreenParams = {
-    {"screen", "integer", "Index of the physical screen to capture, default 0; valid range is 0 to count-1 from get_display_screen_count", false},
-};
-
-const std::vector<ParamSpec> kGetDisplayScreenCountParams = {};
-
-const std::vector<ParamSpec> kGetDisplayScreenDpiParams = {
-    {"screen", "integer", "Index of the screen to query, default 0; valid range is 0 to count-1 from get_display_screen_count", false},
-};
-
-const std::vector<ParamSpec> kGetDisplayScreenPositionParams = {
-    {"screen", "integer", "Index of the screen to query, default 0; valid range is 0 to count-1 from get_display_screen_count", false},
-};
-
-const std::vector<ParamSpec> kGetDisplayScreenRefreshRateParams = {
-    {"screen", "integer", "Index of the screen to query, default 0; valid range is 0 to count-1 from get_display_screen_count", false},
-};
-
-const std::vector<ParamSpec> kGetDisplayScreenSizeParams = {
-    {"screen", "integer", "Index of the screen to query, default 0; valid range is 0 to count-1 from get_display_screen_count", false},
-};
-
-const std::vector<ParamSpec> kGetDisplayTtsVoicesParams = {};
-
-const std::vector<ParamSpec> kSpeakDisplayTtsParams = {
-    {"text", "string", "Text to synthesize and speak aloud, e.g. 'Level complete'", true},
-    {"voice", "string", "Voice id from get_display_tts_voices; omit to use the system default voice", false},
-    {"volume", "integer", "Speech volume from 0 to 100, default 50", false},
-    {"pitch", "number", "Speech pitch multiplier, default 1.0; values above 1.0 raise the pitch", false},
-    {"rate", "number", "Speech speed multiplier, default 1.0; values above 1.0 speak faster", false},
-};
-
-const std::vector<ParamSpec> kStopDisplayTtsParams = {};
-
-const std::vector<ParamSpec> kCreateDisplayWindowParams = {
-    {"mode", "integer", "Window mode as a Window.Mode enum value, default 0 (windowed); note this enum differs from the DisplayServer.WindowMode used by set_display_window_mode", false},
-    {"rect", "object", "Window rectangle as an object with integer x, y, w and h fields, e.g. {x: 100, y: 50, w: 800, h: 600}; defaults to 800x600 at the origin", false},
+    {"screen", "integer", "Index of the physical screen to capture, default 0; valid range is 0 to count-1 from get_display_info action=screens", false},
 };
 
 const std::vector<ParamSpec> kDeleteDisplayWindowParams = {
-    {"window_id", "integer", "window_id as returned by create_display_window; errors when no window with this id exists, and window_id 0 (the editor main window) is refused", true},
+    {"window_id", "integer", "window_id as returned by display_window action=create; errors when no window with this id exists, and window_id 0 (the editor main window) is refused", true},
 };
 
-const std::vector<ParamSpec> kGetDisplayWindowRectParams = {
-    {"window_id", "integer", "Window id to query (default: 0 = main window)", false},
+const std::vector<ParamSpec> kDisplayWindowParams = {
+    {"window_id", "integer", "window_id of the target sub-window; defaults to the main window for foreground, attention, flag, mode, position, size and title, and is ignored by create", false},
+    {"mode", "integer", "Window mode integer: for create it is a Window.Mode value (default 0 windowed); for the mode action it is a DisplayServer.WindowMode value (e.g. 1 fullscreen, 2 maximized) — the two enums differ", false},
+    {"rect", "object", "Only with action=create: window rectangle as {x, y, w, h} integers; defaults to 800x600 at the origin", false},
+    {"x", "integer", "Only with action=position: window X position in screen coordinates (pixels)", false},
+    {"y", "integer", "Only with action=position: window Y position in screen coordinates (pixels)", false},
+    {"width", "integer", "Only with action=size: window width in pixels, e.g. 1024", false},
+    {"height", "integer", "Only with action=size: window height in pixels, e.g. 768", false},
+    {"title", "string", "Only with action=title: title bar text to set, e.g. 'Output Preview'", false},
+    {"flag", "integer", "Only with action=flag: Window flag as a DisplayServer.WindowFlags enum value, e.g. 0 for always-on-top or 1 for borderless", false},
+    {"enabled", "boolean", "Only with action=flag: true applies the flag, false removes it", false},
 };
 
-const std::vector<ParamSpec> kMoveDisplayWindowToForegroundParams = {
-    {"window_id", "integer", "window_id of the window to raise, e.g. from create_display_window; defaults to the main window", false},
+const std::vector<ParamSpec> kDisplayMouseParams = {
+    {"mode", "integer", "Only with action=mode: cursor behavior 0=visible, 1=hidden, 2=captured (pointer locked to the window, used for FPS controls), 3=confined, 4=confined_hidden; values outside 0-4 return an error", false},
+    {"x", "integer", "Only with action=warp: mouse X position in pixels relative to the client area of the focused window (not screen coordinates), e.g. 640", false},
+    {"y", "integer", "Only with action=warp: mouse Y position in pixels relative to the client area of the focused window (not screen coordinates), e.g. 360", false},
 };
 
-const std::vector<ParamSpec> kRequestDisplayWindowAttentionParams = {
-    {"window_id", "integer", "window_id of the window to flash in the taskbar, e.g. from create_display_window; defaults to the main window", false},
+const std::vector<ParamSpec> kDisplayTtsParams = {
+    {"text", "string", "Only with action=speak: text to synthesize and speak aloud, e.g. 'Level complete'", false},
+    {"voice", "string", "Only with action=speak: voice id from get_display_info action=voices; omit to use the system default voice", false},
+    {"volume", "integer", "Only with action=speak: speech volume from 0 to 100, default 50", false},
+    {"pitch", "number", "Only with action=speak: speech pitch multiplier, default 1.0; values above 1.0 raise the pitch", false},
+    {"rate", "number", "Only with action=speak: speech speed multiplier, default 1.0; values above 1.0 speak faster", false},
 };
 
-const std::vector<ParamSpec> kSetDisplayWindowFlagParams = {
-    {"flag", "integer", "Window flag as a DisplayServer.WindowFlags enum value, e.g. 0 for always-on-top or 1 for borderless", true},
-    {"enabled", "boolean", "true applies the flag, false removes it", true},
-    {"window_id", "integer", "window_id of the window to modify, e.g. from create_display_window; defaults to the main window", false},
-};
+const std::vector<std::string> kGetDisplayInfoActions = {
+    "screens", "clipboard", "mouse", "voices", "window"};
+const std::vector<std::string> kDisplayWindowActions = {
+    "create", "foreground", "attention", "flag", "mode", "position", "size",
+    "title"};
+const std::vector<std::string> kDisplayMouseActions = {"mode", "warp"};
+const std::vector<std::string> kDisplayTtsActions = {"speak", "stop"};
 
-const std::vector<ParamSpec> kSetDisplayWindowModeParams = {
-    {"mode", "integer", "Window mode as a DisplayServer.WindowMode enum value, e.g. 1 for fullscreen or 2 for maximized; note this enum differs from the Window.Mode enum used by create_display_window", true},
-    {"window_id", "integer", "window_id of the window to modify, e.g. from create_display_window; defaults to the main window", false},
-};
+inline mcp::JsonValue action_args(const mcp::JsonValue &args, const char *action,
+                                  std::initializer_list<const char *> keys) {
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  out["action"] = mcp::JsonValue(action);
+  if (!args.IsObject()) {
+    return out;
+  }
+  for (const char *key : keys) {
+    const mcp::JsonValue *value = args.Find(key);
+    if (value != nullptr) {
+      out[key] = *value;
+    }
+  }
+  return out;
+}
 
-const std::vector<ParamSpec> kSetDisplayWindowPositionParams = {
-    {"x", "integer", "Window X position in screen coordinates (pixels)", true},
-    {"y", "integer", "Window Y position in screen coordinates (pixels)", true},
-    {"window_id", "integer", "window_id of the window to move, e.g. from create_display_window; defaults to the main window", false},
-};
+inline const mcp::JsonValue *screen_entry(const mcp::JsonValue &result,
+                                          const mcp::JsonValue &args) {
+  const mcp::JsonValue *inner = result.Find("result");
+  const mcp::JsonValue *screens =
+      inner != nullptr && inner->IsObject() ? inner->Find("screens") : nullptr;
+  if (screens == nullptr || !screens->IsArray()) {
+    return nullptr;
+  }
+  int64_t requested = 0;
+  const mcp::JsonValue *screen = args.Find("screen");
+  if (screen != nullptr && screen->IsInt()) {
+    requested = screen->GetInt();
+  }
+  for (const auto &entry : screens->GetArray()) {
+    const mcp::JsonValue *index = entry.Find("index");
+    if (index != nullptr && index->IsInt() && index->GetInt() == requested) {
+      return &entry;
+    }
+  }
+  return nullptr;
+}
 
-const std::vector<ParamSpec> kSetDisplayWindowSizeParams = {
-    {"width", "integer", "Window width in pixels, e.g. 1024", true},
-    {"height", "integer", "Window height in pixels, e.g. 768", true},
-    {"window_id", "integer", "window_id of the window to resize, e.g. from create_display_window; defaults to the main window", false},
-};
+inline mcp::JsonValue project_screen_count(const mcp::JsonValue &result) {
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  const mcp::JsonValue *inner = result.Find("result");
+  const mcp::JsonValue *count =
+      inner != nullptr && inner->IsObject() ? inner->Find("count") : nullptr;
+  if (count != nullptr) {
+    out["result"] = *count;
+  } else {
+    out["error"] = mcp::JsonValue("screen count not available");
+  }
+  return out;
+}
 
-const std::vector<ParamSpec> kSetDisplayWindowTitleParams = {
-    {"title", "string", "Title bar text to set, e.g. 'Output Preview'", true},
-    {"window_id", "integer", "window_id of the window to retitle, e.g. from create_display_window; defaults to the main window", false},
-};
+inline mcp::JsonValue project_screen_field(const mcp::JsonValue &result,
+                                           const mcp::JsonValue &args,
+                                           const char *field) {
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  const mcp::JsonValue *entry = screen_entry(result, args);
+  const mcp::JsonValue *value =
+      entry != nullptr ? entry->Find(field) : nullptr;
+  if (value != nullptr) {
+    out["result"] = *value;
+  } else {
+    out["error"] = mcp::JsonValue(
+        "screen index out of range: pass 0 to count-1 as reported by "
+        "get_display_info action=screens");
+  }
+  return out;
+}
 
 } // namespace
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(25);
-  v.push_back(make_spec_tool(ToolSpec{
-      "get_display_clipboard",
-      "Read the current text contents of the system clipboard. Use it to retrieve text copied from other applications or previously set with set_display_clipboard. Returns result as a string; it may be empty when the clipboard holds no text or only non-text data.",
-      "Display", {"display", "clipboard"}, SideEffect::None, tool_flags::kNone,
-      kGetDisplayClipboardParams, display_ops::handle_clipboard_get}));
+  v.reserve(8);
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
+      "get_display_info",
+      "Read display and input-device state in one read-only tool. action selects the view: 'screens' returns {count, screens:[{index, dpi, position:{x,y}, size:{x,y}, refresh_rate}]} for every connected screen; 'clipboard' returns the current system clipboard text as result; 'mouse' returns the desktop mouse cursor position as {x, y} in screen coordinates (a different basis from display_mouse action=warp and the input mouse tools, which use focused-window client coordinates); 'voices' returns the system text-to-speech voices as an array whose fields vary by platform, each with an id usable as voice in display_tts action=speak; 'window' returns the client-area rectangle of the main window or the window given by window_id together with its screen geometry and scale (window_id, position, size, decorated_position, decorated_size, screen, screen_scale, screen_position, screen_size). Example: {\"action\": \"screens\"} or {\"action\": \"window\", \"window_id\": 0}.",
+      "Display", {"display", "screen", "clipboard", "mouse", "tts", "voices", "window", "geometry"},
+      SideEffect::None, tool_flags::kNone,
+      kGetDisplayInfoParams, display_ops::handle_info_get,
+      schema::build_action_schema(
+          kGetDisplayInfoActions, kGetDisplayInfoParams,
+          "screens: all connected screens with dpi, position, size and refresh rate; clipboard: clipboard text; mouse: desktop cursor position; voices: text-to-speech voices; window: window client rectangle and screen geometry"),
+      {},
+      {"get_display_info action=screens",
+       "get_display_info action=window window_id=0"}},
+      {
+          ToolAlias{
+              "get_display_screen_count", "get_display_info",
+              [](const mcp::JsonValue &args) {
+                return action_args(args, "screens", {});
+              },
+              project_screen_count, "0.4.0", "0.6.0"},
+          ToolAlias{
+              "get_display_screen_dpi", "get_display_info",
+              [](const mcp::JsonValue &args) {
+                return action_args(args, "screens", {"screen"});
+              },
+              {}, "0.4.0", "0.6.0", {},
+              [](const mcp::JsonValue &result, const mcp::JsonValue &args) {
+                return project_screen_field(result, args, "dpi");
+              }},
+          ToolAlias{
+              "get_display_screen_position", "get_display_info",
+              [](const mcp::JsonValue &args) {
+                return action_args(args, "screens", {"screen"});
+              },
+              {}, "0.4.0", "0.6.0", {},
+              [](const mcp::JsonValue &result, const mcp::JsonValue &args) {
+                return project_screen_field(result, args, "position");
+              }},
+          ToolAlias{
+              "get_display_screen_refresh_rate", "get_display_info",
+              [](const mcp::JsonValue &args) {
+                return action_args(args, "screens", {"screen"});
+              },
+              {}, "0.4.0", "0.6.0", {},
+              [](const mcp::JsonValue &result, const mcp::JsonValue &args) {
+                return project_screen_field(result, args, "refresh_rate");
+              }},
+          ToolAlias{
+              "get_display_screen_size", "get_display_info",
+              [](const mcp::JsonValue &args) {
+                return action_args(args, "screens", {"screen"});
+              },
+              {}, "0.4.0", "0.6.0", {},
+              [](const mcp::JsonValue &result, const mcp::JsonValue &args) {
+                return project_screen_field(result, args, "size");
+              }},
+          ToolAlias{
+              "get_display_clipboard", "get_display_info",
+              [](const mcp::JsonValue &args) {
+                return action_args(args, "clipboard", {});
+              },
+              {}, "0.4.0", "0.6.0"},
+          ToolAlias{
+              "get_display_mouse_position", "get_display_info",
+              [](const mcp::JsonValue &args) {
+                return action_args(args, "mouse", {});
+              },
+              {}, "0.4.0", "0.6.0"},
+          ToolAlias{
+              "get_display_tts_voices", "get_display_info",
+              [](const mcp::JsonValue &args) {
+                return action_args(args, "voices", {});
+              },
+              {}, "0.4.0", "0.6.0"},
+          ToolAlias{
+              "get_display_window_rect", "get_display_info",
+              [](const mcp::JsonValue &args) {
+                return action_args(args, "window", {"window_id"});
+              },
+              {}, "0.4.0", "0.6.0"},
+      })));
   v.push_back(make_spec_tool(ToolSpec{
       "set_display_clipboard",
-      "Write the given text into the system clipboard, replacing its current contents. Use it to share text with other applications or prepare text for pasting into the editor. Takes text; returns result 'ok'. The clipboard is global to the operating system and persists after the call.",
-      "Display", {"display", "clipboard"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
-      kSetDisplayClipboardParams, display_ops::handle_clipboard_set}));
+      "Write the given text into the system clipboard, replacing its current contents. Use it to share text with other applications or prepare text for pasting into the editor. Takes text; returns result 'ok'. The clipboard is global to the operating system and persists after the call. Example: {\"text\": \"hello\"}.",
+      "Display", {"display", "clipboard", "set"},
+      SideEffect::ModifiesWindow, tool_flags::kMutating,
+      kSetDisplayClipboardParams, display_ops::handle_clipboard_set,
+      {}, {}, {"{\"text\": \"hello\"}"}}));
   v.push_back(make_spec_tool(ToolSpec{
       "show_display_dialog",
-      "Show a native modal dialog with a title, description and the given button labels using the operating system. Use it to prompt the user or surface a message outside the editor UI. Takes title, description and an array of button label strings. The dialog is fire-and-forget: an empty callback is passed, so the clicked button cannot be reported back to the caller.",
-      "Display", {"display", "dialog"}, SideEffect::ShowsAlert, tool_flags::kMutating,
-      kShowDisplayDialogParams, display_ops::handle_dialog_show}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "get_display_mouse_position",
-      "Return the current mouse cursor position in screen (desktop) coordinates — a different basis from warp_display_mouse and the mouse input tools, whose positions are relative to the client area of the focused window. Use it to read the pointer's real desktop position, not as a drop-in input to those tools. Returns result as an object with integer x and y fields.",
-      "Display", {"display", "mouse"}, SideEffect::None, tool_flags::kNone,
-      kGetDisplayMousePositionParams, display_ops::handle_mouse_get_position}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_display_mouse_mode",
-      "Set the mouse cursor behavior for the current display. Use it for first-person camera control (captured) or hiding the cursor during cutscenes; captured locks the pointer to the window. Takes mode: 0=visible, 1=hidden, 2=captured, 3=confined, 4=confined_hidden; values outside 0-4 return an error. Returns result 'ok'.",
-      "Display", {"display", "mouse"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
-      kSetDisplayMouseModeParams, display_ops::handle_mouse_set_mode}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "warp_display_mouse",
-      "Move the mouse cursor instantly to the given position, in pixels relative to the client area of the focused window — the engine converts the position onto the desktop — not screen coordinates, and not the basis reported by get_display_mouse_position. Use it to place the pointer before simulating clicks with the input tools, e.g. warp_display_mouse to the target, then move_input_mouse and press_input_mouse_button at the same window-client coordinates. Takes integer x and y. Returns result 'ok'; behavior may vary slightly between platforms.",
-      "Display", {"display", "mouse"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
-      kWarpDisplayMouseParams, display_ops::handle_mouse_warp}));
+      "Show a native modal dialog with a title, description and the given button labels using the operating system. Use it to prompt the user or surface a message outside the editor UI. Takes title, description and an array of button label strings. The dialog is fire-and-forget: an empty callback is passed, so the clicked button cannot be reported back to the caller. Example: {\"title\": \"Build\", \"description\": \"Done\", \"buttons\": [\"OK\"]}.",
+      "Display", {"display", "dialog", "alert"},
+      SideEffect::ShowsAlert, tool_flags::kMutating,
+      kShowDisplayDialogParams, display_ops::handle_dialog_show,
+      {}, {}, {"{\"title\": \"Build\", \"description\": \"Done\", \"buttons\": [\"OK\"]}"}}));
   v.push_back(make_spec_tool(ToolSpec{
       "capture_display_screen",
-      "Capture the contents of a physical screen as a PNG image. Use it to take desktop screenshots or verify window placement visually. Takes screen (default 0). Returns result with mime, format and data fields, where data is a base64-encoded PNG. Unlike capture_editor_viewport (editor viewport) and capture_game_viewport (running game), this tool captures the whole physical display.",
-      "Display", {"display", "screen"}, SideEffect::None, tool_flags::kCaptureImage,
-      kCaptureDisplayScreenParams, display_ops::handle_screen_capture}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "get_display_screen_count",
-      "Return the number of screens (monitors) connected to the system. Use it before addressing screens by index in other display tools, e.g. get_display_screen_size or capture_display_screen; valid indices run from 0 to count-1. Returns result as an integer, at least 1 on most systems.",
-      "Display", {"display", "screen"}, SideEffect::None, tool_flags::kNone,
-      kGetDisplayScreenCountParams, display_ops::handle_screen_get_count}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "get_display_screen_dpi",
-      "Return the DPI (dots per inch) of the given screen. Use it to account for display density differences when sizing UI or windows. Takes screen (default 0). Returns result as an integer; some platforms report 0 when DPI data is unavailable.",
-      "Display", {"display", "screen"}, SideEffect::None, tool_flags::kNone,
-      kGetDisplayScreenDpiParams, display_ops::handle_screen_get_dpi}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "get_display_screen_position",
-      "Return the position of the given screen's top-left corner in the desktop coordinate space. Use it to compute where windows should be placed or to understand the physical monitor layout. Takes screen (default 0). Returns result as an object with integer x and y fields.",
-      "Display", {"display", "screen"}, SideEffect::None, tool_flags::kNone,
-      kGetDisplayScreenPositionParams, display_ops::handle_screen_get_position}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "get_display_screen_refresh_rate",
-      "Return the refresh rate of the given screen in hertz. Use it to tune or cap the rendering loop, or to verify a monitor's supported rate. Takes screen (default 0). Returns result as a number; values may be 0 when the rate cannot be determined.",
-      "Display", {"display", "screen"}, SideEffect::None, tool_flags::kNone,
-      kGetDisplayScreenRefreshRateParams, display_ops::handle_screen_get_refresh_rate}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "get_display_screen_size",
-      "Return the pixel size of the given screen in pixels. Use it to size windows with set_display_window_size or to plan capture dimensions. Takes screen (default 0). Returns result as an object with integer x (width) and y (height) fields, matching the screen resolution.",
-      "Display", {"display", "screen"}, SideEffect::None, tool_flags::kNone,
-      kGetDisplayScreenSizeParams, display_ops::handle_screen_get_size}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "get_display_tts_voices",
-      "List the text-to-speech voices available on the system. Use it before speaking with speak_display_tts to pick a suitable voice; each returned voice has an id field that can be passed as the voice argument. Returns result as an array of voice objects whose fields vary by platform.",
-      "Display", {"display", "tts"}, SideEffect::None, tool_flags::kNone,
-      kGetDisplayTtsVoicesParams, display_ops::handle_tts_get_voices}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "speak_display_tts",
-      "Speak the given text aloud using the system text-to-speech engine. Use it for accessibility or audible feedback in the project. Optionally pass a voice id from get_display_tts_voices, volume 0-100 (default 50), pitch (default 1.0) and rate (default 1.0). Speech is asynchronous; interrupt it with stop_display_tts. Returns result 'ok'.",
-      "Display", {"display", "tts"}, SideEffect::ShowsAlert, tool_flags::kMutating,
-      kSpeakDisplayTtsParams, display_ops::handle_tts_speak}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "stop_display_tts",
-      "Stop any ongoing text-to-speech playback immediately. Use it to interrupt speech started with speak_display_tts, e.g. when new text should be spoken or the user is done listening. Returns result 'ok' even when nothing is currently being spoken, making it safe to call unconditionally.",
-      "Display", {"display", "tts"}, SideEffect::ShowsAlert, tool_flags::kMutating,
-      kStopDisplayTtsParams, display_ops::handle_tts_stop}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "create_display_window",
-      "Create a new sub-window in the editor process and show it on screen. Use it to display auxiliary content, e.g. a preview or dashboard. Returns result as the window_id, which the window tools (set_display_window_mode, set_display_window_size, delete_display_window and others) accept as their window_id argument. Optional mode (a Window.Mode enum value) and rect {x, y, w, h}; the rect defaults to 800x600 at the origin. Errors when the platform does not support subwindows.",
-      "Display", {"display", "window"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
-      kCreateDisplayWindowParams, display_ops::handle_window_create}));
+      "Capture the contents of a physical screen as a PNG image. Use it to take desktop screenshots or verify window placement visually. Takes screen (default 0). Returns result with mime, format and data fields, where data is a base64-encoded PNG. Unlike capture_editor_viewport (editor viewport) and capture_game_viewport (running game), this tool captures the whole physical display. Example: {\"screen\": 0}.",
+      "Display", {"display", "screen", "capture"},
+      SideEffect::None, tool_flags::kCaptureImage,
+      kCaptureDisplayScreenParams, display_ops::handle_screen_capture,
+      {}, {}, {"{\"screen\": 0}"}}));
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
+      "display_window",
+      "Create or modify an on-screen window in the editor process. action selects the operation (all ModifiesWindow, no confirmation): 'create' returns result window_id and shows a new sub-window (optional mode as a Window.Mode value and rect {x, y, w, h}, default 800x600 at the origin; errors when the platform does not support subwindows); 'foreground' raises and focuses the window; 'attention' flashes the taskbar entry without stealing focus; 'flag' applies or removes a DisplayServer.WindowFlags value with enabled; 'mode' sets a DisplayServer.WindowMode value (note: a different enum from create's Window.Mode); 'position' moves the window to screen coordinates x, y; 'size' resizes it to width x height pixels; 'title' sets the title bar text. window_id defaults to the main window for every action except create. Deleting a window is a destructive operation and stays in delete_display_window (requires confirm). Example: {\"action\": \"create\", \"rect\": {\"x\": 100, \"y\": 50, \"w\": 800, \"h\": 600}} or {\"action\": \"size\", \"width\": 1024, \"height\": 768}.",
+      "Display", {"display", "window", "create", "move", "resize", "title", "mode", "flag"},
+      SideEffect::ModifiesWindow, tool_flags::kMutating,
+      kDisplayWindowParams, display_ops::handle_window_control,
+      schema::build_action_schema(
+          kDisplayWindowActions, kDisplayWindowParams,
+          "create: new sub-window, returns window_id; foreground: raise and focus; attention: flash the taskbar entry; flag: apply or remove a WindowFlags value; mode: set a DisplayServer.WindowMode; position: move to x, y; size: resize to width x height; title: set the title bar text"),
+      {},
+      {"display_window action=create",
+       "display_window action=title title=Preview window_id=0"}},
+      {
+          ToolAlias{
+              "create_display_window", "display_window",
+              [](const mcp::JsonValue &args) {
+                return action_args(args, "create", {"mode", "rect"});
+              },
+              {}, "0.4.0", "0.6.0"},
+          ToolAlias{
+              "move_display_window_to_foreground", "display_window",
+              [](const mcp::JsonValue &args) {
+                return action_args(args, "foreground", {"window_id"});
+              },
+              {}, "0.4.0", "0.6.0"},
+          ToolAlias{
+              "request_display_window_attention", "display_window",
+              [](const mcp::JsonValue &args) {
+                return action_args(args, "attention", {"window_id"});
+              },
+              {}, "0.4.0", "0.6.0"},
+          ToolAlias{
+              "set_display_window_flag", "display_window",
+              [](const mcp::JsonValue &args) {
+                return action_args(args, "flag",
+                                   {"flag", "enabled", "window_id"});
+              },
+              {}, "0.4.0", "0.6.0"},
+          ToolAlias{
+              "set_display_window_mode", "display_window",
+              [](const mcp::JsonValue &args) {
+                return action_args(args, "mode", {"mode", "window_id"});
+              },
+              {}, "0.4.0", "0.6.0"},
+          ToolAlias{
+              "set_display_window_position", "display_window",
+              [](const mcp::JsonValue &args) {
+                return action_args(args, "position", {"x", "y", "window_id"});
+              },
+              {}, "0.4.0", "0.6.0"},
+          ToolAlias{
+              "set_display_window_size", "display_window",
+              [](const mcp::JsonValue &args) {
+                return action_args(args, "size",
+                                   {"width", "height", "window_id"});
+              },
+              {}, "0.4.0", "0.6.0"},
+          ToolAlias{
+              "set_display_window_title", "display_window",
+              [](const mcp::JsonValue &args) {
+                return action_args(args, "title", {"title", "window_id"});
+              },
+              {}, "0.4.0", "0.6.0"},
+      })));
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
+      "display_mouse",
+      "Control the mouse cursor and pointer. action selects the operation: 'mode' sets the cursor behavior with mode 0=visible, 1=hidden, 2=captured (pointer locked to the window, used for FPS controls), 3=confined, 4=confined_hidden (values outside 0-4 return an error); 'warp' moves the cursor instantly to integer x, y in pixels relative to the client area of the focused window (not screen coordinates and not the basis reported by get_display_info action=mouse; the engine converts it onto the desktop) and is useful before injecting clicks with the input tools. Returns result 'ok'; behavior may vary slightly between platforms. Example: {\"action\": \"mode\", \"mode\": 2} or {\"action\": \"warp\", \"x\": 640, \"y\": 360}.",
+      "Display", {"display", "mouse", "cursor", "warp"},
+      SideEffect::ModifiesWindow, tool_flags::kMutating,
+      kDisplayMouseParams, display_ops::handle_mouse_control,
+      schema::build_action_schema(
+          kDisplayMouseActions, kDisplayMouseParams,
+          "mode: set the cursor behavior 0-4; warp: move the pointer to client-area coordinates x, y"),
+      {},
+      {"display_mouse action=mode mode=2",
+       "display_mouse action=warp x=640 y=360"}},
+      {
+          ToolAlias{
+              "set_display_mouse_mode", "display_mouse",
+              [](const mcp::JsonValue &args) {
+                return action_args(args, "mode", {"mode"});
+              },
+              {}, "0.4.0", "0.6.0"},
+          ToolAlias{
+              "warp_display_mouse", "display_mouse",
+              [](const mcp::JsonValue &args) {
+                return action_args(args, "warp", {"x", "y"});
+              },
+              {}, "0.4.0", "0.6.0"},
+      })));
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
+      "display_tts",
+      "Speak text aloud through the system text-to-speech engine. action selects the operation: 'speak' requires text and optionally takes a voice id from get_display_info action=voices, volume 0-100 (default 50), pitch (default 1.0) and rate (default 1.0); speech is asynchronous. 'stop' interrupts any ongoing playback immediately and returns result 'ok' even when nothing is being spoken. Both actions return result 'ok'. Example: {\"action\": \"speak\", \"text\": \"Level complete\"} or {\"action\": \"stop\"}.",
+      "Display", {"display", "tts", "speech", "audio", "alert"},
+      SideEffect::ShowsAlert, tool_flags::kMutating,
+      kDisplayTtsParams, display_ops::handle_tts_control,
+      schema::build_action_schema(
+          kDisplayTtsActions, kDisplayTtsParams,
+          "speak: synthesize and speak text with optional voice, volume, pitch and rate; stop: interrupt ongoing speech"),
+      {},
+      {"display_tts action=speak text=Level complete",
+       "display_tts action=stop"}},
+      {
+          ToolAlias{
+              "speak_display_tts", "display_tts",
+              [](const mcp::JsonValue &args) {
+                return action_args(args, "speak",
+                                   {"text", "voice", "volume", "pitch", "rate"});
+              },
+              {}, "0.4.0", "0.6.0"},
+          ToolAlias{
+              "stop_display_tts", "display_tts",
+              [](const mcp::JsonValue &args) {
+                return action_args(args, "stop", {});
+              },
+              {}, "0.4.0", "0.6.0"},
+      })));
   v.push_back(make_spec_tool(ToolSpec{
       "delete_display_window",
-      "Close and free a sub-window previously created with create_display_window. Use it to clean up windows that are no longer needed. Takes window_id as returned by create_display_window; errors when no window with the given id exists and refuses window_id 0, which is the editor main window and is never destroyed by this tool. The window is freed at the end of the frame. This tool is classified as a destructive side effect because it destroys an existing window.",
-      "Display", {"display", "window"}, SideEffect::Destructive, tool_flags::kMutating,
-      kDeleteDisplayWindowParams, display_ops::handle_window_delete}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "get_display_window_rect",
-      "Return the client-area rectangle of the main window (or of the window given by window_id) in virtual desktop coordinates, together with the geometry and scale of the screen it is on. Use it to place or compare windows and to translate between desktop points and window-client coordinates before injecting input: warp_display_mouse, move_input_mouse and press_input_mouse_button expect coordinates relative to the focused window's client area, so subtract position from a desktop point (or add position to client-area coordinates). Takes optional window_id (default: 0, the main window); negative ids return an error. Returns result as an object with window_id, position {x, y}, size {x, y} where x is the width and y the height, decorated_position, decorated_size, screen, screen_scale, screen_position, screen_size and a note field. Read-only; it does not modify the window.",
-      "Display", {"display", "window", "geometry"}, SideEffect::None, tool_flags::kNone,
-      kGetDisplayWindowRectParams, display_ops::handle_window_get_rect}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "move_display_window_to_foreground",
-      "Raise a window to the foreground of the desktop and give it focus. Use it to bring a sub-window to attention over the editor, e.g. right after creating it. Takes window_id, which defaults to the main window when omitted. Returns result 'ok'.",
-      "Display", {"display", "window"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
-      kMoveDisplayWindowToForegroundParams, display_ops::handle_window_move_to_foreground}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "request_display_window_attention",
-      "Flash the window's taskbar entry or otherwise attract the user's attention without stealing focus from the user. Use it to signal that a background window needs attention, e.g. after a long-running operation finishes. Takes window_id, which defaults to the main window when omitted. Returns result 'ok'.",
-      "Display", {"display", "window"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
-      kRequestDisplayWindowAttentionParams, display_ops::handle_window_request_attention}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_display_window_flag",
-      "Set a window flag on the given window, controlling behavior such as always-on-top, borderless or resizability. Use it to customize a sub-window's appearance. Takes flag as a DisplayServer.WindowFlags enum value, enabled (boolean) and optional window_id (default: main window). Returns result 'ok'.",
-      "Display", {"display", "window"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
-      kSetDisplayWindowFlagParams, display_ops::handle_window_set_flag}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_display_window_mode",
-      "Set the window mode of the given window, e.g. fullscreen, minimized or maximized. Use it to change how a window is displayed on screen. Takes mode as a DisplayServer.WindowMode enum value; note that this enum differs from the Window.Mode enum used by create_display_window. Takes optional window_id (default: main window). Returns result 'ok'.",
-      "Display", {"display", "window"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
-      kSetDisplayWindowModeParams, display_ops::handle_window_set_mode}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_display_window_position",
-      "Move the given window so its top-left corner is at the specified screen coordinates. Use it to arrange sub-windows on the desktop, e.g. for side-by-side layouts. Takes integer x and y plus optional window_id (default: main window). Returns result 'ok'.",
-      "Display", {"display", "window"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
-      kSetDisplayWindowPositionParams, display_ops::handle_window_set_position}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_display_window_size",
-      "Resize the given window to the specified pixel dimensions. Use it to set a fixed window size, e.g. to match a resolution or aspect ratio. Takes width and height in pixels plus optional window_id (default: main window). Returns result 'ok'.",
-      "Display", {"display", "window"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
-      kSetDisplayWindowSizeParams, display_ops::handle_window_set_size}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_display_window_title",
-      "Set the title bar text of the given window. Use it to label a window meaningfully, e.g. right after create_display_window, so the user can identify it in the taskbar. Takes title and optional window_id (default: main window). Returns result 'ok'.",
-      "Display", {"display", "window"}, SideEffect::ModifiesWindow, tool_flags::kMutating,
-      kSetDisplayWindowTitleParams, display_ops::handle_window_set_title}));
+      "Close and free a sub-window previously created with display_window action=create. Use it to clean up windows that are no longer needed. Takes window_id as returned by display_window action=create; errors when no window with the given id exists and refuses window_id 0, which is the editor main window and is never destroyed by this tool. The window is freed at the end of the frame. This tool is classified as a destructive side effect because it destroys an existing window; confirm=true is required. Example: {\"window_id\": 2, \"confirm\": true}.",
+      "Display", {"display", "window", "delete", "destructive"},
+      SideEffect::Destructive, tool_flags::kMutating,
+      kDeleteDisplayWindowParams, display_ops::handle_window_delete,
+      {}, {}, {"{\"window_id\": 2, \"confirm\": true}"}}));
   return v;
 }
 

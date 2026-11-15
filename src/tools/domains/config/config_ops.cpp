@@ -898,5 +898,191 @@ mcp::JsonValue handle_autoload_move(const mcp::JsonValue &args) {
   return r;
 }
 
+namespace {
+
+mcp::JsonValue config_action_error(const std::string &message) {
+  mcp::JsonValue error(mcp::JsonValue::object_tag);
+  error["error"] = mcp::JsonValue(message);
+  return error;
+}
+
+mcp::JsonValue strip_config_action(const mcp::JsonValue &args) {
+  mcp::JsonValue out = args.IsObject()
+                           ? args
+                           : mcp::JsonValue(mcp::JsonValue::object_tag);
+  out.GetObject().erase("action");
+  return out;
+}
+
+bool read_config_action(const mcp::JsonValue &args, const char *fallback,
+                        std::string &out, mcp::JsonValue &error) {
+  const mcp::JsonValue *action = args.Find("action");
+  if (action == nullptr) {
+    if (fallback == nullptr) {
+      error = config_action_error("missing required parameter: action");
+      return false;
+    }
+    out = fallback;
+    return true;
+  }
+  if (!action->IsString()) {
+    error = config_action_error("invalid parameter: action must be a string");
+    return false;
+  }
+  out = action->GetString();
+  return true;
+}
+
+mcp::JsonValue add_found_flag(mcp::JsonValue result) {
+  if (result.IsObject() && result.Find("error") == nullptr) {
+    const mcp::JsonValue *value = result.Find("result");
+    if (value != nullptr && value->IsBool()) {
+      result["found"] = *value;
+    }
+  }
+  return result;
+}
+
+} // namespace
+
+mcp::JsonValue handle_get_project_settings(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!read_config_action(args, "get", action, error)) {
+    return error;
+  }
+  if (action == "get") {
+    return handle_project_settings_get(strip_config_action(args));
+  }
+  if (action == "has") {
+    return add_found_flag(handle_project_settings_has(strip_config_action(args)));
+  }
+  return config_action_error(
+      "unknown action '" + action +
+      "' for get_project_settings (expected get, has)");
+}
+
+mcp::JsonValue handle_update_project_settings(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!read_config_action(args, nullptr, action, error)) {
+    return error;
+  }
+  if (action == "set") {
+    return handle_project_settings_set(strip_config_action(args));
+  }
+  if (action == "save") {
+    return handle_project_settings_save(strip_config_action(args));
+  }
+  return config_action_error(
+      "unknown action '" + action +
+      "' for update_project_settings (expected set, save)");
+}
+
+mcp::JsonValue handle_get_editor_settings(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!read_config_action(args, "get", action, error)) {
+    return error;
+  }
+  if (action == "get") {
+    return handle_editor_settings_get(strip_config_action(args));
+  }
+  if (action == "has") {
+    return add_found_flag(handle_editor_settings_has(strip_config_action(args)));
+  }
+  return config_action_error(
+      "unknown action '" + action +
+      "' for get_editor_settings (expected get, has)");
+}
+
+mcp::JsonValue handle_update_editor_settings(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!read_config_action(args, nullptr, action, error)) {
+    return error;
+  }
+  if (action == "set") {
+    return handle_editor_settings_set(strip_config_action(args));
+  }
+  return config_action_error(
+      "unknown action '" + action +
+      "' for update_editor_settings (expected set)");
+}
+
+mcp::JsonValue handle_get_engine_state(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!read_config_action(args, nullptr, action, error)) {
+    return error;
+  }
+  if (action == "version") {
+    return handle_engine_get_version(strip_config_action(args));
+  }
+  if (action == "fps") {
+    return handle_engine_get_fps(strip_config_action(args));
+  }
+  if (action == "frames_drawn") {
+    return handle_engine_get_frames_drawn(strip_config_action(args));
+  }
+  if (action == "time_scale") {
+    return handle_engine_get_time_scale(strip_config_action(args));
+  }
+  return config_action_error(
+      "unknown action '" + action +
+      "' for get_engine_state (expected version, fps, frames_drawn, "
+      "time_scale)");
+}
+
+mcp::JsonValue handle_update_engine_state(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!read_config_action(args, nullptr, action, error)) {
+    return error;
+  }
+  if (action == "time_scale") {
+    return handle_engine_set_time_scale(strip_config_action(args));
+  }
+  if (action == "max_fps") {
+    return handle_engine_set_max_fps(strip_config_action(args));
+  }
+  return config_action_error(
+      "unknown action '" + action +
+      "' for update_engine_state (expected time_scale, max_fps)");
+}
+
+mcp::JsonValue handle_get_autoloads(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!read_config_action(args, nullptr, action, error)) {
+    return error;
+  }
+  if (action == "list") {
+    return handle_autoload_list(strip_config_action(args));
+  }
+  return config_action_error(
+      "unknown action '" + action + "' for get_autoloads (expected list)");
+}
+
+mcp::JsonValue handle_update_autoloads(const mcp::JsonValue &args) {
+  std::string action;
+  mcp::JsonValue error;
+  if (!read_config_action(args, nullptr, action, error)) {
+    return error;
+  }
+  if (action == "add") {
+    return handle_autoload_add(strip_config_action(args));
+  }
+  if (action == "remove") {
+    return handle_autoload_remove(strip_config_action(args));
+  }
+  if (action == "move") {
+    return handle_autoload_move(strip_config_action(args));
+  }
+  return config_action_error(
+      "unknown action '" + action +
+      "' for update_autoloads (expected add, remove, move)");
+}
+
 } // namespace config_ops
 } // namespace godot_autopilot

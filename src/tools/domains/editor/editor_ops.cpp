@@ -1,4 +1,5 @@
 #include "tools/domains/editor/editor_ops.hpp"
+#include "tools/domains/editor/editor_ui_ops.hpp"
 #include "runtime/gda_protocol.hpp"
 #include "util/scene_path.hpp"
 #include "util/scene_verify.hpp"
@@ -16,6 +17,7 @@
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/editor_file_system.hpp>
+#include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/editor_file_system_directory.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/editor_selection.hpp>
@@ -1623,6 +1625,274 @@ std::string hash_hex(uint64_t value) {
   std::snprintf(buf, sizeof(buf), "%016llx",
                 static_cast<unsigned long long>(value));
   return std::string(buf);
+}
+
+namespace {
+
+std::string editor_action_text(const mcp::JsonValue &args) {
+  auto *action = args.Find("action");
+  return (action && action->IsString()) ? action->GetString() : std::string();
+}
+
+mcp::JsonValue editor_action_missing(const std::string &choices) {
+  mcp::JsonValue error(mcp::JsonValue::object_tag);
+  error["error"] =
+      mcp::JsonValue("missing required parameter: action (" + choices + ")");
+  return error;
+}
+
+mcp::JsonValue editor_action_invalid(const std::string &choices) {
+  mcp::JsonValue error(mcp::JsonValue::object_tag);
+  error["error"] = mcp::JsonValue("invalid action: expected " + choices);
+  return error;
+}
+
+mcp::JsonValue editor_open_scenes_result(godot::EditorInterface *editor) {
+  godot::PackedStringArray scenes = editor->get_open_scenes();
+  mcp::JsonValue array(mcp::JsonValue::array_tag);
+  for (int i = 0; i < scenes.size(); i++) {
+    array.PushBack(mcp::JsonValue(util::to_std(scenes[i])));
+  }
+  mcp::JsonValue result(mcp::JsonValue::object_tag);
+  result["result"] = std::move(array);
+  return result;
+}
+
+mcp::JsonValue editor_info_result(godot::EditorInterface *editor) {
+  mcp::JsonValue info(mcp::JsonValue::object_tag);
+  auto *engine = godot::Engine::get_singleton();
+  if (engine) {
+    godot::Dictionary version = engine->get_version_info();
+    if (version.has("string")) {
+      godot::String text = version["string"];
+      info["engine_version"] = mcp::JsonValue(util::to_std(text));
+    }
+  }
+  auto *settings = godot::ProjectSettings::get_singleton();
+  if (settings) {
+    godot::Variant project_name =
+        settings->get_setting("application/config/name");
+    if (project_name.get_type() == godot::Variant::STRING) {
+      info["project_name"] =
+          mcp::JsonValue(util::to_std(godot::String(project_name)));
+    }
+    godot::Variant main_scene =
+        settings->get_setting("application/run/main_scene");
+    if (main_scene.get_type() == godot::Variant::STRING) {
+      info["main_scene"] =
+          mcp::JsonValue(util::to_std(godot::String(main_scene)));
+    }
+  }
+  auto *root = editor->get_edited_scene_root();
+  if (root) {
+    mcp::JsonValue root_info(mcp::JsonValue::object_tag);
+    root_info["name"] = mcp::JsonValue(util::to_std(root->get_name()));
+    root_info["type"] = mcp::JsonValue(util::to_std(root->get_class()));
+    const std::string scene_path = util::to_std(root->get_scene_file_path());
+    if (!scene_path.empty()) {
+      root_info["scene_file_path"] = mcp::JsonValue(scene_path);
+    }
+    info["edited_root"] = std::move(root_info);
+  } else {
+    info["edited_root"] = mcp::JsonValue(nullptr);
+  }
+  info["open_scene_count"] =
+      mcp::JsonValue(static_cast<int64_t>(editor->get_open_scenes().size()));
+  info["is_playing"] = mcp::JsonValue(editor->is_playing_scene());
+  mcp::JsonValue result(mcp::JsonValue::object_tag);
+  result["result"] = std::move(info);
+  return result;
+}
+
+} // namespace
+
+mcp::JsonValue handle_editor_state(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "get_editor_state called");
+  const std::string action = editor_action_text(args);
+  if (action.empty()) {
+    return editor_action_missing("selection|root|open|unsaved|playing|info");
+  }
+  if (action == "selection") {
+    return handle_get_selection(args);
+  }
+  if (action == "root") {
+    return handle_get_edited_scene_root(args);
+  }
+  auto *editor = godot::EditorInterface::get_singleton();
+  if (!editor) {
+    mcp::JsonValue error(mcp::JsonValue::object_tag);
+    error["error"] = mcp::JsonValue("EditorInterface not available");
+    return error;
+  }
+  if (action == "open") {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                              "get_editor_state open completed");
+    return editor_open_scenes_result(editor);
+  }
+  if (action == "unsaved") {
+    godot::PackedStringArray unsaved = editor_unsaved_scenes(editor);
+    mcp::JsonValue array(mcp::JsonValue::array_tag);
+    for (int i = 0; i < unsaved.size(); i++) {
+      array.PushBack(mcp::JsonValue(util::to_std(unsaved[i])));
+    }
+    mcp::JsonValue result(mcp::JsonValue::object_tag);
+    result["result"] = std::move(array);
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                              "get_editor_state unsaved completed");
+    return result;
+  }
+  if (action == "playing") {
+    mcp::JsonValue inner(mcp::JsonValue::object_tag);
+    inner["is_playing"] = mcp::JsonValue(editor->is_playing_scene());
+    mcp::JsonValue result(mcp::JsonValue::object_tag);
+    result["result"] = std::move(inner);
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                              "get_editor_state playing completed");
+    return result;
+  }
+  if (action == "info") {
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                              "get_editor_state info completed");
+    return editor_info_result(editor);
+  }
+  return editor_action_invalid("selection|root|open|unsaved|playing|info");
+}
+
+mcp::JsonValue handle_editor_files(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "get_editor_files called");
+  const std::string action = editor_action_text(args);
+  if (action.empty()) {
+    return editor_action_missing("tree|status|scan");
+  }
+  if (action == "tree") {
+    return handle_file_system_get_resources(args);
+  }
+  if (action == "status") {
+    return handle_get_resource_filesystem(args);
+  }
+  if (action == "scan") {
+    return handle_file_system_scan(args);
+  }
+  return editor_action_invalid("tree|status|scan");
+}
+
+mcp::JsonValue handle_editor_scene_control(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "editor_scene_control called");
+  const std::string action = editor_action_text(args);
+  if (action.empty()) {
+    return editor_action_missing("create|open|close|reload|play|stop");
+  }
+  if (action == "create") {
+    return handle_new_scene(args);
+  }
+  if (action == "open") {
+    return handle_open_scene(args);
+  }
+  if (action == "close") {
+    return handle_close_scene(args);
+  }
+  if (action == "reload") {
+    return handle_reload_scene(args);
+  }
+  if (action == "play") {
+    return handle_play_current_scene(args);
+  }
+  if (action == "stop") {
+    return handle_stop_playing(args);
+  }
+  return editor_action_invalid("create|open|close|reload|play|stop");
+}
+
+mcp::JsonValue handle_editor_save(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "save_editor_scene called");
+  std::string action = editor_action_text(args);
+  if (action.empty()) {
+    action = "save";
+  }
+  if (action == "save") {
+    return handle_save_scene(args);
+  }
+  if (action == "save_as") {
+    return handle_save_scene_as(args);
+  }
+  if (action == "save_all") {
+    return handle_save_all_scenes(args);
+  }
+  return editor_action_invalid("save|save_as|save_all");
+}
+
+mcp::JsonValue handle_editor_selection_set(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "editor_selection_set called");
+  const std::string action = editor_action_text(args);
+  if (action.empty()) {
+    return editor_action_missing("set|select_tree");
+  }
+  if (action == "set") {
+    return handle_set_selection(args);
+  }
+  if (action == "select_tree") {
+    return editor_ui_ops::handle_select_scene_tree_node(args);
+  }
+  return editor_action_invalid("set|select_tree");
+}
+
+mcp::JsonValue handle_editor_undo(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "editor_undo called");
+  const std::string action = editor_action_text(args);
+  if (action.empty()) {
+    return editor_action_missing("create|add_do|add_undo|commit");
+  }
+  if (action == "create") {
+    return handle_undo_redo_start(args);
+  }
+  if (action == "commit") {
+    return handle_undo_redo_commit(args);
+  }
+  if (action == "add_do" || action == "add_undo") {
+    if (auto *side = args.Find("side")) {
+      if (!side->IsString()) {
+        mcp::JsonValue error(mcp::JsonValue::object_tag);
+        error["error"] =
+            mcp::JsonValue("invalid parameter: side must be 'do' or 'undo'");
+        return error;
+      }
+      const std::string expected = action == "add_do" ? "do" : "undo";
+      if (side->GetString() != expected) {
+        mcp::JsonValue error(mcp::JsonValue::object_tag);
+        error["error"] = mcp::JsonValue(
+            "side '" + side->GetString() + "' does not match action '" +
+            action + "'");
+        return error;
+      }
+    }
+    if (action == "add_do") {
+      return handle_undo_redo_add_do(args);
+    }
+    return handle_undo_redo_add_undo(args);
+  }
+  return editor_action_invalid("create|add_do|add_undo|commit");
+}
+
+mcp::JsonValue handle_editor_config(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "editor_config called");
+  const std::string action = editor_action_text(args);
+  if (action.empty()) {
+    return editor_action_missing("main_scene|plugin_enable");
+  }
+  if (action == "main_scene") {
+    return handle_set_main_scene(args);
+  }
+  if (action == "plugin_enable") {
+    return handle_set_plugin_enabled(args);
+  }
+  return editor_action_invalid("main_scene|plugin_enable");
 }
 
 } // namespace editor_ops

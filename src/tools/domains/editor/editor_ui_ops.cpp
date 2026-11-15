@@ -1398,5 +1398,36 @@ mcp::JsonValue handle_get_editor_viewport_geometry(const mcp::JsonValue &args) {
   return util::ok_result(std::move(inner));
 }
 
+mcp::JsonValue handle_editor_ui(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Debug, LogCategory::Tools,
+                            "get_editor_ui called");
+  auto *action_p = args.Find("action");
+  const std::string action =
+      (action_p && action_p->IsString()) ? action_p->GetString() : std::string();
+  if (action.empty()) {
+    mcp::JsonValue error(mcp::JsonValue::object_tag);
+    error["error"] = mcp::JsonValue(
+        "missing required parameter: action "
+        "(elements|hit|geometry|scene_tree_items)");
+    return error;
+  }
+  if (action == "elements") {
+    return handle_get_editor_ui_elements(args);
+  }
+  if (action == "hit") {
+    return handle_hit_test_editor_point(args);
+  }
+  if (action == "geometry") {
+    return handle_get_editor_viewport_geometry(args);
+  }
+  if (action == "scene_tree_items") {
+    return handle_scene_tree_items(args);
+  }
+  mcp::JsonValue error(mcp::JsonValue::object_tag);
+  error["error"] = mcp::JsonValue(
+      "invalid action: expected elements|hit|geometry|scene_tree_items");
+  return error;
+}
+
 } // namespace editor_ui_ops
 } // namespace godot_autopilot

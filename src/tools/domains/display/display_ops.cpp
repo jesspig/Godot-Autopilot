@@ -381,5 +381,146 @@ JV handle_tts_stop(const JV &args) {
   return util::ok_result(JV("ok"));
 }
 
+JV handle_info_get(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "get_display_info called");
+  auto *ap = args.Find("action");
+  if (!ap || !ap->IsString()) {
+    return util::error_json("missing required parameter: action");
+  }
+  const std::string action = ap->GetString();
+  if (action == "clipboard") {
+    return handle_clipboard_get(args);
+  }
+  if (action == "mouse") {
+    return handle_mouse_get_position(args);
+  }
+  if (action == "voices") {
+    return handle_tts_get_voices(args);
+  }
+  if (action == "window") {
+    return handle_window_get_rect(args);
+  }
+  if (action != "screens") {
+    return util::error_json(
+        "unknown action '" + action +
+        "': expected screens, clipboard, mouse, voices or window");
+  }
+  auto *ds = godot::DisplayServer::get_singleton();
+  if (!ds) {
+    return util::error_json("DisplayServer not available");
+  }
+  const int count = ds->get_screen_count();
+  int first = 0;
+  int last = count;
+  if (auto *sp = args.Find("screen")) {
+    if (sp->IsInt()) {
+      first = static_cast<int>(sp->GetInt());
+      last = first + 1;
+    }
+  }
+  JV screens(JV::array_tag);
+  for (int index = first; index < last; index++) {
+    godot::Vector2i position = ds->screen_get_position(index);
+    godot::Vector2i size = ds->screen_get_size(index);
+    JV entry(JV::object_tag);
+    entry["index"] = JV(static_cast<int64_t>(index));
+    entry["dpi"] = JV(static_cast<int64_t>(ds->screen_get_dpi(index)));
+    JV pos(JV::object_tag);
+    pos["x"] = JV(static_cast<int64_t>(position.x));
+    pos["y"] = JV(static_cast<int64_t>(position.y));
+    entry["position"] = std::move(pos);
+    JV dims(JV::object_tag);
+    dims["x"] = JV(static_cast<int64_t>(size.x));
+    dims["y"] = JV(static_cast<int64_t>(size.y));
+    entry["size"] = std::move(dims);
+    entry["refresh_rate"] =
+        JV(static_cast<double>(ds->screen_get_refresh_rate(index)));
+    screens.PushBack(std::move(entry));
+  }
+  JV result(JV::object_tag);
+  result["count"] = JV(static_cast<int64_t>(count));
+  result["screens"] = std::move(screens);
+  JV r(JV::object_tag);
+  r["result"] = std::move(result);
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "get_display_info completed");
+  return r;
+}
+
+JV handle_window_control(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "display_window called");
+  auto *ap = args.Find("action");
+  if (!ap || !ap->IsString()) {
+    return util::error_json("missing required parameter: action");
+  }
+  const std::string action = ap->GetString();
+  if (action == "create") {
+    return handle_window_create(args);
+  }
+  if (action == "foreground") {
+    return handle_window_move_to_foreground(args);
+  }
+  if (action == "attention") {
+    return handle_window_request_attention(args);
+  }
+  if (action == "flag") {
+    return handle_window_set_flag(args);
+  }
+  if (action == "mode") {
+    return handle_window_set_mode(args);
+  }
+  if (action == "position") {
+    return handle_window_set_position(args);
+  }
+  if (action == "size") {
+    return handle_window_set_size(args);
+  }
+  if (action == "title") {
+    return handle_window_set_title(args);
+  }
+  return util::error_json(
+      "unknown action '" + action +
+      "': expected create, foreground, attention, flag, mode, position, size "
+      "or title");
+}
+
+JV handle_mouse_control(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "display_mouse called");
+  auto *ap = args.Find("action");
+  if (!ap || !ap->IsString()) {
+    return util::error_json("missing required parameter: action");
+  }
+  const std::string action = ap->GetString();
+  if (action == "mode") {
+    return handle_mouse_set_mode(args);
+  }
+  if (action == "warp") {
+    return handle_mouse_warp(args);
+  }
+  return util::error_json("unknown action '" + action +
+                          "': expected mode or warp");
+}
+
+JV handle_tts_control(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "display_tts called");
+  auto *ap = args.Find("action");
+  if (!ap || !ap->IsString()) {
+    return util::error_json("missing required parameter: action");
+  }
+  const std::string action = ap->GetString();
+  if (action == "speak") {
+    return handle_tts_speak(args);
+  }
+  if (action == "stop") {
+    return handle_tts_stop(args);
+  }
+  return util::error_json("unknown action '" + action +
+                          "': expected speak or stop");
+}
+
 } // namespace display_ops
 } // namespace godot_autopilot

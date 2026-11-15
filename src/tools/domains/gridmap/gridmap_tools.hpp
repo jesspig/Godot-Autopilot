@@ -27,9 +27,9 @@ const std::vector<ParamSpec> kCreateMeshLibraryItemParams = {
     {"item_name", "string", "Display name stored on the item (default: empty)", false},
 };
 
-const std::vector<ParamSpec> kFillGridmapBoxParams = {
+const std::vector<ParamSpec> kSetGridmapCellsParams = {
     {"node_path", "string", "Path to the GridMap node", true},
-    {"from", "object", "Inclusive first corner cell {x, y, z}; the two corners are normalized internally, so from/to order does not matter", true},
+    {"from", "object", "Inclusive first corner cell {x, y, z}; the two corners are normalized internally, so from/to order does not matter. A single cell sets from and to to the same position", true},
     {"to", "object", "Inclusive opposite corner cell {x, y, z}", true},
     {"item", "integer", "MeshLibrary item id placed in every cell; required and must be >= 0 unless erase is true", false},
     {"orientation", "integer", "Cell orientation 0-23 placed in every cell (default: 0)", false},
@@ -119,19 +119,51 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       kCreateGridmapParams, gridmap_ops::handle_create}));
   v.push_back(make_spec_tool(ToolSpec{
       "create_meshlibrary_item",
-      "Add an item with a mesh to a MeshLibrary created by create_resource (type MeshLibrary). Requires library (the memory:// reference name), item_id (>= 0, must be unused) and mesh (a Mesh resource reference: res:// or memory:// string or {\"path\": \"res://...\"} / {\"resource\": \"memory://...\"}); optional item_name display name. The item id is then usable as item in set_gridmap_cell and fill_gridmap_box. Returns result, item_id, item_name and mesh_class.",
+      "Add an item with a mesh to a MeshLibrary created by create_resource (type MeshLibrary). Requires library (the memory:// reference name), item_id (>= 0, must be unused) and mesh (a Mesh resource reference: res:// or memory:// string or {\"path\": \"res://...\"} / {\"resource\": \"memory://...\"}); optional item_name display name. The item id is then usable as item in set_gridmap_cells. Returns result, item_id, item_name and mesh_class.",
       "TileMap", {"meshlibrary", "mesh", "create"}, SideEffect::None, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
       kCreateMeshLibraryItemParams, gridmap_ops::handle_create_library_item}));
   v.push_back(make_spec_tool(with_aliases(ToolSpec{
-      "fill_gridmap_box",
-      "Fill an axis-aligned cell box on a GridMap node in one call. Requires node_path plus from and to {x, y, z} corner cells (both inclusive; the corner order does not matter). Pass item and optional orientation 0-23 (default 0) to place one item in every cell, or erase=true to clear the box instead (item and orientation are then ignored). The box is capped at 100000 cells per call, so split bigger volumes into chunks. Implemented as a per-cell set_cell_item loop: it saves round trips and produces a single undo action, but does not make the fill itself faster. Returns set_count, from, to, size_x, size_y, size_z and undo.",
-      "TileMap", {"gridmap", "cell", "fill", "box"}, SideEffect::WritesScene, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
-      kFillGridmapBoxParams, gridmap_ops::handle_fill_box},
+      "set_gridmap_cells",
+      "Set GridMap cells in one call, in single-cell, batch-box or fill forms. Requires node_path plus from and to {x, y, z} corner cells (both inclusive; the corner order does not matter; a single cell uses the same position for both). Pass item and optional orientation 0-23 (default 0) to place one item in every cell, or erase=true to clear the box instead (item and orientation are then ignored). The box is capped at 100000 cells per call, so split bigger volumes into chunks. Implemented as a per-cell set_cell_item loop: it saves round trips and produces a single undo action, but does not make the fill itself faster. Returns set_count, from, to, size_x, size_y, size_z and undo. Example: {\"node_path\": \"GridMap\", \"from\": {\"x\": 0, \"y\": 0, \"z\": 0}, \"to\": {\"x\": 0, \"y\": 0, \"z\": 0}, \"item\": 0} or {\"node_path\": \"GridMap\", \"from\": {\"x\": 0, \"y\": 0, \"z\": 0}, \"to\": {\"x\": 9, \"y\": 0, \"z\": 9}, \"item\": 0, \"orientation\": 0}.",
+      "TileMap", {"gridmap", "cell", "set", "fill", "box", "batch", "single"},
+      SideEffect::WritesScene, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
+      kSetGridmapCellsParams, gridmap_ops::handle_fill_box,
+      {},
+      {},
+      {"{\"node_path\": \"GridMap\", \"from\": {\"x\": 0, \"y\": 0, \"z\": 0}, \"to\": {\"x\": 0, \"y\": 0, \"z\": 0}, \"item\": 0}",
+       "{\"node_path\": \"GridMap\", \"from\": {\"x\": 0, \"y\": 0, \"z\": 0}, \"to\": {\"x\": 9, \"y\": 0, \"z\": 9}, \"item\": 0}"}},
       {
           ToolAlias{
-              "set_gridmap_cell", "fill_gridmap_box",
+              "set_gridmap_cell", "set_gridmap_cells",
               gridmap_cell_args, project_gridmap_cell_result, "0.4.0", "0.6.0",
               validate_gridmap_cell_args},
+          ToolAlias{
+              "fill_gridmap_box", "set_gridmap_cells",
+              {}, {}, "0.4.0", "0.6.0",
+              [](const mcp::JsonValue &args) {
+                const mcp::JsonValue *path = args.Find("node_path");
+                const mcp::JsonValue *from = args.Find("from");
+                const mcp::JsonValue *to = args.Find("to");
+                if (path == nullptr || !path->IsString()) {
+                  mcp::JsonValue error(mcp::JsonValue::object_tag);
+                  error["error"] = mcp::JsonValue(
+                      "missing required parameter: node_path");
+                  return error;
+                }
+                if (from == nullptr || !from->IsObject()) {
+                  mcp::JsonValue error(mcp::JsonValue::object_tag);
+                  error["error"] =
+                      mcp::JsonValue("missing required parameter: from");
+                  return error;
+                }
+                if (to == nullptr || !to->IsObject()) {
+                  mcp::JsonValue error(mcp::JsonValue::object_tag);
+                  error["error"] =
+                      mcp::JsonValue("missing required parameter: to");
+                  return error;
+                }
+                return mcp::JsonValue();
+              }},
       })));
   v.push_back(make_spec_tool(ToolSpec{
       "get_gridmap_used_cells",

@@ -1,18 +1,20 @@
 ---
 type: 基线文档
 title: 工具面基线
-description: 451 域工具 + system_status + 7 元工具的静态审计基线、严格冗余候选、目标计数与能力矩阵
+description: ST-03 中间快照（308 catalog / 302 域 / 5 元）与 T-01 严格冗余基线的静态审计记录
 tags:
   - 工具面
   - 基线
   - 审计
-timestamp: "2026-11-16T04:49:31+08:00"
+timestamp: "2026-11-16T06:00:00+08:00"
 resource: devtools/commands/tool-audit.ts
 ---
 
 # 工具面基线
 
 > 审计日期：2026-11-16。数据由 `devtools/commands/tool-audit.ts` 静态解析源码生成；本页数字均可在 [tool_catalog_baseline.json](../../tests/data/tool_catalog_baseline.json) 中找到来源。
+
+> ST-03 中间快照：catalog 308 = 域 302 + 元 5 + system 1，生产别名 209，schema 284/24，能力矩阵缺失 0。下文的 459 计数与域分布表是 T-01 历史基线，最终收口计数由 T-25 重写。
 
 ## 数据来源与命令
 
