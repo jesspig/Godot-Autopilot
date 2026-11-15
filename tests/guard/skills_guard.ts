@@ -243,33 +243,37 @@ function checkTree(label: string, files: Tree, contract: Contract, violations: V
       continue;
     }
     roots.add(book);
-    if (parts.length !== 2 || parts[1] !== "SKILL.md") {
+    const isSkillDoc = parts.length === 2 && parts[1] === "SKILL.md";
+    const isReference = parts.length === 3 && parts[1] === "references" && parts[2] !== undefined && parts[2].endsWith(".md");
+    if (!isSkillDoc && !isReference) {
       violations.push({
         file: `${label}/${relative}`,
         line: 1,
         rule: "unexpected-file",
-        message: "each book must contain exactly SKILL.md",
+        message: "a book may only contain SKILL.md and references/*.md",
       });
       continue;
     }
-    let frontmatter: { name: string; description: string } | null = null;
-    try {
-      frontmatter = parseFrontmatter(content, `${label}/${relative}`);
-    } catch (error) {
-      violations.push({
-        file: `${label}/${relative}`,
-        line: 1,
-        rule: "frontmatter",
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
-    if (frontmatter !== null && frontmatter.name !== book) {
-      violations.push({
-        file: `${label}/${relative}`,
-        line: 2,
-        rule: "frontmatter",
-        message: `name ${frontmatter.name} does not match directory ${book}`,
-      });
+    if (isSkillDoc) {
+      let frontmatter: { name: string; description: string } | null = null;
+      try {
+        frontmatter = parseFrontmatter(content, `${label}/${relative}`);
+      } catch (error) {
+        violations.push({
+          file: `${label}/${relative}`,
+          line: 1,
+          rule: "frontmatter",
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+      if (frontmatter !== null && frontmatter.name !== book) {
+        violations.push({
+          file: `${label}/${relative}`,
+          line: 2,
+          rule: "frontmatter",
+          message: `name ${frontmatter.name} does not match directory ${book}`,
+        });
+      }
     }
     checkKeywords({ [`${label}/${relative}`]: content }, violations);
     checkCommands(`${label}/${relative}`, content, contract, violations);
@@ -278,6 +282,8 @@ function checkTree(label: string, files: Tree, contract: Contract, violations: V
   for (const book of BOOKS) {
     if (!roots.has(book)) {
       violations.push({ file: `${label}/${book}`, line: 1, rule: "missing-book", message: `missing book ${book}` });
+    } else if (files[`${book}/SKILL.md`] === undefined) {
+      violations.push({ file: `${label}/${book}`, line: 1, rule: "missing-skill", message: `missing ${book}/SKILL.md` });
     }
   }
 }

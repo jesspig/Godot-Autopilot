@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import type { GlobalOptions } from "../src/args";
 import { run as runSkills } from "../src/commands/skills";
 import { CliError, ExitCode } from "../src/errors";
+import { builtinRetiredSkills, normalizeRetiredSkills } from "../src/skills";
 
 function captureOutput(): { stdout(): string; stderr(): string; restore(): void } {
   const origOut = process.stdout.write;
@@ -36,6 +37,22 @@ async function runCaptured(positional: string[], opts: GlobalOptions) {
     cap.restore();
   }
 }
+
+describe("retired skills", () => {
+  test("内置退役清单为 9 个领域册且不含入口", () => {
+    const retired = builtinRetiredSkills();
+    expect(retired.length).toBe(9);
+    expect(retired).not.toContain("godot-autopilot");
+    expect(retired).toContain("godot-autopilot-tools");
+    expect(retired).toEqual([...retired].sort((a, b) => a.localeCompare(b)));
+  });
+
+  test("旧 asset 缺少 retired 或含非法名时安全归一", () => {
+    expect(normalizeRetiredSkills(undefined)).toEqual([]);
+    expect(normalizeRetiredSkills("x")).toEqual([]);
+    expect(normalizeRetiredSkills(["b", "a", "a", "../x", 1])).toEqual(["a", "b"]);
+  });
+});
 
 describe("skills", () => {
   test("list 离线列出 10 册并带路径与文件数", async () => {
