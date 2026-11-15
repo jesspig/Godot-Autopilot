@@ -5,6 +5,7 @@ import { runDeploy, type DeployOptions } from "./commands/deploy";
 import { runPackage } from "./commands/package";
 import { runPackageCheck } from "./commands/package-check";
 import { runTests, type TestOptions } from "./commands/test";
+import { runToolAudit, type ToolAuditOptions } from "./commands/tool-audit";
 import { runTui } from "./tui";
 
 const USAGE = [
@@ -17,6 +18,7 @@ const USAGE = [
   "  package                  [--libs-dir <dir>]",
   "  package-check <zip>",
   "  test                     [--preset debug|release] [--single <用例名>]",
+  "  audit-tools              [--json|--baseline|--target]",
   "  tui",
 ].join("\n");
 
@@ -67,6 +69,21 @@ function parsePackage(args: string[]): { libsDir: string | null } {
     index += 1;
   }
   return { libsDir };
+}
+
+function parseToolAudit(args: string[]): ToolAuditOptions {
+  const options: ToolAuditOptions = { json: false, baseline: false, target: false };
+  for (const arg of args) {
+    if (arg === "--json") options.json = true;
+    else if (arg === "--baseline") options.baseline = true;
+    else if (arg === "--target") options.target = true;
+    else throw new UsageError(`audit-tools: unrecognized argument: ${arg}`);
+  }
+  const selected = [options.json, options.baseline, options.target].filter(Boolean).length;
+  if (selected > 1) {
+    throw new UsageError("audit-tools: choose only one of --json, --baseline, --target");
+  }
+  return options;
 }
 
 function parseTest(args: string[]): TestOptions {
@@ -129,6 +146,8 @@ export async function main(argv: string[]): Promise<number> {
         return runPackageCheck(rest[0]);
       case "test":
         return runTests(parseTest(rest));
+      case "audit-tools":
+        return runToolAudit(parseToolAudit(rest));
       case "tui":
         expectNoArgs("tui", rest);
         return runTui();
