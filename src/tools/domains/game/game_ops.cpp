@@ -7,6 +7,7 @@
 #include "tools/base/debugger_access.hpp"
 #include "tools/base/tool_base.hpp"
 #include "util/error_util.hpp"
+#include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/translation_server.hpp>
 #include <chrono>
 #include <cstdint>
@@ -1330,6 +1331,196 @@ mcp::JsonValue handle_translate_text(const mcp::JsonValue &args) {
   r["key"] = JV(key);
   r["locale"] = JV(current);
   return r;
+}
+
+namespace {
+
+std::string bundle_action_text(const JV &args) {
+  auto *action = args.Find("action");
+  return (action && action->IsString()) ? action->GetString() : std::string();
+}
+
+JV bundle_without_action(const JV &args) {
+  JV out(JV::object_tag);
+  if (args.IsObject()) {
+    out = args;
+  }
+  if (out.IsObject()) {
+    out.GetObject().erase("action");
+  }
+  return out;
+}
+
+void bundle_rename_action(JV &forwarded, const JV &args, const char *from,
+                          const char *to) {
+  auto *source = args.Find(from);
+  if (source != nullptr && source->IsString()) {
+    forwarded[to] = *source;
+  }
+  if (forwarded.IsObject()) {
+    forwarded.GetObject().erase(from);
+  }
+}
+
+mcp::JsonValue bundle_action_missing(const std::string &choices) {
+  mcp::JsonValue error(mcp::JsonValue::object_tag);
+  error["error"] =
+      mcp::JsonValue("missing required parameter: action (" + choices + ")");
+  return error;
+}
+
+mcp::JsonValue bundle_action_invalid(const std::string &choices) {
+  mcp::JsonValue error(mcp::JsonValue::object_tag);
+  error["error"] = mcp::JsonValue("invalid action: expected " + choices);
+  return error;
+}
+
+mcp::JsonValue game_session_result(const JV &forwarded) {
+  if (!forwarded.IsObject() || !forwarded.GetObject().empty()) {
+    return error_json("session action accepts no parameters");
+  }
+  JV session(JV::object_tag);
+  auto *editor = godot::EditorInterface::get_singleton();
+  session["playing"] =
+      JV(editor != nullptr ? editor->is_playing_scene() : false);
+  const int32_t active = debugger_active_session_count();
+  session["active_sessions"] = JV(static_cast<int64_t>(active));
+  session["ready_sessions"] = JV(static_cast<int64_t>(
+      debugger_ready_session_count()));
+  session["scene_ready_sessions"] = JV(static_cast<int64_t>(
+      debugger_scene_ready_session_count()));
+  JV breaked(JV::array_tag);
+  for (int32_t session_id : debugger_breaked_session_ids()) {
+    breaked.PushBack(JV(static_cast<int64_t>(session_id)));
+  }
+  session["breaked_sessions"] = std::move(breaked);
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "get_game_state session completed");
+  JV result(JV::object_tag);
+  result["result"] = std::move(session);
+  return result;
+}
+
+} // namespace
+
+mcp::JsonValue handle_game_state_bundle(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "get_game_state called");
+  const std::string action = bundle_action_text(args);
+  if (action.empty()) {
+    return bundle_action_missing("status|session|input|job");
+  }
+  JV forwarded = bundle_without_action(args);
+  if (action == "status") {
+    return handle_game_status(forwarded);
+  }
+  if (action == "session") {
+    return game_session_result(forwarded);
+  }
+  if (action == "input") {
+    bundle_rename_action(forwarded, args, "input_action", "action");
+    return handle_game_input_status(forwarded);
+  }
+  if (action == "job") {
+    return handle_game_job_get(forwarded);
+  }
+  return bundle_action_invalid("status|session|input|job");
+}
+
+mcp::JsonValue handle_game_ui_bundle(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "get_game_ui called");
+  const std::string action = bundle_action_text(args);
+  if (action.empty()) {
+    return bundle_action_missing("elements");
+  }
+  JV forwarded = bundle_without_action(args);
+  if (action == "elements") {
+    return handle_game_ui_elements(forwarded);
+  }
+  return bundle_action_invalid("elements");
+}
+
+mcp::JsonValue handle_game_evidence_bundle(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "get_game_evidence called");
+  const std::string action = bundle_action_text(args);
+  if (action.empty()) {
+    return bundle_action_missing("sample|collect|validate");
+  }
+  JV forwarded = bundle_without_action(args);
+  if (action == "sample") {
+    return handle_game_sample_property(forwarded);
+  }
+  if (action == "collect") {
+    return handle_game_collect_evidence(forwarded);
+  }
+  if (action == "validate") {
+    return handle_game_validate_ui_layout(forwarded);
+  }
+  return bundle_action_invalid("sample|collect|validate");
+}
+
+mcp::JsonValue handle_game_localization_bundle(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "get_game_localization called");
+  const std::string action = bundle_action_text(args);
+  if (action.empty()) {
+    return bundle_action_missing("locale|list|translate");
+  }
+  JV forwarded = bundle_without_action(args);
+  if (action == "locale") {
+    return handle_get_game_locale(forwarded);
+  }
+  if (action == "list") {
+    return handle_get_translation_list(forwarded);
+  }
+  if (action == "translate") {
+    return handle_translate_text(forwarded);
+  }
+  return bundle_action_invalid("locale|list|translate");
+}
+
+mcp::JsonValue handle_game_script_bundle(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "game_script called");
+  const std::string action = bundle_action_text(args);
+  if (action.empty()) {
+    return bundle_action_missing("execute|start_job");
+  }
+  JV forwarded = bundle_without_action(args);
+  if (action == "execute") {
+    bundle_rename_action(forwarded, args, "script_action", "action");
+    return handle_game_eval(forwarded);
+  }
+  if (action == "start_job") {
+    if (forwarded.IsObject()) {
+      forwarded.GetObject().erase("script_action");
+    }
+    return handle_game_job_start(forwarded);
+  }
+  return bundle_action_invalid("execute|start_job");
+}
+
+mcp::JsonValue handle_game_input_bundle(const mcp::JsonValue &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "game_input called");
+  const std::string action = bundle_action_text(args);
+  if (action.empty()) {
+    return bundle_action_missing("queue|wait|sequence");
+  }
+  JV forwarded = bundle_without_action(args);
+  if (action == "queue" || action == "wait") {
+    bundle_rename_action(forwarded, args, "input_action", "action");
+    if (action == "queue") {
+      return handle_game_input(forwarded);
+    }
+    return handle_game_input_wait(forwarded);
+  }
+  if (action == "sequence") {
+    return handle_sequence_game_inputs(forwarded);
+  }
+  return bundle_action_invalid("queue|wait|sequence");
 }
 
 } // namespace runtime_ops
