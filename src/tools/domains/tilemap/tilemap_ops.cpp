@@ -231,8 +231,13 @@ JV handle_set_cells(const JV &args) {
         "property_set (TileMapLayer), or fix the path");
 
   auto *cells = args.Find("cells");
-  if (!cells || !cells->IsArray())
-    return util::error_json("missing required parameter: cells");
+  if (!cells || !cells->IsArray()) {
+    if (args.Find("from") != nullptr || args.Find("to") != nullptr) {
+      return handle_fill_rect(args);
+    }
+    return util::error_json(
+        "missing required parameter: cells (or from/to for the rect form)");
+  }
 
   int layer = 0;
   auto *la = args.Find("layer");

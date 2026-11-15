@@ -33,11 +33,11 @@
 
 namespace {
 
-constexpr size_t kMetaToolCount = 7;
+constexpr size_t kMetaToolCount = 5;
 
 const char *const kMetaToolNames[kMetaToolCount] = {
-    "ping",      "search_tools",  "list_categories", "get_tool_detail",
-    "call_tool", "batch_execute", "code_execute"};
+    "search_tools", "get_tool_detail", "call_tool", "batch_execute",
+    "code_execute"};
 
 const char *const kValidCategories[] = {
     "Analysis",   "Animation",  "Audio",      "Capture",    "Config",     "Debug",
@@ -98,7 +98,7 @@ struct RegisteredServerFixture : ::testing::Test {
 
 } // namespace
 
-TEST_F(RegisteredServerFixture, ListToolsReturnsExactlySevenMetaTools) {
+TEST_F(RegisteredServerFixture, ListToolsReturnsExactlyFiveMetaTools) {
   auto result = client->ListTools();
   ASSERT_EQ(result.tools.size(), kMetaToolCount);
 }
@@ -203,9 +203,8 @@ TEST_F(RegisteredServerFixture, SchemaSampledTools) {
       "get_scene_tree",        "batch_execute",
       "call_tool",             "code_execute",
       "search_tools",          "get_tool_detail"};
-  const char *const kEmpty[] = {"get_engine_version",   "create_physics_2d_body",
-                                "ping",                 "system_status",
-                                "list_categories"};
+  const char *const kEmpty[] = {"get_engine_version",
+                                "create_physics_2d_body", "system_status"};
   for (const char *name : kNonEmpty) {
     auto info = catalog.get_tool(name);
     ASSERT_TRUE(info.has_value()) << name;

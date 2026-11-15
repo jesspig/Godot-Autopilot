@@ -190,10 +190,10 @@ TEST(DestructiveTierGuardTest, ReviewedWriteAndDangerToolsKeepTheirTier) {
   EXPECT_EQ(side_effect_of_tool("execute_script"), "code_execute");
   EXPECT_EQ(side_effect_of_tool("execute_game_script"), "game_runtime");
   EXPECT_EQ(side_effect_of_tool("property_set"), "writes_scene");
-  EXPECT_EQ(side_effect_of_tool("set_properties_batch"), "writes_scene");
+  EXPECT_EQ(side_effect_of_tool("spawn_node_bundle"), "writes_scene");
   EXPECT_EQ(side_effect_of_tool("create_scene_node"), "writes_scene");
   EXPECT_EQ(side_effect_of_tool("signal_connect"), "writes_scene");
-  EXPECT_EQ(side_effect_of_tool("set_tilemap_cell"), "writes_scene");
+  EXPECT_EQ(side_effect_of_tool("set_tilemap_cells"), "writes_scene");
   EXPECT_EQ(side_effect_of_tool("attach_script_to_node"), "writes_scene");
   EXPECT_EQ(side_effect_of_tool("add_group_node"), "writes_scene");
   EXPECT_EQ(side_effect_of_tool("get_os_environment"), "process");

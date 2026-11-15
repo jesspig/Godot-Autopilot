@@ -4,111 +4,111 @@
     "domains": "src/tools/domains/*/*_tools.hpp",
     "register_all": "src/tools/base/register_all.cpp"
   },
-  "catalog_total": 459,
-  "domain_total": 451,
-  "meta_total": 7,
+  "catalog_total": 427,
+  "domain_total": 421,
+  "meta_total": 5,
   "system_total": 1,
   "domain_count": 33,
   "by_domain": {
     "Analysis": 3,
     "Animation": 11,
-    "Audio": 24,
+    "Audio": 21,
     "Capture": 2,
     "Config": 17,
     "C#": 6,
-    "Debug": 15,
+    "Debug": 9,
     "Debugger": 6,
     "Display": 25,
-    "Docs": 4,
-    "Editor": 33,
-    "Game": 19,
-    "GridMap": 5,
+    "Docs": 2,
+    "Editor": 32,
+    "Game": 18,
+    "GridMap": 4,
     "Group": 3,
     "Input": 15,
-    "InputMap": 9,
+    "InputMap": 5,
     "Log": 1,
     "Nav": 15,
     "OS": 23,
     "Physics": 51,
-    "Properties": 7,
+    "Properties": 6,
     "Render": 52,
-    "Resources": 34,
-    "Scene": 15,
+    "Resources": 32,
+    "Scene": 13,
     "SceneTree": 8,
-    "Scripts": 11,
+    "Scripts": 10,
     "SpriteFrames": 3,
     "Testing": 2,
     "Text": 10,
-    "Theme": 10,
-    "TileMap": 5,
+    "Theme": 5,
+    "TileMap": 4,
     "Tileset": 3,
     "Tween": 4
   },
   "by_category": {
     "Analysis": 3,
     "Animation": 11,
-    "Audio": 24,
+    "Audio": 21,
     "Capture": 2,
     "Config": 17,
-    "Scripts": 18,
-    "Debug": 16,
+    "Scripts": 17,
+    "Debug": 10,
     "Debugger": 6,
     "Display": 25,
-    "Docs": 4,
-    "Editor": 33,
-    "Game": 23,
-    "TileMap": 13,
+    "Docs": 2,
+    "Editor": 32,
+    "Game": 22,
+    "TileMap": 11,
     "Group": 3,
-    "Input": 24,
+    "Input": 20,
     "System": 5,
     "Navigation": 15,
     "OS": 22,
     "Physics": 50,
-    "Properties": 7,
+    "Properties": 6,
     "Render": 52,
-    "Resources": 34,
-    "Scene": 23,
+    "Resources": 32,
+    "Scene": 21,
     "SpriteFrames": 3,
     "Testing": 2,
     "Text": 10,
-    "Theme": 10,
-    "Meta": 4
+    "Theme": 5,
+    "Meta": 2
   },
   "domain_by_category": {
     "Analysis": 3,
     "Animation": 11,
-    "Audio": 24,
+    "Audio": 21,
     "Capture": 2,
     "Config": 17,
-    "Scripts": 18,
-    "Debug": 16,
+    "Scripts": 17,
+    "Debug": 10,
     "Debugger": 6,
     "Display": 25,
-    "Docs": 4,
-    "Editor": 33,
-    "Game": 23,
-    "TileMap": 13,
+    "Docs": 2,
+    "Editor": 32,
+    "Game": 22,
+    "TileMap": 11,
     "Group": 3,
-    "Input": 24,
+    "Input": 20,
     "System": 1,
     "Navigation": 15,
     "OS": 22,
     "Physics": 50,
-    "Properties": 7,
+    "Properties": 6,
     "Render": 52,
-    "Resources": 34,
-    "Scene": 23,
+    "Resources": 32,
+    "Scene": 21,
     "SpriteFrames": 3,
     "Testing": 2,
     "Text": 10,
-    "Theme": 10
+    "Theme": 5
   },
   "by_side_effect": {
-    "None": 282,
-    "WritesScene": 43,
+    "None": 262,
+    "WritesScene": 39,
     "Destructive": 6,
-    "WritesFile": 27,
-    "WritesConfig": 18,
+    "WritesFile": 22,
+    "WritesConfig": 15,
     "ModifiesWindow": 42,
     "CodeExecute": 9,
     "ShowsAlert": 4,
@@ -116,11 +116,11 @@
     "GameRuntime": 18
   },
   "domain_by_side_effect": {
-    "None": 276,
-    "WritesScene": 43,
+    "None": 258,
+    "WritesScene": 39,
     "Destructive": 6,
-    "WritesFile": 27,
-    "WritesConfig": 18,
+    "WritesFile": 22,
+    "WritesConfig": 15,
     "ModifiesWindow": 42,
     "CodeExecute": 7,
     "ShowsAlert": 4,
@@ -128,10 +128,43 @@
     "GameRuntime": 18
   },
   "strict_redundant_count": 32,
-  "alias_count": 0,
-  "alias_names": [],
-  "schema_non_empty": 393,
-  "schema_empty": 66,
+  "alias_count": 32,
+  "alias_names": [
+    "add_input_map_action",
+    "add_input_map_action_event",
+    "capture_game_viewport",
+    "get_audio_bus_count",
+    "get_audio_bus_name",
+    "get_audio_device_inputs",
+    "get_debug_custom_monitor_names",
+    "get_debug_memory_usage",
+    "get_debug_monitor",
+    "get_debug_monitor_catalog",
+    "get_debug_node_count",
+    "get_debug_object_count",
+    "get_docs_method",
+    "get_docs_property",
+    "get_scene_node_screen_rect",
+    "get_scene_snapshot",
+    "has_input_map_action",
+    "has_resource_dependency",
+    "list_categories",
+    "load_script",
+    "move_resource_file",
+    "ping",
+    "set_control_anchor_preset",
+    "set_gridmap_cell",
+    "set_input_map_action_deadzone",
+    "set_properties_batch",
+    "set_theme_color",
+    "set_theme_constant",
+    "set_theme_font_size",
+    "set_theme_stylebox_flat",
+    "set_tilemap_cell",
+    "verify_scene_saved"
+  ],
+  "schema_non_empty": 373,
+  "schema_empty": 54,
   "tool_names": [
     "validate_scene_file",
     "find_unused_resources",
@@ -149,8 +182,6 @@
     "connect_animation_states",
     "get_audio_bus_layout",
     "set_audio_bus_layout",
-    "get_audio_bus_count",
-    "get_audio_bus_name",
     "set_audio_bus_volume_db",
     "set_audio_bus_mute",
     "set_audio_bus_bypass_effects",
@@ -165,7 +196,6 @@
     "set_audio_bus_solo",
     "get_audio_device_outputs",
     "set_audio_device_output",
-    "get_audio_device_inputs",
     "set_audio_device_input",
     "start_audio_input_capture",
     "stop_audio_input_capture",
@@ -198,10 +228,6 @@
     "csharp_list_members",
     "print_debug_log",
     "get_debug_stack",
-    "get_debug_monitor",
-    "get_debug_monitor_catalog",
-    "get_debug_object_count",
-    "get_debug_memory_usage",
     "set_debug_physics_fps",
     "set_debug_collision_visual",
     "set_debug_navigation_visual",
@@ -209,8 +235,6 @@
     "get_debug_monitors",
     "remove_debug_custom_monitor",
     "get_debug_custom_monitor",
-    "get_debug_custom_monitor_names",
-    "get_debug_node_count",
     "get_debugger_log",
     "get_plugin_log",
     "get_debugger_errors",
@@ -244,8 +268,6 @@
     "set_display_window_title",
     "get_docs_class",
     "find_docs_class",
-    "get_docs_method",
-    "get_docs_property",
     "get_editor_selection",
     "set_editor_selection",
     "get_editor_edited_scene_root",
@@ -267,7 +289,6 @@
     "create_editor_scene",
     "open_editor_scene",
     "save_editor_scene_as",
-    "verify_scene_saved",
     "build_csharp_assembly",
     "dotnet_environment",
     "close_editor_scene",
@@ -288,7 +309,6 @@
     "get_game_job",
     "reload_game_scripts",
     "queue_game_input",
-    "capture_game_viewport",
     "wait_game_input",
     "get_game_input_status",
     "sequence_game_inputs",
@@ -300,7 +320,6 @@
     "translate_text",
     "create_gridmap",
     "create_meshlibrary_item",
-    "set_gridmap_cell",
     "fill_gridmap_box",
     "get_gridmap_used_cells",
     "add_group_node",
@@ -322,13 +341,9 @@
     "start_input_gamepad_vibration",
     "stop_input_gamepad_vibration",
     "save_input_map",
-    "add_input_map_action",
-    "add_input_map_action_event",
     "erase_input_map_action_event",
-    "set_input_map_action_deadzone",
     "erase_input_map_action",
     "get_input_map_actions",
-    "has_input_map_action",
     "set_input_map_action_bundle",
     "get_game_log_entries",
     "create_nav_2d_map",
@@ -425,7 +440,6 @@
     "property_get_list",
     "signal_connect",
     "signal_disconnect",
-    "set_properties_batch",
     "set_node_transform",
     "create_render_canvas_item",
     "add_render_canvas_item_rect",
@@ -496,11 +510,9 @@
     "set_resource_uid",
     "remove_resource_file",
     "rename_resource_file",
-    "move_resource_file",
     "copy_resource_file",
     "create_directory",
     "get_resource_dependencies",
-    "has_resource_dependency",
     "get_resource_references",
     "reimport_resource_files",
     "set_resource_import_options",
@@ -519,9 +531,7 @@
     "reparent_node",
     "get_scene_tree",
     "instantiate_scene",
-    "get_scene_node_screen_rect",
     "build_nodes_from_spec",
-    "get_scene_snapshot",
     "spawn_node_bundle",
     "create_path_node",
     "advance_path_follow",
@@ -537,7 +547,6 @@
     "set_scene_tree_debug_collisions_hint",
     "set_scene_tree_pause",
     "execute_script",
-    "load_script",
     "create_script",
     "patch_script",
     "attach_script_to_node",
@@ -563,17 +572,11 @@
     "add_shaped_text_string",
     "get_shaped_text_size",
     "create_theme_resource",
-    "set_theme_color",
-    "set_theme_constant",
-    "set_theme_font_size",
-    "set_theme_stylebox_flat",
     "get_theme_info",
     "apply_theme_to_control",
-    "set_control_anchor_preset",
     "set_control_layout",
     "set_theme_item_bundle",
     "create_tilemap",
-    "set_tilemap_cell",
     "set_tilemap_cells",
     "fill_tilemap_rect",
     "create_tilemap_tileset",
@@ -585,9 +588,7 @@
     "get_game_tween_list",
     "tween_editor_property",
     "system_status",
-    "ping",
     "search_tools",
-    "list_categories",
     "get_tool_detail",
     "call_tool",
     "batch_execute",
@@ -781,9 +782,9 @@
       "flags": [
         "kNone"
       ],
-      "param_count": 0,
+      "param_count": 2,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 128
+      "line": 123
     },
     {
       "name": "set_audio_bus_layout",
@@ -795,31 +796,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 133
-    },
-    {
-      "name": "get_audio_bus_count",
-      "category": "Audio",
-      "domain": "Audio",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 138
-    },
-    {
-      "name": "get_audio_bus_name",
-      "category": "Audio",
-      "domain": "Audio",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 143
+      "line": 150
     },
     {
       "name": "set_audio_bus_volume_db",
@@ -831,7 +808,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 148
+      "line": 155
     },
     {
       "name": "set_audio_bus_mute",
@@ -843,7 +820,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 153
+      "line": 160
     },
     {
       "name": "set_audio_bus_bypass_effects",
@@ -855,7 +832,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 158
+      "line": 165
     },
     {
       "name": "add_audio_bus_effect",
@@ -867,7 +844,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 163
+      "line": 170
     },
     {
       "name": "remove_audio_bus_effect",
@@ -879,7 +856,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 168
+      "line": 175
     },
     {
       "name": "play_audio_player",
@@ -891,7 +868,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 173
+      "line": 180
     },
     {
       "name": "stop_audio_player",
@@ -903,7 +880,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 178
+      "line": 185
     },
     {
       "name": "set_audio_player_volume_db",
@@ -915,7 +892,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 183
+      "line": 190
     },
     {
       "name": "set_audio_player_pitch_scale",
@@ -927,7 +904,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 188
+      "line": 195
     },
     {
       "name": "get_audio_player_playback_position",
@@ -939,7 +916,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 193
+      "line": 200
     },
     {
       "name": "seek_audio_player",
@@ -951,7 +928,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 198
+      "line": 205
     },
     {
       "name": "set_audio_bus_solo",
@@ -963,7 +940,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 203
+      "line": 210
     },
     {
       "name": "get_audio_device_outputs",
@@ -975,7 +952,7 @@
       ],
       "param_count": 0,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 208
+      "line": 215
     },
     {
       "name": "set_audio_device_output",
@@ -987,19 +964,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 213
-    },
-    {
-      "name": "get_audio_device_inputs",
-      "category": "Audio",
-      "domain": "Audio",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 218
+      "line": 220
     },
     {
       "name": "set_audio_device_input",
@@ -1011,7 +976,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 223
+      "line": 225
     },
     {
       "name": "start_audio_input_capture",
@@ -1023,7 +988,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 228
+      "line": 230
     },
     {
       "name": "stop_audio_input_capture",
@@ -1035,7 +1000,7 @@
       ],
       "param_count": 5,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 233
+      "line": 235
     },
     {
       "name": "create_audiostream_wav",
@@ -1047,7 +1012,7 @@
       ],
       "param_count": 5,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 238
+      "line": 240
     },
     {
       "name": "get_audio_input_devices",
@@ -1059,7 +1024,7 @@
       ],
       "param_count": 0,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 243
+      "line": 245
     },
     {
       "name": "capture_editor_viewport",
@@ -1071,7 +1036,7 @@
       ],
       "param_count": 16,
       "source": "src/tools/domains/capture/capture_tools.hpp",
-      "line": 57
+      "line": 66
     },
     {
       "name": "review_scene_visually",
@@ -1083,7 +1048,7 @@
       ],
       "param_count": 13,
       "source": "src/tools/domains/capture/capture_tools.hpp",
-      "line": 62
+      "line": 75
     },
     {
       "name": "get_project_settings",
@@ -1371,7 +1336,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/debug/debug_tools.hpp",
-      "line": 70
+      "line": 102
     },
     {
       "name": "get_debug_stack",
@@ -1383,55 +1348,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/debug/debug_tools.hpp",
-      "line": 75
-    },
-    {
-      "name": "get_debug_monitor",
-      "category": "Debug",
-      "domain": "Debug",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/debug/debug_tools.hpp",
-      "line": 80
-    },
-    {
-      "name": "get_debug_monitor_catalog",
-      "category": "Debug",
-      "domain": "Debug",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/debug/debug_tools.hpp",
-      "line": 85
-    },
-    {
-      "name": "get_debug_object_count",
-      "category": "Debug",
-      "domain": "Debug",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/debug/debug_tools.hpp",
-      "line": 90
-    },
-    {
-      "name": "get_debug_memory_usage",
-      "category": "Debug",
-      "domain": "Debug",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/debug/debug_tools.hpp",
-      "line": 95
+      "line": 107
     },
     {
       "name": "set_debug_physics_fps",
@@ -1443,7 +1360,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/debug/debug_tools.hpp",
-      "line": 100
+      "line": 112
     },
     {
       "name": "set_debug_collision_visual",
@@ -1455,7 +1372,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/debug/debug_tools.hpp",
-      "line": 105
+      "line": 117
     },
     {
       "name": "set_debug_navigation_visual",
@@ -1467,7 +1384,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/debug/debug_tools.hpp",
-      "line": 110
+      "line": 122
     },
     {
       "name": "set_debug_performance_visual",
@@ -1479,7 +1396,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/debug/debug_tools.hpp",
-      "line": 115
+      "line": 127
     },
     {
       "name": "get_debug_monitors",
@@ -1489,9 +1406,9 @@
       "flags": [
         "kNone"
       ],
-      "param_count": 0,
+      "param_count": 3,
       "source": "src/tools/domains/debug/debug_tools.hpp",
-      "line": 120
+      "line": 132
     },
     {
       "name": "remove_debug_custom_monitor",
@@ -1503,7 +1420,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/debug/debug_tools.hpp",
-      "line": 125
+      "line": 196
     },
     {
       "name": "get_debug_custom_monitor",
@@ -1515,31 +1432,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/debug/debug_tools.hpp",
-      "line": 130
-    },
-    {
-      "name": "get_debug_custom_monitor_names",
-      "category": "Debug",
-      "domain": "Debug",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/debug/debug_tools.hpp",
-      "line": 135
-    },
-    {
-      "name": "get_debug_node_count",
-      "category": "Debug",
-      "domain": "Debug",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "source": "src/tools/domains/debug/debug_tools.hpp",
-      "line": 140
+      "line": 201
     },
     {
       "name": "get_debugger_log",
@@ -1921,9 +1814,9 @@
       "flags": [
         "kNone"
       ],
-      "param_count": 3,
+      "param_count": 4,
       "source": "src/tools/domains/doc/doc_tools.hpp",
-      "line": 42
+      "line": 33
     },
     {
       "name": "find_docs_class",
@@ -1935,31 +1828,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/doc/doc_tools.hpp",
-      "line": 47
-    },
-    {
-      "name": "get_docs_method",
-      "category": "Docs",
-      "domain": "Docs",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/doc/doc_tools.hpp",
-      "line": 52
-    },
-    {
-      "name": "get_docs_property",
-      "category": "Docs",
-      "domain": "Docs",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/doc/doc_tools.hpp",
-      "line": 57
+      "line": 132
     },
     {
       "name": "get_editor_selection",
@@ -1971,7 +1840,7 @@
       ],
       "param_count": 0,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 173
+      "line": 169
     },
     {
       "name": "set_editor_selection",
@@ -1983,7 +1852,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 178
+      "line": 174
     },
     {
       "name": "get_editor_edited_scene_root",
@@ -1995,7 +1864,7 @@
       ],
       "param_count": 0,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 183
+      "line": 179
     },
     {
       "name": "save_editor_scene",
@@ -2007,7 +1876,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 188
+      "line": 184
     },
     {
       "name": "save_editor_scenes",
@@ -2019,7 +1888,7 @@
       ],
       "param_count": 0,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 193
+      "line": 189
     },
     {
       "name": "reload_editor_scene",
@@ -2031,7 +1900,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 198
+      "line": 194
     },
     {
       "name": "inspect_editor_resource",
@@ -2043,7 +1912,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 203
+      "line": 199
     },
     {
       "name": "create_editor_undo_redo_action",
@@ -2056,7 +1925,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 208
+      "line": 204
     },
     {
       "name": "commit_editor_undo_redo",
@@ -2068,7 +1937,7 @@
       ],
       "param_count": 0,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 213
+      "line": 209
     },
     {
       "name": "add_editor_undo_redo_do",
@@ -2080,7 +1949,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 218
+      "line": 214
     },
     {
       "name": "add_editor_undo_redo_undo",
@@ -2092,7 +1961,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 223
+      "line": 219
     },
     {
       "name": "get_editor_file_system_tree",
@@ -2104,7 +1973,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 228
+      "line": 224
     },
     {
       "name": "scan_editor_file_system",
@@ -2116,7 +1985,7 @@
       ],
       "param_count": 0,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 233
+      "line": 229
     },
     {
       "name": "set_editor_main_scene",
@@ -2128,7 +1997,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 238
+      "line": 234
     },
     {
       "name": "play_editor_current_scene",
@@ -2140,7 +2009,7 @@
       ],
       "param_count": 0,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 243
+      "line": 239
     },
     {
       "name": "stop_editor_playing",
@@ -2152,7 +2021,7 @@
       ],
       "param_count": 0,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 248
+      "line": 244
     },
     {
       "name": "get_editor_file_system_status",
@@ -2164,7 +2033,7 @@
       ],
       "param_count": 0,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 253
+      "line": 249
     },
     {
       "name": "set_editor_plugin_enabled",
@@ -2176,7 +2045,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 258
+      "line": 254
     },
     {
       "name": "create_editor_scene",
@@ -2188,7 +2057,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 263
+      "line": 259
     },
     {
       "name": "open_editor_scene",
@@ -2200,7 +2069,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 268
+      "line": 264
     },
     {
       "name": "save_editor_scene_as",
@@ -2212,19 +2081,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 273
-    },
-    {
-      "name": "verify_scene_saved",
-      "category": "Editor",
-      "domain": "Editor",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 278
+      "line": 269
     },
     {
       "name": "build_csharp_assembly",
@@ -2236,7 +2093,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 283
+      "line": 274
     },
     {
       "name": "dotnet_environment",
@@ -2248,7 +2105,7 @@
       ],
       "param_count": 0,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 288
+      "line": 279
     },
     {
       "name": "close_editor_scene",
@@ -2260,7 +2117,7 @@
       ],
       "param_count": 0,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 293
+      "line": 284
     },
     {
       "name": "get_editor_viewport_geometry",
@@ -2272,7 +2129,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 298
+      "line": 289
     },
     {
       "name": "get_editor_ui_elements",
@@ -2284,7 +2141,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 303
+      "line": 294
     },
     {
       "name": "hit_test_editor_point",
@@ -2296,7 +2153,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 308
+      "line": 299
     },
     {
       "name": "scene_tree_items",
@@ -2308,7 +2165,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 313
+      "line": 304
     },
     {
       "name": "select_scene_tree_node",
@@ -2320,7 +2177,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 318
+      "line": 309
     },
     {
       "name": "click_editor_element",
@@ -2334,7 +2191,7 @@
       ],
       "param_count": 5,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 323
+      "line": 314
     },
     {
       "name": "type_editor_element_text",
@@ -2348,7 +2205,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 329
+      "line": 320
     },
     {
       "name": "run_editor_shortcut",
@@ -2360,7 +2217,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 336
+      "line": 327
     },
     {
       "name": "sample_game_property",
@@ -2372,7 +2229,7 @@
       ],
       "param_count": 6,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 187
+      "line": 173
     },
     {
       "name": "collect_game_evidence",
@@ -2384,7 +2241,7 @@
       ],
       "param_count": 9,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 192
+      "line": 178
     },
     {
       "name": "validate_game_ui_layout",
@@ -2396,7 +2253,7 @@
       ],
       "param_count": 8,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 197
+      "line": 183
     },
     {
       "name": "get_game_status",
@@ -2408,7 +2265,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 202
+      "line": 188
     },
     {
       "name": "execute_game_script",
@@ -2420,7 +2277,7 @@
       ],
       "param_count": 12,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 207
+      "line": 193
     },
     {
       "name": "start_game_job",
@@ -2432,7 +2289,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 212
+      "line": 198
     },
     {
       "name": "get_game_job",
@@ -2444,7 +2301,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 217
+      "line": 203
     },
     {
       "name": "reload_game_scripts",
@@ -2456,7 +2313,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 222
+      "line": 208
     },
     {
       "name": "queue_game_input",
@@ -2468,20 +2325,7 @@
       ],
       "param_count": 16,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 227
-    },
-    {
-      "name": "capture_game_viewport",
-      "category": "Game",
-      "domain": "Game",
-      "side_effect": "None",
-      "flags": [
-        "kNone",
-        "kCaptureImage"
-      ],
-      "param_count": 12,
-      "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 232
+      "line": 213
     },
     {
       "name": "wait_game_input",
@@ -2493,7 +2337,7 @@
       ],
       "param_count": 5,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 237
+      "line": 218
     },
     {
       "name": "get_game_input_status",
@@ -2505,7 +2349,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 242
+      "line": 223
     },
     {
       "name": "sequence_game_inputs",
@@ -2517,7 +2361,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 247
+      "line": 228
     },
     {
       "name": "get_game_ui_elements",
@@ -2529,7 +2373,7 @@
       ],
       "param_count": 6,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 252
+      "line": 233
     },
     {
       "name": "click_game_ui_element",
@@ -2541,7 +2385,7 @@
       ],
       "param_count": 9,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 257
+      "line": 238
     },
     {
       "name": "get_game_locale",
@@ -2553,7 +2397,7 @@
       ],
       "param_count": 0,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 262
+      "line": 243
     },
     {
       "name": "set_game_locale",
@@ -2565,7 +2409,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 267
+      "line": 248
     },
     {
       "name": "get_translation_list",
@@ -2577,7 +2421,7 @@
       ],
       "param_count": 0,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 272
+      "line": 253
     },
     {
       "name": "translate_text",
@@ -2589,7 +2433,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/game/game_tools.hpp",
-      "line": 277
+      "line": 258
     },
     {
       "name": "create_gridmap",
@@ -2603,7 +2447,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/gridmap/gridmap_tools.hpp",
-      "line": 56
+      "line": 115
     },
     {
       "name": "create_meshlibrary_item",
@@ -2617,21 +2461,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/gridmap/gridmap_tools.hpp",
-      "line": 61
-    },
-    {
-      "name": "set_gridmap_cell",
-      "category": "TileMap",
-      "domain": "GridMap",
-      "side_effect": "WritesScene",
-      "flags": [
-        "kMutating",
-        "kSceneTarget",
-        "kUndoable"
-      ],
-      "param_count": 4,
-      "source": "src/tools/domains/gridmap/gridmap_tools.hpp",
-      "line": 66
+      "line": 120
     },
     {
       "name": "fill_gridmap_box",
@@ -2645,7 +2475,7 @@
       ],
       "param_count": 6,
       "source": "src/tools/domains/gridmap/gridmap_tools.hpp",
-      "line": 71
+      "line": 125
     },
     {
       "name": "get_gridmap_used_cells",
@@ -2659,7 +2489,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/gridmap/gridmap_tools.hpp",
-      "line": 76
+      "line": 136
     },
     {
       "name": "add_group_node",
@@ -2899,31 +2729,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/input_map/input_map_tools.hpp",
-      "line": 63
-    },
-    {
-      "name": "add_input_map_action",
-      "category": "Input",
-      "domain": "InputMap",
-      "side_effect": "WritesConfig",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/input_map/input_map_tools.hpp",
-      "line": 68
-    },
-    {
-      "name": "add_input_map_action_event",
-      "category": "Input",
-      "domain": "InputMap",
-      "side_effect": "WritesConfig",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/input_map/input_map_tools.hpp",
-      "line": 73
+      "line": 140
     },
     {
       "name": "erase_input_map_action_event",
@@ -2935,19 +2741,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/input_map/input_map_tools.hpp",
-      "line": 78
-    },
-    {
-      "name": "set_input_map_action_deadzone",
-      "category": "Input",
-      "domain": "InputMap",
-      "side_effect": "WritesConfig",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/input_map/input_map_tools.hpp",
-      "line": 83
+      "line": 145
     },
     {
       "name": "erase_input_map_action",
@@ -2959,7 +2753,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/input_map/input_map_tools.hpp",
-      "line": 88
+      "line": 150
     },
     {
       "name": "get_input_map_actions",
@@ -2969,21 +2763,9 @@
       "flags": [
         "kNone"
       ],
-      "param_count": 0,
-      "source": "src/tools/domains/input_map/input_map_tools.hpp",
-      "line": 93
-    },
-    {
-      "name": "has_input_map_action",
-      "category": "Input",
-      "domain": "InputMap",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
       "param_count": 1,
       "source": "src/tools/domains/input_map/input_map_tools.hpp",
-      "line": 98
+      "line": 155
     },
     {
       "name": "set_input_map_action_bundle",
@@ -2995,7 +2777,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/input_map/input_map_tools.hpp",
-      "line": 103
+      "line": 169
     },
     {
       "name": "get_game_log_entries",
@@ -4092,7 +3874,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/property/property_tools.hpp",
-      "line": 72
+      "line": 102
     },
     {
       "name": "property_set",
@@ -4104,9 +3886,9 @@
         "kSceneTarget",
         "kUndoable"
       ],
-      "param_count": 5,
+      "param_count": 6,
       "source": "src/tools/domains/property/property_tools.hpp",
-      "line": 77
+      "line": 107
     },
     {
       "name": "property_get_list",
@@ -4118,7 +3900,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/property/property_tools.hpp",
-      "line": 82
+      "line": 118
     },
     {
       "name": "signal_connect",
@@ -4130,7 +3912,7 @@
       ],
       "param_count": 5,
       "source": "src/tools/domains/property/property_tools.hpp",
-      "line": 87
+      "line": 123
     },
     {
       "name": "signal_disconnect",
@@ -4142,21 +3924,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/property/property_tools.hpp",
-      "line": 92
-    },
-    {
-      "name": "set_properties_batch",
-      "category": "Properties",
-      "domain": "Properties",
-      "side_effect": "WritesScene",
-      "flags": [
-        "kMutating",
-        "kSceneTarget",
-        "kUndoable"
-      ],
-      "param_count": 3,
-      "source": "src/tools/domains/property/property_tools.hpp",
-      "line": 97
+      "line": 128
     },
     {
       "name": "set_node_transform",
@@ -4170,7 +3938,7 @@
       ],
       "param_count": 5,
       "source": "src/tools/domains/property/property_tools.hpp",
-      "line": 107
+      "line": 138
     },
     {
       "name": "create_render_canvas_item",
@@ -4804,9 +4572,9 @@
       "flags": [
         "kNone"
       ],
-      "param_count": 2,
+      "param_count": 3,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 200
+      "line": 268
     },
     {
       "name": "reload_resource",
@@ -4818,7 +4586,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 205
+      "line": 279
     },
     {
       "name": "load_resource_threaded",
@@ -4830,7 +4598,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 210
+      "line": 284
     },
     {
       "name": "get_resource_load_threaded_status",
@@ -4842,7 +4610,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 215
+      "line": 289
     },
     {
       "name": "get_resource_load_threaded",
@@ -4854,7 +4622,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 220
+      "line": 294
     },
     {
       "name": "save_resource",
@@ -4866,7 +4634,7 @@
       ],
       "param_count": 7,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 225
+      "line": 299
     },
     {
       "name": "create_resource",
@@ -4878,7 +4646,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 230
+      "line": 304
     },
     {
       "name": "duplicate_resource",
@@ -4890,7 +4658,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 235
+      "line": 309
     },
     {
       "name": "get_resource_type",
@@ -4902,7 +4670,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 240
+      "line": 314
     },
     {
       "name": "has_resource",
@@ -4914,7 +4682,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 245
+      "line": 319
     },
     {
       "name": "get_resource_types",
@@ -4926,7 +4694,7 @@
       ],
       "param_count": 0,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 250
+      "line": 324
     },
     {
       "name": "get_resource_extensions",
@@ -4938,7 +4706,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 255
+      "line": 329
     },
     {
       "name": "get_resource_dir_files",
@@ -4950,7 +4718,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 260
+      "line": 334
     },
     {
       "name": "get_resource_uid",
@@ -4962,7 +4730,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 265
+      "line": 339
     },
     {
       "name": "set_resource_uid",
@@ -4974,7 +4742,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 270
+      "line": 344
     },
     {
       "name": "remove_resource_file",
@@ -4986,7 +4754,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 275
+      "line": 349
     },
     {
       "name": "rename_resource_file",
@@ -4996,21 +4764,9 @@
       "flags": [
         "kMutating"
       ],
-      "param_count": 2,
+      "param_count": 3,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 280
-    },
-    {
-      "name": "move_resource_file",
-      "category": "Resources",
-      "domain": "Resources",
-      "side_effect": "WritesFile",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 285
+      "line": 354
     },
     {
       "name": "copy_resource_file",
@@ -5022,7 +4778,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 290
+      "line": 364
     },
     {
       "name": "create_directory",
@@ -5034,7 +4790,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 295
+      "line": 369
     },
     {
       "name": "get_resource_dependencies",
@@ -5044,21 +4800,9 @@
       "flags": [
         "kNone"
       ],
-      "param_count": 1,
-      "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 300
-    },
-    {
-      "name": "has_resource_dependency",
-      "category": "Resources",
-      "domain": "Resources",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
       "param_count": 2,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 305
+      "line": 374
     },
     {
       "name": "get_resource_references",
@@ -5070,7 +4814,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 310
+      "line": 385
     },
     {
       "name": "reimport_resource_files",
@@ -5082,7 +4826,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 315
+      "line": 390
     },
     {
       "name": "set_resource_import_options",
@@ -5094,7 +4838,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 320
+      "line": 395
     },
     {
       "name": "set_resource_property",
@@ -5106,7 +4850,7 @@
       ],
       "param_count": 7,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 325
+      "line": 400
     },
     {
       "name": "get_resource_property",
@@ -5118,7 +4862,7 @@
       ],
       "param_count": 6,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 330
+      "line": 405
     },
     {
       "name": "create_curve_resource",
@@ -5130,7 +4874,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 335
+      "line": 410
     },
     {
       "name": "set_curve_points",
@@ -5142,7 +4886,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 340
+      "line": 415
     },
     {
       "name": "get_curve_baked_points",
@@ -5154,7 +4898,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 345
+      "line": 420
     },
     {
       "name": "create_primitive_mesh",
@@ -5166,7 +4910,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 350
+      "line": 425
     },
     {
       "name": "create_array_mesh",
@@ -5178,7 +4922,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 355
+      "line": 430
     },
     {
       "name": "set_mesh_surface_material",
@@ -5190,7 +4934,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 360
+      "line": 435
     },
     {
       "name": "assign_mesh_to_instance",
@@ -5202,7 +4946,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 365
+      "line": 440
     },
     {
       "name": "create_scene_node",
@@ -5215,7 +4959,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 116
+      "line": 257
     },
     {
       "name": "delete_scene_node",
@@ -5229,7 +4973,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 121
+      "line": 262
     },
     {
       "name": "rename_scene_node",
@@ -5243,7 +4987,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 126
+      "line": 267
     },
     {
       "name": "reparent_node",
@@ -5257,7 +5001,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 131
+      "line": 272
     },
     {
       "name": "get_scene_tree",
@@ -5265,11 +5009,11 @@
       "domain": "Scene",
       "side_effect": "None",
       "flags": [
-        "kNone"
+        "kObserve"
       ],
-      "param_count": 2,
+      "param_count": 8,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 136
+      "line": 277
     },
     {
       "name": "instantiate_scene",
@@ -5282,19 +5026,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 141
-    },
-    {
-      "name": "get_scene_node_screen_rect",
-      "category": "Scene",
-      "domain": "Scene",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 146
+      "line": 292
     },
     {
       "name": "build_nodes_from_spec",
@@ -5307,19 +5039,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 151
-    },
-    {
-      "name": "get_scene_snapshot",
-      "category": "Scene",
-      "domain": "Scene",
-      "side_effect": "None",
-      "flags": [
-        "kObserve"
-      ],
-      "param_count": 5,
-      "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 156
+      "line": 297
     },
     {
       "name": "spawn_node_bundle",
@@ -5333,7 +5053,7 @@
       ],
       "param_count": 10,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 161
+      "line": 302
     },
     {
       "name": "create_path_node",
@@ -5346,7 +5066,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 166
+      "line": 307
     },
     {
       "name": "advance_path_follow",
@@ -5359,7 +5079,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 171
+      "line": 312
     },
     {
       "name": "focus_camera_on_node",
@@ -5373,7 +5093,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 176
+      "line": 317
     },
     {
       "name": "set_camera_params",
@@ -5387,7 +5107,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 181
+      "line": 322
     },
     {
       "name": "get_camera_view_rect",
@@ -5399,7 +5119,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 186
+      "line": 327
     },
     {
       "name": "call_scene_tree_group",
@@ -5507,19 +5227,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 82
-    },
-    {
-      "name": "load_script",
-      "category": "Scripts",
-      "domain": "Scripts",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 87
+      "line": 78
     },
     {
       "name": "create_script",
@@ -5531,7 +5239,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 92
+      "line": 83
     },
     {
       "name": "patch_script",
@@ -5543,7 +5251,7 @@
       ],
       "param_count": 6,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 97
+      "line": 88
     },
     {
       "name": "attach_script_to_node",
@@ -5557,7 +5265,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 102
+      "line": 93
     },
     {
       "name": "detach_script_from_node",
@@ -5570,7 +5278,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 107
+      "line": 98
     },
     {
       "name": "get_script_property",
@@ -5582,7 +5290,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 112
+      "line": 103
     },
     {
       "name": "set_script_property",
@@ -5594,7 +5302,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 117
+      "line": 108
     },
     {
       "name": "call_script_node",
@@ -5606,7 +5314,7 @@
       ],
       "param_count": 3,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 122
+      "line": 113
     },
     {
       "name": "reload_script",
@@ -5618,7 +5326,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 127
+      "line": 118
     },
     {
       "name": "get_script_property_list",
@@ -5630,7 +5338,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/script/script_tools.hpp",
-      "line": 132
+      "line": 123
     },
     {
       "name": "create_spriteframes",
@@ -5822,55 +5530,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/theme/theme_tools.hpp",
-      "line": 91
-    },
-    {
-      "name": "set_theme_color",
-      "category": "Theme",
-      "domain": "Theme",
-      "side_effect": "WritesFile",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 4,
-      "source": "src/tools/domains/theme/theme_tools.hpp",
-      "line": 96
-    },
-    {
-      "name": "set_theme_constant",
-      "category": "Theme",
-      "domain": "Theme",
-      "side_effect": "WritesFile",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 4,
-      "source": "src/tools/domains/theme/theme_tools.hpp",
-      "line": 101
-    },
-    {
-      "name": "set_theme_font_size",
-      "category": "Theme",
-      "domain": "Theme",
-      "side_effect": "WritesFile",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 4,
-      "source": "src/tools/domains/theme/theme_tools.hpp",
-      "line": 106
-    },
-    {
-      "name": "set_theme_stylebox_flat",
-      "category": "Theme",
-      "domain": "Theme",
-      "side_effect": "WritesFile",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 4,
-      "source": "src/tools/domains/theme/theme_tools.hpp",
-      "line": 111
+      "line": 204
     },
     {
       "name": "get_theme_info",
@@ -5882,7 +5542,7 @@
       ],
       "param_count": 1,
       "source": "src/tools/domains/theme/theme_tools.hpp",
-      "line": 116
+      "line": 209
     },
     {
       "name": "apply_theme_to_control",
@@ -5895,20 +5555,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/theme/theme_tools.hpp",
-      "line": 121
-    },
-    {
-      "name": "set_control_anchor_preset",
-      "category": "Theme",
-      "domain": "Theme",
-      "side_effect": "WritesScene",
-      "flags": [
-        "kNone",
-        "kSceneTarget"
-      ],
-      "param_count": 3,
-      "source": "src/tools/domains/theme/theme_tools.hpp",
-      "line": 126
+      "line": 214
     },
     {
       "name": "set_control_layout",
@@ -5922,7 +5569,7 @@
       ],
       "param_count": 10,
       "source": "src/tools/domains/theme/theme_tools.hpp",
-      "line": 131
+      "line": 219
     },
     {
       "name": "set_theme_item_bundle",
@@ -5934,7 +5581,7 @@
       ],
       "param_count": 5,
       "source": "src/tools/domains/theme/theme_tools.hpp",
-      "line": 136
+      "line": 230
     },
     {
       "name": "create_tilemap",
@@ -5947,20 +5594,7 @@
       ],
       "param_count": 4,
       "source": "src/tools/domains/tilemap/tilemap_tools.hpp",
-      "line": 60
-    },
-    {
-      "name": "set_tilemap_cell",
-      "category": "TileMap",
-      "domain": "TileMap",
-      "side_effect": "WritesScene",
-      "flags": [
-        "kNone",
-        "kSceneTarget"
-      ],
-      "param_count": 6,
-      "source": "src/tools/domains/tilemap/tilemap_tools.hpp",
-      "line": 65
+      "line": 118
     },
     {
       "name": "set_tilemap_cells",
@@ -5971,9 +5605,9 @@
         "kNone",
         "kSceneTarget"
       ],
-      "param_count": 3,
+      "param_count": 9,
       "source": "src/tools/domains/tilemap/tilemap_tools.hpp",
-      "line": 70
+      "line": 123
     },
     {
       "name": "fill_tilemap_rect",
@@ -5987,7 +5621,7 @@
       ],
       "param_count": 8,
       "source": "src/tools/domains/tilemap/tilemap_tools.hpp",
-      "line": 75
+      "line": 134
     },
     {
       "name": "create_tilemap_tileset",
@@ -5999,7 +5633,7 @@
       ],
       "param_count": 2,
       "source": "src/tools/domains/tilemap/tilemap_tools.hpp",
-      "line": 80
+      "line": 139
     },
     {
       "name": "add_tilemap_atlas_source",
@@ -6088,19 +5722,6 @@
   ],
   "meta_tools": [
     {
-      "name": "ping",
-      "category": "Meta",
-      "domain": "Meta",
-      "side_effect": "None",
-      "flags": [
-        "kMeta",
-        "kHealthProbe"
-      ],
-      "param_count": null,
-      "source": "src/tools/base/register_all.cpp",
-      "line": 466
-    },
-    {
       "name": "search_tools",
       "category": "Meta",
       "domain": "Meta",
@@ -6110,19 +5731,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 475
-    },
-    {
-      "name": "list_categories",
-      "category": "Meta",
-      "domain": "Meta",
-      "side_effect": "None",
-      "flags": [
-        "kMeta"
-      ],
-      "param_count": null,
-      "source": "src/tools/base/register_all.cpp",
-      "line": 510
+      "line": 481
     },
     {
       "name": "get_tool_detail",
@@ -6134,7 +5743,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 519
+      "line": 530
     },
     {
       "name": "call_tool",
@@ -6146,7 +5755,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 532
+      "line": 543
     },
     {
       "name": "batch_execute",
@@ -6159,7 +5768,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 554
+      "line": 565
     },
     {
       "name": "code_execute",
@@ -6172,7 +5781,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 617
+      "line": 628
     }
   ],
   "system_tools": [
@@ -6186,7 +5795,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 375
+      "line": 382
     }
   ],
   "side_effect_review": [
@@ -6195,21 +5804,21 @@
       "domain": "Audio",
       "side_effect": "None",
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 173
+      "line": 180
     },
     {
       "name": "stop_audio_player",
       "domain": "Audio",
       "side_effect": "None",
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 178
+      "line": 185
     },
     {
       "name": "stop_audio_input_capture",
       "domain": "Audio",
       "side_effect": "None",
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 233
+      "line": 235
     },
     {
       "name": "remove_physics_3d_body_collision_exception",
@@ -6230,7 +5839,7 @@
       "domain": "Resources",
       "side_effect": "None",
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 235
+      "line": 309
     },
     {
       "name": "run_gdscript_tests",

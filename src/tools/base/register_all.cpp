@@ -73,11 +73,7 @@ static int g_port = 0;
 static mcp::McpServer *g_surface_server = nullptr;
 static ToolSurface g_tool_surface = ToolSurface::Meta;
 
-static mcp::JsonValue meta_ping_impl() {
-    mcp::JsonValue r(mcp::JsonValue::object_tag);
-    r["result"] = mcp::JsonValue("pong");
-    return r;
-}
+static mcp::JsonValue meta_categories_impl(ToolCatalog& catalog);
 
 static mcp::JsonValue meta_search_tools_impl(const mcp::JsonValue& args,
                                              Bm25Index& index,
@@ -97,6 +93,19 @@ static mcp::JsonValue meta_search_tools_impl(const mcp::JsonValue& args,
             return error;
         }
         limit = limit_p->GetInt();
+    }
+
+    bool categories = false;
+    if (auto* categories_p = args.Find("categories"); categories_p && !categories_p->IsNull()) {
+        if (!categories_p->IsBool()) {
+            mcp::JsonValue error(mcp::JsonValue::object_tag);
+            error["error"] = mcp::JsonValue("invalid parameter: categories must be a boolean");
+            return error;
+        }
+        categories = categories_p->GetBool();
+    }
+    if (categories) {
+        return meta_categories_impl(catalog);
     }
 
     Bm25Index::SearchQuery query;
@@ -161,8 +170,7 @@ static mcp::JsonValue meta_search_tools_impl(const mcp::JsonValue& args,
     return j;
 }
 
-static mcp::JsonValue meta_list_categories_impl(ToolCatalog& catalog) {
-    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "list_categories called");
+static mcp::JsonValue meta_categories_impl(ToolCatalog& catalog) {
     auto cats = catalog.get_categories();
     mcp::JsonValue j(mcp::JsonValue::object_tag);
     mcp::JsonValue arr(mcp::JsonValue::array_tag);
@@ -180,7 +188,6 @@ static mcp::JsonValue meta_list_categories_impl(ToolCatalog& catalog) {
         arr.PushBack(std::move(item));
     }
     j["categories"] = std::move(arr);
-    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools, "list_categories completed");
     return j;
 }
 
@@ -419,7 +426,15 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
             return r;
         };
         spec.raw_schema = schema::build_schema({});
-        registry->add(make_spec_tool(std::move(spec)));
+        registry->add(make_spec_tool(with_aliases(
+            std::move(spec),
+            {ToolAlias{"ping", "system_status", {},
+                       [](const mcp::JsonValue &) {
+                         mcp::JsonValue out(mcp::JsonValue::object_tag);
+                         out["result"] = mcp::JsonValue("pong");
+                         return out;
+                       },
+                       "0.4.0", "0.6.0"}})));
     }
 
     auto add_domain_tools = [&registry](auto& make_fn) {
@@ -463,16 +478,7 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
     add_domain_tools(tween_tools::make_tools);
 
     {
-        ToolSpec spec{"ping", "Health check ping", "Meta", {"health", "ping"}};
-        spec.side_effect = SideEffect::None;
-        spec.flags = tool_flags::kMeta | tool_flags::kHealthProbe;
-        spec.handler = [](const mcp::JsonValue&) { return meta_ping_impl(); };
-        spec.raw_schema = schema::build_schema({});
-        registry->add(make_spec_tool(std::move(spec)));
-    }
-
-    {
-        ToolSpec spec{"search_tools", "Search available tools by query", "Meta", {"search", "discovery"}};
+        ToolSpec spec{"search_tools", "Search available tools by query, category or tags; categories=true lists categories with tool counts", "Meta", {"search", "discovery"}};
         spec.side_effect = SideEffect::None;
         spec.flags = tool_flags::kMeta;
         spec.handler = [&index, &catalog](const mcp::JsonValue& args) { return meta_search_tools_impl(args, index, catalog); };
@@ -500,19 +506,24 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
         t_prop["items"] = std::move(ti);
         t_prop["description"] = mcp::JsonValue("Filter by tags");
         props["tags"] = std::move(t_prop);
+        mcp::JsonValue cat_prop(mcp::JsonValue::object_tag);
+        cat_prop["type"] = mcp::JsonValue("boolean");
+        cat_prop["description"] = mcp::JsonValue(
+            "When true return the category list with per-category tool counts instead of tool results");
+        props["categories"] = std::move(cat_prop);
         s["properties"] = std::move(props);
         s["required"] = mcp::JsonValue(mcp::JsonValue::array_tag);
         spec.raw_schema = std::move(s);
-        registry->add(make_spec_tool(std::move(spec)));
-    }
-
-    {
-        ToolSpec spec{"list_categories", "List all tool categories", "Meta", {"categories", "discovery"}};
-        spec.side_effect = SideEffect::None;
-        spec.flags = tool_flags::kMeta;
-        spec.handler = [&catalog](const mcp::JsonValue&) { return meta_list_categories_impl(catalog); };
-        spec.raw_schema = schema::build_schema({});
-        registry->add(make_spec_tool(std::move(spec)));
+        registry->add(make_spec_tool(with_aliases(
+            std::move(spec),
+            {ToolAlias{"list_categories", "search_tools",
+                       [](const mcp::JsonValue &) {
+                         mcp::JsonValue out(mcp::JsonValue::object_tag);
+                         out["categories"] = mcp::JsonValue(true);
+                         out["limit"] = mcp::JsonValue(static_cast<int64_t>(0));
+                         return out;
+                       },
+                       {}, "0.4.0", "0.6.0"}})));
     }
 
     {
@@ -523,14 +534,14 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
             return meta_get_tool_detail_impl(args, catalog, get_active_registry());
         };
         spec.raw_schema = schema::build_schema({
-            {"name", "string", "Tool name (e.g. ping, search_tools)", true},
+            {"name", "string", "Tool name (e.g. get_scene_tree, search_tools)", true},
         });
         registry->add(make_spec_tool(std::move(spec)));
     }
 
     {
         ToolSpec spec{"call_tool",
-                      "Execute any tool by name. Use this to call all 452 non-meta tools (451 domain tools plus system_status).",
+                      "Execute any tool by name. Use this to call all 422 non-meta tools (421 domain tools plus system_status).",
                       "System", {"call", "dispatch", "proxy"}};
         spec.side_effect = SideEffect::None;
         spec.flags = tool_flags::kMeta;

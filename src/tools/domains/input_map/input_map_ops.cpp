@@ -634,7 +634,7 @@ JV handle_erase_action(const JV &args) {
   return r;
 }
 
-JV handle_get_actions(const JV &) {
+JV handle_get_actions(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "get_input_map_actions called");
   auto *im = godot::InputMap::get_singleton();
@@ -643,10 +643,23 @@ JV handle_get_actions(const JV &) {
     e["error"] = JV("InputMap not available");
     return e;
   }
-  auto names = im->get_actions();
   JV result_arr(JV::array_tag);
-  for (int i = 0; i < names.size(); i++) {
-    result_arr.PushBack(JV(util::to_std(godot::String(names[i]))));
+  const JV *action_p = args.Find("action");
+  if (action_p != nullptr) {
+    if (!action_p->IsString()) {
+      JV e(JV::object_tag);
+      e["error"] = JV("invalid parameter: action must be a string");
+      return e;
+    }
+    const std::string action = action_p->GetString();
+    if (im->has_action(godot::StringName(action.c_str()))) {
+      result_arr.PushBack(JV(action));
+    }
+  } else {
+    auto names = im->get_actions();
+    for (int i = 0; i < names.size(); i++) {
+      result_arr.PushBack(JV(util::to_std(godot::String(names[i]))));
+    }
   }
   JV r(JV::object_tag);
   r["result"] = std::move(result_arr);

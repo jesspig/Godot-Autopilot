@@ -297,6 +297,8 @@ const META_TOOLS_WITH_PARAMS = new Set([
   "code_execute",
 ]);
 
+const PREVIOUS_META_TOOLS = new Set(["ping", "list_categories"]);
+
 const PRUNE_ROWS: PruneRow[] = [
   {
     old_tool: "get_audio_device_inputs",
@@ -911,6 +913,22 @@ function parseSystemSpecs(text: string): { meta: ToolRecord[]; system: ToolRecor
   return { meta, system };
 }
 
+function loadPreviousMatrixTools(): Set<string> {
+  if (!fs.existsSync(MATRIX_PATH)) {
+    return new Set();
+  }
+  const previous = JSON.parse(fs.readFileSync(MATRIX_PATH, "utf8")) as {
+    rows?: Array<{ old_tool?: string }>;
+  };
+  const names = new Set<string>();
+  for (const row of previous.rows ?? []) {
+    if (typeof row.old_tool === "string" && row.old_tool.length > 0) {
+      names.add(row.old_tool);
+    }
+  }
+  return names;
+}
+
 function countValues<T extends string>(values: T[]): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const value of values) counts[value] = (counts[value] ?? 0) + 1;
@@ -951,11 +969,8 @@ function buildAudit() {
   if (duplicateNames.length > 0) {
     throw new Error(`duplicate tool names: ${[...new Set(duplicateNames)].join(", ")}`);
   }
-  if (domainTools.length !== 451) {
-    throw new Error(`expected 451 domain tools, found ${domainTools.length}`);
-  }
-  if (meta.length !== 7) {
-    throw new Error(`expected 7 meta tools, found ${meta.length}`);
+  if (meta.length !== 5) {
+    throw new Error(`expected 5 meta tools, found ${meta.length}`);
   }
   if (system.length !== 1) {
     throw new Error(`expected 1 system tool, found ${system.length}`);
@@ -979,9 +994,15 @@ function buildAudit() {
   }
 
   const known = new Set(names);
-  const missingPrune = PRUNE_ROWS.filter((row) => !known.has(row.old_tool));
+  const previousMatrixTools = loadPreviousMatrixTools();
+  const missingPrune = PRUNE_ROWS.filter(
+    (row) =>
+      !known.has(row.old_tool) &&
+      !previousMatrixTools.has(row.old_tool) &&
+      !PREVIOUS_META_TOOLS.has(row.old_tool),
+  );
   if (missingPrune.length > 0) {
-    throw new Error(`prune rows reference missing tools: ${missingPrune.map((row) => row.old_tool).join(", ")}`);
+    throw new Error(`prune rows reference unknown tools: ${missingPrune.map((row) => row.old_tool).join(", ")}`);
   }
 
   const sideEffectReview = domainTools.filter(
@@ -1082,9 +1103,22 @@ function buildTarget(audit: ReturnType<typeof buildAudit>) {
   };
 }
 
+type MatrixRow = {
+  old_tool: string;
+  domain: string;
+  category: string;
+  side_effect: string;
+  new_tool: string;
+  action: string;
+  alias: boolean;
+  status: string;
+  arg_adapt: string;
+  result_projection: string;
+};
+
 function buildCapabilityMatrix(audit: ReturnType<typeof buildAudit>) {
   const pruneByTool = new Map(PRUNE_ROWS.map((row) => [row.old_tool, row]));
-  const toRow = (tool: ToolRecord) => {
+  const toRow = (tool: ToolRecord): MatrixRow => {
     const prune = pruneByTool.get(tool.name);
     return {
       old_tool: tool.name,
@@ -1099,22 +1133,65 @@ function buildCapabilityMatrix(audit: ReturnType<typeof buildAudit>) {
       result_projection: prune ? prune.result_projection : "",
     };
   };
-  const rows = audit.tools.map(toRow);
+  let previousRows: MatrixRow[] = [];
+  if (fs.existsSync(MATRIX_PATH)) {
+    const previous = JSON.parse(fs.readFileSync(MATRIX_PATH, "utf8")) as {
+      rows?: MatrixRow[];
+    };
+    if (Array.isArray(previous.rows)) {
+      previousRows = previous.rows;
+    }
+  }
+  const currentByName = new Map(audit.tools.map((tool) => [tool.name, tool]));
+  const rows = previousRows.length > 0
+    ? previousRows.map((previousRow) => {
+        const current = currentByName.get(previousRow.old_tool);
+        if (current) {
+          return toRow(current);
+        }
+        const prune = pruneByTool.get(previousRow.old_tool);
+        return {
+          old_tool: previousRow.old_tool,
+          domain: previousRow.domain,
+          category: previousRow.category,
+          side_effect: previousRow.side_effect,
+          new_tool: prune?.new_tool ?? previousRow.new_tool,
+          action: prune?.action ?? previousRow.action,
+          alias: prune !== undefined || previousRow.alias,
+          status: prune
+            ? "mapped"
+            : previousRow.status === "mapped"
+              ? "mapped"
+              : "missing",
+          arg_adapt: prune?.arg_adapt ?? previousRow.arg_adapt,
+          result_projection:
+            prune?.result_projection ?? previousRow.result_projection,
+        };
+      })
+    : audit.tools.map(toRow);
+  const knownRows = new Set(rows.map((row) => row.old_tool));
+  for (const tool of audit.tools) {
+    if (!knownRows.has(tool.name)) {
+      rows.push(toRow(tool));
+    }
+  }
   const metaRows = [...audit.system_tools, ...audit.meta_tools].map(toRow);
+  const allRows = [...rows, ...metaRows];
   return {
     schema: 1,
     source: "src/tools/domains/*/*_tools.hpp",
     row_count: rows.length,
     unique_tool_count: new Set(rows.map((row) => row.old_tool)).size,
-    catalog_row_count: rows.length + metaRows.length,
-    catalog_unique_tool_count: new Set([...rows, ...metaRows].map((row) => row.old_tool)).size,
+    catalog_row_count: allRows.length,
+    catalog_unique_tool_count: new Set(allRows.map((row) => row.old_tool)).size,
     strict_prune_count: PRUNE_ROWS.length,
     domain_mapped_count: rows.filter((row) => row.status === "mapped").length,
     domain_kept_count: rows.filter((row) => row.status === "kept").length,
+    domain_missing_count: rows.filter((row) => row.status === "missing").length,
     meta_mapped_count: metaRows.filter((row) => row.status === "mapped").length,
     meta_kept_count: metaRows.filter((row) => row.status === "kept").length,
-    mapped_count: [...rows, ...metaRows].filter((row) => row.status === "mapped").length,
-    kept_count: [...rows, ...metaRows].filter((row) => row.status === "kept").length,
+    mapped_count: allRows.filter((row) => row.status === "mapped").length,
+    kept_count: allRows.filter((row) => row.status === "kept").length,
     rows,
     meta_rows: metaRows,
   };

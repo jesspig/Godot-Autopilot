@@ -14,16 +14,13 @@ namespace audio_tools {
 
 namespace {
 
-const std::vector<ParamSpec> kGetAudioBusLayoutParams = {};
+const std::vector<ParamSpec> kGetAudioBusLayoutParams = {
+    {"action", "string", "Optional action: 'layout' (default) returns the serialized AudioBusLayout, 'count' returns the bus count, 'name' returns one bus name", false},
+    {"bus_index", "integer", "Bus index for action='name'; 0 is the Master bus", false},
+};
 
 const std::vector<ParamSpec> kSetAudioBusLayoutParams = {
     {"layout", "object", "Serialized AudioBusLayout object as returned by get_audio_bus_layout, typically edited before applying", true},
-};
-
-const std::vector<ParamSpec> kGetAudioBusCountParams = {};
-
-const std::vector<ParamSpec> kGetAudioBusNameParams = {
-    {"bus_index", "integer", "Zero-based audio bus index; 0 is the Master bus and the index must be below the count from get_audio_bus_count", true},
 };
 
 const std::vector<ParamSpec> kSetAudioBusVolumeDbParams = {
@@ -92,10 +89,8 @@ const std::vector<ParamSpec> kSetAudioDeviceOutputParams = {
     {"device", "string", "Output device name as returned by get_audio_device_outputs", true},
 };
 
-const std::vector<ParamSpec> kGetAudioDeviceInputsParams = {};
-
 const std::vector<ParamSpec> kSetAudioDeviceInputParams = {
-    {"device", "string", "Input device name as returned by get_audio_device_inputs", true},
+    {"device", "string", "Input device name as returned by get_audio_input_devices", true},
 };
 
 const std::vector<ParamSpec> kStartAudioInputCaptureParams = {
@@ -124,27 +119,39 @@ const std::vector<ParamSpec> kGetAudioInputDevicesParams = {};
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(24);
-  v.push_back(make_spec_tool(ToolSpec{
+  v.reserve(21);
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
       "get_audio_bus_layout",
-      "Get the complete audio bus layout from the audio server, including the Master bus and every bus effect chain. Use this to inspect the current bus routing or to snapshot a layout before making changes. Returns the serialized AudioBusLayout object in 'result'. No parameters are required.",
+      "Get the audio bus layout or a projection of it. 'action' selects 'layout' (default, the complete serialized AudioBusLayout including every bus effect chain), 'count' (number of buses including Master) or 'name' (name of the bus at 'bus_index'; 0 is Master). Use it to inspect routing, snapshot a layout, bound bus indices, or resolve one bus name without fetching the full layout. Returns the selected value in 'result'.",
       "Audio", {"audio", "bus", "layout", "get"}, SideEffect::None, tool_flags::kNone,
-      kGetAudioBusLayoutParams, audio_ops::handle_bus_get_layout}));
+      kGetAudioBusLayoutParams, audio_ops::handle_bus_get_layout},
+      {
+          ToolAlias{
+              "get_audio_bus_count", "get_audio_bus_layout",
+              [](const mcp::JsonValue &) {
+                mcp::JsonValue out(mcp::JsonValue::object_tag);
+                out["action"] = mcp::JsonValue("count");
+                return out;
+              },
+              {}, "0.4.0", "0.6.0"},
+          ToolAlias{
+              "get_audio_bus_name", "get_audio_bus_layout",
+              [](const mcp::JsonValue &args) {
+                mcp::JsonValue out(mcp::JsonValue::object_tag);
+                out["action"] = mcp::JsonValue("name");
+                const mcp::JsonValue *index = args.Find("bus_index");
+                if (index != nullptr) {
+                  out["bus_index"] = *index;
+                }
+                return out;
+              },
+              {}, "0.4.0", "0.6.0"},
+      })));
   v.push_back(make_spec_tool(ToolSpec{
       "set_audio_bus_layout",
       "Replace the whole audio bus layout of the audio server, including bus count, names, volume and effect chains. Use the object returned by get_audio_bus_layout as input, typically after editing the layout. Returns 'result' set to 'ok'. The change applies immediately to editor playback.",
       "Audio", {"audio", "bus", "layout", "set"}, SideEffect::None, tool_flags::kNone,
       kSetAudioBusLayoutParams, audio_ops::handle_bus_set_layout}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "get_audio_bus_count",
-      "Get the number of audio buses currently defined, including the default Master bus which always occupies index 0. Use the returned count to bound 'bus_index' values passed to the other bus tools. Returns the count as an integer in 'result'.",
-      "Audio", {"audio", "bus", "count"}, SideEffect::None, tool_flags::kNone,
-      kGetAudioBusCountParams, audio_ops::handle_bus_get_count}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "get_audio_bus_name",
-      "Get the name of an audio bus by its zero-based index. Index 0 is always the Master bus, and the index must be smaller than the count returned by get_audio_bus_count or an error is returned. Returns the bus name string in 'result'.",
-      "Audio", {"audio", "bus", "name"}, SideEffect::None, tool_flags::kNone,
-      kGetAudioBusNameParams, audio_ops::handle_bus_get_name}));
   v.push_back(make_spec_tool(ToolSpec{
       "set_audio_bus_volume_db",
       "Set the volume of an audio bus in decibels, applied immediately to bus playback. Negative values attenuate and positive values amplify, with typical ranges from -80 (silence) to +24. Use set_audio_player_volume_db instead to adjust a single player node. Returns 'result' set to 'ok'.",
@@ -216,13 +223,8 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       "Audio", {"audio", "device"}, SideEffect::None, tool_flags::kNone,
       kSetAudioDeviceOutputParams, audio_ops::handle_set_output_device}));
   v.push_back(make_spec_tool(ToolSpec{
-      "get_audio_device_inputs",
-      "List the audio input devices available on this machine, such as microphones. Use the returned device name strings directly as the 'device' value for set_audio_device_input. Returns an array of device name strings in 'result'. The list reflects hardware attached to the system, not project settings.",
-      "Audio", {"audio", "device"}, SideEffect::None, tool_flags::kNone,
-      kGetAudioDeviceInputsParams, audio_ops::handle_get_input_device_list}));
-  v.push_back(make_spec_tool(ToolSpec{
       "set_audio_device_input",
-      "Switch the audio input device of the editor process, for example to a different microphone. 'device' must be one of the names returned by get_audio_device_inputs; a running game process keeps its own device. List devices first to get valid names. Returns 'result' set to 'ok'.",
+      "Switch the audio input device of the editor process, for example to a different microphone. 'device' must be one of the names returned by get_audio_input_devices; a running game process keeps its own device. List devices first to get valid names. Returns 'result' set to 'ok'.",
       "Audio", {"audio", "device"}, SideEffect::None, tool_flags::kNone,
       kSetAudioDeviceInputParams, audio_ops::handle_set_input_device}));
   v.push_back(make_spec_tool(ToolSpec{
@@ -240,11 +242,30 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       "Build an AudioStreamWAV from inline 'samples' and register it as 'memory://name' for later tools. 'format' accepts 8 or 16 (default 16) and any other value is rejected; 'mix_rate' defaults to 44100; 'stereo' false treats samples as mono while true expects flat interleaved L/R pairs; total frames (samples divided by channel count) must be between 1 and 1000000. Returns the WAV locator with format, mix_rate, stereo and frames in 'result'. Save it to disk before assigning it to a node property.",
       "Audio", {"audio", "wav", "create"}, SideEffect::None, tool_flags::kNone,
       kCreateAudioStreamWavParams, audio_ops::handle_create_wav}));
-  v.push_back(make_spec_tool(ToolSpec{
+  v.push_back(make_spec_tool(with_aliases(ToolSpec{
       "get_audio_input_devices",
       "List the audio input devices available on this machine, such as microphones, together with the current capture state. Use a returned device name as the 'device' value for start_audio_input_capture or set_audio_device_input. Returns an object with 'devices' (array of device name strings), 'current', 'input_mix_rate' and 'frames_available' in 'result'.",
       "Audio", {"audio", "device", "input"}, SideEffect::None, tool_flags::kNone,
-      kGetAudioInputDevicesParams, audio_ops::handle_get_input_devices}));
+      kGetAudioInputDevicesParams, audio_ops::handle_get_input_devices},
+      {
+          ToolAlias{
+              "get_audio_device_inputs", "get_audio_input_devices", {},
+              [](const mcp::JsonValue &result) {
+                mcp::JsonValue out(mcp::JsonValue::object_tag);
+                const mcp::JsonValue *inner = result.Find("result");
+                const mcp::JsonValue *devices =
+                    inner != nullptr && inner->IsObject()
+                        ? inner->Find("devices")
+                        : nullptr;
+                if (devices != nullptr) {
+                  out["result"] = *devices;
+                } else {
+                  out["error"] = mcp::JsonValue("devices not available");
+                }
+                return out;
+              },
+              "0.4.0", "0.6.0"},
+      })));
   return v;
 }
 

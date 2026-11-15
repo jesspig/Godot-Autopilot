@@ -99,10 +99,6 @@ const std::vector<ParamSpec> kSaveEditorSceneAsParams = {
     {"include_paths", "boolean", "Always attach the missing_paths list even when node counts match (default: attached only on mismatch)", false},
 };
 
-const std::vector<ParamSpec> kVerifySceneSavedParams = {
-    {"scene_path", "string", "Scene file path to compare against the in-memory tree, e.g. 'res://game.tscn'; when omitted the current scene file path is used", false},
-    {"include_hash", "boolean", "Attach FNV-1a content hashes of the memory tree and the on-disk file (memory_hash/disk_hash); off by default", false},
-};
 
 const std::vector<ParamSpec> kBuildCsharpAssemblyParams = {
     {"wait", "boolean", "When true run dotnet build synchronously via OS.execute and wait for the BuildResult with exit_code, success, errors and output_digest; when false or omitted launch via OS.create_process and return immediately with pid and started", false},
@@ -169,7 +165,7 @@ const std::vector<ParamSpec> kRunEditorShortcutParams = {
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(33);
+  v.reserve(32);
   v.push_back(make_spec_tool(ToolSpec{
       "get_editor_selection",
       "Retrieve the list of nodes currently selected in the edited scene. Use it to see which nodes the user has selected before operating on them with scene tools. Returns result as an array of objects, each with name, class and path fields relative to the scene root; an empty array means nothing is selected.",
@@ -275,11 +271,6 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       "Save the currently edited scene to a specific file path, creating missing parent directories automatically. Use it when the scene has no file path yet or when you want to store a copy at another location. Errors when the file is not created after saving. Returns result 'saved'.",
       "Editor", {"editor", "scene", "save"}, SideEffect::WritesFile, tool_flags::kMutating,
       kSaveEditorSceneAsParams, editor_ops::handle_save_scene_as}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "verify_scene_saved",
-      "Compare the in-memory edited scene tree against its on-disk .tscn file without modifying anything. Use it after save_editor_scene or save_editor_scene_as to prove the save persisted every node (e.g. after moving a subtree with children), or as a standalone consistency check. Returns result 'match' or 'mismatch' plus memory_nodes, disk_nodes, match, missing_paths (memory paths absent on disk, capped at 50 with missing_truncated) and path; optional scene_path overrides the compared file, include_hash adds FNV-1a memory_hash/disk_hash. inherited_nodes and inherited_connections count the nodes and connections inside sub-scene instances that are never written to the .tscn, inherited_paths lists those node paths when any exist (capped at 50 with inherited_truncated), and the match verdict compares only the persistable node and connection set. Read-only.",
-      "Editor", {"editor", "scene", "verify", "save"}, SideEffect::None, tool_flags::kNone,
-      kVerifySceneSavedParams, editor_ops::handle_verify_scene_saved}));
   v.push_back(make_spec_tool(ToolSpec{
       "build_csharp_assembly",
       "Trigger a C# project build with dotnet build --nologo on the res:// root .csproj/.sln. The engine path is globalized to an OS absolute path (ProjectSettings.globalize_path) before it reaches dotnet, because dotnet cannot resolve res:// paths. Intended for CI/command-line compile verification only: it does NOT rewind to an in-editor Build and does not hot-reload the loaded .NET assembly. By default (wait omitted or false) it launches via OS.create_process and returns immediately with result {project_file,project_path,command,pid,started,note}. With wait=true it runs synchronously via OS.execute, temporarily pinning DOTNET_CLI_UI_LANGUAGE=en for the child process and restoring the previous value afterwards so that output_digest carries ASCII English text instead of ACP-mangled localized output, and waits for the BuildResult {project_file,project_path,command,exit_code,success,errors,output_digest,output_empty}: project_file is the res:// project file, project_path the OS absolute path handed to dotnet, command the logical dotnet invocation on the res:// file, exit_code the dotnet exit code, success exit_code==0, errors lists output lines containing error (capped at 50 with errors_truncated), output_digest the combined stdout/stderr truncated to 4000 chars when desensitized else 64000 chars with output_truncated when cut, output_empty true when nothing was captured (output_hint then explains the exit code); timeout_ms declares the wait budget (1-25000, default 25000) validated to stay below the dispatch default 27000ms; errors when the project is not a C# project or dotnet is not available. Both shapes also return next_action (array of executable follow-up steps), restart_required (true when the build succeeded or was launched, independent of whether a game is running, because nothing hot-reloads the loaded assemblies) and game_running. With probe_script the response additionally carries editor_assembly_probe {path,is_dotnet_editor,state,can_instantiate,base_class,hint}: the editor loads the .cs resource without instantiating it, state is 'available' when it loads and 'unavailable' with unavailable=true when the editor is not a .NET build or the load fails; can_instantiate=false on an available probe means the editor still runs the old assembly, so click Build or restart the editor.",

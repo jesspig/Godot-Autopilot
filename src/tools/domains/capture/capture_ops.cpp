@@ -699,7 +699,10 @@ mcp::JsonValue handle_capture_viewport(const mcp::JsonValue &args) {
     }
     mcp::JsonValue captured = runtime_ops::handle_gda_send(
         "capture", params, timeout_ms, false, wait_ready);
-    return with_capture_save_options(std::move(captured), save_options);
+    mcp::JsonValue result =
+        with_capture_save_options(std::move(captured), save_options);
+    runtime_ops::append_runtime_degradation_hint(result);
+    return result;
   }
   if (target != "editor") {
     return util::error_detail("invalid target '" + target + "'",

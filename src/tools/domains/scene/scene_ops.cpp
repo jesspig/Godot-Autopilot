@@ -3,6 +3,7 @@
 #include "util/scene_verify.hpp"
 #include "core/observability/log_system.hpp"
 #include "core/scene_dirty_tracker.hpp"
+#include "tools/domains/editor/editor_ops.hpp"
 #include "tools/domains/property/property_ops.hpp"
 #include "tools/domains/resource/resource_ops.hpp"
 #include "util/error_util.hpp"
@@ -941,6 +942,23 @@ mcp::JsonValue handle_instance(const mcp::JsonValue &args) {
 }
 
 mcp::JsonValue handle_get_tree(const mcp::JsonValue &args) {
+  if (args.IsObject()) {
+    const mcp::JsonValue *verify = args.Find("verify");
+    const mcp::JsonValue *observe = args.Find("observe");
+    const bool extended =
+        (verify != nullptr && verify->IsBool() && verify->GetBool()) ||
+        (observe != nullptr && observe->IsBool() && observe->GetBool()) ||
+        args.Find("paths") != nullptr ||
+        args.Find("scene_path") != nullptr ||
+        args.Find("include_hash") != nullptr;
+    if (extended) {
+      mcp::JsonValue snapshot_args = args;
+      if (snapshot_args.Find("verify") == nullptr) {
+        snapshot_args["verify"] = mcp::JsonValue(false);
+      }
+      return handle_get_snapshot(snapshot_args);
+    }
+  }
   auto *editor = godot::EditorInterface::get_singleton();
   godot::Node *root = nullptr;
   if (editor) {
@@ -1246,11 +1264,23 @@ mcp::JsonValue handle_get_snapshot(const mcp::JsonValue &args) {
   inner["tree"] = std::move(tree);
   if (want_verify) {
     mcp::JsonValue vsum(mcp::JsonValue::object_tag);
-    std::string target_path = util::to_std(root->get_scene_file_path());
+    std::string target_path;
+    const mcp::JsonValue *scene_path_p = args.Find("scene_path");
+    if (scene_path_p != nullptr && scene_path_p->IsString() &&
+        !scene_path_p->GetString().empty()) {
+      target_path = scene_path_p->GetString();
+    } else {
+      target_path = util::to_std(root->get_scene_file_path());
+    }
+    bool want_hash = false;
+    if (const mcp::JsonValue *hash_p = args.Find("include_hash")) {
+      want_hash = hash_p->IsBool() && hash_p->GetBool();
+    }
     if (target_path.empty()) {
       vsum["available"] = mcp::JsonValue(false);
       vsum["error"] = mcp::JsonValue(
-          "current scene has no file path — save it first");
+          "current scene has no file path — save it first (save_editor_scene), "
+          "or provide scene_path");
       vsum["path"] = mcp::JsonValue("");
     } else if (!godot::FileAccess::file_exists(
                    godot::String(target_path.c_str()))) {
@@ -1269,7 +1299,7 @@ mcp::JsonValue handle_get_snapshot(const mcp::JsonValue &args) {
         vsum["path"] = mcp::JsonValue(target_path);
       } else {
         const scene_verify::VerifyResult vr =
-            scene_verify::compare_tree_with_text(root, text, false);
+            scene_verify::compare_tree_with_text(root, text, want_hash);
         vsum["available"] = mcp::JsonValue(true);
         vsum["match"] = mcp::JsonValue(vr.match);
         vsum["path"] = mcp::JsonValue(target_path);
@@ -1296,6 +1326,11 @@ mcp::JsonValue handle_get_snapshot(const mcp::JsonValue &args) {
         }
         if (vr.inherited_truncated)
           vsum["inherited_truncated"] = mcp::JsonValue(true);
+        if (want_hash && vr.hash_computed) {
+          vsum["memory_hash"] =
+              mcp::JsonValue(editor_ops::hash_hex(vr.memory_hash));
+          vsum["disk_hash"] = mcp::JsonValue(editor_ops::hash_hex(vr.disk_hash));
+        }
       }
     }
     inner["verify"] = std::move(vsum);
@@ -1303,7 +1338,10 @@ mcp::JsonValue handle_get_snapshot(const mcp::JsonValue &args) {
   if (has_paths) {
     mcp::JsonValue rect_args(mcp::JsonValue::object_tag);
     rect_args["paths"] = *paths_p;
-    rect_args["viewport"] = mcp::JsonValue("auto");
+    const mcp::JsonValue *viewport_p = args.Find("viewport");
+    rect_args["viewport"] = viewport_p != nullptr && viewport_p->IsString()
+                                ? *viewport_p
+                                : mcp::JsonValue("auto");
     mcp::JsonValue rect_res = handle_get_node_screen_rect(rect_args);
     const mcp::JsonValue *rect_inner = rect_res.Find("result");
     if (rect_inner && rect_inner->IsObject()) {

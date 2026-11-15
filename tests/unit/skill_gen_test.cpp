@@ -33,7 +33,7 @@ const char *const kManualWhitelist[] = {
     "godot", "at_frame", "stop_on_error", "rollback_on_error", "parent_path",
     "max_depth", "include_properties", "source_code", "function_name",
     "timeout_ms", "auto_owner", "SceneRoot", "target", "retryable", "isError",
-    "true", "false",
+    "true", "false", "theme_type",
     "godot_autopilot", "editor_readiness", "resource_ops", "record_error",
     "writes_file", "writes_scene", "is_error", "confirm_required",
     "already_playing", "physics_stalled", "node_count", "scan_truncated",
@@ -407,6 +407,9 @@ TEST_F(SkillRegistryFixture, ToolNamesExistInRegistry) {
         allowed.insert(entry.first);
       }
     }
+  }
+  for (const std::string &alias : registry_catalog().alias_names()) {
+    allowed.insert(alias);
   }
   for (const char *word : kManualWhitelist) {
     allowed.insert(word);

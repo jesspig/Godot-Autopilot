@@ -3,14 +3,15 @@
   "source": "src/tools/domains/*/*_tools.hpp",
   "row_count": 451,
   "unique_tool_count": 451,
-  "catalog_row_count": 459,
-  "catalog_unique_tool_count": 459,
+  "catalog_row_count": 457,
+  "catalog_unique_tool_count": 457,
   "strict_prune_count": 32,
   "domain_mapped_count": 30,
   "domain_kept_count": 421,
-  "meta_mapped_count": 2,
+  "domain_missing_count": 0,
+  "meta_mapped_count": 0,
   "meta_kept_count": 6,
-  "mapped_count": 32,
+  "mapped_count": 30,
   "kept_count": 427,
   "rows": [
     {
@@ -5440,18 +5441,6 @@
       "result_projection": ""
     },
     {
-      "old_tool": "ping",
-      "domain": "Meta",
-      "category": "Meta",
-      "side_effect": "None",
-      "new_tool": "system_status",
-      "action": "",
-      "alias": true,
-      "status": "mapped",
-      "arg_adapt": "无",
-      "result_projection": "{result:\"pong\"}"
-    },
-    {
       "old_tool": "search_tools",
       "domain": "Meta",
       "category": "Meta",
@@ -5462,18 +5451,6 @@
       "status": "kept",
       "arg_adapt": "",
       "result_projection": ""
-    },
-    {
-      "old_tool": "list_categories",
-      "domain": "Meta",
-      "category": "Meta",
-      "side_effect": "None",
-      "new_tool": "search_tools",
-      "action": "categories",
-      "alias": true,
-      "status": "mapped",
-      "arg_adapt": "categories=true, limit=0",
-      "result_projection": "旧 categories 数组"
     },
     {
       "old_tool": "get_tool_detail",
