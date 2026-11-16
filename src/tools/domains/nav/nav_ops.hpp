@@ -23,6 +23,10 @@ mcp::JsonValue handle_3d_map_set_cell_size(const mcp::JsonValue &args);
 mcp::JsonValue handle_3d_region_set_nav_mesh(const mcp::JsonValue &args);
 mcp::JsonValue handle_3d_obstacle_create(const mcp::JsonValue &args);
 
+mcp::JsonValue handle_nav_query(const mcp::JsonValue &args);
+mcp::JsonValue handle_bake_navigation_mesh(const mcp::JsonValue &args);
+mcp::JsonValue handle_astar_path(const mcp::JsonValue &args);
+
 } // namespace nav_ops
 } // namespace godot_autopilot
 

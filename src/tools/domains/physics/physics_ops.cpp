@@ -8,6 +8,8 @@
 #include "util/rid_registry.hpp"
 #include "util/scene_path.hpp"
 #include "util/variant_json.hpp"
+#include <godot_cpp/classes/area2d.hpp>
+#include <godot_cpp/classes/area3d.hpp>
 #include <godot_cpp/classes/box_shape3d.hpp>
 #include <godot_cpp/classes/capsule_shape2d.hpp>
 #include <godot_cpp/classes/capsule_shape3d.hpp>
@@ -18,6 +20,10 @@
 #include <godot_cpp/classes/collision_shape3d.hpp>
 #include <godot_cpp/classes/editor_interface.hpp>
 #include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/classes/node2d.hpp>
+#include <godot_cpp/classes/node3d.hpp>
+#include <godot_cpp/classes/physics_direct_body_state2d.hpp>
+#include <godot_cpp/classes/physics_direct_body_state3d.hpp>
 #include <godot_cpp/classes/physics_direct_space_state2d.hpp>
 #include <godot_cpp/classes/physics_direct_space_state3d.hpp>
 #include <godot_cpp/classes/physics_point_query_parameters2d.hpp>
@@ -28,6 +34,10 @@
 #include <godot_cpp/classes/physics_server3d.hpp>
 #include <godot_cpp/classes/physics_shape_query_parameters2d.hpp>
 #include <godot_cpp/classes/physics_shape_query_parameters3d.hpp>
+#include <godot_cpp/classes/physics_test_motion_parameters2d.hpp>
+#include <godot_cpp/classes/physics_test_motion_parameters3d.hpp>
+#include <godot_cpp/classes/physics_test_motion_result2d.hpp>
+#include <godot_cpp/classes/physics_test_motion_result3d.hpp>
 #include <godot_cpp/classes/rectangle_shape2d.hpp>
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
@@ -39,6 +49,7 @@
 #include <godot_cpp/core/object.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
+#include <godot_cpp/variant/packed_float32_array.hpp>
 #include <godot_cpp/variant/rid.hpp>
 #include <godot_cpp/variant/transform2d.hpp>
 #include <godot_cpp/variant/transform3d.hpp>
@@ -1819,6 +1830,1044 @@ JV handle_physics_node_get_rid(const JV &args) {
   return r;
 }
 
+namespace {
+
+const char *const kPhysicsQueryModeText =
+    "intersect_point, intersect_ray, intersect_shape, cast_motion, "
+    "collide_shape, rest_info, test_motion, contacts, area_overlaps";
+
+bool require_query_key(const JV &args, const char *mode, const char *key,
+                       JV *error) {
+  if (args.Find(key) != nullptr)
+    return true;
+  *error = util::error_json("missing required parameter for mode '" +
+                            std::string(mode) + "': " + key);
+  return false;
+}
+
+bool parse_query_dimension(const JV &args, int *dimension, JV *error) {
+  auto *value = args.Find("dimension");
+  if (!value || !value->IsNumber()) {
+    *error = util::error_json(
+        "missing or invalid required parameter: dimension (expected 2 or 3)");
+    return false;
+  }
+  int64_t number = 0;
+  if (value->IsInt()) {
+    number = value->GetInt();
+  } else {
+    const double raw = value->GetDouble();
+    if (raw != 2.0 && raw != 3.0) {
+      *error = util::error_json(
+          "invalid dimension: expected 2 (PhysicsServer2D) or 3 "
+          "(PhysicsServer3D)");
+      return false;
+    }
+    number = static_cast<int64_t>(raw);
+  }
+  if (number != 2 && number != 3) {
+    *error = util::error_json("invalid dimension: expected 2 (PhysicsServer2D) "
+                              "or 3 (PhysicsServer3D)");
+    return false;
+  }
+  *dimension = static_cast<int>(number);
+  return true;
+}
+
+bool parse_query_mode(const JV &args, std::string *mode, JV *error) {
+  auto *value = args.Find("mode");
+  if (!value || !value->IsString()) {
+    *error = util::error_json(
+        "missing or invalid required parameter: mode (supported: " +
+        std::string(kPhysicsQueryModeText) + ")");
+    return false;
+  }
+  static const char *const kModes[] = {
+      "intersect_point", "intersect_ray", "intersect_shape", "cast_motion",
+      "collide_shape",   "rest_info",     "test_motion",     "contacts",
+      "area_overlaps"};
+  const std::string candidate = value->GetString();
+  for (const char *known : kModes) {
+    if (candidate == known) {
+      *mode = candidate;
+      return true;
+    }
+  }
+  *error = util::error_json("invalid mode: " + candidate + " (supported: " +
+                            kPhysicsQueryModeText + ")");
+  return false;
+}
+
+bool parse_query_vec2(const JV &args, const char *key, godot::Vector2 *out,
+                      JV *error) {
+  auto *value = args.Find(key);
+  auto *x = value && value->IsObject() ? value->Find("x") : nullptr;
+  auto *y = value && value->IsObject() ? value->Find("y") : nullptr;
+  if (!x || !y || !x->IsNumber() || !y->IsNumber()) {
+    *error = util::error_json(
+        "invalid parameter: " + std::string(key) +
+        " expects a Vector2 object {x, y} for dimension 2");
+    return false;
+  }
+  *out = godot::Vector2(static_cast<float>(util::json_number(x, 0.0)),
+                        static_cast<float>(util::json_number(y, 0.0)));
+  return true;
+}
+
+bool parse_query_vec3(const JV &args, const char *key, godot::Vector3 *out,
+                      JV *error) {
+  auto *value = args.Find(key);
+  auto *x = value && value->IsObject() ? value->Find("x") : nullptr;
+  auto *y = value && value->IsObject() ? value->Find("y") : nullptr;
+  auto *z = value && value->IsObject() ? value->Find("z") : nullptr;
+  if (!x || !y || !z || !x->IsNumber() || !y->IsNumber() || !z->IsNumber()) {
+    *error = util::error_json(
+        "invalid parameter: " + std::string(key) +
+        " expects a Vector3 object {x, y, z} for dimension 3");
+    return false;
+  }
+  *out = godot::Vector3(static_cast<float>(util::json_number(x, 0.0)),
+                        static_cast<float>(util::json_number(y, 0.0)),
+                        static_cast<float>(util::json_number(z, 0.0)));
+  return true;
+}
+
+bool parse_query_transform2d(const JV &args, const char *key,
+                             godot::Transform2D *out, JV *error) {
+  auto *value = args.Find(key);
+  if (!value || !value->IsObject()) {
+    *error = util::error_json(
+        "invalid parameter: " + std::string(key) +
+        " expects a Transform2D object with origin {x, y}, rotation and scale "
+        "{x, y} for dimension 2");
+    return false;
+  }
+  const bool has_transform_fields =
+      value->Contains("origin") || value->Contains("rotation") ||
+      value->Contains("scale");
+  if (!has_transform_fields) {
+    if (!value->Contains("x") && !value->Contains("y")) {
+      *out = godot::Transform2D();
+      return true;
+    }
+    auto *x = value->Find("x");
+    auto *y = value->Find("y");
+    if (!x || !y || !x->IsNumber() || !y->IsNumber()) {
+      *error = util::error_json(
+          "invalid parameter: " + std::string(key) +
+          " expects a Vector2 object {x, y} or a Transform2D object for "
+          "dimension 2");
+      return false;
+    }
+    godot::Transform2D transform;
+    transform.set_origin(
+        godot::Vector2(static_cast<float>(util::json_number(x, 0.0)),
+                       static_cast<float>(util::json_number(y, 0.0))));
+    *out = transform;
+    return true;
+  }
+  auto *origin = value->Find("origin");
+  if (origin &&
+      (!origin->IsObject() || !origin->Find("x") || !origin->Find("y") ||
+       !origin->Find("x")->IsNumber() || !origin->Find("y")->IsNumber())) {
+    *error = util::error_json(
+        "invalid parameter: " + std::string(key) +
+        ".origin expects a Vector2 object {x, y} for dimension 2");
+    return false;
+  }
+  auto *rotation = value->Find("rotation");
+  if (rotation && !rotation->IsNumber()) {
+    *error = util::error_json("invalid parameter: " + std::string(key) +
+                              ".rotation expects a number for dimension 2");
+    return false;
+  }
+  auto *scale = value->Find("scale");
+  if (scale &&
+      (!scale->IsObject() || !scale->Find("x") || !scale->Find("y") ||
+       !scale->Find("x")->IsNumber() || !scale->Find("y")->IsNumber())) {
+    *error = util::error_json(
+        "invalid parameter: " + std::string(key) +
+        ".scale expects a Vector2 object {x, y} for dimension 2");
+    return false;
+  }
+  *out = parse_t2d(*value);
+  return true;
+}
+
+bool parse_query_transform3d(const JV &args, const char *key,
+                             godot::Transform3D *out, JV *error) {
+  auto *value = args.Find(key);
+  if (!value || !value->IsObject()) {
+    *error = util::error_json(
+        "invalid parameter: " + std::string(key) +
+        " expects a Transform3D object with basis rows and origin {x, y, z} "
+        "for dimension 3");
+    return false;
+  }
+  const bool has_transform_fields =
+      value->Contains("origin") || value->Contains("basis");
+  if (!has_transform_fields) {
+    if (!value->Contains("x") && !value->Contains("y") &&
+        !value->Contains("z")) {
+      *out = godot::Transform3D();
+      return true;
+    }
+    auto *x = value->Find("x");
+    auto *y = value->Find("y");
+    auto *z = value->Find("z");
+    if (!x || !y || !z || !x->IsNumber() || !y->IsNumber() || !z->IsNumber()) {
+      *error = util::error_json(
+          "invalid parameter: " + std::string(key) +
+          " expects a Vector3 object {x, y, z} or a Transform3D object for "
+          "dimension 3");
+      return false;
+    }
+    godot::Transform3D transform;
+    transform.set_origin(godot::Vector3(
+        static_cast<float>(util::json_number(x, 0.0)),
+        static_cast<float>(util::json_number(y, 0.0)),
+        static_cast<float>(util::json_number(z, 0.0))));
+    *out = transform;
+    return true;
+  }
+  auto *origin = value->Find("origin");
+  if (origin &&
+      (!origin->IsObject() || !origin->Find("x") || !origin->Find("y") ||
+       !origin->Find("z") || !origin->Find("x")->IsNumber() ||
+       !origin->Find("y")->IsNumber() || !origin->Find("z")->IsNumber())) {
+    *error = util::error_json(
+        "invalid parameter: " + std::string(key) +
+        ".origin expects a Vector3 object {x, y, z} for dimension 3");
+    return false;
+  }
+  auto *basis = value->Find("basis");
+  if (basis) {
+    if (!basis->IsArray() || basis->Size() != 3) {
+      *error = util::error_json(
+          "invalid parameter: " + std::string(key) +
+          ".basis expects an array of 3 row arrays for dimension 3");
+      return false;
+    }
+    for (size_t i = 0; i < 3; i++) {
+      const JV &row = (*basis)[i];
+      if (!row.IsArray() || row.Size() != 3 || !row[0].IsNumber() ||
+          !row[1].IsNumber() || !row[2].IsNumber()) {
+        *error = util::error_json(
+            "invalid parameter: " + std::string(key) +
+            ".basis expects an array of 3 row arrays for dimension 3");
+        return false;
+      }
+    }
+  }
+  *out = parse_t3d(*value);
+  return true;
+}
+
+bool resolve_query_space_2d(const JV &args,
+                            godot::PhysicsDirectSpaceState2D **state,
+                            godot::RID *space, JV *error) {
+  *space = util::resolve_rid<PhysicsRidDomain>(args, "space_rid");
+  if (!space->is_valid()) {
+    *error = util::error_json(
+        "missing or invalid required parameter: space_rid (required for "
+        "dimension 2)");
+    return false;
+  }
+  auto *server = godot::PhysicsServer2D::get_singleton();
+  if (!server) {
+    *error = util::error_json("PhysicsServer2D not available");
+    return false;
+  }
+  *state = server->space_get_direct_state(*space);
+  if (!*state) {
+    *error = util::error_json("space_get_direct_state returned null: the space "
+                              "must be active and attached to a scene");
+    return false;
+  }
+  return true;
+}
+
+bool resolve_query_space_3d(const JV &args,
+                            godot::PhysicsDirectSpaceState3D **state,
+                            godot::RID *space, JV *error) {
+  *space = util::resolve_rid<PhysicsRidDomain>(args, "space_rid");
+  if (!space->is_valid()) {
+    *error = util::error_json(
+        "missing or invalid required parameter: space_rid (required for "
+        "dimension 3)");
+    return false;
+  }
+  auto *server = godot::PhysicsServer3D::get_singleton();
+  if (!server) {
+    *error = util::error_json("PhysicsServer3D not available");
+    return false;
+  }
+  *state = server->space_get_direct_state(*space);
+  if (!*state) {
+    *error = util::error_json("space_get_direct_state returned null: the space "
+                              "must be active and attached to a scene");
+    return false;
+  }
+  return true;
+}
+
+bool build_query_shape_2d(
+    const JV &args, godot::Ref<godot::PhysicsShapeQueryParameters2D> *params,
+    JV *error) {
+  godot::RID shape = util::resolve_rid<PhysicsRidDomain>(args, "shape_rid");
+  if (!shape.is_valid()) {
+    *error = util::error_json(
+        "missing or invalid required parameter: shape_rid");
+    return false;
+  }
+  params->instantiate();
+  (*params)->set_shape_rid(shape);
+  if (args.Contains("transform")) {
+    godot::Transform2D transform;
+    if (!parse_query_transform2d(args, "transform", &transform, error))
+      return false;
+    (*params)->set_transform(transform);
+  }
+  if (args.Contains("motion")) {
+    godot::Vector2 motion;
+    if (!parse_query_vec2(args, "motion", &motion, error))
+      return false;
+    (*params)->set_motion(motion);
+  }
+  if (args.Contains("collision_mask"))
+    (*params)->set_collision_mask(
+        static_cast<uint32_t>(args["collision_mask"].GetInt()));
+  if (args.Contains("exclude"))
+    (*params)->set_exclude(parse_rids(args["exclude"]));
+  if (args.Contains("collide_with_bodies"))
+    (*params)->set_collide_with_bodies(args["collide_with_bodies"].GetBool());
+  if (args.Contains("collide_with_areas"))
+    (*params)->set_collide_with_areas(args["collide_with_areas"].GetBool());
+  return true;
+}
+
+bool build_query_shape_3d(
+    const JV &args, godot::Ref<godot::PhysicsShapeQueryParameters3D> *params,
+    JV *error) {
+  godot::RID shape = util::resolve_rid<PhysicsRidDomain>(args, "shape_rid");
+  if (!shape.is_valid()) {
+    *error = util::error_json(
+        "missing or invalid required parameter: shape_rid");
+    return false;
+  }
+  params->instantiate();
+  (*params)->set_shape_rid(shape);
+  if (args.Contains("transform")) {
+    godot::Transform3D transform;
+    if (!parse_query_transform3d(args, "transform", &transform, error))
+      return false;
+    (*params)->set_transform(transform);
+  }
+  if (args.Contains("motion")) {
+    godot::Vector3 motion;
+    if (!parse_query_vec3(args, "motion", &motion, error))
+      return false;
+    (*params)->set_motion(motion);
+  }
+  if (args.Contains("collision_mask"))
+    (*params)->set_collision_mask(
+        static_cast<uint32_t>(args["collision_mask"].GetInt()));
+  if (args.Contains("exclude"))
+    (*params)->set_exclude(parse_rids(args["exclude"]));
+  if (args.Contains("collide_with_bodies"))
+    (*params)->set_collide_with_bodies(args["collide_with_bodies"].GetBool());
+  if (args.Contains("collide_with_areas"))
+    (*params)->set_collide_with_areas(args["collide_with_areas"].GetBool());
+  return true;
+}
+
+JV query_success(JV payload, const char *mode, int dimension) {
+  JV result(JV::object_tag);
+  result["result"] = std::move(payload);
+  result["mode"] = JV(mode);
+  result["dimension"] = JV(dimension);
+  return result;
+}
+
+bool validate_query_intersect(const JV &args, int dimension,
+                              const std::string &mode, JV *error) {
+  if (mode == "intersect_point") {
+    if (!args.Contains("position"))
+      return true;
+    if (dimension == 2) {
+      godot::Vector2 position;
+      return parse_query_vec2(args, "position", &position, error);
+    }
+    godot::Vector3 position;
+    return parse_query_vec3(args, "position", &position, error);
+  }
+  if (mode == "intersect_ray") {
+    if (args.Contains("from")) {
+      if (dimension == 2) {
+        godot::Vector2 from;
+        if (!parse_query_vec2(args, "from", &from, error))
+          return false;
+      } else {
+        godot::Vector3 from;
+        if (!parse_query_vec3(args, "from", &from, error))
+          return false;
+      }
+    }
+    if (args.Contains("to")) {
+      if (dimension == 2) {
+        godot::Vector2 to;
+        if (!parse_query_vec2(args, "to", &to, error))
+          return false;
+      } else {
+        godot::Vector3 to;
+        if (!parse_query_vec3(args, "to", &to, error))
+          return false;
+      }
+    }
+    return true;
+  }
+  if (args.Contains("transform")) {
+    if (dimension == 2) {
+      godot::Transform2D transform;
+      if (!parse_query_transform2d(args, "transform", &transform, error))
+        return false;
+    } else {
+      godot::Transform3D transform;
+      if (!parse_query_transform3d(args, "transform", &transform, error))
+        return false;
+    }
+  }
+  if (args.Contains("motion")) {
+    if (dimension == 2) {
+      godot::Vector2 motion;
+      if (!parse_query_vec2(args, "motion", &motion, error))
+        return false;
+    } else {
+      godot::Vector3 motion;
+      if (!parse_query_vec3(args, "motion", &motion, error))
+        return false;
+    }
+  }
+  return true;
+}
+
+JV normalize_query_transform(const JV &args, int dimension) {
+  JV out(JV::object_tag);
+  if (args.IsObject())
+    out = args;
+  auto *transform = out.Find("transform");
+  if (!transform || !transform->IsObject())
+    return out;
+  const bool has_fields =
+      dimension == 2
+          ? (transform->Contains("origin") ||
+             transform->Contains("rotation") || transform->Contains("scale"))
+          : (transform->Contains("origin") ||
+             transform->Contains("basis"));
+  if (has_fields)
+    return out;
+  auto *x = transform->Find("x");
+  auto *y = transform->Find("y");
+  auto *z = transform->Find("z");
+  if (!x || !y || (dimension == 3 && !z))
+    return out;
+  JV origin(JV::object_tag);
+  origin["x"] = *x;
+  origin["y"] = *y;
+  if (dimension == 3)
+    origin["z"] = *z;
+  JV normalized(JV::object_tag);
+  normalized["origin"] = std::move(origin);
+  out["transform"] = std::move(normalized);
+  return out;
+}
+
+JV query_intersect(const JV &args, int dimension, const std::string &mode) {
+  const JV normalized = normalize_query_transform(args, dimension);
+  JV result;
+  if (dimension == 2) {
+    if (mode == "intersect_point")
+      result = handle_2d_intersect_point(normalized);
+    else if (mode == "intersect_ray")
+      result = handle_2d_ray_cast(normalized);
+    else
+      result = handle_2d_intersect_shape(normalized);
+  } else {
+    if (mode == "intersect_point")
+      result = handle_3d_intersect_point(normalized);
+    else if (mode == "intersect_ray")
+      result = handle_3d_ray_cast(normalized);
+    else
+      result = handle_3d_intersect_shape(normalized);
+  }
+  if (result.IsObject()) {
+    result["mode"] = JV(mode);
+    result["dimension"] = JV(dimension);
+  }
+  return result;
+}
+
+JV query_rest_info_json(const godot::Dictionary &info, int dimension) {
+  auto vec = [dimension](const godot::Variant &value) -> JV {
+    if (dimension == 2)
+      return util::vec2_to_json(godot::Vector2(value));
+    return util::vec3_to_json(godot::Vector3(value));
+  };
+  JV result(JV::object_tag);
+  if (info.has("point"))
+    result["point"] = vec(info["point"]);
+  if (info.has("normal"))
+    result["normal"] = vec(info["normal"]);
+  if (info.has("linear_velocity"))
+    result["linear_velocity"] = vec(info["linear_velocity"]);
+  if (info.has("rid")) {
+    godot::RID rid = info["rid"];
+    result["rid"] = JV(util::rid_store<PhysicsRidDomain>().store(rid));
+  }
+  if (info.has("collider_id"))
+    result["collider_id"] = JV(static_cast<int64_t>(info["collider_id"]));
+  if (info.has("shape"))
+    result["shape"] = JV(static_cast<int>(info["shape"]));
+  return result;
+}
+
+JV handle_query_shape_modes(const JV &args, int dimension,
+                            const std::string &mode) {
+  JV error;
+  if (!require_query_key(args, mode.c_str(), "space_rid", &error))
+    return error;
+  if (!require_query_key(args, mode.c_str(), "shape_rid", &error))
+    return error;
+  if (mode == "cast_motion" &&
+      !require_query_key(args, mode.c_str(), "motion", &error))
+    return error;
+  if (dimension == 2) {
+    godot::PhysicsDirectSpaceState2D *state = nullptr;
+    godot::RID space;
+    if (!resolve_query_space_2d(args, &state, &space, &error))
+      return error;
+    godot::Ref<godot::PhysicsShapeQueryParameters2D> params;
+    if (!build_query_shape_2d(args, &params, &error))
+      return error;
+    JV payload;
+    if (mode == "cast_motion") {
+      auto fractions = state->cast_motion(params);
+      if (fractions.size() != 2) {
+        return util::error_json(
+            "cast_motion returned no safe/unsafe fraction pair");
+      }
+      JV value(JV::object_tag);
+      value["safe"] = JV(static_cast<double>(fractions[0]));
+      value["unsafe"] = JV(static_cast<double>(fractions[1]));
+      payload = std::move(value);
+    } else if (mode == "collide_shape") {
+      auto *max_value = args.Find("max_results");
+      const int64_t max_results = max_value ? max_value->GetInt() : 32;
+      auto points =
+          state->collide_shape(params, static_cast<int32_t>(max_results));
+      JV values(JV::array_tag);
+      for (int i = 0; i < points.size(); i++)
+        values.PushBack(util::vec2_to_json(godot::Vector2(points[i])));
+      JV value(JV::object_tag);
+      value["points"] = std::move(values);
+      payload = std::move(value);
+    } else {
+      godot::Dictionary info = state->get_rest_info(params);
+      payload = info.is_empty() ? JV(nullptr)
+                                : query_rest_info_json(info, dimension);
+    }
+    JV result = query_success(std::move(payload), mode.c_str(), dimension);
+    result["space_rid"] = JV(util::rid_store<PhysicsRidDomain>().store(space));
+    return result;
+  }
+  godot::PhysicsDirectSpaceState3D *state = nullptr;
+  godot::RID space;
+  if (!resolve_query_space_3d(args, &state, &space, &error))
+    return error;
+  godot::Ref<godot::PhysicsShapeQueryParameters3D> params;
+  if (!build_query_shape_3d(args, &params, &error))
+    return error;
+  JV payload;
+  if (mode == "cast_motion") {
+    auto fractions = state->cast_motion(params);
+    if (fractions.size() != 2) {
+      return util::error_json(
+          "cast_motion returned no safe/unsafe fraction pair");
+    }
+    JV value(JV::object_tag);
+    value["safe"] = JV(static_cast<double>(fractions[0]));
+    value["unsafe"] = JV(static_cast<double>(fractions[1]));
+    payload = std::move(value);
+  } else if (mode == "collide_shape") {
+    auto *max_value = args.Find("max_results");
+    const int64_t max_results = max_value ? max_value->GetInt() : 32;
+    auto points =
+        state->collide_shape(params, static_cast<int32_t>(max_results));
+    JV values(JV::array_tag);
+    for (int i = 0; i < points.size(); i++)
+      values.PushBack(util::vec3_to_json(godot::Vector3(points[i])));
+    JV value(JV::object_tag);
+    value["points"] = std::move(values);
+    payload = std::move(value);
+  } else {
+    godot::Dictionary info = state->get_rest_info(params);
+    payload = info.is_empty() ? JV(nullptr)
+                              : query_rest_info_json(info, dimension);
+  }
+  JV result = query_success(std::move(payload), mode.c_str(), dimension);
+  result["space_rid"] = JV(util::rid_store<PhysicsRidDomain>().store(space));
+  return result;
+}
+
+JV query_test_collision_2d(
+    const godot::Ref<godot::PhysicsTestMotionResult2D> &result) {
+  JV collision(JV::object_tag);
+  collision["point"] = util::vec2_to_json(result->get_collision_point());
+  collision["normal"] = util::vec2_to_json(result->get_collision_normal());
+  collision["collider_id"] =
+      JV(static_cast<int64_t>(result->get_collider_id()));
+  collision["collider_rid"] = JV(util::rid_store<PhysicsRidDomain>().store(
+      result->get_collider_rid()));
+  collision["collider_shape"] = JV(result->get_collider_shape());
+  collision["local_shape"] = JV(result->get_collision_local_shape());
+  collision["depth"] = JV(static_cast<double>(result->get_collision_depth()));
+  collision["safe_fraction"] =
+      JV(static_cast<double>(result->get_collision_safe_fraction()));
+  collision["unsafe_fraction"] =
+      JV(static_cast<double>(result->get_collision_unsafe_fraction()));
+  return collision;
+}
+
+JV query_test_collision_3d(
+    const godot::Ref<godot::PhysicsTestMotionResult3D> &result, int index) {
+  JV collision(JV::object_tag);
+  collision["point"] =
+      util::vec3_to_json(result->get_collision_point(index));
+  collision["normal"] =
+      util::vec3_to_json(result->get_collision_normal(index));
+  collision["collider_id"] =
+      JV(static_cast<int64_t>(result->get_collider_id(index)));
+  collision["collider_rid"] = JV(util::rid_store<PhysicsRidDomain>().store(
+      result->get_collider_rid(index)));
+  collision["collider_shape"] = JV(result->get_collider_shape(index));
+  collision["local_shape"] = JV(result->get_collision_local_shape(index));
+  collision["depth"] =
+      JV(static_cast<double>(result->get_collision_depth(index)));
+  return collision;
+}
+
+JV handle_query_test_motion(const JV &args, int dimension) {
+  JV error;
+  if (!require_query_key(args, "test_motion", "body_rid", &error))
+    return error;
+  if (!require_query_key(args, "test_motion", "from", &error))
+    return error;
+  if (!require_query_key(args, "test_motion", "motion", &error))
+    return error;
+  godot::RID body = util::resolve_rid<PhysicsRidDomain>(args, "body_rid");
+  if (!body.is_valid())
+    return util::error_json(
+        "missing or invalid required parameter for mode 'test_motion': "
+        "body_rid");
+  if (dimension == 2) {
+    auto *server = godot::PhysicsServer2D::get_singleton();
+    if (!server)
+      return util::error_json("PhysicsServer2D not available");
+    godot::Transform2D from;
+    if (!parse_query_transform2d(args, "from", &from, &error))
+      return error;
+    godot::Vector2 motion;
+    if (!parse_query_vec2(args, "motion", &motion, &error))
+      return error;
+    godot::Ref<godot::PhysicsTestMotionParameters2D> params;
+    params.instantiate();
+    params->set_from(from);
+    params->set_motion(motion);
+    if (args.Contains("margin"))
+      params->set_margin(
+          static_cast<float>(util::json_number(args.Find("margin"), 0.0)));
+    if (args.Contains("collide_separation_ray"))
+      params->set_collide_separation_ray_enabled(
+          args["collide_separation_ray"].GetBool());
+    if (args.Contains("recovery_as_collision"))
+      params->set_recovery_as_collision_enabled(
+          args["recovery_as_collision"].GetBool());
+    if (args.Contains("exclude"))
+      params->set_exclude_bodies(parse_rids(args["exclude"]));
+    godot::Ref<godot::PhysicsTestMotionResult2D> result;
+    result.instantiate();
+    const bool collided = server->body_test_motion(body, params, result);
+    JV payload(JV::object_tag);
+    payload["safe"] = JV(!collided);
+    payload["unsafe"] = JV(collided);
+    payload["travel"] = util::vec2_to_json(result->get_travel());
+    payload["remainder"] = util::vec2_to_json(result->get_remainder());
+    payload["safe_fraction"] =
+        JV(static_cast<double>(result->get_collision_safe_fraction()));
+    payload["unsafe_fraction"] =
+        JV(static_cast<double>(result->get_collision_unsafe_fraction()));
+    JV collisions(JV::array_tag);
+    if (collided) {
+      JV collision = query_test_collision_2d(result);
+      payload["collision"] = collision;
+      collisions.PushBack(std::move(collision));
+    } else {
+      payload["collision"] = JV(nullptr);
+    }
+    payload["collisions"] = std::move(collisions);
+    return query_success(std::move(payload), "test_motion", dimension);
+  }
+  auto *server = godot::PhysicsServer3D::get_singleton();
+  if (!server)
+    return util::error_json("PhysicsServer3D not available");
+  godot::Transform3D from;
+  if (!parse_query_transform3d(args, "from", &from, &error))
+    return error;
+  godot::Vector3 motion;
+  if (!parse_query_vec3(args, "motion", &motion, &error))
+    return error;
+  godot::Ref<godot::PhysicsTestMotionParameters3D> params;
+  params.instantiate();
+  params->set_from(from);
+  params->set_motion(motion);
+  if (args.Contains("margin"))
+    params->set_margin(
+        static_cast<float>(util::json_number(args.Find("margin"), 0.0)));
+  if (args.Contains("collide_separation_ray"))
+    params->set_collide_separation_ray_enabled(
+        args["collide_separation_ray"].GetBool());
+  if (args.Contains("recovery_as_collision"))
+    params->set_recovery_as_collision_enabled(
+        args["recovery_as_collision"].GetBool());
+  if (args.Contains("exclude"))
+    params->set_exclude_bodies(parse_rids(args["exclude"]));
+  godot::Ref<godot::PhysicsTestMotionResult3D> result;
+  result.instantiate();
+  const bool collided = server->body_test_motion(body, params, result);
+  const int collision_count = result->get_collision_count();
+  JV payload(JV::object_tag);
+  payload["safe"] = JV(!collided);
+  payload["unsafe"] = JV(collided);
+  payload["travel"] = util::vec3_to_json(result->get_travel());
+  payload["remainder"] = util::vec3_to_json(result->get_remainder());
+  payload["safe_fraction"] =
+      JV(static_cast<double>(result->get_collision_safe_fraction()));
+  payload["unsafe_fraction"] =
+      JV(static_cast<double>(result->get_collision_unsafe_fraction()));
+  JV collisions(JV::array_tag);
+  for (int i = 0; i < collision_count; i++)
+    collisions.PushBack(query_test_collision_3d(result, i));
+  if (collision_count > 0)
+    payload["collision"] = query_test_collision_3d(result, 0);
+  else
+    payload["collision"] = JV(nullptr);
+  payload["collisions"] = std::move(collisions);
+  return query_success(std::move(payload), "test_motion", dimension);
+}
+
+JV handle_query_contacts(const JV &args, int dimension) {
+  JV error;
+  if (!require_query_key(args, "contacts", "body_rid", &error))
+    return error;
+  godot::RID body = util::resolve_rid<PhysicsRidDomain>(args, "body_rid");
+  if (!body.is_valid())
+    return util::error_json(
+        "missing or invalid required parameter for mode 'contacts': body_rid");
+  if (dimension == 2) {
+    auto *server = godot::PhysicsServer2D::get_singleton();
+    if (!server)
+      return util::error_json("PhysicsServer2D not available");
+    auto *state = server->body_get_direct_state(body);
+    if (!state)
+      return util::error_json("body_get_direct_state returned null: the body "
+                              "must be in an active physics space");
+    const int count = state->get_contact_count();
+    JV contacts(JV::array_tag);
+    for (int i = 0; i < count; i++) {
+      JV contact(JV::object_tag);
+      contact["local_position"] =
+          util::vec2_to_json(state->get_contact_local_position(i));
+      contact["normal"] =
+          util::vec2_to_json(state->get_contact_local_normal(i));
+      contact["collider_position"] =
+          util::vec2_to_json(state->get_contact_collider_position(i));
+      contact["impulse"] = util::vec2_to_json(state->get_contact_impulse(i));
+      contact["collider_id"] =
+          JV(static_cast<int64_t>(state->get_contact_collider_id(i)));
+      contact["collider_shape"] =
+          JV(state->get_contact_collider_shape(i));
+      contact["collider_rid"] = JV(util::rid_store<PhysicsRidDomain>().store(
+          state->get_contact_collider(i)));
+      contacts.PushBack(std::move(contact));
+    }
+    JV payload(JV::object_tag);
+    payload["count"] = JV(count);
+    payload["contacts"] = std::move(contacts);
+    return query_success(std::move(payload), "contacts", dimension);
+  }
+  auto *server = godot::PhysicsServer3D::get_singleton();
+  if (!server)
+    return util::error_json("PhysicsServer3D not available");
+  auto *state = server->body_get_direct_state(body);
+  if (!state)
+    return util::error_json("body_get_direct_state returned null: the body "
+                            "must be in an active physics space");
+  const int count = state->get_contact_count();
+  JV contacts(JV::array_tag);
+  for (int i = 0; i < count; i++) {
+    JV contact(JV::object_tag);
+    contact["local_position"] =
+        util::vec3_to_json(state->get_contact_local_position(i));
+    contact["normal"] =
+        util::vec3_to_json(state->get_contact_local_normal(i));
+    contact["collider_position"] =
+        util::vec3_to_json(state->get_contact_collider_position(i));
+    contact["impulse"] = util::vec3_to_json(state->get_contact_impulse(i));
+    contact["collider_id"] =
+        JV(static_cast<int64_t>(state->get_contact_collider_id(i)));
+    contact["collider_shape"] = JV(state->get_contact_collider_shape(i));
+    contact["collider_rid"] = JV(util::rid_store<PhysicsRidDomain>().store(
+        state->get_contact_collider(i)));
+    contacts.PushBack(std::move(contact));
+  }
+  JV payload(JV::object_tag);
+  payload["count"] = JV(count);
+  payload["contacts"] = std::move(contacts);
+  return query_success(std::move(payload), "contacts", dimension);
+}
+
+JV query_node_ref_json(godot::Node *node, const godot::RID &rid) {
+  JV entry(JV::object_tag);
+  entry["rid"] = JV(util::rid_store<PhysicsRidDomain>().store(rid));
+  entry["collider_id"] = JV(static_cast<int64_t>(node->get_instance_id()));
+  entry["name"] = JV(util::to_std(node->get_name()));
+  entry["path"] = JV(util::to_std(node->get_path()));
+  return entry;
+}
+
+godot::Area3D *resolve_query_area_3d(const JV &args, JV *error) {
+  auto *node_path = args.Find("node_path");
+  auto *area_value = args.Find("area_rid");
+  if (node_path && area_value) {
+    *error = util::error_json(
+        "invalid parameter for mode 'area_overlaps': pass either area_rid or "
+        "node_path, not both");
+    return nullptr;
+  }
+  if (node_path) {
+    if (!node_path->IsString()) {
+      *error = util::error_json(
+          "invalid parameter for mode 'area_overlaps': node_path must be a "
+          "string");
+      return nullptr;
+    }
+    auto *editor = godot::EditorInterface::get_singleton();
+    if (!editor) {
+      *error = util::error_json("EditorInterface not available");
+      return nullptr;
+    }
+    auto *root = editor->get_edited_scene_root();
+    if (!root) {
+      *error = util::error_json("no edited scene root");
+      return nullptr;
+    }
+    const std::string path = node_path->GetString();
+    godot::Node *node = util::resolve_scene_node(path, root);
+    if (!node) {
+      *error = util::error_json("node not found: " + path);
+      return nullptr;
+    }
+    auto *area = godot::Object::cast_to<godot::Area3D>(node);
+    if (!area) {
+      *error = util::error_json("node is not an Area3D: " + path);
+      return nullptr;
+    }
+    return area;
+  }
+  if (area_value) {
+    godot::RID area_rid = util::resolve_rid<PhysicsRidDomain>(args, "area_rid");
+    if (!area_rid.is_valid()) {
+      *error = util::error_json(
+          "missing or invalid required parameter for mode 'area_overlaps': "
+          "area_rid");
+      return nullptr;
+    }
+    auto *server = godot::PhysicsServer3D::get_singleton();
+    if (!server) {
+      *error = util::error_json("PhysicsServer3D not available");
+      return nullptr;
+    }
+    const uint64_t instance_id = server->area_get_object_instance_id(area_rid);
+    auto *area = godot::Object::cast_to<godot::Area3D>(
+        godot::ObjectDB::get_instance(instance_id));
+    if (!area) {
+      *error = util::error_json(
+          "area_rid is not attached to an Area3D node; pass node_path of an "
+          "Area3D instead");
+      return nullptr;
+    }
+    return area;
+  }
+  *error = util::error_json(
+      "missing required parameter for mode 'area_overlaps': area_rid or "
+      "node_path");
+  return nullptr;
+}
+
+godot::Area2D *resolve_query_area_2d(const JV &args, JV *error) {
+  auto *node_path = args.Find("node_path");
+  auto *area_value = args.Find("area_rid");
+  if (node_path && area_value) {
+    *error = util::error_json(
+        "invalid parameter for mode 'area_overlaps': pass either area_rid or "
+        "node_path, not both");
+    return nullptr;
+  }
+  if (node_path) {
+    if (!node_path->IsString()) {
+      *error = util::error_json(
+          "invalid parameter for mode 'area_overlaps': node_path must be a "
+          "string");
+      return nullptr;
+    }
+    auto *editor = godot::EditorInterface::get_singleton();
+    if (!editor) {
+      *error = util::error_json("EditorInterface not available");
+      return nullptr;
+    }
+    auto *root = editor->get_edited_scene_root();
+    if (!root) {
+      *error = util::error_json("no edited scene root");
+      return nullptr;
+    }
+    const std::string path = node_path->GetString();
+    godot::Node *node = util::resolve_scene_node(path, root);
+    if (!node) {
+      *error = util::error_json("node not found: " + path);
+      return nullptr;
+    }
+    auto *area = godot::Object::cast_to<godot::Area2D>(node);
+    if (!area) {
+      *error = util::error_json("node is not an Area2D: " + path);
+      return nullptr;
+    }
+    return area;
+  }
+  if (area_value) {
+    godot::RID area_rid = util::resolve_rid<PhysicsRidDomain>(args, "area_rid");
+    if (!area_rid.is_valid()) {
+      *error = util::error_json(
+          "missing or invalid required parameter for mode 'area_overlaps': "
+          "area_rid");
+      return nullptr;
+    }
+    auto *server = godot::PhysicsServer2D::get_singleton();
+    if (!server) {
+      *error = util::error_json("PhysicsServer2D not available");
+      return nullptr;
+    }
+    const uint64_t instance_id = server->area_get_object_instance_id(area_rid);
+    auto *area = godot::Object::cast_to<godot::Area2D>(
+        godot::ObjectDB::get_instance(instance_id));
+    if (!area) {
+      *error = util::error_json(
+          "area_rid is not attached to an Area2D node; pass node_path of an "
+          "Area2D instead");
+      return nullptr;
+    }
+    return area;
+  }
+  *error = util::error_json(
+      "missing required parameter for mode 'area_overlaps': area_rid or "
+      "node_path");
+  return nullptr;
+}
+
+JV handle_query_area_overlaps(const JV &args, int dimension) {
+  JV error;
+  if (dimension == 2) {
+    godot::Area2D *area = resolve_query_area_2d(args, &error);
+    if (!area)
+      return error;
+    JV bodies(JV::array_tag);
+    auto overlapping_bodies = area->get_overlapping_bodies();
+    for (int i = 0; i < overlapping_bodies.size(); i++) {
+      auto *collider = godot::Object::cast_to<godot::CollisionObject2D>(
+          overlapping_bodies[i]);
+      if (collider)
+        bodies.PushBack(query_node_ref_json(collider, collider->get_rid()));
+    }
+    JV areas(JV::array_tag);
+    auto overlapping_areas = area->get_overlapping_areas();
+    for (int i = 0; i < overlapping_areas.size(); i++) {
+      auto *collider = godot::Object::cast_to<godot::CollisionObject2D>(
+          overlapping_areas[i]);
+      if (collider)
+        areas.PushBack(query_node_ref_json(collider, collider->get_rid()));
+    }
+    JV payload(JV::object_tag);
+    payload["bodies"] = std::move(bodies);
+    payload["areas"] = std::move(areas);
+    return query_success(std::move(payload), "area_overlaps", dimension);
+  }
+  godot::Area3D *area = resolve_query_area_3d(args, &error);
+  if (!area)
+    return error;
+  JV bodies(JV::array_tag);
+  auto overlapping_bodies = area->get_overlapping_bodies();
+  for (int i = 0; i < overlapping_bodies.size(); i++) {
+    auto *collider =
+        godot::Object::cast_to<godot::CollisionObject3D>(overlapping_bodies[i]);
+    if (collider)
+      bodies.PushBack(query_node_ref_json(collider, collider->get_rid()));
+  }
+  JV areas(JV::array_tag);
+  auto overlapping_areas = area->get_overlapping_areas();
+  for (int i = 0; i < overlapping_areas.size(); i++) {
+    auto *collider =
+        godot::Object::cast_to<godot::CollisionObject3D>(overlapping_areas[i]);
+    if (collider)
+      areas.PushBack(query_node_ref_json(collider, collider->get_rid()));
+  }
+  JV payload(JV::object_tag);
+  payload["bodies"] = std::move(bodies);
+  payload["areas"] = std::move(areas);
+  return query_success(std::move(payload), "area_overlaps", dimension);
+}
+
+} // namespace
+
+JV handle_physics_query(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "physics_query called");
+  JV error;
+  int dimension = 0;
+  if (!parse_query_dimension(args, &dimension, &error))
+    return error;
+  std::string mode;
+  if (!parse_query_mode(args, &mode, &error))
+    return error;
+  JV result;
+  if (mode == "intersect_point" || mode == "intersect_ray" ||
+      mode == "intersect_shape") {
+    if (!validate_query_intersect(args, dimension, mode, &error))
+      return error;
+    result = query_intersect(args, dimension, mode);
+  } else if (mode == "cast_motion" || mode == "collide_shape" ||
+             mode == "rest_info") {
+    result = handle_query_shape_modes(args, dimension, mode);
+  } else if (mode == "test_motion") {
+    result = handle_query_test_motion(args, dimension);
+  } else if (mode == "contacts") {
+    result = handle_query_contacts(args, dimension);
+  } else {
+    result = handle_query_area_overlaps(args, dimension);
+  }
+  if (result.IsObject() && result.Find("error") == nullptr)
+    LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                              "physics_query completed");
+  return result;
+}
 
 } // namespace physics_ops
 } // namespace godot_autopilot
