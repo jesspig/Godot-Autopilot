@@ -33,7 +33,7 @@ resource:
 
 | 路径 | 命令 | 用途 |
 |---|---|---|
-| bunx（技能书默认，钉版本） | `bunx "github:jesspig/Godot-Autopilot#<VERSION>" <cmd>` | 阶梯第二级的 bunx 分发；`<VERSION>` 取根 `VERSION`（当前 `0.3.3`），由 `version_sync_guard` 兜底与全部版本钉同值 |
+| bunx（技能书默认，钉版本） | `bunx "github:jesspig/Godot-Autopilot#<VERSION>" <cmd>` | 阶梯第二级的 bunx 分发；`<VERSION>` 取根 `VERSION`（当前开发版 `0.3.4-dev`；README 在开发期钉 `develop`，发布时改为纯版本号），由 `version_sync_guard` 兜底与全部版本钉同值 |
 | bun install -g（人类文档） | `bun install -g github:jesspig/Godot-Autopilot#<VERSION>` | 全局安装后直接用 `gda <cmd>` |
 | 独立二进制（无需任何 JS 运行时） | 从 GitHub Release 下载 `gda-<version>-<platform>.zip`（Windows）或 `.tar.gz`（其余），对照 `sha256sums.txt` 校验后直接运行 | 阶梯第二级的独立二进制分发；目标五个：`windows-x64` / `linux-x64` / `linux-x64-musl` / `macos-arm64` / `macos-x64`；macOS 产物为 ad-hoc 签名（非公证）；下载器对 `v<version>` 与 `<version>` 两种 tag 依次尝试 |
 

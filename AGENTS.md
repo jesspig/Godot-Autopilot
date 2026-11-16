@@ -11,7 +11,15 @@ Godot Autopilot（GDA）：进程内 GDExtension，把 Godot 编辑器经 MCP（
 - 手动构建：`cmake --preset debug && cmake --build --preset debug`
 - 快速验证：`ctest --preset debug`（全量默认门：单元 + 边界 + 集成 + 守卫 + CLI，零引擎依赖；`--single <用例名>` 单跑）
 - CLI 单测：`bun test cli/tests`（Bun + TS，秒级）
-- 版本只改根 `VERSION`，随后重新 configure
+- 升版同步根 `VERSION`、`cli/src/version.ts` 与 `cli/assets/skills.json`，随后重新 configure；发布时另同步 README 版本钉；递增规则见下节
+
+## 版本号规则
+
+- 发布版本号固定为 `0.y.x`：`y` 为 minor，`x` 为 patch；不得引入 `1.x` 或其他 major。
+- 版本号可带 `-dev` 后缀（如 `0.3.4-dev`），表示当前处于开发中；目标发布版本是去掉 `-dev` 的同一版本号。
+- 默认只递增 `x`，无论是否包含破坏性更新；只有用户明确要求更新 `y` 时才允许递增 `y`，否则绝对禁止改动 `y`。
+- 未经用户明确允许，禁止移除 `-dev` 后缀、打 tag 或执行发布；发布相关操作仍需逐项确认。
+- 版本落点与发布校验见 `docs/wiki/build.md`「版本号单一来源」。
 
 ## 每次在场的硬约束
 

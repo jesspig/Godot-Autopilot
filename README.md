@@ -105,13 +105,13 @@ Prefer a terminal to a chat client? The GDA CLI drives a running GDA instance fr
 Run it one-off with `bunx` (quoted on PowerShell, because `#` starts a comment):
 
 ```bash
-bunx "github:jesspig/Godot-Autopilot#0.3.3" ping
+bunx "github:jesspig/Godot-Autopilot#develop" ping
 ```
 
 Or install it globally once and use the `gda` command:
 
 ```bash
-bun install -g github:jesspig/Godot-Autopilot#0.3.3
+bun install -g github:jesspig/Godot-Autopilot#develop
 gda ping
 ```
 

@@ -47,11 +47,13 @@ resource:
 
 | 消费方 | 方式 |
 |---|---|
-| `CMakeLists.txt` | `project()` 前 `file(READ ...)` 读入并 `string(STRIP)`，作为 `project(... VERSION ...)` 实参 |
-| C++（MCP `server_info`、`system_status.version`） | `configure_file(src/core/version.hpp.in → <build>/generated/version.hpp @ONLY)` 生成 `GDA_VERSION` 字符串宏；`server_context.cpp` / `register_all.cpp` 包含 `<version.hpp>` 引用 |
+| `CMakeLists.txt` | `project()` 前 `file(READ ...)` 读入并 `string(STRIP)`；取 `major.minor.patch` 数字前缀作为 `project(... VERSION ...)` 实参，完整字符串（可带 `-dev` 等预发布后缀）保留为 `GDA_VERSION` |
+| C++（MCP `server_info`、`system_status.version`） | `configure_file(src/core/version.hpp.in → <build>/generated/version.hpp @ONLY)` 用完整 `GDA_VERSION` 生成字符串宏；`server_context.cpp` / `register_all.cpp` 包含 `<version.hpp>` 引用 |
 | `devtools/lib/config.ts` | `ADDON_VERSION = fs.readFileSync(path.join(PROJECT_ROOT, "VERSION"), "utf8").trim()`，用于打包产物名 |
 
-升版流程：只改 `VERSION` 文件内容即可（重新 configure 后生效）。
+升版流程：递增规则见 [`AGENTS.md`](../../AGENTS.md)「版本号规则」（固定 `0.y.x`，默认只增 `x`；只有用户明确要求才增 `y`）；同步根 `VERSION`、`cli/src/version.ts` 与 `cli/assets/skills.json`，随后重新 configure。发布前去掉 `-dev` 后缀需用户明确许可。
+
+开发期 `VERSION` 可带 `-dev` 后缀（当前 `0.3.4-dev`），`GDA_VERSION`、CLI `CLI_VERSION` 与 `gda status` 原样显示该后缀，用于区分开发版与正式版。`.github/workflows/release.yml` 的 validate 会校验 tag 与 `VERSION` 完全一致，带后缀无法发布。
 
 ### 版本与 LTO 的单一事实源与 CI 断言
 
@@ -124,7 +126,7 @@ resource:
 
 | job | 内容 |
 |---|---|
-| validate | 校验 tag 与根 `VERSION` 一致（`v` 前缀可选：`v0.3.3` / `0.3.3` ↔ `0.3.3`，版本号以根 `VERSION` 为准，当前 0.3.3），不一致 fail |
+| validate | 校验 tag 与根 `VERSION` 一致（`v` 前缀可选：`v0.3.4` / `0.3.4` ↔ `0.3.4`，版本号以根 `VERSION` 为准，当前开发版 0.3.4-dev；发布前去掉 `-dev`），不一致 fail |
 | build | 同 CI 环境（Ninja/sccache/msvc-dev-cmd，ninja 由 `seanmiddleditch/gha-setup-ninja@v5` 提供，故 `resolvePreset` 恒选 `release`；checkout 带 `submodules: true`，缓存同 CI 改为 `key: submodules-release-${{ runner.os }}-${{ steps.submodules.outputs.shas }}`），Release 构建后按精确文件名上传各平台库 artifact（天然排除 pdb） |
 | cli | 5 个目标的 `bun build --compile` 独立二进制（`windows-x64` / `linux-x64` / `linux-x64-musl` / `macos-arm64` / `macos-x64`），macOS 产物 ad-hoc 签名（`codesign --force --sign -`），各自打 zip/tar.gz 后上传 artifact；二进制名带根 `VERSION` |
 | package | 下载全部 artifact → `bun run gda-dev-tools package --libs-dir dist` 合并 → **跑 `bun run gda-dev-tools package-check dist/godot-autopilot-*.zip` 自检（失败即中止发布）** → 重命名为 `addons.zip` → 收集 `cli-dist/` 下二进制并生成 `sha256sums.txt` → softprops/action-gh-release 一并发布（`addons.zip` + `gda-<version>-<platform>.*` + 校验和）。校验和覆盖 `addons.zip` 与全部 CLI 二进制 |

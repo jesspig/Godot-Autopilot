@@ -105,13 +105,13 @@ gda install skills --prune
 用 `bunx` 单次执行（PowerShell 下需加引号，因为 `#` 会被当作注释）：
 
 ```bash
-bunx "github:jesspig/Godot-Autopilot#0.3.3" ping
+bunx "github:jesspig/Godot-Autopilot#develop" ping
 ```
 
 或全局安装一次，之后直接用 `gda` 命令：
 
 ```bash
-bun install -g github:jesspig/Godot-Autopilot#0.3.3
+bun install -g github:jesspig/Godot-Autopilot#develop
 gda ping
 ```
 
