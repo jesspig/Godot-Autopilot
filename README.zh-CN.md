@@ -5,7 +5,7 @@
 ![Godot版本](https://img.shields.io/badge/Godot-4.7%2B-478CBF?logo=godotengine&logoColor=white)
 ![支持平台](https://img.shields.io/badge/platform-Windows%7CLinux%7CMacOS-lightgrey)
 [![协议](https://img.shields.io/badge/MCP-Streamable_HTTP-blueviolet)](https://modelcontextprotocol.io/)
-![工具数](https://img.shields.io/badge/tools-452%2B-brightgreen)
+![工具数](https://img.shields.io/badge/tools-252-brightgreen)
 
 > **让 AI 代理在编辑器里帮你搭场景、试玩和排错。**
 
@@ -23,15 +23,15 @@ Godot Autopilot（GDA）是一个住在 **Godot 编辑器内部**的插件型 [M
 
 ## 能做什么
 
-**452+ 个工具**，覆盖从编辑器到游戏的完整闭环（数量随版本增长，以代理通过 `search_tools` 查到的为准）。举例：
+**252 个工具**，覆盖从编辑器到游戏的完整闭环——246 个域工具 + 5 个元工具 + `system_status`（数量随版本增长，以代理通过 `search_tools` 查到的为准）；325 条旧工具名别名在 0.6.0 前经 `call_tool` 可调用（与实名工具重名的条目按实名工具优先）。举例：
 
-- **搭场景**——创建、改名、移动、删除节点，读写属性，连接信号，三维块地图 GridMap 搭关卡（如 `create_scene_node`、`property_set`、`signal_connect`、`scene_tree_items`；GridMap：`create_gridmap`、`set_gridmap_cell`、`fill_gridmap_box`）。
-- **画面与声音**——网格材质、灯光环境、音频播放、动画与补间、UI 主题、瓦片地图（如 `create_animation`、`tween_editor_property`、`create_game_tween`、`play_audio_player`、`fill_tilemap_rect`）。
-- **物理与导航**——射线/形状检测、刚体、导航地图与寻路（如 `intersect_physics_3d_ray`、`create_nav_3d_map`、`get_nav_3d_map_path`）。
-- **动手：输入与 UI 自动化**——模拟键盘鼠标手柄，按名称点击编辑器控件，执行编辑器快捷键，点击运行中游戏的按钮（如 `click_input_mouse`、`get_editor_ui_elements`、`click_editor_element`、`run_editor_shortcut`、`click_game_ui_element`）。
-- **脚本与排错**——在编辑器或游戏中执行 GDScript，把耗时游戏脚本作为后台任务运行，读取插件/游戏/脚本错误日志（如 `execute_script`、`execute_game_script`、`start_game_job`、`get_plugin_log`）。
-- **项目与知识**——读写、搜索、复制项目文件与目录，查看项目设置，离线查询引擎内置 API 文档（如 `read_file`、`find_in_files`、`list_directory`、`copy_file`、`get_project_settings`、`get_docs_class`）。
-- **试玩与视觉验证**——运行当前场景，注入定时输入序列，给编辑器和游戏截图并对比前后差异（如 `play_editor_current_scene`、`queue_game_input`、`capture_editor_viewport`、`capture_game_viewport`、`review_scene_visually`）。
+- **搭场景**——创建、改名、移动、删除节点，读写属性，连接信号，三维块地图 GridMap 搭关卡（如 `create_scene_node`、`property_set`、`signal_connect`、`get_editor_ui`；GridMap：`create_gridmap`、`set_gridmap_cells`）。
+- **画面与声音**——网格材质、灯光环境、音频播放、动画与补间、UI 主题、瓦片地图（如 `create_animation`、`tween_editor_property`、`game_tween`、`audio_player`、`set_tilemap_cells`）。
+- **物理与导航**——射线/形状检测、刚体、导航地图与寻路（如 `physics_query`、`create_nav_3d_map`、`nav_query`）。
+- **动手：输入与 UI 自动化**——模拟键盘鼠标手柄，按名称点击编辑器控件，执行编辑器快捷键，点击运行中游戏的按钮（如 `input_mouse`、`get_editor_ui`、`editor_ui_action`、`click_game_ui_element`）。
+- **脚本与排错**——在编辑器或游戏中执行 GDScript，把耗时游戏脚本作为后台任务运行，读取插件/游戏/脚本错误日志（如 `execute_script`、`game_script`、`get_plugin_log`）。
+- **项目与知识**——读写、搜索、复制项目文件与目录，查看项目设置，离线查询引擎内置 API 文档（如 `os_file_text`、`os_file_manager`、`os_file_write`、`get_project_settings`、`get_docs_class`）。
+- **试玩与视觉验证**——运行当前场景，注入定时输入序列，给编辑器和游戏截图并对比前后差异（如 `editor_scene_control`、`game_input`、`capture_editor_viewport`、`review_scene_visually`）。
 
 ## 快速开始
 

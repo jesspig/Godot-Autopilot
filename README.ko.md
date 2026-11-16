@@ -5,11 +5,13 @@
 ![Godot](https://img.shields.io/badge/Godot-4.7%2B-478CBF?logo=godotengine&logoColor=white)
 ![플랫폼](https://img.shields.io/badge/platform-Windows%7CLinux%7CmacOS-lightgrey)
 [![프로토콜](https://img.shields.io/badge/MCP-Streamable_HTTP-blueviolet)](https://modelcontextprotocol.io/)
-![도구](https://img.shields.io/badge/tools-452%2B-brightgreen)
+![도구](https://img.shields.io/badge/tools-252-brightgreen)
 
 > **AI 에이전트가 에디터 안에서 Godot 게임을 빌드하고, 플레이테스트하고, 디버깅하게 하세요.**
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | **한국어**
+
+> 이 번역은 영문 [README.md](README.md)를 기준으로 합니다.
 
 Godot Autopilot(GDA)은 **Godot 에디터 내부**에 플러그인으로 상주하는 [MCP](https://modelcontextprotocol.io/) 서버입니다. 설치하고 나면 AI 코딩 어시스턴트(Claude Code, Cursor, Codex, OpenCode 등)가 사용자와 똑같은 방식으로 프로젝트를 다룰 수 있습니다. 씬을 만들고, 속성을 조정하고, 게임을 실행하고, 버튼을 누르고, 스크린샷을 찍고, 로그를 읽은 다음, 확인한 내용을 바탕으로 계속 반복 개선합니다.
 
@@ -23,15 +25,15 @@ Godot Autopilot(GDA)은 **Godot 에디터 내부**에 플러그인으로 상주�
 
 ## 할 수 있는 일
 
-**452개 이상의 도구**가 에디터에서 게임까지 이어지는 전체 루프를 아우릅니다(정확한 개수는 버전마다 늘어나므로, `search_tools`로 에이전트에게 확인하도록 요청하세요). 주요 기능:
+**252개의 도구**가 에디터에서 게임까지 이어지는 전체 루프를 아우릅니다(정확한 개수는 버전마다 늘어나므로, `search_tools`로 에이전트에게 확인하도록 요청하세요). 주요 기능:
 
-- **씬 빌드** — 노드를 생성, 이름 변경, 이동, 삭제하고 속성을 읽고 씁니다. 시그널을 연결하고 GridMap으로 3D 블록 레벨을 만듭니다(예: `create_scene_node`, `property_set`, `signal_connect`, `scene_tree_items`; GridMap: `create_gridmap`, `set_gridmap_cell`, `fill_gridmap_box`).
-- **비주얼, 사운드, 감각** — 메시와 머티리얼, 조명과 환경, 오디오 재생, 애니메이션과 트윈, UI 테마, 타일맵(예: `create_animation`, `tween_editor_property`, `create_game_tween`, `play_audio_player`, `fill_tilemap_rect`).
-- **물리와 내비게이션** — 레이/셰이프 캐스트, 리지드 바디, 내비게이션 맵과 경로 조회(예: `intersect_physics_3d_ray`, `create_nav_3d_map`, `get_nav_3d_map_path`).
-- **손: 입력과 UI 자동화** — 키, 마우스, 게임패드를 시뮬레이션하고, 이름으로 에디터 컨트롤을 클릭하고, 에디터 단축키를 실행하고, 실행 중인 게임의 버튼을 클릭합니다(예: `click_input_mouse`, `get_editor_ui_elements`, `click_editor_element`, `run_editor_shortcut`, `click_game_ui_element`).
-- **스크립트와 디버깅** — 에디터 또는 게임에서 GDScript를 실행하고, 오래 걸리는 게임 스크립트를 백그라운드 작업으로 실행하고, 플러그인/게임/스크립트 오류 로그를 읽습니다(예: `execute_script`, `execute_game_script`, `start_game_job`, `get_plugin_log`).
-- **프로젝트와 지식** — 프로젝트 파일과 디렉터리를 읽고, 검색하고, 복사하며, 프로젝트 설정을 확인하고, 엔진 내장 API 문서를 오프라인으로 조회합니다(예: `read_file`, `find_in_files`, `list_directory`, `copy_file`, `get_project_settings`, `get_docs_class`).
-- **플레이와 시각적 검증** — 현재 씬을 실행하고, 시간 지정 입력 시퀀스를 주입하고, 에디터와 게임의 스크린샷을 찍고 전후 차이를 비교합니다(예: `play_editor_current_scene`, `queue_game_input`, `capture_editor_viewport`, `capture_game_viewport`, `review_scene_visually`).
+- **씬 빌드** — 노드를 생성, 이름 변경, 이동, 삭제하고 속성을 읽고 씁니다. 시그널을 연결하고 GridMap으로 3D 블록 레벨을 만듭니다(예: `create_scene_node`, `property_set`, `signal_connect`, `get_editor_ui`; GridMap: `create_gridmap`, `set_gridmap_cells`).
+- **비주얼, 사운드, 감각** — 메시와 머티리얼, 조명과 환경, 오디오 재생, 애니메이션과 트윈, UI 테마, 타일맵(예: `create_animation`, `tween_editor_property`, `game_tween`, `audio_player`, `set_tilemap_cells`).
+- **물리와 내비게이션** — 레이/셰이프 캐스트, 리지드 바디, 내비게이션 맵과 경로 조회(예: `physics_query`, `create_nav_3d_map`, `nav_query`).
+- **손: 입력과 UI 자동화** — 키, 마우스, 게임패드를 시뮬레이션하고, 이름으로 에디터 컨트롤을 클릭하고, 에디터 단축키를 실행하고, 실행 중인 게임의 버튼을 클릭합니다(예: `input_mouse`, `get_editor_ui`, `editor_ui_action`, `click_game_ui_element`).
+- **스크립트와 디버깅** — 에디터 또는 게임에서 GDScript를 실행하고, 오래 걸리는 게임 스크립트를 백그라운드 작업으로 실행하고, 플러그인/게임/스크립트 오류 로그를 읽습니다(예: `execute_script`, `game_script`, `get_plugin_log`).
+- **프로젝트와 지식** — 프로젝트 파일과 디렉터리를 읽고, 검색하고, 복사하며, 프로젝트 설정을 확인하고, 엔진 내장 API 문서를 오프라인으로 조회합니다(예: `os_file_text`, `os_file_manager`, `os_file_write`, `get_project_settings`, `get_docs_class`).
+- **플레이와 시각적 검증** — 현재 씬을 실행하고, 시간 지정 입력 시퀀스를 주입하고, 에디터와 게임의 스크린샷을 찍고 전후 차이를 비교합니다(예: `editor_scene_control`, `game_input`, `capture_editor_viewport`, `review_scene_visually`).
 
 ## 빠른 시작
 

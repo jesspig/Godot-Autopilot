@@ -5,7 +5,7 @@
 ![Godot](https://img.shields.io/badge/Godot-4.7%2B-478CBF?logo=godotengine&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-Windows%7CLinux%7CmacOS-lightgrey)
 [![Protocol](https://img.shields.io/badge/MCP-Streamable_HTTP-blueviolet)](https://modelcontextprotocol.io/)
-![Tools](https://img.shields.io/badge/tools-452%2B-brightgreen)
+![Tools](https://img.shields.io/badge/tools-252-brightgreen)
 
 > **Let an AI agent build, playtest, and debug your Godot game — from inside the editor.**
 
@@ -23,15 +23,15 @@ AI controlling a game character in real time during end-to-end tests:
 
 ## What it can do
 
-Over **452 tools** covering the whole editor-to-game loop (the exact count grows with each version — ask the agent to check via `search_tools`). Highlights:
+**252 tools** covering the whole editor-to-game loop — 246 domain tools, 5 meta tools, and `system_status` (the exact count grows with each version; ask the agent to check via `search_tools`). 325 deprecated tool-name aliases are registered and stay callable through `call_tool` until 0.6.0 (names still exposed as real tools win). Highlights:
 
-- **Build scenes** — create, rename, move, and delete nodes; read and write properties; connect signals; build 3D block levels with GridMap (e.g. `create_scene_node`, `property_set`, `signal_connect`, `scene_tree_items`; GridMap: `create_gridmap`, `set_gridmap_cell`, `fill_gridmap_box`).
-- **Look, sound, and feel** — meshes and materials, lights and environments, audio playback, animations and tweens, UI themes, tilemaps (e.g. `create_animation`, `tween_editor_property`, `create_game_tween`, `play_audio_player`, `fill_tilemap_rect`).
-- **Physics and navigation** — ray/shape casts, rigid bodies, navigation maps and path queries (e.g. `intersect_physics_3d_ray`, `create_nav_3d_map`, `get_nav_3d_map_path`).
-- **Hands: input and UI automation** — simulate keys, mouse, and gamepad; click editor controls by name; run editor shortcuts; click buttons in the running game (e.g. `click_input_mouse`, `get_editor_ui_elements`, `click_editor_element`, `run_editor_shortcut`, `click_game_ui_element`).
-- **Scripts and debugging** — run GDScript in the editor or in the game, launch long game scripts as background jobs, read plugin/game/script-error logs (e.g. `execute_script`, `execute_game_script`, `start_game_job`, `get_plugin_log`).
-- **Project and knowledge** — read, search, and copy project files and directories, inspect project settings, query the engine's built-in API docs offline (e.g. `read_file`, `find_in_files`, `list_directory`, `copy_file`, `get_project_settings`, `get_docs_class`).
-- **Play and verify visually** — launch the current scene, inject timed input sequences, screenshot the editor and the game, and diff before/after (e.g. `play_editor_current_scene`, `queue_game_input`, `capture_editor_viewport`, `capture_game_viewport`, `review_scene_visually`).
+- **Build scenes** — create, rename, move, and delete nodes; read and write properties; connect signals; build 3D block levels with GridMap (e.g. `create_scene_node`, `property_set`, `signal_connect`, `get_editor_ui`; GridMap: `create_gridmap`, `set_gridmap_cells`).
+- **Look, sound, and feel** — meshes and materials, lights and environments, audio playback, animations and tweens, UI themes, tilemaps (e.g. `create_animation`, `tween_editor_property`, `game_tween`, `audio_player`, `set_tilemap_cells`).
+- **Physics and navigation** — ray/shape casts, rigid bodies, navigation maps and path queries (e.g. `physics_query`, `create_nav_3d_map`, `nav_query`).
+- **Hands: input and UI automation** — simulate keys, mouse, and gamepad; click editor controls by name; run editor shortcuts; click buttons in the running game (e.g. `input_mouse`, `get_editor_ui`, `editor_ui_action`, `click_game_ui_element`).
+- **Scripts and debugging** — run GDScript in the editor or in the game, launch long game scripts as background jobs, read plugin/game/script-error logs (e.g. `execute_script`, `game_script`, `get_plugin_log`).
+- **Project and knowledge** — read, search, and copy project files and directories, inspect project settings, query the engine's built-in API docs offline (e.g. `os_file_text`, `os_file_manager`, `os_file_write`, `get_project_settings`, `get_docs_class`).
+- **Play and verify visually** — launch the current scene, inject timed input sequences, screenshot the editor and the game, and diff before/after (e.g. `editor_scene_control`, `game_input`, `capture_editor_viewport`, `review_scene_visually`).
 
 ## Quick start
 

@@ -5,11 +5,13 @@
 ![Godot 版本](https://img.shields.io/badge/Godot-4.7%2B-478CBF?logo=godotengine&logoColor=white)
 ![支援平台](https://img.shields.io/badge/platform-Windows%7CLinux%7CmacOS-lightgrey)
 [![協定](https://img.shields.io/badge/MCP-Streamable_HTTP-blueviolet)](https://modelcontextprotocol.io/)
-![工具數](https://img.shields.io/badge/tools-452%2B-brightgreen)
+![工具數](https://img.shields.io/badge/tools-252-brightgreen)
 
 > **讓 AI 代理在編輯器內部建置、試玩與除錯你的 Godot 遊戲。**
 
 [English](README.md) | [简体中文](README.zh-CN.md) | **繁體中文** | [日本語](README.ja.md) | [한국어](README.ko.md)
+
+> 本翻譯以英文版 [README.md](README.md) 為準。
 
 Godot Autopilot（GDA）是一個以插件形式**常駐於 Godot 編輯器內部**的 [MCP](https://modelcontextprotocol.io/) 伺服器。安裝完成後，你的 AI 程式設計助理（Claude Code、Cursor、Codex、OpenCode 等）就能像你一樣操作專案：建置場景、調整屬性、執行遊戲、按下按鈕、截圖，並讀取日誌——再依據所見結果反覆迭代。
 
@@ -23,15 +25,15 @@ Godot Autopilot（GDA）是一個以插件形式**常駐於 Godot 編輯器內�
 
 ## 能做什麼
 
-超過 **452 個工具**，涵蓋從編輯器到遊戲的完整閉環（實際數量隨版本成長——請代理透過 `search_tools` 查詢）。重點如下：
+**252 個工具**，涵蓋從編輯器到遊戲的完整閉環（實際數量隨版本成長——請代理透過 `search_tools` 查詢）。重點如下：
 
-- **建置場景**——建立、重新命名、移動與刪除節點；讀取與寫入屬性；連接訊號；用 GridMap 搭建 3D 方塊關卡（例如 `create_scene_node`、`property_set`、`signal_connect`、`scene_tree_items`；GridMap：`create_gridmap`、`set_gridmap_cell`、`fill_gridmap_box`）。
-- **畫面、聲音與手感**——網格與材質、燈光與環境、音訊播放、動畫與補間、UI 主題、圖塊地圖（例如 `create_animation`、`tween_editor_property`、`create_game_tween`、`play_audio_player`、`fill_tilemap_rect`）。
-- **物理與導航**——射線/形狀投射、剛體、導航地圖與路徑查詢（例如 `intersect_physics_3d_ray`、`create_nav_3d_map`、`get_nav_3d_map_path`）。
-- **動手：輸入與 UI 自動化**——模擬鍵盤、滑鼠與遊戲手把；依名稱點擊編輯器控制項；執行編輯器快速鍵；點擊執行中遊戲裡的按鈕（例如 `click_input_mouse`、`get_editor_ui_elements`、`click_editor_element`、`run_editor_shortcut`、`click_game_ui_element`）。
-- **腳本與除錯**——在編輯器或遊戲中執行 GDScript，將長時間執行的遊戲腳本作為背景工作啟動，讀取外掛/遊戲/腳本錯誤日誌（例如 `execute_script`、`execute_game_script`、`start_game_job`、`get_plugin_log`）。
-- **專案與知識**——讀取、搜尋與複製專案檔案與目錄，檢視專案設定，離線查詢引擎內建的 API 文件（例如 `read_file`、`find_in_files`、`list_directory`、`copy_file`、`get_project_settings`、`get_docs_class`）。
-- **試玩與視覺驗證**——啟動目前場景，注入定時輸入序列，為編輯器與遊戲截圖，並比對前後差異（例如 `play_editor_current_scene`、`queue_game_input`、`capture_editor_viewport`、`capture_game_viewport`、`review_scene_visually`）。
+- **建置場景**——建立、重新命名、移動與刪除節點；讀取與寫入屬性；連接訊號；用 GridMap 搭建 3D 方塊關卡（例如 `create_scene_node`、`property_set`、`signal_connect`、`get_editor_ui`；GridMap：`create_gridmap`、`set_gridmap_cells`）。
+- **畫面、聲音與手感**——網格與材質、燈光與環境、音訊播放、動畫與補間、UI 主題、圖塊地圖（例如 `create_animation`、`tween_editor_property`、`game_tween`、`audio_player`、`set_tilemap_cells`）。
+- **物理與導航**——射線/形狀投射、剛體、導航地圖與路徑查詢（例如 `physics_query`、`create_nav_3d_map`、`nav_query`）。
+- **動手：輸入與 UI 自動化**——模擬鍵盤、滑鼠與遊戲手把；依名稱點擊編輯器控制項；執行編輯器快速鍵；點擊執行中遊戲裡的按鈕（例如 `input_mouse`、`get_editor_ui`、`editor_ui_action`、`click_game_ui_element`）。
+- **腳本與除錯**——在編輯器或遊戲中執行 GDScript，將長時間執行的遊戲腳本作為背景工作啟動，讀取外掛/遊戲/腳本錯誤日誌（例如 `execute_script`、`game_script`、`get_plugin_log`）。
+- **專案與知識**——讀取、搜尋與複製專案檔案與目錄，檢視專案設定，離線查詢引擎內建的 API 文件（例如 `os_file_text`、`os_file_manager`、`os_file_write`、`get_project_settings`、`get_docs_class`）。
+- **試玩與視覺驗證**——啟動目前場景，注入定時輸入序列，為編輯器與遊戲截圖，並比對前後差異（例如 `editor_scene_control`、`game_input`、`capture_editor_viewport`、`review_scene_visually`）。
 
 ## 快速開始
 

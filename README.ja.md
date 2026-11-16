@@ -5,11 +5,13 @@
 ![Godot](https://img.shields.io/badge/Godot-4.7%2B-478CBF?logo=godotengine&logoColor=white)
 ![プラットフォーム](https://img.shields.io/badge/platform-Windows%7CLinux%7CmacOS-lightgrey)
 [![プロトコル](https://img.shields.io/badge/MCP-Streamable_HTTP-blueviolet)](https://modelcontextprotocol.io/)
-![ツール](https://img.shields.io/badge/tools-452%2B-brightgreen)
+![ツール](https://img.shields.io/badge/tools-252-brightgreen)
 
 > **AIエージェントがGodotゲームのビルド、プレイテスト、デバッグをエディターの内部から行います。**
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | **日本語** | [한국어](README.ko.md)
+
+> 本翻訳は英語版 [README.md](README.md) を正とします。
 
 Godot Autopilot (GDA) は、プラグインとして**Godotエディターの内部**に常駐する [MCP](https://modelcontextprotocol.io/) サーバーです。インストールすると、AIコーディングアシスタント（Claude Code、Cursor、Codex、OpenCode など）が、ユーザーと同じようにプロジェクトを操作できるようになります。シーンの構築、プロパティの調整、ゲームの実行、ボタンの押下、スクリーンショットの撮影、ログの読み取りを行い、その結果を見ながら反復改善します。
 
@@ -23,15 +25,15 @@ Godot Autopilot (GDA) は、プラグインとして**Godotエディターの内
 
 ## できること
 
-エディターからゲーム実行までのループ全体をカバーする **452以上のツール** を備えています（正確な数はバージョンごとに増えていきます。`search_tools` でエージェントに確認してください）。主な機能は次のとおりです：
+エディターからゲーム実行までのループ全体をカバーする **252個のツール** を備えています（正確な数はバージョンごとに増えていきます。`search_tools` でエージェントに確認してください）。主な機能は次のとおりです：
 
-- **シーンの構築** — ノードの作成、名前変更、移動、削除、プロパティの読み書き、シグナルの接続、GridMap による 3D ブロックレベルの構築ができます（例：`create_scene_node`、`property_set`、`signal_connect`、`scene_tree_items`；GridMap：`create_gridmap`、`set_gridmap_cell`、`fill_gridmap_box`）。
-- **見た目・サウンド・操作感** — メッシュとマテリアル、ライトと環境、オーディオ再生、アニメーションとトゥイーン、UIテーマ、タイルマップを扱えます（例：`create_animation`、`tween_editor_property`、`create_game_tween`、`play_audio_player`、`fill_tilemap_rect`）。
-- **物理とナビゲーション** — レイ／シェイプキャスト、リジッドボディ、ナビゲーションマップと経路クエリ（例：`intersect_physics_3d_ray`、`create_nav_3d_map`、`get_nav_3d_map_path`）。
-- **手を動かす：入力とUIの自動化** — キー、マウス、ゲームパッドのシミュレート、エディターコントロールの名前指定クリック、エディターショートカットの実行、実行中のゲーム内ボタンのクリックができます（例：`click_input_mouse`、`get_editor_ui_elements`、`click_editor_element`、`run_editor_shortcut`、`click_game_ui_element`）。
-- **スクリプトとデバッグ** — エディター内またはゲーム内での GDScript の実行、長時間実行するゲームスクリプトのバックグラウンドジョブとしての起動、プラグイン／ゲーム／スクリプトエラーのログの読み取りができます（例：`execute_script`、`execute_game_script`、`start_game_job`、`get_plugin_log`）。
-- **プロジェクトと知識** — プロジェクトのファイルとディレクトリーの読み取り・検索・コピー、プロジェクト設定の確認、エンジン内蔵 API ドキュメントのオフライン検索ができます（例：`read_file`、`find_in_files`、`list_directory`、`copy_file`、`get_project_settings`、`get_docs_class`）。
-- **プレイと目視による検証** — 現在のシーンの起動、タイミングを指定した入力シーケンスの注入、エディターとゲームのスクリーンショット撮影、変更前後の差分比較ができます（例：`play_editor_current_scene`、`queue_game_input`、`capture_editor_viewport`、`capture_game_viewport`、`review_scene_visually`）。
+- **シーンの構築** — ノードの作成、名前変更、移動、削除、プロパティの読み書き、シグナルの接続、GridMap による 3D ブロックレベルの構築ができます（例：`create_scene_node`、`property_set`、`signal_connect`、`get_editor_ui`；GridMap：`create_gridmap`、`set_gridmap_cells`）。
+- **見た目・サウンド・操作感** — メッシュとマテリアル、ライトと環境、オーディオ再生、アニメーションとトゥイーン、UIテーマ、タイルマップを扱えます（例：`create_animation`、`tween_editor_property`、`game_tween`、`audio_player`、`set_tilemap_cells`）。
+- **物理とナビゲーション** — レイ／シェイプキャスト、リジッドボディ、ナビゲーションマップと経路クエリ（例：`physics_query`、`create_nav_3d_map`、`nav_query`）。
+- **手を動かす：入力とUIの自動化** — キー、マウス、ゲームパッドのシミュレート、エディターコントロールの名前指定クリック、エディターショートカットの実行、実行中のゲーム内ボタンのクリックができます（例：`input_mouse`、`get_editor_ui`、`editor_ui_action`、`click_game_ui_element`）。
+- **スクリプトとデバッグ** — エディター内またはゲーム内での GDScript の実行、長時間実行するゲームスクリプトのバックグラウンドジョブとしての起動、プラグイン／ゲーム／スクリプトエラーのログの読み取りができます（例：`execute_script`、`game_script`、`get_plugin_log`）。
+- **プロジェクトと知識** — プロジェクトのファイルとディレクトリーの読み取り・検索・コピー、プロジェクト設定の確認、エンジン内蔵 API ドキュメントのオフライン検索ができます（例：`os_file_text`、`os_file_manager`、`os_file_write`、`get_project_settings`、`get_docs_class`）。
+- **プレイと目視による検証** — 現在のシーンの起動、タイミングを指定した入力シーケンスの注入、エディターとゲームのスクリーンショット撮影、変更前後の差分比較ができます（例：`editor_scene_control`、`game_input`、`capture_editor_viewport`、`review_scene_visually`）。
 
 ## クイックスタート
 

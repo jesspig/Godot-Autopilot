@@ -117,6 +117,7 @@ resource: devtools/commands/tool-audit.ts
 
 - 325 个生产别名不占 catalog、不进 `search_tools`，仅经 `call_tool` / `batch_execute` 解析到 canonical；结果顶层附加 `deprecated_alias`、`canonical_name`、`alias_removal_version`、`deprecated_since`。契约见 [tool_surface_conventions.md](tool_surface_conventions.md)。
 - 137 处 `ToolAlias{...}` 字面量与 15 个域 helper 构造（合计 152 处）全部设置 `deprecated_since = "0.4.0"`、`removal_version = "0.6.0"`；源码中这两个字段没有其它版本值。
+- 325 条别名定义中 8 条与实名工具重名（`create_render_decal`、`create_render_material`、`create_render_reflection_probe`、`create_render_shader`、`create_render_sky`、`get_particles_state`、`restart_particles`、`set_particles_params`），按“实名工具优先”在注册时移除；审计按定义数计 325，实际可解析别名为 317。
 - 根 `VERSION` 当前为 0.3.3；窗口从 0.4.0 起算，至少保留两个 minor 版本到 0.6.0，到期前删除别名而不是恢复正式工具。
 - T-23 证据中的 `alias-matrix.json` 摘录为 319，与其 `catalog.json` 的 325 及当前 audit JSON 的 325 不一致；319 属旧摘录，以 audit JSON 的 325 为准。
 
