@@ -39,16 +39,19 @@ const std::vector<ParamSpec> kDeleteDisplayWindowParams = {
 };
 
 const std::vector<ParamSpec> kDisplayWindowParams = {
-    {"window_id", "integer", "window_id of the target sub-window; defaults to the main window for foreground, attention, flag, mode, position, size and title, and is ignored by create", false},
+    {"window_id", "integer", "window_id of the target sub-window; defaults to the main window for foreground, attention, flag, mode, position, size and title, and is ignored by create. popup, popup_centered, transient, exclusive, unparent_when_invisible and close require a sub-window created with action=create; window_id 0 is refused", false},
     {"mode", "integer", "Window mode integer: for create it is a Window.Mode value (default 0 windowed); for the mode action it is a DisplayServer.WindowMode value (e.g. 1 fullscreen, 2 maximized) — the two enums differ", false},
-    {"rect", "object", "Only with action=create: window rectangle as {x, y, w, h} integers; defaults to 800x600 at the origin", false},
+    {"rect", "object", "Only with action=create or action=popup: window rectangle as {x, y, w, h} integers; create defaults to 800x600 at the origin, popup requires w and h above 0", false},
     {"x", "integer", "Only with action=position: window X position in screen coordinates (pixels)", false},
     {"y", "integer", "Only with action=position: window Y position in screen coordinates (pixels)", false},
-    {"width", "integer", "Only with action=size: window width in pixels, e.g. 1024", false},
-    {"height", "integer", "Only with action=size: window height in pixels, e.g. 768", false},
+    {"width", "integer", "Only with action=size (window width in pixels, e.g. 1024) or action=popup_centered (minimum width, default 0)", false},
+    {"height", "integer", "Only with action=size (window height in pixels, e.g. 768) or action=popup_centered (minimum height, default 0)", false},
     {"title", "string", "Only with action=title: title bar text to set, e.g. 'Output Preview'", false},
     {"flag", "integer", "Only with action=flag: Window flag as a DisplayServer.WindowFlags enum value, e.g. 0 for always-on-top or 1 for borderless", false},
     {"enabled", "boolean", "Only with action=flag: true applies the flag, false removes it", false},
+    {"transient", "boolean", "Only with action=transient: true marks the sub-window as transient of its parent (it follows the parent and stays above it), false clears the flag", false},
+    {"exclusive", "boolean", "Only with action=exclusive: true makes the transient sub-window exclusive (it blocks input to its parent until hidden), false clears the flag", false},
+    {"unparent_when_invisible", "boolean", "Only with action=unparent_when_invisible: true removes the sub-window from the tree when it becomes invisible (parents may re-add it)", false},
 };
 
 const std::vector<ParamSpec> kDisplayMouseParams = {
@@ -69,9 +72,11 @@ const std::vector<std::string> kGetDisplayInfoActions = {
     "screens", "clipboard", "mouse", "voices", "window"};
 const std::vector<std::string> kDisplayWindowActions = {
     "create", "foreground", "attention", "flag", "mode", "position", "size",
-    "title"};
+    "title", "popup", "popup_centered", "transient", "exclusive",
+    "unparent_when_invisible", "close"};
 const std::vector<std::string> kDisplayMouseActions = {"mode", "warp"};
-const std::vector<std::string> kDisplayTtsActions = {"speak", "stop"};
+const std::vector<std::string> kDisplayTtsActions = {
+    "speak", "stop", "pause", "resume", "is_speaking"};
 
 inline mcp::JsonValue action_args(const mcp::JsonValue &args, const char *action,
                                   std::initializer_list<const char *> keys) {
@@ -148,13 +153,13 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   v.reserve(8);
   v.push_back(make_spec_tool(with_aliases(ToolSpec{
       "get_display_info",
-      "Read display and input-device state in one read-only tool. action selects the view: 'screens' returns {count, screens:[{index, dpi, position:{x,y}, size:{x,y}, refresh_rate}]} for every connected screen; 'clipboard' returns the current system clipboard text as result; 'mouse' returns the desktop mouse cursor position as {x, y} in screen coordinates (a different basis from display_mouse action=warp and the input mouse tools, which use focused-window client coordinates); 'voices' returns the system text-to-speech voices as an array whose fields vary by platform, each with an id usable as voice in display_tts action=speak; 'window' returns the client-area rectangle of the main window or the window given by window_id together with its screen geometry and scale (window_id, position, size, decorated_position, decorated_size, screen, screen_scale, screen_position, screen_size). Example: {\"action\": \"screens\"} or {\"action\": \"window\", \"window_id\": 0}.",
-      "Display", {"display", "screen", "clipboard", "mouse", "tts", "voices", "window", "geometry"},
+      "Read display and input-device state in one read-only tool. action selects the view: 'screens' returns {count, screens:[{index, dpi, position:{x,y}, size:{x,y}, usable_rect:{x,y,w,h}, scale, max_scale, orientation, refresh_rate}]} for every connected screen (usable_rect is the work area excluding taskbars/docks, scale is the per-screen content scale, max_scale is the system maximum, orientation is a DisplayServer.ScreenOrientation value); 'clipboard' returns the current system clipboard text as result; 'mouse' returns the desktop mouse cursor position as {x, y} in screen coordinates (a different basis from display_mouse action=warp and the input mouse tools, which use focused-window client coordinates); 'voices' returns the system text-to-speech voices as an array whose fields vary by platform, each with an id usable as voice in display_tts action=speak; 'window' returns the client-area rectangle of the main window or the window given by window_id together with its screen geometry, scale and vsync (window_id, position, size, decorated_position, decorated_size, screen, screen_scale, screen_position, screen_size, vsync). Example: {\"action\": \"screens\"} or {\"action\": \"window\", \"window_id\": 0}.",
+      "Display", {"display", "screen", "clipboard", "mouse", "tts", "voices", "window", "geometry", "scale", "orientation", "vsync"},
       SideEffect::None, tool_flags::kNone,
       kGetDisplayInfoParams, display_ops::handle_info_get,
       schema::build_action_schema(
           kGetDisplayInfoActions, kGetDisplayInfoParams,
-          "screens: all connected screens with dpi, position, size and refresh rate; clipboard: clipboard text; mouse: desktop cursor position; voices: text-to-speech voices; window: window client rectangle and screen geometry"),
+          "screens: all connected screens with dpi, position, size, usable_rect, scale, max_scale, orientation and refresh rate; clipboard: clipboard text; mouse: desktop cursor position; voices: text-to-speech voices; window: window client rectangle, screen geometry and vsync"),
       {},
       {"get_display_info action=screens",
        "get_display_info action=window window_id=0"}},
@@ -249,15 +254,16 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       {}, {}, {"{\"screen\": 0}"}}));
   v.push_back(make_spec_tool(with_aliases(ToolSpec{
       "display_window",
-      "Create or modify an on-screen window in the editor process. action selects the operation (all ModifiesWindow, no confirmation): 'create' returns result window_id and shows a new sub-window (optional mode as a Window.Mode value and rect {x, y, w, h}, default 800x600 at the origin; errors when the platform does not support subwindows); 'foreground' raises and focuses the window; 'attention' flashes the taskbar entry without stealing focus; 'flag' applies or removes a DisplayServer.WindowFlags value with enabled; 'mode' sets a DisplayServer.WindowMode value (note: a different enum from create's Window.Mode); 'position' moves the window to screen coordinates x, y; 'size' resizes it to width x height pixels; 'title' sets the title bar text. window_id defaults to the main window for every action except create. Deleting a window is a destructive operation and stays in delete_display_window (requires confirm). Example: {\"action\": \"create\", \"rect\": {\"x\": 100, \"y\": 50, \"w\": 800, \"h\": 600}} or {\"action\": \"size\", \"width\": 1024, \"height\": 768}.",
-      "Display", {"display", "window", "create", "move", "resize", "title", "mode", "flag"},
+      "Create or modify an on-screen window in the editor process. action selects the operation (all ModifiesWindow, no confirmation): 'create' returns result window_id and shows a new sub-window parented under the editor main window (optional mode as a Window.Mode value and rect {x, y, w, h}, default 800x600 at the origin; errors when the platform does not support subwindows); 'foreground' raises and focuses the window; 'attention' flashes the taskbar entry without stealing focus; 'flag' applies or removes a DisplayServer.WindowFlags value with enabled; 'mode' sets a DisplayServer.WindowMode value (note: a different enum from create's Window.Mode); 'position' moves the window to screen coordinates x, y; 'size' resizes it to width x height pixels; 'title' sets the title bar text; 'popup' shows a sub-window at rect {x, y, w, h} with a non-modal Window.popup call; 'popup_centered' shows a sub-window centered on its parent with an optional minimum width/height; 'transient' set_transient toggles whether the sub-window follows its parent; 'exclusive' set_exclusive blocks parent input while the sub-window is visible (keep it transient); 'unparent_when_invisible' toggles removing the sub-window from the tree when hidden; 'close' hides the sub-window without freeing it. window_id defaults to the main window for foreground, attention, flag, mode, position, size and title, while popup, popup_centered, transient, exclusive, unparent_when_invisible and close require a sub-window created by 'create' and refuse window_id 0. Deleting a window is a destructive operation and stays in delete_display_window (requires confirm). Example: {\"action\": \"create\", \"rect\": {\"x\": 100, \"y\": 50, \"w\": 800, \"h\": 600}} or {\"action\": \"popup_centered\", \"window_id\": 2}.",
+      "Display", {"display", "window", "create", "move", "resize", "title", "mode", "flag", "popup", "transient", "exclusive", "close"},
       SideEffect::ModifiesWindow, tool_flags::kMutating,
       kDisplayWindowParams, display_ops::handle_window_control,
       schema::build_action_schema(
           kDisplayWindowActions, kDisplayWindowParams,
-          "create: new sub-window, returns window_id; foreground: raise and focus; attention: flash the taskbar entry; flag: apply or remove a WindowFlags value; mode: set a DisplayServer.WindowMode; position: move to x, y; size: resize to width x height; title: set the title bar text"),
+          "create: new sub-window, returns window_id; foreground: raise and focus; attention: flash the taskbar entry; flag: apply or remove a WindowFlags value; mode: set a DisplayServer.WindowMode; position: move to x, y; size: resize to width x height; title: set the title bar text; popup: show the sub-window at rect; popup_centered: show centered with optional min width/height; transient, exclusive, unparent_when_invisible: toggle the matching Window flag; close: hide the sub-window"),
       {},
       {"display_window action=create",
+       "display_window action=popup_centered window_id=2",
        "display_window action=title title=Preview window_id=0"}},
       {
           ToolAlias{
@@ -339,15 +345,16 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       })));
   v.push_back(make_spec_tool(with_aliases(ToolSpec{
       "display_tts",
-      "Speak text aloud through the system text-to-speech engine. action selects the operation: 'speak' requires text and optionally takes a voice id from get_display_info action=voices, volume 0-100 (default 50), pitch (default 1.0) and rate (default 1.0); speech is asynchronous. 'stop' interrupts any ongoing playback immediately and returns result 'ok' even when nothing is being spoken. Both actions return result 'ok'. Example: {\"action\": \"speak\", \"text\": \"Level complete\"} or {\"action\": \"stop\"}.",
-      "Display", {"display", "tts", "speech", "audio", "alert"},
+      "Speak text aloud through the system text-to-speech engine. action selects the operation: 'speak' requires text and optionally takes a voice id from get_display_info action=voices, volume 0-100 (default 50), pitch (default 1.0) and rate (default 1.0); speech is asynchronous. 'stop' interrupts any ongoing playback immediately and returns result 'ok' even when nothing is being spoken. 'pause' pauses the current utterance and 'resume' continues it (both return result 'ok'). 'is_speaking' returns {speaking} as a read-only probe usable before waiting on speech completion. Example: {\"action\": \"speak\", \"text\": \"Level complete\"} or {\"action\": \"is_speaking\"}.",
+      "Display", {"display", "tts", "speech", "audio", "alert", "speaking"},
       SideEffect::ShowsAlert, tool_flags::kMutating,
       kDisplayTtsParams, display_ops::handle_tts_control,
       schema::build_action_schema(
           kDisplayTtsActions, kDisplayTtsParams,
-          "speak: synthesize and speak text with optional voice, volume, pitch and rate; stop: interrupt ongoing speech"),
+          "speak: synthesize and speak text with optional voice, volume, pitch and rate; stop: interrupt ongoing speech; pause/resume: pause or continue the current utterance; is_speaking: report whether speech is active"),
       {},
       {"display_tts action=speak text=Level complete",
+       "display_tts action=is_speaking",
        "display_tts action=stop"}},
       {
           ToolAlias{

@@ -63,6 +63,9 @@ inline constexpr Exemption kDestructiveExemptions[] = {
     {"remove_physics_3d_body_collision_exception",
      "removes a relation entry between two physics bodies; no object is "
      "destroyed"},
+    {"os_process",
+     "starts, inspects and kills external processes, not objects that live "
+     "inside the host (danger tier)"},
 };
 
 struct ToolDeclaration {

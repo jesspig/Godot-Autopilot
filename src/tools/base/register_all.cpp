@@ -19,6 +19,8 @@
 #include "tools/domains/display/display_tools.hpp"
 #include "tools/domains/editor/editor_tools.hpp"
 #include "tools/domains/input/input_tools.hpp"
+#include "tools/domains/image/image_tools.hpp"
+#include "tools/domains/mesh/mesh_tools.hpp"
 #include "tools/domains/os/os_tools.hpp"
 #include "tools/domains/physics/physics_tools.hpp"
 #include "tools/domains/scene/scene_tools.hpp"
@@ -454,6 +456,8 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
     add_domain_tools(display_tools::make_tools);
     add_domain_tools(editor_tools::make_tools);
     add_domain_tools(input_tools::make_tools);
+    add_domain_tools(image_tools::make_tools);
+    add_domain_tools(mesh_tools::make_tools);
     add_domain_tools(os_tools::make_tools);
     add_domain_tools(physics_tools::make_tools);
     add_domain_tools(scene_tools::make_tools);
@@ -541,7 +545,7 @@ static std::shared_ptr<ToolRegistry> build_registry(ToolCatalog& catalog, Bm25In
 
     {
         ToolSpec spec{"call_tool",
-                      "Execute any tool by name. Use this to call all 249 non-meta tools (244 domain tools plus system_status).",
+                      "Execute any tool by name. Use this to call all 251 non-meta tools (246 domain tools plus system_status).",
                       "System", {"call", "dispatch", "proxy"}};
         spec.side_effect = SideEffect::None;
         spec.flags = tool_flags::kMeta;

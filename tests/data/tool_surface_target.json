@@ -1,16 +1,16 @@
 {
   "schema": 1,
   "source": "src/tools/domains/*/*_tools.hpp",
-  "catalog_current": 250,
+  "catalog_current": 252,
   "catalog_target": 270,
-  "catalog_expected": 269,
+  "catalog_expected": 277,
   "catalog_target_range": [
     250,
     300
   ],
-  "domain_current_total": 244,
-  "domain_target_total": 257,
-  "planned_domain_target_total": 258,
+  "domain_current_total": 246,
+  "domain_target_total": 265,
+  "planned_domain_target_total": 266,
   "net_new_total": 6,
   "strict_prune_count": 32,
   "meta_current": 5,
@@ -204,6 +204,18 @@
       ]
     },
     {
+      "name": "Image",
+      "current": 4,
+      "target": 4,
+      "plan_target": 4,
+      "merge_groups": [
+        "image_edit",
+        "image_pixel",
+        "image_save",
+        "texture_gen"
+      ]
+    },
+    {
       "name": "Input",
       "current": 6,
       "target": 7,
@@ -239,8 +251,20 @@
       ]
     },
     {
+      "name": "Mesh",
+      "current": 4,
+      "target": 4,
+      "plan_target": 4,
+      "merge_groups": [
+        "mesh_surface",
+        "mesh_inspect",
+        "multimesh",
+        "multimesh_instance"
+      ]
+    },
+    {
       "name": "Nav",
-      "current": 15,
+      "current": 14,
       "target": 6,
       "plan_target": 6,
       "merge_groups": [
@@ -267,7 +291,7 @@
     },
     {
       "name": "Physics",
-      "current": 51,
+      "current": 46,
       "target": 32,
       "plan_target": 32,
       "merge_groups": [

@@ -78,10 +78,13 @@ const std::vector<ParamSpec> kGetSceneTreeParams = {
 };
 
 const std::vector<ParamSpec> kSceneCameraParams = {
-    {"camera_path", "string", "Camera node path in the edited scene (a Camera2D for 2D targets, a Camera3D for 3D targets)", true},
+    {"camera_path", "string", "Camera node path in the edited scene (a Camera2D for 2D targets, a Camera3D for 3D targets; also the camera queried by project, unproject, project_ray and behind)", true},
     {"target_path", "string", "focus: target node path in the edited scene to focus on (Node2D or Control for 2D cameras, Node3D for 3D cameras)", false},
     {"margin", "number", "focus: extra padding: grows the 2D focus rect around the target anchor, or pulls a 3D camera back along its view direction by this many world units (number, default: 0, must not be negative)", false},
     {"params", "object", "set_params: camera settings to apply with at least one entry: 'zoom' (Camera2D only, number above 0 or {x, y} object with components above 0), 'fov' (Camera3D only, 1 to 179), 'near' (Camera3D only, above 0 and below far), 'far' (Camera3D only, above 0 and above near), 'limits' (Camera2D only, object with any of limit_left, limit_top, limit_right, limit_bottom integers and limit_smoothed boolean); unknown keys error", false},
+    {"point", "object", "project/behind: world-space point to convert, {x, y} for a Camera2D or {x, y, z} for a Camera3D, e.g. {\"x\": 100, \"y\": 50}", false},
+    {"screen_point", "object", "unproject/project_ray: point in the camera viewport client area in pixels as {x, y}, e.g. {\"x\": 640, \"y\": 360}", false},
+    {"depth", "number", "unproject: distance from the Camera3D plane along the view direction used to place the world point (number greater than 0, default 1.0); ignored by a Camera2D", false},
 };
 
 const std::vector<ParamSpec> kGetCameraViewRectParams = {
@@ -91,7 +94,8 @@ const std::vector<ParamSpec> kGetCameraViewRectParams = {
 const std::vector<std::string> kEditSceneNodeActions = {
     "rename", "reparent", "advance_path", "duplicate", "reorder", "replace"};
 
-const std::vector<std::string> kSceneCameraActions = {"focus", "set_params"};
+const std::vector<std::string> kSceneCameraActions = {
+    "focus", "set_params", "project", "unproject", "project_ray", "behind"};
 
 inline mcp::JsonValue scene_create_schema() {
   mcp::JsonValue schema_value = schema::build_schema(kCreateSceneNodeParams);
@@ -501,19 +505,22 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       })));
   v.push_back(make_spec_tool(ToolSpec{
       "scene_camera",
-      "Point or configure a camera in the edited scene in one action tool. action='focus' points 'camera_path' (a Camera2D for 2D targets, a Camera3D for 3D targets) at 'target_path' (Node2D or Control for 2D cameras, Node3D for 3D cameras; other types error naming the actual class): a 2D camera is centered on the target anchor (the Control global-rect center, otherwise the canvas origin) and reports the padded 'focus_rect'; a 3D camera keeps its position and turns toward the target via look_at, reporting whether the target is 'behind' it. Optional 'margin' (number, default 0, must not be negative) grows the 2D focus rect, or pulls a 3D camera back along its view direction before aiming. action='set_params' applies 'params' (object with at least one entry) to 'camera_path': 'zoom' (Camera2D only), 'fov', 'near' and 'far' (Camera3D only), 'limits' (Camera2D only); keys for the wrong camera type or unknown keys error naming the actual class. Both actions are WritesScene with one editor undo step and mark the scene modified; action='focus' returns camera and target paths and types, space, position, zoom and focus_rect (2D) or target_position and behind (3D) plus margin, while action='set_params' returns the applied key array and the resulting position, zoom and limits (2D) or fov, near and far (3D). Read camera geometry with get_camera_view_rect. Deprecated aliases: focus_camera_on_node (action=focus), set_camera_params (action=set_params).",
-      "Scene", {"camera", "focus", "params", "focus_camera_on_node",
+      "Point or configure a camera in the edited scene, or convert coordinates through it, in one action tool. action='focus' points 'camera_path' (a Camera2D for 2D targets, a Camera3D for 3D targets) at 'target_path' (Node2D or Control for 2D cameras, Node3D for 3D cameras; other types error naming the actual class): a 2D camera is centered on the target anchor (the Control global-rect center, otherwise the canvas origin) and reports the padded 'focus_rect'; a 3D camera keeps its position and turns toward the target via look_at, reporting whether the target is 'behind' it. Optional 'margin' (number, default 0, must not be negative) grows the 2D focus rect, or pulls a 3D camera back along its view direction before aiming. action='set_params' applies 'params' (object with at least one entry) to 'camera_path': 'zoom' (Camera2D only), 'fov', 'near' and 'far' (Camera3D only), 'limits' (Camera2D only); keys for the wrong camera type or unknown keys error naming the actual class. action='project' converts a world 'point' ({x,y} or {x,y,z}) to 'screen_point' pixels; action='unproject' converts a viewport client-area 'screen_point' back to 'world_point' (3D uses 'depth', default 1.0, as the distance along the view direction); a Camera2D converts through its canvas transform built from get_screen_center_position/get_screen_rotation/get_zoom, so project then unproject round-trips, while a Camera3D uses Camera3D::unproject_position/project_position; action='project_ray' (Camera3D only) returns the 'origin' and 'normal' of the view ray through 'screen_point'; action='behind' reports whether 'point' sits behind a Camera3D (always false for a Camera2D). focus and set_params are WritesScene with one editor undo step and mark the scene modified; project, unproject, project_ray and behind are read-only and leave the scene untouched. Deprecated aliases: focus_camera_on_node (action=focus), set_camera_params (action=set_params).",
+      "Scene", {"camera", "focus", "params", "project", "unproject", "ray",
+                "behind", "screen", "focus_camera_on_node",
                 "set_camera_params"},
       SideEffect::WritesScene, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
       kSceneCameraParams, scene_ops::handle_scene_camera,
       schema::build_action_schema(kSceneCameraActions, kSceneCameraParams,
-                                  "Camera action: focus|set_params"),
+                                  "Camera action: focus|set_params|project|unproject|project_ray|behind"),
       {
           scene_action_alias("focus_camera_on_node", "scene_camera", "focus"),
           scene_action_alias("set_camera_params", "scene_camera", "set_params"),
       },
       {"{\"action\":\"focus\",\"camera_path\":\"Camera2D\",\"target_path\":\"Player\",\"margin\":16}",
-       "{\"action\":\"set_params\",\"camera_path\":\"Camera3D\",\"params\":{\"fov\":60}}"}}));
+       "{\"action\":\"set_params\",\"camera_path\":\"Camera3D\",\"params\":{\"fov\":60}}",
+       "{\"action\":\"project\",\"camera_path\":\"Camera3D\",\"point\":{\"x\":0,\"y\":1,\"z\":-5}}",
+       "{\"action\":\"unproject\",\"camera_path\":\"Camera2D\",\"screen_point\":{\"x\":640,\"y\":360}}"}}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_camera_view_rect",
       "Describe what a scene camera sees in editor window client-area coordinates with the same mapping as get_scene_node_screen_rect (client = offset + pixel * scale). Pass 'camera_path' (a Camera2D or Camera3D; other types error naming the actual class). Returns camera_path, camera_type, viewport, window_id, space, world_position, window_center, 'view_rect' ({position, size} centered on the projected camera origin with the editor viewport size), 'behind' (always false for 2D; true when a 3D camera origin sits behind the 3D editor camera), zoom (2D) or forward, fov, near and far (3D), viewport_size and the pixel mapping. Read-only.",

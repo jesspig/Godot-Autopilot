@@ -30,7 +30,7 @@ const std::vector<ParamSpec> kOsProcessParams = {
     {"arguments", "array", "Command line arguments for action='create' and action='execute'; non-string entries are ignored", false},
     {"output", "boolean", "Capture stdout and stderr into the result for action='execute' (default: false); captured output is capped at 2 MiB per stream and stdout_truncated / stderr_truncated report the cap", false},
     {"timeout_ms", "integer", "Deadline for action='execute' in milliseconds (default: 5000, min: 100, max: 25000); when the deadline passes the process is terminated and the call fails with code main_thread_timeout", false},
-    {"pid", "integer", "Process ID to kill for action='kill', as returned by action='create'; killing is immediate and unsaved data in the target process is lost", false},
+    {"pid", "integer", "Process ID for action='kill', 'status', 'exit_code' and 'is_running', as returned by action='create'; killing is immediate and unsaved data in the target process is lost", false},
 };
 
 const std::vector<ParamSpec> kOsEnvironmentParams = {
@@ -142,18 +142,21 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       os_action_spec(
           ToolSpec{
               "os_process",
-              "Manage external processes, actions: create, execute, kill. create starts an executable as a detached background process and returns its PID immediately for long-running or fire-and-forget programs. execute runs a command and returns exit_code plus optional stdout/stderr while the editor main thread stays responsive; timeout_ms defaults to 5000 and bounds the wait, and the process is ended with code main_thread_timeout when the deadline passes. The third action (pid) stops the process identified by pid immediately, so unsaved data in the target is lost. Requires the process capability; create and execute capture output capped at 2 MiB per stream. Deprecated aliases: create_os_process, execute_os_process, kill_os_process.",
+              "Manage external processes, actions: create, execute, kill, status, exit_code, is_running. create starts an executable as a detached background process and returns its PID immediately for long-running or fire-and-forget programs. execute runs a command and returns exit_code plus optional stdout/stderr while the editor main thread stays responsive; timeout_ms defaults to 5000 and bounds the wait, and the process is ended with code main_thread_timeout when the deadline passes. status reports is_running plus exit_code (null while running) and available; exit_code reports the same exit-code view; is_running reports only the liveness boolean; all three take pid and return structured unavailable fields instead of failing when the platform cannot report the state. The kill action (pid) stops the process identified by pid immediately, so unsaved data in the target is lost. Requires the process capability and confirm=true; create and execute capture output capped at 2 MiB per stream. Deprecated aliases: create_os_process, execute_os_process, kill_os_process.",
               "OS",
-              {"os", "process", "execute", "kill", "create_os_process",
-               "execute_os_process", "kill_os_process"},
+              {"os", "process", "execute", "kill", "status", "exit_code",
+               "is_running", "create_os_process", "execute_os_process",
+               "kill_os_process"},
               SideEffect::Process,
               tool_flags::kMutating,
               kOsProcessParams,
               os_ops::handle_os_process},
-          {"create", "execute", "kill"},
+          {"create", "execute", "kill", "status", "exit_code", "is_running"},
           {"{\"action\":\"execute\",\"path\":\"git\",\"arguments\":[\"status\"],\"output\":true}",
            "{\"action\":\"create\",\"path\":\"notepad.exe\",\"arguments\":[]}",
-           "{\"action\":\"kill\",\"pid\":1234}"}),
+           "{\"action\":\"kill\",\"pid\":1234}",
+           "{\"action\":\"status\",\"pid\":1234}",
+           "{\"action\":\"is_running\",\"pid\":1234}"}),
       {
           os_alias("create_os_process", "os_process", "create"),
           os_alias("execute_os_process", "os_process", "execute"),
@@ -202,18 +205,24 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       os_action_spec(
           ToolSpec{
               "os_system_info",
-              "Read host system information that needs no process capability, actions: info (name, version, processor_count and processor_name of the host), locale (system locale string such as 'en' or 'zh_CN') and fonts (names of installed system fonts). Machine identity and user data paths remain separate process-gated tools. Deprecated aliases: get_os_system_info, get_os_locale, get_os_system_fonts.",
+              "Read host system information that needs no process capability, actions: info (name, version, processor_count and processor_name of the host), locale (system locale string such as 'en' or 'zh_CN'), fonts (names of installed system fonts), memory_info (OS.get_memory_info dictionary such as physical/free/available/stack), static_memory ({usage, peak_usage} of the engine static allocator), video_adapter (driver info fields from the active rendering adapter, typically vendor/model/api/version) and cmdline_args (editor process command-line arguments). Machine identity and user data paths remain separate process-gated tools. Deprecated aliases: get_os_system_info, get_os_locale, get_os_system_fonts.",
               "OS",
-              {"os", "system", "info", "locale", "fonts",
+              {"os", "system", "info", "locale", "fonts", "memory_info",
+               "static_memory", "video_adapter", "cmdline_args",
                "get_os_system_info", "get_os_locale", "get_os_system_fonts"},
               SideEffect::None,
               tool_flags::kNone,
               kOsSystemInfoParams,
               os_ops::handle_os_system_info},
-          {"info", "locale", "fonts"},
+          {"info", "locale", "fonts", "memory_info", "static_memory",
+           "video_adapter", "cmdline_args"},
           {"{\"action\":\"info\"}",
            "{\"action\":\"locale\"}",
-           "{\"action\":\"fonts\"}"}),
+           "{\"action\":\"fonts\"}",
+           "{\"action\":\"memory_info\"}",
+           "{\"action\":\"static_memory\"}",
+           "{\"action\":\"video_adapter\"}",
+           "{\"action\":\"cmdline_args\"}"}),
       {
           os_alias("get_os_system_info", "os_system_info", "info"),
           os_alias("get_os_locale", "os_system_info", "locale"),
@@ -276,10 +285,10 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       os_action_spec(
           ToolSpec{
               "os_file_manager",
-              "Read-only file and directory inspection with plain filesystem I/O and no editor resource tracking, actions: list (entries of a directory as {name, path, is_dir} objects, with include_hidden and max_entries; sets truncated when more entries exist) and info (path, exists, is_dir, is_file, size in bytes and modified_time for one path). Paths accept res:// and user:// below the namespace root. Mutating file operations live in os_file_write. Deprecated aliases: list_directory, get_file_info.",
+              "Read-only file and directory inspection with plain filesystem I/O and no editor resource tracking, actions: list (entries of a directory as {name, path, is_dir} objects, with include_hidden and max_entries; sets truncated when more entries exist) and info (path, exists, is_dir, is_file, size in bytes, modified_time plus sha256 and md5 for files, empty strings otherwise). Paths accept res:// and user:// below the namespace root. Mutating file operations live in os_file_write. Deprecated aliases: list_directory, get_file_info.",
               "OS",
-              {"os", "file", "directory", "list", "info", "list_directory",
-               "get_file_info"},
+              {"os", "file", "directory", "list", "info", "sha256", "md5",
+               "list_directory", "get_file_info"},
               SideEffect::None,
               tool_flags::kNone,
               kOsFileManagerParams,

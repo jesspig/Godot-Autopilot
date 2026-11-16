@@ -52,6 +52,8 @@ const DOMAIN_LABELS: Record<string, string> = {
   csharp_bridge: "C#",
   debug: "Debug",
   debugger: "Debugger",
+  image: "Image",
+  mesh: "Mesh",
   display: "Display",
   doc: "Docs",
   editor: "Editor",
@@ -94,6 +96,16 @@ const DOMAIN_TARGETS: Record<string, DomainTarget> = {
   Capture: { target: 2, plan_target: 2, merge_groups: ["capture_editor_viewport", "review_scene_visually"] },
   "C#": { target: 3, plan_target: 3, merge_groups: ["csharp_member", "csharp_event", "dotnet"] },
   Config: { target: 11, plan_target: 11, merge_groups: ["config_read", "config_write", "autoload"] },
+  Image: {
+    target: 4,
+    plan_target: 4,
+    merge_groups: ["image_edit", "image_pixel", "image_save", "texture_gen"],
+  },
+  Mesh: {
+    target: 4,
+    plan_target: 4,
+    merge_groups: ["mesh_surface", "mesh_inspect", "multimesh", "multimesh_instance"],
+  },
   Debug: {
     target: 9,
     plan_target: 10,
@@ -835,6 +847,15 @@ function parseAliasMappings(text: string): AliasMapping[] {
       name: match[1],
       canonical: match[2],
       action: match[3] ?? "",
+    });
+  }
+  for (const match of text.matchAll(
+    /physics_query_alias\s*\(\s*"([^"]+)"\s*,\s*[23]\s*,\s*"([^"]+)"/g,
+  )) {
+    mappings.push({
+      name: match[1],
+      canonical: "physics_query",
+      action: match[2],
     });
   }
   return mappings;

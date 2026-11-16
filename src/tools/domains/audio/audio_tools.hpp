@@ -19,7 +19,7 @@ namespace {
 
 const std::vector<ParamSpec> kAudioBusParams = {
     {"layout", "object", "Serialized AudioBusLayout object for action='set_layout', as returned by action='get_layout', typically edited before applying", false},
-    {"bus_index", "integer", "Zero-based audio bus index; 0 is the Master bus; used by action='get_info' (optional) and required by the per-bus setter actions", false},
+    {"bus_index", "integer", "Zero-based audio bus index; 0 is the Master bus; used by action='get_info' and action='info' (optional, default 0) and required by the per-bus setter actions", false},
     {"volume_db", "number", "Volume in decibels for action='set_volume'; negative attenuates, positive amplifies (typical range -80 to +24)", false},
     {"muted", "boolean", "Mute state for action='set_mute'; true silences the bus regardless of volume", false},
     {"solo", "boolean", "Solo state for action='set_solo'; true mutes all other buses so only this one is heard", false},
@@ -242,7 +242,7 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
       audio_action_spec(
           ToolSpec{
               "audio_bus",
-              "Audio bus management, actions: get_layout (default serialized AudioBusLayout with every effect chain), set_layout (replace the whole layout), get_info (bus count, all bus names and, with bus_index, one bus volume/mute/solo/bypass/effect count), set_volume (decibels), set_mute, set_solo, set_bypass (skip effects without removing them), add_effect (instantiate an AudioEffect subclass into a bus slot). Every change applies immediately to editor playback. Requires action plus the parameters named by that action; bus_index 0 is Master. Deprecated aliases: get_audio_bus_layout, get_audio_bus_count, get_audio_bus_name, set_audio_bus_layout, set_audio_bus_volume_db, set_audio_bus_mute, set_audio_bus_solo, set_audio_bus_bypass_effects, add_audio_bus_effect.",
+              "Audio bus management, actions: get_layout (default serialized AudioBusLayout with every effect chain), set_layout (replace the whole layout), get_info (bus count, all bus names and, with bus_index, one bus volume/mute/solo/bypass/effect count), info (acceptance metrics for one bus: peak_left_db/peak_right_db plus peaks_db per channel, effect_count and effects with their class names, send, channels, mix_rate, speaker_mode and driver_name; bus_index defaults to 0), set_volume (decibels), set_mute, set_solo, set_bypass (skip effects without removing them), add_effect (instantiate an AudioEffect subclass into a bus slot). Every change applies immediately to editor playback. Requires action plus the parameters named by that action; bus_index 0 is Master. Deprecated aliases: get_audio_bus_layout, get_audio_bus_count, get_audio_bus_name, set_audio_bus_layout, set_audio_bus_volume_db, set_audio_bus_mute, set_audio_bus_solo, set_audio_bus_bypass_effects, add_audio_bus_effect.",
               "Audio",
               {"audio", "bus", "layout", "get_audio_bus_layout",
                "get_audio_bus_count", "get_audio_bus_name",
@@ -254,11 +254,12 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
               tool_flags::kNone,
               kAudioBusParams,
               audio_ops::handle_audio_bus},
-          {"get_layout", "set_layout", "get_info", "set_volume", "set_mute",
-           "set_solo", "set_bypass", "add_effect"},
+          {"get_layout", "set_layout", "get_info", "info", "set_volume",
+           "set_mute", "set_solo", "set_bypass", "add_effect"},
           {"{\"action\":\"get_layout\"}",
            "{\"action\":\"set_layout\",\"layout\":{\"class\":\"AudioBusLayout\"}}",
            "{\"action\":\"get_info\",\"bus_index\":0}",
+           "{\"action\":\"info\",\"bus_index\":0}",
            "{\"action\":\"set_volume\",\"bus_index\":1,\"volume_db\":-6.0}",
            "{\"action\":\"set_mute\",\"bus_index\":1,\"muted\":true}",
            "{\"action\":\"set_solo\",\"bus_index\":1,\"solo\":true}",

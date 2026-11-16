@@ -14,7 +14,7 @@ resource: devtools/commands/tool-audit.ts
 
 > 审计日期：2026-11-16。数据由 `devtools/commands/tool-audit.ts` 静态解析源码生成；本页数字均可在 [tool_catalog_baseline.json](../../tests/data/tool_catalog_baseline.json) 中找到来源。
 
-> ST-05 中间快照：catalog 250 = 域 244 + 元 5 + system 1，生产别名 315（含被实名工具遮蔽的历史别名），schema 233/17，能力矩阵缺失 0。下文的 459 计数与域分布表是 T-01 历史基线，最终收口计数由 T-25 重写。
+> ST-06 最终候选：catalog 252 = 域 246 + 元 5 + system 1，生产别名 319（含被实名工具遮蔽的历史别名），schema 235/17，能力矩阵缺失 0。下文的 459 计数与域分布表是 T-01 历史基线，最终收口计数由 T-25 重写。
 
 ## 数据来源与命令
 
