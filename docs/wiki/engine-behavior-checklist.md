@@ -57,7 +57,7 @@ resource: src/tools/
 - 空参必报缺参：schema `required` 非空但空参未报错记 warnings；历史上 4 个工具（`start_input_gamepad_vibration` / `stop_input_gamepad_vibration` / `get_resource_extensions` / `reimport_resource_files`）的缺口已于 2026-10-21 修复（`03_tools_contract.json` warnings 基线语义，旧 tests.md「warnings 语义」节）。
 - **回归点（遍历豁免与改判，changelog/2026-10-19 至 10-22-log.md）**：`create_scene_node` 由 `None` 改判 `writes_scene` 退出遍历（空参不再意外建根，连带 `intersect_physics_2d_ray` 的 `could not resolve 2D physics space: …` 文案进入预期错误豁免表）——工具声明变更必须同步核对遍历候选与豁免表。
 - json 参数类型接受任意 JSON：property_set 直写标量/布尔/对象/数组不再被类型校验拒绝（`42_tool_contract.json`）。
-- e2e 抽查建议：跑一轮 demo 时顺带用 search_tools/describe 核对新增工具的 `side_effect` 与 schema 是否如实声明；发现"空参不报错"或"未声明副作用"即登记。
+- e2e 抽查建议：跑一轮工程时顺带用 search_tools/describe 核对新增工具的 `side_effect` 与 schema 是否如实声明；发现"空参不报错"或"未声明副作用"即登记。
 
 ## 域 2：授权门
 
@@ -133,13 +133,13 @@ resource: src/tools/
 - CJK 落盘往返：含中文注释脚本 create_script 断言 verified/readback/cache_refreshed（godot-cpp `String(const char*)` latin1 构造曾致 3 字节 CJK 变 6 字节乱码）；read_file 全量内容逐字节比对；find_in_files 中文 query 命中（`19_cjk_roundtrip.json`；控制台输出侧的 GBK/ACP 回环由 单元测试 editor_output_decode_test 钉住）。
 - 根路径 create_script（B3 同款切割修复）：见域 7 的 `31_theme_root.json` 条目。
 - **code_execute 超时与预算（39_exec_budget.json）**：死循环脚本 + `timeout_ms=300` 返回 `code=exec_timeout` 结构化错误、不挂死编辑器主线程（协作式截止检查点注入）；正常脚本不被超时机制误伤；越界 `timeout_ms` 被参数校验拒绝不进入脚本执行。参数上限与宿主派发预算同源（静态上限 27000 ms 与长阻塞预算取 min，见 [tests.md](tests.md) 数值总表行）。
-- e2e 抽查建议：demo 中真实跑一段含中文注释与 @export 的脚本（写盘→挂载→读属性链路），再故意跑一个死循环验证 exec_timeout 返回而非挂死。
+- e2e 抽查建议：工程中真实跑一段含中文注释与 @export 的脚本（写盘→挂载→读属性链路），再故意跑一个死循环验证 exec_timeout 返回而非挂死。
 
 ## 域 9：瓦片地图
 
 - fill_tilemap_rect 矩形铺砖：from/to 角点（含逆序归一）成功铺砖、erase 反序擦除、set_count 统计、单条 undo 动作；超 100000 格上限报错；缺 from/缺 source_id/缺 node_path 报错（`14_tilemap_rect.json`；归一与上限纯逻辑由 单元测试 tilemap_ops_test 钉住）。
 - 夹具构建链：create_tilemap_tileset + add_tilemap_atlas_source + save_resource 落盘后挂到 TileMapLayer（`14_tilemap_rect.json`）。
-- e2e 抽查建议：demo 含瓦片地图时核对一次矩形铺砖/擦除与 undo 单条性；无瓦片场景可跳过本域。
+- e2e 抽查建议：工程含瓦片地图时核对一次矩形铺砖/擦除与 undo 单条性；无瓦片场景可跳过本域。
 
 ## 域 10：游戏运行时通道
 
@@ -168,14 +168,14 @@ resource: src/tools/
 - **回归点（诊断假阳性分野）**：create_csharp_script 的 `diagnostics.ok`（ResourceLoader 可加载）与 `diagnostics.instantiable`（Script::can_instantiate）两字段分野，ok=true 而 instantiable=false 正是原假阳性现场（`44_csharp_tooling.json`）。
 - **回归点（ACP 回环乱码）**：build_csharp_assembly 的 console_output 经 UTF-8 严格校验 + 系统代码页回退 + ACP 回环修复（还原 Godot OS_Windows::execute 以 CP_ACP 预解码 dotnet UTF-8 输出造成的「姝ｅ湪」类乱码），`output_digest` 不含已知乱码前缀作回归哨兵（`44_csharp_tooling.json`；解码纯逻辑由 单元测试 editor_output_decode_test 覆盖）。
 - 运行期新建 C# 全局类在当次会话内不可实例化（.NET 程序集须编辑器启动时加载，GDExtension 无热重载 API）——属上游装载时序边界而非工具缺陷，历史上以 soft_error 前缀区分软失败；e2e 遇到同款报错按环境边界登记、不判工具回归（`38_csharp_bridge.json` 降级依据段，changelog/2026-10-21-log.md）。
-- e2e 抽查建议：仅在 .NET 编辑器环境执行；核对 diagnostics 两字段分野与构建 output_digest 无乱码哨兵即可，反射真调按 demo 需要抽一两个成员访问。
+- e2e 抽查建议：仅在 .NET 编辑器环境执行；核对 diagnostics 两字段分野与构建 output_digest 无乱码哨兵即可，反射真调按工程需要抽一两个成员访问。
 
 ## 域 12：动态用户工具
 
 - 注册→调用→注销闭环：code_execute 内 `AutopilotTools.register_tool` 注册用户工具 → MCP call_tool 调用回显 → search_tools 命中且 get_tool_detail 标记 `dynamic=true` → code_execute 内 `api.call_tool` 直连（code-mode 桥）→ `get_tool` 取 handle 后 `unregister_tool` → 再调报 `domain tool ... not found`（`26_user_tools_code_mode.json`）。
 - 目录扫描 rescan：code_execute 写 probe 工具文件（`register_autopilot_tools(api)` 实例方法约定）→ `api.rescan` 注册非空 → call_tool 回显 → 二次 rescan 幂等（registered 空、failed 存在）（`27_user_tools_rescan.json`）。
 - **前置：code_execute + user_tools 能力**；user_tools 开关写配置自包含（env 优先于配置，env 不含 user_tools 时 set_enabled 无效）。
-- e2e 抽查建议：demo 需要临时专用工具时走一次注册/调用/注销闭环，核对 dynamic 标记与注销后不可再调。
+- e2e 抽查建议：工程需要临时专用工具时走一次注册/调用/注销闭环，核对 dynamic 标记与注销后不可再调。
 
 ## 域 13：可观测性与主线程韧性
 
@@ -219,7 +219,7 @@ resource: src/tools/
 
 ## 与 gda-e2e-testing 的衔接
 
-- 验收执行走 [gda-e2e-testing 技能](../../.agents/skills/gda-e2e-testing/SKILL.md)：以 `examples/<名称>` 为场地、按其任务书与验收清单推进，本页的域条目与回归点作为**验收时的行为对照面**（发现偏离即记入该技能产出的问题记录）。
+- 验收执行走 [gda-e2e-testing 技能](../../.agents/skills/gda-e2e-testing/SKILL.md)：以任意 Godot 工程为场地、按其任务书与验收清单推进，本页的域条目与回归点作为**验收时的行为对照面**（发现偏离即记入该技能产出的问题记录）。
 - 本页不改变该技能流程；分析闭环由 [gda-e2e-analysis 技能](../../.agents/skills/gda-e2e-analysis/SKILL.md) 承接。测试计数口径见 [tests.md](tests.md)「数值核算总表」。
 
 ## A 类迁移对照表
@@ -258,7 +258,7 @@ resource: src/tools/
 | 6. 截图与视觉辅助 | 12（合法落盘路径）、17（正向）、48 | GUI 游戏帧相位抓拍、连续 save 落盘清单核对、越权路径拒绝 |
 | 7. 资源与引用事务 | 04（资源面）、05、06、22、31（theme） | 建资源→引用→rename→move 事务序列、UID 流转、根/子目录落盘 |
 | 8. 脚本与 GDScript 执行 | 04（execute_script 与诊断）、18、19、31、39 | 真实脚本编译执行、缓存刷新链路、CJK 落盘、exec_timeout 超时行为 |
-| 9. 瓦片地图 | 14 | demo 含瓦片时的铺砖/擦除/undo 与夹具构建链 |
+| 9. 瓦片地图 | 14 | 工程含瓦片时的铺砖/擦除/undo 与夹具构建链 |
 | 10. 游戏运行时通道 | 16（生命周期）、23（坐标换算）、24（游戏侧）、35（游戏内行为）、37（就绪窗口）、45、46 | 真实游戏进程（play + 游戏侧扩展）下的 job 生命周期、坐标换算端到端、SceneTree 落点、错误增量游标、UI 遮挡命中 |
 | 11. C# 与 .NET | 38、44 | .NET 编辑器下反射真调、程序集构建、诊断分野、编码哨兵（见域 11 前置） |
 | 12. 动态用户工具 | 26、27 | 用户脚本工具注册/调用/注销与 rescan 生命周期 |
