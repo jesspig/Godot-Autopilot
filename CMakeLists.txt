@@ -77,7 +77,9 @@ add_library(godot-autopilot SHARED
     ${GDA_API_STORAGE_SOURCES}
     ${GDA_API_TRANSPORT_SOURCES}
     ${GDA_API_CLI_SOURCES}
-    ${GDA_API_INSTANCE_GUARD_SOURCES})
+    ${GDA_API_INSTANCE_GUARD_SOURCES}
+    src/tools/domains/image/image_ops.cpp
+    src/tools/domains/mesh/mesh_ops.cpp)
 
 add_dependencies(godot-autopilot gda_skill_embed_header)
 
