@@ -1,14 +1,14 @@
 {
   "schema": 1,
   "source": "src/tools/domains/*/*_tools.hpp",
-  "catalog_current": 268,
+  "catalog_current": 250,
   "catalog_target": 270,
   "catalog_expected": 269,
   "catalog_target_range": [
     250,
     300
   ],
-  "domain_current_total": 262,
+  "domain_current_total": 244,
   "domain_target_total": 257,
   "planned_domain_target_total": 258,
   "net_new_total": 6,
@@ -37,7 +37,7 @@
     },
     {
       "name": "Animation",
-      "current": 11,
+      "current": 10,
       "target": 6,
       "plan_target": 6,
       "merge_groups": [
@@ -109,7 +109,7 @@
     },
     {
       "name": "Debugger",
-      "current": 3,
+      "current": 4,
       "target": 4,
       "plan_target": 4,
       "merge_groups": [
@@ -145,7 +145,7 @@
     },
     {
       "name": "Editor",
-      "current": 12,
+      "current": 16,
       "target": 24,
       "plan_target": 24,
       "merge_groups": [
@@ -297,7 +297,7 @@
     },
     {
       "name": "Render",
-      "current": 52,
+      "current": 29,
       "target": 30,
       "plan_target": 30,
       "merge_groups": [
@@ -333,7 +333,7 @@
     },
     {
       "name": "Scene",
-      "current": 6,
+      "current": 7,
       "target": 9,
       "plan_target": 9,
       "merge_groups": [

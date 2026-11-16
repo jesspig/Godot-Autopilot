@@ -4,23 +4,23 @@
     "domains": "src/tools/domains/*/*_tools.hpp",
     "register_all": "src/tools/base/register_all.cpp"
   },
-  "catalog_total": 268,
-  "domain_total": 262,
+  "catalog_total": 250,
+  "domain_total": 244,
   "meta_total": 5,
   "system_total": 1,
   "domain_count": 33,
   "by_domain": {
     "Analysis": 1,
-    "Animation": 11,
+    "Animation": 10,
     "Audio": 5,
     "Capture": 2,
     "Config": 8,
     "C#": 2,
     "Debug": 6,
-    "Debugger": 3,
+    "Debugger": 4,
     "Display": 8,
     "Docs": 1,
-    "Editor": 12,
+    "Editor": 16,
     "Game": 9,
     "GridMap": 4,
     "Group": 1,
@@ -31,9 +31,9 @@
     "OS": 12,
     "Physics": 51,
     "Properties": 6,
-    "Render": 52,
+    "Render": 29,
     "Resources": 10,
-    "Scene": 6,
+    "Scene": 7,
     "SceneTree": 1,
     "Scripts": 10,
     "SpriteFrames": 1,
@@ -46,16 +46,16 @@
   },
   "by_category": {
     "Analysis": 1,
-    "Animation": 11,
+    "Animation": 10,
     "Audio": 5,
     "Capture": 2,
     "Config": 8,
     "Scripts": 13,
     "Debug": 7,
-    "Debugger": 3,
+    "Debugger": 4,
     "Display": 8,
     "Docs": 1,
-    "Editor": 12,
+    "Editor": 16,
     "Game": 12,
     "TileMap": 8,
     "Group": 1,
@@ -65,9 +65,9 @@
     "OS": 11,
     "Physics": 50,
     "Properties": 6,
-    "Render": 52,
+    "Render": 29,
     "Resources": 10,
-    "Scene": 7,
+    "Scene": 8,
     "SpriteFrames": 1,
     "Testing": 1,
     "Text": 3,
@@ -76,16 +76,16 @@
   },
   "domain_by_category": {
     "Analysis": 1,
-    "Animation": 11,
+    "Animation": 10,
     "Audio": 5,
     "Capture": 2,
     "Config": 8,
     "Scripts": 13,
     "Debug": 7,
-    "Debugger": 3,
+    "Debugger": 4,
     "Display": 8,
     "Docs": 1,
-    "Editor": 12,
+    "Editor": 16,
     "Game": 12,
     "TileMap": 8,
     "Group": 1,
@@ -95,41 +95,42 @@
     "OS": 11,
     "Physics": 50,
     "Properties": 6,
-    "Render": 52,
+    "Render": 29,
     "Resources": 10,
-    "Scene": 7,
+    "Scene": 8,
     "SpriteFrames": 1,
     "Testing": 1,
     "Text": 3,
     "Theme": 3
   },
   "by_side_effect": {
-    "None": 177,
-    "WritesScene": 29,
-    "Destructive": 6,
-    "WritesFile": 12,
+    "None": 151,
+    "WritesScene": 28,
+    "Destructive": 7,
+    "ModifiesWindow": 20,
+    "WritesFile": 13,
     "WritesConfig": 8,
-    "ModifiesWindow": 14,
     "CodeExecute": 5,
-    "ShowsAlert": 3,
+    "ShowsAlert": 4,
     "Process": 7,
     "GameRuntime": 7
   },
   "domain_by_side_effect": {
-    "None": 173,
-    "WritesScene": 29,
-    "Destructive": 6,
-    "WritesFile": 12,
+    "None": 147,
+    "WritesScene": 28,
+    "Destructive": 7,
+    "ModifiesWindow": 20,
+    "WritesFile": 13,
     "WritesConfig": 8,
-    "ModifiesWindow": 14,
     "CodeExecute": 3,
-    "ShowsAlert": 3,
+    "ShowsAlert": 4,
     "Process": 7,
     "GameRuntime": 7
   },
   "strict_redundant_count": 32,
-  "alias_count": 263,
+  "alias_count": 315,
   "alias_names": [
+    "add_animation_machine_state",
     "add_audio_bus_effect",
     "add_autoload",
     "add_editor_undo_redo_do",
@@ -137,6 +138,11 @@
     "add_group_node",
     "add_input_map_action",
     "add_input_map_action_event",
+    "add_render_canvas_item_circle",
+    "add_render_canvas_item_line",
+    "add_render_canvas_item_rect",
+    "add_render_canvas_item_texture_rect",
+    "add_render_mesh_surface",
     "add_shaped_text_string",
     "add_spriteframes_animation",
     "add_spriteframes_frame",
@@ -152,6 +158,7 @@
     "close_editor_scene",
     "collect_game_evidence",
     "commit_editor_undo_redo",
+    "connect_animation_states",
     "control_game_tween",
     "copy_file",
     "copy_resource_file",
@@ -166,7 +173,21 @@
     "create_os_process",
     "create_path_node",
     "create_primitive_mesh",
+    "create_render_camera",
+    "create_render_canvas_item",
+    "create_render_decal",
+    "create_render_fog_volume",
+    "create_render_light",
+    "create_render_material",
+    "create_render_mesh",
+    "create_render_particles",
+    "create_render_reflection_probe",
+    "create_render_shader",
+    "create_render_sky",
+    "create_render_texture_from_image",
+    "create_render_viewport",
     "create_resource",
+    "create_scene_animation_tree",
     "create_scene_tree_timer",
     "create_shaped_text",
     "create_spriteframes",
@@ -246,6 +267,7 @@
     "get_os_system_fonts",
     "get_os_system_info",
     "get_os_unix_time",
+    "get_particles_state",
     "get_resource_dependencies",
     "get_resource_dir_files",
     "get_resource_extensions",
@@ -270,6 +292,7 @@
     "has_resource_dependency",
     "has_text_feature",
     "hit_test_editor_point",
+    "inspect_editor_resource",
     "instantiate_scene",
     "is_input_action_just_pressed",
     "is_input_action_pressed",
@@ -310,6 +333,8 @@
     "rename_scene_node",
     "reparent_node",
     "request_display_window_attention",
+    "restart_particles",
+    "restart_render_particles",
     "run_editor_shortcut",
     "run_gdscript_test_files",
     "sample_game_property",
@@ -356,8 +381,35 @@
     "set_input_map_action_deadzone",
     "set_mesh_surface_material",
     "set_os_environment",
+    "set_particles_params",
     "set_project_settings",
     "set_properties_batch",
+    "set_render_camera_orthogonal",
+    "set_render_camera_perspective",
+    "set_render_camera_transform",
+    "set_render_canvas_item_transform",
+    "set_render_canvas_item_visible",
+    "set_render_environment_ambient_light",
+    "set_render_environment_bg_color",
+    "set_render_environment_glow",
+    "set_render_environment_sdfgi",
+    "set_render_environment_ssr",
+    "set_render_environment_tonemap",
+    "set_render_environment_volumetric_fog",
+    "set_render_fog_volume_shape",
+    "set_render_instance_layer_mask",
+    "set_render_instance_visible",
+    "set_render_light_color",
+    "set_render_light_param",
+    "set_render_material_param",
+    "set_render_mesh_surface_material",
+    "set_render_particles_emitting",
+    "set_render_particles_lifetime",
+    "set_render_shader_code",
+    "set_render_shader_parameter_global",
+    "set_render_sky_material",
+    "set_render_viewport_clear_mode",
+    "set_render_viewport_size",
     "set_resource_import_options",
     "set_resource_property",
     "set_resource_uid",
@@ -396,6 +448,11 @@
   ],
   "alias_mappings": [
     {
+      "name": "add_animation_machine_state",
+      "canonical": "animation_tree",
+      "action": "add_node"
+    },
+    {
       "name": "add_audio_bus_effect",
       "canonical": "audio_bus",
       "action": "add_effect"
@@ -429,6 +486,31 @@
       "name": "add_input_map_action_event",
       "canonical": "set_input_map_action",
       "action": "set"
+    },
+    {
+      "name": "add_render_canvas_item_circle",
+      "canonical": "render_canvas_item",
+      "action": "add_circle"
+    },
+    {
+      "name": "add_render_canvas_item_line",
+      "canonical": "render_canvas_item",
+      "action": "add_line"
+    },
+    {
+      "name": "add_render_canvas_item_rect",
+      "canonical": "render_canvas_item",
+      "action": "add_rect"
+    },
+    {
+      "name": "add_render_canvas_item_texture_rect",
+      "canonical": "render_canvas_item",
+      "action": "add_texture_rect"
+    },
+    {
+      "name": "add_render_mesh_surface",
+      "canonical": "render_mesh",
+      "action": "add_surface"
     },
     {
       "name": "add_shaped_text_string",
@@ -506,6 +588,11 @@
       "action": ""
     },
     {
+      "name": "connect_animation_states",
+      "canonical": "animation_tree",
+      "action": "connect"
+    },
+    {
       "name": "control_game_tween",
       "canonical": "game_tween",
       "action": ""
@@ -576,8 +663,78 @@
       "action": "primitive"
     },
     {
+      "name": "create_render_camera",
+      "canonical": "render_camera",
+      "action": "create"
+    },
+    {
+      "name": "create_render_canvas_item",
+      "canonical": "render_canvas_item",
+      "action": "create"
+    },
+    {
+      "name": "create_render_decal",
+      "canonical": "render_decal",
+      "action": "create"
+    },
+    {
+      "name": "create_render_fog_volume",
+      "canonical": "render_fog_volume",
+      "action": "create"
+    },
+    {
+      "name": "create_render_light",
+      "canonical": "render_light",
+      "action": "create"
+    },
+    {
+      "name": "create_render_material",
+      "canonical": "render_material",
+      "action": "create"
+    },
+    {
+      "name": "create_render_mesh",
+      "canonical": "render_mesh",
+      "action": "create"
+    },
+    {
+      "name": "create_render_particles",
+      "canonical": "render_particles",
+      "action": "create"
+    },
+    {
+      "name": "create_render_reflection_probe",
+      "canonical": "render_reflection_probe",
+      "action": "create"
+    },
+    {
+      "name": "create_render_shader",
+      "canonical": "render_shader",
+      "action": "create"
+    },
+    {
+      "name": "create_render_sky",
+      "canonical": "render_sky",
+      "action": "create"
+    },
+    {
+      "name": "create_render_texture_from_image",
+      "canonical": "render_texture",
+      "action": "create_from_image"
+    },
+    {
+      "name": "create_render_viewport",
+      "canonical": "render_viewport",
+      "action": "create"
+    },
+    {
       "name": "create_resource",
       "canonical": "resource_create",
+      "action": "create"
+    },
+    {
+      "name": "create_scene_animation_tree",
+      "canonical": "animation_tree",
       "action": "create"
     },
     {
@@ -976,6 +1133,11 @@
       "action": "unix_time"
     },
     {
+      "name": "get_particles_state",
+      "canonical": "render_particles",
+      "action": "get_state"
+    },
+    {
       "name": "get_resource_dependencies",
       "canonical": "resource_query",
       "action": "deps"
@@ -1093,6 +1255,11 @@
     {
       "name": "hit_test_editor_point",
       "canonical": "get_editor_ui",
+      "action": ""
+    },
+    {
+      "name": "inspect_editor_resource",
+      "canonical": "editor_inspect",
       "action": ""
     },
     {
@@ -1294,6 +1461,16 @@
       "name": "request_display_window_attention",
       "canonical": "display_window",
       "action": ""
+    },
+    {
+      "name": "restart_particles",
+      "canonical": "render_particles",
+      "action": "restart"
+    },
+    {
+      "name": "restart_render_particles",
+      "canonical": "render_particles",
+      "action": "restart"
     },
     {
       "name": "run_editor_shortcut",
@@ -1526,6 +1703,11 @@
       "action": "set"
     },
     {
+      "name": "set_particles_params",
+      "canonical": "render_particles",
+      "action": "set_params"
+    },
+    {
       "name": "set_project_settings",
       "canonical": "update_project_settings",
       "action": "set"
@@ -1534,6 +1716,136 @@
       "name": "set_properties_batch",
       "canonical": "property_set",
       "action": ""
+    },
+    {
+      "name": "set_render_camera_orthogonal",
+      "canonical": "render_camera",
+      "action": "orthogonal"
+    },
+    {
+      "name": "set_render_camera_perspective",
+      "canonical": "render_camera",
+      "action": "perspective"
+    },
+    {
+      "name": "set_render_camera_transform",
+      "canonical": "render_camera",
+      "action": "transform"
+    },
+    {
+      "name": "set_render_canvas_item_transform",
+      "canonical": "render_canvas_item",
+      "action": "set_transform"
+    },
+    {
+      "name": "set_render_canvas_item_visible",
+      "canonical": "render_canvas_item",
+      "action": "set_visible"
+    },
+    {
+      "name": "set_render_environment_ambient_light",
+      "canonical": "ambient",
+      "action": ""
+    },
+    {
+      "name": "set_render_environment_bg_color",
+      "canonical": "bg",
+      "action": ""
+    },
+    {
+      "name": "set_render_environment_glow",
+      "canonical": "glow",
+      "action": ""
+    },
+    {
+      "name": "set_render_environment_sdfgi",
+      "canonical": "sdfgi",
+      "action": ""
+    },
+    {
+      "name": "set_render_environment_ssr",
+      "canonical": "ssr",
+      "action": ""
+    },
+    {
+      "name": "set_render_environment_tonemap",
+      "canonical": "tonemap",
+      "action": ""
+    },
+    {
+      "name": "set_render_environment_volumetric_fog",
+      "canonical": "volumetric_fog",
+      "action": ""
+    },
+    {
+      "name": "set_render_fog_volume_shape",
+      "canonical": "render_fog_volume",
+      "action": "set_shape"
+    },
+    {
+      "name": "set_render_instance_layer_mask",
+      "canonical": "render_instance",
+      "action": "set_layer_mask"
+    },
+    {
+      "name": "set_render_instance_visible",
+      "canonical": "render_instance",
+      "action": "set_visible"
+    },
+    {
+      "name": "set_render_light_color",
+      "canonical": "render_light",
+      "action": "set_color"
+    },
+    {
+      "name": "set_render_light_param",
+      "canonical": "render_light",
+      "action": "set_param"
+    },
+    {
+      "name": "set_render_material_param",
+      "canonical": "render_material",
+      "action": "set_param"
+    },
+    {
+      "name": "set_render_mesh_surface_material",
+      "canonical": "render_mesh",
+      "action": "set_surface_material"
+    },
+    {
+      "name": "set_render_particles_emitting",
+      "canonical": "render_particles",
+      "action": "set_emitting"
+    },
+    {
+      "name": "set_render_particles_lifetime",
+      "canonical": "render_particles",
+      "action": "set_lifetime"
+    },
+    {
+      "name": "set_render_shader_code",
+      "canonical": "render_shader",
+      "action": "set_code"
+    },
+    {
+      "name": "set_render_shader_parameter_global",
+      "canonical": "render_shader",
+      "action": "set_global_param"
+    },
+    {
+      "name": "set_render_sky_material",
+      "canonical": "render_sky",
+      "action": "set_material"
+    },
+    {
+      "name": "set_render_viewport_clear_mode",
+      "canonical": "render_viewport",
+      "action": "set_clear_mode"
+    },
+    {
+      "name": "set_render_viewport_size",
+      "canonical": "render_viewport",
+      "action": "set_size"
     },
     {
       "name": "set_resource_import_options",
@@ -1711,8 +2023,8 @@
       "action": "write"
     }
   ],
-  "schema_non_empty": 247,
-  "schema_empty": 21,
+  "schema_non_empty": 233,
+  "schema_empty": 17,
   "tool_names": [
     "analyze_project",
     "create_scene_animation_player",
@@ -1723,9 +2035,8 @@
     "insert_animation_keyframe",
     "remove_animation_track",
     "set_animation_track_bundle",
-    "create_scene_animation_tree",
-    "add_animation_machine_state",
-    "connect_animation_states",
+    "animation_runtime",
+    "animation_tree",
     "audio_bus",
     "audio_player",
     "audio_device",
@@ -1750,6 +2061,7 @@
     "get_debug_info",
     "remove_debug_custom_monitor",
     "get_debugger_stream",
+    "debugger_breakpoints",
     "get_plugin_log",
     "get_debugger_scene_tree",
     "get_display_info",
@@ -1768,9 +2080,13 @@
     "save_editor_scene",
     "editor_selection_set",
     "editor_undo",
+    "script_editor",
+    "editor_session",
+    "editor_inspect",
+    "editor_files",
+    "editor_info",
     "editor_ui_action",
     "editor_config",
-    "inspect_editor_resource",
     "build_csharp_assembly",
     "dotnet_environment",
     "get_game_state",
@@ -1882,55 +2198,32 @@
     "signal_connect",
     "signal_disconnect",
     "set_node_transform",
-    "create_render_canvas_item",
-    "add_render_canvas_item_rect",
-    "add_render_canvas_item_circle",
-    "add_render_canvas_item_texture_rect",
-    "add_render_canvas_item_line",
-    "set_render_canvas_item_transform",
-    "set_render_canvas_item_visible",
-    "get_render_canvas_item_rid",
+    "render_environment",
+    "render_instance",
+    "render_viewport",
+    "render_camera",
+    "render_canvas_item",
+    "render_light",
+    "render_particles",
+    "render_material",
+    "render_shader",
+    "render_sky",
+    "render_fog_volume",
+    "render_decal",
+    "render_reflection_probe",
+    "render_mesh",
+    "render_texture",
+    "render_inspect",
+    "free_render_rid",
     "create_render_scenario",
     "set_render_scenario_environment",
-    "create_render_camera",
-    "set_render_camera_transform",
-    "set_render_camera_perspective",
-    "set_render_camera_orthogonal",
-    "create_render_light",
-    "set_render_light_param",
-    "set_render_light_color",
-    "create_render_mesh",
-    "add_render_mesh_surface",
-    "set_render_mesh_surface_material",
+    "get_render_canvas_item_rid",
+    "find_render_node_from_rid",
     "create_render_material",
-    "set_render_material_param",
-    "create_render_viewport",
-    "set_render_viewport_size",
-    "set_render_viewport_clear_mode",
-    "create_render_particles",
-    "set_render_environment_bg_color",
-    "set_render_environment_ambient_light",
-    "create_render_fog_volume",
     "create_render_shader",
-    "create_render_texture_from_image",
-    "set_render_shader_code",
-    "set_render_environment_glow",
-    "set_render_environment_ssr",
-    "set_render_environment_tonemap",
-    "set_render_environment_sdfgi",
-    "set_render_environment_volumetric_fog",
     "create_render_sky",
-    "set_render_sky_material",
-    "set_render_particles_emitting",
-    "restart_render_particles",
-    "set_render_particles_lifetime",
     "create_render_reflection_probe",
     "create_render_decal",
-    "set_render_fog_volume_shape",
-    "set_render_instance_visible",
-    "set_render_instance_layer_mask",
-    "set_render_shader_parameter_global",
-    "find_render_node_from_rid",
     "restart_particles",
     "set_particles_params",
     "get_particles_state",
@@ -1947,6 +2240,7 @@
     "create_scene_node",
     "edit_scene_node",
     "delete_scene_node",
+    "pack_scene",
     "get_scene_tree",
     "scene_camera",
     "get_camera_view_rect",
@@ -1992,10 +2286,10 @@
       "flags": [
         "kNone"
       ],
-      "param_count": 4,
+      "param_count": 6,
       "has_action_schema": true,
       "source": "src/tools/domains/analyze/analyze_tools.hpp",
-      "line": 55
+      "line": 57
     },
     {
       "name": "create_scene_animation_player",
@@ -2009,7 +2303,7 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/animation/animation_tools.hpp",
-      "line": 94
+      "line": 164
     },
     {
       "name": "create_animation",
@@ -2023,7 +2317,7 @@
       "param_count": 4,
       "has_action_schema": false,
       "source": "src/tools/domains/animation/animation_tools.hpp",
-      "line": 99
+      "line": 169
     },
     {
       "name": "remove_animation",
@@ -2037,20 +2331,20 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/animation/animation_tools.hpp",
-      "line": 104
+      "line": 174
     },
     {
       "name": "get_animation_list",
       "category": "Animation",
       "domain": "Animation",
-      "side_effect": "None",
+      "side_effect": "WritesScene",
       "flags": [
-        "kNone"
+        "kMutating"
       ],
-      "param_count": 1,
+      "param_count": 9,
       "has_action_schema": false,
       "source": "src/tools/domains/animation/animation_tools.hpp",
-      "line": 109
+      "line": 179
     },
     {
       "name": "create_animation_track",
@@ -2064,7 +2358,7 @@
       "param_count": 5,
       "has_action_schema": false,
       "source": "src/tools/domains/animation/animation_tools.hpp",
-      "line": 114
+      "line": 195
     },
     {
       "name": "insert_animation_keyframe",
@@ -2078,7 +2372,7 @@
       "param_count": 5,
       "has_action_schema": false,
       "source": "src/tools/domains/animation/animation_tools.hpp",
-      "line": 119
+      "line": 200
     },
     {
       "name": "remove_animation_track",
@@ -2092,7 +2386,7 @@
       "param_count": 3,
       "has_action_schema": false,
       "source": "src/tools/domains/animation/animation_tools.hpp",
-      "line": 124
+      "line": 205
     },
     {
       "name": "set_animation_track_bundle",
@@ -2100,56 +2394,41 @@
       "domain": "Animation",
       "side_effect": "WritesScene",
       "flags": [
-        "kMutating",
+        "kNone",
         "kSceneTarget",
         "kUndoable"
       ],
       "param_count": 7,
       "has_action_schema": false,
       "source": "src/tools/domains/animation/animation_tools.hpp",
-      "line": 129
+      "line": 210
     },
     {
-      "name": "create_scene_animation_tree",
+      "name": "animation_runtime",
+      "category": "Animation",
+      "domain": "Animation",
+      "side_effect": "ModifiesWindow",
+      "flags": [
+        "kMutating"
+      ],
+      "param_count": 10,
+      "has_action_schema": true,
+      "source": "src/tools/domains/animation/animation_tools.hpp",
+      "line": 215
+    },
+    {
+      "name": "animation_tree",
       "category": "Animation",
       "domain": "Animation",
       "side_effect": "WritesScene",
       "flags": [
-        "kNone",
+        "kMutating",
         "kSceneTarget"
       ],
-      "param_count": 3,
-      "has_action_schema": false,
+      "param_count": 16,
+      "has_action_schema": true,
       "source": "src/tools/domains/animation/animation_tools.hpp",
-      "line": 134
-    },
-    {
-      "name": "add_animation_machine_state",
-      "category": "Animation",
-      "domain": "Animation",
-      "side_effect": "WritesScene",
-      "flags": [
-        "kNone",
-        "kSceneTarget"
-      ],
-      "param_count": 3,
-      "has_action_schema": false,
-      "source": "src/tools/domains/animation/animation_tools.hpp",
-      "line": 139
-    },
-    {
-      "name": "connect_animation_states",
-      "category": "Animation",
-      "domain": "Animation",
-      "side_effect": "WritesScene",
-      "flags": [
-        "kNone",
-        "kSceneTarget"
-      ],
-      "param_count": 4,
-      "has_action_schema": false,
-      "source": "src/tools/domains/animation/animation_tools.hpp",
-      "line": 144
+      "line": 232
     },
     {
       "name": "audio_bus",
@@ -2461,7 +2740,20 @@
       "param_count": 8,
       "has_action_schema": true,
       "source": "src/tools/domains/debugger/debugger_tools.hpp",
-      "line": 62
+      "line": 70
+    },
+    {
+      "name": "debugger_breakpoints",
+      "category": "Debugger",
+      "domain": "Debugger",
+      "side_effect": "ModifiesWindow",
+      "flags": [
+        "kMutating"
+      ],
+      "param_count": 2,
+      "has_action_schema": true,
+      "source": "src/tools/domains/debugger/debugger_tools.hpp",
+      "line": 109
     },
     {
       "name": "get_plugin_log",
@@ -2474,7 +2766,7 @@
       "param_count": 5,
       "has_action_schema": false,
       "source": "src/tools/domains/debugger/debugger_tools.hpp",
-      "line": 101
+      "line": 121
     },
     {
       "name": "get_debugger_scene_tree",
@@ -2487,7 +2779,7 @@
       "param_count": 0,
       "has_action_schema": false,
       "source": "src/tools/domains/debugger/debugger_tools.hpp",
-      "line": 110
+      "line": 130
     },
     {
       "name": "get_display_info",
@@ -2617,7 +2909,7 @@
       "param_count": 0,
       "has_action_schema": true,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 166
+      "line": 211
     },
     {
       "name": "get_editor_ui",
@@ -2630,7 +2922,7 @@
       "param_count": 13,
       "has_action_schema": true,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 186
+      "line": 231
     },
     {
       "name": "get_editor_files",
@@ -2643,7 +2935,7 @@
       "param_count": 4,
       "has_action_schema": true,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 217
+      "line": 262
     },
     {
       "name": "editor_scene_control",
@@ -2656,7 +2948,7 @@
       "param_count": 7,
       "has_action_schema": true,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 243
+      "line": 288
     },
     {
       "name": "save_editor_scene",
@@ -2669,7 +2961,7 @@
       "param_count": 3,
       "has_action_schema": false,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 285
+      "line": 330
     },
     {
       "name": "editor_selection_set",
@@ -2682,7 +2974,7 @@
       "param_count": 5,
       "has_action_schema": true,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 307
+      "line": 352
     },
     {
       "name": "editor_undo",
@@ -2693,10 +2985,75 @@
         "kMutating",
         "kUndoable"
       ],
-      "param_count": 5,
+      "param_count": 6,
       "has_action_schema": true,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 329
+      "line": 374
+    },
+    {
+      "name": "script_editor",
+      "category": "Editor",
+      "domain": "Editor",
+      "side_effect": "ModifiesWindow",
+      "flags": [
+        "kMutating"
+      ],
+      "param_count": 4,
+      "has_action_schema": true,
+      "source": "src/tools/domains/editor/editor_tools.hpp",
+      "line": 406
+    },
+    {
+      "name": "editor_session",
+      "category": "Editor",
+      "domain": "Editor",
+      "side_effect": "ModifiesWindow",
+      "flags": [
+        "kMutating"
+      ],
+      "param_count": 1,
+      "has_action_schema": true,
+      "source": "src/tools/domains/editor/editor_tools.hpp",
+      "line": 417
+    },
+    {
+      "name": "editor_inspect",
+      "category": "Editor",
+      "domain": "Editor",
+      "side_effect": "ModifiesWindow",
+      "flags": [
+        "kMutating"
+      ],
+      "param_count": 4,
+      "has_action_schema": true,
+      "source": "src/tools/domains/editor/editor_tools.hpp",
+      "line": 428
+    },
+    {
+      "name": "editor_files",
+      "category": "Editor",
+      "domain": "Editor",
+      "side_effect": "ModifiesWindow",
+      "flags": [
+        "kMutating"
+      ],
+      "param_count": 1,
+      "has_action_schema": true,
+      "source": "src/tools/domains/editor/editor_tools.hpp",
+      "line": 452
+    },
+    {
+      "name": "editor_info",
+      "category": "Editor",
+      "domain": "Editor",
+      "side_effect": "ShowsAlert",
+      "flags": [
+        "kMutating"
+      ],
+      "param_count": 3,
+      "has_action_schema": true,
+      "source": "src/tools/domains/editor/editor_tools.hpp",
+      "line": 464
     },
     {
       "name": "editor_ui_action",
@@ -2711,7 +3068,7 @@
       "param_count": 8,
       "has_action_schema": true,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 360
+      "line": 475
     },
     {
       "name": "editor_config",
@@ -2724,20 +3081,7 @@
       "param_count": 3,
       "has_action_schema": true,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 388
-    },
-    {
-      "name": "inspect_editor_resource",
-      "category": "Editor",
-      "domain": "Editor",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "has_action_schema": false,
-      "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 409
+      "line": 503
     },
     {
       "name": "build_csharp_assembly",
@@ -2750,7 +3094,7 @@
       "param_count": 3,
       "has_action_schema": false,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 414
+      "line": 524
     },
     {
       "name": "dotnet_environment",
@@ -2763,7 +3107,7 @@
       "param_count": 0,
       "has_action_schema": false,
       "source": "src/tools/domains/editor/editor_tools.hpp",
-      "line": 419
+      "line": 529
     },
     {
       "name": "get_game_state",
@@ -4206,20 +4550,98 @@
       "line": 138
     },
     {
-      "name": "create_render_canvas_item",
+      "name": "render_environment",
       "category": "Render",
       "domain": "Render",
       "side_effect": "None",
       "flags": [
         "kNone"
       ],
-      "param_count": 0,
-      "has_action_schema": false,
+      "param_count": 3,
+      "has_action_schema": true,
       "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 319
+      "line": 309
     },
     {
-      "name": "add_render_canvas_item_rect",
+      "name": "render_instance",
+      "category": "Render",
+      "domain": "Render",
+      "side_effect": "None",
+      "flags": [
+        "kNone"
+      ],
+      "param_count": 15,
+      "has_action_schema": true,
+      "source": "src/tools/domains/render/render_tools.hpp",
+      "line": 334
+    },
+    {
+      "name": "render_viewport",
+      "category": "Render",
+      "domain": "Render",
+      "side_effect": "None",
+      "flags": [
+        "kCaptureImage"
+      ],
+      "param_count": 9,
+      "has_action_schema": true,
+      "source": "src/tools/domains/render/render_tools.hpp",
+      "line": 353
+    },
+    {
+      "name": "render_camera",
+      "category": "Render",
+      "domain": "Render",
+      "side_effect": "None",
+      "flags": [
+        "kNone"
+      ],
+      "param_count": 15,
+      "has_action_schema": true,
+      "source": "src/tools/domains/render/render_tools.hpp",
+      "line": 373
+    },
+    {
+      "name": "render_canvas_item",
+      "category": "Render",
+      "domain": "Render",
+      "side_effect": "None",
+      "flags": [
+        "kNone"
+      ],
+      "param_count": 21,
+      "has_action_schema": true,
+      "source": "src/tools/domains/render/render_tools.hpp",
+      "line": 395
+    },
+    {
+      "name": "render_light",
+      "category": "Render",
+      "domain": "Render",
+      "side_effect": "None",
+      "flags": [
+        "kNone"
+      ],
+      "param_count": 5,
+      "has_action_schema": true,
+      "source": "src/tools/domains/render/render_tools.hpp",
+      "line": 424
+    },
+    {
+      "name": "render_particles",
+      "category": "Render",
+      "domain": "Render",
+      "side_effect": "None",
+      "flags": [
+        "kMutating"
+      ],
+      "param_count": 9,
+      "has_action_schema": true,
+      "source": "src/tools/domains/render/render_tools.hpp",
+      "line": 441
+    },
+    {
+      "name": "render_material",
       "category": "Render",
       "domain": "Render",
       "side_effect": "None",
@@ -4227,12 +4649,12 @@
         "kNone"
       ],
       "param_count": 4,
-      "has_action_schema": false,
+      "has_action_schema": true,
       "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 324
+      "line": 466
     },
     {
-      "name": "add_render_canvas_item_circle",
+      "name": "render_shader",
       "category": "Render",
       "domain": "Render",
       "side_effect": "None",
@@ -4240,51 +4662,12 @@
         "kNone"
       ],
       "param_count": 5,
-      "has_action_schema": false,
+      "has_action_schema": true,
       "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 329
+      "line": 483
     },
     {
-      "name": "add_render_canvas_item_texture_rect",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 6,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 334
-    },
-    {
-      "name": "add_render_canvas_item_line",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 6,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 339
-    },
-    {
-      "name": "set_render_canvas_item_transform",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 5,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 344
-    },
-    {
-      "name": "set_render_canvas_item_visible",
+      "name": "render_sky",
       "category": "Render",
       "domain": "Render",
       "side_effect": "None",
@@ -4292,12 +4675,64 @@
         "kNone"
       ],
       "param_count": 2,
-      "has_action_schema": false,
+      "has_action_schema": true,
       "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 349
+      "line": 501
     },
     {
-      "name": "get_render_canvas_item_rid",
+      "name": "render_fog_volume",
+      "category": "Render",
+      "domain": "Render",
+      "side_effect": "None",
+      "flags": [
+        "kNone"
+      ],
+      "param_count": 3,
+      "has_action_schema": true,
+      "source": "src/tools/domains/render/render_tools.hpp",
+      "line": 517
+    },
+    {
+      "name": "render_decal",
+      "category": "Render",
+      "domain": "Render",
+      "side_effect": "None",
+      "flags": [
+        "kNone"
+      ],
+      "param_count": 0,
+      "has_action_schema": true,
+      "source": "src/tools/domains/render/render_tools.hpp",
+      "line": 535
+    },
+    {
+      "name": "render_reflection_probe",
+      "category": "Render",
+      "domain": "Render",
+      "side_effect": "None",
+      "flags": [
+        "kNone"
+      ],
+      "param_count": 0,
+      "has_action_schema": true,
+      "source": "src/tools/domains/render/render_tools.hpp",
+      "line": 548
+    },
+    {
+      "name": "render_mesh",
+      "category": "Render",
+      "domain": "Render",
+      "side_effect": "None",
+      "flags": [
+        "kNone"
+      ],
+      "param_count": 5,
+      "has_action_schema": true,
+      "source": "src/tools/domains/render/render_tools.hpp",
+      "line": 563
+    },
+    {
+      "name": "render_texture",
       "category": "Render",
       "domain": "Render",
       "side_effect": "None",
@@ -4305,9 +4740,35 @@
         "kNone"
       ],
       "param_count": 1,
+      "has_action_schema": true,
+      "source": "src/tools/domains/render/render_tools.hpp",
+      "line": 582
+    },
+    {
+      "name": "render_inspect",
+      "category": "Render",
+      "domain": "Render",
+      "side_effect": "None",
+      "flags": [
+        "kCaptureImage"
+      ],
+      "param_count": 7,
+      "has_action_schema": true,
+      "source": "src/tools/domains/render/render_tools.hpp",
+      "line": 596
+    },
+    {
+      "name": "free_render_rid",
+      "category": "Render",
+      "domain": "Render",
+      "side_effect": "Destructive",
+      "flags": [
+        "kNone"
+      ],
+      "param_count": 1,
       "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 354
+      "line": 609
     },
     {
       "name": "create_render_scenario",
@@ -4320,7 +4781,7 @@
       "param_count": 0,
       "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 359
+      "line": 618
     },
     {
       "name": "set_render_scenario_environment",
@@ -4333,62 +4794,10 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 364
+      "line": 626
     },
     {
-      "name": "create_render_camera",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 369
-    },
-    {
-      "name": "set_render_camera_transform",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 4,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 374
-    },
-    {
-      "name": "set_render_camera_perspective",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 4,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 379
-    },
-    {
-      "name": "set_render_camera_orthogonal",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 4,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 384
-    },
-    {
-      "name": "create_render_light",
+      "name": "get_render_canvas_item_rid",
       "category": "Render",
       "domain": "Render",
       "side_effect": "None",
@@ -4398,436 +4807,7 @@
       "param_count": 1,
       "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 389
-    },
-    {
-      "name": "set_render_light_param",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 3,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 394
-    },
-    {
-      "name": "set_render_light_color",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 399
-    },
-    {
-      "name": "create_render_mesh",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 404
-    },
-    {
-      "name": "add_render_mesh_surface",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 3,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 409
-    },
-    {
-      "name": "set_render_mesh_surface_material",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 3,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 414
-    },
-    {
-      "name": "create_render_material",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 419
-    },
-    {
-      "name": "set_render_material_param",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 4,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 424
-    },
-    {
-      "name": "create_render_viewport",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 429
-    },
-    {
-      "name": "set_render_viewport_size",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 3,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 434
-    },
-    {
-      "name": "set_render_viewport_clear_mode",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 439
-    },
-    {
-      "name": "create_render_particles",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 444
-    },
-    {
-      "name": "set_render_environment_bg_color",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 449
-    },
-    {
-      "name": "set_render_environment_ambient_light",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 4,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 454
-    },
-    {
-      "name": "create_render_fog_volume",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 459
-    },
-    {
-      "name": "create_render_shader",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 464
-    },
-    {
-      "name": "create_render_texture_from_image",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 469
-    },
-    {
-      "name": "set_render_shader_code",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 474
-    },
-    {
-      "name": "set_render_environment_glow",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 12,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 479
-    },
-    {
-      "name": "set_render_environment_ssr",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 6,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 484
-    },
-    {
-      "name": "set_render_environment_tonemap",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 4,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 489
-    },
-    {
-      "name": "set_render_environment_sdfgi",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 11,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 494
-    },
-    {
-      "name": "set_render_environment_volumetric_fog",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 14,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 499
-    },
-    {
-      "name": "create_render_sky",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 504
-    },
-    {
-      "name": "set_render_sky_material",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 509
-    },
-    {
-      "name": "set_render_particles_emitting",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 514
-    },
-    {
-      "name": "restart_render_particles",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 519
-    },
-    {
-      "name": "set_render_particles_lifetime",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 524
-    },
-    {
-      "name": "create_render_reflection_probe",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 529
-    },
-    {
-      "name": "create_render_decal",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 534
-    },
-    {
-      "name": "set_render_fog_volume_shape",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 539
-    },
-    {
-      "name": "set_render_instance_visible",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 544
-    },
-    {
-      "name": "set_render_instance_layer_mask",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 549
-    },
-    {
-      "name": "set_render_shader_parameter_global",
-      "category": "Render",
-      "domain": "Render",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 3,
-      "has_action_schema": false,
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 554
+      "line": 634
     },
     {
       "name": "find_render_node_from_rid",
@@ -4840,7 +4820,72 @@
       "param_count": 1,
       "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 559
+      "line": 642
+    },
+    {
+      "name": "create_render_material",
+      "category": "Render",
+      "domain": "Render",
+      "side_effect": "None",
+      "flags": [
+        "kNone"
+      ],
+      "param_count": 0,
+      "has_action_schema": false,
+      "source": "src/tools/domains/render/render_tools.hpp",
+      "line": 650
+    },
+    {
+      "name": "create_render_shader",
+      "category": "Render",
+      "domain": "Render",
+      "side_effect": "None",
+      "flags": [
+        "kNone"
+      ],
+      "param_count": 1,
+      "has_action_schema": false,
+      "source": "src/tools/domains/render/render_tools.hpp",
+      "line": 655
+    },
+    {
+      "name": "create_render_sky",
+      "category": "Render",
+      "domain": "Render",
+      "side_effect": "None",
+      "flags": [
+        "kNone"
+      ],
+      "param_count": 0,
+      "has_action_schema": false,
+      "source": "src/tools/domains/render/render_tools.hpp",
+      "line": 660
+    },
+    {
+      "name": "create_render_reflection_probe",
+      "category": "Render",
+      "domain": "Render",
+      "side_effect": "None",
+      "flags": [
+        "kNone"
+      ],
+      "param_count": 0,
+      "has_action_schema": false,
+      "source": "src/tools/domains/render/render_tools.hpp",
+      "line": 665
+    },
+    {
+      "name": "create_render_decal",
+      "category": "Render",
+      "domain": "Render",
+      "side_effect": "None",
+      "flags": [
+        "kNone"
+      ],
+      "param_count": 0,
+      "has_action_schema": false,
+      "source": "src/tools/domains/render/render_tools.hpp",
+      "line": 670
     },
     {
       "name": "restart_particles",
@@ -4853,7 +4898,7 @@
       "param_count": 1,
       "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 564
+      "line": 675
     },
     {
       "name": "set_particles_params",
@@ -4866,7 +4911,7 @@
       "param_count": 7,
       "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 569
+      "line": 680
     },
     {
       "name": "get_particles_state",
@@ -4879,7 +4924,7 @@
       "param_count": 1,
       "has_action_schema": false,
       "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 574
+      "line": 685
     },
     {
       "name": "resource_load",
@@ -5020,10 +5065,10 @@
         "kNone",
         "kSceneTarget"
       ],
-      "param_count": 14,
+      "param_count": 15,
       "has_action_schema": false,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 395
+      "line": 412
     },
     {
       "name": "edit_scene_node",
@@ -5035,10 +5080,10 @@
         "kSceneTarget",
         "kUndoable"
       ],
-      "param_count": 8,
+      "param_count": 12,
       "has_action_schema": true,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 418
+      "line": 435
     },
     {
       "name": "delete_scene_node",
@@ -5053,7 +5098,21 @@
       "param_count": 1,
       "has_action_schema": false,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 440
+      "line": 461
+    },
+    {
+      "name": "pack_scene",
+      "category": "Scene",
+      "domain": "Scene",
+      "side_effect": "WritesFile",
+      "flags": [
+        "kMutating",
+        "kSceneTarget"
+      ],
+      "param_count": 3,
+      "has_action_schema": false,
+      "source": "src/tools/domains/scene/scene_tools.hpp",
+      "line": 466
     },
     {
       "name": "get_scene_tree",
@@ -5063,10 +5122,10 @@
       "flags": [
         "kObserve"
       ],
-      "param_count": 9,
+      "param_count": 15,
       "has_action_schema": false,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 445
+      "line": 476
     },
     {
       "name": "scene_camera",
@@ -5081,7 +5140,7 @@
       "param_count": 4,
       "has_action_schema": true,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 463
+      "line": 502
     },
     {
       "name": "get_camera_view_rect",
@@ -5094,7 +5153,7 @@
       "param_count": 1,
       "has_action_schema": false,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 478
+      "line": 517
     },
     {
       "name": "game_scene_tree",
@@ -5527,13 +5586,6 @@
       "side_effect": "None",
       "source": "src/tools/domains/physics/physics_tools.hpp",
       "line": 481
-    },
-    {
-      "name": "restart_render_particles",
-      "domain": "Render",
-      "side_effect": "None",
-      "source": "src/tools/domains/render/render_tools.hpp",
-      "line": 519
     },
     {
       "name": "run_gdscript_tests",
