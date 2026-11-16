@@ -13,9 +13,9 @@ const USAGE = [
   "",
   "Commands:",
   "  build                    [--release|--debug]",
-  "  deploy                   [--release|--debug] [--demos 名称...]",
-  "  clean",
-  "  package                  [--libs-dir <dir>]",
+  "  deploy                   [--release|--debug] [--project <dir>]...",
+  "  clean                    [--project <dir>]...",
+  "  package                  [--libs-dir <dir> | --preset debug|release]",
   "  package-check <zip>",
   "  test                     [--preset debug|release] [--single <用例名>]",
   "  audit-tools              [--json|--baseline|--target] [--report [--json] [--out <file>]]",
@@ -38,37 +38,58 @@ function parseBuild(args: string[]): BuildOptions {
   return options;
 }
 
-function parseDeploy(args: string[]): DeployOptions {
-  const options: DeployOptions = { release: false, debug: false, demos: null };
+function parseProjectArgs(command: string, args: string[]): string[] {
+  const projects: string[] = [];
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
+    if (arg !== "--project") throw new UsageError(`${command}: unrecognized argument: ${arg}`);
+    const value = args[index + 1];
+    if (value === undefined || value.startsWith("-")) {
+      throw new UsageError(`${command}: argument --project: expected one argument`);
+    }
+    projects.push(value);
+    index += 1;
+  }
+  return projects;
+}
+
+function parseDeploy(args: string[]): DeployOptions {
+  const options: DeployOptions = { release: false, debug: false, projects: [] };
+  const remaining: string[] = [];
+  for (const arg of args) {
     if (arg === "--release") options.release = true;
     else if (arg === "--debug") options.debug = true;
-    else if (arg === "--demos") {
-      const names: string[] = [];
-      while (index + 1 < args.length && !args[index + 1].startsWith("-")) {
-        names.push(args[index + 1]);
-        index += 1;
-      }
-      options.demos = names;
-    } else throw new UsageError(`deploy: unrecognized argument: ${arg}`);
+    else remaining.push(arg);
   }
+  options.projects = parseProjectArgs("deploy", remaining);
   return options;
 }
 
-function parsePackage(args: string[]): { libsDir: string | null } {
+function parsePackage(args: string[]): { libsDir: string | null; preset: "debug" | "release" } {
   let libsDir: string | null = null;
+  let preset: "debug" | "release" = "debug";
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
-    if (arg !== "--libs-dir") throw new UsageError(`package: unrecognized argument: ${arg}`);
-    const value = args[index + 1];
-    if (value === undefined) {
-      throw new UsageError("package: argument --libs-dir: expected one argument");
+    if (arg !== "--libs-dir" && arg !== "--preset") {
+      throw new UsageError(`package: unrecognized argument: ${arg}`);
     }
-    libsDir = value;
+    const value = args[index + 1];
+    if (value === undefined || value.startsWith("-")) {
+      throw new UsageError(`package: argument ${arg}: expected one argument`);
+    }
+    if (arg === "--libs-dir") libsDir = value;
+    else if (value === "debug" || value === "release") preset = value;
+    else {
+      throw new UsageError(
+        `package: argument --preset: invalid choice: '${value}' (choose from 'debug', 'release')`,
+      );
+    }
     index += 1;
   }
-  return { libsDir };
+  if (libsDir !== null && args.includes("--preset")) {
+    throw new UsageError("package: --preset cannot be combined with --libs-dir");
+  }
+  return { libsDir, preset };
 }
 
 function parseToolAudit(args: string[]): ToolAuditOptions {
@@ -159,10 +180,11 @@ export async function main(argv: string[]): Promise<number> {
       case "deploy":
         return await runDeploy(parseDeploy(rest));
       case "clean":
-        expectNoArgs("clean", rest);
-        return runClean();
-      case "package":
-        return runPackage(parsePackage(rest).libsDir);
+        return runClean(parseProjectArgs("clean", rest));
+      case "package": {
+        const options = parsePackage(rest);
+        return runPackage(options.libsDir, options.preset);
+      }
       case "package-check":
         if (rest.length !== 1 || rest[0].startsWith("-")) {
           throw new UsageError("package-check: expected exactly one zip path");

@@ -377,7 +377,7 @@ flowchart LR
 | 文档 | 声称 | 代码事实 | 判定 |
 |---|---|---|---|
 | AGENTS.md（构建段） | 暗示每个模块有成对的 `.cpp/.hpp` 参与 `add_library()` | `command_queue.hpp` 无对应 `.cpp`，header-only，不进 CMake 源列表 | 文档未明说，审计时需注意 |
-| README.md / README.zh-CN.md（前提） | "Godot 4.7+" | demo 工程为 4.7（`examples/*/project.godot`），AGENTS.md 亦写 4.7 | 一致 ✓ |
+| README.md / README.zh-CN.md（前提） | "Godot 4.7+" | `.gdextension` 的 `compatibility_minimum = "4.7"`（`devtools/lib/gdextension.ts`），AGENTS.md 亦写 4.7 | 一致 ✓ |
 | README.md / README.zh-CN.md（安装） | "图形界面编辑器打开项目时服务端自动启动" | cmdline/`GDA_FORCE_HEADLESS` 模式下 UI 与服务器被禁用（`main.cpp`） | 一致（README 已限定图形界面会话）✓ |
 | AGENTS.md（架构/端口段） | 端口自动分配（20000–29999，按工程持久化）、`/mcp`、`GODOT_AUTOPILOT_PORT` 覆盖、日志类别五枚举 | 全部与代码一致 | 一致 ✓ |
 | README.md / README.zh-CN.md（安全段） | 回环监听 + 端口自动分配（20000–29999）+ `/mcp` + 高风险工具 `confirm` | 与代码一致 | 一致 ✓ |

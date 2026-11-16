@@ -12,7 +12,7 @@
 - **回归属性**（跨载体）：各层基线断言承载——schema 基线、工具面动态枚举契约、错误全串契约、CLI wire 形状、skill 白名单；清单与更新 SOP 见 wiki「回归属性清单」小节。
 - **守卫与脚本项**（ctest 常驻）：源码守卫（注释 / 主线程契约 / 版本同步 / 迁移 / 源清单 / 工具域）+ 4 个守卫自测 + 2 个 CLI 脚本项（标签 `guard` / `cli`），全部零构建依赖（读源码断言）。
 
-真实引擎行为的端到端验证**不在仓库基建内**：由 `gda-e2e-testing` Agent 工作流在 `examples/<名称>` 场地自然发生（工具调用随实际操作驱动），问题经 `gda-e2e-analysis` 闭环分析。历史 L2 引擎轨（`gda_test_runner` / `tests/config/*.json` / `tests/testbed/` / 池化编排）已于 2026-11 删除，语义蒸馏落点见 wiki「引擎行为验收清单」。
+真实引擎行为的端到端验证**不在仓库基建内**：由 `gda-e2e-testing` Agent 工作流在任意 Godot 工程场地自然发生（工具调用随实际操作驱动），问题经 `gda-e2e-analysis` 闭环分析。历史 L2 引擎轨（`gda_test_runner` / `tests/config/*.json` / `tests/testbed/` / 池化编排）已于 2026-11 删除，语义蒸馏落点见 wiki「引擎行为验收清单」。
 
 架构一句话：进程内 GDExtension（EditorPlugin），领域工具经 `call_tool` 元工具代理，由 `register_all.cpp` 的 registry（`build_registry`，经 `refresh_derived` 派生 dispatch 映射）分发。
 

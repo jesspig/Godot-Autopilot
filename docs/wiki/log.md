@@ -8,6 +8,8 @@
 
 - **工具面压缩收口（T-25 文档，`feature/tool-surface-closeout` 本地未推送）**：catalog 459→**252**（246 域 + 5 元 + `system_status`）、生产别名 **325**、schema **235/17**、能力矩阵 561 行 mapped 315 / missing 0；35 个域文件（新增 Image、Mesh）。重写 [overview.md](overview.md) 工具面与 [modules/tools_ops_a.md](modules/tools_ops_a.md) / [modules/tools_ops_b.md](modules/tools_ops_b.md)（按 canonical action 工具列表，旧名只留别名列与迁移说明），[tool_surface_baseline.md](tool_surface_baseline.md) 改为最终 252 基线，新增 [changelog/2026-11-16-log.md](changelog/2026-11-16-log.md) 压缩段；五语 README 的 badge/描述改为 252 并换用 canonical 示例名，非 EN/ZH 版标注以 EN 为准。旧名残留与相对链接已自查；本轮未编译、未测试，真实引擎 e2e 留待 T-26。详见 [changelog/2026-11-16-log.md](changelog/2026-11-16-log.md)。
 
+- **示例工程退场（devtools 目标解耦）**：删除五语 README 的 `examples/` 素材声明；`deploy`/`clean` 改为可重复 `--project <dir>`（省略时自动发现 `examples/*`），`package` 默认从本机构建产物打包并新增 `--preset debug|release`；release workflow 直接从 `build/release/` 上传平台库；[gda-e2e-testing](../../.agents/skills/gda-e2e-testing/SKILL.md) 扩展为任意 Godot 工程路径。验证：typecheck、临时工程 deploy/clean 冒烟、`package --preset debug`、4 个守卫 6/6 通过。详见 [changelog/2026-11-16-log.md](changelog/2026-11-16-log.md)。
+
 ## 2026-11-14
 
 - **0.3.3 ST-04 资源与提示词（`feature/resource-access`，本地未推送）**：CLI 新增通用 `request()` 与 `gda resources list|templates|read|watch`、`gda prompts list|get`；资源 read 支持文本直出、JSON pretty、blob 摘要/`--save`、`--json` 脱敏与 `--raw`。EN/ZH 技能书与 cli.md 同步，命令面 18→20。验证：CLI 259 项（241 pass / 18 skip / 0 fail）、typecheck、skills_guard。真实资源读取待 T-25。

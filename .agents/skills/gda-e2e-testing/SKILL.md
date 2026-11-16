@@ -1,22 +1,22 @@
 ---
 name: gda-e2e-testing
-description: "以 examples/<名称> 为场地，用 GDA 完成一轮端到端开发或验收，产出问题记录、优化建议与递归闭环证据；触发词：端到端测试、e2e、跑一轮验收、验收 demo、用 GDA 开发这个 demo、测试 GDA 工具表现、递归优化闭环、指定某个 demo 做端到端。"
+description: "以任意 Godot 工程（或 examples/<名称>）为场地，用 GDA 完成一轮端到端开发或验收，产出问题记录、优化建议与递归闭环证据；触发词：端到端测试、e2e、跑一轮验收、验收 demo、用 GDA 开发这个 demo、测试 GDA 工具表现、递归优化闭环、指定某个 demo 做端到端。"
 ---
 
-# Demo 端到端验收
+# Godot 工程端到端验收
 
-读取 examples 工程，用 GDA 完成一轮真实开发或验收，记录过程、问题与优化建议。只做在线探索与证据沉淀；不分析 GDA 源码，不修改 GDA 本体。
+读取目标 Godot 工程，用 GDA 完成一轮真实开发或验收，记录过程、问题与优化建议。只做在线探索与证据沉淀；不分析 GDA 源码，不修改 GDA 本体。
 
 ## 输入
 
-- 识别 example 标识；支持 `pink_man_adventure` 与 `examples/pink_man_adventure` 两种写法。
-- 接收可选的本轮聚焦目标，例如「只验证场景与脚本工具」；未给出时按 example 的任务书完整推进。
-- 未收到 example 标识时，列出 `examples/*` 并停止；不默认选一个。
+- 识别工程标识：接受绝对路径、相对路径，或 `examples/<名称>` 写法。
+- 接收可选的本轮聚焦目标，例如「只验证场景与脚本工具」；未给出时按工程的任务书完整推进。
+- 未收到工程路径时：若 `examples/` 下存在含 `project.godot` 的工程，列出并停止；否则要求用户提供路径。不默认选一个。
 
 ## 1. 校验输入
 
-1. 规范化到 `<repo>/examples/<name>`。
-2. 校验 `project.godot`；缺失时报错、列出 `examples/*` 中的工程并停止。
+1. 规范化到绝对路径 `<project-dir>`。
+2. 校验 `project.godot`；缺失时报错并停止。
 3. 校验 `docs/`；缺失时只做运行与观测验收，并在报告中注明无设计文档。
 
 ## 2. 读任务书
@@ -27,16 +27,16 @@ description: "以 examples/<名称> 为场地，用 GDA 完成一轮端到端开
 2. `docs/test/test-plan.md`：任务性质、测试约定、证据要求、问题格式、终止条件。
 3. `docs/test/acceptance.md`：验收清单。
 4. 按 test-plan 的阅读路径补读 `docs/gdd/`、`docs/tech/`、`docs/art/` 中与本轮相关的页面。
-5. 若 `report/<example>/` 最近一轮存在 `analysis.md`，只读取其中的「待下一轮端到端验证项」，作为本轮附加观察点；文件缺失时继续执行，不阻塞，不改变 test-plan。
+5. 若 `report/<工程名>/` 最近一轮存在 `analysis.md`，只读取其中的「待下一轮端到端验证项」，作为本轮附加观察点；文件缺失时继续执行，不阻塞，不改变 test-plan。
 
 判定任务形态：
 
 - 开发型：工程为空或文档要求从零实现。仅经 GDA 创建和修改工程文件。
 - 验收型：工程已建成且 test-plan 要求只读运行与核对。保持工程文件只读。
 
-优先遵循 example 文档的项目约定；与本技能默认流程冲突时，以 example 文档为准，并在报告中记录冲突。
+优先遵循工程文档的项目约定；与本技能默认流程冲突时，以工程文档为准，并在报告中记录冲突。
 
-按 example 文档定位素材与资源，不假设固定目录。开发型只读查阅 `*.tscn`、`*.tres`、`project.godot` 用于核对与截图验证；不手动修改。
+按工程文档定位素材与资源，不假设固定目录。开发型只读查阅 `*.tscn`、`*.tres`、`project.godot` 用于核对与截图验证；不手动修改。
 
 ## 执行期边界
 
@@ -44,10 +44,10 @@ description: "以 examples/<名称> 为场地，用 GDA 完成一轮端到端开
 
 只读取：
 
-- `examples/<name>/` 下的文档、素材、`project.godot`、`*.tscn`、`*.tres`、`*.gd`，用于只读核对。
-- 本轮 `report/<example>/<YYYY-MM-DD-HH-mm>/` 下的报告、证据与截图。
+- `<project-dir>/` 下的文档、素材、`project.godot`、`*.tscn`、`*.tres`、`*.gd`，用于只读核对。
+- 本轮 `report/<工程名>/<YYYY-MM-DD-HH-mm>/` 下的报告、证据与截图。
 - GDA 工具返回的日志、轨迹、错误信息。
-- `examples/<name>/.agents/skills/godot-autopilot-*`（若存在），仅用于查工具用法。
+- `<project-dir>/.agents/skills/godot-autopilot-*`（若存在），仅用于查工具用法。
 
 禁止读取：
 
@@ -55,9 +55,9 @@ description: "以 examples/<名称> 为场地，用 GDA 完成一轮端到端开
 - 仓库根 `.agents/skills/` 下除本技能规则外的内容。
 - GDA 的构建、测试与实现代码。
 
-把文件搜索与通配扫描限定在 `examples/<name>/` 与本轮报告目录内；不使用仓库根递归搜索。
+把文件搜索与通配扫描限定在 `<project-dir>/` 与本轮报告目录内；不使用仓库根递归搜索。
 
-只执行 `bun run gda-dev-tools build` 与 `bun run gda-dev-tools deploy --demos <name>` 完成构建与部署；读取命令输出，不读 `devtools/` 或源码实现。
+只执行 `bun run gda-dev-tools build` 与 `bun run gda-dev-tools deploy --project <project-dir>` 完成构建与部署；读取命令输出，不读 `devtools/` 或源码实现。
 
 遇到工具失败、行为异常或疑似缺陷时：
 
@@ -80,9 +80,9 @@ description: "以 examples/<名称> 为场地，用 GDA 完成一轮端到端开
    任一探针失败时：记录命令、退出码（0 成功 / 1 工具失败 / 2 传输或环境失败 / 3 用法错误）与 `gda status --json` / `gda list` 的输出（实例、端口、`mcp_url` 与 `live`），再按下列判据分流，不自行启动或重启 Godot：
    - CLI 成功而后续 MCP 工具调用失败 → 客户端路径问题（客户端连接、协议或授权），GDA 本体可用；
    - CLI 与客户端都失败且 `gda status --json` / `gda list` 显示端口无监听 → 查 Windows 事件日志与 `%LOCALAPPDATA%\CrashDumps`，在报告中如实记录后再判断是否停止。
-2. 确认 `addons/godot-autopilot/` 已部署。缺失时在仓库根执行：
+2. 确认 `<project-dir>/addons/godot-autopilot/` 已部署。缺失时在仓库根执行：
    - `bun run gda-dev-tools build`
-   - `bun run gda-dev-tools deploy --demos <name>`
+   - `bun run gda-dev-tools deploy --project <project-dir>`
 3. 调用 `system_status`，要求 `running=true`。不可达时停止，说明需要打开 Godot 编辑器并启用插件；部署后仍不可达时请用户重新打开工程或启用插件。不自行启动或重启 Godot。
 4. 记录基线：开始时间、`system_status.version`、`get_engine_version`、`git rev-parse --short HEAD`。
 5. 用 `execute_script` 读取 `GODOT_AUTOPILOT_TRACE_DIR` 与 `GODOT_AUTOPILOT_LOG_DIR`。被授权门拒绝时，记录「轨迹不可得」及原因，继续执行，不推测。
@@ -90,7 +90,7 @@ description: "以 examples/<名称> 为场地，用 GDA 完成一轮端到端开
 
 ## 4. 执行
 
-1. 按 example 的 test-plan 推进；无 test-plan 时按「搭 → 写 → 看 → 定」四拍推进：先搭场景与调整，再写脚本与挂载，再运行调试，据结果进入下一轮。
+1. 按工程的 test-plan 推进；无 test-plan 时按「搭 → 写 → 看 → 定」四拍推进：先搭场景与调整，再写脚本与挂载，再运行调试，据结果进入下一轮。
 2. 单环只做一个功能增量，不合并多个功能。
 3. 每环开始前记录基线：同条件截图、读回值或日志。
 4. 每环的「看」必须产生证据：结构类用编辑器截图，运行类用游戏截图，逻辑类用读回值或日志。
@@ -135,7 +135,7 @@ description: "以 examples/<名称> 为场地，用 GDA 完成一轮端到端开
 
 - 给每条问题分配唯一编号 `Q1`、`Q2`…，编号在本轮内唯一且连续。
 - 标注类型：失败 / 缺陷 / 体验 / 文档。
-- 标注可复用性：通用 / 本工程。通用指换一个 example 仍可复现；本工程指仅在当前 example、当前环境或本次会话出现。
+- 标注可复用性：通用 / 本工程。通用指换一个 Godot 工程仍可复现；本工程指仅在当前工程、当前环境或本次会话出现。
 
 按五要素记录每个问题：
 
@@ -161,15 +161,15 @@ description: "以 examples/<名称> 为场地，用 GDA 完成一轮端到端开
 
 ## 8. 报告
 
-- 把本轮目录设为 `report/<example>/<YYYY-MM-DD-HH-mm>/`；取本地开始时间；目录已存在时追加 `-2`、`-3`，不覆盖已有轮次。
+- 把本轮目录设为 `report/<工程名>/<YYYY-MM-DD-HH-mm>/`；取本地开始时间；目录已存在时追加 `-2`、`-3`，不覆盖已有轮次。
 - 在本轮目录写 `report.md`（目录已带时间，文件名固定）。
 - 在本轮目录写 `img/`（截图）与 `evidence.md`（关键事件摘录）；其他本轮产物同样放本轮目录，不写入共享目录。
 - 只写 `report.md`、`evidence.md`、`img/`；不创建、不改写 `analysis.md`；本轮结束后不再改写这些文件。
-- example 文档若写 `report/<ts>-report.md` 或 `report/img/`，以本技能路径为准，并在报告中说明覆盖。
+- 工程文档若写 `report/<ts>-report.md` 或 `report/img/`，以本技能路径为准，并在报告中说明覆盖。
 - 按以下结构写报告：
 
 ```markdown
-# <example> 端到端测试报告
+# <工程名> 端到端测试报告
 - 开始时间 / 结束时间 / GDA 版本 / Godot 版本 / git HEAD / 任务类型 / 完成度
 - 轨迹：`<集中根>/projects/...`（关键事件见 `evidence.md`）
 - 日志：`<集中根>/projects/...`
@@ -199,23 +199,23 @@ description: "以 examples/<名称> 为场地，用 GDA 完成一轮端到端开
 本轮只执行「在线探索」与「证据沉淀」；把「离线评估」与「部署改进」留给后续轮次，并在执行前取得用户明确授权。
 
 - 用真实开发动作、轨迹与报告完成在线探索与证据沉淀。
-- 把 `report/` 下所有 example 的轮目录作为证据池，跨轮累积；每轮目录自包含报告、截图、关键事件摘录、对照证据与后续 `analysis.md`（若存在）；不新建索引文件。
+- 把 `report/` 下所有工程的轮目录作为证据池，跨轮累积；每轮目录自包含报告、截图、关键事件摘录、对照证据与后续 `analysis.md`（若存在）；不新建索引文件。
 - 每轮结束向证据池新增一条可回放记录：本轮 `report.md`、`evidence.md`、关键对照（Q 编号与基线/改动后差异）、`analysis.md`（若存在）。历史证据不足时，由后续分析阶段用最小复现代替回放，并在报告中注明。
 - 在报告第 7 节区分：
-  - GDA 通用事实：换 example 或工程仍成立，写明复现条件。
-  - 本工程偶然现象：仅在本 example、本次会话或当前环境出现，写明未跨工程验证。
+  - GDA 通用事实：换工程仍成立，写明复现条件。
+  - 本工程偶然现象：仅在当前工程、本次会话或当前环境出现，写明未跨工程验证。
 
 ## 文件契约（自包含）
 
 只通过文件系统与后续流程配合；不依赖任何其他技能。
 
-- 接收输入：`examples/<name>/`、`docs/`、同一 example 的历史轮目录。
-- 写出输出：`report/<example>/<YYYY-MM-DD-HH-mm>/report.md`、同目录 `evidence.md`、`img/`；每环的基线/改动后对照证据。
-- 若同 example 最近一轮存在 `analysis.md`，只读取「待下一轮端到端验证项」。
+- 接收输入：`<project-dir>/`、`docs/`、同一工程的历史轮目录。
+- 写出输出：`report/<工程名>/<YYYY-MM-DD-HH-mm>/report.md`、同目录 `evidence.md`、`img/`；每环的基线/改动后对照证据。
+- 若同工程最近一轮存在 `analysis.md`，只读取「待下一轮端到端验证项」。
 - 不写 `analysis.md`；不修改已有轮目录中的文件。
 - 按 `Q<n>` 编号问题、`S<n>` 编号建议；标注问题类型与可复用性（通用/本工程）。
 - 提供可回放的报告、证据与对照材料，供后续离线评估；不复制完整轨迹。
-- 测试期只读 `examples/`、本轮报告目录与 GDA 工具输出；把 GDA 源码、`docs/wiki/`、`AGENTS.md`、`cli/`、`tests/` 留给分析阶段。
+- 测试期只读 `<project-dir>/`、本轮报告目录与 GDA 工具输出；把 GDA 源码、`docs/wiki/`、`AGENTS.md`、`cli/`、`tests/` 留给分析阶段。
 
 ## 10. 禁止事项
 

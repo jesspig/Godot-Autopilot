@@ -7,10 +7,9 @@ import {
   ADDON_VERSION,
   BRIDGE_DIR,
   BRIDGE_SOURCES,
-  DEMO_DIRS,
   PLATFORM_LIBS,
   PROJECT_ROOT,
-  addonDir,
+  artifactDir,
   hostPlatform,
   hostPlatformLib,
 } from "../lib/config";
@@ -104,18 +103,19 @@ function collectZipEntries(root: string): ZipSourceEntry[] {
   return entries;
 }
 
-function packageAddon(libsDir: string | null): void {
+function packageAddon(libsDir: string | null, preset: "debug" | "release"): void {
   let libDir: string;
   let requiredLibs: string[];
   if (libsDir !== null) {
     libDir = libsDir;
     requiredLibs = Object.values(PLATFORM_LIBS);
   } else {
-    const deployedDir = addonDir(DEMO_DIRS[0]);
-    if (!fs.existsSync(deployedDir)) {
-      throw new Error("Addons not deployed; run a build first (e.g. bun run gda-dev-tools build)");
+    libDir = artifactDir(preset);
+    if (!fs.existsSync(libDir)) {
+      throw new Error(
+        `Build artifacts not found in ${libDir}; run bun run gda-dev-tools build${preset === "release" ? " --release" : ""} first`,
+      );
     }
-    libDir = deployedDir;
     const libName = hostPlatformLib();
     if (libName === null) throw new Error(`Unsupported platform: ${hostPlatform()}`);
     requiredLibs = [libName];
@@ -144,10 +144,10 @@ function packageAddon(libsDir: string | null): void {
   }
 }
 
-export function runPackage(libsDir: string | null): number {
-  console.log("[PACKAGE] Packaging existing addons...");
+export function runPackage(libsDir: string | null, preset: "debug" | "release"): number {
+  console.log("[PACKAGE] Packaging build artifacts...");
   try {
-    packageAddon(libsDir);
+    packageAddon(libsDir, preset);
     return 0;
   } catch (error) {
     console.log(`[ERROR] ${errorMessage(error)}`);
