@@ -6,6 +6,7 @@
 namespace godot_autopilot {
 namespace scene_tree_ops {
 
+mcp::JsonValue handle_game_scene_tree(const mcp::JsonValue &args);
 mcp::JsonValue handle_call_group(const mcp::JsonValue &args);
 mcp::JsonValue handle_create_timer(const mcp::JsonValue &args);
 mcp::JsonValue handle_get_nodes_in_group(const mcp::JsonValue &args);

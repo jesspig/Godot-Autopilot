@@ -283,6 +283,25 @@ void append_connection_edges(
 
 } // namespace
 
+mcp::JsonValue handle_analyze_project(const mcp::JsonValue &args) {
+  auto *action_p = args.Find("action");
+  if (!action_p || !action_p->IsString() || action_p->GetString().empty()) {
+    return make_error(
+        "missing required parameter: action (one of: validate_scene, "
+        "unused_resources, signal_flow)");
+  }
+  const std::string action = action_p->GetString();
+  if (action == "validate_scene")
+    return handle_validate_scene_file(args);
+  if (action == "unused_resources")
+    return handle_find_unused_resources(args);
+  if (action == "signal_flow")
+    return handle_trace_signal_flow(args);
+  return make_error("unknown action '" + action +
+                    "' for analyze_project — expected validate_scene, "
+                    "unused_resources or signal_flow");
+}
+
 mcp::JsonValue handle_validate_scene_file(const mcp::JsonValue &args) {
   std::string path;
   if (!require_string_arg(args, "path", path))

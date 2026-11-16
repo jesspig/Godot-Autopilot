@@ -1,13 +1,14 @@
 #ifndef GODOT_AUTOPILOT_SCENE_TOOLS_HPP
 #define GODOT_AUTOPILOT_SCENE_TOOLS_HPP
 
+#include <functional>
+#include <initializer_list>
 #include <mcp/JsonValue.hpp>
 #include <memory>
 #include <string>
 #include <vector>
 
 #include "tools/domains/scene/scene_ops.hpp"
-#include "tools/domains/scene/scene_spec_ops.hpp"
 #include <tools/base/tool_spec.hpp>
 
 namespace godot_autopilot {
@@ -16,30 +17,41 @@ namespace scene_tools {
 namespace {
 
 const std::vector<ParamSpec> kCreateSceneNodeParams = {
-    {"parent_path", "string", "Parent node path in the edited scene (e.g. 'Player' or 'Player/Weapon'); omit only while the scene has no root — required once the scene already has a root. The response includes scene_path and scene_unsaved so the caller can confirm which scene received the node", false},
-    {"name", "string", "Node name (string, default: NewNode); optional — the node is named NewNode when the parameter is omitted", false},
-    {"type", "string", "Node class type (string, default: Node); optional — a Node is created when the parameter is omitted. Must be a Node subclass, e.g. Node2D, Sprite2D — other classes error", false},
-    {"properties", "object", "Optional map of property names to values applied right after creation via the same conversion chain as property_set (object, e.g. {\"visible\": false, \"position\": {\"x\": 10, \"y\": 20}}); any failing property frees the new node and reports the failing name", false},
+    {"mode", "string", "Operation to run: 'node' (default) creates a single node, 'scene' instantiates a .tscn file, 'spec' builds a declarative subtree, 'bundle' creates one node and finishes its setup atomically, 'path' creates a Path2D/Path3D bound to a curve resource", false},
+    {"parent_path", "string", "node/scene/spec/bundle/path: parent node path in the edited scene (e.g. 'Player' or 'Player/Weapon'); omit only while the scene has no root — required once the scene already has a root. The response includes scene_path and scene_unsaved so the caller can confirm which scene received the node", false},
+    {"name", "string", "node/bundle: node name (default: NewNode / Node); path: required path node name; scene: override the instance root name (default: scene root name). '/' and ':' are rejected where the mode validates names", false},
+    {"type", "string", "node/bundle: node class type (default: Node). Must be a Node subclass, e.g. Node2D, Sprite2D — other classes error", false},
+    {"properties", "object", "node/bundle: map of property names to values applied right after creation (object, e.g. {\"visible\": false, \"position\": {\"x\": 10, \"y\": 20}}); node mode applies them through the same conversion chain as property_set and frees the new node on failure, bundle mode applies them atomically via set_properties_batch and rolls the whole bundle back on failure", false},
+    {"path", "string", "scene: path to the .tscn scene file to instantiate (string, e.g. 'res://scenes/Enemy.tscn')", false},
+    {"owner", "boolean", "scene/bundle: set scene ownership so nodes are saved with the scene (default: true)", false},
+    {"spec", "object", "spec: declarative subtree spec {type, name, props, children}: type is a Node subclass (default: Node), name must not contain '/' or ':' (default: Node), props maps property names to values applied through the property_set conversion chain with OBJECT-typed values applied first, children is an array of nested specs; recursion is capped at 32 levels and 500 nodes per call and any failure rolls the whole subtree back", false},
+    {"dry_run", "boolean", "spec/bundle: validate the parameters and return the preview without writing to the scene (default: false); either dry_run or preview enables preview-only mode", false},
+    {"preview", "boolean", "spec/bundle: alias of dry_run: validate and preview without writing (default: false)", false},
+    {"script_path", "string", "bundle: optional Script resource path to attach via attach_script_to_node (string, must start with 'res://'); the script is re-read from disk before attaching", false},
+    {"groups", "array", "bundle: optional array of 1..16 group names added persistently via node_group action=add with editor undo registration", false},
+    {"connections", "array", "bundle: optional array of {signal, target_path, method, persist} objects connected from the new node via signal_connect; persist defaults to true (CONNECT_PERSIST, saved with the scene)", false},
+    {"curve", "string", "path: registration name of a curve from create_curve_resource (memory://name); a Curve2D creates a Path2D, a Curve3D creates a Path3D", false},
+};
+
+const std::vector<ParamSpec> kEditSceneNodeParams = {
+    {"path", "string", "Node path in the edited scene (e.g. 'Player/Sprite2D'). The response includes scene_path and scene_unsaved to confirm which scene was written", true},
+    {"new_name", "string", "rename: new node name; must be unique among siblings and cannot contain '/' or ':' (string, e.g. 'Hero')", false},
+    {"new_parent_path", "string", "reparent: target parent node path in the edited scene; must not be the node itself or one of its descendants (string, e.g. 'Inventory')", false},
+    {"keep_world_position", "boolean", "reparent: preserve the world transform when the node and the new parent are both Node2D or both Node3D; other type combinations ignore it (boolean, default: false)", false},
+    {"offset", "number", "advance_path: distance in pixels to advance along the curve; negative values move backward", false},
+    {"count", "integer", "duplicate: number of copies to create, an integer >= 1 (default: 1); reserved for the T-17 node capability task", false},
+    {"name_suffix", "string", "duplicate: suffix appended to each copy's name; reserved for the T-17 node capability task", false},
+    {"editable_instance", "boolean", "duplicate: mark the copies as editable instances of their source scene (default: false); reserved for the T-17 node capability task", false},
 };
 
 const std::vector<ParamSpec> kDeleteSceneNodeParams = {
     {"path", "string", "Node path in the edited scene (e.g. 'Enemies/Enemy1'); the scene root cannot be deleted. The response includes scene_path and scene_unsaved to confirm which scene was written", true},
 };
 
-const std::vector<ParamSpec> kRenameSceneNodeParams = {
-    {"path", "string", "Node path in the edited scene (e.g. 'Player/Sprite2D'). The response includes scene_path and scene_unsaved to confirm which scene was written", true},
-    {"new_name", "string", "New node name; must be unique among siblings and cannot contain '/' or ':' (string, e.g. 'Hero')", true},
-};
-
-const std::vector<ParamSpec> kReparentNodeParams = {
-    {"path", "string", "Node path in the edited scene to reparent (e.g. 'Player/Weapon')", true},
-    {"new_parent_path", "string", "Target parent node path in the edited scene; must not be the node itself or one of its descendants (string, e.g. 'Inventory')", true},
-    {"keep_world_position", "boolean", "Preserve the world transform when the node and the new parent are both Node2D or both Node3D; other type combinations ignore it (boolean, default: false)", false},
-};
-
 const std::vector<ParamSpec> kGetSceneTreeParams = {
     {"max_depth", "integer", "Maximum tree depth to include (integer, default: 8; -1 means unlimited)", false},
     {"include_properties", "boolean", "Add up to 20 properties per node, skipping metadata/* keys, names starting with '_' and Object-typed values (boolean, default: false)", false},
+    {"include_groups", "boolean", "Attach the group membership of every node as a 'groups' string array (boolean, default: false); use it as the membership check that replaces has_group_node", false},
     {"verify", "boolean", "Attach a verify summary comparing the in-memory tree against the on-disk scene file (default: false); when true or when paths is given the result switches to the snapshot envelope {tree, verify?, nodes?} plus scene_path/scene_unsaved", false},
     {"observe", "boolean", "Append a fresh editor viewport capture through the observe pipeline (boolean, default: false); a capture failure is reported as observe_error without failing the call", false},
     {"paths", "array", "Optional non-empty array (max 50) of node paths; attaches a nodes section with per-node screen positions and per-item errors never fail the call", false},
@@ -47,6 +59,75 @@ const std::vector<ParamSpec> kGetSceneTreeParams = {
     {"scene_path", "string", "Scene file path compared by verify, e.g. 'res://game.tscn'; defaults to the edited scene file path", false},
     {"include_hash", "boolean", "With verify: attach FNV-1a content hashes memory_hash/disk_hash (default: false)", false},
 };
+
+const std::vector<ParamSpec> kSceneCameraParams = {
+    {"camera_path", "string", "Camera node path in the edited scene (a Camera2D for 2D targets, a Camera3D for 3D targets)", true},
+    {"target_path", "string", "focus: target node path in the edited scene to focus on (Node2D or Control for 2D cameras, Node3D for 3D cameras)", false},
+    {"margin", "number", "focus: extra padding: grows the 2D focus rect around the target anchor, or pulls a 3D camera back along its view direction by this many world units (number, default: 0, must not be negative)", false},
+    {"params", "object", "set_params: camera settings to apply with at least one entry: 'zoom' (Camera2D only, number above 0 or {x, y} object with components above 0), 'fov' (Camera3D only, 1 to 179), 'near' (Camera3D only, above 0 and below far), 'far' (Camera3D only, above 0 and above near), 'limits' (Camera2D only, object with any of limit_left, limit_top, limit_right, limit_bottom integers and limit_smoothed boolean); unknown keys error", false},
+};
+
+const std::vector<ParamSpec> kGetCameraViewRectParams = {
+    {"camera_path", "string", "Camera node path in the edited scene (Camera2D or Camera3D)", true},
+};
+
+const std::vector<std::string> kEditSceneNodeActions = {
+    "rename", "reparent", "advance_path", "duplicate", "reorder", "replace"};
+
+const std::vector<std::string> kSceneCameraActions = {"focus", "set_params"};
+
+inline mcp::JsonValue scene_create_schema() {
+  mcp::JsonValue schema_value = schema::build_schema(kCreateSceneNodeParams);
+  mcp::JsonValue *properties = schema_value.Find("properties");
+  if (properties != nullptr && properties->IsObject()) {
+    mcp::JsonValue mode(mcp::JsonValue::object_tag);
+    mode["type"] = mcp::JsonValue("string");
+    mode["description"] = mcp::JsonValue(
+        "Operation to run: node (default)|scene|spec|bundle|path");
+    mcp::JsonValue values(mcp::JsonValue::array_tag);
+    for (const char *value : {"node", "scene", "spec", "bundle", "path"}) {
+      values.PushBack(mcp::JsonValue(value));
+    }
+    mode["enum"] = std::move(values);
+    (*properties)["mode"] = std::move(mode);
+  }
+  return schema_value;
+}
+
+inline std::function<mcp::JsonValue(const mcp::JsonValue &)> scene_mode_args(
+    const char *mode) {
+  return [mode](const mcp::JsonValue &args) {
+    mcp::JsonValue out(mcp::JsonValue::object_tag);
+    if (args.IsObject()) {
+      out = args;
+    }
+    out["mode"] = mcp::JsonValue(mode);
+    return out;
+  };
+}
+
+inline mcp::JsonValue scene_alias_args_with_action(const mcp::JsonValue &args,
+                                                   const char *action) {
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  if (args.IsObject()) {
+    out = args;
+  }
+  out["action"] = mcp::JsonValue(action);
+  return out;
+}
+
+inline ToolAlias scene_action_alias(const char *name, const char *canonical,
+                                    const char *action) {
+  ToolAlias alias;
+  alias.name = name;
+  alias.canonical = canonical;
+  alias.adapt_args = [action](const mcp::JsonValue &args) {
+    return scene_alias_args_with_action(args, action);
+  };
+  alias.deprecated_since = "0.4.0";
+  alias.removal_version = "0.6.0";
+  return alias;
+}
 
 mcp::JsonValue scene_alias_args_with_verify(const mcp::JsonValue &args) {
   mcp::JsonValue out(mcp::JsonValue::object_tag);
@@ -196,88 +277,175 @@ mcp::JsonValue verify_alias_project(const mcp::JsonValue &canonical) {
   return out;
 }
 
-const std::vector<ParamSpec> kInstantiateSceneParams = {
-    {"path", "string", "Path to the .tscn scene file to instantiate (string, e.g. 'res://scenes/Enemy.tscn')", true},
-    {"parent_path", "string", "Parent node path (string, default: edited scene root)", false},
-    {"name", "string", "Node name to override the instance root (string, default: scene root name)", false},
-    {"owner", "boolean", "Set scene ownership so nodes are saved with the scene (boolean, default: true)", false},
-};
+mcp::JsonValue has_group_node_args(const mcp::JsonValue &) {
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  out["include_groups"] = mcp::JsonValue(true);
+  out["max_depth"] = mcp::JsonValue(static_cast<int64_t>(-1));
+  return out;
+}
 
-const std::vector<ParamSpec> kBuildNodesFromSpecParams = {
-    {"spec", "object", "Declarative subtree spec {type, name, props, children}: type is a Node subclass (default: Node), name must not contain '/' or ':' (default: Node), props maps property names to values applied through the property_set conversion chain with OBJECT-typed values applied first, children is an array of nested specs; recursion is capped at 32 levels and 500 nodes per call and any failure rolls the whole subtree back", true},
-    {"parent_path", "string", "Parent node path for the top spec node (default: scene root); omit only while the scene has no root, in which case the top spec node becomes the root", false},
-    {"dry_run", "boolean", "Validate the spec and return the node list without writing to the scene (default: false); either dry_run or preview enables preview-only mode", false},
-    {"preview", "boolean", "Alias of dry_run: validate and preview without writing (default: false)", false},
-};
+mcp::JsonValue has_group_node_validate(const mcp::JsonValue &args) {
+  const mcp::JsonValue *node_path = args.Find("node_path");
+  if (node_path == nullptr || !node_path->IsString()) {
+    mcp::JsonValue error(mcp::JsonValue::object_tag);
+    error["error"] = mcp::JsonValue("missing required parameter: node_path");
+    return error;
+  }
+  const mcp::JsonValue *group_name = args.Find("group_name");
+  if (group_name == nullptr || !group_name->IsString()) {
+    mcp::JsonValue error(mcp::JsonValue::object_tag);
+    error["error"] = mcp::JsonValue("missing required parameter: group_name");
+    return error;
+  }
+  return mcp::JsonValue();
+}
 
-const std::vector<ParamSpec> kSpawnNodeBundleParams = {
-    {"type", "string", "Node class type (string, default: Node). Must be a Node subclass, e.g. Node2D, Sprite2D — other classes error", false},
-    {"name", "string", "Node name (string, default: Node); '/' and ':' are rejected", false},
-    {"parent_path", "string", "Parent node path in the edited scene (string, default: edited scene root); omit only while the scene has no root, in which case the new node becomes the root", false},
-    {"properties", "object", "Optional map of property names to values applied via set_properties_batch with atomic:true (object, e.g. {\"visible\": false}); any failing property rolls the whole bundle back", false},
-    {"script_path", "string", "Optional Script resource path to attach via attach_script_to_node (string, must start with 'res://'); the script is re-read from disk before attaching", false},
-    {"groups", "array", "Optional array of 1..16 group names added persistently via add_group_node with editor undo registration", false},
-    {"connections", "array", "Optional array of {signal, target_path, method, persist} objects connected from the new node via signal_connect; persist defaults to true (CONNECT_PERSIST, saved with the scene)", false},
-    {"owner", "boolean", "Set scene ownership so the node is saved with the scene (boolean, default: true)", false},
-    {"dry_run", "boolean", "Validate parameters and return the preview without writing to the scene (default: false); either dry_run or preview enables preview-only mode", false},
-    {"preview", "boolean", "Alias of dry_run: validate and preview without writing (default: false)", false},
-};
+std::string group_query_relative_path(const std::string &raw,
+                                      const mcp::JsonValue &tree) {
+  std::string clean = raw;
+  if (!clean.empty() && clean[0] == '/') {
+    clean = clean.substr(1);
+  }
+  auto strip_segment = [&clean](const std::string &segment) {
+    if (segment.empty()) {
+      return;
+    }
+    if (clean == segment) {
+      clean.clear();
+      return;
+    }
+    if (clean.size() > segment.size() &&
+        clean.compare(0, segment.size(), segment) == 0 &&
+        clean[segment.size()] == '/') {
+      clean = clean.substr(segment.size() + 1);
+    }
+  };
+  strip_segment("root");
+  const mcp::JsonValue *root_name = tree.Find("name");
+  if (root_name != nullptr && root_name->IsString()) {
+    strip_segment(root_name->GetString());
+  }
+  return clean;
+}
 
-const std::vector<ParamSpec> kCreatePathNodeParams = {
-    {"name", "string", "Path node name (e.g. 'EnemyPath')", true},
-    {"parent_path", "string", "Parent node path in the edited scene; omit only while the scene has no root, in which case the new path node becomes the root", false},
-    {"curve", "string", "Registration name of a curve from create_curve_resource (memory://name); a Curve2D creates a Path2D, a Curve3D creates a Path3D", true},
-};
+const mcp::JsonValue *find_tree_node(const mcp::JsonValue &node,
+                                     const std::string &target) {
+  if (!node.IsObject()) {
+    return nullptr;
+  }
+  const mcp::JsonValue *path = node.Find("path");
+  if (path != nullptr && path->IsString() &&
+      path->GetString() == target) {
+    return &node;
+  }
+  const mcp::JsonValue *children = node.Find("children");
+  if (children != nullptr && children->IsArray()) {
+    for (const mcp::JsonValue &child : children->GetArray()) {
+      if (const mcp::JsonValue *hit = find_tree_node(child, target)) {
+        return hit;
+      }
+    }
+  }
+  return nullptr;
+}
 
-const std::vector<ParamSpec> kAdvancePathFollowParams = {
-    {"path", "string", "Node path of a PathFollow2D/PathFollow3D in the edited scene (e.g. 'EnemyPath/Follower')", true},
-    {"offset", "number", "Distance in pixels to advance along the curve; negative values move backward", true},
-};
-
-const std::vector<ParamSpec> kFocusCameraOnNodeParams = {
-    {"camera_path", "string", "Camera node path in the edited scene (a Camera2D for 2D targets, a Camera3D for 3D targets)", true},
-    {"target_path", "string", "Target node path in the edited scene to focus on (Node2D or Control for 2D cameras, Node3D for 3D cameras)", true},
-    {"margin", "number", "Extra padding: grows the 2D focus rect around the target anchor, or pulls a 3D camera back along its view direction by this many world units (number, default: 0, must not be negative)", false},
-};
-
-const std::vector<ParamSpec> kSetCameraParamsParams = {
-    {"camera_path", "string", "Camera node path in the edited scene (Camera2D and Camera3D accept different params keys)", true},
-    {"params", "object", "Camera settings to apply with at least one entry: 'zoom' (Camera2D only, number above 0 or {x, y} object with components above 0), 'fov' (Camera3D only, 1 to 179), 'near' (Camera3D only, above 0 and below far), 'far' (Camera3D only, above 0 and above near), 'limits' (Camera2D only, object with any of limit_left, limit_top, limit_right, limit_bottom integers and limit_smoothed boolean); unknown keys error", true},
-};
-
-const std::vector<ParamSpec> kGetCameraViewRectParams = {
-    {"camera_path", "string", "Camera node path in the edited scene (Camera2D or Camera3D)", true},
-};
+mcp::JsonValue has_group_node_project(const mcp::JsonValue &canonical,
+                                      const mcp::JsonValue &args) {
+  if (canonical.Find("error") != nullptr) {
+    return canonical;
+  }
+  const mcp::JsonValue *node_path = args.Find("node_path");
+  const mcp::JsonValue *group_name = args.Find("group_name");
+  const mcp::JsonValue *tree = canonical.Find("result");
+  if (node_path == nullptr || !node_path->IsString() ||
+      group_name == nullptr || !group_name->IsString() || tree == nullptr ||
+      !tree->IsObject()) {
+    return canonical;
+  }
+  const std::string target =
+      group_query_relative_path(node_path->GetString(), *tree);
+  const mcp::JsonValue *found =
+      target.empty() ? tree : find_tree_node(*tree, target);
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  if (found == nullptr) {
+    out["error"] =
+        mcp::JsonValue("node not found: " + node_path->GetString());
+    return out;
+  }
+  bool in_group = false;
+  if (const mcp::JsonValue *groups = found->Find("groups")) {
+    if (groups->IsArray()) {
+      for (const mcp::JsonValue &entry : groups->GetArray()) {
+        if (entry.IsString() && entry.GetString() == group_name->GetString()) {
+          in_group = true;
+          break;
+        }
+      }
+    }
+  }
+  out["result"] = mcp::JsonValue(in_group);
+  return out;
+}
 
 } // namespace
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(13);
+  v.reserve(6);
   v.push_back(make_spec_tool(ToolSpec{
       "create_scene_node",
-      "Create a new node in the currently edited scene. Provide 'type' (any Node subclass, default Node) and 'name' (default NewNode); omit 'parent_path' only while the scene has no root, otherwise pass the parent node path. Optional 'properties' object applies values right after creation through the same conversion chain as property_set (NodePath strings become node references, resource references are resolved, and an inline resource description such as {\"type\": \"RectangleShape2D\", \"properties\": {...}} creates a pathless sub-resource saved as a sub_resource) — any failing property frees the new node and reports the property name. Returns the new node 'path', the 'applied_properties' array (property names applied without error; a property may still have been adjusted by the engine — it then also appears in 'property_warnings'), the 'inline_resources' array ({property, type} entries present only when inline descriptions were applied) and an 'undo' hint describing how to remove the node via delete_scene_node. When the engine adjusts or flags a value after a successful set, the response additionally includes 'property_warnings', an array of {path, property, warning} objects; the field is absent when there are no warnings.",
-      "Scene", {"node", "create"}, SideEffect::WritesScene, tool_flags::kNone | tool_flags::kSceneTarget,
-      kCreateSceneNodeParams, scene_ops::handle_create}));
+      "Create scene content in the currently edited scene with one mode-based tool. mode='node' (default) creates a single node: provide 'type' (any Node subclass, default Node) and 'name' (default NewNode); omit 'parent_path' only while the scene has no root. Optional 'properties' applies values right after creation through the same conversion chain as property_set (NodePath strings become node references, resource references are resolved, an inline resource description such as {\"type\": \"RectangleShape2D\", \"properties\": {...}} creates a pathless sub-resource saved as a sub_resource); any failing property frees the new node and reports the property name. mode='scene' instantiates the PackedScene at 'path' (.tscn) under 'parent_path' (default: scene root), with optional 'name' and 'owner' (default true). mode='spec' builds a declarative subtree from 'spec' {type, name, props, children}, capped at 32 levels and 500 nodes with a whole-subtree rollback, and 'dry_run'/'preview' validates without writing. mode='bundle' creates one node and finishes properties, script, groups and signal connections atomically in that order, rolling the whole bundle back on any failure. mode='path' creates a Path2D/Path3D bound to a curve created by create_curve_resource ('name' and 'curve' required). Every mode is WritesScene, marks the scene modified and returns the previous per-mode result shape; the result also carries scene_path and scene_unsaved. Deprecated aliases: instantiate_scene (mode=scene), build_nodes_from_spec (mode=spec), spawn_node_bundle (mode=bundle), create_path_node (mode=path).",
+      "Scene",
+      {"node", "create", "mode", "instantiate_scene", "build_nodes_from_spec",
+       "spawn_node_bundle", "create_path_node"},
+      SideEffect::WritesScene, tool_flags::kNone | tool_flags::kSceneTarget,
+      kCreateSceneNodeParams, scene_ops::handle_create_scene_node,
+      scene_create_schema(),
+      {
+          ToolAlias{"instantiate_scene", "create_scene_node",
+                    scene_mode_args("scene"), {}, "0.4.0", "0.6.0"},
+          ToolAlias{"build_nodes_from_spec", "create_scene_node",
+                    scene_mode_args("spec"), {}, "0.4.0", "0.6.0"},
+          ToolAlias{"spawn_node_bundle", "create_scene_node",
+                    scene_mode_args("bundle"), {}, "0.4.0", "0.6.0"},
+          ToolAlias{"create_path_node", "create_scene_node",
+                    scene_mode_args("path"), {}, "0.4.0", "0.6.0"},
+      },
+      {"{\"mode\":\"node\",\"type\":\"Sprite2D\",\"name\":\"Icon\",\"parent_path\":\"UI\"}",
+       "{\"mode\":\"scene\",\"path\":\"res://scenes/Enemy.tscn\"}",
+       "{\"mode\":\"spec\",\"spec\":{\"type\":\"Node2D\",\"name\":\"Group\",\"children\":[{\"type\":\"Sprite2D\",\"name\":\"Icon\"}]}}",
+       "{\"mode\":\"path\",\"name\":\"EnemyPath\",\"curve\":\"memory://enemy_curve\"}"}}));
+  v.push_back(make_spec_tool(ToolSpec{
+      "edit_scene_node",
+      "Edit an existing node in the edited scene in one action tool. action='rename' renames 'path' to 'new_name' ('/' and ':' rejected; sibling names must stay unique) in one editor undo step. action='reparent' moves 'path' under 'new_parent_path' with optional 'keep_world_position' (default false; preserved only when both the node and the new parent are Node2D or both Node3D); the scene root, the node itself, its current parent and its own descendants are rejected. action='advance_path' advances a PathFollow2D/PathFollow3D at 'path' along its curve by 'offset' pixels (negative moves backward) and reports the new progress, progress_ratio and global position. action='duplicate', 'reorder' and 'replace' are reserved for the T-17 node capability task: they validate parameters (path required; duplicate accepts count >= 1, name_suffix and editable_instance) and return code=not_implemented instead of changing the scene. Deprecated aliases: rename_scene_node (action=rename), reparent_node (action=reparent), advance_path_follow (action=advance_path).",
+      "Scene",
+      {"node", "edit", "rename", "reparent", "advance_path", "duplicate",
+       "reorder", "replace", "rename_scene_node", "reparent_node",
+       "advance_path_follow"},
+      SideEffect::WritesScene,
+      tool_flags::kNone | tool_flags::kSceneTarget | tool_flags::kUndoable,
+      kEditSceneNodeParams, scene_ops::handle_edit_scene_node,
+      schema::build_action_schema(
+          kEditSceneNodeActions, kEditSceneNodeParams,
+          "Node edit action: rename|reparent|advance_path (duplicate|reorder|replace are not implemented yet)"),
+      {
+          scene_action_alias("rename_scene_node", "edit_scene_node", "rename"),
+          scene_action_alias("reparent_node", "edit_scene_node", "reparent"),
+          scene_action_alias("advance_path_follow", "edit_scene_node",
+                             "advance_path"),
+      },
+      {"{\"action\":\"rename\",\"path\":\"Player/Sprite2D\",\"new_name\":\"Hero\"}",
+       "{\"action\":\"reparent\",\"path\":\"Player/Weapon\",\"new_parent_path\":\"Inventory\"}",
+       "{\"action\":\"advance_path\",\"path\":\"EnemyPath/Follower\",\"offset\":48}"}}));
   v.push_back(make_spec_tool(ToolSpec{
       "delete_scene_node",
       "Delete a node from the edited scene by 'path'. Managed by the editor undo/redo history (action 'Delete Node <name>'): do removes the child and queue_frees it, undo re-adds it under the old parent with owner and sibling index restored — effective while the deferred free has not destroyed the node yet. Refuses to delete the scene root (close the scene first). Returns 'deleted' with 'undoable' true and an 'undo' info object (name, type, parent_path). This tool is classified as a destructive side effect because it destroys a scene entity that already exists in the host, and the editor undo stack is a session-only recovery path that is lost when the editor exits.",
       "Scene", {"node", "delete"}, SideEffect::Destructive, tool_flags::kNone | tool_flags::kSceneTarget | tool_flags::kUndoable,
       kDeleteSceneNodeParams, scene_ops::handle_delete}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "rename_scene_node",
-      "Rename a node in the edited scene: pass 'path' and 'new_name' ('/' and ':' are rejected). Refuses names already used by a sibling, mirroring Godot's uniqueness rule. Wrapped in one editor undo/redo step ('Rename Node <old>') restoring the previous name on undo; returns result 'renamed' with 'undoable' true and the new relative path.",
-      "Scene", {"node", "rename"}, SideEffect::WritesScene, tool_flags::kNone | tool_flags::kSceneTarget | tool_flags::kUndoable,
-      kRenameSceneNodeParams, scene_ops::handle_rename}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "reparent_node",
-      "Reparent a node in the edited scene to a new parent: pass 'path' and 'new_parent_path'; refuses the scene root, itself, its own descendants and its current parent. One editor undo/redo step ('Reparent Node <name>'): do removes from the old parent then adds under the new one, undo restores the old parent with original sibling index and owner. Optional 'keep_world_position' (default false) preserves the world transform when the node and new parent are both Node2D or both Node3D; other type combinations ignore it. If the previous owner was the scene root it stays owned by the current scene root so the node is saved.",
-      "Scene", {"node", "reparent"}, SideEffect::WritesScene, tool_flags::kNone | tool_flags::kSceneTarget | tool_flags::kUndoable,
-      kReparentNodeParams, scene_ops::handle_reparent}));
   v.push_back(make_spec_tool(with_aliases(ToolSpec{
       "get_scene_tree",
-      "Walk the node tree of the currently edited scene, returning name, type, path and children for each node. Optional 'max_depth' (default 8; -1 for unlimited) and 'include_properties' (true adds up to 20 properties per node, skipping metadata/ keys, names starting with underscore and Object-typed properties). Optional 'verify' (default false) attaches a memory-versus-disk verify summary with match, node and connection counts plus missing_paths; optional 'paths' (1-50) attaches per-node screen positions under a nodes section; optional 'observe' appends a fresh editor viewport capture. With verify or paths the result is the snapshot envelope {tree, verify?, nodes?, scene_path, scene_unsaved}; without them the result is the tree object itself. Errors if no scene is open — create or open one first.",
-      "Scene", {"tree", "structure"}, SideEffect::None, tool_flags::kObserve,
+      "Walk the node tree of the currently edited scene, returning name, type, path and children for each node. Optional 'max_depth' (default 8; -1 for unlimited), 'include_properties' (true adds up to 20 properties per node, skipping metadata/ keys, names starting with underscore and Object-typed properties) and 'include_groups' (true adds a 'groups' string array to every node; this is the membership check that replaces the removed has_group_node tool). Optional 'verify' (default false) attaches a memory-versus-disk verify summary with match, node and connection counts plus missing_paths; optional 'paths' (1-50) attaches per-node screen positions under a nodes section; optional 'observe' appends a fresh editor viewport capture. With verify or paths the result is the snapshot envelope {tree, verify?, nodes?, scene_path, scene_unsaved}; without them the result is the tree object itself. Errors if no scene is open — create or open one first. Deprecated aliases: get_scene_snapshot, get_scene_node_screen_rect, verify_scene_saved, has_group_node.",
+      "Scene", {"tree", "structure", "groups", "has_group_node"}, SideEffect::None, tool_flags::kObserve,
       kGetSceneTreeParams, scene_ops::handle_get_tree},
       {
           ToolAlias{"get_scene_snapshot", "get_scene_tree",
@@ -288,42 +456,25 @@ inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
           ToolAlias{"verify_scene_saved", "get_scene_tree",
                     scene_alias_args_with_verify, verify_alias_project, "0.4.0",
                     "0.6.0"},
+          ToolAlias{"has_group_node", "get_scene_tree", has_group_node_args,
+                    {}, "0.4.0", "0.6.0", has_group_node_validate,
+                    has_group_node_project},
       })));
   v.push_back(make_spec_tool(ToolSpec{
-      "instantiate_scene",
-      "Instantiate a PackedScene from 'path' (.tscn file) into the edited scene. Optional 'parent_path' (default: scene root), 'name' and 'owner' (default true — sets scene ownership so children are saved). Returns the instance 'path', 'name' and 'type'. Instances inherit CONNECT_PERSIST connections saved in the source scene; do not reconnect the same signal pairs.",
-      "Scene", {"scene", "instance"}, SideEffect::WritesScene, tool_flags::kNone | tool_flags::kSceneTarget,
-      kInstantiateSceneParams, scene_ops::handle_instance}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "build_nodes_from_spec",
-      "用声明式 spec 一次建好整棵子树：传 'spec' 对象 {type（Node 子类，默认 Node）、name（默认 Node，'/' 与 ':' 非法）、props（经 property_set 同转换链逐节点应用，OBJECT 型值先行）、children（同形 spec 数组递归）}；可选 'parent_path'（默认场景根，仅在无场景时省略并让顶层 spec 节点成根）、'dry_run'/'preview'（任一 true 则只校验并返回节点清单，不写场景）。自顶向下挂接并设 owner 为场景根以保证落盘；任一步失败整体回滚（摘除顶层已建节点并释放子树，无残留）。递归上限 32 层、单次上限 500 节点。与 create_scene_node、code_execute 并存：定型结构用本工具，单次零散节点用 create_scene_node，异形逻辑（循环、条件、计算值）用 code_execute。返回 mode（built/dry_run）、node_count、created [{path, type}] 与 delete_scene_node 撤销提示。",
-      "Scene", {"node", "build", "spec"}, SideEffect::WritesScene, tool_flags::kMutating | tool_flags::kSceneTarget,
-      kBuildNodesFromSpecParams, scene_spec_ops::handle_build_from_spec}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "spawn_node_bundle",
-      "Create one node and finish its common setup in a single atomic call: 'type' (any Node subclass, default Node) and 'name' (default Node, '/' and ':' rejected) under 'parent_path' (default: edited scene root; omit only while the scene has no root, in which case the new node becomes the root). Optional 'properties' object is applied via set_properties_batch with atomic:true, optional 'script_path' (must start with 'res://') is attached via attach_script_to_node with a fresh disk re-read, optional 'groups' (array of 1..16 names) is added persistently via add_group_node with editor undo registration, and optional 'connections' (array of {signal, target_path, method, persist} with persist defaulting to true for CONNECT_PERSIST scene-saved wiring) is connected from the new node via signal_connect. Optional 'owner' (default true) keeps scene ownership so the node is saved; 'dry_run'/'preview' (either true) only validates and previews without writing. The steps run in order properties, script, groups, connections; any failing step removes the new node and rolls the whole bundle back with no residue. Returns the new node 'path' and 'type', the 'applied' property name array, 'groups_connected' and 'signals_connected' counts, and an 'undo' hint describing how to remove the node via delete_scene_node.",
-      "Scene", {"node", "bundle", "spawn"}, SideEffect::WritesScene, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
-      kSpawnNodeBundleParams, scene_spec_ops::handle_spawn_bundle}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "create_path_node",
-      "Create a Path2D/Path3D node in the edited scene bound to a curve created by create_curve_resource. Requires 'name' and 'curve' (the memory:// reference); the curve type decides the node type (Curve2D creates Path2D, Curve3D creates Path3D). Optional 'parent_path' (default: scene root; omit only while the scene has no root, in which case the new node becomes the root). Sets scene ownership so the node is saved. Returns the new node 'path', 'type', 'curve' and an 'undo' hint describing how to remove the node via delete_scene_node.",
-      "Scene", {"node", "path", "create"}, SideEffect::WritesScene, tool_flags::kNone | tool_flags::kSceneTarget,
-      kCreatePathNodeParams, scene_ops::handle_create_path_node}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "advance_path_follow",
-      "Advance a PathFollow2D/PathFollow3D node along its parent path curve by 'offset' pixels (negative moves backward). Requires 'path' (the follower node path in the edited scene) and 'offset' (number). Sets progress to current progress plus offset and reports the new progress, progress_ratio and global position. Marks the scene modified.",
-      "Scene", {"node", "path", "follow", "advance"}, SideEffect::WritesScene, tool_flags::kNone | tool_flags::kSceneTarget,
-      kAdvancePathFollowParams, scene_ops::handle_advance_path_follow}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "focus_camera_on_node",
-      "Point a scene camera at a node: pass 'camera_path' (a Camera2D for 2D targets, a Camera3D for 3D targets) and 'target_path' (Node2D or Control for 2D cameras, Node3D for 3D cameras; other types error naming the actual class). A 2D camera is centered on the target anchor (the Control global-rect center, otherwise the canvas origin) and reports the padded 'focus_rect'; a 3D camera keeps its position and turns toward the target via look_at, reporting whether the target is 'behind' it. Optional 'margin' (number, default 0, must not be negative) grows the 2D focus rect, or pulls a 3D camera back along its view direction before aiming. One editor undo step; marks the scene modified. Returns camera and target paths and types, space, position, zoom and focus_rect (2D) or target_position and behind (3D), plus margin.",
-      "Scene", {"camera", "focus"}, SideEffect::WritesScene, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
-      kFocusCameraOnNodeParams, scene_ops::handle_focus_camera_on_node}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "set_camera_params",
-      "Update settings on a scene camera in one editor undo step: pass 'camera_path' and 'params' (object with at least one entry). 'zoom' (Camera2D only: number above 0 or {x, y} object with components above 0), 'fov' (Camera3D only: 1 to 179), 'near' and 'far' (Camera3D only: above 0 with near below far), 'limits' (Camera2D only: object with any of limit_left, limit_top, limit_right, limit_bottom integers and limit_smoothed boolean); keys for the wrong camera type or unknown keys error naming the actual class. Marks the scene modified. Returns the camera path, type, the applied key array, and the resulting position, zoom and limits (2D) or fov, near and far (3D).",
-      "Scene", {"camera", "params"}, SideEffect::WritesScene, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
-      kSetCameraParamsParams, scene_ops::handle_set_camera_params}));
+      "scene_camera",
+      "Point or configure a camera in the edited scene in one action tool. action='focus' points 'camera_path' (a Camera2D for 2D targets, a Camera3D for 3D targets) at 'target_path' (Node2D or Control for 2D cameras, Node3D for 3D cameras; other types error naming the actual class): a 2D camera is centered on the target anchor (the Control global-rect center, otherwise the canvas origin) and reports the padded 'focus_rect'; a 3D camera keeps its position and turns toward the target via look_at, reporting whether the target is 'behind' it. Optional 'margin' (number, default 0, must not be negative) grows the 2D focus rect, or pulls a 3D camera back along its view direction before aiming. action='set_params' applies 'params' (object with at least one entry) to 'camera_path': 'zoom' (Camera2D only), 'fov', 'near' and 'far' (Camera3D only), 'limits' (Camera2D only); keys for the wrong camera type or unknown keys error naming the actual class. Both actions are WritesScene with one editor undo step and mark the scene modified; action='focus' returns camera and target paths and types, space, position, zoom and focus_rect (2D) or target_position and behind (3D) plus margin, while action='set_params' returns the applied key array and the resulting position, zoom and limits (2D) or fov, near and far (3D). Read camera geometry with get_camera_view_rect. Deprecated aliases: focus_camera_on_node (action=focus), set_camera_params (action=set_params).",
+      "Scene", {"camera", "focus", "params", "focus_camera_on_node",
+                "set_camera_params"},
+      SideEffect::WritesScene, tool_flags::kMutating | tool_flags::kSceneTarget | tool_flags::kUndoable,
+      kSceneCameraParams, scene_ops::handle_scene_camera,
+      schema::build_action_schema(kSceneCameraActions, kSceneCameraParams,
+                                  "Camera action: focus|set_params"),
+      {
+          scene_action_alias("focus_camera_on_node", "scene_camera", "focus"),
+          scene_action_alias("set_camera_params", "scene_camera", "set_params"),
+      },
+      {"{\"action\":\"focus\",\"camera_path\":\"Camera2D\",\"target_path\":\"Player\",\"margin\":16}",
+       "{\"action\":\"set_params\",\"camera_path\":\"Camera3D\",\"params\":{\"fov\":60}}"}}));
   v.push_back(make_spec_tool(ToolSpec{
       "get_camera_view_rect",
       "Describe what a scene camera sees in editor window client-area coordinates with the same mapping as get_scene_node_screen_rect (client = offset + pixel * scale). Pass 'camera_path' (a Camera2D or Camera3D; other types error naming the actual class). Returns camera_path, camera_type, viewport, window_id, space, world_position, window_center, 'view_rect' ({position, size} centered on the projected camera origin with the editor viewport size), 'behind' (always false for 2D; true when a 3D camera origin sits behind the 3D editor camera), zoom (2D) or forward, fov, near and far (3D), viewport_size and the pixel mapping. Read-only.",

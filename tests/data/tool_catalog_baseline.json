@@ -4,13 +4,13 @@
     "domains": "src/tools/domains/*/*_tools.hpp",
     "register_all": "src/tools/base/register_all.cpp"
   },
-  "catalog_total": 308,
-  "domain_total": 302,
+  "catalog_total": 268,
+  "domain_total": 262,
   "meta_total": 5,
   "system_total": 1,
   "domain_count": 33,
   "by_domain": {
-    "Analysis": 3,
+    "Analysis": 1,
     "Animation": 11,
     "Audio": 5,
     "Capture": 2,
@@ -23,7 +23,7 @@
     "Editor": 12,
     "Game": 9,
     "GridMap": 4,
-    "Group": 3,
+    "Group": 1,
     "Input": 6,
     "InputMap": 4,
     "Log": 1,
@@ -32,9 +32,9 @@
     "Physics": 51,
     "Properties": 6,
     "Render": 52,
-    "Resources": 32,
-    "Scene": 13,
-    "SceneTree": 8,
+    "Resources": 10,
+    "Scene": 6,
+    "SceneTree": 1,
     "Scripts": 10,
     "SpriteFrames": 1,
     "Testing": 1,
@@ -45,7 +45,7 @@
     "Tween": 3
   },
   "by_category": {
-    "Analysis": 3,
+    "Analysis": 1,
     "Animation": 11,
     "Audio": 5,
     "Capture": 2,
@@ -58,7 +58,7 @@
     "Editor": 12,
     "Game": 12,
     "TileMap": 8,
-    "Group": 3,
+    "Group": 1,
     "Input": 10,
     "System": 5,
     "Navigation": 15,
@@ -66,8 +66,8 @@
     "Physics": 50,
     "Properties": 6,
     "Render": 52,
-    "Resources": 32,
-    "Scene": 21,
+    "Resources": 10,
+    "Scene": 7,
     "SpriteFrames": 1,
     "Testing": 1,
     "Text": 3,
@@ -75,7 +75,7 @@
     "Meta": 2
   },
   "domain_by_category": {
-    "Analysis": 3,
+    "Analysis": 1,
     "Animation": 11,
     "Audio": 5,
     "Capture": 2,
@@ -88,7 +88,7 @@
     "Editor": 12,
     "Game": 12,
     "TileMap": 8,
-    "Group": 3,
+    "Group": 1,
     "Input": 10,
     "System": 1,
     "Navigation": 15,
@@ -96,44 +96,45 @@
     "Physics": 50,
     "Properties": 6,
     "Render": 52,
-    "Resources": 32,
-    "Scene": 21,
+    "Resources": 10,
+    "Scene": 7,
     "SpriteFrames": 1,
     "Testing": 1,
     "Text": 3,
     "Theme": 3
   },
   "by_side_effect": {
-    "None": 198,
-    "WritesScene": 37,
+    "None": 177,
+    "WritesScene": 29,
     "Destructive": 6,
-    "WritesFile": 16,
+    "WritesFile": 12,
     "WritesConfig": 8,
     "ModifiesWindow": 14,
     "CodeExecute": 5,
     "ShowsAlert": 3,
     "Process": 7,
-    "GameRuntime": 14
+    "GameRuntime": 7
   },
   "domain_by_side_effect": {
-    "None": 194,
-    "WritesScene": 37,
+    "None": 173,
+    "WritesScene": 29,
     "Destructive": 6,
-    "WritesFile": 16,
+    "WritesFile": 12,
     "WritesConfig": 8,
     "ModifiesWindow": 14,
     "CodeExecute": 3,
     "ShowsAlert": 3,
     "Process": 7,
-    "GameRuntime": 14
+    "GameRuntime": 7
   },
   "strict_redundant_count": 32,
-  "alias_count": 209,
+  "alias_count": 263,
   "alias_names": [
     "add_audio_bus_effect",
     "add_autoload",
     "add_editor_undo_redo_do",
     "add_editor_undo_redo_undo",
+    "add_group_node",
     "add_input_map_action",
     "add_input_map_action_event",
     "add_shaped_text_string",
@@ -141,7 +142,10 @@
     "add_spriteframes_frame",
     "add_tilemap_atlas_source",
     "add_tilemap_physics_layer",
+    "advance_path_follow",
     "apply_theme_to_control",
+    "build_nodes_from_spec",
+    "call_scene_tree_group",
     "capture_game_viewport",
     "click_editor_element",
     "click_input_mouse",
@@ -150,12 +154,20 @@
     "commit_editor_undo_redo",
     "control_game_tween",
     "copy_file",
+    "copy_resource_file",
+    "create_array_mesh",
     "create_audiostream_wav",
+    "create_curve_resource",
+    "create_directory",
     "create_display_window",
     "create_editor_scene",
     "create_editor_undo_redo_action",
     "create_game_tween",
     "create_os_process",
+    "create_path_node",
+    "create_primitive_mesh",
+    "create_resource",
+    "create_scene_tree_timer",
     "create_shaped_text",
     "create_spriteframes",
     "create_text_font",
@@ -167,6 +179,7 @@
     "csharp_subscribe_event",
     "csharp_unsubscribe_event",
     "drag_input_mouse",
+    "duplicate_resource",
     "ensure_directory",
     "erase_input_map_action",
     "erase_input_map_action_event",
@@ -176,6 +189,8 @@
     "fill_tilemap_rect",
     "find_docs_class",
     "find_in_files",
+    "find_unused_resources",
+    "focus_camera_on_node",
     "get_audio_bus_count",
     "get_audio_bus_layout",
     "get_audio_bus_name",
@@ -184,6 +199,7 @@
     "get_audio_input_devices",
     "get_audio_player_playback_position",
     "get_autoload_list",
+    "get_curve_baked_points",
     "get_debug_custom_monitor",
     "get_debug_custom_monitor_names",
     "get_debug_memory_usage",
@@ -230,29 +246,47 @@
     "get_os_system_fonts",
     "get_os_system_info",
     "get_os_unix_time",
+    "get_resource_dependencies",
+    "get_resource_dir_files",
+    "get_resource_extensions",
+    "get_resource_load_threaded",
+    "get_resource_load_threaded_status",
+    "get_resource_property",
+    "get_resource_references",
+    "get_resource_type",
+    "get_resource_types",
+    "get_resource_uid",
     "get_scene_node_screen_rect",
     "get_scene_snapshot",
+    "get_scene_tree_nodes_in_group",
     "get_shaped_text_size",
     "get_text_font_system_path",
     "get_translation_list",
     "has_editor_settings",
+    "has_group_node",
     "has_input_map_action",
     "has_project_settings",
+    "has_resource",
     "has_resource_dependency",
     "has_text_feature",
     "hit_test_editor_point",
+    "instantiate_scene",
     "is_input_action_just_pressed",
     "is_input_action_pressed",
+    "is_scene_tree_paused",
     "is_text_locale_right_to_left",
     "kill_os_process",
     "list_categories",
     "list_directory",
+    "load_resource",
+    "load_resource_threaded",
     "load_script",
     "move_autoload",
     "move_display_window_to_foreground",
     "move_input_mouse",
     "move_os_file_to_trash",
     "move_resource_file",
+    "notify_scene_tree_group",
     "open_editor_scene",
     "ping",
     "play_audio_player",
@@ -262,11 +296,19 @@
     "press_input_mouse_button",
     "queue_game_input",
     "read_file",
+    "reimport_resource_files",
     "release_input_action",
     "release_input_key",
     "release_input_mouse_button",
     "reload_editor_scene",
+    "reload_resource",
+    "reload_scene_tree_current_scene",
     "remove_autoload",
+    "remove_group_node",
+    "remove_resource_file",
+    "rename_resource_file",
+    "rename_scene_node",
+    "reparent_node",
     "request_display_window_attention",
     "run_editor_shortcut",
     "run_gdscript_test_files",
@@ -274,6 +316,7 @@
     "save_editor_scene_as",
     "save_editor_scenes",
     "save_project_settings",
+    "save_resource",
     "scan_editor_file_system",
     "scene_tree_items",
     "scroll_input_mouse",
@@ -289,8 +332,10 @@
     "set_audio_device_output",
     "set_audio_player_pitch_scale",
     "set_audio_player_volume_db",
+    "set_camera_params",
     "set_control_anchor_preset",
     "set_control_layout",
+    "set_curve_points",
     "set_debug_collision_visual",
     "set_debug_navigation_visual",
     "set_debug_performance_visual",
@@ -309,9 +354,15 @@
     "set_gridmap_cell",
     "set_input_map_action_bundle",
     "set_input_map_action_deadzone",
+    "set_mesh_surface_material",
     "set_os_environment",
     "set_project_settings",
     "set_properties_batch",
+    "set_resource_import_options",
+    "set_resource_property",
+    "set_resource_uid",
+    "set_scene_tree_debug_collisions_hint",
+    "set_scene_tree_pause",
     "set_text_font_antialiasing",
     "set_text_font_data",
     "set_text_font_hinting",
@@ -322,6 +373,7 @@
     "set_theme_stylebox_flat",
     "set_tilemap_cell",
     "set_tilemap_tile_collision",
+    "spawn_node_bundle",
     "speak_display_tts",
     "start_audio_input_capture",
     "start_game_job",
@@ -331,10 +383,12 @@
     "stop_display_tts",
     "stop_editor_playing",
     "stop_input_gamepad_vibration",
+    "trace_signal_flow",
     "translate_text",
     "type_editor_element_text",
     "type_input_text",
     "validate_game_ui_layout",
+    "validate_scene_file",
     "verify_scene_saved",
     "wait_game_input",
     "warp_display_mouse",
@@ -360,6 +414,11 @@
       "name": "add_editor_undo_redo_undo",
       "canonical": "editor_undo",
       "action": ""
+    },
+    {
+      "name": "add_group_node",
+      "canonical": "node_group",
+      "action": "add"
     },
     {
       "name": "add_input_map_action",
@@ -397,9 +456,24 @@
       "action": ""
     },
     {
+      "name": "advance_path_follow",
+      "canonical": "edit_scene_node",
+      "action": "advance_path"
+    },
+    {
       "name": "apply_theme_to_control",
       "canonical": "update_control_layout",
       "action": ""
+    },
+    {
+      "name": "build_nodes_from_spec",
+      "canonical": "create_scene_node",
+      "action": ""
+    },
+    {
+      "name": "call_scene_tree_group",
+      "canonical": "game_scene_tree",
+      "action": "call_group"
     },
     {
       "name": "capture_game_viewport",
@@ -442,9 +516,29 @@
       "action": "copy"
     },
     {
+      "name": "copy_resource_file",
+      "canonical": "resource_file",
+      "action": "copy"
+    },
+    {
+      "name": "create_array_mesh",
+      "canonical": "resource_create",
+      "action": "array"
+    },
+    {
       "name": "create_audiostream_wav",
       "canonical": "audio_capture",
       "action": "create_wav"
+    },
+    {
+      "name": "create_curve_resource",
+      "canonical": "resource_create",
+      "action": "curve"
+    },
+    {
+      "name": "create_directory",
+      "canonical": "resource_file",
+      "action": "create_dir"
     },
     {
       "name": "create_display_window",
@@ -470,6 +564,26 @@
       "name": "create_os_process",
       "canonical": "os_process",
       "action": "create"
+    },
+    {
+      "name": "create_path_node",
+      "canonical": "create_scene_node",
+      "action": ""
+    },
+    {
+      "name": "create_primitive_mesh",
+      "canonical": "resource_create",
+      "action": "primitive"
+    },
+    {
+      "name": "create_resource",
+      "canonical": "resource_create",
+      "action": "create"
+    },
+    {
+      "name": "create_scene_tree_timer",
+      "canonical": "game_scene_tree",
+      "action": "create_timer"
     },
     {
       "name": "create_shaped_text",
@@ -527,6 +641,11 @@
       "action": "drag"
     },
     {
+      "name": "duplicate_resource",
+      "canonical": "resource_create",
+      "action": "duplicate"
+    },
+    {
       "name": "ensure_directory",
       "canonical": "os_file_write",
       "action": "ensure"
@@ -572,6 +691,16 @@
       "action": "find"
     },
     {
+      "name": "find_unused_resources",
+      "canonical": "analyze_project",
+      "action": "unused_resources"
+    },
+    {
+      "name": "focus_camera_on_node",
+      "canonical": "scene_camera",
+      "action": "focus"
+    },
+    {
       "name": "get_audio_bus_count",
       "canonical": "audio_bus",
       "action": "get_info"
@@ -610,6 +739,11 @@
       "name": "get_autoload_list",
       "canonical": "get_autoloads",
       "action": "list"
+    },
+    {
+      "name": "get_curve_baked_points",
+      "canonical": "resource_query",
+      "action": "curve_baked"
     },
     {
       "name": "get_debug_custom_monitor",
@@ -842,6 +976,56 @@
       "action": "unix_time"
     },
     {
+      "name": "get_resource_dependencies",
+      "canonical": "resource_query",
+      "action": "deps"
+    },
+    {
+      "name": "get_resource_dir_files",
+      "canonical": "resource_query",
+      "action": "dir"
+    },
+    {
+      "name": "get_resource_extensions",
+      "canonical": "resource_query",
+      "action": "extensions"
+    },
+    {
+      "name": "get_resource_load_threaded",
+      "canonical": "resource_load",
+      "action": "threaded_get"
+    },
+    {
+      "name": "get_resource_load_threaded_status",
+      "canonical": "resource_load",
+      "action": "threaded_status"
+    },
+    {
+      "name": "get_resource_property",
+      "canonical": "resource_property",
+      "action": "get"
+    },
+    {
+      "name": "get_resource_references",
+      "canonical": "resource_query",
+      "action": "references"
+    },
+    {
+      "name": "get_resource_type",
+      "canonical": "resource_query",
+      "action": "type"
+    },
+    {
+      "name": "get_resource_types",
+      "canonical": "resource_query",
+      "action": "types"
+    },
+    {
+      "name": "get_resource_uid",
+      "canonical": "resource_query",
+      "action": "uid"
+    },
+    {
       "name": "get_scene_node_screen_rect",
       "canonical": "get_scene_tree",
       "action": ""
@@ -850,6 +1034,11 @@
       "name": "get_scene_snapshot",
       "canonical": "get_scene_tree",
       "action": ""
+    },
+    {
+      "name": "get_scene_tree_nodes_in_group",
+      "canonical": "game_scene_tree",
+      "action": "get_nodes_in_group"
     },
     {
       "name": "get_shaped_text_size",
@@ -872,6 +1061,11 @@
       "action": "has"
     },
     {
+      "name": "has_group_node",
+      "canonical": "get_scene_tree",
+      "action": ""
+    },
+    {
       "name": "has_input_map_action",
       "canonical": "get_input_map",
       "action": "has"
@@ -882,9 +1076,14 @@
       "action": "has"
     },
     {
+      "name": "has_resource",
+      "canonical": "resource_query",
+      "action": "exists"
+    },
+    {
       "name": "has_resource_dependency",
-      "canonical": "get_resource_dependencies",
-      "action": ""
+      "canonical": "resource_query",
+      "action": "deps"
     },
     {
       "name": "has_text_feature",
@@ -897,6 +1096,11 @@
       "action": ""
     },
     {
+      "name": "instantiate_scene",
+      "canonical": "create_scene_node",
+      "action": ""
+    },
+    {
       "name": "is_input_action_just_pressed",
       "canonical": "get_input_state",
       "action": "action_just_pressed"
@@ -905,6 +1109,11 @@
       "name": "is_input_action_pressed",
       "canonical": "get_input_state",
       "action": "action_pressed"
+    },
+    {
+      "name": "is_scene_tree_paused",
+      "canonical": "game_scene_tree",
+      "action": "is_paused"
     },
     {
       "name": "is_text_locale_right_to_left",
@@ -927,9 +1136,19 @@
       "action": "list"
     },
     {
+      "name": "load_resource",
+      "canonical": "resource_load",
+      "action": "load"
+    },
+    {
+      "name": "load_resource_threaded",
+      "canonical": "resource_load",
+      "action": "threaded_start"
+    },
+    {
       "name": "load_script",
-      "canonical": "load_resource",
-      "action": ""
+      "canonical": "resource_load",
+      "action": "load"
     },
     {
       "name": "move_autoload",
@@ -953,8 +1172,13 @@
     },
     {
       "name": "move_resource_file",
-      "canonical": "rename_resource_file",
-      "action": ""
+      "canonical": "resource_file",
+      "action": "move"
+    },
+    {
+      "name": "notify_scene_tree_group",
+      "canonical": "game_scene_tree",
+      "action": "notify_group"
     },
     {
       "name": "open_editor_scene",
@@ -1002,6 +1226,11 @@
       "action": "read"
     },
     {
+      "name": "reimport_resource_files",
+      "canonical": "resource_import",
+      "action": "reimport"
+    },
+    {
       "name": "release_input_action",
       "canonical": "input_action",
       "action": "release"
@@ -1022,9 +1251,44 @@
       "action": ""
     },
     {
+      "name": "reload_resource",
+      "canonical": "resource_load",
+      "action": "reload"
+    },
+    {
+      "name": "reload_scene_tree_current_scene",
+      "canonical": "game_scene_tree",
+      "action": "reload_current_scene"
+    },
+    {
       "name": "remove_autoload",
       "canonical": "update_autoloads",
       "action": "remove"
+    },
+    {
+      "name": "remove_group_node",
+      "canonical": "node_group",
+      "action": "remove"
+    },
+    {
+      "name": "remove_resource_file",
+      "canonical": "resource_file",
+      "action": "remove"
+    },
+    {
+      "name": "rename_resource_file",
+      "canonical": "resource_file",
+      "action": "rename"
+    },
+    {
+      "name": "rename_scene_node",
+      "canonical": "edit_scene_node",
+      "action": "rename"
+    },
+    {
+      "name": "reparent_node",
+      "canonical": "edit_scene_node",
+      "action": "reparent"
     },
     {
       "name": "request_display_window_attention",
@@ -1059,6 +1323,11 @@
     {
       "name": "save_project_settings",
       "canonical": "update_project_settings",
+      "action": "save"
+    },
+    {
+      "name": "save_resource",
+      "canonical": "resource_save",
       "action": "save"
     },
     {
@@ -1137,6 +1406,11 @@
       "action": "set_volume"
     },
     {
+      "name": "set_camera_params",
+      "canonical": "scene_camera",
+      "action": "set_params"
+    },
+    {
       "name": "set_control_anchor_preset",
       "canonical": "update_control_layout",
       "action": ""
@@ -1145,6 +1419,11 @@
       "name": "set_control_layout",
       "canonical": "update_control_layout",
       "action": ""
+    },
+    {
+      "name": "set_curve_points",
+      "canonical": "resource_create",
+      "action": "curve_points"
     },
     {
       "name": "set_debug_collision_visual",
@@ -1237,6 +1516,11 @@
       "action": "set"
     },
     {
+      "name": "set_mesh_surface_material",
+      "canonical": "resource_mesh",
+      "action": "surface_material"
+    },
+    {
       "name": "set_os_environment",
       "canonical": "os_environment",
       "action": "set"
@@ -1250,6 +1534,31 @@
       "name": "set_properties_batch",
       "canonical": "property_set",
       "action": ""
+    },
+    {
+      "name": "set_resource_import_options",
+      "canonical": "resource_import",
+      "action": "import_options"
+    },
+    {
+      "name": "set_resource_property",
+      "canonical": "resource_property",
+      "action": "set"
+    },
+    {
+      "name": "set_resource_uid",
+      "canonical": "resource_uid_set",
+      "action": "set_uid"
+    },
+    {
+      "name": "set_scene_tree_debug_collisions_hint",
+      "canonical": "game_scene_tree",
+      "action": "set_debug_collisions_hint"
+    },
+    {
+      "name": "set_scene_tree_pause",
+      "canonical": "game_scene_tree",
+      "action": "set_pause"
     },
     {
       "name": "set_text_font_antialiasing",
@@ -1302,6 +1611,11 @@
       "action": ""
     },
     {
+      "name": "spawn_node_bundle",
+      "canonical": "create_scene_node",
+      "action": ""
+    },
+    {
       "name": "speak_display_tts",
       "canonical": "display_tts",
       "action": ""
@@ -1347,6 +1661,11 @@
       "action": "stop_vibration"
     },
     {
+      "name": "trace_signal_flow",
+      "canonical": "analyze_project",
+      "action": "signal_flow"
+    },
+    {
       "name": "translate_text",
       "canonical": "get_game_localization",
       "action": ""
@@ -1365,6 +1684,11 @@
       "name": "validate_game_ui_layout",
       "canonical": "get_game_evidence",
       "action": ""
+    },
+    {
+      "name": "validate_scene_file",
+      "canonical": "analyze_project",
+      "action": "validate_scene"
     },
     {
       "name": "verify_scene_saved",
@@ -1387,12 +1711,10 @@
       "action": "write"
     }
   ],
-  "schema_non_empty": 284,
-  "schema_empty": 24,
+  "schema_non_empty": 247,
+  "schema_empty": 21,
   "tool_names": [
-    "validate_scene_file",
-    "find_unused_resources",
-    "trace_signal_flow",
+    "analyze_project",
     "create_scene_animation_player",
     "create_animation",
     "remove_animation",
@@ -1464,9 +1786,7 @@
     "create_meshlibrary_item",
     "set_gridmap_cells",
     "get_gridmap_used_cells",
-    "add_group_node",
-    "remove_group_node",
-    "has_group_node",
+    "node_group",
     "get_input_state",
     "input_action",
     "input_key",
@@ -1614,59 +1934,23 @@
     "restart_particles",
     "set_particles_params",
     "get_particles_state",
-    "load_resource",
-    "reload_resource",
-    "load_resource_threaded",
-    "get_resource_load_threaded_status",
-    "get_resource_load_threaded",
-    "save_resource",
-    "create_resource",
-    "duplicate_resource",
-    "get_resource_type",
-    "has_resource",
-    "get_resource_types",
-    "get_resource_extensions",
-    "get_resource_dir_files",
-    "get_resource_uid",
-    "set_resource_uid",
-    "remove_resource_file",
-    "rename_resource_file",
-    "copy_resource_file",
-    "create_directory",
-    "get_resource_dependencies",
-    "get_resource_references",
-    "reimport_resource_files",
-    "set_resource_import_options",
-    "set_resource_property",
-    "get_resource_property",
-    "create_curve_resource",
-    "set_curve_points",
-    "get_curve_baked_points",
-    "create_primitive_mesh",
-    "create_array_mesh",
-    "set_mesh_surface_material",
+    "resource_load",
+    "resource_query",
+    "resource_create",
+    "resource_mesh",
+    "resource_property",
+    "resource_file",
+    "resource_save",
+    "resource_uid_set",
+    "resource_import",
     "assign_mesh_to_instance",
     "create_scene_node",
+    "edit_scene_node",
     "delete_scene_node",
-    "rename_scene_node",
-    "reparent_node",
     "get_scene_tree",
-    "instantiate_scene",
-    "build_nodes_from_spec",
-    "spawn_node_bundle",
-    "create_path_node",
-    "advance_path_follow",
-    "focus_camera_on_node",
-    "set_camera_params",
+    "scene_camera",
     "get_camera_view_rect",
-    "call_scene_tree_group",
-    "create_scene_tree_timer",
-    "get_scene_tree_nodes_in_group",
-    "is_scene_tree_paused",
-    "notify_scene_tree_group",
-    "reload_scene_tree_current_scene",
-    "set_scene_tree_debug_collisions_hint",
-    "set_scene_tree_pause",
+    "game_scene_tree",
     "execute_script",
     "create_script",
     "patch_script",
@@ -1701,43 +1985,17 @@
   ],
   "tools": [
     {
-      "name": "validate_scene_file",
+      "name": "analyze_project",
       "category": "Analysis",
       "domain": "Analysis",
       "side_effect": "None",
       "flags": [
         "kNone"
       ],
-      "param_count": 1,
-      "has_action_schema": false,
+      "param_count": 4,
+      "has_action_schema": true,
       "source": "src/tools/domains/analyze/analyze_tools.hpp",
-      "line": 36
-    },
-    {
-      "name": "find_unused_resources",
-      "category": "Analysis",
-      "domain": "Analysis",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "has_action_schema": false,
-      "source": "src/tools/domains/analyze/analyze_tools.hpp",
-      "line": 41
-    },
-    {
-      "name": "trace_signal_flow",
-      "category": "Analysis",
-      "domain": "Analysis",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 3,
-      "has_action_schema": false,
-      "source": "src/tools/domains/analyze/analyze_tools.hpp",
-      "line": 46
+      "line": 55
     },
     {
       "name": "create_scene_animation_player",
@@ -2685,7 +2943,7 @@
       "line": 168
     },
     {
-      "name": "add_group_node",
+      "name": "node_group",
       "category": "Group",
       "domain": "Group",
       "side_effect": "WritesScene",
@@ -2695,37 +2953,9 @@
         "kUndoable"
       ],
       "param_count": 2,
-      "has_action_schema": false,
+      "has_action_schema": true,
       "source": "src/tools/domains/group/group_tools.hpp",
-      "line": 37
-    },
-    {
-      "name": "remove_group_node",
-      "category": "Group",
-      "domain": "Group",
-      "side_effect": "WritesScene",
-      "flags": [
-        "kNone",
-        "kSceneTarget",
-        "kUndoable"
-      ],
-      "param_count": 2,
-      "has_action_schema": false,
-      "source": "src/tools/domains/group/group_tools.hpp",
-      "line": 42
-    },
-    {
-      "name": "has_group_node",
-      "category": "Group",
-      "domain": "Group",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "has_action_schema": false,
-      "source": "src/tools/domains/group/group_tools.hpp",
-      "line": 47
+      "line": 53
     },
     {
       "name": "get_input_state",
@@ -4652,407 +4882,121 @@
       "line": 574
     },
     {
-      "name": "load_resource",
+      "name": "resource_load",
       "category": "Resources",
       "domain": "Resources",
       "side_effect": "None",
       "flags": [
         "kNone"
       ],
-      "param_count": 3,
-      "has_action_schema": false,
+      "param_count": 4,
+      "has_action_schema": true,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 268
+      "line": 283
     },
     {
-      "name": "reload_resource",
+      "name": "resource_query",
       "category": "Resources",
       "domain": "Resources",
       "side_effect": "None",
       "flags": [
         "kNone"
       ],
-      "param_count": 1,
-      "has_action_schema": false,
+      "param_count": 10,
+      "has_action_schema": true,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 279
+      "line": 307
     },
     {
-      "name": "load_resource_threaded",
+      "name": "resource_create",
       "category": "Resources",
       "domain": "Resources",
       "side_effect": "None",
       "flags": [
         "kNone"
       ],
-      "param_count": 3,
-      "has_action_schema": false,
+      "param_count": 11,
+      "has_action_schema": true,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 284
+      "line": 340
     },
     {
-      "name": "get_resource_load_threaded_status",
+      "name": "resource_mesh",
       "category": "Resources",
       "domain": "Resources",
       "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "has_action_schema": false,
-      "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 289
-    },
-    {
-      "name": "get_resource_load_threaded",
-      "category": "Resources",
-      "domain": "Resources",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "has_action_schema": false,
-      "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 294
-    },
-    {
-      "name": "save_resource",
-      "category": "Resources",
-      "domain": "Resources",
-      "side_effect": "WritesFile",
       "flags": [
         "kMutating"
+      ],
+      "param_count": 3,
+      "has_action_schema": true,
+      "source": "src/tools/domains/resource/resource_tools.hpp",
+      "line": 365
+    },
+    {
+      "name": "resource_property",
+      "category": "Resources",
+      "domain": "Resources",
+      "side_effect": "None",
+      "flags": [
+        "kNone"
       ],
       "param_count": 7,
-      "has_action_schema": false,
+      "has_action_schema": true,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 299
+      "line": 379
     },
     {
-      "name": "create_resource",
-      "category": "Resources",
-      "domain": "Resources",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "has_action_schema": false,
-      "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 304
-    },
-    {
-      "name": "duplicate_resource",
-      "category": "Resources",
-      "domain": "Resources",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 3,
-      "has_action_schema": false,
-      "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 309
-    },
-    {
-      "name": "get_resource_type",
-      "category": "Resources",
-      "domain": "Resources",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "has_action_schema": false,
-      "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 314
-    },
-    {
-      "name": "has_resource",
-      "category": "Resources",
-      "domain": "Resources",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "has_action_schema": false,
-      "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 319
-    },
-    {
-      "name": "get_resource_types",
-      "category": "Resources",
-      "domain": "Resources",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "has_action_schema": false,
-      "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 324
-    },
-    {
-      "name": "get_resource_extensions",
-      "category": "Resources",
-      "domain": "Resources",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "has_action_schema": false,
-      "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 329
-    },
-    {
-      "name": "get_resource_dir_files",
-      "category": "Resources",
-      "domain": "Resources",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "has_action_schema": false,
-      "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 334
-    },
-    {
-      "name": "get_resource_uid",
-      "category": "Resources",
-      "domain": "Resources",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "has_action_schema": false,
-      "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 339
-    },
-    {
-      "name": "set_resource_uid",
+      "name": "resource_file",
       "category": "Resources",
       "domain": "Resources",
       "side_effect": "WritesFile",
       "flags": [
         "kMutating"
       ],
-      "param_count": 2,
-      "has_action_schema": false,
-      "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 344
-    },
-    {
-      "name": "remove_resource_file",
-      "category": "Resources",
-      "domain": "Resources",
-      "side_effect": "WritesFile",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 2,
-      "has_action_schema": false,
-      "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 349
-    },
-    {
-      "name": "rename_resource_file",
-      "category": "Resources",
-      "domain": "Resources",
-      "side_effect": "WritesFile",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 3,
-      "has_action_schema": false,
-      "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 354
-    },
-    {
-      "name": "copy_resource_file",
-      "category": "Resources",
-      "domain": "Resources",
-      "side_effect": "WritesFile",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 2,
-      "has_action_schema": false,
-      "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 364
-    },
-    {
-      "name": "create_directory",
-      "category": "Resources",
-      "domain": "Resources",
-      "side_effect": "WritesFile",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 1,
-      "has_action_schema": false,
-      "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 369
-    },
-    {
-      "name": "get_resource_dependencies",
-      "category": "Resources",
-      "domain": "Resources",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "has_action_schema": false,
-      "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 374
-    },
-    {
-      "name": "get_resource_references",
-      "category": "Resources",
-      "domain": "Resources",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 3,
-      "has_action_schema": false,
-      "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 385
-    },
-    {
-      "name": "reimport_resource_files",
-      "category": "Resources",
-      "domain": "Resources",
-      "side_effect": "WritesFile",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 2,
-      "has_action_schema": false,
-      "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 390
-    },
-    {
-      "name": "set_resource_import_options",
-      "category": "Resources",
-      "domain": "Resources",
-      "side_effect": "WritesFile",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 2,
-      "has_action_schema": false,
+      "param_count": 5,
+      "has_action_schema": true,
       "source": "src/tools/domains/resource/resource_tools.hpp",
       "line": 395
     },
     {
-      "name": "set_resource_property",
+      "name": "resource_save",
       "category": "Resources",
       "domain": "Resources",
-      "side_effect": "None",
+      "side_effect": "WritesFile",
       "flags": [
-        "kNone"
+        "kMutating"
       ],
       "param_count": 7,
-      "has_action_schema": false,
+      "has_action_schema": true,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 400
+      "line": 417
     },
     {
-      "name": "get_resource_property",
+      "name": "resource_uid_set",
       "category": "Resources",
       "domain": "Resources",
-      "side_effect": "None",
+      "side_effect": "WritesFile",
       "flags": [
-        "kNone"
-      ],
-      "param_count": 6,
-      "has_action_schema": false,
-      "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 405
-    },
-    {
-      "name": "create_curve_resource",
-      "category": "Resources",
-      "domain": "Resources",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 3,
-      "has_action_schema": false,
-      "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 410
-    },
-    {
-      "name": "set_curve_points",
-      "category": "Resources",
-      "domain": "Resources",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
+        "kMutating"
       ],
       "param_count": 2,
-      "has_action_schema": false,
+      "has_action_schema": true,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 415
+      "line": 429
     },
     {
-      "name": "get_curve_baked_points",
+      "name": "resource_import",
       "category": "Resources",
       "domain": "Resources",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "has_action_schema": false,
-      "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 420
-    },
-    {
-      "name": "create_primitive_mesh",
-      "category": "Resources",
-      "domain": "Resources",
-      "side_effect": "None",
+      "side_effect": "WritesFile",
       "flags": [
         "kMutating"
       ],
       "param_count": 3,
-      "has_action_schema": false,
+      "has_action_schema": true,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 425
-    },
-    {
-      "name": "create_array_mesh",
-      "category": "Resources",
-      "domain": "Resources",
-      "side_effect": "None",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 4,
-      "has_action_schema": false,
-      "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 430
-    },
-    {
-      "name": "set_mesh_surface_material",
-      "category": "Resources",
-      "domain": "Resources",
-      "side_effect": "None",
-      "flags": [
-        "kMutating"
-      ],
-      "param_count": 3,
-      "has_action_schema": false,
-      "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 435
+      "line": 442
     },
     {
       "name": "assign_mesh_to_instance",
@@ -5065,7 +5009,7 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 440
+      "line": 458
     },
     {
       "name": "create_scene_node",
@@ -5076,10 +5020,25 @@
         "kNone",
         "kSceneTarget"
       ],
-      "param_count": 4,
+      "param_count": 14,
       "has_action_schema": false,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 257
+      "line": 395
+    },
+    {
+      "name": "edit_scene_node",
+      "category": "Scene",
+      "domain": "Scene",
+      "side_effect": "WritesScene",
+      "flags": [
+        "kNone",
+        "kSceneTarget",
+        "kUndoable"
+      ],
+      "param_count": 8,
+      "has_action_schema": true,
+      "source": "src/tools/domains/scene/scene_tools.hpp",
+      "line": 418
     },
     {
       "name": "delete_scene_node",
@@ -5094,37 +5053,7 @@
       "param_count": 1,
       "has_action_schema": false,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 262
-    },
-    {
-      "name": "rename_scene_node",
-      "category": "Scene",
-      "domain": "Scene",
-      "side_effect": "WritesScene",
-      "flags": [
-        "kNone",
-        "kSceneTarget",
-        "kUndoable"
-      ],
-      "param_count": 2,
-      "has_action_schema": false,
-      "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 267
-    },
-    {
-      "name": "reparent_node",
-      "category": "Scene",
-      "domain": "Scene",
-      "side_effect": "WritesScene",
-      "flags": [
-        "kNone",
-        "kSceneTarget",
-        "kUndoable"
-      ],
-      "param_count": 3,
-      "has_action_schema": false,
-      "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 272
+      "line": 440
     },
     {
       "name": "get_scene_tree",
@@ -5134,111 +5063,25 @@
       "flags": [
         "kObserve"
       ],
-      "param_count": 8,
+      "param_count": 9,
       "has_action_schema": false,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 277
+      "line": 445
     },
     {
-      "name": "instantiate_scene",
+      "name": "scene_camera",
       "category": "Scene",
       "domain": "Scene",
       "side_effect": "WritesScene",
       "flags": [
-        "kNone",
-        "kSceneTarget"
+        "kMutating",
+        "kSceneTarget",
+        "kUndoable"
       ],
       "param_count": 4,
-      "has_action_schema": false,
+      "has_action_schema": true,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 292
-    },
-    {
-      "name": "build_nodes_from_spec",
-      "category": "Scene",
-      "domain": "Scene",
-      "side_effect": "WritesScene",
-      "flags": [
-        "kMutating",
-        "kSceneTarget"
-      ],
-      "param_count": 4,
-      "has_action_schema": false,
-      "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 297
-    },
-    {
-      "name": "spawn_node_bundle",
-      "category": "Scene",
-      "domain": "Scene",
-      "side_effect": "WritesScene",
-      "flags": [
-        "kMutating",
-        "kSceneTarget",
-        "kUndoable"
-      ],
-      "param_count": 10,
-      "has_action_schema": false,
-      "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 302
-    },
-    {
-      "name": "create_path_node",
-      "category": "Scene",
-      "domain": "Scene",
-      "side_effect": "WritesScene",
-      "flags": [
-        "kNone",
-        "kSceneTarget"
-      ],
-      "param_count": 3,
-      "has_action_schema": false,
-      "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 307
-    },
-    {
-      "name": "advance_path_follow",
-      "category": "Scene",
-      "domain": "Scene",
-      "side_effect": "WritesScene",
-      "flags": [
-        "kNone",
-        "kSceneTarget"
-      ],
-      "param_count": 2,
-      "has_action_schema": false,
-      "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 312
-    },
-    {
-      "name": "focus_camera_on_node",
-      "category": "Scene",
-      "domain": "Scene",
-      "side_effect": "WritesScene",
-      "flags": [
-        "kMutating",
-        "kSceneTarget",
-        "kUndoable"
-      ],
-      "param_count": 3,
-      "has_action_schema": false,
-      "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 317
-    },
-    {
-      "name": "set_camera_params",
-      "category": "Scene",
-      "domain": "Scene",
-      "side_effect": "WritesScene",
-      "flags": [
-        "kMutating",
-        "kSceneTarget",
-        "kUndoable"
-      ],
-      "param_count": 2,
-      "has_action_schema": false,
-      "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 322
+      "line": 463
     },
     {
       "name": "get_camera_view_rect",
@@ -5251,111 +5094,20 @@
       "param_count": 1,
       "has_action_schema": false,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 327
+      "line": 478
     },
     {
-      "name": "call_scene_tree_group",
+      "name": "game_scene_tree",
       "category": "Scene",
       "domain": "SceneTree",
       "side_effect": "GameRuntime",
       "flags": [
         "kNone"
       ],
-      "param_count": 3,
-      "has_action_schema": false,
+      "param_count": 9,
+      "has_action_schema": true,
       "source": "src/tools/domains/scene_tree/scene_tree_tools.hpp",
-      "line": 55
-    },
-    {
-      "name": "create_scene_tree_timer",
-      "category": "Scene",
-      "domain": "SceneTree",
-      "side_effect": "GameRuntime",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 3,
-      "has_action_schema": false,
-      "source": "src/tools/domains/scene_tree/scene_tree_tools.hpp",
-      "line": 60
-    },
-    {
-      "name": "get_scene_tree_nodes_in_group",
-      "category": "Scene",
-      "domain": "SceneTree",
-      "side_effect": "GameRuntime",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "has_action_schema": false,
-      "source": "src/tools/domains/scene_tree/scene_tree_tools.hpp",
-      "line": 65
-    },
-    {
-      "name": "is_scene_tree_paused",
-      "category": "Scene",
-      "domain": "SceneTree",
-      "side_effect": "GameRuntime",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "has_action_schema": false,
-      "source": "src/tools/domains/scene_tree/scene_tree_tools.hpp",
-      "line": 70
-    },
-    {
-      "name": "notify_scene_tree_group",
-      "category": "Scene",
-      "domain": "SceneTree",
-      "side_effect": "GameRuntime",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 2,
-      "has_action_schema": false,
-      "source": "src/tools/domains/scene_tree/scene_tree_tools.hpp",
-      "line": 75
-    },
-    {
-      "name": "reload_scene_tree_current_scene",
-      "category": "Scene",
-      "domain": "SceneTree",
-      "side_effect": "GameRuntime",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 0,
-      "has_action_schema": false,
-      "source": "src/tools/domains/scene_tree/scene_tree_tools.hpp",
-      "line": 80
-    },
-    {
-      "name": "set_scene_tree_debug_collisions_hint",
-      "category": "Scene",
-      "domain": "SceneTree",
-      "side_effect": "GameRuntime",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "has_action_schema": false,
-      "source": "src/tools/domains/scene_tree/scene_tree_tools.hpp",
-      "line": 85
-    },
-    {
-      "name": "set_scene_tree_pause",
-      "category": "Scene",
-      "domain": "SceneTree",
-      "side_effect": "GameRuntime",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "has_action_schema": false,
-      "source": "src/tools/domains/scene_tree/scene_tree_tools.hpp",
-      "line": 90
+      "line": 63
     },
     {
       "name": "execute_script",
@@ -5782,13 +5534,6 @@
       "side_effect": "None",
       "source": "src/tools/domains/render/render_tools.hpp",
       "line": 519
-    },
-    {
-      "name": "duplicate_resource",
-      "domain": "Resources",
-      "side_effect": "None",
-      "source": "src/tools/domains/resource/resource_tools.hpp",
-      "line": 309
     },
     {
       "name": "run_gdscript_tests",

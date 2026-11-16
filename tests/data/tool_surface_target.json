@@ -1,14 +1,14 @@
 {
   "schema": 1,
   "source": "src/tools/domains/*/*_tools.hpp",
-  "catalog_current": 308,
+  "catalog_current": 268,
   "catalog_target": 270,
   "catalog_expected": 269,
   "catalog_target_range": [
     250,
     300
   ],
-  "domain_current_total": 302,
+  "domain_current_total": 262,
   "domain_target_total": 257,
   "planned_domain_target_total": 258,
   "net_new_total": 6,
@@ -28,7 +28,7 @@
   "domains": [
     {
       "name": "Analysis",
-      "current": 3,
+      "current": 1,
       "target": 1,
       "plan_target": 1,
       "merge_groups": [
@@ -196,7 +196,7 @@
     },
     {
       "name": "Group",
-      "current": 3,
+      "current": 1,
       "target": 1,
       "plan_target": 1,
       "merge_groups": [
@@ -315,7 +315,7 @@
     },
     {
       "name": "Resources",
-      "current": 32,
+      "current": 10,
       "target": 20,
       "plan_target": 20,
       "merge_groups": [
@@ -333,7 +333,7 @@
     },
     {
       "name": "Scene",
-      "current": 13,
+      "current": 6,
       "target": 9,
       "plan_target": 9,
       "merge_groups": [
@@ -347,7 +347,7 @@
     },
     {
       "name": "SceneTree",
-      "current": 8,
+      "current": 1,
       "target": 1,
       "plan_target": 1,
       "merge_groups": [

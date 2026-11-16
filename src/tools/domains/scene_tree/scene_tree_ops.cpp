@@ -10,6 +10,86 @@ namespace scene_tree_ops {
 
 using JV = mcp::JsonValue;
 
+namespace {
+
+JV game_scene_tree_error(const std::string &message) {
+  JV e(JV::object_tag);
+  e["error"] = JV(message);
+  return e;
+}
+
+JV game_scene_tree_missing(const std::string &action,
+                           const std::string &parameter) {
+  return game_scene_tree_error(
+      "missing required parameter for action '" + action + "': " + parameter);
+}
+
+} // namespace
+
+JV handle_game_scene_tree(const JV &args) {
+  LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
+                            "game_scene_tree called");
+  auto *action_p = args.Find("action");
+  if (!action_p || !action_p->IsString() || action_p->GetString().empty()) {
+    return game_scene_tree_error(
+        "missing required parameter: action (one of: call_group, create_timer, "
+        "get_nodes_in_group, is_paused, notify_group, reload_current_scene, "
+        "set_debug_collisions_hint, set_pause)");
+  }
+  const std::string action = action_p->GetString();
+  if (action == "call_group") {
+    auto *group_name = args.Find("group_name");
+    if (!group_name || !group_name->IsString())
+      return game_scene_tree_missing(action, "group_name");
+    auto *method = args.Find("method");
+    if (!method || !method->IsString())
+      return game_scene_tree_missing(action, "method");
+    return handle_call_group(args);
+  }
+  if (action == "create_timer") {
+    auto *delay = args.Find("delay_sec");
+    if (!delay || !delay->IsNumber())
+      return game_scene_tree_missing(action, "delay_sec");
+    return handle_create_timer(args);
+  }
+  if (action == "get_nodes_in_group") {
+    auto *group_name = args.Find("group_name");
+    if (!group_name || !group_name->IsString())
+      return game_scene_tree_missing(action, "group_name");
+    return handle_get_nodes_in_group(args);
+  }
+  if (action == "is_paused")
+    return handle_is_paused(args);
+  if (action == "notify_group") {
+    auto *group_name = args.Find("group_name");
+    if (!group_name || !group_name->IsString())
+      return game_scene_tree_missing(action, "group_name");
+    auto *notification = args.Find("notification");
+    if (!notification || !notification->IsInt())
+      return game_scene_tree_missing(action, "notification");
+    return handle_notify_group(args);
+  }
+  if (action == "reload_current_scene")
+    return handle_reload_current_scene(args);
+  if (action == "set_debug_collisions_hint") {
+    auto *enabled = args.Find("enabled");
+    if (!enabled || !enabled->IsBool())
+      return game_scene_tree_missing(action, "enabled");
+    return handle_set_debug_collisions(args);
+  }
+  if (action == "set_pause") {
+    auto *paused = args.Find("paused");
+    if (!paused || !paused->IsBool())
+      return game_scene_tree_missing(action, "paused");
+    return handle_set_pause(args);
+  }
+  return game_scene_tree_error(
+      "unknown action '" + action +
+      "' for game_scene_tree — expected call_group, create_timer, "
+      "get_nodes_in_group, is_paused, notify_group, reload_current_scene, "
+      "set_debug_collisions_hint or set_pause");
+}
+
 JV handle_call_group(const JV &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "call_scene_tree_group called");

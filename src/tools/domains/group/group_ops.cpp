@@ -24,6 +24,25 @@ godot::Node *find_node(const std::string &path_str) {
 
 } // namespace
 
+mcp::JsonValue handle_node_group(const mcp::JsonValue &args) {
+  auto *action_p = args.Find("action");
+  if (!action_p || !action_p->IsString() || action_p->GetString().empty()) {
+    mcp::JsonValue e(mcp::JsonValue::object_tag);
+    e["error"] = mcp::JsonValue(
+        "missing required parameter: action (one of: add, remove)");
+    return e;
+  }
+  const std::string action = action_p->GetString();
+  if (action == "add")
+    return handle_add_node_to_group(args);
+  if (action == "remove")
+    return handle_remove_node_from_group(args);
+  mcp::JsonValue e(mcp::JsonValue::object_tag);
+  e["error"] = mcp::JsonValue("unknown action '" + action +
+                              "' for node_group — expected add or remove");
+  return e;
+}
+
 mcp::JsonValue handle_add_node_to_group(const mcp::JsonValue &args) {
   auto *np = args.Find("node_path");
   auto *gp = args.Find("group_name");
@@ -143,38 +162,6 @@ mcp::JsonValue handle_remove_node_from_group(const mcp::JsonValue &args) {
   LogSystem::instance().log(LogLevel::Info, LogCategory::Tools,
                             "group_remove_node_from_group: " + node_path +
                                 " -> " + group_name);
-  return r;
-}
-
-mcp::JsonValue handle_has_node_in_group(const mcp::JsonValue &args) {
-  auto *np = args.Find("node_path");
-  auto *gp = args.Find("group_name");
-
-  if (!np || !np->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: node_path");
-    return e;
-  }
-  if (!gp || !gp->IsString()) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("missing required parameter: group_name");
-    return e;
-  }
-
-  std::string node_path = np->GetString();
-  std::string group_name = gp->GetString();
-
-  auto *node = find_node(node_path);
-  if (!node) {
-    mcp::JsonValue e(mcp::JsonValue::object_tag);
-    e["error"] = mcp::JsonValue("node not found: " + node_path);
-    return e;
-  }
-
-  bool in_group = node->is_in_group(godot::StringName(group_name.c_str()));
-
-  mcp::JsonValue r(mcp::JsonValue::object_tag);
-  r["result"] = mcp::JsonValue(in_group);
   return r;
 }
 
