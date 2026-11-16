@@ -7,6 +7,8 @@ export type ToolAuditOptions = {
   json: boolean;
   baseline: boolean;
   target: boolean;
+  report: boolean;
+  out: string | null;
 };
 
 type ToolRecord = {
@@ -1261,9 +1263,108 @@ function buildCapabilityMatrix(audit: ReturnType<typeof buildAudit>) {
   };
 }
 
+function buildReport(
+  audit: ReturnType<typeof buildAudit>,
+  matrix: ReturnType<typeof buildCapabilityMatrix>,
+) {
+  return {
+    schema: 1,
+    source: audit.source,
+    catalog: {
+      total: audit.catalog_total,
+      domain: audit.domain_total,
+      meta: audit.meta_total,
+      system: audit.system_total,
+      domain_count: audit.domain_count,
+    },
+    alias_count: audit.alias_count,
+    parameter_schema: {
+      non_empty: audit.schema_non_empty,
+      empty: audit.schema_empty,
+    },
+    capability_matrix: {
+      row_count: matrix.row_count,
+      catalog_row_count: matrix.catalog_row_count,
+      mapped_count: matrix.mapped_count,
+      kept_count: matrix.kept_count,
+      missing_count: matrix.catalog_row_count - matrix.mapped_count - matrix.kept_count,
+      meta_row_count: matrix.meta_rows.length,
+    },
+    by_domain: audit.by_domain,
+    by_side_effect: audit.by_side_effect,
+    domain_by_side_effect: audit.domain_by_side_effect,
+  };
+}
+
+function sortedCounts(counts: Record<string, number>): Array<[string, number]> {
+  return Object.entries(counts).sort(
+    (a, b) => b[1] - a[1] || a[0].localeCompare(b[0]),
+  );
+}
+
+function countTable(
+  title: string,
+  rows: Array<[string, number | string]>,
+): string[] {
+  return [
+    `## ${title}`,
+    "",
+    "| Metric | Value |",
+    "| --- | ---: |",
+    ...rows.map(([name, value]) => `| ${name} | ${value} |`),
+    "",
+  ];
+}
+
+function renderReportText(report: ReturnType<typeof buildReport>): string {
+  const { catalog, parameter_schema: schema, capability_matrix: matrix } = report;
+  const lines = [
+    "# GDA tool surface audit report",
+    "",
+    `- source: ${report.source.domains}`,
+    `- register_all: ${report.source.register_all}`,
+    "",
+    ...countTable("Catalog", [
+      ["catalog_total", catalog.total],
+      ["domain_total", catalog.domain],
+      ["meta_total", catalog.meta],
+      ["system_total", catalog.system],
+      ["domain_count", catalog.domain_count],
+      ["alias_count", report.alias_count],
+      ["schema_non_empty", schema.non_empty],
+      ["schema_empty", schema.empty],
+    ]),
+    ...countTable("Capability matrix", [
+      ["row_count", matrix.row_count],
+      ["catalog_row_count", matrix.catalog_row_count],
+      ["mapped_count", matrix.mapped_count],
+      ["kept_count", matrix.kept_count],
+      ["missing_count", matrix.missing_count],
+      ["meta_row_count", matrix.meta_row_count],
+    ]),
+    ...countTable("Side effects (catalog)", sortedCounts(report.by_side_effect)),
+    ...countTable(
+      "Side effects (domain tools)",
+      sortedCounts(report.domain_by_side_effect),
+    ),
+    "## Tools by domain",
+    "",
+    "| Domain | Count |",
+    "| --- | ---: |",
+    ...Object.entries(report.by_domain).map(([name, count]) => `| ${name} | ${count} |`),
+    "",
+  ];
+  return lines.join("\n");
+}
+
 function writeJson(target: string, value: unknown): void {
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.writeFileSync(target, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+}
+
+function writeText(target: string, text: string): void {
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, text, "utf8");
 }
 
 function printSummary(audit: ReturnType<typeof buildAudit>, matrixRows: number): void {
@@ -1281,6 +1382,19 @@ function printSummary(audit: ReturnType<typeof buildAudit>, matrixRows: number):
 export function runToolAudit(options: ToolAuditOptions): number {
   const audit = buildAudit();
   const matrix = buildCapabilityMatrix(audit);
+  if (options.report) {
+    const report = buildReport(audit, matrix);
+    const payload = options.json
+      ? `${JSON.stringify(report, null, 2)}\n`
+      : renderReportText(report);
+    if (options.out !== null) {
+      const outPath = path.resolve(options.out);
+      writeText(outPath, payload);
+      process.stderr.write(`[AUDIT] report written to ${relativeToRoot(outPath)}\n`);
+    }
+    process.stdout.write(payload);
+    return 0;
+  }
   if (options.json) {
     process.stdout.write(`${JSON.stringify(audit, null, 2)}\n`);
     return 0;

@@ -15,6 +15,7 @@
 | [tool_base_design.md](tool_base_design.md) | ToolSpec 工具数据层与执行管线：451 域工具全为 ToolSpec 数据记录、SpecTool 统一执行授权/后处理、dispatch 主线程等待预算、Args 取参器、用户脚本动态工具、迁移规则与守卫 | `tool_spec.hpp`、`tool_args.hpp`、`tool_pipeline.hpp`、`dynamic_spec_store.hpp`、`autopilot_tools.{hpp,cpp}`、33 个域 `*_tools.hpp`、`register_all.cpp` |
 | [tool_surface_baseline.md](tool_surface_baseline.md) | 工具面基线：451 域 + `system_status` + 7 元的静态审计、严格冗余候选、目标计数与能力矩阵 | `devtools/commands/tool-audit.ts`、`tests/data/*.json` |
 | [tool_surface_conventions.md](tool_surface_conventions.md) | 工具面别名约定：隐藏别名、参数适配、结果投影、弃用字段、冲突与目录/搜索排除 | `tool_spec.hpp`、`tool_registry.hpp`、`dispatch.cpp`、`tool_catalog.cpp` |
+| [tool_surface_report.md](tool_surface_report.md) | T-24 最终审计：catalog 459→252、生产别名 325、schema 235/17、能力矩阵 561 行缺失 0、按域与副作用分布、未验证的引擎 e2e | `devtools/commands/tool-audit.ts`、`tests/data/*.json` |
 | [modules/core.md](modules/core.md) | 核心层：线程模型、端口、统一埋点门面（monitor/monitor_env/perf_sampler）、日志与本地持久化（日志/trace 双目录、脱敏）、配置常量、集中根与工程级存储布局、遗留数据兼容 | `src/core/` |
 | [modules/entry_runtime.md](modules/entry_runtime.md) | 插件入口与运行时桥接、gda 协议 | `src/main.cpp`、`src/runtime/` |
 | [modules/ports.md](modules/ports.md) | 端口与实例登记：一个端口承载 MCP 与 REST 两个端点、端口解析优先级与候选序列、显式与自动分配的失败差异、实例登记结构与全局索引、CLI 发现链与两级存活校验、控制面端口与实例端口的分工 | `src/core/port_resolver.*`、`instance_registry.*`、`project_store.*`、`gda_home.*`、`cli/src/target.ts` |

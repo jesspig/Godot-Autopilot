@@ -18,7 +18,7 @@ const USAGE = [
   "  package                  [--libs-dir <dir>]",
   "  package-check <zip>",
   "  test                     [--preset debug|release] [--single <用例名>]",
-  "  audit-tools              [--json|--baseline|--target]",
+  "  audit-tools              [--json|--baseline|--target] [--report [--json] [--out <file>]]",
   "  tui",
 ].join("\n");
 
@@ -72,16 +72,40 @@ function parsePackage(args: string[]): { libsDir: string | null } {
 }
 
 function parseToolAudit(args: string[]): ToolAuditOptions {
-  const options: ToolAuditOptions = { json: false, baseline: false, target: false };
-  for (const arg of args) {
+  const options: ToolAuditOptions = {
+    json: false,
+    baseline: false,
+    target: false,
+    report: false,
+    out: null,
+  };
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
     if (arg === "--json") options.json = true;
     else if (arg === "--baseline") options.baseline = true;
     else if (arg === "--target") options.target = true;
-    else throw new UsageError(`audit-tools: unrecognized argument: ${arg}`);
+    else if (arg === "--report") options.report = true;
+    else if (arg === "--out") {
+      const value = args[index + 1];
+      if (value === undefined || value.startsWith("-")) {
+        throw new UsageError("audit-tools: argument --out: expected one argument");
+      }
+      options.out = value;
+      index += 1;
+    } else throw new UsageError(`audit-tools: unrecognized argument: ${arg}`);
   }
-  const selected = [options.json, options.baseline, options.target].filter(Boolean).length;
-  if (selected > 1) {
-    throw new UsageError("audit-tools: choose only one of --json, --baseline, --target");
+  if (options.report) {
+    if (options.baseline || options.target) {
+      throw new UsageError("audit-tools: --report cannot be combined with --baseline or --target");
+    }
+  } else {
+    const selected = [options.json, options.baseline, options.target].filter(Boolean).length;
+    if (selected > 1) {
+      throw new UsageError("audit-tools: choose only one of --json, --baseline, --target");
+    }
+    if (options.out !== null) {
+      throw new UsageError("audit-tools: --out requires --report");
+    }
   }
   return options;
 }
