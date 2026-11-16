@@ -1,4 +1,5 @@
 #include "tools/domains/scene/scene_ops.hpp"
+#include "tools/domains/scene/scene_spec_ops.hpp"
 #include "util/scene_path.hpp"
 #include "util/scene_verify.hpp"
 #include "core/observability/log_system.hpp"
@@ -141,7 +142,8 @@ void collect_property_summary(godot::Node *node, mcp::JsonValue &j) {
 }
 
 void node_to_json(godot::Node *node, int remaining_depth,
-                  bool include_properties, mcp::JsonValue &j) {
+                  bool include_properties, bool include_groups,
+                  mcp::JsonValue &j) {
   if (!node)
     return;
   j["name"] = mcp::JsonValue(util::to_std(node->get_name()));
@@ -172,6 +174,14 @@ void node_to_json(godot::Node *node, int remaining_depth,
     collect_property_summary(node, props);
     j["properties"] = std::move(props);
   }
+  if (include_groups) {
+    mcp::JsonValue groups(mcp::JsonValue::array_tag);
+    godot::TypedArray<godot::StringName> names = node->get_groups();
+    for (int i = 0; i < names.size(); i++) {
+      groups.PushBack(mcp::JsonValue(util::to_std(godot::String(names[i]))));
+    }
+    j["groups"] = std::move(groups);
+  }
   if (remaining_depth <= 0)
     return;
   j["children"] = mcp::JsonValue(mcp::JsonValue::array_tag);
@@ -180,7 +190,8 @@ void node_to_json(godot::Node *node, int remaining_depth,
     auto *child = godot::Object::cast_to<godot::Node>(children[i]);
     if (child) {
       mcp::JsonValue child_j(mcp::JsonValue::object_tag);
-      node_to_json(child, remaining_depth - 1, include_properties, child_j);
+      node_to_json(child, remaining_depth - 1, include_properties,
+                   include_groups, child_j);
       j["children"].PushBack(std::move(child_j));
     }
   }
@@ -493,6 +504,101 @@ mcp::JsonValue handle_create(const mcp::JsonValue &args) {
         "unknown");
   }
   return r;
+}
+
+mcp::JsonValue handle_create_scene_node(const mcp::JsonValue &args) {
+  std::string mode = "node";
+  if (const mcp::JsonValue *mode_p = args.Find("mode")) {
+    if (!mode_p->IsString() || mode_p->GetString().empty()) {
+      return util::error_json(
+          "parameter 'mode' must be a non-empty string: node, scene, spec, "
+          "bundle or path");
+    }
+    mode = mode_p->GetString();
+  }
+  if (mode == "node")
+    return handle_create(args);
+  if (mode == "scene")
+    return handle_instance(args);
+  if (mode == "spec")
+    return scene_spec_ops::handle_build_from_spec(args);
+  if (mode == "bundle")
+    return scene_spec_ops::handle_spawn_bundle(args);
+  if (mode == "path")
+    return handle_create_path_node(args);
+  return util::error_json("unknown mode '" + mode +
+                          "' for create_scene_node — expected node, scene, "
+                          "spec, bundle or path");
+}
+
+mcp::JsonValue handle_edit_scene_node(const mcp::JsonValue &args) {
+  const mcp::JsonValue *action_p = args.Find("action");
+  if (action_p == nullptr || !action_p->IsString() ||
+      action_p->GetString().empty()) {
+    return util::error_json(
+        "missing required parameter: action (one of: rename, reparent, "
+        "advance_path, duplicate, reorder, replace)");
+  }
+  const std::string action = action_p->GetString();
+  if (action == "rename")
+    return handle_rename(args);
+  if (action == "reparent")
+    return handle_reparent(args);
+  if (action == "advance_path")
+    return handle_advance_path_follow(args);
+  if (action != "duplicate" && action != "reorder" && action != "replace") {
+    return util::error_json("unknown action '" + action +
+                            "' for edit_scene_node — expected rename, "
+                            "reparent, advance_path, duplicate, reorder or "
+                            "replace");
+  }
+  const mcp::JsonValue *path_p = args.Find("path");
+  if (path_p == nullptr || !path_p->IsString() ||
+      path_p->GetString().empty()) {
+    return util::error_json("missing required parameter for action '" +
+                            action + "': path");
+  }
+  if (action == "duplicate") {
+    if (const mcp::JsonValue *count_p = args.Find("count")) {
+      if (!count_p->IsInt() || count_p->GetInt() < 1) {
+        return util::error_json("parameter 'count' must be an integer >= 1");
+      }
+    }
+    if (const mcp::JsonValue *suffix_p = args.Find("name_suffix")) {
+      if (!suffix_p->IsString()) {
+        return util::error_json("parameter 'name_suffix' must be a string");
+      }
+    }
+    if (const mcp::JsonValue *editable_p = args.Find("editable_instance")) {
+      if (!editable_p->IsBool()) {
+        return util::error_json(
+            "parameter 'editable_instance' must be a boolean");
+      }
+    }
+  }
+  mcp::JsonValue error(mcp::JsonValue::object_tag);
+  error["error"] = mcp::JsonValue(
+      "action '" + action +
+      "' is not implemented yet — planned for the T-17 node capability task");
+  error["code"] = mcp::JsonValue("not_implemented");
+  error["action"] = mcp::JsonValue(action);
+  return error;
+}
+
+mcp::JsonValue handle_scene_camera(const mcp::JsonValue &args) {
+  const mcp::JsonValue *action_p = args.Find("action");
+  if (action_p == nullptr || !action_p->IsString() ||
+      action_p->GetString().empty()) {
+    return util::error_json(
+        "missing required parameter: action (one of: focus, set_params)");
+  }
+  const std::string action = action_p->GetString();
+  if (action == "focus")
+    return handle_focus_camera_on_node(args);
+  if (action == "set_params")
+    return handle_set_camera_params(args);
+  return util::error_json("unknown action '" + action +
+                          "' for scene_camera — expected focus or set_params");
 }
 
 mcp::JsonValue handle_delete(const mcp::JsonValue &args) {
@@ -983,9 +1089,13 @@ mcp::JsonValue handle_get_tree(const mcp::JsonValue &args) {
   auto *ip = args.Find("include_properties");
   if (ip && ip->IsBool())
     include_properties = ip->GetBool();
+  bool include_groups = false;
+  auto *ig = args.Find("include_groups");
+  if (ig && ig->IsBool())
+    include_groups = ig->GetBool();
 
   mcp::JsonValue result(mcp::JsonValue::object_tag);
-  node_to_json(root, max_depth, include_properties, result);
+  node_to_json(root, max_depth, include_properties, include_groups, result);
   mcp::JsonValue r(mcp::JsonValue::object_tag);
   r["result"] = std::move(result);
   return r;
@@ -1225,6 +1335,10 @@ mcp::JsonValue handle_get_snapshot(const mcp::JsonValue &args) {
   auto *ip = args.Find("include_properties");
   if (ip && ip->IsBool())
     include_properties = ip->GetBool();
+  bool include_groups = false;
+  if (auto *ig = args.Find("include_groups")) {
+    include_groups = ig->IsBool() && ig->GetBool();
+  }
   bool want_verify = true;
   auto *vp = args.Find("verify");
   if (vp && vp->IsBool())
@@ -1259,7 +1373,7 @@ mcp::JsonValue handle_get_snapshot(const mcp::JsonValue &args) {
     }
   }
   mcp::JsonValue tree(mcp::JsonValue::object_tag);
-  node_to_json(root, max_depth, include_properties, tree);
+  node_to_json(root, max_depth, include_properties, include_groups, tree);
   mcp::JsonValue inner(mcp::JsonValue::object_tag);
   inner["tree"] = std::move(tree);
   if (want_verify) {

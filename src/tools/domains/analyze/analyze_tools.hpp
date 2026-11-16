@@ -14,40 +14,67 @@ namespace analyze_tools {
 
 namespace {
 
-const std::vector<ParamSpec> kValidateSceneFileParams = {
-    {"path", "string", "res:// path to a .tscn/.scn scene file on disk to dry-run validate (e.g. \"res://levels/level_01.tscn\"); loaded with CACHE_MODE_IGNORE, dependencies checked and instantiate() attempted without touching the edited scene", true},
+const std::vector<std::string> kAnalyzeProjectActions = {
+    "validate_scene", "unused_resources", "signal_flow"};
+
+const std::vector<ParamSpec> kAnalyzeProjectParams = {
+    {"path", "string", "validate_scene: res:// path to a .tscn/.scn scene file on disk to dry-run validate (e.g. \"res://levels/level_01.tscn\"); signal_flow: scene-relative node path of the node whose signal wiring is traced (e.g. \"Player\")", false},
+    {"directory", "string", "unused_resources: project directory whose files are scanned recursively for unreferenced resources (string, default: \"res://\", e.g. \"res://assets\")", false},
+    {"direction", "string", "signal_flow: which connections to report: 'outgoing' (signals the node emits), 'incoming' (connections targeting it) or 'both' (default)", false},
+    {"max_depth", "integer", "signal_flow: how many hops to walk from the start node, >= 1 (default: 3); cycles are cut by a visited set", false},
 };
 
-const std::vector<ParamSpec> kFindUnusedResourcesParams = {
-    {"directory", "string", "Project directory whose files are scanned recursively for unreferenced resources (string, default: \"res://\", e.g. \"res://assets\")", false},
-};
+inline mcp::JsonValue analyze_alias_args_with_action(
+    const mcp::JsonValue &args, const char *action) {
+  mcp::JsonValue out(mcp::JsonValue::object_tag);
+  if (args.IsObject()) {
+    out = args;
+  }
+  out["action"] = mcp::JsonValue(action);
+  return out;
+}
 
-const std::vector<ParamSpec> kTraceSignalFlowParams = {
-    {"path", "string", "Scene-relative node path of the node whose signal wiring is traced (e.g. \"Player\")", true},
-    {"direction", "string", "Which connections to report: 'outgoing' (signals the node emits), 'incoming' (connections targeting it) or 'both' (default)", false},
-    {"max_depth", "integer", "How many hops to walk from the start node, >= 1 (default: 3); cycles are cut by a visited set", false},
-};
+inline ToolAlias analyze_action_alias(const char *name, const char *canonical,
+                                      const char *action) {
+  ToolAlias alias;
+  alias.name = name;
+  alias.canonical = canonical;
+  alias.adapt_args = [action](const mcp::JsonValue &args) {
+    return analyze_alias_args_with_action(args, action);
+  };
+  alias.deprecated_since = "0.4.0";
+  alias.removal_version = "0.6.0";
+  return alias;
+}
 
 } // namespace
 
 inline std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> make_tools() {
   std::vector<std::unique_ptr<::godot_autopilot::ToolBase>> v;
-  v.reserve(3);
+  v.reserve(1);
   v.push_back(make_spec_tool(ToolSpec{
-      "validate_scene_file",
-      "Dry-run validate a scene file on disk without touching the " "currently edited scene. Required 'path' (string, res:// path " "to a .tscn/.scn file, e.g. \"res://levels/level_01.tscn\"). " "Loads it via ResourceLoader with CACHE_MODE_IGNORE (bypasses " "the resource cache), checks every dependency reported by " "get_dependencies for existence on disk, then calls " "PackedScene::instantiate() and immediately frees the instance. " "Returns {valid, problems:[{kind,message}], " "missing_dependencies, dependency_count}; problem kinds: " "load_failed / missing_dependency / instantiate_failed. Use " "after bulk edits or before committing scene changes.",
-      "Analysis", {"analysis", "validation", "scene", "dependencies"}, SideEffect::None, tool_flags::kNone,
-      kValidateSceneFileParams, analyze_ops::handle_validate_scene_file}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "find_unused_resources",
-      "Find project files that are never referenced by any other " "file's dependencies under 'directory' (optional string, " "default \"res://\", e.g. \"res://assets\"). Scans the editor " "filesystem recursively (EditorFileSystemDirectory), collects " "each file's get_dependencies(), resolves uid:// entries " "through ResourceUID (unresolvable ones are listed in " "'unresolved_uids' instead of being misreported), then " "subtracts the referenced set plus exemptions: icon.svg, " "main_scene and autoload paths read from ProjectSettings, " "*.import sidecars and project.godot. Returns {scanned, " "unused:[{path,type}], unresolved_uids, exempted}. Read-only; " "large projects may take a few seconds.",
-      "Analysis", {"analysis", "resources", "unused", "dependencies"}, SideEffect::None, tool_flags::kNone,
-      kFindUnusedResourcesParams, analyze_ops::handle_find_unused_resources}));
-  v.push_back(make_spec_tool(ToolSpec{
-      "trace_signal_flow",
-      "Trace signal wiring around a node of the edited scene. " "Required 'path' (string, scene-relative node path, e.g. " "\"Player\"); optional 'direction' (string: \"outgoing\" for " "signals the node emits, \"incoming\" for connections targeting " "it, default \"both\") and 'max_depth' (int >= 1, how many hops " "to walk from the start node, default 3; cycles are cut by a " "visited set). Each edge is {from,signal,to,method,persisted} " "where 'persisted' marks connections saved in the scene file " "(CONNECT_PERSIST). Non-node targets such as autoloads are " "shown as Class#instance_id. Returns {root, edges, edge_count}.",
-      "Analysis", {"analysis", "signals", "connections", "graph"}, SideEffect::None, tool_flags::kNone,
-      kTraceSignalFlowParams, analyze_ops::handle_trace_signal_flow}));
+      "analyze_project",
+      "Run read-only project analysis in one action tool; no action touches the edited scene or writes files. action='validate_scene' dry-run validates the scene file at 'path' (res:// .tscn/.scn): it loads it via ResourceLoader with CACHE_MODE_IGNORE, checks every dependency reported by get_dependencies for existence on disk, then calls PackedScene::instantiate() and immediately frees the instance, returning {valid, problems:[{kind,message}], missing_dependencies, dependency_count} with problem kinds load_failed / missing_dependency / instantiate_failed. action='unused_resources' finds project files never referenced by any other file under 'directory' (default \"res://\"): it scans the editor filesystem recursively, collects each file's get_dependencies(), resolves uid:// entries through ResourceUID (unresolvable ones are listed in 'unresolved_uids' instead of being misreported), then subtracts the referenced set plus exemptions (icon.svg, main_scene and autoload paths from ProjectSettings, *.import sidecars and project.godot), returning {scanned, unused:[{path,type}], unresolved_uids, exempted}; large projects may take a few seconds. action='signal_flow' traces signal wiring around 'path' in the edited scene with optional 'direction' (outgoing/incoming/both, default both) and 'max_depth' (int >= 1, default 3; cycles are cut by a visited set): each edge is {from,signal,to,method,persisted} where persisted marks CONNECT_PERSIST connections, non-node targets appear as Class#instance_id, and the result is {root, edges, edge_count}. Deprecated aliases: validate_scene_file (action=validate_scene), find_unused_resources (action=unused_resources), trace_signal_flow (action=signal_flow).",
+      "Analysis",
+      {"analysis", "validation", "scene", "dependencies", "resources", "unused",
+       "signals", "connections", "graph", "validate_scene_file",
+       "find_unused_resources", "trace_signal_flow"},
+      SideEffect::None, tool_flags::kNone,
+      kAnalyzeProjectParams, analyze_ops::handle_analyze_project,
+      schema::build_action_schema(
+          kAnalyzeProjectActions, kAnalyzeProjectParams,
+          "Analysis action: validate_scene|unused_resources|signal_flow"),
+      {
+          analyze_action_alias("validate_scene_file", "analyze_project",
+                               "validate_scene"),
+          analyze_action_alias("find_unused_resources", "analyze_project",
+                               "unused_resources"),
+          analyze_action_alias("trace_signal_flow", "analyze_project",
+                               "signal_flow"),
+      },
+      {"{\"action\":\"validate_scene\",\"path\":\"res://levels/level_01.tscn\"}",
+       "{\"action\":\"unused_resources\",\"directory\":\"res://assets\"}",
+       "{\"action\":\"signal_flow\",\"path\":\"Player\",\"direction\":\"both\",\"max_depth\":3}"}}));
   return v;
 }
 
