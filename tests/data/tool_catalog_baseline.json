@@ -4,11 +4,11 @@
     "domains": "src/tools/domains/*/*_tools.hpp",
     "register_all": "src/tools/base/register_all.cpp"
   },
-  "catalog_total": 250,
-  "domain_total": 244,
+  "catalog_total": 252,
+  "domain_total": 246,
   "meta_total": 5,
   "system_total": 1,
-  "domain_count": 33,
+  "domain_count": 35,
   "by_domain": {
     "Analysis": 1,
     "Animation": 10,
@@ -24,12 +24,14 @@
     "Game": 9,
     "GridMap": 4,
     "Group": 1,
+    "Image": 4,
     "Input": 6,
     "InputMap": 4,
     "Log": 1,
-    "Nav": 15,
+    "Mesh": 4,
+    "Nav": 14,
     "OS": 12,
-    "Physics": 51,
+    "Physics": 46,
     "Properties": 6,
     "Render": 29,
     "Resources": 10,
@@ -59,14 +61,14 @@
     "Game": 12,
     "TileMap": 8,
     "Group": 1,
+    "Resources": 18,
     "Input": 10,
     "System": 5,
-    "Navigation": 15,
+    "Navigation": 14,
     "OS": 11,
-    "Physics": 50,
+    "Physics": 45,
     "Properties": 6,
     "Render": 29,
-    "Resources": 10,
     "Scene": 8,
     "SpriteFrames": 1,
     "Testing": 1,
@@ -89,14 +91,14 @@
     "Game": 12,
     "TileMap": 8,
     "Group": 1,
+    "Resources": 18,
     "Input": 10,
     "System": 1,
-    "Navigation": 15,
+    "Navigation": 14,
     "OS": 11,
-    "Physics": 50,
+    "Physics": 45,
     "Properties": 6,
     "Render": 29,
-    "Resources": 10,
     "Scene": 8,
     "SpriteFrames": 1,
     "Testing": 1,
@@ -105,10 +107,10 @@
   },
   "by_side_effect": {
     "None": 151,
-    "WritesScene": 28,
+    "WritesScene": 29,
     "Destructive": 7,
     "ModifiesWindow": 20,
-    "WritesFile": 13,
+    "WritesFile": 14,
     "WritesConfig": 8,
     "CodeExecute": 5,
     "ShowsAlert": 4,
@@ -117,10 +119,10 @@
   },
   "domain_by_side_effect": {
     "None": 147,
-    "WritesScene": 28,
+    "WritesScene": 29,
     "Destructive": 7,
     "ModifiesWindow": 20,
-    "WritesFile": 13,
+    "WritesFile": 14,
     "WritesConfig": 8,
     "CodeExecute": 3,
     "ShowsAlert": 4,
@@ -128,7 +130,7 @@
     "GameRuntime": 7
   },
   "strict_redundant_count": 32,
-  "alias_count": 315,
+  "alias_count": 325,
   "alias_names": [
     "add_animation_machine_state",
     "add_audio_bus_effect",
@@ -261,6 +263,10 @@
     "get_game_status",
     "get_game_ui_elements",
     "get_input_map_actions",
+    "get_nav_2d_map_path",
+    "get_nav_3d_agent_state",
+    "get_nav_3d_map_closest_point_to_segment",
+    "get_nav_3d_map_path",
     "get_os_datetime",
     "get_os_environment",
     "get_os_locale",
@@ -294,6 +300,12 @@
     "hit_test_editor_point",
     "inspect_editor_resource",
     "instantiate_scene",
+    "intersect_physics_2d_point",
+    "intersect_physics_2d_ray",
+    "intersect_physics_2d_shape",
+    "intersect_physics_3d_point",
+    "intersect_physics_3d_ray",
+    "intersect_physics_3d_shape",
     "is_input_action_just_pressed",
     "is_input_action_pressed",
     "is_scene_tree_paused",
@@ -1103,6 +1115,26 @@
       "action": "list"
     },
     {
+      "name": "get_nav_2d_map_path",
+      "canonical": "nav_query",
+      "action": ""
+    },
+    {
+      "name": "get_nav_3d_agent_state",
+      "canonical": "nav_query",
+      "action": ""
+    },
+    {
+      "name": "get_nav_3d_map_closest_point_to_segment",
+      "canonical": "nav_query",
+      "action": ""
+    },
+    {
+      "name": "get_nav_3d_map_path",
+      "canonical": "nav_query",
+      "action": ""
+    },
+    {
       "name": "get_os_datetime",
       "canonical": "os_time",
       "action": "datetime"
@@ -1266,6 +1298,36 @@
       "name": "instantiate_scene",
       "canonical": "create_scene_node",
       "action": ""
+    },
+    {
+      "name": "intersect_physics_2d_point",
+      "canonical": "physics_query",
+      "action": "intersect_point"
+    },
+    {
+      "name": "intersect_physics_2d_ray",
+      "canonical": "physics_query",
+      "action": "intersect_ray"
+    },
+    {
+      "name": "intersect_physics_2d_shape",
+      "canonical": "physics_query",
+      "action": "intersect_shape"
+    },
+    {
+      "name": "intersect_physics_3d_point",
+      "canonical": "physics_query",
+      "action": "intersect_point"
+    },
+    {
+      "name": "intersect_physics_3d_ray",
+      "canonical": "physics_query",
+      "action": "intersect_ray"
+    },
+    {
+      "name": "intersect_physics_3d_shape",
+      "canonical": "physics_query",
+      "action": "intersect_shape"
     },
     {
       "name": "is_input_action_just_pressed",
@@ -2023,7 +2085,7 @@
       "action": "write"
     }
   ],
-  "schema_non_empty": 233,
+  "schema_non_empty": 235,
   "schema_empty": 17,
   "tool_names": [
     "analyze_project",
@@ -2103,6 +2165,10 @@
     "set_gridmap_cells",
     "get_gridmap_used_cells",
     "node_group",
+    "image_edit",
+    "image_pixel",
+    "image_save",
+    "texture_gen",
     "get_input_state",
     "input_action",
     "input_key",
@@ -2114,21 +2180,24 @@
     "erase_input_map",
     "save_input_map",
     "get_game_log_entries",
+    "mesh_surface",
+    "mesh_inspect",
+    "multimesh",
+    "multimesh_instance",
     "create_nav_2d_map",
     "create_nav_2d_region",
-    "get_nav_2d_map_path",
     "create_nav_2d_agent",
     "set_nav_2d_agent_velocity",
     "create_nav_3d_map",
     "set_nav_3d_map_cell_size",
     "create_nav_3d_region",
     "set_nav_3d_region_navigation_mesh",
-    "get_nav_3d_map_path",
-    "get_nav_3d_map_closest_point_to_segment",
     "create_nav_3d_agent",
     "set_nav_3d_agent_velocity",
-    "get_nav_3d_agent_state",
     "create_nav_3d_obstacle",
+    "nav_query",
+    "bake_navigation_mesh",
+    "astar_path",
     "os_process",
     "os_environment",
     "os_time",
@@ -2142,9 +2211,7 @@
     "open_os_path",
     "show_os_alert",
     "get_physics_2d_space_direct_state",
-    "intersect_physics_2d_ray",
-    "intersect_physics_2d_shape",
-    "intersect_physics_2d_point",
+    "physics_query",
     "create_physics_2d_body",
     "set_physics_2d_body_mode",
     "apply_physics_2d_body_force",
@@ -2157,9 +2224,6 @@
     "create_physics_2d_circle_shape",
     "set_physics_2d_shape_data",
     "get_physics_3d_space_direct_state",
-    "intersect_physics_3d_ray",
-    "intersect_physics_3d_shape",
-    "intersect_physics_3d_point",
     "create_physics_3d_body",
     "set_physics_3d_body_mode",
     "apply_physics_3d_body_force",
@@ -2454,7 +2518,7 @@
       "param_count": 6,
       "has_action_schema": true,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 312
+      "line": 313
     },
     {
       "name": "audio_device",
@@ -2467,7 +2531,7 @@
       "param_count": 1,
       "has_action_schema": true,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 345
+      "line": 346
     },
     {
       "name": "audio_capture",
@@ -2480,7 +2544,7 @@
       "param_count": 7,
       "has_action_schema": true,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 378
+      "line": 379
     },
     {
       "name": "remove_audio_bus_effect",
@@ -2493,7 +2557,7 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/audio/audio_tools.hpp",
-      "line": 399
+      "line": 400
     },
     {
       "name": "capture_editor_viewport",
@@ -2792,7 +2856,7 @@
       "param_count": 2,
       "has_action_schema": true,
       "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 149
+      "line": 154
     },
     {
       "name": "set_display_clipboard",
@@ -2805,7 +2869,7 @@
       "param_count": 1,
       "has_action_schema": false,
       "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 229
+      "line": 234
     },
     {
       "name": "show_display_dialog",
@@ -2818,7 +2882,7 @@
       "param_count": 3,
       "has_action_schema": false,
       "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 236
+      "line": 241
     },
     {
       "name": "capture_display_screen",
@@ -2831,7 +2895,7 @@
       "param_count": 1,
       "has_action_schema": false,
       "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 243
+      "line": 248
     },
     {
       "name": "display_window",
@@ -2841,10 +2905,10 @@
       "flags": [
         "kMutating"
       ],
-      "param_count": 10,
+      "param_count": 13,
       "has_action_schema": true,
       "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 250
+      "line": 255
     },
     {
       "name": "display_mouse",
@@ -2857,7 +2921,7 @@
       "param_count": 3,
       "has_action_schema": true,
       "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 314
+      "line": 320
     },
     {
       "name": "display_tts",
@@ -2870,7 +2934,7 @@
       "param_count": 5,
       "has_action_schema": true,
       "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 340
+      "line": 346
     },
     {
       "name": "delete_display_window",
@@ -2883,7 +2947,7 @@
       "param_count": 1,
       "has_action_schema": false,
       "source": "src/tools/domains/display/display_tools.hpp",
-      "line": 367
+      "line": 374
     },
     {
       "name": "get_docs_class",
@@ -3302,6 +3366,58 @@
       "line": 53
     },
     {
+      "name": "image_edit",
+      "category": "Resources",
+      "domain": "Image",
+      "side_effect": "None",
+      "flags": [
+        "kNone"
+      ],
+      "param_count": 13,
+      "has_action_schema": true,
+      "source": "src/tools/domains/image/image_tools.hpp",
+      "line": 95
+    },
+    {
+      "name": "image_pixel",
+      "category": "Resources",
+      "domain": "Image",
+      "side_effect": "None",
+      "flags": [
+        "kNone"
+      ],
+      "param_count": 13,
+      "has_action_schema": true,
+      "source": "src/tools/domains/image/image_tools.hpp",
+      "line": 107
+    },
+    {
+      "name": "image_save",
+      "category": "Resources",
+      "domain": "Image",
+      "side_effect": "WritesFile",
+      "flags": [
+        "kMutating"
+      ],
+      "param_count": 2,
+      "has_action_schema": true,
+      "source": "src/tools/domains/image/image_tools.hpp",
+      "line": 119
+    },
+    {
+      "name": "texture_gen",
+      "category": "Resources",
+      "domain": "Image",
+      "side_effect": "None",
+      "flags": [
+        "kNone"
+      ],
+      "param_count": 21,
+      "has_action_schema": true,
+      "source": "src/tools/domains/image/image_tools.hpp",
+      "line": 129
+    },
+    {
       "name": "get_input_state",
       "category": "Input",
       "domain": "Input",
@@ -3449,6 +3565,58 @@
       "line": 27
     },
     {
+      "name": "mesh_surface",
+      "category": "Resources",
+      "domain": "Mesh",
+      "side_effect": "None",
+      "flags": [
+        "kNone"
+      ],
+      "param_count": 20,
+      "has_action_schema": true,
+      "source": "src/tools/domains/mesh/mesh_tools.hpp",
+      "line": 90
+    },
+    {
+      "name": "mesh_inspect",
+      "category": "Resources",
+      "domain": "Mesh",
+      "side_effect": "None",
+      "flags": [
+        "kLongBlocking"
+      ],
+      "param_count": 10,
+      "has_action_schema": true,
+      "source": "src/tools/domains/mesh/mesh_tools.hpp",
+      "line": 103
+    },
+    {
+      "name": "multimesh",
+      "category": "Resources",
+      "domain": "Mesh",
+      "side_effect": "None",
+      "flags": [
+        "kNone"
+      ],
+      "param_count": 11,
+      "has_action_schema": true,
+      "source": "src/tools/domains/mesh/mesh_tools.hpp",
+      "line": 116
+    },
+    {
+      "name": "multimesh_instance",
+      "category": "Resources",
+      "domain": "Mesh",
+      "side_effect": "WritesScene",
+      "flags": [
+        "kMutating"
+      ],
+      "param_count": 2,
+      "has_action_schema": true,
+      "source": "src/tools/domains/mesh/mesh_tools.hpp",
+      "line": 128
+    },
+    {
       "name": "create_nav_2d_map",
       "category": "Navigation",
       "domain": "Nav",
@@ -3459,7 +3627,7 @@
       "param_count": 1,
       "has_action_schema": false,
       "source": "src/tools/domains/nav/nav_tools.hpp",
-      "line": 116
+      "line": 199
     },
     {
       "name": "create_nav_2d_region",
@@ -3472,20 +3640,7 @@
       "param_count": 3,
       "has_action_schema": false,
       "source": "src/tools/domains/nav/nav_tools.hpp",
-      "line": 121
-    },
-    {
-      "name": "get_nav_2d_map_path",
-      "category": "Navigation",
-      "domain": "Nav",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 5,
-      "has_action_schema": false,
-      "source": "src/tools/domains/nav/nav_tools.hpp",
-      "line": 126
+      "line": 204
     },
     {
       "name": "create_nav_2d_agent",
@@ -3498,7 +3653,7 @@
       "param_count": 5,
       "has_action_schema": false,
       "source": "src/tools/domains/nav/nav_tools.hpp",
-      "line": 131
+      "line": 209
     },
     {
       "name": "set_nav_2d_agent_velocity",
@@ -3511,7 +3666,7 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/nav/nav_tools.hpp",
-      "line": 136
+      "line": 214
     },
     {
       "name": "create_nav_3d_map",
@@ -3524,7 +3679,7 @@
       "param_count": 4,
       "has_action_schema": false,
       "source": "src/tools/domains/nav/nav_tools.hpp",
-      "line": 141
+      "line": 219
     },
     {
       "name": "set_nav_3d_map_cell_size",
@@ -3537,7 +3692,7 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/nav/nav_tools.hpp",
-      "line": 146
+      "line": 224
     },
     {
       "name": "create_nav_3d_region",
@@ -3550,7 +3705,7 @@
       "param_count": 3,
       "has_action_schema": false,
       "source": "src/tools/domains/nav/nav_tools.hpp",
-      "line": 151
+      "line": 229
     },
     {
       "name": "set_nav_3d_region_navigation_mesh",
@@ -3563,33 +3718,7 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/nav/nav_tools.hpp",
-      "line": 156
-    },
-    {
-      "name": "get_nav_3d_map_path",
-      "category": "Navigation",
-      "domain": "Nav",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 5,
-      "has_action_schema": false,
-      "source": "src/tools/domains/nav/nav_tools.hpp",
-      "line": 161
-    },
-    {
-      "name": "get_nav_3d_map_closest_point_to_segment",
-      "category": "Navigation",
-      "domain": "Nav",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 4,
-      "has_action_schema": false,
-      "source": "src/tools/domains/nav/nav_tools.hpp",
-      "line": 166
+      "line": 234
     },
     {
       "name": "create_nav_3d_agent",
@@ -3602,7 +3731,7 @@
       "param_count": 6,
       "has_action_schema": false,
       "source": "src/tools/domains/nav/nav_tools.hpp",
-      "line": 171
+      "line": 239
     },
     {
       "name": "set_nav_3d_agent_velocity",
@@ -3615,20 +3744,7 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/nav/nav_tools.hpp",
-      "line": 176
-    },
-    {
-      "name": "get_nav_3d_agent_state",
-      "category": "Navigation",
-      "domain": "Nav",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 1,
-      "has_action_schema": false,
-      "source": "src/tools/domains/nav/nav_tools.hpp",
-      "line": 181
+      "line": 244
     },
     {
       "name": "create_nav_3d_obstacle",
@@ -3641,7 +3757,46 @@
       "param_count": 4,
       "has_action_schema": false,
       "source": "src/tools/domains/nav/nav_tools.hpp",
-      "line": 186
+      "line": 249
+    },
+    {
+      "name": "nav_query",
+      "category": "Navigation",
+      "domain": "Nav",
+      "side_effect": "None",
+      "flags": [
+        "kNone"
+      ],
+      "param_count": 16,
+      "has_action_schema": false,
+      "source": "src/tools/domains/nav/nav_tools.hpp",
+      "line": 254
+    },
+    {
+      "name": "bake_navigation_mesh",
+      "category": "Navigation",
+      "domain": "Nav",
+      "side_effect": "None",
+      "flags": [
+        "kLongBlocking"
+      ],
+      "param_count": 3,
+      "has_action_schema": false,
+      "source": "src/tools/domains/nav/nav_tools.hpp",
+      "line": 299
+    },
+    {
+      "name": "astar_path",
+      "category": "Navigation",
+      "domain": "Nav",
+      "side_effect": "None",
+      "flags": [
+        "kNone"
+      ],
+      "param_count": 17,
+      "has_action_schema": true,
+      "source": "src/tools/domains/nav/nav_tools.hpp",
+      "line": 307
     },
     {
       "name": "os_process",
@@ -3667,7 +3822,7 @@
       "param_count": 2,
       "has_action_schema": true,
       "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 164
+      "line": 167
     },
     {
       "name": "os_time",
@@ -3680,7 +3835,7 @@
       "param_count": 1,
       "has_action_schema": true,
       "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 184
+      "line": 187
     },
     {
       "name": "os_system_info",
@@ -3693,7 +3848,7 @@
       "param_count": 0,
       "has_action_schema": true,
       "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 203
+      "line": 206
     },
     {
       "name": "get_os_unique_id",
@@ -3706,7 +3861,7 @@
       "param_count": 0,
       "has_action_schema": false,
       "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 222
+      "line": 231
     },
     {
       "name": "get_os_user_data_dir",
@@ -3719,7 +3874,7 @@
       "param_count": 0,
       "has_action_schema": false,
       "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 227
+      "line": 236
     },
     {
       "name": "os_file_text",
@@ -3732,7 +3887,7 @@
       "param_count": 6,
       "has_action_schema": true,
       "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 234
+      "line": 243
     },
     {
       "name": "os_file_write",
@@ -3745,7 +3900,7 @@
       "param_count": 4,
       "has_action_schema": true,
       "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 253
+      "line": 262
     },
     {
       "name": "os_file_manager",
@@ -3758,7 +3913,7 @@
       "param_count": 3,
       "has_action_schema": true,
       "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 277
+      "line": 286
     },
     {
       "name": "create_csharp_script",
@@ -3771,7 +3926,7 @@
       "param_count": 3,
       "has_action_schema": false,
       "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 294
+      "line": 303
     },
     {
       "name": "open_os_path",
@@ -3784,7 +3939,7 @@
       "param_count": 1,
       "has_action_schema": false,
       "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 299
+      "line": 308
     },
     {
       "name": "show_os_alert",
@@ -3797,7 +3952,7 @@
       "param_count": 3,
       "has_action_schema": false,
       "source": "src/tools/domains/os/os_tools.hpp",
-      "line": 304
+      "line": 313
     },
     {
       "name": "get_physics_2d_space_direct_state",
@@ -3810,46 +3965,20 @@
       "param_count": 1,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 326
+      "line": 340
     },
     {
-      "name": "intersect_physics_2d_ray",
+      "name": "physics_query",
       "category": "Physics",
       "domain": "Physics",
       "side_effect": "None",
       "flags": [
         "kNone"
       ],
-      "param_count": 8,
+      "param_count": 22,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 331
-    },
-    {
-      "name": "intersect_physics_2d_shape",
-      "category": "Physics",
-      "domain": "Physics",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 9,
-      "has_action_schema": false,
-      "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 336
-    },
-    {
-      "name": "intersect_physics_2d_point",
-      "category": "Physics",
-      "domain": "Physics",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 7,
-      "has_action_schema": false,
-      "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 341
+      "line": 345
     },
     {
       "name": "create_physics_2d_body",
@@ -3862,7 +3991,7 @@
       "param_count": 0,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 346
+      "line": 374
     },
     {
       "name": "set_physics_2d_body_mode",
@@ -3875,7 +4004,7 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 351
+      "line": 379
     },
     {
       "name": "apply_physics_2d_body_force",
@@ -3888,7 +4017,7 @@
       "param_count": 3,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 356
+      "line": 384
     },
     {
       "name": "apply_physics_2d_body_impulse",
@@ -3901,7 +4030,7 @@
       "param_count": 3,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 361
+      "line": 389
     },
     {
       "name": "set_physics_2d_body_state",
@@ -3914,7 +4043,7 @@
       "param_count": 3,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 366
+      "line": 394
     },
     {
       "name": "get_physics_2d_body_state",
@@ -3927,7 +4056,7 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 371
+      "line": 399
     },
     {
       "name": "create_physics_2d_joint",
@@ -3940,7 +4069,7 @@
       "param_count": 8,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 376
+      "line": 404
     },
     {
       "name": "create_physics_2d_area",
@@ -3953,7 +4082,7 @@
       "param_count": 0,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 381
+      "line": 409
     },
     {
       "name": "set_physics_2d_area_monitorable",
@@ -3966,7 +4095,7 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 386
+      "line": 414
     },
     {
       "name": "create_physics_2d_circle_shape",
@@ -3979,7 +4108,7 @@
       "param_count": 0,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 391
+      "line": 419
     },
     {
       "name": "set_physics_2d_shape_data",
@@ -3992,7 +4121,7 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 396
+      "line": 424
     },
     {
       "name": "get_physics_3d_space_direct_state",
@@ -4005,46 +4134,7 @@
       "param_count": 1,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 401
-    },
-    {
-      "name": "intersect_physics_3d_ray",
-      "category": "Physics",
-      "domain": "Physics",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 9,
-      "has_action_schema": false,
-      "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 406
-    },
-    {
-      "name": "intersect_physics_3d_shape",
-      "category": "Physics",
-      "domain": "Physics",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 9,
-      "has_action_schema": false,
-      "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 411
-    },
-    {
-      "name": "intersect_physics_3d_point",
-      "category": "Physics",
-      "domain": "Physics",
-      "side_effect": "None",
-      "flags": [
-        "kNone"
-      ],
-      "param_count": 7,
-      "has_action_schema": false,
-      "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 416
+      "line": 429
     },
     {
       "name": "create_physics_3d_body",
@@ -4057,7 +4147,7 @@
       "param_count": 0,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 421
+      "line": 434
     },
     {
       "name": "set_physics_3d_body_mode",
@@ -4070,7 +4160,7 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 426
+      "line": 439
     },
     {
       "name": "apply_physics_3d_body_force",
@@ -4083,7 +4173,7 @@
       "param_count": 3,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 431
+      "line": 444
     },
     {
       "name": "apply_physics_3d_body_impulse",
@@ -4096,7 +4186,7 @@
       "param_count": 3,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 436
+      "line": 449
     },
     {
       "name": "set_physics_3d_body_state",
@@ -4109,7 +4199,7 @@
       "param_count": 3,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 441
+      "line": 454
     },
     {
       "name": "get_physics_3d_body_state",
@@ -4122,7 +4212,7 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 446
+      "line": 459
     },
     {
       "name": "create_physics_3d_joint",
@@ -4135,7 +4225,7 @@
       "param_count": 9,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 451
+      "line": 464
     },
     {
       "name": "create_physics_3d_area",
@@ -4148,7 +4238,7 @@
       "param_count": 0,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 456
+      "line": 469
     },
     {
       "name": "set_physics_3d_area_monitorable",
@@ -4161,7 +4251,7 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 461
+      "line": 474
     },
     {
       "name": "apply_physics_3d_body_torque",
@@ -4174,7 +4264,7 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 466
+      "line": 479
     },
     {
       "name": "set_physics_3d_body_axis_lock",
@@ -4187,7 +4277,7 @@
       "param_count": 3,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 471
+      "line": 484
     },
     {
       "name": "add_physics_3d_body_collision_exception",
@@ -4200,7 +4290,7 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 476
+      "line": 489
     },
     {
       "name": "remove_physics_3d_body_collision_exception",
@@ -4213,7 +4303,7 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 481
+      "line": 494
     },
     {
       "name": "set_physics_3d_joint_param",
@@ -4226,7 +4316,7 @@
       "param_count": 3,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 486
+      "line": 499
     },
     {
       "name": "set_physics_3d_area_space",
@@ -4239,7 +4329,7 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 491
+      "line": 504
     },
     {
       "name": "set_physics_3d_space_solver_iterations",
@@ -4252,7 +4342,7 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 496
+      "line": 509
     },
     {
       "name": "set_physics_3d_space_solver_params",
@@ -4265,7 +4355,7 @@
       "param_count": 3,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 501
+      "line": 514
     },
     {
       "name": "create_physics_3d_soft_body",
@@ -4278,7 +4368,7 @@
       "param_count": 0,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 506
+      "line": 519
     },
     {
       "name": "set_physics_3d_soft_body_mesh",
@@ -4291,7 +4381,7 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 511
+      "line": 524
     },
     {
       "name": "create_physics_3d_sphere_shape",
@@ -4304,7 +4394,7 @@
       "param_count": 0,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 516
+      "line": 529
     },
     {
       "name": "set_physics_3d_shape_data",
@@ -4317,7 +4407,7 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 521
+      "line": 534
     },
     {
       "name": "add_physics_3d_body_shape",
@@ -4330,7 +4420,7 @@
       "param_count": 4,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 526
+      "line": 539
     },
     {
       "name": "set_physics_3d_body_param",
@@ -4343,7 +4433,7 @@
       "param_count": 3,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 531
+      "line": 544
     },
     {
       "name": "set_physics_3d_area_param",
@@ -4356,7 +4446,7 @@
       "param_count": 3,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 536
+      "line": 549
     },
     {
       "name": "set_physics_3d_space_param",
@@ -4369,7 +4459,7 @@
       "param_count": 3,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 541
+      "line": 554
     },
     {
       "name": "set_physics_3d_area_transform",
@@ -4382,7 +4472,7 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 546
+      "line": 559
     },
     {
       "name": "set_physics_3d_body_transform",
@@ -4395,7 +4485,7 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 551
+      "line": 564
     },
     {
       "name": "get_physics_node_rid",
@@ -4408,7 +4498,7 @@
       "param_count": 1,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 556
+      "line": 569
     },
     {
       "name": "get_debug_object_info",
@@ -4421,7 +4511,7 @@
       "param_count": 1,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 561
+      "line": 574
     },
     {
       "name": "set_physics_body_bundle",
@@ -4435,7 +4525,7 @@
       "param_count": 11,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 566
+      "line": 579
     },
     {
       "name": "create_collision_shape",
@@ -4450,7 +4540,7 @@
       "param_count": 3,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 571
+      "line": 584
     },
     {
       "name": "assign_collision_shape",
@@ -4465,7 +4555,7 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 576
+      "line": 589
     },
     {
       "name": "property_get",
@@ -5068,7 +5158,7 @@
       "param_count": 15,
       "has_action_schema": false,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 412
+      "line": 416
     },
     {
       "name": "edit_scene_node",
@@ -5083,7 +5173,7 @@
       "param_count": 12,
       "has_action_schema": true,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 435
+      "line": 439
     },
     {
       "name": "delete_scene_node",
@@ -5098,7 +5188,7 @@
       "param_count": 1,
       "has_action_schema": false,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 461
+      "line": 465
     },
     {
       "name": "pack_scene",
@@ -5112,7 +5202,7 @@
       "param_count": 3,
       "has_action_schema": false,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 466
+      "line": 470
     },
     {
       "name": "get_scene_tree",
@@ -5125,7 +5215,7 @@
       "param_count": 15,
       "has_action_schema": false,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 476
+      "line": 480
     },
     {
       "name": "scene_camera",
@@ -5137,10 +5227,10 @@
         "kSceneTarget",
         "kUndoable"
       ],
-      "param_count": 4,
+      "param_count": 7,
       "has_action_schema": true,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 502
+      "line": 506
     },
     {
       "name": "get_camera_view_rect",
@@ -5153,7 +5243,7 @@
       "param_count": 1,
       "has_action_schema": false,
       "source": "src/tools/domains/scene/scene_tools.hpp",
-      "line": 517
+      "line": 524
     },
     {
       "name": "game_scene_tree",
@@ -5469,10 +5559,10 @@
       "flags": [
         "kMutating"
       ],
-      "param_count": 12,
+      "param_count": 17,
       "has_action_schema": true,
       "source": "src/tools/domains/tween/tween_tools.hpp",
-      "line": 82
+      "line": 97
     },
     {
       "name": "get_game_tween_list",
@@ -5485,7 +5575,7 @@
       "param_count": 2,
       "has_action_schema": false,
       "source": "src/tools/domains/tween/tween_tools.hpp",
-      "line": 104
+      "line": 123
     },
     {
       "name": "tween_editor_property",
@@ -5495,10 +5585,10 @@
       "flags": [
         "kMutating"
       ],
-      "param_count": 7,
-      "has_action_schema": false,
+      "param_count": 13,
+      "has_action_schema": true,
       "source": "src/tools/domains/tween/tween_tools.hpp",
-      "line": 109
+      "line": 128
     }
   ],
   "meta_tools": [
@@ -5512,7 +5602,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 481
+      "line": 485
     },
     {
       "name": "get_tool_detail",
@@ -5524,7 +5614,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 530
+      "line": 534
     },
     {
       "name": "call_tool",
@@ -5536,7 +5626,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 543
+      "line": 547
     },
     {
       "name": "batch_execute",
@@ -5549,7 +5639,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 565
+      "line": 569
     },
     {
       "name": "code_execute",
@@ -5562,7 +5652,7 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 628
+      "line": 632
     }
   ],
   "system_tools": [
@@ -5576,16 +5666,23 @@
       ],
       "param_count": null,
       "source": "src/tools/base/register_all.cpp",
-      "line": 382
+      "line": 384
     }
   ],
   "side_effect_review": [
+    {
+      "name": "bake_navigation_mesh",
+      "domain": "Nav",
+      "side_effect": "None",
+      "source": "src/tools/domains/nav/nav_tools.hpp",
+      "line": 299
+    },
     {
       "name": "remove_physics_3d_body_collision_exception",
       "domain": "Physics",
       "side_effect": "None",
       "source": "src/tools/domains/physics/physics_tools.hpp",
-      "line": 481
+      "line": 494
     },
     {
       "name": "run_gdscript_tests",
