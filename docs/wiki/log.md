@@ -4,7 +4,7 @@
 
 ## 2026-11-17
 
-- **Game Jam 生成器与 e2e 抽题（`feature/gamejam-generator`，本地未提交）**：新增 `bun run gda-dev-tools jam [--theme <id> | --list] [--out <dir>] [--json]`，从 `devtools/data/gamejam/themes.json` 抽题并渲染 `devtools/templates/gamejam/brief.md`，生成 `examples/<id>/{project.godot,GAMEJAM.md}`；题库 12 个主题（4 个用户给定 + 8 个联网收录：WAVES / BUBBLE / TINY CREATURES / DEPTHS / TRISKAIDEKAPHOBIA / COUNT DOWN / MASK / TRUST NO ONE）；默认优先未用主题、冲突加后缀、显式目录不覆盖。`gda-e2e-testing` 在未给工程路径时先抽题再开发，收到路径则不抽题；新增 `gda status --project <project-dir> --json` 的工程目标校验，报告增加主题/来源与 1.1 Game Jam 六项验收。程序化测试不依赖 `jam` 抽题；生成器自身单测在临时目录覆盖。验证：`bun run typecheck` 通过，`bun test cli/tests` 36 文件 / 336 项（313 pass + 23 skip + 0 fail），`jam --list` / 生成冒烟通过。完整 e2e 需用户在 Godot 中打开新工程，未声称跑通。详见 [changelog/2026-11-17-log.md](changelog/2026-11-17-log.md)。
+- **Game Jam 生成器 v2 与 e2e 抽题（`feature/gamejam-generator`，本地未提交）**：题库升为 `schema_version: 2`、50 条，新增 `organizer` / `event` / `edition` / `year` / `source_title` / `source_kind` / `rules_url` / `verified_at` / `tags` / `design_constraints`，`source_url` 必填，官方来源优先、历史主题允许归档；每条只记录真实的设计/内容层创意约束（时间、引擎、团队、提交平台、素材授权、AI 限制等不写入）；赛事模板由用户固定维护，当前模板不渲染创意约束，约束仅保留在题库与 `jam.json`。抽题时关键词与概念灵感各自随机抽 3–5 条并打乱；`jam` 只生成 `examples/<theme_id>/project/` intake，`jam create` 再复制为 `examples/<theme_id>/<slug>-<hash8>/`，写入 `jam.json`；作品说明文档完全按 `GAMEJAM.md` 的提交要求处理，技能不额外约束。新增 `jam list [--projects]`、`jam index`、`devtools/lib/jam_projects.ts` 递归发现与 intake 跳过；`gda-e2e-testing` 改为「抽题 → 读题 → 命名 → 创建 → 按模板准备作品说明文档 → 开发 → 索引」。验证：`bun run typecheck` 通过，`bun test cli/tests` 37 文件 / 345 项（322 pass + 23 skip + 0 fail），`jam --list` 50 条与 CLI 抽题/创建/索引冒烟通过。完整 e2e 需用户在 Godot 中打开最终项目，未声称跑通。详见 [changelog/2026-11-17-log.md](changelog/2026-11-17-log.md)。
 
 ## 2026-11-16
 

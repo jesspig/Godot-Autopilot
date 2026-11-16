@@ -9,7 +9,7 @@ tags:
   - TypeScript
   - MCP
   - IPC
-timestamp: "2026-11-17T00:01:21+08:00"
+timestamp: "2026-11-17T02:19:35+08:00"
 resource:
   - cli/
   - package.json
@@ -23,9 +23,9 @@ resource:
 
 > 2026-11-16（本轮，未升版：新增 `gda docs` 离线引擎文档组 6 个子命令；技能资源收敛为 1 张入口卡 + 9 篇 references，MCP 资源 21→12；新增 docs/prune 系列全局选项。命令数以 `cli/src/commands/index.ts` 的 22 个顶层命令为准；CLI 源码 54 个 .ts、测试 38 个 .ts（36 个测试文件），运行期项数以 `bun test cli/tests` 实测为准。）
 >
-> 2026-11-17（Game Jam 生成器单测：新增 `cli/tests/jam.test.ts`；`tests/` 38 个 .ts（36 个测试文件），运行期 336 项（313 pass + 23 skip）；CLI 源码 54 个 .ts 不变）
+> 2026-11-17（Game Jam 生成器 v2 单测：新增 `cli/tests/jam.test.ts`、`cli/tests/jam_projects.test.ts`；`tests/` 39 个 .ts（37 个测试文件），运行期 345 项（322 pass + 23 skip）；CLI 源码 54 个 .ts 不变）
 >
-> 覆盖范围：`cli/` 全部（`bin/gda.ts` 入口、`src/` 54 个 .ts（含 `src/mcp/` 协议客户端、`src/ipc/` 本机通道、`src/commands/` 22 个）、`tests/` 36 个测试文件）+ 根 [`package.json`](../../../package.json) 与 [`bun.lock`](../../../bun.lock)。CLI 是技能书调用阶梯的第二级（原生 MCP → **GDA CLI** → 手动兜底），定位与分发见下文。
+> 覆盖范围：`cli/` 全部（`bin/gda.ts` 入口、`src/` 54 个 .ts（含 `src/mcp/` 协议客户端、`src/ipc/` 本机通道、`src/commands/` 22 个）、`tests/` 37 个测试文件）+ 根 [`package.json`](../../../package.json) 与 [`bun.lock`](../../../bun.lock)。CLI 是技能书调用阶梯的第二级（原生 MCP → **GDA CLI** → 手动兜底），定位与分发见下文。
 
 ## 定位与分发
 
