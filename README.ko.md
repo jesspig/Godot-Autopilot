@@ -133,10 +133,6 @@ gda ping
 - [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md) — 전체 CLI 레퍼런스.
 - [tests/README.md](tests/README.md) — 테스트 구성과 명령.
 
-## 에셋 출처
-
-`examples/` 아래의 샘플 프로젝트 5개(2D/3D 입문 튜토리얼, UI 컨트롤 갤러리, 뷰포트 구성, 네트워크 Pong)는 공식 [Godot 데모 프로젝트](https://github.com/godotengine/godot-demo-projects)에서 가져왔으며, 테스트를 위해 에셋과 정리된 프로젝트 설정만 유지했습니다. 여섯 번째 프로젝트인 `examples/pink_man_adventure`는 과거 `Example/` 데모 프로젝트에서 복원한 저장소 내 예제로, 173개의 PNG 에셋은 Pixel Frog의 Pixel Adventure 1(CC0 1.0)에서 가져왔고 설계 문서는 이 저장소의 오리지널입니다. 저작권과 라이선스 세부 정보는 각 프로젝트의 README와 LICENSE 파일에 있습니다.
-
 ## 라이선스
 
 MIT

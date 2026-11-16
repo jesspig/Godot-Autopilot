@@ -133,10 +133,6 @@ gda ping
 - [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md) — CLI の完全なリファレンス。
 - [tests/README.md](tests/README.md) — テストの構成とコマンド。
 
-## アセットの帰属
-
-`examples/` 配下の5つのサンプルプロジェクト（2D／3D 初心者向けチュートリアル、UIコントロールギャラリー、ビューポート合成、ネットワーク対戦 Pong）は、公式の [Godot デモプロジェクト](https://github.com/godotengine/godot-demo-projects) に由来します。テスト用に、各プロジェクトのアセットとクリーンなプロジェクト設定のみを残しています。6つ目のプロジェクト `examples/pink_man_adventure` は、過去の `Example/` デモプロジェクトから復元されたリポジトリ内のサンプルです。173枚の PNG アセットは Pixel Frog の Pixel Adventure 1（CC0 1.0）に由来し、設計ドキュメントはこのリポジトリのオリジナルです。著作権とライセンスの詳細は、各プロジェクトの README と LICENSE ファイルに記載されています。
-
 ## ライセンス
 
 MIT

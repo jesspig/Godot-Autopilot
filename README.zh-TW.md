@@ -133,10 +133,6 @@ gda ping
 - [docs/wiki/modules/cli.md](docs/wiki/modules/cli.md)——完整 CLI 參考。
 - [tests/README.md](tests/README.md)——測試結構與命令。
 
-## 素材聲明
-
-`examples/` 下的 5 個範例專案（2D/3D 入門教學、UI 控制項展示、視埠合成、連線 Pong）來自官方 [Godot 示範專案集](https://github.com/godotengine/godot-demo-projects)，僅保留其素材與乾淨的專案設定供測試使用。第六個專案 `examples/pink_man_adventure` 是從歷史上的 `Example/` 示範專案還原的倉庫內範例：其 173 個 PNG 素材來自 Pixel Frog 的 Pixel Adventure 1（CC0 1.0），設計文件則為本倉庫原創。版權與授權細節見各專案的 README 與 LICENSE 檔案。
-
 ## 授權
 
 MIT
